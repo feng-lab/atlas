@@ -2,6 +2,10 @@
 *.dylib
 *.a
 *.o
+*.tar.gz
+*.zip
+*.tar.bz2
+*.rar
 *~
 
 # slickedit file
