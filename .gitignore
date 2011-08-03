@@ -1,0 +1,20 @@
+*.bak
+*.dylib
+*.a
+*.o
+*~
+
+# slickedit file
+*.vtg
+*.vpwhistu
+*.vpj
+*.vpw
+
+# binary file
+obj/
+bin/
+obj64/
+release/
+lib/
+gui-build-desktop/
+
