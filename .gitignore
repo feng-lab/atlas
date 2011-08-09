@@ -19,5 +19,6 @@ obj/
 bin/
 obj64/
 release/
+genelib/src/*.c
 gui-build-desktop/
 
