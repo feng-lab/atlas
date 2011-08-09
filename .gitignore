@@ -19,6 +19,6 @@ obj/
 bin/
 obj64/
 release/
-/neurolibi/lib/genelib/src/*.c
+/neurolabi/lib/genelib/src/*.c
 gui-build-desktop/
 
