@@ -20,5 +20,7 @@ bin/
 obj64/
 release/
 /neurolabi/lib/genelib/src/*.c
+/neurolabi/c/config.log
+/neurolabi/lib/genelib/src/config.log
 gui-build-desktop/
 
