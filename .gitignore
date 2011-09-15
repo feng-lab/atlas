@@ -11,6 +11,7 @@
 # slickedit file
 *.vtg
 *.vpwhistu
+*.vpwhist
 *.vpj
 *.vpw
 
