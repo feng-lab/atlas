@@ -17,6 +17,11 @@
 *.vpj
 *.vpw
 
+# eclipse file
+.cproject
+.project
+/neurolabi/c/.settings/
+
 # binary file
 obj/*.*
 bin/*.*
