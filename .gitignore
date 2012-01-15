@@ -20,6 +20,8 @@
 # eclipse file
 .cproject
 .project
+*.sublime-project
+*.sublime-workspace
 /neurolabi/c/.settings/
 
 # binary file
