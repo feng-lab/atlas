@@ -11,19 +11,7 @@
 *.pro.user*
 .DS_Store
 
-# slickedit file
-*.vtg
-*.vpwhistu
-*.vpwhist
-*.vpj
-*.vpw
-
-# eclipse file
-.cproject
-.project
-*.sublime-project
-*.sublime-workspace
-/neurolabi/c/.settings/
+# qtcreator c project file
 /neurolabi/c/clib.*
 
 # binary file
