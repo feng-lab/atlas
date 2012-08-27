@@ -24,6 +24,7 @@
 *.sublime-project
 *.sublime-workspace
 /neurolabi/c/.settings/
+/neurolabi/c/nbproject/
 
 # binary file
 obj/*.*
