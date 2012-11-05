@@ -16,6 +16,9 @@
 # qtcreator c project file
 /neurolabi/c/clib.*
 
+# data file
+/neurolabi/data/
+
 # binary file
 obj/*.*
 bin/*.*
