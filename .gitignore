@@ -30,6 +30,7 @@ release/*.*
 /neurolabi/lib/genelib/src/config.log
 *-build-desktop-Qt*/
 gui-build-Desktop-*/
+build-gui-Desktop-*/
 
 
 /neurolabi/gui/gui.pro.user*
