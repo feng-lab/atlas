@@ -31,6 +31,10 @@ release/*.*
 *-build-desktop-Qt*/
 gui-build-Desktop-*/
 build-gui-Desktop-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+/neurolabi/lib/genelib/src/Makefile
 
 
 /neurolabi/gui/gui.pro.user*
