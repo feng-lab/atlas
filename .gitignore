@@ -5,6 +5,7 @@
 *.la
 *.lai
 *.o
+*.lib
 *.tar.gz
 *.zip
 *.tar.bz2
