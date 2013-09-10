@@ -22,8 +22,11 @@
 # data file
 /neurolabi/data/
 
+# config file
+/neurolabi/gui/img/3rdparty/libjpeg-turbo/config.h
+/neurolabi/gui/img/3rdparty/libjpeg-turbo/jconfig.h
+
 # binary file
-/**/libjpeg-turbo/lib/
 obj/*.*
 bin/*.*
 obj64/*.*
