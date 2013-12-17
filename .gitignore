@@ -45,7 +45,18 @@ CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
 /neurolabi/lib/genelib/src/Makefile
-
+neuTube.app/
+neurolabi/build/
+neurolabi/lib/fftw-3.3.2/
+neurolabi/lib/fftw3/
+neurolabi/lib/hdf5-1.8.12/
+neurolabi/lib/hdf5/
+neurolabi/lib/jansson-2.5/
+neurolabi/lib/jansson/
+neurolabi/lib/libpng-1.6.7/
+neurolabi/lib/libxml2-2.9.1/
+neurolabi/lib/png/
+neurolabi/lib/xml/
 
 /neurolabi/gui/gui.pro.user*
 /neurolabi/c/c_lib.creator.user*
