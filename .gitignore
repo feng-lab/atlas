@@ -24,8 +24,8 @@
 /neurolabi/data/
 
 # config file
-/neurolabi/gui/img/3rdparty/libjpeg-turbo/config.h
-/neurolabi/gui/img/3rdparty/libjpeg-turbo/jconfig.h
+/neurolabi/atlas/3rdparty/libjpeg-turbo/config.h
+/neurolabi/atlas/3rdparty/libjpeg-turbo/jconfig.h
 
 # binary file
 obj/*.*
@@ -41,6 +41,8 @@ gui-build-Desktop-*/
 gui-build-Desktop*-*/
 build-gui-Desktop-*/
 build-gui-Desktop*-*/
+build-atlas-Desktop-*/
+build-atlas-Desktop*-*/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
