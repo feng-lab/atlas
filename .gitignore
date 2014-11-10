@@ -8,6 +8,7 @@
 *.lib
 *.tar.gz
 *.zip
+*.tar
 *.tar.bz2
 *.rar
 *~
@@ -155,3 +156,9 @@ neurolabi/lib/Mingw/64/
 /neurolabi/c/tz_unipointer_linked_list.h
 /neurolabi/c/tz_voxel_linked_list.c
 /neurolabi/c/tz_voxel_linked_list.h
+
+#
+/neurolabi/cpp/lib/CMakeLists.txt
+/neurolabi/cpp/lib/build/
+/neurolabi/python/CMakeParser.pyc
+/neurolabi/python/QMakeParser.pyc
