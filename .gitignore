@@ -25,8 +25,7 @@
 /neurolabi/data/
 
 # config file
-/neurolabi/atlas/3rdparty/libjpeg-turbo/config.h
-/neurolabi/atlas/3rdparty/libjpeg-turbo/jconfig.h
+/neurolabi/atlas/3rdparty/libjpeg-turbo/
 
 # binary file
 obj/
