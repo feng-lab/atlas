@@ -26,6 +26,7 @@
 
 # config file
 /neurolabi/atlas/3rdparty/libjpeg-turbo/
+/neurolabi/atlas/3rdparty/glbinding/share/
 
 # binary file
 obj/
