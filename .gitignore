@@ -52,6 +52,8 @@ build-gui-Desktop-*/
 build-gui-Desktop*-*/
 build-atlas-Desktop-*/
 build-atlas-Desktop*-*/
+build-img-Desktop-*/
+build-img-Desktop*-*/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
