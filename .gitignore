@@ -37,6 +37,7 @@
 /neurolabi/atlas/3rdparty/libpng/
 /neurolabi/atlas/3rdparty/jxrlib/
 /neurolabi/atlas/3rdparty/opencv/
+/neurolabi/atlas/3rdparty/ospray/
 
 # binary file
 obj/
