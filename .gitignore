@@ -38,6 +38,10 @@
 /neurolabi/atlas/3rdparty/jxrlib/
 /neurolabi/atlas/3rdparty/opencv/
 /neurolabi/atlas/3rdparty/ospray/
+/neurolabi/atlas/3rdparty/boost/
+/neurolabi/atlas/3rdparty/eigen/
+/neurolabi/atlas/3rdparty/glm/
+ffmpeg
 
 # binary file
 obj/
