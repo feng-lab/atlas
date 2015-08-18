@@ -1,14 +1,14 @@
 #!/bin/sh
 
-DIR="$( cd -P "$( dirname "$0" )" && pwd )"
-cd $DIR
+currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
+cd $currDIR
 
-DIRECTORY="../../atlas-build-Desktop-Release/atlas"
+DIRECTORY="../atlas-build-Desktop-Release/atlas"
 
 if [[ -d "$DIRECTORY" && ! -L "$DIRECTORY" ]] ; then
     cd $DIRECTORY
 else
-    DIRECTORY="../../build-atlas-Desktop-Release/atlas"
+    DIRECTORY="../build-atlas-Desktop-Release/atlas"
 	if [[ -d "$DIRECTORY" && ! -L "$DIRECTORY" ]] ; then
     	cd $DIRECTORY
     else
