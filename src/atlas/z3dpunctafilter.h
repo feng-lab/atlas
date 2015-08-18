@@ -1,0 +1,118 @@
+#ifndef Z3DPUNCTAFILTER1_H
+#define Z3DPUNCTAFILTER1_H
+
+#include <QObject>
+#include "z3dgeometryfilter.h"
+#include "zoptionparameter.h"
+#include <map>
+#include <QString>
+#include <QPoint>
+#include <vector>
+#include "zwidgetsgroup.h"
+#include "zcolormap.h"
+#include "znumericparameter.h"
+#include "z3dsphererenderer.h"
+#include "zeventlistenerparameter.h"
+#include "zpuncta.h"
+
+namespace nim {
+
+class Z3DPunctaFilter : public Z3DGeometryFilter
+{
+  Q_OBJECT
+public:
+  explicit Z3DPunctaFilter(Z3DGlobalParameters &globalParas, QObject *parent = nullptr);
+  virtual ~Z3DPunctaFilter();
+
+  void setVisible(bool v) { m_visible.set(v); }
+
+  void setData(ZPuncta &puncta);
+  inline void setSelectedPuncta(std::set<ZPunctum*> *list) { m_selectedPuncta = list; }
+
+  virtual bool isReady(Z3DEye eye) const override;
+
+  ZWidgetsGroup *widgetsGroup();
+
+  inline void setColorMode(const std::string &mode)
+  {
+    m_colorMode.select(mode.c_str());
+  }
+
+  virtual void renderOpaque(Z3DEye eye) override;
+  virtual void renderTransparent(Z3DEye eye) override;
+
+signals:
+  void punctumSelected(ZPunctum*, bool append);
+
+protected slots:
+  void prepareColor();
+  void adjustWidgets();
+  void changePunctaSize();
+  void selectPuncta(QMouseEvent *e, int w, int h);
+
+  void updateData();
+
+protected:
+  virtual void process(Z3DEye) override;
+
+  virtual void renderPicking(Z3DEye eye) override;
+
+  virtual void registerPickingObjects() override;
+  virtual void deregisterPickingObjects() override;
+
+  void prepareData();
+
+  // result should has at least 6 elements
+  void punctumBound(const ZPunctum &p, std::vector<double> &result) const;
+
+  // result should has at least 6 elements
+  void notTransformedPunctumBound(const ZPunctum &p, std::vector<double> &result) const;
+
+  //virtual void updateAxisAlignedBoundBoxImpl() override;
+  virtual void updateNotTransformedBoundBoxImpl() override;
+  virtual void addSelectionLines() override;
+
+private:
+  // get visible data from origPunctaList put into punctaList
+  void getVisibleData();
+
+public slots:
+  void updatePunctumVisibleState();
+
+private:
+  Z3DSphereRenderer m_sphereRenderer;
+
+  ZBoolParameter m_visible;
+  ZStringIntOptionParameter m_colorMode;
+  ZVec4Parameter m_singleColorForAllPuncta;
+  ZColorMapParameter m_colorMapScore;
+  ZColorMapParameter m_colorMapMeanIntensity;
+  ZColorMapParameter m_colorMapMaxIntensity;
+  ZBoolParameter m_useSameSizeForAllPuncta;
+
+  //std::map<QString, size_t> m_sourceColorMapper;   // should use unordered_map
+  // puncta list used for rendering, it is a subset of m_origPunctaList. Some puncta are
+  // hidden because they are unchecked from the object model. This allows us to control
+  // the visibility of each single punctum.
+  std::vector<ZPunctum*> m_punctaList;
+  std::vector<ZPunctum*> m_registeredPunctaList;    // used for picking
+
+  ZEventListenerParameter m_selectPunctumEvent;
+  glm::ivec2 m_startCoord;
+  ZPunctum *m_pressedPunctum;
+  std::set<ZPunctum*> *m_selectedPuncta;   //point to all selected puncta, managed by other class
+
+  std::vector<glm::vec4> m_pointAndRadius;
+  std::vector<glm::vec4> m_specularAndShininess;
+  std::vector<glm::vec4> m_pointColors;
+  std::vector<glm::vec4> m_pointPickingColors;
+
+  ZWidgetsGroup *m_widgetsGroup;
+  bool m_dataIsInvalid;
+
+  ZPuncta* m_origPuncta;
+};
+
+} // namespace nim
+
+#endif // Z3DPUNCTAFILTER1_H

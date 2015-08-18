@@ -1,0 +1,28 @@
+#!/bin/bash
+
+currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
+srcDIR=$currDIR/../../../glbinding
+buildDIR=$srcDIR/../__glbinding-build
+installDIR=$currDIR/glbinding
+
+if [ -d $installDIR ]
+then
+  rm -rf $installDIR
+fi
+
+cd $srcDIR
+git pull
+
+if [ -d $buildDIR ]
+then
+  rm -rf $buildDIR
+fi
+mkdir $buildDIR
+cd $buildDIR
+
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.7 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.10.sdk -DOPTION_BUILD_STATIC=ON -DOPTION_BUILD_TESTS=OFF $srcDIR
+
+make install
+
+cd $currDIR
+rm -rf $buildDIR

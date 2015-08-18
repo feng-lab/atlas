@@ -1,0 +1,32 @@
+#!/bin/bash
+
+currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
+srcDIR=$currDIR/../../../libjpeg-turbo-1.4.1
+buildDIR=$srcDIR/../__libjpeg-turbo-build
+installDIR=$currDIR/libjpeg-turbo
+
+if [ -d $installDIR ]
+then
+  rm -rf $installDIR
+fi
+
+if [ -d $buildDIR ]
+then
+  rm -rf $buildDIR
+fi
+mkdir $buildDIR
+cd $buildDIR
+
+if [[ "$OSTYPE" == "linux-gnu" ]]; then
+    echo 'Linux'
+    sh $srcDIR/configure --host x86_64-pc-linux-gnu --enable-static --disable-shared
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    echo 'Mac'
+    sh $srcDIR/configure --host x86_64-apple-darwin NASM=$currDIR/nasm --enable-static --disable-shared CFLAGS='-mmacosx-version-min=10.7 -O3' LDFLAGS='-mmacosx-version-min=10.7'
+fi
+
+make -j4
+make install prefix=$installDIR libdir=$installDIR/lib
+
+cd $currDIR
+rm -rf $buildDIR

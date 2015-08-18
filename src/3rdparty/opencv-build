@@ -1,0 +1,42 @@
+#!/bin/bash
+
+currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
+srcDIR=$currDIR/../../../opencv
+srcContribDIR=$currDIR/../../../opencv_contrib
+buildDIR=$srcDIR/../__opencv-build
+installDIR=$currDIR/opencv
+
+if [ -d $installDIR ]
+then
+  rm -rf $installDIR
+fi
+
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  git pull
+else
+  git clone git@github.com:Itseez/opencv.git $srcDIR
+fi
+
+if [ -d $srcContribDIR ]
+then
+  cd $srcContribDIR
+  git pull
+else
+  git clone git@github.com:Itseez/opencv_contrib.git $srcContribDIR
+fi
+
+if [ -d $buildDIR ]
+then
+  rm -rf $buildDIR
+fi
+mkdir $buildDIR
+cd $buildDIR
+
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.7 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.10.sdk -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++11" -DIPPROOT="/opt/intel/ipp" -DWITH_PTHREADS_PF:BOOL="0" -DBUILD_opencv_videoio:BOOL="1" -DBUILD_SHARED_LIBS:BOOL="0" -DBUILD_opencv_python2:BOOL="0" -DBUILD_opencv_videostab:BOOL="1" -DEIGEN_INCLUDE_PATH:PATH="$currDIR/eigen" -DBUILD_opencv_world:BOOL="0" -DWITH_TBB:BOOL="1" -DWITH_VTK:BOOL="0" -DBUILD_PERF_TESTS:BOOL="0" -DWITH_PNG:BOOL="0" -DWITH_FFMPEG:BOOL="0" -DWITH_1394:BOOL="0" -DWITH_GSTREAMER:BOOL="0" -DBUILD_DOCS:BOOL="0" -DBUILD_PNG:BOOL="0" -DWITH_GPHOTO2:BOOL="0" -DBUILD_ZLIB:BOOL="0" -DWITH_CUDA:BOOL="1" -DWITH_PVAPI:BOOL="0" -DBUILD_JASPER:BOOL="0" -DOPENCV_EXTRA_MODULES_PATH:PATH="$srcContribDIR/modules" -DBUILD_TESTS:BOOL="0" -DBUILD_JPEG:BOOL="0" -DBUILD_TIFF:BOOL="0" -DWITH_LIBV4L:BOOL="0" -DWITH_GIGEAPI:BOOL="0" -DBUILD_WITH_DYNAMIC_IPP:BOOL="0" -DBUILD_opencv_video:BOOL="1" -DWITH_V4L:BOOL="0" -DWITH_WEBP:BOOL="0" -DWITH_TIFF:BOOL="0" -DBUILD_FAT_JAVA_LIB:BOOL="0" -DBUILD_OPENEXR:BOOL="0" -DWITH_CUFFT:BOOL="1" -DWITH_JPEG:BOOL="0" -DWITH_OPENEXR:BOOL="0" -DBUILD_PACKAGE:BOOL="0" -DWITH_JASPER:BOOL="0" -DBUILD_WITH_DEBUG_INFO:BOOL="0" -DBUILD_opencv_apps:BOOL="0" $srcDIR
+
+make -j4 install
+
+cd $currDIR
+rm -rf $buildDIR

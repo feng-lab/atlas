@@ -1,0 +1,99 @@
+#include "zvideoencoder.h"
+
+#include "QsLog.h"
+#include <QApplication>
+
+namespace nim {
+
+ZVideoEncoder::ZVideoEncoder(QObject *parent)
+  : QObject(parent)
+  , m_lock(false)
+{
+  m_ffmpegProcess = new QProcess(this);
+  connect(m_ffmpegProcess, SIGNAL(error(QProcess::ProcessError)),
+          this, SLOT(ffmpegError(QProcess::ProcessError)));
+  connect(m_ffmpegProcess, SIGNAL(finished(int,QProcess::ExitStatus)),
+          this, SLOT(ffmpegFinished(int,QProcess::ExitStatus)));
+  connect(m_ffmpegProcess, SIGNAL(readyReadStandardOutput()),
+          this, SLOT(logStandardOutput()));
+  connect(m_ffmpegProcess, SIGNAL(readyReadStandardError()),
+          this, SLOT(logStandardError()));
+}
+
+void ZVideoEncoder::encode(const QDir &dir, const QString &namePrefix, int fieldWidth, int framesPerSecond, const QString &outputFilename)
+{
+  if (m_ffmpegProcess->state() != QProcess::NotRunning) {
+    emit error("Encoder is already running.");
+    return;
+  }
+  QString program = QApplication::applicationDirPath() + QString("/../Resources/ffmpeg");
+  QStringList arguments;
+  arguments << "-r" << QString::number(framesPerSecond, 'f', 2) << "-i"
+            << (QString("%1/%2% 0%3d.tif").arg(dir.absolutePath()).arg(namePrefix).arg(fieldWidth).replace("% 0", "%0"))
+            << "-c:v" << "libx264" << "-crf" << "18" << "-pix_fmt" << "yuv420p"
+            << "-r" << QString::number(framesPerSecond, 'f', 2) << outputFilename;
+  LINFO() << program << arguments.join(" ");
+  m_ffmpegProcess->start(program, arguments);
+}
+
+void ZVideoEncoder::cancel()
+{
+  if (m_lock)
+    return;
+  m_lock = true;
+  blockSignals(true);
+  m_ffmpegProcess->kill();
+  m_ffmpegProcess->waitForFinished();
+  blockSignals(false);
+  emit canceled();
+  m_lock = false;
+}
+
+void ZVideoEncoder::ffmpegError(QProcess::ProcessError err)
+{
+  QString msg;
+  switch (err) {
+  case QProcess::FailedToStart:
+    msg = "Failed to Start";
+    break;
+  case QProcess::Crashed:
+    msg = "Crashed";
+    break;
+  case QProcess::Timedout:
+    msg = "Timedout";
+    break;
+  case QProcess::WriteError:
+    msg = "Write Error";
+    break;
+  case QProcess::ReadError:
+    msg = "Read Error";
+    break;
+  case QProcess::UnknownError:
+    msg = "Unknown Error";
+    break;
+  default:
+    break;
+  }
+  emit error(msg);
+}
+
+void ZVideoEncoder::ffmpegFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+  if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+    emit finished();
+  } else {
+    emit error(m_ffmpegProcess->readAllStandardError());
+  }
+}
+
+void ZVideoEncoder::logStandardError()
+{
+  LERROR() << m_ffmpegProcess->readAllStandardError();
+}
+
+void ZVideoEncoder::logStandardOutput()
+{
+  LINFO() << m_ffmpegProcess->readAllStandardOutput();
+}
+
+} // namespace nim

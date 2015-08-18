@@ -1,0 +1,392 @@
+#include "z3dmeshfilter.h"
+
+#include "zmesh.h"
+#include "zrandom.h"
+#include <QFileInfo>
+
+namespace nim {
+
+Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters &globalParas, QObject *parent)
+  : Z3DGeometryFilter(globalParas, parent)
+  , m_triangleListRenderer(m_rendererBase)
+  , m_visible("Visible", true)
+  , m_colorMode("Color Mode")
+  , m_singleColorForAllMesh("Mesh Color", glm::vec4(ZRandomInstance.randReal<float>(),
+                                                    ZRandomInstance.randReal<float>(),
+                                                    ZRandomInstance.randReal<float>(),
+                                                    1.f))
+  , m_selectMeshEvent("Select Mesh", false)
+  , m_pressedMesh(nullptr)
+  , m_selectedMeshes(nullptr)
+  , m_widgetsGroup(nullptr)
+  , m_dataIsInvalid(false)
+{
+  m_singleColorForAllMesh.setStyle("COLOR");
+  connect(&m_singleColorForAllMesh, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
+
+  // Color Mode
+  m_colorMode.addOption("Single Color");
+  m_colorMode.select("Single Color");
+
+  connect(&m_colorMode, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
+  connect(&m_colorMode, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
+
+  addParameter(m_visible);
+  addParameter(m_colorMode);
+
+  addParameter(m_singleColorForAllMesh);
+
+  m_selectMeshEvent.listenTo("select mesh", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonPress);
+  m_selectMeshEvent.listenTo("select mesh", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonRelease);
+  m_selectMeshEvent.listenTo("select mesh", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonDblClick);
+  m_selectMeshEvent.listenTo("select mesh", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonDblClick);
+  m_selectMeshEvent.listenTo("append select mesh", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonPress);
+  m_selectMeshEvent.listenTo("append select mesh", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonRelease);
+  connect(&m_selectMeshEvent, SIGNAL(mouseEventTriggered(QMouseEvent*,int,int)), this, SLOT(selectMesh(QMouseEvent*,int,int)));
+  addEventListener(m_selectMeshEvent);
+
+  adjustWidgets();
+
+  addParameter(m_triangleListRenderer.wireframeModePara());
+  addParameter(m_triangleListRenderer.wireframeColorPara());
+  m_triangleListRenderer.setColorSource("CustomColor");
+
+  connect(&m_visible, SIGNAL(valueChanged(bool)), this, SIGNAL(objVisibleChanged(bool)));
+}
+
+Z3DMeshFilter::~Z3DMeshFilter()
+{
+}
+
+void Z3DMeshFilter::process(Z3DEye)
+{
+  if (m_dataIsInvalid) {
+    prepareData();
+  }
+}
+
+void Z3DMeshFilter::setData(std::vector<ZMesh *> *meshList)
+{
+  m_origMeshList.clear();
+  if (meshList) {
+    m_origMeshList = *meshList;
+    LINFO() << className() << "Read" << m_origMeshList.size() << "meshes.";
+  }
+  getVisibleData();
+  m_dataIsInvalid = true;
+  invalidateResult();
+
+  updateBoundBox();
+}
+
+void Z3DMeshFilter::setData(QList<ZMesh *> *meshList)
+{
+  m_origMeshList.clear();
+  if (meshList) {
+    for (int i=0; i<meshList->size(); i++)
+      m_origMeshList.push_back(meshList->at(i));
+    LINFO() << className() << "Read" << m_origMeshList.size() << "meshes.";
+  }
+  getVisibleData();
+  m_dataIsInvalid = true;
+  invalidateResult();
+
+  updateBoundBox();
+}
+
+bool Z3DMeshFilter::isReady(Z3DEye eye) const
+{
+  return Z3DGeometryFilter::isReady(eye) && m_visible.get() && !m_origMeshList.empty();
+}
+
+//namespace {
+
+//bool compareParameterName(const ZParameter *p1, const ZParameter *p2)
+//{
+//  QString n1 = p1->getName().mid(5); // "Mesh "
+//  QString n2 = p2->getName().mid(5);
+//  n1.remove(n1.size()-6, 6); //" Color"
+//  n2.remove(n2.size()-6, 6);
+//  return n1.toInt() < n2.toInt();
+//}
+
+//}
+
+ZWidgetsGroup *Z3DMeshFilter::widgetsGroup()
+{
+  if (!m_widgetsGroup) {
+    m_widgetsGroup = new ZWidgetsGroup("Mesh", nullptr, 1);
+    new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
+    new ZWidgetsGroup(&m_stayOnTop, m_widgetsGroup, 1);
+    new ZWidgetsGroup(&m_colorMode, m_widgetsGroup, 1);
+    new ZWidgetsGroup(&m_singleColorForAllMesh, m_widgetsGroup, 1);
+    new ZWidgetsGroup(&m_triangleListRenderer.wireframeModePara(), m_widgetsGroup, 1);
+    new ZWidgetsGroup(&m_triangleListRenderer.wireframeColorPara(), m_widgetsGroup, 1);
+
+    std::vector<ZParameter*> paras = m_rendererBase.parameters();
+    for (size_t i=0; i<paras.size(); i++) {
+      ZParameter *para = paras[i];
+      if (para->name() == "Coord Transform")
+        new ZWidgetsGroup(para, m_widgetsGroup, 2);
+      //else if (para->name() == "Size Scale")
+        //new ZWidgetsGroup(para, m_widgetsGroup, 3);
+      //else if (para->name() == "Rendering Method")
+        //new ZWidgetsGroup(para, m_widgetsGroup, 4);
+      else if (para->name() == "Opacity")
+        new ZWidgetsGroup(para, m_widgetsGroup, 5);
+      else if (para->name() != "Size Scale")
+        new ZWidgetsGroup(para, m_widgetsGroup, 7);
+    }
+    new ZWidgetsGroup(&m_xCut, m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_yCut, m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_zCut, m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_boundBoxMode, m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_boundBoxLineWidth, m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_boundBoxLineColor, m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_selectionLineWidth, m_widgetsGroup, 7);
+    new ZWidgetsGroup(&m_selectionLineColor, m_widgetsGroup, 7);
+    new ZWidgetsGroup(&m_manipulatorSize, m_widgetsGroup, 7);
+    m_widgetsGroup->setBasicAdvancedCutoff(5);
+  }
+  return m_widgetsGroup;
+}
+
+ZWidgetsGroup *Z3DMeshFilter::widgetsGroupForAnnotationFilter()
+{
+  if (!m_widgetsGroup) {
+    m_widgetsGroup = new ZWidgetsGroup("Mesh", nullptr, 1);
+    new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
+    new ZWidgetsGroup(&m_singleColorForAllMesh, m_widgetsGroup, 1);
+    new ZWidgetsGroup(&m_triangleListRenderer.wireframeModePara(), m_widgetsGroup, 1);
+    new ZWidgetsGroup(&m_triangleListRenderer.wireframeColorPara(), m_widgetsGroup, 1);
+
+    std::vector<ZParameter*> paras = m_rendererBase.parameters();
+    for (size_t i=0; i<paras.size(); i++) {
+      ZParameter *para = paras[i];
+      if (para->name().contains("Opacity") || para->name().contains("Material"))
+        new ZWidgetsGroup(para, m_widgetsGroup, 5);
+    }
+    new ZWidgetsGroup(&m_xCut, m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_yCut, m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_zCut, m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_boundBoxMode, m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_boundBoxLineWidth, m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_boundBoxLineColor, m_widgetsGroup, 5);
+    m_widgetsGroup->setBasicAdvancedCutoff(5);
+  }
+  return m_widgetsGroup;
+}
+
+void Z3DMeshFilter::renderOpaque(Z3DEye eye)
+{
+  m_rendererBase.render(eye, m_triangleListRenderer);
+  renderBoundBox(eye);
+}
+
+void Z3DMeshFilter::renderTransparent(Z3DEye eye)
+{
+  m_rendererBase.render(eye, m_triangleListRenderer);
+  renderBoundBox(eye);
+}
+
+void Z3DMeshFilter::renderPicking(Z3DEye eye)
+{
+  if (!m_pickingObjectsRegistered)
+    registerPickingObjects();
+  m_rendererBase.renderPicking(eye, m_triangleListRenderer);
+}
+
+void Z3DMeshFilter::prepareData()
+{
+  if (!m_dataIsInvalid)
+    return;
+
+  deregisterPickingObjects();
+
+  initializeCutRange();
+  initializeRotationCenter();
+
+  m_triangleListRenderer.setData(&m_meshList);
+  prepareColor();
+  adjustWidgets();
+  m_dataIsInvalid = false;
+}
+
+void Z3DMeshFilter::registerPickingObjects()
+{
+  if (!m_pickingObjectsRegistered) {
+    for (size_t i=0; i<m_meshList.size(); i++) {
+      pickingManager().registerObject(m_meshList[i]);
+    }
+    m_registeredMeshList = m_meshList;
+    m_meshPickingColors.clear();
+    for (size_t i=0; i<m_meshList.size(); i++) {
+      glm::col4 pickingColor = pickingManager().colorOfObject(m_meshList[i]);
+      glm::vec4 fPickingColor(pickingColor[0]/255.f, pickingColor[1]/255.f, pickingColor[2]/255.f, pickingColor[3]/255.f);
+      m_meshPickingColors.push_back(fPickingColor);
+    }
+    m_triangleListRenderer.setDataPickingColors(&m_meshPickingColors);
+  }
+
+  m_pickingObjectsRegistered = true;
+}
+
+void Z3DMeshFilter::deregisterPickingObjects()
+{
+  if (m_pickingObjectsRegistered) {
+    for (size_t i=0; i<m_registeredMeshList.size(); i++) {
+      pickingManager().deregisterObject(m_registeredMeshList[i]);
+    }
+    m_registeredMeshList.clear();
+  }
+
+  m_pickingObjectsRegistered = false;
+}
+
+std::vector<double> Z3DMeshFilter::meshBound(ZMesh *p)
+{
+  std::map<ZMesh*, std::vector<double> >::const_iterator it
+      = m_meshBoundboxMapper.find(p);
+  if (it != m_meshBoundboxMapper.end()) {
+    std::vector<double> result = it->second;
+    //    result[0] *= getCoordTransform().x;
+    //    result[1] *= getCoordTransform().x;
+    //    result[2] *= getCoordTransform().y;
+    //    result[3] *= getCoordTransform().y;
+    //    result[4] *= getCoordTransform().z;
+    //    result[5] *= getCoordTransform().z;
+    return result;
+  } else {
+    std::vector<double> result = p->boundBox(coordTransform());
+    m_meshBoundboxMapper[p] = result;
+    //    result[0] *= getCoordTransform().x;
+    //    result[1] *= getCoordTransform().x;
+    //    result[2] *= getCoordTransform().y;
+    //    result[3] *= getCoordTransform().y;
+    //    result[4] *= getCoordTransform().z;
+    //    result[5] *= getCoordTransform().z;
+    return result;
+  }
+}
+
+//void Z3DMeshFilter::updateAxisAlignedBoundBoxImpl()
+//{
+//  m_meshBoundboxMapper.clear();
+//  m_axisAlignedBoundBox[0] = m_axisAlignedBoundBox[2] = m_axisAlignedBoundBox[4] = std::numeric_limits<double>::max();
+//  m_axisAlignedBoundBox[1] = m_axisAlignedBoundBox[3] = m_axisAlignedBoundBox[5] = -std::numeric_limits<double>::max();
+//  for (size_t i=0; i<m_origMeshList.size(); ++i) {
+//    std::vector<double> boundBox = getMeshBound(m_origMeshList[i]);
+//    m_axisAlignedBoundBox[0] = std::min(boundBox[0], m_axisAlignedBoundBox[0]);
+//    m_axisAlignedBoundBox[1] = std::max(boundBox[1], m_axisAlignedBoundBox[1]);
+//    m_axisAlignedBoundBox[2] = std::min(boundBox[2], m_axisAlignedBoundBox[2]);
+//    m_axisAlignedBoundBox[3] = std::max(boundBox[3], m_axisAlignedBoundBox[3]);
+//    m_axisAlignedBoundBox[4] = std::min(boundBox[4], m_axisAlignedBoundBox[4]);
+//    m_axisAlignedBoundBox[5] = std::max(boundBox[5], m_axisAlignedBoundBox[5]);
+//  }
+//}
+
+void Z3DMeshFilter::updateNotTransformedBoundBoxImpl()
+{
+  m_notTransformedBoundBox[0] = m_notTransformedBoundBox[2] = m_notTransformedBoundBox[4] = std::numeric_limits<double>::max();
+  m_notTransformedBoundBox[1] = m_notTransformedBoundBox[3] = m_notTransformedBoundBox[5] = -std::numeric_limits<double>::max();
+  for (size_t i=0; i<m_origMeshList.size(); ++i) {
+    std::vector<double> boundBox = m_origMeshList[i]->boundBox();
+    m_notTransformedBoundBox[0] = std::min(boundBox[0], m_notTransformedBoundBox[0]);
+    m_notTransformedBoundBox[1] = std::max(boundBox[1], m_notTransformedBoundBox[1]);
+    m_notTransformedBoundBox[2] = std::min(boundBox[2], m_notTransformedBoundBox[2]);
+    m_notTransformedBoundBox[3] = std::max(boundBox[3], m_notTransformedBoundBox[3]);
+    m_notTransformedBoundBox[4] = std::min(boundBox[4], m_notTransformedBoundBox[4]);
+    m_notTransformedBoundBox[5] = std::max(boundBox[5], m_notTransformedBoundBox[5]);
+  }
+}
+
+void Z3DMeshFilter::prepareColor()
+{
+  m_meshColors.clear();
+
+  if (m_colorMode.isSelected("Single Color")) {
+    for (size_t i=0; i<m_meshList.size(); i++) {
+      m_meshColors.push_back(m_singleColorForAllMesh.get());
+    }
+  }
+
+  m_triangleListRenderer.setDataColors(&m_meshColors);
+}
+
+void Z3DMeshFilter::adjustWidgets()
+{
+  if (m_colorMode.isSelected("Single Color"))
+    m_singleColorForAllMesh.setVisible(true);
+  else
+    m_singleColorForAllMesh.setVisible(false);
+}
+
+void Z3DMeshFilter::selectMesh(QMouseEvent *e, int , int h)
+{
+  if (m_meshList.empty())
+    return;
+
+  e->ignore();
+  if (e->type() == QEvent::MouseButtonDblClick) {
+    const void* obj = pickingManager().objectAtWidgetPos(
+          glm::ivec2(e->x(), e->y()));
+    bool appending = (e->modifiers() == Qt::ControlModifier);
+    if (!obj && !appending && m_isSelected) {
+      emit objDeselected();
+      return;
+    }
+    bool hit = std::find(m_meshList.begin(), m_meshList.end(), (ZMesh*)obj) != m_meshList.end();
+    if (hit) {
+      emit objSelected(appending);
+      e->accept();
+    }
+    return;
+  }
+
+  e->ignore();
+  // Mouse button pressend
+  // can not accept the event in button press, because we don't know if it is a selection or interaction
+  if (e->type() == QEvent::MouseButtonPress) {
+    m_startCoord.x = e->x();
+    m_startCoord.y = e->y();
+    const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->x(), e->y()));
+    if (!obj) {
+      return;
+    }
+
+    // Check if any point was selected...
+    for (std::vector<ZMesh*>::iterator it=m_meshList.begin(); it!=m_meshList.end(); ++it)
+      if (*it == obj) {
+        m_pressedMesh = *it;
+        break;
+      }
+    return;
+  }
+
+  if (e->type() == QEvent::MouseButtonRelease) {
+    if (std::abs(e->x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->y()) < 2) {
+      if (e->modifiers() == Qt::ControlModifier)
+        emit meshSelected(m_pressedMesh, true);
+      else
+        emit meshSelected(m_pressedMesh, false);
+      if (m_pressedMesh)
+        e->accept();
+    }
+    m_pressedMesh = nullptr;
+  }
+}
+
+void Z3DMeshFilter::updateMeshVisibleState()
+{
+  getVisibleData();
+  m_dataIsInvalid = true;
+  invalidateResult();
+}
+
+void Z3DMeshFilter::getVisibleData()
+{
+  m_meshList = m_origMeshList;
+}
+
+} // namespace nim
+

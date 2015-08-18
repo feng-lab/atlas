@@ -1,0 +1,359 @@
+#include "z2danimationdoc.h"
+
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QSettings>
+#include <QApplication>
+#include <QIcon>
+#include <set>
+#include "zexception.h"
+#include <cassert>
+#include "zanimationwidget.h"
+#include "QsLog.h"
+#include "zview.h"
+
+namespace nim {
+
+Z2DAnimationDoc::Z2DAnimationDoc(ZDoc &doc)
+  : ZObjDoc(doc), m_view(nullptr)
+{
+  createActions();
+}
+
+Z2DAnimationDoc::~Z2DAnimationDoc()
+{
+  std::set<AnimationPack*> packs;
+  for (std::map<size_t, AnimationPack*>::iterator it = m_idToAnimationPacks.begin();
+       it != m_idToAnimationPacks.end(); ++it) {
+    packs.insert(it->second);
+  }
+  qDeleteAll(packs.begin(), packs.end());
+}
+
+void Z2DAnimationDoc::bindView(ZView *v)
+{
+  m_view = v;
+  connect(m_view, SIGNAL(destroyed()), this, SLOT(releaseView()));
+  for (std::map<size_t, AnimationPack*>::iterator it = m_idToAnimationPacks.begin();
+       it != m_idToAnimationPacks.end(); ++it) {
+    it->second->animation->bindView(m_view);
+  }
+}
+
+void Z2DAnimationDoc::createNewAnimation(const QString &name)
+{
+  Z2DAnimation *animation = new Z2DAnimation(m_doc, this);
+  addAnimation(animation, "", name);
+  animation->addKeyFrame(0);
+}
+
+bool Z2DAnimationDoc::save(size_t id)
+{
+  if (!objHasUnsavedChange(id))
+    return true;
+
+  AnimationPack* pack = m_idToAnimationPacks.at(id);
+  if (pack->path.endsWith(".animation2d", Qt::CaseInsensitive)) {
+    QString err;
+    if (saveAnimation(pack, pack->path, err)) {
+      m_doc.updateObjInfo(id);
+      return true;
+    } else {
+      QMessageBox::critical(QApplication::activeWindow(), "Save Error", err);
+      return false;
+    }
+  } else {
+    return saveAs(id);
+  }
+}
+
+bool Z2DAnimationDoc::saveAs(size_t id)
+{
+  QStringList filters;
+  filters << "Animation files (*.animation2d)";
+
+  QFileDialog dialog(QApplication::activeWindow());
+  dialog.setAcceptMode(QFileDialog::AcceptSave);
+  dialog.setFileMode(QFileDialog::AnyFile);
+  dialog.setNameFilters(filters);
+  dialog.setDirectory(lastOpenedObjPath());
+  dialog.setWindowTitle(tr("Save 2D Animation %1 As").arg(objName(id)));
+  if (dialog.exec()) {
+    QString err;
+    AnimationPack* pack = m_idToAnimationPacks.at(id);
+    if (saveAnimation(pack, dialog.selectedFiles().at(0), err)) {
+      m_doc.updateObjInfo(id);
+      return true;
+    } else {
+      QMessageBox::critical(QApplication::activeWindow(), "Save As Error", err);
+    }
+  }
+  return false;
+}
+
+bool Z2DAnimationDoc::canReadFile(const QString &fileName)
+{
+  return fileName.endsWith(".animation2d", Qt::CaseInsensitive);
+}
+
+size_t Z2DAnimationDoc::loadFile(const QString &fileName, QString &errorMsg)
+{
+  for (std::map<size_t, AnimationPack*>::iterator it = m_idToAnimationPacks.begin();
+       it != m_idToAnimationPacks.end(); ++it) {
+    if (it->second->path == fileName)
+      return it->first;
+  }
+  size_t id;
+  Z2DAnimation *animation = nullptr;
+  try {
+    animation = new Z2DAnimation(m_doc);
+    animation->load(fileName);
+    id = addAnimation(animation, fileName);
+    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    setLastOpenedObjPath(fileName);
+    return id;
+  }
+  catch (const ZException & e) {
+    delete animation;
+    errorMsg = e.what();
+    return 0;
+  }
+}
+
+size_t Z2DAnimationDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
+{
+  if (!jValue.isString() || jValue.toString().trimmed().isEmpty()) {
+    errorMsg = QString("File path is not string or is empty");
+    return 0;
+  }
+  for (std::map<size_t, AnimationPack*>::iterator it = m_idToAnimationPacks.begin();
+       it != m_idToAnimationPacks.end(); ++it) {
+    if (isSameObj(jValue, jsonValue(it->first)))
+      return it->first;
+  }
+  size_t id;
+  QString fileName = jValue.toString();
+  Z2DAnimation *animation = nullptr;
+  try {
+    animation = new Z2DAnimation(m_doc);
+    animation->load(fileName);
+    id = addAnimation(animation, fileName);
+    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    setLastOpenedObjPath(fileName);
+    return id;
+  }
+  catch (const ZException & e) {
+    delete animation;
+    errorMsg = e.what();
+    return 0;
+  }
+}
+
+QList<QAction *> Z2DAnimationDoc::loadFileActions() const
+{
+  QList<QAction*> res;
+  res.push_back(m_loadAnimationsAction);
+  return res;
+}
+
+void Z2DAnimationDoc::removeObj(size_t id)
+{
+  std::map<size_t, AnimationPack*>::iterator it = m_idToAnimationPacks.find(id);
+  m_doc.undoGroup()->removeStack(objUndoStack(id));
+  emit objAboutToBeRemoved(it->first, this);
+  if (!isAlias(id))
+    delete it->second;
+  m_idToAnimationPacks.erase(it);
+  emit objRemoved(id, this);
+}
+
+const QString &Z2DAnimationDoc::objName(size_t id) const
+{
+  return m_idToAnimationPacks.at(id)->name();
+}
+
+QString Z2DAnimationDoc::objPath(size_t id) const
+{
+  return m_idToAnimationPacks.at(id)->path;
+}
+
+bool Z2DAnimationDoc::objHasUnsavedChange(size_t id) const
+{
+  return m_idToAnimationPacks.at(id)->hasUnsavedChange;
+}
+
+const QString &Z2DAnimationDoc::objInfo(size_t id) const
+{
+  return m_idToAnimationPacks.at(id)->info();
+}
+
+const QString &Z2DAnimationDoc::objTooltip(size_t id) const
+{
+  return m_idToAnimationPacks.at(id)->tooltip();
+}
+
+QUndoStack *Z2DAnimationDoc::objUndoStack(size_t id)
+{
+  return m_idToAnimationPacks.at(id)->animation->undoStack();
+}
+
+QJsonValue Z2DAnimationDoc::jsonValue(size_t id) const
+{
+  return QJsonValue(m_idToAnimationPacks.at(id)->path);
+}
+
+bool Z2DAnimationDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
+{
+  assert(v1.isString() && v2.isString());
+  if (v1 == v2)
+    return true;
+  QString f1 = v1.toString();
+  QString f2 = v2.toString();
+  if (!QFile::exists(f1) || !QFile::exists(f2))
+    return false;
+  return QFileInfo(f1).canonicalFilePath() == QFileInfo(f2).canonicalFilePath();
+}
+
+size_t Z2DAnimationDoc::makeAlias(size_t)
+{
+  return 0;
+}
+
+bool Z2DAnimationDoc::isAlias(size_t id) const
+{
+  assert(m_idToAnimationPacks.find(id) != m_idToAnimationPacks.end());
+
+  AnimationPack* pack = m_idToAnimationPacks.at(id);
+  for (std::map<size_t, AnimationPack*>::const_iterator it = m_idToAnimationPacks.begin();
+       it != m_idToAnimationPacks.end(); ++it) {
+    if (it->first != id && it->second == pack)
+      return true;
+  }
+  return false;
+}
+
+QWidget *Z2DAnimationDoc::createObjEditWidget(size_t id)
+{
+  assert(m_idToAnimationPacks.find(id) != m_idToAnimationPacks.end());
+
+  AnimationPack* pack = m_idToAnimationPacks.at(id);
+  return new ZAnimationWidget(*pack->animation);
+}
+
+void Z2DAnimationDoc::loadAnimation()
+{
+  QFileDialog dialog(QApplication::activeWindow());
+  dialog.setFileMode(QFileDialog::ExistingFiles);
+  dialog.setNameFilter("*.animation2d");
+  dialog.setDirectory(lastOpenedObjPath());
+  dialog.setWindowTitle("Load 2D Animation File");
+  if (dialog.exec()) {
+    QString errorMsg;
+    //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+    for (int i=0; i<dialog.selectedFiles().size(); ++i) {
+      if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
+        QMessageBox::critical(QApplication::activeWindow(), tr("Can not read Animation"),
+                              errorMsg);
+      }
+    }
+  }
+}
+
+void Z2DAnimationDoc::setModified()
+{
+  Z2DAnimation *animation = qobject_cast<Z2DAnimation*>(sender());
+  if (animation) {
+    for(std::map<size_t, AnimationPack*>::iterator it = m_idToAnimationPacks.begin();
+        it != m_idToAnimationPacks.end(); ++it) {
+      if (it->second->animation == animation) {
+        it->second->updateDerivedData();
+        it->second->hasUnsavedChange = true;
+        m_doc.updateObjInfo(it->first);
+        return;
+      }
+    }
+  }
+}
+
+void Z2DAnimationDoc::releaseView()
+{
+  for (std::map<size_t, AnimationPack*>::iterator it = m_idToAnimationPacks.begin();
+       it != m_idToAnimationPacks.end(); ++it) {
+    it->second->animation->releaseView();
+  }
+  m_view = nullptr;
+}
+
+size_t Z2DAnimationDoc::addAnimation(Z2DAnimation *animation, const QString &path, const QString &name)
+{
+  size_t id = m_doc.getNewObjId();
+  m_idToAnimationPacks[id] = new AnimationPack(animation, path, name);
+  m_doc.registerNewObj(id, this);
+  m_doc.undoGroup()->addStack(animation->undoStack());
+  animation->bindView(m_view);
+
+  emit objAdded(id, this);
+  connect(animation, SIGNAL(durationChanged(double)), this, SLOT(setModified()));
+  connect(animation, SIGNAL(keyChanged()), this, SLOT(setModified()));
+  connect(animation, SIGNAL(objChanged()), this, SLOT(setModified()));
+  connect(animation, SIGNAL(keyChanged(ZParameterKey*)), this, SLOT(setModified()));
+  connect(animation, SIGNAL(colorChanged(ZParameterAnimation*)), this, SLOT(setModified()));
+  return id;
+}
+
+Z2DAnimationDoc::AnimationPack::AnimationPack(Z2DAnimation *animationIn, const QString &path, const QString &name)
+  : path(QFileInfo(path).canonicalFilePath()), hasUnsavedChange(false), m_tmpName(name)
+{
+  animation = animationIn;
+  if (path.isEmpty()) {
+    hasUnsavedChange = true;
+  }
+  updateDerivedData();
+}
+
+Z2DAnimationDoc::AnimationPack::~AnimationPack()
+{
+  delete animation;
+}
+
+void Z2DAnimationDoc::AnimationPack::updateDerivedData()
+{
+  m_info.clear();
+  m_name = path.isEmpty() ? m_tmpName : QFileInfo(path).fileName();
+  m_tooltip = path;
+}
+
+const QString &Z2DAnimationDoc::AnimationPack::info() const
+{
+  if (m_info.isEmpty()) {
+    m_info = QString("%1 secs").arg(animation->duration());
+  }
+  return m_info;
+}
+
+void Z2DAnimationDoc::createActions()
+{
+  m_loadAnimationsAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load 2D Animations..."), this);
+  m_loadAnimationsAction->setStatusTip(tr("Load one or more existing Animation files"));
+  connect(m_loadAnimationsAction, SIGNAL(triggered()), this, SLOT(loadAnimation()));
+}
+
+bool Z2DAnimationDoc::saveAnimation(AnimationPack *pack, const QString &fileName, QString &errorMsg)
+{
+  try {
+    pack->animation->save(fileName);
+    pack->path = QFileInfo(fileName).canonicalFilePath();
+    pack->hasUnsavedChange = false;
+    pack->updateDerivedData();
+
+    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    setLastOpenedObjPath(fileName);
+    return true;
+  }
+  catch (const ZException & e) {
+    errorMsg = e.what();
+    return false;
+  }
+}
+
+} // namespace nim

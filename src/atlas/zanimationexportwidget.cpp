@@ -1,0 +1,199 @@
+#include "zanimationexportwidget.h"
+
+#include "z3dgpuinfo.h"
+#include <QHBoxLayout>
+#include <QVBoxLayout>
+#include <QMessageBox>
+#include <QPushButton>
+#include "zselectfilewidget.h"
+#include <QLabel>
+#include <QGroupBox>
+#include <QScrollBar>
+#include <QSettings>
+
+namespace nim {
+
+ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget *parent)
+  : QScrollArea(parent)
+  , m_group(false)
+  , m_captureStereoImage("Stereo", false)
+  , m_stereoImageType("Stereo Type")
+  , m_useWindowSize("Use Window Size", true)
+  , m_customSize("Custom Image Size", glm::ivec2(1920, 1080), glm::ivec2(128, 128),
+                 glm::ivec2(Z3DGpuInfoInstance.maxTextureSize()))
+  , m_framePerSecond("Frames per Second", 30, 12, 60)
+  , m_filename("Filename Prefix", "")
+  , m_is2DAnimation(is2DAni)
+{
+  m_customSize.setStyle("SPINBOX");
+  QList<QString> names;
+  names.push_back("Width:");
+  names.push_back("Height:");
+  m_customSize.setNameForEachValue(names);
+  m_stereoImageType.addOptions("Full Side-By-Side", "Half Side-By-Side");
+  m_stereoImageType.select("Half Side-By-Side");
+  QString prefix = QString("animation.mp4");
+  m_filename.set(prefix);
+  m_framePerSecond.setStyle("SPINBOX");
+  m_framePerSecond.setDecimal(2);
+  m_framePerSecond.setSingleStep(1);
+  createWidget();
+  connect(&m_captureStereoImage, SIGNAL(valueChanged()), this, SLOT(adjustWidget()));
+  connect(&m_useWindowSize, SIGNAL(valueChanged()), this, SLOT(updateImageSizeWidget()));
+  connect(m_captureButton, SIGNAL(clicked()), this, SLOT(captureButtonPressed()));
+  adjustWidget();
+  updateImageSizeWidget();
+}
+
+QSize ZAnimationExportWidget::sizeHint() const
+{
+  QSize res = QScrollArea::sizeHint();
+  res.setWidth(res.width() + verticalScrollBar()->sizeHint().width());
+  return res;
+}
+
+void ZAnimationExportWidget::captureButtonPressed()
+{
+  if (m_folderWidget->getSelectedDirectory().isEmpty()) {
+    QMessageBox::critical(this, "Output Folder do not exist", "Output Folder do not exist");
+    return;
+  }
+  QDir dir(m_folderWidget->getSelectedDirectory());
+
+  QSettings settings;
+  settings.setValue(QString("Animation/exportPath"), dir.absolutePath());
+
+  if (m_is2DAnimation) {
+    if (m_useWindowSize.get()) {
+      emit export2DAnimation(dir, m_filename.get(), m_framePerSecond.get());
+    } else {
+      glm::ivec2 size = m_customSize.get();
+      emit export2DAnimation(dir, m_filename.get(), m_framePerSecond.get(), size.x, size.y);
+    }
+  } else {
+    Z3DScreenShotType sst;
+    if (m_captureStereoImage.get()) {
+      if (m_stereoImageType.isSelected("Half Side-By-Side"))
+        sst = Z3DScreenShotType::HalfSideBySideStereoView;
+      else
+        sst = Z3DScreenShotType::FullSideBySideStereoView;
+    } else
+      sst = Z3DScreenShotType::MonoView;
+
+    if (m_useWindowSize.get()) {
+      emit export3DAnimation(dir, m_filename.get(), m_framePerSecond.get(), sst);
+    } else {
+      glm::ivec2 size = m_customSize.get();
+      emit export3DAnimation(dir, m_filename.get(), m_framePerSecond.get(), size.x, size.y, sst);
+    }
+  }
+}
+
+void ZAnimationExportWidget::updateImageSizeWidget()
+{
+  m_customSize.setEnabled(!m_useWindowSize.get());
+}
+
+void ZAnimationExportWidget::adjustWidget()
+{
+  m_framePerSecond.setVisible(true);
+  m_captureButton->setVisible(true);
+  m_folderWidget->setEnabled(true);
+  m_filename.setEnabled(true);
+  m_stereoImageType.setVisible(m_captureStereoImage.get());
+}
+
+void ZAnimationExportWidget::createWidget()
+{
+  QVBoxLayout *lo = new QVBoxLayout;
+
+  QHBoxLayout *hlo = nullptr;
+  QWidget *wg = nullptr;
+
+  if (!m_is2DAnimation) {
+    hlo = new QHBoxLayout;
+    hlo->addWidget(m_captureStereoImage.createNameLabel());
+    wg = m_captureStereoImage.createWidget();
+    wg->setMinimumWidth(125);
+    wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+    hlo->addWidget(wg);
+    lo->addLayout(hlo);
+
+    hlo = new QHBoxLayout;
+    hlo->addWidget(m_stereoImageType.createNameLabel());
+    wg = m_stereoImageType.createWidget();
+    wg->setMinimumWidth(125);
+    wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+    hlo->addWidget(wg);
+    lo->addLayout(hlo);
+  }
+
+  hlo = new QHBoxLayout;
+  hlo->addWidget(m_useWindowSize.createNameLabel());
+  wg = m_useWindowSize.createWidget();
+  wg->setMinimumWidth(125);
+  wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+  hlo->addWidget(wg);
+  lo->addLayout(hlo);
+
+  hlo = new QHBoxLayout;
+  hlo->addWidget(m_customSize.createNameLabel());
+  wg = m_customSize.createWidget();
+  wg->setMinimumWidth(125);
+  wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+  hlo->addWidget(wg);
+  lo->addLayout(hlo);
+
+  hlo = new QHBoxLayout;
+  hlo->addWidget(m_framePerSecond.createNameLabel());
+  wg = m_framePerSecond.createWidget();
+  wg->setMinimumWidth(125);
+  wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+  hlo->addWidget(wg);
+  lo->addLayout(hlo);
+
+  hlo = new QHBoxLayout;
+  int left;
+  int top;
+  int right;
+  int bottom;
+  hlo->getContentsMargins(&left, &top, &right, &bottom);
+  //hlo->setContentsMargins(left+20, top, right, bottom);
+  QSettings settings;
+  QString folder = settings.value(QString("Animation/exportPath")).toString();
+  m_folderWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::Directory, "output folder:", QString(),
+                                         QBoxLayout::LeftToRight, folder, this);
+  m_folderWidget->setFile(folder);
+  hlo->addWidget(m_folderWidget);
+  lo->addLayout(hlo);
+
+  hlo = new QHBoxLayout;
+  //hlo->setContentsMargins(left+20, top, right, bottom);
+  hlo->addWidget(m_filename.createNameLabel());
+  wg = m_filename.createWidget();
+  wg->setMinimumWidth(125);
+  wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+  hlo->addWidget(wg);
+  lo->addLayout(hlo);
+
+  m_captureButton = new QPushButton(tr("Export"), this);
+  m_captureButton->setIcon(QIcon(":/icons/camcoder_pro-512.png"));
+  m_captureButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  lo->addWidget(m_captureButton, 0, Qt::AlignHCenter | Qt::AlignVCenter);
+
+  QWidget *resWgt = new QWidget(this);
+  if (m_group) {
+    m_groupBox = new QGroupBox(tr("capture"), this);
+    m_groupBox->setLayout(lo);
+    hlo = new QHBoxLayout;
+    hlo->addWidget(m_groupBox);
+    resWgt->setLayout(hlo);
+  } else {
+    resWgt->setLayout(lo);
+  }
+
+  setWidget(resWgt);
+  ensureWidgetVisible(m_captureButton);
+}
+
+} // namespace nim

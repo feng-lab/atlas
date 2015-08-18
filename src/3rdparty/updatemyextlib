@@ -1,0 +1,67 @@
+#!/bin/sh
+
+srcDIR="/Users/feng/Google Drive/code/my"
+baseDIR=/Users/feng/code
+currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
+
+if [ -d $baseDIR/FreeImage ]
+then
+  rm -rf $baseDIR/FreeImage
+fi
+srcArchive=$srcDIR/FreeImage3170.zip
+unzip "$srcArchive" -d $baseDIR
+
+if [ -d $baseDIR/libjpeg-turbo-1.4.1 ]
+then
+  rm -rf $baseDIR/libjpeg-turbo-1.4.1
+fi
+srcArchive=$srcDIR/libjpeg-turbo-1.4.1.tar.gz
+tar -zxvf "$srcArchive" -C $baseDIR
+
+if [ -d $baseDIR/hdf5-1.8.15-patch1 ]
+then
+  rm -rf $baseDIR/hdf5-1.8.15-patch1
+fi
+srcArchive=$srcDIR/hdf5-1.8.15-patch1.tar.bz2
+tar -jxvf "$srcArchive" -C $baseDIR
+
+if [ -d $baseDIR/GeometricTools ]
+then
+  rm -rf $baseDIR/GeometricTools
+fi
+srcArchive=$srcDIR/GeometricTools/WildMagic5p13.zip
+unzip "$srcArchive" -d $baseDIR
+
+if [ -d $baseDIR/ispc-v1.8.2-osx ]
+then
+  rm -rf $baseDIR/ispc-v1.8.2-osx
+fi
+srcArchive=$srcDIR/ispc-v1.8.2-osx.tar.gz
+tar -zxvf "$srcArchive" -C $baseDIR
+
+srcArchive=$srcDIR/ffmpeg-2.7.2.7z
+7z x -y -o$baseDIR/atlas "$srcArchive"
+
+if [ -d $currDIR/boost ]
+then
+  rm -rf $currDIR/boost
+fi
+srcArchive=$srcDIR/boost_1_59_0.tar.bz2
+tar -jxvf "$srcArchive" -C $currDIR
+mv $currDIR/boost_1_59_0 $currDIR/boost
+
+if [ -d $currDIR/eigen ]
+then
+  rm -rf $currDIR/eigen
+fi
+srcArchive=$srcDIR/eigen-eigen-bdd17ee3b1b3.tar.bz2
+tar -jxvf "$srcArchive" -C $currDIR
+mv $currDIR/eigen-eigen-bdd17ee3b1b3 $currDIR/eigen
+
+if [ -d $currDIR/glm ]
+then
+  rm -rf $currDIR/glm
+fi
+srcArchive=$srcDIR/glm-master.zip
+unzip "$srcArchive" -d $currDIR
+mv $currDIR/glm-master $currDIR/glm

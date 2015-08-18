@@ -1,0 +1,950 @@
+#include "zroi.h"
+
+#include "QsLog.h"
+#include <cmath>
+#include <Wm5NaturalSpline2.h>
+#include "zsaturateoperation.h"
+#include <QFile>
+
+namespace {
+
+QPainterPath splineToQPainterPath(const QPolygonF& spline, bool showLastSeg = true)
+{
+  QPainterPath res;
+  if (spline.size() < 2)
+    return res;
+  bool isClosed = spline.isClosed();
+  if ((isClosed && spline.size() < 4) ||
+      (!isClosed && spline.size() < 3)) {
+    res.moveTo(spline[0]);
+    res.lineTo(spline[1]);
+    return res;
+  }
+
+  int numSegments = spline.size() - 1;
+  double *times = new double[numSegments+1];
+  Wm5::Vector2d *points = new Wm5::Vector2d[numSegments+1];
+  memcpy(points, spline.data(), sizeof(Wm5::Vector2d) * spline.size());
+
+  times[0] = 0;
+  for (int i=1; i<numSegments+1; ++i) {
+    times[i] = times[i-1] + (points[i] - points[i-1]).Length();
+    //times[i] = times[i-1] + 1;
+  }
+  if (isClosed) {
+    Wm5::NaturalSpline2d splineCurve(Wm5::NaturalSpline2d::BT_CLOSED, numSegments, times, points);
+    res.moveTo(spline[0]);
+    int endSeg = showLastSeg ? numSegments : numSegments - 1;
+    for (int i=0; i<endSeg; ++i) {
+      Wm5::Vector2d m0 = splineCurve.GetFirstDerivative(times[i]);
+      Wm5::Vector2d m1 = splineCurve.GetFirstDerivative(times[i+1]);
+      m0 *= times[i+1] - times[i];
+      m1 *= times[i+1] - times[i];
+      //LINFO() << m0.X() << m0.Y() << m1.X() << m1.Y() << cspline[i] << cspline[i+1];
+      res.cubicTo(spline[i].x() + 1./3.*m0.X(), spline[i].y() + 1./3.*m0.Y(),
+                  spline[i+1].x() - 1./3.*m1.X(), spline[i+1].y() - 1./3.*m1.Y(),
+          spline[i+1].x(), spline[i+1].y());
+    }
+  } else {
+    Wm5::NaturalSpline2d splineCurve(Wm5::NaturalSpline2d::BT_FREE, numSegments, times, points);
+    res.moveTo(spline[0]);
+    int endSeg = showLastSeg ? numSegments : numSegments - 1;
+    for (int i=0; i<endSeg; ++i) {
+      Wm5::Vector2d m0 = splineCurve.GetFirstDerivative(times[i]);
+      Wm5::Vector2d m1 = splineCurve.GetFirstDerivative(times[i+1]);
+      m0 *= times[i+1] - times[i];
+      m1 *= times[i+1] - times[i];
+      //LINFO() << m0.X() << m0.Y() << m1.X() << m1.Y() << cspline[i] << cspline[i+1];
+      res.cubicTo(spline[i].x() + 1./3.*m0.X(), spline[i].y() + 1./3.*m0.Y(),
+                  spline[i+1].x() - 1./3.*m1.X(), spline[i+1].y() - 1./3.*m1.Y(),
+          spline[i+1].x(), spline[i+1].y());
+    }
+  }
+  return res;
+}
+
+}
+
+namespace nim {
+
+void ZSliceROI::updateROI(bool moveOnly)
+{
+  m_roi = QPainterPath();
+  for (int i=0; i<m_shapeOperations.size(); ++i) {
+    QPainterPath tmp;
+    switch (m_shapeOperations[i].type) {
+    case ROIType::Rect:
+      tmp.addRect(m_shapeOperations[i].rect());
+      break;
+    case ROIType::Ellipse:
+      tmp.addEllipse(m_shapeOperations[i].rect());
+      break;
+    case ROIType::Polygon:
+      tmp.addPolygon(m_shapeOperations[i].poly);
+      break;
+    case ROIType::Spline:
+      tmp.addPath(splineToQPainterPath(m_shapeOperations[i].poly));
+      break;
+    default:
+      assert(false);
+      break;
+    }
+    if (m_shapeOperations[i].isAdd) {
+      m_roi += tmp;
+    } else {
+      m_roi -= tmp;
+    }
+  }
+
+  if (!moveOnly && m_roi.isEmpty()) {
+    m_shapeOperations.clear();
+    m_roi = QPainterPath();
+  }
+}
+
+void ZSliceROI::addRect(const QRectF &rect)
+{
+  if (m_roi.contains(rect))
+    return;
+  m_shapeOperations.push_back(ZROIShapeOperation(true, ROIType::Rect, rect));
+  updateROI(false);
+}
+
+void ZSliceROI::addEllipse(const QRectF &ellipse)
+{
+  if (m_roi.contains(ellipse))
+    return;
+  m_shapeOperations.push_back(ZROIShapeOperation(true, ROIType::Ellipse, ellipse));
+  updateROI(false);
+}
+
+void ZSliceROI::addPolygon(const QPolygonF &poly)
+{
+  QPainterPath tmp;
+  tmp.addPolygon(poly);
+  if (m_roi.contains(tmp))
+    return;
+  m_shapeOperations.push_back(ZROIShapeOperation(true, ROIType::Polygon, poly));
+  updateROI(false);
+}
+
+void ZSliceROI::addSpline(const QPolygonF &spline)
+{
+  QPainterPath tmp;
+  tmp.addPolygon(spline);
+  if (m_roi.contains(tmp))
+    return;
+  m_shapeOperations.push_back(ZROIShapeOperation(true, ROIType::Spline, spline));
+  updateROI(false);
+}
+
+void ZSliceROI::subtractRect(const QRectF &rect)
+{
+  if (!m_roi.intersects(rect))
+    return;
+  m_shapeOperations.push_back(ZROIShapeOperation(false, ROIType::Rect, rect));
+  updateROI(false);
+}
+
+void ZSliceROI::subtractEllipse(const QRectF &ellipse)
+{
+  if (!m_roi.intersects(ellipse))
+    return;
+  m_shapeOperations.push_back(ZROIShapeOperation(false, ROIType::Ellipse, ellipse));
+  updateROI(false);
+}
+
+void ZSliceROI::subtractPolygon(const QPolygonF &poly)
+{
+  QPainterPath tmp;
+  tmp.addPolygon(poly);
+  if (!m_roi.intersects(tmp))
+    return;
+  m_shapeOperations.push_back(ZROIShapeOperation(false, ROIType::Polygon, poly));
+  updateROI(false);
+}
+
+void ZSliceROI::subtractSpline(const QPolygonF &spline)
+{
+  QPainterPath tmp;
+  tmp.addPolygon(spline);
+  if (!m_roi.intersects(tmp))
+    return;
+  m_shapeOperations.push_back(ZROIShapeOperation(false, ROIType::Spline, spline));
+  updateROI(false);
+}
+
+void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::set<size_t> > &shapeOpIndexToPointIndices)
+{
+  size_t shapeOpIndexSubtract = 0;
+  for (auto it = shapeOpIndexToPointIndices.begin(); it != shapeOpIndexToPointIndices.end(); ++it) {
+    size_t i = it->first - shapeOpIndexSubtract;
+    const std::set<size_t> &pointIndices = it->second;
+    ZROIShapeOperation &shapeOp = m_shapeOperations[i];
+
+    bool deleteAll = shapeOp.type == ROIType::Rect ||
+        shapeOp.type == ROIType::Ellipse ||
+        (shapeOp.poly.size() - static_cast<int>(pointIndices.size()) < 4);
+    //LINFO() << m_shapeOperations.size() << shapeOp->poly.size();
+    if (deleteAll) {
+      m_shapeOperations.removeAt(i);
+      ++shapeOpIndexSubtract;
+    } else {
+      size_t pointIndexSubtract = 0;
+      for (auto iit = pointIndices.begin(); iit != pointIndices.end(); ++iit) {
+        size_t idx = *iit - pointIndexSubtract;
+        ++pointIndexSubtract;
+        if ((idx == 0 || idx == static_cast<size_t>(shapeOp.poly.size()-1))) {
+          m_shapeOperations[i].poly.removeFirst();
+          m_shapeOperations[i].poly.removeLast();
+          m_shapeOperations[i].poly.push_back(m_shapeOperations[i].poly.first());
+        } else {
+          m_shapeOperations[i].poly.removeAt(idx);
+        }
+      }
+    }
+    //LINFO() << m_shapeOperations.size();
+  }
+  updateROI(false);
+}
+
+bool ZSliceROI::addCtrlPoint(const QPointF &pt)
+{
+  int shapeIdx = -1;
+  int pos = -1;
+  double minDist = std::numeric_limits<double>::max();
+  for (int i=0; i<m_shapeOperations.size(); ++i) {
+    if (m_shapeOperations[i].type == ROIType::Polygon ||
+        m_shapeOperations[i].type == ROIType::Spline) {
+      const QPolygonF &poly = m_shapeOperations[i].poly;
+      for (int j=0; j<poly.size()-1; ++j) {
+        double dist = (pt - poly[j]).manhattanLength() + (pt - poly[j+1]).manhattanLength();
+        if (dist < minDist) {
+          minDist = dist;
+          shapeIdx = i;
+          pos = j+1;
+        }
+      }
+    }
+  }
+  if (shapeIdx >= 0 && pos >= 0) {
+    m_shapeOperations[shapeIdx].poly.insert(pos, pt);
+    updateROI(false);
+    return true;
+  }
+  return false;
+}
+
+void ZSliceROI::mergeWith(const ZSliceROI &other)
+{
+  m_shapeOperations.append(other.m_shapeOperations);
+  updateROI(false);
+}
+
+void ZSliceROI::setTopLeft(double x, double y)
+{
+  QRectF rect = m_roi.boundingRect();
+  double dx = x - rect.left();
+  double dy = y - rect.top();
+  for (int i=0; i<m_shapeOperations.size(); ++i) {
+    m_shapeOperations[i].translate(dx, dy);
+  }
+  updateROI(true);
+}
+
+void ZSliceROI::load(H5::Group &sliceGrp)
+{
+  m_shapeOperations.clear();
+  m_roi = QPainterPath();
+
+  try {
+    H5::Exception::dontPrint();
+
+    H5::FloatType doubleType(H5::PredType::IEEE_F64LE);
+    H5::IntType intType(H5::PredType::STD_I32LE);
+    H5::StrType strType(0, H5T_VARIABLE);
+
+    H5::Attribute numShapeAttr = sliceGrp.openAttribute("ShapeNumber");
+    int numShape;
+    numShapeAttr.read(intType, &numShape);
+
+    H5std_string strBuf;
+    for (int j=0; j<numShape; ++j) {
+      H5::Group shapeGrp = sliceGrp.openGroup(qPrintable(QString("Shape%1").arg(j+1)));
+
+      H5::Attribute typeAttr = shapeGrp.openAttribute("Type");
+      typeAttr.read(strType, strBuf);
+      ROIType type = ROIType::Rect;
+      if (strBuf == "Rect") {
+        type = ROIType::Rect;
+      } else if (strBuf == "Ellipse") {
+        type = ROIType::Ellipse;
+      } else if (strBuf == "Polygon") {
+        type = ROIType::Polygon;
+      } else if (strBuf == "Spline") {
+        type = ROIType::Spline;
+      } else {
+        throw ZIOException(QString("invalid shape type %1").arg(QString::fromStdString(strBuf)));
+      }
+
+      H5::Attribute isAddAttr = shapeGrp.openAttribute("IsAdd");
+      int isAdd;
+      isAddAttr.read(intType, &isAdd);
+
+      H5::DataSet points = shapeGrp.openDataSet("Points");
+      H5::DataSpace pointsDataspace = points.getSpace();
+
+      if (pointsDataspace.getSimpleExtentNdims() != 2)
+        throw ZIOException("Wrong ROI file contents");
+
+      hsize_t pointListDim[2];
+
+      pointsDataspace.getSimpleExtentDims(pointListDim, NULL);
+
+      if (pointListDim[1] != 2 || pointListDim[0] < 2)
+        throw ZIOException("Wrong ROI file contents");
+
+      QPolygonF poly(pointListDim[0]);
+      points.read(poly.data(), doubleType);
+      QRectF rect(poly[0], poly[1]);
+
+      switch (type) {
+      case ROIType::Rect:
+        m_shapeOperations.push_back(ZROIShapeOperation(isAdd, ROIType::Rect, rect));
+        break;
+      case ROIType::Ellipse:
+        m_shapeOperations.push_back(ZROIShapeOperation(isAdd, ROIType::Ellipse, rect));
+        break;
+      case ROIType::Polygon:
+        m_shapeOperations.push_back(ZROIShapeOperation(isAdd, ROIType::Polygon, poly));
+        break;
+      case ROIType::Spline:
+        m_shapeOperations.push_back(ZROIShapeOperation(isAdd, ROIType::Spline, poly));
+        break;
+      default:
+        assert(false);
+        break;
+      }
+    }
+    updateROI(false);
+  }
+  catch(H5::Exception const & e)
+  {
+    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+  }
+}
+
+void ZSliceROI::save(H5::Group &sliceGrp) const
+{
+  try {
+    H5::Exception::dontPrint();
+
+    H5::FloatType doubleType(H5::PredType::IEEE_F64LE);
+    H5::IntType intType(H5::PredType::STD_I32LE);
+    H5::StrType strType(0, H5T_VARIABLE);
+
+    H5::DataSpace attrDataSpace(H5S_SCALAR);
+
+    H5::Attribute shapeNumberAttr = sliceGrp.createAttribute("ShapeNumber", intType, attrDataSpace);
+    int shapeNumber = m_shapeOperations.size();
+    shapeNumberAttr.write(intType, &shapeNumber);
+
+    for (int i=0; i<m_shapeOperations.size(); ++i) {
+      H5::Group shapeGrp = sliceGrp.createGroup(qPrintable(QString("Shape%1").arg(i+1)));
+
+      H5::Attribute type = shapeGrp.createAttribute("Type", strType, attrDataSpace);
+      switch (m_shapeOperations[i].type) {
+      case ROIType::Rect:
+        type.write(strType, std::string("Rect"));
+        break;
+      case ROIType::Ellipse:
+        type.write(strType, std::string("Ellipse"));
+        break;
+      case ROIType::Polygon:
+        type.write(strType, std::string("Polygon"));
+        break;
+      case ROIType::Spline:
+        type.write(strType, std::string("Spline"));
+        break;
+      default:
+        assert(false);
+        break;
+      }
+
+      H5::Attribute isAddAttr = shapeGrp.createAttribute("IsAdd", intType, attrDataSpace);
+      int isAdd = m_shapeOperations[i].isAdd ? 1 : 0;
+      isAddAttr.write(intType, &isAdd);
+
+      hsize_t pointListDim[2];
+      pointListDim[1] = 2;
+      assert(m_shapeOperations[i].poly.size() >= 2);
+      pointListDim[0] = m_shapeOperations[i].poly.size();
+      H5::DataSpace pointListDataspace(2, pointListDim);
+      H5::DataSet pointList = shapeGrp.createDataSet("Points", doubleType, pointListDataspace);
+      pointList.write(m_shapeOperations[i].poly.data(), doubleType);
+    }
+  }
+  catch(H5::Exception const & e)
+  {
+    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+  }
+}
+
+bool ZSliceROI::hasPolyOrSpline() const
+{
+  for (int i=0; i<m_shapeOperations.size(); ++i) {
+    if (m_shapeOperations[i].type == ROIType::Polygon ||
+        m_shapeOperations[i].type == ROIType::Spline)
+      return true;
+  }
+  return false;
+}
+
+ZROI::ZROI(QUndoStack *undoStack, QObject *parent)
+  : QObject(parent)
+  , m_boundBox(8)
+  , m_undoStack(undoStack)
+  , m_moveSelectedControlPointsCommand(nullptr)
+{
+  resetBoundBox();
+  if (!m_undoStack) {
+    m_undoStack = new QUndoStack(this);
+  }
+}
+
+ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpolation) const
+{
+  ZImg img;
+  const std::vector<int>& bBox = boundBox();
+  if (bBox[5] == bBox[4]) {
+    img = ZImg(ZImgInfo(bBox[1]+3, bBox[3]+3, 1));
+    const ZSliceROI &sliceROI = cbegin()->second;
+    const QPainterPath& path = sliceROI.paintPath();
+    for (size_t x = std::max(0, bBox[0]); x < img.width(); ++x) {
+      for (size_t y = std::max(0, bBox[2]); y < img.height(); ++y) {
+        if (path.contains(QPointF(x,y))) {
+          *img.data<uint8_t>(x, y, 0) = 255;
+        }
+      }
+    }
+
+    if (outWidth <= 0 || outHeight <= 0 || outDepth <= 0) {
+      img = img.crop(ZImgRegion(0, bBox[1], 0, bBox[3], 0, 1));
+    } else {
+      img = img.cropWithPad(ZVoxelCoordinate(), ZVoxelCoordinate(outWidth, outHeight, outDepth, 1, 1));
+    }
+  } else {
+    img = ZImg(ZImgInfo(bBox[1]+3, bBox[3]+3, bBox[5]+3));
+    std::map<size_t, ZImg> distMapImgs;
+    std::vector<size_t> srcSlices;
+    ZImgSignedDistanceMap<> distMap;
+    distMap.setInsideIsPositive(false);
+    for (ZROI::const_iterator it = cbegin(); it != cend(); ++it) {
+      if (it->first < 0)
+        continue;
+      size_t slice = it->first;
+      //LINFO() << slice;
+      const ZSliceROI &sliceROI = it->second;
+      const QPainterPath& path = sliceROI.paintPath();
+      QRectF pathRect = path.boundingRect();
+      size_t minX = std::max(static_cast<int>(std::floor(pathRect.left())),
+                             std::max(0, bBox[0]));
+      size_t maxX = std::min(img.width(), static_cast<size_t>(std::ceil(pathRect.right())));
+      size_t minY = std::max(static_cast<int>(std::floor(pathRect.top())),
+                             std::max(0, bBox[2]));
+      size_t maxY = std::min(img.height(), static_cast<size_t>(std::ceil(pathRect.bottom())));
+      for (size_t x = minX; x < maxX; ++x) {
+        for (size_t y = minY; y < maxY; ++y) {
+          if (path.contains(QPointF(x,y))) {
+            *img.data<uint8_t>(x, y, slice) = 255;
+          }
+        }
+      }
+      srcSlices.push_back(slice);
+    }
+
+    if (doInterpolation) {
+      for (size_t i=1; i<srcSlices.size(); ++i) {
+        size_t prevSlice = srcSlices[i-1];
+        size_t nextSlice = srcSlices[i];
+        if (prevSlice + 1 == nextSlice)
+          continue;
+        if (distMapImgs.find(prevSlice) == distMapImgs.end()) {
+          distMapImgs[prevSlice] = distMap.run<double>(img.createView(prevSlice,0,0), false);
+        }
+        if (distMapImgs.find(nextSlice) == distMapImgs.end()) {
+          distMapImgs[nextSlice] = distMap.run<double>(img.createView(nextSlice,0,0), false);
+        }
+        double *prevData = distMapImgs[prevSlice].channelData<double>(0);
+        double *nextData = distMapImgs[nextSlice].channelData<double>(0);
+        size_t numSlice = nextSlice - prevSlice - 1;
+        std::vector<uint8_t*> dataPts;
+        std::vector<double> progresses;
+        for (size_t slice = prevSlice+1; slice < nextSlice; ++slice) {
+          dataPts.push_back(img.planeData<uint8_t>(slice));
+          progresses.push_back(double(slice - prevSlice) / double (nextSlice - prevSlice));
+        }
+        for (size_t idx = 0; idx < img.planeVoxelNumber(); ++idx) {
+          if (prevData[idx] <= 0 && nextData[idx] <= 0) {
+            for (size_t k=0; k < numSlice; ++k) {
+              dataPts[k][idx] = 255;
+            }
+          } else if (prevData[idx] <= 0 || nextData[idx] <= 0) {
+            for (size_t k=0; k < numSlice; ++k) {
+              double dst = prevData[idx] + progresses[k] * (nextData[idx] - prevData[idx]);
+              if (dst <= 0)
+                dataPts[k][idx] = 255;
+            }
+          }
+        }
+        if (i > 1) {
+          distMapImgs.erase(distMapImgs.begin());
+        }
+      }
+    }
+
+    if (outWidth <= 0 || outHeight <= 0 || outDepth <= 0) {
+      img = img.crop(ZImgRegion(0, bBox[1], 0, bBox[3], 0, bBox[5]));
+    } else {
+      img = img.cropWithPad(ZVoxelCoordinate(), ZVoxelCoordinate(outWidth, outHeight, outDepth, 1, 1));
+    }
+  }
+
+  return img;
+}
+
+void ZROI::clear()
+{
+  for (auto it = m_sliceROIs.begin(); it != m_sliceROIs.end(); ++it) {
+    emit roiDeleted(it->first);
+  }
+  m_sliceROIs.clear();
+  resetBoundBox();
+}
+
+void ZROI::deleteSliceROI(int slice)
+{
+  if (m_sliceROIs.find(slice) != m_sliceROIs.end()) {
+    m_undoStack->push(new ZROIDeleteSliceROICommand(*this, slice));
+  }
+}
+
+void ZROI::mergeWith(const ZROI &other)
+{
+  m_undoStack->push(new ZROIMergeROICommand(*this, other.m_sliceROIs));
+}
+
+std::set<int> ZROI::mergeWith_Impl(const std::map<int, ZSliceROI> &sliceROIs)
+{
+  std::set<int> changedSlices;
+  for (auto it = sliceROIs.begin(); it != sliceROIs.end(); ++it) {
+    if (!it->second.isEmpty()) {
+      //LINFO() << getOrCreateSliceROI(it->first).isEmpty();
+      changedSlices.insert(it->first);
+      m_sliceROIs[it->first].mergeWith(it->second);
+      onSliceROIUpdated(it->first);
+    }
+  }
+  return changedSlices;
+}
+
+QPainterPath ZROI::splineToPainterPath(const QPolygonF &spline, bool makeCloseIfNot)
+{
+  QPainterPath res;
+  if (spline.size() < 2)
+    return res;
+  QPolygonF cspline = spline;
+  if (cspline[cspline.size()-1] == cspline[cspline.size()-2])
+    cspline.removeLast();
+  if (cspline.size() < 2)
+    return res;
+
+  if (!cspline.isClosed() && makeCloseIfNot)
+    cspline << cspline[0];
+
+  return splineToQPainterPath(cspline);
+}
+
+std::vector<ZROIControlPoint> ZROI::sliceControlPoints(int slice) const
+{
+  std::vector<ZROIControlPoint> res;
+  const ZSliceROI &sliceROI = m_sliceROIs.at(slice);
+
+  const QList<ZROIShapeOperation>& shapeOps = sliceROI.m_shapeOperations;
+  for (int i=0; i<shapeOps.size(); ++i) {
+    if (shapeOps[i].type == ROIType::Polygon || shapeOps[i].type == ROIType::Spline) {
+      for (int j=0; j<shapeOps[i].poly.size()-1; ++j) {
+        res.emplace_back(slice, i, ZROIControlPoint::Pos::Any, j);
+      }
+    } else {
+      res.emplace_back(slice, i, ZROIControlPoint::Pos::MidLeft);
+      res.emplace_back(slice, i, ZROIControlPoint::Pos::BottomMid);
+      res.emplace_back(slice, i, ZROIControlPoint::Pos::MidRight);
+      res.emplace_back(slice, i, ZROIControlPoint::Pos::TopMid);
+      res.emplace_back(slice, i, ZROIControlPoint::Pos::Center);
+      if (shapeOps[i].type == ROIType::Rect) {
+        res.emplace_back(slice, i, ZROIControlPoint::Pos::TopLeft);
+        res.emplace_back(slice, i, ZROIControlPoint::Pos::BottomLeft);
+        res.emplace_back(slice, i, ZROIControlPoint::Pos::BottomRight);
+        res.emplace_back(slice, i, ZROIControlPoint::Pos::TopRight);
+      }
+    }
+  }
+  return res;
+}
+
+void ZROI::deleteROIControlPoints(const std::vector<ZROIControlPoint> &controlPoints)
+{
+  if (!controlPoints.empty())
+    m_undoStack->push(new ZROIDeleteControlPointsCommand(*this, controlPoints));
+}
+
+std::set<int> ZROI::deleteROIControlPoints_Impl(const std::vector<ZROIControlPoint> &controlPoints)
+{
+  std::set<int> slices;
+  std::map<int, std::map<size_t, std::set<size_t> > > sliceToShapeOpIndexToPointIndices;
+  for (auto controlPoint : controlPoints) {
+    sliceToShapeOpIndexToPointIndices[controlPoint.slice][controlPoint.shapeOperationIndex].insert(controlPoint.pointIndex);
+    slices.insert(controlPoint.slice);
+  }
+  for (auto it = sliceToShapeOpIndexToPointIndices.begin();
+       it != sliceToShapeOpIndexToPointIndices.end(); ++it) {
+    auto sit = m_sliceROIs.find(it->first);
+    if (sit != m_sliceROIs.end()) {
+      sit->second.deleteCtrlPoints(it->second);
+      onSliceROIUpdated(it->first);
+    }
+  }
+  return slices;
+}
+
+QPointF ZROI::controlPointCoord(const ZROIControlPoint &ctrlPt) const
+{
+  const ZROIShapeOperation &shapeOp = m_sliceROIs.at(ctrlPt.slice).m_shapeOperations[ctrlPt.shapeOperationIndex];
+
+  double midX = 0;
+  double midY = 0;
+  if (shapeOp.type == ROIType::Ellipse || shapeOp.type == ROIType::Rect) {
+    midX = shapeOp.rect().center().x();
+    midY = shapeOp.rect().center().y();
+  }
+  switch (ctrlPt.pos) {
+  case ZROIControlPoint::Pos::TopLeft:
+    return shapeOp.rect().topLeft();
+    break;
+  case ZROIControlPoint::Pos::MidLeft:
+    return QPointF(shapeOp.rect().left(), midY);
+    break;
+  case ZROIControlPoint::Pos::BottomLeft:
+    return shapeOp.rect().bottomLeft();
+    break;
+  case ZROIControlPoint::Pos::BottomMid:
+    return QPointF(midX, shapeOp.rect().bottom());
+    break;
+  case ZROIControlPoint::Pos::BottomRight:
+    return shapeOp.rect().bottomRight();
+    break;
+  case ZROIControlPoint::Pos::MidRight:
+    return QPointF(shapeOp.rect().right(), midY);
+    break;
+  case ZROIControlPoint::Pos::TopRight:
+    return shapeOp.rect().topRight();
+    break;
+  case ZROIControlPoint::Pos::TopMid:
+    return QPointF(midX, shapeOp.rect().top());
+    break;
+  case ZROIControlPoint::Pos::Center:
+    return shapeOp.rect().center();
+    break;
+  case ZROIControlPoint::Pos::Any:
+    return shapeOp.poly.at(ctrlPt.pointIndex);
+    break;
+  default:
+    assert(false);
+    return QPointF();
+    break;
+  }
+}
+
+QPointF ZROI::setControlPointCoord(const ZROIControlPoint &ctrlPt, const QPointF &coord)
+{
+  m_changedSlices.insert(ctrlPt.slice);
+
+  ZROIShapeOperation &shapeOp = m_sliceROIs.at(ctrlPt.slice).m_shapeOperations[ctrlPt.shapeOperationIndex];
+  QPointF newPos = coord;
+  QRectF rect;
+  if (shapeOp.type == ROIType::Ellipse || shapeOp.type == ROIType::Rect) {
+    rect = shapeOp.rect();
+  }
+
+  switch (ctrlPt.pos) {
+  case ZROIControlPoint::Pos::TopLeft:
+    newPos.setX(qMin(shapeOp.rect().right()-1, newPos.x()));
+    newPos.setY(qMin(shapeOp.rect().bottom()-1, newPos.y()));
+    rect.setTopLeft(newPos);
+    shapeOp.setRect(rect);
+    break;
+  case ZROIControlPoint::Pos::MidLeft:
+    newPos.setX(qMin(shapeOp.rect().right()-1, newPos.x()));
+    newPos.setY(rect.center().y());
+    rect.setLeft(newPos.x());
+    shapeOp.setRect(rect);
+    break;
+  case ZROIControlPoint::Pos::BottomLeft:
+    newPos.setX(qMin(shapeOp.rect().right()-1, newPos.x()));
+    newPos.setY(qMax(shapeOp.rect().top()+1, newPos.y()));
+    rect.setBottomLeft(newPos);
+    shapeOp.setRect(rect);
+    break;
+  case ZROIControlPoint::Pos::BottomMid:
+    newPos.setX(rect.center().x());
+    newPos.setY(qMax(shapeOp.rect().top()+1, newPos.y()));
+    rect.setBottom(newPos.y());
+    shapeOp.setRect(rect);
+    break;
+  case ZROIControlPoint::Pos::BottomRight:
+    newPos.setX(qMax(shapeOp.rect().left()+1, newPos.x()));
+    newPos.setY(qMax(shapeOp.rect().top()+1, newPos.y()));
+    rect.setBottomRight(newPos);
+    shapeOp.setRect(rect);
+    break;
+  case ZROIControlPoint::Pos::MidRight:
+    newPos.setX(qMax(shapeOp.rect().left()+1, newPos.x()));
+    newPos.setY(rect.center().y());
+    rect.setRight(newPos.x());
+    shapeOp.setRect(rect);
+    break;
+  case ZROIControlPoint::Pos::TopRight:
+    newPos.setX(qMax(shapeOp.rect().left()+1, newPos.x()));
+    newPos.setY(qMin(shapeOp.rect().bottom()-1, newPos.y()));
+    rect.setTopRight(newPos);
+    shapeOp.setRect(rect);
+    break;
+  case ZROIControlPoint::Pos::TopMid:
+    newPos.setX(rect.center().x());
+    newPos.setY(qMin(shapeOp.rect().bottom()-1, newPos.y()));
+    rect.setTop(newPos.y());
+    shapeOp.setRect(rect);
+    break;
+  case ZROIControlPoint::Pos::Center:
+    rect.translate(newPos - rect.center());
+    shapeOp.setRect(rect);
+    break;
+  case ZROIControlPoint::Pos::Any:
+    shapeOp.poly[ctrlPt.pointIndex] = newPos;
+    if (ctrlPt.pointIndex == 0)
+      shapeOp.poly.last() = newPos;
+    break;
+  default:
+    assert(false);
+    break;
+  }
+
+  m_sliceROIs.at(ctrlPt.slice).updateROI(true);
+  onSliceROIMoved(ctrlPt.slice);
+
+  return newPos;
+}
+
+const ZROIShapeOperation &ZROI::controlPointShapeOp(const ZROIControlPoint &ctrlPt) const
+{
+  return m_sliceROIs.at(ctrlPt.slice).m_shapeOperations[ctrlPt.shapeOperationIndex];
+}
+
+void ZROI::sliceAddCtrlPoint(int slice, const QPointF &pt)
+{
+  m_undoStack->push(new ZROISliceAddControlPointCommand(*this, slice, pt));
+}
+
+void ZROI::startMoveSelectedControlPointsCommand()
+{
+  assert(!m_moveSelectedControlPointsCommand);
+  m_changedSlices.clear();
+  m_moveSelectedControlPointsCommand = new ZROISliceMoveSelectedControlPointsCommand(*this);
+}
+
+void ZROI::endMoveSelectedControlPointsCommand()
+{
+  if (m_moveSelectedControlPointsCommand) {
+    m_moveSelectedControlPointsCommand->setNewSliceROIs(m_sliceROIs);
+    m_moveSelectedControlPointsCommand->setChangedSlices(m_changedSlices);
+    m_undoStack->push(m_moveSelectedControlPointsCommand);
+    m_moveSelectedControlPointsCommand = nullptr;
+  }
+}
+
+void ZROI::changeSliceROIs(const std::map<int, ZSliceROI> &sliceROIs, const std::set<int> &changedSlices)
+{
+  for (auto it = changedSlices.begin(); it != changedSlices.end(); ++it) {
+    if (m_sliceROIs.find(*it) != m_sliceROIs.end()) {
+      emit roiDeleted(*it);
+    }
+    if (sliceROIs.find(*it) != sliceROIs.end()) {
+      m_sliceROIs[*it] = sliceROIs.at(*it);
+      emit roiChanged(*it);
+    }
+  }
+  //  for (auto it = m_sliceROIs.begin(); it != m_sliceROIs.end(); ++it) {
+  //    emit roiDeleted(it->first);
+  //  }
+  //  m_sliceROIs = sliceROIs;
+  //  resetBoundBox();
+  //  for (auto it = m_sliceROIs.begin(); it != m_sliceROIs.end(); ++it) {
+  //    emit roiChanged(it->first);
+  //  }
+}
+
+void ZROI::load(const QString &filename)
+{
+  clear();
+
+  try {
+    H5::Exception::dontPrint();
+
+    H5::H5File file(qPrintable(filename), H5F_ACC_RDONLY);
+
+    H5::Group allGrp = file.openGroup("ROI");
+
+    load(allGrp);
+  }
+  catch(H5::Exception const & e)
+  {
+    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+  }
+}
+
+void ZROI::save(const QString &filename) const
+{
+  try {
+    H5::Exception::dontPrint();
+
+    H5::H5File file(qPrintable(filename), H5F_ACC_TRUNC);
+
+    H5::Group allGrp = file.createGroup("ROI");
+
+    save(allGrp);
+  }
+  catch(H5::Exception const & e)
+  {
+    QFile::remove(filename);
+    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+  }
+}
+
+void ZROI::load(H5::Group &allGrp)
+{
+  clear();
+
+  try {
+    H5::Exception::dontPrint();
+
+    H5::IntType intType(H5::PredType::STD_I32LE);
+
+    H5::Attribute ver = allGrp.openAttribute("Version");
+    int roiVer;
+    ver.read(intType, &roiVer);
+
+    H5::Attribute numSliceAttr = allGrp.openAttribute("SliceNumber");
+    int numSlice;
+    numSliceAttr.read(intType, &numSlice);
+
+    for (int i=0; i<numSlice; ++i) {
+      H5::Group sliceGrp = allGrp.openGroup(qPrintable(QString("Slice%1").arg(i+1)));
+
+      H5::Attribute sliceAttr = sliceGrp.openAttribute("Slice");
+      int slice;
+      sliceAttr.read(intType, &slice);
+
+      m_sliceROIs[slice].load(sliceGrp);
+
+      onSliceROIUpdated(slice);
+    }
+  }
+  catch(H5::Exception const & e)
+  {
+    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+  }
+}
+
+void ZROI::save(H5::Group &allGrp) const
+{
+  try {
+    H5::Exception::dontPrint();
+
+    H5::IntType intType(H5::PredType::STD_I32LE);
+
+    H5::DataSpace attrDataSpace(H5S_SCALAR);
+
+    H5::Attribute ver = allGrp.createAttribute("Version", intType, attrDataSpace);
+    int roiVer = 100;
+    ver.write(intType, &roiVer);
+
+    int idx = 0;
+    for (auto it = m_sliceROIs.cbegin(); it != m_sliceROIs.cend(); ++it) {
+      if (it->second.isEmpty())
+        continue;
+
+      H5::Group sliceGrp = allGrp.createGroup(qPrintable(QString("Slice%1").arg(idx+1)));
+      ++idx;
+
+      H5::Attribute sliceAttr = sliceGrp.createAttribute("Slice", intType, attrDataSpace);
+      sliceAttr.write(intType, &it->first);
+
+      it->second.save(sliceGrp);
+    }
+
+    H5::Attribute numSliceAttr = allGrp.createAttribute("SliceNumber", intType, attrDataSpace);
+    numSliceAttr.write(intType, &idx);
+  }
+  catch(H5::Exception const & e)
+  {
+    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+  }
+}
+
+void ZROI::resetBoundBox()
+{
+  m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = m_boundBox[6] = std::numeric_limits<int>::max();
+  m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = m_boundBox[7] = std::numeric_limits<int>::min();
+  for (auto it = m_sliceROIs.begin(); it != m_sliceROIs.end(); ++it) {
+    QRectF rect = it->second.paintPath().boundingRect();
+    m_boundBox[0] = std::min(roundTo<int>(rect.left()), m_boundBox[0]);
+    m_boundBox[1] = std::max(roundTo<int>(rect.right()-1), m_boundBox[1]);
+    m_boundBox[2] = std::min(roundTo<int>(rect.top()), m_boundBox[2]);
+    m_boundBox[3] = std::max(roundTo<int>(rect.bottom()-1), m_boundBox[3]);
+    m_boundBox[4] = std::min(it->first, m_boundBox[4]);
+    m_boundBox[5] = std::max(it->first, m_boundBox[5]);
+    m_boundBox[6] = std::min(0, m_boundBox[6]);
+    m_boundBox[7] = std::max(0, m_boundBox[7]);
+  }
+  emit boundBoxChanged();
+}
+
+void ZROI::onSliceROIUpdated(int slice)
+{
+  //LINFO() << "..";
+  if (m_sliceROIs.at(slice).isEmpty()) {
+    deleteSliceROI_Impl(slice);
+    resetBoundBox();
+  } else {
+    resetBoundBox();
+    emit roiChanged(slice);
+  }
+}
+
+void ZROI::onSliceROIMoved(int slice)
+{
+  resetBoundBox();
+  emit roiMoved(slice);
+}
+
+void ZROISliceMoveSelectedControlPointsCommand::redo()
+{
+  if (m_firstRun) {
+    m_firstRun = false;
+  } else {
+    m_roi.changeSliceROIs(m_newSliceROIs, m_changedSlices);
+  }
+}
+
+} // namespace nim

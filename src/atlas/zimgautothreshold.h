@@ -1,0 +1,59 @@
+#ifndef ZIMGAUTOTHRESHOLD_H
+#define ZIMGAUTOTHRESHOLD_H
+
+#include "zimgalgorithm.h"
+#include "zimg.h"
+
+namespace nim {
+
+template<bool ReportProgress = false>
+class ZImgAutoThreshold : public ZImgAlgorithm<ReportProgress>
+{
+public:
+  ZImgAutoThreshold() {}
+
+  // ting's triangle auto threshold
+  // threshold is calculated as img voxel type and returned as TValue because we don't know img type
+  // throw ZImgException for empty img and wrong channel or location
+  // *note* this function assume that float img range is [0.0 1.0]
+  template<typename TValue>
+  TValue triangleThre(const ZImg& img, size_t c = 0, size_t t = 0)
+  {
+    IMG_RETURN_TYPED_CALL(typedTriangleThre, img, img, c, t);
+    return 0;
+  }
+
+  // in case you already know img type, call this version and pass type as template parameter
+  // throw ZImgException if passed type don't match voxel type of imgIn
+  template<typename TVoxel>
+  TVoxel typedTriangleThre(const ZImg& imgIn, size_t c = 0, size_t t = 0);
+
+  template<typename TValue>
+  TValue centroidThre(double &cent1, double &cent2, const ZImg& img, size_t c = 0, size_t t = 0)
+  {
+    IMG_RETURN_TYPED_CALL(typedCentroidThre, img, cent1, cent2, img, c, t);
+    return 0;
+  }
+
+  template<typename TVoxel>
+  TVoxel typedCentroidThre(double &cent1, double &cent2, const ZImg& imgIn, size_t c = 0, size_t t = 0);
+
+  template<typename TValue>
+  TValue maxHistThre(const ZImg& img, size_t c = 0, size_t t = 0)
+  {
+    IMG_RETURN_TYPED_CALL(typedMaxHistThre, img, img, c, t);
+    return 0;
+  }
+
+  template<typename TVoxel>
+  TVoxel typedMaxHistThre(const ZImg& imgIn, size_t c = 0, size_t t = 0);
+
+private:
+  // assume hist is not empty
+  void histNonZeroRange(std::vector<size_t> &hist, size_t &low, size_t &high);
+
+};
+
+} // namespace nim
+
+#endif // ZIMGAUTOTHRESHOLD_H

@@ -1,0 +1,501 @@
+#include "z3dgl.h"
+#include "z3dshaderprogram.h"
+
+#include "zsysteminfo.h"
+#include <QFile>
+#include "QsLog.h"
+#include "z3dvolume.h"
+#include "zexception.h"
+#include "z3dshadermanager.h"
+#include "zexception.h"
+
+namespace nim {
+
+Z3DShaderProgram::Z3DShaderProgram()
+  : m_logUniformLocationError(false)
+  , m_linked(false)
+  , m_id(0)
+  , m_context()
+{
+  m_id = glCreateProgram();
+  if (!m_id) {
+    throw ZGLException("Z3DShaderProgram: Could not create shader program");
+  }
+}
+
+Z3DShaderProgram::~Z3DShaderProgram()
+{
+  for (auto shader : m_anonShaders) {
+    glDetachShader(m_id, shader->shaderId());
+    delete shader;
+  }
+  glDeleteProgram(m_id);
+  CHECK_GL_ERROR;
+}
+
+void Z3DShaderProgram::addShader(Z3DShader &shader)
+{
+  if (m_shaders.contains(&shader))
+    return;
+  if (m_context != shader.context()) {
+    throw ZGLException("Z3DShaderProgram: Add shader failed as program and shader are not associated with same context");
+  }
+  glAttachShader(m_id, shader.shaderId());
+  CHECK_GL_ERROR;
+  m_linked = false;
+  m_shaders.append(&shader);
+}
+
+void Z3DShaderProgram::removeShader(Z3DShader &shader)
+{
+  glDetachShader(m_id, shader.shaderId());
+  CHECK_GL_ERROR;
+  m_linked = false;
+  m_shaders.removeAll(&shader);
+  m_anonShaders.removeAll(&shader);
+}
+
+void Z3DShaderProgram::addShaderFromSourceCode(Z3DShader::Type type, const char *source)
+{
+  std::unique_ptr<Z3DShader> shader(new Z3DShader(type));
+  shader->compileSourceCode(source);
+  m_anonShaders.append(shader.release());
+  addShader(*m_anonShaders.last());
+}
+
+void Z3DShaderProgram::removeAllShaders()
+{
+  for (auto shader : m_shaders) {
+    glDetachShader(m_id, shader->shaderId());
+  }
+  for (auto shader : m_anonShaders) {
+    glDetachShader(m_id, shader->shaderId());
+    delete shader;
+  }
+  m_shaders.clear();
+  m_anonShaders.clear();
+  m_linked = false;
+}
+
+void Z3DShaderProgram::link()
+{
+  GLint value;
+  if (m_shaders.isEmpty()) {
+    // If there are no explicit shaders, then it is possible that the
+    // application added a program binary with glProgramBinaryOES(),
+    // or otherwise populated the shaders itself. Check to see if the
+    // program is already linked and bail out if so.
+    value = 0;
+    glGetProgramiv(m_id, GL_LINK_STATUS, &value);
+    m_linked = (value != 0);
+    if (m_linked) {
+      storeUniformLocations();
+      storeAttributeLocations();
+    }
+  }
+  glLinkProgram(m_id);
+  value = 0;
+  glGetProgramiv(m_id, GL_LINK_STATUS, &value);
+  m_linked = (value != 0);
+  if (m_linked) {
+    storeUniformLocations();
+    storeAttributeLocations();
+  } else {
+    value = 0;
+    glGetProgramiv(m_id, GL_INFO_LOG_LENGTH, &value);
+    QString log;
+    if (value > 1) {
+      char *logbuf = new char[value];
+      GLint len;
+      glGetProgramInfoLog(m_id, value, &len, logbuf);
+      log = QString::fromLatin1(logbuf);
+      delete []logbuf;
+    } else {
+      log = "failed";
+    }
+    throw ZGLException(QString("Z3DShaderProgram::Link: %s").arg(log));
+  }
+}
+
+void Z3DShaderProgram::bind()
+{
+  if (!m_linked)
+    link();
+  m_textureUnitManager.reset();
+  glUseProgram(m_id);
+}
+
+void Z3DShaderProgram::release()
+{
+  glUseProgram(0);
+}
+
+void Z3DShaderProgram::bindFragDataLocation(GLuint colorNumber, const QString &name)
+{
+  if (GLVersionGE(3, 0)) {
+    glBindFragDataLocation(programId(), colorNumber, name.toLocal8Bit().constData());
+  }
+}
+
+void Z3DShaderProgram::bindTexture(const QString &name, const Z3DTexture *texture)
+{
+  if (texture) {
+    m_textureUnitManager.nextAvailableUnit();
+    m_textureUnitManager.activateCurrentUnit();
+    texture->bind();
+    setUniform(name, m_textureUnitManager.currentUnitNumber());
+    glActiveTexture(GL_TEXTURE0);
+    CHECK_GL_ERROR;
+  }
+}
+
+void Z3DShaderProgram::bindTexture(const QString &name, GLenum target, GLuint textureId)
+{
+  m_textureUnitManager.nextAvailableUnit();
+  m_textureUnitManager.activateCurrentUnit();
+  glBindTexture(target, textureId);
+  setUniform(name, m_textureUnitManager.currentUnitNumber());
+  glActiveTexture(GL_TEXTURE0);
+  CHECK_GL_ERROR;
+}
+
+void Z3DShaderProgram::bindVolume(const QString &name, Z3DVolume *volume)
+{
+  if (!volume)
+    return;
+
+  m_textureUnitManager.nextAvailableUnit();
+  m_textureUnitManager.activateCurrentUnit();
+
+  if (!volume->texture()) {
+    LWARN() << "volume do not contains any texture";
+    glActiveTexture(GL_TEXTURE0);
+    return;
+  }
+
+  volume->texture()->bind();
+  volume->setUniform(*this, name, m_textureUnitManager.currentUnitNumber());
+  glActiveTexture(GL_TEXTURE0);
+  CHECK_GL_ERROR;
+}
+
+void Z3DShaderProgram::bindVolume(const QString &name, Z3DVolume *volume,
+                                  GLint minFilter, GLint magFilter)
+{
+  if (!volume)
+    return;
+
+  m_textureUnitManager.nextAvailableUnit();
+  m_textureUnitManager.activateCurrentUnit();
+
+  if (!volume->texture()) {
+    LWARN() << "volume do not contains any texture";
+    glActiveTexture(GL_TEXTURE0);
+    return;
+  }
+
+  volume->texture()->bind();
+
+  GLenum target = volume->texture()->textureTarget();
+  // texture filtering
+  glTexParameteri(target, GL_TEXTURE_MAG_FILTER, magFilter);
+  glTexParameteri(target, GL_TEXTURE_MIN_FILTER, minFilter);
+
+  volume->setUniform(*this, name, m_textureUnitManager.currentUnitNumber());
+  glActiveTexture(GL_TEXTURE0);
+  CHECK_GL_ERROR;
+}
+
+void Z3DShaderProgram::loadFromSourceFile(const QString &vertFilename, const QString &geomFilename,
+                                          const QString &fragFilename, const QString &header, const QString &geomHeader)
+{
+  removeAllShaders();
+  addShader(Z3DShaderManagerInstance.shader(vertFilename, header, m_context));
+  addShader(Z3DShaderManagerInstance.shader(fragFilename, header, m_context));
+  if (!geomFilename.isEmpty()) {
+    addShader(Z3DShaderManagerInstance.shader(geomFilename, geomHeader, m_context));
+  }
+  link();
+  m_shaderFiles.clear();
+  m_shaderFiles << vertFilename << fragFilename << geomFilename;
+}
+
+void Z3DShaderProgram::loadFromSourceFile(const QString &vertFilename, const QString &fragFilename,
+                                          const QString &header, const QString &geomHeader)
+{
+  loadFromSourceFile(vertFilename, "", fragFilename, header, geomHeader);
+}
+
+void Z3DShaderProgram::loadFromSourceFile(const QStringList &shaderFilenames, const QString &header, const QString &geomHeader)
+{
+  removeAllShaders();
+  for (int i=0; i<shaderFilenames.size(); ++i) {
+    if (shaderFilenames[i].isEmpty())
+      continue;
+    if (shaderFilenames[i].endsWith(".geom", Qt::CaseInsensitive)) {
+      addShader(Z3DShaderManagerInstance.shader(shaderFilenames[i], geomHeader, m_context));
+    } else {
+      addShader(Z3DShaderManagerInstance.shader(shaderFilenames[i], header, m_context));
+    }
+  }
+  link();
+  m_shaderFiles = shaderFilenames;
+}
+
+void Z3DShaderProgram::loadFromSourceCode(const QStringList &vertSrcs, const QStringList &geomSrcs,
+                                          const QStringList &fragSrcs, const QString &header, const QString &geomHeader)
+{
+  removeAllShaders();
+  for (int i=0; i<vertSrcs.size(); ++i) {
+    QString vertSrc = header + vertSrcs[i];
+    addShaderFromSourceCode(Z3DShader::Type::Vertex, vertSrc);
+  }
+
+  for (int i=0; i<geomSrcs.size(); ++i) {
+    QString geomSrc = geomHeader + geomSrcs[i];
+    addShaderFromSourceCode(Z3DShader::Type::Geometry, geomSrc);
+  }
+
+  for (int i=0; i<fragSrcs.size(); ++i) {
+    QString fragSrc = header + fragSrcs[i];
+    addShaderFromSourceCode(Z3DShader::Type::Fragment, fragSrc);
+  }
+
+  link();
+}
+
+void Z3DShaderProgram::loadFromSourceCode(const QStringList &vertSrcs, const QStringList &fragSrcs,
+                                          const QString &header, const QString &geomHeader)
+{
+  loadFromSourceCode(vertSrcs, QStringList(), fragSrcs, header, geomHeader);
+}
+
+void Z3DShaderProgram::setHeaderAndRebuild(const QString &header, const QString &geomHeader)
+{
+  loadFromSourceFile(m_shaderFiles, header, geomHeader);
+}
+
+int Z3DShaderProgram::uniformLocation(const QString &name) const
+{
+  std::map<QString, Uniform>::const_iterator it = m_uniforms.find(name);
+  if (it != m_uniforms.end()) {
+    return it->second.location;
+  }
+  if (logUniformLocationError()) {
+    LWARN() << "Failed to locate uniform:" << name;
+  }
+  return -1;
+}
+
+int Z3DShaderProgram::attributeLocation(const QString &name) const
+{
+  std::map<QString, Attribute>::const_iterator it = m_attributes.find(name);
+  if (it != m_attributes.end()) {
+    return it->second.location;
+  }
+  if (logUniformLocationError()) {
+    LWARN() << "Failed to locate attribute:" << name;
+  }
+  return -1;
+}
+
+//void Z3DShaderProgram::setUniformValue(GLint loc, bool value)
+//{
+//  setUniformValue(loc, static_cast<GLint>(value));
+//}
+
+//void Z3DShaderProgram::setUniformValue(GLint loc, bool v1, bool v2)
+//{
+//  setUniformValue(loc, static_cast<GLint>(v1), static_cast<GLint>(v2));
+//}
+
+//void Z3DShaderProgram::setUniformValue(GLint loc, bool v1, bool v2, bool v3)
+//{
+//  setUniformValue(loc, static_cast<GLint>(v1), static_cast<GLint>(v2), static_cast<GLint>(v3));
+//}
+
+//void Z3DShaderProgram::setUniformValue(GLint loc, bool v1, bool v2, bool v3, bool v4)
+//{
+//  setUniformValue(loc, static_cast<GLint>(v1), static_cast<GLint>(v2), static_cast<GLint>(v3), static_cast<GLint>(v4));
+//}
+
+//void Z3DShaderProgram::setUniformValue(const QString &name, bool value)
+//{
+//  setUniformValue(name, static_cast<GLint>(value));
+//}
+
+//void Z3DShaderProgram::setUniformValue(const QString &name, bool v1, bool v2)
+//{
+//  setUniformValue(name, static_cast<GLint>(v1), static_cast<GLint>(v2));
+//}
+
+//void Z3DShaderProgram::setUniformValue(const QString &name, bool v1, bool v2, bool v3)
+//{
+//  setUniformValue(name, static_cast<GLint>(v1), static_cast<GLint>(v2), static_cast<GLint>(v3));
+//}
+
+//void Z3DShaderProgram::setUniformValue(const QString &name, bool v1, bool v2, bool v3, bool v4)
+//{
+//  setUniformValue(name, static_cast<GLint>(v1), static_cast<GLint>(v2), static_cast<GLint>(v3), static_cast<GLint>(v4));
+//}
+
+void Z3DShaderProgram::storeUniformLocations()
+{
+  m_uniforms.clear();
+  GLint count;
+  GLint maxLength;
+  glGetProgramiv(programId(), GL_ACTIVE_UNIFORMS, &count);
+  glGetProgramiv(programId(), GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxLength);
+  std::vector<char> name(maxLength);
+  for (GLint i=0; i<count; ++i) {
+    Uniform u;
+    glGetActiveUniform(programId(), i, maxLength, nullptr, &u.size, &u.type, &name[0]);
+    u.location = glGetUniformLocation(programId(), &name[0]);
+    QString nm(&name[0]);
+    if (nm.endsWith("[0]"))
+      nm.chop(3);
+    m_uniforms[nm] = u;
+  }
+
+  std::map<QString, Uniform>::const_iterator it;
+
+  it = m_uniforms.find("screen_dim");
+  m_screenDimUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("screen_dim_RCP");
+  m_screenDimRCPUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("camera_position");
+  m_cameraPositionUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("view_matrix");
+  m_viewMatrixUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("view_matrix_inverse");
+  m_viewMatrixInverseUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("projection_matrix");
+  m_projectionMatrixUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("projection_matrix_inverse");
+  m_projectionMatrixInverseUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("normal_matrix");
+  m_normalMatrixUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("viewport_matrix");
+  m_viewportMatrixUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("viewport_matrix_inverse");
+  m_viewportMatrixInverseUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("projection_view_matrix");
+  m_projectionViewMatrixUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("gamma");
+  m_gammaUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("size_scale");
+  m_sizeScaleUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("pos_transform");
+  m_posTransformUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("pos_transform_normal_matrix");
+  m_posTransformNormalMatrixUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("lights_position");
+  m_lightsPositionUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("lights_ambient");
+  m_lightsAmbientUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("lights_diffuse");
+  m_lightsDiffuseUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("lights_specular");
+  m_lightsSpecularUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("lights_spotCutoff");
+  m_lightsSpotCutoffUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("lights_attenuation");
+  m_lightsAttenuationUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("lights_spotExponent");
+  m_lightsSpotExponentUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("lights_spotDirection");
+  m_lightsSpotDirectionUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("material_specular");
+  m_materialSpecularUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("material_shininess");
+  m_materialShininessUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("material_ambient");
+  m_materialAmbientUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("ortho");
+  m_orthoUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("scene_ambient");
+  m_sceneAmbientUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("alpha");
+  m_alphaUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("fog_color_top");
+  m_fogColorTopUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("fog_color_bottom");
+  m_fogColorBottomUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("fog_end");
+  m_fogEndUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("fog_scale");
+  m_fogScaleUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("fog_density_log2e");
+  m_fogDensityLog2eUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("fog_density_density_log2e");
+  m_fogDensityDensityLog2eUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("clip_planes");
+  m_clipPlanesUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("lighting_enabled");
+  m_lightingEnabledUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("color1");
+  m_color1Uniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("color2");
+  m_color2Uniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("line_width");
+  m_lineWidthUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("box_correction");
+  m_boxCorrectionUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("custom_color");
+  m_customColorUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("use_custom_color");
+  m_useCustomColorUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+}
+
+void Z3DShaderProgram::storeAttributeLocations()
+{
+  m_attributes.clear();
+  GLint count;
+  GLint maxLength;
+  glGetProgramiv(programId(), GL_ACTIVE_ATTRIBUTES, &count);
+  glGetProgramiv(programId(), GL_ACTIVE_ATTRIBUTE_MAX_LENGTH, &maxLength);
+  std::vector<char> name(maxLength);
+  for (GLint i=0; i<count; ++i) {
+    Attribute u;
+    glGetActiveAttrib(programId(), i, maxLength, nullptr, &u.size, &u.type, &name[0]);
+    u.location = glGetAttribLocation(programId(), &name[0]);
+    m_attributes[QString(&name[0])] = u;
+  }
+
+  std::map<QString, Attribute>::const_iterator it;
+
+  it = m_attributes.find("attr_vertex");
+  m_vertexAttribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+  it = m_attributes.find("attr_normal");
+  m_normalAttribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+  it = m_attributes.find("attr_origin");
+  m_originAttribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+  it = m_attributes.find("attr_axis");
+  m_axisAttribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+  it = m_attributes.find("attr_flags");
+  m_flagsAttribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+  it = m_attributes.find("attr_color");
+  m_colorAttribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+  it = m_attributes.find("attr_color2");
+  m_color2Attribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+  it = m_attributes.find("attr_specular_shininess");
+  m_specularShininessAttribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+  it = m_attributes.find("attr_1dTexCoord0");
+  m_1dTexCoord0Attribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+  it = m_attributes.find("attr_2dTexCoord0");
+  m_2dTexCoord0Attribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+  it = m_attributes.find("attr_3dTexCoord0");
+  m_3dTexCoord0Attribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+  it = m_attributes.find("attr_p0");
+  m_p0Attribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+  it = m_attributes.find("attr_p1");
+  m_p1Attribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+  it = m_attributes.find("attr_p0color");
+  m_p0ColorAttribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+  it = m_attributes.find("attr_p1color");
+  m_p1ColorAttribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+  it = m_attributes.find("attr_T");
+  m_TAttribute = (it == m_attributes.end()) ? nullptr : &(it->second);
+}
+
+} // namespace nim

@@ -1,0 +1,37 @@
+#!/bin/bash
+
+currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
+srcDIR=$currDIR/../../../botan
+buildDIR=$srcDIR/../__botan-build
+installDIR=$currDIR/botan
+
+if [ -d $installDIR ]
+then
+  rm -rf $installDIR
+fi
+
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  git pull
+else
+  git clone git@github.com:randombit/botan.git $srcDIR
+fi
+
+if [ -d $buildDIR ]
+then
+  rm -rf $buildDIR
+fi
+mkdir $buildDIR
+#cd %buildDIR
+cd $srcDIR
+
+$srcDIR/configure.py --cc=clang --cc-abi-flags="-mmacosx-version-min=10.7 -stdlib=libc++" --prefix=$installDIR
+
+make -j4 install
+
+rm Makefile
+rm -rf build
+
+cd $currDIR
+rm -rf $buildDIR

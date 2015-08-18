@@ -1,0 +1,42 @@
+#ifndef Z2DANIMATION_H
+#define Z2DANIMATION_H
+
+#include "zanimation.h"
+#include <map>
+
+namespace nim {
+
+class ZView;
+class ZParameterAnimation;
+
+class Z2DAnimation : public ZAnimation
+{
+  Q_OBJECT
+public:
+  explicit Z2DAnimation(ZDoc &doc, QObject *parent = nullptr);
+  ~Z2DAnimation();
+
+  void bindView(ZView *v);
+
+  void load(const QString &filename);
+  void save(const QString &filename);
+
+  virtual bool is2DAnimation() const override { return true; }
+
+signals:
+
+protected:
+  virtual void bindGlobalParameters() override;
+  virtual void addGlobalKey(double time) override;
+
+protected:
+  ZParameterAnimation *m_sliceAnimation;
+  ZParameterAnimation *m_timeAnimation;
+  ZParameterAnimation *m_mipAnimation;
+  ZParameterAnimation *m_viewportAnimation;
+};
+
+} // namespace nim
+
+
+#endif // Z2DANIMATION_H

@@ -1,0 +1,33 @@
+#!/bin/bash
+
+currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
+srcDIR=$currDIR/../../../VTK
+buildDIR=$srcDIR/../__vtk-build
+installDIR=$currDIR/vtk
+
+if [ -d $installDIR ]
+then
+  rm -rf $installDIR
+fi
+
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  git pull
+else
+  git clone https://gitlab.kitware.com/vtk/vtk.git $srcDIR
+fi
+
+if [ -d $buildDIR ]
+then
+  rm -rf $buildDIR
+fi
+mkdir $buildDIR
+cd $buildDIR
+
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.7 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.10.sdk -DBUILD_EXAMPLES:BOOL="0" -DBUILD_TESTING:BOOL="0" -DBUILD_SHARED_LIBS:BOOL="0" -DVTK_USE_SYSTEM_ZLIB:BOOL="1" -DVTK_LEGACY_REMOVE:BOOL="1" -DVTK_USE_SYSTEM_LIBXML2:BOOL="1" -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++11" $srcDIR
+
+make -j4 install
+
+cd $currDIR
+rm -rf $buildDIR

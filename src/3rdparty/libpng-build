@@ -1,0 +1,25 @@
+#!/bin/bash
+
+currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
+srcDIR=$currDIR/../../../libpng-1.6.16
+buildDIR=$srcDIR/../__libpng-build
+installDIR=$currDIR/libpng
+
+if [ -d $installDIR ]
+then
+  rm -rf $installDIR
+fi
+
+if [ -d $buildDIR ]
+then
+  rm -rf $buildDIR
+fi
+mkdir $buildDIR
+cd $buildDIR
+
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.7 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.10.sdk -DPNG_TESTS:BOOL="0" -DPNG_SHARED:BOOL="0" $srcDIR
+
+make -j4 install
+
+cd $currDIR
+rm -rf $buildDIR

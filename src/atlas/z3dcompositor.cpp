@@ -1,0 +1,1405 @@
+#include "z3dgl.h"
+#include "z3dcompositor.h"
+
+#include "z3dtexture.h"
+#include "z3dgpuinfo.h"
+#include "z3drendertarget.h"
+
+#include "zbenchtimer.h"
+
+namespace nim {
+
+//#define USE_RECT_TEX
+
+Z3DCompositor::Z3DCompositor(Z3DGlobalParameters &globalParas, QObject *parent)
+  : Z3DRenderProcessor(globalParas, parent)
+  , m_alphaBlendRenderer(m_rendererBase, "DepthTestBlending")
+  , m_firstOnTopBlendRenderer(m_rendererBase, "FirstOnTopBlending")
+  , m_firstOnTopRenderer(m_rendererBase, "FirstOnTop")
+  , m_textureCopyRenderer(m_rendererBase)
+  , m_backgroundRenderer(m_rendererBase)
+  //, m_renderGeometries("Render Geometries", true)
+  , m_inport("Image", true, InvalidMonoViewResult)
+  , m_leftEyeInport("LeftEyeImage", true, InvalidLeftEyeResult)
+  , m_rightEyeInport("RightEyeImage", true, InvalidRightEyeResult)
+  , m_outport("Image", true, InvalidMonoViewResult)
+  , m_leftEyeOutport("LeftEyeImage", true, InvalidLeftEyeResult)
+  , m_rightEyeOutport("RightEyeImage", true, InvalidRightEyeResult)
+  , m_tempPort("ImageTemp")
+  , m_tempPort2("ImageTemp2")
+  , m_tempPort3("ImageTemp3")
+  , m_tempPort4("ImageTemp4")
+  , m_tempPort5("ImageTemp5")
+  , m_pickingPort("PickingTarget", true, Z3DProcessor::InvalidAllResult, (GLint)GL_RGBA8)
+  , m_gPPort("GeometryFilters", true)
+  , m_vPPort("VolumeFilters", true)
+  , m_ddpRT(NULL)
+  , m_ddpBlendShader()
+  , m_ddpFinalShader()
+  , m_waRT(NULL)
+  , m_waFinalShader()
+  , m_showBackground("Show Background", true)
+  , m_backgroundWidgetsGroup(NULL)
+  , m_lineRenderer(m_rendererBase)
+  , m_arrowRenderer(m_rendererBase)
+  , m_fontRenderer(m_rendererBase)
+  , m_showAxis("Show Axis", true)
+  , m_XAxisColor("X Axis Color", glm::vec4(1.f, 0.f, 0.f, 1.0f))
+  , m_YAxisColor("Y Axis Color", glm::vec4(0.f, 1.f, 0.f, 1.0f))
+  , m_ZAxisColor("Z Axis Color", glm::vec4(0.f, 0.f, 1.f, 1.0f))
+  , m_axisRegionRatio("Axis Region Ratio", .2f, .1f, 1.f)
+  , m_axisMode("Mode")
+  , m_axisWidgetsGroup(NULL)
+{
+  addParameter(m_showBackground);
+  //addParameter(m_renderGeometries);
+
+  addPort(m_inport);
+  addPort(m_leftEyeInport);
+  addPort(m_rightEyeInport);
+  addPort(m_outport);
+  addPort(m_leftEyeOutport);
+  addPort(m_rightEyeOutport);
+  addPrivateRenderPort(m_tempPort);
+  addPrivateRenderPort(m_tempPort2);
+  addPrivateRenderPort(m_tempPort3);
+  addPrivateRenderPort(m_tempPort4);
+  addPrivateRenderPort(m_tempPort5);
+  addPrivateRenderPort(m_pickingPort);
+  addPort(m_gPPort);
+  addPort(m_vPPort);
+
+  m_textureCopyRenderer.setDiscardTransparent(true);
+  addParameter(m_backgroundRenderer.modePara());
+  addParameter(m_backgroundRenderer.firstColorPara());
+  addParameter(m_backgroundRenderer.secondColorPara());
+  addParameter(m_backgroundRenderer.gradientOrientationPara());
+
+  if (Z3DGpuInfoInstance.isWeightedAverageSupported()) {
+    m_waFinalShader.bindFragDataLocation(0, "FragData0");
+#ifdef USE_RECT_TEX
+    m_waFinalShader.loadFromSourceFile("pass.vert", "wavg_final.frag",
+                                        m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
+#else
+    m_waFinalShader.loadFromSourceFile("pass.vert", "wavg_final.frag", m_rendererBase.generateHeader());
+#endif
+  }
+
+  if (Z3DGpuInfoInstance.isDualDepthPeelingSupported()) {
+    m_ddpBlendShader.bindFragDataLocation(0, "FragData0");
+#ifdef USE_RECT_TEX
+    m_ddpBlendShader.loadFromSourceFile("pass.vert", "dual_peeling_blend.frag",
+                                         m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
+#else
+    m_ddpBlendShader.loadFromSourceFile("pass.vert", "dual_peeling_blend.frag", m_rendererBase.generateHeader());
+#endif
+    m_ddpFinalShader.bindFragDataLocation(0, "FragData0");
+#ifdef USE_RECT_TEX
+    m_ddpFinalShader.loadFromSourceFile("pass.vert", "dual_peeling_final.frag",
+                                         m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
+#else
+    m_ddpFinalShader.loadFromSourceFile("pass.vert", "dual_peeling_final.frag", m_rendererBase.generateHeader());
+#endif
+  }
+
+  CHECK_GL_ERROR;
+  globalParas.setPickingTarget(m_pickingPort.renderTarget());
+  addInteractionHandler(globalParas.interactionHandler);
+
+  m_XAxisColor.setStyle("COLOR");
+  m_YAxisColor.setStyle("COLOR");
+  m_ZAxisColor.setStyle("COLOR");
+  m_axisMode.addOptions("Arrow", "Line");
+  m_axisMode.select("Arrow");
+  addParameter(m_showAxis);
+  addParameter(m_XAxisColor);
+  addParameter(m_YAxisColor);
+  addParameter(m_ZAxisColor);
+  addParameter(m_axisRegionRatio);
+  addParameter(m_axisMode);
+  addParameter(&m_fontRenderer.allFontNamesPara());
+  addParameter(&m_fontRenderer.fontPara());
+  addParameter(&m_fontRenderer.fontSizePara());
+  addParameter(&m_fontRenderer.fontSoftEdgeScalePara());
+  addParameter(&m_fontRenderer.showFontOutlinePara());
+  addParameter(&m_fontRenderer.fontOutlineModePara());
+  addParameter(&m_fontRenderer.fontOutlineColorPara());
+  addParameter(&m_fontRenderer.showFontShadowPara());
+  addParameter(&m_fontRenderer.fontShadowColorPara());
+  m_arrowRenderer.setUseDisplayList(false);
+  m_lineRenderer.setUseDisplayList(false);
+  m_fontRenderer.setFollowCoordTransform(false);
+  setupAxisCamera();
+}
+
+Z3DCompositor::~Z3DCompositor()
+{
+  if (Z3DGpuInfoInstance.isWeightedAverageSupported()) {
+    if (m_waRT) {
+      delete m_waRT;
+      m_waRT = NULL;
+    }
+  }
+
+  if (Z3DGpuInfoInstance.isDualDepthPeelingSupported()) {
+    if (m_ddpRT) {
+      delete m_ddpRT;
+      m_ddpRT = NULL;
+    }
+  }
+}
+
+bool Z3DCompositor::isReady(Z3DEye eye) const
+{
+  if (eye == Z3DEye::Mono && m_outport.isReady())
+    return true;
+  else if (eye == Z3DEye::Left && m_leftEyeOutport.isReady())
+    return true;
+  else if (eye == Z3DEye::Right && m_rightEyeOutport.isReady())
+    return true;
+  return false;
+}
+
+ZWidgetsGroup *Z3DCompositor::backgroundWidgetsGroup()
+{
+  if (!m_backgroundWidgetsGroup) {
+    m_backgroundWidgetsGroup = new ZWidgetsGroup("Background", NULL, 1);
+    new ZWidgetsGroup(&m_showBackground, m_backgroundWidgetsGroup, 1);
+    new ZWidgetsGroup(&m_backgroundRenderer.modePara(), m_backgroundWidgetsGroup, 1);
+    new ZWidgetsGroup(&m_backgroundRenderer.firstColorPara(), m_backgroundWidgetsGroup, 1);
+    new ZWidgetsGroup(&m_backgroundRenderer.secondColorPara(), m_backgroundWidgetsGroup, 1);
+    new ZWidgetsGroup(&m_backgroundRenderer.gradientOrientationPara(), m_backgroundWidgetsGroup, 1);
+    m_backgroundWidgetsGroup->setBasicAdvancedCutoff(4);
+  }
+  return m_backgroundWidgetsGroup;
+}
+
+ZWidgetsGroup *Z3DCompositor::axisWidgetsGroup()
+{
+  if (!m_axisWidgetsGroup) {
+    m_axisWidgetsGroup = new ZWidgetsGroup("Axis", NULL, 1);
+    new ZWidgetsGroup(&m_showAxis, m_axisWidgetsGroup, 1);
+    new ZWidgetsGroup(&m_axisMode, m_axisWidgetsGroup, 1);
+    new ZWidgetsGroup(&m_axisRegionRatio, m_axisWidgetsGroup, 1);
+    new ZWidgetsGroup(&m_XAxisColor, m_axisWidgetsGroup, 1);
+    new ZWidgetsGroup(&m_YAxisColor, m_axisWidgetsGroup, 1);
+    new ZWidgetsGroup(&m_ZAxisColor, m_axisWidgetsGroup, 1);
+    std::vector<ZParameter*> paras = m_rendererBase.parameters();
+    for (size_t i=0; i<paras.size(); i++) {
+      ZParameter *para = paras[i];
+      if (para->name() == "Size Scale")
+        new ZWidgetsGroup(para, m_axisWidgetsGroup, 1);
+      else if (para->name() == "Rendering Method")
+        new ZWidgetsGroup(para, m_axisWidgetsGroup, 3);
+      else if (para->name() == "Opacity")
+        new ZWidgetsGroup(para, m_axisWidgetsGroup, 3);
+    }
+    new ZWidgetsGroup(&m_fontRenderer.allFontNamesPara(), m_axisWidgetsGroup, 4);
+    new ZWidgetsGroup(&m_fontRenderer.fontPara(), m_axisWidgetsGroup, 4);
+    new ZWidgetsGroup(&m_fontRenderer.fontSizePara(), m_axisWidgetsGroup, 4);
+    new ZWidgetsGroup(&m_fontRenderer.fontSoftEdgeScalePara(), m_axisWidgetsGroup, 4);
+    new ZWidgetsGroup(&m_fontRenderer.showFontOutlinePara(), m_axisWidgetsGroup, 4);
+    new ZWidgetsGroup(&m_fontRenderer.fontOutlineModePara(), m_axisWidgetsGroup, 4);
+    new ZWidgetsGroup(&m_fontRenderer.fontOutlineColorPara(), m_axisWidgetsGroup, 4);
+    new ZWidgetsGroup(&m_fontRenderer.showFontShadowPara(), m_axisWidgetsGroup, 4);
+    new ZWidgetsGroup(&m_fontRenderer.fontShadowColorPara(), m_axisWidgetsGroup, 4);
+    m_axisWidgetsGroup->setBasicAdvancedCutoff(5);
+  }
+  return m_axisWidgetsGroup;
+}
+
+void Z3DCompositor::savePickingBufferToImage(const QString &filename)
+{
+  Z3DTexture *tex = pickingManager().renderTarget().attachment(GL_COLOR_ATTACHMENT0);
+  saveTextureAsImage(tex, filename);
+}
+
+void Z3DCompositor::process(Z3DEye eye)
+{
+  std::vector<Z3DGeometryFilter*> filters = m_gPPort.connectedProcessors();
+  std::vector<Z3DVolumeFilter*> vFilters = m_vPPort.connectedProcessors();
+  std::vector<Z3DBoundedFilter*> onTopOpaqueFilters;
+  std::vector<Z3DBoundedFilter*> onTopTransparentFilters;
+  std::vector<Z3DBoundedFilter*> normalOpaqueFilters;
+  std::vector<Z3DBoundedFilter*> normalTransparentFilters;
+  std::vector<Z3DBoundedFilter*> selectedFilters;
+  std::vector<Z3DBoundedFilter*> showHandleFilters;
+  for (size_t i=0; i<vFilters.size(); ++i) {
+    Z3DVolumeFilter* vFilter = vFilters.at(i);
+    if (vFilter->isReady(eye) && vFilter->hasOpaque(eye)) {
+      normalOpaqueFilters.push_back(vFilter);
+    }
+    if (vFilter->isSelected()) {
+      selectedFilters.push_back(vFilter);
+      if (vFilter->isTransformEnabled())
+        showHandleFilters.push_back(vFilter);
+    }
+  }
+  //if (m_renderGeometries.get()) {
+  for (size_t i=0; i<filters.size(); ++i) {
+    Z3DGeometryFilter* geomFilter = filters.at(i);
+    if (geomFilter->isReady(eye) && (geomFilter->opacity() > 0.0)) {
+      if (geomFilter->hasOpaque(eye)) {
+        if (geomFilter->isStayOnTop())
+          onTopOpaqueFilters.push_back(geomFilter);
+        else
+          normalOpaqueFilters.push_back(geomFilter);
+      }
+      if (geomFilter->hasTransparent(eye)) {
+        if (geomFilter->isStayOnTop())
+          onTopTransparentFilters.push_back(geomFilter);
+        else
+          normalTransparentFilters.push_back(geomFilter);
+      }
+    }
+    if (geomFilter->isSelected()) {
+      selectedFilters.push_back(geomFilter);
+      if (geomFilter->isTransformEnabled())
+        showHandleFilters.push_back(geomFilter);
+    }
+  }
+  //}
+  size_t numNormalFilters = normalOpaqueFilters.size() + normalTransparentFilters.size();
+  size_t numOnTopFilters = onTopOpaqueFilters.size() + onTopTransparentFilters.size();
+
+  Z3DRenderOutputPort &currentOutport = (!showHandleFilters.empty()) ? m_tempPort5 : (eye == Z3DEye::Mono) ?
+        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+  Z3DRenderInputPort &currentInport = (eye == Z3DEye::Mono) ?
+        m_inport : (eye == Z3DEye::Left) ? m_leftEyeInport : m_rightEyeInport;
+
+  glEnable(GL_DEPTH_TEST);
+
+  if (m_rendererBase.transparencyMethodPara().isSelected("Blend No Depth Mask") || m_rendererBase.transparencyMethodPara().isSelected("Blend Delayed")) {
+    if (!currentInport.isReady()) {  // no volume, only geometrys to render
+      if (numNormalFilters == 0 || numOnTopFilters == 0) {
+        if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) { // render to tempport (twice larger than outport) then copy to outport
+          m_tempPort.resize(currentOutport.size() * 2);
+        } else {  // render to tempport then copy to outport
+          m_tempPort.resize(currentOutport.size());
+        }
+
+        if (numOnTopFilters == 0)
+          renderGeometries(normalOpaqueFilters, normalTransparentFilters, m_tempPort, eye);
+        else
+          renderGeometries(onTopOpaqueFilters, onTopTransparentFilters, m_tempPort, eye);
+
+        // copy to outport
+        currentOutport.bindTarget();
+        currentOutport.clearTarget();
+        m_rendererBase.setViewport(currentOutport.size());
+
+        if (m_showBackground.get()) {
+          m_rendererBase.render(eye, m_backgroundRenderer);
+          glEnable(GL_BLEND);
+          glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+        }
+        glDepthFunc(GL_ALWAYS);
+        m_textureCopyRenderer.setColorTexture(m_tempPort.colorTexture());
+        m_textureCopyRenderer.setDepthTexture(m_tempPort.depthTexture());
+        m_rendererBase.render(eye, m_textureCopyRenderer);
+        glDepthFunc(GL_LESS);
+        if (m_showAxis.get()) {
+          if (!m_showBackground.get()) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+          }
+          renderAxis(eye);
+        }
+        if (m_showBackground.get() || m_showAxis.get()) {
+          glBlendFunc(GL_ONE,GL_ZERO);
+          glDisable(GL_BLEND);
+        }
+
+        currentOutport.releaseTarget();
+        CHECK_GL_ERROR;
+      } else {
+        if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
+          m_tempPort.resize(currentOutport.size() * 2);
+          m_tempPort2.resize(currentOutport.size() * 2);
+        } else {
+          m_tempPort.resize(currentOutport.size());
+          m_tempPort2.resize(currentOutport.size());
+        }
+
+        // render normal geometries to tempport
+        renderGeometries(normalOpaqueFilters, normalTransparentFilters, m_tempPort, eye);
+
+        // render on top geometries to tempport2
+        renderGeometries(onTopOpaqueFilters, onTopTransparentFilters, m_tempPort2, eye);
+
+        // blend to output
+        currentOutport.bindTarget();
+        currentOutport.clearTarget();
+        m_rendererBase.setViewport(currentOutport.size());
+
+        if (m_showBackground.get()) {
+          m_rendererBase.render(eye, m_backgroundRenderer);
+          glEnable(GL_BLEND);
+          glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+        }
+        m_firstOnTopBlendRenderer.setColorTexture1(m_tempPort2.colorTexture());
+        m_firstOnTopBlendRenderer.setDepthTexture1(m_tempPort2.depthTexture());
+        m_firstOnTopBlendRenderer.setColorTexture2(m_tempPort.colorTexture());
+        m_firstOnTopBlendRenderer.setDepthTexture2(m_tempPort.depthTexture());
+        m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
+        if (m_showAxis.get()) {
+          if (!m_showBackground.get()) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+          }
+          renderAxis(eye);
+        }
+        if (m_showBackground.get() || m_showAxis.get()) {
+          glBlendFunc(GL_ONE,GL_ZERO);
+          glDisable(GL_BLEND);
+        }
+
+        currentOutport.releaseTarget();
+        CHECK_GL_ERROR;
+      }
+    } else {      // with volume
+      if (numNormalFilters == 0 && numOnTopFilters == 0) {  // directly copy inport image to outport
+        const Z3DTexture *colorTex = NULL;
+        const Z3DTexture *depthTex = NULL;
+        renderImages(currentInport, currentOutport, eye, colorTex, depthTex);
+
+        currentOutport.bindTarget();
+        currentOutport.clearTarget();
+        m_rendererBase.setViewport(currentOutport.size());
+
+        if (m_showBackground.get()) {
+          m_rendererBase.render(eye, m_backgroundRenderer);
+          glEnable(GL_BLEND);
+          glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+        }
+        glDepthFunc(GL_ALWAYS);
+        m_textureCopyRenderer.setColorTexture(colorTex);
+        m_textureCopyRenderer.setDepthTexture(depthTex);
+        m_rendererBase.render(eye, m_textureCopyRenderer);
+        glDepthFunc(GL_LESS);
+        if (m_showAxis.get()) {
+          if (!m_showBackground.get()) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+          }
+          renderAxis(eye);
+        }
+        if (m_showBackground.get() || m_showAxis.get()) {
+          glBlendFunc(GL_ONE,GL_ZERO);
+          glDisable(GL_BLEND);
+        }
+
+        currentOutport.releaseTarget();
+        CHECK_GL_ERROR;
+      } else if (numNormalFilters == 0 || numOnTopFilters == 0) {  // render geometries into one temp port then blend with volume
+        if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
+          m_tempPort.resize(currentOutport.size() * 2);
+        } else {
+          m_tempPort.resize(currentOutport.size());
+        }
+
+        // render geometries into one temp port
+        if (numOnTopFilters == 0)
+          renderGeometries(normalOpaqueFilters, normalTransparentFilters, m_tempPort, eye);
+        else
+          renderGeometries(onTopOpaqueFilters, onTopTransparentFilters, m_tempPort, eye);
+
+        const Z3DTexture *colorTex = NULL;
+        const Z3DTexture *depthTex = NULL;
+        renderImages(currentInport, currentOutport, eye, colorTex, depthTex);
+
+        // blend tempPort with volume
+        currentOutport.bindTarget();
+        currentOutport.clearTarget();
+        m_rendererBase.setViewport(currentOutport.size());
+
+        if (m_showBackground.get()) {
+          m_rendererBase.render(eye, m_backgroundRenderer);
+          glEnable(GL_BLEND);
+          glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+        }
+        if (numOnTopFilters == 0) {
+          m_alphaBlendRenderer.setColorTexture1(m_tempPort.colorTexture());
+          m_alphaBlendRenderer.setDepthTexture1(m_tempPort.depthTexture());
+          m_alphaBlendRenderer.setColorTexture2(colorTex);
+          m_alphaBlendRenderer.setDepthTexture2(depthTex);
+          m_rendererBase.render(eye, m_alphaBlendRenderer);
+        } else {
+          m_firstOnTopBlendRenderer.setColorTexture1(m_tempPort.colorTexture());
+          m_firstOnTopBlendRenderer.setDepthTexture1(m_tempPort.depthTexture());
+          m_firstOnTopBlendRenderer.setColorTexture2(colorTex);
+          m_firstOnTopBlendRenderer.setDepthTexture2(depthTex);
+          m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
+        }
+        if (m_showAxis.get()) {
+          if (!m_showBackground.get()) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+          }
+          renderAxis(eye);
+        }
+        if (m_showBackground.get() || m_showAxis.get()) {
+          glBlendFunc(GL_ONE,GL_ZERO);
+          glDisable(GL_BLEND);
+        }
+
+        currentOutport.releaseTarget();
+        CHECK_GL_ERROR;
+      } else { // render normal geometries into tempport, then blend inport and tempport into tempport2, then render on top geometries into tempport, then
+        // blend temport and temport2 into outport
+        if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
+          m_tempPort.resize(currentOutport.size() * 2);
+          m_tempPort2.resize(currentOutport.size() * 2);
+        } else {
+          m_tempPort.resize(currentOutport.size());
+          m_tempPort2.resize(currentOutport.size());
+        }
+
+        // render normal geometries into tempport
+        renderGeometries(normalOpaqueFilters, normalTransparentFilters, m_tempPort, eye);
+
+        const Z3DTexture *colorTex = NULL;
+        const Z3DTexture *depthTex = NULL;
+        renderImages(currentInport, currentOutport, eye, colorTex, depthTex);
+
+        // blend inport and tempport into tempport2
+        m_tempPort2.bindTarget();
+        CHECK_GL_ERROR;
+
+        m_rendererBase.setViewport(m_tempPort2.size());
+        m_alphaBlendRenderer.setColorTexture1(m_tempPort.colorTexture());
+        m_alphaBlendRenderer.setDepthTexture1(m_tempPort.depthTexture());
+        m_alphaBlendRenderer.setColorTexture2(colorTex);
+        m_alphaBlendRenderer.setDepthTexture2(depthTex);
+        m_rendererBase.render(eye, m_alphaBlendRenderer);
+
+        m_tempPort2.releaseTarget();
+        CHECK_GL_ERROR;
+
+        // render on top geometries into tempport
+        renderGeometries(onTopOpaqueFilters, onTopTransparentFilters, m_tempPort, eye);
+
+        // blend temport and temport2 into outport
+        currentOutport.bindTarget();
+        currentOutport.clearTarget();
+        m_rendererBase.setViewport(currentOutport.size());
+
+        if (m_showBackground.get()) {
+          m_rendererBase.render(eye, m_backgroundRenderer);
+          glEnable(GL_BLEND);
+          glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+        }
+        m_firstOnTopBlendRenderer.setColorTexture1(m_tempPort.colorTexture());
+        m_firstOnTopBlendRenderer.setDepthTexture1(m_tempPort.depthTexture());
+        m_firstOnTopBlendRenderer.setColorTexture2(m_tempPort2.colorTexture());
+        m_firstOnTopBlendRenderer.setDepthTexture2(m_tempPort2.depthTexture());
+        m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
+        if (m_showAxis.get()) {
+          if (!m_showBackground.get()) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+          }
+          renderAxis(eye);
+        }
+        if (m_showBackground.get() || m_showAxis.get()) {
+          glBlendFunc(GL_ONE,GL_ZERO);
+          glDisable(GL_BLEND);
+        }
+
+        currentOutport.releaseTarget();
+        CHECK_GL_ERROR;
+      }
+    }
+  } else {
+    for (size_t i=0; i<vFilters.size(); ++i) {
+      Z3DVolumeFilter* vFilter = vFilters.at(i);
+      if (vFilter->isReady(eye) && vFilter->hasTransparent(eye)) {
+        normalTransparentFilters.push_back(vFilter);
+      }
+    }
+    numNormalFilters = normalOpaqueFilters.size() + normalTransparentFilters.size();
+    if (numNormalFilters == 0 || numOnTopFilters == 0) {
+      if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) { // render to tempport (twice larger than outport) then copy to outport
+        m_tempPort.resize(currentOutport.size() * 2);
+      } else {  // render to tempport then copy to outport
+        m_tempPort.resize(currentOutport.size());
+      }
+
+      if (numOnTopFilters == 0)
+        renderGeometries(normalOpaqueFilters, normalTransparentFilters, m_tempPort, eye);
+      else
+        renderGeometries(onTopOpaqueFilters, onTopTransparentFilters, m_tempPort, eye);
+
+      // copy to outport
+      currentOutport.bindTarget();
+      currentOutport.clearTarget();
+      m_rendererBase.setViewport(currentOutport.size());
+
+      if (m_showBackground.get()) {
+        m_rendererBase.render(eye, m_backgroundRenderer);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+      }
+      glDepthFunc(GL_ALWAYS);
+      m_textureCopyRenderer.setColorTexture(m_tempPort.colorTexture());
+      m_textureCopyRenderer.setDepthTexture(m_tempPort.depthTexture());
+      m_rendererBase.render(eye, m_textureCopyRenderer);
+      glDepthFunc(GL_LESS);
+      if (m_showAxis.get()) {
+        if (!m_showBackground.get()) {
+          glEnable(GL_BLEND);
+          glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+        }
+        renderAxis(eye);
+      }
+      if (m_showBackground.get() || m_showAxis.get()) {
+        glBlendFunc(GL_ONE,GL_ZERO);
+        glDisable(GL_BLEND);
+      }
+
+      currentOutport.releaseTarget();
+      CHECK_GL_ERROR;
+    } else {
+      if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
+        m_tempPort.resize(currentOutport.size() * 2);
+        m_tempPort2.resize(currentOutport.size() * 2);
+      } else {
+        m_tempPort.resize(currentOutport.size());
+        m_tempPort2.resize(currentOutport.size());
+      }
+
+      // render normal geometries to tempport
+      renderGeometries(normalOpaqueFilters, normalTransparentFilters, m_tempPort, eye);
+
+      // render on top geometries to tempport2
+      renderGeometries(onTopOpaqueFilters, onTopTransparentFilters, m_tempPort2, eye);
+
+      // blend to output
+      currentOutport.bindTarget();
+      currentOutport.clearTarget();
+      m_rendererBase.setViewport(currentOutport.size());
+
+      if (m_showBackground.get()) {
+        m_rendererBase.render(eye, m_backgroundRenderer);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+      }
+      m_firstOnTopBlendRenderer.setColorTexture1(m_tempPort2.colorTexture());
+      m_firstOnTopBlendRenderer.setDepthTexture1(m_tempPort2.depthTexture());
+      m_firstOnTopBlendRenderer.setColorTexture2(m_tempPort.colorTexture());
+      m_firstOnTopBlendRenderer.setDepthTexture2(m_tempPort.depthTexture());
+      m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
+      if (m_showAxis.get()) {
+        if (!m_showBackground.get()) {
+          glEnable(GL_BLEND);
+          glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+        }
+        renderAxis(eye);
+      }
+      if (m_showBackground.get() || m_showAxis.get()) {
+        glBlendFunc(GL_ONE,GL_ZERO);
+        glDisable(GL_BLEND);
+      }
+
+      currentOutport.releaseTarget();
+      CHECK_GL_ERROR;
+    }
+  }
+
+  if (!showHandleFilters.empty()) {
+    m_tempPort4.bindTarget();
+    m_tempPort4.clearTarget();
+    for (size_t i=0; i<showHandleFilters.size(); ++i) {
+      showHandleFilters[i]->setViewport(m_tempPort4.size());
+      showHandleFilters[i]->renderHandle(eye);
+    }
+    m_tempPort4.releaseTarget();
+    CHECK_GL_ERROR;
+    Z3DRenderOutputPort &finalOutport = (eye == Z3DEye::Mono) ?
+          m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+    finalOutport.bindTarget();
+    finalOutport.clearTarget();
+    m_rendererBase.setViewport(finalOutport.size());
+    m_firstOnTopBlendRenderer.setColorTexture1(m_tempPort4.colorTexture());
+    m_firstOnTopBlendRenderer.setDepthTexture1(m_tempPort4.depthTexture());
+    m_firstOnTopBlendRenderer.setColorTexture2(currentOutport.colorTexture());
+    m_firstOnTopBlendRenderer.setDepthTexture2(currentOutport.depthTexture());
+    m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+    for (size_t i=0; i<selectedFilters.size(); ++i) {
+      selectedFilters[i]->setViewport(finalOutport.size());
+      selectedFilters[i]->renderSelectionBox(eye);
+    }
+    glBlendFunc(GL_ONE,GL_ZERO);
+    glDisable(GL_BLEND);
+    finalOutport.releaseTarget();
+    CHECK_GL_ERROR;
+  } else if (!selectedFilters.empty()) {
+    currentOutport.bindTarget();
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+    for (size_t i=0; i<selectedFilters.size(); ++i) {
+      selectedFilters[i]->setViewport(currentOutport.size());
+      selectedFilters[i]->renderSelectionBox(eye);
+    }
+    glBlendFunc(GL_ONE,GL_ZERO);
+    glDisable(GL_BLEND);
+    currentOutport.releaseTarget();
+    CHECK_GL_ERROR;
+  }
+
+  // render picking objects
+  if (filters.empty() && !showHandleFilters.empty()) {
+    pickingManager().bindTarget();
+    pickingManager().clearTarget();
+    for (size_t i=0; i<showHandleFilters.size(); ++i) {
+      showHandleFilters[i]->setViewport(pickingManager().renderTarget().size());
+      showHandleFilters[i]->renderHandlePicking(eye);
+    }
+    pickingManager().releaseTarget();
+  } else if (showHandleFilters.empty() && !filters.empty()) {
+    pickingManager().bindTarget();
+    pickingManager().clearTarget();
+    for (size_t i=0; i<filters.size(); i++) {
+      Z3DGeometryFilter* geomFilter = filters.at(i);
+      if (geomFilter->isReady(eye)) {
+        geomFilter->setViewport(pickingManager().renderTarget().size());
+        geomFilter->renderPicking(eye);
+        CHECK_GL_ERROR;
+      }
+    }
+    pickingManager().releaseTarget();
+  } else if (!filters.empty() && !showHandleFilters.empty()) {
+    m_tempPort5.bindTarget();
+    m_tempPort5.clearTarget();
+    for (size_t i=0; i<showHandleFilters.size(); ++i) {
+      showHandleFilters[i]->setViewport(m_tempPort5.size());
+      showHandleFilters[i]->renderHandlePicking(eye);
+    }
+    m_tempPort5.releaseTarget();
+    m_tempPort4.bindTarget();
+    m_tempPort4.clearTarget();
+    for (size_t i=0; i<filters.size(); i++) {
+      Z3DGeometryFilter* geomFilter = filters.at(i);
+      if (geomFilter->isReady(eye)) {
+        geomFilter->setViewport(m_tempPort4.size());
+        geomFilter->renderPicking(eye);
+        CHECK_GL_ERROR;
+      }
+    }
+    m_tempPort4.releaseTarget();
+    pickingManager().bindTarget();
+    pickingManager().clearTarget();
+    m_rendererBase.setViewport(pickingManager().renderTarget().size());
+    m_firstOnTopRenderer.setColorTexture1(m_tempPort5.colorTexture());
+    m_firstOnTopRenderer.setDepthTexture1(m_tempPort5.depthTexture());
+    m_firstOnTopRenderer.setColorTexture2(m_tempPort4.colorTexture());
+    m_firstOnTopRenderer.setDepthTexture2(m_tempPort4.depthTexture());
+    m_rendererBase.render(eye, m_firstOnTopRenderer);
+    pickingManager().releaseTarget();
+  }
+
+  glDisable(GL_DEPTH_TEST);
+  CHECK_GL_ERROR;
+}
+
+void Z3DCompositor::renderGeometries(const std::vector<Z3DBoundedFilter*> &opaqueFilters,
+                                     const std::vector<Z3DBoundedFilter*> &transparentFilters,
+                                     Z3DRenderOutputPort &port, Z3DEye eye)
+{
+  if (m_rendererBase.transparencyMethodPara().isSelected("Blend No Depth Mask"))
+    renderGeomsBlendNoDepthMask(opaqueFilters, transparentFilters, port, eye);
+  else if (m_rendererBase.transparencyMethodPara().isSelected("Blend Delayed"))
+    renderGeomsBlendDelayed(opaqueFilters, transparentFilters, port, eye);
+  else
+    renderGeomsOIT(opaqueFilters, transparentFilters, port, eye, m_rendererBase.transparencyMethodPara().get());
+}
+
+void Z3DCompositor::renderGeomsBlendDelayed(const std::vector<Z3DBoundedFilter*> &opaqueFilters,
+                                            const std::vector<Z3DBoundedFilter*> &transparentFilters,
+                                            Z3DRenderOutputPort &port, Z3DEye eye)
+{
+  port.bindTarget();
+  glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+  CHECK_GL_ERROR;
+
+  for (size_t i=0; i<opaqueFilters.size(); i++) {
+    Z3DBoundedFilter* filter = opaqueFilters.at(i);
+    filter->setViewport(port.size());
+    filter->renderOpaque(eye);
+    CHECK_GL_ERROR;
+  }
+
+  for (size_t i=0; i<transparentFilters.size(); i++) {
+    Z3DBoundedFilter* filter = transparentFilters.at(i);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+    filter->setViewport(port.size());
+    filter->renderTransparent(eye);
+    glBlendFunc(GL_ONE,GL_ZERO);
+    glDisable(GL_BLEND);
+    CHECK_GL_ERROR;
+  }
+
+  port.releaseTarget();
+  CHECK_GL_ERROR;
+}
+
+void Z3DCompositor::renderGeomsBlendNoDepthMask(const std::vector<Z3DBoundedFilter*> &opaqueFilters,
+                                                const std::vector<Z3DBoundedFilter*> &transparentFilters,
+                                                Z3DRenderOutputPort &port, Z3DEye eye)
+{
+  port.bindTarget();
+  glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+  CHECK_GL_ERROR;
+
+  for (size_t i=0; i<opaqueFilters.size(); i++) {
+    Z3DBoundedFilter* filter = opaqueFilters.at(i);
+    filter->setViewport(port.size());
+    filter->renderOpaque(eye);
+    CHECK_GL_ERROR;
+  }
+
+  for (size_t i=0; i<transparentFilters.size(); i++) {
+    Z3DBoundedFilter* filter = transparentFilters.at(i);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+    filter->setViewport(port.size());
+    filter->renderTransparent(eye);
+    glBlendFunc(GL_ONE,GL_ZERO);
+    glDisable(GL_BLEND);
+    glDepthMask(GL_TRUE);
+    CHECK_GL_ERROR;
+  }
+
+  port.releaseTarget();
+  CHECK_GL_ERROR;
+}
+
+void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*> &opaqueFilters,
+                                   const std::vector<Z3DBoundedFilter*> &transparentFilters,
+                                   Z3DRenderOutputPort &port, Z3DEye eye, const QString &method)
+{
+//  std::vector<Z3DBoundedFilter*> allFilters;
+//  allFilters.insert(allFilters.end(), opaqueFilters.begin(), opaqueFilters.end());
+//  allFilters.insert(allFilters.end(), transparentFilters.begin(), transparentFilters.end());
+//  if (method == "Dual Depth Peeling") {
+//    renderTransparentDDP(allFilters, port, eye);
+//  } else if (method == "Weighted Average") {
+//    renderTransparentWA(allFilters, port, eye);
+//  }
+//  return;
+  if (transparentFilters.empty()) {
+    renderOpaqueFilters(opaqueFilters, port, eye);
+  }
+  //  else {
+  //    if (method == "Dual Depth Peeling") {
+  //      renderTransparentDDP(renderers, port, eye);
+  //    }
+  //  }
+  else if (opaqueFilters.empty()) {
+    if (method == "Dual Depth Peeling") {
+      renderTransparentDDP(transparentFilters, port, eye);
+    } else if (method == "Weighted Average") {
+      renderTransparentWA(transparentFilters, port, eye);
+    }
+  } else {
+    m_tempPort3.resize(port.size());
+    renderOpaqueFilters(opaqueFilters, m_tempPort3, eye);
+
+    m_tempPort4.resize(port.size());
+    if (method == "Dual Depth Peeling") {
+      renderTransparentDDP(transparentFilters, m_tempPort4, eye, m_tempPort3.depthTexture());
+    } else if (method == "Weighted Average") {
+      renderTransparentWA(transparentFilters, m_tempPort4, eye, m_tempPort3.depthTexture());
+    }
+
+    // blend temport3 and temport4 into outport
+    port.bindTarget();
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+    m_rendererBase.setViewport(port.size());
+    m_alphaBlendRenderer.setColorTexture1(m_tempPort3.colorTexture());
+    m_alphaBlendRenderer.setDepthTexture1(m_tempPort3.depthTexture());
+    m_alphaBlendRenderer.setColorTexture2(m_tempPort4.colorTexture());
+    m_alphaBlendRenderer.setDepthTexture2(m_tempPort4.depthTexture());
+    m_rendererBase.render(eye, m_alphaBlendRenderer);
+    port.releaseTarget();
+  }
+  CHECK_GL_ERROR;
+}
+
+void Z3DCompositor::renderOpaqueFilters(const std::vector<Z3DBoundedFilter*> &filters,
+                                 Z3DRenderOutputPort &port, Z3DEye eye)
+{
+  port.bindTarget();
+  glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+  CHECK_GL_ERROR;
+  for (size_t i=0; i<filters.size(); i++) {
+    Z3DBoundedFilter* filter = filters.at(i);
+    filter->setViewport(port.size());
+    filter->renderOpaque(eye);
+    CHECK_GL_ERROR;
+  }
+  port.releaseTarget();
+  CHECK_GL_ERROR;
+}
+
+void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*> &filters,
+                                         Z3DRenderOutputPort &port, Z3DEye eye, Z3DTexture *depthTexture)
+{
+  if (!m_ddpRT)
+    if (!createDDPRenderTarget(port.size())) {
+      LERROR() << "Can not create fbo for dual depth peeling rendering";
+      return;
+    }
+  m_ddpRT->resize(port.size());
+  if (depthTexture) {
+    m_ddpRT->attachTextureToFBO(depthTexture, GL_DEPTH_ATTACHMENT, 0, 0, false);
+  }
+
+  Z3DTexture* g_dualDepthTexId[2];
+  g_dualDepthTexId[0] = m_ddpRT->attachment(GL_COLOR_ATTACHMENT0);
+  g_dualDepthTexId[1] = m_ddpRT->attachment(GL_COLOR_ATTACHMENT3);
+  Z3DTexture* g_dualFrontBlenderTexId[2];
+  g_dualFrontBlenderTexId[0] = m_ddpRT->attachment(GL_COLOR_ATTACHMENT1);
+  g_dualFrontBlenderTexId[1] = m_ddpRT->attachment(GL_COLOR_ATTACHMENT4);
+  Z3DTexture* g_dualBackTempTexId[2];
+  g_dualBackTempTexId[0] = m_ddpRT->attachment(GL_COLOR_ATTACHMENT2);
+  g_dualBackTempTexId[1] = m_ddpRT->attachment(GL_COLOR_ATTACHMENT5);
+  Z3DTexture* g_dualBackBlenderTexId = m_ddpRT->attachment(GL_COLOR_ATTACHMENT6);
+  Z3DTexture* g_depthTex = m_ddpRT->attachment(GL_COLOR_ATTACHMENT7);
+  GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
+                            GL_COLOR_ATTACHMENT1,
+                            GL_COLOR_ATTACHMENT2,
+                            GL_COLOR_ATTACHMENT3,
+                            GL_COLOR_ATTACHMENT4,
+                            GL_COLOR_ATTACHMENT5,
+                            GL_COLOR_ATTACHMENT6
+                           };
+
+  GLenum g_db[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT7};
+
+  bool g_useOQ = true;
+  int g_numPasses = 100;
+
+#define MAX_DEPTH 1.0
+
+  if (depthTexture)
+    glDepthMask(GL_FALSE);
+  else
+    glDisable(GL_DEPTH_TEST);
+  glEnable(GL_BLEND);
+
+  // ---------------------------------------------------------------------
+  // 1. Initialize Min-Max Depth Buffer
+  // ---------------------------------------------------------------------
+
+  m_ddpRT->bind();
+
+  // Render targets 1 and 2 store the front and back colors
+  // Clear to 0.0 and use MAX blending to filter written color
+  // At most one front color and one back color can be written every pass
+  glDrawBuffers(2, &g_drawBuffers[1]);
+  glClearColor(0, 0, 0, 0);
+  glClear(GL_COLOR_BUFFER_BIT);
+
+  // Render target 0 stores (-minDepth, maxDepth, alphaMultiplier)
+  glDrawBuffers(2, g_db);
+  glClearColor(-MAX_DEPTH, -MAX_DEPTH, 0, 0);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glBlendEquation(GL_MAX);
+
+  for (size_t i=0; i<filters.size(); i++) {
+    Z3DBoundedFilter* filter = filters.at(i);
+    filter->setViewport(m_ddpRT->size());
+    filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
+    filter->renderTransparent(eye);
+    CHECK_GL_ERROR;
+  }
+
+
+  // ---------------------------------------------------------------------
+  // 2. Dual Depth Peeling + Blending
+  // ---------------------------------------------------------------------
+
+  // Since we cannot blend the back colors in the geometry passes,
+  // we use another render target to do the alpha blending
+  glDrawBuffer(g_drawBuffers[6]);
+  glClearColor(0, 0, 0, 0);
+  glClear(GL_COLOR_BUFFER_BIT);
+
+  int currId = 0;
+
+  for (int pass = 1; g_useOQ && pass < g_numPasses; pass++) {
+    currId = pass % 2;
+    int prevId = 1 - currId;
+    int bufId = currId * 3;
+
+    glDrawBuffers(2, &g_drawBuffers[bufId+1]);
+    glClearColor(0, 0, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glDrawBuffer(g_drawBuffers[bufId+0]);
+    glClearColor(-MAX_DEPTH, -MAX_DEPTH, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    // Render target 0: RG32F MAX blending
+    // Render target 1: RGBA MAX blending
+    // Render target 2: RGBA MAX blending
+    glDrawBuffers(3, &g_drawBuffers[bufId+0]);
+    glBlendEquation(GL_MAX);
+
+    for (size_t i=0; i<filters.size(); i++) {
+      Z3DBoundedFilter* filter = filters.at(i);
+      filter->setViewport(m_ddpRT->size());
+      filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+      filter->setShaderHookParaDDPDepthBlenderTexture(g_dualDepthTexId[prevId]);
+      filter->setShaderHookParaDDPFrontBlenderTexture(g_dualFrontBlenderTexId[prevId]);
+      filter->renderTransparent(eye);
+      CHECK_GL_ERROR;
+    }
+
+    // Full screen pass to alpha-blend the back color
+    glDrawBuffer(g_drawBuffers[6]);
+
+    glBlendEquation(GL_FUNC_ADD);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+    GLuint queryId;
+    if (g_useOQ) {
+      glGenQueries(1, &queryId);
+      glBeginQuery(GL_SAMPLES_PASSED, queryId);
+    }
+
+    m_ddpBlendShader.bind();
+    m_ddpBlendShader.bindTexture("TempTex", g_dualBackTempTexId[currId]);
+#if !defined(USE_RECT_TEX)
+    m_rendererBase.setViewport(m_ddpRT->size());
+    m_rendererBase.setGlobalShaderParameters(m_ddpBlendShader, eye);
+#endif
+    renderScreenQuad(m_ddpBlendShader);
+    m_ddpBlendShader.release();
+
+    CHECK_GL_ERROR;
+
+    if (g_useOQ) {
+      glEndQuery(GL_SAMPLES_PASSED);
+      GLuint sample_count;
+      glGetQueryObjectuiv(queryId, GL_QUERY_RESULT, &sample_count);
+      glDeleteQueries(1, &queryId);
+      if (sample_count == 0) {
+        break;
+      }
+    }
+    CHECK_GL_ERROR;
+  }
+
+  if (depthTexture) {
+    m_ddpRT->detach(GL_DEPTH_ATTACHMENT);
+  }
+  m_ddpRT->release();
+
+  if (depthTexture)
+    glDepthMask(GL_TRUE);
+  glClearColor(0, 0, 0, 0);
+  glBlendEquation(GL_FUNC_ADD);
+  glBlendFunc(GL_ONE, GL_ZERO);
+  glDisable(GL_BLEND);
+
+  for (size_t i=0; i<filters.size(); i++) {
+    Z3DBoundedFilter* filter = filters.at(i);
+    filter->setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
+  }
+  CHECK_GL_ERROR;
+
+  // ---------------------------------------------------------------------
+  // 3. Final Pass
+  // ---------------------------------------------------------------------
+
+  port.bindTarget();
+  glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+  m_ddpFinalShader.bind();
+  m_ddpFinalShader.bindTexture("DepthTex", g_depthTex);
+  m_ddpFinalShader.bindTexture("FrontBlenderTex", g_dualFrontBlenderTexId[currId]);
+  m_ddpFinalShader.bindTexture("BackBlenderTex", g_dualBackBlenderTexId);
+#if !defined(USE_RECT_TEX)
+  m_rendererBase.setViewport(m_ddpRT->size());
+  m_rendererBase.setGlobalShaderParameters(m_ddpFinalShader, eye);
+#endif
+  renderScreenQuad(m_ddpFinalShader);
+  m_ddpFinalShader.release();
+  port.releaseTarget();
+
+  CHECK_GL_ERROR;
+}
+
+bool Z3DCompositor::createDDPRenderTarget(glm::ivec2 size)
+{
+  m_ddpRT = new Z3DRenderTarget(size);
+  Z3DTexture* g_dualDepthTexId[2];
+  Z3DTexture* g_dualFrontBlenderTexId[2];
+  Z3DTexture* g_dualBackTempTexId[2];
+  Z3DTexture* g_dualBackBlenderTexId;
+  Z3DTexture* g_depthTex;
+
+#ifdef USE_RECT_TEX
+  for (int i = 0; i < 2; i++)
+  {
+    g_dualDepthTexId[i] = new Z3DTexture(glm::ivec3(size, 1), GL_TEXTURE_RECTANGLE,
+                                         GL_RG, GL_RG32F, GL_FLOAT,
+                                         GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    g_dualDepthTexId[i]->uploadTexture();
+
+    g_dualFrontBlenderTexId[i] = new Z3DTexture(glm::ivec3(size, 1), GL_TEXTURE_RECTANGLE,
+                                                GL_RGBA, GL_RGBA16, GL_UNSIGNED_SHORT,
+                                                GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    g_dualFrontBlenderTexId[i]->uploadTexture();
+
+    g_dualBackTempTexId[i] = new Z3DTexture(glm::ivec3(size, 1), GL_TEXTURE_RECTANGLE,
+                                            GL_RGBA, GL_RGBA16, GL_UNSIGNED_SHORT,
+                                            GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    g_dualBackTempTexId[i]->uploadTexture();
+  }
+
+  g_dualBackBlenderTexId = new Z3DTexture(glm::ivec3(size, 1), GL_TEXTURE_RECTANGLE,
+                                          GL_RGBA, GL_RGBA16, GL_UNSIGNED_SHORT,
+                                          GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE);
+  g_dualBackBlenderTexId->uploadTexture();
+
+  g_depthTex = new Z3DTexture(glm::ivec3(size, 1), GL_TEXTURE_RECTANGLE,
+                              GL_RED, GL_R32F, GL_FLOAT,
+                              GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE);
+  g_depthTex->uploadTexture();
+#else
+  for (int i = 0; i < 2; i++)
+  {
+    g_dualDepthTexId[i] = new Z3DTexture(glm::ivec3(size, 1),
+                                         GL_RG, (GLint)GL_RG32F, GL_FLOAT,
+                                         (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
+    g_dualDepthTexId[i]->uploadTexture();
+
+    g_dualFrontBlenderTexId[i] = new Z3DTexture(glm::ivec3(size, 1),
+                                                GL_RGBA, (GLint)GL_RGBA16, GL_UNSIGNED_SHORT,
+                                                (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
+    g_dualFrontBlenderTexId[i]->uploadTexture();
+
+    g_dualBackTempTexId[i] = new Z3DTexture(glm::ivec3(size, 1),
+                                            GL_RGBA, (GLint)GL_RGBA16, GL_UNSIGNED_SHORT,
+                                            (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
+    g_dualBackTempTexId[i]->uploadTexture();
+  }
+
+  g_dualBackBlenderTexId = new Z3DTexture(glm::ivec3(size, 1),
+                                          GL_RGBA, (GLint)GL_RGBA16, GL_UNSIGNED_SHORT,
+                                          (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
+  g_dualBackBlenderTexId->uploadTexture();
+
+  g_depthTex = new Z3DTexture(glm::ivec3(size, 1),
+                              GL_RED, (GLint)GL_R32F, GL_FLOAT,
+                              (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
+  g_depthTex->uploadTexture();
+#endif
+
+  int j = 0;
+  m_ddpRT->attachTextureToFBO(g_dualDepthTexId[j], GL_COLOR_ATTACHMENT0);
+  m_ddpRT->attachTextureToFBO(g_dualFrontBlenderTexId[j], GL_COLOR_ATTACHMENT1);
+  m_ddpRT->attachTextureToFBO(g_dualBackTempTexId[j], GL_COLOR_ATTACHMENT2);
+
+  j = 1;
+  m_ddpRT->attachTextureToFBO(g_dualDepthTexId[j], GL_COLOR_ATTACHMENT3);
+  m_ddpRT->attachTextureToFBO(g_dualFrontBlenderTexId[j], GL_COLOR_ATTACHMENT4);
+  m_ddpRT->attachTextureToFBO(g_dualBackTempTexId[j], GL_COLOR_ATTACHMENT5);
+
+  m_ddpRT->attachTextureToFBO(g_dualBackBlenderTexId, GL_COLOR_ATTACHMENT6);
+  m_ddpRT->attachTextureToFBO(g_depthTex, GL_COLOR_ATTACHMENT7);
+  bool comp =  m_ddpRT->isFBOComplete();
+  if (!comp) {
+    delete m_ddpRT;
+    m_ddpRT = NULL;
+  }
+  return comp;
+}
+
+void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*> &filters,
+                                        Z3DRenderOutputPort &port, Z3DEye eye, Z3DTexture *depthTexture)
+{
+  if (!m_waRT)
+    if (!createWARenderTarget(port.size())) {
+      LERROR() << "Can not create fbo for weighted average rendering";
+      return;
+    }
+  m_waRT->resize(port.size());
+  if (depthTexture) {
+    m_waRT->attachTextureToFBO(depthTexture, GL_DEPTH_ATTACHMENT, 0, 0, false);
+  }
+
+  Z3DTexture* g_accumulationTexId[2];
+  g_accumulationTexId[0] = m_waRT->attachment(GL_COLOR_ATTACHMENT0);
+  g_accumulationTexId[1] = m_waRT->attachment(GL_COLOR_ATTACHMENT1);
+  GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
+                            GL_COLOR_ATTACHMENT1
+                           };
+
+  if (depthTexture)
+    glDepthMask(GL_FALSE);
+  else
+    glDisable(GL_DEPTH_TEST);
+
+  // ---------------------------------------------------------------------
+  // 1. Accumulate Colors and Depth Complexity
+  // ---------------------------------------------------------------------
+
+  m_waRT->bind();
+
+  glDrawBuffers(2, g_drawBuffers);
+
+  glClearColor(0, 0, 0, 0);
+  glClear(GL_COLOR_BUFFER_BIT);
+
+  glBlendFunc(GL_ONE, GL_ONE);
+  glEnable(GL_BLEND);
+
+  for (size_t i=0; i<filters.size(); i++) {
+    Z3DBoundedFilter* filter = filters.at(i);
+    filter->setViewport(m_waRT->size());
+    filter->setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
+    filter->renderTransparent(eye);
+    CHECK_GL_ERROR;
+  }
+
+  if (depthTexture) {
+    m_waRT->detach(GL_DEPTH_ATTACHMENT);
+  }
+  m_waRT->release();
+
+  if (depthTexture)
+    glDepthMask(GL_TRUE);
+  glBlendFunc(GL_ONE, GL_ZERO);
+  glDisable(GL_BLEND);
+
+  for (size_t i=0; i<filters.size(); i++) {
+    Z3DBoundedFilter* filter = filters.at(i);
+    filter->setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
+  }
+  CHECK_GL_ERROR;
+
+  // ---------------------------------------------------------------------
+  // 2. Approximate Blending
+  // ---------------------------------------------------------------------
+
+  port.bindTarget();
+  glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+  m_waFinalShader.bind();
+  m_waFinalShader.bindTexture("ColorTex0", g_accumulationTexId[0]);
+  m_waFinalShader.bindTexture("ColorTex1", g_accumulationTexId[1]);
+#if !defined(USE_RECT_TEX)
+  m_rendererBase.setViewport(m_waRT->size());
+  m_rendererBase.setGlobalShaderParameters(m_waFinalShader, eye);
+#endif
+  renderScreenQuad(m_waFinalShader);
+  m_waFinalShader.release();
+  port.releaseTarget();
+
+  CHECK_GL_ERROR;
+}
+
+bool Z3DCompositor::createWARenderTarget(glm::ivec2 size)
+{
+  m_waRT = new Z3DRenderTarget(size);
+  Z3DTexture* g_accumulationTexId[2];
+
+#ifdef USE_RECT_TEX
+  g_accumulationTexId[0] = new Z3DTexture(glm::ivec3(size, 1), GL_TEXTURE_RECTANGLE,
+                                          (GLint)GL_RGBA, GL_RGBA32F, GL_FLOAT,
+                                          (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
+  g_accumulationTexId[0]->uploadTexture();
+  g_accumulationTexId[1] = new Z3DTexture(glm::ivec3(size, 1), GL_TEXTURE_RECTANGLE,
+                                          (GLint)GL_RG, GL_RG32F, GL_FLOAT,
+                                          (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
+  g_accumulationTexId[1]->uploadTexture();
+#else
+  g_accumulationTexId[0] = new Z3DTexture(glm::ivec3(size, 1),
+                                          GL_RGBA, (GLint)GL_RGBA32F, GL_FLOAT,
+                                          (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
+  g_accumulationTexId[0]->uploadTexture();
+  g_accumulationTexId[1] = new Z3DTexture(glm::ivec3(size, 1),
+                                          GL_RG, (GLint)GL_RG32F, GL_FLOAT,
+                                          (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
+  g_accumulationTexId[1]->uploadTexture();
+#endif
+
+  m_waRT->attachTextureToFBO(g_accumulationTexId[0], GL_COLOR_ATTACHMENT0);
+  m_waRT->attachTextureToFBO(g_accumulationTexId[1], GL_COLOR_ATTACHMENT1);
+  bool comp = m_waRT->isFBOComplete();
+  if (!comp) {
+    delete m_waRT;
+    m_waRT = NULL;
+  }
+  return comp;
+}
+
+void Z3DCompositor::renderImages(Z3DRenderInputPort &currentInport, Z3DRenderOutputPort &currentOutport,
+                                 Z3DEye eye, const Z3DTexture *&colorTex, const Z3DTexture *&depthTex)
+{
+  size_t numImages = currentInport.numValidInputs();
+  if (numImages == 0) {
+    assert(false);
+  }
+  if (numImages == 1) {
+    colorTex = currentInport.colorTexture(0);
+    depthTex = currentInport.depthTexture(0);
+  } else {
+    m_tempPort3.resize(currentOutport.size());
+    m_tempPort4.resize(currentOutport.size());
+
+    // blend inport1 and inport2 into tempport3
+    m_tempPort3.bindTarget();
+    m_tempPort3.clearTarget();
+    CHECK_GL_ERROR;
+
+    m_rendererBase.setViewport(m_tempPort3.size());
+    m_alphaBlendRenderer.setColorTexture1(currentInport.colorTexture(0));
+    m_alphaBlendRenderer.setDepthTexture1(currentInport.depthTexture(0));
+    m_alphaBlendRenderer.setColorTexture2(currentInport.colorTexture(1));
+    m_alphaBlendRenderer.setDepthTexture2(currentInport.depthTexture(1));
+    m_rendererBase.render(eye, m_alphaBlendRenderer);
+
+    m_tempPort3.releaseTarget();
+    CHECK_GL_ERROR;
+
+    Z3DRenderOutputPort *resPort = &m_tempPort3;
+    Z3DRenderOutputPort *nextResPort = &m_tempPort4;
+    for (size_t i=2; i<numImages; ++i) {
+      nextResPort->bindTarget();
+      nextResPort->clearTarget();
+      CHECK_GL_ERROR;
+
+      m_alphaBlendRenderer.setColorTexture1(resPort->colorTexture());
+      m_alphaBlendRenderer.setDepthTexture1(resPort->depthTexture());
+      m_alphaBlendRenderer.setColorTexture2(currentInport.colorTexture(i));
+      m_alphaBlendRenderer.setDepthTexture2(currentInport.depthTexture(i));
+      m_rendererBase.render(eye, m_alphaBlendRenderer);
+
+      nextResPort->releaseTarget();
+      CHECK_GL_ERROR;
+
+      std::swap(resPort, nextResPort);
+    }
+
+    colorTex = resPort->colorTexture();
+    depthTex = resPort->depthTexture();
+  }
+}
+
+void Z3DCompositor::renderAxis(Z3DEye eye)
+{
+  prepareAxisData(eye);
+  m_rendererBase.coordTransformPara().blockSignals(true);
+  m_rendererBase.coordTransformPara().set(glm::mat4(globalCamera().rotateMatrix(eye)));
+
+  glm::ivec4 viewport = m_rendererBase.viewport();
+  int size = std::min(viewport.z, viewport.w) * m_axisRegionRatio.get();
+  glViewport(viewport.x, viewport.y, size, size);
+  glScissor(viewport.x, viewport.y, size, size);
+  glEnable(GL_SCISSOR_TEST);
+  glClear(GL_DEPTH_BUFFER_BIT);
+
+  if (m_axisMode.get() == "Arrow")
+    m_rendererBase.render(eye, m_arrowRenderer, m_fontRenderer);
+  else
+    m_rendererBase.render(eye, m_lineRenderer, m_fontRenderer);
+
+  glViewport(viewport.x, viewport.y, viewport.z, viewport.w);
+  glScissor(viewport.x, viewport.y, viewport.z, viewport.w);
+  glDisable(GL_SCISSOR_TEST);
+  m_rendererBase.coordTransformPara().blockSignals(false);
+}
+
+void Z3DCompositor::prepareAxisData(Z3DEye eye)
+{
+  m_textPositions.clear();
+  glm::mat3 rotMatrix = globalCamera().rotateMatrix(eye);
+  m_XEnd = rotMatrix * glm::vec3(256.f, 0.f, 0.f);
+  m_YEnd = rotMatrix * glm::vec3(0.f, 256.f, 0.f);
+  m_ZEnd = rotMatrix * glm::vec3(0.f, 0.f, 256.f);
+
+  m_textPositions.push_back(m_XEnd*glm::vec3(0.93));
+  m_textPositions.push_back(m_YEnd*glm::vec3(0.93));
+  m_textPositions.push_back(m_ZEnd*glm::vec3(0.93));
+  QStringList texts;
+  texts.push_back("X");
+  texts.push_back("Y");
+  texts.push_back("Z");
+
+  m_fontRenderer.setData(&m_textPositions, texts);
+}
+
+void Z3DCompositor::setupAxisCamera()
+{
+  Z3DCamera camera;
+  glm::vec3 center(0.f);
+  camera.setFieldOfView(glm::radians(10.f));
+
+  float radius = 300.f;
+
+  float distance = radius/std::sin(camera.fieldOfView()*0.5);
+  glm::vec3 vn(0, 0, 1);     //plane normal
+  glm::vec3 position = center + vn * distance;
+  camera.setCamera(position, center, glm::vec3(0.0, 1.0, 0.0));
+  camera.setNearDist(distance - radius - 1);
+  camera.setFarDist(distance + radius);
+
+  m_rendererBase.setCamera(camera);
+
+  m_tailPosAndTailRadius.clear();
+  m_headPosAndHeadRadius.clear();
+  m_lineColors.clear();
+  m_lines.clear();
+  m_textColors.clear();
+  m_textPositions.clear();
+  m_XEnd = glm::vec3(256.f, 0.f, 0.f);
+  m_YEnd = glm::vec3(0.f, 256.f, 0.f);
+  m_ZEnd = glm::vec3(0.f, 0.f, 256.f);
+  glm::vec3 origin(0.f);
+  m_lines.push_back(origin);
+  m_lineColors.push_back(m_XAxisColor.get());
+  m_lines.push_back(m_XEnd*glm::vec3(0.88));
+  m_lineColors.push_back(m_XAxisColor.get());
+  m_lines.push_back(origin);
+  m_lineColors.push_back(m_YAxisColor.get());
+  m_lines.push_back(m_YEnd*glm::vec3(0.88));
+  m_lineColors.push_back(m_YAxisColor.get());
+  m_lines.push_back(origin);
+  m_lineColors.push_back(m_ZAxisColor.get());
+  m_lines.push_back(m_ZEnd*glm::vec3(0.88));
+  m_lineColors.push_back(m_ZAxisColor.get());
+
+  m_textPositions.push_back(m_XEnd*glm::vec3(0.93));
+  m_textPositions.push_back(m_YEnd*glm::vec3(0.93));
+  m_textPositions.push_back(m_ZEnd*glm::vec3(0.93));
+  m_textColors.push_back(m_XAxisColor.get());
+  m_textColors.push_back(m_YAxisColor.get());
+  m_textColors.push_back(m_ZAxisColor.get());
+
+  float tailRadius = 5.f;
+  float headRadius = 10.f;
+
+  m_tailPosAndTailRadius.emplace_back(origin, tailRadius);
+  m_headPosAndHeadRadius.emplace_back(m_XEnd*glm::vec3(0.88), headRadius);
+
+  m_tailPosAndTailRadius.emplace_back(origin, tailRadius);
+  m_headPosAndHeadRadius.emplace_back(m_YEnd*glm::vec3(0.88), headRadius);
+
+  m_tailPosAndTailRadius.emplace_back(origin, tailRadius);
+  m_headPosAndHeadRadius.emplace_back(m_ZEnd*glm::vec3(0.88), headRadius);
+
+  m_lineRenderer.setData(&m_lines);
+  m_lineRenderer.setDataColors(&m_lineColors);
+  m_arrowRenderer.setArrowData(&m_tailPosAndTailRadius, &m_headPosAndHeadRadius, .1f);
+  m_arrowRenderer.setArrowColors(&m_textColors);
+  m_fontRenderer.setDataColors(&m_textColors);
+}
+
+} // namespace nim

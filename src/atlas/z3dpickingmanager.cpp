@@ -1,0 +1,151 @@
+#include "z3dgl.h"
+#include "z3dpickingmanager.h"
+
+#include "z3dtexture.h"
+#include "QsLog.h"
+#include <QApplication>
+#include <functional>
+#include <memory>
+
+ namespace nim {
+
+Z3DPickingManager::Z3DPickingManager()
+  : m_renderTarget(nullptr)
+  , m_currentColor(0,0,0,128)
+{
+}
+
+void Z3DPickingManager::setRenderTarget(Z3DRenderTarget &rt)
+{
+  assert(rt.attachment(GL_COLOR_ATTACHMENT0)->internalFormat() == GL_RGBA8);
+  m_renderTarget = &rt;
+}
+
+glm::col4 Z3DPickingManager::registerObject(const void* obj)
+{
+  increaseColor();
+  m_colorToObject[m_currentColor] = obj;
+  m_objectToColor[obj] = m_currentColor;
+  return m_currentColor;
+}
+
+void Z3DPickingManager::deregisterObject(const void* obj)
+{
+  glm::col4 col = colorOfObject(obj);
+  m_colorToObject.erase(col);
+  m_objectToColor.erase(obj);
+}
+
+void Z3DPickingManager::deregisterObject(const glm::col4& col)
+{
+  const void* obj = objectOfColor(col);
+  m_colorToObject.erase(col);
+  m_objectToColor.erase(obj);
+}
+
+void Z3DPickingManager::clearRegisteredObjects()
+{
+  m_colorToObject.clear();
+  m_objectToColor.clear();
+  m_currentColor = glm::col4(0,0,0,128);
+}
+
+glm::col4 Z3DPickingManager::colorOfObject(const void* obj)
+{
+  if (!obj)
+    return glm::col4(0,0,0,0);
+
+  if (isRegistered(obj)) {
+    return m_objectToColor[obj];
+  } else
+    return glm::col4(0,0,0,0);
+}
+
+const void* Z3DPickingManager::objectOfColor(glm::col4 col)
+{
+  if (col.a == 0)
+    return NULL;
+
+  if (isRegistered(col))
+    return m_colorToObject[col];
+  else
+    return NULL;
+}
+
+const void* Z3DPickingManager::objectAtWidgetPos(glm::ivec2 pos)
+{
+#ifndef _QT4_
+  pos[0] = pos[0] * qApp->devicePixelRatio();
+  pos[1] = pos[1] * qApp->devicePixelRatio();
+#endif
+  glm::ivec3 texSize = m_renderTarget->attachment(GL_COLOR_ATTACHMENT0)->dimensions();
+  pos[1] = texSize[1]- pos[1];
+  return objectOfColor(m_renderTarget->colorAtPos(pos));
+}
+
+std::vector<const void *> Z3DPickingManager::sortObjectsByDistanceToPos(glm::ivec2 pos, int radius, bool ascend)
+{
+  std::map<glm::col4, int, colComp> col2dist;
+  const Z3DTexture *tex = m_renderTarget->attachment(GL_COLOR_ATTACHMENT0);
+  GLenum dataFormat = GL_BGRA;
+  GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
+  std::unique_ptr<glm::col4[]> buf(new glm::col4[tex->bypePerPixel(dataFormat, dataType) * tex->numPixels() / 4]);
+  tex->downloadTextureToBuffer(dataFormat, dataType, buf.get());
+  glm::ivec2 texSize = m_renderTarget->size();
+  if (radius < 0)
+    radius = std::max(texSize.x, texSize.y);
+  for(int y = std::max(0, pos.y-radius); y <= std::min(texSize.y-1, pos.y+radius); ++y) {
+    for(int x = std::max(0, pos.x-radius); x <= std::min(texSize.x-1, pos.x+radius); ++x) {
+      glm::col4 col = buf[(y*texSize.x) + x];
+      std::swap(col.r, col.b);
+      if (col2dist[col] == 0)
+        col2dist[col] = (x-pos.x)*(x-pos.x) + (y-pos.y)*(y-pos.y);
+      else
+        col2dist[col] = std::min(col2dist[col], (x-pos.x)*(x-pos.x) + (y-pos.y)*(y-pos.y));
+    }
+  }
+  std::vector<const void *> res;
+  if (ascend) {
+    std::multimap<int, const void *> dist2obj;
+    for (std::map<glm::col4, int>::const_iterator it = col2dist.begin();
+         it != col2dist.end(); ++it) {
+      const void *obj = objectOfColor(it->first);
+      if (obj)
+        dist2obj.emplace(it->second,obj);
+    }
+    for (std::multimap<int, const void *>::const_iterator it = dist2obj.begin();
+         it != dist2obj.end(); ++it) {
+      res.push_back(it->second);
+    }
+  } else {
+    std::multimap<int, const void *, std::greater<int> > dist2obj;
+    for (std::map<glm::col4, int>::const_iterator it = col2dist.begin();
+         it != col2dist.end(); ++it) {
+      const void *obj = objectOfColor(it->first);
+      if (obj)
+        dist2obj.emplace(it->second,obj);
+    }
+    for (std::multimap<int, const void *>::const_iterator it = dist2obj.begin();
+         it != dist2obj.end(); ++it) {
+      res.push_back(it->second);
+    }
+  }
+  return res;
+}
+
+void Z3DPickingManager::clearTarget()
+{
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
+void Z3DPickingManager::increaseColor()
+{
+  if (*reinterpret_cast<uint32_t*>(&m_currentColor[0]) != 0xffffffff)
+    ++(*reinterpret_cast<uint32_t*>(&m_currentColor[0]));
+  else {
+    m_currentColor = glm::col4(0,0,0,128);
+    //LERROR() << "Out of colors...";
+  }
+}
+
+} // namespace nim

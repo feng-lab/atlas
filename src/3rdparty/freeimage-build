@@ -1,0 +1,30 @@
+#!/bin/bash
+
+currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
+srcDIR=$currDIR/../../../FreeImage
+buildDIR=$srcDIR/../__freeimage-build
+installDIR=$currDIR/freeimage
+
+if [ -d $installDIR ]
+then
+  rm -rf $installDIR
+fi
+
+cp $currDIR/freeimage-makefiles/Makefile_gnu $srcDIR/
+cp $currDIR/freeimage-makefiles/Makefile_fip $srcDIR/
+cd $srcDIR
+
+make -f Makefile_gnu -j8
+make -f Makefile_gnu -j8 install PREFIX=$installDIR
+make -f Makefile_gnu clean
+make -f Makefile_fip -j8
+make -f Makefile_fip -j8 install PREFIX=$installDIR
+make -f Makefile_fip clean
+
+rm $srcDIR/Makefile_gnu
+rm $srcDIR/Makefile_fip
+
+install_name_tool -id $installDIR/lib/libfreeimage.dylib $installDIR/lib/libfreeimage.dylib
+install_name_tool -id $installDIR/lib/libfreeimageplus.dylib $installDIR/lib/libfreeimageplus.dylib
+
+cd $currDIR

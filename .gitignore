@@ -25,22 +25,22 @@
 /neurolabi/data/
 
 # config file
-/neurolabi/atlas/3rdparty/libjpeg-turbo/
-/neurolabi/atlas/3rdparty/glbinding/
-/neurolabi/atlas/3rdparty/zlib/
-/neurolabi/atlas/3rdparty/hdf5/
-/neurolabi/atlas/3rdparty/wildmagic/
-/neurolabi/atlas/3rdparty/assimp/
-/neurolabi/atlas/3rdparty/freeimage/
-/neurolabi/atlas/3rdparty/itk/
-/neurolabi/atlas/3rdparty/vtk/
-/neurolabi/atlas/3rdparty/libpng/
-/neurolabi/atlas/3rdparty/jxrlib/
-/neurolabi/atlas/3rdparty/opencv/
-/neurolabi/atlas/3rdparty/ospray/
-/neurolabi/atlas/3rdparty/boost/
-/neurolabi/atlas/3rdparty/eigen/
-/neurolabi/atlas/3rdparty/glm/
+/src/3rdparty/libjpeg-turbo/
+/src/3rdparty/glbinding/
+/src/3rdparty/zlib/
+/src/3rdparty/hdf5/
+/src/3rdparty/wildmagic/
+/src/3rdparty/assimp/
+/src/3rdparty/freeimage/
+/src/3rdparty/itk/
+/src/3rdparty/vtk/
+/src/3rdparty/libpng/
+/src/3rdparty/jxrlib/
+/src/3rdparty/opencv/
+/src/3rdparty/ospray/
+/src/3rdparty/boost/
+/src/3rdparty/eigen/
+/src/3rdparty/glm/
 ffmpeg
 
 # binary file

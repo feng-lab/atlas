@@ -1,0 +1,333 @@
+#include "z3dvolumeraycasterrenderer.h"
+
+#include "z3dtexture.h"
+#include "z3dvolume.h"
+
+namespace nim {
+
+Z3DVolumeRaycasterRenderer::Z3DVolumeRaycasterRenderer(Z3DRendererBase &rendererBase)
+  : Z3DPrimitiveRenderer(rendererBase)
+  , m_samplingRate("Sampling Rate", 2.f, 0.01f, 20.f)
+  , m_isoValue("ISO Value", 0.5f, 0.0f, 1.0f)
+  , m_localMIPThreshold("Local MIP Threshold", 0.8f, 0.01f, 1.f)
+  , m_compositingMode("Compositing")
+  , m_is2DImage(false)
+  , m_entryCoordTexture(NULL)
+  , m_entryDepthTexture(NULL)
+  , m_exitCoordTexture(NULL)
+  , m_exitDepthTexture(NULL)
+  , m_opaque(false)
+  , m_alpha(1.0)
+{
+  //m_gradientMode.addOptions("None", "Forward Differences", "Central Differences", "Filtered");
+  //m_gradientMode.select("None");
+  // todo: add gradient
+  //addParameter(m_gradientMode);
+
+  // compositing modes
+  m_compositingMode.addOptions("Direct Volume Rendering", "Maximum Intensity Projection",
+                               "MIP Opaque", "Local MIP", "Local MIP Opaque", "ISO Surface", "X Ray");
+  m_compositingMode.select("MIP Opaque");
+
+  connect(&m_compositingMode, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
+  connect(&m_compositingMode, SIGNAL(valueChanged()), this, SLOT(compile()));
+  //connect(&m_gradientMode, SIGNAL(valueChanged()), this, SLOT(compile()));
+
+  adjustWidgets();
+
+  m_raycasterShader.bindFragDataLocation(0, "FragData0");
+  m_raycasterShader.loadFromSourceFile("pass.vert", "volume_raycaster.frag", m_rendererBase.generateHeader() + generateHeader());
+  m_2dImageShader.bindFragDataLocation(0, "FragData0");
+  m_2dImageShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_transfun.frag", m_rendererBase.generateHeader() + generateHeader());
+  m_volumeSliceWithTransferfunShader.bindFragDataLocation(0, "FragData0");
+  m_volumeSliceWithTransferfunShader.loadFromSourceFile("transform_with_3dtexture.vert", "volume_slice_with_transfun.frag", m_rendererBase.generateHeader() + generateHeader());
+  CHECK_GL_ERROR;
+}
+
+QString Z3DVolumeRaycasterRenderer::compositeMode() const
+{
+  return m_compositingMode.get();
+}
+
+void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume> > &volsIn)
+{
+  std::vector<Z3DVolume*> vols;
+  for (size_t i=0; i<volsIn.size(); ++i) {
+    vols.push_back(volsIn[i].get());
+  }
+
+  if (m_volumes != vols) {
+    bool numChannelsChanged = m_volumes.size() != vols.size();
+    if (numChannelsChanged) {
+      m_volumeUniformNames.clear();
+      m_transferFuncUniformNames.clear();
+      m_channelVisibleParas.clear();
+      m_transferFuncParas.clear();
+      m_texFilterModeParas.clear();
+    }
+
+    m_volumes = vols;
+
+    if (numChannelsChanged) {
+      for (size_t i=0; i<m_volumes.size(); ++i) {
+        m_volumeUniformNames.push_back(QString("volume_struct_%1").arg(i+1));
+        m_transferFuncUniformNames.push_back(QString("transfer_function_%1").arg(i+1));
+        m_channelVisibleParas.emplace_back(new ZBoolParameter(QString("Show Channel %1").arg(i+1), true));
+        connect(m_channelVisibleParas[i].get(), SIGNAL(valueChanged()), this, SLOT(compile()));
+        m_transferFuncParas.emplace_back(new Z3DTransferFunctionParameter(QString("Transfer Function %1").arg(i+1)));
+        m_texFilterModeParas.emplace_back(new ZStringIntOptionParameter(QString("Texture Filtering %1").arg(i+1)));
+        m_texFilterModeParas[i]->addOptionsWithData(qMakePair(QString("Nearest"), static_cast<int>(GL_NEAREST)),
+                                                    qMakePair(QString("Linear"), static_cast<int>(GL_LINEAR)));
+        m_texFilterModeParas[i]->select("Linear");
+      }
+    }
+
+    for (size_t i=0; i<m_volumes.size(); ++i) {
+      m_transferFuncParas[i]->setVolume(m_volumes[i]);
+    }
+
+    m_is2DImage = !m_volumes.empty() && m_volumes[0]->is2DData();
+
+    if (numChannelsChanged) {
+      compile();
+      resetTransferFunctions();
+    }
+  }
+}
+
+void Z3DVolumeRaycasterRenderer::addQuad(const ZMesh &quad)
+{
+  if (quad.empty() ||
+      (quad.numVertices() != 4 && quad.numVertices() != 6) ||
+      (quad.numVertices() != quad.num2DTextureCoordinates() &&
+       quad.numVertices() != quad.num3DTextureCoordinates())) {
+    LERROR() << "Input quad should be 2D slice with either 2D or 3D texture coordinates";
+    return;
+  }
+  m_quads.push_back(quad);
+  m_entryCoordTexture = NULL;
+  m_entryDepthTexture = NULL;
+  m_exitCoordTexture = NULL;
+  m_exitDepthTexture = NULL;
+}
+
+void Z3DVolumeRaycasterRenderer::setEntryExitCoordTextures(const Z3DTexture *entryCoordTexture, const Z3DTexture *entryDepthTexture,
+                                                           const Z3DTexture *exitCoordTexture, const Z3DTexture *exitDepthTexture)
+{
+  m_entryCoordTexture = entryCoordTexture;
+  m_entryDepthTexture = entryDepthTexture;
+  m_exitCoordTexture = exitCoordTexture;
+  m_exitDepthTexture = exitDepthTexture;
+  m_quads.clear();
+}
+
+
+void Z3DVolumeRaycasterRenderer::adjustWidgets()
+{
+  m_isoValue.setVisible(m_compositingMode.isSelected("ISO Surface"));
+  m_localMIPThreshold.setVisible(m_compositingMode.isSelected("Local MIP") ||
+                                 m_compositingMode.isSelected("Local MIP Opaque"));
+}
+
+void Z3DVolumeRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram &shader)
+{
+  shader.setLogUniformLocationError(false);
+
+  size_t idx = 0;
+  for (size_t i=0; i<m_volumes.size(); ++i) {
+    if (!m_channelVisibleParas[i]->get())
+      continue;
+
+    // volumes
+    shader.bindVolume(m_volumeUniformNames[idx], m_volumes[i], m_texFilterModeParas[i]->associatedData(),
+                      m_texFilterModeParas[i]->associatedData());
+
+    // transfer functions
+    shader.bindTexture(m_transferFuncUniformNames[idx++], m_transferFuncParas[i]->get().texture());
+
+    CHECK_GL_ERROR;
+  }
+
+  shader.setLogUniformLocationError(true);
+}
+
+void Z3DVolumeRaycasterRenderer::compile()
+{
+  m_raycasterShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+  m_2dImageShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+  m_volumeSliceWithTransferfunShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+}
+
+QString Z3DVolumeRaycasterRenderer::generateHeader()
+{
+  QString headerSource;
+
+  if (hasVisibleRendering()) {
+    size_t numVisibleChannels = 0;
+    for (size_t i=0; i<m_volumes.size(); ++i) {
+      if (m_channelVisibleParas[i]->get()) {
+        ++numVisibleChannels;
+      }
+    }
+    headerSource += QString("#define NUM_VOLUMES %1\n").arg(numVisibleChannels);
+  } else {
+    headerSource += QString("#define NUM_VOLUMES 0\n");
+    headerSource += "#define DISABLE_TEXTURE_COORD_OUTPUT\n";
+  }
+
+  //  if (!m_gradientMode.isSelected("None"))
+  //    headerSource += "#define USE_GRADIENTS\n";
+
+  for (size_t i=0; i<m_transferFuncParas.size(); ++i) {
+    headerSource += QString("#define TF_SAMPLER_TYPE_%1 %2\n").arg(i+1).arg(m_transferFuncParas[i]->get().samplerType());
+  }
+
+  if (m_compositingMode.isSelected("Direct Volume Rendering")) {
+    headerSource += "#define COMPOSITING(result, color, currentRayLength, rayDepth) ";
+    headerSource += "compositeDVR(result, color, currentRayLength, rayDepth);\n";
+  } else if (m_compositingMode.isSelected("ISO Surface")) {
+    headerSource += "#define ISO\n";
+    headerSource += "#define COMPOSITING(result, color, currentRayLength, rayDepth) ";
+    headerSource += "compositeISO(result, color, currentRayLength, rayDepth, iso_value);\n";
+  } else if (m_compositingMode.isSelected("Maximum Intensity Projection")) {
+    headerSource += "#define MIP\n";
+  } else if (m_compositingMode.isSelected("Local MIP")) {
+    headerSource += "#define MIP\n";
+    headerSource += "#define LOCAL_MIP\n";
+  } else if (m_compositingMode.isSelected("X Ray")) {
+    headerSource += "#define COMPOSITING(result, color, currentRayLength, rayDepth) ";
+    headerSource += "compositeXRay(result, color, currentRayLength, rayDepth);\n";
+  } else if (m_compositingMode.isSelected("MIP Opaque")) {
+    headerSource += "#define MIP\n";
+    headerSource += "#define RESULT_OPAQUE\n";
+  } else if (m_compositingMode.isSelected("Local MIP Opaque")) {
+    headerSource += "#define MIP\n";
+    headerSource += "#define LOCAL_MIP\n";
+    headerSource += "#define RESULT_OPAQUE\n";
+  }
+
+  return headerSource;
+}
+
+void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
+{
+  if (!hasVisibleRendering())
+    return;
+
+  if (m_quads.empty()) {
+    if (m_entryCoordTexture == NULL || m_entryDepthTexture == NULL ||
+        m_exitCoordTexture == NULL || m_exitDepthTexture == NULL)
+      return;
+  } else {
+    for (size_t i=0; i<m_quads.size(); ++i) {
+      if (m_is2DImage && m_quads[i].numVertices() != m_quads[i].num2DTextureCoordinates())
+        return;
+      if (!m_is2DImage && m_quads[i].numVertices() != m_quads[i].num3DTextureCoordinates())
+        return;
+    }
+  }
+
+  if (!m_quads.empty()) { // 2d image or slice from 3d volume
+    if (m_is2DImage) {   // image is 2D
+      m_2dImageShader.bind();
+      m_rendererBase.setGlobalShaderParameters(m_2dImageShader, eye);
+
+      bindVolumesAndTransferFuncs(m_2dImageShader);
+
+      for (size_t i=0; i<m_quads.size(); ++i)
+        renderTriangleList(m_2dImageShader, m_quads[i]);
+
+      m_2dImageShader.release();
+    } else {   // image is 3D, but a 2D slice will be shown
+      m_volumeSliceWithTransferfunShader.bind();
+      m_rendererBase.setGlobalShaderParameters(m_volumeSliceWithTransferfunShader, eye);
+
+      bindVolumesAndTransferFuncs(m_volumeSliceWithTransferfunShader);
+
+      for (size_t i=0; i<m_quads.size(); ++i)
+        renderTriangleList(m_volumeSliceWithTransferfunShader, m_quads[i]);
+
+      m_volumeSliceWithTransferfunShader.release();
+    }
+  } else {  // 3d volume raycasting
+    m_raycasterShader.bind();
+
+    m_rendererBase.setGlobalShaderParameters(m_raycasterShader, eye);
+
+    bindVolumesAndTransferFuncs(m_raycasterShader);
+
+    float n = m_rendererBase.camera().nearDist();
+    float f = m_rendererBase.camera().farDist();
+    //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
+    // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
+    float a = f*n/(f-n);
+    float b = 0.5f * (f+n)/(f-n) + 0.5f;
+    m_raycasterShader.setUniform("ze_to_zw_b", b);
+    m_raycasterShader.setUniform("ze_to_zw_a", a);
+
+    // entry exit points
+    m_raycasterShader.bindTexture("ray_entry_points", m_entryCoordTexture);
+    m_raycasterShader.bindTexture("ray_entry_points_depth", m_entryDepthTexture);
+    m_raycasterShader.bindTexture("ray_exit_points",  m_exitCoordTexture);
+    m_raycasterShader.bindTexture("ray_exit_points_depth", m_exitDepthTexture);
+
+    if (m_compositingMode.get() ==  "ISO Surface")
+      m_raycasterShader.setUniform("iso_value", m_isoValue.get());
+
+    if (m_compositingMode.get() ==  "Local MIP" || m_compositingMode.get() ==  "Local MIP Opaque")
+      m_raycasterShader.setUniform("local_MIP_threshold", m_localMIPThreshold.get());
+
+    m_raycasterShader.setUniform("sampling_rate", m_samplingRate.get());
+
+    renderScreenQuad(m_raycasterShader);
+    m_raycasterShader.release();
+  }
+  CHECK_GL_ERROR;
+}
+
+void Z3DVolumeRaycasterRenderer::renderPicking(Z3DEye)
+{
+}
+
+void Z3DVolumeRaycasterRenderer::resetTransferFunctions()
+{
+  for (size_t i=0; i<m_transferFuncParas.size(); ++i) {
+    if (m_opaque) {
+      m_transferFuncParas[i]->get().reset(
+            0.0, 1.0, glm::vec4(0.f),
+            glm::vec4(m_volumes[i]->volColor(), 1.0f));
+      m_transferFuncParas[i]->get().addKey(
+            ZColorMapKey(0.001, glm::vec4(0.01f, 0.01f, 0.01f, 0.0f)));
+      m_transferFuncParas[i]->get().addKey(
+            ZColorMapKey(0.01, glm::vec4(0.01f, 0.01f, 0.01f, 1.0f)));
+    } else {
+      m_transferFuncParas[i]->get().reset(
+            0.0, 1.0, glm::vec4(0.f),
+            glm::vec4(m_volumes[i]->volColor(), 1.f));
+      //m_transferFuncParas[i]->get().addKey(ZColorMapKey(0.1, glm::vec4(m_volumes[i]->volColor(), 1.f) *
+      //                                                  glm::vec4(.1f,.1f,.1f,0.f)));
+    }
+  }
+}
+
+void Z3DVolumeRaycasterRenderer::translate(double dx, double dy, double dz)
+{
+  for (std::vector<Z3DVolume *>::iterator iter = m_volumes.begin();
+       iter != m_volumes.end(); ++iter) {
+    if (*iter != NULL) {
+      (*iter)->translate(dx, dy, dz);
+    }
+  }
+}
+
+bool Z3DVolumeRaycasterRenderer::hasVisibleRendering() const
+{
+  for (size_t i=0; i<m_volumes.size(); ++i) {
+    if (m_channelVisibleParas[i]->get()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+} // namespace nim

@@ -1,0 +1,132 @@
+#include "z3dshader.h"
+
+#include "z3dgl.h"
+#include "zexception.h"
+
+namespace nim {
+
+Z3DShader::Z3DShader(Z3DShader::Type type)
+  : m_type(type)
+  , m_compiled(false)
+  , m_id(0)
+  , m_context()
+{
+  if (m_type == Z3DShader::Type::Vertex) {
+    m_id = glCreateShader(GL_VERTEX_SHADER);
+  } else if (m_type == Z3DShader::Type::Fragment) {
+    m_id = glCreateShader(GL_FRAGMENT_SHADER);
+  } else if (m_type == Z3DShader::Type::Geometry) {
+    m_id = glCreateShader(GL_GEOMETRY_SHADER);
+  } else if (m_type == Z3DShader::Type::TessellationControl) {
+    m_id = glCreateShader(GL_TESS_CONTROL_SHADER);
+  } else if (m_type == Z3DShader::Type::TessellationEvaluation) {
+    m_id = glCreateShader(GL_TESS_EVALUATION_SHADER);
+  } else if (m_type == Z3DShader::Type::Compute) {
+    m_id = glCreateShader(GL_COMPUTE_SHADER);
+  }
+  CHECK_GL_ERROR;
+  if (!m_id) {
+    throw ZGLException("Z3DShader: Could not create shader");
+  }
+}
+
+Z3DShader::~Z3DShader()
+{
+  glDeleteShader(m_id);
+  CHECK_GL_ERROR;
+}
+
+void Z3DShader::compileSourceCode(const char *source)
+{
+  if (m_id) {
+    GLint length = std::strlen(source);
+    glShaderSource(m_id, 1, &source, &length);
+
+    glCompileShader(m_id);
+    GLint value = 0;
+    glGetShaderiv(m_id, GL_COMPILE_STATUS, &value);
+    m_compiled = (value != 0);
+
+    if (!m_compiled) {
+      const char *types[] = {
+        "Fragment",
+        "Vertex",
+        "Geometry",
+        "Tessellation Control",
+        "Tessellation Evaluation",
+        "Compute",
+        ""
+      };
+      const char *type = types[6];
+      switch (m_type) {
+      case Z3DShader::Type::Fragment:
+        type = types[0]; break;
+      case Z3DShader::Type::Vertex:
+        type = types[1]; break;
+      case Z3DShader::Type::Geometry:
+        type = types[2]; break;
+      case Z3DShader::Type::TessellationControl:
+        type = types[3]; break;
+      case Z3DShader::Type::TessellationEvaluation:
+        type = types[4]; break;
+      case Z3DShader::Type::Compute:
+        type = types[5]; break;
+      }
+      // Get info and source code lengths
+      GLint infoLogLength = 0;
+      GLint sourceCodeLength = 0;
+      char *logBuffer = nullptr;
+      char *sourceCodeBuffer = nullptr;
+      // Get the compilation info log
+      glGetShaderiv(m_id, GL_INFO_LOG_LENGTH, &infoLogLength);
+      if (infoLogLength > 1) {
+        GLint temp;
+        logBuffer = new char[infoLogLength];
+        glGetShaderInfoLog(m_id, infoLogLength, &temp, logBuffer);
+      }
+      // Get the source code
+      glGetShaderiv(m_id, GL_SHADER_SOURCE_LENGTH, &sourceCodeLength);
+      if (sourceCodeLength > 1) {
+        GLint temp;
+        sourceCodeBuffer = new char[sourceCodeLength];
+        glGetShaderSource(m_id, sourceCodeLength, &temp, sourceCodeBuffer);
+      }
+      QString log = QString("Z3DShader::compileSourceCode(%1): %2").arg(type).arg(logBuffer ? logBuffer : "failed");
+      delete []logBuffer;
+      // Dump the source code if we got it
+      if (sourceCodeBuffer) {
+        log += QString("\n*** source code ***\n");
+        log += source;
+        log += QString("\n***");
+      }
+      delete []sourceCodeBuffer;
+      CHECK_GL_ERROR;
+      throw ZGLException(log);
+    }
+  } else {
+    throw ZGLException("Z3DShader: Share is not created yet");
+  }
+}
+
+void Z3DShader::compileSourceCode(const QString &source)
+{
+  compileSourceCode(source.toLatin1().constData());
+}
+
+QByteArray Z3DShader::sourceCode() const
+{
+  if (!m_id)
+    return QByteArray();
+  GLint size = 0;
+  glGetShaderiv(m_id, GL_SHADER_SOURCE_LENGTH, &size);
+  if (size <= 0)
+    return QByteArray();
+  GLint len = 0;
+  char *source = new char[size];
+  glGetShaderSource(m_id, size, &len, source);
+  QByteArray src(source);
+  delete []source;
+  return src;
+}
+
+} // namespace nim

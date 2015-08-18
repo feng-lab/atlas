@@ -1,0 +1,42 @@
+#ifndef ZVIDEOENCODER_H
+#define ZVIDEOENCODER_H
+
+#include <QObject>
+#include <QString>
+#include <QProcess>
+#include <QDir>
+
+namespace nim {
+
+class ZVideoEncoder : public QObject
+{
+  Q_OBJECT
+public:
+  ZVideoEncoder(QObject *parent = nullptr);
+
+  void encode(const QDir& dir, const QString& namePrefix, int fieldWidth,
+              int framesPerSecond, const QString& outputFilename);
+
+signals:
+  void error(QString);
+  void finished();
+  void canceled();
+
+public slots:
+  void cancel();
+
+protected slots:
+  void ffmpegError(QProcess::ProcessError error);
+  void ffmpegFinished(int exitCode, QProcess::ExitStatus exitStatus);
+  void logStandardError();
+  void logStandardOutput();
+
+private:
+  QProcess *m_ffmpegProcess;
+
+  bool m_lock;
+};
+
+} // namespace nim
+
+#endif // ZVIDEOENCODER_H

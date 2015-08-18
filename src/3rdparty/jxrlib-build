@@ -1,0 +1,27 @@
+#!/bin/bash
+
+currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
+srcDIR=$currDIR/../../../jxrlib
+buildDIR=$srcDIR/../__jxrlib-build
+installDIR=$currDIR/jxrlib
+
+if [ -d $installDIR ]
+then
+  rm -rf $installDIR
+fi
+
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  git pull
+else
+  git clone https://git01.codeplex.com/jxrlib $srcDIR
+fi
+
+cd $srcDIR
+
+make -j8 install DIR_INSTALL=$installDIR
+
+rm -r $srcDIR/build
+
+cd $currDIR

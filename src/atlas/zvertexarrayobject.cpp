@@ -1,0 +1,54 @@
+#include "zvertexarrayobject.h"
+
+#include "z3dgpuinfo.h"
+
+#if defined(__APPLE__) && !defined(_USE_CORE_PROFILE_)
+#undef glGenVertexArrays
+#undef glBindVertexArray
+#undef glDeleteVertexArrays
+#define glGenVertexArrays glGenVertexArraysAPPLE
+#define glBindVertexArray glBindVertexArrayAPPLE
+#define glDeleteVertexArrays glDeleteVertexArraysAPPLE
+#endif
+
+namespace nim {
+
+ZVertexArrayObject::ZVertexArrayObject(GLsizei n)
+  : m_hardwareSupportVAO(Z3DGpuInfoInstance.isVAOSupported())
+  , m_arrays(std::max((GLsizei)0, n), 0)
+{
+  if (m_hardwareSupportVAO)
+    glGenVertexArrays(m_arrays.size(), &m_arrays[0]);
+}
+
+ZVertexArrayObject::~ZVertexArrayObject()
+{
+  if (!m_hardwareSupportVAO)
+    return;
+  glDeleteVertexArrays(m_arrays.size(), &m_arrays[0]);
+}
+
+void ZVertexArrayObject::bind(size_t idx)
+{
+  if (!m_hardwareSupportVAO)
+    return;
+  glBindVertexArray(m_arrays[idx]);
+}
+
+void ZVertexArrayObject::release()
+{
+  if (!m_hardwareSupportVAO)
+    return;
+  glBindVertexArray(0);
+}
+
+void ZVertexArrayObject::resize(GLsizei n)
+{
+  if (!m_hardwareSupportVAO || n == (GLsizei)m_arrays.size())
+    return;
+  glDeleteVertexArrays(m_arrays.size(), &m_arrays[0]);
+  m_arrays.resize(std::max((GLsizei)0, n), 0);
+  glGenVertexArrays(m_arrays.size(), &m_arrays[0]);
+}
+
+} // namespace nim

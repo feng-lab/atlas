@@ -1,0 +1,178 @@
+#include "zanalysisworklistdialog.h"
+
+#include <QtGui>
+#ifndef _QT4_
+#include <QtWidgets>
+#endif
+#include <QTableView>
+#include "QsLog.h"
+#include "zanalysisworklistmodel.h"
+#include "zstyleditemdelegate.h"
+
+namespace nim {
+
+ZAnalysisWorklistDialog::ZAnalysisWorklistDialog(QWidget *parent)
+  : QDialog(parent)
+{
+  setFocusPolicy(Qt::StrongFocus);
+  setAcceptDrops(true);
+  createWidget();
+}
+
+ZAnalysisWorklistDialog::~ZAnalysisWorklistDialog()
+{
+}
+
+void ZAnalysisWorklistDialog::reject()
+{
+  if (!m_saveButton->isEnabled() || m_model->worklist().empty()) {
+    QDialog::reject();
+    return;
+  }
+
+  int ans =  QMessageBox::question(this, tr("Confirm"), tr("There are unsaved worklist changes. Exit anyway?"),
+                                    QMessageBox::Cancel | QMessageBox::Ok, QMessageBox::Ok);
+  if (ans == QMessageBox::Ok) {
+    QDialog::reject();
+  }
+}
+
+void ZAnalysisWorklistDialog::onNew()
+{
+  m_model->reset();
+  m_saveButton->setEnabled(true);
+  setWindowTitle("~UntitledWorklist.csv");
+  m_filename.clear();
+}
+
+void ZAnalysisWorklistDialog::onOpen()
+{
+  QString fileName =
+      QFileDialog::getOpenFileName(this, tr("Choose worklist file"),
+                                   m_filename,
+                                   tr("Worklist file (*.csv)"),
+                                   nullptr);
+
+  if (!fileName.isEmpty()) {
+    m_model->setSource(fileName);
+    m_filename = fileName;
+    m_saveButton->setEnabled(false);
+    setWindowTitle(m_filename);
+  }
+}
+
+void ZAnalysisWorklistDialog::onSave()
+{
+  if (m_filename.isEmpty() && !m_model->worklist().empty()) {
+    m_filename =
+        QFileDialog::getSaveFileName(this, tr("Save worklist file as..."),
+                                     m_filename,
+                                     tr("Worklist file (*.csv)"),
+                                     nullptr);
+  }
+  if (!m_filename.isEmpty()) {
+    m_model->toCSV(m_filename, true);
+    m_saveButton->setEnabled(false);
+    setWindowTitle(m_filename);
+  }
+}
+
+void ZAnalysisWorklistDialog::onSaveAs()
+{
+  QString fileName =
+      QFileDialog::getSaveFileName(this, tr("Save worklist file as..."),
+                                   m_filename,
+                                   tr("Worklist file (*.csv)"),
+                                   nullptr);
+
+  if (!fileName.isEmpty()) {
+    m_filename = fileName;
+    m_model->toCSV(m_filename, true);
+    m_saveButton->setEnabled(false);
+    setWindowTitle(m_filename);
+  }
+}
+
+void ZAnalysisWorklistDialog::onGenerate()
+{
+  onSave();
+
+  const QList<ZAnalysisTextFileInput>& list = m_model->worklist();
+  if (!list.empty()) {
+    ZGenerateAnalysisTextFile gen;
+    QProgressDialog progress("Generating analysis text files...", "Cancel", 0, list.size(), this);
+    progress.setWindowModality(Qt::WindowModal);
+    progress.show();
+    try {
+      for (int i=0; i<list.size(); i++) {
+        progress.setValue(i);
+        if (progress.wasCanceled())
+          break;
+
+        qApp->processEvents();
+        gen.generate(list[i]);
+      }
+      progress.setValue(list.size());
+      QMessageBox::information(this, "Analysis files generated", "Analysis files generated!");
+    }
+    catch (const ZException & e) {
+      progress.setValue(list.size());
+      LERROR() << "Error while generating analysis files:" << e.what();
+      QMessageBox::critical(this, "Error while generating analysis files", e.what());
+    }
+  } else {
+    QMessageBox::information(this, "Empty list", "No work to do.");
+  }
+}
+
+void ZAnalysisWorklistDialog::dataModified()
+{
+  m_saveButton->setEnabled(true);
+  if (!m_filename.isEmpty() && windowTitle().compare(QString("%1 *").arg(m_filename)) != 0) {
+    setWindowTitle(QString("%1 *").arg(m_filename));
+  }
+}
+
+void ZAnalysisWorklistDialog::createWidget()
+{
+  QVBoxLayout *vlayout = new QVBoxLayout;
+  QHBoxLayout *hlayout = new QHBoxLayout;
+  QPushButton *newButton = new QPushButton(tr("new"), this);
+  connect(newButton, SIGNAL(clicked()), this, SLOT(onNew()));
+  hlayout->addWidget(newButton);
+  QPushButton *openButton = new QPushButton(tr("open"), this);
+  connect(openButton, SIGNAL(clicked()), this, SLOT(onOpen()));
+  hlayout->addWidget(openButton);
+  m_saveButton = new QPushButton(tr("save"), this);
+  connect(m_saveButton, SIGNAL(clicked()), this, SLOT(onSave()));
+  hlayout->addWidget(m_saveButton);
+  QPushButton *saveAsButton = new QPushButton(tr("save as..."), this);
+  connect(saveAsButton, SIGNAL(clicked()), this, SLOT(onSaveAs()));
+  hlayout->addWidget(saveAsButton);
+
+  m_view = new QTableView(this);
+  m_view->setAcceptDrops(true);
+  m_view->setDropIndicatorShown(true);
+  m_view->setItemDelegate(new ZStyledItemDelegate(this));
+  m_model = new ZAnalysisWorklistModel(this);
+  m_view->setModel(m_model);
+
+  vlayout->addLayout(hlayout);
+  vlayout->addWidget(m_view);
+
+  QPushButton* runButton = new QPushButton(tr("Generate"), this);
+  QPushButton* exitButton = new QPushButton(tr("Exit"), this);
+  QDialogButtonBox* buttonBox = new QDialogButtonBox(Qt::Horizontal, this);
+  buttonBox->addButton(exitButton, QDialogButtonBox::RejectRole);
+  buttonBox->addButton(runButton, QDialogButtonBox::ActionRole);
+  connect(exitButton, SIGNAL(clicked()), this, SLOT(reject()));
+  connect(runButton, SIGNAL(clicked()), this, SLOT(onGenerate()));
+  vlayout->addWidget(buttonBox);
+
+  setLayout(vlayout);
+
+  setWindowTitle("~UntitledWorklist.csv");
+  connect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(dataModified()));
+}
+
+} // namespace nim
