@@ -174,8 +174,8 @@ QStringList Z3DGpuInfo::gpuInfo() const
   info << QString("OpenGL Version:                %1").arg(m_glVersionString);
   info << QString("OpenGL SL Version:             %1").arg(m_glslVersionString);
   info << QString("OpenGL Extensions:             %1").arg(m_glExtensionsString);
-  info << QString("Max Texture Size:              %1").arg(m_maxTexureSize);
-  info << QString("Max 3D Texture Size:           %1").arg(m_max3DTextureSize);
+  info << QString("Max Texture Size:              %1 (use %2)").arg(m_maxTexureSize).arg(maxTextureSize());
+  info << QString("Max 3D Texture Size:           %1 (use %2)").arg(m_max3DTextureSize).arg(max3DTextureSize());
   info << QString("Max Color Attachments:         %1").arg(m_maxColorAttachments);
   info << QString("Max Draw Buffer:               %1").arg(m_maxDrawBuffer);
   if (isGeometryShaderSupported() && m_maxGeometryOutputVertices > 0) {

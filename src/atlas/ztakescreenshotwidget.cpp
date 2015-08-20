@@ -23,8 +23,9 @@ ZTakeScreenShotWidget::ZTakeScreenShotWidget(bool is2D, bool group, QWidget *par
   , m_captureStereoImage("Capture Stereo Image", false)
   , m_stereoImageType("Stereo Image Type")
   , m_useWindowSize("Use Window Size as Image Size", true)
-  , m_customSize("Use Custom Image Size", glm::ivec2(1920, 1080), glm::ivec2(6, 6),
-                 glm::ivec2(is2D ? 16384 : Z3DGpuInfoInstance.maxTextureSize()))
+  // todo: use max texture size?
+  , m_customSize("Use Custom Image Size", glm::ivec2(1920, 1080), glm::ivec2(128, 128),
+                 glm::ivec2(8192))
   , m_namePrefix("filename prefix", "")
   , m_nextNumber(1)
   , m_axis("Rotate Around Axis")

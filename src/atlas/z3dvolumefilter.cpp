@@ -57,12 +57,15 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters &globalParas, QObject *pare
   m_baseBoundBoxRenderer.setEnableMultisample(false);
   m_textureCopyRenderer.setDiscardTransparent(true);
 
-  uint64_t currentAvailableTexMem = Z3DGpuInfoInstance.dedicatedVideoMemoryMB();
-  if (currentAvailableTexMem <= 256)
-    m_maxVoxelNumber = 256 * 256 * 256 * 2;
-  else
-    m_maxVoxelNumber = currentAvailableTexMem * 1024 * 1024 / 2;
-  LINFO() << m_maxVoxelNumber;
+  // directX 10 resource limit
+  // 128 MB
+  // directX 11 resource limit
+  //min(max(128, 0.25f * (amount of dedicated VRAM)), 2048) MB
+  //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_A_TERM (128)
+  //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_B_TERM (0.25f)
+  //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_C_TERM (2048)
+  size_t currentAvailableTexMem = Z3DGpuInfoInstance.dedicatedVideoMemoryMB();
+  m_maxVoxelNumber = std::min(std::max(size_t(128), static_cast<size_t>(0.25 * currentAvailableTexMem)), size_t(2048)) * 1024 * 1024;
 
   addParameter(m_visible);
   addParameter(m_stayOnTop);

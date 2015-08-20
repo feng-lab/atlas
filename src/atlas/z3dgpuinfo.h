@@ -49,16 +49,14 @@ public:
   QString glExtensionsString() const;
   QString glShadingLanguageVersionString() const;
 
-  // Returns the maximal side length of 1D and 2D textures.
-  int maxTextureSize() const { return m_maxTexureSize; }
+  // directX 10 resource limit
+  // 1D 8192 2D 8192 3D 2048
+  // directX 11 resource limit
+  // 1D 16384 2D 16384 3D 2048
+  int maxTextureSize() const { return std::min(16384, m_maxTexureSize); }
   // Returns the maximal side length of 3D textures.
-#ifdef __APPLE__
-  // mac pro bug.
-  // todo: check new mac pro 2013
-  int max3DTextureSize() const { return std::min(20480000, m_max3DTextureSize); }
-#else
-  int max3DTextureSize() const { return m_max3DTextureSize; }
-#endif
+  // directx limit?
+  int max3DTextureSize() const { return std::min(2048, m_max3DTextureSize); }
 
   // Return a value such as 16 or 32. That is the number of image samplers that your GPU supports in the fragment shader.
   // the maximum supported texture image units that can be used to access texture maps from the fragment shader.
