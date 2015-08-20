@@ -343,8 +343,8 @@ protected:
     }
 
     size_t nUniqueData = 0;
-    std::set<VectorXrt,ZVectorCompare<ResultDataType> > myset;
-    std::pair<typename std::set<VectorXrt,ZVectorCompare<ResultDataType> >::iterator,bool> ret;
+    std::set<VectorXrt,ZVectorCompare<ResultDataType>> myset;
+    std::pair<typename std::set<VectorXrt,ZVectorCompare<ResultDataType>>::iterator,bool> ret;
     for (int r=0; r < m_pData->rows(); r++) {
       ret = myset.insert(m_pData->row(r));
       if (ret.second != false) {

@@ -195,7 +195,7 @@ void ZImgMerge::removeImg(const ZImg &img)
 {
   m_imgCoords.erase(&img);
   m_imgNames.erase(&img);
-  std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double> >::iterator it = m_imgPairs.begin();
+  std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::iterator it = m_imgPairs.begin();
   while (it != m_imgPairs.end()) {
     if (it->first.first == &img || it->first.second == &img) {
       m_imgPairs.erase(it++);
@@ -207,7 +207,7 @@ void ZImgMerge::removeImg(const ZImg &img)
 
 void ZImgMerge::removeImgConnection(const ZImg &img1, const ZImg &img2)
 {
-  std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double> >::iterator it = m_imgPairs.begin();
+  std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::iterator it = m_imgPairs.begin();
   while (it != m_imgPairs.end()) {
     if (it->first == std::make_pair(&img1, &img2) || it->first == std::make_pair(&img2, &img1)) {
       m_imgPairs.erase(it++);
@@ -233,7 +233,7 @@ ZImg ZImgMerge::merge(Mode mode, QString *summary) const
     }
   }
   double minCost = std::numeric_limits<double>::max();
-  for (std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double> >::const_iterator it = m_imgPairs.begin();
+  for (std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::const_iterator it = m_imgPairs.begin();
        it != m_imgPairs.end(); ++it) {
     minCost = std::min(minCost, it->second.second);
     if (!refImg) refImg = it->first.first;
@@ -292,7 +292,7 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
   }
   }
 
-  for (std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double> >::const_iterator it = m_imgPairs.begin();
+  for (std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::const_iterator it = m_imgPairs.begin();
        it != m_imgPairs.end(); ++it) {
     if (imgToVertexMapper.find(it->first.first) == imgToVertexMapper.end()) {
       Vertex v = boost::add_vertex(VertexInfo(it->first.first, vIdx++), graph);
@@ -342,7 +342,7 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
         summary += QString("tile %1 connects to tile %2\n")
             .arg(m_imgNames.at(img1))
             .arg(m_imgNames.at(img2));
-        std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double> >::const_iterator pairIt;
+        std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::const_iterator pairIt;
         pairIt = m_imgPairs.find(std::make_pair(img1, img2));
         if (pairIt != m_imgPairs.end())
           imgCoords[img2] = imgCoords[img1] + pairIt->second.first;
@@ -355,7 +355,7 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
         summary += QString("tile %1 connects to tile %2\n")
             .arg(m_imgNames.at(img1))
             .arg(m_imgNames.at(img2));
-        std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double> >::const_iterator pairIt;
+        std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::const_iterator pairIt;
         pairIt = m_imgPairs.find(std::make_pair(img1, img2));
         if (pairIt != m_imgPairs.end())
           imgCoords[img1] = imgCoords[img2] - pairIt->second.first;
@@ -379,7 +379,7 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
     imgCoords[refImg] = ZVoxelCoordinate();
 
   edge_in_MST<Edge> filter(tree);
-  boost::filtered_graph<GraphT, edge_in_MST<Edge> > fg(graph, filter);
+  boost::filtered_graph<GraphT, edge_in_MST<Edge>> fg(graph, filter);
 
   std::vector<Edge> sortedEdges;
   dfs_edge_visitor<Edge> vis(sortedEdges);
@@ -394,7 +394,7 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
     bool img2HasLocation = imgCoords.find(img2) != imgCoords.end();
 
     if (img1HasLocation && !img2HasLocation) {
-      std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double> >::const_iterator pairIt;
+      std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::const_iterator pairIt;
       pairIt = m_imgPairs.find(std::make_pair(img1, img2));
       if (pairIt != m_imgPairs.end())
         imgCoords[img2] = imgCoords[img1] + pairIt->second.first;
@@ -407,7 +407,7 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
           .arg(m_imgNames.at(img2))
           .arg(pairIt->second.second);
     } else if (!img1HasLocation && img2HasLocation) {
-      std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double> >::const_iterator pairIt;
+      std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::const_iterator pairIt;
       pairIt = m_imgPairs.find(std::make_pair(img1, img2));
       if (pairIt != m_imgPairs.end())
         imgCoords[img1] = imgCoords[img2] - pairIt->second.first;

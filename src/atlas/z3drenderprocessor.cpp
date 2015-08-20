@@ -55,23 +55,18 @@ void Z3DRenderProcessor::updateSize()
   invalidate();
 }
 
-void Z3DRenderProcessor::addPrivateRenderPort(Z3DRenderOutputPort* port)
-{
-  port->setProcessor(this);
-  m_privateRenderPorts.push_back(port);
-
-  std::map<QString, Z3DOutputPortBase*>::const_iterator it = m_outputPortMap.find(port->name());
-  if (it == m_outputPortMap.end())
-    m_outputPortMap.emplace(port->name(), port);
-  else {
-    LERROR() << className() << "port" << port->name() << "has already been inserted!";
-    assert(false);
-  }
-}
-
 void Z3DRenderProcessor::addPrivateRenderPort(Z3DRenderOutputPort& port)
 {
-  addPrivateRenderPort(&port);
+  port.setProcessor(this);
+  m_privateRenderPorts.push_back(&port);
+
+  std::map<QString, Z3DOutputPortBase*>::const_iterator it = m_outputPortMap.find(port.name());
+  if (it == m_outputPortMap.end())
+    m_outputPortMap.emplace(port.name(), &port);
+  else {
+    LERROR() << className() << "port" << port.name() << "has already been inserted!";
+    assert(false);
+  }
 }
 
 void Z3DRenderProcessor::renderScreenQuad(const Z3DShaderProgram &shader)
@@ -114,14 +109,14 @@ const std::vector<Z3DRenderOutputPort*> &Z3DRenderProcessor::privateRenderPorts(
   return m_privateRenderPorts;
 }
 
-void Z3DRenderProcessor::saveTextureAsImage(const Z3DTexture *tex, const QString &filename)
+void Z3DRenderProcessor::saveTextureAsImage(const Z3DTexture &tex, const QString &filename)
 {
   try {
     GLenum dataFormat = GL_BGRA;
     GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
-    std::unique_ptr<uint8_t[]> colorBuffer(new uint8_t[tex->bypePerPixel(dataFormat, dataType) * tex->numPixels()]);
-    tex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
-    QImage upsideDownImage(colorBuffer.get(), tex->width(), tex->height(),
+    std::unique_ptr<uint8_t[]> colorBuffer(new uint8_t[tex.bypePerPixel(dataFormat, dataType) * tex.numPixels()]);
+    tex.downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
+    QImage upsideDownImage(colorBuffer.get(), tex.width(), tex.height(),
                            QImage::Format_ARGB32);
     QImage image = upsideDownImage.mirrored(false, true);
     QImageWriter writer(filename);
@@ -135,15 +130,15 @@ void Z3DRenderProcessor::saveTextureAsImage(const Z3DTexture *tex, const QString
   }
 }
 
-void Z3DRenderProcessor::saveDepthTextureAsImage(const Z3DTexture *tex, const QString &filename)
+void Z3DRenderProcessor::saveDepthTextureAsImage(const Z3DTexture &tex, const QString &filename)
 {
   try {
     GLenum dataFormat = GL_DEPTH_COMPONENT;
     GLenum dataType = GL_UNSIGNED_INT;
-    std::unique_ptr<uint32_t[]> depthBuffer(new uint32_t[tex->numPixels()]);
-    tex->downloadTextureToBuffer(dataFormat, dataType, depthBuffer.get());
+    std::unique_ptr<uint32_t[]> depthBuffer(new uint32_t[tex.numPixels()]);
+    tex.downloadTextureToBuffer(dataFormat, dataType, depthBuffer.get());
     nim::ZImg img;
-    img.wrapData(depthBuffer.get(), tex->width(), tex->height(), 1);
+    img.wrapData(depthBuffer.get(), tex.width(), tex.height(), 1);
     img.flip(nim::Dimension::Y);
     img.save(filename);
   }

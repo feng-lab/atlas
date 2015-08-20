@@ -83,7 +83,7 @@ public:
   bool needUpdate(const QRectF &viewport, double scale,
                   const QRectF &oldViewport, double oldScale) const;
 
-  void retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg> > &imgs,
+  void retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs,
                            std::vector<QPoint> &locs,
                            std::vector<double> &scales,
                            size_t z,
@@ -116,7 +116,7 @@ protected:
   void createSliceTiles(ZImg *img, size_t z, size_t t, bool mip = false);
   void buildPyramidal(ZImg& img);
   void buildPyramidal();
-  void buildFastReadIndex(const std::vector<std::shared_ptr<ZImgSubBlock> > &subBlocks);
+  void buildFastReadIndex(const std::vector<std::shared_ptr<ZImgSubBlock>> &subBlocks);
   ZImg assembleImg(size_t level) const;
   ZImg assembleImg(size_t level, size_t t) const;
   ZImg assembleImg(size_t level, size_t t, size_t z) const;
@@ -146,7 +146,7 @@ private:
   size_t m_tileSize = 4096;
   int64_t m_fastReadSizeThreshold = 100 * 1024 * 1024;  // 100MB
   QString m_pyramidalFolder;
-  std::vector<std::map<ZImgTileKey, std::shared_ptr<ZImgSubBlock> > > m_levelTileMaps;
+  std::vector<std::map<ZImgTileKey, std::shared_ptr<ZImgSubBlock>>> m_levelTileMaps;
   std::vector<size_t> m_levelWidths;
   std::vector<size_t> m_levelHeights;
 

@@ -895,7 +895,7 @@ size_t ZMesh::numCoverCubes(double cubeEdgeLength)
   int xdim = std::ceil((maxx-minx) / cubeEdgeLength);
   int ydim = std::ceil((maxy-miny) / cubeEdgeLength);
   int zdim = std::ceil((maxz-minz) / cubeEdgeLength);
-  std::vector<ZBBox<glm::vec3> > boxes;
+  std::vector<ZBBox<glm::vec3>> boxes;
   std::vector<int> numPts;
   for (int x=0; x<xdim; ++x) {
     for (int y=0; y<ydim; ++y) {

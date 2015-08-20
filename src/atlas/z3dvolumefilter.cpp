@@ -126,10 +126,10 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters &globalParas, QObject *pare
   m_boundBoxLineWidth.set(1);
   m_boundBoxMode.select("Bound Box");
 
-  addParameter(&m_volumeRaycasterRenderer.compositingModePara());
-  addParameter(&m_volumeRaycasterRenderer.isoValuePara());
-  addParameter(&m_volumeRaycasterRenderer.localMIPThresholdPara());
-  addParameter(&m_volumeRaycasterRenderer.samplingRatePara());
+  addParameter(m_volumeRaycasterRenderer.compositingModePara());
+  addParameter(m_volumeRaycasterRenderer.isoValuePara());
+  addParameter(m_volumeRaycasterRenderer.localMIPThresholdPara());
+  addParameter(m_volumeRaycasterRenderer.samplingRatePara());
 
   adjustWidget();
   CHECK_GL_ERROR;
@@ -168,7 +168,7 @@ void Z3DVolumeFilter::setData(const ZImgPack &img)
     }
   }
   while (m_numParas < m_parameters.size()) {
-    removeParameter(m_parameters[m_numParas]);
+    removeParameter(*m_parameters[m_numParas]);
   }
 
   m_imgPack = &img;
@@ -180,18 +180,18 @@ void Z3DVolumeFilter::setData(const ZImgPack &img)
 
   for (auto it = m_volumeRaycasterRenderer.channelVisibleParas().begin();
        it != m_volumeRaycasterRenderer.channelVisibleParas().end(); ++it) {
-    addParameter(it->get());
+    addParameter(*it->get());
   }
   for (auto it = m_volumeRaycasterRenderer.transferFuncParas().begin();
        it != m_volumeRaycasterRenderer.transferFuncParas().end(); ++it) {
-    addParameter(it->get());
+    addParameter(*it->get());
   }
   for (auto it = m_volumeRaycasterRenderer.texFilterModeParas().begin();
        it != m_volumeRaycasterRenderer.texFilterModeParas().end(); ++it) {
-    addParameter(it->get());
+    addParameter(*it->get());
   }
   for (auto it = m_sliceColormaps.begin(); it != m_sliceColormaps.end(); ++it) {
-    addParameter(it->get());
+    addParameter(*it->get());
   }
 
   if (m_widgetsGroup) {
@@ -926,7 +926,7 @@ void Z3DVolumeFilter::process(Z3DEye eye)
   CHECK_GL_ERROR;
 }
 
-const std::vector<std::unique_ptr<Z3DVolume> >& Z3DVolumeFilter::getVolumes() const
+const std::vector<std::unique_ptr<Z3DVolume>>& Z3DVolumeFilter::getVolumes() const
 {
   if (m_isSubVolume.get())
     return m_zoomInVolumes;

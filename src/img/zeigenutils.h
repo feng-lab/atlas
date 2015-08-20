@@ -225,7 +225,7 @@ public:
   inline static bool matrixIsPositiveDefinite(const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& x,
                                               Real thre = Eigen::NumTraits<Real>::dummy_precision())
   {
-    Eigen::SelfAdjointEigenSolver<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> > es;
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> es;
     es.compute(x);
     return (es.eigenvalues().array() > thre).all();
   }
@@ -326,7 +326,7 @@ public:
   template<class T>
   inline static size_t rank(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x, double thre = -1)
   {
-    Eigen::JacobiSVD<Eigen::Matrix<T,Eigen::Dynamic,Eigen::Dynamic> > svd(x);
+    Eigen::JacobiSVD<Eigen::Matrix<T,Eigen::Dynamic,Eigen::Dynamic>> svd(x);
     if (thre > 0)
       svd.setThreshold(thre);
     return svd.rank();
@@ -617,8 +617,8 @@ public:
     typedef Eigen::Matrix<T, 1, Eigen::Dynamic> VectorXt;
     int nUniqueData = 0;
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> uniqueMat(x.rows(), x.cols());
-    std::set<VectorXt,ZVectorCompare<T> > myset;
-    std::pair<typename std::set<VectorXt,ZVectorCompare<T> >::iterator,bool> ret;
+    std::set<VectorXt,ZVectorCompare<T>> myset;
+    std::pair<typename std::set<VectorXt,ZVectorCompare<T>>::iterator,bool> ret;
     for (int r=0; r < x.rows(); r++) {
       ret = myset.insert(x.row(r));
       if (ret.second != false) {

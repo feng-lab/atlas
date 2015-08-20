@@ -32,7 +32,7 @@ QStringList ZImgV3DRaw::extensions() const
   return res;
 }
 
-void ZImgV3DRaw::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock> > > *subBlocks,
+void ZImgV3DRaw::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
                           std::vector<size_t> *numPyramidalLevel)
 {
   std::ifstream inputFileStream;

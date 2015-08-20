@@ -345,7 +345,7 @@ void binaryImgToROI(const ZImg &img, ZROI &roi)
 
     try {
       cv::Mat mat(simg.height(), simg.width(), CV_8UC1, simg.channelData(0));
-      std::vector<std::vector<cv::Point> > contours;
+      std::vector<std::vector<cv::Point>> contours;
       std::vector<cv::Vec4i> hierarchy;
       cv::findContours(mat, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_NONE);
 

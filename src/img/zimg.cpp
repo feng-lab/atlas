@@ -41,7 +41,7 @@ QString ZImgMetadata::toQString() const
 {
   QString res;
 
-  for (std::map<_AttachPoint, std::vector<ZImgMetatag> >::const_iterator it = m_data.begin();
+  for (std::map<_AttachPoint, std::vector<ZImgMetatag>>::const_iterator it = m_data.begin();
        it != m_data.end(); ++it) {
     if (!it->second.empty()) {
       res = res % QString("Attach Point: z: %1, c: %2, t: %3\n").arg(it->first.z)
@@ -63,7 +63,7 @@ QString ZImgThumbernail::toQString() const
 {
   QString res;
 
-  for (std::map<_AttachPoint, std::vector<ZImg> >::const_iterator it = m_data.begin();
+  for (std::map<_AttachPoint, std::vector<ZImg>>::const_iterator it = m_data.begin();
        it != m_data.end(); ++it) {
     if (!it->second.empty()) {
       res = res % QString("Attach Point: z: %1, c: %2, t: %3, Number of Thumbnails: %4\n").arg(it->first.z)
@@ -248,7 +248,7 @@ void ZImg::load(const QStringList &fileList, Dimension catDim, const ZImgRegion 
   ZImgIOInstance.readImg(fileList, catDim, region, *this, scene, format, expandXY, expandWithMaxValue);
 }
 
-std::vector<ZImgInfo> ZImg::readImgInfo(const QString &filename, std::vector<std::vector<std::shared_ptr<ZImgSubBlock> > > *subBlocks, FileFormat format)
+std::vector<ZImgInfo> ZImg::readImgInfo(const QString &filename, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks, FileFormat format)
 {
   std::vector<ZImgInfo> res;
   ZImgIOInstance.readInfo(filename, res, subBlocks, nullptr, format);

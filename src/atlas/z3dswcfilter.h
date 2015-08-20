@@ -122,10 +122,10 @@ private:
   ZStringIntOptionParameter m_renderingPrimitive;
   ZStringIntOptionParameter m_colorMode;
   ZVec4Parameter m_swcTreeColor;
-  std::vector<ZVec4Parameter*> m_colorsForDifferentType;
-  std::vector<ZVec4Parameter*> m_colorsForSubclassType;
+  std::vector<std::unique_ptr<ZVec4Parameter>> m_colorsForDifferentType;
+  std::vector<std::unique_ptr<ZVec4Parameter>> m_colorsForSubclassType;
   std::map<int, size_t> m_subclassTypeColorMapper;
-  std::vector<ZVec4Parameter*> m_colorsForDifferentTopology;
+  std::vector<std::unique_ptr<ZVec4Parameter>> m_colorsForDifferentTopology;
   ZColorMapParameter m_colorMapBranchType;
 
   //std::map<std::string, size_t> m_sourceColorMapper;   // should use unordered_map
@@ -154,7 +154,7 @@ private:
   std::vector<glm::vec4> m_pointColors;
   std::vector<glm::vec4> m_pointPickingColors;
 
-  std::vector<std::pair<SwcTreeNode, SwcTreeNode> > m_decompsedNodePairs;
+  std::vector<std::pair<SwcTreeNode, SwcTreeNode>> m_decompsedNodePairs;
   std::vector<SwcTreeNode> m_decomposedNodes;
   std::set<SwcTreeNode*> m_allNodesSet;  // for fast search
   std::set<int> m_allNodeType;   // all node type of current opened swc, used for adjust widget (hide irrelavant stuff)

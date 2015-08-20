@@ -49,7 +49,7 @@ QString Z3DVolumeRaycasterRenderer::compositeMode() const
   return m_compositingMode.get();
 }
 
-void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume> > &volsIn)
+void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &volsIn)
 {
   std::vector<Z3DVolume*> vols;
   for (size_t i=0; i<volsIn.size(); ++i) {

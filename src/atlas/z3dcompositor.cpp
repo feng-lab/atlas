@@ -117,15 +117,15 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters &globalParas, QObject *parent)
   addParameter(m_ZAxisColor);
   addParameter(m_axisRegionRatio);
   addParameter(m_axisMode);
-  addParameter(&m_fontRenderer.allFontNamesPara());
-  addParameter(&m_fontRenderer.fontPara());
-  addParameter(&m_fontRenderer.fontSizePara());
-  addParameter(&m_fontRenderer.fontSoftEdgeScalePara());
-  addParameter(&m_fontRenderer.showFontOutlinePara());
-  addParameter(&m_fontRenderer.fontOutlineModePara());
-  addParameter(&m_fontRenderer.fontOutlineColorPara());
-  addParameter(&m_fontRenderer.showFontShadowPara());
-  addParameter(&m_fontRenderer.fontShadowColorPara());
+  addParameter(m_fontRenderer.allFontNamesPara());
+  addParameter(m_fontRenderer.fontPara());
+  addParameter(m_fontRenderer.fontSizePara());
+  addParameter(m_fontRenderer.fontSoftEdgeScalePara());
+  addParameter(m_fontRenderer.showFontOutlinePara());
+  addParameter(m_fontRenderer.fontOutlineModePara());
+  addParameter(m_fontRenderer.fontOutlineColorPara());
+  addParameter(m_fontRenderer.showFontShadowPara());
+  addParameter(m_fontRenderer.fontShadowColorPara());
   m_arrowRenderer.setUseDisplayList(false);
   m_lineRenderer.setUseDisplayList(false);
   m_fontRenderer.setFollowCoordTransform(false);
@@ -211,7 +211,7 @@ ZWidgetsGroup *Z3DCompositor::axisWidgetsGroup()
 void Z3DCompositor::savePickingBufferToImage(const QString &filename)
 {
   Z3DTexture *tex = pickingManager().renderTarget().attachment(GL_COLOR_ATTACHMENT0);
-  saveTextureAsImage(tex, filename);
+  saveTextureAsImage(*tex, filename);
 }
 
 void Z3DCompositor::process(Z3DEye eye)

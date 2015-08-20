@@ -64,7 +64,7 @@ public:
 
   virtual QWidget* createObjEditWidget(size_t /*id*/) { return nullptr; }
 
-  std::map<size_t,size_t> read(const QList<QPair<QString,QJsonValue> > &docKeyValueList, QString &err);
+  std::map<size_t,size_t> read(const QList<QPair<QString,QJsonValue>> &docKeyValueList, QString &err);
   void write(QJsonObject &json) const;
 
   // show/hide obj with id

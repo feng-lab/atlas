@@ -56,8 +56,8 @@ bool seperate2DKernel(const double *kernel, size_t width, size_t height,
     return true;
   }
   if (width > 1 && height > 1 && width*height >= 49) {
-    Map<const Matrix<double,Dynamic,Dynamic,RowMajor> > knl(kernel,height,width);
-    JacobiSVD<Matrix<double,Dynamic,Dynamic,RowMajor> > svd(knl, ComputeThinU | ComputeThinV);
+    Map<const Matrix<double,Dynamic,Dynamic,RowMajor>> knl(kernel,height,width);
+    JacobiSVD<Matrix<double,Dynamic,Dynamic,RowMajor>> svd(knl, ComputeThinU | ComputeThinV);
     VectorXd s = svd.singularValues();
     //LINFO() << s;
     double tol = std::numeric_limits<double>::epsilon() * s(0) * std::max(width, height);

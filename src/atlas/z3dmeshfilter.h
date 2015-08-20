@@ -91,7 +91,7 @@ private:
   std::set<ZMesh*> *m_selectedMeshes;   //point to all selected meshes, managed by other class
 
   // generate and save to speed up bound box rendering for big mesh
-  std::map<ZMesh*, std::vector<double> > m_meshBoundboxMapper;
+  std::map<ZMesh*, std::vector<double>> m_meshBoundboxMapper;
 
   ZWidgetsGroup *m_widgetsGroup;
   bool m_dataIsInvalid;

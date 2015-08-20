@@ -162,7 +162,7 @@ void ZImageTransform::transformImage(const TPixel *Iin, size_t width, size_t hei
     int numThreads = QThread::idealThreadCount();
     int numBlock = std::min(outDepth, numThreads * 2);
     int zPerBlock = outDepth / numBlock;
-    QList<std::pair<int,int> > allRange;
+    QList<std::pair<int,int>> allRange;
     for (int i=0; i<numBlock; ++i) {
       allRange.push_back(std::make_pair(i*zPerBlock + zstart,
                                         (i==numBlock-1) ? zend : ((i+1)*zPerBlock + zstart)));
@@ -252,7 +252,7 @@ void ZImageTransform::transformImage(const TPixel *Iin, size_t width, size_t hei
     int numThreads = QThread::idealThreadCount();
     int numBlock = std::min(outHeight, numThreads * 2);
     int rowsPerBlock = outHeight / numBlock;
-    QList<std::pair<int,int> > allRange;
+    QList<std::pair<int,int>> allRange;
     for (int i=0; i<numBlock; ++i) {
       allRange.push_back(std::make_pair(i*rowsPerBlock + ystart,
                                         (i==numBlock-1) ? yend : ((i+1)*rowsPerBlock) + ystart));

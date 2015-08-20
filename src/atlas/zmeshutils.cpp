@@ -286,7 +286,7 @@ typedef std::vector<int64_t> vtkCCSPolyEdges;
 // each triangle.
 void vtkCCSInsertTriangle(
     std::vector<glm::i64vec3> &polys, const std::vector<int64_t> &poly, const size_t trids[3],
-    const std::vector<int64_t> &polyEdges, std::vector<std::vector<int64_t> > &originalEdges)
+    const std::vector<int64_t> &polyEdges, std::vector<std::vector<int64_t>> &originalEdges)
 {
   static const size_t nextVert[3] = { 1, 2, 0 };
 
@@ -842,7 +842,7 @@ bool TriangulatePolygon2(const std::vector<int64_t> &poly, const std::vector<glm
   // vertex. Place the structure into a priority queue (those
   // vertices with smallest angle are to be removed first).
   //
-  std::priority_queue<std::pair<double, size_t>, std::vector<std::pair<double, size_t> >, MeasureIDComparison> VertexQueue;
+  std::priority_queue<std::pair<double, size_t>, std::vector<std::pair<double, size_t>>, MeasureIDComparison> VertexQueue;
   for (size_t i=0; i < poly.size(); i++)
   {
     //concave (negative measure) vertices are not elgible for removal
@@ -941,7 +941,7 @@ bool TriangulatePolygon2(const std::vector<int64_t> &poly, const std::vector<glm
 // The return value is true if triangulation was successful.
 bool vtkCCSTriangulate(
     const std::vector<int64_t> &poly, const std::vector<glm::dvec3> &vertices,
-    const std::vector<int64_t> &polyEdges, std::vector<std::vector<int64_t> > &originalEdges,
+    const std::vector<int64_t> &polyEdges, std::vector<std::vector<int64_t>> &originalEdges,
     std::vector<glm::i64vec3> &triangles)
 {
   int triangulationFailure = false;
@@ -996,7 +996,7 @@ bool vtkCCSTriangulate(
 // Take a set of lines, join them tip-to-tail to create polygons
 void vtkCCSMakePolysFromLines(
     std::vector<glm::i64vec2> &lines,
-    std::vector<std::vector<int64_t> > &newPolys,
+    std::vector<std::vector<int64_t>> &newPolys,
     std::vector<size_t> &incompletePolys)
 {
   // Bitfield for marking lines as used
@@ -1130,7 +1130,7 @@ void vtkCCSMakePolysFromLines(
 // Shorter edges will be preferred over long edges.
 // Finish any incomplete polygons by trying to join loose ends
 void vtkCCSJoinLooseEnds(
-    std::vector<std::vector<int64_t> > &polys, std::vector<size_t> &incompletePolys,
+    std::vector<std::vector<int64_t>> &polys, std::vector<size_t> &incompletePolys,
     std::vector<glm::dvec3> &vertices, const glm::dvec3 normal)
 {
   // Relative tolerance for checking whether an edge is on the hull
@@ -1308,9 +1308,9 @@ int vtkCCSVectorProgression(
 // Check for polygons that contain multiple loops, and split the loops apart.
 // Returns the number of splits made.
 int vtkCCSSplitAtPinchPoints(
-    std::vector<std::vector<int64_t> > &polys, std::vector<glm::dvec3> &vertices,
-    std::vector<std::vector<size_t> > &polyGroups,
-    std::vector<std::vector<int64_t> > &polyEdges,
+    std::vector<std::vector<int64_t>> &polys, std::vector<glm::dvec3> &vertices,
+    std::vector<std::vector<size_t>> &polyGroups,
+    std::vector<std::vector<int64_t>> &polyEdges,
     const glm::dvec3 normal)
 {
   int splitCount = 0;
@@ -1463,8 +1463,8 @@ int vtkCCSSplitAtPinchPoints(
 // where each cell in this array will be a polyline consisting of two
 // corner vertices and all the points in between.
 void vtkCCSFindTrueEdges(
-    std::vector<std::vector<int64_t> > &polys, std::vector<glm::dvec3> &vertices,
-    std::vector<std::vector<int64_t> > &polyEdges, std::vector<std::vector<int64_t> > &originalEdges)
+    std::vector<std::vector<int64_t>> &polys, std::vector<glm::dvec3> &vertices,
+    std::vector<std::vector<int64_t>> &polyEdges, std::vector<std::vector<int64_t>> &originalEdges)
 {
   // Tolerance^2 for angle to see if line segments are parallel
   const double atol2 = (VTK_CCS_POLYGON_TOLERANCE*VTK_CCS_POLYGON_TOLERANCE);
@@ -1769,8 +1769,8 @@ void vtkCCSPrepareForPolyInPoly(
 // Check for polys within other polys, i.e. find polys that are holes and
 // add them to the "polyGroup" of the poly that they are inside of.
 void vtkCCSMakeHoleyPolys(
-    std::vector<std::vector<int64_t> > &newPolys, std::vector<glm::dvec3> &vertices,
-    std::vector<std::vector<size_t> > &polyGroups,
+    std::vector<std::vector<int64_t>> &newPolys, std::vector<glm::dvec3> &vertices,
+    std::vector<std::vector<size_t>> &polyGroups,
     const glm::dvec3 normal)
 {
   size_t numNewPolys = newPolys.size();
@@ -1899,7 +1899,7 @@ void vtkCCSMakeHoleyPolys(
 // usable.
 
 int vtkCCSCheckCut(
-    const std::vector<std::vector<int64_t> > &polys, std::vector<glm::dvec3> &vertices,
+    const std::vector<std::vector<int64_t>> &polys, std::vector<glm::dvec3> &vertices,
     const glm::dvec3 normal, const std::vector<size_t> &polyGroup,
     size_t outerPolyId, size_t innerPolyId,
     int64_t outerIdx, int64_t innerIdx)
@@ -2167,7 +2167,7 @@ void vtkCCSFindSharpestVerts(
 // Used by vtkCCSCutHoleyPolys.
 
 int vtkCCSFindCuts(
-    const std::vector<std::vector<int64_t> > &polys,
+    const std::vector<std::vector<int64_t>> &polys,
     const std::vector<size_t> &polyGroup, size_t outerPolyId, size_t innerPolyId,
     std::vector<glm::dvec3> &vertices, const glm::dvec3 normal, size_t cuts[2][2],
     size_t exhaustive)
@@ -2263,8 +2263,8 @@ int vtkCCSFindCuts(
 // into two separate polygons by making two cuts between them.
 
 void vtkCCSMakeCuts(
-    std::vector<std::vector<int64_t> > &polys,
-    std::vector<std::vector<int64_t> > &polyEdges,
+    std::vector<std::vector<int64_t>> &polys,
+    std::vector<std::vector<int64_t>> &polyEdges,
     size_t outerPolyId, size_t innerPolyId,
     std::vector<glm::dvec3> &vertices, const size_t cuts[2][2])
 {
@@ -2358,9 +2358,9 @@ void vtkCCSMakeCuts(
 // For each poly that has holes, make two cuts between each hole and
 // the outer poly in order to turn the polygon+hole into two polys.
 int vtkCCSCutHoleyPolys(
-    std::vector<std::vector<int64_t> > &polys, std::vector<glm::dvec3> &vertices,
-    std::vector<std::vector<size_t> > &polyGroups,
-    std::vector<std::vector<int64_t> > &polyEdges,
+    std::vector<std::vector<int64_t>> &polys, std::vector<glm::dvec3> &vertices,
+    std::vector<std::vector<size_t>> &polyGroups,
+    std::vector<std::vector<int64_t>> &polyEdges,
     const glm::dvec3 normal)
 {
   int cutFailure = 0;
@@ -2383,7 +2383,7 @@ int vtkCCSCutHoleyPolys(
       size_t innerPolyId = polyGroup[1];
 
       // Sort the group by size, do largest holes first
-      std::vector<std::pair<size_t, size_t> >
+      std::vector<std::pair<size_t, size_t>>
           innerBySize(polyGroup.size());
 
       for (size_t i = 1; i < polyGroup.size(); i++)
@@ -2510,7 +2510,7 @@ void MakePolysFromContours(
   // If we are lucky these will be simple, convex polygons.  But
   // we can't count on that.
 
-  std::vector<std::vector<int64_t> > newPolys;
+  std::vector<std::vector<int64_t>> newPolys;
   std::vector<size_t> incompletePolys;
 
   vtkCCSMakePolysFromLines(lines, newPolys, incompletePolys);
@@ -2526,8 +2526,8 @@ void MakePolysFromContours(
   // Unfortunately removing these points also means that the polys
   // will no longer form a watertight cap over the cut.
 
-  std::vector<std::vector<int64_t> > polyEdges;
-  std::vector<std::vector<int64_t> > originalEdges;
+  std::vector<std::vector<int64_t>> polyEdges;
+  std::vector<std::vector<int64_t>> originalEdges;
   vtkCCSFindTrueEdges(newPolys, vertices, polyEdges, originalEdges);
 
   // Next we have to check for polygons with holes, i.e. polygons that
@@ -2537,7 +2537,7 @@ void MakePolysFromContours(
   // Initialize each group to hold just one polygon.
 
   size_t numNewPolys = newPolys.size();
-  std::vector<std::vector<size_t> > polyGroups(numNewPolys);
+  std::vector<std::vector<size_t>> polyGroups(numNewPolys);
   for (size_t i = 0; i < numNewPolys; i++)
   {
     polyGroups[i].push_back(i);
@@ -2594,13 +2594,13 @@ void MakePolysFromContours(
 // ---------------------------------------------------
 bool TriangulatePolygon(std::vector<int64_t> &polygon, std::vector<glm::dvec3> &vertices, std::vector<glm::i64vec3> &triangles)
 {
-  std::vector<std::vector<int64_t> > polys(1);
+  std::vector<std::vector<int64_t>> polys(1);
   std::vector<int64_t> &poly = polys[0];
   poly = polygon;
 
-  std::vector<std::vector<int64_t> > originalEdges;
+  std::vector<std::vector<int64_t>> originalEdges;
 
-  std::vector<std::vector<int64_t> > polyEdges;
+  std::vector<std::vector<int64_t>> polyEdges;
   vtkCCSFindTrueEdges(polys, vertices, polyEdges, originalEdges);
   std::vector<int64_t> &edges = polyEdges[0];
 
@@ -5946,7 +5946,7 @@ int vtkCCSCutHoleyPolys(
       size_t innerPolyId = polyGroup[1];
 
       // Sort the group by size, do largest holes first
-      std::vector<std::pair<size_t, size_t> >
+      std::vector<std::pair<size_t, size_t>>
           innerBySize(polyGroup.size());
 
       for (size_t i = 1; i < polyGroup.size(); i++)

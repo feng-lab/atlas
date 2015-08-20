@@ -20,7 +20,7 @@ struct ConnComp
   size_t time;
   // voxelIdxList.size() is number of connected components (objects) we found
   // kth vector contains the linear indices of the voxels in the kth object
-  std::vector<std::vector<size_t> > voxelIdxList;
+  std::vector<std::vector<size_t>> voxelIdxList;
 
   void clear();
 

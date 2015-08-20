@@ -93,7 +93,7 @@ protected slots:
 protected:
   virtual void process(Z3DEye eye) override;
 
-  const std::vector<std::unique_ptr<Z3DVolume> >& getVolumes() const;
+  const std::vector<std::unique_ptr<Z3DVolume>>& getVolumes() const;
 
   virtual void updateNotTransformedBoundBoxImpl() override;
   virtual void expandCutRange() override {}
@@ -123,12 +123,12 @@ private:
   Z3DVolumeRaycasterRenderer m_volumeRaycasterRenderer;
   Z3DVolumeSliceRenderer m_volumeSliceRenderer;
   Z3DTextureCoordinateRenderer m_textureCoordinateRenderer;
-  std::vector<std::unique_ptr<Z3DImage2DRenderer> > m_image2DRenderers;
+  std::vector<std::unique_ptr<Z3DImage2DRenderer>> m_image2DRenderers;
   Z3DTextureCopyRenderer m_textureCopyRenderer;
 
   const ZImgPack *m_imgPack;
-  std::vector<std::unique_ptr<Z3DVolume> > m_volumes;
-  std::vector<std::unique_ptr<Z3DVolume> > m_zoomInVolumes;
+  std::vector<std::unique_ptr<Z3DVolume>> m_volumes;
+  std::vector<std::unique_ptr<Z3DVolume>> m_zoomInVolumes;
   ZBoolParameter m_visible;
   ZBoolParameter m_stayOnTop;
   ZBoolParameter m_isVolumeDownsampled;
@@ -154,7 +154,7 @@ private:
 
   static const size_t m_maxNumOfFullResolutionVolumeSlice;
   // each channel is represented by a Z3DVolume
-  std::vector<std::vector<std::unique_ptr<Z3DVolume> > > m_FRVolumeSlices;
+  std::vector<std::vector<std::unique_ptr<Z3DVolume>>> m_FRVolumeSlices;
   std::vector<bool> m_FRVolumeSlicesValidState;
   ZBoolParameter m_useFRVolumeSlice;
   ZBoolParameter m_showXSlice;
@@ -163,7 +163,7 @@ private:
   ZIntParameter m_ySlicePosition;
   ZBoolParameter m_showZSlice;
   ZIntParameter m_zSlicePosition;
-  std::vector<std::unique_ptr<ZColorMapParameter> > m_sliceColormaps;
+  std::vector<std::unique_ptr<ZColorMapParameter>> m_sliceColormaps;
   ZBoolParameter m_showXSlice2;
   ZIntParameter m_xSlice2Position;
   ZBoolParameter m_showYSlice2;

@@ -97,8 +97,8 @@ void ZItemSelectionModel::appendSelectObj(size_t id)
 
 void ZItemSelectionModel::convertSelectionChangedSignal(const QItemSelection &selected, const QItemSelection &deselected)
 {
-  std::map<ZObjDoc*,QList<size_t> > docSelected;
-  std::map<ZObjDoc*,QList<size_t> > docDeselected;
+  std::map<ZObjDoc*,QList<size_t>> docSelected;
+  std::map<ZObjDoc*,QList<size_t>> docDeselected;
   QModelIndexList indexes = selected.indexes();
   for (int i=0; i<indexes.size(); ++i) {
     if (indexes[i].column() != ZObjModel::ShowHideNameColumn && indexes[i].column() != ZObjModel::NameColumn)
@@ -118,8 +118,8 @@ void ZItemSelectionModel::convertSelectionChangedSignal(const QItemSelection &se
     if (docSelected.find(doc) == docSelected.end())
       docSelected.emplace(doc, QList<size_t>());
   }
-  std::map<ZObjDoc*,QList<size_t> >::iterator it1 = docDeselected.begin();
-  for (std::map<ZObjDoc*,QList<size_t> >::iterator it = docSelected.begin();
+  std::map<ZObjDoc*,QList<size_t>>::iterator it1 = docDeselected.begin();
+  for (std::map<ZObjDoc*,QList<size_t>>::iterator it = docSelected.begin();
        it != docSelected.end(); ++it, ++it1) {
     it->first->sendObjSelectionChangedFromDocSignal(it->second, it1->second);
   }

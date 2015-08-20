@@ -323,7 +323,7 @@ void ZMeshIO::readAllenAtlasMesh(const QString &filename, std::vector<glm::vec3>
 
   uint32_t numTriangleStrips = 0;
   readStream(inputFileStream, reinterpret_cast<char*>(&numTriangleStrips), 4);
-  std::vector<std::vector<uint32_t> > allStrips;
+  std::vector<std::vector<uint32_t>> allStrips;
 
   // read triangle strips
   for (uint32_t i=0; i<numTriangleStrips; i++) {

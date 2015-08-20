@@ -35,7 +35,7 @@ private:
     bool operator<(const ShaderKey& rhs) const;
   };
 
-  std::map<ShaderKey, std::unique_ptr<Z3DShader> > m_shaders;
+  std::map<ShaderKey, std::unique_ptr<Z3DShader>> m_shaders;
 };
 
 } // namespace nim

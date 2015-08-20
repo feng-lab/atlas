@@ -11,7 +11,7 @@ ZImgCache &ZImgCache::instance()
 }
 
 ZImgCache::ZImgCache()
-  : QCache<size_t, std::shared_ptr<ZImg> >(ZCpuInfoInstance.nPhysicalRAM / 2 / 1024 / 1024)
+  : QCache<size_t, std::shared_ptr<ZImg>>(ZCpuInfoInstance.nPhysicalRAM / 2 / 1024 / 1024)
 {
 
 }

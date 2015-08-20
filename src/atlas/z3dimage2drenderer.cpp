@@ -14,8 +14,8 @@ Z3DImage2DRenderer::Z3DImage2DRenderer(Z3DRendererBase &rendererBase)
   CHECK_GL_ERROR;
 }
 
-void Z3DImage2DRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume> > &volsIn,
-                                     const std::vector<std::unique_ptr<ZColorMapParameter> > &colormapsIn)
+void Z3DImage2DRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &volsIn,
+                                     const std::vector<std::unique_ptr<ZColorMapParameter>> &colormapsIn)
 {
   assert(colormapsIn.size() >= volsIn.size());
   for (size_t i=0; i<volsIn.size(); ++i) {

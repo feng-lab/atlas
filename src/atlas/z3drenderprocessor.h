@@ -19,9 +19,8 @@ public:
 
   const std::vector<Z3DRenderOutputPort*>& privateRenderPorts() const;
 
-  void saveTextureAsImage(const Z3DTexture* tex, const QString &filename);
-
-  void saveDepthTextureAsImage(const Z3DTexture *tex, const QString &filename);
+  static void saveTextureAsImage(const Z3DTexture &tex, const QString &filename);
+  static void saveDepthTextureAsImage(const Z3DTexture &tex, const QString &filename);
 
 signals:
   // emit this only if resize starts from current processor.
@@ -37,9 +36,7 @@ public slots:
   virtual void updateSize();
 
 protected:
-  void addPrivateRenderPort(Z3DRenderOutputPort* port);
   void addPrivateRenderPort(Z3DRenderOutputPort& port);
-
   void renderScreenQuad(const Z3DShaderProgram &shader);
 
 protected:

@@ -367,7 +367,7 @@ QStringList ZImgJpeg::extensions() const
   return res;
 }
 
-void ZImgJpeg::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock> > > *subBlocks,
+void ZImgJpeg::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
                         std::vector<size_t> *numPyramidalLevel)
 {
   std::unique_ptr<FILE, int (*)(FILE*)> infile(fopen(qPrintable(filename), "rb"), fclose);

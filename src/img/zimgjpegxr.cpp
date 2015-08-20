@@ -159,7 +159,7 @@ QStringList ZImgJpegXR::extensions() const
   return res;
 }
 
-void ZImgJpegXR::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock> > > *subBlocks,
+void ZImgJpegXR::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
                           std::vector<size_t> *numPyramidalLevel)
 {
   ERR err = WMP_errSuccess;

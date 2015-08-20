@@ -57,7 +57,7 @@ const QString ZObjDoc::objNameWithModifiedMarkerAndID(size_t id) const
     return QString("%1 (id: %2)").arg(objName(id)).arg(id);
 }
 
-std::map<size_t, size_t> ZObjDoc::read(const QList<QPair<QString, QJsonValue> > &docKeyValueList, QString &err)
+std::map<size_t, size_t> ZObjDoc::read(const QList<QPair<QString, QJsonValue>> &docKeyValueList, QString &err)
 {
   std::map<size_t,size_t> idmap;
   QList<size_t> allObjs = objs();

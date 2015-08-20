@@ -72,7 +72,7 @@ private:
   uint32_t m_tag;
   DataType m_dataType;
   uint64_t m_count;
-  std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32> > m_data;
+  std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> m_data;
 };
 
 } // namespace

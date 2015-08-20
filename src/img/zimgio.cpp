@@ -49,7 +49,7 @@ ZImgIO::~ZImgIO()
 }
 
 void ZImgIO::readInfo(const QString &filename, std::vector<ZImgInfo> &res,
-                      std::vector<std::vector<std::shared_ptr<ZImgSubBlock> > > *subBlocks,
+                      std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
                       std::vector<size_t> *numPyramidalLevel,
                       FileFormat format)
 {

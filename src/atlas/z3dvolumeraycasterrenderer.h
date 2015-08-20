@@ -19,7 +19,7 @@ public:
   explicit Z3DVolumeRaycasterRenderer(Z3DRendererBase &rendererBase);
 
   // input vols can not be nullptr
-  void setChannels(const std::vector<std::unique_ptr<Z3DVolume> > &vols);
+  void setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &vols);
 
   // quad or entryexit texture should be set before rendering
 
@@ -50,9 +50,9 @@ public:
   ZFloatParameter& samplingRatePara() { return m_samplingRate; }
   ZFloatParameter& isoValuePara() { return m_isoValue; }
   ZFloatParameter& localMIPThresholdPara() { return m_localMIPThreshold; }
-  const std::vector<std::unique_ptr<ZBoolParameter> >& channelVisibleParas() const { return m_channelVisibleParas; }
-  const std::vector<std::unique_ptr<Z3DTransferFunctionParameter> >& transferFuncParas() const { return m_transferFuncParas; }
-  const std::vector<std::unique_ptr<ZStringIntOptionParameter> >& texFilterModeParas() const { return m_texFilterModeParas; }
+  const std::vector<std::unique_ptr<ZBoolParameter>>& channelVisibleParas() const { return m_channelVisibleParas; }
+  const std::vector<std::unique_ptr<Z3DTransferFunctionParameter>>& transferFuncParas() const { return m_transferFuncParas; }
+  const std::vector<std::unique_ptr<ZStringIntOptionParameter>>& texFilterModeParas() const { return m_texFilterModeParas; }
 
 signals:
 
@@ -81,9 +81,9 @@ protected:
   std::vector<Z3DVolume *> m_volumes;
   std::vector<QString> m_volumeUniformNames;
   std::vector<QString> m_transferFuncUniformNames;
-  std::vector<std::unique_ptr<ZBoolParameter> > m_channelVisibleParas;
-  std::vector<std::unique_ptr<Z3DTransferFunctionParameter> > m_transferFuncParas;
-  std::vector<std::unique_ptr<ZStringIntOptionParameter> > m_texFilterModeParas;
+  std::vector<std::unique_ptr<ZBoolParameter>> m_channelVisibleParas;
+  std::vector<std::unique_ptr<Z3DTransferFunctionParameter>> m_transferFuncParas;
+  std::vector<std::unique_ptr<ZStringIntOptionParameter>> m_texFilterModeParas;
 
 private:
   // this function is used to get proper default

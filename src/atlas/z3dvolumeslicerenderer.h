@@ -20,8 +20,8 @@ public:
   explicit Z3DVolumeSliceRenderer(Z3DRendererBase &rendererBase);
 
   // input vols can not be nullptr
-  void setChannels(const std::vector<std::unique_ptr<Z3DVolume> > &vols,
-                   const std::vector<std::unique_ptr<ZColorMapParameter> >& colormaps);
+  void setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &vols,
+                   const std::vector<std::unique_ptr<ZColorMapParameter>>& colormaps);
 
   // a slice (quad) in 3D volume contains corner vertex and 3d texture coordinates
   // clear

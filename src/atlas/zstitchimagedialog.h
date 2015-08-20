@@ -119,7 +119,7 @@ private:
   QWidget* createIOWidget();
   QWidget* createConnWidget();
   QWidget* createCommandOutputWidget();
-  bool getTileMatrix(ZImg& img, QVector<QVector<int> > &tileMatrix,
+  bool getTileMatrix(ZImg& img, QVector<QVector<int>> &tileMatrix,
                      QList<ZTile> &tileList);
 
   void initChannel1ComboBox(int nchannel);
@@ -131,7 +131,7 @@ private:
   void stitchStacks2(); //stitch two stack sets with common channel, merge channel into output
 
 private:
-  QVector<QVector<int> > m_tileMatrix;
+  QVector<QVector<int>> m_tileMatrix;
   QList<ZTile> m_tileList;
   int m_nSel;
 

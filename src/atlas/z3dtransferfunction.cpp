@@ -206,7 +206,7 @@ void Z3DTransferFunctionParameter::setSameAs(const ZParameter &rhs)
 QJsonValue Z3DTransferFunctionParameter::jsonValue() const
 {
   QJsonArray keyArray;
-  for (std::vector<std::pair<ZColorMapKey, bool> >::const_iterator it = m_value.m_keys.begin();
+  for (std::vector<std::pair<ZColorMapKey, bool>>::const_iterator it = m_value.m_keys.begin();
        it != m_value.m_keys.end(); ++it) {
     QJsonObject key;
     key.insert("intensity", toQString(it->first.m_intensity));

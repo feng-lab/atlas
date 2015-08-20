@@ -94,7 +94,7 @@ void ZSectionsRegistration::doWork()
 #else
   double totalNumPairs = m_img.depth() * m_numNeighbors;
 
-  std::map<std::pair<size_t, size_t>, std::pair<ZImageTransform*, double> > idxPairs;
+  std::map<std::pair<size_t, size_t>, std::pair<ZImageTransform*, double>> idxPairs;
   double progress = 0;
   for (size_t i=0; i<m_img.depth(); ++i) {
     for (size_t j=i+1; j<i+1+m_numNeighbors; ++j) {

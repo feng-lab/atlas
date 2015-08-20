@@ -20,8 +20,8 @@ public:
   explicit Z3DImage2DRenderer(Z3DRendererBase &rendererBase);
 
   // input vols can not be nullptr
-  void setChannels(const std::vector<std::unique_ptr<Z3DVolume> > &vols,
-                   const std::vector<std::unique_ptr<ZColorMapParameter> >& colormaps);
+  void setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &vols,
+                   const std::vector<std::unique_ptr<ZColorMapParameter>>& colormaps);
 
   // quad contains corner vertex and 2d texture coordinates
   // clear

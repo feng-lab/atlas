@@ -130,14 +130,14 @@ ZImgPack::ZImgPack(ZImg &img, const QString &fileName)
 }
 
 ZImgPack::ZImgPack(const QString &fileName, size_t scene, FileFormat format, size_t numScene,
-                   const ZImgInfo *info, const std::vector<std::shared_ptr<ZImgSubBlock> > *subBlock)
+                   const ZImgInfo *info, const std::vector<std::shared_ptr<ZImgSubBlock>> *subBlock)
   : m_imgSource(fileName, ZImgRegion(), scene, format)
   , m_hasUnsavedChange(false)
   , m_offsetX(0), m_offsetY(0), m_offsetZ(0), m_offsetT(0)
   , m_minMaxState(MinMaxState::Invalid)
   , m_diskCached(true)
 {
-  const std::vector<std::shared_ptr<ZImgSubBlock> > *sceneSubBlock = nullptr;
+  const std::vector<std::shared_ptr<ZImgSubBlock>> *sceneSubBlock = nullptr;
   std::vector<std::shared_ptr<ZImgSubBlock>> ssb;
   if (numScene > 0 && info && subBlock) {
     m_imgInfo = *info;
@@ -183,14 +183,14 @@ ZImgPack::ZImgPack(const QString &fileName, size_t scene, FileFormat format, siz
 }
 
 ZImgPack::ZImgPack(const QStringList &files, Dimension catDim, size_t scene, FileFormat format, size_t numScene,
-                   const ZImgInfo *info, const std::vector<std::shared_ptr<ZImgSubBlock> > *subBlock)
+                   const ZImgInfo *info, const std::vector<std::shared_ptr<ZImgSubBlock>> *subBlock)
   : m_imgSource(files, catDim, ZImgRegion(), scene, format, true)
   , m_hasUnsavedChange(false)
   , m_offsetX(0), m_offsetY(0), m_offsetZ(0), m_offsetT(0)
   , m_minMaxState(MinMaxState::Invalid)
   , m_diskCached(true)
 {
-  const std::vector<std::shared_ptr<ZImgSubBlock> > *sceneSubBlock = nullptr;
+  const std::vector<std::shared_ptr<ZImgSubBlock>> *sceneSubBlock = nullptr;
   std::vector<std::shared_ptr<ZImgSubBlock>> ssb;
   if (numScene > 0 && info && subBlock) {
     m_imgInfo = *info;
@@ -321,7 +321,7 @@ bool ZImgPack::needUpdate(const QRectF &viewport, double scale, const QRectF &ol
   return false;
 }
 
-void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg> > &imgs, std::vector<QPoint> &locs, std::vector<double> &scales,
+void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs, std::vector<QPoint> &locs, std::vector<double> &scales,
                                    size_t z, size_t t, const QRectF &viewport, double scale, bool mip) const
 {
   assert(m_diskCached);
@@ -717,7 +717,7 @@ void ZImgPack::buildPyramidal()
   }
 }
 
-void ZImgPack::buildFastReadIndex(const std::vector<std::shared_ptr<ZImgSubBlock> > &subBlocks)
+void ZImgPack::buildFastReadIndex(const std::vector<std::shared_ptr<ZImgSubBlock>> &subBlocks)
 {
   m_levelTileMaps.clear();
   for (size_t i=0; i<subBlocks.size(); ++i) {

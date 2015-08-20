@@ -314,7 +314,7 @@ struct ZDistanceManhattan
     // get median of each dimension
     Eigen::VectorXi counts(centroids.rows());
     std::vector<Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>*> sepMats;
-    std::vector<std::vector<NonInteger> > sepWeights(centroids.rows());
+    std::vector<std::vector<NonInteger>> sepWeights(centroids.rows());
     std::vector<int> sepMatsRowIdxs;
 
     counts.setZero();
@@ -411,7 +411,7 @@ void ZKmeansGetBestResult(typename ZKMeans<T,WeightT,Distance>::InterResult &res
 }
 #endif
 
-template <class T, class WeightT = float, typename Distance = ZDistanceEuclideanSquared<typename MaxFloatType<T,WeightT>::type> >
+template <class T, class WeightT = float, typename Distance = ZDistanceEuclideanSquared<typename MaxFloatType<T,WeightT>::type>>
 class ZKMeans
 {
 public:

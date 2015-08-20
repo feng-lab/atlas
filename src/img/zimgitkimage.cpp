@@ -78,7 +78,7 @@ QStringList ZImgITKImage::extensions() const
   return res;
 }
 
-void ZImgITKImage::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock> > > *subBlocks,
+void ZImgITKImage::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
                             std::vector<size_t> *numPyramidalLevel)
 {
   try {

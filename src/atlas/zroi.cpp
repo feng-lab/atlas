@@ -174,7 +174,7 @@ void ZSliceROI::subtractSpline(const QPolygonF &spline)
   updateROI(false);
 }
 
-void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::set<size_t> > &shapeOpIndexToPointIndices)
+void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::set<size_t>> &shapeOpIndexToPointIndices)
 {
   size_t shapeOpIndexSubtract = 0;
   for (auto it = shapeOpIndexToPointIndices.begin(); it != shapeOpIndexToPointIndices.end(); ++it) {
@@ -602,7 +602,7 @@ void ZROI::deleteROIControlPoints(const std::vector<ZROIControlPoint> &controlPo
 std::set<int> ZROI::deleteROIControlPoints_Impl(const std::vector<ZROIControlPoint> &controlPoints)
 {
   std::set<int> slices;
-  std::map<int, std::map<size_t, std::set<size_t> > > sliceToShapeOpIndexToPointIndices;
+  std::map<int, std::map<size_t, std::set<size_t>>> sliceToShapeOpIndexToPointIndices;
   for (auto controlPoint : controlPoints) {
     sliceToShapeOpIndexToPointIndices[controlPoint.slice][controlPoint.shapeOperationIndex].insert(controlPoint.pointIndex);
     slices.insert(controlPoint.slice);

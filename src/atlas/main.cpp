@@ -28,7 +28,7 @@
 // thanks to Daniel Price for this workaround
 struct MacEventFilter : public QObject
 {
-  QStack<QPointer<QWidget> > m_activationstack; // stack of widgets to re-active on dialog close.
+  QStack<QPointer<QWidget>> m_activationstack; // stack of widgets to re-active on dialog close.
 
   explicit MacEventFilter(QObject *parent = nullptr)
     : QObject(parent)

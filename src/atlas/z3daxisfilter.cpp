@@ -29,15 +29,15 @@ Z3DAxisFilter::Z3DAxisFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   addParameter(m_axisRegionRatio);
   addParameter(m_mode);
 
-  addParameter(&m_fontRenderer.allFontNamesPara());
-  addParameter(&m_fontRenderer.fontPara());
-  addParameter(&m_fontRenderer.fontSizePara());
-  addParameter(&m_fontRenderer.fontSoftEdgeScalePara());
-  addParameter(&m_fontRenderer.showFontOutlinePara());
-  addParameter(&m_fontRenderer.fontOutlineModePara());
-  addParameter(&m_fontRenderer.fontOutlineColorPara());
-  addParameter(&m_fontRenderer.showFontShadowPara());
-  addParameter(&m_fontRenderer.fontShadowColorPara());
+  addParameter(m_fontRenderer.allFontNamesPara());
+  addParameter(m_fontRenderer.fontPara());
+  addParameter(m_fontRenderer.fontSizePara());
+  addParameter(m_fontRenderer.fontSoftEdgeScalePara());
+  addParameter(m_fontRenderer.showFontOutlinePara());
+  addParameter(m_fontRenderer.fontOutlineModePara());
+  addParameter(m_fontRenderer.fontOutlineColorPara());
+  addParameter(m_fontRenderer.showFontShadowPara());
+  addParameter(m_fontRenderer.fontShadowColorPara());
 
   m_arrowRenderer.setUseDisplayList(false);
   m_lineRenderer.setUseDisplayList(false);

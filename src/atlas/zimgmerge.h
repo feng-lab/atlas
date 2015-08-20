@@ -44,7 +44,7 @@ protected:
 private:
   std::map<const ZImg*, ZVoxelCoordinate> m_imgCoords;
   std::map<const ZImg*, QString> m_imgNames;
-  std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double> > m_imgPairs;
+  std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>> m_imgPairs;
 };
 
 } // namespace nim

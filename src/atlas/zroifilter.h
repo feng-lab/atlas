@@ -96,7 +96,7 @@ signals:
 public slots:
 
 protected:
-  std::vector<std::unique_ptr<ROICtrlPtGraphicsItem> > createCtrlPtItems(int slice);
+  std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> createCtrlPtItems(int slice);
 
 private slots:
   void visibleChanged();
@@ -110,8 +110,8 @@ private slots:
 
 private:
   ZROI *m_ROI;
-  std::map<int, std::unique_ptr<ROIGraphicsItem> > m_sliceToROIItem;
-  std::map<int, std::vector<std::unique_ptr<ROICtrlPtGraphicsItem> > > m_sliceToCtrlPtItems;
+  std::map<int, std::unique_ptr<ROIGraphicsItem>> m_sliceToROIItem;
+  std::map<int, std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>>> m_sliceToCtrlPtItems;
 
   ZBoolParameter m_visible;
   ZBoolParameter m_showControlPoints;

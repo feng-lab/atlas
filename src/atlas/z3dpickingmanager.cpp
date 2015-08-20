@@ -118,7 +118,7 @@ std::vector<const void *> Z3DPickingManager::sortObjectsByDistanceToPos(glm::ive
       res.push_back(it->second);
     }
   } else {
-    std::multimap<int, const void *, std::greater<int> > dist2obj;
+    std::multimap<int, const void *, std::greater<int>> dist2obj;
     for (std::map<glm::col4, int>::const_iterator it = col2dist.begin();
          it != col2dist.end(); ++it) {
       const void *obj = objectOfColor(it->first);

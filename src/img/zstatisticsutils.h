@@ -103,7 +103,7 @@ minMaxElement(RandomAccessIterator begin, RandomAccessIterator end, bool useMult
     size_t size = end - begin;
     size_t numBlock = std::min(size, static_cast<size_t>(QThread::idealThreadCount())*2);
     size_t pixelPerBlock = size / numBlock;
-    QList<std::pair<RandomAccessIterator,RandomAccessIterator> > allRange;
+    QList<std::pair<RandomAccessIterator,RandomAccessIterator>> allRange;
     for (size_t i=0; i<numBlock; ++i) {
       allRange.push_back(std::make_pair(begin+i*pixelPerBlock,
                                         (i==numBlock-1) ? end : begin+(i+1)*pixelPerBlock));
@@ -168,7 +168,7 @@ ResultType sumRange(RandomAccessIterator begin, RandomAccessIterator end, Result
     size_t size = end - begin;
     size_t numBlock = std::min(size, static_cast<size_t>(QThread::idealThreadCount())*2);
     size_t pixelPerBlock = size / numBlock;
-    QList<std::pair<RandomAccessIterator,RandomAccessIterator> > allRange;
+    QList<std::pair<RandomAccessIterator,RandomAccessIterator>> allRange;
     for (size_t i=0; i<numBlock; ++i) {
       allRange.push_back(std::make_pair(begin+i*pixelPerBlock,
                                         (i==numBlock-1) ? end : begin+(i+1)*pixelPerBlock));
@@ -274,7 +274,7 @@ void meanAndStandardDeviation(RandomAccessIterator begin, RandomAccessIterator e
 #else
     size_t numBlock = std::min(size, static_cast<size_t>(QThread::idealThreadCount())*2);
     size_t pixelPerBlock = size / numBlock;
-    QList<std::pair<size_t,size_t> > allRange;
+    QList<std::pair<size_t,size_t>> allRange;
     for (size_t i=0; i<numBlock; ++i) {
       allRange.push_back(std::make_pair(i*pixelPerBlock,
                                         (i==numBlock-1) ? size : (i+1)*pixelPerBlock));

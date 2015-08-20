@@ -176,7 +176,7 @@ QStringList ZImgFreeImage::extensions() const
    return res;
  }
 
-void ZImgFreeImage::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock> > > *subBlocks,
+void ZImgFreeImage::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
                              std::vector<size_t> *numPyramidalLevel)
 {
   FREE_IMAGE_FORMAT fmt = fipImage::identifyFIF(qPrintable(filename));
@@ -199,7 +199,7 @@ void ZImgFreeImage::readInfo(const QString &filename, std::vector<ZImgInfo> &inf
   } else { // not multipage
     fipImage fipImg;
     if (!fipImg.load(qPrintable(filename), FIF_LOAD_NOPIXELS)) {
-      throw ZIOException("Can not read");
+      throw ZIOException("Can not load header");
     }
     infos.push_back(readInfoFromFIPImage(fipImg));
   }
@@ -241,7 +241,7 @@ void ZImgFreeImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
   if (info.numTimes == 1) {
     fipImage fipImg;
     if (!fipImg.load(qPrintable(filename))) {
-      throw ZIOException("Can not read");
+      throw ZIOException("Can not load");
     }
 
     isBGA = fipImg.getImageType() == FIT_BITMAP;
@@ -281,7 +281,7 @@ void ZImgFreeImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
   } else {
     fipMultiPage fipMp(true);
     if (!fipMp.open(qPrintable(filename), false, true, GIF_PLAYBACK)) {
-      throw ZIOException("Can not read");
+      throw ZIOException("Can not open gif");
     }
 
     for (size_t t=0; t<info.numTimes; ++t) {
@@ -349,7 +349,7 @@ void ZImgFreeImage::readInfo(uint8_t *mem, size_t size, ZImgInfo &info)
   fipImage fipImg;
   fipMemoryIO memIO(mem, size);
   if (!fipImg.loadFromMemory(memIO, FIF_LOAD_NOPIXELS)) {
-    throw ZIOException("Can not read");
+    throw ZIOException("Can not load from memory");
   }
   info = readInfoFromFIPImage(fipImg);
 }
@@ -359,7 +359,7 @@ void ZImgFreeImage::readImg(uint8_t *mem, size_t size, uint8_t *des, size_t desS
   fipImage fipImg;
   fipMemoryIO memIO(mem, size);
   if (!fipImg.loadFromMemory(memIO)) {
-    throw ZIOException("Can not read");
+    throw ZIOException("Can not load from memory");
   }
   ZImgInfo info = readInfoFromFIPImage(fipImg);
 

@@ -26,7 +26,7 @@ public:
 
 private:
   std::map<size_t, const ZImageTransform*> m_idxTransforms;
-  std::map<std::pair<size_t, size_t>, std::pair<const ZImageTransform*, double> > m_idxPairs;
+  std::map<std::pair<size_t, size_t>, std::pair<const ZImageTransform*, double>> m_idxPairs;
 };
 
 } // namespace nim

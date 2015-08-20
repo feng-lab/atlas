@@ -110,58 +110,58 @@ public:
 
   inline bool hasTopLevelAttachment() const
   {
-    typename std::map<_AttachPoint, std::vector<T> >::const_iterator it = m_data.find(_AttachPoint(-1,-1,-1));
+    typename std::map<_AttachPoint, std::vector<T>>::const_iterator it = m_data.find(_AttachPoint(-1,-1,-1));
     return it != m_data.end() && !it->second.empty();
   }
   inline bool hasTimeAttachment(size_t t) const
   {
-    typename std::map<_AttachPoint, std::vector<T> >::const_iterator it = m_data.find(_AttachPoint(-1,-1,t));
+    typename std::map<_AttachPoint, std::vector<T>>::const_iterator it = m_data.find(_AttachPoint(-1,-1,t));
     return it != m_data.end() && !it->second.empty();
   }
   inline bool hasChannelAttachment(size_t c, size_t t) const
   {
-    typename std::map<_AttachPoint, std::vector<T> >::const_iterator it = m_data.find(_AttachPoint(-1,c,t));
+    typename std::map<_AttachPoint, std::vector<T>>::const_iterator it = m_data.find(_AttachPoint(-1,c,t));
     return it != m_data.end() && !it->second.empty();
   }
   inline bool hasPlaneAttachment(size_t z, size_t t) const
   {
-    typename std::map<_AttachPoint, std::vector<T> >::const_iterator it = m_data.find(_AttachPoint(z,-1,t));
+    typename std::map<_AttachPoint, std::vector<T>>::const_iterator it = m_data.find(_AttachPoint(z,-1,t));
     return it != m_data.end() && !it->second.empty();
   }
   inline bool hasSingleChannelPlaneAttachment(size_t z, size_t c, size_t t) const
   {
-    typename std::map<_AttachPoint, std::vector<T> >::const_iterator it = m_data.find(_AttachPoint(z,c,t));
+    typename std::map<_AttachPoint, std::vector<T>>::const_iterator it = m_data.find(_AttachPoint(z,c,t));
     return it != m_data.end() && !it->second.empty();
   }
 
   inline const std::vector<T>& topLevelAttachments() const
   {
-    typename std::map<_AttachPoint, std::vector<T> >::const_iterator it = m_data.find(_AttachPoint(-1,-1,-1));
+    typename std::map<_AttachPoint, std::vector<T>>::const_iterator it = m_data.find(_AttachPoint(-1,-1,-1));
     return it != m_data.end() ? it->second : m_empty;
   }
   inline const std::vector<T>& timeAttachments(size_t t) const
   {
-    typename std::map<_AttachPoint, std::vector<T> >::const_iterator it = m_data.find(_AttachPoint(-1,-1,t));
+    typename std::map<_AttachPoint, std::vector<T>>::const_iterator it = m_data.find(_AttachPoint(-1,-1,t));
     return it != m_data.end() ? it->second : m_empty;
   }
   inline const std::vector<T>& channelAttachments(size_t c, size_t t) const
   {
-    typename std::map<_AttachPoint, std::vector<T> >::const_iterator it = m_data.find(_AttachPoint(-1,c,t));
+    typename std::map<_AttachPoint, std::vector<T>>::const_iterator it = m_data.find(_AttachPoint(-1,c,t));
     return it != m_data.end() ? it->second : m_empty;
   }
   inline const std::vector<T>& planeAttachments(size_t z, size_t t) const
   {
-    typename std::map<_AttachPoint, std::vector<T> >::const_iterator it = m_data.find(_AttachPoint(z,-1,t));
+    typename std::map<_AttachPoint, std::vector<T>>::const_iterator it = m_data.find(_AttachPoint(z,-1,t));
     return it != m_data.end() ? it->second : m_empty;
   }
   inline const std::vector<T>& singleChannelPlaneAttachments(size_t z, size_t c, size_t t) const
   {
-    typename std::map<_AttachPoint, std::vector<T> >::const_iterator it = m_data.find(_AttachPoint(z,c,t));
+    typename std::map<_AttachPoint, std::vector<T>>::const_iterator it = m_data.find(_AttachPoint(z,c,t));
     return it != m_data.end() ? it->second : m_empty;
   }
 
 protected:
-  std::map<_AttachPoint, std::vector<T> > m_data;
+  std::map<_AttachPoint, std::vector<T>> m_data;
   std::vector<T> m_empty;
 };
 

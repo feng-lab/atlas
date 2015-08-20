@@ -344,9 +344,9 @@ void ZROIFilter::mouseReleased(const QPointF &)
   }
 }
 
-std::vector<std::unique_ptr<ROICtrlPtGraphicsItem> > ZROIFilter::createCtrlPtItems(int slice)
+std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> ZROIFilter::createCtrlPtItems(int slice)
 {
-  std::vector<std::unique_ptr<ROICtrlPtGraphicsItem> > items;
+  std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> items;
   std::vector<ZROIControlPoint> controlPoints = m_ROI->sliceControlPoints(slice);
   for (auto controlPoint : controlPoints) {
     ROICtrlPtGraphicsItem* rectItem = new ROICtrlPtGraphicsItem(*m_ROI, controlPoint, m_view.graphicsView().currentScale());

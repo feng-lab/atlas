@@ -346,7 +346,7 @@ bool ZColorMap::setDomainMin(double min, bool rescaleKeys)
       double distToMax = domainMax() - min;
       double scale = distToMax/prevDistToMax;
       double dmax = domainMax();
-      std::vector<std::pair<ZColorMapKey, bool> > newKeys;
+      std::vector<std::pair<ZColorMapKey, bool>> newKeys;
       for (size_t i=0; i<m_keys.size(); i++) {
         double inten = keyIntensity(i);
         double newInten = dmax - (dmax-inten)*scale;
@@ -390,7 +390,7 @@ bool ZColorMap::setDomainMax(double max, bool rescaleKeys)
       double distToMin = max - domainMin();
       double scale = distToMin/prevDistToMin;
       double dmin = domainMin();
-      std::vector<std::pair<ZColorMapKey, bool> > newKeys;
+      std::vector<std::pair<ZColorMapKey, bool>> newKeys;
       for (size_t i=0; i<m_keys.size(); i++) {
         double inten = keyIntensity(i);
         double newInten = dmin + (inten-dmin)*scale;
@@ -461,7 +461,7 @@ glm::col4 ZColorMap::mappedColor(double i) const
     return glm::col4(0, 0, 0, 0);
 
   // iterate through all keys until we get to the correct position
-  std::vector<std::pair<ZColorMapKey,bool> >::const_iterator keyIt = m_keys.begin();
+  std::vector<std::pair<ZColorMapKey,bool>>::const_iterator keyIt = m_keys.begin();
 
   while ((keyIt != m_keys.end()) && (i > (*keyIt).first.intensity()))
     keyIt++;
@@ -940,7 +940,7 @@ void ZColorMapParameter::setSameAs(const ZParameter &rhs)
 QJsonValue ZColorMapParameter::jsonValue() const
 {
   QJsonArray keyArray;
-  for (std::vector<std::pair<ZColorMapKey, bool> >::const_iterator it = m_value.m_keys.begin();
+  for (std::vector<std::pair<ZColorMapKey, bool>>::const_iterator it = m_value.m_keys.begin();
        it != m_value.m_keys.end(); ++it) {
     QJsonObject key;
     key.insert("intensity", toQString(it->first.m_intensity));

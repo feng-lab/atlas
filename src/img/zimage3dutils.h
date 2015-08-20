@@ -616,7 +616,7 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
   size_t desWidth = leftPad+width+rightPad;
   size_t desHeight = upPad+height+downPad;
   size_t desDepth = frontPad+depth+backPad;
-  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32> > padImg(desWidth*desHeight*desDepth);
+  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32>> padImg(desWidth*desHeight*desDepth);
   //ZBenchTimer bt;
   //bt.start();
   image3DPad(img, width, height, depth, leftPad, rightPad, upPad, downPad, frontPad, backPad, &padImg[0],
@@ -625,7 +625,7 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
 
   //image3DWrite(&padImg[0], desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
 
-  std::vector<double, boost::alignment::aligned_allocator<double, 32> > alignedKernel;
+  std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedKernel;
   alignedKernel.insert(alignedKernel.end(), kernel, kernel + kernelWidth*kernelHeight*kernelDepth);
   const double *adjKernel = &alignedKernel[0];
   if (!corr) {
@@ -648,7 +648,7 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
     size_t numThreads = QThread::idealThreadCount();
     size_t numBlock = std::min(depth, numThreads * 2);
     size_t zPerBlock = depth / numBlock;
-    QList<std::pair<size_t,size_t> > allRange;
+    QList<std::pair<size_t,size_t>> allRange;
     for (size_t i=0; i<numBlock; ++i) {
       allRange.push_back(std::make_pair(i*zPerBlock,
                                         (i==numBlock-1) ? depth : (i+1)*zPerBlock));
@@ -678,7 +678,7 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
   size_t desWidth = leftPad+width+rightPad;
   size_t desHeight = upPad+height+downPad;
   size_t desDepth = frontPad+depth+backPad;
-  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32> > padImg(desWidth*desHeight*desDepth);
+  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32>> padImg(desWidth*desHeight*desDepth);
   //ZBenchTimer bt;
   //bt.start();
   image3DPad(img, width, height, depth, leftPad, rightPad, upPad, downPad, frontPad, backPad, &padImg[0],
@@ -687,9 +687,9 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
 
   //image3DWrite(&padImg[0], desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
 
-  std::vector<double, boost::alignment::aligned_allocator<double, 32> > alignedRowKernel;
-  std::vector<double, boost::alignment::aligned_allocator<double, 32> > alignedColKernel;
-  std::vector<double, boost::alignment::aligned_allocator<double, 32> > alignedZKernel;
+  std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedRowKernel;
+  std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedColKernel;
+  std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedZKernel;
   alignedRowKernel.insert(alignedRowKernel.end(), rowkernel, rowkernel + kernelWidth);
   alignedColKernel.insert(alignedColKernel.end(), colkernel, colkernel + kernelHeight);
   alignedZKernel.insert(alignedZKernel.end(), zkernel, zkernel + kernelDepth);
@@ -704,7 +704,7 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
 
   // get correlation of padImg and adjKernel
   if (!useMultithreading) {
-    std::vector<double, boost::alignment::aligned_allocator<double, 32> > bufImg1(desWidth*height*desDepth);
+    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg1(desWidth*height*desDepth);
     Image3DColFilterForOneBlock<TPixel,double> colfunctor(&padImg[0], desWidth, desHeight,
         adjcolkernel, kernelHeight, &bufImg1[0], desWidth, height);
 #ifndef _USE_QTCONCURRENT_
@@ -715,7 +715,7 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
     padImg.clear();
     padImg.shrink_to_fit();
 
-    std::vector<double, boost::alignment::aligned_allocator<double, 32> > bufImg2(width*height*desDepth);
+    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg2(width*height*desDepth);
     Image3DRowFilterForOneBlock<double,double> rowfunctor(&bufImg1[0], desWidth, height,
         adjrowkernel, kernelWidth, &bufImg2[0], width, height);
 #ifndef _USE_QTCONCURRENT_
@@ -735,14 +735,14 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
 #endif
   } else {
 #ifndef _USE_QTCONCURRENT_
-    std::vector<double, boost::alignment::aligned_allocator<double, 32> > bufImg1(desWidth*height*desDepth);
+    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg1(desWidth*height*desDepth);
     tbb::parallel_for(tbb::blocked_range<size_t>(0, desDepth),
                       Image3DColFilterForOneBlock<TPixel,double>(&padImg[0], desWidth, desHeight,
                       adjcolkernel, kernelHeight, &bufImg1[0], desWidth, height));
     padImg.clear();
     padImg.shrink_to_fit();
 
-    std::vector<double, boost::alignment::aligned_allocator<double, 32> > bufImg2(width*height*desDepth);
+    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg2(width*height*desDepth);
     tbb::parallel_for(tbb::blocked_range<size_t>(0, desDepth),
                       Image3DRowFilterForOneBlock<double,double>(&bufImg1[0], desWidth, height,
                       adjrowkernel, kernelWidth, &bufImg2[0], width, height));
@@ -756,21 +756,21 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
     size_t numThreads = QThread::idealThreadCount();
     size_t numBlock = std::min(depth, numThreads * 2);
     size_t zPerBlock = depth / numBlock;
-    QList<std::pair<size_t,size_t> > allRange;
+    QList<std::pair<size_t,size_t>> allRange;
     for (size_t i=0; i<numBlock; ++i) {
       allRange.push_back(std::make_pair(i*zPerBlock,
                                         (i==numBlock-1) ? depth : (i+1)*zPerBlock));
     }
 
     allRange[allRange.size()-1].second = desDepth;
-    std::vector<double, boost::alignment::aligned_allocator<double, 32> > bufImg1(desWidth*height*desDepth);
+    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg1(desWidth*height*desDepth);
     QtConcurrent::blockingMap(allRange,
                               Image3DColFilterForOneBlock<TPixel,double>(&padImg[0], desWidth, desHeight,
                               adjcolkernel, kernelHeight, &bufImg1[0], desWidth, height));
     padImg.clear();
     padImg.shrink_to_fit();
 
-    std::vector<double, boost::alignment::aligned_allocator<double, 32> > bufImg2(width*height*desDepth);
+    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg2(width*height*desDepth);
     QtConcurrent::blockingMap(allRange,
                               Image3DRowFilterForOneBlock<double,double>(&bufImg1[0], desWidth, height,
                               adjrowkernel, kernelWidth, &bufImg2[0], width, height));
@@ -993,7 +993,7 @@ void image3DResize(const TPixel *img, size_t width, size_t height, size_t depth,
     size_t numThreads = QThread::idealThreadCount();
     size_t numBlock = std::min(outDepth, numThreads * 2);
     size_t pagesPerBlock = outDepth / numBlock;
-    QList<std::pair<size_t,size_t> > allRange;
+    QList<std::pair<size_t,size_t>> allRange;
     for (size_t i=0; i<numBlock; ++i) {
       allRange.push_back(std::make_pair(i*pagesPerBlock,
                                         (i==numBlock-1) ? outDepth : ((i+1)*pagesPerBlock)));

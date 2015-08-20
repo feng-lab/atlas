@@ -60,15 +60,15 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject *parent)
   addParameter(m_swcTreeColor);
 
   for (size_t i=0; i<m_colorsForDifferentType.size(); i++) {
-    addParameter(m_colorsForDifferentType[i]);
+    addParameter(*m_colorsForDifferentType[i].get());
   }
 
   for (size_t i=0; i<m_colorsForDifferentTopology.size(); i++) {
-    addParameter(m_colorsForDifferentTopology[i]);
+    addParameter(*m_colorsForDifferentTopology[i].get());
   }
 
   for (size_t i=0; i<m_colorsForSubclassType.size(); i++) {
-    addParameter(m_colorsForSubclassType[i]);
+    addParameter(*m_colorsForSubclassType[i].get());
   }
 
   m_selectSwcEvent.listenTo("select swc", Qt::LeftButton,
@@ -115,15 +115,6 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject *parent)
 
 Z3DSwcFilter::~Z3DSwcFilter()
 {
-  for(size_t i=0; i<m_colorsForDifferentType.size(); i++) {
-    delete m_colorsForDifferentType[i];
-  }
-  for(size_t i=0; i<m_colorsForDifferentTopology.size(); i++) {
-    delete m_colorsForDifferentTopology[i];
-  }
-  for(size_t i=0; i<m_colorsForSubclassType.size(); i++) {
-    delete m_colorsForSubclassType[i];
-  }
 }
 
 void Z3DSwcFilter::process(Z3DEye)
@@ -136,17 +127,13 @@ void Z3DSwcFilter::process(Z3DEye)
 void Z3DSwcFilter::initTopologyColor()
 {
   // topology colors (root, branch point, leaf, others)
-  m_colorsForDifferentTopology.push_back(
-        new ZVec4Parameter("Root Color", glm::vec4(0/255.f, 0/255.f, 255/255.f, 1.f)));
-  m_colorsForDifferentTopology.push_back(
-        new ZVec4Parameter("Branch Point Color", glm::vec4(0/255.f, 255/255.f, 0/255.f, 1.f)));
-  m_colorsForDifferentTopology.push_back(
-        new ZVec4Parameter("Leaf Color", glm::vec4(255/255.f, 255/255.f, 0/255.f, 1.f)));
-  m_colorsForDifferentTopology.push_back(
-        new ZVec4Parameter("Other", glm::vec4(255/255.f, 0/255.f, 0/255.f, 1.f)));
+  m_colorsForDifferentTopology.emplace_back(new ZVec4Parameter("Root Color", glm::vec4(0/255.f, 0/255.f, 255/255.f, 1.f)));
+  m_colorsForDifferentTopology.emplace_back(new ZVec4Parameter("Branch Point Color", glm::vec4(0/255.f, 255/255.f, 0/255.f, 1.f)));
+  m_colorsForDifferentTopology.emplace_back(new ZVec4Parameter("Leaf Color", glm::vec4(255/255.f, 255/255.f, 0/255.f, 1.f)));
+  m_colorsForDifferentTopology.emplace_back(new ZVec4Parameter("Other", glm::vec4(255/255.f, 0/255.f, 0/255.f, 1.f)));
   for (size_t i=0; i<m_colorsForDifferentTopology.size(); i++) {
     m_colorsForDifferentTopology[i]->setStyle("COLOR");
-    connect(m_colorsForDifferentTopology[i], SIGNAL(valueChanged()), this, SLOT(prepareColor()));
+    connect(m_colorsForDifferentTopology[i].get(), SIGNAL(valueChanged()), this, SLOT(prepareColor()));
   }
 }
 
@@ -155,68 +142,68 @@ void Z3DSwcFilter::initTypeColor()
   // type colors
   int index = 0;
   QString name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(255/255.f, 255/255.f, 255/255.f, 1.f))); //white
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(255/255.f, 255/255.f, 255/255.f, 1.f))); //white
   // 1
   name = QString("Type %1 (Soma) Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(20/255.f, 20/255.f, 20/255.f, 1.f))); //black
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(20/255.f, 20/255.f, 20/255.f, 1.f))); //black
   // 2
   name = QString("Type %1 (Axon) Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(200/255.f, 20/255.f, 0/255.f, 1.f))); //red
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(200/255.f, 20/255.f, 0/255.f, 1.f))); //red
   // 3
   name = QString("Type %1 (Basal Dendrite) Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(0/255.f, 20/255.f, 200/255.f, 1.f))); //blue
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(0/255.f, 20/255.f, 200/255.f, 1.f))); //blue
   // 4
   name = QString("Type %1 (Apical Dendrite) Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(200/255.f, 0/255.f, 200/255.f, 1.f))); //purple
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(200/255.f, 0/255.f, 200/255.f, 1.f))); //purple
   // 5
   name = QString("Type %1 (Main Trunk) Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(0/255.f, 200/255.f, 200/255.f, 1.f))); //cyan
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(0/255.f, 200/255.f, 200/255.f, 1.f))); //cyan
   // 6
   name = QString("Type %1 (Basal Intermediate) Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(220/255.f, 200/255.f, 0/255.f, 1.f))); //yellow
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(220/255.f, 200/255.f, 0/255.f, 1.f))); //yellow
   // 7
   name = QString("Type %1 (Basal Terminal) Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(0/255.f, 200/255.f, 20/255.f, 1.f))); //green
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(0/255.f, 200/255.f, 20/255.f, 1.f))); //green
   // 8
   name = QString("Type %1 (Apical Oblique Intermediate) Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(188/255.f, 94/255.f, 37/255.f, 1.f))); //coffee
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(188/255.f, 94/255.f, 37/255.f, 1.f))); //coffee
   // 9
   name = QString("Type %1 (Apical Oblique Terminal) Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(180/255.f, 200/255.f, 120/255.f, 1.f))); //asparagus
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(180/255.f, 200/255.f, 120/255.f, 1.f))); //asparagus
   // 10
   name = QString("Type %1 (Apical Tuft) Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(250/255.f, 100/255.f, 120/255.f, 1.f))); //salmon
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(250/255.f, 100/255.f, 120/255.f, 1.f))); //salmon
   // 11
   name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(120/255.f, 200/255.f, 200/255.f, 1.f))); //ice
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(120/255.f, 200/255.f, 200/255.f, 1.f))); //ice
   // 12
   name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(100/255.f, 120/255.f, 200/255.f, 1.f))); //orchid
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(100/255.f, 120/255.f, 200/255.f, 1.f))); //orchid
   // 13
   name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(255/255.f, 128/255.f, 168/255.f, 1.f)));
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(255/255.f, 128/255.f, 168/255.f, 1.f)));
   // 14
   name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(128/255.f, 255/255.f, 168/255.f, 1.f)));
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(128/255.f, 255/255.f, 168/255.f, 1.f)));
   // 15
   name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(128/255.f, 168/255.f, 255/255.f, 1.f)));
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(128/255.f, 168/255.f, 255/255.f, 1.f)));
   // 16
   name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(128/255.f, 255/255.f, 168/255.f, 1.f)));
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(128/255.f, 255/255.f, 168/255.f, 1.f)));
   // 17
   name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(255/255.f, 168/255.f, 128/255.f, 1.f)));
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(255/255.f, 168/255.f, 128/255.f, 1.f)));
   // 18
   name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(168/255.f, 128/255.f, 255/255.f, 1.f)));
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(168/255.f, 128/255.f, 255/255.f, 1.f)));
   // 19
   name = QString("Undefined Type Color");
-  m_colorsForDifferentType.push_back(new ZVec4Parameter(name, glm::vec4(0xcc/255.f, 0xcc/255.f, 0xcc/255.f, 1.f)));
+  m_colorsForDifferentType.emplace_back(new ZVec4Parameter(name, glm::vec4(0xcc/255.f, 0xcc/255.f, 0xcc/255.f, 1.f)));
 
   for (size_t i=0; i<m_colorsForDifferentType.size(); i++) {
     m_colorsForDifferentType[i]->setStyle("COLOR");
-    connect(m_colorsForDifferentType[i], SIGNAL(valueChanged()), this, SLOT(prepareColor()));
+    connect(m_colorsForDifferentType[i].get(), SIGNAL(valueChanged()), this, SLOT(prepareColor()));
   }
 }
 
@@ -225,30 +212,30 @@ void Z3DSwcFilter::initSubclassTypeColor()
   // subclass type color
   QString name = QString("Soma Color");
   m_subclassTypeColorMapper[1] = m_colorsForSubclassType.size();
-  m_colorsForSubclassType.push_back(new ZVec4Parameter(name, glm::vec4(0/255.f, 0/255.f, 0/255.f, 1.f)));
+  m_colorsForSubclassType.emplace_back(new ZVec4Parameter(name, glm::vec4(0/255.f, 0/255.f, 0/255.f, 1.f)));
   name = QString("Main Trunk Color");
   m_subclassTypeColorMapper[5] = m_colorsForSubclassType.size();
-  m_colorsForSubclassType.push_back(new ZVec4Parameter(name, glm::vec4(0/255.f, 0/255.f, 0/255.f, 1.f)));
+  m_colorsForSubclassType.emplace_back(new ZVec4Parameter(name, glm::vec4(0/255.f, 0/255.f, 0/255.f, 1.f)));
   name = QString("Basal Intermediate Color");
   m_subclassTypeColorMapper[6] = m_colorsForSubclassType.size();
-  m_colorsForSubclassType.push_back(new ZVec4Parameter(name, glm::vec4(0x33/255.f, 0xcc/255.f, 0xff/255.f, 1.f)));
+  m_colorsForSubclassType.emplace_back(new ZVec4Parameter(name, glm::vec4(0x33/255.f, 0xcc/255.f, 0xff/255.f, 1.f)));
   name = QString("Basal Terminal Color");
   m_subclassTypeColorMapper[7] = m_colorsForSubclassType.size();
-  m_colorsForSubclassType.push_back(new ZVec4Parameter(name, glm::vec4(0x33/255.f, 0x66/255.f, 0xcc/255.f, 1.f)));
+  m_colorsForSubclassType.emplace_back(new ZVec4Parameter(name, glm::vec4(0x33/255.f, 0x66/255.f, 0xcc/255.f, 1.f)));
   name = QString("Apical Oblique Intermediate Color");
   m_subclassTypeColorMapper[8] = m_colorsForSubclassType.size();
-  m_colorsForSubclassType.push_back(new ZVec4Parameter(name, glm::vec4(0xff/255.f, 0xff/255.f, 0/255.f, 1.f)));
+  m_colorsForSubclassType.emplace_back(new ZVec4Parameter(name, glm::vec4(0xff/255.f, 0xff/255.f, 0/255.f, 1.f)));
   name = QString("Apical Oblique Terminal Color");
   m_subclassTypeColorMapper[9] = m_colorsForSubclassType.size();
-  m_colorsForSubclassType.push_back(new ZVec4Parameter(name, glm::vec4(0xcc/255.f, 0x33/255.f, 0x66/255.f, 1.f)));
+  m_colorsForSubclassType.emplace_back(new ZVec4Parameter(name, glm::vec4(0xcc/255.f, 0x33/255.f, 0x66/255.f, 1.f)));
   name = QString("Apical Tuft Color");
   m_subclassTypeColorMapper[10] = m_colorsForSubclassType.size();
-  m_colorsForSubclassType.push_back(new ZVec4Parameter(name, glm::vec4(0/255.f, 0x99/255.f, 0/255.f, 1.f)));
+  m_colorsForSubclassType.emplace_back(new ZVec4Parameter(name, glm::vec4(0/255.f, 0x99/255.f, 0/255.f, 1.f)));
   name = QString("Other Undefined class Color");
-  m_colorsForSubclassType.push_back(new ZVec4Parameter(name, glm::vec4(0xcc/255.f, 0xcc/255.f, 0xcc/255.f, 1.f)));
+  m_colorsForSubclassType.emplace_back(new ZVec4Parameter(name, glm::vec4(0xcc/255.f, 0xcc/255.f, 0xcc/255.f, 1.f)));
   for (size_t i=0; i<m_colorsForSubclassType.size(); i++) {
     m_colorsForSubclassType[i]->setStyle("COLOR");
-    connect(m_colorsForSubclassType[i], SIGNAL(valueChanged()), this, SLOT(prepareColor()));
+    connect(m_colorsForSubclassType[i].get(), SIGNAL(valueChanged()), this, SLOT(prepareColor()));
   }
 }
 
@@ -328,13 +315,13 @@ ZWidgetsGroup *Z3DSwcFilter::widgetsGroup()
     new ZWidgetsGroup(&m_swcTreeColor, m_widgetsGroup, 1);
 
     for(size_t i=0; i<m_colorsForDifferentType.size(); i++) {
-      new ZWidgetsGroup(m_colorsForDifferentType[i], m_widgetsGroup, 1);
+      new ZWidgetsGroup(m_colorsForDifferentType[i].get(), m_widgetsGroup, 1);
     }
     for(size_t i=0; i<m_colorsForSubclassType.size(); i++) {
-      new ZWidgetsGroup(m_colorsForSubclassType[i], m_widgetsGroup, 1);
+      new ZWidgetsGroup(m_colorsForSubclassType[i].get(), m_widgetsGroup, 1);
     }
     for(size_t i=0; i<m_colorsForDifferentTopology.size(); i++) {
-      new ZWidgetsGroup(m_colorsForDifferentTopology[i], m_widgetsGroup, 1);
+      new ZWidgetsGroup(m_colorsForDifferentTopology[i].get(), m_widgetsGroup, 1);
     }
     new ZWidgetsGroup(&m_colorMapBranchType, m_widgetsGroup, 1);
 

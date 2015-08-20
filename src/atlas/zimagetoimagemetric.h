@@ -174,10 +174,10 @@ struct EvaluateMetricForOneBlock {
 //  {
 //  }
 
-//  typedef std::vector<std::vector<double> > result_type;
+//  typedef std::vector<std::vector<double>> result_type;
 
-//  std::vector<std::vector<double> > operator()(const std::pair<size_t,size_t> &range) const {
-//    std::vector<std::vector<double> > res(3);
+//  std::vector<std::vector<double>> operator()(const std::pair<size_t,size_t> &range) const {
+//    std::vector<std::vector<double>> res(3);
 //    res[0] = std::vector<double>(m_nbins, 0);
 //    res[1] = std::vector<double>(m_nbins, 0);
 //    res[2] = std::vector<double>(m_nbins*m_nbins, 0);
@@ -233,20 +233,20 @@ double ZImageToImageMetric::value(const TPixel1 *img1, const TPixel2 *img2, size
   //    double Imin, Imax;
   //    getHistogramRange<TPixel>(Imin, Imax);
   //    BuildImageHistogramForOneBlock<TPixel> func(img1, img2, size, Imin, Imax, m_nbins);
-  //    std::vector<std::vector<double> > hists;
+  //    std::vector<std::vector<double>> hists;
   //    if (m_numThreads == 1) {
   //      hists = func(std::make_pair((size_t)0, size));
   //    } else {
   //      size_t numBlock = std::min(size, (size_t)m_numThreads*2);
   //      size_t pixelPerBlock = size / numBlock;
-  //      QList<std::pair<size_t,size_t> > allRange;
+  //      QList<std::pair<size_t,size_t>> allRange;
   //      for (size_t i=0; i<numBlock; ++i) {
   //        allRange.push_back(std::make_pair(i*pixelPerBlock,
   //                                          (i==numBlock-1) ? size : (i+1)*pixelPerBlock));
   //      }
   //      if (m_numThreads != (size_t)QThread::idealThreadCount())
   //        QThreadPool::globalInstance()->setMaxThreadCount(m_numThreads);
-  //      QList<std::vector<std::vector<double> > > values = QtConcurrent::blockingMapped(allRange, func);
+  //      QList<std::vector<std::vector<double>>> values = QtConcurrent::blockingMapped(allRange, func);
   //      if (m_numThreads != (size_t)QThread::idealThreadCount())
   //        QThreadPool::globalInstance()->setMaxThreadCount(QThread::idealThreadCount());
   //      hists = values[0];
@@ -310,7 +310,7 @@ double ZImageToImageMetric::value(const TPixel1 *img1, const TPixel2 *img2, size
     size_t numThreads = QThread::idealThreadCount();
     size_t numBlock = std::min(size, numThreads*2);
     size_t pixelPerBlock = size / numBlock;
-    QList<std::pair<size_t,size_t> > allRange;
+    QList<std::pair<size_t,size_t>> allRange;
     for (size_t i=0; i<numBlock; ++i) {
       allRange.push_back(std::make_pair(i*pixelPerBlock,
                                         (i==numBlock-1) ? size : (i+1)*pixelPerBlock));

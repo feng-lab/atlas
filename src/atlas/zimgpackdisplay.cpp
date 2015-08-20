@@ -51,7 +51,7 @@ void ZImgPackDisplay::showChannel(size_t ch, double minData, double maxData)
 
 void ZImgPackDisplay::hideChannel(size_t ch)
 {
-  std::map<size_t, std::pair<double,double> >::iterator it = m_channels.find(ch);
+  std::map<size_t, std::pair<double,double>>::iterator it = m_channels.find(ch);
   if (it != m_channels.end())
     m_channels.erase(it);
 }
@@ -99,7 +99,7 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
     if (m_channels.empty())
       return resV;
 
-    std::vector<std::shared_ptr<ZImg> > imgs;
+    std::vector<std::shared_ptr<ZImg>> imgs;
     std::vector<QPoint> locs;
     std::vector<double> scales;
 
@@ -142,7 +142,7 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
 //template<typename TVoxel>
 //void ZImgDisplay::setQImageDataBlockCM(QImage &qim, size_t startLine, size_t endLine,
 //                                       const std::vector<size_t>& channels,
-//                                       const std::vector<ZImgVoxelColormap<TVoxel> > &colormaps) const
+//                                       const std::vector<ZImgVoxelColormap<TVoxel>> &colormaps) const
 //{
 //  std::vector<const TVoxel*> imgDatas(channels.size());
 //  for (size_t c=0; c<channels.size(); ++c) {
@@ -169,7 +169,7 @@ void ZImgPackDisplay::setQImageDataBlockCM(const ZImg *img, QImage *qim, const t
 void ZImgPackDisplay::setQImageDataBlockCM(const ZImg *img, QImage *qim, std::pair<size_t, size_t> rowRange,
 #endif
                                            const std::vector<size_t>* channels,
-                                           const std::vector<ZImgVoxelColormap<TVoxel> > *colormaps) const
+                                           const std::vector<ZImgVoxelColormap<TVoxel>> *colormaps) const
 {
   std::vector<const TVoxel*> imgDatas(channels->size());
 #ifndef _USE_QTCONCURRENT_
@@ -203,7 +203,7 @@ void ZImgPackDisplay::setQImageDataBlockCMMultAlpha(const ZImg *img, QImage *qim
 void ZImgPackDisplay::setQImageDataBlockCMMultAlpha(const ZImg *img, QImage *qim, std::pair<size_t, size_t> rowRange,
 #endif
                                                 const std::vector<size_t>* channels,
-                                                const std::vector<ZImgVoxelColormap<TVoxel> > *colormaps) const
+                                                const std::vector<ZImgVoxelColormap<TVoxel>> *colormaps) const
 {
   std::vector<const TVoxel*> imgDatas(channels->size());
 #ifndef _USE_QTCONCURRENT_
@@ -238,12 +238,12 @@ void ZImgPackDisplay::setQImageDataCM(const ZImg &img, QImage &qim) const
 {
   size_t numChannelsToShow = m_channels.size();
   std::vector<size_t> channels(numChannelsToShow);
-  std::vector<ZImgVoxelColormap<TVoxel> > colormaps(numChannelsToShow);
+  std::vector<ZImgVoxelColormap<TVoxel>> colormaps(numChannelsToShow);
   TVoxel minimum = std::numeric_limits<TVoxel>::min();
   TVoxel maximum = std::numeric_limits<TVoxel>::max();
   size_t idx=0;
   int alphaChannelIdx = -1;
-  for (std::map<size_t, std::pair<double,double> >::const_iterator it = m_channels.begin();
+  for (std::map<size_t, std::pair<double,double>>::const_iterator it = m_channels.begin();
        it != m_channels.end(); ++it) {
     if (m_imgPack.imgInfo().isAlphaChannel(it->first)) {
       alphaChannelIdx = idx;
@@ -253,7 +253,7 @@ void ZImgPackDisplay::setQImageDataCM(const ZImg &img, QImage &qim) const
   }
   idx = 0;
   if (alphaChannelIdx < 0) {
-    for (std::map<size_t, std::pair<double,double> >::const_iterator it = m_channels.begin();
+    for (std::map<size_t, std::pair<double,double>>::const_iterator it = m_channels.begin();
          it != m_channels.end(); ++it) {
       size_t ch = it->first;
       double minValue = it->second.first;
@@ -270,7 +270,7 @@ void ZImgPackDisplay::setQImageDataCM(const ZImg &img, QImage &qim) const
       idx++;
     }
   } else {
-    for (std::map<size_t, std::pair<double,double> >::const_iterator it = m_channels.begin();
+    for (std::map<size_t, std::pair<double,double>>::const_iterator it = m_channels.begin();
          it != m_channels.end(); ++it) {
       size_t ch = it->first;
       double minValue = it->second.first;
@@ -325,7 +325,7 @@ void ZImgPackDisplay::setQImageDataCM(const ZImg &img, QImage &qim) const
 #else
   size_t numBlock = std::min(img.height(), size_t(32));
   size_t blockHeight = img.height() / numBlock;
-  std::vector<QFuture<void> > res(numBlock);
+  std::vector<QFuture<void>> res(numBlock);
   for (size_t i=0; i<numBlock; ++i) {
     size_t startLine = i * blockHeight;
     size_t endLine = (i+1) * blockHeight;
@@ -482,7 +482,7 @@ void ZImgPackDisplay::setQImageData(const ZImg &img, QImage &qim) const
 {
   std::vector<size_t> channels(m_channels.size());
   size_t idx=0;
-  for (std::map<size_t, std::pair<double,double> >::const_iterator it = m_channels.begin();
+  for (std::map<size_t, std::pair<double,double>>::const_iterator it = m_channels.begin();
        it != m_channels.end(); ++it) {
     channels[idx++] = it->first;
   }
@@ -500,7 +500,7 @@ void ZImgPackDisplay::setQImageData(const ZImg &img, QImage &qim) const
 #else
   size_t numBlock = std::min(img.height(), size_t(32));
   size_t blockHeight = img.height() / numBlock;
-  std::vector<QFuture<void> > res(numBlock);
+  std::vector<QFuture<void>> res(numBlock);
   for (size_t i=0; i<numBlock; ++i) {
     size_t startLine = i * blockHeight;
     size_t endLine = (i+1) * blockHeight;

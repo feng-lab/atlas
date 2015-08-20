@@ -215,8 +215,8 @@ protected:
   inline void clearKeys() {m_keys.clear();}
   virtual bool equalTo(const ZColorMap& cm) const;
 
-  std::vector<std::pair<ZColorMapKey, bool> > m_keys;
-  typedef std::vector<std::pair<ZColorMapKey, bool> >::iterator KeyIterType;
+  std::vector<std::pair<ZColorMapKey, bool>> m_keys;
+  typedef std::vector<std::pair<ZColorMapKey, bool>>::iterator KeyIterType;
   bool m_hasDataRange;
   double m_dataMin;
   double m_dataMax;

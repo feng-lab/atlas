@@ -21,88 +21,80 @@ Z3DProcessor::~Z3DProcessor()
 {
 }
 
-void Z3DProcessor::addPort(Z3DInputPortBase *port)
+void Z3DProcessor::addPort(Z3DInputPortBase &port)
 {
-  assert(port);
-  port->setProcessor(this);
+  port.setProcessor(this);
 
-  m_inputPorts.push_back(port);
+  m_inputPorts.push_back(&port);
 
-  std::map<QString, Z3DInputPortBase*>::const_iterator it = m_inputPortMap.find(port->name());
+  std::map<QString, Z3DInputPortBase*>::const_iterator it = m_inputPortMap.find(port.name());
   if (it == m_inputPortMap.end())
-    m_inputPortMap.emplace(port->name(), port);
+    m_inputPortMap.emplace(port.name(), &port);
   else {
-    LERROR() << className() << "port" << port->name() << "has already been inserted!";
+    LERROR() << className() << "port" << port.name() << "has already been inserted!";
     assert(false);
   }
 }
 
-void Z3DProcessor::addPort(Z3DOutputPortBase *port)
+void Z3DProcessor::addPort(Z3DOutputPortBase &port)
 {
-  assert(port);
-  port->setProcessor(this);
-  m_outputPorts.push_back(port);
-  std::map<QString, Z3DOutputPortBase*>::const_iterator it = m_outputPortMap.find(port->name());
+  port.setProcessor(this);
+  m_outputPorts.push_back(&port);
+  std::map<QString, Z3DOutputPortBase*>::const_iterator it = m_outputPortMap.find(port.name());
   if (it == m_outputPortMap.end())
-    m_outputPortMap.emplace(port->name(), port);
+    m_outputPortMap.emplace(port.name(), &port);
   else {
-    LERROR() << className() << "port" << port->name() << "has already been inserted!";
+    LERROR() << className() << "port" << port.name() << "has already been inserted!";
     assert(false);
   }
 }
 
-void Z3DProcessor::removePort(Z3DInputPortBase* port)
+void Z3DProcessor::removePort(Z3DInputPortBase &port)
 {
-  assert(port);
+  m_inputPorts.erase(std::find(m_inputPorts.begin(), m_inputPorts.end(), &port));
 
-  m_inputPorts.erase(std::find(m_inputPorts.begin(), m_inputPorts.end(), port));
-
-  std::map<QString, Z3DInputPortBase*>::iterator inIt = m_inputPortMap.find(port->name());
+  std::map<QString, Z3DInputPortBase*>::iterator inIt = m_inputPortMap.find(port.name());
   if (inIt != m_inputPortMap.end())
     m_inputPortMap.erase(inIt);
   else {
-    LERROR() << className() << "port" << port->name() << "was not found!";
+    LERROR() << className() << "port" << port.name() << "was not found!";
     assert(false);
   }
 }
 
-void Z3DProcessor::removePort(Z3DOutputPortBase* port)
+void Z3DProcessor::removePort(Z3DOutputPortBase &port)
 {
-  assert(port);
+  m_outputPorts.erase(std::find(m_outputPorts.begin(), m_outputPorts.end(), &port));
 
-  m_outputPorts.erase(std::find(m_outputPorts.begin(), m_outputPorts.end(), port));
-
-  std::map<QString, Z3DOutputPortBase*>::iterator outIt = m_outputPortMap.find(port->name());
+  std::map<QString, Z3DOutputPortBase*>::iterator outIt = m_outputPortMap.find(port.name());
   if (outIt != m_outputPortMap.end())
     m_outputPortMap.erase(outIt);
   else {
-    LERROR() << className() << "port" << port->name() << "was not found!";
+    LERROR() << className() << "port" << port.name() << "was not found!";
     assert(false);
   }
 }
 
-void Z3DProcessor::addParameter(ZParameter *para, InvalidationState inv)
+void Z3DProcessor::addParameter(ZParameter &para, InvalidationState inv)
 {
-  assert(para);
-  if (para && m_parameterNames.find(para->name()) != m_parameterNames.end()) {
-    LFATAL() << "Duplicated para name" << para->name();
+  if (m_parameterNames.find(para.name()) != m_parameterNames.end()) {
+    LFATAL() << "Duplicated para name" << para.name();
   }
-  m_parameters.push_back(para);
-  m_parameterNames.insert(para->name());
+  m_parameters.push_back(&para);
+  m_parameterNames.insert(para.name());
   if (inv != Valid) {
-    connect(para, SIGNAL(valueChanged()), this, SLOT(invalidateResult()));
+    connect(&para, SIGNAL(valueChanged()), this, SLOT(invalidateResult()));
   }
 }
 
-void Z3DProcessor::removeParameter(ZParameter *para)
+void Z3DProcessor::removeParameter(ZParameter &para)
 {
-  assert(para);
-  if (!parameter(para->name())) {
-    LERROR() << className() << "parameter" << para->name() << "cannot be removed, it does not exist";
+  if (!parameter(para.name())) {
+    LERROR() << className() << "parameter" << para.name() << "cannot be removed, it does not exist";
   } else {
-    para->disconnect(this);
-    m_parameters.erase(std::find(m_parameters.begin(), m_parameters.end(), para));
-    m_parameterNames.erase(para->name());
+    para.disconnect(this);
+    m_parameters.erase(std::find(m_parameters.begin(), m_parameters.end(), &para));
+    m_parameterNames.erase(para.name());
   }
 }
 
@@ -214,17 +206,15 @@ bool Z3DProcessor::isValid(Z3DEye eye) const
     return !m_invalidationState.testFlag(InvalidRightEyeResult);
 }
 
-void Z3DProcessor::addEventListener(ZEventListenerParameter* para)
+void Z3DProcessor::addEventListener(ZEventListenerParameter &para)
 {
-  assert(para);
   addParameter(para);
-  m_eventListeners.push_back(para);
+  m_eventListeners.push_back(&para);
 }
 
-void Z3DProcessor::addInteractionHandler(Z3DInteractionHandler* handler)
+void Z3DProcessor::addInteractionHandler(Z3DInteractionHandler &handler)
 {
-  assert(handler);
-  m_interactionHandlers.push_back(handler);
+  m_interactionHandlers.push_back(&handler);
 }
 
 void Z3DProcessor::onEvent(QEvent *e, int w, int h)

@@ -245,7 +245,7 @@ void Z3DMeshFilter::deregisterPickingObjects()
 
 std::vector<double> Z3DMeshFilter::meshBound(ZMesh *p)
 {
-  std::map<ZMesh*, std::vector<double> >::const_iterator it
+  std::map<ZMesh*, std::vector<double>>::const_iterator it
       = m_meshBoundboxMapper.find(p);
   if (it != m_meshBoundboxMapper.end()) {
     std::vector<double> result = it->second;

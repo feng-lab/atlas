@@ -8,7 +8,7 @@ namespace nim {
 
 #define ZImgCacheInstance nim::ZImgCache::instance()
 
-class ZImgCache : public QCache<size_t, std::shared_ptr<ZImg> >
+class ZImgCache : public QCache<size_t, std::shared_ptr<ZImg>>
 {
 public:
   static ZImgCache& instance();

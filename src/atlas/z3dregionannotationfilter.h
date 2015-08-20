@@ -63,7 +63,7 @@ private:
 
   ZRegionAnnotation *m_regionAnnotation;
 
-  std::map<int, std::unique_ptr<Z3DMeshFilter> > m_idToMeshFilters;
+  std::map<int, std::unique_ptr<Z3DMeshFilter>> m_idToMeshFilters;
   std::map<int, QString> m_idToRegionNames;
   std::map<QString, int> m_nameToID;
 

@@ -48,7 +48,7 @@ public:
   // returns all parameters
   const std::vector<ZParameter*>& parameters() const { return m_parameters; }
   std::vector<ZParameter*>& parameters() { return m_parameters; }
-  // returns first parameter with the given name. return NULL if not found
+  // returns first parameter with the given name. return nullptr if not found
   ZParameter* parameter(const QString& name) const;
   // returns all parameters matching the specified type T, including subtypes.
   template<class T>
@@ -56,7 +56,7 @@ public:
 
   virtual void invalidate(InvalidationState inv = InvalidAllResult);
 
-  // returns the port with the given name, or null if such a port does not exist.
+  // returns the port with the given name, or nullptr if such a port does not exist.
   Z3DInputPortBase* inputPort(const QString &name) const;
   Z3DOutputPortBase* outputPort(const QString& name) const;
   // return all inputports or outputports as vector
@@ -101,36 +101,20 @@ protected:
   // input is current camera (eye), can be left or right in stereo case
   virtual void process(Z3DEye eye) = 0;
 
-  void addPort(Z3DInputPortBase *port);
-  void addPort(Z3DInputPortBase &port)
-    { addPort(&port); }
-  void addPort(Z3DOutputPortBase *port);
-  void addPort(Z3DOutputPortBase &port)
-    { addPort(&port); }
+  void addPort(Z3DInputPortBase &port);
+  void addPort(Z3DOutputPortBase &port);
 
-  void removePort(Z3DInputPortBase *port);
-  void removePort(Z3DInputPortBase &port)
-    { removePort(&port); }
-  void removePort(Z3DOutputPortBase *port);
-  void removePort(Z3DOutputPortBase &port)
-    { removePort(&port); }
+  void removePort(Z3DInputPortBase &port);
+  void removePort(Z3DOutputPortBase &port);
 
-  void addParameter(ZParameter *para, InvalidationState inv = InvalidAllResult);
-  void addParameter(ZParameter &para, InvalidationState inv = InvalidAllResult)
-    { addParameter(&para, inv); }
-  void removeParameter(ZParameter *para);
-  void removeParameter(ZParameter &para)
-    { removeParameter(&para); }
+  void addParameter(ZParameter &para, InvalidationState inv = InvalidAllResult);
+  void removeParameter(ZParameter &para);
 
   // listen to some events
-  void addEventListener(ZEventListenerParameter *para);
-  void addEventListener(ZEventListenerParameter &para)
-    { addEventListener(&para); }
+  void addEventListener(ZEventListenerParameter &para);
 
   // react to interaction
-  void addInteractionHandler(Z3DInteractionHandler *handler);
-  void addInteractionHandler(Z3DInteractionHandler &handler)
-    { addInteractionHandler(&handler); }
+  void addInteractionHandler(Z3DInteractionHandler &handler);
 
   virtual void enterInteractionMode() {}
   virtual void exitInteractionMode() {}

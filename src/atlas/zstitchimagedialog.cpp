@@ -32,7 +32,7 @@ protected:
   QString m_what;
 };
 
-void buildConnectionFromGrid(const std::vector<std::vector<size_t> > &grid,
+void buildConnectionFromGrid(const std::vector<std::vector<size_t>> &grid,
                              std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint> &conn)
 {
   for (size_t i=0; i<grid.size(); i++) {
@@ -962,7 +962,7 @@ void ZStitchImageDialog::selectInputStacks2()
   }
 }
 
-bool ZStitchImageDialog::getTileMatrix(ZImg &img, QVector<QVector<int> > &tileMatrix,
+bool ZStitchImageDialog::getTileMatrix(ZImg &img, QVector<QVector<int>> &tileMatrix,
                                        QList<ZTile> &tileList)
 {
   double minvalue;
@@ -1000,7 +1000,7 @@ bool ZStitchImageDialog::getTileMatrix(ZImg &img, QVector<QVector<int> > &tileMa
   if (numTilePerRow == 0 || numTilePerCol == 0) {
     return false;
   }
-  tileMatrix = QVector<QVector<int> >(numTilePerCol, QVector<int>(numTilePerRow, 0));
+  tileMatrix = QVector<QVector<int>>(numTilePerCol, QVector<int>(numTilePerRow, 0));
   int tileindex = 1;
   int tileindex2 = 1;
   int currentrow = 0;
@@ -1473,7 +1473,7 @@ void ZStitchImageDialog::stitchStacks2()
   /*generate connection file from tile_selection.lsm file*/
   else if (m_useTileImageRadioButton->isChecked()) {
 
-    std::vector<std::vector<size_t> > tileMatrix(m_tileMatrix.size(), std::vector<size_t>(m_tileMatrix[0].size(), 0));
+    std::vector<std::vector<size_t>> tileMatrix(m_tileMatrix.size(), std::vector<size_t>(m_tileMatrix[0].size(), 0));
 
     int index = 1;
     for (size_t i=0; i<tileMatrix.size(); i++) {
@@ -1516,7 +1516,7 @@ void ZStitchImageDialog::stitchStacks2()
     int row = m_layout1SpinBox->value();
     int col = m_layout2SpinBox->value();
 
-    std::vector<std::vector<size_t> > tileMatrix(row, std::vector<size_t>(col, 0));
+    std::vector<std::vector<size_t>> tileMatrix(row, std::vector<size_t>(col, 0));
 
     int index = 1;
     for (size_t i=0; i<tileMatrix.size(); i++) {
@@ -1527,7 +1527,7 @@ void ZStitchImageDialog::stitchStacks2()
     buildConnectionFromGrid(tileMatrix, conn);
   }
 
-  std::map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate,double> > offsets;
+  std::map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate,double>> offsets;
   int intv[3];
 
   intv[0] = m_intvXSpinBox->value();
@@ -1700,7 +1700,7 @@ void ZStitchImageDialog::stitchStacks2()
       }
     }
   }
-  for (std::map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double> >::iterator it = offsets.begin();
+  for (std::map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>>::iterator it = offsets.begin();
        it != offsets.end(); ++it) {
     size_t f = it->first.first;
     size_t m = it->first.second;
@@ -2117,7 +2117,7 @@ void ZStitchImageDialog::stitchStacks()
   /*generate connection file from tile_selection.lsm file*/
   else if (m_useTileImageRadioButton->isChecked()) {
 
-    std::vector<std::vector<size_t> > tileMatrix(m_tileMatrix.size(), std::vector<size_t>(m_tileMatrix[0].size(), 0));
+    std::vector<std::vector<size_t>> tileMatrix(m_tileMatrix.size(), std::vector<size_t>(m_tileMatrix[0].size(), 0));
 
     int index = 1;
     for (size_t i=0; i<tileMatrix.size(); i++) {
@@ -2157,7 +2157,7 @@ void ZStitchImageDialog::stitchStacks()
     int row = m_layout1SpinBox->value();
     int col = m_layout2SpinBox->value();
 
-    std::vector<std::vector<size_t> > tileMatrix(row, std::vector<size_t>(col, 0));
+    std::vector<std::vector<size_t>> tileMatrix(row, std::vector<size_t>(col, 0));
 
     int index = 1;
     for (size_t i=0; i<tileMatrix.size(); i++) {
@@ -2231,7 +2231,7 @@ void ZStitchImageDialog::stitchStacks()
     res.save(m_outputFileEdit->text());
     emit resultReady(&res, m_outputFileEdit->text());
   } else {
-    std::map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate,double> > offsets;
+    std::map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate,double>> offsets;
     int intv[3];
 
     intv[0] = m_intvXSpinBox->value();
@@ -2312,7 +2312,7 @@ void ZStitchImageDialog::stitchStacks()
         imgs[i].blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(), ZImg::CombineMode::Mean);
       }
     }
-    for (std::map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double> >::iterator it = offsets.begin();
+    for (std::map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>>::iterator it = offsets.begin();
          it != offsets.end(); ++it) {
       size_t f = it->first.first;
       size_t m = it->first.second;

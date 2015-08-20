@@ -146,7 +146,7 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
   }
 
   while (m_numParas < m_parameters.size()) {
-    removeParameter(m_parameters[m_numParas]);
+    removeParameter(*m_parameters[m_numParas]);
   }
   m_idToMeshFilters.clear();
   m_idToRegionNames.clear();
@@ -181,7 +181,7 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
                  paras[i]->name() == "Z Cut" ||
                  paras[i]->name() == "Bound Box") {
         paras[i]->setName(QString("%1 %2").arg(m_idToRegionNames[id]).arg(paras[i]->name()));
-        addParameter(paras[i]);
+        addParameter(*paras[i]);
       }
     }
     m_idToMeshFilters[id] = std::unique_ptr<Z3DMeshFilter>(flt);

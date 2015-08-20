@@ -468,7 +468,7 @@ QStringList ZImgZeissCZI::extensions() const
 }
 
 void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &infos,
-                            std::vector<std::vector<std::shared_ptr<ZImgSubBlock> > > *subBlocks,
+                            std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
                             std::vector<size_t> *numPyramidalLevel)
 {
   //dump(filename);
@@ -1341,7 +1341,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
     m_shouldSeparateChannelsToDifferentScenes = true;
   }
 
-  std::map<std::array<int32_t, 6>, std::vector<CZITile> > sceneIdxToTiles;
+  std::map<std::array<int32_t, 6>, std::vector<CZITile>> sceneIdxToTiles;
   for (size_t i=0; i<allTiles.size(); ++i) {
     if (!m_shouldSeparateChannelsToDifferentScenes) { // remove channel info from scene idx
       allTiles[i].sceneIdx[5] = 0;

@@ -632,7 +632,7 @@ void image2DFilter(const TPixel *img, size_t width, size_t height,
   size_t downPad = (kernelHeight - 1) / 2;
   size_t desWidth = leftPad+width+rightPad;
   size_t desHeight = upPad+height+downPad;
-  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32> > padImg(desWidth*desHeight);
+  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32>> padImg(desWidth*desHeight);
   //ZBenchTimer bt;
   //bt.start();
   image2DPad(img, width, height, leftPad, rightPad, upPad, downPad, &padImg[0],
@@ -641,17 +641,17 @@ void image2DFilter(const TPixel *img, size_t width, size_t height,
 
   //image2DWrite(&padImg[0], desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
 
-  std::vector<double, boost::alignment::aligned_allocator<double, 32> > alignedKernel;
+  std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedKernel;
   alignedKernel.insert(alignedKernel.end(), kernel, kernel + kernelWidth*kernelHeight);
   if (!corr) {
     image2DReflect(&alignedKernel[0], kernelWidth, kernelHeight);
   }
 
-  std::vector<double, boost::alignment::aligned_allocator<double, 32> > rowKernel(kernelWidth);
-  std::vector<double, boost::alignment::aligned_allocator<double, 32> > colKernel(kernelHeight);
+  std::vector<double, boost::alignment::aligned_allocator<double, 32>> rowKernel(kernelWidth);
+  std::vector<double, boost::alignment::aligned_allocator<double, 32>> colKernel(kernelHeight);
   if (seperate2DKernel(&alignedKernel[0], kernelWidth, kernelHeight,
                        &rowKernel[0], &colKernel[0])) {
-    std::vector<double, boost::alignment::aligned_allocator<double, 32> > bufImg(width*desHeight);
+    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg(width*desHeight);
 
     Image2DRowFilterForOneBlock<TPixel,double> rowfunctor(&padImg[0], desWidth,
         &rowKernel[0], kernelWidth, &bufImg[0], width);
@@ -675,7 +675,7 @@ void image2DFilter(const TPixel *img, size_t width, size_t height,
       size_t numThreads = QThread::idealThreadCount();
       size_t numBlock = std::min(height, numThreads * 2);
       size_t rowsPerBlock = height / numBlock;
-      QList<std::pair<size_t,size_t> > allRange;
+      QList<std::pair<size_t,size_t>> allRange;
       for (size_t i=0; i<numBlock; ++i) {
         allRange.push_back(std::make_pair(i*rowsPerBlock,
                                           (i==numBlock-1) ? height : (i+1)*rowsPerBlock));
@@ -705,7 +705,7 @@ void image2DFilter(const TPixel *img, size_t width, size_t height,
       size_t numThreads = QThread::idealThreadCount();
       size_t numBlock = std::min(height, numThreads * 2);
       size_t rowsPerBlock = height / numBlock;
-      QList<std::pair<size_t,size_t> > allRange;
+      QList<std::pair<size_t,size_t>> allRange;
       for (size_t i=0; i<numBlock; ++i) {
         allRange.push_back(std::make_pair(i*rowsPerBlock,
                                           (i==numBlock-1) ? height : (i+1)*rowsPerBlock));
@@ -732,7 +732,7 @@ void image2DFilter(const TPixel *img, size_t width, size_t height,
   size_t downPad = (kernelHeight - 1) / 2;
   size_t desWidth = leftPad+width+rightPad;
   size_t desHeight = upPad+height+downPad;
-  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32> > padImg(desWidth*desHeight);
+  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32>> padImg(desWidth*desHeight);
   //ZBenchTimer bt;
   //bt.start();
   image2DPad(img, width, height, leftPad, rightPad, upPad, downPad, &padImg[0],
@@ -741,8 +741,8 @@ void image2DFilter(const TPixel *img, size_t width, size_t height,
 
   //image2DWrite(&padImg[0], desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
 
-  std::vector<double, boost::alignment::aligned_allocator<double, 32> > alignedRowKernel;
-  std::vector<double, boost::alignment::aligned_allocator<double, 32> > alignedColKernel;
+  std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedRowKernel;
+  std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedColKernel;
   alignedRowKernel.insert(alignedRowKernel.end(), rowkernel, rowkernel + kernelWidth);
   alignedColKernel.insert(alignedColKernel.end(), colkernel, colkernel + kernelHeight);
   if (!corr) {
@@ -750,7 +750,7 @@ void image2DFilter(const TPixel *img, size_t width, size_t height,
     image2DFlip(&alignedColKernel[0], kernelHeight, 1, Dimension::X);
   }
 
-  std::vector<double, boost::alignment::aligned_allocator<double, 32> > bufImg(width*desHeight);
+  std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg(width*desHeight);
 
   Image2DRowFilterForOneBlock<TPixel,double> rowfunctor(&padImg[0], desWidth,
       &alignedRowKernel[0], kernelWidth, &bufImg[0], width);
@@ -774,7 +774,7 @@ void image2DFilter(const TPixel *img, size_t width, size_t height,
     size_t numThreads = QThread::idealThreadCount();
     size_t numBlock = std::min(height, numThreads * 2);
     size_t rowsPerBlock = height / numBlock;
-    QList<std::pair<size_t,size_t> > allRange;
+    QList<std::pair<size_t,size_t>> allRange;
     for (size_t i=0; i<numBlock; ++i) {
       allRange.push_back(std::make_pair(i*rowsPerBlock,
                                         (i==numBlock-1) ? height : (i+1)*rowsPerBlock));
@@ -966,7 +966,7 @@ void image2DResize(const TPixel *img, size_t width, size_t height,
     size_t numThreads = QThread::idealThreadCount();
     size_t numBlock = std::min(outHeight, numThreads * 2);
     size_t rowsPerBlock = outHeight / numBlock;
-    QList<std::pair<size_t,size_t> > allRange;
+    QList<std::pair<size_t,size_t>> allRange;
     for (size_t i=0; i<numBlock; ++i) {
       allRange.push_back(std::make_pair(i*rowsPerBlock,
                                         (i==numBlock-1) ? outHeight : ((i+1)*rowsPerBlock)));

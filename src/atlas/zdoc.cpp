@@ -378,7 +378,7 @@ std::map<size_t, size_t> ZDoc::read(const QJsonObject &json, QString &err)
   std::map<size_t,size_t> res;
   if (!json.isEmpty()) {
     for (int i=0; i<m_docPacks.size(); ++i) {
-      QList<QPair<QString,QJsonValue> > docKeyValueList;
+      QList<QPair<QString,QJsonValue>> docKeyValueList;
       for (QJsonObject::const_iterator it = json.begin(); it != json.end(); ++it) {
         if (it.key().startsWith(m_docPacks[i].doc->typeName())) {
           docKeyValueList.push_back(qMakePair(it.key(), it.value()));

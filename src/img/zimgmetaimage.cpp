@@ -34,7 +34,7 @@ QStringList ZImgMetaImage::extensions() const
   return res;
 }
 
-void ZImgMetaImage::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock> > > *subBlocks,
+void ZImgMetaImage::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
                              std::vector<size_t> *numPyramidalLevel)
 {
   MetaImage metaImage;

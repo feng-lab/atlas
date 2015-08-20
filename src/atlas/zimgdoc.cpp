@@ -425,7 +425,7 @@ size_t ZImgDoc::loadImg(const QString &fileName, FileFormat format, QString &err
 }
 
 size_t ZImgDoc::loadImg(const QString &fileName, size_t scene, FileFormat format, QString &errorMsg,
-                        size_t numScene, const ZImgInfo *info, const std::vector<std::shared_ptr<ZImgSubBlock> > *subBlock)
+                        size_t numScene, const ZImgInfo *info, const std::vector<std::shared_ptr<ZImgSubBlock>> *subBlock)
 {
   try {
     ZImgSource imgSource(fileName, ZImgRegion(), scene, format);
@@ -467,7 +467,7 @@ size_t ZImgDoc::loadImg(const QStringList &files, Dimension catDim, FileFormat f
 }
 
 size_t ZImgDoc::loadImg(const QStringList &files, Dimension catDim, size_t scene, FileFormat format, QString &errorMsg,
-                        size_t numScene, const ZImgInfo *info, const std::vector<std::shared_ptr<ZImgSubBlock> > *subBlock)
+                        size_t numScene, const ZImgInfo *info, const std::vector<std::shared_ptr<ZImgSubBlock>> *subBlock)
 {
   try {
     ZImgSource imgSource(files, catDim, ZImgRegion(), scene, format);

@@ -127,7 +127,7 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters &globalPara, QObject *par
   }
   const std::vector<ZParameter*>& paras = m_rendererBase.parameters();
   for (size_t i=0; i<paras.size(); i++) {
-    addParameter(paras[i]);
+    addParameter(*paras[i]);
   }
 }
 

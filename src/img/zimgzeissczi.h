@@ -290,7 +290,7 @@ private:
   bool m_shouldSeparateChannelsToDifferentScenes;
   bool m_someTilesAreNot2D;
 
-  std::vector<std::set<CZITile> > m_sceneTiles;
+  std::vector<std::set<CZITile>> m_sceneTiles;
   std::vector<ZVoxelCoordinate> m_sceneStart;
   std::vector<ZVoxelCoordinate> m_sceneEnd;
 };

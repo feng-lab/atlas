@@ -60,7 +60,7 @@ public:
   void subtractPolygon(const QPolygonF& poly);
   void subtractSpline(const QPolygonF& spline);
 
-  void deleteCtrlPoints(const std::map<size_t, std::set<size_t> > &shapeOpIndexToPointIndices);
+  void deleteCtrlPoints(const std::map<size_t, std::set<size_t>> &shapeOpIndexToPointIndices);
   bool addCtrlPoint(const QPointF &pt);
 
   void mergeWith(const ZSliceROI &other);

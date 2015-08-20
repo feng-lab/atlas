@@ -158,7 +158,7 @@ std::map<size_t, ZImageCompositeTransform*> ZImageTransformResolve::resolve(QStr
                                        vertex_index_map(boost::get(&VertexInfo::idx, graph)));
 
   edge_in_MST<Edge> filter(tree);
-  boost::filtered_graph<GraphT, edge_in_MST<Edge> > fg(graph, filter);
+  boost::filtered_graph<GraphT, edge_in_MST<Edge>> fg(graph, filter);
 
   std::vector<Edge> sortedEdges;
   dfs_edge_visitor<Edge> vis(sortedEdges);
@@ -173,7 +173,7 @@ std::map<size_t, ZImageCompositeTransform*> ZImageTransformResolve::resolve(QStr
     bool img2HasLocation = res.find(img2) != res.end();
 
     if (img1HasLocation && !img2HasLocation) {
-      std::map<std::pair<size_t, size_t>, std::pair<const ZImageTransform*, double> >::const_iterator pairIt;
+      std::map<std::pair<size_t, size_t>, std::pair<const ZImageTransform*, double>>::const_iterator pairIt;
       pairIt = m_idxPairs.find(std::make_pair(img1, img2));
       res[img2] = dynamic_cast<ZImageCompositeTransform*>(res[img1]->clone());
       if (pairIt != m_idxPairs.end()) {
@@ -184,7 +184,7 @@ std::map<size_t, ZImageCompositeTransform*> ZImageTransformResolve::resolve(QStr
       }
       summ += QString("%1 connects to %2 with cost %3\n").arg(img1).arg(img2).arg(pairIt->second.second);
     } else if (!img1HasLocation && img2HasLocation) {
-      std::map<std::pair<size_t, size_t>, std::pair<const ZImageTransform*, double> >::const_iterator pairIt;
+      std::map<std::pair<size_t, size_t>, std::pair<const ZImageTransform*, double>>::const_iterator pairIt;
       pairIt = m_idxPairs.find(std::make_pair(img1, img2));
       res[img1] = dynamic_cast<ZImageCompositeTransform*>(res[img2]->clone());
       if (pairIt != m_idxPairs.end())

@@ -32,7 +32,7 @@ protected:
   void constructParameters();
 
 protected:
-  std::deque<std::unique_ptr<ZImageTransform> > m_tfms;
+  std::deque<std::unique_ptr<ZImageTransform>> m_tfms;
 };
 
 } // namespace nim

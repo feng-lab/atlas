@@ -47,28 +47,28 @@ private:
   //  template<typename TVoxel>
   //  void setQImageDataBlockCM(QImage &qim, size_t startLine, size_t endLine,
   //                            const std::vector<size_t>& channels,
-  //                            const std::vector<ZImgVoxelColormap<TVoxel> >& colormaps) const;
+  //                            const std::vector<ZImgVoxelColormap<TVoxel>>& colormaps) const;
 
 #ifndef _USE_QTCONCURRENT_
   template<typename TVoxel>
   void setQImageDataBlockCM(const ZImg *img, QImage *qim, const tbb::blocked_range<size_t> &rowRange,
                             const std::vector<size_t>* channels,
-                            const std::vector<ZImgVoxelColormap<TVoxel> >* colormaps) const;
+                            const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const;
 
   template<typename TVoxel>
   void setQImageDataBlockCMMultAlpha(const ZImg *img, QImage *qim, const tbb::blocked_range<size_t> &rowRange,
                                      const std::vector<size_t>* channels,
-                                     const std::vector<ZImgVoxelColormap<TVoxel> >* colormaps) const;
+                                     const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const;
 #else
   template<typename TVoxel>
   void setQImageDataBlockCM(const ZImg *img, QImage *qim, std::pair<size_t,size_t> rowRange,
                             const std::vector<size_t>* channels,
-                            const std::vector<ZImgVoxelColormap<TVoxel> >* colormaps) const;
+                            const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const;
 
   template<typename TVoxel>
   void setQImageDataBlockCMMultAlpha(const ZImg *img, QImage *qim, std::pair<size_t,size_t> rowRange,
                                      const std::vector<size_t>* channels,
-                                     const std::vector<ZImgVoxelColormap<TVoxel> >* colormaps) const;
+                                     const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const;
 #endif
 
   template<typename TVoxel>
@@ -97,7 +97,7 @@ private:
   const ZImg& m_img;
   mutable size_t m_z;
   mutable size_t m_t;
-  std::map<size_t, std::pair<double,double> > m_channels;
+  std::map<size_t, std::pair<double,double>> m_channels;
   mutable double m_alpha;
 };
 

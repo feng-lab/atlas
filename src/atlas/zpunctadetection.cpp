@@ -499,7 +499,7 @@ MatrixXi ZPunctaDetection::detectSomaPuncta(const Image3DType *preprocessedImage
   Uint8Image3DType::Pointer somaArea = constructBinaryITKImage(somaVoxels, m_img, borderWidth, &minLoc, &size);
 
   typedef itk::SizeValueType LabelType;
-  typedef itk::LabelMap<itk::LabelObject<LabelType, 3> > LabelMapType;
+  typedef itk::LabelMap<itk::LabelObject<LabelType, 3>> LabelMapType;
   typedef itk::Image<LabelType, 3>  LabelImageType;
 
   typename Image3DType::Pointer somaPunctaImage = cropITKImage(preprocessedImage, minLoc, size);
@@ -1005,7 +1005,7 @@ void ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi &voxelLocs, const Eigen:
   Eigen::MatrixXd centroids = meanShiftGaussianCenters(vbgmm, img, z);
   Eigen::VectorXi labels = vbgmm.labels();
 
-  std::vector<std::vector<int> > modelGroups;
+  std::vector<std::vector<int>> modelGroups;
   std::vector<int> group1;
   group1.push_back(0);
   modelGroups.push_back(group1);
