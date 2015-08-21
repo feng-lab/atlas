@@ -384,7 +384,7 @@ void Z3DView::init()
 {
   m_globalParas.setCanvas(m_canvas);
 
-  // processors
+  // filters
   m_compositor = new Z3DCompositor(m_globalParas);
   //ZStringIntOptionParameter* transparentMethod = dynamic_cast<ZStringIntOptionParameter*>(m_compositor->getParameter("Transparency"));
   //if (Z3DGpuInfoInstance.isWeightedAverageSupported())
@@ -406,7 +406,7 @@ void Z3DView::init()
   // pass the canvasrender to the network evaluator
   m_networkEvaluator->setNetworkSink(m_canvasPainter);
 
-  // initializes all connected processors
+  // initializes all connected filters
   m_networkEvaluator->initializeNetwork();
 
   //packages

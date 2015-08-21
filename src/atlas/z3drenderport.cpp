@@ -7,7 +7,7 @@
 namespace nim {
 
 Z3DRenderOutputPort::Z3DRenderOutputPort(const QString &name, bool allowMultipleConnections,
-                                         Z3DProcessor::InvalidationState invalidationState, GLint internalColorFormat, GLint internalDepthFormat)
+                                         Z3DFilter::InvalidationState invalidationState, GLint internalColorFormat, GLint internalDepthFormat)
   : Z3DOutputPortBase(name, allowMultipleConnections, invalidationState)
   , m_resultIsValid(false)
   , m_size(128,128)
@@ -116,7 +116,7 @@ bool Z3DRenderOutputPort::canConnectTo(const Z3DInputPortBase *inport) const
 //-----------------------------------------------------------------------------------
 
 Z3DRenderInputPort::Z3DRenderInputPort(const QString &name, bool allowMultipleConnections,
-                                       Z3DProcessor::InvalidationState invalidationState)
+                                       Z3DFilter::InvalidationState invalidationState)
   : Z3DInputPortBase(name, allowMultipleConnections, invalidationState)
   , m_expectedSize(0)
 {

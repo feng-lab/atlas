@@ -23,7 +23,7 @@ class Z3DRenderOutputPort : public Z3DOutputPortBase
 {
 public:
   Z3DRenderOutputPort(const QString& name, bool allowMultipleConnections = true,
-                      Z3DProcessor::InvalidationState invalidationState = Z3DProcessor::InvalidAllResult,
+                      Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult,
                       GLint internalColorFormat=(GLint)GL_RGBA16, GLint internalDepthFormat=(GLint)GL_DEPTH_COMPONENT24);
   virtual ~Z3DRenderOutputPort();
 
@@ -85,7 +85,7 @@ class Z3DRenderInputPort : public Z3DInputPortBase
 {
 public:
   Z3DRenderInputPort(const QString &name, bool allowMultipleConnections = false,
-                     Z3DProcessor::InvalidationState invalidationState = Z3DProcessor::InvalidAllResult);
+                     Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult);
   virtual ~Z3DRenderInputPort();
 
   virtual bool isReady() const override { return numValidInputs() > 0; }

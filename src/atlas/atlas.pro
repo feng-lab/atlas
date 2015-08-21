@@ -111,7 +111,6 @@ HEADERS += \
     z3dobjview.h \
     z3dimgview.h \
     zviewsettinginterface.h \
-    z3dvolumefilter.h \
     zpunctadoc.h \
     z3dpunctaview.h \
     z3dpunctafilter.h \
@@ -173,7 +172,6 @@ HEADERS += \
     z3dcanvas.h \
     z3dscene.h \
     z3dshadergroup.h \
-    z3dprocessor.h \
     z3dport.h \
     z3drenderport.h \
     z3dglobalparameters.h \
@@ -270,7 +268,9 @@ HEADERS += \
     zregionannotationtreeview.h \
     zbuttoncolumndelegate.h \
     zchooseobjdialog.h \
-    zgraphicsscene.h
+    zgraphicsscene.h \
+    z3dfilter.h \
+    z3dimgfilter.h
 
 SOURCES += \
     main.cpp \
@@ -323,7 +323,6 @@ SOURCES += \
     z3dview.cpp \
     z3dobjview.cpp \
     z3dimgview.cpp \
-    z3dvolumefilter.cpp \
     zpunctadoc.cpp \
     z3dpunctaview.cpp \
     z3dpunctafilter.cpp \
@@ -385,7 +384,6 @@ SOURCES += \
     z3dcanvas.cpp \
     z3dscene.cpp \
     z3dshadergroup.cpp \
-    z3dprocessor.cpp \
     z3dport.cpp \
     z3drenderport.cpp \
     z3dglobalparameters.cpp \
@@ -472,7 +470,9 @@ SOURCES += \
     zregionannotationtreeview.cpp \
     zbuttoncolumndelegate.cpp \
     zchooseobjdialog.cpp \
-    zgraphicsscene.cpp
+    zgraphicsscene.cpp \
+    z3dfilter.cpp \
+    z3dimgfilter.cpp
 
 contains(CONFIG, use_glbinding) {
     include($$PWD/../3rdparty/glbinding.pri)

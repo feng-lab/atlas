@@ -39,7 +39,7 @@ protected:
   // for renderers
   virtual void registerPickingObjects() {}
 
-  Z3DProcessorOutputPort<Z3DGeometryFilter> m_outPort;
+  Z3DFilterOutputPort<Z3DGeometryFilter> m_outPort;
 
   ZBoolParameter m_stayOnTop;
 

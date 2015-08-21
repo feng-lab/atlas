@@ -1,5 +1,5 @@
-#ifndef Z3DVOLUMEFILTER_H
-#define Z3DVOLUMEFILTER_H
+#ifndef Z3DIMGFILTER_H
+#define Z3DIMGFILTER_H
 
 #include "z3dboundedfilter.h"
 
@@ -24,13 +24,13 @@ namespace nim {
 class ZImg;
 class ZMesh;
 
-class Z3DVolumeFilter : public Z3DBoundedFilter
+class Z3DImgFilter : public Z3DBoundedFilter
 {
   Q_OBJECT
   friend class Z3DCompositor;
 public:
-  explicit Z3DVolumeFilter(Z3DGlobalParameters &globalParas, QObject *parent = nullptr);
-  ~Z3DVolumeFilter();
+  explicit Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent = nullptr);
+  ~Z3DImgFilter();
 
   void setVisible(bool v) { m_visible.set(v); }
   void setOffset(double x, double y, double z);
@@ -151,7 +151,7 @@ private:
   Z3DRenderOutputPort m_outport;
   Z3DRenderOutputPort m_leftEyeOutport;
   Z3DRenderOutputPort m_rightEyeOutport;
-  Z3DProcessorOutputPort<Z3DVolumeFilter> m_vPPort;
+  Z3DFilterOutputPort<Z3DImgFilter> m_vPPort;
 
   static const size_t m_maxNumOfFullResolutionVolumeSlice;
   // each channel is represented by a Z3DVolume
@@ -187,4 +187,4 @@ private:
 
 } // namespace nim
 
-#endif // Z3DVOLUMEFILTER_H
+#endif // Z3DIMGFILTER_H

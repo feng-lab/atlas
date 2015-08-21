@@ -2,7 +2,7 @@
 #define Z3DPORT_H
 
 #include "QsLog.h"
-#include "z3dprocessor.h"
+#include "z3dfilter.h"
 
 #include <vector>
 
@@ -12,25 +12,25 @@ class Z3DPort
 {
 public:
   Z3DPort(const QString &name, bool allowMultipleConnections = false,
-          Z3DProcessor::InvalidationState invalidationState = Z3DProcessor::InvalidAllResult);
+          Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult);
   virtual ~Z3DPort();
 
   bool allowMultipleConnections() const { return m_allowMultipleConnections; }
 
-  // return the processor this port belongs to.
-  Z3DProcessor* processor() const { return m_processor; }
+  // return the filter this port belongs to.
+  Z3DFilter* filter() const { return m_filter; }
 
   QString name() const { return m_name; }
 
-  virtual void setProcessor(Z3DProcessor* p);
+  virtual void setFilter(Z3DFilter* p);
 
 protected:
   QString m_name;
-  Z3DProcessor* m_processor;
+  Z3DFilter* m_filter;
   bool m_allowMultipleConnections;
 
-  // how changes from this port affect its processor
-  Z3DProcessor::InvalidationState m_invalidationState;
+  // how changes from this port affect its filter
+  Z3DFilter::InvalidationState m_invalidationState;
 };
 
 class Z3DOutputPortBase;
@@ -39,10 +39,10 @@ class Z3DInputPortBase : public Z3DPort
 {
 public:
   Z3DInputPortBase(const QString &name, bool allowMultipleConnections = false,
-                   Z3DProcessor::InvalidationState invalidationState = Z3DProcessor::InvalidAllResult);
+                   Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult);
   virtual ~Z3DInputPortBase();
 
-  // invalidate processor with the given InvalidationState and set hasChanged=true.
+  // invalidate filter with the given InvalidationState and set hasChanged=true.
   void invalidate();
   // has the data in this port changed since the last process() call?
   bool hasChanged() const { return m_hasChanged; }
@@ -71,7 +71,7 @@ class Z3DOutputPortBase : public Z3DPort
 {
 public:
   Z3DOutputPortBase(const QString &name, bool allowMultipleConnections = true,
-                    Z3DProcessor::InvalidationState invalidationState = Z3DProcessor::InvalidAllResult);
+                    Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult);
 
   virtual ~Z3DOutputPortBase();
 
@@ -89,7 +89,7 @@ public:
 
   bool isConnectedTo(const Z3DInputPortBase* port) const;
 
-  // returns whether the port is ready to be used by its owning processor.
+  // returns whether the port is ready to be used by its owning filter.
   // return true if the port is connected.
   virtual bool isReady() const { return isConnected(); }
 
@@ -110,7 +110,7 @@ class Z3DOutputPort : public Z3DOutputPortBase
 {
 public:
   Z3DOutputPort(const QString& name, bool allowMultipleConnections = true,
-                Z3DProcessor::InvalidationState invalidationState = Z3DProcessor::InvalidAllResult)
+                Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult)
     : Z3DOutputPortBase(name, allowMultipleConnections, invalidationState)
     , m_portData(0)
     , m_ownsData(false)
@@ -170,7 +170,7 @@ class Z3DInputPort : public Z3DInputPortBase
 {
 public:
   Z3DInputPort(const QString& name, bool allowMultipleConnections = true,
-               Z3DProcessor::InvalidationState invalidationState = Z3DProcessor::InvalidAllResult)
+               Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult)
     : Z3DInputPortBase(name, allowMultipleConnections, invalidationState)
   {}
 
@@ -218,29 +218,29 @@ public:
 
 
 template <typename T>
-class Z3DProcessorInputPort : public Z3DInputPortBase
+class Z3DFilterInputPort : public Z3DInputPortBase
 {
 public:
-  Z3DProcessorInputPort(const QString& name, bool allowMultipleConnections = true,
-                        Z3DProcessor::InvalidationState invalidationState = Z3DProcessor::InvalidAllResult)
+  Z3DFilterInputPort(const QString& name, bool allowMultipleConnections = true,
+                        Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult)
     : Z3DInputPortBase(name, allowMultipleConnections, invalidationState)
   {
   }
 
-  std::vector<T*> connectedProcessors() const
+  std::vector<T*> connectedFilters() const
   {
-    std::vector<T*> processors;
+    std::vector<T*> filters;
     for (size_t i = 0; i < m_connectedOutputPorts.size(); ++i) {
-      T* p = static_cast<T*>(m_connectedOutputPorts[i]->processor());
-      processors.push_back(p);
+      T* p = static_cast<T*>(m_connectedOutputPorts[i]->filter());
+      filters.push_back(p);
     }
-    return processors;
+    return filters;
   }
 
-  T* firstConnectedProcessor() const
+  T* firstConnectedFilter() const
   {
     if (isConnected())
-      return static_cast<T*>(m_connectedOutputPorts[0]->processor());
+      return static_cast<T*>(m_connectedOutputPorts[0]->filter());
     else
       return 0;
   }
@@ -249,33 +249,33 @@ public:
 };
 
 template <typename T>
-class Z3DProcessorOutputPort : public Z3DOutputPortBase
+class Z3DFilterOutputPort : public Z3DOutputPortBase
 {
 public:
-  Z3DProcessorOutputPort(const QString& name, bool allowMultipleConnections = false,
-                         Z3DProcessor::InvalidationState invalidationState = Z3DProcessor::InvalidAllResult)
+  Z3DFilterOutputPort(const QString& name, bool allowMultipleConnections = false,
+                         Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult)
     : Z3DOutputPortBase(name, allowMultipleConnections, invalidationState)
   {
   }
 
   virtual bool canConnectTo(const Z3DInputPortBase* inport) const override
   {
-    if (dynamic_cast<const Z3DProcessorInputPort<T>*>(inport))
+    if (dynamic_cast<const Z3DFilterInputPort<T>*>(inport))
       return Z3DOutputPortBase::canConnectTo(inport);
     else
       return false;
   }
 
-  // data is processor itself, so it is always valid
+  // data is filter itself, so it is always valid
   virtual bool hasValidData() const override { return true; }
 
 protected:
-  virtual void setProcessor(Z3DProcessor *p) override
+  virtual void setFilter(Z3DFilter *p) override
   {
-    Z3DOutputPortBase::setProcessor(p);
+    Z3DOutputPortBase::setFilter(p);
     T* tp = dynamic_cast<T*>(p);
     if (!tp) {
-      LERROR() << "Port" << name() << "attached to processor of wrong type" << p->className();
+      LERROR() << "Port" << name() << "attached to filter of wrong type" << p->className();
     }
   }
 };

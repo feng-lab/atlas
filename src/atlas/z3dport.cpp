@@ -3,9 +3,9 @@
 
 namespace nim {
 
-Z3DPort::Z3DPort(const QString& name, bool allowMultipleConnections, Z3DProcessor::InvalidationState invalidationState)
+Z3DPort::Z3DPort(const QString& name, bool allowMultipleConnections, Z3DFilter::InvalidationState invalidationState)
   : m_name(name)
-  , m_processor(NULL)
+  , m_filter(NULL)
   , m_allowMultipleConnections(allowMultipleConnections)
   , m_invalidationState(invalidationState)
 {
@@ -15,12 +15,12 @@ Z3DPort::~Z3DPort()
 {
 }
 
-void Z3DPort::setProcessor(Z3DProcessor *p)
+void Z3DPort::setFilter(Z3DFilter *p)
 {
-  m_processor = p;
+  m_filter = p;
 }
 
-Z3DInputPortBase::Z3DInputPortBase(const QString &name, bool allowMultipleConnections, Z3DProcessor::InvalidationState invalidationState)
+Z3DInputPortBase::Z3DInputPortBase(const QString &name, bool allowMultipleConnections, Z3DFilter::InvalidationState invalidationState)
   : Z3DPort(name, allowMultipleConnections, invalidationState)
 {
 }
@@ -33,7 +33,7 @@ Z3DInputPortBase::~Z3DInputPortBase()
 void Z3DInputPortBase::invalidate()
 {
   m_hasChanged = true;
-  processor()->invalidate(m_invalidationState);
+  filter()->invalidate(m_invalidationState);
 }
 
 bool Z3DInputPortBase::isConnectedTo(const Z3DOutputPortBase *port) const
@@ -66,7 +66,7 @@ void Z3DInputPortBase::disconnectAll()
 }
 
 
-Z3DOutputPortBase::Z3DOutputPortBase(const QString &name, bool allowMultipleConnections, Z3DProcessor::InvalidationState invalidationState)
+Z3DOutputPortBase::Z3DOutputPortBase(const QString &name, bool allowMultipleConnections, Z3DFilter::InvalidationState invalidationState)
   : Z3DPort(name, allowMultipleConnections, invalidationState)
 {
 }
@@ -87,7 +87,7 @@ bool Z3DOutputPortBase::canConnectTo(const Z3DInputPortBase *inport) const
   if ((inport->allowMultipleConnections() == false) && inport->isConnected())
     return false;
 
-  if (processor() == inport->processor())
+  if (filter() == inport->filter())
     return false;
 
   return true;

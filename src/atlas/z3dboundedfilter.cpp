@@ -10,7 +10,7 @@
 namespace nim {
 
 Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters &globalPara, QObject *parent)
-  : Z3DProcessor(parent)
+  : Z3DFilter(parent)
   , m_rendererBase(globalPara)
   , m_baseBoundBoxRenderer(m_rendererBase)
   , m_selectionBoundBoxRenderer(m_rendererBase)

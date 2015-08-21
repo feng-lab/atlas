@@ -1,5 +1,5 @@
-#ifndef Z3DPROCESSOR_H
-#define Z3DPROCESSOR_H
+#ifndef Z3DFILTER_H
+#define Z3DFILTER_H
 
 #include <QObject>
 #include <vector>
@@ -23,15 +23,15 @@ class Z3DTexture;
 class Z3DShaderProgram;
 class ZVertexArrayObject;
 
-class Z3DProcessor : public QObject, public Z3DCanvasEventListener
+class Z3DFilter : public QObject, public Z3DCanvasEventListener
 {
   Q_OBJECT
 
   friend class Z3DNetworkEvaluator;
 
 public:
-  // specifies the invalidation status of the processor.
-  // The networkEvaluator use this value to mark processors that has to be processed
+  // specifies the invalidation status of the filter.
+  // The networkEvaluator use this value to mark filters that has to be executed
   enum ___InvalidationState {
     Valid = 0x00,
     InvalidMonoViewResult = 0x01,
@@ -42,8 +42,8 @@ public:
   };
   Q_DECLARE_FLAGS(InvalidationState, ___InvalidationState)
 
-  Z3DProcessor(QObject *parent = NULL);
-  virtual ~Z3DProcessor();
+  Z3DFilter(QObject *parent = NULL);
+  virtual ~Z3DFilter();
 
   QString className() const {return metaObject()->className();}
   void setName(const QString& name) { m_name = name; }
@@ -86,19 +86,19 @@ public slots:
   inline void invalidateResult() { invalidate(InvalidAllResult); }
 
 protected:
-  // mark that the output of current processor for certain eye is valid.
+  // mark that the output of current filter for certain eye is valid.
   // if process function (e.g. prepare data) is not related to stereo view or mono view, you should rewrite this
-  // function in subclass and set the invalidstate to VALID to avoid being processed again for
+  // function in subclass and set the invalidstate to VALID to avoid being executed again for
   // a different eye parameter
   // this function will be called by networkevaluator after process(eye) is called
   virtual void setValid(Z3DEye eye);
 
-  // return true if the output of current processor for certain eye is valid.
+  // return true if the output of current filter for certain eye is valid.
   // will be used by networkevalutor to decide whether is neccessary to call process(eye)
   virtual bool isValid(Z3DEye eye) const;
 
-  // returns true if processor is ready to do rendering
-  // The default implementation checks, whether the processor has been initialized and
+  // returns true if filter is ready to do rendering
+  // The default implementation checks, whether the filter has been initialized and
   // all input ports and output ports are ready. This is not always necessary since not all
   // input or output ports are needed depending on rendering context.
   virtual bool isReady(Z3DEye eye) const;
@@ -132,8 +132,8 @@ protected:
   static void renderScreenQuad(const ZVertexArrayObject &vao, const Z3DShaderProgram &shader);
 
 signals:
-  // emit this only if resize starts from current processor.
-  void requestUpstreamSizeChange(Z3DProcessor*);
+  // emit this only if resize starts from current filter.
+  void requestUpstreamSizeChange(Z3DFilter*);
 
 public slots:
   // 1. for each outport, get all expected size from all connected inports, and use the maximum one
@@ -158,9 +158,9 @@ protected:
   std::vector<ZParameter*> m_parameters;
   std::set<QString> m_parameterNames;
 
-  // input the processor expects.
+  // input the filter expects.
   std::vector<Z3DInputPortBase*> m_inputPorts;
-  // output the processor generates.
+  // output the filter generates.
   std::vector<Z3DOutputPortBase*> m_outputPorts;
   // private port for intermediate rendering
   std::vector<Z3DRenderOutputPort*> m_privateRenderPorts;
@@ -173,7 +173,7 @@ protected:
 };
 
 template<class T>
-std::vector<T*> Z3DProcessor::parametersOfType() const {
+std::vector<T*> Z3DFilter::parametersOfType() const {
   std::vector<T*> result;
   for (size_t i=0; i<m_parameters.size(); ++i) {
     if (dynamic_cast<T*>(m_parameters[i]))
@@ -182,8 +182,8 @@ std::vector<T*> Z3DProcessor::parametersOfType() const {
   return result;
 }
 
-Q_DECLARE_OPERATORS_FOR_FLAGS(Z3DProcessor::InvalidationState)
+Q_DECLARE_OPERATORS_FOR_FLAGS(Z3DFilter::InvalidationState)
 
 } // namespace nim
 
-#endif // Z3DPROCESSOR_H
+#endif // Z3DFILTER_H

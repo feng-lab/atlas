@@ -1,7 +1,7 @@
 #ifndef Z3DBOUNDEDFILTER_H
 #define Z3DBOUNDEDFILTER_H
 
-#include "z3dprocessor.h"
+#include "z3dfilter.h"
 #include "z3dtransferfunction.h"
 #include "z3dlinerenderer.h"
 #include "z3dmeshrenderer.h"
@@ -12,7 +12,7 @@ namespace nim {
 
 // child class should implement two pure virtual function and call updateBoundBox whenever its
 // own parameter affect bound box
-class Z3DBoundedFilter : public Z3DProcessor
+class Z3DBoundedFilter : public Z3DFilter
 {
   Q_OBJECT
 public:

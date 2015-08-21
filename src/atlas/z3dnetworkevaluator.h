@@ -12,17 +12,17 @@
 
 namespace nim {
 
-class Z3DProcessor;
+class Z3DFilter;
 class Z3DCanvasPainter;
 class Z3DOutputPortBase;
 class Z3DInputPortBase;
 
-class Z3DProcessWrapper
+class Z3DFilterWrapper
 {
 public:
-  virtual ~Z3DProcessWrapper() {}
-  virtual void beforeProcess(const Z3DProcessor*) {}
-  virtual void afterProcess(const Z3DProcessor*) {}
+  virtual ~Z3DFilterWrapper() {}
+  virtual void beforeFilterProcess(const Z3DFilter*) {}
+  virtual void afterFilterProcess(const Z3DFilter*) {}
   virtual void beforeNetworkProcess() {}
   virtual void afterNetworkProcess() {}
 };
@@ -41,17 +41,11 @@ public:
   void setNetworkSink(Z3DCanvasPainter* canvasPainter);
 
   // process the currently assigned network. The rendering order is determined internally
-  // according the network topology and the invalidation levels of the processors.
+  // according the network topology and the invalidation levels of the filters.
   // stereo means run two passes for left and right eye
   void process(bool stereo = false);
 
   void initializeNetwork();
-
-  // Manage ProcessWrappers which will be called before and after Processor::process()
-  // networkevaluator will take ownership of the passed Z3DProcessWrapper object
-  void addProcessWrapper(Z3DProcessWrapper* w);
-  void removeProcessWrapper(const Z3DProcessWrapper* w);
-  void clearProcessWrappers();
 
 public slots:
   // call when network topology changed
@@ -61,20 +55,20 @@ protected:
   void buildNetwork();
 
   // Locks the evaluator. In this state, it does not perform
-  // any operations, such as initializing or processing, on the processor network
+  // any operations, such as initializing or processing, on the filter network
   void lock() { m_locked = true; }
   void unlock() { m_locked = false; }
 
   inline void getGLFocus() const { if (m_openGLContext) m_openGLContext->getGLFocus(); }
 
 protected slots:
-  // update all upstream renderprocessor size. If input renderProcessor is NULL, update all renderProcessor
-  void sizeChangedFromProcessor(Z3DProcessor *rp = 0);
+  // update size of all upstream filters. If input filter is NULL, update all filters
+  void sizeChangedFromFilter(Z3DFilter *rp = 0);
 
 private:
-  std::vector<Z3DProcessor*> m_renderingOrder;
+  std::vector<Z3DFilter*> m_renderingOrder;
 
-  std::vector<Z3DProcessWrapper*> m_processWrappers;
+  std::vector<std::unique_ptr<Z3DFilterWrapper>> m_filterWrappers;
 
   // used to make sure we operate in the correct opengl context
   Z3DCanvas* m_openGLContext;
@@ -86,9 +80,9 @@ private:
   Z3DCanvasPainter *m_canvasPainter;
 
   struct VertexInfo {
-    VertexInfo() : processor(0) {}
-    VertexInfo(Z3DProcessor* p) : processor(p) {}
-    Z3DProcessor *processor;
+    VertexInfo() : filter(0) {}
+    VertexInfo(Z3DFilter* p) : filter(p) {}
+    Z3DFilter *filter;
     //
   };
 
@@ -101,29 +95,30 @@ private:
   typedef boost::adjacency_list<boost::listS, boost::vecS, boost::bidirectionalS, VertexInfo, EdgeInfo> GraphT;
   typedef boost::graph_traits<GraphT>::vertex_descriptor Vertex;
   typedef boost::graph_traits<GraphT>::edge_descriptor Edge;
-  std::map<Z3DProcessor*, Vertex> m_processorToVertexMapper;
-  GraphT m_processorGraph;
+  std::map<Z3DFilter*, Vertex> m_filterToVertexMapper;
+  GraphT m_filterGraph;
 
-  std::vector<Z3DProcessor*> m_reverseSortedRenderProcessors;
+  std::vector<Z3DFilter*> m_reverseSortedFilters;
 };
 
 // check if OpenGL state conforms to default settings. Log a warning message if not.
-class Z3DCheckOpenGLStateProcessWrapper : public Z3DProcessWrapper
+class Z3DCheckOpenGLStateFilterWrapper : public Z3DFilterWrapper
 {
 public:
-  void afterProcess(const Z3DProcessor *p);
-  void beforeNetworkProcess();
-  void checkState(const Z3DProcessor *p = 0);
-  void warn(const Z3DProcessor *p, const QString &message);
+  void afterFilterProcess(const Z3DFilter *p) override;
+  void beforeNetworkProcess() override;
+private:
+  void checkState(const Z3DFilter *p = 0);
+  void warn(const Z3DFilter *p, const QString &message);
 };
 
-// profile each process and whole network
-class Z3DProfileProcessWrapper : public Z3DProcessWrapper
+// profile each filter and whole network
+class Z3DProfileFilterWrapper : public Z3DFilterWrapper
 {
   ZBenchTimer m_benchTimer;
 public:
-  void beforeProcess(const Z3DProcessor*) override;
-  void afterProcess(const Z3DProcessor *p) override;
+  void beforeFilterProcess(const Z3DFilter*) override;
+  void afterFilterProcess(const Z3DFilter *p) override;
   void beforeNetworkProcess() override;
   void afterNetworkProcess() override;
 };
