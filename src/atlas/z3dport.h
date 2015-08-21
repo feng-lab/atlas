@@ -61,10 +61,15 @@ public:
   void disconnect(Z3DOutputPortBase* outport);
   void disconnectAll();
 
+  void setExpectedSize(glm::ivec2 size) { m_expectedSize = size; }
+  glm::ivec2 expectedSize() const { return m_expectedSize; }
+
 protected:
   friend class Z3DOutputPortBase;
   std::vector<Z3DOutputPortBase*> m_connectedOutputPorts;
   bool m_hasChanged;
+
+  glm::ivec2 m_expectedSize;
 };
 
 class Z3DOutputPortBase : public Z3DPort
@@ -100,8 +105,16 @@ public:
   void disconnect(Z3DInputPortBase* inport);
   void disconnectAll();
 
+  glm::ivec2 size() const { return m_size; }
+  // return the maximum of expectesize of all connected inports.
+  // If no inport connected, return (-1, -1)
+  glm::ivec2 expectedSize() const;
+  virtual void resize(const glm::ivec2& newsize) { m_size = newsize; }
+
 protected:
   std::vector<Z3DInputPortBase*> m_connectedInputPorts;
+
+  glm::ivec2 m_size;
 };
 
 template<class T> class Z3DInputPort;

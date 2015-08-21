@@ -358,33 +358,25 @@ void Z3DFilter::updateSize()
   // 1. update outport size
   bool resized = false;
 
-  const std::vector<Z3DOutputPortBase*> outports = outputPorts();
   glm::ivec2 maxOutportSize(-1, -1);
-  for(size_t i=0; i<outports.size(); ++i) {
-    Z3DRenderOutputPort* rp = dynamic_cast<Z3DRenderOutputPort*>(outports[i]);
-    if (rp) {
-      glm::ivec2 outportSize = rp->expectedSize();
-      if (outportSize.x > 0 && outportSize != rp->size()) {
-        resized = true;
-        rp->resize(outportSize);
-      }
-
-      maxOutportSize = glm::max(maxOutportSize, rp->size());
+  for(size_t i=0; i<m_outputPorts.size(); ++i) {
+    glm::ivec2 outportSize = m_outputPorts[i]->expectedSize();
+    if (outportSize.x > 0 && outportSize != m_outputPorts[i]->size()) {
+      resized = true;
+      m_outputPorts[i]->resize(outportSize);
     }
+
+    maxOutportSize = glm::max(maxOutportSize, m_outputPorts[i]->size());
   }
 
   // 2. update private ports
-  const std::vector<Z3DRenderOutputPort*> privatePorts = privateRenderPorts();
-  for (size_t i=0; i<privatePorts.size(); ++i) {
-    privatePorts[i]->resize(maxOutportSize);
+  for (size_t i=0; i<m_privateRenderPorts.size(); ++i) {
+    m_privateRenderPorts[i]->resize(maxOutportSize);
   }
 
   // 3. update inport expected size
-  const std::vector<Z3DInputPortBase*> inports = inputPorts();
-  for (size_t i=0; i<inports.size(); i++) {
-    Z3DRenderInputPort *renderInport = dynamic_cast< Z3DRenderInputPort* >(inports[i]);
-    if (renderInport)
-      renderInport->setExpectedSize(maxOutportSize);
+  for (size_t i=0; i<m_inputPorts.size(); i++) {
+    m_inputPorts[i]->setExpectedSize(maxOutportSize);
   }
 
   invalidate();

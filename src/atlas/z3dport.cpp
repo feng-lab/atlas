@@ -22,6 +22,7 @@ void Z3DPort::setFilter(Z3DFilter *p)
 
 Z3DInputPortBase::Z3DInputPortBase(const QString &name, bool allowMultipleConnections, Z3DFilter::InvalidationState invalidationState)
   : Z3DPort(name, allowMultipleConnections, invalidationState)
+  , m_expectedSize(0)
 {
 }
 
@@ -68,6 +69,7 @@ void Z3DInputPortBase::disconnectAll()
 
 Z3DOutputPortBase::Z3DOutputPortBase(const QString &name, bool allowMultipleConnections, Z3DFilter::InvalidationState invalidationState)
   : Z3DPort(name, allowMultipleConnections, invalidationState)
+  , m_size(128,128)
 {
 }
 
@@ -133,6 +135,15 @@ void Z3DOutputPortBase::disconnectAll()
   while (!m_connectedInputPorts.empty()) {
     m_connectedInputPorts[0]->disconnect(this);
   }
+}
+
+glm::ivec2 Z3DOutputPortBase::expectedSize() const
+{
+  glm::ivec2 result(-1, -1);
+  for (size_t j=0; j<m_connectedInputPorts.size(); ++j) {
+    result = glm::max(result, m_connectedInputPorts[j]->expectedSize());
+  }
+  return result;
 }
 
 } // namespace nim

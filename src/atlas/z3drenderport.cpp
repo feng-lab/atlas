@@ -10,7 +10,6 @@ Z3DRenderOutputPort::Z3DRenderOutputPort(const QString &name, bool allowMultiple
                                          Z3DFilter::InvalidationState invalidationState, GLint internalColorFormat, GLint internalDepthFormat)
   : Z3DOutputPortBase(name, allowMultipleConnections, invalidationState)
   , m_resultIsValid(false)
-  , m_size(128,128)
   , m_internalColorFormat(internalColorFormat)
   , m_internalDepthFormat(internalDepthFormat)
   , m_multisample(false)
@@ -37,20 +36,6 @@ void Z3DRenderOutputPort::clearTarget()
     LERROR() << "RenderTarget is not bound, can not clear.";
   else
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-}
-
-glm::ivec2 Z3DRenderOutputPort::expectedSize() const
-{
-  glm::ivec2 result(-1, -1);
-  const std::vector<Z3DInputPortBase*> inports = connected();
-  for (size_t j=0; j<inports.size(); ++j) {
-    Z3DRenderInputPort *renderInport = dynamic_cast< Z3DRenderInputPort* >(inports[j]);
-    if (renderInport)
-      result = glm::max(result, renderInport->expectedSize());
-    else
-      LFATAL() << "This should not happen..";
-  }
-  return result;
 }
 
 Z3DTexture *Z3DRenderOutputPort::colorTexture()
@@ -118,7 +103,6 @@ bool Z3DRenderOutputPort::canConnectTo(const Z3DInputPortBase *inport) const
 Z3DRenderInputPort::Z3DRenderInputPort(const QString &name, bool allowMultipleConnections,
                                        Z3DFilter::InvalidationState invalidationState)
   : Z3DInputPortBase(name, allowMultipleConnections, invalidationState)
-  , m_expectedSize(0)
 {
 }
 

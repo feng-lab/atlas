@@ -40,13 +40,6 @@ public:
 
   virtual bool hasValidData() const override { return m_resultIsValid; }
 
-  // returns the dimensions of the associated RenderTarget
-  glm::ivec2 size() const { return m_renderTarget.size(); }
-
-  // return the maximum of expectesize of all connected inports.
-  // If no inport connected, return (-1, -1)
-  glm::ivec2 expectedSize() const;
-
   // Returns true, if the associated RenderTarget is currently bound.
   bool isBound() const { return m_renderTarget.isBound(); }
 
@@ -57,8 +50,7 @@ public:
   Z3DTexture* depthTexture();
 
   // Resizes the associated RenderTarget to the passed dimensions.
-  void resize(const glm::ivec2& newsize);
-  void resize(int x, int y) { resize(glm::ivec2(x,y)); }
+  virtual void resize(const glm::ivec2& newsize) override;
 
   // change RenderTarget with the given format.
   void changeColorFormat(GLint internalColorFormat);
@@ -70,7 +62,6 @@ public:
 
 private:
   bool m_resultIsValid;
-  glm::ivec2 m_size;
 
   GLint m_internalColorFormat;
   GLint m_internalDepthFormat;
@@ -90,9 +81,6 @@ public:
 
   virtual bool isReady() const override { return numValidInputs() > 0; }
 
-  void setExpectedSize(glm::ivec2 size) { m_expectedSize = size; }
-  glm::ivec2 expectedSize() const { return m_expectedSize; }
-
   // go through all connected output render ports and count how many have valid rendering
   size_t numValidInputs() const;
 
@@ -104,8 +92,6 @@ public:
 
 private:
   const Z3DRenderTarget* renderTarget(size_t idx) const;
-
-  glm::ivec2 m_expectedSize;
 };
 
 } // namespace nim
