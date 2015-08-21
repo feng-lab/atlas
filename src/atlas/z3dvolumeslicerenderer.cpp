@@ -7,6 +7,7 @@ namespace nim {
 
 Z3DVolumeSliceRenderer::Z3DVolumeSliceRenderer(Z3DRendererBase &rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
+  , m_VAO(1)
 {
   m_volumeSliceShader.bindFragDataLocation(0, "FragData0");
   m_volumeSliceShader.loadFromSourceFile("transform_with_3dtexture.vert", "volume_slice_with_colormap.frag", m_rendererBase.generateHeader() + generateHeader());
@@ -109,7 +110,7 @@ void Z3DVolumeSliceRenderer::render(Z3DEye eye)
   bindVolumes(m_volumeSliceShader);
 
   for (size_t i=0; i<m_quads.size(); ++i)
-    renderTriangleList(m_volumeSliceShader, m_quads[i]);
+    renderTriangleList(m_VAO, m_volumeSliceShader, m_quads[i]);
 
   m_volumeSliceShader.release();
 }

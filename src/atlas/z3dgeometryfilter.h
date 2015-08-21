@@ -20,7 +20,6 @@ public:
   void setStayOnTop(bool s) { m_stayOnTop.set(s); }
 
   glm::mat4 coordTransform() const {return m_rendererBase.coordTransform();}
-  void translate(float x, float y, float z) { m_rendererBase.translate(x, y, z); }
   float opacity() const {return m_rendererBase.opacity();}
   void setOpacity(float v) { m_rendererBase.setOpacity(v); }
   float sizeScale() const {return m_rendererBase.sizeScale();}

@@ -68,6 +68,7 @@ protected:
   std::vector<glm::vec2> m_fontTextureCoords;
   std::vector<GLuint> m_indexs;
 
+  ZVertexArrayObject m_VAO;
   ZVertexBufferObject m_VBOs;
   ZVertexBufferObject m_pickingVBOs;
   bool m_dataChanged;

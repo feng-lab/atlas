@@ -18,6 +18,8 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase &rendererBase)
   , m_srcLineWidth(1)
   , m_enableMultisample(true)
   , m_texture(NULL)
+  , m_VAO(1)
+  , m_pickingVAO(1)
   , m_VBOs(2)
   , m_pickingVBOs(2)
   , m_dataChanged(false)
@@ -254,10 +256,10 @@ float Z3DLineRenderer::lineWidth() const
 {
   if (m_followSizeScale) {
     if (m_useSmoothLine)
-      return std::max(1.f, m_lineWidth * sizeScale());
+      return std::max(1.f, m_lineWidth * m_rendererBase.sizeScale());
     else
       return std::min(Z3DGpuInfoInstance.maxAliasedLineWidth(),
-                      std::max(sizeScale() * m_lineWidth,
+                      std::max(m_rendererBase.sizeScale() * m_lineWidth,
                                Z3DGpuInfoInstance.minAliasedLineWidth()));
   } else {
     if (m_useSmoothLine)

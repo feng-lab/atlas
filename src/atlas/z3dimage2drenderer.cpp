@@ -8,6 +8,7 @@ namespace nim {
 Z3DImage2DRenderer::Z3DImage2DRenderer(Z3DRendererBase &rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_image2DShader()
+  , m_VAO(1)
 {
   m_image2DShader.bindFragDataLocation(0, "FragData0");
   m_image2DShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_colormap.frag", m_rendererBase.generateHeader() + generateHeader());
@@ -110,7 +111,7 @@ void Z3DImage2DRenderer::render(Z3DEye eye)
   bindVolumes(m_image2DShader);
 
   for (size_t i=0; i<m_quads.size(); ++i)
-    renderTriangleList(m_image2DShader, m_quads[i]);
+    renderTriangleList(m_VAO, m_image2DShader, m_quads[i]);
 
   m_image2DShader.release();
 }

@@ -168,7 +168,6 @@ HEADERS += \
     z3darrowrenderer.h \
     z3drendererbase.h \
     z3dprimitiverenderer.h \
-    z3drenderprocessor.h \
     z3dcanvaspainter.h \
     z3dnetworkevaluator.h \
     z3dcanvas.h \
@@ -381,7 +380,6 @@ SOURCES += \
     z3dbackgroundrenderer.cpp \
     z3darrowrenderer.cpp \
     z3drendererbase.cpp \
-    z3drenderprocessor.cpp \
     z3dcanvaspainter.cpp \
     z3dnetworkevaluator.cpp \
     z3dcanvas.cpp \

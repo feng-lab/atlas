@@ -12,6 +12,7 @@ Z3DTextureCopyRenderer::Z3DTextureCopyRenderer(Z3DRendererBase &rendererBase, Ou
   , m_copyTextureShaderGrp(rendererBase)
   , m_discardTransparent(false)
   , m_mode(mode)
+  , m_VAO(1)
 {
   QStringList allshaders;
   allshaders << "pass.vert" << "copyimage_func.frag";
@@ -51,7 +52,7 @@ void Z3DTextureCopyRenderer::render(Z3DEye eye)
   shader.bindTexture("color_texture", m_colorTexture);
   shader.bindTexture("depth_texture", m_depthTexture);
 
-  renderScreenQuad(shader);
+  renderScreenQuad(m_VAO, shader);
   m_copyTextureShaderGrp.release();
 }
 

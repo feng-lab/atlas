@@ -68,9 +68,6 @@ public:
 
   //void setMultisample(bool multisample, int nsample = 4);
 
-public:
-  virtual void setProcessor(Z3DProcessor *p) override;
-
 private:
   bool m_resultIsValid;
   glm::ivec2 m_size;
@@ -104,9 +101,6 @@ public:
   glm::ivec2 size(size_t idx = 0) const;
   const Z3DTexture* colorTexture(size_t idx = 0) const;
   const Z3DTexture* depthTexture(size_t idx = 0) const;
-
-protected:
-  virtual void setProcessor(Z3DProcessor *p) override;
 
 private:
   const Z3DRenderTarget* renderTarget(size_t idx) const;

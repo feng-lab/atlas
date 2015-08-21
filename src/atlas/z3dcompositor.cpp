@@ -12,7 +12,7 @@ namespace nim {
 //#define USE_RECT_TEX
 
 Z3DCompositor::Z3DCompositor(Z3DGlobalParameters &globalParas, QObject *parent)
-  : Z3DRenderProcessor(globalParas, parent)
+  : Z3DBoundedFilter(globalParas, parent)
   , m_alphaBlendRenderer(m_rendererBase, "DepthTestBlending")
   , m_firstOnTopBlendRenderer(m_rendererBase, "FirstOnTopBlending")
   , m_firstOnTopRenderer(m_rendererBase, "FirstOnTop")
@@ -50,6 +50,7 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters &globalParas, QObject *parent)
   , m_axisRegionRatio("Axis Region Ratio", .2f, .1f, 1.f)
   , m_axisMode("Mode")
   , m_axisWidgetsGroup(NULL)
+  , m_screenQuadVAO(1)
 {
   addParameter(m_showBackground);
   //addParameter(m_renderGeometries);
@@ -979,7 +980,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*> &f
     m_rendererBase.setViewport(m_ddpRT->size());
     m_rendererBase.setGlobalShaderParameters(m_ddpBlendShader, eye);
 #endif
-    renderScreenQuad(m_ddpBlendShader);
+    renderScreenQuad(m_screenQuadVAO, m_ddpBlendShader);
     m_ddpBlendShader.release();
 
     CHECK_GL_ERROR;
@@ -1028,7 +1029,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*> &f
   m_rendererBase.setViewport(m_ddpRT->size());
   m_rendererBase.setGlobalShaderParameters(m_ddpFinalShader, eye);
 #endif
-  renderScreenQuad(m_ddpFinalShader);
+  renderScreenQuad(m_screenQuadVAO, m_ddpFinalShader);
   m_ddpFinalShader.release();
   port.releaseTarget();
 
@@ -1198,7 +1199,7 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*> &fi
   m_rendererBase.setViewport(m_waRT->size());
   m_rendererBase.setGlobalShaderParameters(m_waFinalShader, eye);
 #endif
-  renderScreenQuad(m_waFinalShader);
+  renderScreenQuad(m_screenQuadVAO, m_waFinalShader);
   m_waFinalShader.release();
   port.releaseTarget();
 

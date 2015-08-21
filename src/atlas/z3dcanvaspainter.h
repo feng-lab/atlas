@@ -1,11 +1,12 @@
 #ifndef Z3DCANVASPAINTER_H
 #define Z3DCANVASPAINTER_H
 
-#include "z3drenderprocessor.h"
+#include "z3dboundedfilter.h"
 #include "znumericparameter.h"
 #include "zexception.h"
 #include <QString>
 #include "z3dtexturecopyrenderer.h"
+#include "z3drenderport.h"
 
 class Z3DTexture;
 
@@ -13,7 +14,7 @@ namespace nim {
 
 class Z3DCanvas;
 
-class Z3DCanvasPainter : public Z3DRenderProcessor
+class Z3DCanvasPainter : public Z3DBoundedFilter
 {
   Q_OBJECT
 public:

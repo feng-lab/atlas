@@ -6,7 +6,6 @@
 #include <boost/graph/topological_sort.hpp>
 #include "z3dcanvaspainter.h"
 #include "z3dprocessor.h"
-#include "z3drenderprocessor.h"
 #include "QsLog.h"
 #include "z3dtexture.h"
 #include "z3drendertarget.h"
@@ -139,10 +138,10 @@ void Z3DNetworkEvaluator::initializeNetwork()
   sizeChangedFromProcessor();
   for (size_t i=0; i<m_reverseSortedRenderProcessors.size(); i++) {
     QObject::disconnect(m_reverseSortedRenderProcessors[i],
-                        SIGNAL(requestUpstreamSizeChange(Z3DRenderProcessor*)),
+                        SIGNAL(requestUpstreamSizeChange(Z3DProcessor*)),
                         0, 0);
-    connect(m_reverseSortedRenderProcessors[i], SIGNAL(requestUpstreamSizeChange(Z3DRenderProcessor*)),
-            this, SLOT(sizeChangedFromProcessor(Z3DRenderProcessor*)));
+    connect(m_reverseSortedRenderProcessors[i], SIGNAL(requestUpstreamSizeChange(Z3DProcessor*)),
+            this, SLOT(sizeChangedFromProcessor(Z3DProcessor*)));
   }
 
   unlock();
@@ -235,15 +234,11 @@ void Z3DNetworkEvaluator::buildNetwork()
   LINFO() << "";
 
   // update reverse sorted renderprocessors
-  for (std::vector<Z3DProcessor*>::reverse_iterator rit = m_renderingOrder.rbegin();
-       rit != m_renderingOrder.rend(); rit++) {
-    if (dynamic_cast<Z3DRenderProcessor*>(*rit) == 0)
-      continue;
-    m_reverseSortedRenderProcessors.push_back(dynamic_cast<Z3DRenderProcessor*>(*rit));
-  }
+  m_reverseSortedRenderProcessors = m_renderingOrder;
+  std::reverse(m_reverseSortedRenderProcessors.begin(), m_reverseSortedRenderProcessors.end());
 }
 
-void Z3DNetworkEvaluator::sizeChangedFromProcessor(Z3DRenderProcessor *rp)
+void Z3DNetworkEvaluator::sizeChangedFromProcessor(Z3DProcessor *rp)
 {
   if (rp) {
     bool started = false;

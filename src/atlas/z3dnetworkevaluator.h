@@ -13,7 +13,6 @@
 namespace nim {
 
 class Z3DProcessor;
-class Z3DRenderProcessor;
 class Z3DCanvasPainter;
 class Z3DOutputPortBase;
 class Z3DInputPortBase;
@@ -70,7 +69,7 @@ protected:
 
 protected slots:
   // update all upstream renderprocessor size. If input renderProcessor is NULL, update all renderProcessor
-  void sizeChangedFromProcessor(Z3DRenderProcessor* rp = 0);
+  void sizeChangedFromProcessor(Z3DProcessor *rp = 0);
 
 private:
   std::vector<Z3DProcessor*> m_renderingOrder;
@@ -105,7 +104,7 @@ private:
   std::map<Z3DProcessor*, Vertex> m_processorToVertexMapper;
   GraphT m_processorGraph;
 
-  std::vector<Z3DRenderProcessor*> m_reverseSortedRenderProcessors;
+  std::vector<Z3DProcessor*> m_reverseSortedRenderProcessors;
 };
 
 // check if OpenGL state conforms to default settings. Log a warning message if not.

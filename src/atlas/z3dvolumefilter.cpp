@@ -15,7 +15,7 @@ namespace nim {
 const size_t Z3DVolumeFilter::m_maxNumOfFullResolutionVolumeSlice = 6;
 
 Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters &globalParas, QObject *parent)
-  : Z3DRenderProcessor(globalParas, parent)
+  : Z3DBoundedFilter(globalParas, parent)
   , m_volumeRaycasterRenderer(m_rendererBase)
   , m_volumeSliceRenderer(m_rendererBase)
   , m_textureCoordinateRenderer(m_rendererBase)
@@ -402,7 +402,7 @@ void Z3DVolumeFilter::exitInteractionMode()
 
 bool Z3DVolumeFilter::isReady(Z3DEye eye) const
 {
-  return Z3DRenderProcessor::isReady(eye) && m_visible.get() && m_imgPack;
+  return Z3DProcessor::isReady(eye) && m_visible.get() && m_imgPack;
 }
 
 glm::vec3 Z3DVolumeFilter::get3DPosition(int x, int y, int width, int height, bool &success)

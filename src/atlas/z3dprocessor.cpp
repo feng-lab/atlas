@@ -7,6 +7,12 @@
 #include "zparameter.h"
 #include "zeventlistenerparameter.h"
 #include <cassert>
+#include "z3dshaderprogram.h"
+#include "z3drenderport.h"
+#include <QImage>
+#include <QImageWriter>
+#include "zimg.h"
+#include "zvertexarrayobject.h"
 
 namespace nim {
 
@@ -19,6 +25,169 @@ Z3DProcessor::Z3DProcessor(QObject *parent)
 
 Z3DProcessor::~Z3DProcessor()
 {
+}
+
+ZParameter* Z3DProcessor::parameter(const QString &name) const
+{
+  for (size_t i=0; i<m_parameters.size(); i++) {
+    if (m_parameters[i]->name() == name)
+      return m_parameters[i];
+  }
+  return NULL;
+}
+
+void Z3DProcessor::invalidate(InvalidationState inv)
+{
+  m_invalidationState |= inv;
+
+  if (inv == Z3DProcessor::Valid)
+    return;
+
+  if (!m_invalidationVisited) {
+    m_invalidationVisited = true;
+
+    for (size_t i=0; i<m_outputPorts.size(); ++i)
+      m_outputPorts[i]->invalidate();
+
+    m_invalidationVisited = false;
+  }
+}
+
+Z3DInputPortBase *Z3DProcessor::inputPort(const QString &name) const
+{
+  for (size_t i=0; i < m_inputPorts.size(); i++) {
+    if (m_inputPorts[i]->name() == name)
+      return m_inputPorts[i];
+  }
+
+  return NULL;
+}
+
+Z3DOutputPortBase *Z3DProcessor::outputPort(const QString &name) const
+{
+  for (size_t i=0; i < m_outputPorts.size(); i++) {
+    if (m_outputPorts[i]->name() == name)
+      return m_outputPorts[i];
+  }
+
+  return NULL;
+}
+
+void Z3DProcessor::onEvent(QEvent *e, int w, int h)
+{
+  e->ignore();
+
+  //LWARN() << e << className();
+  // propagate to interaction handlers
+  for (size_t i=0; i<m_interactionHandlers.size() && !e->isAccepted(); ++i) {
+    for (size_t j=0; j<m_interactionHandlers[i]->eventListeners().size() &&
+         !e->isAccepted(); ++j) {
+      m_interactionHandlers[i]->eventListeners().at(j)->sendEvent(e, w, h);
+    }
+  }
+
+  // propagate to event listeners
+  for (size_t i = 0; (i < m_eventListeners.size()) && !e->isAccepted(); ++i)
+    m_eventListeners[i]->sendEvent(e, w, h);
+}
+
+void Z3DProcessor::disconnectAllPorts()
+{
+  for (size_t i = 0; i < m_inputPorts.size(); ++i) {
+    m_inputPorts[i]->disconnectAll();
+  }
+
+  for (size_t i = 0; i < m_outputPorts.size(); ++i) {
+    m_outputPorts[i]->disconnectAll();
+  }
+}
+
+void Z3DProcessor::read(const QJsonObject &json)
+{
+  for (size_t i=0; i<m_parameters.size(); ++i) {
+    m_parameters[i]->read(json);
+  }
+}
+
+void Z3DProcessor::write(QJsonObject &json) const
+{
+  for (size_t i=0; i<m_parameters.size(); ++i) {
+    m_parameters[i]->write(json);
+  }
+}
+
+void Z3DProcessor::saveTextureAsImage(const Z3DTexture &tex, const QString &filename)
+{
+  try {
+    GLenum dataFormat = GL_BGRA;
+    GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
+    std::unique_ptr<uint8_t[]> colorBuffer(new uint8_t[tex.bypePerPixel(dataFormat, dataType) * tex.numPixels()]);
+    tex.downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
+    QImage upsideDownImage(colorBuffer.get(), tex.width(), tex.height(),
+                           QImage::Format_ARGB32);
+    QImage image = upsideDownImage.mirrored(false, true);
+    QImageWriter writer(filename);
+    writer.setCompression(1);
+    if(!writer.write(image)) {
+      LERROR() << writer.errorString();
+    }
+  }
+  catch (ZException const & e) {
+    LERROR() << "Exception:" << e.what();
+  }
+}
+
+void Z3DProcessor::saveDepthTextureAsImage(const Z3DTexture &tex, const QString &filename)
+{
+  try {
+    GLenum dataFormat = GL_DEPTH_COMPONENT;
+    GLenum dataType = GL_UNSIGNED_INT;
+    std::unique_ptr<uint32_t[]> depthBuffer(new uint32_t[tex.numPixels()]);
+    tex.downloadTextureToBuffer(dataFormat, dataType, depthBuffer.get());
+    nim::ZImg img;
+    img.wrapData(depthBuffer.get(), tex.width(), tex.height(), 1);
+    img.flip(nim::Dimension::Y);
+    img.save(filename);
+  }
+  catch (ZException const & e) {
+    LERROR() << "Exception:" << e.what();
+  }
+}
+
+void Z3DProcessor::setValid(Z3DEye eye)
+{
+  if (eye == Z3DEye::Mono)
+    m_invalidationState &= ~InvalidMonoViewResult;
+  else if (eye == Z3DEye::Left)
+    m_invalidationState &= ~InvalidLeftEyeResult;
+  else
+    m_invalidationState &= ~InvalidRightEyeResult;
+
+  for (size_t i=0; i<m_inputPorts.size(); ++i)
+    m_inputPorts[i]->setValid();
+}
+
+bool Z3DProcessor::isValid(Z3DEye eye) const
+{
+  if (eye == Z3DEye::Mono)
+    return !m_invalidationState.testFlag(InvalidMonoViewResult);
+  else if (eye == Z3DEye::Left)
+    return !m_invalidationState.testFlag(InvalidLeftEyeResult);
+  else
+    return !m_invalidationState.testFlag(InvalidRightEyeResult);
+}
+
+bool Z3DProcessor::isReady(Z3DEye) const
+{
+  for(size_t i=0; i<m_inputPorts.size(); ++i)
+    if (!m_inputPorts[i]->isReady())
+      return false;
+
+  for (size_t i=0; i<m_outputPorts.size(); ++i)
+    if(!m_outputPorts[i]->isReady())
+      return false;
+
+  return true;
 }
 
 void Z3DProcessor::addPort(Z3DInputPortBase &port)
@@ -98,68 +267,20 @@ void Z3DProcessor::removeParameter(ZParameter &para)
   }
 }
 
-ZParameter* Z3DProcessor::parameter(const QString &name) const
+void Z3DProcessor::addEventListener(ZEventListenerParameter &para)
 {
-  for (size_t i=0; i<m_parameters.size(); i++) {
-    if (m_parameters[i]->name() == name)
-      return m_parameters[i];
-  }
-  return NULL;
+  addParameter(para);
+  m_eventListeners.push_back(&para);
+}
+
+void Z3DProcessor::addInteractionHandler(Z3DInteractionHandler &handler)
+{
+  m_interactionHandlers.push_back(&handler);
 }
 
 bool Z3DProcessor::isInInteractionMode() const
 {
   return (!m_interactionModeSources.empty());
-}
-
-Z3DInputPortBase *Z3DProcessor::inputPort(const QString &name) const
-{
-  for (size_t i=0; i < m_inputPorts.size(); i++) {
-    if (m_inputPorts[i]->name() == name)
-      return m_inputPorts[i];
-  }
-
-  return NULL;
-}
-
-Z3DOutputPortBase *Z3DProcessor::outputPort(const QString &name) const
-{
-  for (size_t i=0; i < m_outputPorts.size(); i++) {
-    if (m_outputPorts[i]->name() == name)
-      return m_outputPorts[i];
-  }
-
-  return NULL;
-}
-
-void Z3DProcessor::invalidate(InvalidationState inv)
-{
-  m_invalidationState |= inv;
-
-  if (inv == Z3DProcessor::Valid)
-    return;
-
-  if (!m_invalidationVisited) {
-    m_invalidationVisited = true;
-
-    for (size_t i=0; i<m_outputPorts.size(); ++i)
-      m_outputPorts[i]->invalidate();
-
-    m_invalidationVisited = false;
-  }
-}
-
-bool Z3DProcessor::isReady(Z3DEye) const
-{
-  for(size_t i=0; i<m_inputPorts.size(); ++i)
-    if (!m_inputPorts[i]->isReady())
-      return false;
-
-  for (size_t i=0; i<m_outputPorts.size(); ++i)
-    if(!m_outputPorts[i]->isReady())
-      return false;
-
-  return true;
 }
 
 void Z3DProcessor::toggleInteractionMode(bool interactionMode, void* source)
@@ -183,81 +304,90 @@ void Z3DProcessor::toggleInteractionMode(bool interactionMode, void* source)
   }
 }
 
-void Z3DProcessor::setValid(Z3DEye eye)
+void Z3DProcessor::addPrivateRenderPort(Z3DRenderOutputPort& port)
 {
-  if (eye == Z3DEye::Mono)
-    m_invalidationState &= ~InvalidMonoViewResult;
-  else if (eye == Z3DEye::Left)
-    m_invalidationState &= ~InvalidLeftEyeResult;
-  else
-    m_invalidationState &= ~InvalidRightEyeResult;
+  port.setProcessor(this);
+  m_privateRenderPorts.push_back(&port);
 
-  for (size_t i=0; i<m_inputPorts.size(); ++i)
-    m_inputPorts[i]->setValid();
+  std::map<QString, Z3DOutputPortBase*>::const_iterator it = m_outputPortMap.find(port.name());
+  if (it == m_outputPortMap.end())
+    m_outputPortMap.emplace(port.name(), &port);
+  else {
+    LERROR() << className() << "port" << port.name() << "has already been inserted!";
+    assert(false);
+  }
 }
 
-bool Z3DProcessor::isValid(Z3DEye eye) const
+void Z3DProcessor::renderScreenQuad(const ZVertexArrayObject &vao, const Z3DShaderProgram &shader)
 {
-  if (eye == Z3DEye::Mono)
-    return !m_invalidationState.testFlag(InvalidMonoViewResult);
-  else if (eye == Z3DEye::Left)
-    return !m_invalidationState.testFlag(InvalidLeftEyeResult);
-  else
-    return !m_invalidationState.testFlag(InvalidRightEyeResult);
+  if (!shader.isLinked())
+    return;
+
+  glDepthFunc(GL_ALWAYS);
+
+  vao.bind();
+
+  GLfloat vertices[] = {-1.f, 1.f, 0.f, //top left corner
+                        -1.f, -1.f, 0.f, //bottom left corner
+                        1.f, 1.f, 0.f, //top right corner
+                        1.f, -1.f, 0.f}; // bottom right rocner
+  GLint attr_vertex = shader.vertexAttributeLocation();
+
+  GLuint bufObjects[1];
+  glGenBuffers(1, bufObjects);
+
+  glEnableVertexAttribArray(attr_vertex);
+  glBindBuffer(GL_ARRAY_BUFFER, bufObjects[0]);
+  glBufferData(GL_ARRAY_BUFFER, 3*4*sizeof(GLfloat), vertices, GL_STATIC_DRAW);
+  glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+  glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glDeleteBuffers(1, bufObjects);
+
+  glDisableVertexAttribArray(attr_vertex);
+
+  vao.release();
+
+  glDepthFunc(GL_LESS);
 }
 
-void Z3DProcessor::addEventListener(ZEventListenerParameter &para)
+void Z3DProcessor::updateSize()
 {
-  addParameter(para);
-  m_eventListeners.push_back(&para);
-}
+  // 1. update outport size
+  bool resized = false;
 
-void Z3DProcessor::addInteractionHandler(Z3DInteractionHandler &handler)
-{
-  m_interactionHandlers.push_back(&handler);
-}
+  const std::vector<Z3DOutputPortBase*> outports = outputPorts();
+  glm::ivec2 maxOutportSize(-1, -1);
+  for(size_t i=0; i<outports.size(); ++i) {
+    Z3DRenderOutputPort* rp = dynamic_cast<Z3DRenderOutputPort*>(outports[i]);
+    if (rp) {
+      glm::ivec2 outportSize = rp->expectedSize();
+      if (outportSize.x > 0 && outportSize != rp->size()) {
+        resized = true;
+        rp->resize(outportSize);
+      }
 
-void Z3DProcessor::onEvent(QEvent *e, int w, int h)
-{
-  e->ignore();
-
-  //LWARN() << e << className();
-  // propagate to interaction handlers
-  for (size_t i=0; i<m_interactionHandlers.size() && !e->isAccepted(); ++i) {
-    for (size_t j=0; j<m_interactionHandlers[i]->eventListeners().size() &&
-         !e->isAccepted(); ++j) {
-      m_interactionHandlers[i]->eventListeners().at(j)->sendEvent(e, w, h);
+      maxOutportSize = glm::max(maxOutportSize, rp->size());
     }
   }
 
-  // propagate to event listeners
-  for (size_t i = 0; (i < m_eventListeners.size()) && !e->isAccepted(); ++i)
-    m_eventListeners[i]->sendEvent(e, w, h);
-}
-
-void Z3DProcessor::disconnectAllPorts()
-{
-  for (size_t i = 0; i < m_inputPorts.size(); ++i) {
-    m_inputPorts[i]->disconnectAll();
+  // 2. update private ports
+  const std::vector<Z3DRenderOutputPort*> privatePorts = privateRenderPorts();
+  for (size_t i=0; i<privatePorts.size(); ++i) {
+    privatePorts[i]->resize(maxOutportSize);
   }
 
-  for (size_t i = 0; i < m_outputPorts.size(); ++i) {
-    m_outputPorts[i]->disconnectAll();
+  // 3. update inport expected size
+  const std::vector<Z3DInputPortBase*> inports = inputPorts();
+  for (size_t i=0; i<inports.size(); i++) {
+    Z3DRenderInputPort *renderInport = dynamic_cast< Z3DRenderInputPort* >(inports[i]);
+    if (renderInport)
+      renderInport->setExpectedSize(maxOutportSize);
   }
-}
 
-void Z3DProcessor::read(const QJsonObject &json)
-{
-  for (size_t i=0; i<m_parameters.size(); ++i) {
-    m_parameters[i]->read(json);
-  }
-}
-
-void Z3DProcessor::write(QJsonObject &json) const
-{
-  for (size_t i=0; i<m_parameters.size(); ++i) {
-    m_parameters[i]->write(json);
-  }
+  invalidate();
 }
 
 } // namespace nim

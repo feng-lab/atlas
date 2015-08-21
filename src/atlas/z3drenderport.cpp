@@ -1,6 +1,5 @@
 #include "z3dgl.h"
 #include "z3drenderport.h"
-#include "z3drenderprocessor.h"
 #include "z3drendertarget.h"
 
 #include "z3dgpuinfo.h"
@@ -114,18 +113,6 @@ bool Z3DRenderOutputPort::canConnectTo(const Z3DInputPortBase *inport) const
 //  changeFormat(m_internalColorFormat, m_internalDepthFormat);    // use same format, just replace rendertarget
 //}
 
-void Z3DRenderOutputPort::setProcessor(Z3DProcessor *p)
-{
-  Z3DOutputPortBase::setProcessor(p);
-
-  Z3DRenderProcessor* rp = dynamic_cast<Z3DRenderProcessor*>(p);
-  assert(rp);
-  if (!rp) {
-    LERROR() << "RenderPort" << name() << "attached to processor of wrong type:"
-             << p->className();
-  }
-}
-
 //-----------------------------------------------------------------------------------
 
 Z3DRenderInputPort::Z3DRenderInputPort(const QString &name, bool allowMultipleConnections,
@@ -173,18 +160,6 @@ const Z3DTexture *Z3DRenderInputPort::depthTexture(size_t idx) const
     return renderTarget(idx)->attachment(GL_DEPTH_ATTACHMENT);
   else
     return NULL;
-}
-
-void Z3DRenderInputPort::setProcessor(Z3DProcessor *p)
-{
-  Z3DInputPortBase::setProcessor(p);
-
-  Z3DRenderProcessor* rp = dynamic_cast<Z3DRenderProcessor*>(p);
-  assert(rp);
-  if (!rp) {
-    LERROR() << "RenderPort" << name() << "attached to processor of wrong type:"
-             << p->className();
-  }
 }
 
 const Z3DRenderTarget *Z3DRenderInputPort::renderTarget(size_t idx) const

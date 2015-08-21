@@ -28,14 +28,14 @@ ZVertexArrayObject::~ZVertexArrayObject()
   glDeleteVertexArrays(m_arrays.size(), &m_arrays[0]);
 }
 
-void ZVertexArrayObject::bind(size_t idx)
+void ZVertexArrayObject::bind(size_t idx) const
 {
   if (!m_hardwareSupportVAO)
     return;
   glBindVertexArray(m_arrays[idx]);
 }
 
-void ZVertexArrayObject::release()
+void ZVertexArrayObject::release() const
 {
   if (!m_hardwareSupportVAO)
     return;

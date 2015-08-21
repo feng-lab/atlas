@@ -100,6 +100,7 @@ private:
 
   bool m_opaque;
   double m_alpha; //only takes effect when m_opaque is true
+  ZVertexArrayObject m_VAO;
 };
 
 } // namespace nim

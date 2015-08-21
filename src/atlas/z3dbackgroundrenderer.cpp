@@ -12,6 +12,7 @@ Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase &rendererBase)
   , m_secondColor("Second Color", glm::vec4(0.2f, 0.2f, 0.2f, 1.0f))
   , m_gradientOrientation("Gradient Orientation")
   , m_mode("mode")
+  , m_VAO(1)
 {
   m_firstColor.setStyle("COLOR");
   m_secondColor.setStyle("COLOR");

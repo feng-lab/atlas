@@ -48,6 +48,12 @@ public:
       return glm::mat4(1.f);
   }
 
+  // commonly used render functions
+  // Render a screen-aligned quad (whole screen)
+  static void renderScreenQuad(const ZVertexArrayObject &vao, const Z3DShaderProgram &shader);
+  // render a trianglelist with whatever it contains
+  static void renderTriangleList(const ZVertexArrayObject &vao, const Z3DShaderProgram &shader, const ZMesh &mesh);
+
 public slots:
   virtual void compile() = 0;
 
@@ -61,8 +67,6 @@ protected slots:
 
 protected:
   friend class Z3DRendererBase;
-  inline float opacity() const {return m_rendererBase.opacity();}
-  inline float sizeScale() const {return m_rendererBase.sizeScale();}
 
   void setShaderParameters(Z3DShaderProgram &shader);
 
@@ -76,12 +80,6 @@ protected:
   virtual void render(Z3DEye) = 0;
   virtual void renderPicking(Z3DEye) {}
 
-  // commonly used render functions
-  // Render a screen-aligned quad (whole screen)
-  void renderScreenQuad(const Z3DShaderProgram &shader);
-  // render a trianglelist with whatever it contains
-  void renderTriangleList(const Z3DShaderProgram &shader, const ZMesh &mesh);
-
   Z3DRendererBase& m_rendererBase;
   bool m_needLighting;
   bool m_useDisplayList;
@@ -90,11 +88,6 @@ protected:
   bool m_followSizeScale;
 
   bool m_hardwareSupportVAO;
-  ZVertexArrayObject m_VAO;
-  ZVertexArrayObject m_pickingVAO;
-
-private:
-  ZVertexArrayObject m_privateVAO;
 };
 
 } // namespace nim

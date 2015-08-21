@@ -50,6 +50,8 @@ private:
   std::vector<GLfloat> m_allFlags;
   std::vector<GLuint> m_indexs;
 
+  ZVertexArrayObject m_VAO;
+  ZVertexArrayObject m_pickingVAO;
   ZVertexBufferObject m_VBOs;
   ZVertexBufferObject m_pickingVBOs;
   bool m_dataChanged;

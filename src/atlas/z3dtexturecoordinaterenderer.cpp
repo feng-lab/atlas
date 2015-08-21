@@ -9,6 +9,7 @@ Z3DTextureCoordinateRenderer::Z3DTextureCoordinateRenderer(Z3DRendererBase &rend
   : Z3DPrimitiveRenderer(rendererBase)
   , m_mesh(NULL)
   , m_VBOs(3)
+  , m_VAO(1)
   , m_dataChanged(false)
 {
   m_renderTextureCoordinateShader.bindFragDataLocation(0, "FragData0");

@@ -18,6 +18,10 @@ class Z3DOutputPortBase;
 class Z3DInteractionHandler;
 class ZParameter;
 class ZEventListenerParameter;
+class Z3DRenderOutputPort;
+class Z3DTexture;
+class Z3DShaderProgram;
+class ZVertexArrayObject;
 
 class Z3DProcessor : public QObject, public Z3DCanvasEventListener
 {
@@ -62,6 +66,7 @@ public:
   // return all inputports or outputports as vector
   const std::vector<Z3DInputPortBase*>& inputPorts() const { return m_inputPorts; }
   const std::vector<Z3DOutputPortBase*>& outputPorts() const { return m_outputPorts; }
+  const std::vector<Z3DRenderOutputPort*>& privateRenderPorts() const { return m_privateRenderPorts; }
 
   virtual void onEvent(QEvent* e, int w, int h) override;
 
@@ -74,6 +79,8 @@ public:
   void read(const QJsonObject &json);
   void write(QJsonObject &json) const;
 
+  static void saveTextureAsImage(const Z3DTexture &tex, const QString &filename);
+  static void saveDepthTextureAsImage(const Z3DTexture &tex, const QString &filename);
 
 public slots:
   inline void invalidateResult() { invalidate(InvalidAllResult); }
@@ -121,6 +128,23 @@ protected:
   bool isInInteractionMode() const;
   void toggleInteractionMode(bool isInInteractionMode, void *source);
 
+  void addPrivateRenderPort(Z3DRenderOutputPort& port);
+  static void renderScreenQuad(const ZVertexArrayObject &vao, const Z3DShaderProgram &shader);
+
+signals:
+  // emit this only if resize starts from current processor.
+  void requestUpstreamSizeChange(Z3DProcessor*);
+
+public slots:
+  // 1. for each outport, get all expected size from all connected inports, and use the maximum one
+  //    as the new size of the outport
+  // 2. update private port size
+  // 3. Once we get the newsize of all outports, we calculate a expected size for each inport and set it.
+  //    default choice for inport expected size is the maximum new outport size
+  // reimplement this if you want different behavior
+  virtual void updateSize();
+
+protected:
   // used for the detection of duplicate port names.
   std::map<QString, Z3DInputPortBase*> m_inputPortMap;
   std::map<QString, Z3DOutputPortBase*> m_outputPortMap;
@@ -128,7 +152,6 @@ protected:
   InvalidationState m_invalidationState;
   std::set<void*> m_interactionModeSources;
 
-protected:
   QString m_name;
 
   // all parameters that can change the render behavior
@@ -139,6 +162,8 @@ protected:
   std::vector<Z3DInputPortBase*> m_inputPorts;
   // output the processor generates.
   std::vector<Z3DOutputPortBase*> m_outputPorts;
+  // private port for intermediate rendering
+  std::vector<Z3DRenderOutputPort*> m_privateRenderPorts;
 
   std::vector<ZEventListenerParameter*> m_eventListeners;
   std::vector<Z3DInteractionHandler*> m_interactionHandlers;

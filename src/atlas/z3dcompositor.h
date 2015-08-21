@@ -2,7 +2,7 @@
 #define Z3DCOMPOSITOR_H
 
 #include "z3drenderport.h"
-#include "z3drenderprocessor.h"
+#include "z3dboundedfilter.h"
 #include "z3dgeometryfilter.h"
 #include "z3dvolumefilter.h"
 #include "z3dpickingmanager.h"
@@ -17,7 +17,7 @@
 
 namespace nim {
 
-class Z3DCompositor : public Z3DRenderProcessor
+class Z3DCompositor : public Z3DBoundedFilter
 {
   Q_OBJECT
 public:
@@ -127,6 +127,8 @@ private:
   glm::vec3 m_ZEnd;
 
   ZWidgetsGroup *m_axisWidgetsGroup;
+
+  ZVertexArrayObject m_screenQuadVAO;
 };
 
 } // namespace nim

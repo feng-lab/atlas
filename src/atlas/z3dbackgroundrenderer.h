@@ -40,6 +40,7 @@ protected:
   ZStringIntOptionParameter m_gradientOrientation;
   ZStringIntOptionParameter m_mode;
 
+  ZVertexArrayObject m_VAO;
   ZVertexBufferObject m_VBO;
 };
 

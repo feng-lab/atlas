@@ -18,6 +18,7 @@ Z3DVolumeRaycasterRenderer::Z3DVolumeRaycasterRenderer(Z3DRendererBase &renderer
   , m_exitDepthTexture(NULL)
   , m_opaque(false)
   , m_alpha(1.0)
+  , m_VAO(1)
 {
   //m_gradientMode.addOptions("None", "Forward Differences", "Central Differences", "Filtered");
   //m_gradientMode.select("None");
@@ -235,7 +236,7 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
       bindVolumesAndTransferFuncs(m_2dImageShader);
 
       for (size_t i=0; i<m_quads.size(); ++i)
-        renderTriangleList(m_2dImageShader, m_quads[i]);
+        renderTriangleList(m_VAO, m_2dImageShader, m_quads[i]);
 
       m_2dImageShader.release();
     } else {   // image is 3D, but a 2D slice will be shown
@@ -245,7 +246,7 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
       bindVolumesAndTransferFuncs(m_volumeSliceWithTransferfunShader);
 
       for (size_t i=0; i<m_quads.size(); ++i)
-        renderTriangleList(m_volumeSliceWithTransferfunShader, m_quads[i]);
+        renderTriangleList(m_VAO, m_volumeSliceWithTransferfunShader, m_quads[i]);
 
       m_volumeSliceWithTransferfunShader.release();
     }
@@ -279,7 +280,7 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
 
     m_raycasterShader.setUniform("sampling_rate", m_samplingRate.get());
 
-    renderScreenQuad(m_raycasterShader);
+    renderScreenQuad(m_VAO, m_raycasterShader);
     m_raycasterShader.release();
   }
   CHECK_GL_ERROR;

@@ -1,7 +1,7 @@
 #ifndef Z3DVOLUMEFILTER_H
 #define Z3DVOLUMEFILTER_H
 
-#include "z3drenderprocessor.h"
+#include "z3dboundedfilter.h"
 
 #include "z3dcameraparameter.h"
 #include "znumericparameter.h"
@@ -17,13 +17,14 @@
 #include "zeventlistenerparameter.h"
 #include "z3dtexturecopyrenderer.h"
 #include "zimgpack.h"
+#include "z3drenderport.h"
 
 namespace nim {
 
 class ZImg;
 class ZMesh;
 
-class Z3DVolumeFilter : public Z3DRenderProcessor
+class Z3DVolumeFilter : public Z3DBoundedFilter
 {
   Q_OBJECT
   friend class Z3DCompositor;

@@ -15,7 +15,7 @@
 namespace nim {
 
 Z3DCanvasPainter::Z3DCanvasPainter(Z3DGlobalParameters &globalParas, QObject *parent)
-  : Z3DRenderProcessor(globalParas, parent)
+  : Z3DBoundedFilter(globalParas, parent)
   , m_textureCopyRenderer(m_rendererBase, Z3DTextureCopyRenderer::OutputColorOption::DivideByAlpha)
   , m_canvas(NULL)
   , m_inport("Image", false, InvalidMonoViewResult)

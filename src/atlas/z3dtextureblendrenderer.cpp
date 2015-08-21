@@ -11,6 +11,7 @@ Z3DTextureBlendRenderer::Z3DTextureBlendRenderer(Z3DRendererBase &rendererBase, 
   , m_colorTexture2(NULL)
   , m_depthTexture2(NULL)
   , m_blendMode("Blend Mode")
+  , m_VAO(1)
 {
   m_blendMode.addOptionsWithData(qMakePair<QString,QString>("DepthTest", "DEPTH_TEST"),
                                  qMakePair<QString,QString>("FirstOnTop", "FIRST_ON_TOP"),
@@ -53,7 +54,7 @@ void Z3DTextureBlendRenderer::render(Z3DEye eye)
   m_blendTextureShader.bindTexture("depth_texture_1", m_depthTexture2);
 
   glDepthFunc(GL_ALWAYS);
-  renderScreenQuad(m_blendTextureShader);
+  renderScreenQuad(m_VAO, m_blendTextureShader);
   glDepthFunc(GL_LESS);
   m_blendTextureShader.release();
 }
