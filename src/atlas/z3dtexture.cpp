@@ -1,6 +1,9 @@
 #include "z3dtexture.h"
 #include "QsLog.h"
 #include "z3dgpuinfo.h"
+#include <QImage>
+#include <QImageWriter>
+#include "zimg.h"
 
 namespace nim {
 
@@ -383,6 +386,44 @@ size_t Z3DTexture::bypePerPixel(GLint internalFormat)
   return bpp;
 }
 
+void Z3DTexture::saveAsColorImage(const QString &filename) const
+{
+  try {
+    GLenum dataFormat = GL_BGRA;
+    GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
+    std::unique_ptr<uint8_t[]> colorBuffer(new uint8_t[bypePerPixel(dataFormat, dataType) * numPixels()]);
+    downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
+    QImage upsideDownImage(colorBuffer.get(), width(), height(),
+                           QImage::Format_ARGB32);
+    QImage image = upsideDownImage.mirrored(false, true);
+    QImageWriter writer(filename);
+    writer.setCompression(1);
+    if(!writer.write(image)) {
+      LERROR() << writer.errorString();
+    }
+  }
+  catch (ZException const & e) {
+    LERROR() << "Exception:" << e.what();
+  }
+}
+
+void Z3DTexture::saveAsDepthImage(const QString &filename) const
+{
+  try {
+    GLenum dataFormat = GL_DEPTH_COMPONENT;
+    GLenum dataType = GL_UNSIGNED_INT;
+    std::unique_ptr<uint32_t[]> depthBuffer(new uint32_t[numPixels()]);
+    downloadTextureToBuffer(dataFormat, dataType, depthBuffer.get());
+    nim::ZImg img;
+    img.wrapData(depthBuffer.get(), width(), height(), 1);
+    img.flip(nim::Dimension::Y);
+    img.save(filename);
+  }
+  catch (ZException const & e) {
+    LERROR() << "Exception:" << e.what();
+  }
+}
+
 void Z3DTexture::deriveTextureTarget()
 {
   if (m_dimensions.z == 1) {
@@ -460,7 +501,7 @@ void Z3DTextureUnitManager::activateCurrentUnit()
 
 GLenum Z3DTextureUnitManager::currentUnitEnum() const
 {
-  return GL_TEXTURE0 + m_currentUnitNumber;
+  return GLenum(GLint(GL_TEXTURE0) + m_currentUnitNumber);
 }
 
 GLint Z3DTextureUnitManager::activeTextureUnit()

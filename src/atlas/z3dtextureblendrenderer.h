@@ -4,8 +4,6 @@
 #include "z3dprimitiverenderer.h"
 #include "z3dshaderprogram.h"
 
-class Z3DTexture;
-
 namespace nim {
 
 class Z3DTextureBlendRenderer : public Z3DPrimitiveRenderer
@@ -34,10 +32,10 @@ protected:
 
   virtual void render(Z3DEye eye) override;
 
-  const Z3DTexture *m_colorTexture1;
-  const Z3DTexture *m_depthTexture1;
-  const Z3DTexture *m_colorTexture2;
-  const Z3DTexture *m_depthTexture2;
+  const Z3DTexture *m_colorTexture1 = nullptr;
+  const Z3DTexture *m_depthTexture1 = nullptr;
+  const Z3DTexture *m_colorTexture2 = nullptr;
+  const Z3DTexture *m_depthTexture2 = nullptr;
 
   Z3DShaderProgram m_blendTextureShader;
 

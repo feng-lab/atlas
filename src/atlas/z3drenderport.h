@@ -36,7 +36,7 @@ public:
   GLint internalColorFormat() const { return m_internalColorFormat; }
 
   // Clears the contents of an activated outport's RenderTarget,
-  void clearTarget();
+  void clearTarget() const;
 
   virtual bool hasValidData() const override { return m_resultIsValid; }
 

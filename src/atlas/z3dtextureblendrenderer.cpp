@@ -6,10 +6,6 @@ namespace nim {
 
 Z3DTextureBlendRenderer::Z3DTextureBlendRenderer(Z3DRendererBase &rendererBase, const QString &mode)
   : Z3DPrimitiveRenderer(rendererBase)
-  , m_colorTexture1(NULL)
-  , m_depthTexture1(NULL)
-  , m_colorTexture2(NULL)
-  , m_depthTexture2(NULL)
   , m_blendMode("Blend Mode")
   , m_VAO(1)
 {
@@ -40,8 +36,8 @@ QString Z3DTextureBlendRenderer::generateHeader()
 
 void Z3DTextureBlendRenderer::render(Z3DEye eye)
 {
-  if (m_colorTexture1 == NULL || m_depthTexture1 == NULL ||
-      m_colorTexture2 == NULL || m_depthTexture2 == NULL)
+  if (!m_colorTexture1 || !m_depthTexture1 ||
+      !m_colorTexture2 || !m_depthTexture2)
     return;
 
   m_blendTextureShader.bind();

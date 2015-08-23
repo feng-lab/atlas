@@ -71,6 +71,9 @@ public:
   // calculates the bytes per pixel from the internal format
   static size_t bypePerPixel(GLint internalFormat);
 
+  void saveAsColorImage(const QString &filename) const;
+  void saveAsDepthImage(const QString &filename) const;
+
 private:
   void deriveTextureTarget();
   void applyFilter();

@@ -7,8 +7,6 @@ namespace nim {
 
 Z3DTextureCopyRenderer::Z3DTextureCopyRenderer(Z3DRendererBase &rendererBase, OutputColorOption mode)
   : Z3DPrimitiveRenderer(rendererBase)
-  , m_colorTexture(NULL)
-  , m_depthTexture(NULL)
   , m_copyTextureShaderGrp(rendererBase)
   , m_discardTransparent(false)
   , m_mode(mode)
@@ -40,7 +38,7 @@ QString Z3DTextureCopyRenderer::generateHeader() const
 
 void Z3DTextureCopyRenderer::render(Z3DEye eye)
 {
-  if (m_colorTexture == NULL || m_depthTexture == NULL)
+  if (!m_colorTexture || !m_depthTexture)
     return;
 
   m_copyTextureShaderGrp.bind();

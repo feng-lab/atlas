@@ -8,7 +8,8 @@ namespace nim {
 
 Z3DRenderTarget::Z3DRenderTarget(GLint internalColorFormat, GLint internalDepthFormat, glm::ivec2 size,
                                  bool multisample, int sample)
-  : m_previousDrawFBOID(0)
+  : m_previousViewport(0)
+  , m_previousDrawFBOID(0)
   , m_previousReadFBOID(0)
   , m_multisample(multisample)
   , m_samples(sample)
@@ -145,11 +146,13 @@ void Z3DRenderTarget::createDepthAttachment(GLint internalDepthFormat)
 
 void Z3DRenderTarget::bind()
 {
-  glViewport(0, 0, m_size.x, m_size.y);
   if (isBound())
     return;
   m_previousDrawFBOID = currentBoundDrawFBO();
   m_previousReadFBOID = currentBoundReadFBO();
+  glGetIntegerv(GL_VIEWPORT, &m_previousViewport[0]);
+
+  glViewport(0, 0, m_size.x, m_size.y);
   if (!m_multisample)
     glBindFramebuffer(GL_FRAMEBUFFER, m_fboID);
   //else
@@ -169,12 +172,21 @@ void Z3DRenderTarget::release()
   //LINFO() << m_previousDrawFBOID << m_previousReadFBOID;
   glBindFramebuffer(GL_READ_FRAMEBUFFER, m_previousReadFBOID);
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_previousDrawFBOID);
+  glViewport(m_previousViewport.x, m_previousViewport.y, m_previousViewport.z, m_previousViewport.w);
   glGetError(); // there should be no error according to openGL doc, but some drivers report error, ignore
 }
 
 bool Z3DRenderTarget::isBound() const
 {
   return currentBoundDrawFBO() == m_fboID;
+}
+
+void Z3DRenderTarget::clear() const
+{
+  if (!isBound())
+    LERROR() << "RenderTarget is not bound, can not clear.";
+  else
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 GLuint Z3DRenderTarget::handle() const

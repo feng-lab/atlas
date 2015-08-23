@@ -12,6 +12,9 @@
 #include "znumericparameter.h"
 #include "z3dmeshrenderer.h"
 #include "zeventlistenerparameter.h"
+#include "z3dtextureglowrenderer.h"
+#include "z3drenderport.h"
+#include "z3dtexturecopyrenderer.h"
 
 namespace nim {
 
@@ -26,7 +29,7 @@ public:
   bool isVisible() const { return m_visible.get(); }
   void setMeshColor(glm::vec4 col) { m_singleColorForAllMesh.set(col); }
 
-  virtual void process(Z3DEye) override;
+  virtual void process(Z3DEye eye) override;
 
   void setData(std::vector<ZMesh*> *meshList);
   void setData(QList<ZMesh*> *meshList);
@@ -37,7 +40,9 @@ public:
   ZWidgetsGroup *widgetsGroup();
   ZWidgetsGroup *widgetsGroupForAnnotationFilter();
 
+  virtual bool hasOpaque(Z3DEye eye) const override { return Z3DGeometryFilter::hasOpaque(eye) && !m_glow.get(); }
   virtual void renderOpaque(Z3DEye eye) override;
+  virtual bool hasTransparent(Z3DEye eye) const override { return Z3DGeometryFilter::hasTransparent(eye) || m_glow.get(); }
   virtual void renderTransparent(Z3DEye eye) override;
 
 signals:
@@ -69,11 +74,23 @@ private:
   // get visible data from m_origMeshList put into m_meshList
   void getVisibleData();
 
+  Z3DRenderOutputPort m_monoEyeOutport;
+  Z3DRenderOutputPort m_leftEyeOutport;
+  Z3DRenderOutputPort m_rightEyeOutport;
+  Z3DRenderOutputPort m_monoEyeOutport2;
+  Z3DRenderOutputPort m_leftEyeOutport2;
+  Z3DRenderOutputPort m_rightEyeOutport2;
+
   Z3DMeshRenderer m_triangleListRenderer;
 
   ZBoolParameter m_visible;
   ZStringIntOptionParameter m_colorMode;
   ZVec4Parameter m_singleColorForAllMesh;
+
+  Z3DTextureGlowRenderer m_textureGlowRenderer;
+
+  ZBoolParameter m_glow;
+  Z3DTextureCopyRenderer m_textureCopyRenderer;
 
   //std::map<QString, size_t> m_sourceColorMapper;   // should use unordered_map
   // mesh list used for rendering, it is a subset of m_origMeshList. Some mesh are

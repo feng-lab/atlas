@@ -30,7 +30,7 @@ void Z3DRenderOutputPort::invalidate()
   Z3DOutputPortBase::invalidate();
 }
 
-void Z3DRenderOutputPort::clearTarget()
+void Z3DRenderOutputPort::clearTarget() const
 {
   if (!isBound())
     LERROR() << "RenderTarget is not bound, can not clear.";

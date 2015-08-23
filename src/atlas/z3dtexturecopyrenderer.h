@@ -3,8 +3,6 @@
 
 #include "z3dprimitiverenderer.h"
 
-class Z3DTexture;
-
 namespace nim {
 
 class Z3DTextureCopyRenderer : public Z3DPrimitiveRenderer

@@ -212,7 +212,7 @@ ZWidgetsGroup *Z3DCompositor::axisWidgetsGroup()
 void Z3DCompositor::savePickingBufferToImage(const QString &filename)
 {
   Z3DTexture *tex = pickingManager().renderTarget().attachment(GL_COLOR_ATTACHMENT0);
-  saveTextureAsImage(*tex, filename);
+  tex->saveAsColorImage(filename);
 }
 
 void Z3DCompositor::process(Z3DEye eye)

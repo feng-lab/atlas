@@ -26,6 +26,8 @@ public:
   void release();
   bool isBound() const;
 
+  void clear() const;
+
   //Returns the OpenGL framebuffer object handle for this framebuffer object (returned by the glGenFrameBuffers() function).
   // returned fbo should only be used for read if multisample is used
   GLuint handle() const;
@@ -66,6 +68,7 @@ protected:
   GLuint m_fboID, m_multisampleFBOID;
   GLuint m_colorBufferID, m_depthBufferID;
 
+  glm::ivec4 m_previousViewport;
   GLuint m_previousDrawFBOID;
   GLuint m_previousReadFBOID;
 

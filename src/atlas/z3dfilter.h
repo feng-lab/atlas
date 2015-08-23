@@ -79,9 +79,6 @@ public:
   void read(const QJsonObject &json);
   void write(QJsonObject &json) const;
 
-  static void saveTextureAsImage(const Z3DTexture &tex, const QString &filename);
-  static void saveDepthTextureAsImage(const Z3DTexture &tex, const QString &filename);
-
 public slots:
   inline void invalidateResult() { invalidate(InvalidAllResult); }
 

@@ -105,5 +105,8 @@
         <file>icons/hand_cursor-512.png</file>
         <file>icons/lock-512.png</file>
         <file>icons/unlock-512.png</file>
+        <file>Resources/shader/blur.frag</file>
+        <file>Resources/shader/glow.frag</file>
+        <file>Resources/shader/glow_func.frag</file>
     </qresource>
 </RCC>
