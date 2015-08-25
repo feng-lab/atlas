@@ -307,7 +307,7 @@ void ZObjModel::setObjVisible(size_t id, bool v)
   if (isObjVisible(id) != v) {
     QModelIndex idx = idToIndex(id, 0);
     if (idx.isValid()) {
-      //setData(idx, v ? Qt::Checked : Qt::Unchecked, Qt::CheckStateRole);
+      setData(idx, v ? Qt::Checked : Qt::Unchecked, Qt::CheckStateRole);
       ObjItem *item = static_cast<ObjItem*>(idx.internalPointer());
       item->show = v;
       emit dataChanged(idx, idx);

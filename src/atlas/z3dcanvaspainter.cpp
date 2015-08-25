@@ -113,9 +113,13 @@ void Z3DCanvasPainter::onCanvasResized(int w, int h)
 
 void Z3DCanvasPainter::invalidate(InvalidationState inv)
 {
-  m_invalidationState |= inv;
-  if (m_canvas) {
-    m_canvas->updateAll();
+  if (!m_locked) {
+    m_locked = true;
+    m_invalidationState |= inv;
+    if (m_canvas) {
+      m_canvas->updateAll();
+    }
+    m_locked = false;
   }
 }
 

@@ -35,6 +35,8 @@ public:
 
   QString renderToImageError() const;
 
+  void setLock(bool v) { m_locked = v; }
+
 protected slots:
   void onCanvasResized(int w, int h);
 
@@ -61,6 +63,8 @@ private:
   QString m_renderToImageFilename;
   QString m_renderToImageError;
   Z3DScreenShotType m_renderToImageType;
+
+  bool m_locked = false;
 };
 
 } // namespace nim

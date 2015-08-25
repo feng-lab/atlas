@@ -9,6 +9,8 @@
 #include "QsLog.h"
 #include "z3dtexture.h"
 #include "z3drendertarget.h"
+#include "z3dmeshfilter.h"
+#include "zrandom.h"
 
 //#define PROFILE3DRENDERERS
 
@@ -50,11 +52,24 @@ void Z3DNetworkEvaluator::process(bool stereo)
 
   if (m_locked) {
     LDEBUG() << "locked. Scheduling.";
-    m_processPending = true;
+    //m_processPending = true;
     return;
   }
 
   lock();
+
+//  for (size_t i = 0; i < m_renderingOrder.size(); ++i) {
+//    Z3DMeshFilter* meshFilter = dynamic_cast<Z3DMeshFilter*>(m_renderingOrder[i]);
+//    if (meshFilter && !meshFilter->isFixed()) {
+//      if (ZRandomInstance.randReal<float>() < 0.001f) {
+//        meshFilter->setVisible(true);
+//        meshFilter->setGlow(true);
+//        meshFilter->setStayOnTop(true);
+//      } else {
+//        meshFilter->setVisible(false);
+//      }
+//    }
+//  }
 
   // notify filter wrappers
   for (size_t j = 0; j < m_filterWrappers.size(); ++j)

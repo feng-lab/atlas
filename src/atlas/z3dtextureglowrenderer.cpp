@@ -8,9 +8,9 @@ Z3DTextureGlowRenderer::Z3DTextureGlowRenderer(Z3DRendererBase &rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_glowTextureShaderGrp(rendererBase)
   , m_glowMode("Glow Mode")
-  , m_blurRadius("Blur Radius", 10, 2, 10)
-  , m_blurScale("Blur Scale", 1.f, 1.f, 5.f)
-  , m_blurStrength("Blur Strength", .5f, 0.f, 1.f)
+  , m_blurRadius("Glow Blur Radius", 10, 2, 10)
+  , m_blurScale("Glow Blur Scale", 1.f, 1.f, 5.f)
+  , m_blurStrength("Glow Blur Strength", .5f, 0.f, 1.f)
   , m_VAO(1)
 {
   m_blurScale.setSingleStep(0.5);

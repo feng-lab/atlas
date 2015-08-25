@@ -9,6 +9,12 @@ namespace nim {
 
 Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject *parent)
   : Z3DGeometryFilter(globalParas, parent)
+  , m_monoEyeOutport("Image")
+  , m_leftEyeOutport("LeftEyeImage")
+  , m_rightEyeOutport("RightEyeImage")
+  , m_monoEyeOutport2("Image2")
+  , m_leftEyeOutport2("LeftEyeImage2")
+  , m_rightEyeOutport2("RightEyeImage2")
   , m_sphereRenderer(m_rendererBase)
   , m_visible("Visible", true)
   , m_colorMode("Color Mode")
@@ -20,6 +26,11 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject *pare
   , m_colorMapMeanIntensity("Mean Intensity Color Map", 0., 1., QColor(255,0,0), QColor(0,0,0))
   , m_colorMapMaxIntensity("Max Intensity Color Map", 0., 1., QColor(255,0,0), QColor(0,0,0))
   , m_useSameSizeForAllPuncta("Use Same Size", false)
+  , m_glowSphereRenderer(m_rendererBase)
+  , m_textureGlowRenderer(m_rendererBase)
+  , m_randomGlow("Random Glow", false)
+  , m_glowPercentage("Glow Percentage", 0.2f, 0.f, 1.f)
+  , m_textureCopyRenderer(m_rendererBase)
   , m_selectPunctumEvent("Select Puncta", false)
   , m_pressedPunctum(nullptr)
   , m_selectedPuncta(nullptr)
@@ -27,6 +38,15 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject *pare
   , m_dataIsInvalid(false)
   , m_origPuncta(nullptr)
 {
+  addPrivateRenderPort(m_monoEyeOutport);
+  addPrivateRenderPort(m_leftEyeOutport);
+  addPrivateRenderPort(m_rightEyeOutport);
+  addPrivateRenderPort(m_monoEyeOutport2);
+  addPrivateRenderPort(m_leftEyeOutport2);
+  addPrivateRenderPort(m_rightEyeOutport2);
+
+  m_textureCopyRenderer.setDiscardTransparent(true);
+
   m_singleColorForAllPuncta.setStyle("COLOR");
   connect(&m_singleColorForAllPuncta, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
   connect(&m_colorMapScore, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
@@ -54,6 +74,15 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject *pare
 
   addParameter(m_sphereRenderer.useDynamicMaterialPara());
 
+  m_glowSphereRenderer.useDynamicMaterialPara().set(false);
+  connect(&m_randomGlow, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
+  addParameter(m_randomGlow);
+  addParameter(m_textureGlowRenderer.glowModePara());
+  addParameter(m_textureGlowRenderer.blurRadiusPara());
+  addParameter(m_textureGlowRenderer.blurScalePara());
+  addParameter(m_textureGlowRenderer.blurStrengthPara());
+  addParameter(m_glowPercentage);
+
   m_selectPunctumEvent.listenTo("select punctum", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonPress);
   m_selectPunctumEvent.listenTo("select punctum", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonRelease);
   m_selectPunctumEvent.listenTo("select punctum", Qt::LeftButton,
@@ -74,10 +103,63 @@ Z3DPunctaFilter::~Z3DPunctaFilter()
 {
 }
 
-void Z3DPunctaFilter::process(Z3DEye)
+void Z3DPunctaFilter::process(Z3DEye eye)
 {
   if (m_dataIsInvalid) {
     prepareData();
+  }
+  if (m_randomGlow.get()) {
+    m_pointAndRadiusGlow.clear();
+    m_specularAndShininessGlow.clear();
+    m_pointColorsGlow.clear();
+    m_pointAndRadiusNormal.clear();
+    m_specularAndShininessNormal.clear();
+    m_pointColorsNormal.clear();
+
+    for (size_t i=0; i<m_punctaList.size(); i++) {
+      if (ZRandomInstance.randReal<float>() < m_glowPercentage.get()) {
+        m_pointAndRadiusGlow.push_back(m_pointAndRadius[i]);
+        m_specularAndShininessGlow.push_back(m_specularAndShininess[i]);
+        m_pointColorsGlow.push_back(m_pointColors[i]);
+      } else {
+        m_pointAndRadiusNormal.push_back(m_pointAndRadius[i]);
+        m_specularAndShininessNormal.push_back(m_specularAndShininess[i]);
+        m_pointColorsNormal.push_back(m_pointColors[i]);
+      }
+    }
+    m_sphereRenderer.setData(&m_pointAndRadiusNormal, &m_specularAndShininessNormal);
+    m_sphereRenderer.setDataColors(&m_pointColorsNormal);
+    m_glowSphereRenderer.setData(&m_pointAndRadiusGlow, &m_specularAndShininessGlow);
+    m_glowSphereRenderer.setDataColors(&m_pointColorsGlow);
+
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+
+    Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
+          m_monoEyeOutport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+
+    currentOutport.bindTarget();
+    currentOutport.clearTarget();
+    m_rendererBase.setViewport(currentOutport.size());
+    m_rendererBase.render(eye, m_glowSphereRenderer);
+    CHECK_GL_ERROR;
+    currentOutport.releaseTarget();
+
+    Z3DRenderOutputPort &currentOutport2 = (eye == Z3DEye::Mono) ?
+          m_monoEyeOutport2 : (eye == Z3DEye::Left) ? m_leftEyeOutport2 : m_rightEyeOutport2;
+    currentOutport2.bindTarget();
+    currentOutport2.clearTarget();
+    m_rendererBase.setViewport(currentOutport2.size());
+    m_textureGlowRenderer.setColorTexture(currentOutport.colorTexture());
+    m_textureGlowRenderer.setDepthTexture(currentOutport.depthTexture());
+    m_rendererBase.render(eye, m_textureGlowRenderer);
+    CHECK_GL_ERROR;
+    currentOutport2.releaseTarget();
+
+    glBlendFunc(GL_ONE,GL_ZERO);
+    glDisable(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);
   }
 }
 
@@ -133,6 +215,14 @@ ZWidgetsGroup *Z3DPunctaFilter::widgetsGroup()
       else
         new ZWidgetsGroup(para, m_widgetsGroup, 7);
     }
+
+    new ZWidgetsGroup(&m_randomGlow, m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_glowPercentage, m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_textureGlowRenderer.glowModePara(), m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_textureGlowRenderer.blurRadiusPara(), m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_textureGlowRenderer.blurScalePara(), m_widgetsGroup, 5);
+    new ZWidgetsGroup(&m_textureGlowRenderer.blurStrengthPara(), m_widgetsGroup, 5);
+
     new ZWidgetsGroup(&m_xCut, m_widgetsGroup, 5);
     new ZWidgetsGroup(&m_yCut, m_widgetsGroup, 5);
     new ZWidgetsGroup(&m_zCut, m_widgetsGroup, 5);
@@ -149,12 +239,30 @@ ZWidgetsGroup *Z3DPunctaFilter::widgetsGroup()
 
 void Z3DPunctaFilter::renderOpaque(Z3DEye eye)
 {
+  if (m_randomGlow.get()) {
+    Z3DRenderOutputPort &currentOutport2 = (eye == Z3DEye::Mono) ?
+          m_monoEyeOutport2 : (eye == Z3DEye::Left) ? m_leftEyeOutport2 : m_rightEyeOutport2;
+    m_textureCopyRenderer.setColorTexture(currentOutport2.colorTexture());
+    m_textureCopyRenderer.setDepthTexture(currentOutport2.depthTexture());
+    m_rendererBase.render(eye, m_textureCopyRenderer);
+    renderBoundBox(eye);
+  }
   m_rendererBase.render(eye, m_sphereRenderer);
   renderBoundBox(eye);
 }
 
 void Z3DPunctaFilter::renderTransparent(Z3DEye eye)
 {
+  if (m_randomGlow.get()) {
+    Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
+          m_monoEyeOutport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+    Z3DRenderOutputPort &currentOutport2 = (eye == Z3DEye::Mono) ?
+          m_monoEyeOutport2 : (eye == Z3DEye::Left) ? m_leftEyeOutport2 : m_rightEyeOutport2;
+    m_textureCopyRenderer.setColorTexture(currentOutport2.colorTexture());
+    m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
+    m_rendererBase.render(eye, m_textureCopyRenderer);
+    renderBoundBox(eye);
+  }
   m_rendererBase.render(eye, m_sphereRenderer);
   renderBoundBox(eye);
 }
@@ -360,6 +468,12 @@ void Z3DPunctaFilter::adjustWidgets()
   m_colorMapScore.setVisible(m_colorMode.isSelected("Colormap Score"));
   m_colorMapMeanIntensity.setVisible(m_colorMode.isSelected("Colormap Mean Intensity"));
   m_colorMapMaxIntensity.setVisible(m_colorMode.isSelected("Colormap Max Intensity"));
+
+  m_glowPercentage.setVisible(m_randomGlow.get());
+  m_textureGlowRenderer.glowModePara().setVisible(m_randomGlow.get());
+  m_textureGlowRenderer.blurRadiusPara().setVisible(m_randomGlow.get());
+  m_textureGlowRenderer.blurScalePara().setVisible(m_randomGlow.get());
+  m_textureGlowRenderer.blurStrengthPara().setVisible(m_randomGlow.get());
 }
 
 void Z3DPunctaFilter::selectPuncta(QMouseEvent *e, int, int h)

@@ -29,6 +29,9 @@ public:
   bool isVisible() const { return m_visible.get(); }
   void setMeshColor(glm::vec4 col) { m_singleColorForAllMesh.set(col); }
 
+  bool isFixed() const { return m_meshList[0]->numVertices() == 96957; }
+  void setGlow(bool v) { m_glow.set(v); }
+
   virtual void process(Z3DEye eye) override;
 
   void setData(std::vector<ZMesh*> *meshList);
@@ -88,7 +91,6 @@ private:
   ZVec4Parameter m_singleColorForAllMesh;
 
   Z3DTextureGlowRenderer m_textureGlowRenderer;
-
   ZBoolParameter m_glow;
   Z3DTextureCopyRenderer m_textureCopyRenderer;
 

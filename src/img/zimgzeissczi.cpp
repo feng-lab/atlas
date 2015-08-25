@@ -230,10 +230,14 @@ ZImg ZImgCZISubBlock::read()
     std::ifstream inputFileStream;
     openFileStream(inputFileStream, m_filename, std::ios_base::in | std::ios_base::binary);
     if (m_mixedTiles) {
-      res = ZImg(ZImgInfo(width, height, 1, m_numChannels, 1, m_bytePerVoxel, m_voxelFormat));
+      double scale = std::pow(0.5, level);
+      res = ZImg(ZImgInfo(std::ceil(width * scale), std::ceil(height * scale), 1, m_numChannels, 1, m_bytePerVoxel, m_voxelFormat));
       for (size_t i=0; i<m_tiles.size(); ++i) {
         ZImg img = readCZITile(inputFileStream, m_tiles[i]);
-        res.pasteImg(img, m_tiles[i].start - m_mixedTilesStart);
+        ZVoxelCoordinate tileStart = m_tiles[i].start - m_mixedTilesStart;
+        tileStart.x *= scale;
+        tileStart.y *= scale;
+        res.pasteImg(img, tileStart);
       }
     } else {
       if (m_tiles.size() == 1) {

@@ -14,6 +14,9 @@
 #include "z3dsphererenderer.h"
 #include "zeventlistenerparameter.h"
 #include "zpuncta.h"
+#include "z3dtextureglowrenderer.h"
+#include "z3drenderport.h"
+#include "z3dtexturecopyrenderer.h"
 
 namespace nim {
 
@@ -38,7 +41,9 @@ public:
     m_colorMode.select(mode.c_str());
   }
 
+  //virtual bool hasOpaque(Z3DEye eye) const override { return Z3DGeometryFilter::hasOpaque(eye) && !m_randomGlow.get(); }
   virtual void renderOpaque(Z3DEye eye) override;
+  virtual bool hasTransparent(Z3DEye eye) const override { return Z3DGeometryFilter::hasTransparent(eye) || m_randomGlow.get(); }
   virtual void renderTransparent(Z3DEye eye) override;
 
 signals:
@@ -53,7 +58,7 @@ protected slots:
   void updateData();
 
 protected:
-  virtual void process(Z3DEye) override;
+  virtual void process(Z3DEye eye) override;
 
   virtual void renderPicking(Z3DEye eye) override;
 
@@ -80,6 +85,13 @@ public slots:
   void updatePunctumVisibleState();
 
 private:
+  Z3DRenderOutputPort m_monoEyeOutport;
+  Z3DRenderOutputPort m_leftEyeOutport;
+  Z3DRenderOutputPort m_rightEyeOutport;
+  Z3DRenderOutputPort m_monoEyeOutport2;
+  Z3DRenderOutputPort m_leftEyeOutport2;
+  Z3DRenderOutputPort m_rightEyeOutport2;
+
   Z3DSphereRenderer m_sphereRenderer;
 
   ZBoolParameter m_visible;
@@ -89,6 +101,12 @@ private:
   ZColorMapParameter m_colorMapMeanIntensity;
   ZColorMapParameter m_colorMapMaxIntensity;
   ZBoolParameter m_useSameSizeForAllPuncta;
+
+  Z3DSphereRenderer m_glowSphereRenderer;
+  Z3DTextureGlowRenderer m_textureGlowRenderer;
+  ZBoolParameter m_randomGlow;
+  ZFloatParameter m_glowPercentage;
+  Z3DTextureCopyRenderer m_textureCopyRenderer;
 
   //std::map<QString, size_t> m_sourceColorMapper;   // should use unordered_map
   // puncta list used for rendering, it is a subset of m_origPunctaList. Some puncta are
@@ -106,6 +124,13 @@ private:
   std::vector<glm::vec4> m_specularAndShininess;
   std::vector<glm::vec4> m_pointColors;
   std::vector<glm::vec4> m_pointPickingColors;
+
+  std::vector<glm::vec4> m_pointAndRadiusGlow;
+  std::vector<glm::vec4> m_specularAndShininessGlow;
+  std::vector<glm::vec4> m_pointColorsGlow;
+  std::vector<glm::vec4> m_pointAndRadiusNormal;
+  std::vector<glm::vec4> m_specularAndShininessNormal;
+  std::vector<glm::vec4> m_pointColorsNormal;
 
   ZWidgetsGroup *m_widgetsGroup;
   bool m_dataIsInvalid;
