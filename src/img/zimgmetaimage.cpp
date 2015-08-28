@@ -35,7 +35,7 @@ QStringList ZImgMetaImage::extensions() const
 }
 
 void ZImgMetaImage::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                             std::vector<size_t> *numPyramidalLevel)
+                             std::vector<std::set<size_t>> *pyramidalRatios)
 {
   MetaImage metaImage;
   if (!metaImage.Read(qPrintable(filename), false, nullptr)) {
@@ -45,7 +45,7 @@ void ZImgMetaImage::readInfo(const QString &filename, std::vector<ZImgInfo> &inf
   parseInfo(metaImage, infos[0]);
   LINFO() << infos[0].toQString();
 
-  createDefaultSubBlocks(filename, infos, subBlocks, numPyramidalLevel);
+  createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 }
 
 void ZImgMetaImage::readMetadata(const QString &, ZImgMetadata &, size_t )
@@ -56,7 +56,7 @@ void ZImgMetaImage::readThumbnail(const QString &, ZImgThumbernail &, const ZImg
 {
 }
 
-void ZImgMetaImage::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t pyramidalLevel)
+void ZImgMetaImage::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -121,7 +121,9 @@ void ZImgMetaImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
     }
   }
 
-  shrinkImg(img, pyramidalLevel);
+  if (ratio > 1) {
+    img.zoom(1.0 / ratio, 1.0 / ratio);
+  }
 }
 
 void ZImgMetaImage::writeImg(const QString &filename, const ZImg &img, Compression comp)

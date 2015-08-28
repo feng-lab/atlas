@@ -74,16 +74,16 @@ struct ZImgSource
 class ZImgSubBlock
 {
 public:
-  ZImgSubBlock(size_t level, size_t t, size_t z,
+  ZImgSubBlock(size_t ratio, size_t t, size_t z,
                int64_t x, int64_t y, size_t width, size_t height)
-    : level(level), t(t), z(z), x(x), y(y), width(width), height(height)
+    : ratio(ratio), t(t), z(z), x(x), y(y), width(width), height(height)
   {}
   virtual ~ZImgSubBlock() {}
 
   // subclass read should depend its own members rather than member of this class
   virtual ZImg read() = 0;
 
-  size_t level;
+  size_t ratio;  // realsize / storedsize
   size_t t;
   size_t z;
   int64_t x;

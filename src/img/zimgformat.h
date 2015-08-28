@@ -5,6 +5,7 @@
 #include "zimginfo.h"
 #include "zimg.h"
 #include <fstream>
+#include <set>
 
 // don't use ZImgFormat and derived class directly, use ZImgIOInstance instead
 
@@ -13,7 +14,7 @@ namespace nim {
 class ZImgCommonSubBlock : public ZImgSubBlock
 {
 public:
-  ZImgCommonSubBlock(const QString &fileName, FileFormat format, size_t scene, size_t level,
+  ZImgCommonSubBlock(const QString &fileName, FileFormat format, size_t scene, size_t ratio,
                      size_t t, size_t z, size_t x, size_t y, size_t width, size_t height);
   virtual ~ZImgCommonSubBlock() {}
 
@@ -58,7 +59,7 @@ public:
   // only info, input can be changed even if read failed
   virtual void readInfo(const QString &filename, std::vector<ZImgInfo> &infos,
                         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                        std::vector<size_t> *numPyramidalLevel) = 0;
+                        std::vector<std::set<size_t>> *pyramidalRatios) = 0;
   // only metadata, input can be changed even if read failed
   virtual void readMetadata(const QString &filename, ZImgMetadata &meta, size_t scene) = 0;
   // only thumbnail, input can be changed even if read failed
@@ -67,7 +68,7 @@ public:
                              const ZImgRegion &region, size_t scene) = 0;
   // read everything, input can be changed even if read failed
   virtual void readImg(const QString &filename, ZImg &img,
-                       const ZImgRegion &region, size_t scene, size_t pyramidalLevel) = 0;
+                       const ZImgRegion &region, size_t scene, size_t ratio) = 0;
 
 
   virtual void writeImg(const QString &filename, const ZImg &img, Compression comp);
@@ -86,13 +87,11 @@ protected:
 
   void createDefaultSubBlocks(const QString &filename, const std::vector<ZImgInfo> &infos,
                               std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                              std::vector<size_t> *numPyramidalLevel);
+                              std::vector<std::set<size_t>> *pyramidalRatios);
 
   void createEmptySubBlocks(const std::vector<ZImgInfo> &infos,
                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                            std::vector<size_t> *numPyramidalLevel);
-
-  void shrinkImg(ZImg &img, size_t pyramidalLevel) const;
+                            std::vector<std::set<size_t>> *pyramidalRatios);
 };
 
 } // namespace

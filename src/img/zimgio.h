@@ -5,6 +5,7 @@
 #include <map>
 #include <QString>
 #include "zimg.h"
+#include <set>
 
 namespace nim {
 
@@ -29,7 +30,7 @@ public:
   // only info
   void readInfo(const QString &filename, std::vector<ZImgInfo> &res,
                 std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks = nullptr,
-                std::vector<size_t> *numPyramidalLevel = nullptr,
+                std::vector<std::set<size_t>> *pyramidalRatios = nullptr,
                 FileFormat format = FileFormat::Unknown);
   void readInfo(const QStringList &fileList, Dimension catDim, std::vector<ZImgInfo> &res,
                 std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks = nullptr,

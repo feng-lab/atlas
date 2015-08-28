@@ -166,7 +166,7 @@ struct CZITile
     sceneIdx[5] = std::numeric_limits<int32_t>::max();
   }
 
-  int level = -1;
+  size_t ratio = 0;  // size / storedsize
   ZVoxelCoordinate start = ZVoxelCoordinate(std::numeric_limits<int32_t>::max(),
                                             std::numeric_limits<int32_t>::max(),
                                             std::numeric_limits<int32_t>::max(),
@@ -186,8 +186,8 @@ bool operator<(const CZITile& lhs, const CZITile& rhs);
 struct MixedTilesSort {
   bool operator()(const CZITile& lhs, const CZITile& rhs) const
   {
-    return std::tie(lhs.level, lhs.start.z, lhs.start.t, lhs.start.c, lhs.start.x, lhs.start.y) <
-        std::tie(rhs.level, rhs.start.z, rhs.start.t, rhs.start.c, rhs.start.x, rhs.start.y);
+    return std::tie(lhs.ratio, lhs.start.z, lhs.start.t, lhs.start.c, lhs.start.x, lhs.start.y) <
+        std::tie(rhs.ratio, rhs.start.z, rhs.start.t, rhs.start.c, rhs.start.x, rhs.start.y);
   }
 };
 
@@ -240,10 +240,10 @@ public:
   virtual FileFormat format() const override { return FileFormat::ZeissCZI; }
   virtual void readInfo(const QString &filename, std::vector<ZImgInfo> &infos,
                         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                        std::vector<size_t> *numPyramidalLevel) override;
+                        std::vector<std::set<size_t>> *pyramidalRatios) override;
   virtual void readMetadata(const QString &filename, ZImgMetadata &meta, size_t scene) override;
   virtual void readThumbnail(const QString &filename, ZImgThumbernail &thumbnail, const ZImgRegion &region, size_t scene) override;
-  virtual void readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t pyramidalLevel) override;
+  virtual void readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio) override;
 
 private:
   void clearInternalState();

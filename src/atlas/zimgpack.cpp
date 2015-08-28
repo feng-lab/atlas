@@ -121,9 +121,11 @@ ZImgPack::ZImgPack(ZImg &img, const QString &fileName)
 
   //createPyramidalFolder(m_imgSource.filenames[0]);
   buildPyramidal(img);
-  for (size_t i=0; i<m_levelTileMaps.size(); ++i) {
-    m_levelWidths.push_back(std::ceil(double(m_imgInfo.width) / (1 << i)));
-    m_levelHeights.push_back(std::ceil(double(m_imgInfo.height) / (1 << i)));
+  m_ratioWidths.push_back(0);
+  m_ratioHeights.push_back(0);
+  for (size_t i=1; i<m_ratioTileMaps.size(); ++i) {
+    m_ratioWidths.push_back(std::ceil(double(m_imgInfo.width) / i));
+    m_ratioHeights.push_back(std::ceil(double(m_imgInfo.height) / i));
   }
 
   updateDerivedData();
@@ -173,9 +175,11 @@ ZImgPack::ZImgPack(const QString &fileName, size_t scene, FileFormat format, siz
     } else {
       buildFastReadIndex(*sceneSubBlock);
     }
-    for (size_t i=0; i<m_levelTileMaps.size(); ++i) {
-      m_levelWidths.push_back(std::ceil(double(m_imgInfo.width) / (1 << i)));
-      m_levelHeights.push_back(std::ceil(double(m_imgInfo.height) / (1 << i)));
+    m_ratioWidths.push_back(0);
+    m_ratioHeights.push_back(0);
+    for (size_t i=1; i<m_ratioTileMaps.size(); ++i) {
+      m_ratioWidths.push_back(std::ceil(double(m_imgInfo.width) / i));
+      m_ratioHeights.push_back(std::ceil(double(m_imgInfo.height) / i));
     }
   }
 
@@ -226,9 +230,11 @@ ZImgPack::ZImgPack(const QStringList &files, Dimension catDim, size_t scene, Fil
     } else {
       buildFastReadIndex(*sceneSubBlock);
     }
-    for (size_t i=0; i<m_levelTileMaps.size(); ++i) {
-      m_levelWidths.push_back(std::ceil(double(m_imgInfo.width) / (1 << i)));
-      m_levelHeights.push_back(std::ceil(double(m_imgInfo.height) / (1 << i)));
+    m_ratioWidths.push_back(0);
+    m_ratioHeights.push_back(0);
+    for (size_t i=1; i<m_ratioTileMaps.size(); ++i) {
+      m_ratioWidths.push_back(std::ceil(double(m_imgInfo.width) / i));
+      m_ratioHeights.push_back(std::ceil(double(m_imgInfo.height) / i));
     }
   }
 
@@ -237,8 +243,8 @@ ZImgPack::ZImgPack(const QStringList &files, Dimension catDim, size_t scene, Fil
 
 ZImgPack::~ZImgPack()
 {
-  for (size_t l=0; l<m_levelTileMaps.size(); ++l) {
-    for (auto it = m_levelTileMaps[l].begin(); it != m_levelTileMaps[l].end(); ++it) {
+  for (size_t l=0; l<m_ratioTileMaps.size(); ++l) {
+    for (auto it = m_ratioTileMaps[l].begin(); it != m_ratioTileMaps[l].end(); ++it) {
       ZImgCacheInstance.remove(boost::hash_value(it->first));
     }
   }
@@ -282,11 +288,13 @@ void ZImgPack::save(QString fileName, FileFormat format, Compression comp)
   m_imgInfo = infos[0];
   m_numScenes = infos.size();
   buildFastReadIndex(subBlocks[0]);
-  m_levelHeights.clear();
-  m_levelWidths.clear();
-  for (size_t i=0; i<m_levelTileMaps.size(); ++i) {
-    m_levelWidths.push_back(std::ceil(double(m_imgInfo.width) / (1 << i)));
-    m_levelHeights.push_back(std::ceil(double(m_imgInfo.height) / (1 << i)));
+  m_ratioHeights.clear();
+  m_ratioWidths.clear();
+  m_ratioWidths.push_back(0);
+  m_ratioHeights.push_back(0);
+  for (size_t i=1; i<m_ratioTileMaps.size(); ++i) {
+    m_ratioWidths.push_back(std::ceil(double(m_imgInfo.width) / i));
+    m_ratioHeights.push_back(std::ceil(double(m_imgInfo.height) / i));
   }
 
   updateDerivedData();
@@ -297,14 +305,22 @@ bool ZImgPack::needUpdate(const QRectF &viewport, double scale, const QRectF &ol
   if (!m_diskCached)
     return false;
 
-  assert(!m_levelTileMaps.empty());
-  size_t level = std::min(m_levelTileMaps.size()-1, static_cast<size_t>(std::max(0.0, -std::ceil(std::log(scale) / std::log(2.0)))));
-  size_t oldLevel = std::min(m_levelTileMaps.size()-1, static_cast<size_t>(std::max(0.0, -std::ceil(std::log(oldScale) / std::log(2.0)))));
-  if (level != oldLevel)
+  assert(!m_ratioTileMaps.empty());
+  size_t needRatio = std::max(1.0, std::floor(1.0 / scale));
+  size_t readRatio = std::min(m_ratioTileMaps.size()-1, needRatio);
+  while (m_ratioTileMaps[readRatio].empty() && readRatio > 1) {
+    --readRatio;
+  }
+  size_t oldNeedRatio = std::max(1.0, std::floor(1.0 / oldScale));
+  size_t oldReadRatio = std::min(m_ratioTileMaps.size()-1, oldNeedRatio);
+  while (m_ratioTileMaps[oldReadRatio].empty() && oldReadRatio > 1) {
+    --oldReadRatio;
+  }
+  if (readRatio != oldReadRatio)
     return true;
 
 
-  for (auto it = m_levelTileMaps[level].begin(); it != m_levelTileMaps[level].end(); ++it) {
+  for (auto it = m_ratioTileMaps[readRatio].begin(); it != m_ratioTileMaps[readRatio].end(); ++it) {
     if (std::get<2>(it->first) != 0 || std::get<3>(it->first) != 0 || std::get<8>(it->first))
       continue;
     int64_t x = std::get<4>(it->first);
@@ -330,13 +346,16 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs, std
   locs.clear();
   scales.clear();
 
-  assert(!m_levelTileMaps.empty());
-  //LINFO() << m_levelTileMaps.size() << scale << -std::ceil(std::log(scale) / std::log(2.0));
-  size_t level = std::min(m_levelTileMaps.size()-1, static_cast<size_t>(std::max(0.0, -std::ceil(std::log(scale) / std::log(2.0)))));
+  assert(!m_ratioTileMaps.empty());
+  size_t needRatio = std::max(1.0, std::floor(1.0 / scale));
+  size_t readRatio = std::min(m_ratioTileMaps.size()-1, needRatio);
+  while (m_ratioTileMaps[readRatio].empty() && readRatio > 1) {
+    --readRatio;
+  }
 
   if (m_imgInfo.depth == 1)
     mip = false;
-  for (auto it = m_levelTileMaps[level].begin(); it != m_levelTileMaps[level].end(); ++it) {
+  for (auto it = m_ratioTileMaps[readRatio].begin(); it != m_ratioTileMaps[readRatio].end(); ++it) {
     if (std::get<2>(it->first) != t || std::get<3>(it->first) != z || std::get<8>(it->first) != mip)
       continue;
     int64_t x = std::get<4>(it->first);
@@ -357,7 +376,7 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs, std
         ZImgCacheInstance.insert(keyHash, imgPtr, (*imgPtr)->byteNumber() / 1024 / 1024);
       }
       locs.push_back(QPoint(x, y));
-      scales.push_back(1 << level);
+      scales.push_back(readRatio);
       //LINFO() << level << (1<<level) << x << y << width << height;
     }
   }
@@ -366,10 +385,10 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs, std
 double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mip) const
 {
   if (m_diskCached) {
-    assert(!m_levelTileMaps.empty());
+    assert(!m_ratioTileMaps.empty());
     if (m_imgInfo.depth == 1)
       mip = false;
-    for (auto it = m_levelTileMaps[0].begin(); it != m_levelTileMaps[0].end(); ++it) {
+    for (auto it = m_ratioTileMaps[1].begin(); it != m_ratioTileMaps[1].end(); ++it) {
       if (std::get<2>(it->first) != t || std::get<3>(it->first) != z || std::get<8>(it->first) != mip)
         continue;
       size_t tx = std::get<4>(it->first);
@@ -427,7 +446,7 @@ ZImg ZImgPack::crop(const ZImgRegion &region) const
   res = ZImg(resInfo);
   // start copy data
   typedef ZVoxelCoordinate::value_type TCoordinate;
-  for (auto it = m_levelTileMaps[0].begin(); it != m_levelTileMaps[0].end(); ++it) {
+  for (auto it = m_ratioTileMaps[1].begin(); it != m_ratioTileMaps[1].end(); ++it) {
     if (std::get<8>(it->first))
       continue;
     size_t t = std::get<2>(it->first);
@@ -472,13 +491,13 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
     return res;
   }
 
-  size_t l = 0;
-  for (; l < m_levelTileMaps.size()-1; ++l) {
-    if (m_levelWidths[l] < width || m_levelHeights[l] < height) {
+  size_t l = 1;
+  for (; l < m_ratioTileMaps.size()-1; ++l) {
+    if (m_ratioWidths[l] < width || m_ratioHeights[l] < height) {
       break;
     }
   }
-  l = std::max(l, size_t(1));
+  l = std::max(l, size_t(2));
   l -= 1;
   if (m_imgInfo.width == width && m_imgInfo.height == height && m_imgInfo.depth == depth) {
     res = assembleImg(l, t);
@@ -523,13 +542,13 @@ ZImg &ZImgPack::maxZProjectedImg()
 ZImg ZImgPack::slice(size_t z, size_t t) const
 {
   assert(m_diskCached);
-  return assembleImg(0, t, z);
+  return assembleImg(1, t, z);
 }
 
 ZImg ZImgPack::allSlices(size_t t) const
 {
   assert(m_diskCached);
-  return assembleImg(0, t);
+  return assembleImg(1, t);
 }
 
 void ZImgPack::createPyramidalFolder(const QString &fileName)
@@ -556,17 +575,17 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
 {
   if (true || (img->width() * img->height() <= 20480 * 20480 &&
       img->width() <= 32767 && img->height() <= 32767)) {
-    size_t level = 0;
-    if (m_levelTileMaps.size() <= level) {
-      m_levelTileMaps.resize(level+1);
+    size_t ratio = 1;
+    if (m_ratioTileMaps.size() <= ratio) {
+      m_ratioTileMaps.resize(ratio+1);
     }
-    ZImgTileKey key(this, level, t, z, 0, 0, img->width(), img->height(), mip);
+    ZImgTileKey key(this, ratio, t, z, 0, 0, img->width(), img->height(), mip);
     if (mip) {
       //QString fn = mipDir.filePath(QString("%1_%2_%3_%4_%5_%6_%7.tif").arg(level).arg(t).arg(z).arg(0).arg(0).arg(img->width()).arg(img->height()));
       //img->save(fn);
-      m_levelTileMaps[level][key] = std::shared_ptr<ZImgSubBlock>(new ZImgPackSubBlock(m_imgSource, t, 0, m_imgInfo.depth, key));
+      m_ratioTileMaps[ratio][key] = std::shared_ptr<ZImgSubBlock>(new ZImgPackSubBlock(m_imgSource, t, 0, m_imgInfo.depth, key));
     } else {
-      m_levelTileMaps[level][key] = std::shared_ptr<ZImgSubBlock>(new ZImgPackSubBlock(m_imgSource, t, z, key));;
+      m_ratioTileMaps[ratio][key] = std::shared_ptr<ZImgSubBlock>(new ZImgPackSubBlock(m_imgSource, t, z, key));;
     }
     ZImgCacheInstance.insert(boost::hash_value(key), new std::shared_ptr<ZImg>(img), img->byteNumber() / 1024 / 1024);
     return;
@@ -577,8 +596,8 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
 
   size_t level = 0;
   while (true) {
-    if (m_levelTileMaps.size() <= level) {
-      m_levelTileMaps.resize(level+1);
+    if (m_ratioTileMaps.size() <= level) {
+      m_ratioTileMaps.resize(level+1);
     }
     size_t lastCol = img->width() % m_tileSize;
     size_t lastRow = img->height() % m_tileSize;
@@ -595,7 +614,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
         fn = dir.filePath(QString("%1_%2_%3_%4_%5_%6_%7.tif").arg(level).arg(t).arg(z).arg(0).arg(0).arg(width).arg(height));
       }
       img->save(fn);
-      m_levelTileMaps[level][key] = std::shared_ptr<ZImgSubBlock>(new ZImgPackSubBlock(fn, key));
+      m_ratioTileMaps[level][key] = std::shared_ptr<ZImgSubBlock>(new ZImgPackSubBlock(fn, key));
       ZImgCacheInstance.insert(boost::hash_value(key), new std::shared_ptr<ZImg>(img), img->byteNumber() / 1024 / 1024);
       break;
     } else {
@@ -619,7 +638,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
           } else {
             fn = dir.filePath(QString("%1_%2_%3_%4_%5_%6_%7.tif").arg(level).arg(t).arg(z).arg(startX).arg(startY).arg(width).arg(height));
           }
-          m_levelTileMaps[level][key] = std::shared_ptr<ZImgSubBlock>(new ZImgPackSubBlock(fn, key));
+          m_ratioTileMaps[level][key] = std::shared_ptr<ZImgSubBlock>(new ZImgPackSubBlock(fn, key));
           cropped->save(fn);
           ZImgCacheInstance.insert(boost::hash_value(key), new std::shared_ptr<ZImg>(cropped), cropped->byteNumber() / 1024 / 1024);
         }
@@ -719,41 +738,42 @@ void ZImgPack::buildPyramidal()
 
 void ZImgPack::buildFastReadIndex(const std::vector<std::shared_ptr<ZImgSubBlock>> &subBlocks)
 {
-  m_levelTileMaps.clear();
+  m_ratioTileMaps.clear();
   for (size_t i=0; i<subBlocks.size(); ++i) {
     ZImgSubBlock *sb = subBlocks[i].get();
-    if (m_levelTileMaps.size() <= sb->level)
-      m_levelTileMaps.resize(sb->level+1);
-    ZImgTileKey key(this, sb->level, sb->t, sb->z, sb->x, sb->y, sb->width, sb->height, false);
-    m_levelTileMaps[sb->level][key] = subBlocks[i];
+    if (m_ratioTileMaps.size() <= sb->ratio)
+      m_ratioTileMaps.resize(sb->ratio+1);
+    ZImgTileKey key(this, sb->ratio, sb->t, sb->z, sb->x, sb->y, sb->width, sb->height, false);
+    m_ratioTileMaps[sb->ratio][key] = subBlocks[i];
   }
 
   if (m_imgInfo.depth > 1) {
     for (size_t t=0; t<m_imgInfo.numTimes; ++t) {
       ZImgTileKey key(this, 0, t, 0, 0, 0, m_imgInfo.width, m_imgInfo.height, true);
-      m_levelTileMaps[0][key] = std::shared_ptr<ZImgSubBlock>(new ZImgPackSubBlock(m_imgSource, t, 0, m_imgInfo.depth, key));
+      m_ratioTileMaps[1][key] = std::shared_ptr<ZImgSubBlock>(new ZImgPackSubBlock(m_imgSource, t, 0, m_imgInfo.depth, key));
     }
   }
 }
 
-ZImg ZImgPack::assembleImg(size_t level) const
+ZImg ZImgPack::assembleImg(size_t ratio) const
 {
+  assert(ratio >= 1);
   ZImgInfo info = m_imgInfo;
-  if (level > 0) {
-    info.width = m_levelWidths[level];
-    info.height = m_levelHeights[level];
+  if (ratio > 1) {
+    info.width = m_ratioWidths[ratio];
+    info.height = m_ratioHeights[ratio];
   }
   //LINFO() << info.toQString();
   ZImg res(info);
 
-  for (auto it = m_levelTileMaps[level].begin(); it != m_levelTileMaps[level].end(); ++it) {
+  for (auto it = m_ratioTileMaps[ratio].begin(); it != m_ratioTileMaps[ratio].end(); ++it) {
     if (std::get<8>(it->first))
       continue;
     size_t t = std::get<2>(it->first);
     size_t z = std::get<3>(it->first);
     int64_t x = std::get<4>(it->first);
     int64_t y = std::get<5>(it->first);
-    ZVoxelCoordinate start(std::ceil(x / std::pow(2, level)), std::ceil(y / std::pow(2, level)), z, 0, t);
+    ZVoxelCoordinate start(std::ceil(x / double(ratio)), std::ceil(y / double(ratio)), z, 0, t);
 
     size_t keyHash = boost::hash_value(it->first);
     std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(keyHash);
@@ -771,18 +791,19 @@ ZImg ZImgPack::assembleImg(size_t level) const
   return res;
 }
 
-ZImg ZImgPack::assembleImg(size_t level, size_t t) const
+ZImg ZImgPack::assembleImg(size_t ratio, size_t t) const
 {
+  assert(ratio >= 1);
   //LINFO() << "assemble level" << level;
   ZImgRegion rgn(0,-1,0,-1,0,-1,0,-1,t,t+1);
   ZImgInfo info = rgn.clip(m_imgInfo);
-  if (level > 0) {
-    info.width = m_levelWidths[level];
-    info.height = m_levelHeights[level];
+  if (ratio > 1) {
+    info.width = m_ratioWidths[ratio];
+    info.height = m_ratioHeights[ratio];
   }
   ZImg res(info);
 
-  for (auto it = m_levelTileMaps[level].begin(); it != m_levelTileMaps[level].end(); ++it) {
+  for (auto it = m_ratioTileMaps[ratio].begin(); it != m_ratioTileMaps[ratio].end(); ++it) {
     size_t tt = std::get<2>(it->first);
     if (tt != t)
       continue;
@@ -791,7 +812,7 @@ ZImg ZImgPack::assembleImg(size_t level, size_t t) const
     size_t z = std::get<3>(it->first);
     int64_t x = std::get<4>(it->first);
     int64_t y = std::get<5>(it->first);
-    ZVoxelCoordinate start(std::ceil(x / std::pow(2, level)), std::ceil(y / std::pow(2, level)), z, 0, 0);
+    ZVoxelCoordinate start(std::ceil(x / double(ratio)), std::ceil(y / double(ratio)), z, 0, 0);
 
     size_t keyHash = boost::hash_value(it->first);
     std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(keyHash);
@@ -809,17 +830,18 @@ ZImg ZImgPack::assembleImg(size_t level, size_t t) const
   return res;
 }
 
-ZImg ZImgPack::assembleImg(size_t level, size_t t, size_t z) const
+ZImg ZImgPack::assembleImg(size_t ratio, size_t t, size_t z) const
 {
+  assert(ratio >= 1);
   ZImgRegion rgn(0,-1,0,-1,z,z+1,0,-1,t,t+1);
   ZImgInfo info = rgn.clip(m_imgInfo);
-  if (level > 0) {
-    info.width = m_levelWidths[level];
-    info.height = m_levelHeights[level];
+  if (ratio > 1) {
+    info.width = m_ratioWidths[ratio];
+    info.height = m_ratioHeights[ratio];
   }
   ZImg res(info);
 
-  for (auto it = m_levelTileMaps[level].begin(); it != m_levelTileMaps[level].end(); ++it) {
+  for (auto it = m_ratioTileMaps[ratio].begin(); it != m_ratioTileMaps[ratio].end(); ++it) {
     size_t tt = std::get<2>(it->first);
     if (tt != t)
       continue;
@@ -830,7 +852,7 @@ ZImg ZImgPack::assembleImg(size_t level, size_t t, size_t z) const
       continue;
     int64_t x = std::get<4>(it->first);
     int64_t y = std::get<5>(it->first);
-    ZVoxelCoordinate start(std::ceil(x / std::pow(2, level)), std::ceil(y / std::pow(2, level)), 0, 0, 0);
+    ZVoxelCoordinate start(std::ceil(x / double(ratio)), std::ceil(y / double(ratio)), 0, 0, 0);
 
     size_t keyHash = boost::hash_value(it->first);
     std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(keyHash);

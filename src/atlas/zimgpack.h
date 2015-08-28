@@ -10,7 +10,7 @@ namespace nim {
 
 class ZImgPack;
 // 0    1     2  3  4  5  6       7       8
-// pt, level, t, z, x, y, width, height, mip
+// pt, ratio, t, z, x, y, width, height, mip
 using ZImgTileKey = std::tuple<ZImgPack*, size_t, size_t, size_t, int64_t, int64_t, size_t, size_t, bool>;
 
 class ZImgPackSubBlock : public ZImgSubBlock
@@ -117,9 +117,9 @@ protected:
   void buildPyramidal(ZImg& img);
   void buildPyramidal();
   void buildFastReadIndex(const std::vector<std::shared_ptr<ZImgSubBlock>> &subBlocks);
-  ZImg assembleImg(size_t level) const;
-  ZImg assembleImg(size_t level, size_t t) const;
-  ZImg assembleImg(size_t level, size_t t, size_t z) const;
+  ZImg assembleImg(size_t ratio) const;
+  ZImg assembleImg(size_t ratio, size_t t) const;
+  ZImg assembleImg(size_t ratio, size_t t, size_t z) const;
 
   void updateDerivedData();
   void updateNameTootip();
@@ -146,9 +146,9 @@ private:
   size_t m_tileSize = 4096;
   int64_t m_fastReadSizeThreshold = 100 * 1024 * 1024;  // 100MB
   QString m_pyramidalFolder;
-  std::vector<std::map<ZImgTileKey, std::shared_ptr<ZImgSubBlock>>> m_levelTileMaps;
-  std::vector<size_t> m_levelWidths;
-  std::vector<size_t> m_levelHeights;
+  std::vector<std::map<ZImgTileKey, std::shared_ptr<ZImgSubBlock>>> m_ratioTileMaps;
+  std::vector<size_t> m_ratioWidths;
+  std::vector<size_t> m_ratioHeights;
 
   double m_minIntensity;
   double m_maxIntensity;

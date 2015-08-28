@@ -50,7 +50,7 @@ ZImgIO::~ZImgIO()
 
 void ZImgIO::readInfo(const QString &filename, std::vector<ZImgInfo> &res,
                       std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                      std::vector<size_t> *numPyramidalLevel,
+                      std::vector<std::set<size_t> > *pyramidalRatios,
                       FileFormat format)
 {
   res.clear();
@@ -66,7 +66,7 @@ void ZImgIO::readInfo(const QString &filename, std::vector<ZImgInfo> &res,
           std::vector<ZImgInfo> tmpInfo;
           if (subBlocks)
             subBlocks->clear();
-          readers[i]->readInfo(filename, tmpInfo, subBlocks, numPyramidalLevel);
+          readers[i]->readInfo(filename, tmpInfo, subBlocks, pyramidalRatios);
           if (!tmpInfo.empty()) {
             tmpInfo.swap(res);
             return;
@@ -86,7 +86,7 @@ void ZImgIO::readInfo(const QString &filename, std::vector<ZImgInfo> &res,
       std::vector<ZImgInfo> tmpInfo;
       if (subBlocks)
         subBlocks->clear();
-      m_ioFormats[format]->readInfo(filename, tmpInfo, subBlocks, numPyramidalLevel);
+      m_ioFormats[format]->readInfo(filename, tmpInfo, subBlocks, pyramidalRatios);
       if (!tmpInfo.empty()) {
         tmpInfo.swap(res);
         return;

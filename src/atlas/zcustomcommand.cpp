@@ -8,6 +8,7 @@
 #include "zregistrationnumericdiffcostfunction.h"
 #include "zswc.h"
 #include "zimgio.h"
+#include "zmesh.h"
 
 namespace nim {
 
@@ -215,6 +216,31 @@ void resizeInjectionCoreImgs()
     img.zoom(0.3, 0.3);
     QString outname = outFolder + fileInfo.baseName() + ".ome.tif";
     img.save(outname);
+  }
+}
+
+void transfromMesh()
+{
+  QDir dir("/Users/feng/Downloads/all_obj/pial_Full");
+  QStringList filters;
+  filters << "*.obj";
+  QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+  list.append(QDir("/Users/feng/Downloads/all_obj").entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
+  QString outFolder = "/Users/feng/code/Neural-Network/models";
+  glm::mat4 mat;
+  nim::toVal(QString("[1.03, 0, 0, 0; 0, 6.13928e-08, 1.03, 0; 0, -1.03, 6.13928e-08, 0; 0, 0, 0, 1]"), mat);
+
+  for (int i=0; i<list.size(); i++) {
+    QFileInfo fileInfo = list.at(i);
+    ZMesh msh(fileInfo.absoluteFilePath());
+
+    std::vector<glm::vec3> vertices = msh.vertices();
+    for (size_t i=0; i<vertices.size(); ++i) {
+      vertices[i] = glm::applyMatrix(mat, vertices[i]);
+    }
+    msh.setVertices(vertices);
+    msh.generateNormals();
+    msh.save(QString("%1/%2").arg(outFolder).arg(fileInfo.fileName()));
   }
 }
 

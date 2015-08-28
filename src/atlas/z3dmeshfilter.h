@@ -56,6 +56,8 @@ protected slots:
   void adjustWidgets();
   void selectMesh(QMouseEvent *e, int w, int h);
 
+  void onApplyTransform();
+
 protected:
   virtual void renderPicking(Z3DEye eye) override;
 

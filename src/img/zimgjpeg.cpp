@@ -368,7 +368,7 @@ QStringList ZImgJpeg::extensions() const
 }
 
 void ZImgJpeg::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                        std::vector<size_t> *numPyramidalLevel)
+                        std::vector<std::set<size_t>> *pyramidalRatios)
 {
   std::unique_ptr<FILE, int (*)(FILE*)> infile(fopen(qPrintable(filename), "rb"), fclose);
   if (!infile) {
@@ -385,7 +385,7 @@ void ZImgJpeg::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, s
 
   finishReading(cinfo);
 
-  createDefaultSubBlocks(filename, infos, subBlocks, numPyramidalLevel);
+  createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 }
 
 void ZImgJpeg::readMetadata(const QString &filename, ZImgMetadata &meta, size_t scene)
@@ -500,7 +500,7 @@ void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
   finishReading(cinfo);
 }
 
-void ZImgJpeg::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t pyramidalLevel)
+void ZImgJpeg::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -522,7 +522,9 @@ void ZImgJpeg::readImg(const QString &filename, ZImg &img, const ZImgRegion &reg
   readThumbnail(filename, img.thumbnailRef(), region, scene);
   readMetadata(filename, img.metadataRef(), scene);
 
-  shrinkImg(img, pyramidalLevel);
+  if (ratio > 1) {
+    img.zoom(1.0 / ratio, 1.0 / ratio);
+  }
 }
 
 bool ZImgJpeg::supportRead() const

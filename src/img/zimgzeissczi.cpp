@@ -190,13 +190,13 @@ namespace nim {
 
 bool operator<(const CZITile &lhs, const CZITile &rhs)
 {
-  return std::tie(lhs.level, lhs.start.x, lhs.start.y, lhs.start.z, lhs.start.t, lhs.start.c) <
-      std::tie(rhs.level, rhs.start.x, rhs.start.y, rhs.start.z, rhs.start.t, rhs.start.c);
+  return std::tie(lhs.ratio, lhs.start.x, lhs.start.y, lhs.start.z, lhs.start.t, lhs.start.c) <
+      std::tie(rhs.ratio, rhs.start.x, rhs.start.y, rhs.start.z, rhs.start.t, rhs.start.c);
 }
 
 ZImgCZISubBlock::ZImgCZISubBlock(const QString &fileName, std::vector<CZITile> &tiles,
                                  bool mixedTiles, size_t numChannels, size_t bytePerVoxel, VoxelFormat vf)
-  : ZImgSubBlock(tiles[0].level, tiles[0].start.t, tiles[0].start.z, tiles[0].start.x, tiles[0].start.y, tiles[0].size.x, tiles[0].size.y)
+  : ZImgSubBlock(tiles[0].ratio, tiles[0].start.t, tiles[0].start.z, tiles[0].start.x, tiles[0].start.y, tiles[0].size.x, tiles[0].size.y)
   , m_filename(fileName)
   , m_mixedTiles(mixedTiles)
   , m_mixedTilesStart(ZVoxelCoordinate::Init::Maximum)
@@ -230,7 +230,7 @@ ZImg ZImgCZISubBlock::read()
     std::ifstream inputFileStream;
     openFileStream(inputFileStream, m_filename, std::ios_base::in | std::ios_base::binary);
     if (m_mixedTiles) {
-      double scale = std::pow(0.5, level);
+      double scale = 1.0 / ratio;
       res = ZImg(ZImgInfo(std::ceil(width * scale), std::ceil(height * scale), 1, m_numChannels, 1, m_bytePerVoxel, m_voxelFormat));
       for (size_t i=0; i<m_tiles.size(); ++i) {
         ZImg img = readCZITile(inputFileStream, m_tiles[i]);
@@ -304,7 +304,7 @@ ZImg ZImgZeissCZI::stackTiles(const QString &filename, size_t ch, size_t scene)
 
   std::vector<ZImg> imgs;
   for (auto it=m_sceneTiles[scene].cbegin(); it != m_sceneTiles[scene].cend(); ++it) {
-    if (it->level == 0 && it->start.c == static_cast<int>(ch)) {
+    if (it->ratio == size_t(1) && it->start.c == static_cast<int>(ch)) {
       imgs.push_back(readCZITile(inputFileStream, *it));
     }
   }
@@ -347,7 +347,7 @@ ZImg ZImgZeissCZI::stackTiles(const QString &filename, size_t ch, size_t scene, 
 
   std::vector<ZImg> imgs;
   for (auto it=m_sceneTiles[scene].cbegin(); it != m_sceneTiles[scene].cend(); ++it) {
-    if (it->level == 0 && it->start.c == static_cast<int>(ch)) {
+    if (it->ratio == size_t(1) && it->start.c == static_cast<int>(ch)) {
       int startX = std::max(0.0, std::floor(it->start.x * scale));
       int endX = std::min(inverseMask.width() * 1.0, startX + std::ceil(it->size.x * scale));
       int startY = std::max(0.0, std::floor(it->start.y * scale));
@@ -416,7 +416,7 @@ ZImg ZImgZeissCZI::correctShading(const QString &filename, size_t ch, size_t sce
     meanZ = mean(modelZ.channelData<double>(0), modelZ.channelData<double>(0) + modelZ.channelVoxelNumber());
   }
   for (auto it=m_sceneTiles[scene].cbegin(); it != m_sceneTiles[scene].cend(); ++it) {
-    if (it->level == 0 && it->start.c == static_cast<int>(ch)) {
+    if (it->ratio == size_t(1) && it->start.c == static_cast<int>(ch)) {
       ZImg origtile = readCZITile(inputFileStream, *it);
       ZImg tile = origtile.castTo<double>();
       origtile.clear();
@@ -473,7 +473,7 @@ QStringList ZImgZeissCZI::extensions() const
 
 void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &infos,
                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                            std::vector<size_t> *numPyramidalLevel)
+                            std::vector<std::set<size_t>> *pyramidalRatios)
 {
   //dump(filename);
   clearInternalState();
@@ -496,7 +496,7 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
   detectInfos(infos, inputFileStream, fh);
 
   if (m_someTilesAreNot2D) {
-    createDefaultSubBlocks(filename, infos, subBlocks, numPyramidalLevel);
+    createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
   } else {
     if (subBlocks) {
       subBlocks->resize(infos.size());
@@ -516,19 +516,27 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
         bool mixAllTilesIfNecessary = true;
         bool hasMixedTiles = false;
 
-        int currnetLevel = -1;
+        size_t currnetRatio = 0;
         int currentX = -1;
         int currentY = -1;
         int currentZ = -1;
         int currentT = -1;
         for (auto it = m_sceneTiles[s].cbegin(); it != m_sceneTiles[s].cend(); ++it) {
           const CZITile &tile = *it;
-          if (currnetLevel < 0 || tile.level != currnetLevel || tile.start.x != currentX || tile.start.y != currentY ||
+          if (currnetRatio < size_t(1) || tile.ratio != currnetRatio || tile.start.x != currentX || tile.start.y != currentY ||
               tile.start.z != currentZ || tile.start.t != currentT) {
             if (tiles.size() == infos[s].numChannels) {
               subBlocks->at(s).emplace_back(new ZImgCZISubBlock(filename, tiles));
             } else if (!tiles.empty()) {
               hasMixedTiles = true;
+
+//              LINFO() << "";
+//              LINFO() << "";
+//              LINFO() << "";
+//              for (size_t tp=0; tp<tiles.size(); ++tp) {
+//                LINFO() << tiles[tp].ratio << tiles[tp].start << tiles[tp].size;
+//              }
+
               if(mixAllTilesIfNecessary) {
                 subBlocks->at(s).clear();
                 break;
@@ -537,7 +545,7 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
               }
             }
             tiles.clear();
-            currnetLevel = tile.level;
+            currnetRatio = tile.ratio;
             currentX = tile.start.x;
             currentY = tile.start.y;
             currentZ = tile.start.z;
@@ -551,24 +559,25 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
         }
 
         if (hasMixedTiles) {
+          LINFO() << "scene" << s << "with mixed tiles";
           if (mixAllTilesIfNecessary) {
             assert(allMixedTiles.empty());
             allMixedTiles.insert(m_sceneTiles[s].cbegin(), m_sceneTiles[s].cend());
           }
 
           // process mixed tiles
-          currnetLevel = -1;
+          currnetRatio = 0;
           currentZ = -1;
           currentT = -1;
           for (auto it = allMixedTiles.cbegin(); it != allMixedTiles.cend(); ++it) {
             const CZITile &tile = *it;
-            if (currnetLevel < 0 || tile.level != currnetLevel || tile.start.z != currentZ || tile.start.t != currentT) {
+            if (currnetRatio < size_t(1) || tile.ratio != currnetRatio || tile.start.z != currentZ || tile.start.t != currentT) {
               if (!tiles.empty()) {
                 subBlocks->at(s).emplace_back(new ZImgCZISubBlock(filename, tiles, true, infos[s].numChannels, infos[s].bytesPerVoxel,
                                                                   infos[s].voxelFormat));
                 tiles.clear();
               }
-              currnetLevel = tile.level;
+              currnetRatio = tile.ratio;
               currentZ = tile.start.z;
               currentT = tile.start.t;
             }
@@ -581,15 +590,13 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
         }
       }
     }
-    if (numPyramidalLevel) {
-      numPyramidalLevel->resize(infos.size());
+    if (pyramidalRatios) {
+      pyramidalRatios->resize(infos.size());
       for (size_t s=0; s<infos.size(); ++s) {
-        numPyramidalLevel->at(s) = 0;
         for (auto it=m_sceneTiles[s].cbegin(); it != m_sceneTiles[s].cend(); ++it) {
-          assert(it->level >= 0);
-          numPyramidalLevel->at(s) = std::max(numPyramidalLevel->at(s), size_t(it->level));
+          assert(it->ratio >= 1);
+          pyramidalRatios->at(s).insert(it->ratio);
         }
-        ++(numPyramidalLevel->at(s));
       }
     }
   }
@@ -646,7 +653,7 @@ void ZImgZeissCZI::readThumbnail(const QString &filename, ZImgThumbernail &thumb
   Q_UNUSED(scene);
 }
 
-void ZImgZeissCZI::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t pyramidalLevel)
+void ZImgZeissCZI::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
 {
   clearInternalState();
 
@@ -680,23 +687,26 @@ void ZImgZeissCZI::readImg(const QString &filename, ZImg &img, const ZImgRegion 
   ZImgRegion rgn = region;
   rgn.resolveRegionEnd(info);
 
-  int maxPyramidalLevel = 0;
+  std::set<size_t> pyRatios;
   for (auto it = m_sceneTiles[scene].cbegin(); it != m_sceneTiles[scene].cend(); ++it) {
-    assert(it->level >= 0);
-    maxPyramidalLevel = std::max(maxPyramidalLevel, it->level);
+    assert(it->ratio >= 1);
+    pyRatios.insert(it->ratio);
   }
 
-  int pl = pyramidalLevel;
-
-  int remainingLevel = pl - maxPyramidalLevel;
-  if (remainingLevel > 0) {
-    pl = maxPyramidalLevel;
+  assert(ratio >= 1);
+  size_t readRatio = 0;
+  for (auto it = pyRatios.cbegin(); it != pyRatios.cend(); ++it) {
+    if (*it <= ratio) {
+      readRatio = *it;
+    } else {
+      break;
+    }
   }
 
-  double scale = std::pow(0.5, pl);
+  double scale = 1.0 / readRatio;
 
   if (rgn.containsWholeImg(info)) {
-    if (pl > 0) {
+    if (readRatio > 1) {
       info.width = std::ceil(info.width * scale);
       info.height = std::ceil(info.height * scale);
       info.voxelSizeX /= scale;
@@ -705,22 +715,22 @@ void ZImgZeissCZI::readImg(const QString &filename, ZImg &img, const ZImgRegion 
     img = ZImg(info);
     for (auto it = m_sceneTiles[scene].cbegin(); it != m_sceneTiles[scene].cend(); ++it) {
       auto &tile = *it;
-      if (tile.level == pl) {
+      if (tile.ratio == readRatio) {
         ZImg tileImg = readCZITile(inputFileStream, tile);
         ZVoxelCoordinate start = tile.start;
-        if (pl > 0) {
+        if (readRatio > 1) {
           start.x *= scale;
           start.y *= scale;
         }
         img.pasteImg(tileImg, start);
       }
-      if (tile.level > pl) {
+      if (tile.ratio > readRatio) {
         break;
       }
     }
   } else {
     ZImgInfo resInfo = rgn.clip(info);
-    if (pl > 0) {
+    if (readRatio > 1) {
       resInfo.width = std::ceil(resInfo.width * scale);
       resInfo.height = std::ceil(resInfo.height * scale);
       resInfo.voxelSizeX /= scale;
@@ -730,19 +740,19 @@ void ZImgZeissCZI::readImg(const QString &filename, ZImg &img, const ZImgRegion 
     ZBBox<ZVoxelCoordinate> imgBox(rgn.start, rgn.end-1);
     for (auto it = m_sceneTiles[scene].cbegin(); it != m_sceneTiles[scene].cend(); ++it) {
       auto &tile = *it;
-      if (tile.level == pl) {
+      if (tile.ratio == readRatio) {
         ZBBox<ZVoxelCoordinate> tileBox(tile.start, tile.start+tile.size-1);
         if (imgBox.conjoint(tileBox)) {
           ZImg tileImg = readCZITile(inputFileStream, tile);
           ZVoxelCoordinate start = tile.start - rgn.start;
-          if (pl > 0) {
+          if (readRatio > 1) {
             start.x *= scale;
             start.y *= scale;
           }
           img.pasteImg(tileImg, start);
         }
       }
-      if (tile.level > pl) {
+      if (tile.ratio > readRatio) {
         break;
       }
     }
@@ -751,8 +761,8 @@ void ZImgZeissCZI::readImg(const QString &filename, ZImg &img, const ZImgRegion 
   ZImgMetatag tag("metadata", m_metadataXmlString);
   img.metadataRef().attachToTopLevel(tag);
 
-  if (remainingLevel > 0) {
-    shrinkImg(img, remainingLevel);
+  if (ratio > readRatio) {
+    img.zoom(1.0 * readRatio / ratio, 1.0 * readRatio / ratio);
   }
 }
 
@@ -1197,7 +1207,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
     tile.filePosition = de.filePosition;
     tile.pixelType = de.pixelType;
     if (de.pyramidType == 0)
-      tile.level = 0;
+      tile.ratio = 1;
     bool tileValid = true;
     for (size_t i=0; i<dimensionEntries.size(); ++i) {
       DimensionEntryDV1 dimE = dimensionEntries[i];
@@ -1212,15 +1222,15 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
         tile.start.x = dimE.start;
         tile.size.x = dimE.size;
         if (de.pyramidType != 0) {
-          int l = std::round(std::log2(std::round(double(dimE.size) / dimE.storedSize)));
-          if (l < 1) {
+          size_t l = std::round(double(dimE.size) / dimE.storedSize);
+          if (l < 2) {
             tileValid = false;
             break;
           }
-          if (tile.level > 0 && tile.level != l) {
+          if (tile.ratio > size_t(1) && tile.ratio != l) {
             throw ZIOException("level does not match");
           } else {
-            tile.level = l;
+            tile.ratio = l;
           }
         } else if (dimE.storedSize != dimE.size) {
           tileValid = false;
@@ -1232,15 +1242,15 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
         tile.start.y = dimE.start;
         tile.size.y = dimE.size;
         if (de.pyramidType != 0) {
-          int l = std::round(std::log2(std::round(double(dimE.size) / dimE.storedSize)));
-          if (l < 1) {
+          size_t l = std::round(double(dimE.size) / dimE.storedSize);
+          if (l < 2) {
             tileValid = false;
             break;
           }
-          if (tile.level > 0 && tile.level != l) {
+          if (tile.ratio > size_t(1) && tile.ratio != l) {
             throw ZIOException("level does not match");
           } else {
-            tile.level = l;
+            tile.ratio = l;
           }
         } else if (dimE.storedSize != dimE.size) {
           tileValid = false;
@@ -1369,7 +1379,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
 
     for (size_t i=0; i<it->second.size(); ++i) {
       const CZITile &tile = it->second.at(i);
-      if (tile.level != 0)
+      if (tile.ratio != size_t(1))
         continue;
       start = min(start, tile.start);
       end = max(end, tile.start + tile.size);
@@ -1514,6 +1524,14 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
       tile.start -= start;
       m_sceneTiles[m_sceneTiles.size()-1].insert(tile);
     }
+
+//    for (size_t j=0; j<20; ++j) {
+//      LINFO() << "";
+//    }
+//    for (auto it=m_sceneTiles[m_sceneTiles.size()-1].cbegin();
+//         it != m_sceneTiles[m_sceneTiles.size()-1].cend(); ++it) {
+//      LINFO() << it->ratio << it->start << it->size << it->storedSize;
+//    }
   }
 
   if (m_hasSceneInfo) {

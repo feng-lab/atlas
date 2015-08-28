@@ -4,6 +4,7 @@
 #include "zrandom.h"
 #include <QFileInfo>
 #include "z3drenderport.h"
+#include <QPushButton>
 
 namespace nim {
 
@@ -182,8 +183,12 @@ ZWidgetsGroup *Z3DMeshFilter::widgetsGroup()
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
     for (size_t i=0; i<paras.size(); i++) {
       ZParameter *para = paras[i];
-      if (para->name() == "Coord Transform")
+      if (para->name() == "Coord Transform") {
         new ZWidgetsGroup(para, m_widgetsGroup, 2);
+        QPushButton *pb = new QPushButton("Apply Transform");
+        connect(pb, SIGNAL(clicked(bool)), this, SLOT(onApplyTransform()));
+        new ZWidgetsGroup(pb, m_widgetsGroup, 2);
+      }
       //else if (para->name() == "Size Scale")
         //new ZWidgetsGroup(para, m_widgetsGroup, 3);
       //else if (para->name() == "Rendering Method")
@@ -448,6 +453,11 @@ void Z3DMeshFilter::selectMesh(QMouseEvent *e, int , int h)
     }
     m_pressedMesh = nullptr;
   }
+}
+
+void Z3DMeshFilter::onApplyTransform()
+{
+  LINFO() << m_rendererBase.coordTransform();
 }
 
 void Z3DMeshFilter::updateMeshVisibleState()

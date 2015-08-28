@@ -34,7 +34,7 @@ QStringList ZImgTiff::extensions() const
 }
 
 void ZImgTiff::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                        std::vector<size_t> *numPyramidalLevel)
+                        std::vector<std::set<size_t>> *pyramidalRatios)
 {
   clearInternalState();
   ZTiff tiff;
@@ -42,7 +42,7 @@ void ZImgTiff::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, s
   detectImgInfo(tiff);
   infos = m_imgInfo;
 
-  createDefaultSubBlocks(filename, infos, subBlocks, numPyramidalLevel);
+  createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 
   if (!m_imageDescription.isEmpty()) {
     LINFO() << m_imageDescription;
@@ -73,7 +73,7 @@ void ZImgTiff::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
   readThumbnailInternal(thumbnail, region, scene, tiff);
 }
 
-void ZImgTiff::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t pyramidalLevel)
+void ZImgTiff::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
 {
   clearInternalState();
   ZTiff tiff;
@@ -135,7 +135,9 @@ void ZImgTiff::readImg(const QString &filename, ZImg &img, const ZImgRegion &reg
   readThumbnailInternal(imgTmp.thumbnailRef(), region, scene, tiff);
   imgTmp.swap(img);
 
-  shrinkImg(img, pyramidalLevel);
+  if (ratio > 1) {
+    img.zoom(1.0 / ratio, 1.0 / ratio);
+  }
 }
 
 void ZImgTiff::writeImg(const QString &filename, const ZImg &img, Compression comp)

@@ -177,7 +177,7 @@ QStringList ZImgFreeImage::extensions() const
  }
 
 void ZImgFreeImage::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                             std::vector<size_t> *numPyramidalLevel)
+                             std::vector<std::set<size_t>> *pyramidalRatios)
 {
   FREE_IMAGE_FORMAT fmt = fipImage::identifyFIF(qPrintable(filename));
   if (fmt == FIF_UNKNOWN) {
@@ -204,7 +204,7 @@ void ZImgFreeImage::readInfo(const QString &filename, std::vector<ZImgInfo> &inf
     infos.push_back(readInfoFromFIPImage(fipImg));
   }
 
-  createDefaultSubBlocks(filename, infos, subBlocks, numPyramidalLevel);
+  createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 }
 
 void ZImgFreeImage::readMetadata(const QString &filename, ZImgMetadata &meta, size_t scene)
@@ -222,7 +222,7 @@ void ZImgFreeImage::readThumbnail(const QString &filename, ZImgThumbernail &thum
   Q_UNUSED(scene);
 }
 
-void ZImgFreeImage::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t pyramidalLevel)
+void ZImgFreeImage::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
 {
   std::vector<ZImgInfo> infos;
   readInfo(filename, infos, nullptr, nullptr);
@@ -341,7 +341,9 @@ void ZImgFreeImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
     img = img.crop(region);
   }
 
-  shrinkImg(img, pyramidalLevel);
+  if (ratio > 1) {
+    img.zoom(1.0 / ratio, 1.0 / ratio);
+  }
 }
 
 void ZImgFreeImage::readInfo(uint8_t *mem, size_t size, ZImgInfo &info)
