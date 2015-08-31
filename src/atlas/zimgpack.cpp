@@ -305,17 +305,8 @@ bool ZImgPack::needUpdate(const QRectF &viewport, double scale, const QRectF &ol
   if (!m_diskCached)
     return false;
 
-  assert(!m_ratioTileMaps.empty());
-  size_t needRatio = std::max(1.0, std::floor(1.0 / scale));
-  size_t readRatio = std::min(m_ratioTileMaps.size()-1, needRatio);
-  while (m_ratioTileMaps[readRatio].empty() && readRatio > 1) {
-    --readRatio;
-  }
-  size_t oldNeedRatio = std::max(1.0, std::floor(1.0 / oldScale));
-  size_t oldReadRatio = std::min(m_ratioTileMaps.size()-1, oldNeedRatio);
-  while (m_ratioTileMaps[oldReadRatio].empty() && oldReadRatio > 1) {
-    --oldReadRatio;
-  }
+  size_t readRatio = ratioForScale(scale);
+  size_t oldReadRatio = ratioForScale(oldScale);
   if (readRatio != oldReadRatio)
     return true;
 
@@ -346,12 +337,7 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs, std
   locs.clear();
   scales.clear();
 
-  assert(!m_ratioTileMaps.empty());
-  size_t needRatio = std::max(1.0, std::floor(1.0 / scale));
-  size_t readRatio = std::min(m_ratioTileMaps.size()-1, needRatio);
-  while (m_ratioTileMaps[readRatio].empty() && readRatio > 1) {
-    --readRatio;
-  }
+  size_t readRatio = ratioForScale(scale);
 
   if (m_imgInfo.depth == 1)
     mip = false;
@@ -911,6 +897,19 @@ void ZImgPack::updateNameTootip()
       m_tooltip = m_imgSource.filenames[0] + QString(" scene %1 of %2").arg(m_imgSource.scene+1).arg(m_numScenes);
     }
   }
+}
+
+size_t ZImgPack::ratioForScale(double scale) const
+{
+  if (m_ratioTileMaps.size() == 2)
+    return 1;
+  assert(!m_ratioTileMaps.empty());
+  size_t needRatio = std::max(1.0, std::floor(1.0 / scale));
+  size_t readRatio = std::min(m_ratioTileMaps.size()-1, needRatio);
+  while (m_ratioTileMaps[readRatio].empty() && readRatio > 1) {
+    --readRatio;
+  }
+  return readRatio;
 }
 
 } // namespace

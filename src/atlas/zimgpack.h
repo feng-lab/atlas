@@ -124,6 +124,9 @@ protected:
   void updateDerivedData();
   void updateNameTootip();
 
+private:
+  size_t ratioForScale(double scale) const;
+
 protected:
   ZImgInfo m_imgInfo;
   ZImgSource m_imgSource;

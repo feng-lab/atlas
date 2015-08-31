@@ -5,9 +5,9 @@
 
 namespace nim {
 
-ZImgCommonSubBlock::ZImgCommonSubBlock(const QString &fileName, FileFormat format, size_t scene, size_t level, size_t t,
+ZImgCommonSubBlock::ZImgCommonSubBlock(const QString &fileName, FileFormat format, size_t scene, size_t ratio, size_t t,
                                        size_t z, size_t x, size_t y, size_t width, size_t height)
-  : ZImgSubBlock(level, t, z, x, y, width, height)
+  : ZImgSubBlock(ratio, t, z, x, y, width, height)
   , m_filename(fileName), m_format(format), m_scene(scene), m_t(t), m_z(z), m_x(x), m_y(y), m_width(width), m_height(height)
 {}
 
@@ -461,7 +461,7 @@ void ZImgFormat::createDefaultSubBlocks(const QString &filename,
   for (size_t s=0; s<infos.size(); ++s) {
     for (size_t t=0; t<infos[s].numTimes; ++t) {
       for (size_t z=0; z<infos[s].depth; ++z) {
-        subBlocks->at(s).emplace_back(new ZImgCommonSubBlock(filename, format(), s, 0, t, z,
+        subBlocks->at(s).emplace_back(new ZImgCommonSubBlock(filename, format(), s, 1, t, z,
                                                              0, 0, infos[s].width, infos[s].height));
       }
     }
