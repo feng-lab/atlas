@@ -545,9 +545,8 @@ exists(/opt/intel/ipp/include) {
 exists(/opt/intel/tbb/include) {
     TBBPath = /opt/intel/tbb
     INCLUDEPATH += $$TBBPath/include
-    LIBS += $$TBBPath/lib/libc++/libtbb.dylib
-    QMAKE_POST_LINK += install_name_tool -change libtbb.dylib @rpath/libtbb.dylib $$OUT_PWD/$${TARGET}.app/Contents/MacOS/$${TARGET} $$escape_expand(\\n\\t)
-    TBB.files = $$TBBPath/lib/libc++/libtbb.dylib
+    LIBS += $$TBBPath/lib/libtbb.dylib
+    TBB.files = $$TBBPath/lib/libtbb.dylib
     TBB.path = Contents/Frameworks
     QMAKE_BUNDLE_DATA += TBB
 } else {

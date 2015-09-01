@@ -163,7 +163,7 @@ macx {
 exists(/opt/intel/tbb/include) {
     TBBPath = /opt/intel/tbb
     INCLUDEPATH += $$TBBPath/include
-    LIBS += $$TBBPath/lib/libc++/libtbb.dylib
+    LIBS += $$TBBPath/lib/libtbb.dylib
 } else {
     DEFINES += _USE_QTCONCURRENT_
     QT += concurrent
