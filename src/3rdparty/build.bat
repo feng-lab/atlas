@@ -10,6 +10,8 @@ call "%currDIR%\assimp-build.bat" < nul
 call "%currDIR%\hdf5-build.bat" < nul
 call "%currDIR%\freeimage-build.bat" < nul
 call "%currDIR%\itk-build.bat" < nul
+call "%currDIR%\vtk-build.bat" < nul
+call "%currDIR%\opencv-build.bat" < nul
 
 echo off
 pause

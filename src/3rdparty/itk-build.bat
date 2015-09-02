@@ -2,7 +2,7 @@ cd /d "%~dp0"
 
 set currDIR=%CD%
 set srcDIR=%currDIR%\..\..\..\ITK
-set buildDIR=%srcDIR%\..\itk-build
+set buildDIR=%srcDIR%\..\__itk-build
 set installDIR=%currDIR%\itk
 
 rd /q/s %installDIR%
