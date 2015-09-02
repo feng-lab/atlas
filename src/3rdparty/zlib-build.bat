@@ -11,8 +11,8 @@ rd /q/s %buildDIR%
 md %buildDIR%
 cd %buildDIR%
 
-call "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\vcvarsall.bat" x86_amd64
-cmake -G "Visual Studio 12 2013 Win64" -DCMAKE_INSTALL_PREFIX=%installDIR% %srcDIR%
+call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64
+cmake -G "Visual Studio 14 2015 Win64" -DCMAKE_INSTALL_PREFIX=%installDIR% %srcDIR%
 
 MSBuild.exe ALL_BUILD.vcxproj /property:Configuration=Release /maxcpucount
 MSBuild.exe INSTALL.vcxproj /property:Configuration=Release

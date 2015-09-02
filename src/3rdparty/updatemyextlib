@@ -1,8 +1,13 @@
-#!/bin/sh
+#!/bin/bash
 
 srcDIR="/Users/feng/Google Drive/code/my"
 baseDIR=/Users/feng/code
 currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
+
+if [[ "$OSTYPE" == "msys" ]]; then
+  srcDIR="/z/Google Drive/code/my"
+  baseDIR=/c/Users/feng/code
+fi
 
 if [ -d $baseDIR/FreeImage ]
 then
@@ -32,15 +37,31 @@ fi
 srcArchive=$srcDIR/GeometricTools/WildMagic5p13.zip
 7z x -y -o$baseDIR "$srcArchive"
 
-if [ -d $baseDIR/ispc-v1.8.2-osx ]
-then
-  rm -rf $baseDIR/ispc-v1.8.2-osx
-fi
-srcArchive=$srcDIR/ispc-v1.8.2-osx.tar.gz
-tar -zxvf "$srcArchive" -C $baseDIR
+if [[ "$OSTYPE" == "msys" ]]; then
+  if [ -d $baseDIR/ispc-v1.8.2-windows ]
+  then
+    rm -rf $baseDIR/ispc-v1.8.2-windows
+  fi
+  srcArchive=$srcDIR/ispc-v1.8.2-windows.zip
+  7z x -y -o$baseDIR "$srcArchive"
 
-srcArchive=$srcDIR/ffmpeg-2.7.2.7z
-7z x -y -o$baseDIR/atlas "$srcArchive"
+  if [ -d $baseDIR/zlib-1.2.8 ]
+  then
+    rm -rf $baseDIR/zlib-1.2.8
+  fi
+  srcArchive=$srcDIR/zlib128.zip
+  7z x -y -o$baseDIR "$srcArchive"
+else
+  if [ -d $baseDIR/ispc-v1.8.2-osx ]
+  then
+    rm -rf $baseDIR/ispc-v1.8.2-osx
+  fi
+  srcArchive=$srcDIR/ispc-v1.8.2-osx.tar.gz
+  tar -zxvf "$srcArchive" -C $baseDIR
+
+  srcArchive=$srcDIR/ffmpeg-2.7.2.7z
+  7z x -y -o$baseDIR/atlas "$srcArchive"
+fi
 
 if [ -d $currDIR/boost ]
 then

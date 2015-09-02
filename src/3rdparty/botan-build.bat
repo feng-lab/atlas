@@ -12,7 +12,7 @@ md %buildDIR%
 #cd %buildDIR%
 cd %srcDIR%
 
-call "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\vcvarsall.bat" x86_amd64
+call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64
 C:\Python27\python.exe configure.py --cc=msvc --prefix=%installDIR%
 
 nmake
