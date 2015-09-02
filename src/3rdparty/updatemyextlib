@@ -9,7 +9,7 @@ then
   rm -rf $baseDIR/FreeImage
 fi
 srcArchive=$srcDIR/FreeImage3170.zip
-unzip "$srcArchive" -d $baseDIR
+7z x -y -o$baseDIR "$srcArchive"
 
 if [ -d $baseDIR/libjpeg-turbo-1.4.1 ]
 then
@@ -30,7 +30,7 @@ then
   rm -rf $baseDIR/GeometricTools
 fi
 srcArchive=$srcDIR/GeometricTools/WildMagic5p13.zip
-unzip "$srcArchive" -d $baseDIR
+7z x -y -o$baseDIR "$srcArchive"
 
 if [ -d $baseDIR/ispc-v1.8.2-osx ]
 then
@@ -63,5 +63,5 @@ then
   rm -rf $currDIR/glm
 fi
 srcArchive=$srcDIR/glm-master.zip
-unzip "$srcArchive" -d $currDIR
+7z x -y -o$currDIR "$srcArchive"
 mv $currDIR/glm-master $currDIR/glm
