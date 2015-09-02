@@ -9,7 +9,7 @@ rd /q/s %installDIR%
 
 cd %srcDIR%
 
-call "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\vcvarsall.bat" x86_amd64
+call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64
 
 MSBuild.exe FreeImage.2013.sln /target:FreeImagePlus /property:Platform=x64 /property:Configuration=Release /maxcpucount
 
