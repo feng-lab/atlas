@@ -1,4 +1,4 @@
-/* $Id: tif_win32.c,v 1.40 2012-11-18 17:51:52 bfriesen Exp $ */
+/* $Id: tif_win32.c,v 1.41 2015-08-23 20:12:44 bfriesen Exp $ */
 
 /*
  * Copyright (c) 1988-1997 Sam Leffler
@@ -28,6 +28,31 @@
  * TIFF Library Win32-specific Routines.  Adapted from tif_unix.c 4/5/95 by
  * Scott Wagner (wagner@itek.com), Itek Graphix, Rochester, NY USA
  */
+
+/*
+  CreateFileA/CreateFileW return type 'HANDLE'.
+
+  thandle_t is declared like
+
+    DECLARE_HANDLE(thandle_t);
+
+  in tiffio.h.
+
+  Windows (from winnt.h) DECLARE_HANDLE logic looks like
+
+  #ifdef STRICT
+    typedef void *HANDLE;
+  #define DECLARE_HANDLE(name) struct name##__ { int unused; }; typedef struct name##__ *name
+  #else
+    typedef PVOID HANDLE;
+  #define DECLARE_HANDLE(name) typedef HANDLE name
+  #endif
+
+  See http://bugzilla.maptools.org/show_bug.cgi?id=1941 for problems in WIN64
+  builds resulting from this.  Unfortunately, the proposed patch was lost.
+
+*/
+  
 #include "tiffiop.h"
 
 #include <windows.h>

@@ -10,6 +10,39 @@
 
 #ifdef _MSC_VER
 
+/* Signed 16-bit type */
+#define TIFF_INT16_T signed short
+
+/* Signed 32-bit type */
+#define TIFF_INT32_T signed int
+
+/* Signed 64-bit type */
+#define TIFF_INT64_T signed long long
+
+/* Signed 8-bit type */
+#define TIFF_INT8_T signed char
+
+/* Unsigned 16-bit type */
+#define TIFF_UINT16_T unsigned short
+
+/* Unsigned 32-bit type */
+#define TIFF_UINT32_T unsigned int
+
+/* Unsigned 64-bit type */
+#define TIFF_UINT64_T unsigned long long
+
+/* Unsigned 8-bit type */
+#define TIFF_UINT8_T unsigned char
+
+/* Unsigned size type */
+#define TIFF_SIZE_T unsigned long
+
+/* Signed size type */
+#define TIFF_SSIZE_T signed long long
+
+/* Pointer difference type */
+#define TIFF_PTRDIFF_T ptrdiff_t
+
 /* Define to 1 if the system has the type `int16'. */
 /* #undef HAVE_INT16 */
 
@@ -19,63 +52,6 @@
 /* Define to 1 if the system has the type `int8'. */
 /* #undef HAVE_INT8 */
 
-/* The size of a `int', as computed by sizeof. */
-#define SIZEOF_INT 4
-
-/* Signed 8-bit type */
-#define TIFF_INT8_T signed char
-
-/* Unsigned 8-bit type */
-#define TIFF_UINT8_T unsigned char
-
-/* Signed 16-bit type */
-#define TIFF_INT16_T signed short
-
-/* Unsigned 16-bit type */
-#define TIFF_UINT16_T unsigned short
-
-/* Signed 32-bit type formatter */
-#define TIFF_INT32_FORMAT "%d"
-
-/* Signed 32-bit type */
-#define TIFF_INT32_T signed int
-
-/* Unsigned 32-bit type formatter */
-#define TIFF_UINT32_FORMAT "%u"
-
-/* Unsigned 32-bit type */
-#define TIFF_UINT32_T unsigned int
-
-/* Signed 64-bit type formatter */
-#define TIFF_INT64_FORMAT "%I64d"
-
-/* Signed 64-bit type */
-#define TIFF_INT64_T signed __int64
-
-/* Unsigned 64-bit type formatter */
-#define TIFF_UINT64_FORMAT "%I64u"
-
-/* Unsigned 64-bit type */
-#define TIFF_UINT64_T unsigned __int64
-
-#if _WIN64
-/*
-  Windows 64-bit build
-*/
-
-/* Signed size type */
-#  define TIFF_SSIZE_T TIFF_INT64_T
-
-#else
-/*
-  Windows 32-bit build
-*/
-
-/* Signed size type */
-#  define TIFF_SSIZE_T signed int
-
-#endif
-
 /* Compatibility stuff. */
 
 /* Define as 0 or 1 according to the floating point format suported by the
@@ -83,7 +59,7 @@
 #define HAVE_IEEEFP 1
 
 /* Set the native cpu bit order (FILLORDER_LSB2MSB or FILLORDER_MSB2LSB) */
-#define HOST_FILLORDER FILLORDER_LSB2MSB
+#define HOST_FILLORDER FILLORDER_MSB2LSB
 
 /* Native cpu byte order: 1 if big-endian (Motorola) or 0 if little-endian
    (Intel) */
@@ -121,11 +97,11 @@
 #define THUNDER_SUPPORT 1
 
 /* Support Deflate compression */
-#define ZIP_SUPPORT
+#define ZIP_SUPPORT 1
 
 /* Support strip chopping (whether or not to convert single-strip uncompressed
    images to mutiple strips of ~8Kb to reduce memory usage) */
-#define STRIPCHOP_DEFAULT TIFF_STRIPCHOP
+#define STRIPCHOP_DEFAULT 1
 
 /* Enable SubIFD tag (330) support */
 #define SUBIFD_SUPPORT 1
@@ -153,6 +129,7 @@
 #define ICC_SUPPORT
 #define PHOTOSHOP_SUPPORT
 #define IPTC_SUPPORT
+
 
 #else
 
