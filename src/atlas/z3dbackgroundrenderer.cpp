@@ -165,12 +165,12 @@ void Z3DBackgroundRenderer::renderPicking(Z3DEye)
 void Z3DBackgroundRenderer::adjustWidgets()
 {
   if (m_mode.get() == "Gradient") {
-    m_firstColor.setName("First Color");
+    //m_firstColor.setName("First Color");
     m_firstColor.setVisible(true);
     m_secondColor.setVisible(true);
     m_gradientOrientation.setVisible(true);
   } else if (m_mode.get() == "Uniform") {
-    m_firstColor.setName("Color");
+    //m_firstColor.setName("Color");
     m_firstColor.setVisible(true);
     m_secondColor.setVisible(false);
     m_gradientOrientation.setVisible(false);

@@ -43,7 +43,7 @@ public:
 
   //virtual bool hasOpaque(Z3DEye eye) const override { return Z3DGeometryFilter::hasOpaque(eye) && !m_randomGlow.get(); }
   virtual void renderOpaque(Z3DEye eye) override;
-  virtual bool hasTransparent(Z3DEye eye) const override { return Z3DGeometryFilter::hasTransparent(eye) || m_randomGlow.get(); }
+  //virtual bool hasTransparent(Z3DEye eye) const override { return Z3DGeometryFilter::hasTransparent(eye) || m_randomGlow.get(); }
   virtual void renderTransparent(Z3DEye eye) override;
 
 signals:
@@ -102,11 +102,11 @@ private:
   ZColorMapParameter m_colorMapMaxIntensity;
   ZBoolParameter m_useSameSizeForAllPuncta;
 
-  Z3DSphereRenderer m_glowSphereRenderer;
-  Z3DTextureGlowRenderer m_textureGlowRenderer;
-  ZBoolParameter m_randomGlow;
-  ZFloatParameter m_glowPercentage;
-  Z3DTextureCopyRenderer m_textureCopyRenderer;
+  //  Z3DSphereRenderer m_glowSphereRenderer;
+  //  Z3DTextureGlowRenderer m_textureGlowRenderer;
+  //  ZBoolParameter m_randomGlow;
+  //  ZFloatParameter m_glowPercentage;
+  //  Z3DTextureCopyRenderer m_textureCopyRenderer;
 
   //std::map<QString, size_t> m_sourceColorMapper;   // should use unordered_map
   // puncta list used for rendering, it is a subset of m_origPunctaList. Some puncta are
