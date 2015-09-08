@@ -15,6 +15,8 @@
 #include "zstatisticsutils.h"
 #include "zimgregioniterator.h"
 
+//#define DUMP_CZI_INFO
+
 namespace {
 
 using namespace nim;
@@ -475,7 +477,9 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
                             std::vector<std::set<size_t>> *pyramidalRatios)
 {
-  //dump(filename);
+#ifdef DUMP_CZI_INFO
+  dump(filename);
+#endif
   clearInternalState();
 
   std::ifstream inputFileStream;
@@ -601,10 +605,10 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
     }
   }
 
-  //  for (size_t i=0; i<infos.size(); ++i) {
-  //    LINFO() << infos[i].toQString();
-  //  }
-  //  LINFO() << "";
+  for (size_t i=0; i<infos.size(); ++i) {
+    LINFO() << infos[i].toQString();
+  }
+  LINFO() << "";
 }
 
 void ZImgZeissCZI::readMetadata(const QString &filename, ZImgMetadata &meta, size_t scene)
@@ -917,7 +921,7 @@ void ZImgZeissCZI::parseMetadata(QXmlStreamReader &xml)
     m_voxelSizeX *= 1e6;
     m_voxelSizeY *= 1e6;
     m_voxelSizeZ = m_voxelSizeZ <= 0 ? 1 : (m_voxelSizeZ * 1e6);
-    LINFO() << m_voxelSizeX << m_voxelSizeY << m_voxelSizeZ;
+    //LINFO() << m_voxelSizeX << m_voxelSizeY << m_voxelSizeZ;
   }
 
   if (m_channelColors.size() < m_channelNames.size()) {
@@ -1525,13 +1529,15 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
       m_sceneTiles[m_sceneTiles.size()-1].insert(tile);
     }
 
-//    for (size_t j=0; j<20; ++j) {
-//      LINFO() << "";
-//    }
-//    for (auto it=m_sceneTiles[m_sceneTiles.size()-1].cbegin();
-//         it != m_sceneTiles[m_sceneTiles.size()-1].cend(); ++it) {
-//      LINFO() << it->ratio << it->start << it->size << it->storedSize;
-//    }
+#ifdef DUMP_CZI_INFO
+    for (size_t j=0; j<20; ++j) {
+      LINFO() << "";
+    }
+    for (auto it=m_sceneTiles[m_sceneTiles.size()-1].cbegin();
+         it != m_sceneTiles[m_sceneTiles.size()-1].cend(); ++it) {
+      LINFO() << it->ratio << it->start << it->size << it->storedSize;
+    }
+#endif
   }
 
   if (m_hasSceneInfo) {

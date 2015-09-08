@@ -214,13 +214,13 @@ bool ZImg::fileExtensionWriteSupported(const QString &filename)
 void ZImg::load(const QString &filename, size_t scene, FileFormat format)
 {
   clear();
-  ZImgIOInstance.readImg(filename, *this, ZImgRegion(), scene, 0, format);
+  ZImgIOInstance.readImg(filename, *this, ZImgRegion(), scene, 1, format);
 }
 
 void ZImg::load(const QString &filename, ZImgRegion region, size_t scene, FileFormat format)
 {
   clear();
-  ZImgIOInstance.readImg(filename, *this, region, scene, 0, format);
+  ZImgIOInstance.readImg(filename, *this, region, scene, 1, format);
 }
 
 void ZImg::load(const ZImgSource &imgSource)

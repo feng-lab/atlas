@@ -1,0 +1,139 @@
+#include "z3dcameracontrolwidget.h"
+
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QPushButton>
+#include <QSpinBox>
+
+namespace nim {
+
+Z3DCameraControlWidget::Z3DCameraControlWidget(Z3DCameraParameter &camera, QWidget *parent)
+  : QWidget(parent)
+  , m_camera(camera)
+{
+  createWidget();
+}
+
+void Z3DCameraControlWidget::roll()
+{
+  if (m_rollDegreeSpinBox->value()) {
+    double angle = glm::radians(double(m_rollDegreeSpinBox->value()));
+    m_camera.roll(angle);
+  }
+}
+
+void Z3DCameraControlWidget::azimuth()
+{
+  if (m_azimuthDegreeSpinBox->value()) {
+    double angle = glm::radians(double(m_azimuthDegreeSpinBox->value()));
+    m_camera.azimuth(angle);
+  }
+}
+
+void Z3DCameraControlWidget::yaw()
+{
+  if (m_yawDegreeSpinBox->value()) {
+    double angle = glm::radians(double(m_yawDegreeSpinBox->value()));
+    m_camera.yaw(angle);
+  }
+}
+
+void Z3DCameraControlWidget::elevation()
+{
+  if (m_elevationDegreeSpinBox->value()) {
+    double angle = glm::radians(double(m_elevationDegreeSpinBox->value()));
+    m_camera.elevation(angle);
+  }
+}
+
+void Z3DCameraControlWidget::pitch()
+{
+  if (m_pitchDegreeSpinBox->value()) {
+    double angle = glm::radians(double(m_pitchDegreeSpinBox->value()));
+    m_camera.pitch(angle);
+  }
+}
+
+void Z3DCameraControlWidget::createWidget()
+{
+  QVBoxLayout *vlo = new QVBoxLayout;
+  QHBoxLayout *hlo = nullptr;
+
+  hlo = new QHBoxLayout;
+  QPushButton *azimuthButton = new QPushButton("Azimuth Camera", this);
+  azimuthButton->setToolTip("Rotate the camera about the view up vector centered at the focal point. "
+                            "The result is a horizontal rotation of the camera.");
+  hlo->addWidget(azimuthButton);
+  connect(azimuthButton, SIGNAL(clicked(bool)), this, SLOT(azimuth()));
+  m_azimuthDegreeSpinBox = new QSpinBox(this);
+  m_azimuthDegreeSpinBox->setMinimum(std::numeric_limits<int>::min());
+  m_azimuthDegreeSpinBox->setMaximum(std::numeric_limits<int>::max());
+  m_azimuthDegreeSpinBox->setValue(90);
+  m_azimuthDegreeSpinBox->setSuffix(" degree");
+  hlo->addWidget(m_azimuthDegreeSpinBox);
+  vlo->addLayout(hlo);
+
+  hlo = new QHBoxLayout;
+  QPushButton *elevationButton = new QPushButton("Elevation Camera", this);
+  elevationButton->setToolTip("Rotate the camera about the cross product of the view up vector and the view vector (point at left in screen), "
+                              "using the focal point as the center of rotation. "
+                              "The result is a vertical rotation of the scene.");
+  hlo->addWidget(elevationButton);
+  connect(elevationButton, SIGNAL(clicked(bool)), this, SLOT(elevation()));
+  m_elevationDegreeSpinBox = new QSpinBox(this);
+  m_elevationDegreeSpinBox->setMinimum(std::numeric_limits<int>::min());
+  m_elevationDegreeSpinBox->setMaximum(std::numeric_limits<int>::max());
+  m_elevationDegreeSpinBox->setValue(90);
+  m_elevationDegreeSpinBox->setSuffix(" degree");
+  hlo->addWidget(m_elevationDegreeSpinBox);
+  vlo->addLayout(hlo);
+
+  hlo = new QHBoxLayout;
+  QPushButton *rollButton = new QPushButton("Roll Camera", this);
+  rollButton->setToolTip("Rotate the camera about the view vector. "
+                         "This will spin the camera about its axis.");
+  hlo->addWidget(rollButton);
+  connect(rollButton, SIGNAL(clicked(bool)), this, SLOT(roll()));
+  m_rollDegreeSpinBox = new QSpinBox(this);
+  m_rollDegreeSpinBox->setMinimum(std::numeric_limits<int>::min());
+  m_rollDegreeSpinBox->setMaximum(std::numeric_limits<int>::max());
+  m_rollDegreeSpinBox->setValue(90);
+  m_rollDegreeSpinBox->setSuffix(" degree");
+  hlo->addWidget(m_rollDegreeSpinBox);
+  vlo->addLayout(hlo);
+
+  hlo = new QHBoxLayout;
+  QPushButton *yawButton = new QPushButton("Yaw Camera", this);
+  yawButton->setToolTip("Rotate the focal point about the view up vector, "
+                        "using the camera's position as the center of rotation. "
+                        "The result is a horizontal rotation of the scene.");
+  hlo->addWidget(yawButton);
+  connect(yawButton, SIGNAL(clicked(bool)), this, SLOT(yaw()));
+  m_yawDegreeSpinBox = new QSpinBox(this);
+  m_yawDegreeSpinBox->setMinimum(std::numeric_limits<int>::min());
+  m_yawDegreeSpinBox->setMaximum(std::numeric_limits<int>::max());
+  m_yawDegreeSpinBox->setValue(90);
+  m_yawDegreeSpinBox->setSuffix(" degree");
+  hlo->addWidget(m_yawDegreeSpinBox);
+  vlo->addLayout(hlo);
+
+
+  hlo = new QHBoxLayout;
+  QPushButton *pitchButton = new QPushButton("Pitch Camera", this);
+  pitchButton->setToolTip("Rotate the focal point about the cross product of the view vector and the view up vector (point right in screen), "
+                          "using the camera's position as the center of rotation. "
+                          "The result is a vertical rotation of the camera.");
+  hlo->addWidget(pitchButton);
+  connect(pitchButton, SIGNAL(clicked(bool)), this, SLOT(pitch()));
+  m_pitchDegreeSpinBox = new QSpinBox(this);
+  m_pitchDegreeSpinBox->setMinimum(std::numeric_limits<int>::min());
+  m_pitchDegreeSpinBox->setMaximum(std::numeric_limits<int>::max());
+  m_pitchDegreeSpinBox->setValue(90);
+  m_pitchDegreeSpinBox->setSuffix(" degree");
+  hlo->addWidget(m_pitchDegreeSpinBox);
+  vlo->addLayout(hlo);
+
+  setLayout(vlo);
+}
+
+} // namespace nim

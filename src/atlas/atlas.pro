@@ -271,7 +271,8 @@ HEADERS += \
     zgraphicsscene.h \
     z3dfilter.h \
     z3dimgfilter.h \
-    z3dtextureglowrenderer.h
+    z3dtextureglowrenderer.h \
+    z3dcameracontrolwidget.h
 
 SOURCES += \
     main.cpp \
@@ -474,7 +475,8 @@ SOURCES += \
     zgraphicsscene.cpp \
     z3dfilter.cpp \
     z3dimgfilter.cpp \
-    z3dtextureglowrenderer.cpp
+    z3dtextureglowrenderer.cpp \
+    z3dcameracontrolwidget.cpp
 
 contains(CONFIG, use_glbinding) {
     include($$PWD/../3rdparty/glbinding.pri)

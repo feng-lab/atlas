@@ -49,10 +49,8 @@ public:
   inline void roll(float angle) { m_value.roll(angle); updatePara(); }
   inline void azimuth(float angle) { m_value.azimuth(angle); updatePara(); }
   inline void yaw(float angle) { m_value.yaw(angle); updatePara(); }
-  inline void pan(float angle) { m_value.pan(angle); updatePara(); }
   inline void elevation(float angle) { m_value.elevation(angle); updatePara(); }
   inline void pitch(float angle) { m_value.pitch(angle); updatePara(); }
-  inline void tilt(float angle) { m_value.tilt(angle); updatePara(); }
   inline void zoom(float factor) { m_value.zoom(factor); updatePara(); }
   inline void rotate(float angle, glm::vec3 axis, glm::vec3 point) { m_value.rotate(angle, axis, point); updatePara(); }
   inline void rotate(glm::quat quat, glm::vec3 point) { m_value.rotate(quat, point); updatePara(); }

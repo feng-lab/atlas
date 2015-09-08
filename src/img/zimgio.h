@@ -47,7 +47,7 @@ public:
   void readImg(const QString &filename, ZImg &img,
                const ZImgRegion &region = ZImgRegion(),
                size_t scene = 0,
-               size_t pyramidalLevel = 0,
+               size_t ratio = 1,
                FileFormat format = FileFormat::Unknown);
   // read image sequence, cat these imgs along dimension "catDim"
   // imgs should have same size in other dimensions and have same type

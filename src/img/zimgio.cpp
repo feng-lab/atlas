@@ -267,7 +267,7 @@ void ZImgIO::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail, 
   throw ZIOException(error);
 }
 
-void ZImgIO::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t pyramidalLevel, FileFormat format)
+void ZImgIO::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio, FileFormat format)
 {
   img.clear();
   QString error;
@@ -280,7 +280,7 @@ void ZImgIO::readImg(const QString &filename, ZImg &img, const ZImgRegion &regio
       for (size_t i=0; i<readers.size(); ++i) {
         try {
           ZImg tmpImg;
-          readers[i]->readImg(filename, tmpImg, region, scene, pyramidalLevel);
+          readers[i]->readImg(filename, tmpImg, region, scene, ratio);
           tmpImg.swap(img);
           return;
         }
@@ -294,7 +294,7 @@ void ZImgIO::readImg(const QString &filename, ZImg &img, const ZImgRegion &regio
   } else {
     try {
       ZImg tmpImg;
-      m_ioFormats[format]->readImg(filename, tmpImg, region, scene, pyramidalLevel);
+      m_ioFormats[format]->readImg(filename, tmpImg, region, scene, ratio);
       tmpImg.swap(img);
       return;
     }
@@ -310,7 +310,7 @@ void ZImgIO::readImg(const QStringList &fileList, Dimension catDim, ZImg &img, s
                      FileFormat format, bool expandXY, bool expandWithMaxValue)
 {
   if (fileList.size() == 1) {
-    readImg(fileList[0], img, ZImgRegion(), scene, 0, format);
+    readImg(fileList[0], img, ZImgRegion(), scene, 1, format);
     return;
   }
 
@@ -365,7 +365,7 @@ void ZImgIO::readImg(const QStringList &fileList, Dimension catDim, const ZImgRe
                      FileFormat format, bool expandXY, bool expandWithMaxValue)
 {
   if (fileList.size() == 1) {
-    readImg(fileList[0], img, regionIn, scene, 0, format);
+    readImg(fileList[0], img, regionIn, scene, 1, format);
     return;
   }
 
@@ -469,7 +469,7 @@ void ZImgIO::readImg(const QStringList &fileList, Dimension catDim, const ZImgRe
 void ZImgIO::readImg(const ZImgSource &imgSource, ZImg &img)
 {
   if (imgSource.filenames.size() == 1) {
-    readImg(imgSource.filenames[0], img, imgSource.region, imgSource.scene, 0, imgSource.format);
+    readImg(imgSource.filenames[0], img, imgSource.region, imgSource.scene, 1, imgSource.format);
   } else if (imgSource.filenames.size() > 1) {
     readImg(imgSource.filenames, imgSource.catDim, imgSource.region, img, imgSource.scene,
             imgSource.format, imgSource.expandXY, imgSource.expandWithMaxValue);

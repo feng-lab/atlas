@@ -3,6 +3,7 @@
 #include "zwidgetsgroup.h"
 #include "z3dcanvas.h"
 #include "z3dgpuinfo.h"
+#include "z3dcameracontrolwidget.h"
 
 namespace nim {
 
@@ -191,6 +192,7 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   m_widgetsGrp = new ZWidgetsGroup("Global", nullptr, 1);
   new ZWidgetsGroup(&geometriesMultisampleMode, m_widgetsGrp, 1);
   new ZWidgetsGroup(&transparencyMethod, m_widgetsGrp, 1);
+  new ZWidgetsGroup(new Z3DCameraControlWidget(camera), m_widgetsGrp, 1);
   new ZWidgetsGroup(&camera, m_widgetsGrp, 1);
   m_widgetsGrpNoCamera = new ZWidgetsGroup("Lighting", nullptr, 1);
   new ZWidgetsGroup(&geometriesMultisampleMode, m_widgetsGrpNoCamera, 1);
