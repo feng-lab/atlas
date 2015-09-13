@@ -595,7 +595,7 @@
 #define LT_OBJDIR ".libs/"
 
 /* Support LZMA2 compression */
-//#define LZMA_SUPPORT 1
+/* #undef LZMA_SUPPORT */
 
 /* Support LZW algorithm */
 #define LZW_SUPPORT 1
@@ -619,7 +619,7 @@
 #define PACKAGE_NAME "LibTIFF Software"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "LibTIFF Software 4.0.5"
+#define PACKAGE_STRING "LibTIFF Software 4.0.6"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "tiff"
@@ -628,7 +628,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "4.0.5"
+#define PACKAGE_VERSION "4.0.6"
 
 /* Support Macintosh PackBits algorithm */
 #define PACKBITS_SUPPORT 1
@@ -750,7 +750,7 @@
 /* #undef USE_WIN32_FILEIO */
 
 /* Version number of package */
-#define VERSION "4.0.5"
+#define VERSION "4.0.6"
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
