@@ -216,8 +216,12 @@ void ZImgFilter::offsetChanged()
 {
   //m_doc.setImgOffset(m_id, m_offsetPara->get().x, m_offsetPara->get().y,
   //                    m_offsetPara->get().z, m_offsetPara->get().w);
-  m_displayValid = false;
   ZObjFilter::offsetChanged();
+  m_displayValid = false;
+  if (m_view.isMaxZProjView())
+    setMaxZProjView(m_view.currentTime());
+  else
+    setNormalView(m_view.currentSlice(), m_view.currentTime());
 }
 
 void ZImgFilter::updateViewSettingWidgetsGroup()

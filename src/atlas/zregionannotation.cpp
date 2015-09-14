@@ -393,6 +393,9 @@ void binaryImgToROI(const ZImg &img, ZROI &roi)
           for (size_t p=0; p<contours[c].size(); p+=dst) {
             poly.push_back(QPointF(contours[c][p].x, contours[c][p].y));
           }
+          if (!poly.isClosed()) {
+            poly.push_back(poly[0]);
+          }
           if (contoursTree.numAncestors(it) % 2 == 0) {
             roi.addSpline(s, poly);
           } else {

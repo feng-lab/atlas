@@ -59,10 +59,6 @@ void ZObjFilter::updateBoundBoxWithOffsetPara(std::vector<int> &boundBox) const
 void ZObjFilter::offsetChanged()
 {
   emit boundBoxChanged();
-  if (m_view.isMaxZProjView())
-    setMaxZProjView(m_view.currentTime());
-  else
-    setNormalView(m_view.currentSlice(), m_view.currentTime());
 }
 
 } // namespace nim

@@ -316,9 +316,15 @@ void ZSliceROI::load(H5::Group &sliceGrp)
         m_shapeOperations.push_back(ZROIShapeOperation(isAdd, ROIType::Ellipse, rect));
         break;
       case ROIType::Polygon:
+        if (!poly.isClosed()) {
+          poly.push_back(poly[0]);
+        }
         m_shapeOperations.push_back(ZROIShapeOperation(isAdd, ROIType::Polygon, poly));
         break;
       case ROIType::Spline:
+        if (!poly.isClosed()) {
+          poly.push_back(poly[0]);
+        }
         m_shapeOperations.push_back(ZROIShapeOperation(isAdd, ROIType::Spline, poly));
         break;
       default:

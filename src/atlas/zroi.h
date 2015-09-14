@@ -28,7 +28,9 @@ struct ZROIShapeOperation {
   }
   ZROIShapeOperation(bool isAdd, ROIType type, const QPolygonF& poly)
     : isAdd(isAdd), type(type), poly(poly)
-  {}
+  {
+    assert(poly.isClosed());
+  }
 
   void translate(double x, double y) { poly.translate(x, y); }
   QRectF rect() const { assert(poly.size() == 2); return QRectF(poly[0], poly[1]); }

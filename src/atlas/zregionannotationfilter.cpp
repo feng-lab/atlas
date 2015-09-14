@@ -67,10 +67,11 @@ ZWidgetsGroup *ZRegionAnnotationFilter::viewSettingWidgetsGroup()
     m_widgetsGroup = new ZWidgetsGroup("", nullptr, 1);
     new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
     for (auto it = m_nameToID.begin(); it != m_nameToID.end(); ++it) {
-      ZWidgetsGroup *wg = m_idToROIFilters[it->second]->viewSettingWidgetsGroup();
+      ZWidgetsGroup *wg = m_idToROIFilters[it->second]->viewSettingWidgetsGroupForAnnotationFilter();
       wg->setGroupName(it->first);
       m_widgetsGroup->addChildGroup(wg);
     }
+    new ZWidgetsGroup(&m_offsetPara, m_widgetsGroup, 2);
   }
   m_widgetsGroup->setUseToolBoxStyle(true);
   return m_widgetsGroup;
@@ -114,7 +115,7 @@ void ZRegionAnnotationFilter::allROIChanged()
 {
   if (m_widgetsGroup) {
     for (auto it = m_nameToID.begin(); it != m_nameToID.end(); ++it) {
-      delete m_idToROIFilters[it->second]->viewSettingWidgetsGroup();
+      delete m_idToROIFilters[it->second]->viewSettingWidgetsGroupForAnnotationFilter();
     }
   }
 
@@ -124,6 +125,7 @@ void ZRegionAnnotationFilter::allROIChanged()
 
   m_parameters.clear();
   //addParameter(&m_visible);
+  addParameter(&m_offsetPara);
 
   ZTree<RegionNode>& annoTree = m_regionAnnotation->annotationTree();
   for (auto it = annoTree.begin(); it != annoTree.end(); ++it) {
@@ -135,10 +137,14 @@ void ZRegionAnnotationFilter::allROIChanged()
     flt->setVisible(false);
     flt->setOutlineColor(glm::vec3(it->red/255.f, it->green/255.f, it->blue/255.f));
     flt->setRegionColor(glm::vec3(it->red/255.f, it->green/255.f, it->blue/255.f));
+    connect(&m_offsetPara, SIGNAL(valueChanged()), &flt->offsetPara(), SLOT(updateFromSender()));
     m_idToRegionNames[id] = QString("%1_%2").arg(it->abbreviation).arg(it->id);
     m_nameToID[m_idToRegionNames[id]] = id;
     QList<ZParameter*> paras = flt->parameters();
     for (int i=0; i<paras.size(); ++i) {
+      if (paras[i]->name() == "Offset") {
+        continue;
+      }
       paras[i]->setName(QString("%1 %2").arg(m_idToRegionNames[id]).arg(paras[i]->name()));
       addParameter(paras[i]);
     }
@@ -147,7 +153,7 @@ void ZRegionAnnotationFilter::allROIChanged()
 
   if (m_widgetsGroup) {
     for (auto it = m_nameToID.begin(); it != m_nameToID.end(); ++it) {
-      ZWidgetsGroup *wg = m_idToROIFilters[it->second]->viewSettingWidgetsGroup();
+      ZWidgetsGroup *wg = m_idToROIFilters[it->second]->viewSettingWidgetsGroupForAnnotationFilter();
       wg->setGroupName(it->first);
       m_widgetsGroup->addChildGroup(wg);
     }

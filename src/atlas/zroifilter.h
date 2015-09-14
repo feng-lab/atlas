@@ -26,6 +26,8 @@ public:
 
   void updateValue();
 
+  void setOffset(double x, double y);
+
 protected:
   //virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
   //virtual void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
@@ -37,6 +39,7 @@ private:
   int m_slice;
 
   QPointF m_basePos;
+  QPointF m_offset;
 };
 
 class ROICtrlPtGraphicsItem : public QGraphicsRectItem
@@ -55,6 +58,8 @@ public:
 
   virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 
+  void setOffset(double x, double y);
+
 protected:
   virtual QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
 
@@ -66,6 +71,7 @@ private:
   const ZROIShapeOperation &m_shapeOp;
 
   QPointF m_basePos;
+  QPointF m_offset;
 };
 
 class ZROIFilter : public ZObjFilter
@@ -90,14 +96,20 @@ public:
   std::vector<int> boundBox() const;
 
   ZWidgetsGroup* viewSettingWidgetsGroup();
+  ZWidgetsGroup* viewSettingWidgetsGroupForAnnotationFilter();
 
   virtual void deleteKeyPressed() override;
   virtual void mousePressed(const QPointF &scenePos) override;
   virtual void mouseReleased(const QPointF &scenePos) override;
 
+  ZDVec4Parameter& offsetPara() { return m_offsetPara; }
+
 signals:
 
 public slots:
+
+protected slots:
+  virtual void offsetChanged() override;
 
 protected:
   std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> createCtrlPtItems(int slice);

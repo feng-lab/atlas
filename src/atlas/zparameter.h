@@ -89,8 +89,6 @@ protected slots:
   virtual void reservedSlot1() {}
   virtual void reservedSlot2() {}
 
-  virtual void updateFromDependee() {}
-
 protected:
   inline void addStyle(const QString& style) {m_allStyles.push_back(style);}
   // all subclass should implement this function

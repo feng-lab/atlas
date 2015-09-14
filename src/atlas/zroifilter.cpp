@@ -7,6 +7,7 @@
 #include "zwidgetsgroup.h"
 #include "zgraphicsview.h"
 #include <QGraphicsSceneContextMenuEvent>
+#include <QToolTip>
 
 namespace nim {
 
@@ -23,7 +24,7 @@ ROIGraphicsItem::ROIGraphicsItem(ZROI &roi, int slice, double z, QGraphicsItem *
   path.translate(-topLeft);
   setPath(path);
   m_basePos = topLeft;
-  setPos(m_basePos);
+  setPos(m_basePos + m_offset);
   //todo: uncomment this when we have undo
   //setCursor(Qt::OpenHandCursor);
   setZValue(z);
@@ -37,7 +38,15 @@ void ROIGraphicsItem::updateValue()
   setPath(path);
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
   m_basePos = topLeft;
-  setPos(m_basePos);
+  setPos(m_basePos + m_offset);
+  setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
+}
+
+void ROIGraphicsItem::setOffset(double x, double y)
+{
+  setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
+  m_offset = QPointF(x,y);
+  setPos(m_basePos + m_offset);
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
 
@@ -56,14 +65,14 @@ void ROIGraphicsItem::updateValue()
 QVariant ROIGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)
 {
   if (change == ItemPositionChange && scene()) {
-    QPointF newPos = value.toPointF();
+    QPointF newPos = value.toPointF()-m_offset;
     QRectF boundRect = path().boundingRect();
     QRectF rect = scene()->sceneRect();
     // Keep the item inside the scene rect.
     newPos.setX(qMin(rect.right() - boundRect.width(), qMax(newPos.x(), rect.left())));
     newPos.setY(qMin(rect.bottom() - boundRect.height(), qMax(newPos.y(), rect.top())));
     m_roi.sliceSetTopLeft(m_slice, newPos.x(), newPos.y());
-    return newPos;
+    return newPos+m_offset;
   }
   return QGraphicsPathItem::itemChange(change, value);
 }
@@ -75,7 +84,7 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
     QAction *addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
     QAction *selectedAction = menu.exec(event->screenPos());
     if (selectedAction == addCtrlPointAction) {
-      m_roi.sliceAddCtrlPoint(m_slice, event->scenePos());
+      m_roi.sliceAddCtrlPoint(m_slice, event->scenePos()-m_offset);
     }
   }
 }
@@ -97,7 +106,8 @@ ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI &roi, const ZROIControlPoint &
   }
 
   m_basePos = m_roi.controlPointCoord(m_controlPoint);
-  setPos(m_basePos);
+  setPos(m_basePos + m_offset);
+  setToolTip(QString("Coord:(%1,%2), Offset:(%3,%4)").arg(m_basePos.x()).arg(m_basePos.y()).arg(m_offset.x()).arg(m_offset.y()));
   setPen(QPen(QColor(0,0,0), 0));
   setBrush(QBrush(QColor(255,255,255)));
   setCursor(Qt::PointingHandCursor);
@@ -108,7 +118,8 @@ void ROICtrlPtGraphicsItem::updateValue()
 {
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
   m_basePos = m_roi.controlPointCoord(m_controlPoint);
-  setPos(m_basePos);
+  setPos(m_basePos + m_offset);
+  setToolTip(QString("Coord:(%1,%2), Offset:(%3,%4)").arg(m_basePos.x()).arg(m_basePos.y()).arg(m_offset.x()).arg(m_offset.y()));
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
 
@@ -140,10 +151,19 @@ void ROICtrlPtGraphicsItem::paint(QPainter *painter, const QStyleOptionGraphicsI
   QGraphicsRectItem::paint(painter, option, widget);
 }
 
+void ROICtrlPtGraphicsItem::setOffset(double x, double y)
+{
+  setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
+  m_offset = QPointF(x,y);
+  setPos(m_basePos + m_offset);
+  setToolTip(QString("Coord:(%1,%2), Offset:(%3,%4)").arg(m_basePos.x()).arg(m_basePos.y()).arg(m_offset.x()).arg(m_offset.y()));
+  setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
+}
+
 QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)
 {
   if (change == ItemPositionChange && scene()) {
-    QPointF newPos = value.toPointF();
+    QPointF newPos = value.toPointF()-m_offset;
     QRectF sceneRect = scene()->sceneRect();
     if (true) {
       // Keep the item inside the scene rect.
@@ -155,7 +175,7 @@ QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange cha
         newPos.setY(qMin(sceneRect.bottom(), qMax(newPos.y(), sceneRect.top())));
       }
     }
-    return m_roi.setControlPointCoord(m_controlPoint, newPos);
+    return m_roi.setControlPointCoord(m_controlPoint, newPos) + m_offset;
   }
   return QGraphicsRectItem::itemChange(change, value);
 }
@@ -208,7 +228,7 @@ void ZROIFilter::setData(ZROI &roi)
                                m_regionColor.get().y * 255,
                                m_regionColor.get().z * 255,
                                m_opacity.get() * 255));
-      roiItem->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
+      roiItem->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
       roiItem->setVisible((realZ() == i || m_view.isMaxZProjView()) && m_visible.get());
       m_view.scene().addItem(roiItem);
 
@@ -243,13 +263,11 @@ void ZROIFilter::setNormalView(int z, int t)
   int rz = realZ(z);
   for (auto it = m_sliceToROIItem.begin(); it != m_sliceToROIItem.end(); ++it) {
     it->second->setVisible(it->first == int(rz));
-    it->second->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
   }
   if (m_showControlPoints.get()) {
     for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
       for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
         (*it1)->setVisible(it->first == int(rz));
-        (*it1)->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
       }
     }
   }
@@ -262,13 +280,11 @@ void ZROIFilter::setMaxZProjView(int t)
     return;
   for (auto it = m_sliceToROIItem.begin(); it != m_sliceToROIItem.end(); ++it) {
     it->second->setVisible(true);
-    it->second->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
   }
   if (m_showControlPoints.get()) {
     for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
       for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
         (*it1)->setVisible(true);
-        (*it1)->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
       }
     }
   }
@@ -290,6 +306,19 @@ ZWidgetsGroup *ZROIFilter::viewSettingWidgetsGroup()
     new ZWidgetsGroup(&m_outlineColor, m_widgetsGroup, 1);
     new ZWidgetsGroup(&m_regionColor, m_widgetsGroup, 1);
     new ZWidgetsGroup(&m_offsetPara, m_widgetsGroup, 1);
+    new ZWidgetsGroup(&m_opacity, m_widgetsGroup, 1);
+  }
+  return m_widgetsGroup;
+}
+
+ZWidgetsGroup *ZROIFilter::viewSettingWidgetsGroupForAnnotationFilter()
+{
+  if (!m_widgetsGroup) {
+    m_widgetsGroup = new ZWidgetsGroup("", nullptr, 1);
+    new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
+    new ZWidgetsGroup(&m_showControlPoints, m_widgetsGroup, 1);
+    new ZWidgetsGroup(&m_outlineColor, m_widgetsGroup, 1);
+    new ZWidgetsGroup(&m_regionColor, m_widgetsGroup, 1);
     new ZWidgetsGroup(&m_opacity, m_widgetsGroup, 1);
   }
   return m_widgetsGroup;
@@ -355,6 +384,20 @@ void ZROIFilter::mouseReleased(const QPointF &)
   }
 }
 
+void ZROIFilter::offsetChanged()
+{
+  for (auto it = m_sliceToROIItem.begin(); it != m_sliceToROIItem.end(); ++it) {
+    it->second->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
+  }
+  if (m_showControlPoints.get()) {
+    for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
+      for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
+        (*it1)->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
+      }
+    }
+  }
+}
+
 std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> ZROIFilter::createCtrlPtItems(int slice)
 {
   std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> items;
@@ -362,7 +405,7 @@ std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> ZROIFilter::createCtrlPtItem
   for (auto controlPoint : controlPoints) {
     ROICtrlPtGraphicsItem* rectItem = new ROICtrlPtGraphicsItem(*m_ROI, controlPoint, m_view.graphicsView().currentScale());
     rectItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get() && m_showControlPoints.get());
-    rectItem->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
+    rectItem->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
     m_view.scene().addItem(rectItem);
     items.emplace_back(rectItem);
   }
@@ -437,7 +480,7 @@ void ZROIFilter::onRoiChanged(int slice)
                              m_regionColor.get().y * 255,
                              m_regionColor.get().z * 255,
                              m_opacity.get() * 255));
-    roiItem->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
+    roiItem->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
     roiItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get());
     m_view.scene().addItem(roiItem);
 
