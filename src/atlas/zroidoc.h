@@ -18,6 +18,8 @@ public:
 
   ZROI& currentROI();
 
+  void askToSave(const ZROI &roi, const QString &title = "");
+
   // ZObjDoc interface
 public:
   virtual bool save(size_t id) override;

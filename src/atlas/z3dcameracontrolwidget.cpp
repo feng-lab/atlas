@@ -16,7 +16,7 @@ Z3DCameraControlWidget::Z3DCameraControlWidget(Z3DCameraParameter &camera, QWidg
 
 void Z3DCameraControlWidget::roll()
 {
-  if (m_rollDegreeSpinBox->value()) {
+  if (m_rollDegreeSpinBox->value() % 360 != 0) {
     double angle = glm::radians(double(m_rollDegreeSpinBox->value()));
     m_camera.roll(angle);
   }
@@ -24,7 +24,7 @@ void Z3DCameraControlWidget::roll()
 
 void Z3DCameraControlWidget::azimuth()
 {
-  if (m_azimuthDegreeSpinBox->value()) {
+  if (m_azimuthDegreeSpinBox->value() % 360 != 0) {
     double angle = glm::radians(double(m_azimuthDegreeSpinBox->value()));
     m_camera.azimuth(angle);
   }
@@ -32,7 +32,7 @@ void Z3DCameraControlWidget::azimuth()
 
 void Z3DCameraControlWidget::yaw()
 {
-  if (m_yawDegreeSpinBox->value()) {
+  if (m_yawDegreeSpinBox->value() % 360 != 0) {
     double angle = glm::radians(double(m_yawDegreeSpinBox->value()));
     m_camera.yaw(angle);
   }
@@ -40,7 +40,7 @@ void Z3DCameraControlWidget::yaw()
 
 void Z3DCameraControlWidget::elevation()
 {
-  if (m_elevationDegreeSpinBox->value()) {
+  if (m_elevationDegreeSpinBox->value() % 360 != 0) {
     double angle = glm::radians(double(m_elevationDegreeSpinBox->value()));
     m_camera.elevation(angle);
   }
@@ -48,7 +48,7 @@ void Z3DCameraControlWidget::elevation()
 
 void Z3DCameraControlWidget::pitch()
 {
-  if (m_pitchDegreeSpinBox->value()) {
+  if (m_pitchDegreeSpinBox->value() % 360 != 0) {
     double angle = glm::radians(double(m_pitchDegreeSpinBox->value()));
     m_camera.pitch(angle);
   }
@@ -56,6 +56,9 @@ void Z3DCameraControlWidget::pitch()
 
 void Z3DCameraControlWidget::createWidget()
 {
+  int minDegrees = -360;
+  int maxDegrees = 360;
+
   QVBoxLayout *vlo = new QVBoxLayout;
   QHBoxLayout *hlo = nullptr;
 
@@ -66,10 +69,10 @@ void Z3DCameraControlWidget::createWidget()
   hlo->addWidget(azimuthButton);
   connect(azimuthButton, SIGNAL(clicked(bool)), this, SLOT(azimuth()));
   m_azimuthDegreeSpinBox = new QSpinBox(this);
-  m_azimuthDegreeSpinBox->setMinimum(std::numeric_limits<int>::min());
-  m_azimuthDegreeSpinBox->setMaximum(std::numeric_limits<int>::max());
+  m_azimuthDegreeSpinBox->setMinimum(minDegrees);
+  m_azimuthDegreeSpinBox->setMaximum(maxDegrees);
   m_azimuthDegreeSpinBox->setValue(90);
-  m_azimuthDegreeSpinBox->setSuffix(" degree");
+  m_azimuthDegreeSpinBox->setSuffix(" degrees");
   hlo->addWidget(m_azimuthDegreeSpinBox);
   vlo->addLayout(hlo);
 
@@ -81,10 +84,10 @@ void Z3DCameraControlWidget::createWidget()
   hlo->addWidget(elevationButton);
   connect(elevationButton, SIGNAL(clicked(bool)), this, SLOT(elevation()));
   m_elevationDegreeSpinBox = new QSpinBox(this);
-  m_elevationDegreeSpinBox->setMinimum(std::numeric_limits<int>::min());
-  m_elevationDegreeSpinBox->setMaximum(std::numeric_limits<int>::max());
+  m_elevationDegreeSpinBox->setMinimum(minDegrees);
+  m_elevationDegreeSpinBox->setMaximum(maxDegrees);
   m_elevationDegreeSpinBox->setValue(90);
-  m_elevationDegreeSpinBox->setSuffix(" degree");
+  m_elevationDegreeSpinBox->setSuffix(" degrees");
   hlo->addWidget(m_elevationDegreeSpinBox);
   vlo->addLayout(hlo);
 
@@ -95,10 +98,10 @@ void Z3DCameraControlWidget::createWidget()
   hlo->addWidget(rollButton);
   connect(rollButton, SIGNAL(clicked(bool)), this, SLOT(roll()));
   m_rollDegreeSpinBox = new QSpinBox(this);
-  m_rollDegreeSpinBox->setMinimum(std::numeric_limits<int>::min());
-  m_rollDegreeSpinBox->setMaximum(std::numeric_limits<int>::max());
+  m_rollDegreeSpinBox->setMinimum(minDegrees);
+  m_rollDegreeSpinBox->setMaximum(maxDegrees);
   m_rollDegreeSpinBox->setValue(90);
-  m_rollDegreeSpinBox->setSuffix(" degree");
+  m_rollDegreeSpinBox->setSuffix(" degrees");
   hlo->addWidget(m_rollDegreeSpinBox);
   vlo->addLayout(hlo);
 
@@ -110,10 +113,10 @@ void Z3DCameraControlWidget::createWidget()
   hlo->addWidget(yawButton);
   connect(yawButton, SIGNAL(clicked(bool)), this, SLOT(yaw()));
   m_yawDegreeSpinBox = new QSpinBox(this);
-  m_yawDegreeSpinBox->setMinimum(std::numeric_limits<int>::min());
-  m_yawDegreeSpinBox->setMaximum(std::numeric_limits<int>::max());
+  m_yawDegreeSpinBox->setMinimum(minDegrees);
+  m_yawDegreeSpinBox->setMaximum(maxDegrees);
   m_yawDegreeSpinBox->setValue(90);
-  m_yawDegreeSpinBox->setSuffix(" degree");
+  m_yawDegreeSpinBox->setSuffix(" degrees");
   hlo->addWidget(m_yawDegreeSpinBox);
   vlo->addLayout(hlo);
 
@@ -126,10 +129,10 @@ void Z3DCameraControlWidget::createWidget()
   hlo->addWidget(pitchButton);
   connect(pitchButton, SIGNAL(clicked(bool)), this, SLOT(pitch()));
   m_pitchDegreeSpinBox = new QSpinBox(this);
-  m_pitchDegreeSpinBox->setMinimum(std::numeric_limits<int>::min());
-  m_pitchDegreeSpinBox->setMaximum(std::numeric_limits<int>::max());
+  m_pitchDegreeSpinBox->setMinimum(minDegrees);
+  m_pitchDegreeSpinBox->setMaximum(maxDegrees);
   m_pitchDegreeSpinBox->setValue(90);
-  m_pitchDegreeSpinBox->setSuffix(" degree");
+  m_pitchDegreeSpinBox->setSuffix(" degrees");
   hlo->addWidget(m_pitchDegreeSpinBox);
   vlo->addLayout(hlo);
 

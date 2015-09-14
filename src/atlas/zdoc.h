@@ -24,6 +24,7 @@ class ZImgDoc;
 class Z2DAnimationDoc;
 class Z3DAnimationDoc;
 class ZROIDoc;
+class ZMeshDoc;
 
 class ZDoc : public QObject
 {
@@ -102,6 +103,7 @@ public:
   Z3DAnimationDoc& animation3DDoc() { return *m_animation3DDoc; }
   Z2DAnimationDoc& animation2DDoc() { return *m_animation2DDoc; }
   ZROIDoc& roiDoc() { return *m_roiDoc; }
+  ZMeshDoc& meshDoc() { return *m_meshDoc; }
 
   void hideAnimation3DView();
 
@@ -165,6 +167,7 @@ private:
   Z2DAnimationDoc *m_animation2DDoc;
   Z3DAnimationDoc *m_animation3DDoc;
   ZROIDoc* m_roiDoc;
+  ZMeshDoc* m_meshDoc;
 };
 
 } // namespace nim

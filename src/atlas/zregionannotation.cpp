@@ -662,6 +662,26 @@ void ZRegionAnnotation::mergeROIToRegion(const ZROI &roi, int64_t regionID)
   }
 }
 
+const ZMesh *ZRegionAnnotation::meshOfRegion(int64_t regionID)
+{
+  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
+    if (it->id == regionID) {
+      return it->mesh.get();
+    }
+  }
+  return nullptr;
+}
+
+const ZROI *ZRegionAnnotation::roiOfRegion(int64_t regionID)
+{
+  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
+    if (it->id == regionID) {
+      return it->roi.get();
+    }
+  }
+  return nullptr;
+}
+
 void ZRegionAnnotation::load(const QString &filename)
 {
   clear();

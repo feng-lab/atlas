@@ -41,6 +41,12 @@ QVariant ZRegionAnnotationTreeModel::data(const QModelIndex &index, int role) co
     case MergeROIColumn:
       return QString("Merge ROI to %1...").arg(item->abbreviation);
       break;
+    case ExportROIColumn:
+      return QString("Export ROI of %1...").arg(item->abbreviation);
+      break;
+    case ExportMeshColumn:
+      return QString("Export Mesh of %1...").arg(item->abbreviation);
+      break;
     default:
       break;
     }
@@ -52,7 +58,13 @@ QVariant ZRegionAnnotationTreeModel::data(const QModelIndex &index, int role) co
     case IDColumn:
     case NameColumn:
     case MergeROIColumn:
-      return static_cast<qlonglong>(item->id);
+      return static_cast<qlonglong>(item->id * 10 + 1);
+      break;
+    case ExportROIColumn:
+      return static_cast<qlonglong>(item->id * 10 + 2);
+      break;
+    case ExportMeshColumn:
+      return static_cast<qlonglong>(item->id * 10 + 3);
       break;
     default:
       break;
@@ -97,6 +109,12 @@ QVariant ZRegionAnnotationTreeModel::headerData(int section, Qt::Orientation ori
     case MergeROIColumn:
       return QString("Merge ROI");
       break;
+    case ExportROIColumn:
+      return QString("Export ROI");
+      break;
+    case ExportMeshColumn:
+      return QString("Export Mesh");
+      break;
     default:
       break;
     }
@@ -105,6 +123,8 @@ QVariant ZRegionAnnotationTreeModel::headerData(int section, Qt::Orientation ori
   if (orientation == Qt::Horizontal && role == Qt::UserRole) {
     switch (section) {
     case MergeROIColumn:
+    case ExportROIColumn:
+    case ExportMeshColumn:
       return 1;
       break;
     default:

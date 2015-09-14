@@ -157,7 +157,7 @@
 #define PACKAGE_NAME "LibTIFF Software"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "LibTIFF Software 4.0.5beta"
+#define PACKAGE_STRING "LibTIFF Software 4.0.6"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "tiff"
@@ -166,7 +166,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "4.0.5beta"
+#define PACKAGE_VERSION "4.0.6"
 
 /* The size of `signed int', as computed by sizeof. */
 #define SIZEOF_SIGNED_INT 4
@@ -232,7 +232,7 @@
 #define USE_WIN32_FILEIO 1
 
 /* Version number of package */
-#define VERSION "4.0.5beta"
+#define VERSION "4.0.6"
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */

@@ -16,6 +16,8 @@ public:
   // return info of mesh with id, assume mesh exist, otherwise crash
   QList<ZMesh*>* meshList(size_t id) { return &(m_idToMeshPacks.at(id)->meshList); }
 
+  void askToSave(const ZMesh &msh, const QString &title = "");
+
   // ZObjDoc interface
 public:
   virtual bool save(size_t id) override;

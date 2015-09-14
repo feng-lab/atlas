@@ -26,6 +26,37 @@ ZMeshDoc::~ZMeshDoc()
   qDeleteAll(packs.begin(), packs.end());
 }
 
+void ZMeshDoc::askToSave(const ZMesh &msh, const QString &title)
+{
+  QStringList filters;
+  QList<std::string> formats;
+  ZMesh::getQtWriteNameFilter(filters, formats);
+
+  QFileDialog dialog(QApplication::activeWindow());
+  dialog.setAcceptMode(QFileDialog::AcceptSave);
+  dialog.setFileMode(QFileDialog::AnyFile);
+  dialog.setNameFilters(filters);
+  dialog.setDirectory(lastOpenedObjPath());
+  if (title.isEmpty())
+    dialog.setWindowTitle(tr("Save Mesh As"));
+  else
+    dialog.setWindowTitle(title);
+
+  if (dialog.exec()) {
+    int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+
+    try {
+      msh.save(dialog.selectedFiles().at(0), formats[fmtIdx]);
+
+      ZSystemInfoInstance.addFileToRecentFileList(dialog.selectedFiles().at(0));
+      setLastOpenedObjPath(dialog.selectedFiles().at(0));
+    }
+    catch (const ZException & e) {
+      QMessageBox::critical(QApplication::activeWindow(), "Save Mesh Error", e.what());
+    }
+  }
+}
+
 bool ZMeshDoc::save(size_t id)
 {
   if (!objHasUnsavedChange(id))

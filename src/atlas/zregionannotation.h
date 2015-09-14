@@ -70,6 +70,10 @@ public:
 
   void mergeROIToRegion(const ZROI &roi, int64_t regionID);
 
+  // return nullptr if not exist
+  const ZMesh* meshOfRegion(int64_t regionID);
+  const ZROI* roiOfRegion(int64_t regionID);
+
   const std::vector<int>& boundBox() const { return m_boundBox; }
   const ZTree<RegionNode>& annotationTree() const { return m_ontology; }
   ZTree<RegionNode>& annotationTree() { return m_ontology; }

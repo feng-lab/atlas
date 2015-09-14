@@ -16,7 +16,7 @@ class ZRegionAnnotationTreeModel : public QAbstractItemModel
 public:
   enum Column
   {
-    AbbreviationColumn, IDColumn, NameColumn, MergeROIColumn, ColumnCount
+    AbbreviationColumn, IDColumn, NameColumn, MergeROIColumn, ExportROIColumn, ExportMeshColumn, ColumnCount
   };
 
   explicit ZRegionAnnotationTreeModel(ZRegionAnnotation &anno, QObject *parent = nullptr);

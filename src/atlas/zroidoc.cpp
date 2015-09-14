@@ -40,6 +40,31 @@ ZROI &ZROIDoc::currentROI()
   return *m_idToROIPacks.begin()->second->roi;
 }
 
+void ZROIDoc::askToSave(const ZROI &roi, const QString &title)
+{
+  QFileDialog dialog(QApplication::activeWindow());
+  dialog.setAcceptMode(QFileDialog::AcceptSave);
+  dialog.setFileMode(QFileDialog::AnyFile);
+  dialog.setNameFilter(ZROI::getQtWriteNameFilter());
+  dialog.setDirectory(lastOpenedObjPath());
+  if (title.isEmpty())
+    dialog.setWindowTitle(tr("Save Mesh As"));
+  else
+    dialog.setWindowTitle(title);
+
+  if (dialog.exec()) {
+    try {
+      roi.save(dialog.selectedFiles().at(0));
+
+      ZSystemInfoInstance.addFileToRecentFileList(dialog.selectedFiles().at(0));
+      setLastOpenedObjPath(dialog.selectedFiles().at(0));
+    }
+    catch (const ZException & e) {
+      QMessageBox::critical(QApplication::activeWindow(), "Save ROI Error", e.what());
+    }
+  }
+}
+
 bool ZROIDoc::save(size_t id)
 {
   if (!objHasUnsavedChange(id))

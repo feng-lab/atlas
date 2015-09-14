@@ -420,9 +420,6 @@ void ZMainWindow::init()
   ZRegionAnnotationView *regionAnnotationView = new ZRegionAnnotationView(*regionAnnotationDoc, *m_view);
   m_view->registerObjView(regionAnnotationView);
 
-  ZMeshDoc *meshDoc = new ZMeshDoc(*m_doc);
-  m_doc->registerObjDoc(meshDoc);
-
   // UI
   setCentralWidget(m_view);
 

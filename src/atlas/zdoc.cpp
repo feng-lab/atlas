@@ -19,6 +19,7 @@
 #include "z2danimationdoc.h"
 #include "z3danimationdoc.h"
 #include "zroidoc.h"
+#include "zmeshdoc.h"
 
 namespace nim {
 
@@ -44,6 +45,9 @@ ZDoc::ZDoc(QObject *parent)
 
   m_roiDoc = new ZROIDoc(*this);
   registerObjDoc(m_roiDoc);
+
+  m_meshDoc = new ZMeshDoc(*this);
+  registerObjDoc(m_meshDoc);
 }
 
 bool ZDoc::hasObj() const

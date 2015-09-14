@@ -10,7 +10,8 @@
 namespace nim {
 
 ZButtonColumnDelegate::ZButtonColumnDelegate(QObject *parent)
-  : m_button(nullptr)
+  : QStyledItemDelegate(parent)
+  , m_button(nullptr)
 {
   if (QAbstractItemView *wg = qobject_cast<QAbstractItemView*>(parent)) {
     m_widget = wg;
@@ -83,7 +84,10 @@ void ZButtonColumnDelegate::updateEditorGeometry(QWidget *editor, const QStyleOp
 QSize ZButtonColumnDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    return m_button->grab().size();
+    m_button->setText(index.data().toString());
+    QSize res = m_button->grab().size();
+    res.setWidth(res.width() * 2);
+    return res;
   } else {
     return QStyledItemDelegate::sizeHint(option, index);
   }
