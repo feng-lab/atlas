@@ -35,6 +35,8 @@ protected:
 private:
   ZROI &m_roi;
   int m_slice;
+
+  QPointF m_basePos;
 };
 
 class ROICtrlPtGraphicsItem : public QGraphicsRectItem
@@ -62,6 +64,8 @@ private:
   double m_viewScale;
 
   const ZROIShapeOperation &m_shapeOp;
+
+  QPointF m_basePos;
 };
 
 class ZROIFilter : public ZObjFilter
@@ -77,13 +81,13 @@ public:
 
   void setVisible(bool v) { m_visible.set(v); }
   void setSelected(bool v) { Q_UNUSED(v); }
-  void setNormalView(int z, int t);
-  void setMaxZProjView(int t);
+  void setNormalView(int z, int t) override;
+  void setMaxZProjView(int t) override;
 
   void setOutlineColor(glm::vec3 col) { m_outlineColor.set(col); }
   void setRegionColor(glm::vec3 col) { m_regionColor.set(col); }
 
-  const std::vector<int>& boundBox() const;
+  std::vector<int> boundBox() const;
 
   ZWidgetsGroup* viewSettingWidgetsGroup();
 

@@ -22,7 +22,8 @@ ROIGraphicsItem::ROIGraphicsItem(ZROI &roi, int slice, double z, QGraphicsItem *
   QPointF topLeft = path.boundingRect().topLeft();
   path.translate(-topLeft);
   setPath(path);
-  setPos(topLeft);
+  m_basePos = topLeft;
+  setPos(m_basePos);
   //todo: uncomment this when we have undo
   //setCursor(Qt::OpenHandCursor);
   setZValue(z);
@@ -35,7 +36,8 @@ void ROIGraphicsItem::updateValue()
   path.translate(-topLeft);
   setPath(path);
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
-  setPos(topLeft);
+  m_basePos = topLeft;
+  setPos(m_basePos);
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
 
@@ -94,7 +96,8 @@ ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI &roi, const ZROIControlPoint &
              QGraphicsItem::ItemIsSelectable);
   }
 
-  setPos(m_roi.controlPointCoord(m_controlPoint));
+  m_basePos = m_roi.controlPointCoord(m_controlPoint);
+  setPos(m_basePos);
   setPen(QPen(QColor(0,0,0), 0));
   setBrush(QBrush(QColor(255,255,255)));
   setCursor(Qt::PointingHandCursor);
@@ -104,7 +107,8 @@ ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI &roi, const ZROIControlPoint &
 void ROICtrlPtGraphicsItem::updateValue()
 {
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
-  setPos(m_roi.controlPointCoord(m_controlPoint));
+  m_basePos = m_roi.controlPointCoord(m_controlPoint);
+  setPos(m_basePos);
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
 
@@ -178,6 +182,7 @@ ZROIFilter::ZROIFilter(ZView &view)
   addParameter(&m_showControlPoints);
   addParameter(&m_outlineColor);
   addParameter(&m_regionColor);
+  addParameter(&m_offsetPara);
   addParameter(&m_opacity);
 
   connect(&view.graphicsView(), SIGNAL(scaleChanged(double)), this, SLOT(viewScaleChanged(double)));
@@ -203,10 +208,8 @@ void ZROIFilter::setData(ZROI &roi)
                                m_regionColor.get().y * 255,
                                m_regionColor.get().z * 255,
                                m_opacity.get() * 255));
-      if ((m_view.currentSlice() == i || m_view.isMaxZProjView()) && m_visible.get())
-        roiItem->setVisible(true);
-      else
-        roiItem->setVisible(false);
+      roiItem->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
+      roiItem->setVisible((realZ() == i || m_view.isMaxZProjView()) && m_visible.get());
       m_view.scene().addItem(roiItem);
 
       m_sliceToROIItem.emplace(i, std::unique_ptr<ROIGraphicsItem>(roiItem));
@@ -237,13 +240,16 @@ void ZROIFilter::setNormalView(int z, int t)
   Q_UNUSED(t);
   if (!m_visible.get())
     return;
+  int rz = realZ(z);
   for (auto it = m_sliceToROIItem.begin(); it != m_sliceToROIItem.end(); ++it) {
-    it->second->setVisible(it->first == int(z));
+    it->second->setVisible(it->first == int(rz));
+    it->second->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
   }
   if (m_showControlPoints.get()) {
     for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
       for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
-        (*it1)->setVisible(it->first == int(z));
+        (*it1)->setVisible(it->first == int(rz));
+        (*it1)->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
       }
     }
   }
@@ -256,19 +262,23 @@ void ZROIFilter::setMaxZProjView(int t)
     return;
   for (auto it = m_sliceToROIItem.begin(); it != m_sliceToROIItem.end(); ++it) {
     it->second->setVisible(true);
+    it->second->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
   }
   if (m_showControlPoints.get()) {
     for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
       for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
         (*it1)->setVisible(true);
+        (*it1)->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
       }
     }
   }
 }
 
-const std::vector<int> &ZROIFilter::boundBox() const
+std::vector<int> ZROIFilter::boundBox() const
 {
-  return m_ROI->boundBox();
+  std::vector<int> res = m_ROI->boundBox();
+  updateBoundBoxWithOffsetPara(res);
+  return res;
 }
 
 ZWidgetsGroup *ZROIFilter::viewSettingWidgetsGroup()
@@ -279,6 +289,7 @@ ZWidgetsGroup *ZROIFilter::viewSettingWidgetsGroup()
     new ZWidgetsGroup(&m_showControlPoints, m_widgetsGroup, 1);
     new ZWidgetsGroup(&m_outlineColor, m_widgetsGroup, 1);
     new ZWidgetsGroup(&m_regionColor, m_widgetsGroup, 1);
+    new ZWidgetsGroup(&m_offsetPara, m_widgetsGroup, 1);
     new ZWidgetsGroup(&m_opacity, m_widgetsGroup, 1);
   }
   return m_widgetsGroup;
@@ -322,9 +333,9 @@ void ZROIFilter::mousePressed(const QPointF &)
       if (m_hasSelectedItems)
         break;
     }
-  } else if (m_sliceToCtrlPtItems.find(m_view.currentSlice()) != m_sliceToCtrlPtItems.end()) {
-    for (auto it1 = m_sliceToCtrlPtItems.at(m_view.currentSlice()).begin();
-         it1 != m_sliceToCtrlPtItems.at(m_view.currentSlice()).end(); ++it1) {
+  } else if (m_sliceToCtrlPtItems.find(realZ()) != m_sliceToCtrlPtItems.end()) {
+    for (auto it1 = m_sliceToCtrlPtItems.at(realZ()).begin();
+         it1 != m_sliceToCtrlPtItems.at(realZ()).end(); ++it1) {
       if ((*it1)->isSelected()) {
         m_hasSelectedItems = true;
         break;
@@ -350,7 +361,8 @@ std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> ZROIFilter::createCtrlPtItem
   std::vector<ZROIControlPoint> controlPoints = m_ROI->sliceControlPoints(slice);
   for (auto controlPoint : controlPoints) {
     ROICtrlPtGraphicsItem* rectItem = new ROICtrlPtGraphicsItem(*m_ROI, controlPoint, m_view.graphicsView().currentScale());
-    rectItem->setVisible((m_view.currentSlice() == slice || m_view.isMaxZProjView()) && m_visible.get() && m_showControlPoints.get());
+    rectItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get() && m_showControlPoints.get());
+    rectItem->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
     m_view.scene().addItem(rectItem);
     items.emplace_back(rectItem);
   }
@@ -425,10 +437,8 @@ void ZROIFilter::onRoiChanged(int slice)
                              m_regionColor.get().y * 255,
                              m_regionColor.get().z * 255,
                              m_opacity.get() * 255));
-    if ((m_view.currentSlice() == slice || m_view.isMaxZProjView()) && m_visible.get())
-      roiItem->setVisible(true);
-    else
-      roiItem->setVisible(false);
+    roiItem->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
+    roiItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get());
     m_view.scene().addItem(roiItem);
 
     m_sliceToROIItem.emplace(slice, std::unique_ptr<ROIGraphicsItem>(roiItem));

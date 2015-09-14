@@ -16,9 +16,6 @@ class ZImg;
 class ZImgPack;
 class ZImgPackDisplay;
 class ZDoubleSpanParameter;
-class ZVec3Parameter;
-class ZDVec4Parameter;
-class ZDoubleParameter;
 
 class ZImgFilter : public ZObjFilter
 {
@@ -29,12 +26,12 @@ public:
 
   void setData(ZImgPack &pack);
 
-  void releaseItemsOwnership() { m_imgItems.clear(); }
+  void releaseItemsOwnership();
 
   void setVisible(bool v) { m_visible.set(v); }
   void setSelected(bool v) { Q_UNUSED(v); }
-  void setNormalView(int z, int t);
-  void setMaxZProjView(int t);
+  void setNormalView(int z, int t) override;
+  void setMaxZProjView(int t) override;
   void setViewport(const QRectF &rect, double scale) override;
 
   inline bool isVisible() const { return m_isVisible; }
@@ -51,6 +48,9 @@ signals:
 
 public slots:
 
+protected slots:
+  virtual void offsetChanged() override;
+
 protected:
   void updateViewSettingWidgetsGroup();
 
@@ -58,7 +58,6 @@ private slots:
   void channelVisibleChanged();
   void channelRangeChanged();
   void channelColorChanged();
-  void offsetChanged();
   void opacityChanged();
   void visibleChanged();
 
@@ -74,21 +73,20 @@ private:
 private:
   ZImgPack* m_imgPack;
 
-  QList<QGraphicsPixmapItem*> m_imgItems;
+  std::vector<std::unique_ptr<QGraphicsPixmapItem>> m_imgItems;
 
   ZBoolParameter m_visible;
   bool m_sliceValid;
   bool m_hasVisibleChannel;
   bool m_isVisible;
 
-  QList<ZBoolParameter*> m_channelVisibleParas;
-  QList<ZDoubleSpanParameter*> m_doubleChannelRangeParas;
-  QList<ZVec3Parameter*> m_channelColorParas;
-  ZDVec4Parameter *m_offsetPara;
+  std::vector<std::unique_ptr<ZBoolParameter>> m_channelVisibleParas;
+  std::vector<std::unique_ptr<ZDoubleSpanParameter>> m_doubleChannelRangeParas;
+  std::vector<std::unique_ptr<ZVec3Parameter>> m_channelColorParas;
   ZDoubleParameter m_opacity;
 
-  ZImgPackDisplay *m_display;
-  mutable ZImgPackDisplay *m_maxZProjDisplay;
+  std::unique_ptr<ZImgPackDisplay> m_display;
+  mutable std::unique_ptr<ZImgPackDisplay> m_maxZProjDisplay;
   bool m_displayValid;
 
   ZImgPackDisplay *m_lastDisplay;

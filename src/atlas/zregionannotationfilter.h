@@ -20,8 +20,8 @@ public:
 
   void setVisible(bool v) { m_visible.set(v); }
   void setSelected(bool v) { Q_UNUSED(v); }
-  void setNormalView(int z, int t);
-  void setMaxZProjView(int t);
+  void setNormalView(int z, int t) override;
+  void setMaxZProjView(int t) override;
 
   const std::vector<int>& boundBox() const;
 

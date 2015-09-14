@@ -9,7 +9,14 @@ namespace nim {
 ZObjFilter::ZObjFilter(ZView &view)
   : QObject(nullptr)
   , m_view(view)
+  , m_offsetPara(QString("Offset"), glm::dvec4(0,0,0,0),
+                 glm::dvec4(std::numeric_limits<int>::min()),
+                 glm::dvec4(std::numeric_limits<int>::max()))
 {
+  m_offsetPara.setDecimal(0);
+  m_offsetPara.setSingleStep(1);
+  m_offsetPara.setStyle("SPINBOX");
+  connect(&m_offsetPara, SIGNAL(valueChanged()), this, SLOT(offsetChanged()));
 }
 
 void ZObjFilter::read(const QJsonObject &json)
@@ -35,6 +42,27 @@ void ZObjFilter::addParameter(ZParameter *para)
 void ZObjFilter::removeParameter(ZParameter *para)
 {
   m_parameters.removeAll(para);
+}
+
+void ZObjFilter::updateBoundBoxWithOffsetPara(std::vector<int> &boundBox) const
+{
+  boundBox[0] += m_offsetPara.get().x;
+  boundBox[1] += m_offsetPara.get().x;
+  boundBox[2] += m_offsetPara.get().y;
+  boundBox[3] += m_offsetPara.get().y;
+  boundBox[4] += m_offsetPara.get().z;
+  boundBox[5] += m_offsetPara.get().z;
+  boundBox[6] += m_offsetPara.get().w;
+  boundBox[7] += m_offsetPara.get().w;
+}
+
+void ZObjFilter::offsetChanged()
+{
+  emit boundBoxChanged();
+  if (m_view.isMaxZProjView())
+    setMaxZProjView(m_view.currentTime());
+  else
+    setNormalView(m_view.currentSlice(), m_view.currentTime());
 }
 
 } // namespace nim
