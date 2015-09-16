@@ -215,6 +215,7 @@ ZImgCZISubBlock::ZImgCZISubBlock(const QString &fileName, std::vector<CZITile> &
       endx = std::max(endx, m_tiles[i].start.x + m_tiles[i].size.x);
       endy = std::max(endy, m_tiles[i].start.y + m_tiles[i].size.y);
     }
+    m_mixedTilesStart.c = 0;
     x = m_mixedTilesStart.x;
     y = m_mixedTilesStart.y;
     width = endx - x;
