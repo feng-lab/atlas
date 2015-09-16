@@ -5,6 +5,7 @@
 #include <Wm5NaturalSpline2.h>
 #include "zsaturateoperation.h"
 #include <QFile>
+#include "zglmutils.h"
 
 namespace {
 
@@ -172,6 +173,35 @@ void ZSliceROI::subtractSpline(const QPolygonF &spline)
     return;
   m_shapeOperations.push_back(ZROIShapeOperation(false, ROIType::Spline, spline));
   updateROI(false);
+}
+
+void ZSliceROI::rotateCtrlPoints(const std::map<size_t, std::set<size_t> > &shapeOpIndexToPointIndices, double angle)
+{
+  for (auto it = shapeOpIndexToPointIndices.begin(); it != shapeOpIndexToPointIndices.end(); ++it) {
+    const std::set<size_t> &pointIndices = it->second;
+    ZROIShapeOperation &shapeOp = m_shapeOperations[it->first];
+    QPolygonF &poly = shapeOp.poly;
+    if (poly.size() > 3 && (shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline)) {
+      QPointF center = poly[0];
+      for (int i=1; i<poly.size(); ++i) {
+        center += poly[i];
+      }
+      center /= poly.size();
+
+      for (auto iit = pointIndices.begin(); iit != pointIndices.end(); ++iit) {
+        size_t idx = *iit;
+        QPointF startPt = poly[idx] - center;
+        glm::dvec2 rPt = glm::rotate(glm::dvec2(startPt.x(), startPt.y()), angle);
+        QPointF resPt = QPointF(rPt.x, rPt.y) + center;
+        poly[idx] = resPt;
+        if (idx == 0 || idx == size_t(poly.size())-1) {
+          poly[0] = resPt;
+          poly[poly.size()-1] = resPt;
+        }
+      }
+    }
+  }
+  updateROI(true);
 }
 
 void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::set<size_t>> &shapeOpIndexToPointIndices)
@@ -597,6 +627,31 @@ std::vector<ZROIControlPoint> ZROI::sliceControlPoints(int slice) const
     }
   }
   return res;
+}
+
+void ZROI::rotateROIControlPoints(const std::vector<ZROIControlPoint> &controlPoints, double angle)
+{
+  if (!controlPoints.empty())
+    m_undoStack->push(new ZROIRotateControlPointsCommand(*this, controlPoints, angle));
+}
+
+std::set<int> ZROI::rotateROIControlPoints_Impl(const std::vector<ZROIControlPoint> &controlPoints, double angle)
+{
+  std::set<int> slices;
+  std::map<int, std::map<size_t, std::set<size_t>>> sliceToShapeOpIndexToPointIndices;
+  for (auto controlPoint : controlPoints) {
+    sliceToShapeOpIndexToPointIndices[controlPoint.slice][controlPoint.shapeOperationIndex].insert(controlPoint.pointIndex);
+    slices.insert(controlPoint.slice);
+  }
+  for (auto it = sliceToShapeOpIndexToPointIndices.begin();
+       it != sliceToShapeOpIndexToPointIndices.end(); ++it) {
+    auto sit = m_sliceROIs.find(it->first);
+    if (sit != m_sliceROIs.end()) {
+      sit->second.rotateCtrlPoints(it->second, angle);
+      onSliceROIMoved(it->first);
+    }
+  }
+  return slices;
 }
 
 void ZROI::deleteROIControlPoints(const std::vector<ZROIControlPoint> &controlPoints)

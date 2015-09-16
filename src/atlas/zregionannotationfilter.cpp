@@ -98,6 +98,20 @@ void ZRegionAnnotationFilter::mouseReleased(const QPointF &scenePos)
   }
 }
 
+void ZRegionAnnotationFilter::rotateClockwise()
+{
+  for (auto it = m_idToROIFilters.begin(); it != m_idToROIFilters.end(); ++it) {
+    it->second->rotateClockwise();
+  }
+}
+
+void ZRegionAnnotationFilter::rotateCounterclockwise()
+{
+  for (auto it = m_idToROIFilters.begin(); it != m_idToROIFilters.end(); ++it) {
+    it->second->rotateCounterclockwise();
+  }
+}
+
 void ZRegionAnnotationFilter::visibleChanged()
 {
   for (auto it = m_idToROIFilters.begin(); it != m_idToROIFilters.end(); ++it) {

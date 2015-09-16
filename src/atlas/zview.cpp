@@ -420,12 +420,16 @@ void ZView::keyPressEvent(QKeyEvent *event)
 {
   switch(event->key()) {
   case Qt::Key_Left:
-    if (m_normalViewAction->isChecked() && m_imgSlice->get() > 0)
-      m_imgSlice->set(m_imgSlice->get() - 1);
+    if (event->modifiers() == Qt::NoModifier) {
+      if (m_normalViewAction->isChecked() && m_imgSlice->get() > 0)
+        m_imgSlice->set(m_imgSlice->get() - 1);
+    }
     break;
   case Qt::Key_Right:
-    if (m_normalViewAction->isChecked() && m_imgSlice->get() < m_imgSlice->rangeMax())
-      m_imgSlice->set(m_imgSlice->get() + 1);
+    if (event->modifiers() == Qt::NoModifier) {
+      if (m_normalViewAction->isChecked() && m_imgSlice->get() < m_imgSlice->rangeMax())
+        m_imgSlice->set(m_imgSlice->get() + 1);
+    }
     break;
   case Qt::Key_M:
     if (event->modifiers() == Qt::ControlModifier) {
@@ -441,6 +445,17 @@ void ZView::keyPressEvent(QKeyEvent *event)
     if (event->modifiers() == Qt::NoModifier) {
       for (int i=0; i<m_objViews.size(); ++i) {
         m_objViews[i]->deleteKeyPressed();
+      }
+    }
+    break;
+  case Qt::Key_R:
+    if (event->modifiers() == Qt::ControlModifier) {
+      for (int i=0; i<m_objViews.size(); ++i) {
+        m_objViews[i]->rotateClockwise();
+      }
+    } else if (event->modifiers() == (Qt::ControlModifier | Qt::AltModifier)) {
+      for (int i=0; i<m_objViews.size(); ++i) {
+        m_objViews[i]->rotateCounterclockwise();
       }
     }
     break;

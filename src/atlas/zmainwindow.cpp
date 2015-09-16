@@ -262,9 +262,10 @@ void ZMainWindow::openRecentFile()
 void ZMainWindow::about()
 {
   QMessageBox::about(this, QString("About Atlas"),
-                     QString("<p>Atlas is developed by Linqing Feng (flq@live.com).</p>"
+                     QString("<p>Atlas ver. %1</p>"
+                             "<p>Atlas is developed by Linqing Feng (flq@live.com).</p>"
                              "<p>Jinny Kim's Lab, Center for Functional Connectomics, Korea Institute of Science and Technology</p>"
-                             "<p>All rights reserved.</p>"));
+                             "<p>All rights reserved.</p>").arg(__DATE__));
 }
 
 void ZMainWindow::activateWindowIfNot()

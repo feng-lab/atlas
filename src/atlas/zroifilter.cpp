@@ -384,6 +384,34 @@ void ZROIFilter::mouseReleased(const QPointF &)
   }
 }
 
+void ZROIFilter::rotateClockwise()
+{
+  std::vector<ZROIControlPoint> controlPoints;
+  for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
+    for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
+      if ((*it1)->isSelected()) {
+        controlPoints.push_back((*it1)->controlPoint());
+      }
+    }
+  }
+  if (!controlPoints.empty())
+    m_ROI->rotateROIControlPoints(controlPoints, 5. / 180. * M_PI);
+}
+
+void ZROIFilter::rotateCounterclockwise()
+{
+  std::vector<ZROIControlPoint> controlPoints;
+  for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
+    for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
+      if ((*it1)->isSelected()) {
+        controlPoints.push_back((*it1)->controlPoint());
+      }
+    }
+  }
+  if (!controlPoints.empty())
+    m_ROI->rotateROIControlPoints(controlPoints, -5. / 180. * M_PI);
+}
+
 void ZROIFilter::offsetChanged()
 {
   for (auto it = m_sliceToROIItem.begin(); it != m_sliceToROIItem.end(); ++it) {

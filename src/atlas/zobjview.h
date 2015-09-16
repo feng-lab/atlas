@@ -40,6 +40,9 @@ public:
   // called if mouse is pressed in a scene pos
   virtual void mousePressed(const QPointF &scenePos) = 0;
   virtual void mouseReleased(const QPointF &scenePos) = 0;
+  //
+  virtual void rotateClockwise() = 0;
+  virtual void rotateCounterclockwise() = 0;
 
 signals:
   void objViewReady(size_t id);

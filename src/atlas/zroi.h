@@ -62,6 +62,7 @@ public:
   void subtractPolygon(const QPolygonF& poly);
   void subtractSpline(const QPolygonF& spline);
 
+  void rotateCtrlPoints(const std::map<size_t, std::set<size_t>> &shapeOpIndexToPointIndices, double angle);
   void deleteCtrlPoints(const std::map<size_t, std::set<size_t>> &shapeOpIndexToPointIndices);
   bool addCtrlPoint(const QPointF &pt);
 
@@ -144,6 +145,8 @@ public:
   size_t numSlices() const { return m_sliceROIs.size(); }
 
   std::vector<ZROIControlPoint> sliceControlPoints(int slice) const;
+  void rotateROIControlPoints(const std::vector<ZROIControlPoint> &controlPoints, double angle);
+  std::set<int> rotateROIControlPoints_Impl(const std::vector<ZROIControlPoint> &controlPoints, double angle);
   void deleteROIControlPoints(const std::vector<ZROIControlPoint> &controlPoints);
   std::set<int> deleteROIControlPoints_Impl(const std::vector<ZROIControlPoint> &controlPoints);
   QPointF controlPointCoord(const ZROIControlPoint &ctrlPt) const;
@@ -210,6 +213,20 @@ protected:
   ZROI& m_roi;
   std::map<int, ZSliceROI> m_oldSliceROIs;
   std::set<int> m_changedSlices;
+};
+
+class ZROIRotateControlPointsCommand : public ZROICommand
+{
+public:
+  ZROIRotateControlPointsCommand(ZROI &roi, const std::vector<ZROIControlPoint> &controlPoints, double angle)
+    : ZROICommand(roi), m_controlPoints(controlPoints), m_angle(angle)
+  {
+    setText("Rotate Control Points");
+  }
+  void redo() override { m_changedSlices = m_roi.rotateROIControlPoints_Impl(m_controlPoints, m_angle); }
+protected:
+  std::vector<ZROIControlPoint> m_controlPoints;
+  double m_angle;
 };
 
 class ZROIDeleteControlPointsCommand : public ZROICommand

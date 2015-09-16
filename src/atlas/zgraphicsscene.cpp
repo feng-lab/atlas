@@ -17,7 +17,8 @@ ZGraphicsScene::ZGraphicsScene(ZView *view)
 void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
   QGraphicsScene::mousePressEvent(event);
-  if (!selectedItems().empty()) {
+  if (!selectedItems().empty() &&
+      event->button() == Qt::LeftButton && event->modifiers() == Qt::NoModifier) {
     emit mousePressed(event->scenePos());
   }
 }
@@ -25,7 +26,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 void ZGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
   QGraphicsScene::mouseReleaseEvent(event);
-  if (!selectedItems().empty()) {
+  if (!selectedItems().empty() && event->button() == Qt::LeftButton) {
     emit mouseReleased(event->scenePos());
   }
 }

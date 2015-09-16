@@ -138,6 +138,32 @@ public:
     }
   }
 
+  virtual void rotateClockwise() override
+  {
+    for (typename std::map<size_t, FilterType*>::iterator it = m_idToFilter.begin();
+         it != m_idToFilter.end(); ++it) {
+      try {
+        it->second->rotateClockwise();
+      }
+      catch (const ZException& e) {
+        QMessageBox::critical(QApplication::activeWindow(), "Error", e.what());
+      }
+    }
+  }
+
+  virtual void rotateCounterclockwise() override
+  {
+    for (typename std::map<size_t, FilterType*>::iterator it = m_idToFilter.begin();
+         it != m_idToFilter.end(); ++it) {
+      try {
+        it->second->rotateCounterclockwise();
+      }
+      catch (const ZException& e) {
+        QMessageBox::critical(QApplication::activeWindow(), "Error", e.what());
+      }
+    }
+  }
+
 public slots:
   virtual void updateBoundBox() override
   {

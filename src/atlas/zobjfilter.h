@@ -24,6 +24,8 @@ public:
   virtual void deleteKeyPressed() {}
   virtual void mousePressed(const QPointF &scenePos) { Q_UNUSED(scenePos); }
   virtual void mouseReleased(const QPointF &scenePos) { Q_UNUSED(scenePos); }
+  virtual void rotateClockwise() {}
+  virtual void rotateCounterclockwise() {}
 
   QList<ZParameter*> parameters() { return m_parameters; }
 

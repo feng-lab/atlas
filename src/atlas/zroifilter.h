@@ -101,6 +101,8 @@ public:
   virtual void deleteKeyPressed() override;
   virtual void mousePressed(const QPointF &scenePos) override;
   virtual void mouseReleased(const QPointF &scenePos) override;
+  virtual void rotateClockwise() override;
+  virtual void rotateCounterclockwise() override;
 
   ZDVec4Parameter& offsetPara() { return m_offsetPara; }
 

@@ -26,7 +26,6 @@ QMAKE_CXXFLAGS += /wd4267 # 'var' : conversion from 'size_t' to 'type', possible
 QMAKE_CXXFLAGS += /wd4244 # 'argument' : conversion from 'type1' to 'type2', possible loss of data
 QMAKE_CXXFLAGS += /wd4305 # 'identifier' : truncation from 'type1' to 'type2'
 QMAKE_CXXFLAGS += /wd4819 # The file contains a character that cannot be represented in the current code page (number). Save the file in Unicode format to prevent data loss.
-
 }
 
 QT += opengl network svg
