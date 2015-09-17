@@ -260,7 +260,7 @@ win32 {
     LIBS += $$ZlibPath\lib\zlibstatic.lib
 
     LIBS += "C:\Program Files (x86)\Intel\Composer XE\compiler\lib\intel64\libiomp5md.lib" \
-        "C:\Program Files (x86)\Intel\Composer XE\compiler\lib\intel64\libirc.lib" \
-        "odbc32.lib" "odbccp32.lib" "wbemuuid.lib" "d3d9.lib" "kernel32.lib" "user32.lib" "gdi32.lib" \
-        "winspool.lib" "comdlg32.lib" "advapi32.lib" "shell32.lib" "ole32.lib" "oleaut32.lib" "uuid.lib"
+        "C:\Program Files (x86)\Intel\Composer XE\compiler\lib\intel64\libirc.lib"
+#        "odbc32.lib" "odbccp32.lib" "wbemuuid.lib" "d3d9.lib" "kernel32.lib" "user32.lib" "gdi32.lib" \
+#        "winspool.lib" "comdlg32.lib" "advapi32.lib" "shell32.lib" "ole32.lib" "oleaut32.lib" "uuid.lib"
 }

@@ -47,14 +47,14 @@ public:
   explicit ZTileImageWidget(QWidget *parent, QImage *image = nullptr, QList<ZTile> *pTiles = nullptr,
                             const QStringList &filenames = QStringList());
   void init(QImage *image, QList<ZTile> *pTiles);
-  void paintEvent(QPaintEvent *event);
+  void paintEvent(QPaintEvent *event) override;
   void zoomIn();
   void zoomOut();
   void clearAllSelected();
   void selectAll();
   void saveAsImage(const QString &fn);
-  QSize minimumSizeHint() const;
-  QSize sizeHint() const;
+  QSize minimumSizeHint() const override;
+  QSize sizeHint() const override;
 
   virtual void mouseReleaseEvent(QMouseEvent *event) override;
   virtual void mouseMoveEvent(QMouseEvent *event) override;

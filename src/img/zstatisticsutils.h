@@ -332,7 +332,7 @@ double median(RandomAccessIterator begin, RandomAccessIterator end)
 template <class RandomAccessIterator>
 double medianInPlace(RandomAccessIterator begin, RandomAccessIterator end)
 {
-  typedef typename std::iterator_traits<RandomAccessIterator>::value_type ValueType;
+  //typedef typename std::iterator_traits<RandomAccessIterator>::value_type ValueType;
   //typedef typename NumTraits<ValueType>::NonInteger ResultType;
   typedef double ResultType;
   assert(end > begin);

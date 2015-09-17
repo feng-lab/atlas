@@ -83,7 +83,7 @@ protected:
   virtual void registerPickingObjects() override;
   virtual void deregisterPickingObjects() override;
 
-  void renderPicking(Z3DEye eye);
+  void renderPicking(Z3DEye eye) override;
   void prepareData();
 
   //get bounding box of swc tree in world coordinate :[xmin xmax ymin ymax zmin zmax]

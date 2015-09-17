@@ -18,7 +18,7 @@ class ZPunctaGraphicsItem : public QGraphicsItem
 {
 public:
   enum { Type = UserType + 9 };
-  int type() const { return Type; }
+  int type() const override { return Type; }
 
   ZPunctaGraphicsItem(ZPuncta &puncta, double z = 1, QGraphicsItem *parent = nullptr);
 

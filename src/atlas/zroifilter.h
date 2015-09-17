@@ -20,7 +20,7 @@ class ROIGraphicsItem : public QGraphicsPathItem
 {
 public:
   enum { Type = UserType + 5 };
-  int type() const { return Type; }
+  int type() const override { return Type; }
 
   ROIGraphicsItem(ZROI &roi, int slice, double z = 100, QGraphicsItem *parent = nullptr);
 
@@ -46,7 +46,7 @@ class ROICtrlPtGraphicsItem : public QGraphicsRectItem
 {
 public:
   enum { Type = UserType + 6 };
-  int type() const { return Type; }
+  int type() const override { return Type; }
 
   ROICtrlPtGraphicsItem(ZROI &roi, const ZROIControlPoint &controlPoint,
                         double viewScale = 1., double z = 100, QGraphicsItem *parent = nullptr);

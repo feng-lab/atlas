@@ -35,7 +35,7 @@ class ParameterKeysItem : public QGraphicsRectItem
 {
 public:
   enum { Type = UserType + 4 };
-  int type() const { return Type; }
+  int type() const override { return Type; }
   ParameterKeysItem(ZParameterKey &paraKey, ZParameterAnimation &paraAnimation, const ZAnimationDisplayPack &pack,
                     ZTimelineWidget &timeline, QGraphicsItem *parent);
   ~ParameterKeysItem();

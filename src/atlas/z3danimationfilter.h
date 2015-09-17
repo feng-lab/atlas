@@ -46,7 +46,7 @@ signals:
 
 protected slots:
   void prepareColor();
-  void setClipPlanes();
+  void setClipPlanes() override;
   void updateData();
   void adjustWidgets();
   void updateLineWidth();

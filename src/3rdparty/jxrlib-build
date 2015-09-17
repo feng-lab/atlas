@@ -20,8 +20,14 @@ fi
 
 cd $srcDIR
 
+# patch to avoid error: explicit specialization of 'ZERO_TOLERANCE' after instantiation
+sed -i.bak 's/CFLAGS=/CFLAGS=-mmacosx-version-min=10.7 /' $srcDIR/Makefile
+
 make -j8 install DIR_INSTALL=$installDIR
 
 rm -r $srcDIR/build
+
+#unpatch
+mv -f $srcDIR/Makefile.bak $srcDIR/Makefile
 
 cd $currDIR

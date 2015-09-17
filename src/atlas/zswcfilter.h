@@ -19,7 +19,7 @@ class ZSwcGraphicsItem : public QGraphicsItem
 {
 public:
   enum { Type = UserType + 7 };
-  int type() const { return Type; }
+  int type() const override { return Type; }
 
   ZSwcGraphicsItem(ZSwc &swc, double z = 1, QGraphicsItem *parent = nullptr);
 
