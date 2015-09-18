@@ -4,6 +4,7 @@ currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
 srcDIR=$currDIR/../../../glbinding
 buildDIR=$srcDIR/../__glbinding-build
 installDIR=$currDIR/glbinding
+numCores=$( sysctl -n hw.logicalcpu )
 
 if [ -d $installDIR ]
 then
@@ -22,7 +23,7 @@ cd $buildDIR
 
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.7 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk -DOPTION_BUILD_STATIC=ON -DOPTION_BUILD_TESTS=OFF $srcDIR
 
-make install
+make -j $numCores install
 
 cd $currDIR
 rm -rf $buildDIR

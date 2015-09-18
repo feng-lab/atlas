@@ -4,6 +4,7 @@ currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
 srcDIR=$currDIR/../../../FreeImage
 buildDIR=$srcDIR/../__freeimage-build
 installDIR=$currDIR/freeimage
+numCores=$( sysctl -n hw.logicalcpu )
 
 if [ -d $installDIR ]
 then
@@ -14,11 +15,11 @@ cp $currDIR/freeimage-makefiles/Makefile_gnu $srcDIR/
 cp $currDIR/freeimage-makefiles/Makefile_fip $srcDIR/
 cd $srcDIR
 
-make -f Makefile_gnu -j8
-make -f Makefile_gnu -j8 install PREFIX=$installDIR
+make -f Makefile_gnu -j $numCores
+make -f Makefile_gnu -j $numCores install PREFIX=$installDIR
 make -f Makefile_gnu clean
-make -f Makefile_fip -j8
-make -f Makefile_fip -j8 install PREFIX=$installDIR
+make -f Makefile_fip -j $numCores
+make -f Makefile_fip -j $numCores install PREFIX=$installDIR
 make -f Makefile_fip clean
 
 rm $srcDIR/Makefile_gnu

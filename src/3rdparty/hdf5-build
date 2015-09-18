@@ -4,6 +4,7 @@ currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
 srcDIR=$currDIR/../../../hdf5-1.8.15-patch1
 buildDIR=$srcDIR/../__hdf5-build
 installDIR=$currDIR/hdf5
+numCores=$( sysctl -n hw.logicalcpu )
 
 if [ -d $installDIR ]
 then
@@ -17,9 +18,9 @@ fi
 mkdir $buildDIR
 cd $buildDIR
 
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.7 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk -DBUILD_TESTING:BOOL="0" -DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL="0" -DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL="1" -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++11" $srcDIR
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.7 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk -DBUILD_TESTING:BOOL="0" -DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL="0" -DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL="1" -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++14" $srcDIR
 
-make -j4 install
+make -j $numCores install
 
 cd $currDIR
 rm -rf $buildDIR

@@ -4,6 +4,7 @@ currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
 srcDIR=$currDIR/../../../botan
 buildDIR=$srcDIR/../__botan-build
 installDIR=$currDIR/botan
+numCores=$( sysctl -n hw.logicalcpu )
 
 if [ -d $installDIR ]
 then
@@ -26,9 +27,9 @@ mkdir $buildDIR
 #cd %buildDIR
 cd $srcDIR
 
-$srcDIR/configure.py --cc=clang --cc-abi-flags="-mmacosx-version-min=10.7 -stdlib=libc++" --prefix=$installDIR
+$srcDIR/configure.py --cc=clang --cc-abi-flags="-mmacosx-version-min=10.7 -stdlib=libc++ -std=c++14" --prefix=$installDIR
 
-make -j4 install
+make -j $numCores install
 
 rm Makefile
 rm -rf build

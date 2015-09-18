@@ -4,6 +4,7 @@ currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
 srcDIR=$currDIR/../../../libjpeg-turbo-1.4.1
 buildDIR=$srcDIR/../__libjpeg-turbo-build
 installDIR=$currDIR/libjpeg-turbo
+numCores=$( sysctl -n hw.logicalcpu )
 
 if [ -d $installDIR ]
 then
@@ -25,7 +26,7 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
     sh $srcDIR/configure --host x86_64-apple-darwin NASM=$currDIR/nasm --enable-static --disable-shared CFLAGS='-mmacosx-version-min=10.7 -O3' LDFLAGS='-mmacosx-version-min=10.7'
 fi
 
-make -j4
+make -j $numCores
 make install prefix=$installDIR libdir=$installDIR/lib
 
 cd $currDIR

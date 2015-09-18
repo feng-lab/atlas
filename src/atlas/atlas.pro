@@ -39,7 +39,8 @@ isEqual(QT_MAJOR_VERSION,5) {
   }
 }
     QT += gui
-    CONFIG += c++11
+    QMAKE_CXXFLAGS += -mmacosx-version-min=10.7 -std=c++14 -stdlib=libc++
+    QMAKE_LFLAGS += -stdlib=libc++
 }
 
 #Qt4
@@ -47,7 +48,8 @@ isEqual(QT_MAJOR_VERSION,4) {
     message("Qt 4")
     include($$PWD/../3rdparty/qjson/qjson.pri)
     DEFINES += _QT4_
-    QMAKE_CXXFLAGS += -std=c++11
+    QMAKE_CXXFLAGS += -mmacosx-version-min=10.7 -std=c++14 -stdlib=libc++
+    QMAKE_LFLAGS += -stdlib=libc++
 }
 
 CONFIG += rtti exceptions

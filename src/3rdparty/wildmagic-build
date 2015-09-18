@@ -4,6 +4,7 @@ currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
 srcDIR=$currDIR/../../../GeometricTools/WildMagic5
 buildDIR=$srcDIR/../__wildmagic-build
 installDIR=$currDIR/wildmagic
+numCores=$( sysctl -n hw.logicalcpu )
 
 if [ -d $installDIR ]
 then
@@ -19,12 +20,12 @@ sed -i.bak 's/Mathf::ZERO_TOLERANCE/1e-06f/' $srcDIR/LibMathematics/Algebra/Wm5H
 
 cd LibCore
 chmod +x *.sh
-xcodebuild -project LibCore.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 OTHER_CPLUSPLUSFLAGS="-std=c++11 -stdlib=libc++"
+xcodebuild -project LibCore.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 OTHER_CPLUSPLUSFLAGS="-std=c++14 -stdlib=libc++"
 cd ..
 
 cd LibMathematics
 chmod +x *.sh
-xcodebuild -project LibMathematics.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 OTHER_CPLUSPLUSFLAGS="-std=c++11 -stdlib=libc++"
+xcodebuild -project LibMathematics.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 OTHER_CPLUSPLUSFLAGS="-std=c++14 -stdlib=libc++"
 cd ..
 
 cp -R $srcDIR/SDK/ $installDIR

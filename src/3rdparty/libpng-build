@@ -4,6 +4,7 @@ currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
 srcDIR=$currDIR/../../../libpng-1.6.16
 buildDIR=$srcDIR/../__libpng-build
 installDIR=$currDIR/libpng
+numCores=$( sysctl -n hw.logicalcpu )
 
 if [ -d $installDIR ]
 then
@@ -19,7 +20,7 @@ cd $buildDIR
 
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.7 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk -DPNG_TESTS:BOOL="0" -DPNG_SHARED:BOOL="0" $srcDIR
 
-make -j4 install
+make -j $numCores install
 
 cd $currDIR
 rm -rf $buildDIR

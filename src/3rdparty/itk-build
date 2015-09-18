@@ -4,6 +4,7 @@ currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
 srcDIR=$currDIR/../../../ITK
 buildDIR=$srcDIR/../__itk-build
 installDIR=$currDIR/itk
+numCores=$( sysctl -n hw.logicalcpu )
 
 if [ -d $installDIR ]
 then
@@ -28,12 +29,15 @@ fi
 mkdir $buildDIR
 cd $buildDIR
 
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.7 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk -DBUILD_EXAMPLES:BOOL="0" -DBUILD_TESTING:BOOL="0" -DITK_USE_64BITS_IDS:BOOL="1" -DITK_LEGACY_REMOVE:BOOL="1" -DITK_USE_GPU:BOOL="1" -DITK_DOXYGEN_HTML:BOOL="0" -DITK_USE_STRICT_CONCEPT_CHECKING:BOOL="1" -DModule_ITKReview:BOOL="1" -DITK_USE_SYSTEM_ZLIB:BOOL="1" -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++11" $srcDIR
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.7 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk -DBUILD_EXAMPLES:BOOL="0" -DBUILD_TESTING:BOOL="0" -DITK_USE_64BITS_IDS:BOOL="1" -DITK_LEGACY_REMOVE:BOOL="1" -DITK_USE_GPU:BOOL="1" -DITK_DOXYGEN_HTML:BOOL="0" -DITK_USE_STRICT_CONCEPT_CHECKING:BOOL="1" -DModule_ITKReview:BOOL="1" -DITK_USE_SYSTEM_ZLIB:BOOL="1" -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++14" $srcDIR
 
-make -j4 install
+make -j $numCores install
 
 #unpatch
 mv -f $srcDIR/Modules/Core/Common/include/itkLightObject.h.bak $srcDIR/Modules/Core/Common/include/itkLightObject.h
+
+# for xcode 7
+sed -i.bak 's/Math::NotAlmostEquals/std::not_equal_to<>()/' $installDIR/include/ITK-4.9/itkSignedMaurerDistanceMapImageFilter.hxx
 
 cd $currDIR
 rm -rf $buildDIR

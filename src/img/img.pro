@@ -44,7 +44,8 @@ isEqual(QT_MAJOR_VERSION,5) {
     error("Use at least Qt 5.4.0.")
   }
 }
-    CONFIG += c++11
+    QMAKE_CXXFLAGS += -mmacosx-version-min=10.7 -std=c++14 -stdlib=libc++
+    QMAKE_LFLAGS += -stdlib=libc++
 }
 
 CONFIG += rtti exceptions

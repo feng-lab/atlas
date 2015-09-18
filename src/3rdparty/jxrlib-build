@@ -4,6 +4,7 @@ currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
 srcDIR=$currDIR/../../../jxrlib
 buildDIR=$srcDIR/../__jxrlib-build
 installDIR=$currDIR/jxrlib
+numCores=$( sysctl -n hw.logicalcpu )
 
 if [ -d $installDIR ]
 then
@@ -23,7 +24,7 @@ cd $srcDIR
 # patch to avoid error: explicit specialization of 'ZERO_TOLERANCE' after instantiation
 sed -i.bak 's/CFLAGS=/CFLAGS=-mmacosx-version-min=10.7 /' $srcDIR/Makefile
 
-make -j8 install DIR_INSTALL=$installDIR
+make -j $numCores install DIR_INSTALL=$installDIR
 
 rm -r $srcDIR/build
 

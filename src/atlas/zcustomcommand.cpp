@@ -9,6 +9,7 @@
 #include "zswc.h"
 #include "zimgio.h"
 #include "zmesh.h"
+#include "itkMath.h"
 
 namespace nim {
 
@@ -246,6 +247,7 @@ void transfromMesh()
 
 void tmp()
 {
+  LINFO() << itk::NumericTraits< double >::max() << itk::Math::NotAlmostEquals(-9.0, itk::NumericTraits< double >::max());
 }
 
 }
