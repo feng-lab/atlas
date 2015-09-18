@@ -61,19 +61,19 @@ void ZImgFilter::setData(ZImgPack &pack)
   }
 
   for (size_t c=0; c<m_imgPack->imgInfo().numChannels; ++c) {
-    m_channelVisibleParas.emplace_back(new ZBoolParameter(QString("Show %1").arg(m_imgPack->imgInfo().channelNames[c]), true));
-    m_doubleChannelRangeParas.emplace_back(new ZDoubleSpanParameter(QString("%1 Display Range").arg(m_imgPack->imgInfo().channelNames[c]),
+    m_channelVisibleParas.emplace_back(std::make_unique<ZBoolParameter>(QString("Show %1").arg(m_imgPack->imgInfo().channelNames[c]), true));
+    m_doubleChannelRangeParas.emplace_back(std::make_unique<ZDoubleSpanParameter>(QString("%1 Display Range").arg(m_imgPack->imgInfo().channelNames[c]),
                                                                  dr,
                                                                  m_imgPack->rangeMin(), m_imgPack->rangeMax()));
     if (m_imgPack->imgInfo().voxelFormat != VoxelFormat::Float) {
       m_doubleChannelRangeParas[m_doubleChannelRangeParas.size()-1]->setDecimal(0);
       m_doubleChannelRangeParas[m_doubleChannelRangeParas.size()-1]->setSingleStep(1);
     }
-    m_channelColorParas.emplace_back(new ZVec3Parameter(QString("%1 Color").arg(m_imgPack->imgInfo().channelNames[c]),
-                                                     glm::vec3(m_imgPack->imgInfo().channelColors[c].r / 255.,
-                                                               m_imgPack->imgInfo().channelColors[c].g / 255.,
-                                                               m_imgPack->imgInfo().channelColors[c].b / 255.),
-                                                     glm::vec3(0.f), glm::vec3(1.f)));
+    m_channelColorParas.emplace_back(std::make_unique<ZVec3Parameter>(QString("%1 Color").arg(m_imgPack->imgInfo().channelNames[c]),
+                                                                      glm::vec3(m_imgPack->imgInfo().channelColors[c].r / 255.,
+                                                                                m_imgPack->imgInfo().channelColors[c].g / 255.,
+                                                                                m_imgPack->imgInfo().channelColors[c].b / 255.),
+                                                                      glm::vec3(0.f), glm::vec3(1.f)));
     m_channelColorParas[c]->setStyle("COLOR");
     connect(m_channelVisibleParas[c].get(), SIGNAL(valueChanged(bool)), m_doubleChannelRangeParas[c].get(), SLOT(setEnabled(bool)));
     connect(m_channelVisibleParas[c].get(), SIGNAL(valueChanged(bool)), m_channelColorParas[c].get(), SLOT(setEnabled(bool)));
@@ -411,7 +411,7 @@ void ZImgFilter::updateImgItems()
 
     const ZQImagePack &qImagePack = curDisplay->toQImagePack();
     for (size_t i=0; i<qImagePack.numImages(); ++i) {
-      m_imgItems.emplace_back(new QGraphicsPixmapItem(QPixmap::fromImage(qImagePack.image(i))));
+      m_imgItems.emplace_back(std::make_unique<QGraphicsPixmapItem>(QPixmap::fromImage(qImagePack.image(i))));
       m_imgItems[i]->setScale(qImagePack.scale(i));
       m_imgItems[i]->setPos(QPointF(qImagePack.location(i)) + QPointF(m_offsetPara.get().x, m_offsetPara.get().y));
       m_imgItems[i]->setVisible(m_isVisible);

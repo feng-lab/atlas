@@ -124,7 +124,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   addEventListener(m_leftMouseButtonPressEvent);
 
   for (size_t i=0; i<m_maxNumOfFullResolutionVolumeSlice; ++i) {
-    m_image2DRenderers.emplace_back(new Z3DImage2DRenderer(m_rendererBase));
+    m_image2DRenderers.emplace_back(std::make_unique<Z3DImage2DRenderer>(m_rendererBase));
   }
   m_boundBoxLineWidth.set(1);
   m_boundBoxMode.select("Bound Box");
@@ -1038,7 +1038,7 @@ void Z3DImgFilter::readVolumes()
 
   m_sliceColormaps.clear();
   for (size_t i=0; i<m_volumes.size(); ++i) {
-    m_sliceColormaps.emplace_back(new ZColorMapParameter(QString("Slice Channel %1 Colormap").arg(i+1)));
+    m_sliceColormaps.emplace_back(std::make_unique<ZColorMapParameter>(QString("Slice Channel %1 Colormap").arg(i+1)));
     m_sliceColormaps[i]->get().create1DTexture(256);
     m_sliceColormaps[i]->get().reset(0.0, 1.0, QColor(0,0,0),
                                      QColor(m_imgPack->imgInfo().channelColors[i].r,

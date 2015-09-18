@@ -50,93 +50,93 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   // lights
   QString lightname = "Key Light";
   QString name = lightname + " Position";
-  lightPositions.push_back(new ZVec4Parameter(name, glm::vec4(0.1116f, 0.7660f, 0.6330f, 0.0f), glm::vec4(-1.0f), glm::vec4(1.f)));
+  lightPositions.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.1116f, 0.7660f, 0.6330f, 0.0f), glm::vec4(-1.0f), glm::vec4(1.f)));
   name = lightname + " Ambient";
-  lightAmbients.push_back(new ZVec4Parameter(name, glm::vec4(0.1f, 0.1f, 0.1f, 1.0f)));
+  lightAmbients.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.1f, 0.1f, 0.1f, 1.0f)));
   name = lightname + " Diffuse";
-  lightDiffuses.push_back(new ZVec4Parameter(name, glm::vec4(0.75f, 0.75f, 0.75f, 1.0f)));
+  lightDiffuses.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.75f, 0.75f, 0.75f, 1.0f)));
   name = lightname + " Specular";
-  lightSpeculars.push_back(new ZVec4Parameter(name, glm::vec4(0.85f, 0.85f, 0.85f, 1.0f)));
+  lightSpeculars.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.85f, 0.85f, 0.85f, 1.0f)));
   name = lightname + " Attenuation";
-  lightAttenuations.push_back(new ZVec3Parameter(name, glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f), glm::vec3(100.f)));
+  lightAttenuations.emplace_back(std::make_unique<ZVec3Parameter>(name, glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f), glm::vec3(100.f)));
   name = lightname + " Spot Cutoff";
-  lightSpotCutoff.push_back(new ZFloatParameter(name, 180.f, 0.f, 180.f));
+  lightSpotCutoff.emplace_back(std::make_unique<ZFloatParameter>(name, 180.f, 0.f, 180.f));
   name = lightname + " Spot Exponent";
-  lightSpotExponent.push_back(new ZFloatParameter(name, 1.f, 0.f, 50.f));
+  lightSpotExponent.emplace_back(std::make_unique<ZFloatParameter>(name, 1.f, 0.f, 50.f));
   name = lightname + " Spot Direction";
-  lightSpotDirection.push_back(new ZVec3Parameter(name, glm::vec3(-0.1116f, -0.7660f, -0.6330f), glm::vec3(-1.f), glm::vec3(1.f)));
+  lightSpotDirection.emplace_back(std::make_unique<ZVec3Parameter>(name, glm::vec3(-0.1116f, -0.7660f, -0.6330f), glm::vec3(-1.f), glm::vec3(1.f)));
 
   lightname = "Head Light";
   name = lightname + " Position";
-  lightPositions.push_back(new ZVec4Parameter(name, glm::vec4(0.f, 0.f, 1.f, 0.0f), glm::vec4(-1.0f), glm::vec4(1.f)));
+  lightPositions.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.f, 0.f, 1.f, 0.0f), glm::vec4(-1.0f), glm::vec4(1.f)));
   name = lightname + " Ambient";
-  lightAmbients.push_back(new ZVec4Parameter(name, glm::vec4(0.1* 0.333f, 0.1* 0.333f, 0.1* 0.333f, 1.0f)));
+  lightAmbients.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.1* 0.333f, 0.1* 0.333f, 0.1* 0.333f, 1.0f)));
   name = lightname + " Diffuse";
-  lightDiffuses.push_back(new ZVec4Parameter(name, glm::vec4(0.75* 0.333f, 0.75* 0.333f, 0.75* 0.333f, 1.0f)));
+  lightDiffuses.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.75* 0.333f, 0.75* 0.333f, 0.75* 0.333f, 1.0f)));
   name = lightname + " Specular";
-  lightSpeculars.push_back(new ZVec4Parameter(name, glm::vec4(0.f, 0.f, 0.f, 1.0f)));
+  lightSpeculars.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.f, 0.f, 0.f, 1.0f)));
   name = lightname + " Attenuation";
-  lightAttenuations.push_back(new ZVec3Parameter(name, glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f), glm::vec3(100.f)));
+  lightAttenuations.emplace_back(std::make_unique<ZVec3Parameter>(name, glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f), glm::vec3(100.f)));
   name = lightname + " Spot Cutoff";
-  lightSpotCutoff.push_back(new ZFloatParameter(name, 180.f, 0.f, 180.f));
+  lightSpotCutoff.emplace_back(std::make_unique<ZFloatParameter>(name, 180.f, 0.f, 180.f));
   name = lightname + " Spot Exponent";
-  lightSpotExponent.push_back(new ZFloatParameter(name, 1.f, 0.f, 50.f));
+  lightSpotExponent.emplace_back(std::make_unique<ZFloatParameter>(name, 1.f, 0.f, 50.f));
   name = lightname + " Spot Direction";
-  lightSpotDirection.push_back(new ZVec3Parameter(name, glm::vec3(0.f, 0.f, -1.f), glm::vec3(-1.f), glm::vec3(1.f)));
+  lightSpotDirection.emplace_back(std::make_unique<ZVec3Parameter>(name, glm::vec3(0.f, 0.f, -1.f), glm::vec3(-1.f), glm::vec3(1.f)));
 
   lightname = "Fill Light";
   name = lightname + " Position";
-  lightPositions.push_back(new ZVec4Parameter(name, glm::vec4(-0.0449f, -0.9659f, 0.2549f, 0.0f), glm::vec4(-1.0f), glm::vec4(1.f)));
+  lightPositions.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(-0.0449f, -0.9659f, 0.2549f, 0.0f), glm::vec4(-1.0f), glm::vec4(1.f)));
   name = lightname + " Ambient";
-  lightAmbients.push_back(new ZVec4Parameter(name, glm::vec4(0.1* 0.333f, 0.1* 0.333f, 0.1* 0.333f, 1.0f)));
+  lightAmbients.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.1* 0.333f, 0.1* 0.333f, 0.1* 0.333f, 1.0f)));
   name = lightname + " Diffuse";
-  lightDiffuses.push_back(new ZVec4Parameter(name, glm::vec4(0.75* 0.333f, 0.75* 0.333f, 0.75* 0.333f, 1.0f)));
+  lightDiffuses.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.75* 0.333f, 0.75* 0.333f, 0.75* 0.333f, 1.0f)));
   name = lightname + " Specular";
-  lightSpeculars.push_back(new ZVec4Parameter(name, glm::vec4(0.85* 0.333f, 0.85* 0.333f, 0.85* 0.333f, 1.0f)));
+  lightSpeculars.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.85* 0.333f, 0.85* 0.333f, 0.85* 0.333f, 1.0f)));
   name = lightname + " Attenuation";
-  lightAttenuations.push_back(new ZVec3Parameter(name, glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f), glm::vec3(100.f)));
+  lightAttenuations.emplace_back(std::make_unique<ZVec3Parameter>(name, glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f), glm::vec3(100.f)));
   name = lightname + " Spot Cutoff";
-  lightSpotCutoff.push_back(new ZFloatParameter(name, 180.f, 0.f, 180.f));
+  lightSpotCutoff.emplace_back(std::make_unique<ZFloatParameter>(name, 180.f, 0.f, 180.f));
   name = lightname + " Spot Exponent";
-  lightSpotExponent.push_back(new ZFloatParameter(name, 1.f, 0.f, 50.f));
+  lightSpotExponent.emplace_back(std::make_unique<ZFloatParameter>(name, 1.f, 0.f, 50.f));
   name = lightname + " Spot Direction";
-  lightSpotDirection.push_back(new ZVec3Parameter(name, glm::vec3(0.0449f, 0.9659f, -0.2549f), glm::vec3(-1.f), glm::vec3(1.f)));
+  lightSpotDirection.emplace_back(std::make_unique<ZVec3Parameter>(name, glm::vec3(0.0449f, 0.9659f, -0.2549f), glm::vec3(-1.f), glm::vec3(1.f)));
 
   lightname = "Back Light 1";
   name = lightname + " Position";
-  lightPositions.push_back(new ZVec4Parameter(name, glm::vec4(0.9397f, 0.f, -0.3420f, 0.0f), glm::vec4(-1.0f), glm::vec4(1.f)));
+  lightPositions.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.9397f, 0.f, -0.3420f, 0.0f), glm::vec4(-1.0f), glm::vec4(1.f)));
   name = lightname + " Ambient";
-  lightAmbients.push_back(new ZVec4Parameter(name, glm::vec4(0.1* 0.27f, 0.1* 0.27f, 0.1* 0.27f, 1.0f) ));
+  lightAmbients.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.1* 0.27f, 0.1* 0.27f, 0.1* 0.27f, 1.0f) ));
   name = lightname + " Diffuse";
-  lightDiffuses.push_back(new ZVec4Parameter(name, glm::vec4(0.75* 0.27f, 0.75* 0.27f, 0.75* 0.27f, 1.0f) ));
+  lightDiffuses.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.75* 0.27f, 0.75* 0.27f, 0.75* 0.27f, 1.0f) ));
   name = lightname + " Specular";
-  lightSpeculars.push_back(new ZVec4Parameter(name, glm::vec4(0.85* 0.27f, 0.85* 0.27f, 0.85* 0.27f, 1.0f) ));
+  lightSpeculars.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.85* 0.27f, 0.85* 0.27f, 0.85* 0.27f, 1.0f) ));
   name = lightname + " Attenuation";
-  lightAttenuations.push_back(new ZVec3Parameter(name, glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f), glm::vec3(100.f)));
+  lightAttenuations.emplace_back(std::make_unique<ZVec3Parameter>(name, glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f), glm::vec3(100.f)));
   name = lightname + " Spot Cutoff";
-  lightSpotCutoff.push_back(new ZFloatParameter(name, 180.f, 0.f, 180.f));
+  lightSpotCutoff.emplace_back(std::make_unique<ZFloatParameter>(name, 180.f, 0.f, 180.f));
   name = lightname + " Spot Exponent";
-  lightSpotExponent.push_back(new ZFloatParameter(name, 1.f, 0.f, 50.f));
+  lightSpotExponent.emplace_back(std::make_unique<ZFloatParameter>(name, 1.f, 0.f, 50.f));
   name = lightname + " Spot Direction";
-  lightSpotDirection.push_back(new ZVec3Parameter(name, glm::vec3(-0.9397f, 0.f, 0.3420f), glm::vec3(-1.f), glm::vec3(1.f)));
+  lightSpotDirection.emplace_back(std::make_unique<ZVec3Parameter>(name, glm::vec3(-0.9397f, 0.f, 0.3420f), glm::vec3(-1.f), glm::vec3(1.f)));
 
   lightname = "Back Light 2";
   name = lightname + " Position";
-  lightPositions.push_back(new ZVec4Parameter(name, glm::vec4(-0.9397f, 0.f, -0.3420f, 0.0f), glm::vec4(-1.0f), glm::vec4(1.f)));
+  lightPositions.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(-0.9397f, 0.f, -0.3420f, 0.0f), glm::vec4(-1.0f), glm::vec4(1.f)));
   name = lightname + " Ambient";
-  lightAmbients.push_back(new ZVec4Parameter(name, glm::vec4(0.1* 0.27f, 0.1* 0.27f, 0.1* 0.27f, 1.0f) ));
+  lightAmbients.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.1* 0.27f, 0.1* 0.27f, 0.1* 0.27f, 1.0f) ));
   name = lightname + " Diffuse";
-  lightDiffuses.push_back(new ZVec4Parameter(name, glm::vec4(0.75* 0.27f, 0.75* 0.27f, 0.75* 0.27f, 1.0f) ));
+  lightDiffuses.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.75* 0.27f, 0.75* 0.27f, 0.75* 0.27f, 1.0f) ));
   name = lightname + " Specular";
-  lightSpeculars.push_back(new ZVec4Parameter(name, glm::vec4(0.85* 0.27f, 0.85* 0.27f, 0.85* 0.27f, 1.0f) ));
+  lightSpeculars.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.85* 0.27f, 0.85* 0.27f, 0.85* 0.27f, 1.0f) ));
   name = lightname + " Attenuation";
-  lightAttenuations.push_back(new ZVec3Parameter(name, glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f), glm::vec3(100.f)));
+  lightAttenuations.emplace_back(std::make_unique<ZVec3Parameter>(name, glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f), glm::vec3(100.f)));
   name = lightname + " Spot Cutoff";
-  lightSpotCutoff.push_back(new ZFloatParameter(name, 180.f, 0.f, 180.f));
+  lightSpotCutoff.emplace_back(std::make_unique<ZFloatParameter>(name, 180.f, 0.f, 180.f));
   name = lightname + " Spot Exponent";
-  lightSpotExponent.push_back(new ZFloatParameter(name, 1.f, 0.f, 50.f));
+  lightSpotExponent.emplace_back(std::make_unique<ZFloatParameter>(name, 1.f, 0.f, 50.f));
   name = lightname + " Spot Direction";
-  lightSpotDirection.push_back(new ZVec3Parameter(name, glm::vec3(0.9397f, 0.f, 0.3420f), glm::vec3(-1.f), glm::vec3(1.f)));
+  lightSpotDirection.emplace_back(std::make_unique<ZVec3Parameter>(name, glm::vec3(0.9397f, 0.f, 0.3420f), glm::vec3(-1.f), glm::vec3(1.f)));
 
   addParameter(lightCount);
 
@@ -154,22 +154,22 @@ Z3DGlobalParameters::Z3DGlobalParameters()
     lightAmbients[i]->setStyle("COLOR");
     lightDiffuses[i]->setStyle("COLOR");
     lightSpeculars[i]->setStyle("COLOR");
-    addParameter(lightPositions[i]);
-    connect(lightPositions[i], SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
-    addParameter(lightAmbients[i]);
-    connect(lightAmbients[i], SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
-    addParameter(lightDiffuses[i]);
-    connect(lightDiffuses[i], SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
-    addParameter(lightSpeculars[i]);
-    connect(lightSpeculars[i], SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
-    addParameter(lightAttenuations[i]);
-    connect(lightAttenuations[i], SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
-    addParameter(lightSpotCutoff[i]);
-    connect(lightSpotCutoff[i], SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
-    addParameter(lightSpotExponent[i]);
-    connect(lightSpotExponent[i], SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
-    addParameter(lightSpotDirection[i]);
-    connect(lightSpotDirection[i], SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    addParameter(*lightPositions[i]);
+    connect(lightPositions[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    addParameter(*lightAmbients[i]);
+    connect(lightAmbients[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    addParameter(*lightDiffuses[i]);
+    connect(lightDiffuses[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    addParameter(*lightSpeculars[i]);
+    connect(lightSpeculars[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    addParameter(*lightAttenuations[i]);
+    connect(lightAttenuations[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    addParameter(*lightSpotCutoff[i]);
+    connect(lightSpotCutoff[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    addParameter(*lightSpotExponent[i]);
+    connect(lightSpotExponent[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    addParameter(*lightSpotDirection[i]);
+    connect(lightSpotDirection[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
   }
 
   sceneAmbient.setStyle("COLOR");
@@ -205,16 +205,6 @@ Z3DGlobalParameters::Z3DGlobalParameters()
 
 Z3DGlobalParameters::~Z3DGlobalParameters()
 {
-  for(size_t i=0; i<lightPositions.size(); i++) {
-    delete lightPositions[i];
-    delete lightAmbients[i];
-    delete lightDiffuses[i];
-    delete lightSpeculars[i];
-    delete lightAttenuations[i];
-    delete lightSpotCutoff[i];
-    delete lightSpotExponent[i];
-    delete lightSpotDirection[i];
-  }
 }
 
 void Z3DGlobalParameters::read(const QJsonObject &json)

@@ -461,8 +461,8 @@ void ZImgFormat::createDefaultSubBlocks(const QString &filename,
   for (size_t s=0; s<infos.size(); ++s) {
     for (size_t t=0; t<infos[s].numTimes; ++t) {
       for (size_t z=0; z<infos[s].depth; ++z) {
-        subBlocks->at(s).emplace_back(new ZImgCommonSubBlock(filename, format(), s, 1, t, z,
-                                                             0, 0, infos[s].width, infos[s].height));
+        subBlocks->at(s).emplace_back(std::make_shared<ZImgCommonSubBlock>(filename, format(), s, 1, t, z,
+                                                                           0, 0, infos[s].width, infos[s].height));
       }
     }
   }

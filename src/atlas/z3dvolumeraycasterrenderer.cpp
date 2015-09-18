@@ -73,10 +73,10 @@ void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z
       for (size_t i=0; i<m_volumes.size(); ++i) {
         m_volumeUniformNames.push_back(QString("volume_struct_%1").arg(i+1));
         m_transferFuncUniformNames.push_back(QString("transfer_function_%1").arg(i+1));
-        m_channelVisibleParas.emplace_back(new ZBoolParameter(QString("Show Channel %1").arg(i+1), true));
+        m_channelVisibleParas.emplace_back(std::make_unique<ZBoolParameter>(QString("Show Channel %1").arg(i+1), true));
         connect(m_channelVisibleParas[i].get(), SIGNAL(valueChanged()), this, SLOT(compile()));
-        m_transferFuncParas.emplace_back(new Z3DTransferFunctionParameter(QString("Transfer Function %1").arg(i+1)));
-        m_texFilterModeParas.emplace_back(new ZStringIntOptionParameter(QString("Texture Filtering %1").arg(i+1)));
+        m_transferFuncParas.emplace_back(std::make_unique<Z3DTransferFunctionParameter>(QString("Transfer Function %1").arg(i+1)));
+        m_texFilterModeParas.emplace_back(std::make_unique<ZStringIntOptionParameter>(QString("Texture Filtering %1").arg(i+1)));
         m_texFilterModeParas[i]->addOptionsWithData(qMakePair(QString("Nearest"), static_cast<int>(GL_NEAREST)),
                                                     qMakePair(QString("Linear"), static_cast<int>(GL_LINEAR)));
         m_texFilterModeParas[i]->select("Linear");

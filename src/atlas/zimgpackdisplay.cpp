@@ -107,12 +107,12 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
 
     for (size_t i=0; i<imgs.size(); ++i) {
       QImage res(imgs[i]->width(), imgs[i]->height(), QImage::Format_ARGB32_Premultiplied);
-      fillQImage(*imgs[i].get(), res);
+      fillQImage(*imgs[i], res);
       resV.addImage(res, locs[i], scales[i]);
 
       if (imgs[i]->width() <= tileWidth && imgs[i]->height() <= tileHeight) {
         QImage res(imgs[i]->width(), imgs[i]->height(), QImage::Format_ARGB32_Premultiplied);
-        fillQImage(*imgs[i].get(), res);
+        fillQImage(*imgs[i], res);
         resV.addImage(res, locs[i], scales[i]);
       } else {
         size_t lastCol = imgs[i]->width() % tileWidth;

@@ -572,12 +572,12 @@ void ZRegionAnnotation::importLabelImage(const QString &fn, FileFormat format, b
     }
     if (createMesh) {
       // create mesh
-      it->mesh = std::shared_ptr<ZMesh>(new ZMesh());
+      it->mesh = std::make_shared<ZMesh>();
       binaryImgToMesh(binaryImg, *it->mesh.get());
     }
     if (createROI) {
       // create contours
-      it->roi = std::shared_ptr<ZROI>(new ZROI(undoStack()));
+      it->roi = std::make_shared<ZROI>(undoStack());
       binaryImgToROI(binaryImg, *it->roi.get());
       //connect(it->roi.get(), SIGNAL(roiChanged(int)), this, SIGNAL(modified()));
       //connect(it->roi.get(), SIGNAL(roiDeleted(int)), this, SIGNAL(modified()));
@@ -641,7 +641,7 @@ void ZRegionAnnotation::mergeROIToRegion(const ZROI &roi, int64_t regionID)
   for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
     if (it->id == regionID) {
       if (!it->roi) {
-        it->roi = std::shared_ptr<ZROI>(new ZROI(undoStack()));
+        it->roi = std::make_shared<ZROI>(undoStack());
         //connect(it->roi.get(), SIGNAL(roiChanged(int)), this, SIGNAL(modified()));
         //connect(it->roi.get(), SIGNAL(roiDeleted(int)), this, SIGNAL(modified()));
         //connect(it->roi.get(), SIGNAL(roiMoved(int)), this, SIGNAL(modified()));
@@ -651,7 +651,7 @@ void ZRegionAnnotation::mergeROIToRegion(const ZROI &roi, int64_t regionID)
 
       for (auto pit = m_ontology.beginAncestor(it); pit != m_ontology.endAncestor(it); ++pit) {
         if (!pit->roi) {
-          pit->roi = std::shared_ptr<ZROI>(new ZROI(undoStack()));
+          pit->roi = std::make_shared<ZROI>(undoStack());
           //connect(pit->roi.get(), SIGNAL(roiChanged(int)), this, SIGNAL(modified()));
           //connect(pit->roi.get(), SIGNAL(roiDeleted(int)), this, SIGNAL(modified()));
           //connect(pit->roi.get(), SIGNAL(roiMoved(int)), this, SIGNAL(modified()));
@@ -750,7 +750,7 @@ void ZRegionAnnotation::load(const QString &filename)
 
       if (H5Lexists(regionGrp.getId(), "ROI", H5P_DEFAULT) > 0) {
         H5::Group roiGrp = regionGrp.openGroup("ROI");
-        p.roi = std::shared_ptr<ZROI>(new ZROI(undoStack()));
+        p.roi = std::make_shared<ZROI>(undoStack());
         p.roi->load(roiGrp);
         //connect(p.roi.get(), SIGNAL(roiChanged(int)), this, SIGNAL(modified()));
         //connect(p.roi.get(), SIGNAL(roiDeleted(int)), this, SIGNAL(modified()));
@@ -759,7 +759,7 @@ void ZRegionAnnotation::load(const QString &filename)
 
       if (H5Lexists(regionGrp.getId(), "Mesh", H5P_DEFAULT) > 0) {
         H5::Group meshGrp = regionGrp.openGroup("Mesh");
-        p.mesh = std::shared_ptr<ZMesh>(new ZMesh());
+        p.mesh = std::make_shared<ZMesh>();
         p.mesh->load(meshGrp);
       }
 

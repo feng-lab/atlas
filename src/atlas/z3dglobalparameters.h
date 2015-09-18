@@ -37,15 +37,15 @@ public:
   ZStringIntOptionParameter geometriesMultisampleMode;
   ZStringIntOptionParameter transparencyMethod;
   ZIntParameter lightCount;
-  std::vector<ZVec4Parameter*> lightPositions;
-  std::vector<ZVec4Parameter*> lightAmbients;
-  std::vector<ZVec4Parameter*> lightDiffuses;
-  std::vector<ZVec4Parameter*> lightSpeculars;
+  std::vector<std::unique_ptr<ZVec4Parameter>> lightPositions;
+  std::vector<std::unique_ptr<ZVec4Parameter>> lightAmbients;
+  std::vector<std::unique_ptr<ZVec4Parameter>> lightDiffuses;
+  std::vector<std::unique_ptr<ZVec4Parameter>> lightSpeculars;
   // The light source's attenuation factors (x = constant, y = linear, z = quadratic)
-  std::vector<ZVec3Parameter*> lightAttenuations;
-  std::vector<ZFloatParameter*> lightSpotCutoff;
-  std::vector<ZFloatParameter*> lightSpotExponent;
-  std::vector<ZVec3Parameter*> lightSpotDirection;
+  std::vector<std::unique_ptr<ZVec3Parameter>> lightAttenuations;
+  std::vector<std::unique_ptr<ZFloatParameter>> lightSpotCutoff;
+  std::vector<std::unique_ptr<ZFloatParameter>> lightSpotExponent;
+  std::vector<std::unique_ptr<ZVec3Parameter>> lightSpotDirection;
   ZVec4Parameter sceneAmbient;
 
   // fog
@@ -71,8 +71,7 @@ private slots:
   void updateLightsArray();
 
 private:
-  void addParameter(ZParameter &para) { addParameter(&para); }
-  void addParameter(ZParameter *para) { m_parameters.push_back(para); }
+  void addParameter(ZParameter &para) { m_parameters.push_back(&para); }
 
   std::vector<ZParameter*> m_parameters;
 

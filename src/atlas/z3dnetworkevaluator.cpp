@@ -24,10 +24,10 @@ Z3DNetworkEvaluator::Z3DNetworkEvaluator(QObject *parent)
   , m_canvasPainter(NULL)
 {
 #if defined(_DEBUG_)
-  m_filterWrappers.emplace_back(new Z3DCheckOpenGLStateFilterWrapper());
+  m_filterWrappers.emplace_back(std::make_unique<Z3DCheckOpenGLStateFilterWrapper>());
 #endif
 #if defined(PROFILE3DRENDERERS)
-  m_filterWrappers.emplace_back(new Z3DProfileFilterWrapper());
+  m_filterWrappers.emplace_back(std::make_unique<Z3DProfileFilterWrapper>());
 #endif
 }
 
