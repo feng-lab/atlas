@@ -253,7 +253,7 @@ void Z3DSphereRenderer::render(Z3DEye eye)
         glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, 0);
 
         m_VBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 4);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), &(m_indexs[0]), GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         m_VAOs.release();
@@ -321,7 +321,7 @@ void Z3DSphereRenderer::render(Z3DEye eye)
 
       m_VBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 4);
       if (m_dataChanged)
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), &(m_indexs[0]), GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
 
       glDrawElements(GL_TRIANGLES, size*6/4, GL_UNSIGNED_INT, 0);
 
@@ -411,7 +411,7 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
 
         if (m_dataChanged) {
           m_pickingVBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 3);
-          glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), &(m_indexs[0]), GL_STATIC_DRAW);
+          glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
         } else {
           m_VBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 4);
         }
@@ -479,7 +479,7 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
       if (m_dataChanged) {
         m_pickingVBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 3);
         if (m_pickingDataChanged)
-          glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), &(m_indexs[0]), GL_STATIC_DRAW);
+          glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
       } else {
         m_VBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 4);
       }

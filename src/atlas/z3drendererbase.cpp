@@ -153,7 +153,7 @@ void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram &shader, Z3DEye
     shader.setFogDensityDensityLog2eUniform(m_globalParas.fogDensity.get() * m_globalParas.fogDensity.get() * static_cast<float>(M_LOG2E));
   }
 
-  shader.setClipPlanesUniform(&m_clipPlanes[0], m_clipPlanes.size());
+  shader.setClipPlanesUniform(m_clipPlanes.data(), m_clipPlanes.size());
   CHECK_GL_ERROR;
 }
 

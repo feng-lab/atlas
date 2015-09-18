@@ -880,7 +880,7 @@ void ZColorMap::update1DTexture()
   std::vector<glm::col4> tfData(m_texture->dimensions().x);
   for (size_t x = 0; x < tfData.size(); ++x)
     tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size()-1));
-  m_texture->setData(&tfData[0]);
+  m_texture->setData(tfData.data());
 
   m_texture->uploadTexture();
   CHECK_GL_ERROR;

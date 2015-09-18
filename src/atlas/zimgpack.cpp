@@ -569,9 +569,9 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
     if (mip) {
       //QString fn = mipDir.filePath(QString("%1_%2_%3_%4_%5_%6_%7.tif").arg(level).arg(t).arg(z).arg(0).arg(0).arg(img->width()).arg(img->height()));
       //img->save(fn);
-      m_ratioTileMaps[ratio][key] = std::shared_ptr<ZImgSubBlock>(new ZImgPackSubBlock(m_imgSource, t, 0, m_imgInfo.depth, key));
+      m_ratioTileMaps[ratio][key] = std::make_shared<ZImgPackSubBlock>(m_imgSource, t, 0, m_imgInfo.depth, key);
     } else {
-      m_ratioTileMaps[ratio][key] = std::shared_ptr<ZImgSubBlock>(new ZImgPackSubBlock(m_imgSource, t, z, key));;
+      m_ratioTileMaps[ratio][key] = std::make_shared<ZImgPackSubBlock>(m_imgSource, t, z, key);;
     }
     ZImgCacheInstance.insert(boost::hash_value(key), new std::shared_ptr<ZImg>(img), img->byteNumber() / 1024 / 1024);
     return;
@@ -600,7 +600,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
         fn = dir.filePath(QString("%1_%2_%3_%4_%5_%6_%7.tif").arg(level).arg(t).arg(z).arg(0).arg(0).arg(width).arg(height));
       }
       img->save(fn);
-      m_ratioTileMaps[level][key] = std::shared_ptr<ZImgSubBlock>(new ZImgPackSubBlock(fn, key));
+      m_ratioTileMaps[level][key] = std::make_shared<ZImgPackSubBlock>(fn, key);
       ZImgCacheInstance.insert(boost::hash_value(key), new std::shared_ptr<ZImg>(img), img->byteNumber() / 1024 / 1024);
       break;
     } else {
@@ -624,7 +624,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
           } else {
             fn = dir.filePath(QString("%1_%2_%3_%4_%5_%6_%7.tif").arg(level).arg(t).arg(z).arg(startX).arg(startY).arg(width).arg(height));
           }
-          m_ratioTileMaps[level][key] = std::shared_ptr<ZImgSubBlock>(new ZImgPackSubBlock(fn, key));
+          m_ratioTileMaps[level][key] = std::make_shared<ZImgPackSubBlock>(fn, key);
           cropped->save(fn);
           ZImgCacheInstance.insert(boost::hash_value(key), new std::shared_ptr<ZImg>(cropped), cropped->byteNumber() / 1024 / 1024);
         }
@@ -736,7 +736,7 @@ void ZImgPack::buildFastReadIndex(const std::vector<std::shared_ptr<ZImgSubBlock
   if (m_imgInfo.depth > 1) {
     for (size_t t=0; t<m_imgInfo.numTimes; ++t) {
       ZImgTileKey key(this, 0, t, 0, 0, 0, m_imgInfo.width, m_imgInfo.height, true);
-      m_ratioTileMaps[1][key] = std::shared_ptr<ZImgSubBlock>(new ZImgPackSubBlock(m_imgSource, t, 0, m_imgInfo.depth, key));
+      m_ratioTileMaps[1][key] = std::make_shared<ZImgPackSubBlock>(m_imgSource, t, 0, m_imgInfo.depth, key);
     }
   }
 }

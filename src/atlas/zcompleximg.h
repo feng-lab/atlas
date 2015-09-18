@@ -36,7 +36,7 @@ public:
   inline size_t width() const { return m_width; }
   inline size_t height() const { return m_height; }
   inline size_t depth() const { return m_depth; }
-  inline std::complex<double>* rawData() { return &m_data[0]; }
+  inline std::complex<double>* rawData() { return m_data.data(); }
 
   inline QString toQString() const
   {

@@ -57,7 +57,7 @@ void Z3DShaderProgram::removeShader(Z3DShader &shader)
 
 void Z3DShaderProgram::addShaderFromSourceCode(Z3DShader::Type type, const char *source)
 {
-  std::unique_ptr<Z3DShader> shader(new Z3DShader(type));
+  auto shader = std::make_unique<Z3DShader>(type);
   shader->compileSourceCode(source);
   m_anonShaders.append(shader.release());
   addShader(*m_anonShaders.last());
@@ -349,9 +349,9 @@ void Z3DShaderProgram::storeUniformLocations()
   std::vector<char> name(maxLength);
   for (GLint i=0; i<count; ++i) {
     Uniform u;
-    glGetActiveUniform(programId(), i, maxLength, nullptr, &u.size, &u.type, &name[0]);
-    u.location = glGetUniformLocation(programId(), &name[0]);
-    QString nm(&name[0]);
+    glGetActiveUniform(programId(), i, maxLength, nullptr, &u.size, &u.type, name.data());
+    u.location = glGetUniformLocation(programId(), name.data());
+    QString nm(name.data());
     if (nm.endsWith("[0]"))
       nm.chop(3);
     m_uniforms[nm] = u;
@@ -457,9 +457,9 @@ void Z3DShaderProgram::storeAttributeLocations()
   std::vector<char> name(maxLength);
   for (GLint i=0; i<count; ++i) {
     Attribute u;
-    glGetActiveAttrib(programId(), i, maxLength, nullptr, &u.size, &u.type, &name[0]);
-    u.location = glGetAttribLocation(programId(), &name[0]);
-    m_attributes[QString(&name[0])] = u;
+    glGetActiveAttrib(programId(), i, maxLength, nullptr, &u.size, &u.type, name.data());
+    u.location = glGetAttribLocation(programId(), name.data());
+    m_attributes[QString(name.data())] = u;
   }
 
   std::map<QString, Attribute>::const_iterator it;

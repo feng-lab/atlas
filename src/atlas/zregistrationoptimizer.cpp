@@ -24,7 +24,7 @@ struct ScalarCostFunctor
     std::vector<double> parameters(m_costFunc.numParameters());
     for (size_t i=0; i<parameters.size(); ++i)
       parameters[i] = x[i] * m_scales[i];
-    m_costFunc.evaluate(&parameters[0], residuals);
+    m_costFunc.evaluate(parameters.data(), residuals);
     return true;
   }
 
@@ -61,7 +61,7 @@ public:
       fallbackdelta += std::abs(para[0][i]) * m_relativeStepSize;
     }
 
-    m_costFunc.evaluate(&parameters[0], residuals);
+    m_costFunc.evaluate(parameters.data(), residuals);
 
     if (jacobians) {
       fallbackdelta = (fallbackdelta == 0) ? m_relativeStepSize : (fallbackdelta / parameters.size());
@@ -72,7 +72,7 @@ public:
           delta = fallbackdelta;
         paraPlusDelta[i] += delta * m_scales[i];
         double newValue;
-        m_costFunc.evaluate(&paraPlusDelta[0], &newValue);
+        m_costFunc.evaluate(paraPlusDelta.data(), &newValue);
         jacobians[0][i] = (newValue - residuals[0]) / delta;
         paraPlusDelta[i] = parameters[i];
       }
@@ -148,7 +148,7 @@ void ZRegistrationOptimizer::minimize()
 
   m_currentParameters = m_initialParameters;
   GradientProblem problem(new FirstOrderFunctionAdaptor(*m_costFunction));
-  Solve(m_options, problem, &m_currentParameters[0], &m_summary);
+  Solve(m_options, problem, m_currentParameters.data(), &m_summary);
 }
 
 void ZRegistrationOptimizer::checkParameterNumber() const

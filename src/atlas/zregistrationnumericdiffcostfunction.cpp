@@ -52,7 +52,7 @@ bool ZRegistrationNumericDiffCostFunction::evaluate(const double * const paramet
         delta = fallbackdelta;
       paraPlusDelta[i] += delta;
       double newValue = 0;
-      IMG_TYPED_CALL_2TYPE(evaluate_Impl, (*m_fixedImg), (*m_movingImg), &paraPlusDelta[0], &newValue);
+      IMG_TYPED_CALL_2TYPE(evaluate_Impl, (*m_fixedImg), (*m_movingImg), paraPlusDelta.data(), &newValue);
       gradient[i] = (newValue - *cost) / delta;
       paraPlusDelta[i] = paras[i];
     }

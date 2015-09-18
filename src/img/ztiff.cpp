@@ -1059,7 +1059,7 @@ uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigt
   }
 
   std::vector<char> dirmemvector(dircount * direntrysize);
-  dirmem = &dirmemvector[0];
+  dirmem = dirmemvector.data();
   fs.read(dirmem, dircount * direntrysize);
   n = fs.gcount();
   if (n != dircount*direntrysize) {
@@ -1399,8 +1399,8 @@ void ZTiff::readImg(ZImg &img)
             size_t tileCol = (tile - c * tilesPerChannel) % numTilePerRow;
             size_t x = tileCol * tileWidth;
             size_t y = tileRow * tileHeight;
-            readTile(tile, &tileBuf[0], tileWidth, tileHeight, 1, invertWhiteBlack);
-            copyOneChannelTileToImg(&tileBuf[0], tileWidth, tileHeight, img.voxelByteNumber(), img, x, y, c);
+            readTile(tile, tileBuf.data(), tileWidth, tileHeight, 1, invertWhiteBlack);
+            copyOneChannelTileToImg(tileBuf.data(), tileWidth, tileHeight, img.voxelByteNumber(), img, x, y, c);
           }
         }
       } else {
@@ -1411,8 +1411,8 @@ void ZTiff::readImg(ZImg &img)
           size_t tileCol = (tile) % numTilePerRow;
           size_t x = tileCol * tileWidth;
           size_t y = tileRow * tileHeight;
-          readTile(tile, &tileBuf[0], tileWidth, tileHeight, img.numChannels(), invertWhiteBlack);
-          copyTileToImg(&tileBuf[0], tileWidth, tileHeight, img.numChannels(), img.voxelByteNumber(), img, x, y);
+          readTile(tile, tileBuf.data(), tileWidth, tileHeight, img.numChannels(), invertWhiteBlack);
+          copyTileToImg(tileBuf.data(), tileWidth, tileHeight, img.numChannels(), img.voxelByteNumber(), img, x, y);
         }
       }
 
@@ -1559,7 +1559,7 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t *buf, size_t width, size_t heigh
     return read;
   } else if (bitspersample == 1) {
     std::vector<uint8_t> packedBuf(TIFFStripSize(m_tif.get()));
-    TIFFReadEncodedStrip(m_tif.get(), strip, &packedBuf[0], (tmsize_t)-1);
+    TIFFReadEncodedStrip(m_tif.get(), strip, packedBuf.data(), (tmsize_t)-1);
     uint8_t *buf8 = buf;
     size_t bytesPerRow = (width*nChannel+7)/8;
     if (packedBuf.size() < bytesPerRow*height) {
@@ -1576,7 +1576,7 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t *buf, size_t width, size_t heigh
     return height*width*nChannel;
   } else if (bitspersample == 2) {
     std::vector<uint8_t> packedBuf(TIFFStripSize(m_tif.get()));
-    TIFFReadEncodedStrip(m_tif.get(), strip, &packedBuf[0], (tmsize_t)-1);
+    TIFFReadEncodedStrip(m_tif.get(), strip, packedBuf.data(), (tmsize_t)-1);
     uint8_t *buf8 = buf;
     size_t bytesPerRow = (width*nChannel+3)/4;
     if (packedBuf.size() < bytesPerRow*height) {
@@ -1593,7 +1593,7 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t *buf, size_t width, size_t heigh
     return height*width*nChannel;
   } else if (bitspersample == 4) {
     std::vector<uint8_t> packedBuf(TIFFStripSize(m_tif.get()));
-    TIFFReadEncodedStrip(m_tif.get(), strip, &packedBuf[0], (tmsize_t)-1);
+    TIFFReadEncodedStrip(m_tif.get(), strip, packedBuf.data(), (tmsize_t)-1);
     uint8_t *buf8 = buf;
     size_t bytesPerRow = (width*nChannel+1)/2;
     if (packedBuf.size() < bytesPerRow*height) {
@@ -1654,7 +1654,7 @@ void ZTiff::readTile(uint32_t tile, uint8_t *buf, size_t tileWidth, size_t tileH
     }
   } else if (bitspersample == 1) {
     std::vector<uint8_t> packedBuf(TIFFTileSize(m_tif.get()));
-    TIFFReadEncodedTile(m_tif.get(), tile, &packedBuf[0], (tmsize_t)-1);
+    TIFFReadEncodedTile(m_tif.get(), tile, packedBuf.data(), (tmsize_t)-1);
     uint8_t *buf8 = buf;
     size_t bytesPerRow = packedBuf.size() / tileHeight;
     for (size_t r=0; r<tileHeight; ++r) {
@@ -1666,7 +1666,7 @@ void ZTiff::readTile(uint32_t tile, uint8_t *buf, size_t tileWidth, size_t tileH
     }
   } else if (bitspersample == 2) {
     std::vector<uint8_t> packedBuf(TIFFTileSize(m_tif.get()));
-    TIFFReadEncodedTile(m_tif.get(), tile, &packedBuf[0], (tmsize_t)-1);
+    TIFFReadEncodedTile(m_tif.get(), tile, packedBuf.data(), (tmsize_t)-1);
     uint8_t *buf8 = buf;
     size_t bytesPerRow = packedBuf.size() / tileHeight;
     for (size_t r=0; r<tileHeight; ++r) {
@@ -1678,7 +1678,7 @@ void ZTiff::readTile(uint32_t tile, uint8_t *buf, size_t tileWidth, size_t tileH
     }
   } else if (bitspersample == 4) {
     std::vector<uint8_t> packedBuf(TIFFTileSize(m_tif.get()));
-    TIFFReadEncodedTile(m_tif.get(), tile, &packedBuf[0], (tmsize_t)-1);
+    TIFFReadEncodedTile(m_tif.get(), tile, packedBuf.data(), (tmsize_t)-1);
     uint8_t *buf8 = buf;
     size_t bytesPerRow = packedBuf.size() / tileHeight;
     for (size_t r=0; r<tileHeight; ++r) {
@@ -1831,7 +1831,7 @@ void ZTiffWriter::writeIFD(const ZImg &img, int z, int t, int c, bool writeThumb
     thumbnails = &(img.thumbnail().planeAttachments(z, t));
     if (thumbnails->size() > 0) {
       std::vector<toff_t> sub_IFDs_offsets(thumbnails->size());
-      TIFFSetField(m_tif.get(), TIFFTAG_SUBIFD, thumbnails->size(), &sub_IFDs_offsets[0]);
+      TIFFSetField(m_tif.get(), TIFFTAG_SUBIFD, thumbnails->size(), sub_IFDs_offsets.data());
     }
   }
 

@@ -1319,9 +1319,9 @@ ZImg &ZImg::flip(Dimension dim)
         size_t j = numChannels() - 1;
         for (size_t i=0; i<numChannels()/2; ++i,--j) {
           // swap channel i,j
-          memcpy(&buf[0], channelData(i,t), channelByteNumber());
+          memcpy(buf.data(), channelData(i,t), channelByteNumber());
           memcpy(channelData(i,t), channelData(j,t), channelByteNumber());
-          memcpy(channelData(j,t), &buf[0], channelByteNumber());
+          memcpy(channelData(j,t), buf.data(), channelByteNumber());
         }
       }
     }
@@ -2245,7 +2245,7 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
                    res.rowData(theight-1,z,c,t),
                    rowByteNum);
             // save to subtract
-            memcpy(&bufRow[0], res.rowData(0,z,c,t), rowByteNum);
+            memcpy(bufRow.data(), res.rowData(0,z,c,t), rowByteNum);
             // other
             for (size_t y=1; y<theight; ++y) {
               TVoxel* resData = res.rowData<TVoxel>(y,z,c,t);
@@ -2256,20 +2256,20 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
             }
             for (size_t y=theight; y<height(); ++y) {
               TVoxel* resData = res.rowData<TVoxel>(y,z,c,t);
-              memcpy(&buf[0], resData, rowByteNum);
+              memcpy(buf.data(), resData, rowByteNum);
               for (size_t v=0; v<rowVoxelNum; ++v) {
                 resData[v] = saturate_sub(saturate_add(resData[v - rowVoxelNum],
                                           resData[v + dataOffset]), bufRow[v]);
               }
-              memcpy(&bufRow[0], &buf[0], rowByteNum);
+              memcpy(bufRow.data(), buf.data(), rowByteNum);
             }
             for (size_t y=height(); y<res.height(); ++y) {
               TVoxel* resData = res.rowData<TVoxel>(y,z,c,t);
-              memcpy(&buf[0], resData, rowByteNum);
+              memcpy(buf.data(), resData, rowByteNum);
               for (size_t v=0; v<rowVoxelNum; ++v) {
                 resData[v] = saturate_sub(resData[v - rowVoxelNum], bufRow[v]);
               }
-              memcpy(&bufRow[0], &buf[0], rowByteNum);
+              memcpy(bufRow.data(), buf.data(), rowByteNum);
             }
           }
         }
@@ -2283,7 +2283,7 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
                    res.rowData(theight-1,z,c,t),
                    rowByteNum);
             // save to subtract
-            memcpy(&bufRow[0], res.rowData(0,z,c,t), rowByteNum);
+            memcpy(bufRow.data(), res.rowData(0,z,c,t), rowByteNum);
             // other
             for (size_t y=1; y<height(); ++y) {
               TVoxel* resData = res.rowData<TVoxel>(y,z,c,t);
@@ -2298,11 +2298,11 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
             }
             for (size_t y=theight; y<res.height(); ++y) {
               TVoxel* resData = res.rowData<TVoxel>(y,z,c,t);
-              memcpy(&buf[0], resData, rowByteNum);
+              memcpy(buf.data(), resData, rowByteNum);
               for (size_t v=0; v<rowVoxelNum; ++v) {
                 resData[v] = saturate_sub(resData[v - rowVoxelNum], bufRow[v]);
               }
-              memcpy(&bufRow[0], &buf[0], rowByteNum);
+              memcpy(bufRow.data(), buf.data(), rowByteNum);
             }
           }
         }
@@ -2324,7 +2324,7 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
                  res.planeData(tdepth-1,c,t),
                  planeByteNum);
           // save to subtract
-          memcpy(&bufPlane[0], res.planeData(0,c,t), planeByteNum);
+          memcpy(bufPlane.data(), res.planeData(0,c,t), planeByteNum);
           // other
           for (size_t z=1; z<tdepth; ++z) {
             TVoxel* resData = res.planeData<TVoxel>(z,c,t);
@@ -2335,20 +2335,20 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
           }
           for (size_t z=tdepth; z<depth(); ++z) {
             TVoxel* resData = res.planeData<TVoxel>(z,c,t);
-            memcpy(&buf[0], resData, planeByteNum);
+            memcpy(buf.data(), resData, planeByteNum);
             for (size_t v=0; v<planeVoxelNum; ++v) {
               resData[v] = saturate_sub(saturate_add(resData[v - planeVoxelNum],
                                         resData[v + dataOffset]), bufPlane[v]);
             }
-            memcpy(&bufPlane[0], &buf[0], planeByteNum);
+            memcpy(bufPlane.data(), buf.data(), planeByteNum);
           }
           for (size_t z=depth(); z<res.depth(); ++z) {
             TVoxel* resData = res.planeData<TVoxel>(z,c,t);
-            memcpy(&buf[0], resData, planeByteNum);
+            memcpy(buf.data(), resData, planeByteNum);
             for (size_t v=0; v<planeVoxelNum; ++v) {
               resData[v] = saturate_sub(resData[v - planeVoxelNum], bufPlane[v]);
             }
-            memcpy(&bufPlane[0], &buf[0], planeByteNum);
+            memcpy(bufPlane.data(), buf.data(), planeByteNum);
           }
         }
       }
@@ -2360,7 +2360,7 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
                  res.planeData(tdepth-1,c,t),
                  planeByteNum);
           // save to subtract
-          memcpy(&bufPlane[0], res.planeData(0,c,t), planeByteNum);
+          memcpy(bufPlane.data(), res.planeData(0,c,t), planeByteNum);
           // other
           for (size_t z=1; z<depth(); ++z) {
             TVoxel* resData = res.planeData<TVoxel>(z,c,t);
@@ -2375,11 +2375,11 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
           }
           for (size_t z=tdepth; z<res.depth(); ++z) {
             TVoxel* resData = res.planeData<TVoxel>(z,c,t);
-            memcpy(&buf[0], resData, planeByteNum);
+            memcpy(buf.data(), resData, planeByteNum);
             for (size_t v=0; v<planeVoxelNum; ++v) {
               resData[v] = saturate_sub(resData[v - planeVoxelNum], bufPlane[v]);
             }
-            memcpy(&bufPlane[0], &buf[0], planeByteNum);
+            memcpy(bufPlane.data(), buf.data(), planeByteNum);
           }
         }
       }

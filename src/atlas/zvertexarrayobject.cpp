@@ -18,14 +18,14 @@ ZVertexArrayObject::ZVertexArrayObject(GLsizei n)
   , m_arrays(std::max((GLsizei)0, n), 0)
 {
   if (m_hardwareSupportVAO)
-    glGenVertexArrays(m_arrays.size(), &m_arrays[0]);
+    glGenVertexArrays(m_arrays.size(), m_arrays.data());
 }
 
 ZVertexArrayObject::~ZVertexArrayObject()
 {
   if (!m_hardwareSupportVAO)
     return;
-  glDeleteVertexArrays(m_arrays.size(), &m_arrays[0]);
+  glDeleteVertexArrays(m_arrays.size(), m_arrays.data());
 }
 
 void ZVertexArrayObject::bind(size_t idx) const
@@ -46,9 +46,9 @@ void ZVertexArrayObject::resize(GLsizei n)
 {
   if (!m_hardwareSupportVAO || n == (GLsizei)m_arrays.size())
     return;
-  glDeleteVertexArrays(m_arrays.size(), &m_arrays[0]);
+  glDeleteVertexArrays(m_arrays.size(), m_arrays.data());
   m_arrays.resize(std::max((GLsizei)0, n), 0);
-  glGenVertexArrays(m_arrays.size(), &m_arrays[0]);
+  glGenVertexArrays(m_arrays.size(), m_arrays.data());
 }
 
 } // namespace nim

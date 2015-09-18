@@ -94,7 +94,7 @@ void ZImageMatrix2DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
   m_centerY *= scale;
   m_parameters[2] *= scale;
   m_parameters[5] *= scale;
-  setParameters(&m_parameters[0]);
+  setParameters(m_parameters.data());
 }
 
 void ZImageMatrix2DTransform::transformPoint(double *inoutCoords) const
@@ -150,7 +150,7 @@ void ZImageYTranslation2DTransform::adaptParameters(size_t fromLevel, size_t toL
   m_centerX *= scale;
   m_centerY *= scale;
   m_parameters[0] *= scale;
-  setParameters(&m_parameters[0]);
+  setParameters(m_parameters.data());
 }
 
 void ZImageYTranslation2DTransform::transformPoint(double *inoutCoords) const
@@ -203,7 +203,7 @@ void ZImageTranslation2DTransform::adaptParameters(size_t fromLevel, size_t toLe
   m_centerY *= scale;
   m_parameters[0] *= scale;
   m_parameters[1] *= scale;
-  setParameters(&m_parameters[0]);
+  setParameters(m_parameters.data());
 }
 
 void ZImageTranslation2DTransform::transformPoint(double *inoutCoords) const
@@ -258,7 +258,7 @@ void ZImageRigid2DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
   m_centerY *= scale;
   m_parameters[0] *= scale;
   m_parameters[1] *= scale;
-  setParameters(&m_parameters[0]);
+  setParameters(m_parameters.data());
 }
 
 std::vector<double> ZImageRigid2DTransform::estimateParameterScales(const double *dims) const
@@ -313,7 +313,7 @@ void ZImageSimilarity2DTransform::adaptParameters(size_t fromLevel, size_t toLev
   m_centerY *= scale;
   m_parameters[0] *= scale;
   m_parameters[1] *= scale;
-  setParameters(&m_parameters[0]);
+  setParameters(m_parameters.data());
 }
 
 std::vector<double> ZImageSimilarity2DTransform::estimateParameterScales(const double *dims) const
@@ -370,7 +370,7 @@ void ZImageAffine2DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
   m_centerY *= scale;
   m_parameters[0] *= scale;
   m_parameters[1] *= scale;
-  setParameters(&m_parameters[0]);
+  setParameters(m_parameters.data());
 }
 
 std::vector<double> ZImageAffine2DTransform::estimateParameterScales(const double *dims) const

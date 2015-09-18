@@ -98,7 +98,7 @@ double ZImgRegistration::run()
 //            params[1] = transY;
 //            params[2] = rot;
 //            double cost;
-//            costFunction.evaluate(&params[0], &cost);
+//            costFunction.evaluate(params.data(), &cost);
 //            if (cost < bestCost) {
 //              bestCost = cost;
 //              bestParams = params;

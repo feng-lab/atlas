@@ -320,9 +320,9 @@ void image2DFlip(TPixel* img, size_t width, size_t height, Dimension dim)
     size_t k = height - 1;
     size_t size = sizeof(TPixel) * width;
     while (j < k) {
-      memcpy(&buffer[0], img+j*width, size);
+      memcpy(buffer.data(), img+j*width, size);
       memcpy(img+j*width, img+k*width, size);
-      memcpy(img+k*width, &buffer[0], size);
+      memcpy(img+k*width, buffer.data(), size);
       ++j;
       --k;
     }
@@ -347,7 +347,7 @@ void image2DTranspose(TPixel* img, size_t width, size_t height)
   for (size_t i = 0; i < height; i++)
     for (size_t j = 0; j < width; j++)
       buf[i+j*height] = img[j+i*width];
-  memcpy(img, &buf[0], sizeof(TPixel)*width*height);
+  memcpy(img, buf.data(), sizeof(TPixel)*width*height);
 }
 
 template<typename TPixel, typename TPixelOut = TPixel>
@@ -635,28 +635,28 @@ void image2DFilter(const TPixel *img, size_t width, size_t height,
   std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32>> padImg(desWidth*desHeight);
   //ZBenchTimer bt;
   //bt.start();
-  image2DPad(img, width, height, leftPad, rightPad, upPad, downPad, &padImg[0],
+  image2DPad(img, width, height, leftPad, rightPad, upPad, downPad, padImg.data(),
       boundaryOption, boundaryValue);
   //bt.stopAndPrint();
 
-  //image2DWrite(&padImg[0], desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
+  //image2DWrite(padImg.data(), desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
 
   std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedKernel;
   alignedKernel.insert(alignedKernel.end(), kernel, kernel + kernelWidth*kernelHeight);
   if (!corr) {
-    image2DReflect(&alignedKernel[0], kernelWidth, kernelHeight);
+    image2DReflect(alignedKernel.data(), kernelWidth, kernelHeight);
   }
 
   std::vector<double, boost::alignment::aligned_allocator<double, 32>> rowKernel(kernelWidth);
   std::vector<double, boost::alignment::aligned_allocator<double, 32>> colKernel(kernelHeight);
-  if (seperate2DKernel(&alignedKernel[0], kernelWidth, kernelHeight,
-                       &rowKernel[0], &colKernel[0])) {
+  if (seperate2DKernel(alignedKernel.data(), kernelWidth, kernelHeight,
+                       rowKernel.data(), colKernel.data())) {
     std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg(width*desHeight);
 
-    Image2DRowFilterForOneBlock<TPixel,double> rowfunctor(&padImg[0], desWidth,
-        &rowKernel[0], kernelWidth, &bufImg[0], width);
-    Image2DColFilterForOneBlock<double,TPixelOut> colfunctor(&bufImg[0], width,
-        &colKernel[0], kernelHeight, imgOut, width);
+    Image2DRowFilterForOneBlock<TPixel,double> rowfunctor(padImg.data(), desWidth,
+        rowKernel.data(), kernelWidth, bufImg.data(), width);
+    Image2DColFilterForOneBlock<double,TPixelOut> colfunctor(bufImg.data(), width,
+        colKernel.data(), kernelHeight, imgOut, width);
 
     // get correlation of padImg and adjKernel
     if (!useMultithreading) {
@@ -690,8 +690,8 @@ void image2DFilter(const TPixel *img, size_t width, size_t height,
     }
   } else {
     // get correlation of padImg and adjKernel
-    Image2DFilterForOneBlock<TPixel,TPixelOut> functor(&padImg[0], desWidth,
-        &alignedKernel[0], kernelWidth, kernelHeight, imgOut, width);
+    Image2DFilterForOneBlock<TPixel,TPixelOut> functor(padImg.data(), desWidth,
+        alignedKernel.data(), kernelWidth, kernelHeight, imgOut, width);
     if (!useMultithreading) {
 #ifndef _USE_QTCONCURRENT_
       functor(tbb::blocked_range<size_t>(0, height));
@@ -735,27 +735,27 @@ void image2DFilter(const TPixel *img, size_t width, size_t height,
   std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32>> padImg(desWidth*desHeight);
   //ZBenchTimer bt;
   //bt.start();
-  image2DPad(img, width, height, leftPad, rightPad, upPad, downPad, &padImg[0],
+  image2DPad(img, width, height, leftPad, rightPad, upPad, downPad, padImg.data(),
       boundaryOption, boundaryValue);
   //bt.stopAndPrint();
 
-  //image2DWrite(&padImg[0], desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
+  //image2DWrite(padImg.data(), desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
 
   std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedRowKernel;
   std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedColKernel;
   alignedRowKernel.insert(alignedRowKernel.end(), rowkernel, rowkernel + kernelWidth);
   alignedColKernel.insert(alignedColKernel.end(), colkernel, colkernel + kernelHeight);
   if (!corr) {
-    image2DFlip(&alignedRowKernel[0], kernelWidth, 1, Dimension::X);
-    image2DFlip(&alignedColKernel[0], kernelHeight, 1, Dimension::X);
+    image2DFlip(alignedRowKernel.data(), kernelWidth, 1, Dimension::X);
+    image2DFlip(alignedColKernel.data(), kernelHeight, 1, Dimension::X);
   }
 
   std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg(width*desHeight);
 
-  Image2DRowFilterForOneBlock<TPixel,double> rowfunctor(&padImg[0], desWidth,
-      &alignedRowKernel[0], kernelWidth, &bufImg[0], width);
-  Image2DColFilterForOneBlock<double,TPixelOut> colfunctor(&bufImg[0], width,
-      &alignedColKernel[0], kernelHeight, imgOut, width);
+  Image2DRowFilterForOneBlock<TPixel,double> rowfunctor(padImg.data(), desWidth,
+      alignedRowKernel.data(), kernelWidth, bufImg.data(), width);
+  Image2DColFilterForOneBlock<double,TPixelOut> colfunctor(bufImg.data(), width,
+      alignedColKernel.data(), kernelHeight, imgOut, width);
 
   // get correlation of padImg and adjKernel
   if (!useMultithreading) {
@@ -807,7 +807,7 @@ void image2DGaussianFilter(const TPixel *img, size_t width, size_t height,
 
   //ZBenchTimer bt;
   //bt.start();
-  image2DFilter(img, width, height, &kernel[0], kWidth, kHeight,
+  image2DFilter(img, width, height, kernel.data(), kWidth, kHeight,
       imgOut, boundaryOption, boundaryValue, true, useMultithreading);
   //bt.stopAndPrint();
 #else
@@ -816,8 +816,8 @@ void image2DGaussianFilter(const TPixel *img, size_t width, size_t height,
 
   //ZBenchTimer bt;
   //bt.start();
-  image2DFilter(img, width, height, &rowkernel[0], kWidth,
-      &colkernel[0], kHeight,
+  image2DFilter(img, width, height, rowkernel.data(), kWidth,
+      colkernel.data(), kHeight,
       imgOut, boundaryOption, boundaryValue, true, useMultithreading);
   //bt.stopAndPrint();
 #endif
@@ -844,15 +844,15 @@ void image2DLoGFilter(const TPixel *img, size_t width, size_t height,
 
   //ZBenchTimer bt;
   //bt.start();
-  image2DFilter(img, width, height, &rowLoGkernel[0], kWidth,
-      &colGkernel[0], kHeight,
+  image2DFilter(img, width, height, rowLoGkernel.data(), kWidth,
+      colGkernel.data(), kHeight,
       imgOut, boundaryOption, boundaryValue, true, useMultithreading);
 
   std::vector<TPixelOut> bufImg(width*height);
 
-  image2DFilter(img, width, height, &rowGkernel[0], kWidth,
-      &colLoGkernel[0], kHeight,
-      &bufImg[0], boundaryOption, boundaryValue, true, useMultithreading);
+  image2DFilter(img, width, height, rowGkernel.data(), kWidth,
+      colLoGkernel.data(), kHeight,
+      bufImg.data(), boundaryOption, boundaryValue, true, useMultithreading);
 
   for (size_t i=0; i<bufImg.size(); ++i)
     imgOut[i] += bufImg[i];

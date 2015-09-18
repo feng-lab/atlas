@@ -45,17 +45,17 @@ void Z3DTextureCoordinateRenderer::render(Z3DEye eye)
       int bufIdx = 0;
       glEnableVertexAttribArray(attr_vertex);
       m_VBOs.bind(GL_ARRAY_BUFFER, bufIdx++);
-      glBufferData(GL_ARRAY_BUFFER, vertices.size()*3*sizeof(GLfloat), &(vertices[0]), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, vertices.size()*3*sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
       glEnableVertexAttribArray(attr_3dTexCoord0);
       m_VBOs.bind(GL_ARRAY_BUFFER, bufIdx++);
-      glBufferData(GL_ARRAY_BUFFER, texCoords.size()*3*sizeof(GLfloat), &(texCoords[0]), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, texCoords.size()*3*sizeof(GLfloat), texCoords.data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_3dTexCoord0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
       if (!triangleIndexes.empty()) {
         m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, triangleIndexes.size()*sizeof(GLuint), &(triangleIndexes[0]), GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, triangleIndexes.size()*sizeof(GLuint), triangleIndexes.data(), GL_STATIC_DRAW);
       }
 
       glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -79,19 +79,19 @@ void Z3DTextureCoordinateRenderer::render(Z3DEye eye)
     int bufIdx = 0;
     glEnableVertexAttribArray(attr_vertex);
     m_VBOs.bind(GL_ARRAY_BUFFER, bufIdx++);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size()*3*sizeof(GLfloat), &(vertices[0]), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size()*3*sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
     glEnableVertexAttribArray(attr_3dTexCoord0);
     m_VBOs.bind(GL_ARRAY_BUFFER, bufIdx++);
-    glBufferData(GL_ARRAY_BUFFER, texCoords.size()*3*sizeof(GLfloat), &(texCoords[0]), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, texCoords.size()*3*sizeof(GLfloat), texCoords.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_3dTexCoord0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
     if (triangleIndexes.empty()) {
       glDrawArrays(m_mesh->type(), 0, vertices.size());
     } else {
       m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
-      glBufferData(GL_ELEMENT_ARRAY_BUFFER, triangleIndexes.size()*sizeof(GLuint), &(triangleIndexes[0]), GL_STATIC_DRAW);
+      glBufferData(GL_ELEMENT_ARRAY_BUFFER, triangleIndexes.size()*sizeof(GLuint), triangleIndexes.data(), GL_STATIC_DRAW);
       glDrawElements(m_mesh->type(), triangleIndexes.size(), GL_UNSIGNED_INT, 0);
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }

@@ -478,7 +478,7 @@ void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
 
               ZImg thumbImg;
 
-              startReading(&buf[0], buf.size(), thumbCinfo, thumbJerr);
+              startReading(buf.data(), buf.size(), thumbCinfo, thumbJerr);
               readImgFromJpeg(thumbCinfo, thumbImg, thumbRegion, getOrientation(cinfo));
               finishReading(thumbCinfo);
 

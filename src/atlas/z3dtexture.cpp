@@ -391,7 +391,7 @@ void Z3DTexture::saveAsColorImage(const QString &filename) const
   try {
     GLenum dataFormat = GL_BGRA;
     GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
-    std::unique_ptr<uint8_t[]> colorBuffer(new uint8_t[bypePerPixel(dataFormat, dataType) * numPixels()]);
+    auto colorBuffer = std::make_unique<uint8_t[]>(bypePerPixel(dataFormat, dataType) * numPixels());
     downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
     QImage upsideDownImage(colorBuffer.get(), width(), height(),
                            QImage::Format_ARGB32);
@@ -412,7 +412,7 @@ void Z3DTexture::saveAsDepthImage(const QString &filename) const
   try {
     GLenum dataFormat = GL_DEPTH_COMPONENT;
     GLenum dataType = GL_UNSIGNED_INT;
-    std::unique_ptr<uint32_t[]> depthBuffer(new uint32_t[numPixels()]);
+    auto depthBuffer = std::make_unique<uint32_t[]>(numPixels());
     downloadTextureToBuffer(dataFormat, dataType, depthBuffer.get());
     nim::ZImg img;
     img.wrapData(depthBuffer.get(), width(), height(), 1);

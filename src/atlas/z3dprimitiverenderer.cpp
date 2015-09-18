@@ -99,41 +99,41 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject &vao, con
   int bufIdx = 0;
   glEnableVertexAttribArray(attr_vertex);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[bufIdx++]);
-  glBufferData(GL_ARRAY_BUFFER, vertices.size()*3*sizeof(GLfloat), &(vertices[0]), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, vertices.size()*3*sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
   glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
   if (attr_1dTexCoord0 != -1 && !textureCoordinates1D.empty()) {
     glEnableVertexAttribArray(attr_1dTexCoord0);
     glBindBuffer(GL_ARRAY_BUFFER, bufObjects[bufIdx++]);
-    glBufferData(GL_ARRAY_BUFFER, textureCoordinates1D.size()*1*sizeof(GLfloat), &(textureCoordinates1D[0]), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, textureCoordinates1D.size()*1*sizeof(GLfloat), textureCoordinates1D.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_1dTexCoord0, 1, GL_FLOAT, GL_FALSE, 0, 0);
   }
 
   if (attr_2dTexCoord0 != -1 && !textureCoordinates2D.empty()) {
     glEnableVertexAttribArray(attr_2dTexCoord0);
     glBindBuffer(GL_ARRAY_BUFFER, bufObjects[bufIdx++]);
-    glBufferData(GL_ARRAY_BUFFER, textureCoordinates2D.size()*2*sizeof(GLfloat), &(textureCoordinates2D[0]), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, textureCoordinates2D.size()*2*sizeof(GLfloat), textureCoordinates2D.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, 0);
   }
 
   if (attr_3dTexCoord0 != -1 && !textureCoordinates3D.empty()) {
     glEnableVertexAttribArray(attr_3dTexCoord0);
     glBindBuffer(GL_ARRAY_BUFFER, bufObjects[bufIdx++]);
-    glBufferData(GL_ARRAY_BUFFER, textureCoordinates3D.size()*3*sizeof(GLfloat), &(textureCoordinates3D[0]), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, textureCoordinates3D.size()*3*sizeof(GLfloat), textureCoordinates3D.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_3dTexCoord0, 3, GL_FLOAT, GL_FALSE, 0, 0);
   }
 
   if (attr_normal != -1 && !normals.empty()) {
     glEnableVertexAttribArray(attr_normal);
     glBindBuffer(GL_ARRAY_BUFFER, bufObjects[bufIdx++]);
-    glBufferData(GL_ARRAY_BUFFER, normals.size()*3*sizeof(GLfloat), &(normals[0]), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, normals.size()*3*sizeof(GLfloat), normals.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_normal, 3, GL_FLOAT, GL_FALSE, 0, 0);
   }
 
   if (attr_color != -1 && !colors.empty()) {
     glEnableVertexAttribArray(attr_color);
     glBindBuffer(GL_ARRAY_BUFFER, bufObjects[bufIdx++]);
-    glBufferData(GL_ARRAY_BUFFER, colors.size()*4*sizeof(GLfloat), &(colors[0]), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, colors.size()*4*sizeof(GLfloat), colors.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
   }
 
@@ -141,7 +141,7 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject &vao, con
     glDrawArrays(type, 0, vertices.size());
   } else {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufObjects[bufIdx++]);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, triangleIndexes.size()*sizeof(GLuint), &(triangleIndexes[0]), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, triangleIndexes.size()*sizeof(GLuint), triangleIndexes.data(), GL_STATIC_DRAW);
     glDrawElements(type, triangleIndexes.size(), GL_UNSIGNED_INT, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
   }

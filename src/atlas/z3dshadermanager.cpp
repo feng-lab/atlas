@@ -43,7 +43,7 @@ Z3DShader &Z3DShaderManager::shader(const QString &fn, const QString &header, co
     QString src = header + file.readAll();
 
     assert(context == Z3DContext());
-    std::unique_ptr<Z3DShader> shdr(new Z3DShader(type));
+    auto shdr = std::make_unique<Z3DShader>(type);
     shdr->compileSourceCode(src);
     Z3DShader *res = shdr.get();
     m_shaders.emplace(key, std::move(shdr));

@@ -82,7 +82,7 @@ void ZImageMatrix3DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
   m_parameters[3] *= scale;
   m_parameters[7] *= scale;
   m_parameters[11] *= scale;
-  setParameters(&m_parameters[0]);
+  setParameters(m_parameters.data());
 }
 
 void ZImageMatrix3DTransform::transformPoint(double *inoutCoords) const
@@ -146,7 +146,7 @@ void ZImageTranslation3DTransform::adaptParameters(size_t fromLevel, size_t toLe
   m_parameters[0] *= scale;
   m_parameters[1] *= scale;
   m_parameters[2] *= scale;
-  setParameters(&m_parameters[0]);
+  setParameters(m_parameters.data());
 }
 
 void ZImageTranslation3DTransform::transformPoint(double *inoutCoords) const
@@ -204,7 +204,7 @@ void ZImageRigid3DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
   m_parameters[0] *= scale;
   m_parameters[1] *= scale;
   m_parameters[2] *= scale;
-  setParameters(&m_parameters[0]);
+  setParameters(m_parameters.data());
 }
 
 ZImageTransform *ZImageRigid3DTransform::clone() const
@@ -254,7 +254,7 @@ void ZImageSimilarity3DTransform::adaptParameters(size_t fromLevel, size_t toLev
   m_parameters[0] *= scale;
   m_parameters[1] *= scale;
   m_parameters[2] *= scale;
-  setParameters(&m_parameters[0]);
+  setParameters(m_parameters.data());
 }
 
 ZImageTransform *ZImageSimilarity3DTransform::clone() const
@@ -307,7 +307,7 @@ void ZImageAffine3DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
   m_parameters[0] *= scale;
   m_parameters[1] *= scale;
   m_parameters[2] *= scale;
-  setParameters(&m_parameters[0]);
+  setParameters(m_parameters.data());
 }
 
 ZImageTransform *ZImageAffine3DTransform::clone() const

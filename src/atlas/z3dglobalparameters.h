@@ -25,14 +25,14 @@ public:
   ZWidgetsGroup* widgetsGroup(bool includeCamera);
 
   // count is lightCount
-  const glm::vec4* lightPositionArray() const { return &m_lightPositionArray[0]; }
-  const glm::vec4* lightAmbientArray() const { return &m_lightAmbientArray[0]; }
-  const glm::vec4* lightDiffuseArray() const { return &m_lightDiffuseArray[0]; }
-  const glm::vec4* lightSpecularArray() const { return &m_lightSpecularArray[0]; }
-  const glm::vec3* lightAttenuationArray() const { return &m_lightAttenuationArray[0]; }
-  const float* lightSpotCutoffArray() const { return &m_lightSpotCutoffArray[0]; }
-  const float* lightSpotExponentArray() const { return &m_lightSpotExponentArray[0]; }
-  const glm::vec3* lightSpotDirectionArray() const { return &m_lightSpotDirectionArray[0]; }
+  const glm::vec4* lightPositionArray() const { return m_lightPositionArray.data(); }
+  const glm::vec4* lightAmbientArray() const { return m_lightAmbientArray.data(); }
+  const glm::vec4* lightDiffuseArray() const { return m_lightDiffuseArray.data(); }
+  const glm::vec4* lightSpecularArray() const { return m_lightSpecularArray.data(); }
+  const glm::vec3* lightAttenuationArray() const { return m_lightAttenuationArray.data(); }
+  const float* lightSpotCutoffArray() const { return m_lightSpotCutoffArray.data(); }
+  const float* lightSpotExponentArray() const { return m_lightSpotExponentArray.data(); }
+  const glm::vec3* lightSpotDirectionArray() const { return m_lightSpotDirectionArray.data(); }
 
   ZStringIntOptionParameter geometriesMultisampleMode;
   ZStringIntOptionParameter transparencyMethod;

@@ -25,27 +25,19 @@ ZImgIO &ZImgIO::instance()
 
 ZImgIO::ZImgIO()
 {
-  m_ioFormats[FileFormat::Vaa3DRaw] = new ZImgV3DRaw();
-  m_ioFormats[FileFormat::OmeTiff] = new ZImgOmeTiff();
-  m_ioFormats[FileFormat::Tiff] = new ZImgTiff();
-  m_ioFormats[FileFormat::ZeissLsm] = new ZImgZeissLsm();
-  m_ioFormats[FileFormat::ZeissCZI] = new ZImgZeissCZI();
+  m_ioFormats[FileFormat::Vaa3DRaw] = std::make_unique<ZImgV3DRaw>();
+  m_ioFormats[FileFormat::OmeTiff] = std::make_unique<ZImgOmeTiff>();
+  m_ioFormats[FileFormat::Tiff] = std::make_unique<ZImgTiff>();
+  m_ioFormats[FileFormat::ZeissLsm] = std::make_unique<ZImgZeissLsm>();
+  m_ioFormats[FileFormat::ZeissCZI] = std::make_unique<ZImgZeissCZI>();
 #ifndef _NEUTUBE_
-  m_ioFormats[FileFormat::Jpeg] = new ZImgJpeg();
-  m_ioFormats[FileFormat::JpegXR] = new ZImgJpegXR();
-  m_ioFormats[FileFormat::Png] = new ZImgPng();
-  m_ioFormats[FileFormat::FreeImage] = new ZImgFreeImage();
-  m_ioFormats[FileFormat::MetaImage] = new ZImgMetaImage();
-  m_ioFormats[FileFormat::ITKImage] = new ZImgITKImage();
+  m_ioFormats[FileFormat::Jpeg] = std::make_unique<ZImgJpeg>();
+  m_ioFormats[FileFormat::JpegXR] = std::make_unique<ZImgJpegXR>();
+  m_ioFormats[FileFormat::Png] = std::make_unique<ZImgPng>();
+  m_ioFormats[FileFormat::FreeImage] = std::make_unique<ZImgFreeImage>();
+  m_ioFormats[FileFormat::MetaImage] = std::make_unique<ZImgMetaImage>();
+  m_ioFormats[FileFormat::ITKImage] = std::make_unique<ZImgITKImage>();
 #endif
-}
-
-ZImgIO::~ZImgIO()
-{
-  for (std::map<FileFormat, ZImgFormat*>::iterator it = m_ioFormats.begin();
-       it != m_ioFormats.end(); ++it)
-    delete it->second;
-  m_ioFormats.clear();
 }
 
 void ZImgIO::readInfo(const QString &filename, std::vector<ZImgInfo> &res,
@@ -559,8 +551,7 @@ void ZImgIO::getQtReadNameFilter(QStringList &filters, QList<FileFormat> &format
 
   QString all = "Images";
   QStringList lst;
-  for (std::map<FileFormat, ZImgFormat*>::const_iterator it = m_ioFormats.begin();
-       it != m_ioFormats.end(); ++it) {
+  for (auto it = m_ioFormats.cbegin(); it != m_ioFormats.cend(); ++it) {
     if (it->second->supportRead()) {
       QString filter = QString("*.") + it->second->extensions().join(" *.");
       lst.push_back(filter);
@@ -583,8 +574,7 @@ void ZImgIO::getQtWriteNameFilter(QStringList &filters, QList<FileFormat> &forma
   filters.clear();
   formats.clear();
   comps.clear();
-  for (std::map<FileFormat, ZImgFormat*>::const_iterator it = m_ioFormats.begin();
-       it != m_ioFormats.end(); ++it) {
+  for (auto it = m_ioFormats.cbegin(); it != m_ioFormats.cend(); ++it) {
 #ifdef _QT4_
     if (it->second->supportWrite() && it->first != FileFormat::OmeTiff) {  // skip ome tiff since mac file dialog doesn't support double extension like .ome.tiff todo: find workaround
 #else
@@ -634,8 +624,7 @@ void ZImgIO::getQtWriteNameFilter(QStringList &filters, QList<FileFormat> &forma
 
 bool ZImgIO::fileExtensionReadSupported(const QString &filename) const
 {
-  for (std::map<FileFormat, ZImgFormat*>::const_iterator it = m_ioFormats.begin();
-       it != m_ioFormats.end(); ++it) {
+  for (auto it = m_ioFormats.cbegin(); it != m_ioFormats.cend(); ++it) {
     if (it->second->canRead(filename))
       return true;
   }
@@ -644,32 +633,29 @@ bool ZImgIO::fileExtensionReadSupported(const QString &filename) const
 
 bool ZImgIO::fileExtensionWriteSupported(const QString &filename) const
 {
-  for (std::map<FileFormat, ZImgFormat*>::const_iterator it = m_ioFormats.begin();
-       it != m_ioFormats.end(); ++it) {
+  for (auto it = m_ioFormats.cbegin(); it != m_ioFormats.cend(); ++it) {
     if (it->second->canWrite(filename))
       return true;
   }
   return false;
 }
 
-std::vector<ZImgFormat *> ZImgIO::getSupportedReader(const QString &filename) const
+std::vector<ZImgFormat*> ZImgIO::getSupportedReader(const QString &filename) const
 {
-  std::vector<ZImgFormat *> res;
-  for (std::map<FileFormat, ZImgFormat*>::const_iterator it = m_ioFormats.begin();
-       it != m_ioFormats.end(); ++it) {
+  std::vector<ZImgFormat*> res;
+  for (auto it = m_ioFormats.cbegin(); it != m_ioFormats.cend(); ++it) {
     if (it->second->canRead(filename))
-      res.push_back(it->second);
+      res.push_back(it->second.get());
   }
   return res;
 }
 
-std::vector<ZImgFormat *> ZImgIO::getSupportedWriter(const QString &filename) const
+std::vector<ZImgFormat*> ZImgIO::getSupportedWriter(const QString &filename) const
 {
-  std::vector<ZImgFormat *> res;
-  for (std::map<FileFormat, ZImgFormat*>::const_iterator it = m_ioFormats.begin();
-       it != m_ioFormats.end(); ++it) {
+  std::vector<ZImgFormat*> res;
+  for (auto it = m_ioFormats.cbegin(); it != m_ioFormats.cend(); ++it) {
     if (it->second->canWrite(filename))
-      res.push_back(it->second);
+      res.push_back(it->second.get());
   }
   return res;
 }

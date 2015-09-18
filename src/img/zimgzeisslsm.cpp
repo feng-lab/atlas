@@ -122,7 +122,7 @@ void ZImgZeissLsm::readLsmInfo(const QString &filename, ZTiff &tiff)
     inputFileStream.seekg(m_lsmInfo.u32OffsetChannelColors);
     readStream(inputFileStream, chStruct.data(), chStruct.size());
     m_lsmImgInfo.channelColors.resize(m_lsmChannelColors.s32NumberColors);
-    memcpy(&(m_lsmImgInfo.channelColors[0]), &chStruct[0]+m_lsmChannelColors.s32ColorsOffset,
+    memcpy(m_lsmImgInfo.channelColors.data(), chStruct.data()+m_lsmChannelColors.s32ColorsOffset,
         sizeof(uint32_t)*m_lsmChannelColors.s32NumberColors);
 
     size_t offset = m_lsmChannelColors.s32NamesOffset;

@@ -316,12 +316,12 @@ void Z3DLineRenderer::renderUsingOpengl()
 
   glEnableClientState(GL_VERTEX_ARRAY);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[0]);
-  glBufferData(GL_ARRAY_BUFFER, m_linesPt->size()*3*sizeof(GLfloat), &((*m_linesPt)[0]), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, m_linesPt->size()*3*sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
   glVertexPointer(3, GL_FLOAT, 0, 0);
 
   glEnableClientState(GL_COLOR_ARRAY);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[1]);
-  glBufferData(GL_ARRAY_BUFFER, colors->size()*4*sizeof(GLfloat), &((*colors)[0]), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, colors->size()*4*sizeof(GLfloat), colors->data(), GL_STATIC_DRAW);
   glColorPointer(4, GL_FLOAT, 0, 0);
 
   glDrawArrays(GL_LINES, 0, m_linesPt->size());
@@ -361,12 +361,12 @@ void Z3DLineRenderer::renderPickingUsingOpengl()
 
   glEnableClientState(GL_VERTEX_ARRAY);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[0]);
-  glBufferData(GL_ARRAY_BUFFER, m_linesPt->size()*3*sizeof(GLfloat), &((*m_linesPt)[0]), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, m_linesPt->size()*3*sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
   glVertexPointer(3, GL_FLOAT, 0, 0);
 
   glEnableClientState(GL_COLOR_ARRAY);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[1]);
-  glBufferData(GL_ARRAY_BUFFER, m_linePickingColorsPt->size()*4*sizeof(GLfloat), &((*m_linePickingColorsPt)[0]), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, m_linePickingColorsPt->size()*4*sizeof(GLfloat), m_linePickingColorsPt->data(), GL_STATIC_DRAW);
   glColorPointer(4, GL_FLOAT, 0, 0);
 
   glDrawArrays(GL_LINES, 0, m_linesPt->size());
@@ -417,14 +417,14 @@ void Z3DLineRenderer::render(Z3DEye eye)
 
       glEnableVertexAttribArray(attr_vertex);
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
-      glBufferData(GL_ARRAY_BUFFER, m_linesPt->size()*3*sizeof(GLfloat), &((*m_linesPt)[0]), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_linesPt->size()*3*sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
       if (!m_useTextureColor) {
         GLint attr_color = shader.colorAttributeLocation();
         glEnableVertexAttribArray(attr_color);
         m_VBOs.bind(GL_ARRAY_BUFFER, 1);
-        glBufferData(GL_ARRAY_BUFFER, colors->size()*4*sizeof(GLfloat), &((*colors)[0]), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, colors->size()*4*sizeof(GLfloat), colors->data(), GL_STATIC_DRAW);
         glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
       }
 
@@ -462,7 +462,7 @@ void Z3DLineRenderer::render(Z3DEye eye)
     glEnableVertexAttribArray(attr_vertex);
     m_VBOs.bind(GL_ARRAY_BUFFER, 0);
     if (m_dataChanged)
-      glBufferData(GL_ARRAY_BUFFER, m_linesPt->size()*3*sizeof(GLfloat), &((*m_linesPt)[0]), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_linesPt->size()*3*sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
     GLint attr_color;
@@ -471,7 +471,7 @@ void Z3DLineRenderer::render(Z3DEye eye)
       glEnableVertexAttribArray(attr_color);
       m_VBOs.bind(GL_ARRAY_BUFFER, 1);
       if (m_dataChanged)
-        glBufferData(GL_ARRAY_BUFFER, colors->size()*4*sizeof(GLfloat), &((*colors)[0]), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, colors->size()*4*sizeof(GLfloat), colors->data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
     }
 
@@ -544,7 +544,7 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
       glEnableVertexAttribArray(attr_vertex);
       if (m_dataChanged) {
         m_pickingVBOs.bind(GL_ARRAY_BUFFER, 0);
-        glBufferData(GL_ARRAY_BUFFER, m_linesPt->size()*3*sizeof(GLfloat), &((*m_linesPt)[0]), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_linesPt->size()*3*sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
       } else {
         m_VBOs.bind(GL_ARRAY_BUFFER, 0);
       }
@@ -552,7 +552,7 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
 
       glEnableVertexAttribArray(attr_color);
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 1);
-      glBufferData(GL_ARRAY_BUFFER, m_linePickingColorsPt->size()*4*sizeof(GLfloat), &((*m_linePickingColorsPt)[0]), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_linePickingColorsPt->size()*4*sizeof(GLfloat), m_linePickingColorsPt->data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
       glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -577,7 +577,7 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
     if (m_dataChanged) {
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 0);
       if (m_pickingDataChanged)
-        glBufferData(GL_ARRAY_BUFFER, m_linesPt->size()*3*sizeof(GLfloat), &((*m_linesPt)[0]), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_linesPt->size()*3*sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
     } else {
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
     }
@@ -586,7 +586,7 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
     glEnableVertexAttribArray(attr_color);
     m_pickingVBOs.bind(GL_ARRAY_BUFFER, 1);
     if (m_pickingDataChanged)
-      glBufferData(GL_ARRAY_BUFFER, m_linePickingColorsPt->size()*4*sizeof(GLfloat), &((*m_linePickingColorsPt)[0]), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_linePickingColorsPt->size()*4*sizeof(GLfloat), m_linePickingColorsPt->data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
     if (m_isLineStrip) {
@@ -682,7 +682,7 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
         glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, 0);
 
         m_batchVBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 5);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), &(m_indexs[0]), GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         m_VAOs.release();
@@ -758,7 +758,7 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
 
       m_batchVBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 5);
       if (m_dataChanged)
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), &(m_indexs[0]), GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
 
       glDrawElements(GL_TRIANGLES, size*6/4, GL_UNSIGNED_INT, 0);
 
@@ -849,7 +849,7 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
 
         if (m_dataChanged) {
           m_batchPickingVBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 4);
-          glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), &(m_indexs[0]), GL_STATIC_DRAW);
+          glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
         } else {
           m_batchVBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 5);
         }
@@ -933,7 +933,7 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
       if (m_dataChanged) {
         m_batchPickingVBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 4);
         if (m_pickingDataChanged)
-          glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), &(m_indexs[0]), GL_STATIC_DRAW);
+          glBufferData(GL_ELEMENT_ARRAY_BUFFER, size*6/4*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
       } else {
         m_batchVBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 5);
       }

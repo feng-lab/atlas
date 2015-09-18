@@ -69,15 +69,15 @@ public:
 
   inline void setExifIFD(const ZTiffIFD &exif) { m_exifIFD.clear(); m_exifIFD.push_back(exif); }
   inline bool hasExifIFD() const { return !m_exifIFD.empty(); }
-  const ZTiffIFD *exifIFD() const { if (m_exifIFD.empty()) return nullptr; else return &m_exifIFD[0]; }
+  const ZTiffIFD *exifIFD() const { if (m_exifIFD.empty()) return nullptr; else return m_exifIFD.data(); }
 
   inline void setGpsIFD(const ZTiffIFD &gps) { m_gpsIFD.clear(); m_gpsIFD.push_back(gps); }
   inline bool hasGpsIFD() const { return !m_gpsIFD.empty(); }
-  const ZTiffIFD *gpsIFD() const { if (m_gpsIFD.empty()) return nullptr; else return &m_gpsIFD[0]; }
+  const ZTiffIFD *gpsIFD() const { if (m_gpsIFD.empty()) return nullptr; else return m_gpsIFD.data(); }
 
   inline void setInteroperabilityIFD(const ZTiffIFD &interop) { m_interoperabilityIFD.clear(); m_interoperabilityIFD.push_back(interop); }
   inline bool hasInteroperabilityIFD() const { return !m_interoperabilityIFD.empty(); }
-  const ZTiffIFD *InteroperabilityIFD() const { if (m_interoperabilityIFD.empty()) return nullptr; else return &m_interoperabilityIFD[0]; }
+  const ZTiffIFD *InteroperabilityIFD() const { if (m_interoperabilityIFD.empty()) return nullptr; else return m_interoperabilityIFD.data(); }
 
   bool isGrayscaleColormap() const;
 

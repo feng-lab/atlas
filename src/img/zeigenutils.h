@@ -177,7 +177,7 @@ public:
   static Eigen::Matrix<T, Eigen::Dynamic, 1> convertToVector(const std::vector<T> &vec)
   {
     Eigen::Matrix<T, Eigen::Dynamic, 1> result(vec.size());
-    memcpy(result.data(), &(vec[0]), vec.size()*sizeof(T));
+    memcpy(result.data(), vec.data(), vec.size()*sizeof(T));
     return result;
   }
 
@@ -185,7 +185,7 @@ public:
   static Eigen::Matrix<T, 1, Eigen::Dynamic> convertToRowVector(const std::vector<T> &vec)
   {
     Eigen::Matrix<T, 1, Eigen::Dynamic> result(vec.size());
-    memcpy(result.data(), &(vec[0]), vec.size()*sizeof(T));
+    memcpy(result.data(), vec.data(), vec.size()*sizeof(T));
     return result;
   }
 

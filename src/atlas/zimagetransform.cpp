@@ -16,7 +16,7 @@ ZImageTransform::~ZImageTransform()
 void ZImageTransform::setParameters(const std::vector<double> &para)
 {
   CHECK_GE(para.size(), numParameters()) << "Incorrect number of parameters.";
-  setParameters(&para[0]);
+  setParameters(para.data());
 }
 
 std::vector<double> ZImageTransform::estimateParameterScales(const double *) const

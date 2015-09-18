@@ -193,21 +193,21 @@ void Z3DFontRenderer::render(Z3DEye eye)
 
       glEnableVertexAttribArray(attr_vertex);
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
-      glBufferData(GL_ARRAY_BUFFER, m_fontPositions.size()*3*sizeof(GLfloat), &(m_fontPositions[0]), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_fontPositions.size()*3*sizeof(GLfloat), m_fontPositions.data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
       glEnableVertexAttribArray(attr_2dTexCoord0);
       m_VBOs.bind(GL_ARRAY_BUFFER, 1);
-      glBufferData(GL_ARRAY_BUFFER, m_fontTextureCoords.size()*2*sizeof(GLfloat), &(m_fontTextureCoords[0]), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_fontTextureCoords.size()*2*sizeof(GLfloat), m_fontTextureCoords.data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
       glEnableVertexAttribArray(attr_color);
       m_VBOs.bind(GL_ARRAY_BUFFER, 2);
-      glBufferData(GL_ARRAY_BUFFER, m_fontColors.size()*4*sizeof(GLfloat), &(m_fontColors[0]), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_fontColors.size()*4*sizeof(GLfloat), m_fontColors.data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
       m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 3);
-      glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size()*sizeof(GLuint), &(m_indexs[0]), GL_STATIC_DRAW);
+      glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size()*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
 
       glBindBuffer(GL_ARRAY_BUFFER, 0);
       m_VAO.release();
@@ -227,21 +227,21 @@ void Z3DFontRenderer::render(Z3DEye eye)
 
     glEnableVertexAttribArray(attr_vertex);
     m_VBOs.bind(GL_ARRAY_BUFFER, 0);
-    glBufferData(GL_ARRAY_BUFFER, m_fontPositions.size()*3*sizeof(GLfloat), &(m_fontPositions[0]), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, m_fontPositions.size()*3*sizeof(GLfloat), m_fontPositions.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
     glEnableVertexAttribArray(attr_2dTexCoord0);
     m_VBOs.bind(GL_ARRAY_BUFFER, 1);
-    glBufferData(GL_ARRAY_BUFFER, m_fontTextureCoords.size()*2*sizeof(GLfloat), &(m_fontTextureCoords[0]), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, m_fontTextureCoords.size()*2*sizeof(GLfloat), m_fontTextureCoords.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
     glEnableVertexAttribArray(attr_color);
     m_VBOs.bind(GL_ARRAY_BUFFER, 2);
-    glBufferData(GL_ARRAY_BUFFER, m_fontColors.size()*4*sizeof(GLfloat), &(m_fontColors[0]), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, m_fontColors.size()*4*sizeof(GLfloat), m_fontColors.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
     m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 3);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size()*sizeof(GLuint), &(m_indexs[0]), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size()*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
 
     glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, 0);
 

@@ -110,7 +110,7 @@ void ZSectionsRegistration::doWork()
   }
 
   ZImageTransformResolve tfmResolve;
-  std::unique_ptr<ZImageTransform> notfm(new ZImageAffine2DTransform());
+  auto notfm = std::make_unique<ZImageAffine2DTransform>();
   tfmResolve.addFixedImage(m_fixedSliceIndex, notfm.get());
   for (auto it = idxPairs.cbegin(); it != idxPairs.cend(); ++it) {
     tfmResolve.addImagePair(it->first.first, it->first.second, it->second.first, it->second.second);
@@ -238,15 +238,15 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
   std::vector<double> filteredFixedImageData(length);
   std::vector<double> filteredMovingImageData(length);
 
-  image2DGaussianFilter(&fixedImageData[0], m_img.width(), m_img.height(),
-      2.5, 2.5, &filteredFixedImageData[0], 11, 11, PadOption::Constant, 0.0, m_useMultithreading);
-  image2DGaussianFilter(&movingImageData[0], m_img.width(), m_img.height(),
-      2.5, 2.5, &filteredMovingImageData[0], 11, 11, PadOption::Constant, 0.0, m_useMultithreading);
+  image2DGaussianFilter(fixedImageData.data(), m_img.width(), m_img.height(),
+      2.5, 2.5, filteredFixedImageData.data(), 11, 11, PadOption::Constant, 0.0, m_useMultithreading);
+  image2DGaussianFilter(movingImageData.data(), m_img.width(), m_img.height(),
+      2.5, 2.5, filteredMovingImageData.data(), 11, 11, PadOption::Constant, 0.0, m_useMultithreading);
 
-  //  image2DWrite(&fixedImageData[0], m_stack.width(), m_stack.height(), "/Users/feng/Downloads/fim.tif");
-  //  image2DWrite(&movingImageData[0], m_stack.width(), m_stack.height(), "/Users/feng/Downloads/mim.tif");
-  //  image2DWrite(&filteredFixedImageData[0], m_stack.width(), m_stack.height(), "/Users/feng/Downloads/ffim.tif");
-  //  image2DWrite(&filteredMovingImageData[0], m_stack.width(), m_stack.height(), "/Users/feng/Downloads/fmim.tif");
+  //  image2DWrite(fixedImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/fim.tif");
+  //  image2DWrite(movingImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/mim.tif");
+  //  image2DWrite(filteredFixedImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/ffim.tif");
+  //  image2DWrite(filteredMovingImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/fmim.tif");
 
   ZImageToImageMetric metric;
   if (m_metric == "Mean Differences")
@@ -296,9 +296,9 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
   registration.setInitialTransform(*transform);
 
   ZImg fixedImg;
-  fixedImg.wrapData(&filteredFixedImageData[0], m_img.width(), m_img.height());
+  fixedImg.wrapData(filteredFixedImageData.data(), m_img.width(), m_img.height());
   ZImg movingImg;
-  movingImg.wrapData(&filteredMovingImageData[0], m_img.width(), m_img.height());
+  movingImg.wrapData(filteredMovingImageData.data(), m_img.width(), m_img.height());
   registration.setFixedImg(fixedImg);
   registration.setMovingImg(movingImg);
   cost = registration.run();
@@ -426,15 +426,15 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
   std::vector<double> filteredFixedImageData(length);
   std::vector<double> filteredMovingImageData(length);
 
-  image2DGaussianFilter(&fixedImageData[0], m_img.width(), m_img.height(),
-      2.5, 2.5, &filteredFixedImageData[0], 11, 11, PadOption::Constant, 0.0, m_useMultithreading);
-  image2DGaussianFilter(&movingImageData[0], m_img.width(), m_img.height(),
-      2.5, 2.5, &filteredMovingImageData[0], 11, 11, PadOption::Constant, 0.0, m_useMultithreading);
+  image2DGaussianFilter(fixedImageData.data(), m_img.width(), m_img.height(),
+      2.5, 2.5, filteredFixedImageData.data(), 11, 11, PadOption::Constant, 0.0, m_useMultithreading);
+  image2DGaussianFilter(movingImageData.data(), m_img.width(), m_img.height(),
+      2.5, 2.5, filteredMovingImageData.data(), 11, 11, PadOption::Constant, 0.0, m_useMultithreading);
 
-  //  image2DWrite(&fixedImageData[0], m_stack.width(), m_stack.height(), "/Users/feng/Downloads/fim.tif");
-  //  image2DWrite(&movingImageData[0], m_stack.width(), m_stack.height(), "/Users/feng/Downloads/mim.tif");
-  //  image2DWrite(&filteredFixedImageData[0], m_stack.width(), m_stack.height(), "/Users/feng/Downloads/ffim.tif");
-  //  image2DWrite(&filteredMovingImageData[0], m_stack.width(), m_stack.height(), "/Users/feng/Downloads/fmim.tif");
+  //  image2DWrite(fixedImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/fim.tif");
+  //  image2DWrite(movingImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/mim.tif");
+  //  image2DWrite(filteredFixedImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/ffim.tif");
+  //  image2DWrite(filteredMovingImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/fmim.tif");
 
   ZImageToImageMetric metric;
   if (m_metric == "Mean Differences")
@@ -486,14 +486,14 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
 
   bool flip = false;
   ZImg fixedImg;
-  fixedImg.wrapData(&filteredFixedImageData[0], m_img.width(), m_img.height());
+  fixedImg.wrapData(filteredFixedImageData.data(), m_img.width(), m_img.height());
   ZImg movingImg;
-  movingImg.wrapData(&filteredMovingImageData[0], m_img.width(), m_img.height());
+  movingImg.wrapData(filteredMovingImageData.data(), m_img.width(), m_img.height());
   registration.setFixedImg(fixedImg);
   registration.setMovingImg(movingImg);
   double cost = registration.run();
   if (m_allowFlip) {
-    image2DFlip(&filteredMovingImageData[0], m_img.width(), m_img.height(), Dimension::X);
+    image2DFlip(filteredMovingImageData.data(), m_img.width(), m_img.height(), Dimension::X);
     std::unique_ptr<ZImageTransform> flipTransform;
     if (m_transform == "YTranslation") {
       ZImageYTranslation2DTransform *tfm = new ZImageYTranslation2DTransform();
@@ -521,7 +521,7 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
 
     LINFO() << "";
     LINFO() << "Align fixed image with flipped moving image: ";
-    movingImg.wrapData(&filteredMovingImageData[0], m_img.width(), m_img.height());
+    movingImg.wrapData(filteredMovingImageData.data(), m_img.width(), m_img.height());
     registration.setMovingImg(movingImg);
     double flipCost = registration.run();
     if (flipCost < cost) {
@@ -537,9 +537,9 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
   if (flip) {
     std::vector<ImagePixelType> buffer(m_img.planeVoxelNumber());
     for (size_t i=0; i<m_registeredImg.numChannels(); ++i) {
-      memcpy(&buffer[0], m_img.planeData<ImagePixelType>(movingImageIndex, i), m_img.planeByteNumber());
-      image2DFlip(&buffer[0], m_img.width(), m_img.height(), Dimension::X);
-      transform->transformImage(&buffer[0],
+      memcpy(buffer.data(), m_img.planeData<ImagePixelType>(movingImageIndex, i), m_img.planeByteNumber());
+      image2DFlip(buffer.data(), m_img.width(), m_img.height(), Dimension::X);
+      transform->transformImage(buffer.data(),
           m_img.width(), m_img.height(),
           m_registeredImg.planeData<ImagePixelType>(movingImageIndex, i));
     }

@@ -20,7 +20,6 @@ public:
   static ZImgIO& instance();
 
   ZImgIO();
-  ~ZImgIO();
 
   // if FileFormat is FileFormat::Unknown, use extension of filename to match correct reader or writer
   // otherwise file extension is ignored, which means you can write a tif file with '.raw' as extension...
@@ -76,10 +75,10 @@ public:
 
 protected:
   std::vector<ZImgFormat*> getSupportedReader(const QString &filename) const;
-  std::vector<ZImgFormat *> getSupportedWriter(const QString &filename) const;
+  std::vector<ZImgFormat*> getSupportedWriter(const QString &filename) const;
 
 private:
-  std::map<FileFormat, ZImgFormat*> m_ioFormats;
+  std::map<FileFormat, std::unique_ptr<ZImgFormat>> m_ioFormats;
 };
 
 } // namespace nim

@@ -211,7 +211,7 @@ void Z3DCanvasPainter::renderInportToImage(const QString &filename, Z3DEye eye)
 
   if (eye == Z3DEye::Mono) {
     // get color buffer content
-    std::unique_ptr<uint8_t[]> colorBuffer(new uint8_t[tex->bypePerPixel(dataFormat, dataType) * tex->numPixels()]);
+    auto colorBuffer = std::make_unique<uint8_t[]>(tex->bypePerPixel(dataFormat, dataType) * tex->numPixels());
     tex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
     QImage upsideDownImage(colorBuffer.get(), tex->width(), tex->height(),
                            QImage::Format_ARGB32_Premultiplied);
@@ -226,7 +226,7 @@ void Z3DCanvasPainter::renderInportToImage(const QString &filename, Z3DEye eye)
     if (!leftTex) {
       throw ZGLException("not ready to capture image");
     }
-    std::unique_ptr<uint8_t[]> colorBuffer(new uint8_t[leftTex->bypePerPixel(dataFormat, dataType) * leftTex->numPixels()]);
+    auto colorBuffer = std::make_unique<uint8_t[]>(leftTex->bypePerPixel(dataFormat, dataType) * leftTex->numPixels());
     leftTex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
     QImage sideBySideImage(tex->width() * 2, tex->height(), QImage::Format_ARGB32_Premultiplied);
     QPainter painter(&sideBySideImage);
