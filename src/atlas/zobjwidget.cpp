@@ -131,6 +131,7 @@ void ZObjWidget::createContextMenu()
 #ifdef Q_OS_WIN
   m_contextMenu->addAction(QString("Show in Explorer"), m_doc, SLOT(showSelectedObjsInGraphicalShell()));
 #endif
+  m_contextMenu->addAction(QString("Copy Full Path"), m_doc, SLOT(copySelectedObjsPathToClipboard()));
 }
 
 } // namespace nim

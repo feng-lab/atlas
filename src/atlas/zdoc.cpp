@@ -20,6 +20,7 @@
 #include "z3danimationdoc.h"
 #include "zroidoc.h"
 #include "zmeshdoc.h"
+#include <QClipboard>
 
 namespace nim {
 
@@ -522,6 +523,19 @@ void ZDoc::showSelectedObjsInGraphicalShell()
   QList<size_t> objs = m_objSelectionModel->selectedObjs();
   for (int i=0; i<objs.size(); ++i) {
     idToDoc(objs[i])->showObjInGraphicalShell(objs[i]);
+  }
+}
+
+void ZDoc::copySelectedObjsPathToClipboard()
+{
+  QList<size_t> objs = m_objSelectionModel->selectedObjs();
+  if (!objs.isEmpty()) {
+    QString path =  idToDoc(objs[0])->objPath(objs[0]);
+    for (int i=1; i<objs.size(); ++i) {
+      path += QString("\n");
+      path += idToDoc(objs[i])->objPath(objs[i]);
+    }
+     QApplication::clipboard()->setText(path);
   }
 }
 

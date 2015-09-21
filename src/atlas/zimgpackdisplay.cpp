@@ -84,7 +84,7 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
 
   if (!m_imgPack.isDiskCached()) {
 
-    ZImgDisplay display(m_imgPack.img());
+    ZImgDisplay display(m_mip ? m_imgPack.maxZProjectedImg() : m_imgPack.img());
     display.setSlice(m_z);
     display.setTime(m_t);
     display.setAlpha(m_alpha);

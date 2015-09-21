@@ -126,6 +126,7 @@ public slots:
   bool saveSelectedObjsAs();
   bool saveAllObjs();
   void showSelectedObjsInGraphicalShell();
+  void copySelectedObjsPathToClipboard();
 
 protected:
   friend class ZObjModel;
