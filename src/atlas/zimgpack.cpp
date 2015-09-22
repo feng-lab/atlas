@@ -407,6 +407,43 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
   }
 }
 
+double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, bool mip) const
+{
+  if (m_diskCached) {
+    assert(!m_ratioTileMaps.empty());
+    if (m_imgInfo.depth == 1)
+      mip = false;
+    bool hasTile = false;
+    for (size_t i=1; i<m_ratioTileMaps.size(); ++i) {
+      for (auto it = m_ratioTileMaps[i].begin(); it != m_ratioTileMaps[i].end(); ++it) {
+        if (std::get<2>(it->first) != t || std::get<3>(it->first) != z || std::get<8>(it->first) != mip)
+          continue;
+        size_t tx = std::get<4>(it->first);
+        size_t ty = std::get<5>(it->first);
+        size_t twidth = std::get<6>(it->first);
+        size_t theight = std::get<7>(it->first);
+        if (x >= tx && x < tx + twidth && y >= ty && y < ty + theight) {
+          if (i == 1)
+            hasTile = true;
+          size_t keyHash = boost::hash_value(it->first);
+          std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(keyHash);
+          if (imgPtr) {
+            return (*imgPtr)->value<double>((x-tx)/(1.0*i), (y-ty)/(1.0*i), 0, c, 0);
+          }
+        }
+      }
+    }
+    return hasTile ? value(x, y, z, c, t, mip) : 0;
+  } else {
+    if (mip) {
+      assert(!m_maximumProjectedAlongZImg.isEmpty());
+      return m_maximumProjectedAlongZImg.value<double>(x, y, 0, c, t);
+    } else {
+      return m_img.value<double>(x, y, z, c, t);
+    }
+  }
+}
+
 ZImg ZImgPack::crop(const ZImgRegion &region) const
 {
   ZImg res;

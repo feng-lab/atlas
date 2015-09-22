@@ -94,6 +94,9 @@ public:
 
   double value(size_t x, size_t y, size_t z, size_t c = 0, size_t t = 0, bool mip = false) const;
 
+  // same as value but can use low resolution image value
+  double displayValue(size_t x, size_t y, size_t z, size_t c = 0, size_t t = 0, bool mip = false) const;
+
   ZImg crop(const ZImgRegion &region) const;
 
   ZImg resizedImg(size_t width, size_t height, size_t depth, size_t t) const;
