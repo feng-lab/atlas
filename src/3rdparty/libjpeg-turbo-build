@@ -1,7 +1,7 @@
 #!/bin/bash
 
 currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
-srcDIR=$currDIR/../../../libjpeg-turbo-1.4.1
+srcDIR=$currDIR/../../../libjpeg-turbo-1.4.2
 buildDIR=$srcDIR/../__libjpeg-turbo-build
 installDIR=$currDIR/libjpeg-turbo
 numCores=$( sysctl -n hw.logicalcpu )
@@ -9,6 +9,13 @@ numCores=$( sysctl -n hw.logicalcpu )
 if [ -d $installDIR ]
 then
   rm -rf $installDIR
+fi
+
+if [ ! -d $srcDIR ]
+then
+  srcPackageDIR="/Users/feng/Google Drive/code/my"
+  srcArchive=$srcPackageDIR/libjpeg-turbo-1.4.2.tar.gz
+  tar -zxvf "$srcArchive" -C $currDIR/../../..
 fi
 
 if [ -d $buildDIR ]

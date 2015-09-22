@@ -668,6 +668,7 @@ void ZMainWindow::createDockWindows()
   m_editObjDockWidget->setWidget(m_objEditWidget);
   addDockWidget(Qt::BottomDockWidgetArea, m_editObjDockWidget);
   m_windowMenu->addAction(m_editObjDockWidget->toggleViewAction());
+  m_editObjDockWidget->setVisible(false);
 }
 
 void ZMainWindow::readSettings()

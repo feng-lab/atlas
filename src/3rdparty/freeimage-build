@@ -11,6 +11,13 @@ then
   rm -rf $installDIR
 fi
 
+if [ ! -d $srcDIR ]
+then
+  srcPackageDIR="/Users/feng/Google Drive/code/my"
+  srcArchive=$srcPackageDIR/FreeImage3170.zip
+  7z x -y -o$currDIR/../../.. "$srcArchive"
+fi
+
 cp $currDIR/freeimage-makefiles/Makefile_gnu $srcDIR/
 cp $currDIR/freeimage-makefiles/Makefile_fip $srcDIR/
 cd $srcDIR

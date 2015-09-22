@@ -11,6 +11,13 @@ then
   rm -rf $installDIR
 fi
 
+if [ ! -d $srcDIR ]
+then
+  srcPackageDIR="/Users/feng/Google Drive/code/my"
+  srcArchive=$srcPackageDIR/GeometricTools/WildMagic5p13.zip
+  7z x -y -o$currDIR/../../.. "$srcArchive"
+fi
+
 cd $srcDIR
 
 # patch to avoid error: explicit specialization of 'ZERO_TOLERANCE' after instantiation

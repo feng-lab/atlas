@@ -420,13 +420,14 @@ void ZView::keyPressEvent(QKeyEvent *event)
 {
   switch(event->key()) {
   case Qt::Key_Left:
-    if (event->modifiers() == Qt::NoModifier) {
-      if (m_normalViewAction->isChecked() && m_imgSlice->get() > 0)
+    if (event->modifiers() == Qt::NoModifier || event->modifiers() == Qt::KeypadModifier) {
+      if (m_normalViewAction->isChecked() && m_imgSlice->get() > 0) {
         m_imgSlice->set(m_imgSlice->get() - 1);
+      }
     }
     break;
   case Qt::Key_Right:
-    if (event->modifiers() == Qt::NoModifier) {
+    if (event->modifiers() == Qt::NoModifier || event->modifiers() == Qt::KeypadModifier) {
       if (m_normalViewAction->isChecked() && m_imgSlice->get() < m_imgSlice->rangeMax())
         m_imgSlice->set(m_imgSlice->get() + 1);
     }

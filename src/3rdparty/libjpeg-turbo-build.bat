@@ -1,7 +1,7 @@
 cd /d "%~dp0"
 
 set currDIR=%CD%
-set srcDIR=%currDIR%\..\..\..\libjpeg-turbo-1.4.1
+set srcDIR=%currDIR%\..\..\..\libjpeg-turbo-1.4.2
 set buildDIR=%srcDIR%\..\__libjpeg-turbo-build
 set installDIR=%currDIR%\libjpeg-turbo
 

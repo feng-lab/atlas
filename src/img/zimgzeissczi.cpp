@@ -16,6 +16,7 @@
 #include "zimgregioniterator.h"
 
 //#define DUMP_CZI_INFO
+#define NO_MIXED_TILE
 
 namespace {
 
@@ -507,6 +508,45 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
       subBlocks->resize(infos.size());
       for (size_t s=0; s<infos.size(); ++s) {
         std::vector<CZITile> tiles;
+#ifdef NO_MIXED_TILE
+        bool hasMissingTiles = false;
+
+        size_t currnetRatio = 0;
+        int currentX = -1;
+        int currentY = -1;
+        int currentZ = -1;
+        int currentT = -1;
+        for (auto it = m_sceneTiles[s].cbegin(); it != m_sceneTiles[s].cend(); ++it) {
+          const CZITile &tile = *it;
+          if (currnetRatio < size_t(1) || tile.ratio != currnetRatio || tile.start.x != currentX || tile.start.y != currentY ||
+              tile.start.z != currentZ || tile.start.t != currentT) {
+            if (tiles.size() > infos[s].numChannels) {
+              throw ZIOException("invalid tiles: too many channels");
+            } else if (tiles.size() == infos[s].numChannels) {
+              subBlocks->at(s).emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles));
+            } else if (!tiles.empty()) {
+              hasMissingTiles = true;
+              subBlocks->at(s).emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles, true, infos[s].numChannels, infos[s].bytesPerVoxel,
+                                                                              infos[s].voxelFormat));
+            }
+            tiles.clear();
+            currnetRatio = tile.ratio;
+            currentX = tile.start.x;
+            currentY = tile.start.y;
+            currentZ = tile.start.z;
+            currentT = tile.start.t;
+          }
+          tiles.push_back(tile);
+        }
+        if (!tiles.empty()) {
+          subBlocks->at(s).emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles));
+          tiles.clear();
+        }
+
+        if (hasMissingTiles) {
+          LINFO() << "scene" << s << "has missing tiles";
+        }
+#else
         std::set<CZITile, MixedTilesSort> allMixedTiles;
 
         // if image tiles can be grouped into multiple channel tiles (tiles has same location and size but different channel), we
@@ -593,6 +633,7 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
                                                                             infos[s].voxelFormat));
           }
         }
+#endif
       }
     }
     if (pyramidalRatios) {

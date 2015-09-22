@@ -11,6 +11,13 @@ then
   rm -rf $installDIR
 fi
 
+if [ ! -d $srcDIR ]
+then
+  srcPackageDIR="/Users/feng/Google Drive/code/my"
+  srcArchive=$srcPackageDIR/hdf5-1.8.15-patch1.tar.bz2
+  tar -jxvf "$srcArchive" -C $currDIR/../../..
+fi
+
 if [ -d $buildDIR ]
 then
   rm -rf $buildDIR
