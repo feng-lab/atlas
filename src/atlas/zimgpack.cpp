@@ -359,7 +359,7 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs, std
         imgPtr = new std::shared_ptr<ZImg>(new ZImg());
         **imgPtr = it->second->read();
         imgs.push_back(*imgPtr);
-        ZImgCacheInstance.insert(keyHash, imgPtr, (*imgPtr)->byteNumber() / 1024 / 1024);
+        ZImgCacheInstance.insert(keyHash, imgPtr, std::max(size_t(1), (*imgPtr)->byteNumber() / 1024 / 1024));
       }
       locs.push_back(QPoint(x, y));
       scales.push_back(readRatio);
@@ -377,6 +377,7 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
     for (auto it = m_ratioTileMaps[1].begin(); it != m_ratioTileMaps[1].end(); ++it) {
       if (std::get<2>(it->first) != t || std::get<3>(it->first) != z || std::get<8>(it->first) != mip)
         continue;
+      assert(std::get<4>(it->first) >= 0 && std::get<5>(it->first) >= 0);
       size_t tx = std::get<4>(it->first);
       size_t ty = std::get<5>(it->first);
       size_t twidth = std::get<6>(it->first);
@@ -391,7 +392,7 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
           imgPtr = new std::shared_ptr<ZImg>(new ZImg());
           **imgPtr = it->second->read();
           double retval = (*imgPtr)->value<double>(x-tx, y-ty, 0, c, 0);
-          ZImgCacheInstance.insert(keyHash, imgPtr, (*imgPtr)->byteNumber() / 1024 / 1024);
+          ZImgCacheInstance.insert(keyHash, imgPtr, std::max(size_t(1), (*imgPtr)->byteNumber() / 1024 / 1024));
           return retval;
         }
       }
@@ -414,21 +415,23 @@ double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, 
     if (m_imgInfo.depth == 1)
       mip = false;
     bool hasTile = false;
+    int64_t ix = x;
+    int64_t iy = y;
     for (size_t i=1; i<m_ratioTileMaps.size(); ++i) {
       for (auto it = m_ratioTileMaps[i].begin(); it != m_ratioTileMaps[i].end(); ++it) {
         if (std::get<2>(it->first) != t || std::get<3>(it->first) != z || std::get<8>(it->first) != mip)
           continue;
-        size_t tx = std::get<4>(it->first);
-        size_t ty = std::get<5>(it->first);
-        size_t twidth = std::get<6>(it->first);
-        size_t theight = std::get<7>(it->first);
-        if (x >= tx && x < tx + twidth && y >= ty && y < ty + theight) {
+        int64_t tx = std::get<4>(it->first);
+        int64_t ty = std::get<5>(it->first);
+        int64_t twidth = std::get<6>(it->first);
+        int64_t theight = std::get<7>(it->first);
+        if (ix >= tx && ix < tx + twidth && iy >= ty && iy < ty + theight) {
           if (i == 1)
             hasTile = true;
           size_t keyHash = boost::hash_value(it->first);
           std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(keyHash);
           if (imgPtr) {
-            return (*imgPtr)->value<double>((x-tx)/(1.0*i), (y-ty)/(1.0*i), 0, c, 0);
+            return (*imgPtr)->value<double>((ix-tx)/(1.0*i), (iy-ty)/(1.0*i), 0, c, 0);
           }
         }
       }
@@ -496,7 +499,7 @@ ZImg ZImgPack::crop(const ZImgRegion &region) const
       imgPtr = new std::shared_ptr<ZImg>(new ZImg());
       **imgPtr = it->second->read();
       res.pasteImg(*imgPtr->get(), start);
-      ZImgCacheInstance.insert(keyHash, imgPtr, (*imgPtr)->byteNumber() / 1024 / 1024);
+      ZImgCacheInstance.insert(keyHash, imgPtr, std::max(size_t(1), (*imgPtr)->byteNumber() / 1024 / 1024));
     }
   }
 
@@ -610,7 +613,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
     } else {
       m_ratioTileMaps[ratio][key] = std::make_shared<ZImgPackSubBlock>(m_imgSource, t, z, key);;
     }
-    ZImgCacheInstance.insert(boost::hash_value(key), new std::shared_ptr<ZImg>(img), img->byteNumber() / 1024 / 1024);
+    ZImgCacheInstance.insert(boost::hash_value(key), new std::shared_ptr<ZImg>(img), std::max(size_t(1), img->byteNumber() / 1024 / 1024));
     return;
   }
 
@@ -638,7 +641,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
       }
       img->save(fn);
       m_ratioTileMaps[level][key] = std::make_shared<ZImgPackSubBlock>(fn, key);
-      ZImgCacheInstance.insert(boost::hash_value(key), new std::shared_ptr<ZImg>(img), img->byteNumber() / 1024 / 1024);
+      ZImgCacheInstance.insert(boost::hash_value(key), new std::shared_ptr<ZImg>(img), std::max(size_t(1), img->byteNumber() / 1024 / 1024));
       break;
     } else {
       for (size_t x=0; x<numX; ++x) {
@@ -663,7 +666,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
           }
           m_ratioTileMaps[level][key] = std::make_shared<ZImgPackSubBlock>(fn, key);
           cropped->save(fn);
-          ZImgCacheInstance.insert(boost::hash_value(key), new std::shared_ptr<ZImg>(cropped), cropped->byteNumber() / 1024 / 1024);
+          ZImgCacheInstance.insert(boost::hash_value(key), new std::shared_ptr<ZImg>(cropped), std::max(size_t(1), cropped->byteNumber() / 1024 / 1024));
         }
       }
 
@@ -796,7 +799,7 @@ ZImg ZImgPack::assembleImg(size_t ratio) const
     size_t z = std::get<3>(it->first);
     int64_t x = std::get<4>(it->first);
     int64_t y = std::get<5>(it->first);
-    ZVoxelCoordinate start(std::ceil(x / double(ratio)), std::ceil(y / double(ratio)), z, 0, t);
+    ZVoxelCoordinate start(x / double(ratio), y / double(ratio), z, 0, t);
 
     size_t keyHash = boost::hash_value(it->first);
     std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(keyHash);
@@ -807,7 +810,7 @@ ZImg ZImgPack::assembleImg(size_t ratio) const
       imgPtr = new std::shared_ptr<ZImg>(new ZImg());
       **imgPtr = it->second->read();
       res.pasteImg(*imgPtr->get(), start);
-      ZImgCacheInstance.insert(keyHash, imgPtr, (*imgPtr)->byteNumber() / 1024 / 1024);
+      ZImgCacheInstance.insert(keyHash, imgPtr, std::max(size_t(1), (*imgPtr)->byteNumber() / 1024 / 1024));
     }
   }
   //LINFO() << "end assemble level" << level;
@@ -835,7 +838,7 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t) const
     size_t z = std::get<3>(it->first);
     int64_t x = std::get<4>(it->first);
     int64_t y = std::get<5>(it->first);
-    ZVoxelCoordinate start(std::ceil(x / double(ratio)), std::ceil(y / double(ratio)), z, 0, 0);
+    ZVoxelCoordinate start(x / double(ratio), y / double(ratio), z, 0, 0);
 
     size_t keyHash = boost::hash_value(it->first);
     std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(keyHash);
@@ -846,7 +849,7 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t) const
       imgPtr = new std::shared_ptr<ZImg>(new ZImg());
       **imgPtr = it->second->read();
       res.pasteImg(*imgPtr->get(), start);
-      ZImgCacheInstance.insert(keyHash, imgPtr, (*imgPtr)->byteNumber() / 1024 / 1024);
+      ZImgCacheInstance.insert(keyHash, imgPtr, std::max(size_t(1), (*imgPtr)->byteNumber() / 1024 / 1024));
     }
   }
   //LINFO() << "end assemble level" << level;
@@ -875,7 +878,7 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t, size_t z) const
       continue;
     int64_t x = std::get<4>(it->first);
     int64_t y = std::get<5>(it->first);
-    ZVoxelCoordinate start(std::ceil(x / double(ratio)), std::ceil(y / double(ratio)), 0, 0, 0);
+    ZVoxelCoordinate start(x / double(ratio), y / double(ratio), 0, 0, 0);
 
     size_t keyHash = boost::hash_value(it->first);
     std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(keyHash);
@@ -886,7 +889,7 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t, size_t z) const
       imgPtr = new std::shared_ptr<ZImg>(new ZImg());
       **imgPtr = it->second->read();
       res.pasteImg(*imgPtr->get(), start);
-      ZImgCacheInstance.insert(keyHash, imgPtr, (*imgPtr)->byteNumber() / 1024 / 1024);
+      ZImgCacheInstance.insert(keyHash, imgPtr, std::max(size_t(1), (*imgPtr)->byteNumber() / 1024 / 1024));
     }
   }
   return res;
