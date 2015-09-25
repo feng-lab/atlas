@@ -18,6 +18,7 @@
 #include <QToolButton>
 #include <QStatusBar>
 #include <QDesktopServices>
+#include <QProcess>
 
 #include "zmainwindow.h"
 #include "zdoc.h"
@@ -46,15 +47,21 @@
 #include "zregionannotationdoc.h"
 #include "zregionannotationview.h"
 
+#ifdef Q_OS_OSX
+void qt_mac_set_dock_menu(QMenu *menu);
+#endif
+
 namespace nim {
 
 ZMainWindow::ZMainWindow()
   : QMainWindow()
   , m_3dWindow(nullptr)
   , m_isClosed(false)
+  , m_versionString(__DATE__)
 {
   init();
-  setCurrentFile("");
+  setWindowTitle(QString("Atlas ver. %1").arg(m_versionString));
+  //setCurrentFile("");
 }
 
 void ZMainWindow::initOpenglContext()
@@ -143,6 +150,11 @@ void ZMainWindow::openEditWidget(size_t id)
   }
 }
 
+//void ZMainWindow::appAboutToQuit()
+//{
+//  fftw_cleanup_threads();
+//}
+
 void ZMainWindow::closeEvent(QCloseEvent *event)
 {
   // Qt 5.4 mac bug, use dock icon context menu -> quit will call this function twice and crash
@@ -205,15 +217,16 @@ void ZMainWindow::dropEvent(QDropEvent *event)
     m_doc->loadFileList(fileList);
 }
 
-void ZMainWindow::newWindow()
-{
-  ZMainWindow *other = new ZMainWindow();
-  other->move(x() + 40, y() + 40);
-  other->show();
-}
+//void ZMainWindow::newWindow()
+//{
+//  ZMainWindow *other = new ZMainWindow();
+//  other->move(x() + 40, y() + 40);
+//  other->show();
+//}
 
 void ZMainWindow::open()
 {
+  /*
   QString fileName = QFileDialog::getOpenFileName(this, tr("Open Workspace"),
                                                   "/");
   if (!fileName.isEmpty()) {
@@ -234,6 +247,7 @@ void ZMainWindow::open()
       other->loadWorkspace(fileName);
     }
   }
+  */
 }
 
 bool ZMainWindow::save()
@@ -265,7 +279,7 @@ void ZMainWindow::about()
                      QString("<p>Atlas ver. %1</p>"
                              "<p>Atlas is developed by Linqing Feng (flq@live.com).</p>"
                              "<p>Jinny Kim's Lab, Center for Functional Connectomics, Korea Institute of Science and Technology</p>"
-                             "<p>All rights reserved.</p>").arg(__DATE__));
+                             "<p>All rights reserved.</p>").arg(m_versionString));
 }
 
 void ZMainWindow::activateWindowIfNot()
@@ -305,7 +319,7 @@ void ZMainWindow::open3DWindow()
     try {
       if (!m_3dWindow) {
         m_3dWindow = new Z3DMainWindow(m_doc, *this, false);
-        m_3dWindow->setWindowTitle("3D View");
+        m_3dWindow->setWindowTitle(QString("3D View  %1").arg(windowTitle()));
         connect(m_3dWindow, SIGNAL(loadScene()), this, SLOT(loadScene()));
         connect(m_3dWindow, SIGNAL(saveScene()), this, SLOT(saveScene()));
         connect(m_3dWindow, SIGNAL(loadJsonScene(QString)), this, SLOT(loadJsonScene(QString)));
@@ -391,6 +405,18 @@ void ZMainWindow::loadJsonScene(const QString &fn)
   }
 }
 
+void ZMainWindow::openNewInstance()
+{
+#ifdef Q_OS_OSX
+  QDir dir = QDir(QCoreApplication::applicationDirPath());
+  dir.cdUp();
+  dir.cdUp();
+  QProcess process;
+  process.start("open", QStringList() << "-n" << dir.absolutePath());
+  process.waitForFinished();
+#endif
+}
+
 void ZMainWindow::init()
 {
   setAttribute(Qt::WA_DeleteOnClose);
@@ -442,24 +468,24 @@ void ZMainWindow::init()
 void ZMainWindow::createActions()
 {
   // file
-  m_newAction = new QAction(QIcon(":/icons/file-512.png"), tr("&New"), this);
-  m_newAction->setShortcuts(QKeySequence::New);
-  m_newAction->setStatusTip(tr("Open a new window"));
-  connect(m_newAction, SIGNAL(triggered()), this, SLOT(newWindow()));
+//  m_newAction = new QAction(QIcon(":/icons/file-512.png"), tr("&New"), this);
+//  m_newAction->setShortcuts(QKeySequence::New);
+//  m_newAction->setStatusTip(tr("Open a new window"));
+//  connect(m_newAction, SIGNAL(triggered()), this, SLOT(newWindow()));
 
   m_openAction = new QAction(QIcon(":/icons/folder-512.png"), tr("&Open..."), this);
   m_openAction->setShortcuts(QKeySequence::Open);
-  m_openAction->setStatusTip(tr("Open an existing file"));
-  connect(m_openAction, SIGNAL(triggered()), this, SLOT(open()));
+  m_openAction->setStatusTip(tr("Open an existing scene file"));
+  connect(m_openAction, SIGNAL(triggered()), this, SLOT(loadScene()));
 
   m_saveAction = new QAction(QIcon(":/icons/save-512.png"), tr("&Save"), this);
   m_saveAction->setShortcuts(QKeySequence::Save);
-  m_saveAction->setStatusTip(tr("Save the document to disk"));
+  m_saveAction->setStatusTip(tr("Save unsaved objects to disk"));
   connect(m_saveAction, SIGNAL(triggered()), this, SLOT(save()));
 
   m_saveAsAction = new QAction(QIcon(":/icons/save_as-512.png"), tr("Save &As..."), this);
   m_saveAsAction->setShortcuts(QKeySequence::SaveAs);
-  m_saveAsAction->setStatusTip(tr("Save the document under a new name"));
+  m_saveAsAction->setStatusTip(tr("Save selected objects under a new name"));
   connect(m_saveAsAction, SIGNAL(triggered()), this, SLOT(saveAs()));
 
   m_loadSceneAction = new QAction(tr("Load &Scene..."), this);
@@ -519,12 +545,15 @@ void ZMainWindow::createActions()
   m_runCustomCommandAction = new QAction(QIcon(":/icons/run_command-512.png"), tr("&Run Custom Command"), this);
   m_runCustomCommandAction->setStatusTip(tr("Run Custom Command"));
   connect(m_runCustomCommandAction, SIGNAL(triggered()), this, SLOT(runCustomCommand()));
+
+  m_openNewInstanceAction = new QAction(tr("Open Additional Instance of Atlas"), this);
+  connect(m_openNewInstanceAction, SIGNAL(triggered()), this, SLOT(openNewInstance()));
 }
 
 void ZMainWindow::createMenus()
 {
   m_fileMenu = menuBar()->addMenu(tr("&File"));
-  m_fileMenu->addAction(m_newAction);
+  //m_fileMenu->addAction(m_newAction);
   m_fileMenu->addAction(m_openAction);
   m_fileMenu->addAction(m_saveAction);
   m_fileMenu->addAction(m_saveAsAction);
@@ -580,13 +609,19 @@ void ZMainWindow::createMenus()
   m_helpMenu->addAction(m_testAction);
 #endif
   m_helpMenu->addAction(m_runCustomCommandAction);
+
+  m_dockMenu = new QMenu(this);
+  m_dockMenu->addAction(m_openNewInstanceAction);
+#ifdef Q_OS_OSX
+  qt_mac_set_dock_menu(m_dockMenu);
+#endif
 }
 
 void ZMainWindow::createToolBars()
 {
   QSize iconSize(22,22);
   m_fileToolBar = addToolBar(tr("File"));
-  m_fileToolBar->addAction(m_newAction);
+  //m_fileToolBar->addAction(m_newAction);
   m_fileToolBar->addAction(m_openAction);
   m_fileToolBar->addAction(m_saveAction);
   //const QList<QAction*> &loadFileActList = m_doc->loadFileActions();
@@ -692,32 +727,32 @@ bool ZMainWindow::maybeSave()
   return m_doc->saveOrDiscard(m_doc->objs());
 }
 
-void ZMainWindow::loadWorkspace(const QString &fileName)
-{
-  setCurrentFile(fileName);
-  statusBar()->showMessage(tr("Workspace loaded"), 2000);
-  activateWindowIfNot();
-}
+//void ZMainWindow::loadWorkspace(const QString &fileName)
+//{
+//  setCurrentFile(fileName);
+//  statusBar()->showMessage(tr("Workspace loaded"), 2000);
+//  activateWindowIfNot();
+//}
 
-bool ZMainWindow::saveFile(const QString &fileName)
-{
-  setCurrentFile(fileName);
-  statusBar()->showMessage(tr("Workspace saved"), 2000);
-  return true;
-}
+//bool ZMainWindow::saveFile(const QString &fileName)
+//{
+//  setCurrentFile(fileName);
+//  statusBar()->showMessage(tr("Workspace saved"), 2000);
+//  return true;
+//}
 
-void ZMainWindow::setCurrentFile(const QString &fileName)
-{
-  static int sequenceNumber = 1;
+//void ZMainWindow::setCurrentFile(const QString &fileName)
+//{
+//  static int sequenceNumber = 1;
 
-  if (fileName.isEmpty()) {
-    setWindowFilePath(tr("Workspace%1").arg(sequenceNumber++));
-  } else {
-    setWindowFilePath(QFileInfo(fileName).canonicalFilePath());
-  }
+//  if (fileName.isEmpty()) {
+//    setWindowFilePath(tr("Workspace%1").arg(sequenceNumber++));
+//  } else {
+//    setWindowFilePath(QFileInfo(fileName).canonicalFilePath());
+//  }
 
-  setWindowModified(false);
-}
+//  setWindowModified(false);
+//}
 
 QString ZMainWindow::strippedName(const QString &fullFileName)
 {

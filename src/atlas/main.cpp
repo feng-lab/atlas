@@ -207,6 +207,8 @@ int main(int argc, char *argv[])
       LINFO() << ippSetCpuFeatures(featureMask);
     }
   }
+
+  // pointer to static data, no need to delete
   const IppLibraryVersion* ippVer = ippiGetLibVersion();
   LINFO() << "IPP:" << ippVer->Name << ippVer->Version << ippVer->major << ippVer->minor << ippVer->majorBuild << ippVer->build;
   LINFO() << "";
@@ -225,6 +227,7 @@ int main(int argc, char *argv[])
   //qApp->installEventFilter(new MacEventFilter(qApp));
 #endif
 
+  // Our MainWindow has Qt::WA_DeleteOnClose attribute, don't delete again.
   nim::ZMainWindow *mainWin = new nim::ZMainWindow();
   mainWin->show();
   mainWin->initOpenglContext();

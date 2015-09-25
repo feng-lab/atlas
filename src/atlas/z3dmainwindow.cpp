@@ -229,17 +229,17 @@ void Z3DMainWindow::createActions()
   // file
   m_openAction = new QAction(QIcon(":/icons/folder-512.png"), tr("&Open..."), this);
   m_openAction->setShortcuts(QKeySequence::Open);
-  m_openAction->setStatusTip(tr("Open an existing file"));
-  connect(m_openAction, SIGNAL(triggered()), this, SLOT(open()));
+  m_openAction->setStatusTip(tr("Open an existing scene file"));
+  connect(m_openAction, SIGNAL(triggered()), this, SIGNAL(loadScene()));
 
   m_saveAction = new QAction(QIcon(":/icons/save-512.png"), tr("&Save"), this);
   m_saveAction->setShortcuts(QKeySequence::Save);
-  m_saveAction->setStatusTip(tr("Save the document to disk"));
+  m_saveAction->setStatusTip(tr("Save unsaved objects to disk"));
   connect(m_saveAction, SIGNAL(triggered()), this, SLOT(save()));
 
   m_saveAsAction = new QAction(QIcon(":/icons/save_as-512.png"), tr("Save &As..."), this);
   m_saveAsAction->setShortcuts(QKeySequence::SaveAs);
-  m_saveAsAction->setStatusTip(tr("Save the document under a new name"));
+  m_saveAsAction->setStatusTip(tr("Save selected objects under a new name"));
   connect(m_saveAsAction, SIGNAL(triggered()), this, SLOT(saveAs()));
 
   m_loadSceneAction = new QAction(tr("Load &Scene..."), this);

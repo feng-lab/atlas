@@ -30,6 +30,7 @@ public:
 
 public slots:
   void openEditWidget(size_t id);
+  //void appAboutToQuit();
 
 protected:
   void closeEvent(QCloseEvent *event);
@@ -37,7 +38,7 @@ protected:
   void dropEvent(QDropEvent *event);
 
 private slots:
-  void newWindow();
+  //void newWindow();
   void open();
   bool save();
   bool saveAs();
@@ -61,6 +62,8 @@ private slots:
 
   void loadJsonScene(const QString &fn);
 
+  void openNewInstance();
+
 private:
   void init();
   void createActions();
@@ -72,10 +75,9 @@ private:
 
   void writeSettings();
   bool maybeSave();
-  void loadWorkspace(const QString &fileName);
-
-  bool saveFile(const QString &fileName);
-  void setCurrentFile(const QString &fileName);
+  //void loadWorkspace(const QString &fileName);
+  //bool saveFile(const QString &fileName);
+  //void setCurrentFile(const QString &fileName);
   QString strippedName(const QString &fullFileName);
   ZMainWindow *findMainWindow(const QString &fileName);
 
@@ -88,6 +90,7 @@ private:
   QMenu *m_animationMenu;
   QMenu *m_windowMenu;
   QMenu *m_helpMenu;
+  QMenu *m_dockMenu;
   QToolBar *m_fileToolBar;
   QToolBar *m_editToolBar;
   QToolBar *m_viewToolBar;
@@ -95,7 +98,7 @@ private:
   QToolBar *m_roiToolBar;
   QToolBar *m_helpToolBar;
 
-  QAction *m_newAction;
+  //QAction *m_newAction;
   QAction *m_openAction;
   QAction *m_saveAction;
   QAction *m_saveAsAction;
@@ -119,6 +122,8 @@ private:
   QAction *m_open3DViewAction;
   QAction *m_screenShotAction;
 
+  QAction *m_openNewInstanceAction;
+
   QDockWidget *m_objectsDockWidget;
   QDockWidget *m_viewSettingDockWidget;
   QDockWidget *m_captureDockWidget;
@@ -135,6 +140,8 @@ private:
   Z3DMainWindow *m_3dWindow;
 
   bool m_isClosed;
+
+  QString m_versionString;
 };
 
 } // namespace nim
