@@ -1,6 +1,6 @@
 #include "z3dboundedfilter.h"
 
-#include <Wm5DistLine3Ray3.h>
+#include "Mathematics/GteDistLineRay.h"
 #ifndef _QT4_
 #include <QtMath>  // for M_PI
 #else
@@ -289,22 +289,20 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent *e, int w, int h)
       glm::vec3 v1, v2;
       rayUnderScreenPoint(v1, v2, e->x(), e->y(), w, h);
       v2 -= v1;
-      Wm5::Ray3f ray(Wm5::Vector3f(v1.x,v1.y,v1.z), Wm5::Vector3f(v2.x,v2.y,v2.z));
+      gte::Ray<3,float> ray(gte::Vector<3,float>{v1.x,v1.y,v1.z}, gte::Vector<3,float>{v2.x,v2.y,v2.z});
+      gte::DCPLineRay<3, float> dist;
       if (m_selectedHandle == 2) {
-        Wm5::Line3f xLine(Wm5::Vector3f(m_startMouseWorldPos.x,m_startMouseWorldPos.y,m_startMouseWorldPos.z), Wm5::Vector3f(1,0,0));
-        Wm5::DistLine3Ray3f dist(xLine, ray);
-        dist.GetSquared();
-        m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(dist.GetLineParameter(), 0, 0));
+        gte::Line<3,float> xLine(gte::Vector<3,float>{m_startMouseWorldPos.x,m_startMouseWorldPos.y,m_startMouseWorldPos.z}, gte::Vector<3,float>{1,0,0});
+        auto result = dist(xLine, ray);
+        m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(result.parameter[0], 0, 0));
       } else if (m_selectedHandle == 3) {
-        Wm5::Line3f xLine(Wm5::Vector3f(m_startMouseWorldPos.x,m_startMouseWorldPos.y,m_startMouseWorldPos.z), Wm5::Vector3f(0,1,0));
-        Wm5::DistLine3Ray3f dist(xLine, ray);
-        dist.GetSquared();
-        m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(0, dist.GetLineParameter(), 0));
+        gte::Line<3,float> xLine(gte::Vector<3,float>{m_startMouseWorldPos.x,m_startMouseWorldPos.y,m_startMouseWorldPos.z}, gte::Vector<3,float>{0,1,0});
+        auto result = dist(xLine, ray);
+        m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(0, result.parameter[0], 0));
       } else if (m_selectedHandle == 4) {
-        Wm5::Line3f xLine(Wm5::Vector3f(m_startMouseWorldPos.x,m_startMouseWorldPos.y,m_startMouseWorldPos.z), Wm5::Vector3f(0,0,1));
-        Wm5::DistLine3Ray3f dist(xLine, ray);
-        dist.GetSquared();
-        m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(0, 0, dist.GetLineParameter()));
+        gte::Line<3,float> xLine(gte::Vector<3,float>{m_startMouseWorldPos.x,m_startMouseWorldPos.y,m_startMouseWorldPos.z}, gte::Vector<3,float>{0,0,1});
+        auto result = dist(xLine, ray);
+        m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(0, 0, result.parameter[0]));
       }
     }
     m_lastMousePosition = glm::ivec2(e->x(), e->y());

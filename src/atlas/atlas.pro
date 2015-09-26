@@ -579,8 +579,8 @@ exists(/opt/intel/tbb/include) {
       -lvtkCommonMath-$$VTKVersion -lvtkCommonCore-$$VTKVersion -lvtksys-$$VTKVersion
 
     WildMagicSDKPath = $$PWD/../3rdparty/wildmagic
-    INCLUDEPATH += $$WildMagicSDKPath/Include
-    LIBS += $$WildMagicSDKPath/Library/Release/libWm5Mathematics.a $$WildMagicSDKPath/Library/Release/libWm5Core.a
+    INCLUDEPATH += $$WildMagicSDKPath/include
+    LIBS += $$WildMagicSDKPath/lib/libGTEngine.a
 
     JpegPath = $$PWD/../3rdparty/libjpeg-turbo
     INCLUDEPATH += $$JpegPath/include

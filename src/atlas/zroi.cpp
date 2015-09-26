@@ -2,7 +2,7 @@
 
 #include "QsLog.h"
 #include <cmath>
-#include <Wm5NaturalSpline2.h>
+#include <Mathematics/GteNaturalSplineCurve.h>
 #include "zsaturateoperation.h"
 #include <QFile>
 #include "zglmutils.h"
@@ -23,41 +23,46 @@ QPainterPath splineToQPainterPath(const QPolygonF& spline, bool showLastSeg = tr
   }
 
   int numSegments = spline.size() - 1;
-  double *times = new double[numSegments+1];
-  Wm5::Vector2d *points = new Wm5::Vector2d[numSegments+1];
-  memcpy(points, spline.data(), sizeof(Wm5::Vector2d) * spline.size());
-
+  std::vector<double> times(spline.size());
   times[0] = 0;
-  for (int i=1; i<numSegments+1; ++i) {
-    times[i] = times[i-1] + (points[i] - points[i-1]).Length();
-    //times[i] = times[i-1] + 1;
+  for (size_t i=1; i<times.size(); ++i) {
+    times[i] = times[i-1] + std::sqrt(QPointF::dotProduct(spline[i]-spline[i-1], spline[i]-spline[i-1]));
   }
+
   if (isClosed) {
-    Wm5::NaturalSpline2d splineCurve(Wm5::NaturalSpline2d::BT_CLOSED, numSegments, times, points);
+    gte::NaturalSplineCurve<2,double> splineCurve(false, spline.size(), (gte::Vector<2,double> const*)spline.data(), times.data());
     res.moveTo(spline[0]);
     int endSeg = showLastSeg ? numSegments : numSegments - 1;
     for (int i=0; i<endSeg; ++i) {
-      Wm5::Vector2d m0 = splineCurve.GetFirstDerivative(times[i]);
-      Wm5::Vector2d m1 = splineCurve.GetFirstDerivative(times[i+1]);
+      gte::Vector<2,double> values0[4];
+      gte::Vector<2,double> values1[4];
+      splineCurve.Evaluate(times[i], 1, values0);
+      splineCurve.Evaluate(times[i+1], 1, values1);
+      gte::Vector<2,double> &m0 = values0[1];
+      gte::Vector<2,double> &m1 = values1[1];
       m0 *= times[i+1] - times[i];
       m1 *= times[i+1] - times[i];
       //LINFO() << m0.X() << m0.Y() << m1.X() << m1.Y() << cspline[i] << cspline[i+1];
-      res.cubicTo(spline[i].x() + 1./3.*m0.X(), spline[i].y() + 1./3.*m0.Y(),
-                  spline[i+1].x() - 1./3.*m1.X(), spline[i+1].y() - 1./3.*m1.Y(),
+      res.cubicTo(spline[i].x() + 1./3.*m0[0], spline[i].y() + 1./3.*m0[1],
+                  spline[i+1].x() - 1./3.*m1[0], spline[i+1].y() - 1./3.*m1[1],
           spline[i+1].x(), spline[i+1].y());
     }
   } else {
-    Wm5::NaturalSpline2d splineCurve(Wm5::NaturalSpline2d::BT_FREE, numSegments, times, points);
+    gte::NaturalSplineCurve<2,double> splineCurve(true, spline.size(), (gte::Vector<2,double> const*)spline.data(), times.data());
     res.moveTo(spline[0]);
     int endSeg = showLastSeg ? numSegments : numSegments - 1;
     for (int i=0; i<endSeg; ++i) {
-      Wm5::Vector2d m0 = splineCurve.GetFirstDerivative(times[i]);
-      Wm5::Vector2d m1 = splineCurve.GetFirstDerivative(times[i+1]);
+      gte::Vector<2,double> values0[4];
+      gte::Vector<2,double> values1[4];
+      splineCurve.Evaluate(times[i], 1, values0);
+      splineCurve.Evaluate(times[i+1], 1, values1);
+      gte::Vector<2,double> &m0 = values0[1];
+      gte::Vector<2,double> &m1 = values1[1];
       m0 *= times[i+1] - times[i];
       m1 *= times[i+1] - times[i];
       //LINFO() << m0.X() << m0.Y() << m1.X() << m1.Y() << cspline[i] << cspline[i+1];
-      res.cubicTo(spline[i].x() + 1./3.*m0.X(), spline[i].y() + 1./3.*m0.Y(),
-                  spline[i+1].x() - 1./3.*m1.X(), spline[i+1].y() - 1./3.*m1.Y(),
+      res.cubicTo(spline[i].x() + 1./3.*m0[0], spline[i].y() + 1./3.*m0[1],
+                  spline[i+1].x() - 1./3.*m1[0], spline[i+1].y() - 1./3.*m1[1],
           spline[i+1].x(), spline[i+1].y());
     }
   }

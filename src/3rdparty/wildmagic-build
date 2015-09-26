@@ -1,7 +1,7 @@
 #!/bin/bash
 
 currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
-srcDIR=$currDIR/../../../GeometricTools/WildMagic5
+srcDIR=$currDIR/../../../GeometricTools/GTEngine
 buildDIR=$srcDIR/../__wildmagic-build
 installDIR=$currDIR/wildmagic
 numCores=$( sysctl -n hw.logicalcpu )
@@ -14,32 +14,63 @@ fi
 if [ ! -d $srcDIR ]
 then
   srcPackageDIR="/Users/feng/Google Drive/code/my"
-  srcArchive=$srcPackageDIR/GeometricTools/WildMagic5p13.zip
+  srcArchive=$srcPackageDIR/GeometricTools/GeometricToolsEngine2p0.zip
   7z x -y -o$currDIR/../../.. "$srcArchive"
 fi
 
 cd $srcDIR
 
-# patch to avoid error: explicit specialization of 'ZERO_TOLERANCE' after instantiation
-sed -i.bak 's/Mathf::ZERO_TOLERANCE/1e-06f/' $srcDIR/LibMathematics/Algebra/Wm5AVector.h
-sed -i.bak 's/Mathf::ZERO_TOLERANCE/1e-06f/' $srcDIR/LibMathematics/Algebra/Wm5HPlane.h
-sed -i.bak 's/Mathf::ZERO_TOLERANCE/1e-06f/' $srcDIR/LibMathematics/Algebra/Wm5HQuaternion.h
+# xcodebuild -project GTEngine.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 CLANG_CXX_LANGUAGE_STANDARD=c++14 -showBuildSettings
 
-cd LibCore
-chmod +x *.sh
-xcodebuild -project LibCore.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 OTHER_CPLUSPLUSFLAGS="-std=c++14 -stdlib=libc++"
-cd ..
+xcodebuild -project GTEngine.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 CLANG_CXX_LANGUAGE_STANDARD=c++14
 
-cd LibMathematics
-chmod +x *.sh
-xcodebuild -project LibMathematics.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 OTHER_CPLUSPLUSFLAGS="-std=c++14 -stdlib=libc++"
-cd ..
-
-cp -R $srcDIR/SDK/ $installDIR
-
-#unpatch
-mv -f $srcDIR/LibMathematics/Algebra/Wm5AVector.h.bak $srcDIR/LibMathematics/Algebra/Wm5AVector.h
-mv -f $srcDIR/LibMathematics/Algebra/Wm5HPlane.h.bak $srcDIR/LibMathematics/Algebra/Wm5HPlane.h
-mv -f $srcDIR/LibMathematics/Algebra/Wm5HQuaternion.h.bak $srcDIR/LibMathematics/Algebra/Wm5HQuaternion.h
+mkdir $installDIR
+mkdir $installDIR/lib
+cp $srcDIR/build/Default/*.a $installDIR/lib
+cp -R $srcDIR/Include/ $installDIR/include
 
 cd $currDIR
+
+# currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
+# srcDIR=$currDIR/../../../GeometricTools/WildMagic5
+# buildDIR=$srcDIR/../__wildmagic-build
+# installDIR=$currDIR/wildmagic
+# numCores=$( sysctl -n hw.logicalcpu )
+
+# if [ -d $installDIR ]
+# then
+#   rm -rf $installDIR
+# fi
+
+# if [ ! -d $srcDIR ]
+# then
+#   srcPackageDIR="/Users/feng/Google Drive/code/my"
+#   srcArchive=$srcPackageDIR/GeometricTools/WildMagic5p13.zip
+#   7z x -y -o$currDIR/../../.. "$srcArchive"
+# fi
+
+# cd $srcDIR
+
+# # patch to avoid error: explicit specialization of 'ZERO_TOLERANCE' after instantiation
+# sed -i.bak 's/Mathf::ZERO_TOLERANCE/1e-06f/' $srcDIR/LibMathematics/Algebra/Wm5AVector.h
+# sed -i.bak 's/Mathf::ZERO_TOLERANCE/1e-06f/' $srcDIR/LibMathematics/Algebra/Wm5HPlane.h
+# sed -i.bak 's/Mathf::ZERO_TOLERANCE/1e-06f/' $srcDIR/LibMathematics/Algebra/Wm5HQuaternion.h
+
+# cd LibCore
+# chmod +x *.sh
+# xcodebuild -project LibCore.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 OTHER_CPLUSPLUSFLAGS="-std=c++14 -stdlib=libc++"
+# cd ..
+
+# cd LibMathematics
+# chmod +x *.sh
+# xcodebuild -project LibMathematics.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 OTHER_CPLUSPLUSFLAGS="-std=c++14 -stdlib=libc++"
+# cd ..
+
+# cp -R $srcDIR/SDK/ $installDIR
+
+# #unpatch
+# mv -f $srcDIR/LibMathematics/Algebra/Wm5AVector.h.bak $srcDIR/LibMathematics/Algebra/Wm5AVector.h
+# mv -f $srcDIR/LibMathematics/Algebra/Wm5HPlane.h.bak $srcDIR/LibMathematics/Algebra/Wm5HPlane.h
+# mv -f $srcDIR/LibMathematics/Algebra/Wm5HQuaternion.h.bak $srcDIR/LibMathematics/Algebra/Wm5HQuaternion.h
+
+# cd $currDIR
