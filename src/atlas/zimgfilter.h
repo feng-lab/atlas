@@ -4,17 +4,15 @@
 #include "zobjfilter.h"
 #include <QList>
 #include <vector>
+#include <QGraphicsPixmapItem>
+#include "zimgpackdisplay.h"
 #include "zparameter.h"
 #include "znumericparameter.h"
 
-class QGraphicsPixmapItem;
 class ZWidgetsGroup;
 
 namespace nim {
 
-class ZImg;
-class ZImgPack;
-class ZImgPackDisplay;
 class ZDoubleSpanParameter;
 
 class ZImgFilter : public ZObjFilter
@@ -22,7 +20,6 @@ class ZImgFilter : public ZObjFilter
   Q_OBJECT
 public:
   ZImgFilter(ZView &view);
-  ~ZImgFilter();
 
   void setData(ZImgPack &pack);
 
@@ -42,7 +39,7 @@ public:
   int imgSlice() const;
   int imgTime() const;
 
-  ZWidgetsGroup* viewSettingWidgetsGroup();
+  std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
 signals:
 
@@ -95,7 +92,7 @@ private:
   double m_lastScale;
   QRectF m_lastViewport;
 
-  ZWidgetsGroup *m_widgetsGroup;
+  std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
 };
 
 } // namespace nim

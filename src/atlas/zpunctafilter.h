@@ -49,7 +49,6 @@ class ZPunctaFilter : public ZObjFilter
   Q_OBJECT
 public:
   ZPunctaFilter(ZView &view);
-  ~ZPunctaFilter();
 
   void setData(ZPuncta &puncta);
 
@@ -62,7 +61,7 @@ public:
 
   const std::vector<int>& boundBox() const;
 
-  ZWidgetsGroup* viewSettingWidgetsGroup();
+  std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
 signals:
 
@@ -83,7 +82,7 @@ private:
   ZDoubleParameter m_opacity;
   bool m_sliceValid;
 
-  ZWidgetsGroup *m_widgetsGroup;
+  std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
 
   std::vector<int> m_boundBox;
 };

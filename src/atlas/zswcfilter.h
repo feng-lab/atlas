@@ -53,7 +53,6 @@ class ZSwcFilter : public ZObjFilter
   Q_OBJECT
 public:
   ZSwcFilter(ZView &view);
-  ~ZSwcFilter();
 
   void setData(ZSwc &swc);
 
@@ -66,7 +65,7 @@ public:
 
   const std::vector<int>& boundBox() const;
 
-  ZWidgetsGroup* viewSettingWidgetsGroup();
+  std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
 signals:
 
@@ -89,7 +88,7 @@ private:
   ZDoubleParameter m_opacity;
   bool m_sliceValid;
 
-  ZWidgetsGroup *m_widgetsGroup;
+  std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
 };
 
 } // namespace nim

@@ -18,25 +18,15 @@ ZRegionAnnotationDoc::ZRegionAnnotationDoc(ZDoc &doc)
   createActions();
 }
 
-ZRegionAnnotationDoc::~ZRegionAnnotationDoc()
-{
-  std::set<RegionAnnotationPack*> packs;
-  for (std::map<size_t, RegionAnnotationPack*>::iterator it = m_idToRegionAnnotationPacks.begin();
-       it != m_idToRegionAnnotationPacks.end(); ++it) {
-    packs.insert(it->second);
-  }
-  qDeleteAll(packs.begin(), packs.end());
-}
-
 bool ZRegionAnnotationDoc::save(size_t id)
 {
   if (!objHasUnsavedChange(id))
     return true;
 
-  RegionAnnotationPack* pack = m_idToRegionAnnotationPacks.at(id);
+  auto& pack = m_idToRegionAnnotationPacks.at(id);
   if (ZRegionAnnotation::canWriteFile(pack->path)) {
     QString err;
-    if (saveRegionAnnotation(pack, pack->path, err)) {
+    if (saveRegionAnnotation(pack.get(), pack->path, err)) {
       m_doc.updateObjInfo(id);
       return true;
     } else {
@@ -58,8 +48,8 @@ bool ZRegionAnnotationDoc::saveAs(size_t id)
   dialog.setWindowTitle(tr("Save Region Annotation %1 As").arg(objName(id)));
   if (dialog.exec()) {
     QString err;
-    RegionAnnotationPack* pack = m_idToRegionAnnotationPacks.at(id);
-    if (saveRegionAnnotation(pack, dialog.selectedFiles().at(0), err)) {
+    auto& pack = m_idToRegionAnnotationPacks.at(id);
+    if (saveRegionAnnotation(pack.get(), dialog.selectedFiles().at(0), err)) {
       m_doc.updateObjInfo(id);
       return true;
     } else {
@@ -76,8 +66,7 @@ bool ZRegionAnnotationDoc::canReadFile(const QString &fileName)
 
 size_t ZRegionAnnotationDoc::loadFile(const QString &fileName, QString &errorMsg)
 {
-  for (std::map<size_t, RegionAnnotationPack*>::iterator it = m_idToRegionAnnotationPacks.begin();
-       it != m_idToRegionAnnotationPacks.end(); ++it) {
+  for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
     if (it->second->path == fileName)
       return it->first;
   }
@@ -100,8 +89,7 @@ size_t ZRegionAnnotationDoc::loadFile(const QJsonValue &jValue, QString &errorMs
     errorMsg = QString("File path is not string or is empty");
     return 0;
   }
-  for (std::map<size_t, RegionAnnotationPack*>::iterator it = m_idToRegionAnnotationPacks.begin();
-       it != m_idToRegionAnnotationPacks.end(); ++it) {
+  for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
     if (isSameObj(jValue, jsonValue(it->first)))
       return it->first;
   }
@@ -136,11 +124,9 @@ QMenu *ZRegionAnnotationDoc::processObjMenu() const
 
 void ZRegionAnnotationDoc::removeObj(size_t id)
 {
-  std::map<size_t, RegionAnnotationPack*>::iterator it = m_idToRegionAnnotationPacks.find(id);
+  auto it = m_idToRegionAnnotationPacks.find(id);
   m_doc.undoGroup()->removeStack(objUndoStack(id));
   emit objAboutToBeRemoved(it->first, this);
-  if (!isAlias(id))
-    delete it->second;
   m_idToRegionAnnotationPacks.erase(it);
   emit objRemoved(id, this);
 }
@@ -208,9 +194,8 @@ bool ZRegionAnnotationDoc::isAlias(size_t id) const
 {
   assert(m_idToRegionAnnotationPacks.find(id) != m_idToRegionAnnotationPacks.end());
 
-  RegionAnnotationPack* pack = m_idToRegionAnnotationPacks.at(id);
-  for (std::map<size_t, RegionAnnotationPack*>::const_iterator it = m_idToRegionAnnotationPacks.begin();
-       it != m_idToRegionAnnotationPacks.end(); ++it) {
+  auto& pack = m_idToRegionAnnotationPacks.at(id);
+  for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
     if (it->first != id && it->second == pack)
       return true;
   }
@@ -221,7 +206,7 @@ QWidget *ZRegionAnnotationDoc::createObjEditWidget(size_t id)
 {
   assert(m_idToRegionAnnotationPacks.find(id) != m_idToRegionAnnotationPacks.end());
 
-  RegionAnnotationPack* pack = m_idToRegionAnnotationPacks.at(id);
+  auto& pack = m_idToRegionAnnotationPacks.at(id);
   return new ZRegionAnnotationWidget(*pack->regionAnnotation, m_doc);
 }
 
@@ -377,7 +362,7 @@ void ZRegionAnnotationDoc::setModified(bool clean)
 size_t ZRegionAnnotationDoc::addRegionAnnotation(ZRegionAnnotation *regionAnnotation, const QString &path, bool unsaved)
 {
   size_t id = m_doc.getNewObjId();
-  m_idToRegionAnnotationPacks[id] = new RegionAnnotationPack(regionAnnotation, path, unsaved);
+  m_idToRegionAnnotationPacks[id] = std::make_shared<RegionAnnotationPack>(regionAnnotation, path, unsaved);
   m_doc.registerNewObj(id, this);
   m_doc.undoGroup()->addStack(regionAnnotation->undoStack());
 
@@ -452,9 +437,8 @@ bool ZRegionAnnotationDoc::saveRegionAnnotation(RegionAnnotationPack *pack, cons
 
 void ZRegionAnnotationDoc::packInfoUpdated(RegionAnnotationPack *pack)
 {
-  for (std::map<size_t, RegionAnnotationPack*>::iterator it = m_idToRegionAnnotationPacks.begin();
-       it != m_idToRegionAnnotationPacks.end(); ++it) {
-    if (it->second == pack)
+  for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
+    if (it->second.get() == pack)
       m_doc.updateObjInfo(it->first);
   }
 }

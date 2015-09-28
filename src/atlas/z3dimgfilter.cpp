@@ -26,7 +26,6 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   , m_isVolumeDownsampled("Volume Is Downsampled", false)
   , m_isSubVolume("Is Subvolume", false)
   , m_zoomInViewSize("Zoom In View Size", 256, 128, 1024)
-  , m_widgetsGroup(nullptr)
   , m_numParas(0)
   , m_interactionDownsample("Interaction Downsample", 1, 1, 16)
   , m_entryPort("ImageEntryPoints")
@@ -156,18 +155,18 @@ void Z3DImgFilter::setData(const ZImgPack &img)
   if (m_widgetsGroup) {
     for (auto it = m_volumeRaycasterRenderer.channelVisibleParas().begin();
          it != m_volumeRaycasterRenderer.channelVisibleParas().end(); ++it) {
-      m_widgetsGroup->deleteChildParamter(it->get());
+      m_widgetsGroup->removeChild(*it->get());
     }
     for (auto it = m_volumeRaycasterRenderer.transferFuncParas().begin();
          it != m_volumeRaycasterRenderer.transferFuncParas().end(); ++it) {
-      m_widgetsGroup->deleteChildParamter(it->get());
+      m_widgetsGroup->removeChild(*it->get());
     }
     for (auto it = m_volumeRaycasterRenderer.texFilterModeParas().begin();
          it != m_volumeRaycasterRenderer.texFilterModeParas().end(); ++it) {
-      m_widgetsGroup->deleteChildParamter(it->get());
+      m_widgetsGroup->removeChild(*it->get());
     }
     for (auto it = m_sliceColormaps.begin(); it != m_sliceColormaps.end(); ++it) {
-      m_widgetsGroup->deleteChildParamter(it->get());
+      m_widgetsGroup->removeChild(*it->get());
     }
   }
   while (m_numParas < m_parameters.size()) {
@@ -200,18 +199,18 @@ void Z3DImgFilter::setData(const ZImgPack &img)
   if (m_widgetsGroup) {
     for (auto it = m_volumeRaycasterRenderer.channelVisibleParas().begin();
          it != m_volumeRaycasterRenderer.channelVisibleParas().end(); ++it) {
-      new ZWidgetsGroup(it->get(), m_widgetsGroup, 2);
+      m_widgetsGroup->addChild(*it->get(), 2);
     }
     for (auto it = m_volumeRaycasterRenderer.transferFuncParas().begin();
          it != m_volumeRaycasterRenderer.transferFuncParas().end(); ++it) {
-      new ZWidgetsGroup(it->get(), m_widgetsGroup, 3);
+      m_widgetsGroup->addChild(*it->get(), 3);
     }
     for (auto it = m_volumeRaycasterRenderer.texFilterModeParas().begin();
          it != m_volumeRaycasterRenderer.texFilterModeParas().end(); ++it) {
-      new ZWidgetsGroup(it->get(), m_widgetsGroup, 15);
+      m_widgetsGroup->addChild(*it->get(), 15);
     }
     for (auto it = m_sliceColormaps.begin(); it != m_sliceColormaps.end(); ++it) {
-      new ZWidgetsGroup(it->get(), m_widgetsGroup, 11);
+      m_widgetsGroup->addChild(*it->get(), 11);
     }
     m_widgetsGroup->emitWidgetsGroupChangedSignal();
   }
@@ -285,53 +284,53 @@ bool Z3DImgFilter::isVolumeDownsampled() const
   return m_isVolumeDownsampled.get();
 }
 
-ZWidgetsGroup *Z3DImgFilter::widgetsGroup()
+std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
 {
   if (!m_widgetsGroup) {
-    m_widgetsGroup = new ZWidgetsGroup("", nullptr, 1);
+    m_widgetsGroup = std::make_shared<ZWidgetsGroup>("Img", 1);
 
-    new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_stayOnTop, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_isVolumeDownsampled, m_widgetsGroup, 2);
-    new ZWidgetsGroup(&m_isSubVolume, m_widgetsGroup, 2);
-    new ZWidgetsGroup(&m_zoomInViewSize, m_widgetsGroup, 2);
+    m_widgetsGroup->addChild(m_visible, 1);
+    m_widgetsGroup->addChild(m_stayOnTop, 1);
+    m_widgetsGroup->addChild(m_isVolumeDownsampled, 2);
+    m_widgetsGroup->addChild(m_isSubVolume, 2);
+    m_widgetsGroup->addChild(m_zoomInViewSize, 2);
 
     for (auto it = m_volumeRaycasterRenderer.channelVisibleParas().begin();
          it != m_volumeRaycasterRenderer.channelVisibleParas().end(); ++it) {
-      new ZWidgetsGroup(it->get(), m_widgetsGroup, 2);
+      m_widgetsGroup->addChild(*it->get(), 2);
     }
     for (auto it = m_volumeRaycasterRenderer.transferFuncParas().begin();
          it != m_volumeRaycasterRenderer.transferFuncParas().end(); ++it) {
-      new ZWidgetsGroup(it->get(), m_widgetsGroup, 3);
+      m_widgetsGroup->addChild(*it->get(), 3);
     }
-    new ZWidgetsGroup(&m_volumeRaycasterRenderer.compositingModePara(), m_widgetsGroup, 4);
-    new ZWidgetsGroup(&m_volumeRaycasterRenderer.isoValuePara(), m_widgetsGroup, 4);
-    new ZWidgetsGroup(&m_volumeRaycasterRenderer.localMIPThresholdPara(), m_widgetsGroup, 4);
-    new ZWidgetsGroup(&m_volumeRaycasterRenderer.samplingRatePara(), m_widgetsGroup, 15);
+    m_widgetsGroup->addChild(m_volumeRaycasterRenderer.compositingModePara(), 4);
+    m_widgetsGroup->addChild(m_volumeRaycasterRenderer.isoValuePara(), 4);
+    m_widgetsGroup->addChild(m_volumeRaycasterRenderer.localMIPThresholdPara(), 4);
+    m_widgetsGroup->addChild(m_volumeRaycasterRenderer.samplingRatePara(), 15);
     for (auto it = m_volumeRaycasterRenderer.texFilterModeParas().begin();
          it != m_volumeRaycasterRenderer.texFilterModeParas().end(); ++it) {
-      new ZWidgetsGroup(it->get(), m_widgetsGroup, 15);
+      m_widgetsGroup->addChild(*it->get(), 15);
     }
 
-    new ZWidgetsGroup(&m_xCut, m_widgetsGroup, 12);
-    new ZWidgetsGroup(&m_yCut, m_widgetsGroup, 12);
-    new ZWidgetsGroup(&m_zCut, m_widgetsGroup, 12);
-    new ZWidgetsGroup(&m_boundBoxMode, m_widgetsGroup, 13);
-    new ZWidgetsGroup(&m_boundBoxLineWidth, m_widgetsGroup, 13);
-    new ZWidgetsGroup(&m_boundBoxLineColor, m_widgetsGroup, 13);
-    new ZWidgetsGroup(&m_selectionLineWidth, m_widgetsGroup, 17);
-    new ZWidgetsGroup(&m_selectionLineColor, m_widgetsGroup, 17);
-    new ZWidgetsGroup(&m_manipulatorSize, m_widgetsGroup, 17);
-    new ZWidgetsGroup(&m_interactionDownsample, m_widgetsGroup, 19);
-    new ZWidgetsGroup(&m_rendererBase.coordTransformPara(), m_widgetsGroup, 1);
+    m_widgetsGroup->addChild(m_xCut, 12);
+    m_widgetsGroup->addChild(m_yCut, 12);
+    m_widgetsGroup->addChild(m_zCut, 12);
+    m_widgetsGroup->addChild(m_boundBoxMode, 13);
+    m_widgetsGroup->addChild(m_boundBoxLineWidth, 13);
+    m_widgetsGroup->addChild(m_boundBoxLineColor, 13);
+    m_widgetsGroup->addChild(m_selectionLineWidth, 17);
+    m_widgetsGroup->addChild(m_selectionLineColor, 17);
+    m_widgetsGroup->addChild(m_manipulatorSize, 17);
+    m_widgetsGroup->addChild(m_interactionDownsample, 19);
+    m_widgetsGroup->addChild(m_rendererBase.coordTransformPara(), 1);
 
     const std::vector<ZParameter*>& paras = parameters();
     for (size_t i=0; i<paras.size(); i++) {
       ZParameter *para = paras[i];
       if (para->name().contains("Slice") && !para->name().endsWith("2") && !para->name().endsWith("2 Position"))
-        new ZWidgetsGroup(para, m_widgetsGroup, 11);
+        m_widgetsGroup->addChild(*para, 11);
       else if (para->name().contains("Slice"))
-        new ZWidgetsGroup(para, m_widgetsGroup, 19);
+        m_widgetsGroup->addChild(*para, 19);
     }
     m_widgetsGroup->setBasicAdvancedCutoff(14);
   }

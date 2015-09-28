@@ -24,7 +24,7 @@ public:
                             QObject *parent = 0);
   ~ZCameraParameterAnimation();
 
-  ZStringIntOptionParameter* interpolationMethodPara() { return &m_interpolationMethod; }
+  ZStringIntOptionParameter& interpolationMethodPara() { return m_interpolationMethod; }
 
   // create a new key based on current view
   virtual ZParameterKey* createKey(double secs) const override;

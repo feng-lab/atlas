@@ -25,7 +25,6 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject *parent)
   , m_selectedSwcs(nullptr)
   , m_pressedSwcTreeNode(nullptr)
   , m_selectedSwcTreeNodes(nullptr)
-  , m_widgetsGroup(nullptr)
   , m_dataIsInvalid(false)
   , m_swcTree(nullptr)
   , m_registeredSwcTree(nullptr)
@@ -304,50 +303,50 @@ bool Z3DSwcFilter::isReady(Z3DEye eye) const
   return Z3DGeometryFilter::isReady(eye) && m_visible.get() && m_swcTree;
 }
 
-ZWidgetsGroup *Z3DSwcFilter::widgetsGroup()
+std::shared_ptr<ZWidgetsGroup> Z3DSwcFilter::widgetsGroup()
 {
   if (!m_widgetsGroup) {
-    m_widgetsGroup = new ZWidgetsGroup("Swcs", nullptr, 1);
-    new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_stayOnTop, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_renderingPrimitive, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_colorMode, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_swcTreeColor, m_widgetsGroup, 1);
+    m_widgetsGroup = std::make_shared<ZWidgetsGroup>("Swc", 1);
+    m_widgetsGroup->addChild(m_visible, 1);
+    m_widgetsGroup->addChild(m_stayOnTop, 1);
+    m_widgetsGroup->addChild(m_renderingPrimitive, 1);
+    m_widgetsGroup->addChild(m_colorMode, 1);
+    m_widgetsGroup->addChild(m_swcTreeColor, 1);
 
     for(size_t i=0; i<m_colorsForDifferentType.size(); i++) {
-      new ZWidgetsGroup(m_colorsForDifferentType[i].get(), m_widgetsGroup, 1);
+      m_widgetsGroup->addChild(*m_colorsForDifferentType[i], 1);
     }
     for(size_t i=0; i<m_colorsForSubclassType.size(); i++) {
-      new ZWidgetsGroup(m_colorsForSubclassType[i].get(), m_widgetsGroup, 1);
+      m_widgetsGroup->addChild(*m_colorsForSubclassType[i], 1);
     }
     for(size_t i=0; i<m_colorsForDifferentTopology.size(); i++) {
-      new ZWidgetsGroup(m_colorsForDifferentTopology[i].get(), m_widgetsGroup, 1);
+      m_widgetsGroup->addChild(*m_colorsForDifferentTopology[i], 1);
     }
-    new ZWidgetsGroup(&m_colorMapBranchType, m_widgetsGroup, 1);
+    m_widgetsGroup->addChild(m_colorMapBranchType, 1);
 
     const std::vector<ZParameter*>& paras = m_rendererBase.parameters();
     for (size_t i=0; i<paras.size(); i++) {
       ZParameter *para = paras[i];
       if (para->name() == "Coord Transform")
-        new ZWidgetsGroup(para, m_widgetsGroup, 2);
+        m_widgetsGroup->addChild(*para, 2);
       else if (para->name() == "Size Scale")
-        new ZWidgetsGroup(para, m_widgetsGroup, 3);
+        m_widgetsGroup->addChild(*para, 3);
       else if (para->name() == "Rendering Method")
-        new ZWidgetsGroup(para, m_widgetsGroup, 4);
+        m_widgetsGroup->addChild(*para, 4);
       else if (para->name() == "Opacity")
-        new ZWidgetsGroup(para, m_widgetsGroup, 5);
+        m_widgetsGroup->addChild(*para, 5);
       else
-        new ZWidgetsGroup(para, m_widgetsGroup, 7);
+        m_widgetsGroup->addChild(*para, 7);
     }
-    new ZWidgetsGroup(&m_xCut, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_yCut, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_zCut, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_boundBoxMode, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_boundBoxLineWidth, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_boundBoxLineColor, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_selectionLineWidth, m_widgetsGroup, 7);
-    new ZWidgetsGroup(&m_selectionLineColor, m_widgetsGroup, 7);
-    new ZWidgetsGroup(&m_manipulatorSize, m_widgetsGroup, 7);
+    m_widgetsGroup->addChild(m_xCut, 5);
+    m_widgetsGroup->addChild(m_yCut, 5);
+    m_widgetsGroup->addChild(m_zCut, 5);
+    m_widgetsGroup->addChild(m_boundBoxMode, 5);
+    m_widgetsGroup->addChild(m_boundBoxLineWidth, 5);
+    m_widgetsGroup->addChild(m_boundBoxLineColor, 5);
+    m_widgetsGroup->addChild(m_selectionLineWidth, 7);
+    m_widgetsGroup->addChild(m_selectionLineColor, 7);
+    m_widgetsGroup->addChild(m_manipulatorSize, 7);
     m_widgetsGroup->setBasicAdvancedCutoff(5);
   }
   return m_widgetsGroup;

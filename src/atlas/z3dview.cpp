@@ -143,7 +143,7 @@ Z3DView::~Z3DView()
   m_canvasPainter = nullptr;
 }
 
-ZWidgetsGroup *Z3DView::viewSettingWidgetsGroupOf(size_t id)
+std::shared_ptr<ZWidgetsGroup> Z3DView::viewSettingWidgetsGroupOf(size_t id)
 {
   if (id == 1) {
     return m_compositor->backgroundWidgetsGroup();
@@ -153,12 +153,12 @@ ZWidgetsGroup *Z3DView::viewSettingWidgetsGroupOf(size_t id)
     return m_globalParas.widgetsGroup(false);
   } else {
     for (int i=0; i<m_3dObjViews.size(); ++i) {
-      ZWidgetsGroup* wg = m_3dObjViews[i]->viewSettingWidgetsGroupOf(id);
+      std::shared_ptr<ZWidgetsGroup> wg = m_3dObjViews[i]->viewSettingWidgetsGroupOf(id);
       if (wg)
         return wg;
     }
   }
-  return nullptr;
+  return std::shared_ptr<ZWidgetsGroup>();
 }
 
 QWidget *Z3DView::globalParasWidget()

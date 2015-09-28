@@ -22,7 +22,7 @@ public:
 
   virtual bool isReady(Z3DEye eye) const override;
 
-  ZWidgetsGroup *widgetsGroup();
+  std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   virtual void renderOpaque(Z3DEye eye) override;
   virtual void renderTransparent(Z3DEye eye) override;
@@ -58,7 +58,7 @@ public slots:
 private:
   ZBoolParameter m_visible;
 
-  ZWidgetsGroup *m_widgetsGroup;
+  std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_dataIsInvalid;
 
   ZRegionAnnotation *m_regionAnnotation;

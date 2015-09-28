@@ -47,8 +47,6 @@ public:
   Z3DShaderProgram &operator=(const Z3DShaderProgram &) = delete;
 
   void addShader(Z3DShader &shader);
-  void removeShader(Z3DShader &shader);
-  QList<Z3DShader*> shaders() const { return m_shaders; }
 
   void addShaderFromSourceCode(Z3DShader::Type type, const char *source);
   void addShaderFromSourceCode(Z3DShader::Type type, const QString &source) { addShaderFromSourceCode(type, source.toLatin1().constData()); }
@@ -349,8 +347,8 @@ protected:
 private:
   bool m_linked;
   unsigned int m_id;
-  QList<Z3DShader*> m_shaders;
-  QList<Z3DShader*> m_anonShaders;
+  std::vector<Z3DShader*> m_shaders;
+  std::vector<std::unique_ptr<Z3DShader>> m_anonShaders;
   Z3DContext m_context;
 };
 

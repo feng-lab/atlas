@@ -21,16 +21,6 @@ ZROIDoc::ZROIDoc(ZDoc &doc)
   createActions();
 }
 
-ZROIDoc::~ZROIDoc()
-{
-  std::set<ROIPack*> packs;
-  for (std::map<size_t, ROIPack*>::iterator it = m_idToROIPacks.begin();
-       it != m_idToROIPacks.end(); ++it) {
-    packs.insert(it->second);
-  }
-  qDeleteAll(packs.begin(), packs.end());
-}
-
 ZROI &ZROIDoc::currentROI()
 {
   if (m_idToROIPacks.empty()) {
@@ -70,10 +60,10 @@ bool ZROIDoc::save(size_t id)
   if (!objHasUnsavedChange(id))
     return true;
 
-  ROIPack* pack = m_idToROIPacks.at(id);
+  auto& pack = m_idToROIPacks.at(id);
   if (ZROI::canWriteFile(pack->path)) {
     QString err;
-    if (saveROI(pack, pack->path, err)) {
+    if (saveROI(pack.get(), pack->path, err)) {
       m_doc.updateObjInfo(id);
       return true;
     } else {
@@ -96,8 +86,8 @@ bool ZROIDoc::saveAs(size_t id)
   dialog.setWindowTitle(tr("Save ROI %1 As").arg(objName(id)));
   if (dialog.exec()) {
     QString err;
-    ROIPack* pack = m_idToROIPacks.at(id);
-    if (saveROI(pack, dialog.selectedFiles().at(0), err)) {
+    auto& pack = m_idToROIPacks.at(id);
+    if (saveROI(pack.get(), dialog.selectedFiles().at(0), err)) {
       m_doc.updateObjInfo(id);
       return true;
     } else {
@@ -115,8 +105,7 @@ bool ZROIDoc::canReadFile(const QString &fileName)
 
 size_t ZROIDoc::loadFile(const QString &fileName, QString &errorMsg)
 {
-  for (std::map<size_t, ROIPack*>::iterator it = m_idToROIPacks.begin();
-       it != m_idToROIPacks.end(); ++it) {
+  for (auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
     if (it->second->path == fileName)
       return it->first;
   }
@@ -144,8 +133,7 @@ size_t ZROIDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
     errorMsg = QString("File path is not string or is empty");
     return 0;
   }
-  for (std::map<size_t, ROIPack*>::iterator it = m_idToROIPacks.begin();
-       it != m_idToROIPacks.end(); ++it) {
+  for (auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
     if (isSameObj(jValue, jsonValue(it->first)))
       return it->first;
   }
@@ -184,11 +172,9 @@ QMenu *ZROIDoc::processObjMenu() const
 
 void ZROIDoc::removeObj(size_t id)
 {
-  std::map<size_t, ROIPack*>::iterator it = m_idToROIPacks.find(id);
+  auto it = m_idToROIPacks.find(id);
   m_doc.undoGroup()->removeStack(objUndoStack(id));
   emit objAboutToBeRemoved(it->first, this);
-  if (!isAlias(id))
-    delete it->second;
   m_idToROIPacks.erase(it);
   emit objRemoved(id, this);
 }
@@ -249,9 +235,8 @@ bool ZROIDoc::isAlias(size_t id) const
 {
   assert(m_idToROIPacks.find(id) != m_idToROIPacks.end());
 
-  ROIPack* pack = m_idToROIPacks.at(id);
-  for (std::map<size_t, ROIPack*>::const_iterator it = m_idToROIPacks.begin();
-       it != m_idToROIPacks.end(); ++it) {
+  auto& pack = m_idToROIPacks.at(id);
+  for (auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
     if (it->first != id && it->second == pack)
       return true;
   }
@@ -281,8 +266,7 @@ void ZROIDoc::setModified()
 {
   ZROI *roi = qobject_cast<ZROI*>(sender());
   if (roi) {
-    for(std::map<size_t, ROIPack*>::iterator it = m_idToROIPacks.begin();
-        it != m_idToROIPacks.end(); ++it) {
+    for(auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
       if (it->second->roi == roi) {
         it->second->updateDerivedData();
         it->second->hasUnsavedChange = true;
@@ -342,7 +326,7 @@ void ZROIDoc::createMaskImage()
 size_t ZROIDoc::addROI(ZROI *roi, const QString &path)
 {
   size_t id = m_doc.getNewObjId();
-  m_idToROIPacks[id] = new ROIPack(roi, path);
+  m_idToROIPacks[id] = std::make_shared<ROIPack>(roi, path);
   m_doc.registerNewObj(id, this);
   m_doc.undoGroup()->addStack(roi->undoStack());
 
@@ -422,9 +406,8 @@ bool ZROIDoc::saveROI(ROIPack *pack, const QString &fileName, QString &errorMsg)
 
 void ZROIDoc::packInfoUpdated(ROIPack *pack)
 {
-  for (std::map<size_t, ROIPack*>::iterator it = m_idToROIPacks.begin();
-       it != m_idToROIPacks.end(); ++it) {
-    if (it->second == pack)
+  for (auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
+    if (it->second.get() == pack)
       m_doc.updateObjInfo(it->first);
   }
 }

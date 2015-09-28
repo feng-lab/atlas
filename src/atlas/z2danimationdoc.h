@@ -11,7 +11,6 @@ class Z2DAnimationDoc : public ZObjDoc
   Q_OBJECT
 public:
   explicit Z2DAnimationDoc(ZDoc &doc);
-  ~Z2DAnimationDoc();
 
   void bindView(ZView *v);
   void createNewAnimation(const QString &name = "");
@@ -79,7 +78,7 @@ private:
   bool saveAnimation(AnimationPack *pack, const QString &fileName, QString &errorMsg);
 
 private:
-  std::map<size_t, AnimationPack*> m_idToAnimationPacks;
+  std::map<size_t, std::shared_ptr<AnimationPack>> m_idToAnimationPacks;
 
   QAction *m_loadAnimationsAction;
 

@@ -152,7 +152,7 @@ void ZAnimation::addKeyFrame(double time)
     if (objTypeName.contains("Animation", Qt::CaseInsensitive)) {
       continue;
     }
-    ZWidgetsGroup *wg = m_view->viewSettingWidgetsGroupOf(id);
+    std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
     QList<ZParameter*> paraList = wg->getParameterList();
 
     AnimationObj *aniObj = findBoundId(id);
@@ -301,9 +301,9 @@ void ZAnimation::rebindView()
     size_t id = m_objList[k].boundId;
     if (id == 0)
       continue;
-    ZWidgetsGroup *wg = m_view->viewSettingWidgetsGroupOf(id);
+    std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
     assert(wg);
-    connect(wg, SIGNAL(widgetsGroupChanged()), this, SLOT(rebindView()));
+    connect(wg.get(), SIGNAL(widgetsGroupChanged()), this, SLOT(rebindView()));
     sorted = bind(m_objList[k].objParaAnimations, wg->getParameterList()) || sorted;
   }
 
@@ -681,7 +681,7 @@ void ZAnimation::tryLinkAnimationWith(size_t id)
   for (int i=0; i<m_objList.size(); ++i) {
     if (m_objList[i].boundId == 0 && m_objList[i].objType == doc->typeName() && doc->isSameObj(m_objList[i].objJsonValue, jv)) {
       m_objList[i].boundId = id;
-      ZWidgetsGroup *wg = m_view->viewSettingWidgetsGroupOf(id);
+      std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
       assert(wg);
       bind(m_objList[i].objParaAnimations, wg->getParameterList());
       buildDisplayPacks();

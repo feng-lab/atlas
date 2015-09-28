@@ -44,7 +44,7 @@ public:
 
   virtual bool isReady(Z3DEye eye) const override;
 
-  ZWidgetsGroup *widgetsGroup();
+  std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   inline void setRenderingPrimitive(const std::string &mode) {
     m_renderingPrimitive.select(mode.c_str());
@@ -159,7 +159,7 @@ private:
   std::set<SwcTreeNode*> m_allNodesSet;  // for fast search
   std::set<int> m_allNodeType;   // all node type of current opened swc, used for adjust widget (hide irrelavant stuff)
 
-  ZWidgetsGroup *m_widgetsGroup;
+  std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_dataIsInvalid;
 
   ZSwc *m_swcTree;

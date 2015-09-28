@@ -34,7 +34,7 @@ public:
   // called to show a rect with scale
   virtual void setViewport(const QRectF &rect, double scale) = 0;
   // get view setting widget group of obj id, default return nullptr
-  virtual ZWidgetsGroup* viewSettingWidgetsGroupOf(size_t id);
+  virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id);
   // called if delete key is pressed
   virtual void deleteKeyPressed() = 0;
   // called if mouse is pressed in a scene pos

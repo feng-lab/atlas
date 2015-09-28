@@ -11,7 +11,6 @@ class ZPunctaDoc : public ZObjDoc
   Q_OBJECT
 public:
   explicit ZPunctaDoc(ZDoc &doc);
-  ~ZPunctaDoc();
 
   // return info of puncta with id, assume puncta exist, otherwise crash
   ZPuncta& puncta(size_t id) { return m_idToPunctaPacks.at(id)->puncta; }
@@ -76,7 +75,7 @@ private:
   void packInfoUpdated(PunctaPack* pack);
 
 private:
-  std::map<size_t, PunctaPack*> m_idToPunctaPacks;
+  std::map<size_t, std::shared_ptr<PunctaPack>> m_idToPunctaPacks;
 
   QAction *m_loadPunctaAction;
 

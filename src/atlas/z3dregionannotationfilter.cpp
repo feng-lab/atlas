@@ -9,7 +9,6 @@ namespace nim {
 Z3DRegionAnnotationFilter::Z3DRegionAnnotationFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   : Z3DGeometryFilter(globalParas, parent)
   , m_visible("Visible", true)
-  , m_widgetsGroup(nullptr)
 {
   //addParameter(m_visible);
 
@@ -44,31 +43,31 @@ bool Z3DRegionAnnotationFilter::isReady(Z3DEye eye) const
   return Z3DGeometryFilter::isReady(eye) && m_regionAnnotation;
 }
 
-ZWidgetsGroup *Z3DRegionAnnotationFilter::widgetsGroup()
+std::shared_ptr<ZWidgetsGroup> Z3DRegionAnnotationFilter::widgetsGroup()
 {
   if (!m_widgetsGroup) {
-    m_widgetsGroup = new ZWidgetsGroup("Mesh", nullptr, 1);
-    new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_stayOnTop, m_widgetsGroup, 1);
+    m_widgetsGroup = std::make_shared<ZWidgetsGroup>("RegionAnnotation", 1);
+    m_widgetsGroup->addChild(m_visible, 1);
+    m_widgetsGroup->addChild(m_stayOnTop, 1);
 
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
     for (size_t i=0; i<paras.size(); i++) {
       ZParameter *para = paras[i];
       if (para->name() == "Coord Transform")
-        new ZWidgetsGroup(para, m_widgetsGroup, 2);
+        m_widgetsGroup->addChild(*para, 2);
     }
-    new ZWidgetsGroup(&m_boundBoxMode, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_boundBoxLineWidth, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_boundBoxLineColor, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_selectionLineWidth, m_widgetsGroup, 7);
-    new ZWidgetsGroup(&m_selectionLineColor, m_widgetsGroup, 7);
-    new ZWidgetsGroup(&m_manipulatorSize, m_widgetsGroup, 7);
+    m_widgetsGroup->addChild(m_boundBoxMode, 5);
+    m_widgetsGroup->addChild(m_boundBoxLineWidth, 5);
+    m_widgetsGroup->addChild(m_boundBoxLineColor, 5);
+    m_widgetsGroup->addChild(m_selectionLineWidth, 7);
+    m_widgetsGroup->addChild(m_selectionLineColor, 7);
+    m_widgetsGroup->addChild(m_manipulatorSize, 7);
 
 
     for (auto it = m_nameToID.begin(); it != m_nameToID.end(); ++it) {
-      ZWidgetsGroup *wg = m_idToMeshFilters[it->second]->widgetsGroupForAnnotationFilter();
+      std::shared_ptr<ZWidgetsGroup> wg = m_idToMeshFilters[it->second]->widgetsGroupForAnnotationFilter();
       wg->setGroupName(it->first);
-      m_widgetsGroup->addChildGroup(wg);
+      m_widgetsGroup->addChild(wg);
     }
   }
   m_widgetsGroup->setUseToolBoxStyle(true);
@@ -141,7 +140,7 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
 {
   if (m_widgetsGroup) {
     for (auto it = m_nameToID.begin(); it != m_nameToID.end(); ++it) {
-      delete m_idToMeshFilters[it->second]->widgetsGroupForAnnotationFilter();
+      m_widgetsGroup->removeChild(m_idToMeshFilters[it->second]->widgetsGroupForAnnotationFilter());
     }
   }
 
@@ -194,9 +193,9 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
 
   if (m_widgetsGroup) {
     for (auto it = m_nameToID.begin(); it != m_nameToID.end(); ++it) {
-      ZWidgetsGroup *wg = m_idToMeshFilters[it->second]->widgetsGroupForAnnotationFilter();
+      std::shared_ptr<ZWidgetsGroup> wg = m_idToMeshFilters[it->second]->widgetsGroupForAnnotationFilter();
       wg->setGroupName(it->first);
-      m_widgetsGroup->addChildGroup(wg);
+      m_widgetsGroup->addChild(wg);
     }
     m_widgetsGroup->emitWidgetsGroupChangedSignal();
   }

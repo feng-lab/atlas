@@ -189,17 +189,17 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   addParameter(fogRange);
   addParameter(fogDensity);
 
-  m_widgetsGrp = new ZWidgetsGroup("Global", nullptr, 1);
-  new ZWidgetsGroup(&geometriesMultisampleMode, m_widgetsGrp, 1);
-  new ZWidgetsGroup(&transparencyMethod, m_widgetsGrp, 1);
-  new ZWidgetsGroup(new Z3DCameraControlWidget(camera), m_widgetsGrp, 1);
-  new ZWidgetsGroup(&camera, m_widgetsGrp, 1);
-  m_widgetsGrpNoCamera = new ZWidgetsGroup("Lighting", nullptr, 1);
-  new ZWidgetsGroup(&geometriesMultisampleMode, m_widgetsGrpNoCamera, 1);
-  new ZWidgetsGroup(&transparencyMethod, m_widgetsGrpNoCamera, 1);
+  m_widgetsGrp = std::make_shared<ZWidgetsGroup>("Global", 1);
+  m_widgetsGrp->addChild(geometriesMultisampleMode, 1);
+  m_widgetsGrp->addChild(transparencyMethod, 1);
+  m_widgetsGrp->addChild(*(new Z3DCameraControlWidget(camera)), 1);
+  m_widgetsGrp->addChild(camera, 1);
+  m_widgetsGrpNoCamera = std::make_shared<ZWidgetsGroup>("Lighting", 1);
+  m_widgetsGrpNoCamera->addChild(geometriesMultisampleMode, 1);
+  m_widgetsGrpNoCamera->addChild(transparencyMethod, 1);
   for (size_t i=3; i<m_parameters.size(); ++i) {
-    new ZWidgetsGroup(m_parameters[i], m_widgetsGrp, 1);
-    new ZWidgetsGroup(m_parameters[i], m_widgetsGrpNoCamera, 1);
+    m_widgetsGrp->addChild(*m_parameters[i], 1);
+    m_widgetsGrpNoCamera->addChild(*m_parameters[i], 1);
   }
 }
 
@@ -221,7 +221,7 @@ void Z3DGlobalParameters::write(QJsonObject &json) const
   }
 }
 
-ZWidgetsGroup *Z3DGlobalParameters::widgetsGroup(bool includeCamera)
+std::shared_ptr<ZWidgetsGroup> Z3DGlobalParameters::widgetsGroup(bool includeCamera)
 {
   return includeCamera ? m_widgetsGrp : m_widgetsGrpNoCamera;
 }

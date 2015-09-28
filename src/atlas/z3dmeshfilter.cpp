@@ -29,7 +29,6 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   , m_selectMeshEvent("Select Mesh", false)
   , m_pressedMesh(nullptr)
   , m_selectedMeshes(nullptr)
-  , m_widgetsGroup(nullptr)
   , m_dataIsInvalid(false)
 {
   addPrivateRenderPort(m_monoEyeOutport);
@@ -169,77 +168,77 @@ bool Z3DMeshFilter::isReady(Z3DEye eye) const
 
 //}
 
-ZWidgetsGroup *Z3DMeshFilter::widgetsGroup()
+std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroup()
 {
   if (!m_widgetsGroup) {
-    m_widgetsGroup = new ZWidgetsGroup("Mesh", nullptr, 1);
-    new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_stayOnTop, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_colorMode, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_singleColorForAllMesh, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_triangleListRenderer.wireframeModePara(), m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_triangleListRenderer.wireframeColorPara(), m_widgetsGroup, 1);
+    m_widgetsGroup = std::make_shared<ZWidgetsGroup>("Mesh", 1);
+    m_widgetsGroup->addChild(m_visible, 1);
+    m_widgetsGroup->addChild(m_stayOnTop, 1);
+    m_widgetsGroup->addChild(m_colorMode, 1);
+    m_widgetsGroup->addChild(m_singleColorForAllMesh, 1);
+    m_widgetsGroup->addChild(m_triangleListRenderer.wireframeModePara(), 1);
+    m_widgetsGroup->addChild(m_triangleListRenderer.wireframeColorPara(), 1);
 
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
     for (size_t i=0; i<paras.size(); i++) {
       ZParameter *para = paras[i];
       if (para->name() == "Coord Transform") {
-        new ZWidgetsGroup(para, m_widgetsGroup, 2);
+        m_widgetsGroup->addChild(*para, 2);
         QPushButton *pb = new QPushButton("Apply Transform");
         connect(pb, SIGNAL(clicked(bool)), this, SLOT(onApplyTransform()));
-        new ZWidgetsGroup(pb, m_widgetsGroup, 2);
+        m_widgetsGroup->addChild(*pb, 2);
       }
       //else if (para->name() == "Size Scale")
-        //new ZWidgetsGroup(para, m_widgetsGroup, 3);
+        //m_widgetsGroup->addChild(para, 3);
       //else if (para->name() == "Rendering Method")
-        //new ZWidgetsGroup(para, m_widgetsGroup, 4);
+        //m_widgetsGroup->addChild(para, 4);
       else if (para->name() == "Opacity")
-        new ZWidgetsGroup(para, m_widgetsGroup, 5);
+        m_widgetsGroup->addChild(*para, 5);
       else if (para->name() != "Size Scale")
-        new ZWidgetsGroup(para, m_widgetsGroup, 7);
+        m_widgetsGroup->addChild(*para, 7);
     }
 
-    new ZWidgetsGroup(&m_glow, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_textureGlowRenderer.glowModePara(), m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_textureGlowRenderer.blurRadiusPara(), m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_textureGlowRenderer.blurScalePara(), m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_textureGlowRenderer.blurStrengthPara(), m_widgetsGroup, 5);
+    m_widgetsGroup->addChild(m_glow, 5);
+    m_widgetsGroup->addChild(m_textureGlowRenderer.glowModePara(), 5);
+    m_widgetsGroup->addChild(m_textureGlowRenderer.blurRadiusPara(), 5);
+    m_widgetsGroup->addChild(m_textureGlowRenderer.blurScalePara(), 5);
+    m_widgetsGroup->addChild(m_textureGlowRenderer.blurStrengthPara(), 5);
 
-    new ZWidgetsGroup(&m_xCut, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_yCut, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_zCut, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_boundBoxMode, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_boundBoxLineWidth, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_boundBoxLineColor, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_selectionLineWidth, m_widgetsGroup, 7);
-    new ZWidgetsGroup(&m_selectionLineColor, m_widgetsGroup, 7);
-    new ZWidgetsGroup(&m_manipulatorSize, m_widgetsGroup, 7);
+    m_widgetsGroup->addChild(m_xCut, 5);
+    m_widgetsGroup->addChild(m_yCut, 5);
+    m_widgetsGroup->addChild(m_zCut, 5);
+    m_widgetsGroup->addChild(m_boundBoxMode, 5);
+    m_widgetsGroup->addChild(m_boundBoxLineWidth, 5);
+    m_widgetsGroup->addChild(m_boundBoxLineColor, 5);
+    m_widgetsGroup->addChild(m_selectionLineWidth, 7);
+    m_widgetsGroup->addChild(m_selectionLineColor, 7);
+    m_widgetsGroup->addChild(m_manipulatorSize, 7);
     m_widgetsGroup->setBasicAdvancedCutoff(5);
   }
   return m_widgetsGroup;
 }
 
-ZWidgetsGroup *Z3DMeshFilter::widgetsGroupForAnnotationFilter()
+std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroupForAnnotationFilter()
 {
   if (!m_widgetsGroup) {
-    m_widgetsGroup = new ZWidgetsGroup("Mesh", nullptr, 1);
-    new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_singleColorForAllMesh, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_triangleListRenderer.wireframeModePara(), m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_triangleListRenderer.wireframeColorPara(), m_widgetsGroup, 1);
+    m_widgetsGroup = std::make_shared<ZWidgetsGroup>("Mesh", 1);
+    m_widgetsGroup->addChild(m_visible, 1);
+    m_widgetsGroup->addChild(m_singleColorForAllMesh, 1);
+    m_widgetsGroup->addChild(m_triangleListRenderer.wireframeModePara(), 1);
+    m_widgetsGroup->addChild(m_triangleListRenderer.wireframeColorPara(), 1);
 
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
     for (size_t i=0; i<paras.size(); i++) {
       ZParameter *para = paras[i];
       if (para->name().contains("Opacity") || para->name().contains("Material"))
-        new ZWidgetsGroup(para, m_widgetsGroup, 5);
+        m_widgetsGroup->addChild(*para, 5);
     }
-    new ZWidgetsGroup(&m_xCut, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_yCut, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_zCut, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_boundBoxMode, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_boundBoxLineWidth, m_widgetsGroup, 5);
-    new ZWidgetsGroup(&m_boundBoxLineColor, m_widgetsGroup, 5);
+    m_widgetsGroup->addChild(m_xCut, 5);
+    m_widgetsGroup->addChild(m_yCut, 5);
+    m_widgetsGroup->addChild(m_zCut, 5);
+    m_widgetsGroup->addChild(m_boundBoxMode, 5);
+    m_widgetsGroup->addChild(m_boundBoxLineWidth, 5);
+    m_widgetsGroup->addChild(m_boundBoxLineColor, 5);
     m_widgetsGroup->setBasicAdvancedCutoff(5);
   }
   return m_widgetsGroup;

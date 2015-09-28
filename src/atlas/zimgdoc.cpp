@@ -19,19 +19,9 @@ ZImgDoc::ZImgDoc(ZDoc &doc)
   createActions();
 }
 
-ZImgDoc::~ZImgDoc()
-{
-  std::set<ZImgPack*> packs;
-  for (std::map<size_t, ZImgPack*>::iterator it = m_idToImgPacks.begin();
-       it != m_idToImgPacks.end(); ++it) {
-    packs.insert(it->second);
-  }
-  qDeleteAll(packs.begin(), packs.end());
-}
-
 void ZImgDoc::setImgOffset(size_t id, int offx, int offy, int offz, int offt)
 {
-  ZImgPack* pack = m_idToImgPacks.at(id);
+  auto& pack = m_idToImgPacks.at(id);
   pack->setOffsetX(offx);
   pack->setOffsetY(offy);
   pack->setOffsetZ(offz);
@@ -40,7 +30,7 @@ void ZImgDoc::setImgOffset(size_t id, int offx, int offy, int offz, int offt)
 
 void ZImgDoc::setImgChannelColor(size_t id, size_t c, col4 col)
 {
-  ZImgPack *pack = m_idToImgPacks.at(id);
+  auto& pack = m_idToImgPacks.at(id);
   pack->imgInfoRef().channelColors[c] = col;
 }
 
@@ -49,10 +39,10 @@ bool ZImgDoc::save(size_t id)
   if (!objHasUnsavedChange(id))
     return true;
 
-  ZImgPack* pack = m_idToImgPacks.at(id);
+  auto& pack = m_idToImgPacks.at(id);
   if (!pack->isSequence() && ZImg::fileExtensionWriteSupported(pack->paths()[0])) {
     QString err;
-    if (saveImg(pack, pack->paths()[0], FileFormat::Unknown, Compression::AUTO, err)) {
+    if (saveImg(pack.get(), pack->paths()[0], FileFormat::Unknown, Compression::AUTO, err)) {
       m_doc.updateObjInfo(id);
       return true;
     } else {
@@ -79,9 +69,9 @@ bool ZImgDoc::saveAs(size_t id)
   dialog.setWindowTitle(tr("Save Image %1 As").arg(objName(id)));
   if (dialog.exec()) {
     QString err;
-    ZImgPack* pack = m_idToImgPacks.at(id);
+    auto& pack = m_idToImgPacks.at(id);
     int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    if (saveImg(pack, dialog.selectedFiles().at(0), formats[fmtIdx], comps[fmtIdx], err)) {
+    if (saveImg(pack.get(), dialog.selectedFiles().at(0), formats[fmtIdx], comps[fmtIdx], err)) {
       m_doc.updateObjInfo(id);
       return true;
     } else {
@@ -169,10 +159,8 @@ QMenu *ZImgDoc::processObjMenu() const
 
 void ZImgDoc::removeObj(size_t id)
 {
-  std::map<size_t, ZImgPack*>::iterator it = m_idToImgPacks.find(id);
+  auto it = m_idToImgPacks.find(id);
   emit objAboutToBeRemoved(it->first, this);
-  if (!isAlias(id))
-    delete it->second;
   m_idToImgPacks.erase(it);
   emit objRemoved(id, this);
 }
@@ -214,7 +202,7 @@ const QString &ZImgDoc::objTooltip(size_t id) const
 QJsonValue ZImgDoc::jsonValue(size_t id) const
 {
   QJsonObject obj;
-  ZImgPack *pack = m_idToImgPacks.at(id);
+  auto& pack = m_idToImgPacks.at(id);
   QJsonArray pathArray;
   for (int i=0; i<pack->paths().size(); ++i) {
     pathArray.append(pack->paths()[i]);
@@ -291,9 +279,8 @@ bool ZImgDoc::isAlias(size_t id) const
 {
   assert(m_idToImgPacks.find(id) != m_idToImgPacks.end());
 
-  ZImgPack* pack = m_idToImgPacks.at(id);
-  for (std::map<size_t, ZImgPack*>::const_iterator it = m_idToImgPacks.begin();
-       it != m_idToImgPacks.end(); ++it) {
+  auto& pack = m_idToImgPacks.at(id);
+  for (auto it = m_idToImgPacks.cbegin(); it != m_idToImgPacks.cend(); ++it) {
     if (it->first != id && it->second == pack)
       return true;
   }
@@ -304,8 +291,7 @@ void ZImgDoc::showImg(ZImg *img, const QString &path)
 {
   QStringList files;
   files.push_back(QFileInfo(path).canonicalFilePath());
-  for (std::map<size_t, ZImgPack*>::iterator it = m_idToImgPacks.begin();
-       it != m_idToImgPacks.end(); ++it) {
+  for (auto it = m_idToImgPacks.cbegin(); it != m_idToImgPacks.cend(); ++it) {
     if (it->second->paths() == files) {
       //it->second->setImg(*img);
       sendChangedSignal(it->first);
@@ -398,7 +384,7 @@ size_t ZImgDoc::addImgPack(ZImgPack *imgPack)
   assert(imgPack);
 
   size_t id = m_doc.getNewObjId();
-  m_idToImgPacks[id] = imgPack;
+  m_idToImgPacks[id] = std::shared_ptr<ZImgPack>(imgPack);
   m_doc.registerNewObj(id, this);
 
   emit objAdded(id, this);
@@ -493,9 +479,8 @@ void ZImgDoc::sendChangedSignal(size_t id)
 {
   assert(m_idToImgPacks.find(id) != m_idToImgPacks.end());
 
-  ZImgPack* pack = m_idToImgPacks.at(id);
-  for (std::map<size_t, ZImgPack*>::const_iterator it = m_idToImgPacks.begin();
-       it != m_idToImgPacks.end(); ++it) {
+  auto& pack = m_idToImgPacks.at(id);
+  for (auto it = m_idToImgPacks.cbegin(); it != m_idToImgPacks.cend(); ++it) {
     if (it->second == pack)
       emit imgChanged(id);
   }
@@ -541,9 +526,8 @@ bool ZImgDoc::saveImg(ZImgPack *pack, QString fileName, FileFormat format, Compr
 
 void ZImgDoc::packInfoUpdated(ZImgPack *pack)
 {
-  for (std::map<size_t, ZImgPack*>::iterator it = m_idToImgPacks.begin();
-       it != m_idToImgPacks.end(); ++it) {
-    if (it->second == pack)
+  for (auto it = m_idToImgPacks.cbegin(); it != m_idToImgPacks.cend(); ++it) {
+    if (it->second.get() == pack)
       m_doc.updateObjInfo(it->first);
   }
 }

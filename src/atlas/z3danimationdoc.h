@@ -11,7 +11,6 @@ class Z3DAnimationDoc : public ZObjDoc
   Q_OBJECT
 public:
   explicit Z3DAnimationDoc(ZDoc &doc);
-  ~Z3DAnimationDoc();
 
   void bindView(Z3DView *v);
   void createNewAnimation(const QString &name = "");
@@ -81,7 +80,7 @@ private:
   bool saveAnimation(AnimationPack *pack, const QString &fileName, QString &errorMsg);
 
 private:
-  std::map<size_t, AnimationPack*> m_idToAnimationPacks;
+  std::map<size_t, std::shared_ptr<AnimationPack>> m_idToAnimationPacks;
 
   QAction *m_loadAnimationsAction;
 

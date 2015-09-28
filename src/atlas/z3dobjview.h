@@ -26,7 +26,7 @@ public:
   virtual void write(size_t id, QJsonObject &json) const = 0;
 
   // get view setting widget group of obj id, default return nullptr
-  virtual ZWidgetsGroup* viewSettingWidgetsGroupOf(size_t id);
+  virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id);
 
   inline Z3DCameraParameter& camera() { return m_view.camera(); }
   inline Z3DTrackballInteractionHandler& interactionHandler() { return m_view.interactionHandler(); }

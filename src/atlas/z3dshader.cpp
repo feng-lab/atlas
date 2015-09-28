@@ -75,31 +75,29 @@ void Z3DShader::compileSourceCode(const char *source)
       // Get info and source code lengths
       GLint infoLogLength = 0;
       GLint sourceCodeLength = 0;
-      char *logBuffer = nullptr;
-      char *sourceCodeBuffer = nullptr;
+      std::vector<char> logBuffer;
+      std::vector<char> sourceCodeBuffer;
       // Get the compilation info log
       glGetShaderiv(m_id, GL_INFO_LOG_LENGTH, &infoLogLength);
       if (infoLogLength > 1) {
         GLint temp;
-        logBuffer = new char[infoLogLength];
-        glGetShaderInfoLog(m_id, infoLogLength, &temp, logBuffer);
+        logBuffer.resize(infoLogLength);
+        glGetShaderInfoLog(m_id, infoLogLength, &temp, logBuffer.data());
       }
       // Get the source code
       glGetShaderiv(m_id, GL_SHADER_SOURCE_LENGTH, &sourceCodeLength);
       if (sourceCodeLength > 1) {
         GLint temp;
-        sourceCodeBuffer = new char[sourceCodeLength];
-        glGetShaderSource(m_id, sourceCodeLength, &temp, sourceCodeBuffer);
+        sourceCodeBuffer.resize(sourceCodeLength);
+        glGetShaderSource(m_id, sourceCodeLength, &temp, sourceCodeBuffer.data());
       }
-      QString log = QString("Z3DShader::compileSourceCode(%1): %2").arg(type).arg(logBuffer ? logBuffer : "failed");
-      delete []logBuffer;
+      QString log = QString("Z3DShader::compileSourceCode(%1): %2").arg(type).arg(logBuffer.empty() ? "failed" : logBuffer.data());
       // Dump the source code if we got it
-      if (sourceCodeBuffer) {
+      if (!sourceCodeBuffer.empty()) {
         log += QString("\n*** source code ***\n");
         log += source;
         log += QString("\n***");
       }
-      delete []sourceCodeBuffer;
       CHECK_GL_ERROR;
       throw ZGLException(log);
     }
@@ -122,10 +120,9 @@ QByteArray Z3DShader::sourceCode() const
   if (size <= 0)
     return QByteArray();
   GLint len = 0;
-  char *source = new char[size];
-  glGetShaderSource(m_id, size, &len, source);
-  QByteArray src(source);
-  delete []source;
+  std::vector<char> source(size);
+  glGetShaderSource(m_id, size, &len, source.data());
+  QByteArray src(source.data());
   return src;
 }
 

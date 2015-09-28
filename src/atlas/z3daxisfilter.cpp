@@ -15,7 +15,6 @@ Z3DAxisFilter::Z3DAxisFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   , m_ZAxisColor("Z Axis Color", glm::vec4(0.f, 0.f, 1.f, 1.0f))
   , m_axisRegionRatio("Axis Region Ratio", .2f, .1f, 1.f)
   , m_mode("mode")
-  , m_widgetsGroup(NULL)
 {
   m_XAxisColor.setStyle("COLOR");
   m_YAxisColor.setStyle("COLOR");
@@ -59,35 +58,35 @@ void Z3DAxisFilter::setVisible(bool visible)
   m_showAxis.setValue(visible);
 }
 
-ZWidgetsGroup *Z3DAxisFilter::widgetsGroup()
+std::shared_ptr<ZWidgetsGroup> Z3DAxisFilter::widgetsGroup()
 {
   if (!m_widgetsGroup) {
-    m_widgetsGroup = new ZWidgetsGroup("Axis", NULL, 1);
-    new ZWidgetsGroup(&m_showAxis, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_mode, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_axisRegionRatio, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_XAxisColor, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_YAxisColor, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_ZAxisColor, m_widgetsGroup, 1);
+    m_widgetsGroup = std::make_shared<ZWidgetsGroup>("Axis", 1);
+    m_widgetsGroup->addChild(m_showAxis, 1);
+    m_widgetsGroup->addChild(m_mode, 1);
+    m_widgetsGroup->addChild(m_axisRegionRatio, 1);
+    m_widgetsGroup->addChild(m_XAxisColor, 1);
+    m_widgetsGroup->addChild(m_YAxisColor, 1);
+    m_widgetsGroup->addChild(m_ZAxisColor, 1);
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
     for (size_t i=0; i<paras.size(); i++) {
       ZParameter *para = paras[i];
       if (para->name() == "Size Scale")
-        new ZWidgetsGroup(para, m_widgetsGroup, 1);
+        m_widgetsGroup->addChild(*para, 1);
       else if (para->name() == "Rendering Method")
-        new ZWidgetsGroup(para, m_widgetsGroup, 3);
+        m_widgetsGroup->addChild(*para, 3);
       else if (para->name() == "Opacity")
-        new ZWidgetsGroup(para, m_widgetsGroup, 3);
+        m_widgetsGroup->addChild(*para, 3);
     }
-    new ZWidgetsGroup(&m_fontRenderer.allFontNamesPara(), m_widgetsGroup, 4);
-    new ZWidgetsGroup(&m_fontRenderer.fontPara(), m_widgetsGroup, 4);
-    new ZWidgetsGroup(&m_fontRenderer.fontSizePara(), m_widgetsGroup, 4);
-    new ZWidgetsGroup(&m_fontRenderer.fontSoftEdgeScalePara(), m_widgetsGroup, 4);
-    new ZWidgetsGroup(&m_fontRenderer.showFontOutlinePara(), m_widgetsGroup, 4);
-    new ZWidgetsGroup(&m_fontRenderer.fontOutlineModePara(), m_widgetsGroup, 4);
-    new ZWidgetsGroup(&m_fontRenderer.fontOutlineColorPara(), m_widgetsGroup, 4);
-    new ZWidgetsGroup(&m_fontRenderer.showFontShadowPara(), m_widgetsGroup, 4);
-    new ZWidgetsGroup(&m_fontRenderer.fontShadowColorPara(), m_widgetsGroup, 4);
+    m_widgetsGroup->addChild(m_fontRenderer.allFontNamesPara(), 4);
+    m_widgetsGroup->addChild(m_fontRenderer.fontPara(), 4);
+    m_widgetsGroup->addChild(m_fontRenderer.fontSizePara(), 4);
+    m_widgetsGroup->addChild(m_fontRenderer.fontSoftEdgeScalePara(), 4);
+    m_widgetsGroup->addChild(m_fontRenderer.showFontOutlinePara(), 4);
+    m_widgetsGroup->addChild(m_fontRenderer.fontOutlineModePara(), 4);
+    m_widgetsGroup->addChild(m_fontRenderer.fontOutlineColorPara(), 4);
+    m_widgetsGroup->addChild(m_fontRenderer.showFontShadowPara(), 4);
+    m_widgetsGroup->addChild(m_fontRenderer.fontShadowColorPara(), 4);
     m_widgetsGroup->setBasicAdvancedCutoff(5);
   }
   return m_widgetsGroup;

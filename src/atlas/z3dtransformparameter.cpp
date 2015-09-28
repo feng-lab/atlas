@@ -288,20 +288,19 @@ void Z3DTransformParameter::updateMatrix()
 
 QWidget *Z3DTransformParameter::actualCreateWidget(QWidget *parent)
 {
-  ZWidgetsGroup *transform = new ZWidgetsGroup("Transform", NULL, 1);
-  new ZWidgetsGroup(&m_scale, transform, 1);
-  new ZWidgetsGroup(&m_rotation, transform, 1);
-  new ZWidgetsGroup(&m_translation, transform, 1);
-  new ZWidgetsGroup(&m_center, transform, 1);
+  ZWidgetsGroup transform("Transform", 1);
+  transform.addChild(m_scale, 1);
+  transform.addChild(m_rotation, 1);
+  transform.addChild(m_translation, 1);
+  transform.addChild(m_center, 1);
 
-  QLayout *lw = transform->createLayout(false);
+  QLayout *lw = transform.createLayout(false);
   //QWidget *widget = new QWidget();
   //widget->setLayout(lw);
   QGroupBox *groupBox = new QGroupBox("Transform Parameters", parent);
   groupBox->setLayout(lw);
 
   //widget->setParent(parent);
-  delete transform;
   //return widget;
   return groupBox;
 }

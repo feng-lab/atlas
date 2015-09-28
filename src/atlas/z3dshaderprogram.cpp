@@ -25,17 +25,13 @@ Z3DShaderProgram::Z3DShaderProgram()
 
 Z3DShaderProgram::~Z3DShaderProgram()
 {
-  for (auto shader : m_anonShaders) {
-    glDetachShader(m_id, shader->shaderId());
-    delete shader;
-  }
   glDeleteProgram(m_id);
   CHECK_GL_ERROR;
 }
 
 void Z3DShaderProgram::addShader(Z3DShader &shader)
 {
-  if (m_shaders.contains(&shader))
+  if (std::find(m_shaders.begin(), m_shaders.end(), &shader) != m_shaders.end())
     return;
   if (m_context != shader.context()) {
     throw ZGLException("Z3DShaderProgram: Add shader failed as program and shader are not associated with same context");
@@ -43,34 +39,23 @@ void Z3DShaderProgram::addShader(Z3DShader &shader)
   glAttachShader(m_id, shader.shaderId());
   CHECK_GL_ERROR;
   m_linked = false;
-  m_shaders.append(&shader);
-}
-
-void Z3DShaderProgram::removeShader(Z3DShader &shader)
-{
-  glDetachShader(m_id, shader.shaderId());
-  CHECK_GL_ERROR;
-  m_linked = false;
-  m_shaders.removeAll(&shader);
-  m_anonShaders.removeAll(&shader);
+  m_shaders.push_back(&shader);
 }
 
 void Z3DShaderProgram::addShaderFromSourceCode(Z3DShader::Type type, const char *source)
 {
-  auto shader = std::make_unique<Z3DShader>(type);
-  shader->compileSourceCode(source);
-  m_anonShaders.append(shader.release());
-  addShader(*m_anonShaders.last());
+  m_anonShaders.emplace_back(std::make_unique<Z3DShader>(type));
+  m_anonShaders[m_anonShaders.size()-1]->compileSourceCode(source);
+  addShader(*m_anonShaders[m_anonShaders.size()-1].get());
 }
 
 void Z3DShaderProgram::removeAllShaders()
 {
-  for (auto shader : m_shaders) {
+  for (auto const &shader : m_shaders) {
     glDetachShader(m_id, shader->shaderId());
   }
-  for (auto shader : m_anonShaders) {
+  for (auto const &shader : m_anonShaders) {
     glDetachShader(m_id, shader->shaderId());
-    delete shader;
   }
   m_shaders.clear();
   m_anonShaders.clear();
@@ -80,7 +65,7 @@ void Z3DShaderProgram::removeAllShaders()
 void Z3DShaderProgram::link()
 {
   GLint value;
-  if (m_shaders.isEmpty()) {
+  if (m_shaders.empty()) {
     // If there are no explicit shaders, then it is possible that the
     // application added a program binary with glProgramBinaryOES(),
     // or otherwise populated the shaders itself. Check to see if the
@@ -105,11 +90,10 @@ void Z3DShaderProgram::link()
     glGetProgramiv(m_id, GL_INFO_LOG_LENGTH, &value);
     QString log;
     if (value > 1) {
-      char *logbuf = new char[value];
+      std::vector<char> logbuf(value);
       GLint len;
-      glGetProgramInfoLog(m_id, value, &len, logbuf);
-      log = QString::fromLatin1(logbuf);
-      delete []logbuf;
+      glGetProgramInfoLog(m_id, value, &len, logbuf.data());
+      log = QString::fromLatin1(logbuf.data());
     } else {
       log = "failed";
     }

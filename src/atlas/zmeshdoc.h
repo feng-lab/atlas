@@ -11,7 +11,6 @@ class ZMeshDoc : public ZObjDoc
   Q_OBJECT
 public:
   explicit ZMeshDoc(ZDoc &doc);
-  ~ZMeshDoc();
 
   // return info of mesh with id, assume mesh exist, otherwise crash
   QList<ZMesh*>* meshList(size_t id) { return &(m_idToMeshPacks.at(id)->meshList); }
@@ -76,7 +75,7 @@ private:
   void packInfoUpdated(MeshPack* pack);
 
 private:
-  std::map<size_t, MeshPack*> m_idToMeshPacks;
+  std::map<size_t, std::shared_ptr<MeshPack>> m_idToMeshPacks;
 
   QAction *m_loadMeshAction;
 };

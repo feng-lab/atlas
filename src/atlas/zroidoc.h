@@ -11,7 +11,6 @@ class ZROIDoc : public ZObjDoc
   Q_OBJECT
 public:
   explicit ZROIDoc(ZDoc &doc);
-  ~ZROIDoc();
 
   inline ZROI& roi(size_t id) { return *m_idToROIPacks.at(id)->roi; }
   inline const ZROI& roi(size_t id) const { return *m_idToROIPacks.at(id)->roi; }
@@ -87,7 +86,7 @@ private:
   void packInfoUpdated(ROIPack* pack);
 
 private:
-  std::map<size_t, ROIPack*> m_idToROIPacks;
+  std::map<size_t, std::shared_ptr<ROIPack>> m_idToROIPacks;
 
   QAction *m_loadROIAction;
 

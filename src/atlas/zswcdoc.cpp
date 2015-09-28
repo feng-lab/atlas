@@ -18,25 +18,15 @@ ZSwcDoc::ZSwcDoc(ZDoc &doc)
   createActions();
 }
 
-ZSwcDoc::~ZSwcDoc()
-{
-  std::set<SwcPack*> packs;
-  for (std::map<size_t, SwcPack*>::iterator it = m_idToSwcPacks.begin();
-       it != m_idToSwcPacks.end(); ++it) {
-    packs.insert(it->second);
-  }
-  qDeleteAll(packs.begin(), packs.end());
-}
-
 bool ZSwcDoc::save(size_t id)
 {
   if (!objHasUnsavedChange(id))
     return true;
 
-  SwcPack* pack = m_idToSwcPacks.at(id);
+  auto& pack = m_idToSwcPacks.at(id);
   if (ZSwc::canWriteFile(pack->path)) {
     QString err;
-    if (saveSwc(pack, pack->path, err)) {
+    if (saveSwc(pack.get(), pack->path, err)) {
       m_doc.updateObjInfo(id);
       return true;
     } else {
@@ -59,8 +49,8 @@ bool ZSwcDoc::saveAs(size_t id)
   dialog.setWindowTitle(tr("Save Swc %1 As").arg(objName(id)));
   if (dialog.exec()) {
     QString err;
-    SwcPack* pack = m_idToSwcPacks.at(id);
-    if (saveSwc(pack, dialog.selectedFiles().at(0), err)) {
+    auto& pack = m_idToSwcPacks.at(id);
+    if (saveSwc(pack.get(), dialog.selectedFiles().at(0), err)) {
       m_doc.updateObjInfo(id);
       return true;
     } else {
@@ -77,8 +67,7 @@ bool ZSwcDoc::canReadFile(const QString &fileName)
 
 size_t ZSwcDoc::loadFile(const QString &fileName, QString &errorMsg)
 {
-  for (std::map<size_t, SwcPack*>::iterator it = m_idToSwcPacks.begin();
-       it != m_idToSwcPacks.end(); ++it) {
+  for (auto it = m_idToSwcPacks.begin(); it != m_idToSwcPacks.end(); ++it) {
     if (it->second->path == fileName)
       return it->first;
   }
@@ -102,8 +91,7 @@ size_t ZSwcDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
     errorMsg = QString("File path is not string or is empty");
     return 0;
   }
-  for (std::map<size_t, SwcPack*>::iterator it = m_idToSwcPacks.begin();
-       it != m_idToSwcPacks.end(); ++it) {
+  for (auto it = m_idToSwcPacks.begin(); it != m_idToSwcPacks.end(); ++it) {
     if (isSameObj(jValue, jsonValue(it->first)))
       return it->first;
   }
@@ -130,10 +118,8 @@ QList<QAction *> ZSwcDoc::loadFileActions() const
 
 void ZSwcDoc::removeObj(size_t id)
 {
-  std::map<size_t, SwcPack*>::iterator it = m_idToSwcPacks.find(id);
+  auto it = m_idToSwcPacks.find(id);
   emit objAboutToBeRemoved(it->first, this);
-  if (!isAlias(id))
-    delete it->second;
   m_idToSwcPacks.erase(it);
   emit objRemoved(id, this);
 }
@@ -194,9 +180,8 @@ size_t ZSwcDoc::makeAlias(size_t id)
 
 bool ZSwcDoc::isAlias(size_t id) const
 {
-  SwcPack* pack = m_idToSwcPacks.at(id);
-  for (std::map<size_t, SwcPack*>::const_iterator it = m_idToSwcPacks.begin();
-       it != m_idToSwcPacks.end(); ++it) {
+  auto& pack = m_idToSwcPacks.at(id);
+  for (auto it = m_idToSwcPacks.begin(); it != m_idToSwcPacks.end(); ++it) {
     if (it->first != id && it->second == pack)
       return true;
   }
@@ -225,7 +210,7 @@ void ZSwcDoc::loadSwc()
 size_t ZSwcDoc::addSwc(ZSwc &tree, const QString &path)
 {
   size_t id = m_doc.getNewObjId();
-  m_idToSwcPacks[id] = new SwcPack(tree, path);
+  m_idToSwcPacks[id] = std::make_shared<SwcPack>(tree, path);
   m_doc.registerNewObj(id, this);
 
   emit objAdded(id, this);
@@ -286,9 +271,8 @@ bool ZSwcDoc::saveSwc(SwcPack *pack, const QString &fileName, QString &errorMsg)
 
 void ZSwcDoc::packInfoUpdated(SwcPack *pack)
 {
-  for (std::map<size_t, SwcPack*>::iterator it = m_idToSwcPacks.begin();
-       it != m_idToSwcPacks.end(); ++it) {
-    if (it->second == pack)
+  for (auto it = m_idToSwcPacks.begin(); it != m_idToSwcPacks.end(); ++it) {
+    if (it->second.get() == pack)
       m_doc.updateObjInfo(it->first);
   }
 }

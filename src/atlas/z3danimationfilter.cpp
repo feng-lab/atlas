@@ -29,7 +29,6 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters &globalParas, QObject
   , m_upDirectionColor("Up Direction Color", glm::vec4(0,1,0,1))
   , m_viewDirectionColor("View Direction Color", glm::vec4(0,0,1,1))
   , m_cameraDirectionTimeInterval("Camera Direction Time Interval", .5, .1, 100)
-  , m_widgetsGroup(nullptr)
   , m_locked(false)
 {
   setTransformEnabled(false);
@@ -111,23 +110,23 @@ bool Z3DAnimationFilter::isReady(Z3DEye eye) const
   return Z3DGeometryFilter::isReady(eye) && m_visible.get() && m_animation;
 }
 
-ZWidgetsGroup *Z3DAnimationFilter::widgetsGroup()
+std::shared_ptr<ZWidgetsGroup> Z3DAnimationFilter::widgetsGroup()
 {
   if (!m_widgetsGroup) {
-    m_widgetsGroup = new ZWidgetsGroup("Animation3D", nullptr, 1);
-    new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
-    new ZWidgetsGroup(cameraParaAnimation()->interpolationMethodPara(), m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_lineWidth, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_colorMode, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_color, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_colorMap, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_timeInterval, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_cameraSize, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_showCameraDirection, m_widgetsGroup, 2);
-    new ZWidgetsGroup(&m_cameraDirectionSize, m_widgetsGroup, 2);
-    new ZWidgetsGroup(&m_upDirectionColor, m_widgetsGroup, 2);
-    new ZWidgetsGroup(&m_viewDirectionColor, m_widgetsGroup, 2);
-    new ZWidgetsGroup(&m_cameraDirectionTimeInterval, m_widgetsGroup, 2);
+    m_widgetsGroup = std::make_shared<ZWidgetsGroup>("Animation3D", 1);
+    m_widgetsGroup->addChild(m_visible, 1);
+    m_widgetsGroup->addChild(cameraParaAnimation()->interpolationMethodPara(), 1);
+    m_widgetsGroup->addChild(m_lineWidth, 1);
+    m_widgetsGroup->addChild(m_colorMode, 1);
+    m_widgetsGroup->addChild(m_color, 1);
+    m_widgetsGroup->addChild(m_colorMap, 1);
+    m_widgetsGroup->addChild(m_timeInterval, 1);
+    m_widgetsGroup->addChild(m_cameraSize, 1);
+    m_widgetsGroup->addChild(m_showCameraDirection, 2);
+    m_widgetsGroup->addChild(m_cameraDirectionSize, 2);
+    m_widgetsGroup->addChild(m_upDirectionColor, 2);
+    m_widgetsGroup->addChild(m_viewDirectionColor, 2);
+    m_widgetsGroup->addChild(m_cameraDirectionTimeInterval, 2);
   }
   return m_widgetsGroup;
 }

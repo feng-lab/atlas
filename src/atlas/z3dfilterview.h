@@ -47,13 +47,13 @@ public:
     }
   }
 
-  virtual ZWidgetsGroup* viewSettingWidgetsGroupOf(size_t id) override
+  virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override
   {
     typename std::map<size_t, FilterType*>::iterator it = m_idToFilter.find(id);
     if (it != m_idToFilter.end()) {
       return it->second->widgetsGroup();
     }
-    return nullptr;
+    return std::shared_ptr<ZWidgetsGroup>();
   }
 
 public slots:

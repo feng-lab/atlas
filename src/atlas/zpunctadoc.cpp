@@ -17,25 +17,15 @@ ZPunctaDoc::ZPunctaDoc(ZDoc &doc)
   createActions();
 }
 
-ZPunctaDoc::~ZPunctaDoc()
-{
-  std::set<PunctaPack*> packs;
-  for (std::map<size_t, PunctaPack*>::iterator it = m_idToPunctaPacks.begin();
-       it != m_idToPunctaPacks.end(); ++it) {
-    packs.insert(it->second);
-  }
-  qDeleteAll(packs.begin(), packs.end());
-}
-
 bool ZPunctaDoc::save(size_t id)
 {
   if (!objHasUnsavedChange(id))
     return true;
 
-  PunctaPack* pack = m_idToPunctaPacks.at(id);
+  auto& pack = m_idToPunctaPacks.at(id);
   if (ZPuncta::canWriteFile(pack->path)) {
     QString err;
-    if (savePuncta(pack, pack->path, err)) {
+    if (savePuncta(pack.get(), pack->path, err)) {
       m_doc.updateObjInfo(id);
       return true;
     } else {
@@ -61,9 +51,9 @@ bool ZPunctaDoc::saveAs(size_t id)
   dialog.setWindowTitle(tr("Save Puncta %1 As").arg(objName(id)));
   if (dialog.exec()) {
     QString err;
-    PunctaPack* pack = m_idToPunctaPacks.at(id);
+    auto& pack = m_idToPunctaPacks.at(id);
     int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    if (savePuncta(pack, dialog.selectedFiles().at(0), err, formats[fmtIdx])) {
+    if (savePuncta(pack.get(), dialog.selectedFiles().at(0), err, formats[fmtIdx])) {
       m_doc.updateObjInfo(id);
       return true;
     } else {
@@ -80,8 +70,7 @@ bool ZPunctaDoc::canReadFile(const QString &fileName)
 
 size_t ZPunctaDoc::loadFile(const QString &fileName, QString &errorMsg)
 {
-  for (std::map<size_t, PunctaPack*>::iterator it = m_idToPunctaPacks.begin();
-       it != m_idToPunctaPacks.end(); ++it) {
+  for (auto it = m_idToPunctaPacks.begin(); it != m_idToPunctaPacks.end(); ++it) {
     if (it->second->path == fileName)
       return it->first;
   }
@@ -104,8 +93,7 @@ size_t ZPunctaDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
     errorMsg = QString("File path is not string or is empty");
     return 0;
   }
-  for (std::map<size_t, PunctaPack*>::iterator it = m_idToPunctaPacks.begin();
-       it != m_idToPunctaPacks.end(); ++it) {
+  for (auto it = m_idToPunctaPacks.begin(); it != m_idToPunctaPacks.end(); ++it) {
     if (isSameObj(jValue, jsonValue(it->first)))
       return it->first;
   }
@@ -140,10 +128,8 @@ QMenu *ZPunctaDoc::processObjMenu() const
 
 void ZPunctaDoc::removeObj(size_t id)
 {
-  std::map<size_t, PunctaPack*>::iterator it = m_idToPunctaPacks.find(id);
+  auto it = m_idToPunctaPacks.find(id);
   emit objAboutToBeRemoved(it->first, this);
-  if (!isAlias(id))
-    delete it->second;
   m_idToPunctaPacks.erase(it);
   emit objRemoved(id, this);
 }
@@ -206,9 +192,8 @@ bool ZPunctaDoc::isAlias(size_t id) const
 {
   assert(m_idToPunctaPacks.find(id) != m_idToPunctaPacks.end());
 
-  PunctaPack* pack = m_idToPunctaPacks.at(id);
-  for (std::map<size_t, PunctaPack*>::const_iterator it = m_idToPunctaPacks.begin();
-       it != m_idToPunctaPacks.end(); ++it) {
+  auto& pack = m_idToPunctaPacks.at(id);
+  for (auto it = m_idToPunctaPacks.cbegin(); it != m_idToPunctaPacks.cend(); ++it) {
     if (it->first != id && it->second == pack)
       return true;
   }
@@ -250,7 +235,7 @@ void ZPunctaDoc::generateAnalysisTextFiles()
 size_t ZPunctaDoc::addPuncta(ZPuncta &puncta, const QString &path)
 {
   size_t id = m_doc.getNewObjId();
-  m_idToPunctaPacks[id] = new PunctaPack(puncta, path);
+  m_idToPunctaPacks[id] = std::make_shared<PunctaPack>(puncta, path);
   m_doc.registerNewObj(id, this);
 
   emit objAdded(id, this);
@@ -318,9 +303,8 @@ bool ZPunctaDoc::savePuncta(PunctaPack *pack, const QString &fileName, QString &
 
 void ZPunctaDoc::packInfoUpdated(PunctaPack *pack)
 {
-  for (std::map<size_t, PunctaPack*>::iterator it = m_idToPunctaPacks.begin();
-       it != m_idToPunctaPacks.end(); ++it) {
-    if (it->second == pack)
+  for (auto it = m_idToPunctaPacks.begin(); it != m_idToPunctaPacks.end(); ++it) {
+    if (it->second.get() == pack)
       m_doc.updateObjInfo(it->first);
   }
 }

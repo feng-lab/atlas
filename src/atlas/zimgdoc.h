@@ -12,7 +12,6 @@ class ZImgDoc : public ZObjDoc
   Q_OBJECT
 public:
   explicit ZImgDoc(ZDoc &doc);
-  ~ZImgDoc();
 
   inline ZImgPack& imgPack(size_t id) { return *m_idToImgPacks.at(id); }
   inline const ZImgPack& imgPack(size_t id) const { return *m_idToImgPacks.at(id); }
@@ -76,7 +75,7 @@ private:
   void packInfoUpdated(ZImgPack* pack);
 
 private:
-  std::map<size_t, ZImgPack*> m_idToImgPacks;
+  std::map<size_t, std::shared_ptr<ZImgPack>> m_idToImgPacks;
 
   QAction *m_loadImgAction;
   QAction *m_importImgZSequenceAction;

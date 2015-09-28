@@ -11,10 +11,10 @@ Z3DObjView::Z3DObjView(Z3DView &view)
   resetBoundBox();
 }
 
-ZWidgetsGroup *Z3DObjView::viewSettingWidgetsGroupOf(size_t id)
+std::shared_ptr<ZWidgetsGroup> Z3DObjView::viewSettingWidgetsGroupOf(size_t id)
 {
   Q_UNUSED(id);
-  return nullptr;
+  return std::shared_ptr<ZWidgetsGroup>();
 }
 
 void Z3DObjView::resetBoundBox()

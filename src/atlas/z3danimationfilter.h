@@ -35,7 +35,7 @@ public:
 
   virtual bool isReady(Z3DEye eye) const override;
 
-  ZWidgetsGroup *widgetsGroup();
+  std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   virtual bool hasOpaque(Z3DEye) const override { return false; }
   virtual void renderOpaque(Z3DEye eye) override;
@@ -83,7 +83,7 @@ private:
   ZVec4Parameter m_upDirectionColor;
   ZVec4Parameter m_viewDirectionColor;
   ZDoubleParameter m_cameraDirectionTimeInterval;
-  ZWidgetsGroup *m_widgetsGroup;
+  std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
 
   std::vector<glm::vec3> m_lines;
   std::vector<glm::vec4> m_lineColors;

@@ -126,7 +126,6 @@ ZSwcFilter::ZSwcFilter(ZView &view)
   , m_showSkeleton("Show Skeleton", true)
   , m_outlineColor("Outline Color", glm::vec3(1,0,0), glm::vec3(0), glm::vec3(1))
   , m_opacity("Opacity", 1, 0., 1.)
-  , m_widgetsGroup(nullptr)
 {
   m_outlineColor.setStyle("COLOR");
   connect(&m_visible, SIGNAL(valueChanged()), this, SLOT(visibleChanged()));
@@ -137,10 +136,6 @@ ZSwcFilter::ZSwcFilter(ZView &view)
   addParameter(&m_showSkeleton);
   addParameter(&m_outlineColor);
   addParameter(&m_opacity);
-}
-
-ZSwcFilter::~ZSwcFilter()
-{
 }
 
 void ZSwcFilter::setData(ZSwc &swc)
@@ -182,14 +177,14 @@ const std::vector<int> &ZSwcFilter::boundBox() const
   return m_item->boundBox();
 }
 
-ZWidgetsGroup *ZSwcFilter::viewSettingWidgetsGroup()
+std::shared_ptr<ZWidgetsGroup> ZSwcFilter::viewSettingWidgetsGroup()
 {
   if (!m_widgetsGroup) {
-    m_widgetsGroup = new ZWidgetsGroup("", nullptr, 1);
-    new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_showSkeleton, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_outlineColor, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_opacity, m_widgetsGroup, 1);
+    m_widgetsGroup = std::make_shared<ZWidgetsGroup>("", 1);
+    m_widgetsGroup->addChild(m_visible, 1);
+    m_widgetsGroup->addChild(m_showSkeleton, 1);
+    m_widgetsGroup->addChild(m_outlineColor, 1);
+    m_widgetsGroup->addChild(m_opacity, 1);
   }
   return m_widgetsGroup;
 }

@@ -51,7 +51,7 @@ public:
   bool isVolumeDownsampled() const;
   bool isSubvolume() const { return m_isSubVolume.get(); }
 
-  ZWidgetsGroup *widgetsGroup();
+  std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   virtual void enterInteractionMode() override;
   virtual void exitInteractionMode() override;
@@ -140,7 +140,7 @@ private:
 
   size_t m_maxVoxelNumber;
 
-  ZWidgetsGroup *m_widgetsGroup;
+  std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   size_t m_numParas;
 
   ZIntParameter m_interactionDownsample;      // screen space downsample during interaction

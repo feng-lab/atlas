@@ -77,7 +77,7 @@ public:
 
   void registerObjView(ZObjView* v);
 
-  ZWidgetsGroup* viewSettingWidgetsGroupOf(size_t id);
+  virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override;
 
   void read(size_t id, const QJsonObject &json);
   void write(size_t id, QJsonObject &json) const;
@@ -111,7 +111,7 @@ private slots:
   void setViewDragMode(QAction* act);
 
 protected:
-  void keyPressEvent(QKeyEvent *e);
+  void keyPressEvent(QKeyEvent *e) override;
 
 private:
   void createActions();

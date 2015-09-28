@@ -16,16 +16,6 @@ ZMeshDoc::ZMeshDoc(ZDoc &doc)
   createActions();
 }
 
-ZMeshDoc::~ZMeshDoc()
-{
-  std::set<MeshPack*> packs;
-  for (std::map<size_t, MeshPack*>::iterator it = m_idToMeshPacks.begin();
-       it != m_idToMeshPacks.end(); ++it) {
-    packs.insert(it->second);
-  }
-  qDeleteAll(packs.begin(), packs.end());
-}
-
 void ZMeshDoc::askToSave(const ZMesh &msh, const QString &title)
 {
   QStringList filters;
@@ -62,10 +52,10 @@ bool ZMeshDoc::save(size_t id)
   if (!objHasUnsavedChange(id))
     return true;
 
-  MeshPack* pack = m_idToMeshPacks.at(id);
+  auto& pack = m_idToMeshPacks.at(id);
   if (ZMesh::canWriteFile(pack->path)) {
     QString err;
-    if (saveMesh(pack, pack->path, err)) {
+    if (saveMesh(pack.get(), pack->path, err)) {
       m_doc.updateObjInfo(id);
       return true;
     } else {
@@ -91,9 +81,9 @@ bool ZMeshDoc::saveAs(size_t id)
   dialog.setWindowTitle(tr("Save Mesh %1 As").arg(objName(id)));
   if (dialog.exec()) {
     QString err;
-    MeshPack* pack = m_idToMeshPacks.at(id);
+    auto& pack = m_idToMeshPacks.at(id);
     int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    if (saveMesh(pack, dialog.selectedFiles().at(0), err, formats[fmtIdx])) {
+    if (saveMesh(pack.get(), dialog.selectedFiles().at(0), err, formats[fmtIdx])) {
       m_doc.updateObjInfo(id);
       return true;
     } else {
@@ -110,8 +100,7 @@ bool ZMeshDoc::canReadFile(const QString &fileName)
 
 size_t ZMeshDoc::loadFile(const QString &fileName, QString &errorMsg)
 {
-  for (std::map<size_t, MeshPack*>::iterator it = m_idToMeshPacks.begin();
-       it != m_idToMeshPacks.end(); ++it) {
+  for (auto it = m_idToMeshPacks.begin(); it != m_idToMeshPacks.end(); ++it) {
     if (it->second->path == fileName)
       return it->first;
   }
@@ -134,8 +123,7 @@ size_t ZMeshDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
     errorMsg = QString("File path is not string or is empty");
     return 0;
   }
-  for (std::map<size_t, MeshPack*>::iterator it = m_idToMeshPacks.begin();
-       it != m_idToMeshPacks.end(); ++it) {
+  for (auto it = m_idToMeshPacks.begin(); it != m_idToMeshPacks.end(); ++it) {
     if (isSameObj(jValue, jsonValue(it->first)))
       return it->first;
   }
@@ -162,10 +150,8 @@ QList<QAction *> ZMeshDoc::loadFileActions() const
 
 void ZMeshDoc::removeObj(size_t id)
 {
-  std::map<size_t, MeshPack*>::iterator it = m_idToMeshPacks.find(id);
+  auto it = m_idToMeshPacks.find(id);
   emit objAboutToBeRemoved(it->first, this);
-  if (!isAlias(id))
-    delete it->second;
   m_idToMeshPacks.erase(it);
   emit objRemoved(id, this);
 }
@@ -228,9 +214,8 @@ bool ZMeshDoc::isAlias(size_t id) const
 {
   assert(m_idToMeshPacks.find(id) != m_idToMeshPacks.end());
 
-  MeshPack* pack = m_idToMeshPacks.at(id);
-  for (std::map<size_t, MeshPack*>::const_iterator it = m_idToMeshPacks.begin();
-       it != m_idToMeshPacks.end(); ++it) {
+  auto& pack = m_idToMeshPacks.at(id);
+  for (auto it = m_idToMeshPacks.cbegin(); it != m_idToMeshPacks.cend(); ++it) {
     if (it->first != id && it->second == pack)
       return true;
   }
@@ -259,7 +244,7 @@ void ZMeshDoc::loadMesh()
 size_t ZMeshDoc::addMesh(ZMesh &mesh, const QString &path)
 {
   size_t id = m_doc.getNewObjId();
-  m_idToMeshPacks[id] = new MeshPack(mesh, path);
+  m_idToMeshPacks[id] = std::make_shared<MeshPack>(mesh, path);
   m_doc.registerNewObj(id, this);
 
   emit objAdded(id, this);
@@ -321,9 +306,8 @@ bool ZMeshDoc::saveMesh(MeshPack *pack, const QString &fileName, QString &errorM
 
 void ZMeshDoc::packInfoUpdated(MeshPack *pack)
 {
-  for (std::map<size_t, MeshPack*>::iterator it = m_idToMeshPacks.begin();
-       it != m_idToMeshPacks.end(); ++it) {
-    if (it->second == pack)
+  for (auto it = m_idToMeshPacks.begin(); it != m_idToMeshPacks.end(); ++it) {
+    if (it->second.get() == pack)
       m_doc.updateObjInfo(it->first);
   }
 }

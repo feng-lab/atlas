@@ -23,17 +23,12 @@ ZImgFilter::ZImgFilter(ZView &view)
   , m_lastTime(-1)
   , m_lastScale(0)
   , m_lastViewport()
-  , m_widgetsGroup(nullptr)
 {
   connect(&m_visible, SIGNAL(valueChanged()), this, SLOT(visibleChanged()));
   addParameter(&m_visible);
   connect(&m_opacity, SIGNAL(valueChanged()), this, SLOT(opacityChanged()));
   addParameter(&m_opacity);
   addParameter(&m_offsetPara);
-}
-
-ZImgFilter::~ZImgFilter()
-{
 }
 
 void ZImgFilter::setData(ZImgPack &pack)
@@ -195,18 +190,18 @@ int ZImgFilter::imgTime() const
   return realT();
 }
 
-ZWidgetsGroup *ZImgFilter::viewSettingWidgetsGroup()
+std::shared_ptr<ZWidgetsGroup> ZImgFilter::viewSettingWidgetsGroup()
 {
   if (!m_widgetsGroup) {
-    m_widgetsGroup = new ZWidgetsGroup(m_imgPack->name(), nullptr, 1);
-    new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
+    m_widgetsGroup = std::make_shared<ZWidgetsGroup>(m_imgPack->name(), 1);
+    m_widgetsGroup->addChild(m_visible, 1);
     for(size_t i=0; i<m_channelVisibleParas.size(); ++i) {
-      new ZWidgetsGroup(m_channelVisibleParas[i].get(), m_widgetsGroup, 1);
-      new ZWidgetsGroup(m_channelColorParas[i].get(), m_widgetsGroup, 1);
-      new ZWidgetsGroup(m_doubleChannelRangeParas[i].get(), m_widgetsGroup, 1);
+      m_widgetsGroup->addChild(*m_channelVisibleParas[i], 1);
+      m_widgetsGroup->addChild(*m_channelColorParas[i], 1);
+      m_widgetsGroup->addChild(*m_doubleChannelRangeParas[i], 1);
     }
-    new ZWidgetsGroup(&m_offsetPara, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_opacity, m_widgetsGroup, 1);
+    m_widgetsGroup->addChild(m_offsetPara, 1);
+    m_widgetsGroup->addChild(m_opacity, 1);
     m_widgetsGroup->setBasicAdvancedCutoff(5);
   }
   return m_widgetsGroup;
@@ -227,16 +222,16 @@ void ZImgFilter::offsetChanged()
 void ZImgFilter::updateViewSettingWidgetsGroup()
 {
   if (m_widgetsGroup) {
-    m_widgetsGroup->deleteAllChildGroups();
+    m_widgetsGroup->removeAllChildren();
 
-    new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
+    m_widgetsGroup->addChild(m_visible, 1);
     for(size_t i=0; i<m_channelVisibleParas.size(); ++i) {
-      new ZWidgetsGroup(m_channelVisibleParas[i].get(), m_widgetsGroup, 1);
-      new ZWidgetsGroup(m_channelColorParas[i].get(), m_widgetsGroup, 1);
-      new ZWidgetsGroup(m_doubleChannelRangeParas[i].get(), m_widgetsGroup, 1);
+      m_widgetsGroup->addChild(*m_channelVisibleParas[i], 1);
+      m_widgetsGroup->addChild(*m_channelColorParas[i], 1);
+      m_widgetsGroup->addChild(*m_doubleChannelRangeParas[i], 1);
     }
-    new ZWidgetsGroup(&m_offsetPara, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_opacity, m_widgetsGroup, 1);
+    m_widgetsGroup->addChild(m_offsetPara, 1);
+    m_widgetsGroup->addChild(m_opacity, 1);
     m_widgetsGroup->setBasicAdvancedCutoff(5);
 
     m_widgetsGroup->emitWidgetsGroupChangedSignal();

@@ -11,7 +11,6 @@ class ZSwcDoc : public ZObjDoc
   Q_OBJECT
 public:
   explicit ZSwcDoc(ZDoc &doc);
-  ~ZSwcDoc();
 
   // return info of swc with id, assume swc exist, otherwise crash
   ZSwc& swc(size_t id) { return m_idToSwcPacks.at(id)->swc; }
@@ -73,7 +72,7 @@ private:
   void packInfoUpdated(SwcPack* pack);
 
 private:
-  std::map<size_t, SwcPack*> m_idToSwcPacks;
+  std::map<size_t, std::shared_ptr<SwcPack>> m_idToSwcPacks;
 
   QAction *m_loadSwcAction;
 };

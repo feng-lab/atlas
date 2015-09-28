@@ -20,22 +20,11 @@ Z2DAnimationDoc::Z2DAnimationDoc(ZDoc &doc)
   createActions();
 }
 
-Z2DAnimationDoc::~Z2DAnimationDoc()
-{
-  std::set<AnimationPack*> packs;
-  for (std::map<size_t, AnimationPack*>::iterator it = m_idToAnimationPacks.begin();
-       it != m_idToAnimationPacks.end(); ++it) {
-    packs.insert(it->second);
-  }
-  qDeleteAll(packs.begin(), packs.end());
-}
-
 void Z2DAnimationDoc::bindView(ZView *v)
 {
   m_view = v;
   connect(m_view, SIGNAL(destroyed()), this, SLOT(releaseView()));
-  for (std::map<size_t, AnimationPack*>::iterator it = m_idToAnimationPacks.begin();
-       it != m_idToAnimationPacks.end(); ++it) {
+  for (auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
     it->second->animation->bindView(m_view);
   }
 }
@@ -52,10 +41,10 @@ bool Z2DAnimationDoc::save(size_t id)
   if (!objHasUnsavedChange(id))
     return true;
 
-  AnimationPack* pack = m_idToAnimationPacks.at(id);
+  auto& pack = m_idToAnimationPacks.at(id);
   if (pack->path.endsWith(".animation2d", Qt::CaseInsensitive)) {
     QString err;
-    if (saveAnimation(pack, pack->path, err)) {
+    if (saveAnimation(pack.get(), pack->path, err)) {
       m_doc.updateObjInfo(id);
       return true;
     } else {
@@ -80,8 +69,8 @@ bool Z2DAnimationDoc::saveAs(size_t id)
   dialog.setWindowTitle(tr("Save 2D Animation %1 As").arg(objName(id)));
   if (dialog.exec()) {
     QString err;
-    AnimationPack* pack = m_idToAnimationPacks.at(id);
-    if (saveAnimation(pack, dialog.selectedFiles().at(0), err)) {
+    auto& pack = m_idToAnimationPacks.at(id);
+    if (saveAnimation(pack.get(), dialog.selectedFiles().at(0), err)) {
       m_doc.updateObjInfo(id);
       return true;
     } else {
@@ -98,8 +87,7 @@ bool Z2DAnimationDoc::canReadFile(const QString &fileName)
 
 size_t Z2DAnimationDoc::loadFile(const QString &fileName, QString &errorMsg)
 {
-  for (std::map<size_t, AnimationPack*>::iterator it = m_idToAnimationPacks.begin();
-       it != m_idToAnimationPacks.end(); ++it) {
+  for (auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
     if (it->second->path == fileName)
       return it->first;
   }
@@ -126,8 +114,7 @@ size_t Z2DAnimationDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
     errorMsg = QString("File path is not string or is empty");
     return 0;
   }
-  for (std::map<size_t, AnimationPack*>::iterator it = m_idToAnimationPacks.begin();
-       it != m_idToAnimationPacks.end(); ++it) {
+  for (auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
     if (isSameObj(jValue, jsonValue(it->first)))
       return it->first;
   }
@@ -158,11 +145,9 @@ QList<QAction *> Z2DAnimationDoc::loadFileActions() const
 
 void Z2DAnimationDoc::removeObj(size_t id)
 {
-  std::map<size_t, AnimationPack*>::iterator it = m_idToAnimationPacks.find(id);
+  auto it = m_idToAnimationPacks.find(id);
   m_doc.undoGroup()->removeStack(objUndoStack(id));
   emit objAboutToBeRemoved(it->first, this);
-  if (!isAlias(id))
-    delete it->second;
   m_idToAnimationPacks.erase(it);
   emit objRemoved(id, this);
 }
@@ -223,9 +208,8 @@ bool Z2DAnimationDoc::isAlias(size_t id) const
 {
   assert(m_idToAnimationPacks.find(id) != m_idToAnimationPacks.end());
 
-  AnimationPack* pack = m_idToAnimationPacks.at(id);
-  for (std::map<size_t, AnimationPack*>::const_iterator it = m_idToAnimationPacks.begin();
-       it != m_idToAnimationPacks.end(); ++it) {
+  auto& pack = m_idToAnimationPacks.at(id);
+  for (auto it = m_idToAnimationPacks.cbegin(); it != m_idToAnimationPacks.cend(); ++it) {
     if (it->first != id && it->second == pack)
       return true;
   }
@@ -236,7 +220,7 @@ QWidget *Z2DAnimationDoc::createObjEditWidget(size_t id)
 {
   assert(m_idToAnimationPacks.find(id) != m_idToAnimationPacks.end());
 
-  AnimationPack* pack = m_idToAnimationPacks.at(id);
+  auto& pack = m_idToAnimationPacks.at(id);
   return new ZAnimationWidget(*pack->animation);
 }
 
@@ -263,8 +247,7 @@ void Z2DAnimationDoc::setModified()
 {
   Z2DAnimation *animation = qobject_cast<Z2DAnimation*>(sender());
   if (animation) {
-    for(std::map<size_t, AnimationPack*>::iterator it = m_idToAnimationPacks.begin();
-        it != m_idToAnimationPacks.end(); ++it) {
+    for(auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
       if (it->second->animation == animation) {
         it->second->updateDerivedData();
         it->second->hasUnsavedChange = true;
@@ -277,8 +260,7 @@ void Z2DAnimationDoc::setModified()
 
 void Z2DAnimationDoc::releaseView()
 {
-  for (std::map<size_t, AnimationPack*>::iterator it = m_idToAnimationPacks.begin();
-       it != m_idToAnimationPacks.end(); ++it) {
+  for (auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
     it->second->animation->releaseView();
   }
   m_view = nullptr;
@@ -287,7 +269,7 @@ void Z2DAnimationDoc::releaseView()
 size_t Z2DAnimationDoc::addAnimation(Z2DAnimation *animation, const QString &path, const QString &name)
 {
   size_t id = m_doc.getNewObjId();
-  m_idToAnimationPacks[id] = new AnimationPack(animation, path, name);
+  m_idToAnimationPacks[id] = std::make_shared<AnimationPack>(animation, path, name);
   m_doc.registerNewObj(id, this);
   m_doc.undoGroup()->addStack(animation->undoStack());
   animation->bindView(m_view);

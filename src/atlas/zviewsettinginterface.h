@@ -8,7 +8,7 @@ namespace nim {
 class ZViewSettingInterface
 {
 public:
-  virtual ZWidgetsGroup* viewSettingWidgetsGroupOf(size_t id) = 0;
+  virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) = 0;
 };
 
 } // namespace nim

@@ -216,24 +216,23 @@ void Z3DCameraParameter::updateFarDist()
 
 QWidget *Z3DCameraParameter::actualCreateWidget(QWidget *parent)
 {
-  ZWidgetsGroup *camera = new ZWidgetsGroup("Camera", NULL, 1);
-  new ZWidgetsGroup(&m_projectionType, camera, 1);
-  new ZWidgetsGroup(&m_eye, camera, 1);
-  new ZWidgetsGroup(&m_center, camera, 1);
-  new ZWidgetsGroup(&m_upVector, camera, 1);
-  new ZWidgetsGroup(&m_eyeSeparationAngle, camera, 1);
-  new ZWidgetsGroup(&m_fieldOfView, camera, 1);
-  new ZWidgetsGroup(&m_nearDist, camera, 1);
-  new ZWidgetsGroup(&m_farDist, camera, 1);
+  ZWidgetsGroup camera("Camera", 1);
+  camera.addChild(m_projectionType, 1);
+  camera.addChild(m_eye, 1);
+  camera.addChild(m_center, 1);
+  camera.addChild(m_upVector, 1);
+  camera.addChild(m_eyeSeparationAngle, 1);
+  camera.addChild(m_fieldOfView, 1);
+  camera.addChild(m_nearDist, 1);
+  camera.addChild(m_farDist, 1);
 
-  QLayout *lw = camera->createLayout(false);
+  QLayout *lw = camera.createLayout(false);
   //QWidget *widget = new QWidget();
   //widget->setLayout(lw);
   QGroupBox *groupBox = new QGroupBox("Camera Parameters", parent);
   groupBox->setLayout(lw);
 
   //widget->setParent(parent);
-  delete camera;
   //return widget;
   return groupBox;
 }

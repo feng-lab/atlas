@@ -34,7 +34,7 @@ public:
 
   virtual bool isReady(Z3DEye eye) const override;
 
-  ZWidgetsGroup *widgetsGroup();
+  std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   inline void setColorMode(const std::string &mode)
   {
@@ -132,7 +132,7 @@ private:
   std::vector<glm::vec4> m_specularAndShininessNormal;
   std::vector<glm::vec4> m_pointColorsNormal;
 
-  ZWidgetsGroup *m_widgetsGroup;
+  std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_dataIsInvalid;
 
   ZPuncta* m_origPuncta;

@@ -26,9 +26,8 @@ public:
 
   virtual bool isReady(Z3DEye eye) const override;
 
-  // caller should clean up this (by delete parent of this zwidgetgroup)
-  ZWidgetsGroup *backgroundWidgetsGroup();
-  ZWidgetsGroup *axisWidgetsGroup();
+  std::shared_ptr<ZWidgetsGroup> backgroundWidgetsGroup();
+  std::shared_ptr<ZWidgetsGroup> axisWidgetsGroup();
 
   void savePickingBufferToImage(const QString &filename);
 
@@ -102,7 +101,7 @@ private:
   Z3DShaderProgram m_waFinalShader;
 
   ZBoolParameter m_showBackground;
-  ZWidgetsGroup *m_backgroundWidgetsGroup;
+  std::shared_ptr<ZWidgetsGroup> m_backgroundWidgetsGroup;
 
   Z3DLineRenderer m_lineRenderer;
   Z3DArrowRenderer m_arrowRenderer;
@@ -126,7 +125,7 @@ private:
   glm::vec3 m_YEnd;
   glm::vec3 m_ZEnd;
 
-  ZWidgetsGroup *m_axisWidgetsGroup;
+  std::shared_ptr<ZWidgetsGroup> m_axisWidgetsGroup;
 
   ZVertexArrayObject m_screenQuadVAO;
 };

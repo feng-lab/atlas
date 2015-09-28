@@ -188,7 +188,6 @@ ZROIFilter::ZROIFilter(ZView &view)
   , m_outlineColor("Outline Color", glm::vec3(1,1,0), glm::vec3(0), glm::vec3(1))
   , m_regionColor("Region Color", glm::vec3(.2, .2, .2), glm::vec3(0), glm::vec3(1))
   , m_opacity("Opacity", .5, 0., 1.)
-  , m_widgetsGroup(nullptr)
   , m_hasSelectedItems(false)
 {
   m_outlineColor.setStyle("COLOR");
@@ -206,10 +205,6 @@ ZROIFilter::ZROIFilter(ZView &view)
   addParameter(&m_opacity);
 
   connect(&view.graphicsView(), SIGNAL(scaleChanged(double)), this, SLOT(viewScaleChanged(double)));
-}
-
-ZROIFilter::~ZROIFilter()
-{
 }
 
 void ZROIFilter::setData(ZROI &roi)
@@ -297,29 +292,29 @@ std::vector<int> ZROIFilter::boundBox() const
   return res;
 }
 
-ZWidgetsGroup *ZROIFilter::viewSettingWidgetsGroup()
+std::shared_ptr<ZWidgetsGroup> ZROIFilter::viewSettingWidgetsGroup()
 {
   if (!m_widgetsGroup) {
-    m_widgetsGroup = new ZWidgetsGroup("", nullptr, 1);
-    new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_showControlPoints, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_outlineColor, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_regionColor, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_offsetPara, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_opacity, m_widgetsGroup, 1);
+    m_widgetsGroup = std::make_shared<ZWidgetsGroup>("ROI", 1);
+    m_widgetsGroup->addChild(m_visible, 1);
+    m_widgetsGroup->addChild(m_showControlPoints, 1);
+    m_widgetsGroup->addChild(m_outlineColor, 1);
+    m_widgetsGroup->addChild(m_regionColor, 1);
+    m_widgetsGroup->addChild(m_offsetPara, 1);
+    m_widgetsGroup->addChild(m_opacity, 1);
   }
   return m_widgetsGroup;
 }
 
-ZWidgetsGroup *ZROIFilter::viewSettingWidgetsGroupForAnnotationFilter()
+std::shared_ptr<ZWidgetsGroup> ZROIFilter::viewSettingWidgetsGroupForAnnotationFilter()
 {
   if (!m_widgetsGroup) {
-    m_widgetsGroup = new ZWidgetsGroup("", nullptr, 1);
-    new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_showControlPoints, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_outlineColor, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_regionColor, m_widgetsGroup, 1);
-    new ZWidgetsGroup(&m_opacity, m_widgetsGroup, 1);
+    m_widgetsGroup = std::make_shared<ZWidgetsGroup>("", 1);
+    m_widgetsGroup->addChild(m_visible, 1);
+    m_widgetsGroup->addChild(m_showControlPoints, 1);
+    m_widgetsGroup->addChild(m_outlineColor, 1);
+    m_widgetsGroup->addChild(m_regionColor, 1);
+    m_widgetsGroup->addChild(m_opacity, 1);
   }
   return m_widgetsGroup;
 }

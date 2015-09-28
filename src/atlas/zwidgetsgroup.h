@@ -16,31 +16,30 @@ public:
     Group, Widget, Parameter
   };
 
-  explicit ZWidgetsGroup(QWidget* widget, ZWidgetsGroup* parentGroup, int visibleLevel, QObject *parent = 0);
-  explicit ZWidgetsGroup(const QString &groupName, ZWidgetsGroup* parentGroup, int visibleLevel, QObject *parent = 0);
-  explicit ZWidgetsGroup(ZParameter *parameter, ZWidgetsGroup* parentGroup, int visibleLevel, QObject *parent = 0);
-  virtual ~ZWidgetsGroup();
+  explicit ZWidgetsGroup(QWidget &widget, int visibleLevel);
+  explicit ZWidgetsGroup(const QString &groupName, int visibleLevel);
+  explicit ZWidgetsGroup(ZParameter &parameter, int visibleLevel);
 
   inline bool isGroup() const {return m_type == Type::Group;}
   inline QString getGroupName() const {return m_groupName;}
   inline void setGroupName(const QString &name) { m_groupName = name; }
-  const QList<ZWidgetsGroup*>& getChildGroups();
 
   inline void setUseToolBoxStyle(bool v) { m_useToolBoxStyle = v; }
 
   QList<ZParameter*> getParameterList();
 
-  void addChildGroup(ZWidgetsGroup *child, bool atEnd = true);
-  void deleteAllChildGroups();
-  void deleteChildParamter(const ZParameter *para);
+  void addChild(QWidget &widget, int visibleLevel);
+  void addChild(ZParameter &parameter, int visibleLevel);
+  void addChild(std::shared_ptr<ZWidgetsGroup> child, bool atEnd = true);
+  void removeAllChildren();
+  void removeChild(const ZParameter &para);
+  void removeChild(const std::shared_ptr<ZWidgetsGroup> &child);
 
-  void mergeGroup(ZWidgetsGroup* other, bool atEnd = true);
-
-  inline int getVisibleLevel() const {return m_visibleLevel;}
+  inline int visibleLevel() const {return m_visibleLevel;}
   inline void setVisibleLevel(int v) {m_visibleLevel=v;}
   inline void setBasicAdvancedCutoff(int v) {m_cutOffbetweenBasicAndAdvancedLevel=v;}
-  inline int getBasicAdvancedCutoff() const {return m_cutOffbetweenBasicAndAdvancedLevel;}
-  void setVisible(bool visible);
+  inline int basicAdvancedCutoff() const {return m_cutOffbetweenBasicAndAdvancedLevel;}
+  void setVisible(bool visible) { m_isVisible = visible; }
   inline bool isVisible() { return m_isVisible; }
 
   QWidget *createWidget(bool createBasic = true, bool scroll = true, const QString &label = QString());
@@ -49,7 +48,6 @@ public:
   bool operator<(const ZWidgetsGroup& other) const;
 
 protected:
-  void removeChildGroup(ZWidgetsGroup* child);
   
 signals:
   void requestAdvancedWidget(const QString &name);
@@ -67,11 +65,10 @@ private:
   QString m_groupName;
   QWidget *m_widget;
   ZParameter *m_parameter;
-  ZWidgetsGroup* m_parent;
   int m_visibleLevel;
   bool m_isSorted;
   int m_cutOffbetweenBasicAndAdvancedLevel;
-  QList<ZWidgetsGroup*> m_childGroups;
+  QList<std::shared_ptr<ZWidgetsGroup>> m_childGroups;
   bool m_isVisible;
 
   bool m_useToolBoxStyle;

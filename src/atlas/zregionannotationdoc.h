@@ -11,7 +11,6 @@ class ZRegionAnnotationDoc : public ZObjDoc
   Q_OBJECT
 public:
   explicit ZRegionAnnotationDoc(ZDoc &doc);
-  ~ZRegionAnnotationDoc();
 
   // return info of RegionAnnotation with id, assume RegionAnnotation exist, otherwise crash
   ZRegionAnnotation& regionAnnotation(size_t id) { return *m_idToRegionAnnotationPacks.at(id)->regionAnnotation; }
@@ -80,7 +79,7 @@ private:
   void packInfoUpdated(RegionAnnotationPack* pack);
 
 private:
-  std::map<size_t, RegionAnnotationPack*> m_idToRegionAnnotationPacks;
+  std::map<size_t, std::shared_ptr<RegionAnnotationPack>> m_idToRegionAnnotationPacks;
 
   QAction *m_loadRegionAnnotationAction;
   QAction *m_importLabelImageAction;

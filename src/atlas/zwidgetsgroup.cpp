@@ -12,76 +12,44 @@
 
 namespace nim {
 
-ZWidgetsGroup::ZWidgetsGroup(QWidget *widget, ZWidgetsGroup *parentGroup, int visibleLevel, QObject *parent)
-  : QObject(parent)
+ZWidgetsGroup::ZWidgetsGroup(QWidget &widget, int visibleLevel)
+  : QObject()
   , m_type(Type::Widget)
   , m_groupName("This is not a group")
-  , m_widget(widget)
-  , m_parameter(NULL)
-  , m_parent(parentGroup)
+  , m_widget(&widget)
+  , m_parameter(nullptr)
   , m_visibleLevel(visibleLevel)
   , m_isSorted(true)
   , m_isVisible(true)
   , m_useToolBoxStyle(false)
 {
-  if (parentGroup)
-    parentGroup->addChildGroup(this);
 }
 
-ZWidgetsGroup::ZWidgetsGroup(const QString &groupName, ZWidgetsGroup *parentGroup, int visibleLevel, QObject *parent)
-  : QObject(parent)
+ZWidgetsGroup::ZWidgetsGroup(const QString &groupName, int visibleLevel)
+  : QObject()
   , m_type(Type::Group)
   , m_groupName(groupName)
-  , m_widget(NULL)
-  , m_parameter(NULL)
-  , m_parent(parentGroup)
+  , m_widget(nullptr)
+  , m_parameter(nullptr)
   , m_visibleLevel(visibleLevel)
   , m_isSorted(false)
   , m_cutOffbetweenBasicAndAdvancedLevel(1)
   , m_isVisible(true)
   , m_useToolBoxStyle(false)
 {
-  if (parentGroup)
-    parentGroup->addChildGroup(this);
 }
 
-ZWidgetsGroup::ZWidgetsGroup(ZParameter *parameter, ZWidgetsGroup *parentGroup, int visibleLevel, QObject *parent)
-  : QObject(parent)
+ZWidgetsGroup::ZWidgetsGroup(ZParameter &parameter, int visibleLevel)
+  : QObject()
   , m_type(Type::Parameter)
   , m_groupName("This is not a group")
-  , m_widget(NULL)
-  , m_parameter(parameter)
-  , m_parent(parentGroup)
+  , m_widget(nullptr)
+  , m_parameter(&parameter)
   , m_visibleLevel(visibleLevel)
   , m_isSorted(true)
   , m_isVisible(true)
   , m_useToolBoxStyle(false)
 {
-  if (parentGroup)
-    parentGroup->addChildGroup(this);
-}
-
-ZWidgetsGroup::~ZWidgetsGroup()
-{
-  if (m_parent)
-    m_parent->removeChildGroup(this);
-  if (m_type == Type::Group) {
-    for (int i=0; i<m_childGroups.size(); i++) {
-      delete m_childGroups[i];
-    }
-  }
-}
-
-void ZWidgetsGroup::setVisible(bool visible)
-{
-  m_isVisible = visible;
-}
-
-const QList<ZWidgetsGroup *> &ZWidgetsGroup::getChildGroups()
-{
-  if (!m_isSorted)
-    sortChildGroups();
-  return m_childGroups;
 }
 
 QList<ZParameter *> ZWidgetsGroup::getParameterList()
@@ -90,9 +58,11 @@ QList<ZParameter *> ZWidgetsGroup::getParameterList()
   if (m_type == Type::Parameter) {
     res.push_back(m_parameter);
   } else if (m_type == Type::Group) {
-    const QList<ZWidgetsGroup*> &cgs = getChildGroups();
-    for (int i=0; i<cgs.size(); ++i) {
-      QList<ZParameter*> tmpRes = cgs[i]->getParameterList();
+    if (!m_isSorted) {
+      sortChildGroups();
+    }
+    for (int i=0; i<m_childGroups.size(); ++i) {
+      QList<ZParameter*> tmpRes = m_childGroups[i]->getParameterList();
       for (int j=0; j<tmpRes.size(); ++j) {
         res.push_back(tmpRes[j]);
       }
@@ -101,49 +71,52 @@ QList<ZParameter *> ZWidgetsGroup::getParameterList()
   return res;
 }
 
-void ZWidgetsGroup::addChildGroup(ZWidgetsGroup *child, bool atEnd)
+void ZWidgetsGroup::addChild(QWidget &widget, int visibleLevel)
 {
-  if (child->m_parent && child->m_parent != this)
-    child->m_parent->removeChildGroup(child);
-  child->m_parent = this;
+  addChild(std::make_shared<ZWidgetsGroup>(widget, visibleLevel));
+}
+
+void ZWidgetsGroup::addChild(ZParameter &parameter, int visibleLevel)
+{
+  addChild(std::make_shared<ZWidgetsGroup>(parameter, visibleLevel));
+}
+
+void ZWidgetsGroup::addChild(std::shared_ptr<ZWidgetsGroup> child, bool atEnd)
+{
   if (atEnd)
     m_childGroups.push_back(child);
   else
     m_childGroups.push_front(child);
-  connect(child, SIGNAL(widgetsGroupChanged()), this, SLOT(emitWidgetsGroupChangedSignal()));
+  connect(child.get(), SIGNAL(widgetsGroupChanged()), this, SLOT(emitWidgetsGroupChangedSignal()));
   m_isSorted = false;
 }
 
-void ZWidgetsGroup::deleteAllChildGroups()
+void ZWidgetsGroup::removeAllChildren()
 {
-  while (!m_childGroups.empty()) {
-    delete m_childGroups[0];
+  for (int i=0; i<m_childGroups.size(); i++) {
+    m_childGroups[i]->disconnect(this);
   }
+  m_childGroups.clear();
 }
 
-void ZWidgetsGroup::deleteChildParamter(const ZParameter *para)
+void ZWidgetsGroup::removeChild(const ZParameter &para)
 {
   for (int i=0; i<m_childGroups.size(); i++) {
     if (m_childGroups[i]->m_type == Type::Parameter &&
-        m_childGroups[i]->m_parameter == para) {
-      delete m_childGroups[i];
+        m_childGroups[i]->m_parameter == &para) {
+      m_childGroups[i]->disconnect(this);
+      m_childGroups.removeAt(i);
     }
   }
 }
 
-void ZWidgetsGroup::mergeGroup(ZWidgetsGroup *other, bool atEnd)
+void ZWidgetsGroup::removeChild(const std::shared_ptr<ZWidgetsGroup> &child)
 {
-  if (other->m_type != Type::Group) {
-      addChildGroup(other, atEnd);
-  } else {
-    if (atEnd) {
-      while (other->m_childGroups.size() > 0) {
-        addChildGroup(other->m_childGroups[0], atEnd);
-      }
-    } else {
-      for (int i=other->m_childGroups.size()-1; i>=0; i--) {
-        addChildGroup(other->m_childGroups[i], atEnd);
-      }
+  for (int i=0; i<m_childGroups.size(); i++) {
+    if (m_childGroups[i]->m_type == Type::Group &&
+        m_childGroups[i] == child) {
+      m_childGroups[i]->disconnect(this);
+      m_childGroups.removeAt(i);
     }
   }
 }
@@ -276,18 +249,10 @@ bool ZWidgetsGroup::operator <(const ZWidgetsGroup &other) const
   return m_visibleLevel < other.m_visibleLevel;
 }
 
-void ZWidgetsGroup::removeChildGroup(ZWidgetsGroup *child)
+bool __widgetGroupPtVisibleLevelLessThan(const std::shared_ptr<ZWidgetsGroup> &s1, const std::shared_ptr<ZWidgetsGroup> &s2)
 {
-  int num = m_childGroups.removeAll(child);
-  child->m_parent = nullptr;
-  if (num > 0)
-    child->disconnect(this);
+  return s1->visibleLevel() < s2->visibleLevel();
 }
-
-bool __widgetGroupPtVisibleLevelLessThan(const ZWidgetsGroup *s1, const ZWidgetsGroup *s2)
- {
-     return s1->getVisibleLevel() < s2->getVisibleLevel();
- }
 
 void ZWidgetsGroup::sortChildGroups()
 {

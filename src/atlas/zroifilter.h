@@ -79,7 +79,6 @@ class ZROIFilter : public ZObjFilter
   Q_OBJECT
 public:
   ZROIFilter(ZView &view);
-  ~ZROIFilter();
 
   void setData(ZROI &roi);
 
@@ -95,8 +94,8 @@ public:
 
   std::vector<int> boundBox() const;
 
-  ZWidgetsGroup* viewSettingWidgetsGroup();
-  ZWidgetsGroup* viewSettingWidgetsGroupForAnnotationFilter();
+  std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
+  std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupForAnnotationFilter();
 
   virtual void deleteKeyPressed() override;
   virtual void mousePressed(const QPointF &scenePos) override;
@@ -138,7 +137,7 @@ private:
   ZDoubleParameter m_opacity;
   bool m_sliceValid;
 
-  ZWidgetsGroup *m_widgetsGroup;
+  std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_hasSelectedItems;
 };
 

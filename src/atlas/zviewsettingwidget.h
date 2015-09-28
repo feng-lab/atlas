@@ -13,7 +13,6 @@ class ZViewSettingWidget : public QWidget
   Q_OBJECT
 public:
   explicit ZViewSettingWidget(ZDoc *doc, ZViewSettingInterface *view, QWidget *mw = nullptr);
-  ~ZViewSettingWidget();
 
 signals:
 
@@ -37,12 +36,16 @@ protected:
   QWidget *m_defaultWidget;
 
   struct SubWidget {
+    SubWidget(size_t id, ZWidgetsGroup *wg, QWidget *wt)
+      : id(id), widgetsGroup(wg), widget(wt)
+    {}
+
     size_t id;
-    ZWidgetsGroup *widgetsGroup;
+    ZWidgetsGroup* widgetsGroup;
     QWidget* widget;
   };
 
-  QList<SubWidget> m_subWidgets;
+  std::vector<SubWidget> m_subWidgets;
 };
 
 } // namespace nim

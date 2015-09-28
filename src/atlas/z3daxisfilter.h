@@ -23,7 +23,7 @@ public:
   void setVisible(bool visible);
 
   // caller should clean up this (by delete parent of this zwidgetgroup)
-  ZWidgetsGroup *widgetsGroup();
+  std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   virtual bool hasOpaque(Z3DEye) const override { return false; }
   virtual void renderOpaque(Z3DEye eye) override;
@@ -61,7 +61,7 @@ protected:
   glm::vec3 m_YEnd;
   glm::vec3 m_ZEnd;
 
-  ZWidgetsGroup *m_widgetsGroup;
+  std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
 };
 
 } // namespace nim

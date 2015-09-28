@@ -25,13 +25,6 @@ ZViewSettingWidget::ZViewSettingWidget(ZDoc *doc, ZViewSettingInterface *view, Q
   setMinimumHeight(250);
 }
 
-ZViewSettingWidget::~ZViewSettingWidget()
-{
-  for (int i=0; i<m_subWidgets.size(); ++i) {
-    delete m_subWidgets[i].widgetsGroup;
-  }
-}
-
 void ZViewSettingWidget::showDefaultWidget()
 {
   if (m_widget->currentWidget() != m_defaultWidget)
@@ -40,21 +33,18 @@ void ZViewSettingWidget::showDefaultWidget()
 
 void ZViewSettingWidget::showViewSettingWidgetOfObj(size_t id)
 {
-  for (int i=0; i<m_subWidgets.size(); ++i) {
+  for (size_t i=0; i<m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       m_widget->setCurrentWidget(m_subWidgets[i].widget);
       return;
     }
   }
-  ZWidgetsGroup* wg = m_view->viewSettingWidgetsGroupOf(id);
+  std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
   if (wg) {
-    SubWidget sw;
-    sw.id = id;
-    sw.widgetsGroup = wg;
-    sw.widget = wg->createWidget(false, true, QString("%1").arg(m_doc->objNameWithModifiedMarkerAndID(id)));
-    connect(wg, SIGNAL(widgetsGroupChanged()), this, SLOT(updateWidget()));
-    m_subWidgets.push_back(sw);
-    m_widget->setCurrentIndex(m_widget->addWidget(sw.widget));
+    QWidget *wt = wg->createWidget(false, true, QString("%1").arg(m_doc->objNameWithModifiedMarkerAndID(id)));
+    connect(wg.get(), SIGNAL(widgetsGroupChanged()), this, SLOT(updateWidget()));
+    m_subWidgets.emplace_back(id, wg.get(), wt);
+    m_widget->setCurrentIndex(m_widget->addWidget(wt));
   } else {
     m_widget->setCurrentWidget(m_defaultWidget);
   }
@@ -77,14 +67,13 @@ void ZViewSettingWidget::setDefaultWidget(QWidget *widget)
 
 void ZViewSettingWidget::removeViewSettingWidgetOfObj(size_t id)
 {
-  for (int i=0; i<m_subWidgets.size(); ++i) {
+  for (size_t i=0; i<m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       if (m_widget->currentWidget() == m_subWidgets[i].widget)
         m_widget->setCurrentWidget(m_defaultWidget);
       m_widget->removeWidget(m_subWidgets[i].widget);
       delete m_subWidgets[i].widget;
-      delete m_subWidgets[i].widgetsGroup;
-      m_subWidgets.removeAt(i);
+      m_subWidgets.erase(m_subWidgets.begin() + i);
       return;
     }
   }
@@ -93,7 +82,7 @@ void ZViewSettingWidget::removeViewSettingWidgetOfObj(size_t id)
 void ZViewSettingWidget::updateViewSettingWidgetLabelOfObj(size_t id)
 {
   //LINFO() << "..";
-  for (int i=0; i<m_subWidgets.size(); ++i) {
+  for (size_t i=0; i<m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       QScrollArea *sa = dynamic_cast<QScrollArea*>(m_subWidgets[i].widget);
       if (sa && sa->widget()) {
@@ -118,7 +107,7 @@ void ZViewSettingWidget::updateViewSettingWidgetLabelOfObj(size_t id)
 void ZViewSettingWidget::updateWidget()
 {
   ZWidgetsGroup *wg = qobject_cast<ZWidgetsGroup*>(sender());
-  for (int i=0; i<m_subWidgets.size(); ++i) {
+  for (size_t i=0; i<m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].widgetsGroup == wg) {
       bool current = false;
       if (m_widget->currentWidget() == m_subWidgets[i].widget) {

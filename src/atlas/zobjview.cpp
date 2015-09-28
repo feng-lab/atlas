@@ -19,10 +19,10 @@ QString ZObjView::infoOfPos(double x, double y)
   return QString();
 }
 
-ZWidgetsGroup *ZObjView::viewSettingWidgetsGroupOf(size_t id)
+std::shared_ptr<ZWidgetsGroup> ZObjView::viewSettingWidgetsGroupOf(size_t id)
 {
   Q_UNUSED(id);
-  return nullptr;
+  return std::shared_ptr<ZWidgetsGroup>();
 }
 
 void ZObjView::resetBoundBox()

@@ -22,7 +22,7 @@ public:
   const std::vector<ZParameter*>& parameters() const { return m_parameters; }
   void read(const QJsonObject &json);
   void write(QJsonObject &json) const;
-  ZWidgetsGroup* widgetsGroup(bool includeCamera);
+  std::shared_ptr<ZWidgetsGroup> widgetsGroup(bool includeCamera);
 
   // count is lightCount
   const glm::vec4* lightPositionArray() const { return m_lightPositionArray.data(); }
@@ -75,8 +75,8 @@ private:
 
   std::vector<ZParameter*> m_parameters;
 
-  ZWidgetsGroup* m_widgetsGrp;
-  ZWidgetsGroup* m_widgetsGrpNoCamera;
+  std::shared_ptr<ZWidgetsGroup> m_widgetsGrp;
+  std::shared_ptr<ZWidgetsGroup> m_widgetsGrpNoCamera;
 
   std::vector<glm::vec4> m_lightPositionArray;
   std::vector<glm::vec4> m_lightAmbientArray;

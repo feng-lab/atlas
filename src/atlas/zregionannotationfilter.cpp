@@ -12,15 +12,10 @@ ZRegionAnnotationFilter::ZRegionAnnotationFilter(ZView &view)
   : ZObjFilter(view)
   , m_regionAnnotation(nullptr)
   , m_visible("Visible", true)
-  , m_widgetsGroup(nullptr)
   , m_view(view)
 {
   connect(&m_visible, SIGNAL(valueChanged()), this, SLOT(visibleChanged()));
   //addParameter(&m_visible);
-}
-
-ZRegionAnnotationFilter::~ZRegionAnnotationFilter()
-{
 }
 
 void ZRegionAnnotationFilter::setData(ZRegionAnnotation &regionAnnotation)
@@ -61,17 +56,17 @@ const std::vector<int> &ZRegionAnnotationFilter::boundBox() const
   return m_regionAnnotation->boundBox();
 }
 
-ZWidgetsGroup *ZRegionAnnotationFilter::viewSettingWidgetsGroup()
+std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup()
 {
   if (!m_widgetsGroup) {
-    m_widgetsGroup = new ZWidgetsGroup("", nullptr, 1);
-    new ZWidgetsGroup(&m_visible, m_widgetsGroup, 1);
+    m_widgetsGroup = std::make_shared<ZWidgetsGroup>("", 1);
+    m_widgetsGroup->addChild(m_visible, 1);
     for (auto it = m_nameToID.begin(); it != m_nameToID.end(); ++it) {
-      ZWidgetsGroup *wg = m_idToROIFilters[it->second]->viewSettingWidgetsGroupForAnnotationFilter();
+      std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[it->second]->viewSettingWidgetsGroupForAnnotationFilter();
       wg->setGroupName(it->first);
-      m_widgetsGroup->addChildGroup(wg);
+      m_widgetsGroup->addChild(wg);
     }
-    new ZWidgetsGroup(&m_offsetPara, m_widgetsGroup, 2);
+    m_widgetsGroup->addChild(m_offsetPara, 2);
   }
   m_widgetsGroup->setUseToolBoxStyle(true);
   return m_widgetsGroup;
@@ -129,7 +124,7 @@ void ZRegionAnnotationFilter::allROIChanged()
 {
   if (m_widgetsGroup) {
     for (auto it = m_nameToID.begin(); it != m_nameToID.end(); ++it) {
-      delete m_idToROIFilters[it->second]->viewSettingWidgetsGroupForAnnotationFilter();
+      m_widgetsGroup->removeChild(m_idToROIFilters[it->second]->viewSettingWidgetsGroupForAnnotationFilter());
     }
   }
 
@@ -167,9 +162,9 @@ void ZRegionAnnotationFilter::allROIChanged()
 
   if (m_widgetsGroup) {
     for (auto it = m_nameToID.begin(); it != m_nameToID.end(); ++it) {
-      ZWidgetsGroup *wg = m_idToROIFilters[it->second]->viewSettingWidgetsGroupForAnnotationFilter();
+      std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[it->second]->viewSettingWidgetsGroupForAnnotationFilter();
       wg->setGroupName(it->first);
-      m_widgetsGroup->addChildGroup(wg);
+      m_widgetsGroup->addChild(wg);
     }
     m_widgetsGroup->emitWidgetsGroupChangedSignal();
   }

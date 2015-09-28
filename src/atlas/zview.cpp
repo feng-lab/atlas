@@ -232,16 +232,16 @@ void ZView::registerObjView(ZObjView *v)
   m_objViews.push_back(v);
 }
 
-ZWidgetsGroup *ZView::viewSettingWidgetsGroupOf(size_t id)
+std::shared_ptr<ZWidgetsGroup> ZView::viewSettingWidgetsGroupOf(size_t id)
 {
   if (id == 1 || id == 2 || id == 3)
-    return nullptr;
+    return std::shared_ptr<ZWidgetsGroup>();
   for (int i=0; i<m_objViews.size(); ++i) {
-    ZWidgetsGroup* wg = m_objViews[i]->viewSettingWidgetsGroupOf(id);
+    std::shared_ptr<ZWidgetsGroup> wg = m_objViews[i]->viewSettingWidgetsGroupOf(id);
     if (wg)
       return wg;
   }
-  return nullptr;
+  return std::shared_ptr<ZWidgetsGroup>();
 }
 
 void ZView::read(size_t id, const QJsonObject &json)

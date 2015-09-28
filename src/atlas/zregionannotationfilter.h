@@ -12,7 +12,6 @@ class ZRegionAnnotationFilter : public ZObjFilter
   Q_OBJECT
 public:
   ZRegionAnnotationFilter(ZView &view);
-  ~ZRegionAnnotationFilter();
 
   void setData(ZRegionAnnotation &regionAnnotation);
 
@@ -25,7 +24,7 @@ public:
 
   const std::vector<int>& boundBox() const;
 
-  ZWidgetsGroup* viewSettingWidgetsGroup();
+  std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
   virtual void deleteKeyPressed() override;
   virtual void mousePressed(const QPointF &scenePos) override;
@@ -52,7 +51,7 @@ private:
 
   ZBoolParameter m_visible;
 
-  ZWidgetsGroup *m_widgetsGroup;
+  std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   ZView &m_view;
 };
 
