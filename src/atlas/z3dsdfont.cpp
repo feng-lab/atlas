@@ -12,15 +12,9 @@ Z3DSDFont::Z3DSDFont(const QString &imageFileName, const QString &txtFileName)
   , m_txtFileName(txtFileName)
   , m_isEmpty(false)
   , m_maxFontHeight(0)
-  , m_texture(NULL)
 {
   loadImage();
   parseFontFile();
-}
-
-Z3DSDFont::~Z3DSDFont()
-{
-  delete m_texture;
 }
 
 Z3DSDFont::CharInfo Z3DSDFont::charInfo(int id) const
@@ -41,7 +35,7 @@ Z3DTexture *Z3DSDFont::texture()
     return NULL;
   if (!m_texture)
     createTexture();
-  return m_texture;
+  return m_texture.get();
 }
 
 void Z3DSDFont::loadImage()
@@ -181,11 +175,11 @@ void Z3DSDFont::parseFontFile()
 
 void Z3DSDFont::createTexture()
 {
-  if (m_isEmpty || m_texture != 0)
+  if (m_isEmpty || m_texture)
     return;
-  m_texture = new Z3DTexture(glm::ivec3(m_GLFormattedImage.width(), m_GLFormattedImage.height(), 1),
-                             GL_BGRA, (GLint)GL_RGBA8, GL_UNSIGNED_INT_8_8_8_8_REV, (GLint)GL_LINEAR, (GLint)GL_LINEAR,
-                             (GLint)GL_REPEAT);
+  m_texture.reset(new Z3DTexture(glm::ivec3(m_GLFormattedImage.width(), m_GLFormattedImage.height(), 1),
+                                 GL_BGRA, (GLint)GL_RGBA8, GL_UNSIGNED_INT_8_8_8_8_REV, (GLint)GL_LINEAR, (GLint)GL_LINEAR,
+                                 (GLint)GL_REPEAT));
   m_texture->setData(m_GLFormattedImage.bits());
   m_texture->uploadTexture();
   CHECK_GL_ERROR;

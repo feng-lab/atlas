@@ -74,7 +74,7 @@ protected:
 
   std::map<GLenum, Z3DTexture*> m_attachments;
   // textures created by this rendertarget
-  std::set<Z3DTexture*> m_ownTextures;
+  std::set<std::unique_ptr<Z3DTexture>> m_ownTextures;
 
   bool m_multisample;
   int m_samples;

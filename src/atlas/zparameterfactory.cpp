@@ -55,15 +55,6 @@ ZParameterFactory::ZParameterFactory()
   registerMaker("Font", new ZParameterMaker<ZFontParameter>());
 }
 
-ZParameterFactory::~ZParameterFactory()
-{
-  for (std::map<QString, ZParameterMakerInterface*>::iterator it = m_makers.begin();
-       it != m_makers.end(); ++it) {
-    delete it->second;
-  }
-  m_makers.clear();
-}
-
 bool ZParameterFactory::isTypeValid(const QString &type)
 {
   return m_makers.find(type) != m_makers.end();
@@ -71,7 +62,7 @@ bool ZParameterFactory::isTypeValid(const QString &type)
 
 ZParameter *ZParameterFactory::create(const QString &name, const QString &type, QObject *parent) const
 {
-  std::map<QString, ZParameterMakerInterface*>::const_iterator it = m_makers.find(type);
+  auto it = m_makers.find(type);
   if (it == m_makers.end())
     return nullptr;
   return it->second->create(name, parent);
@@ -81,9 +72,8 @@ void ZParameterFactory::registerMaker(const QString &typeName, ZParameterMakerIn
 {
   if (m_makers.find(typeName) != m_makers.end()) {
     LWARN() << "Multiple makers for type" << typeName;
-    delete m_makers[typeName];
   }
-  m_makers[typeName] = maker;
+  m_makers[typeName].reset(maker);
 }
 
 } // namespace nim

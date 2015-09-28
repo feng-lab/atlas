@@ -17,7 +17,7 @@ void ZROIView::docROIAdded(const QList<size_t> &objs)
     ZROIFilter *viewControl = new ZROIFilter(m_view);
     viewControl->setData(m_doc.roi(objs[i]));
     expandBoundBox(viewControl->boundBox());
-    m_idToFilter[objs[i]] = viewControl;
+    m_idToFilter[objs[i]].reset(viewControl);
     connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
     connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));
     connect(viewControl, SIGNAL(objSelected(bool)), this, SLOT(onObjSelectedFromView(bool)));
@@ -33,7 +33,7 @@ void ZROIView::docROIAdded(size_t id)
   ZROIFilter *viewControl = new ZROIFilter(m_view);
   viewControl->setData(m_doc.roi(id));
   expandBoundBox(viewControl->boundBox());
-  m_idToFilter[id] = viewControl;
+  m_idToFilter[id].reset(viewControl);
   m_view.updateBoundBox();
   connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
   connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));

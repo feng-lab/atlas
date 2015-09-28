@@ -3,8 +3,7 @@
 
 #include <map>
 #include "z3drendererbase.h"
-
-class Z3DShaderProgram;
+#include "z3dshaderprogram.h"
 
 namespace nim {
 
@@ -12,7 +11,6 @@ class Z3DShaderGroup
 {
 public:
   Z3DShaderGroup(Z3DRendererBase &rendererBase);
-  ~Z3DShaderGroup();
 
   void init(const QStringList &shaderFiles, const QString &header, const QString &geomHeader = "",
             const QStringList &normalShaderFiles = QStringList());
@@ -41,7 +39,7 @@ private:
   QString m_geomHeader;
   Z3DRendererBase &m_base;
   QStringList m_normalShaderFiles;
-  std::map<Z3DRendererBase::ShaderHookType, Z3DShaderProgram*> m_shaders;
+  std::map<Z3DRendererBase::ShaderHookType, std::unique_ptr<Z3DShaderProgram>> m_shaders;
 
   GLenum m_geometryInputType;
   GLenum m_geometryOutputType;

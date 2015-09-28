@@ -20,7 +20,7 @@ void Z3DSwcView::docSwcAdded(const QList<size_t> &objs)
       viewControl->setData(m_doc.swc(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
-      m_idToFilter[id] = viewControl;
+      m_idToFilter[id].reset(viewControl);
 
       viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
       connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
@@ -51,7 +51,7 @@ void Z3DSwcView::docSwcAdded(size_t id)
     viewControl->setData(m_doc.swc(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
-    m_idToFilter[id] = viewControl;
+    m_idToFilter[id].reset(viewControl);
 
     viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
     connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));

@@ -22,7 +22,6 @@ public:
 
   void setVisible(bool visible);
 
-  // caller should clean up this (by delete parent of this zwidgetgroup)
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   virtual bool hasOpaque(Z3DEye) const override { return false; }

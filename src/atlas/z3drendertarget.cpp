@@ -42,11 +42,6 @@ Z3DRenderTarget::~Z3DRenderTarget()
   //    glDeleteFramebuffers(1, &m_multisampleFBOID);
   //  }
   glDeleteFramebuffers(1, &m_fboID);
-
-  for (std::set<Z3DTexture*>::iterator it = m_ownTextures.begin();
-       it != m_ownTextures.end(); ++it) {
-    delete (*it);
-  }
 }
 
 void Z3DRenderTarget::createColorAttachment(GLint internalColorFormat, GLenum attachment)
@@ -415,7 +410,7 @@ void Z3DRenderTarget::attachTextureToFBO(Z3DTexture *texture, GLenum attachment,
   release();
   m_attachments[attachment] = texture;
   if (takeOwnership)
-    m_ownTextures.insert(texture);
+    m_ownTextures.emplace(texture);
 }
 
 void Z3DRenderTarget::detach(GLenum attachment)

@@ -93,8 +93,8 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject &vao, con
   if (!triangleIndexes.empty())
     bufObjectsSize++;
 
-  GLuint *bufObjects = new GLuint[bufObjectsSize];
-  glGenBuffers(bufObjectsSize, bufObjects);
+  std::vector<GLuint> bufObjects(bufObjectsSize);
+  glGenBuffers(bufObjectsSize, bufObjects.data());
 
   int bufIdx = 0;
   glEnableVertexAttribArray(attr_vertex);
@@ -147,8 +147,7 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject &vao, con
   }
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
-  glDeleteBuffers(bufObjectsSize, bufObjects);
-  delete bufObjects;
+  glDeleteBuffers(bufObjectsSize, bufObjects.data());
 
   glDisableVertexAttribArray(attr_vertex);
   if (attr_1dTexCoord0 != -1 && !textureCoordinates1D.empty())

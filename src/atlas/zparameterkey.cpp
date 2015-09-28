@@ -23,7 +23,7 @@ ZParameterKey::ZParameterKey(double tm, const ZParameter &p)
   : m_time(std::max(tm,0.0))
   , m_paraAnimation(nullptr)
 {
-  m_value = ZParameterFactoryInstance.create(p.name(), p.type());
+  m_value.reset(ZParameterFactoryInstance.create(p.name(), p.type()));
   m_value->forceSetValueSameAs(p);
   setDefaultType();
 }
@@ -33,7 +33,7 @@ ZParameterKey::ZParameterKey(double tm, ZParameter *p)
   , m_paraAnimation(nullptr)
 {
   assert(p);
-  m_value = p;
+  m_value.reset(p);
   setDefaultType();
 }
 
@@ -41,7 +41,7 @@ ZParameterKey::ZParameterKey(const QString &type)
   : m_time(0)
   , m_paraAnimation(nullptr)
 {
-  m_value = ZParameterFactoryInstance.create("",type);
+  m_value.reset(ZParameterFactoryInstance.create("",type));
   assert(m_value);
   setDefaultType();
 }
@@ -50,7 +50,7 @@ ZParameterKey::ZParameterKey(const ZParameterKey &key)
   : m_time(std::max(0.,key.time()))
   , m_paraAnimation(nullptr)
 {
-  m_value = ZParameterFactoryInstance.create(key.value().name(), key.value().type());
+  m_value.reset(ZParameterFactoryInstance.create(key.value().name(), key.value().type()));
   m_value->setSameAs(key.value());
   setDefaultType();
   setType(key.type());
@@ -58,7 +58,6 @@ ZParameterKey::ZParameterKey(const ZParameterKey &key)
 
 ZParameterKey::~ZParameterKey()
 {
-  delete m_value;
 }
 
 void ZParameterKey::setTime(double t)

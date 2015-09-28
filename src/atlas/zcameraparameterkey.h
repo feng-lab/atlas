@@ -18,9 +18,9 @@ public:
 
   ZCameraParameterKey(const ZCameraParameterKey &key);
 
-  inline Z3DCameraParameter* para() { return static_cast<Z3DCameraParameter*>(m_value); }
-  inline glm::vec3 eye() const { return static_cast<Z3DCameraParameter*>(m_value)->get().eye(); }
-  inline glm::quat rot() const { return glm::quat_cast(static_cast<Z3DCameraParameter*>(m_value)->get().viewMatrix(Z3DEye::Mono)); }
+  inline Z3DCameraParameter* para() { return static_cast<Z3DCameraParameter*>(m_value.get()); }
+  inline glm::vec3 eye() const { return static_cast<Z3DCameraParameter*>(m_value.get())->get().eye(); }
+  inline glm::quat rot() const { return glm::quat_cast(static_cast<Z3DCameraParameter*>(m_value.get())->get().viewMatrix(Z3DEye::Mono)); }
 
   float posTension() const { return m_posTension; }
   void setPosTension(float v) { m_posTension = std::min(std::max(v,-1.f), 1.f); }

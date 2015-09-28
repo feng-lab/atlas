@@ -110,17 +110,15 @@ size_t ZROIDoc::loadFile(const QString &fileName, QString &errorMsg)
       return it->first;
   }
   size_t id;
-  ZROI *roi = nullptr;
   try {
-    roi = new ZROI();
+    auto roi = std::make_unique<ZROI>();
     roi->load(fileName);
-    id = addROI(roi, fileName);
+    id = addROI(roi.release(), fileName);
     ZSystemInfoInstance.addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
   catch (const ZException & e) {
-    delete roi;
     errorMsg = QString("Can not read animation from %1: %2")
         .arg(fileName).arg(e.what());
     return 0;
@@ -139,17 +137,15 @@ size_t ZROIDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
   }
   size_t id;
   QString fileName = jValue.toString();
-  ZROI *roi = nullptr;
   try {
-    roi = new ZROI();
+    auto roi = std::make_unique<ZROI>();
     roi->load(fileName);
-    id = addROI(roi, fileName);
+    id = addROI(roi.release(), fileName);
     ZSystemInfoInstance.addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
   catch (const ZException & e) {
-    delete roi;
     errorMsg = QString("Can not read ROI from %1: %2")
         .arg(fileName).arg(e.what());
     return 0;
@@ -267,7 +263,7 @@ void ZROIDoc::setModified()
   ZROI *roi = qobject_cast<ZROI*>(sender());
   if (roi) {
     for(auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
-      if (it->second->roi == roi) {
+      if (it->second->roi.get() == roi) {
         it->second->updateDerivedData();
         it->second->hasUnsavedChange = true;
         m_doc.updateObjInfo(it->first);
@@ -345,11 +341,6 @@ ZROIDoc::ROIPack::ROIPack(ZROI *roi, const QString &path)
     hasUnsavedChange = true;
     m_name = generateUniqueName();
   }
-}
-
-ZROIDoc::ROIPack::~ROIPack()
-{
-  delete roi;
 }
 
 void ZROIDoc::ROIPack::updateDerivedData()

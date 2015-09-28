@@ -50,7 +50,7 @@ protected:
 
 protected:
   double m_time;
-  ZParameter *m_value;
+  std::unique_ptr<ZParameter> m_value;
   ZStringIntOptionParameter *m_type;
 
   QEasingCurve m_curve;

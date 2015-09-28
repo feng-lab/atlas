@@ -52,7 +52,6 @@ signals:
 private:
   struct AnimationPack { // animation and its associated data
     AnimationPack(Z2DAnimation *animation, const QString &path, const QString &name = "");
-    ~AnimationPack();
 
     void updateDerivedData();
     const QString& info() const;
@@ -60,7 +59,7 @@ private:
     inline const QString& tooltip() const { return m_tooltip; }
 
 
-    Z2DAnimation *animation;
+    std::unique_ptr<Z2DAnimation> animation;
     QString path;
     bool hasUnsavedChange;
 

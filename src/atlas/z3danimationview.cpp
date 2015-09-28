@@ -17,10 +17,10 @@ void Z3DAnimationView::docAnimationAdded(const QList<size_t> &objs)
     for (int i=0; i<objs.size(); ++i) {
       size_t id = objs[i];
       Z3DAnimationFilter *viewControl = new Z3DAnimationFilter(globalParas(), this);
-      viewControl->setData(m_doc.animation(id));
+      viewControl->setData(&m_doc.animation(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
-      m_idToFilter[id] = viewControl;
+      m_idToFilter[id].reset(viewControl);
 
       viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
       connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
@@ -42,10 +42,10 @@ void Z3DAnimationView::docAnimationAdded(size_t id)
 {
   try {
     Z3DAnimationFilter *viewControl = new Z3DAnimationFilter(globalParas(), this);
-    viewControl->setData(m_doc.animation(id));
+    viewControl->setData(&m_doc.animation(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
-    m_idToFilter[id] = viewControl;
+    m_idToFilter[id].reset(viewControl);
 
     viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
     connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));

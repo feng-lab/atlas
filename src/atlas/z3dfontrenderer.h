@@ -3,17 +3,15 @@
 
 #include "z3dprimitiverenderer.h"
 #include "zfontparameter.h"
+#include "z3dsdfont.h"
 
 namespace nim {
-
-class Z3DSDFont;
 
 class Z3DFontRenderer : public Z3DPrimitiveRenderer
 {
   Q_OBJECT
 public:
   explicit Z3DFontRenderer(Z3DRendererBase &rendererBase);
-  virtual ~Z3DFontRenderer();
 
   void setData(std::vector<glm::vec3> *positions, const QStringList &texts);
   void setDataColors(std::vector<glm::vec4> *colors);
@@ -55,7 +53,7 @@ protected:
   ZBoolParameter m_showFontShadow;
   ZVec4Parameter m_fontShadowColor;
 
-  std::vector<Z3DSDFont*> m_allFonts;
+  std::vector<std::unique_ptr<Z3DSDFont>> m_allFonts;
 
   std::vector<glm::vec3> *m_positionsPt;
   std::vector<glm::vec4> *m_colorsPt;

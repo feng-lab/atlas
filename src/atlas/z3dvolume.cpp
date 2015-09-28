@@ -12,9 +12,7 @@ Z3DVolume::Z3DVolume(nim::ZImg &img, const glm::vec3 &spacing,
                      const glm::vec3 &offset, const glm::mat4 &transformation, QObject *parent)
   : QObject(parent)
   , m_histogramMaxValue(-1)
-  , m_texture(NULL)
   , m_volColor(1.f,1.f,1.f)
-  , m_histogramThread(NULL)
 {
   m_img.swap(img);
   m_dimensions = glm::uvec3(m_img.width(), m_img.height(), m_img.depth());
@@ -33,9 +31,7 @@ Z3DVolume::~Z3DVolume()
     if (m_histogramThread->isRunning()) {
       m_histogramThread->wait();
     }
-    delete m_histogramThread;
   }
-  delete m_texture;
 }
 
 int Z3DVolume::bitsStored() const
@@ -94,8 +90,8 @@ void Z3DVolume::asyncGenerateHistogram()
 {
   if (hasHistogram() || m_histogramThread)
     return;
-  m_histogramThread = new Z3DVolumeHistogramThread(this);
-  connect(m_histogramThread, SIGNAL(finished()), this, SLOT(setHistogram()));
+  m_histogramThread.reset(new Z3DVolumeHistogramThread(this));
+  connect(m_histogramThread.get(), SIGNAL(finished()), this, SLOT(setHistogram()));
   m_histogramThread->start();
 }
 
@@ -147,12 +143,10 @@ double Z3DVolume::logNormalizedHistogramValue(double fraction) const
 
 Z3DTexture *Z3DVolume::texture()
 {
-  if (m_texture)
-    return m_texture;
-  else {
+  if (!m_texture) {
     generateTexture();
-    return m_texture;   // might still be null
   }
+  return m_texture.get();
 }
 
 void Z3DVolume::setUniform(Z3DShaderProgram &shader, const QString &uniform, const GLint texUnit) const
@@ -335,7 +329,7 @@ void Z3DVolume::generateTexture()
   CHECK_GL_ERROR;
 
   // append to internal data structure
-  m_texture = tex;
+  m_texture.reset(tex);
 }
 
 void Z3DVolume::computeHistogramMaxValue()

@@ -23,7 +23,6 @@ public:
   static ZParameterFactory& instance();
 
   ZParameterFactory();
-  ~ZParameterFactory();
 
   bool isTypeValid(const QString &type);
   // return nullptr if failed
@@ -32,7 +31,7 @@ public:
   void registerMaker(const QString &typeName, ZParameterMakerInterface* maker);
 
 private:
-  std::map<QString, ZParameterMakerInterface*> m_makers;
+  std::map<QString, std::unique_ptr<ZParameterMakerInterface>> m_makers;
 };
 
 } // namespace nim

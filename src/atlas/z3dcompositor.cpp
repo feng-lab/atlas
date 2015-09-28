@@ -33,10 +33,8 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters &globalParas, QObject *parent)
   , m_pickingPort("PickingTarget", true, Z3DFilter::InvalidAllResult, (GLint)GL_RGBA8)
   , m_gPPort("GeometryFilters", true)
   , m_vPPort("VolumeFilters", true)
-  , m_ddpRT(NULL)
   , m_ddpBlendShader()
   , m_ddpFinalShader()
-  , m_waRT(NULL)
   , m_waFinalShader()
   , m_showBackground("Show Background", true)
   , m_lineRenderer(m_rendererBase)
@@ -129,23 +127,6 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters &globalParas, QObject *parent)
   m_lineRenderer.setUseDisplayList(false);
   m_fontRenderer.setFollowCoordTransform(false);
   setupAxisCamera();
-}
-
-Z3DCompositor::~Z3DCompositor()
-{
-  if (Z3DGpuInfoInstance.isWeightedAverageSupported()) {
-    if (m_waRT) {
-      delete m_waRT;
-      m_waRT = NULL;
-    }
-  }
-
-  if (Z3DGpuInfoInstance.isDualDepthPeelingSupported()) {
-    if (m_ddpRT) {
-      delete m_ddpRT;
-      m_ddpRT = NULL;
-    }
-  }
 }
 
 bool Z3DCompositor::isReady(Z3DEye eye) const
@@ -1036,7 +1017,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*> &f
 
 bool Z3DCompositor::createDDPRenderTarget(glm::ivec2 size)
 {
-  m_ddpRT = new Z3DRenderTarget(size);
+  m_ddpRT.reset(new Z3DRenderTarget(size));
   Z3DTexture* g_dualDepthTexId[2];
   Z3DTexture* g_dualFrontBlenderTexId[2];
   Z3DTexture* g_dualBackTempTexId[2];
@@ -1115,8 +1096,7 @@ bool Z3DCompositor::createDDPRenderTarget(glm::ivec2 size)
   m_ddpRT->attachTextureToFBO(g_depthTex, GL_COLOR_ATTACHMENT7);
   bool comp =  m_ddpRT->isFBOComplete();
   if (!comp) {
-    delete m_ddpRT;
-    m_ddpRT = NULL;
+    m_ddpRT.reset();
   }
   return comp;
 }
@@ -1206,7 +1186,7 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*> &fi
 
 bool Z3DCompositor::createWARenderTarget(glm::ivec2 size)
 {
-  m_waRT = new Z3DRenderTarget(size);
+  m_waRT.reset(new Z3DRenderTarget(size));
   Z3DTexture* g_accumulationTexId[2];
 
 #ifdef USE_RECT_TEX
@@ -1233,8 +1213,7 @@ bool Z3DCompositor::createWARenderTarget(glm::ivec2 size)
   m_waRT->attachTextureToFBO(g_accumulationTexId[1], GL_COLOR_ATTACHMENT1);
   bool comp = m_waRT->isFBOComplete();
   if (!comp) {
-    delete m_waRT;
-    m_waRT = NULL;
+    m_waRT.reset();
   }
   return comp;
 }

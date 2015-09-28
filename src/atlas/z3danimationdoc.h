@@ -16,7 +16,7 @@ public:
   void createNewAnimation(const QString &name = "");
 
   // return info of animation with id, animation mesh exist, otherwise crash
-  Z3DAnimation* animation(size_t id) { return m_idToAnimationPacks.at(id)->animation; }
+  Z3DAnimation& animation(size_t id) { return *m_idToAnimationPacks.at(id)->animation; }
 
   // ZObjDoc interface
 public:
@@ -55,14 +55,13 @@ signals:
 private:
   struct AnimationPack { // animation and its associated data
     AnimationPack(Z3DAnimation *animation, const QString &path, const QString &name = "");
-    ~AnimationPack();
 
     void updateDerivedData();
     const QString& info() const;
     inline const QString& name() const { return m_name; }
     inline const QString& tooltip() const { return m_tooltip; }
 
-    Z3DAnimation *animation;
+    std::unique_ptr<Z3DAnimation> animation;
     QString path;
     bool hasUnsavedChange;
 

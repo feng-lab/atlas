@@ -62,22 +62,14 @@ Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase &rendererBase)
     QFileInfo txtFileInfo(fontDir, fileInfo.completeBaseName() + ".txt");
     if (!txtFileInfo.exists())
       continue;
-    Z3DSDFont *sdFont = new Z3DSDFont(fileInfo.absoluteFilePath(),
-                                      txtFileInfo.absoluteFilePath());
-    if (sdFont->isEmpty())
-      delete sdFont;
-    else {
+    auto sdFont = std::make_unique<Z3DSDFont>(fileInfo.absoluteFilePath(),
+                                              txtFileInfo.absoluteFilePath());
+    if (!sdFont->isEmpty()) {
       m_allFontNames.addOptionWithData(qMakePair(sdFont->fontName(), static_cast<int>(m_allFonts.size())));
-      m_allFonts.push_back(sdFont);
+      m_allFonts.emplace_back(std::move(sdFont));
     }
   }
   CHECK_GL_ERROR;
-}
-
-Z3DFontRenderer::~Z3DFontRenderer()
-{
-  for (size_t i=0; i<m_allFonts.size(); i++)
-    delete m_allFonts[i];
 }
 
 void Z3DFontRenderer::setData(std::vector<glm::vec3> *positions, const QStringList &texts)
@@ -164,7 +156,7 @@ void Z3DFontRenderer::render(Z3DEye eye)
 
   prepareFontShaderData(eye);
 
-  Z3DSDFont* font = m_allFonts[m_allFontNames.associatedData()];
+  Z3DSDFont* font = m_allFonts[m_allFontNames.associatedData()].get();
 
   if (m_rendererBase.shaderHookType() == Z3DRendererBase::ShaderHookType::Normal) {
     glEnable(GL_BLEND);
@@ -286,7 +278,7 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
   glm::mat4 viewMatrix = m_rendererBase.camera().viewMatrix(eye);
   glm::vec3 rightVector(viewMatrix[0][0], viewMatrix[0][1], viewMatrix[0][2]);
   glm::vec3 upVector(viewMatrix[1][0], viewMatrix[1][1], viewMatrix[1][2]);
-  Z3DSDFont* font = m_allFonts[m_allFontNames.associatedData()];
+  Z3DSDFont* font = m_allFonts[m_allFontNames.associatedData()].get();
   float scale = m_fontSize.get() / font->maxFontHeight();
   int indices[6] = { 0, 1, 2, 2, 1, 3 };
   int quadIdx = 0;

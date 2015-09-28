@@ -135,12 +135,6 @@ Z3DView::Z3DView(ZDoc *doc, bool stereo, Z3DMainWindow *parent)
 Z3DView::~Z3DView()
 {
   m_canvas->setNetworkEvaluator(nullptr);
-  delete m_networkEvaluator;
-  m_networkEvaluator = nullptr;
-  delete m_compositor;
-  m_compositor = nullptr;
-  delete m_canvasPainter;
-  m_canvasPainter = nullptr;
 }
 
 std::shared_ptr<ZWidgetsGroup> Z3DView::viewSettingWidgetsGroupOf(size_t id)
@@ -385,26 +379,26 @@ void Z3DView::init()
   m_globalParas.setCanvas(m_canvas);
 
   // filters
-  m_compositor = new Z3DCompositor(m_globalParas);
+  m_compositor.reset(new Z3DCompositor(m_globalParas));
   //ZStringIntOptionParameter* transparentMethod = dynamic_cast<ZStringIntOptionParameter*>(m_compositor->getParameter("Transparency"));
   //if (Z3DGpuInfoInstance.isWeightedAverageSupported())
     //transparentMethod->select("Weighted Average");
 
-  m_canvasPainter = new Z3DCanvasPainter(m_globalParas);
+  m_canvasPainter.reset(new Z3DCanvasPainter(m_globalParas));
   m_canvasPainter->setCanvas(m_canvas);
 
-  m_canvas->addEventListenerToBack(m_compositor);  // for interaction
+  m_canvas->addEventListenerToBack(m_compositor.get());  // for interaction
 
   m_compositor->outputPort("Image")->connect(m_canvasPainter->inputPort("Image"));
   m_compositor->outputPort("LeftEyeImage")->connect(m_canvasPainter->inputPort("LeftEyeImage"));
   m_compositor->outputPort("RightEyeImage")->connect(m_canvasPainter->inputPort("RightEyeImage"));
 
   // connection: canvas <-----> networkevaluator <-----> canvasrender
-  m_networkEvaluator = new Z3DNetworkEvaluator();
-  m_canvas->setNetworkEvaluator(m_networkEvaluator);
+  m_networkEvaluator.reset(new Z3DNetworkEvaluator());
+  m_canvas->setNetworkEvaluator(m_networkEvaluator.get());
 
   // pass the canvasrender to the network evaluator
-  m_networkEvaluator->setNetworkSink(m_canvasPainter);
+  m_networkEvaluator->setNetworkSink(m_canvasPainter.get());
 
   // initializes all connected filters
   m_networkEvaluator->initializeNetwork();

@@ -87,11 +87,11 @@ private:
 
   QList<Z3DObjView*> m_3dObjViews;
 
-  Z3DNetworkEvaluator *m_networkEvaluator;
+  std::unique_ptr<Z3DNetworkEvaluator> m_networkEvaluator;
   Z3DGlobalParameters m_globalParas;
   Z3DCanvas *m_canvas;
-  Z3DCanvasPainter *m_canvasPainter;
-  Z3DCompositor *m_compositor;
+  std::unique_ptr<Z3DCanvasPainter> m_canvasPainter;
+  std::unique_ptr<Z3DCompositor> m_compositor;
 
   std::vector<double> m_boundBox;
   size_t m_numObjsBefore;

@@ -14,17 +14,6 @@ Z3DShaderGroup::Z3DShaderGroup(Z3DRendererBase &rendererBase)
 {
 }
 
-Z3DShaderGroup::~Z3DShaderGroup()
-{
-  std::map<Z3DRendererBase::ShaderHookType, Z3DShaderProgram*>::iterator i = m_shaders.begin();
-  while (i != m_shaders.end()) {
-    i->second->removeAllShaders();
-    delete i->second;
-    ++i;
-  }
-  m_shaders.clear();
-}
-
 void Z3DShaderGroup::init(const QStringList &shaderFiles, const QString &header, const QString &geomHeader,
                           const QStringList &normalShaderFiles)
 {
@@ -32,13 +21,13 @@ void Z3DShaderGroup::init(const QStringList &shaderFiles, const QString &header,
   m_header = header;
   m_geomHeader = geomHeader;
   m_normalShaderFiles = normalShaderFiles;
-  m_shaders[Z3DRendererBase::ShaderHookType::Normal] = new Z3DShaderProgram();
+  m_shaders[Z3DRendererBase::ShaderHookType::Normal].reset(new Z3DShaderProgram());
   if (!GLVersionGE(3, 2)) {
     m_shaders[Z3DRendererBase::ShaderHookType::Normal]->setGeometryInputType(m_geometryInputType);
     m_shaders[Z3DRendererBase::ShaderHookType::Normal]->setGeometryOutputType(m_geometryOutputType);
     m_shaders[Z3DRendererBase::ShaderHookType::Normal]->setGeometryOutputVertexCount(m_geometryOutputVertexCount);
   }
-  buildNormalShader(m_shaders[Z3DRendererBase::ShaderHookType::Normal]);
+  buildNormalShader(m_shaders[Z3DRendererBase::ShaderHookType::Normal].get());
 }
 
 void Z3DShaderGroup::addAllSupportedPostShaders()
@@ -50,33 +39,33 @@ void Z3DShaderGroup::addAllSupportedPostShaders()
 void Z3DShaderGroup::addDualDepthPeelingShaders()
 {
   if (Z3DGpuInfoInstance.isDualDepthPeelingSupported()) {
-    m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit] = new Z3DShaderProgram();
+    m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit].reset(new Z3DShaderProgram());
     if (!GLVersionGE(3, 2)) {
       m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit]->setGeometryInputType(m_geometryInputType);
       m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit]->setGeometryOutputType(m_geometryOutputType);
       m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit]->setGeometryOutputVertexCount(m_geometryOutputVertexCount);
     }
-    m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel] = new Z3DShaderProgram();
+    m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel].reset(new Z3DShaderProgram());
     if (!GLVersionGE(3, 2)) {
       m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel]->setGeometryInputType(m_geometryInputType);
       m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel]->setGeometryOutputType(m_geometryOutputType);
       m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel]->setGeometryOutputVertexCount(m_geometryOutputVertexCount);
     }
-    buildDualDepthPeelingInitShader(m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit]);
-    buildDualDepthPeelingPeelShader(m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel]);
+    buildDualDepthPeelingInitShader(m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit].get());
+    buildDualDepthPeelingPeelShader(m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel].get());
   }
 }
 
 void Z3DShaderGroup::addWeightedAverageShaders()
 {
   if (Z3DGpuInfoInstance.isWeightedAverageSupported()) {
-    m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit] = new Z3DShaderProgram();
+    m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit].reset(new Z3DShaderProgram());
     if (!GLVersionGE(3, 2)) {
       m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit]->setGeometryInputType(m_geometryInputType);
       m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit]->setGeometryOutputType(m_geometryOutputType);
       m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit]->setGeometryOutputVertexCount(m_geometryOutputVertexCount);
     }
-    buildWeightedAverageShader(m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit]);
+    buildWeightedAverageShader(m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit].get());
   }
 }
 
@@ -104,21 +93,21 @@ void Z3DShaderGroup::rebuild(const QString &header, const QString &geomHeader)
 {
   m_header = header;
   m_geomHeader = geomHeader;
-  std::map<Z3DRendererBase::ShaderHookType, Z3DShaderProgram*>::iterator i = m_shaders.begin();
+  auto i = m_shaders.begin();
   while (i != m_shaders.end()) {
     i->second->removeAllShaders();
     switch (i->first) {
     case Z3DRendererBase::ShaderHookType::Normal:
-      buildNormalShader(i->second);
+      buildNormalShader(i->second.get());
       break;
     case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
-      buildDualDepthPeelingInitShader(i->second);
+      buildDualDepthPeelingInitShader(i->second.get());
       break;
     case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
-      buildDualDepthPeelingPeelShader(i->second);
+      buildDualDepthPeelingPeelShader(i->second.get());
       break;
     case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
-      buildWeightedAverageShader(i->second);
+      buildWeightedAverageShader(i->second.get());
     default:
       break;
     }

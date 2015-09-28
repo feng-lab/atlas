@@ -574,8 +574,8 @@ protected:
         m_priors(i) = clusterSizes(i)/clusterSizes.sum();
       }
       Eigen::VectorXi counts(m_nclasses);
-      std::vector<MatrixXrt*> sepMats;
-      std::vector<VectorXrt*> sepWeights;
+      std::vector<std::unique_ptr<MatrixXrt>> sepMats;
+      std::vector<std::unique_ptr<VectorXrt>> sepWeights;
       std::vector<int> sepMatsRowIdxs;
       switch (m_covarType) {
       case CovarianceType::Spherical:
@@ -602,8 +602,8 @@ protected:
         }
 
         for (int i=0; i<counts.rows(); i++) {
-          sepMats.push_back(new MatrixXrt(counts(i), m_dimension));
-          sepWeights.push_back(new VectorXrt(counts(i)));
+          sepMats.emplace_back(new MatrixXrt(counts(i), m_dimension));
+          sepWeights.emplace_back(new VectorXrt(counts(i)));
           sepMatsRowIdxs.push_back(0);
         }
 
@@ -621,8 +621,6 @@ protected:
             }
           }
           m_covars[i].diagonal() = covar.diagonal();
-          delete sepMats[i];
-          delete sepWeights[i];
         }
         break;
       case CovarianceType::Full:
@@ -633,8 +631,8 @@ protected:
         }
 
         for (int i=0; i<counts.rows(); i++) {
-          sepMats.push_back(new MatrixXrt(counts(i), m_dimension));
-          sepWeights.push_back(new VectorXrt(counts(i)));
+          sepMats.emplace_back(new MatrixXrt(counts(i), m_dimension));
+          sepWeights.emplace_back(new VectorXrt(counts(i)));
           sepMatsRowIdxs.push_back(0);
         }
 
@@ -649,8 +647,6 @@ protected:
           if (ZEigenUtils::rank(m_covars[i]) < m_dimension) {
             m_covars[i] += MatrixXrt::Identity(m_dimension, m_dimension);
           }
-          delete sepMats[i];
-          delete sepWeights[i];
         }
         break;
       case CovarianceType::PPCA:
@@ -665,7 +661,7 @@ protected:
         m_priors(i) = clusterSizes(i)/clusterSizes.sum();
       }
       Eigen::VectorXi counts(m_nclasses);
-      std::vector<MatrixXrt*> sepMats;
+      std::vector<std::unique_ptr<MatrixXrt>> sepMats;
       std::vector<int> sepMatsRowIdxs;
       switch (m_covarType) {
       case CovarianceType::Spherical:
@@ -692,7 +688,7 @@ protected:
         }
 
         for (int i=0; i<counts.rows(); i++) {
-          sepMats.push_back(new MatrixXrt(counts(i), m_dimension));
+          sepMats.emplace_back(new MatrixXrt(counts(i), m_dimension));
           sepMatsRowIdxs.push_back(0);
         }
 
@@ -709,7 +705,6 @@ protected:
             }
           }
           m_covars[i].diagonal() = covar.diagonal();
-          delete sepMats[i];
         }
         break;
       case CovarianceType::Full:
@@ -720,7 +715,7 @@ protected:
         }
 
         for (int i=0; i<counts.rows(); i++) {
-          sepMats.push_back(new MatrixXrt(counts(i), m_dimension));
+          sepMats.emplace_back(new MatrixXrt(counts(i), m_dimension));
           sepMatsRowIdxs.push_back(0);
         }
 
@@ -734,7 +729,6 @@ protected:
           if (ZEigenUtils::rank(m_covars[i]) < m_dimension) {
             m_covars[i] += MatrixXrt::Identity(m_dimension, m_dimension);
           }
-          delete sepMats[i];
         }
         break;
       case CovarianceType::PPCA:

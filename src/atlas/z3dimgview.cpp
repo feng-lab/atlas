@@ -21,7 +21,7 @@ void Z3DImgView::docImgAdded(const QList<size_t> &objs)
       viewControl->setData(m_doc.imgPack(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
-      m_idToFilter[id] = viewControl;
+      m_idToFilter[id].reset(viewControl);
 
       viewControl->outputPort("Image")->connect(compositor().inputPort("Image"));
       viewControl->outputPort("LeftEyeImage")->connect(compositor().inputPort("LeftEyeImage"));
@@ -56,7 +56,7 @@ void Z3DImgView::docImgAdded(size_t id)
     viewControl->setData(m_doc.imgPack(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
-    m_idToFilter[id] = viewControl;
+    m_idToFilter[id].reset(viewControl);
 
     viewControl->outputPort("Image")->connect(compositor().inputPort("Image"));
     viewControl->outputPort("LeftEyeImage")->connect(compositor().inputPort("LeftEyeImage"));

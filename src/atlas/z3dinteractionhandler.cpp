@@ -20,14 +20,6 @@ Z3DInteractionHandler::Z3DInteractionHandler(const QString &name, QObject *paren
 {
 }
 
-Z3DInteractionHandler::~Z3DInteractionHandler()
-{
-  for (size_t i=0; i<m_eventListeners.size(); ++i) {
-    delete m_eventListeners[i];
-  }
-  m_eventListeners.clear();
-}
-
 void Z3DInteractionHandler::setEnabled(bool enabled)
 {
   for (size_t i=0; i<m_eventListeners.size(); i++)
@@ -44,6 +36,13 @@ void Z3DInteractionHandler::setSharing(bool sharing)
 {
   for (size_t i=0; i<m_eventListeners.size(); i++)
     m_eventListeners[i]->setSharing(sharing);
+}
+
+void Z3DInteractionHandler::onEvent(QEvent *e, int w, int h)
+{
+  for (size_t j=0; j<m_eventListeners.size() && !e->isAccepted(); ++j) {
+    m_eventListeners[j]->sendEvent(e, w, h);
+  }
 }
 
 //////////////////////////////////////////////////////////////////////////////////

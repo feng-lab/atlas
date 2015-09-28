@@ -92,17 +92,15 @@ size_t Z3DAnimationDoc::loadFile(const QString &fileName, QString &errorMsg)
       return it->first;
   }
   size_t id;
-  Z3DAnimation *animation = nullptr;
   try {
-    animation = new Z3DAnimation(m_doc);
+    auto animation = std::make_unique<Z3DAnimation>(m_doc);
     animation->load(fileName);
-    id = addAnimation(animation, fileName);
+    id = addAnimation(animation.release(), fileName);
     ZSystemInfoInstance.addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
   catch (const ZException & e) {
-    delete animation;
     errorMsg = e.what();
     return 0;
   }
@@ -120,17 +118,15 @@ size_t Z3DAnimationDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
   }
   size_t id;
   QString fileName = jValue.toString();
-  Z3DAnimation *animation = nullptr;
   try {
-    animation = new Z3DAnimation(m_doc);
+    auto animation = std::make_unique<Z3DAnimation>(m_doc);
     animation->load(fileName);
-    id = addAnimation(animation, fileName);
+    id = addAnimation(animation.release(), fileName);
     ZSystemInfoInstance.addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
   catch (const ZException & e) {
-    delete animation;
     errorMsg = e.what();
     return 0;
   }
@@ -248,7 +244,7 @@ void Z3DAnimationDoc::setModified()
   Z3DAnimation *animation = qobject_cast<Z3DAnimation*>(sender());
   if (animation) {
     for(auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
-      if (it->second->animation == animation) {
+      if (it->second->animation.get() == animation) {
         it->second->updateDerivedData();
         it->second->hasUnsavedChange = true;
         m_doc.updateObjInfo(it->first);
@@ -284,18 +280,12 @@ size_t Z3DAnimationDoc::addAnimation(Z3DAnimation *animation, const QString &pat
 }
 
 Z3DAnimationDoc::AnimationPack::AnimationPack(Z3DAnimation *animationIn, const QString &path, const QString &name)
-  : path(QFileInfo(path).canonicalFilePath()), hasUnsavedChange(false), m_tmpName(name)
+  : animation(animationIn), path(QFileInfo(path).canonicalFilePath()), hasUnsavedChange(false), m_tmpName(name)
 {
-  animation = animationIn;
   if (path.isEmpty()) {
     hasUnsavedChange = true;
   }
   updateDerivedData();
-}
-
-Z3DAnimationDoc::AnimationPack::~AnimationPack()
-{
-  delete animation;
 }
 
 void Z3DAnimationDoc::AnimationPack::updateDerivedData()

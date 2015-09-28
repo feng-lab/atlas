@@ -18,9 +18,8 @@ QString ZImgView::infoOfPos(double x, double y)
 {
   QString info;
   try {
-  for (std::map<size_t, ZImgFilter*>::iterator it = m_idToFilter.begin();
-       it != m_idToFilter.end(); ++it) {
-    ZImgFilter *viewControl = it->second;
+  for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
+    ZImgFilter *viewControl = it->second.get();
     if (!viewControl->isVisible())
       continue;
     size_t id = it->first;
@@ -54,7 +53,7 @@ void ZImgView::docImgAdded(const QList<size_t> &objs)
     ZImgFilter *viewControl = new ZImgFilter(m_view);
     viewControl->setData(m_doc.imgPack(objs[i]));
     expandBoundBox(viewControl->boundBox());
-    m_idToFilter[objs[i]] = viewControl;
+    m_idToFilter[objs[i]].reset(viewControl);
     connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
     connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));
     connect(viewControl, SIGNAL(objSelected(bool)), this, SLOT(onObjSelectedFromView(bool)));
@@ -70,7 +69,7 @@ void ZImgView::docImgAdded(size_t id)
   ZImgFilter *viewControl = new ZImgFilter(m_view);
   viewControl->setData(m_doc.imgPack(id));
   expandBoundBox(viewControl->boundBox());
-  m_idToFilter[id] = viewControl;
+  m_idToFilter[id].reset(viewControl);
   m_view.updateBoundBox();
   connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
   connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));

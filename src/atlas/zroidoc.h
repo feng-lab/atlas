@@ -58,14 +58,13 @@ signals:
 private:
   struct ROIPack { // ROI and its associated data
     ROIPack(ZROI *roi, const QString &path);
-    ~ROIPack();
 
     void updateDerivedData();
     const QString& info() const;
     inline const QString& name() const { return m_name; }
     inline const QString& tooltip() const { return m_tooltip; }
 
-    ZROI *roi;
+    std::unique_ptr<ZROI> roi;
     QString path;
     bool hasUnsavedChange;
 

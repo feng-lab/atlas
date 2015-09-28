@@ -13,7 +13,6 @@ class Z3DInteractionHandler : public QObject
   Q_OBJECT
 public:
   Z3DInteractionHandler(const QString& name, QObject *parent = 0);
-  virtual ~Z3DInteractionHandler();
 
   void setName(const QString& name) { m_name = name; }
   inline QString name() const { return m_name; }
@@ -27,8 +26,7 @@ public:
   void setVisible(bool state);
   void setSharing(bool sharing);
 
-  const std::vector<ZEventListenerParameter*>& eventListeners() const
-  {return m_eventListeners;}
+  void onEvent(QEvent* e, int w, int h);
 
 signals:
   void cameraMoved();
@@ -45,10 +43,10 @@ protected:
   void setState(State state) { m_state = state; }
 
   void addEventListener(ZEventListenerParameter* eventListener)
-  { m_eventListeners.push_back(eventListener); }
+  { m_eventListeners.emplace_back(eventListener); }
 
   QString m_name;
-  std::vector<ZEventListenerParameter*> m_eventListeners;
+  std::vector<std::unique_ptr<ZEventListenerParameter>> m_eventListeners;
   State m_state;
 
   float m_mouseWheelMotionFactor;

@@ -77,10 +77,7 @@ void Z3DFilter::onEvent(QEvent *e, int w, int h)
   //LWARN() << e << className();
   // propagate to interaction handlers
   for (size_t i=0; i<m_interactionHandlers.size() && !e->isAccepted(); ++i) {
-    for (size_t j=0; j<m_interactionHandlers[i]->eventListeners().size() &&
-         !e->isAccepted(); ++j) {
-      m_interactionHandlers[i]->eventListeners().at(j)->sendEvent(e, w, h);
-    }
+    m_interactionHandlers[i]->onEvent(e, w, h);
   }
 
   // propagate to event listeners

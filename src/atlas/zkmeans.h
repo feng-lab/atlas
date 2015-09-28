@@ -280,7 +280,7 @@ struct ZDistanceManhattan
   {
     // get median of each dimension
     Eigen::VectorXi counts(centroids.rows());
-    std::vector<Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>*> sepMats;
+    std::vector<std::unique_ptr<Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>>> sepMats;
     std::vector<int> sepMatsRowIdxs;
 
     counts.setZero();
@@ -289,7 +289,7 @@ struct ZDistanceManhattan
     }
 
     for (int i=0; i<counts.rows(); i++) {
-      sepMats.push_back(new Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>(counts(i), mat.cols()));
+      sepMats.emplace_back(new Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>(counts(i), mat.cols()));
       sepMatsRowIdxs.push_back(0);
     }
 
@@ -302,7 +302,6 @@ struct ZDistanceManhattan
       for (int c=0; c<sepMats[i]->cols(); c++) {
         centroids(i,c) = medianInPlace(sepMats[i]->col(c).data(), sepMats[i]->col(c).data()+counts(i));
       }
-      delete sepMats[i];
     }
   }
 
@@ -313,7 +312,7 @@ struct ZDistanceManhattan
   {
     // get median of each dimension
     Eigen::VectorXi counts(centroids.rows());
-    std::vector<Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>*> sepMats;
+    std::vector<std::unique_ptr<Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>>> sepMats;
     std::vector<std::vector<NonInteger>> sepWeights(centroids.rows());
     std::vector<int> sepMatsRowIdxs;
 
@@ -323,7 +322,7 @@ struct ZDistanceManhattan
     }
 
     for (int i=0; i<counts.rows(); i++) {
-      sepMats.push_back(new Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>(counts(i), mat.cols()));
+      sepMats.emplace_back(new Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>(counts(i), mat.cols()));
       sepMatsRowIdxs.push_back(0);
     }
 
@@ -338,7 +337,6 @@ struct ZDistanceManhattan
         centroids(i,c) = weightedMedian(sepMats[i]->col(c).data(), sepMats[i]->col(c).data()+counts(i),
                                         sepWeights[i].begin(), sepWeights[i].end());
       }
-      delete sepMats[i];
     }
   }
 };

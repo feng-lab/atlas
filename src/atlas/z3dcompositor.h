@@ -22,7 +22,6 @@ class Z3DCompositor : public Z3DBoundedFilter
   Q_OBJECT
 public:
   Z3DCompositor(Z3DGlobalParameters &globalParas, QObject *parent = nullptr);
-  ~Z3DCompositor();
 
   virtual bool isReady(Z3DEye eye) const override;
 
@@ -93,11 +92,11 @@ private:
   Z3DFilterInputPort<Z3DGeometryFilter> m_gPPort;
   Z3DFilterInputPort<Z3DImgFilter> m_vPPort;
 
-  Z3DRenderTarget *m_ddpRT;
+  std::unique_ptr<Z3DRenderTarget> m_ddpRT;
   Z3DShaderProgram m_ddpBlendShader;
   Z3DShaderProgram m_ddpFinalShader;
 
-  Z3DRenderTarget *m_waRT;
+  std::unique_ptr<Z3DRenderTarget> m_waRT;
   Z3DShaderProgram m_waFinalShader;
 
   ZBoolParameter m_showBackground;

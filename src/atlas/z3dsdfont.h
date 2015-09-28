@@ -42,7 +42,6 @@ public:
   };
 
   Z3DSDFont(const QString &imageFileName, const QString &txtFileName);
-  ~Z3DSDFont();
 
   inline QString fontName() const { return m_fontName; }
   inline int maxFontHeight() const { return m_maxFontHeight; }
@@ -68,7 +67,7 @@ private:
   QList<CharInfo> m_charInfos;
   int m_maxFontHeight;
 
-  Z3DTexture* m_texture;
+  std::unique_ptr<Z3DTexture> m_texture;
 };
 
 } // namespace nim

@@ -20,14 +20,6 @@ public:
             this, SLOT(onSelectionChanged(QList<size_t>,QList<size_t>)));
   }
 
-  ~Z3DFilterView()
-  {
-    for (typename std::map<size_t, FilterType*>::iterator it = m_idToFilter.begin();
-         it != m_idToFilter.end(); ++it) {
-      delete it->second;
-    }
-  }
-
   // Z3DObjView interface
 public:
   virtual const ZObjDoc& doc() const override { return m_doc; }
@@ -49,7 +41,7 @@ public:
 
   virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override
   {
-    typename std::map<size_t, FilterType*>::iterator it = m_idToFilter.find(id);
+    auto it = m_idToFilter.find(id);
     if (it != m_idToFilter.end()) {
       return it->second->widgetsGroup();
     }
@@ -60,8 +52,7 @@ public slots:
   virtual void updateBoundBox() override
   {
     resetBoundBox();
-    for (typename std::map<size_t, FilterType*>::iterator it = m_idToFilter.begin();
-         it != m_idToFilter.end(); ++it) {
+    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
       if (m_doc.isObjVisible(it->first) || m_doc.isObjSelected(it->first))
         expandBoundBox(it->second->axisAlignedBoundBox());
     }
@@ -71,15 +62,14 @@ public slots:
 protected slots:
   virtual void onObjRemoved(size_t id) override
   {
-    typename std::map<size_t, FilterType*>::iterator it = m_idToFilter.find(id);
+    auto it = m_idToFilter.find(id);
     if (it == m_idToFilter.end())
       return;
-    FilterType *viewControl = it->second;
+    FilterType *viewControl = it->second.get();
     canvas().removeEventListener(viewControl);
     m_view.canvas().getGLFocus();
-    delete viewControl;
-    networkEvaluator().updateNetwork();
     m_idToFilter.erase(it);
+    networkEvaluator().updateNetwork();
     updateBoundBox();
   }
 
@@ -87,20 +77,18 @@ protected slots:
   {
     if (m_idToFilter.empty())
       return;
-    for (typename std::map<size_t, FilterType*>::iterator it = m_idToFilter.begin();
-         it != m_idToFilter.end(); ++it) {
-      FilterType *viewControl = it->second;
+    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
+      FilterType *viewControl = it->second.get();
       canvas().removeEventListener(viewControl);
-      delete viewControl;
     }
-    networkEvaluator().updateNetwork();
     m_idToFilter.clear();
+    networkEvaluator().updateNetwork();
     updateBoundBox();
   }
 
   virtual void onObjVisibleChanged(size_t id, bool v) override
   {
-    typename std::map<size_t, FilterType*>::iterator it = m_idToFilter.find(id);
+    auto it = m_idToFilter.find(id);
     if (it == m_idToFilter.end())
       return;
     it->second->setVisible(v);
@@ -110,13 +98,13 @@ protected slots:
   virtual void onSelectionChanged(const QList<size_t> &selected, const QList<size_t> &deselected) override
   {
     for (int i=0; i<selected.size(); ++i) {
-      typename std::map<size_t, FilterType*>::iterator it = m_idToFilter.find(selected[i]);
+      auto it = m_idToFilter.find(selected[i]);
       if (it == m_idToFilter.end())
         return;
       it->second->setSelected(true);
     }
     for (int i=0; i<deselected.size(); ++i) {
-      typename std::map<size_t, FilterType*>::iterator it = m_idToFilter.find(deselected[i]);
+      auto it = m_idToFilter.find(deselected[i]);
       if (it == m_idToFilter.end())
         return;
       it->second->setSelected(false);
@@ -128,9 +116,8 @@ protected slots:
   {
     FilterType* filter = qobject_cast<FilterType*>(sender());
     if (filter) {
-      for (typename std::map<size_t, FilterType*>::iterator it = m_idToFilter.begin();
-           it != m_idToFilter.end(); ++it) {
-        if (it->second == filter) {
+      for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
+        if (it->second.get() == filter) {
           if (append)
             m_doc.doc().appendSelectObj(it->first);
           else
@@ -146,9 +133,8 @@ protected slots:
   {
     FilterType* filter = qobject_cast<FilterType*>(sender());
     if (filter) {
-      for (typename std::map<size_t, FilterType*>::iterator it = m_idToFilter.begin();
-           it != m_idToFilter.end(); ++it) {
-        if (it->second == filter) {
+      for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
+        if (it->second.get() == filter) {
           m_doc.doc().deselectObj(it->first);
           updateBoundBox();
           return;
@@ -161,9 +147,8 @@ protected slots:
   {
     FilterType* filter = qobject_cast<FilterType*>(sender());
     if (filter) {
-      for (typename std::map<size_t, FilterType*>::iterator it = m_idToFilter.begin();
-           it != m_idToFilter.end(); ++it) {
-        if (it->second == filter) {
+      for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
+        if (it->second.get() == filter) {
           if (m_doc.doc().isObjVisible(it->first) != v) {
             m_doc.doc().setObjVisible(it->first, v);
           }
@@ -175,7 +160,7 @@ protected slots:
 
 protected:
   DocType& m_doc;
-  std::map<size_t, FilterType*> m_idToFilter;
+  std::map<size_t, std::unique_ptr<FilterType>> m_idToFilter;
 };
 
 } // namespace nim

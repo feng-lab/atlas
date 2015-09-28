@@ -1507,7 +1507,6 @@ void ZImg::clearData()
 
   for (size_t i=0; i<m_data.size(); ++i) {
     //for (size_t j=0; j<m_data[i].size(); ++j) {
-    //delete [] m_data[i];
     boost::alignment::aligned_free(m_data[i]);
     //}
   }

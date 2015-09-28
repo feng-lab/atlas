@@ -237,12 +237,12 @@ protected:
   glm::mat4 m_transformationMatrix;
   std::vector<size_t> m_histogram;
   double m_histogramMaxValue;
-  Z3DTexture *m_texture;
+  std::unique_ptr<Z3DTexture> m_texture;
 
   glm::vec3 m_volColor;
 
 private:
-  Z3DVolumeHistogramThread *m_histogramThread;
+  std::unique_ptr<Z3DVolumeHistogramThread> m_histogramThread;
   bool m_hasTransformMatrix;
 };
 

@@ -41,7 +41,7 @@ public:
   // Set the opengl context of this canvas as the current one.
   inline void getGLFocus() { makeCurrent(); }
   void toggleFullScreen();
-  void forceUpdate() { QPaintEvent *pe = new QPaintEvent(rect()); paintEvent(pe); delete pe; }
+  void forceUpdate() { auto pe = std::make_unique<QPaintEvent>(rect()); paintEvent(pe.get()); }
   void updateAll() { update(); }
 
   // for high dpi support like retina
@@ -140,7 +140,7 @@ public:
   void getGLFocus();
 #endif
   void toggleFullScreen();
-  void forceUpdate() { QPaintEvent *pe = new QPaintEvent(rect()); paintEvent(pe); delete pe; }
+  void forceUpdate() { auto pe = std::make_unique<QPaintEvent>(rect()); paintEvent(pe.get()); }
   void updateAll();
 
   // for high dpi support like retina
