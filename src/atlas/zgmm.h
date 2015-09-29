@@ -602,8 +602,8 @@ protected:
         }
 
         for (int i=0; i<counts.rows(); i++) {
-          sepMats.emplace_back(new MatrixXrt(counts(i), m_dimension));
-          sepWeights.emplace_back(new VectorXrt(counts(i)));
+          sepMats.emplace_back(std::make_unique<MatrixXrt>(counts(i), m_dimension));
+          sepWeights.emplace_back(std::make_unique<VectorXrt>(counts(i)));
           sepMatsRowIdxs.push_back(0);
         }
 
@@ -631,8 +631,8 @@ protected:
         }
 
         for (int i=0; i<counts.rows(); i++) {
-          sepMats.emplace_back(new MatrixXrt(counts(i), m_dimension));
-          sepWeights.emplace_back(new VectorXrt(counts(i)));
+          sepMats.emplace_back(std::make_unique<MatrixXrt>(counts(i), m_dimension));
+          sepWeights.emplace_back(std::make_unique<VectorXrt>(counts(i)));
           sepMatsRowIdxs.push_back(0);
         }
 
@@ -688,7 +688,7 @@ protected:
         }
 
         for (int i=0; i<counts.rows(); i++) {
-          sepMats.emplace_back(new MatrixXrt(counts(i), m_dimension));
+          sepMats.emplace_back(std::make_unique<MatrixXrt>(counts(i), m_dimension));
           sepMatsRowIdxs.push_back(0);
         }
 
@@ -715,7 +715,7 @@ protected:
         }
 
         for (int i=0; i<counts.rows(); i++) {
-          sepMats.emplace_back(new MatrixXrt(counts(i), m_dimension));
+          sepMats.emplace_back(std::make_unique<MatrixXrt>(counts(i), m_dimension));
           sepMatsRowIdxs.push_back(0);
         }
 

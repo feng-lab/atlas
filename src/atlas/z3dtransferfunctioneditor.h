@@ -31,8 +31,6 @@ public:
                             const QString &histogramNormalizeMethod = tr("Log"), QString xAxisText = tr("Intensity"),
                             QString yAxisText = tr("Opacity"), QWidget* parent = 0);
 
-  virtual ~Z3DTransferFunctionWidget();
-
   virtual void paintEvent(QPaintEvent* event) override;
 
   virtual void mousePressEvent(QMouseEvent* event) override;
@@ -99,7 +97,7 @@ protected:
   void updateHistogram();
 
   Z3DTransferFunctionParameter* m_transferFunction;
-  QPixmap* m_histogramCache;
+  std::unique_ptr<QPixmap> m_histogramCache;
 
   // variables for interaction
   bool m_selectedLeftPart;            // when selected key is split, was the left part selected?

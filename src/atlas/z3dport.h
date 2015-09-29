@@ -126,13 +126,10 @@ public:
                 Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult)
     : Z3DOutputPortBase(name, allowMultipleConnections, invalidationState)
     , m_portData(0)
-    , m_ownsData(false)
   {}
 
   virtual ~Z3DOutputPort()
   {
-    if (m_ownsData)
-      delete m_portData;
   }
 
   virtual bool canConnectTo(const Z3DInputPortBase* inport) const override
@@ -143,14 +140,11 @@ public:
       return false;
   }
 
-  void setData(T* data, bool takeOwnership = false)
+  void setData(T* data)
   {
     // is it possible that the new allocated data has the same address as the old one???
     if (data != m_portData) {
-      if (m_ownsData)
-        delete m_portData;
       m_portData = data;
-      m_ownsData = takeOwnership;
       invalidate();
     }
   }
@@ -175,7 +169,6 @@ public:
 
 protected:
   T* m_portData;
-  bool m_ownsData;
 };
 
 template<typename T>

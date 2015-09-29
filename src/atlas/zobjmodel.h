@@ -27,7 +27,6 @@ public:
   };
 
   explicit ZObjModel(ZDoc *doc);
-  ~ZObjModel();
 
   QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
   Qt::ItemFlags flags(const QModelIndex &index) const;
@@ -76,12 +75,10 @@ protected:
 
   struct ObjItem {
     ObjItem(size_t id, ZObjDoc *doc, ObjItem *parent);
-    ~ObjItem();
 
-    void cleanup();
     int row() const;
 
-    QList<ObjItem*> children;
+    std::vector<std::unique_ptr<ObjItem>> children;
     ObjItem *parent;
 
     size_t id;
@@ -96,7 +93,7 @@ protected:
   QIcon m_eyeCloseIcon;
   QIcon m_lockIcon;
   QIcon m_unlockIcon;
-  ObjItem *m_rootItem;
+  std::unique_ptr<ObjItem> m_rootItem;
   ObjItem *m_viewSettingCurrentItem;
 
 signals:

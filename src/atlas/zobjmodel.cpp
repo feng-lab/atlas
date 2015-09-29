@@ -13,14 +13,9 @@ ZObjModel::ZObjModel(ZDoc *doc)
   , m_eyeCloseIcon(":/icons/eye_close-512.png")
   , m_lockIcon(":/icons/lock-512.png")
   , m_unlockIcon(":/icons/unlock-512.png")
+  , m_rootItem(std::make_unique<ObjItem>(0, nullptr, nullptr))
   , m_viewSettingCurrentItem(nullptr)
 {
-  m_rootItem = new ObjItem(0, nullptr, nullptr);
-}
-
-ZObjModel::~ZObjModel()
-{
-  delete m_rootItem;
 }
 
 QVariant ZObjModel::data(const QModelIndex &index, int role) const
@@ -194,13 +189,13 @@ QModelIndex ZObjModel::index(int row, int column, const QModelIndex &parent) con
   ObjItem *parentItem;
 
   if (!parent.isValid())
-    parentItem = m_rootItem;
+    parentItem = m_rootItem.get();
   else
     parentItem = static_cast<ObjItem*>(parent.internalPointer());
 
-  ObjItem *childItem = parentItem->children[row];
+  auto& childItem = parentItem->children[row];
   if (childItem)
-    return createIndex(row, column, childItem);
+    return createIndex(row, column, childItem.get());
   else
     return QModelIndex();
 }
@@ -213,7 +208,7 @@ QModelIndex ZObjModel::parent(const QModelIndex &index) const
   ObjItem *childItem = static_cast<ObjItem*>(index.internalPointer());
   ObjItem *parentItem = childItem->parent;
 
-  if (parentItem == m_rootItem)
+  if (parentItem == m_rootItem.get())
     return QModelIndex();
 
   return createIndex(parentItem->row(), 0, parentItem);
@@ -226,7 +221,7 @@ int ZObjModel::rowCount(const QModelIndex &parent) const
     return 0;
 
   if (!parent.isValid()) {
-    parentItem = m_rootItem;
+    parentItem = m_rootItem.get();
     return parentItem->children.size();
   } else {
     parentItem = static_cast<ObjItem*>(parent.internalPointer());
@@ -246,8 +241,8 @@ int ZObjModel::columnCount(const QModelIndex &) const
 size_t ZObjModel::numObjs() const
 {
   int num = 0;
-  for (int i=0; i<m_rootItem->children.size(); ++i) {
-    num += std::max(m_rootItem->children[i]->children.size(), 1);
+  for (size_t i=0; i<m_rootItem->children.size(); ++i) {
+    num += std::max(m_rootItem->children[i]->children.size(), size_t(1));
   }
   return num;
 }
@@ -255,11 +250,11 @@ size_t ZObjModel::numObjs() const
 QList<size_t> ZObjModel::objs() const
 {
   QList<size_t> res;
-  for (int i=0; i<m_rootItem->children.size(); ++i) {
+  for (size_t i=0; i<m_rootItem->children.size(); ++i) {
     if (m_rootItem->children[i]->children.empty()) {
       res.push_back(m_rootItem->children[i]->id);
     } else {
-      for (int j=0; j<m_rootItem->children[i]->children.size(); ++j) {
+      for (size_t j=0; j<m_rootItem->children[i]->children.size(); ++j) {
         res.push_back(m_rootItem->children[i]->children[j]->id);
       }
     }
@@ -270,13 +265,13 @@ QList<size_t> ZObjModel::objs() const
 QList<size_t> ZObjModel::objsOfDoc(const ZObjDoc *doc) const
 {
   QList<size_t> res;
-  for (int i=0; i<m_rootItem->children.size(); ++i) {
+  for (size_t i=0; i<m_rootItem->children.size(); ++i) {
     if (m_rootItem->children[i]->doc != doc)
       continue;
     if (m_rootItem->children[i]->children.empty()) {
       res.push_back(m_rootItem->children[i]->id);
     } else {
-      for (int j=0; j<m_rootItem->children[i]->children.size(); ++j) {
+      for (size_t j=0; j<m_rootItem->children[i]->children.size(); ++j) {
         res.push_back(m_rootItem->children[i]->children[j]->id);
       }
     }
@@ -286,13 +281,13 @@ QList<size_t> ZObjModel::objsOfDoc(const ZObjDoc *doc) const
 
 bool ZObjModel::isObjVisible(size_t id) const
 {
-  for (int i=0; i<m_rootItem->children.size(); ++i) {
+  for (size_t i=0; i<m_rootItem->children.size(); ++i) {
     if (m_rootItem->children[i]->children.empty()) {
       if (m_rootItem->children[i]->id == id)
         //return m_rootItem->children[i]->checkState == Qt::Checked;
         return m_rootItem->children[i]->show;
     } else {
-      for (int j=0; j<m_rootItem->children[i]->children.size(); ++j) {
+      for (size_t j=0; j<m_rootItem->children[i]->children.size(); ++j) {
         if (m_rootItem->children[i]->children[j]->id == id)
           //return m_rootItem->children[i]->children[j]->checkState == Qt::Checked;
           return m_rootItem->children[i]->children[j]->show;
@@ -317,12 +312,12 @@ void ZObjModel::setObjVisible(size_t id, bool v)
 
 ZObjDoc *ZObjModel::idToDoc(size_t id) const
 {
-  for (int i=0; i<m_rootItem->children.size(); ++i) {
+  for (size_t i=0; i<m_rootItem->children.size(); ++i) {
     if (m_rootItem->children[i]->children.empty()) {
       if (m_rootItem->children[i]->id == id)
         return m_rootItem->children[i]->doc;
     } else {
-      for (int j=0; j<m_rootItem->children[i]->children.size(); ++j) {
+      for (size_t j=0; j<m_rootItem->children[i]->children.size(); ++j) {
         if (m_rootItem->children[i]->children[j]->id == id)
           return m_rootItem->children[i]->children[j]->doc;
       }
@@ -340,19 +335,18 @@ void ZObjModel::addObj(size_t id, ZObjDoc *doc)
 {
   int row = m_rootItem->children.size();
   emit beginInsertRows(QModelIndex(), row, row);
-  m_rootItem->children.push_back(new ObjItem(id, doc, m_rootItem));
+  m_rootItem->children.emplace_back(std::make_unique<ObjItem>(id, doc, m_rootItem.get()));
   emit endInsertRows();
 }
 
 void ZObjModel::removeObj(size_t id)
 {
-  for (int i=0; i<m_rootItem->children.size(); ++i) {
+  for (size_t i=0; i<m_rootItem->children.size(); ++i) {
     if (m_rootItem->children[i]->id == id) {
       emit beginRemoveRows(QModelIndex(), i, i);
-      if (m_rootItem->children[i] == m_viewSettingCurrentItem)
+      if (m_rootItem->children[i].get() == m_viewSettingCurrentItem)
         m_viewSettingCurrentItem = nullptr;
-      delete m_rootItem->children[i];
-      m_rootItem->children.removeAt(i);
+      m_rootItem->children.erase(m_rootItem->children.begin() + i);
       emit endRemoveRows();
       return;
     }
@@ -364,13 +358,12 @@ void ZObjModel::removeObjsOfDoc(ZObjDoc *doc)
   bool cont = true;
   while (cont) {
     cont = false;
-    for (int i=0; i<m_rootItem->children.size(); ++i) {
+    for (size_t i=0; i<m_rootItem->children.size(); ++i) {
       if (m_rootItem->children[i]->doc == doc) {
         emit beginRemoveRows(QModelIndex(), i, i);
-        if (m_rootItem->children[i] == m_viewSettingCurrentItem)
+        if (m_rootItem->children[i].get() == m_viewSettingCurrentItem)
           m_viewSettingCurrentItem = nullptr;
-        delete m_rootItem->children[i];
-        m_rootItem->children.removeAt(i);
+        m_rootItem->children.erase(m_rootItem->children.begin() + i);
         emit endRemoveRows();
         cont = true;
         break;
@@ -382,7 +375,7 @@ void ZObjModel::removeObjsOfDoc(ZObjDoc *doc)
 void ZObjModel::removeAllObjs()
 {
   beginResetModel();
-  m_rootItem->cleanup();
+  m_rootItem->children.clear();
   m_viewSettingCurrentItem = nullptr;
   endResetModel();
 }
@@ -561,7 +554,7 @@ Qt::CheckState ZObjModel::getModelIndexCheckState(const QModelIndex &index) cons
 
 bool ZObjModel::needCheckbox(const QModelIndex &index) const
 {
-  if (static_cast<ObjItem*>(index.internalPointer()) == m_rootItem) {
+  if (static_cast<ObjItem*>(index.internalPointer()) == m_rootItem.get()) {
     return false;
   }
   return true;
@@ -573,24 +566,15 @@ ZObjModel::ObjItem::ObjItem(size_t id, ZObjDoc *doc, ObjItem *parent)
   checkState = Qt::Checked;
 }
 
-ZObjModel::ObjItem::~ObjItem()
-{
-  cleanup();
-}
-
-void ZObjModel::ObjItem::cleanup()
-{
-  for (int i=0; i<children.size(); ++i) {
-    children[i]->cleanup();
-    delete children[i];
-  }
-  children.clear();
-}
-
 int ZObjModel::ObjItem::row() const
 {
-  if (parent)
-    return parent->children.indexOf(const_cast<ObjItem*>(this));
+  if (parent) {
+    for (size_t i=0; i<parent->children.size(); ++i) {
+      if (parent->children[i].get() == this) {
+        return i;
+      }
+    }
+  }
   return 0;
 }
 

@@ -18,7 +18,6 @@ public:
   ZAssignPuncta(const ZImg& img, size_t dendriteChannel, size_t t = 0);
   ~ZAssignPuncta();
 
-  // DO NOT delete input puncta during the lifespan of this ZAssignPuncta instance
   void setPuncta(const ZPuncta &puncta) { m_puncta = puncta; }
   void setSomaPuncta(const ZPuncta &somaPuncta) { m_somaPuncta = somaPuncta; }
 

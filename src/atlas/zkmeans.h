@@ -289,7 +289,7 @@ struct ZDistanceManhattan
     }
 
     for (int i=0; i<counts.rows(); i++) {
-      sepMats.emplace_back(new Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>(counts(i), mat.cols()));
+      sepMats.emplace_back(std::make_unique<Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>>(counts(i), mat.cols()));
       sepMatsRowIdxs.push_back(0);
     }
 
@@ -322,7 +322,7 @@ struct ZDistanceManhattan
     }
 
     for (int i=0; i<counts.rows(); i++) {
-      sepMats.emplace_back(new Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>(counts(i), mat.cols()));
+      sepMats.emplace_back(std::make_unique<Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>>(counts(i), mat.cols()));
       sepMatsRowIdxs.push_back(0);
     }
 

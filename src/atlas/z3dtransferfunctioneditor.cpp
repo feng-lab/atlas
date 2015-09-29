@@ -27,7 +27,6 @@ Z3DTransferFunctionWidget::Z3DTransferFunctionWidget(Z3DTransferFunctionParamete
                                                      QString xAxisText, QString yAxisText, QWidget* parent)
   : QWidget(parent)
   , m_transferFunction(tf)
-  , m_histogramCache(NULL)
   , m_xAxisText(xAxisText)
   , m_yAxisText(yAxisText)
   , m_showHistogram(showHistogram)
@@ -71,11 +70,6 @@ Z3DTransferFunctionWidget::Z3DTransferFunctionWidget(Z3DTransferFunctionParamete
   setSizePolicy(QSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding));
 }
 
-Z3DTransferFunctionWidget::~Z3DTransferFunctionWidget()
-{
-  delete m_histogramCache;
-}
-
 void Z3DTransferFunctionWidget::showNoKeyContextMenu(QMouseEvent *event)
 {
   m_noKeyContextMenu.popup(event->globalPos());
@@ -113,14 +107,13 @@ void Z3DTransferFunctionWidget::paintEvent(QPaintEvent* event)
   paint.drawRect(0, 0, width() - 1, height() - 1);
 
   if (m_showHistogram) {
-    if (m_histogramCache == NULL || m_histogramCache->rect() != rect()) {
-      delete m_histogramCache;
-      m_histogramCache = NULL;
+    if (!m_histogramCache || m_histogramCache->rect() != rect()) {
+      m_histogramCache.reset();
       if (m_volume && m_volume->hasHistogram()) {
-        m_histogramCache = new QPixmap(rect().size());
+        m_histogramCache.reset(new QPixmap(rect().size()));
         m_histogramCache->fill(Qt::transparent);
 
-        QPainter cachePaint(m_histogramCache);
+        QPainter cachePaint(m_histogramCache.get());
         // draw histogram
         cachePaint.setPen(Qt::NoPen);
         cachePaint.setBrush(QColor(0, 40, 160, 120));
@@ -493,8 +486,7 @@ void Z3DTransferFunctionWidget::setHistogramNormalizeMethod(const QString &metho
 {
   if (m_histogramNormalizeMethod != method) {
     m_histogramNormalizeMethod = method;
-    delete m_histogramCache;
-    m_histogramCache = 0;
+    m_histogramCache.reset();
     update();
   }
 }
@@ -704,8 +696,7 @@ void Z3DTransferFunctionWidget::showKeyInfo(QPoint pos, glm::dvec2 values)
 
 void Z3DTransferFunctionWidget::volumeChanged(Z3DVolume* volume)
 {
-  delete m_histogramCache;
-  m_histogramCache = NULL;
+  m_histogramCache.reset();
 
   m_volume = volume;
   connect(m_volume, SIGNAL(histogramFinished()), this, SLOT(update()));

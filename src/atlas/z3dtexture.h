@@ -100,15 +100,13 @@ protected:
 // provide unique texture units
 // usage:
 
-// Z3DTextureUnitManager *textureUnitManager = new Z3DTextureUnitManager();
+// auto textureUnitManager = std::make_unique<Z3DTextureUnitManager>();
 // textureUnitManager->nextAvailableUnit();
 // textureUnitManager->activateCurrentUnit();
 // texture->bind();
 
 // textureUnitManager->nextAvailableUnit();
 // ...
-
-// delete textureUnitManager;
 class Z3DTextureUnitManager
 {
 public:

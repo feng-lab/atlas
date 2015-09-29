@@ -66,7 +66,7 @@ void appendChildToParentNode(aiNode *pParent, aiNode *pChild)
 
   // If already children was assigned to the parent node, store them in a
   std::vector<aiNode*> temp;
-  if (pParent->mChildren != NULL) {
+  if (pParent->mChildren != nullptr) {
     assert(0 != pParent->mNumChildren);
     for (size_t index = 0; index < pParent->mNumChildren; index++) {
       temp.push_back(pParent->mChildren[index]);
@@ -95,11 +95,9 @@ aiNode* createNodes(const ZMesh& mesh, aiNode *pParent, aiScene* pScene, std::ve
   appendChildToParentNode(pParent, pNode);
 
   for (unsigned int i=0; i< 1; i++) {
-    aiMesh *pMesh = createAIMesh(mesh);
+    std::unique_ptr<aiMesh> pMesh(createAIMesh(mesh));
     if (pMesh->mNumVertices > 0) {
-      MeshArray.push_back(pMesh);
-    } else {
-      delete pMesh;
+      MeshArray.push_back(pMesh.release());
     }
   }
 

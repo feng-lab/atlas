@@ -8,13 +8,7 @@ namespace nim {
 Z3DTransferFunctionWidgetWithEditorWindow::Z3DTransferFunctionWidgetWithEditorWindow(Z3DTransferFunctionParameter *tf, QWidget *parent)
   : ZClickableTransferFunctionLabel(tf, parent)
   , m_transferFunction(tf)
-  , m_editorWindow(nullptr)
 {
-}
-
-Z3DTransferFunctionWidgetWithEditorWindow::~Z3DTransferFunctionWidgetWithEditorWindow()
-{
-  delete m_editorWindow;
 }
 
 void Z3DTransferFunctionWidgetWithEditorWindow::createEditorWindow()
@@ -27,7 +21,7 @@ void Z3DTransferFunctionWidgetWithEditorWindow::createEditorWindow()
   } else {
     QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
 
-    m_editorWindow = new Z3DTransferFunctionEditor(m_transferFunction);
+    m_editorWindow.reset(new Z3DTransferFunctionEditor(m_transferFunction));
     m_editorWindow->show();
     m_editorWindow->raise();
 

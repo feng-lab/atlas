@@ -12,7 +12,6 @@ class Z3DTransferFunctionWidgetWithEditorWindow : public ZClickableTransferFunct
   Q_OBJECT
 public:
   explicit Z3DTransferFunctionWidgetWithEditorWindow(Z3DTransferFunctionParameter* tf, QWidget *parent = 0);
-  ~Z3DTransferFunctionWidgetWithEditorWindow();
 
 signals:
 
@@ -26,7 +25,7 @@ private:
   Z3DTransferFunctionParameter *m_transferFunction;
   Z3DTransferFunctionEditor *m_transferFunctionEditor;
 
-  QWidget* m_editorWindow;
+  std::unique_ptr<QWidget> m_editorWindow;
 };
 
 } // namespace nim
