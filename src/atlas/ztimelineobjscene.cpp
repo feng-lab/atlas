@@ -135,14 +135,14 @@ void ZTimelineObjScene::updateItems()
 {
   //ZBenchTimer bt;
   //bt.start();
-  const QList<ZAnimationDisplayPack>& dps = m_timeline.animation().displayPacks();
+  const auto& dps = m_timeline.animation().displayPacks();
   int height = (dps.size() + 2) * m_timeline.rowHeight();  // leave space for horizonal scrollbar
   setSceneRect(0, 0, m_timeline.objViewWidth(), height);
   this->clear();
   m_itemToDisplayPack.clear();
 
-  for (int i=0; i<dps.size(); ++i) {
-    const ZAnimationDisplayPack &pack = dps[i];
+  for (size_t dpi=0; dpi<dps.size(); ++dpi) {
+    const ZAnimationDisplayPack &pack = dps[dpi];
     if (pack.type == ZAnimationDisplayPack::Type::GlobalPara) {
       ObjBoundRectItem* rect = new ObjBoundRectItem(pack, m_timeline);
       rect->setRect(0, 0, m_timeline.objViewWidth(), m_timeline.rowHeight());

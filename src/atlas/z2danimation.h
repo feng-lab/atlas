@@ -14,7 +14,6 @@ class Z2DAnimation : public ZAnimation
   Q_OBJECT
 public:
   explicit Z2DAnimation(ZDoc &doc, QObject *parent = nullptr);
-  ~Z2DAnimation();
 
   void bindView(ZView *v);
 
@@ -30,6 +29,7 @@ protected:
   virtual void addGlobalKey(double time) override;
 
 protected:
+  // managed by parent class
   ZParameterAnimation *m_sliceAnimation;
   ZParameterAnimation *m_timeAnimation;
   ZParameterAnimation *m_mipAnimation;

@@ -60,7 +60,6 @@ ParameterKeysItem::ParameterKeysItem(ZParameterKey &paraKey, ZParameterAnimation
   , m_paraAnimation(paraAnimation)
   , m_displayPack(pack)
   , m_timeline(timeline)
-  , m_editDialog(nullptr)
 {
   if (m_paraAnimation.boundParameter()) {
     setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
@@ -71,11 +70,6 @@ ParameterKeysItem::ParameterKeysItem(ZParameterKey &paraKey, ZParameterAnimation
   setPos(m_timeline.timeToX(m_paraKey.time()), 0);
   setRect(-5, 5, 10, m_timeline.rowHeight()-10);
   setAcceptHoverEvents(true);
-}
-
-ParameterKeysItem::~ParameterKeysItem()
-{
-  delete m_editDialog;
 }
 
 void ParameterKeysItem::updateValue()
@@ -128,7 +122,7 @@ void ParameterKeysItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *)
 {
   if (m_paraAnimation.boundParameter()) {
     if (!m_editDialog)
-      m_editDialog = new ZTimelineKeyEditDialog(m_paraAnimation, m_paraKey, &m_timeline);
+      m_editDialog.reset(new ZTimelineKeyEditDialog(m_paraAnimation, m_paraKey, &m_timeline));
     m_editDialog->setInitialValue();
     m_editDialog->show();
     m_editDialog->raise();
@@ -211,7 +205,7 @@ void ZTimelineEventScene::updateItems()
 {
   //ZBenchTimer bt;
   //bt.start();
-  const QList<ZAnimationDisplayPack>& dps = m_timeline.animation().displayPacks();
+  const auto& dps = m_timeline.animation().displayPacks();
   int height = (dps.size() + 2) * m_timeline.rowHeight() - m_view->horizontalScrollBar()->height();  // leave space for horizonal scrollbar
   setSceneRect(0, 0, m_timeline.eventViewWidth() - m_view->verticalScrollBar()->width(), height);
   this->clear();
@@ -220,8 +214,8 @@ void ZTimelineEventScene::updateItems()
   m_ObjKeyToItem.clear();
   m_ObjParaKeyToItem.clear();
 
-  for (int i=0; i<dps.size(); ++i) {
-    const ZAnimationDisplayPack &pack = dps[i];
+  for (size_t dpi=0; dpi<dps.size(); ++dpi) {
+    const ZAnimationDisplayPack &pack = dps[dpi];
     if (pack.type == ZAnimationDisplayPack::Type::GlobalPara) {
       EventBoundRectItem* rect = new EventBoundRectItem(pack, m_timeline);
       rect->setRect(-1, 0, m_timeline.eventViewWidth()+2, m_timeline.rowHeight());
@@ -243,9 +237,9 @@ void ZTimelineEventScene::updateItems()
       rect->setBrush(QBrush(QColor(220+20,220+20,220+20)));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
 
-      const QList<ZParameterAnimation*>& paraAnimationList = m_timeline.animation().paraAnimationList(pack.id);
-      for (int j=0; j<paraAnimationList.size(); ++j) {
-        ZParameterAnimation* paraAnimation = paraAnimationList[j];
+      const auto& paraAnimationList = m_timeline.animation().paraAnimationList(pack.id);
+      for (size_t j=0; j<paraAnimationList.size(); ++j) {
+        ZParameterAnimation* paraAnimation = paraAnimationList[j].get();
         const auto& keys = paraAnimation->keys();
         for (size_t i=0; i<keys.size(); ++i) {
           ParameterKeysItem *ki = new ParameterKeysItem(*keys[i], *paraAnimation, pack, m_timeline, rect);

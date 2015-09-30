@@ -38,7 +38,6 @@ public:
   int type() const override { return Type; }
   ParameterKeysItem(ZParameterKey &paraKey, ZParameterAnimation &paraAnimation, const ZAnimationDisplayPack &pack,
                     ZTimelineWidget &timeline, QGraphicsItem *parent);
-  ~ParameterKeysItem();
 
   void updateValue();
 
@@ -57,7 +56,7 @@ private:
   ZParameterAnimation &m_paraAnimation;
   const ZAnimationDisplayPack &m_displayPack;
   ZTimelineWidget &m_timeline;
-  ZTimelineKeyEditDialog *m_editDialog;
+  std::unique_ptr<ZTimelineKeyEditDialog> m_editDialog;
 };
 
 class CurrentTimeLineItem : public QGraphicsLineItem

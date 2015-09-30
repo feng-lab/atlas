@@ -8,12 +8,11 @@
 #include "zviewsettinginterface.h"
 #include <QDir>
 #include "z3dgl.h"
+#include "zparameteranimation.h"
 
 namespace nim {
 
 class ZDoc;
-class ZParameterAnimation;
-class ZParameterKey;
 class ZVideoEncoder;
 
 struct ZAnimationDisplayPack {
@@ -61,8 +60,8 @@ public:
 
   inline double duration() const { return m_duration; }
 
-  const QList<ZParameterAnimation*>& paraAnimationList(size_t id) const { return findUniqueId(id)->objParaAnimations; }
-  const QList<ZAnimationDisplayPack>& displayPacks() const { return m_displayPacks; }
+  const std::vector<std::unique_ptr<ZParameterAnimation>>& paraAnimationList(size_t id) const { return findUniqueId(id)->objParaAnimations; }
+  const std::vector<ZAnimationDisplayPack>& displayPacks() const { return m_displayPacks; }
   void setExpanded(size_t id, bool v);
   void toogleExpanded(size_t id);
   void toogleShowAll(size_t id);
@@ -106,8 +105,8 @@ protected:
   void buildDisplayPacks();
   void releaseParameters();
   // return if paraAnimationList is resorted
-  bool bind(QList<ZParameterAnimation*> &paraAnimationList,
-            const QList<ZParameter*> &paraList);
+  bool bind(std::vector<std::unique_ptr<ZParameterAnimation>> &paraAnimationList,
+            const std::vector<ZParameter*> &paraList);
 
   void readContent(const QString &fn, const QString &jsonKey);
   void writeContent(const QString &fn, const QString &jsonKey);
@@ -127,7 +126,7 @@ protected:
 
     QString objType;
     QJsonValue objJsonValue;
-    QList<ZParameterAnimation*> objParaAnimations;
+    std::vector<std::unique_ptr<ZParameterAnimation>> objParaAnimations;
     bool isExpanded;
     bool isShowAll;
     size_t boundId;
@@ -135,10 +134,10 @@ protected:
     size_t uniqueId;
   };
 
-  AnimationObj* findBoundId(size_t id, int *idx = nullptr);
-  AnimationObj* findUniqueId(size_t id, int *idx = nullptr);
-  const AnimationObj* findBoundId(size_t id, int *idx = nullptr) const;
-  const AnimationObj* findUniqueId(size_t id, int *idx = nullptr) const;
+  AnimationObj* findBoundId(size_t id, size_t *idx = nullptr);
+  AnimationObj* findUniqueId(size_t id, size_t *idx = nullptr);
+  const AnimationObj* findBoundId(size_t id, size_t *idx = nullptr) const;
+  const AnimationObj* findUniqueId(size_t id, size_t *idx = nullptr) const;
 
 protected:
   friend class ZAnimationChangeDurationCommand;
@@ -148,11 +147,11 @@ protected:
 
   double m_duration;
 
-  QList<ZParameterAnimation*> m_globalParameters;
-  QList<AnimationObj> m_objList;
+  std::vector<std::unique_ptr<ZParameterAnimation>> m_globalParaAnimations;
+  std::vector<std::unique_ptr<AnimationObj>> m_objList;
   size_t m_nextUniqueId;
 
-  QList<ZAnimationDisplayPack> m_displayPacks;
+  std::vector<ZAnimationDisplayPack> m_displayPacks;
 
   QUndoStack m_undoStack;
 

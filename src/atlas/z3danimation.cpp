@@ -16,12 +16,8 @@ namespace nim {
 Z3DAnimation::Z3DAnimation(ZDoc &doc, QObject *parent)
   : ZAnimation(doc, parent)
 {
-  m_cameraParameterAnimation = new ZCameraParameterAnimation("Camera", QColor(0,255,0), this);
-  m_globalParameters.push_back(m_cameraParameterAnimation);
-}
-
-Z3DAnimation::~Z3DAnimation()
-{
+  m_cameraParameterAnimation = new ZCameraParameterAnimation("Camera", QColor(0,255,0));
+  m_globalParaAnimations.emplace_back(m_cameraParameterAnimation);
 }
 
 void Z3DAnimation::bindView(Z3DView *v)
@@ -42,7 +38,7 @@ void Z3DAnimation::bindView(Z3DView *v)
 void Z3DAnimation::load(const QString &fn)
 {
   readContent(fn, "Animation3D");
-  m_cameraParameterAnimation = static_cast<ZCameraParameterAnimation*>(m_globalParameters[0]);
+  m_cameraParameterAnimation = static_cast<ZCameraParameterAnimation*>(m_globalParaAnimations[0].get());
   LINFO() << "Finish loading animation";
 }
 

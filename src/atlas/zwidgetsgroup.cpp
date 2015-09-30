@@ -52,9 +52,9 @@ ZWidgetsGroup::ZWidgetsGroup(ZParameter &parameter, int visibleLevel)
 {
 }
 
-QList<ZParameter *> ZWidgetsGroup::getParameterList()
+std::vector<ZParameter*> ZWidgetsGroup::getParameterList()
 {
-  QList<ZParameter*> res;
+  std::vector<ZParameter*> res;
   if (m_type == Type::Parameter) {
     res.push_back(m_parameter);
   } else if (m_type == Type::Group) {
@@ -62,8 +62,8 @@ QList<ZParameter *> ZWidgetsGroup::getParameterList()
       sortChildGroups();
     }
     for (int i=0; i<m_childGroups.size(); ++i) {
-      QList<ZParameter*> tmpRes = m_childGroups[i]->getParameterList();
-      for (int j=0; j<tmpRes.size(); ++j) {
+      std::vector<ZParameter*> tmpRes = m_childGroups[i]->getParameterList();
+      for (size_t j=0; j<tmpRes.size(); ++j) {
         res.push_back(tmpRes[j]);
       }
     }

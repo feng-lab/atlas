@@ -26,7 +26,7 @@ public:
 
   inline void setUseToolBoxStyle(bool v) { m_useToolBoxStyle = v; }
 
-  QList<ZParameter*> getParameterList();
+  std::vector<ZParameter*> getParameterList();
 
   void addChild(QWidget &widget, int visibleLevel);
   void addChild(ZParameter &parameter, int visibleLevel);
