@@ -66,11 +66,11 @@ void ZCameraParameterAnimation::updateParaToTime(double secs, ZParameter *para) 
   float centerDist = 1.f;
   glm::vec3 center;
   glm::quat rot;
-  for (int i=1; i<m_keys.size(); ++i) {
+  for (size_t i=1; i<m_keys.size(); ++i) {
     if (secs < m_keys[i]->time()) {
       double progress = m_keys[i]->timeToProgress(*m_keys[i-1], secs);
-      ZCameraParameterKey* key1 = static_cast<ZCameraParameterKey*>(m_keys[i-1]);
-      ZCameraParameterKey* key2 = static_cast<ZCameraParameterKey*>(m_keys[i]);
+      ZCameraParameterKey* key1 = static_cast<ZCameraParameterKey*>(m_keys[i-1].get());
+      ZCameraParameterKey* key2 = static_cast<ZCameraParameterKey*>(m_keys[i].get());
       centerDist = glm::mix(key1->para()->get().centerDist(), key2->para()->get().centerDist(), progress);
       center = glm::mix(key1->para()->get().center(), key2->para()->get().center(), progress);
       Z3DCamera::ProjectionType pt = key1->para()->get().projectionType();
@@ -94,7 +94,7 @@ void ZCameraParameterAnimation::updateParaToTime(double secs, ZParameter *para) 
     static_cast<Z3DCameraParameter*>(para)->setCamera(center-viewVector*centerDist, center, upVector);
   } else if (m_interpolationMethod.isSelected("Position Spline")) {
     glm::vec3 pos;
-    for (int i=1; i<m_pathSegments.size(); ++i) {
+    for (size_t i=1; i<m_pathSegments.size(); ++i) {
       if (secs < m_pathSegments[i].startTime()) {  // belongs to prev segment
         pos = m_pathSegments[i-1].position(secs);
         break;
@@ -112,7 +112,7 @@ void ZCameraParameterAnimation::updateParaToTime(double secs, ZParameter *para) 
     static_cast<Z3DCameraParameter*>(para)->setCamera(pos, pos+viewVector*centerDist, upVector);
   } else {
     glm::vec3 pos;
-    for (int i=1; i<m_pathSegments.size(); ++i) {
+    for (size_t i=1; i<m_pathSegments.size(); ++i) {
       if (secs < m_pathSegments[i].startTime()) {  // belongs to prev segment
         pos = m_pathSegments[i-1].position(secs);
         rot = m_pathSegments[i-1].rotation(secs);
@@ -140,16 +140,16 @@ void ZCameraParameterAnimation::buildSpline()
   if (m_keys.size() < 2)
     return;
 
-  int start = 0;
-  for (int i=1; i<m_keys.size(); ++i) {
+  size_t start = 0;
+  for (size_t i=1; i<m_keys.size(); ++i) {
     if (m_keys[i]->type() == "Switch") {
       // end of one segment, build spline with range
       QList<ZCameraParameterKey*> res;
-      for (int j=start; j<i; ++j) {
+      for (size_t j=start; j<i; ++j) {
         // make sure no overlap key
         if (j>start && m_keys[j]->time() - m_keys[j-1]->time() < 0.0001)
           m_keys[j]->setTime(m_keys[j-1]->time() + 0.0001);
-        res.push_back(static_cast<ZCameraParameterKey*>(m_keys[j]));
+        res.push_back(static_cast<ZCameraParameterKey*>(m_keys[j].get()));
       }
       m_pathSegments.push_back(SplineRange());
       SplineRange sr(res);
@@ -160,11 +160,11 @@ void ZCameraParameterAnimation::buildSpline()
   }
   // last segment
   QList<ZCameraParameterKey*> res;
-  for (int j=start; j<m_keys.size(); ++j) {
+  for (size_t j=start; j<m_keys.size(); ++j) {
     // make sure no overlap key
     if (j>start && m_keys[j]->time() - m_keys[j-1]->time() < 0.0001)
       m_keys[j]->setTime(m_keys[j-1]->time() + 0.0001);
-    res.push_back(static_cast<ZCameraParameterKey*>(m_keys[j]));
+    res.push_back(static_cast<ZCameraParameterKey*>(m_keys[j].get()));
   }
   m_pathSegments.push_back(SplineRange());
   SplineRange sr(res);
@@ -209,33 +209,28 @@ glm::quat ZCameraParameterAnimation::SquadPoly::Q(float fU) const
 
 ZCameraParameterAnimation::SplineRange::SplineRange()
   : posSplineTotalLength(0)
+  , m_hasSpline(false)
 {
 }
 
 ZCameraParameterAnimation::SplineRange::SplineRange(QList<ZCameraParameterKey *> &kys)
   : posSplineTotalLength(0)
+  , m_hasSpline(kys.size() >= 2)
 {
   keys.swap(kys);
-  if (hasSpline()) {
-    keys.push_front(new ZCameraParameterKey(*keys[0]));
-    keys.push_back(new ZCameraParameterKey(*keys[keys.size()-1]));
+  if (m_hasSpline) {
+    firstKey.reset(new ZCameraParameterKey(*keys[0]));
+    lastKey.reset(new ZCameraParameterKey(*keys[keys.size()-1]));
+    keys.push_front(firstKey.get());
+    keys.push_back(lastKey.get());
     buildPosSpline();
     buildRotSpline();
   }
 }
 
-ZCameraParameterAnimation::SplineRange::~SplineRange()
-{
-  if (hasSpline()) {
-    delete keys[0];
-    delete keys[keys.size()-1];
-  }
-  keys.clear();
-}
-
 glm::quat ZCameraParameterAnimation::SplineRange::rotation(float fTime) const
 {
-  if (!hasSpline())
+  if (!m_hasSpline)
     return keys[0]->rot();
 
   // find the interpolating polynomial (clamping used, modify for looping)
@@ -268,7 +263,7 @@ glm::quat ZCameraParameterAnimation::SplineRange::rotation(float fTime) const
 
 glm::vec3 ZCameraParameterAnimation::SplineRange::position(double fTime) const
 {
-  if (!hasSpline())
+  if (!m_hasSpline)
     return keys[0]->eye();
 
   int i;
@@ -279,7 +274,7 @@ glm::vec3 ZCameraParameterAnimation::SplineRange::position(double fTime) const
 
 glm::vec3 ZCameraParameterAnimation::SplineRange::velocity(double fTime)
 {
-  if (!hasSpline())
+  if (!m_hasSpline)
     return glm::vec3(0.f);
 
   int i;
@@ -290,7 +285,7 @@ glm::vec3 ZCameraParameterAnimation::SplineRange::velocity(double fTime)
 
 glm::vec3 ZCameraParameterAnimation::SplineRange::acceleration(double fTime)
 {
-  if (!hasSpline())
+  if (!m_hasSpline)
     return glm::vec3(0.f);
 
   int i;
@@ -301,7 +296,7 @@ glm::vec3 ZCameraParameterAnimation::SplineRange::acceleration(double fTime)
 
 double ZCameraParameterAnimation::SplineRange::length(double fTime)
 {
-  if (!hasSpline())
+  if (!m_hasSpline)
     return 0;
 
   int i;
@@ -317,7 +312,7 @@ double ZCameraParameterAnimation::SplineRange::totalLength()
 
 glm::vec3 ZCameraParameterAnimation::SplineRange::positionAL(double fS)
 {
-  if (!hasSpline())
+  if (!m_hasSpline)
     return keys[0]->eye();
 
   int i;
@@ -328,7 +323,7 @@ glm::vec3 ZCameraParameterAnimation::SplineRange::positionAL(double fS)
 
 glm::vec3 ZCameraParameterAnimation::SplineRange::velocityAL(double fS)
 {
-  if (!hasSpline())
+  if (!m_hasSpline)
     return glm::vec3(0.f);
 
   int i;
@@ -339,7 +334,7 @@ glm::vec3 ZCameraParameterAnimation::SplineRange::velocityAL(double fS)
 
 glm::vec3 ZCameraParameterAnimation::SplineRange::accelerationAL(double fS)
 {
-  if (!hasSpline())
+  if (!m_hasSpline)
     return glm::vec3(0.f);
 
   int i;

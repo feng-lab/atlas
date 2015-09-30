@@ -201,9 +201,9 @@ void ZTimelineEventScene::updateKey(ZParameterKey *paraKey)
 
 void ZTimelineEventScene::updateParameterAnimation(ZParameterAnimation *pa)
 {
-  const QList<ZParameterKey*>& keys = pa->keys();
-  for (int i=0; i<keys.size(); ++i) {
-    updateKey(keys[i]);
+  const auto& keys = pa->keys();
+  for (size_t i=0; i<keys.size(); ++i) {
+    updateKey(keys[i].get());
   }
 }
 
@@ -229,9 +229,9 @@ void ZTimelineEventScene::updateItems()
       rect->setBrush(QBrush(QColor(235+20,235+20,235+20)));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
 
-      const QList<ZParameterKey*>& keys = pack.paraAnimation->keys();
-      for (int i=0; i<keys.size(); ++i) {
-        m_globalParaKeyToItem[keys[i]] = new ParameterKeysItem(*keys[i], *pack.paraAnimation, pack, m_timeline, rect);
+      const auto& keys = pack.paraAnimation->keys();
+      for (size_t i=0; i<keys.size(); ++i) {
+        m_globalParaKeyToItem[keys[i].get()] = new ParameterKeysItem(*keys[i], *pack.paraAnimation, pack, m_timeline, rect);
       }
 
       addItem(rect);
@@ -246,10 +246,10 @@ void ZTimelineEventScene::updateItems()
       const QList<ZParameterAnimation*>& paraAnimationList = m_timeline.animation().paraAnimationList(pack.id);
       for (int j=0; j<paraAnimationList.size(); ++j) {
         ZParameterAnimation* paraAnimation = paraAnimationList[j];
-        const QList<ZParameterKey*>& keys = paraAnimation->keys();
-        for (int i=0; i<keys.size(); ++i) {
+        const auto& keys = paraAnimation->keys();
+        for (size_t i=0; i<keys.size(); ++i) {
           ParameterKeysItem *ki = new ParameterKeysItem(*keys[i], *paraAnimation, pack, m_timeline, rect);
-          m_ObjKeyToItem[keys[i]] = ki;
+          m_ObjKeyToItem[keys[i].get()] = ki;
         }
       }
 
@@ -262,9 +262,9 @@ void ZTimelineEventScene::updateItems()
       rect->setBrush(QBrush(QColor(235+20,235+20,235+20)));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
 
-      const QList<ZParameterKey*>& keys = pack.paraAnimation->keys();
-      for (int i=0; i<keys.size(); ++i) {
-        m_ObjParaKeyToItem[keys[i]] = new ParameterKeysItem(*keys[i], *pack.paraAnimation, pack, m_timeline, rect);
+      const auto& keys = pack.paraAnimation->keys();
+      for (size_t i=0; i<keys.size(); ++i) {
+        m_ObjParaKeyToItem[keys[i].get()] = new ParameterKeysItem(*keys[i], *pack.paraAnimation, pack, m_timeline, rect);
       }
 
       addItem(rect);

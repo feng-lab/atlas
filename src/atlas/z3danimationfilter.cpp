@@ -230,10 +230,10 @@ void Z3DAnimationFilter::prepareColor()
   }
 
   if (m_animation) {
-    const QList<ZParameterKey*>& keys = cameraParaAnimation()->keys();
+    const auto& keys = cameraParaAnimation()->keys();
     std::vector<glm::vec4> colors;
     if (m_colorMode.isSelected("Single Color")) {
-      for (int i=0; i<keys.size(); ++i) {
+      for (size_t i=0; i<keys.size(); ++i) {
         colors.push_back(m_color.get());
         colors.push_back(m_color.get());
         colors.push_back(m_color.get());
@@ -251,7 +251,7 @@ void Z3DAnimationFilter::prepareColor()
       } else if (keys.size() > 1) {
         double startTime = keys[0]->time();
         double endTime = std::max(startTime + 0.01, keys[keys.size()-1]->time());
-        for (int i=0; i<keys.size(); ++i) {
+        for (size_t i=0; i<keys.size(); ++i) {
           glm::vec4 color = m_colorMap.get().mappedFColor( (keys[i]->time() - startTime) / (endTime - startTime) );
           colors.push_back(color);
           colors.push_back(color);
@@ -291,8 +291,8 @@ void Z3DAnimationFilter::updateData()
   m_cameraDirectionTimeInterval.setRange(.01, m_animation->duration() / 2.);
 
   if (m_animation) {
-    const QList<ZParameterKey*>& keys = cameraParaAnimation()->keys();
-    for (int i=0; i<keys.size()-1; ++i) {
+    const auto& keys = cameraParaAnimation()->keys();
+    for (size_t i=0; i+1<keys.size(); ++i) {
       double currentKeyTime = keys[i]->time();
       double nextKeyTime = keys[i+1]->time();
       for (double t=currentKeyTime; t<nextKeyTime; t+=m_timeInterval.get()) {
@@ -351,7 +351,7 @@ void Z3DAnimationFilter::updateData()
     float triangleWidth = halfWidth / 2.f;
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> normals;
-    for (int i=0; i<keys.size(); ++i) {
+    for (size_t i=0; i<keys.size(); ++i) {
       cameraParaAnimation()->updateParaToTime(keys[i]->time(), &para);
       glm::vec3 pt5 = para.get().eye() + m_cameraSize.get() * para.get().viewVector();
       glm::vec3 pt1 = pt5 + halfHeight * para.get().upVector() + halfWidth * para.get().strafeVector();

@@ -36,7 +36,7 @@ public:
 
   void deleteKey(ZParameterKey* key);
   void addKey(ZParameterKey* key, bool keepRedundant = true);
-  const QList<ZParameterKey*>& keys() const { return m_keys; }
+  const std::vector<std::unique_ptr<ZParameterKey>>& keys() const { return m_keys; }
   int numKeys() const { return m_keys.size(); }
   void emitKeyChangedSignal(ZParameterKey* key) { emit keyChanged(key); }
 
@@ -60,13 +60,13 @@ public slots:
   virtual void updateParaToTime(double secs, ZParameter* para) const;
 
 protected:
-  inline const ZParameterKey* lastKey() const { return m_keys[m_keys.size()-1]; }
+  inline const ZParameterKey& lastKey() const { return *m_keys[m_keys.size()-1]; }
 
 protected:
   QString m_name;
   QString m_type;
   QColor m_color;
-  QList<ZParameterKey*> m_keys;
+  std::vector<std::unique_ptr<ZParameterKey>> m_keys;
   ZParameter *m_boundPara;
 };
 

@@ -74,7 +74,6 @@ protected:
   struct SplineRange {
     SplineRange();
     SplineRange(QList<ZCameraParameterKey*> &kys);
-    ~SplineRange();
 
     glm::quat rotation(float fTime) const;
     glm::vec3 position(double fTime) const; // X(t)
@@ -100,8 +99,6 @@ protected:
     double startTime() const { return keys[0]->time(); }
     double endTime() const { return keys[keys.size()-1]->time(); }
 
-    bool hasSpline() const { return keys.size() >= 2; }
-
     void swap(SplineRange &rhs) noexcept;
 
     QList<ZCameraParameterKey*> keys;
@@ -109,8 +106,11 @@ protected:
     std::vector<float> posSplineLengths;
     float posSplineTotalLength;
     QList<SquadPoly> rotSpline;
+    bool m_hasSpline;
+    std::unique_ptr<ZCameraParameterKey> firstKey;
+    std::unique_ptr<ZCameraParameterKey> lastKey;
   };
-  QList<SplineRange> m_pathSegments;
+  std::vector<SplineRange> m_pathSegments;
 
 protected:
   ZStringIntOptionParameter m_interpolationMethod;
