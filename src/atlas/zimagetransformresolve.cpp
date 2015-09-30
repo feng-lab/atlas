@@ -82,12 +82,12 @@ void ZImageTransformResolve::addImagePair(size_t fixedIdx, size_t movingIdx, con
   m_idxPairs[std::make_pair(fixedIdx, movingIdx)] = std::make_pair(tfm, transformCost);
 }
 
-std::map<size_t, ZImageCompositeTransform*> ZImageTransformResolve::resolve(QString *summary) const
+std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResolve::resolve(QString *summary) const
 {
   assert(!m_idxTransforms.empty());
-  std::map<size_t, ZImageCompositeTransform*> res;
+  std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> res;
   for (auto it = m_idxTransforms.cbegin(); it != m_idxTransforms.cend(); ++it) {
-    res[it->first] = new ZImageCompositeTransform();
+    res[it->first] = std::make_unique<ZImageCompositeTransform>();
     res[it->first]->addTransform(*it->second);
   }
   if (m_idxPairs.empty())
@@ -175,7 +175,7 @@ std::map<size_t, ZImageCompositeTransform*> ZImageTransformResolve::resolve(QStr
     if (img1HasLocation && !img2HasLocation) {
       std::map<std::pair<size_t, size_t>, std::pair<const ZImageTransform*, double>>::const_iterator pairIt;
       pairIt = m_idxPairs.find(std::make_pair(img1, img2));
-      res[img2] = dynamic_cast<ZImageCompositeTransform*>(res[img1]->clone());
+      res[img2] = std::unique_ptr<ZImageCompositeTransform>(dynamic_cast<ZImageCompositeTransform*>(res[img1]->clone()));
       if (pairIt != m_idxPairs.end()) {
         res[img2]->addTransform(*pairIt->second.first);
       } else {
@@ -186,7 +186,7 @@ std::map<size_t, ZImageCompositeTransform*> ZImageTransformResolve::resolve(QStr
     } else if (!img1HasLocation && img2HasLocation) {
       std::map<std::pair<size_t, size_t>, std::pair<const ZImageTransform*, double>>::const_iterator pairIt;
       pairIt = m_idxPairs.find(std::make_pair(img1, img2));
-      res[img1] = dynamic_cast<ZImageCompositeTransform*>(res[img2]->clone());
+      res[img1] = std::unique_ptr<ZImageCompositeTransform>(dynamic_cast<ZImageCompositeTransform*>(res[img2]->clone()));
       if (pairIt != m_idxPairs.end())
         res[img1]->addTransform(pairIt->second.first->makeInverseTransform());
       else {

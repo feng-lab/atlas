@@ -61,7 +61,7 @@ private:
   void alignSection(int fixedImageIndex, int movingImageIndex, double &cost, ZImageTransform*& transform);
 
   template <typename ImagePixelType>
-  void transformSections(const std::map<size_t, ZImageCompositeTransform*> &tfmmap, const ZImg &inImg, ZImg &outImg) const;
+  void transformSections(const std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> &tfmmap, const ZImg &inImg, ZImg &outImg) const;
 
   template <typename ImagePixelType>
   void alignSection(int fixedImageIndex, int movingImageIndex);

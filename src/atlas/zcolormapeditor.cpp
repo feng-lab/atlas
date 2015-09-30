@@ -180,12 +180,12 @@ void ZColorMapWidget::contextMenuEvent(QContextMenuEvent *e)
     QMenu contextMenu(this);
     contextMenu.setTitle(QString("Key %1").arg(index+1));
     bool isSplit = m_colorMap->get().key(index).isSplit();
-    QAction *mergeAction = NULL;
-    QAction *editLColorAction = NULL;
-    QAction *editRColorAction = NULL;
-    QAction *splitAction = NULL;
-    QAction *editIntensityAction = NULL;
-    QAction *removeAction = NULL;
+    QAction *mergeAction = nullptr;
+    QAction *editLColorAction = nullptr;
+    QAction *editRColorAction = nullptr;
+    QAction *splitAction = nullptr;
+    QAction *editIntensityAction = nullptr;
+    QAction *removeAction = nullptr;
     if (isSplit) {
       editLColorAction = contextMenu.addAction("Change Left Color");
       editRColorAction = contextMenu.addAction("Change Right Color");
@@ -221,12 +221,6 @@ void ZColorMapWidget::contextMenuEvent(QContextMenuEvent *e)
       if (action == splitAction)
         m_colorMap->get().setKeySplit(index, true);
     }
-    delete mergeAction;
-    delete editLColorAction;
-    delete editRColorAction;
-    delete splitAction;
-    delete editIntensityAction;
-    delete removeAction;
   } else if (contentsRect().contains(e->pos())) {
     double intensity = screenXPositionToIntensity(e->pos().x());
     QMenu contextMenu(this);
@@ -242,9 +236,6 @@ void ZColorMapWidget::contextMenuEvent(QContextMenuEvent *e)
                                             intensity);
       m_colorMap->get().addKeyAtIntensity(newI);
     }
-
-    delete addKeyAtAction;
-    delete addKeyHereAction;
   }
 }
 

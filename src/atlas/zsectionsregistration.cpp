@@ -94,16 +94,16 @@ void ZSectionsRegistration::doWork()
 #else
   double totalNumPairs = m_img.depth() * m_numNeighbors;
 
-  std::map<std::pair<size_t, size_t>, std::pair<ZImageTransform*, double>> idxPairs;
+  std::map<std::pair<size_t, size_t>, std::pair<std::unique_ptr<ZImageTransform>, double>> idxPairs;
   double progress = 0;
   for (size_t i=0; i<m_img.depth(); ++i) {
     for (size_t j=i+1; j<i+1+m_numNeighbors; ++j) {
       if (j >= m_img.depth())
         break;
       double cost;
-      ZImageTransform *tfm;
+      ZImageTransform *tfm = nullptr;
       IMG_TYPED_CALL(alignSection, m_img, i, j, cost, tfm);
-      idxPairs[std::make_pair(i,j)] = std::make_pair(tfm, cost);
+      idxPairs[std::make_pair(i,j)] = std::make_pair(std::unique_ptr<ZImageTransform>(tfm), cost);
       progress += 1;
       reportProgress(progress / totalNumPairs);
     }
@@ -113,18 +113,11 @@ void ZSectionsRegistration::doWork()
   auto notfm = std::make_unique<ZImageAffine2DTransform>();
   tfmResolve.addFixedImage(m_fixedSliceIndex, notfm.get());
   for (auto it = idxPairs.cbegin(); it != idxPairs.cend(); ++it) {
-    tfmResolve.addImagePair(it->first.first, it->first.second, it->second.first, it->second.second);
+    tfmResolve.addImagePair(it->first.first, it->first.second, it->second.first.get(), it->second.second);
   }
-  std::map<size_t, ZImageCompositeTransform*> tfmmap = tfmResolve.resolve();
+  std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> tfmmap = tfmResolve.resolve();
 
   IMG_TYPED_CALL(transformSections, m_img, tfmmap, m_img, m_registeredImg);
-
-  for (auto it = idxPairs.begin(); it != idxPairs.end(); ++it) {
-    delete it->second.first;
-  }
-  for (auto it = tfmmap.begin(); it != tfmmap.end(); ++it) {
-    delete it->second;
-  }
 
   reportProgress(1.0);
 #endif
@@ -305,11 +298,11 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
 }
 
 template <typename ImagePixelType>
-void ZSectionsRegistration::transformSections(const std::map<size_t, ZImageCompositeTransform*> &tfmmap, const ZImg &inImg, ZImg &outImg) const
+void ZSectionsRegistration::transformSections(const std::map<size_t, std::unique_ptr<ZImageCompositeTransform> > &tfmmap, const ZImg &inImg, ZImg &outImg) const
 {
   outImg = inImg;
   for (size_t i=0; i<inImg.depth(); ++i) {
-    ZImageCompositeTransform* tfm = tfmmap.at(i);
+    auto& tfm = tfmmap.at(i);
     tfm->setImageInterpolation(ZImageInterpolation(Interpolant::Cubic, PadOption::Constant,
                                                    m_brightBackground ? m_sectionInfos[i].max : m_sectionInfos[i].min));
     for (size_t c=0; c<inImg.numChannels(); ++c) {
