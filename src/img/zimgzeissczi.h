@@ -199,7 +199,7 @@ public:
                   size_t numChannels = 0, size_t bytePerVoxel = 0, VoxelFormat vf = VoxelFormat::Unsigned);
   virtual ~ZImgCZISubBlock() {}
 
-  virtual ZImg read() override;
+  virtual ZImg read() const override;
 
 protected:
   QString m_filename;

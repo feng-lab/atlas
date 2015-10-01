@@ -74,7 +74,7 @@ ZImgPackSubBlock::ZImgPackSubBlock(const ZImgSource &imgSource, size_t t, size_t
   m_imgSource.region.end.t = t+1;
 }
 
-ZImg ZImgPackSubBlock::read()
+ZImg ZImgPackSubBlock::read() const
 {
   ZImg res;
   switch (m_type) {
@@ -86,10 +86,11 @@ ZImg ZImgPackSubBlock::read()
     break;
   case Type::OrigSourceMIP:
     for (size_t slc=m_zStart; slc<m_zEnd; ++slc) {
-      m_imgSource.region.start.z = slc;
-      m_imgSource.region.end.z = slc+1;
+      ZImgSource imgSource = m_imgSource;
+      imgSource.region.start.z = slc;
+      imgSource.region.end.z = slc+1;
       ZImg tImg;
-      tImg.load(m_imgSource);    //todo: reading result not cached
+      tImg.load(imgSource);    //todo: reading result not cached
       if (slc == m_zStart) {
         res.swap(tImg);
       } else {
@@ -351,16 +352,8 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs, std
     QRectF tileRect(x, y, width, height);
     if (tileRect.intersects(viewport)) {
       size_t keyHash = boost::hash_value(it->first);
-      std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(keyHash);
-      if (imgPtr) {
-        imgs.push_back(*imgPtr);
-      } else {
-        // read from disk
-        imgPtr = new std::shared_ptr<ZImg>(new ZImg());
-        **imgPtr = it->second->read();
-        imgs.push_back(*imgPtr);
-        ZImgCacheInstance.insert(keyHash, imgPtr, std::max(size_t(1), (*imgPtr)->byteNumber() / 1024 / 1024));
-      }
+      std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(keyHash, *it->second);
+      imgs.push_back(*imgPtr);
       locs.push_back(QPoint(x, y));
       scales.push_back(readRatio);
       //LINFO() << level << (1<<level) << x << y << width << height;
@@ -384,17 +377,8 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
       size_t theight = std::get<7>(it->first);
       if (x >= tx && x < tx + twidth && y >= ty && y < ty + theight) {
         size_t keyHash = boost::hash_value(it->first);
-        std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(keyHash);
-        if (imgPtr) {
-          return (*imgPtr)->value<double>(x-tx, y-ty, 0, c, 0);
-        } else {
-          // read from disk
-          imgPtr = new std::shared_ptr<ZImg>(new ZImg());
-          **imgPtr = it->second->read();
-          double retval = (*imgPtr)->value<double>(x-tx, y-ty, 0, c, 0);
-          ZImgCacheInstance.insert(keyHash, imgPtr, std::max(size_t(1), (*imgPtr)->byteNumber() / 1024 / 1024));
-          return retval;
-        }
+        std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(keyHash, *it->second);
+        return (*imgPtr)->value<double>(x-tx, y-ty, 0, c, 0);
       }
     }
     return 0;
@@ -491,16 +475,8 @@ ZImg ZImgPack::crop(const ZImgRegion &region) const
     }
 
     size_t keyHash = boost::hash_value(it->first);
-    std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(keyHash);
-    if (imgPtr) {
-      res.pasteImg(*imgPtr->get(), start);
-    } else {
-      // read from disk
-      imgPtr = new std::shared_ptr<ZImg>(new ZImg());
-      **imgPtr = it->second->read();
-      res.pasteImg(*imgPtr->get(), start);
-      ZImgCacheInstance.insert(keyHash, imgPtr, std::max(size_t(1), (*imgPtr)->byteNumber() / 1024 / 1024));
-    }
+    std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(keyHash, *it->second);
+    res.pasteImg(*imgPtr->get(), start);
   }
 
   return res;
@@ -599,6 +575,12 @@ void ZImgPack::createPyramidalFolder(const QString &fileName)
 
 void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
 {
+#if 1
+  Q_UNUSED(img)
+  Q_UNUSED(z)
+  Q_UNUSED(t)
+  Q_UNUSED(mip)
+#else
   if (true || (img->width() * img->height() <= 20480 * 20480 &&
       img->width() <= 32767 && img->height() <= 32767)) {
     size_t ratio = 1;
@@ -674,6 +656,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
       ++level;
     }
   }
+#endif
 }
 
 void ZImgPack::buildPyramidal(ZImg &img)
@@ -802,16 +785,8 @@ ZImg ZImgPack::assembleImg(size_t ratio) const
     ZVoxelCoordinate start(x / double(ratio), y / double(ratio), z, 0, t);
 
     size_t keyHash = boost::hash_value(it->first);
-    std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(keyHash);
-    if (imgPtr) {
-      res.pasteImg(*imgPtr->get(), start);
-    } else {
-      // read from disk
-      imgPtr = new std::shared_ptr<ZImg>(new ZImg());
-      **imgPtr = it->second->read();
-      res.pasteImg(*imgPtr->get(), start);
-      ZImgCacheInstance.insert(keyHash, imgPtr, std::max(size_t(1), (*imgPtr)->byteNumber() / 1024 / 1024));
-    }
+    std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(keyHash, *it->second);
+    res.pasteImg(*imgPtr->get(), start);
   }
   //LINFO() << "end assemble level" << level;
   return res;
@@ -841,16 +816,8 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t) const
     ZVoxelCoordinate start(x / double(ratio), y / double(ratio), z, 0, 0);
 
     size_t keyHash = boost::hash_value(it->first);
-    std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(keyHash);
-    if (imgPtr) {
-      res.pasteImg(*imgPtr->get(), start);
-    } else {
-      // read from disk
-      imgPtr = new std::shared_ptr<ZImg>(new ZImg());
-      **imgPtr = it->second->read();
-      res.pasteImg(*imgPtr->get(), start);
-      ZImgCacheInstance.insert(keyHash, imgPtr, std::max(size_t(1), (*imgPtr)->byteNumber() / 1024 / 1024));
-    }
+    std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(keyHash, *it->second);
+    res.pasteImg(*imgPtr->get(), start);
   }
   //LINFO() << "end assemble level" << level;
   return res;
@@ -881,16 +848,8 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t, size_t z) const
     ZVoxelCoordinate start(x / double(ratio), y / double(ratio), 0, 0, 0);
 
     size_t keyHash = boost::hash_value(it->first);
-    std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(keyHash);
-    if (imgPtr) {
-      res.pasteImg(*imgPtr->get(), start);
-    } else {
-      // read from disk
-      imgPtr = new std::shared_ptr<ZImg>(new ZImg());
-      **imgPtr = it->second->read();
-      res.pasteImg(*imgPtr->get(), start);
-      ZImgCacheInstance.insert(keyHash, imgPtr, std::max(size_t(1), (*imgPtr)->byteNumber() / 1024 / 1024));
-    }
+    std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(keyHash, *it->second);
+    res.pasteImg(*imgPtr->get(), start);
   }
   return res;
 }

@@ -11,7 +11,7 @@ ZImgCommonSubBlock::ZImgCommonSubBlock(const QString &fileName, FileFormat forma
   , m_filename(fileName), m_format(format), m_scene(scene), m_t(t), m_z(z), m_x(x), m_y(y), m_width(width), m_height(height)
 {}
 
-ZImg ZImgCommonSubBlock::read()
+ZImg ZImgCommonSubBlock::read() const
 {
   ZImgRegion rgn;
   rgn.start.t = m_t;

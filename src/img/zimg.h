@@ -81,7 +81,7 @@ public:
   virtual ~ZImgSubBlock() {}
 
   // subclass read should depend its own members rather than member of this class
-  virtual ZImg read() = 0;
+  virtual ZImg read() const = 0;
 
   size_t ratio;  // realsize / storedsize
   size_t t;

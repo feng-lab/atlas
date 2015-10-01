@@ -1,6 +1,7 @@
 #ifndef ZIMGCACHE_H
 #define ZIMGCACHE_H
 
+#include <mutex>
 #include <QCache>
 #include "zimgpack.h"
 
@@ -8,13 +9,23 @@ namespace nim {
 
 #define ZImgCacheInstance nim::ZImgCache::instance()
 
-class ZImgCache : public QCache<size_t, std::shared_ptr<ZImg>>
+class ZImgCache : private QCache<size_t, std::shared_ptr<ZImg>>
 {
 public:
   static ZImgCache& instance();
 
   ZImgCache();
   ~ZImgCache();
+
+  using QCache<size_t, std::shared_ptr<ZImg>>::object;
+
+  // thread-safe functions:
+  std::shared_ptr<ZImg> *get(size_t key);
+  bool remove(size_t key);
+  std::shared_ptr<ZImg> *getOrRead(size_t key, const ZImgSubBlock &imgBlock);
+
+private:
+  std::mutex m_mutex;
 };
 
 } // namespace

@@ -25,7 +25,7 @@ public:
   ZImgPackSubBlock(const ZImgSource &imgSource, size_t t, size_t sliceStart, size_t sliceEnd, const ZImgTileKey &key);
   virtual ~ZImgPackSubBlock() {}
 
-  virtual ZImg read() override;
+  virtual ZImg read() const override;
 
 protected:
   Type m_type;
@@ -149,7 +149,7 @@ private:
   QString m_name;
   QString m_tooltip;
 
-  size_t m_tileSize = 4096;
+  //size_t m_tileSize = 4096;
   int64_t m_fastReadSizeThreshold = 100 * 1024 * 1024;  // 100MB
   QString m_pyramidalFolder;
   std::vector<std::map<ZImgTileKey, std::shared_ptr<ZImgSubBlock>>> m_ratioTileMaps;

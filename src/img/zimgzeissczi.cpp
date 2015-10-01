@@ -224,7 +224,7 @@ ZImgCZISubBlock::ZImgCZISubBlock(const QString &fileName, std::vector<CZITile> &
   }
 }
 
-ZImg ZImgCZISubBlock::read()
+ZImg ZImgCZISubBlock::read() const
 {
   try {
     if (m_tiles.empty()) {
