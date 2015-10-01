@@ -136,7 +136,7 @@ template<typename T> inline std::ostream& operator<<(std::ostream& cout, const Z
 {
   return cout << "[" << box.minCorner() << "; " << box.maxCorner() << "]";
 }
-template<typename T> QDebug& operator<<(QDebug s, const ZBBox<T>& box)
+template<typename T> QDebug operator<<(QDebug s, const ZBBox<T>& box)
 {
   s.nospace() << "[" << box.minCorner() << "; " << box.maxCorner() << "]";
   return s.space();

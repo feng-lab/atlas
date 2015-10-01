@@ -315,8 +315,8 @@ glm::vec3 ZCameraParameterAnimation::SplineRange::positionAL(double fS)
   if (!m_hasSpline)
     return keys[0]->eye();
 
-  int i;
-  float fU;
+  int i = 0;
+  float fU = 0;
   invertIntegral(fS,i,fU);
   return posSpline[i].Position(fU);
 }
@@ -326,8 +326,8 @@ glm::vec3 ZCameraParameterAnimation::SplineRange::velocityAL(double fS)
   if (!m_hasSpline)
     return glm::vec3(0.f);
 
-  int i;
-  float fU;
+  int i = 0;
+  float fU = 0;
   invertIntegral(fS,i,fU);
   return posSpline[i].Velocity(fU);
 }
@@ -337,8 +337,8 @@ glm::vec3 ZCameraParameterAnimation::SplineRange::accelerationAL(double fS)
   if (!m_hasSpline)
     return glm::vec3(0.f);
 
-  int i;
-  float fU;
+  int i = 0;
+  float fU = 0;
   invertIntegral(fS,i,fU);
   return posSpline[i].Acceleration(fU);
 }
@@ -499,7 +499,7 @@ void ZCameraParameterAnimation::SplineRange::invertIntegral(float fS, int &riI, 
     return;
   }
   // determine which polynomial corresponds to s
-  float fDist;
+  float fDist = 0.f;
 
   for (riI = 0; riI < posSpline.size(); riI++)
   {

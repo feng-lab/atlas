@@ -288,7 +288,7 @@ inline std::ostream& operator<<(std::ostream& cout, const ZVoxelCoordinate& c)
 {
   return cout << qPrintable(c.toQString());
 }
-inline QDebug& operator<<(QDebug s, const ZVoxelCoordinate& c)
+inline QDebug operator<<(QDebug s, const ZVoxelCoordinate& c)
 {
   s.nospace() << qPrintable(c.toQString());
   return s.space();

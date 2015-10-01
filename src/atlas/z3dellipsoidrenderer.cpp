@@ -216,7 +216,7 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
       m_VAO.bind();
       // set vertex data
       GLint attr_T = shader.TAttributeLocation();
-      GLint attr_a_specular_shininess;
+      GLint attr_a_specular_shininess = -1;
       if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
         attr_a_specular_shininess = shader.specularShininessAttributeLocation();
       }
@@ -276,7 +276,7 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
   } else {
     // set vertex data
     GLint attr_T = shader.TAttributeLocation();
-    GLint attr_a_specular_shininess;
+    GLint attr_a_specular_shininess = -1;
     if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
       attr_a_specular_shininess = shader.specularShininessAttributeLocation();
     }

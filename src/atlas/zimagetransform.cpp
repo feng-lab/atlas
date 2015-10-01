@@ -39,7 +39,7 @@ std::ostream& operator << (std::ostream& s, const nim::ZImageTransform& tfm)
   return (s << qPrintable(tfm.toQString()));
 }
 
-QDebug& operator << (QDebug s, const nim::ZImageTransform& tfm)
+QDebug operator << (QDebug s, const nim::ZImageTransform& tfm)
 {
   s.nospace() << tfm.toQString();
   return s.space();

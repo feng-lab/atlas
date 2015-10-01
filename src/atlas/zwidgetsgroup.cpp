@@ -10,6 +10,15 @@
 #include <QLabel>
 #include <QToolBox>
 
+namespace {
+
+bool widgetGroupPtVisibleLevelLessThan(const std::shared_ptr<nim::ZWidgetsGroup> &s1, const std::shared_ptr<nim::ZWidgetsGroup> &s2)
+{
+  return s1->visibleLevel() < s2->visibleLevel();
+}
+
+}
+
 namespace nim {
 
 ZWidgetsGroup::ZWidgetsGroup(QWidget &widget, int visibleLevel)
@@ -61,7 +70,7 @@ std::vector<ZParameter*> ZWidgetsGroup::getParameterList()
     if (!m_isSorted) {
       sortChildGroups();
     }
-    for (int i=0; i<m_childGroups.size(); ++i) {
+    for (size_t i=0; i<m_childGroups.size(); ++i) {
       std::vector<ZParameter*> tmpRes = m_childGroups[i]->getParameterList();
       for (size_t j=0; j<tmpRes.size(); ++j) {
         res.push_back(tmpRes[j]);
@@ -86,14 +95,14 @@ void ZWidgetsGroup::addChild(std::shared_ptr<ZWidgetsGroup> child, bool atEnd)
   if (atEnd)
     m_childGroups.push_back(child);
   else
-    m_childGroups.push_front(child);
+    m_childGroups.insert(m_childGroups.begin(), child);
   connect(child.get(), SIGNAL(widgetsGroupChanged()), this, SLOT(emitWidgetsGroupChangedSignal()));
   m_isSorted = false;
 }
 
 void ZWidgetsGroup::removeAllChildren()
 {
-  for (int i=0; i<m_childGroups.size(); i++) {
+  for (size_t i=0; i<m_childGroups.size(); i++) {
     m_childGroups[i]->disconnect(this);
   }
   m_childGroups.clear();
@@ -101,22 +110,22 @@ void ZWidgetsGroup::removeAllChildren()
 
 void ZWidgetsGroup::removeChild(const ZParameter &para)
 {
-  for (int i=0; i<m_childGroups.size(); i++) {
-    if (m_childGroups[i]->m_type == Type::Parameter &&
-        m_childGroups[i]->m_parameter == &para) {
-      m_childGroups[i]->disconnect(this);
-      m_childGroups.removeAt(i);
+  for (auto it = m_childGroups.begin(); it != m_childGroups.end(); ++it) {
+    if ((*it)->m_type == Type::Parameter && (*it)->m_parameter == &para) {
+      (*it)->disconnect(this);
+      m_childGroups.erase(it);
+      break;
     }
   }
 }
 
 void ZWidgetsGroup::removeChild(const std::shared_ptr<ZWidgetsGroup> &child)
 {
-  for (int i=0; i<m_childGroups.size(); i++) {
-    if (m_childGroups[i]->m_type == Type::Group &&
-        m_childGroups[i] == child) {
-      m_childGroups[i]->disconnect(this);
-      m_childGroups.removeAt(i);
+  for (auto it = m_childGroups.begin(); it != m_childGroups.end(); ++it) {
+    if ((*it)->m_type == Type::Group && (*it) == child) {
+      (*it)->disconnect(this);
+      m_childGroups.erase(it);
+      break;
     }
   }
 }
@@ -180,9 +189,8 @@ QLayout *ZWidgetsGroup::createLayout(bool createBasic)
     if (!m_isSorted)
       sortChildGroups();
     if (createBasic) {
-      int i;
-      for (i=0; i<m_childGroups.size() && m_childGroups[i]->m_visibleLevel
-           <= m_cutOffbetweenBasicAndAdvancedLevel; i++) {
+      size_t i;
+      for (i=0; i<m_childGroups.size() && m_childGroups[i]->m_visibleLevel<=m_cutOffbetweenBasicAndAdvancedLevel; i++) {
         QLayout *lw = m_childGroups[i]->createLayout(true);
         if (m_childGroups[i]->isGroup()) {
           QGroupBox *groupBox = new QGroupBox(m_childGroups[i]->getGroupName());
@@ -200,7 +208,7 @@ QLayout *ZWidgetsGroup::createLayout(bool createBasic)
     } else {
       if (m_useToolBoxStyle) {
         QToolBox *toolBox = new QToolBox();
-        for (int i=0; i<m_childGroups.size(); i++) {
+        for (size_t i=0; i<m_childGroups.size(); i++) {
           if (m_useToolBoxStyle) {
             if (m_childGroups[i]->isGroup()) {
               QWidget *wg = m_childGroups[i]->createWidget(false, false);
@@ -226,7 +234,7 @@ QLayout *ZWidgetsGroup::createLayout(bool createBasic)
         }
         vbl->addWidget(toolBox);
       } else {
-        for (int i=0; i<m_childGroups.size(); i++) {
+        for (size_t i=0; i<m_childGroups.size(); i++) {
           if (m_childGroups[i]->isGroup()) {
             QGroupBox *groupBox = new QGroupBox(m_childGroups[i]->getGroupName());
             QLayout *lw = m_childGroups[i]->createLayout(false);
@@ -249,14 +257,9 @@ bool ZWidgetsGroup::operator <(const ZWidgetsGroup &other) const
   return m_visibleLevel < other.m_visibleLevel;
 }
 
-bool __widgetGroupPtVisibleLevelLessThan(const std::shared_ptr<ZWidgetsGroup> &s1, const std::shared_ptr<ZWidgetsGroup> &s2)
-{
-  return s1->visibleLevel() < s2->visibleLevel();
-}
-
 void ZWidgetsGroup::sortChildGroups()
 {
-  qStableSort(m_childGroups.begin(), m_childGroups.end(), __widgetGroupPtVisibleLevelLessThan);
+  std::stable_sort(m_childGroups.begin(), m_childGroups.end(), widgetGroupPtVisibleLevelLessThan);
   m_isSorted = true;
 }
 

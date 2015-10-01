@@ -169,7 +169,7 @@ inline std::ostream& operator <<(std::ostream & s, const ZBenchTimer& m)
 }
 
 // qDebug output
-QDebug& operator << (QDebug s, const ZBenchTimer& m);
+QDebug operator << (QDebug s, const ZBenchTimer& m);
 
 } // namespace nim
 

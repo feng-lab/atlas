@@ -308,7 +308,8 @@ ZAssignPuncta::SwcTreeNode ZAssignPuncta::intensityWeightedNearestNode(double x,
   ZImgGraph imgGraph(img);
   imgGraph.setConnectivity(26);
   ZImgAutoThreshold<> imgAutoThre;
-  double cent1, cent2;
+  double cent1 = 0;
+  double cent2 = 0;
   double thre1 = imgAutoThre.centroidThre<double>(cent1, cent2, img);
   double scale = cent2 - cent1;
   if (scale < 1.0)

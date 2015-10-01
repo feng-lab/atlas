@@ -392,49 +392,49 @@ std::ostream& operator << (std::ostream& s, const glm::tquat<T,P>& q)
 // qDebug print
 
 template<typename T, glm::precision P>
-QDebug& operator << (QDebug s, const glm::tvec2<T,P>& v)
+QDebug operator << (QDebug s, const glm::tvec2<T,P>& v)
 {
   s.nospace() << qPrintable(toQString(v));
   return s.space();
 }
 
 template<typename T, glm::precision P>
-QDebug& operator << (QDebug s, const glm::tvec3<T,P>& v)
+QDebug operator << (QDebug s, const glm::tvec3<T,P>& v)
 {
   s.nospace() << qPrintable(toQString(v));
   return s.space();
 }
 
 template<typename T, glm::precision P>
-QDebug& operator << (QDebug s, const glm::tvec4<T,P>& v)
+QDebug operator << (QDebug s, const glm::tvec4<T,P>& v)
 {
   s.nospace() << qPrintable(toQString(v));
   return s.space();
 }
 
 template<typename T, glm::precision P>
-QDebug& operator << (QDebug s, const glm::tmat2x2<T,P>& m)
+QDebug operator << (QDebug s, const glm::tmat2x2<T,P>& m)
 {
   s.nospace() << qPrintable(toQString(m));
   return s.space();
 }
 
 template<typename T, glm::precision P>
-QDebug& operator << (QDebug& s, const glm::tmat3x3<T,P>& m)
+QDebug operator << (QDebug& s, const glm::tmat3x3<T,P>& m)
 {
   s.nospace() << qPrintable(toQString(m));
   return s.space();
 }
 
 template<typename T, glm::precision P>
-QDebug& operator << (QDebug s, const glm::tmat4x4<T,P>& m)
+QDebug operator << (QDebug s, const glm::tmat4x4<T,P>& m)
 {
   s.nospace() << qPrintable(toQString(m));
   return s.space();
 }
 
 template<typename T, glm::precision P>
-QDebug& operator << (QDebug s, const glm::tquat<T,P>& q)
+QDebug operator << (QDebug s, const glm::tquat<T,P>& q)
 {
   s.nospace() << qPrintable(toQString(q));
   return s.space();

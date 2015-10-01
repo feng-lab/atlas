@@ -24,7 +24,7 @@ namespace nim {
 
 // qDebug output of eigen matrix and vector
 template<typename Derived>
-QDebug& operator << (QDebug s, const Eigen::DenseBase<Derived> & m)
+QDebug operator << (QDebug s, const Eigen::DenseBase<Derived> & m)
 {
   std::ostringstream oss;
   oss << m;
@@ -33,7 +33,7 @@ QDebug& operator << (QDebug s, const Eigen::DenseBase<Derived> & m)
 }
 
 template<typename ExpressionType>
-QDebug& operator << (QDebug s, const Eigen::WithFormat<ExpressionType> & m)
+QDebug operator << (QDebug s, const Eigen::WithFormat<ExpressionType> & m)
 {
   std::ostringstream oss;
   oss << m;

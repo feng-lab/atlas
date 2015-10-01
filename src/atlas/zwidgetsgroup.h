@@ -68,7 +68,7 @@ private:
   int m_visibleLevel;
   bool m_isSorted;
   int m_cutOffbetweenBasicAndAdvancedLevel;
-  QList<std::shared_ptr<ZWidgetsGroup>> m_childGroups;
+  std::vector<std::shared_ptr<ZWidgetsGroup>> m_childGroups;
   bool m_isVisible;
 
   bool m_useToolBoxStyle;

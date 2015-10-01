@@ -135,7 +135,7 @@ std::ostream& ZBenchTimer::print(std::ostream& s) const
 }
 
 // qDebug output
-QDebug& operator << (QDebug s, const ZBenchTimer& m)
+QDebug operator << (QDebug s, const ZBenchTimer& m)
 {
   std::ostringstream oss;
   oss << m;

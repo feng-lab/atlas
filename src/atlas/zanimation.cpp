@@ -961,11 +961,9 @@ void ZAnimation::readContent(const QString &fn, const QString &jsonKey)
 
   // match global parameters
   for (size_t i=0; i<globalParaAnimations.size(); ++i) {
-    bool found = false;
     for (size_t j=0; j<m_globalParaAnimations.size(); ++j) {
       if (globalParaAnimations[i]->name() == m_globalParaAnimations[j]->name() &&
           globalParaAnimations[i]->type() == m_globalParaAnimations[j]->type()) {
-        found = true;
         m_globalParaAnimations[j] = std::move(globalParaAnimations[i]);
         break;
       }

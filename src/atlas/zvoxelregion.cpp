@@ -65,7 +65,7 @@ std::ostream& operator << (std::ostream& s, const ZVoxelRegion& m)
   return s;
 }
 
-QDebug& operator << (QDebug s, const ZVoxelRegion& m)
+QDebug operator << (QDebug s, const ZVoxelRegion& m)
 {
   std::ostringstream oss;
   oss << m;

@@ -13,7 +13,7 @@ CONFIG += staticlib
 macx {
 # suppress warnings from 3rd party library, works for gcc and clang
 QMAKE_CXXFLAGS += -isystem $$PWD/../3rdparty -isystem $$PWD/../3rdparty/eigen -isystem $$PWD/../3rdparty/boost -isystem $$PWD/../3rdparty/glm \
-  -mllvm -inline-threshold=600
+  -mllvm -inline-threshold=600 #--analyze
 }
 
 win32 {

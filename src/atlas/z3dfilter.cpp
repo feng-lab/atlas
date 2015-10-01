@@ -312,13 +312,10 @@ void Z3DFilter::renderScreenQuad(const ZVertexArrayObject &vao, const Z3DShaderP
 void Z3DFilter::updateSize()
 {
   // 1. update outport size
-  bool resized = false;
-
   glm::ivec2 maxOutportSize(-1, -1);
   for(size_t i=0; i<m_outputPorts.size(); ++i) {
     glm::ivec2 outportSize = m_outputPorts[i]->expectedSize();
     if (outportSize.x > 0 && outportSize != m_outputPorts[i]->size()) {
-      resized = true;
       m_outputPorts[i]->resize(outportSize);
     }
 

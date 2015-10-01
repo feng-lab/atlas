@@ -465,7 +465,7 @@ void Z3DLineRenderer::render(Z3DEye eye)
       glBufferData(GL_ARRAY_BUFFER, m_linesPt->size()*3*sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-    GLint attr_color;
+    GLint attr_color = -1;
     if (!m_useTextureColor) {
       attr_color = shader.colorAttributeLocation();
       glEnableVertexAttribArray(attr_color);
@@ -710,8 +710,8 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
     // set vertex data
     GLint attr_p0 = shader.p0AttributeLocation();
     GLint attr_p1 = shader.p1AttributeLocation();
-    GLint attr_p0color;
-    GLint attr_p1color;
+    GLint attr_p0color = -1;
+    GLint attr_p1color = -1;
     if (!m_useTextureColor) {
       attr_p0color = shader.p0ColorAttributeLocation();
       attr_p1color = shader.p1ColorAttributeLocation();

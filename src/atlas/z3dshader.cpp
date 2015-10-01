@@ -57,7 +57,7 @@ void Z3DShader::compileSourceCode(const char *source)
         "Compute",
         ""
       };
-      const char *type = types[6];
+      const char *type = nullptr;
       switch (m_type) {
       case Z3DShader::Type::Fragment:
         type = types[0]; break;
@@ -71,6 +71,8 @@ void Z3DShader::compileSourceCode(const char *source)
         type = types[4]; break;
       case Z3DShader::Type::Compute:
         type = types[5]; break;
+      default:
+        type = types[6]; break;
       }
       // Get info and source code lengths
       GLint infoLogLength = 0;

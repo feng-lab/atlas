@@ -79,9 +79,9 @@ void Z3DSDFont::parseFontFile()
     //char id=32    x=208   y=249   width=4     height=4     xoffset=-1.500    yoffset=1.500     xadvance=15.625      page=0  chnl=0
     if (line.startsWith("char ")) {
       line = line.mid(5).trimmed();
-      int	id, x, y, width, height;
-      float	xoffset, yoffset, xadvance;
-      int	page, chnl;
+      int	id = 0, x = 0, y = 0, width = 0, height = 0;
+      float	xoffset = 0.f, yoffset = 0.f, xadvance = 0.f;
+      int	page = 0, chnl = 0;
       QStringList tokens;
       tokens.push_back("id=");
       tokens.push_back("x=");

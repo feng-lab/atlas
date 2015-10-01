@@ -556,25 +556,25 @@ uint64_t ZTiffIFD::stripByteCounts(size_t idx) const
 uint64_t ZTiffIFD::tileWidth() const
 {
   int64_t i = indexOf(TIFFTAG_TILEWIDTH);
-  if (i != -1) {
-    if (m_entries[i].dataType() == DataType::Short)
-      return m_entries[i].dataAt<uint16_t>(0);
-    else
-      return m_entries[i].dataAt<uint32_t>(0);
+  if (i < 0) {
+    throw ZIOException(QString("Tile width required for tile image"));
   }
-  return 0;
+  if (m_entries[i].dataType() == DataType::Short)
+    return m_entries[i].dataAt<uint16_t>(0);
+  else
+    return m_entries[i].dataAt<uint32_t>(0);
 }
 
 uint64_t ZTiffIFD::tileHeight() const
 {
   int64_t i = indexOf(TIFFTAG_TILELENGTH);
-  if (i != -1) {
-    if (m_entries[i].dataType() == DataType::Short)
-      return m_entries[i].dataAt<uint16_t>(0);
-    else
-      return m_entries[i].dataAt<uint32_t>(0);
+  if (i < 0) {
+    throw ZIOException(QString("Tile length required for tile image"));
   }
-  return 0;
+  if (m_entries[i].dataType() == DataType::Short)
+    return m_entries[i].dataAt<uint16_t>(0);
+  else
+    return m_entries[i].dataAt<uint32_t>(0);
 }
 
 uint64_t ZTiffIFD::tileOffsets(size_t idx) const

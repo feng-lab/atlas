@@ -171,7 +171,7 @@ private:
 };
 
 std::ostream& operator << (std::ostream& s, const ZVoxelRegion& m);
-QDebug& operator << (QDebug s, const ZVoxelRegion& m);
+QDebug operator << (QDebug s, const ZVoxelRegion& m);
 
 } // namespace nim
 
