@@ -420,7 +420,7 @@ QDebug operator << (QDebug s, const glm::tmat2x2<T,P>& m)
 }
 
 template<typename T, glm::precision P>
-QDebug operator << (QDebug& s, const glm::tmat3x3<T,P>& m)
+QDebug operator << (QDebug s, const glm::tmat3x3<T,P>& m)
 {
   s.nospace() << qPrintable(toQString(m));
   return s.space();
