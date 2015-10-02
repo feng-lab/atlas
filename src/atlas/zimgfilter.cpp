@@ -56,15 +56,15 @@ void ZImgFilter::setData(ZImgPack &pack)
   }
 
   for (size_t c=0; c<m_imgPack->imgInfo().numChannels; ++c) {
-    m_channelVisibleParas.emplace_back(std::make_unique<ZBoolParameter>(QString("Show %1").arg(m_imgPack->imgInfo().channelNames[c]), true));
-    m_doubleChannelRangeParas.emplace_back(std::make_unique<ZDoubleSpanParameter>(QString("%1 Display Range").arg(m_imgPack->imgInfo().channelNames[c]),
-                                                                 dr,
-                                                                 m_imgPack->rangeMin(), m_imgPack->rangeMax()));
+    m_channelVisibleParas.emplace_back(std::make_unique<ZBoolParameter>(QString("Show %1").arg(m_imgPack->imgInfo().displayChannelName(c)), true));
+    m_doubleChannelRangeParas.emplace_back(std::make_unique<ZDoubleSpanParameter>(QString("%1 Display Range").arg(m_imgPack->imgInfo().displayChannelName(c)),
+                                                                                  dr,
+                                                                                  m_imgPack->rangeMin(), m_imgPack->rangeMax()));
     if (m_imgPack->imgInfo().voxelFormat != VoxelFormat::Float) {
       m_doubleChannelRangeParas[m_doubleChannelRangeParas.size()-1]->setDecimal(0);
       m_doubleChannelRangeParas[m_doubleChannelRangeParas.size()-1]->setSingleStep(1);
     }
-    m_channelColorParas.emplace_back(std::make_unique<ZVec3Parameter>(QString("%1 Color").arg(m_imgPack->imgInfo().channelNames[c]),
+    m_channelColorParas.emplace_back(std::make_unique<ZVec3Parameter>(QString("%1 Color").arg(m_imgPack->imgInfo().displayChannelName(c)),
                                                                       glm::vec3(m_imgPack->imgInfo().channelColors[c].r / 255.,
                                                                                 m_imgPack->imgInfo().channelColors[c].g / 255.,
                                                                                 m_imgPack->imgInfo().channelColors[c].b / 255.),

@@ -247,7 +247,9 @@ void transfromMesh()
 
 void tmp()
 {
-  LINFO() << itk::NumericTraits< double >::max() << itk::Math::NotAlmostEquals(-9.0, itk::NumericTraits< double >::max());
+//  ZImg img("/Users/feng/Downloads/mGRASP_match_mesoscale.ome.tif");
+//  img.zoom(0.2, 0.2, 0.5);
+//  img.save("/Users/feng/Downloads/mGRASP_match_mesoscale_0.2_0.2_0.5.ome.tif");
 }
 
 }

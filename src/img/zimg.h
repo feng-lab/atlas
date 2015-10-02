@@ -233,6 +233,7 @@ public:
   inline col4 channelColor(size_t c) const { return m_info.channelColors[c]; }
   //inline Location location(size_t l) const { return m_info.locations[l]; }
   inline const QString& channelName(size_t c) const { return m_info.channelNames[c]; }
+  inline QString displayChannelName(size_t c) const { return m_info.displayChannelName(c); }
   inline double timeStamp(size_t t) const { return m_info.timeStamps[t]; }
 
   // remove old data and allocate data space based on current info

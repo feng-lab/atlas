@@ -28,6 +28,8 @@ struct ZImgInfo
   QString toQString() const;
   // return img data type as string "float32", "int8" ...
   QString typeAsQString() const;
+  // channel name for interface, prepend ch1, ch2, ...
+  QString displayChannelName(size_t c) const;
 
   // create default value if not filled or number don't match
   // image reader or creator should take care of this to make sure all information exist

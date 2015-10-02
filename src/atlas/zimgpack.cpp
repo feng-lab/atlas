@@ -575,12 +575,6 @@ void ZImgPack::createPyramidalFolder(const QString &fileName)
 
 void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
 {
-#if 1
-  Q_UNUSED(img)
-  Q_UNUSED(z)
-  Q_UNUSED(t)
-  Q_UNUSED(mip)
-#else
   if (true || (img->width() * img->height() <= 20480 * 20480 &&
       img->width() <= 32767 && img->height() <= 32767)) {
     size_t ratio = 1;
@@ -656,7 +650,6 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
       ++level;
     }
   }
-#endif
 }
 
 void ZImgPack::buildPyramidal(ZImg &img)

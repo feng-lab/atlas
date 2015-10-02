@@ -154,18 +154,24 @@ QString ZImgInfo::typeAsQString() const
   return "invalid image type";
 }
 
+QString ZImgInfo::displayChannelName(size_t c) const
+{
+  QString res;
+  if (channelNames[c].isEmpty()) {
+    res = QString("Ch%1").arg(c+1);
+  } else {
+    res = QString("Ch%1 (%2)").arg(c+1).arg(channelNames[c]);
+  }
+
+  if (static_cast<int>(c) == alphaChannelIdx) {
+    res += QString(" (Alpha)");
+  }
+  return res;
+}
+
 void ZImgInfo::createDefaultChannelNames()
 {
   channelNames.resize(numChannels);
-  for (size_t i=0; i<numChannels; ++i) {
-    if (channelNames[i].isEmpty())
-      channelNames[i] = QString("Ch%1").arg(i+1);
-    else
-      channelNames[i] = QString("Ch%1 (%2)").arg(i+1).arg(channelNames[i]);
-    if (static_cast<int>(i) == alphaChannelIdx) {
-      channelNames[i] += QString(" (Alpha)");
-    }
-  }
 }
 
 void ZImgInfo::createDefaultChannelColors()

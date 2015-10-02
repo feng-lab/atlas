@@ -21,6 +21,7 @@ public:
 
   // thread-safe functions:
   std::shared_ptr<ZImg> *get(size_t key);
+  bool insert(size_t key, std::shared_ptr<ZImg> *object, int cost = 1);
   bool remove(size_t key);
   std::shared_ptr<ZImg> *getOrRead(size_t key, const ZImgSubBlock &imgBlock);
 
