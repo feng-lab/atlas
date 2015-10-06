@@ -8,7 +8,7 @@ class ZUnitTest
 public:
   ZUnitTest();
 
-  static int run(int argc, char *argv[]);
+  static int run();
 };
 
 } // namespace nim

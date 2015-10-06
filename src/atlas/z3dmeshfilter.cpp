@@ -184,9 +184,9 @@ std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroup()
       ZParameter *para = paras[i];
       if (para->name() == "Coord Transform") {
         m_widgetsGroup->addChild(*para, 2);
-        QPushButton *pb = new QPushButton("Apply Transform");
-        connect(pb, SIGNAL(clicked(bool)), this, SLOT(onApplyTransform()));
-        m_widgetsGroup->addChild(*pb, 2);
+        //        QPushButton *pb = new QPushButton("Apply Transform");
+        //        connect(pb, SIGNAL(clicked(bool)), this, SLOT(onApplyTransform()));
+        //        m_widgetsGroup->addChild(*pb, 2);
       }
       //else if (para->name() == "Size Scale")
         //m_widgetsGroup->addChild(para, 3);

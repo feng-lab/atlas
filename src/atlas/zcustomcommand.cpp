@@ -245,11 +245,36 @@ void transfromMesh()
   }
 }
 
+void transfromMesh2()
+{
+  QDir dir("/Users/feng/Library/Application Support/Brain Explorer 2/Atlases/Allen Mouse Brain Common Coordinate Framework/Spaces/P56/Meshes");
+  QStringList filters;
+  filters << "*.msh";
+  QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+  list.append(QDir("/Users/feng/Downloads/all_obj").entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
+  QString outFolder = "/Users/feng/Downloads/gpe_stn_traj_mesh";
+  glm::mat4 mat;
+  nim::toVal(QString("[5.96047e-09, 0, -0.1, 490.6; 0, 0.1, 0, -355.6; 0.1, 0, 5.96047e-09, -513.4; 0, 0, 0, 1]"), mat);
+
+  for (int i=0; i<list.size(); i++) {
+    QFileInfo fileInfo = list.at(i);
+    ZMesh msh(fileInfo.absoluteFilePath());
+
+    std::vector<glm::vec3> vertices = msh.vertices();
+    for (size_t i=0; i<vertices.size(); ++i) {
+      vertices[i] = glm::applyMatrix(mat, vertices[i]);
+    }
+    msh.setVertices(vertices);
+    msh.generateNormals();
+    msh.save(QString("%1/%2.obj").arg(outFolder).arg(fileInfo.fileName()));
+  }
+}
+
 void tmp()
 {
 //  ZImg img("/Users/feng/Downloads/mGRASP_match_mesoscale.ome.tif");
-//  img.zoom(0.2, 0.2, 0.5);
-//  img.save("/Users/feng/Downloads/mGRASP_match_mesoscale_0.2_0.2_0.5.ome.tif");
+//  img.zoom(0.3189, 0.3189, 0.5);
+//  img.save("/Users/feng/Downloads/mGRASP_match_mesoscale_0.32_0.32_0.5.ome.tif");
 }
 
 }

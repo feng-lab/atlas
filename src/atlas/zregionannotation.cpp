@@ -632,6 +632,16 @@ void ZRegionAnnotation::exportLabelImage(const QString &fn, FileFormat format, C
       res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
     }
   }
+  for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
+    if (it->abbreviation.compare("GPe", Qt::CaseInsensitive) == 0 ||
+        it->abbreviation.compare("STN", Qt::CaseInsensitive) == 0) {
+      LINFO() << "Post Processing Region" << it->abbreviation << it->id << "...";
+      if (it->roi) {
+        ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), false);
+        res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
+      }
+    }
+  }
   res.save(fn, format, comp);
   LINFO() << "Finish exporting label image";
 }

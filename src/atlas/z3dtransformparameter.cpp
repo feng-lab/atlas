@@ -1,6 +1,7 @@
 #include "z3dtransformparameter.h"
 #include <QWidget>
 #include <QGroupBox>
+#include <QPushButton>
 #include "zwidgetsgroup.h"
 
 namespace {
@@ -286,6 +287,13 @@ void Z3DTransformParameter::updateMatrix()
   }
 }
 
+void Z3DTransformParameter::showTransformMatrix()
+{
+  LINFO() << "Transform:" << m_value;
+  LINFO() << "Inverse Transform: " << glm::affineInverse(m_value);
+  LINFO() << "";
+}
+
 QWidget *Z3DTransformParameter::actualCreateWidget(QWidget *parent)
 {
   ZWidgetsGroup transform("Transform", 1);
@@ -293,6 +301,10 @@ QWidget *Z3DTransformParameter::actualCreateWidget(QWidget *parent)
   transform.addChild(m_rotation, 1);
   transform.addChild(m_translation, 1);
   transform.addChild(m_center, 1);
+
+  QPushButton *pb = new QPushButton("Show Transform Matrix");
+  connect(pb, SIGNAL(clicked(bool)), this, SLOT(showTransformMatrix()));
+  transform.addChild(*pb, 2);
 
   QLayout *lw = transform.createLayout(false);
   //QWidget *widget = new QWidget();

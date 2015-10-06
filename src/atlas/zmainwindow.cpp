@@ -304,7 +304,7 @@ void ZMainWindow::openLogFolder()
 #ifdef _WITH_TESTS_
 void ZMainWindow::runUnitTest()
 {
-  ZUnitTest::run(0, nullptr);
+  ZUnitTest::run();
 }
 #endif
 

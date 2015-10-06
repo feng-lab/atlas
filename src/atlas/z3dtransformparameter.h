@@ -41,6 +41,7 @@ public:
 
 protected slots:
   void updateMatrix();
+  void showTransformMatrix();
 
 protected:
   virtual QWidget* actualCreateWidget(QWidget *parent) override;
