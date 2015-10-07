@@ -22,7 +22,7 @@ void openFileStream(std::ofstream &fs, const QString &filename, std::ios_base::o
   }
 }
 
-void readStream(std::istream &fs, char *buf, size_t count)
+void readStream_impl(std::istream &fs, char *buf, size_t count)
 {
 #if defined(__APPLE__)
   if (count < size_t(1024)*1024*1024*2) {
@@ -48,7 +48,7 @@ void readStream(std::istream &fs, char *buf, size_t count)
 #endif
 }
 
-void writeStream(std::ostream &fs, const char *buf, size_t count)
+void writeStream_impl(std::ostream &fs, const char *buf, size_t count)
 {
   if (!fs.write(buf, count)) {
     throw ZIOException("File write failed.");

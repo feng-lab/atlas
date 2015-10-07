@@ -1042,13 +1042,13 @@ uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigt
     return 0;
   fs.seekg(off);
   if (!bigtiff) {
-    readStream(fs, reinterpret_cast<char*>(&dircount), sizeof(uint16_t));
+    readStream(fs, &dircount, sizeof(uint16_t));
     if (swabflag)
       boost::endian::endian_reverse_inplace(dircount);
     direntrysize = 12;
   } else {
     uint64_t dircount64 = 0;
-    readStream(fs, reinterpret_cast<char*>(&dircount64), sizeof(uint64_t));
+    readStream(fs, &dircount64, sizeof(uint64_t));
     if (swabflag)
       boost::endian::endian_reverse_inplace(dircount64);
     if (dircount64 > 0xFFFF) {
@@ -1262,7 +1262,7 @@ void ZTiff::readIFDs(const QString &filename, std::vector<ZTiffIFD> &ifds) const
 void ZTiff::readIFDs(std::istream &fs, std::vector<ZTiffIFD> &ifds) const
 {
   std::vector<ZTiffIFD> _ifds;
-  readStream(fs, reinterpret_cast<char*>(&hdr), sizeof(TIFFHeaderCommon));
+  readStream(fs, &hdr, sizeof(TIFFHeaderCommon));
 
   if (hdr.common.tiff_magic != TIFF_BIGENDIAN
       && hdr.common.tiff_magic != TIFF_LITTLEENDIAN &&
@@ -1282,7 +1282,7 @@ void ZTiff::readIFDs(std::istream &fs, std::vector<ZTiffIFD> &ifds) const
   bool bigtiff = false;
   uint64_t diroff = 0;
   if (hdr.common.tiff_version == 42) {
-    readStream(fs, reinterpret_cast<char*>(&hdr.classic.tiff_diroff), 4);
+    readStream(fs, &hdr.classic.tiff_diroff, 4);
     if (swabflag)
       boost::endian::endian_reverse_inplace(hdr.classic.tiff_diroff);
     //    printf("Magic: %#x <%s-endian> Version: %#x <%s>\n",
@@ -1292,7 +1292,7 @@ void ZTiff::readIFDs(std::istream &fs, std::vector<ZTiffIFD> &ifds) const
     if (diroff == 0)
       diroff = hdr.classic.tiff_diroff;
   } else if (hdr.common.tiff_version==43) {
-    readStream(fs, reinterpret_cast<char*>(&hdr.big.tiff_offsetsize), 12);
+    readStream(fs, &hdr.big.tiff_offsetsize, 12);
     if (swabflag) {
       boost::endian::endian_reverse_inplace(hdr.big.tiff_offsetsize);
       boost::endian::endian_reverse_inplace(hdr.big.tiff_unused);

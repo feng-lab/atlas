@@ -116,7 +116,7 @@ void ZImgZeissLsm::readLsmInfo(const QString &filename, ZTiff &tiff)
 
   if (m_lsmInfo.u32OffsetChannelColors != 0) {
     inputFileStream.seekg(m_lsmInfo.u32OffsetChannelColors);
-    readStream(inputFileStream, reinterpret_cast<char*>(&m_lsmChannelColors), sizeof(CZ_ChannelColors));
+    readStream(inputFileStream, &m_lsmChannelColors, sizeof(CZ_ChannelColors));
 
     std::vector<char> chStruct(m_lsmChannelColors.s32BlockSize);
     inputFileStream.seekg(m_lsmInfo.u32OffsetChannelColors);
@@ -138,31 +138,31 @@ void ZImgZeissLsm::readLsmInfo(const QString &filename, ZTiff &tiff)
 
   if (m_lsmInfo.u32OffsetTimeStamps != 0) {
     inputFileStream.seekg(m_lsmInfo.u32OffsetTimeStamps);
-    readStream(inputFileStream, reinterpret_cast<char*>(&m_lsmTimeStamps), sizeof(CZ_TimeStamps));
+    readStream(inputFileStream, &m_lsmTimeStamps, sizeof(CZ_TimeStamps));
     m_lsmImgInfo.timeStamps.resize(m_lsmTimeStamps.s32NumberTimeStamps);
-    readStream(inputFileStream, reinterpret_cast<char*>(m_lsmImgInfo.timeStamps.data()), sizeof(double) * m_lsmTimeStamps.s32NumberTimeStamps);
+    readStream(inputFileStream, m_lsmImgInfo.timeStamps.data(), sizeof(double) * m_lsmTimeStamps.s32NumberTimeStamps);
   }
 
   if (m_lsmInfo.u32OffsetChannelDataTypes != 0) {
     inputFileStream.seekg(m_lsmInfo.u32OffsetChannelDataTypes);
     m_channelDataTypes.resize(m_lsmInfo.s32DimensionChannels);
-    readStream(inputFileStream, reinterpret_cast<char*>(m_channelDataTypes.data()), sizeof(uint32_t) * m_channelDataTypes.size());
+    readStream(inputFileStream, m_channelDataTypes.data(), sizeof(uint32_t) * m_channelDataTypes.size());
   }
 
   if (m_lsmInfo.u32OffsetPositions != 0) {
     inputFileStream.seekg(m_lsmInfo.u32OffsetPositions);
     uint32_t numPositions;
-    readStream(inputFileStream, reinterpret_cast<char*>(&numPositions), sizeof(uint32_t));
+    readStream(inputFileStream, &numPositions, sizeof(uint32_t));
     m_positions.resize(numPositions);
-    readStream(inputFileStream, reinterpret_cast<char*>(m_positions.data()), sizeof(Location) * numPositions);
+    readStream(inputFileStream, m_positions.data(), sizeof(Location) * numPositions);
   }
 
   if (m_lsmInfo.u32OffsetTilePositions != 0) {
     inputFileStream.seekg(m_lsmInfo.u32OffsetTilePositions);
     uint32_t numTiles;
-    readStream(inputFileStream, reinterpret_cast<char*>(&numTiles), sizeof(uint32_t));
+    readStream(inputFileStream, &numTiles, sizeof(uint32_t));
     m_tilePositions.resize(numTiles);
-    readStream(inputFileStream, reinterpret_cast<char*>(m_tilePositions.data()), sizeof(Location) * numTiles);
+    readStream(inputFileStream, m_tilePositions.data(), sizeof(Location) * numTiles);
   }
 
   m_lsmImgInfo.width = m_lsmInfo.s32DimensionX;

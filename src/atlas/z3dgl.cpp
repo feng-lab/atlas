@@ -87,7 +87,7 @@ bool checkGLState(GLenum pname, GLfloat value)
 bool checkGLState(GLenum pname, const glm::vec4 value)
 {
   glm::vec4 v;
-  glGetFloatv(pname, reinterpret_cast<float*>(&v[0]));
+  glGetFloatv(pname, &v[0]);
   return (v == value);
 }
 

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <cstddef>
+#include <cstring>
 #include <type_traits>
 
 namespace nim {
@@ -48,6 +49,16 @@ template<typename TEnum>
 constexpr const char* enumToString(TEnum e)
 {
   return EnumStrings<TEnum>::data[static_cast<typename std::underlying_type<TEnum>::type>(e)];
+}
+
+// https://chromium.googlesource.com/chromium/src/+/master/base/macros.h
+template <class Dest, class Source>
+inline Dest bit_cast(const Source& source)
+{
+  static_assert(sizeof(Dest) == sizeof(Source), "VerifySizesAreEqual");
+  Dest dest;
+  memcpy(&dest, &source, sizeof(dest));
+  return dest;
 }
 
 } // namespace nim

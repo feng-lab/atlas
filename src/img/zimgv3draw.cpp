@@ -49,22 +49,19 @@ void ZImgV3DRaw::readInfo(const QString &filename, std::vector<ZImgInfo> &infos,
   readStream(inputFileStream, &endian, 1);
 
   uint16_t dataType;
-  readStream(inputFileStream, reinterpret_cast<char*>(&dataType), 2);
+  readStream(inputFileStream, &dataType, 2);
 
   uint16_t sz_buffer[8];
   uint32_t sz[4];
-  readStream(inputFileStream, reinterpret_cast<char*>(sz_buffer), 8);
+  readStream(inputFileStream, sz_buffer, 8);
 
   for (int i = 0; i < 4; ++i) {
     sz[i] = sz_buffer[i];
   }
 
   if ((sz[0] == 0) || (sz[1] == 0) || (sz[2] == 0) || (sz[3] == 0)) {
-    readStream(inputFileStream, reinterpret_cast<char*>(sz_buffer + 4), 8);
-
-    for (int i = 0; i < 4; ++i) {
-      sz[i] = *(reinterpret_cast<uint32_t*>(sz_buffer + i * 2));
-    }
+    readStream(inputFileStream, sz_buffer + 4, 8);
+    memcpy(sz, sz_buffer, 16);
   }
 
   infos.resize(1);
@@ -134,11 +131,11 @@ void ZImgV3DRaw::readImg(const QString &filename, ZImg &img, const ZImgRegion &r
   readStream(inputFileStream, &endian, 1);
 
   uint16_t dataType;
-  readStream(inputFileStream, reinterpret_cast<char*>(&dataType), 2);
+  readStream(inputFileStream, &dataType, 2);
 
   uint16_t sz_buffer[8];
   uint32_t sz[4];
-  readStream(inputFileStream, reinterpret_cast<char*>(sz_buffer), 8);
+  readStream(inputFileStream, sz_buffer, 8);
 
   for (int i = 0; i < 4; ++i) {
     sz[i] = sz_buffer[i];
@@ -146,11 +143,8 @@ void ZImgV3DRaw::readImg(const QString &filename, ZImg &img, const ZImgRegion &r
   size_t dataOffset = 35;
 
   if ((sz[0] == 0) || (sz[1] == 0) || (sz[2] == 0) || (sz[3] == 0)) {
-    readStream(inputFileStream, reinterpret_cast<char*>(sz_buffer + 4), 8);
-
-    for (int i = 0; i < 4; ++i) {
-      sz[i] = *(reinterpret_cast<uint32_t*>(sz_buffer + i * 2));
-    }
+    readStream(inputFileStream, sz_buffer + 4, 8);
+    memcpy(sz, sz_buffer, 16);
     dataOffset += 8;
   }
 
@@ -192,14 +186,14 @@ void ZImgV3DRaw::writeImg(const QString &filename, const ZImg &img, Compression 
   writeStream(outputFileStream, &endian, 1);
 
   uint16_t dataType = img.voxelByteNumber();
-  writeStream(outputFileStream, reinterpret_cast<char*>(&dataType), 2);
+  writeStream(outputFileStream, &dataType, 2);
 
   uint32_t sz[4];
   sz[0] = img.width();
   sz[1] = img.height();
   sz[2] = img.depth();
   sz[3] = img.numChannels();
-  writeStream(outputFileStream, reinterpret_cast<char*>(sz), 16);
+  writeStream(outputFileStream, sz, 16);
 
   writeStream(outputFileStream, img.timeData<char>(0), img.timeByteNumber());
 }
@@ -225,14 +219,14 @@ void ZImgV3DRaw::writeImg(const QString &filename, const ZImgSliceProvider &imgS
     writeStream(outputFileStream, &endian, 1);
 
     uint16_t dataType = imgSliceProvider.imgInfo().voxelByteNumber();
-    writeStream(outputFileStream, reinterpret_cast<char*>(&dataType), 2);
+    writeStream(outputFileStream, &dataType, 2);
 
     uint32_t sz[4];
     sz[0] = imgSliceProvider.imgInfo().width;
     sz[1] = imgSliceProvider.imgInfo().height;
     sz[2] = imgSliceProvider.imgInfo().depth;
     sz[3] = imgSliceProvider.imgInfo().numChannels;
-    writeStream(outputFileStream, reinterpret_cast<char*>(sz), 16);
+    writeStream(outputFileStream, sz, 16);
 
     for (size_t z=0; z<imgSliceProvider.imgInfo().depth; ++z) {
       ZImg img = imgSliceProvider.slice(z,0);

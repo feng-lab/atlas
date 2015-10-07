@@ -32,14 +32,14 @@ ZImg readCZITile(std::ifstream &inputFileStream, const CZITile &tile)
 {
   SegmentHeader sh;
   inputFileStream.seekg(tile.filePosition);
-  readStream(inputFileStream, reinterpret_cast<char*>(&sh), sizeof(SegmentHeader));
+  readStream(inputFileStream, &sh, sizeof(SegmentHeader));
 
   if (std::strncmp(sh.id, "ZISRAWSUBBLOCK", 15) != 0) {
     throw ZIOException("can not locate czi tile");
   }
 
   SubBlockSegment sb;
-  readStream(inputFileStream, reinterpret_cast<char*>(&sb), sizeof(SubBlockSegment));
+  readStream(inputFileStream, &sb, sizeof(SubBlockSegment));
 
   int directoryEntriesSize = sizeof(DimensionEntryDV1) * sb.directoryEntry.dimensionCount;
   int directoryEntrySize = sizeof(DirectoryEntryDV) + directoryEntriesSize;
@@ -49,9 +49,9 @@ ZImg readCZITile(std::ifstream &inputFileStream, const CZITile &tile)
 
   std::vector<uint8_t> fileBuf(192 + sb.dataSize);
   if (sb.directoryEntry.compression == 2) {
-    readStream(inputFileStream, reinterpret_cast<char*>(fileBuf.data()) + 192, sb.dataSize); // wrap a tif header and use tif decoder
+    readStream(inputFileStream, fileBuf.data() + 192, sb.dataSize); // wrap a tif header and use tif decoder
   } else {
-    readStream(inputFileStream, reinterpret_cast<char*>(fileBuf.data()), sb.dataSize);
+    readStream(inputFileStream, fileBuf.data(), sb.dataSize);
   }
 
   ZImgInfo info;
@@ -284,13 +284,13 @@ ZImg ZImgZeissCZI::stackTiles(const QString &filename, size_t ch, size_t scene)
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
 
   SegmentHeader sh;
-  readStream(inputFileStream, reinterpret_cast<char*>(&sh), sizeof(SegmentHeader));
+  readStream(inputFileStream, &sh, sizeof(SegmentHeader));
 
   if (std::strncmp(sh.id, "ZISRAWFILE", 15) != 0) {
     throw ZIOException("incorrect czi file header");
   }
   FileHeader fh;
-  readStream(inputFileStream, reinterpret_cast<char*>(&fh), sizeof(FileHeader));
+  readStream(inputFileStream, &fh, sizeof(FileHeader));
   if (fh.updatePending) {
     throw ZIOException("can not read czi file with pending update");
   }
@@ -323,13 +323,13 @@ ZImg ZImgZeissCZI::stackTiles(const QString &filename, size_t ch, size_t scene, 
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
 
   SegmentHeader sh;
-  readStream(inputFileStream, reinterpret_cast<char*>(&sh), sizeof(SegmentHeader));
+  readStream(inputFileStream, &sh, sizeof(SegmentHeader));
 
   if (std::strncmp(sh.id, "ZISRAWFILE", 15) != 0) {
     throw ZIOException("incorrect czi file header");
   }
   FileHeader fh;
-  readStream(inputFileStream, reinterpret_cast<char*>(&fh), sizeof(FileHeader));
+  readStream(inputFileStream, &fh, sizeof(FileHeader));
   if (fh.updatePending) {
     throw ZIOException("can not read czi file with pending update");
   }
@@ -385,13 +385,13 @@ ZImg ZImgZeissCZI::correctShading(const QString &filename, size_t ch, size_t sce
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
 
   SegmentHeader sh;
-  readStream(inputFileStream, reinterpret_cast<char*>(&sh), sizeof(SegmentHeader));
+  readStream(inputFileStream, &sh, sizeof(SegmentHeader));
 
   if (std::strncmp(sh.id, "ZISRAWFILE", 15) != 0) {
     throw ZIOException("incorrect czi file header");
   }
   FileHeader fh;
-  readStream(inputFileStream, reinterpret_cast<char*>(&fh), sizeof(FileHeader));
+  readStream(inputFileStream, &fh, sizeof(FileHeader));
   if (fh.updatePending) {
     throw ZIOException("can not read czi file with pending update");
   }
@@ -488,13 +488,13 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
 
   SegmentHeader sh;
-  readStream(inputFileStream, reinterpret_cast<char*>(&sh), sizeof(SegmentHeader));
+  readStream(inputFileStream, &sh, sizeof(SegmentHeader));
 
   if (std::strncmp(sh.id, "ZISRAWFILE", 15) != 0) {
     throw ZIOException("incorrect czi file header");
   }
   FileHeader fh;
-  readStream(inputFileStream, reinterpret_cast<char*>(&fh), sizeof(FileHeader));
+  readStream(inputFileStream, &fh, sizeof(FileHeader));
   if (fh.updatePending) {
     throw ZIOException("can not read czi file with pending update");
   }
@@ -663,23 +663,23 @@ void ZImgZeissCZI::readMetadata(const QString &filename, ZImgMetadata &meta, siz
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
 
   SegmentHeader sh;
-  readStream(inputFileStream, reinterpret_cast<char*>(&sh), sizeof(SegmentHeader));
+  readStream(inputFileStream, &sh, sizeof(SegmentHeader));
 
   if (std::strncmp(sh.id, "ZISRAWFILE", 15) != 0) {
     throw ZIOException("incorrect czi file header");
   }
   FileHeader fh;
-  readStream(inputFileStream, reinterpret_cast<char*>(&fh), sizeof(FileHeader));
+  readStream(inputFileStream, &fh, sizeof(FileHeader));
   if (fh.updatePending) {
     throw ZIOException("can not read czi file with pending update");
   }
 
   inputFileStream.seekg(fh.metaDataPosition);
-  readStream(inputFileStream, reinterpret_cast<char*>(&sh), sizeof(SegmentHeader));
+  readStream(inputFileStream, &sh, sizeof(SegmentHeader));
 
   if (std::strncmp(sh.id, "ZISRAWMETADATA", 15) == 0) {
     MetaDataSegment md;
-    readStream(inputFileStream, reinterpret_cast<char*>(&md), sizeof(MetaDataSegment));
+    readStream(inputFileStream, &md, sizeof(MetaDataSegment));
     std::vector<char> xmlBuffer(md.xmlSize);
     readStream(inputFileStream, xmlBuffer.data(), md.xmlSize);
     QString xmlString = QString::fromUtf8(xmlBuffer.data(), md.xmlSize);
@@ -707,13 +707,13 @@ void ZImgZeissCZI::readImg(const QString &filename, ZImg &img, const ZImgRegion 
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
 
   SegmentHeader sh;
-  readStream(inputFileStream, reinterpret_cast<char*>(&sh), sizeof(SegmentHeader));
+  readStream(inputFileStream, &sh, sizeof(SegmentHeader));
 
   if (std::strncmp(sh.id, "ZISRAWFILE", 15) != 0) {
     throw ZIOException("incorrect czi file header");
   }
   FileHeader fh;
-  readStream(inputFileStream, reinterpret_cast<char*>(&fh), sizeof(FileHeader));
+  readStream(inputFileStream, &fh, sizeof(FileHeader));
   if (fh.updatePending) {
     throw ZIOException("can not read czi file with pending update");
   }
@@ -1212,11 +1212,11 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
 {
   SegmentHeader sh;
   inputFileStream.seekg(fh.metaDataPosition);
-  readStream(inputFileStream, reinterpret_cast<char*>(&sh), sizeof(SegmentHeader));
+  readStream(inputFileStream, &sh, sizeof(SegmentHeader));
 
   if (std::strncmp(sh.id, "ZISRAWMETADATA", 15) == 0) {
     MetaDataSegment md;
-    readStream(inputFileStream, reinterpret_cast<char*>(&md), sizeof(MetaDataSegment));
+    readStream(inputFileStream, &md, sizeof(MetaDataSegment));
     std::vector<char> xmlBuffer(md.xmlSize);
     readStream(inputFileStream, xmlBuffer.data(), md.xmlSize);
     m_metadataXmlString = QString::fromUtf8(xmlBuffer.data(), md.xmlSize);
@@ -1229,13 +1229,13 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
   }
 
   inputFileStream.seekg(fh.directoryPosition);
-  readStream(inputFileStream, reinterpret_cast<char*>(&sh), sizeof(SegmentHeader));
+  readStream(inputFileStream, &sh, sizeof(SegmentHeader));
 
   if (std::strncmp(sh.id, "ZISRAWDIRECTORY", 15) != 0) {
     throw ZIOException("empty czi file");
   }
   subBlockDirectorySegment sd;
-  readStream(inputFileStream, reinterpret_cast<char*>(&sd), sizeof(subBlockDirectorySegment));
+  readStream(inputFileStream, &sd, sizeof(subBlockDirectorySegment));
   if (sd.entryCount <= 0) {
     throw ZIOException("no data block in czi");
   }
@@ -1246,9 +1246,9 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
   while (idx < sd.entryCount) {
     CZITile tile;
     DirectoryEntryDV de;
-    readStream(inputFileStream, reinterpret_cast<char*>(&de), sizeof(DirectoryEntryDV));
+    readStream(inputFileStream, &de, sizeof(DirectoryEntryDV));
     std::vector<DimensionEntryDV1> dimensionEntries(de.dimensionCount);
-    readStream(inputFileStream, reinterpret_cast<char*>(dimensionEntries.data()), sizeof(DimensionEntryDV1) * dimensionEntries.size());
+    readStream(inputFileStream, dimensionEntries.data(), sizeof(DimensionEntryDV1) * dimensionEntries.size());
     tile.compression = de.compression;
     tile.filePosition = de.filePosition;
     tile.pixelType = de.pixelType;
@@ -1610,7 +1610,7 @@ void ZImgZeissCZI::dumpCZIStream(std::ifstream &inputFileStream, int64_t filesiz
   do {
     inputFileStream.seekg(nextSegPos);
     SegmentHeader sh;
-    readStream(inputFileStream, reinterpret_cast<char*>(&sh), sizeof(SegmentHeader));
+    readStream(inputFileStream, &sh, sizeof(SegmentHeader));
     dumpSegmentInfo(sh, inputFileStream, str, indent);
     nextSegPos += sizeof(SegmentHeader) + sh.allocatedSize;
   } while (nextSegPos - offset < filesize - 1);
@@ -1642,7 +1642,7 @@ void ZImgZeissCZI::dumpFileHeaderSegment(std::ifstream &inputFileStream, QString
 {
   QString ind(indent, QChar(' '));
   FileHeader fh;
-  readStream(inputFileStream, reinterpret_cast<char*>(&fh), sizeof(FileHeader));
+  readStream(inputFileStream, &fh, sizeof(FileHeader));
   str += QString("%1FileHeaderSegment\n").arg(ind);
   str += QString("%1Major: %2\n").arg(ind).arg(fh.major);
   str += QString("%1Minor: %2\n").arg(ind).arg(fh.minor);
@@ -1661,7 +1661,7 @@ void ZImgZeissCZI::dumpMetadataSegment(std::ifstream &inputFileStream, QString &
 {
   QString ind(indent, QChar(' '));
   MetaDataSegment md;
-  readStream(inputFileStream, reinterpret_cast<char*>(&md), sizeof(MetaDataSegment));
+  readStream(inputFileStream, &md, sizeof(MetaDataSegment));
   str += QString("%1MetadataSegment\n").arg(ind);
   str += QString("%1XmlSize: %2\n").arg(ind).arg(md.xmlSize);
   str += QString("%1AttachmentSize: %2\n").arg(ind).arg(md.attachmentSize);
@@ -1678,13 +1678,13 @@ void ZImgZeissCZI::dumpSubBlockSegment(std::ifstream &inputFileStream, QString &
 {
   QString ind(indent, QChar(' '));
   SubBlockSegment sb;
-  readStream(inputFileStream, reinterpret_cast<char*>(&sb), sizeof(SubBlockSegment));
+  readStream(inputFileStream, &sb, sizeof(SubBlockSegment));
   str += QString("%1SubBlockSegment\n").arg(ind);
   str += QString("%1MetadataSize: %2\n").arg(ind).arg(sb.metaDataSize);
   str += QString("%1AttachmentSize: %2\n").arg(ind).arg(sb.attachmentSize);
   str += QString("%1DataSize: %2\n").arg(ind).arg(sb.dataSize);
   std::vector<DimensionEntryDV1> dimensionEntries(sb.directoryEntry.dimensionCount);
-  readStream(inputFileStream, reinterpret_cast<char*>(dimensionEntries.data()), sizeof(DimensionEntryDV1) * dimensionEntries.size());
+  readStream(inputFileStream, dimensionEntries.data(), sizeof(DimensionEntryDV1) * dimensionEntries.size());
   dumpDirectoryEntry(sb.directoryEntry, str, indent);
   for (size_t i=0; i<dimensionEntries.size(); ++i) {
     dumpDimensionEntry(dimensionEntries[i], str, indent);
@@ -1825,7 +1825,7 @@ void ZImgZeissCZI::dumpSubBlockDirectory(std::ifstream &inputFileStream, QString
 {
   QString ind(indent, QChar(' '));
   subBlockDirectorySegment sd;
-  readStream(inputFileStream, reinterpret_cast<char*>(&sd), sizeof(subBlockDirectorySegment));
+  readStream(inputFileStream, &sd, sizeof(subBlockDirectorySegment));
   str += QString("%1SubBlockDirectorySegment\n").arg(ind);
   str += QString("%1EntryCount: %2\n").arg(ind).arg(sd.entryCount);
 
@@ -1833,9 +1833,9 @@ void ZImgZeissCZI::dumpSubBlockDirectory(std::ifstream &inputFileStream, QString
   while (idx < sd.entryCount) {
     str += QString("%1Entry %2:\n").arg(ind).arg(idx);
     DirectoryEntryDV de;
-    readStream(inputFileStream, reinterpret_cast<char*>(&de), sizeof(DirectoryEntryDV));
+    readStream(inputFileStream, &de, sizeof(DirectoryEntryDV));
     std::vector<DimensionEntryDV1> dimensionEntries(de.dimensionCount);
-    readStream(inputFileStream, reinterpret_cast<char*>(dimensionEntries.data()), sizeof(DimensionEntryDV1) * dimensionEntries.size());
+    readStream(inputFileStream, dimensionEntries.data(), sizeof(DimensionEntryDV1) * dimensionEntries.size());
     dumpDirectoryEntry(de, str, indent);
     for (size_t i=0; i<dimensionEntries.size(); ++i) {
       dumpDimensionEntry(dimensionEntries[i], str, indent);
@@ -1850,7 +1850,7 @@ void ZImgZeissCZI::dumpAttachmentSegment(std::ifstream &inputFileStream, QString
 {
   QString ind(indent, QChar(' '));
   AttachmentSegment as;
-  readStream(inputFileStream, reinterpret_cast<char*>(&as), sizeof(AttachmentSegment));
+  readStream(inputFileStream, &as, sizeof(AttachmentSegment));
   str += QString("%1AttachmentSegment\n").arg(ind);
   str += QString("%1DataSize: %2\n").arg(ind).arg(as.dataSize);
   dumpAttachmentEntry(as.attachmentEntry, str, indent);
@@ -1864,12 +1864,12 @@ void ZImgZeissCZI::dumpAttachmentSegment(std::ifstream &inputFileStream, QString
     str += QString("%1Data: %2\n").arg(ind).arg(xmlString);
   } else if (std::strncmp(as.attachmentEntry.name, "TimeStamps", 80) == 0) {
     TimeStampSegment ts;
-    readStream(inputFileStream, reinterpret_cast<char*>(&ts), sizeof(TimeStampSegment));
+    readStream(inputFileStream, &ts, sizeof(TimeStampSegment));
     str += QString("%1Size: %2\n").arg(ind).arg(ts.size);
     str += QString("%1NumberTimeStamps: %2\n").arg(ind).arg(ts.numberTimeStamps);
     if (ts.numberTimeStamps > 0) {
       std::vector<double> timeStamps(ts.numberTimeStamps);
-      readStream(inputFileStream, reinterpret_cast<char*>(timeStamps.data()), 8 * ts.numberTimeStamps);
+      readStream(inputFileStream, timeStamps.data(), 8 * ts.numberTimeStamps);
       str += QString("%1TimeStamps (s): %2").arg(ind).arg(timeStamps[0]);
       for (size_t i=1; i<timeStamps.size(); ++i) {
         str += QString(" %1").arg(timeStamps[i]);
@@ -1878,14 +1878,14 @@ void ZImgZeissCZI::dumpAttachmentSegment(std::ifstream &inputFileStream, QString
     }
   } else if (std::strncmp(as.attachmentEntry.name, "EventList", 80) == 0) {
     EventListSegment el;
-    readStream(inputFileStream, reinterpret_cast<char*>(&el), sizeof(EventListSegment));
+    readStream(inputFileStream, &el, sizeof(EventListSegment));
     str += QString("%1Size: %2\n").arg(ind).arg(el.size);
     str += QString("%1NumberEvents: %2\n").arg(ind).arg(el.numberEvents);
     if (el.numberEvents > 0) {
       int eventIdx = 0;
       while (eventIdx < el.numberEvents) {
         EventListEntry ele;
-        readStream(inputFileStream, reinterpret_cast<char*>(&ele), sizeof(EventListEntry));
+        readStream(inputFileStream, &ele, sizeof(EventListEntry));
         std::vector<char> descriptionBuffer(ele.descriptionSize);
         readStream(inputFileStream, descriptionBuffer.data(), ele.descriptionSize);
         QString desp = QString::fromUtf8(descriptionBuffer.data());
@@ -1920,12 +1920,12 @@ void ZImgZeissCZI::dumpAttachmentSegment(std::ifstream &inputFileStream, QString
     }
   } else if (std::strncmp(as.attachmentEntry.name, "FocusPositions", 80) == 0) {
     FocusPositions fp;
-    readStream(inputFileStream, reinterpret_cast<char*>(&fp), sizeof(FocusPositions));
+    readStream(inputFileStream, &fp, sizeof(FocusPositions));
     str += QString("%1Size: %2\n").arg(ind).arg(fp.size);
     str += QString("%1NumberPositions: %2\n").arg(ind).arg(fp.numberPositions);
     if (fp.numberPositions > 0) {
       std::vector<double> positions(fp.numberPositions);
-      readStream(inputFileStream, reinterpret_cast<char*>(positions.data()), 8 * fp.numberPositions);
+      readStream(inputFileStream, positions.data(), 8 * fp.numberPositions);
       str += QString("%1Positions (um): %2").arg(ind).arg(positions[0]);
       for (size_t i=1; i<positions.size(); ++i) {
         str += QString(" %1").arg(positions[i]);
@@ -1963,11 +1963,11 @@ void ZImgZeissCZI::dumpAttachmentDirectory(std::ifstream &inputFileStream, QStri
 {
   QString ind(indent, QChar(' '));
   AttachmentDirectorySegment ad;
-  readStream(inputFileStream, reinterpret_cast<char*>(&ad), sizeof(AttachmentDirectorySegment));
+  readStream(inputFileStream, &ad, sizeof(AttachmentDirectorySegment));
   str += QString("%1AttachmentDirectorySegment\n").arg(ind);
   str += QString("%1EntryCount: %2\n").arg(ind).arg(ad.entryCount);
   std::vector<AttachmentEntryA1> entries(ad.entryCount);
-  readStream(inputFileStream, reinterpret_cast<char*>(entries.data()), ad.entryCount * sizeof(AttachmentEntryA1));
+  readStream(inputFileStream, entries.data(), ad.entryCount * sizeof(AttachmentEntryA1));
   for (size_t i=0; i<entries.size(); ++i) {
     str += QString("%1Entry %2:\n").arg(ind).arg(i);
     dumpAttachmentEntry(entries[i], str, indent);

@@ -85,7 +85,7 @@ const void* Z3DPickingManager::objectAtWidgetPos(glm::ivec2 pos)
 
 std::vector<const void *> Z3DPickingManager::sortObjectsByDistanceToPos(glm::ivec2 pos, int radius, bool ascend)
 {
-  std::map<glm::col4, int, colComp> col2dist;
+  std::map<glm::col4, int, Col4Compare> col2dist;
   const Z3DTexture *tex = m_renderTarget->attachment(GL_COLOR_ATTACHMENT0);
   GLenum dataFormat = GL_BGRA;
   GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
@@ -140,9 +140,11 @@ void Z3DPickingManager::clearTarget()
 
 void Z3DPickingManager::increaseColor()
 {
-  if (*reinterpret_cast<uint32_t*>(&m_currentColor[0]) != 0xffffffff)
-    ++(*reinterpret_cast<uint32_t*>(&m_currentColor[0]));
-  else {
+  uint32_t col = bit_cast<uint32_t>(m_currentColor);
+  if (col != 0xffffffff) {
+    ++col;
+    m_currentColor = bit_cast<glm::col4>(col);
+  } else {
     m_currentColor = glm::col4(0,0,0,128);
     //LERROR() << "Out of colors...";
   }

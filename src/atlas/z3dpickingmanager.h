@@ -9,17 +9,6 @@
 
 namespace nim {
 
-struct colComp
-{
-  // only work in little-endian system
-  bool operator()(const glm::col4 &c1, const glm::col4 &c2) const
-  {
-    const uint32_t i1 = reinterpret_cast<const uint32_t&>(c1);
-    const uint32_t i2 = reinterpret_cast<const uint32_t&>(c2);
-    return i1 < i2;
-  }
-};
-
 class Z3DPickingManager
 {
 public:
@@ -55,7 +44,7 @@ public:
 private:
   void increaseColor();
 
-  std::map<glm::col4, const void*, colComp> m_colorToObject;
+  std::map<glm::col4, const void*, Col4Compare> m_colorToObject;
   std::map<const void*, glm::col4> m_objectToColor;
   Z3DRenderTarget* m_renderTarget;
   glm::col4 m_currentColor;

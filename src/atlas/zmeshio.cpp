@@ -307,7 +307,7 @@ void ZMeshIO::readAllenAtlasMesh(const QString &filename, std::vector<glm::vec3>
   openFileStream(inputFileStream, filename, std::ios::in | std::ios::binary);
 
   uint32_t numPoints;
-  readStream(inputFileStream, reinterpret_cast<char*>(&numPoints), 4);
+  readStream(inputFileStream, &numPoints, 4);
 
   normals.resize(numPoints);
   vertices.resize(numPoints);
@@ -315,23 +315,23 @@ void ZMeshIO::readAllenAtlasMesh(const QString &filename, std::vector<glm::vec3>
   //read points
   // 3 floats for normals followed by 3 floats for coordinates per point
   for (uint32_t i=0; i<numPoints; i++) {
-    readStream(inputFileStream, reinterpret_cast<char*>(&normals[i][0]), 3*4);
-    readStream(inputFileStream, reinterpret_cast<char*>(&vertices[i][0]), 3*4);
+    readStream(inputFileStream, &normals[i][0], 3*4);
+    readStream(inputFileStream, &vertices[i][0], 3*4);
   }
 
   uint32_t numTriangleStrips = 0;
-  readStream(inputFileStream, reinterpret_cast<char*>(&numTriangleStrips), 4);
+  readStream(inputFileStream, &numTriangleStrips, 4);
   std::vector<std::vector<uint32_t>> allStrips;
 
   // read triangle strips
   for (uint32_t i=0; i<numTriangleStrips; i++) {
     //read number of points in the strip
     uint32_t numPointsInStrip = 0;
-    readStream(inputFileStream, reinterpret_cast<char*>(&numPointsInStrip), 2);
+    readStream(inputFileStream, &numPointsInStrip, 2);
 
     if (numPointsInStrip > 0) {
       std::vector<uint32_t> strip(numPointsInStrip);
-      readStream(inputFileStream, reinterpret_cast<char*>(strip.data()), numPointsInStrip*4);
+      readStream(inputFileStream, strip.data(), numPointsInStrip*4);
       allStrips.push_back(strip);
     }
   }

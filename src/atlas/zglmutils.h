@@ -113,6 +113,9 @@ public:
   }
 };
 
+using Col3Compare = Vec3Compare<unsigned char, glm::highp>;
+using Col4Compare = Vec4Compare<unsigned char, glm::highp>;
+
 // serialization support
 
 inline void toVal(const QString& str, bool& v)
