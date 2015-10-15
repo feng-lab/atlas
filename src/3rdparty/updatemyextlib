@@ -21,14 +21,14 @@ then
   rm -rf $baseDIR/libjpeg-turbo-1.4.2
 fi
 srcArchive=$srcPackageDIR/libjpeg-turbo-1.4.2.tar.gz
-tar -zxvf "$srcArchive" -C $baseDIR
+tar -zxf "$srcArchive" -C $baseDIR
 
 if [ -d $baseDIR/hdf5-1.8.15-patch1 ]
 then
   rm -rf $baseDIR/hdf5-1.8.15-patch1
 fi
 srcArchive=$srcPackageDIR/hdf5-1.8.15-patch1.tar.bz2
-tar -jxvf "$srcArchive" -C $baseDIR
+tar -jxf "$srcArchive" -C $baseDIR
 
 if [ -d $baseDIR/GeometricTools ]
 then
@@ -57,9 +57,9 @@ else
     rm -rf $baseDIR/ispc-v1.8.2-osx
   fi
   srcArchive=$srcPackageDIR/ispc-v1.8.2-osx.tar.gz
-  tar -zxvf "$srcArchive" -C $baseDIR
+  tar -zxf "$srcArchive" -C $baseDIR
 
-  srcArchive=$srcPackageDIR/ffmpeg-2.8.7z
+  srcArchive=$srcPackageDIR/ffmpeg-2.8.1.7z
   7z x -y -o$baseDIR/atlas "$srcArchive"
 fi
 
@@ -68,7 +68,7 @@ then
   rm -rf $currDIR/boost
 fi
 srcArchive=$srcPackageDIR/boost_1_59_0.tar.bz2
-tar -jxvf "$srcArchive" -C $currDIR
+tar -jxf "$srcArchive" -C $currDIR
 mv $currDIR/boost_1_59_0 $currDIR/boost
 
 if [ -d $currDIR/eigen ]
@@ -76,7 +76,7 @@ then
   rm -rf $currDIR/eigen
 fi
 srcArchive=$srcPackageDIR/eigen-eigen-c58038c56923.tar.bz2
-tar -jxvf "$srcArchive" -C $currDIR
+tar -jxf "$srcArchive" -C $currDIR
 mv $currDIR/eigen-eigen-c58038c56923 $currDIR/eigen
 
 if [ -d $currDIR/glm ]
