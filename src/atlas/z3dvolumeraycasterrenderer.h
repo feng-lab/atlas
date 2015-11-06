@@ -34,10 +34,10 @@ public:
   void addQuad(const ZMesh &quad);
   // For 3D Raycasting rendering, once called, 2d quads will be cleared and renderer
   // switch to 3D mode
-  void setEntryExitCoordTextures(const Z3DTexture *entryCoordTexture,
-                                 const Z3DTexture *entryDepthTexture,
-                                 const Z3DTexture *exitCoordTexture,
-                                 const Z3DTexture *exitDepthTexture);
+  void setEntryExitInfo(const Z3DTexture *entryTexCoordTexture,
+                        const Z3DTexture *entryEyeCoordTexture,
+                        const Z3DTexture *exitTexCoordTexture,
+                        const Z3DTexture *exitEyeCoordTexture);
 
   void translate(double dx, double dy, double dz);
 
@@ -93,10 +93,10 @@ private:
   bool m_is2DImage;
 
   std::vector<ZMesh> m_quads;
-  const Z3DTexture *m_entryCoordTexture;
-  const Z3DTexture *m_entryDepthTexture;
-  const Z3DTexture *m_exitCoordTexture;
-  const Z3DTexture *m_exitDepthTexture;
+  const Z3DTexture *m_entryTexCoordTexture;
+  const Z3DTexture *m_entryEyeCoordTexture;
+  const Z3DTexture *m_exitTexCoordTexture;
+  const Z3DTexture *m_exitEyeCoordTexture;
 
   bool m_opaque;
   double m_alpha; //only takes effect when m_opaque is true

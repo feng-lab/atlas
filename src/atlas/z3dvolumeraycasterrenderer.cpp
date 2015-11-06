@@ -12,10 +12,10 @@ Z3DVolumeRaycasterRenderer::Z3DVolumeRaycasterRenderer(Z3DRendererBase &renderer
   , m_localMIPThreshold("Local MIP Threshold", 0.8f, 0.01f, 1.f)
   , m_compositingMode("Compositing")
   , m_is2DImage(false)
-  , m_entryCoordTexture(NULL)
-  , m_entryDepthTexture(NULL)
-  , m_exitCoordTexture(NULL)
-  , m_exitDepthTexture(NULL)
+  , m_entryTexCoordTexture(NULL)
+  , m_entryEyeCoordTexture(NULL)
+  , m_exitTexCoordTexture(NULL)
+  , m_exitEyeCoordTexture(NULL)
   , m_opaque(false)
   , m_alpha(1.0)
   , m_VAO(1)
@@ -106,19 +106,19 @@ void Z3DVolumeRaycasterRenderer::addQuad(const ZMesh &quad)
     return;
   }
   m_quads.push_back(quad);
-  m_entryCoordTexture = NULL;
-  m_entryDepthTexture = NULL;
-  m_exitCoordTexture = NULL;
-  m_exitDepthTexture = NULL;
+  m_entryTexCoordTexture = nullptr;
+  m_entryEyeCoordTexture = nullptr;
+  m_exitTexCoordTexture = nullptr;
+  m_exitEyeCoordTexture = nullptr;
 }
 
-void Z3DVolumeRaycasterRenderer::setEntryExitCoordTextures(const Z3DTexture *entryCoordTexture, const Z3DTexture *entryDepthTexture,
-                                                           const Z3DTexture *exitCoordTexture, const Z3DTexture *exitDepthTexture)
+void Z3DVolumeRaycasterRenderer::setEntryExitInfo(const Z3DTexture *entryTexCoordTexture, const Z3DTexture *entryEyeCoordTexture,
+                                                  const Z3DTexture *exitTexCoordTexture, const Z3DTexture *exitEyeCoordTexture)
 {
-  m_entryCoordTexture = entryCoordTexture;
-  m_entryDepthTexture = entryDepthTexture;
-  m_exitCoordTexture = exitCoordTexture;
-  m_exitDepthTexture = exitDepthTexture;
+  m_entryTexCoordTexture = entryTexCoordTexture;
+  m_entryEyeCoordTexture = entryEyeCoordTexture;
+  m_exitTexCoordTexture = exitTexCoordTexture;
+  m_exitEyeCoordTexture = exitEyeCoordTexture;
   m_quads.clear();
 }
 
@@ -216,8 +216,8 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
     return;
 
   if (m_quads.empty()) {
-    if (m_entryCoordTexture == NULL || m_entryDepthTexture == NULL ||
-        m_exitCoordTexture == NULL || m_exitDepthTexture == NULL)
+    if (m_entryTexCoordTexture == nullptr || m_entryEyeCoordTexture == nullptr ||
+        m_exitTexCoordTexture == nullptr || m_exitEyeCoordTexture == nullptr)
       return;
   } else {
     for (size_t i=0; i<m_quads.size(); ++i) {
@@ -267,10 +267,10 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
     m_raycasterShader.setUniform("ze_to_zw_a", a);
 
     // entry exit points
-    m_raycasterShader.bindTexture("ray_entry_points", m_entryCoordTexture);
-    m_raycasterShader.bindTexture("ray_entry_points_depth", m_entryDepthTexture);
-    m_raycasterShader.bindTexture("ray_exit_points",  m_exitCoordTexture);
-    m_raycasterShader.bindTexture("ray_exit_points_depth", m_exitDepthTexture);
+    m_raycasterShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordTexture);
+    m_raycasterShader.bindTexture("ray_entry_eye_coord", m_entryEyeCoordTexture);
+    m_raycasterShader.bindTexture("ray_exit_tex_coord",  m_exitTexCoordTexture);
+    m_raycasterShader.bindTexture("ray_exit_eye_coord", m_exitEyeCoordTexture);
 
     if (m_compositingMode.get() ==  "ISO Surface")
       m_raycasterShader.setUniform("iso_value", m_isoValue.get());

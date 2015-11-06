@@ -15,10 +15,10 @@ uniform float local_MIP_threshold;
 uniform float ze_to_zw_a;
 uniform float ze_to_zw_b;
 
-uniform sampler2D ray_entry_points;
-uniform sampler2D ray_entry_points_depth;
-uniform sampler2D ray_exit_points;
-uniform sampler2D ray_exit_points_depth;
+uniform sampler2D ray_entry_tex_coord;
+uniform sampler2D ray_entry_eye_coord;
+uniform sampler2D ray_exit_tex_coord;
+uniform sampler2D ray_exit_eye_coord;
 
 #if NUM_VOLUMES >= 1
 uniform VolumeStruct volume_struct_1;
@@ -186,12 +186,14 @@ void main()
 #if NUM_VOLUMES > 0
   vec2 texCoords = gl_FragCoord.xy * screen_dim_RCP;
 #if GLSL_VERSION >= 130
-  vec3 startRayPosition = texture(ray_entry_points, texCoords).xyz;
-  vec3 exitRayPosition = texture(ray_exit_points, texCoords).xyz;
+  vec4 entryTexCoordAndZ = texture(ray_entry_tex_coord, texCoords);
+  vec4 exitTexCoordAndZ = texture(ray_exit_tex_coord, texCoords);
 #else
-  vec3 startRayPosition = texture2D(ray_entry_points, texCoords).xyz;
-  vec3 exitRayPosition = texture2D(ray_exit_points, texCoords).xyz;
+  vec4 entryTexCoordAndZ = texture2D(ray_entry_tex_coord, texCoords);
+  vec4 exitTexCoordAndZ = texture2D(ray_exit_tex_coord, texCoords);
 #endif
+  vec3 startRayPosition = entryTexCoordAndZ.xyz;
+  vec3 exitRayPosition = exitTexCoordAndZ.xyz;
 
   if (startRayPosition == exitRayPosition)
     discard;   // background
@@ -1149,23 +1151,17 @@ void main()
       //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
       // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
 #if GLSL_VERSION >= 130
-      float zwFront = texture(ray_entry_points_depth, texCoords).r;
-      float zwBack = texture(ray_exit_points_depth, texCoords).r;
+      float zeFront = texture(ray_entry_eye_coord, texCoords).z;
+      float zeBack = texture(ray_exit_eye_coord, texCoords).z;
 #else
-      float zwFront = texture2D(ray_entry_points_depth, texCoords).r;
-      float zwBack = texture2D(ray_exit_points_depth, texCoords).r;
+      float zeFront = texture2D(ray_entry_eye_coord, texCoords).z;
+      float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
 #endif
-      float zeFront = ze_to_zw_a / (zwFront - ze_to_zw_b);
-      float zeBack = ze_to_zw_a / (zwBack - ze_to_zw_b);
       float ze = zeFront + rayDepth / maxRayLength * (zeBack-zeFront);
       gl_FragDepth = ze_to_zw_a / ze + ze_to_zw_b;
     } else {
 #ifdef RESULT_OPAQUE
-#if GLSL_VERSION >= 130
-      gl_FragDepth = texture(ray_entry_points_depth, texCoords).r;
-#else
-      gl_FragDepth = texture2D(ray_entry_points_depth, texCoords).r;
-#endif
+      gl_FragDepth = entryTexCoordAndZ.w;
 #else
       gl_FragDepth = 1.0;
 #endif

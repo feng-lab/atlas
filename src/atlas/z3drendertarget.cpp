@@ -3,6 +3,7 @@
 #include "z3dtexture.h"
 #include "QsLog.h"
 #include "zbenchtimer.h"
+#include "z3dgpuinfo.h"
 
 namespace nim {
 
@@ -225,10 +226,20 @@ glm::ivec2 Z3DRenderTarget::size() const
   return m_size;
 }
 
-void Z3DRenderTarget::resize(glm::ivec2 newsize)
+bool Z3DRenderTarget::resize(glm::ivec2 newsize)
 {
   if (newsize == m_size)
-    return;
+    return false;
+  if (newsize == glm::ivec2(0)) {
+    LWARN() << "invalid size:" << newsize;
+    return false;
+  }
+  if (newsize.x > Z3DGpuInfoInstance.maxTextureSize() ||
+      newsize.y > Z3DGpuInfoInstance.maxTextureSize()) {
+    LWARN() << "size" << newsize << "exceeds texture size limit:"
+            << Z3DGpuInfoInstance.maxTextureSize();
+    return false;
+  }
 
   m_size = newsize;
 
@@ -251,6 +262,7 @@ void Z3DRenderTarget::resize(glm::ivec2 newsize)
   //                                     m_depthTex->getInternalFormat(),
   //                                     m_depthTex->getWidth(), m_depthTex->getHeight());
   //  }
+  return true;
 }
 
 void Z3DRenderTarget::changeColorAttachmentFormat(GLint internalColorFormat, GLenum attachment)

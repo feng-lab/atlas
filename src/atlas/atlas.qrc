@@ -108,5 +108,8 @@
         <file>Resources/shader/blur.frag</file>
         <file>Resources/shader/glow.frag</file>
         <file>Resources/shader/glow_func.frag</file>
+        <file>Resources/shader/render_3dtexture_coordinate_and_eye_coordinate.frag</file>
+        <file>Resources/shader/transform_with_3dtexture_and_eye_coordinate.vert</file>
+        <file>Resources/shader/image3d_raycaster.frag</file>
     </qresource>
 </RCC>

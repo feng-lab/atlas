@@ -136,8 +136,8 @@ void Z3DTexture::uploadTexture()
                  m_dimensions.x, m_dimensions.y, m_dimensions.z, 0,
                  m_dataFormat, m_dataType, m_data);
 
-  if (useMipmap())
-    glGenerateMipmap(m_textureTarget);
+  //if (useMipmap())
+    //glGenerateMipmap(m_textureTarget);
 
   CHECK_GL_ERROR;
 }

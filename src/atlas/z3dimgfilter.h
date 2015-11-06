@@ -12,7 +12,7 @@
 #include <vector>
 #include "z3dvolumeraycasterrenderer.h"
 #include "z3dvolumeslicerenderer.h"
-#include "z3dtexturecoordinaterenderer.h"
+#include "z3dtextureandeyecoordinaterenderer.h"
 #include "z3dimage2drenderer.h"
 #include "zeventlistenerparameter.h"
 #include "z3dtexturecopyrenderer.h"
@@ -123,7 +123,7 @@ private:
 
   Z3DVolumeRaycasterRenderer m_volumeRaycasterRenderer;
   Z3DVolumeSliceRenderer m_volumeSliceRenderer;
-  Z3DTextureCoordinateRenderer m_textureCoordinateRenderer;
+  Z3DTextureAndEyeCoordinateRenderer m_textureAndEyeCoordinateRenderer;
   std::vector<std::unique_ptr<Z3DImage2DRenderer>> m_image2DRenderers;
   Z3DTextureCopyRenderer m_textureCopyRenderer;
 
@@ -145,8 +145,8 @@ private:
 
   ZIntParameter m_interactionDownsample;      // screen space downsample during interaction
 
-  Z3DRenderOutputPort m_entryPort;
-  Z3DRenderOutputPort m_exitPort;
+  Z3DRenderTarget m_entryTarget;
+  Z3DRenderTarget m_exitTarget;
 
   Z3DRenderOutputPort m_outport;
   Z3DRenderOutputPort m_leftEyeOutport;

@@ -49,7 +49,7 @@ public:
   GLfloat depthAtPos(glm::ivec2 pos);
 
   glm::ivec2 size() const;
-  void resize(glm::ivec2 newsize);
+  bool resize(glm::ivec2 newsize);
 
   void changeColorAttachmentFormat(GLint internalColorFormat, GLenum attachment = GL_COLOR_ATTACHMENT0);
   void changeDepthAttachmentFormat(GLint internalDepthFormat);

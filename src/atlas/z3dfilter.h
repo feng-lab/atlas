@@ -19,6 +19,7 @@ class Z3DInteractionHandler;
 class ZParameter;
 class ZEventListenerParameter;
 class Z3DRenderOutputPort;
+class Z3DRenderTarget;
 class Z3DTexture;
 class Z3DShaderProgram;
 class ZVertexArrayObject;
@@ -66,7 +67,6 @@ public:
   // return all inputports or outputports as vector
   const std::vector<Z3DInputPortBase*>& inputPorts() const { return m_inputPorts; }
   const std::vector<Z3DOutputPortBase*>& outputPorts() const { return m_outputPorts; }
-  const std::vector<Z3DRenderOutputPort*>& privateRenderPorts() const { return m_privateRenderPorts; }
 
   virtual void onEvent(QEvent* e, int w, int h) override;
 
@@ -126,6 +126,7 @@ protected:
   void toggleInteractionMode(bool isInInteractionMode, void *source);
 
   void addPrivateRenderPort(Z3DRenderOutputPort& port);
+  void addPrivateRenderTarget(Z3DRenderTarget& target);
   static void renderScreenQuad(const ZVertexArrayObject &vao, const Z3DShaderProgram &shader);
 
 signals:
@@ -161,6 +162,7 @@ protected:
   std::vector<Z3DOutputPortBase*> m_outputPorts;
   // private port for intermediate rendering
   std::vector<Z3DRenderOutputPort*> m_privateRenderPorts;
+  std::vector<Z3DRenderTarget*> m_privateRenderTargets;
 
   std::vector<ZEventListenerParameter*> m_eventListeners;
   std::vector<Z3DInteractionHandler*> m_interactionHandlers;

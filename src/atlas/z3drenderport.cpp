@@ -50,21 +50,10 @@ Z3DTexture *Z3DRenderOutputPort::depthTexture()
 
 void Z3DRenderOutputPort::resize(const glm::ivec2 &newsize)
 {
-  if (m_size == newsize)
-    return;
-  if (newsize == glm::ivec2(0)) {
-    LWARN() << "invalid size:" << newsize;
-    return;
+  if (m_renderTarget.resize(newsize)) {
+    m_resultIsValid = false;
+    m_size = newsize;
   }
-  if (newsize.x > Z3DGpuInfoInstance.maxTextureSize() ||
-      newsize.y > Z3DGpuInfoInstance.maxTextureSize()) {
-    LWARN() << "size" << newsize << "exceeds texture size limit:"
-            << Z3DGpuInfoInstance.maxTextureSize();
-    return;
-  }
-  m_renderTarget.resize(newsize);
-  m_resultIsValid = false;
-  m_size = newsize;
 }
 
 void Z3DRenderOutputPort::changeColorFormat(GLint internalColorFormat)

@@ -274,6 +274,11 @@ void Z3DFilter::addPrivateRenderPort(Z3DRenderOutputPort& port)
   }
 }
 
+void Z3DFilter::addPrivateRenderTarget(Z3DRenderTarget &target)
+{
+  m_privateRenderTargets.push_back(&target);
+}
+
 void Z3DFilter::renderScreenQuad(const ZVertexArrayObject &vao, const Z3DShaderProgram &shader)
 {
   if (!shader.isLinked())
@@ -325,6 +330,9 @@ void Z3DFilter::updateSize()
   // 2. update private ports
   for (size_t i=0; i<m_privateRenderPorts.size(); ++i) {
     m_privateRenderPorts[i]->resize(maxOutportSize);
+  }
+  for (size_t i=0; i<m_privateRenderTargets.size(); ++i) {
+    m_privateRenderTargets[i]->resize(maxOutportSize);
   }
 
   // 3. update inport expected size
