@@ -75,9 +75,9 @@ if [ -d $currDIR/eigen ]
 then
   rm -rf $currDIR/eigen
 fi
-srcArchive=$srcPackageDIR/eigen-eigen-c58038c56923.tar.bz2
+srcArchive=$srcPackageDIR/eigen-eigen-b30b87236a1b.tar.bz2
 tar -jxf "$srcArchive" -C $currDIR
-mv $currDIR/eigen-eigen-c58038c56923 $currDIR/eigen
+mv $currDIR/eigen-eigen-b30b87236a1b $currDIR/eigen
 
 if [ -d $currDIR/glm ]
 then
