@@ -8,6 +8,7 @@ uniform sampler3D voxel_cache;
 uniform ivec3 voxel_dimensions[LEVEL_COUNT];
 uniform float voxel_size[LEVEL_COUNT];
 uniform ivec3 voxel_block_size = ivec3(32, 32, 32);
+uniform uvec4 pos_to_block_id[LEVEL_COUNT];
 
 uniform vec2 screen_dim_RCP;
 uniform float minus_near_dist;
@@ -30,16 +31,16 @@ uniform TF_SAMPLER_TYPE transfer_function;
 
 #if GLSL_VERSION >= 330
 layout(location = 0) out vec4 FragData0;
-layout(location = 1) out ivec4 FragData1;
-layout(location = 2) out ivec4 FragData2;
-layout(location = 3) out ivec4 FragData3;
-layout(location = 4) out ivec4 FragData4;
+layout(location = 1) out uvec4 FragData1;
+layout(location = 2) out uvec4 FragData2;
+layout(location = 3) out uvec4 FragData3;
+layout(location = 4) out uvec4 FragData4;
 #elif GLSL_VERSION >= 130
 out vec4 FragData0;  // call glBindFragDataLocation before linking
-out ivec4 FragData1;  // call glBindFragDataLocation before linking
-out ivec4 FragData2;  // call glBindFragDataLocation before linking
-out ivec4 FragData3;  // call glBindFragDataLocation before linking
-out ivec4 FragData4;  // call glBindFragDataLocation before linking
+out uvec4 FragData1;  // call glBindFragDataLocation before linking
+out uvec4 FragData2;  // call glBindFragDataLocation before linking
+out uvec4 FragData3;  // call glBindFragDataLocation before linking
+out uvec4 FragData4;  // call glBindFragDataLocation before linking
 #else
 #define FragData0 gl_FragData[0]
 #define FragData1 gl_FragData[1]
@@ -129,6 +130,7 @@ void main()
     float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
 #endif
     float ze = zeFront;
+    float finalZe = -1.0;
     int curLevel = 0;
     float zeLengthRCP = 1.0 / (zeBack - zeFront);
     
@@ -163,90 +165,127 @@ void main()
         vec4 chColor;
         bool saturated = true;
 
-        ivec3 curPageDirAddress = page_directory_base[curLevel] + samplePos * page_directory_dimensions[curResult];
+        ivec3 curPageDirAddress = page_directory_base[curLevel] + ivec3(samplePos * page_directory_dimensions[curResult]);
         if (curPageDirAddress != pageDirAddress) {
           pageDirAddress = curPageDirAddress;
           pageDirEntry = texelFetch(page_directory, pageDirAddress);
         }
         int pagingFlag = pageDirEntry.w;
         if (pagingFlag == MAPPED) {
-          ivec3 curPageTableAddress = pageDirEntry.xyz + (samplePos * page_table_dimensions[curLevel]) % page_table_block_size;
+          ivec3 curPageTableAddress = pageDirEntry.xyz + ivec3(samplePos * page_table_dimensions[curLevel]) % page_table_block_size;
           if (curPageTableAddress != pageTableAddress) {
             pageTableAddress = curPageTableAddress;
             pageTableEntry = texelFetch(page_table_cache, pageTableAddress);
           }
           pagingFlag = pageTableEntry.w;
           if (pagingFlag == MAPPED) {
-            ivec3 voxelAddress = pageTableEntry.xyz + (samplePos * voxel_dimensions[curLevel]) % voxel_block_size;
-            voxel = texelFetch(voxel_cache, voxelAddress);
+            ivec3 voxelAddress = pageTableEntry.xyz + ivec3(samplePos * voxel_dimensions[curLevel]) % voxel_block_size;
+            voxel = texelFetch(voxel_cache, voxelAddress).r;
+
+#ifdef MIP
+#ifdef LOCAL_MIP
+            if (!ch1Done) {
+              if (voxel <= ch1V && ch1V >= local_MIP_threshold) {
+                ch1Done = true;
+              } else if (voxel > ch1V) {
+                ch1V = voxel;
+                finalZe = ze;
+              }
+            }
+            saturated = saturated && ch1Done;
+#else
+            if (voxel > ch1V) {
+              finalZe = ze;
+              ch1V = voxel;
+            }
+            saturated = saturated && ch1V >= 1.0;
+#endif
+#else
+            chColor = applyTF(transfer_function_1, voxel);
+            chColor.a /= sampling_rate;
+
+            if (chColor.a > 0.0) {
+              color = max(color, chColor);
+            }
+#endif //MIP
+
+
+#ifdef MIP
+            finished = saturated;
+#else
+            if (color.a > 0.0) {
+              result = COMPOSITING(result, color, ze, finalZe);
+            }
+
+            if (result.a >= 1.0) {
+              result.a = 1.0;
+              finished = true;
+            }
+#endif // MIP
+            ze += stepSize;
+
             if (usedBlockIDsIndex < 12) {
-              int blockID = 
+              uint blockID = pos_to_block_id[curLevel].w + dot(pos_to_block_id[curLevel].xyz, uvec3(samplePos * voxel_dimensions[curLevel]) / uvec3(voxel_block_size));
               if (usedBlockIDsIndex == 0 || blockID != usedBlockIDs[usedBlockIDsIndex-1]) {
                 usedBlockIDs[usedBlockIDsIndex++] = blockID;
               }
             }
           } else {
             // skip empty space page table entry recursive
-            
+            if (pagingFlag == UNMAPPED) {
+              ivec3 prevBlock = ivec3(samplePos * voxel_dimensions[curLevel]) / voxel_block_size;
+              vec3 testSamplePos;
+              do {
+                ze += stepSize;
+                testSamplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
+              } while (ivec3(testSamplePos * voxel_dimensions[curLevel]) / voxel_block_size == prevBlock && ze > zeBack);
+            } else { // empty block
+              int nextNonEmptyLevel = curLevel + 1;
+              int testPagingFlag = EMPTY;
+              while (testPagingFlag == EMPTY && nextNonEmptyLevel < LEVEL_COUNT) {
+                ivec4 testPageDirEntry = texelFetch(page_directory, page_directory_base[nextNonEmptyLevel] + ivec3(samplePos * page_directory_dimensions[nextNonEmptyLevel]));
+                testPagingFlag = testPageDirEntry.w;
+                if (testPagingFlag == MAPPED) {
+                  testPagingFlag = texelFetch(page_table_cache, testPageDirEntry.xyz + ivec3(samplePos * page_table_dimensions[nextNonEmptyLevel]) % page_table_block_size).w;
+                }
+                ++nextNonEmptyLevel;
+              }
+
+              ivec3 prevBlock = ivec3(samplePos * voxel_dimensions[nextNonEmptyLevel-1]) / voxel_block_size;
+              float testStepSize = -sampling_rate * voxel_size[nextNonEmptyLevel-1];
+              vec3 testSamplePos;
+              do {
+                ze += testStepSize;
+                testSamplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
+              } while (ivec3(testSamplePos * voxel_dimensions[nextNonEmptyLevel-1]) / voxel_block_size == prevBlock && ze > zeBack);
+            }
           }
         } else {
           // skip empty space page directory entry
-
+          ivec3 prevBlock = ivec3(samplePos * voxel_dimensions[curLevel]) / voxel_block_size;
+          vec3 testSamplePos;
+          do {
+            ze += stepSize;
+            testSamplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
+          } while (ivec3(testSamplePos * voxel_dimensions[curLevel]) / voxel_block_size == prevBlock && ze > zeBack);
         }
+
         if (pagingFlag == UNMAPPED && missBlockIDsIndex < 4) {
-          int blockID = 
+          uint blockID = pos_to_block_id[curLevel].w + dot(pos_to_block_id[curLevel].xyz, uvec3(samplePos * voxel_dimensions[curLevel]) / uvec3(voxel_block_size));
           if (missBlockIDsIndex == 0 || blockID != missBlockIDs[missBlockIDsIndex-1]) {
             missBlockIDs[missBlockIDsIndex++] = blockID;
           }
-        }
-
-#ifdef MIP
-#ifdef LOCAL_MIP
-        if (!ch1Done) {
-          if (voxel <= ch1V && ch1V >= local_MIP_threshold) {
-            ch1Done = true;
-          } else if (voxel > ch1V) {
-            ch1V = voxel;
-            rayDepth = currentRayLength;
+          if (missBlockIDsIndex == 4) {
+            finished = true;
           }
         }
-        saturated = saturated && ch1Done;
-#else
-        if (voxel > ch1V) {
-          rayDepth = currentRayLength;
-          ch1V = voxel;
-        }
-        saturated = saturated && ch1V >= 1.0;
-#endif
-#else
-        chColor = applyTF(transfer_function_1, voxel);
-        chColor.a /= sampling_rate;
 
-        if (chColor.a > 0.0) {
-          color = max(color, chColor);
-        }
-#endif //MIP
-
-
-#ifdef MIP
-        finished = saturated;
-#else
-        if (color.a > 0.0) {
-          result = COMPOSITING(result, color, currentRayLength, rayDepth);
-        }
-
-        if (result.a >= 1.0) {
-          result.a = 1.0;
-          finished = true;
-        }
-#endif // MIP
-        ze += stepSize;
-        finished = finished || (ze < zeBack);
-      }
+        finished = finished || (ze <= zeBack);
+      } // for
     }
 
 #ifdef MIP
-  result = max(result, applyTF(transfer_function_1, ch1V));
+    result = max(result, applyTF(transfer_function_1, ch1V));
 #endif // MIP
 
 #ifdef RESULT_OPAQUE
@@ -255,7 +294,7 @@ void main()
 
 
     if (rayDepth >= 0.0) {
-      gl_FragDepth = ze_to_zw_a / ze + ze_to_zw_b;
+      gl_FragDepth = ze_to_zw_a / finalZe + ze_to_zw_b;
     } else {
 #ifdef RESULT_OPAQUE
       gl_FragDepth = entryTexCoordAndZ.w;
