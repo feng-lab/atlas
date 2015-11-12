@@ -197,7 +197,7 @@ void Z3DCompositor::savePickingBufferToImage(const QString &filename)
 void Z3DCompositor::process(Z3DEye eye)
 {
   std::vector<Z3DGeometryFilter*> filters = m_gPPort.connectedFilters();
-  std::vector<Z3DImgFilter*> vFilters = m_vPPort.connectedFilters();
+  std::vector<Z3DVolumeFilter*> vFilters = m_vPPort.connectedFilters();
   std::vector<Z3DBoundedFilter*> onTopOpaqueFilters;
   std::vector<Z3DBoundedFilter*> onTopTransparentFilters;
   std::vector<Z3DBoundedFilter*> normalOpaqueFilters;
@@ -205,7 +205,7 @@ void Z3DCompositor::process(Z3DEye eye)
   std::vector<Z3DBoundedFilter*> selectedFilters;
   std::vector<Z3DBoundedFilter*> showHandleFilters;
   for (size_t i=0; i<vFilters.size(); ++i) {
-    Z3DImgFilter* vFilter = vFilters.at(i);
+    Z3DVolumeFilter* vFilter = vFilters.at(i);
     if (vFilter->isReady(eye) && vFilter->hasOpaque(eye)) {
       normalOpaqueFilters.push_back(vFilter);
     }
@@ -492,7 +492,7 @@ void Z3DCompositor::process(Z3DEye eye)
     }
   } else {
     for (size_t i=0; i<vFilters.size(); ++i) {
-      Z3DImgFilter* vFilter = vFilters.at(i);
+      Z3DVolumeFilter* vFilter = vFilters.at(i);
       if (vFilter->isReady(eye) && vFilter->hasTransparent(eye)) {
         normalTransparentFilters.push_back(vFilter);
       }

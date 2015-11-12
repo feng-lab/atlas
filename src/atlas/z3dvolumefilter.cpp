@@ -1,4 +1,4 @@
-#include "z3dimgfilter.h"
+#include "z3dvolumefilter.h"
 
 #include "z3dgpuinfo.h"
 #include "zimg.h"
@@ -12,9 +12,9 @@
 
 namespace nim {
 
-const size_t Z3DImgFilter::m_maxNumOfFullResolutionVolumeSlice = 6;
+const size_t Z3DVolumeFilter::m_maxNumOfFullResolutionVolumeSlice = 6;
 
-Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
+Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   : Z3DBoundedFilter(globalParas, parent)
   , m_volumeRaycasterRenderer(m_rendererBase)
   , m_volumeSliceRenderer(m_rendererBase)
@@ -165,16 +165,16 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   m_numParas = m_parameters.size();
 }
 
-Z3DImgFilter::~Z3DImgFilter()
+Z3DVolumeFilter::~Z3DVolumeFilter()
 {
 }
 
-void Z3DImgFilter::setOffset(double x, double y, double z)
+void Z3DVolumeFilter::setOffset(double x, double y, double z)
 {
   m_rendererBase.translate(x, y, z);
 }
 
-void Z3DImgFilter::setData(const ZImgPack &img)
+void Z3DVolumeFilter::setData(const ZImgPack &img)
 {
   if (m_widgetsGroup) {
     for (auto it = m_volumeRaycasterRenderer.channelVisibleParas().begin();
@@ -242,7 +242,7 @@ void Z3DImgFilter::setData(const ZImgPack &img)
   invalidateResult();
 }
 
-bool Z3DImgFilter::openZoomInView(const glm::ivec3 &volPos)
+bool Z3DVolumeFilter::openZoomInView(const glm::ivec3 &volPos)
 {
   if (!m_isVolumeDownsampled.get())
     return false;
@@ -274,7 +274,7 @@ bool Z3DImgFilter::openZoomInView(const glm::ivec3 &volPos)
   return true;
 }
 
-void Z3DImgFilter::exitZoomInView()
+void Z3DVolumeFilter::exitZoomInView()
 {
   if (m_zoomInVolumes.empty())
     return;
@@ -291,7 +291,7 @@ void Z3DImgFilter::exitZoomInView()
   invalidateResult();
 }
 
-bool Z3DImgFilter::volumeNeedDownsample() const
+bool Z3DVolumeFilter::volumeNeedDownsample() const
 {
   size_t maxTextureSize = 100;
   if (m_imgPack->imgInfo().depth > 1)
@@ -303,12 +303,12 @@ bool Z3DImgFilter::volumeNeedDownsample() const
       m_imgPack->imgInfo().depth > maxTextureSize;
 }
 
-bool Z3DImgFilter::isVolumeDownsampled() const
+bool Z3DVolumeFilter::isVolumeDownsampled() const
 {
   return m_isVolumeDownsampled.get();
 }
 
-std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
+std::shared_ptr<ZWidgetsGroup> Z3DVolumeFilter::widgetsGroup()
 {
   if (!m_widgetsGroup) {
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("Img", 1);
@@ -361,7 +361,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
   return m_widgetsGroup;
 }
 
-void Z3DImgFilter::enterInteractionMode()
+void Z3DVolumeFilter::enterInteractionMode()
 {
   glm::ivec2 expectedSize = m_outport.expectedSize();
   if (m_interactionDownsample.get() != 1) {
@@ -393,7 +393,7 @@ void Z3DImgFilter::enterInteractionMode()
   }
 }
 
-void Z3DImgFilter::exitInteractionMode()
+void Z3DVolumeFilter::exitInteractionMode()
 {
   glm::ivec2 expectedSize = m_outport.expectedSize();
   if (m_interactionDownsample.get() != 1) {
@@ -425,12 +425,12 @@ void Z3DImgFilter::exitInteractionMode()
   }
 }
 
-bool Z3DImgFilter::isReady(Z3DEye eye) const
+bool Z3DVolumeFilter::isReady(Z3DEye eye) const
 {
   return Z3DBoundedFilter::isReady(eye) && m_visible.get() && m_imgPack;
 }
 
-glm::vec3 Z3DImgFilter::get3DPosition(int x, int y, int width, int height, bool &success)
+glm::vec3 Z3DVolumeFilter::get3DPosition(int x, int y, int width, int height, bool &success)
 {
   if (m_volumeRaycasterRenderer.compositeMode() == "Direct Volume Rendering") {
     return getMaxInten3DPositionUnderScreenPoint(x, y, width, height, success);
@@ -439,13 +439,13 @@ glm::vec3 Z3DImgFilter::get3DPosition(int x, int y, int width, int height, bool 
   }
 }
 
-bool Z3DImgFilter::hasOpaque(Z3DEye) const
+bool Z3DVolumeFilter::hasOpaque(Z3DEye) const
 {
   return m_showZSlice.get() || m_showXSlice.get() || m_showYSlice.get()
       || m_showXSlice2.get() || m_showYSlice2.get() || m_showZSlice2.get();
 }
 
-void Z3DImgFilter::renderOpaque(Z3DEye eye)
+void Z3DVolumeFilter::renderOpaque(Z3DEye eye)
 {
   Z3DVolume *volume = getVolumes().at(0).get();
   glm::uvec3 volDim = volume->originalDimensions();
@@ -736,14 +736,14 @@ void Z3DImgFilter::renderOpaque(Z3DEye eye)
   }
 }
 
-bool Z3DImgFilter::hasTransparent(Z3DEye eye) const
+bool Z3DVolumeFilter::hasTransparent(Z3DEye eye) const
 {
   const Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
         m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
   return currentOutport.hasValidData();
 }
 
-void Z3DImgFilter::renderTransparent(Z3DEye eye)
+void Z3DVolumeFilter::renderTransparent(Z3DEye eye)
 {
   Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
         m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
@@ -752,7 +752,7 @@ void Z3DImgFilter::renderTransparent(Z3DEye eye)
   m_rendererBase.render(eye, m_textureCopyRenderer);
 }
 
-void Z3DImgFilter::changeCoordTransform()
+void Z3DVolumeFilter::changeCoordTransform()
 {
   if (m_volumes.empty())
     return;
@@ -765,7 +765,7 @@ void Z3DImgFilter::changeCoordTransform()
   invalidateAllFRVolumeSlices();
 }
 
-void Z3DImgFilter::changeZoomInViewSize()
+void Z3DVolumeFilter::changeZoomInViewSize()
 {
   if (m_zoomInVolumes.empty())
     return;
@@ -773,7 +773,7 @@ void Z3DImgFilter::changeZoomInViewSize()
   openZoomInView(m_zoomInPos);
 }
 
-void Z3DImgFilter::adjustWidget()
+void Z3DVolumeFilter::adjustWidget()
 {
   m_zSlicePosition.setVisible(m_showZSlice.get());
   m_ySlicePosition.setVisible(m_showYSlice.get());
@@ -783,7 +783,7 @@ void Z3DImgFilter::adjustWidget()
   m_xSlice2Position.setVisible(m_showXSlice2.get());
 }
 
-void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent *e, int w, int h)
+void Z3DVolumeFilter::leftMouseButtonPressed(QMouseEvent *e, int w, int h)
 {
   e->ignore();
   if (!m_volumeRaycasterRenderer.hasVisibleRendering())
@@ -817,37 +817,37 @@ void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent *e, int w, int h)
   }
 }
 
-void Z3DImgFilter::invalidateFRVolumeZSlice()
+void Z3DVolumeFilter::invalidateFRVolumeZSlice()
 {
   m_FRVolumeSlicesValidState[0] = false;
 }
 
-void Z3DImgFilter::invalidateFRVolumeYSlice()
+void Z3DVolumeFilter::invalidateFRVolumeYSlice()
 {
   m_FRVolumeSlicesValidState[1] = false;
 }
 
-void Z3DImgFilter::invalidateFRVolumeXSlice()
+void Z3DVolumeFilter::invalidateFRVolumeXSlice()
 {
   m_FRVolumeSlicesValidState[2] = false;
 }
 
-void Z3DImgFilter::invalidateFRVolumeZSlice2()
+void Z3DVolumeFilter::invalidateFRVolumeZSlice2()
 {
   m_FRVolumeSlicesValidState[3] = false;
 }
 
-void Z3DImgFilter::invalidateFRVolumeYSlice2()
+void Z3DVolumeFilter::invalidateFRVolumeYSlice2()
 {
   m_FRVolumeSlicesValidState[4] = false;
 }
 
-void Z3DImgFilter::invalidateFRVolumeXSlice2()
+void Z3DVolumeFilter::invalidateFRVolumeXSlice2()
 {
   m_FRVolumeSlicesValidState[5] = false;
 }
 
-void Z3DImgFilter::updateCubeSerieSlices()
+void Z3DVolumeFilter::updateCubeSerieSlices()
 {
   m_cubeSerieSlices.clear();
   Z3DVolume *volume = getVolumes().at(0).get();
@@ -912,7 +912,7 @@ void Z3DImgFilter::updateCubeSerieSlices()
                                                            glm::vec3(xTexCoordStart, yTexCoordEnd, zTexCoordEnd));
 }
 
-void Z3DImgFilter::process(Z3DEye eye)
+void Z3DVolumeFilter::process(Z3DEye eye)
 {
   glEnable(GL_DEPTH_TEST);
 
@@ -954,7 +954,7 @@ void Z3DImgFilter::process(Z3DEye eye)
   CHECK_GL_ERROR;
 }
 
-const std::vector<std::unique_ptr<Z3DVolume>>& Z3DImgFilter::getVolumes() const
+const std::vector<std::unique_ptr<Z3DVolume>>& Z3DVolumeFilter::getVolumes() const
 {
   if (m_isSubVolume.get())
     return m_zoomInVolumes;
@@ -962,7 +962,7 @@ const std::vector<std::unique_ptr<Z3DVolume>>& Z3DImgFilter::getVolumes() const
     return m_volumes;
 }
 
-void Z3DImgFilter::updateNotTransformedBoundBoxImpl()
+void Z3DVolumeFilter::updateNotTransformedBoundBoxImpl()
 {
   m_notTransformedBoundBox[0] = m_volumes[0]->parentVolPhysicalLUF().x;
   m_notTransformedBoundBox[1] = m_volumes[0]->parentVolPhysicalLUF().y;
@@ -972,7 +972,7 @@ void Z3DImgFilter::updateNotTransformedBoundBoxImpl()
   m_notTransformedBoundBox[5] = m_volumes[0]->parentVolPhysicalRDB().z;
 }
 
-void Z3DImgFilter::readVolumes()
+void Z3DVolumeFilter::readVolumes()
 {
   m_volumes.clear();
   m_nChannels = m_imgPack->imgInfo().numChannels;
@@ -1074,7 +1074,7 @@ void Z3DImgFilter::readVolumes()
   volumeChanged();
 }
 
-void Z3DImgFilter::readSubVolumes(int left, int right, int up, int down, int front, int back)
+void Z3DVolumeFilter::readSubVolumes(int left, int right, int up, int down, int front, int back)
 {
   m_zoomInVolumes.clear();
 
@@ -1104,7 +1104,7 @@ void Z3DImgFilter::readSubVolumes(int left, int right, int up, int down, int fro
   m_zoomInBound = m_zoomInVolumes[0]->worldBoundBox();
 }
 
-glm::vec3 Z3DImgFilter::getFirstHit3DPosition(int x, int y, int width, int height, bool &success)
+glm::vec3 Z3DVolumeFilter::getFirstHit3DPosition(int x, int y, int width, int height, bool &success)
 {
   glm::vec3 res(-1);
   success = false;
@@ -1128,7 +1128,7 @@ glm::vec3 Z3DImgFilter::getFirstHit3DPosition(int x, int y, int width, int heigh
   return res;
 }
 
-glm::vec3 Z3DImgFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, int width, int height, bool &success)
+glm::vec3 Z3DVolumeFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, int width, int height, bool &success)
 {
   glm::vec3 res(-1);
   glm::vec3 des(-1);
@@ -1186,7 +1186,7 @@ glm::vec3 Z3DImgFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, int 
   return res;
 }
 
-glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderOutputPort &port)
+glm::vec3 Z3DVolumeFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderOutputPort &port)
 {
   glm::mat4 projection = globalCamera().projectionMatrix(Z3DEye::Mono);
   glm::mat4 modelview = globalCamera().viewMatrix(Z3DEye::Mono);
@@ -1210,7 +1210,7 @@ glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z
   return pos;
 }
 
-glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, double depth, int width, int height)
+glm::vec3 Z3DVolumeFilter::get3DPosition(glm::ivec2 pos2D, double depth, int width, int height)
 {
   glm::mat4 projection = globalCamera().projectionMatrix(Z3DEye::Mono);
   glm::mat4 modelview = globalCamera().viewMatrix(Z3DEye::Mono);
@@ -1227,7 +1227,7 @@ glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, double depth, int width,
   return pos;
 }
 
-void Z3DImgFilter::prepareDataForRaycaster(Z3DVolume *volume, Z3DEye eye)
+void Z3DVolumeFilter::prepareDataForRaycaster(Z3DVolume *volume, Z3DEye eye)
 {
   if (!m_volumeRaycasterRenderer.hasVisibleRendering())
     return;
@@ -1358,13 +1358,13 @@ void Z3DImgFilter::prepareDataForRaycaster(Z3DVolume *volume, Z3DEye eye)
                                              m_exitTarget.attachment(GL_COLOR_ATTACHMENT1));
 }
 
-void Z3DImgFilter::invalidateAllFRVolumeSlices()
+void Z3DVolumeFilter::invalidateAllFRVolumeSlices()
 {
   m_FRVolumeSlicesValidState.clear();
   m_FRVolumeSlicesValidState.resize(m_maxNumOfFullResolutionVolumeSlice, false);
 }
 
-void Z3DImgFilter::volumeChanged()
+void Z3DVolumeFilter::volumeChanged()
 {
   Z3DVolume *volume = getVolumes().at(0).get();
   bool is2DImage = (volume->is2DData());
@@ -1409,5 +1409,3 @@ void Z3DImgFilter::volumeChanged()
 }
 
 } // namespace nim
-
-

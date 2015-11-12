@@ -5,7 +5,7 @@
 namespace nim {
 
 Z3DImgView::Z3DImgView(ZImgDoc &doc, Z3DView &view)
-  : Z3DFilterView<ZImgDoc, Z3DImgFilter>(doc, view)
+  : Z3DFilterView<ZImgDoc, Z3DVolumeFilter>(doc, view)
 {
   docImgAdded(m_doc.objs());
   connect(&m_doc, SIGNAL(objAdded(size_t,ZObjDoc*)), this, SLOT(docImgAdded(size_t)));
@@ -16,7 +16,7 @@ void Z3DImgView::docImgAdded(const QList<size_t> &objs)
   try {
     for (int i=0; i<objs.size(); ++i) {
       size_t id = objs[i];
-      Z3DImgFilter *viewControl = new Z3DImgFilter(globalParas(), this);
+      Z3DVolumeFilter *viewControl = new Z3DVolumeFilter(globalParas(), this);
       viewControl->setOffset(m_doc.imgPack(id).offsetX(), m_doc.imgPack(id).offsetY(), m_doc.imgPack(id).offsetZ());
       viewControl->setData(m_doc.imgPack(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
@@ -51,7 +51,7 @@ void Z3DImgView::docImgAdded(const QList<size_t> &objs)
 void Z3DImgView::docImgAdded(size_t id)
 {
   try {
-    Z3DImgFilter *viewControl = new Z3DImgFilter(globalParas(), this);
+    Z3DVolumeFilter *viewControl = new Z3DVolumeFilter(globalParas(), this);
     viewControl->setOffset(m_doc.imgPack(id).offsetX(), m_doc.imgPack(id).offsetY(), m_doc.imgPack(id).offsetZ());
     viewControl->setData(m_doc.imgPack(id));
     viewControl->setSelected(m_doc.isObjSelected(id));

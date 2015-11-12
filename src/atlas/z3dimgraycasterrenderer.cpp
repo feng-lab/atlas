@@ -1,11 +1,11 @@
-#include "z3dvolumeraycasterrenderer.h"
+#include "z3dimgraycasterrenderer.h"
 
 #include "z3dtexture.h"
 #include "z3dvolume.h"
 
 namespace nim {
 
-Z3DVolumeRaycasterRenderer::Z3DVolumeRaycasterRenderer(Z3DRendererBase &rendererBase)
+Z3DImgRayCasterRenderer::Z3DImgRayCasterRenderer(Z3DRendererBase &rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_samplingRate("Sampling Rate", 2.f, 0.01f, 20.f)
   , m_isoValue("ISO Value", 0.5f, 0.0f, 1.0f)
@@ -45,12 +45,12 @@ Z3DVolumeRaycasterRenderer::Z3DVolumeRaycasterRenderer(Z3DRendererBase &renderer
   CHECK_GL_ERROR;
 }
 
-QString Z3DVolumeRaycasterRenderer::compositeMode() const
+QString Z3DImgRayCasterRenderer::compositeMode() const
 {
   return m_compositingMode.get();
 }
 
-void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &volsIn)
+void Z3DImgRayCasterRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &volsIn)
 {
   std::vector<Z3DVolume*> vols;
   for (size_t i=0; i<volsIn.size(); ++i) {
@@ -96,7 +96,7 @@ void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z
   }
 }
 
-void Z3DVolumeRaycasterRenderer::addQuad(const ZMesh &quad)
+void Z3DImgRayCasterRenderer::addQuad(const ZMesh &quad)
 {
   if (quad.empty() ||
       (quad.numVertices() != 4 && quad.numVertices() != 6) ||
@@ -112,8 +112,8 @@ void Z3DVolumeRaycasterRenderer::addQuad(const ZMesh &quad)
   m_exitEyeCoordTexture = nullptr;
 }
 
-void Z3DVolumeRaycasterRenderer::setEntryExitInfo(const Z3DTexture *entryTexCoordTexture, const Z3DTexture *entryEyeCoordTexture,
-                                                  const Z3DTexture *exitTexCoordTexture, const Z3DTexture *exitEyeCoordTexture)
+void Z3DImgRayCasterRenderer::setEntryExitInfo(const Z3DTexture *entryTexCoordTexture, const Z3DTexture *entryEyeCoordTexture,
+                                               const Z3DTexture *exitTexCoordTexture, const Z3DTexture *exitEyeCoordTexture)
 {
   m_entryTexCoordTexture = entryTexCoordTexture;
   m_entryEyeCoordTexture = entryEyeCoordTexture;
@@ -123,14 +123,14 @@ void Z3DVolumeRaycasterRenderer::setEntryExitInfo(const Z3DTexture *entryTexCoor
 }
 
 
-void Z3DVolumeRaycasterRenderer::adjustWidgets()
+void Z3DImgRayCasterRenderer::adjustWidgets()
 {
   m_isoValue.setVisible(m_compositingMode.isSelected("ISO Surface"));
   m_localMIPThreshold.setVisible(m_compositingMode.isSelected("Local MIP") ||
                                  m_compositingMode.isSelected("Local MIP Opaque"));
 }
 
-void Z3DVolumeRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram &shader)
+void Z3DImgRayCasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram &shader)
 {
   shader.setLogUniformLocationError(false);
 
@@ -152,14 +152,14 @@ void Z3DVolumeRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram &s
   shader.setLogUniformLocationError(true);
 }
 
-void Z3DVolumeRaycasterRenderer::compile()
+void Z3DImgRayCasterRenderer::compile()
 {
   m_raycasterShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
   m_2dImageShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
   m_volumeSliceWithTransferfunShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
-QString Z3DVolumeRaycasterRenderer::generateHeader()
+QString Z3DImgRayCasterRenderer::generateHeader()
 {
   QString headerSource;
 
@@ -210,7 +210,7 @@ QString Z3DVolumeRaycasterRenderer::generateHeader()
   return headerSource;
 }
 
-void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
+void Z3DImgRayCasterRenderer::render(Z3DEye eye)
 {
   if (!hasVisibleRendering())
     return;
@@ -286,11 +286,11 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
   CHECK_GL_ERROR;
 }
 
-void Z3DVolumeRaycasterRenderer::renderPicking(Z3DEye)
+void Z3DImgRayCasterRenderer::renderPicking(Z3DEye)
 {
 }
 
-void Z3DVolumeRaycasterRenderer::resetTransferFunctions()
+void Z3DImgRayCasterRenderer::resetTransferFunctions()
 {
   for (size_t i=0; i<m_transferFuncParas.size(); ++i) {
     if (m_opaque) {
@@ -311,7 +311,7 @@ void Z3DVolumeRaycasterRenderer::resetTransferFunctions()
   }
 }
 
-void Z3DVolumeRaycasterRenderer::translate(double dx, double dy, double dz)
+void Z3DImgRayCasterRenderer::translate(double dx, double dy, double dz)
 {
   for (std::vector<Z3DVolume *>::iterator iter = m_volumes.begin();
        iter != m_volumes.end(); ++iter) {
@@ -321,7 +321,7 @@ void Z3DVolumeRaycasterRenderer::translate(double dx, double dy, double dz)
   }
 }
 
-bool Z3DVolumeRaycasterRenderer::hasVisibleRendering() const
+bool Z3DImgRayCasterRenderer::hasVisibleRendering() const
 {
   for (size_t i=0; i<m_volumes.size(); ++i) {
     if (m_channelVisibleParas[i]->get()) {
@@ -332,3 +332,4 @@ bool Z3DVolumeRaycasterRenderer::hasVisibleRendering() const
 }
 
 } // namespace nim
+

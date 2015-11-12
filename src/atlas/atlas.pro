@@ -272,10 +272,13 @@ HEADERS += \
     zchooseobjdialog.h \
     zgraphicsscene.h \
     z3dfilter.h \
-    z3dimgfilter.h \
     z3dtextureglowrenderer.h \
     z3dcameracontrolwidget.h \
-    z3dtextureandeyecoordinaterenderer.h
+    z3dtextureandeyecoordinaterenderer.h \
+    z3dimgraycasterrenderer.h \
+    z3dimg.h \
+    z3dvolumefilter.h \
+    z3dimgfilter.h
 
 SOURCES += \
     main.cpp \
@@ -477,10 +480,13 @@ SOURCES += \
     zchooseobjdialog.cpp \
     zgraphicsscene.cpp \
     z3dfilter.cpp \
-    z3dimgfilter.cpp \
     z3dtextureglowrenderer.cpp \
     z3dcameracontrolwidget.cpp \
-    z3dtextureandeyecoordinaterenderer.cpp
+    z3dtextureandeyecoordinaterenderer.cpp \
+    z3dimgraycasterrenderer.cpp \
+    z3dimg.cpp \
+    z3dvolumefilter.cpp \
+    z3dimgfilter.cpp
 
 contains(CONFIG, use_glbinding) {
     include($$PWD/../3rdparty/glbinding.pri)
