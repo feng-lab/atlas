@@ -40,17 +40,6 @@ public:
   virtual bool isStayOnTop() const { return m_stayOnTop.get(); }
   virtual void setStayOnTop(bool s) { m_stayOnTop.set(s); }
 
-  // input volPos should be in volume coordinate
-  // means it is in range [0 width-1 0 height-1 0 depth-1]
-  bool openZoomInView(const glm::ivec3 &volPos);
-  void exitZoomInView();
-
-  std::vector<double> zoomInBound() const { return m_zoomInBound; }
-
-  bool volumeNeedDownsample() const;
-  bool isVolumeDownsampled() const;
-  bool isSubvolume() const { return m_isSubVolume.get(); }
-
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   virtual void enterInteractionMode() override;
@@ -75,7 +64,6 @@ signals:
 
 protected slots:
   void changeCoordTransform();
-  void changeZoomInViewSize();
 
   void adjustWidget();
   void leftMouseButtonPressed(QMouseEvent *e, int w, int h);
@@ -101,7 +89,6 @@ protected:
 
 private:
   void readVolumes();
-  void readSubVolumes(int left, int right, int up, int down, int front, int back);
 
   // check success before using the returned value
   // if first hit 3d position is in volume, success will be true,
@@ -129,14 +116,8 @@ private:
 
   const ZImgPack *m_imgPack;
   std::vector<std::unique_ptr<Z3DVolume>> m_volumes;
-  std::vector<std::unique_ptr<Z3DVolume>> m_zoomInVolumes;
   ZBoolParameter m_visible;
   ZBoolParameter m_stayOnTop;
-  ZBoolParameter m_isVolumeDownsampled;
-  ZBoolParameter m_isSubVolume;
-  ZIntParameter m_zoomInViewSize;
-  glm::ivec3 m_zoomInPos;
-  std::vector<double> m_zoomInBound;
 
   size_t m_maxVoxelNumber;
 

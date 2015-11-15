@@ -1,7 +1,7 @@
 cd /d "%~dp0"
 
 set currDIR=%CD%
-set srcDIR=%currDIR%\..\..\..\hdf5-1.8.15-patch1
+set srcDIR=%currDIR%\..\..\..\hdf5-1.8.16
 set buildDIR=%srcDIR%\..\hdf5-build
 set installDIR=%currDIR%\hdf5
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
-srcDIR=$currDIR/../../../hdf5-1.8.15-patch1
+srcDIR=$currDIR/../../../hdf5-1.8.16
 buildDIR=$srcDIR/../__hdf5-build
 installDIR=$currDIR/hdf5
 numCores=$( sysctl -n hw.logicalcpu )
@@ -14,7 +14,7 @@ fi
 if [ ! -d $srcDIR ]
 then
   srcPackageDIR="/Users/feng/Google Drive/code/my"
-  srcArchive=$srcPackageDIR/hdf5-1.8.15-patch1.tar.bz2
+  srcArchive=$srcPackageDIR/hdf5-1.8.16.tar.bz2
   tar -jxvf "$srcArchive" -C $currDIR/../../..
 fi
 

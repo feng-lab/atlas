@@ -23,9 +23,6 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   , m_imgPack(nullptr)
   , m_visible("Visible", true)
   , m_stayOnTop("Stay On Top", false)
-  , m_isVolumeDownsampled("Volume Is Downsampled", false)
-  , m_isSubVolume("Is Subvolume", false)
-  , m_zoomInViewSize("Zoom In View Size", 256, 128, 1024)
   , m_numParas(0)
   , m_interactionDownsample("Interaction Downsample", 1, 1, 16)
   , m_entryTarget(glm::ivec2(32,32))
@@ -68,15 +65,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
 
   addParameter(m_visible);
   addParameter(m_stayOnTop);
-  m_isVolumeDownsampled.setEnabled(false);
-  addParameter(m_isVolumeDownsampled);
-  m_isSubVolume.setEnabled(false);
-  addParameter(m_isSubVolume);
-  m_zoomInViewSize.setTracking(false);
-  m_zoomInViewSize.setSingleStep(32);
-  addParameter(m_zoomInViewSize);
   connect(&m_rendererBase, SIGNAL(coordTransformChanged()), this, SLOT(changeCoordTransform()));
-  connect(&m_zoomInViewSize, SIGNAL(valueChanged()), this, SLOT(changeZoomInViewSize()));
 
   addParameter(m_interactionDownsample);
 
@@ -200,7 +189,6 @@ void Z3DImgFilter::setData(const ZImgPack &img)
   m_imgPack = &img;
 
   m_volumes.clear();
-  m_zoomInVolumes.clear();
   readVolumes();
   updateBoundBox();
 
@@ -242,72 +230,6 @@ void Z3DImgFilter::setData(const ZImgPack &img)
   invalidateResult();
 }
 
-bool Z3DImgFilter::openZoomInView(const glm::ivec3 &volPos)
-{
-  if (!m_isVolumeDownsampled.get())
-    return false;
-  if (!volumeNeedDownsample())
-    return false;
-  if (m_volumes.empty())
-    return false;
-  glm::ivec3 voldim = glm::ivec3(m_volumes[0]->cubeSize());
-  if (!(volPos[0] >= 0 && volPos[0] < voldim.x  && volPos[1] >= 0 && volPos[1] < voldim.y && volPos[2] >= 0 && volPos[2] < voldim.z))
-    return false;
-
-  m_zoomInPos = volPos;
-  if (m_zoomInViewSize.get() % 2 != 0)
-    m_zoomInViewSize.set(m_zoomInViewSize.get()+1);
-  int halfsize = m_zoomInViewSize.get() / 2;
-  int left = std::max(volPos[0]-halfsize+1, 0);
-  int right = std::min(volPos[0]+halfsize, int(m_imgPack->imgInfo().width)-1);
-  int up = std::max(volPos[1]-halfsize+1, 0);
-  int down = std::min(volPos[1]+halfsize, int(m_imgPack->imgInfo().height)-1);
-  int front = 0;
-  int back = m_imgPack->imgInfo().depth - 1;
-  readSubVolumes(left, right, up, down, front, back);
-
-  m_isSubVolume.set(true);
-  m_isVolumeDownsampled.set(false);
-
-  volumeChanged();
-  invalidateResult();
-  return true;
-}
-
-void Z3DImgFilter::exitZoomInView()
-{
-  if (m_zoomInVolumes.empty())
-    return;
-
-  // copy transform matrix from sub volume, in case it is changed
-  for (size_t i=0; i<m_volumes.size(); i++) {
-    m_volumes[i]->setPhysicalToWorldMatrix(m_zoomInVolumes[i]->physicalToWorldMatrix());
-  }
-  m_zoomInVolumes.clear();
-  m_isSubVolume.set(false);
-  m_isVolumeDownsampled.set(true);
-
-  volumeChanged();
-  invalidateResult();
-}
-
-bool Z3DImgFilter::volumeNeedDownsample() const
-{
-  size_t maxTextureSize = 100;
-  if (m_imgPack->imgInfo().depth > 1)
-    maxTextureSize = Z3DGpuInfoInstance.max3DTextureSize();
-  else
-    maxTextureSize = Z3DGpuInfoInstance.maxTextureSize();
-  return m_imgPack->imgInfo().timeVoxelNumber() > m_maxVoxelNumber ||
-      m_imgPack->imgInfo().width > maxTextureSize || m_imgPack->imgInfo().height > maxTextureSize ||
-      m_imgPack->imgInfo().depth > maxTextureSize;
-}
-
-bool Z3DImgFilter::isVolumeDownsampled() const
-{
-  return m_isVolumeDownsampled.get();
-}
-
 std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
 {
   if (!m_widgetsGroup) {
@@ -315,9 +237,6 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
 
     m_widgetsGroup->addChild(m_visible, 1);
     m_widgetsGroup->addChild(m_stayOnTop, 1);
-    m_widgetsGroup->addChild(m_isVolumeDownsampled, 2);
-    m_widgetsGroup->addChild(m_isSubVolume, 2);
-    m_widgetsGroup->addChild(m_zoomInViewSize, 2);
 
     for (auto it = m_volumeRaycasterRenderer.channelVisibleParas().begin();
          it != m_volumeRaycasterRenderer.channelVisibleParas().end(); ++it) {
@@ -759,18 +678,7 @@ void Z3DImgFilter::changeCoordTransform()
   for (size_t i=0; i<m_volumes.size(); i++) {
     m_volumes[i]->setPhysicalToWorldMatrix(m_rendererBase.coordTransform());
   }
-  for (size_t i=0; i<m_zoomInVolumes.size(); i++) {
-    m_zoomInVolumes[i]->setPhysicalToWorldMatrix(m_rendererBase.coordTransform());
-  }
   invalidateAllFRVolumeSlices();
-}
-
-void Z3DImgFilter::changeZoomInViewSize()
-{
-  if (m_zoomInVolumes.empty())
-    return;
-  exitZoomInView();
-  openZoomInView(m_zoomInPos);
 }
 
 void Z3DImgFilter::adjustWidget()
@@ -956,10 +864,7 @@ void Z3DImgFilter::process(Z3DEye eye)
 
 const std::vector<std::unique_ptr<Z3DVolume>>& Z3DImgFilter::getVolumes() const
 {
-  if (m_isSubVolume.get())
-    return m_zoomInVolumes;
-  else
-    return m_volumes;
+  return m_volumes;
 }
 
 void Z3DImgFilter::updateNotTransformedBoundBoxImpl()
@@ -1025,10 +930,6 @@ void Z3DImgFilter::readVolumes()
   if (scaleZ)
     depthScale *= scale;
 
-  if (widthScale != 1.0 || heightScale != 1.0 || depthScale != 1.0) {
-    m_isVolumeDownsampled.set(true);
-  }
-
   ZImg img = m_imgPack->resizedImg(width, height, depth, 0);
   img.computeMinMax(m_imgMinIntensity, m_imgMaxIntensity);
   if (!img.isType<uint8_t>()) {
@@ -1072,36 +973,6 @@ void Z3DImgFilter::readVolumes()
   }
 
   volumeChanged();
-}
-
-void Z3DImgFilter::readSubVolumes(int left, int right, int up, int down, int front, int back)
-{
-  m_zoomInVolumes.clear();
-
-  glm::vec3 downsampleSpacing = glm::vec3(1.f, 1.f, 1.f);
-  glm::vec3 offset = glm::vec3(left, right, front) + m_volumes[0]->offset();
-  for (size_t i=0; i<m_nChannels; i++) {
-    ZImg img = m_imgPack->crop(ZImgRegion(left, right+1, up, down+1, front, back+1,
-                                          i, i+1, 0, 1));
-    if (!img.isType<uint8_t>())
-      img = img.convertTo<uint8_t>(m_imgMinIntensity, m_imgMaxIntensity);
-    else
-      img.normalize(m_imgMinIntensity, m_imgMaxIntensity);
-
-    Z3DVolume *vh = new Z3DVolume(img, downsampleSpacing, offset,
-                                  m_volumes[0]->physicalToWorldMatrix());
-    vh->setParentVolumeDimensions(glm::uvec3(m_imgPack->imgInfo().width, m_imgPack->imgInfo().height, m_imgPack->imgInfo().depth));
-    vh->setParentVolumeOffset(m_volumes[0]->offset());
-    m_zoomInVolumes.emplace_back(vh);
-  }
-
-  for (size_t i=0; i<m_nChannels; i++) {
-    m_zoomInVolumes[i]->setVolColor(glm::vec3(m_imgPack->imgInfo().channelColors[i].r / 255.,
-                                              m_imgPack->imgInfo().channelColors[i].g / 255.,
-                                              m_imgPack->imgInfo().channelColors[i].b / 255.));
-  }
-
-  m_zoomInBound = m_zoomInVolumes[0]->worldBoundBox();
 }
 
 glm::vec3 Z3DImgFilter::getFirstHit3DPosition(int x, int y, int width, int height, bool &success)
