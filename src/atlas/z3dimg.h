@@ -26,16 +26,16 @@ public:
          QObject *parent = 0);
   virtual ~Z3DImg();
 
-  bool is1DData() const { return m_voxelDimensions[0].z == 1 && (m_voxelDimensions[0].x == 1 || m_voxelDimensions[0].y == 1); }
-  bool is2DData() const { return m_voxelDimensions[0].z == 1 && m_voxelDimensions[0].x > 1 && m_voxelDimensions[0].y > 1; }
-  bool is3DData() const { return m_voxelDimensions[0].z > 1 && m_voxelDimensions[0].x > 1 && m_voxelDimensions[0].y > 1; }
+  bool is1DData() const { return m_imageDimensions[0].z == 1 && (m_imageDimensions[0].x == 1 || m_imageDimensions[0].y == 1); }
+  bool is2DData() const { return m_imageDimensions[0].z == 1 && m_imageDimensions[0].x > 1 && m_imageDimensions[0].y > 1; }
+  bool is3DData() const { return m_imageDimensions[0].z > 1 && m_imageDimensions[0].x > 1 && m_imageDimensions[0].y > 1; }
 
   // Returns a string representation of the sampler type: "sampler2D" for 2D image, "sampler3D" for 3D volume
   QString samplerType() const;
 
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
   glm::vec3 physicalLUF() const { return glm::vec3(0, 0, 0); }
-  glm::vec3 physicalRDB() const { return glm::vec3(m_voxelDimensions[0]); }
+  glm::vec3 physicalRDB() const { return glm::vec3(m_imageDimensions[0]); }
   glm::vec3 physicalLDF() const { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z); }
   glm::vec3 physicalRDF() const { return glm::vec3(physicalRDB().x, physicalRDB().y, physicalLUF().z); }
   glm::vec3 physicalRUF() const { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalLUF().z); }
@@ -59,13 +59,15 @@ protected:
   ZImg m_pageTableCache;
   ZImg m_voxelCache;
   size_t m_pageTableBlockSize = 32;
-  size_t m_voxelBlockSize = 32;
+  size_t m_imageBlockSize = 32;
   size_t m_numLevels;
   std::vector<glm::ivec3> m_pageDirectoryBases;
   std::vector<glm::ivec3> m_pageDirectoryDimensions;
   std::vector<glm::ivec3> m_pageTableDimensions;
-  std::vector<glm::ivec3> m_voxelDimensions;
-  std::vector<float> m_voxelSizes;
+  std::vector<glm::ivec3> m_imageDimensions;
+  std::vector<glm::ivec3> m_levelScales;
+  std::vector<glm::vec3> m_voxelWorldDimensions;
+  std::vector<float> m_voxelWorldSizes;
   std::vector<glm::uvec4> m_posToBlockIDs;
 
 private:

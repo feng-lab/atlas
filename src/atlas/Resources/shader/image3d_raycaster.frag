@@ -1,14 +1,14 @@
 uniform sampler3D page_directory;
-uniform ivec3 page_directory_base[LEVEL_COUNT];
+uniform ivec3 page_directory_bases[LEVEL_COUNT];
 uniform ivec3 page_directory_dimensions[LEVEL_COUNT];
 uniform sampler3D page_table_cache;
 uniform ivec3 page_table_dimensions[LEVEL_COUNT];
 uniform ivec3 page_table_block_size = ivec3(32, 32, 32);
-uniform sampler3D voxel_cache;
-uniform ivec3 voxel_dimensions[LEVEL_COUNT];
-uniform float voxel_size[LEVEL_COUNT];
-uniform ivec3 voxel_block_size = ivec3(32, 32, 32);
-uniform uvec4 pos_to_block_id[LEVEL_COUNT];
+uniform sampler3D image_cache;
+uniform ivec3 image_dimensions[LEVEL_COUNT];
+uniform float voxel_world_sizes[LEVEL_COUNT];
+uniform ivec3 image_block_size = ivec3(32, 32, 32);
+uniform uvec4 pos_to_block_ids[LEVEL_COUNT];
 
 uniform vec2 screen_dim_RCP;
 uniform float minus_near_dist;
@@ -90,8 +90,8 @@ vec4 compositeXRay(in vec4 curResult, in vec4 color, in float currentRayLength, 
   return curResult + color;
 }
 
-#define MAPPED 0
-#define UNMAPPED 1
+#define UNMAPPED 0
+#define MAPPED 1
 #define EMPTY 2
 
 void main()
@@ -154,10 +154,10 @@ void main()
     for (int loop0=0; !finished && loop0<255; loop0++) {
       for (int loop1=0; !finished && loop1<255; loop1++) {
         float desiredVoxelSize = ze / minus_near_dist;
-        while (voxel_size[curLevel] <= desiredVoxelSize && curLevel + 1 < LEVEL_COUNT) {
+        while (voxel_world_sizes[curLevel] <= desiredVoxelSize && curLevel + 1 < LEVEL_COUNT) {
           ++curLevel;
         }
-        float stepSize = -sampling_rate * voxel_size[curLevel];
+        float stepSize = -sampling_rate * voxel_world_sizes[curLevel];
         vec3 samplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
 
         float voxel = 0;
@@ -165,7 +165,7 @@ void main()
         vec4 chColor;
         bool saturated = true;
 
-        ivec3 curPageDirAddress = page_directory_base[curLevel] + ivec3(samplePos * page_directory_dimensions[curResult]);
+        ivec3 curPageDirAddress = page_directory_bases[curLevel] + ivec3(samplePos * page_directory_dimensions[curResult]);
         if (curPageDirAddress != pageDirAddress) {
           pageDirAddress = curPageDirAddress;
           pageDirEntry = texelFetch(page_directory, pageDirAddress);
@@ -179,8 +179,8 @@ void main()
           }
           pagingFlag = pageTableEntry.w;
           if (pagingFlag == MAPPED) {
-            ivec3 voxelAddress = pageTableEntry.xyz + ivec3(samplePos * voxel_dimensions[curLevel]) % voxel_block_size;
-            voxel = texelFetch(voxel_cache, voxelAddress).r;
+            ivec3 voxelAddress = pageTableEntry.xyz + ivec3(samplePos * image_dimensions[curLevel]) % image_block_size;
+            voxel = texelFetch(image_cache, voxelAddress).r;
 
 #ifdef MIP
 #ifdef LOCAL_MIP
@@ -225,7 +225,7 @@ void main()
             ze += stepSize;
 
             if (usedBlockIDsIndex < 12) {
-              uint blockID = pos_to_block_id[curLevel].w + dot(pos_to_block_id[curLevel].xyz, uvec3(samplePos * voxel_dimensions[curLevel]) / uvec3(voxel_block_size));
+              uint blockID = pos_to_block_ids[curLevel].w + dot(pos_to_block_ids[curLevel].xyz, uvec3(samplePos * image_dimensions[curLevel]) / uvec3(image_block_size));
               if (usedBlockIDsIndex == 0 || blockID != usedBlockIDs[usedBlockIDsIndex-1]) {
                 usedBlockIDs[usedBlockIDsIndex++] = blockID;
               }
@@ -233,17 +233,17 @@ void main()
           } else {
             // skip empty space page table entry recursive
             if (pagingFlag == UNMAPPED) {
-              ivec3 prevBlock = ivec3(samplePos * voxel_dimensions[curLevel]) / voxel_block_size;
+              ivec3 prevBlock = ivec3(samplePos * image_dimensions[curLevel]) / image_block_size;
               vec3 testSamplePos;
               do {
                 ze += stepSize;
                 testSamplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
-              } while (ivec3(testSamplePos * voxel_dimensions[curLevel]) / voxel_block_size == prevBlock && ze > zeBack);
+              } while (ivec3(testSamplePos * image_dimensions[curLevel]) / image_block_size == prevBlock && ze > zeBack);
             } else { // empty block
               int nextNonEmptyLevel = curLevel + 1;
               int testPagingFlag = EMPTY;
               while (testPagingFlag == EMPTY && nextNonEmptyLevel < LEVEL_COUNT) {
-                ivec4 testPageDirEntry = texelFetch(page_directory, page_directory_base[nextNonEmptyLevel] + ivec3(samplePos * page_directory_dimensions[nextNonEmptyLevel]));
+                ivec4 testPageDirEntry = texelFetch(page_directory, page_directory_bases[nextNonEmptyLevel] + ivec3(samplePos * page_directory_dimensions[nextNonEmptyLevel]));
                 testPagingFlag = testPageDirEntry.w;
                 if (testPagingFlag == MAPPED) {
                   testPagingFlag = texelFetch(page_table_cache, testPageDirEntry.xyz + ivec3(samplePos * page_table_dimensions[nextNonEmptyLevel]) % page_table_block_size).w;
@@ -251,27 +251,27 @@ void main()
                 ++nextNonEmptyLevel;
               }
 
-              ivec3 prevBlock = ivec3(samplePos * voxel_dimensions[nextNonEmptyLevel-1]) / voxel_block_size;
-              float testStepSize = -sampling_rate * voxel_size[nextNonEmptyLevel-1];
+              ivec3 prevBlock = ivec3(samplePos * image_dimensions[nextNonEmptyLevel-1]) / image_block_size;
+              float testStepSize = -sampling_rate * voxel_world_sizes[nextNonEmptyLevel-1];
               vec3 testSamplePos;
               do {
                 ze += testStepSize;
                 testSamplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
-              } while (ivec3(testSamplePos * voxel_dimensions[nextNonEmptyLevel-1]) / voxel_block_size == prevBlock && ze > zeBack);
+              } while (ivec3(testSamplePos * image_dimensions[nextNonEmptyLevel-1]) / image_block_size == prevBlock && ze > zeBack);
             }
           }
         } else {
           // skip empty space page directory entry
-          ivec3 prevBlock = ivec3(samplePos * voxel_dimensions[curLevel]) / voxel_block_size;
+          ivec3 prevBlock = ivec3(samplePos * image_dimensions[curLevel]) / image_block_size;
           vec3 testSamplePos;
           do {
             ze += stepSize;
             testSamplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
-          } while (ivec3(testSamplePos * voxel_dimensions[curLevel]) / voxel_block_size == prevBlock && ze > zeBack);
+          } while (ivec3(testSamplePos * image_dimensions[curLevel]) / image_block_size == prevBlock && ze > zeBack);
         }
 
         if (pagingFlag == UNMAPPED && missBlockIDsIndex < 4) {
-          uint blockID = pos_to_block_id[curLevel].w + dot(pos_to_block_id[curLevel].xyz, uvec3(samplePos * voxel_dimensions[curLevel]) / uvec3(voxel_block_size));
+          uint blockID = pos_to_block_ids[curLevel].w + dot(pos_to_block_ids[curLevel].xyz, uvec3(samplePos * image_dimensions[curLevel]) / uvec3(image_block_size));
           if (missBlockIDsIndex == 0 || blockID != missBlockIDs[missBlockIDsIndex-1]) {
             missBlockIDs[missBlockIDsIndex++] = blockID;
           }
