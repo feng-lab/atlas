@@ -278,7 +278,8 @@ HEADERS += \
     z3dimgraycasterrenderer.h \
     z3dimg.h \
     z3dvolumefilter.h \
-    z3dimgfilter.h
+    z3dimgfilter.h \
+    z3dblockcache.h
 
 SOURCES += \
     main.cpp \

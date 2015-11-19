@@ -55,17 +55,16 @@ protected:
 protected:
   const ZImgPack& m_imgPack;
 
-  ZImg m_pageDirectory;
-  ZImg m_pageTableCache;
-  ZImg m_voxelCache;
+  std::vector<glm::ivec4> m_pageDirectory;
+  std::vector<glm::ivec4> m_pageTableCache;
   size_t m_pageTableBlockSize = 32;
   size_t m_imageBlockSize = 32;
   size_t m_numLevels;
   std::vector<glm::ivec3> m_pageDirectoryBases;
-  std::vector<glm::ivec3> m_pageDirectoryDimensions;
-  std::vector<glm::ivec3> m_pageTableDimensions;
-  std::vector<glm::ivec3> m_imageDimensions;
-  std::vector<glm::ivec3> m_levelScales;
+  std::vector<glm::uvec3> m_pageDirectoryDimensions;
+  std::vector<glm::uvec3> m_pageTableDimensions;
+  std::vector<glm::uvec3> m_imageDimensions;
+  std::vector<glm::uvec3> m_levelScales;
   std::vector<glm::vec3> m_voxelWorldDimensions;
   std::vector<float> m_voxelWorldSizes;
   std::vector<glm::uvec4> m_posToBlockIDs;

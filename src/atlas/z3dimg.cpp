@@ -6,6 +6,7 @@
 #include "z3dgpuinfo.h"
 #include "z3dtexture.h"
 #include "zkmeans.h"
+#include "zexception.h"
 
 namespace nim {
 
@@ -38,8 +39,9 @@ Z3DImg::Z3DImg(ZImgPack &imgPack, QObject *parent)
     }
   }
 
+  glm::ivec3 pageDirectoryEnd(0, 0, 0);
   for (size_t l=0; l<m_numLevels; ++l) {
-    m_levelScales.push_back(glm::ivec3(1, 1, 1));
+    m_levelScales.push_back(glm::uvec3(1, 1, 1));
     if (l > 0) {
       if (stayRounds[sortedIndex[2]] > stayRounds[sortedIndex[1]]) {
         --stayRounds[sortedIndex[2]];
@@ -57,24 +59,44 @@ Z3DImg::Z3DImg(ZImgPack &imgPack, QObject *parent)
         m_levelScales[l] = m_levelScales[l-1] * 2;
       }
     }
-    m_imageDimensions.push_back(glm::ivec3((info.width + m_levelScales[l].x - 1) / m_levelScales[l].x,
+    m_imageDimensions.push_back(glm::uvec3((info.width + m_levelScales[l].x - 1) / m_levelScales[l].x,
                                            (info.height + m_levelScales[l].y - 1) / m_levelScales[l].y,
                                            (info.depth + m_levelScales[l].z - 1) / m_levelScales[l].z));
-    m_pageTableDimensions.push_back(glm::ivec3((m_imageDimensions[l].x + m_imageBlockSize - 1) / m_imageBlockSize,
+    m_pageTableDimensions.push_back(glm::uvec3((m_imageDimensions[l].x + m_imageBlockSize - 1) / m_imageBlockSize,
                                                (m_imageDimensions[l].y + m_imageBlockSize - 1) / m_imageBlockSize,
                                                (m_imageDimensions[l].z + m_imageBlockSize - 1) / m_imageBlockSize));
-    m_pageDirectoryDimensions.push_back(glm::ivec3((m_pageTableDimensions[l].x + m_pageTableBlockSize - 1) / m_pageTableBlockSize,
+    m_pageDirectoryDimensions.push_back(glm::uvec3((m_pageTableDimensions[l].x + m_pageTableBlockSize - 1) / m_pageTableBlockSize,
                                                    (m_pageTableDimensions[l].y + m_pageTableBlockSize - 1) / m_pageTableBlockSize,
                                                    (m_pageTableDimensions[l].z + m_pageTableBlockSize - 1) / m_pageTableBlockSize));
+
+      // id starts from 1
+    m_posToBlockIDs[l].push_back(glm::uvec4(1,
+                                            m_pageTableDimensions[l].x,
+                                            m_pageTableDimensions[l].x * m_pageTableDimensions[l].y,
+                                            l == 0 ? 1 : (1 + m_pageTableDimensions[l-1].x * m_pageTableDimensions[l-1].y * m_pageTableDimensions[l-1].z)));
+    if (l == 0) {
+      m_pageDirectoryBases.push_back(glm::ivec3(0, 0, 0));
+    } else if (l == 1) {
+      m_pageDirectoryBases.push_back(m_pageDirectoryBases[l-1]);
+      m_pageDirectoryBases[l][sortedIndex[1]] += m_pageTableDimensions[l-1][sortedIndex[1]];
+    } else {
+      m_pageDirectoryBases.push_back(m_pageDirectoryBases[l-1]);
+      m_pageDirectoryBases[l][sortedIndex[0]] += m_pageTableDimensions[l-1][sortedIndex[0]];
+    }
+    pageDirectoryEnd = glm::max(pageDirectoryEnd, m_pageDirectoryBases[l] + glm::ivec3(m_pageDirectoryDimensions[l]));
+    if (pageDirectoryEnd.x > Z3DGpuInfoInstance.max3DTextureSize() ||
+        pageDirectoryEnd.y > Z3DGpuInfoInstance.max3DTextureSize() ||
+        pageDirectoryEnd.z > Z3DGpuInfoInstance.max3DTextureSize()) {
+      throw ZGLException(QString("Image (%1) is not supported").arg(info.toQString()));
+    }
   }
 
-  ZImg m_pageDirectory;
-  ZImg m_pageTableCache;
-  ZImg m_voxelCache;
-  std::vector<glm::ivec3> m_pageDirectoryBases;
-  std::vector<glm::vec3> m_voxelWorldDimensions;
-  std::vector<float> m_voxelWorldSizes;
-  std::vector<glm::uvec4> m_posToBlockIDs;
+  // content of RGBA32I texture
+  m_pageDirectory.resize(size_t(pageDirectoryEnd.x) * pageDirectoryEnd.y * pageDirectoryEnd.z, glm::ivec4(0,0,0,0));
+
+
+  //std::vector<glm::vec3> m_voxelWorldDimensions;
+  //std::vector<float> m_voxelWorldSizes;
 }
 
 Z3DImg::~Z3DImg()
