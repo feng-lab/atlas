@@ -20,6 +20,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/vector_angle.hpp>
 #include <glm/gtx/rotate_vector.hpp>
+#include <glm/gtx/hash.hpp>
 
 #include <iostream>
 #include <sstream>

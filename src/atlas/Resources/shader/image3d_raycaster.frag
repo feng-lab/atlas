@@ -130,7 +130,8 @@ void main()
     float ze = zeFront;
     float finalZe = -1.0;
     int curLevel = 0;
-    float zeLengthRCP = 1.0 / (zeBack - zeFront);
+    float zeLength = zeBack - zeFront;
+    float zeLengthRCP = 1.0 / zeLength;
     
     uint missBlockIDs[4] = uint[4](0,0,0,0);
     int missBlockIDsIndex = 0;
@@ -139,6 +140,10 @@ void main()
 
     vec3 rayVector = exitRayPosition - startRayPosition;
     float maxRayLength = length(rayVector);
+
+    vec3 numVoxels = abs(rayVector * image_dimensions[curLevel]);
+    float numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
+    float stepSize = zeLength / (sampling_rate * numVoxel);
 
     float currentRayLength = 0.0;
     float rayDepth = -1.0;
@@ -154,8 +159,10 @@ void main()
         float desiredVoxelSize = ze / minus_near_dist;
         while (voxel_world_sizes[curLevel] <= desiredVoxelSize && curLevel + 1 < LEVEL_COUNT) {
           ++curLevel;
+          numVoxels = abs(rayVector * image_dimensions[curLevel]);
+          numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
+          stepSize = zeLength / (sampling_rate * numVoxel);
         }
-        float stepSize = -sampling_rate * voxel_world_sizes[curLevel];
         vec3 samplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
 
         float voxel = 0;
@@ -256,7 +263,7 @@ void main()
               }
 
               ivec3 prevBlock = ivec3(samplePos * image_dimensions[nextNonEmptyLevel-1]) / image_block_size;
-              float testStepSize = -sampling_rate * voxel_world_sizes[nextNonEmptyLevel-1];
+              float testStepSize = -voxel_world_sizes[nextNonEmptyLevel-1] / sampling_rate;
               vec3 testSamplePos;
               do {
                 ze += testStepSize;

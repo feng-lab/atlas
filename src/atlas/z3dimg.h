@@ -5,11 +5,12 @@
 #include <QObject>
 #include "zimgpack.h"
 #include <QThread>
+#include "z3dblockcache.h"
+#include "z3dtexture.h"
 
 namespace nim {
 
 class Z3DShaderProgram;
-class Z3DTexture;
 
 // Z3DVolume coordinates:
 // 1. Voxel Coordinate:    [0, dim.x-1] x [0, dim.y-1] x [0, dim.z-1]
@@ -22,9 +23,8 @@ class Z3DImg : public QObject
   Q_OBJECT
 public:
   // Z3DVolume will take ownership of the img
-  Z3DImg(ZImgPack &imgPack,
-         QObject *parent = 0);
-  virtual ~Z3DImg();
+  Z3DImg(ZImgPack &imgPack, const glm::vec3& scale, QObject *parent = 0);
+  ~Z3DImg();
 
   bool is1DData() const { return m_imageDimensions[0].z == 1 && (m_imageDimensions[0].x == 1 || m_imageDimensions[0].y == 1); }
   bool is2DData() const { return m_imageDimensions[0].z == 1 && m_imageDimensions[0].x > 1 && m_imageDimensions[0].y > 1; }
@@ -46,6 +46,8 @@ public:
   // xmin, xmax, ymin, ymax, zmin, zmax
   std::vector<double> physicalBoundBox() const;
 
+  void setScale(const glm::vec3& scale);
+
 signals:
 
 protected slots:
@@ -55,19 +57,32 @@ protected:
 protected:
   const ZImgPack& m_imgPack;
 
+  glm::uvec3 m_pageTableBlockSize;
+  glm::uvec3 m_pageTableCacheNumBlocks;
+  glm::uvec3 m_imageBlockSize;
+  glm::uvec3 m_imageCacheNumBlocks;
+  int m_unmappedFlag = 0;
+  int m_mappedFlag = 1;
+  int m_emptyFlag = 2;
+
   std::vector<glm::ivec4> m_pageDirectory;
+  std::unique_ptr<Z3DTexture> m_pageDirectoryTexture;
   std::vector<glm::ivec4> m_pageTableCache;
-  size_t m_pageTableBlockSize = 32;
-  size_t m_imageBlockSize = 32;
+  std::unique_ptr<Z3DTexture> m_pageTableCacheTexture;
+  Z3DBlockCache<glm::ivec4> m_pageTableCacheManager;
+  std::vector<std::unique_ptr<Z3DTexture>> m_imageCacheTextures;
+  Z3DBlockCache<glm::ivec4> m_imageCacheManager;
+
   size_t m_numLevels;
   std::vector<glm::ivec3> m_pageDirectoryBases;
   std::vector<glm::uvec3> m_pageDirectoryDimensions;
   std::vector<glm::uvec3> m_pageTableDimensions;
   std::vector<glm::uvec3> m_imageDimensions;
   std::vector<glm::uvec3> m_levelScales;
+  std::vector<glm::uvec4> m_posToBlockIDs;
+
   std::vector<glm::vec3> m_voxelWorldDimensions;
   std::vector<float> m_voxelWorldSizes;
-  std::vector<glm::uvec4> m_posToBlockIDs;
 
 private:
   //std::unique_ptr<Z3DImgHistogramThread> m_histogramThread;
