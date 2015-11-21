@@ -151,11 +151,11 @@ void Z3DImg::setScale(const glm::vec3 &scale)
   }
 }
 
-void Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::set<uint32_t> &usedBlockIDs)
+bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::set<uint32_t> &usedBlockIDs)
 {
   int numBlocksToRead = int(m_imageCacheManager.size()) - int(usedBlockIDs.size());
   if (missingBlockIDs.empty() || numBlocksToRead <= 0)
-    return;
+    return false;
 
   std::set<glm::ivec4, Vec4Compare<int, glm::highp>> usedPageTableKeys;
   size_t level = 0;
@@ -185,6 +185,7 @@ void Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
   glm::ivec4 erasedKey;
   int numAvailablePageCacheBlock = int(m_pageTableCacheManager.size()) - int(usedPageTableKeys.size());
   assert(numAvailablePageCacheBlock >= 0);
+  std::vector<std::pair<glm::ivec4, glm::ivec3>> blocksToRead;
   for (auto it = missingBlockIDs.begin(); it != missingBlockIDs.end() && count < numBlocksToRead; ++it) {
     uint32_t blockID = *it;
     if (blockID == 0) {
@@ -222,8 +223,51 @@ void Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
       }
     }
 
+    glm::ivec3 pageDirectoryCoord = m_pageDirectoryBases[pageTableKey.x] + pageTableKey.yzw();
+    glm::ivec4& pageDirectoryContent = m_pageDirectory[pageDirectoryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
+        pageDirectoryCoord.y * m_pageDirectorySize.x + pageDirectoryCoord.x];
+    if (pageDirectoryContent.w == 0) { // page directory unmapped
+      if (numAvailablePageCacheBlock > 0) { // construct new page table block
+        glm::ivec3 pageTableBlockPos = m_pageTableCacheManager.insert(pageTableKey, erasedKey);
+        pageDirectoryContent = glm::ivec4(pageTableBlockPos, 1);
+
+        if (erasedKey.x >= 0) {
+          glm::ivec3 erasedKeyPageDirectoryCoord = m_pageDirectoryBases[erasedKey.x] + erasedKey.yzw();
+          glm::ivec4& erasedKeyPageDirectoryContent = m_pageDirectory[erasedKeyPageDirectoryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
+              erasedKeyPageDirectoryCoord.y * m_pageDirectorySize.x + erasedKeyPageDirectoryCoord.x];
+          erasedKeyPageDirectoryContent.w = 0;
+        }
+
+        glm::ivec3 pageTableCacheCoord = pageDirectoryContent.xyz() + blockKey.yzw() % glm::ivec3(m_pageTableBlockSize);
+        glm::ivec4& pageTableCacheContent = m_pageTableCache[pageTableCacheCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+            pageTableCacheCoord.y * m_pageTableCacheSize.x + pageTableCacheCoord.x];
+        pageTableCacheContent = glm::ivec4(blockPos, 1);
+        --numAvailablePageCacheBlock;
+      } else { // no space for new page table block, skip current image block
+        m_imageCacheManager.popFront();
+        continue;
+      }
+    } else { // page directory mapped
+      assert(pageDirectoryContent.w > 0);
+      glm::ivec3 pageTableCacheCoord = pageDirectoryContent.xyz() + blockKey.yzw() % glm::ivec3(m_pageTableBlockSize);
+      glm::ivec4& pageTableCacheContent = m_pageTableCache[pageTableCacheCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+          pageTableCacheCoord.y * m_pageTableCacheSize.x + pageTableCacheCoord.x];
+      pageTableCacheContent = glm::ivec4(blockPos, 1);
+      ++pageDirectoryContent.w;
+    }
+
+    blocksToRead.push_back(std::make_pair(blockKey * glm::ivec4(1, glm::ivec3(m_imageBlockSize)), blockPos));
+    ++count;
+  }
+
+  for (size_t i=0; i<blocksToRead.size(); ++i) {
+    const glm::ivec4& blockImagePos = blocksToRead[i].first;  // level, x, y, z
+    const glm::ivec3& blockCachePos = blocksToRead[i].second;
+    // actual read and upload
 
   }
+
+  return count > 0;
 }
 
 } // namespace nim

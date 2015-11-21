@@ -49,7 +49,7 @@ public:
 
   void setScale(const glm::vec3& scale);
 
-  void updateCaches(const std::set<uint32_t>& missingBlockIDs, const std::set<uint32_t>& usedBlockIDs);
+  bool updateCaches(const std::set<uint32_t>& missingBlockIDs, const std::set<uint32_t>& usedBlockIDs);
 
 signals:
 
