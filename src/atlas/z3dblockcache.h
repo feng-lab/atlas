@@ -16,9 +16,9 @@ public:
   typedef typename std::list<KeyValuePairType>::iterator ListIteratorType;
 
   Z3DBlockCache(const glm::uvec3& blockSize, const glm::uvec3& numBlocks, const KeyType& invalidKey)
-    : m_blockSize(blockSize)
+    : m_numValidItems(0)
+    , m_blockSize(blockSize)
     , m_numBlocks(numBlocks)
-    , m_numValidItems(0)
     , m_invalidKey(invalidKey)
   {
     assert(m_numBlocks.x > 0 && m_numBlocks.y > 0 && m_numBlocks.z > 0 &&
@@ -47,6 +47,29 @@ public:
     last->first = key;
     m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, last);
     m_cacheItemsMap[key] = m_cacheItemsList.begin();
+    return last->second;
+  }
+
+  void remove(const KeyType& key)
+  {
+    auto it = m_cacheItemsMap.find(key);
+    m_cacheItemsList.splice(m_cacheItemsList.end(), m_cacheItemsList, it->second);
+    it->second->first = m_invalidKey;
+    m_cacheItemsMap.erase(it);
+    if (m_numValidItems > 0) {
+      --m_numValidItems;
+    }
+  }
+
+  void popFront()
+  {
+    auto first = m_cacheItemsList.begin();
+    m_cacheItemsMap.erase(first->first);
+    first->first = m_invalidKey;
+    m_cacheItemsList.splice(m_cacheItemsList.end(), m_cacheItemsList, first);
+    if (m_numValidItems > 0) {
+      --m_numValidItems;
+    }
   }
 
   const glm::ivec3& get(const KeyType& key)
@@ -56,7 +79,7 @@ public:
     return it->second->second;
   }
 
-  bool touch(const KeyType& key)
+  void touch(const KeyType& key)
   {
     m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, m_cacheItemsMap.find(key)->second);
   }
@@ -74,11 +97,11 @@ public:
 private:
   std::list<KeyValuePairType> m_cacheItemsList;
   std::unordered_map<KeyType, ListIteratorType> m_cacheItemsMap;
-  size_t m_size;
+  size_t m_numValidItems;
 
+  size_t m_size;
   glm::uvec3 m_blockSize;
   glm::uvec3 m_numBlocks;
-  size_t m_numValidItems;
   KeyType m_invalidKey;
 };
 

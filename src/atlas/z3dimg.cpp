@@ -45,7 +45,7 @@ Z3DImg::Z3DImg(ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
     }
   }
 
-  glm::ivec3 pageDirectoryEnd(0, 0, 0);
+  m_pageDirectorySize = glm::ivec3(0, 0, 0);
   for (size_t l=0; l<m_numLevels; ++l) {
     m_levelScales.push_back(glm::uvec3(1, 1, 1));
     if (l > 0) {
@@ -85,21 +85,22 @@ Z3DImg::Z3DImg(ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
       m_pageDirectoryBases.push_back(m_pageDirectoryBases[l-1]);
       m_pageDirectoryBases[l][sortedIndex[0]] += m_pageTableDimensions[l-1][sortedIndex[0]];
     }
-    pageDirectoryEnd = glm::max(pageDirectoryEnd, m_pageDirectoryBases[l] + glm::ivec3(m_pageDirectoryDimensions[l]));
-    if (pageDirectoryEnd.x > Z3DGpuInfoInstance.max3DTextureSize() ||
-        pageDirectoryEnd.y > Z3DGpuInfoInstance.max3DTextureSize() ||
-        pageDirectoryEnd.z > Z3DGpuInfoInstance.max3DTextureSize()) {
+    m_pageDirectorySize = glm::max(m_pageDirectorySize, m_pageDirectoryBases[l] + glm::ivec3(m_pageDirectoryDimensions[l]));
+    if (m_pageDirectorySize.x > Z3DGpuInfoInstance.max3DTextureSize() ||
+        m_pageDirectorySize.y > Z3DGpuInfoInstance.max3DTextureSize() ||
+        m_pageDirectorySize.z > Z3DGpuInfoInstance.max3DTextureSize()) {
       throw ZGLException(QString("Image (%1) is not supported").arg(info.toQString()));
     }
   }
 
   // content of RGBA32I texture
-  m_pageDirectoryTexture.reset(new Z3DTexture(pageDirectoryEnd, GL_RGBA_INTEGER, (GLint)GL_RGBA32I, GL_INT));
+  m_pageDirectoryTexture.reset(new Z3DTexture(m_pageDirectorySize, GL_RGBA_INTEGER, (GLint)GL_RGBA32I, GL_INT));
   m_pageDirectory.resize(m_pageDirectoryTexture->numPixels(), glm::ivec4(0,0,0,m_unmappedFlag));
   m_pageDirectoryTexture->setData(m_pageDirectory.data());
   m_pageDirectoryTexture->uploadTexture();
 
-  m_pageTableCacheTexture.reset(new Z3DTexture(glm::ivec3(m_pageTableBlockSize * m_pageTableCacheNumBlocks), GL_RGBA_INTEGER, (GLint)GL_RGBA32I, GL_INT));
+  m_pageTableCacheSize = glm::ivec3(m_pageTableBlockSize * m_pageTableCacheNumBlocks);
+  m_pageTableCacheTexture.reset(new Z3DTexture(m_pageTableCacheSize, GL_RGBA_INTEGER, (GLint)GL_RGBA32I, GL_INT));
   m_pageTableCache.resize(m_pageTableCacheTexture->numPixels(), glm::ivec4(0,0,0,m_unmappedFlag));
   m_pageTableCacheTexture->setData(m_pageTableCache.data());
   m_pageTableCacheTexture->uploadTexture();
@@ -145,8 +146,83 @@ void Z3DImg::setScale(const glm::vec3 &scale)
   m_voxelWorldDimensions.resize(m_numLevels);
   m_voxelWorldSizes.resize(m_numLevels);
   for (size_t l=0; l<m_numLevels; ++l) {
-    m_voxelWorldDimensions[l] = scale * glm::vec3(m_levelScales);
+    m_voxelWorldDimensions[l] = scale * glm::vec3(m_levelScales[l]);
     m_voxelWorldSizes[l] = std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y), m_voxelWorldDimensions[l].z);
+  }
+}
+
+void Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::set<uint32_t> &usedBlockIDs)
+{
+  int numBlocksToRead = int(m_imageCacheManager.size()) - int(usedBlockIDs.size());
+  if (missingBlockIDs.empty() || numBlocksToRead <= 0)
+    return;
+
+  std::set<glm::ivec4, Vec4Compare<int, glm::highp>> usedPageTableKeys;
+  size_t level = 0;
+  for (uint32_t blockID : usedBlockIDs) {  // blockID must be ordered, can not use unordered_set here
+    if (blockID == 0) {
+      continue;
+    }
+    while (level+1 < m_numLevels && blockID >= m_posToBlockIDs[level+1].w) {
+      ++level;
+    }
+
+    blockID -= m_posToBlockIDs[level].w;
+    int z = blockID / m_posToBlockIDs[level].z;
+    blockID -= z * m_posToBlockIDs[level].z;
+    int y = blockID / m_posToBlockIDs[level].y;
+    blockID -= y * m_posToBlockIDs[level].y;
+    glm::ivec4 blockKey(level, blockID, y, z);
+    usedPageTableKeys.insert(blockKey / glm::ivec4(1, m_pageTableBlockSize));
+    m_imageCacheManager.touch(blockKey);
+  }
+  for (const glm::ivec4& key : usedPageTableKeys) {
+    m_pageTableCacheManager.touch(key);
+  }
+
+  int count = 0;
+  level = 0;
+  glm::ivec4 erasedKey;
+  int numAvailablePageCacheBlock = int(m_pageTableCacheManager.size()) - int(usedPageTableKeys.size());
+  assert(numAvailablePageCacheBlock >= 0);
+  for (auto it = missingBlockIDs.begin(); it != missingBlockIDs.end() && count < numBlocksToRead; ++it) {
+    uint32_t blockID = *it;
+    if (blockID == 0) {
+      continue;
+    }
+    while (level+1 < m_numLevels && blockID >= m_posToBlockIDs[level+1].w) {
+      ++level;
+    }
+
+    blockID -= m_posToBlockIDs[level].w;
+    int z = blockID / m_posToBlockIDs[level].z;
+    blockID -= z * m_posToBlockIDs[level].z;
+    int y = blockID / m_posToBlockIDs[level].y;
+    blockID -= y * m_posToBlockIDs[level].y;
+    glm::ivec4 blockKey(level, blockID, y, z);
+    glm::ivec4 pageTableKey = blockKey / glm::ivec4(1, m_pageTableBlockSize);
+
+    glm::ivec3 blockPos = m_imageCacheManager.insert(blockKey, erasedKey);
+    if (erasedKey.x >= 0) { //valid
+      glm::ivec4 erasedKeyPageTableKey = erasedKey / glm::ivec4(1, glm::ivec3(m_pageTableBlockSize));
+      glm::ivec3 pageDirectoryCoord = m_pageDirectoryBases[erasedKeyPageTableKey.x] + erasedKeyPageTableKey.yzw();
+      glm::ivec4& pageDirectoryContent = m_pageDirectory[pageDirectoryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
+          pageDirectoryCoord.y * m_pageDirectorySize.x + pageDirectoryCoord.x];
+      --pageDirectoryContent.w;
+      assert(pageDirectoryContent.w >= 0);
+
+      glm::ivec3 pageTableCacheCoord = pageDirectoryContent.xyz() + erasedKey.yzw() % glm::ivec3(m_pageTableBlockSize);
+      glm::ivec4& pageTableCacheContent = m_pageTableCache[pageTableCacheCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+          pageTableCacheCoord.y * m_pageTableCacheSize.x + pageTableCacheCoord.x];
+      pageTableCacheContent.w = 0;
+      if (pageDirectoryContent.w == 0) {
+        // unmap entire page table block
+        m_pageTableCacheManager.remove(erasedKeyPageTableKey);
+        ++numAvailablePageCacheBlock;
+      }
+    }
+
+
   }
 }
 

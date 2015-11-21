@@ -89,8 +89,7 @@ vec4 compositeXRay(in vec4 curResult, in vec4 color, in float currentRayLength, 
 }
 
 #define UNMAPPED 0
-#define MAPPED 1
-#define EMPTY 2
+#define EMPTY 40000
 
 void main()
 {
@@ -179,14 +178,14 @@ void main()
           pageDirEntry = texelFetch(page_directory, pageDirAddress);
         }
         int pagingFlag = pageDirEntry.w;
-        if (pagingFlag == MAPPED) {
+        if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
           ivec3 curPageTableAddress = pageDirEntry.xyz + pageTableCoord % page_table_block_size;
           if (curPageTableAddress != pageTableAddress) {
             pageTableAddress = curPageTableAddress;
             pageTableEntry = texelFetch(page_table_cache, pageTableAddress);
           }
           pagingFlag = pageTableEntry.w;
-          if (pagingFlag == MAPPED) {
+          if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
             ivec3 voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size;
             voxel = texelFetch(image_cache, voxelAddress).r;
 
@@ -256,7 +255,7 @@ void main()
 
                 ivec4 testPageDirEntry = texelFetch(page_directory, page_directory_bases[nextNonEmptyLevel] + testPageDirectoryCoord);
                 testPagingFlag = testPageDirEntry.w;
-                if (testPagingFlag == MAPPED) {
+                if (testPagingFlag != UNMAPPED && pagingFlag != EMPTY) {
                   testPagingFlag = texelFetch(page_table_cache, testPageDirEntry.xyz + testPageTableCoord % page_table_block_size).w;
                 }
                 ++nextNonEmptyLevel;

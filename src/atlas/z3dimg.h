@@ -7,6 +7,7 @@
 #include <QThread>
 #include "z3dblockcache.h"
 #include "z3dtexture.h"
+#include <set>
 
 namespace nim {
 
@@ -48,6 +49,8 @@ public:
 
   void setScale(const glm::vec3& scale);
 
+  void updateCaches(const std::set<uint32_t>& missingBlockIDs, const std::set<uint32_t>& usedBlockIDs);
+
 signals:
 
 protected slots:
@@ -61,13 +64,14 @@ protected:
   glm::uvec3 m_pageTableCacheNumBlocks;
   glm::uvec3 m_imageBlockSize;
   glm::uvec3 m_imageCacheNumBlocks;
-  int m_unmappedFlag = 0;
-  int m_mappedFlag = 1;
-  int m_emptyFlag = 2;
+  int m_unmappedFlag = 0;  // 1 - 32*32*32(32768) means number of blocks mapped
+  int m_emptyFlag = 40000;
 
   std::vector<glm::ivec4> m_pageDirectory;
+  glm::ivec3 m_pageDirectorySize;
   std::unique_ptr<Z3DTexture> m_pageDirectoryTexture;
   std::vector<glm::ivec4> m_pageTableCache;
+  glm::ivec3 m_pageTableCacheSize;
   std::unique_ptr<Z3DTexture> m_pageTableCacheTexture;
   Z3DBlockCache<glm::ivec4> m_pageTableCacheManager;
   std::vector<std::unique_ptr<Z3DTexture>> m_imageCacheTextures;
