@@ -49,7 +49,7 @@ void Z3DTextureGlowRenderer::render(Z3DEye eye)
   if (!m_colorTexture || !m_depthTexture)
     return;
 
-  glm::ivec2 size = glm::ivec2(m_colorTexture->dimensions());
+  glm::uvec2 size = m_colorTexture->dimension().xy();
   //glm::ivec2 size = glm::ivec2(glm::vec2(m_colorTexture->dimensions()) * 128.f / float(std::min(m_colorTexture->dimensions().x, m_colorTexture->dimensions().y)));
   m_blurXTarget.resize(size);
   m_blurYTarget.resize(size);

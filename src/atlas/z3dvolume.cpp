@@ -320,16 +320,17 @@ void Z3DVolume::generateTexture()
   }
 
   // Create texture
-  Z3DTexture* tex = new Z3DTexture(glm::ivec3(dimensions()), format, internalFormat, dataType);
+  if (dimensions().z == 1 && dimensions().y == 1) {
+    m_texture.reset(new Z3DTexture(GL_TEXTURE_1D, internalFormat, dimensions(), format, dataType));
+  } else if (dimensions().z == 1) {
+    m_texture.reset(new Z3DTexture(GL_TEXTURE_2D, internalFormat, dimensions(), format, dataType));
+  } else {
+    m_texture.reset(new Z3DTexture(GL_TEXTURE_3D, internalFormat, dimensions(), format, dataType));
+  }
+
+  m_texture->uploadImage(m_img.channelData(0));
 
   CHECK_GL_ERROR;
-  tex->setData(m_img.channelData(0));
-  tex->uploadTexture();
-
-  CHECK_GL_ERROR;
-
-  // append to internal data structure
-  m_texture.reset(tex);
 }
 
 void Z3DVolume::computeHistogramMaxValue()

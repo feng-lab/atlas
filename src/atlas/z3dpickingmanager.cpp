@@ -78,7 +78,7 @@ const void* Z3DPickingManager::objectAtWidgetPos(glm::ivec2 pos)
   pos[0] = pos[0] * qApp->devicePixelRatio();
   pos[1] = pos[1] * qApp->devicePixelRatio();
 #endif
-  glm::ivec3 texSize = m_renderTarget->attachment(GL_COLOR_ATTACHMENT0)->dimensions();
+  glm::ivec3 texSize = glm::ivec3(m_renderTarget->attachment(GL_COLOR_ATTACHMENT0)->dimension());
   pos[1] = texSize[1]- pos[1];
   return objectOfColor(m_renderTarget->colorAtPos(pos));
 }
@@ -91,7 +91,7 @@ std::vector<const void *> Z3DPickingManager::sortObjectsByDistanceToPos(glm::ive
   GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
   auto buf = std::make_unique<glm::col4[]>(tex->bypePerPixel(dataFormat, dataType) * tex->numPixels() / 4);
   tex->downloadTextureToBuffer(dataFormat, dataType, buf.get());
-  glm::ivec2 texSize = m_renderTarget->size();
+  glm::ivec2 texSize = glm::ivec2(m_renderTarget->size());
   if (radius < 0)
     radius = std::max(texSize.x, texSize.y);
   for(int y = std::max(0, pos.y-radius); y <= std::min(texSize.y-1, pos.y+radius); ++y) {

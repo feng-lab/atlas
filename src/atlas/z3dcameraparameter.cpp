@@ -132,7 +132,7 @@ void Z3DCameraParameter::flipViewDirection()
   setEye(referenceCenter - viewVector);
 }
 
-void Z3DCameraParameter::viewportChanged(const glm::ivec2 &viewport)
+void Z3DCameraParameter::viewportChanged(const glm::uvec2 &viewport)
 {
   m_value.setWindowAspectRatio(static_cast<float>(viewport.x) / viewport.y);
   emit windowsAspectRatioChanged(static_cast<float>(viewport.x) / viewport.y);

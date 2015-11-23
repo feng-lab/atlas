@@ -1,6 +1,6 @@
-uniform sampler3D page_directory;
+uniform isampler3D page_directory;
 uniform ivec3 page_directory_bases[LEVEL_COUNT];
-uniform sampler3D page_table_cache;
+uniform isampler3D page_table_cache;
 uniform ivec3 page_table_block_size = ivec3(32, 32, 32);
 uniform sampler3D image_cache;
 uniform vec3 image_dimensions[LEVEL_COUNT];

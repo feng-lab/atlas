@@ -144,9 +144,9 @@ public:
   void updateAll();
 
   // for high dpi support like retina
-  glm::ivec2 physicalSize() { return glm::ivec2(width() * devicePixelRatio(),
+  glm::uvec2 physicalSize() { return glm::uvec2(width() * devicePixelRatio(),
                                                 height() * devicePixelRatio()); }
-  glm::ivec2 logicalSize() { return glm::ivec2(width(), height()); }
+  glm::uvec2 logicalSize() { return glm::uvec2(width(), height()); }
 
   virtual void enterEvent(QEvent* e) override;
   virtual void leaveEvent(QEvent* e) override;
@@ -171,7 +171,7 @@ public:
 
 signals:
   // w and h is physical size not logical size, opengl works in physical pixel
-  void canvasSizeChanged(int w, int h);
+  void canvasSizeChanged(size_t w, size_t h);
 
 protected slots:
   void rotateX();

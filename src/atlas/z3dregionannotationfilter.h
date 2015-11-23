@@ -30,8 +30,8 @@ public:
   virtual bool hasOpaque(Z3DEye) const override { return true; }
   virtual bool hasTransparent(Z3DEye) const override { return true; }
 
-  virtual void setViewport(glm::ivec2 viewport) override;
-  virtual void setViewport(glm::ivec4 viewport) override;
+  virtual void setViewport(glm::uvec2 viewport) override;
+  virtual void setViewport(glm::uvec4 viewport) override;
   virtual void setShaderHookType(Z3DRendererBase::ShaderHookType t) override;
   virtual void setShaderHookParaDDPDepthBlenderTexture(Z3DTexture *t) override;
   virtual void setShaderHookParaDDPFrontBlenderTexture(Z3DTexture *t) override;

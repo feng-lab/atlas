@@ -7,176 +7,91 @@
 
 namespace nim {
 
-Z3DTexture::Z3DTexture(const glm::ivec3 &dimensions, GLenum dataFormat, GLint internalformat, GLenum dataType)
-  : m_dimensions(dimensions)
+Z3DTexture::Z3DTexture(GLenum textureTarget, GLint internalFormat, const glm::uvec3 &dimension,
+                       GLenum dataFormat, GLenum dataType)
+  : m_textureTarget(textureTarget)
+  , m_dimension(dimension)
+  , m_internalFormat(internalFormat)
   , m_dataFormat(dataFormat)
-  , m_internalFormat(internalformat)
   , m_dataType(dataType)
-  , m_minFilter((GLint)GL_LINEAR)
-  , m_magFilter((GLint)GL_LINEAR)
-  , m_wrap((GLint)GL_CLAMP_TO_EDGE)
-  , m_id(0)
-  , m_data(NULL)
 {
-  deriveTextureTarget();
-  init();
-}
-
-Z3DTexture::Z3DTexture(const glm::ivec3 &dimensions, GLenum dataFormat, GLint internalformat, GLenum dataType,
-                       GLint minFilter, GLint magFilter, GLint wrap)
-  : m_dimensions(dimensions)
-  , m_dataFormat(dataFormat)
-  , m_internalFormat(internalformat)
-  , m_dataType(dataType)
-  , m_minFilter(minFilter)
-  , m_magFilter(magFilter)
-  , m_wrap(wrap)
-  , m_id(0)
-  , m_data(NULL)
-{
-  deriveTextureTarget();
-  init();
-}
-
-Z3DTexture::Z3DTexture(const glm::ivec3 &dimensions, GLenum textureTarget, GLenum dataFormat, GLint internalformat,
-                       GLenum dataType)
-  : m_dimensions(dimensions)
-  , m_textureTarget(textureTarget)
-  , m_dataFormat(dataFormat)
-  , m_internalFormat(internalformat)
-  , m_dataType(dataType)
-  , m_minFilter((GLint)GL_LINEAR)
-  , m_magFilter((GLint)GL_LINEAR)
-  , m_wrap((GLint)GL_CLAMP_TO_EDGE)
-  , m_id(0)
-  , m_data(NULL)
-{
-  init();
-}
-
-Z3DTexture::Z3DTexture(const glm::ivec3 &dimensions, GLenum textureTarget, GLenum dataFormat, GLint internalformat,
-                       GLenum dataType, GLint minFilter, GLint magFilter, GLint wrap)
-  : m_dimensions(dimensions)
-  , m_textureTarget(textureTarget)
-  , m_dataFormat(dataFormat)
-  , m_internalFormat(internalformat)
-  , m_dataType(dataType)
-  , m_minFilter(minFilter)
-  , m_magFilter(magFilter)
-  , m_wrap(wrap)
-  , m_id(0)
-  , m_data(NULL)
-{
-  init();
+  glGenTextures(1, &m_id);
+  CHECK_GL_ERROR;
 }
 
 Z3DTexture::~Z3DTexture()
 {
-  if (m_id)
+  if (m_id) {
     glDeleteTextures(1, &m_id);
+  }
 }
 
-void Z3DTexture::setFilter(GLint minFilter, GLint magFilter)
-{
-  bool generateMipmap = false;
-  if ((m_minFilter == GL_LINEAR || m_minFilter == GL_NEAREST) &&
-      (minFilter != GL_LINEAR && minFilter != GL_NEAREST))
-    generateMipmap = true;
-  m_minFilter = minFilter;
-  m_magFilter = magFilter;
-  bind();
-  if (generateMipmap)
-    glGenerateMipmap(m_textureTarget);
-  applyFilter();
-}
-
-void Z3DTexture::setMinFilter(GLint minFilter)
-{
-  bool generateMipmap = false;
-  if ((m_minFilter == GL_LINEAR || m_minFilter == GL_NEAREST) &&
-      (minFilter != GL_LINEAR && minFilter != GL_NEAREST))
-    generateMipmap = true;
-  m_minFilter = minFilter;
-  bind();
-  if (generateMipmap)
-    glGenerateMipmap(m_textureTarget);
-  applyFilter();
-}
-
-void Z3DTexture::setMagFilter(GLint magFilter)
-{
-  m_magFilter = magFilter;
-  bind();
-  applyFilter();
-}
-
-void Z3DTexture::setWrap(GLint wrap)
-{
-  m_wrap = wrap;
-  bind();
-  applyWrap();
-}
-
-void Z3DTexture::uploadTexture()
+void Z3DTexture::uploadImage(const GLvoid *data)
 {
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
   bind();
 
-  if (is1DTexture())
-    glTexImage1D(m_textureTarget, 0, m_internalFormat,
-                 m_dimensions.x, 0,
-                 m_dataFormat, m_dataType, m_data);
-  else if (is2DTexture())
-    glTexImage2D(m_textureTarget, 0, m_internalFormat,
-                 m_dimensions.x, m_dimensions.y, 0,
-                 m_dataFormat, m_dataType, m_data);
-  else if (is3DTexture())
+  if (is3DTexture()) {
     glTexImage3D(m_textureTarget, 0, m_internalFormat,
-                 m_dimensions.x, m_dimensions.y, m_dimensions.z, 0,
-                 m_dataFormat, m_dataType, m_data);
-
-  //if (useMipmap())
-    //glGenerateMipmap(m_textureTarget);
+                 m_dimension.x, m_dimension.y, m_dimension.z, 0,
+                 m_dataFormat, m_dataType, data);
+  } else if (is2DTexture()) {
+    glTexImage2D(m_textureTarget, 0, m_internalFormat,
+                 m_dimension.x, m_dimension.y, 0,
+                 m_dataFormat, m_dataType, data);
+  } else if (is1DTexture()) {
+    glTexImage1D(m_textureTarget, 0, m_internalFormat,
+                 m_dimension.x, 0,
+                 m_dataFormat, m_dataType, data);
+  }
 
   CHECK_GL_ERROR;
 }
 
-bool Z3DTexture::is1DTexture() const
+void Z3DTexture::uploadSubImage(const glm::uvec3 &offset, const glm::uvec3 &size, const GLvoid *data)
 {
-  return m_textureTarget == GL_TEXTURE_1D ||
-      m_textureTarget == GL_PROXY_TEXTURE_1D;
-}
+  assert(data);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-bool Z3DTexture::is2DTexture() const
-{
-  GLenum all_2dtexture_targets[] = {
-    GL_TEXTURE_2D,
-    GL_TEXTURE_RECTANGLE,
-    GL_PROXY_TEXTURE_2D,
-    GL_TEXTURE_1D_ARRAY,
-    GL_PROXY_TEXTURE_1D_ARRAY,
-    GL_PROXY_TEXTURE_RECTANGLE,
-    GL_TEXTURE_CUBE_MAP_POSITIVE_X,
-    GL_TEXTURE_CUBE_MAP_NEGATIVE_X,
-    GL_TEXTURE_CUBE_MAP_POSITIVE_Y,
-    GL_TEXTURE_CUBE_MAP_NEGATIVE_Y,
-    GL_TEXTURE_CUBE_MAP_POSITIVE_Z,
-    GL_TEXTURE_CUBE_MAP_NEGATIVE_Z,
-    GL_PROXY_TEXTURE_CUBE_MAP};
-  for (int i=0; i<13; ++i) {
-    if (m_textureTarget == all_2dtexture_targets[i])
-      return true;
+  bind();
+
+  if (is3DTexture()) {
+    glTexSubImage3D(m_textureTarget, 0, offset.x, offset.y, offset.z, size.x, size.y, size.z,
+                    m_dataFormat, m_dataType, data);
+  } else if (is2DTexture()) {
+    glTexSubImage2D(m_textureTarget, 0, offset.x, offset.y, size.x, size.y,
+                    m_dataFormat, m_dataType, data);
+  } else if (is1DTexture()) {
+    glTexSubImage1D(m_textureTarget, 0, offset.x, size.x,
+                    m_dataFormat, m_dataType, data);
   }
-  return false;
+
+  CHECK_GL_ERROR;
 }
 
-bool Z3DTexture::is3DTexture() const
+void Z3DTexture::setFilter(GLint minFilter, GLint magFilter)
 {
-  return m_textureTarget == GL_TEXTURE_3D ||
-      m_textureTarget == GL_PROXY_TEXTURE_3D ||
-      m_textureTarget == GL_TEXTURE_2D_ARRAY ||
-      m_textureTarget == GL_PROXY_TEXTURE_2D_ARRAY;
+  bind();
+  glTexParameteri(m_textureTarget, GL_TEXTURE_MAG_FILTER, magFilter);
+  glTexParameteri(m_textureTarget, GL_TEXTURE_MIN_FILTER, minFilter);
+  CHECK_GL_ERROR;
+}
+
+void Z3DTexture::setWrap(GLint wrap)
+{
+  bind();
+  glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_S, wrap);
+  glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_T, wrap);
+  glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_R, wrap);
+  CHECK_GL_ERROR;
+}
+
+void Z3DTexture::generateMipmap()
+{
+  bind();
+  glGenerateMipmap(m_textureTarget);
+  CHECK_GL_ERROR;
 }
 
 void Z3DTexture::downloadTextureToBuffer(GLenum dataFormat, GLenum dataType, GLvoid *buffer) const
@@ -424,50 +339,42 @@ void Z3DTexture::saveAsDepthImage(const QString &filename) const
   }
 }
 
-void Z3DTexture::deriveTextureTarget()
+bool Z3DTexture::is1DTexture() const
 {
-  if (m_dimensions.z == 1) {
-    if (m_dimensions.y == 1  || m_dimensions.x == 1)
-      m_textureTarget = GL_TEXTURE_1D;
-    else
-      m_textureTarget = GL_TEXTURE_2D;
-  } else {
-    m_textureTarget = GL_TEXTURE_3D;
-  }
+  return m_textureTarget == GL_TEXTURE_1D ||
+      m_textureTarget == GL_PROXY_TEXTURE_1D;
 }
 
-void Z3DTexture::applyFilter()
+bool Z3DTexture::is2DTexture() const
 {
-  glTexParameteri(m_textureTarget, GL_TEXTURE_MAG_FILTER, m_magFilter);
-  glTexParameteri(m_textureTarget, GL_TEXTURE_MIN_FILTER, m_minFilter);
+  std::vector<GLenum> all_2dtexture_targets = {
+    GL_TEXTURE_2D,
+    GL_TEXTURE_1D_ARRAY,
+    GL_TEXTURE_RECTANGLE,
+    GL_PROXY_TEXTURE_2D,
+    GL_PROXY_TEXTURE_1D_ARRAY,
+    GL_PROXY_TEXTURE_RECTANGLE,
+    GL_TEXTURE_CUBE_MAP_POSITIVE_X,
+    GL_TEXTURE_CUBE_MAP_NEGATIVE_X,
+    GL_TEXTURE_CUBE_MAP_POSITIVE_Y,
+    GL_TEXTURE_CUBE_MAP_NEGATIVE_Y,
+    GL_TEXTURE_CUBE_MAP_POSITIVE_Z,
+    GL_TEXTURE_CUBE_MAP_NEGATIVE_Z,
+    GL_PROXY_TEXTURE_CUBE_MAP
+  };
+
+  return std::find(all_2dtexture_targets.begin(), all_2dtexture_targets.end(), m_textureTarget)
+      != all_2dtexture_targets.end();
 }
 
-void Z3DTexture::applyWrap()
+bool Z3DTexture::is3DTexture() const
 {
-  glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_S, m_wrap);
-  if (m_textureTarget == GL_TEXTURE_2D || m_textureTarget == GL_TEXTURE_3D ||
-      m_textureTarget == GL_TEXTURE_RECTANGLE)
-    glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_T, m_wrap);
-  if (m_textureTarget == GL_TEXTURE_3D)
-    glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_R, m_wrap);
-}
-
-bool Z3DTexture::useMipmap() const
-{
-  if (m_minFilter == GL_LINEAR || m_minFilter == GL_NEAREST)
-    return false;
-  else
-    return true;
-}
-
-void Z3DTexture::init()
-{
-  glGenTextures(1, &m_id);
-
-  bind();
-  applyFilter();
-  applyWrap();
-  CHECK_GL_ERROR;
+  return m_textureTarget == GL_TEXTURE_3D ||
+      m_textureTarget == GL_PROXY_TEXTURE_3D ||
+      m_textureTarget == GL_TEXTURE_2D_ARRAY ||
+      m_textureTarget == GL_PROXY_TEXTURE_2D_ARRAY ||
+      m_textureTarget == GL_TEXTURE_CUBE_MAP_ARRAY ||
+      m_textureTarget == GL_PROXY_TEXTURE_CUBE_MAP_ARRAY;
 }
 
 Z3DTextureUnitManager::Z3DTextureUnitManager()

@@ -25,8 +25,8 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   , m_stayOnTop("Stay On Top", false)
   , m_numParas(0)
   , m_interactionDownsample("Interaction Downsample", 1, 1, 16)
-  , m_entryTarget(glm::ivec2(32,32))
-  , m_exitTarget(glm::ivec2(32,32))
+  , m_entryTarget(glm::uvec2(32,32))
+  , m_exitTarget(glm::uvec2(32,32))
   , m_outport("Image", true, InvalidMonoViewResult)
   , m_leftEyeOutport("LeftEyeImage", true, InvalidLeftEyeResult)
   , m_rightEyeOutport("RightEyeImage", true, InvalidRightEyeResult)
@@ -70,25 +70,25 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   addParameter(m_interactionDownsample);
 
   Z3DTexture* g_TexId[2];
-  g_TexId[0] = new Z3DTexture(glm::ivec3(32,32,1),
-                              GL_RGBA, (GLint)GL_RGBA32F, GL_FLOAT,
-                              (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
-  g_TexId[0]->uploadTexture();
-  g_TexId[1] = new Z3DTexture(glm::ivec3(32,32,1),
-                              GL_RGBA, (GLint)GL_RGBA32F, GL_FLOAT,
-                              (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
-  g_TexId[1]->uploadTexture();
+  g_TexId[0] = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RGBA32F, glm::uvec3(32,32,1),
+                              GL_RGBA, GL_FLOAT);
+  g_TexId[0]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  g_TexId[0]->uploadImage();
+  g_TexId[1] = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RGBA32F, glm::uvec3(32,32,1),
+                              GL_RGBA, GL_FLOAT);
+  g_TexId[1]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  g_TexId[1]->uploadImage();
   m_entryTarget.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0);
   m_entryTarget.attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1);
   m_entryTarget.isFBOComplete();
-  g_TexId[0] = new Z3DTexture(glm::ivec3(32,32,1),
-                              GL_RGBA, (GLint)GL_RGBA32F, GL_FLOAT,
-                              (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
-  g_TexId[0]->uploadTexture();
-  g_TexId[1] = new Z3DTexture(glm::ivec3(32,32,1),
-                              GL_RGBA, (GLint)GL_RGBA32F, GL_FLOAT,
-                              (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
-  g_TexId[1]->uploadTexture();
+  g_TexId[0] = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RGBA32F, glm::uvec3(32,32,1),
+                              GL_RGBA, GL_FLOAT);
+  g_TexId[0]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  g_TexId[0]->uploadImage();
+  g_TexId[1] = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RGBA32F, glm::uvec3(32,32,1),
+                              GL_RGBA, GL_FLOAT);
+  g_TexId[1]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  g_TexId[1]->uploadImage();
   m_exitTarget.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0);
   m_exitTarget.attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1);
   m_exitTarget.isFBOComplete();
@@ -282,27 +282,27 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
 
 void Z3DImgFilter::enterInteractionMode()
 {
-  glm::ivec2 expectedSize = m_outport.expectedSize();
+  glm::uvec2 expectedSize = m_outport.expectedSize();
   if (m_interactionDownsample.get() != 1) {
     const std::vector<Z3DOutputPortBase*> outports = outputPorts();
     for(size_t i=0; i<outports.size(); ++i) {
       Z3DRenderOutputPort* rp = dynamic_cast<Z3DRenderOutputPort*>(outports[i]);
       if (rp)
-        rp->resize(expectedSize / m_interactionDownsample.get());
+        rp->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
     }
 
     for (size_t i=0; i<m_privateRenderPorts.size(); ++i) {
-      m_privateRenderPorts[i]->resize(expectedSize / m_interactionDownsample.get());
+      m_privateRenderPorts[i]->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
     }
     for (size_t i=0; i<m_privateRenderTargets.size(); ++i) {
-      m_privateRenderTargets[i]->resize(expectedSize / m_interactionDownsample.get());
+      m_privateRenderTargets[i]->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
     }
 
     const std::vector<Z3DInputPortBase*> inports = inputPorts();
     for(size_t i=0; i<inports.size(); ++i) {
       Z3DRenderInputPort* rp = dynamic_cast<Z3DRenderInputPort*>(inports[i]);
       if (rp)
-        rp->setExpectedSize(expectedSize / m_interactionDownsample.get());
+        rp->setExpectedSize(expectedSize / uint32_t(m_interactionDownsample.get()));
     }
     emit requestUpstreamSizeChange(this);
 
@@ -314,7 +314,7 @@ void Z3DImgFilter::enterInteractionMode()
 
 void Z3DImgFilter::exitInteractionMode()
 {
-  glm::ivec2 expectedSize = m_outport.expectedSize();
+  glm::uvec2 expectedSize = m_outport.expectedSize();
   if (m_interactionDownsample.get() != 1) {
     const std::vector<Z3DOutputPortBase*> outports = outputPorts();
     for(size_t i=0; i<outports.size(); ++i) {
@@ -983,7 +983,7 @@ glm::vec3 Z3DImgFilter::getFirstHit3DPosition(int x, int y, int width, int heigh
       (m_outport.hasValidData() || m_rightEyeOutport.hasValidData())) {
     glm::ivec2 pos2D = glm::ivec2(x, height - y);
     Z3DRenderOutputPort &port = m_outport.hasValidData() ? m_outport : m_rightEyeOutport;
-    if (port.size() == port.expectedSize() / m_interactionDownsample.get()) {
+    if (port.size() == port.expectedSize() / uint32_t(m_interactionDownsample.get())) {
       pos2D /= m_interactionDownsample.get();
       width /= m_interactionDownsample.get();
       height /= m_interactionDownsample.get();
@@ -1008,7 +1008,7 @@ glm::vec3 Z3DImgFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, int 
       (m_outport.hasValidData() || m_rightEyeOutport.hasValidData())) {
     glm::ivec2 pos2D = glm::ivec2(x, height - y);
     Z3DRenderOutputPort &port = m_outport.hasValidData() ? m_outport : m_rightEyeOutport;
-    if (port.size() == port.expectedSize() / m_interactionDownsample.get()) {
+    if (port.size() == port.expectedSize() / uint32_t(m_interactionDownsample.get())) {
       pos2D /= m_interactionDownsample.get();
       width /= m_interactionDownsample.get();
       height /= m_interactionDownsample.get();

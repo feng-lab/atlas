@@ -92,7 +92,7 @@ void Z3DRegionAnnotationFilter::renderTransparent(Z3DEye eye)
   renderBoundBox(eye);
 }
 
-void Z3DRegionAnnotationFilter::setViewport(glm::ivec2 viewport)
+void Z3DRegionAnnotationFilter::setViewport(glm::uvec2 viewport)
 {
   Z3DGeometryFilter::setViewport(viewport);
   for (auto it = m_idToMeshFilters.begin(); it != m_idToMeshFilters.end(); ++it) {
@@ -100,7 +100,7 @@ void Z3DRegionAnnotationFilter::setViewport(glm::ivec2 viewport)
   }
 }
 
-void Z3DRegionAnnotationFilter::setViewport(glm::ivec4 viewport)
+void Z3DRegionAnnotationFilter::setViewport(glm::uvec4 viewport)
 {
   Z3DGeometryFilter::setViewport(viewport);
   for (auto it = m_idToMeshFilters.begin(); it != m_idToMeshFilters.end(); ++it) {

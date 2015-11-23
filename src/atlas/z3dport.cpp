@@ -137,9 +137,9 @@ void Z3DOutputPortBase::disconnectAll()
   }
 }
 
-glm::ivec2 Z3DOutputPortBase::expectedSize() const
+glm::uvec2 Z3DOutputPortBase::expectedSize() const
 {
-  glm::ivec2 result(-1, -1);
+  glm::uvec2 result(0, 0);
   for (size_t j=0; j<m_connectedInputPorts.size(); ++j) {
     result = glm::max(result, m_connectedInputPorts[j]->expectedSize());
   }

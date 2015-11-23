@@ -253,7 +253,7 @@ void Z3DCompositor::process(Z3DEye eye)
     if (!currentInport.isReady()) {  // no volume, only geometrys to render
       if (numNormalFilters == 0 || numOnTopFilters == 0) {
         if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) { // render to tempport (twice larger than outport) then copy to outport
-          m_tempPort.resize(currentOutport.size() * 2);
+          m_tempPort.resize(currentOutport.size() * uint32_t(2));
         } else {  // render to tempport then copy to outport
           m_tempPort.resize(currentOutport.size());
         }
@@ -294,8 +294,8 @@ void Z3DCompositor::process(Z3DEye eye)
         CHECK_GL_ERROR;
       } else {
         if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
-          m_tempPort.resize(currentOutport.size() * 2);
-          m_tempPort2.resize(currentOutport.size() * 2);
+          m_tempPort.resize(currentOutport.size() * uint32_t(2));
+          m_tempPort2.resize(currentOutport.size() * uint32_t(2));
         } else {
           m_tempPort.resize(currentOutport.size());
           m_tempPort2.resize(currentOutport.size());
@@ -373,7 +373,7 @@ void Z3DCompositor::process(Z3DEye eye)
         CHECK_GL_ERROR;
       } else if (numNormalFilters == 0 || numOnTopFilters == 0) {  // render geometries into one temp port then blend with volume
         if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
-          m_tempPort.resize(currentOutport.size() * 2);
+          m_tempPort.resize(currentOutport.size() * uint32_t(2));
         } else {
           m_tempPort.resize(currentOutport.size());
         }
@@ -428,8 +428,8 @@ void Z3DCompositor::process(Z3DEye eye)
       } else { // render normal geometries into tempport, then blend inport and tempport into tempport2, then render on top geometries into tempport, then
         // blend temport and temport2 into outport
         if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
-          m_tempPort.resize(currentOutport.size() * 2);
-          m_tempPort2.resize(currentOutport.size() * 2);
+          m_tempPort.resize(currentOutport.size() * uint32_t(2));
+          m_tempPort2.resize(currentOutport.size() * uint32_t(2));
         } else {
           m_tempPort.resize(currentOutport.size());
           m_tempPort2.resize(currentOutport.size());
@@ -500,7 +500,7 @@ void Z3DCompositor::process(Z3DEye eye)
     numNormalFilters = normalOpaqueFilters.size() + normalTransparentFilters.size();
     if (numNormalFilters == 0 || numOnTopFilters == 0) {
       if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) { // render to tempport (twice larger than outport) then copy to outport
-        m_tempPort.resize(currentOutport.size() * 2);
+        m_tempPort.resize(currentOutport.size() * uint32_t(2));
       } else {  // render to tempport then copy to outport
         m_tempPort.resize(currentOutport.size());
       }
@@ -541,8 +541,8 @@ void Z3DCompositor::process(Z3DEye eye)
       CHECK_GL_ERROR;
     } else {
       if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
-        m_tempPort.resize(currentOutport.size() * 2);
-        m_tempPort2.resize(currentOutport.size() * 2);
+        m_tempPort.resize(currentOutport.size() * uint32_t(2));
+        m_tempPort2.resize(currentOutport.size() * uint32_t(2));
       } else {
         m_tempPort.resize(currentOutport.size());
         m_tempPort2.resize(currentOutport.size());
@@ -1015,7 +1015,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*> &f
   CHECK_GL_ERROR;
 }
 
-bool Z3DCompositor::createDDPRenderTarget(glm::ivec2 size)
+bool Z3DCompositor::createDDPRenderTarget(glm::uvec2 size)
 {
   m_ddpRT.reset(new Z3DRenderTarget(size));
   Z3DTexture* g_dualDepthTexId[2];
@@ -1055,31 +1055,31 @@ bool Z3DCompositor::createDDPRenderTarget(glm::ivec2 size)
 #else
   for (int i = 0; i < 2; i++)
   {
-    g_dualDepthTexId[i] = new Z3DTexture(glm::ivec3(size, 1),
-                                         GL_RG, (GLint)GL_RG32F, GL_FLOAT,
-                                         (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
-    g_dualDepthTexId[i]->uploadTexture();
+    g_dualDepthTexId[i] = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RG32F, glm::uvec3(size, 1),
+                                         GL_RG, GL_FLOAT);
+    g_dualDepthTexId[i]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+    g_dualDepthTexId[i]->uploadImage();
 
-    g_dualFrontBlenderTexId[i] = new Z3DTexture(glm::ivec3(size, 1),
-                                                GL_RGBA, (GLint)GL_RGBA16, GL_UNSIGNED_SHORT,
-                                                (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
-    g_dualFrontBlenderTexId[i]->uploadTexture();
+    g_dualFrontBlenderTexId[i] = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RGBA16, glm::uvec3(size, 1),
+                                                GL_RGBA, GL_UNSIGNED_SHORT);
+    g_dualFrontBlenderTexId[i]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+    g_dualFrontBlenderTexId[i]->uploadImage();
 
-    g_dualBackTempTexId[i] = new Z3DTexture(glm::ivec3(size, 1),
-                                            GL_RGBA, (GLint)GL_RGBA16, GL_UNSIGNED_SHORT,
-                                            (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
-    g_dualBackTempTexId[i]->uploadTexture();
+    g_dualBackTempTexId[i] = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RGBA16, glm::uvec3(size, 1),
+                                            GL_RGBA, GL_UNSIGNED_SHORT);
+    g_dualBackTempTexId[i]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+    g_dualBackTempTexId[i]->uploadImage();
   }
 
-  g_dualBackBlenderTexId = new Z3DTexture(glm::ivec3(size, 1),
-                                          GL_RGBA, (GLint)GL_RGBA16, GL_UNSIGNED_SHORT,
-                                          (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
-  g_dualBackBlenderTexId->uploadTexture();
+  g_dualBackBlenderTexId = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RGBA16, glm::uvec3(size, 1),
+                                          GL_RGBA, GL_UNSIGNED_SHORT);
+  g_dualBackBlenderTexId->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  g_dualBackBlenderTexId->uploadImage();
 
-  g_depthTex = new Z3DTexture(glm::ivec3(size, 1),
-                              GL_RED, (GLint)GL_R32F, GL_FLOAT,
-                              (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
-  g_depthTex->uploadTexture();
+  g_depthTex = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_R32F, glm::uvec3(size, 1),
+                              GL_RED, GL_FLOAT);
+  g_depthTex->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  g_depthTex->uploadImage();
 #endif
 
   int j = 0;
@@ -1184,7 +1184,7 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*> &fi
   CHECK_GL_ERROR;
 }
 
-bool Z3DCompositor::createWARenderTarget(glm::ivec2 size)
+bool Z3DCompositor::createWARenderTarget(glm::uvec2 size)
 {
   m_waRT.reset(new Z3DRenderTarget(size));
   Z3DTexture* g_accumulationTexId[2];
@@ -1199,14 +1199,14 @@ bool Z3DCompositor::createWARenderTarget(glm::ivec2 size)
                                           (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
   g_accumulationTexId[1]->uploadTexture();
 #else
-  g_accumulationTexId[0] = new Z3DTexture(glm::ivec3(size, 1),
-                                          GL_RGBA, (GLint)GL_RGBA32F, GL_FLOAT,
-                                          (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
-  g_accumulationTexId[0]->uploadTexture();
-  g_accumulationTexId[1] = new Z3DTexture(glm::ivec3(size, 1),
-                                          GL_RG, (GLint)GL_RG32F, GL_FLOAT,
-                                          (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
-  g_accumulationTexId[1]->uploadTexture();
+  g_accumulationTexId[0] = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RGBA32F, glm::uvec3(size, 1),
+                                          GL_RGBA, GL_FLOAT);
+  g_accumulationTexId[0]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  g_accumulationTexId[0]->uploadImage();
+  g_accumulationTexId[1] = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RG32F, glm::uvec3(size, 1),
+                                          GL_RG, GL_FLOAT);
+  g_accumulationTexId[1]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  g_accumulationTexId[1]->uploadImage();
 #endif
 
   m_waRT->attachTextureToFBO(g_accumulationTexId[0], GL_COLOR_ATTACHMENT0);
@@ -1277,8 +1277,8 @@ void Z3DCompositor::renderAxis(Z3DEye eye)
   m_rendererBase.coordTransformPara().blockSignals(true);
   m_rendererBase.coordTransformPara().set(glm::mat4(globalCamera().rotateMatrix(eye)));
 
-  glm::ivec4 viewport = m_rendererBase.viewport();
-  int size = std::min(viewport.z, viewport.w) * m_axisRegionRatio.get();
+  glm::uvec4 viewport = m_rendererBase.viewport();
+  GLsizei size = std::min(viewport.z, viewport.w) * m_axisRegionRatio.get();
   glViewport(viewport.x, viewport.y, size, size);
   glScissor(viewport.x, viewport.y, size, size);
   glEnable(GL_SCISSOR_TEST);

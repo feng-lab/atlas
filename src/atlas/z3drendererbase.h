@@ -52,9 +52,9 @@ public:
   inline ZStringIntOptionParameter& geometriesMultisampleModePara() { return m_globalParas.geometriesMultisampleMode; }
   inline ZStringIntOptionParameter& transparencyMethodPara() { return m_globalParas.transparencyMethod; }
 
-  inline void setViewport(glm::ivec4 viewport) { if (m_viewport != viewport) {m_viewport = viewport; makeViewportMatrix();} }
-  inline void setViewport(glm::ivec2 viewport) { if (m_viewport.zw() != viewport) {m_viewport = glm::ivec4(0,0,viewport); makeViewportMatrix();} }
-  inline glm::ivec4 viewport() const { return m_viewport; }
+  inline void setViewport(glm::uvec4 viewport) { if (m_viewport != viewport) {m_viewport = viewport; makeViewportMatrix();} }
+  inline void setViewport(glm::uvec2 viewport) { if (m_viewport.zw() != viewport) {m_viewport = glm::ivec4(0,0,viewport); makeViewportMatrix();} }
+  inline glm::uvec4 viewport() const { return m_viewport; }
 
   // need valid camera and viewport
   void setGlobalShaderParameters(Z3DShaderProgram &shader, Z3DEye eye);
@@ -192,7 +192,7 @@ protected:
 
   bool m_hasCustomCamera;
   Z3DCamera m_camera;
-  glm::ivec4 m_viewport;
+  glm::uvec4 m_viewport;
   glm::mat4 m_viewportMatrix;
   glm::mat4 m_inverseViewportMatrix;
 

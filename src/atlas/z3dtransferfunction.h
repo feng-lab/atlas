@@ -20,7 +20,7 @@ public:
 
   Z3DTransferFunction(double min = 0.0, double max = 1.0, const glm::col4 &minColor = glm::col4(0,0,0,0),
                       const glm::col4 &maxColor = glm::col4(255,255,255,255),
-                      int width = 256,
+                      uint32_t width = 256,
                       QObject *parent = 0);
 
 
@@ -39,12 +39,12 @@ public:
 
   QString samplerType() const;
 
-  inline glm::ivec3 textureDimensions() const { return m_dimensions; }
+  inline glm::uvec3 textureDimensions() const { return m_dimensions; }
 
   // Returns the texture of the transfer function.
   Z3DTexture* texture();
 
-  void resize(int width);
+  void resize(uint32_t width);
 
   void updateTexture();
 
@@ -57,13 +57,13 @@ signals:
 protected:
   void createTexture();
 
-  glm::ivec3 m_dimensions;
+  glm::uvec3 m_dimensions;
   GLenum m_textureFormat;
   GLenum m_textureDataType;
 
 private:
   // Adapts the given width and height of transfer function to graphics board capabilities.
-  void fitDimensions(int& width, int& height, int& depth) const;
+  void fitDimensions(uint32_t& width, uint32_t& height, uint32_t& depth) const;
 };
 
 class Z3DTransferFunctionParameter : public ZSingleValueParameter<Z3DTransferFunction>

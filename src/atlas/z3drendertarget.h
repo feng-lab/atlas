@@ -14,9 +14,9 @@ class Z3DRenderTarget
 public:
   // create one color and one depth attachment
   Z3DRenderTarget(GLint internalColorFormat = (GLint)GL_RGBA16, GLint internalDepthFormat = (GLint)GL_DEPTH_COMPONENT24,
-                  glm::ivec2 size = glm::ivec2(128,128), bool multisample = false, int sample = 4);
+                  glm::uvec2 size = glm::uvec2(32,32), bool multisample = false, int sample = 4);
   // empty fbo with no attachment
-  Z3DRenderTarget(glm::ivec2 size);
+  Z3DRenderTarget(glm::uvec2 size);
   virtual ~Z3DRenderTarget();
 
   void createColorAttachment(GLint internalColorFormat = (GLint)GL_RGBA16, GLenum attachment = GL_COLOR_ATTACHMENT0);
@@ -48,8 +48,8 @@ public:
   glm::col4 colorAtPos(glm::ivec2 pos);
   GLfloat depthAtPos(glm::ivec2 pos);
 
-  glm::ivec2 size() const;
-  bool resize(glm::ivec2 newsize);
+  glm::uvec2 size() const { return m_size; }
+  bool resize(glm::uvec2 newsize);
 
   void changeColorAttachmentFormat(GLint internalColorFormat, GLenum attachment = GL_COLOR_ATTACHMENT0);
   void changeDepthAttachmentFormat(GLint internalDepthFormat);
@@ -80,7 +80,7 @@ protected:
   int m_samples;
   int m_maxSamples;
 
-  glm::ivec2 m_size;
+  glm::uvec2 m_size;
 };
 
 } // namespace nim

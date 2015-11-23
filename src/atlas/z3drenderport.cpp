@@ -48,7 +48,7 @@ Z3DTexture *Z3DRenderOutputPort::depthTexture()
   return m_renderTarget.attachment(GL_DEPTH_ATTACHMENT);
 }
 
-void Z3DRenderOutputPort::resize(const glm::ivec2 &newsize)
+void Z3DRenderOutputPort::resize(const glm::uvec2 &newsize)
 {
   if (m_renderTarget.resize(newsize)) {
     m_resultIsValid = false;
@@ -111,12 +111,12 @@ size_t Z3DRenderInputPort::numValidInputs() const
   return res;
 }
 
-glm::ivec2 Z3DRenderInputPort::size(size_t idx) const
+glm::uvec2 Z3DRenderInputPort::size(size_t idx) const
 {
   if (renderTarget(idx))
     return renderTarget(idx)->size();
   else
-    return glm::ivec2(0);
+    return glm::uvec2(0);
 }
 
 const Z3DTexture *Z3DRenderInputPort::colorTexture(size_t idx) const

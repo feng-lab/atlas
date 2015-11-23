@@ -22,8 +22,8 @@ public:
   bool isSelected() const { return m_isSelected; }
   bool isTransformEnabled() const { return m_transformEnabled; }
 
-  virtual void setViewport(glm::ivec2 viewport) { m_rendererBase.setViewport(viewport); }
-  virtual void setViewport(glm::ivec4 viewport) { m_rendererBase.setViewport(viewport); }
+  virtual void setViewport(glm::uvec2 viewport) { m_rendererBase.setViewport(viewport); }
+  virtual void setViewport(glm::uvec4 viewport) { m_rendererBase.setViewport(viewport); }
 
   inline Z3DCamera& camera() { return m_rendererBase.camera(); }
   inline Z3DCamera& globalCamera() { return m_rendererBase.globalCamera(); }

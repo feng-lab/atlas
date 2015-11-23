@@ -104,9 +104,9 @@ void Z3DCanvasPainter::updateSize()
   emit requestUpstreamSizeChange(this);
 }
 
-void Z3DCanvasPainter::onCanvasResized(int w, int h)
+void Z3DCanvasPainter::onCanvasResized(size_t w, size_t h)
 {
-  glm::ivec2 newsize(w, h);
+  glm::uvec2 newsize(w, h);
   setOutputSize(newsize);
   emit requestUpstreamSizeChange(this);
 }
@@ -135,7 +135,7 @@ void Z3DCanvasPainter::setCanvas(Z3DCanvas *canvas)
   if (m_canvas) {
     setOutputSize(m_canvas->physicalSize());
     emit requestUpstreamSizeChange(this);
-    connect(m_canvas, SIGNAL(canvasSizeChanged(int,int)), this, SLOT(onCanvasResized(int,int)));
+    connect(m_canvas, SIGNAL(canvasSizeChanged(size_t,size_t)), this, SLOT(onCanvasResized(size_t,size_t)));
   }
 
   invalidate();
@@ -184,10 +184,10 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, int width, int hei
     QApplication::processEvents();
   }
 
-  glm::ivec2 oldDimensions = m_inport.size();
+  glm::uvec2 oldDimensions = m_inport.size();
   // resize texture container to desired image dimensions and propagate change
   m_canvas->getGLFocus();
-  setOutputSize(glm::ivec2(width, height));
+  setOutputSize(glm::uvec2(width, height));
   emit requestUpstreamSizeChange(this);
 
   // render with adjusted viewport size
@@ -258,7 +258,7 @@ void Z3DCanvasPainter::renderInportToImage(const QString &filename, Z3DEye eye)
   }
 }
 
-void Z3DCanvasPainter::setOutputSize(glm::ivec2 size)
+void Z3DCanvasPainter::setOutputSize(glm::uvec2 size)
 {
   m_inport.setExpectedSize(size);
   m_leftEyeInport.setExpectedSize(size);

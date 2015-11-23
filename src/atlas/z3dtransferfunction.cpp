@@ -10,7 +10,7 @@
 namespace nim {
 
 Z3DTransferFunction::Z3DTransferFunction(double min, double max, const glm::col4 &minColor,
-                                         const glm::col4 &maxColor, int width, QObject *parent)
+                                         const glm::col4 &maxColor, uint32_t width, QObject *parent)
   : ZColorMap(min, max, minColor, maxColor, parent)
   , m_dimensions(width, 1, 1)
   , m_textureFormat(GL_BGRA)
@@ -70,7 +70,7 @@ void Z3DTransferFunction::resetToDefault()
 
 void Z3DTransferFunction::createTexture()
 {
-  m_texture.reset(new Z3DTexture(m_dimensions, m_textureFormat, (GLint)GL_RGBA8, m_textureDataType));
+  m_texture.reset(new Z3DTexture(GL_TEXTURE_1D, (GLint)GL_RGBA8, glm::uvec3(m_dimensions), m_textureFormat, m_textureDataType));
   CHECK_GL_ERROR;
 }
 
@@ -92,7 +92,7 @@ QString Z3DTransferFunction::samplerType() const
     return "sampler1D";
 }
 
-void Z3DTransferFunction::resize(int width)
+void Z3DTransferFunction::resize(uint32_t width)
 {
   fitDimensions(width, m_dimensions.y, m_dimensions.z);
 
@@ -102,13 +102,13 @@ void Z3DTransferFunction::resize(int width)
   }
 }
 
-void Z3DTransferFunction::fitDimensions(int& width, int& height, int& depth) const
+void Z3DTransferFunction::fitDimensions(uint32_t& width, uint32_t& height, uint32_t& depth) const
 {
-  int maxTexSize;
+  uint32_t maxTexSize;
   if (depth == 1)
-    maxTexSize = Z3DGpuInfoInstance.maxTextureSize();
+    maxTexSize = uint32_t(Z3DGpuInfoInstance.maxTextureSize());
   else
-    maxTexSize = Z3DGpuInfoInstance.max3DTextureSize();
+    maxTexSize = uint32_t(Z3DGpuInfoInstance.max3DTextureSize());
 
   if (maxTexSize < width)
     width = maxTexSize;
@@ -122,16 +122,14 @@ void Z3DTransferFunction::fitDimensions(int& width, int& height, int& depth) con
 
 void Z3DTransferFunction::updateTexture()
 {
-  if (!m_texture || (m_texture->dimensions() != m_dimensions))
+  if (!m_texture || (m_texture->dimension() != glm::uvec3(m_dimensions)))
     createTexture();
   assert(m_texture);
 
   std::vector<glm::col4> tfData(m_dimensions.x);
   for (size_t x = 0; x < tfData.size(); ++x)
     tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size()-1));
-  m_texture->setData(tfData.data());
-
-  m_texture->uploadTexture();
+  m_texture->uploadImage(tfData.data());
   CHECK_GL_ERROR;
 
   m_textureIsInvalid = false;

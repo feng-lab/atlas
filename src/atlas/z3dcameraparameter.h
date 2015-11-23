@@ -61,7 +61,7 @@ signals:
   void windowsAspectRatioChanged(float r);
 
 public slots:
-  void viewportChanged(const glm::ivec2& viewport);
+  void viewportChanged(const glm::uvec2 &viewport);
   void setWindowsAspectRatio(float r);
 
   void updateProjectionType();

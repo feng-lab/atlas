@@ -50,7 +50,7 @@ public:
   Z3DTexture* depthTexture();
 
   // Resizes the associated RenderTarget to the passed dimensions.
-  virtual void resize(const glm::ivec2& newsize) override;
+  virtual void resize(const glm::uvec2& newsize) override;
 
   // change RenderTarget with the given format.
   void changeColorFormat(GLint internalColorFormat);
@@ -86,7 +86,7 @@ public:
 
   // once we have the number of valid inputs, we can use a index as parameter to query data from input
   // idx range from 0 to numValidInputs() - 1
-  glm::ivec2 size(size_t idx = 0) const;
+  glm::uvec2 size(size_t idx = 0) const;
   const Z3DTexture* colorTexture(size_t idx = 0) const;
   const Z3DTexture* depthTexture(size_t idx = 0) const;
 

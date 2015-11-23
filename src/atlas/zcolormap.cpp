@@ -868,7 +868,7 @@ void ZColorMap::create1DTexture(size_t width)
   size_t maxTexSize = Z3DGpuInfoInstance.maxTextureSize();
   if (maxTexSize < width)
     width = maxTexSize;
-  m_texture.reset(new Z3DTexture(glm::ivec3(width,1,1), GL_BGRA, (GLint)GL_RGBA8, GL_UNSIGNED_INT_8_8_8_8_REV));
+  m_texture.reset(new Z3DTexture(GL_TEXTURE_1D, (GLint)GL_RGBA8, glm::uvec3(width,1,1), GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV));
   CHECK_GL_ERROR;
 }
 
@@ -877,12 +877,10 @@ void ZColorMap::update1DTexture()
   if (!m_texture)
     return;
 
-  std::vector<glm::col4> tfData(m_texture->dimensions().x);
+  std::vector<glm::col4> tfData(m_texture->dimension().x);
   for (size_t x = 0; x < tfData.size(); ++x)
     tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size()-1));
-  m_texture->setData(tfData.data());
-
-  m_texture->uploadTexture();
+  m_texture->uploadImage(tfData.data());
   CHECK_GL_ERROR;
 
   m_textureIsInvalid = false;
