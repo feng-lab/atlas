@@ -10,6 +10,9 @@ class Z3DTexture
 public:
   Z3DTexture(GLenum textureTarget, GLint internalFormat, const glm::uvec3& dimension,
              GLenum dataFormat, GLenum dataType);
+  // derive teture target as 1D, 2D or 3D
+  Z3DTexture(GLint internalFormat, const glm::uvec3& dimension,
+             GLenum dataFormat, GLenum dataType);
   ~Z3DTexture();
 
   // Input data must match current dataFormat and dataType.
@@ -38,8 +41,9 @@ public:
   GLint internalFormat() const { return m_internalFormat; }
   GLenum dataType() const { return m_dataType; }
 
-  // default is GL_NEAREST_MIPMAP_LINEAR and GL_LINEAR.
-  void setFilter(GLint minFilter = (GLint)GL_NEAREST_MIPMAP_LINEAR, GLint magFilter = (GLint)GL_LINEAR);
+  // default is GL_LINEAR and GL_LINEAR.
+  // note: openGL default is GL_NEAREST_MIPMAP_LINEAR and GL_LINEAR.
+  void setFilter(GLint minFilter = (GLint)GL_LINEAR, GLint magFilter = (GLint)GL_LINEAR);
   // default is GL_CLAMP_TO_EDGE
   // note: openGL default is GL_REPEAT !!
   void setWrap(GLint wrap = (GLint)GL_CLAMP_TO_EDGE);

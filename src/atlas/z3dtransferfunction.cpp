@@ -70,7 +70,7 @@ void Z3DTransferFunction::resetToDefault()
 
 void Z3DTransferFunction::createTexture()
 {
-  m_texture.reset(new Z3DTexture(GL_TEXTURE_1D, (GLint)GL_RGBA8, glm::uvec3(m_dimensions), m_textureFormat, m_textureDataType));
+  m_texture.reset(new Z3DTexture((GLint)GL_RGBA8, glm::uvec3(m_dimensions), m_textureFormat, m_textureDataType));
   CHECK_GL_ERROR;
 }
 

@@ -94,17 +94,17 @@ Z3DImg::Z3DImg(ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
   }
 
   // content of RGBA32I texture
-  m_pageDirectoryTexture.reset(new Z3DTexture(GL_TEXTURE_3D, (GLint)GL_RGBA32I, glm::uvec3(m_pageDirectorySize), GL_RGBA_INTEGER, GL_INT));
+  m_pageDirectoryTexture.reset(new Z3DTexture((GLint)GL_RGBA32I, glm::uvec3(m_pageDirectorySize), GL_RGBA_INTEGER, GL_INT));
   m_pageDirectory.resize(m_pageDirectoryTexture->numPixels(), glm::ivec4(0,0,0,m_unmappedFlag));
   m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
 
   m_pageTableCacheSize = glm::ivec3(m_pageTableBlockSize * m_pageTableCacheNumBlocks);
-  m_pageTableCacheTexture.reset(new Z3DTexture(GL_TEXTURE_3D, (GLint)GL_RGBA32I, glm::uvec3(m_pageTableCacheSize), GL_RGBA_INTEGER, GL_INT));
+  m_pageTableCacheTexture.reset(new Z3DTexture((GLint)GL_RGBA32I, glm::uvec3(m_pageTableCacheSize), GL_RGBA_INTEGER, GL_INT));
   m_pageTableCache.resize(m_pageTableCacheTexture->numPixels(), glm::ivec4(0,0,0,m_unmappedFlag));
   m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
 
   for (size_t c=0; c<info.numChannels; ++c) {
-    m_imageCacheTextures.emplace_back(new Z3DTexture(GL_TEXTURE_3D, (GLint)GL_R8, m_imageBlockSize * m_imageCacheNumBlocks, GL_RED, GL_UNSIGNED_BYTE));
+    m_imageCacheTextures.emplace_back(new Z3DTexture((GLint)GL_R8, m_imageBlockSize * m_imageCacheNumBlocks, GL_RED, GL_UNSIGNED_BYTE));
     m_imageCacheTextures[c]->uploadImage();
   }
 

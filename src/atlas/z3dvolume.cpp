@@ -320,14 +320,7 @@ void Z3DVolume::generateTexture()
   }
 
   // Create texture
-  if (dimensions().z == 1 && dimensions().y == 1) {
-    m_texture.reset(new Z3DTexture(GL_TEXTURE_1D, internalFormat, dimensions(), format, dataType));
-  } else if (dimensions().z == 1) {
-    m_texture.reset(new Z3DTexture(GL_TEXTURE_2D, internalFormat, dimensions(), format, dataType));
-  } else {
-    m_texture.reset(new Z3DTexture(GL_TEXTURE_3D, internalFormat, dimensions(), format, dataType));
-  }
-
+  m_texture.reset(new Z3DTexture(internalFormat, dimensions(), format, dataType));
   m_texture->uploadImage(m_img.channelData(0));
 
   CHECK_GL_ERROR;

@@ -15,7 +15,30 @@ Z3DTexture::Z3DTexture(GLenum textureTarget, GLint internalFormat, const glm::uv
   , m_dataFormat(dataFormat)
   , m_dataType(dataType)
 {
+  assert(m_dimension.x > 0 && m_dimension.y > 0 && m_dimension.z > 0);
   glGenTextures(1, &m_id);
+  setFilter();
+  setWrap();
+  CHECK_GL_ERROR;
+}
+
+Z3DTexture::Z3DTexture(GLint internalFormat, const glm::uvec3 &dimension, GLenum dataFormat, GLenum dataType)
+  : m_dimension(dimension)
+  , m_internalFormat(internalFormat)
+  , m_dataFormat(dataFormat)
+  , m_dataType(dataType)
+{
+  assert(m_dimension.x > 0 && m_dimension.y > 0 && m_dimension.z > 0);
+  if (m_dimension.z > 1) {
+    m_textureTarget = GL_TEXTURE_3D;
+  } else if (m_dimension.y > 1) {
+    m_textureTarget = GL_TEXTURE_2D;
+  } else {
+    m_textureTarget = GL_TEXTURE_1D;
+  }
+  glGenTextures(1, &m_id);
+  setFilter();
+  setWrap();
   CHECK_GL_ERROR;
 }
 

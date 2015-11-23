@@ -69,7 +69,7 @@ void Z3DInputPortBase::disconnectAll()
 
 Z3DOutputPortBase::Z3DOutputPortBase(const QString &name, bool allowMultipleConnections, Z3DFilter::InvalidationState invalidationState)
   : Z3DPort(name, allowMultipleConnections, invalidationState)
-  , m_size(128,128)
+  , m_size(32,32)
 {
 }
 

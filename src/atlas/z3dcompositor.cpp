@@ -1055,29 +1055,24 @@ bool Z3DCompositor::createDDPRenderTarget(glm::uvec2 size)
 #else
   for (int i = 0; i < 2; i++)
   {
-    g_dualDepthTexId[i] = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RG32F, glm::uvec3(size, 1),
-                                         GL_RG, GL_FLOAT);
+    g_dualDepthTexId[i] = new Z3DTexture((GLint)GL_RG32F, glm::uvec3(size, 1), GL_RG, GL_FLOAT);
     g_dualDepthTexId[i]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
     g_dualDepthTexId[i]->uploadImage();
 
-    g_dualFrontBlenderTexId[i] = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RGBA16, glm::uvec3(size, 1),
-                                                GL_RGBA, GL_UNSIGNED_SHORT);
+    g_dualFrontBlenderTexId[i] = new Z3DTexture((GLint)GL_RGBA16, glm::uvec3(size, 1), GL_RGBA, GL_UNSIGNED_SHORT);
     g_dualFrontBlenderTexId[i]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
     g_dualFrontBlenderTexId[i]->uploadImage();
 
-    g_dualBackTempTexId[i] = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RGBA16, glm::uvec3(size, 1),
-                                            GL_RGBA, GL_UNSIGNED_SHORT);
+    g_dualBackTempTexId[i] = new Z3DTexture((GLint)GL_RGBA16, glm::uvec3(size, 1), GL_RGBA, GL_UNSIGNED_SHORT);
     g_dualBackTempTexId[i]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
     g_dualBackTempTexId[i]->uploadImage();
   }
 
-  g_dualBackBlenderTexId = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RGBA16, glm::uvec3(size, 1),
-                                          GL_RGBA, GL_UNSIGNED_SHORT);
+  g_dualBackBlenderTexId = new Z3DTexture((GLint)GL_RGBA16, glm::uvec3(size, 1), GL_RGBA, GL_UNSIGNED_SHORT);
   g_dualBackBlenderTexId->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
   g_dualBackBlenderTexId->uploadImage();
 
-  g_depthTex = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_R32F, glm::uvec3(size, 1),
-                              GL_RED, GL_FLOAT);
+  g_depthTex = new Z3DTexture((GLint)GL_R32F, glm::uvec3(size, 1), GL_RED, GL_FLOAT);
   g_depthTex->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
   g_depthTex->uploadImage();
 #endif
@@ -1199,12 +1194,10 @@ bool Z3DCompositor::createWARenderTarget(glm::uvec2 size)
                                           (GLint)GL_NEAREST, (GLint)GL_NEAREST, (GLint)GL_CLAMP_TO_EDGE);
   g_accumulationTexId[1]->uploadTexture();
 #else
-  g_accumulationTexId[0] = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RGBA32F, glm::uvec3(size, 1),
-                                          GL_RGBA, GL_FLOAT);
+  g_accumulationTexId[0] = new Z3DTexture((GLint)GL_RGBA32F, glm::uvec3(size, 1), GL_RGBA, GL_FLOAT);
   g_accumulationTexId[0]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
   g_accumulationTexId[0]->uploadImage();
-  g_accumulationTexId[1] = new Z3DTexture(GL_TEXTURE_2D, (GLint)GL_RG32F, glm::uvec3(size, 1),
-                                          GL_RG, GL_FLOAT);
+  g_accumulationTexId[1] = new Z3DTexture((GLint)GL_RG32F, glm::uvec3(size, 1), GL_RG, GL_FLOAT);
   g_accumulationTexId[1]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
   g_accumulationTexId[1]->uploadImage();
 #endif
