@@ -93,6 +93,8 @@ protected slots:
 
 protected:
   virtual void process(Z3DEye eye) override;
+  bool hasSlices() const;
+  void renderSlices(Z3DEye eye);
 
   const std::vector<std::unique_ptr<Z3DVolume>>& getVolumes() const;
 
@@ -155,6 +157,9 @@ private:
   Z3DRenderOutputPort m_leftEyeOutport;
   Z3DRenderOutputPort m_rightEyeOutport;
   Z3DFilterOutputPort<Z3DVolumeFilter> m_vPPort;
+  Z3DRenderOutputPort m_opaqueOutport;
+  Z3DRenderOutputPort m_opaqueLeftEyeOutport;
+  Z3DRenderOutputPort m_opaqueRightEyeOutport;
 
   static const size_t m_maxNumOfFullResolutionVolumeSlice;
   // each channel is represented by a Z3DVolume

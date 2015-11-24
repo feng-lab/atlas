@@ -37,6 +37,9 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters &globalParas, QObject *pare
   , m_leftEyeOutport("LeftEyeImage", true, InvalidLeftEyeResult)
   , m_rightEyeOutport("RightEyeImage", true, InvalidRightEyeResult)
   , m_vPPort("VolumeFilter")
+  , m_opaqueOutport("OpaqueImage", true, InvalidMonoViewResult)
+  , m_opaqueLeftEyeOutport("OpaqueLeftEyeImage", true, InvalidLeftEyeResult)
+  , m_opaqueRightEyeOutport("OpaqueRightEyeImage", true, InvalidRightEyeResult)
   , m_FRVolumeSlices(m_maxNumOfFullResolutionVolumeSlice)
   , m_FRVolumeSlicesValidState(m_maxNumOfFullResolutionVolumeSlice, false)
   , m_useFRVolumeSlice("Use Full Resolution Volume Slice", true)
@@ -116,6 +119,9 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters &globalParas, QObject *pare
   addPort(m_leftEyeOutport);
   addPort(m_rightEyeOutport);
   addPort(m_vPPort);
+  addPrivateRenderPort(m_opaqueOutport);
+  addPrivateRenderPort(m_opaqueLeftEyeOutport);
+  addPrivateRenderPort(m_opaqueRightEyeOutport);
 
   addParameter(m_useFRVolumeSlice);
   addParameter(m_showXSlice);
@@ -153,6 +159,7 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters &globalParas, QObject *pare
 
   for (size_t i=0; i<m_maxNumOfFullResolutionVolumeSlice; ++i) {
     m_image2DRenderers.emplace_back(std::make_unique<Z3DImage2DRenderer>(m_rendererBase));
+    m_image2DRenderers[i]->setLayerTarget(&m_layerTarget);
   }
   m_boundBoxLineWidth.set(1);
   m_boundBoxMode.select("Bound Box");
@@ -446,12 +453,256 @@ glm::vec3 Z3DVolumeFilter::get3DPosition(int x, int y, int width, int height, bo
 
 bool Z3DVolumeFilter::hasOpaque(Z3DEye) const
 {
-  return m_showZSlice.get() || m_showXSlice.get() || m_showYSlice.get()
-      || m_showXSlice2.get() || m_showYSlice2.get() || m_showZSlice2.get();
+  return hasSlices();
 }
 
 void Z3DVolumeFilter::renderOpaque(Z3DEye eye)
 {
+  Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
+        m_opaqueOutport : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport : m_opaqueRightEyeOutport;
+  m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
+  m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
+  m_rendererBase.render(eye, m_textureCopyRenderer);
+}
+
+bool Z3DVolumeFilter::hasTransparent(Z3DEye eye) const
+{
+  const Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
+        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+  return currentOutport.hasValidData();
+}
+
+void Z3DVolumeFilter::renderTransparent(Z3DEye eye)
+{
+  Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
+        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+  m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
+  m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
+  m_rendererBase.render(eye, m_textureCopyRenderer);
+}
+
+void Z3DVolumeFilter::changeCoordTransform()
+{
+  if (m_volumes.empty())
+    return;
+  for (size_t i=0; i<m_volumes.size(); i++) {
+    m_volumes[i]->setPhysicalToWorldMatrix(m_rendererBase.coordTransform());
+  }
+  for (size_t i=0; i<m_zoomInVolumes.size(); i++) {
+    m_zoomInVolumes[i]->setPhysicalToWorldMatrix(m_rendererBase.coordTransform());
+  }
+  invalidateAllFRVolumeSlices();
+}
+
+void Z3DVolumeFilter::changeZoomInViewSize()
+{
+  if (m_zoomInVolumes.empty())
+    return;
+  exitZoomInView();
+  openZoomInView(m_zoomInPos);
+}
+
+void Z3DVolumeFilter::adjustWidget()
+{
+  m_zSlicePosition.setVisible(m_showZSlice.get());
+  m_ySlicePosition.setVisible(m_showYSlice.get());
+  m_xSlicePosition.setVisible(m_showXSlice.get());
+  m_zSlice2Position.setVisible(m_showZSlice2.get());
+  m_ySlice2Position.setVisible(m_showYSlice2.get());
+  m_xSlice2Position.setVisible(m_showXSlice2.get());
+}
+
+void Z3DVolumeFilter::leftMouseButtonPressed(QMouseEvent *e, int w, int h)
+{
+  e->ignore();
+  if (!m_volumeRaycasterRenderer.hasVisibleRendering())
+    return;
+  // Mouse button pressed
+  if (e->type() == QEvent::MouseButtonPress) {
+    m_startCoord.x = e->x();
+    m_startCoord.y = e->y();
+    toggleInteractionMode(true, this);
+    return;
+  }
+
+  if (e->type() == QEvent::MouseButtonRelease) {
+    if (std::abs(e->x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->y()) < 2) {
+      bool success;
+#ifndef _QT4_
+      glm::vec3 pos3D = getFirstHit3DPosition(e->x() * qApp->devicePixelRatio(),
+                                              e->y() * qApp->devicePixelRatio(),
+                                              w * qApp->devicePixelRatio(),
+                                              h * qApp->devicePixelRatio(),
+                                              success);
+#else
+      glm::vec3 pos3D = getFirstHit3DPosition(e->x(), e->y(), w, h, success);
+#endif
+      if (success) {
+        emit pointInVolumeLeftClicked(e->pos(), glm::ivec3(pos3D));
+        //e->accept();
+      }
+    }
+    toggleInteractionMode(false, this);
+  }
+}
+
+void Z3DVolumeFilter::invalidateFRVolumeZSlice()
+{
+  m_FRVolumeSlicesValidState[0] = false;
+}
+
+void Z3DVolumeFilter::invalidateFRVolumeYSlice()
+{
+  m_FRVolumeSlicesValidState[1] = false;
+}
+
+void Z3DVolumeFilter::invalidateFRVolumeXSlice()
+{
+  m_FRVolumeSlicesValidState[2] = false;
+}
+
+void Z3DVolumeFilter::invalidateFRVolumeZSlice2()
+{
+  m_FRVolumeSlicesValidState[3] = false;
+}
+
+void Z3DVolumeFilter::invalidateFRVolumeYSlice2()
+{
+  m_FRVolumeSlicesValidState[4] = false;
+}
+
+void Z3DVolumeFilter::invalidateFRVolumeXSlice2()
+{
+  m_FRVolumeSlicesValidState[5] = false;
+}
+
+void Z3DVolumeFilter::updateCubeSerieSlices()
+{
+  m_cubeSerieSlices.clear();
+  Z3DVolume *volume = getVolumes().at(0).get();
+
+  glm::vec3 coordLuf = volume->physicalLUF();
+  glm::vec3 coordRdb = volume->physicalRDB();
+  glm::uvec3 volDim = volume->originalDimensions();
+  glm::uvec3 dim = volume->dimensions();
+
+  float xTexCoordStart = std::max(m_xCut.lowerValue(), m_xCut.minimum()+1) / (m_xCut.maximum()-1);
+  float xTexCoordEnd = std::min(m_xCut.upperValue(), m_xCut.maximum()-1) / (m_xCut.maximum()-1);
+  float xCoordStart = glm::mix(coordLuf.x, coordRdb.x, xTexCoordStart);
+  float xCoordEnd = glm::mix(coordLuf.x, coordRdb.x, xTexCoordEnd);
+  float yTexCoordStart = std::max(m_yCut.lowerValue(), m_yCut.minimum()+1) / (m_yCut.maximum()-1);
+  float yTexCoordEnd = std::min(m_yCut.upperValue(), m_yCut.maximum()-1) / (m_yCut.maximum()-1.f);
+  float yCoordStart = glm::mix(coordLuf.y, coordRdb.y, yTexCoordStart);
+  float yCoordEnd = glm::mix(coordLuf.y, coordRdb.y, yTexCoordEnd);
+  float zTexCoordStart = std::max(m_zCut.lowerValue(), m_zCut.minimum()+1) / (m_zCut.maximum()-1);
+  float zTexCoordEnd = std::min(m_zCut.upperValue(), m_zCut.maximum()-1) / (m_zCut.maximum()-1);
+  float zCoordStart = glm::mix(coordLuf.z, coordRdb.z, zTexCoordStart);
+  float zCoordEnd = glm::mix(coordLuf.z, coordRdb.z, zTexCoordEnd);
+
+  // it is no point to make more slices than actual texture dimension
+  int numZSlice = std::ceil((m_zCut.upperValue() - m_zCut.lowerValue() - 1.0) / dim.z * volDim.z) * 2;
+  int numYSlice = std::ceil((m_yCut.upperValue() - m_yCut.lowerValue() - 1.0) / dim.y * volDim.y) * 2;
+  int numXSlice = std::ceil((m_xCut.upperValue() - m_xCut.lowerValue() - 1.0) / dim.x * volDim.x) * 2;
+  // Z front to back
+  m_cubeSerieSlices["ZF2B"] = ZMesh::createCubeSerieSlices(numZSlice, 2,
+                                                           glm::vec3(xCoordStart, yCoordStart, zCoordStart),
+                                                           glm::vec3(xCoordEnd, yCoordEnd, zCoordEnd),
+                                                           glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordStart),
+                                                           glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordEnd));
+  // Z back to front
+  m_cubeSerieSlices["ZB2F"] = ZMesh::createCubeSerieSlices(numZSlice, 2,
+                                                           glm::vec3(xCoordStart, yCoordStart, zCoordEnd),
+                                                           glm::vec3(xCoordEnd, yCoordEnd, zCoordStart),
+                                                           glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordEnd),
+                                                           glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordStart));
+  // Y front to back
+  m_cubeSerieSlices["YF2B"] = ZMesh::createCubeSerieSlices(numYSlice, 1,
+                                                           glm::vec3(xCoordStart, yCoordStart, zCoordStart),
+                                                           glm::vec3(xCoordEnd, yCoordEnd, zCoordEnd),
+                                                           glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordStart),
+                                                           glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordEnd));
+  // Y back to front
+  m_cubeSerieSlices["YB2F"] = ZMesh::createCubeSerieSlices(numYSlice, 1,
+                                                           glm::vec3(xCoordStart, yCoordEnd, zCoordStart),
+                                                           glm::vec3(xCoordEnd, yCoordStart, zCoordEnd),
+                                                           glm::vec3(xTexCoordStart, yTexCoordEnd, zTexCoordStart),
+                                                           glm::vec3(xTexCoordEnd, yTexCoordStart, zTexCoordEnd));
+  // X front to back
+  m_cubeSerieSlices["XF2B"] = ZMesh::createCubeSerieSlices(numXSlice, 0,
+                                                           glm::vec3(xCoordStart, yCoordStart, zCoordStart),
+                                                           glm::vec3(xCoordEnd, yCoordEnd, zCoordEnd),
+                                                           glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordStart),
+                                                           glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordEnd));
+  // X back to front
+  m_cubeSerieSlices["XB2F"] = ZMesh::createCubeSerieSlices(numXSlice, 0,
+                                                           glm::vec3(xCoordEnd, yCoordStart, zCoordStart),
+                                                           glm::vec3(xCoordStart, yCoordEnd, zCoordEnd),
+                                                           glm::vec3(xTexCoordEnd, yTexCoordStart, zTexCoordStart),
+                                                           glm::vec3(xTexCoordStart, yTexCoordEnd, zTexCoordEnd));
+}
+
+void Z3DVolumeFilter::process(Z3DEye eye)
+{
+  glEnable(GL_DEPTH_TEST);
+
+  Z3DVolume *volume = getVolumes().at(0).get();
+  if (volume->is1DData())
+    return;
+
+  bool allCliped = m_xCut.upperValue() < m_xCut.minimum() + 1 ||
+      m_yCut.upperValue() < m_yCut.minimum() + 1 ||
+      m_zCut.upperValue() < m_zCut.minimum() + 1 ||
+      m_xCut.lowerValue() > m_xCut.maximum() - 1 ||
+      m_yCut.lowerValue() > m_yCut.maximum() - 1 ||
+      m_zCut.lowerValue() > m_zCut.maximum() - 1;
+
+  Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
+        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+
+  currentOutport.bindTarget();
+  currentOutport.clearTarget();
+  m_rendererBase.setViewport(currentOutport.size());
+
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+
+  if (m_volumeRaycasterRenderer.hasVisibleRendering() && !allCliped) {
+    prepareDataForRaycaster(volume, eye);
+    m_rendererBase.render(eye, m_volumeRaycasterRenderer);
+  }
+
+  renderBoundBox(eye);
+  CHECK_GL_ERROR;
+
+  currentOutport.releaseTarget();
+
+  glBlendFunc(GL_ONE,GL_ZERO);
+  glDisable(GL_BLEND);
+
+  if (hasSlices()) {
+    renderSlices(eye);
+  }
+
+  glDisable(GL_DEPTH_TEST);
+
+  CHECK_GL_ERROR;
+}
+
+bool Z3DVolumeFilter::hasSlices() const
+{
+  return m_showZSlice.get() || m_showXSlice.get() || m_showYSlice.get()
+      || m_showXSlice2.get() || m_showYSlice2.get() || m_showZSlice2.get();
+}
+
+void Z3DVolumeFilter::renderSlices(Z3DEye eye)
+{
+  Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
+        m_opaqueOutport : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport : m_opaqueRightEyeOutport;
+
+  currentOutport.bindTarget();
+  currentOutport.clearTarget();
+  m_rendererBase.setViewport(currentOutport.size());
+
   Z3DVolume *volume = getVolumes().at(0).get();
   glm::uvec3 volDim = volume->originalDimensions();
   glm::vec3 coordLuf = volume->physicalLUF();
@@ -739,224 +990,8 @@ void Z3DVolumeFilter::renderOpaque(Z3DEye eye)
     }
     m_rendererBase.render(eye, m_volumeSliceRenderer);
   }
-}
-
-bool Z3DVolumeFilter::hasTransparent(Z3DEye eye) const
-{
-  const Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
-        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
-  return currentOutport.hasValidData();
-}
-
-void Z3DVolumeFilter::renderTransparent(Z3DEye eye)
-{
-  Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
-        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
-  m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
-  m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
-  m_rendererBase.render(eye, m_textureCopyRenderer);
-}
-
-void Z3DVolumeFilter::changeCoordTransform()
-{
-  if (m_volumes.empty())
-    return;
-  for (size_t i=0; i<m_volumes.size(); i++) {
-    m_volumes[i]->setPhysicalToWorldMatrix(m_rendererBase.coordTransform());
-  }
-  for (size_t i=0; i<m_zoomInVolumes.size(); i++) {
-    m_zoomInVolumes[i]->setPhysicalToWorldMatrix(m_rendererBase.coordTransform());
-  }
-  invalidateAllFRVolumeSlices();
-}
-
-void Z3DVolumeFilter::changeZoomInViewSize()
-{
-  if (m_zoomInVolumes.empty())
-    return;
-  exitZoomInView();
-  openZoomInView(m_zoomInPos);
-}
-
-void Z3DVolumeFilter::adjustWidget()
-{
-  m_zSlicePosition.setVisible(m_showZSlice.get());
-  m_ySlicePosition.setVisible(m_showYSlice.get());
-  m_xSlicePosition.setVisible(m_showXSlice.get());
-  m_zSlice2Position.setVisible(m_showZSlice2.get());
-  m_ySlice2Position.setVisible(m_showYSlice2.get());
-  m_xSlice2Position.setVisible(m_showXSlice2.get());
-}
-
-void Z3DVolumeFilter::leftMouseButtonPressed(QMouseEvent *e, int w, int h)
-{
-  e->ignore();
-  if (!m_volumeRaycasterRenderer.hasVisibleRendering())
-    return;
-  // Mouse button pressed
-  if (e->type() == QEvent::MouseButtonPress) {
-    m_startCoord.x = e->x();
-    m_startCoord.y = e->y();
-    toggleInteractionMode(true, this);
-    return;
-  }
-
-  if (e->type() == QEvent::MouseButtonRelease) {
-    if (std::abs(e->x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->y()) < 2) {
-      bool success;
-#ifndef _QT4_
-      glm::vec3 pos3D = getFirstHit3DPosition(e->x() * qApp->devicePixelRatio(),
-                                              e->y() * qApp->devicePixelRatio(),
-                                              w * qApp->devicePixelRatio(),
-                                              h * qApp->devicePixelRatio(),
-                                              success);
-#else
-      glm::vec3 pos3D = getFirstHit3DPosition(e->x(), e->y(), w, h, success);
-#endif
-      if (success) {
-        emit pointInVolumeLeftClicked(e->pos(), glm::ivec3(pos3D));
-        //e->accept();
-      }
-    }
-    toggleInteractionMode(false, this);
-  }
-}
-
-void Z3DVolumeFilter::invalidateFRVolumeZSlice()
-{
-  m_FRVolumeSlicesValidState[0] = false;
-}
-
-void Z3DVolumeFilter::invalidateFRVolumeYSlice()
-{
-  m_FRVolumeSlicesValidState[1] = false;
-}
-
-void Z3DVolumeFilter::invalidateFRVolumeXSlice()
-{
-  m_FRVolumeSlicesValidState[2] = false;
-}
-
-void Z3DVolumeFilter::invalidateFRVolumeZSlice2()
-{
-  m_FRVolumeSlicesValidState[3] = false;
-}
-
-void Z3DVolumeFilter::invalidateFRVolumeYSlice2()
-{
-  m_FRVolumeSlicesValidState[4] = false;
-}
-
-void Z3DVolumeFilter::invalidateFRVolumeXSlice2()
-{
-  m_FRVolumeSlicesValidState[5] = false;
-}
-
-void Z3DVolumeFilter::updateCubeSerieSlices()
-{
-  m_cubeSerieSlices.clear();
-  Z3DVolume *volume = getVolumes().at(0).get();
-
-  glm::vec3 coordLuf = volume->physicalLUF();
-  glm::vec3 coordRdb = volume->physicalRDB();
-  glm::uvec3 volDim = volume->originalDimensions();
-  glm::uvec3 dim = volume->dimensions();
-
-  float xTexCoordStart = std::max(m_xCut.lowerValue(), m_xCut.minimum()+1) / (m_xCut.maximum()-1);
-  float xTexCoordEnd = std::min(m_xCut.upperValue(), m_xCut.maximum()-1) / (m_xCut.maximum()-1);
-  float xCoordStart = glm::mix(coordLuf.x, coordRdb.x, xTexCoordStart);
-  float xCoordEnd = glm::mix(coordLuf.x, coordRdb.x, xTexCoordEnd);
-  float yTexCoordStart = std::max(m_yCut.lowerValue(), m_yCut.minimum()+1) / (m_yCut.maximum()-1);
-  float yTexCoordEnd = std::min(m_yCut.upperValue(), m_yCut.maximum()-1) / (m_yCut.maximum()-1.f);
-  float yCoordStart = glm::mix(coordLuf.y, coordRdb.y, yTexCoordStart);
-  float yCoordEnd = glm::mix(coordLuf.y, coordRdb.y, yTexCoordEnd);
-  float zTexCoordStart = std::max(m_zCut.lowerValue(), m_zCut.minimum()+1) / (m_zCut.maximum()-1);
-  float zTexCoordEnd = std::min(m_zCut.upperValue(), m_zCut.maximum()-1) / (m_zCut.maximum()-1);
-  float zCoordStart = glm::mix(coordLuf.z, coordRdb.z, zTexCoordStart);
-  float zCoordEnd = glm::mix(coordLuf.z, coordRdb.z, zTexCoordEnd);
-
-  // it is no point to make more slices than actual texture dimension
-  int numZSlice = std::ceil((m_zCut.upperValue() - m_zCut.lowerValue() - 1.0) / dim.z * volDim.z) * 2;
-  int numYSlice = std::ceil((m_yCut.upperValue() - m_yCut.lowerValue() - 1.0) / dim.y * volDim.y) * 2;
-  int numXSlice = std::ceil((m_xCut.upperValue() - m_xCut.lowerValue() - 1.0) / dim.x * volDim.x) * 2;
-  // Z front to back
-  m_cubeSerieSlices["ZF2B"] = ZMesh::createCubeSerieSlices(numZSlice, 2,
-                                                           glm::vec3(xCoordStart, yCoordStart, zCoordStart),
-                                                           glm::vec3(xCoordEnd, yCoordEnd, zCoordEnd),
-                                                           glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordStart),
-                                                           glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordEnd));
-  // Z back to front
-  m_cubeSerieSlices["ZB2F"] = ZMesh::createCubeSerieSlices(numZSlice, 2,
-                                                           glm::vec3(xCoordStart, yCoordStart, zCoordEnd),
-                                                           glm::vec3(xCoordEnd, yCoordEnd, zCoordStart),
-                                                           glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordEnd),
-                                                           glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordStart));
-  // Y front to back
-  m_cubeSerieSlices["YF2B"] = ZMesh::createCubeSerieSlices(numYSlice, 1,
-                                                           glm::vec3(xCoordStart, yCoordStart, zCoordStart),
-                                                           glm::vec3(xCoordEnd, yCoordEnd, zCoordEnd),
-                                                           glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordStart),
-                                                           glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordEnd));
-  // Y back to front
-  m_cubeSerieSlices["YB2F"] = ZMesh::createCubeSerieSlices(numYSlice, 1,
-                                                           glm::vec3(xCoordStart, yCoordEnd, zCoordStart),
-                                                           glm::vec3(xCoordEnd, yCoordStart, zCoordEnd),
-                                                           glm::vec3(xTexCoordStart, yTexCoordEnd, zTexCoordStart),
-                                                           glm::vec3(xTexCoordEnd, yTexCoordStart, zTexCoordEnd));
-  // X front to back
-  m_cubeSerieSlices["XF2B"] = ZMesh::createCubeSerieSlices(numXSlice, 0,
-                                                           glm::vec3(xCoordStart, yCoordStart, zCoordStart),
-                                                           glm::vec3(xCoordEnd, yCoordEnd, zCoordEnd),
-                                                           glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordStart),
-                                                           glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordEnd));
-  // X back to front
-  m_cubeSerieSlices["XB2F"] = ZMesh::createCubeSerieSlices(numXSlice, 0,
-                                                           glm::vec3(xCoordEnd, yCoordStart, zCoordStart),
-                                                           glm::vec3(xCoordStart, yCoordEnd, zCoordEnd),
-                                                           glm::vec3(xTexCoordEnd, yTexCoordStart, zTexCoordStart),
-                                                           glm::vec3(xTexCoordStart, yTexCoordEnd, zTexCoordEnd));
-}
-
-void Z3DVolumeFilter::process(Z3DEye eye)
-{
-  glEnable(GL_DEPTH_TEST);
-
-  Z3DVolume *volume = getVolumes().at(0).get();
-  if (volume->is1DData())
-    return;
-
-  bool allCliped = m_xCut.upperValue() < m_xCut.minimum() + 1 ||
-      m_yCut.upperValue() < m_yCut.minimum() + 1 ||
-      m_zCut.upperValue() < m_zCut.minimum() + 1 ||
-      m_xCut.lowerValue() > m_xCut.maximum() - 1 ||
-      m_yCut.lowerValue() > m_yCut.maximum() - 1 ||
-      m_zCut.lowerValue() > m_zCut.maximum() - 1;
-
-  Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
-        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
-
-  currentOutport.bindTarget();
-  currentOutport.clearTarget();
-  m_rendererBase.setViewport(currentOutport.size());
-
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
-
-  if (m_volumeRaycasterRenderer.hasVisibleRendering() && !allCliped) {
-    prepareDataForRaycaster(volume, eye);
-    m_rendererBase.render(eye, m_volumeRaycasterRenderer);
-  }
-
-  renderBoundBox(eye);
-  CHECK_GL_ERROR;
 
   currentOutport.releaseTarget();
-
-  glBlendFunc(GL_ONE,GL_ZERO);
-  glDisable(GL_BLEND);
-  glDisable(GL_DEPTH_TEST);
-
-  CHECK_GL_ERROR;
 }
 
 const std::vector<std::unique_ptr<Z3DVolume>>& Z3DVolumeFilter::getVolumes() const
@@ -982,10 +1017,14 @@ void Z3DVolumeFilter::readVolumes()
   m_volumes.clear();
   m_nChannels = m_imgPack->imgInfo().numChannels;
 
+#if 0
   // shader limit is 20 channels
   // limited by Max FS Texture Image Units
   // see https://www.opengl.org/wiki/Shader#Resource_limitations
   size_t maxPossibleChannels = std::min(20, (Z3DGpuInfoInstance.maxTextureImageUnits() - 4) / 2);
+#else
+  size_t maxPossibleChannels = Z3DGpuInfoInstance.maxArrayTextureLayers();
+#endif
   if (m_nChannels > maxPossibleChannels) {
     QMessageBox::warning(QApplication::activeWindow(), "Too many channels",
                          QString("Due to hardware limit, only first %1 channels of this image will be shown").arg(maxPossibleChannels));
@@ -1414,6 +1453,7 @@ void Z3DVolumeFilter::volumeChanged()
   m_volumeRaycasterRenderer.setLayerTarget(&m_layerTarget);
   if (!is2DImage) {
     m_volumeSliceRenderer.setChannels(getVolumes(), m_sliceColormaps);
+    m_volumeSliceRenderer.setLayerTarget(&m_layerTarget);
   }
 }
 

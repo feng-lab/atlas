@@ -329,16 +329,16 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
         m_sc2dImageShader.bind();
         m_rendererBase.setGlobalShaderParameters(m_sc2dImageShader, eye);
 
-        for (size_t i=0; i<visibleIdxs.size(); ++i) {
-          m_scTarget->attachSlice(i);
-          m_scTarget->bind();
-          m_scTarget->clear();
-          bindVolumeAndTransferFunc(m_sc2dImageShader, visibleIdxs[i]);
+        for (size_t j=0; j<visibleIdxs.size(); ++j) {
+          m_layerTarget->attachSlice(j);
+          m_layerTarget->bind();
+          m_layerTarget->clear();
+          bindVolumeAndTransferFunc(m_sc2dImageShader, visibleIdxs[j]);
 
           for (size_t i=0; i<m_quads.size(); ++i)
             renderTriangleList(m_VAO, m_sc2dImageShader, m_quads[i]);
 
-          m_scTarget->release();
+          m_layerTarget->release();
         }
 
         m_sc2dImageShader.release();
@@ -346,17 +346,17 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
         m_scVolumeSliceWithTransferfunShader.bind();
         m_rendererBase.setGlobalShaderParameters(m_scVolumeSliceWithTransferfunShader, eye);
 
-        for (size_t i=0; i<visibleIdxs.size(); ++i) {
-          m_scTarget->attachSlice(i);
-          m_scTarget->bind();
-          m_scTarget->clear();
+        for (size_t j=0; j<visibleIdxs.size(); ++j) {
+          m_layerTarget->attachSlice(j);
+          m_layerTarget->bind();
+          m_layerTarget->clear();
 
-          bindVolumeAndTransferFunc(m_scVolumeSliceWithTransferfunShader, visibleIdxs[i]);
+          bindVolumeAndTransferFunc(m_scVolumeSliceWithTransferfunShader, visibleIdxs[j]);
 
           for (size_t i=0; i<m_quads.size(); ++i)
             renderTriangleList(m_VAO, m_scVolumeSliceWithTransferfunShader, m_quads[i]);
 
-          m_scTarget->release();
+          m_layerTarget->release();
         }
 
         m_scVolumeSliceWithTransferfunShader.release();
@@ -390,22 +390,22 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
       m_scRaycasterShader.setUniform("sampling_rate", m_samplingRate.get());
 
       for (size_t i=0; i<visibleIdxs.size(); ++i) {
-        m_scTarget->attachSlice(i);
-        m_scTarget->bind();
-        m_scTarget->clear();
+        m_layerTarget->attachSlice(i);
+        m_layerTarget->bind();
+        m_layerTarget->clear();
 
         bindVolumeAndTransferFunc(m_scRaycasterShader, visibleIdxs[i]);
         renderScreenQuad(m_VAO, m_scRaycasterShader);
 
-        m_scTarget->release();
+        m_layerTarget->release();
       }
 
       m_scRaycasterShader.release();
     }
 
     m_mergeChannelShader.bind();
-    m_mergeChannelShader.bindTexture("color_texture", m_scTarget->attachment(GL_COLOR_ATTACHMENT0));
-    m_mergeChannelShader.bindTexture("depth_texture", m_scTarget->attachment(GL_DEPTH_ATTACHMENT));
+    m_mergeChannelShader.bindTexture("color_texture", m_layerTarget->attachment(GL_COLOR_ATTACHMENT0));
+    m_mergeChannelShader.bindTexture("depth_texture", m_layerTarget->attachment(GL_DEPTH_ATTACHMENT));
     renderScreenQuad(m_VAO, m_mergeChannelShader);
     m_mergeChannelShader.release();
   }

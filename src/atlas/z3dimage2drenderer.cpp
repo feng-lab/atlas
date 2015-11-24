@@ -7,11 +7,18 @@ namespace nim {
 
 Z3DImage2DRenderer::Z3DImage2DRenderer(Z3DRendererBase &rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
-  , m_image2DShader()
   , m_VAO(1)
 {
   m_image2DShader.bindFragDataLocation(0, "FragData0");
-  m_image2DShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_colormap.frag", m_rendererBase.generateHeader() + generateHeader());
+  m_image2DShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_colormap.frag",
+                                     m_rendererBase.generateHeader() + generateHeader());
+
+  m_scImage2DShader.bindFragDataLocation(0, "FragData0");
+  m_scImage2DShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_colormap_single_channel.frag",
+                                       m_rendererBase.generateHeader() + generateHeader());
+  m_mergeChannelShader.bindFragDataLocation(0, "FragData0");
+  m_mergeChannelShader.loadFromSourceFile("pass.vert", "image2d_array_compositor.frag",
+                                          m_rendererBase.generateHeader() + generateHeader());
   CHECK_GL_ERROR;
 }
 
@@ -72,6 +79,17 @@ void Z3DImage2DRenderer::bindVolumes(Z3DShaderProgram &shader)
   }
 }
 
+void Z3DImage2DRenderer::bindVolume(Z3DShaderProgram &shader, size_t idx)
+{
+  // volumes
+  shader.bindVolume(m_volumeUniformNames[0], m_volumes[idx], (GLint)GL_NEAREST, (GLint)GL_NEAREST);
+
+  // colormap
+  shader.bindTexture(m_colormapUniformNames[0], m_colormaps[idx]->get().texture1D());
+
+  CHECK_GL_ERROR;
+}
+
 bool Z3DImage2DRenderer::hasVolume() const
 {
   for (size_t i=0; i<m_volumes.size(); ++i)
@@ -83,6 +101,9 @@ bool Z3DImage2DRenderer::hasVolume() const
 void Z3DImage2DRenderer::compile()
 {
   m_image2DShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+
+  m_scImage2DShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+  m_mergeChannelShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
 QString Z3DImage2DRenderer::generateHeader()
@@ -96,6 +117,9 @@ QString Z3DImage2DRenderer::generateHeader()
     headerSource += "#define DISABLE_TEXTURE_COORD_OUTPUT\n";
   }
 
+  // for merge shader
+  headerSource += "#define MIP\n";
+
   return headerSource;
 }
 
@@ -105,15 +129,40 @@ void Z3DImage2DRenderer::render(Z3DEye eye)
   if (!needRender)
     return;
 
-  m_image2DShader.bind();
-  m_rendererBase.setGlobalShaderParameters(m_image2DShader, eye);
+  if (m_volumes.size() == 1) {
+    m_image2DShader.bind();
+    m_rendererBase.setGlobalShaderParameters(m_image2DShader, eye);
 
-  bindVolumes(m_image2DShader);
+    bindVolumes(m_image2DShader);
 
-  for (size_t i=0; i<m_quads.size(); ++i)
-    renderTriangleList(m_VAO, m_image2DShader, m_quads[i]);
+    for (size_t i=0; i<m_quads.size(); ++i)
+      renderTriangleList(m_VAO, m_image2DShader, m_quads[i]);
 
-  m_image2DShader.release();
+    m_image2DShader.release();
+  } else {
+    m_scImage2DShader.bind();
+    m_rendererBase.setGlobalShaderParameters(m_scImage2DShader, eye);
+
+    for (size_t j=0; j<m_volumes.size(); ++j) {
+      m_layerTarget->attachSlice(j);
+      m_layerTarget->bind();
+      m_layerTarget->clear();
+
+      bindVolume(m_scImage2DShader, j);
+      for (size_t i=0; i<m_quads.size(); ++i)
+        renderTriangleList(m_VAO, m_scImage2DShader, m_quads[i]);
+
+      m_layerTarget->release();
+    }
+
+    m_scImage2DShader.release();
+
+    m_mergeChannelShader.bind();
+    m_mergeChannelShader.bindTexture("color_texture", m_layerTarget->attachment(GL_COLOR_ATTACHMENT0));
+    m_mergeChannelShader.bindTexture("depth_texture", m_layerTarget->attachment(GL_DEPTH_ATTACHMENT));
+    renderScreenQuad(m_VAO, m_mergeChannelShader);
+    m_mergeChannelShader.release();
+  }
 }
 
 } // namespace nim

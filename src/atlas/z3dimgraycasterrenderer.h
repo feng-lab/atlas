@@ -10,8 +10,6 @@ namespace nim {
 
 // use raycaster to render volume or 2D Image (stack with depth==1) with color
 // transfer functions
-// only support up to 20 channels now.
-// use python script to generate new shader to support more channels
 class Z3DImgRayCasterRenderer : public Z3DPrimitiveRenderer
 {
   Q_OBJECT

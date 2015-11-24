@@ -11,8 +11,7 @@ namespace nim {
 class Z3DVolume;
 
 // render 2d slices of volume with colormap
-// support up to 20 channels, use colormap of each volume to composite final image
-// use python script to generate new shader to support more channels
+// use colormap of each volume to composite final image
 class Z3DVolumeSliceRenderer : public Z3DPrimitiveRenderer
 {
   Q_OBJECT
@@ -22,6 +21,7 @@ public:
   // input vols can not be nullptr
   void setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &vols,
                    const std::vector<std::unique_ptr<ZColorMapParameter>>& colormaps);
+  void setLayerTarget(Z3DRenderTarget *layerTarget) { m_layerTarget = layerTarget; }
 
   // a slice (quad) in 3D volume contains corner vertex and 3d texture coordinates
   // clear
@@ -35,6 +35,7 @@ protected slots:
 
 protected:
   void bindVolumes(Z3DShaderProgram &shader);
+  void bindVolume(Z3DShaderProgram &shader, size_t idx);
   bool hasVolume() const;
 
   virtual void compile() override;
@@ -43,6 +44,9 @@ protected:
   virtual void render(Z3DEye eye) override;
 
   Z3DShaderProgram m_volumeSliceShader;
+  Z3DShaderProgram m_scVolumeSliceShader;
+  Z3DRenderTarget* m_layerTarget = nullptr;
+  Z3DShaderProgram m_mergeChannelShader;
 
   std::vector<Z3DVolume*> m_volumes;
   std::vector<ZColorMapParameter*> m_colormaps;

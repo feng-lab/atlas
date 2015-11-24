@@ -11,8 +11,6 @@ namespace nim {
 
 // use raycaster to render volume or 2D Image (stack with depth==1) with color
 // transfer functions
-// only support up to 20 channels now.
-// use python script to generate new shader to support more channels
 class Z3DVolumeRaycasterRenderer : public Z3DPrimitiveRenderer
 {
   Q_OBJECT
@@ -21,7 +19,7 @@ public:
 
   // input vols can not be nullptr
   void setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &vols);
-  void setLayerTarget(Z3DRenderTarget *scTarget) { m_scTarget = scTarget; }
+  void setLayerTarget(Z3DRenderTarget *layerTarget) { m_layerTarget = layerTarget; }
 
   // quad or entryexit texture should be set before rendering
 
@@ -79,7 +77,7 @@ protected:
   Z3DShaderProgram m_scRaycasterShader;
   Z3DShaderProgram m_sc2dImageShader;
   Z3DShaderProgram m_scVolumeSliceWithTransferfunShader;
-  Z3DRenderTarget* m_scTarget;
+  Z3DRenderTarget* m_layerTarget = nullptr;
   Z3DShaderProgram m_mergeChannelShader;
 
   ZFloatParameter m_samplingRate;  // Sampling rate of the raycasting, specified relative to the size of one voxel

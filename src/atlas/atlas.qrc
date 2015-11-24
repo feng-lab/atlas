@@ -115,5 +115,7 @@
         <file>Resources/shader/image2d_with_transfun_single_channel.frag</file>
         <file>Resources/shader/volume_raycaster_single_channel.frag</file>
         <file>Resources/shader/volume_slice_with_transfun_single_channel.frag</file>
+        <file>Resources/shader/image2d_with_colormap_single_channel.frag</file>
+        <file>Resources/shader/volume_slice_with_colormap_single_channel.frag</file>
     </qresource>
 </RCC>
