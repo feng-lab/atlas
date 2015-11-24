@@ -20,40 +20,25 @@ out vec4 FragData0;  // call glBindFragDataLocation before linking
 #define FragData0 gl_FragData[0]
 #endif
 
-vec4 applyTF(in sampler1D tex, in vec4 intensity)
-{
-#if GLSL_VERSION >= 130
-  return texture(tex, intensity.r);
-#else
-  return texture1D(tex, intensity.r);
-#endif
-}
-
 void main()
 {
 #if NUM_VOLUMES > 0
-  vec4 color = vec4(0.0);
-  vec4 voxel;
-  vec4 chColor;
 
 #if GLSL_VERSION >= 130
-  voxel = texture(volume_struct_1.volume, texCoord0);
+  vec4 color = texture(transfer_function_1, texture(volume_struct_1.volume, texCoord0).r);
 #else
-  voxel = texture2D(volume_struct_1.volume, texCoord0);
+  vec4 color = texture1D(transfer_function_1, texture2D(volume_struct_1.volume, texCoord0).r);
 #endif
-  chColor = applyTF(transfer_function_1, voxel);
-  if (chColor.a > 0.0) {
-    color = max(color, chColor);
+  if (color.a == 0.0) {
+    color = vec4(0.0);
   }
 
 #ifdef RESULT_OPAQUE
   color.a = 1.0;
 #else
-  if (color.a == 0.0)
-    discard;
+  color.rgb *= color.a;
 #endif
 
-  color.rgb *= color.a;
   FragData0 = color;
 #else
   discard;

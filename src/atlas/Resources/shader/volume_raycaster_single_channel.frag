@@ -4,7 +4,9 @@ struct VolumeStruct
   vec3 dimensions;
 };
 
+#if GLSL_VERSION >= 130
 uniform vec2 screen_dim_RCP;
+#endif
 uniform float sampling_rate;
 #ifdef ISO
 uniform float iso_value;
@@ -86,11 +88,11 @@ vec4 compositeXRay(in vec4 curResult, in vec4 color, in float currentRayLength, 
 
 void main()
 {
-  vec2 texCoords = gl_FragCoord.xy * screen_dim_RCP;
 #if GLSL_VERSION >= 130
-  vec4 entryTexCoordAndZ = texture(ray_entry_tex_coord, texCoords);
-  vec4 exitTexCoordAndZ = texture(ray_exit_tex_coord, texCoords);
+  vec4 entryTexCoordAndZ = texelFetch(ray_entry_tex_coord, ivec2(gl_FragCoord.xy), 0);
+  vec4 exitTexCoordAndZ = texelFetch(ray_exit_tex_coord, ivec2(gl_FragCoord.xy), 0);
 #else
+  vec2 texCoords = gl_FragCoord.xy * screen_dim_RCP;
   vec4 entryTexCoordAndZ = texture2D(ray_entry_tex_coord, texCoords);
   vec4 exitTexCoordAndZ = texture2D(ray_exit_tex_coord, texCoords);
 #endif
@@ -123,60 +125,35 @@ void main()
     for (int loop0=0; !finished && loop0<255; loop0++) {
       for (int loop1=0; !finished && loop1<255; loop1++) {
         float voxel;
-        vec4 color = vec4(0.0);
-        vec4 chColor;
         vec3 samplePos = startRayPosition + currentRayLength / maxRayLength * rayVector;
-        bool saturated = true;
 
-
-#ifdef MIP
-#ifdef LOCAL_MIP
-        if (!ch1Done) {
-#if GLSL_VERSION >= 130
-          voxel = texture(volume_struct_1.volume, samplePos).r;
-#else
-          voxel = texture3D(volume_struct_1.volume, samplePos).r;
-#endif
-          if (voxel <= ch1V && ch1V >= local_MIP_threshold) {
-            ch1Done = true;
-          } else if (voxel > ch1V) {
-            ch1V = voxel;
-            rayDepth = currentRayLength;
-          }
-        }
-        saturated = saturated && ch1Done;
-#else
-        if (ch1V < 1.0) {
-#if GLSL_VERSION >= 130
-          voxel = texture(volume_struct_1.volume, samplePos).r;
-#else
-          voxel = texture3D(volume_struct_1.volume, samplePos).r;
-#endif
-          if (voxel > ch1V) {
-            rayDepth = currentRayLength;
-            ch1V = voxel;
-          }
-        }
-        saturated = saturated && ch1V >= 1.0;
-#endif
-#else
 #if GLSL_VERSION >= 130
         voxel = texture(volume_struct_1.volume, samplePos).r;
 #else
         voxel = texture3D(volume_struct_1.volume, samplePos).r;
 #endif
-        chColor = applyTF(transfer_function_1, voxel);
-
-        if (chColor.a > 0.0) {
-          color = max(color, chColor);
-        }
-#endif //MIP
-
 
 
 #ifdef MIP
-        finished = saturated;
+#ifdef LOCAL_MIP
+        if (voxel <= ch1V && ch1V >= local_MIP_threshold) {
+          finished = true;
+        } else if (voxel > ch1V) {
+          ch1V = voxel;
+          rayDepth = currentRayLength;
+        }
 #else
+        if (voxel > ch1V) {
+          ch1V = voxel;
+          rayDepth = currentRayLength;
+        }
+        finished = ch1V >= 1.0;
+#endif
+#else
+        vec4 color = applyTF(transfer_function_1, voxel);
+#endif //MIP
+
+#ifndef MIP
         if (color.a > 0.0) {
           result = COMPOSITING(result, color, currentRayLength, rayDepth);
         }
@@ -186,6 +163,7 @@ void main()
           finished = true;
         }
 #endif // MIP
+
         currentRayLength += stepSize;
         finished = finished || (currentRayLength > maxRayLength);
       }
@@ -199,13 +177,12 @@ void main()
     result.a = 1.0;
 #endif
 
-
     if (rayDepth >= 0.0) {
       //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
       // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
 #if GLSL_VERSION >= 130
-      float zeFront = texture(ray_entry_eye_coord, texCoords).z;
-      float zeBack = texture(ray_exit_eye_coord, texCoords).z;
+      float zeFront = texelFetch(ray_entry_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
+      float zeBack = texelFetch(ray_exit_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
 #else
       float zeFront = texture2D(ray_entry_eye_coord, texCoords).z;
       float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
