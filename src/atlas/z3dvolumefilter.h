@@ -147,6 +147,9 @@ private:
 
   Z3DRenderTarget m_entryTarget;
   Z3DRenderTarget m_exitTarget;
+  Z3DRenderTarget m_layerTarget;
+  Z3DTexture m_layerColorTexture;
+  Z3DTexture m_layerDepthTexture;
 
   Z3DRenderOutputPort m_outport;
   Z3DRenderOutputPort m_leftEyeOutport;

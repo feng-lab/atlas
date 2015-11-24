@@ -5,6 +5,7 @@
 #include "z3dtransferfunction.h"
 #include "zmesh.h"
 #include "z3dshaderprogram.h"
+#include "z3drendertarget.h"
 
 namespace nim {
 
@@ -20,6 +21,7 @@ public:
 
   // input vols can not be nullptr
   void setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &vols);
+  void setLayerTarget(Z3DRenderTarget *scTarget) { m_scTarget = scTarget; }
 
   // quad or entryexit texture should be set before rendering
 
@@ -61,6 +63,7 @@ protected slots:
 
 protected:
   void bindVolumesAndTransferFuncs(Z3DShaderProgram &shader);
+  void bindVolumeAndTransferFunc(Z3DShaderProgram &shader, size_t idx);
 
   virtual void compile() override;
   QString generateHeader();
@@ -71,6 +74,13 @@ protected:
   Z3DShaderProgram m_raycasterShader;
   Z3DShaderProgram m_2dImageShader;
   Z3DShaderProgram m_volumeSliceWithTransferfunShader;
+
+  // single channel version
+  Z3DShaderProgram m_scRaycasterShader;
+  Z3DShaderProgram m_sc2dImageShader;
+  Z3DShaderProgram m_scVolumeSliceWithTransferfunShader;
+  Z3DRenderTarget* m_scTarget;
+  Z3DShaderProgram m_mergeChannelShader;
 
   ZFloatParameter m_samplingRate;  // Sampling rate of the raycasting, specified relative to the size of one voxel
   ZFloatParameter m_isoValue;  // The used isovalue, when isosurface raycasting is enabled

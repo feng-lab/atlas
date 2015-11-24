@@ -97,7 +97,7 @@ void Z3DShaderProgram::link()
     } else {
       log = "failed";
     }
-    throw ZGLException(QString("Z3DShaderProgram::Link: %s").arg(log));
+    throw ZGLException(QString("Z3DShaderProgram::Link: %1").arg(log));
   }
 }
 

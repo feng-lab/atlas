@@ -5,102 +5,102 @@ struct VolumeStruct
 
 #if NUM_VOLUMES >= 1
 uniform VolumeStruct volume_struct_1;
-uniform TF_SAMPLER_TYPE_1 transfer_function_1;
+uniform sampler1D transfer_function_1;
 #endif
 
 #if NUM_VOLUMES >= 2
 uniform VolumeStruct volume_struct_2;
-uniform TF_SAMPLER_TYPE_2 transfer_function_2;
+uniform sampler1D transfer_function_2;
 #endif
 
 #if NUM_VOLUMES >= 3
 uniform VolumeStruct volume_struct_3;
-uniform TF_SAMPLER_TYPE_3 transfer_function_3;
+uniform sampler1D transfer_function_3;
 #endif
 
 #if NUM_VOLUMES >= 4
 uniform VolumeStruct volume_struct_4;
-uniform TF_SAMPLER_TYPE_4 transfer_function_4;
+uniform sampler1D transfer_function_4;
 #endif
 
 #if NUM_VOLUMES >= 5
 uniform VolumeStruct volume_struct_5;
-uniform TF_SAMPLER_TYPE_5 transfer_function_5;
+uniform sampler1D transfer_function_5;
 #endif
 
 #if NUM_VOLUMES >= 6
 uniform VolumeStruct volume_struct_6;
-uniform TF_SAMPLER_TYPE_6 transfer_function_6;
+uniform sampler1D transfer_function_6;
 #endif
 
 #if NUM_VOLUMES >= 7
 uniform VolumeStruct volume_struct_7;
-uniform TF_SAMPLER_TYPE_7 transfer_function_7;
+uniform sampler1D transfer_function_7;
 #endif
 
 #if NUM_VOLUMES >= 8
 uniform VolumeStruct volume_struct_8;
-uniform TF_SAMPLER_TYPE_8 transfer_function_8;
+uniform sampler1D transfer_function_8;
 #endif
 
 #if NUM_VOLUMES >= 9
 uniform VolumeStruct volume_struct_9;
-uniform TF_SAMPLER_TYPE_9 transfer_function_9;
+uniform sampler1D transfer_function_9;
 #endif
 
 #if NUM_VOLUMES >= 10
 uniform VolumeStruct volume_struct_10;
-uniform TF_SAMPLER_TYPE_10 transfer_function_10;
+uniform sampler1D transfer_function_10;
 #endif
 
 #if NUM_VOLUMES >= 11
 uniform VolumeStruct volume_struct_11;
-uniform TF_SAMPLER_TYPE_11 transfer_function_11;
+uniform sampler1D transfer_function_11;
 #endif
 
 #if NUM_VOLUMES >= 12
 uniform VolumeStruct volume_struct_12;
-uniform TF_SAMPLER_TYPE_12 transfer_function_12;
+uniform sampler1D transfer_function_12;
 #endif
 
 #if NUM_VOLUMES >= 13
 uniform VolumeStruct volume_struct_13;
-uniform TF_SAMPLER_TYPE_13 transfer_function_13;
+uniform sampler1D transfer_function_13;
 #endif
 
 #if NUM_VOLUMES >= 14
 uniform VolumeStruct volume_struct_14;
-uniform TF_SAMPLER_TYPE_14 transfer_function_14;
+uniform sampler1D transfer_function_14;
 #endif
 
 #if NUM_VOLUMES >= 15
 uniform VolumeStruct volume_struct_15;
-uniform TF_SAMPLER_TYPE_15 transfer_function_15;
+uniform sampler1D transfer_function_15;
 #endif
 
 #if NUM_VOLUMES >= 16
 uniform VolumeStruct volume_struct_16;
-uniform TF_SAMPLER_TYPE_16 transfer_function_16;
+uniform sampler1D transfer_function_16;
 #endif
 
 #if NUM_VOLUMES >= 17
 uniform VolumeStruct volume_struct_17;
-uniform TF_SAMPLER_TYPE_17 transfer_function_17;
+uniform sampler1D transfer_function_17;
 #endif
 
 #if NUM_VOLUMES >= 18
 uniform VolumeStruct volume_struct_18;
-uniform TF_SAMPLER_TYPE_18 transfer_function_18;
+uniform sampler1D transfer_function_18;
 #endif
 
 #if NUM_VOLUMES >= 19
 uniform VolumeStruct volume_struct_19;
-uniform TF_SAMPLER_TYPE_19 transfer_function_19;
+uniform sampler1D transfer_function_19;
 #endif
 
 #if NUM_VOLUMES >= 20
 uniform VolumeStruct volume_struct_20;
-uniform TF_SAMPLER_TYPE_20 transfer_function_20;
+uniform sampler1D transfer_function_20;
 #endif
 
 #if GLSL_VERSION >= 130

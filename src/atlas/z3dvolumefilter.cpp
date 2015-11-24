@@ -30,6 +30,9 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters &globalParas, QObject *pare
   , m_interactionDownsample("Interaction Downsample", 1, 1, 16)
   , m_entryTarget(glm::uvec2(32,32))
   , m_exitTarget(glm::uvec2(32,32))
+  , m_layerTarget(glm::uvec2(32,32))
+  , m_layerColorTexture(GL_TEXTURE_2D_ARRAY, (GLint)GL_RGBA16, glm::uvec3(32,32,3), GL_RGBA, GL_FLOAT)
+  , m_layerDepthTexture(GL_TEXTURE_2D_ARRAY, (GLint)GL_DEPTH_COMPONENT24, glm::uvec3(32,32,3), GL_DEPTH_COMPONENT, GL_FLOAT)
   , m_outport("Image", true, InvalidMonoViewResult)
   , m_leftEyeOutport("LeftEyeImage", true, InvalidLeftEyeResult)
   , m_rightEyeOutport("RightEyeImage", true, InvalidRightEyeResult)
@@ -99,10 +102,16 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters &globalParas, QObject *pare
   m_exitTarget.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0);
   m_exitTarget.attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1);
   m_exitTarget.isFBOComplete();
+  m_layerColorTexture.uploadImage();
+  m_layerDepthTexture.uploadImage();
+  m_layerTarget.attachTextureToFBO(&m_layerColorTexture, GL_COLOR_ATTACHMENT0, false);
+  m_layerTarget.attachTextureToFBO(&m_layerDepthTexture, GL_DEPTH_ATTACHMENT, false);
+  m_layerTarget.isFBOComplete();
 
   // ports
   addPrivateRenderTarget(m_entryTarget);
   addPrivateRenderTarget(m_exitTarget);
+  addPrivateRenderTarget(m_layerTarget);
   addPort(m_outport);
   addPort(m_leftEyeOutport);
   addPort(m_rightEyeOutport);
@@ -983,6 +992,16 @@ void Z3DVolumeFilter::readVolumes()
     m_nChannels = maxPossibleChannels;
   }
 
+  if (m_nChannels > m_layerColorTexture.depth()) {
+    m_layerColorTexture.setDimension(glm::uvec3(m_layerColorTexture.width(), m_layerColorTexture.height(), m_nChannels));
+    m_layerColorTexture.uploadImage();
+    m_layerDepthTexture.setDimension(glm::uvec3(m_layerDepthTexture.width(), m_layerDepthTexture.height(), m_nChannels));
+    m_layerDepthTexture.uploadImage();
+    m_layerTarget.attachTextureToFBO(&m_layerColorTexture, GL_COLOR_ATTACHMENT0, false);
+    m_layerTarget.attachTextureToFBO(&m_layerDepthTexture, GL_DEPTH_ATTACHMENT, false);
+    m_layerTarget.isFBOComplete();
+  }
+
   bool scaleZ = m_imgPack->imgInfo().depth > std::pow(m_maxVoxelNumber, 1/3.0);
   double scale = 1.0;
   if (m_imgPack->imgInfo().timeVoxelNumber() > m_maxVoxelNumber) {
@@ -1392,6 +1411,7 @@ void Z3DVolumeFilter::volumeChanged()
   }
 
   m_volumeRaycasterRenderer.setChannels(getVolumes());
+  m_volumeRaycasterRenderer.setLayerTarget(&m_layerTarget);
   if (!is2DImage) {
     m_volumeSliceRenderer.setChannels(getVolumes(), m_sliceColormaps);
   }
