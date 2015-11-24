@@ -16,6 +16,7 @@ Z3DTexture::Z3DTexture(GLenum textureTarget, GLint internalFormat, const glm::uv
   , m_dataType(dataType)
 {
   assert(m_dimension.x > 0 && m_dimension.y > 0 && m_dimension.z > 0);
+  getType();
   glGenTextures(1, &m_id);
   setFilter();
   setWrap();
@@ -36,6 +37,7 @@ Z3DTexture::Z3DTexture(GLint internalFormat, const glm::uvec3 &dimension, GLenum
   } else {
     m_textureTarget = GL_TEXTURE_1D;
   }
+  getType();
   glGenTextures(1, &m_id);
   setFilter();
   setWrap();
@@ -47,50 +49,6 @@ Z3DTexture::~Z3DTexture()
   if (m_id) {
     glDeleteTextures(1, &m_id);
   }
-}
-
-void Z3DTexture::uploadImage(const GLvoid *data)
-{
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
-  bind();
-
-  if (is3DTexture()) {
-    glTexImage3D(m_textureTarget, 0, m_internalFormat,
-                 m_dimension.x, m_dimension.y, m_dimension.z, 0,
-                 m_dataFormat, m_dataType, data);
-  } else if (is2DTexture()) {
-    glTexImage2D(m_textureTarget, 0, m_internalFormat,
-                 m_dimension.x, m_dimension.y, 0,
-                 m_dataFormat, m_dataType, data);
-  } else if (is1DTexture()) {
-    glTexImage1D(m_textureTarget, 0, m_internalFormat,
-                 m_dimension.x, 0,
-                 m_dataFormat, m_dataType, data);
-  }
-
-  CHECK_GL_ERROR;
-}
-
-void Z3DTexture::uploadSubImage(const glm::uvec3 &offset, const glm::uvec3 &size, const GLvoid *data)
-{
-  assert(data);
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
-  bind();
-
-  if (is3DTexture()) {
-    glTexSubImage3D(m_textureTarget, 0, offset.x, offset.y, offset.z, size.x, size.y, size.z,
-                    m_dataFormat, m_dataType, data);
-  } else if (is2DTexture()) {
-    glTexSubImage2D(m_textureTarget, 0, offset.x, offset.y, size.x, size.y,
-                    m_dataFormat, m_dataType, data);
-  } else if (is1DTexture()) {
-    glTexSubImage1D(m_textureTarget, 0, offset.x, size.x,
-                    m_dataFormat, m_dataType, data);
-  }
-
-  CHECK_GL_ERROR;
 }
 
 void Z3DTexture::setFilter(GLint minFilter, GLint magFilter)
@@ -117,16 +75,60 @@ void Z3DTexture::generateMipmap()
   CHECK_GL_ERROR;
 }
 
-void Z3DTexture::downloadTextureToBuffer(GLenum dataFormat, GLenum dataType, GLvoid *buffer) const
+void Z3DTexture::uploadImage(const GLvoid *data)
 {
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
   bind();
-  glGetTexImage(m_textureTarget, 0, dataFormat, dataType, buffer);
+
+  switch (m_type) {
+  case 3:
+    glTexImage3D(m_textureTarget, 0, m_internalFormat,
+                 m_dimension.x, m_dimension.y, m_dimension.z, 0,
+                 m_dataFormat, m_dataType, data);
+    break;
+  case 2:
+    glTexImage2D(m_textureTarget, 0, m_internalFormat,
+                 m_dimension.x, m_dimension.y, 0,
+                 m_dataFormat, m_dataType, data);
+    break;
+  case 1:
+    glTexImage1D(m_textureTarget, 0, m_internalFormat,
+                 m_dimension.x, 0,
+                 m_dataFormat, m_dataType, data);
+    break;
+  default:
+    break;
+  }
+
   CHECK_GL_ERROR;
 }
 
-int Z3DTexture::textureSizeOnGPU() const
+void Z3DTexture::uploadSubImage(const glm::uvec3 &offset, const glm::uvec3 &size, const GLvoid *data)
 {
-  return bypePerPixel(m_internalFormat) * numPixels();
+  assert(data);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+  bind();
+
+  switch (m_type) {
+  case 3:
+    glTexSubImage3D(m_textureTarget, 0, offset.x, offset.y, offset.z, size.x, size.y, size.z,
+                    m_dataFormat, m_dataType, data);
+    break;
+  case 2:
+    glTexSubImage2D(m_textureTarget, 0, offset.x, offset.y, size.x, size.y,
+                    m_dataFormat, m_dataType, data);
+    break;
+  case 1:
+    glTexSubImage1D(m_textureTarget, 0, offset.x, size.x,
+                    m_dataFormat, m_dataType, data);
+    break;
+  default:
+    break;
+  }
+
+  CHECK_GL_ERROR;
 }
 
 size_t Z3DTexture::bypePerPixel(GLenum dataFormat, GLenum dataType)
@@ -324,6 +326,13 @@ size_t Z3DTexture::bypePerPixel(GLint internalFormat)
   return bpp;
 }
 
+void Z3DTexture::downloadTextureToBuffer(GLenum dataFormat, GLenum dataType, GLvoid *buffer) const
+{
+  bind();
+  glGetTexImage(m_textureTarget, 0, dataFormat, dataType, buffer);
+  CHECK_GL_ERROR;
+}
+
 void Z3DTexture::saveAsColorImage(const QString &filename) const
 {
   try {
@@ -398,6 +407,19 @@ bool Z3DTexture::is3DTexture() const
       m_textureTarget == GL_PROXY_TEXTURE_2D_ARRAY ||
       m_textureTarget == GL_TEXTURE_CUBE_MAP_ARRAY ||
       m_textureTarget == GL_PROXY_TEXTURE_CUBE_MAP_ARRAY;
+}
+
+void Z3DTexture::getType()
+{
+  if (is3DTexture()) {
+    m_type = 3;
+  } else if (is2DTexture()) {
+    m_type = 2;
+  } else if (is1DTexture()) {
+    m_type = 1;
+  } else {
+    assert(false);
+  }
 }
 
 Z3DTextureUnitManager::Z3DTextureUnitManager()

@@ -31,8 +31,8 @@ public:
   inline Z3DPickingManager& pickingManager() { return m_rendererBase.globalParas().pickingManager; }
   inline Z3DTrackballInteractionHandler& interactionHandler() { return m_rendererBase.globalParas().interactionHandler; }
   virtual void setShaderHookType(Z3DRendererBase::ShaderHookType t) { m_rendererBase.setShaderHookType(t); }
-  virtual void setShaderHookParaDDPDepthBlenderTexture(Z3DTexture *t) { m_rendererBase.setShaderHookParaDDPDepthBlenderTexture(t); }
-  virtual void setShaderHookParaDDPFrontBlenderTexture(Z3DTexture *t) { m_rendererBase.setShaderHookParaDDPFrontBlenderTexture(t); }
+  virtual void setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture *t) { m_rendererBase.setShaderHookParaDDPDepthBlenderTexture(t); }
+  virtual void setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture *t) { m_rendererBase.setShaderHookParaDDPFrontBlenderTexture(t); }
   inline Z3DRendererBase::ShaderHookParameter& shaderHookPara() { return m_rendererBase.shaderHookPara(); }
 
   const std::vector<double>& axisAlignedBoundBox() const { return m_axisAlignedBoundBox; }

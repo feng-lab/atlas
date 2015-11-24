@@ -15,32 +15,6 @@ public:
              GLenum dataFormat, GLenum dataType);
   ~Z3DTexture();
 
-  // Input data must match current dataFormat and dataType.
-  void uploadImage(const GLvoid* data = nullptr);
-  // glTexSubImage*D
-  void uploadSubImage(const glm::uvec3& offset, const glm::uvec3& size, const GLvoid* data);
-
-  void bind() const { glBindTexture(m_textureTarget, m_id); }
-
-  GLuint id() const { return m_id; }
-  // Check if texture is in resident GL memory
-  //bool isResident() const { GLboolean res; return glAreTexturesResident(1, &m_id, &res) == GL_TRUE; }
-
-  // buffer must have at least bypePerPixel(dataFormat, dataType) * numPixels() bytes space, crash otherwise
-  void downloadTextureToBuffer(GLenum dataFormat, GLenum dataType, GLvoid* buffer) const;
-
-  int textureSizeOnGPU() const;
-
-  GLenum textureTarget() const { return m_textureTarget; }
-  glm::uvec3 dimension() const { return m_dimension;}
-  size_t width() const { return m_dimension.x; }
-  size_t height() const { return m_dimension.y; }
-  size_t depth() const { return m_dimension.z; }
-  size_t numPixels() const { return m_dimension.x * m_dimension.y * m_dimension.z; }
-  GLenum dataFormat() const { return m_dataFormat; }
-  GLint internalFormat() const { return m_internalFormat; }
-  GLenum dataType() const { return m_dataType; }
-
   // default is GL_LINEAR and GL_LINEAR.
   // note: openGL default is GL_NEAREST_MIPMAP_LINEAR and GL_LINEAR.
   void setFilter(GLint minFilter = (GLint)GL_LINEAR, GLint magFilter = (GLint)GL_LINEAR);
@@ -52,14 +26,36 @@ public:
 
   // changes made by the following four functions will take effect after next call of uploadImage()
   void setDimension(const glm::uvec3& dimension) { m_dimension = dimension; }
-  void setDataFormat(GLenum format) { m_dataFormat = format; }
   void setInternalFormat(GLint internalformat) { m_internalFormat = internalformat; }
+  void setDataFormat(GLenum format) { m_dataFormat = format; }
   void setDataType(GLenum dataType) { m_dataType = dataType; }
+
+  // Input data must match current dataFormat and dataType.
+  void uploadImage(const GLvoid* data = nullptr);
+  // glTexSubImage*D
+  void uploadSubImage(const glm::uvec3& offset, const glm::uvec3& size, const GLvoid* data);
+
+  void bind() const { glBindTexture(m_textureTarget, m_id); }
+
+  GLuint id() const { return m_id; }
+  GLenum textureTarget() const { return m_textureTarget; }
+  glm::uvec3 dimension() const { return m_dimension; }
+  size_t width() const { return m_dimension.x; }
+  size_t height() const { return m_dimension.y; }
+  size_t depth() const { return m_dimension.z; }
+  size_t numPixels() const { return m_dimension.x * m_dimension.y * m_dimension.z; }
+  GLenum dataFormat() const { return m_dataFormat; }
+  GLenum dataType() const { return m_dataType; }
+  GLint internalFormat() const { return m_internalFormat; }
 
   // calculates the bytes per pixel from dataFormat and dataType
   static size_t bypePerPixel(GLenum dataFormat, GLenum dataType);
   // calculates the bytes per pixel from the internal format
   static size_t bypePerPixel(GLint internalFormat);
+
+  // buffer must have at least bypePerPixel(dataFormat, dataType) * numPixels() bytes space, crash otherwise
+  void downloadTextureToBuffer(GLenum dataFormat, GLenum dataType, GLvoid* buffer) const;
+  size_t textureSizeOnGPU() const { return bypePerPixel(m_internalFormat) * numPixels(); }
 
   void saveAsColorImage(const QString &filename) const;
   void saveAsDepthImage(const QString &filename) const;
@@ -68,8 +64,9 @@ private:
   bool is1DTexture() const;
   bool is2DTexture() const;
   bool is3DTexture() const;
+  void getType();
 
-protected:
+private:
   GLenum m_textureTarget;
   glm::uvec3 m_dimension;
   GLint m_internalFormat;
@@ -78,6 +75,8 @@ protected:
   GLenum m_dataType;
 
   GLuint m_id = 0; // texture id
+
+  int m_type;
 };
 
 // provide unique texture units

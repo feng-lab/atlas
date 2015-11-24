@@ -32,16 +32,9 @@ public:
   // returned fbo should only be used for read if multisample is used
   GLuint handle() const;
 
-  const Z3DTexture* attachment(GLenum attachment) const
-  {
-    std::map<GLenum, Z3DTexture*>::const_iterator it = m_attachments.find(attachment);
-    if (it != m_attachments.end())
-      return it->second;
-    else
-      return NULL;
-  }
-
-  Z3DTexture* attachment(GLenum attachment) { return m_attachments[attachment]; }
+  // might crash
+  const Z3DTexture* attachment(GLenum attachment) const { return m_attachments.at(attachment); }
+  Z3DTexture* attachment(GLenum attachment) { return m_attachments.at(attachment); }
 
   //Get the color at position pos. This method will bind the RenderTarget!
   glm::vec4 floatColorAtPos(glm::ivec2 pos);
@@ -55,9 +48,11 @@ public:
   void changeDepthAttachmentFormat(GLint internalDepthFormat);
 
   bool isFBOComplete();
-  void attachTextureToFBO(Z3DTexture* texture, GLenum attachment, int mipLevel = 0, int zSlice = 0,
-                          bool takeOwnership = true);
+  // attach first layer miplevel 0 of texture to attachment point
+  void attachTextureToFBO(Z3DTexture* texture, GLenum attachment, bool takeOwnership = true);
   void detach(GLenum attachment);
+
+  void attachSlice(size_t zSlice);
 
   static GLuint currentBoundDrawFBO();
   static GLuint currentBoundReadFBO();

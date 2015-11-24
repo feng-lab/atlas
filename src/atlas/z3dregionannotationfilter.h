@@ -33,8 +33,8 @@ public:
   virtual void setViewport(glm::uvec2 viewport) override;
   virtual void setViewport(glm::uvec4 viewport) override;
   virtual void setShaderHookType(Z3DRendererBase::ShaderHookType t) override;
-  virtual void setShaderHookParaDDPDepthBlenderTexture(Z3DTexture *t) override;
-  virtual void setShaderHookParaDDPFrontBlenderTexture(Z3DTexture *t) override;
+  virtual void setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture *t) override;
+  virtual void setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture *t) override;
 
 signals:
 

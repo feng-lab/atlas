@@ -115,14 +115,14 @@ void Z3DRegionAnnotationFilter::setShaderHookType(Z3DRendererBase::ShaderHookTyp
   }
 }
 
-void Z3DRegionAnnotationFilter::setShaderHookParaDDPDepthBlenderTexture(Z3DTexture *t)
+void Z3DRegionAnnotationFilter::setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture *t)
 {
   for (auto it = m_idToMeshFilters.begin(); it != m_idToMeshFilters.end(); ++it) {
     it->second->setShaderHookParaDDPDepthBlenderTexture(t);
   }
 }
 
-void Z3DRegionAnnotationFilter::setShaderHookParaDDPFrontBlenderTexture(Z3DTexture *t)
+void Z3DRegionAnnotationFilter::setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture *t)
 {
   for (auto it = m_idToMeshFilters.begin(); it != m_idToMeshFilters.end(); ++it) {
     it->second->setShaderHookParaDDPFrontBlenderTexture(t);

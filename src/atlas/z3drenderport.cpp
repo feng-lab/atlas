@@ -38,16 +38,6 @@ void Z3DRenderOutputPort::clearTarget() const
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-Z3DTexture *Z3DRenderOutputPort::colorTexture()
-{
-  return m_renderTarget.attachment(GL_COLOR_ATTACHMENT0);
-}
-
-Z3DTexture *Z3DRenderOutputPort::depthTexture()
-{
-  return m_renderTarget.attachment(GL_DEPTH_ATTACHMENT);
-}
-
 void Z3DRenderOutputPort::resize(const glm::uvec2 &newsize)
 {
   if (m_renderTarget.resize(newsize)) {

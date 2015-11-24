@@ -190,7 +190,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DCompositor::axisWidgetsGroup()
 
 void Z3DCompositor::savePickingBufferToImage(const QString &filename)
 {
-  Z3DTexture *tex = pickingManager().renderTarget().attachment(GL_COLOR_ATTACHMENT0);
+  const Z3DTexture *tex = pickingManager().renderTarget().attachment(GL_COLOR_ATTACHMENT0);
   tex->saveAsColorImage(filename);
 }
 
@@ -827,7 +827,7 @@ void Z3DCompositor::renderOpaqueFilters(const std::vector<Z3DBoundedFilter*> &fi
 }
 
 void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*> &filters,
-                                         Z3DRenderOutputPort &port, Z3DEye eye, Z3DTexture *depthTexture)
+                                         Z3DRenderOutputPort &port, Z3DEye eye, Z3DTexture* depthTexture)
 {
   if (!m_ddpRT)
     if (!createDDPRenderTarget(port.size())) {
@@ -836,20 +836,20 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*> &f
     }
   m_ddpRT->resize(port.size());
   if (depthTexture) {
-    m_ddpRT->attachTextureToFBO(depthTexture, GL_DEPTH_ATTACHMENT, 0, 0, false);
+    m_ddpRT->attachTextureToFBO(depthTexture, GL_DEPTH_ATTACHMENT, false);
   }
 
-  Z3DTexture* g_dualDepthTexId[2];
+  const Z3DTexture* g_dualDepthTexId[2];
   g_dualDepthTexId[0] = m_ddpRT->attachment(GL_COLOR_ATTACHMENT0);
   g_dualDepthTexId[1] = m_ddpRT->attachment(GL_COLOR_ATTACHMENT3);
-  Z3DTexture* g_dualFrontBlenderTexId[2];
+  const Z3DTexture* g_dualFrontBlenderTexId[2];
   g_dualFrontBlenderTexId[0] = m_ddpRT->attachment(GL_COLOR_ATTACHMENT1);
   g_dualFrontBlenderTexId[1] = m_ddpRT->attachment(GL_COLOR_ATTACHMENT4);
-  Z3DTexture* g_dualBackTempTexId[2];
+  const Z3DTexture* g_dualBackTempTexId[2];
   g_dualBackTempTexId[0] = m_ddpRT->attachment(GL_COLOR_ATTACHMENT2);
   g_dualBackTempTexId[1] = m_ddpRT->attachment(GL_COLOR_ATTACHMENT5);
-  Z3DTexture* g_dualBackBlenderTexId = m_ddpRT->attachment(GL_COLOR_ATTACHMENT6);
-  Z3DTexture* g_depthTex = m_ddpRT->attachment(GL_COLOR_ATTACHMENT7);
+  const Z3DTexture* g_dualBackBlenderTexId = m_ddpRT->attachment(GL_COLOR_ATTACHMENT6);
+  const Z3DTexture* g_depthTex = m_ddpRT->attachment(GL_COLOR_ATTACHMENT7);
   GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
                             GL_COLOR_ATTACHMENT1,
                             GL_COLOR_ATTACHMENT2,
@@ -1097,7 +1097,7 @@ bool Z3DCompositor::createDDPRenderTarget(glm::uvec2 size)
 }
 
 void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*> &filters,
-                                        Z3DRenderOutputPort &port, Z3DEye eye, Z3DTexture *depthTexture)
+                                        Z3DRenderOutputPort &port, Z3DEye eye, Z3DTexture* depthTexture)
 {
   if (!m_waRT)
     if (!createWARenderTarget(port.size())) {
@@ -1106,10 +1106,10 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*> &fi
     }
   m_waRT->resize(port.size());
   if (depthTexture) {
-    m_waRT->attachTextureToFBO(depthTexture, GL_DEPTH_ATTACHMENT, 0, 0, false);
+    m_waRT->attachTextureToFBO(depthTexture, GL_DEPTH_ATTACHMENT, false);
   }
 
-  Z3DTexture* g_accumulationTexId[2];
+  const Z3DTexture* g_accumulationTexId[2];
   g_accumulationTexId[0] = m_waRT->attachment(GL_COLOR_ATTACHMENT0);
   g_accumulationTexId[1] = m_waRT->attachment(GL_COLOR_ATTACHMENT1);
   GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,

@@ -46,8 +46,10 @@ public:
   const Z3DRenderTarget& renderTarget() const { return m_renderTarget; }
   Z3DRenderTarget& renderTarget() { return m_renderTarget; }
 
-  Z3DTexture* colorTexture();
-  Z3DTexture* depthTexture();
+  const Z3DTexture* colorTexture() const { return m_renderTarget.attachment(GL_COLOR_ATTACHMENT0); }
+  const Z3DTexture* depthTexture() const { return m_renderTarget.attachment(GL_DEPTH_ATTACHMENT); }
+  Z3DTexture* colorTexture() { return m_renderTarget.attachment(GL_COLOR_ATTACHMENT0); }
+  Z3DTexture* depthTexture() { return m_renderTarget.attachment(GL_DEPTH_ATTACHMENT); }
 
   // Resizes the associated RenderTarget to the passed dimensions.
   virtual void resize(const glm::uvec2& newsize) override;

@@ -303,25 +303,23 @@ bool Z3DRenderTarget::isFBOComplete()
   return complete;
 }
 
-void Z3DRenderTarget::attachTextureToFBO(Z3DTexture *texture, GLenum attachment, int mipLevel, int zSlice,
-                                         bool takeOwnership)
+void Z3DRenderTarget::attachTextureToFBO(Z3DTexture *texture, GLenum attachment, bool takeOwnership)
 {
+  assert(texture);
   if (m_size != texture->dimension().xy()) {
     LWARN() << "attached texture has imcompatible size with current fbo";
   }
   bind();
   switch(texture->textureTarget()) {
   case GL_TEXTURE_1D:
-    glFramebufferTexture1D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_1D, texture->id(), mipLevel);
+    glFramebufferTexture1D(GL_DRAW_FRAMEBUFFER, attachment, GL_TEXTURE_1D, texture->id(), 0);
     break;
   case GL_TEXTURE_3D:
-    glFramebufferTexture3D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_3D, texture->id(), mipLevel, zSlice);
-    break;
   case GL_TEXTURE_2D_ARRAY:
-    glFramebufferTextureLayer(GL_FRAMEBUFFER, attachment, texture->id(), mipLevel, zSlice);
+    glFramebufferTextureLayer(GL_DRAW_FRAMEBUFFER, attachment, texture->id(), 0, 0);
     break;
   default: //GL_TEXTURE_2D, GL_TEXTURE_RECTANGLE, ...
-    glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, texture->textureTarget(), texture->id(), mipLevel);
+    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, attachment, texture->textureTarget(), texture->id(), 0);
     break;
   }
   //LINFO() << texture->getId() << texture->getTextureTarget() << GL_TEXTURE_RECTANGLE << texture->getDimensions();
@@ -335,7 +333,21 @@ void Z3DRenderTarget::attachTextureToFBO(Z3DTexture *texture, GLenum attachment,
 void Z3DRenderTarget::detach(GLenum attachment)
 {
   bind();
-  glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, 0, 0);
+  glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, attachment, GL_TEXTURE_2D, 0, 0);
+  CHECK_GL_ERROR;
+  release();
+}
+
+void Z3DRenderTarget::attachSlice(size_t zSlice)
+{
+  bind();
+  for (auto it = m_attachments.begin(); it != m_attachments.end(); ++it) {
+    Z3DTexture* texture = it->second;
+    assert(texture->textureTarget() == GL_TEXTURE_2D_ARRAY || texture->textureTarget() == GL_TEXTURE_3D);
+    assert(zSlice < texture->depth());
+    glFramebufferTextureLayer(GL_DRAW_FRAMEBUFFER, it->first, texture->id(), 0, zSlice);
+  }
+  isFBOComplete();
   CHECK_GL_ERROR;
   release();
 }

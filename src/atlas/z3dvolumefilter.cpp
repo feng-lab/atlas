@@ -1314,25 +1314,18 @@ void Z3DVolumeFilter::prepareDataForRaycaster(Z3DVolume *volume, Z3DEye eye)
                            };
   m_exitTarget.bind();
   glDrawBuffers(2, g_drawBuffers);
-  glClearDepth(0.0f);
-  glDepthFunc(GL_GREATER);
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glClear(GL_COLOR_BUFFER_BIT);
   glCullFace(GL_FRONT);
 
   m_textureAndEyeCoordinateRenderer.setTriangleList(&cube);
   m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
-  CHECK_GL_ERROR;
   m_exitTarget.release();
-  glDepthFunc(GL_LESS);
-  glClearDepth(1.0f);
   CHECK_GL_ERROR;
 
   // render front texture
   m_entryTarget.bind();
   glDrawBuffers(2, g_drawBuffers);
-  CHECK_GL_ERROR;
-
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glClear(GL_COLOR_BUFFER_BIT);
   glCullFace(GL_BACK);
 
   float nearPlaneDistToOrigin = glm::dot(globalCamera().eye(), -globalCamera().viewVector()) - globalCamera().nearDist() - 0.01f;
@@ -1341,8 +1334,8 @@ void Z3DVolumeFilter::prepareDataForRaycaster(Z3DVolume *volume, Z3DEye eye)
   ZMesh clipped = ZMeshUtils::clipClosedSurface(cube, planes);
   m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
   m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
-
   m_entryTarget.release();
+  CHECK_GL_ERROR;
 
   // restore OpenGL state
   glCullFace(GL_BACK);

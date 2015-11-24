@@ -36,8 +36,8 @@ public:
 
   struct ShaderHookParameter
   {
-    Z3DTexture *dualDepthPeelingDepthBlenderTexture;
-    Z3DTexture *dualDepthPeelingFrontBlenderTexture;
+    const Z3DTexture *dualDepthPeelingDepthBlenderTexture;
+    const Z3DTexture *dualDepthPeelingFrontBlenderTexture;
   };
 
   explicit Z3DRendererBase(Z3DGlobalParameters &globalParas, QObject *parent = nullptr);
@@ -123,8 +123,8 @@ public:
   inline void setShaderHookType(ShaderHookType t) { m_shaderHookType = t; }
   inline ShaderHookType shaderHookType() const { return m_shaderHookType; }
   inline ShaderHookParameter& shaderHookPara() { return m_shaderHookPara; }
-  inline void setShaderHookParaDDPDepthBlenderTexture(Z3DTexture *t) { m_shaderHookPara.dualDepthPeelingDepthBlenderTexture = t; }
-  inline void setShaderHookParaDDPFrontBlenderTexture(Z3DTexture *t) { m_shaderHookPara.dualDepthPeelingFrontBlenderTexture = t; }
+  inline void setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture *t) { m_shaderHookPara.dualDepthPeelingDepthBlenderTexture = t; }
+  inline void setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture *t) { m_shaderHookPara.dualDepthPeelingFrontBlenderTexture = t; }
 
   inline const glm::mat4& viewportMatrix() const { return m_viewportMatrix; }
   inline const glm::mat4& inverseViewportMatrix() const { return m_inverseViewportMatrix; }
