@@ -346,14 +346,14 @@ void main()
 
 #if NUM_VOLUMES >= 1
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_1.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_1.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch1Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_1.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_1.volume, samplePos).r;
+#endif
           if (voxel <= ch1V && ch1V >= local_MIP_threshold) {
             ch1Done = true;
           } else if (voxel > ch1V) {
@@ -363,13 +363,25 @@ void main()
         }
         saturated = saturated && ch1Done;
 #else
-        if (voxel > ch1V) {
-          rayDepth = currentRayLength;
-          ch1V = voxel;
+        if (ch1V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_1.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_1.volume, samplePos).r;
+#endif
+          if (voxel > ch1V) {
+            rayDepth = currentRayLength;
+            ch1V = voxel;
+          }
         }
         saturated = saturated && ch1V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_1.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_1.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_1, voxel);
 
         if (chColor.a > 0.0) {
@@ -382,14 +394,14 @@ void main()
 
 #if NUM_VOLUMES >= 2
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_2.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_2.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch2Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_2.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_2.volume, samplePos).r;
+#endif
           if (voxel <= ch2V && ch2V >= local_MIP_threshold) {
             ch2Done = true;
           } else if (voxel > ch2V) {
@@ -399,13 +411,25 @@ void main()
         }
         saturated = saturated && ch2Done;
 #else
-        if (voxel > ch2V) {
-          rayDepth = currentRayLength;
-          ch2V = voxel;
+        if (ch2V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_2.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_2.volume, samplePos).r;
+#endif
+          if (voxel > ch2V) {
+            rayDepth = currentRayLength;
+            ch2V = voxel;
+          }
         }
         saturated = saturated && ch2V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_2.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_2.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_2, voxel);
 
         if (chColor.a > 0.0) {
@@ -418,14 +442,14 @@ void main()
 
 #if NUM_VOLUMES >= 3
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_3.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_3.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch3Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_3.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_3.volume, samplePos).r;
+#endif
           if (voxel <= ch3V && ch3V >= local_MIP_threshold) {
             ch3Done = true;
           } else if (voxel > ch3V) {
@@ -435,13 +459,25 @@ void main()
         }
         saturated = saturated && ch3Done;
 #else
-        if (voxel > ch3V) {
-          rayDepth = currentRayLength;
-          ch3V = voxel;
+        if (ch3V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_3.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_3.volume, samplePos).r;
+#endif
+          if (voxel > ch3V) {
+            rayDepth = currentRayLength;
+            ch3V = voxel;
+          }
         }
         saturated = saturated && ch3V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_3.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_3.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_3, voxel);
 
         if (chColor.a > 0.0) {
@@ -454,14 +490,14 @@ void main()
 
 #if NUM_VOLUMES >= 4
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_4.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_4.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch4Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_4.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_4.volume, samplePos).r;
+#endif
           if (voxel <= ch4V && ch4V >= local_MIP_threshold) {
             ch4Done = true;
           } else if (voxel > ch4V) {
@@ -471,13 +507,25 @@ void main()
         }
         saturated = saturated && ch4Done;
 #else
-        if (voxel > ch4V) {
-          rayDepth = currentRayLength;
-          ch4V = voxel;
+        if (ch4V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_4.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_4.volume, samplePos).r;
+#endif
+          if (voxel > ch4V) {
+            rayDepth = currentRayLength;
+            ch4V = voxel;
+          }
         }
         saturated = saturated && ch4V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_4.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_4.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_4, voxel);
 
         if (chColor.a > 0.0) {
@@ -490,14 +538,14 @@ void main()
 
 #if NUM_VOLUMES >= 5
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_5.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_5.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch5Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_5.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_5.volume, samplePos).r;
+#endif
           if (voxel <= ch5V && ch5V >= local_MIP_threshold) {
             ch5Done = true;
           } else if (voxel > ch5V) {
@@ -507,13 +555,25 @@ void main()
         }
         saturated = saturated && ch5Done;
 #else
-        if (voxel > ch5V) {
-          rayDepth = currentRayLength;
-          ch5V = voxel;
+        if (ch5V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_5.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_5.volume, samplePos).r;
+#endif
+          if (voxel > ch5V) {
+            rayDepth = currentRayLength;
+            ch5V = voxel;
+          }
         }
         saturated = saturated && ch5V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_5.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_5.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_5, voxel);
 
         if (chColor.a > 0.0) {
@@ -526,14 +586,14 @@ void main()
 
 #if NUM_VOLUMES >= 6
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_6.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_6.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch6Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_6.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_6.volume, samplePos).r;
+#endif
           if (voxel <= ch6V && ch6V >= local_MIP_threshold) {
             ch6Done = true;
           } else if (voxel > ch6V) {
@@ -543,13 +603,25 @@ void main()
         }
         saturated = saturated && ch6Done;
 #else
-        if (voxel > ch6V) {
-          rayDepth = currentRayLength;
-          ch6V = voxel;
+        if (ch6V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_6.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_6.volume, samplePos).r;
+#endif
+          if (voxel > ch6V) {
+            rayDepth = currentRayLength;
+            ch6V = voxel;
+          }
         }
         saturated = saturated && ch6V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_6.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_6.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_6, voxel);
 
         if (chColor.a > 0.0) {
@@ -562,14 +634,14 @@ void main()
 
 #if NUM_VOLUMES >= 7
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_7.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_7.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch7Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_7.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_7.volume, samplePos).r;
+#endif
           if (voxel <= ch7V && ch7V >= local_MIP_threshold) {
             ch7Done = true;
           } else if (voxel > ch7V) {
@@ -579,13 +651,25 @@ void main()
         }
         saturated = saturated && ch7Done;
 #else
-        if (voxel > ch7V) {
-          rayDepth = currentRayLength;
-          ch7V = voxel;
+        if (ch7V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_7.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_7.volume, samplePos).r;
+#endif
+          if (voxel > ch7V) {
+            rayDepth = currentRayLength;
+            ch7V = voxel;
+          }
         }
         saturated = saturated && ch7V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_7.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_7.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_7, voxel);
 
         if (chColor.a > 0.0) {
@@ -598,14 +682,14 @@ void main()
 
 #if NUM_VOLUMES >= 8
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_8.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_8.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch8Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_8.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_8.volume, samplePos).r;
+#endif
           if (voxel <= ch8V && ch8V >= local_MIP_threshold) {
             ch8Done = true;
           } else if (voxel > ch8V) {
@@ -615,13 +699,25 @@ void main()
         }
         saturated = saturated && ch8Done;
 #else
-        if (voxel > ch8V) {
-          rayDepth = currentRayLength;
-          ch8V = voxel;
+        if (ch8V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_8.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_8.volume, samplePos).r;
+#endif
+          if (voxel > ch8V) {
+            rayDepth = currentRayLength;
+            ch8V = voxel;
+          }
         }
         saturated = saturated && ch8V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_8.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_8.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_8, voxel);
 
         if (chColor.a > 0.0) {
@@ -634,14 +730,14 @@ void main()
 
 #if NUM_VOLUMES >= 9
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_9.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_9.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch9Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_9.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_9.volume, samplePos).r;
+#endif
           if (voxel <= ch9V && ch9V >= local_MIP_threshold) {
             ch9Done = true;
           } else if (voxel > ch9V) {
@@ -651,13 +747,25 @@ void main()
         }
         saturated = saturated && ch9Done;
 #else
-        if (voxel > ch9V) {
-          rayDepth = currentRayLength;
-          ch9V = voxel;
+        if (ch9V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_9.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_9.volume, samplePos).r;
+#endif
+          if (voxel > ch9V) {
+            rayDepth = currentRayLength;
+            ch9V = voxel;
+          }
         }
         saturated = saturated && ch9V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_9.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_9.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_9, voxel);
 
         if (chColor.a > 0.0) {
@@ -670,14 +778,14 @@ void main()
 
 #if NUM_VOLUMES >= 10
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_10.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_10.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch10Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_10.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_10.volume, samplePos).r;
+#endif
           if (voxel <= ch10V && ch10V >= local_MIP_threshold) {
             ch10Done = true;
           } else if (voxel > ch10V) {
@@ -687,13 +795,25 @@ void main()
         }
         saturated = saturated && ch10Done;
 #else
-        if (voxel > ch10V) {
-          rayDepth = currentRayLength;
-          ch10V = voxel;
+        if (ch10V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_10.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_10.volume, samplePos).r;
+#endif
+          if (voxel > ch10V) {
+            rayDepth = currentRayLength;
+            ch10V = voxel;
+          }
         }
         saturated = saturated && ch10V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_10.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_10.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_10, voxel);
 
         if (chColor.a > 0.0) {
@@ -706,14 +826,14 @@ void main()
 
 #if NUM_VOLUMES >= 11
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_11.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_11.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch11Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_11.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_11.volume, samplePos).r;
+#endif
           if (voxel <= ch11V && ch11V >= local_MIP_threshold) {
             ch11Done = true;
           } else if (voxel > ch11V) {
@@ -723,13 +843,25 @@ void main()
         }
         saturated = saturated && ch11Done;
 #else
-        if (voxel > ch11V) {
-          rayDepth = currentRayLength;
-          ch11V = voxel;
+        if (ch11V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_11.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_11.volume, samplePos).r;
+#endif
+          if (voxel > ch11V) {
+            rayDepth = currentRayLength;
+            ch11V = voxel;
+          }
         }
         saturated = saturated && ch11V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_11.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_11.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_11, voxel);
 
         if (chColor.a > 0.0) {
@@ -742,14 +874,14 @@ void main()
 
 #if NUM_VOLUMES >= 12
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_12.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_12.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch12Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_12.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_12.volume, samplePos).r;
+#endif
           if (voxel <= ch12V && ch12V >= local_MIP_threshold) {
             ch12Done = true;
           } else if (voxel > ch12V) {
@@ -759,13 +891,25 @@ void main()
         }
         saturated = saturated && ch12Done;
 #else
-        if (voxel > ch12V) {
-          rayDepth = currentRayLength;
-          ch12V = voxel;
+        if (ch12V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_12.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_12.volume, samplePos).r;
+#endif
+          if (voxel > ch12V) {
+            rayDepth = currentRayLength;
+            ch12V = voxel;
+          }
         }
         saturated = saturated && ch12V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_12.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_12.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_12, voxel);
 
         if (chColor.a > 0.0) {
@@ -778,14 +922,14 @@ void main()
 
 #if NUM_VOLUMES >= 13
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_13.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_13.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch13Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_13.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_13.volume, samplePos).r;
+#endif
           if (voxel <= ch13V && ch13V >= local_MIP_threshold) {
             ch13Done = true;
           } else if (voxel > ch13V) {
@@ -795,13 +939,25 @@ void main()
         }
         saturated = saturated && ch13Done;
 #else
-        if (voxel > ch13V) {
-          rayDepth = currentRayLength;
-          ch13V = voxel;
+        if (ch13V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_13.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_13.volume, samplePos).r;
+#endif
+          if (voxel > ch13V) {
+            rayDepth = currentRayLength;
+            ch13V = voxel;
+          }
         }
         saturated = saturated && ch13V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_13.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_13.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_13, voxel);
 
         if (chColor.a > 0.0) {
@@ -814,14 +970,14 @@ void main()
 
 #if NUM_VOLUMES >= 14
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_14.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_14.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch14Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_14.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_14.volume, samplePos).r;
+#endif
           if (voxel <= ch14V && ch14V >= local_MIP_threshold) {
             ch14Done = true;
           } else if (voxel > ch14V) {
@@ -831,13 +987,25 @@ void main()
         }
         saturated = saturated && ch14Done;
 #else
-        if (voxel > ch14V) {
-          rayDepth = currentRayLength;
-          ch14V = voxel;
+        if (ch14V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_14.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_14.volume, samplePos).r;
+#endif
+          if (voxel > ch14V) {
+            rayDepth = currentRayLength;
+            ch14V = voxel;
+          }
         }
         saturated = saturated && ch14V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_14.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_14.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_14, voxel);
 
         if (chColor.a > 0.0) {
@@ -850,14 +1018,14 @@ void main()
 
 #if NUM_VOLUMES >= 15
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_15.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_15.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch15Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_15.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_15.volume, samplePos).r;
+#endif
           if (voxel <= ch15V && ch15V >= local_MIP_threshold) {
             ch15Done = true;
           } else if (voxel > ch15V) {
@@ -867,13 +1035,25 @@ void main()
         }
         saturated = saturated && ch15Done;
 #else
-        if (voxel > ch15V) {
-          rayDepth = currentRayLength;
-          ch15V = voxel;
+        if (ch15V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_15.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_15.volume, samplePos).r;
+#endif
+          if (voxel > ch15V) {
+            rayDepth = currentRayLength;
+            ch15V = voxel;
+          }
         }
         saturated = saturated && ch15V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_15.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_15.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_15, voxel);
 
         if (chColor.a > 0.0) {
@@ -886,14 +1066,14 @@ void main()
 
 #if NUM_VOLUMES >= 16
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_16.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_16.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch16Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_16.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_16.volume, samplePos).r;
+#endif
           if (voxel <= ch16V && ch16V >= local_MIP_threshold) {
             ch16Done = true;
           } else if (voxel > ch16V) {
@@ -903,13 +1083,25 @@ void main()
         }
         saturated = saturated && ch16Done;
 #else
-        if (voxel > ch16V) {
-          rayDepth = currentRayLength;
-          ch16V = voxel;
+        if (ch16V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_16.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_16.volume, samplePos).r;
+#endif
+          if (voxel > ch16V) {
+            rayDepth = currentRayLength;
+            ch16V = voxel;
+          }
         }
         saturated = saturated && ch16V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_16.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_16.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_16, voxel);
 
         if (chColor.a > 0.0) {
@@ -922,14 +1114,14 @@ void main()
 
 #if NUM_VOLUMES >= 17
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_17.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_17.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch17Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_17.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_17.volume, samplePos).r;
+#endif
           if (voxel <= ch17V && ch17V >= local_MIP_threshold) {
             ch17Done = true;
           } else if (voxel > ch17V) {
@@ -939,13 +1131,25 @@ void main()
         }
         saturated = saturated && ch17Done;
 #else
-        if (voxel > ch17V) {
-          rayDepth = currentRayLength;
-          ch17V = voxel;
+        if (ch17V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_17.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_17.volume, samplePos).r;
+#endif
+          if (voxel > ch17V) {
+            rayDepth = currentRayLength;
+            ch17V = voxel;
+          }
         }
         saturated = saturated && ch17V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_17.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_17.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_17, voxel);
 
         if (chColor.a > 0.0) {
@@ -958,14 +1162,14 @@ void main()
 
 #if NUM_VOLUMES >= 18
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_18.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_18.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch18Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_18.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_18.volume, samplePos).r;
+#endif
           if (voxel <= ch18V && ch18V >= local_MIP_threshold) {
             ch18Done = true;
           } else if (voxel > ch18V) {
@@ -975,13 +1179,25 @@ void main()
         }
         saturated = saturated && ch18Done;
 #else
-        if (voxel > ch18V) {
-          rayDepth = currentRayLength;
-          ch18V = voxel;
+        if (ch18V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_18.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_18.volume, samplePos).r;
+#endif
+          if (voxel > ch18V) {
+            rayDepth = currentRayLength;
+            ch18V = voxel;
+          }
         }
         saturated = saturated && ch18V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_18.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_18.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_18, voxel);
 
         if (chColor.a > 0.0) {
@@ -994,14 +1210,14 @@ void main()
 
 #if NUM_VOLUMES >= 19
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_19.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_19.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch19Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_19.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_19.volume, samplePos).r;
+#endif
           if (voxel <= ch19V && ch19V >= local_MIP_threshold) {
             ch19Done = true;
           } else if (voxel > ch19V) {
@@ -1011,13 +1227,25 @@ void main()
         }
         saturated = saturated && ch19Done;
 #else
-        if (voxel > ch19V) {
-          rayDepth = currentRayLength;
-          ch19V = voxel;
+        if (ch19V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_19.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_19.volume, samplePos).r;
+#endif
+          if (voxel > ch19V) {
+            rayDepth = currentRayLength;
+            ch19V = voxel;
+          }
         }
         saturated = saturated && ch19V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_19.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_19.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_19, voxel);
 
         if (chColor.a > 0.0) {
@@ -1030,14 +1258,14 @@ void main()
 
 #if NUM_VOLUMES >= 20
 
-#if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_20.volume, samplePos).r;
-#else
-        voxel = texture3D(volume_struct_20.volume, samplePos).r;
-#endif
 #ifdef MIP
 #ifdef LOCAL_MIP
         if (!ch20Done) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_20.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_20.volume, samplePos).r;
+#endif
           if (voxel <= ch20V && ch20V >= local_MIP_threshold) {
             ch20Done = true;
           } else if (voxel > ch20V) {
@@ -1047,13 +1275,25 @@ void main()
         }
         saturated = saturated && ch20Done;
 #else
-        if (voxel > ch20V) {
-          rayDepth = currentRayLength;
-          ch20V = voxel;
+        if (ch20V < 1.0) {
+#if GLSL_VERSION >= 130
+          voxel = texture(volume_struct_20.volume, samplePos).r;
+#else
+          voxel = texture3D(volume_struct_20.volume, samplePos).r;
+#endif
+          if (voxel > ch20V) {
+            rayDepth = currentRayLength;
+            ch20V = voxel;
+          }
         }
         saturated = saturated && ch20V >= 1.0;
 #endif
 #else
+#if GLSL_VERSION >= 130
+        voxel = texture(volume_struct_20.volume, samplePos).r;
+#else
+        voxel = texture3D(volume_struct_20.volume, samplePos).r;
+#endif
         chColor = applyTF(transfer_function_20, voxel);
 
         if (chColor.a > 0.0) {
