@@ -239,6 +239,14 @@ QString Z3DVolumeRaycasterRenderer::generateHeader()
     headerSource += "#define RESULT_OPAQUE\n";
   }
 
+  if (!m_quads.empty() ||
+      m_compositingMode.isSelected("Maximum Intensity Projection") ||
+      m_compositingMode.isSelected("Local MIP") ||
+      m_compositingMode.isSelected("MIP Opaque") ||
+      m_compositingMode.isSelected("Local MIP Opaque")) {
+    headerSource += "#define MAX_PROJ_MERGE\n";
+  }
+
   return headerSource;
 }
 

@@ -9,9 +9,9 @@ Z3DVolumeSliceRenderer::Z3DVolumeSliceRenderer(Z3DRendererBase &rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_VAO(1)
 {
-  m_volumeSliceShader.bindFragDataLocation(0, "FragData0");
-  m_volumeSliceShader.loadFromSourceFile("transform_with_3dtexture.vert", "volume_slice_with_colormap.frag",
-                                         m_rendererBase.generateHeader() + generateHeader());
+//  m_volumeSliceShader.bindFragDataLocation(0, "FragData0");
+//  m_volumeSliceShader.loadFromSourceFile("transform_with_3dtexture.vert", "volume_slice_with_colormap.frag",
+//                                         m_rendererBase.generateHeader() + generateHeader());
 
   m_scVolumeSliceShader.bindFragDataLocation(0, "FragData0");
   m_scVolumeSliceShader.loadFromSourceFile("transform_with_3dtexture.vert", "volume_slice_with_colormap_single_channel.frag",
@@ -100,7 +100,7 @@ bool Z3DVolumeSliceRenderer::hasVolume() const
 
 void Z3DVolumeSliceRenderer::compile()
 {
-  m_volumeSliceShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+  //m_volumeSliceShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 
   m_scVolumeSliceShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
   m_mergeChannelShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
@@ -118,7 +118,7 @@ QString Z3DVolumeSliceRenderer::generateHeader()
   }
 
   // for merge shader
-  headerSource += "#define MIP\n";
+  headerSource += "#define MAX_PROJ_MERGE\n";
 
   return headerSource;
 }
@@ -129,20 +129,14 @@ void Z3DVolumeSliceRenderer::render(Z3DEye eye)
   if (!needRender)
     return;
 
+  m_scVolumeSliceShader.bind();
+  m_rendererBase.setGlobalShaderParameters(m_scVolumeSliceShader, eye);
+
   if (m_volumes.size() == 1) {
-    m_volumeSliceShader.bind();
-    m_rendererBase.setGlobalShaderParameters(m_volumeSliceShader, eye);
-
-    bindVolumes(m_volumeSliceShader);
-
+    bindVolume(m_scVolumeSliceShader, 0);
     for (size_t i=0; i<m_quads.size(); ++i)
-      renderTriangleList(m_VAO, m_volumeSliceShader, m_quads[i]);
-
-    m_volumeSliceShader.release();
+      renderTriangleList(m_VAO, m_scVolumeSliceShader, m_quads[i]);
   } else {
-    m_scVolumeSliceShader.bind();
-    m_rendererBase.setGlobalShaderParameters(m_scVolumeSliceShader, eye);
-
     for (size_t j=0; j<m_volumes.size(); ++j) {
       m_layerTarget->attachSlice(j);
       m_layerTarget->bind();
@@ -154,9 +148,11 @@ void Z3DVolumeSliceRenderer::render(Z3DEye eye)
 
       m_layerTarget->release();
     }
+  }
 
-    m_scVolumeSliceShader.release();
+  m_scVolumeSliceShader.release();
 
+  if (m_volumes.size() > 1) {
     m_mergeChannelShader.bind();
     m_mergeChannelShader.bindTexture("color_texture", m_layerTarget->attachment(GL_COLOR_ATTACHMENT0));
     m_mergeChannelShader.bindTexture("depth_texture", m_layerTarget->attachment(GL_DEPTH_ATTACHMENT));

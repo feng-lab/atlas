@@ -157,6 +157,8 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters &globalParas, QObject *pare
           this, SLOT(leftMouseButtonPressed(QMouseEvent*,int,int)));
   addEventListener(m_leftMouseButtonPressEvent);
 
+  m_volumeRaycasterRenderer.setLayerTarget(&m_layerTarget);
+  m_volumeSliceRenderer.setLayerTarget(&m_layerTarget);
   for (size_t i=0; i<m_maxNumOfFullResolutionVolumeSlice; ++i) {
     m_image2DRenderers.emplace_back(std::make_unique<Z3DImage2DRenderer>(m_rendererBase));
     m_image2DRenderers[i]->setLayerTarget(&m_layerTarget);
@@ -1450,10 +1452,8 @@ void Z3DVolumeFilter::volumeChanged()
   }
 
   m_volumeRaycasterRenderer.setChannels(getVolumes());
-  m_volumeRaycasterRenderer.setLayerTarget(&m_layerTarget);
   if (!is2DImage) {
     m_volumeSliceRenderer.setChannels(getVolumes(), m_sliceColormaps);
-    m_volumeSliceRenderer.setLayerTarget(&m_layerTarget);
   }
 }
 

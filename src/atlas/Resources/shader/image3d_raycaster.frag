@@ -8,7 +8,9 @@ uniform float voxel_world_sizes[LEVEL_COUNT];
 uniform ivec3 image_block_size = ivec3(32, 32, 32);
 uniform uvec4 pos_to_block_ids[LEVEL_COUNT];
 
+#if GLSL_VERSION < 130
 uniform vec2 screen_dim_RCP;
+#endif
 uniform float minus_near_dist;
 uniform float sampling_rate;
 #ifdef ISO
@@ -25,7 +27,7 @@ uniform sampler2D ray_entry_eye_coord;
 uniform sampler2D ray_exit_tex_coord;
 uniform sampler2D ray_exit_eye_coord;
 
-uniform TF_SAMPLER_TYPE transfer_function;
+uniform sampler1D transfer_function;
 
 #if GLSL_VERSION >= 330
 layout(location = 0) out vec4 FragData0;
@@ -46,15 +48,6 @@ out uvec4 FragData4;  // call glBindFragDataLocation before linking
 #define FragData1 gl_FragData[3]
 #define FragData1 gl_FragData[4]
 #endif
-
-vec4 applyTF(in sampler1D tex, in float intensity)
-{
-#if GLSL_VERSION >= 130
-  return texture(tex, intensity);
-#else
-  return texture1D(tex, intensity);
-#endif
-}
 
 vec4 compositeDVR(in vec4 curResult, in vec4 color, in float currentRayLength, inout float rayDepth)
 {
@@ -93,11 +86,11 @@ vec4 compositeXRay(in vec4 curResult, in vec4 color, in float currentRayLength, 
 
 void main()
 {
-  vec2 texCoords = gl_FragCoord.xy * screen_dim_RCP;
 #if GLSL_VERSION >= 130
-  vec4 entryTexCoordAndZ = texture(ray_entry_tex_coord, texCoords);
-  vec4 exitTexCoordAndZ = texture(ray_exit_tex_coord, texCoords);
+  vec4 entryTexCoordAndZ = texelFetch(ray_entry_tex_coord, ivec2(gl_FragCoord.xy), 0);
+  vec4 exitTexCoordAndZ = texelFetch(ray_exit_tex_coord, ivec2(gl_FragCoord.xy), 0);
 #else
+  vec2 texCoords = gl_FragCoord.xy * screen_dim_RCP;
   vec4 entryTexCoordAndZ = texture2D(ray_entry_tex_coord, texCoords);
   vec4 exitTexCoordAndZ = texture2D(ray_exit_tex_coord, texCoords);
 #endif
@@ -113,15 +106,11 @@ void main()
     float ch1V = 0.0;
 #endif
 
-#ifdef LOCAL_MIP
-    bool ch1Done = false;
-#endif
-
     //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
     // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
 #if GLSL_VERSION >= 130
-    float zeFront = texture(ray_entry_eye_coord, texCoords).z;
-    float zeBack = texture(ray_exit_eye_coord, texCoords).z;
+    float zeFront = texelFetch(ray_entry_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
+    float zeBack = texelFetch(ray_exit_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
 #else
     float zeFront = texture2D(ray_entry_eye_coord, texCoords).z;
     float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
@@ -165,9 +154,6 @@ void main()
         vec3 samplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
 
         float voxel = 0;
-        vec4 color = vec4(0.0);
-        vec4 chColor;
-        bool saturated = true;
 
         ivec3 voxelCoord = ivec3(samplePos * image_dimensions[curLevel]);
         ivec3 pageTableCoord = voxelCoord / image_block_size;
@@ -191,42 +177,33 @@ void main()
 
 #ifdef MIP
 #ifdef LOCAL_MIP
-            if (!ch1Done) {
-              if (voxel <= ch1V && ch1V >= local_MIP_threshold) {
-                ch1Done = true;
-              } else if (voxel > ch1V) {
-                ch1V = voxel;
-                finalZe = ze;
-              }
+            if (voxel <= ch1V && ch1V >= local_MIP_threshold) {
+              finished = true;
+            } else if (voxel > ch1V) {
+              ch1V = voxel;
+              finalZe = ze;
             }
-            saturated = saturated && ch1Done;
 #else
             if (voxel > ch1V) {
-              finalZe = ze;
               ch1V = voxel;
+              finalZe = ze;
             }
-            saturated = saturated && ch1V >= 1.0;
+            finished = ch1V >= 1.0;
 #endif
 #else
-            chColor = applyTF(transfer_function_1, voxel);
-            chColor.a /= sampling_rate;
-
-            if (chColor.a > 0.0) {
-              color = max(color, chColor);
-            }
-#endif //MIP
-
-
-#ifdef MIP
-            finished = saturated;
+#if GLSL_VERSION >= 130
+            vec4 color = texture(transfer_function, voxel);
 #else
-            if (color.a > 0.0) {
-              result = COMPOSITING(result, color, ze, finalZe);
-            }
+            vec4 color = texture1D(transfer_function, voxel);
+#endif
 
-            if (result.a >= 1.0) {
-              result.a = 1.0;
-              finished = true;
+            if (color.a > 0.0) {
+              color.a / sampling_rate;
+              result = COMPOSITING(result, color, currentRayLength, rayDepth);
+              if (result.a >= 1.0) {
+                result.a = 1.0;
+                finished = true;
+              }
             }
 #endif // MIP
             ze += stepSize;
@@ -294,13 +271,16 @@ void main()
     }
 
 #ifdef MIP
-    result = max(result, applyTF(transfer_function_1, ch1V));
+#if GLSL_VERSION >= 130
+    result = texture(transfer_function, ch1V);
+#else
+    result = texture1D(transfer_function, ch1V);
+#endif
 #endif // MIP
 
 #ifdef RESULT_OPAQUE
     result.a = 1.0;
 #endif
-
 
     if (rayDepth >= 0.0) {
       gl_FragDepth = ze_to_zw_a / finalZe + ze_to_zw_b;

@@ -14,7 +14,7 @@ void main()
 #if NUM_VOLUMES < 2
   FragData0 = texelFetch(color_texture, ivec3(gl_FragCoord.xy, 0), 0);;
   gl_FragDepth = texelFetch(depth_texture, ivec3(gl_FragCoord.xy, 0), 0).r;;
-#elif defined(MIP)
+#elif defined(MAX_PROJ_MERGE)
   FragData0 = texelFetch(color_texture, ivec3(gl_FragCoord.xy, 0), 0);
   gl_FragDepth = texelFetch(depth_texture, ivec3(gl_FragCoord.xy, 0), 0).r;
   for (int i = 1; i < NUM_VOLUMES; ++i) {

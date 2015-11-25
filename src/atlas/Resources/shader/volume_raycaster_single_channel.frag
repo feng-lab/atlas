@@ -4,7 +4,7 @@ struct VolumeStruct
   vec3 dimensions;
 };
 
-#if GLSL_VERSION >= 130
+#if GLSL_VERSION < 130
 uniform vec2 screen_dim_RCP;
 #endif
 uniform float sampling_rate;

@@ -9,9 +9,9 @@ Z3DImage2DRenderer::Z3DImage2DRenderer(Z3DRendererBase &rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_VAO(1)
 {
-  m_image2DShader.bindFragDataLocation(0, "FragData0");
-  m_image2DShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_colormap.frag",
-                                     m_rendererBase.generateHeader() + generateHeader());
+//  m_image2DShader.bindFragDataLocation(0, "FragData0");
+//  m_image2DShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_colormap.frag",
+//                                     m_rendererBase.generateHeader() + generateHeader());
 
   m_scImage2DShader.bindFragDataLocation(0, "FragData0");
   m_scImage2DShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_colormap_single_channel.frag",
@@ -100,7 +100,7 @@ bool Z3DImage2DRenderer::hasVolume() const
 
 void Z3DImage2DRenderer::compile()
 {
-  m_image2DShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+  //m_image2DShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 
   m_scImage2DShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
   m_mergeChannelShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
@@ -118,7 +118,7 @@ QString Z3DImage2DRenderer::generateHeader()
   }
 
   // for merge shader
-  headerSource += "#define MIP\n";
+  headerSource += "#define MAX_PROJ_MERGE\n";
 
   return headerSource;
 }
@@ -129,20 +129,14 @@ void Z3DImage2DRenderer::render(Z3DEye eye)
   if (!needRender)
     return;
 
+  m_scImage2DShader.bind();
+  m_rendererBase.setGlobalShaderParameters(m_scImage2DShader, eye);
+
   if (m_volumes.size() == 1) {
-    m_image2DShader.bind();
-    m_rendererBase.setGlobalShaderParameters(m_image2DShader, eye);
-
-    bindVolumes(m_image2DShader);
-
+    bindVolume(m_scImage2DShader, 0);
     for (size_t i=0; i<m_quads.size(); ++i)
-      renderTriangleList(m_VAO, m_image2DShader, m_quads[i]);
-
-    m_image2DShader.release();
+      renderTriangleList(m_VAO, m_scImage2DShader, m_quads[i]);
   } else {
-    m_scImage2DShader.bind();
-    m_rendererBase.setGlobalShaderParameters(m_scImage2DShader, eye);
-
     for (size_t j=0; j<m_volumes.size(); ++j) {
       m_layerTarget->attachSlice(j);
       m_layerTarget->bind();
@@ -154,9 +148,11 @@ void Z3DImage2DRenderer::render(Z3DEye eye)
 
       m_layerTarget->release();
     }
+  }
 
-    m_scImage2DShader.release();
+  m_scImage2DShader.release();
 
+  if (m_volumes.size() > 1) {
     m_mergeChannelShader.bind();
     m_mergeChannelShader.bindTexture("color_texture", m_layerTarget->attachment(GL_COLOR_ATTACHMENT0));
     m_mergeChannelShader.bindTexture("depth_texture", m_layerTarget->attachment(GL_DEPTH_ATTACHMENT));

@@ -43,7 +43,7 @@ protected:
 
   virtual void render(Z3DEye eye) override;
 
-  Z3DShaderProgram m_volumeSliceShader;
+  //Z3DShaderProgram m_volumeSliceShader;
   Z3DShaderProgram m_scVolumeSliceShader;
   Z3DRenderTarget* m_layerTarget = nullptr;
   Z3DShaderProgram m_mergeChannelShader;
