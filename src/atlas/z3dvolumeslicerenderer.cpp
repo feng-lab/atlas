@@ -2,6 +2,7 @@
 
 #include "z3dtexture.h"
 #include "z3dvolume.h"
+#include "z3dimg.h"
 
 namespace nim {
 
@@ -48,6 +49,11 @@ void Z3DVolumeSliceRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVo
     m_volumeUniformNames[i] = QString("volume_struct_%1").arg(i+1);
     m_colormapUniformNames[i] = QString("colormap_%1").arg(i+1);
   }
+}
+
+void Z3DVolumeSliceRenderer::setChannels(const Z3DImg &img, const std::vector<std::unique_ptr<ZColorMapParameter> > &colormaps)
+{
+  setChannels(img.volumes(), colormaps);
 }
 
 void Z3DVolumeSliceRenderer::addQuad(const ZMesh &quad)

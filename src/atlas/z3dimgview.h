@@ -3,11 +3,11 @@
 
 #include "z3dfilterview.h"
 #include "zimgdoc.h"
-#include "z3dvolumefilter.h"
+#include "z3dimgfilter.h"
 
 namespace nim {
 
-class Z3DImgView : public Z3DFilterView<ZImgDoc, Z3DVolumeFilter>
+class Z3DImgView : public Z3DFilterView<ZImgDoc, Z3DImgFilter>
 {
   Q_OBJECT
 public:

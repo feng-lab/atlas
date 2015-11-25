@@ -9,6 +9,8 @@
 
 namespace nim {
 
+class Z3DImg;
+
 // use raycaster to render volume or 2D Image (stack with depth==1) with color
 // transfer functions
 class Z3DVolumeRaycasterRenderer : public Z3DPrimitiveRenderer
@@ -19,6 +21,7 @@ public:
 
   // input vols can not be nullptr
   void setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &vols);
+  void setChannels(const Z3DImg &img);
   void setLayerTarget(Z3DRenderTarget *layerTarget) { m_layerTarget = layerTarget; }
 
   // quad or entryexit texture should be set before rendering

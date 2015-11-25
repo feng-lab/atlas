@@ -88,9 +88,9 @@ void ZMesh::load(H5::Group &allGrp)
     if (strBuf == "TRIANGLES") {
       m_type = GL_TRIANGLES;
     } else if (strBuf == "TRIANGLE_STRIP") {
-     m_type = GL_TRIANGLE_STRIP;
+      m_type = GL_TRIANGLE_STRIP;
     } else if (strBuf == "TRIANGLE_FAN") {
-     m_type = GL_TRIANGLE_FAN;
+      m_type = GL_TRIANGLE_FAN;
     } else {
       throw ZIOException(QString("invalid mesh type %1").arg(QString::fromStdString(strBuf)));
     }
@@ -292,20 +292,20 @@ void ZMesh::interpolate(const ZMesh &ref)
         float ft = static_cast<float>(t);
         if (!ref.m_1DTextureCoordinates.empty())
           m_1DTextureCoordinates.push_back(ref.m_1DTextureCoordinates[triIdx[0]] +
-                                           (ref.m_1DTextureCoordinates[triIdx[1]] - ref.m_1DTextureCoordinates[triIdx[0]]) * fs +
-                                           (ref.m_1DTextureCoordinates[triIdx[2]] - ref.m_1DTextureCoordinates[triIdx[0]]) * ft);
+              (ref.m_1DTextureCoordinates[triIdx[1]] - ref.m_1DTextureCoordinates[triIdx[0]]) * fs +
+              (ref.m_1DTextureCoordinates[triIdx[2]] - ref.m_1DTextureCoordinates[triIdx[0]]) * ft);
         if (!ref.m_2DTextureCoordinates.empty())
           m_2DTextureCoordinates.push_back(ref.m_2DTextureCoordinates[triIdx[0]] +
-                                           (ref.m_2DTextureCoordinates[triIdx[1]] - ref.m_2DTextureCoordinates[triIdx[0]]) * fs +
-                                           (ref.m_2DTextureCoordinates[triIdx[2]] - ref.m_2DTextureCoordinates[triIdx[0]]) * ft);
+              (ref.m_2DTextureCoordinates[triIdx[1]] - ref.m_2DTextureCoordinates[triIdx[0]]) * fs +
+              (ref.m_2DTextureCoordinates[triIdx[2]] - ref.m_2DTextureCoordinates[triIdx[0]]) * ft);
         if (!ref.m_3DTextureCoordinates.empty())
           m_3DTextureCoordinates.push_back(ref.m_3DTextureCoordinates[triIdx[0]] +
-                                           (ref.m_3DTextureCoordinates[triIdx[1]] - ref.m_3DTextureCoordinates[triIdx[0]]) * fs +
-                                           (ref.m_3DTextureCoordinates[triIdx[2]] - ref.m_3DTextureCoordinates[triIdx[0]]) * ft);
+              (ref.m_3DTextureCoordinates[triIdx[1]] - ref.m_3DTextureCoordinates[triIdx[0]]) * fs +
+              (ref.m_3DTextureCoordinates[triIdx[2]] - ref.m_3DTextureCoordinates[triIdx[0]]) * ft);
         if (!ref.m_colors.empty())
           m_colors.push_back(ref.m_colors[triIdx[0]] +
-                             (ref.m_colors[triIdx[1]] - ref.m_colors[triIdx[0]]) * fs +
-                             (ref.m_colors[triIdx[2]] - ref.m_colors[triIdx[0]]) * ft);
+              (ref.m_colors[triIdx[1]] - ref.m_colors[triIdx[0]]) * fs +
+              (ref.m_colors[triIdx[2]] - ref.m_colors[triIdx[0]]) * ft);
       }
     }
     if (!match) {
@@ -668,8 +668,8 @@ ZMesh ZMesh::createCube(glm::vec3 coordLlf, glm::vec3 coordUrb, glm::vec3 texLlf
 }
 
 ZMesh ZMesh::createCubeSlice(float coordIn3rdDim, float texCoordIn3rdDim, int alongDim,
-                                                 glm::vec2 coordlow, glm::vec2 coordhigh,
-                                                 glm::vec2 texlow, glm::vec2 texhigh)
+                             glm::vec2 coordlow, glm::vec2 coordhigh,
+                             glm::vec2 texlow, glm::vec2 texhigh)
 {
   ZMesh quad(GL_TRIANGLE_STRIP);
   std::vector<glm::vec3> vertices;
@@ -709,8 +709,8 @@ ZMesh ZMesh::createCubeSlice(float coordIn3rdDim, float texCoordIn3rdDim, int al
 }
 
 ZMesh ZMesh::createCubeSliceWith2DTexture(float coordIn3rdDim, int alongDim,
-                                                              glm::vec2 coordlow, glm::vec2 coordhigh,
-                                                              glm::vec2 texlow, glm::vec2 texhigh)
+                                          glm::vec2 coordlow, glm::vec2 coordhigh,
+                                          glm::vec2 texlow, glm::vec2 texhigh)
 {
   ZMesh quad(GL_TRIANGLE_STRIP);
   std::vector<glm::vec3> vertices;
@@ -742,7 +742,7 @@ ZMesh ZMesh::createCubeSliceWith2DTexture(float coordIn3rdDim, int alongDim,
 }
 
 ZMesh ZMesh::createImageSlice(float coordIn3rdDim, glm::vec2 coordlow,
-                                                  glm::vec2 coordhigh, glm::vec2 texlow, glm::vec2 texhigh)
+                              glm::vec2 coordhigh, glm::vec2 texlow, glm::vec2 texhigh)
 {
   ZMesh quad(GL_TRIANGLE_STRIP);
   std::vector<glm::vec3> vertices;
@@ -763,7 +763,7 @@ ZMesh ZMesh::createImageSlice(float coordIn3rdDim, glm::vec2 coordlow,
 }
 
 ZMesh ZMesh::createCubeSerieSlices(int numSlices, int alongDim, glm::vec3 coordfirst,
-                                                       glm::vec3 coordlast, glm::vec3 texfirst, glm::vec3 texlast)
+                                   glm::vec3 coordlast, glm::vec3 texfirst, glm::vec3 texlast)
 {
   ZMesh quad(GL_TRIANGLES);
   std::vector<glm::vec3> vertices;

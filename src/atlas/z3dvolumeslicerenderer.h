@@ -9,6 +9,7 @@
 namespace nim {
 
 class Z3DVolume;
+class Z3DImg;
 
 // render 2d slices of volume with colormap
 // use colormap of each volume to composite final image
@@ -20,6 +21,8 @@ public:
 
   // input vols can not be nullptr
   void setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &vols,
+                   const std::vector<std::unique_ptr<ZColorMapParameter>>& colormaps);
+  void setChannels(const Z3DImg& img,
                    const std::vector<std::unique_ptr<ZColorMapParameter>>& colormaps);
   void setLayerTarget(Z3DRenderTarget *layerTarget) { m_layerTarget = layerTarget; }
 

@@ -7,10 +7,12 @@
 #include "z3dtexture.h"
 #include "zkmeans.h"
 #include "zexception.h"
+#include <QApplication>
+#include <QMessageBox>
 
 namespace nim {
 
-Z3DImg::Z3DImg(ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
+Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
   : QObject(parent)
   , m_imgPack(imgPack)
   , m_pageTableBlockSize(32, 32, 32)
@@ -20,6 +22,17 @@ Z3DImg::Z3DImg(ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
   , m_pageTableCacheManager(m_pageTableBlockSize, m_pageTableCacheNumBlocks, glm::ivec4(-1, -1, -1, -1))
   , m_imageCacheManager(m_imageBlockSize, m_imageCacheNumBlocks, glm::ivec4(-1, -1, -1, -1))
 {
+  // directX 10 resource limit
+  // 128 MB
+  // directX 11 resource limit
+  //min(max(128, 0.25f * (amount of dedicated VRAM)), 2048) MB
+  //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_A_TERM (128)
+  //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_B_TERM (0.25f)
+  //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_C_TERM (2048)
+  size_t currentAvailableTexMem = Z3DGpuInfoInstance.dedicatedVideoMemoryMB();
+  m_maxVoxelNumber = std::min(std::max(size_t(128), static_cast<size_t>(0.25 * currentAvailableTexMem)), size_t(2048)) * 1024 * 1024;
+  readVolumes();
+
   const ZImgInfo& info = m_imgPack.imgInfo();
   glm::dvec3 imgDim = glm::dvec3(info.width, info.height, info.depth);
   glm::dvec3 relativeResolution = glm::dvec3(info.voxelSizeXInUm(), info.voxelSizeYInUm(), info.voxelSizeZInUm());
@@ -38,12 +51,16 @@ Z3DImg::Z3DImg(ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
       if (res*2 < relativeResolution[sortedIndex[i]]) {
         res *= 2;
         ++stayRounds[sortedIndex[i]];
-      } else if ((res*2 - relativeResolution[sortedIndex[i]]) < (relativeResolution[sortedIndex[i]] - res)) {
-        ++stayRounds[sortedIndex[i]];
+      } else {
+        if ((res*2 - relativeResolution[sortedIndex[i]]) < (relativeResolution[sortedIndex[i]] - res)) {
+          ++stayRounds[sortedIndex[i]];
+        }
         break;
       }
     }
   }
+
+  LINFO() << m_numLevels;
 
   m_pageDirectorySize = glm::ivec3(0, 0, 0);
   for (size_t l=0; l<m_numLevels; ++l) {
@@ -123,6 +140,80 @@ QString Z3DImg::samplerType() const
     return "sampler2D";
   else
     return "sampler1D";
+}
+
+std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeXSliceVolume(size_t x)
+{
+  std::vector<std::unique_ptr<Z3DVolume>> res;
+  size_t maxTextureSize = Z3DGpuInfoInstance.maxTextureSize();
+  for (size_t c=0; c<m_nChannels; ++c) {
+    ZImg croped = m_imgPack.crop(ZImgRegion(x,x+1,0,-1,0,-1,c,c+1,0,1));
+    croped.infoRef().width = m_imgPack.imgInfo().height;
+    croped.infoRef().height = m_imgPack.imgInfo().depth;
+    croped.infoRef().depth = 1;
+    if (croped.width() > maxTextureSize || croped.height() > maxTextureSize) {
+      croped = croped.resize(std::min(maxTextureSize, croped.width()),
+                             std::min(maxTextureSize, croped.height()), 1);
+    }
+    if (!croped.isType<uint8_t>())
+      croped = croped.convertTo<uint8_t>(m_imgMinIntensity, m_imgMaxIntensity);
+    else
+      croped.normalize(m_imgMinIntensity, m_imgMaxIntensity);
+    Z3DVolume *vh = new Z3DVolume(croped);
+    vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
+                              m_imgPack.imgInfo().channelColors[c].g / 255.,
+                              m_imgPack.imgInfo().channelColors[c].b / 255.));
+    res.emplace_back(vh);
+  }
+  return res;
+}
+
+std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeYSliceVolume(size_t y)
+{
+  std::vector<std::unique_ptr<Z3DVolume>> res;
+  size_t maxTextureSize = Z3DGpuInfoInstance.maxTextureSize();
+  for (size_t c=0; c<m_nChannels; ++c) {
+    ZImg croped = m_imgPack.crop(ZImgRegion(0,-1,y,y+1,0,-1,c,c+1,0,1));
+    croped.infoRef().height = m_imgPack.imgInfo().depth;
+    croped.infoRef().depth = 1;
+    if (croped.width() > maxTextureSize || croped.height() > maxTextureSize) {
+      croped = croped.resize(std::min(maxTextureSize, croped.width()),
+                             std::min(maxTextureSize, croped.height()), 1);
+    }
+    if (!croped.isType<uint8_t>())
+      croped = croped.convertTo<uint8_t>(m_imgMinIntensity, m_imgMaxIntensity);
+    else
+      croped.normalize(m_imgMinIntensity, m_imgMaxIntensity);
+    Z3DVolume *vh = new Z3DVolume(croped);
+    vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
+                              m_imgPack.imgInfo().channelColors[c].g / 255.,
+                              m_imgPack.imgInfo().channelColors[c].b / 255.));
+    res.emplace_back(vh);
+  }
+  return res;
+}
+
+std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeZSliceVolume(size_t z)
+{
+  std::vector<std::unique_ptr<Z3DVolume>> res;
+  size_t maxTextureSize = Z3DGpuInfoInstance.maxTextureSize();
+  for (size_t c=0; c<m_nChannels; ++c) {
+    ZImg croped = m_imgPack.crop(ZImgRegion(0,-1,0,-1,z,z+1,c,c+1,0,1));
+    if (croped.width() > maxTextureSize || croped.height() > maxTextureSize) {
+      croped = croped.resize(std::min(maxTextureSize, croped.width()),
+                             std::min(maxTextureSize, croped.height()), 1);
+    }
+    if (!croped.isType<uint8_t>())
+      croped = croped.convertTo<uint8_t>(m_imgMinIntensity, m_imgMaxIntensity);
+    else
+      croped.normalize(m_imgMinIntensity, m_imgMaxIntensity);
+    Z3DVolume *vh = new Z3DVolume(croped);
+    vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
+                              m_imgPack.imgInfo().channelColors[c].g / 255.,
+                              m_imgPack.imgInfo().channelColors[c].b / 255.));
+    res.emplace_back(vh);
+  }
+  return res;
 }
 
 std::vector<double> Z3DImg::physicalBoundBox() const
@@ -266,6 +357,99 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
   }
 
   return count > 0;
+}
+
+void Z3DImg::readVolumes()
+{
+  m_volumes.clear();
+  const ZImgInfo& info = m_imgPack.imgInfo();
+  m_nChannels = info.numChannels;
+
+#if 0
+  // shader limit is 20 channels
+  // limited by Max FS Texture Image Units
+  // see https://www.opengl.org/wiki/Shader#Resource_limitations
+  size_t maxPossibleChannels = std::min(20, (Z3DGpuInfoInstance.maxTextureImageUnits() - 4) / 2);
+#else
+  size_t maxPossibleChannels = Z3DGpuInfoInstance.maxArrayTextureLayers();
+#endif
+  if (m_nChannels > maxPossibleChannels) {
+    QMessageBox::warning(QApplication::activeWindow(), "Too many channels",
+                         QString("Due to hardware limit, only first %1 channels of this image will be shown").arg(maxPossibleChannels));
+    m_nChannels = maxPossibleChannels;
+  }
+
+  bool scaleZ = info.depth > std::pow(m_maxVoxelNumber, 1/3.0);
+  double scale = 1.0;
+  if (info.timeVoxelNumber() > m_maxVoxelNumber) {
+    if (scaleZ)
+      scale = std::pow((m_maxVoxelNumber*1.0) / info.timeVoxelNumber(), 1/3.0);
+    else
+      scale = std::sqrt((m_maxVoxelNumber*1.0) / info.timeVoxelNumber());
+  }
+  int height = static_cast<int>(info.height * scale);
+  int width = static_cast<int>(info.width * scale);
+  int depth = scaleZ ? static_cast<int>(info.depth * scale) : static_cast<int>(info.depth);
+  double widthScale = 1.0;
+  double heightScale = 1.0;
+  double depthScale = 1.0;
+  int maxTextureSize = 100;
+  if (info.depth > 1)
+    maxTextureSize = Z3DGpuInfoInstance.max3DTextureSize();
+  else
+    maxTextureSize = Z3DGpuInfoInstance.maxTextureSize();
+
+  if (height > maxTextureSize) {
+    heightScale = static_cast<double>(maxTextureSize) / height;
+    height = std::floor(height * heightScale);
+  }
+  if (width > maxTextureSize) {
+    widthScale = static_cast<double>(maxTextureSize) / width;
+    width = std::floor(width * widthScale);
+  }
+  if (depth > maxTextureSize) {
+    depthScale = static_cast<double>(maxTextureSize) / depth;
+    depth = std::floor(depth * depthScale);
+  }
+
+  widthScale *= scale;
+  heightScale *= scale;
+  if (scaleZ)
+    depthScale *= scale;
+
+  if (widthScale != 1.0 || heightScale != 1.0 || depthScale != 1.0) {
+    m_isVolumeDownsampled = true;
+  }
+
+  ZImg img = m_imgPack.resizedImg(width, height, depth, 0);
+  img.computeMinMax(m_imgMinIntensity, m_imgMaxIntensity);
+  if (!img.isType<uint8_t>()) {
+    img = img.convertTo<uint8_t>(m_imgMinIntensity, m_imgMaxIntensity);
+  } else/* if (img.validBitCount() != 0 && img.validBitCount() < 8) */{
+    img.normalize(m_imgMinIntensity, m_imgMaxIntensity);
+  }
+  if (m_nChannels == 1) {
+    Z3DVolume *vh = new Z3DVolume(img,
+                                  glm::vec3(1.f/widthScale, 1.f/heightScale, 1.f/depthScale),
+                                  glm::vec3(.0));
+
+    m_volumes.emplace_back(vh);
+  } else {
+    for (size_t i=0; i<m_nChannels; i++) {
+      ZImg cImg = img.crop(ZImgRegion(0,-1,0,-1,0,-1,i,i+1));
+      Z3DVolume *vh = new Z3DVolume(cImg,
+                                    glm::vec3(1.f/widthScale, 1.f/heightScale, 1.f/depthScale),
+                                    glm::vec3(.0));
+
+      m_volumes.emplace_back(vh);
+    } //for each cannel
+  }
+
+  for (size_t i=0; i<m_nChannels; i++) {
+    m_volumes[i]->setVolColor(glm::vec3(info.channelColors[i].r / 255.,
+                                        info.channelColors[i].g / 255.,
+                                        info.channelColors[i].b / 255.));
+  }
 }
 
 } // namespace nim

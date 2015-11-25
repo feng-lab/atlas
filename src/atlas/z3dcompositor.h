@@ -4,7 +4,7 @@
 #include "z3drenderport.h"
 #include "z3dboundedfilter.h"
 #include "z3dgeometryfilter.h"
-#include "z3dvolumefilter.h"
+#include "z3dimgfilter.h"
 #include "z3dpickingmanager.h"
 #include "z3dcameraparameter.h"
 #include "z3dbackgroundrenderer.h"
@@ -90,7 +90,7 @@ private:
   Z3DRenderOutputPort m_tempPort5;
   Z3DRenderOutputPort m_pickingPort;
   Z3DFilterInputPort<Z3DGeometryFilter> m_gPPort;
-  Z3DFilterInputPort<Z3DVolumeFilter> m_vPPort;
+  Z3DFilterInputPort<Z3DImgFilter> m_vPPort;
 
   std::unique_ptr<Z3DRenderTarget> m_ddpRT;
   Z3DShaderProgram m_ddpBlendShader;

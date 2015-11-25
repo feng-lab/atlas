@@ -7,6 +7,7 @@
 #include <QThread>
 #include "z3dblockcache.h"
 #include "z3dtexture.h"
+#include "z3dvolume.h"
 #include <set>
 
 namespace nim {
@@ -24,12 +25,18 @@ class Z3DImg : public QObject
   Q_OBJECT
 public:
   // Z3DVolume will take ownership of the img
-  Z3DImg(ZImgPack &imgPack, const glm::vec3& scale, QObject *parent = 0);
+  Z3DImg(const ZImgPack &imgPack, const glm::vec3& scale, QObject *parent = 0);
   ~Z3DImg();
 
   bool is1DData() const { return m_imageDimensions[0].z == 1 && (m_imageDimensions[0].x == 1 || m_imageDimensions[0].y == 1); }
   bool is2DData() const { return m_imageDimensions[0].z == 1 && m_imageDimensions[0].x > 1 && m_imageDimensions[0].y > 1; }
   bool is3DData() const { return m_imageDimensions[0].z > 1 && m_imageDimensions[0].x > 1 && m_imageDimensions[0].y > 1; }
+
+  glm::uvec3 dimensions() const { return m_imageDimensions[0]; }
+  size_t numChannels() const { return m_nChannels; }
+  col4 channelColor(size_t c) const { return m_imgPack.imgInfo().channelColors[c]; }
+  bool isVolumeDownsampled() const { return m_isVolumeDownsampled; }
+  const std::vector<std::unique_ptr<Z3DVolume>>& volumes() const { return m_volumes; }
 
   // Returns a string representation of the sampler type: "sampler2D" for 2D image, "sampler3D" for 3D volume
   QString samplerType() const;
@@ -44,6 +51,10 @@ public:
   glm::vec3 physicalLDB() const { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalRDB().z); }
   glm::vec3 physicalRUB() const { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalRDB().z); }
 
+  std::vector<std::unique_ptr<Z3DVolume>> makeXSliceVolume(size_t x);
+  std::vector<std::unique_ptr<Z3DVolume>> makeYSliceVolume(size_t y);
+  std::vector<std::unique_ptr<Z3DVolume>> makeZSliceVolume(size_t z);
+
   // xmin, xmax, ymin, ymax, zmin, zmax
   std::vector<double> physicalBoundBox() const;
 
@@ -56,6 +67,7 @@ signals:
 protected slots:
 
 protected:
+  void readVolumes();
 
 protected:
   const ZImgPack& m_imgPack;
@@ -90,6 +102,13 @@ protected:
 
 private:
   //std::unique_ptr<Z3DImgHistogramThread> m_histogramThread;
+
+  size_t m_maxVoxelNumber = 0;
+  std::vector<std::unique_ptr<Z3DVolume>> m_volumes;
+  size_t m_nChannels = 0;
+  bool m_isVolumeDownsampled = false;
+  double m_imgMinIntensity;
+  double m_imgMaxIntensity;
 };
 
 } // namespace nim

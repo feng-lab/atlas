@@ -5,9 +5,8 @@
 
 #include "z3dcameraparameter.h"
 #include "znumericparameter.h"
-#include "z3dvolume.h"
+#include "z3dimg.h"
 #include "z3dtransformparameter.h"
-#include "zmesh.h"
 #include "zwidgetsgroup.h"
 #include <vector>
 #include "z3dvolumeraycasterrenderer.h"
@@ -22,7 +21,6 @@
 namespace nim {
 
 class ZImg;
-class ZMesh;
 
 class Z3DImgFilter : public Z3DBoundedFilter
 {
@@ -35,7 +33,7 @@ public:
   void setVisible(bool v) { m_visible.set(v); }
   void setOffset(double x, double y, double z);
 
-  void setData(const ZImgPack &img);
+  void setData(const ZImgPack &imgPack);
 
   virtual bool isStayOnTop() const { return m_stayOnTop.get(); }
   virtual void setStayOnTop(bool s) { m_stayOnTop.set(s); }
@@ -47,26 +45,15 @@ public:
 
   bool isReady(Z3DEye eye) const override;
 
-  // get salient 3d position hit by 2d point
-  // check success before using the returned value
-  // if first hit 3d position is in volume, success will be true,
-  // otherwise don't use the returned value
-  glm::vec3 get3DPosition(int x, int y, int width, int height, bool &success);
-
   virtual bool hasOpaque(Z3DEye eye) const override;
   virtual void renderOpaque(Z3DEye eye) override;
   virtual bool hasTransparent(Z3DEye eye) const override;
   virtual void renderTransparent(Z3DEye eye) override;
 
-signals:
-  void pointInVolumeLeftClicked(QPoint pt, glm::ivec3 pos3D);
-  void pointInVolumeRightClicked(QPoint pt, glm::ivec3 pos3D);
-
 protected slots:
   void changeCoordTransform();
 
   void adjustWidget();
-  void leftMouseButtonPressed(QMouseEvent *e, int w, int h);
 
   void invalidateFRVolumeZSlice();
   void invalidateFRVolumeYSlice();
@@ -75,35 +62,19 @@ protected slots:
   void invalidateFRVolumeYSlice2();
   void invalidateFRVolumeXSlice2();
 
-  void updateCubeSerieSlices();
-
   virtual void setClipPlanes() override {}
 
 protected:
   virtual void process(Z3DEye eye) override;
-
-  const std::vector<std::unique_ptr<Z3DVolume>>& getVolumes() const;
+  bool hasSlices() const;
+  void renderSlices(Z3DEye eye);
+  bool hasImage() const;
+  void renderImage(Z3DEye eye);
 
   virtual void updateNotTransformedBoundBoxImpl() override;
   virtual void expandCutRange() override {}
 
 private:
-  void readVolumes();
-
-  // check success before using the returned value
-  // if first hit 3d position is in volume, success will be true,
-  // otherwise don't use the returned value
-  glm::vec3 getFirstHit3DPosition(int x, int y, int width, int height, bool &success);
-  // use first channel intensity
-  glm::vec3 getMaxInten3DPositionUnderScreenPoint(int x, int y, int width, int height, bool &success);
-  //get 3D position from 2D screen position
-  glm::vec3 get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderOutputPort &port);
-  //get 3D position from 2D screen position and depth
-  glm::vec3 get3DPosition(glm::ivec2 pos2D, double depth, int width, int height);
-
-  // based on context, prepare minimum necessary data and send to raycasterrenderer
-  void prepareDataForRaycaster(Z3DVolume *volume, Z3DEye eye);
-
   void invalidateAllFRVolumeSlices();
 
   void volumeChanged();
@@ -114,12 +85,10 @@ private:
   std::vector<std::unique_ptr<Z3DImage2DRenderer>> m_image2DRenderers;
   Z3DTextureCopyRenderer m_textureCopyRenderer;
 
-  const ZImgPack *m_imgPack;
-  std::vector<std::unique_ptr<Z3DVolume>> m_volumes;
+  std::unique_ptr<Z3DImg> m_3dImg;
   ZBoolParameter m_visible;
   ZBoolParameter m_stayOnTop;
-
-  size_t m_maxVoxelNumber;
+  ZBoolParameter m_isVolumeDownsampled;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   size_t m_numParas;
@@ -128,11 +97,17 @@ private:
 
   Z3DRenderTarget m_entryTarget;
   Z3DRenderTarget m_exitTarget;
+  Z3DRenderTarget m_layerTarget;
+  Z3DTexture m_layerColorTexture;
+  Z3DTexture m_layerDepthTexture;
 
   Z3DRenderOutputPort m_outport;
   Z3DRenderOutputPort m_leftEyeOutport;
   Z3DRenderOutputPort m_rightEyeOutport;
   Z3DFilterOutputPort<Z3DImgFilter> m_vPPort;
+  Z3DRenderOutputPort m_opaqueOutport;
+  Z3DRenderOutputPort m_opaqueLeftEyeOutport;
+  Z3DRenderOutputPort m_opaqueRightEyeOutport;
 
   static const size_t m_maxNumOfFullResolutionVolumeSlice;
   // each channel is represented by a Z3DVolume
@@ -152,18 +127,6 @@ private:
   ZIntParameter m_ySlice2Position;
   ZBoolParameter m_showZSlice2;
   ZIntParameter m_zSlice2Position;
-
-  ZEventListenerParameter m_leftMouseButtonPressEvent;
-  glm::ivec2 m_startCoord;
-
-  ZMesh m_2DImageQuad;
-
-  std::map<std::string, ZMesh> m_cubeSerieSlices;
-
-  double m_imgMinIntensity;
-  double m_imgMaxIntensity;
-
-  size_t m_nChannels;
 };
 
 } // namespace nim

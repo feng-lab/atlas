@@ -2,6 +2,7 @@
 
 #include "z3dtexture.h"
 #include "z3dvolume.h"
+#include "z3dimg.h"
 
 namespace nim {
 
@@ -110,6 +111,11 @@ void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z
       resetTransferFunctions();
     }
   }
+}
+
+void Z3DVolumeRaycasterRenderer::setChannels(const Z3DImg &img)
+{
+  setChannels(img.volumes());
 }
 
 void Z3DVolumeRaycasterRenderer::addQuad(const ZMesh &quad)
