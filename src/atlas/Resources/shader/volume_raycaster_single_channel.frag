@@ -33,27 +33,6 @@ out vec4 FragData0;  // call glBindFragDataLocation before linking
 #define FragData0 gl_FragData[0]
 #endif
 
-vec4 applyTF(in sampler1D tex, in float intensity)
-{
-#if GLSL_VERSION >= 130
-#if defined(MIP)
-  return texture(tex, intensity);
-#else
-  vec4 res = texture(tex, intensity);
-  res.a = res.a / sampling_rate;
-  return res;
-#endif
-#else
-#if defined(MIP)
-  return texture1D(tex, intensity);
-#else
-  vec4 res = texture1D(tex, intensity);
-  res.a = res.a / sampling_rate;
-  return res;
-#endif
-#endif
-}
-
 vec4 compositeDVR(in vec4 curResult, in vec4 color, in float currentRayLength, inout float rayDepth)
 {
   if (rayDepth < 0.0)
@@ -99,17 +78,13 @@ void main()
   vec3 startRayPosition = entryTexCoordAndZ.xyz;
   vec3 exitRayPosition = exitTexCoordAndZ.xyz;
 
-  if (startRayPosition == exitRayPosition)
+  if (startRayPosition == exitRayPosition) {
     discard;   // background
-  else {
+  } else {
     vec4 result = vec4(0.0);
 
 #ifdef MIP
     float ch1V = 0.0;
-#endif
-
-#ifdef LOCAL_MIP
-    bool ch1Done = false;
 #endif
 
     vec3 dimension = volume_struct_1.dimensions;
@@ -150,17 +125,19 @@ void main()
         finished = ch1V >= 1.0;
 #endif
 #else
-        vec4 color = applyTF(transfer_function_1, voxel);
-#endif //MIP
+#if GLSL_VERSION >= 130
+        vec4 color = texture(transfer_function_1, voxel);
+#else
+        vec4 color = texture1D(transfer_function_1, voxel);
+#endif
 
-#ifndef MIP
         if (color.a > 0.0) {
+          color.a / sampling_rate;
           result = COMPOSITING(result, color, currentRayLength, rayDepth);
-        }
-
-        if (result.a >= 1.0) {
-          result.a = 1.0;
-          finished = true;
+          if (result.a >= 1.0) {
+            result.a = 1.0;
+            finished = true;
+          }
         }
 #endif // MIP
 
@@ -170,7 +147,11 @@ void main()
     }
 
 #ifdef MIP
-    result = applyTF(transfer_function_1, ch1V);
+#if GLSL_VERSION >= 130
+    result = texture(transfer_function_1, ch1V);
+#else
+    result = texture1D(transfer_function_1, ch1V);
+#endif
 #endif // MIP
 
 #ifdef RESULT_OPAQUE

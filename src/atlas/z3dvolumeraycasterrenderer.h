@@ -69,9 +69,9 @@ protected:
   virtual void render(Z3DEye eye) override;
   virtual void renderPicking(Z3DEye) override;
 
-  Z3DShaderProgram m_raycasterShader;
-  Z3DShaderProgram m_2dImageShader;
-  Z3DShaderProgram m_volumeSliceWithTransferfunShader;
+//  Z3DShaderProgram m_raycasterShader;
+//  Z3DShaderProgram m_2dImageShader;
+//  Z3DShaderProgram m_volumeSliceWithTransferfunShader;
 
   // single channel version
   Z3DShaderProgram m_scRaycasterShader;

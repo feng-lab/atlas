@@ -36,15 +36,15 @@ Z3DVolumeRaycasterRenderer::Z3DVolumeRaycasterRenderer(Z3DRendererBase &renderer
 
   adjustWidgets();
 
-  m_raycasterShader.bindFragDataLocation(0, "FragData0");
-  m_raycasterShader.loadFromSourceFile("pass.vert", "volume_raycaster.frag",
-                                       m_rendererBase.generateHeader() + generateHeader());
-  m_2dImageShader.bindFragDataLocation(0, "FragData0");
-  m_2dImageShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_transfun.frag",
-                                     m_rendererBase.generateHeader() + generateHeader());
-  m_volumeSliceWithTransferfunShader.bindFragDataLocation(0, "FragData0");
-  m_volumeSliceWithTransferfunShader.loadFromSourceFile("transform_with_3dtexture.vert", "volume_slice_with_transfun.frag",
-                                                        m_rendererBase.generateHeader() + generateHeader());
+//  m_raycasterShader.bindFragDataLocation(0, "FragData0");
+//  m_raycasterShader.loadFromSourceFile("pass.vert", "volume_raycaster.frag",
+//                                       m_rendererBase.generateHeader() + generateHeader());
+//  m_2dImageShader.bindFragDataLocation(0, "FragData0");
+//  m_2dImageShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_transfun.frag",
+//                                     m_rendererBase.generateHeader() + generateHeader());
+//  m_volumeSliceWithTransferfunShader.bindFragDataLocation(0, "FragData0");
+//  m_volumeSliceWithTransferfunShader.loadFromSourceFile("transform_with_3dtexture.vert", "volume_slice_with_transfun.frag",
+//                                                        m_rendererBase.generateHeader() + generateHeader());
 
   m_scRaycasterShader.bindFragDataLocation(0, "FragData0");
   m_scRaycasterShader.loadFromSourceFile("pass.vert", "volume_raycaster_single_channel.frag",
@@ -185,9 +185,9 @@ void Z3DVolumeRaycasterRenderer::bindVolumeAndTransferFunc(Z3DShaderProgram &sha
 
 void Z3DVolumeRaycasterRenderer::compile()
 {
-  m_raycasterShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
-  m_2dImageShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
-  m_volumeSliceWithTransferfunShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+//  m_raycasterShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+//  m_2dImageShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+//  m_volumeSliceWithTransferfunShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 
   m_scRaycasterShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
   m_sc2dImageShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
@@ -267,85 +267,42 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
     }
   }
 
-  if (visibleIdxs.size() == 1) {
-    if (!m_quads.empty()) { // 2d image or slice from 3d volume
-      if (m_is2DImage) {   // image is 2D
-        m_2dImageShader.bind();
-        m_rendererBase.setGlobalShaderParameters(m_2dImageShader, eye);
+  if (!m_quads.empty()) { // 2d image or slice from 3d volume
+    if (m_is2DImage) {   // image is 2D
+      m_sc2dImageShader.bind();
+      m_rendererBase.setGlobalShaderParameters(m_sc2dImageShader, eye);
 
-        bindVolumesAndTransferFuncs(m_2dImageShader);
-
-        for (size_t i=0; i<m_quads.size(); ++i)
-          renderTriangleList(m_VAO, m_2dImageShader, m_quads[i]);
-
-        m_2dImageShader.release();
-      } else {   // image is 3D, but a 2D slice will be shown
-        m_volumeSliceWithTransferfunShader.bind();
-        m_rendererBase.setGlobalShaderParameters(m_volumeSliceWithTransferfunShader, eye);
-
-        bindVolumesAndTransferFuncs(m_volumeSliceWithTransferfunShader);
+      if (visibleIdxs.size() == 1) {
+        bindVolumeAndTransferFunc(m_sc2dImageShader, visibleIdxs[0]);
 
         for (size_t i=0; i<m_quads.size(); ++i)
-          renderTriangleList(m_VAO, m_volumeSliceWithTransferfunShader, m_quads[i]);
+          renderTriangleList(m_VAO, m_sc2dImageShader, m_quads[i]);
 
-        m_volumeSliceWithTransferfunShader.release();
+      } else {
+      for (size_t j=0; j<visibleIdxs.size(); ++j) {
+        m_layerTarget->attachSlice(j);
+        m_layerTarget->bind();
+        m_layerTarget->clear();
+        bindVolumeAndTransferFunc(m_sc2dImageShader, visibleIdxs[j]);
+
+        for (size_t i=0; i<m_quads.size(); ++i)
+          renderTriangleList(m_VAO, m_sc2dImageShader, m_quads[i]);
+
+        m_layerTarget->release();
       }
-    } else {  // 3d volume raycasting
-      m_raycasterShader.bind();
+      }
 
-      m_rendererBase.setGlobalShaderParameters(m_raycasterShader, eye);
+      m_sc2dImageShader.release();
+    } else {   // image is 3D, but a 2D slice will be shown
+      m_scVolumeSliceWithTransferfunShader.bind();
+      m_rendererBase.setGlobalShaderParameters(m_scVolumeSliceWithTransferfunShader, eye);
 
-      bindVolumesAndTransferFuncs(m_raycasterShader);
+      if (visibleIdxs.size() == 1) {
+        bindVolumeAndTransferFunc(m_scVolumeSliceWithTransferfunShader, visibleIdxs[0]);
 
-      float n = m_rendererBase.camera().nearDist();
-      float f = m_rendererBase.camera().farDist();
-      //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
-      // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
-      float a = f*n/(f-n);
-      float b = 0.5f * (f+n)/(f-n) + 0.5f;
-      m_raycasterShader.setUniform("ze_to_zw_b", b);
-      m_raycasterShader.setUniform("ze_to_zw_a", a);
-
-      // entry exit points
-      m_raycasterShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordTexture);
-      m_raycasterShader.bindTexture("ray_entry_eye_coord", m_entryEyeCoordTexture);
-      m_raycasterShader.bindTexture("ray_exit_tex_coord",  m_exitTexCoordTexture);
-      m_raycasterShader.bindTexture("ray_exit_eye_coord", m_exitEyeCoordTexture);
-
-      if (m_compositingMode.get() ==  "ISO Surface")
-        m_raycasterShader.setUniform("iso_value", m_isoValue.get());
-
-      if (m_compositingMode.get() ==  "Local MIP" || m_compositingMode.get() ==  "Local MIP Opaque")
-        m_raycasterShader.setUniform("local_MIP_threshold", m_localMIPThreshold.get());
-
-      m_raycasterShader.setUniform("sampling_rate", m_samplingRate.get());
-
-      renderScreenQuad(m_VAO, m_raycasterShader);
-      m_raycasterShader.release();
-    }
-  } else {
-    if (!m_quads.empty()) { // 2d image or slice from 3d volume
-      if (m_is2DImage) {   // image is 2D
-        m_sc2dImageShader.bind();
-        m_rendererBase.setGlobalShaderParameters(m_sc2dImageShader, eye);
-
-        for (size_t j=0; j<visibleIdxs.size(); ++j) {
-          m_layerTarget->attachSlice(j);
-          m_layerTarget->bind();
-          m_layerTarget->clear();
-          bindVolumeAndTransferFunc(m_sc2dImageShader, visibleIdxs[j]);
-
-          for (size_t i=0; i<m_quads.size(); ++i)
-            renderTriangleList(m_VAO, m_sc2dImageShader, m_quads[i]);
-
-          m_layerTarget->release();
-        }
-
-        m_sc2dImageShader.release();
-      } else {   // image is 3D, but a 2D slice will be shown
-        m_scVolumeSliceWithTransferfunShader.bind();
-        m_rendererBase.setGlobalShaderParameters(m_scVolumeSliceWithTransferfunShader, eye);
-
+        for (size_t i=0; i<m_quads.size(); ++i)
+          renderTriangleList(m_VAO, m_scVolumeSliceWithTransferfunShader, m_quads[i]);
+      } else {
         for (size_t j=0; j<visibleIdxs.size(); ++j) {
           m_layerTarget->attachSlice(j);
           m_layerTarget->bind();
@@ -358,37 +315,42 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
 
           m_layerTarget->release();
         }
-
-        m_scVolumeSliceWithTransferfunShader.release();
       }
-    } else {  // 3d volume raycasting
-      m_scRaycasterShader.bind();
 
-      m_rendererBase.setGlobalShaderParameters(m_scRaycasterShader, eye);
+      m_scVolumeSliceWithTransferfunShader.release();
+    }
+  } else {  // 3d volume raycasting
+    m_scRaycasterShader.bind();
 
-      float n = m_rendererBase.camera().nearDist();
-      float f = m_rendererBase.camera().farDist();
-      //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
-      // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
-      float a = f*n/(f-n);
-      float b = 0.5f * (f+n)/(f-n) + 0.5f;
-      m_scRaycasterShader.setUniform("ze_to_zw_b", b);
-      m_scRaycasterShader.setUniform("ze_to_zw_a", a);
+    m_rendererBase.setGlobalShaderParameters(m_scRaycasterShader, eye);
 
-      // entry exit points
-      m_scRaycasterShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordTexture);
-      m_scRaycasterShader.bindTexture("ray_entry_eye_coord", m_entryEyeCoordTexture);
-      m_scRaycasterShader.bindTexture("ray_exit_tex_coord",  m_exitTexCoordTexture);
-      m_scRaycasterShader.bindTexture("ray_exit_eye_coord", m_exitEyeCoordTexture);
+    float n = m_rendererBase.camera().nearDist();
+    float f = m_rendererBase.camera().farDist();
+    //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
+    // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
+    float a = f*n/(f-n);
+    float b = 0.5f * (f+n)/(f-n) + 0.5f;
+    m_scRaycasterShader.setUniform("ze_to_zw_b", b);
+    m_scRaycasterShader.setUniform("ze_to_zw_a", a);
 
-      if (m_compositingMode.get() ==  "ISO Surface")
-        m_scRaycasterShader.setUniform("iso_value", m_isoValue.get());
+    // entry exit points
+    m_scRaycasterShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordTexture);
+    m_scRaycasterShader.bindTexture("ray_entry_eye_coord", m_entryEyeCoordTexture);
+    m_scRaycasterShader.bindTexture("ray_exit_tex_coord",  m_exitTexCoordTexture);
+    m_scRaycasterShader.bindTexture("ray_exit_eye_coord", m_exitEyeCoordTexture);
 
-      if (m_compositingMode.get() ==  "Local MIP" || m_compositingMode.get() ==  "Local MIP Opaque")
-        m_scRaycasterShader.setUniform("local_MIP_threshold", m_localMIPThreshold.get());
+    if (m_compositingMode.get() ==  "ISO Surface")
+      m_scRaycasterShader.setUniform("iso_value", m_isoValue.get());
 
-      m_scRaycasterShader.setUniform("sampling_rate", m_samplingRate.get());
+    if (m_compositingMode.get() ==  "Local MIP" || m_compositingMode.get() ==  "Local MIP Opaque")
+      m_scRaycasterShader.setUniform("local_MIP_threshold", m_localMIPThreshold.get());
 
+    m_scRaycasterShader.setUniform("sampling_rate", m_samplingRate.get());
+
+    if (visibleIdxs.size() == 1) {
+      bindVolumeAndTransferFunc(m_scRaycasterShader, visibleIdxs[0]);
+      renderScreenQuad(m_VAO, m_scRaycasterShader);
+    } else {
       for (size_t i=0; i<visibleIdxs.size(); ++i) {
         m_layerTarget->attachSlice(i);
         m_layerTarget->bind();
@@ -399,16 +361,19 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
 
         m_layerTarget->release();
       }
-
-      m_scRaycasterShader.release();
     }
 
+    m_scRaycasterShader.release();
+  }
+
+  if (visibleIdxs.size() > 1) {
     m_mergeChannelShader.bind();
     m_mergeChannelShader.bindTexture("color_texture", m_layerTarget->attachment(GL_COLOR_ATTACHMENT0));
     m_mergeChannelShader.bindTexture("depth_texture", m_layerTarget->attachment(GL_DEPTH_ATTACHMENT));
     renderScreenQuad(m_VAO, m_mergeChannelShader);
     m_mergeChannelShader.release();
   }
+
   CHECK_GL_ERROR;
 }
 
