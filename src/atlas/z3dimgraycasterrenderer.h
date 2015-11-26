@@ -19,9 +19,7 @@ class Z3DImgRaycasterRenderer : public Z3DPrimitiveRenderer
 public:
   explicit Z3DImgRaycasterRenderer(Z3DRendererBase &rendererBase);
 
-  // input vols can not be nullptr
-  void setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &vols);
-  void setChannels(const Z3DImg &img);
+  void setData(const Z3DImg &img);
   void setLayerTarget(Z3DRenderTarget *layerTarget) { m_layerTarget = layerTarget; }
 
   // quad or entryexit texture should be set before rendering
@@ -41,8 +39,6 @@ public:
                         const Z3DTexture *entryEyeCoordTexture,
                         const Z3DTexture *exitTexCoordTexture,
                         const Z3DTexture *exitEyeCoordTexture);
-
-  void translate(double dx, double dy, double dz);
 
   // return true if something is rendered by this renderer
   bool hasVisibleRendering() const;
@@ -89,7 +85,7 @@ protected:
 
   ZStringIntOptionParameter m_compositingMode;
 
-  std::vector<Z3DVolume *> m_volumes;
+  const Z3DImg* m_img = nullptr;
   std::vector<QString> m_volumeUniformNames;
   std::vector<QString> m_volumeDimensionNames;
   std::vector<QString> m_transferFuncUniformNames;

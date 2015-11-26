@@ -19,11 +19,8 @@ class Z3DVolumeSliceRenderer : public Z3DPrimitiveRenderer
 public:
   explicit Z3DVolumeSliceRenderer(Z3DRendererBase &rendererBase);
 
-  // input vols can not be nullptr
-  void setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &vols,
-                   const std::vector<std::unique_ptr<ZColorMapParameter>>& colormaps);
-  void setChannels(const Z3DImg& img,
-                   const std::vector<std::unique_ptr<ZColorMapParameter>>& colormaps);
+  void setData(const Z3DImg& img,
+               const std::vector<std::unique_ptr<ZColorMapParameter>>& colormaps);
   void setLayerTarget(Z3DRenderTarget *layerTarget) { m_layerTarget = layerTarget; }
 
   // a slice (quad) in 3D volume contains corner vertex and 3d texture coordinates
@@ -39,7 +36,6 @@ protected slots:
 protected:
   void bindVolumes(Z3DShaderProgram &shader);
   void bindVolume(Z3DShaderProgram &shader, size_t idx);
-  bool hasVolume() const;
 
   virtual void compile() override;
   QString generateHeader();
@@ -51,8 +47,8 @@ protected:
   Z3DRenderTarget* m_layerTarget = nullptr;
   Z3DShaderProgram m_mergeChannelShader;
 
-  std::vector<Z3DVolume*> m_volumes;
-  std::vector<ZColorMapParameter*> m_colormaps;
+  const Z3DImg* m_img = nullptr;
+  const std::vector<std::unique_ptr<ZColorMapParameter>>* m_colormaps = nullptr;
   std::vector<QString> m_volumeUniformNames;
   std::vector<QString> m_colormapUniformNames;
 

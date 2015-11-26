@@ -236,9 +236,9 @@ void Z3DImgFilter::setData(const ZImgPack &imgPack)
   m_showYSlice2.setVisible(!is2DImage);
   m_showZSlice2.setVisible(!is2DImage);
 
-  m_imgRaycasterRenderer.setChannels(*m_3dImg.get());
+  m_imgRaycasterRenderer.setData(*m_3dImg.get());
   if (!is2DImage) {
-    m_volumeSliceRenderer.setChannels(*m_3dImg.get(), m_sliceColormaps);
+    m_volumeSliceRenderer.setData(*m_3dImg.get(), m_sliceColormaps);
   }
 
   updateBoundBox();

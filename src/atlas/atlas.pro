@@ -153,7 +153,6 @@ HEADERS += \
     z3daxisfilter.h \
     z3dboundedfilter.h \
     z3dvolumeslicerenderer.h \
-    z3dvolumeraycasterrenderer.h \
     z3dmeshrenderer.h \
     z3dtexturecopyrenderer.h \
     z3dtexturecoordinaterenderer.h \
@@ -277,7 +276,6 @@ HEADERS += \
     z3dtextureandeyecoordinaterenderer.h \
     z3dimgraycasterrenderer.h \
     z3dimg.h \
-    z3dvolumefilter.h \
     z3dimgfilter.h \
     z3dblockcache.h
 
@@ -372,7 +370,6 @@ SOURCES += \
     z3daxisfilter.cpp \
     z3dboundedfilter.cpp \
     z3dvolumeslicerenderer.cpp \
-    z3dvolumeraycasterrenderer.cpp \
     z3dmeshrenderer.cpp \
     z3dtexturecopyrenderer.cpp \
     z3dtexturecoordinaterenderer.cpp \
@@ -486,7 +483,6 @@ SOURCES += \
     z3dtextureandeyecoordinaterenderer.cpp \
     z3dimgraycasterrenderer.cpp \
     z3dimg.cpp \
-    z3dvolumefilter.cpp \
     z3dimgfilter.cpp
 
 contains(CONFIG, use_glbinding) {
