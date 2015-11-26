@@ -56,6 +56,10 @@ Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase &rendererBase)
   m_scVolumeSliceWithTransferfunShader.loadFromSourceFile("transform_with_3dtexture.vert", "volume_slice_with_transfun_single_channel.frag",
                                                           m_rendererBase.generateHeader() + generateHeader());
   m_scFullResRaycasterShader.bindFragDataLocation(0, "FragData0");
+  m_scFullResRaycasterShader.bindFragDataLocation(1, "FragData1");
+  m_scFullResRaycasterShader.bindFragDataLocation(2, "FragData2");
+  m_scFullResRaycasterShader.bindFragDataLocation(3, "FragData3");
+  m_scFullResRaycasterShader.bindFragDataLocation(4, "FragData4");
   m_scFullResRaycasterShader.loadFromSourceFile("pass.vert", "image3d_raycaster.frag",
                                                 m_rendererBase.generateHeader() + generateHeader());
   m_mergeChannelShader.bindFragDataLocation(0, "FragData0");
@@ -69,7 +73,7 @@ QString Z3DImgRaycasterRenderer::compositeMode() const
   return m_compositingMode.get();
 }
 
-void Z3DImgRaycasterRenderer::setData(const Z3DImg &img)
+void Z3DImgRaycasterRenderer::setData(Z3DImg &img)
 {
   m_img = &img;
 
@@ -336,6 +340,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       float a = f*n/(f-n);
       float b = 0.5f * (f+n)/(f-n) + 0.5f;
       m_scFullResRaycasterShader.setUniform("minus_near_dist", -n);
+      LINFO() << -n;
       m_scFullResRaycasterShader.setUniform("ze_to_zw_b", b);
       m_scFullResRaycasterShader.setUniform("ze_to_zw_a", a);
 
@@ -354,8 +359,15 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       m_scFullResRaycasterShader.setUniform("sampling_rate", m_samplingRate.get());
 
       // render first channel
+      GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
+                                GL_COLOR_ATTACHMENT1,
+                                GL_COLOR_ATTACHMENT2,
+                                GL_COLOR_ATTACHMENT3,
+                                GL_COLOR_ATTACHMENT4
+                               };
       m_layerTarget->attachSlice(0);
       m_layerTarget->bind();
+      glDrawBuffers(5, g_drawBuffers);
       m_layerTarget->clear();
 
       m_img->bindFullResShader(m_scFullResRaycasterShader, visibleIdxs[0]);
@@ -399,11 +411,12 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       if (missingBlockIDs.empty()) {
         i = 1;
       } else {
-        //m_img->updateCaches(missingBlockIDs, usedBlockIDs);
+        m_img->updateCaches(missingBlockIDs, usedBlockIDs);
       }
       for (; i<visibleIdxs.size(); ++i) {
         m_layerTarget->attachSlice(i);
         m_layerTarget->bind();
+        glDrawBuffers(1, g_drawBuffers);
         m_layerTarget->clear();
 
         m_img->bindFullResShader(m_scFullResRaycasterShader, visibleIdxs[i]);

@@ -51,7 +51,7 @@ out uvec4 FragData4;  // call glBindFragDataLocation before linking
 
 vec4 compositeDVR(in vec4 curResult, in vec4 color, in float currentRayLength, inout float rayDepth)
 {
-  if (rayDepth < 0.0)
+  if (rayDepth > 0.0)
     rayDepth = currentRayLength;
 
   vec4 result = vec4(0.0);
@@ -76,7 +76,7 @@ vec4 compositeISO(in vec4 curResult, in vec4 color, in float currentRayLength, i
 
 vec4 compositeXRay(in vec4 curResult, in vec4 color, in float currentRayLength, inout float rayDepth)
 {
-  if (rayDepth < 0.0)
+  if (rayDepth > 0.0)
     rayDepth = currentRayLength;
   return curResult + color;
 }
@@ -116,7 +116,7 @@ void main()
     float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
 #endif
     float ze = zeFront;
-    float finalZe = -1.0;
+    float finalZe = 1.0;
     int curLevel = 0;
     float zeLength = zeBack - zeFront;
     float zeLengthRCP = 1.0 / zeLength;
@@ -127,14 +127,18 @@ void main()
     int usedBlockIDsIndex = 0;
 
     vec3 rayVector = exitRayPosition - startRayPosition;
-    float maxRayLength = length(rayVector);
-
     vec3 numVoxels = abs(rayVector * image_dimensions[curLevel]);
     float numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
     float stepSize = zeLength / (sampling_rate * numVoxel);
 
-    float currentRayLength = 0.0;
-    float rayDepth = -1.0;
+#if 1
+    FragData0 = vec4(ze / minus_near_dist > 2 ? 1 : 0, ze / minus_near_dist > 10 ? 1 : 0, ze / minus_near_dist > 20 ? 1 : 0, ze / minus_near_dist >= 1 ? 1 : 0);
+    gl_FragDepth = 0.5;
+    FragData1 = uvec4(missBlockIDs[0], missBlockIDs[1], missBlockIDs[2], missBlockIDs[3]);
+    FragData2 = uvec4(usedBlockIDs[0], usedBlockIDs[1], usedBlockIDs[2], usedBlockIDs[3]);
+    FragData3 = uvec4(usedBlockIDs[4], usedBlockIDs[5], usedBlockIDs[6], usedBlockIDs[7]);
+    FragData4 = uvec4(usedBlockIDs[8], usedBlockIDs[9], usedBlockIDs[10], usedBlockIDs[11]);
+#else
     bool finished = false;
 
     ivec3 pageDirAddress = ivec3(-1,-1,-1);
@@ -152,8 +156,6 @@ void main()
           stepSize = zeLength / (sampling_rate * numVoxel);
         }
         vec3 samplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
-
-        float voxel = 0;
 
         ivec3 voxelCoord = ivec3(samplePos * image_dimensions[curLevel]);
         ivec3 pageTableCoord = voxelCoord / image_block_size;
@@ -173,7 +175,7 @@ void main()
           pagingFlag = pageTableEntry.w;
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
             ivec3 voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size;
-            voxel = texelFetch(image_cache, voxelAddress, 0).r;
+            float voxel = texelFetch(image_cache, voxelAddress, 0).r;
 
 #ifdef MIP
 #ifdef LOCAL_MIP
@@ -199,7 +201,7 @@ void main()
 
             if (color.a > 0.0) {
               color.a / sampling_rate;
-              result = COMPOSITING(result, color, currentRayLength, rayDepth);
+              result = COMPOSITING(result, color, ze, finalZe);
               if (result.a >= 1.0) {
                 result.a = 1.0;
                 finished = true;
@@ -282,7 +284,7 @@ void main()
     result.a = 1.0;
 #endif
 
-    if (rayDepth >= 0.0) {
+    if (finalZe < 0.0) {
       gl_FragDepth = ze_to_zw_a / finalZe + ze_to_zw_b;
     } else {
 #ifdef RESULT_OPAQUE
@@ -298,6 +300,7 @@ void main()
     FragData2 = uvec4(usedBlockIDs[0], usedBlockIDs[1], usedBlockIDs[2], usedBlockIDs[3]);
     FragData3 = uvec4(usedBlockIDs[4], usedBlockIDs[5], usedBlockIDs[6], usedBlockIDs[7]);
     FragData4 = uvec4(usedBlockIDs[8], usedBlockIDs[9], usedBlockIDs[10], usedBlockIDs[11]);
+#endif
   }
 }
 

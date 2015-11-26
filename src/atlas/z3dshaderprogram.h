@@ -164,8 +164,8 @@ public:
   void setUniformArray(GLint loc, const glm::ivec3* values, int count) { if (loc != -1) { glUniform3iv(loc, count, &(values[0][0])); } }
   void setUniformArray(GLint loc, const glm::ivec4* values, int count) { if (loc != -1) { glUniform4iv(loc, count, &(values[0][0])); } }
   void setUniformArray(GLint loc, const glm::uvec2* values, int count) { if (loc != -1) { glUniform2uiv(loc, count, &(values[0][0])); } }
-  void setUniformArray(GLint loc, const glm::uvec3* values, int count) { if (loc != -1) { glUniform2uiv(loc, count, &(values[0][0])); } }
-  void setUniformArray(GLint loc, const glm::uvec4* values, int count) { if (loc != -1) { glUniform2uiv(loc, count, &(values[0][0])); } }
+  void setUniformArray(GLint loc, const glm::uvec3* values, int count) { if (loc != -1) { glUniform3uiv(loc, count, &(values[0][0])); } }
+  void setUniformArray(GLint loc, const glm::uvec4* values, int count) { if (loc != -1) { glUniform4uiv(loc, count, &(values[0][0])); } }
   void setUniformArray(const QString& name, const GLfloat* values, int count) { setUniformArray(uniformLocation(name), values, count); }
   void setUniformArray(const QString& name, const glm::vec2* values, int count) { setUniformArray(uniformLocation(name), values, count); }
   void setUniformArray(const QString& name, const glm::vec3* values, int count) { setUniformArray(uniformLocation(name), values, count); }

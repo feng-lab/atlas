@@ -88,7 +88,7 @@ protected:
   std::vector<std::unique_ptr<Z3DTexture>> m_imageCacheTextures;
   std::unique_ptr<Z3DBlockCache<glm::ivec4>> m_imageCacheManager;
 
-  size_t m_numLevels = 0;
+  size_t m_numLevels = 1;
   std::vector<glm::ivec3> m_pageDirectoryBases;
   std::vector<glm::uvec3> m_pageDirectoryDimensions;
   std::vector<glm::uvec3> m_pageTableDimensions;

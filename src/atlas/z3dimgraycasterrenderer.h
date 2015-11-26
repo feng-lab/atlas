@@ -19,7 +19,7 @@ class Z3DImgRaycasterRenderer : public Z3DPrimitiveRenderer
 public:
   explicit Z3DImgRaycasterRenderer(Z3DRendererBase &rendererBase);
 
-  void setData(const Z3DImg &img);
+  void setData(Z3DImg &img);
   void setLayerTarget(Z3DRenderTarget *layerTarget) { m_layerTarget = layerTarget; }
 
   // quad or entryexit texture should be set before rendering
@@ -92,7 +92,7 @@ protected:
 
   ZStringIntOptionParameter m_compositingMode;
 
-  const Z3DImg* m_img = nullptr;
+  Z3DImg* m_img = nullptr;
   std::vector<QString> m_volumeUniformNames;
   std::vector<QString> m_volumeDimensionNames;
   std::vector<QString> m_transferFuncUniformNames;
