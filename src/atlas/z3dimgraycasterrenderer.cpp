@@ -3,6 +3,8 @@
 #include "z3dtexture.h"
 #include "z3dvolume.h"
 #include "z3dimg.h"
+#include <tbb/parallel_for.h>
+#include <tbb/concurrent_unordered_set.h>
 
 namespace nim {
 
@@ -378,6 +380,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       // check missed blocks and upload
       std::set<uint32_t> missingBlockIDs;
       std::set<uint32_t> usedBlockIDs;
+      tbb::concurrent_unordered_set<uint32_t> ccSet;
 
       const Z3DTexture* missingBlockIDsTexture = m_layerTarget->attachment(GL_COLOR_ATTACHMENT1);
       if (missingBlockIDsTexture->numPixels() * 4 != m_blockIDs.size()) {
@@ -385,24 +388,40 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       }
       size_t numIDs = missingBlockIDsTexture->width() * missingBlockIDsTexture->height() * 4;
       missingBlockIDsTexture->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
-      for (size_t i=0; i<numIDs; ++i) {
-        if (m_blockIDs[i])
-          missingBlockIDs.insert(m_blockIDs[i]);
+
+      tbb::parallel_for(
+            tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.begin()+numIDs),
+            [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range){
+        ccSet.insert(range.begin(), range.end()); // inserts a sequence
       }
-      m_layerTarget->attachment(GL_COLOR_ATTACHMENT2)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
-      for (size_t i=0; i<numIDs; ++i) {
-        if (m_blockIDs[i])
-          usedBlockIDs.insert(m_blockIDs[i]);
-      }
-      m_layerTarget->attachment(GL_COLOR_ATTACHMENT3)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
-      for (size_t i=0; i<numIDs; ++i) {
-        if (m_blockIDs[i])
-          usedBlockIDs.insert(m_blockIDs[i]);
-      }
-      m_layerTarget->attachment(GL_COLOR_ATTACHMENT4)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
-      for (size_t i=0; i<numIDs; ++i) {
-        if (m_blockIDs[i])
-          usedBlockIDs.insert(m_blockIDs[i]);
+      );
+
+      if (!ccSet.empty()) {
+        missingBlockIDs.insert(ccSet.begin(), ccSet.end());
+        ccSet.clear();
+
+        m_layerTarget->attachment(GL_COLOR_ATTACHMENT2)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+        tbb::parallel_for(
+              tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.begin()+numIDs),
+              [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range){
+          ccSet.insert(range.begin(), range.end()); // inserts a sequence
+        }
+        );
+        m_layerTarget->attachment(GL_COLOR_ATTACHMENT3)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+        tbb::parallel_for(
+              tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.begin()+numIDs),
+              [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range){
+          ccSet.insert(range.begin(), range.end()); // inserts a sequence
+        }
+        );
+        m_layerTarget->attachment(GL_COLOR_ATTACHMENT4)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+        tbb::parallel_for(
+              tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.begin()+numIDs),
+              [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range){
+          ccSet.insert(range.begin(), range.end()); // inserts a sequence
+        }
+        );
+        usedBlockIDs.insert(ccSet.begin(), ccSet.end());
       }
 
       LINFO() << missingBlockIDs.size() << usedBlockIDs.size();
