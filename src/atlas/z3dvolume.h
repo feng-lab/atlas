@@ -98,8 +98,6 @@ public:
 
   Z3DTexture* texture();
 
-  void setUniform(Z3DShaderProgram &shader, const QString &uniform, const GLint texUnit) const;
-
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
 
   glm::vec3 cubeSize() const { return glm::vec3(dimensions()) * spacing(); }

@@ -9,7 +9,7 @@
 #include "z3dtransformparameter.h"
 #include "zwidgetsgroup.h"
 #include <vector>
-#include "z3dvolumeraycasterrenderer.h"
+#include "z3dimgraycasterrenderer.h"
 #include "z3dvolumeslicerenderer.h"
 #include "z3dtextureandeyecoordinaterenderer.h"
 #include "z3dimage2drenderer.h"
@@ -79,7 +79,7 @@ private:
 
   void volumeChanged();
 
-  Z3DVolumeRaycasterRenderer m_volumeRaycasterRenderer;
+  Z3DImgRaycasterRenderer m_imgRaycasterRenderer;
   Z3DVolumeSliceRenderer m_volumeSliceRenderer;
   Z3DTextureAndEyeCoordinateRenderer m_textureAndEyeCoordinateRenderer;
   std::vector<std::unique_ptr<Z3DImage2DRenderer>> m_image2DRenderers;

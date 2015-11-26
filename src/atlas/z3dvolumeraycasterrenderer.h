@@ -91,6 +91,7 @@ protected:
 
   std::vector<Z3DVolume *> m_volumes;
   std::vector<QString> m_volumeUniformNames;
+  std::vector<QString> m_volumeDimensionNames;
   std::vector<QString> m_transferFuncUniformNames;
   std::vector<std::unique_ptr<ZBoolParameter>> m_channelVisibleParas;
   std::vector<std::unique_ptr<Z3DTransferFunctionParameter>> m_transferFuncParas;

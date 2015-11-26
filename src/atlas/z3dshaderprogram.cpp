@@ -4,7 +4,6 @@
 #include "zsysteminfo.h"
 #include <QFile>
 #include "QsLog.h"
-#include "z3dvolume.h"
 #include "zexception.h"
 #include "z3dshadermanager.h"
 #include "zexception.h"
@@ -133,59 +132,25 @@ void Z3DShaderProgram::bindTexture(const QString &name, const Z3DTexture *textur
   }
 }
 
+void Z3DShaderProgram::bindTexture(const QString &name, const Z3DTexture *texture, GLint minFilter, GLint magFilter)
+{
+  if (texture) {
+    texture->setFilter(minFilter, magFilter);
+    m_textureUnitManager.nextAvailableUnit();
+    m_textureUnitManager.activateCurrentUnit();
+    texture->bind();
+    setUniform(name, m_textureUnitManager.currentUnitNumber());
+    glActiveTexture(GL_TEXTURE0);
+    CHECK_GL_ERROR;
+  }
+}
+
 void Z3DShaderProgram::bindTexture(const QString &name, GLenum target, GLuint textureId)
 {
   m_textureUnitManager.nextAvailableUnit();
   m_textureUnitManager.activateCurrentUnit();
   glBindTexture(target, textureId);
   setUniform(name, m_textureUnitManager.currentUnitNumber());
-  glActiveTexture(GL_TEXTURE0);
-  CHECK_GL_ERROR;
-}
-
-void Z3DShaderProgram::bindVolume(const QString &name, Z3DVolume *volume)
-{
-  if (!volume)
-    return;
-
-  m_textureUnitManager.nextAvailableUnit();
-  m_textureUnitManager.activateCurrentUnit();
-
-  if (!volume->texture()) {
-    LWARN() << "volume do not contains any texture";
-    glActiveTexture(GL_TEXTURE0);
-    return;
-  }
-
-  volume->texture()->bind();
-  volume->setUniform(*this, name, m_textureUnitManager.currentUnitNumber());
-  glActiveTexture(GL_TEXTURE0);
-  CHECK_GL_ERROR;
-}
-
-void Z3DShaderProgram::bindVolume(const QString &name, Z3DVolume *volume,
-                                  GLint minFilter, GLint magFilter)
-{
-  if (!volume)
-    return;
-
-  m_textureUnitManager.nextAvailableUnit();
-  m_textureUnitManager.activateCurrentUnit();
-
-  if (!volume->texture()) {
-    LWARN() << "volume do not contains any texture";
-    glActiveTexture(GL_TEXTURE0);
-    return;
-  }
-
-  volume->texture()->bind();
-
-  GLenum target = volume->texture()->textureTarget();
-  // texture filtering
-  glTexParameteri(target, GL_TEXTURE_MAG_FILTER, magFilter);
-  glTexParameteri(target, GL_TEXTURE_MIN_FILTER, minFilter);
-
-  volume->setUniform(*this, name, m_textureUnitManager.currentUnitNumber());
   glActiveTexture(GL_TEXTURE0);
   CHECK_GL_ERROR;
 }

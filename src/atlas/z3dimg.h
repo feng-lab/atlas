@@ -28,11 +28,10 @@ public:
   Z3DImg(const ZImgPack &imgPack, const glm::vec3& scale, QObject *parent = 0);
   ~Z3DImg();
 
-  bool is1DData() const { return m_imageDimensions[0].z == 1 && (m_imageDimensions[0].x == 1 || m_imageDimensions[0].y == 1); }
-  bool is2DData() const { return m_imageDimensions[0].z == 1 && m_imageDimensions[0].x > 1 && m_imageDimensions[0].y > 1; }
-  bool is3DData() const { return m_imageDimensions[0].z > 1 && m_imageDimensions[0].x > 1 && m_imageDimensions[0].y > 1; }
+  bool is2DData() const { return m_imgPack.imgInfo().depth == 1; }
+  bool is3DData() const { return m_imgPack.imgInfo().depth > 1; }
 
-  glm::uvec3 dimensions() const { return m_imageDimensions[0]; }
+  glm::uvec3 dimensions() const { return glm::uvec3(m_imgPack.imgInfo().width, m_imgPack.imgInfo().height, m_imgPack.imgInfo().depth); }
   size_t numChannels() const { return m_nChannels; }
   col4 channelColor(size_t c) const { return m_imgPack.imgInfo().channelColors[c]; }
   bool isVolumeDownsampled() const { return m_isVolumeDownsampled; }
@@ -43,7 +42,7 @@ public:
 
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
   glm::vec3 physicalLUF() const { return glm::vec3(0, 0, 0); }
-  glm::vec3 physicalRDB() const { return glm::vec3(m_imageDimensions[0]); }
+  glm::vec3 physicalRDB() const { return glm::vec3(m_imgPack.imgInfo().width, m_imgPack.imgInfo().height, m_imgPack.imgInfo().depth); }
   glm::vec3 physicalLDF() const { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z); }
   glm::vec3 physicalRDF() const { return glm::vec3(physicalRDB().x, physicalRDB().y, physicalLUF().z); }
   glm::vec3 physicalRUF() const { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalLUF().z); }
@@ -70,8 +69,6 @@ protected:
   void readVolumes();
 
 protected:
-  const ZImgPack& m_imgPack;
-
   glm::uvec3 m_pageTableBlockSize;
   glm::uvec3 m_pageTableCacheNumBlocks;
   glm::uvec3 m_imageBlockSize;
@@ -85,9 +82,9 @@ protected:
   std::vector<glm::ivec4> m_pageTableCache;
   glm::ivec3 m_pageTableCacheSize;
   std::unique_ptr<Z3DTexture> m_pageTableCacheTexture;
-  Z3DBlockCache<glm::ivec4> m_pageTableCacheManager;
+  std::unique_ptr<Z3DBlockCache<glm::ivec4>> m_pageTableCacheManager;
   std::vector<std::unique_ptr<Z3DTexture>> m_imageCacheTextures;
-  Z3DBlockCache<glm::ivec4> m_imageCacheManager;
+  std::unique_ptr<Z3DBlockCache<glm::ivec4>> m_imageCacheManager;
 
   size_t m_numLevels;
   std::vector<glm::ivec3> m_pageDirectoryBases;
@@ -102,11 +99,11 @@ protected:
 
 private:
   //std::unique_ptr<Z3DImgHistogramThread> m_histogramThread;
-
+  const ZImgPack& m_imgPack;
   size_t m_maxVoxelNumber = 0;
   std::vector<std::unique_ptr<Z3DVolume>> m_volumes;
   size_t m_nChannels = 0;
-  bool m_isVolumeDownsampled = false;
+  bool m_isVolumeDownsampled;
   double m_imgMinIntensity;
   double m_imgMaxIntensity;
 };

@@ -51,7 +51,7 @@ Z3DTexture::~Z3DTexture()
   }
 }
 
-void Z3DTexture::setFilter(GLint minFilter, GLint magFilter)
+void Z3DTexture::setFilter(GLint minFilter, GLint magFilter) const
 {
   bind();
   glTexParameteri(m_textureTarget, GL_TEXTURE_MAG_FILTER, magFilter);
@@ -59,7 +59,7 @@ void Z3DTexture::setFilter(GLint minFilter, GLint magFilter)
   CHECK_GL_ERROR;
 }
 
-void Z3DTexture::setWrap(GLint wrap)
+void Z3DTexture::setWrap(GLint wrap) const
 {
   bind();
   glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_S, wrap);
@@ -68,14 +68,14 @@ void Z3DTexture::setWrap(GLint wrap)
   CHECK_GL_ERROR;
 }
 
-void Z3DTexture::generateMipmap()
+void Z3DTexture::generateMipmap() const
 {
   bind();
   glGenerateMipmap(m_textureTarget);
   CHECK_GL_ERROR;
 }
 
-void Z3DTexture::uploadImage(const GLvoid *data)
+void Z3DTexture::uploadImage(const GLvoid *data) const
 {
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
@@ -104,7 +104,7 @@ void Z3DTexture::uploadImage(const GLvoid *data)
   CHECK_GL_ERROR;
 }
 
-void Z3DTexture::uploadSubImage(const glm::uvec3 &offset, const glm::uvec3 &size, const GLvoid *data)
+void Z3DTexture::uploadSubImage(const glm::uvec3 &offset, const glm::uvec3 &size, const GLvoid *data) const
 {
   assert(data);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);

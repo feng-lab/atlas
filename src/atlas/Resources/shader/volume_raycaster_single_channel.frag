@@ -1,9 +1,3 @@
-struct VolumeStruct
-{
-  sampler3D volume;
-  vec3 dimensions;
-};
-
 #if GLSL_VERSION < 130
 uniform vec2 screen_dim_RCP;
 #endif
@@ -22,7 +16,8 @@ uniform sampler2D ray_entry_eye_coord;
 uniform sampler2D ray_exit_tex_coord;
 uniform sampler2D ray_exit_eye_coord;
 
-uniform VolumeStruct volume_struct_1;
+uniform sampler3D volume_1;
+uniform vec3 volume_dimensions_1;
 uniform sampler1D transfer_function_1;
 
 #if GLSL_VERSION >= 330
@@ -87,10 +82,9 @@ void main()
     float ch1V = 0.0;
 #endif
 
-    vec3 dimension = volume_struct_1.dimensions;
     vec3 rayVector = exitRayPosition - startRayPosition;
     float maxRayLength = length(rayVector);
-    vec3 numVoxels = abs(rayVector * dimension);
+    vec3 numVoxels = abs(rayVector * volume_dimensions_1);
     float numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
     float stepSize = maxRayLength / (sampling_rate * numVoxel);
 
@@ -103,9 +97,9 @@ void main()
         vec3 samplePos = startRayPosition + currentRayLength / maxRayLength * rayVector;
 
 #if GLSL_VERSION >= 130
-        voxel = texture(volume_struct_1.volume, samplePos).r;
+        voxel = texture(volume_1, samplePos).r;
 #else
-        voxel = texture3D(volume_struct_1.volume, samplePos).r;
+        voxel = texture3D(volume_1, samplePos).r;
 #endif
 
 

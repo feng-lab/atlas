@@ -1,9 +1,4 @@
-struct VolumeStruct
-{
-  sampler3D volume;
-};
-
-uniform VolumeStruct volume_struct_1;
+uniform sampler3D volume_1;
 uniform sampler1D transfer_function_1;
 
 #if GLSL_VERSION >= 130
@@ -25,9 +20,9 @@ void main()
 #if NUM_VOLUMES > 0
 
 #if GLSL_VERSION >= 130
-  vec4 color = texture(transfer_function_1, texture(volume_struct_1.volume, texCoord0).r);
+  vec4 color = texture(transfer_function_1, texture(volume_1, texCoord0).r);
 #else
-  vec4 color = texture1D(transfer_function_1, texture2D(volume_struct_1.volume, texCoord0).r);
+  vec4 color = texture1D(transfer_function_1, texture3D(volume_1, texCoord0).r);
 #endif
   if (color.a == 0.0) {
     color = vec4(0.0);

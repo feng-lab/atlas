@@ -46,7 +46,7 @@ void Z3DVolumeSliceRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVo
   m_volumeUniformNames.resize(m_volumes.size());
   m_colormapUniformNames.resize(m_volumes.size());
   for (size_t i=0; i<m_volumes.size(); ++i) {
-    m_volumeUniformNames[i] = QString("volume_struct_%1").arg(i+1);
+    m_volumeUniformNames[i] = QString("volume_%1").arg(i+1);
     m_colormapUniformNames[i] = QString("colormap_%1").arg(i+1);
   }
 }
@@ -76,7 +76,7 @@ void Z3DVolumeSliceRenderer::bindVolumes(Z3DShaderProgram &shader)
       continue;
 
     // volumes
-    shader.bindVolume(m_volumeUniformNames[idx], volume, (GLint)GL_NEAREST, (GLint)GL_NEAREST);
+    shader.bindTexture(m_volumeUniformNames[idx], volume->texture(), (GLint)GL_NEAREST, (GLint)GL_NEAREST);
 
     // colormap
     shader.bindTexture(m_colormapUniformNames[idx++], m_colormaps[i]->get().texture1D());
@@ -88,7 +88,7 @@ void Z3DVolumeSliceRenderer::bindVolumes(Z3DShaderProgram &shader)
 void Z3DVolumeSliceRenderer::bindVolume(Z3DShaderProgram &shader, size_t idx)
 {
   // volumes
-  shader.bindVolume(m_volumeUniformNames[0], m_volumes[idx], (GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  shader.bindTexture(m_volumeUniformNames[0], m_volumes[idx]->texture(), (GLint)GL_NEAREST, (GLint)GL_NEAREST);
 
   // colormap
   shader.bindTexture(m_colormapUniformNames[0], m_colormaps[idx]->get().texture1D());

@@ -1,9 +1,4 @@
-struct VolumeStruct
-{
-  sampler2D volume;
-};
-
-uniform VolumeStruct volume_struct_1;
+uniform sampler2D volume_1;
 uniform sampler1D colormap_1;
 
 #if GLSL_VERSION >= 130
@@ -25,9 +20,9 @@ void main()
 #if NUM_VOLUMES > 0
 
 #if GLSL_VERSION >= 130
-  FragData0 = texture(colormap_1, texture(volume_struct_1.volume, texCoord0).r);
+  FragData0 = texture(colormap_1, texture(volume_1, texCoord0).r);
 #else
-  FragData0 = texture1D(colormap_1, texture2D(volume_struct_1.volume, texCoord0).r);
+  FragData0 = texture1D(colormap_1, texture2D(volume_1, texCoord0).r);
 #endif
 
   FragData0.rgb *= FragData0.a;

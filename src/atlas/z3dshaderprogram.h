@@ -34,8 +34,6 @@ void glUniform4uiv(GLint location, GLsizei count, const GLuint *value);
 
 namespace nim {
 
-class Z3DVolume;
-
 // throw ZGLException if error
 class Z3DShaderProgram
 {
@@ -71,9 +69,8 @@ public:
 
   // bind samplers
   void bindTexture(const QString &name, const Z3DTexture *texture);
+  void bindTexture(const QString &name, const Z3DTexture *texture, GLint minFilter, GLint magFilter);
   void bindTexture(const QString &name, GLenum target, GLuint textureId);
-  void bindVolume(const QString &name, Z3DVolume *volume);
-  void bindVolume(const QString &name, Z3DVolume *volume, GLint minFilter, GLint magFilter);
 
   // load functions will load shaders and link, throw Exception if error
   // input filenames should not contain path, shader paths are managed by Z3DApplication

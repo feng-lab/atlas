@@ -88,7 +88,8 @@ void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z
 
     if (numChannelsChanged) {
       for (size_t i=0; i<m_volumes.size(); ++i) {
-        m_volumeUniformNames.push_back(QString("volume_struct_%1").arg(i+1));
+        m_volumeUniformNames.push_back(QString("volume_%1").arg(i+1));
+        m_volumeDimensionNames.push_back(QString("volume_dimensions_%1").arg(i+1));
         m_transferFuncUniformNames.push_back(QString("transfer_function_%1").arg(i+1));
         m_channelVisibleParas.emplace_back(std::make_unique<ZBoolParameter>(QString("Show Channel %1").arg(i+1), true));
         connect(m_channelVisibleParas[i].get(), SIGNAL(valueChanged()), this, SLOT(compile()));
@@ -162,8 +163,9 @@ void Z3DVolumeRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram &s
       continue;
 
     // volumes
-    shader.bindVolume(m_volumeUniformNames[idx], m_volumes[i], m_texFilterModeParas[i]->associatedData(),
-                      m_texFilterModeParas[i]->associatedData());
+    shader.bindTexture(m_volumeUniformNames[idx], m_volumes[i]->texture(), m_texFilterModeParas[i]->associatedData(),
+                       m_texFilterModeParas[i]->associatedData());
+    shader.setUniform(m_volumeDimensionNames[idx], glm::vec3(m_volumes[i]->dimensions()));
 
     // transfer functions
     shader.bindTexture(m_transferFuncUniformNames[idx++], m_transferFuncParas[i]->get().texture());
@@ -178,8 +180,9 @@ void Z3DVolumeRaycasterRenderer::bindVolumeAndTransferFunc(Z3DShaderProgram &sha
 {
   shader.setLogUniformLocationError(false);
 
-  shader.bindVolume(m_volumeUniformNames[0], m_volumes[idx], m_texFilterModeParas[idx]->associatedData(),
-                    m_texFilterModeParas[idx]->associatedData());
+  shader.bindTexture(m_volumeUniformNames[0], m_volumes[idx]->texture(), m_texFilterModeParas[idx]->associatedData(),
+                     m_texFilterModeParas[idx]->associatedData());
+  shader.setUniform(m_volumeDimensionNames[0], glm::vec3(m_volumes[idx]->dimensions()));
 
   // transfer functions
   shader.bindTexture(m_transferFuncUniformNames[0], m_transferFuncParas[idx]->get().texture());

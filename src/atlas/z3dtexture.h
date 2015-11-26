@@ -17,12 +17,12 @@ public:
 
   // default is GL_LINEAR and GL_LINEAR.
   // note: openGL default is GL_NEAREST_MIPMAP_LINEAR and GL_LINEAR.
-  void setFilter(GLint minFilter = (GLint)GL_LINEAR, GLint magFilter = (GLint)GL_LINEAR);
+  void setFilter(GLint minFilter = (GLint)GL_LINEAR, GLint magFilter = (GLint)GL_LINEAR) const;
   // default is GL_CLAMP_TO_EDGE
   // note: openGL default is GL_REPEAT !!
-  void setWrap(GLint wrap = (GLint)GL_CLAMP_TO_EDGE);
+  void setWrap(GLint wrap = (GLint)GL_CLAMP_TO_EDGE) const;
   //
-  void generateMipmap();
+  void generateMipmap() const;
 
   // changes made by the following four functions will take effect after next call of uploadImage()
   void setDimension(const glm::uvec3& dimension) { m_dimension = dimension; }
@@ -31,9 +31,9 @@ public:
   void setDataType(GLenum dataType) { m_dataType = dataType; }
 
   // Input data must match current dataFormat and dataType.
-  void uploadImage(const GLvoid* data = nullptr);
+  void uploadImage(const GLvoid* data = nullptr) const;
   // glTexSubImage*D
-  void uploadSubImage(const glm::uvec3& offset, const glm::uvec3& size, const GLvoid* data);
+  void uploadSubImage(const glm::uvec3& offset, const glm::uvec3& size, const GLvoid* data) const;
 
   void bind() const { glBindTexture(m_textureTarget, m_id); }
 

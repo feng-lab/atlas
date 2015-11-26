@@ -149,23 +149,6 @@ Z3DTexture *Z3DVolume::texture()
   return m_texture.get();
 }
 
-void Z3DVolume::setUniform(Z3DShaderProgram &shader, const QString &uniform, const GLint texUnit) const
-{
-  shader.setUniform(uniform + ".volume", texUnit);
-
-  shader.setLogUniformLocationError(false);
-
-  shader.setUniform(uniform + ".color", m_volColor);
-  // volume size
-  glm::vec3 dims = glm::vec3(dimensions());
-  shader.setUniform(uniform + ".dimensions", dims);
-  shader.setUniform(uniform + ".dimensions_RCP", glm::vec3(1.f) / dims);
-
-  CHECK_GL_ERROR;
-
-  shader.setLogUniformLocationError(true);
-}
-
 std::vector<double> Z3DVolume::physicalBoundBox() const
 {
   glm::vec3 luf = physicalLUF();

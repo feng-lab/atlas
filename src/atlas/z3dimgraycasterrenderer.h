@@ -5,19 +5,24 @@
 #include "z3dtransferfunction.h"
 #include "zmesh.h"
 #include "z3dshaderprogram.h"
+#include "z3drendertarget.h"
 
 namespace nim {
 
+class Z3DImg;
+
 // use raycaster to render volume or 2D Image (stack with depth==1) with color
 // transfer functions
-class Z3DImgRayCasterRenderer : public Z3DPrimitiveRenderer
+class Z3DImgRaycasterRenderer : public Z3DPrimitiveRenderer
 {
   Q_OBJECT
 public:
-  explicit Z3DImgRayCasterRenderer(Z3DRendererBase &rendererBase);
+  explicit Z3DImgRaycasterRenderer(Z3DRendererBase &rendererBase);
 
   // input vols can not be nullptr
   void setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &vols);
+  void setChannels(const Z3DImg &img);
+  void setLayerTarget(Z3DRenderTarget *layerTarget) { m_layerTarget = layerTarget; }
 
   // quad or entryexit texture should be set before rendering
 
@@ -59,6 +64,7 @@ protected slots:
 
 protected:
   void bindVolumesAndTransferFuncs(Z3DShaderProgram &shader);
+  void bindVolumeAndTransferFunc(Z3DShaderProgram &shader, size_t idx);
 
   virtual void compile() override;
   QString generateHeader();
@@ -66,9 +72,16 @@ protected:
   virtual void render(Z3DEye eye) override;
   virtual void renderPicking(Z3DEye) override;
 
-  Z3DShaderProgram m_raycasterShader;
-  Z3DShaderProgram m_2dImageShader;
-  Z3DShaderProgram m_volumeSliceWithTransferfunShader;
+  //  Z3DShaderProgram m_raycasterShader;
+  //  Z3DShaderProgram m_2dImageShader;
+  //  Z3DShaderProgram m_volumeSliceWithTransferfunShader;
+
+  // single channel version
+  Z3DShaderProgram m_scRaycasterShader;
+  Z3DShaderProgram m_sc2dImageShader;
+  Z3DShaderProgram m_scVolumeSliceWithTransferfunShader;
+  Z3DRenderTarget* m_layerTarget = nullptr;
+  Z3DShaderProgram m_mergeChannelShader;
 
   ZFloatParameter m_samplingRate;  // Sampling rate of the raycasting, specified relative to the size of one voxel
   ZFloatParameter m_isoValue;  // The used isovalue, when isosurface raycasting is enabled
@@ -78,6 +91,7 @@ protected:
 
   std::vector<Z3DVolume *> m_volumes;
   std::vector<QString> m_volumeUniformNames;
+  std::vector<QString> m_volumeDimensionNames;
   std::vector<QString> m_transferFuncUniformNames;
   std::vector<std::unique_ptr<ZBoolParameter>> m_channelVisibleParas;
   std::vector<std::unique_ptr<Z3DTransferFunctionParameter>> m_transferFuncParas;

@@ -14,7 +14,7 @@ const size_t Z3DImgFilter::m_maxNumOfFullResolutionVolumeSlice = 6;
 
 Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   : Z3DBoundedFilter(globalParas, parent)
-  , m_volumeRaycasterRenderer(m_rendererBase)
+  , m_imgRaycasterRenderer(m_rendererBase)
   , m_volumeSliceRenderer(m_rendererBase)
   , m_textureAndEyeCoordinateRenderer(m_rendererBase)
   , m_textureCopyRenderer(m_rendererBase)
@@ -127,7 +127,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   connect(&m_ySlice2Position, SIGNAL(valueChanged()), this, SLOT(invalidateFRVolumeXSlice2()));
   connect(&m_zSlice2Position, SIGNAL(valueChanged()), this, SLOT(invalidateFRVolumeXSlice2()));
 
-  m_volumeRaycasterRenderer.setLayerTarget(&m_layerTarget);
+  m_imgRaycasterRenderer.setLayerTarget(&m_layerTarget);
   m_volumeSliceRenderer.setLayerTarget(&m_layerTarget);
   for (size_t i=0; i<m_maxNumOfFullResolutionVolumeSlice; ++i) {
     m_image2DRenderers.emplace_back(std::make_unique<Z3DImage2DRenderer>(m_rendererBase));
@@ -136,10 +136,10 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   m_boundBoxLineWidth.set(1);
   m_boundBoxMode.select("Bound Box");
 
-  addParameter(m_volumeRaycasterRenderer.compositingModePara());
-  addParameter(m_volumeRaycasterRenderer.isoValuePara());
-  addParameter(m_volumeRaycasterRenderer.localMIPThresholdPara());
-  addParameter(m_volumeRaycasterRenderer.samplingRatePara());
+  addParameter(m_imgRaycasterRenderer.compositingModePara());
+  addParameter(m_imgRaycasterRenderer.isoValuePara());
+  addParameter(m_imgRaycasterRenderer.localMIPThresholdPara());
+  addParameter(m_imgRaycasterRenderer.samplingRatePara());
 
   adjustWidget();
   CHECK_GL_ERROR;
@@ -161,16 +161,16 @@ void Z3DImgFilter::setOffset(double x, double y, double z)
 void Z3DImgFilter::setData(const ZImgPack &imgPack)
 {
   if (m_widgetsGroup) {
-    for (auto it = m_volumeRaycasterRenderer.channelVisibleParas().begin();
-         it != m_volumeRaycasterRenderer.channelVisibleParas().end(); ++it) {
+    for (auto it = m_imgRaycasterRenderer.channelVisibleParas().begin();
+         it != m_imgRaycasterRenderer.channelVisibleParas().end(); ++it) {
       m_widgetsGroup->removeChild(*it->get());
     }
-    for (auto it = m_volumeRaycasterRenderer.transferFuncParas().begin();
-         it != m_volumeRaycasterRenderer.transferFuncParas().end(); ++it) {
+    for (auto it = m_imgRaycasterRenderer.transferFuncParas().begin();
+         it != m_imgRaycasterRenderer.transferFuncParas().end(); ++it) {
       m_widgetsGroup->removeChild(*it->get());
     }
-    for (auto it = m_volumeRaycasterRenderer.texFilterModeParas().begin();
-         it != m_volumeRaycasterRenderer.texFilterModeParas().end(); ++it) {
+    for (auto it = m_imgRaycasterRenderer.texFilterModeParas().begin();
+         it != m_imgRaycasterRenderer.texFilterModeParas().end(); ++it) {
       m_widgetsGroup->removeChild(*it->get());
     }
     for (auto it = m_sliceColormaps.begin(); it != m_sliceColormaps.end(); ++it) {
@@ -236,23 +236,23 @@ void Z3DImgFilter::setData(const ZImgPack &imgPack)
   m_showYSlice2.setVisible(!is2DImage);
   m_showZSlice2.setVisible(!is2DImage);
 
-  m_volumeRaycasterRenderer.setChannels(*m_3dImg.get());
+  m_imgRaycasterRenderer.setChannels(*m_3dImg.get());
   if (!is2DImage) {
     m_volumeSliceRenderer.setChannels(*m_3dImg.get(), m_sliceColormaps);
   }
 
   updateBoundBox();
 
-  for (auto it = m_volumeRaycasterRenderer.channelVisibleParas().begin();
-       it != m_volumeRaycasterRenderer.channelVisibleParas().end(); ++it) {
+  for (auto it = m_imgRaycasterRenderer.channelVisibleParas().begin();
+       it != m_imgRaycasterRenderer.channelVisibleParas().end(); ++it) {
     addParameter(*it->get());
   }
-  for (auto it = m_volumeRaycasterRenderer.transferFuncParas().begin();
-       it != m_volumeRaycasterRenderer.transferFuncParas().end(); ++it) {
+  for (auto it = m_imgRaycasterRenderer.transferFuncParas().begin();
+       it != m_imgRaycasterRenderer.transferFuncParas().end(); ++it) {
     addParameter(*it->get());
   }
-  for (auto it = m_volumeRaycasterRenderer.texFilterModeParas().begin();
-       it != m_volumeRaycasterRenderer.texFilterModeParas().end(); ++it) {
+  for (auto it = m_imgRaycasterRenderer.texFilterModeParas().begin();
+       it != m_imgRaycasterRenderer.texFilterModeParas().end(); ++it) {
     addParameter(*it->get());
   }
   for (auto it = m_sliceColormaps.begin(); it != m_sliceColormaps.end(); ++it) {
@@ -260,16 +260,16 @@ void Z3DImgFilter::setData(const ZImgPack &imgPack)
   }
 
   if (m_widgetsGroup) {
-    for (auto it = m_volumeRaycasterRenderer.channelVisibleParas().begin();
-         it != m_volumeRaycasterRenderer.channelVisibleParas().end(); ++it) {
+    for (auto it = m_imgRaycasterRenderer.channelVisibleParas().begin();
+         it != m_imgRaycasterRenderer.channelVisibleParas().end(); ++it) {
       m_widgetsGroup->addChild(*it->get(), 2);
     }
-    for (auto it = m_volumeRaycasterRenderer.transferFuncParas().begin();
-         it != m_volumeRaycasterRenderer.transferFuncParas().end(); ++it) {
+    for (auto it = m_imgRaycasterRenderer.transferFuncParas().begin();
+         it != m_imgRaycasterRenderer.transferFuncParas().end(); ++it) {
       m_widgetsGroup->addChild(*it->get(), 3);
     }
-    for (auto it = m_volumeRaycasterRenderer.texFilterModeParas().begin();
-         it != m_volumeRaycasterRenderer.texFilterModeParas().end(); ++it) {
+    for (auto it = m_imgRaycasterRenderer.texFilterModeParas().begin();
+         it != m_imgRaycasterRenderer.texFilterModeParas().end(); ++it) {
       m_widgetsGroup->addChild(*it->get(), 15);
     }
     for (auto it = m_sliceColormaps.begin(); it != m_sliceColormaps.end(); ++it) {
@@ -290,20 +290,20 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_stayOnTop, 1);
     m_widgetsGroup->addChild(m_isVolumeDownsampled, 2);
 
-    for (auto it = m_volumeRaycasterRenderer.channelVisibleParas().begin();
-         it != m_volumeRaycasterRenderer.channelVisibleParas().end(); ++it) {
+    for (auto it = m_imgRaycasterRenderer.channelVisibleParas().begin();
+         it != m_imgRaycasterRenderer.channelVisibleParas().end(); ++it) {
       m_widgetsGroup->addChild(*it->get(), 2);
     }
-    for (auto it = m_volumeRaycasterRenderer.transferFuncParas().begin();
-         it != m_volumeRaycasterRenderer.transferFuncParas().end(); ++it) {
+    for (auto it = m_imgRaycasterRenderer.transferFuncParas().begin();
+         it != m_imgRaycasterRenderer.transferFuncParas().end(); ++it) {
       m_widgetsGroup->addChild(*it->get(), 3);
     }
-    m_widgetsGroup->addChild(m_volumeRaycasterRenderer.compositingModePara(), 4);
-    m_widgetsGroup->addChild(m_volumeRaycasterRenderer.isoValuePara(), 4);
-    m_widgetsGroup->addChild(m_volumeRaycasterRenderer.localMIPThresholdPara(), 4);
-    m_widgetsGroup->addChild(m_volumeRaycasterRenderer.samplingRatePara(), 15);
-    for (auto it = m_volumeRaycasterRenderer.texFilterModeParas().begin();
-         it != m_volumeRaycasterRenderer.texFilterModeParas().end(); ++it) {
+    m_widgetsGroup->addChild(m_imgRaycasterRenderer.compositingModePara(), 4);
+    m_widgetsGroup->addChild(m_imgRaycasterRenderer.isoValuePara(), 4);
+    m_widgetsGroup->addChild(m_imgRaycasterRenderer.localMIPThresholdPara(), 4);
+    m_widgetsGroup->addChild(m_imgRaycasterRenderer.samplingRatePara(), 15);
+    for (auto it = m_imgRaycasterRenderer.texFilterModeParas().begin();
+         it != m_imgRaycasterRenderer.texFilterModeParas().end(); ++it) {
       m_widgetsGroup->addChild(*it->get(), 15);
     }
 
@@ -680,7 +680,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
 
 bool Z3DImgFilter::hasImage() const
 {
-  return m_volumeRaycasterRenderer.hasVisibleRendering() &&
+  return m_imgRaycasterRenderer.hasVisibleRendering() &&
       m_xCut.upperValue() > m_xCut.minimum() &&
       m_yCut.upperValue() > m_yCut.minimum() &&
       m_zCut.upperValue() > m_zCut.minimum() &&
@@ -712,29 +712,29 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
                                                   glm::vec2(xCoordEnd, yCoordEnd), glm::vec2(xTexCoordStart, yTexCoordStart),
                                                   glm::vec2(xTexCoordEnd, yTexCoordEnd));
     m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_volumeRaycasterRenderer.clearQuads();
-    m_volumeRaycasterRenderer.addQuad(m_2DImageQuad);
+    m_imgRaycasterRenderer.clearQuads();
+    m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
   } else if (m_zCut.lowerValue() == m_zCut.upperValue()) { // slice of 3d image
     ZMesh m_2DImageQuad = ZMesh::createCubeSlice(zCoordStart, zTexCoordStart, 2, glm::vec2(xCoordStart, yCoordStart),
                                                  glm::vec2(xCoordEnd, yCoordEnd), glm::vec2(xTexCoordStart, yTexCoordStart),
                                                  glm::vec2(xTexCoordEnd, yTexCoordEnd));
     m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_volumeRaycasterRenderer.clearQuads();
-    m_volumeRaycasterRenderer.addQuad(m_2DImageQuad);
+    m_imgRaycasterRenderer.clearQuads();
+    m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
   } else if (m_yCut.lowerValue() == m_yCut.upperValue()) { // slice of 3d image
     ZMesh m_2DImageQuad = ZMesh::createCubeSlice(yCoordStart, yTexCoordStart, 1, glm::vec2(xCoordStart, zCoordStart),
                                                  glm::vec2(xCoordEnd, zCoordEnd), glm::vec2(xTexCoordStart, zTexCoordStart),
                                                  glm::vec2(xTexCoordEnd, zTexCoordEnd));
     m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_volumeRaycasterRenderer.clearQuads();
-    m_volumeRaycasterRenderer.addQuad(m_2DImageQuad);
+    m_imgRaycasterRenderer.clearQuads();
+    m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
   } else if (m_xCut.lowerValue() == m_xCut.upperValue()) { // slice of 3d image
     ZMesh m_2DImageQuad = ZMesh::createCubeSlice(xCoordStart, xTexCoordStart, 0, glm::vec2(yCoordStart, zCoordStart),
                                                  glm::vec2(yCoordEnd, zCoordEnd), glm::vec2(yTexCoordStart, zTexCoordStart),
                                                  glm::vec2(yTexCoordEnd, zTexCoordEnd));
     m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_volumeRaycasterRenderer.clearQuads();
-    m_volumeRaycasterRenderer.addQuad(m_2DImageQuad);
+    m_imgRaycasterRenderer.clearQuads();
+    m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
   } else { // 3d volume Raycasting
     ZMesh cube = ZMesh::createCube(glm::vec3(xCoordStart, yCoordStart, zCoordStart),
                                    glm::vec3(xCoordEnd, yCoordEnd, zCoordEnd),
@@ -781,10 +781,10 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     glCullFace(GL_BACK);
     glDisable(GL_CULL_FACE);
 
-    m_volumeRaycasterRenderer.setEntryExitInfo(m_entryTarget.attachment(GL_COLOR_ATTACHMENT0),
-                                               m_entryTarget.attachment(GL_COLOR_ATTACHMENT1),
-                                               m_exitTarget.attachment(GL_COLOR_ATTACHMENT0),
-                                               m_exitTarget.attachment(GL_COLOR_ATTACHMENT1));
+    m_imgRaycasterRenderer.setEntryExitInfo(m_entryTarget.attachment(GL_COLOR_ATTACHMENT0),
+                                            m_entryTarget.attachment(GL_COLOR_ATTACHMENT1),
+                                            m_exitTarget.attachment(GL_COLOR_ATTACHMENT0),
+                                            m_exitTarget.attachment(GL_COLOR_ATTACHMENT1));
   }
 
 
@@ -798,7 +798,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
   currentOutport.clearTarget();
   m_rendererBase.setViewport(currentOutport.size());
 
-  m_rendererBase.render(eye, m_volumeRaycasterRenderer);
+  m_rendererBase.render(eye, m_imgRaycasterRenderer);
 
   renderBoundBox(eye);
   CHECK_GL_ERROR;
