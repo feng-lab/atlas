@@ -3,7 +3,7 @@ uniform ivec3 page_directory_bases[LEVEL_COUNT];
 uniform isampler3D page_table_cache;
 uniform ivec3 page_table_block_size = ivec3(32, 32, 32);
 uniform sampler3D image_cache;
-uniform vec3 image_dimensions[LEVEL_COUNT];
+uniform uvec3 image_dimensions[LEVEL_COUNT];
 uniform float voxel_world_sizes[LEVEL_COUNT];
 uniform ivec3 image_block_size = ivec3(32, 32, 32);
 uniform uvec4 pos_to_block_ids[LEVEL_COUNT];
@@ -161,19 +161,19 @@ void main()
         ivec3 curPageDirAddress = page_directory_bases[curLevel] + pageDirectoryCoord;
         if (curPageDirAddress != pageDirAddress) {
           pageDirAddress = curPageDirAddress;
-          pageDirEntry = texelFetch(page_directory, pageDirAddress);
+          pageDirEntry = texelFetch(page_directory, pageDirAddress, 0);
         }
         int pagingFlag = pageDirEntry.w;
         if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
           ivec3 curPageTableAddress = pageDirEntry.xyz + pageTableCoord % page_table_block_size;
           if (curPageTableAddress != pageTableAddress) {
             pageTableAddress = curPageTableAddress;
-            pageTableEntry = texelFetch(page_table_cache, pageTableAddress);
+            pageTableEntry = texelFetch(page_table_cache, pageTableAddress, 0);
           }
           pagingFlag = pageTableEntry.w;
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
             ivec3 voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size;
-            voxel = texelFetch(image_cache, voxelAddress).r;
+            voxel = texelFetch(image_cache, voxelAddress, 0).r;
 
 #ifdef MIP
 #ifdef LOCAL_MIP
@@ -209,7 +209,7 @@ void main()
             ze += stepSize;
 
             if (usedBlockIDsIndex < 12) {
-              uint blockID = pos_to_block_ids[curLevel].w + dot(pos_to_block_ids[curLevel].xyz, uvec3(pageTableCoord));
+              uint blockID = pos_to_block_ids[curLevel].w + pos_to_block_ids[curLevel].x * pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
               if (usedBlockIDsIndex == 0 || blockID != usedBlockIDs[usedBlockIDsIndex-1]) {
                 usedBlockIDs[usedBlockIDsIndex++] = blockID;
               }
@@ -230,10 +230,10 @@ void main()
                 ivec3 testPageTableCoord = testVoxelCoord / image_block_size;
                 ivec3 testPageDirectoryCoord = testPageTableCoord / page_table_block_size;
 
-                ivec4 testPageDirEntry = texelFetch(page_directory, page_directory_bases[nextNonEmptyLevel] + testPageDirectoryCoord);
+                ivec4 testPageDirEntry = texelFetch(page_directory, page_directory_bases[nextNonEmptyLevel] + testPageDirectoryCoord, 0);
                 testPagingFlag = testPageDirEntry.w;
                 if (testPagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-                  testPagingFlag = texelFetch(page_table_cache, testPageDirEntry.xyz + testPageTableCoord % page_table_block_size).w;
+                  testPagingFlag = texelFetch(page_table_cache, testPageDirEntry.xyz + testPageTableCoord % page_table_block_size, 0).w;
                 }
                 ++nextNonEmptyLevel;
               }
@@ -257,7 +257,7 @@ void main()
         }
 
         if (pagingFlag == UNMAPPED && missBlockIDsIndex < 4) {
-          uint blockID = pos_to_block_ids[curLevel].w + dot(pos_to_block_ids[curLevel].xyz, uvec3(pageTableCoord));
+          uint blockID = pos_to_block_ids[curLevel].w + pos_to_block_ids[curLevel].x * pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
           if (missBlockIDsIndex == 0 || blockID != missBlockIDs[missBlockIDsIndex-1]) {
             missBlockIDs[missBlockIDsIndex++] = blockID;
           }

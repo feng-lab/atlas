@@ -68,6 +68,12 @@ protected:
   virtual void render(Z3DEye eye) override;
   virtual void renderPicking(Z3DEye) override;
 
+private:
+  // this function is used to get proper default
+  // transfer functions (grey or color depends on current number of channel)
+  void resetTransferFunctions();
+
+protected:
   //  Z3DShaderProgram m_raycasterShader;
   //  Z3DShaderProgram m_2dImageShader;
   //  Z3DShaderProgram m_volumeSliceWithTransferfunShader;
@@ -76,6 +82,7 @@ protected:
   Z3DShaderProgram m_scRaycasterShader;
   Z3DShaderProgram m_sc2dImageShader;
   Z3DShaderProgram m_scVolumeSliceWithTransferfunShader;
+  Z3DShaderProgram m_scFullResRaycasterShader;
   Z3DRenderTarget* m_layerTarget = nullptr;
   Z3DShaderProgram m_mergeChannelShader;
 
@@ -94,12 +101,6 @@ protected:
   std::vector<std::unique_ptr<ZStringIntOptionParameter>> m_texFilterModeParas;
 
 private:
-  // this function is used to get proper default
-  // transfer functions (grey or color depends on current number of channel)
-  void resetTransferFunctions();
-
-  bool m_is2DImage;
-
   std::vector<ZMesh> m_quads;
   const Z3DTexture *m_entryTexCoordTexture;
   const Z3DTexture *m_entryEyeCoordTexture;
@@ -109,6 +110,8 @@ private:
   bool m_opaque;
   double m_alpha; //only takes effect when m_opaque is true
   ZVertexArrayObject m_VAO;
+
+  std::vector<uint32_t> m_blockIDs;
 };
 
 } // namespace nim

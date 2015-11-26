@@ -59,6 +59,8 @@ public:
 
   void setScale(const glm::vec3& scale);
 
+  size_t numLevels() const { return m_numLevels; }
+  void bindFullResShader(Z3DShaderProgram &shader, size_t c) const;
   bool updateCaches(const std::set<uint32_t>& missingBlockIDs, const std::set<uint32_t>& usedBlockIDs);
 
 signals:
@@ -86,7 +88,7 @@ protected:
   std::vector<std::unique_ptr<Z3DTexture>> m_imageCacheTextures;
   std::unique_ptr<Z3DBlockCache<glm::ivec4>> m_imageCacheManager;
 
-  size_t m_numLevels;
+  size_t m_numLevels = 0;
   std::vector<glm::ivec3> m_pageDirectoryBases;
   std::vector<glm::uvec3> m_pageDirectoryDimensions;
   std::vector<glm::uvec3> m_pageTableDimensions;

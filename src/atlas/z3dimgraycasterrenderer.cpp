@@ -12,7 +12,6 @@ Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase &rendererBase)
   , m_isoValue("ISO Value", 0.5f, 0.0f, 1.0f)
   , m_localMIPThreshold("Local MIP Threshold", 0.8f, 0.01f, 1.f)
   , m_compositingMode("Compositing")
-  , m_is2DImage(false)
   , m_entryTexCoordTexture(nullptr)
   , m_entryEyeCoordTexture(nullptr)
   , m_exitTexCoordTexture(nullptr)
@@ -56,6 +55,9 @@ Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase &rendererBase)
   m_scVolumeSliceWithTransferfunShader.bindFragDataLocation(0, "FragData0");
   m_scVolumeSliceWithTransferfunShader.loadFromSourceFile("transform_with_3dtexture.vert", "volume_slice_with_transfun_single_channel.frag",
                                                           m_rendererBase.generateHeader() + generateHeader());
+  m_scFullResRaycasterShader.bindFragDataLocation(0, "FragData0");
+  m_scFullResRaycasterShader.loadFromSourceFile("pass.vert", "image3d_raycaster.frag",
+                                                m_rendererBase.generateHeader() + generateHeader());
   m_mergeChannelShader.bindFragDataLocation(0, "FragData0");
   m_mergeChannelShader.loadFromSourceFile("pass.vert", "image2d_array_compositor.frag",
                                           m_rendererBase.generateHeader() + generateHeader());
@@ -70,7 +72,6 @@ QString Z3DImgRaycasterRenderer::compositeMode() const
 void Z3DImgRaycasterRenderer::setData(const Z3DImg &img)
 {
   m_img = &img;
-  m_is2DImage = m_img->is2DData();
 
   if (m_img->numChannels() != m_volumeUniformNames.size()) {
     m_volumeUniformNames.clear();
@@ -92,9 +93,9 @@ void Z3DImgRaycasterRenderer::setData(const Z3DImg &img)
                                                   qMakePair(QString("Linear"), static_cast<int>(GL_LINEAR)));
       m_texFilterModeParas[i]->select("Linear");
     }
-    compile();
-    resetTransferFunctions();
   }
+  compile();
+  resetTransferFunctions();
 }
 
 void Z3DImgRaycasterRenderer::addQuad(const ZMesh &quad)
@@ -179,6 +180,7 @@ void Z3DImgRaycasterRenderer::compile()
   m_scRaycasterShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
   m_sc2dImageShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
   m_scVolumeSliceWithTransferfunShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+  m_scFullResRaycasterShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
   m_mergeChannelShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
@@ -187,13 +189,18 @@ QString Z3DImgRaycasterRenderer::generateHeader()
   QString headerSource;
 
   size_t numVisibleChannels = 0;
+  size_t numLevels = 1;
   if (m_img) {
     for (size_t i=0; i<m_img->numChannels(); ++i) {
       if (m_channelVisibleParas[i]->get()) {
         ++numVisibleChannels;
       }
     }
+    numLevels = m_img->numLevels();
   }
+
+  headerSource += QString("#define LEVEL_COUNT %1\n").arg(numLevels);
+
   if (numVisibleChannels > 0) {
     headerSource += QString("#define NUM_VOLUMES %1\n").arg(numVisibleChannels);
   } else {
@@ -250,9 +257,9 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       return;
   } else {
     for (size_t i=0; i<m_quads.size(); ++i) {
-      if (m_is2DImage && m_quads[i].numVertices() != m_quads[i].num2DTextureCoordinates())
+      if (m_img->is2DData() && m_quads[i].numVertices() != m_quads[i].num2DTextureCoordinates())
         return;
-      if (!m_is2DImage && m_quads[i].numVertices() != m_quads[i].num3DTextureCoordinates())
+      if (m_img->is3DData() && m_quads[i].numVertices() != m_quads[i].num3DTextureCoordinates())
         return;
     }
   }
@@ -263,9 +270,10 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       visibleIdxs.push_back(i);
     }
   }
+  bool fullResRendering = false;
 
   if (!m_quads.empty()) { // 2d image or slice from 3d volume
-    if (m_is2DImage) {   // image is 2D
+    if (m_img->is2DData()) {   // image is 2D
       m_sc2dImageShader.bind();
       m_rendererBase.setGlobalShaderParameters(m_sc2dImageShader, eye);
 
@@ -317,53 +325,145 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       m_scVolumeSliceWithTransferfunShader.release();
     }
   } else {  // 3d volume raycasting
-    m_scRaycasterShader.bind();
+    if (m_img->isVolumeDownsampled()) {
+      fullResRendering = true;
+      m_scFullResRaycasterShader.bind();
 
-    m_rendererBase.setGlobalShaderParameters(m_scRaycasterShader, eye);
+      float n = m_rendererBase.camera().nearDist();
+      float f = m_rendererBase.camera().farDist();
+      //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
+      // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
+      float a = f*n/(f-n);
+      float b = 0.5f * (f+n)/(f-n) + 0.5f;
+      m_scFullResRaycasterShader.setUniform("minus_near_dist", -n);
+      m_scFullResRaycasterShader.setUniform("ze_to_zw_b", b);
+      m_scFullResRaycasterShader.setUniform("ze_to_zw_a", a);
 
-    float n = m_rendererBase.camera().nearDist();
-    float f = m_rendererBase.camera().farDist();
-    //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
-    // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
-    float a = f*n/(f-n);
-    float b = 0.5f * (f+n)/(f-n) + 0.5f;
-    m_scRaycasterShader.setUniform("ze_to_zw_b", b);
-    m_scRaycasterShader.setUniform("ze_to_zw_a", a);
+      // entry exit points
+      m_scFullResRaycasterShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordTexture);
+      m_scFullResRaycasterShader.bindTexture("ray_entry_eye_coord", m_entryEyeCoordTexture);
+      m_scFullResRaycasterShader.bindTexture("ray_exit_tex_coord",  m_exitTexCoordTexture);
+      m_scFullResRaycasterShader.bindTexture("ray_exit_eye_coord", m_exitEyeCoordTexture);
 
-    // entry exit points
-    m_scRaycasterShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordTexture);
-    m_scRaycasterShader.bindTexture("ray_entry_eye_coord", m_entryEyeCoordTexture);
-    m_scRaycasterShader.bindTexture("ray_exit_tex_coord",  m_exitTexCoordTexture);
-    m_scRaycasterShader.bindTexture("ray_exit_eye_coord", m_exitEyeCoordTexture);
+      if (m_compositingMode.get() ==  "ISO Surface")
+        m_scFullResRaycasterShader.setUniform("iso_value", m_isoValue.get());
 
-    if (m_compositingMode.get() ==  "ISO Surface")
-      m_scRaycasterShader.setUniform("iso_value", m_isoValue.get());
+      if (m_compositingMode.get() ==  "Local MIP" || m_compositingMode.get() ==  "Local MIP Opaque")
+        m_scFullResRaycasterShader.setUniform("local_MIP_threshold", m_localMIPThreshold.get());
 
-    if (m_compositingMode.get() ==  "Local MIP" || m_compositingMode.get() ==  "Local MIP Opaque")
-      m_scRaycasterShader.setUniform("local_MIP_threshold", m_localMIPThreshold.get());
+      m_scFullResRaycasterShader.setUniform("sampling_rate", m_samplingRate.get());
 
-    m_scRaycasterShader.setUniform("sampling_rate", m_samplingRate.get());
+      // render first channel
+      m_layerTarget->attachSlice(0);
+      m_layerTarget->bind();
+      m_layerTarget->clear();
 
-    if (visibleIdxs.size() == 1) {
-      bindVolumeAndTransferFunc(m_scRaycasterShader, visibleIdxs[0]);
-      renderScreenQuad(m_VAO, m_scRaycasterShader);
-    } else {
-      for (size_t i=0; i<visibleIdxs.size(); ++i) {
+      m_img->bindFullResShader(m_scFullResRaycasterShader, visibleIdxs[0]);
+      renderScreenQuad(m_VAO, m_scFullResRaycasterShader);
+
+      m_layerTarget->release();
+
+      // check missed blocks and upload
+      std::set<uint32_t> missingBlockIDs;
+      std::set<uint32_t> usedBlockIDs;
+
+      const Z3DTexture* missingBlockIDsTexture = m_layerTarget->attachment(GL_COLOR_ATTACHMENT1);
+      if (missingBlockIDsTexture->numPixels() * 4 != m_blockIDs.size()) {
+        m_blockIDs.resize(missingBlockIDsTexture->numPixels() * 4);
+      }
+      size_t numIDs = missingBlockIDsTexture->width() * missingBlockIDsTexture->height() * 4;
+      missingBlockIDsTexture->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+      for (size_t i=0; i<numIDs; ++i) {
+        if (m_blockIDs[i])
+          missingBlockIDs.insert(m_blockIDs[i]);
+      }
+      m_layerTarget->attachment(GL_COLOR_ATTACHMENT2)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+      for (size_t i=0; i<numIDs; ++i) {
+        if (m_blockIDs[i])
+          usedBlockIDs.insert(m_blockIDs[i]);
+      }
+      m_layerTarget->attachment(GL_COLOR_ATTACHMENT3)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+      for (size_t i=0; i<numIDs; ++i) {
+        if (m_blockIDs[i])
+          usedBlockIDs.insert(m_blockIDs[i]);
+      }
+      m_layerTarget->attachment(GL_COLOR_ATTACHMENT4)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+      for (size_t i=0; i<numIDs; ++i) {
+        if (m_blockIDs[i])
+          usedBlockIDs.insert(m_blockIDs[i]);
+      }
+
+      LINFO() << missingBlockIDs.size() << usedBlockIDs.size();
+      // render other channels
+      size_t i = 0;
+      if (missingBlockIDs.empty()) {
+        i = 1;
+      } else {
+        //m_img->updateCaches(missingBlockIDs, usedBlockIDs);
+      }
+      for (; i<visibleIdxs.size(); ++i) {
         m_layerTarget->attachSlice(i);
         m_layerTarget->bind();
         m_layerTarget->clear();
 
-        bindVolumeAndTransferFunc(m_scRaycasterShader, visibleIdxs[i]);
-        renderScreenQuad(m_VAO, m_scRaycasterShader);
+        m_img->bindFullResShader(m_scFullResRaycasterShader, visibleIdxs[i]);
+        renderScreenQuad(m_VAO, m_scFullResRaycasterShader);
 
         m_layerTarget->release();
       }
-    }
 
-    m_scRaycasterShader.release();
+      m_scFullResRaycasterShader.release();
+    } else {
+      m_scRaycasterShader.bind();
+
+      if (!GLVersionGE(3, 0)) {
+        m_rendererBase.setGlobalShaderParameters(m_scRaycasterShader, eye);
+      }
+
+      float n = m_rendererBase.camera().nearDist();
+      float f = m_rendererBase.camera().farDist();
+      //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
+      // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
+      float a = f*n/(f-n);
+      float b = 0.5f * (f+n)/(f-n) + 0.5f;
+      m_scRaycasterShader.setUniform("ze_to_zw_b", b);
+      m_scRaycasterShader.setUniform("ze_to_zw_a", a);
+
+      // entry exit points
+      m_scRaycasterShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordTexture);
+      m_scRaycasterShader.bindTexture("ray_entry_eye_coord", m_entryEyeCoordTexture);
+      m_scRaycasterShader.bindTexture("ray_exit_tex_coord",  m_exitTexCoordTexture);
+      m_scRaycasterShader.bindTexture("ray_exit_eye_coord", m_exitEyeCoordTexture);
+
+      if (m_compositingMode.get() ==  "ISO Surface")
+        m_scRaycasterShader.setUniform("iso_value", m_isoValue.get());
+
+      if (m_compositingMode.get() ==  "Local MIP" || m_compositingMode.get() ==  "Local MIP Opaque")
+        m_scRaycasterShader.setUniform("local_MIP_threshold", m_localMIPThreshold.get());
+
+      m_scRaycasterShader.setUniform("sampling_rate", m_samplingRate.get());
+
+      if (visibleIdxs.size() == 1) {
+        bindVolumeAndTransferFunc(m_scRaycasterShader, visibleIdxs[0]);
+        renderScreenQuad(m_VAO, m_scRaycasterShader);
+      } else {
+        for (size_t i=0; i<visibleIdxs.size(); ++i) {
+          m_layerTarget->attachSlice(i);
+          m_layerTarget->bind();
+          m_layerTarget->clear();
+
+          bindVolumeAndTransferFunc(m_scRaycasterShader, visibleIdxs[i]);
+          renderScreenQuad(m_VAO, m_scRaycasterShader);
+
+          m_layerTarget->release();
+        }
+      }
+
+      m_scRaycasterShader.release();
+    }
   }
 
-  if (visibleIdxs.size() > 1) {
+  if (fullResRendering || visibleIdxs.size() > 1) {
     m_mergeChannelShader.bind();
     m_mergeChannelShader.bindTexture("color_texture", m_layerTarget->attachment(GL_COLOR_ATTACHMENT0));
     m_mergeChannelShader.bindTexture("depth_texture", m_layerTarget->attachment(GL_DEPTH_ATTACHMENT));

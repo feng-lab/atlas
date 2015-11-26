@@ -120,11 +120,13 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
     // content of RGBA32I texture
     m_pageDirectoryTexture.reset(new Z3DTexture((GLint)GL_RGBA32I, glm::uvec3(m_pageDirectorySize), GL_RGBA_INTEGER, GL_INT));
     m_pageDirectory.resize(m_pageDirectoryTexture->numPixels(), glm::ivec4(0,0,0,m_unmappedFlag));
+    m_pageDirectoryTexture->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
     m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
 
     m_pageTableCacheSize = glm::ivec3(m_pageTableBlockSize * m_pageTableCacheNumBlocks);
     m_pageTableCacheTexture.reset(new Z3DTexture((GLint)GL_RGBA32I, glm::uvec3(m_pageTableCacheSize), GL_RGBA_INTEGER, GL_INT));
     m_pageTableCache.resize(m_pageTableCacheTexture->numPixels(), glm::ivec4(0,0,0,m_unmappedFlag));
+    m_pageTableCacheTexture->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
     m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
 
     for (size_t c=0; c<info.numChannels; ++c) {
@@ -244,6 +246,19 @@ void Z3DImg::setScale(const glm::vec3 &scale)
     m_voxelWorldDimensions[l] = scale * glm::vec3(m_levelScales[l]);
     m_voxelWorldSizes[l] = std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y), m_voxelWorldDimensions[l].z);
   }
+}
+
+void Z3DImg::bindFullResShader(Z3DShaderProgram &shader, size_t c) const
+{
+  shader.bindTexture("page_directory", m_pageDirectoryTexture.get());
+  shader.setUniformArray("page_directory_bases", m_pageDirectoryBases.data(), m_numLevels);
+  shader.bindTexture("page_table_cache", m_pageTableCacheTexture.get());
+  shader.setUniform("page_table_block_size", glm::ivec3(m_pageTableBlockSize));
+  shader.bindTexture("image_cache", m_imageCacheTextures[c].get());
+  shader.setUniformArray("image_dimensions", m_imageDimensions.data(), m_numLevels);
+  shader.setUniformArray("voxel_world_sizes", m_voxelWorldSizes.data(), m_numLevels);
+  shader.setUniform("image_block_size", glm::ivec3(m_imageBlockSize));
+  shader.setUniformArray("pos_to_block_ids", m_posToBlockIDs.data(), m_numLevels);
 }
 
 bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::set<uint32_t> &usedBlockIDs)
