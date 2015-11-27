@@ -277,6 +277,7 @@ protected:
   QStringList m_shaderFiles;
 
   Z3DTextureUnitManager m_textureUnitManager;
+  std::map<GLint, std::pair<GLenum, GLint>> m_locToTextureUnit;
 
   std::map<QString, Uniform> m_uniforms;
   std::map<QString, Attribute> m_attributes;

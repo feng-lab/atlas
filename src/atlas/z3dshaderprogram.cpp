@@ -105,6 +105,7 @@ void Z3DShaderProgram::bind()
   if (!m_linked)
     link();
   m_textureUnitManager.reset();
+  m_locToTextureUnit.clear();
   glUseProgram(m_id);
 }
 
@@ -122,11 +123,26 @@ void Z3DShaderProgram::bindFragDataLocation(GLuint colorNumber, const QString &n
 
 void Z3DShaderProgram::bindTexture(const QString &name, const Z3DTexture *texture)
 {
-  if (texture) {
-    m_textureUnitManager.nextAvailableUnit();
-    m_textureUnitManager.activateCurrentUnit();
+  if (!texture)
+    return;
+
+  int loc = uniformLocation(name);
+  if (loc != -1) {
+    GLenum textureEnum;
+    GLint textureNumber;
+    auto it = m_locToTextureUnit.find(loc);
+    if (it == m_locToTextureUnit.end()) {
+      m_textureUnitManager.nextAvailableUnit();
+      textureEnum = m_textureUnitManager.currentUnitEnum();
+      textureNumber = m_textureUnitManager.currentUnitNumber();
+      m_locToTextureUnit[loc] = std::make_pair(textureEnum, textureNumber);
+    } else {
+      textureEnum = it->second.first;
+      textureNumber = it->second.second;
+    }
+    glActiveTexture(textureEnum);
     texture->bind();
-    setUniform(name, m_textureUnitManager.currentUnitNumber());
+    setUniform(name, textureNumber);
     glActiveTexture(GL_TEXTURE0);
     CHECK_GL_ERROR;
   }
@@ -134,12 +150,27 @@ void Z3DShaderProgram::bindTexture(const QString &name, const Z3DTexture *textur
 
 void Z3DShaderProgram::bindTexture(const QString &name, const Z3DTexture *texture, GLint minFilter, GLint magFilter)
 {
-  if (texture) {
+  if (!texture)
+    return;
+
+  int loc = uniformLocation(name);
+  if (loc != -1) {
+    GLenum textureEnum;
+    GLint textureNumber;
+    auto it = m_locToTextureUnit.find(loc);
+    if (it == m_locToTextureUnit.end()) {
+      m_textureUnitManager.nextAvailableUnit();
+      textureEnum = m_textureUnitManager.currentUnitEnum();
+      textureNumber = m_textureUnitManager.currentUnitNumber();
+      m_locToTextureUnit[loc] = std::make_pair(textureEnum, textureNumber);
+    } else {
+      textureEnum = it->second.first;
+      textureNumber = it->second.second;
+    }
     texture->setFilter(minFilter, magFilter);
-    m_textureUnitManager.nextAvailableUnit();
-    m_textureUnitManager.activateCurrentUnit();
+    glActiveTexture(textureEnum);
     texture->bind();
-    setUniform(name, m_textureUnitManager.currentUnitNumber());
+    setUniform(name, textureNumber);
     glActiveTexture(GL_TEXTURE0);
     CHECK_GL_ERROR;
   }
@@ -147,12 +178,26 @@ void Z3DShaderProgram::bindTexture(const QString &name, const Z3DTexture *textur
 
 void Z3DShaderProgram::bindTexture(const QString &name, GLenum target, GLuint textureId)
 {
-  m_textureUnitManager.nextAvailableUnit();
-  m_textureUnitManager.activateCurrentUnit();
-  glBindTexture(target, textureId);
-  setUniform(name, m_textureUnitManager.currentUnitNumber());
-  glActiveTexture(GL_TEXTURE0);
-  CHECK_GL_ERROR;
+  int loc = uniformLocation(name);
+  if (loc != -1) {
+    GLenum textureEnum;
+    GLint textureNumber;
+    auto it = m_locToTextureUnit.find(loc);
+    if (it == m_locToTextureUnit.end()) {
+      m_textureUnitManager.nextAvailableUnit();
+      textureEnum = m_textureUnitManager.currentUnitEnum();
+      textureNumber = m_textureUnitManager.currentUnitNumber();
+      m_locToTextureUnit[loc] = std::make_pair(textureEnum, textureNumber);
+    } else {
+      textureEnum = it->second.first;
+      textureNumber = it->second.second;
+    }
+    glActiveTexture(textureEnum);
+    glBindTexture(target, textureId);
+    setUniform(name, textureNumber);
+    glActiveTexture(GL_TEXTURE0);
+    CHECK_GL_ERROR;
+  }
 }
 
 void Z3DShaderProgram::loadFromSourceFile(const QString &vertFilename, const QString &geomFilename,
