@@ -68,6 +68,8 @@ public:
   float windowAspectRatio() const { return m_windowAspectRatio; }
   void setWindowAspectRatio(float war) { m_windowAspectRatio = war; updateFrustum(); }
 
+  glm::vec2 frustumNearPlaneSize() const { return glm::vec2(m_right - m_left, m_top - m_bottom); }
+
   float eyeSeparationAngle() const { return m_eyeSeparationAngle; }
   void setEyeSeparationAngle(float angle) { m_eyeSeparationAngle = glm::clamp(angle, glm::radians(1.f), glm::radians(80.f)); updateCamera(); updateFrustum(); }
 

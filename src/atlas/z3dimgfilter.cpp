@@ -28,10 +28,6 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   , m_layerTarget(glm::uvec2(32,32))
   , m_layerColorTexture(GL_TEXTURE_2D_ARRAY, (GLint)GL_RGBA16, glm::uvec3(32,32,3), GL_RGBA, GL_FLOAT)
   , m_layerDepthTexture(GL_TEXTURE_2D_ARRAY, (GLint)GL_DEPTH_COMPONENT24, glm::uvec3(32,32,3), GL_DEPTH_COMPONENT, GL_FLOAT)
-  , m_layerMissBlocksTexture(GL_TEXTURE_2D_ARRAY, (GLint)GL_RGBA32UI, glm::uvec3(32,32,3), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_layerUsedBlocksTexture1(GL_TEXTURE_2D_ARRAY, (GLint)GL_RGBA32UI, glm::uvec3(32,32,3), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_layerUsedBlocksTexture2(GL_TEXTURE_2D_ARRAY, (GLint)GL_RGBA32UI, glm::uvec3(32,32,3), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_layerUsedBlocksTexture3(GL_TEXTURE_2D_ARRAY, (GLint)GL_RGBA32UI, glm::uvec3(32,32,3), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
   , m_outport("Image", true, InvalidMonoViewResult)
   , m_leftEyeOutport("LeftEyeImage", true, InvalidLeftEyeResult)
   , m_rightEyeOutport("RightEyeImage", true, InvalidRightEyeResult)
@@ -90,18 +86,6 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   m_layerDepthTexture.uploadImage();
   m_layerTarget.attachTextureToFBO(&m_layerColorTexture, GL_COLOR_ATTACHMENT0, false);
   m_layerTarget.attachTextureToFBO(&m_layerDepthTexture, GL_DEPTH_ATTACHMENT, false);
-  m_layerMissBlocksTexture.setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
-  m_layerUsedBlocksTexture1.setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
-  m_layerUsedBlocksTexture2.setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
-  m_layerUsedBlocksTexture3.setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
-  m_layerMissBlocksTexture.uploadImage();
-  m_layerUsedBlocksTexture1.uploadImage();
-  m_layerUsedBlocksTexture2.uploadImage();
-  m_layerUsedBlocksTexture3.uploadImage();
-  m_layerTarget.attachTextureToFBO(&m_layerMissBlocksTexture, GL_COLOR_ATTACHMENT1, false);
-  m_layerTarget.attachTextureToFBO(&m_layerUsedBlocksTexture1, GL_COLOR_ATTACHMENT2, false);
-  m_layerTarget.attachTextureToFBO(&m_layerUsedBlocksTexture2, GL_COLOR_ATTACHMENT3, false);
-  m_layerTarget.attachTextureToFBO(&m_layerUsedBlocksTexture3, GL_COLOR_ATTACHMENT4, false);
   m_layerTarget.isFBOComplete();
 
   // ports

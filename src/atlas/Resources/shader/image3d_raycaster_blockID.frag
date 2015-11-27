@@ -2,22 +2,13 @@ uniform isampler3D page_directory;
 uniform ivec3 page_directory_bases[LEVEL_COUNT];
 uniform isampler3D page_table_cache;
 uniform ivec3 page_table_block_size = ivec3(32, 32, 32);
-uniform sampler3D image_cache;
 uniform uvec3 image_dimensions[LEVEL_COUNT];
 uniform float voxel_world_sizes[LEVEL_COUNT];
 uniform ivec3 image_block_size = ivec3(32, 32, 32);
 uniform uvec4 pos_to_block_ids[LEVEL_COUNT];
 
-#if GLSL_VERSION < 130
 uniform vec2 screen_dim_RCP;
-#endif
 uniform float sampling_rate;
-#ifdef ISO
-uniform float iso_value;
-#endif
-#ifdef LOCAL_MIP
-uniform float local_MIP_threshold;
-#endif
 uniform float ze_to_zw_a;
 uniform float ze_to_zw_b;
 uniform float ze_to_screen_pixel_voxel_size;
@@ -27,70 +18,33 @@ uniform sampler2D ray_entry_eye_coord;
 uniform sampler2D ray_exit_tex_coord;
 uniform sampler2D ray_exit_eye_coord;
 
-uniform sampler1D transfer_function;
-
 #if GLSL_VERSION >= 330
-layout(location = 0) out vec4 FragData0;
+layout(location = 0) out uvec4 FragData0;
 layout(location = 1) out uvec4 FragData1;
 layout(location = 2) out uvec4 FragData2;
 layout(location = 3) out uvec4 FragData3;
-layout(location = 4) out uvec4 FragData4;
 #elif GLSL_VERSION >= 130
-out vec4 FragData0;  // call glBindFragDataLocation before linking
+out uvec4 FragData0;  // call glBindFragDataLocation before linking
 out uvec4 FragData1;  // call glBindFragDataLocation before linking
 out uvec4 FragData2;  // call glBindFragDataLocation before linking
 out uvec4 FragData3;  // call glBindFragDataLocation before linking
-out uvec4 FragData4;  // call glBindFragDataLocation before linking
 #else
 #define FragData0 gl_FragData[0]
 #define FragData1 gl_FragData[1]
 #define FragData0 gl_FragData[2]
 #define FragData1 gl_FragData[3]
-#define FragData1 gl_FragData[4]
 #endif
-
-vec4 compositeDVR(in vec4 curResult, in vec4 color, in float currentRayLength, inout float rayDepth)
-{
-  if (rayDepth > 0.0)
-    rayDepth = currentRayLength;
-
-  vec4 result = vec4(0.0);
-
-  result.a = curResult.a + (1.0 -curResult.a) * color.a;
-  result.rgb = (curResult.rgb * curResult.a + (1.0 - curResult.a) * color.a * color.rgb) / result.a;
-
-  return result;
-}
-
-vec4 compositeISO(in vec4 curResult, in vec4 color, in float currentRayLength, inout float rayDepth, in float isoValue)
-{
-  vec4 result = curResult;
-  float epsilon = 0.02;
-  if (color.a >= isoValue-epsilon && color.a <= isoValue+epsilon) {
-    result = color;
-    result.a = 1.0;
-    rayDepth = currentRayLength;
-  }
-  return result;
-}
-
-vec4 compositeXRay(in vec4 curResult, in vec4 color, in float currentRayLength, inout float rayDepth)
-{
-  if (rayDepth > 0.0)
-    rayDepth = currentRayLength;
-  return curResult + color;
-}
 
 #define UNMAPPED 0
 #define EMPTY 40000
 
 void main()
 {
-#if GLSL_VERSION >= 130
-  vec4 entryTexCoordAndZ = texelFetch(ray_entry_tex_coord, ivec2(gl_FragCoord.xy), 0);
-  vec4 exitTexCoordAndZ = texelFetch(ray_exit_tex_coord, ivec2(gl_FragCoord.xy), 0);
-#else
   vec2 texCoords = gl_FragCoord.xy * screen_dim_RCP;
+#if GLSL_VERSION >= 130
+  vec4 entryTexCoordAndZ = texture(ray_entry_tex_coord, texCoords);
+  vec4 exitTexCoordAndZ = texture(ray_exit_tex_coord, texCoords);
+#else
   vec4 entryTexCoordAndZ = texture2D(ray_entry_tex_coord, texCoords);
   vec4 exitTexCoordAndZ = texture2D(ray_exit_tex_coord, texCoords);
 #endif
@@ -100,17 +54,11 @@ void main()
   if (startRayPosition == exitRayPosition) {
     discard;   // background
   } else {
-    vec4 result = vec4(0.0);
-
-#ifdef MIP
-    float ch1V = 0.0;
-#endif
-
     //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
     // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
 #if GLSL_VERSION >= 130
-    float zeFront = texelFetch(ray_entry_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
-    float zeBack = texelFetch(ray_exit_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
+    float zeFront = texture(ray_entry_eye_coord, texCoords).z;
+    float zeBack = texture(ray_exit_eye_coord, texCoords).z;
 #else
     float zeFront = texture2D(ray_entry_eye_coord, texCoords).z;
     float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
@@ -131,15 +79,6 @@ void main()
     float numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
     float stepSize = zeLength / (sampling_rate * numVoxel);
 
-#if 0
-    float desiredVoxelSize = ze * ze_to_screen_pixel_voxel_size;
-    FragData0 = vec4(desiredVoxelSize > 2 ? 1 : 0, desiredVoxelSize > 10 ? 1 : 0, desiredVoxelSize > 20 ? 1 : 0, 1);
-    gl_FragDepth = 0.5;
-    FragData1 = uvec4(missBlockIDs[0], missBlockIDs[1], missBlockIDs[2], missBlockIDs[3]);
-    FragData2 = uvec4(usedBlockIDs[0], usedBlockIDs[1], usedBlockIDs[2], usedBlockIDs[3]);
-    FragData3 = uvec4(usedBlockIDs[4], usedBlockIDs[5], usedBlockIDs[6], usedBlockIDs[7]);
-    FragData4 = uvec4(usedBlockIDs[8], usedBlockIDs[9], usedBlockIDs[10], usedBlockIDs[11]);
-#else
     bool finished = false;
 
     ivec3 pageDirAddress = ivec3(-1,-1,-1);
@@ -175,40 +114,6 @@ void main()
           }
           pagingFlag = pageTableEntry.w;
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-            ivec3 voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size;
-            float voxel = texelFetch(image_cache, voxelAddress, 0).r;
-
-#ifdef MIP
-#ifdef LOCAL_MIP
-            if (voxel <= ch1V && ch1V >= local_MIP_threshold) {
-              finished = true;
-            } else if (voxel > ch1V) {
-              ch1V = voxel;
-              finalZe = ze;
-            }
-#else
-            if (voxel > ch1V) {
-              ch1V = voxel;
-              finalZe = ze;
-            }
-            finished = ch1V >= 1.0;
-#endif
-#else
-#if GLSL_VERSION >= 130
-            vec4 color = texture(transfer_function, voxel);
-#else
-            vec4 color = texture1D(transfer_function, voxel);
-#endif
-
-            if (color.a > 0.0) {
-              color.a / sampling_rate;
-              result = COMPOSITING(result, color, ze, finalZe);
-              if (result.a >= 1.0) {
-                result.a = 1.0;
-                finished = true;
-              }
-            }
-#endif // MIP
             ze += stepSize;
 
             if (usedBlockIDsIndex < 12) {
@@ -273,36 +178,10 @@ void main()
       } // for
     }
 
-#ifdef MIP
-#if GLSL_VERSION >= 130
-    result = texture(transfer_function, ch1V);
-#else
-    result = texture1D(transfer_function, ch1V);
-#endif
-#endif // MIP
-
-#ifdef RESULT_OPAQUE
-    result.a = 1.0;
-#endif
-
-    if (finalZe < 0.0) {
-      gl_FragDepth = ze_to_zw_a / finalZe + ze_to_zw_b;
-      gl_FragDepth = 0.3;
-    } else {
-#ifdef RESULT_OPAQUE
-      gl_FragDepth = entryTexCoordAndZ.w;
-#else
-      gl_FragDepth = 1.0;
-#endif
-    }
-
-    result.rgb *= result.a;
-    FragData0 = result;
-    FragData1 = uvec4(missBlockIDs[0], missBlockIDs[1], missBlockIDs[2], missBlockIDs[3]);
-    FragData2 = uvec4(usedBlockIDs[0], usedBlockIDs[1], usedBlockIDs[2], usedBlockIDs[3]);
-    FragData3 = uvec4(usedBlockIDs[4], usedBlockIDs[5], usedBlockIDs[6], usedBlockIDs[7]);
-    FragData4 = uvec4(usedBlockIDs[8], usedBlockIDs[9], usedBlockIDs[10], usedBlockIDs[11]);
-#endif
+    FragData0 = uvec4(missBlockIDs[0], missBlockIDs[1], missBlockIDs[2], missBlockIDs[3]);
+    FragData1 = uvec4(usedBlockIDs[0], usedBlockIDs[1], usedBlockIDs[2], usedBlockIDs[3]);
+    FragData2 = uvec4(usedBlockIDs[4], usedBlockIDs[5], usedBlockIDs[6], usedBlockIDs[7]);
+    FragData3 = uvec4(usedBlockIDs[8], usedBlockIDs[9], usedBlockIDs[10], usedBlockIDs[11]);
   }
 }
 

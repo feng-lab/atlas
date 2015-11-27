@@ -100,10 +100,6 @@ private:
   Z3DRenderTarget m_layerTarget;
   Z3DTexture m_layerColorTexture;
   Z3DTexture m_layerDepthTexture;
-  Z3DTexture m_layerMissBlocksTexture;
-  Z3DTexture m_layerUsedBlocksTexture1;
-  Z3DTexture m_layerUsedBlocksTexture2;
-  Z3DTexture m_layerUsedBlocksTexture3;
 
   Z3DRenderOutputPort m_outport;
   Z3DRenderOutputPort m_leftEyeOutport;

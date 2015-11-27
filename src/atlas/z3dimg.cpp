@@ -104,10 +104,10 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
         m_pageDirectoryBases.push_back(glm::ivec3(0, 0, 0));
       } else if (l == 1) {
         m_pageDirectoryBases.push_back(m_pageDirectoryBases[l-1]);
-        m_pageDirectoryBases[l][sortedIndex[1]] += m_pageTableDimensions[l-1][sortedIndex[1]];
+        m_pageDirectoryBases[l][sortedIndex[1]] += m_pageDirectoryDimensions[l-1][sortedIndex[1]];
       } else {
         m_pageDirectoryBases.push_back(m_pageDirectoryBases[l-1]);
-        m_pageDirectoryBases[l][sortedIndex[0]] += m_pageTableDimensions[l-1][sortedIndex[0]];
+        m_pageDirectoryBases[l][sortedIndex[0]] += m_pageDirectoryDimensions[l-1][sortedIndex[0]];
       }
       m_pageDirectorySize = glm::max(m_pageDirectorySize, m_pageDirectoryBases[l] + glm::ivec3(m_pageDirectoryDimensions[l]));
       if (m_pageDirectorySize.x > Z3DGpuInfoInstance.max3DTextureSize() ||
@@ -115,16 +115,17 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
           m_pageDirectorySize.z > Z3DGpuInfoInstance.max3DTextureSize()) {
         throw ZGLException(QString("Image (%1) is not supported").arg(info.toQString()));
       }
+      LINFO() << m_pageDirectoryBases[l] << m_pageDirectoryDimensions[l];
     }
 
     // content of RGBA32I texture
-    m_pageDirectoryTexture.reset(new Z3DTexture((GLint)GL_RGBA32I, glm::uvec3(m_pageDirectorySize), GL_RGBA_INTEGER, GL_INT));
+    m_pageDirectoryTexture.reset(new Z3DTexture(GL_TEXTURE_3D, (GLint)GL_RGBA32I, glm::uvec3(m_pageDirectorySize), GL_RGBA_INTEGER, GL_INT));
     m_pageDirectory.resize(m_pageDirectoryTexture->numPixels(), glm::ivec4(0,0,0,m_unmappedFlag));
     m_pageDirectoryTexture->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
     m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
 
     m_pageTableCacheSize = glm::ivec3(m_pageTableBlockSize * m_pageTableCacheNumBlocks);
-    m_pageTableCacheTexture.reset(new Z3DTexture((GLint)GL_RGBA32I, glm::uvec3(m_pageTableCacheSize), GL_RGBA_INTEGER, GL_INT));
+    m_pageTableCacheTexture.reset(new Z3DTexture(GL_TEXTURE_3D, (GLint)GL_RGBA32I, glm::uvec3(m_pageTableCacheSize), GL_RGBA_INTEGER, GL_INT));
     m_pageTableCache.resize(m_pageTableCacheTexture->numPixels(), glm::ivec4(0,0,0,m_unmappedFlag));
     m_pageTableCacheTexture->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
     m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());

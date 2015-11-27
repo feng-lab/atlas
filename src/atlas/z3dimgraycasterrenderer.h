@@ -82,9 +82,16 @@ protected:
   Z3DShaderProgram m_scRaycasterShader;
   Z3DShaderProgram m_sc2dImageShader;
   Z3DShaderProgram m_scVolumeSliceWithTransferfunShader;
+  Z3DShaderProgram m_scFullResRaycasterBlockIDsShader;
   Z3DShaderProgram m_scFullResRaycasterShader;
-  Z3DRenderTarget* m_layerTarget = nullptr;
   Z3DShaderProgram m_mergeChannelShader;
+
+  Z3DRenderTarget* m_layerTarget = nullptr;
+  Z3DTexture m_missBlocksTexture;
+  Z3DTexture m_usedBlocksTexture1;
+  Z3DTexture m_usedBlocksTexture2;
+  Z3DTexture m_usedBlocksTexture3;
+  Z3DRenderTarget m_blockIDsRenderTarget;
 
   ZFloatParameter m_samplingRate;  // Sampling rate of the raycasting, specified relative to the size of one voxel
   ZFloatParameter m_isoValue;  // The used isovalue, when isosurface raycasting is enabled
