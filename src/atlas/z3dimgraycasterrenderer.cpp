@@ -114,7 +114,7 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg &img)
       m_channelVisibleParas.emplace_back(std::make_unique<ZBoolParameter>(QString("Show Channel %1").arg(i+1), true));
       connect(m_channelVisibleParas[i].get(), SIGNAL(valueChanged()), this, SLOT(compile()));
       m_transferFuncParas.emplace_back(std::make_unique<Z3DTransferFunctionParameter>(QString("Transfer Function %1").arg(i+1)));
-      m_transferFuncParas[i]->setVolume(m_img->volumes().at(i).get());
+      //m_transferFuncParas[i]->setVolume(m_img->volumes().at(i).get());
       m_texFilterModeParas.emplace_back(std::make_unique<ZStringIntOptionParameter>(QString("Texture Filtering %1").arg(i+1)));
       m_texFilterModeParas[i]->addOptionsWithData(qMakePair(QString("Nearest"), static_cast<int>(GL_NEAREST)),
                                                   qMakePair(QString("Linear"), static_cast<int>(GL_LINEAR)));
@@ -373,8 +373,6 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
       m_scFullResRaycasterBlockIDsShader.bind();
       m_scFullResRaycasterBlockIDsShader.setUniform("screen_dim_RCP", 1.f / glm::vec2(size));
-      m_scFullResRaycasterBlockIDsShader.setUniform("ze_to_zw_b", ze_to_zw_b);
-      m_scFullResRaycasterBlockIDsShader.setUniform("ze_to_zw_a", ze_to_zw_a);
       m_scFullResRaycasterBlockIDsShader.setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
 
       // entry exit points
@@ -395,7 +393,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       glDrawBuffers(4, g_drawBuffers);
       glClear(GL_COLOR_BUFFER_BIT);
 
-      m_img->bindFullResShader(m_scFullResRaycasterBlockIDsShader, visibleIdxs[0]);
+      m_img->bindFullResBlockIDsShader(m_scFullResRaycasterBlockIDsShader, visibleIdxs[0]);
       renderScreenQuad(m_VAO, m_scFullResRaycasterBlockIDsShader);
 
       m_blockIDsRenderTarget.release();
@@ -478,7 +476,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       m_scFullResRaycasterShader.setUniform("sampling_rate", m_samplingRate.get());
 
       if (visibleIdxs.size() == 1) {
-        m_img->bindFullResShader(m_scFullResRaycasterShader, visibleIdxs[0]);
+        m_img->bindFullResRenderShader(m_scFullResRaycasterShader, visibleIdxs[0]);
         m_scFullResRaycasterShader.bindTexture("transfer_function", m_transferFuncParas[visibleIdxs[0]]->get().texture());
         renderScreenQuad(m_VAO, m_scFullResRaycasterShader);
       } else {
@@ -487,7 +485,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           m_layerTarget->bind();
           m_layerTarget->clear();
 
-          m_img->bindFullResShader(m_scFullResRaycasterShader, visibleIdxs[i]);
+          m_img->bindFullResRenderShader(m_scFullResRaycasterShader, visibleIdxs[i]);
           m_scFullResRaycasterShader.bindTexture("transfer_function", m_transferFuncParas[visibleIdxs[i]]->get().texture());
           renderScreenQuad(m_VAO, m_scFullResRaycasterShader);
 

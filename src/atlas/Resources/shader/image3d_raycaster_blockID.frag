@@ -9,8 +9,6 @@ uniform uvec4 pos_to_block_ids[LEVEL_COUNT];
 
 uniform vec2 screen_dim_RCP;
 uniform float sampling_rate;
-uniform float ze_to_zw_a;
-uniform float ze_to_zw_b;
 uniform float ze_to_screen_pixel_voxel_size;
 
 uniform sampler2D ray_entry_tex_coord;

@@ -11,7 +11,7 @@
 namespace nim {
 
 Z3DShaderProgram::Z3DShaderProgram()
-  : m_logUniformLocationError(false)
+  : m_logUniformLocationError(true)
   , m_linked(false)
   , m_id(0)
   , m_context()

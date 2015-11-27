@@ -113,15 +113,6 @@ void main()
     float numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
     float stepSize = zeLength / (sampling_rate * numVoxel);
 
-#if 0
-    float desiredVoxelSize = ze * ze_to_screen_pixel_voxel_size;
-    FragData0 = vec4(desiredVoxelSize > 2 ? 1 : 0, desiredVoxelSize > 10 ? 1 : 0, desiredVoxelSize > 20 ? 1 : 0, 1);
-    gl_FragDepth = 0.5;
-    FragData1 = uvec4(missBlockIDs[0], missBlockIDs[1], missBlockIDs[2], missBlockIDs[3]);
-    FragData2 = uvec4(usedBlockIDs[0], usedBlockIDs[1], usedBlockIDs[2], usedBlockIDs[3]);
-    FragData3 = uvec4(usedBlockIDs[4], usedBlockIDs[5], usedBlockIDs[6], usedBlockIDs[7]);
-    FragData4 = uvec4(usedBlockIDs[8], usedBlockIDs[9], usedBlockIDs[10], usedBlockIDs[11]);
-#else
     bool finished = false;
 
     ivec3 pageDirAddress = ivec3(-1,-1,-1);
@@ -263,7 +254,6 @@ void main()
 
     result.rgb *= result.a;
     FragData0 = result;
-#endif
   }
 }
 

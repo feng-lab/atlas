@@ -249,7 +249,19 @@ void Z3DImg::setScale(const glm::vec3 &scale)
   }
 }
 
-void Z3DImg::bindFullResShader(Z3DShaderProgram &shader, size_t c) const
+void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram &shader, size_t c) const
+{
+  shader.bindTexture("page_directory", m_pageDirectoryTexture.get());
+  shader.setUniformArray("page_directory_bases", m_pageDirectoryBases.data(), m_numLevels);
+  shader.bindTexture("page_table_cache", m_pageTableCacheTexture.get());
+  shader.setUniform("page_table_block_size", glm::ivec3(m_pageTableBlockSize));
+  shader.setUniformArray("image_dimensions", m_imageDimensions.data(), m_numLevels);
+  shader.setUniformArray("voxel_world_sizes", m_voxelWorldSizes.data(), m_numLevels);
+  shader.setUniform("image_block_size", glm::ivec3(m_imageBlockSize));
+  shader.setUniformArray("pos_to_block_ids", m_posToBlockIDs.data(), m_numLevels);
+}
+
+void Z3DImg::bindFullResRenderShader(Z3DShaderProgram &shader, size_t c) const
 {
   shader.bindTexture("page_directory", m_pageDirectoryTexture.get());
   shader.setUniformArray("page_directory_bases", m_pageDirectoryBases.data(), m_numLevels);
@@ -259,7 +271,6 @@ void Z3DImg::bindFullResShader(Z3DShaderProgram &shader, size_t c) const
   shader.setUniformArray("image_dimensions", m_imageDimensions.data(), m_numLevels);
   shader.setUniformArray("voxel_world_sizes", m_voxelWorldSizes.data(), m_numLevels);
   shader.setUniform("image_block_size", glm::ivec3(m_imageBlockSize));
-  shader.setUniformArray("pos_to_block_ids", m_posToBlockIDs.data(), m_numLevels);
 }
 
 bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::set<uint32_t> &usedBlockIDs)
@@ -439,6 +450,7 @@ void Z3DImg::readVolumes()
 
   if (widthScale != 1.0 || heightScale != 1.0 || depthScale != 1.0) {
     m_isVolumeDownsampled = true;
+    return;
   }
 
   ZImg img = m_imgPack.resizedImg(width, height, depth, 0);
