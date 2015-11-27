@@ -42,7 +42,7 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
 
     const ZImgInfo& info = m_imgPack.imgInfo();
     glm::dvec3 imgDim = glm::dvec3(info.width, info.height, info.depth);
-    glm::dvec3 relativeResolution = glm::dvec3(info.voxelSizeXInUm(), info.voxelSizeYInUm(), info.voxelSizeZInUm());
+    glm::dvec3 relativeResolution = glm::dvec3(info.voxelSizeXInUm(), info.voxelSizeYInUm(), info.voxelSizeZInUm() * 5);
     double minRes = std::min(std::min(relativeResolution.x, relativeResolution.y), relativeResolution.z);
     relativeResolution /= minRes;
     imgDim *= relativeResolution;
@@ -66,8 +66,6 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
         }
       }
     }
-
-    LINFO() << m_numLevels;
 
     m_pageDirectorySize = glm::ivec3(0, 0, 0);
     for (size_t l=0; l<m_numLevels; ++l) {
@@ -115,7 +113,7 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
           m_pageDirectorySize.z > Z3DGpuInfoInstance.max3DTextureSize()) {
         throw ZGLException(QString("Image (%1) is not supported").arg(info.toQString()));
       }
-      LINFO() << m_pageDirectoryBases[l] << m_pageDirectoryDimensions[l] << m_posToBlockIDs[l];
+      LINFO() << l << m_pageDirectoryDimensions[l] << m_pageTableDimensions[l] << m_imageDimensions[l] << m_levelScales[l] << m_posToBlockIDs[l];
     }
 
     // content of RGBA32I texture
@@ -125,7 +123,7 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
     m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
 
     m_pageTableCacheSize = glm::ivec3(m_pageTableBlockSize * m_pageTableCacheNumBlocks);
-    m_pageTableCacheTexture.reset(new Z3DTexture(GL_TEXTURE_3D, (GLint)GL_RGBA32I, glm::uvec3(m_pageTableCacheSize), GL_RGBA_INTEGER, GL_INT));
+    m_pageTableCacheTexture.reset(new Z3DTexture((GLint)GL_RGBA32I, glm::uvec3(m_pageTableCacheSize), GL_RGBA_INTEGER, GL_INT));
     m_pageTableCache.resize(m_pageTableCacheTexture->numPixels(), glm::ivec4(0,0,0,m_unmappedFlag));
     m_pageTableCacheTexture->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
     m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
@@ -242,21 +240,19 @@ std::vector<double> Z3DImg::physicalBoundBox() const
 void Z3DImg::setScale(const glm::vec3 &scale)
 {
   m_voxelWorldDimensions.resize(m_numLevels);
-  m_voxelWorldSizes.resize(m_numLevels);
   for (size_t l=0; l<m_numLevels; ++l) {
     m_voxelWorldDimensions[l] = scale * glm::vec3(m_levelScales[l]);
-    m_voxelWorldSizes[l] = std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y), m_voxelWorldDimensions[l].z);
   }
 }
 
-void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram &shader, size_t c) const
+void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram &shader) const
 {
   shader.bindTexture("page_directory", m_pageDirectoryTexture.get());
   shader.setUniformArray("page_directory_bases", m_pageDirectoryBases.data(), m_numLevels);
   shader.bindTexture("page_table_cache", m_pageTableCacheTexture.get());
   shader.setUniform("page_table_block_size", glm::ivec3(m_pageTableBlockSize));
   shader.setUniformArray("image_dimensions", m_imageDimensions.data(), m_numLevels);
-  shader.setUniformArray("voxel_world_sizes", m_voxelWorldSizes.data(), m_numLevels);
+  shader.setUniformArray("voxel_world_dimensions", m_voxelWorldDimensions.data(), m_numLevels);
   shader.setUniform("image_block_size", glm::ivec3(m_imageBlockSize));
   shader.setUniformArray("pos_to_block_ids", m_posToBlockIDs.data(), m_numLevels);
 }
@@ -269,7 +265,7 @@ void Z3DImg::bindFullResRenderShader(Z3DShaderProgram &shader, size_t c) const
   shader.setUniform("page_table_block_size", glm::ivec3(m_pageTableBlockSize));
   shader.bindTexture("image_cache", m_imageCacheTextures[c].get());
   shader.setUniformArray("image_dimensions", m_imageDimensions.data(), m_numLevels);
-  shader.setUniformArray("voxel_world_sizes", m_voxelWorldSizes.data(), m_numLevels);
+  shader.setUniformArray("voxel_world_dimensions", m_voxelWorldDimensions.data(), m_numLevels);
   shader.setUniform("image_block_size", glm::ivec3(m_imageBlockSize));
 }
 
@@ -381,7 +377,7 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
     const glm::ivec4& blockImagePos = blocksToRead[i].first;  // level, x, y, z
     const glm::ivec3& blockCachePos = blocksToRead[i].second;
     // actual read and upload
-
+    LINFO() << blockImagePos << blockCachePos;
   }
 
   m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());

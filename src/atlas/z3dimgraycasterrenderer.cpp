@@ -393,7 +393,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       glDrawBuffers(4, g_drawBuffers);
       glClear(GL_COLOR_BUFFER_BIT);
 
-      m_img->bindFullResBlockIDsShader(m_scFullResRaycasterBlockIDsShader, visibleIdxs[0]);
+      m_img->bindFullResBlockIDsShader(m_scFullResRaycasterBlockIDsShader);
       renderScreenQuad(m_VAO, m_scFullResRaycasterBlockIDsShader);
 
       m_blockIDsRenderTarget.release();

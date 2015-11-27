@@ -3,7 +3,7 @@ uniform ivec3 page_directory_bases[LEVEL_COUNT];
 uniform isampler3D page_table_cache;
 uniform ivec3 page_table_block_size = ivec3(32, 32, 32);
 uniform uvec3 image_dimensions[LEVEL_COUNT];
-uniform float voxel_world_sizes[LEVEL_COUNT];
+uniform vec3 voxel_world_dimensions[LEVEL_COUNT];
 uniform ivec3 image_block_size = ivec3(32, 32, 32);
 uniform uvec4 pos_to_block_ids[LEVEL_COUNT];
 
@@ -76,6 +76,12 @@ void main()
     vec3 numVoxels = abs(rayVector * image_dimensions[curLevel]);
     float numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
     float stepSize = zeLength / (sampling_rate * numVoxel);
+
+    float voxel_world_sizes[LEVEL_COUNT];
+    vec3 unitRayVector = normalize(rayVector);
+    for (int i=0; i<LEVEL_COUNT; ++i) {
+      voxel_world_sizes[i] = length(unitRayVector * voxel_world_dimensions[i]);
+    }
 
     bool finished = false;
 

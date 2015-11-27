@@ -60,7 +60,7 @@ public:
   void setScale(const glm::vec3& scale);
 
   size_t numLevels() const { return m_numLevels; }
-  void bindFullResBlockIDsShader(Z3DShaderProgram &shader, size_t c) const;
+  void bindFullResBlockIDsShader(Z3DShaderProgram &shader) const;
   void bindFullResRenderShader(Z3DShaderProgram &shader, size_t c) const;
   bool updateCaches(const std::set<uint32_t>& missingBlockIDs, const std::set<uint32_t>& usedBlockIDs);
 
