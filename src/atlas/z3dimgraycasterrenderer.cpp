@@ -364,10 +364,10 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
       glm::uvec2 size = m_layerTarget->size();
       if (size.x >= 32) {
-        size.x /= 8;
+        size.x /= 16;
       }
       if (size.y >= 32) {
-        size.y /= 8;
+        size.y /= 16;
       }
       m_blockIDsRenderTarget.resize(size);
 
@@ -392,8 +392,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
                                 GL_COLOR_ATTACHMENT3
                                };
       m_blockIDsRenderTarget.bind();
-      m_blockIDsRenderTarget.clear();
       glDrawBuffers(4, g_drawBuffers);
+      glClear(GL_COLOR_BUFFER_BIT);
 
       m_img->bindFullResShader(m_scFullResRaycasterBlockIDsShader, visibleIdxs[0]);
       renderScreenQuad(m_VAO, m_scFullResRaycasterBlockIDsShader);

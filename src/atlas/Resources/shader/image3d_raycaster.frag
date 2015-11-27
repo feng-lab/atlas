@@ -6,7 +6,6 @@ uniform sampler3D image_cache;
 uniform uvec3 image_dimensions[LEVEL_COUNT];
 uniform float voxel_world_sizes[LEVEL_COUNT];
 uniform ivec3 image_block_size = ivec3(32, 32, 32);
-uniform uvec4 pos_to_block_ids[LEVEL_COUNT];
 
 #if GLSL_VERSION < 130
 uniform vec2 screen_dim_RCP;
@@ -31,22 +30,10 @@ uniform sampler1D transfer_function;
 
 #if GLSL_VERSION >= 330
 layout(location = 0) out vec4 FragData0;
-layout(location = 1) out uvec4 FragData1;
-layout(location = 2) out uvec4 FragData2;
-layout(location = 3) out uvec4 FragData3;
-layout(location = 4) out uvec4 FragData4;
 #elif GLSL_VERSION >= 130
 out vec4 FragData0;  // call glBindFragDataLocation before linking
-out uvec4 FragData1;  // call glBindFragDataLocation before linking
-out uvec4 FragData2;  // call glBindFragDataLocation before linking
-out uvec4 FragData3;  // call glBindFragDataLocation before linking
-out uvec4 FragData4;  // call glBindFragDataLocation before linking
 #else
 #define FragData0 gl_FragData[0]
-#define FragData1 gl_FragData[1]
-#define FragData0 gl_FragData[2]
-#define FragData1 gl_FragData[3]
-#define FragData1 gl_FragData[4]
 #endif
 
 vec4 compositeDVR(in vec4 curResult, in vec4 color, in float currentRayLength, inout float rayDepth)
@@ -120,11 +107,6 @@ void main()
     int curLevel = 0;
     float zeLength = zeBack - zeFront;
     float zeLengthRCP = 1.0 / zeLength;
-    
-    uint missBlockIDs[4] = uint[4](0,0,0,0);
-    int missBlockIDsIndex = 0;
-    uint usedBlockIDs[12] = uint[12](0,0,0,0, 0,0,0,0, 0,0,0,0);
-    int usedBlockIDsIndex = 0;
 
     vec3 rayVector = exitRayPosition - startRayPosition;
     vec3 numVoxels = abs(rayVector * image_dimensions[curLevel]);
@@ -210,13 +192,6 @@ void main()
             }
 #endif // MIP
             ze += stepSize;
-
-            if (usedBlockIDsIndex < 12) {
-              uint blockID = pos_to_block_ids[curLevel].w + pos_to_block_ids[curLevel].x * pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
-              if (usedBlockIDsIndex == 0 || blockID != usedBlockIDs[usedBlockIDsIndex-1]) {
-                usedBlockIDs[usedBlockIDsIndex++] = blockID;
-              }
-            }
           } else {
             // skip empty space page table entry recursive
             if (pagingFlag == UNMAPPED) {
@@ -259,16 +234,6 @@ void main()
           } while (ivec3(testSamplePos * image_dimensions[curLevel]) / image_block_size == pageTableCoord && ze > zeBack);
         }
 
-        if (pagingFlag == UNMAPPED && missBlockIDsIndex < 4) {
-          uint blockID = pos_to_block_ids[curLevel].w + pos_to_block_ids[curLevel].x * pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
-          if (missBlockIDsIndex == 0 || blockID != missBlockIDs[missBlockIDsIndex-1]) {
-            missBlockIDs[missBlockIDsIndex++] = blockID;
-          }
-          if (missBlockIDsIndex == 4) {
-            finished = true;
-          }
-        }
-
         finished = finished || (ze <= zeBack);
       } // for
     }
@@ -298,10 +263,6 @@ void main()
 
     result.rgb *= result.a;
     FragData0 = result;
-    FragData1 = uvec4(missBlockIDs[0], missBlockIDs[1], missBlockIDs[2], missBlockIDs[3]);
-    FragData2 = uvec4(usedBlockIDs[0], usedBlockIDs[1], usedBlockIDs[2], usedBlockIDs[3]);
-    FragData3 = uvec4(usedBlockIDs[4], usedBlockIDs[5], usedBlockIDs[6], usedBlockIDs[7]);
-    FragData4 = uvec4(usedBlockIDs[8], usedBlockIDs[9], usedBlockIDs[10], usedBlockIDs[11]);
 #endif
   }
 }

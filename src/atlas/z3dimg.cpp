@@ -99,7 +99,7 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
       m_posToBlockIDs.push_back(glm::uvec4(1,
                                            m_pageTableDimensions[l].x,
                                            m_pageTableDimensions[l].x * m_pageTableDimensions[l].y,
-                                           l == 0 ? 1 : (1 + m_pageTableDimensions[l-1].x * m_pageTableDimensions[l-1].y * m_pageTableDimensions[l-1].z)));
+                                           l == 0 ? 1 : (m_posToBlockIDs[l-1].w + m_pageTableDimensions[l-1].x * m_pageTableDimensions[l-1].y * m_pageTableDimensions[l-1].z)));
       if (l == 0) {
         m_pageDirectoryBases.push_back(glm::ivec3(0, 0, 0));
       } else if (l == 1) {
@@ -115,7 +115,7 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
           m_pageDirectorySize.z > Z3DGpuInfoInstance.max3DTextureSize()) {
         throw ZGLException(QString("Image (%1) is not supported").arg(info.toQString()));
       }
-      LINFO() << m_pageDirectoryBases[l] << m_pageDirectoryDimensions[l];
+      LINFO() << m_pageDirectoryBases[l] << m_pageDirectoryDimensions[l] << m_posToBlockIDs[l];
     }
 
     // content of RGBA32I texture
@@ -271,9 +271,6 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
   std::set<glm::ivec4, Vec4Compare<int, glm::highp>> usedPageTableKeys;
   size_t level = 0;
   for (uint32_t blockID : usedBlockIDs) {  // blockID must be ordered, can not use unordered_set here
-    if (blockID == 0) {
-      continue;
-    }
     while (level+1 < m_numLevels && blockID >= m_posToBlockIDs[level+1].w) {
       ++level;
     }
@@ -299,9 +296,6 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
   std::vector<std::pair<glm::ivec4, glm::ivec3>> blocksToRead;
   for (auto it = missingBlockIDs.begin(); it != missingBlockIDs.end() && count < numBlocksToRead; ++it) {
     uint32_t blockID = *it;
-    if (blockID == 0) {
-      continue;
-    }
     while (level+1 < m_numLevels && blockID >= m_posToBlockIDs[level+1].w) {
       ++level;
     }
@@ -315,6 +309,7 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
     glm::ivec4 pageTableKey = blockKey / glm::ivec4(1, m_pageTableBlockSize);
 
     glm::ivec3 blockPos = m_imageCacheManager->insert(blockKey, erasedKey);
+    //LINFO() << blockKey << erasedKey << m_posToBlockIDs[level] << blockID << level;
     if (erasedKey.x >= 0) { //valid
       glm::ivec4 erasedKeyPageTableKey = erasedKey / glm::ivec4(1, glm::ivec3(m_pageTableBlockSize));
       glm::ivec3 pageDirectoryCoord = m_pageDirectoryBases[erasedKeyPageTableKey.x] + erasedKeyPageTableKey.yzw();
@@ -377,6 +372,9 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
     // actual read and upload
 
   }
+
+  m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
+  m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
 
   return count > 0;
 }
