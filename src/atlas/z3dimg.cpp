@@ -241,8 +241,10 @@ std::vector<double> Z3DImg::physicalBoundBox() const
 void Z3DImg::setScale(const glm::vec3 &scale)
 {
   m_voxelWorldDimensions.resize(m_numLevels);
+  m_voxelWorldSizes.resize(m_numLevels);
   for (size_t l=0; l<m_numLevels; ++l) {
     m_voxelWorldDimensions[l] = scale * glm::vec3(m_levelScales[l]);
+    m_voxelWorldSizes[l] = std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y), m_voxelWorldDimensions[l].z);
   }
 }
 
@@ -253,7 +255,7 @@ void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram &shader) const
   shader.bindTexture("page_table_cache", m_pageTableCacheTexture.get());
   shader.setUniform("page_table_block_size", glm::ivec3(m_pageTableBlockSize));
   shader.setUniformArray("image_dimensions", m_imageDimensions.data(), m_numLevels);
-  shader.setUniformArray("voxel_world_dimensions", m_voxelWorldDimensions.data(), m_numLevels);
+  shader.setUniformArray("voxel_world_sizes", m_voxelWorldSizes.data(), m_numLevels);
   shader.setUniform("image_block_size", glm::ivec3(m_imageBlockSize));
   shader.setUniformArray("pos_to_block_ids", m_posToBlockIDs.data(), m_numLevels);
 }
@@ -266,7 +268,7 @@ void Z3DImg::bindFullResRenderShader(Z3DShaderProgram &shader, size_t c) const
   shader.setUniform("page_table_block_size", glm::ivec3(m_pageTableBlockSize));
   shader.bindTexture("image_cache", m_imageCacheTextures[c].get());
   shader.setUniformArray("image_dimensions", m_imageDimensions.data(), m_numLevels);
-  shader.setUniformArray("voxel_world_dimensions", m_voxelWorldDimensions.data(), m_numLevels);
+  shader.setUniformArray("voxel_world_sizes", m_voxelWorldSizes.data(), m_numLevels);
   shader.setUniform("image_block_size", glm::ivec3(m_imageBlockSize));
 }
 

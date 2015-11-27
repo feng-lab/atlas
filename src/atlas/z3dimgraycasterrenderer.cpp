@@ -5,6 +5,7 @@
 #include "z3dimg.h"
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
+#include <QApplication>
 
 namespace nim {
 
@@ -360,7 +361,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
       float ze_to_zw_a = f*n/(f-n);
       float ze_to_zw_b = 0.5f * (f+n)/(f-n) + 0.5f;
-      float ze_to_screen_pixel_voxel_size = -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n;
+      float ze_to_screen_pixel_voxel_size = -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio();
 
       glm::uvec2 size = m_layerTarget->size();
       if (size.x >= 32) {
@@ -369,6 +370,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       if (size.y >= 32) {
         size.y /= 16;
       }
+      LINFO() << m_layerTarget->size() << pixelEyeSpaceSize << size;
       m_blockIDsRenderTarget.resize(size);
 
       m_scFullResRaycasterBlockIDsShader.bind();
@@ -402,7 +404,6 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       // check missed blocks and upload
       std::set<uint32_t> missingBlockIDs;
       std::set<uint32_t> usedBlockIDs;
-      tbb::concurrent_unordered_set<uint32_t> ccSet;
 
       const Z3DTexture* missingBlockIDsTexture = m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT0);
       if (missingBlockIDsTexture->numPixels() * 4 != m_blockIDs.size()) {
@@ -410,6 +411,20 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       }
       missingBlockIDsTexture->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
 
+#if 0
+      missingBlockIDs.insert(m_blockIDs.begin(), m_blockIDs.end());
+      missingBlockIDs.erase(uint32_t(0));
+      if (!missingBlockIDs.empty()) {
+        m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT1)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+        usedBlockIDs.insert(m_blockIDs.begin(), m_blockIDs.end());
+        m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT2)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+        usedBlockIDs.insert(m_blockIDs.begin(), m_blockIDs.end());
+        m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT3)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+        usedBlockIDs.insert(m_blockIDs.begin(), m_blockIDs.end());
+        usedBlockIDs.erase(uint32_t(0));
+      }
+#else
+      tbb::concurrent_unordered_set<uint32_t> ccSet;
       tbb::parallel_for(
             tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
             [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range){
@@ -446,6 +461,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         usedBlockIDs.insert(ccSet.begin(), ccSet.end());
         usedBlockIDs.erase(uint32_t(0));
       }
+#endif
 
       LINFO() << missingBlockIDs.size() << usedBlockIDs.size();
 

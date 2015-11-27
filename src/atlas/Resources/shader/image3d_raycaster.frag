@@ -4,7 +4,7 @@ uniform isampler3D page_table_cache;
 uniform ivec3 page_table_block_size;
 uniform sampler3D image_cache;
 uniform uvec3 image_dimensions[LEVEL_COUNT];
-uniform vec3 voxel_world_dimensions[LEVEL_COUNT];
+uniform float voxel_world_sizes[LEVEL_COUNT];
 uniform ivec3 image_block_size;
 
 #if GLSL_VERSION < 130
@@ -113,12 +113,6 @@ void main()
     float numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
     float stepSize = zeLength / (sampling_rate * numVoxel);
 
-    float voxel_world_sizes[LEVEL_COUNT];
-    vec3 unitRayVector = normalize(rayVector);
-    for (int i=0; i<LEVEL_COUNT; ++i) {
-      voxel_world_sizes[i] = length(unitRayVector * voxel_world_dimensions[i]);
-    }
-
     bool finished = false;
 
     ivec3 pageDirAddress = ivec3(-1,-1,-1);
@@ -129,7 +123,7 @@ void main()
     for (int loop0=0; !finished && loop0<255; loop0++) {
       for (int loop1=0; !finished && loop1<255; loop1++) {
         float desiredVoxelSize = ze * ze_to_screen_pixel_voxel_size;
-        while (voxel_world_sizes[curLevel] <= desiredVoxelSize && curLevel + 1 < LEVEL_COUNT) {
+        while (curLevel+1 < LEVEL_COUNT && voxel_world_sizes[curLevel+1] <= desiredVoxelSize) {
           ++curLevel;
           numVoxels = abs(rayVector * image_dimensions[curLevel]);
           numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
