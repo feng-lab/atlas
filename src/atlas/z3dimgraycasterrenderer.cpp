@@ -383,7 +383,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
       m_scFullResRaycasterBlockIDsShader.setUniform("sampling_rate", m_samplingRate.get());
 
-      // render first channel
+      // render block ids
       GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
                                 GL_COLOR_ATTACHMENT1,
                                 GL_COLOR_ATTACHMENT2,
@@ -453,8 +453,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         m_img->updateCaches(missingBlockIDs, usedBlockIDs);
       }
 
-////////////////////////////////////////////////////
-
+      // render channels one by one
       m_scFullResRaycasterShader.bind();
 
       m_scFullResRaycasterShader.setUniform("ze_to_zw_b", ze_to_zw_b);

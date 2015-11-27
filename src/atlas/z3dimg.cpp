@@ -31,11 +31,11 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
   if (m_isVolumeDownsampled) {
     m_pageTableBlockSize = glm::uvec3(32, 32, 32);
     m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 2); // 256*256*64*4*4   64MB
-    m_imageBlockSize = glm::uvec3(32, 32, 32);
+    m_imageBlockSize = glm::uvec3(64, 64, 64);
     if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() > 1500) {
-      m_imageCacheNumBlocks = glm::uvec3(32,32,32);
+      m_imageCacheNumBlocks = glm::uvec3(16,16,16);
     } else {
-      m_imageCacheNumBlocks = glm::uvec3(32,32,16);
+      m_imageCacheNumBlocks = glm::uvec3(16,16,8);
     }
     m_pageTableCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
     m_imageCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_imageBlockSize, m_imageCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
@@ -134,6 +134,7 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
     }
 
     setScale(scale);
+    setScale(glm::vec3(1,1,5));
   }
 }
 

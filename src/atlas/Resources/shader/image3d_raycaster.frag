@@ -1,11 +1,11 @@
 uniform isampler3D page_directory;
 uniform ivec3 page_directory_bases[LEVEL_COUNT];
 uniform isampler3D page_table_cache;
-uniform ivec3 page_table_block_size = ivec3(32, 32, 32);
+uniform ivec3 page_table_block_size;
 uniform sampler3D image_cache;
 uniform uvec3 image_dimensions[LEVEL_COUNT];
 uniform vec3 voxel_world_dimensions[LEVEL_COUNT];
-uniform ivec3 image_block_size = ivec3(32, 32, 32);
+uniform ivec3 image_block_size;
 
 #if GLSL_VERSION < 130
 uniform vec2 screen_dim_RCP;
