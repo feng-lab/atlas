@@ -76,7 +76,7 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters &globalParas, QObject *parent)
     m_waFinalShader.bindFragDataLocation(0, "FragData0");
 #ifdef USE_RECT_TEX
     m_waFinalShader.loadFromSourceFile("pass.vert", "wavg_final.frag",
-                                        m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
+                                       m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
 #else
     m_waFinalShader.loadFromSourceFile("pass.vert", "wavg_final.frag", m_rendererBase.generateHeader());
 #endif
@@ -86,14 +86,14 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters &globalParas, QObject *parent)
     m_ddpBlendShader.bindFragDataLocation(0, "FragData0");
 #ifdef USE_RECT_TEX
     m_ddpBlendShader.loadFromSourceFile("pass.vert", "dual_peeling_blend.frag",
-                                         m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
+                                        m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
 #else
     m_ddpBlendShader.loadFromSourceFile("pass.vert", "dual_peeling_blend.frag", m_rendererBase.generateHeader());
 #endif
     m_ddpFinalShader.bindFragDataLocation(0, "FragData0");
 #ifdef USE_RECT_TEX
     m_ddpFinalShader.loadFromSourceFile("pass.vert", "dual_peeling_final.frag",
-                                         m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
+                                        m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
 #else
     m_ddpFinalShader.loadFromSourceFile("pass.vert", "dual_peeling_final.frag", m_rendererBase.generateHeader());
 #endif
@@ -243,7 +243,7 @@ void Z3DCompositor::process(Z3DEye eye)
   size_t numOnTopFilters = onTopOpaqueFilters.size() + onTopTransparentFilters.size();
 
   Z3DRenderOutputPort &currentOutport = (!showHandleFilters.empty()) ? m_tempPort5 : (eye == Z3DEye::Mono) ?
-        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+                                                                         m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
   Z3DRenderInputPort &currentInport = (eye == Z3DEye::Mono) ?
         m_inport : (eye == Z3DEye::Left) ? m_leftEyeInport : m_rightEyeInport;
 
@@ -762,15 +762,15 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*> &opaqueF
                                    const std::vector<Z3DBoundedFilter*> &transparentFilters,
                                    Z3DRenderOutputPort &port, Z3DEye eye, const QString &method)
 {
-//  std::vector<Z3DBoundedFilter*> allFilters;
-//  allFilters.insert(allFilters.end(), opaqueFilters.begin(), opaqueFilters.end());
-//  allFilters.insert(allFilters.end(), transparentFilters.begin(), transparentFilters.end());
-//  if (method == "Dual Depth Peeling") {
-//    renderTransparentDDP(allFilters, port, eye);
-//  } else if (method == "Weighted Average") {
-//    renderTransparentWA(allFilters, port, eye);
-//  }
-//  return;
+  //  std::vector<Z3DBoundedFilter*> allFilters;
+  //  allFilters.insert(allFilters.end(), opaqueFilters.begin(), opaqueFilters.end());
+  //  allFilters.insert(allFilters.end(), transparentFilters.begin(), transparentFilters.end());
+  //  if (method == "Dual Depth Peeling") {
+  //    renderTransparentDDP(allFilters, port, eye);
+  //  } else if (method == "Weighted Average") {
+  //    renderTransparentWA(allFilters, port, eye);
+  //  }
+  //  return;
   if (transparentFilters.empty()) {
     renderOpaqueFilters(opaqueFilters, port, eye);
   }
@@ -811,7 +811,7 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*> &opaqueF
 }
 
 void Z3DCompositor::renderOpaqueFilters(const std::vector<Z3DBoundedFilter*> &filters,
-                                 Z3DRenderOutputPort &port, Z3DEye eye)
+                                        Z3DRenderOutputPort &port, Z3DEye eye)
 {
   port.bindTarget();
   glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
@@ -850,16 +850,16 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*> &f
   g_dualBackTempTexId[1] = m_ddpRT->attachment(GL_COLOR_ATTACHMENT5);
   const Z3DTexture* g_dualBackBlenderTexId = m_ddpRT->attachment(GL_COLOR_ATTACHMENT6);
   const Z3DTexture* g_depthTex = m_ddpRT->attachment(GL_COLOR_ATTACHMENT7);
-  GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
-                            GL_COLOR_ATTACHMENT1,
-                            GL_COLOR_ATTACHMENT2,
-                            GL_COLOR_ATTACHMENT3,
-                            GL_COLOR_ATTACHMENT4,
-                            GL_COLOR_ATTACHMENT5,
-                            GL_COLOR_ATTACHMENT6
-                           };
+  const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
+                                  GL_COLOR_ATTACHMENT1,
+                                  GL_COLOR_ATTACHMENT2,
+                                  GL_COLOR_ATTACHMENT3,
+                                  GL_COLOR_ATTACHMENT4,
+                                  GL_COLOR_ATTACHMENT5,
+                                  GL_COLOR_ATTACHMENT6
+                                 };
 
-  GLenum g_db[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT7};
+  const GLenum g_db[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT7};
 
   bool g_useOQ = true;
   int g_numPasses = 100;
@@ -1112,9 +1112,9 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*> &fi
   const Z3DTexture* g_accumulationTexId[2];
   g_accumulationTexId[0] = m_waRT->attachment(GL_COLOR_ATTACHMENT0);
   g_accumulationTexId[1] = m_waRT->attachment(GL_COLOR_ATTACHMENT1);
-  GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
-                            GL_COLOR_ATTACHMENT1
-                           };
+  const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
+                                  GL_COLOR_ATTACHMENT1
+                                 };
 
   if (depthTexture)
     glDepthMask(GL_FALSE);

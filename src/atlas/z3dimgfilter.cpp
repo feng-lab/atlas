@@ -750,9 +750,9 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     CHECK_GL_ERROR;
 
     // render back texture
-    GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
-                              GL_COLOR_ATTACHMENT1
-                             };
+    const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
+                                    GL_COLOR_ATTACHMENT1
+                                   };
     m_exitTarget.bind();
     glDrawBuffers(2, g_drawBuffers);
     glClear(GL_COLOR_BUFFER_BIT);

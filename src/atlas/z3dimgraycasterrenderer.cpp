@@ -386,11 +386,11 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       m_scFullResRaycasterBlockIDsShader.setUniform("sampling_rate", m_samplingRate.get());
 
       // render block ids
-      GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
-                                GL_COLOR_ATTACHMENT1,
-                                GL_COLOR_ATTACHMENT2,
-                                GL_COLOR_ATTACHMENT3
-                               };
+      const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
+                                      GL_COLOR_ATTACHMENT1,
+                                      GL_COLOR_ATTACHMENT2,
+                                      GL_COLOR_ATTACHMENT3
+                                     };
       m_blockIDsRenderTarget.bind();
       glDrawBuffers(4, g_drawBuffers);
       glClear(GL_COLOR_BUFFER_BIT);

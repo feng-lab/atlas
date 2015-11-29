@@ -42,7 +42,7 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
 
     const ZImgInfo& info = m_imgPack.imgInfo();
     glm::dvec3 imgDim = glm::dvec3(info.width, info.height, info.depth);
-    glm::dvec3 relativeResolution = glm::dvec3(info.voxelSizeXInUm(), info.voxelSizeYInUm(), info.voxelSizeZInUm() * 5);
+    glm::dvec3 relativeResolution = glm::dvec3(info.voxelSizeXInUm(), info.voxelSizeYInUm(), info.voxelSizeZInUm());
     double minRes = std::min(std::min(relativeResolution.x, relativeResolution.y), relativeResolution.z);
     relativeResolution /= minRes;
     imgDim *= relativeResolution;
@@ -134,7 +134,7 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
     }
 
     setScale(scale);
-    setScale(glm::vec3(1,1,5));
+    //setScale(glm::vec3(1,1,5));
   }
 }
 

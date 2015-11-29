@@ -288,10 +288,10 @@ void Z3DFilter::renderScreenQuad(const ZVertexArrayObject &vao, const Z3DShaderP
 
   vao.bind();
 
-  GLfloat vertices[] = {-1.f, 1.f, 0.f, //top left corner
-                        -1.f, -1.f, 0.f, //bottom left corner
-                        1.f, 1.f, 0.f, //top right corner
-                        1.f, -1.f, 0.f}; // bottom right rocner
+  const GLfloat vertices[] = {-1.f, 1.f, 0.f, //top left corner
+                              -1.f, -1.f, 0.f, //bottom left corner
+                              1.f, 1.f, 0.f, //top right corner
+                              1.f, -1.f, 0.f}; // bottom right rocner
   GLint attr_vertex = shader.vertexAttributeLocation();
 
   GLuint bufObjects[1];

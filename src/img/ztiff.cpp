@@ -308,8 +308,6 @@ static const struct exiftagname {
   { 4, "GPSLongitude"},
 };
 
-#define TIFFArrayCount(a) (sizeof (a) / sizeof ((a)[0]))
-
 #ifdef _MSC_VER
 #define snprintf _snprintf
 #endif
@@ -1239,12 +1237,12 @@ uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigt
 
 QString ZTiff::tagToName(uint32_t tag) const
 {
-  for (size_t i=0; i<TIFFArrayCount(tiftagnames); ++i) {
+  for (size_t i=0; i<std::extent<decltype(tiftagnames)>::value; ++i) {
     if (tiftagnames[i].tag == tag) {
       return tiftagnames[i].name;
     }
   }
-  for (size_t i=0; i<TIFFArrayCount(exiftagnames); ++i) {
+  for (size_t i=0; i<std::extent<decltype(exiftagnames)>::value; ++i) {
     if (exiftagnames[i].tag == tag) {
       return exiftagnames[i].name;
     }
@@ -1864,10 +1862,10 @@ void ZTiffWriter::writeIFD(const ZImg &img, int z, int t, int c, bool writeThumb
 
 Compression ZTiffWriter::defaultCompression(const ZImg *img)
 {
-  Compression list[] = {
+  const Compression list[] = {
     Compression::ADOBE_DEFLATE, Compression::LZW, Compression::PACKBITS
   };
-  for (size_t i=0; i<TIFFArrayCount(list); ++i)
+  for (size_t i=0; i<std::extent<decltype(list)>::value; ++i)
     if (checkCompression(img, list[i]))
       return list[i];
   return Compression::NONE;
