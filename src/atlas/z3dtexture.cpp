@@ -379,7 +379,7 @@ bool Z3DTexture::is1DTexture() const
 
 bool Z3DTexture::is2DTexture() const
 {
-  std::vector<GLenum> all_2dtexture_targets = {
+  const GLenum all_2dtexture_targets[] = {
     GL_TEXTURE_2D,
     GL_TEXTURE_1D_ARRAY,
     GL_TEXTURE_RECTANGLE,
@@ -395,8 +395,8 @@ bool Z3DTexture::is2DTexture() const
     GL_PROXY_TEXTURE_CUBE_MAP
   };
 
-  return std::find(all_2dtexture_targets.begin(), all_2dtexture_targets.end(), m_textureTarget)
-      != all_2dtexture_targets.end();
+  return std::find(std::begin(all_2dtexture_targets), std::end(all_2dtexture_targets), m_textureTarget)
+      != std::end(all_2dtexture_targets);
 }
 
 bool Z3DTexture::is3DTexture() const
