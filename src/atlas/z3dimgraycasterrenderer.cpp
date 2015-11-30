@@ -370,7 +370,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       if (size.y >= 32) {
         size.y /= 16;
       }
-      LINFO() << m_layerTarget->size() << pixelEyeSpaceSize << size;
+      //LINFO() << m_layerTarget->size() << pixelEyeSpaceSize << size;
       m_blockIDsRenderTarget.resize(size);
 
       m_scFullResRaycasterBlockIDsShader.bind();
@@ -489,9 +489,10 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         m_scFullResRaycasterShader.setUniform("local_MIP_threshold", m_localMIPThreshold.get());
 
       m_scFullResRaycasterShader.setUniform("sampling_rate", m_samplingRate.get());
+      m_img->bindFullResRenderShader(m_scFullResRaycasterShader);
 
       if (visibleIdxs.size() == 1) {
-        m_img->bindFullResRenderShader(m_scFullResRaycasterShader, visibleIdxs[0]);
+        m_img->bindImageCacheToFullResRenderShader(m_scFullResRaycasterShader, visibleIdxs[0]);
         m_scFullResRaycasterShader.bindTexture("transfer_function", m_transferFuncParas[visibleIdxs[0]]->get().texture());
         renderScreenQuad(m_VAO, m_scFullResRaycasterShader);
       } else {
@@ -500,7 +501,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           m_layerTarget->bind();
           m_layerTarget->clear();
 
-          m_img->bindFullResRenderShader(m_scFullResRaycasterShader, visibleIdxs[i]);
+          m_img->bindImageCacheToFullResRenderShader(m_scFullResRaycasterShader, visibleIdxs[i]);
           m_scFullResRaycasterShader.bindTexture("transfer_function", m_transferFuncParas[visibleIdxs[i]]->get().texture());
           renderScreenQuad(m_VAO, m_scFullResRaycasterShader);
 

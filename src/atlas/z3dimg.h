@@ -61,7 +61,8 @@ public:
 
   size_t numLevels() const { return m_numLevels; }
   void bindFullResBlockIDsShader(Z3DShaderProgram &shader) const;
-  void bindFullResRenderShader(Z3DShaderProgram &shader, size_t c) const;
+  void bindFullResRenderShader(Z3DShaderProgram &shader) const;
+  void bindImageCacheToFullResRenderShader(Z3DShaderProgram &shader, size_t c) const;
   bool updateCaches(const std::set<uint32_t>& missingBlockIDs, const std::set<uint32_t>& usedBlockIDs);
 
 signals:
@@ -70,11 +71,13 @@ protected slots:
 
 protected:
   void readVolumes();
+  void checkPageSystemError();
 
 protected:
   glm::uvec3 m_pageTableBlockSize;
   glm::uvec3 m_pageTableCacheNumBlocks;
   glm::uvec3 m_imageBlockSize;
+  glm::ivec3 m_imageBlockReadSize;
   glm::uvec3 m_imageCacheNumBlocks;
   int m_unmappedFlag = 0;  // 1 - 32*32*32(32768) means number of blocks mapped
   int m_emptyFlag = 40000;
@@ -94,6 +97,7 @@ protected:
   std::vector<glm::uvec3> m_pageDirectoryDimensions;
   std::vector<glm::uvec3> m_pageTableDimensions;
   std::vector<glm::uvec3> m_imageDimensions;
+  std::vector<glm::uvec3> m_imageBounds;
   std::vector<glm::uvec3> m_levelScales;
   std::vector<glm::uvec4> m_posToBlockIDs;
 

@@ -75,7 +75,6 @@ public:
   const glm::ivec3& get(const KeyType& key)
   {
     auto it = m_cacheItemsMap.find(key);
-    m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, it->second);
     return it->second->second;
   }
 
