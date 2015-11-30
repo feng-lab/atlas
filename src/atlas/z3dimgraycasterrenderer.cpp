@@ -380,7 +380,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       // entry exit points
       m_scFullResRaycasterBlockIDsShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordTexture);
       m_scFullResRaycasterBlockIDsShader.bindTexture("ray_entry_eye_coord", m_entryEyeCoordTexture);
-      m_scFullResRaycasterBlockIDsShader.bindTexture("ray_exit_tex_coord",  m_exitTexCoordTexture);
+      m_scFullResRaycasterBlockIDsShader.bindTexture("ray_exit_tex_coord", m_exitTexCoordTexture);
       m_scFullResRaycasterBlockIDsShader.bindTexture("ray_exit_eye_coord", m_exitEyeCoordTexture);
 
       m_scFullResRaycasterBlockIDsShader.setUniform("sampling_rate", m_samplingRate.get());
@@ -479,7 +479,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       // entry exit points
       m_scFullResRaycasterShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordTexture);
       m_scFullResRaycasterShader.bindTexture("ray_entry_eye_coord", m_entryEyeCoordTexture);
-      m_scFullResRaycasterShader.bindTexture("ray_exit_tex_coord",  m_exitTexCoordTexture);
+      m_scFullResRaycasterShader.bindTexture("ray_exit_tex_coord", m_exitTexCoordTexture);
       m_scFullResRaycasterShader.bindTexture("ray_exit_eye_coord", m_exitEyeCoordTexture);
 
       if (m_compositingMode.get() ==  "ISO Surface")
@@ -529,7 +529,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       // entry exit points
       m_scRaycasterShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordTexture);
       m_scRaycasterShader.bindTexture("ray_entry_eye_coord", m_entryEyeCoordTexture);
-      m_scRaycasterShader.bindTexture("ray_exit_tex_coord",  m_exitTexCoordTexture);
+      m_scRaycasterShader.bindTexture("ray_exit_tex_coord", m_exitTexCoordTexture);
       m_scRaycasterShader.bindTexture("ray_exit_eye_coord", m_exitEyeCoordTexture);
 
       if (m_compositingMode.get() ==  "ISO Surface")

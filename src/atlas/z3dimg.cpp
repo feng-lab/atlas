@@ -317,81 +317,95 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
       ++level;
     }
 
-    glm::ivec4 blockKey(level, blockID, 0, 0);
-    blockKey.y -= m_posToBlockIDs[level].w;
-    blockKey.w = blockKey.y / m_posToBlockIDs[level].z;
-    blockKey.y -= blockKey.w * m_posToBlockIDs[level].z;
-    blockKey.z = blockKey.y / m_posToBlockIDs[level].y;
-    blockKey.y -= blockKey.z * m_posToBlockIDs[level].y;
-    glm::ivec4 pageTableKey = blockKey / glm::ivec4(1, m_pageTableBlockSize);
+    glm::ivec4 pageTableEntryKey(level, blockID, 0, 0);
+    pageTableEntryKey.y -= m_posToBlockIDs[level].w;
+    pageTableEntryKey.w = pageTableEntryKey.y / m_posToBlockIDs[level].z;
+    pageTableEntryKey.y -= pageTableEntryKey.w * m_posToBlockIDs[level].z;
+    pageTableEntryKey.z = pageTableEntryKey.y / m_posToBlockIDs[level].y;
+    pageTableEntryKey.y -= pageTableEntryKey.z * m_posToBlockIDs[level].y;
+    assert(glm::all(glm::lessThan(pageTableEntryKey.yzw(), glm::ivec3(m_pageTableDimensions[level]))));
+    assert(glm::all(glm::greaterThanEqual(pageTableEntryKey.yzw(), glm::ivec3(0))));
+    glm::ivec4 pageDirectoryEntryKey = pageTableEntryKey / glm::ivec4(1, m_pageTableBlockSize);
+    glm::ivec3 pageDirectoryEntryCoord = m_pageDirectoryBases[pageDirectoryEntryKey.x] + pageDirectoryEntryKey.yzw();
+    glm::ivec4& pageDirectoryEntry = m_pageDirectory[pageDirectoryEntryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
+        pageDirectoryEntryCoord.y * m_pageDirectorySize.x + pageDirectoryEntryCoord.x];
+    if (pageDirectoryEntry.w > 0) {
+      glm::ivec3 pageTableEntryCoord = pageDirectoryEntry.xyz() + pageTableEntryKey.yzw() % glm::ivec3(m_pageTableBlockSize);
+      glm::ivec4& pageTableEntry = m_pageTableCache[pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+          pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
+      if (pageTableEntry.w != 0) {
+        LINFO() << pageTableEntryKey << pageDirectoryEntryKey << "a";
+        checkPageSystemError();
+      }
+      assert(pageTableEntry.w == 0);
+    }
 
-    glm::ivec3 blockPos = m_imageCacheManager->insert(blockKey, erasedKey);
+    glm::ivec3 imageBlockCachePos = m_imageCacheManager->insert(pageTableEntryKey, erasedKey);
     //LINFO() << blockKey << erasedKey << m_posToBlockIDs[level] << blockID << level;
     if (erasedKey.x >= 0) { //valid
-      glm::ivec4 erasedKeyPageTableKey = erasedKey / glm::ivec4(1, glm::ivec3(m_pageTableBlockSize));
-      glm::ivec3 pageDirectoryCoord = m_pageDirectoryBases[erasedKeyPageTableKey.x] + erasedKeyPageTableKey.yzw();
-      glm::ivec4& pageDirectoryContent = m_pageDirectory[pageDirectoryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
-          pageDirectoryCoord.y * m_pageDirectorySize.x + pageDirectoryCoord.x];
-      --pageDirectoryContent.w;
+      glm::ivec4 erasedKeyPageDirectoryEntryKey = erasedKey / glm::ivec4(1, glm::ivec3(m_pageTableBlockSize));
+      glm::ivec3 erasedKeyPageDirectoryEntryCoord = m_pageDirectoryBases[erasedKeyPageDirectoryEntryKey.x] + erasedKeyPageDirectoryEntryKey.yzw();
+      glm::ivec4& erasedKeyPageDirectoryEntry = m_pageDirectory[erasedKeyPageDirectoryEntryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
+          erasedKeyPageDirectoryEntryCoord.y * m_pageDirectorySize.x + erasedKeyPageDirectoryEntryCoord.x];
 
-      assert(pageDirectoryContent.w >= 0);
-      glm::ivec3 pageTableCacheCoord = pageDirectoryContent.xyz() + erasedKey.yzw() % glm::ivec3(m_pageTableBlockSize);
-      glm::ivec4& pageTableCacheContent = m_pageTableCache[pageTableCacheCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-          pageTableCacheCoord.y * m_pageTableCacheSize.x + pageTableCacheCoord.x];
-      pageTableCacheContent.w = 0;
-
-      if (pageDirectoryContent.w == 0) {
-        // unmap entire page table block
-        m_pageTableCacheManager->remove(erasedKeyPageTableKey);
-        ++numAvailablePageCacheBlock;
+      if (erasedKeyPageDirectoryEntry.w > 0) {
+        glm::ivec3 erasedKeyPageTableEntryCoord = erasedKeyPageDirectoryEntry.xyz() + erasedKey.yzw() % glm::ivec3(m_pageTableBlockSize);
+        glm::ivec4& erasedKeyPageTableEntry = m_pageTableCache[erasedKeyPageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+            erasedKeyPageTableEntryCoord.y * m_pageTableCacheSize.x + erasedKeyPageTableEntryCoord.x];
+        if (erasedKeyPageTableEntry.w > 0) {
+          erasedKeyPageTableEntry.w = 0;
+          --erasedKeyPageDirectoryEntry.w;
+          if (erasedKeyPageDirectoryEntry.w == 0) {
+            // unmap entire page table block
+            m_pageTableCacheManager->remove(erasedKeyPageDirectoryEntryKey);
+            ++numAvailablePageCacheBlock;
+          }
+        }
       }
     }
 
-    glm::ivec3 pageDirectoryCoord = m_pageDirectoryBases[pageTableKey.x] + pageTableKey.yzw();
-    glm::ivec4& pageDirectoryContent = m_pageDirectory[pageDirectoryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
-        pageDirectoryCoord.y * m_pageDirectorySize.x + pageDirectoryCoord.x];
-    if (pageDirectoryContent.w == 0) { // page directory unmapped
+    if (pageDirectoryEntry.w == 0) { // page directory unmapped
       if (numAvailablePageCacheBlock > 0) { // construct new page table block
-        glm::ivec3 pageTableBlockPos = m_pageTableCacheManager->insert(pageTableKey, erasedKey);
-        pageDirectoryContent = glm::ivec4(pageTableBlockPos, 1);
+        glm::ivec3 pageTableBlockCachePos = m_pageTableCacheManager->insert(pageDirectoryEntryKey, erasedKey);
+        pageDirectoryEntry = glm::ivec4(pageTableBlockCachePos, 1);
 
         if (erasedKey.x >= 0) {
           for (size_t z=0; z<m_pageTableBlockSize.z; ++z) {
             for (size_t y=0; y<m_pageTableBlockSize.y; ++y) {
-              memset(&m_pageTableCache[(pageTableBlockPos.z+z) * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-                  (pageTableBlockPos.y+y) * m_pageTableCacheSize.x + pageTableBlockPos.x],
-                     0,
-                     m_pageTableBlockSize.x * sizeof(glm::ivec4));
+              memset(&m_pageTableCache[(pageTableBlockCachePos.z+z) * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+                  (pageTableBlockCachePos.y+y) * m_pageTableCacheSize.x + pageTableBlockCachePos.x],
+                  0,
+                  m_pageTableBlockSize.x * sizeof(glm::ivec4));
             }
           }
 
-          glm::ivec3 erasedKeyPageDirectoryCoord = m_pageDirectoryBases[erasedKey.x] + erasedKey.yzw();
-          glm::ivec4& erasedKeyPageDirectoryContent = m_pageDirectory[erasedKeyPageDirectoryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
-              erasedKeyPageDirectoryCoord.y * m_pageDirectorySize.x + erasedKeyPageDirectoryCoord.x];
-          erasedKeyPageDirectoryContent.w = 0;
+          glm::ivec3 erasedKeyPageDirectoryEntryCoord = m_pageDirectoryBases[erasedKey.x] + erasedKey.yzw();
+          glm::ivec4& erasedKeyPageDirectoryEntry = m_pageDirectory[erasedKeyPageDirectoryEntryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
+              erasedKeyPageDirectoryEntryCoord.y * m_pageDirectorySize.x + erasedKeyPageDirectoryEntryCoord.x];
+          erasedKeyPageDirectoryEntry.w = 0;
         }
 
-        glm::ivec3 pageTableCacheCoord = pageDirectoryContent.xyz() + blockKey.yzw() % glm::ivec3(m_pageTableBlockSize);
-        glm::ivec4& pageTableCacheContent = m_pageTableCache[pageTableCacheCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-            pageTableCacheCoord.y * m_pageTableCacheSize.x + pageTableCacheCoord.x];
-        pageTableCacheContent = glm::ivec4(blockPos, 1);
+        glm::ivec3 pageTableEntryCoord = pageDirectoryEntry.xyz() + pageTableEntryKey.yzw() % glm::ivec3(m_pageTableBlockSize);
+        glm::ivec4& pageTableEntry = m_pageTableCache[pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+            pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
+        pageTableEntry = glm::ivec4(imageBlockCachePos, 1);
         --numAvailablePageCacheBlock;
       } else { // no space for new page table block, skip current image block
         m_imageCacheManager->popFront();
         continue;
       }
     } else { // page directory mapped
-      assert(pageDirectoryContent.w > 0);
-      glm::ivec3 pageTableCacheCoord = pageDirectoryContent.xyz() + blockKey.yzw() % glm::ivec3(m_pageTableBlockSize);
-      glm::ivec4& pageTableCacheContent = m_pageTableCache[pageTableCacheCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-          pageTableCacheCoord.y * m_pageTableCacheSize.x + pageTableCacheCoord.x];
-      assert(pageTableCacheContent.w == 0);
-      pageTableCacheContent = glm::ivec4(blockPos, 1);
-      ++pageDirectoryContent.w;
+      assert(pageDirectoryEntry.w > 0);
+      glm::ivec3 pageTableEntryCoord = pageDirectoryEntry.xyz() + pageTableEntryKey.yzw() % glm::ivec3(m_pageTableBlockSize);
+      glm::ivec4& pageTableEntry = m_pageTableCache[pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+          pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
+      assert(pageTableEntry.w == 0);
+      pageTableEntry = glm::ivec4(imageBlockCachePos, 1);
+      ++pageDirectoryEntry.w;
     }
 
-    blocksImagePos.push_back(blockKey * glm::ivec4(1, glm::ivec3(m_imageBlockSize)));
-    blocksCachePos.push_back(glm::uvec3(blockPos));
+    blocksImagePos.push_back(pageTableEntryKey * glm::ivec4(1, glm::ivec3(m_imageBlockSize)));
+    blocksCachePos.push_back(glm::uvec3(imageBlockCachePos));
     ++count;
   }
 
@@ -578,7 +592,6 @@ void Z3DImg::checkPageSystemError()
         }
       }
     }
-    LINFO() << numValidEntry << m_pageDirectory[i].w;
     assert(numValidEntry == m_pageDirectory[i].w);
   }
 }

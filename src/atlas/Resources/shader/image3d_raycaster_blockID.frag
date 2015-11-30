@@ -62,7 +62,6 @@ void main()
     float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
 #endif
     float ze = zeFront;
-    float finalZe = 1.0;
     int curLevel = 0;
     float zeLength = zeBack - zeFront;
     float zeLengthRCP = 1.0 / zeLength;
