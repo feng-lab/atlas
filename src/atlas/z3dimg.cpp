@@ -9,6 +9,7 @@
 #include "zexception.h"
 #include <QApplication>
 #include <QMessageBox>
+#include "zbenchtimer.h"
 
 namespace nim {
 
@@ -284,6 +285,9 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
   if (missingBlockIDs.empty() || numBlocksToRead <= 0)
     return false;
 
+  ZBenchTimer bt("update page table");
+  bt.start();
+
   std::set<glm::ivec4, Vec4Compare<int, glm::highp>> usedPageTableKeys;
   size_t level = 0;
   for (uint32_t blockID : usedBlockIDs) {  // blockID must be ordered, can not use unordered_set here
@@ -409,9 +413,16 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
     blocksCachePos.push_back(glm::uvec3(imageBlockCachePos));
     ++count;
   }
+  m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
+  m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
+  glFinish();
+  bt.stopAndPrint();
 
-  checkPageSystemError();
+  //checkPageSystemError();
 
+  bt.setName("update image cache");
+  bt.reset();
+  bt.start();
   ZImg img(ZImgInfo(m_imageBlockSize.x, m_imageBlockSize.y, m_imageBlockSize.z, m_nChannels));
   if (m_imageBlockReadSize == glm::ivec3(m_imageBlockSize)) {
     for (size_t i=0; i<blocksImagePos.size(); ++i) {
@@ -440,9 +451,8 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
       }
     }
   }
-
-  m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
-  m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
+  glFinish();
+  bt.stopAndPrint();
 
   return count > 0;
 }
