@@ -416,11 +416,10 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
   if (m_imageBlockReadSize == glm::ivec3(m_imageBlockSize)) {
     for (size_t i=0; i<blocksImagePos.size(); ++i) {
       const glm::ivec4& blockImagePos = blocksImagePos[i];  // level, x, y, z
-      const glm::uvec3& blockCachePos = blocksCachePos[i];
       // actual read and upload
       img.fillRandom();  // read from blockImagePos
       for (size_t c=0; c<m_nChannels; ++c) {
-        m_imageCacheTextures[c]->uploadSubImage(blockCachePos, m_imageBlockSize, img.channelData(c));
+        m_imageCacheTextures[c]->uploadSubImage(blocksCachePos[i], m_imageBlockSize, img.channelData(c));
       }
     }
   } else {

@@ -54,6 +54,7 @@ protected slots:
   void changeCoordTransform();
 
   void adjustWidget();
+  void leftMouseButtonPressed(QMouseEvent *e, int w, int h);
 
   void invalidateFRVolumeZSlice();
   void invalidateFRVolumeYSlice();
@@ -127,6 +128,9 @@ private:
   ZIntParameter m_ySlice2Position;
   ZBoolParameter m_showZSlice2;
   ZIntParameter m_zSlice2Position;
+
+  ZEventListenerParameter m_leftMouseButtonPressEvent;
+  glm::ivec2 m_startCoord;
 };
 
 } // namespace nim

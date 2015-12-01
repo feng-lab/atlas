@@ -64,12 +64,7 @@ void main()
     float zeFront = texture2D(ray_entry_eye_coord, texCoords).z;
     float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
 #endif
-    float ze = zeFront;
     int curLevel = 0;
-    float zeLength = zeBack - zeFront;
-    if (zeLength > -1e-5)
-      discard;
-    float zeLengthRCP = 1.0 / zeLength;
     
     uint missBlockIDs[8] = uint[8](0,0,0,0, 0,0,0,0);
     int missBlockIDsIndex = 0;
@@ -78,9 +73,9 @@ void main()
 
     vec3 rayVector = exitRayPosition - startRayPosition;
     vec3 numVoxels = abs(rayVector * image_dimensions[curLevel]);
-    float numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
-    float stepSize = zeLength / (sampling_rate * numVoxel);
+    float stepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
 
+    float currentRayLength = 0.0;
     bool finished = false;
 
     ivec3 pageDirAddress = ivec3(-1,-1,-1);
@@ -90,14 +85,13 @@ void main()
 
     for (int loop0=0; !finished && loop0<255; loop0++) {
       for (int loop1=0; !finished && loop1<255; loop1++) {
-        float desiredVoxelSize = ze * ze_to_screen_pixel_voxel_size;
+        float desiredVoxelSize = mix(zeFront, zeBack, currentRayLength) * ze_to_screen_pixel_voxel_size;
         while (curLevel+1 < LEVEL_COUNT && voxel_world_sizes[curLevel+1] <= desiredVoxelSize) {
           ++curLevel;
           numVoxels = abs(rayVector * image_dimensions[curLevel]);
-          numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
-          stepSize = zeLength / (sampling_rate * numVoxel);
+          stepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
         }
-        vec3 samplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
+        vec3 samplePos = startRayPosition + currentRayLength * rayVector;
 
         ivec3 voxelCoord = ivec3(samplePos * image_dimensions[curLevel]);
         ivec3 pageTableCoord = voxelCoord / image_block_size;
@@ -115,22 +109,24 @@ void main()
           }
           pagingFlag = pageTableEntry.w;
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-            ze += stepSize;
-
+            // save used blockid
             if (usedBlockIDsIndex < 12) {
               uint blockID = pos_to_block_ids[curLevel].w + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
-              if (usedBlockIDsIndex == 0 || blockID != usedBlockIDs[usedBlockIDsIndex-1]) {
+              //if (usedBlockIDsIndex == 0 || blockID != usedBlockIDs[usedBlockIDsIndex-1]) {
                 usedBlockIDs[usedBlockIDsIndex++] = blockID;
-              }
+              //}
             }
+
+            // goto next block
+            do {
+              currentRayLength += stepSize;
+            } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength < 1.0);
           } else {
             // skip empty space page table entry recursive
             if (pagingFlag == UNMAPPED) {
-              vec3 testSamplePos;
               do {
-                ze += stepSize;
-                testSamplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
-              } while (ivec3(testSamplePos * image_dimensions[curLevel]) / image_block_size == pageTableCoord && ze > zeBack);
+                currentRayLength += stepSize;
+              } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength < 1.0);
             } else { // empty block
               int nextNonEmptyLevel = curLevel + 1;
               int testPagingFlag = EMPTY;
@@ -147,34 +143,32 @@ void main()
               }
 
               ivec3 prevBlock = ivec3(samplePos * image_dimensions[nextNonEmptyLevel-1]) / image_block_size;
-              float testStepSize = -voxel_world_sizes[nextNonEmptyLevel-1] / sampling_rate;
-              vec3 testSamplePos;
+              numVoxels = abs(rayVector * image_dimensions[nextNonEmptyLevel-1]);
+              float testStepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
               do {
-                ze += testStepSize;
-                testSamplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
-              } while (ivec3(testSamplePos * image_dimensions[nextNonEmptyLevel-1]) / image_block_size == prevBlock && ze > zeBack);
+                currentRayLength += testStepSize;
+              } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[nextNonEmptyLevel-1]) / image_block_size == prevBlock && currentRayLength < 1.0);
             }
           }
         } else {
           // skip empty space page directory entry
-          vec3 testSamplePos;
           do {
-            ze += stepSize;
-            testSamplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
-          } while (ivec3(testSamplePos * image_dimensions[curLevel]) / image_block_size == pageTableCoord && ze > zeBack);
+            currentRayLength += stepSize;
+          } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength < 1.0);
         }
 
+        // save missed blockid
         if (pagingFlag == UNMAPPED && missBlockIDsIndex < 8) {
           uint blockID = pos_to_block_ids[curLevel].w + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
-          if (missBlockIDsIndex == 0 || blockID != missBlockIDs[missBlockIDsIndex-1]) {
+          //if (missBlockIDsIndex == 0 || blockID != missBlockIDs[missBlockIDsIndex-1]) {
             missBlockIDs[missBlockIDsIndex++] = blockID;
-          }
+          //}
           if (missBlockIDsIndex == 8) {
             finished = true;
           }
         }
 
-        finished = finished || (ze <= zeBack);
+        finished = finished || (currentRayLength > 1.0);
       } // for
     }
 

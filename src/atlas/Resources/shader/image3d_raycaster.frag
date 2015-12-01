@@ -38,7 +38,7 @@ out vec4 FragData0;  // call glBindFragDataLocation before linking
 
 vec4 compositeDVR(in vec4 curResult, in vec4 color, in float currentRayLength, inout float rayDepth)
 {
-  if (rayDepth > 0.0)
+  if (rayDepth < 0.0)
     rayDepth = currentRayLength;
 
   vec4 result = vec4(0.0);
@@ -63,7 +63,7 @@ vec4 compositeISO(in vec4 curResult, in vec4 color, in float currentRayLength, i
 
 vec4 compositeXRay(in vec4 curResult, in vec4 color, in float currentRayLength, inout float rayDepth)
 {
-  if (rayDepth > 0.0)
+  if (rayDepth < 0.0)
     rayDepth = currentRayLength;
   return curResult + color;
 }
@@ -102,19 +102,14 @@ void main()
     float zeFront = texture2D(ray_entry_eye_coord, texCoords).z;
     float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
 #endif
-    float ze = zeFront;
-    float finalZe = 1.0;
     int curLevel = 0;
-    float zeLength = zeBack - zeFront;
-    if (zeLength > -1e-5)
-      discard;
-    float zeLengthRCP = 1.0 / zeLength;
 
     vec3 rayVector = exitRayPosition - startRayPosition;
     vec3 numVoxels = abs(rayVector * image_dimensions[curLevel]);
-    float numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
-    float stepSize = zeLength / (sampling_rate * numVoxel);
+    float stepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
 
+    float currentRayLength = 0.0;
+    float rayDepth = -1.0;
     bool finished = false;
 
     ivec3 pageDirAddress = ivec3(-1,-1,-1);
@@ -124,14 +119,13 @@ void main()
 
     for (int loop0=0; !finished && loop0<255; loop0++) {
       for (int loop1=0; !finished && loop1<255; loop1++) {
-        float desiredVoxelSize = ze * ze_to_screen_pixel_voxel_size;
+        float desiredVoxelSize = mix(zeFront, zeBack, currentRayLength) * ze_to_screen_pixel_voxel_size;
         while (curLevel+1 < LEVEL_COUNT && voxel_world_sizes[curLevel+1] <= desiredVoxelSize) {
           ++curLevel;
           numVoxels = abs(rayVector * image_dimensions[curLevel]);
-          numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
-          stepSize = zeLength / (sampling_rate * numVoxel);
+          stepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
         }
-        vec3 samplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
+        vec3 samplePos = startRayPosition + currentRayLength * rayVector;
 
         ivec3 voxelCoord = ivec3(samplePos * image_dimensions[curLevel]);
         ivec3 pageTableCoord = voxelCoord / image_block_size;
@@ -158,12 +152,12 @@ void main()
               finished = true;
             } else if (voxel > ch1V) {
               ch1V = voxel;
-              finalZe = ze;
+              rayDepth = currentRayLength;
             }
 #else
             if (voxel > ch1V) {
               ch1V = voxel;
-              finalZe = ze;
+              rayDepth = currentRayLength;
             }
             finished = ch1V >= 1.0;
 #endif
@@ -176,22 +170,20 @@ void main()
 
             if (color.a > 0.0) {
               color.a / sampling_rate;
-              result = COMPOSITING(result, color, ze, finalZe);
+              result = COMPOSITING(result, color, currentRayLength, rayDepth);
               if (result.a >= 1.0) {
                 result.a = 1.0;
                 finished = true;
               }
             }
 #endif // MIP
-            ze += stepSize;
+            currentRayLength += stepSize;
           } else {
             // skip empty space page table entry recursive
             if (pagingFlag == UNMAPPED) {
-              vec3 testSamplePos;
               do {
-                ze += stepSize;
-                testSamplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
-              } while (ivec3(testSamplePos * image_dimensions[curLevel]) / image_block_size == pageTableCoord && ze > zeBack);
+                currentRayLength += stepSize;
+              } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength < 1.0);
             } else { // empty block
               int nextNonEmptyLevel = curLevel + 1;
               int testPagingFlag = EMPTY;
@@ -208,24 +200,21 @@ void main()
               }
 
               ivec3 prevBlock = ivec3(samplePos * image_dimensions[nextNonEmptyLevel-1]) / image_block_size;
-              float testStepSize = -voxel_world_sizes[nextNonEmptyLevel-1] / sampling_rate;
-              vec3 testSamplePos;
+              numVoxels = abs(rayVector * image_dimensions[nextNonEmptyLevel-1]);
+              float testStepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
               do {
-                ze += testStepSize;
-                testSamplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
-              } while (ivec3(testSamplePos * image_dimensions[nextNonEmptyLevel-1]) / image_block_size == prevBlock && ze > zeBack);
+                currentRayLength += testStepSize;
+              } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[nextNonEmptyLevel-1]) / image_block_size == prevBlock && currentRayLength < 1.0);
             }
           }
         } else {
           // skip empty space page directory entry
-          vec3 testSamplePos;
           do {
-            ze += stepSize;
-            testSamplePos = startRayPosition + (ze - zeFront) * zeLengthRCP * rayVector;
-          } while (ivec3(testSamplePos * image_dimensions[curLevel]) / image_block_size == pageTableCoord && ze > zeBack);
+            currentRayLength += stepSize;
+          } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength < 1.0);
         }
 
-        finished = finished || (ze <= zeBack);
+        finished = finished || (currentRayLength > 1.0);
       } // for
     }
 
@@ -241,8 +230,8 @@ void main()
     result.a = 1.0;
 #endif
 
-    if (finalZe < 0.0) {
-      gl_FragDepth = ze_to_zw_a / finalZe + ze_to_zw_b;
+    if (rayDepth >= 0.0) {
+      gl_FragDepth = ze_to_zw_a / mix(zeFront, zeBack, rayDepth) + ze_to_zw_b;
     } else {
 #ifdef RESULT_OPAQUE
       gl_FragDepth = entryTexCoordAndZ.w;

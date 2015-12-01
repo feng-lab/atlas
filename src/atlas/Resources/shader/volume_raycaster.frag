@@ -341,10 +341,9 @@ void main()
 #endif
 
     vec3 rayVector = exitRayPosition - startRayPosition;
-    float maxRayLength = length(rayVector);
     vec3 numVoxels = abs(rayVector * volume_dimensions_1);
     float numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
-    float stepSize = maxRayLength / (sampling_rate * numVoxel);
+    float stepSize = 1.0 / (sampling_rate * numVoxel);
 
     float currentRayLength = 0.0;
     float rayDepth = -1.0;
@@ -354,7 +353,7 @@ void main()
         float voxel;
         vec4 color = vec4(0.0);
         vec4 chColor;
-        vec3 samplePos = startRayPosition + currentRayLength / maxRayLength * rayVector;
+        vec3 samplePos = startRayPosition + currentRayLength * rayVector;
         bool saturated = true;
 
 #if NUM_VOLUMES >= 1
@@ -1330,7 +1329,7 @@ void main()
         }
 #endif // MIP
         currentRayLength += stepSize;
-        finished = finished || (currentRayLength > maxRayLength);
+        finished = finished || (currentRayLength > 1.0);
       }
     }
 
@@ -1412,7 +1411,7 @@ void main()
       float zeFront = texture2D(ray_entry_eye_coord, texCoords).z;
       float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
 #endif
-      float ze = zeFront + rayDepth / maxRayLength * (zeBack-zeFront);
+      float ze = zeFront + rayDepth * (zeBack-zeFront);
       gl_FragDepth = ze_to_zw_a / ze + ze_to_zw_b;
     } else {
 #ifdef RESULT_OPAQUE

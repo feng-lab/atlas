@@ -50,6 +50,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   , m_ySlice2Position("Y Slice 2 Position", 0, 0, 1)
   , m_showZSlice2("Show Z Slice 2", false)
   , m_zSlice2Position("Z Slice 2 Position", 0, 0, 1)
+  , m_leftMouseButtonPressEvent("Left Mouse Button Pressed", false)
 {
   CHECK_GL_ERROR;
   m_baseBoundBoxRenderer.setEnableMultisample(false);
@@ -127,6 +128,12 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   connect(&m_xSlice2Position, SIGNAL(valueChanged()), this, SLOT(invalidateFRVolumeXSlice2()));
   connect(&m_ySlice2Position, SIGNAL(valueChanged()), this, SLOT(invalidateFRVolumeXSlice2()));
   connect(&m_zSlice2Position, SIGNAL(valueChanged()), this, SLOT(invalidateFRVolumeXSlice2()));
+
+  m_leftMouseButtonPressEvent.listenTo("trace", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonPress);
+  m_leftMouseButtonPressEvent.listenTo("trace", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonRelease);
+  connect(&m_leftMouseButtonPressEvent, SIGNAL(mouseEventTriggered(QMouseEvent*,int,int)),
+          this, SLOT(leftMouseButtonPressed(QMouseEvent*,int,int)));
+  addEventListener(m_leftMouseButtonPressEvent);
 
   m_imgRaycasterRenderer.setLayerTarget(&m_layerTarget);
   m_volumeSliceRenderer.setLayerTarget(&m_layerTarget);
@@ -445,6 +452,24 @@ void Z3DImgFilter::adjustWidget()
   m_zSlice2Position.setVisible(m_showZSlice2.get());
   m_ySlice2Position.setVisible(m_showYSlice2.get());
   m_xSlice2Position.setVisible(m_showXSlice2.get());
+}
+
+void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent *e, int w, int h)
+{
+  e->ignore();
+  if (!m_imgRaycasterRenderer.hasVisibleRendering())
+    return;
+  // Mouse button pressed
+  if (e->type() == QEvent::MouseButtonPress) {
+    m_startCoord.x = e->x();
+    m_startCoord.y = e->y();
+    toggleInteractionMode(true, this);
+    return;
+  }
+
+  if (e->type() == QEvent::MouseButtonRelease) {
+    toggleInteractionMode(false, this);
+  }
 }
 
 void Z3DImgFilter::invalidateFRVolumeZSlice()
