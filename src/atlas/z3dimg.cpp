@@ -323,21 +323,24 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
     pageTableEntryKey.y -= pageTableEntryKey.w * m_posToBlockIDs[level].z;
     pageTableEntryKey.z = pageTableEntryKey.y / m_posToBlockIDs[level].y;
     pageTableEntryKey.y -= pageTableEntryKey.z * m_posToBlockIDs[level].y;
-    assert(glm::all(glm::lessThan(pageTableEntryKey.yzw(), glm::ivec3(m_pageTableDimensions[level]))));
-    assert(glm::all(glm::greaterThanEqual(pageTableEntryKey.yzw(), glm::ivec3(0))));
+    if (!glm::all(glm::lessThan(pageTableEntryKey.yzw(), glm::ivec3(m_pageTableDimensions[level]))) ||
+        !glm::all(glm::greaterThanEqual(pageTableEntryKey.yzw(), glm::ivec3(0)))) {
+      LINFO() << pageTableEntryKey << m_pageTableDimensions[level];
+      assert(false);
+    }
     glm::ivec4 pageDirectoryEntryKey = pageTableEntryKey / glm::ivec4(1, m_pageTableBlockSize);
     glm::ivec3 pageDirectoryEntryCoord = m_pageDirectoryBases[pageDirectoryEntryKey.x] + pageDirectoryEntryKey.yzw();
     glm::ivec4& pageDirectoryEntry = m_pageDirectory[pageDirectoryEntryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
         pageDirectoryEntryCoord.y * m_pageDirectorySize.x + pageDirectoryEntryCoord.x];
+    glm::ivec3 pageTableEntryCoord;
+
     if (pageDirectoryEntry.w > 0) {
-      glm::ivec3 pageTableEntryCoord = pageDirectoryEntry.xyz() + pageTableEntryKey.yzw() % glm::ivec3(m_pageTableBlockSize);
-      glm::ivec4& pageTableEntry = m_pageTableCache[pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-          pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
-      if (pageTableEntry.w != 0) {
-        LINFO() << pageTableEntryKey << pageDirectoryEntryKey << "a";
-        checkPageSystemError();
+      pageTableEntryCoord = pageDirectoryEntry.xyz() + pageTableEntryKey.yzw() % glm::ivec3(m_pageTableBlockSize);
+      if (m_pageTableCache[pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+          pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x].w != 0) {
+        LERROR() << "missing block is already mapped!" << pageTableEntryKey << pageDirectoryEntryKey;
+        continue;
       }
-      assert(pageTableEntry.w == 0);
     }
 
     glm::ivec3 imageBlockCachePos = m_imageCacheManager->insert(pageTableEntryKey, erasedKey);
@@ -385,22 +388,20 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
           erasedKeyPageDirectoryEntry.w = 0;
         }
 
-        glm::ivec3 pageTableEntryCoord = pageDirectoryEntry.xyz() + pageTableEntryKey.yzw() % glm::ivec3(m_pageTableBlockSize);
+        pageTableEntryCoord = pageDirectoryEntry.xyz() + pageTableEntryKey.yzw() % glm::ivec3(m_pageTableBlockSize);
         glm::ivec4& pageTableEntry = m_pageTableCache[pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
             pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
         pageTableEntry = glm::ivec4(imageBlockCachePos, 1);
         --numAvailablePageCacheBlock;
-      } else { // no space for new page table block, skip current image block
+      } else {
         m_imageCacheManager->popFront();
+        LERROR() << "no space for new page table block, skip current image block";
         continue;
       }
     } else { // page directory mapped
       assert(pageDirectoryEntry.w > 0);
-      glm::ivec3 pageTableEntryCoord = pageDirectoryEntry.xyz() + pageTableEntryKey.yzw() % glm::ivec3(m_pageTableBlockSize);
-      glm::ivec4& pageTableEntry = m_pageTableCache[pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-          pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
-      assert(pageTableEntry.w == 0);
-      pageTableEntry = glm::ivec4(imageBlockCachePos, 1);
+      m_pageTableCache[pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+          pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x] = glm::ivec4(imageBlockCachePos, 1);
       ++pageDirectoryEntry.w;
     }
 

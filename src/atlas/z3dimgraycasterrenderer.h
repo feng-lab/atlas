@@ -87,7 +87,8 @@ protected:
   Z3DShaderProgram m_mergeChannelShader;
 
   Z3DRenderTarget* m_layerTarget = nullptr;
-  Z3DTexture m_missBlocksTexture;
+  Z3DTexture m_missBlocksTexture1;
+  Z3DTexture m_missBlocksTexture2;
   Z3DTexture m_usedBlocksTexture1;
   Z3DTexture m_usedBlocksTexture2;
   Z3DTexture m_usedBlocksTexture3;

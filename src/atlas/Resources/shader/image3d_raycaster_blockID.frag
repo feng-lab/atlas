@@ -21,16 +21,19 @@ layout(location = 0) out uvec4 FragData0;
 layout(location = 1) out uvec4 FragData1;
 layout(location = 2) out uvec4 FragData2;
 layout(location = 3) out uvec4 FragData3;
+layout(location = 4) out uvec4 FragData4;
 #elif GLSL_VERSION >= 130
 out uvec4 FragData0;  // call glBindFragDataLocation before linking
 out uvec4 FragData1;  // call glBindFragDataLocation before linking
 out uvec4 FragData2;  // call glBindFragDataLocation before linking
 out uvec4 FragData3;  // call glBindFragDataLocation before linking
+out uvec4 FragData4;  // call glBindFragDataLocation before linking
 #else
 #define FragData0 gl_FragData[0]
 #define FragData1 gl_FragData[1]
-#define FragData0 gl_FragData[2]
-#define FragData1 gl_FragData[3]
+#define FragData2 gl_FragData[2]
+#define FragData3 gl_FragData[3]
+#define FragData4 gl_FragData[4]
 #endif
 
 #define UNMAPPED 0
@@ -64,9 +67,11 @@ void main()
     float ze = zeFront;
     int curLevel = 0;
     float zeLength = zeBack - zeFront;
+    if (zeLength > -1e-5)
+      discard;
     float zeLengthRCP = 1.0 / zeLength;
     
-    uint missBlockIDs[4] = uint[4](0,0,0,0);
+    uint missBlockIDs[8] = uint[8](0,0,0,0, 0,0,0,0);
     int missBlockIDsIndex = 0;
     uint usedBlockIDs[12] = uint[12](0,0,0,0, 0,0,0,0, 0,0,0,0);
     int usedBlockIDsIndex = 0;
@@ -159,12 +164,12 @@ void main()
           } while (ivec3(testSamplePos * image_dimensions[curLevel]) / image_block_size == pageTableCoord && ze > zeBack);
         }
 
-        if (pagingFlag == UNMAPPED && missBlockIDsIndex < 4) {
+        if (pagingFlag == UNMAPPED && missBlockIDsIndex < 8) {
           uint blockID = pos_to_block_ids[curLevel].w + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
           if (missBlockIDsIndex == 0 || blockID != missBlockIDs[missBlockIDsIndex-1]) {
             missBlockIDs[missBlockIDsIndex++] = blockID;
           }
-          if (missBlockIDsIndex == 4) {
+          if (missBlockIDsIndex == 8) {
             finished = true;
           }
         }
@@ -174,9 +179,10 @@ void main()
     }
 
     FragData0 = uvec4(missBlockIDs[0], missBlockIDs[1], missBlockIDs[2], missBlockIDs[3]);
-    FragData1 = uvec4(usedBlockIDs[0], usedBlockIDs[1], usedBlockIDs[2], usedBlockIDs[3]);
-    FragData2 = uvec4(usedBlockIDs[4], usedBlockIDs[5], usedBlockIDs[6], usedBlockIDs[7]);
-    FragData3 = uvec4(usedBlockIDs[8], usedBlockIDs[9], usedBlockIDs[10], usedBlockIDs[11]);
+    FragData1 = uvec4(missBlockIDs[4], missBlockIDs[5], missBlockIDs[6], missBlockIDs[7]);
+    FragData2 = uvec4(usedBlockIDs[0], usedBlockIDs[1], usedBlockIDs[2], usedBlockIDs[3]);
+    FragData3 = uvec4(usedBlockIDs[4], usedBlockIDs[5], usedBlockIDs[6], usedBlockIDs[7]);
+    FragData4 = uvec4(usedBlockIDs[8], usedBlockIDs[9], usedBlockIDs[10], usedBlockIDs[11]);
   }
 }
 
