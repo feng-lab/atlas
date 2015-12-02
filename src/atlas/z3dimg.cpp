@@ -31,13 +31,20 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
 
   if (m_isVolumeDownsampled) {
     m_pageTableBlockSize = glm::uvec3(32, 32, 32);
-    m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 2); // 256*256*64*4*4   64MB
     m_imageBlockSize = glm::uvec3(32, 32, 32);
     m_imageBlockReadSize = glm::ivec3(512, 512, 32);
-    if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() > 1500) {
-      m_imageCacheNumBlocks = glm::uvec3(32,32,32);
-    } else {
+    if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 4096) {
+      m_imageCacheNumBlocks = glm::uvec3(32,32,32); // 1G
+      m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 2); // 256*256*64*4*4   64MB
+    } else if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 2048) {
       m_imageCacheNumBlocks = glm::uvec3(32,32,16);
+      m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 1); // 256*256*32*4*4   32MB
+    } else if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 1024) {
+      m_imageCacheNumBlocks = glm::uvec3(32,32,8);
+      m_pageTableCacheNumBlocks = glm::uvec3(4, 4, 2); // 128*128*64*4*4   16MB
+    } else {
+      m_imageCacheNumBlocks = glm::uvec3(32,32,4);
+      m_pageTableCacheNumBlocks = glm::uvec3(4, 4, 1); // 128*128*32*4*4   8MB
     }
     m_pageTableCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
     m_imageCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_imageBlockSize, m_imageCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
