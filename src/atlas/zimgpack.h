@@ -105,6 +105,8 @@ public:
 
   ZImg resizedImg(size_t width, size_t height, size_t depth, size_t t) const;
 
+  void readRegionToImg(size_t xyRatio, size_t zRatio, size_t sx, size_t sy, size_t sz, size_t t, ZImg &res) const;
+
   // only for non-disk-cached image
   bool isDiskCached() const { return m_diskCached; }
   const ZImg& img() const { assert(!m_diskCached); return m_img; }
@@ -134,6 +136,7 @@ protected:
 
 private:
   size_t ratioForScale(double scale) const;
+  size_t readRatioOf(size_t needRatio) const;
 
 protected:
   ZImgInfo m_imgInfo;

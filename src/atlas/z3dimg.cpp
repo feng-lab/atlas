@@ -431,9 +431,9 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
   ZImg img(ZImgInfo(m_imageBlockSize.x, m_imageBlockSize.y, m_imageBlockSize.z, m_nChannels));
   if (m_imageBlockReadSize == glm::ivec3(m_imageBlockSize)) {
     for (size_t i=0; i<blocksImagePos.size(); ++i) {
-      const glm::ivec4& blockImagePos = blocksImagePos[i];  // level, x, y, z
       // actual read and upload
-      img.fillRandom();  // read from blockImagePos
+      m_imgPack.readRegionToImg(m_levelScales[blocksImagePos[i].x].x, m_levelScales[blocksImagePos[i].x].z,
+          blocksImagePos[i].y, blocksImagePos[i].z, blocksImagePos[i].w, 0, img);
       for (size_t c=0; c<m_nChannels; ++c) {
         m_imageCacheTextures[c]->uploadSubImage(blocksCachePos[i], m_imageBlockSize, img.channelData(c));
       }
@@ -447,7 +447,8 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
     }
     for (auto it = bigToSmall.begin(); it != bigToSmall.end(); ++it) {
       // read from it->first level x y z
-
+      m_imgPack.readRegionToImg(m_levelScales[it->first.x].x, m_levelScales[it->first.x].z,
+          it->first.y, it->first.z, it->first.w, 0, bigImg);
       for (size_t i=0; i<it->second.size(); ++i) {
         glm::ivec3 startCoord = it->first.yzw() - it->second[i].first.yzw();
         img.pasteImg(bigImg, ZVoxelCoordinate(startCoord.x, startCoord.y, startCoord.z));

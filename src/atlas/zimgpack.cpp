@@ -500,6 +500,35 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
   return res;
 }
 
+void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, size_t sx, size_t sy, size_t sz, size_t t, ZImg &res) const
+{
+  size_t readRatio = readRatioOf(xyRatio);
+  if (readRatio == xyRatio) {
+    size_t zEnd = std::min(m_imgInfo.depth, (sz+res.depth()) * zRatio);
+    size_t zIdx = 0;
+    for (size_t z=sz*zRatio; z<zEnd; z+=zRatio) {
+      auto tiit = m_rtzToTileIndice.find(std::tuple<size_t, size_t, int>(xyRatio, t, int(z)));
+      if (tiit != m_rtzToTileIndice.end()) {
+        const std::vector<size_t>& tileIndice = tiit->second;
+        for (size_t i=0; i<tileIndice.size(); ++i) {
+          const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
+          if (tile.x + int64_t(tile.width) <= int64_t(sx * xyRatio) ||
+              tile.x >= int64_t((sx + res.width()) * xyRatio) ||
+              tile.y + int64_t(tile.height) <= int64_t(sy * xyRatio) ||
+              tile.y >= int64_t((sy + res.height()) * xyRatio)) {
+            continue;
+          }
+          ZVoxelCoordinate start(tile.x / xyRatio - int64_t(sx), tile.y / xyRatio - int64_t(sy), zIdx++, 0, 0);
+          std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, tileIndice[i])), tile);
+          res.pasteImg(*imgPtr->get(), start);
+        }
+      }
+    }
+  } else {
+    throw ZIOException("not implemented yet");
+  }
+}
+
 const ZImg &ZImgPack::maxZProjectedImg() const
 {
   assert(!m_diskCached);
@@ -869,6 +898,11 @@ size_t ZImgPack::ratioForScale(double scale) const
 {
   assert(!m_ratioToSize.empty());
   size_t needRatio = std::max(1.0, std::floor(1.0 / scale));
+  return readRatioOf(needRatio);
+}
+
+size_t ZImgPack::readRatioOf(size_t needRatio) const
+{
   size_t readRatio = 1;
   for (auto it = m_ratioToSize.begin(); it != m_ratioToSize.end(); ++it) {
     if (it->first > needRatio) {
