@@ -144,7 +144,8 @@ void main()
           pagingFlag = pageTableEntry.w;
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
             ivec3 voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size;
-            float voxel = texelFetch(image_cache, voxelAddress, 0).r;
+            //float voxel = texelFetch(image_cache, voxelAddress, 0).r;
+            float voxel = 0.3;
 
 #ifdef MIP
 #ifdef LOCAL_MIP

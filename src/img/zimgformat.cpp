@@ -11,7 +11,7 @@ ZImgCommonSubBlock::ZImgCommonSubBlock(const QString &fileName, FileFormat forma
   , m_filename(fileName), m_format(format), m_scene(scene), m_t(t), m_z(z), m_x(x), m_y(y), m_width(width), m_height(height)
 {}
 
-ZImg ZImgCommonSubBlock::read() const
+std::shared_ptr<ZImg> ZImgCommonSubBlock::read() const
 {
   ZImgRegion rgn;
   rgn.start.t = m_t;
@@ -22,8 +22,8 @@ ZImg ZImgCommonSubBlock::read() const
   rgn.end.x = m_x + m_width;
   rgn.start.y = m_y;
   rgn.end.y = m_y + m_height;
-  ZImg res;
-  res.load(m_filename, rgn, m_scene, m_format);
+  std::shared_ptr<ZImg> res(new ZImg());
+  res->load(m_filename, rgn, m_scene, m_format);
   return res;
 }
 

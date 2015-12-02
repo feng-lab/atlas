@@ -111,8 +111,6 @@ private:
   std::vector<std::unique_ptr<Z3DVolume>> m_volumes;
   size_t m_nChannels = 0;
   bool m_isVolumeDownsampled;
-  double m_imgMinIntensity;
-  double m_imgMaxIntensity;
 };
 
 } // namespace nim

@@ -45,6 +45,10 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
     const ZImgInfo& info = m_imgPack.imgInfo();
     glm::dvec3 imgDim = glm::dvec3(info.width, info.height, info.depth);
     glm::dvec3 relativeResolution = glm::dvec3(info.voxelSizeXInUm(), info.voxelSizeYInUm(), info.voxelSizeZInUm());
+    // make x and y scales same
+    relativeResolution.x = std::max(relativeResolution.x, relativeResolution.y);
+    relativeResolution.y = relativeResolution.x;
+
     double minRes = std::min(std::min(relativeResolution.x, relativeResolution.y), relativeResolution.z);
     relativeResolution /= minRes;
     imgDim *= relativeResolution;
@@ -89,6 +93,7 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
           m_levelScales[l] = m_levelScales[l-1] * uint32_t(2);
         }
       }
+      assert(m_levelScales[l].x == m_levelScales[l].y);
       m_imageDimensions.push_back(glm::uvec3((info.width + m_levelScales[l].x - 1) / m_levelScales[l].x,
                                              (info.height + m_levelScales[l].y - 1) / m_levelScales[l].y,
                                              (info.depth + m_levelScales[l].z - 1) / m_levelScales[l].z));
@@ -167,9 +172,9 @@ std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeXSliceVolume(size_t x)
                              std::min(maxTextureSize, croped.height()), 1);
     }
     if (!croped.isType<uint8_t>())
-      croped = croped.convertTo<uint8_t>(m_imgMinIntensity, m_imgMaxIntensity);
+      croped = croped.convertTo<uint8_t>(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
     else
-      croped.normalize(m_imgMinIntensity, m_imgMaxIntensity);
+      croped.normalize(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
     Z3DVolume *vh = new Z3DVolume(croped);
     vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
                               m_imgPack.imgInfo().channelColors[c].g / 255.,
@@ -192,9 +197,9 @@ std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeYSliceVolume(size_t y)
                              std::min(maxTextureSize, croped.height()), 1);
     }
     if (!croped.isType<uint8_t>())
-      croped = croped.convertTo<uint8_t>(m_imgMinIntensity, m_imgMaxIntensity);
+      croped = croped.convertTo<uint8_t>(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
     else
-      croped.normalize(m_imgMinIntensity, m_imgMaxIntensity);
+      croped.normalize(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
     Z3DVolume *vh = new Z3DVolume(croped);
     vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
                               m_imgPack.imgInfo().channelColors[c].g / 255.,
@@ -215,9 +220,9 @@ std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeZSliceVolume(size_t z)
                              std::min(maxTextureSize, croped.height()), 1);
     }
     if (!croped.isType<uint8_t>())
-      croped = croped.convertTo<uint8_t>(m_imgMinIntensity, m_imgMaxIntensity);
+      croped = croped.convertTo<uint8_t>(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
     else
-      croped.normalize(m_imgMinIntensity, m_imgMaxIntensity);
+      croped.normalize(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
     Z3DVolume *vh = new Z3DVolume(croped);
     vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
                               m_imgPack.imgInfo().channelColors[c].g / 255.,
@@ -441,7 +446,8 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
       bigToSmall[blocksImagePos[i] / tmp * tmp].push_back(std::make_pair(blocksImagePos[i], blocksCachePos[i]));
     }
     for (auto it = bigToSmall.begin(); it != bigToSmall.end(); ++it) {
-      //bigImg.fillRandom(); // read from it->first
+      // read from it->first level x y z
+
       for (size_t i=0; i<it->second.size(); ++i) {
         glm::ivec3 startCoord = it->first.yzw() - it->second[i].first.yzw();
         img.pasteImg(bigImg, ZVoxelCoordinate(startCoord.x, startCoord.y, startCoord.z));
@@ -521,11 +527,10 @@ void Z3DImg::readVolumes()
   }
 
   ZImg img = m_imgPack.resizedImg(width, height, depth, 0);
-  img.computeMinMax(m_imgMinIntensity, m_imgMaxIntensity);
   if (!img.isType<uint8_t>()) {
-    img = img.convertTo<uint8_t>(m_imgMinIntensity, m_imgMaxIntensity);
+    img = img.convertTo<uint8_t>(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
   } else/* if (img.validBitCount() != 0 && img.validBitCount() < 8) */{
-    img.normalize(m_imgMinIntensity, m_imgMaxIntensity);
+    //img.normalize(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
   }
   if (m_nChannels == 1) {
     Z3DVolume *vh = new Z3DVolume(img,

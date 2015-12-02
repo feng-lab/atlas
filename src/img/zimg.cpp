@@ -76,6 +76,10 @@ QString ZImgThumbernail::toQString() const
   return res;
 }
 
+ZImgSource::ZImgSource()
+{
+}
+
 ZImgSource::ZImgSource(const QString &fn, const ZImgRegion &rgn, size_t scene, FileFormat format)
   : region(rgn), scene(scene), format(format)
 {

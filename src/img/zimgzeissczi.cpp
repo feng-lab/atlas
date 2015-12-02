@@ -224,34 +224,34 @@ ZImgCZISubBlock::ZImgCZISubBlock(const QString &fileName, std::vector<CZITile> &
   }
 }
 
-ZImg ZImgCZISubBlock::read() const
+std::shared_ptr<ZImg> ZImgCZISubBlock::read() const
 {
   try {
     if (m_tiles.empty()) {
       throw ZIOException("empty czi sub block");
     }
-    ZImg res;
+    std::shared_ptr<ZImg> res(new ZImg());
     std::ifstream inputFileStream;
     openFileStream(inputFileStream, m_filename, std::ios_base::in | std::ios_base::binary);
     if (m_mixedTiles) {
       double scale = 1.0 / ratio;
-      res = ZImg(ZImgInfo(std::ceil(width * scale), std::ceil(height * scale), 1, m_numChannels, 1, m_bytePerVoxel, m_voxelFormat));
+      *res = ZImg(ZImgInfo(std::ceil(width * scale), std::ceil(height * scale), 1, m_numChannels, 1, m_bytePerVoxel, m_voxelFormat));
       for (size_t i=0; i<m_tiles.size(); ++i) {
         ZImg img = readCZITile(inputFileStream, m_tiles[i]);
         ZVoxelCoordinate tileStart = m_tiles[i].start - m_mixedTilesStart;
         tileStart.x *= scale;
         tileStart.y *= scale;
-        res.pasteImg(img, tileStart);
+        res->pasteImg(img, tileStart);
       }
     } else {
       if (m_tiles.size() == 1) {
-        res = readCZITile(inputFileStream, m_tiles[0]);
+        *res = readCZITile(inputFileStream, m_tiles[0]);
       } else {
         std::vector<ZImg> imgs(m_tiles.size());
         for (size_t i=0; i<m_tiles.size(); ++i) {
           imgs[i] = readCZITile(inputFileStream, m_tiles[i]);
         }
-        res = ZImg::cat(imgs, Dimension::C);
+        *res = ZImg::cat(imgs, Dimension::C);
       }
     }
     return res;

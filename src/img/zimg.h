@@ -34,6 +34,7 @@ public:
 // throw ZIOException if file does not exist
 struct ZImgSource
 {
+  ZImgSource();
   ZImgSource(const QString& fn, const ZImgRegion& rgn = ZImgRegion(), size_t scene = 0,
              FileFormat format = FileFormat::Unknown);
   ZImgSource(const QStringList& fns, Dimension catDim, const ZImgRegion& rgn = ZImgRegion(), size_t scene = 0,
@@ -74,18 +75,18 @@ struct ZImgSource
 class ZImgSubBlock
 {
 public:
-  ZImgSubBlock(size_t ratio, size_t t, size_t z,
+  ZImgSubBlock(size_t ratio, size_t t, int64_t z,
                int64_t x, int64_t y, size_t width, size_t height)
     : ratio(ratio), t(t), z(z), x(x), y(y), width(width), height(height)
   {}
   virtual ~ZImgSubBlock() {}
 
   // subclass read should depend its own members rather than member of this class
-  virtual ZImg read() const = 0;
+  virtual std::shared_ptr<ZImg> read() const = 0;
 
   size_t ratio;  // realsize / storedsize
   size_t t;
-  size_t z;
+  int64_t z;
   int64_t x;
   int64_t y;
   size_t width;

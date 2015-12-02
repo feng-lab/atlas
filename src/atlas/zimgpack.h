@@ -8,11 +8,6 @@
 
 namespace nim {
 
-class ZImgPack;
-// 0    1     2  3  4  5  6       7       8
-// pt, ratio, t, z, x, y, width, height, mip
-using ZImgTileKey = std::tuple<ZImgPack*, size_t, size_t, size_t, int64_t, int64_t, size_t, size_t, bool>;
-
 class ZImgPackSubBlock : public ZImgSubBlock
 {
 public:
@@ -20,18 +15,26 @@ public:
     CacheFile, OrigSource, OrigSourceMIP
   };
 
-  ZImgPackSubBlock(const QString &fn, const ZImgTileKey &key);
-  ZImgPackSubBlock(const ZImgSource &imgSource, size_t t, size_t slice, const ZImgTileKey &key);
-  ZImgPackSubBlock(const ZImgSource &imgSource, size_t t, size_t sliceStart, size_t sliceEnd, const ZImgTileKey &key);
+  ZImgPackSubBlock(const QString &fn, size_t ratio, size_t t, size_t z,
+                   int64_t x, int64_t y, size_t width, size_t height);
+  ZImgPackSubBlock(const ZImgSource &imgSource, size_t ratio, size_t t, size_t z,
+                   int64_t x, int64_t y, size_t width, size_t height);
+  ZImgPackSubBlock(const ZImgSource &imgSource, size_t ratio, size_t t, size_t sliceStart, size_t sliceEnd,
+                   int64_t x, int64_t y, size_t width, size_t height);
+  ZImgPackSubBlock(std::shared_ptr<ZImg>& img, size_t ratio, size_t t, size_t z,
+                   int64_t x, int64_t y, size_t width, size_t height);
+  ZImgPackSubBlock(std::shared_ptr<ZImg>& img, size_t ratio, size_t t, size_t sliceStart, size_t sliceEnd,
+                   int64_t x, int64_t y, size_t width, size_t height);
   virtual ~ZImgPackSubBlock() {}
 
-  virtual ZImg read() const override;
+  virtual std::shared_ptr<ZImg> read() const override;
 
 protected:
   Type m_type;
   ZImgSource m_imgSource;
   size_t m_zStart;
   size_t m_zEnd;
+  std::shared_ptr<ZImg> m_img;
 };
 
 class ZImgPack : public ZImgSliceProvider
@@ -81,7 +84,8 @@ public:
   void save(QString fileName, FileFormat format, Compression comp);
 
   bool needUpdate(const QRectF &viewport, double scale,
-                  const QRectF &oldViewport, double oldScale) const;
+                  const QRectF &oldViewport, double oldScale,
+                  size_t t, size_t z, bool mip) const;
 
   void retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs,
                            std::vector<QPoint> &locs,
@@ -114,12 +118,13 @@ public:
   virtual ZImg allSlices(size_t t) const override;
 
 protected:
-  void createPyramidalFolder(const QString &fileName);
   // will take ownership of img
   void createSliceTiles(ZImg *img, size_t z, size_t t, bool mip = false);
   void buildPyramidal(ZImg& img);
   void buildPyramidal();
   void buildFastReadIndex(const std::vector<std::shared_ptr<ZImgSubBlock>> &subBlocks);
+  void createTileIndexStructure();
+
   ZImg assembleImg(size_t ratio) const;
   ZImg assembleImg(size_t ratio, size_t t) const;
   ZImg assembleImg(size_t ratio, size_t t, size_t z) const;
@@ -149,13 +154,12 @@ private:
   QString m_name;
   QString m_tooltip;
 
-  size_t m_tileSize = 4096;
+  size_t m_tileSize = 512;
   int64_t m_fastReadSizeThreshold = 100 * 1024 * 1024;  // 100MB
-  QString m_pyramidalFolder;
+
   std::vector<std::shared_ptr<ZImgSubBlock>> m_allTiles;
-  std::vector<std::map<ZImgTileKey, std::shared_ptr<ZImgSubBlock>>> m_ratioTileMaps;
-  std::vector<size_t> m_ratioWidths;
-  std::vector<size_t> m_ratioHeights;
+  std::map<size_t, QSize> m_ratioToSize;
+  std::map<std::tuple<size_t, size_t, int>, std::vector<size_t>> m_rtzToTileIndice;
 
   double m_minIntensity;
   double m_maxIntensity;

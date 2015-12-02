@@ -155,7 +155,7 @@ void ZImgFilter::setViewport(const QRectF &rect, double scale)
 {
   QRectF vp = rect;
   vp.moveTo(vp.x()-m_offsetPara.get().x, vp.y()-m_offsetPara.get().y);
-  if (m_imgPack->needUpdate(vp, scale, m_lastViewport, m_lastScale)) {
+  if (m_imgPack->needUpdate(vp, scale, m_lastViewport, m_lastScale, realT(), realZ(), m_view.isMaxZProjView())) {
     if (!m_isVisible) {
       destroyImgItems(); // will create new one next time
     } else {

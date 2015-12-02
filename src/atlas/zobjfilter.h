@@ -34,9 +34,9 @@ protected:
   void removeParameter(ZParameter* para);
 
   void updateBoundBoxWithOffsetPara(std::vector<int> &boundBox) const;
-  int realZ() const { return int(m_view.currentSlice()) - int(m_offsetPara.get().z); }
+  int realZ() const { return m_view.currentSlice() - int(m_offsetPara.get().z); }
   int realZ(int z) const { return z - int(m_offsetPara.get().z); }
-  int realT() const { return int(m_view.currentTime()) - int(m_offsetPara.get().w); }
+  int realT() const { return m_view.currentTime() - int(m_offsetPara.get().w); }
   int realT(int t) const { return t - int(m_offsetPara.get().w); }
 
 signals:
