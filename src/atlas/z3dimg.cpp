@@ -169,6 +169,10 @@ std::vector<double> Z3DImg::physicalBoundBox() const
 
 void Z3DImg::setScale(const glm::vec3 &scale)
 {
+  if (!m_isVolumeDownsampled) {
+    return;
+  }
+
   m_pageTableCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
   m_imageCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_imageBlockSize+uint32_t(2), m_imageCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
 
