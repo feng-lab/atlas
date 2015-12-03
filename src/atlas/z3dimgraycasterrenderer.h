@@ -53,6 +53,8 @@ public:
   const std::vector<std::unique_ptr<Z3DTransferFunctionParameter>>& transferFuncParas() const { return m_transferFuncParas; }
   const std::vector<std::unique_ptr<ZStringIntOptionParameter>>& texFilterModeParas() const { return m_texFilterModeParas; }
 
+  virtual void compile() override;
+
 signals:
 
 protected slots:
@@ -62,7 +64,6 @@ protected:
   void bindVolumesAndTransferFuncs(Z3DShaderProgram &shader);
   void bindVolumeAndTransferFunc(Z3DShaderProgram &shader, size_t idx);
 
-  virtual void compile() override;
   QString generateHeader();
 
   virtual void render(Z3DEye eye) override;

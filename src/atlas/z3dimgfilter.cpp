@@ -445,6 +445,7 @@ void Z3DImgFilter::changeCoordTransform()
   if (m_3dImg) {
     m_3dImg->setScale(m_rendererBase.coordTransformPara().scale());
   }
+  m_imgRaycasterRenderer.compile();
 }
 
 void Z3DImgFilter::adjustWidget()

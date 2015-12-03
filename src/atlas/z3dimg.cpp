@@ -50,96 +50,6 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
       m_imageCacheNumBlocks = glm::uvec3(30,30,4);
       m_pageTableCacheNumBlocks = glm::uvec3(4, 4, 1); // 128*128*32*4*4   8MB
     }
-    m_pageTableCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
-    m_imageCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_imageBlockSize+uint32_t(2), m_imageCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
-
-    const ZImgInfo& info = m_imgPack.imgInfo();
-    glm::dvec3 imgDim = glm::dvec3(info.width, info.height, info.depth);
-    glm::dvec3 relativeResolution = glm::dvec3(info.voxelSizeXInUm(), info.voxelSizeYInUm(), info.voxelSizeZInUm());
-    // make x and y scales same
-    relativeResolution.x = std::max(relativeResolution.x, relativeResolution.y);
-    relativeResolution.y = relativeResolution.x;
-
-    double minRes = std::min(std::min(relativeResolution.x, relativeResolution.y), relativeResolution.z);
-    relativeResolution /= minRes;
-    imgDim *= relativeResolution;
-    glm::dvec3 levels = glm::ceil(glm::log2(imgDim / glm::dvec3(m_imageBlockSize))) + 1.0;
-    m_numLevels = std::max(std::max(levels.x, levels.y), levels.z);
-
-    std::vector<size_t> sortedIndex = argSort(&relativeResolution[0], &relativeResolution[0] + 3);
-    std::vector<size_t> stayRounds(3, 0);
-    assert(relativeResolution[sortedIndex[0]] == 1.0);
-    for (size_t i=1; i<3; ++i) {
-      double res = relativeResolution[sortedIndex[0]];
-      while (true) {
-        if (res*2 < relativeResolution[sortedIndex[i]]) {
-          res *= 2;
-          ++stayRounds[sortedIndex[i]];
-        } else {
-          if ((res*2 - relativeResolution[sortedIndex[i]]) < (relativeResolution[sortedIndex[i]] - res)) {
-            ++stayRounds[sortedIndex[i]];
-          }
-          break;
-        }
-      }
-    }
-
-    m_pageDirectorySize = glm::ivec3(0, 0, 0);
-    for (size_t l=0; l<m_numLevels; ++l) {
-      m_levelScales.push_back(glm::uvec3(1, 1, 1));
-      if (l > 0) {
-        if (stayRounds[sortedIndex[2]] > stayRounds[sortedIndex[1]]) {
-          --stayRounds[sortedIndex[2]];
-          m_levelScales[l][sortedIndex[2]] = m_levelScales[l-1][sortedIndex[2]];
-          m_levelScales[l][sortedIndex[1]] = m_levelScales[l-1][sortedIndex[1]] * 2;
-          m_levelScales[l][sortedIndex[0]] = m_levelScales[l-1][sortedIndex[0]] * 2;
-        } else if (stayRounds[sortedIndex[2]] > 0) {
-          assert(stayRounds[sortedIndex[2]] == stayRounds[sortedIndex[1]]);
-          --stayRounds[sortedIndex[2]];
-          --stayRounds[sortedIndex[1]];
-          m_levelScales[l][sortedIndex[2]] = m_levelScales[l-1][sortedIndex[2]];
-          m_levelScales[l][sortedIndex[1]] = m_levelScales[l-1][sortedIndex[1]];
-          m_levelScales[l][sortedIndex[0]] = m_levelScales[l-1][sortedIndex[0]] * 2;
-        } else {
-          m_levelScales[l] = m_levelScales[l-1] * uint32_t(2);
-        }
-      }
-      assert(m_levelScales[l].x == m_levelScales[l].y);
-      m_imageDimensions.push_back(glm::uvec3((info.width + m_levelScales[l].x - 1) / m_levelScales[l].x,
-                                             (info.height + m_levelScales[l].y - 1) / m_levelScales[l].y,
-                                             (info.depth + m_levelScales[l].z - 1) / m_levelScales[l].z));
-      m_imageBounds.push_back(m_imageDimensions[l]-uint32_t(1));
-      m_pageTableDimensions.push_back(glm::uvec3(m_imageDimensions[l] + m_imageBlockSize - uint32_t(1)) / m_imageBlockSize);
-      m_pageDirectoryDimensions.push_back(glm::uvec3(m_pageTableDimensions[l] + m_pageTableBlockSize - uint32_t(1)) / m_pageTableBlockSize);
-
-      // id starts from 1
-      m_posToBlockIDs.push_back(glm::uvec4(1,
-                                           m_pageTableDimensions[l].x,
-                                           m_pageTableDimensions[l].x * m_pageTableDimensions[l].y,
-                                           l == 0 ? 1 : (m_posToBlockIDs[l-1].w + m_pageTableDimensions[l-1].x * m_pageTableDimensions[l-1].y * m_pageTableDimensions[l-1].z)));
-      if (l == 0) {
-        m_pageDirectoryBases.push_back(glm::ivec3(0, 0, 0));
-      } else if (l == 1) {
-        m_pageDirectoryBases.push_back(m_pageDirectoryBases[l-1]);
-        m_pageDirectoryBases[l][sortedIndex[1]] += m_pageDirectoryDimensions[l-1][sortedIndex[1]];
-      } else {
-        m_pageDirectoryBases.push_back(m_pageDirectoryBases[l-1]);
-        m_pageDirectoryBases[l][sortedIndex[0]] += m_pageDirectoryDimensions[l-1][sortedIndex[0]];
-      }
-      m_pageDirectorySize = glm::max(m_pageDirectorySize, m_pageDirectoryBases[l] + glm::ivec3(m_pageDirectoryDimensions[l]));
-      if (m_pageDirectorySize.x > Z3DGpuInfoInstance.max3DTextureSize() ||
-          m_pageDirectorySize.y > Z3DGpuInfoInstance.max3DTextureSize() ||
-          m_pageDirectorySize.z > Z3DGpuInfoInstance.max3DTextureSize()) {
-        throw ZGLException(QString("Image (%1) is not supported").arg(info.toQString()));
-      }
-      LINFO() << l << m_pageDirectoryDimensions[l] << m_pageTableDimensions[l] << m_imageDimensions[l] << m_levelScales[l] << m_posToBlockIDs[l];
-    }
-
-    // content of RGBA32I texture
-    m_pageDirectoryTexture.reset(new Z3DTexture(GL_TEXTURE_3D, (GLint)GL_RGBA32I, glm::uvec3(m_pageDirectorySize), GL_RGBA_INTEGER, GL_INT));
-    m_pageDirectory.resize(m_pageDirectoryTexture->numPixels(), glm::ivec4(0,0,0,m_unmappedFlag));
-    m_pageDirectoryTexture->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
-    m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
 
     m_pageTableCacheSize = glm::ivec3(m_pageTableBlockSize * m_pageTableCacheNumBlocks);
     m_pageTableCacheTexture.reset(new Z3DTexture((GLint)GL_RGBA32I, glm::uvec3(m_pageTableCacheSize), GL_RGBA_INTEGER, GL_INT));
@@ -147,7 +57,7 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
     m_pageTableCacheTexture->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
     m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
 
-    for (size_t c=0; c<info.numChannels; ++c) {
+    for (size_t c=0; c<m_imgPack.imgInfo().numChannels; ++c) {
       m_imageCacheTextures.emplace_back(new Z3DTexture((GLint)GL_R8, (m_imageBlockSize+uint32_t(2)) * m_imageCacheNumBlocks, GL_RED, GL_UNSIGNED_BYTE));
       m_imageCacheTextures[c]->uploadImage();
     }
@@ -259,6 +169,110 @@ std::vector<double> Z3DImg::physicalBoundBox() const
 
 void Z3DImg::setScale(const glm::vec3 &scale)
 {
+  m_pageTableCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
+  m_imageCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_imageBlockSize+uint32_t(2), m_imageCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
+
+  const ZImgInfo& info = m_imgPack.imgInfo();
+  glm::dvec3 imgDim = glm::dvec3(info.width, info.height, info.depth);
+  glm::dvec3 relativeResolution = glm::dvec3(scale);
+  // make x and y scales same
+  relativeResolution.x = std::max(relativeResolution.x, relativeResolution.y);
+  relativeResolution.y = relativeResolution.x;
+
+  double minRes = std::min(std::min(relativeResolution.x, relativeResolution.y), relativeResolution.z);
+  relativeResolution /= minRes;
+  imgDim *= relativeResolution;
+  glm::dvec3 levels = glm::ceil(glm::log2(imgDim / glm::dvec3(m_imageBlockSize))) + 1.0;
+  m_numLevels = std::max(std::max(levels.x, levels.y), levels.z);
+
+  std::vector<size_t> sortedIndex = argSort(&relativeResolution[0], &relativeResolution[0] + 3);
+  std::vector<size_t> stayRounds(3, 0);
+  assert(relativeResolution[sortedIndex[0]] == 1.0);
+  for (size_t i=1; i<3; ++i) {
+    double res = relativeResolution[sortedIndex[0]];
+    while (true) {
+      if (res*2 < relativeResolution[sortedIndex[i]]) {
+        res *= 2;
+        ++stayRounds[sortedIndex[i]];
+      } else {
+        if ((res*2 - relativeResolution[sortedIndex[i]]) < (relativeResolution[sortedIndex[i]] - res)) {
+          ++stayRounds[sortedIndex[i]];
+        }
+        break;
+      }
+    }
+  }
+
+  m_pageDirectorySize = glm::ivec3(0, 0, 0);
+  m_levelScales.resize(m_numLevels);
+  m_imageDimensions.resize(m_numLevels);
+  m_imageBounds.resize(m_numLevels);
+  m_pageTableDimensions.resize(m_numLevels);
+  m_pageDirectoryDimensions.resize(m_numLevels);
+  m_posToBlockIDs.resize(m_numLevels);
+  m_pageDirectoryBases.resize(m_numLevels);
+  for (size_t l=0; l<m_numLevels; ++l) {
+    if (l == 0) {
+      m_levelScales[l] = glm::uvec3(1, 1, 1);
+    } else {
+      if (stayRounds[sortedIndex[2]] > stayRounds[sortedIndex[1]]) {
+        --stayRounds[sortedIndex[2]];
+        m_levelScales[l][sortedIndex[2]] = m_levelScales[l-1][sortedIndex[2]];
+        m_levelScales[l][sortedIndex[1]] = m_levelScales[l-1][sortedIndex[1]] * 2;
+        m_levelScales[l][sortedIndex[0]] = m_levelScales[l-1][sortedIndex[0]] * 2;
+      } else if (stayRounds[sortedIndex[2]] > 0) {
+        assert(stayRounds[sortedIndex[2]] == stayRounds[sortedIndex[1]]);
+        --stayRounds[sortedIndex[2]];
+        --stayRounds[sortedIndex[1]];
+        m_levelScales[l][sortedIndex[2]] = m_levelScales[l-1][sortedIndex[2]];
+        m_levelScales[l][sortedIndex[1]] = m_levelScales[l-1][sortedIndex[1]];
+        m_levelScales[l][sortedIndex[0]] = m_levelScales[l-1][sortedIndex[0]] * 2;
+      } else {
+        m_levelScales[l] = m_levelScales[l-1] * uint32_t(2);
+      }
+    }
+    assert(m_levelScales[l].x == m_levelScales[l].y);
+
+    m_imageDimensions[l] = glm::uvec3((info.width + m_levelScales[l].x - 1) / m_levelScales[l].x,
+                                      (info.height + m_levelScales[l].y - 1) / m_levelScales[l].y,
+                                      (info.depth + m_levelScales[l].z - 1) / m_levelScales[l].z);
+    m_imageBounds[l] = m_imageDimensions[l]-uint32_t(1);
+    m_pageTableDimensions[l] = glm::uvec3(m_imageDimensions[l] + m_imageBlockSize - uint32_t(1)) / m_imageBlockSize;
+    m_pageDirectoryDimensions[l] = glm::uvec3(m_pageTableDimensions[l] + m_pageTableBlockSize - uint32_t(1)) / m_pageTableBlockSize;
+
+    // id starts from 1
+    m_posToBlockIDs[l] = glm::uvec4(1,
+                                    m_pageTableDimensions[l].x,
+                                    m_pageTableDimensions[l].x * m_pageTableDimensions[l].y,
+                                    l == 0 ? 1 : (m_posToBlockIDs[l-1].w + m_pageTableDimensions[l-1].x * m_pageTableDimensions[l-1].y * m_pageTableDimensions[l-1].z));
+    if (l == 0) {
+      m_pageDirectoryBases[l] = glm::ivec3(0, 0, 0);
+    } else if (l == 1) {
+      m_pageDirectoryBases[l] = m_pageDirectoryBases[l-1];
+      m_pageDirectoryBases[l][sortedIndex[1]] += m_pageDirectoryDimensions[l-1][sortedIndex[1]];
+    } else {
+      m_pageDirectoryBases[l] = m_pageDirectoryBases[l-1];
+      m_pageDirectoryBases[l][sortedIndex[0]] += m_pageDirectoryDimensions[l-1][sortedIndex[0]];
+    }
+    m_pageDirectorySize = glm::max(m_pageDirectorySize, m_pageDirectoryBases[l] + glm::ivec3(m_pageDirectoryDimensions[l]));
+    if (m_pageDirectorySize.x > Z3DGpuInfoInstance.max3DTextureSize() ||
+        m_pageDirectorySize.y > Z3DGpuInfoInstance.max3DTextureSize() ||
+        m_pageDirectorySize.z > Z3DGpuInfoInstance.max3DTextureSize()) {
+      throw ZGLException(QString("Image (%1) is not supported").arg(info.toQString()));
+    }
+    LINFO() << l << m_pageDirectoryDimensions[l] << m_pageTableDimensions[l] << m_imageDimensions[l] << m_levelScales[l] << m_posToBlockIDs[l];
+  }
+
+  // content of RGBA32I texture
+  m_pageDirectoryTexture.reset(new Z3DTexture(GL_TEXTURE_3D, (GLint)GL_RGBA32I, glm::uvec3(m_pageDirectorySize), GL_RGBA_INTEGER, GL_INT));
+  m_pageDirectory.resize(m_pageDirectoryTexture->numPixels());
+  memset(m_pageDirectory.data(), 0, m_pageDirectory.size() * sizeof(glm::ivec4));
+  m_pageDirectoryTexture->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
+
+  memset(m_pageTableCache.data(), 0, m_pageTableCache.size() * sizeof(glm::ivec4));
+  m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
+
   m_voxelWorldDimensions.resize(m_numLevels);
   m_voxelWorldSizes.resize(m_numLevels);
   for (size_t l=0; l<m_numLevels; ++l) {
