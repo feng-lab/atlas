@@ -5,6 +5,13 @@
 #include <tuple>
 #include <QRectF>
 #include "zimgsliceprovider.h"
+#include <boost/geometry.hpp>
+#include <boost/geometry/geometries/point.hpp>
+#include <boost/geometry/geometries/box.hpp>
+#include <boost/geometry/index/rtree.hpp>
+
+namespace bg = boost::geometry;
+namespace bgi = boost::geometry::index;
 
 namespace nim {
 
@@ -105,7 +112,7 @@ public:
 
   ZImg resizedImg(size_t width, size_t height, size_t depth, size_t t) const;
 
-  void readRegionToImg(size_t xyRatio, size_t zRatio, size_t sx, size_t sy, size_t sz, size_t t, ZImg &res) const;
+  void readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_t sy, int64_t sz, size_t t, ZImg &res) const;
 
   // only for non-disk-cached image
   bool isDiskCached() const { return m_diskCached; }
@@ -163,6 +170,10 @@ private:
   std::vector<std::shared_ptr<ZImgSubBlock>> m_allTiles;
   std::map<size_t, QSize> m_ratioToSize;
   std::map<std::tuple<size_t, size_t, int>, std::vector<size_t>> m_rtzToTileIndice;
+  typedef bg::model::point<int64_t, 2, bg::cs::cartesian> TileCorner;
+  typedef bg::model::box<TileCorner> TileBox;
+  typedef std::pair<TileBox, size_t> RTreeValue;
+  std::map<std::tuple<size_t, size_t, int>, std::unique_ptr<bgi::rtree<RTreeValue, bgi::quadratic<16>>>> m_rtzToTileBoxRTree;
 
   double m_minIntensity;
   double m_maxIntensity;

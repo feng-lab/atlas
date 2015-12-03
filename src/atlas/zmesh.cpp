@@ -516,8 +516,16 @@ double ZMesh::volume() const
 {
   double res = 0;
   for (size_t i=0; i<numTriangles(); ++i) {
-    std::vector<glm::vec3> vertices = triangleVertices(i);
-    res += signedVolumeOfTriangle(vertices[0], vertices[1], vertices[2]);
+    glm::uvec3 tIs = triangleIndices(i);
+    glm::vec3 normal = glm::normalize(glm::cross(m_vertices[tIs[1]] - m_vertices[tIs[0]],
+        m_vertices[tIs[2]] - m_vertices[tIs[0]]));
+    if (glm::dot(m_normals[tIs[0]], normal) +
+        glm::dot(m_normals[tIs[1]], normal) +
+        glm::dot(m_normals[tIs[2]], normal) < 0) {
+      res += signedVolumeOfTriangle(m_vertices[tIs[0]] - m_vertices[0], m_vertices[tIs[2]] - m_vertices[0], m_vertices[tIs[1]] - m_vertices[0]);
+    } else {
+      res += signedVolumeOfTriangle(m_vertices[tIs[0]] - m_vertices[0], m_vertices[tIs[1]] - m_vertices[0], m_vertices[tIs[2]] - m_vertices[0]);
+    }
   }
   return std::abs(res);
 }
@@ -867,6 +875,7 @@ void ZMesh::appendTriangle(const ZMesh &mesh, glm::uvec3 triangle)
 
 double ZMesh::signedVolumeOfTriangle(const glm::vec3 &v1, const glm::vec3 &v2, const glm::vec3 &v3) const
 {
+#if 1
   double v321 = v3.x * v2.y * v1.z;
   double v231 = v2.x * v3.y * v1.z;
   double v312 = v3.x * v1.y * v2.z;
@@ -874,6 +883,9 @@ double ZMesh::signedVolumeOfTriangle(const glm::vec3 &v1, const glm::vec3 &v2, c
   double v213 = v2.x * v1.y * v3.z;
   double v123 = v1.x * v2.y * v3.z;
   return (1.0 / 6.0) * (-v321 + v231 + v312 - v132 - v213 + v123);
+#else
+  return glm::dot(glm::dvec3(v1), glm::cross(glm::dvec3(v2), glm::dvec3(v3))) / 6.0;
+#endif
 }
 
 size_t ZMesh::numCoverCubes(double cubeEdgeLength)

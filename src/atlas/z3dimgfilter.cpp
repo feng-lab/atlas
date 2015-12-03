@@ -442,6 +442,9 @@ void Z3DImgFilter::renderTransparent(Z3DEye eye)
 void Z3DImgFilter::changeCoordTransform()
 {
   invalidateAllFRVolumeSlices();
+  if (m_3dImg) {
+    m_3dImg->setScale(m_rendererBase.coordTransformPara().scale());
+  }
 }
 
 void Z3DImgFilter::adjustWidget()

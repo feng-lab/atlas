@@ -6,6 +6,7 @@ uniform sampler3D image_cache;
 uniform uvec3 image_dimensions[LEVEL_COUNT];
 uniform float voxel_world_sizes[LEVEL_COUNT];
 uniform ivec3 image_block_size;
+uniform vec3 image_address_to_normalized_texture_coord;
 
 #if GLSL_VERSION < 130
 uniform vec2 screen_dim_RCP;
@@ -127,7 +128,8 @@ void main()
         }
         vec3 samplePos = startRayPosition + currentRayLength * rayVector;
 
-        ivec3 voxelCoord = ivec3(samplePos * image_dimensions[curLevel]);
+        vec3 fVoxelCoord = samplePos * image_dimensions[curLevel];
+        ivec3 voxelCoord = ivec3(fVoxelCoord);
         ivec3 pageTableCoord = voxelCoord / image_block_size;
         ivec3 curPageDirAddress = page_directory_bases[curLevel] + pageTableCoord / page_table_block_size;
         if (curPageDirAddress != pageDirAddress) {
@@ -143,8 +145,10 @@ void main()
           }
           pagingFlag = pageTableEntry.w;
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-            ivec3 voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size;
-            float voxel = texelFetch(image_cache, voxelAddress, 0).r;
+            //ivec3 voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size;
+            //float voxel = texelFetch(image_cache, voxelAddress, 0).r;
+            vec3 voxelAddress = pageTableEntry.xyz + mod(fVoxelCoord, image_block_size);
+            float voxel = texture(image_cache, (voxelAddress*2.0+1.0)*image_address_to_normalized_texture_coord).r;
 
 #ifdef MIP
 #ifdef LOCAL_MIP

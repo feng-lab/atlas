@@ -76,7 +76,7 @@ class ZImgSubBlock
 {
 public:
   ZImgSubBlock(size_t ratio, size_t t, int64_t z,
-               int64_t x, int64_t y, size_t width, size_t height)
+               int64_t x, int64_t y, int64_t width, int64_t height)
     : ratio(ratio), t(t), z(z), x(x), y(y), width(width), height(height)
   {}
   virtual ~ZImgSubBlock() {}
@@ -89,8 +89,8 @@ public:
   int64_t z;
   int64_t x;
   int64_t y;
-  size_t width;
-  size_t height;
+  int64_t width;
+  int64_t height;
 };
 
 // Dimension order of ZImg is XYZCT

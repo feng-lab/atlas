@@ -275,6 +275,10 @@ void tmp()
 //  ZImg img("/Users/feng/Downloads/mGRASP_match_mesoscale.ome.tif");
 //  img.zoom(0.3189, 0.3189, 0.5);
 //  img.save("/Users/feng/Downloads/mGRASP_match_mesoscale_0.32_0.32_0.5.ome.tif");
+  ZMesh mesh("/Users/feng/Library/Application Support/Brain Explorer 2/Atlases/Allen Mouse Brain Common Coordinate Framework/Spaces/P56/Meshes/STN_470.msh");
+  LINFO() << mesh.volume();
+  ZMesh mesh1("/Users/feng/Downloads/tr3wtw.obj");
+  LINFO() << mesh1.volume();
 }
 
 }
