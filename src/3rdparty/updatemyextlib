@@ -59,7 +59,7 @@ else
   srcArchive=$srcPackageDIR/ispc-v1.8.2-osx.tar.gz
   tar -zxf "$srcArchive" -C $baseDIR
 
-  srcArchive=$srcPackageDIR/ffmpeg-2.8.2.7z
+  srcArchive=$srcPackageDIR/ffmpeg-2.8.3.7z
   7z x -y -o$baseDIR/atlas "$srcArchive"
 fi
 
