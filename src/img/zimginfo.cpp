@@ -1,6 +1,7 @@
 #include "zimginfo.h"
 //#include <sstream>
 #include <type_traits>
+#include "zrandom.h"
 
 namespace nim {
 
@@ -195,7 +196,9 @@ void ZImgInfo::createDefaultChannelColors()
       } else if (i==5) {
         channelColors[i] = col4(0,255,255);
       } else {
-        channelColors[i] = col4(255,255,255);
+        channelColors[i] = col4(ZRandomInstance.randInt(255),
+                                ZRandomInstance.randInt(255),
+                                ZRandomInstance.randInt(255));
       }
     }
     if (alphaChannelIdx >= 0)

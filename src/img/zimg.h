@@ -466,6 +466,9 @@ public:
   // make img of new type, map [minData maxData] to target img data type range, return new img
   template<typename TDesVoxel, typename TRange>
   ZImg __warn_unused_result convertTo(TRange minData, TRange maxData) const;
+  // deduce TDesVoxel from img
+  template<typename TRange>
+  ZImg __warn_unused_result convertTo(TRange minData, TRange maxData, const ZImg &targetImgType) const;
   // resize in x-y-z dimensions
   // 'antialiasing' specifies whether to perform antialiasing when shrinking an image. For the 'nearest' method,
   // the parameter 'antialiasingForNearest' is used (default false); for all other methods, the default is true.

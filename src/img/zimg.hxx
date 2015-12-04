@@ -206,6 +206,14 @@ ZImg ZImg::convertTo(TRange minData, TRange maxData) const
   return res;
 }
 
+template<typename TRange>
+ZImg ZImg::convertTo(TRange minData, TRange maxData, const ZImg &targetImgType) const
+{
+  IMG_RETURN_TYPED_CALL(convertTo, targetImgType, minData, maxData);
+  assert(false);
+  return ZImg();
+}
+
 template<typename TValue>
 ZImg& ZImg::thresholdAbove(TValue threshold, ThresholdMode threMode, TValue outsideValue)
 {
@@ -569,7 +577,8 @@ void ZImg::scale_Impl(TVoxel minData, TVoxel maxData, const ZImg *src, ZImg *des
     }
   }
 
-  if (src->voxelFormat() != VoxelFormat::Float && dataRangeMin == minData && dataRangeMax == maxData) {
+  if (src->voxelFormat() != VoxelFormat::Float && std::is_same<TVoxel, TDesVoxel>::value &&
+      dataRangeMin == (TDesVoxel)minData && dataRangeMax == (TDesVoxel)maxData) {
     if (src != des) {
       for (size_t t=0; t<src->numTimes(); ++t) {
         memcpy(des->timeData(t), src->timeData(t), src->timeByteNumber());

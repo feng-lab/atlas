@@ -18,15 +18,6 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
   , m_imgPack(imgPack)
   , m_isVolumeDownsampled(false)
 {
-  // directX 10 resource limit
-  // 128 MB
-  // directX 11 resource limit
-  //min(max(128, 0.25f * (amount of dedicated VRAM)), 2048) MB
-  //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_A_TERM (128)
-  //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_B_TERM (0.25f)
-  //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_C_TERM (2048)
-  size_t currentAvailableTexMem = Z3DGpuInfoInstance.dedicatedVideoMemoryMB();
-  m_maxVoxelNumber = std::min(std::max(size_t(128), static_cast<size_t>(0.25 * currentAvailableTexMem)), size_t(2048)) * 1024 * 1024;
   readVolumes();
 
   if (m_isVolumeDownsampled) {
@@ -516,54 +507,24 @@ void Z3DImg::readVolumes()
     m_nChannels = maxPossibleChannels;
   }
 
-  bool scaleZ = info.depth > std::pow(m_maxVoxelNumber, 1/3.0);
-  double scale = 1.0;
-  if (info.timeVoxelNumber() > m_maxVoxelNumber) {
-    if (scaleZ)
-      scale = std::pow((m_maxVoxelNumber*1.0) / info.timeVoxelNumber(), 1/3.0);
-    else
-      scale = std::sqrt((m_maxVoxelNumber*1.0) / info.timeVoxelNumber());
-  }
-  int height = static_cast<int>(info.height * scale);
-  int width = static_cast<int>(info.width * scale);
-  int depth = scaleZ ? static_cast<int>(info.depth * scale) : static_cast<int>(info.depth);
   double widthScale = 1.0;
   double heightScale = 1.0;
   double depthScale = 1.0;
-  int maxTextureSize = 100;
-  if (info.depth > 1)
-    maxTextureSize = Z3DGpuInfoInstance.max3DTextureSize();
-  else
-    maxTextureSize = Z3DGpuInfoInstance.maxTextureSize();
-
-  if (height > maxTextureSize) {
-    heightScale = static_cast<double>(maxTextureSize) / height;
-    height = std::floor(height * heightScale);
-  }
-  if (width > maxTextureSize) {
-    widthScale = static_cast<double>(maxTextureSize) / width;
-    width = std::floor(width * widthScale);
-  }
-  if (depth > maxTextureSize) {
-    depthScale = static_cast<double>(maxTextureSize) / depth;
-    depth = std::floor(depth * depthScale);
-  }
-
-  widthScale *= scale;
-  heightScale *= scale;
-  if (scaleZ)
-    depthScale *= scale;
+  Z3DGpuInfoInstance.getDataScaleForTexture(info.width, info.height, info.depth, widthScale, heightScale, depthScale);
 
   if (widthScale != 1.0 || heightScale != 1.0 || depthScale != 1.0) {
     m_isVolumeDownsampled = true;
     return;
   }
 
-  ZImg img = m_imgPack.resizedImg(width, height, depth, 0);
+  ZImg img = m_imgPack.resizedImg(info.width*widthScale,
+                                  info.height*heightScale,
+                                  info.depth*depthScale,
+                                  0);
   if (!img.isType<uint8_t>()) {
     img = img.convertTo<uint8_t>(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
-  } else/* if (img.validBitCount() != 0 && img.validBitCount() < 8) */{
-    //img.normalize(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
+  } else if (img.validBitCount() != 0 && img.validBitCount() != 8 && img.validBitCount() != 16) {
+    img.normalize(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
   }
   if (m_nChannels == 1) {
     Z3DVolume *vh = new Z3DVolume(img,

@@ -81,6 +81,46 @@ QString Z3DGpuInfo::glShadingLanguageVersionString() const
   return m_glslVersionString;
 }
 
+void Z3DGpuInfo::getDataScaleForTexture(uint64_t width, uint64_t height, uint64_t depth,
+                                 double &widthScale, double &heightScale, double &depthScale) const
+{
+  bool scaleZ = depth > std::pow(textureSizeLimit()*1.0, 1/3.0);
+  double scale = 1.0;
+  uint64_t dataSize = width * height * depth;
+  if (dataSize > textureSizeLimit()) {
+    if (scaleZ)
+      scale = std::pow((textureSizeLimit()*1.0) / dataSize, 1/3.0);
+    else
+      scale = std::sqrt((textureSizeLimit()*1.0) / dataSize);
+  }
+  uint64_t resHeight = height * scale;
+  uint64_t resWidth = width * scale;
+  uint64_t resDepth = scaleZ ? (depth * scale) : double(depth);
+  widthScale = scale;
+  heightScale = scale;
+  depthScale = scaleZ ? scale : 1.0;
+
+  uint64_t maxTexSize = depth > 1 ? max3DTextureSize() : maxTextureSize();
+  if (resHeight > maxTexSize) {
+    heightScale *= static_cast<double>(maxTexSize) / resHeight;
+  }
+  if (resWidth > maxTexSize) {
+    widthScale *= static_cast<double>(maxTexSize) / resWidth;
+  }
+  if (resDepth > maxTexSize) {
+    depthScale *= static_cast<double>(maxTexSize) / resDepth;
+  }
+}
+
+bool Z3DGpuInfo::needScaleDataForTexture(uint64_t width, uint64_t height, uint64_t depth)
+{
+  double s1 = 1.0;
+  double s2 = 1.0;
+  double s3 = 1.0;
+  getDataScaleForTexture(width, height, depth, s1, s2, s3);
+  return s1 != 1.0 || s2 != 1.0 || s3 != 1.0;
+}
+
 QString Z3DGpuInfo::glExtensionsString() const
 {
   return m_glExtensionsString;

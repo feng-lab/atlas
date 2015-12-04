@@ -107,7 +107,6 @@ protected:
 private:
   //std::unique_ptr<Z3DImgHistogramThread> m_histogramThread;
   const ZImgPack& m_imgPack;
-  size_t m_maxVoxelNumber = 0;
   std::vector<std::unique_ptr<Z3DVolume>> m_volumes;
   size_t m_nChannels = 0;
   bool m_isVolumeDownsampled;

@@ -9,6 +9,7 @@
 #include "zcpuinfo.h"
 #include "zimgio.h"
 #include <boost/functional/hash.hpp>
+#include "z3dgpuinfo.h"
 
 namespace {
 
@@ -164,18 +165,22 @@ ZImgPack::ZImgPack(const QString &fileName, size_t scene, FileFormat format, siz
   m_rangeMin = m_imgInfo.dataRangeMin<double>();
   m_rangeMax = m_imgInfo.dataRangeMax<double>();
 
-  //todo: Is it reasonable to read whole image if it is float only to get its data range?
-  if (sceneSubBlock->empty() || m_imgInfo.voxelFormat == VoxelFormat::Float) {
-    m_diskCached = false;
-    ZImgIOInstance.readImg(m_imgSource, m_img);
-  } else {
-    if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold && m_imgInfo.byteNumber() <= std::numeric_limits<int>::max()) {
-      //createPyramidalFolder(m_imgSource.filenames[0]);
-      buildPyramidal();
-    } else {
-      //buildFastReadIndex(*sceneSubBlock);
-      buildPyramidal();
+  //m_diskCached = false;
+  //ZImgIOInstance.readImg(m_imgSource, m_img);
+
+  bool hasPyramidal = false;
+  for (size_t i=0; i<sceneSubBlock->size(); ++i) {
+    if (sceneSubBlock->at(i)->ratio > 1) {
+      hasPyramidal = true;
+      break;
     }
+  }
+
+  if (hasPyramidal ||
+      !Z3DGpuInfoInstance.needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height, m_imgInfo.depth)) {
+    buildFastReadIndex(*sceneSubBlock);
+  } else {
+    buildPyramidal();
   }
 
   updateDerivedData();
@@ -214,18 +219,22 @@ ZImgPack::ZImgPack(const QStringList &files, Dimension catDim, size_t scene, Fil
   m_rangeMin = m_imgInfo.dataRangeMin<double>();
   m_rangeMax = m_imgInfo.dataRangeMax<double>();
 
-  //todo: Is it reasonable to read whole image if it is float only to get its data range?
-  if (sceneSubBlock->empty() || m_imgInfo.voxelFormat == VoxelFormat::Float) {
-    m_diskCached = false;
-    ZImgIOInstance.readImg(m_imgSource, m_img);
-  } else {
-    if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold && m_imgInfo.byteNumber() <= std::numeric_limits<int>::max()) {
-      //createPyramidalFolder(m_imgSource.filenames[0]);
-      buildPyramidal();
-    } else {
-      //buildFastReadIndex(*sceneSubBlock);
-      buildPyramidal();
+  //m_diskCached = false;
+  //ZImgIOInstance.readImg(m_imgSource, m_img);
+
+  bool hasPyramidal = false;
+  for (size_t i=0; i<sceneSubBlock->size(); ++i) {
+    if (sceneSubBlock->at(i)->ratio > 1) {
+      hasPyramidal = true;
+      break;
     }
+  }
+
+  if (hasPyramidal ||
+      !Z3DGpuInfoInstance.needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height, m_imgInfo.depth)) {
+    buildFastReadIndex(*sceneSubBlock);
+  } else {
+    buildPyramidal();
   }
 
   updateDerivedData();
@@ -564,7 +573,17 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
                                  0,
                                  0);
           std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, queryResult[i].second)), tile);
-          res.pasteImg(*imgPtr->get(), start);
+          if ((*imgPtr)->isSameType(res)) {
+            if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
+              ZImg tmp = (*imgPtr)->normalized(m_minIntensity, m_maxIntensity);
+              res.pasteImg(tmp, start);
+            } else {
+              res.pasteImg(*imgPtr->get(), start);
+            }
+          } else {
+            ZImg tmp = (*imgPtr)->convertTo(m_minIntensity, m_maxIntensity, res);
+            res.pasteImg(tmp, start);
+          }
         }
       }
 #else
@@ -591,7 +610,12 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
 #endif
     }
   } else {
-    throw ZIOException("not implemented yet");
+    ZImgInfo info = res.info();
+    info.width = std::round(info.width * xyRatio * 1.0 / readRatio);
+    info.height = std::round(info.height * xyRatio * 1.0 / readRatio);
+    ZImg tmp(info);
+    readRegionToImg(readRatio, zRatio, std::round(sx * xyRatio * 1.0 / readRatio), std::round(sy * xyRatio * 1.0 / readRatio), sz, t, tmp);
+    res = tmp.resized(res.width(), res.height(), res.depth());
   }
 }
 
@@ -748,7 +772,7 @@ void ZImgPack::buildPyramidal(ZImg &img)
 
 void ZImgPack::buildPyramidal()
 {
-  if (true || m_imgInfo.byteNumber() <= ZCpuInfoInstance.nPhysicalRAM / 2) {
+  if (m_imgInfo.byteNumber() <= ZCpuInfoInstance.nPhysicalRAM / 2) {
     ZImg tImg;
     tImg.load(m_imgSource.filenames, m_imgSource.catDim, ZImgRegion(), m_imgSource.scene, m_imgSource.format);
     buildPyramidal(tImg);

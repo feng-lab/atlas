@@ -81,6 +81,19 @@ public:
   int maxArrayTextureLayers() const { return m_maxArrayTextureLayers; }
 
   uint64_t dedicatedVideoMemoryMB() const { return m_dedicatedVideoMemoryMB; }
+  // directX 10 resource limit
+  // 128 MB
+  // directX 11 resource limit
+  //min(max(128, 0.25f * (amount of dedicated VRAM)), 2048) MB
+  //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_A_TERM (128)
+  //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_B_TERM (0.25f)
+  //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_C_TERM (2048)
+  uint64_t textureSizeLimit() const
+  { return std::min(std::max(uint64_t(128), static_cast<uint64_t>(0.25 * dedicatedVideoMemoryMB())), uint64_t(2048)) * 1024 * 1024; }
+  // get the required scales to fit uint8_t data of size (width, height, depth) to texture limit
+  void getDataScaleForTexture(uint64_t width, uint64_t height, uint64_t depth,
+                              double &widthScale, double &heightScale, double &depthScale) const;
+  bool needScaleDataForTexture(uint64_t width, uint64_t height, uint64_t depth);
 
   bool isFrameBufferObjectSupported() const;
   bool isNonPowerOfTwoTextureSupported() const;
