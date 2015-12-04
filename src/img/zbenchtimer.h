@@ -83,6 +83,19 @@ public:
     m_start = getCpuTicks();
   }
 
+  inline void resetAndStart()
+  {
+    reset();
+    start();
+  }
+
+  inline void resetAndStart(const std::string &newName)
+  {
+    setName(newName);
+    reset();
+    start();
+  }
+
   void stop();
 
   void pause();
@@ -94,6 +107,8 @@ public:
     stop();
     print(s);
   }
+
+  void stopAndLog();
 
   // elapsed time in seconds
   inline double time() { return m_time; }

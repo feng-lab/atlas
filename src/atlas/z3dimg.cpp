@@ -442,13 +442,11 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
   m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
   m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
   glFinish();
-  bt.stopAndPrint();
+  bt.stopAndLog();
 
   //checkPageSystemError();
 
-  bt.setName("update image cache");
-  bt.reset();
-  bt.start();
+  bt.resetAndStart("update image cache");
   ZImg img(ZImgInfo(m_imageBlockSize.x+2, m_imageBlockSize.y+2, m_imageBlockSize.z+2, m_nChannels));
   if (m_imageBlockReadSize == glm::ivec3(m_imageBlockSize)) {
     for (size_t i=0; i<blocksImagePos.size(); ++i) {
@@ -482,7 +480,7 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
     }
   }
   glFinish();
-  bt.stopAndPrint();
+  bt.stopAndLog();
 
   return count > 0;
 }

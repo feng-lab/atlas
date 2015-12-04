@@ -117,6 +117,12 @@ void ZBenchTimer::resume()
   m_start = getCpuTicks();
 }
 
+void ZBenchTimer::stopAndLog()
+{
+  stop();
+  LINFO() << *this;
+}
+
 std::ostream& ZBenchTimer::print(std::ostream& s) const
 {
   if (m_rep == 1) {

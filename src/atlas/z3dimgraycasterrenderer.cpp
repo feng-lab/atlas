@@ -413,11 +413,9 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       m_blockIDsRenderTarget.release();
       m_scFullResRaycasterBlockIDsShader.release();
       glFinish();
-      bt.stopAndPrint();
+      bt.stopAndLog();
 
-      bt.setName("collect blockids");
-      bt.reset();
-      bt.start();
+      bt.resetAndStart("collect blockids");
       // check missed blocks and upload
       std::set<uint32_t> missingBlockIDs;
       std::set<uint32_t> usedBlockIDs;
@@ -531,15 +529,13 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 #endif
 
       LINFO() << missingBlockIDs.size() << usedBlockIDs.size();
-      bt.stopAndPrint();
+      bt.stopAndLog();
 
       if (!missingBlockIDs.empty()) {
         m_img->updateCaches(missingBlockIDs, usedBlockIDs);
       }
 
-      bt.setName("render images");
-      bt.reset();
-      bt.start();
+      bt.resetAndStart("render images");
       // render channels one by one
       m_scFullResRaycasterShader.bind();
 
@@ -582,7 +578,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
       m_scFullResRaycasterShader.release();
       glFinish();
-      bt.stopAndPrint();
+      bt.stopAndLog();
     } else {
       m_scRaycasterShader.bind();
 
@@ -632,7 +628,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       m_scRaycasterShader.release();
       glFinish();
     }
-    bta.stopAndPrint();
+    bta.stopAndLog();
   }
 
   if (visibleIdxs.size() > 1) {

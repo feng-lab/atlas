@@ -9,6 +9,7 @@
 #include "zcpuinfo.h"
 #include "zimgio.h"
 #include <boost/functional/hash.hpp>
+#include <boost/function_output_iterator.hpp>
 #include "z3dgpuinfo.h"
 
 namespace {
@@ -165,9 +166,6 @@ ZImgPack::ZImgPack(const QString &fileName, size_t scene, FileFormat format, siz
   m_rangeMin = m_imgInfo.dataRangeMin<double>();
   m_rangeMax = m_imgInfo.dataRangeMax<double>();
 
-  //m_diskCached = false;
-  //ZImgIOInstance.readImg(m_imgSource, m_img);
-
   bool hasPyramidal = false;
   for (size_t i=0; i<sceneSubBlock->size(); ++i) {
     if (sceneSubBlock->at(i)->ratio > 1) {
@@ -176,8 +174,11 @@ ZImgPack::ZImgPack(const QString &fileName, size_t scene, FileFormat format, siz
     }
   }
 
-  if (hasPyramidal ||
-      !Z3DGpuInfoInstance.needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height, m_imgInfo.depth)) {
+  bool needScale = Z3DGpuInfoInstance.needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height, m_imgInfo.depth);
+  if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold && !needScale) {
+    m_diskCached = false;
+    ZImgIOInstance.readImg(m_imgSource, m_img);
+  } else if (hasPyramidal || !needScale) {
     buildFastReadIndex(*sceneSubBlock);
   } else {
     buildPyramidal();
@@ -219,9 +220,6 @@ ZImgPack::ZImgPack(const QStringList &files, Dimension catDim, size_t scene, Fil
   m_rangeMin = m_imgInfo.dataRangeMin<double>();
   m_rangeMax = m_imgInfo.dataRangeMax<double>();
 
-  //m_diskCached = false;
-  //ZImgIOInstance.readImg(m_imgSource, m_img);
-
   bool hasPyramidal = false;
   for (size_t i=0; i<sceneSubBlock->size(); ++i) {
     if (sceneSubBlock->at(i)->ratio > 1) {
@@ -230,8 +228,11 @@ ZImgPack::ZImgPack(const QStringList &files, Dimension catDim, size_t scene, Fil
     }
   }
 
-  if (hasPyramidal ||
-      !Z3DGpuInfoInstance.needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height, m_imgInfo.depth)) {
+  bool needScale = Z3DGpuInfoInstance.needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height, m_imgInfo.depth);
+  if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold && !needScale) {
+    m_diskCached = false;
+    ZImgIOInstance.readImg(m_imgSource, m_img);
+  } else if (hasPyramidal || !needScale) {
     buildFastReadIndex(*sceneSubBlock);
   } else {
     buildPyramidal();
@@ -301,32 +302,26 @@ bool ZImgPack::needUpdate(const QRectF &viewport, double scale, const QRectF &ol
     mip = false;
 
 #if 1
-  TileBox queryBox1(TileCorner(std::floor(viewport.x()), std::floor(viewport.y())),
-                    TileCorner(std::ceil(viewport.right()), std::ceil(viewport.bottom())));
-  TileBox queryBox2(TileCorner(std::floor(oldViewport.x()), std::floor(oldViewport.y())),
-                    TileCorner(std::ceil(oldViewport.right()), std::ceil(oldViewport.bottom())));
-  auto tiit = m_rtzToTileBoxRTree.find(std::tuple<size_t, size_t, int>(readRatio, t, mip ? -1 : int(z)));
+  auto tiit = m_rtzToTileBoxRTree.find(std::make_tuple(readRatio, t, mip ? -1 : int(z)));
   if (tiit != m_rtzToTileBoxRTree.end()) {
-    std::vector<RTreeValue> queryResult1;
-    std::vector<RTreeValue> queryResult2;
-    tiit->second->query(bgi::intersects(queryBox1), std::back_inserter(queryResult1));
-    tiit->second->query(bgi::intersects(queryBox2), std::back_inserter(queryResult2));
-    if (queryResult1.size() == queryResult2.size()) {
-      std::set<size_t> idxs1;
-      std::set<size_t> idxs2;
-      for (const RTreeValue& v : queryResult1) {
-        idxs1.insert(v.second);
-      }
-      for (const RTreeValue& v : queryResult2) {
-        idxs2.insert(v.second);
-      }
-      return idxs1 != idxs2;
-    } else {
-      return true;
-    }
+    TileBox queryBox1(TileCorner(std::floor(viewport.x()), std::floor(viewport.y())),
+                      TileCorner(std::ceil(viewport.right()), std::ceil(viewport.bottom())));
+    TileBox queryBox2(TileCorner(std::floor(oldViewport.x()), std::floor(oldViewport.y())),
+                      TileCorner(std::ceil(oldViewport.right()), std::ceil(oldViewport.bottom())));
+    std::set<size_t> queryResult1;
+    std::set<size_t> queryResult2;
+    tiit->second->query(bgi::intersects(queryBox1),
+                        boost::make_function_output_iterator([&queryResult1](auto const& val){
+                          queryResult1.insert(val.second);
+                        }));
+    tiit->second->query(bgi::intersects(queryBox2),
+                        boost::make_function_output_iterator([&queryResult2](auto const& val){
+                          queryResult2.insert(val.second);
+                        }));
+    return queryResult1 != queryResult2;
   }
 #else
-  auto tiit = m_rtzToTileIndice.find(std::tuple<size_t, size_t, int>(readRatio, t, mip ? -1 : int(z)));
+  auto tiit = m_rtzToTileIndice.find(std::make_tuple(readRatio, t, mip ? -1 : int(z)));
   if (tiit != m_rtzToTileIndice.end()) {
     const std::vector<size_t>& tileIndice = tiit->second;
     for (size_t i=0; i<tileIndice.size(); ++i) {
@@ -358,10 +353,10 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs, std
     mip = false;
 
 #if 1
-  TileBox queryBox(TileCorner(std::floor(viewport.x()), std::floor(viewport.y())),
-                   TileCorner(std::ceil(viewport.right()), std::ceil(viewport.bottom())));
-  auto tiit = m_rtzToTileBoxRTree.find(std::tuple<size_t, size_t, int>(readRatio, t, mip ? -1 : int(z)));
+  auto tiit = m_rtzToTileBoxRTree.find(std::make_tuple(readRatio, t, mip ? -1 : int(z)));
   if (tiit != m_rtzToTileBoxRTree.end()) {
+    TileBox queryBox(TileCorner(std::floor(viewport.x()), std::floor(viewport.y())),
+                     TileCorner(std::ceil(viewport.right()), std::ceil(viewport.bottom())));
     std::vector<RTreeValue> queryResult;
     tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
     for (size_t i=0; i<queryResult.size(); ++i) {
@@ -373,7 +368,7 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs, std
     }
   }
 #else
-  auto tiit = m_rtzToTileIndice.find(std::tuple<size_t, size_t, int>(readRatio, t, mip ? -1 : int(z)));
+  auto tiit = m_rtzToTileIndice.find(std::make_tuple(readRatio, t, mip ? -1 : int(z)));
   if (tiit != m_rtzToTileIndice.end()) {
     const std::vector<size_t>& tileIndice = tiit->second;
     for (size_t i=0; i<tileIndice.size(); ++i) {
@@ -396,7 +391,7 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
   if (m_diskCached) {
     if (m_imgInfo.depth == 1)
       mip = false;
-    auto tiit = m_rtzToTileIndice.find(std::tuple<size_t, size_t, int>(1, t, mip ? -1 : int(z)));
+    auto tiit = m_rtzToTileIndice.find(std::make_tuple(size_t(1), t, mip ? -1 : int(z)));
     if (tiit != m_rtzToTileIndice.end()) {
       const std::vector<size_t>& tileIndice = tiit->second;
       for (size_t i=0; i<tileIndice.size(); ++i) {
@@ -430,7 +425,7 @@ double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, 
 
     for (auto it = m_ratioToSize.begin(); it != m_ratioToSize.end(); ++it) {
       size_t ratio = it->first;
-      auto tiit = m_rtzToTileIndice.find(std::tuple<size_t, size_t, int>(ratio, t, mip ? -1 : int(z)));
+      auto tiit = m_rtzToTileIndice.find(std::make_tuple(ratio, t, mip ? -1 : int(z)));
       if (tiit != m_rtzToTileIndice.end()) {
         const std::vector<size_t>& tileIndice = tiit->second;
         for (size_t i=0; i<tileIndice.size(); ++i) {
@@ -486,7 +481,7 @@ ZImg ZImgPack::crop(const ZImgRegion &region) const
 
   for (TCoordinate t=rgn.tStart(); t<rgn.tEnd(); ++t) {
     for (TCoordinate z=rgn.zStart(); z<rgn.zEnd(); ++z) {
-      auto tiit = m_rtzToTileIndice.find(std::tuple<size_t, size_t, int>(1, t, int(z)));
+      auto tiit = m_rtzToTileIndice.find(std::make_tuple(size_t(1), size_t(t), int(z)));
       if (tiit != m_rtzToTileIndice.end()) {
         const std::vector<size_t>& tileIndice = tiit->second;
         for (size_t i=0; i<tileIndice.size(); ++i) {
@@ -560,8 +555,8 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
     for (int64_t z=sz*(int64_t)zRatio; z<zEnd; z+=(int64_t)zRatio, ++zIdx) {
       if (z < 0)
         continue;
-#if 1
-      auto tiit = m_rtzToTileBoxRTree.find(std::tuple<size_t, size_t, int>(xyRatio, t, int(z)));
+
+      auto tiit = m_rtzToTileBoxRTree.find(std::make_tuple(xyRatio, t, int(z)));
       if (tiit != m_rtzToTileBoxRTree.end()) {
         std::vector<RTreeValue> queryResult;
         tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
@@ -586,28 +581,6 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
           }
         }
       }
-#else
-      auto tiit = m_rtzToTileIndice.find(std::tuple<size_t, size_t, int>(xyRatio, t, int(z)));
-      if (tiit != m_rtzToTileIndice.end()) {
-        const std::vector<size_t>& tileIndice = tiit->second;
-        for (size_t i=0; i<tileIndice.size(); ++i) {
-          const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
-          if (tile.x + tile.width <= int64_t(sx * xyRatio) ||
-              tile.x >= int64_t((sx + res.width()) * xyRatio) ||
-              tile.y + tile.height <= int64_t(sy * xyRatio) ||
-              tile.y >= int64_t((sy + res.height()) * xyRatio)) {
-            continue;
-          }
-          ZVoxelCoordinate start(tile.x / int64_t(xyRatio) - int64_t(sx),
-                                 tile.y / int64_t(xyRatio) - int64_t(sy),
-                                 zIdx++,
-                                 0,
-                                 0);
-          std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, tileIndice[i])), tile);
-          res.pasteImg(*imgPtr->get(), start);
-        }
-      }
-#endif
     }
   } else {
     ZImgInfo info = res.info();
@@ -881,7 +854,7 @@ ZImg ZImgPack::assembleImg(size_t ratio) const
 
   for (size_t t=0; t<m_imgInfo.numTimes; ++t) {
     for (size_t z=0; z<m_imgInfo.depth; ++z) {
-      auto tiit = m_rtzToTileIndice.find(std::tuple<size_t, size_t, int>(ratio, t, int(z)));
+      auto tiit = m_rtzToTileIndice.find(std::make_tuple(ratio, t, int(z)));
       if (tiit != m_rtzToTileIndice.end()) {
         const std::vector<size_t>& tileIndice = tiit->second;
         for (size_t i=0; i<tileIndice.size(); ++i) {
@@ -912,7 +885,7 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t) const
   ZImg res(info);
 
   for (size_t z=0; z<m_imgInfo.depth; ++z) {
-    auto tiit = m_rtzToTileIndice.find(std::tuple<size_t, size_t, int>(ratio, t, int(z)));
+    auto tiit = m_rtzToTileIndice.find(std::make_tuple(ratio, t, int(z)));
     if (tiit != m_rtzToTileIndice.end()) {
       const std::vector<size_t>& tileIndice = tiit->second;
       for (size_t i=0; i<tileIndice.size(); ++i) {
@@ -939,7 +912,7 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t, size_t z) const
   }
   ZImg res(info);
 
-  auto tiit = m_rtzToTileIndice.find(std::tuple<size_t, size_t, int>(ratio, t, int(z)));
+  auto tiit = m_rtzToTileIndice.find(std::make_tuple(ratio, t, int(z)));
   if (tiit != m_rtzToTileIndice.end()) {
     const std::vector<size_t>& tileIndice = tiit->second;
     for (size_t i=0; i<tileIndice.size(); ++i) {
