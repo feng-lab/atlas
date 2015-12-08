@@ -37,6 +37,8 @@ public:
   bool isVolumeDownsampled() const { return m_isVolumeDownsampled; }
   const std::vector<std::unique_ptr<Z3DVolume>>& volumes() const { return m_volumes; }
 
+  const glm::uvec3& imageBlockSize() const { return m_imageBlockSize; }
+
   // Returns a string representation of the sampler type: "sampler2D" for 2D image, "sampler3D" for 3D volume
   QString samplerType() const;
 

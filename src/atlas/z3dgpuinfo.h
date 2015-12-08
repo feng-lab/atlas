@@ -53,7 +53,7 @@ public:
   // 1D 8192 2D 8192 3D 2048
   // directX 11 resource limit
   // 1D 16384 2D 16384 3D 2048
-  int maxTextureSize() const { return std::min(16384, m_maxTexureSize); }
+  int maxTextureSize() const { return std::min(m_maxViewportDims, std::min(16384, m_maxTexureSize)); }
   // Returns the maximal side length of 3D textures.
   // directx limit?
   int max3DTextureSize() const { return std::min(2048, m_max3DTextureSize); }
@@ -160,6 +160,8 @@ private:
   QString m_glslVersionString;
   GpuVendor m_gpuVendor;
 
+  int m_maxViewportDims;
+  int m_maxRenderbufferSize;
   int m_maxTexureSize;
   int m_max3DTextureSize;
   float m_maxTextureAnisotropy;

@@ -837,6 +837,8 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*> &f
   m_ddpRT->resize(port.size());
   if (depthTexture) {
     m_ddpRT->attachTextureToFBO(depthTexture, GL_DEPTH_ATTACHMENT, false);
+    m_ddpRT->isFBOComplete();
+    CHECK_GL_ERROR;
   }
 
   const Z3DTexture* g_dualDepthTexId[2];
@@ -978,6 +980,8 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*> &f
 
   if (depthTexture) {
     m_ddpRT->detach(GL_DEPTH_ATTACHMENT);
+    m_ddpRT->isFBOComplete();
+    CHECK_GL_ERROR;
   }
   m_ddpRT->release();
 
@@ -1107,6 +1111,8 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*> &fi
   m_waRT->resize(port.size());
   if (depthTexture) {
     m_waRT->attachTextureToFBO(depthTexture, GL_DEPTH_ATTACHMENT, false);
+    m_waRT->isFBOComplete();
+    CHECK_GL_ERROR;
   }
 
   const Z3DTexture* g_accumulationTexId[2];
@@ -1145,6 +1151,8 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*> &fi
 
   if (depthTexture) {
     m_waRT->detach(GL_DEPTH_ATTACHMENT);
+    m_waRT->isFBOComplete();
+    CHECK_GL_ERROR;
   }
   m_waRT->release();
 

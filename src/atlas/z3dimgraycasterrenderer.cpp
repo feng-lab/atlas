@@ -375,12 +375,9 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       ZBenchTimer bt("render blockids");
       bt.start();
       glm::uvec2 size = m_layerTarget->size();
-      if (size.x >= 32) {
-        size.x /= 16;
-      }
-      if (size.y >= 32) {
-        size.y /= 16;
-      }
+      uint32_t sizeScale = std::min(std::min(m_img->imageBlockSize().x, m_img->imageBlockSize().y), m_img->imageBlockSize().z) / 2;
+      size.x = (size.x + sizeScale - 1) / sizeScale;
+      size.y = (size.y + sizeScale - 1) / sizeScale;
       //LINFO() << m_layerTarget->size() << pixelEyeSpaceSize << size;
       m_blockIDsRenderTarget.resize(size);
 

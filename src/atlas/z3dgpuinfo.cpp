@@ -214,6 +214,8 @@ QStringList Z3DGpuInfo::gpuInfo() const
   info << QString("OpenGL Version:                %1").arg(m_glVersionString);
   info << QString("OpenGL SL Version:             %1").arg(m_glslVersionString);
   info << QString("OpenGL Extensions:             %1").arg(m_glExtensionsString);
+  info << QString("Max Viewport Dimensions:       %1").arg(m_maxViewportDims);
+  info << QString("Max Renderbuffer Size:         %1").arg(m_maxRenderbufferSize);
   info << QString("Max Texture Size:              %1 (use %2)").arg(m_maxTexureSize).arg(maxTextureSize());
   info << QString("Max 3D Texture Size:           %1 (use %2)").arg(m_max3DTextureSize).arg(max3DTextureSize());
   info << QString("Max Color Attachments:         %1").arg(m_maxColorAttachments);
@@ -355,6 +357,9 @@ void Z3DGpuInfo::detectGpuInfo()
       m_maxArrayTextureLayers = 0;
     }
 
+    //
+    glGetIntegerv(GL_MAX_VIEWPORT_DIMS, &m_maxViewportDims);
+    glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE, &m_maxRenderbufferSize);
     // Texturing
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTexureSize);
     glGetIntegerv(GL_MAX_3D_TEXTURE_SIZE, &m_max3DTextureSize);

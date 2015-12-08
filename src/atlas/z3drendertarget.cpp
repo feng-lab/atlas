@@ -203,6 +203,8 @@ bool Z3DRenderTarget::resize(glm::uvec2 newsize)
       it->second->uploadImage();
     }
   }
+  isFBOComplete();
+  CHECK_GL_ERROR;
 
   //  if (m_multisample) {
   //    glBindRenderbuffer(GL_RENDERBUFFER, m_colorBufferID);
