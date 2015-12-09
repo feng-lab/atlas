@@ -69,62 +69,6 @@ vec4 compositeXRay(in vec4 curResult, in vec4 color, in float currentRayLength, 
   return curResult + color;
 }
 
-#ifdef MIP
-void sampleBlock(in ivec3 pageTableEntry, in int curLevel, in ivec3 pageTableCoord, in vec3 fVoxelCoord,
-  in vec3 startRayPosition, in vec3 rayVector, in float stepSize,
-  inout float currentRayLength, inout vec3 samplePos, inout bool finished, inout float ch1V, inout float rayDepth)
-#else
-void sampleBlock(in ivec3 pageTableEntry, in int curLevel, in ivec3 pageTableCoord, in vec3 fVoxelCoord,
-  in vec3 startRayPosition, in vec3 rayVector, in float stepSize,
-  inout float currentRayLength, inout vec3 samplePos, inout bool finished, inout vec4 result, inout float rayDepth)
-#endif
-{
-  bool blockFinished = false;
-  for (int loop0=0; !blockFinished && loop0<64; loop0++) {
-    //ivec3 voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size;
-    //float voxel = texelFetch(image_cache, voxelAddress, 0).r;
-    vec3 voxelAddress = pageTableEntry + mod(fVoxelCoord, image_block_size);
-    float voxel = texture(image_cache, (voxelAddress*2.0+1.0)*image_address_to_normalized_texture_coord).r;
-
-#ifdef MIP
-#ifdef LOCAL_MIP
-    if (voxel <= ch1V && ch1V >= local_MIP_threshold) {
-      finished = true;
-    } else if (voxel > ch1V) {
-      ch1V = voxel;
-      rayDepth = currentRayLength;
-    }
-#else
-    if (voxel > ch1V) {
-      ch1V = voxel;
-      rayDepth = currentRayLength;
-    }
-    finished = ch1V >= 1.0;
-#endif
-#else
-#if GLSL_VERSION >= 130
-    vec4 color = texture(transfer_function, voxel);
-#else
-    vec4 color = texture1D(transfer_function, voxel);
-#endif
-
-    if (color.a > 0.0) {
-      color.a / sampling_rate;
-      result = COMPOSITING(result, color, currentRayLength, rayDepth);
-      if (result.a >= 1.0) {
-        result.a = 1.0;
-        finished = true;
-      }
-    }
-#endif // MIP
-    currentRayLength += stepSize;
-
-    samplePos = startRayPosition + currentRayLength * rayVector;
-    fVoxelCoord = samplePos * image_dimensions[curLevel];
-    blockFinished = finished || ivec3(fVoxelCoord) / image_block_size != pageTableCoord || currentRayLength > 1.0;
-  }
-}
-
 #define UNMAPPED 0
 #define EMPTY 40000
 
@@ -171,10 +115,11 @@ void main()
 
     ivec3 pageDirAddress = ivec3(-1,-1,-1);
     ivec4 pageDirEntry = ivec4(-1,-1,-1,-1);
-
+    ivec3 pageTableAddress = ivec3(-1,-1,-1);
+    ivec4 pageTableEntry = ivec4(-1,-1,-1,-1);
     vec3 samplePos = startRayPosition;
 
-    //for (int loop0=0; !finished && loop0<255; loop0++) {
+    for (int loop0=0; !finished && loop0<255; loop0++) {
       for (int loop1=0; !finished && loop1<255; loop1++) {
         float desiredVoxelSize = mix(zeFront, zeBack, currentRayLength) * ze_to_screen_pixel_voxel_size;
         while (curLevel+1 < LEVEL_COUNT && voxel_world_sizes[curLevel+1] <= desiredVoxelSize) {
@@ -193,18 +138,51 @@ void main()
         }
         int pagingFlag = pageDirEntry.w;
         if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-          ivec4 pageTableEntry = texelFetch(page_table_cache, pageDirEntry.xyz + pageTableCoord % page_table_block_size, 0);
+          ivec3 curPageTableAddress = pageDirEntry.xyz + pageTableCoord % page_table_block_size;
+          if (curPageTableAddress != pageTableAddress) {
+            pageTableAddress = curPageTableAddress;
+            pageTableEntry = texelFetch(page_table_cache, pageTableAddress, 0);
+          }
           pagingFlag = pageTableEntry.w;
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
+            //ivec3 voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size;
+            //float voxel = texelFetch(image_cache, voxelAddress, 0).r;
+            vec3 voxelAddress = pageTableEntry.xyz + mod(fVoxelCoord, image_block_size);
+            float voxel = texture(image_cache, (voxelAddress*2.0+1.0)*image_address_to_normalized_texture_coord).r;
+
 #ifdef MIP
-            sampleBlock(pageTableEntry.xyz, curLevel, pageTableCoord, fVoxelCoord,
-              startRayPosition, rayVector, stepSize,
-              currentRayLength, samplePos, finished, ch1V, rayDepth);
+#ifdef LOCAL_MIP
+            if (voxel <= ch1V && ch1V >= local_MIP_threshold) {
+              finished = true;
+            } else if (voxel > ch1V) {
+              ch1V = voxel;
+              rayDepth = currentRayLength;
+            }
 #else
-            sampleBlock(pageTableEntry.xyz, curLevel, pageTableCoord, fVoxelCoord,
-              startRayPosition, rayVector, stepSize,
-              currentRayLength, samplePos, finished, result, rayDepth);
+            if (voxel > ch1V) {
+              ch1V = voxel;
+              rayDepth = currentRayLength;
+            }
+            finished = ch1V >= 1.0;
 #endif
+#else
+#if GLSL_VERSION >= 130
+            vec4 color = texture(transfer_function, voxel);
+#else
+            vec4 color = texture1D(transfer_function, voxel);
+#endif
+
+            if (color.a > 0.0) {
+              color.a / sampling_rate;
+              result = COMPOSITING(result, color, currentRayLength, rayDepth);
+              if (result.a >= 1.0) {
+                result.a = 1.0;
+                finished = true;
+              }
+            }
+#endif // MIP
+            currentRayLength += stepSize;
+            samplePos = startRayPosition + currentRayLength * rayVector;
           } else {
             // skip empty space page table entry recursive
             if (pagingFlag == UNMAPPED) {
@@ -241,12 +219,12 @@ void main()
           do {
             currentRayLength += stepSize;
             samplePos = startRayPosition + currentRayLength * rayVector;
-          } while (ivec3(samplePos * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength <= 1.0);
+          } while (ivec3((samplePos * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength <= 1.0);
         }
 
         finished = finished || (currentRayLength > 1.0);
       } // for
-    //}
+    }
 
 #ifdef MIP
 #if GLSL_VERSION >= 130
