@@ -529,7 +529,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       bt.stopAndLog();
 
       if (!missingBlockIDs.empty()) {
-        m_img->updateCaches(missingBlockIDs, usedBlockIDs);
+        m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs);
       }
 
       bt.resetAndStart("render images");
@@ -556,6 +556,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       m_img->bindFullResRenderShader(m_scFullResRaycasterShader);
 
       if (visibleIdxs.size() == 1) {
+        m_img->uploadImageCache(visibleIdxs[0]);
         m_img->bindImageCacheToFullResRenderShader(m_scFullResRaycasterShader, visibleIdxs[0]);
         m_scFullResRaycasterShader.bindTexture("transfer_function", m_transferFuncParas[visibleIdxs[0]]->get().texture());
         renderScreenQuad(m_VAO, m_scFullResRaycasterShader);
@@ -565,6 +566,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           m_layerTarget->bind();
           m_layerTarget->clear();
 
+          m_img->uploadImageCache(visibleIdxs[i]);
           m_img->bindImageCacheToFullResRenderShader(m_scFullResRaycasterShader, visibleIdxs[i]);
           m_scFullResRaycasterShader.bindTexture("transfer_function", m_transferFuncParas[visibleIdxs[i]]->get().texture());
           renderScreenQuad(m_VAO, m_scFullResRaycasterShader);

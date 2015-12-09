@@ -112,7 +112,7 @@ public:
 
   ZImg resizedImg(size_t width, size_t height, size_t depth, size_t t) const;
 
-  void readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_t sy, int64_t sz, size_t t, ZImg &res) const;
+  void readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_t sy, int64_t sz, size_t sc, size_t t, ZImg &res) const;
 
   // only for non-disk-cached image
   bool isDiskCached() const { return m_diskCached; }

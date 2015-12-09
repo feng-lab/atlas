@@ -21,7 +21,8 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
   readVolumes();
 
   if (m_isVolumeDownsampled) {
-#if 1
+    m_channelPendingUpdates.resize(m_nChannels);
+#if 0
     m_pageTableBlockSize = glm::uvec3(32, 32, 32);
     m_imageBlockSize = glm::uvec3(64, 64, 64);
     m_imageBlockReadSize = glm::ivec3(512, 512, 64);
@@ -189,6 +190,9 @@ void Z3DImg::setScale(const glm::vec3 &scale)
 
   m_pageTableCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
   m_imageCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_imageBlockSize+uint32_t(2), m_imageCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
+  for (size_t c=0; c<m_channelPendingUpdates.size(); ++c) {
+    m_channelPendingUpdates[c].clear();
+  }
 
   const ZImgInfo& info = m_imgPack.imgInfo();
   glm::dvec3 imgDim = glm::dvec3(info.width, info.height, info.depth);
@@ -328,7 +332,7 @@ void Z3DImg::bindImageCacheToFullResRenderShader(Z3DShaderProgram &shader, size_
   shader.bindTexture("image_cache", m_imageCacheTextures[c].get());
 }
 
-bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::set<uint32_t> &usedBlockIDs)
+bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t> &missingBlockIDs, const std::set<uint32_t> &usedBlockIDs)
 {
   int numBlocksToRead = int(m_imageCacheManager->size()) - int(usedBlockIDs.size());
   if (missingBlockIDs.empty() || numBlocksToRead <= 0)
@@ -362,8 +366,6 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
   glm::ivec4 erasedKey;
   int numAvailablePageCacheBlock = int(m_pageTableCacheManager->size()) - int(usedPageTableKeys.size());
   assert(numAvailablePageCacheBlock >= 0);
-  std::vector<glm::ivec4> blocksImagePos;
-  std::vector<glm::uvec3> blocksCachePos;
   for (auto it = missingBlockIDs.begin(); it != missingBlockIDs.end() && count < numBlocksToRead; ++it) {
     uint32_t blockID = *it;
     while (level+1 < m_numLevels && blockID >= m_posToBlockIDs[level+1].w) {
@@ -458,8 +460,11 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
       ++pageDirectoryEntry.w;
     }
 
-    blocksImagePos.push_back(pageTableEntryKey * glm::ivec4(1, glm::ivec3(m_imageBlockSize)));
-    blocksCachePos.push_back(glm::uvec3(imageBlockCachePos));
+    glm::ivec4 blockImagePos = pageTableEntryKey * glm::ivec4(1, glm::ivec3(m_imageBlockSize));
+    glm::uvec3 blockCachePos = glm::uvec3(imageBlockCachePos);
+    for (size_t c=0; c<m_channelPendingUpdates.size(); ++c) {
+      m_channelPendingUpdates[c][blockCachePos] = blockImagePos;
+    }
     ++count;
   }
   m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
@@ -469,43 +474,47 @@ bool Z3DImg::updateCaches(const std::set<uint32_t> &missingBlockIDs, const std::
 
   //checkPageSystemError();
 
-  bt.resetAndStart("update image cache");
-  ZImg img(ZImgInfo(m_imageBlockSize.x+2, m_imageBlockSize.y+2, m_imageBlockSize.z+2, m_nChannels));
+  return count > 0;
+}
+
+void Z3DImg::uploadImageCache(size_t channel)
+{
+  ZBenchTimer bt("upload image cache");
+  bt.start();
+  if (m_channelPendingUpdates[channel].empty())
+    return;
+
+  ZImg img(ZImgInfo(m_imageBlockSize.x+2, m_imageBlockSize.y+2, m_imageBlockSize.z+2, 1));
   if (m_imageBlockReadSize == glm::ivec3(m_imageBlockSize)) {
-    for (size_t i=0; i<blocksImagePos.size(); ++i) {
-      // actual read and upload
-      m_imgPack.readRegionToImg(m_levelScales[blocksImagePos[i].x].x, m_levelScales[blocksImagePos[i].x].z,
-          blocksImagePos[i].y-1, blocksImagePos[i].z-1, blocksImagePos[i].w-1, 0, img);
-      for (size_t c=0; c<m_nChannels; ++c) {
-        m_imageCacheTextures[c]->uploadSubImage(blocksCachePos[i], m_imageBlockSize+uint32_t(2), img.channelData(c));
-      }
+    for (auto it = m_channelPendingUpdates[channel].cbegin(); it != m_channelPendingUpdates[channel].cend(); ++it) {
+      const glm::ivec4& blockImagePos = it->second;
+      m_imgPack.readRegionToImg(m_levelScales[blockImagePos.x].x, m_levelScales[blockImagePos.x].z,
+          blockImagePos.y-1, blockImagePos.z-1, blockImagePos.w-1, channel, 0, img);
+      m_imageCacheTextures[channel]->uploadSubImage(it->first, m_imageBlockSize+uint32_t(2), img.channelData(0));
       img.fill(0);
     }
   } else {
-    ZImg bigImg(ZImgInfo(m_imageBlockReadSize.x+2, m_imageBlockReadSize.y+2, m_imageBlockReadSize.z+2, m_nChannels));
+    ZImg bigImg(ZImgInfo(m_imageBlockReadSize.x+2, m_imageBlockReadSize.y+2, m_imageBlockReadSize.z+2, 1));
     std::map<glm::ivec4, std::vector<std::pair<glm::ivec4, glm::uvec3>>, Vec4Compare<int,glm::highp>> bigToSmall;
     glm::ivec4 tmp(1, m_imageBlockReadSize.x, m_imageBlockReadSize.y, m_imageBlockReadSize.z);
-    for (size_t i=0; i<blocksImagePos.size(); ++i) {
-      bigToSmall[blocksImagePos[i] / tmp * tmp].push_back(std::make_pair(blocksImagePos[i], blocksCachePos[i]));
+    for (auto it = m_channelPendingUpdates[channel].cbegin(); it != m_channelPendingUpdates[channel].cend(); ++it) {
+      bigToSmall[it->second / tmp * tmp].push_back(std::make_pair(it->second, it->first));
     }
     for (auto it = bigToSmall.begin(); it != bigToSmall.end(); ++it) {
       // read from it->first level x y z
       m_imgPack.readRegionToImg(m_levelScales[it->first.x].x, m_levelScales[it->first.x].z,
-          it->first.y-1, it->first.z-1, it->first.w-1, 0, bigImg);
+          it->first.y-1, it->first.z-1, it->first.w-1, channel, 0, bigImg);
       for (size_t i=0; i<it->second.size(); ++i) {
         glm::ivec3 startCoord = it->first.yzw() - it->second[i].first.yzw();
         img.pasteImg(bigImg, ZVoxelCoordinate(startCoord.x, startCoord.y, startCoord.z));
-        for (size_t c=0; c<m_nChannels; ++c) {
-          m_imageCacheTextures[c]->uploadSubImage(it->second[i].second, m_imageBlockSize+uint32_t(2), img.channelData(c));
-        }
+        m_imageCacheTextures[channel]->uploadSubImage(it->second[i].second, m_imageBlockSize+uint32_t(2), img.channelData(0));
       }
       bigImg.fill(0);
     }
   }
+  m_channelPendingUpdates[channel].clear();
   glFinish();
   bt.stopAndLog();
-
-  return count > 0;
 }
 
 void Z3DImg::readVolumes()

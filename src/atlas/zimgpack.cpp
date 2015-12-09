@@ -544,7 +544,7 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
   return res;
 }
 
-void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_t sy, int64_t sz, size_t t, ZImg &res) const
+void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_t sy, int64_t sz, size_t sc, size_t t, ZImg &res) const
 {
   size_t readRatio = readRatioOf(xyRatio);
   if (readRatio == xyRatio) {
@@ -565,7 +565,7 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
           ZVoxelCoordinate start(tile.x / int64_t(xyRatio) - sx,
                                  tile.y / int64_t(xyRatio) - sy,
                                  zIdx,
-                                 0,
+                                 -ZVoxelCoordinate::value_type(sc),
                                  0);
           std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, queryResult[i].second)), tile);
           if ((*imgPtr)->isSameType(res)) {
@@ -587,7 +587,7 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
     info.width = std::round(info.width * xyRatio * 1.0 / readRatio);
     info.height = std::round(info.height * xyRatio * 1.0 / readRatio);
     ZImg tmp(info);
-    readRegionToImg(readRatio, zRatio, std::round(sx * xyRatio * 1.0 / readRatio), std::round(sy * xyRatio * 1.0 / readRatio), sz, t, tmp);
+    readRegionToImg(readRatio, zRatio, std::round(sx * xyRatio * 1.0 / readRatio), std::round(sy * xyRatio * 1.0 / readRatio), sz, sc, t, tmp);
     res = tmp.resized(res.width(), res.height(), res.depth());
   }
 }
