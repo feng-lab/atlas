@@ -196,6 +196,15 @@ void Z3DCamera::dolly(float value)
     setEye(pos);
 }
 
+void Z3DCamera::dollyToCenterDistance(float centerDist)
+{
+  centerDist = std::max(0.01f, std::min(m_centerDist * 100.f, centerDist));
+  glm::vec3 pos = m_center - m_viewVector * centerDist;
+  float maxV = 1e15;
+  if (std::abs(pos.x) < maxV && std::abs(pos.y) < maxV  && std::abs(pos.z) < maxV )
+    setEye(pos);
+}
+
 void Z3DCamera::roll(float angle)
 {
   glm::vec3 up = glm::rotate(glm::angleAxis(angle, m_viewVector), m_upVector);

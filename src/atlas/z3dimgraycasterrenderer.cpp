@@ -361,7 +361,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
   } else {  // 3d volume raycasting
     ZBenchTimer bta("all");
     bta.start();
-    if (m_img->isVolumeDownsampled()) {
+    if (!m_fastRendering && m_img->isVolumeDownsampled()) {
       float n = m_rendererBase.camera().nearDist();
       float f = m_rendererBase.camera().farDist();
       glm::vec2 pixelEyeSpaceSize = m_rendererBase.camera().frustumNearPlaneSize() / glm::vec2(m_layerTarget->size());

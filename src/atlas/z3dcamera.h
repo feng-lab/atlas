@@ -127,6 +127,7 @@ public:
   // the focal point, and use a value less than one to dolly-out away
   // from the focal point.
   void dolly(float value);
+  void dollyToCenterDistance(float centerDist);
 
   // Rotate the camera about the view vector.  This will
   // spin the camera about its axis.

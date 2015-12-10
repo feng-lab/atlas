@@ -46,6 +46,7 @@ public:
       { m_value.resetCameraNearFarPlane(xmin, xmax, ymin, ymax, zmin, zmax); updatePara(); }
 
   inline void dolly(float value) { m_value.dolly(value); updatePara(); }
+  inline void dollyToCenterDistance(float cd) { m_value.dollyToCenterDistance(cd); updatePara(); }
   inline void roll(float angle) { m_value.roll(angle); updatePara(); }
   inline void azimuth(float angle) { m_value.azimuth(angle); updatePara(); }
   inline void yaw(float angle) { m_value.yaw(angle); updatePara(); }

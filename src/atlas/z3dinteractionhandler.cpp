@@ -73,6 +73,18 @@ Z3DTrackballInteractionHandler::Z3DTrackballInteractionHandler(const QString &na
   connect(m_shiftEvent, SIGNAL(mouseEventTriggered(QMouseEvent*,int,int)), this, SLOT(shiftEvent(QMouseEvent*,int,int)));
   addEventListener(m_shiftEvent);
 
+  m_mouseDollyEvent = new ZEventListenerParameter(name + " Mouse Dolly");
+  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::NoModifier, QEvent::MouseButtonPress);
+  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::NoModifier, QEvent::MouseButtonRelease);
+  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::NoModifier, QEvent::MouseMove);
+#ifdef __APPLE__
+  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::MetaModifier, QEvent::MouseButtonPress);
+  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::MetaModifier, QEvent::MouseButtonRelease);
+  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::MetaModifier, QEvent::MouseMove);
+#endif
+  connect(m_mouseDollyEvent, SIGNAL(mouseEventTriggered(QMouseEvent*,int,int)), this, SLOT(mouseDollyEvent(QMouseEvent*,int,int)));
+  addEventListener(m_mouseDollyEvent);
+
   m_wheelDollyEvent = new ZEventListenerParameter(name + " Wheel Dolly");
   m_wheelDollyEvent->listenTo("dolly", Qt::NoButton, Qt::NoModifier, QEvent::Wheel);
   connect(m_wheelDollyEvent, SIGNAL(wheelEventTriggered(QWheelEvent*,int,int)), this, SLOT(dollyEvent(QWheelEvent*,int,int)));
@@ -126,6 +138,19 @@ void Z3DTrackballInteractionHandler::rotateEvent(QMouseEvent *e, int w, int h)
 {
   if (e->type() == QEvent::MouseButtonPress) {
     setState(State::Rotate);
+    mousePressEvent(e, w, h);
+  } else if (e->type() == QEvent::MouseButtonRelease) {
+    mouseReleaseEvent(e, w, h);
+  } else if (e->type() == QEvent::MouseMove) {
+    mouseMoveEvent(e, w, h);
+    emit cameraMoved();
+  }
+}
+
+void Z3DTrackballInteractionHandler::mouseDollyEvent(QMouseEvent *e, int w, int h)
+{
+  if (e->type() == QEvent::MouseButtonPress) {
+    setState(State::Dolly);
     mousePressEvent(e, w, h);
   } else if (e->type() == QEvent::MouseButtonRelease) {
     mouseReleaseEvent(e, w, h);
@@ -256,12 +281,15 @@ void Z3DTrackballInteractionHandler::keyRollEvent(QKeyEvent *e, int, int)
 
 void Z3DTrackballInteractionHandler::mousePressEvent(QMouseEvent *e, int, int h)
 {
+  emit mousePressed();
   m_lastMousePosition = glm::ivec2(e->x(), h - e->y());
+  m_lastCenterDistance = m_camera->get().centerDist();
   e->ignore();
 }
 
 void Z3DTrackballInteractionHandler::mouseReleaseEvent(QMouseEvent *e, int, int)
 {
+  emit mouseReleased();
   setState(State::None);
   e->ignore();
 }
@@ -275,15 +303,19 @@ void Z3DTrackballInteractionHandler::mouseMoveEvent(QMouseEvent *e, int w, int h
   if (m_state == State::Rotate) {
     rotate(m_lastMousePosition, newMouse, w, h);
     e->accept();
+    m_lastMousePosition = newMouse;
   } else if (m_state == State::Shift) {
     shift(m_lastMousePosition, newMouse, w, h);
     e->accept();
+    m_lastMousePosition = newMouse;
   } else if (m_state == State::Roll) {
     roll(m_lastMousePosition, newMouse, w, h);
     e->accept();
+    m_lastMousePosition = newMouse;
+  } else if (m_state == State::Dolly) {
+    dolly(m_lastMousePosition, newMouse, w, h, m_lastCenterDistance);
+    e->accept();
   }
-
-  m_lastMousePosition = newMouse;
 }
 
 void Z3DTrackballInteractionHandler::wheelEvent(QWheelEvent *e, int, int)
@@ -379,6 +411,17 @@ void Z3DTrackballInteractionHandler::roll(glm::ivec2 mouseStart, glm::ivec2 mous
   double oldAngle = std::atan2(mouseStart.y - center.y, mouseStart.x - center.x);
 
   m_camera->roll(newAngle - oldAngle);
+}
+
+void Z3DTrackballInteractionHandler::dolly(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int, int h, float centerDistStart)
+{
+  glm::ivec2 dPos = mouseEnd - mouseStart;
+
+  double deltaFactor = 20.0 / h;
+  float factor = dPos.y * deltaFactor;
+
+  m_camera->dollyToCenterDistance(std::pow(1.1f, factor) * centerDistStart);
+  //LINFO() << centerDistStart << std::pow(1.1f, factor) * centerDistStart << factor << dPos << deltaFactor << mouseStart << mouseEnd;
 }
 
 } // namespace nim

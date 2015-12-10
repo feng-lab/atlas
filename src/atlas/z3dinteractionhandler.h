@@ -30,6 +30,8 @@ public:
 
 signals:
   void cameraMoved();
+  void mousePressed();
+  void mouseReleased();
 
 protected:
   enum class State {
@@ -89,6 +91,7 @@ signals:
 
 protected slots:
   void rotateEvent(QMouseEvent* e, int w, int h);
+  void mouseDollyEvent(QMouseEvent *e, int w, int h);
   void dollyEvent(QWheelEvent *e, int w, int h);
   void shiftEvent(QMouseEvent *e, int w, int h);
   void rollEvent(QMouseEvent *e, int w, int h);
@@ -109,9 +112,11 @@ protected:
   // use mouse move and mouseMotionFactor to calculate angle then rotate camera
   void rotate(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h);
   void roll(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h);
+  void dolly(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h, float centerDistStart);
 
   ZEventListenerParameter* m_rotateEvent;
   ZEventListenerParameter* m_shiftEvent;
+  ZEventListenerParameter* m_mouseDollyEvent;
   ZEventListenerParameter* m_wheelDollyEvent;
   ZEventListenerParameter* m_rollEvent;
   ZEventListenerParameter* m_keyRotateEvent;
@@ -121,6 +126,7 @@ protected:
 
   Z3DCameraParameter *m_camera;
   glm::ivec2 m_lastMousePosition;
+  float m_lastCenterDistance;
 
   bool m_mouseWheelUpDollyIn;
   bool m_mouseWheelUpRollLeft;

@@ -22,7 +22,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   , m_stayOnTop("Stay On Top", false)
   , m_isVolumeDownsampled("Volume Is Downsampled", false)
   , m_numParas(0)
-  , m_interactionDownsample("Interaction Downsample", 1, 1, 16)
+  //, m_interactionDownsample("Interaction Downsample", 1, 1, 16)
   , m_entryTarget(glm::uvec2(32,32))
   , m_exitTarget(glm::uvec2(32,32))
   , m_layerTarget(glm::uvec2(32,32))
@@ -61,8 +61,12 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   m_isVolumeDownsampled.setEnabled(false);
   addParameter(m_isVolumeDownsampled);
   connect(&m_rendererBase, SIGNAL(coordTransformChanged()), this, SLOT(changeCoordTransform()));
+  connect(&m_rendererBase.globalParas().interactionHandler, SIGNAL(mousePressed()),
+          this, SLOT(mousePressed()));
+  connect(&m_rendererBase.globalParas().interactionHandler, SIGNAL(mouseReleased()),
+          this, SLOT(mouseReleased()));
 
-  addParameter(m_interactionDownsample);
+  //addParameter(m_interactionDownsample);
 
   Z3DTexture* g_TexId[2];
   g_TexId[0] = new Z3DTexture((GLint)GL_RGBA32F, glm::uvec3(32,32,1), GL_RGBA, GL_FLOAT);
@@ -324,7 +328,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_selectionLineWidth, 17);
     m_widgetsGroup->addChild(m_selectionLineColor, 17);
     m_widgetsGroup->addChild(m_manipulatorSize, 17);
-    m_widgetsGroup->addChild(m_interactionDownsample, 19);
+    //m_widgetsGroup->addChild(m_interactionDownsample, 19);
     m_widgetsGroup->addChild(m_rendererBase.coordTransformPara(), 1);
 
     const std::vector<ZParameter*>& paras = parameters();
@@ -342,62 +346,71 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
 
 void Z3DImgFilter::enterInteractionMode()
 {
-  glm::uvec2 expectedSize = m_outport.expectedSize();
-  if (m_interactionDownsample.get() != 1) {
-    const std::vector<Z3DOutputPortBase*> outports = outputPorts();
-    for(size_t i=0; i<outports.size(); ++i) {
-      Z3DRenderOutputPort* rp = dynamic_cast<Z3DRenderOutputPort*>(outports[i]);
-      if (rp)
-        rp->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
-    }
+//  glm::uvec2 expectedSize = m_outport.expectedSize();
+//  if (m_interactionDownsample.get() != 1) {
+//    const std::vector<Z3DOutputPortBase*> outports = outputPorts();
+//    for(size_t i=0; i<outports.size(); ++i) {
+//      Z3DRenderOutputPort* rp = dynamic_cast<Z3DRenderOutputPort*>(outports[i]);
+//      if (rp)
+//        rp->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
+//    }
 
-    for (size_t i=0; i<m_privateRenderPorts.size(); ++i) {
-      m_privateRenderPorts[i]->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
-    }
-    for (size_t i=0; i<m_privateRenderTargets.size(); ++i) {
-      m_privateRenderTargets[i]->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
-    }
+//    for (size_t i=0; i<m_privateRenderPorts.size(); ++i) {
+//      m_privateRenderPorts[i]->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
+//    }
+//    for (size_t i=0; i<m_privateRenderTargets.size(); ++i) {
+//      m_privateRenderTargets[i]->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
+//    }
 
-    const std::vector<Z3DInputPortBase*> inports = inputPorts();
-    for(size_t i=0; i<inports.size(); ++i) {
-      Z3DRenderInputPort* rp = dynamic_cast<Z3DRenderInputPort*>(inports[i]);
-      if (rp)
-        rp->setExpectedSize(expectedSize / uint32_t(m_interactionDownsample.get()));
-    }
-    emit requestUpstreamSizeChange(this);
+//    const std::vector<Z3DInputPortBase*> inports = inputPorts();
+//    for(size_t i=0; i<inports.size(); ++i) {
+//      Z3DRenderInputPort* rp = dynamic_cast<Z3DRenderInputPort*>(inports[i]);
+//      if (rp)
+//        rp->setExpectedSize(expectedSize / uint32_t(m_interactionDownsample.get()));
+//    }
+//    emit requestUpstreamSizeChange(this);
 
-    // upstream will invalidate the network, but in case there are no upstream
-    // do one more invalidation
-    invalidateResult();
+//    // upstream will invalidate the network, but in case there are no upstream
+//    // do one more invalidation
+//    invalidateResult();
+//  }
+  if (m_3dImg && m_3dImg->isVolumeDownsampled()) {
+    m_imgRaycasterRenderer.setFastRendering(true);
   }
 }
 
 void Z3DImgFilter::exitInteractionMode()
 {
-  glm::uvec2 expectedSize = m_outport.expectedSize();
-  if (m_interactionDownsample.get() != 1) {
-    const std::vector<Z3DOutputPortBase*> outports = outputPorts();
-    for(size_t i=0; i<outports.size(); ++i) {
-      Z3DRenderOutputPort* rp = dynamic_cast<Z3DRenderOutputPort*>(outports[i]);
-      if (rp)
-        rp->resize(expectedSize);
-    }
+  //  glm::uvec2 expectedSize = m_outport.expectedSize();
+  //  if (m_interactionDownsample.get() != 1) {
+  //    const std::vector<Z3DOutputPortBase*> outports = outputPorts();
+  //    for(size_t i=0; i<outports.size(); ++i) {
+  //      Z3DRenderOutputPort* rp = dynamic_cast<Z3DRenderOutputPort*>(outports[i]);
+  //      if (rp)
+  //        rp->resize(expectedSize);
+  //    }
 
-    for (size_t i=0; i<m_privateRenderPorts.size(); ++i) {
-      m_privateRenderPorts[i]->resize(expectedSize);
-    }
-    for (size_t i=0; i<m_privateRenderTargets.size(); ++i) {
-      m_privateRenderTargets[i]->resize(expectedSize);
-    }
+  //    for (size_t i=0; i<m_privateRenderPorts.size(); ++i) {
+  //      m_privateRenderPorts[i]->resize(expectedSize);
+  //    }
+  //    for (size_t i=0; i<m_privateRenderTargets.size(); ++i) {
+  //      m_privateRenderTargets[i]->resize(expectedSize);
+  //    }
 
-    const std::vector<Z3DInputPortBase*> inports = inputPorts();
-    for(size_t i=0; i<inports.size(); ++i) {
-      Z3DRenderInputPort* rp = dynamic_cast<Z3DRenderInputPort*>(inports[i]);
-      if (rp)
-        rp->setExpectedSize(expectedSize);
-    }
-    emit requestUpstreamSizeChange(this);
+  //    const std::vector<Z3DInputPortBase*> inports = inputPorts();
+  //    for(size_t i=0; i<inports.size(); ++i) {
+  //      Z3DRenderInputPort* rp = dynamic_cast<Z3DRenderInputPort*>(inports[i]);
+  //      if (rp)
+  //        rp->setExpectedSize(expectedSize);
+  //    }
+  //    emit requestUpstreamSizeChange(this);
 
+  //    // upstream will invalidate the network, but in case there are no upstream
+  //    // do one more invalidation
+  //    invalidateResult();
+  //  }
+  if (m_3dImg && m_3dImg->isVolumeDownsampled()) {
+    m_imgRaycasterRenderer.setFastRendering(false);
     // upstream will invalidate the network, but in case there are no upstream
     // do one more invalidation
     invalidateResult();
@@ -460,20 +473,20 @@ void Z3DImgFilter::adjustWidget()
 
 void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent *e, int w, int h)
 {
-  e->ignore();
-  if (!m_imgRaycasterRenderer.hasVisibleRendering())
-    return;
-  // Mouse button pressed
-  if (e->type() == QEvent::MouseButtonPress) {
-    m_startCoord.x = e->x();
-    m_startCoord.y = e->y();
-    toggleInteractionMode(true, this);
-    return;
-  }
+//  e->ignore();
+//  if (!m_imgRaycasterRenderer.hasVisibleRendering())
+//    return;
+//  // Mouse button pressed
+//  if (e->type() == QEvent::MouseButtonPress) {
+//    m_startCoord.x = e->x();
+//    m_startCoord.y = e->y();
+//    toggleInteractionMode(true, this);
+//    return;
+//  }
 
-  if (e->type() == QEvent::MouseButtonRelease) {
-    toggleInteractionMode(false, this);
-  }
+//  if (e->type() == QEvent::MouseButtonRelease) {
+//    toggleInteractionMode(false, this);
+//  }
 }
 
 void Z3DImgFilter::invalidateFRVolumeZSlice()
@@ -504,6 +517,23 @@ void Z3DImgFilter::invalidateFRVolumeYSlice2()
 void Z3DImgFilter::invalidateFRVolumeXSlice2()
 {
   m_FRVolumeSlicesValidState[5] = false;
+}
+
+void Z3DImgFilter::mousePressed()
+{
+  if (m_3dImg && m_3dImg->isVolumeDownsampled()) {
+    m_imgRaycasterRenderer.setFastRendering(true);
+  }
+}
+
+void Z3DImgFilter::mouseReleased()
+{
+  if (m_3dImg && m_3dImg->isVolumeDownsampled()) {
+    m_imgRaycasterRenderer.setFastRendering(false);
+    // upstream will invalidate the network, but in case there are no upstream
+    // do one more invalidation
+    invalidateResult();
+  }
 }
 
 void Z3DImgFilter::process(Z3DEye eye)

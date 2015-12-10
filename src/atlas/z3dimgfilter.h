@@ -65,6 +65,9 @@ protected slots:
 
   virtual void setClipPlanes() override {}
 
+  void mousePressed();
+  void mouseReleased();
+
 protected:
   virtual void process(Z3DEye eye) override;
   bool hasSlices() const;
@@ -94,7 +97,7 @@ private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   size_t m_numParas;
 
-  ZIntParameter m_interactionDownsample;      // screen space downsample during interaction
+  //ZIntParameter m_interactionDownsample;      // screen space downsample during interaction
 
   Z3DRenderTarget m_entryTarget;
   Z3DRenderTarget m_exitTarget;

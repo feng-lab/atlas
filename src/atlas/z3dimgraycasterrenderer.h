@@ -39,6 +39,7 @@ public:
                         const Z3DTexture *entryEyeCoordTexture,
                         const Z3DTexture *exitTexCoordTexture,
                         const Z3DTexture *exitEyeCoordTexture);
+  void setFastRendering(bool v) { m_fastRendering = v; }
 
   // return true if something is rendered by this renderer
   bool hasVisibleRendering() const;
@@ -121,6 +122,8 @@ private:
   ZVertexArrayObject m_VAO;
 
   std::vector<uint32_t> m_blockIDs;
+
+  bool m_fastRendering = false;
 };
 
 } // namespace nim

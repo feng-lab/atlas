@@ -45,23 +45,19 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
     }
 #else
     m_pageTableBlockSize = glm::uvec3(32, 32, 32);
-    m_imageBlockSize = glm::uvec3(32, 32, 32);
-    m_imageBlockReadSize = glm::ivec3(512, 512, 32);
+    m_imageBlockSize = glm::uvec3(30, 30, 30);
+    m_imageBlockReadSize = glm::ivec3(510, 510, 30);
     if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 4096) {
-      //m_imageCacheNumBlocks = glm::uvec3(32,32,32); // 1G
-      m_imageCacheNumBlocks = glm::uvec3(30,30,30); // 1G
+      m_imageCacheNumBlocks = glm::uvec3(32,32,32); // 1G
       m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 2); // 256*256*64*4*4   64MB
     } else if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 2048) {
-      //m_imageCacheNumBlocks = glm::uvec3(32,32,16);
-      m_imageCacheNumBlocks = glm::uvec3(30,30,15);
+      m_imageCacheNumBlocks = glm::uvec3(32,32,16);
       m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 1); // 256*256*32*4*4   32MB
     } else if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 1024) {
-      //m_imageCacheNumBlocks = glm::uvec3(32,32,8);
-      m_imageCacheNumBlocks = glm::uvec3(30,30,7);
+      m_imageCacheNumBlocks = glm::uvec3(32,32,8);
       m_pageTableCacheNumBlocks = glm::uvec3(4, 4, 2); // 128*128*64*4*4   16MB
     } else {
-      //m_imageCacheNumBlocks = glm::uvec3(32,32,4);
-      m_imageCacheNumBlocks = glm::uvec3(30,30,4);
+      m_imageCacheNumBlocks = glm::uvec3(32,32,4);
       m_pageTableCacheNumBlocks = glm::uvec3(4, 4, 1); // 128*128*32*4*4   8MB
     }
 #endif
@@ -544,7 +540,12 @@ void Z3DImg::readVolumes()
 
   if (widthScale != 1.0 || heightScale != 1.0 || depthScale != 1.0) {
     m_isVolumeDownsampled = true;
-    return;
+
+    widthScale = info.width <= size_t(512) ? 1.0 : 512.0 / info.width;
+    heightScale = info.height <= size_t(512) ? 1.0 : 512.0 / info.height;
+    depthScale = info.depth <= size_t(512) ? 1.0 : 512.0 / info.depth;
+
+    //return;
   }
 
   ZImg img = m_imgPack.resizedImg(info.width*widthScale,
