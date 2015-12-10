@@ -84,8 +84,10 @@ protected:
   Z3DShaderProgram m_scRaycasterShader;
   Z3DShaderProgram m_sc2dImageShader;
   Z3DShaderProgram m_scVolumeSliceWithTransferfunShader;
-  Z3DShaderProgram m_scFullResRaycasterBlockIDsShader;
-  Z3DShaderProgram m_scFullResRaycasterShader;
+  Z3DShaderProgram m_image3DSliceWithTransferfunBlockIDsShader;
+  Z3DShaderProgram m_image3DSliceWithTransferfunShader;
+  Z3DShaderProgram m_image3DRaycasterBlockIDsShader;
+  Z3DShaderProgram m_image3DRaycasterShader;
   Z3DShaderProgram m_mergeChannelShader;
 
   Z3DRenderTarget* m_layerTarget = nullptr;
