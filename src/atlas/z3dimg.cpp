@@ -475,10 +475,11 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t> &missin
 
 void Z3DImg::uploadImageCache(size_t channel)
 {
-  ZBenchTimer bt("upload image cache");
-  bt.start();
   if (m_channelPendingUpdates[channel].empty())
     return;
+
+  ZBenchTimer bt("upload image cache");
+  bt.start();
 
   ZImg img(ZImgInfo(m_imageBlockSize.x+2, m_imageBlockSize.y+2, m_imageBlockSize.z+2, 1));
   if (m_imageBlockReadSize == glm::ivec3(m_imageBlockSize)) {
@@ -629,7 +630,7 @@ void Z3DImg::checkPageSystemError()
             assert(m_imageCacheManager->exists(imageCacheKey));
             assert(m_imageCacheManager->get(imageCacheKey) == pageTableEntry.xyz());
             assert(glm::all(glm::greaterThanEqual(pageTableEntry.xyz(), glm::ivec3(0,0,0))) &&
-                   glm::all(glm::lessThan(pageTableEntry.xyz(), glm::ivec3(m_imageBlockSize * m_imageCacheNumBlocks))));
+                   glm::all(glm::lessThan(pageTableEntry.xyz(), glm::ivec3(m_imageCacheTextures[0]->dimension()))));
           }
         }
       }

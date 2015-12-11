@@ -4,6 +4,9 @@
 #include "QsLog.h"
 #include "zbenchtimer.h"
 #include "z3dgpuinfo.h"
+#include <QImage>
+#include <QImageWriter>
+#include "zimg.h"
 
 namespace nim {
 
@@ -367,6 +370,51 @@ GLuint Z3DRenderTarget::currentBoundReadFBO()
   GLint fbo;
   glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &fbo);
   return static_cast<GLuint>(fbo);
+}
+
+void Z3DRenderTarget::saveAsColorImage(const QString &filename)
+{
+  assert(!isBound());
+  bind();
+  try {
+    GLenum dataFormat = GL_BGRA;
+    GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
+    auto colorBuffer = std::make_unique<uint8_t[]>(Z3DTexture::bypePerPixel(dataFormat, dataType) * m_size.x * m_size.y);
+    glReadPixels(0, 0, m_size.x, m_size.y, dataFormat, dataType, colorBuffer.get());
+    QImage upsideDownImage(colorBuffer.get(), m_size.x, m_size.y, QImage::Format_ARGB32);
+    QImage image = upsideDownImage.mirrored(false, true);
+    QImageWriter writer(filename);
+    writer.setCompression(1);
+    if(!writer.write(image)) {
+      LERROR() << writer.errorString();
+    }
+  }
+  catch (ZException const & e) {
+    release();
+    LERROR() << "Exception:" << e.what();
+  }
+  release();
+}
+
+void Z3DRenderTarget::saveAsDepthImage(const QString &filename)
+{
+  assert(!isBound());
+  bind();
+  try {
+    GLenum dataFormat = GL_DEPTH_COMPONENT;
+    GLenum dataType = GL_UNSIGNED_INT;
+    auto depthBuffer = std::make_unique<uint32_t[]>(m_size.x * m_size.y);
+    glReadPixels(0, 0, m_size.x, m_size.y, dataFormat, dataType, depthBuffer.get());
+    ZImg img;
+    img.wrapData(depthBuffer.get(), m_size.x, m_size.y, 1);
+    img.flip(nim::Dimension::Y);
+    img.save(filename);
+  }
+  catch (ZException const & e) {
+    release();
+    LERROR() << "Exception:" << e.what();
+  }
+  release();
 }
 
 void Z3DRenderTarget::generateId()

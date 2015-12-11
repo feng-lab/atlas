@@ -127,7 +127,7 @@ QString Z3DImgSliceRenderer::generateHeader()
 
 void Z3DImgSliceRenderer::render(Z3DEye eye)
 {
-  bool needRender = m_img && m_img->numChannels() > 0 && !m_quads.empty();
+  bool needRender = m_img && !m_quads.empty();
   if (!needRender)
     return;
 
@@ -223,6 +223,11 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
     } else {
       for (size_t i=0; i<m_img->numChannels(); ++i) {
         m_layerTarget->attachSlice(i);
+
+        if (i == 1) {
+          m_layerTarget->saveAsColorImage("/Users/feng/Downloads/abcd_b.tif");
+        }
+
         m_layerTarget->bind();
         m_layerTarget->clear();
 
@@ -233,6 +238,10 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
           renderTriangleList(m_VAO, m_image3DSliceWithColorMapShader, m_quads[q]);
 
         m_layerTarget->release();
+
+        if (i == 1) {
+          m_layerTarget->saveAsColorImage("/Users/feng/Downloads/abcd.tif");
+        }
       }
     }
 

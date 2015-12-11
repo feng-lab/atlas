@@ -391,6 +391,8 @@ void Z3DImgFilter::renderOpaque(Z3DEye eye)
   m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
   m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
   m_rendererBase.render(eye, m_textureCopyRenderer);
+  //glFinish();
+  //currentOutport.colorTexture()->saveAsColorImage("/Users/feng/Downloads/abc.tif");
 }
 
 bool Z3DImgFilter::hasTransparent(Z3DEye eye) const
@@ -702,6 +704,9 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
   //}
 
   currentOutport.releaseTarget();
+
+  //glFinish();
+  //currentOutport.colorTexture()->saveAsColorImage("/Users/feng/Downloads/abc.tif");
 }
 
 bool Z3DImgFilter::hasImage() const
@@ -849,10 +854,9 @@ void Z3DImgFilter::updateBlockIDTarget()
 {
   if (m_3dImg && m_3dImg->isVolumeDownsampled()) {
     glm::uvec2 size = m_layerTarget.size();
-    uint32_t sizeScale = std::min(std::min(Z3DImg::imageBlockSize().x, Z3DImg::imageBlockSize().y), Z3DImg::imageBlockSize().z) / 2;
+    uint32_t sizeScale = std::min(std::min(Z3DImg::imageBlockSize().x, Z3DImg::imageBlockSize().y), Z3DImg::imageBlockSize().z) / 6;
     size.x = (size.x + sizeScale - 1) / sizeScale;
     size.y = (size.y + sizeScale - 1) / sizeScale;
-    //LINFO() << m_layerTarget->size() << pixelEyeSpaceSize << size;
     m_blockIDsRenderTarget.resize(size);
   }
 }

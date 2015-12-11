@@ -57,6 +57,9 @@ public:
   static GLuint currentBoundDrawFBO();
   static GLuint currentBoundReadFBO();
 
+  void saveAsColorImage(const QString &filename);
+  void saveAsDepthImage(const QString &filename);
+
 protected:
   void generateId();
 
