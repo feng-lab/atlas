@@ -70,20 +70,23 @@ vec4 compositeXRay(in vec4 curResult, in vec4 color, in float currentRayLength, 
 }
 
 #ifdef MIP
-void sampleBlock(in ivec3 pageTableEntry, in int curLevel, in ivec3 pageTableCoord, in vec3 fVoxelCoord,
+void sampleBlock(in ivec3 pageTableEntry, in int curLevel, in ivec3 pageTableCoord,
   in vec3 startRayPosition, in vec3 rayVector, in float stepSize,
   inout float currentRayLength, inout vec3 samplePos, inout bool finished, inout float ch1V, inout float rayDepth)
 #else
-void sampleBlock(in ivec3 pageTableEntry, in int curLevel, in ivec3 pageTableCoord, in vec3 fVoxelCoord,
+void sampleBlock(in ivec3 pageTableEntry, in int curLevel, in ivec3 pageTableCoord,
   in vec3 startRayPosition, in vec3 rayVector, in float stepSize,
   inout float currentRayLength, inout vec3 samplePos, inout bool finished, inout vec4 result, inout float rayDepth)
 #endif
 {
   bool blockFinished = false;
+  vec3 voxelAddress;
+  vec3 fFracVoxelCoord = modf(samplePos * image_dimensions[curLevel], voxelAddress);
+  ivec3 voxelCoord = ivec3(voxelAddress);
   for (int loop0=0; !blockFinished && loop0<64; loop0++) {
     //ivec3 voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size;
     //float voxel = texelFetch(image_cache, voxelAddress, 0).r;
-    vec3 voxelAddress = pageTableEntry + mod(fVoxelCoord, image_block_size);
+    voxelAddress = pageTableEntry + voxelCoord % image_block_size + fFracVoxelCoord + 1.0;
     float voxel = texture(image_cache, (voxelAddress*2.0+1.0)*image_address_to_normalized_texture_coord).r;
 
 #ifdef MIP
@@ -120,8 +123,9 @@ void sampleBlock(in ivec3 pageTableEntry, in int curLevel, in ivec3 pageTableCoo
     currentRayLength += stepSize;
 
     samplePos = startRayPosition + currentRayLength * rayVector;
-    fVoxelCoord = samplePos * image_dimensions[curLevel];
-    blockFinished = finished || ivec3(fVoxelCoord) / image_block_size != pageTableCoord || currentRayLength > 1.0;
+    fFracVoxelCoord = modf(samplePos * image_dimensions[curLevel], voxelAddress);
+    voxelCoord = ivec3(voxelAddress);
+    blockFinished = finished || voxelCoord / image_block_size != pageTableCoord || currentRayLength > 1.0;
   }
 }
 
@@ -183,9 +187,7 @@ void main()
           stepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
         }
 
-        vec3 fVoxelCoord = samplePos * image_dimensions[curLevel];
-        ivec3 voxelCoord = ivec3(fVoxelCoord);
-        ivec3 pageTableCoord = voxelCoord / image_block_size;
+        ivec3 pageTableCoord = ivec3(samplePos * image_dimensions[curLevel]) / image_block_size;
         ivec3 curPageDirAddress = page_directory_bases[curLevel] + pageTableCoord / page_table_block_size;
         if (curPageDirAddress != pageDirAddress) {
           pageDirAddress = curPageDirAddress;
@@ -197,11 +199,11 @@ void main()
           pagingFlag = pageTableEntry.w;
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
 #ifdef MIP
-            sampleBlock(pageTableEntry.xyz, curLevel, pageTableCoord, fVoxelCoord,
+            sampleBlock(pageTableEntry.xyz, curLevel, pageTableCoord,
               startRayPosition, rayVector, stepSize,
               currentRayLength, samplePos, finished, ch1V, rayDepth);
 #else
-            sampleBlock(pageTableEntry.xyz, curLevel, pageTableCoord, fVoxelCoord,
+            sampleBlock(pageTableEntry.xyz, curLevel, pageTableCoord,
               startRayPosition, rayVector, stepSize,
               currentRayLength, samplePos, finished, result, rayDepth);
 #endif

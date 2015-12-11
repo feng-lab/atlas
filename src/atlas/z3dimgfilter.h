@@ -10,7 +10,7 @@
 #include "zwidgetsgroup.h"
 #include <vector>
 #include "z3dimgraycasterrenderer.h"
-#include "z3dvolumeslicerenderer.h"
+#include "z3dimgslicerenderer.h"
 #include "z3dtextureandeyecoordinaterenderer.h"
 #include "z3dimage2drenderer.h"
 #include "zeventlistenerparameter.h"
@@ -50,18 +50,21 @@ public:
   virtual bool hasTransparent(Z3DEye eye) const override;
   virtual void renderTransparent(Z3DEye eye) override;
 
+public slots:
+  virtual void updateSize() override;
+
 protected slots:
   void changeCoordTransform();
 
   void adjustWidget();
   void leftMouseButtonPressed(QMouseEvent *e, int w, int h);
 
-  void invalidateFRVolumeZSlice();
-  void invalidateFRVolumeYSlice();
-  void invalidateFRVolumeXSlice();
-  void invalidateFRVolumeZSlice2();
-  void invalidateFRVolumeYSlice2();
-  void invalidateFRVolumeXSlice2();
+  //  void invalidateFRVolumeZSlice();
+  //  void invalidateFRVolumeYSlice();
+  //  void invalidateFRVolumeXSlice();
+  //  void invalidateFRVolumeZSlice2();
+  //  void invalidateFRVolumeYSlice2();
+  //  void invalidateFRVolumeXSlice2();
 
   virtual void setClipPlanes() override {}
 
@@ -79,14 +82,14 @@ protected:
   virtual void expandCutRange() override {}
 
 private:
-  void invalidateAllFRVolumeSlices();
-
+  //void invalidateAllFRVolumeSlices();
+  void updateBlockIDTarget();
   void volumeChanged();
 
   Z3DImgRaycasterRenderer m_imgRaycasterRenderer;
-  Z3DVolumeSliceRenderer m_volumeSliceRenderer;
+  Z3DImgSliceRenderer m_imgSliceRenderer;
   Z3DTextureAndEyeCoordinateRenderer m_textureAndEyeCoordinateRenderer;
-  std::vector<std::unique_ptr<Z3DImage2DRenderer>> m_image2DRenderers;
+  //std::vector<std::unique_ptr<Z3DImage2DRenderer>> m_image2DRenderers;
   Z3DTextureCopyRenderer m_textureCopyRenderer;
 
   std::unique_ptr<Z3DImg> m_3dImg;
@@ -104,6 +107,12 @@ private:
   Z3DRenderTarget m_layerTarget;
   Z3DTexture m_layerColorTexture;
   Z3DTexture m_layerDepthTexture;
+  Z3DTexture m_missBlocksTexture1;
+  Z3DTexture m_missBlocksTexture2;
+  Z3DTexture m_usedBlocksTexture1;
+  Z3DTexture m_usedBlocksTexture2;
+  Z3DTexture m_usedBlocksTexture3;
+  Z3DRenderTarget m_blockIDsRenderTarget;
 
   Z3DRenderOutputPort m_outport;
   Z3DRenderOutputPort m_leftEyeOutport;
@@ -113,11 +122,11 @@ private:
   Z3DRenderOutputPort m_opaqueLeftEyeOutport;
   Z3DRenderOutputPort m_opaqueRightEyeOutport;
 
-  static const size_t m_maxNumOfFullResolutionVolumeSlice;
+  //static const size_t m_maxNumOfFullResolutionVolumeSlice;
   // each channel is represented by a Z3DVolume
-  std::vector<std::vector<std::unique_ptr<Z3DVolume>>> m_FRVolumeSlices;
-  std::vector<bool> m_FRVolumeSlicesValidState;
-  ZBoolParameter m_useFRVolumeSlice;
+  //std::vector<std::vector<std::unique_ptr<Z3DVolume>>> m_FRVolumeSlices;
+  //std::vector<bool> m_FRVolumeSlicesValidState;
+  //ZBoolParameter m_useFRVolumeSlice;
   ZBoolParameter m_showXSlice;
   ZIntParameter m_xSlicePosition;
   ZBoolParameter m_showYSlice;

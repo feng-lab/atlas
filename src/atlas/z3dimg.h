@@ -37,14 +37,14 @@ public:
   bool isVolumeDownsampled() const { return m_isVolumeDownsampled; }
   const std::vector<std::unique_ptr<Z3DVolume>>& volumes() const { return m_volumes; }
 
-  const glm::uvec3& imageBlockSize() const { return m_imageBlockSize; }
+  static glm::uvec3 imageBlockSize() { return glm::uvec3(30, 30, 30); }
 
   // Returns a string representation of the sampler type: "sampler2D" for 2D image, "sampler3D" for 3D volume
   QString samplerType() const;
 
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
   glm::vec3 physicalLUF() const { return glm::vec3(0, 0, 0); }
-  glm::vec3 physicalRDB() const { return glm::vec3(m_imgPack.imgInfo().width, m_imgPack.imgInfo().height, m_imgPack.imgInfo().depth); }
+  glm::vec3 physicalRDB() const { return glm::vec3(m_imgPack.imgInfo().width-1, m_imgPack.imgInfo().height-1, m_imgPack.imgInfo().depth-1); }
   glm::vec3 physicalLDF() const { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z); }
   glm::vec3 physicalRDF() const { return glm::vec3(physicalRDB().x, physicalRDB().y, physicalLUF().z); }
   glm::vec3 physicalRUF() const { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalLUF().z); }

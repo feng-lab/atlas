@@ -45,7 +45,7 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
     }
 #else
     m_pageTableBlockSize = glm::uvec3(32, 32, 32);
-    m_imageBlockSize = glm::uvec3(30, 30, 30);
+    m_imageBlockSize = imageBlockSize();
     m_imageBlockReadSize = glm::ivec3(510, 510, 30);
     if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 4096) {
       m_imageCacheNumBlocks = glm::uvec3(32,32,32); // 1G
@@ -541,9 +541,11 @@ void Z3DImg::readVolumes()
   if (widthScale != 1.0 || heightScale != 1.0 || depthScale != 1.0) {
     m_isVolumeDownsampled = true;
 
-    widthScale = info.width <= size_t(512) ? 1.0 : 512.0 / info.width;
-    heightScale = info.height <= size_t(512) ? 1.0 : 512.0 / info.height;
-    depthScale = info.depth <= size_t(512) ? 1.0 : 512.0 / info.depth;
+    if (m_imgPack.imgInfo().depth > 1) {
+      widthScale = info.width <= size_t(512) ? 1.0 : 512.0 / info.width;
+      heightScale = info.height <= size_t(512) ? 1.0 : 512.0 / info.height;
+      depthScale = info.depth <= size_t(512) ? 1.0 : 512.0 / info.depth;
+    }
 
     //return;
   }

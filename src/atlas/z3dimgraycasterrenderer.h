@@ -20,7 +20,8 @@ public:
   explicit Z3DImgRaycasterRenderer(Z3DRendererBase &rendererBase);
 
   void setData(Z3DImg &img);
-  void setLayerTarget(Z3DRenderTarget *layerTarget) { m_layerTarget = layerTarget; }
+  void setLayerTarget(Z3DRenderTarget &target) { m_layerTarget = &target; }
+  void setBlockIDsRenderTarget(Z3DRenderTarget &target) { m_blockIDsRenderTarget = &target; }
 
   // quad or entryexit texture should be set before rendering
 
@@ -91,12 +92,7 @@ protected:
   Z3DShaderProgram m_mergeChannelShader;
 
   Z3DRenderTarget* m_layerTarget = nullptr;
-  Z3DTexture m_missBlocksTexture1;
-  Z3DTexture m_missBlocksTexture2;
-  Z3DTexture m_usedBlocksTexture1;
-  Z3DTexture m_usedBlocksTexture2;
-  Z3DTexture m_usedBlocksTexture3;
-  Z3DRenderTarget m_blockIDsRenderTarget;
+  Z3DRenderTarget *m_blockIDsRenderTarget = nullptr;
 
   ZFloatParameter m_samplingRate;  // Sampling rate of the raycasting, specified relative to the size of one voxel
   ZFloatParameter m_isoValue;  // The used isovalue, when isosurface raycasting is enabled
@@ -124,7 +120,6 @@ private:
   ZVertexArrayObject m_VAO;
 
   std::vector<uint32_t> m_blockIDs;
-
   bool m_fastRendering = false;
 };
 

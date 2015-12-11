@@ -167,9 +167,9 @@ void Z3DShaderProgram::bindTexture(const QString &name, const Z3DTexture *textur
       textureEnum = it->second.first;
       textureNumber = it->second.second;
     }
-    texture->setFilter(minFilter, magFilter);
     glActiveTexture(textureEnum);
     texture->bind();
+    texture->setFilter(minFilter, magFilter);
     setUniform(name, textureNumber);
     glActiveTexture(GL_TEXTURE0);
     CHECK_GL_ERROR;

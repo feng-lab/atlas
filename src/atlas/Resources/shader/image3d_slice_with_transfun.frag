@@ -34,39 +34,40 @@ out vec4 FragData0;  // call glBindFragDataLocation before linking
 void main()
 {
 #if NUM_VOLUMES > 0
-
-float desiredVoxelSize = eyeCoord.z * ze_to_screen_pixel_voxel_size;
-int curLevel = 0;
-while (curLevel+1 < LEVEL_COUNT && voxel_world_sizes[curLevel+1] <= desiredVoxelSize) {
-  ++curLevel;
-}
-
-vec4 color = vec4(0.0);
-vec3 fVoxelCoord = texCoord0 * image_dimensions[curLevel];
-ivec3 pageTableCoord = ivec3(fVoxelCoord) / image_block_size;
-ivec4 pageDirEntry = texelFetch(page_directory, page_directory_bases[curLevel] + pageTableCoord / page_table_block_size, 0);
-int pagingFlag = pageDirEntry.w;
-if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-  ivec4 pageTableEntry = texelFetch(page_table_cache, pageDirEntry.xyz + pageTableCoord % page_table_block_size, 0);
-  pagingFlag = pageTableEntry.w;
-  if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-    vec3 voxelAddress = pageTableEntry.xyz + mod(fVoxelCoord, image_block_size);
-#if GLSL_VERSION >= 130
-    color = texture(transfer_function, texture(image_cache, (voxelAddress*2.0+1.0)*image_address_to_normalized_texture_coord).r);
-#else
-    color = texture1D(transfer_function, texture3D(image_cache, (voxelAddress*2.0+1.0)*image_address_to_normalized_texture_coord).r);
-#endif
-    if (color.a == 0.0) {
-      color = vec4(0.0);
-    }
+  float desiredVoxelSize = eyeCoord.z * ze_to_screen_pixel_voxel_size;
+  int curLevel = 0;
+  while (curLevel+1 < LEVEL_COUNT && voxel_world_sizes[curLevel+1] <= desiredVoxelSize) {
+    ++curLevel;
   }
-}
+
+  vec4 color = vec4(0.0);
+  vec3 voxelAddress;
+  vec3 fFracVoxelCoord = modf(texCoord0 * image_dimensions[curLevel], voxelAddress);
+  ivec3 voxelCoord = ivec3(voxelAddress);
+  ivec3 pageTableCoord = voxelCoord / image_block_size;
+  ivec4 pageDirEntry = texelFetch(page_directory, page_directory_bases[curLevel] + pageTableCoord / page_table_block_size, 0);
+  int pagingFlag = pageDirEntry.w;
+  if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
+    ivec4 pageTableEntry = texelFetch(page_table_cache, pageDirEntry.xyz + pageTableCoord % page_table_block_size, 0);
+    pagingFlag = pageTableEntry.w;
+    if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
+      voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size + fFracVoxelCoord + 1.0;
+#if GLSL_VERSION >= 130
+      color = texture(transfer_function, texture(image_cache, (voxelAddress*2.0+1.0)*image_address_to_normalized_texture_coord).r);
+#else
+      color = texture1D(transfer_function, texture3D(image_cache, (voxelAddress*2.0+1.0)*image_address_to_normalized_texture_coord).r);
+#endif
 
 #ifdef RESULT_OPAQUE
-  color.a = 1.0;
+      if (color.a == 0.0) {
+        color = vec4(0.0);
+      }
+      color.a = 1.0;
 #else
-  color.rgb *= color.a;
+      color.rgb *= color.a;
 #endif
+    }
+  }
 
   FragData0 = color;
 #else

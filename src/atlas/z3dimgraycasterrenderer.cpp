@@ -12,12 +12,6 @@ namespace nim {
 
 Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase &rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
-  , m_missBlocksTexture1(GL_TEXTURE_2D, (GLint)GL_RGBA32UI, glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_missBlocksTexture2(GL_TEXTURE_2D, (GLint)GL_RGBA32UI, glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_usedBlocksTexture1(GL_TEXTURE_2D, (GLint)GL_RGBA32UI, glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_usedBlocksTexture2(GL_TEXTURE_2D, (GLint)GL_RGBA32UI, glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_usedBlocksTexture3(GL_TEXTURE_2D, (GLint)GL_RGBA32UI, glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_blockIDsRenderTarget(glm::uvec2(32,32))
   , m_samplingRate("Sampling Rate", 2.f, 0.01f, 20.f)
   , m_isoValue("ISO Value", 0.5f, 0.0f, 1.0f)
   , m_localMIPThreshold("Local MIP Threshold", 0.8f, 0.01f, 1.f)
@@ -30,23 +24,6 @@ Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase &rendererBase)
   , m_alpha(1.0)
   , m_VAO(1)
 {
-  m_missBlocksTexture1.setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
-  m_missBlocksTexture2.setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
-  m_usedBlocksTexture1.setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
-  m_usedBlocksTexture2.setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
-  m_usedBlocksTexture3.setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
-  m_missBlocksTexture1.uploadImage();
-  m_missBlocksTexture2.uploadImage();
-  m_usedBlocksTexture1.uploadImage();
-  m_usedBlocksTexture2.uploadImage();
-  m_usedBlocksTexture3.uploadImage();
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture1, GL_COLOR_ATTACHMENT0, false);
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture2, GL_COLOR_ATTACHMENT1, false);
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_usedBlocksTexture1, GL_COLOR_ATTACHMENT2, false);
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_usedBlocksTexture2, GL_COLOR_ATTACHMENT3, false);
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_usedBlocksTexture3, GL_COLOR_ATTACHMENT4, false);
-  m_blockIDsRenderTarget.isFBOComplete();
-
   //m_gradientMode.addOptions("None", "Forward Differences", "Central Differences", "Filtered");
   //m_gradientMode.select("None");
   // todo: add gradient
@@ -244,7 +221,6 @@ QString Z3DImgRaycasterRenderer::generateHeader()
     }
     numLevels = m_img->numLevels();
   }
-
   headerSource += QString("#define LEVEL_COUNT %1\n").arg(numLevels);
 
   if (numVisibleChannels > 0) {
@@ -352,15 +328,9 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         LINFO() << "";
         ZBenchTimer bt("render and collect blockids");
         bt.start();
-        glm::uvec2 size = m_layerTarget->size();
-        uint32_t sizeScale = std::min(std::min(m_img->imageBlockSize().x, m_img->imageBlockSize().y), m_img->imageBlockSize().z) / 2;
-        size.x = (size.x + sizeScale - 1) / sizeScale;
-        size.y = (size.y + sizeScale - 1) / sizeScale;
-        //LINFO() << m_layerTarget->size() << pixelEyeSpaceSize << size;
-        m_blockIDsRenderTarget.resize(size);
 
-        if (m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4 != m_blockIDs.size()) {
-          m_blockIDs.resize(m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4);
+        if (m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4 != m_blockIDs.size()) {
+          m_blockIDs.resize(m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4);
         }
 
         m_image3DSliceWithTransferfunBlockIDsShader.bind();
@@ -379,16 +349,16 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
         m_img->bindFullResBlockIDsShader(m_image3DSliceWithTransferfunBlockIDsShader);
 
-        for (size_t i=0; i<m_quads.size(); ++i) {
-          m_blockIDsRenderTarget.bind();
+        for (size_t q=0; q<m_quads.size(); ++q) {
+          m_blockIDsRenderTarget->bind();
           glDrawBuffers(2, g_drawBuffers);
           glClear(GL_COLOR_BUFFER_BIT);
 
-          renderTriangleList(m_VAO, m_image3DSliceWithTransferfunBlockIDsShader, m_quads[i]);
+          renderTriangleList(m_VAO, m_image3DSliceWithTransferfunBlockIDsShader, m_quads[q]);
 
-          m_blockIDsRenderTarget.release();
+          m_blockIDsRenderTarget->release();
 
-          m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT0)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+          m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
           tbb::parallel_for(
                 tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
                 [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range){
@@ -399,7 +369,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           missingBlockIDs.insert(ccSet.begin(), ccSet.end());
           ccSet.clear();
 
-          m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT1)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+          m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
           tbb::parallel_for(
                 tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
                 [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range){
@@ -501,15 +471,9 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       LINFO() << "";
       ZBenchTimer bt("render blockids");
       bt.start();
-      glm::uvec2 size = m_layerTarget->size();
-      uint32_t sizeScale = std::min(std::min(m_img->imageBlockSize().x, m_img->imageBlockSize().y), m_img->imageBlockSize().z) / 2;
-      size.x = (size.x + sizeScale - 1) / sizeScale;
-      size.y = (size.y + sizeScale - 1) / sizeScale;
-      //LINFO() << m_layerTarget->size() << pixelEyeSpaceSize << size;
-      m_blockIDsRenderTarget.resize(size);
 
       m_image3DRaycasterBlockIDsShader.bind();
-      m_image3DRaycasterBlockIDsShader.setUniform("screen_dim_RCP", 1.f / glm::vec2(size));
+      m_image3DRaycasterBlockIDsShader.setUniform("screen_dim_RCP", 1.f / glm::vec2(m_blockIDsRenderTarget->size()));
       m_image3DRaycasterBlockIDsShader.setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
 
       // entry exit points
@@ -527,14 +491,14 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
                                       GL_COLOR_ATTACHMENT3,
                                       GL_COLOR_ATTACHMENT4
                                      };
-      m_blockIDsRenderTarget.bind();
+      m_blockIDsRenderTarget->bind();
       glDrawBuffers(5, g_drawBuffers);
       glClear(GL_COLOR_BUFFER_BIT);
 
       m_img->bindFullResBlockIDsShader(m_image3DRaycasterBlockIDsShader);
       renderScreenQuad(m_VAO, m_image3DRaycasterBlockIDsShader);
 
-      m_blockIDsRenderTarget.release();
+      m_blockIDsRenderTarget->release();
       m_image3DRaycasterBlockIDsShader.release();
       glFinish();
       bt.stopAndLog();
@@ -544,7 +508,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       std::set<uint32_t> missingBlockIDs;
       std::set<uint32_t> usedBlockIDs;
 
-      const Z3DTexture* missingBlockIDsTexture = m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT0);
+      const Z3DTexture* missingBlockIDsTexture = m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0);
       if (missingBlockIDsTexture->numPixels() * 4 != m_blockIDs.size()) {
         m_blockIDs.resize(missingBlockIDsTexture->numPixels() * 4);
       }
@@ -572,7 +536,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         ccSet.insert(range.begin(), range.end()); // inserts a sequence
       }
       );
-      m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT1)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+      m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
       tbb::parallel_for(
             tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
             [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range){
@@ -585,21 +549,21 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         missingBlockIDs.insert(ccSet.begin(), ccSet.end());
         ccSet.clear();
 
-        m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT2)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+        m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT2)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
         tbb::parallel_for(
               tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
               [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range){
           ccSet.insert(range.begin(), range.end()); // inserts a sequence
         }
         );
-        m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT3)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+        m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT3)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
         tbb::parallel_for(
               tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
               [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range){
           ccSet.insert(range.begin(), range.end()); // inserts a sequence
         }
         );
-        m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT4)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+        m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT4)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
         tbb::parallel_for(
               tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
               [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range){
