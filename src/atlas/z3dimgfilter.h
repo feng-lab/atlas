@@ -40,9 +40,6 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  virtual void enterInteractionMode() override;
-  virtual void exitInteractionMode() override;
-
   bool isReady(Z3DEye eye) const override;
 
   virtual bool hasOpaque(Z3DEye eye) const override;
@@ -101,6 +98,7 @@ private:
   size_t m_numParas;
 
   //ZIntParameter m_interactionDownsample;      // screen space downsample during interaction
+  ZBoolParameter m_smoothInteraction;
 
   Z3DRenderTarget m_entryTarget;
   Z3DRenderTarget m_exitTarget;
