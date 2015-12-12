@@ -244,7 +244,7 @@ ZImgPack::ZImgPack(const QStringList &files, Dimension catDim, size_t scene, Fil
 ZImgPack::~ZImgPack()
 {
   for (size_t i=0; i<m_allTiles.size(); ++i) {
-    ZImgCacheInstance.remove(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, i)));
+    ZImgCacheInstance.remove(boost::hash_value(HashKeyType(this, i)));
   }
 }
 
@@ -275,7 +275,7 @@ void ZImgPack::save(QString fileName, FileFormat format, Compression comp)
   m_hasUnsavedChange = false;
 
   for (size_t i=0; i<m_allTiles.size(); ++i) {
-    ZImgCacheInstance.remove(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, i)));
+    ZImgCacheInstance.remove(boost::hash_value(HashKeyType(this, i)));
   }
   std::vector<ZImgInfo> infos;
   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
@@ -304,20 +304,20 @@ bool ZImgPack::needUpdate(const QRectF &viewport, double scale, const QRectF &ol
 #if 1
   auto tiit = m_rtzToTileBoxRTree.find(std::make_tuple(readRatio, t, mip ? -1 : int(z)));
   if (tiit != m_rtzToTileBoxRTree.end()) {
-    TileBox queryBox1(TileCorner(std::floor(viewport.x()), std::floor(viewport.y())),
-                      TileCorner(std::ceil(viewport.right()), std::ceil(viewport.bottom())));
-    TileBox queryBox2(TileCorner(std::floor(oldViewport.x()), std::floor(oldViewport.y())),
-                      TileCorner(std::ceil(oldViewport.right()), std::ceil(oldViewport.bottom())));
+    TileBoxType queryBox1(TileCornerType(std::floor(viewport.x()), std::floor(viewport.y())),
+                          TileCornerType(std::ceil(viewport.right()), std::ceil(viewport.bottom())));
+    TileBoxType queryBox2(TileCornerType(std::floor(oldViewport.x()), std::floor(oldViewport.y())),
+                          TileCornerType(std::ceil(oldViewport.right()), std::ceil(oldViewport.bottom())));
     std::set<size_t> queryResult1;
     std::set<size_t> queryResult2;
     tiit->second->query(bgi::intersects(queryBox1),
                         boost::make_function_output_iterator([&queryResult1](auto const& val){
-                          queryResult1.insert(val.second);
-                        }));
+      queryResult1.insert(val.second);
+    }));
     tiit->second->query(bgi::intersects(queryBox2),
                         boost::make_function_output_iterator([&queryResult2](auto const& val){
-                          queryResult2.insert(val.second);
-                        }));
+      queryResult2.insert(val.second);
+    }));
     return queryResult1 != queryResult2;
   }
 #else
@@ -355,13 +355,13 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs, std
 #if 1
   auto tiit = m_rtzToTileBoxRTree.find(std::make_tuple(readRatio, t, mip ? -1 : int(z)));
   if (tiit != m_rtzToTileBoxRTree.end()) {
-    TileBox queryBox(TileCorner(std::floor(viewport.x()), std::floor(viewport.y())),
-                     TileCorner(std::ceil(viewport.right()), std::ceil(viewport.bottom())));
-    std::vector<RTreeValue> queryResult;
+    TileBoxType queryBox(TileCornerType(std::floor(viewport.x()), std::floor(viewport.y())),
+                         TileCornerType(std::ceil(viewport.right()), std::ceil(viewport.bottom())));
+    std::vector<RTreeValueType> queryResult;
     tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
     for (size_t i=0; i<queryResult.size(); ++i) {
       const ZImgSubBlock& tile = *m_allTiles[queryResult[i].second].get();
-      std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, queryResult[i].second)), tile);
+      std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(HashKeyType(this, queryResult[i].second)), tile);
       imgs.push_back(*imgPtr);
       locs.push_back(QPoint(tile.x, tile.y));
       scales.push_back(readRatio);
@@ -375,7 +375,7 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs, std
       const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
       QRectF tileRect(tile.x, tile.y, tile.width, tile.height);
       if (tileRect.intersects(viewport)) {
-        std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, tileIndice[i])), tile);
+        std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(HashKeyType(this, tileIndice[i])), tile);
         imgs.push_back(*imgPtr);
         locs.push_back(QPoint(tile.x, tile.y));
         scales.push_back(readRatio);
@@ -398,7 +398,7 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
         const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
         assert(tile.x >= 0 && tile.y >= 0);
         if (int64_t(x) >= tile.x && int64_t(x) < tile.x + tile.width && int64_t(y) >= tile.y && int64_t(y) < tile.y + tile.height) {
-          std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, tileIndice[i])), tile);
+          std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(HashKeyType(this, tileIndice[i])), tile);
           return (*imgPtr)->value<double>(x-tile.x, y-tile.y, 0, c, 0);
         }
       }
@@ -433,7 +433,7 @@ double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, 
           if (ix >= tile.x && ix < tile.x + tile.width && iy >= tile.y && iy < tile.y + tile.height) {
             if (ratio == 1)
               hasTile = true;
-            std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, tileIndice[i])));
+            std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.object(boost::hash_value(HashKeyType(this, tileIndice[i])));
             if (imgPtr) {
               return (*imgPtr)->value<double>((ix-tile.x)/(1.0*ratio), (iy-tile.y)/(1.0*ratio), 0, c, 0);
             }
@@ -493,7 +493,7 @@ ZImg ZImgPack::crop(const ZImgRegion &region) const
             continue;
           }
 
-          std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, tileIndice[i])), tile);
+          std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(HashKeyType(this, tileIndice[i])), tile);
           res.pasteImg(*imgPtr->get(), start);
         }
       }
@@ -548,8 +548,8 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
 {
   size_t readRatio = readRatioOf(xyRatio);
   if (readRatio == xyRatio) {
-    TileBox queryBox(TileCorner(sx * (int64_t)xyRatio, sy * (int64_t)xyRatio),
-                     TileCorner((sx + (int64_t)res.width()) * (int64_t)xyRatio - 1, (sy + (int64_t)res.height()) * (int64_t)xyRatio - 1));
+    TileBoxType queryBox(TileCornerType(sx * (int64_t)xyRatio, sy * (int64_t)xyRatio),
+                         TileCornerType((sx + (int64_t)res.width()) * (int64_t)xyRatio - 1, (sy + (int64_t)res.height()) * (int64_t)xyRatio - 1));
     int64_t zEnd = std::min((int64_t)m_imgInfo.depth, (sz+(int64_t)res.depth()) * (int64_t)zRatio);
     size_t zIdx = 0;
     for (int64_t z=sz*(int64_t)zRatio; z<zEnd; z+=(int64_t)zRatio, ++zIdx) {
@@ -558,7 +558,7 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
 
       auto tiit = m_rtzToTileBoxRTree.find(std::make_tuple(xyRatio, t, int(z)));
       if (tiit != m_rtzToTileBoxRTree.end()) {
-        std::vector<RTreeValue> queryResult;
+        std::vector<RTreeValueType> queryResult;
         tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
         for (size_t i=0; i<queryResult.size(); ++i) {
           const ZImgSubBlock& tile = *m_allTiles[queryResult[i].second].get();
@@ -567,7 +567,7 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
                                  zIdx,
                                  -ZVoxelCoordinate::value_type(sc),
                                  0);
-          std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, queryResult[i].second)), tile);
+          std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(HashKeyType(this, queryResult[i].second)), tile);
           if ((*imgPtr)->isSameType(res)) {
             if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
               ZImg tmp = (*imgPtr)->normalized(m_minIntensity, m_maxIntensity);
@@ -630,7 +630,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
     } else {
       m_allTiles.emplace_back(new ZImgPackSubBlock(m_imgSource, 1, t, z, 0, 0, img->width(), img->height()));
     }
-    ZImgCacheInstance.insert(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, m_allTiles.size()-1)),
+    ZImgCacheInstance.insert(boost::hash_value(HashKeyType(this, m_allTiles.size()-1)),
                              new std::shared_ptr<ZImg>(img), std::max(size_t(1), img->byteNumber() / 1024 / 1024));
     return;
   }
@@ -649,7 +649,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
         } else {
           m_allTiles.emplace_back(new ZImgPackSubBlock(simg, ratio, t, z, 0, 0, width, height));
         }
-        ZImgCacheInstance.insert(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, m_allTiles.size()-1)),
+        ZImgCacheInstance.insert(boost::hash_value(HashKeyType(this, m_allTiles.size()-1)),
                                  new std::shared_ptr<ZImg>(simg), std::max(size_t(1), simg->byteNumber() / 1024 / 1024));
         break;
       } else {
@@ -659,7 +659,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
         } else {
           m_allTiles.emplace_back(new ZImgPackSubBlock(simg, ratio, t, z, 0, 0, width, height));
         }
-        ZImgCacheInstance.insert(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, m_allTiles.size()-1)),
+        ZImgCacheInstance.insert(boost::hash_value(HashKeyType(this, m_allTiles.size()-1)),
                                  new std::shared_ptr<ZImg>(simg), std::max(size_t(1), simg->byteNumber() / 1024 / 1024));
 
         img->zoom(0.5, 0.5);
@@ -685,7 +685,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
           } else {
             m_allTiles.emplace_back(new ZImgPackSubBlock(cropped, ratio, t, z, startX, startY, width, height));
           }
-          ZImgCacheInstance.insert(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, m_allTiles.size()-1)),
+          ZImgCacheInstance.insert(boost::hash_value(HashKeyType(this, m_allTiles.size()-1)),
                                    new std::shared_ptr<ZImg>(cropped), std::max(size_t(1), cropped->byteNumber() / 1024 / 1024));
         }
       }
@@ -829,15 +829,15 @@ void ZImgPack::createTileIndexStructure()
     m_rtzToTileIndice[std::tie(tile.ratio, tile.t, tile.z)].push_back(i);
   }
   for (auto it = m_rtzToTileIndice.begin(); it != m_rtzToTileIndice.end(); ++it) {
-    std::vector<RTreeValue> values(it->second.size());
+    std::vector<RTreeValueType> values(it->second.size());
     for (size_t i=0; i<it->second.size(); ++i) {
       const ZImgSubBlock& tile = *m_allTiles[it->second[i]].get();
-      values[i] = std::make_pair(TileBox(TileCorner(tile.x, tile.y),
-                                         TileCorner(tile.x + tile.width - 1,
-                                                    tile.y + tile.height - 1)),
+      values[i] = std::make_pair(TileBoxType(TileCornerType(tile.x, tile.y),
+                                             TileCornerType(tile.x + tile.width - 1,
+                                                            tile.y + tile.height - 1)),
                                  it->second[i]);
     }
-    m_rtzToTileBoxRTree[it->first] = std::make_unique<bgi::rtree<RTreeValue, bgi::quadratic<16>>>(values);
+    m_rtzToTileBoxRTree.insert(RTZToTileBoxRTreeType::value_type(it->first, std::make_unique<RTreeType>(values)));
   }
 }
 
@@ -861,7 +861,7 @@ ZImg ZImgPack::assembleImg(size_t ratio) const
           const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
           ZVoxelCoordinate start(tile.x / double(ratio), tile.y / double(ratio), z, 0, t);
 
-          std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, tileIndice[i])), tile);
+          std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(HashKeyType(this, tileIndice[i])), tile);
           res.pasteImg(*imgPtr->get(), start);
         }
       }
@@ -892,7 +892,7 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t) const
         const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
         ZVoxelCoordinate start(tile.x / double(ratio), tile.y / double(ratio), z, 0, 0);
 
-        std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, tileIndice[i])), tile);
+        std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(HashKeyType(this, tileIndice[i])), tile);
         res.pasteImg(*imgPtr->get(), start);
       }
     }
@@ -919,7 +919,7 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t, size_t z) const
       const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
       ZVoxelCoordinate start(tile.x / double(ratio), tile.y / double(ratio), 0, 0, 0);
 
-      std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(std::tuple<const ZImgPack*, size_t>(this, tileIndice[i])), tile);
+      std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(HashKeyType(this, tileIndice[i])), tile);
       res.pasteImg(*imgPtr->get(), start);
     }
   }

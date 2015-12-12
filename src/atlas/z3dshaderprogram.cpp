@@ -348,7 +348,7 @@ void Z3DShaderProgram::storeUniformLocations()
     QString nm(name.data());
     if (nm.endsWith("[0]"))
       nm.chop(3);
-    m_uniforms[nm] = u;
+    efficientAddOrUpdate(m_uniforms, nm, u);
   }
 
   std::map<QString, Uniform>::const_iterator it;
@@ -453,7 +453,7 @@ void Z3DShaderProgram::storeAttributeLocations()
     Attribute u;
     glGetActiveAttrib(programId(), i, maxLength, nullptr, &u.size, &u.type, name.data());
     u.location = glGetAttribLocation(programId(), name.data());
-    m_attributes[QString(name.data())] = u;
+    efficientAddOrUpdate(m_attributes, name.data(), u);
   }
 
   std::map<QString, Attribute>::const_iterator it;

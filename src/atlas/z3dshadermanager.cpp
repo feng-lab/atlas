@@ -22,8 +22,8 @@ Z3DShaderManager::Z3DShaderManager()
 Z3DShader &Z3DShaderManager::shader(const QString &fn, const QString &header, const Z3DContext& context)
 {
   ShaderKey key(fn, header, context);
-  auto it = m_shaders.find(key);
-  if (it == m_shaders.end()) {
+  auto lb = m_shaders.lower_bound(key);
+  if (lb == m_shaders.end() || m_shaders.key_comp()(key, lb->first)) {
     QString filename = ZSystemInfoInstance.shaderPath(fn);
     Z3DShader::Type type;
     if (filename.endsWith(".vert", Qt::CaseInsensitive)) {
@@ -46,20 +46,16 @@ Z3DShader &Z3DShaderManager::shader(const QString &fn, const QString &header, co
     auto shdr = std::make_unique<Z3DShader>(type);
     shdr->compileSourceCode(src);
     Z3DShader *res = shdr.get();
-    m_shaders.emplace(key, std::move(shdr));
+    m_shaders.emplace_hint(lb, key, std::move(shdr));
     return *res;
   } else {
-    return *(it->second);
+    return *(lb->second);
   }
 }
 
 bool Z3DShaderManager::ShaderKey::operator<(const Z3DShaderManager::ShaderKey &rhs) const
 {
-  if (filename != rhs.filename)
-    return filename < rhs.filename;
-  if (context != rhs.context)
-    return context < rhs.context;
-  return header < rhs.header;
+  return std::tie(filename, context, header) < std::tie(rhs.filename, rhs.context, rhs.header);
 }
 
 } // namespace nim

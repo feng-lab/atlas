@@ -61,6 +61,22 @@ inline Dest bit_cast(const Source& source)
   return dest;
 }
 
+// effective stl, item 24, Scott Meyers
+template< typename MapType, // type of map
+          typename KeyArgType, // see below for why
+          typename ValueArgtype> // KeyArgType and ValueArgtype are type
+typename MapType::iterator // parameters
+efficientAddOrUpdate(MapType& m, const KeyArgType& k, const ValueArgtype& v)
+{
+  typename MapType::iterator lb = m.lower_bound(k); // find where k is or should be
+  if (lb != m.end() && !(m.key_comp()(k, lb->first))) { // if Ib points to a pair whose key is equiv to k...
+    lb->second = v; // update the pair's value
+    return lb; // and return an iterator to that pair
+  } else {
+    return m.emplace_hint(lb, k, v); // add pair(k, v) to m and return an iterator to the new map element
+  }
+}
+
 } // namespace nim
 
 #endif // ZGLOBAL
