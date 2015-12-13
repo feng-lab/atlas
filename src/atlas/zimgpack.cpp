@@ -837,7 +837,7 @@ void ZImgPack::createTileIndexStructure()
                                                             tile.y + tile.height - 1)),
                                  it->second[i]);
     }
-    m_rtzToTileBoxRTree.insert(RTZToTileBoxRTreeType::value_type(it->first, std::make_unique<RTreeType>(values)));
+    m_rtzToTileBoxRTree.emplace_hint(m_rtzToTileBoxRTree.end(), it->first, std::make_unique<RTreeType>(values));
   }
 }
 
