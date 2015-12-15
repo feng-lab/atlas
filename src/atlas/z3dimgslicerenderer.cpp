@@ -195,7 +195,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
     usedBlockIDs.erase(0);
 
     m_image3DSliceWithColorMapBlockIDsShader.release();
-    glFinish();
+    //glFinish();
     bt.stopAndLog();
 
     LINFO() << missingBlockIDs.size() << usedBlockIDs.size();
@@ -246,7 +246,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
     }
 
     m_image3DSliceWithColorMapShader.release();
-    glFinish();
+    //glFinish();
     bt.stopAndLog();
   } else {
     m_scVolumeSliceShader.bind();

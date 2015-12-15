@@ -465,7 +465,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t> &missin
   }
   m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
   m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
-  glFinish();
+  //glFinish();
   bt.stopAndLog();
 
   //checkPageSystemError();
@@ -510,7 +510,7 @@ void Z3DImg::uploadImageCache(size_t channel)
     }
   }
   m_channelPendingUpdates[channel].clear();
-  glFinish();
+  //glFinish();
   bt.stopAndLog();
 }
 

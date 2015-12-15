@@ -384,7 +384,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         usedBlockIDs.erase(0);
 
         m_image3DSliceWithTransferfunBlockIDsShader.release();
-        glFinish();
+        //glFinish();
         bt.stopAndLog();
 
         LINFO() << missingBlockIDs.size() << usedBlockIDs.size();
@@ -426,7 +426,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         }
 
         m_image3DSliceWithTransferfunShader.release();
-        glFinish();
+        //glFinish();
         bt.stopAndLog();
       } else {
         m_scVolumeSliceWithTransferfunShader.bind();
@@ -500,7 +500,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
       m_blockIDsRenderTarget->release();
       m_image3DRaycasterBlockIDsShader.release();
-      glFinish();
+      //glFinish();
       bt.stopAndLog();
 
       bt.resetAndStart("collect blockids");
@@ -667,7 +667,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       }
 
       m_image3DRaycasterShader.release();
-      glFinish();
+      //glFinish();
       bt.stopAndLog();
     } else {
       m_scRaycasterShader.bind();
@@ -716,7 +716,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       }
 
       m_scRaycasterShader.release();
-      glFinish();
+      //glFinish();
     }
     bta.stopAndLog();
   }

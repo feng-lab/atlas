@@ -76,7 +76,7 @@ public:
   // then that counts as using two texture image units against this limit. The value must be at least 48
   int maxCombinedTextureImageUnits() const { return m_maxCombinedTextureImageUnits; }
   // and the following is the number of texture coordinates available which usually is 8
-  int maxTextureCoordinates() const { return m_maxTextureCoords; }
+  //int maxTextureCoordinates() const { return m_maxTextureCoords; }
   // The value indicates the maximum number of layers allowed in an array texture, and must be at least 256.
   int maxArrayTextureLayers() const { return m_maxArrayTextureLayers; }
 
@@ -119,8 +119,8 @@ public:
   float minSmoothPointSize() const { return m_minSmoothPointSize; }
   float maxSmoothPointSize() const { return m_maxSmoothPointSize; }
   float smoothPointSizeGranularity() const { return m_smoothPointSizeGranularity; }
-  float minAliasedPointSize() const { return m_minAliasedPointSize; }
-  float maxAliasedPointSize() const { return m_maxAliasedPointSize; }
+  //float minAliasedPointSize() const { return m_minAliasedPointSize; }
+  //float maxAliasedPointSize() const { return m_maxAliasedPointSize; }
 
   float minSmoothLineWidth() const { return m_minSmoothLineWidth; }
   float maxSmoothLineWidth() const { return m_maxSmoothLineWidth; }
@@ -184,8 +184,8 @@ private:
   float m_minSmoothPointSize;
   float m_maxSmoothPointSize;
   float m_smoothPointSizeGranularity;
-  float m_minAliasedPointSize;
-  float m_maxAliasedPointSize;
+  //float m_minAliasedPointSize;
+  //float m_maxAliasedPointSize;
 
   float m_minSmoothLineWidth;
   float m_maxSmoothLineWidth;
@@ -194,6 +194,12 @@ private:
   float m_maxAliasedLineWidth;
 
   uint64_t m_dedicatedVideoMemoryMB;
+
+  bool m_contextCoreProfileBit = false;
+  bool m_contextCompatibilityProfileBit = false;
+  bool m_contextFlagForwardCompatibleBit = false;
+  bool m_contextFlagDebugBit = false;
+  bool m_contextFlagRobustAccessBit = false;
 };
 
 } // namespace nim

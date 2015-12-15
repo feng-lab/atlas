@@ -213,7 +213,12 @@ QStringList Z3DGpuInfo::gpuInfo() const
   info << QString("OpenGL Renderer:               %1").arg(m_glRendererString);
   info << QString("OpenGL Version:                %1").arg(m_glVersionString);
   info << QString("OpenGL SL Version:             %1").arg(m_glslVersionString);
-  info << QString("OpenGL Extensions:             %1").arg(m_glExtensionsString);
+  info << QString("Context Core Profile Bit: %1").arg(m_contextCoreProfileBit);
+  info << QString("Context Compatibility Profile Bit: %1").arg(m_contextCompatibilityProfileBit);
+  info << QString("Context Flag Forward Compatible Bit: %1").arg(m_contextFlagForwardCompatibleBit);
+  info << QString("Context Flag Debug Bit: %1").arg(m_contextFlagDebugBit);
+  info << QString("Context Flag Robust Access Bit: %1").arg(m_contextFlagRobustAccessBit);
+  info << QString("OpenGL Extensions: %1").arg(m_glExtensionsString);
   info << QString("Max Viewport Dimensions:       %1").arg(m_maxViewportDims);
   info << QString("Max Renderbuffer Size:         %1").arg(m_maxRenderbufferSize);
   info << QString("Max Texture Size:              %1 (use %2)").arg(m_maxTexureSize).arg(maxTextureSize());
@@ -231,17 +236,14 @@ QStringList Z3DGpuInfo::gpuInfo() const
   }
   info << QString("Max FS Texture Image Units:    %1").arg(m_maxTextureImageUnits);
   info << QString("VS+GS+FS Texture Image Units:  %1").arg(m_maxCombinedTextureImageUnits);
-  info << QString("Max Texture Coordinates:       %1").arg(m_maxTextureCoords);
+  //info << QString("Max Texture Coordinates:       %1").arg(m_maxTextureCoords);
   info << QString("Max Array Texture Layers:      %1").arg(m_maxArrayTextureLayers);
 
   info << QString("Total Graphics Memory Size:    %1 MB").arg(dedicatedVideoMemoryMB());
 
-  info << QString("Smooth Point Size Range:       (%1, %2)").
-          arg(m_minSmoothPointSize).arg(m_maxSmoothPointSize);
-  info << QString("Smooth Point Size Granularity: %1").
-          arg(m_smoothPointSizeGranularity);
-  info << QString("Aliased Point Size Range:      (%1, %2)").
-          arg(m_minAliasedPointSize).arg(m_maxAliasedPointSize);
+  info << QString("Smooth Point Size Range:       (%1, %2)").arg(m_minSmoothPointSize).arg(m_maxSmoothPointSize);
+  info << QString("Smooth Point Size Granularity: %1").arg(m_smoothPointSizeGranularity);
+  //info << QString("Aliased Point Size Range:      (%1, %2)").arg(m_minAliasedPointSize).arg(m_maxAliasedPointSize);
 
   info << QString("Smooth Line Width Range:       (%1, %2)").
           arg(m_minSmoothLineWidth).arg(m_maxSmoothLineWidth);
@@ -289,7 +291,25 @@ void Z3DGpuInfo::detectGpuInfo()
   m_glVersionString = QString(reinterpret_cast<const char*>(glGetString(GL_VERSION)));
   m_glVendorString  = QString(reinterpret_cast<const char*>(glGetString(GL_VENDOR)));
   m_glRendererString  = QString(reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
-  m_glExtensionsString = QString(reinterpret_cast<const char*>(glGetString(GL_EXTENSIONS)));
+
+  if (GLVersionGE(3, 0)) {
+    GLint contextFlags;
+    glGetIntegerv(GL_CONTEXT_FLAGS, &contextFlags);
+    m_contextFlagForwardCompatibleBit = contextFlags & (GLint)GL_CONTEXT_FLAG_FORWARD_COMPATIBLE_BIT;
+    m_contextFlagDebugBit = contextFlags & (GLint)GL_CONTEXT_FLAG_DEBUG_BIT;
+    m_contextFlagRobustAccessBit = contextFlags & (GLint)GL_CONTEXT_FLAG_ROBUST_ACCESS_BIT;
+    if (GLVersionGE(3, 2)) {
+      GLint contextProfileMask;
+      glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &contextProfileMask);
+      m_contextCoreProfileBit = contextProfileMask & (GLint)GL_CONTEXT_CORE_PROFILE_BIT;
+      m_contextCompatibilityProfileBit = contextProfileMask & (GLint)GL_CONTEXT_COMPATIBILITY_PROFILE_BIT;
+    }
+    if (!m_contextFlagForwardCompatibleBit) {
+      m_glExtensionsString = QString(reinterpret_cast<const char*>(glGetString(GL_EXTENSIONS)));
+    }
+  } else {
+    m_glExtensionsString = QString(reinterpret_cast<const char*>(glGetString(GL_EXTENSIONS)));
+  }
 
   if (GLVersionGE(2, 1)) {
     if (!isFrameBufferObjectSupported()) {
@@ -370,7 +390,9 @@ void Z3DGpuInfo::detectGpuInfo()
     if (isGeometryShaderSupported())
       glGetIntegerv(GL_MAX_GEOMETRY_TEXTURE_IMAGE_UNITS, &m_maxGeometryTextureImageUnits);
     glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &m_maxCombinedTextureImageUnits);
-    glGetIntegerv(GL_MAX_TEXTURE_COORDS, &m_maxTextureCoords);
+    if (!GLVersionGE(3, 1)) {
+      glGetIntegerv(GL_MAX_TEXTURE_COORDS, &m_maxTextureCoords);
+    }
 
     if (isTextureFilterAnisotropicSupported())
       glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &m_maxTextureAnisotropy);
@@ -386,9 +408,10 @@ void Z3DGpuInfo::detectGpuInfo()
     glGetFloatv(GL_SMOOTH_POINT_SIZE_GRANULARITY, &m_smoothPointSizeGranularity);
     m_minSmoothPointSize = range[0];
     m_maxSmoothPointSize = range[1];
-    glGetFloatv(GL_ALIASED_POINT_SIZE_RANGE, range);
-    m_minAliasedPointSize = range[0];
-    m_maxAliasedPointSize = range[1];
+    // can not find in opengl doc
+    //glGetFloatv(GL_ALIASED_POINT_SIZE_RANGE, range);
+    //m_minAliasedPointSize = range[0];
+    //m_maxAliasedPointSize = range[1];
 
     // Line
     glGetFloatv(GL_SMOOTH_LINE_WIDTH_RANGE, range);
