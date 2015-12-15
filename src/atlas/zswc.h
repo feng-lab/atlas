@@ -4,6 +4,7 @@
 #include <QString>
 #include "ztree.hpp"
 #include "zglobal.h"
+#include "zglmutils.h"
 
 namespace nim {
 
@@ -87,6 +88,9 @@ public:
   // might throw ZIOException
   void load(const QString &filename);
   void save(const QString &filename) const;
+
+  //
+  void addLine(const std::vector<glm::dvec3>& line, double radius);
 };
 
 } // namespace nim

@@ -24,6 +24,7 @@ public:
   void build(const EdgeWeightFunctor& edgeWeightFunc)
   {
     m_graph.clear();
+    m_lowestWeight = std::numeric_limits<double>::max();
 
     updateNeighborDistances();
 
@@ -45,7 +46,11 @@ public:
   std::vector<double> shortestPaths(size_t startIdx, std::vector<size_t> *predecessor = nullptr);
 
   // overload, accept img coord rather than region idx
-  std::vector<double> shortestPaths(const ZVoxelCoordinate& coord, std::vector<size_t> *predecessor = nullptr);
+  std::vector<double> shortestPaths(const ZVoxelCoordinate& startCoord, std::vector<size_t> *predecessor = nullptr);
+
+  // astar version, return cost and first reached target idx
+  std::tuple<double, size_t> shortestPath(size_t startIdx, const std::vector<size_t>& targetIdxs,
+                                          std::vector<size_t> *resPath = nullptr);
 
 protected:
   void updateNeighborDistances();
@@ -62,6 +67,7 @@ protected:
           size_t nidx = nit.index(n);
           double weight = edgeWeightFunc(m_dists[n], data[nit.index()], data[nidx]);
           boost::add_edge(nit.index(), nidx, EdgeInfo(weight), m_graph);
+          m_lowestWeight = std::min(m_lowestWeight, weight / m_dists[n]);
         }
       }
     }
@@ -77,6 +83,7 @@ protected:
         if (nit.isInBound(n)) {
           double weight = edgeWeightFunc(m_dists[n], *nit, nit.valueRef(n));
           boost::add_edge(nit.index(), nit.index(n), EdgeInfo(weight), m_graph);
+          m_lowestWeight = std::min(m_lowestWeight, weight / m_dists[n]);
         }
       }
     }
@@ -106,6 +113,7 @@ private:
   typedef boost::graph_traits<GraphT>::edge_descriptor Edge;
 
   GraphT m_graph;
+  double m_lowestWeight;
 
 // some predefined edge weight functor
 public:

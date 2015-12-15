@@ -13,6 +13,7 @@
 #ifndef _USE_GLEW_
 #include <glbinding/Binding.h>
 #include <glbinding/Meta.h>
+#include <glbinding/Binding.h>
 #endif
 
 #if !defined(Q_OS_WIN) && !defined(Q_OS_DARWIN)
@@ -305,7 +306,10 @@ bool ZSystemInfo::initializeGL()
 #endif
   glbinding::setUnresolvedCallback([](const glbinding::AbstractFunction & call)
   {
-    LERROR() << "OpengGL Function" << call.name() << "can not be resolved.";
+    LERROR() << "OpengGL function" << call.name() << "can not be resolved.";
+  });
+  glbinding::Binding::addContextSwitchCallback([](glbinding::ContextHandle handle) {
+      LINFO() << "Switching to openGL context " << handle;
   });
   if (Z3DGpuInfoInstance.isSupported()) {
     m_glInitialized = true;

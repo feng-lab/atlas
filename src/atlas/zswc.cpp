@@ -201,4 +201,16 @@ void ZSwc::save(const QString &filename) const
   }
 }
 
+void ZSwc::addLine(const std::vector<glm::dvec3> &line, double radius)
+{
+  if (line.empty())
+    return;
+  SwcNode root(0, 0, line[0].x, line[0].y, line[0].z, radius, -1);
+  Iterator it = appendRoot(root);
+  for (size_t i=1; i<line.size(); ++i) {
+    SwcNode node(0, 0, line[i].x, line[i].y, line[i].z, radius, -1);
+    it = appendChild(it, node);
+  }
+}
+
 } // namespace nim

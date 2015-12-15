@@ -1,7 +1,73 @@
 #include "zimggraph.h"
 #include <boost/graph/dijkstra_shortest_paths.hpp>
+#include <boost/graph/astar_search.hpp>
 
 namespace nim {
+
+// euclidean distance heuristic
+template <class Graph>
+class distance_heuristic : public boost::astar_heuristic<Graph, double>
+{
+public:
+  typedef typename boost::graph_traits<Graph>::vertex_descriptor Vertex;
+  distance_heuristic(const ZImgRegion& region, const ZImgInfo& regionInfo,
+                     const std::vector<Vertex>& goals, double weight, bool useVoxelSize)
+    : m_region(region), m_regionInfo(regionInfo), m_goals(goals), m_weight(weight), m_useVoxelSize(useVoxelSize)
+  {}
+
+  double operator()(Vertex u)
+  {
+    double res = std::numeric_limits<double>::max();
+    ZVoxelCoordinate vertexCoord = ZImg::indexToCoord(u, m_regionInfo) + m_region.start;
+    for (Vertex v : m_goals) {
+      ZVoxelCoordinate goalCoord = ZImg::indexToCoord(v, m_regionInfo) + m_region.start;
+      if (m_useVoxelSize) {
+        double x = (vertexCoord.x - goalCoord.x) * m_regionInfo.voxelSizeX;
+        double y = (vertexCoord.y - goalCoord.y) * m_regionInfo.voxelSizeY;
+        double z = (vertexCoord.z - goalCoord.z) * m_regionInfo.voxelSizeZ;
+        res = std::min(res, m_weight * std::sqrt(x*x + y*y + z*z));
+      } else {
+        double x = (vertexCoord.x - goalCoord.x);
+        double y = (vertexCoord.y - goalCoord.y);
+        double z = (vertexCoord.z - goalCoord.z);
+        res = std::min(res, m_weight * std::sqrt(x*x + y*y + z*z));
+      }
+    }
+
+    return res;
+  }
+private:
+  const ZImgRegion& m_region;
+  const ZImgInfo& m_regionInfo;
+  const std::vector<Vertex>& m_goals;
+  double m_weight;
+  bool m_useVoxelSize;
+};
+
+template <class Vertex>
+struct found_goal
+{
+  found_goal(Vertex v) : v(v) {}
+  Vertex v;
+}; // exception for termination
+
+// visitor that terminates when we find the goal
+template <class Vertex>
+class astar_goal_visitor : public boost::default_astar_visitor
+{
+public:
+  astar_goal_visitor(const std::vector<Vertex>& goals) : m_goals(goals) {}
+  template <class Graph>
+  void examine_vertex(Vertex u, Graph&)
+  {
+    for (Vertex gv : m_goals) {
+      if (gv == u)
+        throw found_goal<Vertex>(gv);
+    }
+  }
+private:
+  const std::vector<Vertex>& m_goals;
+};
 
 ZImgGraph::ZImgGraph(const ZImg& img, const ZImgRegion& rgn)
   : m_img(img), m_region(rgn), m_useVoxelSize(true), m_graphIsValid(false)
@@ -63,14 +129,74 @@ std::vector<double> ZImgGraph::shortestPaths(size_t startIdx, std::vector<size_t
   return distance;
 }
 
-std::vector<double> ZImgGraph::shortestPaths(const ZVoxelCoordinate &coord, std::vector<size_t> *predecessor)
+std::vector<double> ZImgGraph::shortestPaths(const ZVoxelCoordinate &startCoord, std::vector<size_t> *predecessor)
 {
-  if (!m_region.containsCoord(coord, m_img.info())) {
+  if (!m_region.containsCoord(startCoord, m_img.info())) {
     throw ZImgException(QString("Invalid start coord %1 for shortest path in img region <%2>")
-                        .arg(coord.toQString()).arg(m_region.toQString()));
+                        .arg(startCoord.toQString()).arg(m_region.toQString()));
   }
-  size_t startIdx = ZImg::coordToIndex(coord - m_region.start, m_regionInfo);
+  size_t startIdx = ZImg::coordToIndex(startCoord - m_region.start, m_regionInfo);
   return shortestPaths(startIdx, predecessor);
+}
+
+std::tuple<double, size_t> ZImgGraph::shortestPath(size_t startIdx, const std::vector<size_t>& targetIdxs,
+                                                   std::vector<size_t> *resPath)
+{
+  if (!m_graphIsValid) {
+    throw ZImgException("Img graph is not built yet");
+  }
+  if (startIdx >= boost::num_vertices(m_graph)) {
+    throw ZImgException(QString("Invalid start idx %1 for shortest path in img region <%2>")
+                        .arg(startIdx).arg(m_region.toQString()));
+  }
+  if (targetIdxs.empty()) {
+    throw ZImgException("No target idxs");
+  }
+  for (size_t idx : targetIdxs) {
+    if (idx >= boost::num_vertices(m_graph)) {
+      throw ZImgException(QString("Invalid target idx %1 for shortest path in img region <%2>")
+                          .arg(idx).arg(m_region.toQString()));
+    }
+  }
+
+  std::vector<double> distance(boost::num_vertices(m_graph));
+  std::vector<size_t> predecessor;
+  try {
+    if (resPath) {
+      predecessor.resize(boost::num_vertices(m_graph));
+      boost::astar_search(m_graph, startIdx,
+                          distance_heuristic<GraphT>(m_region, m_regionInfo, targetIdxs, m_lowestWeight, m_useVoxelSize),
+                          boost::weight_map(boost::get(&EdgeInfo::weight, m_graph)).
+                          predecessor_map(boost::make_iterator_property_map(predecessor.begin(),
+                                                                            boost::get(boost::vertex_index, m_graph))).
+                          distance_map(boost::make_iterator_property_map(distance.begin(),
+                                                                         boost::get(boost::vertex_index, m_graph))).
+                          visitor(astar_goal_visitor<size_t>(targetIdxs)));
+    } else {
+      predecessor.resize(boost::num_vertices(m_graph));
+      boost::astar_search(m_graph, startIdx,
+                          distance_heuristic<GraphT>(m_region, m_regionInfo, targetIdxs, m_lowestWeight, m_useVoxelSize),
+                          boost::weight_map(boost::get(&EdgeInfo::weight, m_graph)).
+                          distance_map(boost::make_iterator_property_map(distance.begin(),
+                                                                         boost::get(boost::vertex_index, m_graph))).
+                          visitor(astar_goal_visitor<size_t>(targetIdxs)));
+    }
+  } catch (found_goal<size_t> fg) {
+    if (resPath) {
+      resPath->clear();
+      for(size_t v = fg.v; ; v = predecessor[v]) {
+        resPath->push_back(v);
+        if (predecessor[v] == v) {
+          break;
+        }
+      }
+    }
+
+    return std::make_tuple(distance[fg.v], fg.v);
+  }
+
+  throw ZImgException(QString("Didn't find a path from %1 to target points").arg(startIdx));
+  return std::make_tuple(-1, size_t(-1));
 }
 
 void ZImgGraph::updateNeighborDistances()
