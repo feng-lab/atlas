@@ -11,9 +11,33 @@ class distance_heuristic : public boost::astar_heuristic<Graph, double>
 public:
   typedef typename boost::graph_traits<Graph>::vertex_descriptor Vertex;
   distance_heuristic(const ZImgRegion& region, const ZImgInfo& regionInfo,
-                     const std::vector<Vertex>& goals, double weight, bool useVoxelSize)
+                     const std::vector<Vertex>& goals, double weight, bool useVoxelSize, const ZNeighborhood &nb)
     : m_region(region), m_regionInfo(regionInfo), m_goals(goals), m_weight(weight), m_useVoxelSize(useVoxelSize)
-  {}
+  {
+    if (nb.size() == size_t(2) || nb.size() == size_t(3)) {
+      // no diagonal connection
+      m_wxyz = m_useVoxelSize ? (m_regionInfo.voxelSizeX + m_regionInfo.voxelSizeY + m_regionInfo.voxelSizeZ) : 3.0;
+      m_wxy = m_useVoxelSize ? (m_regionInfo.voxelSizeX + m_regionInfo.voxelSizeY) : 2.0;
+      m_wyz = m_useVoxelSize ? (m_regionInfo.voxelSizeZ + m_regionInfo.voxelSizeY) : 2.0;
+      m_wxz = m_useVoxelSize ? (m_regionInfo.voxelSizeZ + m_regionInfo.voxelSizeX) : 2.0;
+      m_wx = m_useVoxelSize ? m_regionInfo.voxelSizeX : 1.0;
+      m_wy = m_useVoxelSize ? m_regionInfo.voxelSizeY : 1.0;
+      m_wz = m_useVoxelSize ? m_regionInfo.voxelSizeZ : 1.0;
+    } else { // there are many other cases but I am too lazy to write
+      m_wxyz = m_useVoxelSize ? std::sqrt(m_regionInfo.voxelSizeX * m_regionInfo.voxelSizeX +
+                                          m_regionInfo.voxelSizeY * m_regionInfo.voxelSizeY +
+                                          m_regionInfo.voxelSizeZ * m_regionInfo.voxelSizeZ) : std::sqrt(3.0);
+      m_wxy = m_useVoxelSize ? std::sqrt(m_regionInfo.voxelSizeX * m_regionInfo.voxelSizeX +
+                                         m_regionInfo.voxelSizeY * m_regionInfo.voxelSizeY) : std::sqrt(2.0);
+      m_wyz = m_useVoxelSize ? std::sqrt(m_regionInfo.voxelSizeZ * m_regionInfo.voxelSizeZ +
+                                         m_regionInfo.voxelSizeY * m_regionInfo.voxelSizeY) : std::sqrt(2.0);
+      m_wxz = m_useVoxelSize ? std::sqrt(m_regionInfo.voxelSizeZ * m_regionInfo.voxelSizeZ +
+                                         m_regionInfo.voxelSizeX * m_regionInfo.voxelSizeX) : std::sqrt(2.0);
+      m_wx = m_useVoxelSize ? m_regionInfo.voxelSizeX : 1.0;
+      m_wy = m_useVoxelSize ? m_regionInfo.voxelSizeY : 1.0;
+      m_wz = m_useVoxelSize ? m_regionInfo.voxelSizeZ : 1.0;
+    }
+  }
 
   double operator()(Vertex u)
   {
@@ -21,17 +45,30 @@ public:
     ZVoxelCoordinate vertexCoord = ZImg::indexToCoord(u, m_regionInfo) + m_region.start;
     for (Vertex v : m_goals) {
       ZVoxelCoordinate goalCoord = ZImg::indexToCoord(v, m_regionInfo) + m_region.start;
-      if (m_useVoxelSize) {
-        double x = (vertexCoord.x - goalCoord.x) * m_regionInfo.voxelSizeX;
-        double y = (vertexCoord.y - goalCoord.y) * m_regionInfo.voxelSizeY;
-        double z = (vertexCoord.z - goalCoord.z) * m_regionInfo.voxelSizeZ;
-        res = std::min(res, m_weight * std::sqrt(x*x + y*y + z*z));
-      } else {
-        double x = (vertexCoord.x - goalCoord.x);
-        double y = (vertexCoord.y - goalCoord.y);
-        double z = (vertexCoord.z - goalCoord.z);
-        res = std::min(res, m_weight * std::sqrt(x*x + y*y + z*z));
-      }
+      // octile distance
+      double dx = vertexCoord.x - goalCoord.x;
+      double dy = vertexCoord.y - goalCoord.y;
+      double dz = vertexCoord.z - goalCoord.z;
+      double dxyz = std::min(dx, std::min(dy, dz));
+      double dxy = std::min(dx, dy) - dxyz;
+      double dyz = std::min(dy, dz) - dxyz;
+      double dxz = std::min(dx, dz) - dxyz;
+      dx = dx - dxyz - dxy - dxz;
+      dy = dy - dxyz - dxy - dyz;
+      dz = dz - dxyz - dyz - dxz;
+
+      res = std::min(res, dxyz * m_wxyz + dxy * m_wxy + dyz * m_wyz + dxz * m_wxz + dx * m_wx + dy * m_wy + dz * m_wz);
+      //      if (m_useVoxelSize) {
+      //        double x = (vertexCoord.x - goalCoord.x) * m_regionInfo.voxelSizeX;
+      //        double y = (vertexCoord.y - goalCoord.y) * m_regionInfo.voxelSizeY;
+      //        double z = (vertexCoord.z - goalCoord.z) * m_regionInfo.voxelSizeZ;
+      //        res = std::min(res, m_weight * std::sqrt(x*x + y*y + z*z));
+      //      } else {
+      //        double x = (vertexCoord.x - goalCoord.x);
+      //        double y = (vertexCoord.y - goalCoord.y);
+      //        double z = (vertexCoord.z - goalCoord.z);
+      //        res = std::min(res, m_weight * std::sqrt(x*x + y*y + z*z));
+      //      }
     }
 
     return res;
@@ -42,6 +79,14 @@ private:
   const std::vector<Vertex>& m_goals;
   double m_weight;
   bool m_useVoxelSize;
+
+  double m_wxyz;
+  double m_wxy;
+  double m_wyz;
+  double m_wxz;
+  double m_wx;
+  double m_wy;
+  double m_wz;
 };
 
 template <class Vertex>
@@ -165,7 +210,7 @@ std::tuple<double, size_t> ZImgGraph::shortestPath(size_t startIdx, const std::v
     if (resPath) {
       predecessor.resize(boost::num_vertices(m_graph));
       boost::astar_search(m_graph, startIdx,
-                          distance_heuristic<GraphT>(m_region, m_regionInfo, targetIdxs, m_lowestWeight, m_useVoxelSize),
+                          distance_heuristic<GraphT>(m_region, m_regionInfo, targetIdxs, m_lowestWeight, m_useVoxelSize, m_neighborhood),
                           boost::weight_map(boost::get(&EdgeInfo::weight, m_graph)).
                           predecessor_map(boost::make_iterator_property_map(predecessor.begin(),
                                                                             boost::get(boost::vertex_index, m_graph))).
@@ -175,7 +220,7 @@ std::tuple<double, size_t> ZImgGraph::shortestPath(size_t startIdx, const std::v
     } else {
       predecessor.resize(boost::num_vertices(m_graph));
       boost::astar_search(m_graph, startIdx,
-                          distance_heuristic<GraphT>(m_region, m_regionInfo, targetIdxs, m_lowestWeight, m_useVoxelSize),
+                          distance_heuristic<GraphT>(m_region, m_regionInfo, targetIdxs, m_lowestWeight, m_useVoxelSize, m_neighborhood),
                           boost::weight_map(boost::get(&EdgeInfo::weight, m_graph)).
                           distance_map(boost::make_iterator_property_map(distance.begin(),
                                                                          boost::get(boost::vertex_index, m_graph))).
