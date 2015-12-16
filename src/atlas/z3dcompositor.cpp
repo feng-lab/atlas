@@ -490,7 +490,7 @@ void Z3DCompositor::process(Z3DEye eye)
         CHECK_GL_ERROR;
       }
     }
-  } else {
+  } else { // OIT
     for (size_t i=0; i<vFilters.size(); ++i) {
       Z3DImgFilter* vFilter = vFilters.at(i);
       if (vFilter->isReady(eye) && vFilter->hasTransparent(eye)) {
@@ -1016,6 +1016,8 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*> &f
   m_ddpFinalShader.release();
   port.releaseTarget();
 
+  glEnable(GL_DEPTH_TEST);
+
   CHECK_GL_ERROR;
 }
 
@@ -1183,6 +1185,8 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*> &fi
   renderScreenQuad(m_screenQuadVAO, m_waFinalShader);
   m_waFinalShader.release();
   port.releaseTarget();
+
+  glEnable(GL_DEPTH_TEST);
 
   CHECK_GL_ERROR;
 }

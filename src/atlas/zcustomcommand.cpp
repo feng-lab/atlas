@@ -12,6 +12,7 @@
 #include "itkMath.h"
 #include "zimgautothreshold.h"
 #include "zimggraph.h"
+#include <tbb/task_scheduler_init.h>
 
 namespace nim {
 
@@ -279,7 +280,7 @@ void stnTrajectory()
   QStringList filters;
   filters << "*.nrrd";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  QDir outFolder("/Users/feng/Downloads/allen_stn_grid_traj_1");
+  QDir outFolder("/Users/feng/Downloads/allen_stn_grid_traj");
   ZImg annotation("/Users/feng/Documents/allen/CCFv3/ccf_2015/annotation_50.nrrd");
   std::vector<size_t> stnIdxs;
   for (size_t i=0; i<annotation.voxelNumber(); ++i) {
@@ -301,89 +302,102 @@ void stnTrajectory()
       expBaseNames.insert(tokens.join('_'));
     }
   }
+  std::vector<QString> exps;
+  exps.insert(exps.end(), expBaseNames.begin(), expBaseNames.end());
 
   double projectionThre = 0.2;
-  for (const auto &str : expBaseNames) {
-    LINFO() << str;
-    ZImg mask(dir.filePath(str + "_50um_data_mask.nrrd"));
-    ZImg projection(dir.filePath(str + "_50um_projection_density.nrrd"));
-    projection *= mask;
 
-    std::vector<size_t> projIdxs;
-    for (size_t idx : stnIdxs) {
-      if (projection.value(idx) >= projectionThre) {
-        projIdxs.push_back(idx);
+  tbb::task_scheduler_init init(8);
+  tbb::parallel_for(
+        tbb::blocked_range<size_t>(0, exps.size()),
+        [&](const tbb::blocked_range<size_t>& range){
+    for (size_t expIdx = range.begin(); expIdx != range.end(); ++expIdx) {
+      const QString& str = exps[expIdx];
+      LINFO() << str;
+      ZImg mask(dir.filePath(str + "_50um_data_mask.nrrd"));
+      ZImg projection(dir.filePath(str + "_50um_projection_density.nrrd"));
+      projection *= mask;
+
+      std::vector<size_t> projIdxs;
+      for (size_t idx : stnIdxs) {
+        if (projection.value(idx) >= projectionThre) {
+          projIdxs.push_back(idx);
+        }
       }
+
+      if (projIdxs.empty())
+        continue;
+
+      ZImg injection(dir.filePath(str + "_50um_injection_density.nrrd"));
+      injection *= mask;
+
+      std::vector<size_t> injectionIdxs;
+      for (size_t i=0; i<injection.voxelNumber(); ++i) {
+        if (injection.value(i) > 0) {
+          injectionIdxs.push_back(i);
+        }
+      }
+
+      if (injectionIdxs.empty())
+        continue;
+
+      ZImgGraph imgGraph(projection);
+      imgGraph.setConnectivity(26);
+      ZImgAutoThreshold<> imgAutoThre;
+      double cent1 = 0;
+      double cent2 = 0;
+      double thre1 = imgAutoThre.centroidThre<double>(cent1, cent2, projection);
+      double scale = cent2 - cent1;
+      if (scale < 1.0)
+        scale = 1.0;
+      scale /= 9.2;
+      imgGraph.build(ZImgGraph::EdgeWeight2(thre1, scale));
+
+      std::vector<std::vector<glm::dvec3>> lines;
+      for (size_t idx : projIdxs) {
+  #if 1
+        std::vector<size_t> path;
+        imgGraph.shortestPath(idx, injectionIdxs, &path);
+        std::vector<glm::dvec3> line;
+        for (size_t idx : path) {
+          ZVoxelCoordinate coord = ZImg::indexToCoord(idx, projection.info());
+          line.push_back(glm::dvec3(coord.x, coord.y, coord.z));
+        }
+  #else
+        std::vector<size_t> predecessor;
+        std::vector<double> dist = imgGraph.shortestPaths(idx, &predecessor);
+        std::vector<double> injectionMinDists;
+        for (size_t injectionIdx : injectionIdxs) {
+          injectionMinDists.push_back(dist[injectionIdx]);
+        }
+        size_t curIdx = injectionIdxs[std::min_element(injectionMinDists.begin(), injectionMinDists.end()) - injectionMinDists.begin()];
+        std::vector<glm::dvec3> line;
+        while (true) {
+          ZVoxelCoordinate coord = ZImg::indexToCoord(curIdx, projection.info());
+          line.push_back(glm::dvec3(coord.x, coord.y, coord.z));
+          if (curIdx == idx) {
+            break;
+          }
+          assert(predecessor[curIdx] != curIdx);
+          curIdx = predecessor[curIdx];
+        }
+  #endif
+        if (line.empty()) {
+          LWARN() << "WTF";
+        } else {
+          lines.push_back(line);
+        }
+      }
+
+      ZSwc swc;
+      for (const auto& line : lines) {
+        swc.addLine(line, 1);
+      }
+      swc.resortID();
+      swc.save(outFolder.filePath(str + "_50um_stn_trace.swc"));
     }
-
-    if (projIdxs.empty())
-      continue;
-
-    ZImg injection(dir.filePath(str + "_50um_injection_density.nrrd"));
-    injection *= mask;
-
-    std::vector<size_t> injectionIdxs;
-    for (size_t i=0; i<injection.voxelNumber(); ++i) {
-      if (injection.value(i) > 0) {
-        injectionIdxs.push_back(i);
-      }
-    }
-
-    if (injectionIdxs.empty())
-      continue;
-
-    ZImgGraph imgGraph(projection);
-    imgGraph.setConnectivity(26);
-    ZImgAutoThreshold<> imgAutoThre;
-    double cent1 = 0;
-    double cent2 = 0;
-    double thre1 = imgAutoThre.centroidThre<double>(cent1, cent2, projection);
-    double scale = cent2 - cent1;
-    if (scale < 1.0)
-      scale = 1.0;
-    scale /= 9.2;
-    imgGraph.build(ZImgGraph::EdgeWeight2(thre1, scale));
-
-    std::vector<std::vector<glm::dvec3>> lines;
-    for (size_t idx : projIdxs) {
-#if 1
-      std::vector<size_t> path;
-      imgGraph.shortestPath(idx, injectionIdxs, &path);
-      std::vector<glm::dvec3> line;
-      for (size_t idx : path) {
-        ZVoxelCoordinate coord = ZImg::indexToCoord(idx, projection.info());
-        line.push_back(glm::dvec3(coord.x, coord.y, coord.z));
-      }
-#else
-      std::vector<size_t> predecessor;
-      std::vector<double> dist = imgGraph.shortestPaths(idx, &predecessor);
-      std::vector<double> injectionMinDists;
-      for (size_t injectionIdx : injectionIdxs) {
-        injectionMinDists.push_back(dist[injectionIdx]);
-      }
-      size_t curIdx = injectionIdxs[std::min_element(injectionMinDists.begin(), injectionMinDists.end()) - injectionMinDists.begin()];
-      std::vector<glm::dvec3> line;
-      while (curIdx != idx) {
-        ZVoxelCoordinate coord = ZImg::indexToCoord(curIdx, projection.info());
-        line.push_back(glm::dvec3(coord.x, coord.y, coord.z));
-        assert(predecessor[curIdx] != curIdx);
-        curIdx = predecessor[curIdx];
-      }
-#endif
-      if (line.empty()) {
-        LWARN() << "WTF";
-      } else {
-        lines.push_back(line);
-      }
-    }
-
-    ZSwc swc;
-    for (const auto& line : lines) {
-      swc.addLine(line, 1);
-    }
-    swc.resortID();
-    swc.save(outFolder.filePath(str + "_50um_stn_trace.swc"));
   }
+  );
 }
 
 void tmp()
