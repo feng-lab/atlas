@@ -57,7 +57,7 @@ public:
       dy = dy - dxyz - dxy - dyz;
       dz = dz - dxyz - dyz - dxz;
 
-      res = std::min(res, dxyz * m_wxyz + dxy * m_wxy + dyz * m_wyz + dxz * m_wxz + dx * m_wx + dy * m_wy + dz * m_wz);
+      res = std::min(res, m_weight * (dxyz * m_wxyz + dxy * m_wxy + dyz * m_wyz + dxz * m_wxz + dx * m_wx + dy * m_wy + dz * m_wz));
       //      if (m_useVoxelSize) {
       //        double x = (vertexCoord.x - goalCoord.x) * m_regionInfo.voxelSizeX;
       //        double y = (vertexCoord.y - goalCoord.y) * m_regionInfo.voxelSizeY;
