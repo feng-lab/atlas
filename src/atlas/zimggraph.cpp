@@ -145,27 +145,6 @@ void ZImgGraph::setConnectivity(size_t n)
   m_graphIsValid = false;
 }
 
-void ZImgGraph::build(const std::function<double (double, double, double)> &edgeWeightFunc)
-{
-  m_graph.clear();
-  m_lowestWeight = std::numeric_limits<double>::max();
-  m_edgeWeightFunction = edgeWeightFunc;
-
-  updateNeighborDistances();
-
-  for (size_t i=0; i<m_regionInfo.voxelNumber(); ++i) {
-    boost::add_vertex(m_graph);
-  }
-
-  if (m_region.containsWholePlane(m_img.info())) {
-    IMG_TYPED_CALL(addEdges_Opt, m_img);
-  } else {
-    IMG_TYPED_CALL(addEdges, m_img);
-  }
-
-  m_graphIsValid = true;
-}
-
 std::vector<double> ZImgGraph::shortestPaths(size_t startIdx, std::vector<size_t> *predecessor)
 {
   if (!m_graphIsValid) {
@@ -281,40 +260,5 @@ void ZImgGraph::updateNeighborDistances()
     }
   }
 }
-
-template <typename TVoxel>
-void ZImgGraph::addEdges_Opt()
-{
-  ZImgNeighborhoodConstIterator<TVoxel> nit =
-      ZImgNeighborhoodConstIterator<TVoxel>(m_neighborhood, m_img, m_region);
-  const TVoxel* data = m_img.planeData<TVoxel>(m_region.zStart(), m_region.cStart(), m_region.tStart());
-  for (; !nit.isAtEnd(); ++nit) {
-    for (size_t n=0; n<nit.numNeighbors(); ++n) {
-      if (nit.isInBound(n)) {
-        size_t nidx = nit.index(n);
-        double weight = m_edgeWeightFunction(m_dists[n], data[nit.index()], data[nidx]);
-        boost::add_edge(nit.index(), nidx, EdgeInfo(weight), m_graph);
-        m_lowestWeight = std::min(m_lowestWeight, weight / m_dists[n]);
-      }
-    }
-  }
-}
-
-template <typename TVoxel>
-void ZImgGraph::addEdges()
-{
-  ZImgNeighborhoodWithPtrConstIterator<TVoxel> nit =
-      ZImgNeighborhoodWithPtrConstIterator<TVoxel>(m_neighborhood, m_img, m_region);
-  for (; !nit.isAtEnd(); ++nit) {
-    for (size_t n=0; n<nit.numNeighbors(); ++n) {
-      if (nit.isInBound(n)) {
-        double weight = m_edgeWeightFunction(m_dists[n], *nit, nit.valueRef(n));
-        boost::add_edge(nit.index(), nit.index(n), EdgeInfo(weight), m_graph);
-        m_lowestWeight = std::min(m_lowestWeight, weight / m_dists[n]);
-      }
-    }
-  }
-}
-
 
 } // namespace nim
