@@ -534,7 +534,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  stnTrajectory();
+  mergeTraces();
   LINFO() << "done";
 }
 

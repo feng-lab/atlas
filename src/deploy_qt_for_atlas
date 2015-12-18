@@ -24,7 +24,7 @@ if [ -e "atlas.app" ]; then
 	fi
 	zip -qr atlas.app.zip atlas.app
 	rm -r atlas.app
-  cp -f atlas.app.zip "/Users/feng/Google Drive/jinny'lab/software/atlas.app.zip"
+  #cp -f atlas.app.zip "/Users/feng/Google Drive/jinny'lab/software/atlas.app.zip"
 else
 	echo "atlas.app not build yet."
 fi

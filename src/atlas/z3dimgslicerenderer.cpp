@@ -224,9 +224,9 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
       for (size_t i=0; i<m_img->numChannels(); ++i) {
         m_layerTarget->attachSlice(i);
 
-        if (i == 1) {
-          m_layerTarget->saveAsColorImage("/Users/feng/Downloads/abcd_b.tif");
-        }
+        //if (i == 1) {
+          //m_layerTarget->saveAsColorImage("/Users/feng/Downloads/abcd_b.tif");
+        //}
 
         m_layerTarget->bind();
         m_layerTarget->clear();
@@ -239,9 +239,9 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
 
         m_layerTarget->release();
 
-        if (i == 1) {
-          m_layerTarget->saveAsColorImage("/Users/feng/Downloads/abcd.tif");
-        }
+        //if (i == 1) {
+          //m_layerTarget->saveAsColorImage("/Users/feng/Downloads/abcd.tif");
+        //}
       }
     }
 

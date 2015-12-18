@@ -28,6 +28,7 @@ void Z3DScene::drawBackground(QPainter * /*painter*/, const QRectF &)
 
   m_networkEvaluator->process(m_isStereoScene || m_fakeStereoOnce);
   m_fakeStereoOnce = false;
+  glFinish();
 }
 
 } // namespace nim
