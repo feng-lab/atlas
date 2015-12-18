@@ -67,9 +67,9 @@ if [ -d $currDIR/boost ]
 then
   rm -rf $currDIR/boost
 fi
-srcArchive=$srcPackageDIR/boost_1_59_0.tar.bz2
+srcArchive=$srcPackageDIR/boost_1_60_0.tar.bz2
 tar -jxf "$srcArchive" -C $currDIR
-mv $currDIR/boost_1_59_0 $currDIR/boost
+mv $currDIR/boost_1_60_0 $currDIR/boost
 
 if [ -d $currDIR/eigen ]
 then

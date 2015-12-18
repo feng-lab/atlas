@@ -411,8 +411,7 @@ public:
   ZTree(const Iter& it)
   {
     init();
-    appendRoot(*it);
-    copy(begin(), it);
+    copy(appendRoot(*it), it);
   }
   ZTree(const ZTree& rhs)
   {
@@ -677,6 +676,7 @@ public:
   template<typename Iter>
   size_t size(const Iter& parent) { return std::distance(begin(parent), end(parent)); }
   size_t numRoots() const { return std::distance(beginRoot(), endRoot()); }
+  size_t numLeafs() const { return std::distance(beginLeaf(), endLeaf()); }
   template<typename Iter>
   size_t numChildren(const Iter& parent) const { return std::distance(beginChild(parent), endChild(parent)); }
   template<typename Iter>
@@ -694,6 +694,8 @@ public:
   static bool isNull(const Iter& pos) { return !pos.node; }
   template<typename Iter>
   static Iter parent(const Iter& pos) { return Iter(pos.node->parent); }
+  template<typename Iter>
+  static Iter firstChild(const Iter& pos) { return Iter(pos.node->firstChild); }
 
   void clear()
   {

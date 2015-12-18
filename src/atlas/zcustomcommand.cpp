@@ -280,7 +280,7 @@ void stnTrajectory()
   QStringList filters;
   filters << "*.nrrd";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  QDir outFolder("/Users/feng/Downloads/allen_stn_grid_traj");
+  QDir outFolder("/Users/feng/Downloads/allen_stn_grid_traj_1");
   ZImg annotation("/Users/feng/Documents/allen/CCFv3/ccf_2015/annotation_50.nrrd");
   std::vector<size_t> stnIdxs;
   for (size_t i=0; i<annotation.voxelNumber(); ++i) {
@@ -313,6 +313,14 @@ void stnTrajectory()
         [&](const tbb::blocked_range<size_t>& range){
     for (size_t expIdx = range.begin(); expIdx != range.end(); ++expIdx) {
       const QString& str = exps[expIdx];
+      //if (str != "11_wks_coronal_126190033") {
+        //continue;
+      //}
+
+      if (outFolder.exists(str + "_50um_stn_trace.swc")) {
+        continue;
+      }
+
       LINFO() << str;
       ZImg mask(dir.filePath(str + "_50um_data_mask.nrrd"));
       ZImg projection(dir.filePath(str + "_50um_projection_density.nrrd"));
@@ -347,15 +355,20 @@ void stnTrajectory()
       double cent1 = 0;
       double cent2 = 0;
       double thre1 = imgAutoThre.centroidThre<double>(cent1, cent2, projection);
+#if 0
       double scale = cent2 - cent1;
       if (scale < 1.0)
         scale = 1.0;
       scale /= 9.2;
+#else
+      double scale = 0.5;
+#endif
+      LINFO() << str << scale << thre1;
       imgGraph.build(ZImgGraph::EdgeWeight2(thre1, scale));
 
       std::vector<std::vector<glm::dvec3>> lines;
       for (size_t idx : projIdxs) {
-  #if 1
+  #if 0
         std::vector<size_t> path;
         imgGraph.shortestPath(idx, injectionIdxs, &path);
         std::vector<glm::dvec3> line;
@@ -389,15 +402,122 @@ void stnTrajectory()
         }
       }
 
-      ZSwc swc;
+      ZSwc origSwc;
       for (const auto& line : lines) {
-        swc.addLine(line, 1);
+        origSwc.addLine(line, 1);
       }
+
+      ZSwc swc;
+      for (ZSwc::ConstRootIterator oit = origSwc.cbeginRoot(); oit != origSwc.cendRoot(); ++oit) {
+        ZSwc::Iterator desParent;
+        ZSwc::ConstIterator srcChild;
+        for (ZSwc::RootIterator it = swc.beginRoot(); it != swc.endRoot(); ++it) {
+          if (it->x == oit->x && it->y == oit->y && it->z == oit->z) {
+            desParent = it;
+            ZSwc::ConstIterator srcParent = oit;
+            while (swc.numChildren(desParent) > 0 && origSwc.numChildren(srcParent) > 0) {
+              double srcX = ZSwc::firstChild(srcParent)->x;
+              double srcY = ZSwc::firstChild(srcParent)->y;
+              double srcZ = ZSwc::firstChild(srcParent)->z;
+
+              ZSwc::Iterator matchDesChild;
+              for (ZSwc::ChildIterator cit = swc.beginChild(desParent); cit != swc.endChild(desParent); ++cit) {
+                if (cit->x == srcX && cit->y == srcY && cit->z == srcZ) {
+                  matchDesChild = cit;
+                  break;
+                }
+              }
+
+              if (ZSwc::isNull(matchDesChild)) {
+                break;
+              } else {
+                desParent = matchDesChild;
+                srcParent = ZSwc::firstChild(srcParent);
+              }
+            }
+            if (origSwc.numChildren(srcParent) > 0) {
+              srcChild = ZSwc::firstChild(srcParent);
+            }
+            break;
+          }
+        }
+        if (ZSwc::isNull(desParent)) {
+          swc.copy(swc.appendRoot(*oit), oit);
+        } else if (!ZSwc::isNull(srcChild)) {
+          swc.copy(swc.appendChild(desParent, *srcChild), srcChild);
+        }
+      }
+
       swc.resortID();
-      swc.save(outFolder.filePath(str + "_50um_stn_trace.swc"));
+      if (!outFolder.exists(str + "_50um_stn_trace.swc")) {
+        swc.save(outFolder.filePath(str + "_50um_stn_trace.swc"));
+      }
     }
   }
   );
+}
+
+void mergeTraces()
+{
+  QDir dir("/Users/feng/Downloads/allen_stn_grid_traj_1");
+  QStringList filters;
+  filters << "*.swc";
+  QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+  QDir outFolder("/Users/feng/Downloads/allen_stn_grid_traj_clean");
+
+  for (QFileInfo fileInfo : list) {
+    QString fileName = fileInfo.fileName();
+    ZSwc origSwc(fileInfo.absoluteFilePath());
+    ZSwc swc;
+
+    if (origSwc.numRoots() != origSwc.numLeafs()) {
+      origSwc.save(outFolder.filePath(fileName));
+      continue;
+    }
+
+    for (ZSwc::ConstRootIterator oit = origSwc.cbeginRoot(); oit != origSwc.cendRoot(); ++oit) {
+      ZSwc::Iterator desParent;
+      ZSwc::ConstIterator srcChild;
+      for (ZSwc::RootIterator it = swc.beginRoot(); it != swc.endRoot(); ++it) {
+        if (it->x == oit->x && it->y == oit->y && it->z == oit->z) {
+          desParent = it;
+          ZSwc::ConstIterator srcParent = oit;
+          while (swc.numChildren(desParent) > 0 && origSwc.numChildren(srcParent) > 0) {
+            double srcX = ZSwc::firstChild(srcParent)->x;
+            double srcY = ZSwc::firstChild(srcParent)->y;
+            double srcZ = ZSwc::firstChild(srcParent)->z;
+
+            ZSwc::Iterator matchDesChild;
+            for (ZSwc::ChildIterator cit = swc.beginChild(desParent); cit != swc.endChild(desParent); ++cit) {
+              if (cit->x == srcX && cit->y == srcY && cit->z == srcZ) {
+                matchDesChild = cit;
+                break;
+              }
+            }
+
+            if (ZSwc::isNull(matchDesChild)) {
+              break;
+            } else {
+              desParent = matchDesChild;
+              srcParent = ZSwc::firstChild(srcParent);
+            }
+          }
+          if (origSwc.numChildren(srcParent) > 0) {
+            srcChild = ZSwc::firstChild(srcParent);
+          }
+          break;
+        }
+      }
+      if (ZSwc::isNull(desParent)) {
+        swc.copy(swc.appendRoot(*oit), oit);
+      } else if (!ZSwc::isNull(srcChild)) {
+        swc.copy(swc.appendChild(desParent, *srcChild), srcChild);
+      }
+    }
+
+    swc.resortID();
+    swc.save(outFolder.filePath(fileName));
+  }
 }
 
 void tmp()
