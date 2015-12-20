@@ -2,7 +2,7 @@
 #define ZTIFF_H
 
 #include <vector>
-#include <stdint.h>
+#include <cstdint>
 #include <iostream>
 #include <memory>
 #include "zimginterface.h"

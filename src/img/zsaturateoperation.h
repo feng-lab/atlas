@@ -6,9 +6,10 @@
 // if it happens you have to convert the ambiguous type (e.g. size_t can be long or long long) into one of
 // the sized type to make the overload work
 
-#include <stdint.h>
+#include <cstdint>
 #include <numeric>
 #include <cmath>
+#include <limits>
 #include <immintrin.h>
 
 namespace nim {

@@ -2,7 +2,7 @@
 #define ZCPUINFO_H
 
 #include <QString>
-#include <stdint.h>
+#include <cstdint>
 
 namespace nim {
 

@@ -6,7 +6,7 @@
 #include <QColor>
 #include <limits>
 #include "zparameter.h"
-#include <stdint.h>
+#include <cstdint>
 #include "zglobal.h"
 
 namespace nim {

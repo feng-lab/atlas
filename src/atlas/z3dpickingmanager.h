@@ -2,7 +2,7 @@
 #define Z3DPICKINGMANAGER_H
 
 #include "zglmutils.h"
-#include <stdint.h>
+#include <cstdint>
 #include <map>
 #include "z3drendertarget.h"
 

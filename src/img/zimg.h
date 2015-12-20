@@ -1,7 +1,7 @@
 #ifndef ZIMG_H
 #define ZIMG_H
 
-#include <stdint.h>
+#include <cstdint>
 #include <vector>
 #include <QString>
 #include <memory>

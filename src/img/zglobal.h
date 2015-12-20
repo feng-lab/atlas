@@ -1,7 +1,7 @@
 #ifndef ZGLOBAL
 #define ZGLOBAL
 
-#include <stdint.h>
+#include <cstdint>
 #include <cstddef>
 #include <cstring>
 #include <type_traits>
