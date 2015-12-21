@@ -143,6 +143,27 @@ public:
     double m_thre;
     double m_scale;
   };
+
+  struct EdgeWeight3
+  {
+    EdgeWeight3(double thre, double scale)
+      : m_thre(thre), m_scale(scale)
+    {}
+    inline double operator()(double dist, double v1, double v2) const
+    {
+      if (v1 < m_thre || v2 < m_thre) {
+        return 1000;
+      } else {
+        return dist *
+            (1.0 / (1.0 + std::exp((v1 - m_thre) / m_scale))
+             + 1.0 / (1.0 + std::exp((v2 - m_thre) / m_scale))
+             + 0.00001);
+      }
+    }
+  private:
+    double m_thre;
+    double m_scale;
+  };
 };
 
 } // namespace nim

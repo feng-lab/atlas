@@ -278,7 +278,8 @@ HEADERS += \
     z3dimg.h \
     z3dimgfilter.h \
     z3dblockcache.h \
-    z3dimgslicerenderer.h
+    z3dimgslicerenderer.h \
+    zregionontology.h
 
 SOURCES += \
     main.cpp \
@@ -485,7 +486,8 @@ SOURCES += \
     z3dimgraycasterrenderer.cpp \
     z3dimg.cpp \
     z3dimgfilter.cpp \
-    z3dimgslicerenderer.cpp
+    z3dimgslicerenderer.cpp \
+    zregionontology.cpp
 
 contains(CONFIG, use_glbinding) {
     include($$PWD/../3rdparty/glbinding.pri)

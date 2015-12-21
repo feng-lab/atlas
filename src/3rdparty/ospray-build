@@ -20,7 +20,7 @@ else
 fi
 
 # patch ./Modules/Core/Common/include/itkLightObject.h
-sed -i.bak 's/SET(CMAKE_CXX_FLAGS "-fPIC/SET(CMAKE_CXX_FLAGS "-stdlib=libc++ -std=c++14 -fPIC/' $srcDIR/cmake/clang.cmake
+#sed -i.bak 's/SET(CMAKE_CXX_FLAGS "-fPIC/SET(CMAKE_CXX_FLAGS "-stdlib=libc++ -std=c++14 -fPIC/' $srcDIR/cmake/clang.cmake
 
 if [ -d $buildDIR ]
 then
@@ -29,12 +29,12 @@ fi
 mkdir $buildDIR
 cd $buildDIR
 
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.7 -DCMAKE_OSX_SYSROOT:PATH="/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk" -DOSPRAY_BUILD_ISA:STRING="ALL" -DOSPRAY_MODULE_TACHYON:BOOL="0" -DOSPRAY_APPS_QTVIEWER:BOOL="0" -DOSPRAY_COMPILER:STRING="CLANG" -DOSPRAY_MODULE_SEISMIC:BOOL="0" -DOSPRAY_APPS_VOLUMEVIEWER:BOOL="0" -DOSPRAY_APPS_MODELVIEWER:BOOL="0" -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++14" $srcDIR
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.7 -DCMAKE_OSX_SYSROOT:PATH="/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk" -DTBB_ROOT:PATH="/opt/intel/tbb" -DOSPRAY_BUILD_ISA:STRING="ALL" -DOSPRAY_MODULE_TACHYON:BOOL="1" -DOSPRAY_APPS_QTVIEWER:BOOL="0" -DOSPRAY_MODULE_SEISMIC:BOOL="0" -DOSPRAY_APPS_VOLUMEVIEWER:BOOL="0" -DOSPRAY_APPS_MODELVIEWER:BOOL="0" -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++14" $srcDIR
 
 make -j $numCores install
 
 #unpatch
-mv -f $srcDIR/cmake/clang.cmake.bak $srcDIR/cmake/clang.cmake
+#mv -f $srcDIR/cmake/clang.cmake.bak $srcDIR/cmake/clang.cmake
 
 cd $currDIR
 rm -rf $buildDIR

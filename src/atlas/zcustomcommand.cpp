@@ -13,6 +13,7 @@
 #include "zimgautothreshold.h"
 #include "zimggraph.h"
 #include <tbb/task_scheduler_init.h>
+#include "zregionontology.h"
 
 namespace nim {
 
@@ -280,12 +281,22 @@ void stnTrajectory()
   QStringList filters;
   filters << "*.nrrd";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  QDir outFolder("/Users/feng/Downloads/allen_stn_grid_traj_1");
-  ZImg annotation("/Users/feng/Documents/allen/CCFv3/ccf_2015/annotation_50.nrrd");
+  QDir outFolder("/Users/feng/Downloads/allen_stn_grid_traj_2");
+  QString resolution = "50";
+  tbb::task_scheduler_init init(8);
+
+  ZTree<RegionNode> ontology;
+  readMouseBrainAtlasOntology(ontology);
+  ZImg annotation(QString("/Users/feng/Documents/allen/CCFv3/ccf_2015/annotation_%1.nrrd").arg(resolution));
+  ZImg isoCortexMask(ZImgInfo(annotation.width(), annotation.height(), annotation.depth()));
+  uint32_t stnID = idOfRegionAbbreviation("STN", ontology);
+  std::vector<int64_t> cortexIDs = allIDsWithinRegionAbbreviation("Isocortex", ontology);
   std::vector<size_t> stnIdxs;
   for (size_t i=0; i<annotation.voxelNumber(); ++i) {
-    if (annotation.value(i) == 470) {
+    if (annotation.value(i) == stnID) {
       stnIdxs.push_back(i);
+    } else if (std::find(cortexIDs.begin(), cortexIDs.end(), annotation.value(i)) != cortexIDs.end()) {
+      isoCortexMask.setValue(1, i);
     }
   }
 
@@ -307,23 +318,23 @@ void stnTrajectory()
 
   double projectionThre = 0.2;
 
-  tbb::task_scheduler_init init(8);
   tbb::parallel_for(
         tbb::blocked_range<size_t>(0, exps.size()),
         [&](const tbb::blocked_range<size_t>& range){
     for (size_t expIdx = range.begin(); expIdx != range.end(); ++expIdx) {
       const QString& str = exps[expIdx];
-      //if (str != "11_wks_coronal_126190033") {
-        //continue;
-      //}
+      if (!str.contains("298000880") &&
+          !str.contains("306491185")) {
+        continue;
+      }
 
-      if (outFolder.exists(str + "_50um_stn_trace.swc")) {
+      if (outFolder.exists(str + "_" + resolution + "um_stn_trace.swc")) {
         continue;
       }
 
       LINFO() << str;
-      ZImg mask(dir.filePath(str + "_50um_data_mask.nrrd"));
-      ZImg projection(dir.filePath(str + "_50um_projection_density.nrrd"));
+      ZImg mask(dir.filePath(str + "_" + resolution + "um_data_mask.nrrd"));
+      ZImg projection(dir.filePath(str + "_" + resolution + "um_projection_density.nrrd"));
       projection *= mask;
 
       std::vector<size_t> projIdxs;
@@ -336,8 +347,9 @@ void stnTrajectory()
       if (projIdxs.empty())
         continue;
 
-      ZImg injection(dir.filePath(str + "_50um_injection_density.nrrd"));
+      ZImg injection(dir.filePath(str + "_" + resolution + "um_injection_density.nrrd"));
       injection *= mask;
+      //injection *= isoCortexMask;
 
       std::vector<size_t> injectionIdxs;
       for (size_t i=0; i<injection.voxelNumber(); ++i) {
@@ -362,13 +374,14 @@ void stnTrajectory()
       scale /= 9.2;
 #else
       double scale = 0.5;
+      thre1 = 0.15;
 #endif
       LINFO() << str << scale << thre1;
-      imgGraph.build(ZImgGraph::EdgeWeight2(thre1, scale));
+      imgGraph.build(ZImgGraph::EdgeWeight3(thre1, scale));
 
       std::vector<std::vector<glm::dvec3>> lines;
       for (size_t idx : projIdxs) {
-  #if 0
+  #if 1
         std::vector<size_t> path;
         imgGraph.shortestPath(idx, injectionIdxs, &path);
         std::vector<glm::dvec3> line;
@@ -449,8 +462,8 @@ void stnTrajectory()
       }
 
       swc.resortID();
-      if (!outFolder.exists(str + "_50um_stn_trace.swc")) {
-        swc.save(outFolder.filePath(str + "_50um_stn_trace.swc"));
+      if (!outFolder.exists(str + "_" + resolution + "um_stn_trace.swc")) {
+        swc.save(outFolder.filePath(str + "_" + resolution + "um_stn_trace.swc"));
       }
     }
   }
@@ -534,7 +547,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  mergeTraces();
+  stnTrajectory();
   LINFO() << "done";
 }
 

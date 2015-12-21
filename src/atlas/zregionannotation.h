@@ -2,48 +2,12 @@
 #define ZREGIONANNOTATION_H
 
 #include "zglobal.h"
-#include "ztree.hpp"
-#include <QStringList>
 #include <map>
-#include "zroi.h"
-#include <memory>
-#include "zmesh.h"
 #include <QObject>
-#include <QJsonObject>
 #include <QUndoStack>
+#include "zregionontology.h"
 
 namespace nim {
-
-struct RegionNode
-{
-  RegionNode(int64_t id = -1, int64_t parentID = -1, int red = 0, int green = 0, int blue = 0,
-             QString name = "", QString abbreviation = "")
-    : id(id), parentID(parentID), red(red), green(green), blue(blue)
-    , name(name), abbreviation(abbreviation)
-  {}
-
-  int64_t id;
-  int64_t parentID;
-  int red;
-  int green;
-  int blue;
-  QString name;
-  QString abbreviation;
-  std::shared_ptr<ZROI> roi;
-  std::shared_ptr<ZMesh> mesh;
-
-  bool operator==(const RegionNode &rhs) const
-  {
-    return id == rhs.id &&
-        parentID == rhs.parentID &&
-        red == rhs.red &&
-        green == rhs.green &&
-        blue == rhs.blue &&
-        name == rhs.name &&
-        abbreviation == rhs.abbreviation;
-  }
-  inline bool operator!=(const RegionNode &rhs) const { return !(*this == rhs); }
-};
 
 class ZRegionAnnotation : public QObject
 {
@@ -105,10 +69,7 @@ public slots:
   void updateMesh_Impl(const ZTree<RegionNode> &newOntology);
 
 private:
-  void readOntology(bool readAll = true);
   void updateBoundBox();
-
-  void readOntology(const QJsonObject &obj, ZTree<RegionNode>::Iterator &parentIt);
 
 private:
   friend class ZRegionAnnotationUpdateMeshCommand;

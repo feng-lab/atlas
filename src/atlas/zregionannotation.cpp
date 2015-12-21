@@ -456,7 +456,10 @@ ZRegionAnnotation::ZRegionAnnotation(QObject *parent)
   : QObject(parent)
 {
   clear();
-  readOntology(false);
+
+  QStringList regions;
+  regions << "GPe" << "STN" << "SNr" << "STRv" << "STRd" << "GPi" << "SPF";
+  readMouseBrainAtlasOntology(regions, m_ontology);
   connect(&m_undoStack, SIGNAL(cleanChanged(bool)),
           this, SIGNAL(undoStackCleanChanged(bool)));
 }
@@ -909,60 +912,6 @@ void ZRegionAnnotation::updateMesh_Impl(const ZTree<RegionNode> &newOntology)
   emit allMeshChanged();
 }
 
-void ZRegionAnnotation::readOntology(bool readAll)
-{
-  QString ontologyFilename = ":/Resources/ontology/mouse_brain_atlas.json";
-  QFile file(ontologyFilename);
-  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-    throw ZIOException(tr("Can not open ontology file"));
-  }
-
-  QByteArray saveData = file.readAll();
-  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData));
-  if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
-    throw ZIOException(tr("File format is incorrect"));
-  }
-  QJsonObject loadObj = loadDoc.object();
-  if (!loadObj.contains("msg") || !loadObj["msg"].isArray() || !loadObj["msg"].toArray().first().isObject()) {
-    throw ZIOException(tr("File is not %1 format").arg("ontology"));
-  }
-  QJsonObject rootObj = loadObj["msg"].toArray().first().toObject();
-  RegionNode node;
-  QJsonArray children;
-  for (QJsonObject::const_iterator it = rootObj.constBegin(); it != rootObj.constEnd(); ++it) {
-    if (it.key() == "id") {
-      node.id = it.value().toInt(-1);
-    } else if (it.key() == "parent_structure_id") {
-      node.parentID = -1;
-    } else if (it.key() == "acronym") {
-      node.abbreviation = it.value().toString();
-    } else if (it.key() == "name") {
-      node.name = it.value().toString();
-    } else if (it.key() == "color_hex_triplet") {
-      QString colorStr = it.value().toString();
-      assert(colorStr.size() == 6);
-      bool ok;
-      node.red = colorStr.mid(0,2).toInt(&ok, 16);
-      assert(ok);
-      node.green = colorStr.mid(2,2).toInt(&ok, 16);
-      assert(ok);
-      node.blue = colorStr.mid(4,2).toInt(&ok, 16);
-      assert(ok);
-    } else if (it.key() == "children") {
-      assert(it.value().isArray());
-      children = it.value().toArray();
-    }
-  }
-  ZTree<RegionNode>::Iterator currIt;
-  if (readAll) {
-    currIt = m_ontology.appendRoot(node);
-  }
-  for (QJsonArray::const_iterator it = children.constBegin(); it != children.constEnd(); ++it) {
-    assert((*it).isObject());
-    readOntology((*it).toObject(), currIt);
-  }
-}
-
 void ZRegionAnnotation::updateBoundBox()
 {
   if (m_width <= 0 || m_height <= 0 || m_depth <= 0) {
@@ -979,58 +928,6 @@ void ZRegionAnnotation::updateBoundBox()
     m_boundBox[7] = 0;
   }
   emit boundBoxChanged();
-}
-
-void ZRegionAnnotation::readOntology(const QJsonObject &obj, ZTree<RegionNode>::Iterator &parentIt)
-{
-  RegionNode node;
-  QJsonArray children;
-  for (QJsonObject::const_iterator it = obj.constBegin(); it != obj.constEnd(); ++it) {
-    if (it.key() == "id") {
-      node.id = it.value().toInt(-1);
-    } else if (it.key() == "parent_structure_id") {
-      node.parentID = it.value().toInt(-1);
-    } else if (it.key() == "acronym") {
-      node.abbreviation = it.value().toString();
-    } else if (it.key() == "name") {
-      node.name = it.value().toString();
-    } else if (it.key() == "color_hex_triplet") {
-      QString colorStr = it.value().toString();
-      assert(colorStr.size() == 6);
-      bool ok;
-      node.red = colorStr.mid(0,2).toInt(&ok, 16);
-      assert(ok);
-      node.green = colorStr.mid(2,2).toInt(&ok, 16);
-      assert(ok);
-      node.blue = colorStr.mid(4,2).toInt(&ok, 16);
-      assert(ok);
-    } else if (it.key() == "children") {
-      assert(it.value().isArray());
-      children = it.value().toArray();
-    }
-  }
-  if (!m_ontology.isNull(parentIt)) {
-    ZTree<RegionNode>::Iterator currIt = m_ontology.appendChild(parentIt, node);
-    for (QJsonArray::const_iterator it = children.constBegin(); it != children.constEnd(); ++it) {
-      assert((*it).isObject());
-      readOntology((*it).toObject(), currIt);
-    }
-  } else {
-    ZTree<RegionNode>::Iterator currIt;
-    if (node.abbreviation.compare("GPe", Qt::CaseInsensitive) == 0 ||
-        node.abbreviation.compare("STN", Qt::CaseInsensitive) == 0 ||
-        node.abbreviation.compare("SNr", Qt::CaseInsensitive) == 0 ||
-        node.abbreviation.compare("STRv", Qt::CaseInsensitive) == 0 ||
-        node.abbreviation.compare("STRd", Qt::CaseInsensitive) == 0 ||
-        node.abbreviation.compare("GPi", Qt::CaseInsensitive) == 0 ||
-        node.abbreviation.compare("SPF", Qt::CaseInsensitive) == 0) {
-      currIt = m_ontology.appendRoot(node);
-    }
-    for (QJsonArray::const_iterator it = children.constBegin(); it != children.constEnd(); ++it) {
-      assert((*it).isObject());
-      readOntology((*it).toObject(), currIt);
-    }
-  }
 }
 
 void ZRegionAnnotationUpdateMeshCommand::redo()
