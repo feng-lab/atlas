@@ -25,18 +25,18 @@ struct SwcNode
   int parentID;   // after tree change, parentID becomes invalid, use function parentID to get corrent parentID
   int label;
 
-  bool operator==(const SwcNode &rhs) const
-  {
-    return id == rhs.id &&
-        type == rhs.type &&
-        x == rhs.x &&
-        y == rhs.y &&
-        z == rhs.z &&
-        radius == rhs.radius &&
-        parentID == rhs.parentID &&
-        label == rhs.label;
-  }
-  inline bool operator!=(const SwcNode &rhs) const { return !(*this == rhs); }
+//  bool operator==(const SwcNode &rhs) const
+//  {
+//    return id == rhs.id &&
+//        type == rhs.type &&
+//        x == rhs.x &&
+//        y == rhs.y &&
+//        z == rhs.z &&
+//        radius == rhs.radius &&
+//        parentID == rhs.parentID &&
+//        label == rhs.label;
+//  }
+//  inline bool operator!=(const SwcNode &rhs) const { return !(*this == rhs); }
 };
 
 class ZSwc : public ZTree<SwcNode>

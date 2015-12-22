@@ -29,17 +29,17 @@ struct RegionNode
   std::shared_ptr<ZROI> roi;
   std::shared_ptr<ZMesh> mesh;
 
-  bool operator==(const RegionNode &rhs) const
-  {
-    return id == rhs.id &&
-        parentID == rhs.parentID &&
-        red == rhs.red &&
-        green == rhs.green &&
-        blue == rhs.blue &&
-        name == rhs.name &&
-        abbreviation == rhs.abbreviation;
-  }
-  inline bool operator!=(const RegionNode &rhs) const { return !(*this == rhs); }
+//  bool operator==(const RegionNode &rhs) const
+//  {
+//    return id == rhs.id &&
+//        parentID == rhs.parentID &&
+//        red == rhs.red &&
+//        green == rhs.green &&
+//        blue == rhs.blue &&
+//        name == rhs.name &&
+//        abbreviation == rhs.abbreviation;
+//  }
+//  inline bool operator!=(const RegionNode &rhs) const { return !(*this == rhs); }
 };
 
 // ZIOException
@@ -50,8 +50,10 @@ void readMouseBrainAtlasOntology(const QStringList& regionAbbrevs, ZTree<RegionN
 int64_t idOfRegionAbbreviation(const QString &abbreviation, const ZTree<RegionNode> &ontology);
 std::vector<int64_t> allIDsWithinRegionAbbreviation(const QString &abbreviation, const ZTree<RegionNode> &ontology);
 
-void readOntology(const QJsonObject &obj, ZTree<RegionNode>::Iterator &parentIt,
-                  const QStringList& regionAbbrevs, ZTree<RegionNode> &ontology);
+// input img, an unsigned 8-bit single-channel image. Pixels with value 1 is treated as foreground. Other pixels are background.
+void binaryImgToMesh(const ZImg &img, ZMesh &msh);
+// input img, an unsigned 8-bit single-channel image. Non-zero pixels are treated as 1's. Zero pixels remain 0's, so the image is treated as binary.
+void binaryImgToROI(const ZImg &img, ZROI &roi);
 
 } // namespace nim
 
