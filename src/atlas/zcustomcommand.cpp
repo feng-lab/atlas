@@ -535,6 +535,8 @@ void mergeTraces()
 
 void tmp()
 {
+  ZImg img("/Users/feng/Documents/bigimage_new/0515_3to33.raw", ZImgRegion(0,-1,0,-1,0,-1,1,2));
+  img.save("/Users/feng/Documents/bigimage_new/0515_3to33_ch2_nocomp.tif", FileFormat::Tiff, Compression::NONE);
 }
 
 }
@@ -547,7 +549,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  stnTrajectory();
+  //tmp();
   LINFO() << "done";
 }
 

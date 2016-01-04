@@ -579,7 +579,7 @@ exists(/opt/intel/tbb/include) {
       #-litkgdcmIOD-$$ITKVersion -litkgdcmDSED-$$ITKVersion -litkgdcmjpeg8-$$ITKVersion -litkgdcmjpeg12-$$ITKVersion -litkgdcmjpeg16-$$ITKVersion \
       #-litkgdcmuuid-$$ITKVersion -litkopenjpeg-$$ITKVersion -lITKEXPAT-$$ITKVersion
 
-    VTKVersion = 6.3
+    VTKVersion = 7.1
     VTKPath = $$PWD/../3rdparty/vtk
     INCLUDEPATH += $$VTKPath/include/vtk-$$VTKVersion
     LIBS += -L$$VTKPath/lib -lvtkFiltersGeometry-$$VTKVersion -lvtkFiltersGeneral-$$VTKVersion -lvtkCommonComputationalGeometry-$$VTKVersion \
@@ -618,7 +618,7 @@ exists(/opt/intel/tbb/include) {
 
     OpencvPath = $$PWD/../3rdparty/opencv
     INCLUDEPATH += $$OpencvPath/include
-    LIBS += $$OpencvPath/lib/libopencv_imgproc.a $$OpencvPath/lib/libopencv_core.a $$OpencvPath/lib/libopencv_hal.a
+    LIBS += $$OpencvPath/lib/libopencv_imgproc.a $$OpencvPath/lib/libopencv_core.a
 
     ffmpeg.files = $$PWD/../../ffmpeg
     ffmpeg.path = Contents/Resources

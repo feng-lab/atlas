@@ -36,8 +36,5 @@ make -j $numCores install
 #unpatch
 mv -f $srcDIR/Modules/Core/Common/include/itkLightObject.h.bak $srcDIR/Modules/Core/Common/include/itkLightObject.h
 
-# for xcode 7
-sed -i.bak 's/Math::NotAlmostEquals/std::not_equal_to<>()/' $installDIR/include/ITK-4.9/itkSignedMaurerDistanceMapImageFilter.hxx
-
 cd $currDIR
 rm -rf $buildDIR

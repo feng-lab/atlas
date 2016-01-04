@@ -19,7 +19,7 @@ void main()
   gl_FragDepth = texelFetch(depth_texture, ivec3(gl_FragCoord.xy, 0), 0).r;
   for (int i = 1; i < NUM_VOLUMES; ++i) {
     FragData0 = max(FragData0, texelFetch(color_texture, ivec3(gl_FragCoord.xy, i), 0));
-    gl_FragDepth = min(gl_FragDepth, texelFetch(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r);
+    gl_FragDepth = max(gl_FragDepth, texelFetch(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r);
   }
 #else
   vec4 colors[NUM_VOLUMES];

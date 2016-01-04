@@ -19,6 +19,9 @@ else
   git clone https://github.com/assimp/assimp.git $srcDIR
 fi
 
+# patch ./code/SIBImporter.cpp
+sed -i.bak 's/(chunk.Tag>>24)\&0xff, (chunk.Tag>>16)\&0xff, (chunk.Tag>>8)\&0xff, chunk.Tag\&0xff/static_cast<char>((chunk.Tag>>24)\&0xff), static_cast<char>((chunk.Tag>>16)\&0xff), static_cast<char>((chunk.Tag>>8)\&0xff), static_cast<char>(chunk.Tag\&0xff)/' $srcDIR/code/SIBImporter.cpp
+
 if [ -d $buildDIR ]
 then
   rm -rf $buildDIR
@@ -29,6 +32,9 @@ cd $buildDIR
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.7 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk -DASSIMP_BUILD_ASSIMP_TOOLS:BOOL="0" -DASSIMP_BUILD_TESTS:BOOL="0" -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++14" $srcDIR
 
 make -j $numCores install
+
+#unpatch
+mv -f $srcDIR/code/SIBImporter.cpp.bak $srcDIR/code/SIBImporter.cpp
 
 # don't know why
 install_name_tool -id $installDIR/lib/libassimp.dylib $installDIR/lib/libassimp.dylib

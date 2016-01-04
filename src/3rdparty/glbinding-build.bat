@@ -12,7 +12,7 @@ md %buildDIR%
 cd %buildDIR%
 
 call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64
-cmake -G "Visual Studio 14 2015 Win64" -DCMAKE_INSTALL_PREFIX=%installDIR% -DOPTION_BUILD_STATIC=ON -DOPTION_BUILD_TESTS=OFF %srcDIR%
+cmake -G "Visual Studio 14 2015 Win64" -DCMAKE_INSTALL_PREFIX=%installDIR% -DOPTION_BUILD_TOOLS:BOOL="0" -DBUILD_SHARED_LIBS:BOOL="0" -DOPTION_BUILD_TESTS:BOOL="0" %srcDIR%
 
 MSBuild.exe ALL_BUILD.vcxproj /property:Configuration=Release /maxcpucount
 MSBuild.exe INSTALL.vcxproj /property:Configuration=Release
