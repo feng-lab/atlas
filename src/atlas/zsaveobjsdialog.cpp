@@ -38,6 +38,7 @@ void ZSaveObjsDialog::createWidget()
 {
   QVBoxLayout *lo = new QVBoxLayout(this);
   m_label = new QLabel("The following objects have unsaved changes:", this);
+  m_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   m_treeWidget = new QTreeWidget(this);
   m_treeWidget->setColumnCount(2);
   m_treeWidget->setHeaderHidden(true);

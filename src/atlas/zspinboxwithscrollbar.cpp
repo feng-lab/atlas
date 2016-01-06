@@ -62,6 +62,7 @@ void ZSpinBoxWithScrollBar::createWidget(int value, int min, int max, int step, 
   lo->setContentsMargins(0,0,0,0);
   lo->addWidget(m_spinBox);
   m_label = new QLabel(QString("/ (%1 to %2)").arg(min).arg(max));
+  m_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   lo->addWidget(m_label);
   lo->addWidget(m_scrollBar);
   connect(m_scrollBar, SIGNAL(valueChanged(int)), this, SLOT(valueChangedFromScrollBar(int)));

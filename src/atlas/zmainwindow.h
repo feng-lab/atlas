@@ -126,6 +126,7 @@ private:
 
   QDockWidget *m_objectsDockWidget;
   QDockWidget *m_viewSettingDockWidget;
+  QDockWidget *m_objectDetailedInfoDockWidget;
   QDockWidget *m_captureDockWidget;
   QDockWidget *m_editObjDockWidget;
   ZObjEditWidget* m_objEditWidget;

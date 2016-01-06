@@ -139,7 +139,9 @@ QWidget *ZWidgetsGroup::createWidget(bool createBasic, bool scroll, const QStrin
     blo->addStretch();
   //
   if (blo && !label.isEmpty()) {
-    blo->insertWidget(0, new QLabel(label));
+    QLabel *lbl = new QLabel(label);
+    lbl->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    blo->insertWidget(0, lbl);
     blo->insertSpacing(1, 20);
   }
   QWidget *widget = new QWidget();
@@ -174,6 +176,7 @@ QLayout *ZWidgetsGroup::createLayout(bool createBasic)
       return hbl;
     }
     QLabel *label = m_parameter->createNameLabel();
+    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setMinimumWidth(125);
     label->setWordWrap(true);
     hbl->addWidget(label);

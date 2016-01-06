@@ -9,6 +9,7 @@ namespace nim {
 class ZDoc;
 class Z3DView;
 class ZViewSettingWidget;
+class ZObjDetailedInfoWidget;
 class ZObjEditWidget;
 class ZMainWindow;
 
@@ -97,11 +98,13 @@ private:
 
   QDockWidget *m_objectsDockWidget;
   QDockWidget *m_viewSettingDockWidget;
+  QDockWidget *m_objectDetailedInfoDockWidget;
   QDockWidget *m_globalSettingDockWidget;
   QDockWidget *m_captureDockWidget;
   QDockWidget *m_backgroundDockWidget;
   QDockWidget *m_axisDockWidget;
   ZViewSettingWidget *m_viewSettingWidget;
+  ZObjDetailedInfoWidget *m_objDetailedInfoWidget;
   QDockWidget *m_editObjDockWidget;
   ZObjEditWidget* m_objEditWidget;
 

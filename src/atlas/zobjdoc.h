@@ -53,6 +53,7 @@ public:
   virtual QString objPath(size_t id) const = 0;
   virtual bool objHasUnsavedChange(size_t id) const = 0;
   virtual const QString& objInfo(size_t id) const = 0;
+  virtual const QString& objDetailedInfo(size_t id) const { static QString str; Q_UNUSED(id); return str; }
   virtual const QString& objTooltip(size_t id) const = 0;
   virtual QUndoStack* objUndoStack(size_t id) { Q_UNUSED(id); return nullptr; }
   virtual QJsonValue jsonValue(size_t id) const = 0;

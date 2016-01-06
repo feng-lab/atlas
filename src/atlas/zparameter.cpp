@@ -47,6 +47,7 @@ void ZParameter::setStyle(const QString &style)
 QLabel *ZParameter::createNameLabel(QWidget *parent)
 {
   QLabel *label = new QLabel(m_name, parent);
+  label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   if (!m_isWidgetsVisible)
     label->setVisible(m_isWidgetsVisible);
   if (!m_isWidgetsEnabled)

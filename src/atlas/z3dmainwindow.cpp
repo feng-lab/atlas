@@ -18,6 +18,7 @@
 #include "zdoc.h"
 #include "z3dview.h"
 #include "zviewsettingwidget.h"
+#include "zobjdetailedinfowidget.h"
 #include "z3dcanvas.h"
 #include "zobjwidget.h"
 #include "zobjeditwidget.h"
@@ -401,6 +402,16 @@ void Z3DMainWindow::createDockWindows()
   connect(m_doc, SIGNAL(showViewSetting(size_t)), this, SLOT(raiseViewSettingDockWidget()));
   addDockWidget(Qt::RightDockWidgetArea, m_viewSettingDockWidget);
   m_windowMenu->addAction(m_viewSettingDockWidget->toggleViewAction());
+
+  m_objectDetailedInfoDockWidget = new QDockWidget(tr("Object Detailed Info"), this);
+  m_objectDetailedInfoDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
+  m_objectDetailedInfoDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
+  m_objDetailedInfoWidget = new ZObjDetailedInfoWidget(m_doc, this);
+  if (m_doc->viewSettingId() > 0)
+    m_objDetailedInfoWidget->showWidgetOfObj(m_doc->viewSettingId());
+  m_objectDetailedInfoDockWidget->setWidget(m_objDetailedInfoWidget);
+  addDockWidget(Qt::RightDockWidgetArea, m_objectDetailedInfoDockWidget);
+  m_windowMenu->addAction(m_objectDetailedInfoDockWidget->toggleViewAction());
 
   m_globalSettingDockWidget = new QDockWidget(tr("Global View Setting"), this);
   m_globalSettingDockWidget->setFeatures(QDockWidget::DockWidgetClosable |

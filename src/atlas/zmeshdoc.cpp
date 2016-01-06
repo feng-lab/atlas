@@ -176,6 +176,11 @@ const QString &ZMeshDoc::objInfo(size_t id) const
   return m_idToMeshPacks.at(id)->info();
 }
 
+const QString &ZMeshDoc::objDetailedInfo(size_t id) const
+{
+  return m_idToMeshPacks.at(id)->detailedInfo();
+}
+
 const QString &ZMeshDoc::objTooltip(size_t id) const
 {
   return m_idToMeshPacks.at(id)->tooltip();
@@ -267,6 +272,7 @@ ZMeshDoc::MeshPack::~MeshPack()
 void ZMeshDoc::MeshPack::updateDerivedData()
 {
   m_info.clear();
+  m_detailedInfo.clear();
   m_name = QFileInfo(path).fileName();
   m_tooltip = path;
 }
@@ -277,6 +283,30 @@ const QString &ZMeshDoc::MeshPack::info() const
     m_info = QString("%1 vertices, %2 triangles").arg(mesh.numVertices()).arg(mesh.numTriangles());
   }
   return m_info;
+}
+
+const QString &ZMeshDoc::MeshPack::detailedInfo() const
+{
+  if (m_detailedInfo.isEmpty()) {
+    QStringList info;
+    ZMeshProperties prop = mesh.properties();
+    info << QString("Vertices Number: %1").arg(prop.numVertices);
+    info << QString("Triangles Number: %1").arg(prop.numTriangles);
+    info << QString("Surface Area: %1").arg(prop.surfaceArea);
+    info << QString("Min Triangle Area: %1").arg(prop.minTriangleArea);
+    info << QString("Max Triangle Area: %1").arg(prop.maxTriangleArea);
+    info << QString("Volume: %1").arg(prop.volume);
+    info << QString("Volume Projected: %1").arg(prop.volumeProjected);
+    info << QString("Volume X: %1").arg(prop.volumeX);
+    info << QString("Volume Y: %1").arg(prop.volumeY);
+    info << QString("Volume Z: %1").arg(prop.volumeZ);
+    info << QString("Kx: %1").arg(prop.kx);
+    info << QString("Ky: %1").arg(prop.ky);
+    info << QString("Kz: %1").arg(prop.kz);
+    info << QString("NormalizedShapeIndex: %1").arg(prop.normalizedShapeIndex);
+    m_detailedInfo = info.join("\n");
+  }
+  return m_detailedInfo;
 }
 
 void ZMeshDoc::createActions()

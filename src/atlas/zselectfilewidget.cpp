@@ -116,6 +116,7 @@ void ZSelectFileWidget::createWidget(QBoxLayout::Direction direction)
     lo->addWidget(m_textEdit);
     m_layout->addLayout(lo);
     m_label = new QLabel("Filter:", this);
+    m_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     m_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_filterLineEdit = new QLineEdit(this);
     m_filterLineEdit->setReadOnly(false);
@@ -133,6 +134,7 @@ void ZSelectFileWidget::createWidget(QBoxLayout::Direction direction)
     m_layout = new QBoxLayout(direction, this);
     m_layout->setContentsMargins(0,0,0,0);
     m_label = new QLabel(m_guiName, this);
+    m_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     m_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_lineEdit = new QLineEdit(this);
     m_lineEdit->setReadOnly(true);

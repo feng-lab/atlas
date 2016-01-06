@@ -52,6 +52,7 @@ public:
   QString objName(size_t id) const;
   QString objNameWithModifiedMarker(size_t id) const;
   QString objNameWithModifiedMarkerAndID(size_t id) const;
+  QString objDetailedInfo(size_t id) const;
 
   QList<size_t> objsOfDoc(const ZObjDoc* objD) const;
   QList<size_t> selectedObjsOfDoc(const ZObjDoc* objD) const;

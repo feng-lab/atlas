@@ -32,6 +32,7 @@
 #include "z3dview.h"
 #include "zobjwidget.h"
 #include "zobjeditwidget.h"
+#include "zobjdetailedinfowidget.h"
 
 #include "zimgdoc.h"
 #include "zimgview.h"
@@ -685,6 +686,13 @@ void ZMainWindow::createDockWindows()
   m_viewSettingDockWidget->setWidget(new ZViewSettingWidget(m_doc, m_view, this));
   addDockWidget(Qt::RightDockWidgetArea, m_viewSettingDockWidget);
   m_windowMenu->addAction(m_viewSettingDockWidget->toggleViewAction());
+
+  m_objectDetailedInfoDockWidget = new QDockWidget(tr("Object Detailed Info"), this);
+  m_objectDetailedInfoDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
+  m_objectDetailedInfoDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
+  m_objectDetailedInfoDockWidget->setWidget(new ZObjDetailedInfoWidget(m_doc, this));
+  addDockWidget(Qt::RightDockWidgetArea, m_objectDetailedInfoDockWidget);
+  m_windowMenu->addAction(m_objectDetailedInfoDockWidget->toggleViewAction());
 
   m_captureDockWidget = new QDockWidget(tr("Capture"), this);
   m_captureDockWidget->setFeatures(QDockWidget::DockWidgetClosable |

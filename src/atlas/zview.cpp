@@ -36,6 +36,7 @@ ZView::ZView(ZDoc &doc, QWidget *parent, Qt::WindowFlags f)
   setFocusPolicy(Qt::StrongFocus);
 
   m_label = new QLabel(this);
+  m_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   m_label->setWordWrap(true);
 
   m_layout = new QVBoxLayout;

@@ -279,7 +279,8 @@ HEADERS += \
     z3dimgfilter.h \
     z3dblockcache.h \
     z3dimgslicerenderer.h \
-    zregionontology.h
+    zregionontology.h \
+    zobjdetailedinfowidget.h
 
 SOURCES += \
     main.cpp \
@@ -487,7 +488,8 @@ SOURCES += \
     z3dimg.cpp \
     z3dimgfilter.cpp \
     z3dimgslicerenderer.cpp \
-    zregionontology.cpp
+    zregionontology.cpp \
+    zobjdetailedinfowidget.cpp
 
 contains(CONFIG, use_glbinding) {
     include($$PWD/../3rdparty/glbinding.pri)

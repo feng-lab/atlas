@@ -36,6 +36,7 @@ void ZChooseObjDialog::createWidget()
 {
   QVBoxLayout *lo = new QVBoxLayout(this);
   m_label = new QLabel(QString("Choose one %1:").arg(m_doc.typeName()), this);
+  m_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   m_treeWidget = new QTreeWidget(this);
   m_treeWidget->setColumnCount(2);
   m_treeWidget->setHeaderHidden(true);

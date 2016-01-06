@@ -177,6 +177,16 @@ QString ZDoc::objNameWithModifiedMarkerAndID(size_t id) const
   }
 }
 
+QString ZDoc::objDetailedInfo(size_t id) const
+{
+  if (id >= 100) {
+    return idToDoc(id)->objDetailedInfo(id);
+  } else {
+    assert(false);
+    return "";
+  }
+}
+
 QList<size_t> ZDoc::objsOfDoc(const ZObjDoc *objD) const
 {
   return m_objModel->objsOfDoc(objD);
