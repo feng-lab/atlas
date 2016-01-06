@@ -189,11 +189,13 @@ public:
   static ZMesh createConeMesh(glm::vec3 base, float baseRadius, glm::vec3 top, float topRadius,
                               int numberOfSides = 32, bool capping = true);
 
+  // these functions only deal with meshes with normal, other fields (texture, color) are ignored
   static ZMesh unite(const ZMesh &mesh1, const ZMesh &mesh2) { return booleanOperation(mesh1, mesh2, BooleanOperationType::Union); }
   static ZMesh intersect(const ZMesh &mesh1, const ZMesh &mesh2) { return booleanOperation(mesh1, mesh2, BooleanOperationType::Intersection); }
   static ZMesh subtract(const ZMesh &mesh1, const ZMesh &mesh2) { return booleanOperation(mesh1, mesh2, BooleanOperationType::Difference); }
+  static ZMesh merge(const std::vector<ZMesh> &meshes);
 
-  static ZMesh createSwcMesh(const ZSwc &swc, double zScale = 1, int rootType = 1);
+  static void createSwcMesh(const ZSwc &swc, double zScale, int rootType, ZMesh &rootMesh, ZMesh &branchMesh);
 
 private:
   enum class BooleanOperationType {

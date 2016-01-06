@@ -15,6 +15,7 @@
 #include <vtkMassProperties.h>
 #include <vtkTriangleFilter.h>
 #include <vtkCleanPolyData.h>
+#include <vtkAppendPolyData.h>
 
 #include "zswc.h"
 
@@ -1164,7 +1165,26 @@ ZMesh ZMesh::createConeMesh(glm::vec3 base, float baseRadius, glm::vec3 top, flo
   return msh;
 }
 
-ZMesh ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootType)
+ZMesh ZMesh::merge(const std::vector<ZMesh> &meshes)
+{
+  ZMesh res;
+  if (meshes.empty())
+    return res;
+  vtkSmartPointer<vtkAppendPolyData> appendFilter = vtkSmartPointer<vtkAppendPolyData>::New();
+  std::vector<vtkSmartPointer<vtkPolyData>> polys(meshes.size());
+  for (size_t i=0; i<meshes.size(); ++i) {
+    polys[i] = meshToVtkPolyData(meshes[i]);
+    appendFilter->AddInputData(polys[i]);
+  }
+
+  vtkSmartPointer<vtkCleanPolyData> cleanFilter = vtkSmartPointer<vtkCleanPolyData>::New();
+  cleanFilter->SetInputConnection(appendFilter->GetOutputPort());
+
+  cleanFilter->Update();
+  return vtkPolyDataToMesh(cleanFilter->GetOutput());
+}
+
+void ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootType, ZMesh &rootMesh, ZMesh &branchMesh)
 {
   typedef ZSwc::ConstIterator SwcTreeNode;
   std::map<SwcTreeNode, size_t> nodeToBranchId;
@@ -1236,19 +1256,16 @@ ZMesh ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootType)
   for (auto node : rootNodes) {
     meshes.push_back(createSphereMesh(glm::vec3(node->x, node->y, node->z * zScale), node->radius));
   }
-  for (auto node : normalBranchNodes) {
-    //meshes.push_back(createSphereMesh(glm::vec3(node->x, node->y, node->z * zScale), node->radius));
+  if (meshes.empty()) {
+    rootMesh.clear();
+  } else {
+    rootMesh = meshes[0];
+    for (size_t i=1; i<meshes.size(); ++i) {
+      rootMesh = unite(rootMesh, meshes[i]);
+    }
   }
-//  for (std::vector<SwcTreeNode>& branch : rootBranches) {
-//    std::vector<glm::vec3> line(branch.size());
-//    std::vector<float> radius(branch.size());
-//    for (size_t i=0; i<branch.size(); ++i) {
-//      line[i] = glm::vec3(branch[i]->x, branch[i]->y, branch[i]->z * zScale);
-//      radius[i] = branch[i]->radius;
-//    }
-//    meshes.push_back(createTubeMesh(line, radius));
-//  }
-//  int i = 0;
+
+  meshes.clear();
   for (std::vector<SwcTreeNode>& branch : normalBranches) {
     std::vector<glm::vec3> line(branch.size());
     std::vector<float> radius(branch.size());
@@ -1262,24 +1279,25 @@ ZMesh ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootType)
 //    }
 //    LINFO() << branch[0]->type;
   }
+  branchMesh = merge(meshes);
 
-  ZMesh res = meshes[0];
-  ZMeshProperties prop = res.properties();
-  logProperties(prop);
-  double sumVolume = prop.volume;
-  for (size_t i=1; i<20; ++i) {
-    prop = meshes[i].properties();
-    logProperties(prop);
-    sumVolume += prop.volume;
-//    meshes[i].save("/Users/feng/Downloads/curtest.obj");
-//    meshes[i-1].save("/Users/feng/Downloads/prevtest.obj");
-    res = unite(res, meshes[i]);
-    prop = res.properties();
-    logProperties(prop, "Merge Result");
-    res.save("/Users/feng/Downloads/combtest.obj");
-  }
-  LINFO() << sumVolume;
-  return res;
+//  ZMesh res = meshes[0];
+//  ZMeshProperties prop = res.properties();
+//  logProperties(prop);
+//  double sumVolume = prop.volume;
+//  for (size_t i=1; i<20; ++i) {
+//    prop = meshes[i].properties();
+//    logProperties(prop);
+//    sumVolume += prop.volume;
+////    meshes[i].save("/Users/feng/Downloads/curtest.obj");
+////    meshes[i-1].save("/Users/feng/Downloads/prevtest.obj");
+//    res = unite(res, meshes[i]);
+//    prop = res.properties();
+//    logProperties(prop, "Merge Result");
+//    res.save("/Users/feng/Downloads/combtest.obj");
+//  }
+//  LINFO() << sumVolume;
+//  return res;
 }
 
 void ZMesh::appendTriangle(const ZMesh &mesh, glm::uvec3 triangle)
@@ -1413,11 +1431,11 @@ ZMesh ZMesh::booleanOperation(const ZMesh &mesh1, const ZMesh &mesh2, ZMesh::Boo
   booleanOperationFilter->SetReorientDifferenceCells(1);
   booleanOperationFilter->SetTolerance(1e-6);
 
-  vtkSmartPointer<vtkCleanPolyData> cleaner = vtkSmartPointer<vtkCleanPolyData>::New();
-  cleaner->SetInputConnection(booleanOperationFilter->GetOutputPort());
+  vtkSmartPointer<vtkCleanPolyData> cleanFilter = vtkSmartPointer<vtkCleanPolyData>::New();
+  cleanFilter->SetInputConnection(booleanOperationFilter->GetOutputPort());
 
-  cleaner->Update();
-  return vtkPolyDataToMesh(cleaner->GetOutput());
+  cleanFilter->Update();
+  return vtkPolyDataToMesh(cleanFilter->GetOutput());
 }
 
 } // namespace nim

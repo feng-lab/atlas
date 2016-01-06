@@ -404,7 +404,9 @@ void Z3DMainWindow::createDockWindows()
   m_windowMenu->addAction(m_viewSettingDockWidget->toggleViewAction());
 
   m_objectDetailedInfoDockWidget = new QDockWidget(tr("Object Detailed Info"), this);
-  m_objectDetailedInfoDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
+  m_objectDetailedInfoDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
+                                              QDockWidget::DockWidgetMovable |
+                                              QDockWidget::DockWidgetFloatable);
   m_objectDetailedInfoDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
   m_objDetailedInfoWidget = new ZObjDetailedInfoWidget(m_doc, this);
   if (m_doc->viewSettingId() > 0)

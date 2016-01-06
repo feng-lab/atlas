@@ -535,8 +535,11 @@ void mergeTraces()
 
 void tmp()
 {
-  ZMesh msh = ZMesh::createSwcMesh(ZSwc("/Users/feng/Documents/bigimage_new/0515_15Py.swc"), 5, 1);
-  msh.save("/Users/feng/Downloads/abctest.obj");
+  ZMesh rootMesh;
+  ZMesh branchMesh;
+  ZMesh::createSwcMesh(ZSwc("/Users/feng/Documents/bigimage_new/0515_15Py.swc"), 5, 1, rootMesh, branchMesh);
+  rootMesh.save("/Users/feng/Downloads/root.obj");
+  branchMesh.save("/Users/feng/Downloads/branch.obj");
 }
 
 }
