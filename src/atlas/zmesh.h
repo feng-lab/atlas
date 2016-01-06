@@ -188,7 +188,7 @@ public:
   static ZMesh intersect(const ZMesh &mesh1, const ZMesh &mesh2) { return booleanOperation(mesh1, mesh2, BooleanOperationType::Intersection); }
   static ZMesh subtract(const ZMesh &mesh1, const ZMesh &mesh2) { return booleanOperation(mesh1, mesh2, BooleanOperationType::Difference); }
 
-  static ZMesh createSwcMesh(const ZSwc &swc, double zScale = 1, int rootTypeID = 1);
+  static ZMesh createSwcMesh(const ZSwc &swc, double zScale = 1, int rootType = 1);
 
 private:
   enum class BooleanOperationType {

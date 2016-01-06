@@ -995,16 +995,16 @@ ZMesh ZMesh::createTubeMesh(const std::vector<glm::vec3> &line, const std::vecto
     lines->InsertCellPoint(i);
   }
 
-  vtkSmartPointer<vtkPolyData> polyData = vtkSmartPointer<vtkPolyData>::New();
-  polyData->SetPoints(points);
-  polyData->SetLines(lines);
-
   vtkSmartPointer<vtkFloatArray> tubeRadius = vtkSmartPointer<vtkFloatArray>::New();
   tubeRadius->SetName("TubeRadius");
   tubeRadius->SetNumberOfTuples(radius.size());
-  for (size_t i=0; i<line.size(); ++i) {
+  for (size_t i=0; i<radius.size(); ++i) {
     tubeRadius->SetTuple1(i, radius[i]);
   }
+
+  vtkSmartPointer<vtkPolyData> polyData = vtkSmartPointer<vtkPolyData>::New();
+  polyData->SetPoints(points);
+  polyData->SetLines(lines);
   polyData->GetPointData()->AddArray(tubeRadius);
   polyData->GetPointData()->SetActiveScalars("TubeRadius");
 
@@ -1137,7 +1137,7 @@ ZMesh ZMesh::createConeMesh(glm::vec3 base, float baseRadius, glm::vec3 top, flo
   return msh;
 }
 
-ZMesh ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootTypeID)
+ZMesh ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootType)
 {
   typedef ZSwc::ConstIterator SwcTreeNode;
   std::map<SwcTreeNode, size_t> nodeToBranchId;
@@ -1150,7 +1150,7 @@ ZMesh ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootTypeID)
   size_t label = 0;
 
   for (SwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
-    if (tn->id == rootTypeID) {
+    if (tn->type == rootType) {
       rootNodes.push_back(tn);
     }
 
@@ -1185,7 +1185,7 @@ ZMesh ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootTypeID)
     assert(branch.size() >= 1);
     size_t lastRootNodeIndex = branch.size();
     for (size_t i = branch.size()-1; i>0; --i) {
-      if (branch[i]->id == rootTypeID) {
+      if (branch[i]->type == rootType) {
         lastRootNodeIndex = i;
         break;
       }
@@ -1194,7 +1194,7 @@ ZMesh ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootTypeID)
       rootBranches.push_back(branch);
     } else if (lastRootNodeIndex == branch.size()) { // no root
       normalBranches.push_back(branch);
-      if (branch[0]->id != rootTypeID && !ZSwc::isRoot(branch[0])) {
+      if (branch[0]->type != rootType && !ZSwc::isRoot(branch[0])) {
         normalBranchNodes.push_back(branch[0]);
       }
     } else {
@@ -1221,7 +1221,7 @@ ZMesh ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootTypeID)
 //    }
 //    meshes.push_back(createTubeMesh(line, radius));
 //  }
-//  int i = 0;
+  int i = 0;
   for (std::vector<SwcTreeNode>& branch : normalBranches) {
     std::vector<glm::vec3> line(branch.size());
     std::vector<float> radius(branch.size());
@@ -1231,8 +1231,9 @@ ZMesh ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootTypeID)
     }
     meshes.push_back(createTubeMesh(line, radius));
 //    if (i < 20) {
-//      meshes[meshes.size()-1].save(QString("/Users/feng/Downloads/tubetest%1.obj").arg(i++));
+      meshes[meshes.size()-1].save(QString("/Users/feng/Downloads/tubetest%1.obj").arg(i++));
 //    }
+    LINFO() << branch[0]->type;
   }
 
   ZMesh res = meshes[0];
