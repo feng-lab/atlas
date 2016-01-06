@@ -8,6 +8,34 @@
 
 namespace nim {
 
+class ZSwc;
+
+struct ZMeshProperties
+{
+  double  SurfaceArea = -1.0;
+  double  MinTriangleArea = -1.0;
+  double  MaxTriangleArea = -1.0;
+  double  Volume = -1.0;
+  // Typically you should compare this volume to the value returned by GetVolume
+  // if you get an error (GetVolume()-GetVolumeProjected())*10000 that is greater
+  // than GetVolume() this should identify a problem:
+  // * Either the polydata is not closed
+  // * Or the polydata contains triangle that are flipped
+  double  VolumeProjected = -1.0; // == Projected area of triangles * average z values
+  // volume projected on to each axis aligned plane.
+  double  VolumeX = -1.0;
+  double  VolumeY = -1.0;
+  double  VolumeZ = -1.0;
+  // weighting factors for the maximum unit normal component (MUNC)
+  double  Kx = -1.0;
+  double  Ky = -1.0;
+  double  Kz = -1.0;
+  // This characterizes the
+  // deviation of the shape of an object from a sphere. A sphere's NSI
+  // is one. This number is always >= 1.0.
+  double  NormalizedShapeIndex = -1.0;
+};
+
 class ZMesh
 {
 public:
@@ -56,6 +84,7 @@ public:
   void setTextureCoordinates(const std::vector<glm::vec3> &textureCoordinates) { m_3DTextureCoordinates = textureCoordinates; }
   const std::vector<glm::vec3>& normals() const { return m_normals; }
   void setNormals(const std::vector<glm::vec3> &normals) { m_normals = normals; }
+  void setNormals(const std::vector<glm::dvec3> &normals);
   const std::vector<glm::vec4>& colors() const { return m_colors; }
   void setColors(const std::vector<glm::vec4> &colors) { m_colors = colors; }
   const std::vector<GLuint>& indices() const { return m_indices; }
@@ -89,6 +118,7 @@ public:
   void generateNormals(bool useAreaWeight = true);
 
   double volume() const;
+  ZMeshProperties properties() const;
 
   // a list of cubes with normal
   static ZMesh createCubesWithNormal(const std::vector<glm::vec3>& coordLlfs,
@@ -145,7 +175,26 @@ public:
       glm::vec3 texfirst = glm::vec3(0.f, 0.f, 0.f),
       glm::vec3 texlast = glm::vec3(1.f, 1.f, 1.f));
 
+  static ZMesh createSphereMesh(const glm::vec3& center, float radius,
+                                int thetaResolution = 32, int phiResolution = 32,
+                                float startTheta = 0.f, float endTheta = 360.f,
+                                float startPhi = 0.f, float endPhi = 180.f);
+  static ZMesh createTubeMesh(const std::vector<glm::vec3> &line, const std::vector<float> &radius,
+                              int numberOfSides = 32, bool capping = true);
+  static ZMesh createConeMesh(glm::vec3 base, float baseRadius, glm::vec3 top, float topRadius,
+                              int numberOfSides = 32, bool capping = true);
+
+  static ZMesh unite(const ZMesh &mesh1, const ZMesh &mesh2) { return booleanOperation(mesh1, mesh2, BooleanOperationType::Union); }
+  static ZMesh intersect(const ZMesh &mesh1, const ZMesh &mesh2) { return booleanOperation(mesh1, mesh2, BooleanOperationType::Intersection); }
+  static ZMesh subtract(const ZMesh &mesh1, const ZMesh &mesh2) { return booleanOperation(mesh1, mesh2, BooleanOperationType::Difference); }
+
+  static ZMesh createSwcMesh(const ZSwc &swc, double zScale = 1, int rootTypeID = 1);
+
 private:
+  enum class BooleanOperationType {
+    Union, Intersection, Difference
+  };
+
   void appendTriangle(const ZMesh &mesh, glm::uvec3 triangle);
 
   double signedVolumeOfTriangle(const glm::vec3 &v1,
@@ -153,6 +202,8 @@ private:
                                 const glm::vec3 &v3) const;
 
   size_t numCoverCubes(double cubeEdgeLength);
+
+  static ZMesh booleanOperation(const ZMesh &mesh1, const ZMesh &mesh2, BooleanOperationType type);
 
 private:
   friend class ZMeshIO;

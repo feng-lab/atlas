@@ -583,7 +583,7 @@ exists(/opt/intel/tbb/include) {
     VTKPath = $$PWD/../3rdparty/vtk
     INCLUDEPATH += $$VTKPath/include/vtk-$$VTKVersion
     LIBS += -L$$VTKPath/lib -lvtkFiltersGeometry-$$VTKVersion -lvtkFiltersGeneral-$$VTKVersion -lvtkCommonComputationalGeometry-$$VTKVersion \
-      -lvtkFiltersCore-$$VTKVersion -lvtkCommonExecutionModel-$$VTKVersion -lvtkCommonDataModel-$$VTKVersion \
+      -lvtkFiltersSources-$$VTKVersion -lvtkFiltersCore-$$VTKVersion -lvtkCommonExecutionModel-$$VTKVersion -lvtkCommonDataModel-$$VTKVersion \
       -lvtkCommonSystem-$$VTKVersion -lvtkCommonMisc-$$VTKVersion -lvtkCommonTransforms-$$VTKVersion \
       -lvtkCommonMath-$$VTKVersion -lvtkCommonCore-$$VTKVersion -lvtksys-$$VTKVersion
 

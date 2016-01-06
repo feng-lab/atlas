@@ -535,8 +535,8 @@ void mergeTraces()
 
 void tmp()
 {
-  ZImg img("/Users/feng/Documents/bigimage_new/0515_3to33.raw", ZImgRegion(0,-1,0,-1,0,-1,1,2));
-  img.save("/Users/feng/Documents/bigimage_new/0515_3to33_ch2_nocomp.tif", FileFormat::Tiff, Compression::NONE);
+  ZMesh msh = ZMesh::createSwcMesh(ZSwc("/Users/feng/Documents/bigimage_new/0515_15Py.swc"), 5, 1);
+  msh.save("/Users/feng/Downloads/abctest.obj");
 }
 
 }
@@ -549,7 +549,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  //tmp();
+  tmp();
   LINFO() << "done";
 }
 

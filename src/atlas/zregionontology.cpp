@@ -470,20 +470,24 @@ void binaryImgToMesh(const ZImg &img, ZMesh &msh)
   outputPolydata = decimate->GetOutput();
   vtkPoints* points = outputPolydata->GetPoints();
   vtkCellArray* polys = outputPolydata->GetPolys();
+  vtkDataArray* pointsNormals = outputPolydata->GetPointData()->GetNormals();
 
   std::vector<glm::dvec3> vertices(points->GetNumberOfPoints());
+  std::vector<glm::dvec3> normals(pointsNormals->GetNumberOfTuples());
+  assert(vertices.size() == normals.size());
   std::vector<GLuint> indices;
-  for (vtkIdType id = 0; id < points->GetNumberOfPoints(); ++id) {
+  for (vtkIdType id=0; id<points->GetNumberOfPoints(); ++id) {
     points->GetPoint(id, &vertices[id][0]);
+    pointsNormals->GetTuple(id, &normals[id][0]);
   }
   vtkIdType npts;
   vtkIdType *pts;
-  for(int i=0; i<outputPolydata->GetNumberOfPolys(); ++i) {
+  for (int i=0; i<outputPolydata->GetNumberOfPolys(); ++i) {
     int h = polys->GetNextCell(npts, pts);
-    if (h==0) {
+    if (h == 0) {
       break;
     }
-    if (npts==3) {
+    if (npts == 3) {
       indices.push_back(pts[0]);
       indices.push_back(pts[1]);
       indices.push_back(pts[2]);
@@ -493,7 +497,7 @@ void binaryImgToMesh(const ZImg &img, ZMesh &msh)
   msh.clear();
   msh.setVertices(vertices);
   msh.setIndices(indices);
-  msh.generateNormals();
+  msh.setNormals(normals);
 }
 
 struct ContourNode {
