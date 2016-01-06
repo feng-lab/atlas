@@ -14,6 +14,7 @@
 #include <vtkBooleanOperationPolyDataFilter.h>
 #include <vtkMassProperties.h>
 #include <vtkTriangleFilter.h>
+#include <vtkCleanPolyData.h>
 
 #include "zswc.h"
 
@@ -612,23 +613,23 @@ void ZMesh::generateNormals(bool useAreaWeight)
     m_normals[i] = glm::normalize(m_normals[i]);
 }
 
-double ZMesh::volume() const
-{
-  double res = 0;
-  for (size_t i=0; i<numTriangles(); ++i) {
-    glm::uvec3 tIs = triangleIndices(i);
-    glm::vec3 normal = glm::normalize(glm::cross(m_vertices[tIs[1]] - m_vertices[tIs[0]],
-        m_vertices[tIs[2]] - m_vertices[tIs[0]]));
-    if (glm::dot(m_normals[tIs[0]], normal) +
-        glm::dot(m_normals[tIs[1]], normal) +
-        glm::dot(m_normals[tIs[2]], normal) < 0) {
-      res += signedVolumeOfTriangle(m_vertices[tIs[0]] - m_vertices[0], m_vertices[tIs[2]] - m_vertices[0], m_vertices[tIs[1]] - m_vertices[0]);
-    } else {
-      res += signedVolumeOfTriangle(m_vertices[tIs[0]] - m_vertices[0], m_vertices[tIs[1]] - m_vertices[0], m_vertices[tIs[2]] - m_vertices[0]);
-    }
-  }
-  return std::abs(res);
-}
+//double ZMesh::volume() const
+//{
+//  double res = 0;
+//  for (size_t i=0; i<numTriangles(); ++i) {
+//    glm::uvec3 tIs = triangleIndices(i);
+//    glm::vec3 normal = glm::normalize(glm::cross(m_vertices[tIs[1]] - m_vertices[tIs[0]],
+//        m_vertices[tIs[2]] - m_vertices[tIs[0]]));
+//    if (glm::dot(m_normals[tIs[0]], normal) +
+//        glm::dot(m_normals[tIs[1]], normal) +
+//        glm::dot(m_normals[tIs[2]], normal) < 0) {
+//      res += signedVolumeOfTriangle(m_vertices[tIs[0]] - m_vertices[0], m_vertices[tIs[2]] - m_vertices[0], m_vertices[tIs[1]] - m_vertices[0]);
+//    } else {
+//      res += signedVolumeOfTriangle(m_vertices[tIs[0]] - m_vertices[0], m_vertices[tIs[1]] - m_vertices[0], m_vertices[tIs[2]] - m_vertices[0]);
+//    }
+//  }
+//  return std::abs(res);
+//}
 
 ZMeshProperties ZMesh::properties() const
 {
@@ -639,19 +640,45 @@ ZMeshProperties ZMesh::properties() const
   massProperties->Update();
 
   ZMeshProperties res;
-  res.Kx = massProperties->GetKx();
-  res.Ky = massProperties->GetKy();
-  res.Kz = massProperties->GetKz();
-  res.MaxTriangleArea = massProperties->GetMaxCellArea();
-  res.MinTriangleArea = massProperties->GetMinCellArea();
-  res.NormalizedShapeIndex = massProperties->GetNormalizedShapeIndex();
-  res.SurfaceArea = massProperties->GetSurfaceArea();
-  res.Volume = massProperties->GetVolume();
-  res.VolumeProjected = massProperties->GetVolumeProjected();
-  res.VolumeX = massProperties->GetVolumeX();
-  res.VolumeY = massProperties->GetVolumeY();
-  res.VolumeZ = massProperties->GetVolumeZ();
+  res.numVertices = numVertices();
+  res.numTriangles= numTriangles();
+  res.kx = massProperties->GetKx();
+  res.ky = massProperties->GetKy();
+  res.kz = massProperties->GetKz();
+  res.maxTriangleArea = massProperties->GetMaxCellArea();
+  res.minTriangleArea = massProperties->GetMinCellArea();
+  res.normalizedShapeIndex = massProperties->GetNormalizedShapeIndex();
+  res.surfaceArea = massProperties->GetSurfaceArea();
+  res.volume = massProperties->GetVolume();
+  res.volumeProjected = massProperties->GetVolumeProjected();
+  res.volumeX = massProperties->GetVolumeX();
+  res.volumeY = massProperties->GetVolumeY();
+  res.volumeZ = massProperties->GetVolumeZ();
   return res;
+}
+
+void ZMesh::logProperties(const ZMeshProperties &prop, const QString &str)
+{
+  LINFO() << "";
+  if (!str.isEmpty()) {
+    LINFO() << str;
+  }
+  LINFO() << "Vertices Number:" << prop.numVertices;
+  LINFO() << "Triangles Number:" << prop.numTriangles;
+  //LINFO() << "volume old:" << volume();
+  LINFO() << "Surface Area:" << prop.surfaceArea;
+  LINFO() << "Min Triangle Area:" << prop.minTriangleArea;
+  LINFO() << "Max Triangle Area:" << prop.maxTriangleArea;
+  LINFO() << "Volume:" << prop.volume;
+  LINFO() << "Volume Projected:" << prop.volumeProjected;
+  LINFO() << "Volume X:" << prop.volumeX;
+  LINFO() << "Volume Y:" << prop.volumeY;
+  LINFO() << "Volume Z:" << prop.volumeZ;
+  LINFO() << "Kx:" << prop.kx;
+  LINFO() << "Ky:" << prop.ky;
+  LINFO() << "Kz:" << prop.kz;
+  LINFO() << "NormalizedShapeIndex:" << prop.normalizedShapeIndex;
+  LINFO() << "";
 }
 
 ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3> &coordLlfs, const std::vector<glm::vec3> &coordUrbs)
@@ -1207,7 +1234,7 @@ ZMesh ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootType)
 
   std::vector<ZMesh> meshes;
   for (auto node : rootNodes) {
-    //meshes.push_back(createSphereMesh(glm::vec3(node->x, node->y, node->z * zScale), node->radius));
+    meshes.push_back(createSphereMesh(glm::vec3(node->x, node->y, node->z * zScale), node->radius));
   }
   for (auto node : normalBranchNodes) {
     //meshes.push_back(createSphereMesh(glm::vec3(node->x, node->y, node->z * zScale), node->radius));
@@ -1221,7 +1248,7 @@ ZMesh ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootType)
 //    }
 //    meshes.push_back(createTubeMesh(line, radius));
 //  }
-  int i = 0;
+//  int i = 0;
   for (std::vector<SwcTreeNode>& branch : normalBranches) {
     std::vector<glm::vec3> line(branch.size());
     std::vector<float> radius(branch.size());
@@ -1231,22 +1258,27 @@ ZMesh ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootType)
     }
     meshes.push_back(createTubeMesh(line, radius));
 //    if (i < 20) {
-      meshes[meshes.size()-1].save(QString("/Users/feng/Downloads/tubetest%1.obj").arg(i++));
+//      meshes[meshes.size()-1].save(QString("/Users/feng/Downloads/tubetest%1.obj").arg(i++));
 //    }
-    LINFO() << branch[0]->type;
+//    LINFO() << branch[0]->type;
   }
 
   ZMesh res = meshes[0];
-  LINFO() << res.numTriangles();
-  for (size_t i=1; i<3; ++i) {
-    LINFO() << meshes[i].numTriangles();
-    meshes[i].save("/Users/feng/Downloads/curtest.obj");
-    meshes[i-1].save("/Users/feng/Downloads/prevtest.obj");
-    res.save("/Users/feng/Downloads/combtest.obj");
+  ZMeshProperties prop = res.properties();
+  logProperties(prop);
+  double sumVolume = prop.volume;
+  for (size_t i=1; i<20; ++i) {
+    prop = meshes[i].properties();
+    logProperties(prop);
+    sumVolume += prop.volume;
+//    meshes[i].save("/Users/feng/Downloads/curtest.obj");
+//    meshes[i-1].save("/Users/feng/Downloads/prevtest.obj");
     res = unite(res, meshes[i]);
-    LINFO() << "done";
+    prop = res.properties();
+    logProperties(prop, "Merge Result");
+    res.save("/Users/feng/Downloads/combtest.obj");
   }
-  res.save("/Users/feng/Downloads/combtest.obj");
+  LINFO() << sumVolume;
   return res;
 }
 
@@ -1381,8 +1413,11 @@ ZMesh ZMesh::booleanOperation(const ZMesh &mesh1, const ZMesh &mesh2, ZMesh::Boo
   booleanOperationFilter->SetReorientDifferenceCells(1);
   booleanOperationFilter->SetTolerance(1e-6);
 
-  booleanOperationFilter->Update();
-  return vtkPolyDataToMesh(booleanOperationFilter->GetOutput());
+  vtkSmartPointer<vtkCleanPolyData> cleaner = vtkSmartPointer<vtkCleanPolyData>::New();
+  cleaner->SetInputConnection(booleanOperationFilter->GetOutputPort());
+
+  cleaner->Update();
+  return vtkPolyDataToMesh(cleaner->GetOutput());
 }
 
 } // namespace nim

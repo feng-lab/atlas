@@ -12,28 +12,31 @@ class ZSwc;
 
 struct ZMeshProperties
 {
-  double  SurfaceArea = -1.0;
-  double  MinTriangleArea = -1.0;
-  double  MaxTriangleArea = -1.0;
-  double  Volume = -1.0;
+  double  surfaceArea = -1.0;
+  double  minTriangleArea = -1.0;
+  double  maxTriangleArea = -1.0;
+  double  volume = -1.0;
   // Typically you should compare this volume to the value returned by GetVolume
   // if you get an error (GetVolume()-GetVolumeProjected())*10000 that is greater
   // than GetVolume() this should identify a problem:
   // * Either the polydata is not closed
   // * Or the polydata contains triangle that are flipped
-  double  VolumeProjected = -1.0; // == Projected area of triangles * average z values
+  double  volumeProjected = -1.0; // == Projected area of triangles * average z values
   // volume projected on to each axis aligned plane.
-  double  VolumeX = -1.0;
-  double  VolumeY = -1.0;
-  double  VolumeZ = -1.0;
+  double  volumeX = -1.0;
+  double  volumeY = -1.0;
+  double  volumeZ = -1.0;
   // weighting factors for the maximum unit normal component (MUNC)
-  double  Kx = -1.0;
-  double  Ky = -1.0;
-  double  Kz = -1.0;
+  double  kx = -1.0;
+  double  ky = -1.0;
+  double  kz = -1.0;
   // This characterizes the
   // deviation of the shape of an object from a sphere. A sphere's NSI
   // is one. This number is always >= 1.0.
-  double  NormalizedShapeIndex = -1.0;
+  double  normalizedShapeIndex = -1.0;
+
+  size_t numVertices = 0;
+  size_t numTriangles = 0;
 };
 
 class ZMesh
@@ -117,8 +120,10 @@ public:
 
   void generateNormals(bool useAreaWeight = true);
 
-  double volume() const;
+  //double volume() const;
   ZMeshProperties properties() const;
+  void logProperties(const QString& str = "") const { logProperties(properties(), str); }
+  static void logProperties(const ZMeshProperties &prop, const QString& str = "");
 
   // a list of cubes with normal
   static ZMesh createCubesWithNormal(const std::vector<glm::vec3>& coordLlfs,
