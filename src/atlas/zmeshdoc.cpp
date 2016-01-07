@@ -290,8 +290,8 @@ const QString &ZMeshDoc::MeshPack::detailedInfo() const
   if (m_detailedInfo.isEmpty()) {
     QStringList info;
     ZMeshProperties prop = mesh.properties();
-    info << QString("Vertices Number: %1").arg(prop.numVertices);
-    info << QString("Triangles Number: %1").arg(prop.numTriangles);
+    info << QString("Number of Vertices: %1").arg(prop.numVertices);
+    info << QString("Number of Triangles: %1").arg(prop.numTriangles);
     info << QString("Surface Area: %1").arg(prop.surfaceArea);
     info << QString("Min Triangle Area: %1").arg(prop.minTriangleArea);
     info << QString("Max Triangle Area: %1").arg(prop.maxTriangleArea);
@@ -303,7 +303,7 @@ const QString &ZMeshDoc::MeshPack::detailedInfo() const
     info << QString("Kx: %1").arg(prop.kx);
     info << QString("Ky: %1").arg(prop.ky);
     info << QString("Kz: %1").arg(prop.kz);
-    info << QString("NormalizedShapeIndex: %1").arg(prop.normalizedShapeIndex);
+    info << QString("Normalized Shape Index: %1").arg(prop.normalizedShapeIndex);
     m_detailedInfo = info.join("\n");
   }
   return m_detailedInfo;

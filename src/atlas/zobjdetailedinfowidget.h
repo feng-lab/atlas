@@ -34,12 +34,13 @@ protected:
   QWidget *m_defaultWidget;
 
   struct SubWidget {
-    SubWidget(size_t id, QLabel *label, QWidget *wt)
-      : id(id), infoLabel(label), widget(wt)
+    SubWidget(size_t id, QLabel *infoLabel, QLabel *label, QWidget *wt)
+      : id(id), infoLabel(infoLabel), label(label), widget(wt)
     {}
 
     size_t id;
     QLabel* infoLabel;
+    QLabel* label;
     QWidget* widget;
   };
 

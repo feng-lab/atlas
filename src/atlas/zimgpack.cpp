@@ -262,6 +262,32 @@ const QString &ZImgPack::sizeInfo() const
   return m_sizeInfo;
 }
 
+const QString &ZImgPack::detailedInfo() const
+{
+  if (m_detailedInfo.isEmpty()) {
+    QStringList info;
+    info << QString("Width: %1").arg(m_imgInfo.width);
+    info << QString("Height: %1").arg(m_imgInfo.height);
+    info << QString("Depth: %1").arg(m_imgInfo.depth);
+    info << QString("Number of Channels: %1").arg(m_imgInfo.numChannels);
+    info << QString("Number of Times: %1").arg(m_imgInfo.numTimes);
+    info << QString("Bytes per Voxel: %1").arg(m_imgInfo.bytesPerVoxel);
+    info << QString("Voxel Format: %1").arg(enumToString(m_imgInfo.voxelFormat));
+    info << QString("Voxel Size Unit: %1").arg(enumToString(m_imgInfo.voxelSizeUnit));
+    info << QString("Voxel Size X: %1").arg(m_imgInfo.voxelSizeX);
+    info << QString("Voxel Size Y: %1").arg(m_imgInfo.voxelSizeY);
+    info << QString("Voxel Size Z: %1").arg(m_imgInfo.voxelSizeZ);
+    if (m_imgInfo.alphaChannelIdx >= 0) {
+      info << QString("Alpha Channel: %1").arg(m_imgInfo.alphaChannelIdx);
+    }
+    if (m_imgInfo.validBitCount > 0) {
+      info << QString("Valid Bit Count: %1").arg(m_imgInfo.validBitCount);
+    }
+    m_detailedInfo = info.join("\n");
+  }
+  return m_detailedInfo;
+}
+
 void ZImgPack::save(QString fileName, FileFormat format, Compression comp)
 {
   if (m_diskCached) {
@@ -928,7 +954,7 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t, size_t z) const
 
 void ZImgPack::updateDerivedData()
 {
-  LINFO() << m_imgInfo.toQString();
+  //LINFO() << m_imgInfo.toQString();
   if (!m_diskCached) {
     m_maximumProjectedAlongZImg.clear();
     m_img.computeMinMax(m_minIntensity, m_maxIntensity);
@@ -951,6 +977,7 @@ void ZImgPack::updateDerivedData()
   }
 
   m_sizeInfo.clear();
+  m_detailedInfo.clear();
 
   updateNameTootip();
 }

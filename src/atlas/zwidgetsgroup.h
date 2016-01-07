@@ -4,6 +4,8 @@
 #include <QObject>
 #include <QLayout>
 
+class QLabel;
+
 namespace nim {
 
 class ZParameter;
@@ -42,7 +44,7 @@ public:
   void setVisible(bool visible) { m_isVisible = visible; }
   inline bool isVisible() { return m_isVisible; }
 
-  QWidget *createWidget(bool createBasic = true, bool scroll = true, const QString &label = QString());
+  QWidget *createWidget(bool createBasic = true, bool scroll = true, QLabel *label = nullptr);
   QLayout *createLayout(bool createBasic = true);
 
   bool operator<(const ZWidgetsGroup& other) const;

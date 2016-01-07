@@ -194,6 +194,11 @@ const QString &ZImgDoc::objInfo(size_t id) const
   return m_idToImgPacks.at(id)->sizeInfo();
 }
 
+const QString &ZImgDoc::objDetailedInfo(size_t id) const
+{
+  return m_idToImgPacks.at(id)->detailedInfo();
+}
+
 const QString &ZImgDoc::objTooltip(size_t id) const
 {
   return m_idToImgPacks.at(id)->tooltip();

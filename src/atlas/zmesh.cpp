@@ -678,7 +678,7 @@ void ZMesh::logProperties(const ZMeshProperties &prop, const QString &str)
   LINFO() << "Kx:" << prop.kx;
   LINFO() << "Ky:" << prop.ky;
   LINFO() << "Kz:" << prop.kz;
-  LINFO() << "NormalizedShapeIndex:" << prop.normalizedShapeIndex;
+  LINFO() << "Normalized Shape Index:" << prop.normalizedShapeIndex;
   LINFO() << "";
 }
 

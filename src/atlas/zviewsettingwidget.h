@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <QStackedWidget>
+#include <QLabel>
 #include "zviewsettinginterface.h"
 #include "zdoc.h"
 
@@ -36,12 +37,13 @@ protected:
   QWidget *m_defaultWidget;
 
   struct SubWidget {
-    SubWidget(size_t id, ZWidgetsGroup *wg, QWidget *wt)
-      : id(id), widgetsGroup(wg), widget(wt)
+    SubWidget(size_t id, ZWidgetsGroup *wg, QLabel *label, QWidget *wt)
+      : id(id), widgetsGroup(wg), label(label), widget(wt)
     {}
 
     size_t id;
     ZWidgetsGroup* widgetsGroup;
+    QLabel *label;
     QWidget* widget;
   };
 

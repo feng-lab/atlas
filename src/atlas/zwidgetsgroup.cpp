@@ -130,7 +130,7 @@ void ZWidgetsGroup::removeChild(const std::shared_ptr<ZWidgetsGroup> &child)
   }
 }
 
-QWidget *ZWidgetsGroup::createWidget(bool createBasic, bool scroll, const QString &label)
+QWidget *ZWidgetsGroup::createWidget(bool createBasic, bool scroll, QLabel *label)
 {
   QLayout *lw = createLayout(createBasic);
   // if is boxLayout, add strech to fill the space
@@ -138,10 +138,8 @@ QWidget *ZWidgetsGroup::createWidget(bool createBasic, bool scroll, const QStrin
   if (blo)
     blo->addStretch();
   //
-  if (blo && !label.isEmpty()) {
-    QLabel *lbl = new QLabel(label);
-    lbl->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    blo->insertWidget(0, lbl);
+  if (blo && label) {
+    blo->insertWidget(0, label);
     blo->insertSpacing(1, 20);
   }
   QWidget *widget = new QWidget();

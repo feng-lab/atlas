@@ -41,9 +41,12 @@ void ZViewSettingWidget::showViewSettingWidgetOfObj(size_t id)
   }
   std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
   if (wg) {
-    QWidget *wt = wg->createWidget(false, true, QString("%1").arg(m_doc->objNameWithModifiedMarkerAndID(id)));
+    QLabel* label = new QLabel(m_doc->objNameWithModifiedMarkerAndID(id));
+    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    label->setWordWrap(true);
+    QWidget *wt = wg->createWidget(false, true, label);
     connect(wg.get(), SIGNAL(widgetsGroupChanged()), this, SLOT(updateWidget()));
-    m_subWidgets.emplace_back(id, wg.get(), wt);
+    m_subWidgets.emplace_back(id, wg.get(), label, wt);
     m_widget->setCurrentIndex(m_widget->addWidget(wt));
   } else {
     m_widget->setCurrentWidget(m_defaultWidget);
@@ -81,25 +84,10 @@ void ZViewSettingWidget::removeViewSettingWidgetOfObj(size_t id)
 
 void ZViewSettingWidget::updateViewSettingWidgetLabelOfObj(size_t id)
 {
-  //LINFO() << "..";
   for (size_t i=0; i<m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
-      QScrollArea *sa = dynamic_cast<QScrollArea*>(m_subWidgets[i].widget);
-      if (sa && sa->widget()) {
-        QBoxLayout *lo = dynamic_cast<QBoxLayout*>(sa->widget()->layout());
-        //LWARN() << lo;
-        if (lo && lo->count() > 0) {
-          QWidget *firstWidget = lo->itemAt(0)->widget();
-          //LWARN() << firstWidget;
-          if (firstWidget) {
-            QLabel *label = dynamic_cast<QLabel*>(firstWidget);
-            if (label) {
-              label->setText(m_doc->objNameWithModifiedMarkerAndID(id));
-            }
-          }
-        }
-      }
-      return;
+      m_subWidgets[i].label->setText(m_doc->objNameWithModifiedMarkerAndID(id));
+      break;
     }
   }
 }
@@ -116,7 +104,11 @@ void ZViewSettingWidget::updateWidget()
       }
       m_widget->removeWidget(m_subWidgets[i].widget);
       delete m_subWidgets[i].widget;
-      m_subWidgets[i].widget = wg->createWidget(false, true, QString("%1").arg(m_doc->objNameWithModifiedMarkerAndID(m_subWidgets[i].id)));
+
+      m_subWidgets[i].label = new QLabel(m_doc->objNameWithModifiedMarkerAndID(m_subWidgets[i].id));
+      m_subWidgets[i].label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+      m_subWidgets[i].label->setWordWrap(true);
+      m_subWidgets[i].widget = wg->createWidget(false, true, m_subWidgets[i].label);
       if (current) {
         m_widget->setCurrentIndex(m_widget->addWidget(m_subWidgets[i].widget));
       }

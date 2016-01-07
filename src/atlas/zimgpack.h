@@ -60,6 +60,7 @@ public:
   virtual ~ZImgPack();
 
   const QString& sizeInfo() const;
+  const QString& detailedInfo() const;
   inline double rangeMin() const { return m_rangeMin; }
   inline double rangeMax() const { return m_rangeMax; }
   inline bool hasMinMax() const { return m_minMaxState != MinMaxState::Invalid; }
@@ -159,6 +160,7 @@ protected:
   // derived data
 private:
   mutable QString m_sizeInfo;
+  mutable QString m_detailedInfo;
   double m_rangeMin;
   double m_rangeMax;
   QString m_name;

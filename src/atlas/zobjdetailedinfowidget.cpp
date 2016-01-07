@@ -43,12 +43,15 @@ void ZObjDetailedInfoWidget::showWidgetOfObj(size_t id)
   QString info = m_doc->objDetailedInfo(id);
   if (!info.isEmpty()) {
     ZWidgetsGroup wg("Info", 1);
-    QLabel *label = new QLabel(info);
+    QLabel *infoLabel = new QLabel(info);
+    infoLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    infoLabel->setWordWrap(true);
+    wg.addChild(*infoLabel, 1);
+    QLabel* label = new QLabel(m_doc->objNameWithModifiedMarkerAndID(id));
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setWordWrap(true);
-    wg.addChild(*label, 1);
-    QWidget *wt = wg.createWidget(false, true, QString("%1").arg(m_doc->objNameWithModifiedMarkerAndID(id)));
-    m_subWidgets.emplace_back(id, label, wt);
+    QWidget *wt = wg.createWidget(false, true, label);
+    m_subWidgets.emplace_back(id, infoLabel, label, wt);
     m_widget->setCurrentIndex(m_widget->addWidget(wt));
   } else {
     m_widget->setCurrentWidget(m_defaultWidget);
@@ -90,22 +93,8 @@ void ZObjDetailedInfoWidget::updateWidgetLabelOfObj(size_t id)
   for (size_t i=0; i<m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       m_subWidgets[i].infoLabel->setText(m_doc->objDetailedInfo(id));
-      QScrollArea *sa = dynamic_cast<QScrollArea*>(m_subWidgets[i].widget);
-      if (sa && sa->widget()) {
-        QBoxLayout *lo = dynamic_cast<QBoxLayout*>(sa->widget()->layout());
-        //LWARN() << lo;
-        if (lo && lo->count() > 0) {
-          QWidget *firstWidget = lo->itemAt(0)->widget();
-          //LWARN() << firstWidget;
-          if (firstWidget) {
-            QLabel *label = dynamic_cast<QLabel*>(firstWidget);
-            if (label) {
-              label->setText(m_doc->objNameWithModifiedMarkerAndID(id));
-            }
-          }
-        }
-      }
-      return;
+      m_subWidgets[i].label->setText(m_doc->objNameWithModifiedMarkerAndID(id));
+      break;
     }
   }
 }
