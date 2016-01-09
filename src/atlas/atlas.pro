@@ -526,6 +526,10 @@ contains(CONFIG, with_tests) {
 include($$PWD/../3rdparty/optimization/optimization.pri)
 include($$PWD/../3rdparty/libqxt.pri)
 
+DEFINES += EIGEN_NO_DEBUG EIGEN_DONT_PARALLELIZE EIGEN_MPL2_ONLY
+DEFINES += EIGEN_USE_BLAS EIGEN_USE_LAPACKE_STRICT EIGEN_USE_MKL_VML
+#DEFINES += EIGEN_USE_MKL_ALL
+
 DEFINES += QS_LOG_LINE_NUMBERS    # automatically writes the file and line for each log message
 #DEFINES += QS_LOG_DISABLE         # logging code is replaced with a no-op
 #DEFINES += QS_LOG_SEPARATE_THREAD # messages are queued and written from a separate thread

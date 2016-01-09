@@ -2,11 +2,6 @@
 #define ZEIGENUTILS_H
 
 #include <cmath>
-#define EIGEN_NO_DEBUG
-#define EIGEN_DONT_PARALLELIZE
-#ifndef EIGEN_MPL2_ONLY
-  #define EIGEN_MPL2_ONLY
-#endif
 #include <Eigen/Dense>
 #include <fstream>
 #include <sstream>

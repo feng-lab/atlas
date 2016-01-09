@@ -71,7 +71,7 @@ public:
   {
     Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> tmp = randn<Real>(dim);
     Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> Mat = tmp * tmp.transpose();
-    while (!nim::ZEigenUtils::matrixIsPositiveDefinite(Mat, 1e-5))
+    while (!ZEigenUtils::matrixIsPositiveDefinite(Mat, 1e-5))
       Mat += Eigen::Matrix<Real, Eigen::Dynamic, 1>::Constant(dim, 0.001).asDiagonal();
     return Mat;
   }
