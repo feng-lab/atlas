@@ -299,7 +299,8 @@ void ZGenerateAnalysisTextFile::getLayerFeature(ZSwc &tree, ZSwc &layerTree, std
     if (glm::length(glm::dvec3(tn->x - layerTn->x, tn->y - layerTn->y, tn->z - layerTn->z)) > 1.) {
       LWARN() << "node" << tn->x << tn->y << tn->z << tn->radius;
       LWARN() << "layer node" << layerTn->x << layerTn->y << layerTn->z << layerTn->radius;
-      LWARN() << "wrong layer node match";
+      //LWARN() << "wrong layer node match";
+      throw ZImgException("wrong layer node match");
     }
     nodeToLayer[tn] = layerTn->type;
     ++tn;
@@ -599,11 +600,11 @@ ZGenerateAnalysisTextFile::SwcTreeNode ZGenerateAnalysisTextFile::getNodeSegOfPu
   // more than one neighbour branches
   res = intensityWeightedNearestNode(punctum.x(), punctum.y(), punctum.z(), nodesWithinRange);
 
-  if (nearestNode(punctum.x(), punctum.y(), punctum.z(), nodesWithinRange) != res) {
-    LWARN() << "Check Punctum from" << m_input.punctaFilename << ":"
-            << punctum.x() << punctum.y() << punctum.z() << punctum.radius()
-            << punctum.maxIntensity() << punctum.meanIntensity();
-  }
+//  if (nearestNode(punctum.x(), punctum.y(), punctum.z(), nodesWithinRange) != res) {
+//    LWARN() << "Punctum assign example from" << m_input.punctaFilename << ":"
+//            << punctum.x() << punctum.y() << punctum.z() << punctum.radius()
+//            << punctum.maxIntensity() << punctum.meanIntensity();
+//  }
   return res;
 }
 

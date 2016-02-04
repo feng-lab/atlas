@@ -281,7 +281,7 @@ void stnTrajectory()
   QStringList filters;
   filters << "*.nrrd";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  QDir outFolder("/Users/feng/Downloads/allen_stn_grid_traj_2");
+  QDir outFolder("/Users/feng/Downloads/allen_stn_grid_traj_energy");
   QString resolution = "50";
   tbb::task_scheduler_init init(8);
 
@@ -323,10 +323,10 @@ void stnTrajectory()
         [&](const tbb::blocked_range<size_t>& range){
     for (size_t expIdx = range.begin(); expIdx != range.end(); ++expIdx) {
       const QString& str = exps[expIdx];
-      if (!str.contains("298000880") &&
-          !str.contains("306491185")) {
-        continue;
-      }
+//      if (!str.contains("298000880") &&
+//          !str.contains("306491185")) {
+//        continue;
+//      }
 
       if (outFolder.exists(str + "_" + resolution + "um_stn_trace.swc")) {
         continue;
@@ -361,6 +361,14 @@ void stnTrajectory()
       if (injectionIdxs.empty())
         continue;
 
+#if 1
+      projection = ZImg(dir.filePath(str + "_" + resolution + "um_projection_energy.nrrd"));
+      projection *= mask;
+      projection.typedUnaryOperation<float>([](float proj) { return std::max(255.f, proj); });
+      //projection.typedBinaryOperation<float, float>(injection, [](float proj, float inj) { return inj > 0.f ? 0.f : proj; });
+      projection.normalize();
+#endif
+
       ZImgGraph imgGraph(projection);
       imgGraph.setConnectivity(26);
       ZImgAutoThreshold<> imgAutoThre;
@@ -381,7 +389,7 @@ void stnTrajectory()
 
       std::vector<std::vector<glm::dvec3>> lines;
       for (size_t idx : projIdxs) {
-  #if 1
+  #if 0
         std::vector<size_t> path;
         imgGraph.shortestPath(idx, injectionIdxs, &path);
         std::vector<glm::dvec3> line;
@@ -533,13 +541,39 @@ void mergeTraces()
   }
 }
 
-void tmp()
+void calcSwcVolume()
 {
+  QDir dir("/Users/feng/Google Drive/Shaul/CA3Py_CA1PV_os/ipsi/AnalysisTextFiles");
+  QDir outFolder("/Users/feng/Downloads/ipsi_mesh");
+  QStringList filters;
+  QFileInfoList dirlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks | QDir::NoDotAndDotDot);
+  //LINFO() << dirlist.size() << dirlist.at(0).absolutePath();
   ZMesh rootMesh;
   ZMesh branchMesh;
-  ZMesh::createSwcMesh(ZSwc("/Users/feng/Documents/bigimage_new/0515_15Py.swc"), 5, 1, rootMesh, branchMesh);
-  rootMesh.save("/Users/feng/Downloads/root.obj");
-  branchMesh.save("/Users/feng/Downloads/branch.obj");
+  filters << "*c.swc";
+  LINFO() << "NameOfCell, SomaSurfaceArea, SomaVolume, NeuriteSurfaceArea, NeuriteVolume";
+  for (int i=0; i<dirlist.size(); i++) {
+    QFileInfo dirInfo = dirlist.at(i);
+    QDir subDir(dirInfo.absoluteFilePath());
+    QFileInfoList list = subDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+    assert(list.size() == 1);
+    QFileInfo fileInfo = list.at(0);
+    ZMesh::createSwcMesh(ZSwc(fileInfo.absoluteFilePath()), 5, 1, rootMesh, branchMesh);
+    rootMesh.save(outFolder.filePath(fileInfo.baseName() + "_soma.obj"));
+    branchMesh.save(outFolder.filePath(fileInfo.baseName() + "_neurite.obj"));
+    auto rootProp = rootMesh.properties();
+    auto branchProp = branchMesh.properties();
+    LINFO() << qPrintable(fileInfo.baseName()) << ","
+            << rootProp.surfaceArea*(1.0/9.66/9.66) << ","
+            << rootProp.volume*(1.0/9.66/9.66/9.66) << ","
+            << branchProp.surfaceArea*(1.0/9.66/9.66) << ","
+            << branchProp.volume*(1.0/9.66/9.66/9.66);
+  }
+}
+
+void tmp()
+{
+
 }
 
 }
