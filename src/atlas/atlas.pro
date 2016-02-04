@@ -573,7 +573,7 @@ exists(/opt/intel/tbb/include) {
     QT += concurrent
 }
 
-    ITKVersion = 4.9
+    ITKVersion = 4.10
     ITKPath = $$PWD/../3rdparty/itk
     INCLUDEPATH += $$ITKPath/include/ITK-$$ITKVersion
     LIBS += -L$$ITKPath/lib -lITKCommon-$$ITKVersion -lITKVNLInstantiation-$$ITKVersion -litkvnl_algo-$$ITKVersion -litkvnl-$$ITKVersion \
@@ -659,7 +659,7 @@ win32 {
     LIBS += $$TBBPath\lib\intel64\vc12\tbb.lib
     QMAKE_POST_LINK += robocopy /is \"$$TBBPath\..\redist\intel64\tbb\vc12\" $$OUT_PWD/release tbb.dll &
 
-    ITKVersion = 4.9
+    ITKVersion = 4.10
     ITKPath = "$$PWD\..\3rdparty\itk"
     INCLUDEPATH += $$ITKPath\include\ITK-$$ITKVersion
     LIBS += -L$$ITKPath\lib -lITKCommon-$$ITKVersion -lITKVNLInstantiation-$$ITKVersion -litkvnl_algo-$$ITKVersion -litkvnl-$$ITKVersion \

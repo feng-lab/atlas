@@ -14,7 +14,7 @@ fi
 if [ ! -d $srcDIR ]
 then
   srcPackageDIR="/Users/feng/Google Drive/code/my"
-  srcArchive=$srcPackageDIR/GeometricTools/GeometricToolsEngine2p0.zip
+  srcArchive=$srcPackageDIR/GeometricTools/GeometricToolsEngine2p2.zip
   7z x -y -o$currDIR/../../.. "$srcArchive"
 fi
 
