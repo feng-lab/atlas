@@ -27,11 +27,11 @@ public:
   virtual QList<QAction*> loadFileActions() const override;
   virtual QMenu* processObjMenu() const override;
   virtual void removeObj(size_t id) override;
-  virtual const QString& objName(size_t id) const override;
+  virtual QString objName(size_t id) const override;
   virtual QString objPath(size_t id) const override;
   virtual bool objHasUnsavedChange(size_t id) const override;
-  virtual const QString& objInfo(size_t id) const override;
-  virtual const QString& objTooltip(size_t id) const override;
+  virtual QString objInfo(size_t id) const override;
+  virtual QString objTooltip(size_t id) const override;
   virtual QJsonValue jsonValue(size_t id) const override;
   virtual bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
   virtual size_t makeAlias(size_t id) override;

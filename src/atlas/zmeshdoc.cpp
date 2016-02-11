@@ -156,7 +156,7 @@ void ZMeshDoc::removeObj(size_t id)
   emit objRemoved(id, this);
 }
 
-const QString &ZMeshDoc::objName(size_t id) const
+QString ZMeshDoc::objName(size_t id) const
 {
   return m_idToMeshPacks.at(id)->name();
 }
@@ -171,17 +171,17 @@ bool ZMeshDoc::objHasUnsavedChange(size_t id) const
   return m_idToMeshPacks.at(id)->hasUnsavedChange;
 }
 
-const QString &ZMeshDoc::objInfo(size_t id) const
+QString ZMeshDoc::objInfo(size_t id) const
 {
   return m_idToMeshPacks.at(id)->info();
 }
 
-const QString &ZMeshDoc::objDetailedInfo(size_t id) const
+QString ZMeshDoc::objDetailedInfo(size_t id) const
 {
   return m_idToMeshPacks.at(id)->detailedInfo();
 }
 
-const QString &ZMeshDoc::objTooltip(size_t id) const
+QString ZMeshDoc::objTooltip(size_t id) const
 {
   return m_idToMeshPacks.at(id)->tooltip();
 }

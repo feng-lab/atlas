@@ -148,7 +148,7 @@ void Z2DAnimationDoc::removeObj(size_t id)
   emit objRemoved(id, this);
 }
 
-const QString &Z2DAnimationDoc::objName(size_t id) const
+QString Z2DAnimationDoc::objName(size_t id) const
 {
   return m_idToAnimationPacks.at(id)->name();
 }
@@ -163,12 +163,12 @@ bool Z2DAnimationDoc::objHasUnsavedChange(size_t id) const
   return m_idToAnimationPacks.at(id)->hasUnsavedChange;
 }
 
-const QString &Z2DAnimationDoc::objInfo(size_t id) const
+QString Z2DAnimationDoc::objInfo(size_t id) const
 {
   return m_idToAnimationPacks.at(id)->info();
 }
 
-const QString &Z2DAnimationDoc::objTooltip(size_t id) const
+QString Z2DAnimationDoc::objTooltip(size_t id) const
 {
   return m_idToAnimationPacks.at(id)->tooltip();
 }

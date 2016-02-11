@@ -134,7 +134,7 @@ void ZPunctaDoc::removeObj(size_t id)
   emit objRemoved(id, this);
 }
 
-const QString &ZPunctaDoc::objName(size_t id) const
+QString ZPunctaDoc::objName(size_t id) const
 {
   return m_idToPunctaPacks.at(id)->name();
 }
@@ -149,12 +149,12 @@ bool ZPunctaDoc::objHasUnsavedChange(size_t id) const
   return m_idToPunctaPacks.at(id)->hasUnsavedChange;
 }
 
-const QString &ZPunctaDoc::objInfo(size_t id) const
+QString ZPunctaDoc::objInfo(size_t id) const
 {
   return m_idToPunctaPacks.at(id)->info();
 }
 
-const QString &ZPunctaDoc::objTooltip(size_t id) const
+QString ZPunctaDoc::objTooltip(size_t id) const
 {
   return m_idToPunctaPacks.at(id)->tooltip();
 }

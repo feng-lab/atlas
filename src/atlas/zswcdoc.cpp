@@ -124,7 +124,7 @@ void ZSwcDoc::removeObj(size_t id)
   emit objRemoved(id, this);
 }
 
-const QString &ZSwcDoc::objName(size_t id) const
+QString ZSwcDoc::objName(size_t id) const
 {
   return m_idToSwcPacks.at(id)->name();
 }
@@ -139,12 +139,12 @@ bool ZSwcDoc::objHasUnsavedChange(size_t id) const
   return m_idToSwcPacks.at(id)->hasUnsavedChange;
 }
 
-const QString &ZSwcDoc::objInfo(size_t id) const
+QString ZSwcDoc::objInfo(size_t id) const
 {
   return m_idToSwcPacks.at(id)->info();
 }
 
-const QString &ZSwcDoc::objTooltip(size_t id) const
+QString ZSwcDoc::objTooltip(size_t id) const
 {
   return m_idToSwcPacks.at(id)->tooltip();
 }

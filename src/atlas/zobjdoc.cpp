@@ -41,7 +41,7 @@ size_t ZObjDoc::chooseOneObjWithWidget(const QString &title, QWidget *parent) co
   return 0;
 }
 
-const QString ZObjDoc::objNameWithModifiedMarker(size_t id) const
+QString ZObjDoc::objNameWithModifiedMarker(size_t id) const
 {
   if (objHasUnsavedChange(id))
     return QString("%1*").arg(objName(id));
@@ -49,7 +49,7 @@ const QString ZObjDoc::objNameWithModifiedMarker(size_t id) const
     return objName(id);
 }
 
-const QString ZObjDoc::objNameWithModifiedMarkerAndID(size_t id) const
+QString ZObjDoc::objNameWithModifiedMarkerAndID(size_t id) const
 {
   if (objHasUnsavedChange(id))
     return QString("%1* (id: %2)").arg(objName(id)).arg(id);

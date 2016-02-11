@@ -165,7 +165,7 @@ void ZImgDoc::removeObj(size_t id)
   emit objRemoved(id, this);
 }
 
-const QString &ZImgDoc::objName(size_t id) const
+QString ZImgDoc::objName(size_t id) const
 {
   return m_idToImgPacks.at(id)->name();
 }
@@ -189,17 +189,17 @@ bool ZImgDoc::objHasUnsavedChange(size_t id) const
   return m_idToImgPacks.at(id)->hasUnsavedChange();
 }
 
-const QString &ZImgDoc::objInfo(size_t id) const
+QString ZImgDoc::objInfo(size_t id) const
 {
   return m_idToImgPacks.at(id)->sizeInfo();
 }
 
-const QString &ZImgDoc::objDetailedInfo(size_t id) const
+QString ZImgDoc::objDetailedInfo(size_t id) const
 {
   return m_idToImgPacks.at(id)->detailedInfo();
 }
 
-const QString &ZImgDoc::objTooltip(size_t id) const
+QString ZImgDoc::objTooltip(size_t id) const
 {
   return m_idToImgPacks.at(id)->tooltip();
 }

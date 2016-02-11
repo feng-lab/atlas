@@ -131,7 +131,7 @@ void ZRegionAnnotationDoc::removeObj(size_t id)
   emit objRemoved(id, this);
 }
 
-const QString &ZRegionAnnotationDoc::objName(size_t id) const
+QString ZRegionAnnotationDoc::objName(size_t id) const
 {
   return m_idToRegionAnnotationPacks.at(id)->name();
 }
@@ -146,12 +146,12 @@ bool ZRegionAnnotationDoc::objHasUnsavedChange(size_t id) const
   return m_idToRegionAnnotationPacks.at(id)->hasUnsavedChange;
 }
 
-const QString &ZRegionAnnotationDoc::objInfo(size_t id) const
+QString ZRegionAnnotationDoc::objInfo(size_t id) const
 {
   return m_idToRegionAnnotationPacks.at(id)->info();
 }
 
-const QString &ZRegionAnnotationDoc::objTooltip(size_t id) const
+QString ZRegionAnnotationDoc::objTooltip(size_t id) const
 {
   return m_idToRegionAnnotationPacks.at(id)->tooltip();
 }

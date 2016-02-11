@@ -175,7 +175,7 @@ void ZROIDoc::removeObj(size_t id)
   emit objRemoved(id, this);
 }
 
-const QString &ZROIDoc::objName(size_t id) const
+QString ZROIDoc::objName(size_t id) const
 {
   return m_idToROIPacks.at(id)->name();
 }
@@ -190,12 +190,12 @@ bool ZROIDoc::objHasUnsavedChange(size_t id) const
   return m_idToROIPacks.at(id)->hasUnsavedChange;
 }
 
-const QString &ZROIDoc::objInfo(size_t id) const
+QString ZROIDoc::objInfo(size_t id) const
 {
   return m_idToROIPacks.at(id)->info();
 }
 
-const QString &ZROIDoc::objTooltip(size_t id) const
+QString ZROIDoc::objTooltip(size_t id) const
 {
   return m_idToROIPacks.at(id)->tooltip();
 }
