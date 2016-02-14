@@ -92,7 +92,7 @@ public:
   void loadFile(const QString &fileName);
   void loadFileList(const QStringList &fileList);
 
-  size_t viewSettingId() const { return m_viewSettingId; }
+  size_t viewSettingId();
 
   std::map<size_t,size_t> read(const QJsonObject &json, QString &err);
   void write(QJsonObject &json, bool includeAnimation) const;

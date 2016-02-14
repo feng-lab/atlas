@@ -344,8 +344,10 @@ void ZObjModel::removeObj(size_t id)
   for (size_t i=0; i<m_rootItem->children.size(); ++i) {
     if (m_rootItem->children[i]->id == id) {
       emit beginRemoveRows(QModelIndex(), i, i);
-      if (m_rootItem->children[i].get() == m_viewSettingCurrentItem)
+      if (m_rootItem->children[i].get() == m_viewSettingCurrentItem) {
         m_viewSettingCurrentItem = nullptr;
+        m_doc->sendHideViewSettingSignal();
+      }
       m_rootItem->children.erase(m_rootItem->children.begin() + i);
       emit endRemoveRows();
       return;
@@ -361,8 +363,10 @@ void ZObjModel::removeObjsOfDoc(ZObjDoc *doc)
     for (size_t i=0; i<m_rootItem->children.size(); ++i) {
       if (m_rootItem->children[i]->doc == doc) {
         emit beginRemoveRows(QModelIndex(), i, i);
-        if (m_rootItem->children[i].get() == m_viewSettingCurrentItem)
+        if (m_rootItem->children[i].get() == m_viewSettingCurrentItem) {
           m_viewSettingCurrentItem = nullptr;
+          m_doc->sendHideViewSettingSignal();
+        }
         m_rootItem->children.erase(m_rootItem->children.begin() + i);
         emit endRemoveRows();
         cont = true;
@@ -377,6 +381,7 @@ void ZObjModel::removeAllObjs()
   beginResetModel();
   m_rootItem->children.clear();
   m_viewSettingCurrentItem = nullptr;
+  m_doc->sendHideViewSettingSignal();
   endResetModel();
 }
 

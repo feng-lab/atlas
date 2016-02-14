@@ -183,12 +183,14 @@ void ZGenerateAnalysisTextFile::generate()
     if (inputSwcIsPyramidal()) { // already pyramidal, don't need process
       QFile::copy(m_input.swcFilename, m_processedSwcFilename);
     } else { // make it pyramidal
-      // mark soma from swc nodes
-      tree.labelSomaAndOthers(3.0 / m_input.voxelSizeX);  // soma radius at least 3um
-      tree.resortPyramidal();
-      m_processedSwcFilename = outputDir.filePath(swcFileInfo.completeBaseName()) + "Py.swc";
-      tree.resortID();
-      tree.save(m_processedSwcFilename);
+      throw ZImgException(QString("input SWC %1 is not pyramidal SWC")
+                          .arg(m_input.swcFilename));
+      //      // mark soma from swc nodes
+      //      tree.labelSomaAndOthers(3.0 / m_input.voxelSizeX);  // soma radius at least 3um
+      //      tree.resortPyramidal();
+      //      m_processedSwcFilename = outputDir.filePath(swcFileInfo.completeBaseName()) + "Py.swc";
+      //      tree.resortID();
+      //      tree.save(m_processedSwcFilename);
     }
   } else {
     // mark soma from swc nodes
@@ -199,6 +201,7 @@ void ZGenerateAnalysisTextFile::generate()
 
   std::map<SwcTreeNode, double> nodeToBlueness;
   std::map<SwcTreeNode, size_t> nodeToLayer;
+  std::map<SwcTreeNode, size_t> nodeToSubclass;
 
   // blueness
   getAxonFeature(tree, nodeToBlueness);
@@ -223,11 +226,30 @@ void ZGenerateAnalysisTextFile::generate()
     layerTree.save(m_layerSwcFilename);
     getLayerFeature(tree, layerTree, nodeToLayer);
   }
+  // subclass
+  if (m_input.doPyramidalSubclassSeparation) {
+    QString subclassSwcName = m_input.swcFilename;
+    subclassSwcName.replace(".swc", "_subclass.swc", Qt::CaseInsensitive);
+    QFileInfo subclassSwcFileInfo(subclassSwcName);
+    if (subclassSwcFileInfo.exists()) {
+      m_subclassSwcFilename = outputDir.filePath(subclassSwcFileInfo.fileName());
+      QFile::copy(subclassSwcName, m_subclassSwcFilename);
+      ZSwc subclassTree(m_subclassSwcFilename);
+      if (subclassTree.numRoots() != 1) {
+        throw ZImgException(QString("wrong subclass swc file %1 with %2 roots.")
+                            .arg(m_subclassSwcFilename).arg(subclassTree.numRoots()));
+      }
+      getSubclassFeature(tree, subclassTree, nodeToSubclass);
+    } else {
+      throw ZImgException(QString("Can not find subclass SWC %1.")
+                          .arg(m_subclassSwcFilename));
+    }
+  }
 
   mergeSoma(tree, nodeToBlueness, nodeToLayer);
   removeSmallLeafBranch(tree, 6, 5);
 
-  generateAnalysisFiles(tree, nodeToBlueness, nodeToLayer);
+  generateAnalysisFiles(tree, nodeToBlueness, nodeToLayer, nodeToSubclass);
 }
 
 void ZGenerateAnalysisTextFile::checkFileExist(const QString &filename) const
@@ -308,6 +330,23 @@ void ZGenerateAnalysisTextFile::getLayerFeature(ZSwc &tree, ZSwc &layerTree, std
   }
 }
 
+void ZGenerateAnalysisTextFile::getSubclassFeature(ZSwc &tree, ZSwc &subclassTree, std::map<SwcTreeNode, size_t> &nodeToSubclass) const
+{
+  SwcTreeNode tn = tree.begin();
+  SwcTreeNode layerTn = subclassTree.begin();
+  while (tn != tree.end()) {
+    if (glm::length(glm::dvec3(tn->x - layerTn->x, tn->y - layerTn->y, tn->z - layerTn->z)) > 1.) {
+      LWARN() << "node" << tn->x << tn->y << tn->z << tn->radius;
+      LWARN() << "layer node" << layerTn->x << layerTn->y << layerTn->z << layerTn->radius;
+      //LWARN() << "wrong layer node match";
+      throw ZImgException("wrong layer node match");
+    }
+    nodeToSubclass[tn] = layerTn->type;
+    ++tn;
+    ++layerTn;
+  }
+}
+
 void ZGenerateAnalysisTextFile::writeFeatureSwc(ZSwc &treeIn, std::map<SwcTreeNode, double> &nodeToFeature, const QString &outSwcName)
 {
   ZSwc tree = treeIn;
@@ -368,12 +407,9 @@ double ZGenerateAnalysisTextFile::treeNodeDist(const SwcTreeNode &tn, const SwcT
 
 bool ZGenerateAnalysisTextFile::inputSwcIsPyramidal() const
 {
-  if (!m_input.swcFilename.endsWith("Py.swc", Qt::CaseInsensitive)) {
-    return false;
-  }
   ZSwc tree(m_input.swcFilename);
   for (SwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
-    if (tn->type != 3 && tn->type != 1 && tn->type != 4) {
+    if (tn->type != ZSwc::SomaType && tn->type != ZSwc::BasalDendriteType && tn->type != ZSwc::ApicalDendriteType) {
       return false;
     }
   }
@@ -401,7 +437,7 @@ void ZGenerateAnalysisTextFile::mergeSoma(ZSwc &tree,
     }
     parent = ZSwc::parent(tn);
     if (ZSwc::isRoot(parent)) {
-      if (parent->type == 1 && tn->type == 1) {
+      if (parent->type == ZSwc::SomaType && tn->type == ZSwc::SomaType) {
         size_t layer = nodeToLayer[tn];
         layerCount[layer]++;
 
@@ -522,19 +558,19 @@ size_t ZGenerateAnalysisTextFile::labelBranch(ZSwc &tree,
     }
     SwcTreeNode parent = ZSwc::parent(tn);
 
-    if (!ZSwc::isBranchNode(parent) && !ZSwc::isRoot(parent)) {
-      nodeToBranchId[tn] = nodeToBranchId[parent];
-      double distToParent = treeNodeDist(tn, parent);
-      nodeDistToParent[tn] = distToParent;
-      nodeDistToBranchStart[tn] = nodeDistToBranchStart[parent] + distToParent;
-      nodeDistToSoma[tn] = nodeDistToSoma[parent] + distToParent;
-    } else {
+    if (ZSwc::isRoot(parent) || ZSwc::isBranchNode(parent)) {
       // new branch
       nodeToBranchId[tn] = ++label;
       branchIdToParentBranchId[label] = nodeToBranchId[parent];
       double distToParent = treeNodeDist(tn, parent);
       nodeDistToParent[tn] = distToParent;
       nodeDistToBranchStart[tn] = distToParent;
+      nodeDistToSoma[tn] = nodeDistToSoma[parent] + distToParent;
+    } else {
+      nodeToBranchId[tn] = nodeToBranchId[parent];
+      double distToParent = treeNodeDist(tn, parent);
+      nodeDistToParent[tn] = distToParent;
+      nodeDistToBranchStart[tn] = nodeDistToBranchStart[parent] + distToParent;
       nodeDistToSoma[tn] = nodeDistToSoma[parent] + distToParent;
     }
   }
@@ -711,7 +747,8 @@ QDir ZGenerateAnalysisTextFile::getSubDir(const QString &subFoldername) const
 
 void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
                                                       std::map<SwcTreeNode, double> &nodeToBlueness,
-                                                      std::map<SwcTreeNode, size_t> &nodeToLayer) const
+                                                      std::map<SwcTreeNode, size_t> &nodeToLayer,
+                                                      std::map<SwcTreeNode, size_t> &nodeToSubclass) const
 {
   QDir outputDir(m_input.outputFolder);
   QFileInfo swcFileInfo(m_processedSwcFilename);
@@ -740,6 +777,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
   std::map<SwcTreeNode, double> nodeDistToParent;
   std::map<SwcTreeNode, double> nodeDistToBranchStart;
   std::map<SwcTreeNode, double> nodeDistToSoma;
+  std::map<SwcTreeNode, std::vector<const ZPunctum*>> nodeToPuncta;
   std::vector<Branch> branches;
   labelBranch(tree, nodeToBranchId, branchIdToParentBranchId,
               nodeDistToParent, nodeDistToBranchStart, nodeDistToSoma, branches);
@@ -747,15 +785,16 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
   std::map<const ZPunctum*, SwcTreeNode> punctumToNode;
   std::map<const ZPunctum*, double> punctumDistToBranchStart;
   std::map<const ZPunctum*, double> punctumDistToSoma;
+  std::map<const ZPunctum*, double> punctumDistToSegmentStart;
   for (ZPuncta::const_iterator it = punctaList.begin(); it != punctaList.end(); ++it) {
     SwcTreeNode tn = getNodeSegOfPunctum(tree, *it, branches.size(), nodeToBranchId);
     punctumToNode[&(*it)] = tn;
     if (ZSwc::isNull(tn))
       continue;
 
+    nodeToPuncta[tn].push_back(&(*it));
+
     size_t branchId = nodeToBranchId[tn];
-    Branch &branch = branches[branchId-1];
-    branch.puncta.push_back(&(*it));
     bool firstSeg = branchId != nodeToBranchId[ZSwc::parent(tn)];
 
     double frac;
@@ -763,12 +802,15 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
     if (frac < 0) {
       punctumDistToBranchStart[&(*it)] = firstSeg ? 0 : nodeDistToBranchStart[ZSwc::parent(tn)];
       punctumDistToSoma[&(*it)] = nodeDistToSoma[ZSwc::parent(tn)];
+      punctumDistToSegmentStart[&(*it)] = 0;
     } else if (frac > 1) {
       punctumDistToBranchStart[&(*it)] = nodeDistToBranchStart[tn];
       punctumDistToSoma[&(*it)] = nodeDistToSoma[tn];
+      punctumDistToSegmentStart[&(*it)] = nodeDistToParent[tn];
     } else {
       punctumDistToBranchStart[&(*it)] = (firstSeg ? 0 : nodeDistToBranchStart[ZSwc::parent(tn)]) + frac * nodeDistToParent[tn];
       punctumDistToSoma[&(*it)] = nodeDistToSoma[ZSwc::parent(tn)] + frac * nodeDistToParent[tn];
+      punctumDistToSegmentStart[&(*it)] = frac * nodeDistToParent[tn];
     }
   }
 
@@ -825,13 +867,6 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
                                                               .arg(branch.id, 4, 10, QChar('0'))
                                                               .arg(QFileInfo(m_input.punctaFilename).fileName()));
 
-    ZPuncta tmpPunc;
-    for (size_t tmp=0; tmp<branch.puncta.size(); ++tmp) {
-      tmpPunc.push_back(*branch.puncta[tmp]);
-    }
-    tmpPunc.save(outPunctaName);
-    tmpPunc.clear();
-
     std::ofstream outSwcStream;
     openFileStream(outSwcStream, outSwcName, std::ios_base::out | std::ios_base::trunc);
 
@@ -843,6 +878,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
     openFileStream(outPunctaTxtStream, outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
     outPunctaTxtStream << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, distToBranchStart, distToSoma" << std::endl;
 
+    ZPuncta tmpPunc;
     for (size_t j=0; j<branch.nodes.size(); ++j) {
       const SwcTreeNode &tn = branch.nodes[j];
       outSwcStream << tn->id << " " << tn->type << " " << tn->x << " "
@@ -860,9 +896,11 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
                       << tn->z << " " << tn->radius << " "
                       << nodeToBlueness[tn] << " " << nodeToLayer[tn] << std::endl;
 
-      for (size_t k=0; k<branch.puncta.size(); ++k) {
-        const ZPunctum *punctum = branch.puncta[k];
-        if (punctumToNode[punctum] == tn) {
+      if (j > 0) {
+        std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
+        for (size_t k=0; k<puncta.size(); ++k) {
+          const ZPunctum *punctum = puncta[k];
+          tmpPunc.push_back(*punctum);
           outPunctaTxtStream << j << " " << punctum->x() << " " << punctum->y() << " "
                              << punctum->z() << " "
                              << (punctumDistToBranchStart[punctum] / branch.length) << " "
@@ -873,6 +911,8 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
         }
       }
     }
+    tmpPunc.save(outPunctaName);
+    tmpPunc.clear();
   }
 
 
@@ -886,37 +926,27 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
     for (ZSwc::LeafIterator tn = tree.beginLeaf(); tn != tree.endLeaf(); ++tn) {
       SwcTreeNode tmptn = tn;
 
-      QString outSwcName;
-      QString outSwcTxtName;
-      QString outPunctaName;
-      QString outPunctaTxtName;
+      QDir *currentBranchFolder = nullptr;
+      int *currentBranchIndex = nullptr;
+      if (tmptn->type == ZSwc::ApicalDendriteType) {
+        currentBranchFolder = &FCApicalBranchFolder;
+        currentBranchIndex = &apicalIndex;
+      } else if (tmptn->type == ZSwc::BasalDendriteType) {
+        currentBranchFolder = &FCBasalBranchFolder;
+        currentBranchIndex = &basalIndex;
+      }
 
-      if (tmptn->type == 4) {
-        outSwcName = FCApicalBranchFolder.filePath(QString("branch_%1.swc")
-                                                   .arg(apicalIndex, 4, 10, QChar('0')));
-        outSwcTxtName = FCApicalBranchFolder.filePath(QString("branch_%1.txt")
-                                                      .arg(apicalIndex, 4, 10, QChar('0')));
-        outPunctaName = FCApicalBranchFolder.filePath(QString("branch_%1_%2")
-                                                      .arg(apicalIndex, 4, 10, QChar('0'))
-                                                      .arg(QFileInfo(m_input.punctaFilename).fileName()));
-        outPunctaTxtName = FCApicalBranchFolder.filePath(QString("branch_%1_%2.txt")
-                                                         .arg(apicalIndex, 4, 10, QChar('0'))
-                                                         .arg(QFileInfo(m_input.punctaFilename).fileName()));
-        ++apicalIndex;
-      }
-      else if (tmptn->type == 3) {
-        outSwcName = FCBasalBranchFolder.filePath(QString("branch_%1.swc")
-                                                   .arg(basalIndex, 4, 10, QChar('0')));
-        outSwcTxtName = FCBasalBranchFolder.filePath(QString("branch_%1.txt")
-                                                      .arg(basalIndex, 4, 10, QChar('0')));
-        outPunctaName = FCBasalBranchFolder.filePath(QString("branch_%1_%2")
-                                                      .arg(basalIndex, 4, 10, QChar('0'))
-                                                      .arg(QFileInfo(m_input.punctaFilename).fileName()));
-        outPunctaTxtName = FCBasalBranchFolder.filePath(QString("branch_%1_%2.txt")
-                                                         .arg(basalIndex, 4, 10, QChar('0'))
-                                                         .arg(QFileInfo(m_input.punctaFilename).fileName()));
-        ++basalIndex;
-      }
+      QString outSwcName = currentBranchFolder->filePath(QString("branch_%1.swc")
+                                                         .arg(*currentBranchIndex, 4, 10, QChar('0')));
+      QString outSwcTxtName = currentBranchFolder->filePath(QString("branch_%1.txt")
+                                                            .arg(*currentBranchIndex, 4, 10, QChar('0')));
+      QString outPunctaName = currentBranchFolder->filePath(QString("branch_%1_%2")
+                                                            .arg(*currentBranchIndex, 4, 10, QChar('0'))
+                                                            .arg(QFileInfo(m_input.punctaFilename).fileName()));
+      QString outPunctaTxtName = currentBranchFolder->filePath(QString("branch_%1_%2.txt")
+                                                               .arg(*currentBranchIndex, 4, 10, QChar('0'))
+                                                               .arg(QFileInfo(m_input.punctaFilename).fileName()));
+      (*currentBranchIndex) += 1;
 
       double length = nodeDistToSoma[tmptn];
 
@@ -926,19 +956,6 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
         size_t parentBranchId = branchIdToParentBranchId[branchIdList[0]];
         branchIdList.insert(branchIdList.begin(), parentBranchId);
       }
-
-      std::vector<const ZPunctum*> allPuncta;
-      for (size_t i=0; i<branchIdList.size(); ++i) {
-        size_t branchId = branchIdList[i];
-        Branch &branch = branches[branchId-1];
-        allPuncta.insert(allPuncta.end(), branch.puncta.begin(), branch.puncta.end());
-      }
-      ZPuncta tmpPunc;
-      for (size_t tmp=0; tmp<allPuncta.size(); ++tmp) {
-        tmpPunc.push_back(*allPuncta[tmp]);
-      }
-      tmpPunc.save(outPunctaName);
-      tmpPunc.clear();
 
       std::ofstream outSwcStream;
       openFileStream(outSwcStream, outSwcName, std::ios_base::out | std::ios_base::trunc);
@@ -952,6 +969,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
       outPunctaTxtStream << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, distToBranchStart, distToSoma" << std::endl;
 
       int nodeIdx = -1;
+      ZPuncta tmpPunc;
       for (size_t i=0; i<branchIdList.size(); ++i) {
         size_t branchId = branchIdList[i];
         Branch &branch = branches[branchId-1];
@@ -977,12 +995,245 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
                           << btn->z << " " << btn->radius << " "
                           << nodeToBlueness[btn] << " " << nodeToLayer[btn] << std::endl;
 
-          for (size_t k=0; k<branch.puncta.size(); ++k) {
-            const ZPunctum *punctum = branch.puncta[k];
-            if (punctumToNode[punctum] == btn) {
-              outPunctaTxtStream << nodeIdx << " " << punctum->x() << " " << punctum->y() << " "
+          // don't need to skip i == 0 and j == 0 case because btn will be soma and there
+          // should be no puncta for soma
+          std::vector<const ZPunctum*> puncta = nodeToPuncta[btn];
+          for (size_t k=0; k<puncta.size(); ++k) {
+            const ZPunctum *punctum = puncta[k];
+            tmpPunc.push_back(*punctum);
+            outPunctaTxtStream << nodeIdx << " " << punctum->x() << " " << punctum->y() << " "
+                               << punctum->z() << " "
+                               << (punctumDistToSoma[punctum] / length) << " "
+                               << punctum->volSize() << " " << punctum->meanIntensity() << " "
+                               << punctum->maxIntensity() << " "
+                               << punctumDistToSoma[punctum] << " "
+                               << punctumDistToSoma[punctum] << std::endl;
+          }
+        }
+      }
+      tmpPunc.save(outPunctaName);
+      tmpPunc.clear();
+    }
+  }
+
+
+
+  // Subclass Branches
+  if (m_input.doPyramidalSubclassSeparation) {
+    QDir basalIntermediateBranchFolder = getSubDir("Subclass_Branches/BasalIntermediate");
+    QDir basalTerminalBranchFolder = getSubDir("Subclass_Branches/BasalTerminal");
+    QDir apicalObliqueIntermediateBranchFolder = getSubDir("Subclass_Branches/ApicalObliqueIntermediate");
+    QDir apicalObliqueTerminalBranchFolder = getSubDir("Subclass_Branches/ApicalObliqueTerminal");
+    QDir mainTrunkBranchFolder = getSubDir("Subclass_Branches/MainTrunk");
+    QDir apicalTuftBranchFolder = getSubDir("Subclass_Branches/ApicalTuft");
+
+    int basalIntermediateIndex = 0;
+    int basalTerminalIndex = 0;
+    int apicalObliqueIntermediateIndex = 0;
+    int apicalObliqueTerminalIndex = 0;
+    int mainTrunkIndex = 0;
+    int apicalTuftIndex = 0;
+
+    // get main trunk and tuft (MTT)
+    std::map<SwcTreeNode, size_t> nodeToMTTBranchId;
+    std::vector<Branch> MTTBranches;
+    size_t label = 0;
+    for (SwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
+      size_t nodeSubclass = nodeToSubclass[tn];
+      if (ZSwc::isRoot(tn) || (nodeSubclass != ZSwc::MainTrunkType && nodeSubclass != ZSwc::ApicalTuftType))  {
+        nodeToMTTBranchId[tn] = 0;
+        continue;
+      }
+      SwcTreeNode parent = ZSwc::parent(tn);
+      size_t parentNodeSubclass = nodeToSubclass[parent];
+      bool parentIsMTTBranchNode = false;
+      if (nodeToMTTBranchId[parent] != 0 && ZSwc::isBranchNode(parent)) {
+        int count = 0;
+        for (auto ctn = tree.beginChild(parent); ctn != tree.endChild(parent); ++ctn) {
+          if (nodeToSubclass[ctn] == ZSwc::MainTrunkType || nodeToSubclass[ctn] == ZSwc::ApicalTuftType) {
+            ++count;
+          }
+        }
+        parentIsMTTBranchNode = count > 1;
+      }
+
+      if (nodeToMTTBranchId[parent] == 0 || parentIsMTTBranchNode || parentNodeSubclass != nodeSubclass) {
+        // new branch
+        nodeToMTTBranchId[tn] = ++label;
+      } else {
+        nodeToMTTBranchId[tn] = nodeToMTTBranchId[parent];
+      }
+    }
+
+    MTTBranches.resize(label);
+    for (SwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
+      size_t branchId = nodeToMTTBranchId[tn];
+      if (branchId > 0) {
+        Branch &branch = MTTBranches[branchId-1];
+        branch.id = branchId;
+        SwcTreeNode parent = ZSwc::parent(tn);
+        if (nodeToMTTBranchId[parent] != branch.id) { // duplicate parent
+          branch.nodes.push_back(parent);
+        }
+        branch.nodes.push_back(tn);
+        branch.length += nodeDistToParent[tn];
+      }
+    }
+    for (size_t i=0; i<MTTBranches.size(); ++i) {
+      Branch &branch = MTTBranches[i];
+
+      SwcTreeNode tmptn = branch.nodes[branch.nodes.size()-1];
+      size_t nodeSubclass = nodeToSubclass[tmptn];
+
+      QDir *currentBranchFolder = nullptr;
+      int *currentBranchIndex = nullptr;
+
+      if (nodeSubclass == ZSwc::MainTrunkType) {
+        currentBranchFolder = &mainTrunkBranchFolder;
+        currentBranchIndex = &mainTrunkIndex;
+      } else if (nodeSubclass == ZSwc::ApicalTuftType) {
+        currentBranchFolder = &apicalTuftBranchFolder;
+        currentBranchIndex = &apicalTuftIndex;
+      } else {
+        assert(false);
+      }
+
+      QString outSwcName = currentBranchFolder->filePath(QString("branch_%1.swc")
+                                                         .arg(*currentBranchIndex, 4, 10, QChar('0')));
+      QString outSwcTxtName = currentBranchFolder->filePath(QString("branch_%1.txt")
+                                                            .arg(*currentBranchIndex, 4, 10, QChar('0')));
+      QString outPunctaName = currentBranchFolder->filePath(QString("branch_%1_%2")
+                                                            .arg(*currentBranchIndex, 4, 10, QChar('0'))
+                                                            .arg(QFileInfo(m_input.punctaFilename).fileName()));
+      QString outPunctaTxtName = currentBranchFolder->filePath(QString("branch_%1_%2.txt")
+                                                               .arg(*currentBranchIndex, 4, 10, QChar('0'))
+                                                               .arg(QFileInfo(m_input.punctaFilename).fileName()));
+      (*currentBranchIndex) += 1;
+
+      std::ofstream outSwcStream;
+      openFileStream(outSwcStream, outSwcName, std::ios_base::out | std::ios_base::trunc);
+
+      std::ofstream outSwcTxtStream;
+      openFileStream(outSwcTxtStream, outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
+      outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer" << std::endl;
+
+      std::ofstream outPunctaTxtStream;
+      openFileStream(outPunctaTxtStream, outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
+      outPunctaTxtStream << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, distToBranchStart, distToSoma" << std::endl;
+
+      double segmentStartToBranchStartLength = 0.0;
+      ZPuncta tmpPunc;
+      for (size_t j=0; j<branch.nodes.size(); ++j) {
+        const SwcTreeNode &tn = branch.nodes[j];
+        outSwcStream << tn->id << " " << tn->type << " " << tn->x << " "
+                     << tn->y << " " << tn->z << " " << tn->radius << " "
+                     << ZSwc::parentID(tn) << std::endl;
+        if (j == 0) {
+          outSwcTxtStream << 0 << " ";
+        } else if (j == branch.nodes.size() - 1) {
+          outSwcTxtStream << 2 << " ";
+        } else {
+          outSwcTxtStream << 1 << " ";
+        }
+        outSwcTxtStream << tn->type << " " << tn->x << " "
+                        << tn->y << " "
+                        << tn->z << " " << tn->radius << " "
+                        << nodeToBlueness[tn] << " " << nodeToLayer[tn] << std::endl;
+
+        if (j > 0) {
+          std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
+          for (size_t k=0; k<puncta.size(); ++k) {
+            const ZPunctum *punctum = puncta[k];
+            tmpPunc.push_back(*punctum);
+            double punctumDistToMTTBranchStart = segmentStartToBranchStartLength + punctumDistToSegmentStart[punctum];
+            outPunctaTxtStream << j << " " << punctum->x() << " " << punctum->y() << " "
+                               << punctum->z() << " "
+                               << (punctumDistToMTTBranchStart / branch.length) << " "
+                               << punctum->volSize() << " " << punctum->meanIntensity() << " "
+                               << punctum->maxIntensity() << " "
+                               << punctumDistToMTTBranchStart << " "
+                               << punctumDistToSoma[punctum] << std::endl;
+          }
+
+          segmentStartToBranchStartLength += nodeDistToParent[tn];
+        }
+      }
+      tmpPunc.save(outPunctaName);
+      tmpPunc.clear();
+    }
+
+    // other not main trunk and not tuft branches
+    for (size_t i=0; i<branches.size(); ++i) {
+      Branch &branch = branches[i];
+
+      SwcTreeNode tmptn = branch.nodes[branch.nodes.size()-1];
+      size_t nodeSubclass = nodeToSubclass[tmptn];
+      size_t nodeType = tmptn->type;
+      bool nodeIsLeaf = ZSwc::isLeaf(tmptn);
+
+      QDir *currentBranchFolder = nullptr;
+      int *currentBranchIndex = nullptr;
+
+      if (nodeSubclass != ZSwc::MainTrunkType && nodeSubclass != ZSwc::ApicalTuftType) {
+        if (nodeType == ZSwc::ApicalDendriteType) {
+          currentBranchFolder = nodeIsLeaf ? &apicalObliqueTerminalBranchFolder : &apicalObliqueIntermediateBranchFolder;
+          currentBranchIndex = nodeIsLeaf ? &apicalObliqueTerminalIndex : &apicalObliqueIntermediateIndex;
+        } else if (nodeType == ZSwc::BasalDendriteType) {
+          currentBranchFolder = nodeIsLeaf ? &basalTerminalBranchFolder : &basalIntermediateBranchFolder;
+          currentBranchIndex = nodeIsLeaf ? &basalTerminalIndex : &basalIntermediateIndex;
+        } else {
+          assert(false);
+        }
+
+        QString outSwcName = currentBranchFolder->filePath(QString("branch_%1.swc")
+                                                           .arg(*currentBranchIndex, 4, 10, QChar('0')));
+        QString outSwcTxtName = currentBranchFolder->filePath(QString("branch_%1.txt")
+                                                              .arg(*currentBranchIndex, 4, 10, QChar('0')));
+        QString outPunctaName = currentBranchFolder->filePath(QString("branch_%1_%2")
+                                                              .arg(*currentBranchIndex, 4, 10, QChar('0'))
+                                                              .arg(QFileInfo(m_input.punctaFilename).fileName()));
+        QString outPunctaTxtName = currentBranchFolder->filePath(QString("branch_%1_%2.txt")
+                                                                 .arg(*currentBranchIndex, 4, 10, QChar('0'))
+                                                                 .arg(QFileInfo(m_input.punctaFilename).fileName()));
+        (*currentBranchIndex) += 1;
+
+        std::ofstream outSwcStream;
+        openFileStream(outSwcStream, outSwcName, std::ios_base::out | std::ios_base::trunc);
+
+        std::ofstream outSwcTxtStream;
+        openFileStream(outSwcTxtStream, outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
+        outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer" << std::endl;
+
+        std::ofstream outPunctaTxtStream;
+        openFileStream(outPunctaTxtStream, outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
+        outPunctaTxtStream << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, distToBranchStart, distToSoma" << std::endl;
+
+        ZPuncta tmpPunc;
+        for (size_t j=0; j<branch.nodes.size(); ++j) {
+          const SwcTreeNode &tn = branch.nodes[j];
+          outSwcStream << tn->id << " " << tn->type << " " << tn->x << " "
+                       << tn->y << " " << tn->z << " " << tn->radius << " "
+                       << ZSwc::parentID(tn) << std::endl;
+          if (j == 0) {
+            outSwcTxtStream << 0 << " ";
+          } else if (j == branch.nodes.size() - 1) {
+            outSwcTxtStream << 2 << " ";
+          } else {
+            outSwcTxtStream << 1 << " ";
+          }
+          outSwcTxtStream << tn->type << " " << tn->x << " "
+                          << tn->y << " "
+                          << tn->z << " " << tn->radius << " "
+                          << nodeToBlueness[tn] << " " << nodeToLayer[tn] << std::endl;
+
+          if (j > 0) {
+            std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
+            for (size_t k=0; k<puncta.size(); ++k) {
+              const ZPunctum *punctum = puncta[k];
+              tmpPunc.push_back(*punctum);
+              outPunctaTxtStream << j << " " << punctum->x() << " " << punctum->y() << " "
                                  << punctum->z() << " "
-                                 << (punctumDistToSoma[punctum] / length) << " "
+                                 << (punctumDistToBranchStart[punctum] / branch.length) << " "
                                  << punctum->volSize() << " " << punctum->meanIntensity() << " "
                                  << punctum->maxIntensity() << " "
                                  << punctumDistToBranchStart[punctum] << " "
@@ -990,6 +1241,8 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
             }
           }
         }
+        tmpPunc.save(outPunctaName);
+        tmpPunc.clear();
       }
     }
   }

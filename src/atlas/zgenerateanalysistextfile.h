@@ -94,6 +94,7 @@ protected:
   void getAxonFeature(ZSwc& tree, std::map<SwcTreeNode, double>& nodeToBlueness) const;
 
   void getLayerFeature(ZSwc& tree, ZSwc& layerTree, std::map<SwcTreeNode, size_t>& nodeToLayer) const;
+  void getSubclassFeature(ZSwc& tree, ZSwc& subclassTree, std::map<SwcTreeNode, size_t>& nodeToSubclass) const;
 
   void writeFeatureSwc(ZSwc& tree, std::map<SwcTreeNode, double>& nodeToFeature, const QString& outSwcName);
   // return point to swc segment distance in um
@@ -120,7 +121,6 @@ protected:
     size_t id;
     double length;  // in um
     std::vector<SwcTreeNode> nodes;
-    std::vector<const ZPunctum*> puncta;
   };
 
   size_t labelBranch(ZSwc &tree,
@@ -142,7 +142,8 @@ protected:
   QDir getSubDir(const QString& subFoldername) const;
 
   void generateAnalysisFiles(ZSwc &tree, std::map<SwcTreeNode, double> &nodeToBlueness,
-                             std::map<SwcTreeNode, size_t> &nodeToLayer) const;
+                             std::map<SwcTreeNode, size_t> &nodeToLayer,
+                             std::map<SwcTreeNode, size_t> &nodeToSubclass) const;
 
 private:
   ZAnalysisTextFileInput m_input;
@@ -150,6 +151,7 @@ private:
   QString m_processedSwcFilename;
   QString m_layerSwcFilename;
   QString m_bluenessSwcFilename;
+  QString m_subclassSwcFilename;
 };
 
 } // namespace nim

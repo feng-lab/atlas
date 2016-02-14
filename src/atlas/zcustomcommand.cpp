@@ -571,9 +571,38 @@ void calcSwcVolume()
   }
 }
 
-void tmp()
+void changeImgCompressionType()
 {
+  QDir dir("/Users/feng/Documents/PY/py_axonregion");
+  QString outFolder("/Users/feng/Documents/PY/py_ar/");
+  QStringList filters;
+  filters << "*.tif";
+  QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+  for (int i=0; i<list.size(); i++) {
+    QFileInfo fileInfo = list.at(i);
+    LINFO() << i << list.size() << fileInfo.absoluteFilePath();
+    ZImg img(fileInfo.absoluteFilePath());
+    QString outname = outFolder + fileInfo.baseName() + ".tif";
+    img.save(outname, FileFormat::Tiff, Compression::LZW);
+  }
+}
 
+void makeSWCPyramidal()
+{
+  QDir dir("/Users/feng/Documents/PY/PySWC");
+  QString outFolder("/Users/feng/Documents/PY/PySWC/");
+  QStringList filters;
+  filters << "*c.swc";
+  QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+  for (int i=0; i<list.size(); i++) {
+    QFileInfo fileInfo = list.at(i);
+    LINFO() << i << list.size() << fileInfo.absoluteFilePath();
+    ZSwc tree(fileInfo.absoluteFilePath());
+    tree.labelSomaAndOthers(3.0 / 0.104);  // soma radius at least 3um
+    tree.resortPyramidal();
+    QString outname = outFolder + fileInfo.baseName() + ".swc";
+    tree.save(outname);
+  }
 }
 
 }
@@ -586,7 +615,6 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  tmp();
   LINFO() << "done";
 }
 

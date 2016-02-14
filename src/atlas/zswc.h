@@ -45,6 +45,17 @@ public:
   typedef ZSwc::Iterator SwcTreeNode;
   typedef ZSwc::ConstIterator ConstSwcTreeNode;
 
+  static constexpr int SomaType = 1;
+  static constexpr int AxonType = 2;
+  static constexpr int BasalDendriteType = 3;
+  static constexpr int ApicalDendriteType = 4;
+  static constexpr int MainTrunkType = 5;
+  static constexpr int BasalIntermediateType = 6;
+  static constexpr int BasalTerminalType = 7;
+  static constexpr int ApicalObliqueIntermediateType = 8;
+  static constexpr int ApicalObliqueTerminalType = 9;
+  static constexpr int ApicalTuftType = 10;
+
   ZSwc() : ZTree<SwcNode>() {}
   // might throw ZIOException
   explicit ZSwc(const QString &filename) { load(filename); }
@@ -75,9 +86,9 @@ public:
   SwcTreeNode thickestNode(const SwcTreeNode &subtree);
 
   // set type of soma as somaType, other as otherType, set root to thickest node
-  void labelSomaAndOthers(double radiusThre = 0, int somaType = 1, int otherType = 2);
+  void labelSomaAndOthers(double radiusThre = 0, int somaType = SomaType, int otherType = AxonType);
   // before calling this, soma nodes type must be somaType and other nodes type must not be somaType
-  void resortPyramidal(int basalType = 3, int apicalType = 4, int somaType = 1);
+  void resortPyramidal(int basalType = BasalDendriteType, int apicalType = ApicalDendriteType, int somaType = SomaType);
   void resortID();
 
   // qt style read write name filter for filedialog

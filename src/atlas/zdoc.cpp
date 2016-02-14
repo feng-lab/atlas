@@ -388,6 +388,14 @@ void ZDoc::loadFileList(const QStringList &fileList)
   }
 }
 
+size_t ZDoc::viewSettingId()
+{
+  if (!objs().contains(m_viewSettingId)) {
+    m_viewSettingId = 0;
+  }
+  return m_viewSettingId;
+}
+
 std::map<size_t, size_t> ZDoc::read(const QJsonObject &json, QString &err)
 {
   std::map<size_t,size_t> res;
