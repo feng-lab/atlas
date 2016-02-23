@@ -543,8 +543,10 @@ void mergeTraces()
 
 void calcSwcVolume()
 {
-  QDir dir("/Users/feng/Google Drive/Shaul/CA3Py_CA1PV_os/ipsi/AnalysisTextFiles");
-  QDir outFolder("/Users/feng/Downloads/ipsi_mesh");
+  //QDir dir("/Users/feng/Google Drive/Shaul/CA3Py_CA1PV_os/ipsi/AnalysisTextFiles");
+  //QDir outFolder("/Users/feng/Downloads/ipsi_mesh");
+  QDir dir("/Users/feng/Documents/PY/AnalysisTextFiles");
+  QDir outFolder("/Users/feng/Documents/PY/mesh");
   QStringList filters;
   QFileInfoList dirlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks | QDir::NoDotAndDotDot);
   //LINFO() << dirlist.size() << dirlist.at(0).absolutePath();
@@ -573,8 +575,10 @@ void calcSwcVolume()
 
 void changeImgCompressionType()
 {
-  QDir dir("/Users/feng/Documents/PY/py_axonregion");
-  QString outFolder("/Users/feng/Documents/PY/py_ar/");
+  //QDir dir("/Users/feng/Documents/PY/py_axonregion");
+  //QString outFolder("/Users/feng/Documents/PY/py_ar/");
+  QDir dir("/Users/feng/Documents/PV/pv_axonregion");
+  QString outFolder("/Users/feng/Documents/PV/pv_ar/");
   QStringList filters;
   filters << "*.tif";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
@@ -602,6 +606,56 @@ void makeSWCPyramidal()
     tree.resortPyramidal();
     QString outname = outFolder + fileInfo.baseName() + ".swc";
     tree.save(outname);
+  }
+}
+
+void makeAxonChannelImages()
+{
+  QDir dir("/Volumes/PVPY/contra");
+  QDir outFolder("/Volumes/PVPY/contra/axon_channel");
+  size_t axonChannel = 0;
+
+  QStringList filters;
+  filters << "*.raw";
+  QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+  for (int i=0; i<list.size(); i++) {
+    QFileInfo fileInfo = list.at(i);
+    LINFO() << i << list.size() << fileInfo.absoluteFilePath();
+    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,axonChannel,axonChannel+1));
+    img.zoom(0.25, 0.25);
+    img.normalize(11, 50);
+    QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
+    img.save(outname, FileFormat::Tiff, Compression::LZW);
+  }
+
+  dir = QDir("/Volumes/PVPY/ipsi");
+  outFolder = QDir("/Volumes/PVPY/ipsi/axon_channel");
+  axonChannel = 0;
+
+  list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+  for (int i=0; i<list.size(); i++) {
+    QFileInfo fileInfo = list.at(i);
+    LINFO() << i << list.size() << fileInfo.absoluteFilePath();
+    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,axonChannel,axonChannel+1));
+    img.zoom(0.25, 0.25);
+    img.normalize(11, 50);
+    QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
+    img.save(outname, FileFormat::Tiff, Compression::LZW);
+  }
+
+  dir = QDir("/Volumes/PVPY/Py");
+  outFolder = QDir("/Volumes/PVPY/Py/axon_channel");
+  axonChannel = 2;
+
+  list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+  for (int i=0; i<list.size(); i++) {
+    QFileInfo fileInfo = list.at(i);
+    LINFO() << i << list.size() << fileInfo.absoluteFilePath();
+    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,axonChannel,axonChannel+1));
+    img.zoom(0.25, 0.25);
+    img.normalize(11, 50);
+    QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
+    img.save(outname, FileFormat::Tiff, Compression::LZW);
   }
 }
 

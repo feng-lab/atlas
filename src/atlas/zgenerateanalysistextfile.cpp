@@ -194,7 +194,7 @@ void ZGenerateAnalysisTextFile::generate()
     }
   } else {
     // mark soma from swc nodes
-    tree.labelSomaAndOthers(3.0 / m_input.voxelSizeX);  // soma radius at least 3um
+    tree.labelSomaAndOthers(0); //3.0 / m_input.voxelSizeX);  // soma radius at least 3um
     tree.resortID();
     tree.save(m_processedSwcFilename);
   }
