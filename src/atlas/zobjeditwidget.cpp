@@ -13,14 +13,14 @@ QsLogging::TextEditDestination::TextEditDestination(QPlainTextEdit &edit)
   m_errorFormat.setForeground(QBrush(QColor(176,0,0)));
 }
 
-void QsLogging::TextEditDestination::write(const QString &message, QsLogging::Level level)
+void QsLogging::TextEditDestination::write(const LogMessage &message)
 {
   bool atBottom = m_edit.verticalScrollBar()->value() == m_edit.verticalScrollBar()->maximum();
-  if (level <= QsLogging::InfoLevel) {
-    m_edit.appendPlainText(message);
+  if (message.level <= QsLogging::InfoLevel) {
+    m_edit.appendPlainText(message.formatted);
   } else {
     m_edit.setCurrentCharFormat(m_errorFormat);
-    m_edit.appendPlainText(message);
+    m_edit.appendPlainText(message.formatted);
     m_edit.setCurrentCharFormat(m_normalFormat);
   }
   if (atBottom) {
@@ -36,7 +36,7 @@ ZObjEditWidget::ZObjEditWidget(ZDoc *doc, QWidget *mw)
   , m_doc(doc)
   , m_logWidget(new QPlainTextEdit(this))
   //, m_logOutputDestination(new QsLogging::TextEditDestination(*m_logWidget))
-  , m_logOutputDestination(QsLogging::DestinationFactory::MakeFunctorDestination(this, SLOT(writeLogMessage(QString,int))))
+  , m_logOutputDestination(QsLogging::DestinationFactory::MakeFunctorDestination(this, SLOT(writeLogMessage(QsLogging::LogMessage))))
 {
   addTab(m_logWidget, "Log Output");
   connect(m_doc, SIGNAL(objAboutToBeRemoved(size_t,ZObjDoc*)), this, SLOT(removeObjEditWidgetOfObj(size_t)));
@@ -91,14 +91,14 @@ void ZObjEditWidget::updateEditWidgetTitleOfObj(size_t id)
   }
 }
 
-void ZObjEditWidget::writeLogMessage(const QString &message, int level)
+void ZObjEditWidget::writeLogMessage(const QsLogging::LogMessage &message)
 {
   bool atBottom = m_logWidget->verticalScrollBar()->value() == m_logWidget->verticalScrollBar()->maximum();
-  if (static_cast<QsLogging::Level>(level) <= QsLogging::InfoLevel) {
-    m_logWidget->appendPlainText(message);
+  if (message.level <= QsLogging::InfoLevel) {
+    m_logWidget->appendPlainText(message.formatted);
   } else {
     m_logWidget->setCurrentCharFormat(m_errorFormat);
-    m_logWidget->appendPlainText(message);
+    m_logWidget->appendPlainText(message.formatted);
     m_logWidget->setCurrentCharFormat(m_normalFormat);
   }
   if (atBottom) {

@@ -15,7 +15,7 @@ class TextEditDestination : public Destination
 public:
   explicit TextEditDestination(QPlainTextEdit& edit);
 
-  virtual void write(const QString &message, Level level) override;
+  virtual void write(const LogMessage& message) override;
   virtual bool isValid() override { return true; }
 
 private:
@@ -41,7 +41,7 @@ public slots:
   void updateEditWidgetTitleOfObj(size_t id);
 
 private slots:
-  void writeLogMessage(const QString &message, int level);
+  void writeLogMessage(const QsLogging::LogMessage &message);
   void removeObjEditWidgetOfObj(size_t id);
   void closeTab(int index);
 
