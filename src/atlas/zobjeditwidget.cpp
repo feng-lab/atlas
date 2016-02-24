@@ -53,6 +53,9 @@ ZObjEditWidget::ZObjEditWidget(ZDoc *doc, QWidget *mw)
   m_normalFormat = m_logWidget->currentCharFormat();
   m_errorFormat = m_normalFormat;
   m_errorFormat.setForeground(QBrush(QColor(176,0,0)));
+  for (auto const &lm : m_doc->logMessages()) {
+    writeLogMessage(lm);
+  }
   QsLogging::Logger::instance().addDestination(m_logOutputDestination);
 }
 

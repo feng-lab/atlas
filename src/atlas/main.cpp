@@ -4,6 +4,7 @@
 
 #include "QsLog.h"
 #include "QsLogDest.h"
+#include "QsLogDestModel.h"
 #include <QDir>
 #include "zcpuinfo.h"
 #include "zsysteminfo.h"
@@ -143,10 +144,12 @@ int main(int argc, char *argv[])
   QsLogging::DestinationPtr fileDestination(
         QsLogging::DestinationFactory::MakeFileDestination(sLogPath, QsLogging::EnableLogRotation,
                                                            QsLogging::MaxSizeBytes(1e7), QsLogging::MaxOldLogCount(20)));
-  QsLogging::DestinationPtr debugDestination(
+  QsLogging::DestinationPtr debugOutputDestination(
         QsLogging::DestinationFactory::MakeDebugOutputDestination());
-  logger.addDestination(debugDestination);
+  QsLogging::DestinationPtr modelDestination(new QsLogging::ModelDestination());
+  logger.addDestination(debugOutputDestination);
   logger.addDestination(fileDestination);
+  logger.addDestination(modelDestination);
 #if defined _DEBUG_
   logger.setLoggingLevel(QsLogging::DebugLevel);
 #else
@@ -228,7 +231,7 @@ int main(int argc, char *argv[])
 #endif
 
   // Our MainWindow has Qt::WA_DeleteOnClose attribute, don't delete again.
-  nim::ZMainWindow *mainWin = new nim::ZMainWindow();
+  nim::ZMainWindow *mainWin = new nim::ZMainWindow(modelDestination);
   mainWin->show();
   mainWin->initOpenglContext();
 

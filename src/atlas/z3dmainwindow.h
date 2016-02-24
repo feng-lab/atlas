@@ -44,6 +44,7 @@ private slots:
 
   void activateWindowIfNot();  //mac bug?
 
+  void viewLog();
   void openLogFolder();
 
   void changeBackground();
@@ -92,6 +93,7 @@ private:
   QAction *m_aboutAction;
   QAction *m_aboutQtAction;
 
+  QAction *m_viewLogAction;
   QAction *m_openLogFolderAction;
 
   QAction *m_separatorAction;

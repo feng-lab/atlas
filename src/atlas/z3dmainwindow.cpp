@@ -26,6 +26,8 @@
 #include "zmainwindow.h"
 #include "zsysteminfo.h"
 
+#include "QsLogWindow.h"
+
 namespace nim {
 
 Z3DMainWindow::Z3DMainWindow(ZDoc *doc, ZMainWindow &win2d, bool stereoView, QWidget *parent)
@@ -162,6 +164,12 @@ void Z3DMainWindow::activateWindowIfNot()
     this->activateWindow();
 }
 
+void Z3DMainWindow::viewLog()
+{
+  QsLogging::Window logDialog(m_doc->logDestModel(), this);
+  logDialog.exec();
+}
+
 void Z3DMainWindow::openLogFolder()
 {
   QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfoInstance.logDir().absolutePath()));
@@ -286,6 +294,10 @@ void Z3DMainWindow::createActions()
   connect(m_aboutQtAction, SIGNAL(triggered()), qApp, SLOT(aboutQt()));
 
   //
+  m_viewLogAction = new QAction(tr("&View Log"), this);
+  m_viewLogAction->setStatusTip(tr("View Log"));
+  connect(m_viewLogAction, SIGNAL(triggered()), this, SLOT(viewLog()));
+
   m_openLogFolderAction = new QAction(QIcon(":/icons/folder-512.png"), tr("&Open Log Folder"), this);
   m_openLogFolderAction->setStatusTip(tr("Open Log Folder"));
   connect(m_openLogFolderAction, SIGNAL(triggered()), this, SLOT(openLogFolder()));
@@ -343,6 +355,7 @@ void Z3DMainWindow::createMenus()
   m_helpMenu->addAction(m_aboutAction);
   m_helpMenu->addAction(m_aboutQtAction);
   m_helpMenu->addSeparator();
+  m_helpMenu->addAction(m_viewLogAction);
   m_helpMenu->addAction(m_openLogFolderAction);
 }
 
@@ -371,9 +384,9 @@ void Z3DMainWindow::createToolBars()
   m_viewToolBar->addAction(m_screenShotAction);
   m_viewToolBar->setIconSize(iconSize);
 
-  m_helpToolBar = addToolBar(tr("Help"));
-  m_helpToolBar->addAction(m_openLogFolderAction);
-  m_helpToolBar->setIconSize(iconSize);
+  //m_helpToolBar = addToolBar(tr("Help"));
+  //m_helpToolBar->addAction(m_openLogFolderAction);
+  //m_helpToolBar->setIconSize(iconSize);
 }
 
 void Z3DMainWindow::createStatusBar()
@@ -414,6 +427,7 @@ void Z3DMainWindow::createDockWindows()
   m_objectDetailedInfoDockWidget->setWidget(m_objDetailedInfoWidget);
   addDockWidget(Qt::RightDockWidgetArea, m_objectDetailedInfoDockWidget);
   m_windowMenu->addAction(m_objectDetailedInfoDockWidget->toggleViewAction());
+  m_objectDetailedInfoDockWidget->setVisible(false);
 
   m_globalSettingDockWidget = new QDockWidget(tr("Global View Setting"), this);
   m_globalSettingDockWidget->setFeatures(QDockWidget::DockWidgetClosable |

@@ -7,6 +7,8 @@
 #include <QSet>
 #include <QJsonObject>
 #include <QUndoGroup>
+#include <deque>
+#include "QsLogDest.h"
 
 class QUndoStack;
 class QAction;
@@ -32,7 +34,10 @@ class ZDoc : public QObject
 public:
   typedef QList<size_t>::const_iterator ConstObjIdIterator;
 public:
-  explicit ZDoc(QObject *parent = 0);
+  explicit ZDoc(QsLogging::DestinationPtr logDestModel, QObject *parent = 0);
+
+  QsLogging::DestinationPtr logDestModel() { return m_logDestModel; }
+  const std::deque<QsLogging::LogMessage>& logMessages() const;
 
   bool hasObj() const;
   size_t numObjs() const;
@@ -170,6 +175,8 @@ private:
   Z3DAnimationDoc *m_animation3DDoc;
   ZROIDoc* m_roiDoc;
   ZMeshDoc* m_meshDoc;
+
+  QsLogging::DestinationPtr m_logDestModel;
 };
 
 } // namespace nim

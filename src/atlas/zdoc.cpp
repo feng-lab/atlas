@@ -22,12 +22,15 @@
 #include "zmeshdoc.h"
 #include <QClipboard>
 
+#include "QsLogDestModel.h"
+
 namespace nim {
 
-ZDoc::ZDoc(QObject *parent)
+ZDoc::ZDoc(QsLogging::DestinationPtr logDestModel, QObject *parent)
   : QObject(parent)
   , m_nextObjId(100)
   , m_viewSettingId(0)
+  , m_logDestModel(logDestModel)
 {
   m_objModel = new ZObjModel(this);
   m_objSelectionModel = new ZItemSelectionModel(m_objModel, this);
@@ -49,6 +52,13 @@ ZDoc::ZDoc(QObject *parent)
 
   m_meshDoc = new ZMeshDoc(*this);
   registerObjDoc(m_meshDoc);
+}
+
+const std::deque<QsLogging::LogMessage>& ZDoc::logMessages() const
+{
+  QsLogging::ModelDestination *md = dynamic_cast<QsLogging::ModelDestination*>(m_logDestModel.data());
+  assert(md);
+  return md->logMessages();
 }
 
 bool ZDoc::hasObj() const

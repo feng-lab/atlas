@@ -3,6 +3,8 @@
 
 #include <QMainWindow>
 
+#include "QsLogDest.h"
+
 class QAction;
 class QActionGroup;
 class QMenu;
@@ -21,7 +23,7 @@ class ZMainWindow : public QMainWindow
   Q_OBJECT
 
 public:
-  ZMainWindow();
+  ZMainWindow(QsLogging::DestinationPtr logDestModel);
 
   void initOpenglContext();
 
@@ -48,6 +50,7 @@ private slots:
   void activateWindowIfNot();  //mac bug?
 
   void openScreenshotPanel();
+  void viewLog();
   void openLogFolder();
 #ifdef _WITH_TESTS_
   void runUnitTest();
@@ -65,7 +68,7 @@ private slots:
   void openNewInstance();
 
 private:
-  void init();
+  void init(QsLogging::DestinationPtr logDestModel);
   void createActions();
   void createMenus();
   void createToolBars();
@@ -110,6 +113,7 @@ private:
   QAction *m_aboutAction;
   QAction *m_aboutQtAction;
 
+  QAction *m_viewLogAction;
   QAction *m_openLogFolderAction;
 #ifdef _WITH_TESTS_
   QAction *m_testAction;

@@ -143,8 +143,7 @@ contains(CONFIG, static_libtiff) {
     LIBS += -ltiff -llzma
 }
 
-DEFINES += EIGEN_NO_DEBUG EIGEN_DONT_PARALLELIZE EIGEN_MPL2_ONLY
-
+include($$PWD/../3rdparty/eigen.pri)
 include($$PWD/../3rdparty/QsLog/QsLog.pri)
 
 macx {

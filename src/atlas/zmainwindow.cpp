@@ -48,19 +48,21 @@
 #include "zregionannotationdoc.h"
 #include "zregionannotationview.h"
 
+#include "QsLogWindow.h"
+
 #ifdef Q_OS_OSX
 void qt_mac_set_dock_menu(QMenu *menu);
 #endif
 
 namespace nim {
 
-ZMainWindow::ZMainWindow()
+ZMainWindow::ZMainWindow(QsLogging::DestinationPtr logDestModel)
   : QMainWindow()
   , m_3dWindow(nullptr)
   , m_isClosed(false)
   , m_versionString(__DATE__)
 {
-  init();
+  init(logDestModel);
   setWindowTitle(QString("Atlas ver. %1").arg(m_versionString));
   //setCurrentFile("");
 }
@@ -297,6 +299,12 @@ void ZMainWindow::openScreenshotPanel()
   m_captureDockWidget->raise();
 }
 
+void ZMainWindow::viewLog()
+{
+  QsLogging::Window logDialog(m_doc->logDestModel(), this);
+  logDialog.exec();
+}
+
 void ZMainWindow::openLogFolder()
 {
   QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfoInstance.logDir().absolutePath()));
@@ -418,12 +426,12 @@ void ZMainWindow::openNewInstance()
 #endif
 }
 
-void ZMainWindow::init()
+void ZMainWindow::init(QsLogging::DestinationPtr logDestModel)
 {
   setAttribute(Qt::WA_DeleteOnClose);
   setAcceptDrops(true);
 
-  m_doc = new ZDoc(this);
+  m_doc = new ZDoc(logDestModel, this);
   m_view = new ZView(*m_doc, this);
 
   //packages
@@ -533,6 +541,10 @@ void ZMainWindow::createActions()
   connect(m_aboutQtAction, SIGNAL(triggered()), qApp, SLOT(aboutQt()));
 
   //
+  m_viewLogAction = new QAction(tr("&View Log"), this);
+  m_viewLogAction->setStatusTip(tr("View Log"));
+  connect(m_viewLogAction, SIGNAL(triggered()), this, SLOT(viewLog()));
+
   m_openLogFolderAction = new QAction(QIcon(":/icons/folder-512.png"), tr("&Open Log Folder"), this);
   m_openLogFolderAction->setStatusTip(tr("Open Log Folder"));
   connect(m_openLogFolderAction, SIGNAL(triggered()), this, SLOT(openLogFolder()));
@@ -605,6 +617,7 @@ void ZMainWindow::createMenus()
   m_helpMenu->addAction(m_aboutAction);
   m_helpMenu->addAction(m_aboutQtAction);
   m_helpMenu->addSeparator();
+  m_helpMenu->addAction(m_viewLogAction);
   m_helpMenu->addAction(m_openLogFolderAction);
 #ifdef _WITH_TESTS_
   m_helpMenu->addAction(m_testAction);
@@ -655,13 +668,13 @@ void ZMainWindow::createToolBars()
   m_roiToolBar->addWidget(m_view->createROIToolButton(this));
   m_roiToolBar->setIconSize(iconSize);
 
-  m_helpToolBar = addToolBar(tr("Help"));
-  m_helpToolBar->addAction(m_openLogFolderAction);
+  //m_helpToolBar = addToolBar(tr("Help"));
+  //m_helpToolBar->addAction(m_openLogFolderAction);
   //#ifdef _WITH_TESTS_
   //  m_helpToolBar->addAction(m_testAction);
   //#endif
   //  m_helpToolBar->addAction(m_runCustomCommandAction);
-  m_helpToolBar->setIconSize(iconSize);
+  //m_helpToolBar->setIconSize(iconSize);
 }
 
 void ZMainWindow::createStatusBar()
@@ -695,6 +708,7 @@ void ZMainWindow::createDockWindows()
   m_objectDetailedInfoDockWidget->setWidget(new ZObjDetailedInfoWidget(m_doc, this));
   addDockWidget(Qt::RightDockWidgetArea, m_objectDetailedInfoDockWidget);
   m_windowMenu->addAction(m_objectDetailedInfoDockWidget->toggleViewAction());
+  m_objectDetailedInfoDockWidget->setVisible(false);
 
   m_captureDockWidget = new QDockWidget(tr("Capture"), this);
   m_captureDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
