@@ -64,12 +64,12 @@ ZObjEditWidget::~ZObjEditWidget()
   QsLogging::Logger::instance().removeDestination(m_logOutputDestination);
 }
 
-void ZObjEditWidget::showObjEditWidgetOfObj(size_t id)
+bool ZObjEditWidget::showObjEditWidgetOfObj(size_t id)
 {
   for (int i=0; i<m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       setCurrentWidget(m_subWidgets[i].widget);
-      return;
+      return true;
     }
   }
   QWidget* wg = m_doc->createObjEditWidget(id);
@@ -79,9 +79,11 @@ void ZObjEditWidget::showObjEditWidgetOfObj(size_t id)
     sw.widget = wg;
     m_subWidgets.push_back(sw);
     setCurrentIndex(addTab(sw.widget, QString("Edit %1").arg(m_doc->objNameWithModifiedMarkerAndID(id))));
+    return true;
   } else {
     setCurrentWidget(m_logWidget);
   }
+  return false;
 }
 
 void ZObjEditWidget::updateEditWidgetTitleOfObj(size_t id)

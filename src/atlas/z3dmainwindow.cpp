@@ -50,8 +50,9 @@ void Z3DMainWindow::openEditWidget(size_t id)
   else
     m_doc->activateEmptyUndoStack();
   if (!doc->typeName().contains("2D", Qt::CaseInsensitive)) {
-    m_objEditWidget->showObjEditWidgetOfObj(id);
-    m_editObjDockWidget->setVisible(true);
+    if (m_objEditWidget->showObjEditWidgetOfObj(id)) {
+      m_editObjDockWidget->setVisible(true);
+    }
   } else {
     //m_editObjDockWidget->setVisible(false);
     m_2dWindow.openEditWidget(id);

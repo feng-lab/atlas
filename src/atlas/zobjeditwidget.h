@@ -37,7 +37,7 @@ public:
 signals:
 
 public slots:
-  void showObjEditWidgetOfObj(size_t id);
+  bool showObjEditWidgetOfObj(size_t id);
   void updateEditWidgetTitleOfObj(size_t id);
 
 private slots:
