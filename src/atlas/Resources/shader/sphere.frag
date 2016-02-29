@@ -41,7 +41,7 @@ vec4 apply_lighting_and_fog(const in vec4 sceneAmbient,
 
 void main(void)
 {
-  vec3 rayOrigin = mix(vec3(0.0 ,0.0, 0.0), point, ortho);
+  vec3 rayOrigin = mix(point, point, ortho);
   vec3 rayDirection = mix(normalize(point), vec3(0.0, 0.0, -1.0), ortho);
 
   vec3 sphereVector = sphere_center - rayOrigin;
