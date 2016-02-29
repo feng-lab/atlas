@@ -11,6 +11,7 @@
 #include <QImageWriter>
 #include <QPainter>
 #include <memory>
+#include "zimgformat.h"
 
 namespace nim {
 
@@ -22,7 +23,6 @@ Z3DCanvasPainter::Z3DCanvasPainter(Z3DGlobalParameters &globalParas, QObject *pa
   , m_leftEyeInport("LeftEyeImage", false, InvalidLeftEyeResult)
   , m_rightEyeInport("RightEyeImage", false, InvalidRightEyeResult)
   , m_renderToImage(false)
-  , m_renderToImageFilename("")
 {
   addPort(m_inport);
   addPort(m_leftEyeInport);
@@ -43,8 +43,10 @@ void Z3DCanvasPainter::process(Z3DEye eye)
         m_inport : (eye == Z3DEye::Left) ? m_leftEyeInport : m_rightEyeInport;
 
   // render to image
-  if (currentInport.isReady() && m_renderToImage) {
-    renderInportToImage(eye);
+  if (m_renderToImage) {
+    if (currentInport.isReady() && eye != Z3DEye::Left) {
+      renderInportToImage(eye);
+    }
     return;
   }
 
@@ -133,21 +135,57 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, Z3DScreenShotType 
     m_renderToImageError = "No canvas assigned";
     return false;
   }
+  if (m_canvas->format().stereo() && sst == Z3DScreenShotType::MonoView) {
+    LFATAL() << "impossible configuration";
+    return false;
+  }
 
   // enable render-to-file on next process
-  m_renderToImageFilename = filename;
   m_renderToImage = true;
   m_renderToImageError.clear();
   m_renderToImageType = sst;
+  assert(m_monoImg.isEmpty() && m_leftImg.isEmpty() && m_rightImg.isEmpty());
+  m_tiledRendering = false;
 
   // force rendering pass
-  if (m_canvas->format().stereo() && sst == Z3DScreenShotType::MonoView) {
-    LERROR() << "impossible configuration";
-    assert(false);
-  }
   if (!m_canvas->format().stereo() && sst != Z3DScreenShotType::MonoView) {
     m_canvas->setFakeStereoOnce();
   }
+  m_canvas->forceUpdate();
+
+  // save Image
+  if (m_renderToImageError.isEmpty()) {
+    try {
+      if (sst == Z3DScreenShotType::MonoView) {
+        m_monoImg.infoRef().lastChannelIsAlphaChannel = true;
+        m_monoImg.correctPreMultipliedColor().flip(Dimension::Y).save(filename);
+        LINFO() << "Saved rendering (" << m_monoImg.width() << "," <<
+                   m_monoImg.height() << ")" << "to file:" << filename;
+      } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
+        m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
+        m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
+        ZImg::cat(m_leftImg, m_rightImg, Dimension::X).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
+        LINFO() << "Saved stereo rendering (" << m_leftImg.width() << "x 2," <<
+                   m_leftImg.height() << ")" << "to file:" << filename;
+      } else {
+        m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
+        m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
+        ZImg::cat(m_leftImg, m_rightImg, Dimension::X).zoom(0.5, 1).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
+        LINFO() << "Saved half sbs stereo rendering (" << m_leftImg.width() << "," <<
+                   m_leftImg.height() << ")" << "to file:" << filename;
+      }
+    }
+    catch (ZException const & e) {
+      LERROR() << "Exception:" << e.what();
+      m_renderToImageError = e.what();
+    }
+  }
+
+  //
+  m_renderToImage = false;
+  m_monoImg.clear();
+  m_leftImg.clear();
+  m_rightImg.clear();
 
   m_canvas->forceUpdate();
 
@@ -161,25 +199,126 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, int width, int hei
     m_renderToImageError = "No canvas assigned";
     return false;
   }
+  if (m_canvas->format().stereo() && sst == Z3DScreenShotType::MonoView) {
+    LFATAL() << "impossible configuration";
+    return false;
+  }
 
   if (m_inport.numValidInputs() == 0) {
     QApplication::processEvents();
   }
 
   glm::uvec2 oldDimensions = m_inport.size();
-  // resize texture container to desired image dimensions and propagate change
-  m_canvas->getGLFocus();
-  setOutputSize(glm::uvec2(width, height));
-  emit requestUpstreamSizeChange(this);
 
   // render with adjusted viewport size
-  bool success = renderToImage(filename, sst);
+  // enable render-to-file on next process
+  m_renderToImage = true;
+  m_renderToImageError.clear();
+  m_renderToImageType = sst;
+  assert(m_monoImg.isEmpty() && m_leftImg.isEmpty() && m_rightImg.isEmpty());
+
+  int tileSize = 2048;
+  int tileBorder = 128;
+  int tileInnerSize = tileSize - 2 * tileBorder;
+
+  if (width <= tileSize && height <= tileSize) {
+    // resize texture container to desired image dimensions and propagate change
+    m_canvas->getGLFocus();
+    setOutputSize(glm::uvec2(width, height));
+    emit requestUpstreamSizeChange(this);
+
+    m_tiledRendering = false;
+
+    // force rendering pass
+    if (!m_canvas->format().stereo() && sst != Z3DScreenShotType::MonoView) {
+      m_canvas->setFakeStereoOnce();
+    }
+    m_canvas->forceUpdate();
+  } else {
+    m_canvas->getGLFocus();
+    m_inport.setExpectedSize(glm::uvec2(tileSize, tileSize));
+    m_leftEyeInport.setExpectedSize(glm::uvec2(tileSize, tileSize));
+    m_rightEyeInport.setExpectedSize(glm::uvec2(tileSize, tileSize));
+    globalCameraPara().viewportChanged(glm::uvec2(width, height));
+    emit requestUpstreamSizeChange(this);
+
+    m_tiledRendering = true;
+    if (sst == Z3DScreenShotType::MonoView) {
+      m_monoImg = ZImg(ZImgInfo(width, height, 1, 4));
+    } else {
+      m_leftImg = ZImg(ZImgInfo(width, height, 1, 4));
+      m_rightImg = ZImg(ZImgInfo(width, height, 1, 4));
+    }
+
+    int numCols = (width + tileInnerSize - 1) / tileInnerSize;
+    int numRows = (height + tileInnerSize - 1) / tileInnerSize;
+    for (int c=0; c<numCols; ++c) {
+      for (int r=0; r<numRows; ++r) {
+        m_tileStartX = c * tileInnerSize - tileBorder;
+        m_tileStartY = r * tileInnerSize - tileBorder;
+
+        // set camera frustum
+        globalCameraPara().setTileFrustum(m_tileStartX / 1.0 / width,
+                                          (m_tileStartX + tileSize) / 1.0 / width,
+                                          m_tileStartY / 1.0 / height,
+                                          (m_tileStartY + tileSize) / 1.0 / height);
+        //LINFO() << globalCameraPara().get().left() << globalCameraPara().get().right() << globalCameraPara().get().top() << globalCameraPara().get().bottom();
+
+        //LINFO() << "1";
+
+        // force rendering pass
+        if (!m_canvas->format().stereo() && sst != Z3DScreenShotType::MonoView) {
+          m_canvas->setFakeStereoOnce();
+        }
+        //LINFO() << globalCameraPara().get().left() << globalCameraPara().get().right() << globalCameraPara().get().top() << globalCameraPara().get().bottom();
+        m_canvas->forceUpdate();
+        //LINFO() << globalCameraPara().get().left() << globalCameraPara().get().right() << globalCameraPara().get().top() << globalCameraPara().get().bottom();
+        //LINFO() << "2";
+      }
+    }
+    globalCameraPara().setTileFrustum();
+    m_tiledRendering = false;
+  }
+
+  // save Image
+  if (m_renderToImageError.isEmpty()) {
+    try {
+      if (sst == Z3DScreenShotType::MonoView) {
+        m_monoImg.infoRef().lastChannelIsAlphaChannel = true;
+        m_monoImg.correctPreMultipliedColor().flip(Dimension::Y).save(filename);
+        LINFO() << "Saved rendering (" << m_monoImg.width() << "," <<
+                   m_monoImg.height() << ")" << "to file:" << filename;
+      } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
+        m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
+        m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
+        ZImg::cat(m_leftImg, m_rightImg, Dimension::X).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
+        LINFO() << "Saved stereo rendering (" << m_leftImg.width() << "x 2," <<
+                   m_leftImg.height() << ")" << "to file:" << filename;
+      } else {
+        m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
+        m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
+        ZImg::cat(m_leftImg, m_rightImg, Dimension::X).zoom(0.5, 1).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
+        LINFO() << "Saved half sbs stereo rendering (" << m_leftImg.width() << "," <<
+                   m_leftImg.height() << ")" << "to file:" << filename;
+      }
+    }
+    catch (ZException const & e) {
+      LERROR() << "Exception:" << e.what();
+      m_renderToImageError = e.what();
+    }
+  }
+
+  //
+  m_renderToImage = false;
+  m_monoImg.clear();
+  m_leftImg.clear();
+  m_rightImg.clear();
 
   // reset texture container dimensions from canvas size
   setOutputSize(oldDimensions);
   emit requestUpstreamSizeChange(this);
 
-  return success;
+  return (m_renderToImageError.isEmpty());
 }
 
 void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
@@ -192,17 +331,24 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
     GLenum dataFormat = GL_BGRA;
     GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
 
+    //    if (m_tiledRendering) {
+    //      LINFO() << m_tileStartX << m_tileStartY;
+    //    }
+
     if (eye == Z3DEye::Mono) {
       // get color buffer content
       auto colorBuffer = std::make_unique<uint8_t[]>(tex->bypePerPixel(dataFormat, dataType) * tex->numPixels());
       tex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
-      QImage upsideDownImage(colorBuffer.get(), tex->width(), tex->height(),
-                             QImage::Format_ARGB32_Premultiplied);
-      QImage image = upsideDownImage.mirrored(false, true);
-      QImageWriter writer(m_renderToImageFilename);
-      writer.setCompression(1);
-      if (!writer.write(image)) {
-        throw ZIOException(writer.errorString());
+      ZImg bufImg;
+      bufImg.wrapData(colorBuffer.get(), ZImgInfo(tex->width(), tex->height(), 1, 4));
+      if (m_tiledRendering) {
+        assert(!m_monoImg.isEmpty());
+        ZImg tmpImg = ZImg(bufImg.info());
+        ZImgFormat::CXYZtoXYZC(bufImg, tmpImg, true);
+        m_monoImg.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
+      } else {
+        m_monoImg = ZImg(bufImg.info());
+        ZImgFormat::CXYZtoXYZC(bufImg, m_monoImg, true);
       }
     } else if (eye == Z3DEye::Right) {
       const Z3DTexture* leftTex = imageColorTexture(Z3DEye::Left);
@@ -211,55 +357,35 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
       }
       auto colorBuffer = std::make_unique<uint8_t[]>(leftTex->bypePerPixel(dataFormat, dataType) * leftTex->numPixels());
       leftTex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
-      QImage sideBySideImage(tex->width() * 2, tex->height(), QImage::Format_ARGB32_Premultiplied);
-      QPainter painter(&sideBySideImage);
-      painter.scale(1, -1);
-      painter.translate(0, -tex->height());
-      QImage upsideDownImageLeft(colorBuffer.get(), tex->width(), tex->height(),
-                                 QImage::Format_ARGB32_Premultiplied);
-      painter.drawImage(0, 0, upsideDownImageLeft);
-      tex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
-      QImage upsideDownImageRight(colorBuffer.get(), tex->width(), tex->height(),
-                                  QImage::Format_ARGB32_Premultiplied);
-      painter.drawImage(tex->width(), 0, upsideDownImageRight);
-
-      if (m_renderToImageType == Z3DScreenShotType::HalfSideBySideStereoView) {
-        QImage halfSideBySideImage = sideBySideImage.scaled(
-              tex->width(), tex->height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-        QImageWriter writer(m_renderToImageFilename);
-        writer.setCompression(1);
-        if(!writer.write(halfSideBySideImage)) {
-          throw ZIOException(writer.errorString());
-        }
+      ZImg bufImg;
+      bufImg.wrapData(colorBuffer.get(), ZImgInfo(tex->width(), tex->height(), 1, 4));
+      ZImg tmpImg;
+      if (m_tiledRendering) {
+        assert(!m_leftImg.isEmpty());
+        tmpImg = ZImg(bufImg.info());
+        ZImgFormat::CXYZtoXYZC(bufImg, tmpImg, true);
+        m_leftImg.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
       } else {
-        QImageWriter writer(m_renderToImageFilename);
-        writer.setCompression(1);
-        if(!writer.write(sideBySideImage)) {
-          throw ZIOException(writer.errorString());
-        }
+        m_leftImg = ZImg(bufImg.info());
+        ZImgFormat::CXYZtoXYZC(bufImg, m_leftImg, true);
       }
-    }
 
-    if (eye == Z3DEye::Mono) {
-      LINFO() << "Saved rendering (" << tex->width() << "," <<
-                 tex->height() << ")" << "to file:" << m_renderToImageFilename;
-    } else if (eye == Z3DEye::Right) {
-      if (m_renderToImageType == Z3DScreenShotType::HalfSideBySideStereoView) {
-        LINFO() << "Saved half sbs stereo rendering (" << tex->width() << "," <<
-                   tex->height() << ")" << "to file:" << m_renderToImageFilename;
+
+      tex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
+      bufImg.wrapData(colorBuffer.get(), ZImgInfo(tex->width(), tex->height(), 1, 4));
+      if (m_tiledRendering) {
+        assert(!m_rightImg.isEmpty());
+        ZImgFormat::CXYZtoXYZC(bufImg, tmpImg, true);
+        m_rightImg.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
       } else {
-        LINFO() << "Saved stereo rendering (" << tex->width() << "x 2," <<
-                   tex->height() << ")" << "to file:" << m_renderToImageFilename;
+        m_rightImg = ZImg(bufImg.info());
+        ZImgFormat::CXYZtoXYZC(bufImg, m_rightImg, true);
       }
     }
   }
   catch (ZException const & e) {
     LERROR() << "Exception:" << e.what();
     m_renderToImageError = e.what();
-  }
-
-  if (eye == Z3DEye::Mono || eye == Z3DEye::Right) {
-    m_renderToImage = false;
   }
 }
 

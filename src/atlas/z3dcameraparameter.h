@@ -30,6 +30,9 @@ public:
   inline void setProjectionType(Z3DCamera::ProjectionType pt)
       { m_projectionType.select(pt == Z3DCamera::ProjectionType::Perspective ? "Perspective" : "Orthographic"); }
 
+  void setTileFrustum(double left = 0.0, double right = 1.0, double bottom = 0.0, double top = 1.0)
+      { m_value.setTileFrustum(left, right, bottom, top); emit valueChanged(); }
+
   void flipViewDirection();
 
   inline void resetCamera(const std::vector<double> &bound,

@@ -25,7 +25,8 @@ ZTakeScreenShotWidget::ZTakeScreenShotWidget(bool is2D, bool group, QWidget *par
   , m_useWindowSize("Use Window Size as Image Size", true)
   // todo: use max texture size?
   , m_customSize("Use Custom Image Size", glm::ivec2(1920, 1080), glm::ivec2(128, 128),
-                 glm::ivec2(8192))
+                 glm::ivec2(std::numeric_limits<int>::max(),
+                            std::numeric_limits<int>::max()))
   , m_namePrefix("filename prefix", "")
   , m_nextNumber(1)
   , m_axis("Rotate Around Axis")

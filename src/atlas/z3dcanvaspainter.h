@@ -7,6 +7,7 @@
 #include <QString>
 #include "z3dtexturecopyrenderer.h"
 #include "z3drenderport.h"
+#include "zimg.h"
 
 class Z3DTexture;
 
@@ -59,8 +60,14 @@ private:
   Z3DRenderInputPort m_inport;
   Z3DRenderInputPort m_leftEyeInport;
   Z3DRenderInputPort m_rightEyeInport;
+
   bool m_renderToImage;
-  QString m_renderToImageFilename;
+  ZImg m_monoImg;
+  ZImg m_leftImg;
+  ZImg m_rightImg;
+  bool m_tiledRendering;
+  int m_tileStartX;
+  int m_tileStartY;
   QString m_renderToImageError;
   Z3DScreenShotType m_renderToImageType;
 

@@ -714,7 +714,7 @@ public:
   bool setValueNoThrow(TValue value, size_t idx);
 
   // from alpha pre-multiplied color to normal color, assume last channel is alpha channel
-  void correctPreMultipliedColor();
+  ZImg& correctPreMultipliedColor();
 
   // only for interface with zstack
   void releaseTimeData(size_t t) { m_data[t] = nullptr; }

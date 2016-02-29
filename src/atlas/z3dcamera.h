@@ -79,6 +79,8 @@ public:
   void setCamera(glm::vec3 eye, glm::vec3 center, glm::vec3 upVector);
   // setFrustum function will set fov, ratio, nearDist, farDist and other derived values of frustum based on input
   void setFrustum(float fov, float ratio, float nearDist, float farDist);
+  //
+  void setTileFrustum(double left = 0.0, double right = 1.0, double bottom = 0.0, double top = 1.0);
 
   // Automatically set up the camera based on a specified bounding box
   // (xmin,xmax, ymin,ymax, zmin,zmax). Camera will reposition itself so

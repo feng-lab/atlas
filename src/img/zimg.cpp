@@ -1512,7 +1512,7 @@ int64_t ZImg::coordToIndex(const ZVoxelCoordinate &coord, const ZImgInfo &info)
       coord.x;
 }
 
-void ZImg::correctPreMultipliedColor()
+ZImg &ZImg::correctPreMultipliedColor()
 {
   if (numChannels() > 1) {
     if (voxelFormat() == VoxelFormat::Float) {
@@ -1529,6 +1529,7 @@ void ZImg::correctPreMultipliedColor()
       }
     }
   }
+  return *this;
 }
 
 void ZImg::clearData()

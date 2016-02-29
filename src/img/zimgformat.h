@@ -75,7 +75,7 @@ public:
   virtual void writeImg(const QString &filename, const ZImgSliceProvider &imgSliceProvider, Compression comp);
 
   // convert RGBARGBA..... to RRR...GGG...BBB...AAA...
-  static void CXYZtoXYZC(const ZImg &bufImg, ZImg &img, bool BGRtoRGB = false);
+  static void CXYZtoXYZC(const ZImg &bufImg, ZImg &img, bool BGRtoRGB = false, bool ARGBtoRGBA = false);
   // convert RRR...GGG...BBB...AAA... to RGBARGBA.....
   static void XYZCtoCXYZ(const ZImg &bufImg, ZImg &img);
   // convert bufImg of dimensionOrder to img of dimensionOrder XYZCT

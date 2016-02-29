@@ -146,7 +146,7 @@ ZImg ZImgFormat::readRawImg(const QString &filename, const ZImgInfo &imgInfo, co
   return res;
 }
 
-void ZImgFormat::CXYZtoXYZC(const ZImg &bufImg, ZImg &img, bool BGRtoRGB)
+void ZImgFormat::CXYZtoXYZC(const ZImg &bufImg, ZImg &img, bool BGRtoRGB, bool ARGBtoRGBA)
 {
   assert(bufImg.isSameSize(img) && bufImg.isSameType(img) && img.channelData<uint8_t>(0) != bufImg.channelData<uint8_t>(0));
 
@@ -167,7 +167,13 @@ void ZImgFormat::CXYZtoXYZC(const ZImg &bufImg, ZImg &img, bool BGRtoRGB)
           srcC = 2;
         else if (srcC == 2)
           srcC = 0;
+      } else if (ARGBtoRGBA) {
+        if (srcC == 0)
+          srcC = 3;
+        else
+          srcC -= 1;
       }
+
       switch (img.voxelByteNumber()) {
       case 1: {
         uint8_t *des = img.channelData<uint8_t>(c,t);
