@@ -571,6 +571,9 @@ public:
   ZImg& operator/=(const ZImg& rhs);
   template<typename TScalarOrZImg>
   ZImg operator/(const TScalarOrZImg& scalarOrZImg) const;
+  // divide img, input should has same size, otherwise throw ZImgException
+  // result voxel is 0 if rhs voxel is 0
+  ZImg& secureDivideBy(const ZImg& rhs);
 
   // return true if img are same type same size and has same content
   bool operator==(const ZImg& other) const;
@@ -710,6 +713,9 @@ public:
   template <typename TValue>
   bool setValueNoThrow(TValue value, size_t idx);
 
+  // from alpha pre-multiplied color to normal color, assume last channel is alpha channel
+  void correctPreMultipliedColor();
+
   // only for interface with zstack
   void releaseTimeData(size_t t) { m_data[t] = nullptr; }
 
@@ -780,6 +786,8 @@ private:
   void mulImg_Impl(const ZImg& rhs);
   template<typename TVoxel, typename TVoxelRhs>
   void divImg_Impl(const ZImg& rhs);
+  template<typename TVoxel, typename TVoxelRhs>
+  void secureDivImg_Impl(const ZImg& rhs);
 
   template<typename TVoxel>
   void histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData) const;

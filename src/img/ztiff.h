@@ -44,6 +44,7 @@ public:
   uint16_t orientation() const;
   uint16_t compression() const;
   uint16_t planarConfiguration() const;
+  int extraSample() const;
 
   bool isTiledImage() const;
   uint64_t stripsPerImage() const;
@@ -142,7 +143,7 @@ protected:
   void readIFDs(std::istream &fs, std::vector<ZTiffIFD> &ifds) const;
 
   // read img from current ifd
-  void readImg(ZImg &img);
+  void readImg(ZImg &img, bool divideByAlpha);
 
   // from current ifd
   size_t readStrip(uint32_t strip, uint8_t *buf, size_t width, size_t height, size_t nChannel, bool invert);
@@ -169,7 +170,7 @@ public:
   ZTiffWriter();
 
   // call in sequence
-  void startWriting(const QString &filename, Compression comp, bool bigTiff = true);
+  void startWriting(const QString &filename, Compression comp, int extraSample, bool bigTiff);
   // write img(z,c,t,l) to next ifd, if c == -1, write all channels
   // z, t, l must be valid index
   // if writeThumbnails is false, thumbnails of img are ignored, otherwise they will be written to subifd
@@ -187,6 +188,7 @@ private:
 private:
   std::unique_ptr<TIFF, void (*)(TIFF*)> m_tif;
   Compression m_compression;
+  int m_extraSample;
 };
 
 } // namespace

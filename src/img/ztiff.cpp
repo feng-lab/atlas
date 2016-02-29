@@ -483,6 +483,19 @@ uint16_t ZTiffIFD::planarConfiguration() const
     return 1;
 }
 
+int ZTiffIFD::extraSample() const
+{
+  int64_t i = indexOf(TIFFTAG_EXTRASAMPLES);
+  if (i != -1) {
+    if (m_entries[i].count() > 1) {
+      throw ZIOException(QString("Tiff with multiple TIFFTAG_EXTRASAMPLES is not supported."));
+    }
+    return m_entries[i].dataAt<uint16_t>(0);
+  } else {
+    return -1;
+  }
+}
+
 bool ZTiffIFD::isTiledImage() const
 {
   return indexOf(TIFFTAG_TILEWIDTH) != -1;
@@ -908,12 +921,12 @@ void ZTiff::readInfoFromIFD(const ZTiffIFD &ifd, ZImgInfo &info)
         throw ZIOException("Different sample format is not supported.");
     info.voxelFormat = vf;
 
-    if (bps == 8 && info.numChannels == 4 && ifd.planarConfiguration() == PLANARCONFIG_CONTIG) {
-      info.alphaChannelIdx = 3;
+    if (ifd.extraSample() >= 0) {
+      info.lastChannelIsAlphaChannel = true;
     }
   } else {
     info.numChannels = 4;
-    info.alphaChannelIdx = 3;
+    info.lastChannelIsAlphaChannel = true;
     info.bytesPerVoxel = 1;
     info.voxelFormat = VoxelFormat::Unsigned;
   }
@@ -928,14 +941,14 @@ void ZTiff::readImgFromIFD(size_t ifdIdx, ZImg &img)
 {
   if (TIFFSetDirectory(m_tif.get(), ifdIdx) != 1)
     throw ZIOException(QString("Can not read ifd of index %1").arg(ifdIdx));
-  readImg(img);
+  readImg(img, m_ifds[ifdIdx].extraSample() != EXTRASAMPLE_UNASSALPHA);
 }
 
 void ZTiff::readImgFromIFD(const ZTiffIFD &ifd, ZImg &img)
 {
   if (TIFFSetSubDirectory(m_tif.get(), ifd.offset()) != 1)
     throw ZIOException(QString("Can not read ifd at offset %1").arg(ifd.offset()));
-  readImg(img);
+  readImg(img, ifd.extraSample() != EXTRASAMPLE_UNASSALPHA);
 }
 
 ZImg ZTiff::readThumbnailFromIFD(const ZTiffIFD &ifd)
@@ -1327,7 +1340,7 @@ void ZTiff::readIFDs(std::istream &fs, std::vector<ZTiffIFD> &ifds) const
   _ifds.swap(ifds);
 }
 
-void ZTiff::readImg(ZImg &img)
+void ZTiff::readImg(ZImg &img, bool divideByAlpha)
 {
   uint16_t planarConfig;
   TIFFGetFieldDefaulted(m_tif.get(), TIFFTAG_PLANARCONFIG, &planarConfig);
@@ -1464,6 +1477,9 @@ void ZTiff::readImg(ZImg &img)
       }
     }
 
+    if (divideByAlpha) {
+      img.correctPreMultipliedColor();
+    }
   }
 
   // correct orientation
@@ -1763,7 +1779,7 @@ ZTiffWriter::ZTiffWriter()
 {
 }
 
-void ZTiffWriter::startWriting(const QString &filename, Compression comp, bool bigTiff)
+void ZTiffWriter::startWriting(const QString &filename, Compression comp, int extraSample, bool bigTiff)
 {
   if (comp == Compression::AUTO) {
     comp = defaultCompression(nullptr);
@@ -1775,6 +1791,7 @@ void ZTiffWriter::startWriting(const QString &filename, Compression comp, bool b
   }
 
   m_compression = comp;
+  m_extraSample = extraSample;
   finishWriting();
   TIFFSetWarningHandler(0);
   TIFFSetErrorHandler(LibtiffErrorHandler);
@@ -1820,6 +1837,10 @@ void ZTiffWriter::writeIFD(const ZImg &img, int z, int t, int c, bool writeThumb
     } else if (img.voxelByteNumber() <= 4 && img.voxelByteNumber() > 1) {
       TIFFSetField(m_tif.get(), TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL);
     }
+  }
+  if (m_extraSample >=0 && m_extraSample <= 2) {
+    uint16_t extraSample = m_extraSample;
+    TIFFSetField(m_tif.get(), TIFFTAG_EXTRASAMPLES, 1, &extraSample);
   }
   TIFFSetField(m_tif.get(), TIFFTAG_ROWSPERSTRIP, img.height());
   TIFFSetField(m_tif.get(), TIFFTAG_SAMPLEFORMAT, img.voxelFormat());

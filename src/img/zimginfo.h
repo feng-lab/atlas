@@ -66,7 +66,7 @@ struct ZImgInfo
   inline const size_t& operator[](size_t i) const { return (&width)[i]; }
   inline size_t& operator[](Dimension i) { return (&width)[enumToUnderlyingType(i)]; }
   inline const size_t& operator[](Dimension i) const { return (&width)[enumToUnderlyingType(i)]; }
-  inline bool isAlphaChannel(size_t ch) const { return static_cast<int>(ch) == alphaChannelIdx; }
+  inline bool isAlphaChannel(size_t ch) const { return lastChannelIsAlphaChannel && ch+1 == numChannels; }
 
   // if current or result voxelSizeUnit is Voxel, result is meaningless
   double voxelSizeXInUnit(VoxelSizeUnit unit) const;
@@ -109,7 +109,7 @@ struct ZImgInfo
   std::vector<col4> channelColors;
   //std::vector<Location> locations;
   std::vector<double> position;
-  int alphaChannelIdx;
+  bool lastChannelIsAlphaChannel;
 
   inline size_t voxelByteNumber() const { return bytesPerVoxel; } // // voxel of one channel
   inline size_t rowVoxelNumber() const { return width; }

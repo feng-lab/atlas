@@ -143,10 +143,11 @@ void ZImgTiff::readImg(const QString &filename, ZImg &img, const ZImgRegion &reg
 void ZImgTiff::writeImg(const QString &filename, const ZImg &img, Compression comp)
 {
   ZTiffWriter tiffWriter;
+  int extraSample = img.info().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
   if (img.byteNumber() > size_t(1024)*1024*3600)
-    tiffWriter.startWriting(filename, comp, true);
+    tiffWriter.startWriting(filename, comp, extraSample, true);
   else
-    tiffWriter.startWriting(filename, comp, false);
+    tiffWriter.startWriting(filename, comp, extraSample, false);
   for (size_t t=0; t<img.numTimes(); ++t) {
     for (size_t z=0; z<img.depth(); ++z) {
       tiffWriter.writeIFD(img, z, t, -1, true);
@@ -158,10 +159,11 @@ void ZImgTiff::writeImg(const QString &filename, const ZImg &img, Compression co
 void ZImgTiff::writeImg(const QString &filename, const ZImgSliceProvider &imgSliceProvider, Compression comp)
 {
   ZTiffWriter tiffWriter;
+  int extraSample = imgSliceProvider.imgInfo().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
   if (imgSliceProvider.imgInfo().byteNumber() > size_t(1024)*1024*3600)
-    tiffWriter.startWriting(filename, comp, true);
+    tiffWriter.startWriting(filename, comp, extraSample, true);
   else
-    tiffWriter.startWriting(filename, comp, false);
+    tiffWriter.startWriting(filename, comp, extraSample, false);
   for (size_t t=0; t<imgSliceProvider.imgInfo().numTimes; ++t) {
     for (size_t z=0; z<imgSliceProvider.imgInfo().depth; ++z) {
       tiffWriter.writeIFD(imgSliceProvider.slice(z,t), 0, 0, -1, true);
@@ -207,7 +209,7 @@ void ZImgTiff::detectImgInfo(ZTiff &tiff)
   std::set<size_t> numChannels;
   std::set<size_t> bytesPerVoxels;
   std::set<VoxelFormat> voxelFormats;
-  std::set<int> alphaChannel;
+  std::set<bool> alphaChannel;
   std::set<size_t> validBitCounts;
   m_imgInfo.resize(1);
   m_imgInfo[0].depth = 0;
@@ -222,7 +224,7 @@ void ZImgTiff::detectImgInfo(ZTiff &tiff)
       numChannels.insert(tmpInfo.numChannels);
       bytesPerVoxels.insert(tmpInfo.bytesPerVoxel);
       voxelFormats.insert(tmpInfo.voxelFormat);
-      alphaChannel.insert(tmpInfo.alphaChannelIdx);
+      alphaChannel.insert(tmpInfo.lastChannelIsAlphaChannel);
       validBitCounts.insert(tmpInfo.validBitCount);
       if (widths.size() != 1 || heights.size() != 1 || numChannels.size() != 1 || bytesPerVoxels.size() != 1 || voxelFormats.size() != 1 ||
           alphaChannel.size() != 1 || validBitCounts.size() != 1)
@@ -237,7 +239,7 @@ void ZImgTiff::detectImgInfo(ZTiff &tiff)
     m_imgInfo[0].numChannels = *numChannels.begin();
     m_imgInfo[0].bytesPerVoxel = *bytesPerVoxels.begin();
     m_imgInfo[0].voxelFormat = *voxelFormats.begin();
-    m_imgInfo[0].alphaChannelIdx = *alphaChannel.begin();
+    m_imgInfo[0].lastChannelIsAlphaChannel = *alphaChannel.begin();
     m_imgInfo[0].validBitCount = *validBitCounts.begin();
 
     if (m_imageDescription.startsWith("ImageJ=") && m_imageDescription.contains("images=")) {

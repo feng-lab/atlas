@@ -48,7 +48,7 @@ ZImgInfo readInfoFromFIPImage(fipImage &fipImg)
         info.numChannels = 3;  // to RGB
       } else {
         info.numChannels = 4;
-        info.alphaChannelIdx = 3;
+        info.lastChannelIsAlphaChannel = true;
       }
       break;
     default:
@@ -97,7 +97,7 @@ ZImgInfo readInfoFromFIPImage(fipImage &fipImg)
   case FIT_RGBA16:
     info.bytesPerVoxel = 2;
     info.numChannels = 4;
-    info.alphaChannelIdx = 3;
+    info.lastChannelIsAlphaChannel = true;
     info.voxelFormat = VoxelFormat::Unsigned;
     break;
   case FIT_RGBF:
@@ -108,7 +108,7 @@ ZImgInfo readInfoFromFIPImage(fipImage &fipImg)
   case FIT_RGBAF:
     info.bytesPerVoxel = 4;
     info.numChannels = 4;
-    info.alphaChannelIdx = 3;
+    info.lastChannelIsAlphaChannel = true;
     info.voxelFormat = VoxelFormat::Float;
     break;
   default:

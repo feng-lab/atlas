@@ -48,7 +48,7 @@ protected:
 
   virtual void updateSize() override;
 
-  void renderInportToImage(const QString& filename, Z3DEye eye);
+  void renderInportToImage(Z3DEye eye);
 
 private:
   void setOutputSize(glm::uvec2 size);

@@ -1458,6 +1458,16 @@ ZImg &ZImg::operator/=(const ZImg& rhs)
   return *this;
 }
 
+ZImg &ZImg::secureDivideBy(const ZImg &rhs)
+{
+  if (!isSameSize(rhs)) {
+    throw ZImgException(QString("img divides requires same size img as input: this <%1>, other <%2>")
+                        .arg(m_info.toQString()).arg(rhs.info().toQString()));
+  }
+  IMG_TYPED_CALL_2TYPE(secureDivImg_Impl, (*this), rhs, rhs);
+  return *this;
+}
+
 bool ZImg::operator==(const ZImg& other) const
 {
   if (isSameType(other) && isSameSize(other)) {
@@ -1500,6 +1510,25 @@ int64_t ZImg::coordToIndex(const ZVoxelCoordinate &coord, const ZImgInfo &info)
       coord.z * static_cast<int64_t>(info.planeVoxelNumber()) +
       coord.y * static_cast<int64_t>(info.rowVoxelNumber()) +
       coord.x;
+}
+
+void ZImg::correctPreMultipliedColor()
+{
+  if (numChannels() > 1) {
+    if (voxelFormat() == VoxelFormat::Float) {
+      ZImg divImg = createView(numChannels()-1);
+      for (size_t c=0; c<numChannels()-1; ++c) {
+        ZImg chImg = createView(c);
+        chImg.secureDivideBy(divImg);
+      }
+    } else {
+      ZImg divImg = createView(numChannels()-1).convertTo<double>();
+      for (size_t c=0; c<numChannels()-1; ++c) {
+        ZImg chImg = createView(c);
+        chImg.secureDivideBy(divImg);
+      }
+    }
+  }
 }
 
 void ZImg::clearData()
@@ -1969,6 +1998,16 @@ void ZImg::divImg_Impl(const ZImg& rhs)
     TVoxel* data = timeData<TVoxel>(t);
     const TVoxelRhs* rhsData = rhs.timeData<TVoxelRhs>(t);
     saturate_div(data, rhsData, timeVoxelNumber(), data);
+  }
+}
+
+template<typename TVoxel, typename TVoxelRhs>
+void ZImg::secureDivImg_Impl(const ZImg& rhs)
+{
+  for (size_t t=0; t<numTimes(); ++t) {
+    TVoxel* data = timeData<TVoxel>(t);
+    const TVoxelRhs* rhsData = rhs.timeData<TVoxelRhs>(t);
+    saturate_div_secure(data, rhsData, timeVoxelNumber(), data);
   }
 }
 

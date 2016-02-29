@@ -76,7 +76,7 @@ void ZTakeScreenShotWidget::captureButtonPressed()
     }
     QDir dir(m_folderWidget->getSelectedDirectory());
     while (true) {
-      QString filename = QString("%1%2.png").arg(m_namePrefix.get()).arg(m_nextNumber++);
+      QString filename = QString("%1%2.tif").arg(m_namePrefix.get()).arg(m_nextNumber++);
       if (dir.exists(filename))
         continue;
       filepath = dir.filePath(filename);

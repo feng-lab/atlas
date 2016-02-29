@@ -93,10 +93,11 @@ QStringList ZImgOmeTiff::extensions() const
 void ZImgOmeTiff::writeImg(const QString &filename, const ZImg &img, Compression comp)
 {
   ZTiffWriter tiffWriter;
+  int extraSample = img.info().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
   if (img.byteNumber() > size_t(1024)*1024*3600)
-    tiffWriter.startWriting(filename, comp, true);
+    tiffWriter.startWriting(filename, comp, extraSample, true);
   else
-    tiffWriter.startWriting(filename, comp, false);
+    tiffWriter.startWriting(filename, comp, extraSample, false);
   std::vector<ZImgMetatag> tags(1);
   makeImageDescriptionTag(img.info(), "XYZCT", tags[0]);
   for (size_t t=0; t<img.numTimes(); ++t) {
@@ -116,10 +117,11 @@ void ZImgOmeTiff::writeImg(const QString &filename, const ZImg &img, Compression
 void ZImgOmeTiff::writeImg(const QString &filename, const ZImgSliceProvider &imgSliceProvider, Compression comp)
 {
   ZTiffWriter tiffWriter;
+  int extraSample = imgSliceProvider.imgInfo().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
   if (imgSliceProvider.imgInfo().byteNumber() > size_t(1024)*1024*3600)
-    tiffWriter.startWriting(filename, comp, true);
+    tiffWriter.startWriting(filename, comp, extraSample, true);
   else
-    tiffWriter.startWriting(filename, comp, false);
+    tiffWriter.startWriting(filename, comp, extraSample, false);
   std::vector<ZImgMetatag> tags(1);
   makeImageDescriptionTag(imgSliceProvider.imgInfo(), "XYCZT", tags[0]);
   for (size_t t=0; t<imgSliceProvider.imgInfo().numTimes; ++t) {

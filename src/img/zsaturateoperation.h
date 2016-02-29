@@ -1221,6 +1221,14 @@ inline void saturate_div(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* re
 }
 
 template<typename TVoxel1, typename TVoxel2>
+inline void saturate_div_secure(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
+{
+  for (size_t i=0; i<count; ++i) {
+    res[i] = y[i] == TVoxel2(0) ? TVoxel1(0) : saturate_div(x[i], y[i]);
+  }
+}
+
+template<typename TVoxel1, typename TVoxel2>
 inline void saturate_div(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res)
 {
   for (size_t i=0; i<count; ++i) {

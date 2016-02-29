@@ -72,7 +72,7 @@ void readInfoFromDecoder(const PKImageDecode* pDecoder, const PKPixelInfo &PI, Z
     throw ZIOException("Not supported color type");
   }
   if (PI.grBit & PK_pixfmtHasAlpha) {
-    info.alphaChannelIdx = info.numChannels - 1;
+    info.lastChannelIsAlphaChannel = true;
   }
   info.numTimes = 1;
 
@@ -261,22 +261,9 @@ void ZImgJpegXR::readImg(const QString &filename, ZImg &img, const ZImgRegion &r
     CXYZtoXYZC(img, imgTmp, PI.grBit & PK_pixfmtBGR);
     img.swap(imgTmp);
 
-    if (PI.grBit & PK_pixfmtPreMul && info.alphaChannelIdx > 0 ) {
-      if (region.start.c < info.alphaChannelIdx) { // otherwise don't need to process color channels
-        if (info.voxelFormat == VoxelFormat::Float) {
-          ZImg divImg = img.createView(info.alphaChannelIdx);
-          for (int c=0; c<info.alphaChannelIdx; ++c) {
-            ZImg chImg = img.createView(c);
-            chImg /= divImg;
-            chImg.typedUnaryOperation<float>(replaceInfAndNanWith0());  // jpegxr doesn't support double type
-          }
-        } else {
-          ZImg divImg = img.createView(info.alphaChannelIdx).convertTo<float>();
-          for (int c=0; c<info.alphaChannelIdx; ++c) {
-            ZImg chImg = img.createView(c);
-            chImg /= divImg;
-          }
-        }
+    if (PI.grBit & PK_pixfmtPreMul && info.lastChannelIsAlphaChannel) {
+      if (region.start.c < static_cast<int>(img.numChannels()-1)) { // otherwise don't need to process color channels
+        img.correctPreMultipliedColor();
       }
     }
   }
@@ -395,21 +382,8 @@ void ZImgJpegXR::readImg(uint8_t *mem, size_t size, uint8_t *des, size_t desSize
     ZImg imgTmp = img;
     CXYZtoXYZC(imgTmp, img, PI.grBit & PK_pixfmtBGR);
 
-    if (PI.grBit & PK_pixfmtPreMul && info.alphaChannelIdx > 0 ) {
-      if (info.voxelFormat == VoxelFormat::Float) {
-        ZImg divImg = img.createView(info.alphaChannelIdx);
-        for (int c=0; c<info.alphaChannelIdx; ++c) {
-          ZImg chImg = img.createView(c);
-          chImg /= divImg;
-          chImg.typedUnaryOperation<float>(replaceInfAndNanWith0());   // jpegxr doesn't support double type
-        }
-      } else {
-        ZImg divImg = img.createView(info.alphaChannelIdx).convertTo<float>();
-        for (int c=0; c<info.alphaChannelIdx; ++c) {
-          ZImg chImg = img.createView(c);
-          chImg /= divImg;
-        }
-      }
+    if (PI.grBit & PK_pixfmtPreMul && info.lastChannelIsAlphaChannel) {
+      img.correctPreMultipliedColor();
     }
   }
 

@@ -278,8 +278,8 @@ const QString &ZImgPack::detailedInfo() const
     info << QString("Voxel Size X: %1").arg(m_imgInfo.voxelSizeX);
     info << QString("Voxel Size Y: %1").arg(m_imgInfo.voxelSizeY);
     info << QString("Voxel Size Z: %1").arg(m_imgInfo.voxelSizeZ);
-    if (m_imgInfo.alphaChannelIdx >= 0) {
-      info << QString("Alpha Channel: %1").arg(m_imgInfo.alphaChannelIdx);
+    if (m_imgInfo.lastChannelIsAlphaChannel && m_imgInfo.numChannels > 0) {
+      info << QString("Alpha Channel: %1").arg(m_imgInfo.numChannels-1);
     }
     if (m_imgInfo.validBitCount > 0) {
       info << QString("Valid Bit Count: %1").arg(m_imgInfo.validBitCount);

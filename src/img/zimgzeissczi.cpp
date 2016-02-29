@@ -107,7 +107,7 @@ ZImg readCZITile(std::ifstream &inputFileStream, const CZITile &tile)
       dimensionOrder.remove('C');
       dimensionOrder.push_front('C');
       info.numChannels = 4;
-      info.alphaChannelIdx = 3;
+      info.lastChannelIsAlphaChannel = true;
       info.bytesPerVoxel = 1;
       info.voxelFormat = VoxelFormat::Unsigned;
       break;
@@ -1487,7 +1487,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
     case 9:
       assert(info.numChannels == 1);
       info.numChannels = 4;
-      info.alphaChannelIdx = 3;
+      info.lastChannelIsAlphaChannel = true;
       info.bytesPerVoxel = 1;
       info.voxelFormat = VoxelFormat::Unsigned;
       break;

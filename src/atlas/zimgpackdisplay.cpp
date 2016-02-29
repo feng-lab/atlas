@@ -422,12 +422,6 @@ void ZImgPackDisplay::setQImageDataBlock(const ZImg *img, QImage *qim, std::pair
       }
     }
   } else {
-    if (alphaChannelIdx != static_cast<int>(channels->size())-1) {
-      std::swap(imgDatas[alphaChannelIdx], imgDatas[channels->size()-1]);
-      std::swap(chMinValue[alphaChannelIdx], chMinValue[channels->size()-1]);
-      std::swap(chMaxValue[alphaChannelIdx], chMaxValue[channels->size()-1]);
-      std::swap(chCol[alphaChannelIdx], chCol[channels->size()-1]);
-    }
     if (channels->size() == 1) {
 #ifndef _USE_QTCONCURRENT_
       for (size_t i=rowRange.begin(); i != rowRange.end(); ++i) {

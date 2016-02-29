@@ -44,38 +44,19 @@ void Z3DCanvasPainter::process(Z3DEye eye)
 
   // render to image
   if (currentInport.isReady() && m_renderToImage) {
-    try {
-      renderInportToImage(m_renderToImageFilename, eye);
-      if (eye == Z3DEye::Mono) {
-        LINFO() << "Saved rendering (" << currentInport.size().x << "," <<
-                   currentInport.size().y << ")" << "to file:" << m_renderToImageFilename;
-      } else if (eye == Z3DEye::Right) {
-        if (m_renderToImageType == Z3DScreenShotType::HalfSideBySideStereoView) {
-          LINFO() << "Saved half sbs stereo rendering (" << currentInport.size().x << "," <<
-                     currentInport.size().y << ")" << "to file:" << m_renderToImageFilename;
-        } else {
-          LINFO() << "Saved stereo rendering (" << currentInport.size().x << "x 2," <<
-                     currentInport.size().y << ")" << "to file:" << m_renderToImageFilename;
-        }
-      }
-    }
-    catch (ZException const & e) {
-      LERROR() << "Exception:" << e.what();
-      m_renderToImageError = e.what();
-    }
-    if (eye == Z3DEye::Mono || eye == Z3DEye::Right) {
-      m_renderToImage = false;
-    }
+    renderInportToImage(eye);
     return;
   }
 
   // render to screen
   m_canvas->getGLFocus();
   glViewport(0, 0, m_canvas->physicalSize().x, m_canvas->physicalSize().y);
-  if (eye == Z3DEye::Left)
+  if (eye == Z3DEye::Left) {
     glDrawBuffer(GL_BACK_LEFT);
-  else if (eye == Z3DEye::Right)
+  } else if (eye == Z3DEye::Right) {
     glDrawBuffer(GL_BACK_RIGHT);
+  }
+
   if (currentInport.isReady()) {
     m_rendererBase.setViewport(m_canvas->physicalSize());
     m_textureCopyRenderer.setColorTexture(currentInport.colorTexture());
@@ -106,8 +87,7 @@ void Z3DCanvasPainter::updateSize()
 
 void Z3DCanvasPainter::onCanvasResized(size_t w, size_t h)
 {
-  glm::uvec2 newsize(w, h);
-  setOutputSize(newsize);
+  setOutputSize(glm::uvec2(w, h));
   emit requestUpstreamSizeChange(this);
 }
 
@@ -165,8 +145,10 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, Z3DScreenShotType 
     LERROR() << "impossible configuration";
     assert(false);
   }
-  if (!m_canvas->format().stereo() && sst != Z3DScreenShotType::MonoView)
+  if (!m_canvas->format().stereo() && sst != Z3DScreenShotType::MonoView) {
     m_canvas->setFakeStereoOnce();
+  }
+
   m_canvas->forceUpdate();
 
   return (m_renderToImageError.isEmpty());
@@ -200,61 +182,84 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, int width, int hei
   return success;
 }
 
-void Z3DCanvasPainter::renderInportToImage(const QString &filename, Z3DEye eye)
+void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
 {
-  const Z3DTexture* tex = imageColorTexture(eye);
-  if (!tex) {
-    throw ZGLException("not ready to capture image");
-  }
-  GLenum dataFormat = GL_BGRA;
-  GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
-
-  if (eye == Z3DEye::Mono) {
-    // get color buffer content
-    auto colorBuffer = std::make_unique<uint8_t[]>(tex->bypePerPixel(dataFormat, dataType) * tex->numPixels());
-    tex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
-    QImage upsideDownImage(colorBuffer.get(), tex->width(), tex->height(),
-                           QImage::Format_ARGB32_Premultiplied);
-    QImage image = upsideDownImage.mirrored(false, true);
-    QImageWriter writer(filename);
-    writer.setCompression(1);
-    if (!writer.write(image)) {
-      throw ZIOException(writer.errorString());
-    }
-  } else if (eye == Z3DEye::Right) {
-    const Z3DTexture* leftTex = imageColorTexture(Z3DEye::Left);
-    if (!leftTex) {
+  try {
+    const Z3DTexture* tex = imageColorTexture(eye);
+    if (!tex) {
       throw ZGLException("not ready to capture image");
     }
-    auto colorBuffer = std::make_unique<uint8_t[]>(leftTex->bypePerPixel(dataFormat, dataType) * leftTex->numPixels());
-    leftTex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
-    QImage sideBySideImage(tex->width() * 2, tex->height(), QImage::Format_ARGB32_Premultiplied);
-    QPainter painter(&sideBySideImage);
-    painter.scale(1, -1);
-    painter.translate(0, -tex->height());
-    QImage upsideDownImageLeft(colorBuffer.get(), tex->width(), tex->height(),
-                               QImage::Format_ARGB32_Premultiplied);
-    painter.drawImage(0, 0, upsideDownImageLeft);
-    tex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
-    QImage upsideDownImageRight(colorBuffer.get(), tex->width(), tex->height(),
-                                QImage::Format_ARGB32_Premultiplied);
-    painter.drawImage(tex->width(), 0, upsideDownImageRight);
+    GLenum dataFormat = GL_BGRA;
+    GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
 
-    if (m_renderToImageType == Z3DScreenShotType::HalfSideBySideStereoView) {
-      QImage halfSideBySideImage = sideBySideImage.scaled(
-            tex->width(), tex->height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-      QImageWriter writer(filename);
+    if (eye == Z3DEye::Mono) {
+      // get color buffer content
+      auto colorBuffer = std::make_unique<uint8_t[]>(tex->bypePerPixel(dataFormat, dataType) * tex->numPixels());
+      tex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
+      QImage upsideDownImage(colorBuffer.get(), tex->width(), tex->height(),
+                             QImage::Format_ARGB32_Premultiplied);
+      QImage image = upsideDownImage.mirrored(false, true);
+      QImageWriter writer(m_renderToImageFilename);
       writer.setCompression(1);
-      if(!writer.write(halfSideBySideImage)) {
+      if (!writer.write(image)) {
         throw ZIOException(writer.errorString());
       }
-    } else {
-      QImageWriter writer(filename);
-      writer.setCompression(1);
-      if(!writer.write(sideBySideImage)) {
-        throw ZIOException(writer.errorString());
+    } else if (eye == Z3DEye::Right) {
+      const Z3DTexture* leftTex = imageColorTexture(Z3DEye::Left);
+      if (!leftTex) {
+        throw ZGLException("not ready to capture image");
+      }
+      auto colorBuffer = std::make_unique<uint8_t[]>(leftTex->bypePerPixel(dataFormat, dataType) * leftTex->numPixels());
+      leftTex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
+      QImage sideBySideImage(tex->width() * 2, tex->height(), QImage::Format_ARGB32_Premultiplied);
+      QPainter painter(&sideBySideImage);
+      painter.scale(1, -1);
+      painter.translate(0, -tex->height());
+      QImage upsideDownImageLeft(colorBuffer.get(), tex->width(), tex->height(),
+                                 QImage::Format_ARGB32_Premultiplied);
+      painter.drawImage(0, 0, upsideDownImageLeft);
+      tex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
+      QImage upsideDownImageRight(colorBuffer.get(), tex->width(), tex->height(),
+                                  QImage::Format_ARGB32_Premultiplied);
+      painter.drawImage(tex->width(), 0, upsideDownImageRight);
+
+      if (m_renderToImageType == Z3DScreenShotType::HalfSideBySideStereoView) {
+        QImage halfSideBySideImage = sideBySideImage.scaled(
+              tex->width(), tex->height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        QImageWriter writer(m_renderToImageFilename);
+        writer.setCompression(1);
+        if(!writer.write(halfSideBySideImage)) {
+          throw ZIOException(writer.errorString());
+        }
+      } else {
+        QImageWriter writer(m_renderToImageFilename);
+        writer.setCompression(1);
+        if(!writer.write(sideBySideImage)) {
+          throw ZIOException(writer.errorString());
+        }
       }
     }
+
+    if (eye == Z3DEye::Mono) {
+      LINFO() << "Saved rendering (" << tex->width() << "," <<
+                 tex->height() << ")" << "to file:" << m_renderToImageFilename;
+    } else if (eye == Z3DEye::Right) {
+      if (m_renderToImageType == Z3DScreenShotType::HalfSideBySideStereoView) {
+        LINFO() << "Saved half sbs stereo rendering (" << tex->width() << "," <<
+                   tex->height() << ")" << "to file:" << m_renderToImageFilename;
+      } else {
+        LINFO() << "Saved stereo rendering (" << tex->width() << "x 2," <<
+                   tex->height() << ")" << "to file:" << m_renderToImageFilename;
+      }
+    }
+  }
+  catch (ZException const & e) {
+    LERROR() << "Exception:" << e.what();
+    m_renderToImageError = e.what();
+  }
+
+  if (eye == Z3DEye::Mono || eye == Z3DEye::Right) {
+    m_renderToImage = false;
   }
 }
 

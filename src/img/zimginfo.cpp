@@ -23,7 +23,7 @@ ZImgInfo::ZImgInfo(size_t w, size_t h, size_t d,
   voxelSizeX = 1;
   voxelSizeY = 1;
   voxelSizeZ = 1;
-  alphaChannelIdx = -1;
+  lastChannelIsAlphaChannel = false;
 
   createDefaultDescriptions();
 }
@@ -50,7 +50,7 @@ void ZImgInfo::clear()
   channelColors.clear();
   //locations.clear();
   position.clear();
-  alphaChannelIdx = -1;
+  lastChannelIsAlphaChannel = false;
 }
 
 void ZImgInfo::swap(ZImgInfo &other) noexcept
@@ -74,7 +74,7 @@ void ZImgInfo::swap(ZImgInfo &other) noexcept
   channelColors.swap(other.channelColors);
   //locations.swap(other.locations);
   position.swap(other.position);
-  std::swap(alphaChannelIdx, other.alphaChannelIdx);
+  std::swap(lastChannelIsAlphaChannel, other.lastChannelIsAlphaChannel);
 }
 
 //std::string ZImgInfo::toString() const
@@ -110,7 +110,7 @@ QString ZImgInfo::toQString() const
       QString(", voxelSizeX: %1").arg(voxelSizeX) %
       QString(", voxelSizeY: %1").arg(voxelSizeY) %
       QString(", voxelSizeZ: %1").arg(voxelSizeZ) %
-      (alphaChannelIdx >= 0 ? QString(", alphaChannel: %1").arg(alphaChannelIdx) : QString("")) %
+      (lastChannelIsAlphaChannel ? QString(", alphaChannel: %1").arg(numChannels-1) : QString("")) %
       (validBitCount > 0 ? QString(", validBitCount: %1").arg(validBitCount) : QString(""));
 }
 
@@ -164,7 +164,7 @@ QString ZImgInfo::displayChannelName(size_t c) const
     res = QString("Ch%1 (%2)").arg(c+1).arg(channelNames[c]);
   }
 
-  if (static_cast<int>(c) == alphaChannelIdx) {
+  if (lastChannelIsAlphaChannel && c+1 == numChannels) {
     res += QString(" (Alpha)");
   }
   return res;
@@ -201,8 +201,8 @@ void ZImgInfo::createDefaultChannelColors()
                                 ZRandomInstance.randInt(255));
       }
     }
-    if (alphaChannelIdx >= 0)
-      channelColors[alphaChannelIdx] = col4(0,0,0);
+    if (lastChannelIsAlphaChannel && numChannels > 0)
+      channelColors[numChannels-1] = col4(0,0,0);
   }
 }
 

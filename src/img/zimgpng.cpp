@@ -50,7 +50,7 @@ void readInfoFromBuf(const std::vector<char>& buf, lodepng::State &state, ZImgIn
     break;
   case LCT_GREY_ALPHA:
     info.numChannels = 2;
-    info.alphaChannelIdx = 1;
+    info.lastChannelIsAlphaChannel = true;
     break;
   case LCT_RGB:
     info.numChannels = 3;
@@ -58,7 +58,7 @@ void readInfoFromBuf(const std::vector<char>& buf, lodepng::State &state, ZImgIn
   case LCT_RGBA:
   case LCT_PALETTE:
     info.numChannels = 4;
-    info.alphaChannelIdx = 3;
+    info.lastChannelIsAlphaChannel = true;
     break;
   default:
     throw ZIOException("not supported png colortype");
