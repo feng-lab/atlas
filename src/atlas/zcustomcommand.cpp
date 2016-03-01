@@ -14,6 +14,8 @@
 #include "zimggraph.h"
 #include <tbb/task_scheduler_init.h>
 #include "zregionontology.h"
+#include "include/reader.h"
+#include "zjson.h"
 
 namespace nim {
 
@@ -659,6 +661,98 @@ void makeAxonChannelImages()
   }
 }
 
+void moveObjectToCorrectLocation()
+{
+  QString fn = "/Users/feng/Documents/PV/contra.scene";
+  QString resfn = "/Users/feng/Documents/PV/contra_res.scene";
+  QFile file(fn);
+  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    return;
+  }
+
+  QByteArray saveData = file.readAll();
+
+  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData));
+  if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
+    return;
+  }
+
+  QJsonObject loadObj = loadDoc.object();
+  if (!loadObj.contains("Scene") || !loadObj["Scene"].isObject()) {
+    return;
+  }
+
+  QJsonObject sceneObj = loadObj["Scene"].toObject();
+
+  QDir::setCurrent(QFileInfo(fn).absolutePath());
+
+  QList<QStringList> metaData = QtCSV::Reader::readToList("/Users/feng/Documents/PV/contra_neuron_metadata.csv");
+  std::map<QString, glm::dvec3> cellNameToLocations;
+  glm::dvec3 imagescale = glm::dvec3(71, 71, 71);
+  double imagePixelPerUm = 0.136;
+  double swcPixelPerUmxy = 9.66;
+  double swcPixelPerUmz = 2.0;
+  glm::dvec3 refSwcLocInBrain = glm::dvec3(-2.25, 1.27, 2.5);   //in mm
+  glm::dvec3 refSwcRootImageLoc = glm::dvec3(373, 291, 202);   //roughly get from image
+  for (int metaIdx=1; metaIdx<metaData.size(); ++metaIdx) {
+    QString cellName = metaData[metaIdx][0];
+    double Anterior_Posterior = metaData[metaIdx][1].toDouble();
+    double ML_pt = metaData[metaIdx][2].toDouble();
+    double DV_pt = metaData[metaIdx][3].toDouble();
+    double DV_dura_pt = metaData[metaIdx][4].toDouble();
+    double Medial_Lateral = metaData[metaIdx][5].toDouble();
+    double Deep_Superficial = metaData[metaIdx][6].toDouble();
+
+    glm::dvec3 swcLoc(-Medial_Lateral, Deep_Superficial, -Anterior_Posterior);
+    glm::dvec3 swcRootImageLoc = (swcLoc - refSwcLocInBrain) * imagePixelPerUm * 1000. + refSwcRootImageLoc;
+    ZSwc swc(QString("/Users/feng/Documents/PV/contra/%1.swc").arg(cellName));
+    ZSwc::SwcTreeNode rootn = swc.thickestNode();
+    glm::dvec3 rootLoc(rootn->x, rootn->y, rootn->z * swcPixelPerUmxy/swcPixelPerUmz);
+
+    glm::dvec3 rootTrans = swcRootImageLoc - rootLoc * imagePixelPerUm/swcPixelPerUmxy;
+    rootTrans = rootTrans * imagescale;
+    cellNameToLocations[cellName] = rootTrans;
+  }
+
+  QJsonObject docObject = sceneObj["Doc"].toObject();
+  for (QJsonObject::iterator it = docObject.begin(); it != docObject.end(); ++it) {
+    QStringList typeAndID = it.key().split(" ");
+    QString IDString = typeAndID[1].trimmed();
+    QFileInfo docPath(it.value().toString());
+    QString filename = docPath.completeBaseName();
+    if (typeAndID[0] == "Swc") {
+      filename.chop(6);
+    } else if (typeAndID[0] == "Puncta") {
+      filename.chop(8);
+      modifyJsonValue(sceneObj, IDString + ".View3D.Use Same Size Bool", QJsonValue(true));
+      modifyJsonValue(sceneObj, IDString + ".View3D.Size Scale Float", QJsonValue("4"));
+      modifyJsonValue(sceneObj, IDString + ".View3D.Color Mode StringIntOption", QJsonValue("Single Color"));
+      modifyJsonValue(sceneObj, IDString + ".View3D.Puncta Color Vec4", QJsonValue(toQString(glm::vec4(0,1,1,1))));
+    }
+    glm::dvec3 loc = cellNameToLocations.at(filename);
+    QString locString = toQString(loc);
+    QString scaleString = toQString(glm::dvec3(1, 1, 5));
+
+    modifyJsonValue(sceneObj, IDString + ".View3D.Coord Transform 3DTransform.Scale Vec3", scaleString);
+    modifyJsonValue(sceneObj, IDString + ".View3D.Coord Transform 3DTransform.Translation Vec3", locString);
+//    LINFO() << IDString << scaleString << locString << sceneObj[IDString].toObject()["View3D"].toObject()["Coord Transform 3DTransform"].toObject()["Scale Vec3"].toString()
+//        << sceneObj[IDString].toObject()["View3D"].toObject()["Coord Transform 3DTransform"].toObject()["Translation Vec3"].toString();
+  }
+
+  QFile resfile(resfn);
+  if (!resfile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+    return;
+  }
+
+  QJsonObject saveObj;
+  saveObj.insert("Scene", sceneObj);
+
+  QJsonDocument saveDoc(saveObj);
+  if (resfile.write(saveDoc.toJson()) == -1) {
+    return;
+  }
+}
+
 }
 
 namespace nim {
@@ -669,6 +763,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
+  moveObjectToCorrectLocation();
   LINFO() << "done";
 }
 

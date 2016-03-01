@@ -280,7 +280,8 @@ HEADERS += \
     z3dblockcache.h \
     z3dimgslicerenderer.h \
     zregionontology.h \
-    zobjdetailedinfowidget.h
+    zobjdetailedinfowidget.h \
+    zjson.h
 
 SOURCES += \
     main.cpp \
@@ -489,7 +490,8 @@ SOURCES += \
     z3dimgfilter.cpp \
     z3dimgslicerenderer.cpp \
     zregionontology.cpp \
-    zobjdetailedinfowidget.cpp
+    zobjdetailedinfowidget.cpp \
+    zjson.cpp
 
 contains(CONFIG, use_glbinding) {
     include($$PWD/../3rdparty/glbinding.pri)
@@ -527,6 +529,7 @@ include($$PWD/../3rdparty/optimization/optimization.pri)
 include($$PWD/../3rdparty/libqxt.pri)
 include($$PWD/../3rdparty/QsLog/QsLogGUI.pri)
 include($$PWD/../3rdparty/eigenGUI.pri)
+include($$PWD/../3rdparty/qtcsv/qtcsv.pri)
 
 macx {
     SOURCES += $$PWD/../3rdparty/sys/VideoMemoryMac.cpp
