@@ -234,6 +234,7 @@ public:
   void setBoxCorrectionUniform(float value) { if (m_boxCorrectionUniform) { setUniform(m_boxCorrectionUniform->location, value); } }
   void setCustomColorUniform(const glm::vec4& value) { if (m_customColorUniform) { setUniform(m_customColorUniform->location, value); } }
   void setUseCustomColorUniform(bool value) { if (m_useCustomColorUniform) { setUniform(m_useCustomColorUniform->location, value); } }
+  void setRegionUniform(const glm::vec4& value) { if (m_regionUniform) { setUniform(m_regionUniform->location, value); } }
 
   GLint vertexAttributeLocation() const { return m_vertexAttribute ? m_vertexAttribute->location : -1; }
   GLint normalAttributeLocation() const { return m_normalAttribute ? m_normalAttribute->location : -1; }
@@ -324,6 +325,7 @@ protected:
   const Uniform *m_boxCorrectionUniform;
   const Uniform *m_customColorUniform;
   const Uniform *m_useCustomColorUniform;
+  const Uniform *m_regionUniform;
 
   const Attribute *m_vertexAttribute;
   const Attribute *m_normalAttribute;

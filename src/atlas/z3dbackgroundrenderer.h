@@ -16,6 +16,8 @@ public:
   ZVec4Parameter& secondColorPara() { return m_secondColor; }
   ZStringIntOptionParameter& gradientOrientationPara() { return m_gradientOrientation; }
 
+  void setRenderingRegion(double left = 0., double right = 1., double bottom = 0., double top = 1.);
+
 signals:
 
 protected slots:
@@ -42,6 +44,8 @@ protected:
 
   ZVertexArrayObject m_VAO;
   ZVertexBufferObject m_VBO;
+
+  glm::vec4 m_region;
 };
 
 } // namespace nim

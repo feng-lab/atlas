@@ -44,9 +44,10 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters &globalParas, QObject *parent)
   , m_XAxisColor("X Axis Color", glm::vec4(1.f, 0.f, 0.f, 1.0f))
   , m_YAxisColor("Y Axis Color", glm::vec4(0.f, 1.f, 0.f, 1.0f))
   , m_ZAxisColor("Z Axis Color", glm::vec4(0.f, 0.f, 1.f, 1.0f))
-  , m_axisRegionRatio("Axis Region Ratio", .2f, .1f, 1.f)
+  , m_axisRegionRatio("Axis Region Ratio", .25f, .1f, 1.f)
   , m_axisMode("Mode")
   , m_screenQuadVAO(1)
+  , m_region(0,1,0,1)
 {
   addParameter(m_showBackground);
   //addParameter(m_renderGeometries);
@@ -192,6 +193,12 @@ void Z3DCompositor::savePickingBufferToImage(const QString &filename)
 {
   const Z3DTexture *tex = pickingManager().renderTarget().attachment(GL_COLOR_ATTACHMENT0);
   tex->saveAsColorImage(filename);
+}
+
+void Z3DCompositor::setRenderingRegion(double left, double right, double bottom, double top)
+{
+  m_backgroundRenderer.setRenderingRegion(left, right, bottom, top);
+  m_region = glm::vec4(left, right, bottom, top);
 }
 
 void Z3DCompositor::process(Z3DEye eye)
@@ -1283,20 +1290,26 @@ void Z3DCompositor::renderAxis(Z3DEye eye)
   m_rendererBase.coordTransformPara().set(glm::mat4(globalCamera().rotateMatrix(eye)));
 
   glm::uvec4 viewport = m_rendererBase.viewport();
-  GLsizei size = std::min(viewport.z, viewport.w) * m_axisRegionRatio.get();
-  glViewport(viewport.x, viewport.y, size, size);
-  glScissor(viewport.x, viewport.y, size, size);
-  glEnable(GL_SCISSOR_TEST);
-  glClear(GL_DEPTH_BUFFER_BIT);
 
-  if (m_axisMode.get() == "Arrow")
-    m_rendererBase.render(eye, m_arrowRenderer, m_fontRenderer);
-  else
-    m_rendererBase.render(eye, m_lineRenderer, m_fontRenderer);
+  if (m_region[0] <= 0.f && m_region[2] <= 0.f) {
+    double startX = viewport.x + viewport.z / m_region[1] * m_region[0];
+    double startY = viewport.y + viewport.w / m_region[3] * m_region[2];
 
-  glViewport(viewport.x, viewport.y, viewport.z, viewport.w);
-  glScissor(viewport.x, viewport.y, viewport.z, viewport.w);
-  glDisable(GL_SCISSOR_TEST);
+    GLsizei size = std::min(viewport.z, viewport.w) * m_axisRegionRatio.get();
+    glViewport(viewport.x - std::floor(startX), viewport.y - std::floor(startY), size, size);
+    glScissor(viewport.x - std::floor(startX), viewport.y - std::floor(startY), size, size);
+    glEnable(GL_SCISSOR_TEST);
+    glClear(GL_DEPTH_BUFFER_BIT);
+
+    if (m_axisMode.get() == "Arrow")
+      m_rendererBase.render(eye, m_arrowRenderer, m_fontRenderer);
+    else
+      m_rendererBase.render(eye, m_lineRenderer, m_fontRenderer);
+
+    glViewport(viewport.x, viewport.y, viewport.z, viewport.w);
+    glScissor(viewport.x, viewport.y, viewport.z, viewport.w);
+    glDisable(GL_SCISSOR_TEST);
+  }
   m_rendererBase.coordTransformPara().blockSignals(false);
 }
 

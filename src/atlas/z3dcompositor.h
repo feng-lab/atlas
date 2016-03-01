@@ -30,6 +30,8 @@ public:
 
   void savePickingBufferToImage(const QString &filename);
 
+  void setRenderingRegion(double left = 0., double right = 1., double bottom = 0., double top = 1.);
+
 protected:
   virtual void process(Z3DEye eye) override;
 
@@ -127,6 +129,8 @@ private:
   std::shared_ptr<ZWidgetsGroup> m_axisWidgetsGroup;
 
   ZVertexArrayObject m_screenQuadVAO;
+
+  glm::vec4 m_region;
 };
 
 } // namespace nim

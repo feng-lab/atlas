@@ -13,6 +13,8 @@
 #include <memory>
 #include "zimgformat.h"
 
+#include "z3dcompositor.h"
+
 namespace nim {
 
 Z3DCanvasPainter::Z3DCanvasPainter(Z3DGlobalParameters &globalParas, QObject *parent)
@@ -192,7 +194,7 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, Z3DScreenShotType 
   return (m_renderToImageError.isEmpty());
 }
 
-bool Z3DCanvasPainter::renderToImage(const QString &filename, int width, int height, Z3DScreenShotType sst)
+bool Z3DCanvasPainter::renderToImage(const QString &filename, int width, int height, Z3DScreenShotType sst, Z3DCompositor &compositor)
 {
   if (!m_canvas) {
     LWARN() << "no canvas assigned";
@@ -256,12 +258,14 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, int width, int hei
       for (int r=0; r<numRows; ++r) {
         m_tileStartX = c * tileInnerSize - tileBorder;
         m_tileStartY = r * tileInnerSize - tileBorder;
+        double left = m_tileStartX / 1.0 / width;
+        double right = (m_tileStartX + tileSize) / 1.0 / width;
+        double bottom = m_tileStartY / 1.0 / height;
+        double top = (m_tileStartY + tileSize) / 1.0 / height;
 
         // set camera frustum
-        globalCameraPara().setTileFrustum(m_tileStartX / 1.0 / width,
-                                          (m_tileStartX + tileSize) / 1.0 / width,
-                                          m_tileStartY / 1.0 / height,
-                                          (m_tileStartY + tileSize) / 1.0 / height);
+        globalCameraPara().setTileFrustum(left, right, bottom, top);
+        compositor.setRenderingRegion(left, right, bottom, top);
         //LINFO() << globalCameraPara().get().left() << globalCameraPara().get().right() << globalCameraPara().get().top() << globalCameraPara().get().bottom();
 
         //LINFO() << "1";
@@ -277,6 +281,7 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, int width, int hei
       }
     }
     globalCameraPara().setTileFrustum();
+    compositor.setRenderingRegion();
     m_tiledRendering = false;
   }
 

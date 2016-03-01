@@ -392,7 +392,7 @@ void ZAnimation::export3DAnimation(const QDir &dir, const QString &fn, double fr
         }
       }
     }
-    if (!canvasPainter.renderToImage(filepath, width, height, sst)) {
+    if (!canvasPainter.renderToImage(filepath, width, height, sst, static_cast<Z3DView*>(m_view)->compositor())) {
       QMessageBox::critical(QApplication::activeWindow(), "Error", canvasPainter.renderToImageError());
       break;
     }

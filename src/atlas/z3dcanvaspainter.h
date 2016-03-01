@@ -14,6 +14,7 @@ class Z3DTexture;
 namespace nim {
 
 class Z3DCanvas;
+class Z3DCompositor;
 
 class Z3DCanvasPainter : public Z3DBoundedFilter
 {
@@ -32,7 +33,7 @@ public:
   const Z3DTexture* imageDepthTexture(Z3DEye eye) const;
 
   bool renderToImage(const QString &filename, Z3DScreenShotType sst);
-  bool renderToImage(const QString &filename, int width, int height, Z3DScreenShotType sst);
+  bool renderToImage(const QString &filename, int width, int height, Z3DScreenShotType sst, Z3DCompositor &compositor);
 
   QString renderToImageError() const;
 

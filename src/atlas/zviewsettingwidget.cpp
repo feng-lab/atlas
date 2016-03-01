@@ -17,6 +17,7 @@ ZViewSettingWidget::ZViewSettingWidget(ZDoc *doc, ZViewSettingInterface *view, Q
   m_defaultWidget = new QWidget(this);
   m_widget->addWidget(m_defaultWidget);
   layout->addWidget(m_widget);
+  layout->setMargin(0);
   setLayout(layout);
   connect(m_doc, SIGNAL(showViewSetting(size_t)), this, SLOT(showViewSettingWidgetOfObj(size_t)));
   connect(m_doc, SIGNAL(hideViewSetting()), this, SLOT(hideViewSettingWidget()));

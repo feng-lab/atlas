@@ -13,6 +13,7 @@ Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase &rendererBase)
   , m_gradientOrientation("Gradient Orientation")
   , m_mode("mode")
   , m_VAO(1)
+  , m_region(0,1,0,1)
 {
   m_firstColor.setStyle("COLOR");
   m_secondColor.setStyle("COLOR");
@@ -50,6 +51,11 @@ Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase &rendererBase)
     m_VAO.release();
   }
   CHECK_GL_ERROR;
+}
+
+void Z3DBackgroundRenderer::setRenderingRegion(double left, double right, double bottom, double top)
+{
+  m_region = glm::vec4(left, right-left, bottom, top-bottom);
 }
 
 void Z3DBackgroundRenderer::compile()
@@ -128,8 +134,10 @@ void Z3DBackgroundRenderer::render(Z3DEye eye)
   m_rendererBase.setGlobalShaderParameters(shader, eye);
 
   shader.setColor1Uniform(m_firstColor.get());
-  if (m_mode.get() != "Uniform")
+  if (m_mode.get() != "Uniform") {
     shader.setColor2Uniform(m_secondColor.get());
+    shader.setRegionUniform(m_region);
+  }
 
   if (m_hardwareSupportVAO) {
     m_VAO.bind();

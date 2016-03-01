@@ -293,7 +293,7 @@ void Z3DView::resetCameraClippingRange()
 void Z3DView::takeScreenShot(QString filename, int width, int height, Z3DScreenShotType sst)
 {
   m_lock = true;
-  if (!m_canvasPainter->renderToImage(filename, width, height, sst)) {
+  if (!m_canvasPainter->renderToImage(filename, width, height, sst, compositor())) {
     QMessageBox::critical(m_mainWin, "Error", m_canvasPainter->renderToImageError());
   }
   m_lock = false;
