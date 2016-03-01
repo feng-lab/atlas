@@ -198,7 +198,7 @@ void Z3DCompositor::savePickingBufferToImage(const QString &filename)
 void Z3DCompositor::setRenderingRegion(double left, double right, double bottom, double top)
 {
   m_backgroundRenderer.setRenderingRegion(left, right, bottom, top);
-  m_region = glm::vec4(left, right, bottom, top);
+  m_region = glm::vec4(left, right-left, bottom, top-bottom);
 }
 
 void Z3DCompositor::process(Z3DEye eye)
