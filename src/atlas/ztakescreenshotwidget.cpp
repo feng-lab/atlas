@@ -17,7 +17,7 @@
 namespace nim {
 
 ZTakeScreenShotWidget::ZTakeScreenShotWidget(bool is2D, bool group, QWidget *parent)
-  : QWidget(parent)
+  : QScrollArea(parent)
   , m_group(group)
   , m_mode("Mode")
   , m_captureStereoImage("Capture Stereo Image", false)
@@ -202,45 +202,66 @@ void ZTakeScreenShotWidget::createWidget()
 
   QHBoxLayout *hlo = nullptr;
   QWidget *wg = nullptr;
+  QLabel *label = nullptr;
 
   if (!m_is2D) {
     hlo = new QHBoxLayout;
-    hlo->addWidget(m_mode.createNameLabel());
+    label = m_mode.createNameLabel();
+    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    label->setMinimumWidth(125);
+    //label->setWordWrap(true);
+    hlo->addWidget(label);
     wg = m_mode.createWidget();
-    wg->setMinimumWidth(125);
+    wg->setMinimumWidth(175);
     wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
     hlo->addWidget(wg);
     lo->addLayout(hlo);
 
     hlo = new QHBoxLayout;
-    hlo->addWidget(m_captureStereoImage.createNameLabel());
+    label = m_captureStereoImage.createNameLabel();
+    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    label->setMinimumWidth(125);
+    //label->setWordWrap(true);
+    hlo->addWidget(label);
     wg = m_captureStereoImage.createWidget();
-    wg->setMinimumWidth(125);
+    wg->setMinimumWidth(175);
     wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
     hlo->addWidget(wg);
     lo->addLayout(hlo);
 
     hlo = new QHBoxLayout;
-    hlo->addWidget(m_stereoImageType.createNameLabel());
+    label = m_stereoImageType.createNameLabel();
+    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    label->setMinimumWidth(125);
+    //label->setWordWrap(true);
+    hlo->addWidget(label);
     wg = m_stereoImageType.createWidget();
-    wg->setMinimumWidth(125);
+    wg->setMinimumWidth(175);
     wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
     hlo->addWidget(wg);
     lo->addLayout(hlo);
   }
 
   hlo = new QHBoxLayout;
-  hlo->addWidget(m_useWindowSize.createNameLabel());
+  label = m_useWindowSize.createNameLabel();
+  label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+  label->setMinimumWidth(125);
+  //label->setWordWrap(true);
+  hlo->addWidget(label);
   wg = m_useWindowSize.createWidget();
-  wg->setMinimumWidth(125);
+  wg->setMinimumWidth(175);
   wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
   hlo->addWidget(wg);
   lo->addLayout(hlo);
 
   hlo = new QHBoxLayout;
-  hlo->addWidget(m_customSize.createNameLabel());
+  label = m_customSize.createNameLabel();
+  label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+  label->setMinimumWidth(125);
+  //label->setWordWrap(true);
+  hlo->addWidget(label);
   wg = m_customSize.createWidget();
-  wg->setMinimumWidth(125);
+  wg->setMinimumWidth(175);
   wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
   hlo->addWidget(wg);
   lo->addLayout(hlo);
@@ -254,33 +275,49 @@ void ZTakeScreenShotWidget::createWidget()
 
   if (!m_is2D) {
     hlo = new QHBoxLayout;
-    hlo->addWidget(m_axis.createNameLabel());
+    label = m_axis.createNameLabel();
+    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    label->setMinimumWidth(125);
+    //label->setWordWrap(true);
+    hlo->addWidget(label);
     wg = m_axis.createWidget();
-    wg->setMinimumWidth(125);
+    wg->setMinimumWidth(175);
     wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
     hlo->addWidget(wg);
     lo->addLayout(hlo);
 
     hlo = new QHBoxLayout;
-    hlo->addWidget(m_clockwise.createNameLabel());
+    label = m_clockwise.createNameLabel();
+    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    label->setMinimumWidth(125);
+    //label->setWordWrap(true);
+    hlo->addWidget(label);
     wg = m_clockwise.createWidget();
-    wg->setMinimumWidth(125);
+    wg->setMinimumWidth(175);
     wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
     hlo->addWidget(wg);
     lo->addLayout(hlo);
 
     hlo = new QHBoxLayout;
-    hlo->addWidget(m_timeInSecond.createNameLabel());
+    label = m_timeInSecond.createNameLabel();
+    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    label->setMinimumWidth(125);
+    //label->setWordWrap(true);
+    hlo->addWidget(label);
     wg = m_timeInSecond.createWidget();
-    wg->setMinimumWidth(125);
+    wg->setMinimumWidth(175);
     wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
     hlo->addWidget(wg);
     lo->addLayout(hlo);
 
     hlo = new QHBoxLayout;
-    hlo->addWidget(m_framePerSecond.createNameLabel());
+    label = m_framePerSecond.createNameLabel();
+    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    label->setMinimumWidth(125);
+    //label->setWordWrap(true);
+    hlo->addWidget(label);
     wg = m_framePerSecond.createWidget();
-    wg->setMinimumWidth(125);
+    wg->setMinimumWidth(175);
     wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
     hlo->addWidget(wg);
     lo->addLayout(hlo);
@@ -304,9 +341,13 @@ void ZTakeScreenShotWidget::createWidget()
 
   hlo = new QHBoxLayout;
   hlo->setContentsMargins(left+20, top, right, bottom);
-  hlo->addWidget(m_namePrefix.createNameLabel());
+  label = m_namePrefix.createNameLabel();
+  label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+  label->setMinimumWidth(50);
+  //label->setWordWrap(true);
+  hlo->addWidget(label);
   wg = m_namePrefix.createWidget();
-  wg->setMinimumWidth(125);
+  wg->setMinimumWidth(175);
   wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
   hlo->addWidget(wg);
   lo->addLayout(hlo);
@@ -323,15 +364,20 @@ void ZTakeScreenShotWidget::createWidget()
 
   m_useAutoName->click();
 
+  QWidget *widget = new QWidget();
   if (m_group) {
     m_groupBox = new QGroupBox(tr("capture"), this);
     m_groupBox->setLayout(lo);
     hlo = new QHBoxLayout;
     hlo->addWidget(m_groupBox);
-    setLayout(hlo);
+    widget->setLayout(hlo);
   } else {
-    setLayout(lo);
+    widget->setLayout(lo);
   }
+
+  setWidgetResizable(true);
+  setWidget(widget);
+  setFrameShape(QFrame::NoFrame);
 }
 
 } // namespace nim

@@ -148,6 +148,8 @@ QWidget *ZWidgetsGroup::createWidget(bool createBasic, bool scroll, QLabel *labe
     QScrollArea * sa = new QScrollArea();
     sa->setWidgetResizable(true);
     sa->setWidget(widget);
+    sa->setFrameShape(QFrame::NoFrame);
+    sa->setContentsMargins(0,0,0,0);
 
     //sa->setVisible(isVisible());
 

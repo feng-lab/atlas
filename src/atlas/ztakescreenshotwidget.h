@@ -3,6 +3,7 @@
 
 #include "z3dgl.h"
 #include <QWidget>
+#include <QScrollArea>
 #include <QDir>
 #include "zoptionparameter.h"
 #include "znumericparameter.h"
@@ -16,7 +17,7 @@ namespace nim {
 
 class ZSelectFileWidget;
 
-class ZTakeScreenShotWidget : public QWidget
+class ZTakeScreenShotWidget : public QScrollArea
 {
   Q_OBJECT
 public:
