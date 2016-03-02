@@ -1824,10 +1824,12 @@ void ZTiffWriter::writeIFD(const ZImg &img, int z, int t, int c, bool writeThumb
   TIFFSetField(m_tif.get(), TIFFTAG_IMAGEWIDTH, img.width());
   TIFFSetField(m_tif.get(), TIFFTAG_IMAGELENGTH, img.height());
   TIFFSetField(m_tif.get(), TIFFTAG_BITSPERSAMPLE, img.voxelByteNumber()*8);
-  if (c < 0)
+  if (c < 0) {
     TIFFSetField(m_tif.get(), TIFFTAG_SAMPLESPERPIXEL, img.numChannels());
-  else
+    photo = PHOTOMETRIC_RGB;
+  } else {
     TIFFSetField(m_tif.get(), TIFFTAG_SAMPLESPERPIXEL, 1);
+  }
   TIFFSetField(m_tif.get(), TIFFTAG_PLANARCONFIG, PLANARCONFIG_SEPARATE);
   TIFFSetField(m_tif.get(), TIFFTAG_PHOTOMETRIC, photo);
   TIFFSetField(m_tif.get(), TIFFTAG_COMPRESSION, m_compression);
@@ -1884,7 +1886,7 @@ void ZTiffWriter::writeIFD(const ZImg &img, int z, int t, int c, bool writeThumb
 Compression ZTiffWriter::defaultCompression(const ZImg *img)
 {
   const Compression list[] = {
-    Compression::ADOBE_DEFLATE, Compression::LZW, Compression::PACKBITS
+    Compression::LZW, Compression::ADOBE_DEFLATE, Compression::PACKBITS
   };
   for (size_t i=0; i<std::extent<decltype(list)>::value; ++i)
     if (checkCompression(img, list[i]))

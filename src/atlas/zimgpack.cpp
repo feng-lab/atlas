@@ -181,8 +181,8 @@ ZImgPack::ZImgPack(const QString &fileName, size_t scene, FileFormat format, siz
   } else if (hasPyramidal || !needScale) {
     buildFastReadIndex(*sceneSubBlock);
   } else {
-    buildFastReadIndex(*sceneSubBlock);
-    //buildPyramidal();
+    //buildFastReadIndex(*sceneSubBlock);
+    buildPyramidal();
   }
 
   updateDerivedData();

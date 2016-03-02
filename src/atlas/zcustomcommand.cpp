@@ -727,7 +727,7 @@ void moveObjectToCorrectLocation()
       modifyJsonValue(sceneObj, IDString + ".View3D.Use Same Size Bool", QJsonValue(true));
       modifyJsonValue(sceneObj, IDString + ".View3D.Size Scale Float", QJsonValue("4"));
       modifyJsonValue(sceneObj, IDString + ".View3D.Color Mode StringIntOption", QJsonValue("Single Color"));
-      modifyJsonValue(sceneObj, IDString + ".View3D.Puncta Color Vec4", QJsonValue(toQString(glm::vec4(0,1,1,1))));
+      modifyJsonValue(sceneObj, IDString + ".View3D.Puncta Color Vec4", QJsonValue(toQString(glm::vec4(1,1,0,1))));
     }
     glm::dvec3 loc = cellNameToLocations.at(filename);
     QString locString = toQString(loc);

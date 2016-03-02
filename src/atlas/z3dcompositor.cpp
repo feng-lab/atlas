@@ -1325,9 +1325,9 @@ void Z3DCompositor::prepareAxisData(Z3DEye eye)
   m_textPositions.push_back(m_YEnd*glm::vec3(0.93));
   m_textPositions.push_back(m_ZEnd*glm::vec3(0.93));
   QStringList texts;
-  texts.push_back("X");
-  texts.push_back("Y");
-  texts.push_back("Z");
+  texts.push_back("ML");
+  texts.push_back("DV");
+  texts.push_back("AP");
 
   m_fontRenderer.setData(&m_textPositions, texts);
 }
