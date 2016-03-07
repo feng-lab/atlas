@@ -174,9 +174,9 @@ exists(/opt/intel/tbb/include) {
 
     ITKVersion = 4.10
     ITKPath = $$PWD/../3rdparty/itk
-    INCLUDEPATH += $$ITKPath/include/ITK-$$ITKVersion
+    INCLUDEPATH += $$ITKPath/include/ITK-$$ITKVersion $$ITKPath/include/vxl/vcl $$ITKPath/include/vxl/core
     LIBS += -L$$ITKPath/lib -lITKCommon-$$ITKVersion -lITKVNLInstantiation-$$ITKVersion -litkvnl_algo-$$ITKVersion -litkvnl-$$ITKVersion \
-      -lITKLabelMap-$$ITKVersion -litkv3p_netlib-$$ITKVersion -litkvcl-$$ITKVersion -litkv3p_lsqr-$$ITKVersion -lITKStatistics-$$ITKVersion \
+      -lITKLabelMap-$$ITKVersion -litkv3p_netlib-$$ITKVersion -litkvcl-$$ITKVersion -lITKStatistics-$$ITKVersion \
       -litksys-$$ITKVersion -litkdouble-conversion-$$ITKVersion -litkNetlibSlatec-$$ITKVersion -lITKMetaIO-$$ITKVersion \
       -lITKIOImageBase-$$ITKVersion -lITKIONIFTI-$$ITKVersion -lITKniftiio-$$ITKVersion -lITKznz-$$ITKVersion \
       -lITKIONRRD-$$ITKVersion -lITKNrrdIO-$$ITKVersion \
@@ -227,7 +227,7 @@ win32 {
     ITKPath = "$$PWD\..\3rdparty\itk"
     INCLUDEPATH += $$ITKPath\include\ITK-$$ITKVersion
     LIBS += -L$$ITKPath\lib -lITKCommon-$$ITKVersion -lITKVNLInstantiation-$$ITKVersion -litkvnl_algo-$$ITKVersion -litkvnl-$$ITKVersion \
-      -lITKLabelMap-$$ITKVersion -litkv3p_netlib-$$ITKVersion -litkvcl-$$ITKVersion -litkv3p_lsqr-$$ITKVersion -lITKStatistics-$$ITKVersion \
+      -lITKLabelMap-$$ITKVersion -litkv3p_netlib-$$ITKVersion -litkvcl-$$ITKVersion -lITKStatistics-$$ITKVersion \
       -litksys-$$ITKVersion -litkdouble-conversion-$$ITKVersion -litkNetlibSlatec-$$ITKVersion -lITKMetaIO-$$ITKVersion \
       -lITKIOImageBase-$$ITKVersion -lITKIONIFTI-$$ITKVersion -lITKniftiio-$$ITKVersion -lITKznz-$$ITKVersion \
       -lITKIONRRD-$$ITKVersion -lITKNrrdIO-$$ITKVersion \
