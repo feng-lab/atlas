@@ -941,14 +941,18 @@ void ZTiff::readImgFromIFD(size_t ifdIdx, ZImg &img)
 {
   if (TIFFSetDirectory(m_tif.get(), ifdIdx) != 1)
     throw ZIOException(QString("Can not read ifd of index %1").arg(ifdIdx));
-  readImg(img, m_ifds[ifdIdx].extraSample() != EXTRASAMPLE_UNASSALPHA);
+  readImg(img,
+          m_ifds[ifdIdx].extraSample() == EXTRASAMPLE_ASSOCALPHA ||
+          m_ifds[ifdIdx].extraSample() == EXTRASAMPLE_UNSPECIFIED);
 }
 
 void ZTiff::readImgFromIFD(const ZTiffIFD &ifd, ZImg &img)
 {
   if (TIFFSetSubDirectory(m_tif.get(), ifd.offset()) != 1)
     throw ZIOException(QString("Can not read ifd at offset %1").arg(ifd.offset()));
-  readImg(img, ifd.extraSample() != EXTRASAMPLE_UNASSALPHA);
+  readImg(img,
+          ifd.extraSample() == EXTRASAMPLE_ASSOCALPHA ||
+          ifd.extraSample() == EXTRASAMPLE_UNSPECIFIED);
 }
 
 ZImg ZTiff::readThumbnailFromIFD(const ZTiffIFD &ifd)
@@ -1826,7 +1830,9 @@ void ZTiffWriter::writeIFD(const ZImg &img, int z, int t, int c, bool writeThumb
   TIFFSetField(m_tif.get(), TIFFTAG_BITSPERSAMPLE, img.voxelByteNumber()*8);
   if (c < 0) {
     TIFFSetField(m_tif.get(), TIFFTAG_SAMPLESPERPIXEL, img.numChannels());
-    photo = PHOTOMETRIC_RGB;
+    if (img.numChannels() > 1) {
+      photo = PHOTOMETRIC_RGB;
+    }
   } else {
     TIFFSetField(m_tif.get(), TIFFTAG_SAMPLESPERPIXEL, 1);
   }

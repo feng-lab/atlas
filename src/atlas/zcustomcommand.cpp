@@ -622,11 +622,14 @@ void makeAxonChannelImages()
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
   for (int i=0; i<list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
+    QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
+    if (QFileInfo::exists(outname)) {
+      continue;
+    }
     LINFO() << i << list.size() << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,axonChannel,axonChannel+1));
     img.zoom(0.25, 0.25);
     img.normalize(11, 50);
-    QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
     img.save(outname, FileFormat::Tiff, Compression::LZW);
   }
 
@@ -637,11 +640,14 @@ void makeAxonChannelImages()
   list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
   for (int i=0; i<list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
+    QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
+    if (QFileInfo::exists(outname)) {
+      continue;
+    }
     LINFO() << i << list.size() << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,axonChannel,axonChannel+1));
     img.zoom(0.25, 0.25);
     img.normalize(11, 50);
-    QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
     img.save(outname, FileFormat::Tiff, Compression::LZW);
   }
 
@@ -652,11 +658,14 @@ void makeAxonChannelImages()
   list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
   for (int i=0; i<list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
+    QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
+    if (QFileInfo::exists(outname)) {
+      continue;
+    }
     LINFO() << i << list.size() << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,axonChannel,axonChannel+1));
     img.zoom(0.25, 0.25);
     img.normalize(11, 50);
-    QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
     img.save(outname, FileFormat::Tiff, Compression::LZW);
   }
 }
@@ -763,7 +772,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  moveObjectToCorrectLocation();
+  changeImgCompressionType();
   LINFO() << "done";
 }
 

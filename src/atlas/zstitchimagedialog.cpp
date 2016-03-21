@@ -1764,7 +1764,7 @@ void ZStitchImageDialog::selectOutputFile() {
   QString outputFileName = QFileDialog::getSaveFileName(this,
                                                   tr("specify output file"),
                                                   ZSystemInfoInstance.lastOpenedImagePath(),
-                                                  tr("Output Image (*.tif)"));
+                                                  tr("Output Image (*.tif *.v3draw)"));
   if (!outputFileName.isEmpty()) {
     ZSystemInfoInstance.setLastOpenedImagePath(outputFileName);
     m_outputFileEdit->setText(outputFileName);
