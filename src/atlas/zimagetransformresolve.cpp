@@ -199,7 +199,7 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
     }
   }
 
-  LINFO() << "transform resolve summary:\n" << summ;
+  LINFO() << "transform resolve summary:\n" << qPrintable(summ);
   if (summary)
     summ.swap(*summary);
 

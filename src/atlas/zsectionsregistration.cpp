@@ -583,8 +583,14 @@ void ZSectionsRegistration::calcSecInfs()
       if (data[j] > 0)
         dataWithoutZero.push_back(data[j]);
     }
-    meanAndStandardDeviation(dataWithoutZero.begin(), dataWithoutZero.end(), m_sectionInfos[i].mean, m_sectionInfos[i].std);
-    m_sectionInfos[i].median = medianInPlace(dataWithoutZero.begin(), dataWithoutZero.end());
+    if (dataWithoutZero.empty()) {
+      m_sectionInfos[i].mean = 0;
+      m_sectionInfos[i].std = 0;
+      m_sectionInfos[i].median = 0;
+    } else {
+      meanAndStandardDeviation(dataWithoutZero.begin(), dataWithoutZero.end(), m_sectionInfos[i].mean, m_sectionInfos[i].std);
+      m_sectionInfos[i].median = medianInPlace(dataWithoutZero.begin(), dataWithoutZero.end());
+    }
   }
 }
 
