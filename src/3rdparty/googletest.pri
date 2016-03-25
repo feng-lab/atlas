@@ -1,4 +1,4 @@
-INCLUDEPATH += $$PWD/googletest/include
+INCLUDEPATH += $$PWD/googletest/include $$PWD/googletest
 
 #DEFINES += _USE_GTEST_
 
