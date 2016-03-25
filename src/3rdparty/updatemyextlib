@@ -86,3 +86,5 @@ fi
 srcArchive=$srcPackageDIR/glm-master.zip
 7z x -y -o$currDIR "$srcArchive"
 mv $currDIR/glm-master $currDIR/glm
+
+cp -rf $baseDIR/googletest/googletest/ $currDIR/googletest/

@@ -502,7 +502,7 @@ contains(CONFIG, use_glbinding) {
 
 contains(CONFIG, with_tests) {
     DEFINES += _WITH_TESTS_
-    include($$PWD/../3rdparty/gtest.pri)
+    include($$PWD/../3rdparty/googletest.pri)
 
     HEADERS += \
       zunittest.h \

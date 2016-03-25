@@ -41,6 +41,7 @@
 /src/3rdparty/boost/
 /src/3rdparty/eigen/
 /src/3rdparty/glm/
+/src/3rdparty/googletest/
 ffmpeg
 
 # binary file
