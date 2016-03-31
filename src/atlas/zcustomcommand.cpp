@@ -623,14 +623,18 @@ void makeAxonChannelImages()
   for (int i=0; i<list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
-    if (QFileInfo::exists(outname)) {
+    QString outname1 = outFolder.absoluteFilePath(fileInfo.baseName() + "_rb.tif");
+    if (QFileInfo::exists(outname) && QFileInfo::exists(outname1)) {
       continue;
     }
     LINFO() << i << list.size() << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,axonChannel,axonChannel+1));
     img.zoom(0.25, 0.25);
-    img.normalize(11, 50);
+    ZImg img1 = img;
+    img.normalize(0, 50);
     img.save(outname, FileFormat::Tiff, Compression::LZW);
+    img1.normalize(11, 50);
+    img1.save(outname1, FileFormat::Tiff, Compression::LZW);
   }
 
   dir = QDir("/Volumes/PVPY/ipsi");
@@ -641,14 +645,18 @@ void makeAxonChannelImages()
   for (int i=0; i<list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
-    if (QFileInfo::exists(outname)) {
+    QString outname1 = outFolder.absoluteFilePath(fileInfo.baseName() + "_rb.tif");
+    if (QFileInfo::exists(outname) && QFileInfo::exists(outname1)) {
       continue;
     }
     LINFO() << i << list.size() << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,axonChannel,axonChannel+1));
     img.zoom(0.25, 0.25);
-    img.normalize(11, 50);
+    ZImg img1 = img;
+    img.normalize(0, 50);
     img.save(outname, FileFormat::Tiff, Compression::LZW);
+    img1.normalize(11, 50);
+    img1.save(outname1, FileFormat::Tiff, Compression::LZW);
   }
 
   dir = QDir("/Volumes/PVPY/Py");
@@ -659,14 +667,18 @@ void makeAxonChannelImages()
   for (int i=0; i<list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
-    if (QFileInfo::exists(outname)) {
+    QString outname1 = outFolder.absoluteFilePath(fileInfo.baseName() + "_rb.tif");
+    if (QFileInfo::exists(outname) && QFileInfo::exists(outname1)) {
       continue;
     }
     LINFO() << i << list.size() << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,axonChannel,axonChannel+1));
     img.zoom(0.25, 0.25);
-    img.normalize(11, 50);
+    ZImg img1 = img;
+    img.normalize(0, 50);
     img.save(outname, FileFormat::Tiff, Compression::LZW);
+    img1.normalize(11, 50);
+    img1.save(outname1, FileFormat::Tiff, Compression::LZW);
   }
 }
 
@@ -772,7 +784,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  changeImgCompressionType();
+  makeAxonChannelImages();
   LINFO() << "done";
 }
 

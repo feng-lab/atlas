@@ -182,7 +182,7 @@ public:
       m_decimal = 3;
     }
     m_tracking = true;
-    for (size_t i=0; i<this->m_value.size(); i++) {
+    for (size_t i=0; i<this->m_value.length(); i++) {
       if (this->m_value[i] < m_min[i])
         this->m_value[i] = m_min[i];
       if (this->m_value[i] > m_max[i])
@@ -202,7 +202,7 @@ public:
 
   void setNameForEachValue(const QList<QString> &other)
   {
-    if (static_cast<size_t>(other.size()) >= this->m_value.size())
+    if (static_cast<size_t>(other.size()) >= this->m_value.length())
       m_nameOfEachValue = other;
     else
       LERROR() << "input names do not have enough member";
@@ -221,7 +221,7 @@ public:
 protected:
   virtual void makeValid(T& value) const override
   {
-    for (size_t i=0; i<this->m_value.size(); i++) {
+    for (size_t i=0; i<this->m_value.length(); i++) {
       if (value[i] < m_min[i])
         value[i] = m_min[i];
       if (value[i] > m_max[i])

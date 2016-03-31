@@ -23,26 +23,26 @@ fi
 srcArchive=$srcPackageDIR/libjpeg-turbo-1.4.2.tar.gz
 tar -zxf "$srcArchive" -C $baseDIR
 
-if [ -d $baseDIR/hdf5-1.8.16 ]
+if [ -d $baseDIR/hdf5-1.10.0 ]
 then
-  rm -rf $baseDIR/hdf5-1.8.16
+  rm -rf $baseDIR/hdf5-1.10.0
 fi
-srcArchive=$srcPackageDIR/hdf5-1.8.16.tar.bz2
+srcArchive=$srcPackageDIR/hdf5-1.10.0.tar.bz2
 tar -jxf "$srcArchive" -C $baseDIR
 
 if [ -d $baseDIR/GeometricTools ]
 then
   rm -rf $baseDIR/GeometricTools
 fi
-srcArchive=$srcPackageDIR/GeometricTools/GeometricToolsEngine2p2.zip
+srcArchive=$srcPackageDIR/GeometricTools/GeometricToolsEngine2p3.zip
 7z x -y -o$baseDIR "$srcArchive"
 
 if [[ "$OSTYPE" == "msys" ]]; then
-  if [ -d $baseDIR/ispc-v1.8.2-windows ]
+  if [ -d $baseDIR/ispc-v1.9.0-windows-vs2015 ]
   then
-    rm -rf $baseDIR/ispc-v1.8.2-windows
+    rm -rf $baseDIR/ispc-v1.9.0-windows-vs2015
   fi
-  srcArchive=$srcPackageDIR/ispc-v1.8.2-windows.zip
+  srcArchive=$srcPackageDIR/ispc-v1.9.0-windows-vs2015.zip
   7z x -y -o$baseDIR "$srcArchive"
 
   if [ -d $baseDIR/zlib-1.2.8 ]
@@ -52,14 +52,14 @@ if [[ "$OSTYPE" == "msys" ]]; then
   srcArchive=$srcPackageDIR/zlib128.zip
   7z x -y -o$baseDIR "$srcArchive"
 else
-  if [ -d $baseDIR/ispc-v1.8.2-osx ]
+  if [ -d $baseDIR/ispc-v1.9.0-osx ]
   then
-    rm -rf $baseDIR/ispc-v1.8.2-osx
+    rm -rf $baseDIR/ispc-v1.9.0-osx
   fi
-  srcArchive=$srcPackageDIR/ispc-v1.8.2-osx.tar.gz
+  srcArchive=$srcPackageDIR/ispc-v1.9.0-osx.tar.gz
   tar -zxf "$srcArchive" -C $baseDIR
 
-  srcArchive=$srcPackageDIR/ffmpeg-3.0.7z
+  srcArchive=$srcPackageDIR/ffmpeg-3.0.1.7z
   7z x -y -o$baseDIR/atlas "$srcArchive"
 fi
 

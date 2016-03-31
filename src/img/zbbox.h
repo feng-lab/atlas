@@ -14,7 +14,7 @@ public:
   // inverse box
   inline ZBBox()
   {
-    for (size_t i=0; i<m_minCorner.size(); ++i) {
+    for (size_t i=0; i<m_minCorner.length(); ++i) {
       m_minCorner[i] = std::numeric_limits<typename Point::value_type>::max();
       m_maxCorner[i] = std::numeric_limits<typename Point::value_type>::min();
     }
@@ -47,7 +47,7 @@ public:
   inline void setMaxCorner(const Point& mc) { m_maxCorner = mc; }
 
   //
-  inline bool empty() const { for (size_t i=0; i<m_minCorner.size(); ++i) if (m_minCorner[i] > m_maxCorner[i]) return true; return false; }
+  inline bool empty() const { for (size_t i=0; i<m_minCorner.length(); ++i) if (m_minCorner[i] > m_maxCorner[i]) return true; return false; }
   //
   inline Point size() const { return m_maxCorner - m_minCorner; }
   //
@@ -55,7 +55,7 @@ public:
   {
     Point sz = size();
     typename Point::value_type res = 1;
-    for (size_t i=0; i<sz.size(); ++i) {
+    for (size_t i=0; i<sz.length(); ++i) {
       res *= sz[i];
     }
     return res;
@@ -81,12 +81,12 @@ public:
   //
   inline bool contains(const ZBBox& other) const
   {
-    for (size_t i = 0 ; i < m_minCorner.size(); ++i) if (other.m_minCorner[i] < m_minCorner[i] || other.m_maxCorner[i] > m_maxCorner[i]) return false;
+    for (size_t i = 0 ; i < m_minCorner.length(); ++i) if (other.m_minCorner[i] < m_minCorner[i] || other.m_maxCorner[i] > m_maxCorner[i]) return false;
     return true;
   }
   inline bool contains(const Point& other) const
   {
-    for (size_t i = 0 ; i < m_minCorner.size(); ++i) if (other[i] < m_minCorner[i] || other[i] > m_maxCorner[i]) return false;
+    for (size_t i = 0 ; i < m_minCorner.length(); ++i) if (other[i] < m_minCorner[i] || other[i] > m_maxCorner[i]) return false;
     return true;
   }
   inline bool containedBy(const ZBBox& other) const { return other.contains(*this); }
@@ -94,13 +94,13 @@ public:
   inline bool disjoint(const ZBBox& other) const
   {
     const Point sz = min(other.m_maxCorner, m_maxCorner) - max(other.m_minCorner, m_minCorner);
-    for (size_t i = 0 ; i < sz.size(); ++i) if (sz[i] < 0) return true;
+    for (size_t i = 0 ; i < sz.length(); ++i) if (sz[i] < 0) return true;
     return false;
   }
   inline bool disjoint(const Point& other) const
   {
     const Point sz = min(other, m_maxCorner) - max(other, m_minCorner);
-    for (size_t i = 0 ; i < sz.size(); ++i) if (sz[i] < 0) return true;
+    for (size_t i = 0 ; i < sz.length(); ++i) if (sz[i] < 0) return true;
     return false;
   }
   // tests if bounding boxes (and points) are conjoint (non-empty intersection)

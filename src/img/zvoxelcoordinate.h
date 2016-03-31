@@ -64,6 +64,7 @@ struct ZVoxelCoordinate
   }
 
   inline constexpr size_t size() const { return 5; }
+  inline constexpr size_t length() const { return 5; }
 
   // access
   inline value_type& operator[](size_t i) { return (&x)[i]; }

@@ -229,7 +229,7 @@ protected:
     ZVoxelCoordinate coordAdvance = ZImg::indexToCoord(n, m_regionInfo);
     ZVoxelCoordinate::value_type carry = 0;
     m_coord -= m_region.start;
-    for (size_t i=0; i<m_coord.size() - 1; ++i) {
+    for (size_t i=0; i<m_coord.length() - 1; ++i) {
       m_coord[i] += coordAdvance[i];
       m_coord[i] += carry;
       if (m_coord[i] >= (ZVoxelCoordinate::value_type)m_regionInfo.size(i)) {

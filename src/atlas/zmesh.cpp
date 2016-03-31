@@ -74,7 +74,7 @@ vtkSmartPointer<vtkPolyData> meshToVtkPolyData(const nim::ZMesh &mesh)
   nrmls->Allocate(3*normals.size());
   nrmls->SetName("Normals");
   for (size_t i=0; i<normals.size(); ++i) {
-    nrmls->InsertTupleValue(i, &normals[i][0]);
+    nrmls->InsertTuple(i, &normals[i][0]);
   }
 
   vtkSmartPointer<vtkCellArray> polys = vtkSmartPointer<vtkCellArray>::New();
