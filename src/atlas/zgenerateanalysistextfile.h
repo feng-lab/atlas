@@ -129,6 +129,7 @@ protected:
                      std::map<SwcTreeNode, double> &nodeDistToParent,
                      std::map<SwcTreeNode, double> &nodeDistToBranchStart,
                      std::map<SwcTreeNode, double> &nodeDistToSoma,
+                     std::map<SwcTreeNode, int> &nodeTopologyType,
                      std::vector<Branch> &branches) const;
 
   // punctum belongs to returned tree node and its parent

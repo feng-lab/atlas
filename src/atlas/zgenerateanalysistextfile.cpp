@@ -535,6 +535,7 @@ size_t ZGenerateAnalysisTextFile::labelBranch(ZSwc &tree,
                                               std::map<SwcTreeNode, double> &nodeDistToParent,
                                               std::map<SwcTreeNode, double> &nodeDistToBranchStart,
                                               std::map<SwcTreeNode, double> &nodeDistToSoma,
+                                              std::map<SwcTreeNode, int> &nodeTopologyType,
                                               std::vector<Branch> &branches) const
 {
   nodeToBranchId.clear();
@@ -554,7 +555,14 @@ size_t ZGenerateAnalysisTextFile::labelBranch(ZSwc &tree,
       nodeDistToParent[tn] = 0;
       nodeDistToBranchStart[tn] = 0;
       nodeDistToSoma[tn] = 0;
+      nodeTopologyType[tn] = 1;
       continue;
+    } else if (ZSwc::isBranchNode(tn)) {
+      nodeTopologyType[tn] = 2;
+    } else if (ZSwc::isLeaf(tn)) {
+      nodeTopologyType[tn] = 3;
+    } else {
+      nodeTopologyType[tn] = 0;
     }
     SwcTreeNode parent = ZSwc::parent(tn);
 
@@ -777,10 +785,11 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
   std::map<SwcTreeNode, double> nodeDistToParent;
   std::map<SwcTreeNode, double> nodeDistToBranchStart;
   std::map<SwcTreeNode, double> nodeDistToSoma;
+  std::map<SwcTreeNode, int> nodeTopologyType;
   std::map<SwcTreeNode, std::vector<const ZPunctum*>> nodeToPuncta;
   std::vector<Branch> branches;
   labelBranch(tree, nodeToBranchId, branchIdToParentBranchId,
-              nodeDistToParent, nodeDistToBranchStart, nodeDistToSoma, branches);
+              nodeDistToParent, nodeDistToBranchStart, nodeDistToSoma, nodeTopologyType, branches);
   punctaList = ZPuncta(m_input.punctaFilename);
   std::map<const ZPunctum*, SwcTreeNode> punctumToNode;
   std::map<const ZPunctum*, double> punctumDistToBranchStart;
@@ -816,7 +825,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
 
   std::ofstream branchStream;
   openFileStream(branchStream, branchFilename, std::ios_base::out | std::ios_base::trunc);
-  branchStream << "# branch id, type, x, y, z, radius, blueness, layer" << std::endl;
+  branchStream << "# branch id, type, x, y, z, radius, blueness, layer, topological type, distToBranchStart, distToSoma" << std::endl;
 
   for (size_t i=0; i<branches.size(); ++i) {
     Branch &branch = branches[i];
@@ -825,7 +834,11 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
       branchStream << branch.id << " " << tn->type << " "
                    << tn->x << " " << tn->y << " "
                    << tn->z << " " << tn->radius << " "
-                   << nodeToBlueness[tn] << " " << nodeToLayer[tn] << std::endl;
+                   << nodeToBlueness[tn] << " "
+                   << nodeToLayer[tn] << " "
+                   << nodeTopologyType[tn] << " "
+                   << nodeDistToBranchStart[tn] << " "
+                   << nodeDistToSoma[tn] << std::endl;
     }
   }
   branchStream.close();
@@ -872,7 +885,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
 
     std::ofstream outSwcTxtStream;
     openFileStream(outSwcTxtStream, outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
-    outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer" << std::endl;
+    outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, distToBranchStart, distToSoma" << std::endl;
 
     std::ofstream outPunctaTxtStream;
     openFileStream(outPunctaTxtStream, outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
@@ -894,7 +907,11 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
       outSwcTxtStream << tn->type << " " << tn->x << " "
                       << tn->y << " "
                       << tn->z << " " << tn->radius << " "
-                      << nodeToBlueness[tn] << " " << nodeToLayer[tn] << std::endl;
+                      << nodeToBlueness[tn] << " "
+                      << nodeToLayer[tn] << " "
+                      << nodeTopologyType[tn] << " "
+                      << nodeDistToBranchStart[tn] << " "
+                      << nodeDistToSoma[tn] << std::endl;
 
       if (j > 0) {
         std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
@@ -962,7 +979,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
 
       std::ofstream outSwcTxtStream;
       openFileStream(outSwcTxtStream, outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
-      outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer" << std::endl;
+      outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, distToBranchStart, distToSoma" << std::endl;
 
       std::ofstream outPunctaTxtStream;
       openFileStream(outPunctaTxtStream, outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
@@ -993,7 +1010,11 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
           outSwcTxtStream << btn->type << " " << btn->x << " "
                           << btn->y << " "
                           << btn->z << " " << btn->radius << " "
-                          << nodeToBlueness[btn] << " " << nodeToLayer[btn] << std::endl;
+                          << nodeToBlueness[btn] << " "
+                          << nodeToLayer[btn] << " "
+                          << nodeTopologyType[btn] << " "
+                          << nodeDistToBranchStart[btn] << " "
+                          << nodeDistToSoma[btn] << std::endl;
 
           // don't need to skip i == 0 and j == 0 case because btn will be soma and there
           // should be no puncta for soma
@@ -1115,7 +1136,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
 
       std::ofstream outSwcTxtStream;
       openFileStream(outSwcTxtStream, outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
-      outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer" << std::endl;
+      outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, distToBranchStart, distToSoma" << std::endl;
 
       std::ofstream outPunctaTxtStream;
       openFileStream(outPunctaTxtStream, outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
@@ -1138,7 +1159,11 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
         outSwcTxtStream << tn->type << " " << tn->x << " "
                         << tn->y << " "
                         << tn->z << " " << tn->radius << " "
-                        << nodeToBlueness[tn] << " " << nodeToLayer[tn] << std::endl;
+                        << nodeToBlueness[tn] << " "
+                        << nodeToLayer[tn] << " "
+                        << nodeTopologyType[tn] << " "
+                        << nodeDistToBranchStart[tn] << " "
+                        << nodeDistToSoma[tn] << std::endl;
 
         if (j > 0) {
           std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
@@ -1202,7 +1227,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
 
         std::ofstream outSwcTxtStream;
         openFileStream(outSwcTxtStream, outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
-        outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer" << std::endl;
+        outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, distToBranchStart, distToSoma" << std::endl;
 
         std::ofstream outPunctaTxtStream;
         openFileStream(outPunctaTxtStream, outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
@@ -1224,7 +1249,11 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
           outSwcTxtStream << tn->type << " " << tn->x << " "
                           << tn->y << " "
                           << tn->z << " " << tn->radius << " "
-                          << nodeToBlueness[tn] << " " << nodeToLayer[tn] << std::endl;
+                          << nodeToBlueness[tn] << " "
+                          << nodeToLayer[tn] << " "
+                          << nodeTopologyType[tn] << " "
+                          << nodeDistToBranchStart[tn] << " "
+                          << nodeDistToSoma[tn] << std::endl;
 
           if (j > 0) {
             std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
