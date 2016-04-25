@@ -209,8 +209,10 @@ std::shared_ptr<ZWidgetsGroup> ZImgFilter::viewSettingWidgetsGroup()
 
 void ZImgFilter::offsetChanged()
 {
-  //m_doc.setImgOffset(m_id, m_offsetPara->get().x, m_offsetPara->get().y,
-  //                    m_offsetPara->get().z, m_offsetPara->get().w);
+  m_imgPack->setOffsetX(m_offsetPara.get().x);
+  m_imgPack->setOffsetY(m_offsetPara.get().y);
+  m_imgPack->setOffsetZ(m_offsetPara.get().z);
+  m_imgPack->setOffsetT(m_offsetPara.get().w);
   ZObjFilter::offsetChanged();
   m_displayValid = false;
   if (m_view.isMaxZProjView())
@@ -310,7 +312,7 @@ void ZImgFilter::channelColorChanged()
     }
     if (m_channelVisibleParas[c]->get()) {  // only redraw if this channel is visible
       col4 col(para->get().r * 255, para->get().g * 255, para->get().b * 255);
-      m_imgPack->imgInfoRef().channelColors[c] = col;
+      m_imgPack->setChannelColor(c, col);
       m_displayValid = false;
     }
   } else {

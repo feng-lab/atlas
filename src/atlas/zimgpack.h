@@ -72,6 +72,8 @@ public:
   inline const QString& name() const { return m_name; }
   inline const QString& tooltip() const { return m_tooltip; }
 
+  void setChannelColor(size_t c, col4 col);
+
   ZImgInfo& imgInfoRef() { return m_imgInfo; }
   const ZImgSource& imgSource() const { return m_imgSource; }
   const QStringList& paths() const { return m_imgSource.filenames; }

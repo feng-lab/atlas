@@ -179,7 +179,8 @@ ZImgPack::ZImgPack(const QString &fileName, size_t scene, FileFormat format, siz
     m_diskCached = false;
     ZImgIOInstance.readImg(m_imgSource, m_img);
   } else if (hasPyramidal || !needScale) {
-    buildFastReadIndex(*sceneSubBlock);
+    //buildFastReadIndex(*sceneSubBlock);
+    buildPyramidal();
   } else {
     //buildFastReadIndex(*sceneSubBlock);
     buildPyramidal();
@@ -287,6 +288,15 @@ const QString &ZImgPack::detailedInfo() const
     m_detailedInfo = info.join("\n");
   }
   return m_detailedInfo;
+}
+
+void ZImgPack::setChannelColor(size_t c, col4 col)
+{
+  assert(c < m_imgInfo.numChannels);
+  m_imgInfo.channelColors[c] = col;
+  if (!m_diskCached) {
+    m_img.infoRef().channelColors[c] = col;
+  }
 }
 
 void ZImgPack::save(QString fileName, FileFormat format, Compression comp)
