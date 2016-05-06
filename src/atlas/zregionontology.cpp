@@ -28,6 +28,7 @@
 #include <vtkUnstructuredGrid.h>
 #include <vtkCellArray.h>
 #include <vtkQuadricDecimation.h>
+#include <vtkPolyDataNormals.h>
 
 namespace nim {
 
@@ -470,15 +471,26 @@ void binaryImgToMesh(const ZImg &img, ZMesh &msh)
   outputPolydata = decimate->GetOutput();
   vtkPoints* points = outputPolydata->GetPoints();
   vtkCellArray* polys = outputPolydata->GetPolys();
-  vtkDataArray* pointsNormals = outputPolydata->GetPointData()->GetNormals();
+  //  vtkDataArray* pointsNormals = outputPolydata->GetPointData()->GetNormals();
+  //  if (!pointsNormals) {
+  //    // Generate normals
+  //    vtkSmartPointer<vtkPolyDataNormals> normalGenerator = vtkSmartPointer<vtkPolyDataNormals>::New();
+  //    normalGenerator->SetInputData(outputPolydata);
+  //    normalGenerator->ComputePointNormalsOn();
+  //    normalGenerator->ComputeCellNormalsOff();   //todo: check other options
+  //    normalGenerator->Update();
+
+  //    outputPolydata = normalGenerator->GetOutput();
+  //    pointsNormals = outputPolydata->GetPointData()->GetNormals();
+  //  }
 
   std::vector<glm::dvec3> vertices(points->GetNumberOfPoints());
-  std::vector<glm::dvec3> normals(pointsNormals->GetNumberOfTuples());
-  assert(vertices.size() == normals.size());
+  //std::vector<glm::dvec3> normals(pointsNormals->GetNumberOfTuples());
+  //assert(vertices.size() == normals.size());
   std::vector<GLuint> indices;
   for (vtkIdType id=0; id<points->GetNumberOfPoints(); ++id) {
     points->GetPoint(id, &vertices[id][0]);
-    pointsNormals->GetTuple(id, &normals[id][0]);
+    //pointsNormals->GetTuple(id, &normals[id][0]);
   }
   vtkIdType npts;
   vtkIdType *pts;
@@ -497,7 +509,8 @@ void binaryImgToMesh(const ZImg &img, ZMesh &msh)
   msh.clear();
   msh.setVertices(vertices);
   msh.setIndices(indices);
-  msh.setNormals(normals);
+  //msh.setNormals(normals);
+  msh.generateNormals();
 }
 
 struct ContourNode {

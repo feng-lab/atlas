@@ -422,8 +422,8 @@ bool ZRegionAnnotationDoc::saveRegionAnnotation(RegionAnnotationPack *pack, cons
     pack->regionAnnotation->save(fileName);
     pack->path = QFileInfo(fileName).canonicalFilePath();
     pack->regionAnnotation->undoStack()->setClean();
-    //pack->hasUnsavedChange = false;
-    //pack->updateDerivedData();
+    pack->hasUnsavedChange = false;
+    pack->updateDerivedData();
 
     ZSystemInfoInstance.addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
