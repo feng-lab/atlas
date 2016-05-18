@@ -774,6 +774,7 @@ void moveObjectToCorrectLocation()
   }
 }
 
+
 }
 
 namespace nim {
@@ -784,7 +785,6 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  calcSwcVolume();
   LINFO() << "done";
 }
 

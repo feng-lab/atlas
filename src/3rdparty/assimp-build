@@ -21,6 +21,7 @@ fi
 
 # # patch ./code/SIBImporter.cpp
 # sed -i.bak 's/(chunk.Tag>>24)\&0xff, (chunk.Tag>>16)\&0xff, (chunk.Tag>>8)\&0xff, chunk.Tag\&0xff/static_cast<char>((chunk.Tag>>24)\&0xff), static_cast<char>((chunk.Tag>>16)\&0xff), static_cast<char>((chunk.Tag>>8)\&0xff), static_cast<char>(chunk.Tag\&0xff)/' $srcDIR/code/SIBImporter.cpp
+sed -i.bak 's/256U/size_t(256) * 1024/' $srcDIR/include/assimp/defs.h
 
 if [ -d $buildDIR ]
 then
@@ -35,6 +36,7 @@ make -j $numCores install
 
 # #unpatch
 # mv -f $srcDIR/code/SIBImporter.cpp.bak $srcDIR/code/SIBImporter.cpp
+mv -f $srcDIR/include/assimp/defs.h.bak $srcDIR/include/assimp/defs.h
 
 # don't know why
 install_name_tool -id $installDIR/lib/libassimp.dylib $installDIR/lib/libassimp.dylib
