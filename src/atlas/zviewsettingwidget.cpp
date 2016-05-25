@@ -43,6 +43,7 @@ void ZViewSettingWidget::showViewSettingWidgetOfObj(size_t id)
   std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
   if (wg) {
     QLabel* label = new QLabel(m_doc->objNameWithModifiedMarkerAndID(id));
+    label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setWordWrap(true);
     QWidget *wt = wg->createWidget(false, true, label);

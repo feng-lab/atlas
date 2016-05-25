@@ -173,7 +173,7 @@ void main()
 #endif
 
             if (color.a > 0.0) {
-              color.a / sampling_rate;
+              color.a /= sampling_rate;
               result = COMPOSITING(result, color, currentRayLength, rayDepth);
               if (result.a >= 1.0) {
                 result.a = 1.0;

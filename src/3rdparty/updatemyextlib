@@ -59,7 +59,7 @@ else
   srcArchive=$srcPackageDIR/ispc-v1.9.0-osx.tar.gz
   tar -zxf "$srcArchive" -C $baseDIR
 
-  srcArchive=$srcPackageDIR/ffmpeg-3.0.1.7z
+  srcArchive=$srcPackageDIR/ffmpeg-3.0.2.7z
   7z x -y -o$baseDIR/atlas "$srcArchive"
 fi
 
@@ -67,9 +67,9 @@ if [ -d $currDIR/boost ]
 then
   rm -rf $currDIR/boost
 fi
-srcArchive=$srcPackageDIR/boost_1_60_0.tar.bz2
+srcArchive=$srcPackageDIR/boost_1_61_0.tar.bz2
 tar -jxf "$srcArchive" -C $currDIR
-mv $currDIR/boost_1_60_0 $currDIR/boost
+mv $currDIR/boost_1_61_0 $currDIR/boost
 
 if [ -d $currDIR/eigen ]
 then

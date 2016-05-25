@@ -251,6 +251,8 @@ void ZMeshIO::load(const QString &filename, ZMesh &mesh) const
       }
     }
 
+    //mesh.generateNormals();
+
     //throw ZIOException("Not supported mesh format");
   }
   }
