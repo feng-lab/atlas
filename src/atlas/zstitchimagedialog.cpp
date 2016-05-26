@@ -752,6 +752,17 @@ QLayout* ZStitchImageDialog::createConnLayout()
   QVBoxLayout *layout = new QVBoxLayout;
   QHBoxLayout *hlayout = new QHBoxLayout;
 
+  hlayout->addWidget(new QLabel("Max Overlap Rate: "));
+  m_overlapRateSpinBox = new QSpinBox();
+  m_overlapRateSpinBox->setMinimum(1);
+  m_overlapRateSpinBox->setMaximum(100);
+  m_overlapRateSpinBox->setSuffix("%");
+  m_overlapRateSpinBox->setSingleStep(1);
+  m_overlapRateSpinBox->setValue(10);
+  hlayout->addWidget(m_overlapRateSpinBox);
+  layout->addLayout(hlayout);
+
+  hlayout = new QHBoxLayout;
   m_useTileImageRadioButton = new QRadioButton(tr("from tile image"), this);
   connect(m_useTileImageRadioButton, SIGNAL(clicked()), this, SLOT(setConnInfoSource()));
   m_openTileImageButton = new QPushButton(tr("open tile image to get connection info..."), this);
@@ -1565,7 +1576,8 @@ void ZStitchImageDialog::stitchStacks2()
       } else if (m_bgsub2ComboBox->currentIndex() > 1) {
         imgNCCMatch.enableRemoveBackgroundForMovingImgChannel(m_bgsub2ComboBox->currentIndex()-2);
       }
-
+      // fully overlap, no position hint
+      imgNCCMatch.setMovingImgPositionHint(ZImgNCCMatch::None, 1.0);
 
       double maxNCC;
       ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(intv[0], intv[1], intv[2], &maxNCC);
@@ -1621,7 +1633,7 @@ void ZStitchImageDialog::stitchStacks2()
             ZImgNCCMatch::reversePositionHint(hint);
           }
         }
-        imgNCCMatch.setMovingImgPositionHint(hint);
+        imgNCCMatch.setMovingImgPositionHint(hint, m_overlapRateSpinBox->value() / 100.0);
 
         double maxNCC;
         ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(intv[0], intv[1], intv[2], &maxNCC);
@@ -1655,7 +1667,7 @@ void ZStitchImageDialog::stitchStacks2()
             ZImgNCCMatch::reversePositionHint(hint);
           }
         }
-        imgNCCMatch.setMovingImgPositionHint(hint);
+        imgNCCMatch.setMovingImgPositionHint(hint, m_overlapRateSpinBox->value() / 100.0);
 
         double maxNCC;
         ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(intv[0], intv[1], intv[2], &maxNCC);
@@ -2289,7 +2301,7 @@ void ZStitchImageDialog::stitchStacks()
             ZImgNCCMatch::reversePositionHint(hint);
           }
         }
-        imgNCCMatch.setMovingImgPositionHint(hint);
+        imgNCCMatch.setMovingImgPositionHint(hint, m_overlapRateSpinBox->value() / 100.0);
 
         double maxNCC;
         ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(intv[0], intv[1], intv[2], &maxNCC);

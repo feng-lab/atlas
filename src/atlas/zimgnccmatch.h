@@ -115,10 +115,10 @@ private:
                                               double *maxWeightedNCC = nullptr,
                                               double *numOverlapVoxels = nullptr);
 
-  static ZImgRegion getNccImgValidRegion(const PositionHint& hint, const ZImg &fixedImg, const ZImg &movingImg);
+  static ZImgRegion getNccImgValidRegion(const PositionHint& hint, const ZImgInfo &fixedImgInfo, const ZImgInfo &movingImgInfo);
 
   // ting's method, partial
-  static double getRequiredNumberOfOverlapPixels(const ZImg &fixedImg, const ZImg &movingImg);
+  static double getRequiredNumberOfOverlapPixels(const ZImgInfo &fixedImgInfo, const ZImgInfo &movingImgInfo);
 
   // ting's method
   static size_t getMaxWeightedNCCIdx(const double* NCCs, const double* overlapVoxels, double overlapVoxelThre, size_t dataLength,
@@ -126,9 +126,7 @@ private:
 
   static std::pair<ZImgRegion, ZImgRegion> getRequiredSrcImgRegion(const PositionHint& hint,
                                                                    const ZImg &fixedImg, const ZImg &movingImg, double overlapRate);
-  static ZVoxelCoordinate mapOffsetToSrcImg(ZVoxelCoordinate offset,
-                                            const ZImg &fixedImg, const ZImg &movingImg,
-                                            const ZImgRegion &fixedRgn, const ZImgRegion &movingRgn);
+  static ZVoxelCoordinate mapOffsetToSrcImg(ZVoxelCoordinate offset, const ZImgRegion &fixedRgn, const ZImgRegion &movingRgn);
 
 private:
   const ZImg& m_fixedImg;

@@ -161,6 +161,7 @@ private:
   QTextEdit *m_connEdit;
   QTextEdit *m_commandOutputEdit;
 
+  QSpinBox *m_overlapRateSpinBox;
   QRadioButton *m_useConfigRadioButton;
   QRadioButton *m_useTileImageRadioButton;
   QRadioButton *m_useConnFileRadioButton;
