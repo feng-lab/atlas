@@ -1612,9 +1612,9 @@ void ZStitchImageDialog::stitchStacks2()
 
         std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>::iterator it = conn.find(std::make_pair(f,m));
         ZImgNCCMatch::PositionHint hint = ZImgNCCMatch::None;
-        if (it != conn.end())
+        if (it != conn.end()) {
           hint = it->second;
-        else {
+        } else {
           it = conn.find(std::make_pair(m,f));
           if (it != conn.end()) {
             hint = it->second;
@@ -1628,7 +1628,7 @@ void ZStitchImageDialog::stitchStacks2()
         offsets[std::make_pair(f,m)] = std::make_pair(movingImgOffset, maxNCC);
 
         QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
-            .arg(f + 1).arg(m + 1).arg(ZImgNCCMatch::positionHintToQString(hint)).arg(movingImgOffset.toQString()).arg(maxNCC);
+            .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(maxNCC);
         m_commandOutputEdit->append(info);
         QApplication::processEvents();
         LINFO() << info;
@@ -1662,7 +1662,7 @@ void ZStitchImageDialog::stitchStacks2()
         offsets[std::make_pair(f+nstack,m+nstack)] = std::make_pair(movingImgOffset, maxNCC);
 
         QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
-            .arg(f +nstack+ 1).arg(m+nstack + 1).arg(ZImgNCCMatch::positionHintToQString(hint)).arg(movingImgOffset.toQString()).arg(maxNCC);
+            .arg(f +nstack+ 1).arg(m+nstack + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(maxNCC);
         m_commandOutputEdit->append(info);
         QApplication::processEvents();
         LINFO() << info;
@@ -2296,7 +2296,7 @@ void ZStitchImageDialog::stitchStacks()
         offsets[std::make_pair(f,m)] = std::make_pair(movingImgOffset, maxNCC);
 
         QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
-            .arg(f + 1).arg(m + 1).arg(ZImgNCCMatch::positionHintToQString(hint)).arg(movingImgOffset.toQString()).arg(maxNCC);
+            .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(maxNCC);
         m_commandOutputEdit->append(info);
         QApplication::processEvents();
         LINFO() << info;

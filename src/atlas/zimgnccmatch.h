@@ -29,9 +29,10 @@ public:
 
   ZImgNCCMatch(const ZImg& fixedImg, const ZImg& movingImg, size_t fixedT = 0, size_t movingT = 0);
 
-  void setMovingImgPositionHint(PositionHint hint);
+  void setMovingImgPositionHint(PositionHint hint, double overlapRate = 1.0);
+  QString positionHintToQString() const;
   static void reversePositionHint(PositionHint& hint);
-  static QString positionHintToQString(PositionHint hint);
+  static QString positionHintToQString(PositionHint hint, double overlapRate);
 
   // NCC works for single channel, if img contains many channels, these methods control
   // which channels to use. Default use average of all channels
@@ -89,37 +90,45 @@ private:
   void checkFixedImgChannel(size_t ch);
   void checkMovingImgChannel(size_t ch);
 
-  void constructSingleChannelFixedImg(ZImg &fixedImg);
-  void constructSingleChannelMovingImg(ZImg &movingImg);
+  void constructSingleChannelFixedImg(const ZImgRegion& rgn, ZImg &fixedImg);
+  void constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg &movingImg);
   // only works for single channel img
   void removeBackground(ZImg& img);
 
   // will release input, need 4 double padded extra space
   // for two 200M 8bit imgs, this will need 4*200*8*8M = 51200M = 51.2G memory
-  ZVoxelCoordinate maxNormXCorrLoc(ZImg& fixedImg, ZImg& movingImg,
-                                   double *maxNCC = nullptr,
-                                   double *maxWeightedNCC = nullptr,
-                                   double *numOverlapVoxels = nullptr) const;
+  static ZVoxelCoordinate maxNormXCorrLoc(ZImg& fixedImg, ZImg& movingImg, const PositionHint& hint,
+                                          double *maxNCC = nullptr,
+                                          double *maxWeightedNCC = nullptr,
+                                          double *numOverlapVoxels = nullptr);
 
   // slower but use less memory, need 3 double padded extra space
   // for two 200M 8bit imgs, this will need 3*200*8*8M = 38400M = 38.4G memory
-  ZVoxelCoordinate maxNormXCorrLoc_S(ZImg& fixedImg, ZImg& movingImg,
-                                     double *maxNCC = nullptr,
-                                     double *maxWeightedNCC = nullptr,
-                                     double *numOverlapVoxels = nullptr) const;
+  static ZVoxelCoordinate maxNormXCorrLoc_S(ZImg& fixedImg, ZImg& movingImg, const PositionHint& hint,
+                                            double *maxNCC = nullptr,
+                                            double *maxWeightedNCC = nullptr,
+                                            double *numOverlapVoxels = nullptr);
 
-  ZVoxelCoordinate maxNormXCorrLocPart(ZImg& fixedImg, ZImg& movingImg, size_t xStart, size_t xEnd,
-                                       size_t yStart, size_t yEnd, size_t zStart, size_t zEnd,
-                                       double *maxNCC = nullptr,
-                                       double *maxWeightedNCC = nullptr,
-                                       double *numOverlapVoxels = nullptr) const;
+  static ZVoxelCoordinate maxNormXCorrLocPart(ZImg& fixedImg, ZImg& movingImg, size_t xStart, size_t xEnd,
+                                              size_t yStart, size_t yEnd, size_t zStart, size_t zEnd,
+                                              double *maxNCC = nullptr,
+                                              double *maxWeightedNCC = nullptr,
+                                              double *numOverlapVoxels = nullptr);
+
+  static ZImgRegion getNccImgValidRegion(const PositionHint& hint, const ZImg &fixedImg, const ZImg &movingImg);
 
   // ting's method, partial
-  double getRequiredNumberOfOverlapPixels() const;
+  static double getRequiredNumberOfOverlapPixels(const ZImg &fixedImg, const ZImg &movingImg);
 
   // ting's method
-  size_t getMaxWeightedNCCIdx(const double* NCCs, const double* overlapVoxels, double overlapVoxelThre, size_t dataLength,
-                              double *maxNCC = nullptr, double *maxWeightedNCC = nullptr, double *numOverlapVoxels = nullptr) const;
+  static size_t getMaxWeightedNCCIdx(const double* NCCs, const double* overlapVoxels, double overlapVoxelThre, size_t dataLength,
+                                     double *maxNCC = nullptr, double *maxWeightedNCC = nullptr, double *numOverlapVoxels = nullptr);
+
+  static std::pair<ZImgRegion, ZImgRegion> getRequiredSrcImgRegion(const PositionHint& hint,
+                                                                   const ZImg &fixedImg, const ZImg &movingImg, double overlapRate);
+  static ZVoxelCoordinate mapOffsetToSrcImg(ZVoxelCoordinate offset,
+                                            const ZImg &fixedImg, const ZImg &movingImg,
+                                            const ZImgRegion &fixedRgn, const ZImgRegion &movingRgn);
 
 private:
   const ZImg& m_fixedImg;
@@ -127,6 +136,7 @@ private:
   size_t m_fixedT;
   size_t m_movingT;
   PositionHint m_movingImgPosHint;
+  double m_overlapRate;  // 0 to 1
 
   std::set<size_t> m_fixedImgChannelsToUse;
   std::set<size_t> m_movingImgChannelsToUse;
