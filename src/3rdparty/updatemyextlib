@@ -27,14 +27,14 @@ if [ -d $baseDIR/hdf5-1.10.0 ]
 then
   rm -rf $baseDIR/hdf5-1.10.0
 fi
-srcArchive=$srcPackageDIR/hdf5-1.10.0.tar.bz2
+srcArchive=$srcPackageDIR/hdf5-1.10.0-patch1.tar.bz2
 tar -jxf "$srcArchive" -C $baseDIR
 
 if [ -d $baseDIR/GeometricTools ]
 then
   rm -rf $baseDIR/GeometricTools
 fi
-srcArchive=$srcPackageDIR/GeometricTools/GeometricToolsEngine2p4.zip
+srcArchive=$srcPackageDIR/GeometricTools/GeometricToolsEngine2p5.zip
 7z x -y -o$baseDIR "$srcArchive"
 
 if [[ "$OSTYPE" == "msys" ]]; then

@@ -13,9 +13,8 @@ fi
 
 if [ ! -d $srcDIR ]
 then
-  srcPackageDIR="/Users/feng/Google Drive/code/my"
-  srcArchive=$srcPackageDIR/hdf5-1.10.0.tar.bz2
-  tar -jxvf "$srcArchive" -C $currDIR/../../..
+  echo ERROR: src folder $srcDIR does not exist.
+  exit 1 # terminate and indicate error
 fi
 
 if [ -d $buildDIR ]

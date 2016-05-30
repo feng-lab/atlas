@@ -184,6 +184,12 @@ void extractNeuronChannel()
   }
 }
 
+void removeChannel()
+{
+  ZImg img("/Volumes/PVPY/Py/Py0515_s15_1_1.raw", ZImgRegion(0,-1,0,-1,0,-1,0,2));
+  img.save("/Volumes/PVPY/Py/Py0515_s15_1_1_ch12.tif");
+}
+
 void convertImagesFormat()
 {
   QDir dir("/Volumes/Jinny");

@@ -13,9 +13,8 @@ fi
 
 if [ ! -d $srcDIR ]
 then
-  srcPackageDIR="/Users/feng/Google Drive/code/my"
-  srcArchive=$srcPackageDIR/FreeImage3170.zip
-  7z x -y -o$currDIR/../../.. "$srcArchive"
+  echo ERROR: src folder $srcDIR does not exist.
+  exit 1 # terminate and indicate error
 fi
 
 cp $currDIR/freeimage-makefiles/Makefile_gnu $srcDIR/

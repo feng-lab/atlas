@@ -13,9 +13,8 @@ fi
 
 if [ ! -d $srcDIR ]
 then
-  srcPackageDIR="/Users/feng/Google Drive/code/my"
-  srcArchive=$srcPackageDIR/libjpeg-turbo-1.4.2.tar.gz
-  tar -zxvf "$srcArchive" -C $currDIR/../../..
+  echo ERROR: src folder $srcDIR does not exist.
+  exit 1 # terminate and indicate error
 fi
 
 if [ -d $buildDIR ]
