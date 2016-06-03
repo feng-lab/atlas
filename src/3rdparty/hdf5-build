@@ -1,7 +1,7 @@
 #!/bin/bash
 
 currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
-srcDIR=$currDIR/../../../hdf5-1.10.0
+srcDIR=$currDIR/../../../hdf5-1.10.0-patch1
 buildDIR=$srcDIR/../__hdf5-build
 installDIR=$currDIR/hdf5
 numCores=$( sysctl -n hw.logicalcpu )
