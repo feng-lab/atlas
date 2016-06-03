@@ -57,18 +57,20 @@ public:
 signals:
   void objViewReady(size_t id);
 
+public slots:
+  bool takeScreenShot(QString filename, int width, int height, Z3DScreenShotType sst);
+  bool takeScreenShot(QString filename, Z3DScreenShotType sst);
+
 private slots:
   void zoomIn();
   void zoomOut();
   void resetCamera();  // set up camera based on visible objects in scene, original position
   void resetCameraClippingRange(); // Reset the camera clipping range to include this entire bounding box
 
-  void takeScreenShot(QString filename, int width, int height, Z3DScreenShotType sst);
-  void takeScreenShot(QString filename, Z3DScreenShotType sst);
-  void takeSeriesScreenShot(const QDir& dir, const QString &namePrefix, glm::vec3 axis,
+  bool takeSeriesScreenShot(const QDir& dir, const QString &namePrefix, glm::vec3 axis,
                             bool clockWise, int numFrame, int width, int height,
                             Z3DScreenShotType sst);
-  void takeSeriesScreenShot(const QDir& dir, const QString &namePrefix, glm::vec3 axis,
+  bool takeSeriesScreenShot(const QDir& dir, const QString &namePrefix, glm::vec3 axis,
                             bool clockWise, int numFrame, Z3DScreenShotType sst);
 
 private:

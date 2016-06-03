@@ -350,7 +350,6 @@ void ZAnimation::export3DAnimation(const QDir &dir, const QString &fn, double fr
     --height;
   }
   m_doc.hideAnimation3DView();
-  Z3DCanvasPainter& canvasPainter = static_cast<Z3DView*>(m_view)->canvasPainter();
   int numFrame = std::ceil(m_duration * framePerSecond);
   QString title = "Exporting 3D Animation As Images...";
   if (sst == Z3DScreenShotType::HalfSideBySideStereoView)
@@ -392,8 +391,7 @@ void ZAnimation::export3DAnimation(const QDir &dir, const QString &fn, double fr
         }
       }
     }
-    if (!canvasPainter.renderToImage(filepath, width, height, sst, static_cast<Z3DView*>(m_view)->compositor())) {
-      QMessageBox::critical(QApplication::activeWindow(), "Error", canvasPainter.renderToImageError());
+    if (!static_cast<Z3DView*>(m_view)->takeScreenShot(filepath, width, height, sst)) {
       break;
     }
   }
@@ -454,7 +452,6 @@ void ZAnimation::export3DAnimation(const QDir &dir, const QString &fn, double fr
     }
   }
   m_doc.hideAnimation3DView();
-  Z3DCanvasPainter& canvasPainter = static_cast<Z3DView*>(m_view)->canvasPainter();
   Z3DCanvas& canvas = static_cast<Z3DView*>(m_view)->canvas();
   int h = canvas.height();
   if (h % 2 == 1) {
@@ -508,8 +505,7 @@ void ZAnimation::export3DAnimation(const QDir &dir, const QString &fn, double fr
         }
       }
     }
-    if (!canvasPainter.renderToImage(filepath, sst)) {
-      QMessageBox::critical(QApplication::activeWindow(), "Error", canvasPainter.renderToImageError());
+    if (!static_cast<Z3DView*>(m_view)->takeScreenShot(filepath, sst)) {
       break;
     }
   }

@@ -290,16 +290,19 @@ void Z3DView::resetCameraClippingRange()
   m_lock = false;
 }
 
-void Z3DView::takeScreenShot(QString filename, int width, int height, Z3DScreenShotType sst)
+bool Z3DView::takeScreenShot(QString filename, int width, int height, Z3DScreenShotType sst)
 {
+  bool res = true;
   m_lock = true;
   if (!m_canvasPainter->renderToImage(filename, width, height, sst, compositor())) {
+    res = false;
     QMessageBox::critical(m_mainWin, "Error", m_canvasPainter->renderToImageError());
   }
   m_lock = false;
+  return res;
 }
 
-void Z3DView::takeScreenShot(QString filename, Z3DScreenShotType sst)
+bool Z3DView::takeScreenShot(QString filename, Z3DScreenShotType sst)
 {
   int h = m_canvas->height();
   if (h % 2 == 1) {
@@ -313,12 +316,15 @@ void Z3DView::takeScreenShot(QString filename, Z3DScreenShotType sst)
     LINFO() << "Resize canvas size from (" << m_canvas->width() << "," << m_canvas->height() << ") to (" << w << "," << h << ").";
     m_canvas->resize(w, h);
   }
+  bool res = true;
   if (!m_canvasPainter->renderToImage(filename, sst)) {
+    res = false;
     QMessageBox::critical(m_mainWin, "Error", m_canvasPainter->renderToImageError());
   }
+  return res;
 }
 
-void Z3DView::takeSeriesScreenShot(const QDir &dir, const QString &namePrefix, glm::vec3 axis, bool clockWise, int numFrame, int width, int height, Z3DScreenShotType sst)
+bool Z3DView::takeSeriesScreenShot(const QDir &dir, const QString &namePrefix, glm::vec3 axis, bool clockWise, int numFrame, int width, int height, Z3DScreenShotType sst)
 {
   QString title = "Capturing Images...";
   if (sst == Z3DScreenShotType::HalfSideBySideStereoView)
@@ -329,6 +335,7 @@ void Z3DView::takeSeriesScreenShot(const QDir &dir, const QString &namePrefix, g
   progress.setWindowModality(Qt::WindowModal);
   progress.show();
   double rAngle = M_PI * 2. / numFrame;
+  bool res = true;
   for (int i=0; i<numFrame; i++) {
     progress.setValue(i);
     if (progress.wasCanceled())
@@ -342,12 +349,16 @@ void Z3DView::takeSeriesScreenShot(const QDir &dir, const QString &namePrefix, g
     int fieldWidth = numDigits(numFrame);
     QString filename = QString("%1%2.tif").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
     QString filepath = dir.filePath(filename);
-    takeScreenShot(filepath, width, height, sst);
+    if (!takeScreenShot(filepath, width, height, sst)) {
+      res = false;
+      break;
+    }
   }
   progress.setValue(numFrame);
+  return res;
 }
 
-void Z3DView::takeSeriesScreenShot(const QDir &dir, const QString &namePrefix, glm::vec3 axis, bool clockWise, int numFrame, Z3DScreenShotType sst)
+bool Z3DView::takeSeriesScreenShot(const QDir &dir, const QString &namePrefix, glm::vec3 axis, bool clockWise, int numFrame, Z3DScreenShotType sst)
 {
   QString title = "Capturing Images...";
   if (sst == Z3DScreenShotType::HalfSideBySideStereoView)
@@ -358,6 +369,7 @@ void Z3DView::takeSeriesScreenShot(const QDir &dir, const QString &namePrefix, g
   progress.setWindowModality(Qt::WindowModal);
   progress.show();
   double rAngle = M_PI * 2. / numFrame;
+  bool res = true;
   for (int i=0; i<numFrame; i++) {
     progress.setValue(i);
     if (progress.wasCanceled())
@@ -371,9 +383,13 @@ void Z3DView::takeSeriesScreenShot(const QDir &dir, const QString &namePrefix, g
     int fieldWidth = numDigits(numFrame);
     QString filename = QString("%1%2.tif").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
     QString filepath = dir.filePath(filename);
-    takeScreenShot(filepath, sst);
+    if (!takeScreenShot(filepath, sst)) {
+      res = false;
+      break;
+    }
   }
   progress.setValue(numFrame);
+  return res;
 }
 
 void Z3DView::init()
