@@ -1,7 +1,7 @@
 #!/bin/bash
 
 currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
-srcDIR=$currDIR/../../../libjpeg-turbo-1.4.2
+srcDIR=$currDIR/../../../libjpeg-turbo-1.5.0
 buildDIR=$srcDIR/../__libjpeg-turbo-build
 installDIR=$currDIR/libjpeg-turbo
 numCores=$( sysctl -n hw.logicalcpu )

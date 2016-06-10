@@ -16,11 +16,11 @@ fi
 srcArchive=$srcPackageDIR/FreeImage3170.zip
 7z x -y -o$baseDIR "$srcArchive"
 
-if [ -d $baseDIR/libjpeg-turbo-1.4.2 ]
+if [ -d $baseDIR/libjpeg-turbo-1.5.5 ]
 then
-  rm -rf $baseDIR/libjpeg-turbo-1.4.2
+  rm -rf $baseDIR/libjpeg-turbo-1.5.0
 fi
-srcArchive=$srcPackageDIR/libjpeg-turbo-1.4.2.tar.gz
+srcArchive=$srcPackageDIR/libjpeg-turbo-1.5.0.tar.gz
 tar -zxf "$srcArchive" -C $baseDIR
 
 if [ -d $baseDIR/hdf5-1.10.0 ]

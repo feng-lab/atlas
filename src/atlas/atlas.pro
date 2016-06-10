@@ -42,6 +42,7 @@ isEqual(QT_MAJOR_VERSION,5) {
     QT += gui
     QMAKE_CXXFLAGS += -mmacosx-version-min=10.7 -std=c++14 -stdlib=libc++
     QMAKE_LFLAGS += -stdlib=libc++
+    CONFIG += c++14
 }
 
 #Qt4

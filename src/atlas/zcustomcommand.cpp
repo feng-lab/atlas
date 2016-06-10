@@ -791,6 +791,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
+  makeAxonChannelImages();
   LINFO() << "done";
 }
 
