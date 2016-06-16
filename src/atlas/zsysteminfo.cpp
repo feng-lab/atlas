@@ -241,7 +241,15 @@ ZSystemInfo::~ZSystemInfo()
 
 void ZSystemInfo::logOSInfo() const
 {
-  LINFO() << "OS:" << m_osString;
+  //LINFO() << "OS:" << m_osString;
+  LINFO() << "OS:" << QSysInfo::prettyProductName();
+  LINFO() << "Kernel:" << QSysInfo::kernelType() + " " + QSysInfo::kernelVersion();
+  LINFO() << "Build ABI:" << QSysInfo::buildAbi();
+  //LINFO() << "Build CPU:" << QSysInfo::buildCpuArchitecture();
+  LINFO() << "Current CPU:" << QSysInfo::currentCpuArchitecture();
+  LINFO() << "Machine Host Name:" << QSysInfo::machineHostName();
+  //LINFO() << "Product Type:" << QSysInfo::productType();
+  //LINFO() << "Product Version:" << QSysInfo::productVersion();
 }
 
 bool ZSystemInfo::initializeGL()
@@ -500,18 +508,19 @@ void ZSystemInfo::detectOS()
     m_osString = "Mac OS X YOSEMITE";
     break;
   case QSysInfo::MV_10_11:
-    m_osString = "Mac OS El Capitan";
+    m_osString = "Mac OS X El Capitan";
     break;
 #endif
   default:
     m_osString = "unknown mac os";
     return;
   }
-  SInt32 majorVersion,minorVersion,bugFixVersion;
-  Gestalt(gestaltSystemVersionMajor, &majorVersion);
-  Gestalt(gestaltSystemVersionMinor, &minorVersion);
-  Gestalt(gestaltSystemVersionBugFix, &bugFixVersion);
-  m_osString += QString(" %1.%2.%3").arg(majorVersion).arg(minorVersion).arg(bugFixVersion);
+  // deprecated from 10.8
+  //SInt32 majorVersion,minorVersion,bugFixVersion;
+  //Gestalt(gestaltSystemVersionMajor, &majorVersion);
+  //Gestalt(gestaltSystemVersionMinor, &minorVersion);
+  //Gestalt(gestaltSystemVersionBugFix, &bugFixVersion);
+  //m_osString += QString(" %1.%2.%3").arg(majorVersion).arg(minorVersion).arg(bugFixVersion);
 #else
   utsname name;
   if (uname(&name) != 0)
