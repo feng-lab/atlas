@@ -551,10 +551,8 @@ void mergeTraces()
 
 void calcSwcVolume()
 {
-  //QDir dir("/Users/feng/Google Drive/Shaul/CA3Py_CA1PV_os/ipsi/AnalysisTextFiles");
-  //QDir outFolder("/Users/feng/Downloads/ipsi_mesh");
-  QDir dir("/Users/feng/Documents/PY/AnalysisTextFiles");
-  QDir outFolder("/Users/feng/Documents/PY/mesh");
+  QDir dir("/Users/feng/Documents/PV/AnalysisTextFiles");
+  QDir outFolder("/Users/feng/Documents/PV/mesh");
   QStringList filters;
   QFileInfoList dirlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks | QDir::NoDotAndDotDot);
   //LINFO() << dirlist.size() << dirlist.at(0).absolutePath();
@@ -791,7 +789,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  makeAxonChannelImages();
+  calcSwcVolume();
   LINFO() << "done";
 }
 

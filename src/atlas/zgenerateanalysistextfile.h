@@ -41,6 +41,7 @@ struct ZAnalysisTextFileInput {
 class ZGenerateAnalysisTextFile
 {
   typedef ZSwc::Iterator SwcTreeNode;
+  typedef ZSwc::ConstIterator ConstSwcTreeNode;
 public:
   ZGenerateAnalysisTextFile();
 
@@ -91,25 +92,26 @@ protected:
   void checkFileExist(const QString& filename) const;
 
   // if axon channel exist, set tree node feature to average axon intensity, otherwise set to 0
-  void getAxonFeature(ZSwc& tree, std::map<SwcTreeNode, double>& nodeToBlueness) const;
+  void getAxonFeature(const ZSwc &tree, std::map<ConstSwcTreeNode, double> &nodeToBlueness) const;
 
-  void getLayerFeature(ZSwc& tree, ZSwc& layerTree, std::map<SwcTreeNode, size_t>& nodeToLayer) const;
-  void getSubclassFeature(ZSwc& tree, ZSwc& subclassTree, std::map<SwcTreeNode, size_t>& nodeToSubclass) const;
+  void getLayerFeature(const ZSwc& tree, const ZSwc& layerTree, std::map<ConstSwcTreeNode, size_t>& nodeToLayer) const;
+  void getSubclassFeature(const ZSwc& tree, const ZSwc& subclassTree, std::map<ConstSwcTreeNode, size_t>& nodeToSubclass) const;
 
-  void writeFeatureSwc(ZSwc& tree, std::map<SwcTreeNode, double>& nodeToFeature, const QString& outSwcName);
+  void writeFeatureSwc(const ZSwc& tree, const std::map<ConstSwcTreeNode, double>& nodeToFeature, const QString& outSwcName) const;
   // return point to swc segment distance in um
   double pointFrustumConeDist(double x, double y, double z,
-                              const SwcTreeNode &start, const SwcTreeNode &end,
+                              const ConstSwcTreeNode &start, const ConstSwcTreeNode &end,
                               double* frac = nullptr) const;
+  double pointSphereDist(double x, double y, double z, const ConstSwcTreeNode &tn) const;
   double punctaFrustumConeDist(const ZPunctum &punctum,
-                               const SwcTreeNode &start, const SwcTreeNode &end,
+                               const ConstSwcTreeNode &start, const ConstSwcTreeNode &end,
                                double* frac = nullptr) const;
-  double treeNodeDist(const SwcTreeNode &tn, const SwcTreeNode &ptn) const;
+  double treeNodeDist(const ConstSwcTreeNode &tn, const ConstSwcTreeNode &ptn) const;
 
   bool inputSwcIsPyramidal() const;
 
-  void mergeSoma(ZSwc& tree, std::map<SwcTreeNode, double>& nodeToBlueness,
-                 std::map<SwcTreeNode, size_t>& nodeToLayer) const;
+  void mergeSoma(ZSwc& tree, std::map<ConstSwcTreeNode, double>& nodeToBlueness,
+                 std::map<ConstSwcTreeNode, size_t>& nodeToLayer) const;
   void removeSmallLeafBranch(ZSwc& tree, int numNodeThre, double lengthThre) const; // lengthThre in um
 
   // label branch and calculate some properties for each tree node, return number of branches
@@ -120,31 +122,31 @@ protected:
     {}
     size_t id;
     double length;  // in um
-    std::vector<SwcTreeNode> nodes;
+    std::vector<ConstSwcTreeNode> nodes;
   };
 
-  size_t labelBranch(ZSwc &tree,
-                     std::map<SwcTreeNode, size_t> &nodeToBranchId,
+  size_t labelBranch(const ZSwc &tree,
+                     std::map<ConstSwcTreeNode, size_t> &nodeToBranchId,
                      std::map<size_t, size_t> &branchIdToParentBranchId,
-                     std::map<SwcTreeNode, double> &nodeDistToParent,
-                     std::map<SwcTreeNode, double> &nodeDistToBranchStart,
-                     std::map<SwcTreeNode, double> &nodeDistToSoma,
-                     std::map<SwcTreeNode, int> &nodeTopologyType,
+                     std::map<ConstSwcTreeNode, double> &nodeDistToParent,
+                     std::map<ConstSwcTreeNode, double> &nodeDistToBranchStart,
+                     std::map<ConstSwcTreeNode, double> &nodeDistToSoma,
+                     std::map<ConstSwcTreeNode, int> &nodeTopologyType,
                      std::vector<Branch> &branches) const;
 
   // punctum belongs to returned tree node and its parent
-  SwcTreeNode getNodeSegOfPunctum(ZSwc& tree, const ZPunctum& punctum, size_t numBranches,
-                                  std::map<SwcTreeNode, size_t> &nodeToBranchId) const;
-  SwcTreeNode intensityWeightedNearestNode(double x, double y, double z,
-                                           const std::vector<SwcTreeNode> &nodes) const;
-  SwcTreeNode nearestNode(double x, double y, double z, const std::vector<SwcTreeNode> &nodes) const;
+  ConstSwcTreeNode getNodeSegOfPunctum(const ZSwc& tree, const ZPunctum& punctum, size_t numBranches,
+                                       const std::map<ConstSwcTreeNode, size_t> &nodeToBranchId) const;
+  ConstSwcTreeNode intensityWeightedNearestNode(double x, double y, double z,
+                                                const std::vector<ConstSwcTreeNode> &nodes) const;
+  ConstSwcTreeNode nearestNode(double x, double y, double z, const std::vector<ConstSwcTreeNode> &nodes) const;
 
   // go to subfolder, create if neccessary
   QDir getSubDir(const QString& subFoldername) const;
 
-  void generateAnalysisFiles(ZSwc &tree, std::map<SwcTreeNode, double> &nodeToBlueness,
-                             std::map<SwcTreeNode, size_t> &nodeToLayer,
-                             std::map<SwcTreeNode, size_t> &nodeToSubclass) const;
+  void generateAnalysisFiles(const ZSwc &tree, const std::map<ConstSwcTreeNode, double> &nodeToBlueness,
+                             const std::map<ConstSwcTreeNode, size_t> &nodeToLayer,
+                             const std::map<ConstSwcTreeNode, size_t> &nodeToSubclass) const;
 
 private:
   ZAnalysisTextFileInput m_input;

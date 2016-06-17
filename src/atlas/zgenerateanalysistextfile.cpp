@@ -181,7 +181,10 @@ void ZGenerateAnalysisTextFile::generate()
   m_processedSwcFilename = outputDir.filePath(swcFileInfo.fileName());
   if (m_input.doPyramidalFunctionalSeparation || m_input.doPyramidalSubclassSeparation) {
     if (inputSwcIsPyramidal()) { // already pyramidal, don't need process
-      QFile::copy(m_input.swcFilename, m_processedSwcFilename);
+      tree.setAsRoot(tree.thickestNode());
+      tree.resortID();
+      tree.save(m_processedSwcFilename);
+      //QFile::copy(m_input.swcFilename, m_processedSwcFilename);
     } else { // make it pyramidal
       throw ZImgException(QString("input SWC %1 is not pyramidal SWC")
                           .arg(m_input.swcFilename));
@@ -199,9 +202,9 @@ void ZGenerateAnalysisTextFile::generate()
     tree.save(m_processedSwcFilename);
   }
 
-  std::map<SwcTreeNode, double> nodeToBlueness;
-  std::map<SwcTreeNode, size_t> nodeToLayer;
-  std::map<SwcTreeNode, size_t> nodeToSubclass;
+  std::map<ConstSwcTreeNode, double> nodeToBlueness;
+  std::map<ConstSwcTreeNode, size_t> nodeToLayer;
+  std::map<ConstSwcTreeNode, size_t> nodeToSubclass;
 
   // blueness
   getAxonFeature(tree, nodeToBlueness);
@@ -239,10 +242,12 @@ void ZGenerateAnalysisTextFile::generate()
         throw ZImgException(QString("wrong subclass swc file %1 with %2 roots.")
                             .arg(m_subclassSwcFilename).arg(subclassTree.numRoots()));
       }
+      subclassTree.setAsRoot(subclassTree.thickestNode());
+      subclassTree.resortID();
+      subclassTree.save(m_subclassSwcFilename);
       getSubclassFeature(tree, subclassTree, nodeToSubclass);
     } else {
-      throw ZImgException(QString("Can not find subclass SWC %1.")
-                          .arg(m_subclassSwcFilename));
+      throw ZImgException(QString("Can not find subclass SWC %1.").arg(m_subclassSwcFilename));
     }
   }
 
@@ -259,14 +264,54 @@ void ZGenerateAnalysisTextFile::checkFileExist(const QString &filename) const
   }
 }
 
-void ZGenerateAnalysisTextFile::getAxonFeature(ZSwc &tree, std::map<SwcTreeNode, double> &nodeToBlueness) const
+void ZGenerateAnalysisTextFile::getAxonFeature(const ZSwc &tree, std::map<ConstSwcTreeNode, double> &nodeToBlueness) const
 {
   if (m_input.axonChannel < 0)
     return;
   ZImg axonImg(m_input.imgFilename, ZImgRegion(0,-1,0,-1,0,-1,m_input.axonChannel,m_input.axonChannel+1,0,1));
-  for (SwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
-    if (m_input.axonChannel >= 0 && !ZSwc::isRoot(tn)) {
-      SwcTreeNode parent = ZSwc::parent(tn);
+  for (ConstSwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
+    if (ZSwc::isRoot(tn)) {
+      double maxr = tn->radius + m_input.bluenessExtend / m_input.voxelSizeX;
+      double zscale = m_input.voxelSizeZ / m_input.voxelSizeX;
+      int left = std::floor(tn->x - maxr);
+      int right = std::ceil(tn->x + maxr);
+      int up = std::floor(tn->y - maxr);
+      int down = std::ceil(tn->y + maxr);
+      int zup = std::floor(tn->z - maxr / zscale);
+      int zdown = std::ceil(tn->z + maxr / zscale);
+
+      left = std::max(0, left);
+      right = std::min(right, static_cast<int>(axonImg.width())-1);
+      up = std::max(0, up);
+      down = std::min(down, static_cast<int>(axonImg.height())-1);
+      zup = std::max(0, zup);
+      zdown = std::min(zdown, static_cast<int>(axonImg.depth())-1);
+
+      int count = 0;
+      double intensity = 0.0;
+      for (int z = zup; z <= zdown; z++) {
+        for (int y = up; y <= down; y++) {
+          for (int x = left; x <= right; x++) {
+            if ((x == roundTo<int>(tn->x) && y == roundTo<int>(tn->y) && z == roundTo<int>(tn->z)) ||
+                pointSphereDist(x, y, z, tn) <= m_input.bluenessExtend) {
+              count++;
+              intensity += axonImg.value<double>(x, y, z);
+            }
+          }
+        }
+      }
+
+      if (count > 0) {
+        intensity /= count;
+      } else {
+        LWARN() << "node" << tn->x << tn->y << tn->z << tn->radius;
+        LWARN() << "img info" << axonImg.info().toQString();
+        throw ZImgException("Swc root don't overlap with img?");
+      }
+
+      nodeToBlueness[tn] = intensity;
+    } else {
+      ConstSwcTreeNode parent = ZSwc::parent(tn);
       double maxr = std::max(tn->radius + m_input.bluenessExtend / m_input.voxelSizeX,
                              parent->radius + m_input.bluenessExtend / m_input.voxelSizeX);
       double zscale = m_input.voxelSizeZ / m_input.voxelSizeX;
@@ -313,15 +358,14 @@ void ZGenerateAnalysisTextFile::getAxonFeature(ZSwc &tree, std::map<SwcTreeNode,
   }
 }
 
-void ZGenerateAnalysisTextFile::getLayerFeature(ZSwc &tree, ZSwc &layerTree, std::map<SwcTreeNode, size_t> &nodeToLayer) const
+void ZGenerateAnalysisTextFile::getLayerFeature(const ZSwc &tree, const ZSwc &layerTree, std::map<ConstSwcTreeNode, size_t> &nodeToLayer) const
 {
-  SwcTreeNode tn = tree.begin();
-  SwcTreeNode layerTn = layerTree.begin();
+  ConstSwcTreeNode tn = tree.begin();
+  ConstSwcTreeNode layerTn = layerTree.begin();
   while (tn != tree.end()) {
     if (glm::length(glm::dvec3(tn->x - layerTn->x, tn->y - layerTn->y, tn->z - layerTn->z)) > 1.) {
       LWARN() << "node" << tn->x << tn->y << tn->z << tn->radius;
       LWARN() << "layer node" << layerTn->x << layerTn->y << layerTn->z << layerTn->radius;
-      //LWARN() << "wrong layer node match";
       throw ZImgException("wrong layer node match");
     }
     nodeToLayer[tn] = layerTn->type;
@@ -330,16 +374,15 @@ void ZGenerateAnalysisTextFile::getLayerFeature(ZSwc &tree, ZSwc &layerTree, std
   }
 }
 
-void ZGenerateAnalysisTextFile::getSubclassFeature(ZSwc &tree, ZSwc &subclassTree, std::map<SwcTreeNode, size_t> &nodeToSubclass) const
+void ZGenerateAnalysisTextFile::getSubclassFeature(const ZSwc &tree, const ZSwc &subclassTree, std::map<ConstSwcTreeNode, size_t> &nodeToSubclass) const
 {
-  SwcTreeNode tn = tree.begin();
-  SwcTreeNode layerTn = subclassTree.begin();
+  ConstSwcTreeNode tn = tree.begin();
+  ConstSwcTreeNode layerTn = subclassTree.begin();
   while (tn != tree.end()) {
     if (glm::length(glm::dvec3(tn->x - layerTn->x, tn->y - layerTn->y, tn->z - layerTn->z)) > 1.) {
       LWARN() << "node" << tn->x << tn->y << tn->z << tn->radius;
-      LWARN() << "layer node" << layerTn->x << layerTn->y << layerTn->z << layerTn->radius;
-      //LWARN() << "wrong layer node match";
-      throw ZImgException("wrong layer node match");
+      LWARN() << "subclass node" << layerTn->x << layerTn->y << layerTn->z << layerTn->radius;
+      throw ZImgException("wrong subclass node match");
     }
     nodeToSubclass[tn] = layerTn->type;
     ++tn;
@@ -347,13 +390,13 @@ void ZGenerateAnalysisTextFile::getSubclassFeature(ZSwc &tree, ZSwc &subclassTre
   }
 }
 
-void ZGenerateAnalysisTextFile::writeFeatureSwc(ZSwc &treeIn, std::map<SwcTreeNode, double> &nodeToFeature, const QString &outSwcName)
+void ZGenerateAnalysisTextFile::writeFeatureSwc(const ZSwc &treeIn, const std::map<ConstSwcTreeNode, double> &nodeToFeature, const QString &outSwcName) const
 {
   ZSwc tree = treeIn;
   SwcTreeNode tn = tree.begin();
-  SwcTreeNode tnIn = treeIn.begin();
+  ConstSwcTreeNode tnIn = treeIn.begin();
   while (tn != tree.end()) {
-    tn->type = roundTo<int>(nodeToFeature[tnIn]);
+    tn->type = roundTo<int>(nodeToFeature.at(tnIn));
     ++tn;
     ++tnIn;
   }
@@ -362,7 +405,7 @@ void ZGenerateAnalysisTextFile::writeFeatureSwc(ZSwc &treeIn, std::map<SwcTreeNo
 }
 
 double ZGenerateAnalysisTextFile::pointFrustumConeDist(double x, double y, double z,
-                                                       const SwcTreeNode &start, const SwcTreeNode &end, double *fracOut) const
+                                                       const ConstSwcTreeNode &start, const ConstSwcTreeNode &end, double *fracOut) const
 {
   double dist;
   glm::dvec3 pt(x,y,z);
@@ -389,13 +432,21 @@ double ZGenerateAnalysisTextFile::pointFrustumConeDist(double x, double y, doubl
   return dist;
 }
 
+double ZGenerateAnalysisTextFile::pointSphereDist(double x, double y, double z, const ZGenerateAnalysisTextFile::ConstSwcTreeNode &tn) const
+{
+  glm::dvec3 pt(x,y,z);
+  glm::dvec3 center(tn->x, tn->y, tn->z);
+  glm::dvec3 res(m_input.voxelSizeX, m_input.voxelSizeY, m_input.voxelSizeZ);
+  return glm::distance(pt*res, center*res);
+}
+
 double ZGenerateAnalysisTextFile::punctaFrustumConeDist(const ZPunctum &punctum,
-                                                        const SwcTreeNode &start, const SwcTreeNode &end, double *frac) const
+                                                        const ConstSwcTreeNode &start, const ConstSwcTreeNode &end, double *frac) const
 {
   return pointFrustumConeDist(punctum.x(), punctum.y(), punctum.z(), start, end, frac) - punctum.radius() * m_input.voxelSizeX;
 }
 
-double ZGenerateAnalysisTextFile::treeNodeDist(const SwcTreeNode &tn, const SwcTreeNode &ptn) const
+double ZGenerateAnalysisTextFile::treeNodeDist(const ConstSwcTreeNode &tn, const ConstSwcTreeNode &ptn) const
 {
   glm::dvec3 bot(tn->x, tn->y, tn->z);
   glm::dvec3 top(ptn->x, ptn->y, ptn->z);
@@ -417,8 +468,8 @@ bool ZGenerateAnalysisTextFile::inputSwcIsPyramidal() const
 }
 
 void ZGenerateAnalysisTextFile::mergeSoma(ZSwc &tree,
-                                          std::map<SwcTreeNode, double> &nodeToBlueness,
-                                          std::map<SwcTreeNode, size_t> &nodeToLayer) const
+                                          std::map<ConstSwcTreeNode, double> &nodeToBlueness,
+                                          std::map<ConstSwcTreeNode, size_t> &nodeToLayer) const
 {
   SwcTreeNode tn = tree.begin();
   SwcTreeNode next;
@@ -529,13 +580,13 @@ void ZGenerateAnalysisTextFile::removeSmallLeafBranch(ZSwc &tree, int numNodeThr
   }
 }
 
-size_t ZGenerateAnalysisTextFile::labelBranch(ZSwc &tree,
-                                              std::map<SwcTreeNode, size_t> &nodeToBranchId,
+size_t ZGenerateAnalysisTextFile::labelBranch(const ZSwc &tree,
+                                              std::map<ConstSwcTreeNode, size_t> &nodeToBranchId,
                                               std::map<size_t, size_t> &branchIdToParentBranchId,
-                                              std::map<SwcTreeNode, double> &nodeDistToParent,
-                                              std::map<SwcTreeNode, double> &nodeDistToBranchStart,
-                                              std::map<SwcTreeNode, double> &nodeDistToSoma,
-                                              std::map<SwcTreeNode, int> &nodeTopologyType,
+                                              std::map<ConstSwcTreeNode, double> &nodeDistToParent,
+                                              std::map<ConstSwcTreeNode, double> &nodeDistToBranchStart,
+                                              std::map<ConstSwcTreeNode, double> &nodeDistToSoma,
+                                              std::map<ConstSwcTreeNode, int> &nodeTopologyType,
                                               std::vector<Branch> &branches) const
 {
   nodeToBranchId.clear();
@@ -549,7 +600,7 @@ size_t ZGenerateAnalysisTextFile::labelBranch(ZSwc &tree,
 
   branchIdToParentBranchId[0] = 0;
 
-  for (SwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
+  for (ConstSwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
     if (ZSwc::isRoot(tn))  {
       nodeToBranchId[tn] = 0;
       nodeDistToParent[tn] = 0;
@@ -564,7 +615,7 @@ size_t ZGenerateAnalysisTextFile::labelBranch(ZSwc &tree,
     } else {
       nodeTopologyType[tn] = 0;
     }
-    SwcTreeNode parent = ZSwc::parent(tn);
+    ConstSwcTreeNode parent = ZSwc::parent(tn);
 
     if (ZSwc::isRoot(parent) || ZSwc::isBranchNode(parent)) {
       // new branch
@@ -584,12 +635,12 @@ size_t ZGenerateAnalysisTextFile::labelBranch(ZSwc &tree,
   }
 
   branches.resize(label);
-  for (SwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
+  for (ConstSwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
     size_t branchId = nodeToBranchId[tn];
     if (branchId > 0) {
       Branch &branch = branches[branchId-1];
       branch.id = branchId;
-      SwcTreeNode parent = ZSwc::parent(tn);
+      ConstSwcTreeNode parent = ZSwc::parent(tn);
       if (nodeToBranchId[parent] != branch.id) { // duplicate parent
         branch.nodes.push_back(parent);
       }
@@ -601,13 +652,13 @@ size_t ZGenerateAnalysisTextFile::labelBranch(ZSwc &tree,
   return label;
 }
 
-ZGenerateAnalysisTextFile::SwcTreeNode ZGenerateAnalysisTextFile::getNodeSegOfPunctum(ZSwc &tree, const ZPunctum &punctum, size_t numBranches,
-                                                                                      std::map<SwcTreeNode, size_t> &nodeToBranchId) const
+ZGenerateAnalysisTextFile::ConstSwcTreeNode ZGenerateAnalysisTextFile::getNodeSegOfPunctum(const ZSwc &tree, const ZPunctum &punctum, size_t numBranches,
+                                                                                           const std::map<ConstSwcTreeNode, size_t> &nodeToBranchId) const
 {
   std::vector<double> distToBranch(numBranches, std::numeric_limits<double>::max());
-  std::vector<SwcTreeNode> nearestNodeOfBranch(numBranches);
-  for (SwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
-    size_t branchId = nodeToBranchId[tn];
+  std::vector<ConstSwcTreeNode> nearestNodeOfBranch(numBranches);
+  for (ConstSwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
+    size_t branchId = nodeToBranchId.at(tn);
     if (branchId > 0) {
       double dist = punctaFrustumConeDist(punctum, ZSwc::parent(tn), tn);
       if (dist < distToBranch[branchId-1]) {
@@ -617,8 +668,8 @@ ZGenerateAnalysisTextFile::SwcTreeNode ZGenerateAnalysisTextFile::getNodeSegOfPu
     }
   }
   double distToTree = distToBranch[0];
-  SwcTreeNode res = nearestNodeOfBranch[0];
-  std::vector<SwcTreeNode> nodesWithinRange;
+  ConstSwcTreeNode res = nearestNodeOfBranch[0];
+  std::vector<ConstSwcTreeNode> nodesWithinRange;
   for (size_t i=0; i<numBranches; ++i) {
     if (i > 0 && distToBranch[i] < distToTree) {
       distToTree = distToBranch[i];
@@ -636,7 +687,7 @@ ZGenerateAnalysisTextFile::SwcTreeNode ZGenerateAnalysisTextFile::getNodeSegOfPu
     LWARN() << "Check Punctum from (no branch)" << m_input.punctaFilename << ":"
             << punctum.x() << punctum.y() << punctum.z() << punctum.radius()
             << punctum.maxIntensity() << punctum.meanIntensity();
-    return SwcTreeNode();
+    return ConstSwcTreeNode();
   } else if (nodesWithinRange.size() == 1) {
     return res;
   }
@@ -652,8 +703,8 @@ ZGenerateAnalysisTextFile::SwcTreeNode ZGenerateAnalysisTextFile::getNodeSegOfPu
   return res;
 }
 
-ZGenerateAnalysisTextFile::SwcTreeNode ZGenerateAnalysisTextFile::intensityWeightedNearestNode(double x, double y, double z,
-                                                                                               const std::vector<SwcTreeNode> &nodes) const
+ZGenerateAnalysisTextFile::ConstSwcTreeNode ZGenerateAnalysisTextFile::intensityWeightedNearestNode(double x, double y, double z,
+                                                                                                    const std::vector<ConstSwcTreeNode> &nodes) const
 {
   //first crop out the region
   int left = roundTo<int>(x);
@@ -663,7 +714,7 @@ ZGenerateAnalysisTextFile::SwcTreeNode ZGenerateAnalysisTextFile::intensityWeigh
   int zup = roundTo<int>(z);
   int zdown = roundTo<int>(z);
   for (size_t i=0; i<nodes.size(); ++i) {
-    SwcTreeNode parent = ZSwc::parent(nodes[i]);
+    ConstSwcTreeNode parent = ZSwc::parent(nodes[i]);
     left = std::min(std::min(left, roundTo<int>(nodes[i]->x)), roundTo<int>(parent->x));
     right = std::max(std::max(right, roundTo<int>(nodes[i]->x)), roundTo<int>(parent->x));
     up = std::min(std::min(up, roundTo<int>(nodes[i]->y)), roundTo<int>(parent->y));
@@ -722,12 +773,12 @@ ZGenerateAnalysisTextFile::SwcTreeNode ZGenerateAnalysisTextFile::intensityWeigh
   return nodes[minIndex];
 }
 
-ZGenerateAnalysisTextFile::SwcTreeNode ZGenerateAnalysisTextFile::nearestNode(double x, double y, double z, const std::vector<SwcTreeNode> &nodes) const
+ZGenerateAnalysisTextFile::ConstSwcTreeNode ZGenerateAnalysisTextFile::nearestNode(double x, double y, double z, const std::vector<ConstSwcTreeNode> &nodes) const
 {  
   double dist = std::numeric_limits<double>::max();
-  SwcTreeNode res;
+  ConstSwcTreeNode res;
   for (size_t i=0; i<nodes.size(); ++i) {
-    const SwcTreeNode &node = nodes[i];
+    const ConstSwcTreeNode &node = nodes[i];
     double nodeDist = pointFrustumConeDist(x,y,z,node,ZSwc::parent(node));
     if (nodeDist < dist) {
       dist = nodeDist;
@@ -753,10 +804,10 @@ QDir ZGenerateAnalysisTextFile::getSubDir(const QString &subFoldername) const
   return res;
 }
 
-void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
-                                                      std::map<SwcTreeNode, double> &nodeToBlueness,
-                                                      std::map<SwcTreeNode, size_t> &nodeToLayer,
-                                                      std::map<SwcTreeNode, size_t> &nodeToSubclass) const
+void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc &tree,
+                                                      const std::map<ConstSwcTreeNode, double> &nodeToBlueness,
+                                                      const std::map<ConstSwcTreeNode, size_t> &nodeToLayer,
+                                                      const std::map<ConstSwcTreeNode, size_t> &nodeToSubclass) const
 {
   QDir outputDir(m_input.outputFolder);
   QFileInfo swcFileInfo(m_processedSwcFilename);
@@ -780,23 +831,23 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
   }
   somaPunctaStream.close();
 
-  std::map<SwcTreeNode, size_t> nodeToBranchId;
+  std::map<ConstSwcTreeNode, size_t> nodeToBranchId;
   std::map<size_t, size_t> branchIdToParentBranchId;
-  std::map<SwcTreeNode, double> nodeDistToParent;
-  std::map<SwcTreeNode, double> nodeDistToBranchStart;
-  std::map<SwcTreeNode, double> nodeDistToSoma;
-  std::map<SwcTreeNode, int> nodeTopologyType;
-  std::map<SwcTreeNode, std::vector<const ZPunctum*>> nodeToPuncta;
+  std::map<ConstSwcTreeNode, double> nodeDistToParent;
+  std::map<ConstSwcTreeNode, double> nodeDistToBranchStart;
+  std::map<ConstSwcTreeNode, double> nodeDistToSoma;
+  std::map<ConstSwcTreeNode, int> nodeTopologyType;
+  std::map<ConstSwcTreeNode, std::vector<const ZPunctum*>> nodeToPuncta;
   std::vector<Branch> branches;
   labelBranch(tree, nodeToBranchId, branchIdToParentBranchId,
               nodeDistToParent, nodeDistToBranchStart, nodeDistToSoma, nodeTopologyType, branches);
   punctaList = ZPuncta(m_input.punctaFilename);
-  std::map<const ZPunctum*, SwcTreeNode> punctumToNode;
+  std::map<const ZPunctum*, ConstSwcTreeNode> punctumToNode;
   std::map<const ZPunctum*, double> punctumDistToBranchStart;
   std::map<const ZPunctum*, double> punctumDistToSoma;
   std::map<const ZPunctum*, double> punctumDistToSegmentStart;
   for (ZPuncta::const_iterator it = punctaList.begin(); it != punctaList.end(); ++it) {
-    SwcTreeNode tn = getNodeSegOfPunctum(tree, *it, branches.size(), nodeToBranchId);
+    ConstSwcTreeNode tn = getNodeSegOfPunctum(tree, *it, branches.size(), nodeToBranchId);
     punctumToNode[&(*it)] = tn;
     if (ZSwc::isNull(tn))
       continue;
@@ -830,15 +881,15 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
   for (size_t i=0; i<branches.size(); ++i) {
     Branch &branch = branches[i];
     for (size_t j=0; j<branch.nodes.size(); ++j) {
-      const SwcTreeNode &tn = branch.nodes[j];
+      const ConstSwcTreeNode &tn = branch.nodes[j];
       branchStream << branch.id << " " << tn->type << " "
                    << tn->x << " " << tn->y << " "
                    << tn->z << " " << tn->radius << " "
-                   << nodeToBlueness[tn] << " "
-                   << nodeToLayer[tn] << " "
-                   << nodeTopologyType[tn] << " "
-                   << nodeDistToBranchStart[tn] << " "
-                   << nodeDistToSoma[tn] << std::endl;
+                   << nodeToBlueness.at(tn) << " "
+                   << nodeToLayer.at(tn) << " "
+                   << nodeTopologyType.at(tn) << " "
+                   << nodeDistToBranchStart.at(tn) << " "
+                   << nodeDistToSoma.at(tn) << std::endl;
     }
   }
   branchStream.close();
@@ -893,7 +944,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
 
     ZPuncta tmpPunc;
     for (size_t j=0; j<branch.nodes.size(); ++j) {
-      const SwcTreeNode &tn = branch.nodes[j];
+      const ConstSwcTreeNode &tn = branch.nodes[j];
       outSwcStream << tn->id << " " << tn->type << " " << tn->x << " "
                    << tn->y << " " << tn->z << " " << tn->radius << " "
                    << ZSwc::parentID(tn) << std::endl;
@@ -907,11 +958,11 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
       outSwcTxtStream << tn->type << " " << tn->x << " "
                       << tn->y << " "
                       << tn->z << " " << tn->radius << " "
-                      << nodeToBlueness[tn] << " "
-                      << nodeToLayer[tn] << " "
-                      << nodeTopologyType[tn] << " "
-                      << nodeDistToBranchStart[tn] << " "
-                      << nodeDistToSoma[tn] << std::endl;
+                      << nodeToBlueness.at(tn) << " "
+                      << nodeToLayer.at(tn) << " "
+                      << nodeTopologyType.at(tn) << " "
+                      << nodeDistToBranchStart.at(tn) << " "
+                      << nodeDistToSoma.at(tn) << std::endl;
 
       if (j > 0) {
         std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
@@ -940,8 +991,8 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
 
     int basalIndex = 0;
     int apicalIndex = 0;
-    for (ZSwc::LeafIterator tn = tree.beginLeaf(); tn != tree.endLeaf(); ++tn) {
-      SwcTreeNode tmptn = tn;
+    for (ZSwc::ConstLeafIterator tn = tree.beginLeaf(); tn != tree.endLeaf(); ++tn) {
+      ConstSwcTreeNode tmptn = tn;
 
       QDir *currentBranchFolder = nullptr;
       int *currentBranchIndex = nullptr;
@@ -996,7 +1047,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
           }
           ++nodeIdx;
 
-          const SwcTreeNode &btn = branch.nodes[j];
+          const ConstSwcTreeNode &btn = branch.nodes[j];
           outSwcStream << btn->id << " " << btn->type << " " << btn->x << " "
                        << btn->y << " " << btn->z << " " << btn->radius << " "
                        << ZSwc::parentID(btn) << std::endl;
@@ -1010,11 +1061,11 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
           outSwcTxtStream << btn->type << " " << btn->x << " "
                           << btn->y << " "
                           << btn->z << " " << btn->radius << " "
-                          << nodeToBlueness[btn] << " "
-                          << nodeToLayer[btn] << " "
-                          << nodeTopologyType[btn] << " "
-                          << nodeDistToBranchStart[btn] << " "
-                          << nodeDistToSoma[btn] << std::endl;
+                          << nodeToBlueness.at(btn) << " "
+                          << nodeToLayer.at(btn) << " "
+                          << nodeTopologyType.at(btn) << " "
+                          << nodeDistToBranchStart.at(btn) << " "
+                          << nodeDistToSoma.at(btn) << std::endl;
 
           // don't need to skip i == 0 and j == 0 case because btn will be soma and there
           // should be no puncta for soma
@@ -1056,22 +1107,22 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
     int apicalTuftIndex = 0;
 
     // get main trunk and tuft (MTT)
-    std::map<SwcTreeNode, size_t> nodeToMTTBranchId;
+    std::map<ConstSwcTreeNode, size_t> nodeToMTTBranchId;
     std::vector<Branch> MTTBranches;
     size_t label = 0;
-    for (SwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
-      size_t nodeSubclass = nodeToSubclass[tn];
+    for (ConstSwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
+      size_t nodeSubclass = nodeToSubclass.at(tn);
       if (ZSwc::isRoot(tn) || (nodeSubclass != ZSwc::MainTrunkType && nodeSubclass != ZSwc::ApicalTuftType))  {
         nodeToMTTBranchId[tn] = 0;
         continue;
       }
-      SwcTreeNode parent = ZSwc::parent(tn);
-      size_t parentNodeSubclass = nodeToSubclass[parent];
+      ConstSwcTreeNode parent = ZSwc::parent(tn);
+      size_t parentNodeSubclass = nodeToSubclass.at(parent);
       bool parentIsMTTBranchNode = false;
       if (nodeToMTTBranchId[parent] != 0 && ZSwc::isBranchNode(parent)) {
         int count = 0;
         for (auto ctn = tree.beginChild(parent); ctn != tree.endChild(parent); ++ctn) {
-          if (nodeToSubclass[ctn] == ZSwc::MainTrunkType || nodeToSubclass[ctn] == ZSwc::ApicalTuftType) {
+          if (nodeToSubclass.at(ctn) == ZSwc::MainTrunkType || nodeToSubclass.at(ctn) == ZSwc::ApicalTuftType) {
             ++count;
           }
         }
@@ -1087,12 +1138,12 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
     }
 
     MTTBranches.resize(label);
-    for (SwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
+    for (ConstSwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
       size_t branchId = nodeToMTTBranchId[tn];
       if (branchId > 0) {
         Branch &branch = MTTBranches[branchId-1];
         branch.id = branchId;
-        SwcTreeNode parent = ZSwc::parent(tn);
+        ConstSwcTreeNode parent = ZSwc::parent(tn);
         if (nodeToMTTBranchId[parent] != branch.id) { // duplicate parent
           branch.nodes.push_back(parent);
         }
@@ -1103,8 +1154,8 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
     for (size_t i=0; i<MTTBranches.size(); ++i) {
       Branch &branch = MTTBranches[i];
 
-      SwcTreeNode tmptn = branch.nodes[branch.nodes.size()-1];
-      size_t nodeSubclass = nodeToSubclass[tmptn];
+      ConstSwcTreeNode tmptn = branch.nodes[branch.nodes.size()-1];
+      size_t nodeSubclass = nodeToSubclass.at(tmptn);
 
       QDir *currentBranchFolder = nullptr;
       int *currentBranchIndex = nullptr;
@@ -1145,7 +1196,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
       double segmentStartToBranchStartLength = 0.0;
       ZPuncta tmpPunc;
       for (size_t j=0; j<branch.nodes.size(); ++j) {
-        const SwcTreeNode &tn = branch.nodes[j];
+        const ConstSwcTreeNode &tn = branch.nodes[j];
         outSwcStream << tn->id << " " << tn->type << " " << tn->x << " "
                      << tn->y << " " << tn->z << " " << tn->radius << " "
                      << ZSwc::parentID(tn) << std::endl;
@@ -1159,11 +1210,11 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
         outSwcTxtStream << tn->type << " " << tn->x << " "
                         << tn->y << " "
                         << tn->z << " " << tn->radius << " "
-                        << nodeToBlueness[tn] << " "
-                        << nodeToLayer[tn] << " "
-                        << nodeTopologyType[tn] << " "
-                        << nodeDistToBranchStart[tn] << " "
-                        << nodeDistToSoma[tn] << std::endl;
+                        << nodeToBlueness.at(tn) << " "
+                        << nodeToLayer.at(tn) << " "
+                        << nodeTopologyType.at(tn) << " "
+                        << nodeDistToBranchStart.at(tn) << " "
+                        << nodeDistToSoma.at(tn) << std::endl;
 
         if (j > 0) {
           std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
@@ -1191,8 +1242,8 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
     for (size_t i=0; i<branches.size(); ++i) {
       Branch &branch = branches[i];
 
-      SwcTreeNode tmptn = branch.nodes[branch.nodes.size()-1];
-      size_t nodeSubclass = nodeToSubclass[tmptn];
+      ConstSwcTreeNode tmptn = branch.nodes[branch.nodes.size()-1];
+      size_t nodeSubclass = nodeToSubclass.at(tmptn);
       size_t nodeType = tmptn->type;
       bool nodeIsLeaf = ZSwc::isLeaf(tmptn);
 
@@ -1235,7 +1286,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
 
         ZPuncta tmpPunc;
         for (size_t j=0; j<branch.nodes.size(); ++j) {
-          const SwcTreeNode &tn = branch.nodes[j];
+          const ConstSwcTreeNode &tn = branch.nodes[j];
           outSwcStream << tn->id << " " << tn->type << " " << tn->x << " "
                        << tn->y << " " << tn->z << " " << tn->radius << " "
                        << ZSwc::parentID(tn) << std::endl;
@@ -1249,11 +1300,11 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(ZSwc &tree,
           outSwcTxtStream << tn->type << " " << tn->x << " "
                           << tn->y << " "
                           << tn->z << " " << tn->radius << " "
-                          << nodeToBlueness[tn] << " "
-                          << nodeToLayer[tn] << " "
-                          << nodeTopologyType[tn] << " "
-                          << nodeDistToBranchStart[tn] << " "
-                          << nodeDistToSoma[tn] << std::endl;
+                          << nodeToBlueness.at(tn) << " "
+                          << nodeToLayer.at(tn) << " "
+                          << nodeTopologyType.at(tn) << " "
+                          << nodeDistToBranchStart.at(tn) << " "
+                          << nodeDistToSoma.at(tn) << std::endl;
 
           if (j > 0) {
             std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
