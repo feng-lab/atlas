@@ -238,7 +238,7 @@ ZColorMap::ZColorMap(const ZColorMap &cm)
   connect(this, SIGNAL(changed()), this, SLOT(invalidateTexture()));
 }
 
-ZColorMap::ZColorMap(ZColorMap &&other)
+ZColorMap::ZColorMap(ZColorMap &&other) noexcept
 {
   swap(other);
 }

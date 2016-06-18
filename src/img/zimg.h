@@ -115,7 +115,7 @@ public:
   explicit ZImg(const ZImgInfo &info);
   //
   ZImg(const ZImg &other);
-  ZImg(ZImg &&other);
+  ZImg(ZImg &&other) noexcept;
   // read image from file, throw ZIOException if read failed, might throw ZImgException if can't allocate memory
   explicit ZImg(const QString &filename, ZImgRegion region = ZImgRegion(), size_t scene = 0, FileFormat format = FileFormat::Unknown);
   explicit ZImg(const ZImgSource &imgSource);
@@ -125,7 +125,7 @@ public:
   void clear();
   void swap(ZImg &other) noexcept;
 
-  ZImg& operator=(ZImg other) { swap(other); return *this; }
+  ZImg& operator=(ZImg other) noexcept { swap(other); return *this; }
 
   // qt style read write name filter for filedialog
   static void getQtReadNameFilter(QStringList &filters, QList<FileFormat> &formats);

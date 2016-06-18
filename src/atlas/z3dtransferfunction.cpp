@@ -26,7 +26,7 @@ Z3DTransferFunction::Z3DTransferFunction(const Z3DTransferFunction& tf)
 {
 }
 
-Z3DTransferFunction::Z3DTransferFunction(Z3DTransferFunction &&tf)
+Z3DTransferFunction::Z3DTransferFunction(Z3DTransferFunction &&tf) noexcept
 {
   swap(tf);
 }

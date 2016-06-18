@@ -25,12 +25,12 @@ public:
 
 
   Z3DTransferFunction(const Z3DTransferFunction &tf);
-  Z3DTransferFunction(Z3DTransferFunction &&tf);
+  Z3DTransferFunction(Z3DTransferFunction &&tf) noexcept;
   virtual ~Z3DTransferFunction();
 
   void swap(Z3DTransferFunction& other) noexcept;
 
-  Z3DTransferFunction& operator=(Z3DTransferFunction other) { swap(other); return *this; }
+  Z3DTransferFunction& operator=(Z3DTransferFunction other) noexcept { swap(other); return *this; }
 
   bool operator==(const Z3DTransferFunction& tf) const;
   bool operator!=(const Z3DTransferFunction& tf) const;

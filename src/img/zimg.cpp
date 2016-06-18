@@ -128,14 +128,14 @@ QString ZImgSource::toQString() const
 //-----------------------------------------------------------------------------------
 
 ZImg::ZImg()
+  : m_ownData(true)
 {
-  clear();
 }
 
 ZImg::ZImg(const ZImgInfo &info)
+  : m_info(info)
+  , m_ownData(true)
 {
-  clear();
-  m_info = info;
   allocate();
 }
 
@@ -157,7 +157,7 @@ ZImg::ZImg(const ZImg &other)
   }
 }
 
-ZImg::ZImg(ZImg &&other)
+ZImg::ZImg(ZImg &&other) noexcept
 {
   swap(other);
 }

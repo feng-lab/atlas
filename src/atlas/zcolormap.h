@@ -93,12 +93,12 @@ public:
   ZColorMap(double min, double max, const QColor &minColor, const QColor &maxColor = QColor(0,0,0,255), QObject *parent = 0);
 
   ZColorMap(const ZColorMap& cm);
-  ZColorMap(ZColorMap &&other);
+  ZColorMap(ZColorMap &&other) noexcept;
 
   ~ZColorMap();
 
   void swap(ZColorMap& other) noexcept;
-  ZColorMap& operator=(ZColorMap other) { swap(other); return *this; }
+  ZColorMap& operator=(ZColorMap other) noexcept { swap(other); return *this; }
 
 
   void reset(double min = 0.0, double max = 255.0, const glm::col4 &minColor = glm::col4(0,0,0,255),
