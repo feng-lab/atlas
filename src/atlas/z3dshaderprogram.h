@@ -47,7 +47,8 @@ public:
   void addShader(Z3DShader &shader);
 
   void addShaderFromSourceCode(Z3DShader::Type type, const char *source);
-  void addShaderFromSourceCode(Z3DShader::Type type, const QString &source) { addShaderFromSourceCode(type, source.toLatin1().constData()); }
+  void addShaderFromSourceCode(Z3DShader::Type type, const QString &source)
+  { addShaderFromSourceCode(type, source.toUtf8().constData()); }
 
   void removeAllShaders();
 

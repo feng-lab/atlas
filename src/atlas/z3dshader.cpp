@@ -110,7 +110,7 @@ void Z3DShader::compileSourceCode(const char *source)
 
 void Z3DShader::compileSourceCode(const QString &source)
 {
-  compileSourceCode(source.toLatin1().constData());
+  compileSourceCode(source.toUtf8().constData());
 }
 
 QByteArray Z3DShader::sourceCode() const

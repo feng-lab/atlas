@@ -40,7 +40,9 @@ Z3DShader &Z3DShaderManager::shader(const QString &fn, const QString &header, co
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
       throw ZGLException(QString("Can not open vertex shader file: %1.  Error String: %2").arg(filename).arg(file.errorString()));
     }
-    QString src = header + file.readAll();
+    QTextStream fileStream(&file);
+    fileStream.setCodec("UTF-8");
+    QString src = header + fileStream.readAll();
 
     assert(context == Z3DContext());
     auto shdr = std::make_unique<Z3DShader>(type);
