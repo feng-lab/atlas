@@ -9,6 +9,7 @@
 #include <tiff.h>
 #include "zimage2dutils.h"
 #include <memory>
+#include <QFile>
 
 namespace {
 
@@ -370,7 +371,7 @@ QStringList ZImgJpeg::extensions() const
 void ZImgJpeg::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
                         std::vector<std::set<size_t>> *pyramidalRatios)
 {
-  std::unique_ptr<FILE, int (*)(FILE*)> infile(fopen(qPrintable(filename), "rb"), fclose);
+  std::unique_ptr<FILE, int (*)(FILE*)> infile(fopen(QFile::encodeName(filename).constData(), "rb"), fclose);
   if (!infile) {
     throw ZIOException("can't open file");
   }
@@ -393,7 +394,7 @@ void ZImgJpeg::readMetadata(const QString &filename, ZImgMetadata &meta, size_t 
   if (scene != 0) {
     throw ZIOException("invalid scene");
   }
-  std::unique_ptr<FILE, int (*)(FILE*)> infile(fopen(qPrintable(filename), "rb"), fclose);
+  std::unique_ptr<FILE, int (*)(FILE*)> infile(fopen(QFile::encodeName(filename).constData(), "rb"), fclose);
   if (!infile) {
     throw ZIOException("can't open file");
   }
@@ -434,7 +435,7 @@ void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
   if (scene != 0) {
     throw ZIOException("invalid scene");
   }
-  std::unique_ptr<FILE, int (*)(FILE*)> infile(fopen(qPrintable(filename), "rb"), fclose);
+  std::unique_ptr<FILE, int (*)(FILE*)> infile(fopen(QFile::encodeName(filename).constData(), "rb"), fclose);
   if (!infile) {
     throw ZIOException("can't open file");
   }
@@ -505,7 +506,7 @@ void ZImgJpeg::readImg(const QString &filename, ZImg &img, const ZImgRegion &reg
   if (scene != 0) {
     throw ZIOException("invalid scene");
   }
-  std::unique_ptr<FILE, int (*)(FILE*)> infile(fopen(qPrintable(filename), "rb"), fclose);
+  std::unique_ptr<FILE, int (*)(FILE*)> infile(fopen(QFile::encodeName(filename).constData(), "rb"), fclose);
   if (!infile) {
     throw ZIOException("can't open file");
   }

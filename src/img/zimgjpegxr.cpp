@@ -2,6 +2,7 @@
 
 #include "JXRGlue.h"
 #include <cmath>
+#include <QFile>
 
 namespace {
 
@@ -168,7 +169,7 @@ void ZImgJpegXR::readInfo(const QString &filename, std::vector<ZImgInfo> &infos,
   PKPixelInfo PI;
 
   Call(PKCreateCodecFactory(&pCodecFactory, WMP_SDK_VERSION));
-  Call(pCodecFactory->CreateDecoderFromFile(qPrintable(filename), &pDecoder));
+  Call(pCodecFactory->CreateDecoderFromFile(QFile::encodeName(filename).constData(), &pDecoder));
   PI.pGUIDPixFmt = &pDecoder->guidPixFormat;
   Call(PixelFormatLookup(&PI, LOOKUP_FORWARD));
   //Call(PixelFormatLookup(&PI, LOOKUP_BACKWARD_TIF));
@@ -221,7 +222,7 @@ void ZImgJpegXR::readImg(const QString &filename, ZImg &img, const ZImgRegion &r
   ZImgInfo info;
 
   Call(PKCreateCodecFactory(&pCodecFactory, WMP_SDK_VERSION));
-  Call(pCodecFactory->CreateDecoderFromFile(qPrintable(filename), &pDecoder));
+  Call(pCodecFactory->CreateDecoderFromFile(QFile::encodeName(filename).constData(), &pDecoder));
   PI.pGUIDPixFmt = &pDecoder->guidPixFormat;
   Call(PixelFormatLookup(&PI, LOOKUP_FORWARD));
   //Call(PixelFormatLookup(&PI, LOOKUP_BACKWARD_TIF));

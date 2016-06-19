@@ -322,7 +322,7 @@ void ZImgITKImage::writeImg(const QString &filename, const ZImg &img, Compressio
 //  metaImage.DistanceUnits(distanceUnitType);
 //  metaImage.CompressedData(comp != Compression::NONE);
 
-//  if (!metaImage.Write(qPrintable(filename))) {
+//  if (!metaImage.Write(QFile::encodeName(filename).constData())) {
 //    throw ZIOException("Can not write metaimage");
 //  }
 }

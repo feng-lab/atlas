@@ -11,6 +11,7 @@
 #include "zimage2dutils.h"
 #include "zioutils.h"
 #include <set>
+#include <QFile>
 
 namespace {
 
@@ -817,7 +818,7 @@ void ZTiff::load(const QString &filename, bool tagOnly)
 #if defined(_WIN32) || defined(_WIN64)
       m_tif.reset(TIFFOpenW(filename.toStdWString().c_str(), "r"));
 #else
-      m_tif.reset(TIFFOpen(qPrintable(filename), "r"));
+      m_tif.reset(TIFFOpen(QFile::encodeName(filename).constData(), "r"));
 #endif
     }
     catch (const ZIOException & e) {
@@ -830,7 +831,7 @@ void ZTiff::load(const QString &filename, bool tagOnly)
 #if defined(_WIN32) || defined(_WIN64)
         m_tif.reset(TIFFOpenW(filename.toStdWString().c_str(), "r"));
 #else
-        m_tif.reset(TIFFOpen(qPrintable(filename), "r"));
+        m_tif.reset(TIFFOpen(QFile::encodeName(filename).constData(), "r"));
 #endif
       } else {
         m_tif.reset();
@@ -1806,9 +1807,9 @@ void ZTiffWriter::startWriting(const QString &filename, Compression comp, int ex
     m_tif.reset(TIFFOpenW(filename.toStdWString().c_str(), "w"));
 #else
   if (bigTiff)
-    m_tif.reset(TIFFOpen(qPrintable(filename), "w8"));
+    m_tif.reset(TIFFOpen(QFile::encodeName(filename).constData(), "w8"));
   else
-    m_tif.reset(TIFFOpen(qPrintable(filename), "w"));
+    m_tif.reset(TIFFOpen(QFile::encodeName(filename).constData(), "w"));
 #endif
   if (!m_tif)
     throw ZIOException(QString("Can't open ") % filename % QString(" for writing"));

@@ -8,18 +8,23 @@
 #include "zexception.h"
 #include "zioutils.h"
 #include "zstringutils.h"
+#include <QFile>
 
 namespace nim {
 
 using namespace Eigen;
 
-MatrixXd ZEigenUtils::readMatrix(const char *filename, const char *uSep, bool strictDelimiter, double fillValue, const std::string &commentStart)
+MatrixXd ZEigenUtils::readMatrix(const QString &filename, const char *uSep, bool strictDelimiter, double fillValue, const std::string &commentStart)
 {
   MatrixXd mat;
   MatrixXd emptyMat;
 
   std::ifstream inputFileStream;
-  inputFileStream.open(filename, std::ios::in);
+#ifdef _MSC_VER
+  inputFileStream.open(filename.toStdWString().c_str(), std::ios::in);
+#else
+  inputFileStream.open(QFile::encodeName(filename).constData(), std::ios::in);
+#endif
   if (!inputFileStream.is_open()) {
     throw ZIOException(QString("Can not open file %1").arg(filename));
   }

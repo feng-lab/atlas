@@ -106,7 +106,7 @@ void ZPunctaIO::readNimpFile(const QString &filename, ZPuncta &puncta) const
   try {
     H5::Exception::dontPrint();
 
-    H5::H5File file(qPrintable(filename), H5F_ACC_RDONLY);
+    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_RDONLY);
 
     double punctaInfo[13];
 
@@ -214,7 +214,7 @@ void ZPunctaIO::writeNimpFile(const ZPuncta &puncta, const QString &filename) co
   try {
     H5::Exception::dontPrint();
 
-    H5::H5File file(qPrintable(filename), H5F_ACC_TRUNC);
+    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_TRUNC);
 
     double punctaInfo[13];
     hsize_t infoDim = 13;
@@ -477,7 +477,7 @@ void ZPunctaIO::readV3DMarkerFile(const QString &file, ZPuncta &puncta) const
 
 void ZPunctaIO::readMatFile(const QString &file, ZPuncta &puncta) const
 {
-  Eigen::MatrixXd mat = ZEigenUtils::readMatrix(qPrintable(file), "", false, 0, "#");
+  Eigen::MatrixXd mat = ZEigenUtils::readMatrix(file, "", false, 0, "#");
   mat = ZEigenUtils::removeRowsContainNaNOrInF(mat);
   if (mat.rows() > 0 && mat.cols() == 3) {
     for (int i=0; i<mat.rows(); ++i) {

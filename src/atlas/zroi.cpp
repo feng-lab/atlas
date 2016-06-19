@@ -867,7 +867,7 @@ void ZROI::load(const QString &filename)
   try {
     H5::Exception::dontPrint();
 
-    H5::H5File file(qPrintable(filename), H5F_ACC_RDONLY);
+    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_RDONLY);
 
     H5::Group allGrp = file.openGroup("ROI");
 
@@ -884,7 +884,7 @@ void ZROI::save(const QString &filename) const
   try {
     H5::Exception::dontPrint();
 
-    H5::H5File file(qPrintable(filename), H5F_ACC_TRUNC);
+    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_TRUNC);
 
     H5::Group allGrp = file.createGroup("ROI");
 

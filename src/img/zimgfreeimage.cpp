@@ -1,6 +1,7 @@
 #include "zimgfreeimage.h"
 
 #include <FreeImagePlus.h>
+#include <QFile>
 
 namespace {
 
@@ -179,7 +180,7 @@ QStringList ZImgFreeImage::extensions() const
 void ZImgFreeImage::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
                              std::vector<std::set<size_t>> *pyramidalRatios)
 {
-  FREE_IMAGE_FORMAT fmt = fipImage::identifyFIF(qPrintable(filename));
+  FREE_IMAGE_FORMAT fmt = fipImage::identifyFIF(QFile::encodeName(filename).constData());
   if (fmt == FIF_UNKNOWN) {
     throw ZIOException("Can not identify image format");
   } /*else {
@@ -187,7 +188,7 @@ void ZImgFreeImage::readInfo(const QString &filename, std::vector<ZImgInfo> &inf
   }*/
   fipMultiPage fipMp(true);
   bool multipage = fmt == FIF_GIF
-      && fipMp.open(qPrintable(filename), false, true, FIF_LOAD_NOPIXELS | GIF_PLAYBACK)
+      && fipMp.open(QFile::encodeName(filename).constData(), false, true, FIF_LOAD_NOPIXELS | GIF_PLAYBACK)
       && fipMp.getPageCount() > 1;
   if (multipage) {
     fipImage fipImg;
@@ -198,7 +199,7 @@ void ZImgFreeImage::readInfo(const QString &filename, std::vector<ZImgInfo> &inf
     fipMp.close();
   } else { // not multipage
     fipImage fipImg;
-    if (!fipImg.load(qPrintable(filename), FIF_LOAD_NOPIXELS)) {
+    if (!fipImg.load(QFile::encodeName(filename).constData(), FIF_LOAD_NOPIXELS)) {
       throw ZIOException("Can not load header");
     }
     infos.push_back(readInfoFromFIPImage(fipImg));
@@ -240,7 +241,7 @@ void ZImgFreeImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
   bool isBGA = false;
   if (info.numTimes == 1) {
     fipImage fipImg;
-    if (!fipImg.load(qPrintable(filename))) {
+    if (!fipImg.load(QFile::encodeName(filename).constData())) {
       throw ZIOException("Can not load");
     }
 
@@ -280,7 +281,7 @@ void ZImgFreeImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
     }
   } else {
     fipMultiPage fipMp(true);
-    if (!fipMp.open(qPrintable(filename), false, true, GIF_PLAYBACK)) {
+    if (!fipMp.open(QFile::encodeName(filename).constData(), false, true, GIF_PLAYBACK)) {
       throw ZIOException("Can not open gif");
     }
 

@@ -109,7 +109,7 @@ public:
   // the result matrix size will be smaller. Number of cols are detected from statrRow
   // By default consecutive delimiters are seen as one, unless you set strictDelimiter to true.
   // Strict delimiter should be given in uSep. It **can not** be empty or space or tab.
-  static Eigen::MatrixXd readMatrix(const char *filename, const char *uSep = "", bool strictDelimiter = false,
+  static Eigen::MatrixXd readMatrix(const QString &filename, const char *uSep = "", bool strictDelimiter = false,
                                     double fillValue = std::numeric_limits<double>::quiet_NaN(),
                                     const std::string &commentStart = "#");
 

@@ -38,7 +38,7 @@ void ZImgMetaImage::readInfo(const QString &filename, std::vector<ZImgInfo> &inf
                              std::vector<std::set<size_t>> *pyramidalRatios)
 {
   MetaImage metaImage;
-  if (!metaImage.Read(qPrintable(filename), false, nullptr)) {
+  if (!metaImage.Read(QFile::encodeName(filename).constData(), false, nullptr)) {
     throw ZIOException("Can not read file");
   }
   infos.resize(1);
@@ -62,7 +62,7 @@ void ZImgMetaImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
     throw ZIOException("invalid scene");
   }
   MetaImage metaImage;
-  if (!metaImage.Read(qPrintable(filename), false, nullptr)) {
+  if (!metaImage.Read(QFile::encodeName(filename).constData(), false, nullptr)) {
     throw ZIOException("Can not read metaImage");
   }
   //metaImage.PrintInfo();
@@ -79,7 +79,7 @@ void ZImgMetaImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
   if (region.containsWholeImg(imgInfo)) {
     img = ZImg(imgInfo);
     metaImage.Clear();
-    metaImage.Read(qPrintable(filename), true, img.channelData<uint8_t>(0));
+    metaImage.Read(QFile::encodeName(filename).constData(), true, img.channelData<uint8_t>(0));
     if (imgInfo.numChannels > 1) {
       ZImg tpImg(imgInfo);
       CXYZtoXYZC(img, tpImg);
@@ -104,7 +104,7 @@ void ZImgMetaImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
     indexMax[0] = rgn.end.x-1;
     indexMax[1] = rgn.end.y-1;
     indexMax[2] = rgn.end.z-1;
-    metaImage.ReadROI(indexMin, indexMax, qPrintable(filename), true, tmpImg.channelData<uint8_t>(0));
+    metaImage.ReadROI(indexMin, indexMax, QFile::encodeName(filename).constData(), true, tmpImg.channelData<uint8_t>(0));
     if (clipInfo.numChannels > 1) {
       ZImg tpImg(clipInfo);
       CXYZtoXYZC(tmpImg, tpImg);
@@ -221,7 +221,7 @@ void ZImgMetaImage::writeImg(const QString &filename, const ZImg &img, Compressi
   metaImage.DistanceUnits(distanceUnitType);
   metaImage.CompressedData(comp != Compression::NONE);
 
-  if (!metaImage.Write(qPrintable(filename))) {
+  if (!metaImage.Write(QFile::encodeName(filename).constData())) {
     throw ZIOException("Can not write metaimage");
   }
 }

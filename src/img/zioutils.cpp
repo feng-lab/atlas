@@ -8,7 +8,11 @@ namespace nim {
 
 void openFileStream(std::ifstream &fs, const QString &filename, std::ios_base::openmode mode)
 {
-  fs.open(qPrintable(filename), mode);
+#ifdef _MSC_VER
+  fs.open(filename.toStdWString().c_str(), mode);   // use msvc extension
+#else
+  fs.open(QFile::encodeName(filename).constData(), mode);
+#endif
   if (!fs.is_open()) {
     throw ZIOException("Can not open file for reading.");
   }
@@ -16,7 +20,11 @@ void openFileStream(std::ifstream &fs, const QString &filename, std::ios_base::o
 
 void openFileStream(std::ofstream &fs, const QString &filename, std::ios_base::openmode mode)
 {
-  fs.open(qPrintable(filename), mode);
+#ifdef _MSC_VER
+  fs.open(filename.toStdWString().c_str(), mode);   // use msvc extension
+#else
+  fs.open(QFile::encodeName(filename).constData(), mode);
+#endif
   if (!fs.is_open()) {
     throw ZIOException("Can not open file for writing.");
   }

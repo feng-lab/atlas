@@ -69,7 +69,7 @@ void ZPunctaDetectionDialog::detect()
       emit srcImgReady(imgToSend, m_inputImageFileWidget->getSelectedOpenFile());
 #else
       ZStack* stack = imgToZStack(img);
-      stack->setSource(qPrintable(m_inputImageFileWidget->getSelectedOpenFile()));
+      stack->setSource(QFile::encodeName(m_inputImageFileWidget->getSelectedOpenFile()).constData());
       emit stackDocDelivered(stack);
       img = wrapZStackAsZImg(*stack);
 #endif

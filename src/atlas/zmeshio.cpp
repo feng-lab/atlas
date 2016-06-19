@@ -10,6 +10,7 @@
 #include <assimp/material.h>
 #include "QsLog.h"
 #include <memory>
+#include <QFile>
 
 namespace {
 
@@ -196,7 +197,7 @@ void ZMeshIO::load(const QString &filename, ZMesh &mesh) const
                                 aiComponent_ANIMATIONS |
                                 aiComponent_MATERIALS |
                                 0);
-    const aiScene* scene = importer.ReadFile(qPrintable(filename),
+    const aiScene* scene = importer.ReadFile(QFile::encodeName(filename).constData(),
                                              aiProcess_GenSmoothNormals	|
                                              aiProcess_JoinIdenticalVertices |
                                              aiProcess_ImproveCacheLocality |
@@ -292,7 +293,7 @@ void ZMeshIO::save(const ZMesh &mesh, const QString &filename, std::string forma
   createMaterials(sc.get());
 
   Assimp::Exporter exporter;
-  aiReturn res = exporter.Export(sc.get(), format, qPrintable(filename));
+  aiReturn res = exporter.Export(sc.get(), format, QFile::encodeName(filename).constData());
   if (res != aiReturn_SUCCESS) {
     throw ZIOException(exporter.GetErrorString());
   }
