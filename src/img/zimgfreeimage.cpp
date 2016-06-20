@@ -180,7 +180,11 @@ QStringList ZImgFreeImage::extensions() const
 void ZImgFreeImage::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
                              std::vector<std::set<size_t>> *pyramidalRatios)
 {
+#if defined(_WIN32) || defined(_WIN64)
+  FREE_IMAGE_FORMAT fmt = fipImage::identifyFIFU(filename.toStdWString().c_str());
+#else
   FREE_IMAGE_FORMAT fmt = fipImage::identifyFIF(QFile::encodeName(filename).constData());
+#endif
   if (fmt == FIF_UNKNOWN) {
     throw ZIOException("Can not identify image format");
   } /*else {
@@ -199,7 +203,11 @@ void ZImgFreeImage::readInfo(const QString &filename, std::vector<ZImgInfo> &inf
     fipMp.close();
   } else { // not multipage
     fipImage fipImg;
+#if defined(_WIN32) || defined(_WIN64)
+    if (!fipImg.loadU(filename.toStdWString().c_str(), FIF_LOAD_NOPIXELS)) {
+#else
     if (!fipImg.load(QFile::encodeName(filename).constData(), FIF_LOAD_NOPIXELS)) {
+#endif
       throw ZIOException("Can not load header");
     }
     infos.push_back(readInfoFromFIPImage(fipImg));
@@ -241,7 +249,11 @@ void ZImgFreeImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
   bool isBGA = false;
   if (info.numTimes == 1) {
     fipImage fipImg;
+#if defined(_WIN32) || defined(_WIN64)
+    if (!fipImg.loadU(filename.toStdWString().c_str())) {
+#else
     if (!fipImg.load(QFile::encodeName(filename).constData())) {
+#endif
       throw ZIOException("Can not load");
     }
 

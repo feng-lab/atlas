@@ -371,10 +371,18 @@ QStringList ZImgJpeg::extensions() const
 void ZImgJpeg::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
                         std::vector<std::set<size_t>> *pyramidalRatios)
 {
+#ifdef _MSC_VER
+  FILE *tmpf = nullptr;
+  if (_wfopen_s(&tmpf, filename.toStdWString().c_str(), L"rb") != 0) {
+    throw ZIOException("can't open file");
+  }
+  std::unique_ptr<FILE, int (*)(FILE*)> infile(tmpf, fclose);
+#else
   std::unique_ptr<FILE, int (*)(FILE*)> infile(fopen(QFile::encodeName(filename).constData(), "rb"), fclose);
   if (!infile) {
     throw ZIOException("can't open file");
   }
+#endif
 
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
@@ -394,10 +402,18 @@ void ZImgJpeg::readMetadata(const QString &filename, ZImgMetadata &meta, size_t 
   if (scene != 0) {
     throw ZIOException("invalid scene");
   }
+#ifdef _MSC_VER
+  FILE *tmpf = nullptr;
+  if (_wfopen_s(&tmpf, filename.toStdWString().c_str(), L"rb") != 0) {
+    throw ZIOException("can't open file");
+  }
+  std::unique_ptr<FILE, int (*)(FILE*)> infile(tmpf, fclose);
+#else
   std::unique_ptr<FILE, int (*)(FILE*)> infile(fopen(QFile::encodeName(filename).constData(), "rb"), fclose);
   if (!infile) {
     throw ZIOException("can't open file");
   }
+#endif
 
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
@@ -435,10 +451,18 @@ void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
   if (scene != 0) {
     throw ZIOException("invalid scene");
   }
+#ifdef _MSC_VER
+  FILE *tmpf = nullptr;
+  if (_wfopen_s(&tmpf, filename.toStdWString().c_str(), L"rb") != 0) {
+    throw ZIOException("can't open file");
+  }
+  std::unique_ptr<FILE, int (*)(FILE*)> infile(tmpf, fclose);
+#else
   std::unique_ptr<FILE, int (*)(FILE*)> infile(fopen(QFile::encodeName(filename).constData(), "rb"), fclose);
   if (!infile) {
     throw ZIOException("can't open file");
   }
+#endif
 
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
@@ -506,10 +530,18 @@ void ZImgJpeg::readImg(const QString &filename, ZImg &img, const ZImgRegion &reg
   if (scene != 0) {
     throw ZIOException("invalid scene");
   }
+#ifdef _MSC_VER
+  FILE *tmpf = nullptr;
+  if (_wfopen_s(&tmpf, filename.toStdWString().c_str(), L"rb") != 0) {
+    throw ZIOException("can't open file");
+  }
+  std::unique_ptr<FILE, int (*)(FILE*)> infile(tmpf, fclose);
+#else
   std::unique_ptr<FILE, int (*)(FILE*)> infile(fopen(QFile::encodeName(filename).constData(), "rb"), fclose);
   if (!infile) {
     throw ZIOException("can't open file");
   }
+#endif
 
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;

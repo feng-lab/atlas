@@ -21,7 +21,7 @@ MatrixXd ZEigenUtils::readMatrix(const QString &filename, const char *uSep, bool
 
   std::ifstream inputFileStream;
 #ifdef _MSC_VER
-  inputFileStream.open(filename.toStdWString().c_str(), std::ios::in);
+  inputFileStream.open(filename.toStdWString().c_str(), std::ios::in);  // use msvc extension
 #else
   inputFileStream.open(QFile::encodeName(filename).constData(), std::ios::in);
 #endif
