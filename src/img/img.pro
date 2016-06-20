@@ -54,6 +54,8 @@ CONFIG += rtti exceptions
 CONFIG += static_libtiff
 
 DEFINES *= QT_USE_QSTRINGBUILDER
+DEFINES += QT_NO_CAST_FROM_BYTEARRAY
+DEFINES += QT_NO_CAST_TO_ASCII
 
 HEADERS += \
     zbbox.h \

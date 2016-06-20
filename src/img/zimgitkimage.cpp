@@ -82,12 +82,12 @@ void ZImgITKImage::readInfo(const QString &filename, std::vector<ZImgInfo> &info
                             std::vector<std::set<size_t>> *pyramidalRatios)
 {
   try {
-  itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(filename.toLocal8Bit(), itk::ImageIOFactory::ReadMode);
+  itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(), itk::ImageIOFactory::ReadMode);
 
   if (imageIO.IsNull())
     throw ZIOException("can not create reader");
 
-  imageIO->SetFileName(filename.toLocal8Bit());
+  imageIO->SetFileName(QFile::encodeName(filename).constData());
   imageIO->ReadImageInformation();
 
   bool isNrrd = QString(imageIO->GetNameOfClass()).contains("Nrrd");
@@ -131,12 +131,12 @@ void ZImgITKImage::readImg(const QString &filename, ZImg &img, const ZImgRegion 
   }
 
   try {
-  itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(filename.toLocal8Bit(), itk::ImageIOFactory::ReadMode);
+  itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(), itk::ImageIOFactory::ReadMode);
 
   if (imageIO.IsNull())
     throw ZIOException("can not create reader");
 
-  imageIO->SetFileName(filename.toLocal8Bit());
+  imageIO->SetFileName(QFile::encodeName(filename).constData());
   imageIO->ReadImageInformation();
 
   bool isNrrd = QString(imageIO->GetNameOfClass()).contains("Nrrd");

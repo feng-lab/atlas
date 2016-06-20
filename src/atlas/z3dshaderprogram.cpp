@@ -117,7 +117,7 @@ void Z3DShaderProgram::release()
 void Z3DShaderProgram::bindFragDataLocation(GLuint colorNumber, const QString &name)
 {
   if (GLVersionGE(3, 0)) {
-    glBindFragDataLocation(programId(), colorNumber, name.toLocal8Bit().constData());
+    glBindFragDataLocation(programId(), colorNumber, qUtf8Printable(name));
   }
 }
 

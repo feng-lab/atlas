@@ -1506,7 +1506,7 @@ void ZStitchImageDialog::stitchStacks2()
 
   } else if (m_useConnFileRadioButton->isChecked()) {
     //    m_commandOutputEdit->append("Loading connection file...");
-    //    QByteArray connba = m_connFileEdit->text().toLocal8Bit();
+    //    QByteArray connba = m_connFileEdit->text().toUtf8();
     //    conn = load_conn(connba.data(), all_config);
     //    if (!conn) {
     //      m_commandOutputEdit->append(QString("<font color=red>Failed to load connection file: %1. Abort.</font>").arg(m_connFileEdit->text()));
@@ -2148,7 +2148,7 @@ void ZStitchImageDialog::stitchStacks()
 
   } else if (m_useConnFileRadioButton->isChecked()) {
     //    m_commandOutputEdit->append("Loading connection file...");
-    //    QByteArray connba = m_connFileEdit->text().toLocal8Bit();
+    //    QByteArray connba = m_connFileEdit->text().toUtf8();
     //    conn = load_conn(connba.data(), all_config);
     //    if (!conn) {
     //      m_commandOutputEdit->append(QString("<font color=red>Failed to load connection file: %1. Abort.</font>").arg(m_connFileEdit->text()));
