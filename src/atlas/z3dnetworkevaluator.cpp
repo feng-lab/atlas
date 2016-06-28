@@ -326,10 +326,11 @@ void Z3DCheckOpenGLStateFilterWrapper::checkState(const Z3DFilter *p)
     warn(p, "A shader was active");
   }
 
-  if (Z3DRenderTarget::currentBoundDrawFBO() != 0) {
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    warn(p, "A render target was bound (releaseTarget() missing?)");
-  }
+  // can not check this as we are drawing to QOpenglWidget's (Qt5) fbo which is not 0
+  //  if (Z3DRenderTarget::currentBoundDrawFBO() != 0) {
+  //    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  //    warn(p, "A render target was bound (releaseTarget() missing?)");
+  //  }
 
   if (!checkGLState(GL_DEPTH_FUNC, GL_LESS)) {
     glDepthFunc(GL_LESS);

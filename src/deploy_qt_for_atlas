@@ -18,7 +18,7 @@ else
 fi
 
 if [ -e "atlas.app" ]; then
-	/Users/feng/Qt/5.6/clang_64/bin/macdeployqt atlas.app #-verbose=3
+	/Users/feng/Qt/5.7/clang_64/bin/macdeployqt atlas.app #-verbose=3
 	if [ -e "atlas.app.new.zip" ]; then
 		rm atlas.app.new.zip
 	fi
