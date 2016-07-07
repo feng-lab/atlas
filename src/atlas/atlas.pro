@@ -575,7 +575,7 @@ exists(/opt/intel/tbb/include) {
 
     ITKVersion = 4.11
     ITKPath = $$PWD/../3rdparty/itk
-    INCLUDEPATH += $$ITKPath/include/ITK-$$ITKVersion $$ITKPath/include/vxl/vcl $$ITKPath/include/vxl/core
+    INCLUDEPATH += $$ITKPath/include/ITK-$$ITKVersion $$ITKPath/include/ITK-$$ITKVersion/core $$ITKPath/include/vxl/vcl
     LIBS += -L$$ITKPath/lib -lITKCommon-$$ITKVersion -lITKVNLInstantiation-$$ITKVersion -litkvnl_algo-$$ITKVersion -litkvnl-$$ITKVersion \
       -lITKLabelMap-$$ITKVersion -litkv3p_netlib-$$ITKVersion -litkvcl-$$ITKVersion -lITKStatistics-$$ITKVersion \
       -litksys-$$ITKVersion -litkdouble-conversion-$$ITKVersion -litkNetlibSlatec-$$ITKVersion -lITKMetaIO-$$ITKVersion \

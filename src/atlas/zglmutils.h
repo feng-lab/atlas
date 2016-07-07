@@ -4,6 +4,7 @@
 // This file includes some commonly used headers from glm and defines some useful functions
 // for glm
 
+//#define GLM_FORCE_SSE3
 #define GLM_FORCE_PURE
 //#define GLM_FORCE_INLINE
 #define GLM_FORCE_SIZE_T_LENGTH
