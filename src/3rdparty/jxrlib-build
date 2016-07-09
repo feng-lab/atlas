@@ -21,8 +21,8 @@ fi
 
 cd $srcDIR
 
-# patch to avoid error: explicit specialization of 'ZERO_TOLERANCE' after instantiation
-sed -i.bak 's/CFLAGS=/CFLAGS=-mmacosx-version-min=10.7 /' $srcDIR/Makefile
+# patch
+$currDIR/massedit.py -w -e "re.sub(r'CFLAGS=', r'CFLAGS=-mmacosx-version-min=10.7 ', line)" $srcDIR/Makefile
 
 make -j $numCores install DIR_INSTALL=$installDIR
 

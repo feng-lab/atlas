@@ -19,6 +19,9 @@ fi
 
 cd $srcDIR
 
+# patch to build on OSX
+$currDIR/massedit.py -w -e "re.sub(r'#include <GTGraphics.h>', '', line)" -e "re.sub(r'#include <GTPhysics.h>', '', line)" -e "re.sub(r'#include <GTApplications.h>', '', line)" $srcDIR/Include/GTEngine.h
+
 # xcodebuild -project GTEngine.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 CLANG_CXX_LANGUAGE_STANDARD=c++14 -showBuildSettings
 
 xcodebuild -project GTEngine.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 CLANG_CXX_LANGUAGE_STANDARD=c++14
@@ -27,6 +30,9 @@ mkdir $installDIR
 mkdir $installDIR/lib
 cp $srcDIR/build/Default/*.a $installDIR/lib
 cp -R $srcDIR/Include/ $installDIR/include
+
+#unpatch
+mv -f $srcDIR/Include/GTEngine.h.bak $srcDIR/Include/GTEngine.h
 
 cd $currDIR
 
@@ -50,11 +56,6 @@ cd $currDIR
 
 # cd $srcDIR
 
-# # patch to avoid error: explicit specialization of 'ZERO_TOLERANCE' after instantiation
-# sed -i.bak 's/Mathf::ZERO_TOLERANCE/1e-06f/' $srcDIR/LibMathematics/Algebra/Wm5AVector.h
-# sed -i.bak 's/Mathf::ZERO_TOLERANCE/1e-06f/' $srcDIR/LibMathematics/Algebra/Wm5HPlane.h
-# sed -i.bak 's/Mathf::ZERO_TOLERANCE/1e-06f/' $srcDIR/LibMathematics/Algebra/Wm5HQuaternion.h
-
 # cd LibCore
 # chmod +x *.sh
 # xcodebuild -project LibCore.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 OTHER_CPLUSPLUSFLAGS="-std=c++14 -stdlib=libc++"
@@ -66,10 +67,5 @@ cd $currDIR
 # cd ..
 
 # cp -R $srcDIR/SDK/ $installDIR
-
-# #unpatch
-# mv -f $srcDIR/LibMathematics/Algebra/Wm5AVector.h.bak $srcDIR/LibMathematics/Algebra/Wm5AVector.h
-# mv -f $srcDIR/LibMathematics/Algebra/Wm5HPlane.h.bak $srcDIR/LibMathematics/Algebra/Wm5HPlane.h
-# mv -f $srcDIR/LibMathematics/Algebra/Wm5HQuaternion.h.bak $srcDIR/LibMathematics/Algebra/Wm5HQuaternion.h
 
 # cd $currDIR
