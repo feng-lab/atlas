@@ -21,9 +21,9 @@ Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase &rendererBase)
   m_mode.select("Gradient");
   m_gradientOrientation.addOptions("LeftToRight", "RightToLeft", "TopToBottom", "BottomToTop");
   m_gradientOrientation.select("BottomToTop");
-  connect(&m_mode, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
-  connect(&m_mode, SIGNAL(valueChanged()), this, SLOT(compile()));
-  connect(&m_gradientOrientation, SIGNAL(valueChanged()), this, SLOT(compile()));
+  connect(&m_mode, &ZStringIntOptionParameter::valueChanged, this, &Z3DBackgroundRenderer::adjustWidgets);
+  connect(&m_mode, &ZStringIntOptionParameter::valueChanged, this, &Z3DBackgroundRenderer::compile);
+  connect(&m_gradientOrientation, &ZStringIntOptionParameter::valueChanged, this, &Z3DBackgroundRenderer::compile);
 
   QStringList allshaders;
   allshaders << "pass.vert" << "background_func.frag";

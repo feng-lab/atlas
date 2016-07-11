@@ -15,14 +15,14 @@ public:
   explicit ZStringParameter(const QString &name, const QString &str, QObject *parent = NULL);
 
 signals:
-  void strChanged(QString str);
+  void stringChanged(QString str);
   
 public slots:
   void setContent(QString str);
 
 protected:
   virtual QWidget* actualCreateWidget(QWidget *parent) override;
-  virtual void beforeChange(QString &value) override;
+  virtual void afterChange(QString &value) override;
 
   // ZParameter interface
 public:

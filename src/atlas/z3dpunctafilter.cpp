@@ -47,19 +47,19 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject *pare
   //m_textureCopyRenderer.setDiscardTransparent(true);
 
   m_singleColorForAllPuncta.setStyle("COLOR");
-  connect(&m_singleColorForAllPuncta, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
-  connect(&m_colorMapScore, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
-  connect(&m_colorMapMeanIntensity, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
-  connect(&m_colorMapMaxIntensity, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
+  connect(&m_singleColorForAllPuncta, &ZVec4Parameter::valueChanged, this, &Z3DPunctaFilter::prepareColor);
+  connect(&m_colorMapScore, &ZColorMapParameter::valueChanged, this, &Z3DPunctaFilter::prepareColor);
+  connect(&m_colorMapMeanIntensity, &ZColorMapParameter::valueChanged, this, &Z3DPunctaFilter::prepareColor);
+  connect(&m_colorMapMaxIntensity, &ZColorMapParameter::valueChanged, this, &Z3DPunctaFilter::prepareColor);
 
   // Color Mode
   m_colorMode.addOptions("Single Color", "Random Color", "Original Point Color", "Colormap Score");
   m_colorMode.select("Original Point Color");
 
-  connect(&m_colorMode, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
-  connect(&m_colorMode, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
+  connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DPunctaFilter::prepareColor);
+  connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DPunctaFilter::adjustWidgets);
 
-  connect(&m_useSameSizeForAllPuncta, SIGNAL(valueChanged()), this, SLOT(changePunctaSize()));
+  connect(&m_useSameSizeForAllPuncta, &ZBoolParameter::valueChanged, this, &Z3DPunctaFilter::changePunctaSize);
 
   addParameter(m_visible);
   addParameter(m_colorMode);
@@ -74,7 +74,7 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject *pare
   addParameter(m_sphereRenderer.useDynamicMaterialPara());
 
   //  m_glowSphereRenderer.useDynamicMaterialPara().set(false);
-  //  connect(&m_randomGlow, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
+  //  connect(&m_randomGlow, &ZBoolParameter::valueChanged, this, &Z3DPunctaFilter::adjustWidgets);
   //  addParameter(m_randomGlow);
   //  addParameter(m_textureGlowRenderer.glowModePara());
   //  addParameter(m_textureGlowRenderer.blurRadiusPara());
@@ -90,12 +90,12 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject *pare
                                 Qt::ControlModifier, QEvent::MouseButtonDblClick);
   m_selectPunctumEvent.listenTo("append select punctum", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonPress);
   m_selectPunctumEvent.listenTo("append select punctum", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonRelease);
-  connect(&m_selectPunctumEvent, SIGNAL(mouseEventTriggered(QMouseEvent*,int,int)), this, SLOT(selectPuncta(QMouseEvent*,int,int)));
+  connect(&m_selectPunctumEvent, &ZEventListenerParameter::mouseEventTriggered, this, &Z3DPunctaFilter::selectPuncta);
   addEventListener(m_selectPunctumEvent);
 
   adjustWidgets();
 
-  connect(&m_visible, SIGNAL(valueChanged(bool)), this, SIGNAL(objVisibleChanged(bool)));
+  connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DPunctaFilter::objVisibleChanged);
 }
 
 Z3DPunctaFilter::~Z3DPunctaFilter()

@@ -40,18 +40,18 @@ ZAnimationWidget::ZAnimationWidget(ZAnimation &ani, QWidget *parent)
   m_timeLine = new QTimeLine(m_animation.duration() * 1000, this);
   m_timeLine->setFrameRange(0, m_animation.duration() * 25);
   m_timeLine->setCurveShape(QTimeLine::LinearCurve);
-  connect(m_duration, SIGNAL(valueChanged(double)), &m_animation, SLOT(setDuration(double)));
-  connect(m_timeLine, SIGNAL(frameChanged(int)), this, SLOT(setFrame(int)));
-  connect(m_timeLine, SIGNAL(finished()), this, SLOT(timeLineFinished()));
-  connect(&m_animation, SIGNAL(durationChanged(double)), this, SLOT(onDurationChanged(double)));
-  connect(m_currentTime, SIGNAL(valueChanged(double)), &m_animation, SLOT(setCurrentTime(double)));
-  connect(m_playSpeed, SIGNAL(valueChanged(double)), this, SLOT(onSpeedChanged(double)));
-  connect(m_saveKeyFrameButton, SIGNAL(clicked()), this, SLOT(saveKeyFrame()));
-  connect(m_reversePlayButton, SIGNAL(clicked()), this, SLOT(reversePlayPause()));
-  connect(m_playButton, SIGNAL(clicked()), this, SLOT(playPause()));
-  connect(m_gotoStartButton, SIGNAL(clicked()), this, SLOT(gotoStart()));
-  connect(m_gotoEndButton, SIGNAL(clicked()), this, SLOT(gotoEnd()));
-  connect(m_repeatButton, SIGNAL(toggled(bool)), this, SLOT(repeatChanged(bool)));
+  connect(m_duration, &ZDoubleParameter::doubleChanged, &m_animation, &ZAnimation::setDuration);
+  connect(m_timeLine, &QTimeLine::frameChanged, this, &ZAnimationWidget::setFrame);
+  connect(m_timeLine, &QTimeLine::finished, this, &ZAnimationWidget::timeLineFinished);
+  connect(&m_animation, &ZAnimation::durationChanged, this, &ZAnimationWidget::onDurationChanged);
+  connect(m_currentTime, &ZDoubleParameter::doubleChanged, &m_animation, &ZAnimation::setCurrentTime);
+  connect(m_playSpeed, &ZDoubleParameter::doubleChanged, this, &ZAnimationWidget::onSpeedChanged);
+  connect(m_saveKeyFrameButton, &QPushButton::clicked, this, &ZAnimationWidget::saveKeyFrame);
+  connect(m_reversePlayButton, &QToolButton::clicked, this, &ZAnimationWidget::reversePlayPause);
+  connect(m_playButton, &QToolButton::clicked, this, &ZAnimationWidget::playPause);
+  connect(m_gotoStartButton, &QToolButton::clicked, this, &ZAnimationWidget::gotoStart);
+  connect(m_gotoEndButton, &QToolButton::clicked, this, &ZAnimationWidget::gotoEnd);
+  connect(m_repeatButton, &QToolButton::toggled, this, &ZAnimationWidget::repeatChanged);
 
   m_animation.setCurrentTime(0);
 }
@@ -246,17 +246,17 @@ void ZAnimationWidget::createWidget()
   m_exportWidget = new ZAnimationExportWidget(m_animation.is2DAnimation(), this);
   m_exportWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
   m_exportWidget->setVisible(false);
-  connect(m_timelineWidget, SIGNAL(exportButtonToggled(bool)), m_exportWidget, SLOT(setVisible(bool)));
+  connect(m_timelineWidget, &ZTimelineWidget::exportButtonToggled, m_exportWidget, &ZAnimationExportWidget::setVisible);
   if (m_animation.is2DAnimation()) {
-    connect(m_exportWidget, SIGNAL(export2DAnimation(QDir,QString,double,int,int)),
-            &m_animation, SLOT(export2DAnimation(QDir,QString,double,int,int)));
-    connect(m_exportWidget, SIGNAL(export2DAnimation(QDir,QString,double)),
-            &m_animation, SLOT(export2DAnimation(QDir,QString,double)));
+    connect(m_exportWidget, &ZAnimationExportWidget::exportFixedSize2DAnimation,
+            &m_animation, &ZAnimation::exportFixedSize2DAnimation);
+    connect(m_exportWidget, &ZAnimationExportWidget::export2DAnimation,
+            &m_animation, &ZAnimation::export2DAnimation);
   } else {
-    connect(m_exportWidget, SIGNAL(export3DAnimation(QDir,QString,double,int,int,Z3DScreenShotType)),
-            &m_animation, SLOT(export3DAnimation(QDir,QString,double,int,int,Z3DScreenShotType)));
-    connect(m_exportWidget, SIGNAL(export3DAnimation(QDir,QString,double,Z3DScreenShotType)),
-            &m_animation, SLOT(export3DAnimation(QDir,QString,double,Z3DScreenShotType)));
+    connect(m_exportWidget, &ZAnimationExportWidget::exportFixedSize3DAnimation,
+            &m_animation, &ZAnimation::exportFixedSize3DAnimation);
+    connect(m_exportWidget, &ZAnimationExportWidget::export3DAnimation,
+            &m_animation, &ZAnimation::export3DAnimation);
   }
 
   hlo = new QHBoxLayout;

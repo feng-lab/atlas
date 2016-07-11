@@ -31,7 +31,7 @@ ZSaveObjsDialog::ZSaveObjsDialog(const ZDoc &doc, const QList<size_t> &objs, QWi
   adjustButtonWidths();
   updateSaveButton();
 
-  connect(m_treeWidget, SIGNAL(itemSelectionChanged()), this, SLOT(updateSaveButton()));
+  connect(m_treeWidget, &QTreeWidget::itemSelectionChanged, this, &ZSaveObjsDialog::updateSaveButton);
 }
 
 void ZSaveObjsDialog::createWidget()
@@ -59,11 +59,11 @@ void ZSaveObjsDialog::createWidget()
 
   m_treeWidget->setFocus();
 
-  connect(m_buttonBox->button(QDialogButtonBox::Save), SIGNAL(clicked()),
-          this, SLOT(collectObjsToSave()));
-  connect(m_buttonBox->button(QDialogButtonBox::Cancel), SIGNAL(clicked()),
-          this, SLOT(reject()));
-  connect(discardButton, SIGNAL(clicked()), this, SLOT(discard()));
+  connect(m_buttonBox->button(QDialogButtonBox::Save), &QPushButton::clicked,
+          this, &ZSaveObjsDialog::collectObjsToSave);
+  connect(m_buttonBox->button(QDialogButtonBox::Cancel), &QPushButton::clicked,
+          this, &ZSaveObjsDialog::reject);
+  connect(discardButton, &QPushButton::clicked, this, &ZSaveObjsDialog::discard);
 }
 
 void ZSaveObjsDialog::collectObjsToSave()

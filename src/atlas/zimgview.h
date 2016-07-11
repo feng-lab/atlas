@@ -19,7 +19,7 @@ public:
   virtual QString infoOfPos(double x, double y) override;
 
 private slots:
-  void docImgAdded(const QList<size_t> &objs);
+  void docImgsAdded(const QList<size_t> &objs);
   void docImgAdded(size_t id);
   void docImgChanged(size_t id);
 };

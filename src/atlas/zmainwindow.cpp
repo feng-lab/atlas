@@ -330,10 +330,10 @@ void ZMainWindow::open3DWindow()
       if (!m_3dWindow) {
         m_3dWindow = new Z3DMainWindow(m_doc, *this, false);
         m_3dWindow->setWindowTitle(QString("3D View  %1").arg(windowTitle()));
-        connect(m_3dWindow, SIGNAL(loadScene()), this, SLOT(loadScene()));
-        connect(m_3dWindow, SIGNAL(saveScene()), this, SLOT(saveScene()));
-        connect(m_3dWindow, SIGNAL(loadJsonScene(QString)), this, SLOT(loadJsonScene(QString)));
-        connect(m_3dWindow, SIGNAL(destroyed()), this, SLOT(detach3DWindow()));
+        connect(m_3dWindow, &Z3DMainWindow::loadScene, this, &ZMainWindow::loadScene);
+        connect(m_3dWindow, &Z3DMainWindow::saveScene, this, &ZMainWindow::saveScene);
+        connect(m_3dWindow, &Z3DMainWindow::loadJsonScene, this, &ZMainWindow::loadJsonScene);
+        connect(m_3dWindow, &Z3DMainWindow::destroyed, this, &ZMainWindow::detach3DWindow);
         QApplication::processEvents();
         m_doc->animation3DDoc().bindView(m_3dWindow->view());
       }
@@ -364,7 +364,7 @@ void ZMainWindow::loadScene()
                                             tr("Scene file (*.scene)"));
   if (!fn.isEmpty()) {
     QString err;
-    if (!loadJsonScene(fn, err)) {
+    if (!loadJsonSceneImpl(fn, err)) {
       QMessageBox::critical(QApplication::activeWindow(), "Can not load scene",
                             tr("Can not load scene %1: %2").arg(fn).arg(err));
     } else {
@@ -386,7 +386,7 @@ void ZMainWindow::saveScene()
                                             tr("Scene file (*.scene)"));
   if (!fn.isEmpty()) {
     QString err;
-    if (!saveJsonScene(fn, err)) {
+    if (!saveJsonSceneImpl(fn, err)) {
       QMessageBox::critical(QApplication::activeWindow(), "Can not save scene",
                             tr("Can not save scene %1: %2").arg(fn).arg(err));
     } else {
@@ -403,7 +403,7 @@ void ZMainWindow::saveScene()
 void ZMainWindow::loadJsonScene(const QString &fn)
 {
   QString err;
-  if (!loadJsonScene(fn, err)) {
+  if (!loadJsonSceneImpl(fn, err)) {
     QMessageBox::critical(QApplication::activeWindow(), "Can not load scene",
                           tr("Can not load scene %1: %2").arg(fn).arg(err));
   } else {
@@ -472,7 +472,7 @@ void ZMainWindow::init(QsLogging::DestinationPtr logDestModel)
 
   //const QList<QAction*> &loadActList = m_doc->loadFileActions();
   //for (int i=0; i<loadActList.size(); ++i)
-    //connect(loadActList[i], SIGNAL(triggered()), this, SLOT(activateWindowIfNot()));
+    //connect(loadActList[i], &QAction::triggered, this, &ZMainWindow::activateWindowIfNot);
 }
 
 void ZMainWindow::createActions()
@@ -481,40 +481,40 @@ void ZMainWindow::createActions()
 //  m_newAction = new QAction(QIcon(":/icons/file-512.png"), tr("&New"), this);
 //  m_newAction->setShortcuts(QKeySequence::New);
 //  m_newAction->setStatusTip(tr("Open a new window"));
-//  connect(m_newAction, SIGNAL(triggered()), this, SLOT(newWindow()));
+//  connect(m_newAction, &QAction::triggered, this, &ZMainWindow::newWindow);
 
   m_openAction = new QAction(QIcon(":/icons/folder-512.png"), tr("&Open..."), this);
   m_openAction->setShortcuts(QKeySequence::Open);
   m_openAction->setStatusTip(tr("Open an existing scene file"));
-  connect(m_openAction, SIGNAL(triggered()), this, SLOT(loadScene()));
+  connect(m_openAction, &QAction::triggered, this, &ZMainWindow::loadScene);
 
   m_saveAction = new QAction(QIcon(":/icons/save-512.png"), tr("&Save"), this);
   m_saveAction->setShortcuts(QKeySequence::Save);
   m_saveAction->setStatusTip(tr("Save unsaved objects to disk"));
-  connect(m_saveAction, SIGNAL(triggered()), this, SLOT(save()));
+  connect(m_saveAction, &QAction::triggered, this, &ZMainWindow::save);
 
   m_saveAsAction = new QAction(QIcon(":/icons/save_as-512.png"), tr("Save &As..."), this);
   m_saveAsAction->setShortcuts(QKeySequence::SaveAs);
   m_saveAsAction->setStatusTip(tr("Save selected objects under a new name"));
-  connect(m_saveAsAction, SIGNAL(triggered()), this, SLOT(saveAs()));
+  connect(m_saveAsAction, &QAction::triggered, this, &ZMainWindow::saveAs);
 
   m_loadSceneAction = new QAction(tr("Load &Scene..."), this);
   m_loadSceneAction->setStatusTip(tr("Load scene"));
-  connect(m_loadSceneAction, SIGNAL(triggered()), this, SLOT(loadScene()));
+  connect(m_loadSceneAction, &QAction::triggered, this, &ZMainWindow::loadScene);
 
   m_saveSceneAction = new QAction(tr("Save &Scene..."), this);
   m_saveSceneAction->setStatusTip(tr("Save scene"));
-  connect(m_saveSceneAction, SIGNAL(triggered()), this, SLOT(saveScene()));
+  connect(m_saveSceneAction, &QAction::triggered, this, &ZMainWindow::saveScene);
 
   m_closeAction = new QAction(tr("&Close"), this);
   m_closeAction->setShortcut(QKeySequence::Close);
   m_closeAction->setStatusTip(tr("Close this window"));
-  connect(m_closeAction, SIGNAL(triggered()), this, SLOT(close()));
+  connect(m_closeAction, &QAction::triggered, this, &ZMainWindow::close);
 
   for (int i = 0; i < ZSystemInfoInstance.maxNumRecentFiles(); ++i) {
     m_recentFileActions.push_back(new QAction(this));
     m_recentFileActions[i]->setVisible(false);
-    connect(m_recentFileActions[i], SIGNAL(triggered()), this, SLOT(openRecentFile()));
+    connect(m_recentFileActions[i], &QAction::triggered, this, &ZMainWindow::openRecentFile);
   }
 
   // edit
@@ -522,46 +522,46 @@ void ZMainWindow::createActions()
   // view
   m_open3DViewAction = new QAction(tr("Open &3D Window"), this);
   m_open3DViewAction->setStatusTip(tr("Open 3D Window"));
-  connect(m_open3DViewAction, SIGNAL(triggered()), this, SLOT(open3DWindow()));
+  connect(m_open3DViewAction, &QAction::triggered, this, &ZMainWindow::open3DWindow);
 
   m_screenShotAction = new QAction(QIcon(":/icons/screenshot-512.png"), tr("&Screenshot"), this);
   m_screenShotAction->setStatusTip(tr("Screenshot"));
-  connect(m_screenShotAction, SIGNAL(triggered()), this, SLOT(openScreenshotPanel()));
+  connect(m_screenShotAction, &QAction::triggered, this, &ZMainWindow::openScreenshotPanel);
 
   m_exitAction = new QAction(tr("E&xit"), this);
   m_exitAction->setShortcuts(QKeySequence::Quit);
   m_exitAction->setStatusTip(tr("Exit the application"));
-  connect(m_exitAction, SIGNAL(triggered()), qApp, SLOT(closeAllWindows()));
+  connect(m_exitAction, &QAction::triggered, qApp, &QApplication::closeAllWindows);
 
   m_aboutAction = new QAction(tr("&About"), this);
   m_aboutAction->setStatusTip(tr("Show the application's About box"));
-  connect(m_aboutAction, SIGNAL(triggered()), this, SLOT(about()));
+  connect(m_aboutAction, &QAction::triggered, this, &ZMainWindow::about);
 
   m_aboutQtAction = new QAction(tr("About &Qt"), this);
   m_aboutQtAction->setStatusTip(tr("Show the Qt library's About box"));
-  connect(m_aboutQtAction, SIGNAL(triggered()), qApp, SLOT(aboutQt()));
+  connect(m_aboutQtAction, &QAction::triggered, qApp, &QApplication::aboutQt);
 
   //
   m_viewLogAction = new QAction(tr("&View Log"), this);
   m_viewLogAction->setStatusTip(tr("View Log"));
-  connect(m_viewLogAction, SIGNAL(triggered()), this, SLOT(viewLog()));
+  connect(m_viewLogAction, &QAction::triggered, this, &ZMainWindow::viewLog);
 
   m_openLogFolderAction = new QAction(QIcon(":/icons/folder-512.png"), tr("&Open Log Folder"), this);
   m_openLogFolderAction->setStatusTip(tr("Open Log Folder"));
-  connect(m_openLogFolderAction, SIGNAL(triggered()), this, SLOT(openLogFolder()));
+  connect(m_openLogFolderAction, &QAction::triggered, this, &ZMainWindow::openLogFolder);
 
 #ifdef _WITH_TESTS_
   m_testAction = new QAction(QIcon(":/icons/test-512.png"), tr("&UnitTest"), this);
   m_testAction->setStatusTip(tr("Run Unit Test"));
-  connect(m_testAction, SIGNAL(triggered()), this, SLOT(runUnitTest()));
+  connect(m_testAction, &QAction::triggered, this, &ZMainWindow::runUnitTest);
 #endif
 
   m_runCustomCommandAction = new QAction(QIcon(":/icons/run_command-512.png"), tr("&Run Custom Command"), this);
   m_runCustomCommandAction->setStatusTip(tr("Run Custom Command"));
-  connect(m_runCustomCommandAction, SIGNAL(triggered()), this, SLOT(runCustomCommand()));
+  connect(m_runCustomCommandAction, &QAction::triggered, this, &ZMainWindow::runCustomCommand);
 
   m_openNewInstanceAction = new QAction(tr("Open Additional Instance of Atlas"), this);
-  connect(m_openNewInstanceAction, SIGNAL(triggered()), this, SLOT(openNewInstance()));
+  connect(m_openNewInstanceAction, &QAction::triggered, this, &ZMainWindow::openNewInstance);
 }
 
 void ZMainWindow::createMenus()
@@ -690,7 +690,7 @@ void ZMainWindow::createDockWindows()
   m_objectsDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
   ZObjWidget *objWidget = m_doc->createObjWidget(this);
   m_objectsDockWidget->setWidget(objWidget);
-  connect(m_doc, SIGNAL(openEditWidget(size_t)), this, SLOT(openEditWidget(size_t)));
+  connect(m_doc, &ZDoc::openEditWidget, this, &ZMainWindow::openEditWidget);
   addDockWidget(Qt::RightDockWidgetArea, m_objectsDockWidget);
   m_windowMenu->addAction(m_objectsDockWidget->toggleViewAction());
 
@@ -789,7 +789,7 @@ ZMainWindow *ZMainWindow::findMainWindow(const QString &)
   return 0;
 }
 
-bool ZMainWindow::loadJsonScene(const QString &fn, QString &err)
+bool ZMainWindow::loadJsonSceneImpl(const QString &fn, QString &err)
 {
   QFile file(fn);
   if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -863,7 +863,7 @@ bool ZMainWindow::loadJsonScene(const QString &fn, QString &err)
   return true;
 }
 
-bool ZMainWindow::saveJsonScene(const QString &fn, QString &err)
+bool ZMainWindow::saveJsonSceneImpl(const QString &fn, QString &err)
 {
   QFile file(fn);
   if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {

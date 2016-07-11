@@ -65,8 +65,8 @@ void ZSpinBoxWithScrollBar::createWidget(int value, int min, int max, int step, 
   m_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   lo->addWidget(m_label);
   lo->addWidget(m_scrollBar);
-  connect(m_scrollBar, SIGNAL(valueChanged(int)), this, SLOT(valueChangedFromScrollBar(int)));
-  connect(m_spinBox, SIGNAL(valueChanged(int)), this, SLOT(valueChangedFromSpinBox(int)));
+  connect(m_scrollBar, &QScrollBar::valueChanged, this, &ZSpinBoxWithScrollBar::valueChangedFromScrollBar);
+  connect(m_spinBox, qOverload<int>(&ZSpinBox::valueChanged), this, &ZSpinBoxWithScrollBar::valueChangedFromSpinBox);
 }
 
 } // namespace nim

@@ -13,11 +13,10 @@ public:
     : Z3DObjView(view)
     , m_doc(doc)
   {
-    connect(&m_doc, SIGNAL(objRemoved(size_t,ZObjDoc*)), this, SLOT(onObjRemoved(size_t)));
-    connect(&m_doc, SIGNAL(allObjsRemoved(ZObjDoc*)), this, SLOT(onAllObjsRemoved()));
-    connect(&m_doc, SIGNAL(objVisibleChanged(size_t,bool)), this, SLOT(onObjVisibleChanged(size_t,bool)));
-    connect(&m_doc, SIGNAL(selectionChangedFromDoc(QList<size_t>,QList<size_t>)),
-            this, SLOT(onSelectionChanged(QList<size_t>,QList<size_t>)));
+    connect(&m_doc, &DocType::objRemoved, this, &Z3DFilterView::onObjRemoved);
+    connect(&m_doc, &DocType::allObjsRemoved, this, &Z3DFilterView::onAllObjsRemoved);
+    connect(&m_doc, &DocType::objVisibleChanged, this, &Z3DFilterView::onObjVisibleChanged);
+    connect(&m_doc, &DocType::selectionChangedFromDoc, this, &Z3DFilterView::onSelectionChanged);
   }
 
   // Z3DObjView interface

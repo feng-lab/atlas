@@ -16,11 +16,10 @@ public:
     : ZObjView(view)
     , m_doc(doc)
   {
-    connect(&m_doc, SIGNAL(objRemoved(size_t,ZObjDoc*)), this, SLOT(onObjRemoved(size_t)));
-    connect(&m_doc, SIGNAL(allObjsRemoved(ZObjDoc*)), this, SLOT(onAllObjsRemoved()));
-    connect(&m_doc, SIGNAL(objVisibleChanged(size_t,bool)), this, SLOT(onObjVisibleChanged(size_t,bool)));
-    connect(&m_doc, SIGNAL(selectionChangedFromDoc(QList<size_t>,QList<size_t>)),
-            this, SLOT(onSelectionChanged(QList<size_t>,QList<size_t>)));
+    connect(&m_doc, &DocType::objRemoved, this, &ZFilterView::onObjRemoved);
+    connect(&m_doc, &DocType::allObjsRemoved, this, &ZFilterView::onAllObjsRemoved);
+    connect(&m_doc, &DocType::objVisibleChanged, this, &ZFilterView::onObjVisibleChanged);
+    connect(&m_doc, &DocType::selectionChangedFromDoc, this, &ZFilterView::onSelectionChanged);
   }
 
   ~ZFilterView()

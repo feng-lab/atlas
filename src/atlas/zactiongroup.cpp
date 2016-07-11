@@ -15,10 +15,10 @@ QAction *ZActionGroup::addAction(QAction *action)
 {
   if (!m_actions.contains(action)) {
     m_actions.append(action);
-    connect(action, SIGNAL(toggled(bool)), this, SLOT(actionToggled(bool)));
-    connect(action, SIGNAL(triggered()), this, SLOT(actionTriggered()));
-    connect(action, SIGNAL(changed()), this, SLOT(actionChanged()));
-    connect(action, SIGNAL(hovered()), this, SLOT(actionHovered()));
+    connect(action, &QAction::toggled, this, &ZActionGroup::actionToggled);
+    connect(action, &QAction::triggered, this, &ZActionGroup::actionTriggered);
+    connect(action, &QAction::changed, this, &ZActionGroup::actionChanged);
+    connect(action, &QAction::hovered, this, &ZActionGroup::actionHovered);
   }
   action->setEnabled(m_enabled);
   action->setVisible(m_visible);
@@ -42,9 +42,9 @@ void ZActionGroup::removeAction(QAction *action)
   if (m_actions.removeAll(action)) {
     if (action == m_current)
       m_current = 0;
-    disconnect(action, SIGNAL(triggered()), this, SLOT(actionTriggered()));
-    disconnect(action, SIGNAL(changed()), this, SLOT(actionChanged()));
-    disconnect(action, SIGNAL(hovered()), this, SLOT(actionHovered()));
+    disconnect(action, &QAction::triggered, this, &ZActionGroup::actionTriggered);
+    disconnect(action, &QAction::changed, this, &ZActionGroup::actionChanged);
+    disconnect(action, &QAction::hovered, this, &ZActionGroup::actionHovered);
   }
 }
 

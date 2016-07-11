@@ -30,10 +30,11 @@ ZCameraParameterAnimation::ZCameraParameterAnimation(const QString &name, const 
 {
   m_interpolationMethod.addOptions("Center", "Position Spline", "Position Rotation Spline");
   m_interpolationMethod.select("Center");
-  connect(&m_interpolationMethod, SIGNAL(valueChanged()), this, SIGNAL(interpolationMethodChanged()));
+  connect(&m_interpolationMethod, &ZStringIntOptionParameter::valueChanged,
+          this, &ZCameraParameterAnimation::interpolationMethodChanged);
 
-  connect(this, SIGNAL(keyChanged()), this, SLOT(buildSpline()));
-  connect(this, SIGNAL(keyChanged(ZParameterKey*)), this, SLOT(buildSpline()));
+  connect(this, &ZCameraParameterAnimation::keysChanged, this, &ZCameraParameterAnimation::buildSpline);
+  connect(this, &ZCameraParameterAnimation::keyChanged, this, &ZCameraParameterAnimation::buildSpline);
 }
 
 ZCameraParameterAnimation::~ZCameraParameterAnimation()

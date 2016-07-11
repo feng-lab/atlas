@@ -22,14 +22,14 @@ void ZFontParameter::setValue(const QFont &v)
 
 void ZFontParameter::beforeChange(QFont &value)
 {
-  emit valueChanged(value);
+  emit valueWillChange(value);
 }
 
 QWidget *ZFontParameter::actualCreateWidget(QWidget *parent)
 {
   ZFontWidget *res = new ZFontWidget(m_value, parent);
-  connect(res, SIGNAL(fontChanged(QFont)), this, SLOT(setValue(QFont)));
-  connect(this, SIGNAL(valueChanged(QFont)), res, SLOT(setFont(QFont)));
+  connect(res, &ZFontWidget::fontChanged, this, &ZFontParameter::setValue);
+  connect(this, &ZFontParameter::valueWillChange, res, &ZFontWidget::setFont);
   return res;
 }
 

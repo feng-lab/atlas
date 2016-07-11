@@ -10,10 +10,10 @@ Z3DLineWithFixedWidthColorRenderer::Z3DLineWithFixedWidthColorRenderer(Z3DRender
   setUseSmoothLine(false);
   setUseDisplayList(true);
   m_lineColor.setStyle("COLOR");
-  connect(&m_lineWidth, SIGNAL(valueChanged()), this, SLOT(invalidateOpenglRenderer()));
-  connect(&m_lineWidth, SIGNAL(valueChanged()), this, SLOT(invalidateOpenglPickingRenderer()));
-  connect(&m_lineColor, SIGNAL(valueChanged()), this, SLOT(invalidateOpenglRenderer()));
-  connect(&m_lineColor, SIGNAL(valueChanged()), this, SLOT(setLineColors()));
+  connect(&m_lineWidth, &ZFloatParameter::valueChanged, this, &Z3DLineWithFixedWidthColorRenderer::invalidateOpenglRenderer);
+  connect(&m_lineWidth, &ZFloatParameter::valueChanged, this, &Z3DLineWithFixedWidthColorRenderer::invalidateOpenglPickingRenderer);
+  connect(&m_lineColor, &ZVec4Parameter::valueChanged, this, &Z3DLineWithFixedWidthColorRenderer::invalidateOpenglRenderer);
+  connect(&m_lineColor, &ZVec4Parameter::valueChanged, this, &Z3DLineWithFixedWidthColorRenderer::setLineColors);
 }
 
 void Z3DLineWithFixedWidthColorRenderer::setData(std::vector<glm::vec3> *linesInput)

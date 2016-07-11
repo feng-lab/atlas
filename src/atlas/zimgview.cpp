@@ -9,9 +9,9 @@ namespace nim {
 ZImgView::ZImgView(ZImgDoc &doc, ZView &view)
   : ZFilterView<ZImgDoc, ZImgFilter>(doc, view)
 {
-  docImgAdded(m_doc.objs());
-  connect(&m_doc, SIGNAL(objAdded(size_t,ZObjDoc*)), this, SLOT(docImgAdded(size_t)));
-  connect(&m_doc, SIGNAL(imgChanged(size_t)), this, SLOT(docImgChanged(size_t)));
+  docImgsAdded(m_doc.objs());
+  connect(&m_doc, &ZImgDoc::objAdded, this, &ZImgView::docImgAdded);
+  connect(&m_doc, &ZImgDoc::imgChanged, this, &ZImgView::docImgChanged);
 }
 
 QString ZImgView::infoOfPos(double x, double y)
@@ -47,16 +47,16 @@ QString ZImgView::infoOfPos(double x, double y)
   return info;
 }
 
-void ZImgView::docImgAdded(const QList<size_t> &objs)
+void ZImgView::docImgsAdded(const QList<size_t> &objs)
 {
   for (int i=0; i<objs.size(); ++i) {
     ZImgFilter *viewControl = new ZImgFilter(m_view);
     viewControl->setData(m_doc.imgPack(objs[i]));
     expandBoundBox(viewControl->boundBox());
     m_idToFilter[objs[i]].reset(viewControl);
-    connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
-    connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));
-    connect(viewControl, SIGNAL(objSelected(bool)), this, SLOT(onObjSelectedFromView(bool)));
+    connect(viewControl, &ZImgFilter::boundBoxChanged, this, &ZImgView::updateBoundBox);
+    connect(viewControl, &ZImgFilter::objDeselected, this, &ZImgView::onObjDeselectedFromView);
+    connect(viewControl, &ZImgFilter::objSelected, this, &ZImgView::onObjSelectedFromView);
     emit objViewReady(objs[i]);
   }
   if (!objs.empty()) {
@@ -71,9 +71,9 @@ void ZImgView::docImgAdded(size_t id)
   expandBoundBox(viewControl->boundBox());
   m_idToFilter[id].reset(viewControl);
   m_view.updateBoundBox();
-  connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
-  connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));
-  connect(viewControl, SIGNAL(objSelected(bool)), this, SLOT(onObjSelectedFromView(bool)));
+  connect(viewControl, &ZImgFilter::boundBoxChanged, this, &ZImgView::updateBoundBox);
+  connect(viewControl, &ZImgFilter::objDeselected, this, &ZImgView::onObjDeselectedFromView);
+  connect(viewControl, &ZImgFilter::objSelected, this, &ZImgView::onObjSelectedFromView);
   emit objViewReady(id);
 }
 

@@ -150,21 +150,21 @@ void ZPunctaDetectionDialog::detect()
   m_progressDialog->setLabelText("Detecting Puncta...");
   m_progressDialog->setAutoReset(false);
   m_progressDialog->setAttribute(Qt::WA_DeleteOnClose);
-  QObject::disconnect(m_progressDialog, SIGNAL(canceled()), m_progressDialog, SLOT(cancel()));
-  connect(worker, SIGNAL(progressChanged(int)), m_progressDialog, SLOT(setValue(int)));
-  connect(worker, SIGNAL(canceled()), this, SLOT(processCanceled()));
-  connect(worker, SIGNAL(processError(QString)), this, SLOT(processError(QString)));
-  connect(m_progressDialog, SIGNAL(canceled()), this, SLOT(cancelButtonPressed()));
+  QObject::disconnect(m_progressDialog, &QProgressDialog::canceled, m_progressDialog, &QProgressDialog::cancel);
+  connect(worker, qOverload<int>(&ZPunctaDetection::progressChanged), m_progressDialog, &QProgressDialog::setValue);
+  connect(worker, &ZPunctaDetection::canceled, this, &ZPunctaDetectionDialog::processCanceled);
+  connect(worker, &ZPunctaDetection::processError, this, &ZPunctaDetectionDialog::processError);
+  connect(m_progressDialog, &QProgressDialog::canceled, this, &ZPunctaDetectionDialog::cancelButtonPressed);
 
   QThread *thread = new QThread(this);
-  connect(thread, SIGNAL(started()), worker, SLOT(run()));
-  connect(worker, SIGNAL(canceled()), thread, SLOT(quit()));
-  connect(worker, SIGNAL(finished()), thread, SLOT(quit()));
-  connect(worker, SIGNAL(processError(QString)), thread, SLOT(quit()));
-  connect(thread, SIGNAL(finished()), worker, SLOT(deleteLater()));
-  connect(thread, SIGNAL(finished()), m_progressDialog, SLOT(reset()));
-  connect(thread, SIGNAL(finished()), this, SLOT(processFinished()));
-  connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
+  connect(thread, &QThread::started, worker, &ZPunctaDetection::run);
+  connect(worker, &ZPunctaDetection::canceled, thread, &QThread::quit);
+  connect(worker, &ZPunctaDetection::finished, thread, &QThread::quit);
+  connect(worker, &ZPunctaDetection::processError, thread, &QThread::quit);
+  connect(thread, &QThread::finished, worker, &ZPunctaDetection::deleteLater);
+  connect(thread, &QThread::finished, m_progressDialog, &QProgressDialog::reset);
+  connect(thread, &QThread::finished, this, &ZPunctaDetectionDialog::processFinished);
+  connect(thread, &QThread::finished, thread, &QThread::deleteLater);
   worker->moveToThread(thread);
 
   thread->start();
@@ -334,11 +334,11 @@ void ZPunctaDetectionDialog::init()
   m_buttonBox = new QDialogButtonBox(Qt::Horizontal, this);
   m_buttonBox->addButton(m_exitButton, QDialogButtonBox::RejectRole);
   m_buttonBox->addButton(m_runButton, QDialogButtonBox::ActionRole);
-  connect(m_exitButton, SIGNAL(clicked()), this, SLOT(reject()));
-  connect(m_runButton, SIGNAL(clicked()), this, SLOT(detect()));
+  connect(m_exitButton, &QPushButton::clicked, this, &ZPunctaDetectionDialog::reject);
+  connect(m_runButton, &QPushButton::clicked, this, &ZPunctaDetectionDialog::detect);
 
   m_tubeThreshold.setVisible(false);
-  connect(&m_dendriteChannel, SIGNAL(valueChanged()), this, SLOT(dendriteChannelChanged()));
+  connect(&m_dendriteChannel, &ZStringIntOptionParameter::valueChanged, this, &ZPunctaDetectionDialog::dendriteChannelChanged);
 
   QVBoxLayout *mainLayout = new QVBoxLayout;
   mainLayout->addWidget(m_ioGroupBox);
@@ -363,7 +363,7 @@ void ZPunctaDetectionDialog::createIOGroupBox()
     hlayout->addWidget(m_useCurrentActiveImage.createWidget(), 0, Qt::AlignLeft);
     hlayout->addStretch(1);
     alllayout->addLayout(hlayout);
-    connect(&m_useCurrentActiveImage, SIGNAL(valueChanged()), this, SLOT(adjustInputImageWidget()));
+    connect(&m_useCurrentActiveImage, &ZBoolParameter::valueChanged, this, &ZPunctaDetectionDialog::adjustInputImageWidget);
   }
 #endif
   QStringList filters;
@@ -372,7 +372,7 @@ void ZPunctaDetectionDialog::createIOGroupBox()
   m_inputImageFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenSingleFile, "Input Image:",
                                                  filters[0]);
   alllayout->addWidget(m_inputImageFileWidget);
-  connect(m_inputImageFileWidget, SIGNAL(changed()), this, SLOT(inputImageChanged()));
+  connect(m_inputImageFileWidget, &ZSelectFileWidget::changed, this, &ZPunctaDetectionDialog::inputImageChanged);
 
   m_inputSwcFilesWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenMultipleFiles, "Input Swcs:",
                                                 tr("Swcs (*.swc)"));
@@ -413,7 +413,7 @@ void ZPunctaDetectionDialog::createParaGroupBox()
   hlayout->addWidget(m_voxelSize.createNameLabel());
   hlayout->addWidget(m_voxelSize.createWidget(), 0, Qt::AlignLeft);
   m_detectResolutionButton = new QPushButton(tr("Detect From File"), this);
-  connect(m_detectResolutionButton, SIGNAL(clicked()), this, SLOT(detectLSMResolution()));
+  connect(m_detectResolutionButton, &QPushButton::clicked, this, &ZPunctaDetectionDialog::detectLSMResolution);
   hlayout->addWidget(m_detectResolutionButton);
   alllayout->addLayout(hlayout);
 

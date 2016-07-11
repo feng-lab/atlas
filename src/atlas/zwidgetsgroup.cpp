@@ -92,11 +92,12 @@ void ZWidgetsGroup::addChild(ZParameter &parameter, int visibleLevel)
 
 void ZWidgetsGroup::addChild(std::shared_ptr<ZWidgetsGroup> child, bool atEnd)
 {
-  if (atEnd)
+  if (atEnd) {
     m_childGroups.push_back(child);
-  else
+  } else {
     m_childGroups.insert(m_childGroups.begin(), child);
-  connect(child.get(), SIGNAL(widgetsGroupChanged()), this, SLOT(emitWidgetsGroupChangedSignal()));
+  }
+  connect(child.get(), &ZWidgetsGroup::widgetsGroupChanged, &ZWidgetsGroup::emitWidgetsGroupChangedSignal);
   m_isSorted = false;
 }
 
@@ -206,7 +207,7 @@ QLayout *ZWidgetsGroup::createLayout(bool createBasic)
         QPushButton *pb = new QPushButton("Advanced...");
         pb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         vbl->addWidget(pb, 0, Qt::AlignHCenter | Qt::AlignVCenter);
-        connect(pb, SIGNAL(clicked()), this, SLOT(emitRequestAdvancedWidgetSignal()));
+        connect(pb, &QPushButton::clicked, this, &ZWidgetsGroup::emitRequestAdvancedWidgetSignal);
       }
     } else {
       if (m_useToolBoxStyle) {

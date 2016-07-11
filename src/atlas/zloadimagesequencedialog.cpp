@@ -24,8 +24,8 @@ ZLoadImageSequenceDialog::ZLoadImageSequenceDialog(const QString &title, const Q
   m_inputImagesFileWidget->setCompareFunc(naturalSortLessThan);
 
   m_buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
-  connect(m_buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
-  connect(m_buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
+  connect(m_buttonBox, &QDialogButtonBox::accepted, this, &ZLoadImageSequenceDialog::accept);
+  connect(m_buttonBox, &QDialogButtonBox::rejected, this, &ZLoadImageSequenceDialog::reject);
 
   QVBoxLayout *mainLayout = new QVBoxLayout;
   mainLayout->addWidget(m_inputImagesFileWidget);

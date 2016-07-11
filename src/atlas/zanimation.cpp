@@ -104,11 +104,11 @@ ZAnimation::ZAnimation(ZDoc &doc, QObject *parent)
   , m_duration(10.0)
   , m_nextUniqueId(100)
 {
-  connect(&m_doc, SIGNAL(objAboutToBeRemoved(size_t,ZObjDoc*)), this, SLOT(disableAnimationOf(size_t)));
+  connect(&m_doc, &ZDoc::objAboutToBeRemoved, this, &ZAnimation::disableAnimationOf);
   m_videoEncoder = new ZVideoEncoder(this);
-  connect(m_videoEncoder, SIGNAL(error(QString)), this, SLOT(videoEncoderError(QString)));
-  connect(m_videoEncoder, SIGNAL(finished()), this, SLOT(videoEncoderFinished()));
-  connect(m_videoEncoder, SIGNAL(canceled()), this, SLOT(videoEncoderCanceled()));
+  connect(m_videoEncoder, &ZVideoEncoder::error, this, &ZAnimation::videoEncoderError);
+  connect(m_videoEncoder, &ZVideoEncoder::finished, this, &ZAnimation::videoEncoderFinished);
+  connect(m_videoEncoder, &ZVideoEncoder::canceled, this, &ZAnimation::videoEncoderCanceled);
 }
 
 ZAnimation::~ZAnimation()
@@ -196,9 +196,9 @@ void ZAnimation::addKeyFrame(double time)
     updateObjAnimation();
   } else if (sorted) {
     buildDisplayPacks();
-    emit keyChanged();
+    emit keysChanged();
   } else {
-    emit keyChanged();
+    emit keysChanged();
   }
 }
 
@@ -280,7 +280,7 @@ void ZAnimation::removeRedundantKeys()
     }
   }
   blockSignals(false);
-  emit keyChanged();
+  emit keysChanged();
 }
 
 void ZAnimation::rebindView()
@@ -299,7 +299,7 @@ void ZAnimation::rebindView()
       continue;
     std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
     assert(wg);
-    connect(wg.get(), SIGNAL(widgetsGroupChanged()), this, SLOT(rebindView()));
+    connect(wg.get(), &ZWidgetsGroup::widgetsGroupChanged, this, &ZAnimation::rebindView);
     sorted = bind(m_objList[k]->objParaAnimations, wg->getParameterList()) || sorted;
   }
 
@@ -317,7 +317,7 @@ void ZAnimation::releaseView()
   }
 }
 
-void ZAnimation::export3DAnimation(const QDir &dir, const QString &fn, double framePerSecond, int width, int height, Z3DScreenShotType sst)
+void ZAnimation::exportFixedSize3DAnimation(const QDir &dir, const QString &fn, double framePerSecond, int width, int height, Z3DScreenShotType sst)
 {
   assert(m_view);
   if (!dir.exists()) {
@@ -391,7 +391,7 @@ void ZAnimation::export3DAnimation(const QDir &dir, const QString &fn, double fr
         }
       }
     }
-    if (!static_cast<Z3DView*>(m_view)->takeScreenShot(filepath, width, height, sst)) {
+    if (!static_cast<Z3DView*>(m_view)->takeFixedSizeScreenShot(filepath, width, height, sst)) {
       break;
     }
   }
@@ -417,10 +417,10 @@ void ZAnimation::export3DAnimation(const QDir &dir, const QString &fn, double fr
 
   if (!progress->wasCanceled()) {
     progress->setLabelText("Compressing Video...");
-    connect(m_videoEncoder, SIGNAL(error(QString)), progress, SLOT(reset()));
-    connect(m_videoEncoder, SIGNAL(finished()), progress, SLOT(reset()));
-    connect(m_videoEncoder, SIGNAL(canceled()), progress, SLOT(reset()));
-    connect(progress, SIGNAL(canceled()), m_videoEncoder, SLOT(cancel()));
+    connect(m_videoEncoder, &ZVideoEncoder::error, progress, &QProgressDialog::reset);
+    connect(m_videoEncoder, &ZVideoEncoder::finished, progress, &QProgressDialog::reset);
+    connect(m_videoEncoder, &ZVideoEncoder::canceled, progress, &QProgressDialog::reset);
+    connect(progress, &QProgressDialog::canceled, m_videoEncoder, &ZVideoEncoder::cancel);
     m_videoEncoder->encode(dir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
   }
 }
@@ -531,15 +531,15 @@ void ZAnimation::export3DAnimation(const QDir &dir, const QString &fn, double fr
 
   if (!progress->wasCanceled()) {
     progress->setLabelText("Compressing Video...");
-    connect(m_videoEncoder, SIGNAL(error(QString)), progress, SLOT(reset()));
-    connect(m_videoEncoder, SIGNAL(finished()), progress, SLOT(reset()));
-    connect(m_videoEncoder, SIGNAL(canceled()), progress, SLOT(reset()));
-    connect(progress, SIGNAL(canceled()), m_videoEncoder, SLOT(cancel()));
+    connect(m_videoEncoder, &ZVideoEncoder::error, progress, &QProgressDialog::reset);
+    connect(m_videoEncoder, &ZVideoEncoder::finished, progress, &QProgressDialog::reset);
+    connect(m_videoEncoder, &ZVideoEncoder::canceled, progress, &QProgressDialog::reset);
+    connect(progress, &QProgressDialog::canceled, m_videoEncoder, &ZVideoEncoder::cancel);
     m_videoEncoder->encode(dir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
   }
 }
 
-void ZAnimation::export2DAnimation(const QDir &dir, const QString &fn, double framePerSecond, int width, int height)
+void ZAnimation::exportFixedSize2DAnimation(const QDir &dir, const QString &fn, double framePerSecond, int width, int height)
 {
   assert(m_view);
   if (!dir.exists()) {
@@ -637,10 +637,10 @@ void ZAnimation::export2DAnimation(const QDir &dir, const QString &fn, double fr
 
   if (!progress->wasCanceled()) {
     progress->setLabelText("Compressing Video...");
-    connect(m_videoEncoder, SIGNAL(error(QString)), progress, SLOT(reset()));
-    connect(m_videoEncoder, SIGNAL(finished()), progress, SLOT(reset()));
-    connect(m_videoEncoder, SIGNAL(canceled()), progress, SLOT(reset()));
-    connect(progress, SIGNAL(canceled()), m_videoEncoder, SLOT(cancel()));
+    connect(m_videoEncoder, &ZVideoEncoder::error, progress, &QProgressDialog::reset);
+    connect(m_videoEncoder, &ZVideoEncoder::finished, progress, &QProgressDialog::reset);
+    connect(m_videoEncoder, &ZVideoEncoder::canceled, progress, &QProgressDialog::reset);
+    connect(progress, &QProgressDialog::canceled, m_videoEncoder, &ZVideoEncoder::cancel);
     m_videoEncoder->encode(dir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
   }
 }
@@ -649,7 +649,7 @@ void ZAnimation::export2DAnimation(const QDir &dir, const QString &fn, double fr
 {
   assert(m_view);
   ZGraphicsView& canvasPainter = static_cast<ZView*>(m_view)->graphicsView();
-  export2DAnimation(dir, fn, framePerSecond, canvasPainter.viewportSize().width(), canvasPainter.viewportSize().height());
+  exportFixedSize2DAnimation(dir, fn, framePerSecond, canvasPainter.viewportSize().width(), canvasPainter.viewportSize().height());
 }
 
 void ZAnimation::disableAnimationOf(size_t id)
@@ -704,26 +704,26 @@ void ZAnimation::videoEncoderCanceled()
 void ZAnimation::updateObjAnimation()
 {
   for (size_t i=0; i<m_globalParaAnimations.size(); ++i) {
-    connect(m_globalParaAnimations[i].get(), SIGNAL(keyChanged(ZParameterKey*)),
-            this, SIGNAL(keyChanged(ZParameterKey*)), Qt::UniqueConnection);
-    connect(m_globalParaAnimations[i].get(), SIGNAL(keyChanged()),
-            this, SIGNAL(keyChanged()), Qt::UniqueConnection);
-    connect(m_globalParaAnimations[i].get(), SIGNAL(keyAboutToDelete(ZParameterKey*)),
-            this, SIGNAL(keyAboutToDelete(ZParameterKey*)), Qt::UniqueConnection);
-    connect(m_globalParaAnimations[i].get(), SIGNAL(colorChanged(ZParameterAnimation*)),
-            this, SIGNAL(colorChanged(ZParameterAnimation*)), Qt::UniqueConnection);
+    connect(m_globalParaAnimations[i].get(), &ZParameterAnimation::keyChanged,
+            this, &ZAnimation::keyChanged, Qt::UniqueConnection);
+    connect(m_globalParaAnimations[i].get(), &ZParameterAnimation::keysChanged,
+            this, &ZAnimation::keysChanged, Qt::UniqueConnection);
+    connect(m_globalParaAnimations[i].get(), &ZParameterAnimation::keyAboutToDelete,
+            this, &ZAnimation::keyAboutToDelete, Qt::UniqueConnection);
+    connect(m_globalParaAnimations[i].get(), &ZParameterAnimation::colorChanged,
+            this, &ZAnimation::colorChanged, Qt::UniqueConnection);
   }
   for (size_t i=0; i<m_objList.size(); ++i) {
     auto& palist = m_objList[i]->objParaAnimations;
     for (size_t j=0; j<palist.size(); ++j) {
-      connect(palist[j].get(), SIGNAL(keyChanged(ZParameterKey*)),
-              this, SIGNAL(keyChanged(ZParameterKey*)), Qt::UniqueConnection);
-      connect(palist[j].get(), SIGNAL(keyChanged()),
-              this, SIGNAL(keyChanged()), Qt::UniqueConnection);
-      connect(palist[j].get(), SIGNAL(keyAboutToDelete(ZParameterKey*)),
-              this, SIGNAL(keyAboutToDelete(ZParameterKey*)), Qt::UniqueConnection);
-      connect(palist[j].get(), SIGNAL(colorChanged(ZParameterAnimation*)),
-              this, SIGNAL(colorChanged(ZParameterAnimation*)), Qt::UniqueConnection);
+      connect(palist[j].get(), &ZParameterAnimation::keyChanged,
+              this, &ZAnimation::keyChanged, Qt::UniqueConnection);
+      connect(palist[j].get(), &ZParameterAnimation::keysChanged,
+              this, &ZAnimation::keysChanged, Qt::UniqueConnection);
+      connect(palist[j].get(), &ZParameterAnimation::keyAboutToDelete,
+              this, &ZAnimation::keyAboutToDelete, Qt::UniqueConnection);
+      connect(palist[j].get(), &ZParameterAnimation::colorChanged,
+              this, &ZAnimation::colorChanged, Qt::UniqueConnection);
     }
   }
 

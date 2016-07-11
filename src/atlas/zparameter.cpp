@@ -52,9 +52,9 @@ QLabel *ZParameter::createNameLabel(QWidget *parent)
     label->setVisible(m_isWidgetsVisible);
   if (!m_isWidgetsEnabled)
     label->setEnabled(m_isWidgetsEnabled);
-  connect(this, SIGNAL(setWidgetsEnabled(bool)), label, SLOT(setEnabled(bool)));
-  connect(this, SIGNAL(setWidgetsVisible(bool)), label, SLOT(setVisible(bool)));
-  connect(this, SIGNAL(nameChanged(QString)), label, SLOT(setText(QString)));
+  connect(this, &ZParameter::setWidgetsEnabled, label, &QLabel::setEnabled);
+  connect(this, &ZParameter::setWidgetsVisible, label, &QLabel::setVisible);
+  connect(this, &ZParameter::nameChanged, label, &QLabel::setText);
 
 #ifdef __APPLE__
   //QFont fnt = label->font();
@@ -71,8 +71,8 @@ QWidget *ZParameter::createWidget(QWidget *parent)
     widget->setVisible(m_isWidgetsVisible);
   if (!m_isWidgetsEnabled)
     widget->setEnabled(m_isWidgetsEnabled);
-  connect(this, SIGNAL(setWidgetsEnabled(bool)), widget, SLOT(setEnabled(bool)));
-  connect(this, SIGNAL(setWidgetsVisible(bool)), widget, SLOT(setVisible(bool)));
+  connect(this, &ZParameter::setWidgetsEnabled, widget, &QWidget::setEnabled);
+  connect(this, &ZParameter::setWidgetsVisible, widget, &QWidget::setVisible);
 #ifdef __APPLE__
   widget->setAttribute(Qt::WA_LayoutUsesWidgetRect);
 
@@ -155,15 +155,20 @@ void ZBoolParameter::setValue(bool v)
 
 void ZBoolParameter::beforeChange(bool &value)
 {
-  emit valueChanged(value);
+  emit valueWillChange(value);
+}
+
+void ZBoolParameter::afterChange(bool &)
+{
+  emit boolChanged(m_value);
 }
 
 QWidget *ZBoolParameter::actualCreateWidget(QWidget *parent)
 {
   QCheckBox* cb = new QCheckBox(parent);
   cb->setChecked(m_value);
-  connect(cb, SIGNAL(toggled(bool)), this, SLOT(setValue(bool)));
-  connect(this, SIGNAL(valueChanged(bool)), cb, SLOT(setChecked(bool)));
+  connect(cb, &QCheckBox::toggled, this, &ZBoolParameter::setValue);
+  connect(this, &ZBoolParameter::valueWillChange, cb, &QCheckBox::setChecked);
   return cb;
 }
 

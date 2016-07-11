@@ -19,7 +19,7 @@ ZColorMapWidget::ZColorMapWidget(ZColorMapParameter *colorMap, QWidget *parent) 
   getContentsMargins(&l, &t, &r, &b);
   int margin = 15;
   setContentsMargins(l+margin, t+margin, r+margin, b + m_sliderHeight - 1 + margin);
-  connect(m_colorMap, SIGNAL(valueChanged()), this, SLOT(updateIntensityScreenWidth()));
+  connect(m_colorMap, &ZColorMapParameter::valueChanged, this, &ZColorMapWidget::updateIntensityScreenWidth);
   updateIntensityScreenWidth();
 }
 
@@ -420,10 +420,10 @@ ZColorMapEditor::ZColorMapEditor(ZColorMapParameter *colorMap, QWidget *parent)
   : QWidget(parent), m_colorMap(colorMap)
 {
   createWidget();
-  connect(m_colorMap, SIGNAL(valueChanged()), this, SLOT(updateFromColorMap()));
-  connect(m_domainMinSpinBox, SIGNAL(valueChanged(double)), this, SLOT(setDomainMin(double)));
-  connect(m_domainMaxSpinBox, SIGNAL(valueChanged(double)), this, SLOT(setDomainMax(double)));
-  connect(m_fitDomainToDataButton, SIGNAL(clicked()), this, SLOT(fitDomainToDataRange()));
+  connect(m_colorMap, &ZColorMapParameter::valueChanged, this, &ZColorMapEditor::updateFromColorMap);
+  connect(m_domainMinSpinBox, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &ZColorMapEditor::setDomainMin);
+  connect(m_domainMaxSpinBox, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &ZColorMapEditor::setDomainMax);
+  connect(m_fitDomainToDataButton, &QPushButton::clicked, this, &ZColorMapEditor::fitDomainToDataRange);
 }
 
 void ZColorMapEditor::updateFromColorMap()

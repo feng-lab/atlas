@@ -113,8 +113,8 @@ void ZSpinBoxWithSlider::createWidget(int value, int min, int max, int step, boo
   lo->setContentsMargins(0,0,0,0);
   lo->addWidget(m_spinBox);
   lo->addWidget(m_slider);
-  connect(m_slider, SIGNAL(valueChanged(int)), this, SLOT(valueChangedFromSlider(int)));
-  connect(m_spinBox, SIGNAL(valueChanged(int)), this, SLOT(valueChangedFromSpinBox(int)));
+  connect(m_slider, &ZSlider2::valueChanged, this, &ZSpinBoxWithSlider::valueChangedFromSlider);
+  connect(m_spinBox, qOverload<int>(&ZSpinBox::valueChanged), this, &ZSpinBoxWithSlider::valueChangedFromSpinBox);
 }
 
 ZDoubleSpinBoxWithSlider::ZDoubleSpinBoxWithSlider(double value, double min, double max, double step,
@@ -186,8 +186,8 @@ void ZDoubleSpinBoxWithSlider::createWidget(const QString &prefix,
   lo->setContentsMargins(0,0,0,0);
   lo->addWidget(m_spinBox);
   lo->addWidget(m_slider);
-  connect(m_slider, SIGNAL(valueChanged(int)), this, SLOT(valueChangedFromSlider(int)));
-  connect(m_spinBox, SIGNAL(valueChanged(double)), this, SLOT(valueChangedFromSpinBox(double)));
+  connect(m_slider, &ZSlider2::valueChanged, this, &ZDoubleSpinBoxWithSlider::valueChangedFromSlider);
+  connect(m_spinBox, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDoubleSpinBoxWithSlider::valueChangedFromSpinBox);
 }
 
 } // namespace nim

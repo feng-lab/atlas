@@ -155,21 +155,21 @@ Z3DGlobalParameters::Z3DGlobalParameters()
     lightDiffuses[i]->setStyle("COLOR");
     lightSpeculars[i]->setStyle("COLOR");
     addParameter(*lightPositions[i]);
-    connect(lightPositions[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    connect(lightPositions[i].get(), &ZVec4Parameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
     addParameter(*lightAmbients[i]);
-    connect(lightAmbients[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    connect(lightAmbients[i].get(), &ZVec4Parameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
     addParameter(*lightDiffuses[i]);
-    connect(lightDiffuses[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    connect(lightDiffuses[i].get(), &ZVec4Parameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
     addParameter(*lightSpeculars[i]);
-    connect(lightSpeculars[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    connect(lightSpeculars[i].get(), &ZVec4Parameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
     addParameter(*lightAttenuations[i]);
-    connect(lightAttenuations[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    connect(lightAttenuations[i].get(), &ZVec3Parameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
     addParameter(*lightSpotCutoff[i]);
-    connect(lightSpotCutoff[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    connect(lightSpotCutoff[i].get(), &ZFloatParameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
     addParameter(*lightSpotExponent[i]);
-    connect(lightSpotExponent[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    connect(lightSpotExponent[i].get(), &ZFloatParameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
     addParameter(*lightSpotDirection[i]);
-    connect(lightSpotDirection[i].get(), SIGNAL(valueChanged()), this, SLOT(updateLightsArray()));
+    connect(lightSpotDirection[i].get(), &ZVec3Parameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
   }
 
   sceneAmbient.setStyle("COLOR");

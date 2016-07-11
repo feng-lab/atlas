@@ -45,12 +45,10 @@ ZGraphicsView::ZGraphicsView(QGraphicsScene *scene, ZView *parent)
   m_scale.setSuffix("%");
   m_scale.setDecimal(2);
   m_scale.setSingleStep(10);
-  connect(&m_scale, SIGNAL(valueChanged()), this, SLOT(scaleChanged()));
+  connect(&m_scale, &ZDoubleParameter::valueChanged, this, &ZGraphicsView::scaleParaChanged);
 
-  connect(horizontalScrollBar(), SIGNAL(sliderMoved(int)),
-          this, SLOT(checkViewport()));
-  connect(verticalScrollBar(), SIGNAL(sliderMoved(int)),
-          this, SLOT(checkViewport()));
+  connect(horizontalScrollBar(), &QScrollBar::sliderMoved, this, &ZGraphicsView::checkViewport);
+  connect(verticalScrollBar(), &QScrollBar::sliderMoved, this, &ZGraphicsView::checkViewport);
 }
 
 void ZGraphicsView::updateScaleFactorRange()
@@ -140,7 +138,7 @@ void ZGraphicsView::setRubberBandDragMode()
   setInteractive(true);
 }
 
-void ZGraphicsView::scaleChanged()
+void ZGraphicsView::scaleParaChanged()
 {
   double targetScale = m_scale.get() / 100.0;
   if (targetScale == transform().m11() * 100)

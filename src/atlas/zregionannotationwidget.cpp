@@ -69,13 +69,13 @@ void ZRegionAnnotationWidget::createWidget()
   pb->setToolTip("Update 3D mesh with current region contours");
   pb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   vlo->addWidget(pb, 0, Qt::AlignLeft | Qt::AlignVCenter);
-  connect(pb, SIGNAL(clicked()), &m_regionAnnotation, SLOT(updateMesh()));
+  connect(pb, &QPushButton::clicked, &m_regionAnnotation, &ZRegionAnnotation::updateMesh);
 
   pb = new QPushButton("Export Label Image...");
   pb->setToolTip("Export Region Annotation To Label Image");
   pb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   vlo->addWidget(pb, 0, Qt::AlignLeft | Qt::AlignVCenter);
-  connect(pb, SIGNAL(clicked()), this, SLOT(exportLabelImage()));
+  connect(pb, &QPushButton::clicked, this, &ZRegionAnnotationWidget::exportLabelImage);
 
   ZRegionAnnotationTreeModel *model = new ZRegionAnnotationTreeModel(m_regionAnnotation, this);
   ZRegionAnnotationTreeView *view = new ZRegionAnnotationTreeView(*model, m_regionAnnotation, m_doc, this);

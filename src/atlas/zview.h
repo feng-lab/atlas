@@ -101,7 +101,7 @@ private slots:
   void changeViewStyle(bool mip);
   void changeViewport();
 
-  void takeScreenShot(QString filename, int width, int height);
+  void takeFixedSizeScreenShot(QString filename, int width, int height);
   void takeScreenShot(QString filename);
 
   void viewportChanged();

@@ -34,10 +34,10 @@ ZObjWidget::ZObjWidget(ZDoc *doc, ZObjModel *objModel, QItemSelectionModel *sele
         "QTreeView::indicator:indeterminate {image: url(:/icons/eye_half-512.png);}"
         );
 
-  connect(this, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(contextMenu(QPoint)));
-  connect(this, SIGNAL(clicked(QModelIndex)), this, SLOT(indexClicked(QModelIndex)));
-  connect(this, SIGNAL(doubleClicked(QModelIndex)), this, SLOT(indexDoubleClicked(QModelIndex)));
-  connect(this, SIGNAL(activated(QModelIndex)), this, SLOT(indexActivated(QModelIndex)));
+  connect(this, &ZObjWidget::customContextMenuRequested, this, &ZObjWidget::contextMenu);
+  connect(this, &ZObjWidget::clicked, this, &ZObjWidget::indexClicked);
+  connect(this, &ZObjWidget::doubleClicked, this, &ZObjWidget::indexDoubleClicked);
+  connect(this, &ZObjWidget::activated, this, &ZObjWidget::indexActivated);
 
   setMinimumWidth(400);
 
@@ -52,19 +52,19 @@ ZObjWidget::ZObjWidget(ZDoc *doc, ZObjModel *objModel, QItemSelectionModel *sele
   ZStyledItemDelegate *delegate = new ZStyledItemDelegate(this);
   setMouseTracking(true);
   setItemDelegate(delegate);
-  connect(this, SIGNAL(entered(QModelIndex)), delegate, SLOT(cellEntered(QModelIndex)));
+  connect(this, &ZObjWidget::entered, delegate, &ZStyledItemDelegate::cellEntered);
 #endif
 
-  connect(m_objProxyModel, SIGNAL(rowsInserted(QModelIndex,int,int)),
-          this, SLOT(adaptColumns()));
-  connect(m_objProxyModel, SIGNAL(rowsRemoved(QModelIndex,int,int)),
-          this, SLOT(adaptColumns()));
-  connect(m_objProxyModel, SIGNAL(modelReset()),
-          this, SLOT(adaptColumns()));
-  connect(m_objProxyModel, SIGNAL(layoutChanged()),
-          this, SLOT(adaptColumns()));
-  connect(m_objProxyModel, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-          this, SLOT(adaptColumns()));
+  connect(m_objProxyModel, &QSortFilterProxyModel::rowsInserted,
+          this, &ZObjWidget::adaptColumns);
+  connect(m_objProxyModel, &QSortFilterProxyModel::rowsRemoved,
+          this, &ZObjWidget::adaptColumns);
+  connect(m_objProxyModel, &QSortFilterProxyModel::modelReset,
+          this, &ZObjWidget::adaptColumns);
+  connect(m_objProxyModel, &QSortFilterProxyModel::layoutChanged,
+          this, &ZObjWidget::adaptColumns);
+  connect(m_objProxyModel, &QSortFilterProxyModel::dataChanged,
+          this, &ZObjWidget::adaptColumns);
   adaptColumns();
 }
 

@@ -14,7 +14,7 @@ ZRegionAnnotationFilter::ZRegionAnnotationFilter(ZView &view)
   , m_visible("Visible", true)
   , m_view(view)
 {
-  connect(&m_visible, SIGNAL(valueChanged()), this, SLOT(visibleChanged()));
+  connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZRegionAnnotationFilter::visibleChanged);
   //addParameter(&m_visible);
 }
 
@@ -24,10 +24,9 @@ void ZRegionAnnotationFilter::setData(ZRegionAnnotation &regionAnnotation)
 
   allROIChanged();
 
-  connect(m_regionAnnotation, SIGNAL(boundBoxChanged()), this, SIGNAL(boundBoxChanged()));
-  connect(m_regionAnnotation, SIGNAL(allROIChanged()), this, SLOT(allROIChanged()));
-  connect(m_regionAnnotation, SIGNAL(regionROIAdded(int64_t,ZROI*)),
-          this, SLOT(regionROIAdded(int64_t,ZROI*)));
+  connect(m_regionAnnotation, &ZRegionAnnotation::boundBoxChanged, this, &ZRegionAnnotationFilter::boundBoxChanged);
+  connect(m_regionAnnotation, &ZRegionAnnotation::allROIChanged, this, &ZRegionAnnotationFilter::allROIChanged);
+  connect(m_regionAnnotation, &ZRegionAnnotation::regionROIAdded, this, &ZRegionAnnotationFilter::regionROIAdded);
 }
 
 void ZRegionAnnotationFilter::releaseItemsOwnership()
@@ -146,7 +145,7 @@ void ZRegionAnnotationFilter::allROIChanged()
     flt->setVisible(false);
     flt->setOutlineColor(glm::vec3(it->red/255.f, it->green/255.f, it->blue/255.f));
     flt->setRegionColor(glm::vec3(it->red/255.f, it->green/255.f, it->blue/255.f));
-    connect(&m_offsetPara, SIGNAL(valueChanged()), &flt->offsetPara(), SLOT(updateFromSender()));
+    connect(&m_offsetPara, &ZDVec4Parameter::valueChanged, &flt->offsetPara(), &ZDVec4Parameter::updateFromSender);
     m_idToRegionNames[id] = QString("%1_%2").arg(it->abbreviation).arg(it->id);
     m_nameToID[m_idToRegionNames[id]] = id;
     QList<ZParameter*> paras = flt->parameters();

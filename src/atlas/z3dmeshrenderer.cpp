@@ -28,11 +28,11 @@ Z3DMeshRenderer::Z3DMeshRenderer(Z3DRendererBase &rendererBase)
 {
   m_colorSource.addOptions("MeshColor", "Mesh1DTexture", "Mesh2DTexture", "Mesh3DTexture", "CustomColor");
   m_colorSource.select("MeshColor");
-  connect(&m_colorSource, SIGNAL(valueChanged()), this, SLOT(compile()));
+  connect(&m_colorSource, &ZStringIntOptionParameter::valueChanged, this, &Z3DMeshRenderer::compile);
 
   m_wireframeMode.addOptions("No Wireframe", "With Wireframe", "Only Wireframe");
   m_wireframeMode.select("No Wireframe");
-  connect(&m_wireframeMode, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
+  connect(&m_wireframeMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DMeshRenderer::adjustWidgets);
   m_wireframeColor.setStyle("COLOR");
 
   setUseDisplayList(true);

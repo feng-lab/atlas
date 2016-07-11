@@ -43,7 +43,7 @@ public slots:
   void setRubberBandDragMode();
 
 protected slots:
-  void scaleChanged();
+  void scaleParaChanged();
 
   void checkViewport();
 

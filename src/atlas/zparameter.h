@@ -136,6 +136,8 @@ protected:
   // subclass can use this function to emit customized signal before m_value
   // is changed or do other update, input is new value
   virtual void beforeChange(T& value);
+  //
+  virtual void afterChange(T& value);
 
   T m_value;
   bool m_locked;
@@ -171,6 +173,7 @@ void ZSingleValueParameter<T>::set(const T &valueIn)
       beforeChange(value);
       m_value = value;
       emit valueChanged();
+      afterChange(value);
       m_locked = false;
     }
   }
@@ -186,6 +189,11 @@ void ZSingleValueParameter<T>::beforeChange(T &/*value*/)
 {
 }
 
+template<class T>
+void ZSingleValueParameter<T>::afterChange(T &/*value*/)
+{
+}
+
 //-----------------------------------------------------------------------------------------------
 
 class ZBoolParameter : public ZSingleValueParameter<bool>
@@ -194,13 +202,17 @@ class ZBoolParameter : public ZSingleValueParameter<bool>
 public:
   ZBoolParameter(const QString& name, QObject *parent = NULL);
   ZBoolParameter(const QString& name, bool value, QObject *parent = NULL);
+
 signals:
-  void valueChanged(bool);
+  void valueWillChange(bool);
+  void boolChanged(bool);
+
 public slots:
   void setValue(bool v);
 
 protected:
   virtual void beforeChange(bool &value) override;
+  virtual void afterChange(bool &value) override;
   virtual QWidget* actualCreateWidget(QWidget *parent) override;
 
   // ZParameter interface

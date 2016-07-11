@@ -92,10 +92,10 @@ void ZSpanSliderWithSpinBox::createWidget(int lowerValue, int upperValue, int mi
   lo->addWidget(m_lowerSpinBox);
   lo->addWidget(m_slider);
   lo->addWidget(m_upperSpinBox);
-  connect(m_slider, SIGNAL(lowerValueChanged(int)), this, SLOT(lowerValueChangedFromSlider(int)));
-  connect(m_slider, SIGNAL(upperValueChanged(int)), this, SLOT(upperValueChangedFromSlider(int)));
-  connect(m_lowerSpinBox, SIGNAL(valueChanged(int)), this, SLOT(valueChangedFromLowerSpinBox(int)));
-  connect(m_upperSpinBox, SIGNAL(valueChanged(int)), this, SLOT(valueChangedFromUpperSpinBox(int)));
+  connect(m_slider, &QxtSpanSlider::lowerValueChanged, this, &ZSpanSliderWithSpinBox::lowerValueChangedFromSlider);
+  connect(m_slider, &QxtSpanSlider::upperValueChanged, this, &ZSpanSliderWithSpinBox::upperValueChangedFromSlider);
+  connect(m_lowerSpinBox, qOverload<int>(&ZSpinBox::valueChanged), this, &ZSpanSliderWithSpinBox::valueChangedFromLowerSpinBox);
+  connect(m_upperSpinBox, qOverload<int>(&ZSpinBox::valueChanged), this, &ZSpanSliderWithSpinBox::valueChangedFromUpperSpinBox);
 }
 
 
@@ -212,10 +212,10 @@ void ZDoubleSpanSliderWithSpinBox::createWidget()
   lo->addWidget(m_lowerSpinBox);
   lo->addWidget(m_slider);
   lo->addWidget(m_upperSpinBox);
-  connect(m_slider, SIGNAL(lowerValueChanged(int)), this, SLOT(lowerValueChangedFromSlider(int)));
-  connect(m_slider, SIGNAL(upperValueChanged(int)), this, SLOT(upperValueChangedFromSlider(int)));
-  connect(m_lowerSpinBox, SIGNAL(valueChanged(double)), this, SLOT(valueChangedFromLowerSpinBox(double)));
-  connect(m_upperSpinBox, SIGNAL(valueChanged(double)), this, SLOT(valueChangedFromUpperSpinBox(double)));
+  connect(m_slider, &QxtSpanSlider::lowerValueChanged, this, &ZDoubleSpanSliderWithSpinBox::lowerValueChangedFromSlider);
+  connect(m_slider, &QxtSpanSlider::upperValueChanged, this, &ZDoubleSpanSliderWithSpinBox::upperValueChangedFromSlider);
+  connect(m_lowerSpinBox, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDoubleSpanSliderWithSpinBox::valueChangedFromLowerSpinBox);
+  connect(m_upperSpinBox, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDoubleSpanSliderWithSpinBox::valueChangedFromUpperSpinBox);
 }
 
 } // namespace nim

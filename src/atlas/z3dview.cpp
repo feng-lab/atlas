@@ -165,14 +165,14 @@ QWidget *Z3DView::captureWidget()
   QScrollArea *res = new QScrollArea();
   ZTakeScreenShotWidget *m_screenShotWidget = new ZTakeScreenShotWidget(false, false, nullptr);
   m_screenShotWidget->setCaptureStereoImage(m_isStereoView);
-  connect(m_screenShotWidget, SIGNAL(takeScreenShot(QString, Z3DScreenShotType)),
-          this, SLOT(takeScreenShot(QString, Z3DScreenShotType)));
-  connect(m_screenShotWidget, SIGNAL(takeScreenShot(QString,int,int,Z3DScreenShotType)),
-          this, SLOT(takeScreenShot(QString,int,int,Z3DScreenShotType)));
-  connect(m_screenShotWidget, SIGNAL(takeSeriesScreenShot(QDir,QString,glm::vec3,bool,int,Z3DScreenShotType)),
-          this, SLOT(takeSeriesScreenShot(QDir,QString,glm::vec3,bool,int,Z3DScreenShotType)));
-  connect(m_screenShotWidget, SIGNAL(takeSeriesScreenShot(QDir,QString,glm::vec3,bool,int,int,int,Z3DScreenShotType)),
-          this, SLOT(takeSeriesScreenShot(QDir,QString,glm::vec3,bool,int,int,int,Z3DScreenShotType)));
+  connect(m_screenShotWidget, &ZTakeScreenShotWidget::take3DScreenShot,
+          this, &Z3DView::takeScreenShot);
+  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeFixedSize3DScreenShot,
+          this, &Z3DView::takeFixedSizeScreenShot);
+  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeSeries3DScreenShot,
+          this, &Z3DView::takeSeriesScreenShot);
+  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeSeriesFixedSize3DScreenShot,
+          this, &Z3DView::takeFixedSizeSeriesScreenShot);
   res->setWidget(m_screenShotWidget);
   return res;
 }
@@ -290,7 +290,7 @@ void Z3DView::resetCameraClippingRange()
   m_lock = false;
 }
 
-bool Z3DView::takeScreenShot(QString filename, int width, int height, Z3DScreenShotType sst)
+bool Z3DView::takeFixedSizeScreenShot(QString filename, int width, int height, Z3DScreenShotType sst)
 {
   bool res = true;
   m_lock = true;
@@ -324,7 +324,8 @@ bool Z3DView::takeScreenShot(QString filename, Z3DScreenShotType sst)
   return res;
 }
 
-bool Z3DView::takeSeriesScreenShot(const QDir &dir, const QString &namePrefix, glm::vec3 axis, bool clockWise, int numFrame, int width, int height, Z3DScreenShotType sst)
+bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir &dir, const QString &namePrefix, glm::vec3 axis,
+                                            bool clockWise, int numFrame, int width, int height, Z3DScreenShotType sst)
 {
   QString title = "Capturing Images...";
   if (sst == Z3DScreenShotType::HalfSideBySideStereoView)
@@ -349,7 +350,7 @@ bool Z3DView::takeSeriesScreenShot(const QDir &dir, const QString &namePrefix, g
     int fieldWidth = numDigits(numFrame);
     QString filename = QString("%1%2.tif").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
     QString filepath = dir.filePath(filename);
-    if (!takeScreenShot(filepath, width, height, sst)) {
+    if (!takeFixedSizeScreenShot(filepath, width, height, sst)) {
       res = false;
       break;
     }
@@ -358,7 +359,8 @@ bool Z3DView::takeSeriesScreenShot(const QDir &dir, const QString &namePrefix, g
   return res;
 }
 
-bool Z3DView::takeSeriesScreenShot(const QDir &dir, const QString &namePrefix, glm::vec3 axis, bool clockWise, int numFrame, Z3DScreenShotType sst)
+bool Z3DView::takeSeriesScreenShot(const QDir &dir, const QString &namePrefix, glm::vec3 axis,
+                                   bool clockWise, int numFrame, Z3DScreenShotType sst)
 {
   QString title = "Capturing Images...";
   if (sst == Z3DScreenShotType::HalfSideBySideStereoView)
@@ -427,32 +429,32 @@ void Z3DView::init()
     if (objDocs[i]->typeName() == "Image") {
       ZImgDoc* imgDoc = qobject_cast<ZImgDoc*>(objDocs[i]);
       Z3DImgView *imgView = new Z3DImgView(*imgDoc, *this);
-      connect(imgView, SIGNAL(objViewReady(size_t)), this, SIGNAL(objViewReady(size_t)));
+      connect(imgView, &Z3DImgView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(imgView);
     } else if (objDocs[i]->typeName() == "Puncta") {
       ZPunctaDoc *punctaDoc = qobject_cast<ZPunctaDoc*>(objDocs[i]);
       Z3DPunctaView *punctaView = new Z3DPunctaView(*punctaDoc, *this);
-      connect(punctaView, SIGNAL(objViewReady(size_t)), this, SIGNAL(objViewReady(size_t)));
+      connect(punctaView, &Z3DPunctaView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(punctaView);
     } else if (objDocs[i]->typeName() == "Swc") {
       ZSwcDoc *swcDoc = qobject_cast<ZSwcDoc*>(objDocs[i]);
       Z3DSwcView *swcView = new Z3DSwcView(*swcDoc, *this);
-      connect(swcView, SIGNAL(objViewReady(size_t)), this, SIGNAL(objViewReady(size_t)));
+      connect(swcView, &Z3DSwcView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(swcView);
     } else if (objDocs[i]->typeName() == "Mesh") {
       ZMeshDoc *meshDoc = qobject_cast<ZMeshDoc*>(objDocs[i]);
       Z3DMeshView *meshView = new Z3DMeshView(*meshDoc, *this);
-      connect(meshView, SIGNAL(objViewReady(size_t)), this, SIGNAL(objViewReady(size_t)));
+      connect(meshView, &Z3DMeshView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(meshView);
     } else if (objDocs[i]->typeName() == "Animation3D") {
       Z3DAnimationDoc *aniDoc = qobject_cast<Z3DAnimationDoc*>(objDocs[i]);
       Z3DAnimationView *aniView = new Z3DAnimationView(*aniDoc, *this);
-      connect(aniView, SIGNAL(objViewReady(size_t)), this, SIGNAL(objViewReady(size_t)));
+      connect(aniView, &Z3DAnimationView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(aniView);
     } else if (objDocs[i]->typeName() == "RegionAnnotation") {
       ZRegionAnnotationDoc *aniDoc = qobject_cast<ZRegionAnnotationDoc*>(objDocs[i]);
       Z3DRegionAnnotationView *aniView = new Z3DRegionAnnotationView(*aniDoc, *this);
-      connect(aniView, SIGNAL(objViewReady(size_t)), this, SIGNAL(objViewReady(size_t)));
+      connect(aniView, &Z3DRegionAnnotationView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(aniView);
     }
   }
@@ -462,8 +464,7 @@ void Z3DView::init()
   // adjust camera
   resetCamera();
 
-  //connect(interactionHandler(), SIGNAL(cameraMoved()), this, SLOT(resetCameraClippingRange()));
-  connect(&camera(), SIGNAL(valueChanged()), this, SLOT(resetCameraClippingRange()));
+  connect(&camera(), &Z3DCameraParameter::valueChanged, this, &Z3DView::resetCameraClippingRange);
 }
 
 void Z3DView::createActions()
@@ -473,18 +474,18 @@ void Z3DView::createActions()
   zoomInKey << QKeySequence::ZoomIn << QKeySequence(Qt::Key_Plus) << QKeySequence(Qt::Key_Equal);
   m_zoomInAction->setShortcuts(zoomInKey);
   m_zoomInAction->setStatusTip(tr("Zoom in"));
-  connect(m_zoomInAction, SIGNAL(triggered()), this, SLOT(zoomIn()));
+  connect(m_zoomInAction, &QAction::triggered, this, &Z3DView::zoomIn);
 
   m_zoomOutAction = new QAction(QIcon(":/icons/zoom_out-512.png"), tr("Zoom &Out"), this);
   QList<QKeySequence> zoomOutKey;
   zoomOutKey << QKeySequence::ZoomOut << QKeySequence(Qt::Key_Minus);
   m_zoomOutAction->setShortcuts(zoomOutKey);
   m_zoomOutAction->setStatusTip(tr("Zoom out"));
-  connect(m_zoomOutAction, SIGNAL(triggered()), this, SLOT(zoomOut()));
+  connect(m_zoomOutAction, &QAction::triggered, this, &Z3DView::zoomOut);
 
   m_resetCameraAction = new QAction(tr("&Reset Camera"), this);
   m_resetCameraAction->setStatusTip(tr("Reset camera to show all objects in scene"));
-  connect(m_resetCameraAction, SIGNAL(triggered()), this, SLOT(resetCamera()));
+  connect(m_resetCameraAction, &QAction::triggered, this, &Z3DView::resetCamera);
 }
 
 } // namespace nim

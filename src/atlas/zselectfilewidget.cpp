@@ -98,7 +98,7 @@ void ZSelectFileWidget::createWidget(QBoxLayout::Direction direction)
     m_layout = new QBoxLayout(direction, this);
     m_layout->setContentsMargins(0,0,0,0);
     m_selectPushButton = new QPushButton(m_guiName, this);
-    connect(m_selectPushButton, SIGNAL(clicked()), this, SLOT(selectFile()));
+    connect(m_selectPushButton, &QPushButton::clicked, this, &ZSelectFileWidget::selectFile);
     m_textEdit = new QTextEdit(this);
     m_textEdit->setReadOnly(true);
     m_layout->addWidget(m_selectPushButton);
@@ -109,7 +109,7 @@ void ZSelectFileWidget::createWidget(QBoxLayout::Direction direction)
     m_layout = new QBoxLayout(QBoxLayout::TopToBottom, this);
     m_layout->setContentsMargins(0,0,0,0);
     m_selectPushButton = new QPushButton(m_guiName, this);
-    connect(m_selectPushButton, SIGNAL(clicked()), this, SLOT(selectFile()));
+    connect(m_selectPushButton, &QPushButton::clicked, this, &ZSelectFileWidget::selectFile);
     m_textEdit = new QTextEdit(this);
     m_textEdit->setReadOnly(true);
     lo->addWidget(m_selectPushButton);
@@ -122,8 +122,8 @@ void ZSelectFileWidget::createWidget(QBoxLayout::Direction direction)
     m_filterLineEdit->setReadOnly(false);
     m_filterLineEdit->setText("*");
     m_previewButton = new QPushButton("Preview", this);
-    connect(m_filterLineEdit, SIGNAL(returnPressed()), this, SLOT(previewFilterResult()));
-    connect(m_previewButton, SIGNAL(clicked()), this, SLOT(previewFilterResult()));
+    connect(m_filterLineEdit, &QLineEdit::returnPressed, this, &ZSelectFileWidget::previewFilterResult);
+    connect(m_previewButton, &QPushButton::clicked, this, &ZSelectFileWidget::previewFilterResult);
     lo = new QBoxLayout(QBoxLayout::LeftToRight);
     lo->setContentsMargins(40, 0, 0, 40);
     lo->addWidget(m_label);
@@ -141,7 +141,7 @@ void ZSelectFileWidget::createWidget(QBoxLayout::Direction direction)
     m_lineEdit->setText(m_lastFName);
     m_button = new QToolButton(this);
     m_button->setText(tr("..."));
-    connect(m_button, SIGNAL(clicked()), this, SLOT(selectFile()));
+    connect(m_button, &QToolButton::clicked, this, &ZSelectFileWidget::selectFile);
     m_layout->addWidget(m_label);
     m_layout->addWidget(m_lineEdit);
     m_layout->addWidget(m_button);

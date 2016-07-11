@@ -67,7 +67,7 @@ void Z3DCameraControlWidget::createWidget()
   azimuthButton->setToolTip("Rotate the camera about the view up vector centered at the focal point. "
                             "The result is a horizontal rotation of the camera.");
   hlo->addWidget(azimuthButton);
-  connect(azimuthButton, SIGNAL(clicked(bool)), this, SLOT(azimuth()));
+  connect(azimuthButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::azimuth);
   m_azimuthDegreeSpinBox = new QSpinBox(this);
   m_azimuthDegreeSpinBox->setMinimum(minDegrees);
   m_azimuthDegreeSpinBox->setMaximum(maxDegrees);
@@ -82,7 +82,7 @@ void Z3DCameraControlWidget::createWidget()
                               "using the focal point as the center of rotation. "
                               "The result is a vertical rotation of the scene.");
   hlo->addWidget(elevationButton);
-  connect(elevationButton, SIGNAL(clicked(bool)), this, SLOT(elevation()));
+  connect(elevationButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::elevation);
   m_elevationDegreeSpinBox = new QSpinBox(this);
   m_elevationDegreeSpinBox->setMinimum(minDegrees);
   m_elevationDegreeSpinBox->setMaximum(maxDegrees);
@@ -96,7 +96,7 @@ void Z3DCameraControlWidget::createWidget()
   rollButton->setToolTip("Rotate the camera about the view vector. "
                          "This will spin the camera about its axis.");
   hlo->addWidget(rollButton);
-  connect(rollButton, SIGNAL(clicked(bool)), this, SLOT(roll()));
+  connect(rollButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::roll);
   m_rollDegreeSpinBox = new QSpinBox(this);
   m_rollDegreeSpinBox->setMinimum(minDegrees);
   m_rollDegreeSpinBox->setMaximum(maxDegrees);
@@ -111,7 +111,7 @@ void Z3DCameraControlWidget::createWidget()
                         "using the camera's position as the center of rotation. "
                         "The result is a horizontal rotation of the scene.");
   hlo->addWidget(yawButton);
-  connect(yawButton, SIGNAL(clicked(bool)), this, SLOT(yaw()));
+  connect(yawButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::yaw);
   m_yawDegreeSpinBox = new QSpinBox(this);
   m_yawDegreeSpinBox->setMinimum(minDegrees);
   m_yawDegreeSpinBox->setMaximum(maxDegrees);
@@ -127,7 +127,7 @@ void Z3DCameraControlWidget::createWidget()
                           "using the camera's position as the center of rotation. "
                           "The result is a vertical rotation of the camera.");
   hlo->addWidget(pitchButton);
-  connect(pitchButton, SIGNAL(clicked(bool)), this, SLOT(pitch()));
+  connect(pitchButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::pitch);
   m_pitchDegreeSpinBox = new QSpinBox(this);
   m_pitchDegreeSpinBox->setMinimum(minDegrees);
   m_pitchDegreeSpinBox->setMaximum(maxDegrees);

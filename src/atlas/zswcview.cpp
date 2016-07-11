@@ -7,20 +7,20 @@ namespace nim {
 ZSwcView::ZSwcView(ZSwcDoc &doc, ZView &view)
   : ZFilterView<ZSwcDoc, ZSwcFilter>(doc, view)
 {
-  docSwcAdded(m_doc.objs());
-  connect(&m_doc, SIGNAL(objAdded(size_t,ZObjDoc*)), this, SLOT(docSwcAdded(size_t)));
+  docSwcsAdded(m_doc.objs());
+  connect(&m_doc, &ZSwcDoc::objAdded, this, &ZSwcView::docSwcAdded);
 }
 
-void ZSwcView::docSwcAdded(const QList<size_t> &objs)
+void ZSwcView::docSwcsAdded(const QList<size_t> &objs)
 {
   for (int i=0; i<objs.size(); ++i) {
     ZSwcFilter *viewControl = new ZSwcFilter(m_view);
     viewControl->setData(m_doc.swc(objs[i]));
     expandBoundBox(viewControl->boundBox());
     m_idToFilter[objs[i]].reset(viewControl);
-    connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
-    connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));
-    connect(viewControl, SIGNAL(objSelected(bool)), this, SLOT(onObjSelectedFromView(bool)));
+    connect(viewControl, &ZSwcFilter::boundBoxChanged, this, &ZSwcView::updateBoundBox);
+    connect(viewControl, &ZSwcFilter::objDeselected, this, &ZSwcView::onObjDeselectedFromView);
+    connect(viewControl, &ZSwcFilter::objSelected, this, &ZSwcView::onObjSelectedFromView);
     emit objViewReady(objs[i]);
   }
   if (!objs.empty()) {
@@ -35,9 +35,9 @@ void ZSwcView::docSwcAdded(size_t id)
   expandBoundBox(viewControl->boundBox());
   m_idToFilter[id].reset(viewControl);
   m_view.updateBoundBox();
-  connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
-  connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));
-  connect(viewControl, SIGNAL(objSelected(bool)), this, SLOT(onObjSelectedFromView(bool)));
+  connect(viewControl, &ZSwcFilter::boundBoxChanged, this, &ZSwcView::updateBoundBox);
+  connect(viewControl, &ZSwcFilter::objDeselected, this, &ZSwcView::onObjDeselectedFromView);
+  connect(viewControl, &ZSwcFilter::objSelected, this, &ZSwcView::onObjSelectedFromView);
   emit objViewReady(id);
 }
 

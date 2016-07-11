@@ -45,27 +45,27 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters &globalPara, QObject *par
   m_manipulatorSize.setStyle("SPINBOX");
   m_manipulatorSize.setDecimal(0);
   m_manipulatorSize.setSingleStep(10);
-  connect(&m_manipulatorSize, SIGNAL(valueChanged()), this, SLOT(invalidateHandle()));
+  connect(&m_manipulatorSize, &ZFloatParameter::valueChanged, this, &Z3DBoundedFilter::invalidateHandle);
 
-  connect(&m_rendererBase, SIGNAL(coordTransformChanged()), this, SLOT(updateAxisAlignedBoundBox()));
-  connect(&m_rendererBase, SIGNAL(sizeScaleChanged()), this, SLOT(updateBoundBox()));
-  connect(&m_rendererBase.globalCameraPara(), SIGNAL(valueChanged()), this, SLOT(invalidateHandle()));
+  connect(&m_rendererBase, &Z3DRendererBase::coordTransformChanged, this, &Z3DBoundedFilter::updateAxisAlignedBoundBox);
+  connect(&m_rendererBase, &Z3DRendererBase::sizeScaleChanged, this, &Z3DBoundedFilter::updateBoundBox);
+  connect(&m_rendererBase.globalCameraPara(), &Z3DCameraParameter::valueChanged, this, &Z3DBoundedFilter::invalidateHandle);
 
   m_xCut.setSingleStep(1);
   m_yCut.setSingleStep(1);
   m_zCut.setSingleStep(1);
-  connect(&m_xCut, SIGNAL(valueChanged()), this, SLOT(setClipPlanes()));
-  connect(&m_yCut, SIGNAL(valueChanged()), this, SLOT(setClipPlanes()));
-  connect(&m_zCut, SIGNAL(valueChanged()), this, SLOT(setClipPlanes()));
-  connect(&m_boundBoxMode, SIGNAL(valueChanged()), this, SLOT(onBoundBoxModeChanged()));
+  connect(&m_xCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
+  connect(&m_yCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
+  connect(&m_zCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
+  connect(&m_boundBoxMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DBoundedFilter::onBoundBoxModeChanged);
   m_boundBoxLineColor.setStyle("COLOR");
   //m_boundBoxLineColor.get().reset(0., 1., QColor(133,163,240,255), QColor(248,60,35,255));
   //m_boundBoxLineColor.get().addKey(ZColorMapKey(.1, QColor(233,239,235,255)));
   //m_boundBoxLineColor.get().addKey(ZColorMapKey(.2, QColor(240,241,237,255)));
   //m_boundBoxLineColor.get().addKey(ZColorMapKey(.3, QColor(248,205,165,255)));
-  connect(&m_boundBoxLineColor, SIGNAL(valueChanged()), this, SLOT(updateBoundBoxLineColors()));
+  connect(&m_boundBoxLineColor, &ZVec4Parameter::valueChanged, this, &Z3DBoundedFilter::updateBoundBoxLineColors);
   m_selectionLineColor.setStyle("COLOR");
-  connect(&m_selectionLineColor, SIGNAL(valueChanged()), this, SLOT(updateSelectionLineColors()));
+  connect(&m_selectionLineColor, &ZVec4Parameter::valueChanged, this, &Z3DBoundedFilter::updateSelectionLineColors);
 
   addParameter(m_xCut);
   addParameter(m_yCut);
@@ -82,7 +82,7 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters &globalPara, QObject *par
   m_baseBoundBoxRenderer.setFollowSizeScale(false);
   m_baseBoundBoxRenderer.setFollowCoordTransform(false);
   m_baseBoundBoxRenderer.setLineWidth(m_boundBoxLineWidth.get());
-  connect(&m_boundBoxLineWidth, SIGNAL(valueChanged()), this, SLOT(onBoundBoxLineWidthChanged()));
+  connect(&m_boundBoxLineWidth, &ZIntParameter::valueChanged, this, &Z3DBoundedFilter::onBoundBoxLineWidthChanged);
   updateBoundBoxLineColors();
 
   m_selectionBoundBoxRenderer.setUseDisplayList(false);
@@ -91,7 +91,7 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters &globalPara, QObject *par
   m_selectionBoundBoxRenderer.setFollowOpacity(false);
   m_selectionBoundBoxRenderer.setEnableMultisample(false);
   m_selectionBoundBoxRenderer.setLineWidth(m_selectionLineWidth.get());
-  connect(&m_selectionLineWidth, SIGNAL(valueChanged()), this, SLOT(onSelectionBoundBoxLineWidthChanged()));
+  connect(&m_selectionLineWidth, &ZIntParameter::valueChanged, this, &Z3DBoundedFilter::onSelectionBoundBoxLineWidthChanged);
   updateSelectionLineColors();
 
   m_selectionCornerRenderer.setColorSource("CustomColor");
@@ -117,13 +117,14 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters &globalPara, QObject *par
   m_handleEvent.listenTo("transform handle", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonPress);
   m_handleEvent.listenTo("transform handle", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonRelease);
   m_handleEvent.listenTo("transform handle", Qt::LeftButton, Qt::NoModifier, QEvent::MouseMove);
-  connect(&m_handleEvent, SIGNAL(mouseEventTriggered(QMouseEvent*,int,int)), this, SLOT(handleEvent(QMouseEvent*,int,int)));
+  connect(&m_handleEvent, &ZEventListenerParameter::mouseEventTriggered,
+          this, &Z3DBoundedFilter::handleEvent);
   addEventListener(m_handleEvent);
   m_handleEvent.setEnabled(m_isSelected);
 
   const std::vector<ZParameter*>& globalParas = m_rendererBase.globalParameters();
   for (size_t i=0; i<globalParas.size(); i++) {
-    connect(globalParas[i], SIGNAL(valueChanged()), this, SLOT(invalidateResult()));
+    connect(globalParas[i], &ZParameter::valueChanged, this, &Z3DBoundedFilter::invalidateResult);
   }
   const std::vector<ZParameter*>& paras = m_rendererBase.parameters();
   for (size_t i=0; i<paras.size(); i++) {

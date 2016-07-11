@@ -84,8 +84,8 @@ private:
   QString strippedName(const QString &fullFileName);
   ZMainWindow *findMainWindow(const QString &fileName);
 
-  bool loadJsonScene(const QString &fn, QString &err);
-  bool saveJsonScene(const QString &fn, QString &err);
+  bool loadJsonSceneImpl(const QString &fn, QString &err);
+  bool saveJsonSceneImpl(const QString &fn, QString &err);
 
   QMenu *m_fileMenu;
   QMenu *m_editMenu;

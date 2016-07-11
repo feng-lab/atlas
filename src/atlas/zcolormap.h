@@ -231,7 +231,7 @@ ZColorMap::ZColorMap(const ForwardIterator first, const ForwardIterator last, co
   m_dataMax = std::max(m_dataMax, m_dataMin + std::numeric_limits<double>::epsilon());
   addKey(ZColorMapKey(m_dataMin, minColor));
   addKey(ZColorMapKey(m_dataMax, maxColor));
-  connect(this, SIGNAL(changed()), this, SLOT(invalidateTexture()));
+  connect(this, &ZColorMap::changed, this, &ZColorMap::invalidateTexture);
 }
 
 template<class ForwardIterator>
@@ -243,7 +243,7 @@ ZColorMap::ZColorMap(const ForwardIterator first, const ForwardIterator last, co
   m_dataMax = std::max(m_dataMax, m_dataMin + std::numeric_limits<double>::epsilon());
   addKey(ZColorMapKey(m_dataMin, minColor));
   addKey(ZColorMapKey(m_dataMax, maxColor));
-  connect(this, SIGNAL(changed()), this, SLOT(invalidateTexture()));
+  connect(this, &ZColorMap::changed, this, &ZColorMap::invalidateTexture);
 }
 
 template<class ForwardIterator>
@@ -255,7 +255,7 @@ ZColorMap::ZColorMap(const ForwardIterator first, const ForwardIterator last, co
   m_dataMax = std::max(m_dataMax, m_dataMin + std::numeric_limits<double>::epsilon());
   addKey(ZColorMapKey(m_dataMin, minColor));
   addKey(ZColorMapKey(m_dataMax, maxColor));
-  connect(this, SIGNAL(changed()), this, SLOT(invalidateTexture()));
+  connect(this, &ZColorMap::changed, this, &ZColorMap::invalidateTexture);
 }
 
 template<class ForwardIterator>
@@ -350,7 +350,7 @@ ZColorMapParameter::ZColorMapParameter(const QString& name, const ForwardIterato
   : ZSingleValueParameter<ZColorMap>(name, parent)
 {
   m_value.reset(first, last, minColor, maxColor);
-  connect(&m_value, SIGNAL(changed()), this, SIGNAL(valueChanged()));
+  connect(&m_value, &ZColorMap::changed, this, &ZColorMapParameter::valueChanged);
 }
 
 template<class ForwardIterator>
@@ -358,7 +358,7 @@ ZColorMapParameter::ZColorMapParameter(const QString& name, const ForwardIterato
   : ZSingleValueParameter<ZColorMap>(name, parent)
 {
   m_value.reset(first, last, minColor, maxColor);
-  connect(&m_value, SIGNAL(changed()), this, SIGNAL(valueChanged()));
+  connect(&m_value, &ZColorMap::changed, this, &ZColorMapParameter::valueChanged);
 }
 
 template<class ForwardIterator>
@@ -366,7 +366,7 @@ ZColorMapParameter::ZColorMapParameter(const QString& name, const ForwardIterato
   : ZSingleValueParameter<ZColorMap>(name, parent)
 {
   m_value.reset(first, last, minColor, maxColor);
-  connect(&m_value, SIGNAL(changed()), this, SIGNAL(valueChanged()));
+  connect(&m_value, &ZColorMap::changed, this, &ZColorMapParameter::valueChanged);
 }
 
 } // namespace nim

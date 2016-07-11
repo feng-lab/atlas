@@ -15,7 +15,8 @@ public:
   ZFontParameter(const QString& name, const QFont &font, QObject *parent = nullptr);
 
 signals:
-  void valueChanged(QFont);
+  void valueWillChange(QFont);
+
 public slots:
   void setValue(const QFont &v);
 

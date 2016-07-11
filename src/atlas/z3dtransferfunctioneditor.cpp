@@ -49,23 +49,23 @@ Z3DTransferFunctionWidget::Z3DTransferFunctionWidget(Z3DTransferFunctionParamete
 
   QAction* cc = new QAction(tr("Change Color"), this);
   m_keyContextMenu.addAction(cc);
-  connect(cc, SIGNAL(triggered()), this, SLOT(changeCurrentColor()));
+  connect(cc, &QAction::triggered, this, &Z3DTransferFunctionWidget::changeCurrentColor);
 
   m_changeOpacityAction = new QAction(tr("Change Opacity"), this);
   m_keyContextMenu.addAction(m_changeOpacityAction);
-  connect(m_changeOpacityAction, SIGNAL(triggered()), this, SLOT(changeCurrentOpacity()));
+  connect(m_changeOpacityAction, &QAction::triggered, this, &Z3DTransferFunctionWidget::changeCurrentOpacity);
 
   m_changeIntensityAction = new QAction(tr("Change Intensity"), this);
   m_keyContextMenu.addAction(m_changeIntensityAction);
-  connect(m_changeIntensityAction, SIGNAL(triggered()), this, SLOT(changeCurrentIntensity()));
+  connect(m_changeIntensityAction, &QAction::triggered, this, &Z3DTransferFunctionWidget::changeCurrentIntensity);
 
   m_deleteKeyAction = new QAction(tr("Delete This Key"), this);
   m_keyContextMenu.addAction(m_deleteKeyAction);
-  connect(m_deleteKeyAction, SIGNAL(triggered()), this, SLOT(deleteKey()));
+  connect(m_deleteKeyAction, &QAction::triggered, this, &Z3DTransferFunctionWidget::deleteKey);
 
   if (m_volume)
-    connect(m_volume, SIGNAL(histogramFinished()), this, SLOT(update()));
-  connect(m_transferFunction, SIGNAL(valueChanged()), this, SLOT(update()));
+    connect(m_volume, &Z3DVolume::histogramFinished, this, qOverload<>(&Z3DTransferFunctionWidget::update));
+  connect(m_transferFunction, &Z3DTransferFunctionParameter::valueChanged, this, qOverload<>(&Z3DTransferFunctionWidget::update));
 
   setSizePolicy(QSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding));
 }
@@ -699,7 +699,7 @@ void Z3DTransferFunctionWidget::volumeChanged(Z3DVolume* volume)
   m_histogramCache.reset();
 
   m_volume = volume;
-  connect(m_volume, SIGNAL(histogramFinished()), this, SLOT(update()));
+  connect(m_volume, &Z3DVolume::histogramFinished, this, qOverload<>(&Z3DTransferFunctionWidget::update));
 }
 
 void Z3DTransferFunctionWidget::setTransFunc(Z3DTransferFunctionParameter *tf)
@@ -713,9 +713,9 @@ void Z3DTransferFunctionWidget::setTransFunc(Z3DTransferFunctionParameter *tf)
 Z3DTransferFunctionEditor::Z3DTransferFunctionEditor(Z3DTransferFunctionParameter* para, QWidget* parent)
   : QWidget(parent)
   , m_transferFunction(para)
-  , m_volume(NULL)
-  , m_transferFunctionWidget(NULL)
-  , m_transferFunctionTexture(NULL)
+  , m_volume(nullptr)
+  , m_transferFunctionWidget(nullptr)
+  , m_transferFunctionTexture(nullptr)
   , m_showHistogram("Show Histogram: ", true)
   , m_histogramNormalizeMethod("Histogram Normalize Method: ")
 {
@@ -799,7 +799,7 @@ QLayout* Z3DTransferFunctionEditor::createMappingLayout()
   hboxDomain->addWidget(m_rescaleKeys);
 
   QPushButton *resetButton = new QPushButton("Reset", this);
-  connect(resetButton, SIGNAL(clicked()), this, SLOT(reset()));
+  connect(resetButton, &QPushButton::clicked, this, &Z3DTransferFunctionEditor::reset);
 
   m_transferFunctionTexture = new ZClickableTransferFunctionLabel(m_transferFunction);
 
@@ -831,13 +831,13 @@ void Z3DTransferFunctionEditor::createWidgets()
 
 void Z3DTransferFunctionEditor::createConnections()
 {
-  connect(m_transferFunction, SIGNAL(valueChanged()), this, SLOT(updateFromTransferFunction()));
+  connect(m_transferFunction, &Z3DTransferFunctionParameter::valueChanged, this, &Z3DTransferFunctionEditor::updateFromTransferFunction);
 
-  connect(m_domainMinSpinBox, SIGNAL(valueChanged(double)), this, SLOT(domainMinSpinBoxChanged(double)));
-  connect(m_domainMaxSpinBox, SIGNAL(valueChanged(double)), this, SLOT(domainMaxSpinBoxChanged(double)));
-  connect(m_fitDomainToDataButton, SIGNAL(clicked()), this, SLOT(fitDomainToData()));
-  connect(&m_showHistogram, SIGNAL(valueChanged(bool)), m_transferFunctionWidget, SLOT(setHistogramVisible(bool)));
-  connect(&m_histogramNormalizeMethod, SIGNAL(valueChanged()), this, SLOT(changeHistogramNormalizeMethod()));
+  connect(m_domainMinSpinBox, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &Z3DTransferFunctionEditor::domainMinSpinBoxChanged);
+  connect(m_domainMaxSpinBox, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &Z3DTransferFunctionEditor::domainMaxSpinBoxChanged);
+  connect(m_fitDomainToDataButton, &QPushButton::clicked, this, &Z3DTransferFunctionEditor::fitDomainToData);
+  connect(&m_showHistogram, &ZBoolParameter::boolChanged, m_transferFunctionWidget, &Z3DTransferFunctionWidget::setHistogramVisible);
+  connect(&m_histogramNormalizeMethod, &ZStringIntOptionParameter::valueChanged, this, &Z3DTransferFunctionEditor::changeHistogramNormalizeMethod);
 }
 
 void Z3DTransferFunctionEditor::changeHistogramNormalizeMethod()

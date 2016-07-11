@@ -139,12 +139,12 @@ Z3DTransformParameter::Z3DTransformParameter(const QString &name, QObject *paren
   m_scale.setSingleStep(.1);
   m_scale.setDecimal(6);
   m_scale.setStyle("SPINBOX");
-  connect(&m_scale, SIGNAL(valueChanged()), this, SLOT(updateMatrix()));
+  connect(&m_scale, &ZVec3Parameter::valueChanged, this, &Z3DTransformParameter::updateMatrix);
 
   m_translation.setSingleStep(10);
   m_translation.setDecimal(6);
   m_translation.setStyle("SPINBOX");
-  connect(&m_translation, SIGNAL(valueChanged()), this, SLOT(updateMatrix()));
+  connect(&m_translation, &ZVec3Parameter::valueChanged, this, &Z3DTransformParameter::updateMatrix);
 
   names.clear();
   names << "angle:" << "x:" << "y:" << "z:";
@@ -152,12 +152,12 @@ Z3DTransformParameter::Z3DTransformParameter(const QString &name, QObject *paren
   m_rotation.setSingleStep(1);
   m_rotation.setDecimal(6);
   m_rotation.setStyle("SPINBOX");
-  connect(&m_rotation, SIGNAL(valueChanged()), this, SLOT(updateMatrix()));
+  connect(&m_rotation, &ZVec4Parameter::valueChanged, this, &Z3DTransformParameter::updateMatrix);
 
   m_center.setSingleStep(10);
   m_center.setDecimal(6);
   m_center.setStyle("SPINBOX");
-  connect(&m_center, SIGNAL(valueChanged()), this, SLOT(updateMatrix()));
+  connect(&m_center, &ZVec3Parameter::valueChanged, this, &Z3DTransformParameter::updateMatrix);
 }
 
 Z3DTransformParameter::Z3DTransformParameter(const QString &name, const glm::mat4 &value, QObject *parent)
@@ -183,12 +183,12 @@ Z3DTransformParameter::Z3DTransformParameter(const QString &name, const glm::mat
   m_scale.setSingleStep(.1);
   m_scale.setDecimal(6);
   m_scale.setStyle("SPINBOX");
-  connect(&m_scale, SIGNAL(valueChanged()), this, SLOT(updateMatrix()));
+  connect(&m_scale, &ZVec3Parameter::valueChanged, this, &Z3DTransformParameter::updateMatrix);
 
   m_translation.setSingleStep(10);
   m_translation.setDecimal(6);
   m_translation.setStyle("SPINBOX");
-  connect(&m_translation, SIGNAL(valueChanged()), this, SLOT(updateMatrix()));
+  connect(&m_translation, &ZVec3Parameter::valueChanged, this, &Z3DTransformParameter::updateMatrix);
 
   names.clear();
   names << "angle:" << "x:" << "y:" << "z:";
@@ -196,12 +196,12 @@ Z3DTransformParameter::Z3DTransformParameter(const QString &name, const glm::mat
   m_rotation.setSingleStep(1);
   m_rotation.setDecimal(6);
   m_rotation.setStyle("SPINBOX");
-  connect(&m_rotation, SIGNAL(valueChanged()), this, SLOT(updateMatrix()));
+  connect(&m_rotation, &ZVec4Parameter::valueChanged, this, &Z3DTransformParameter::updateMatrix);
 
   m_center.setSingleStep(10);
   m_center.setDecimal(6);
   m_center.setStyle("SPINBOX");
-  connect(&m_center, SIGNAL(valueChanged()), this, SLOT(updateMatrix()));
+  connect(&m_center, &ZVec3Parameter::valueChanged, this, &Z3DTransformParameter::updateMatrix);
 }
 
 glm::quat Z3DTransformParameter::rotation() const
@@ -303,7 +303,7 @@ QWidget *Z3DTransformParameter::actualCreateWidget(QWidget *parent)
   transform.addChild(m_center, 1);
 
   QPushButton *pb = new QPushButton("Show Transform Matrix");
-  connect(pb, SIGNAL(clicked(bool)), this, SLOT(showTransformMatrix()));
+  connect(pb, &QPushButton::clicked, this, &Z3DTransformParameter::showTransformMatrix);
   transform.addChild(*pb, 2);
 
   QLayout *lw = transform.createLayout(false);

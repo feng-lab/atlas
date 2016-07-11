@@ -63,16 +63,16 @@ ZRegionAnnotation::ZRegionAnnotation(QObject *parent)
   QStringList regions;
   regions << "GPe" << "STN" << "SNr" << "STRv" << "STRd" << "GPi" << "SPF";
   readMouseBrainAtlasOntology(regions, m_ontology);
-  connect(&m_undoStack, SIGNAL(cleanChanged(bool)),
-          this, SIGNAL(undoStackCleanChanged(bool)));
+  connect(&m_undoStack, &QUndoStack::cleanChanged,
+          this, &ZRegionAnnotation::undoStackCleanChanged);
 }
 
 ZRegionAnnotation::ZRegionAnnotation(const QString &filename, QObject *parent)
   : QObject(parent)
 {
   load(filename);
-  connect(&m_undoStack, SIGNAL(cleanChanged(bool)),
-          this, SIGNAL(undoStackCleanChanged(bool)));
+  connect(&m_undoStack, &QUndoStack::cleanChanged,
+          this, &ZRegionAnnotation::undoStackCleanChanged);
 }
 
 ZRegionAnnotation::~ZRegionAnnotation()
@@ -185,9 +185,6 @@ void ZRegionAnnotation::importLabelImage(const QString &fn, FileFormat format, b
       // create contours
       it->roi = std::make_shared<ZROI>(undoStack());
       binaryImgToROI(binaryImg, *it->roi.get());
-      //connect(it->roi.get(), SIGNAL(roiChanged(int)), this, SIGNAL(modified()));
-      //connect(it->roi.get(), SIGNAL(roiDeleted(int)), this, SIGNAL(modified()));
-      //connect(it->roi.get(), SIGNAL(roiMoved(int)), this, SIGNAL(modified()));
     }
 
     // update labelImg: change id to parentID (merge current region to parent region)
@@ -258,9 +255,6 @@ void ZRegionAnnotation::mergeROIToRegion(const ZROI &roi, int64_t regionID)
     if (it->id == regionID) {
       if (!it->roi) {
         it->roi = std::make_shared<ZROI>(undoStack());
-        //connect(it->roi.get(), SIGNAL(roiChanged(int)), this, SIGNAL(modified()));
-        //connect(it->roi.get(), SIGNAL(roiDeleted(int)), this, SIGNAL(modified()));
-        //connect(it->roi.get(), SIGNAL(roiMoved(int)), this, SIGNAL(modified()));
         emit regionROIAdded(it->id, it->roi.get());
       }
       it->roi->mergeWith(roi);
@@ -268,9 +262,6 @@ void ZRegionAnnotation::mergeROIToRegion(const ZROI &roi, int64_t regionID)
       for (auto pit = m_ontology.beginAncestor(it); pit != m_ontology.endAncestor(it); ++pit) {
         if (!pit->roi) {
           pit->roi = std::make_shared<ZROI>(undoStack());
-          //connect(pit->roi.get(), SIGNAL(roiChanged(int)), this, SIGNAL(modified()));
-          //connect(pit->roi.get(), SIGNAL(roiDeleted(int)), this, SIGNAL(modified()));
-          //connect(pit->roi.get(), SIGNAL(roiMoved(int)), this, SIGNAL(modified()));
           emit regionROIAdded(it->id, it->roi.get());
         }
         pit->roi->mergeWith(roi);
@@ -368,9 +359,6 @@ void ZRegionAnnotation::load(const QString &filename)
         H5::Group roiGrp = regionGrp.openGroup("ROI");
         p.roi = std::make_shared<ZROI>(undoStack());
         p.roi->load(roiGrp);
-        //connect(p.roi.get(), SIGNAL(roiChanged(int)), this, SIGNAL(modified()));
-        //connect(p.roi.get(), SIGNAL(roiDeleted(int)), this, SIGNAL(modified()));
-        //connect(p.roi.get(), SIGNAL(roiMoved(int)), this, SIGNAL(modified()));
       }
 
       if (H5Lexists(regionGrp.getId(), "Mesh", H5P_DEFAULT) > 0) {

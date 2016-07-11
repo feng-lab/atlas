@@ -128,10 +128,10 @@ ZSwcFilter::ZSwcFilter(ZView &view)
   , m_opacity("Opacity", 1, 0., 1.)
 {
   m_outlineColor.setStyle("COLOR");
-  connect(&m_visible, SIGNAL(valueChanged()), this, SLOT(visibleChanged()));
-  connect(&m_showSkeleton, SIGNAL(valueChanged()), this, SLOT(showSkeletonChanged()));
-  connect(&m_outlineColor, SIGNAL(valueChanged()), this, SLOT(outlineColorChanged()));
-  connect(&m_opacity, SIGNAL(valueChanged()), this, SLOT(outlineColorChanged()));
+  connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZSwcFilter::visibleChanged);
+  connect(&m_showSkeleton, &ZBoolParameter::valueChanged, this, &ZSwcFilter::showSkeletonChanged);
+  connect(&m_outlineColor, &ZVec3Parameter::valueChanged, this, &ZSwcFilter::outlineColorChanged);
+  connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZSwcFilter::outlineColorChanged);
   addParameter(&m_visible);
   addParameter(&m_showSkeleton);
   addParameter(&m_outlineColor);
@@ -153,8 +153,6 @@ void ZSwcFilter::setData(ZSwc &swc)
     m_item->setNormalView(m_view.currentSlice(), m_view.currentTime());
   }
   m_view.scene().addItem(m_item.get());
-
-  //connect(m_swc, SIGNAL(boundBoxChanged()), this, SIGNAL(boundBoxChanged()));
 }
 
 void ZSwcFilter::releaseItemsOwnership()

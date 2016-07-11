@@ -27,12 +27,12 @@ ZShareItemSelectionModel::ZShareItemSelectionModel(QAbstractItemModel *model,
 
   QItemSelectionModel::select(mapSelectionFromSrc(m_srcSelectionModel->selection()), QItemSelectionModel::Select);
 
-  connect(m_srcSelectionModel, SIGNAL(currentChanged(QModelIndex,QModelIndex)),
-          this, SLOT(srcCurrentChanged(QModelIndex,QModelIndex)));
-  connect(m_srcSelectionModel, SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
-          this, SLOT(srcSelectionChanged(QItemSelection,QItemSelection)));
-  connect(this, SIGNAL(currentChanged(QModelIndex,QModelIndex)),
-          this, SLOT(thisCurrentChanged(QModelIndex,QModelIndex)));
+  connect(m_srcSelectionModel, &QItemSelectionModel::currentChanged,
+          this, &ZShareItemSelectionModel::srcCurrentChanged);
+  connect(m_srcSelectionModel, &QItemSelectionModel::selectionChanged,
+          this, &ZShareItemSelectionModel::srcSelectionChanged);
+  connect(this, &ZShareItemSelectionModel::currentChanged,
+          this, &ZShareItemSelectionModel::thisCurrentChanged);
 }
 
 void ZShareItemSelectionModel::select(const QModelIndex &index, SelectionFlags command)

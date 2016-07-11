@@ -34,7 +34,7 @@ void Z2DAnimation::bindView(ZView *v)
     return;
 
   if (v) {
-    connect(v, SIGNAL(objViewReady(size_t)), this, SLOT(tryLinkAnimationWith(size_t)));
+    connect(v, &ZView::objViewReady, this, &Z2DAnimation::tryLinkAnimationWith);
     m_view = v;
     rebindView();
   } else {

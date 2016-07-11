@@ -19,9 +19,9 @@ Z3DEllipsoidRenderer::Z3DEllipsoidRenderer(Z3DRendererBase &rendererBase)
   , m_pickingDataChanged(false)
 {
   setUseDisplayList(true);
-  connect(&m_sphereSlicesStacks, SIGNAL(valueChanged()), this, SLOT(invalidateOpenglRenderer()));
-  connect(&m_useDynamicMaterial, SIGNAL(valueChanged()), this, SLOT(compile()));
-  connect(&m_useDynamicMaterial, SIGNAL(valueChanged()), this, SLOT(invalidateOpenglRenderer()));
+  connect(&m_sphereSlicesStacks, &ZIntParameter::valueChanged, this, &Z3DEllipsoidRenderer::invalidateOpenglRenderer);
+  connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, &Z3DEllipsoidRenderer::compile);
+  connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, &Z3DEllipsoidRenderer::invalidateOpenglRenderer);
 
   QStringList allshaders;
   allshaders << "ellipsoid.vert" << "ellipsoid_func.frag" << "lighting2.frag";

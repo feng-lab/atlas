@@ -14,7 +14,7 @@ public:
   Z3DAnimationView(Z3DAnimationDoc &doc, Z3DView &view);
 
 private slots:
-  void docAnimationAdded(const QList<size_t> &objs);
+  void docAnimationsAdded(const QList<size_t> &objs);
   void docAnimationAdded(size_t id);
 
 private:

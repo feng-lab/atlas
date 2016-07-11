@@ -12,8 +12,8 @@ Z3DRegionAnnotationFilter::Z3DRegionAnnotationFilter(Z3DGlobalParameters &global
 {
   //addParameter(m_visible);
 
-  connect(&m_visible, SIGNAL(valueChanged(bool)), this, SLOT(visibleChanged(bool)));
-  connect(&m_visible, SIGNAL(valueChanged(bool)), this, SIGNAL(objVisibleChanged(bool)));
+  connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DRegionAnnotationFilter::visibleChanged);
+  connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DRegionAnnotationFilter::objVisibleChanged);
 
   m_numParas = m_parameters.size();
 }
@@ -35,7 +35,7 @@ void Z3DRegionAnnotationFilter::setData(ZRegionAnnotation &regAnno)
 {
   m_regionAnnotation = &regAnno;
   allMeshChanged();
-  connect(m_regionAnnotation, SIGNAL(allMeshChanged()), this, SLOT(allMeshChanged()));
+  connect(m_regionAnnotation, &ZRegionAnnotation::allMeshChanged, this, &Z3DRegionAnnotationFilter::allMeshChanged);
 }
 
 bool Z3DRegionAnnotationFilter::isReady(Z3DEye eye) const
@@ -168,8 +168,8 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
     std::vector<ZParameter*> paras = flt->parameters();
     for (size_t i=0; i<paras.size(); ++i) {
       if (paras[i]->name().contains("Coord Transform")) {
-        connect(&m_rendererBase.coordTransformPara(), SIGNAL(valueChanged()),
-                paras[i], SLOT(updateFromSender()));
+        connect(&m_rendererBase.coordTransformPara(), &Z3DTransformParameter::valueChanged,
+                paras[i], &ZParameter::updateFromSender);
       } else if (paras[i]->name() == "Visible" ||
                  paras[i]->name() == "Mesh Color" ||
                  paras[i]->name().contains("Wireframe") ||

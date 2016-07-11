@@ -13,10 +13,10 @@ public:
   ZQuatParameter(const QString &name, glm::quat value, QObject *parent = NULL);
 
 signals:
-  void value1Changed(double);
-  void value2Changed(double);
-  void value3Changed(double);
-  void value4Changed(double);
+  void value1WillChange(double);
+  void value2WillChange(double);
+  void value3WillChange(double);
+  void value4WillChange(double);
 public slots:
   void setValue1(double v);
   void setValue2(double v);

@@ -91,7 +91,7 @@ void Z3DVolume::asyncGenerateHistogram()
   if (hasHistogram() || m_histogramThread)
     return;
   m_histogramThread.reset(new Z3DVolumeHistogramThread(this));
-  connect(m_histogramThread.get(), SIGNAL(finished()), this, SLOT(setHistogram()));
+  connect(m_histogramThread.get(), &Z3DVolumeHistogramThread::finished, this, &Z3DVolume::setHistogram);
   m_histogramThread->start();
 }
 

@@ -36,31 +36,31 @@ ZTimelineWidget::ZTimelineWidget(ZAnimation &ani, ZDoubleParameter *currentTimeP
   m_exportButton->setStatusTip(tr("Export Animation"));
   //m_exportButton->setStyleSheet("border-style: none;");
   m_exportButton->setCheckable(true);
-  connect(m_exportButton, SIGNAL(toggled(bool)), this, SIGNAL(exportButtonToggled(bool)));
+  connect(m_exportButton, &QToolButton::toggled, this, &ZTimelineWidget::exportButtonToggled);
 
   m_cleanupButton = new QToolButton(this);
   m_cleanupButton->setIcon(QIcon(":/icons/clean_up.png"));
   m_cleanupButton->setStatusTip(tr("Remove Redundant Keys"));
   m_cleanupButton->setStyleSheet("border-style: none;");
-  connect(m_cleanupButton, SIGNAL(clicked()), &m_animation, SLOT(removeRedundantKeys()));
+  connect(m_cleanupButton, &QToolButton::clicked, &m_animation, &ZAnimation::removeRedundantKeys);
 
   m_zoomInButton = new QToolButton(this);
   m_zoomInButton->setIcon(QIcon(":/icons/zoom_in-512.png"));
   m_zoomInButton->setStatusTip(tr("Zoom In Timeline"));
   m_zoomInButton->setStyleSheet("border-style: none;");
-  connect(m_zoomInButton, SIGNAL(clicked()), this, SLOT(zoomIn()));
+  connect(m_zoomInButton, &QToolButton::clicked, this, &ZTimelineWidget::zoomIn);
 
   m_zoomOutButton = new QToolButton(this);
   m_zoomOutButton->setIcon(QIcon(":/icons/zoom_out-512.png"));
   m_zoomOutButton->setStatusTip(tr("Zoom Out Timeline"));
   m_zoomOutButton->setStyleSheet("border-style: none;");
-  connect(m_zoomOutButton, SIGNAL(clicked()), this, SLOT(zoomOut()));
+  connect(m_zoomOutButton, &QToolButton::clicked, this, &ZTimelineWidget::zoomOut);
 
   m_expandButton = new QToolButton(this);
   m_expandButton->setIcon(QIcon(":/icons/expand-512.png"));
   m_expandButton->setStatusTip(tr("Fit Timeline to Window"));
   m_expandButton->setStyleSheet("border-style: none;");
-  connect(m_expandButton, SIGNAL(clicked()), this, SLOT(expandToFit()));
+  connect(m_expandButton, &QToolButton::clicked, this, &ZTimelineWidget::expandToFit);
 
   QHBoxLayout *hlo = new QHBoxLayout;
   hlo->addSpacing(objViewWidth()-125);
@@ -79,23 +79,23 @@ ZTimelineWidget::ZTimelineWidget(ZAnimation &ani, ZDoubleParameter *currentTimeP
   lo->addWidget(m_eventView, 1, 1);
   setLayout(lo);
 
-  connect(m_objView, SIGNAL(vScrollBarValueChanged(int)),
-          m_eventView->verticalScrollBar(), SLOT(setValue(int)));
-  connect(m_eventView->verticalScrollBar(), SIGNAL(valueChanged(int)),
-          m_objView->verticalScrollBar(), SLOT(setValue(int)));
+  connect(m_objView, &ZTimelineObjView::vScrollBarValueChanged,
+          m_eventView->verticalScrollBar(), &QScrollBar::setValue);
+  connect(m_eventView->verticalScrollBar(), &QScrollBar::valueChanged,
+          m_objView->verticalScrollBar(), &QScrollBar::setValue);
 
-  connect(m_objView->verticalScrollBar(), SIGNAL(rangeChanged(int,int)),
-          this, SLOT(objViewVerticalScrollBarRangeChanged(int,int)));
-  connect(m_eventView->verticalScrollBar(), SIGNAL(rangeChanged(int,int)),
-          this, SLOT(eventViewVerticalScrollBarRangeChanged(int,int)));
+  connect(m_objView->verticalScrollBar(), &QScrollBar::rangeChanged,
+          this, &ZTimelineWidget::objViewVerticalScrollBarRangeChanged);
+  connect(m_eventView->verticalScrollBar(), &QScrollBar::rangeChanged,
+          this, &ZTimelineWidget::eventViewVerticalScrollBarRangeChanged);
 
-  connect(m_eventView->horizontalScrollBar(), SIGNAL(valueChanged(int)),
-          m_axis->horizontalScrollBar(), SLOT(setValue(int)));
-  connect(m_axis->horizontalScrollBar(), SIGNAL(valueChanged(int)),
-          m_eventView->horizontalScrollBar(), SLOT(setValue(int)));
+  connect(m_eventView->horizontalScrollBar(), &QScrollBar::valueChanged,
+          m_axis->horizontalScrollBar(), &QScrollBar::setValue);
+  connect(m_axis->horizontalScrollBar(), &QScrollBar::valueChanged,
+          m_eventView->horizontalScrollBar(), &QScrollBar::setValue);
 
-  connect(&m_animation, SIGNAL(durationChanged(double)), this, SLOT(updateEventViewWidth()));
-  connect(m_currentTimePara, SIGNAL(valueChanged()), this, SIGNAL(currentTimeChanged()));
+  connect(&m_animation, &ZAnimation::durationChanged, this, &ZTimelineWidget::updateEventViewWidth);
+  connect(m_currentTimePara, &ZDoubleParameter::valueChanged, this, &ZTimelineWidget::currentTimeChanged);
 
   eventViewVerticalScrollBarRangeChanged(m_eventView->verticalScrollBar()->minimum(),
                                          m_eventView->verticalScrollBar()->maximum());

@@ -7,11 +7,11 @@ namespace nim {
 Z3DAnimationView::Z3DAnimationView(Z3DAnimationDoc &doc, Z3DView &view)
   : Z3DFilterView<Z3DAnimationDoc, Z3DAnimationFilter>(doc, view)
 {
-  docAnimationAdded(m_doc.objs());
-  connect(&m_doc, SIGNAL(objAdded(size_t,ZObjDoc*)), this, SLOT(docAnimationAdded(size_t)));
+  docAnimationsAdded(m_doc.objs());
+  connect(&m_doc, &Z3DAnimationDoc::objAdded, this, &Z3DAnimationView::docAnimationAdded);
 }
 
-void Z3DAnimationView::docAnimationAdded(const QList<size_t> &objs)
+void Z3DAnimationView::docAnimationsAdded(const QList<size_t> &objs)
 {
   try {
     for (int i=0; i<objs.size(); ++i) {
@@ -23,8 +23,8 @@ void Z3DAnimationView::docAnimationAdded(const QList<size_t> &objs)
       m_idToFilter[id].reset(viewControl);
 
       viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
-      connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
-      connect(viewControl, SIGNAL(objVisibleChanged(bool)), this, SLOT(onObjVisibleChangedFromView(bool)));
+      connect(viewControl, &Z3DAnimationFilter::boundBoxChanged, this, &Z3DAnimationView::updateBoundBox);
+      connect(viewControl, &Z3DAnimationFilter::objVisibleChanged, this, &Z3DAnimationView::onObjVisibleChangedFromView);
       emit objViewReady(id);
     }
     if (!objs.empty()) {
@@ -48,8 +48,8 @@ void Z3DAnimationView::docAnimationAdded(size_t id)
     m_idToFilter[id].reset(viewControl);
 
     viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
-    connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
-    connect(viewControl, SIGNAL(objVisibleChanged(bool)), this, SLOT(onObjVisibleChangedFromView(bool)));
+    connect(viewControl, &Z3DAnimationFilter::boundBoxChanged, this, &Z3DAnimationView::updateBoundBox);
+    connect(viewControl, &Z3DAnimationFilter::objVisibleChanged, this, &Z3DAnimationView::onObjVisibleChangedFromView);
     networkEvaluator().updateNetwork();
     m_view.updateBoundBox();
 

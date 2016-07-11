@@ -20,7 +20,7 @@ ZTimelineObjView::ZTimelineObjView(ZTimelineWidget &parent)
   setMinimumWidth(m_parent.objViewWidth() + 2);
   setMinimumHeight(m_parent.minViewHeight());
   setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
-  connect(verticalScrollBar(), SIGNAL(valueChanged(int)), this, SLOT(checkScrollBarValue(int)));
+  connect(verticalScrollBar(), &QScrollBar::valueChanged, this, &ZTimelineObjView::checkScrollBarValue);
 }
 
 void ZTimelineObjView::setScrollEnabled(bool v)

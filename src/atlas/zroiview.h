@@ -15,7 +15,7 @@ public:
   ZROIView(ZROIDoc &doc, ZView &view);
 
 private slots:
-  void docROIAdded(const QList<size_t> &objs);
+  void docROIsAdded(const QList<size_t> &objs);
   void docROIAdded(size_t id);
 };
 

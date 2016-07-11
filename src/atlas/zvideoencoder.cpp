@@ -10,14 +10,14 @@ ZVideoEncoder::ZVideoEncoder(QObject *parent)
   , m_lock(false)
 {
   m_ffmpegProcess = new QProcess(this);
-  connect(m_ffmpegProcess, SIGNAL(error(QProcess::ProcessError)),
-          this, SLOT(ffmpegError(QProcess::ProcessError)));
-  connect(m_ffmpegProcess, SIGNAL(finished(int,QProcess::ExitStatus)),
-          this, SLOT(ffmpegFinished(int,QProcess::ExitStatus)));
-  connect(m_ffmpegProcess, SIGNAL(readyReadStandardOutput()),
-          this, SLOT(logStandardOutput()));
-  connect(m_ffmpegProcess, SIGNAL(readyReadStandardError()),
-          this, SLOT(logStandardError()));
+  connect(m_ffmpegProcess, &QProcess::errorOccurred,
+          this, &ZVideoEncoder::ffmpegError);
+  connect(m_ffmpegProcess, qOverload<int,QProcess::ExitStatus>(&QProcess::finished),
+          this, &ZVideoEncoder::ffmpegFinished);
+  connect(m_ffmpegProcess, &QProcess::readyReadStandardOutput,
+          this, &ZVideoEncoder::logStandardOutput);
+  connect(m_ffmpegProcess, &QProcess::readyReadStandardError,
+          this, &ZVideoEncoder::logStandardError);
 }
 
 void ZVideoEncoder::encode(const QDir &dir, const QString &namePrefix, int fieldWidth, int framesPerSecond, const QString &outputFilename)

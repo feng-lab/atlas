@@ -50,7 +50,7 @@ public:
 
 signals:
   void colorChanged(ZParameterAnimation* pa);
-  void keyChanged();
+  void keysChanged();
   void keyChanged(ZParameterKey* key);
   void keyAboutToDelete(ZParameterKey* key);
 

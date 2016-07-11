@@ -222,7 +222,7 @@ void ZPunctaDoc::loadPuncta()
 void ZPunctaDoc::detectPuncta()
 {
   ZPunctaDetectionDialog dlg(QApplication::activeWindow());
-  connect(&dlg, SIGNAL(srcImgReady(ZImg*,QString)), &m_doc.imgDoc(), SLOT(showImg(ZImg*,QString)));
+  connect(&dlg, &ZPunctaDetectionDialog::srcImgReady, &m_doc.imgDoc(), &ZImgDoc::showImg);
   dlg.exec();
 }
 
@@ -272,15 +272,15 @@ void ZPunctaDoc::createActions()
 {
   m_loadPunctaAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load Puncta..."), this);
   m_loadPunctaAction->setStatusTip(tr("Load one or more existing puncta files"));
-  connect(m_loadPunctaAction, SIGNAL(triggered()), this, SLOT(loadPuncta()));
+  connect(m_loadPunctaAction, &QAction::triggered, this, &ZPunctaDoc::loadPuncta);
 
   m_detectPunctaAction = new QAction(tr("&Detect Puncta..."), this);
   m_detectPunctaAction->setStatusTip(tr("Auto Detect Puncta"));
-  connect(m_detectPunctaAction, SIGNAL(triggered()), this, SLOT(detectPuncta()));
+  connect(m_detectPunctaAction, &QAction::triggered, this, &ZPunctaDoc::detectPuncta);
 
   m_generateAnalysisTextFilesAction = new QAction(tr("&Generate Analysis Text Files..."), this);
   m_generateAnalysisTextFilesAction->setStatusTip(tr("Generate Analysis Text Files from input list"));
-  connect(m_generateAnalysisTextFilesAction, SIGNAL(triggered()), this, SLOT(generateAnalysisTextFiles()));
+  connect(m_generateAnalysisTextFilesAction, &QAction::triggered, this, &ZPunctaDoc::generateAnalysisTextFiles);
 }
 
 bool ZPunctaDoc::savePuncta(PunctaPack *pack, const QString &fileName, QString &errorMsg, const QString& format)

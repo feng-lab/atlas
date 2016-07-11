@@ -4,6 +4,7 @@
 #include <QLabel>
 #include <QScrollArea>
 #include "QsLog.h"
+#include "zobjdoc.h"
 
 namespace nim {
 
@@ -19,10 +20,10 @@ ZViewSettingWidget::ZViewSettingWidget(ZDoc *doc, ZViewSettingInterface *view, Q
   layout->addWidget(m_widget);
   layout->setMargin(0);
   setLayout(layout);
-  connect(m_doc, SIGNAL(showViewSetting(size_t)), this, SLOT(showViewSettingWidgetOfObj(size_t)));
-  connect(m_doc, SIGNAL(hideViewSetting()), this, SLOT(hideViewSettingWidget()));
-  connect(m_doc, SIGNAL(objAboutToBeRemoved(size_t,ZObjDoc*)), this, SLOT(removeViewSettingWidgetOfObj(size_t)));
-  connect(m_doc, SIGNAL(objInfoChanged(size_t)), this, SLOT(updateViewSettingWidgetLabelOfObj(size_t)));
+  connect(m_doc, &ZDoc::showViewSetting, this, &ZViewSettingWidget::showViewSettingWidgetOfObj);
+  connect(m_doc, &ZDoc::hideViewSetting, this, &ZViewSettingWidget::hideViewSettingWidget);
+  connect(m_doc, &ZDoc::objAboutToBeRemoved, this, &ZViewSettingWidget::removeViewSettingWidgetOfObj);
+  connect(m_doc, &ZDoc::objInfoChanged, this, &ZViewSettingWidget::updateViewSettingWidgetLabelOfObj);
   setMinimumHeight(250);
 }
 
@@ -47,7 +48,7 @@ void ZViewSettingWidget::showViewSettingWidgetOfObj(size_t id)
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setWordWrap(true);
     QWidget *wt = wg->createWidget(false, true, label);
-    connect(wg.get(), SIGNAL(widgetsGroupChanged()), this, SLOT(updateWidget()));
+    connect(wg.get(), &ZWidgetsGroup::widgetsGroupChanged, this, &ZViewSettingWidget::updateWidget);
     m_subWidgets.emplace_back(id, wg.get(), label, wt);
     m_widget->setCurrentIndex(m_widget->addWidget(wt));
   } else {

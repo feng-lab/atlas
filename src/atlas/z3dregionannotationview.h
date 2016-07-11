@@ -14,7 +14,7 @@ public:
   Z3DRegionAnnotationView(ZRegionAnnotationDoc &doc, Z3DView &view);
 
 private slots:
-  void docRegionAnnotationAdded(const QList<size_t> &objs);
+  void docRegionAnnotationsAdded(const QList<size_t> &objs);
   void docRegionAnnotationAdded(size_t id);
 
 private:

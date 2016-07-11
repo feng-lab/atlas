@@ -36,7 +36,7 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation &paraAnimatio
   if (m_paraAnimation.boundParameter()->type().contains("Span")) {
     m_para = ZParameterFactoryInstance.create(m_paraAnimation.boundParameter()->name(), m_paraAnimation.boundParameter()->type(), this);
     m_para->setSameAs(*m_paraAnimation.boundParameter());
-    connect(m_para, SIGNAL(valueChanged()), m_paraAnimation.boundParameter(), SLOT(updateFromSender()));
+    connect(m_para, &ZParameter::valueChanged, m_paraAnimation.boundParameter(), &ZParameter::updateFromSender);
     m_para->setStyle("SPINBOX");
     if (m_para->type() == "IntSpan") {
       static_cast<ZIntSpanParameter*>(m_para)->setRange(std::numeric_limits<int>::min(),
@@ -49,10 +49,10 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation &paraAnimatio
                                                            std::numeric_limits<double>::max());
     }
     addWidget(m_para->createNameLabel(this), m_para->createWidget(this), lo);
-    connect(m_para, SIGNAL(valueChanged()), this, SLOT(raiseAndActivate()));
+    connect(m_para, &ZParameter::valueChanged, this, &ZTimelineKeyEditDialog::raiseAndActivate);
   } else {
     addWidget(m_paraAnimation.boundParameter()->createNameLabel(this), m_paraAnimation.boundParameter()->createWidget(this), lo);
-    connect(m_paraAnimation.boundParameter(), SIGNAL(valueChanged()), this, SLOT(raiseAndActivate()));
+    connect(m_paraAnimation.boundParameter(), &ZParameter::valueChanged, this, &ZTimelineKeyEditDialog::raiseAndActivate);
   }
 
   if (m_paraAnimation.type() == "3DCamera") {
@@ -71,8 +71,8 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation &paraAnimatio
   QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
   vlo->addWidget(buttonBox);
 
-  connect(buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
-  connect(buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
+  connect(buttonBox, &QDialogButtonBox::accepted, this, &ZTimelineKeyEditDialog::accept);
+  connect(buttonBox, &QDialogButtonBox::rejected, this, &ZTimelineKeyEditDialog::reject);
 
   setWindowTitle(QString("Edit '%1' Key").arg(paraAnimation.name()));
 }

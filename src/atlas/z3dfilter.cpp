@@ -208,7 +208,7 @@ void Z3DFilter::addParameter(ZParameter &para, InvalidationState inv)
   m_parameters.push_back(&para);
   m_parameterNames.insert(para.name());
   if (inv != Valid) {
-    connect(&para, SIGNAL(valueChanged()), this, SLOT(invalidateResult()));
+    connect(&para, &ZParameter::valueChanged, this, &Z3DFilter::invalidateResult);
   }
 }
 

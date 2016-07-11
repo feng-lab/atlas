@@ -327,9 +327,9 @@ size_t ZROIDoc::addROI(ZROI *roi, const QString &path)
   m_doc.undoGroup()->addStack(roi->undoStack());
 
   emit objAdded(id, this);
-  connect(roi, SIGNAL(roiChanged(int)), this, SLOT(setModified()));
-  connect(roi, SIGNAL(roiDeleted(int)), this, SLOT(setModified()));
-  connect(roi, SIGNAL(roiMoved(int)), this, SLOT(setModified()));
+  connect(roi, &ZROI::roiChanged, this, &ZROIDoc::setModified);
+  connect(roi, &ZROI::roiDeleted, this, &ZROIDoc::setModified);
+  connect(roi, &ZROI::roiMoved, this, &ZROIDoc::setModified);
   return id;
 }
 
@@ -369,11 +369,11 @@ void ZROIDoc::createActions()
 {
   m_loadROIAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load ROI..."), this);
   m_loadROIAction->setStatusTip(tr("Load an existing ROI file"));
-  connect(m_loadROIAction, SIGNAL(triggered()), this, SLOT(loadROI()));
+  connect(m_loadROIAction, &QAction::triggered, this, &ZROIDoc::loadROI);
 
   m_createMaskImageAction = new QAction(tr("&To Mask Image..."), this);
   m_createMaskImageAction->setStatusTip(tr("Save ROI as Mask Image"));
-  connect(m_createMaskImageAction, SIGNAL(triggered()), this, SLOT(createMaskImage()));
+  connect(m_createMaskImageAction, &QAction::triggered, this, &ZROIDoc::createMaskImage);
 }
 
 bool ZROIDoc::saveROI(ROIPack *pack, const QString &fileName, QString &errorMsg)

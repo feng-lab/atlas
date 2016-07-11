@@ -155,7 +155,7 @@ Z3DTransferFunctionParameter::Z3DTransferFunctionParameter(const QString &name, 
   : ZSingleValueParameter<Z3DTransferFunction>(name, parent)
   , m_volume(NULL)
 {
-  connect(&m_value, SIGNAL(changed()), this, SIGNAL(valueChanged()));
+  connect(&m_value, &Z3DTransferFunction::changed, this, &Z3DTransferFunctionParameter::valueChanged);
 }
 
 Z3DTransferFunctionParameter::Z3DTransferFunctionParameter(const QString &name, double min, double max, const glm::col4 &minColor,
@@ -164,7 +164,7 @@ Z3DTransferFunctionParameter::Z3DTransferFunctionParameter(const QString &name, 
   , m_volume(NULL)
 {
   m_value = Z3DTransferFunction(min, max, minColor, maxColor, width);
-  connect(&m_value, SIGNAL(changed()), this, SIGNAL(valueChanged()));
+  connect(&m_value, &Z3DTransferFunction::changed, this, &Z3DTransferFunctionParameter::valueChanged);
 }
 
 void Z3DTransferFunctionParameter::setVolume(Z3DVolume *volume)

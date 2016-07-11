@@ -313,7 +313,7 @@ void ZMeshDoc::createActions()
 {
   m_loadMeshAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load Mesh..."), this);
   m_loadMeshAction->setStatusTip(tr("Load an existing mesh file"));
-  connect(m_loadMeshAction, SIGNAL(triggered()), this, SLOT(loadMesh()));
+  connect(m_loadMeshAction, &QAction::triggered, this, &ZMeshDoc::loadMesh);
 }
 
 bool ZMeshDoc::saveMesh(MeshPack *pack, const QString &fileName, QString &errorMsg, const std::string& format)

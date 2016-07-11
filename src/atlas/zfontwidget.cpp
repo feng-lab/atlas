@@ -18,7 +18,7 @@ ZFontWidget::ZFontWidget(const QFont &font, QWidget *parent)
   setLabelFollowFontSize(m_followFontSize);
   m_button = new QToolButton();
   m_button->setText("...");
-  connect(m_button, SIGNAL(clicked()), this, SLOT(chooseFont()));
+  connect(m_button, &QToolButton::clicked, this, &ZFontWidget::chooseFont);
   QHBoxLayout *lo = new QHBoxLayout(this);
   lo->setContentsMargins(0,0,0,0);
   lo->addWidget(m_label);

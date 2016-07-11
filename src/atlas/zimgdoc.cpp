@@ -373,14 +373,14 @@ void ZImgDoc::importImgTimeSequence()
 void ZImgDoc::stitchImgs()
 {
   ZStitchImageDialog stitchImageDialog(QApplication::activeWindow());
-  connect(&stitchImageDialog, SIGNAL(resultReady(ZImg*,QString)), this, SLOT(showImg(ZImg*,QString)));
+  connect(&stitchImageDialog, &ZStitchImageDialog::resultReady, this, &ZImgDoc::showImg);
   stitchImageDialog.exec();
 }
 
 void ZImgDoc::alignSections()
 {
   ZSectionsRegistrationDialog alignSectionsDialog(QApplication::activeWindow());
-  connect(&alignSectionsDialog, SIGNAL(resultReady(ZImg*,QString)), this, SLOT(showImg(ZImg*,QString)));
+  connect(&alignSectionsDialog, &ZSectionsRegistrationDialog::resultReady, this, &ZImgDoc::showImg);
   alignSectionsDialog.exec();
 }
 
@@ -495,23 +495,23 @@ void ZImgDoc::createActions()
 {
   m_loadImgAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load Image..."), this);
   m_loadImgAction->setStatusTip(tr("Load one or more existing image files"));
-  connect(m_loadImgAction, SIGNAL(triggered()), this, SLOT(loadImg()));
+  connect(m_loadImgAction, &QAction::triggered, this, qOverload<>(&ZImgDoc::loadImg));
 
   m_importImgZSequenceAction = new QAction(tr("&Import Z Sequence Images..."), this);
   m_importImgZSequenceAction->setStatusTip(tr("Load sequence images as 3d image stack"));
-  connect(m_importImgZSequenceAction, SIGNAL(triggered()), this, SLOT(importImgZSequence()));
+  connect(m_importImgZSequenceAction, &QAction::triggered, this, &ZImgDoc::importImgZSequence);
 
   m_importImgTimeSequenceAction = new QAction(tr("&Import Time Sequence Images..."), this);
   m_importImgTimeSequenceAction->setStatusTip(tr("Load sequence images as time sequence image"));
-  connect(m_importImgTimeSequenceAction, SIGNAL(triggered()), this, SLOT(importImgTimeSequence()));
+  connect(m_importImgTimeSequenceAction, &QAction::triggered, this, &ZImgDoc::importImgTimeSequence);
 
   m_stitchImageAction = new QAction(tr("&Stitch Images..."), this);
   m_stitchImageAction->setStatusTip(tr("Stitch Images"));
-  connect(m_stitchImageAction, SIGNAL(triggered()), this, SLOT(stitchImgs()));
+  connect(m_stitchImageAction, &QAction::triggered, this, &ZImgDoc::stitchImgs);
 
   m_alignSectionsAction = new QAction(tr("&Align Sections..."), this);
   m_alignSectionsAction->setStatusTip(tr("Align Sections"));
-  connect(m_alignSectionsAction, SIGNAL(triggered()), this, SLOT(alignSections()));
+  connect(m_alignSectionsAction, &QAction::triggered, this, &ZImgDoc::alignSections);
 }
 
 bool ZImgDoc::saveImg(ZImgPack *pack, QString fileName, FileFormat format, Compression comp, QString &errorMsg)

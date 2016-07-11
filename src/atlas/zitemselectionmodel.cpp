@@ -10,8 +10,8 @@ ZItemSelectionModel::ZItemSelectionModel(ZObjModel *model, QObject *parent)
   : QItemSelectionModel(model, parent)
   , m_model(model)
 {
-  connect(this, SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
-          this, SLOT(convertSelectionChangedSignal(QItemSelection,QItemSelection)));
+  connect(this, &ZItemSelectionModel::selectionChanged,
+          this, &ZItemSelectionModel::convertSelectionChangedSignal);
 }
 
 size_t ZItemSelectionModel::numSelectedObjs() const

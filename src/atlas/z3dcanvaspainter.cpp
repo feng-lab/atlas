@@ -119,7 +119,7 @@ void Z3DCanvasPainter::setCanvas(Z3DCanvas *canvas)
   if (m_canvas) {
     setOutputSize(m_canvas->physicalSize());
     emit requestUpstreamSizeChange(this);
-    connect(m_canvas, SIGNAL(canvasSizeChanged(size_t,size_t)), this, SLOT(onCanvasResized(size_t,size_t)));
+    connect(m_canvas, &Z3DCanvas::canvasSizeChanged, this, &Z3DCanvasPainter::onCanvasResized);
   }
 
   invalidate();

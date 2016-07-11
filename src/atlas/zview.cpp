@@ -29,9 +29,9 @@ ZView::ZView(ZDoc &doc, QWidget *parent, Qt::WindowFlags f)
   m_imgTime = new ZIntParameter("time", 0, 0, 0, this);
 
   m_mip = new ZBoolParameter("MIP", false, this);
-  connect(m_mip, SIGNAL(valueChanged(bool)), this, SLOT(changeViewStyle(bool)));
+  connect(m_mip, &ZBoolParameter::boolChanged, this, &ZView::changeViewStyle);
   m_viewport = new ZDVec4Parameter("Viewport", this);
-  connect(m_viewport, SIGNAL(valueChanged()), this, SLOT(changeViewport()));
+  connect(m_viewport, &ZDVec4Parameter::valueChanged, this, &ZView::changeViewport);
 
   setFocusPolicy(Qt::StrongFocus);
 
@@ -43,13 +43,13 @@ ZView::ZView(ZDoc &doc, QWidget *parent, Qt::WindowFlags f)
   m_layout->addWidget(m_label);
 
   m_scene = new ZGraphicsScene(this);
-  connect(m_scene, SIGNAL(mousePressed(QPointF)),
-          this, SLOT(mousePressed(QPointF)));
-  connect(m_scene, SIGNAL(mouseReleased(QPointF)),
-          this, SLOT(mouseReleased(QPointF)));
+  connect(m_scene, &ZGraphicsScene::mousePressed,
+          this, &ZView::mousePressed);
+  connect(m_scene, &ZGraphicsScene::mouseReleased,
+          this, &ZView::mouseReleased);
   m_view = new ZGraphicsView(m_scene, this);
-  connect(m_view, SIGNAL(viewportChanged()),
-          this, SLOT(viewportChanged()));
+  connect(m_view, &ZGraphicsView::viewportChanged,
+          this, &ZView::viewportChanged);
 
   m_layout->addWidget(m_view);
   m_layout->addSpacing(15);
@@ -73,8 +73,8 @@ ZView::ZView(ZDoc &doc, QWidget *parent, Qt::WindowFlags f)
   m_imgSlice->setVisible(false);
   m_imgTime->setVisible(false);
 
-  connect(m_imgSlice, SIGNAL(valueChanged()), this, SLOT(sliceChanged()));
-  connect(m_imgTime, SIGNAL(valueChanged()), this, SLOT(sliceChanged()));
+  connect(m_imgSlice, &ZIntParameter::valueChanged, this, &ZView::sliceChanged);
+  connect(m_imgTime, &ZIntParameter::valueChanged, this, &ZView::sliceChanged);
 
   setLayout(m_layout);
 }
@@ -97,7 +97,7 @@ QToolButton* ZView::createROIToolButton(QWidget *parent)
   res->addAction(m_roiPolygonAction);
   res->addAction(m_roiRectangleAction);
   res->addAction(m_roiEllipseAction);
-  connect(res, SIGNAL(triggered(QAction*)), res, SLOT(setDefaultAction(QAction*)));
+  connect(res, &QToolButton::triggered, res, &QToolButton::setDefaultAction);
   res->setDefaultAction(m_roiSplineAction);
   res->setPopupMode(QToolButton::MenuButtonPopup);
   return res;
@@ -155,10 +155,10 @@ QWidget *ZView::captureWidget()
 {
   QScrollArea *res = new QScrollArea();
   ZTakeScreenShotWidget *m_screenShotWidget = new ZTakeScreenShotWidget(true, false, nullptr);
-  connect(m_screenShotWidget, SIGNAL(takeScreenShot(QString)),
-          this, SLOT(takeScreenShot(QString)));
-  connect(m_screenShotWidget, SIGNAL(takeScreenShot(QString,int,int)),
-          this, SLOT(takeScreenShot(QString,int,int)));
+  connect(m_screenShotWidget, &ZTakeScreenShotWidget::take2DScreenShot,
+          this, &ZView::takeScreenShot);
+  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeFixedSize2DScreenShot,
+          this, &ZView::takeFixedSizeScreenShot);
   res->setWidget(m_screenShotWidget);
   return res;
 }
@@ -229,7 +229,7 @@ void ZView::setInfo(double x, double y)
 
 void ZView::registerObjView(ZObjView *v)
 {
-  connect(v, SIGNAL(objViewReady(size_t)), this, SIGNAL(objViewReady(size_t)));
+  connect(v, &ZObjView::objViewReady, this, &ZView::objViewReady);
   m_objViews.push_back(v);
 }
 
@@ -370,7 +370,7 @@ void ZView::changeViewport()
   }
 }
 
-void ZView::takeScreenShot(QString filename, int width, int height)
+void ZView::takeFixedSizeScreenShot(QString filename, int width, int height)
 {
   QString err;
   if (!m_view->renderToImage(filename, width, height, &err)) {
@@ -473,24 +473,24 @@ void ZView::createActions()
   zoomInKey << QKeySequence::ZoomIn << QKeySequence(Qt::Key_Plus) << QKeySequence(Qt::Key_Equal);
   m_zoomInAction->setShortcuts(zoomInKey);
   m_zoomInAction->setStatusTip(tr("Zoom In"));
-  connect(m_zoomInAction, SIGNAL(triggered()), this, SLOT(zoomIn()));
+  connect(m_zoomInAction, &QAction::triggered, this, &ZView::zoomIn);
 
   m_zoomOutAction = new QAction(QIcon(":/icons/zoom_out-512.png"), tr("Zoom &Out"), this);
   QList<QKeySequence> zoomOutKey;
   zoomOutKey << QKeySequence::ZoomOut << QKeySequence(Qt::Key_Minus);
   m_zoomOutAction->setShortcuts(zoomOutKey);
   m_zoomOutAction->setStatusTip(tr("Zoom Out"));
-  connect(m_zoomOutAction, SIGNAL(triggered()), this, SLOT(zoomOut()));
+  connect(m_zoomOutAction, &QAction::triggered, this, &ZView::zoomOut);
 
   m_normalViewAction = new QAction(QIcon(":/icons/gallery-512.png"), tr("&Normal View"), this);
   m_normalViewAction->setCheckable(true);
   m_normalViewAction->setStatusTip(tr("Default Image View"));
-  connect(m_normalViewAction, SIGNAL(toggled(bool)), this, SLOT(triggerNormalView(bool)));
+  connect(m_normalViewAction, &QAction::toggled, this, &ZView::triggerNormalView);
 
   m_maxZProjViewAction = new QAction(QIcon(":/icons/frame-512.png"), tr("&Maximum Z Projection"), this);
   m_maxZProjViewAction->setCheckable(true);
   m_maxZProjViewAction->setStatusTip(tr("Maximum Project Image Along Dimension Z"));
-  connect(m_maxZProjViewAction, SIGNAL(toggled(bool)), this, SLOT(triggerMaxZProjView(bool)));
+  connect(m_maxZProjViewAction, &QAction::toggled, this, &ZView::triggerMaxZProjView);
 
   m_imgViewStyleActionGroup = new QActionGroup(this);
   m_imgViewStyleActionGroup->setExclusive(true);
@@ -503,7 +503,7 @@ void ZView::createActions()
 
   m_fitIntoWindowAction = new QAction(QIcon(":/icons/collapse-512.png"), tr("&Fit Into Window"), this);
   m_fitIntoWindowAction->setStatusTip(tr("Fit everything inside window"));
-  connect(m_fitIntoWindowAction, SIGNAL(triggered()), this, SLOT(fitContentIntoWindow()));
+  connect(m_fitIntoWindowAction, &QAction::triggered, this, &ZView::fitContentIntoWindow);
 
   m_zoomInAction->setEnabled(false);
   m_zoomOutAction->setEnabled(false);
@@ -522,7 +522,7 @@ void ZView::createActions()
   m_dragModeActionGroup->addAction(m_rubberBandDragAction);
   m_rubberBandDragAction->setChecked(true);
   setViewDragMode(m_rubberBandDragAction);
-  connect(m_dragModeActionGroup, SIGNAL(triggered(QAction*)), this, SLOT(setViewDragMode(QAction*)));
+  connect(m_dragModeActionGroup, &QActionGroup::triggered, this, &ZView::setViewDragMode);
 
   m_roiRectangleAction = new QAction(QIcon(":/icons/rectangle_stroked-512.png"), tr("&Rectangular Selections"), this);
   m_roiRectangleAction->setCheckable(true);

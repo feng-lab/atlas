@@ -247,7 +247,7 @@ void ZSwcDoc::createActions()
 {
   m_loadSwcAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load Swc..."), this);
   m_loadSwcAction->setStatusTip(tr("Load an existing Swc file"));
-  connect(m_loadSwcAction, SIGNAL(triggered()), this, SLOT(loadSwc()));
+  connect(m_loadSwcAction, &QAction::triggered, this, &ZSwcDoc::loadSwc);
 }
 
 bool ZSwcDoc::saveSwc(SwcPack *pack, const QString &fileName, QString &errorMsg)

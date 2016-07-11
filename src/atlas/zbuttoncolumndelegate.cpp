@@ -31,7 +31,7 @@ QWidget *ZButtonColumnDelegate::createEditor(QWidget *parent, const QStyleOption
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
     QPushButton *btn = new QPushButton(parent);
     btn->setText(index.data().toString());
-    connect(btn, SIGNAL(clicked(bool)), this, SLOT(buttonClicked()));
+    connect(btn, &QPushButton::clicked, this, &ZButtonColumnDelegate::buttonClicked);
     return btn;
   } else {
     return QStyledItemDelegate::createEditor(parent, option, index);

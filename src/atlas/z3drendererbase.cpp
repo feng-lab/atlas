@@ -56,42 +56,42 @@ Z3DRendererBase::Z3DRendererBase(Z3DGlobalParameters &globalParas, QObject *pare
   addParameter(m_materialSpecular);
   addParameter(m_materialShininess);
 
-  connect(&m_globalParas.lightCount, SIGNAL(valueChanged()), this, SLOT(compile()));
+  connect(&m_globalParas.lightCount, &ZIntParameter::valueChanged, this, &Z3DRendererBase::compile);
 #ifndef _USE_CORE_PROFILE_
-  connect(&m_globalParas.lightCount, SIGNAL(valueChanged()), this, SLOT(invalidateDisplayList()));
+  connect(&m_globalParas.lightCount, &ZIntParameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
 #endif
 
-  connect(&m_coordTransform, SIGNAL(valueChanged()), this, SLOT(makeCoordTransformNormalMatrix()));
-  connect(&m_coordTransform, SIGNAL(valueChanged()), this, SIGNAL(coordTransformChanged()));
+  connect(&m_coordTransform, &Z3DTransformParameter::valueChanged, this, &Z3DRendererBase::makeCoordTransformNormalMatrix);
+  connect(&m_coordTransform, &Z3DTransformParameter::valueChanged, this, &Z3DRendererBase::coordTransformChanged);
 #ifndef _USE_CORE_PROFILE_
-  connect(&m_coordTransform, SIGNAL(valueChanged()), this, SLOT(invalidateDisplayList()));
-  connect(&m_coordTransform, SIGNAL(valueChanged()), this, SLOT(invalidatePickingDisplayList()));
+  connect(&m_coordTransform, &Z3DTransformParameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
+  connect(&m_coordTransform, &Z3DTransformParameter::valueChanged, this, &Z3DRendererBase::invalidatePickingDisplayList);
 #endif
-  connect(&m_sizeScale, SIGNAL(valueChanged()), this, SIGNAL(sizeScaleChanged()));
+  connect(&m_sizeScale, &ZFloatParameter::valueChanged, this, &Z3DRendererBase::sizeScaleChanged);
 #ifndef _USE_CORE_PROFILE_
-  connect(&m_sizeScale, SIGNAL(valueChanged()), this, SLOT(invalidateDisplayList()));
-  connect(&m_sizeScale, SIGNAL(valueChanged()), this, SLOT(invalidatePickingDisplayList()));
-  connect(&m_opacity, SIGNAL(valueChanged()), this, SLOT(invalidateDisplayList()));
-  connect(&m_materialShininess, SIGNAL(valueChanged()), this, SLOT(invalidateDisplayList()));
-  connect(&m_materialSpecular, SIGNAL(valueChanged()), this, SLOT(invalidateDisplayList()));
+  connect(&m_sizeScale, &ZFloatParameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
+  connect(&m_sizeScale, &ZFloatParameter::valueChanged, this, &Z3DRendererBase::invalidatePickingDisplayList);
+  connect(&m_opacity, &ZFloatParameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
+  connect(&m_materialShininess, &ZFloatParameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
+  connect(&m_materialSpecular, &ZVec4Parameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
 
   for (size_t i=0; i<m_globalParas.lightPositions.size(); i++) {
-    connect(m_globalParas.lightPositions[i], SIGNAL(valueChanged()), this, SLOT(invalidateDisplayList()));
-    connect(m_globalParas.lightAmbients[i], SIGNAL(valueChanged()), this, SLOT(invalidateDisplayList()));
-    connect(m_globalParas.lightDiffuses[i], SIGNAL(valueChanged()), this, SLOT(invalidateDisplayList()));
-    connect(m_globalParas.lightSpeculars[i], SIGNAL(valueChanged()), this, SLOT(invalidateDisplayList()));
-    connect(m_globalParas.lightAttenuations[i], SIGNAL(valueChanged()), this, SLOT(invalidateDisplayList()));
-    connect(m_globalParas.lightSpotCutoff[i], SIGNAL(valueChanged()), this, SLOT(invalidateDisplayList()));
-    connect(m_globalParas.lightSpotExponent[i], SIGNAL(valueChanged()), this, SLOT(invalidateDisplayList()));
-    connect(m_globalParas.lightSpotDirection[i], SIGNAL(valueChanged()), this, SLOT(invalidateDisplayList()));
+    connect(m_globalParas.lightPositions[i], &ZVec4Parameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
+    connect(m_globalParas.lightAmbients[i], &ZVec4Parameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
+    connect(m_globalParas.lightDiffuses[i], &ZVec4Parameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
+    connect(m_globalParas.lightSpeculars[i], &ZVec4Parameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
+    connect(m_globalParas.lightAttenuations[i], &ZVec3Parameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
+    connect(m_globalParas.lightSpotCutoff[i], &ZFloatParameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
+    connect(m_globalParas.lightSpotExponent[i], &ZFloatParameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
+    connect(m_globalParas.lightSpotDirection[i], &ZVec3Parameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
   }
 #endif
 
   // fog
-  connect(&m_globalParas.fogMode, SIGNAL(valueChanged()), this, SLOT(compile()));
+  connect(&m_globalParas.fogMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DRendererBase::compile);
 
   makeCoordTransformNormalMatrix();
-  connect(&m_globalParas.camera, SIGNAL(valueChanged()), this, SLOT(makeCoordTransformNormalMatrix()));
+  connect(&m_globalParas.camera, &Z3DCameraParameter::valueChanged, this, &Z3DRendererBase::makeCoordTransformNormalMatrix);
 }
 
 Z3DRendererBase::~Z3DRendererBase()
@@ -216,8 +216,8 @@ void Z3DRendererBase::registerRenderer(Z3DPrimitiveRenderer *renderer)
   assert(renderer && m_renderers.find(renderer) == m_renderers.end());
 
 #ifndef _USE_CORE_PROFILE_
-  connect(renderer, SIGNAL(openglRendererInvalid()), this, SLOT(invalidateDisplayList()));
-  connect(renderer, SIGNAL(openglPickingRendererInvalid()), this, SLOT(invalidatePickingDisplayList()));
+  connect(renderer, &Z3DPrimitiveRenderer::openglRendererInvalid, this, &Z3DRendererBase::invalidateDisplayList);
+  connect(renderer, &Z3DPrimitiveRenderer::openglPickingRendererInvalid, this, &Z3DRendererBase::invalidatePickingDisplayList);
 #endif
 
   m_renderers.insert(renderer);

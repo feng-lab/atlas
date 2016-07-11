@@ -192,11 +192,11 @@ ZROIFilter::ZROIFilter(ZView &view)
 {
   m_outlineColor.setStyle("COLOR");
   m_regionColor.setStyle("COLOR");
-  connect(&m_visible, SIGNAL(valueChanged()), this, SLOT(visibleChanged()));
-  connect(&m_showControlPoints, SIGNAL(valueChanged()), this, SLOT(showControlPointsChanged()));
-  connect(&m_outlineColor, SIGNAL(valueChanged()), this, SLOT(outlineColorChanged()));
-  connect(&m_regionColor, SIGNAL(valueChanged()), this, SLOT(regionColorChanged()));
-  connect(&m_opacity, SIGNAL(valueChanged()), this, SLOT(regionColorChanged()));
+  connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZROIFilter::visibleChanged);
+  connect(&m_showControlPoints, &ZBoolParameter::valueChanged, this, &ZROIFilter::showControlPointsChanged);
+  connect(&m_outlineColor, &ZVec3Parameter::valueChanged, this, &ZROIFilter::outlineColorChanged);
+  connect(&m_regionColor, &ZVec3Parameter::valueChanged, this, &ZROIFilter::regionColorChanged);
+  connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZROIFilter::regionColorChanged);
   addParameter(&m_visible);
   addParameter(&m_showControlPoints);
   addParameter(&m_outlineColor);
@@ -204,7 +204,7 @@ ZROIFilter::ZROIFilter(ZView &view)
   addParameter(&m_offsetPara);
   addParameter(&m_opacity);
 
-  connect(&view.graphicsView(), SIGNAL(scaleChanged(double)), this, SLOT(viewScaleChanged(double)));
+  connect(&view.graphicsView(), &ZGraphicsView::scaleChanged, this, &ZROIFilter::viewScaleChanged);
 }
 
 void ZROIFilter::setData(ZROI &roi)
@@ -232,10 +232,10 @@ void ZROIFilter::setData(ZROI &roi)
     }
   }
 
-  connect(m_ROI, SIGNAL(boundBoxChanged()), this, SIGNAL(boundBoxChanged()));
-  connect(m_ROI, SIGNAL(roiChanged(int)), this, SLOT(onRoiChanged(int)));
-  connect(m_ROI, SIGNAL(roiMoved(int)), this, SLOT(onRoiMoved(int)));
-  connect(m_ROI, SIGNAL(roiDeleted(int)), this, SLOT(onRoiDeleted(int)));
+  connect(m_ROI, &ZROI::boundBoxChanged, this, &ZROIFilter::boundBoxChanged);
+  connect(m_ROI, &ZROI::roiChanged, this, &ZROIFilter::onRoiChanged);
+  connect(m_ROI, &ZROI::roiMoved, this, &ZROIFilter::onRoiMoved);
+  connect(m_ROI, &ZROI::roiDeleted, this, &ZROIFilter::onRoiDeleted);
 }
 
 void ZROIFilter::releaseItemsOwnership()

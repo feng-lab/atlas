@@ -20,9 +20,9 @@ Z3DSphereRenderer::Z3DSphereRenderer(Z3DRendererBase &rendererBase)
   , m_oneBatchNumber(4e6)
 {
   setUseDisplayList(true);
-  connect(&m_sphereSlicesStacks, SIGNAL(valueChanged()), this, SLOT(invalidateOpenglRenderer()));
-  connect(&m_useDynamicMaterial, SIGNAL(valueChanged()), this, SLOT(compile()));
-  connect(&m_useDynamicMaterial, SIGNAL(valueChanged()), this, SLOT(invalidateOpenglRenderer()));
+  connect(&m_sphereSlicesStacks, &ZIntParameter::valueChanged, this, &Z3DSphereRenderer::invalidateOpenglRenderer);
+  connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, &Z3DSphereRenderer::compile);
+  connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, &Z3DSphereRenderer::invalidateOpenglRenderer);
   //addParameter(m_sphereSlicesStacks);
   //addParameter(m_useDynamicMaterial);
 

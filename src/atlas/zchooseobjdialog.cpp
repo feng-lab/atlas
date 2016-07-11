@@ -43,7 +43,7 @@ void ZChooseObjDialog::createWidget()
   m_treeWidget->setItemsExpandable(true);
   m_treeWidget->setMinimumWidth(500);
   m_treeWidget->setSelectionMode(QAbstractItemView::SingleSelection);
-  connect(m_treeWidget, SIGNAL(itemSelectionChanged()), this, SLOT(updateSelectedID()));
+  connect(m_treeWidget, &QTreeWidget::itemSelectionChanged, this, &ZChooseObjDialog::updateSelectedID);
   m_buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
 
   lo->addWidget(m_label);
@@ -52,10 +52,10 @@ void ZChooseObjDialog::createWidget()
 
   m_treeWidget->setFocus();
 
-  connect(m_buttonBox->button(QDialogButtonBox::Ok), SIGNAL(clicked()),
-          this, SLOT(accept()));
-  connect(m_buttonBox->button(QDialogButtonBox::Cancel), SIGNAL(clicked()),
-          this, SLOT(reject()));
+  connect(m_buttonBox->button(QDialogButtonBox::Ok), &QPushButton::clicked,
+          this, &ZChooseObjDialog::accept);
+  connect(m_buttonBox->button(QDialogButtonBox::Cancel), &QPushButton::clicked,
+          this, &ZChooseObjDialog::reject);
 }
 
 void ZChooseObjDialog::updateSelectedID()

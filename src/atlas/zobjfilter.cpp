@@ -16,7 +16,7 @@ ZObjFilter::ZObjFilter(ZView &view)
   m_offsetPara.setDecimal(0);
   m_offsetPara.setSingleStep(1);
   m_offsetPara.setStyle("SPINBOX");
-  connect(&m_offsetPara, SIGNAL(valueChanged()), this, SLOT(offsetChanged()));
+  connect(&m_offsetPara, &ZDVec4Parameter::valueChanged, this, &ZObjFilter::offsetChanged);
 }
 
 void ZObjFilter::read(const QJsonObject &json)

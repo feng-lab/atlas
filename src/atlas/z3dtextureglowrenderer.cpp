@@ -20,7 +20,7 @@ Z3DTextureGlowRenderer::Z3DTextureGlowRenderer(Z3DRendererBase &rendererBase)
                                 qMakePair<QString,QString>("Glowmap", "GLOWMAP")
                                 );
   m_glowMode.select("Screen");
-  connect(&m_glowMode, SIGNAL(valueChanged()), this, SLOT(compile()));
+  connect(&m_glowMode, &ZStringStringOptionParameter::valueChanged, this, &Z3DTextureGlowRenderer::compile);
 
   m_blurXTextureShader.bindFragDataLocation(0, "FragData0");
   m_blurXTextureShader.loadFromSourceFile("pass.vert", "blur.frag", m_rendererBase.generateHeader() + "#define ORIENTATION_X\n");

@@ -149,21 +149,21 @@ void ZSectionsRegistrationDialog::registerSections()
   m_progressDialog->setLabelText("Registering Sections...");
   m_progressDialog->setAutoReset(false);
   m_progressDialog->setAttribute(Qt::WA_DeleteOnClose);
-  QObject::disconnect(m_progressDialog, SIGNAL(canceled()), m_progressDialog, SLOT(cancel()));
-  connect(worker, SIGNAL(progressChanged(int)), m_progressDialog, SLOT(setValue(int)));
-  connect(worker, SIGNAL(canceled()), this, SLOT(processCanceled()));
-  connect(worker, SIGNAL(processError(QString)), this, SLOT(processError(QString)));
-  connect(m_progressDialog, SIGNAL(canceled()), this, SLOT(cancelButtonPressed()));
+  QObject::disconnect(m_progressDialog, &QProgressDialog::canceled, m_progressDialog, &QProgressDialog::cancel);
+  connect(worker, qOverload<int>(&ZSectionsRegistration::progressChanged), m_progressDialog, &QProgressDialog::setValue);
+  connect(worker, &ZSectionsRegistration::canceled, this, &ZSectionsRegistrationDialog::processCanceled);
+  connect(worker, &ZSectionsRegistration::processError, this, &ZSectionsRegistrationDialog::processError);
+  connect(m_progressDialog, &QProgressDialog::canceled, this, &ZSectionsRegistrationDialog::cancelButtonPressed);
 
   QThread *thread = new QThread(this);
-  connect(thread, SIGNAL(started()), worker, SLOT(run()));
-  connect(worker, SIGNAL(canceled()), thread, SLOT(quit()));
-  connect(worker, SIGNAL(finished()), thread, SLOT(quit()));
-  connect(worker, SIGNAL(processError(QString)), thread, SLOT(quit()));
-  connect(thread, SIGNAL(finished()), worker, SLOT(deleteLater()));
-  connect(thread, SIGNAL(finished()), m_progressDialog, SLOT(reset()));
-  connect(thread, SIGNAL(finished()), this, SLOT(processFinished()));
-  connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
+  connect(thread, &QThread::started, worker, &ZSectionsRegistration::run);
+  connect(worker, &ZSectionsRegistration::canceled, thread, &QThread::quit);
+  connect(worker, &ZSectionsRegistration::finished, thread, &QThread::quit);
+  connect(worker, &ZSectionsRegistration::processError, thread, &QThread::quit);
+  connect(thread, &QThread::finished, worker, &ZSectionsRegistration::deleteLater);
+  connect(thread, &QThread::finished, m_progressDialog, &QProgressDialog::reset);
+  connect(thread, &QThread::finished, this, &ZSectionsRegistrationDialog::processFinished);
+  connect(thread, &QThread::finished, thread, &QThread::deleteLater);
   worker->moveToThread(thread);
 
   thread->start();
@@ -290,8 +290,8 @@ void ZSectionsRegistrationDialog::init()
   m_buttonBox = new QDialogButtonBox(Qt::Horizontal, this);
   m_buttonBox->addButton(m_exitButton, QDialogButtonBox::RejectRole);
   m_buttonBox->addButton(m_runButton, QDialogButtonBox::ActionRole);
-  connect(m_exitButton, SIGNAL(clicked()), this, SLOT(reject()));
-  connect(m_runButton, SIGNAL(clicked()), this, SLOT(registerSections()));
+  connect(m_exitButton, &QPushButton::clicked, this, &ZSectionsRegistrationDialog::reject);
+  connect(m_runButton, &QPushButton::clicked, this, &ZSectionsRegistrationDialog::registerSections);
 
   QVBoxLayout *mainLayout = new QVBoxLayout;
   mainLayout->addWidget(m_ioGroupBox);
@@ -316,14 +316,14 @@ void ZSectionsRegistrationDialog::createIOGroupBox()
     hlayout->addWidget(m_useCurrentActiveImage.createWidget(), 0, Qt::AlignLeft);
     hlayout->addStretch(1);
     alllayout->addLayout(hlayout);
-    connect(&m_useCurrentActiveImage, SIGNAL(valueChanged()), this, SLOT(adjustInputImageWidget()));
+    connect(&m_useCurrentActiveImage, &ZBoolParameter::valueChanged, this, &ZSectionsRegistrationDialog::adjustInputImageWidget);
   }
 #endif
   m_inputImagesFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenMultipleFilesWithFilter, "Input Sections:",
                                                  tr("Images (*.tif *.tiff *.raw *.lsm *.jpg *.png)"));
   m_inputImagesFileWidget->setCompareFunc(naturalSortLessThan);
   alllayout->addWidget(m_inputImagesFileWidget);
-  connect(m_inputImagesFileWidget, SIGNAL(changed()), this, SLOT(inputImagesChanged()));
+  connect(m_inputImagesFileWidget, &ZSelectFileWidget::changed, this, &ZSectionsRegistrationDialog::inputImagesChanged);
 
   //  hlayout = new QHBoxLayout;
   //  hlayout->addWidget(m_openLoadedStack.createNameLabel());

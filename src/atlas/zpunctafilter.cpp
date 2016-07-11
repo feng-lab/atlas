@@ -71,9 +71,9 @@ ZPunctaFilter::ZPunctaFilter(ZView &view)
   , m_opacity("Opacity", 1, 0., 1.)
 {
   m_outlineColor.setStyle("COLOR");
-  connect(&m_visible, SIGNAL(valueChanged()), this, SLOT(visibleChanged()));
-  connect(&m_outlineColor, SIGNAL(valueChanged()), this, SLOT(outlineColorChanged()));
-  connect(&m_opacity, SIGNAL(valueChanged()), this, SLOT(outlineColorChanged()));
+  connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZPunctaFilter::visibleChanged);
+  connect(&m_outlineColor, &ZVec3Parameter::valueChanged, this, &ZPunctaFilter::outlineColorChanged);
+  connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZPunctaFilter::outlineColorChanged);
   addParameter(&m_visible);
   addParameter(&m_outlineColor);
   addParameter(&m_opacity);
@@ -94,7 +94,7 @@ void ZPunctaFilter::setData(ZPuncta &puncta)
   }
   m_view.scene().addItem(m_item.get());
 
-  //connect(m_puncta, SIGNAL(boundBoxChanged()), this, SIGNAL(boundBoxChanged()));
+  //connect(m_puncta, &ZPunctaFilter::boundBoxChanged, this, &ZPunctaFilter::boundBoxChanged);
 }
 
 void ZPunctaFilter::releaseItemsOwnership()

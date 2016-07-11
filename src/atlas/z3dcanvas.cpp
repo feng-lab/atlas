@@ -29,17 +29,17 @@ Z3DCanvas::Z3DCanvas(const QString &title, QWidget* parent, Qt::WindowFlags f)
   setFocusPolicy(Qt::StrongFocus);
 
   m_rotateXShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_X), this);
-  connect(m_rotateXShortCut, SIGNAL(activated()), this, SLOT(rotateX()));
+  connect(m_rotateXShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateX);
   m_rotateYShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Y), this);
-  connect(m_rotateYShortCut, SIGNAL(activated()), this, SLOT(rotateY()));
+  connect(m_rotateYShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateY);
   m_rotateZShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Z), this);
-  connect(m_rotateZShortCut, SIGNAL(activated()), this, SLOT(rotateZ()));
+  connect(m_rotateZShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateZ);
   m_rotateXMShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_X + Qt::SHIFT), this);
-  connect(m_rotateXMShortCut, SIGNAL(activated()), this, SLOT(rotateXM()));
+  connect(m_rotateXMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateXM);
   m_rotateYMShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Y + Qt::SHIFT), this);
-  connect(m_rotateYMShortCut, SIGNAL(activated()), this, SLOT(rotateYM()));
+  connect(m_rotateYMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateYM);
   m_rotateZMShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Z + Qt::SHIFT), this);
-  connect(m_rotateZMShortCut, SIGNAL(activated()), this, SLOT(rotateZM()));
+  connect(m_rotateZMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateZM);
 }
 
 Z3DCanvas::~Z3DCanvas() {}
@@ -284,17 +284,17 @@ Z3DCanvas::Z3DCanvas(const QString &title, int width, int height, const QGLForma
 #endif
 
   m_rotateXShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_X), this);
-  connect(m_rotateXShortCut, SIGNAL(activated()), this, SLOT(rotateX()));
+  connect(m_rotateXShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateX);
   m_rotateYShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Y), this);
-  connect(m_rotateYShortCut, SIGNAL(activated()), this, SLOT(rotateY()));
+  connect(m_rotateYShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateY);
   m_rotateZShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Z), this);
-  connect(m_rotateZShortCut, SIGNAL(activated()), this, SLOT(rotateZ()));
+  connect(m_rotateZShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateZ);
   m_rotateXMShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_X + Qt::SHIFT), this);
-  connect(m_rotateXMShortCut, SIGNAL(activated()), this, SLOT(rotateXM()));
+  connect(m_rotateXMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateXM);
   m_rotateYMShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Y + Qt::SHIFT), this);
-  connect(m_rotateYMShortCut, SIGNAL(activated()), this, SLOT(rotateYM()));
+  connect(m_rotateYMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateYM);
   m_rotateZMShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Z + Qt::SHIFT), this);
-  connect(m_rotateZMShortCut, SIGNAL(activated()), this, SLOT(rotateZM()));
+  connect(m_rotateZMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateZM);
 }
 
 Z3DCanvas::~Z3DCanvas() {}

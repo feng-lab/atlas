@@ -367,8 +367,7 @@ size_t ZRegionAnnotationDoc::addRegionAnnotation(ZRegionAnnotation *regionAnnota
   m_doc.undoGroup()->addStack(regionAnnotation->undoStack());
 
   emit objAdded(id, this);
-  //connect(regionAnnotation, SIGNAL(modified()), this, SLOT(setModified()));
-  connect(regionAnnotation, SIGNAL(undoStackCleanChanged(bool)), this, SLOT(setModified(bool)));
+  connect(regionAnnotation, &ZRegionAnnotation::undoStackCleanChanged, this, qOverload<bool>(&ZRegionAnnotationDoc::setModified));
   return id;
 }
 
@@ -405,15 +404,15 @@ void ZRegionAnnotationDoc::createActions()
 {
   m_loadRegionAnnotationAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load RegionAnnotation..."), this);
   m_loadRegionAnnotationAction->setStatusTip(tr("Load one or more existing regionAnnotation files"));
-  connect(m_loadRegionAnnotationAction, SIGNAL(triggered()), this, SLOT(loadRegionAnnotation()));
+  connect(m_loadRegionAnnotationAction, &QAction::triggered, this, &ZRegionAnnotationDoc::loadRegionAnnotation);
 
   m_importLabelImageAction = new QAction(tr("&Import Label Image..."), this);
   m_importLabelImageAction->setStatusTip(tr("Import Annotation From Label Image"));
-  connect(m_importLabelImageAction, SIGNAL(triggered()), this, SLOT(importLabelImage()));
+  connect(m_importLabelImageAction, &QAction::triggered, this, &ZRegionAnnotationDoc::importLabelImage);
 
   m_exportLabelImageAction = new QAction(tr("&Export Label Image..."), this);
   m_exportLabelImageAction->setStatusTip(tr("Export Annotation To Label Image"));
-  connect(m_exportLabelImageAction, SIGNAL(triggered()), this, SLOT(exportLabelImage()));
+  connect(m_exportLabelImageAction, &QAction::triggered, this, &ZRegionAnnotationDoc::exportLabelImage);
 }
 
 bool ZRegionAnnotationDoc::saveRegionAnnotation(RegionAnnotationPack *pack, const QString &fileName, QString &errorMsg)

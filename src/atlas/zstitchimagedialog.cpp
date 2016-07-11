@@ -267,10 +267,6 @@ void ZTileImageWidget::zoomOut()
 ZStitchImageDialog::ZStitchImageDialog(QWidget *parent) :
     QDialog(parent)
 {
-  // modeless version
-  //setModal(false);
-  //connect(this, SIGNAL(finished(int)), this, SLOT(deleteLater()));
-
   m_nSel = -100;
   m_nchannelStack1 = 1;
   m_nchannelStack2 = 1;
@@ -284,8 +280,8 @@ ZStitchImageDialog::ZStitchImageDialog(QWidget *parent) :
   m_buttonBox = new QDialogButtonBox(Qt::Horizontal, this);
   m_buttonBox->addButton(m_exitButton, QDialogButtonBox::RejectRole);
   m_buttonBox->addButton(m_runButton, QDialogButtonBox::ActionRole);
-  connect(m_exitButton, SIGNAL(clicked()), this, SLOT(reject()));
-  connect(m_runButton, SIGNAL(clicked()), this, SLOT(stitchStacks()));
+  connect(m_exitButton, &QPushButton::clicked, this, &ZStitchImageDialog::reject);
+  connect(m_runButton, &QPushButton::clicked, this, &ZStitchImageDialog::stitchStacks);
 
   m_tabWidget = new QTabWidget;
   m_tabWidget->addTab(createIOWidget(), "Inputs and Outputs");
@@ -317,7 +313,7 @@ QLayout *ZStitchImageDialog::createIOLayout()
   m_inputStack1FileEdit = new QTextEdit(this);
   m_inputStack1FileEdit->setReadOnly(true);
   m_selectInputStacks1Button = new QPushButton(tr("select input stacks 1:"), this);
-  connect(m_selectInputStacks1Button, SIGNAL(clicked()), this, SLOT(selectInputStacks1()));
+  connect(m_selectInputStacks1Button, &QPushButton::clicked, this, &ZStitchImageDialog::selectInputStacks1);
   input1vlayout->addWidget(m_selectInputStacks1Button);
   input1vlayout->addWidget(m_inputStack1FileEdit);
   QHBoxLayout *tmphlayout = new QHBoxLayout;
@@ -358,7 +354,7 @@ QLayout *ZStitchImageDialog::createIOLayout()
   m_inputStack2FileEdit = new QTextEdit(this);
   m_inputStack2FileEdit->setReadOnly(true);
   m_selectInputStacks2Button = new QPushButton(tr("select input stacks 2:"), this);
-  connect(m_selectInputStacks2Button, SIGNAL(clicked()), this, SLOT(selectInputStacks2()));
+  connect(m_selectInputStacks2Button, &QPushButton::clicked, this, &ZStitchImageDialog::selectInputStacks2);
   input2vlayout->addWidget(m_selectInputStacks2Button);
   input2vlayout->addWidget(m_inputStack2FileEdit);
   tmphlayout = new QHBoxLayout;
@@ -434,87 +430,15 @@ QLayout *ZStitchImageDialog::createIOLayout()
   m_outputFileEdit = new QLineEdit(this);
   m_selectOutputButton = new QToolButton(this);
   m_selectOutputButton->setText(tr("..."));
-  connect(m_selectOutputButton, SIGNAL(clicked()), this, SLOT(selectOutputFile()));
+  connect(m_selectOutputButton, &QToolButton::clicked, this, &ZStitchImageDialog::selectOutputFile);
   layout->addWidget(pl, row, 0);
   layout->addWidget(m_outputFileEdit, row, 1, 1, 6);
   layout->addWidget(m_selectOutputButton, row, 7);
   row++;
 
-  //  pl = new QLabel(tr("With Ch1 from "), this);
-  //  m_labelsForTwoInputs.push_back(pl);
-  //  layout->addWidget(pl, row, 1);
-  //  pl = new QLabel(tr("Ch"), this);
-  //  pl->setAlignment(Qt::Alignment(Qt::AlignVCenter | Qt::AlignRight));
-  //  m_labelsForTwoInputs.push_back(pl);
-  //  layout->addWidget(pl, row, 2);
-  //  m_outputCh1ImageChannelSpinBox = new QSpinBox(this);
-  //  m_outputCh1ImageChannelSpinBox->setRange(1,10);
-  //  m_outputCh1ImageChannelSpinBox->setValue(1);
-  //  layout->addWidget(m_outputCh1ImageChannelSpinBox, row, 3);
-  //  m_outputCh1ImageComboBox = new QComboBox(this);
-  //  m_outputCh1ImageComboBox->addItem(tr("none"));
-  //  m_outputCh1ImageComboBox->addItem(tr("Stack 1"));
-  //  m_outputCh1ImageComboBox->addItem(tr("Stack 2"));
-  //  m_outputCh1ImageComboBox->setCurrentIndex(1);
-  //  connect(m_outputCh1ImageComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(outputCh1ImageComboBoxIndexChanged(int)));
-  //  pl = new QLabel(tr("of"), this);
-  //  pl->setAlignment(Qt::Alignment(Qt::AlignVCenter | Qt::AlignCenter));
-  //  m_labelsForTwoInputs.push_back(pl);
-  //  layout->addWidget(pl, row, 4);
-  //  layout->addWidget(m_outputCh1ImageComboBox, row, 5, 1, 2);
-  //  row++;
-
-  //  pl = new QLabel(tr("With Ch2 from "), this);
-  //  m_labelsForTwoInputs.push_back(pl);
-  //  layout->addWidget(pl, row, 1);
-  //  pl = new QLabel(tr("Ch"), this);
-  //  pl->setAlignment(Qt::Alignment(Qt::AlignVCenter | Qt::AlignRight));
-  //  m_labelsForTwoInputs.push_back(pl);
-  //  layout->addWidget(pl, row, 2);
-  //  m_outputCh2ImageChannelSpinBox = new QSpinBox(this);
-  //  m_outputCh2ImageChannelSpinBox->setRange(1,10);
-  //  m_outputCh2ImageChannelSpinBox->setValue(2);
-  //  layout->addWidget(m_outputCh2ImageChannelSpinBox, row, 3);
-  //  m_outputCh2ImageComboBox = new QComboBox(this);
-  //  m_outputCh2ImageComboBox->addItem(tr("none"));
-  //  m_outputCh2ImageComboBox->addItem(tr("Stack 1"));
-  //  m_outputCh2ImageComboBox->addItem(tr("Stack 2"));
-  //  m_outputCh2ImageComboBox->setCurrentIndex(1);
-  //  connect(m_outputCh2ImageComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(outputCh2ImageComboBoxIndexChanged(int)));
-  //  pl = new QLabel(tr("of"), this);
-  //  pl->setAlignment(Qt::Alignment(Qt::AlignVCenter | Qt::AlignCenter));
-  //  m_labelsForTwoInputs.push_back(pl);
-  //  layout->addWidget(pl, row, 4);
-  //  layout->addWidget(m_outputCh2ImageComboBox, row, 5, 1, 2);
-  //  row++;
-
-  //  pl = new QLabel(tr("With Ch3 from "), this);
-  //  m_labelsForTwoInputs.push_back(pl);
-  //  layout->addWidget(pl, row, 1);
-  //  pl = new QLabel(tr("Ch"), this);
-  //  pl->setAlignment(Qt::Alignment(Qt::AlignVCenter | Qt::AlignRight));
-  //  m_labelsForTwoInputs.push_back(pl);
-  //  layout->addWidget(pl, row, 2);
-  //  m_outputCh3ImageChannelSpinBox = new QSpinBox(this);
-  //  m_outputCh3ImageChannelSpinBox->setRange(1,10);
-  //  m_outputCh3ImageChannelSpinBox->setValue(1);
-  //  layout->addWidget(m_outputCh3ImageChannelSpinBox, row, 3);
-  //  m_outputCh3ImageComboBox = new QComboBox(this);
-  //  m_outputCh3ImageComboBox->addItem(tr("none"));
-  //  m_outputCh3ImageComboBox->addItem(tr("Stack 1"));
-  //  m_outputCh3ImageComboBox->addItem(tr("Stack 2"));
-  //  m_outputCh3ImageComboBox->setCurrentIndex(2);
-  //  connect(m_outputCh3ImageComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(outputCh3ImageComboBoxIndexChanged(int)));
-  //  pl = new QLabel(tr("of"), this);
-  //  pl->setAlignment(Qt::Alignment(Qt::AlignVCenter | Qt::AlignCenter));
-  //  m_labelsForTwoInputs.push_back(pl);
-  //  layout->addWidget(pl, row, 4);
-  //  layout->addWidget(m_outputCh3ImageComboBox, row, 5, 1, 2);
-  //  row++;
-
   m_hasTwoInputStackSetCheckBox = new QCheckBox(tr("has two input stack sets"), this);
   m_hasTwoInputStackSetCheckBox->setToolTip(tr("stitch two stack sets with common channel"));
-  connect(m_hasTwoInputStackSetCheckBox, SIGNAL(stateChanged(int)), this, SLOT(hasTwoInputStackSetCheckBoxChanged(int)));
+  connect(m_hasTwoInputStackSetCheckBox, &QCheckBox::stateChanged, this, &ZStitchImageDialog::hasTwoInputStackSetCheckBoxChanged);
   layout->addWidget(m_hasTwoInputStackSetCheckBox, row, 0);
   row++;
 
@@ -525,7 +449,7 @@ QLayout *ZStitchImageDialog::createIOLayout()
 
   m_dsCheckBox = new QCheckBox(tr("downsample"), this);
   m_dsCheckBox->setToolTip(tr("Downsample stack before stitching"));
-  connect(m_dsCheckBox, SIGNAL(stateChanged(int)), this, SLOT(dsCheckBoxChanged(int)));
+  connect(m_dsCheckBox, &QCheckBox::stateChanged, this, &ZStitchImageDialog::dsCheckBoxChanged);
   layout->addWidget(m_dsCheckBox, row, 0);
   m_dsXSpinBox = new QSpinBox(this);
   m_dsXSpinBox->setRange(1,10);
@@ -581,13 +505,13 @@ QLayout *ZStitchImageDialog::createIOLayout()
 
   m_d8CheckBox = new QCheckBox(tr("convert result to 8bit"), this);
   m_d8CheckBox->setToolTip(tr("d8"));
-  connect(m_d8CheckBox, SIGNAL(stateChanged(int)), this, SLOT(d8CheckBoxChanged(int)));
+  connect(m_d8CheckBox, &QCheckBox::stateChanged, this, &ZStitchImageDialog::d8CheckBoxChanged);
   layout->addWidget(m_d8CheckBox, row, 0);
   m_d8ComboBox = new QComboBox(this);
   m_d8ComboBox->addItem(tr("[min, max] -> [0, 255]"));
   m_d8ComboBox->addItem(tr("[min, q(99.99)] -> [0, 255]"));
   m_d8ComboBox->addItem(tr("equal info map"));
-  connect(m_d8ComboBox, SIGNAL(activated(int)), this, SLOT(d8Changed(int)));
+  connect(m_d8ComboBox, qOverload<int>(&QComboBox::activated), this, &ZStitchImageDialog::d8Changed);
   layout->addWidget(m_d8ComboBox, row, 2, 1, 4);
   m_d8ComboBox->setEnabled(false);
   row++;
@@ -597,155 +521,6 @@ QLayout *ZStitchImageDialog::createIOLayout()
   hasTwoInputStackSetCheckBoxChanged(Qt::Unchecked);
   return alllayout;
 }
-
-
-//void ZStitchImageDialog::createIOGroupBox() {
-//  m_ioGroupBox = new QGroupBox(tr("Inputs and Output"), this);
-//  QGridLayout *layout = new QGridLayout(this);
-//  int row = 0;
-
-//  m_inputStackFileEdit = new QTextEdit(this);
-//  m_inputStackFileEdit->setReadOnly(true);
-//  m_selectInputStacksButton = new QPushButton(tr("select input stacks :"), this);
-//  connect(m_selectInputStacksButton, SIGNAL(clicked()), this, SLOT(selectInputStacks()));
-//  layout->addWidget(m_selectInputStacksButton, row, 0, 1, 2);
-//  layout->addWidget(m_inputStackFileEdit, row, 2, 5, 5);
-//  row++;
-
-//  QLabel * pl = new QLabel(tr("Use channel: "), this);
-//  pl->setToolTip(tr("channel used for stitch"));
-//  m_channelComboBox = new QComboBox(this);
-//  m_channelComboBox->addItem(tr("Average of all channels"));
-//  m_channelComboBox->addItem(tr("Average of Ch1 and Ch2"));
-//  layout->addWidget(pl, row, 0);
-//  layout->addWidget(m_channelComboBox, row, 1);
-//  m_channelComboBox->setCurrentIndex(0);     //default average all channels
-//  row++;
-
-//  pl = new QLabel(tr("Remove Background: "), this);
-//  pl->setToolTip(tr("Remove Background (below most common intensity value)"));
-//  m_bgsubComboBox = new QComboBox(this);
-//  m_bgsubComboBox->addItem(tr("None"));
-//  m_bgsubComboBox->addItem(tr("All channels"));
-//  m_bgsubComboBox->addItem(tr("After read"));
-//  m_bgsubComboBox->addItem(tr("After downsample"));
-//  layout->addWidget(pl, row, 0);
-//  layout->addWidget(m_bgsubComboBox, row, 1);
-//  m_bgsubComboBox->setCurrentIndex(1);      //default remove background for all channels
-//  row++;
-
-//  pl = new QLabel(tr("merge mode: "), this);
-//  pl->setToolTip(tr("merge mode"));
-//  m_mergeModeComboBox = new QComboBox(this);
-//  m_mergeModeComboBox->addItem(tr("Max"));
-//  m_mergeModeComboBox->addItem(tr("Min"));
-//  m_mergeModeComboBox->addItem(tr("Mean"));
-//  m_mergeModeComboBox->addItem(tr("First"));
-//  layout->addWidget(pl, row, 0);
-//  layout->addWidget(m_mergeModeComboBox, row, 1);
-//  m_mergeModeComboBox->setCurrentIndex(3);   //default first
-//  row++;
-
-//  m_concatOnlyCheckBox = new QCheckBox(tr("only concatenate image"), this);
-//  m_concatOnlyCheckBox->setToolTip(tr("do not compute actual offset, just concat image together, for overview"));
-//  layout->addWidget(m_concatOnlyCheckBox, row, 0);
-//  row++;
-
-//  m_d8CheckBox = new QCheckBox(tr("d8"), this);
-//  m_d8CheckBox->setToolTip(tr("d8"));
-//  connect(m_d8CheckBox, SIGNAL(stateChanged(int)), this, SLOT(d8CheckBoxChanged(int)));
-//  layout->addWidget(m_d8CheckBox, row, 0);
-//  m_d8ComboBox = new QComboBox(this);
-//  m_d8ComboBox->addItem(tr("[min, max] -> [0, 255]"));
-//  m_d8ComboBox->addItem(tr("[min, q(99.99)] -> [0, 255]"));
-//  m_d8ComboBox->addItem(tr("equal info map"));
-//  connect(m_d8ComboBox, SIGNAL(activated(int)), this, SLOT(d8Changed(int)));
-//  layout->addWidget(m_d8ComboBox, row, 1, 1, 3);
-//  m_d8ComboBox->setEnabled(false);
-//  row++;
-
-//  m_layoutCheckBox = new QCheckBox(tr("layout"), this);
-//  m_layoutCheckBox->setToolTip(tr("layout."));
-//  connect(m_layoutCheckBox, SIGNAL(stateChanged(int)), this, SLOT(layoutCheckBoxChanged(int)));
-//  layout->addWidget(m_layoutCheckBox, row, 0);
-//  m_layout1SpinBox = new QSpinBox(this);
-//  m_layout1SpinBox->setRange(0,1E9);
-//  m_layout2SpinBox = new QSpinBox(this);
-//  m_layout2SpinBox->setRange(0,1E9);
-//  layout->addWidget(m_layout1SpinBox, row, 2);
-//  layout->addWidget(m_layout2SpinBox, row, 4);
-//  m_layout1SpinBox->setEnabled(false);
-//  m_layout2SpinBox->setEnabled(false);
-//  row++;
-
-//  m_dsCheckBox = new QCheckBox(tr("downsample"), this);
-//  m_dsCheckBox->setToolTip(tr("Downsample stack."));
-//  connect(m_dsCheckBox, SIGNAL(stateChanged(int)), this, SLOT(dsCheckBoxChanged(int)));
-//  layout->addWidget(m_dsCheckBox, row, 0);
-//  m_dsXSpinBox = new QSpinBox(this);
-//  m_dsXSpinBox->setRange(0,10);
-//  m_dsXSpinBox->setValue(1);
-//  m_dsYSpinBox = new QSpinBox(this);
-//  m_dsYSpinBox->setRange(0,10);
-//  m_dsYSpinBox->setValue(1);
-//  m_dsZSpinBox = new QSpinBox(this);
-//  m_dsZSpinBox->setRange(0,10);
-//  m_dsZSpinBox->setValue(1);
-//  pl = new QLabel(tr("x:"), this);
-//  pl->setAlignment(Qt::AlignVCenter | Qt::AlignRight);
-//  layout->addWidget(pl, row, 1);
-//  layout->addWidget(m_dsXSpinBox, row, 2);
-//  pl = new QLabel(tr("y:"), this);
-//  pl->setAlignment(Qt::AlignVCenter | Qt::AlignRight);
-//  layout->addWidget(pl, row, 3);
-//  layout->addWidget(m_dsYSpinBox, row, 4);
-//  pl = new QLabel(tr("z:"), this);
-//  pl->setAlignment(Qt::AlignVCenter | Qt::AlignRight);
-//  layout->addWidget(pl, row, 5);
-//  layout->addWidget(m_dsZSpinBox, row, 6);
-//  m_dsXSpinBox->setEnabled(false);
-//  m_dsYSpinBox->setEnabled(false);
-//  m_dsZSpinBox->setEnabled(false);
-//  row++;
-
-//  pl = new QLabel(tr("interval: "), this);
-//  pl->setToolTip(tr("Use the interval to downsample stack while stitching, low accuracy but faster"));
-//  layout->addWidget(pl, row, 0);
-//  m_intvXSpinBox = new QSpinBox(this);
-//  m_intvXSpinBox->setRange(0,10);
-//  m_intvXSpinBox->setValue(1);
-//  m_intvYSpinBox = new QSpinBox(this);
-//  m_intvYSpinBox->setRange(0,10);
-//  m_intvYSpinBox->setValue(1);
-//  m_intvZSpinBox = new QSpinBox(this);
-//  m_intvZSpinBox->setRange(0,10);
-//  m_intvZSpinBox->setValue(1);
-//  pl = new QLabel(tr("x:"), this);
-//  pl->setAlignment(Qt::AlignVCenter | Qt::AlignRight);
-//  layout->addWidget(pl, row, 1);
-//  layout->addWidget(m_intvXSpinBox, row, 2);
-//  pl = new QLabel(tr("y:"), this);
-//  pl->setAlignment(Qt::AlignVCenter | Qt::AlignRight);
-//  layout->addWidget(pl, row, 3);
-//  layout->addWidget(m_intvYSpinBox, row, 4);
-//  pl = new QLabel(tr("z:"), this);
-//  pl->setAlignment(Qt::AlignVCenter | Qt::AlignRight);
-//  layout->addWidget(pl, row, 5);
-//  layout->addWidget(m_intvZSpinBox, row, 6);
-//  row++;
-
-//  pl = new QLabel(tr("Output File:"), this);
-//  m_outputFileEdit = new QLineEdit(this);
-//  m_selectOutputButton = new QToolButton(this);
-//  m_selectOutputButton->setText(tr("..."));
-//  connect(m_selectOutputButton, SIGNAL(clicked()), this, SLOT(selectOutputFile()));
-//  layout->addWidget(pl, row, 0);
-//  layout->addWidget(m_outputFileEdit, row, 1, 1, 6);
-//  layout->addWidget(m_selectOutputButton, row, 7);
-//  row++;
-
-//  m_ioGroupBox->setLayout(layout);
-//}
 
 QLayout* ZStitchImageDialog::createConnLayout()
 {
@@ -764,19 +539,19 @@ QLayout* ZStitchImageDialog::createConnLayout()
 
   hlayout = new QHBoxLayout;
   m_useTileImageRadioButton = new QRadioButton(tr("from tile image"), this);
-  connect(m_useTileImageRadioButton, SIGNAL(clicked()), this, SLOT(setConnInfoSource()));
+  connect(m_useTileImageRadioButton, &QRadioButton::clicked, this, &ZStitchImageDialog::setConnInfoSource);
   m_openTileImageButton = new QPushButton(tr("open tile image to get connection info..."), this);
-  connect(m_openTileImageButton, SIGNAL(clicked()), this, SLOT(getConnFromTileImage()));
+  connect(m_openTileImageButton, &QPushButton::clicked, this, &ZStitchImageDialog::getConnFromTileImage);
   m_useConnFileRadioButton = new QRadioButton(tr("from conn txt file"), this);
-  connect(m_useConnFileRadioButton, SIGNAL(clicked()), this, SLOT(setConnInfoSource()));
+  connect(m_useConnFileRadioButton, &QRadioButton::clicked, this, &ZStitchImageDialog::setConnInfoSource);
   m_useConfigRadioButton = new QRadioButton(tr("manual (for two image)"), this);
-  connect(m_useConfigRadioButton, SIGNAL(clicked()), this, SLOT(setConnInfoSource()));
+  connect(m_useConfigRadioButton, &QRadioButton::clicked, this, &ZStitchImageDialog::setConnInfoSource);
   m_useLayoutRadioButton = new QRadioButton(tr("Layout"), this);
-  connect(m_useLayoutRadioButton, SIGNAL(clicked()), this, SLOT(setConnInfoSource()));
+  connect(m_useLayoutRadioButton, &QRadioButton::clicked, this, &ZStitchImageDialog::setConnInfoSource);
   m_useFullConnectionRadioButton = new QRadioButton(tr("No (blind stitching)"), this);
-  connect(m_useFullConnectionRadioButton, SIGNAL(clicked()), this, SLOT(setConnInfoSource()));
+  connect(m_useFullConnectionRadioButton, &QRadioButton::clicked, this, &ZStitchImageDialog::setConnInfoSource);
   m_editTileImageButton = new QPushButton(tr("edit selection..."), this);
-  connect(m_editTileImageButton, SIGNAL(clicked()), this, SLOT(editConnFromTileImage()));
+  connect(m_editTileImageButton, &QPushButton::clicked, this, &ZStitchImageDialog::editConnFromTileImage);
   hlayout->addWidget(m_useTileImageRadioButton);
   hlayout->addWidget(m_openTileImageButton);
   hlayout->addWidget(m_editTileImageButton);
@@ -790,7 +565,7 @@ QLayout* ZStitchImageDialog::createConnLayout()
   m_connFileEdit->setReadOnly(true);
   m_selectConnFileButton = new QToolButton(this);
   m_selectConnFileButton->setText(tr("..."));
-  connect(m_selectConnFileButton, SIGNAL(clicked()), this, SLOT(selectConnFile()));
+  connect(m_selectConnFileButton, &QToolButton::clicked, this, &ZStitchImageDialog::selectConnFile);
   hlayout->addWidget(m_useConnFileRadioButton);
   hlayout->addWidget(m_connFileEdit);
   hlayout->addWidget(m_selectConnFileButton);
@@ -1069,19 +844,19 @@ void ZStitchImageDialog::editConnFromTileImage()
     QVBoxLayout *vlayout = new QVBoxLayout;
     QHBoxLayout *hlayout = new QHBoxLayout;
     QPushButton *zoomInButton = new QPushButton(tr("zoom in"), this);
-    connect(zoomInButton, SIGNAL(clicked()), this, SLOT(zoomInTileImageWidget()));
+    connect(zoomInButton, &QPushButton::clicked, this, &ZStitchImageDialog::zoomInTileImageWidget);
     hlayout->addWidget(zoomInButton);
     QPushButton *zoomOutButton = new QPushButton(tr("zoom out"), this);
-    connect(zoomOutButton, SIGNAL(clicked()), this, SLOT(zoomOutTileImageWidget()));
+    connect(zoomOutButton, &QPushButton::clicked, this, &ZStitchImageDialog::zoomOutTileImageWidget);
     hlayout->addWidget(zoomOutButton);
     QPushButton *clearAllButton = new QPushButton(tr("clear all selected"), this);
-    connect(clearAllButton, SIGNAL(clicked()), this, SLOT(clearAllSelectedInTileImageWidget()));
+    connect(clearAllButton, &QPushButton::clicked, this, &ZStitchImageDialog::clearAllSelectedInTileImageWidget);
     hlayout->addWidget(clearAllButton);
     QPushButton *selectAllButton = new QPushButton(tr("select all"), this);
-    connect(selectAllButton, SIGNAL(clicked()), this, SLOT(selectAllInTileImageWidget()));
+    connect(selectAllButton, &QPushButton::clicked, this, &ZStitchImageDialog::selectAllInTileImageWidget);
     hlayout->addWidget(selectAllButton);
     QPushButton *saveButton = new QPushButton(tr("save"), this);
-    connect(saveButton, SIGNAL(clicked()), this, SLOT(saveTileImageWidgetAsImage()));
+    connect(saveButton, &QPushButton::clicked, this, &ZStitchImageDialog::saveTileImageWidgetAsImage);
     hlayout->addWidget(saveButton);
 
     vlayout->addLayout(hlayout);
@@ -1090,8 +865,8 @@ void ZStitchImageDialog::editConnFromTileImage()
     QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok
                                                        | QDialogButtonBox::Cancel, Qt::Horizontal, this);
 
-    connect(buttonBox, SIGNAL(accepted()), &dia, SLOT(accept()));
-    connect(buttonBox, SIGNAL(rejected()), &dia, SLOT(reject()));
+    connect(buttonBox, &QDialogButtonBox::accepted, &dia, &QDialog::accept);
+    connect(buttonBox, &QDialogButtonBox::rejected, &dia, &QDialog::reject);
     vlayout->addWidget(buttonBox);
 
     dia.setLayout(vlayout);

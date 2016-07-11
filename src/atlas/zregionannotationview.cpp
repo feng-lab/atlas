@@ -7,20 +7,20 @@ namespace nim {
 ZRegionAnnotationView::ZRegionAnnotationView(ZRegionAnnotationDoc &doc, ZView &view)
   : ZFilterView<ZRegionAnnotationDoc, ZRegionAnnotationFilter>(doc, view)
 {
-  docRegionAnnotationAdded(m_doc.objs());
-  connect(&m_doc, SIGNAL(objAdded(size_t,ZObjDoc*)), this, SLOT(docRegionAnnotationAdded(size_t)));
+  docRegionAnnotationsAdded(m_doc.objs());
+  connect(&m_doc, &ZRegionAnnotationDoc::objAdded, this, &ZRegionAnnotationView::docRegionAnnotationAdded);
 }
 
-void ZRegionAnnotationView::docRegionAnnotationAdded(const QList<size_t> &objs)
+void ZRegionAnnotationView::docRegionAnnotationsAdded(const QList<size_t> &objs)
 {
   for (int i=0; i<objs.size(); ++i) {
     ZRegionAnnotationFilter *viewControl = new ZRegionAnnotationFilter(m_view);
     viewControl->setData(m_doc.regionAnnotation(objs[i]));
     expandBoundBox(viewControl->boundBox());
     m_idToFilter[objs[i]].reset(viewControl);
-    connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
-    connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));
-    connect(viewControl, SIGNAL(objSelected(bool)), this, SLOT(onObjSelectedFromView(bool)));
+    connect(viewControl, &ZRegionAnnotationFilter::boundBoxChanged, this, &ZRegionAnnotationView::updateBoundBox);
+    connect(viewControl, &ZRegionAnnotationFilter::objDeselected, this, &ZRegionAnnotationView::onObjDeselectedFromView);
+    connect(viewControl, &ZRegionAnnotationFilter::objSelected, this, &ZRegionAnnotationView::onObjSelectedFromView);
     emit objViewReady(objs[i]);
   }
   if (!objs.empty()) {
@@ -35,9 +35,9 @@ void ZRegionAnnotationView::docRegionAnnotationAdded(size_t id)
   expandBoundBox(viewControl->boundBox());
   m_idToFilter[id].reset(viewControl);
   m_view.updateBoundBox();
-  connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
-  connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));
-  connect(viewControl, SIGNAL(objSelected(bool)), this, SLOT(onObjSelectedFromView(bool)));
+  connect(viewControl, &ZRegionAnnotationFilter::boundBoxChanged, this, &ZRegionAnnotationView::updateBoundBox);
+  connect(viewControl, &ZRegionAnnotationFilter::objDeselected, this, &ZRegionAnnotationView::onObjDeselectedFromView);
+  connect(viewControl, &ZRegionAnnotationFilter::objSelected, this, &ZRegionAnnotationView::onObjSelectedFromView);
   emit objViewReady(id);
 }
 

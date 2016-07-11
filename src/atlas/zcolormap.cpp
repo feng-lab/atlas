@@ -209,7 +209,7 @@ ZColorMap::ZColorMap(double min, double max, const glm::col4 &minColor,
   addKey(ZColorMapKey(min, minColor));
   max = std::max(max, min + std::numeric_limits<double>::epsilon());
   addKey(ZColorMapKey(max, maxColor));
-  connect(this, SIGNAL(changed()), this, SLOT(invalidateTexture()));
+  connect(this, &ZColorMap::changed, this, &ZColorMap::invalidateTexture);
 }
 
 ZColorMap::ZColorMap(double min, double max, const glm::vec4 &minColor,
@@ -219,7 +219,7 @@ ZColorMap::ZColorMap(double min, double max, const glm::vec4 &minColor,
   addKey(ZColorMapKey(min, minColor));
   max = std::max(max, min + std::numeric_limits<double>::epsilon());
   addKey(ZColorMapKey(max, maxColor));
-  connect(this, SIGNAL(changed()), this, SLOT(invalidateTexture()));
+  connect(this, &ZColorMap::changed, this, &ZColorMap::invalidateTexture);
 }
 
 ZColorMap::ZColorMap(double min, double max, const QColor &minColor, const QColor &maxColor, QObject *parent)
@@ -228,14 +228,14 @@ ZColorMap::ZColorMap(double min, double max, const QColor &minColor, const QColo
   addKey(ZColorMapKey(min, minColor));
   max = std::max(max, min + std::numeric_limits<double>::epsilon());
   addKey(ZColorMapKey(max, maxColor));
-  connect(this, SIGNAL(changed()), this, SLOT(invalidateTexture()));
+  connect(this, &ZColorMap::changed, this, &ZColorMap::invalidateTexture);
 }
 
 ZColorMap::ZColorMap(const ZColorMap &cm)
   : QObject(cm.parent()), m_hasDataRange(cm.m_hasDataRange), m_dataMin(cm.m_dataMin), m_dataMax(cm.m_dataMax)
 {
   m_keys = cm.m_keys;
-  connect(this, SIGNAL(changed()), this, SLOT(invalidateTexture()));
+  connect(this, &ZColorMap::changed, this, &ZColorMap::invalidateTexture);
 }
 
 ZColorMap::ZColorMap(ZColorMap &&other) noexcept
@@ -889,34 +889,34 @@ void ZColorMap::update1DTexture()
 ZColorMapParameter::ZColorMapParameter(const QString &name, QObject *parent)
   : ZSingleValueParameter<ZColorMap>(name, parent)
 {
-  connect(&m_value, SIGNAL(changed()), this, SIGNAL(valueChanged()));
+  connect(&m_value, &ZColorMap::changed, this, &ZColorMapParameter::valueChanged);
 }
 
 ZColorMapParameter::ZColorMapParameter(const QString &name, const ZColorMap &cm, QObject *parent)
   : ZSingleValueParameter<ZColorMap>(name, cm, parent)
 {
-  connect(&m_value, SIGNAL(changed()), this, SIGNAL(valueChanged()));
+  connect(&m_value, &ZColorMap::changed, this, &ZColorMapParameter::valueChanged);
 }
 
 ZColorMapParameter::ZColorMapParameter(const QString &name, double min, double max, const glm::col4 &minColor, const glm::col4 &maxColor, QObject *parent)
   : ZSingleValueParameter<ZColorMap>(name, parent)
 {
   m_value.reset(min, max, minColor, maxColor);
-  connect(&m_value, SIGNAL(changed()), this, SIGNAL(valueChanged()));
+  connect(&m_value, &ZColorMap::changed, this, &ZColorMapParameter::valueChanged);
 }
 
 ZColorMapParameter::ZColorMapParameter(const QString &name, double min, double max, const glm::vec4 &minColor, const glm::vec4 &maxColor, QObject *parent)
   : ZSingleValueParameter<ZColorMap>(name, parent)
 {
   m_value.reset(min, max, minColor, maxColor);
-  connect(&m_value, SIGNAL(changed()), this, SIGNAL(valueChanged()));
+  connect(&m_value, &ZColorMap::changed, this, &ZColorMapParameter::valueChanged);
 }
 
 ZColorMapParameter::ZColorMapParameter(const QString &name, double min, double max, const QColor &minColor, const QColor &maxColor, QObject *parent)
   : ZSingleValueParameter<ZColorMap>(name, parent)
 {
   m_value.reset(min, max, minColor, maxColor);
-  connect(&m_value, SIGNAL(changed()), this, SIGNAL(valueChanged()));
+  connect(&m_value, &ZColorMap::changed, this, &ZColorMapParameter::valueChanged);
 }
 
 QWidget *ZColorMapParameter::actualCreateWidget(QWidget *parent)

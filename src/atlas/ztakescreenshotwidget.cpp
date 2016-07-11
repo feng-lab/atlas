@@ -50,12 +50,12 @@ ZTakeScreenShotWidget::ZTakeScreenShotWidget(bool is2D, bool group, QWidget *par
   QString prefix = QString("neuTubeCapture") + data.toString("yyyyMMdd") + QString("_");
   m_namePrefix.set(prefix);
   createWidget();
-  connect(&m_mode, SIGNAL(valueChanged()), this, SLOT(adjustWidget()));
-  connect(&m_captureStereoImage, SIGNAL(valueChanged()), this, SLOT(adjustWidget()));
-  connect(&m_useWindowSize, SIGNAL(valueChanged()), this, SLOT(updateImageSizeWidget()));
-  connect(&m_namePrefix, SIGNAL(valueChanged()), this, SLOT(prefixChanged()));
-  connect(m_captureButton, SIGNAL(clicked()), this, SLOT(captureButtonPressed()));
-  connect(m_captureSequenceButton, SIGNAL(clicked()), this, SLOT(captureSequenceButtonPressed()));
+  connect(&m_mode, &ZStringIntOptionParameter::valueChanged, this, &ZTakeScreenShotWidget::adjustWidget);
+  connect(&m_captureStereoImage, &ZBoolParameter::valueChanged, this, &ZTakeScreenShotWidget::adjustWidget);
+  connect(&m_useWindowSize, &ZBoolParameter::valueChanged, this, &ZTakeScreenShotWidget::updateImageSizeWidget);
+  connect(&m_namePrefix, &ZStringParameter::valueChanged, this, &ZTakeScreenShotWidget::prefixChanged);
+  connect(m_captureButton, &QPushButton::clicked, this, &ZTakeScreenShotWidget::captureButtonPressed);
+  connect(m_captureSequenceButton, &QPushButton::clicked, this, &ZTakeScreenShotWidget::captureSequenceButtonPressed);
   adjustWidget();
   updateImageSizeWidget();
 }
@@ -87,10 +87,10 @@ void ZTakeScreenShotWidget::captureButtonPressed()
 
   if (m_is2D) {
     if (m_useWindowSize.get())
-      emit takeScreenShot(filepath);
+      emit take2DScreenShot(filepath);
     else {
       glm::ivec2 size = m_customSize.get();
-      emit takeScreenShot(filepath, size.x, size.y);
+      emit takeFixedSize2DScreenShot(filepath, size.x, size.y);
     }
   } else {
     Z3DScreenShotType sst;
@@ -103,10 +103,10 @@ void ZTakeScreenShotWidget::captureButtonPressed()
       sst = Z3DScreenShotType::MonoView;
 
     if (m_useWindowSize.get())
-      emit takeScreenShot(filepath, sst);
+      emit take3DScreenShot(filepath, sst);
     else {
       glm::ivec2 size = m_customSize.get();
-      emit takeScreenShot(filepath, size.x, size.y, sst);
+      emit takeFixedSize3DScreenShot(filepath, size.x, size.y, sst);
     }
   }
 }
@@ -137,11 +137,11 @@ void ZTakeScreenShotWidget::captureSequenceButtonPressed()
     sst = Z3DScreenShotType::MonoView;
 
   if (m_useWindowSize.get())
-    emit takeSeriesScreenShot(dir, m_namePrefix.get(), axis, m_clockwise.get(), numFrame, sst);
+    emit takeSeries3DScreenShot(dir, m_namePrefix.get(), axis, m_clockwise.get(), numFrame, sst);
   else {
     glm::ivec2 size = m_customSize.get();
-    emit takeSeriesScreenShot(dir, m_namePrefix.get(), axis, m_clockwise.get(), numFrame,
-                              size.x, size.y, sst);
+    emit takeSeriesFixedSize3DScreenShot(dir, m_namePrefix.get(), axis, m_clockwise.get(), numFrame,
+                                         size.x, size.y, sst);
   }
 }
 
@@ -267,10 +267,10 @@ void ZTakeScreenShotWidget::createWidget()
   lo->addLayout(hlo);
 
   m_useManualName = new QRadioButton("Manual specify output name", this);
-  connect(m_useManualName, SIGNAL(clicked()), this, SLOT(setFileNameSource()));
+  connect(m_useManualName, &QRadioButton::clicked, this, &ZTakeScreenShotWidget::setFileNameSource);
   lo->addWidget(m_useManualName);
   m_useAutoName = new QRadioButton("Auto generate output name", this);
-  connect(m_useAutoName, SIGNAL(clicked()), this, SLOT(setFileNameSource()));
+  connect(m_useAutoName, &QRadioButton::clicked, this, &ZTakeScreenShotWidget::setFileNameSource);
   lo->addWidget(m_useAutoName);
 
   if (!m_is2D) {

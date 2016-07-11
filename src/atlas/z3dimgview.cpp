@@ -7,11 +7,11 @@ namespace nim {
 Z3DImgView::Z3DImgView(ZImgDoc &doc, Z3DView &view)
   : Z3DFilterView<ZImgDoc, Z3DImgFilter>(doc, view)
 {
-  docImgAdded(m_doc.objs());
-  connect(&m_doc, SIGNAL(objAdded(size_t,ZObjDoc*)), this, SLOT(docImgAdded(size_t)));
+  docImgsAdded(m_doc.objs());
+  connect(&m_doc, &ZImgDoc::objAdded, this, &Z3DImgView::docImgAdded);
 }
 
-void Z3DImgView::docImgAdded(const QList<size_t> &objs)
+void Z3DImgView::docImgsAdded(const QList<size_t> &objs)
 {
   try {
     for (int i=0; i<objs.size(); ++i) {
@@ -27,10 +27,10 @@ void Z3DImgView::docImgAdded(const QList<size_t> &objs)
       viewControl->outputPort("LeftEyeImage")->connect(compositor().inputPort("LeftEyeImage"));
       viewControl->outputPort("RightEyeImage")->connect(compositor().inputPort("RightEyeImage"));
       viewControl->outputPort("VolumeFilter")->connect(compositor().inputPort("VolumeFilters"));
-      connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
-      connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));
-      connect(viewControl, SIGNAL(objSelected(bool)), this, SLOT(onObjSelectedFromView(bool)));
-      connect(viewControl, SIGNAL(objVisibleChanged(bool)), this, SLOT(onObjVisibleChangedFromView(bool)));
+      connect(viewControl, &Z3DImgFilter::boundBoxChanged, this, &Z3DImgView::updateBoundBox);
+      connect(viewControl, &Z3DImgFilter::objDeselected, this, &Z3DImgView::onObjDeselectedFromView);
+      connect(viewControl, &Z3DImgFilter::objSelected, this, &Z3DImgView::onObjSelectedFromView);
+      connect(viewControl, &Z3DImgFilter::objVisibleChanged, this, &Z3DImgView::onObjVisibleChangedFromView);
       canvas().addEventListenerToBack(viewControl);
     }
     if (!objs.empty()) {
@@ -62,10 +62,10 @@ void Z3DImgView::docImgAdded(size_t id)
     viewControl->outputPort("LeftEyeImage")->connect(compositor().inputPort("LeftEyeImage"));
     viewControl->outputPort("RightEyeImage")->connect(compositor().inputPort("RightEyeImage"));
     viewControl->outputPort("VolumeFilter")->connect(compositor().inputPort("VolumeFilters"));
-    connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
-    connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));
-    connect(viewControl, SIGNAL(objSelected(bool)), this, SLOT(onObjSelectedFromView(bool)));
-    connect(viewControl, SIGNAL(objVisibleChanged(bool)), this, SLOT(onObjVisibleChangedFromView(bool)));
+    connect(viewControl, &Z3DImgFilter::boundBoxChanged, this, &Z3DImgView::updateBoundBox);
+    connect(viewControl, &Z3DImgFilter::objDeselected, this, &Z3DImgView::onObjDeselectedFromView);
+    connect(viewControl, &Z3DImgFilter::objSelected, this, &Z3DImgView::onObjSelectedFromView);
+    connect(viewControl, &Z3DImgFilter::objVisibleChanged, this, &Z3DImgView::onObjVisibleChangedFromView);
     canvas().addEventListenerToBack(viewControl);
 
     networkEvaluator().updateNetwork();

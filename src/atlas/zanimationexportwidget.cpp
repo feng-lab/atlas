@@ -38,9 +38,9 @@ ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget *parent)
   m_framePerSecond.setDecimal(2);
   m_framePerSecond.setSingleStep(1);
   createWidget();
-  connect(&m_captureStereoImage, SIGNAL(valueChanged()), this, SLOT(adjustWidget()));
-  connect(&m_useWindowSize, SIGNAL(valueChanged()), this, SLOT(updateImageSizeWidget()));
-  connect(m_captureButton, SIGNAL(clicked()), this, SLOT(captureButtonPressed()));
+  connect(&m_captureStereoImage, &ZBoolParameter::valueChanged, this, &ZAnimationExportWidget::adjustWidget);
+  connect(&m_useWindowSize, &ZBoolParameter::valueChanged, this, &ZAnimationExportWidget::updateImageSizeWidget);
+  connect(m_captureButton, &QPushButton::clicked, this, &ZAnimationExportWidget::captureButtonPressed);
   adjustWidget();
   updateImageSizeWidget();
 }
@@ -68,7 +68,7 @@ void ZAnimationExportWidget::captureButtonPressed()
       emit export2DAnimation(dir, m_filename.get(), m_framePerSecond.get());
     } else {
       glm::ivec2 size = m_customSize.get();
-      emit export2DAnimation(dir, m_filename.get(), m_framePerSecond.get(), size.x, size.y);
+      emit exportFixedSize2DAnimation(dir, m_filename.get(), m_framePerSecond.get(), size.x, size.y);
     }
   } else {
     Z3DScreenShotType sst;
@@ -84,7 +84,7 @@ void ZAnimationExportWidget::captureButtonPressed()
       emit export3DAnimation(dir, m_filename.get(), m_framePerSecond.get(), sst);
     } else {
       glm::ivec2 size = m_customSize.get();
-      emit export3DAnimation(dir, m_filename.get(), m_framePerSecond.get(), size.x, size.y, sst);
+      emit exportFixedSize3DAnimation(dir, m_filename.get(), m_framePerSecond.get(), size.x, size.y, sst);
     }
   }
 }

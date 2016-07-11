@@ -14,7 +14,7 @@ public:
   Z3DPunctaView(ZPunctaDoc &doc, Z3DView &view);
 
 private slots:
-  void docPunctaAdded(const QList<size_t> &objs);
+  void docPunctasAdded(const QList<size_t> &objs);
   void docPunctaAdded(size_t id);
 
 private:

@@ -24,9 +24,9 @@ ZImgFilter::ZImgFilter(ZView &view)
   , m_lastScale(0)
   , m_lastViewport()
 {
-  connect(&m_visible, SIGNAL(valueChanged()), this, SLOT(visibleChanged()));
+  connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZImgFilter::visibleChanged);
   addParameter(&m_visible);
-  connect(&m_opacity, SIGNAL(valueChanged()), this, SLOT(opacityChanged()));
+  connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZImgFilter::opacityChanged);
   addParameter(&m_opacity);
   addParameter(&m_offsetPara);
 }
@@ -70,11 +70,11 @@ void ZImgFilter::setData(ZImgPack &pack)
                                                                                 m_imgPack->imgInfo().channelColors[c].b / 255.),
                                                                       glm::vec3(0.f), glm::vec3(1.f)));
     m_channelColorParas[c]->setStyle("COLOR");
-    connect(m_channelVisibleParas[c].get(), SIGNAL(valueChanged(bool)), m_doubleChannelRangeParas[c].get(), SLOT(setEnabled(bool)));
-    connect(m_channelVisibleParas[c].get(), SIGNAL(valueChanged(bool)), m_channelColorParas[c].get(), SLOT(setEnabled(bool)));
-    connect(m_channelVisibleParas[c].get(), SIGNAL(valueChanged()), this, SLOT(channelVisibleChanged()));
-    connect(m_doubleChannelRangeParas[c].get(), SIGNAL(valueChanged()), this, SLOT(channelRangeChanged()));
-    connect(m_channelColorParas[c].get(), SIGNAL(valueChanged()), this, SLOT(channelColorChanged()));
+    connect(m_channelVisibleParas[c].get(), &ZBoolParameter::boolChanged, m_doubleChannelRangeParas[c].get(), &ZDoubleSpanParameter::setEnabled);
+    connect(m_channelVisibleParas[c].get(), &ZBoolParameter::boolChanged, m_channelColorParas[c].get(), &ZVec3Parameter::setEnabled);
+    connect(m_channelVisibleParas[c].get(), &ZBoolParameter::valueChanged, this, &ZImgFilter::channelVisibleChanged);
+    connect(m_doubleChannelRangeParas[c].get(), &ZDoubleSpanParameter::valueChanged, this, &ZImgFilter::channelRangeChanged);
+    connect(m_channelColorParas[c].get(), &ZVec3Parameter::valueChanged, this, &ZImgFilter::channelColorChanged);
 
     if (m_imgPack->imgInfo().isAlphaChannel(c)) {
       m_channelColorParas[c]->setVisible(false);

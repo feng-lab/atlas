@@ -25,14 +25,14 @@ QWidget *ZStringParameter::actualCreateWidget(QWidget *parent)
 {
   QLineEdit* le = new QLineEdit(parent);
   le->setText(m_value);
-  connect(le, SIGNAL(textChanged(QString)), this, SLOT(setContent(QString)));
-  connect(this, SIGNAL(strChanged(QString)), le, SLOT(setText(QString)));
+  connect(le, &QLineEdit::textChanged, this, &ZStringParameter::setContent);
+  connect(this, &ZStringParameter::stringChanged, le, &QLineEdit::setText);
   return le;
 }
 
-void ZStringParameter::beforeChange(QString &value)
+void ZStringParameter::afterChange(QString &)
 {
-  emit strChanged(value);
+  emit stringChanged(m_value);
 }
 
 void ZStringParameter::setSameAs(const ZParameter &rhs)

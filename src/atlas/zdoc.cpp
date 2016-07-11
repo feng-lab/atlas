@@ -269,12 +269,12 @@ void ZDoc::registerObjDoc(ZObjDoc *objD)
   docPack.doc = objD;
   QAction *docRemoveAllAction = new QAction(tr("&Remove All %1").arg(objD->typePluralName()), this);
   docRemoveAllAction->setStatusTip(tr("&Remove All %1").arg(objD->typePluralName()));
-  connect(docRemoveAllAction, SIGNAL(triggered()), this, SLOT(removeAllObjs()));
+  connect(docRemoveAllAction, &QAction::triggered, this, &ZDoc::removeAllObjs);
   docPack.removeAllAction = docRemoveAllAction;
   m_docPacks.push_back(docPack);
-  connect(objD, SIGNAL(objAboutToBeRemoved(size_t,ZObjDoc*)), this, SIGNAL(objAboutToBeRemoved(size_t,ZObjDoc*)));
-  connect(objD, SIGNAL(objAdded(size_t,ZObjDoc*)), this, SIGNAL(objAdded(size_t,ZObjDoc*)));
-  connect(objD, SIGNAL(objRemoved(size_t,ZObjDoc*)), this, SIGNAL(objRemoved(size_t,ZObjDoc*)));
+  connect(objD, &ZObjDoc::objAboutToBeRemoved, this, &ZDoc::objAboutToBeRemoved);
+  connect(objD, &ZObjDoc::objAdded, this, &ZDoc::objAdded);
+  connect(objD, &ZObjDoc::objRemoved, this, &ZDoc::objRemoved);
 }
 
 void ZDoc::registerNewObj(size_t id, ZObjDoc* objD)
@@ -599,15 +599,15 @@ void ZDoc::createActions()
 
   m_removeAllAction = new QAction(tr("&Remove Everything"), this);
   m_removeAllAction->setStatusTip(tr("Remove everything from workspace"));
-  connect(m_removeAllAction, SIGNAL(triggered()), this, SLOT(removeAllObjs()));
+  connect(m_removeAllAction, &QAction::triggered, this, &ZDoc::removeAllObjs);
 
   m_make2DAnimationAction = new QAction(tr("&Make 2D Animation"), this);
   m_make2DAnimationAction->setStatusTip(tr("Create 2D Animation starting from current scene"));
-  connect(m_make2DAnimationAction, SIGNAL(triggered()), this, SLOT(create2DAnimation()));
+  connect(m_make2DAnimationAction, &QAction::triggered, this, &ZDoc::create2DAnimation);
 
   m_make3DAnimationAction = new QAction(tr("Make 3D &Animation"), this);
   m_make3DAnimationAction->setStatusTip(tr("Create 3D Animation starting from current scene"));
-  connect(m_make3DAnimationAction, SIGNAL(triggered()), this, SLOT(create3DAnimation()));
+  connect(m_make3DAnimationAction, &QAction::triggered, this, &ZDoc::create3DAnimation);
 
   m_changeAnimationSettingAction = new QAction(tr("&Change Animation Settings..."), this);
   m_changeAnimationSettingAction->setStatusTip(tr("Open Animation Settings Dialog"));

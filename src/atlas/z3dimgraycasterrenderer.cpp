@@ -34,9 +34,9 @@ Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase &rendererBase)
                                "MIP Opaque", "Local MIP", "Local MIP Opaque", "ISO Surface", "X Ray");
   m_compositingMode.select("MIP Opaque");
 
-  connect(&m_compositingMode, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
-  connect(&m_compositingMode, SIGNAL(valueChanged()), this, SLOT(compile()));
-  //connect(&m_gradientMode, SIGNAL(valueChanged()), this, SLOT(compile()));
+  connect(&m_compositingMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DImgRaycasterRenderer::adjustWidgets);
+  connect(&m_compositingMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DImgRaycasterRenderer::compile);
+  //connect(&m_gradientMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DImgRaycasterRenderer::compile);
 
   adjustWidgets();
 
@@ -105,7 +105,7 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg &img)
       m_volumeDimensionNames.push_back(QString("volume_dimensions_%1").arg(i+1));
       m_transferFuncUniformNames.push_back(QString("transfer_function_%1").arg(i+1));
       m_channelVisibleParas.emplace_back(std::make_unique<ZBoolParameter>(QString("Show Channel %1").arg(i+1), true));
-      connect(m_channelVisibleParas[i].get(), SIGNAL(valueChanged()), this, SLOT(compile()));
+      connect(m_channelVisibleParas[i].get(), &ZBoolParameter::valueChanged, this, &Z3DImgRaycasterRenderer::compile);
       m_transferFuncParas.emplace_back(std::make_unique<Z3DTransferFunctionParameter>(QString("Transfer Function %1").arg(i+1)));
       //m_transferFuncParas[i]->setVolume(m_img->volumes().at(i).get());
       m_texFilterModeParas.emplace_back(std::make_unique<ZStringIntOptionParameter>(QString("Texture Filtering %1").arg(i+1)));

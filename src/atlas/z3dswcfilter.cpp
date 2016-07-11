@@ -38,7 +38,7 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject *parent)
   // rendering primitive
   m_renderingPrimitive.addOptions("Normal", "Line", "Sphere", "Cylinder");
   m_renderingPrimitive.select("Normal");
-  connect(&m_renderingPrimitive, SIGNAL(valueChanged()), this, SLOT(updateBoundBox()));
+  connect(&m_renderingPrimitive, &ZStringIntOptionParameter::valueChanged, this, &Z3DSwcFilter::updateBoundBox);
 
   m_colorMode.addOptions("Single Color",
                          "Branch Type",
@@ -48,14 +48,14 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject *parent)
 
   m_colorMode.select("Branch Type");
 
-  connect(&m_colorMode, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
-  connect(&m_colorMode, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
+  connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
+  connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DSwcFilter::adjustWidgets);
 
   addParameter(m_renderingPrimitive);
   addParameter(m_colorMode);
 
   m_swcTreeColor.setStyle("COLOR");
-  connect(&m_swcTreeColor, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
+  connect(&m_swcTreeColor, &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
   addParameter(m_swcTreeColor);
 
   for (size_t i=0; i<m_colorsForDifferentType.size(); i++) {
@@ -100,16 +100,16 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject *parent)
   m_selectSwcEvent.listenTo("append select swc", Qt::RightButton,
                              Qt::ControlModifier, QEvent::MouseButtonRelease);
 */
-  connect(&m_selectSwcEvent, SIGNAL(mouseEventTriggered(QMouseEvent*,int,int)),
-          this, SLOT(selectSwc(QMouseEvent*,int,int)));
+  connect(&m_selectSwcEvent, &ZEventListenerParameter::mouseEventTriggered,
+          this, &Z3DSwcFilter::selectSwc);
   addEventListener(m_selectSwcEvent);
 
   addParameter(m_colorMapBranchType);
-  connect(&m_colorMapBranchType, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
+  connect(&m_colorMapBranchType, &ZColorMapParameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
 
   adjustWidgets();
 
-  connect(&m_visible, SIGNAL(valueChanged(bool)), this, SIGNAL(objVisibleChanged(bool)));
+  connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DSwcFilter::objVisibleChanged);
 }
 
 Z3DSwcFilter::~Z3DSwcFilter()
@@ -132,7 +132,7 @@ void Z3DSwcFilter::initTopologyColor()
   m_colorsForDifferentTopology.emplace_back(std::make_unique<ZVec4Parameter>("Other", glm::vec4(255/255.f, 0/255.f, 0/255.f, 1.f)));
   for (size_t i=0; i<m_colorsForDifferentTopology.size(); i++) {
     m_colorsForDifferentTopology[i]->setStyle("COLOR");
-    connect(m_colorsForDifferentTopology[i].get(), SIGNAL(valueChanged()), this, SLOT(prepareColor()));
+    connect(m_colorsForDifferentTopology[i].get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
   }
 }
 
@@ -202,7 +202,7 @@ void Z3DSwcFilter::initTypeColor()
 
   for (size_t i=0; i<m_colorsForDifferentType.size(); i++) {
     m_colorsForDifferentType[i]->setStyle("COLOR");
-    connect(m_colorsForDifferentType[i].get(), SIGNAL(valueChanged()), this, SLOT(prepareColor()));
+    connect(m_colorsForDifferentType[i].get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
   }
 }
 
@@ -234,7 +234,7 @@ void Z3DSwcFilter::initSubclassTypeColor()
   m_colorsForSubclassType.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0xcc/255.f, 0xcc/255.f, 0xcc/255.f, 1.f)));
   for (size_t i=0; i<m_colorsForSubclassType.size(); i++) {
     m_colorsForSubclassType[i]->setStyle("COLOR");
-    connect(m_colorsForSubclassType[i].get(), SIGNAL(valueChanged()), this, SLOT(prepareColor()));
+    connect(m_colorsForSubclassType[i].get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
   }
 }
 

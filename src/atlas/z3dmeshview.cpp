@@ -7,11 +7,11 @@ namespace nim {
 Z3DMeshView::Z3DMeshView(ZMeshDoc &doc, Z3DView &view)
   : Z3DFilterView<ZMeshDoc, Z3DMeshFilter>(doc, view)
 {
-  docMeshAdded(m_doc.objs());
-  connect(&m_doc, SIGNAL(objAdded(size_t,ZObjDoc*)), this, SLOT(docMeshAdded(size_t)));
+  docMeshesAdded(m_doc.objs());
+  connect(&m_doc, &ZMeshDoc::objAdded, this, &Z3DMeshView::docMeshAdded);
 }
 
-void Z3DMeshView::docMeshAdded(const QList<size_t> &objs)
+void Z3DMeshView::docMeshesAdded(const QList<size_t> &objs)
 {
   try {
     for (int i=0; i<objs.size(); ++i) {
@@ -23,10 +23,10 @@ void Z3DMeshView::docMeshAdded(const QList<size_t> &objs)
       m_idToFilter[id].reset(viewControl);
 
       viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
-      connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
-      connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));
-      connect(viewControl, SIGNAL(objSelected(bool)), this, SLOT(onObjSelectedFromView(bool)));
-      connect(viewControl, SIGNAL(objVisibleChanged(bool)), this, SLOT(onObjVisibleChangedFromView(bool)));
+      connect(viewControl, &Z3DMeshFilter::boundBoxChanged, this, &Z3DMeshView::updateBoundBox);
+      connect(viewControl, &Z3DMeshFilter::objDeselected, this, &Z3DMeshView::onObjDeselectedFromView);
+      connect(viewControl, &Z3DMeshFilter::objSelected, this, &Z3DMeshView::onObjSelectedFromView);
+      connect(viewControl, &Z3DMeshFilter::objVisibleChanged, this, &Z3DMeshView::onObjVisibleChangedFromView);
       canvas().addEventListenerToBack(viewControl);
     }
     if (!objs.empty()) {
@@ -54,10 +54,10 @@ void Z3DMeshView::docMeshAdded(size_t id)
     m_idToFilter[id].reset(viewControl);
 
     viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
-    connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
-    connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));
-    connect(viewControl, SIGNAL(objSelected(bool)), this, SLOT(onObjSelectedFromView(bool)));
-    connect(viewControl, SIGNAL(objVisibleChanged(bool)), this, SLOT(onObjVisibleChangedFromView(bool)));
+    connect(viewControl, &Z3DMeshFilter::boundBoxChanged, this, &Z3DMeshView::updateBoundBox);
+    connect(viewControl, &Z3DMeshFilter::objDeselected, this, &Z3DMeshView::onObjDeselectedFromView);
+    connect(viewControl, &Z3DMeshFilter::objSelected, this, &Z3DMeshView::onObjSelectedFromView);
+    connect(viewControl, &Z3DMeshFilter::objVisibleChanged, this, &Z3DMeshView::onObjVisibleChangedFromView);
     canvas().addEventListenerToBack(viewControl);
 
     networkEvaluator().updateNetwork();

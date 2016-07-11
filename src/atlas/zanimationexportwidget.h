@@ -30,9 +30,9 @@ public:
   virtual QSize sizeHint() const override;
 
 signals:
-  void export3DAnimation(const QDir& dir, const QString &filename, double framePerSecond, int width, int height, Z3DScreenShotType sst);
+  void exportFixedSize3DAnimation(const QDir& dir, const QString &filename, double framePerSecond, int width, int height, Z3DScreenShotType sst);
   void export3DAnimation(const QDir& dir, const QString &filename, double framePerSecond, Z3DScreenShotType sst);
-  void export2DAnimation(const QDir& dir, const QString &filename, double framePerSecond, int width, int height);
+  void exportFixedSize2DAnimation(const QDir& dir, const QString &filename, double framePerSecond, int width, int height);
   void export2DAnimation(const QDir& dir, const QString &filename, double framePerSecond);
 
 public slots:

@@ -28,10 +28,10 @@ ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel 
   setContextMenuPolicy(Qt::CustomContextMenu);
   sortByColumn(ZRegionAnnotationTreeModel::AbbreviationColumn);
 
-  connect(this, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(contextMenu(QPoint)));
-  connect(this, SIGNAL(clicked(QModelIndex)), this, SLOT(indexClicked(QModelIndex)));
-  connect(this, SIGNAL(doubleClicked(QModelIndex)), this, SLOT(indexDoubleClicked(QModelIndex)));
-  connect(this, SIGNAL(activated(QModelIndex)), this, SLOT(indexActivated(QModelIndex)));
+  connect(this, &ZRegionAnnotationTreeView::customContextMenuRequested, this, &ZRegionAnnotationTreeView::contextMenu);
+  connect(this, &ZRegionAnnotationTreeView::clicked, this, &ZRegionAnnotationTreeView::indexClicked);
+  connect(this, &ZRegionAnnotationTreeView::doubleClicked, this, &ZRegionAnnotationTreeView::indexDoubleClicked);
+  connect(this, &ZRegionAnnotationTreeView::activated, this, &ZRegionAnnotationTreeView::indexActivated);
 
   setMinimumWidth(400);
 
@@ -45,19 +45,19 @@ ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel 
   ZButtonColumnDelegate *delegate = new ZButtonColumnDelegate(this);
   setMouseTracking(true);
   setItemDelegate(delegate);
-  connect(this, SIGNAL(entered(QModelIndex)), delegate, SLOT(cellEntered(QModelIndex)));
-  connect(delegate, SIGNAL(buttonClickedForUserData(QVariant)), this, SLOT(buttonClickedForUserData(QVariant)));
+  connect(this, &ZRegionAnnotationTreeView::entered, delegate, &ZButtonColumnDelegate::cellEntered);
+  connect(delegate, &ZButtonColumnDelegate::buttonClickedForUserData, this, &ZRegionAnnotationTreeView::buttonClickedForUserData);
 
-  connect(m_ratProxyModel, SIGNAL(rowsInserted(QModelIndex,int,int)),
-          this, SLOT(adaptColumns()));
-  connect(m_ratProxyModel, SIGNAL(rowsRemoved(QModelIndex,int,int)),
-          this, SLOT(adaptColumns()));
-  connect(m_ratProxyModel, SIGNAL(modelReset()),
-          this, SLOT(adaptColumns()));
-  connect(m_ratProxyModel, SIGNAL(layoutChanged()),
-          this, SLOT(adaptColumns()));
-  connect(m_ratProxyModel, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-          this, SLOT(adaptColumns()));
+  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsInserted,
+          this, &ZRegionAnnotationTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsRemoved,
+          this, &ZRegionAnnotationTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::modelReset,
+          this, &ZRegionAnnotationTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::layoutChanged,
+          this, &ZRegionAnnotationTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::dataChanged,
+          this, &ZRegionAnnotationTreeView::adaptColumns);
   adaptColumns();
 }
 

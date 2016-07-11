@@ -23,7 +23,7 @@ Z3DAnimationDoc::Z3DAnimationDoc(ZDoc &doc)
 void Z3DAnimationDoc::bindView(Z3DView *v)
 {
   m_view = v;
-  connect(m_view, SIGNAL(destroyed()), this, SLOT(releaseView()));
+  connect(m_view, &Z3DView::destroyed, this, &Z3DAnimationDoc::releaseView);
   for (auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
     it->second->animation->bindView(m_view);
   }
@@ -271,11 +271,11 @@ size_t Z3DAnimationDoc::addAnimation(Z3DAnimation *animation, const QString &pat
   animation->bindView(m_view);
 
   emit objAdded(id, this);
-  connect(animation, SIGNAL(durationChanged(double)), this, SLOT(setModified()));
-  connect(animation, SIGNAL(keyChanged()), this, SLOT(setModified()));
-  connect(animation, SIGNAL(objChanged()), this, SLOT(setModified()));
-  connect(animation, SIGNAL(keyChanged(ZParameterKey*)), this, SLOT(setModified()));
-  connect(animation, SIGNAL(colorChanged(ZParameterAnimation*)), this, SLOT(setModified()));
+  connect(animation, &Z3DAnimation::durationChanged, this, &Z3DAnimationDoc::setModified);
+  connect(animation, &Z3DAnimation::keysChanged, this, &Z3DAnimationDoc::setModified);
+  connect(animation, &Z3DAnimation::objChanged, this, &Z3DAnimationDoc::setModified);
+  connect(animation, &Z3DAnimation::keyChanged, this, &Z3DAnimationDoc::setModified);
+  connect(animation, &Z3DAnimation::colorChanged, this, &Z3DAnimationDoc::setModified);
   return id;
 }
 
@@ -307,7 +307,7 @@ void Z3DAnimationDoc::createActions()
 {
   m_loadAnimationsAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load 3D Animations..."), this);
   m_loadAnimationsAction->setStatusTip(tr("Load one or more existing Animation files"));
-  connect(m_loadAnimationsAction, SIGNAL(triggered()), this, SLOT(loadAnimation()));
+  connect(m_loadAnimationsAction, &QAction::triggered, this, &Z3DAnimationDoc::loadAnimation);
 }
 
 bool Z3DAnimationDoc::saveAnimation(AnimationPack *pack, const QString &fileName, QString &errorMsg)

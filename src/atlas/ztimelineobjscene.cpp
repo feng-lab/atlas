@@ -126,9 +126,9 @@ ZTimelineObjScene::ZTimelineObjScene(ZTimelineWidget &timeline, QObject *parent)
   , m_arrowDown(":/icons/arrow_down.png")
 {
   updateItems();
-  connect(&m_timeline.animation(), SIGNAL(expandChanged()), this, SLOT(updateItems()));
-  connect(&m_timeline.animation(), SIGNAL(objChanged()), this, SLOT(updateItems()));
-  connect(&m_timeline.animation(), SIGNAL(objViewChanged()), this, SLOT(updateItems()));
+  connect(&m_timeline.animation(), &ZAnimation::expandChanged, this, &ZTimelineObjScene::updateItems);
+  connect(&m_timeline.animation(), &ZAnimation::objChanged, this, &ZTimelineObjScene::updateItems);
+  connect(&m_timeline.animation(), &ZAnimation::objViewChanged, this, &ZTimelineObjScene::updateItems);
 }
 
 void ZTimelineObjScene::updateItems()

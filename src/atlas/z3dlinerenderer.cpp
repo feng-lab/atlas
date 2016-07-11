@@ -34,8 +34,8 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase &rendererBase)
   , m_useGeomLineShader(false)
 {
   updateLineWidth();
-  connect(&m_rendererBase.geometriesMultisampleModePara(), SIGNAL(valueChanged()),
-          this, SLOT(updateLineWidth()));
+  connect(&m_rendererBase.geometriesMultisampleModePara(), &ZStringIntOptionParameter::valueChanged,
+          this, &Z3DLineRenderer::updateLineWidth);
   setUseDisplayList(true);
 
   QStringList allshaders;

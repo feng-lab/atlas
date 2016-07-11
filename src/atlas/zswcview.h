@@ -15,7 +15,7 @@ public:
   ZSwcView(ZSwcDoc &doc, ZView &view);
 
 private slots:
-  void docSwcAdded(const QList<size_t> &objs);
+  void docSwcsAdded(const QList<size_t> &objs);
   void docSwcAdded(size_t id);
 };
 

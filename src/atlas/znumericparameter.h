@@ -116,13 +116,15 @@ public:
   ZIntParameter(const QString &name, int value, int min, int max, QObject *parent = NULL);
 
 signals:
-  void valueChanged(int);
+  void valueWillChange(int);
+  void intChanged(int);
   void rangeChanged(int min, int max);
 public slots:
   void setValue(int v);
 
 protected:
   virtual void beforeChange(int &value) override;
+  virtual void afterChange(int &value) override;
   virtual QWidget* actualCreateWidget(QWidget *parent) override;
   virtual void changeRange() override;
 };
@@ -135,13 +137,15 @@ public:
   ZDoubleParameter(const QString &name, double value, double min, double max, QObject *parent = NULL);
 
 signals:
-  void valueChanged(double);
+  void valueWillChange(double);
+  void doubleChanged(double);
   void rangeChanged(double min, double max);
 public slots:
   void setValue(double v);
 
 protected:
   virtual void beforeChange(double &value) override;
+  virtual void afterChange(double &value) override;
   virtual QWidget* actualCreateWidget(QWidget *parent) override;
   virtual void changeRange() override;
 };
@@ -154,13 +158,15 @@ public:
   ZFloatParameter(const QString &name, float value, float min, float max, QObject *parent = NULL);
 
 signals:
-  void valueChanged(double);
+  void valueWillChange(double);
+  void floatChanged(double);
   void rangeChanged(double min, double max);
 public slots:
   void setValue(double v);
 
 protected:
   virtual void beforeChange(float &value) override;
+  virtual void afterChange(float &value) override;
   virtual QWidget* actualCreateWidget(QWidget *parent) override;
   virtual void changeRange() override;
 };
@@ -292,8 +298,8 @@ public:
                  glm::vec2 max = glm::vec2(1.f), QObject *parent = NULL);
 
 signals:
-  void value1Changed(double);
-  void value2Changed(double);
+  void value1WillChange(double);
+  void value2WillChange(double);
 public slots:
   void setValue1(double v);
   void setValue2(double v);
@@ -312,9 +318,9 @@ public:
                  glm::vec3 max = glm::vec3(1.f), QObject *parent = NULL);
 
 signals:
-  void value1Changed(double);
-  void value2Changed(double);
-  void value3Changed(double);
+  void value1WillChange(double);
+  void value2WillChange(double);
+  void value3WillChange(double);
 public slots:
   void setValue1(double v);
   void setValue2(double v);
@@ -334,10 +340,10 @@ public:
                  glm::vec4 max = glm::vec4(1.f), QObject *parent = NULL);
 
 signals:
-  void value1Changed(double);
-  void value2Changed(double);
-  void value3Changed(double);
-  void value4Changed(double);
+  void value1WillChange(double);
+  void value2WillChange(double);
+  void value3WillChange(double);
+  void value4WillChange(double);
 public slots:
   void setValue1(double v);
   void setValue2(double v);
@@ -358,8 +364,8 @@ public:
                   glm::dvec2 max = glm::dvec2(1.f), QObject *parent = NULL);
 
 signals:
-  void value1Changed(double);
-  void value2Changed(double);
+  void value1WillChange(double);
+  void value2WillChange(double);
 public slots:
   void setValue1(double v);
   void setValue2(double v);
@@ -378,9 +384,9 @@ public:
                   glm::dvec3 max = glm::dvec3(1.f), QObject *parent = NULL);
 
 signals:
-  void value1Changed(double);
-  void value2Changed(double);
-  void value3Changed(double);
+  void value1WillChange(double);
+  void value2WillChange(double);
+  void value3WillChange(double);
 public slots:
   void setValue1(double v);
   void setValue2(double v);
@@ -400,10 +406,10 @@ public:
                  glm::dvec4 max = glm::dvec4(1.f), QObject *parent = NULL);
 
 signals:
-  void value1Changed(double);
-  void value2Changed(double);
-  void value3Changed(double);
-  void value4Changed(double);
+  void value1WillChange(double);
+  void value2WillChange(double);
+  void value3WillChange(double);
+  void value4WillChange(double);
 public slots:
   void setValue1(double v);
   void setValue2(double v);
@@ -424,8 +430,8 @@ public:
                   glm::ivec2 max, QObject *parent = NULL);
 
 signals:
-  void value1Changed(int);
-  void value2Changed(int);
+  void value1WillChange(int);
+  void value2WillChange(int);
 public slots:
   void setValue1(int v);
   void setValue2(int v);
@@ -444,9 +450,9 @@ public:
                   glm::ivec3 max, QObject *parent = NULL);
 
 signals:
-  void value1Changed(int);
-  void value2Changed(int);
-  void value3Changed(int);
+  void value1WillChange(int);
+  void value2WillChange(int);
+  void value3WillChange(int);
 public slots:
   void setValue1(int v);
   void setValue2(int v);
@@ -616,8 +622,8 @@ public:
                     int max, QObject *parent = NULL);
 
 signals:
-  void lowerValueChanged(int);
-  void upperValueChanged(int);
+  void lowerValueWillChange(int);
+  void upperValueWillChange(int);
   void rangeChanged(int min, int max);
 public slots:
   void setLowerValue(int v);
@@ -638,8 +644,8 @@ public:
                       float max, QObject *parent = NULL);
 
 signals:
-  void lowerValueChanged(double);
-  void upperValueChanged(double);
+  void lowerValueWillChange(double);
+  void upperValueWillChange(double);
   void rangeChanged(double min, double max);
 public slots:
   void setLowerValue(double v);
@@ -660,8 +666,8 @@ public:
                        double max, QObject *parent = NULL);
 
 signals:
-  void lowerValueChanged(double);
-  void upperValueChanged(double);
+  void lowerValueWillChange(double);
+  void upperValueWillChange(double);
   void rangeChanged(double min, double max);
 public slots:
   void setLowerValue(double v);

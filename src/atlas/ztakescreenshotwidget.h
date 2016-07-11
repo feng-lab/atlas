@@ -28,14 +28,14 @@ public:
   void setCaptureStereoImage(bool v) { m_captureStereoImage.set(v); if (v) m_captureStereoImage.setVisible(false);}
   
 signals:
-  void takeScreenShot(const QString &filename, int width, int height);
-  void takeScreenShot(const QString &filename);
-  void takeScreenShot(const QString &filename, int width, int height, Z3DScreenShotType sst);
-  void takeScreenShot(const QString &filename, Z3DScreenShotType sst);
-  void takeSeriesScreenShot(const QDir& dir, const QString &namePrefix, glm::vec3 axis,
-                            bool clockWise, int numFrame, int width, int height, Z3DScreenShotType sst);
-  void takeSeriesScreenShot(const QDir& dir, const QString &namePrefix, glm::vec3 axis,
-                            bool clockWise, int numFrame, Z3DScreenShotType sst);
+  void takeFixedSize2DScreenShot(const QString &filename, int width, int height);
+  void take2DScreenShot(const QString &filename);
+  void takeFixedSize3DScreenShot(const QString &filename, int width, int height, Z3DScreenShotType sst);
+  void take3DScreenShot(const QString &filename, Z3DScreenShotType sst);
+  void takeSeriesFixedSize3DScreenShot(const QDir& dir, const QString &namePrefix, glm::vec3 axis,
+                                       bool clockWise, int numFrame, int width, int height, Z3DScreenShotType sst);
+  void takeSeries3DScreenShot(const QDir& dir, const QString &namePrefix, glm::vec3 axis,
+                              bool clockWise, int numFrame, Z3DScreenShotType sst);
   
 public slots:
   void captureButtonPressed();

@@ -39,12 +39,12 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters &globalParas, QObject
 
   m_timeInterval.setDecimal(2);
   m_timeInterval.setSingleStep(.01);
-  connect(&m_lineWidth, SIGNAL(valueChanged()), this, SLOT(updateLineWidth()));
-  connect(&m_colorMode, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
-  connect(&m_colorMode, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
-  connect(&m_color, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
-  connect(&m_colorMap, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
-  connect(&m_timeInterval, SIGNAL(valueChanged()), this, SLOT(updateData()));
+  connect(&m_lineWidth, &ZIntParameter::valueChanged, this, &Z3DAnimationFilter::updateLineWidth);
+  connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DAnimationFilter::prepareColor);
+  connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DAnimationFilter::adjustWidgets);
+  connect(&m_color, &ZVec4Parameter::valueChanged, this, &Z3DAnimationFilter::prepareColor);
+  connect(&m_colorMap, &ZColorMapParameter::valueChanged, this, &Z3DAnimationFilter::prepareColor);
+  connect(&m_timeInterval, &ZDoubleParameter::valueChanged, this, &Z3DAnimationFilter::updateData);
 
   m_cameraSize.setStyle("SPINBOX");
   m_cameraDirectionSize.setStyle("SPINBOX");
@@ -52,12 +52,12 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters &globalParas, QObject
   m_viewDirectionColor.setStyle("COLOR");
   m_cameraDirectionTimeInterval.setDecimal(1);
   m_cameraDirectionTimeInterval.setSingleStep(.1);
-  connect(&m_cameraSize, SIGNAL(valueChanged()), this, SLOT(updateData()));
-  connect(&m_showCameraDirection, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
-  connect(&m_cameraDirectionSize, SIGNAL(valueChanged()), this, SLOT(updateData()));
-  connect(&m_upDirectionColor, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
-  connect(&m_viewDirectionColor, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
-  connect(&m_cameraDirectionTimeInterval, SIGNAL(valueChanged()), this, SLOT(updateData()));
+  connect(&m_cameraSize, &ZFloatParameter::valueChanged, this, &Z3DAnimationFilter::updateData);
+  connect(&m_showCameraDirection, &ZBoolParameter::valueChanged, this, &Z3DAnimationFilter::adjustWidgets);
+  connect(&m_cameraDirectionSize, &ZFloatParameter::valueChanged, this, &Z3DAnimationFilter::updateData);
+  connect(&m_upDirectionColor, &ZVec4Parameter::valueChanged, this, &Z3DAnimationFilter::prepareColor);
+  connect(&m_viewDirectionColor, &ZVec4Parameter::valueChanged, this, &Z3DAnimationFilter::prepareColor);
+  connect(&m_cameraDirectionTimeInterval, &ZDoubleParameter::valueChanged, this, &Z3DAnimationFilter::updateData);
 
   addParameter(m_visible);
   addParameter(m_lineWidth);
@@ -77,7 +77,7 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters &globalParas, QObject
 
   m_lineRenderer.setLineWidth(m_lineWidth.get());
 
-  connect(&m_visible, SIGNAL(valueChanged(bool)), this, SIGNAL(objVisibleChanged(bool)));
+  connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DAnimationFilter::objVisibleChanged);
 }
 
 Z3DAnimationFilter::~Z3DAnimationFilter()
@@ -98,9 +98,12 @@ void Z3DAnimationFilter::setData(Z3DAnimation *animation)
   }
   m_animation = animation;
   if (m_animation) {
-    connect(cameraParaAnimation(), SIGNAL(keyChanged()), this, SLOT(updateData()), Qt::UniqueConnection);
-    connect(cameraParaAnimation(), SIGNAL(keyChanged(ZParameterKey*)), this, SLOT(updateData()), Qt::UniqueConnection);
-    connect(cameraParaAnimation(), SIGNAL(interpolationMethodChanged()), this, SLOT(updateData()), Qt::UniqueConnection);
+    connect(cameraParaAnimation(), &ZCameraParameterAnimation::keysChanged,
+            this, &Z3DAnimationFilter::updateData, Qt::UniqueConnection);
+    connect(cameraParaAnimation(), &ZCameraParameterAnimation::keyChanged,
+            this, &Z3DAnimationFilter::updateData, Qt::UniqueConnection);
+    connect(cameraParaAnimation(), &ZCameraParameterAnimation::interpolationMethodChanged,
+            this, &Z3DAnimationFilter::updateData, Qt::UniqueConnection);
   }
   updateData();
 }

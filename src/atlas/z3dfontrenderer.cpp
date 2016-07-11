@@ -37,13 +37,11 @@ Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase &rendererBase)
   m_fontOutlineColor.setStyle("COLOR");
   m_fontShadowColor.setStyle("COLOR");
   adjustWidgets();
-  //connect(&m_fontUseSoftEdge, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
-  //connect(&m_fontUseSoftEdge, SIGNAL(valueChanged()), this, SLOT(compile()));
-  connect(&m_showFontOutline, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
-  connect(&m_showFontOutline, SIGNAL(valueChanged()), this, SLOT(compile()));
-  connect(&m_fontOutlineMode, SIGNAL(valueChanged()), this, SLOT(compile()));
-  connect(&m_showFontShadow, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
-  connect(&m_showFontShadow, SIGNAL(valueChanged()), this, SLOT(compile()));
+  connect(&m_showFontOutline, &ZBoolParameter::valueChanged, this, &Z3DFontRenderer::adjustWidgets);
+  connect(&m_showFontOutline, &ZBoolParameter::valueChanged, this, &Z3DFontRenderer::compile);
+  connect(&m_fontOutlineMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DFontRenderer::compile);
+  connect(&m_showFontShadow, &ZBoolParameter::valueChanged, this, &Z3DFontRenderer::adjustWidgets);
+  connect(&m_showFontShadow, &ZBoolParameter::valueChanged, this, &Z3DFontRenderer::compile);
 
   QStringList allshaders;
   allshaders << "almag.vert" << "almag_func.frag";

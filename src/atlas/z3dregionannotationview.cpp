@@ -7,11 +7,11 @@ namespace nim {
 Z3DRegionAnnotationView::Z3DRegionAnnotationView(ZRegionAnnotationDoc &doc, Z3DView &view)
   : Z3DFilterView<ZRegionAnnotationDoc, Z3DRegionAnnotationFilter>(doc, view)
 {
-  docRegionAnnotationAdded(m_doc.objs());
-  connect(&m_doc, SIGNAL(objAdded(size_t,ZObjDoc*)), this, SLOT(docRegionAnnotationAdded(size_t)));
+  docRegionAnnotationsAdded(m_doc.objs());
+  connect(&m_doc, &ZRegionAnnotationDoc::objAdded, this, &Z3DRegionAnnotationView::docRegionAnnotationAdded);
 }
 
-void Z3DRegionAnnotationView::docRegionAnnotationAdded(const QList<size_t> &objs)
+void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const QList<size_t> &objs)
 {
   try {
     for (int i=0; i<objs.size(); ++i) {
@@ -23,10 +23,10 @@ void Z3DRegionAnnotationView::docRegionAnnotationAdded(const QList<size_t> &objs
       m_idToFilter[id].reset(viewControl);
 
       viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
-      connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
-      connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));
-      connect(viewControl, SIGNAL(objSelected(bool)), this, SLOT(onObjSelectedFromView(bool)));
-      connect(viewControl, SIGNAL(objVisibleChanged(bool)), this, SLOT(onObjVisibleChangedFromView(bool)));
+      connect(viewControl, &Z3DRegionAnnotationFilter::boundBoxChanged, this, &Z3DRegionAnnotationView::updateBoundBox);
+      connect(viewControl, &Z3DRegionAnnotationFilter::objDeselected, this, &Z3DRegionAnnotationView::onObjDeselectedFromView);
+      connect(viewControl, &Z3DRegionAnnotationFilter::objSelected, this, &Z3DRegionAnnotationView::onObjSelectedFromView);
+      connect(viewControl, &Z3DRegionAnnotationFilter::objVisibleChanged, this, &Z3DRegionAnnotationView::onObjVisibleChangedFromView);
       canvas().addEventListenerToBack(viewControl);
     }
     if (!objs.empty()) {
@@ -54,10 +54,10 @@ void Z3DRegionAnnotationView::docRegionAnnotationAdded(size_t id)
     m_idToFilter[id].reset(viewControl);
 
     viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
-    connect(viewControl, SIGNAL(boundBoxChanged()), this, SLOT(updateBoundBox()));
-    connect(viewControl, SIGNAL(objDeselected()), this, SLOT(onObjDeselectedFromView()));
-    connect(viewControl, SIGNAL(objSelected(bool)), this, SLOT(onObjSelectedFromView(bool)));
-    connect(viewControl, SIGNAL(objVisibleChanged(bool)), this, SLOT(onObjVisibleChangedFromView(bool)));
+    connect(viewControl, &Z3DRegionAnnotationFilter::boundBoxChanged, this, &Z3DRegionAnnotationView::updateBoundBox);
+    connect(viewControl, &Z3DRegionAnnotationFilter::objDeselected, this, &Z3DRegionAnnotationView::onObjDeselectedFromView);
+    connect(viewControl, &Z3DRegionAnnotationFilter::objSelected, this, &Z3DRegionAnnotationView::onObjSelectedFromView);
+    connect(viewControl, &Z3DRegionAnnotationFilter::objVisibleChanged, this, &Z3DRegionAnnotationView::onObjVisibleChangedFromView);
     canvas().addEventListenerToBack(viewControl);
 
     networkEvaluator().updateNetwork();

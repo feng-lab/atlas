@@ -50,7 +50,7 @@ ZClickableColorLabel::ZClickableColorLabel(ZVec4Parameter* color, QWidget *paren
   , m_dvec4Color(0)
   , m_dvec3Color(0)
 {
-  connect(m_vec4Color, SIGNAL(valueChanged()), this, SLOT(update()));
+  connect(m_vec4Color, &ZVec4Parameter::valueChanged, this, qOverload<>(&ZClickableColorLabel::update));
 }
 
 ZClickableColorLabel::ZClickableColorLabel(ZVec3Parameter *color, QWidget *parent, Qt::WindowFlags f)
@@ -60,7 +60,7 @@ ZClickableColorLabel::ZClickableColorLabel(ZVec3Parameter *color, QWidget *paren
   , m_dvec4Color(0)
   , m_dvec3Color(0)
 {
-  connect(m_vec3Color, SIGNAL(valueChanged()), this, SLOT(update()));
+  connect(m_vec3Color, &ZVec3Parameter::valueChanged, this, qOverload<>(&ZClickableColorLabel::update));
 }
 
 ZClickableColorLabel::ZClickableColorLabel(ZDVec4Parameter *color, QWidget *parent, Qt::WindowFlags f)
@@ -70,7 +70,7 @@ ZClickableColorLabel::ZClickableColorLabel(ZDVec4Parameter *color, QWidget *pare
   , m_dvec4Color(color)
   , m_dvec3Color(0)
 {
-  connect(m_dvec4Color, SIGNAL(valueChanged()), this, SLOT(update()));
+  connect(m_dvec4Color, &ZDVec4Parameter::valueChanged, this, qOverload<>(&ZClickableColorLabel::update));
 }
 
 ZClickableColorLabel::ZClickableColorLabel(ZDVec3Parameter *color, QWidget *parent, Qt::WindowFlags f)
@@ -80,7 +80,7 @@ ZClickableColorLabel::ZClickableColorLabel(ZDVec3Parameter *color, QWidget *pare
   , m_dvec4Color(0)
   , m_dvec3Color(color)
 {
-  connect(m_dvec3Color, SIGNAL(valueChanged()), this, SLOT(update()));
+  connect(m_dvec3Color, &ZDVec3Parameter::valueChanged, this, qOverload<>(&ZClickableColorLabel::update));
 }
 
 void ZClickableColorLabel::paintEvent(QPaintEvent *e)
@@ -163,7 +163,7 @@ ZClickableColorMapLabel::ZClickableColorMapLabel(ZColorMapParameter *colorMap, Q
   : ZClickableLabel(parent, f)
   , m_colorMap(colorMap)
 {
-  connect(m_colorMap, SIGNAL(valueChanged()), this, SLOT(update()));
+  connect(m_colorMap, &ZColorMapParameter::valueChanged, this, qOverload<>(&ZClickableColorMapLabel::update));
 }
 
 void ZClickableColorMapLabel::paintEvent(QPaintEvent *e)
@@ -208,7 +208,8 @@ ZClickableTransferFunctionLabel::ZClickableTransferFunctionLabel(Z3DTransferFunc
   : ZClickableLabel(parent, f)
   , m_transferFunction(transferFunc)
 {
-  connect(m_transferFunction, SIGNAL(valueChanged()), this, SLOT(update()));
+  connect(m_transferFunction, &Z3DTransferFunctionParameter::valueChanged,
+          this, qOverload<>(&ZClickableTransferFunctionLabel::update));
 }
 
 void ZClickableTransferFunctionLabel::paintEvent(QPaintEvent * /*e*/)

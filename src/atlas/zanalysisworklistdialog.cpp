@@ -138,16 +138,16 @@ void ZAnalysisWorklistDialog::createWidget()
   QVBoxLayout *vlayout = new QVBoxLayout;
   QHBoxLayout *hlayout = new QHBoxLayout;
   QPushButton *newButton = new QPushButton(tr("new"), this);
-  connect(newButton, SIGNAL(clicked()), this, SLOT(onNew()));
+  connect(newButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::onNew);
   hlayout->addWidget(newButton);
   QPushButton *openButton = new QPushButton(tr("open"), this);
-  connect(openButton, SIGNAL(clicked()), this, SLOT(onOpen()));
+  connect(openButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::onOpen);
   hlayout->addWidget(openButton);
   m_saveButton = new QPushButton(tr("save"), this);
-  connect(m_saveButton, SIGNAL(clicked()), this, SLOT(onSave()));
+  connect(m_saveButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::onSave);
   hlayout->addWidget(m_saveButton);
   QPushButton *saveAsButton = new QPushButton(tr("save as..."), this);
-  connect(saveAsButton, SIGNAL(clicked()), this, SLOT(onSaveAs()));
+  connect(saveAsButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::onSaveAs);
   hlayout->addWidget(saveAsButton);
 
   m_view = new QTableView(this);
@@ -165,14 +165,14 @@ void ZAnalysisWorklistDialog::createWidget()
   QDialogButtonBox* buttonBox = new QDialogButtonBox(Qt::Horizontal, this);
   buttonBox->addButton(exitButton, QDialogButtonBox::RejectRole);
   buttonBox->addButton(runButton, QDialogButtonBox::ActionRole);
-  connect(exitButton, SIGNAL(clicked()), this, SLOT(reject()));
-  connect(runButton, SIGNAL(clicked()), this, SLOT(onGenerate()));
+  connect(exitButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::reject);
+  connect(runButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::onGenerate);
   vlayout->addWidget(buttonBox);
 
   setLayout(vlayout);
 
   setWindowTitle("~UntitledWorklist.csv");
-  connect(m_model, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(dataModified()));
+  connect(m_model, &ZAnalysisWorklistModel::dataChanged, this, &ZAnalysisWorklistDialog::dataModified);
 }
 
 } // namespace nim

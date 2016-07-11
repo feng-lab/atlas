@@ -58,9 +58,9 @@ ZTimelineAxisView::ZTimelineAxisView(ZTimelineWidget &parent)
   //setStyleSheet("border-style: none;");
 
   updateAxisScene();
-  connect(&m_timeline, SIGNAL(pixelsPerSecondChagned()), this, SLOT(updateAxisScene()));
-  connect(&m_timeline, SIGNAL(eventViewWidthChanged()), this, SLOT(updateAxisScene()));
-  connect(&m_timeline, SIGNAL(currentTimeChanged()), this, SLOT(moveCurrentTime()));
+  connect(&m_timeline, &ZTimelineWidget::pixelsPerSecondChagned, this, &ZTimelineAxisView::updateAxisScene);
+  connect(&m_timeline, &ZTimelineWidget::eventViewWidthChanged, this, &ZTimelineAxisView::updateAxisScene);
+  connect(&m_timeline, &ZTimelineWidget::currentTimeChanged, this, &ZTimelineAxisView::moveCurrentTime);
 }
 
 void ZTimelineAxisView::updateAxisScene()

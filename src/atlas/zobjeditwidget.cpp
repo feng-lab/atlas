@@ -4,6 +4,7 @@
 #include "QsLog.h"
 #include <QApplication>
 #include <QScrollBar>
+#include "zobjdoc.h"
 
 QsLogging::TextEditDestination::TextEditDestination(QPlainTextEdit &edit)
   : m_edit(edit)
@@ -39,11 +40,11 @@ ZObjEditWidget::ZObjEditWidget(ZDoc *doc, QWidget *mw)
   , m_logOutputDestination(QsLogging::DestinationFactory::MakeFunctorDestination(this, SLOT(writeLogMessage(QsLogging::LogMessage))))
 {
   addTab(m_logWidget, "Log Output");
-  connect(m_doc, SIGNAL(objAboutToBeRemoved(size_t,ZObjDoc*)), this, SLOT(removeObjEditWidgetOfObj(size_t)));
-  connect(m_doc, SIGNAL(objInfoChanged(size_t)), this, SLOT(updateEditWidgetTitleOfObj(size_t)));
+  connect(m_doc, &ZDoc::objAboutToBeRemoved, this, &ZObjEditWidget::removeObjEditWidgetOfObj);
+  connect(m_doc, &ZDoc::objInfoChanged, this, &ZObjEditWidget::updateEditWidgetTitleOfObj);
   setMinimumHeight(250);
   setTabsClosable(true);
-  connect(this, SIGNAL(tabCloseRequested(int)), this, SLOT(closeTab(int)));
+  connect(this, &ZObjEditWidget::tabCloseRequested, this, &ZObjEditWidget::closeTab);
 #ifdef __APPLE__
   tabBar()->tabButton(0, QTabBar::LeftSide)->hide();
 #else

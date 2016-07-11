@@ -231,7 +231,7 @@ void Z3DMainWindow::init()
 
   //const QList<QAction*> &loadActList = m_doc->loadFileActions();
   //for (int i=0; i<loadActList.size(); ++i)
-    //connect(loadActList[i], SIGNAL(triggered()), this, SLOT(activateWindowIfNot()));
+    //connect(loadActList[i], &QAction::triggered, this, &Z3DMainWindow::activateWindowIfNot);
 }
 
 void Z3DMainWindow::createActions()
@@ -240,68 +240,68 @@ void Z3DMainWindow::createActions()
   m_openAction = new QAction(QIcon(":/icons/folder-512.png"), tr("&Open..."), this);
   m_openAction->setShortcuts(QKeySequence::Open);
   m_openAction->setStatusTip(tr("Open an existing scene file"));
-  connect(m_openAction, SIGNAL(triggered()), this, SIGNAL(loadScene()));
+  connect(m_openAction, &QAction::triggered, this, &Z3DMainWindow::loadScene);
 
   m_saveAction = new QAction(QIcon(":/icons/save-512.png"), tr("&Save"), this);
   m_saveAction->setShortcuts(QKeySequence::Save);
   m_saveAction->setStatusTip(tr("Save unsaved objects to disk"));
-  connect(m_saveAction, SIGNAL(triggered()), this, SLOT(save()));
+  connect(m_saveAction, &QAction::triggered, this, &Z3DMainWindow::save);
 
   m_saveAsAction = new QAction(QIcon(":/icons/save_as-512.png"), tr("Save &As..."), this);
   m_saveAsAction->setShortcuts(QKeySequence::SaveAs);
   m_saveAsAction->setStatusTip(tr("Save selected objects under a new name"));
-  connect(m_saveAsAction, SIGNAL(triggered()), this, SLOT(saveAs()));
+  connect(m_saveAsAction, &QAction::triggered, this, &Z3DMainWindow::saveAs);
 
   m_loadSceneAction = new QAction(tr("Load &Scene..."), this);
   m_loadSceneAction->setStatusTip(tr("Load scene"));
-  connect(m_loadSceneAction, SIGNAL(triggered()), this, SIGNAL(loadScene()));
+  connect(m_loadSceneAction, &QAction::triggered, this, &Z3DMainWindow::loadScene);
 
   m_saveSceneAction = new QAction(tr("Save &Scene..."), this);
   m_saveSceneAction->setStatusTip(tr("Save scene"));
-  connect(m_saveSceneAction, SIGNAL(triggered()), this, SIGNAL(saveScene()));
+  connect(m_saveSceneAction, &QAction::triggered, this, &Z3DMainWindow::saveScene);
 
   m_closeAction = new QAction(tr("&Close"), this);
   m_closeAction->setShortcut(QKeySequence::Close);
   m_closeAction->setStatusTip(tr("Close this window"));
-  connect(m_closeAction, SIGNAL(triggered()), this, SLOT(close()));
+  connect(m_closeAction, &QAction::triggered, this, &Z3DMainWindow::close);
 
   // edit
 
   // view
   m_changeBackgroundAction = new QAction(QIcon(":/icons/background_color-512.png"), tr("&Change Background"), this);
   m_changeBackgroundAction->setStatusTip(tr("Change background of 3d view"));
-  connect(m_changeBackgroundAction, SIGNAL(triggered()), this, SLOT(changeBackground()));
+  connect(m_changeBackgroundAction, &QAction::triggered, this, &Z3DMainWindow::changeBackground);
 
   m_changeAxisAction = new QAction(QIcon(":/icons/axis-512.png"), tr("&Change Axis"), this);
   m_changeAxisAction->setStatusTip(tr("Change axis of 3d view"));
-  connect(m_changeAxisAction, SIGNAL(triggered()), this, SLOT(changeAxis()));
+  connect(m_changeAxisAction, &QAction::triggered, this, &Z3DMainWindow::changeAxis);
 
   m_screenShotAction = new QAction(QIcon(":/icons/screenshot-512.png"), tr("&Screenshot"), this);
   m_screenShotAction->setStatusTip(tr("Screenshot"));
-  connect(m_screenShotAction, SIGNAL(triggered()), this, SLOT(openScreenshotPanel()));
+  connect(m_screenShotAction, &QAction::triggered, this, &Z3DMainWindow::openScreenshotPanel);
 
   //
   m_exitAction = new QAction(tr("E&xit"), this);
   m_exitAction->setShortcuts(QKeySequence::Quit);
   m_exitAction->setStatusTip(tr("Exit the application"));
-  connect(m_exitAction, SIGNAL(triggered()), qApp, SLOT(closeAllWindows()));
+  connect(m_exitAction, &QAction::triggered, qApp, &QApplication::closeAllWindows);
 
   m_aboutAction = new QAction(tr("&About"), this);
   m_aboutAction->setStatusTip(tr("Show the application's About box"));
-  connect(m_aboutAction, SIGNAL(triggered()), this, SLOT(about()));
+  connect(m_aboutAction, &QAction::triggered, this, &Z3DMainWindow::about);
 
   m_aboutQtAction = new QAction(tr("About &Qt"), this);
   m_aboutQtAction->setStatusTip(tr("Show the Qt library's About box"));
-  connect(m_aboutQtAction, SIGNAL(triggered()), qApp, SLOT(aboutQt()));
+  connect(m_aboutQtAction, &QAction::triggered, qApp, &QApplication::aboutQt);
 
   //
   m_viewLogAction = new QAction(tr("&View Log"), this);
   m_viewLogAction->setStatusTip(tr("View Log"));
-  connect(m_viewLogAction, SIGNAL(triggered()), this, SLOT(viewLog()));
+  connect(m_viewLogAction, &QAction::triggered, this, &Z3DMainWindow::viewLog);
 
   m_openLogFolderAction = new QAction(QIcon(":/icons/folder-512.png"), tr("&Open Log Folder"), this);
   m_openLogFolderAction->setStatusTip(tr("Open Log Folder"));
-  connect(m_openLogFolderAction, SIGNAL(triggered()), this, SLOT(openLogFolder()));
+  connect(m_openLogFolderAction, &QAction::triggered, this, &Z3DMainWindow::openLogFolder);
 }
 
 void Z3DMainWindow::createMenus()
@@ -402,7 +402,7 @@ void Z3DMainWindow::createDockWindows()
   m_objectsDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
   ZObjWidget *objWidget = m_doc->createObjWidget(this);
   m_objectsDockWidget->setWidget(objWidget);
-  connect(m_doc, SIGNAL(openEditWidget(size_t)), this, SLOT(openEditWidget(size_t)));
+  connect(m_doc, &ZDoc::openEditWidget, this, &Z3DMainWindow::openEditWidget);
   addDockWidget(Qt::RightDockWidgetArea, m_objectsDockWidget);
   m_windowMenu->addAction(m_objectsDockWidget->toggleViewAction());
 
@@ -413,7 +413,7 @@ void Z3DMainWindow::createDockWindows()
   if (m_doc->viewSettingId() > 0)
     m_viewSettingWidget->showViewSettingWidgetOfObj(m_doc->viewSettingId());
   m_viewSettingDockWidget->setWidget(m_viewSettingWidget);
-  connect(m_doc, SIGNAL(showViewSetting(size_t)), this, SLOT(raiseViewSettingDockWidget()));
+  connect(m_doc, &ZDoc::showViewSetting, this, &Z3DMainWindow::raiseViewSettingDockWidget);
   addDockWidget(Qt::RightDockWidgetArea, m_viewSettingDockWidget);
   m_windowMenu->addAction(m_viewSettingDockWidget->toggleViewAction());
 

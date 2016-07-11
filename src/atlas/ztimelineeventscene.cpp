@@ -161,19 +161,19 @@ ZTimelineEventScene::ZTimelineEventScene(ZTimelineWidget &timeline, ZTimelineEve
   , m_view(view)
 {
   updateItems();
-  connect(&m_timeline.animation(), SIGNAL(expandChanged()), this, SLOT(updateItems()));
-  connect(&m_timeline.animation(), SIGNAL(objChanged()), this, SLOT(updateItems()));
-  connect(&m_timeline.animation(), SIGNAL(objViewChanged()), this, SLOT(updateItems()));
-  connect(&m_timeline.animation(), SIGNAL(keyChanged()), this, SLOT(updateItems()));
-  connect(&m_timeline, SIGNAL(eventViewWidthChanged()), this, SLOT(resizeRects()));
-  connect(&m_timeline, SIGNAL(pixelsPerSecondChagned()), this, SLOT(moveKeys()));
-  connect(&m_timeline, SIGNAL(pixelsPerSecondChagned()), this, SLOT(moveCurrentTime()));
-  connect(&m_timeline, SIGNAL(currentTimeChanged()), this, SLOT(moveCurrentTime()));
-  connect(&m_timeline.animation(), SIGNAL(keyChanged(ZParameterKey*)), this, SLOT(updateKey(ZParameterKey*)));
-  connect(&m_timeline.animation(), SIGNAL(keyAboutToDelete(ZParameterKey*)),
-          this, SLOT(deleteKeyItem(ZParameterKey*)));
-  connect(&m_timeline.animation(), SIGNAL(colorChanged(ZParameterAnimation*)),
-          this, SLOT(updateParameterAnimation(ZParameterAnimation*)));
+  connect(&m_timeline.animation(), &ZAnimation::expandChanged, this, &ZTimelineEventScene::updateItems);
+  connect(&m_timeline.animation(), &ZAnimation::objChanged, this, &ZTimelineEventScene::updateItems);
+  connect(&m_timeline.animation(), &ZAnimation::objViewChanged, this, &ZTimelineEventScene::updateItems);
+  connect(&m_timeline.animation(), &ZAnimation::keysChanged, this, &ZTimelineEventScene::updateItems);
+  connect(&m_timeline, &ZTimelineWidget::eventViewWidthChanged, this, &ZTimelineEventScene::resizeRects);
+  connect(&m_timeline, &ZTimelineWidget::pixelsPerSecondChagned, this, &ZTimelineEventScene::moveKeys);
+  connect(&m_timeline, &ZTimelineWidget::pixelsPerSecondChagned, this, &ZTimelineEventScene::moveCurrentTime);
+  connect(&m_timeline, &ZTimelineWidget::currentTimeChanged, this, &ZTimelineEventScene::moveCurrentTime);
+  connect(&m_timeline.animation(), &ZAnimation::keyChanged, this, &ZTimelineEventScene::updateKey);
+  connect(&m_timeline.animation(), &ZAnimation::keyAboutToDelete,
+          this, &ZTimelineEventScene::deleteKeyItem);
+  connect(&m_timeline.animation(), &ZAnimation::colorChanged,
+          this, &ZTimelineEventScene::updateParameterAnimation);
 }
 
 void ZTimelineEventScene::updateKey(ZParameterKey *paraKey)

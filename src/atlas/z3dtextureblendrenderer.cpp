@@ -17,7 +17,7 @@ Z3DTextureBlendRenderer::Z3DTextureBlendRenderer(Z3DRendererBase &rendererBase, 
                                  qMakePair<QString,QString>("SecondOnTopBlending", "SECOND_ON_TOP_BLENDING")
                                  );
   m_blendMode.select(mode);
-  connect(&m_blendMode, SIGNAL(valueChanged()), this, SLOT(compile()));
+  connect(&m_blendMode, &ZStringStringOptionParameter::valueChanged, this, &Z3DTextureBlendRenderer::compile);
 
   m_blendTextureShader.bindFragDataLocation(0, "FragData0");
   m_blendTextureShader.loadFromSourceFile("pass.vert", "compositor.frag", m_rendererBase.generateHeader() + generateHeader());

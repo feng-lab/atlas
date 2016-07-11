@@ -24,44 +24,44 @@ Z3DCameraParameter::Z3DCameraParameter(const QString &name, QObject *parent)
     m_projectionType.select("Perspective");
   else
     m_projectionType.select("Orthographic");
-  connect(&m_projectionType, SIGNAL(valueChanged()), this, SLOT(updateProjectionType()));
+  connect(&m_projectionType, &ZStringIntOptionParameter::valueChanged, this, &Z3DCameraParameter::updateProjectionType);
 
   m_eye.setSingleStep(1e-10);
   m_eye.setDecimal(10);
   //m_eye.setWidgetOrientation(Qt::Horizontal);
   m_eye.setStyle("SPINBOX");
-  connect(&m_eye, SIGNAL(valueChanged()), this, SLOT(updateEye()));
+  connect(&m_eye, &ZVec3Parameter::valueChanged, this, &Z3DCameraParameter::updateEye);
 
   m_center.setSingleStep(1e-10);
   m_center.setDecimal(10);
   //m_center.setWidgetOrientation(Qt::Horizontal);
   m_center.setStyle("SPINBOX");
-  connect(&m_center, SIGNAL(valueChanged()), this, SLOT(updateCenter()));
+  connect(&m_center, &ZVec3Parameter::valueChanged, this, &Z3DCameraParameter::updateCenter);
 
   m_upVector.setSingleStep(1e-10);
   m_upVector.setDecimal(10);
   m_upVector.setStyle("SPINBOX");
-  connect(&m_upVector, SIGNAL(valueChanged()), this, SLOT(updateUpVector()));
+  connect(&m_upVector, &ZVec3Parameter::valueChanged, this, &Z3DCameraParameter::updateUpVector);
 
   m_eyeSeparationAngle.setSingleStep(.1);
   m_eyeSeparationAngle.setDecimal(1);
-  connect(&m_eyeSeparationAngle, SIGNAL(valueChanged()), this, SLOT(updateEyeSeparationAngle()));
+  connect(&m_eyeSeparationAngle, &ZFloatParameter::valueChanged, this, &Z3DCameraParameter::updateEyeSeparationAngle);
 
   m_fieldOfView.setSingleStep(.1);
   m_fieldOfView.setDecimal(1);
-  connect(&m_fieldOfView, SIGNAL(valueChanged()), this, SLOT(updateFieldOfView()));
+  connect(&m_fieldOfView, &ZFloatParameter::valueChanged, this, &Z3DCameraParameter::updateFieldOfView);
 
   m_nearDist.setSingleStep(1e-10);
   m_nearDist.setDecimal(10);
   m_nearDist.setStyle("SPINBOX");
   m_nearDist.setRange(1e-10, m_value.farDist());
-  connect(&m_nearDist, SIGNAL(valueChanged()), this, SLOT(updateNearDist()));
+  connect(&m_nearDist, &ZFloatParameter::valueChanged, this, &Z3DCameraParameter::updateNearDist);
 
   m_farDist.setSingleStep(1e-10);
   m_farDist.setDecimal(10);
   m_farDist.setStyle("SPINBOX");
   m_farDist.setRange(m_value.nearDist(), std::numeric_limits<float>::max());
-  connect(&m_farDist, SIGNAL(valueChanged()), this, SLOT(updateFarDist()));
+  connect(&m_farDist, &ZFloatParameter::valueChanged, this, &Z3DCameraParameter::updateFarDist);
 }
 
 Z3DCameraParameter::Z3DCameraParameter(const QString &name, const Z3DCamera &value, QObject *parent)
@@ -83,44 +83,44 @@ Z3DCameraParameter::Z3DCameraParameter(const QString &name, const Z3DCamera &val
     m_projectionType.select("Perspective");
   else
     m_projectionType.select("Orthographic");
-  connect(&m_projectionType, SIGNAL(valueChanged()), this, SLOT(updateProjectionType()));
+  connect(&m_projectionType, &ZStringIntOptionParameter::valueChanged, this, &Z3DCameraParameter::updateProjectionType);
 
   m_eye.setSingleStep(1e-10);
   m_eye.setDecimal(10);
   //m_eye.setWidgetOrientation(Qt::Horizontal);
   m_eye.setStyle("SPINBOX");
-  connect(&m_eye, SIGNAL(valueChanged()), this, SLOT(updateEye()));
+  connect(&m_eye, &ZVec3Parameter::valueChanged, this, &Z3DCameraParameter::updateEye);
 
   m_center.setSingleStep(1e-10);
   m_center.setDecimal(10);
   //m_center.setWidgetOrientation(Qt::Horizontal);
   m_center.setStyle("SPINBOX");
-  connect(&m_center, SIGNAL(valueChanged()), this, SLOT(updateCenter()));
+  connect(&m_center, &ZVec3Parameter::valueChanged, this, &Z3DCameraParameter::updateCenter);
 
   m_upVector.setSingleStep(1e-10);
   m_upVector.setDecimal(10);
   m_upVector.setStyle("SPINBOX");
-  connect(&m_upVector, SIGNAL(valueChanged()), this, SLOT(updateUpVector()));
+  connect(&m_upVector, &ZVec3Parameter::valueChanged, this, &Z3DCameraParameter::updateUpVector);
 
   m_eyeSeparationAngle.setSingleStep(.1);
   m_eyeSeparationAngle.setDecimal(1);
-  connect(&m_eyeSeparationAngle, SIGNAL(valueChanged()), this, SLOT(updateEyeSeparationAngle()));
+  connect(&m_eyeSeparationAngle, &ZFloatParameter::valueChanged, this, &Z3DCameraParameter::updateEyeSeparationAngle);
 
   m_fieldOfView.setSingleStep(.1);
   m_fieldOfView.setDecimal(1);
-  connect(&m_fieldOfView, SIGNAL(valueChanged()), this, SLOT(updateFieldOfView()));
+  connect(&m_fieldOfView, &ZFloatParameter::valueChanged, this, &Z3DCameraParameter::updateFieldOfView);
 
   m_nearDist.setSingleStep(1e-10);
   m_nearDist.setDecimal(10);
   m_nearDist.setStyle("SPINBOX");
   m_nearDist.setRange(1e-10, m_value.farDist());
-  connect(&m_nearDist, SIGNAL(valueChanged()), this, SLOT(updateNearDist()));
+  connect(&m_nearDist, &ZFloatParameter::valueChanged, this, &Z3DCameraParameter::updateNearDist);
 
   m_farDist.setSingleStep(1e-10);
   m_farDist.setDecimal(10);
   m_farDist.setStyle("SPINBOX");
   m_farDist.setRange(m_value.nearDist(), std::numeric_limits<float>::max());
-  connect(&m_farDist, SIGNAL(valueChanged()), this, SLOT(updateFarDist()));
+  connect(&m_farDist, &ZFloatParameter::valueChanged, this, &Z3DCameraParameter::updateFarDist);
 }
 
 void Z3DCameraParameter::flipViewDirection()

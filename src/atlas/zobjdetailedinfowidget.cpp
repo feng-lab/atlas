@@ -5,6 +5,7 @@
 #include <QScrollArea>
 #include "zwidgetsgroup.h"
 #include "QsLog.h"
+#include "zobjdoc.h"
 
 namespace nim {
 
@@ -18,10 +19,10 @@ ZObjDetailedInfoWidget::ZObjDetailedInfoWidget(ZDoc *doc, QWidget *mw)
   m_widget->addWidget(m_defaultWidget);
   layout->addWidget(m_widget);
   setLayout(layout);
-  connect(m_doc, SIGNAL(showViewSetting(size_t)), this, SLOT(showWidgetOfObj(size_t)));
-  connect(m_doc, SIGNAL(hideViewSetting()), this, SLOT(hideWidget()));
-  connect(m_doc, SIGNAL(objAboutToBeRemoved(size_t,ZObjDoc*)), this, SLOT(removeWidgetOfObj(size_t)));
-  connect(m_doc, SIGNAL(objInfoChanged(size_t)), this, SLOT(updateWidgetLabelOfObj(size_t)));
+  connect(m_doc, &ZDoc::showViewSetting, this, &ZObjDetailedInfoWidget::showWidgetOfObj);
+  connect(m_doc, &ZDoc::hideViewSetting, this, &ZObjDetailedInfoWidget::hideWidget);
+  connect(m_doc, &ZDoc::objAboutToBeRemoved, this, &ZObjDetailedInfoWidget::removeWidgetOfObj);
+  connect(m_doc, &ZDoc::objInfoChanged, this, &ZObjDetailedInfoWidget::updateWidgetLabelOfObj);
   setMinimumHeight(250);
 }
 

@@ -26,7 +26,7 @@ void Z3DAnimation::bindView(Z3DView *v)
     return;
 
   if (v) {
-    connect(v, SIGNAL(objViewReady(size_t)), this, SLOT(tryLinkAnimationWith(size_t)));
+    connect(v, &Z3DView::objViewReady, this, &Z3DAnimation::tryLinkAnimationWith);
     m_view = v;
     rebindView();
   } else {

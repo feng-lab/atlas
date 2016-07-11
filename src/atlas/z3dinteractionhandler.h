@@ -94,8 +94,8 @@ protected slots:
   void mouseDollyEvent(QMouseEvent *e, int w, int h);
   void dollyEvent(QWheelEvent *e, int w, int h);
   void shiftEvent(QMouseEvent *e, int w, int h);
-  void rollEvent(QMouseEvent *e, int w, int h);
-  void rollEvent(QWheelEvent *e, int w, int h);
+  void mouseRollEvent(QMouseEvent *e, int w, int h);
+  void wheelRollEvent(QWheelEvent *e, int w, int h);
   void keyRotateEvent(QKeyEvent* e, int w, int h);
   void keyShiftEvent(QKeyEvent* e, int w, int h);
   void keyDollyEvent(QKeyEvent* e, int w, int h);

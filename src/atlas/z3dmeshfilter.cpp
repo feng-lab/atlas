@@ -41,21 +41,21 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   m_textureCopyRenderer.setDiscardTransparent(true);
 
   m_singleColorForAllMesh.setStyle("COLOR");
-  connect(&m_singleColorForAllMesh, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
+  connect(&m_singleColorForAllMesh, &ZVec4Parameter::valueChanged, this, &Z3DMeshFilter::prepareColor);
 
   // Color Mode
   m_colorMode.addOption("Single Color");
   m_colorMode.select("Single Color");
 
-  connect(&m_colorMode, SIGNAL(valueChanged()), this, SLOT(prepareColor()));
-  connect(&m_colorMode, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
+  connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DMeshFilter::prepareColor);
+  connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DMeshFilter::adjustWidgets);
 
   addParameter(m_visible);
   addParameter(m_colorMode);
 
   addParameter(m_singleColorForAllMesh);
 
-  connect(&m_glow, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
+  connect(&m_glow, &ZBoolParameter::valueChanged, this, &Z3DMeshFilter::adjustWidgets);
   addParameter(m_glow);
   addParameter(m_textureGlowRenderer.glowModePara());
   addParameter(m_textureGlowRenderer.blurRadiusPara());
@@ -68,7 +68,7 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   m_selectMeshEvent.listenTo("select mesh", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonDblClick);
   m_selectMeshEvent.listenTo("append select mesh", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonPress);
   m_selectMeshEvent.listenTo("append select mesh", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonRelease);
-  connect(&m_selectMeshEvent, SIGNAL(mouseEventTriggered(QMouseEvent*,int,int)), this, SLOT(selectMesh(QMouseEvent*,int,int)));
+  connect(&m_selectMeshEvent, &ZEventListenerParameter::mouseEventTriggered, this, &Z3DMeshFilter::selectMesh);
   addEventListener(m_selectMeshEvent);
 
   adjustWidgets();
@@ -77,7 +77,7 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   addParameter(m_triangleListRenderer.wireframeColorPara());
   m_triangleListRenderer.setColorSource("CustomColor");
 
-  connect(&m_visible, SIGNAL(valueChanged(bool)), this, SIGNAL(objVisibleChanged(bool)));
+  connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DMeshFilter::objVisibleChanged);
 }
 
 Z3DMeshFilter::~Z3DMeshFilter()
@@ -185,7 +185,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroup()
       if (para->name() == "Coord Transform") {
         m_widgetsGroup->addChild(*para, 2);
         //        QPushButton *pb = new QPushButton("Apply Transform");
-        //        connect(pb, SIGNAL(clicked(bool)), this, SLOT(onApplyTransform()));
+        //        connect(pb, &QPushButton::clicked, this, &Z3DMeshFilter::onApplyTransform);
         //        m_widgetsGroup->addChild(*pb, 2);
       }
       //else if (para->name() == "Size Scale")

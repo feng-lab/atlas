@@ -28,11 +28,11 @@ Z3DConeRenderer::Z3DConeRenderer(Z3DRendererBase &rendererBase)
                                     //qMakePair<QString,QString>("Round Base Flat Top", "ROUND_BASE_CAP_FLAT_TOP_CAP"),
                                     qMakePair<QString,QString>("Flat Base Round Top", "FLAT_BASE_CAP_ROUND_TOP_CAP"));
   m_coneCapStyle.select("Flat Caps");
-  connect(&m_coneCapStyle, SIGNAL(valueChanged()), this, SLOT(invalidateOpenglRenderer()));
-  connect(&m_coneCapStyle, SIGNAL(valueChanged()), this, SLOT(invalidateOpenglPickingRenderer()));
-  connect(&m_coneCapStyle, SIGNAL(valueChanged()), this, SLOT(compile()));
-  connect(&m_cylinderSubdivisionAroundZ, SIGNAL(valueChanged()), this, SLOT(invalidateOpenglRenderer()));
-  connect(&m_cylinderSubdivisionAlongZ, SIGNAL(valueChanged()), this, SLOT(invalidateOpenglRenderer()));
+  connect(&m_coneCapStyle, &ZStringStringOptionParameter::valueChanged, this, &Z3DConeRenderer::invalidateOpenglRenderer);
+  connect(&m_coneCapStyle, &ZStringStringOptionParameter::valueChanged, this, &Z3DConeRenderer::invalidateOpenglPickingRenderer);
+  connect(&m_coneCapStyle, &ZStringStringOptionParameter::valueChanged, this, &Z3DConeRenderer::compile);
+  connect(&m_cylinderSubdivisionAroundZ, &ZIntParameter::valueChanged, this, &Z3DConeRenderer::invalidateOpenglRenderer);
+  connect(&m_cylinderSubdivisionAlongZ, &ZIntParameter::valueChanged, this, &Z3DConeRenderer::invalidateOpenglRenderer);
 
   QStringList allshaders;
   if (m_useConeShader2)

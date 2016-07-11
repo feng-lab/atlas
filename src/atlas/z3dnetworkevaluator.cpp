@@ -149,11 +149,9 @@ void Z3DNetworkEvaluator::initializeNetwork()
   // update size
   sizeChangedFromFilter();
   for (size_t i=0; i<m_reverseSortedFilters.size(); i++) {
-    QObject::disconnect(m_reverseSortedFilters[i],
-                        SIGNAL(requestUpstreamSizeChange(Z3DFilter*)),
-                        0, 0);
-    connect(m_reverseSortedFilters[i], SIGNAL(requestUpstreamSizeChange(Z3DFilter*)),
-            this, SLOT(sizeChangedFromFilter(Z3DFilter*)));
+    QObject::disconnect(m_reverseSortedFilters[i], &Z3DFilter::requestUpstreamSizeChange, 0, 0);
+    connect(m_reverseSortedFilters[i], &Z3DFilter::requestUpstreamSizeChange,
+            this, &Z3DNetworkEvaluator::sizeChangedFromFilter);
   }
 
   unlock();
