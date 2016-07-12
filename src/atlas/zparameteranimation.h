@@ -48,18 +48,18 @@ public:
   // create a new key based on current view
   virtual ZParameterKey* createKey(double secs) const;
 
+  void setCurrentTime(double secs);
+  void removeRedundantKeys();
+
 signals:
   void colorChanged(ZParameterAnimation* pa);
   void keysChanged();
   void keyChanged(ZParameterKey* key);
   void keyAboutToDelete(ZParameterKey* key);
 
-public slots:
-  void setCurrentTime(double secs);
-  void removeRedundantKeys();
+protected:
   virtual void updateParaToTime(double secs, ZParameter* para) const;
 
-protected:
   inline const ZParameterKey& lastKey() const { return *m_keys[m_keys.size()-1]; }
 
 protected:

@@ -34,6 +34,19 @@ public:
   const float* lightSpotExponentArray() const { return m_lightSpotExponentArray.data(); }
   const glm::vec3* lightSpotDirectionArray() const { return m_lightSpotDirectionArray.data(); }
 
+  // must call
+  void setCanvas(Z3DCanvas* canvas) { m_canvas = canvas; }
+  void getGLFocus();
+
+  // must call
+  void setPickingTarget(Z3DRenderTarget& rt) { pickingManager.setRenderTarget(rt); }
+
+private:
+  void updateLightsArray();
+
+  void addParameter(ZParameter &para) { m_parameters.push_back(&para); }
+
+public:
   ZStringIntOptionParameter geometriesMultisampleMode;
   ZStringIntOptionParameter transparencyMethod;
   ZIntParameter lightCount;
@@ -60,19 +73,7 @@ public:
   // must add to network
   Z3DTrackballInteractionHandler interactionHandler;
 
-  // must call
-  void setCanvas(Z3DCanvas* canvas) { m_canvas = canvas; }
-  void getGLFocus();
-
-  // must call
-  void setPickingTarget(Z3DRenderTarget& rt) { pickingManager.setRenderTarget(rt); }
-
-private slots:
-  void updateLightsArray();
-
 private:
-  void addParameter(ZParameter &para) { m_parameters.push_back(&para); }
-
   std::vector<ZParameter*> m_parameters;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGrp;

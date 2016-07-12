@@ -35,10 +35,11 @@ public:
   inline Z3DNetworkEvaluator& networkEvaluator() { return m_view.networkEvaluator(); }
   inline Z3DGlobalParameters& globalParas() { return m_view.globalParas(); }
 
-public slots:
-  virtual void updateBoundBox() = 0;
+signals:
+  void objViewReady(size_t id);
 
-protected slots:
+protected:
+  virtual void updateBoundBox() = 0;
   virtual void onObjRemoved(size_t id) = 0;
   virtual void onAllObjsRemoved() = 0;
   virtual void onObjVisibleChanged(size_t id, bool v) = 0;
@@ -47,12 +48,8 @@ protected slots:
   virtual void onObjDeselectedFromView() = 0;
   virtual void onObjVisibleChangedFromView(bool v) = 0;
 
-protected:
   void resetBoundBox();
   void expandBoundBox(const std::vector<double> &boundBox);
-
-signals:
-  void objViewReady(size_t id);
 
 protected:
   Z3DView &m_view;

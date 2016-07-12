@@ -29,6 +29,11 @@ public:
 
   QList<ZParameter*> parameters() { return m_parameters; }
 
+signals:
+  void boundBoxChanged();
+  void objSelected(bool append);
+  void objDeselected();
+
 protected:
   void addParameter(ZParameter* para);
   void removeParameter(ZParameter* para);
@@ -39,14 +44,6 @@ protected:
   int realT() const { return m_view.currentTime() - int(m_offsetPara.get().w); }
   int realT(int t) const { return t - int(m_offsetPara.get().w); }
 
-signals:
-  void boundBoxChanged();
-  void objSelected(bool append);
-  void objDeselected();
-
-public slots:
-
-protected slots:
   virtual void offsetChanged();
 
 protected:

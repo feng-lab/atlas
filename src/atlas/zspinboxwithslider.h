@@ -25,10 +25,9 @@ public:
   ZSlider2(QWidget* parent = 0);
   ZSlider2(Qt::Orientation ori, QWidget* parent = 0);
 
-public slots:
+protected:
   void setDataRange(int min, int max);
 
-protected:
   virtual void focusInEvent(QFocusEvent *event) override;
   virtual void focusOutEvent(QFocusEvent *event) override;
 };
@@ -40,21 +39,20 @@ public:
   explicit ZSpinBoxWithSlider(int value, int min, int max, int step = 1,
                               bool tracking = true, const QString &prefix = "",
                               const QString &suffix = "", QWidget *parent = 0);
+
+  void setValue(int v);
+  void setDataRange(int min, int max);
   
 signals:
   void valueChanged(int);
-  
-public slots:
-  void setValue(int v);
-  void setDataRange(int min, int max);
-
-private slots:
-  void valueChangedFromSlider(int v);
-  void valueChangedFromSpinBox(int v);
 
 protected:
   void createWidget(int value, int min, int max, int step, bool tracking, const QString &prefix,
                     const QString &suffix);
+  
+private:
+  void valueChangedFromSlider(int v);
+  void valueChangedFromSpinBox(int v);
 
   ZSlider2* m_slider;
   ZSpinBox* m_spinBox;
@@ -68,21 +66,21 @@ public:
                                     int decimal = 3, bool tracking = true, const QString &prefix = "",
                                     const QString &suffix = "", QWidget *parent = 0);
 
-signals:
-  void valueChanged(double);
-
-public slots:
   void setValue(double v);
   void setDataRange(double min, double max);
 
-private slots:
-  void valueChangedFromSlider(int v);
-  void valueChangedFromSpinBox(double v);
+signals:
+  void valueChanged(double);
 
 protected:
   void createWidget(const QString &prefix,
                     const QString &suffix);
 
+private:
+  void valueChangedFromSlider(int v);
+  void valueChangedFromSpinBox(double v);
+
+private:
   ZSlider2* m_slider;
   ZDoubleSpinBox* m_spinBox;
   double m_value;

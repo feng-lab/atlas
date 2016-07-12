@@ -34,9 +34,9 @@ QT += opengl network svg
 #Qt5
 isEqual(QT_MAJOR_VERSION,5) | greaterThan(QT_MAJOR_VERSION,5) {
 isEqual(QT_MAJOR_VERSION,5) {
-  lessThan(QT_MINOR_VERSION,4) {
+  lessThan(QT_MINOR_VERSION,7) {
     message("Cannot build Atlas with Qt version $${QT_VERSION}.")
-    error("Use at least Qt 5.4.0.")
+    error("Use at least Qt 5.7.0.")
   }
 }
     QT += gui

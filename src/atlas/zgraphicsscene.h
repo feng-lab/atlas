@@ -17,8 +17,6 @@ signals:
   void mousePressed(QPointF);
   void mouseReleased(QPointF);
 
-public slots:
-
 protected:
   void mousePressEvent(QGraphicsSceneMouseEvent *event);
   void mouseReleaseEvent(QGraphicsSceneMouseEvent *event);

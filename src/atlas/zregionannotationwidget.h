@@ -13,14 +13,8 @@ class ZRegionAnnotationWidget : public QWidget
 public:
   explicit ZRegionAnnotationWidget(ZRegionAnnotation &anno, ZDoc &doc, QWidget *parent = 0);
 
-signals:
-
-public slots:
-
-protected slots:
-  void exportLabelImage();
-
 protected:
+  void exportLabelImage();
 
 private:
   void createWidget();

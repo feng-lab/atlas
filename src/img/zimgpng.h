@@ -24,8 +24,6 @@ public:
   virtual void readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio) override;
   virtual bool supportRead() const override;
   virtual bool supportWrite() const override;
-
-protected:
 };
 
 } // namespace

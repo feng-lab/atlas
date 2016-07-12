@@ -39,18 +39,15 @@ public:
   virtual bool isAlias(size_t id) const override;
   virtual QWidget *createObjEditWidget(size_t id) override;
 
-protected slots:
+protected:
   void loadRegionAnnotation();
   void importLabelImage();
   void exportLabelImage();
   void setModified();
   void setModified(bool clean);
 
-protected:
   // append another RegionAnnotation into this doc
   size_t addRegionAnnotation(ZRegionAnnotation *regionAnnotation, const QString &path, bool unsaved = false);
-
-signals:
 
 private:
   struct RegionAnnotationPack { // RegionAnnotation and its associated data

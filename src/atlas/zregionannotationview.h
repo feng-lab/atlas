@@ -14,7 +14,7 @@ class ZRegionAnnotationView : public ZFilterView<ZRegionAnnotationDoc, ZRegionAn
 public:
   ZRegionAnnotationView(ZRegionAnnotationDoc &doc, ZView &view);
 
-private slots:
+private:
   void docRegionAnnotationsAdded(const QList<size_t> &objs);
   void docRegionAnnotationAdded(size_t id);
 };

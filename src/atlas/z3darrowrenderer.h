@@ -22,10 +22,6 @@ public:
   void setArrowColors(std::vector<glm::vec4> *arrowTailColors, std::vector<glm::vec4> *arrowHeadColors);
   void setArrowPickingColors(std::vector<glm::vec4> *arrowPickingColors = NULL);
 
-signals:
-
-public slots:
-
 private:
   std::vector<glm::vec4> m_arrowConeBaseAndBaseRadius;
   std::vector<glm::vec4> m_arrowConeAxisAndTopRadius;

@@ -43,15 +43,14 @@ public:
 signals:
   void changed();
   
-public slots:
+private:
   void selectFile();
 
-protected slots:
   void previewFilterResult();
 
-private:
   void createWidget(QBoxLayout::Direction direction);
 
+private:
   FileMode m_fileMode;
   QString m_guiName;
   QString m_filter;
@@ -71,7 +70,6 @@ private:
   QLineEdit *m_filterLineEdit;
   QPushButton *m_previewButton;
   QToolButton *m_button;
-
 };
 
 } // namespace nim

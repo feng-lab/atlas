@@ -14,18 +14,13 @@ class Z3DCameraControlWidget : public QWidget
 public:
   explicit Z3DCameraControlWidget(Z3DCameraParameter &camera, QWidget *parent = 0);
 
-signals:
-
-public slots:
-
-private slots:
+private:
   void roll();
   void azimuth();
   void yaw();
   void elevation();
   void pitch();
 
-private:
   void createWidget();
 
 private:

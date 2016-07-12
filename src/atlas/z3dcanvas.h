@@ -49,6 +49,11 @@ public:
                                                 height() * devicePixelRatio()); }
   glm::ivec2 logicalSize() { return glm::ivec2(width(), height()); }
 
+signals:
+  // w and h is physical size not logical size, opengl works in physical pixel
+  void canvasSizeChanged(int w, int h);
+
+protected:
   virtual void enterEvent(QEvent* e);
   virtual void leaveEvent(QEvent* e);
   virtual void mousePressEvent(QMouseEvent* e);
@@ -66,17 +71,6 @@ public:
   virtual void dragEnterEvent(QDragEnterEvent *event);
   virtual void dropEvent(QDropEvent *event);
 
-  // QOpenGLWidget interface
-protected:
-  virtual void initializeGL();
-  virtual void resizeGL(int w, int h);
-  virtual void paintGL();
-
-signals:
-  // w and h is physical size not logical size, opengl works in physical pixel
-  void canvasSizeChanged(int w, int h);
-
-protected slots:
   void rotateX();
   void rotateY();
   void rotateZ();
@@ -84,9 +78,16 @@ protected slots:
   void rotateYM();
   void rotateZM();
 
+  // QOpenGLWidget interface
 protected:
+  virtual void initializeGL();
+  virtual void resizeGL(int w, int h);
+  virtual void paintGL();
+
+private:
   double devicePixelRatio();
 
+private:
   bool m_fullscreen;
 
   std::deque<Z3DCanvasEventListener*> m_listeners;
@@ -148,6 +149,11 @@ public:
                                                 height() * devicePixelRatio()); }
   glm::uvec2 logicalSize() { return glm::uvec2(width(), height()); }
 
+signals:
+  // w and h is physical size not logical size, opengl works in physical pixel
+  void canvasSizeChanged(size_t w, size_t h);
+
+protected:
   virtual void enterEvent(QEvent* e) override;
   virtual void leaveEvent(QEvent* e) override;
   virtual void mousePressEvent(QMouseEvent* e) override;
@@ -169,11 +175,6 @@ public:
   void setCursor(const QCursor &c) { viewport()->setCursor(c); }
 #endif
 
-signals:
-  // w and h is physical size not logical size, opengl works in physical pixel
-  void canvasSizeChanged(size_t w, size_t h);
-
-protected slots:
   void rotateX();
   void rotateY();
   void rotateZ();
@@ -181,9 +182,10 @@ protected slots:
   void rotateYM();
   void rotateZM();
 
-protected:
+private:
   double devicePixelRatio();
 
+private:
   bool m_fullscreen;
 
 #ifndef _QT4_

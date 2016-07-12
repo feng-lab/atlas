@@ -76,7 +76,7 @@ public:
 
 signals:
 
-public slots:
+private:
   void updateItems();
 
 private:

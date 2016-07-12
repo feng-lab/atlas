@@ -190,6 +190,7 @@ protected:
   virtual void makeValid(T& value) const override;
   QString comboBoxItemString(const T &value) const;
 
+private:
   QList<T> m_options;
   T2 m_associatedData;
   QList<T2> m_associatedDatas;

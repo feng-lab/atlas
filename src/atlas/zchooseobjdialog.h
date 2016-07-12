@@ -20,14 +20,10 @@ public:
 
   size_t selectedID() const { return m_selectedID; }
 
-signals:
-
-public slots:
-
 protected:
   void createWidget();
 
-private slots:
+private:
   void updateSelectedID();
 
 private:

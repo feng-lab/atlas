@@ -37,19 +37,19 @@ signals:
   void takeSeries3DScreenShot(const QDir& dir, const QString &namePrefix, glm::vec3 axis,
                               bool clockWise, int numFrame, Z3DScreenShotType sst);
   
-public slots:
+protected:
   void captureButtonPressed();
   void captureSequenceButtonPressed();
   void setFileNameSource();
   void updateImageSizeWidget();
   void prefixChanged();
 
-protected slots:
   void adjustWidget();
   
 private:
   void createWidget();
 
+private:
   bool m_group;
 
   QGroupBox *m_groupBox;

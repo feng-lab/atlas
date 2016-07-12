@@ -42,16 +42,13 @@ public:
   virtual bool hasTransparent(Z3DEye) const override { return true; }
   virtual void renderTransparent(Z3DEye eye) override;
 
-signals:
-
-protected slots:
+protected:
   void prepareColor();
   void setClipPlanes() override;
   void updateData();
   void adjustWidgets();
   void updateLineWidth();
 
-protected:
   virtual void renderPicking(Z3DEye eye) override;
 
   void prepareData();
@@ -65,6 +62,7 @@ private:
   const ZCameraParameterAnimation* cameraParaAnimation() const { return m_animation->cameraParameterAnimation(); }
   ZCameraParameterAnimation* cameraParaAnimation() { return m_animation->cameraParameterAnimation(); }
 
+private:
   Z3DLineRenderer m_lineRenderer;
   Z3DArrowRenderer m_arrowRenderer;
   Z3DMeshRenderer m_triangleListRenderer;

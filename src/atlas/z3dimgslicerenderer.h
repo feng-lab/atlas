@@ -33,10 +33,6 @@ public:
 
   virtual void compile() override;
 
-signals:
-
-protected slots:
-
 protected:
   void bindVolumes(Z3DShaderProgram &shader);
   void bindVolume(Z3DShaderProgram &shader, size_t idx);
@@ -45,6 +41,7 @@ protected:
 
   virtual void render(Z3DEye eye) override;
 
+protected:
   //Z3DShaderProgram m_volumeSliceShader;
   Z3DShaderProgram m_scVolumeSliceShader;
   Z3DRenderTarget* m_layerTarget = nullptr;

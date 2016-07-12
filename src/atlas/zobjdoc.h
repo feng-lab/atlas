@@ -77,9 +77,6 @@ public:
   QString lastOpenedObjPath();
   void setLastOpenedObjPath(const QString &path);
 
-protected:
-  QString strippedName(const QString &fullFileName);
-
 signals:
   void objAdded(size_t id, ZObjDoc* doc);
   void objAboutToBeRemoved(size_t id, ZObjDoc* doc);
@@ -88,7 +85,8 @@ signals:
   void objVisibleChanged(size_t id, bool v);
   void selectionChangedFromDoc(const QList<size_t> &selected, const QList<size_t> &deselected);
 
-public slots:
+protected:
+  QString strippedName(const QString &fullFileName);
 
 protected:
   ZDoc& m_doc;

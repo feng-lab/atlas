@@ -22,7 +22,7 @@ public:
   bool operator==(const Z3DContext& rhs) const;
   bool operator!=(const Z3DContext& rhs) const;
 
-//private:
+private:
 #ifndef _QT4_
   QOpenGLContextGroup *m_context;
 #else

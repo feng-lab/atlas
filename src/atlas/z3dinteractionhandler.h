@@ -47,6 +47,7 @@ protected:
   void addEventListener(ZEventListenerParameter* eventListener)
   { m_eventListeners.emplace_back(eventListener); }
 
+protected:
   QString m_name;
   std::vector<std::unique_ptr<ZEventListenerParameter>> m_eventListeners;
   State m_state;
@@ -89,7 +90,7 @@ public:
 signals:
   void objectsMoved(double x, double y, double z);
 
-protected slots:
+protected:
   void rotateEvent(QMouseEvent* e, int w, int h);
   void mouseDollyEvent(QMouseEvent *e, int w, int h);
   void dollyEvent(QWheelEvent *e, int w, int h);
@@ -101,7 +102,6 @@ protected slots:
   void keyDollyEvent(QKeyEvent* e, int w, int h);
   void keyRollEvent(QKeyEvent* e, int w, int h);
 
-protected:
   void mousePressEvent(QMouseEvent* e, int w, int h);
   void mouseReleaseEvent(QMouseEvent* e, int w, int h);
   void mouseMoveEvent(QMouseEvent* e, int w, int h);
@@ -114,6 +114,7 @@ protected:
   void roll(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h);
   void dolly(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h, float centerDistStart);
 
+protected:
   ZEventListenerParameter* m_rotateEvent;
   ZEventListenerParameter* m_shiftEvent;
   ZEventListenerParameter* m_mouseDollyEvent;

@@ -39,11 +39,16 @@ public:
   virtual void setValueSameAs(const ZParameter &rhs) override;
   virtual void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override;
 
-protected slots:
+  // ZParameter interface
+public:
+  virtual void setSameAs(const ZParameter &rhs) override;
+  virtual QJsonValue jsonValue() const override;
+  virtual void readValue(const QJsonValue &jsonValue) override;
+
+protected:
   void updateMatrix();
   void showTransformMatrix();
 
-protected:
   virtual QWidget* actualCreateWidget(QWidget *parent) override;
   virtual void beforeChange(glm::mat4 &value) override;
 
@@ -55,12 +60,6 @@ private:
   ZVec4Parameter m_rotation;  // angle in degree and axis
   ZVec3Parameter m_center;
   bool m_receiveWidgetSignal;
-
-  // ZParameter interface
-public:
-  virtual void setSameAs(const ZParameter &rhs) override;
-  virtual QJsonValue jsonValue() const override;
-  virtual void readValue(const QJsonValue &jsonValue) override;
 };
 
 } // namespace nim

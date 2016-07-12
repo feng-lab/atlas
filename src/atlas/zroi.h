@@ -182,12 +182,9 @@ signals:
   void roiMoved(int slice);
   void boundBoxChanged();
 
-public slots:
-
 protected:
   void resetBoundBox();
 
-protected slots:
   void onSliceROIUpdated(int slice);
   void onSliceROIMoved(int slice);
 

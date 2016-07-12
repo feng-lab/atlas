@@ -51,14 +51,13 @@ public:
 signals:
   void meshSelected(ZMesh*, bool append);
 
-protected slots:
+protected:
   void prepareColor();
   void adjustWidgets();
   void selectMesh(QMouseEvent *e, int w, int h);
 
   void onApplyTransform();
 
-protected:
   virtual void renderPicking(Z3DEye eye) override;
 
   void prepareData();
@@ -70,15 +69,13 @@ protected:
   //virtual void updateAxisAlignedBoundBoxImpl() override;
   virtual void updateNotTransformedBoundBoxImpl() override;
 
-private:
-
-public slots:
   void updateMeshVisibleState();
 
 private:
   // get visible data from m_origMeshList put into m_meshList
   void getVisibleData();
 
+private:
   Z3DRenderOutputPort m_monoEyeOutport;
   Z3DRenderOutputPort m_leftEyeOutport;
   Z3DRenderOutputPort m_rightEyeOutport;

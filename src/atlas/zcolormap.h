@@ -199,21 +199,20 @@ public:
 signals:
   void changed();
 
-public slots:
+protected:
   void invalidateTexture() { m_textureIsInvalid = true; }
 
-protected:
   void update1DTexture();
-
-  std::unique_ptr<Z3DTexture> m_texture;
-  bool m_textureIsInvalid = true;
-
-protected:
-  friend class ZColorMapParameter;
-  friend class Z3DTransferFunctionParameter;
 
   inline void clearKeys() {m_keys.clear();}
   virtual bool equalTo(const ZColorMap& cm) const;
+
+protected:
+  std::unique_ptr<Z3DTexture> m_texture;
+  bool m_textureIsInvalid = true;
+
+  friend class ZColorMapParameter;
+  friend class Z3DTransferFunctionParameter;
 
   std::vector<std::pair<ZColorMapKey, bool>> m_keys;
   typedef std::vector<std::pair<ZColorMapKey, bool>>::iterator KeyIterType;
@@ -333,15 +332,15 @@ public:
   ZColorMapParameter(const QString& name, double min, double max, const QColor &minColor = QColor(0,0,0,255),
                      const QColor &maxColor = QColor(255,255,255,255), QObject *parent = NULL);
 
-protected:
-  virtual QWidget* actualCreateWidget(QWidget *parent) override;
-
   // ZParameter interface
 public:
   virtual void setSameAs(const ZParameter &rhs) override;
   virtual bool supportInterpolation() const override { return false; }
   virtual QJsonValue jsonValue() const override;
   virtual void readValue(const QJsonValue &jsonValue) override;
+
+protected:
+  virtual QWidget* actualCreateWidget(QWidget *parent) override;
 };
 
 

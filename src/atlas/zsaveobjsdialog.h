@@ -20,21 +20,17 @@ public:
 
   const QList<size_t>& objsToSave() const { return m_objsToSave; }
 
-signals:
-
-public slots:
-
 protected:
   void createWidget();
 
-private slots:
+private:
   void collectObjsToSave();
   void discard();
   void updateSaveButton();
 
-private:
   void adjustButtonWidths();
 
+private:
   const ZDoc &m_doc;
   QList<size_t> m_objsToSave;
 

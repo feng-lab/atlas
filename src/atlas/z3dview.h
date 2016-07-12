@@ -54,14 +54,13 @@ public:
   void read(const QJsonObject &json);
   void write(QJsonObject &json) const;
 
-signals:
-  void objViewReady(size_t id);
-
-public slots:
   bool takeFixedSizeScreenShot(QString filename, int width, int height, Z3DScreenShotType sst);
   bool takeScreenShot(QString filename, Z3DScreenShotType sst);
 
-private slots:
+signals:
+  void objViewReady(size_t id);
+
+private:
   void zoomIn();
   void zoomOut();
   void resetCamera();  // set up camera based on visible objects in scene, original position
@@ -73,7 +72,6 @@ private slots:
   bool takeSeriesScreenShot(const QDir& dir, const QString &namePrefix, glm::vec3 axis,
                             bool clockWise, int numFrame, Z3DScreenShotType sst);
 
-private:
   void init();
   void createActions();
 

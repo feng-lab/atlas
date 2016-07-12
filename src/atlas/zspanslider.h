@@ -14,25 +14,24 @@ public:
   explicit ZSpanSliderWithSpinBox(int lowerValue, int upperValue, int min, int max, int singleStep = 1,
                                   bool tracking = true, QWidget *parent = 0);
 
-signals:
-  void lowerValueChanged(int lower);
-  void upperValueChanged(int upper);
-
-public slots:
   void setLowerValue(int lower);
   void setUpperValue(int upper);
   void setDataRange(int min, int max);
 
-private slots:
+signals:
+  void lowerValueChanged(int lower);
+  void upperValueChanged(int upper);
+
+private:
+  void createWidget(int lowerValue, int upperValue, int min, int max, int singleStep,
+                    bool tracking);
+
   void lowerValueChangedFromSlider(int l);
   void upperValueChangedFromSlider(int u);
   void valueChangedFromLowerSpinBox(int l);
   void valueChangedFromUpperSpinBox(int u);
 
-protected:
-  void createWidget(int lowerValue, int upperValue, int min, int max, int singleStep,
-                    bool tracking);
-
+private:
   QxtSpanSlider* m_slider;
   ZSpinBox* m_lowerSpinBox;
   ZSpinBox* m_upperSpinBox;
@@ -45,24 +44,23 @@ public:
   explicit ZDoubleSpanSliderWithSpinBox(double lowerValue, double upperValue, double min, double max, double singleStep = .01,
                                         int decimal = 3, bool tracking = true, QWidget *parent = 0);
 
-signals:
-  void lowerValueChanged(double lower);
-  void upperValueChanged(double upper);
-
-public slots:
   void setLowerValue(double lower);
   void setUpperValue(double upper);
   void setDataRange(double min, double max);
 
-private slots:
+signals:
+  void lowerValueChanged(double lower);
+  void upperValueChanged(double upper);
+
+private:
   void lowerValueChangedFromSlider(int l);
   void upperValueChangedFromSlider(int u);
   void valueChangedFromLowerSpinBox(double l);
   void valueChangedFromUpperSpinBox(double u);
 
-protected:
   void createWidget();
 
+private:
   QxtSpanSlider* m_slider;
   ZDoubleSpinBox* m_lowerSpinBox;
   ZDoubleSpinBox* m_upperSpinBox;

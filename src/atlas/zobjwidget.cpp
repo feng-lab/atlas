@@ -116,22 +116,22 @@ void ZObjWidget::keyPressEvent(QKeyEvent *e)
 void ZObjWidget::createContextMenu()
 {
   m_contextMenu = new QMenu(this);
-  m_contextMenu->addAction(QString("Show"), m_doc, SLOT(showSelectedObjs()));
-  m_contextMenu->addAction(QString("Hide"), m_doc, SLOT(hideSelectedObjs()));
+  m_contextMenu->addAction(QString("Show"), m_doc, &ZDoc::showSelectedObjs);
+  m_contextMenu->addAction(QString("Hide"), m_doc, &ZDoc::hideSelectedObjs);
   m_contextMenu->addSeparator();
-  m_contextMenu->addAction(QString("Make Alias"), m_doc, SLOT(makeAliasOfSelectedObjs()));
-  m_contextMenu->addAction(QString("Remove"), m_doc, SLOT(removeSelectedObjs()));
+  m_contextMenu->addAction(QString("Make Alias"), m_doc, &ZDoc::makeAliasOfSelectedObjs);
+  m_contextMenu->addAction(QString("Remove"), m_doc, &ZDoc::removeSelectedObjs);
   m_contextMenu->addSeparator();
-  m_contextMenu->addAction(QString("Save"), m_doc, SLOT(saveSelectedObjs()));
-  m_contextMenu->addAction(QString("Save As..."), m_doc, SLOT(saveSelectedObjsAs()));
+  m_contextMenu->addAction(QString("Save"), m_doc, &ZDoc::saveSelectedObjs);
+  m_contextMenu->addAction(QString("Save As..."), m_doc, &ZDoc::saveSelectedObjsAs);
   m_contextMenu->addSeparator();
 #ifdef Q_OS_MAC
-  m_contextMenu->addAction(QString("Show in Finder"), m_doc, SLOT(showSelectedObjsInGraphicalShell()));
+  m_contextMenu->addAction(QString("Show in Finder"), m_doc, &ZDoc::showSelectedObjsInGraphicalShell);
 #endif
 #ifdef Q_OS_WIN
-  m_contextMenu->addAction(QString("Show in Explorer"), m_doc, SLOT(showSelectedObjsInGraphicalShell()));
+  m_contextMenu->addAction(QString("Show in Explorer"), m_doc, &ZDoc::showSelectedObjsInGraphicalShell);
 #endif
-  m_contextMenu->addAction(QString("Copy Full Path"), m_doc, SLOT(copySelectedObjsPathToClipboard()));
+  m_contextMenu->addAction(QString("Copy Full Path"), m_doc, &ZDoc::copySelectedObjsPathToClipboard);
 }
 
 } // namespace nim

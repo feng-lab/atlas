@@ -57,12 +57,9 @@ public:
 
   virtual void compile() override;
 
-signals:
-
-protected slots:
+protected:
   void adjustWidgets();
 
-protected:
   void bindVolumesAndTransferFuncs(Z3DShaderProgram &shader);
   void bindVolumeAndTransferFunc(Z3DShaderProgram &shader, size_t idx);
 

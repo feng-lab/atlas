@@ -17,10 +17,8 @@ public:
   explicit ZAnalysisWorklistDialog(QWidget *parent = 0);
   virtual ~ZAnalysisWorklistDialog();
 
-public slots:
+protected:
   virtual void reject() override;
-
-protected slots:
   void onNew();
   void onOpen();
   void onSave();
@@ -29,7 +27,6 @@ protected slots:
 
   void dataModified();
 
-protected:
   void createWidget();
 
 private:

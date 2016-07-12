@@ -13,12 +13,8 @@ class Z3DTransferFunctionWidgetWithEditorWindow : public ZClickableTransferFunct
 public:
   explicit Z3DTransferFunctionWidgetWithEditorWindow(Z3DTransferFunctionParameter* tf, QWidget *parent = 0);
 
-signals:
-
-public slots:
-  void createEditorWindow();
-
 protected:
+  void createEditorWindow();
   virtual void labelClicked() override;
 
 private:

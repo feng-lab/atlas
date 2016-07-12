@@ -27,11 +27,9 @@ public:
   void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const;
   void updateEditorGeometry(QWidget *editor, const QStyleOptionViewItem &option, const QModelIndex &index) const;
 
-signals:
-
-public slots:
-    void cellEntered(const QModelIndex &index);
+  void cellEntered(const QModelIndex &index);
 #endif
+
 protected:
   ZItemEditorFactory m_factory;
 #if 0

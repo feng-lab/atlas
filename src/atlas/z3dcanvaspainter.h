@@ -39,10 +39,9 @@ public:
 
   void setLock(bool v) { m_locked = v; }
 
-protected slots:
+protected:
   void onCanvasResized(size_t w, size_t h);
 
-protected:
   virtual void process(Z3DEye eye) override;
 
   virtual bool isReady(Z3DEye) const override;
@@ -55,6 +54,7 @@ protected:
 private:
   void setOutputSize(glm::uvec2 size);
 
+private:
   Z3DTextureCopyRenderer m_textureCopyRenderer;
 
   Z3DCanvas* m_canvas;

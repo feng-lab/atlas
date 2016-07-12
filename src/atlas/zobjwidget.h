@@ -18,9 +18,7 @@ class ZObjWidget : public QTreeView
 public:
   ZObjWidget(ZDoc *doc, ZObjModel *objModel, QItemSelectionModel *selectionModel, QWidget *parent = 0);
 
-public slots:
-
-protected slots:
+protected:
   void contextMenu(const QPoint &pos);
 
   void indexClicked(const QModelIndex &index);
@@ -29,7 +27,6 @@ protected slots:
 
   void adaptColumns();
 
-protected:
   virtual void keyPressEvent(QKeyEvent *e) override;
 
   void createContextMenu();

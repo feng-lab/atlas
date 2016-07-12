@@ -77,23 +77,16 @@ class ZTimelineEventScene : public QGraphicsScene
 public:
   explicit ZTimelineEventScene(ZTimelineWidget &timeline, ZTimelineEventView *view);
 
-signals:
-
-public slots:
   void updateKey(ZParameterKey *paraKey);
   void updateParameterAnimation(ZParameterAnimation *pa);
   void updateItems();
   void removeSelectedKeys();
 
-protected slots:
+protected:
   void resizeRects();
   void moveKeys();
   void moveCurrentTime();
   void deleteKeyItem(ZParameterKey *paraKey);
-
-protected:
-
-protected:
 
 private:
   ZTimelineWidget &m_timeline;

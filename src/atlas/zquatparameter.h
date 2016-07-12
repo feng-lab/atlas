@@ -17,13 +17,13 @@ signals:
   void value2WillChange(double);
   void value3WillChange(double);
   void value4WillChange(double);
-public slots:
+
+protected:
   void setValue1(double v);
   void setValue2(double v);
   void setValue3(double v);
   void setValue4(double v);
 
-protected:
   virtual void beforeChange(glm::quat &value) override;
   virtual QWidget* actualCreateWidget(QWidget *parent) override;
 };

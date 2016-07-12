@@ -47,10 +47,9 @@ public:
 signals:
   void objViewReady(size_t id);
 
-public slots:
+protected:
   virtual void updateBoundBox() = 0;
 
-protected slots:
   virtual void onObjRemoved(size_t id) = 0;
   virtual void onAllObjsRemoved() = 0;
   virtual void onObjVisibleChanged(size_t id, bool v) = 0;
@@ -58,7 +57,6 @@ protected slots:
   virtual void onObjSelectedFromView(bool append) = 0;
   virtual void onObjDeselectedFromView() = 0;
 
-protected:
   void resetBoundBox();
   void expandBoundBox(const std::vector<int> &boundBox);
 

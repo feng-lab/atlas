@@ -41,9 +41,11 @@ public:
 
   bool isRegistered(const void* obj) { return m_objectToColor.find(obj) != m_objectToColor.end(); }
   bool isRegistered(glm::col4 col) { return m_colorToObject.find(col) != m_colorToObject.end(); }
+
 private:
   void increaseColor();
 
+private:
   std::map<glm::col4, const void*, Col4Compare> m_colorToObject;
   std::map<const void*, glm::col4> m_objectToColor;
   Z3DRenderTarget* m_renderTarget;

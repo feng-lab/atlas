@@ -195,6 +195,10 @@ protected:
   virtual void detectImgInfo(ZTiff &tiff) override;
 
 protected:
+  void readLsmInfo(const QString &filename, ZTiff &tiff);
+  void logLsmInfo(const QString &filename);
+
+protected:
   CZ_LsmInfo m_lsmInfo;
   CZ_TimeStamps m_lsmTimeStamps;
   CZ_ChannelColors m_lsmChannelColors;
@@ -203,10 +207,6 @@ protected:
   std::vector<Location> m_tilePositions;
   ZImgInfo m_lsmImgInfo;
   size_t m_numScenes;
-
-protected:
-  void readLsmInfo(const QString &filename, ZTiff &tiff);
-  void logLsmInfo(const QString &filename);
 };
 
 } // namespace

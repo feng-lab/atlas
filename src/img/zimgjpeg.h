@@ -32,8 +32,6 @@ public:
 
   void readInfo(uint8_t *mem, size_t size, ZImgInfo &info);
   void readImg(uint8_t *mem, size_t size, uint8_t *des, size_t desSize);
-
-protected:
 };
 
 } // namespace nim

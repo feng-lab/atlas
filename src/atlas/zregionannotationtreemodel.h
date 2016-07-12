@@ -39,16 +39,9 @@ public:
   void activated(const QModelIndex &index);
 
 protected:
-
-protected:
   ZRegionAnnotation& m_regionAnnotation;
   ZTree<RegionNode>& m_annotationTree;
   std::map<RegionNode*, ZTree<RegionNode>::Iterator> m_nodeToIter;
-
-signals:
-
-public slots:
-
 };
 
 } // namespace nim

@@ -34,8 +34,6 @@ public:
 
 protected:
   void parseInfo(const itk::ImageIOBase *imageIO, ZImgInfo &info);
-
-protected:
 };
 
 } // namespace nim

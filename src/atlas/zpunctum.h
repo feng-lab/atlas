@@ -66,7 +66,6 @@ public:
   }
   inline bool operator!=(const ZPunctum &rhs) const { return !(*this == rhs); }
 
-public:
   // compute fields: x, y, z, sDevOfIntensity, maxIntensity, meanIntensity, volSize,
   // mass, radius, score from voxels list. voxelLocations and voxelIntensities must
   // not be empty and must have same number of elements.

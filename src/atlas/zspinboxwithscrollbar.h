@@ -17,21 +17,21 @@ public:
                                  bool tracking = true, const QString &prefix = "",
                                  const QString &suffix = "", QWidget *parent = 0);
 
-signals:
-  void valueChanged(int);
-
-public slots:
   void setValue(int v);
   void setDataRange(int min, int max);
 
-private slots:
-  void valueChangedFromScrollBar(int v);
-  void valueChangedFromSpinBox(int v);
+signals:
+  void valueChanged(int);
 
 protected:
   void createWidget(int value, int min, int max, int step, bool tracking, const QString &prefix,
                     const QString &suffix);
 
+private:
+  void valueChangedFromScrollBar(int v);
+  void valueChangedFromSpinBox(int v);
+
+private:
   QScrollBar* m_scrollBar;
   ZSpinBox* m_spinBox;
   QLabel *m_label;

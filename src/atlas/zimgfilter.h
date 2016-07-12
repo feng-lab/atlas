@@ -41,24 +41,18 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
-signals:
-
-public slots:
-
-protected slots:
+protected:
   virtual void offsetChanged() override;
 
-protected:
   void updateViewSettingWidgetsGroup();
 
-private slots:
+private:
   void channelVisibleChanged();
   void channelRangeChanged();
   void channelColorChanged();
   void opacityChanged();
   void visibleChanged();
 
-private:
   ZImgPackDisplay* getDisplay() const;
   void hideImgItems();
   void destroyImgItems();

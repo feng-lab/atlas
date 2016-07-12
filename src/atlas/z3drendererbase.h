@@ -129,6 +129,10 @@ public:
   inline const glm::mat4& viewportMatrix() const { return m_viewportMatrix; }
   inline const glm::mat4& inverseViewportMatrix() const { return m_inverseViewportMatrix; }
 
+signals:
+  void coordTransformChanged();
+  void sizeScaleChanged();
+
 protected:
 
 #ifndef _USE_CORE_PROFILE_
@@ -153,18 +157,13 @@ protected:
   void deactivateClipPlanesGLSL();
 
   void makeViewportMatrix();
-
-signals:
-  void coordTransformChanged();
-  void sizeScaleChanged();
   
-public slots:
+private:
 #ifndef _USE_CORE_PROFILE_
   void invalidateDisplayList();
   void invalidatePickingDisplayList();
 #endif
 
-private slots:
   void compile();
   void makeCoordTransformNormalMatrix();
 

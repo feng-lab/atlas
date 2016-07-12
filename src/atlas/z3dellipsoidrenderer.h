@@ -33,6 +33,7 @@ protected:
 
   void appendDefaultColors();
 
+protected:
   Z3DShaderGroup m_ellipsoidShaderGrp;
 
   ZIntParameter m_sphereSlicesStacks;

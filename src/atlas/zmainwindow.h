@@ -30,16 +30,16 @@ public:
   const QList<QAction*>& recentFileActions() const { return m_recentFileActions; }
   void updateRecentFileActions();
 
-public slots:
   void openEditWidget(size_t id);
-  //void appAboutToQuit();
 
 protected:
+  //void appAboutToQuit();
+
   void closeEvent(QCloseEvent *event);
   void dragEnterEvent(QDragEnterEvent *event);
   void dropEvent(QDropEvent *event);
 
-private slots:
+private:
   //void newWindow();
   void open();
   bool save();
@@ -67,7 +67,6 @@ private slots:
 
   void openNewInstance();
 
-private:
   void init(QsLogging::DestinationPtr logDestModel);
   void createActions();
   void createMenus();
@@ -87,6 +86,7 @@ private:
   bool loadJsonSceneImpl(const QString &fn, QString &err);
   bool saveJsonSceneImpl(const QString &fn, QString &err);
 
+private:
   QMenu *m_fileMenu;
   QMenu *m_editMenu;
   QMenu *m_viewMenu;

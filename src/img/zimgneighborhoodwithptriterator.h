@@ -289,7 +289,6 @@ protected:
     return other.m_idx - m_idx;
   }
 
-protected:
   void initNbInfo()
   {
     m_nbCoordsIsValid = false;

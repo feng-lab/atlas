@@ -14,7 +14,7 @@ class ZROIView : public ZFilterView<ZROIDoc, ZROIFilter>
 public:
   ZROIView(ZROIDoc &doc, ZView &view);
 
-private slots:
+private:
   void docROIsAdded(const QList<size_t> &objs);
   void docROIAdded(size_t id);
 };

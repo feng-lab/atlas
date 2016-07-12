@@ -21,16 +21,13 @@ public:
   ZFloatParameter& blurScalePara() { return m_blurScale; }
   ZFloatParameter& blurStrengthPara() { return m_blurStrength; }
 
-signals:
-
-public slots:
-
 protected:
   virtual void compile() override;
   QString generateHeader();
 
   virtual void render(Z3DEye eye) override;
 
+protected:
   const Z3DTexture *m_colorTexture = nullptr;
   const Z3DTexture *m_depthTexture = nullptr;
 

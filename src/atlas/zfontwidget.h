@@ -17,13 +17,12 @@ public:
   // default is false
   void setLabelFollowFontSize(bool v);
 
+  void setFont(const QFont &font);
+
 signals:
   void fontChanged(QFont font);
 
-public slots:
-  void setFont(const QFont &font);
-
-protected slots:
+protected:
   void chooseFont();
 
 private:

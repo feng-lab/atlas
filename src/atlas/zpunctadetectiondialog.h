@@ -40,7 +40,7 @@ signals:
 #endif
   void srcImgReady(ZImg *img, QString path);
   
-public slots:
+protected:
   void detect();
 
   void processCanceled();
@@ -51,18 +51,16 @@ public slots:
 
   //virtual void reject() override;
 
-protected:
   virtual void keyPressEvent(QKeyEvent *e) override;
   //virtual void closeEvent(QCloseEvent *e) override;
 
-private slots:
+private:
   void adjustInputImageWidget();
   void inputImageChanged();
   void detectLSMResolution();
   void dendriteChannelChanged();
   void updateInterface(const QString& fn, size_t numChannel, double vsx, double vsy, double vsz);
 
-private:
   void init();
   void createIOGroupBox();
   void createParaGroupBox();

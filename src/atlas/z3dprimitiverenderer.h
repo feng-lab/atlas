@@ -54,18 +54,15 @@ public:
   // render a trianglelist with whatever it contains
   static void renderTriangleList(const ZVertexArrayObject &vao, const Z3DShaderProgram &shader, const ZMesh &mesh);
 
-public slots:
-  virtual void compile() = 0;
-
 signals:
   void openglRendererInvalid();
   void openglPickingRendererInvalid();
 
-protected slots:
+protected:
+  virtual void compile() = 0;
   void invalidateOpenglRenderer();
   void invalidateOpenglPickingRenderer();
 
-protected:
   friend class Z3DRendererBase;
 
   void setShaderParameters(Z3DShaderProgram &shader);
@@ -80,6 +77,7 @@ protected:
   virtual void render(Z3DEye) = 0;
   virtual void renderPicking(Z3DEye) {}
 
+protected:
   Z3DRendererBase& m_rendererBase;
   bool m_needLighting;
   bool m_useDisplayList;

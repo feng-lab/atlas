@@ -20,10 +20,9 @@ public:
   void editLColor(size_t index);
   void editRColor(size_t index);
 
-public slots:
+protected:
   void updateIntensityScreenWidth();
 
-protected:
   virtual void mousePressEvent(QMouseEvent *e) override;
   virtual void mouseMoveEvent(QMouseEvent *e) override;
   virtual void mouseReleaseEvent(QMouseEvent *e) override;
@@ -47,6 +46,7 @@ protected:
   double screenXPositionToIntensity(double x) const;
   QRect sliderBounds(size_t index) const;
 
+private:
   ZColorMapParameter *m_colorMap;
 
   int m_sliderWidth;
@@ -64,15 +64,16 @@ class ZColorMapEditor : public QWidget
 public:
   explicit ZColorMapEditor(ZColorMapParameter *colorMap, QWidget *parent = 0);
 
-public slots:
+protected:
   void updateFromColorMap();
   void setDomainMin(double min);
   void setDomainMax(double max);
   void fitDomainToDataRange();
-private:
 
+private:
   void createWidget();
 
+private:
   ZColorMapParameter *m_colorMap;
   ZColorMapWidget *m_colorMapWidget;
   QLabel *m_dataMinNameLabel;

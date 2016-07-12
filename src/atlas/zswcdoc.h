@@ -36,14 +36,11 @@ public:
   virtual size_t makeAlias(size_t id) override;
   virtual bool isAlias(size_t id) const override;
 
-protected slots:
+protected:
   void loadSwc();
 
-protected:
   // append another swc into this doc
   size_t addSwc(ZSwc &tree, const QString &path);
-
-signals:
 
 private:
   struct SwcPack { // swc and its associated data

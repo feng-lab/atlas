@@ -80,16 +80,13 @@ signals:
   void objDeselected();
   void objVisibleChanged(bool v);
 
-public slots:
-
-protected slots:
+protected:
   void updateBoundBox();
   // implement this to empty function if clip planes are not needed
   virtual void setClipPlanes();
 
   void handleEvent(QMouseEvent *e, int w, int h);
 
-protected:
   void initializeCutRange();
   void initializeRotationCenter();
   void setTransformEnabled(bool v) { m_transformEnabled = v; }
@@ -108,7 +105,7 @@ protected:
   // reimplement this if cut range has different behavior
   virtual void expandCutRange();
 
-private slots:
+private:
   void updateAxisAlignedBoundBox();
   void updateNotTransformedBoundBox();
   void onBoundBoxModeChanged();
@@ -118,7 +115,6 @@ private slots:
   void onSelectionBoundBoxLineWidthChanged();
   void invalidateHandle() { m_handleValid = false; }
 
-private:
   void makeSelectionGeometries();
   void updateHandle();
   void registerHandlePickingColors();

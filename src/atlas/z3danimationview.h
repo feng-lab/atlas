@@ -13,11 +13,9 @@ class Z3DAnimationView : public Z3DFilterView<Z3DAnimationDoc, Z3DAnimationFilte
 public:
   Z3DAnimationView(Z3DAnimationDoc &doc, Z3DView &view);
 
-private slots:
+private:
   void docAnimationsAdded(const QList<size_t> &objs);
   void docAnimationAdded(size_t id);
-
-private:
 };
 
 } // namespace nim

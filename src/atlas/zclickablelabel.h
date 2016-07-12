@@ -21,8 +21,6 @@ public:
 signals:
   void clicked();
 
-public slots:
-
 protected:
   virtual void mousePressEvent(QMouseEvent *ev) override;
   virtual bool event(QEvent *event) override;
@@ -38,6 +36,7 @@ public:
   explicit ZClickableColorLabel(ZVec3Parameter *color, QWidget *parent = 0, Qt::WindowFlags f = 0);
   explicit ZClickableColorLabel(ZDVec4Parameter *color, QWidget *parent = 0, Qt::WindowFlags f = 0);
   explicit ZClickableColorLabel(ZDVec3Parameter *color, QWidget *parent = 0, Qt::WindowFlags f = 0);
+
 protected:
   virtual void paintEvent(QPaintEvent * e) override;
   virtual QSize minimumSizeHint() const override;
@@ -47,6 +46,7 @@ protected:
   ZDVec3Parameter* m_dvec3Color;
   virtual bool getTip(const QPoint &p, QRect *r, QString *s) override;
   virtual void labelClicked() override;
+
 private:
   QColor toQColor();
   void fromQColor(const QColor &col);

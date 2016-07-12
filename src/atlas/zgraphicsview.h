@@ -34,20 +34,18 @@ public:
   bool renderToImage(const QString &filename, QString *err = nullptr);
   bool renderToImage(const QString &filename, int width, int height, QString *err = nullptr);
 
+  void setScrollHandDragMode();
+  void setRubberBandDragMode();
+
 signals:
   void scaleChanged(double s);
   void viewportChanged();
 
-public slots:
-  void setScrollHandDragMode();
-  void setRubberBandDragMode();
-
-protected slots:
+protected:
   void scaleParaChanged();
 
   void checkViewport();
 
-protected:
   void mousePressEvent(QMouseEvent *event) override;
   void mouseMoveEvent(QMouseEvent *event) override;
   void mouseReleaseEvent(QMouseEvent *event) override;

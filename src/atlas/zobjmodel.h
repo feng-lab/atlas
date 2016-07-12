@@ -95,11 +95,6 @@ protected:
   QIcon m_unlockIcon;
   std::unique_ptr<ObjItem> m_rootItem;
   ObjItem *m_viewSettingCurrentItem;
-
-signals:
-
-public slots:
-
 };
 
 } // namespace nim

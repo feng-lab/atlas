@@ -63,6 +63,7 @@ public:
 protected:
   void generateId();
 
+protected:
   GLuint m_fboID, m_multisampleFBOID;
   GLuint m_colorBufferID, m_depthBufferID;
 

@@ -13,11 +13,9 @@ class Z3DMeshView : public Z3DFilterView<ZMeshDoc, Z3DMeshFilter>
 public:
   Z3DMeshView(ZMeshDoc &doc, Z3DView &view);
 
-private slots:
+private:
   void docMeshesAdded(const QList<size_t> &objs);
   void docMeshAdded(size_t id);
-
-private:
 };
 
 } // namespace nim

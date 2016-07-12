@@ -23,9 +23,7 @@ public:
   void clearAndSelectObj(size_t id);
   void appendSelectObj(size_t id);
 
-public slots:
-
-private slots:
+private:
   void convertSelectionChangedSignal(const QItemSelection & selected, const QItemSelection & deselected);
 
 private:

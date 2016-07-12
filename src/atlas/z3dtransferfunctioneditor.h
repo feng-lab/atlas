@@ -54,21 +54,15 @@ public:
 
   void setTransFunc(Z3DTransferFunctionParameter* tf);
 
-signals:
-
-public slots:
-
   void setHistogramNormalizeMethod(const QString &method);
   void setHistogramVisible(bool v);
-
   void volumeChanged(Z3DVolume *volume);
 
+protected:
   void deleteKey();
   void changeCurrentColor();
   void changeCurrentIntensity();
   void changeCurrentOpacity();
-
-protected:
 
   // Creates a new key at the given position.
   void insertNewKey(glm::dvec2 &hit);
@@ -96,6 +90,7 @@ protected:
   // Re-calculated the histogram
   void updateHistogram();
 
+protected:
   Z3DTransferFunctionParameter* m_transferFunction;
   std::unique_ptr<QPixmap> m_histogramCache;
 
@@ -131,16 +126,13 @@ class Z3DTransferFunctionEditor : public QWidget
 {
   Q_OBJECT
 public:
-
   Z3DTransferFunctionEditor(Z3DTransferFunctionParameter* para, QWidget* parent = 0);
   virtual ~Z3DTransferFunctionEditor();
 
   void createWidgets();
   void createConnections();
 
-signals:
-
-public slots:
+protected:
   void changeHistogramNormalizeMethod();
   void updateFromTransferFunction();
   void volumeChanged();
@@ -151,9 +143,9 @@ public slots:
 
   void reset();
 
-protected:
   QLayout* createMappingLayout();
 
+protected:
   Z3DTransferFunctionParameter* m_transferFunction;
 
   Z3DVolume* m_volume;

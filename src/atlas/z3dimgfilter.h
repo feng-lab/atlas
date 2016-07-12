@@ -47,10 +47,9 @@ public:
   virtual bool hasTransparent(Z3DEye eye) const override;
   virtual void renderTransparent(Z3DEye eye) override;
 
-public slots:
+protected:
   virtual void updateSize() override;
 
-protected slots:
   void changeCoordTransform();
 
   void adjustWidget();
@@ -68,7 +67,6 @@ protected slots:
   void mousePressed();
   void mouseReleased();
 
-protected:
   virtual void process(Z3DEye eye) override;
   bool hasSlices() const;
   void renderSlices(Z3DEye eye);
@@ -83,6 +81,7 @@ private:
   void updateBlockIDTarget();
   void volumeChanged();
 
+private:
   Z3DImgRaycasterRenderer m_imgRaycasterRenderer;
   Z3DImgSliceRenderer m_imgSliceRenderer;
   Z3DTextureAndEyeCoordinateRenderer m_textureAndEyeCoordinateRenderer;

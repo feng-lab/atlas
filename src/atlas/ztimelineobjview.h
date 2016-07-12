@@ -19,12 +19,8 @@ public:
 signals:
   void vScrollBarValueChanged(int v);
 
-public slots:
-
-protected slots:
-  void checkScrollBarValue(int v);
-
 protected:
+  void checkScrollBarValue(int v);
   virtual void scrollContentsBy(int dx, int dy) override;
 
 private:

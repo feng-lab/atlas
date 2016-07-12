@@ -47,7 +47,6 @@ public:
 
   void initializeNetwork();
 
-public slots:
   // call when network topology changed
   void updateNetwork();
 
@@ -61,7 +60,6 @@ protected:
 
   inline void getGLFocus() const { if (m_openGLContext) m_openGLContext->getGLFocus(); }
 
-protected slots:
   // update size of all upstream filters. If input filter is NULL, update all filters
   void sizeChangedFromFilter(Z3DFilter *rp = 0);
 

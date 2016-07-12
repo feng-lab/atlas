@@ -49,7 +49,7 @@ public:
 signals:
   void punctumSelected(ZPunctum*, bool append);
 
-protected slots:
+protected:
   void prepareColor();
   void adjustWidgets();
   void changePunctaSize();
@@ -57,7 +57,6 @@ protected slots:
 
   void updateData();
 
-protected:
   virtual void process(Z3DEye eye) override;
 
   virtual void renderPicking(Z3DEye eye) override;
@@ -80,8 +79,6 @@ protected:
 private:
   // get visible data from origPunctaList put into punctaList
   void getVisibleData();
-
-public slots:
   void updatePunctumVisibleState();
 
 private:

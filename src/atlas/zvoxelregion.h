@@ -116,7 +116,6 @@ public:
   //typedef impl::voxel_iter<ZVoxelRegion> iterator;
   typedef impl::voxel_iter<ZVoxelRegion const> const_iterator;
 
-public:
   ZVoxelRegion();
 
   inline void addBox(const ZVoxelCoordinate& minCoord, const ZVoxelCoordinate& maxCoord) { addBox(BoxType(minCoord, maxCoord)); }
@@ -137,7 +136,6 @@ public:
   ZVoxelRegion& intersect(const ZVoxelRegion& other);
   static ZVoxelRegion intersect(const ZVoxelRegion& r1, const ZVoxelRegion& r2);
 
-public:
   friend std::ostream& operator<< (std::ostream &s, const ZVoxelRegion &m);
 
 protected:

@@ -68,10 +68,6 @@ public:
   bool updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missingBlockIDs, const std::set<uint32_t>& usedBlockIDs);
   void uploadImageCache(size_t channel);
 
-signals:
-
-protected slots:
-
 protected:
   void readVolumes();
   void checkPageSystemError();

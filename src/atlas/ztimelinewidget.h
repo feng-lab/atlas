@@ -34,16 +34,15 @@ public:
 
   void removeSelectedKeys();
 
+  void setCurrentTime(double t);
+
 signals:
   void exportButtonToggled(bool);
   void eventViewWidthChanged();
   void pixelsPerSecondChagned();
   void currentTimeChanged();
 
-public slots:
-  void setCurrentTime(double t);
-
-protected slots:
+protected:
   void eventViewVerticalScrollBarRangeChanged(int min, int max);
   void zoomIn();
   void zoomOut();
@@ -52,7 +51,6 @@ protected slots:
   void objViewVerticalScrollBarRangeChanged(int min, int max);
   void showValue(int i);
 
-protected:
   virtual void resizeEvent(QResizeEvent *event) override;
 
 private:

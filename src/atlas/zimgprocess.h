@@ -14,13 +14,12 @@ public:
   // log output
   void setLogFile(const QString &logFile) { m_logFile = logFile; }
 
+  void run();
+
 signals:
   void canceled();
   void processError(QString);
   void finished();
-
-public slots:
-  void run();
 
 protected:
   virtual void doWork() = 0;

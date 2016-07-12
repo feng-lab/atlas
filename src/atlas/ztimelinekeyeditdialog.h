@@ -23,12 +23,11 @@ public:
 
 signals:
 
-public slots:
+protected:
   virtual void accept() override;
   virtual void reject() override;
   void raiseAndActivate();
 
-protected:
   void addWidget(QLabel* label, QWidget *wg, QGridLayout *lo);
 
 protected:

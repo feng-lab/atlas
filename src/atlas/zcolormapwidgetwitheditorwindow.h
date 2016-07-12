@@ -14,12 +14,9 @@ class ZColorMapWidgetWithEditorWindow : public ZClickableColorMapLabel
 public:
   explicit ZColorMapWidgetWithEditorWindow(ZColorMapParameter* cm, QWidget *parent = 0);
 
-signals:
-
-public slots:
+protected:
   void createEditorWindow();
 
-protected:
   virtual void labelClicked() override;
 
 private:

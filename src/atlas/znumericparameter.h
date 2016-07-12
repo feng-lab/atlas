@@ -14,7 +14,7 @@ template<class T>
 class ZNumericParameter : public ZSingleValueParameter<T>
 {
 public:
-  ZNumericParameter(const QString &name, T value, T min, T max, QObject *parent = NULL)
+  ZNumericParameter(const QString &name, T value, T min, T max, QObject *parent = nullptr)
     : ZSingleValueParameter<T>(name, value, parent), m_min(min), m_max(max)
   {
     if (std::numeric_limits<T>::is_integer) {
@@ -52,27 +52,6 @@ public:
   T rangeMin() const { return m_min; }
   T rangeMax() const { return m_max; }
 
-protected:
-  virtual void makeValid(T& value) const override
-  {
-    if (value < m_min)
-      value = m_min;
-    if (value > m_max)
-      value = m_max;
-  }
-  // inherite this to notify associated widgets about the range change (emit a signal)
-  virtual void changeRange() {}
-
-protected:
-  T m_min;
-  T m_max;
-  T m_step;
-  bool m_tracking;
-  int m_decimal;
-
-  QString m_prefix;
-  QString m_suffix;
-
   // ZParameter interface
 public:
   virtual void setSameAs(const ZParameter &rhs) override
@@ -106,6 +85,27 @@ public:
     toVal(jsonValue.toString(toQString(this->m_value)), v);
     this->set(v);
   }
+
+protected:
+  virtual void makeValid(T& value) const override
+  {
+    if (value < m_min)
+      value = m_min;
+    if (value > m_max)
+      value = m_max;
+  }
+  // inherite this to notify associated widgets about the range change (emit a signal)
+  virtual void changeRange() {}
+
+protected:
+  T m_min;
+  T m_max;
+  T m_step;
+  bool m_tracking;
+  int m_decimal;
+
+  QString m_prefix;
+  QString m_suffix;
 };
 
 class ZIntParameter : public ZNumericParameter<int>
@@ -113,14 +113,14 @@ class ZIntParameter : public ZNumericParameter<int>
   Q_OBJECT
 public:
   ZIntParameter(const QString &name, QObject *parent = NULL);
-  ZIntParameter(const QString &name, int value, int min, int max, QObject *parent = NULL);
+  ZIntParameter(const QString &name, int value, int min, int max, QObject *parent = nullptr);
+
+  void setValue(int v);
 
 signals:
   void valueWillChange(int);
   void intChanged(int);
   void rangeChanged(int min, int max);
-public slots:
-  void setValue(int v);
 
 protected:
   virtual void beforeChange(int &value) override;
@@ -134,14 +134,14 @@ class ZDoubleParameter : public ZNumericParameter<double>
   Q_OBJECT
 public:
   ZDoubleParameter(const QString &name, QObject *parent = NULL);
-  ZDoubleParameter(const QString &name, double value, double min, double max, QObject *parent = NULL);
+  ZDoubleParameter(const QString &name, double value, double min, double max, QObject *parent = nullptr);
+
+  void setValue(double v);
 
 signals:
   void valueWillChange(double);
   void doubleChanged(double);
   void rangeChanged(double min, double max);
-public slots:
-  void setValue(double v);
 
 protected:
   virtual void beforeChange(double &value) override;
@@ -155,14 +155,14 @@ class ZFloatParameter : public ZNumericParameter<float>
   Q_OBJECT
 public:
   ZFloatParameter(const QString &name, QObject *parent = NULL);
-  ZFloatParameter(const QString &name, float value, float min, float max, QObject *parent = NULL);
+  ZFloatParameter(const QString &name, float value, float min, float max, QObject *parent = nullptr);
+
+  void setValue(double v);
 
 signals:
   void valueWillChange(double);
   void floatChanged(double);
   void rangeChanged(double min, double max);
-public slots:
-  void setValue(double v);
 
 protected:
   virtual void beforeChange(float &value) override;
@@ -224,32 +224,6 @@ public:
   void setPrefix(const QString &pre) { m_prefix = pre; }
   void setSuffix(const QString &suf) { m_suffix = suf; }
 
-protected:
-  virtual void makeValid(T& value) const override
-  {
-    for (size_t i=0; i<this->m_value.length(); i++) {
-      if (value[i] < m_min[i])
-        value[i] = m_min[i];
-      if (value[i] > m_max[i])
-        value[i] = m_max[i];
-    }
-  }
-
-protected:
-  T m_min;
-  T m_max;
-  typename T::value_type m_step;
-  bool m_tracking;
-  int m_decimal;
-  Qt::Orientation m_widgetOrientation;
-  QList<QString> m_nameOfEachValue;   // default is empty string for each value
-  QString m_groupBoxName;
-
-  QString m_prefix;
-  QString m_suffix;
-
-  // ZSingleValueParameter interface
-
   // ZParameter interface
 public:
   virtual void setSameAs(const ZParameter &rhs) override
@@ -287,6 +261,30 @@ public:
     toVal(jsonValue.toString(toQString(this->m_value)), v);
     this->set(v);
   }
+
+protected:
+  virtual void makeValid(T& value) const override
+  {
+    for (size_t i=0; i<this->m_value.length(); i++) {
+      if (value[i] < m_min[i])
+        value[i] = m_min[i];
+      if (value[i] > m_max[i])
+        value[i] = m_max[i];
+    }
+  }
+
+protected:
+  T m_min;
+  T m_max;
+  typename T::value_type m_step;
+  bool m_tracking;
+  int m_decimal;
+  Qt::Orientation m_widgetOrientation;
+  QList<QString> m_nameOfEachValue;   // default is empty string for each value
+  QString m_groupBoxName;
+
+  QString m_prefix;
+  QString m_suffix;
 };
 
 class ZVec2Parameter : public ZNumericVectorParameter<glm::vec2>
@@ -297,12 +295,12 @@ public:
   ZVec2Parameter(const QString &name, glm::vec2 value, glm::vec2 min = glm::vec2(0.f),
                  glm::vec2 max = glm::vec2(1.f), QObject *parent = NULL);
 
+  void setValue1(double v);
+  void setValue2(double v);
+
 signals:
   void value1WillChange(double);
   void value2WillChange(double);
-public slots:
-  void setValue1(double v);
-  void setValue2(double v);
 
 protected:
   virtual void beforeChange(glm::vec2 &value) override;
@@ -317,14 +315,14 @@ public:
   ZVec3Parameter(const QString &name, glm::vec3 value, glm::vec3 min = glm::vec3(0.f),
                  glm::vec3 max = glm::vec3(1.f), QObject *parent = NULL);
 
+  void setValue1(double v);
+  void setValue2(double v);
+  void setValue3(double v);
+
 signals:
   void value1WillChange(double);
   void value2WillChange(double);
   void value3WillChange(double);
-public slots:
-  void setValue1(double v);
-  void setValue2(double v);
-  void setValue3(double v);
 
 protected:
   virtual void beforeChange(glm::vec3 &value) override;
@@ -339,16 +337,16 @@ public:
   ZVec4Parameter(const QString &name, glm::vec4 value, glm::vec4 min = glm::vec4(0.f),
                  glm::vec4 max = glm::vec4(1.f), QObject *parent = NULL);
 
+  void setValue1(double v);
+  void setValue2(double v);
+  void setValue3(double v);
+  void setValue4(double v);
+
 signals:
   void value1WillChange(double);
   void value2WillChange(double);
   void value3WillChange(double);
   void value4WillChange(double);
-public slots:
-  void setValue1(double v);
-  void setValue2(double v);
-  void setValue3(double v);
-  void setValue4(double v);
 
 protected:
   virtual void beforeChange(glm::vec4 &value) override;
@@ -363,12 +361,12 @@ public:
   ZDVec2Parameter(const QString &name, glm::dvec2 value, glm::dvec2 min = glm::dvec2(0.f),
                   glm::dvec2 max = glm::dvec2(1.f), QObject *parent = NULL);
 
+  void setValue1(double v);
+  void setValue2(double v);
+
 signals:
   void value1WillChange(double);
   void value2WillChange(double);
-public slots:
-  void setValue1(double v);
-  void setValue2(double v);
 
 protected:
   virtual void beforeChange(glm::dvec2 &value) override;
@@ -383,14 +381,14 @@ public:
   ZDVec3Parameter(const QString &name, glm::dvec3 value, glm::dvec3 min = glm::dvec3(0.f),
                   glm::dvec3 max = glm::dvec3(1.f), QObject *parent = NULL);
 
+  void setValue1(double v);
+  void setValue2(double v);
+  void setValue3(double v);
+
 signals:
   void value1WillChange(double);
   void value2WillChange(double);
   void value3WillChange(double);
-public slots:
-  void setValue1(double v);
-  void setValue2(double v);
-  void setValue3(double v);
 
 protected:
   virtual void beforeChange(glm::dvec3 &value) override;
@@ -405,16 +403,16 @@ public:
   ZDVec4Parameter(const QString &name, glm::dvec4 value, glm::dvec4 min = glm::dvec4(0.f),
                  glm::dvec4 max = glm::dvec4(1.f), QObject *parent = NULL);
 
+  void setValue1(double v);
+  void setValue2(double v);
+  void setValue3(double v);
+  void setValue4(double v);
+
 signals:
   void value1WillChange(double);
   void value2WillChange(double);
   void value3WillChange(double);
   void value4WillChange(double);
-public slots:
-  void setValue1(double v);
-  void setValue2(double v);
-  void setValue3(double v);
-  void setValue4(double v);
 
 protected:
   virtual void beforeChange(glm::dvec4 &value) override;
@@ -429,12 +427,12 @@ public:
   ZIVec2Parameter(const QString &name, glm::ivec2 value, glm::ivec2 min,
                   glm::ivec2 max, QObject *parent = NULL);
 
+  void setValue1(int v);
+  void setValue2(int v);
+
 signals:
   void value1WillChange(int);
   void value2WillChange(int);
-public slots:
-  void setValue1(int v);
-  void setValue2(int v);
 
 protected:
   virtual void beforeChange(glm::ivec2 &value) override;
@@ -449,14 +447,14 @@ public:
   ZIVec3Parameter(const QString &name, glm::ivec3 value, glm::ivec3 min,
                   glm::ivec3 max, QObject *parent = NULL);
 
+  void setValue1(int v);
+  void setValue2(int v);
+  void setValue3(int v);
+
 signals:
   void value1WillChange(int);
   void value2WillChange(int);
   void value3WillChange(int);
-public slots:
-  void setValue1(int v);
-  void setValue2(int v);
-  void setValue3(int v);
 
 protected:
   virtual void beforeChange(glm::ivec3 &value) override;
@@ -545,37 +543,6 @@ public:
   void setPrefix(const QString &pre) { m_prefix = pre; }
   void setSuffix(const QString &suf) { m_suffix = suf; }
 
-protected:
-  virtual void makeValid(T& value) const override
-  {
-    for (int i=0; i<2; i++) {
-      if (value[i] < m_min)
-        value[i] = m_min;
-      if (value[i] > m_max)
-        value[i] = m_max;
-    }
-    if (value[0] > value[1])
-      std::swap(value[0], value[1]);
-  }
-
-  // inherite this to notify associated widgets about the range change (emit a signal)
-  virtual void changeRange() {}
-
-
-protected:
-  typename T::value_type m_min;
-  typename T::value_type m_max;
-  typename T::value_type m_step;
-  bool m_tracking;
-  int m_decimal;
-  Qt::Orientation m_widgetOrientation;
-  QList<QString> m_nameOfEachValue;
-
-  QString m_groupBoxName;
-
-  QString m_prefix;
-  QString m_suffix;
-
   // ZParameter interface
 public:
   virtual void setSameAs(const ZParameter &rhs) override
@@ -611,6 +578,36 @@ public:
     toVal(jsonValue.toString(toQString(this->m_value)), v);
     this->set(v);
   }
+
+protected:
+  virtual void makeValid(T& value) const override
+  {
+    for (int i=0; i<2; i++) {
+      if (value[i] < m_min)
+        value[i] = m_min;
+      if (value[i] > m_max)
+        value[i] = m_max;
+    }
+    if (value[0] > value[1])
+      std::swap(value[0], value[1]);
+  }
+
+  // inherite this to notify associated widgets about the range change (emit a signal)
+  virtual void changeRange() {}
+
+protected:
+  typename T::value_type m_min;
+  typename T::value_type m_max;
+  typename T::value_type m_step;
+  bool m_tracking;
+  int m_decimal;
+  Qt::Orientation m_widgetOrientation;
+  QList<QString> m_nameOfEachValue;
+
+  QString m_groupBoxName;
+
+  QString m_prefix;
+  QString m_suffix;
 };
 
 class ZIntSpanParameter : public ZNumericSpanParameter<glm::ivec2>
@@ -621,13 +618,13 @@ public:
   ZIntSpanParameter(const QString &name, glm::ivec2 value, int min,
                     int max, QObject *parent = NULL);
 
+  void setLowerValue(int v);
+  void setUpperValue(int v);
+
 signals:
   void lowerValueWillChange(int);
   void upperValueWillChange(int);
   void rangeChanged(int min, int max);
-public slots:
-  void setLowerValue(int v);
-  void setUpperValue(int v);
 
 protected:
   virtual void beforeChange(glm::ivec2 &value) override;
@@ -643,13 +640,13 @@ public:
   ZFloatSpanParameter(const QString &name, glm::vec2 value, float min,
                       float max, QObject *parent = NULL);
 
+  void setLowerValue(double v);
+  void setUpperValue(double v);
+
 signals:
   void lowerValueWillChange(double);
   void upperValueWillChange(double);
   void rangeChanged(double min, double max);
-public slots:
-  void setLowerValue(double v);
-  void setUpperValue(double v);
 
 protected:
   virtual void beforeChange(glm::vec2 &value) override;
@@ -665,13 +662,13 @@ public:
   ZDoubleSpanParameter(const QString &name, glm::dvec2 value, double min,
                        double max, QObject *parent = NULL);
 
+  void setLowerValue(double v);
+  void setUpperValue(double v);
+
 signals:
   void lowerValueWillChange(double);
   void upperValueWillChange(double);
   void rangeChanged(double min, double max);
-public slots:
-  void setLowerValue(double v);
-  void setUpperValue(double v);
 
 protected:
   virtual void beforeChange(glm::dvec2 &value) override;

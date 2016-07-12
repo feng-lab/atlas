@@ -13,13 +13,6 @@ class ZImgOmeTiff : public ZImgTiff
 public:
   ZImgOmeTiff();
 
-  // ZImgTiff interface
-protected:
-  virtual void readIntoInternalStructure(const QString &filename, ZTiff &tiff) override;
-  virtual void clearInternalState() override;
-  virtual void detectImgInfo(ZTiff &tiff) override;
-  virtual bool mapIFDToImgLocation(size_t ifdIdx, int &z, int &c, int &t, int &l) override;
-
   // ZImgFormat interface
 public:
   virtual QString shortName() const override;
@@ -30,6 +23,25 @@ public:
   virtual void writeImg(const QString &filename, const ZImgSliceProvider &imgSliceProvider, Compression comp) override;
   virtual bool supportRead() const override;
   virtual bool supportWrite() const override;
+
+  // ZImgTiff interface
+protected:
+  virtual void readIntoInternalStructure(const QString &filename, ZTiff &tiff) override;
+  virtual void clearInternalState() override;
+  virtual void detectImgInfo(ZTiff &tiff) override;
+  virtual bool mapIFDToImgLocation(size_t ifdIdx, int &z, int &c, int &t, int &l) override;
+
+protected:
+  void readOmeInfo(ZTiff &tiff);
+  void makeImageDescriptionTag(const ZImgInfo &info, const QString &dimensionOrder, ZImgMetatag &tag);
+
+  //
+  void parseOME(QXmlStreamReader &xml, ZTiff &tiff);
+  void parsePixels(QXmlStreamReader &xml, ZTiff &tiff);
+  void parseTiffData(QXmlStreamReader &xml, ZTiff &tiff);
+  void parseChannel(QXmlStreamReader &xml);
+  //
+  static QString createOmeXml(const ZImgInfo &info, const QString &dimensionOrder);
 
 protected:
   struct IFDPos {
@@ -46,18 +58,6 @@ protected:
 
   ZImgInfo m_omeImgInfo;
   std::map<size_t, IFDPos> m_ifdIdxPosMap;
-
-protected:
-  void readOmeInfo(ZTiff &tiff);
-  void makeImageDescriptionTag(const ZImgInfo &info, const QString &dimensionOrder, ZImgMetatag &tag);
-
-  //
-  void parseOME(QXmlStreamReader &xml, ZTiff &tiff);
-  void parsePixels(QXmlStreamReader &xml, ZTiff &tiff);
-  void parseTiffData(QXmlStreamReader &xml, ZTiff &tiff);
-  void parseChannel(QXmlStreamReader &xml);
-  //
-  static QString createOmeXml(const ZImgInfo &info, const QString &dimensionOrder);
 };
 
 }  // namespace

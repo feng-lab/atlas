@@ -16,9 +16,7 @@ class ZRegionAnnotationTreeView : public QTreeView
 public:
   ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel &objModel, ZRegionAnnotation &anno, ZDoc &doc, QWidget *parent = nullptr);
 
-public slots:
-
-protected slots:
+protected:
   void contextMenu(const QPoint &pos);
 
   void indexClicked(const QModelIndex &index);
@@ -28,7 +26,6 @@ protected slots:
   void adaptColumns();
   void buttonClickedForUserData(QVariant ud);
 
-protected:
   virtual void keyPressEvent(QKeyEvent *e) override;
 
   void createContextMenu();

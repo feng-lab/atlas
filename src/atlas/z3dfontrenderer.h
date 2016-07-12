@@ -27,11 +27,10 @@ public:
   ZBoolParameter& showFontShadowPara() { return m_showFontShadow; }
   ZVec4Parameter& fontShadowColorPara() { return m_fontShadowColor; }
 
-protected slots:
+protected:
   void adjustWidgets();
   virtual void compile() override;
 
-protected:
   std::vector<glm::vec4>* getColors();
   QString generateHeader();
 
@@ -40,6 +39,7 @@ protected:
 
   void prepareFontShaderData(Z3DEye eye);
 
+protected:
   Z3DShaderGroup m_fontShaderGrp;
 
   ZStringIntOptionParameter m_allFontNames;  // font name and index into m_allFonts

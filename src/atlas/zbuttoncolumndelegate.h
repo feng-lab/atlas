@@ -23,13 +23,12 @@ public:
   virtual void updateEditorGeometry(QWidget *editor, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
   virtual QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
 
+  void cellEntered(const QModelIndex &index);
+
 signals:
   void buttonClickedForUserData(QVariant ud);
 
-public slots:
-  void cellEntered(const QModelIndex &index);
-
-protected slots:
+protected:
   void buttonClicked();
 
 private:

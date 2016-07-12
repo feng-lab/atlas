@@ -79,8 +79,11 @@ public:
   void read(const QJsonObject &json);
   void write(QJsonObject &json) const;
 
-public slots:
   inline void invalidateResult() { invalidate(InvalidAllResult); }
+
+signals:
+  // emit this only if resize starts from current filter.
+  void requestUpstreamSizeChange(Z3DFilter*);
 
 protected:
   // mark that the output of current filter for certain eye is valid.
@@ -129,11 +132,6 @@ protected:
   void addPrivateRenderTarget(Z3DRenderTarget& target);
   static void renderScreenQuad(const ZVertexArrayObject &vao, const Z3DShaderProgram &shader);
 
-signals:
-  // emit this only if resize starts from current filter.
-  void requestUpstreamSizeChange(Z3DFilter*);
-
-public slots:
   // 1. for each outport, get all expected size from all connected inports, and use the maximum one
   //    as the new size of the outport
   // 2. update private port size

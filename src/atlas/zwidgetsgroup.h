@@ -49,15 +49,12 @@ public:
 
   bool operator<(const ZWidgetsGroup& other) const;
 
-protected:
+  void emitRequestAdvancedWidgetSignal();
+  void emitWidgetsGroupChangedSignal();
   
 signals:
   void requestAdvancedWidget(const QString &name);
   void widgetsGroupChanged();
-  
-public slots:
-  void emitRequestAdvancedWidgetSignal();
-  void emitWidgetsGroupChangedSignal();
 
 private:
   void sortChildGroups();

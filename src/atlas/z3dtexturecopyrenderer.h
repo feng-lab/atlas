@@ -27,16 +27,13 @@ public:
   // glClear + discard transparent  is usually faster than   not discard transparent if many pixels are empty
   void setDiscardTransparent(bool v) { m_discardTransparent = v; }
 
-signals:
-
-public slots:
-
 protected:
   virtual void compile() override;
   QString generateHeader() const;
 
   virtual void render(Z3DEye eye) override;
 
+protected:
   const Z3DTexture *m_colorTexture;
   const Z3DTexture *m_depthTexture;
 

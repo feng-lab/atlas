@@ -51,7 +51,7 @@ void ZEventListenerParameter::sendEvent(QEvent *e, int w, int h)
     if (accept) {
       emit eventTriggered(e, w, h);
       emit mouseEventTriggered(mouseEvent, w, h);
-      // now all the slots have return
+
       if (m_sharing)
         e->ignore();
     }
@@ -68,7 +68,7 @@ void ZEventListenerParameter::sendEvent(QEvent *e, int w, int h)
     if (accept) {
       emit eventTriggered(e, w, h);
       emit wheelEventTriggered(wheelEvent, w, h);
-      // now all the slots have return
+
       if (m_sharing)
         e->ignore();
     }
@@ -85,7 +85,7 @@ void ZEventListenerParameter::sendEvent(QEvent *e, int w, int h)
     if (accept) {
       emit eventTriggered(e, w, h);
       emit keyEventTriggered(keyEvent, w, h);
-      // now all the slots have return
+
       if (m_sharing)
         e->ignore();
     }

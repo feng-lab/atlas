@@ -63,13 +63,7 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
-signals:
-
-public slots:
-
-protected:
-
-private slots:
+private:
   void visibleChanged();
   void outlineColorChanged();
 

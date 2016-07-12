@@ -13,11 +13,9 @@ class Z3DSwcView : public Z3DFilterView<ZSwcDoc, Z3DSwcFilter>
 public:
   Z3DSwcView(ZSwcDoc &doc, Z3DView &view);
 
-private slots:
+private:
   void docSwcsAdded(const QList<size_t> &objs);
   void docSwcAdded(size_t id);
-
-private:
 };
 
 } // namespace nim

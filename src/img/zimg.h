@@ -107,7 +107,6 @@ public:
     IncludeThreshold, ExcludeThreshold
   };
 
-public:
   // create empty image
   ZImg();
   // create image with size and attribute specified by info and set all data to default value

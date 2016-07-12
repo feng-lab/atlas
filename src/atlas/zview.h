@@ -84,13 +84,15 @@ public:
   void read(const QJsonObject &json);
   void write(QJsonObject &json) const;
 
+  void fitContentIntoWindow();
+
 signals:
   void objViewReady(size_t id);
 
-public slots:
-  void fitContentIntoWindow();
+protected:
+  void keyPressEvent(QKeyEvent *e) override;
 
-private slots:
+private:
   void sliceChanged();
 
   void zoomIn();
@@ -110,10 +112,6 @@ private slots:
 
   void setViewDragMode(QAction* act);
 
-protected:
-  void keyPressEvent(QKeyEvent *e) override;
-
-private:
   void createActions();
   void updateViewportPara() const;
 

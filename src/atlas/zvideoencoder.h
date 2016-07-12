@@ -17,15 +17,14 @@ public:
   void encode(const QDir& dir, const QString& namePrefix, int fieldWidth,
               int framesPerSecond, const QString& outputFilename);
 
+  void cancel();
+
 signals:
   void error(QString);
   void finished();
   void canceled();
 
-public slots:
-  void cancel();
-
-protected slots:
+protected:
   void ffmpegError(QProcess::ProcessError error);
   void ffmpegFinished(int exitCode, QProcess::ExitStatus exitStatus);
   void logStandardError();

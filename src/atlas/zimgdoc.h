@@ -20,6 +20,8 @@ public:
   void setImgOffset(size_t id, int offx, int offy, int offz, int offt);
   void setImgChannelColor(size_t id, size_t c, col4 col);
 
+  void showImg(ZImg *img, const QString &path);
+
   // ZObjDoc interface
 public:
   virtual bool save(size_t id) override;
@@ -43,17 +45,16 @@ public:
   virtual size_t makeAlias(size_t id) override;
   virtual bool isAlias(size_t id) const override;
 
-public slots:
-  void showImg(ZImg *img, const QString &path);
+signals:
+  void imgChanged(size_t id);
 
-protected slots:
+protected:
   void loadImg();
   void importImgZSequence();
   void importImgTimeSequence();
   void stitchImgs();
   void alignSections();
 
-protected:
   // append another img into this doc
   size_t addImgPack(ZImgPack *imgPack);
   //
@@ -65,9 +66,6 @@ protected:
                  const std::vector<std::shared_ptr<ZImgSubBlock>> *subBlock = nullptr);
 
   void sendChangedSignal(size_t id);
-
-signals:
-  void imgChanged(size_t id);
 
 private:
   void createActions();

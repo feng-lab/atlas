@@ -60,7 +60,6 @@ public:
   // if interpolation is not supported, assign dest to one of prev (if progress < 1) and current (if progress >= 1)
   virtual void interpolate(const ZParameter& prev, double progress, ZParameter& dest) = 0;
 
-public slots:
   void setVisible(bool s);
   void setEnabled(bool s);
   void updateFromSender();
@@ -80,7 +79,7 @@ signals:
   void reservedSignal1();
   void reservedSignal2();
 
-protected slots:
+protected:
   // some templated subclass might need this
   virtual void reservedIntSlot1(int) {}
   virtual void reservedIntSlot2(int) {}
@@ -89,11 +88,11 @@ protected slots:
   virtual void reservedSlot1() {}
   virtual void reservedSlot2() {}
 
-protected:
   inline void addStyle(const QString& style) {m_allStyles.push_back(style);}
   // all subclass should implement this function
   virtual QWidget* actualCreateWidget(QWidget* parent) = 0;
 
+protected:
   QString m_name;
   QString m_style;
   QStringList m_allStyles;
@@ -139,6 +138,7 @@ protected:
   //
   virtual void afterChange(T& value);
 
+protected:
   T m_value;
   bool m_locked;
 };
@@ -203,24 +203,23 @@ public:
   ZBoolParameter(const QString& name, QObject *parent = NULL);
   ZBoolParameter(const QString& name, bool value, QObject *parent = NULL);
 
-signals:
-  void valueWillChange(bool);
-  void boolChanged(bool);
-
-public slots:
-  void setValue(bool v);
-
-protected:
-  virtual void beforeChange(bool &value) override;
-  virtual void afterChange(bool &value) override;
-  virtual QWidget* actualCreateWidget(QWidget *parent) override;
-
   // ZParameter interface
 public:
   virtual void setSameAs(const ZParameter &rhs) override;
   virtual bool supportInterpolation() const override { return false; }
   virtual QJsonValue jsonValue() const override;
   virtual void readValue(const QJsonValue &jsonValue) override;
+
+  void setValue(bool v);
+
+signals:
+  void valueWillChange(bool);
+  void boolChanged(bool);
+
+protected:
+  virtual void beforeChange(bool &value) override;
+  virtual void afterChange(bool &value) override;
+  virtual QWidget* actualCreateWidget(QWidget *parent) override;
 };
 
 } // namespace nim

@@ -32,8 +32,6 @@ public:
 
 protected:
   void parseInfo(const MetaImage& metaImage, ZImgInfo &info);
-
-protected:
 };
 
 } // namespace nim

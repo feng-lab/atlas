@@ -25,16 +25,15 @@ public:
   bool isEnabled() const { return m_enabled; }
   bool isVisible() const { return m_visible; }
 
-public slots:
-  void setEnabled(bool v);
-  void setVisible(bool v);
-
 signals:
   void toggled(QAction *, bool);
   void triggered(QAction *);
   void hovered(QAction *);
 
-private slots:
+private:
+  void setEnabled(bool v);
+  void setVisible(bool v);
+
   void actionChanged();
   void actionToggled(bool checked);
   void actionTriggered();

@@ -45,6 +45,9 @@ public:
 protected:
   void updateRecentFiles() const;
 
+private:
+  void detectOS();
+
 protected:
   QString m_osString;
 
@@ -56,9 +59,6 @@ protected:
   bool m_glInitialized;
 
   bool m_stereoViewSupported;
-
-private:
-  void detectOS();
 };
 
 } // namespace nim

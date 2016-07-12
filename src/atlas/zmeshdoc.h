@@ -39,14 +39,11 @@ public:
   virtual size_t makeAlias(size_t id) override;
   virtual bool isAlias(size_t id) const override;
 
-protected slots:
+protected:
   void loadMesh();
 
-protected:
   // append another mesh into this doc
   size_t addMesh(ZMesh &mesh, const QString &path);
-
-signals:
 
 private:
   struct MeshPack { // mesh and its associated data

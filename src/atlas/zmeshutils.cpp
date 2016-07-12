@@ -39,10 +39,8 @@ public:
 
 class vtkCCSEdgeLocator
 {
-private:
   typedef std::map<int64_t, vtkCCSEdgeLocatorNode> MapType;
   MapType EdgeMap;
-
 public:
   static vtkCCSEdgeLocator *New()
   {

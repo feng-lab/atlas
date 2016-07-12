@@ -22,8 +22,6 @@ public:
 
   virtual bool is2DAnimation() const override { return true; }
 
-signals:
-
 protected:
   virtual void bindGlobalParameters() override;
   virtual void addGlobalKey(double time) override;

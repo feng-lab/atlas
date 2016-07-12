@@ -49,7 +49,6 @@ signals:
 protected:
   void subOperationProgressChanged(double p, void* sender);
 
-protected:
   // progress from 0.0 to 1.0
   void reportProgress(double progress);
   // will change the progress interval of internal operation
@@ -101,7 +100,6 @@ protected:
   inline void setProgressReportInterval(double) {}
   inline void setTotalSubOperationWeight(double) {}
 
-protected:
   inline void reportProgress(double) {}
   // will change the progress interval of internal operation
   inline void registerSubOperation(void*, double) {}

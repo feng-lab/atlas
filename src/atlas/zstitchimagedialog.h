@@ -81,9 +81,7 @@ public:
 signals:
   void resultReady(ZImg *img, QString path);
 
-public slots:
-
-private slots:
+private:
   void stitchStacks();
   void selectInputStacks1();
   void selectInputStacks2();
@@ -109,7 +107,6 @@ private slots:
   //  void outputCh2ImageComboBoxIndexChanged(int index);
   //  void outputCh3ImageComboBoxIndexChanged(int index);
 
-private:
   QLayout* createIOLayout();
   QLayout* createConnLayout();
   QLayout* createCommandOutputLayout();

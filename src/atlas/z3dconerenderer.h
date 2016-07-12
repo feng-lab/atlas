@@ -21,10 +21,6 @@ public:
 
   ZStringStringOptionParameter& coneCapStylePara() { return m_coneCapStyle; }
 
-signals:
-
-protected slots:
-
 protected:
   virtual void compile() override;
 
@@ -40,6 +36,7 @@ protected:
 
   void appendDefaultColors();
 
+protected:
   Z3DShaderGroup m_coneShaderGrp;
 
   ZStringStringOptionParameter m_coneCapStyle;

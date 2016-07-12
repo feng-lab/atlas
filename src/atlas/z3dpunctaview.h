@@ -13,11 +13,9 @@ class Z3DPunctaView : public Z3DFilterView<ZPunctaDoc, Z3DPunctaFilter>
 public:
   Z3DPunctaView(ZPunctaDoc &doc, Z3DView &view);
 
-private slots:
+private:
   void docPunctasAdded(const QList<size_t> &objs);
   void docPunctaAdded(size_t id);
-
-private:
 };
 
 } // namespace nim

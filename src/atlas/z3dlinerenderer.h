@@ -57,6 +57,22 @@ protected:
   //void enableLineSmooth();
   //void disableLineSmooth();
 
+private:
+  void updateLineWidth()
+  {
+    if (m_enableMultisample && m_rendererBase.geometriesMultisampleModePara().isSelected("2x2"))
+      m_lineWidth = (m_srcLineWidth - 0.9) * 2.f;
+    else
+      m_lineWidth = m_srcLineWidth - 0.9;
+
+#ifndef _QT4_
+    m_lineWidth *= qApp->devicePixelRatio();
+#endif
+  }
+
+  Z3DShaderGroup& currentShaderGrp() { return m_useGeomLineShader && m_useSmoothLine ? m_smoothLineShaderGrp : m_lineShaderGrp; }
+
+protected:
   Z3DShaderGroup m_lineShaderGrp;
   Z3DShaderGroup m_smoothLineShaderGrp;
   Z3DShaderGroup m_smoothLineShaderGrp1;
@@ -72,22 +88,6 @@ protected:
   std::vector<float> m_lineWidthArray;
 
   Z3DTexture *m_texture;
-
-private slots:
-  void updateLineWidth()
-  {
-    if (m_enableMultisample && m_rendererBase.geometriesMultisampleModePara().isSelected("2x2"))
-      m_lineWidth = (m_srcLineWidth - 0.9) * 2.f;
-    else
-      m_lineWidth = m_srcLineWidth - 0.9;
-
-#ifndef _QT4_
-    m_lineWidth *= qApp->devicePixelRatio();
-#endif
-  }
-
-private:
-  Z3DShaderGroup& currentShaderGrp() { return m_useGeomLineShader && m_useSmoothLine ? m_smoothLineShaderGrp : m_lineShaderGrp; }
 
 private:
   std::vector<glm::vec4> m_lineColors;

@@ -18,12 +18,9 @@ public:
 
   void setRenderingRegion(double left = 0., double right = 1., double bottom = 0., double top = 1.);
 
-signals:
-
-protected slots:
+protected:
   void adjustWidgets();
 
-protected:
   virtual void compile() override;
   QString generateHeader();
 
@@ -35,6 +32,7 @@ protected:
   virtual void render(Z3DEye eye) override;
   virtual void renderPicking(Z3DEye) override;
 
+protected:
   Z3DShaderGroup m_backgroundShaderGrp;
 
   ZVec4Parameter m_firstColor;

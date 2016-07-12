@@ -29,15 +29,12 @@ public:
   virtual bool hasTransparent(Z3DEye) const override { return true; }
   virtual void renderTransparent(Z3DEye eye) override { renderOpaque(eye); }
 
-signals:
-
-public slots:
-
 protected:
   void prepareData(Z3DEye eye);
 
   void setupCamera();
 
+protected:
   Z3DLineRenderer m_lineRenderer;
   Z3DArrowRenderer m_arrowRenderer;
   Z3DFontRenderer m_fontRenderer;

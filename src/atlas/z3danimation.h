@@ -24,8 +24,6 @@ public:
   const ZCameraParameterAnimation* cameraParameterAnimation() const { return m_cameraParameterAnimation; }
   ZCameraParameterAnimation* cameraParameterAnimation() { return m_cameraParameterAnimation; }
 
-signals:
-
 protected:
   virtual void bindGlobalParameters() override;
   virtual void addGlobalKey(double time) override;

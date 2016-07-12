@@ -42,18 +42,14 @@ public:
   virtual size_t makeAlias(size_t id) override;
   virtual bool isAlias(size_t id) const override;
 
-protected slots:
+protected:
   void loadROI();
 
-protected slots:
   void setModified();
   void createMaskImage();
 
-protected:
   // append another ROI into this doc
   size_t addROI(ZROI* roi, const QString &path);
-
-signals:
 
 private:
   struct ROIPack { // ROI and its associated data

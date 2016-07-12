@@ -51,7 +51,6 @@ public:
   Z3DTexture* texture();
 
 protected:
-
   void loadImage();
   void parseFontFile();
 

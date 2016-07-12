@@ -153,7 +153,7 @@ public:
     }
   }
 
-public slots:
+protected:
   virtual void updateBoundBox() override
   {
     resetBoundBox();
@@ -163,7 +163,6 @@ public slots:
     m_view.updateBoundBox();
   }
 
-protected slots:
   virtual void onObjRemoved(size_t id) override
   {
     auto it = m_idToFilter.find(id);

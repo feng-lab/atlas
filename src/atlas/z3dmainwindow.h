@@ -22,20 +22,19 @@ public:
 
   Z3DView* view() { return m_view; }
 
-public slots:
   void openEditWidget(size_t id);
-
-protected:
-  void closeEvent(QCloseEvent *event);
-  void dragEnterEvent(QDragEnterEvent *event);
-  void dropEvent(QDropEvent *event);
 
 signals:
   void loadScene();
   void saveScene();
   void loadJsonScene(const QString &fn);
 
-private slots:
+protected:
+  void closeEvent(QCloseEvent *event);
+  void dragEnterEvent(QDragEnterEvent *event);
+  void dropEvent(QDropEvent *event);
+
+private:
   void open();
   bool save();
   bool saveAs();
@@ -53,7 +52,6 @@ private slots:
   void raiseViewSettingDockWidget();
   void raiseGlobalSettingDockWidget();
 
-private:
   void init();
   void createActions();
   void createMenus();
@@ -71,6 +69,7 @@ private:
   QString strippedName(const QString &fullFileName);
   Z3DMainWindow *findMainWindow(const QString &fileName);
 
+private:
   QMenu *m_fileMenu;
   QMenu *m_editMenu;
   QMenu *m_viewMenu;

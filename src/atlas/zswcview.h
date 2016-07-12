@@ -14,7 +14,7 @@ class ZSwcView : public ZFilterView<ZSwcDoc, ZSwcFilter>
 public:
   ZSwcView(ZSwcDoc &doc, ZView &view);
 
-private slots:
+private:
   void docSwcsAdded(const QList<size_t> &objs);
   void docSwcAdded(size_t id);
 };

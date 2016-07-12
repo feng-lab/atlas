@@ -43,6 +43,7 @@ public:
   }
   void undo();
   void redo();
+
 private:
   ZAnimation* m_ani;
   double m_oldDuration;
@@ -70,6 +71,18 @@ public:
 
   virtual bool is2DAnimation() const { return false; }
 
+  void setDuration(double duration);
+  void setCurrentTime(double time);
+
+  void removeObj(size_t id);
+  void removeRedundantKeys();
+  void rebindView();
+  void releaseView();
+  void exportFixedSize3DAnimation(const QDir& dir, const QString &filename, double framePerSecond, int width, int height, Z3DScreenShotType sst);
+  void export3DAnimation(const QDir& dir, const QString &filename, double framePerSecond, Z3DScreenShotType sst);
+  void exportFixedSize2DAnimation(const QDir& dir, const QString &filename, double framePerSecond, int width, int height);
+  void export2DAnimation(const QDir& dir, const QString &filename, double framePerSecond);
+
 signals:
   void durationChanged(double v);
   void objChanged();
@@ -80,19 +93,7 @@ signals:
   void keyAboutToDelete(ZParameterKey* key);
   void colorChanged(ZParameterAnimation* pa);
 
-public slots:
-  void setDuration(double duration);
-  void setCurrentTime(double time);
-  void removeObj(size_t id);
-  void removeRedundantKeys();
-  void rebindView();
-  void releaseView();
-  void exportFixedSize3DAnimation(const QDir& dir, const QString &filename, double framePerSecond, int width, int height, Z3DScreenShotType sst);
-  void export3DAnimation(const QDir& dir, const QString &filename, double framePerSecond, Z3DScreenShotType sst);
-  void exportFixedSize2DAnimation(const QDir& dir, const QString &filename, double framePerSecond, int width, int height);
-  void export2DAnimation(const QDir& dir, const QString &filename, double framePerSecond);
-
-protected slots:
+protected:
   void disableAnimationOf(size_t id);
   void tryLinkAnimationWith(size_t id);
 
@@ -100,7 +101,6 @@ protected slots:
   void videoEncoderFinished();
   void videoEncoderCanceled();
 
-protected:
   void updateObjAnimation();
   void buildDisplayPacks();
   void releaseParameters();
@@ -118,7 +118,6 @@ protected:
   // assume view exist
   virtual void addGlobalKey(double time) = 0;
 
-protected:  
   struct AnimationObj {
     AnimationObj(const QString &type, const QJsonValue &value)
       : objType(type), objJsonValue(value), isExpanded(false), isShowAll(false), boundId(0), uniqueId(0)

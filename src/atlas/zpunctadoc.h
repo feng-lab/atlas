@@ -37,16 +37,13 @@ public:
   virtual size_t makeAlias(size_t id) override;
   virtual bool isAlias(size_t id) const override;
 
-protected slots:
+protected:
   void loadPuncta();
   void detectPuncta();
   void generateAnalysisTextFiles();
 
-protected:
   // append another puncta into this doc
   size_t addPuncta(ZPuncta &puncta, const QString &path);
-
-signals:
 
 private:
   struct PunctaPack { // puncta and its associated data

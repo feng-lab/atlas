@@ -33,7 +33,7 @@ class ZDoc : public QObject
   Q_OBJECT
 public:
   typedef QList<size_t>::const_iterator ConstObjIdIterator;
-public:
+
   explicit ZDoc(QsLogging::DestinationPtr logDestModel, QObject *parent = 0);
 
   QsLogging::DestinationPtr logDestModel() { return m_logDestModel; }
@@ -113,16 +113,6 @@ public:
 
   void hideAnimation3DView();
 
-signals:
-  void showViewSetting(size_t id);
-  void hideViewSetting();
-  void openEditWidget(size_t id);
-  void objAboutToBeRemoved(size_t id, ZObjDoc* doc);
-  void objAdded(size_t id, ZObjDoc* doc);
-  void objRemoved(size_t id, ZObjDoc* doc);
-  void objInfoChanged(size_t id);
-
-public slots:
   void removeAllObjs();
   void showSelectedObjs();
   void hideSelectedObjs();
@@ -134,13 +124,22 @@ public slots:
   void showSelectedObjsInGraphicalShell();
   void copySelectedObjsPathToClipboard();
 
+signals:
+  void showViewSetting(size_t id);
+  void hideViewSetting();
+  void openEditWidget(size_t id);
+  void objAboutToBeRemoved(size_t id, ZObjDoc* doc);
+  void objAdded(size_t id, ZObjDoc* doc);
+  void objRemoved(size_t id, ZObjDoc* doc);
+  void objInfoChanged(size_t id);
+
 protected:
   friend class ZObjModel;
   void sendShowViewSettingSignal(size_t id) { emit showViewSetting(id); m_viewSettingId = id; }
   void sendHideViewSettingSignal() { emit hideViewSetting(); m_viewSettingId = 0; }
   void sendOpenEditWidgetSignal(size_t id) { emit openEditWidget(id); }
 
-private slots:
+private:
   void create2DAnimation();
   void create3DAnimation();
 

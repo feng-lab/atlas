@@ -28,6 +28,14 @@ public:
 
   void sendEvent(QEvent* e, int w, int h);
 
+  // ZParameter interface
+public:
+  virtual void setSameAs(const ZParameter &rhs) override;
+  virtual void setValueSameAs(const ZParameter &) override;
+  virtual void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override;
+  virtual QJsonValue jsonValue() const override;
+  virtual void readValue(const QJsonValue &jsonValue) override;
+
 signals:
   void eventTriggered(QEvent* e, int w, int h);
   void mouseEventTriggered(QMouseEvent* e, int w, int h);
@@ -61,17 +69,10 @@ protected:
 
   virtual QWidget* actualCreateWidget(QWidget *parent) override;
 
+private:
   bool m_sharing;
   QList<MouseEvent> m_mouseEvents;
   QList<KeyEvent> m_keyEvents;
-
-  // ZParameter interface
-public:
-  virtual void setSameAs(const ZParameter &rhs) override;
-  virtual void setValueSameAs(const ZParameter &) override;
-  virtual void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override;
-  virtual QJsonValue jsonValue() const override;
-  virtual void readValue(const QJsonValue &jsonValue) override;
 };
 
 } // namespace nim

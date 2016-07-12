@@ -54,6 +54,9 @@ public:
   void load(const QString &filename);
   void save(const QString &filename) const;
 
+  // update Mesh after editing contours
+  void updateMesh();
+
 signals:
   void boundBoxChanged();
   //void modified();
@@ -63,12 +66,9 @@ signals:
 
   void undoStackCleanChanged(bool clean);
 
-public slots:
-  // update Mesh after editing contours
-  void updateMesh();
+private:
   void updateMesh_Impl(const ZTree<RegionNode> &newOntology);
 
-private:
   void updateBoundBox();
 
 private:

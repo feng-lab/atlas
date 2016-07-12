@@ -21,11 +21,7 @@ class ZAnimationWidget : public QWidget
 public:
   explicit ZAnimationWidget(ZAnimation &ani, QWidget *parent = 0);
 
-signals:
-
-public slots:
-
-protected slots:
+protected:
   void onDurationChanged(double d);
   void onSpeedChanged(double v);
   void saveKeyFrame();
@@ -37,7 +33,6 @@ protected slots:
   void gotoEnd();
   void repeatChanged(bool v);
 
-protected:
   virtual void keyPressEvent(QKeyEvent *event) override;
 
 private:

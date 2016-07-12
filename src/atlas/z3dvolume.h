@@ -213,10 +213,8 @@ public:
 signals:
   void histogramFinished();
 
-protected slots:
-  void setHistogram();
-
 protected:
+  void setHistogram();
   void generateTexture();
 
 private:

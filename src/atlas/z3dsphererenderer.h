@@ -32,6 +32,7 @@ protected:
 
   void appendDefaultColors();
 
+protected:
   Z3DShaderGroup m_sphereShaderGrp;
 
   ZIntParameter m_sphereSlicesStacks;

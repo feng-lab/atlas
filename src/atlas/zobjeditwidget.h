@@ -34,13 +34,10 @@ public:
   explicit ZObjEditWidget(ZDoc *doc, QWidget *mw = nullptr);
   ~ZObjEditWidget();
 
-signals:
-
-public slots:
   bool showObjEditWidgetOfObj(size_t id);
   void updateEditWidgetTitleOfObj(size_t id);
 
-private slots:
+private:
   void writeLogMessage(const QsLogging::LogMessage &message);
   void removeObjEditWidgetOfObj(size_t id);
   void closeTab(int index);

@@ -97,7 +97,7 @@ void ZWidgetsGroup::addChild(std::shared_ptr<ZWidgetsGroup> child, bool atEnd)
   } else {
     m_childGroups.insert(m_childGroups.begin(), child);
   }
-  connect(child.get(), &ZWidgetsGroup::widgetsGroupChanged, &ZWidgetsGroup::emitWidgetsGroupChangedSignal);
+  connect(child.get(), &ZWidgetsGroup::widgetsGroupChanged, this, &ZWidgetsGroup::widgetsGroupChanged);
   m_isSorted = false;
 }
 

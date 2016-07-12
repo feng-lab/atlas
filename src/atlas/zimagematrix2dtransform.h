@@ -32,8 +32,6 @@ public:
   virtual ZImageTransform* makeInverseTransform() const override;
 
 protected:
-
-protected:
   ZAffine2D m_tform;
   double m_centerX;
   double m_centerY;

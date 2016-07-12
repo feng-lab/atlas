@@ -61,11 +61,19 @@ public:
   inline void rotate(float angle, glm::vec3 axis) { m_value.rotate(angle, axis); updatePara(); }
   inline void rotate(glm::quat quat) { m_value.rotate(quat); updatePara(); }
 
+  void viewportChanged(const glm::uvec2 &viewport);
+
+  // ZParameter interface
+public:
+  virtual void setSameAs(const ZParameter &rhs) override;
+  virtual void setValueSameAs(const ZParameter &rhs) override;
+  virtual QJsonValue jsonValue() const override;
+  virtual void readValue(const QJsonValue &jsonValue) override;
+
 signals:
   void windowsAspectRatioChanged(float r);
 
-public slots:
-  void viewportChanged(const glm::uvec2 &viewport);
+protected:
   void setWindowsAspectRatio(float r);
 
   void updateProjectionType();
@@ -77,7 +85,6 @@ public slots:
   void updateNearDist();
   void updateFarDist();
 
-protected:
   virtual QWidget* actualCreateWidget(QWidget *parent) override;
   virtual void beforeChange(Z3DCamera &value) override;
 
@@ -95,13 +102,6 @@ private:
   ZFloatParameter m_nearDist;
   ZFloatParameter m_farDist;
   bool m_receiveWidgetSignal;
-
-  // ZParameter interface
-public:
-  virtual void setSameAs(const ZParameter &rhs) override;
-  virtual void setValueSameAs(const ZParameter &rhs) override;
-  virtual QJsonValue jsonValue() const override;
-  virtual void readValue(const QJsonValue &jsonValue) override;
 };
 
 } // namespace nim

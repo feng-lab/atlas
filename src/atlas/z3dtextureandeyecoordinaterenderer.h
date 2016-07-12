@@ -20,16 +20,13 @@ public:
   void setTriangleList(const ZMesh *mesh) { m_mesh = mesh; m_dataChanged = true; }
   // todo: add function to set data (vertex, texture coordinate, triangle type, indexes) separately
 
-signals:
-
-public slots:
-
 protected:
   virtual void compile() override;
 
   virtual void render(Z3DEye eye) override;
   virtual void renderPicking(Z3DEye) override;
 
+protected:
   const ZMesh *m_mesh;
 
   Z3DShaderProgram m_renderTextureAndEyeCoordinateShader;

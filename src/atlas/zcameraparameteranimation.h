@@ -29,15 +29,16 @@ public:
   // create a new key based on current view
   virtual ZParameterKey* createKey(double secs) const override;
 
-signals:
-  void interpolationMethodChanged();
-
-public slots:
   virtual void updateParaToTime(double secs, ZParameter* para) const override;
   void buildSpline();
 
+signals:
+  void interpolationMethodChanged();
+
 protected:
-  glm::vec3 accelerationAL (double fS);
+  glm::vec3 accelerationAL(double fS);
+
+protected:
   class Poly
   {
   public:
@@ -111,8 +112,6 @@ protected:
     std::unique_ptr<ZCameraParameterKey> lastKey;
   };
   std::vector<SplineRange> m_pathSegments;
-
-protected:
   ZStringIntOptionParameter m_interpolationMethod;
 };
 

@@ -15,14 +15,6 @@ public:
 
   inline void removeSelectedKeys() { m_scene->removeSelectedKeys(); }
 
-signals:
-
-public slots:
-
-protected slots:
-
-protected:
-
 private:
   ZTimelineWidget &m_parent;
 

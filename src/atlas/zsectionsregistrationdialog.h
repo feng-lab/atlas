@@ -39,7 +39,7 @@ signals:
 #endif
   void resultReady(ZImg *img, QString path);
 
-public slots:
+protected:
   void registerSections();
 
   void processCanceled();
@@ -48,14 +48,12 @@ public slots:
 
   void cancelButtonPressed();
 
-protected:
   virtual void keyPressEvent(QKeyEvent *e) override;
 
-private slots:
+private:
   void adjustInputImageWidget();
   void inputImagesChanged();
 
-private:
   void init();
   void createIOGroupBox();
   void createParaGroupBox();

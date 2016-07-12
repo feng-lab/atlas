@@ -24,7 +24,6 @@ public:
   virtual QSize sizeHint() const override;
   virtual QSize minimumSizeHint() const override;
 
-public slots:
   void addItemSlot(const QString &text);
   void removeItemSlot(const QString &text);
 

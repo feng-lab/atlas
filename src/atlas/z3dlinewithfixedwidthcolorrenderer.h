@@ -17,19 +17,14 @@ public:
   ZFloatParameter& lineWidthPara() { return m_lineWidth; }
   ZVec4Parameter& lineColorPara() { return m_lineColor; }
 
-signals:
-
-protected slots:
+protected:
   void setLineColors();
+  virtual float lineWidth() const override;
 
 protected:
   ZFloatParameter m_lineWidth;
   ZVec4Parameter m_lineColor;
-
-  virtual float lineWidth() const override;
-
   std::vector<glm::vec4> m_lineColorsPrivate;
-
 };
 
 } // namespace nim

@@ -28,9 +28,7 @@ public:
 
 signals:
 
-public slots:
-
-protected slots:
+protected:
   void updateAxisScene();
   QString timeToString(double time) const;
   void moveCurrentTime();

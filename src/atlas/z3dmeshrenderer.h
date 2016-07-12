@@ -47,6 +47,14 @@ protected:
   virtual void render(Z3DEye eye) override;
   virtual void renderPicking(Z3DEye eye) override;
 
+  void adjustWidgets();
+
+private:
+  void prepareMesh();
+  void prepareMeshColor();
+  void prepareMeshPickingColor();
+
+protected:
   Z3DShaderGroup m_meshShaderGrp;
 
   std::vector<ZMesh*> *m_meshPt;
@@ -58,14 +66,7 @@ protected:
 
   Z3DTexture *m_texture;
 
-protected slots:
-  void adjustWidgets();
-
 private:
-  void prepareMesh();
-  void prepareMeshColor();
-  void prepareMeshPickingColor();
-
   std::vector<ZMesh> m_splitMeshes;
   std::vector<ZMesh*> m_splitMeshesWrapper;
   std::vector<glm::vec4> m_splitMeshesColors;

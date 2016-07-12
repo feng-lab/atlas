@@ -36,13 +36,10 @@ public:
   virtual void setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture *t) override;
   virtual void setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture *t) override;
 
-signals:
-
-protected slots:
+protected:
   void visibleChanged(bool v);
   void allMeshChanged();
 
-protected:
   virtual void renderPicking(Z3DEye eye) override;
 
   virtual void registerPickingObjects() override;
@@ -50,10 +47,6 @@ protected:
 
   //virtual void updateAxisAlignedBoundBoxImpl() override;
   virtual void updateNotTransformedBoundBoxImpl() override;
-
-private:
-
-public slots:
 
 private:
   ZBoolParameter m_visible;

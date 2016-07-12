@@ -68,16 +68,13 @@ signals:
   void addNewSwcTreeNode(double x, double y, double z, double r);
   void extendSwcTreeNode(double x, double y, double z);
 
-public slots:
+protected:
   void prepareColor();
   void adjustWidgets();
   void selectSwc(QMouseEvent *e, int w, int h);
 
   void setColorMode(const std::string &mode);
 
-protected slots:
-
-protected:
   virtual void process(Z3DEye) override;
 
   virtual void registerPickingObjects() override;

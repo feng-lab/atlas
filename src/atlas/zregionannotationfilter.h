@@ -32,13 +32,7 @@ public:
   virtual void rotateClockwise() override;
   virtual void rotateCounterclockwise() override;
 
-signals:
-
-public slots:
-
-protected:
-
-private slots:
+private:
   void visibleChanged();
   void regionROIAdded(int64_t id, ZROI *roi);
   void allROIChanged();

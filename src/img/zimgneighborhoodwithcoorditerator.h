@@ -243,7 +243,6 @@ private:
     return other.m_idx - m_idx;
   }
 
-private:
   void initNbInfo()
   {
     if (m_neighborhood.empty()) {

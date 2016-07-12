@@ -19,12 +19,6 @@ public:
   void setNetworkEvaluator(Z3DNetworkEvaluator *n) { m_networkEvaluator = n; }
   void setFakeStereoOnce() { m_fakeStereoOnce = true; }
 
-protected:
-  
-signals:
-  
-public slots:
-
 private:
   Z3DNetworkEvaluator* m_networkEvaluator;
   bool m_isStereoScene;

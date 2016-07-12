@@ -14,19 +14,15 @@ class ZObjDetailedInfoWidget : public QWidget
 public:
   explicit ZObjDetailedInfoWidget(ZDoc *doc, QWidget *mw = nullptr);
 
-signals:
-
-public slots:
+public:
   void showDefaultWidget();
   void showWidgetOfObj(size_t id);
   void hideWidget();
   void setDefaultWidget(QWidget *widget);
 
-private slots:
+private:
   void removeWidgetOfObj(size_t id);
   void updateWidgetLabelOfObj(size_t id);
-
-protected:
 
 protected:
   ZDoc *m_doc;

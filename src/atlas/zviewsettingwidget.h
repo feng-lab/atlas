@@ -15,20 +15,15 @@ class ZViewSettingWidget : public QWidget
 public:
   explicit ZViewSettingWidget(ZDoc *doc, ZViewSettingInterface *view, QWidget *mw = nullptr);
 
-signals:
-
-public slots:
   void showDefaultWidget();
   void showViewSettingWidgetOfObj(size_t id);
   void hideViewSettingWidget();
   void setDefaultWidget(QWidget *widget);
 
-private slots:
+private:
   void removeViewSettingWidgetOfObj(size_t id);
   void updateViewSettingWidgetLabelOfObj(size_t id);
   void updateWidget();
-
-protected:
 
 protected:
   ZDoc *m_doc;

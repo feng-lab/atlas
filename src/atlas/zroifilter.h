@@ -105,17 +105,12 @@ public:
 
   ZDVec4Parameter& offsetPara() { return m_offsetPara; }
 
-signals:
-
-public slots:
-
-protected slots:
+protected:
   virtual void offsetChanged() override;
 
-protected:
   std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> createCtrlPtItems(int slice);
 
-private slots:
+private:
   void visibleChanged();
   void showControlPointsChanged();
   void outlineColorChanged();

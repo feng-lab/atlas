@@ -38,16 +38,13 @@ public:
   virtual bool isAlias(size_t id) const override;
   virtual QWidget *createObjEditWidget(size_t id) override;
 
-protected slots:
+protected:
   void loadAnimation();
   void setModified();
   void releaseView();
 
-protected:
   // append another 2D animation into this doc
   size_t addAnimation(Z2DAnimation *animation, const QString &path, const QString &name = "");
-
-signals:
 
 private:
   struct AnimationPack { // animation and its associated data
