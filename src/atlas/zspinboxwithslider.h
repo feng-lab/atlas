@@ -26,8 +26,6 @@ public:
   ZSlider2(Qt::Orientation ori, QWidget* parent = 0);
 
 protected:
-  void setDataRange(int min, int max);
-
   virtual void focusInEvent(QFocusEvent *event) override;
   virtual void focusOutEvent(QFocusEvent *event) override;
 };

@@ -105,8 +105,7 @@ bool ZClickableColorLabel::getTip(const QPoint &p, QRect *r, QString *s)
   if (!m_vec4Color && !m_vec3Color && !m_dvec4Color && !m_dvec3Color)
     return false;
 
-  if(contentsRect().contains(p))
-  {
+  if(contentsRect().contains(p)) {
     *r = contentsRect();
     *s = toQColor().name();
     return true;
@@ -118,8 +117,7 @@ bool ZClickableColorLabel::getTip(const QPoint &p, QRect *r, QString *s)
 void ZClickableColorLabel::labelClicked()
 {
   QColor newColor = QColorDialog::getColor(toQColor());
-  if(newColor.isValid())
-  {
+  if(newColor.isValid()) {
     fromQColor(newColor);
   }
 }
@@ -191,8 +189,7 @@ bool ZClickableColorMapLabel::getTip(const QPoint &p, QRect *r, QString *s)
   if (!m_colorMap)
     return false;
 
-  if(contentsRect().contains(p))
-  {
+  if(contentsRect().contains(p)) {
     r->setCoords(p.x(), contentsRect().top(),
                  p.x(), contentsRect().bottom());
     QColor color = m_colorMap->get().fractionMappedQColor((p.x()*1.-contentsRect().left())/contentsRect().width());

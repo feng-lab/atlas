@@ -43,11 +43,6 @@ ZSlider2::ZSlider2(Qt::Orientation ori, QWidget *parent)
 {
 }
 
-void ZSlider2::setDataRange(int min, int max)
-{
-  setRange(min, max);
-}
-
 void ZSlider2::focusInEvent(QFocusEvent *e)
 {
   QSlider::focusInEvent(e);

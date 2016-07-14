@@ -24,10 +24,6 @@ public:
   virtual QSize sizeHint() const override;
   virtual QSize minimumSizeHint() const override;
 
-  void setDataRange(int min, int max);
-  void setDataMin(int min) { setMinimum(min); }
-  void setDataMax(int max) { setMaximum(max); }
-
 protected:
   virtual void focusInEvent(QFocusEvent *e) override;
   virtual void focusOutEvent(QFocusEvent *e) override;
@@ -42,10 +38,6 @@ public:
 
   virtual QSize sizeHint() const override;
   virtual QSize minimumSizeHint() const override;
-
-  void setDataRange(double min, double max);
-  void setDataMin(double min) { setMinimum(min); }
-  void setDataMax(double max) { setMaximum(max); }
 
 protected:
   virtual void focusInEvent(QFocusEvent *e) override;

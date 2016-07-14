@@ -26,11 +26,6 @@ QSize ZSpinBox::minimumSizeHint() const
   return size;
 }
 
-void ZSpinBox::setDataRange(int min, int max)
-{
-  setRange(min, max);
-}
-
 void ZSpinBox::focusInEvent(QFocusEvent *e)
 {
   QSpinBox::focusInEvent(e);
@@ -63,11 +58,6 @@ QSize ZDoubleSpinBox::minimumSizeHint() const
   QSize size = QDoubleSpinBox::minimumSizeHint();
   size.setWidth(std::min(size.width(), 57));
   return size;
-}
-
-void ZDoubleSpinBox::setDataRange(double min, double max)
-{
-  setRange(min, max);
 }
 
 void ZDoubleSpinBox::focusInEvent(QFocusEvent *e)

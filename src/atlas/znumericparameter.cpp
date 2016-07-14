@@ -50,7 +50,7 @@ QWidget *ZIntParameter::actualCreateWidget(QWidget *parent)
     sb->setSuffix(m_suffix);
     connect(sb, qOverload<int>(&ZSpinBox::valueChanged), this, &ZIntParameter::setValue);
     connect(this, &ZIntParameter::valueWillChange, sb, &ZSpinBox::setValue);
-    connect(this, &ZIntParameter::rangeChanged, sb, &ZSpinBox::setDataRange);
+    connect(this, &ZIntParameter::rangeChanged, sb, &ZSpinBox::setRange);
     return sb;
   } else if (m_style == "SPINBOXWITHSCROLLBAR") {
     ZSpinBoxWithScrollBar *sbws = new ZSpinBoxWithScrollBar(m_value, m_min, m_max, m_step, m_tracking, m_prefix, m_suffix, parent);
@@ -111,7 +111,7 @@ QWidget *ZDoubleParameter::actualCreateWidget(QWidget *parent)
     sb->setSuffix(m_suffix);
     connect(sb, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDoubleParameter::setValue);
     connect(this, &ZDoubleParameter::valueWillChange, sb, &ZDoubleSpinBox::setValue);
-    connect(this, &ZDoubleParameter::rangeChanged, sb, &ZDoubleSpinBox::setDataRange);
+    connect(this, &ZDoubleParameter::rangeChanged, sb, &ZDoubleSpinBox::setRange);
     return sb;
   } else {
     ZDoubleSpinBoxWithSlider *sbws = new ZDoubleSpinBoxWithSlider(m_value, m_min, m_max, m_step,
@@ -167,7 +167,7 @@ QWidget *ZFloatParameter::actualCreateWidget(QWidget *parent)
     sb->setSuffix(m_suffix);
     connect(sb, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZFloatParameter::setValue);
     connect(this, &ZFloatParameter::valueWillChange, sb, &ZDoubleSpinBox::setValue);
-    connect(this, &ZFloatParameter::rangeChanged, sb, &ZDoubleSpinBox::setDataRange);
+    connect(this, &ZFloatParameter::rangeChanged, sb, &ZDoubleSpinBox::setRange);
     return sb;
   } else {
     ZDoubleSpinBoxWithSlider *sbws = new ZDoubleSpinBoxWithSlider(m_value, m_min, m_max, m_step,
@@ -1908,8 +1908,8 @@ QWidget *ZIntSpanParameter::actualCreateWidget(QWidget *parent)
         lo->addLayout(hlo);
       }
     }
-    connect(sb1, qOverload<int>(&ZSpinBox::valueChanged), sb2, &ZSpinBox::setDataMin);
-    connect(sb2, qOverload<int>(&ZSpinBox::valueChanged), sb1, &ZSpinBox::setDataMax);
+    connect(sb1, qOverload<int>(&ZSpinBox::valueChanged), sb2, &ZSpinBox::setMinimum);
+    connect(sb2, qOverload<int>(&ZSpinBox::valueChanged), sb1, &ZSpinBox::setMaximum);
     lo->setMargin(0);
     w->setLayout(lo);
     return w;
@@ -2025,8 +2025,8 @@ QWidget *ZFloatSpanParameter::actualCreateWidget(QWidget *parent)
         lo->addLayout(hlo);
       }
     }
-    connect(sb1, qOverload<double>(&ZDoubleSpinBox::valueChanged), sb2, &ZDoubleSpinBox::setDataMin);
-    connect(sb2, qOverload<double>(&ZDoubleSpinBox::valueChanged), sb1, &ZDoubleSpinBox::setDataMax);
+    connect(sb1, qOverload<double>(&ZDoubleSpinBox::valueChanged), sb2, &ZDoubleSpinBox::setMinimum);
+    connect(sb2, qOverload<double>(&ZDoubleSpinBox::valueChanged), sb1, &ZDoubleSpinBox::setMaximum);
     lo->setMargin(0);
     w->setLayout(lo);
     return w;
