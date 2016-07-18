@@ -54,7 +54,10 @@ void ZAnalysisWorklistDialog::onOpen()
                                    nullptr);
 
   if (!fileName.isEmpty()) {
-    m_model->setSource(fileName);
+    QString res = m_model->setSource(fileName);
+    if (!res.isEmpty()) {
+      QMessageBox::critical(this, tr("Error"), res);
+    }
     m_filename = fileName;
     m_saveButton->setEnabled(false);
     setWindowTitle(m_filename);
@@ -71,7 +74,10 @@ void ZAnalysisWorklistDialog::onSave()
                                      nullptr);
   }
   if (!m_filename.isEmpty()) {
-    m_model->toCSV(m_filename, true);
+    QString res = m_model->toCSV(m_filename, true);
+    if (!res.isEmpty()) {
+      QMessageBox::critical(this, tr("Error"), res);
+    }
     m_saveButton->setEnabled(false);
     setWindowTitle(m_filename);
   }
@@ -87,7 +93,10 @@ void ZAnalysisWorklistDialog::onSaveAs()
 
   if (!fileName.isEmpty()) {
     m_filename = fileName;
-    m_model->toCSV(m_filename, true);
+    QString res = m_model->toCSV(m_filename, true);
+    if (!res.isEmpty()) {
+      QMessageBox::critical(this, tr("Error"), res);
+    }
     m_saveButton->setEnabled(false);
     setWindowTitle(m_filename);
   }

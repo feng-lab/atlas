@@ -11,7 +11,7 @@
 #include <QModelIndex>
 #include <QMimeData>
 #include <map>
-class QTextCodec;
+#include <QTextCodec>
 
 namespace nim {
 
@@ -20,15 +20,12 @@ class ZAnalysisWorklistModel : public QAbstractTableModel
   Q_OBJECT
 public:
   explicit ZAnalysisWorklistModel(QObject *parent = 0);
-  explicit ZAnalysisWorklistModel(QIODevice *file, QObject *parent = 0);
   explicit ZAnalysisWorklistModel(const QString& filename, QObject *parent = 0);
   ~ZAnalysisWorklistModel();
 
-  void setSource(QIODevice *file, QTextCodec* codec = 0);
-  void setSource(const QString& filename, QTextCodec* codec = 0);
+  QString setSource(const QString& filename, QTextCodec* codec = QTextCodec::codecForName("UTF-8"));
 
-  void toCSV(QIODevice *file, bool withHeader = true, QChar separator = ',', QTextCodec* codec = 0) const;
-  void toCSV(const QString filename, bool withHeader = true, QChar separator = ',', QTextCodec* codec = 0) const;
+  QString toCSV(const QString filename, bool withHeader = true, QChar separator = ',', QTextCodec* codec = QTextCodec::codecForName("UTF-8")) const;
 
   int rowCount(const QModelIndex& parent = QModelIndex()) const;
   int columnCount(const QModelIndex& parent = QModelIndex()) const;

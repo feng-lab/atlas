@@ -7,6 +7,7 @@
 #include "zimgautothreshold.h"
 #include "zglmutils.h"
 #include "zioutils.h"
+#include "include/reader.h"
 
 namespace nim {
 
@@ -32,67 +33,67 @@ void ZGenerateAnalysisTextFile::generate(const QString &worklistFile)
 {
   checkFileExist(worklistFile);
 
-  QFile file(worklistFile);
-  if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-    throw ZImgException(QString("Can not open %1").arg(worklistFile));
+  QStringList header;
+  header << "# imageName" << "swcName" << "punctaName" << "voxelSizeXInUm" << "voxelSizeYInUm"
+         << "voxelSizeZInUm" << "dendriteChannel" << "axonChannel(can be empty)"
+         << "maxDistToBranch"  << "bluenessExtend" << "outputFolder(can be empty)"
+         << "doPyramidalFunctionalSeparation(yes or no)" << "doPyramidalSubclassSeparation(yes or no)"
+         << "somaPunctaName";
 
-  QString format("imageName,swcName,punctaName,voxelSizeXInUm,voxelSizeYInUm,voxelSizeZInUm,dendriteChannel,"
-                 "axonChannel(can be empty),maxDistToBranch,bluenessExtend,outputFolder(can be empty),doPyramidalFunctionalSeparation(yes or no),doPyramidalSubclassSeparation(yes or no)");
+  QList<QStringList> allLines = QtCSV::Reader::readToList(worklistFile);
+  if (allLines.empty()) {
+    throw ZImgException(QString("Can not parse file (%1) or file is empty").arg(worklistFile));
+  }
 
-  while (!file.atEnd()) {
-    QString line = file.readLine();
-    line = line.trimmed();
-    if (line.startsWith("#") || line.isEmpty())
+  for (const auto& list: allLines) {
+    if (list.empty() || list.at(0).startsWith("#")) {
       continue;
-
-    m_input = ZAnalysisTextFileInput();
-    QStringList list = line.split(",");
-    if (list.size() == 14) {
-      bool ok = false;
-      m_input.imgFilename = list[0];
-      m_input.swcFilename = list[1];
-      m_input.punctaFilename = list[2];
-      if (!list[3].isEmpty()) {
-        m_input.voxelSizeX = list[3].toDouble(&ok);
-        if (!ok) throw ZImgException(QString("Can not parse line: %1 with format <%2>").arg(line).arg(format));
-      }
-      if (!list[4].isEmpty()) {
-        m_input.voxelSizeY = list[4].toDouble(&ok);
-        if (!ok) throw ZImgException(QString("Can not parse line: %1 with format <%2>").arg(line).arg(format));
-      }
-      if (!list[5].isEmpty()) {
-        m_input.voxelSizeZ = list[5].toDouble(&ok);
-        if (!ok) throw ZImgException(QString("Can not parse line: %1 with format <%2>").arg(line).arg(format));
-      }
-      m_input.dendriteChannel = list[6].toInt(&ok);
-      if (!ok) throw ZImgException(QString("Can not parse line: %1 with format <%2>").arg(line).arg(format));
-      if (!list[7].isEmpty()) {
-        m_input.axonChannel = list[7].toInt(&ok);
-        if (!ok) throw ZImgException(QString("Can not parse line: %1 with format <%2>").arg(line).arg(format));
-      }
-      m_input.maxDistToBranch = list[8].toDouble(&ok);
-      if (!ok) throw ZImgException(QString("Can not parse line: %1 with format <%2>").arg(line).arg(format));
-      m_input.bluenessExtend = list[9].toDouble(&ok);
-      if (!ok) throw ZImgException(QString("Can not parse line: %1 with format <%2>").arg(line).arg(format));
-      m_input.outputFolder = list[10];
-      if (list[11].compare("yes", Qt::CaseInsensitive) == 0) {
-        m_input.doPyramidalFunctionalSeparation = true;
-      } else if (list[11].compare("no", Qt::CaseInsensitive) == 0) {
-        m_input.doPyramidalFunctionalSeparation = false;
-      } else {
-        throw ZImgException(QString("Can not parse line: %1 with format <%2>").arg(line).arg(format));
-      }
-      if (list[12].compare("yes", Qt::CaseInsensitive) == 0) {
-        m_input.doPyramidalSubclassSeparation = true;
-      } else if (list[12].compare("no", Qt::CaseInsensitive) == 0) {
-        m_input.doPyramidalSubclassSeparation = false;
-      } else {
-        throw ZImgException(QString("Can not parse line: %1 with format <%2>").arg(line).arg(format));
-      }
-      m_input.somaPunctaFilename = list[13];
-    } else {
-      throw ZImgException(QString("Can not parse line: %1 with format <%2>").arg(line).arg(format));
     }
+    if (list.size() != header.size()) {
+      throw ZImgException(QString("Wrong number of items in line (%1), expected format: <%2>").arg(list.join(',')).arg(header.join(',')));
+    }
+    bool ok = false;
+    m_input.imgFilename = list[0];
+    m_input.swcFilename = list[1];
+    m_input.punctaFilename = list[2];
+    if (!list[3].isEmpty()) {
+      m_input.voxelSizeX = list[3].toDouble(&ok);
+      if (!ok) throw ZImgException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+    }
+    if (!list[4].isEmpty()) {
+      m_input.voxelSizeY = list[4].toDouble(&ok);
+      if (!ok) throw ZImgException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+    }
+    if (!list[5].isEmpty()) {
+      m_input.voxelSizeZ = list[5].toDouble(&ok);
+      if (!ok) throw ZImgException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+    }
+    m_input.dendriteChannel = list[6].toInt(&ok);
+    if (!ok) throw ZImgException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+    if (!list[7].isEmpty()) {
+      m_input.axonChannel = list[7].toInt(&ok);
+      if (!ok) throw ZImgException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+    }
+    m_input.maxDistToBranch = list[8].toDouble(&ok);
+    if (!ok) throw ZImgException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+    m_input.bluenessExtend = list[9].toDouble(&ok);
+    if (!ok) throw ZImgException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+    m_input.outputFolder = list[10];
+    if (list[11].compare("yes", Qt::CaseInsensitive) == 0) {
+      m_input.doPyramidalFunctionalSeparation = true;
+    } else if (list[11].compare("no", Qt::CaseInsensitive) == 0) {
+      m_input.doPyramidalFunctionalSeparation = false;
+    } else {
+      throw ZImgException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+    }
+    if (list[12].compare("yes", Qt::CaseInsensitive) == 0) {
+      m_input.doPyramidalSubclassSeparation = true;
+    } else if (list[12].compare("no", Qt::CaseInsensitive) == 0) {
+      m_input.doPyramidalSubclassSeparation = false;
+    } else {
+      throw ZImgException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+    }
+    m_input.somaPunctaFilename = list[13];
 
     generate();
   }

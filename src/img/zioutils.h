@@ -27,8 +27,6 @@ inline void writeStream(std::ostream &fs, const T *buf, size_t count)
   writeStream_impl(fs, reinterpret_cast<const char*>(buf), count);
 }
 
-QList<QStringList> readCSV(const QString filename, QChar separator = ',', QTextCodec* codec = 0);
-
 }
 
 #endif // ZIOUTILS_H

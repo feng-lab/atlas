@@ -4,6 +4,9 @@
 #include <QTextStream>
 #include "QsLog.h"
 #include <QUrl>
+#include "include/reader.h"
+#include "include/variantdata.h"
+#include "include/writer.h"
 
 namespace nim {
 
@@ -13,51 +16,33 @@ ZAnalysisWorklistModel::ZAnalysisWorklistModel(QObject *parent)
   reset();
 }
 
-ZAnalysisWorklistModel::ZAnalysisWorklistModel(QIODevice *file, QObject *parent)
-  : QAbstractTableModel(parent)
-{
-  setSource(file);
-}
-
 ZAnalysisWorklistModel::ZAnalysisWorklistModel(const QString &filename, QObject *parent)
   : QAbstractTableModel(parent)
 {
-  QFile src(filename);
-  setSource(&src);
+  setSource(filename);
 }
 
 ZAnalysisWorklistModel::~ZAnalysisWorklistModel()
 {
 }
 
-void ZAnalysisWorklistModel::setSource(QIODevice *file, QTextCodec *codec)
+QString ZAnalysisWorklistModel::setSource(const QString &filename, QTextCodec *codec)
 {
+  QStringList res;
   beginResetModel();
 
   reset();
 
-  if(!file->isOpen())
-    file->open(QIODevice::ReadOnly);
-
-  QTextStream stream(file);
-  if(codec) {
-    stream.setCodec(codec);
-  } else {
-    stream.setAutoDetectUnicode(true);
-  }
-
-  QString format("imageName,swcName,punctaName,voxelSizeXInUm,voxelSizeYInUm,voxelSizeZInUm,dendriteChannel,"
-                 "axonChannel(can be empty),maxDistToBranch,bluenessExtend,outputFolder(can be empty),doPyramidalFunctionalSeparation(yes or no),doPyramidalSubclassSeparation(yes or no),"
-                 "somaPunctaName");
-
-  while(!stream.atEnd()) {
-    QString line = file->readLine();
-    line = line.trimmed();
-    if (line.startsWith("#") || line.isEmpty())
-      continue;
-
-    QStringList list = line.split(",");
-    if (list.size() == 14) {
+  QList<QStringList> allLines = QtCSV::Reader::readToList(filename, QString(","), QString("\""), codec);
+  if (!allLines.empty()) {
+    for (const auto& list: allLines) {
+      if (list.empty() || list.at(0).startsWith("#")) {
+        continue;
+      }
+      if (list.size() != m_header.size()) {
+        res << QString("Can not parse line (%1) with format <%2>.").arg(list.join(",")).arg(m_header.join(","));
+        continue;
+      }
       ZAnalysisTextFileInput input;
       bool ok = false;
       input.imgFilename = list[0];
@@ -66,44 +51,44 @@ void ZAnalysisWorklistModel::setSource(QIODevice *file, QTextCodec *codec)
       if (!list[3].isEmpty()) {
         input.voxelSizeX = list[3].toDouble(&ok);
         if (!ok) {
-          LERROR() << "Can not parse line: <" << line <<  "> with format:" << format;
+          res << QString("Can not parse line (%1) with format <%2>.").arg(list.join(",")).arg(m_header.join(","));
           continue;
         }
       }
       if (!list[4].isEmpty()) {
         input.voxelSizeY = list[4].toDouble(&ok);
         if (!ok) {
-          LERROR() << "Can not parse line: <" << line <<  "> with format:" << format;
+          res << QString("Can not parse line (%1) with format <%2>.").arg(list.join(",")).arg(m_header.join(","));
           continue;
         }
       }
       if (!list[5].isEmpty()) {
         input.voxelSizeZ = list[5].toDouble(&ok);
         if (!ok) {
-          LERROR() << "Can not parse line: <" << line <<  "> with format:" << format;
+          res << QString("Can not parse line (%1) with format <%2>.").arg(list.join(",")).arg(m_header.join(","));
           continue;
         }
       }
       input.dendriteChannel = list[6].toInt(&ok);
       if (!ok) {
-        LERROR() << "Can not parse line: <" << line <<  "> with format:" << format;
+        res << QString("Can not parse line (%1) with format <%2>.").arg(list.join(",")).arg(m_header.join(","));
         continue;
       }
       if (!list[7].isEmpty()) {
         input.axonChannel = list[7].toInt(&ok);
         if (!ok) {
-          LERROR() << "Can not parse line: <" << line <<  "> with format:" << format;
+          res << QString("Can not parse line (%1) with format <%2>.").arg(list.join(",")).arg(m_header.join(","));
           continue;
         }
       }
       input.maxDistToBranch = list[8].toDouble(&ok);
       if (!ok) {
-        LERROR() << "Can not parse line: <" << line <<  "> with format:" << format;
+        res << QString("Can not parse line (%1) with format <%2>.").arg(list.join(",")).arg(m_header.join(","));
         continue;
       }
       input.bluenessExtend = list[9].toDouble(&ok);
       if (!ok) {
-        LERROR() << "Can not parse line: <" << line <<  "> with format:" << format;
+        res << QString("Can not parse line (%1) with format <%2>.").arg(list.join(",")).arg(m_header.join(","));
         continue;
       }
       input.outputFolder = list[10];
@@ -112,7 +97,7 @@ void ZAnalysisWorklistModel::setSource(QIODevice *file, QTextCodec *codec)
       } else if (list[11].compare("no", Qt::CaseInsensitive) == 0) {
         input.doPyramidalFunctionalSeparation = false;
       } else {
-        LERROR() << "Can not parse line: <" << line <<  "> with format:" << format;
+        res << QString("Can not parse line (%1) with format <%2>.").arg(list.join(",")).arg(m_header.join(","));
         continue;
       }
       if (list[12].compare("yes", Qt::CaseInsensitive) == 0) {
@@ -120,15 +105,15 @@ void ZAnalysisWorklistModel::setSource(QIODevice *file, QTextCodec *codec)
       } else if (list[12].compare("no", Qt::CaseInsensitive) == 0) {
         input.doPyramidalSubclassSeparation = false;
       } else {
-        LERROR() << "Can not parse line: <" << line <<  "> with format:" << format;
+        res << QString("Can not parse line (%1) with format <%2>.").arg(list.join(",")).arg(m_header.join(","));
         continue;
       }
       input.somaPunctaFilename = list[13];
       m_inputs.push_back(input);
     }
+  } else {
+    res << QString("Can not parse file (%1) or file is empty.").arg(filename);
   }
-
-  file->close();
 
   size_t row = 0;
   for (QList<ZAnalysisTextFileInput>::iterator it=m_inputs.begin();
@@ -139,53 +124,43 @@ void ZAnalysisWorklistModel::setSource(QIODevice *file, QTextCodec *codec)
   m_rowCount += m_inputs.size();
 
   endResetModel();
+
+  return res.join("\n");
 }
 
-void ZAnalysisWorklistModel::setSource(const QString &filename, QTextCodec *codec)
+QString ZAnalysisWorklistModel::toCSV(const QString filename, bool withHeader, QChar separator, QTextCodec *codec) const
 {
-  QFile src(filename);
-  setSource(&src, codec);
-}
-
-void ZAnalysisWorklistModel::toCSV(QIODevice *dest, bool withHeader, QChar separator, QTextCodec *codec) const
-{
-  if(!dest->isOpen()) dest->open(QIODevice::WriteOnly | QIODevice::Truncate);
-  QTextStream stream(dest);
-  if(codec) stream.setCodec(codec);
-  if(withHeader) {
-    stream << m_header.join(separator) << endl;
+  QtCSV::VariantData vd;
+  if (withHeader) {
+    vd.addRow(m_header);
   }
-
-  for(size_t row = 0; row < static_cast<size_t>(rowCount()); ++row)
-  {
+  for(size_t row = 0; row < static_cast<size_t>(rowCount()); ++row) {
     std::map<size_t, ZAnalysisTextFileInput*>::const_iterator it = m_rowToInput.find(row);
     if (it != m_rowToInput.end()) {
       const ZAnalysisTextFileInput* input = it->second;
-      stream << input->imgFilename << separator
-             << input->swcFilename << separator
-             << input->punctaFilename << separator
-             << input->voxelSizeX << separator
-             << input->voxelSizeY << separator
-             << input->voxelSizeZ << separator
-             << input->dendriteChannel << separator
-             << input->axonChannel << separator
-             << input->maxDistToBranch << separator
-             << input->bluenessExtend << separator
-             << input->outputFolder << separator
-             << (input->doPyramidalFunctionalSeparation ? "yes" : "no") << separator
-             << (input->doPyramidalSubclassSeparation ? "yes" : "no") << separator
-             << input->somaPunctaFilename
-             << endl;
+      QList<QVariant> values;
+      values << input->imgFilename
+             << input->swcFilename
+             << input->punctaFilename
+             << input->voxelSizeX
+             << input->voxelSizeY
+             << input->voxelSizeZ
+             << input->dendriteChannel
+             << input->axonChannel
+             << input->maxDistToBranch
+             << input->bluenessExtend
+             << input->outputFolder
+             << (input->doPyramidalFunctionalSeparation ? "yes" : "no")
+             << (input->doPyramidalSubclassSeparation ? "yes" : "no")
+             << input->somaPunctaFilename;
+      vd.addRow(values);
     }
   }
-  stream << flush;
-  dest->close();
-}
-
-void ZAnalysisWorklistModel::toCSV(const QString filename, bool withHeader, QChar separator, QTextCodec *codec) const
-{
-  QFile dest(filename);
-  toCSV(&dest, withHeader, separator, codec);
+  if (!QtCSV::Writer::write(filename, vd, separator, QString(""), QtCSV::Writer::REWRITE, QStringList(), QStringList(), codec)) {
+    return QString("Can not write csv to file (%1).").arg(filename);
+  } else {
+    return QString();
+  }
 }
 
 int ZAnalysisWorklistModel::rowCount(const QModelIndex& parent) const
