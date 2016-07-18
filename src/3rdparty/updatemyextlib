@@ -13,8 +13,10 @@ if [ -d $baseDIR/FreeImage ]
 then
   rm -rf $baseDIR/FreeImage
 fi
-srcArchive=$srcPackageDIR/FreeImage3170.zip
-7z x -y -o$baseDIR "$srcArchive"
+#srcArchive=$srcPackageDIR/FreeImage3170.zip
+#7z x -y -o$baseDIR "$srcArchive"
+srcArchive=$srcPackageDIR/freeimage-FreeImage.tar.gz
+tar -zxf "$srcArchive" -C $baseDIR
 
 if [ -d $baseDIR/libjpeg-turbo-1.5.5 ]
 then

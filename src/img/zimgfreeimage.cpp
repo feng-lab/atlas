@@ -204,9 +204,9 @@ void ZImgFreeImage::readInfo(const QString &filename, std::vector<ZImgInfo> &inf
   } else { // not multipage
     fipImage fipImg;
 #if defined(_WIN32) || defined(_WIN64)
-    if (!fipImg.loadU(filename.toStdWString().c_str(), FIF_LOAD_NOPIXELS)) {
+    if (!fipImg.loadU(fmt, filename.toStdWString().c_str(), FIF_LOAD_NOPIXELS)) {
 #else
-    if (!fipImg.load(QFile::encodeName(filename).constData(), FIF_LOAD_NOPIXELS)) {
+    if (!fipImg.load(fmt, QFile::encodeName(filename).constData(), FIF_LOAD_NOPIXELS)) {
 #endif
       throw ZIOException("Can not load header");
     }
