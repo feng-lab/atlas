@@ -194,6 +194,10 @@ exists(/opt/intel/tbb/include) {
     INCLUDEPATH += $$JpegPath/include
     LIBS += $$JpegPath/lib/libjpeg.a
 
+    PngPath = $$PWD/../3rdparty/libpng
+    INCLUDEPATH += $$PngPath/include
+    LIBS += $$PngPath/lib/libpng.a
+
     JpegXRPath = $$PWD/../3rdparty/jxrlib
     LIBS += $$JpegXRPath/lib/libjxrglue.a $$JpegXRPath/lib/libjpegxr.a
 

@@ -25,6 +25,13 @@ fi
 srcArchive=$srcPackageDIR/libjpeg-turbo-1.5.0.tar.gz
 tar -zxf "$srcArchive" -C $baseDIR
 
+if [ -d $baseDIR/libpng-1.6.23 ]
+then
+  rm -rf $baseDIR/libpng-1.6.23
+fi
+srcArchive=$srcPackageDIR/libpng-1.6.23.tar.gz
+tar -zxf "$srcArchive" -C $baseDIR
+
 if [ -d $baseDIR/hdf5-1.10.0-patch1 ]
 then
   rm -rf $baseDIR/hdf5-1.10.0-patch1

@@ -1,7 +1,7 @@
 cd /d "%~dp0"
 
 set currDIR=%CD%
-set srcDIR=%currDIR%\..\..\..\libpng-1.6.16
+set srcDIR=%currDIR%\..\..\..\libpng-1.6.23
 set buildDIR=%srcDIR%\..\__libpng-build
 set installDIR=%currDIR%\libpng
 

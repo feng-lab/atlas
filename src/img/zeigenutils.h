@@ -14,6 +14,7 @@
 #ifndef Q_MOC_RUN
 #include <boost/math/special_functions.hpp>
 #endif
+#include "zioutils.h"
 
 namespace nim {
 
@@ -141,11 +142,8 @@ public:
     }
 
     //open file
-    std::ofstream outFile(filename);
-    if (!outFile.is_open()) {
-      std::perror((std::string("writeMatrix: error while opening file ") + filename).c_str());
-      return false;
-    }
+    std::ofstream outFile;
+    openFileStream(outFile, filename, std::ios_base::out);
 
     std::string sepstr(sep);
     if (sepstr == " " || sepstr == "") {

@@ -6,7 +6,6 @@
 #include <fstream>
 #include "zbenchtimer.h"
 #include "zexception.h"
-#include "zioutils.h"
 #include "zstringutils.h"
 #include <QFile>
 
@@ -20,14 +19,8 @@ MatrixXd ZEigenUtils::readMatrix(const QString &filename, const char *uSep, bool
   MatrixXd emptyMat;
 
   std::ifstream inputFileStream;
-#ifdef _MSC_VER
-  inputFileStream.open(filename.toStdWString().c_str(), std::ios::in);  // use msvc extension
-#else
-  inputFileStream.open(QFile::encodeName(filename).constData(), std::ios::in);
-#endif
-  if (!inputFileStream.is_open()) {
-    throw ZIOException(QString("Can not open file %1").arg(filename));
-  }
+  openFileStream(inputFileStream, filename, std::ios::in);
+
   int nRow = std::count(std::istreambuf_iterator<char>(inputFileStream), std::istreambuf_iterator<char>(), '\n') + 1;
   inputFileStream.clear();
   inputFileStream.seekg(0, std::ios::beg);
