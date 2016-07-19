@@ -181,10 +181,11 @@ void ZImgInfo::createDefaultChannelColors()
     channelColors.resize(numChannels);
     for (size_t i=0; i<numChannels; ++i) {
       if (i==0) {
-        if (numChannels == 1)
+        if (numChannels == 1 || (numChannels == 2 && lastChannelIsAlphaChannel)) {
           channelColors[i] = col4(255,255,255);
-        else
+        } else {
           channelColors[i] = col4(255,0,0);
+        }
       } else if (i==1) {
         channelColors[i] = col4(0,255,0);
       } else if (i==2) {
