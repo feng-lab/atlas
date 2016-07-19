@@ -1,8 +1,6 @@
 #include "zstringparameter.h"
 #include <QtGui>
-#ifndef _QT4_
 #include <QtWidgets>
-#endif
 
 namespace nim {
 

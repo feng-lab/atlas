@@ -3,11 +3,7 @@
 #include "z3dcameraparameter.h"
 #include "QsLog.h"
 
-#ifndef _QT4_
 #include <QtMath>
-#else
-#include <cmath>
-#endif
 #include <cassert>
 
 namespace nim {

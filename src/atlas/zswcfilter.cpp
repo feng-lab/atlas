@@ -6,9 +6,7 @@
 #include "zsaturateoperation.h"
 #include "zgraphicsscene.h"
 
-#ifndef _QT4_
 #include <QWindow>
-#endif
 
 namespace nim {
 
@@ -97,12 +95,8 @@ void ZSwcGraphicsItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
   // drawLines to widget directly is very slow, don't know why
   if (widget && (m_mip || m_showSkeleton)) {
     m_outlineColor.setAlpha(m_opacity * 0.5 * 255);
-#ifndef _QT4_
     double devicePixelRatio = (widget->window() && widget->window()->windowHandle()) ?
           widget->window()->windowHandle()->devicePixelRatio() : 1.0;
-#else
-    double devicePixelRatio = 1.0;
-#endif
     QPixmap buffer(widget->width()*devicePixelRatio, widget->height()*devicePixelRatio);
     buffer.fill(QColor(0,0,0,0));
     QPainter pnt(&buffer);

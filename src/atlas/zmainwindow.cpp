@@ -69,7 +69,6 @@ ZMainWindow::ZMainWindow(QsLogging::DestinationPtr logDestModel)
 
 void ZMainWindow::initOpenglContext()
 {
-#ifndef _QT4_
   m_sharedContext = new Z3DCanvas("Init Canvas", 32, 32, this);
   m_sharedContext->show();
 
@@ -82,34 +81,6 @@ void ZMainWindow::initOpenglContext()
 
   ZSystemInfoInstance.setStereoSupported(m_sharedContext->format().stereo());
   m_sharedContext->hide();
-#else
-  // init openGL context
-  QGLFormat format = QGLFormat();
-  format.setAlpha(true);
-  format.setDepth(true);
-  format.setDoubleBuffer(true);
-  format.setRgba(true);
-  format.setSampleBuffers(true);
-  format.setStereo(true);
-  //if (QSysInfo::MacintoshVersion >= QSysInfo::MV_LION) {
-    //format.setVersion(3, 2);
-    //format.setProfile(QGLFormat::CoreProfile);
-  //}
-  m_sharedContext = new Z3DCanvas("Init Canvas", 32, 32, format, this);
-
-  // initGL requires a valid OpenGL context
-  if (m_sharedContext) {
-    // initialize OpenGL
-    if (!Z3DApplicationInstance.initializeGL()) {
-      QString msg = Z3DApplicationInstance.errorMessage();
-      msg += ". 3D functions will be disabled.";
-      QMessageBox::warning(this, "OpenGL Initialization", msg);
-    }
-
-    Z3DApplicationInstance.setStereoSupported(m_sharedContext->format().stereo());
-    m_sharedContext->hide();
-  }
-#endif
 }
 
 void ZMainWindow::updateRecentFileActions()

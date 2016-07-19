@@ -29,7 +29,7 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
     sh $srcDIR/configure --host x86_64-pc-linux-gnu --enable-static --disable-shared
 elif [[ "$OSTYPE" == "darwin"* ]]; then
     echo 'Mac'
-    sh $srcDIR/configure --host x86_64-apple-darwin NASM=$currDIR/nasm --enable-static --disable-shared CFLAGS='-mmacosx-version-min=10.7 -O3' LDFLAGS='-mmacosx-version-min=10.7'
+    sh $srcDIR/configure --host x86_64-apple-darwin NASM=$currDIR/nasm --enable-static --disable-shared CFLAGS='-mmacosx-version-min=10.8 -O3' LDFLAGS='-mmacosx-version-min=10.8'
 fi
 
 make -j $numCores

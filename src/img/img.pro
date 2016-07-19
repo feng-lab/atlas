@@ -38,15 +38,18 @@ QMAKE_CXXFLAGS += /utf-8  # https://blogs.msdn.microsoft.com/vcblog/2016/02/22/n
 
 #Qt5
 isEqual(QT_MAJOR_VERSION,5) | greaterThan(QT_MAJOR_VERSION,5) {
-isEqual(QT_MAJOR_VERSION,5) {
-  lessThan(QT_MINOR_VERSION,7) {
-    message("Cannot build imgio with Qt version $${QT_VERSION}.")
-    error("Use at least Qt 5.7.0.")
-  }
-}
-    QMAKE_CXXFLAGS += -mmacosx-version-min=10.7 -std=c++14 -stdlib=libc++
+    isEqual(QT_MAJOR_VERSION,5) {
+    lessThan(QT_MINOR_VERSION,7) {
+        message("Cannot build img with Qt version $${QT_VERSION}.")
+        error("Use at least Qt 5.7.0.")
+    }
+    }
+    QMAKE_CXXFLAGS += -mmacosx-version-min=10.8 -std=c++14 -stdlib=libc++
     QMAKE_LFLAGS += -stdlib=libc++
     CONFIG += c++14
+} else {
+    message("Cannot build img with Qt version $${QT_VERSION}.")
+    error("Use at least Qt 5.7.0.")
 }
 
 CONFIG += rtti exceptions

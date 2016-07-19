@@ -1,9 +1,5 @@
 #include "z3dgl.h"
-#ifndef _QT4_
 #include <QtMath>
-#else
-#include <cmath>
-#endif
 #include "z3drendererbase.h"
 
 #include "z3dprimitiverenderer.h"

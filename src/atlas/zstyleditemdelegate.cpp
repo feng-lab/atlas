@@ -34,11 +34,7 @@ void ZStyledItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
 
     if (option.state == QStyle::State_Selected)
       painter->fillRect(option.rect, option.palette.highlight());
-#ifndef _QT4_
     QPixmap map = m_btn->grab();
-#else
-    QPixmap map = QPixmap::grabWidget(m_btn);
-#endif
     painter->drawPixmap(option.rect.x(),option.rect.y(),map);
   } else {
     QStyledItemDelegate::paint(painter,option, index);

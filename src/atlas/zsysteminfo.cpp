@@ -483,11 +483,9 @@ void ZSystemInfo::detectOS()
     case QSysInfo::WV_WINDOWS8:
       m_osString = "Windows 8 (operating system version 6.2)";
       break;
-#ifndef _QT4_
     case QSysInfo::WV_WINDOWS8_1:
       m_osString = "Windows 8.1 (operating system version 6.3)";
       break;
-#endif
     default:
       m_osString = "unknown win os";
     }
@@ -503,14 +501,12 @@ void ZSystemInfo::detectOS()
   case QSysInfo::MV_10_9:
     m_osString = "Mac OS X MAVERICKS";
     break;
-#ifndef _QT4_
   case QSysInfo::MV_10_10:
     m_osString = "Mac OS X YOSEMITE";
     break;
   case QSysInfo::MV_10_11:
     m_osString = "Mac OS X El Capitan";
     break;
-#endif
   default:
     m_osString = "unknown mac os";
     return;

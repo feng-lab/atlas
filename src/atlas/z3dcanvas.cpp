@@ -4,13 +4,9 @@
 #include <algorithm>
 #include "z3dcanvaseventlistener.h"
 #include "z3dscene.h"
-#include "QsLog/QsLog.h"
-#ifndef _QT4_
+#include "QsLog.h"
 #include <QWindow>
 #include <QOpenGLWidget>
-#else
-#include <QGLWidget>
-#endif
 
 namespace nim {
 
@@ -246,12 +242,7 @@ double Z3DCanvas::devicePixelRatio()
 #else
 
 
-#ifndef _QT4_
 Z3DCanvas::Z3DCanvas(const QString &title, int width, int height, QWidget* parent, Qt::WindowFlags f)
-#else
-Z3DCanvas::Z3DCanvas(const QString &title, int width, int height, const QGLFormat &format,
-                     QWidget* parent, const QGLWidget *shareWidget, Qt::WindowFlags f)
-#endif
   : QGraphicsView(parent)
   , m_fullscreen(false)
   , m_glWidget(nullptr)
@@ -260,12 +251,7 @@ Z3DCanvas::Z3DCanvas(const QString &title, int width, int height, const QGLForma
   setAlignment(Qt::AlignLeft | Qt::AlignTop);
   resize(width, height);
 
-#ifndef _QT4_
   m_glWidget = new QOpenGLWidget(nullptr, f);
-#else
-  m_glWidget = new QGLWidget(format, NULL, shareWidget, f);
-  m_glWidget->makeCurrent();
-#endif
   m_3dScene = new Z3DScene(width, height, m_glWidget->format().stereo(), this);
 
   setViewport(m_glWidget);
@@ -299,24 +285,10 @@ Z3DCanvas::Z3DCanvas(const QString &title, int width, int height, const QGLForma
 
 Z3DCanvas::~Z3DCanvas() {}
 
-#ifndef _QT4_
 QSurfaceFormat Z3DCanvas::format() const
 {
   return m_glWidget->format();
 }
-#else
-QGLFormat Z3DCanvas::format() const
-{
-  return m_glWidget->format();
-}
-#endif
-
-#ifdef _QT4_
-void Z3DCanvas::getGLFocus()
-{
-  m_glWidget->makeCurrent();
-}
-#endif
 
 void Z3DCanvas::toggleFullScreen()
 {
@@ -510,12 +482,8 @@ void Z3DCanvas::broadcastEvent(QEvent *e, int w, int h)
 
 double Z3DCanvas::devicePixelRatio()
 {
-#ifndef _QT4_
   return (window() && window()->windowHandle()) ?
         window()->windowHandle()->devicePixelRatio() : 1.0;
-#else
-  return 1.0;
-#endif
 }
 
 #endif

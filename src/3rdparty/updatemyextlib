@@ -18,16 +18,16 @@ fi
 srcArchive=$srcPackageDIR/freeimage-FreeImage.tar.gz
 tar -zxf "$srcArchive" -C $baseDIR
 
-if [ -d $baseDIR/libjpeg-turbo-1.5.5 ]
+if [ -d $baseDIR/libjpeg-turbo-1.5.0 ]
 then
   rm -rf $baseDIR/libjpeg-turbo-1.5.0
 fi
 srcArchive=$srcPackageDIR/libjpeg-turbo-1.5.0.tar.gz
 tar -zxf "$srcArchive" -C $baseDIR
 
-if [ -d $baseDIR/hdf5-1.10.0 ]
+if [ -d $baseDIR/hdf5-1.10.0-patch1 ]
 then
-  rm -rf $baseDIR/hdf5-1.10.0
+  rm -rf $baseDIR/hdf5-1.10.0-patch1
 fi
 srcArchive=$srcPackageDIR/hdf5-1.10.0-patch1.tar.bz2
 tar -jxf "$srcArchive" -C $baseDIR
@@ -40,11 +40,11 @@ srcArchive=$srcPackageDIR/GeometricTools/GeometricToolsEngine3p2.zip
 7z x -y -o$baseDIR "$srcArchive"
 
 if [[ "$OSTYPE" == "msys" ]]; then
-  if [ -d $baseDIR/ispc-v1.9.0-windows-vs2015 ]
+  if [ -d $baseDIR/ispc-v1.9.1-windows-vs2015 ]
   then
-    rm -rf $baseDIR/ispc-v1.9.0-windows-vs2015
+    rm -rf $baseDIR/ispc-v1.9.1-windows-vs2015
   fi
-  srcArchive=$srcPackageDIR/ispc-v1.9.0-windows-vs2015.zip
+  srcArchive=$srcPackageDIR/ispc-v1.9.1-windows-vs2015.zip
   7z x -y -o$baseDIR "$srcArchive"
 
   if [ -d $baseDIR/zlib-1.2.8 ]
@@ -54,11 +54,11 @@ if [[ "$OSTYPE" == "msys" ]]; then
   srcArchive=$srcPackageDIR/zlib128.zip
   7z x -y -o$baseDIR "$srcArchive"
 else
-  if [ -d $baseDIR/ispc-v1.9.0-osx ]
+  if [ -d $baseDIR/ispc-v1.9.1-osx ]
   then
-    rm -rf $baseDIR/ispc-v1.9.0-osx
+    rm -rf $baseDIR/ispc-v1.9.1-osx
   fi
-  srcArchive=$srcPackageDIR/ispc-v1.9.0-osx.tar.gz
+  srcArchive=$srcPackageDIR/ispc-v1.9.1-osx.tar.gz
   tar -zxf "$srcArchive" -C $baseDIR
 
   srcArchive=$srcPackageDIR/ffmpeg-3.1.1.7z
@@ -77,9 +77,9 @@ if [ -d $currDIR/eigen ]
 then
   rm -rf $currDIR/eigen
 fi
-srcArchive=$srcPackageDIR/eigen-eigen-07105f7124f9.tar.bz2
+srcArchive=$srcPackageDIR/eigen-eigen-dc6cfdf9bcec.tar.bz2
 tar -jxf "$srcArchive" -C $currDIR
-mv $currDIR/eigen-eigen-07105f7124f9 $currDIR/eigen
+mv $currDIR/eigen-eigen-dc6cfdf9bcec $currDIR/eigen
 
 if [ -d $currDIR/glm ]
 then

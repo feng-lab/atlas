@@ -1,8 +1,6 @@
 #include "zcolormapwidgetwitheditorwindow.h"
 #include <QtGui>
-#ifndef _QT4_
 #include <QtWidgets>
-#endif
 #include "zcolormap.h"
 #include "zcolormapeditor.h"
 #include "QsLog.h"

@@ -1,9 +1,7 @@
 #include "zcolormapeditor.h"
 #include "zcolormap.h"
 #include <QtGui>
-#ifndef _QT4_
 #include <QtWidgets>
-#endif
 #include "QsLog.h"
 
 namespace nim {

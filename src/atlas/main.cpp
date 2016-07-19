@@ -21,7 +21,6 @@
 #include "ippi.h"
 #endif
 
-#ifndef _QT4_
 #include <QSurfaceFormat>
 
 #include <QStack>
@@ -75,6 +74,9 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
   case QtDebugMsg:
     LDEBUGF(context.file, context.line, context.function) << qPrintable(msg);
     break;
+  case QtInfoMsg:
+    LINFOF(context.file, context.line, context.function) << qPrintable(msg);
+    break;
   case QtWarningMsg:
     LWARNF(context.file, context.line, context.function) << qPrintable(msg);
     break;
@@ -88,25 +90,6 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
     break;
   }
 }
-#else
-void myMessageOutput(QtMsgType type, const char *msg)
-{
-  switch (type) {
-  case QtDebugMsg:
-    LDEBUG_NLN() << msg;
-    break;
-  case QtWarningMsg:
-    LWARN_NLN() << msg;
-    break;
-  case QtCriticalMsg:
-    LERROR_NLN() << msg;
-    break;
-  case QtFatalMsg:
-    LFATAL_NLN() << msg;
-    abort();
-  }
-}
-#endif    // qt version > 5.0.0
 
 // force NVidia Optimus to used dedicated graphics
 #ifdef _WIN32
@@ -118,7 +101,6 @@ extern "C" {
 
 int main(int argc, char *argv[])
 {
-#ifndef _QT4_
   QSurfaceFormat format;
 
 #if defined(__APPLE__) && defined(_USE_CORE_PROFILE_)
@@ -127,11 +109,8 @@ int main(int argc, char *argv[])
 #endif
   //format.setStereo(true);
   QSurfaceFormat::setDefaultFormat(format);
-#endif
 
-#ifndef _QT4_
   QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
-#endif
   QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings, true);
   QApplication app(argc, argv);
   app.setApplicationName("Atlas");
@@ -156,11 +135,7 @@ int main(int argc, char *argv[])
   logger.setLoggingLevel(QsLogging::InfoLevel);
 #endif
 
-#ifndef _QT4_
   qInstallMessageHandler(myMessageOutput);
-#else
-  qInstallMsgHandler(myMessageOutput);
-#endif
 
   LINFO() << "--- App Log Started ---";
   ZSystemInfoInstance.logOSInfo();
@@ -222,13 +197,7 @@ int main(int argc, char *argv[])
     return app.exec();
   }
 
-#if (defined __APPLE__) && (defined _QT4_)
-  app.setGraphicsSystem("raster");
-#endif
-
-#ifndef _QT4_
   //qApp->installEventFilter(new MacEventFilter(qApp));
-#endif
 
   // Our MainWindow has Qt::WA_DeleteOnClose attribute, don't delete again.
   nim::ZMainWindow *mainWin = new nim::ZMainWindow(modelDestination);

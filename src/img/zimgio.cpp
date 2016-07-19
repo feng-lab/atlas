@@ -575,11 +575,7 @@ void ZImgIO::getQtWriteNameFilter(QStringList &filters, QList<FileFormat> &forma
   formats.clear();
   comps.clear();
   for (auto it = m_ioFormats.cbegin(); it != m_ioFormats.cend(); ++it) {
-#ifdef _QT4_
-    if (it->second->supportWrite() && it->first != FileFormat::OmeTiff) {  // skip ome tiff since mac file dialog doesn't support double extension like .ome.tiff todo: find workaround
-#else
     if (it->second->supportWrite()) {
-#endif
       QString filter = it->second->fullName() + QString(" (*.") +
           it->second->extensions().join(" *.") + QString(")");
       if (it->first == FileFormat::OmeTiff || it->first == FileFormat::Tiff) {
@@ -603,23 +599,6 @@ void ZImgIO::getQtWriteNameFilter(QStringList &filters, QList<FileFormat> &forma
       comps.push_back(Compression::NONE);
     }
   }
-#ifdef _QT4_
-  // add ome tiff
-  std::map<FileFormat, ZImgFormat*>::const_iterator it = m_ioFormats.find(FileFormat::OmeTiff);
-  QString filter = it->second->fullName() + QString(" (*.") +
-      it->second->extensions().join(" *.") + QString(")");
-  QString flt = QString("LZW Compressed ") + filter;  // todo: use custom dialog and set compression as option
-  filters.push_back(flt);
-  formats.push_back(it->first);
-  comps.push_back(Compression::LZW);
-  flt = QString("DEFLATE Compressed ") + filter;
-  filters.push_back(flt);
-  formats.push_back(it->first);
-  comps.push_back(Compression::DEFLATE);
-  filters.push_back(filter);
-  formats.push_back(it->first);
-  comps.push_back(Compression::NONE);
-#endif
 }
 
 bool ZImgIO::fileExtensionReadSupported(const QString &filename) const

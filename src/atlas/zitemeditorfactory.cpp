@@ -8,11 +8,7 @@ ZItemEditorFactory::ZItemEditorFactory()
 {
 }
 
-#ifndef _QT4_
 QWidget *ZItemEditorFactory::createEditor(int type, QWidget *parent) const
-#else
-QWidget *ZItemEditorFactory::createEditor(QVariant::Type type, QWidget *parent) const
-#endif
 {
   if (type == QVariant::Double) {
     QDoubleSpinBox *sb = new QDoubleSpinBox(parent);

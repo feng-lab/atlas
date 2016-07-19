@@ -3,13 +3,8 @@
 
 #include "zglmutils.h"
 #include <QGraphicsView>
-#ifndef _QT4_
 #include <QSurfaceFormat>
 class QOpenGLWidget;
-#else
-#include <QGLFormat>
-class QGLWidget;
-#endif
 #include <QInputEvent>
 #include <deque>
 #include <QShortcut>
@@ -110,20 +105,11 @@ class Z3DCanvas : public QGraphicsView
 {
   Q_OBJECT
 public:
-#ifndef _QT4_
   Z3DCanvas(const QString &title, int width, int height, QWidget* parent = nullptr, Qt::WindowFlags f = 0);
-#else
-  Z3DCanvas(const QString &title, int width, int height, const QGLFormat &format,
-            QWidget* parent = nullptr, const QGLWidget * shareWidget = nullptr, Qt::WindowFlags f = 0);
-#endif
 
   virtual ~Z3DCanvas();
 
-#ifndef _QT4_
   QSurfaceFormat format() const;
-#else
-  QGLFormat format() const;
-#endif
 
   void setNetworkEvaluator(Z3DNetworkEvaluator *n);
   void setFakeStereoOnce();
@@ -135,11 +121,7 @@ public:
   void broadcastEvent(QEvent* e, int w, int h);
 
   // Set the opengl context of this canvas as the current one.
-#ifndef _QT4_
   inline void getGLFocus() {}
-#else
-  void getGLFocus();
-#endif
   void toggleFullScreen();
   void forceUpdate() { auto pe = std::make_unique<QPaintEvent>(rect()); paintEvent(pe.get()); }
   void updateAll();
@@ -171,9 +153,7 @@ protected:
   virtual void dragEnterEvent(QDragEnterEvent *event) override;
   virtual void dropEvent(QDropEvent *event) override;
 
-#ifndef _QT4_
   void setCursor(const QCursor &c) { viewport()->setCursor(c); }
-#endif
 
   void rotateX();
   void rotateY();
@@ -188,11 +168,7 @@ private:
 private:
   bool m_fullscreen;
 
-#ifndef _QT4_
   QOpenGLWidget* m_glWidget;
-#else
-  QGLWidget* m_glWidget;
-#endif
   Z3DScene* m_3dScene;
   std::deque<Z3DCanvasEventListener*> m_listeners;
 

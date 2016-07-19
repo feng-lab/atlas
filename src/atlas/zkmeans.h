@@ -19,11 +19,7 @@
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
 #else
-#ifndef _QT4_
 #include <QtConcurrent/QtConcurrentMap>
-#else
-#include <QtConcurrentMap>
-#endif
 #endif
 
 namespace nim {

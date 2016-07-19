@@ -22,9 +22,9 @@ cd $srcDIR
 # patch to build on OSX
 $currDIR/massedit.py -w -e "re.sub(r'#include <GTGraphics.h>', '', line)" -e "re.sub(r'#include <GTPhysics.h>', '', line)" -e "re.sub(r'#include <GTApplications.h>', '', line)" $srcDIR/Include/GTEngine.h
 
-# xcodebuild -project GTEngine.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 CLANG_CXX_LANGUAGE_STANDARD=c++14 -showBuildSettings
+# xcodebuild -project GTEngine.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.8 CLANG_CXX_LANGUAGE_STANDARD=c++14 -showBuildSettings
 
-xcodebuild -project GTEngine.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 CLANG_CXX_LANGUAGE_STANDARD=c++14
+xcodebuild -project GTEngine.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.8 CLANG_CXX_LANGUAGE_STANDARD=c++14
 
 mkdir $installDIR
 mkdir $installDIR/lib
@@ -58,12 +58,12 @@ cd $currDIR
 
 # cd LibCore
 # chmod +x *.sh
-# xcodebuild -project LibCore.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 OTHER_CPLUSPLUSFLAGS="-std=c++14 -stdlib=libc++"
+# xcodebuild -project LibCore.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.8 OTHER_CPLUSPLUSFLAGS="-std=c++14 -stdlib=libc++"
 # cd ..
 
 # cd LibMathematics
 # chmod +x *.sh
-# xcodebuild -project LibMathematics.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.7 OTHER_CPLUSPLUSFLAGS="-std=c++14 -stdlib=libc++"
+# xcodebuild -project LibMathematics.xcodeproj -configuration Default -target "Release Static" build -arch x86_64 MACOSX_DEPLOYMENT_TARGET=10.8 OTHER_CPLUSPLUSFLAGS="-std=c++14 -stdlib=libc++"
 # cd ..
 
 # cp -R $srcDIR/SDK/ $installDIR

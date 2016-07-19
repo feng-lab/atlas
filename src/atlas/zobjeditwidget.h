@@ -37,8 +37,10 @@ public:
   bool showObjEditWidgetOfObj(size_t id);
   void updateEditWidgetTitleOfObj(size_t id);
 
-private:
+private slots:
   void writeLogMessage(const QsLogging::LogMessage &message);
+
+private:
   void removeObjEditWidgetOfObj(size_t id);
   void closeTab(int index);
 

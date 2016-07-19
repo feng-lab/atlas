@@ -1,9 +1,7 @@
 #include "zstitchimagedialog.h"
 
 #include <QtGui>
-#ifndef _QT4_
 #include <QtWidgets>
-#endif
 #include <QtAlgorithms>
 
 #include "zimg.h"

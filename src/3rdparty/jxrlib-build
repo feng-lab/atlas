@@ -22,7 +22,7 @@ fi
 cd $srcDIR
 
 # patch
-$currDIR/massedit.py -w -e "re.sub(r'CFLAGS=', r'CFLAGS=-mmacosx-version-min=10.7 ', line)" $srcDIR/Makefile
+$currDIR/massedit.py -w -e "re.sub(r'CFLAGS=', r'CFLAGS=-mmacosx-version-min=10.8 ', line)" $srcDIR/Makefile
 
 make -j $numCores install DIR_INSTALL=$installDIR
 

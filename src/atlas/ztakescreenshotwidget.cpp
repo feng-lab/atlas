@@ -1,9 +1,5 @@
 #include "ztakescreenshotwidget.h"
-#ifndef _QT4_
 #include <QStandardPaths>
-#else
-#include <QDesktopServices>
-#endif
 #include <QDateTime>
 #include <QPushButton>
 #include <QRadioButton>
@@ -331,11 +327,7 @@ void ZTakeScreenShotWidget::createWidget()
   hlo->getContentsMargins(&left, &top, &right, &bottom);
   hlo->setContentsMargins(left+20, top, right, bottom);
   m_folderWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::Directory, "output folder:", QString(),
-                                       #ifndef _QT4_
                                          QBoxLayout::LeftToRight, QStandardPaths::writableLocation(QStandardPaths::DesktopLocation), this);
-                                       #else
-                                         QBoxLayout::LeftToRight, QDesktopServices::storageLocation(QDesktopServices::DesktopLocation), this);
-                                       #endif
   hlo->addWidget(m_folderWidget);
   lo->addLayout(hlo);
 

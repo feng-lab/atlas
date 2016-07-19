@@ -65,9 +65,7 @@ private:
     else
       m_lineWidth = m_srcLineWidth - 0.9;
 
-#ifndef _QT4_
     m_lineWidth *= qApp->devicePixelRatio();
-#endif
   }
 
   Z3DShaderGroup& currentShaderGrp() { return m_useGeomLineShader && m_useSmoothLine ? m_smoothLineShaderGrp : m_lineShaderGrp; }

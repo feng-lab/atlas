@@ -27,7 +27,7 @@ mkdir $buildDIR
 #cd %buildDIR
 cd $srcDIR
 
-$srcDIR/configure.py --cc=clang --cc-abi-flags="-mmacosx-version-min=10.7 -stdlib=libc++ -std=c++14" --prefix=$installDIR
+$srcDIR/configure.py --cc=clang --cc-abi-flags="-mmacosx-version-min=10.8 -stdlib=libc++ -std=c++14" --prefix=$installDIR
 
 make -j $numCores install
 

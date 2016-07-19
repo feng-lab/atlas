@@ -1,8 +1,5 @@
 #include "z3dview.h"
 
-#ifdef _QT4_
-#include <QGLFormat>
-#endif
 #include "z3dcanvas.h"
 #include "z3daxisfilter.h"
 #include "z3dcompositor.h"
@@ -107,27 +104,8 @@ Z3DView::Z3DView(ZDoc *doc, bool stereo, Z3DMainWindow *parent)
   , m_lock(false)
 {
   assert(m_doc);
-#ifndef _QT4_
   m_canvas = new Z3DCanvas("", 512, 512);
   init();
-#else
-  // init canvas and opengl context
-  QGLFormat format = QGLFormat();
-  format.setAlpha(true);
-  format.setDepth(true);
-  format.setDoubleBuffer(true);
-  format.setRgba(true);
-  format.setSampleBuffers(true);
-  if (m_isStereoView)
-    format.setStereo(true);
-  //if (QSysInfo::MacintoshVersion >= QSysInfo::MV_LION) {
-    //format.setVersion(3, 2);
-    //format.setProfile(QGLFormat::CoreProfile);
-  //}
-  m_canvas = new Z3DCanvas("", 512, 512, format);
-  m_canvas->getGLFocus();
-  init();
-#endif
 
   createActions();
 }

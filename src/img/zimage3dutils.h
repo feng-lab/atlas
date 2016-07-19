@@ -10,11 +10,7 @@
 #ifndef _USE_QTCONCURRENT_
 #include <tbb/parallel_for.h>
 #else
-#ifndef _QT4_
 #include <QtConcurrent/QtConcurrentMap>
-#else
-#include <QtConcurrentMap>
-#endif
 #endif
 #include <QList>
 

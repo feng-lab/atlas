@@ -1,8 +1,6 @@
 #include "zimagefilterkernel.h"
 
-#ifndef _QT4_
 #include <QtMath>  //for M_PI
-#endif
 #include <cmath>
 
 namespace nim {

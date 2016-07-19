@@ -1,9 +1,7 @@
 #include "zanalysisworklistdialog.h"
 
 #include <QtGui>
-#ifndef _QT4_
 #include <QtWidgets>
-#endif
 #include <QTableView>
 #include "QsLog.h"
 #include "zanalysisworklistmodel.h"
