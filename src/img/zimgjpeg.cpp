@@ -10,6 +10,7 @@
 #include "zimage2dutils.h"
 #include <memory>
 #include <QFile>
+#include "folly/ScopeGuard.h"
 
 namespace {
 
@@ -57,15 +58,10 @@ void my_error_exit(j_common_ptr cinfo)
 
   /* Create the message */
   (cinfo->err->format_message) (cinfo, errbuffer);
-
-  QString error = QString("Libjpeg-turbo error: %1").arg(errbuffer);
-
-  jpeg_destroy_decompress((j_decompress_ptr)cinfo);
-
-  throw nim::ZIOException(error);
+  throw nim::ZIOException(QString("Libjpeg-turbo error: %1").arg(errbuffer));
 }
 
-void startReading(FILE *infile, jpeg_decompress_struct &cinfo, my_error_mgr &jerr)
+void createcinfo(jpeg_decompress_struct &cinfo, my_error_mgr &jerr)
 {
   /* We set up the normal JPEG error routines, then override error_exit. */
   cinfo.err = jpeg_std_error(&jerr.pub);
@@ -85,7 +81,10 @@ void startReading(FILE *infile, jpeg_decompress_struct &cinfo, my_error_mgr &jer
   //  }
   /* Now we can initialize the JPEG decompression object. */
   jpeg_create_decompress(&cinfo);
+}
 
+void startReading(FILE *infile, jpeg_decompress_struct &cinfo)
+{
   jpeg_stdio_src(&cinfo, infile);
 
   jpeg_save_markers(&cinfo, JPEG_APP0+1, 0xFFFF);
@@ -113,27 +112,8 @@ void startReading(FILE *infile, jpeg_decompress_struct &cinfo, my_error_mgr &jer
   cinfo.quantize_colors = FALSE;
 }
 
-void startReading(unsigned char *inbuffer, size_t insize, jpeg_decompress_struct &cinfo, my_error_mgr &jerr)
+void startReading(unsigned char *inbuffer, size_t insize, jpeg_decompress_struct &cinfo)
 {
-  /* We set up the normal JPEG error routines, then override error_exit. */
-  cinfo.err = jpeg_std_error(&jerr.pub);
-  jerr.pub.error_exit = my_error_exit;
-  //  /* Establish the setjmp return context for my_error_exit to use. */
-  //  if (setjmp(jerr.setjmp_buffer)) {
-  //    char errbuffer[JMSG_LENGTH_MAX];
-
-  //    /* Create the message */
-  //    (cinfo.err->format_message) ((j_common_ptr)(&cinfo), errbuffer);
-
-  //    /* If we get here, the JPEG code has signaled an error.
-  //       * We need to clean up the JPEG object, close the input file, and return.
-  //       */
-  //    jpeg_destroy_decompress(&cinfo);
-  //    throw ZIOException(QString("Libjpeg-turbo error:") + QString(errbuffer));
-  //  }
-  /* Now we can initialize the JPEG decompression object. */
-  jpeg_create_decompress(&cinfo);
-
   jpeg_mem_src(&cinfo, inbuffer, insize);
 
   jpeg_save_markers(&cinfo, JPEG_APP0+1, 0xFFFF);
@@ -202,14 +182,6 @@ void readInfoFromJpeg(jpeg_decompress_struct &cinfo, ZImgInfo &info)
     std::swap(info.width, info.height);
 }
 
-void finishReading(jpeg_decompress_struct &cinfo)
-{
-  /* Step 8: Release JPEG decompression object */
-
-  /* This is an important step since it will release a good deal of memory. */
-  jpeg_destroy_decompress(&cinfo);
-}
-
 void readImgFromJpeg(jpeg_decompress_struct &cinfo, ZImg &img, const ZImgRegion &region, uint16_t orientation)
 {
   /* Step 5: Start decompressor */
@@ -226,7 +198,6 @@ void readImgFromJpeg(jpeg_decompress_struct &cinfo, ZImg &img, const ZImgRegion 
   imgInfo.createDefaultDescriptions();
 
   if (region.isEmpty() || !region.isValid(imgInfo)) {
-    finishReading(cinfo);
     throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(region.toQString()));
   }
 
@@ -386,13 +357,19 @@ void ZImgJpeg::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, s
 
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
+  createcinfo(cinfo, jerr);
+  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo](void) {
+    /* Step 8: Release JPEG decompression object */
 
-  startReading(infile.get(), cinfo, jerr);
+    /* This is an important step since it will release a good deal of memory. */
+    jpeg_destroy_decompress(&cinfo);
+  });
+  Q_UNUSED(guard1);
+
+  startReading(infile.get(), cinfo);
 
   infos.resize(1);
   readInfoFromJpeg(cinfo, infos[0]);
-
-  finishReading(cinfo);
 
   createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 }
@@ -417,8 +394,16 @@ void ZImgJpeg::readMetadata(const QString &filename, ZImgMetadata &meta, size_t 
 
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
+  createcinfo(cinfo, jerr);
+  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo](void) {
+    /* Step 8: Release JPEG decompression object */
 
-  startReading(infile.get(), cinfo, jerr);
+    /* This is an important step since it will release a good deal of memory. */
+    jpeg_destroy_decompress(&cinfo);
+  });
+  Q_UNUSED(guard1);
+
+  startReading(infile.get(), cinfo);
 
   // extract exif
   jpeg_saved_marker_ptr marker = cinfo.marker_list;
@@ -442,8 +427,6 @@ void ZImgJpeg::readMetadata(const QString &filename, ZImgMetadata &meta, size_t 
     marker = marker->next;
     continue;
   }
-
-  finishReading(cinfo);
 }
 
 void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail, const ZImgRegion &region, size_t scene)
@@ -466,8 +449,16 @@ void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
 
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
+  createcinfo(cinfo, jerr);
+  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo](void) {
+    /* Step 8: Release JPEG decompression object */
 
-  startReading(infile.get(), cinfo, jerr);
+    /* This is an important step since it will release a good deal of memory. */
+    jpeg_destroy_decompress(&cinfo);
+  });
+  Q_UNUSED(guard1);
+
+  startReading(infile.get(), cinfo);
 
   // extract thumbnails
   jpeg_saved_marker_ptr marker = cinfo.marker_list;
@@ -491,6 +482,14 @@ void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
 
               struct jpeg_decompress_struct thumbCinfo;
               my_error_mgr thumbJerr;
+              createcinfo(thumbCinfo, thumbJerr);
+              folly::ScopeGuard guard2 = folly::makeGuard([&thumbCinfo](void) {
+                /* Step 8: Release JPEG decompression object */
+
+                /* This is an important step since it will release a good deal of memory. */
+                jpeg_destroy_decompress(&thumbCinfo);
+              });
+              Q_UNUSED(guard2);
 
               // don't slice thumbnail in x, y, c
               ZImgRegion thumbRegion = region;
@@ -503,9 +502,8 @@ void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
 
               ZImg thumbImg;
 
-              startReading(buf.data(), buf.size(), thumbCinfo, thumbJerr);
+              startReading(buf.data(), buf.size(), thumbCinfo);
               readImgFromJpeg(thumbCinfo, thumbImg, thumbRegion, getOrientation(cinfo));
-              finishReading(thumbCinfo);
 
               thumbnail.attachToPlane(thumbImg, 0, 0);
             }
@@ -521,8 +519,6 @@ void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
     marker = marker->next;
     continue;
   }
-
-  finishReading(cinfo);
 }
 
 void ZImgJpeg::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
@@ -545,12 +541,18 @@ void ZImgJpeg::readImg(const QString &filename, ZImg &img, const ZImgRegion &reg
 
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
+  createcinfo(cinfo, jerr);
+  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo](void) {
+    /* Step 8: Release JPEG decompression object */
 
-  startReading(infile.get(), cinfo, jerr);
+    /* This is an important step since it will release a good deal of memory. */
+    jpeg_destroy_decompress(&cinfo);
+  });
+  Q_UNUSED(guard1);
+
+  startReading(infile.get(), cinfo);
 
   readImgFromJpeg(cinfo, img, region, getOrientation(cinfo));
-
-  finishReading(cinfo);
 
   readThumbnail(filename, img.thumbnailRef(), region, scene);
   readMetadata(filename, img.metadataRef(), scene);
@@ -574,20 +576,34 @@ void ZImgJpeg::readInfo(uint8_t *mem, size_t size, ZImgInfo &info)
 {
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
+  createcinfo(cinfo, jerr);
+  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo](void) {
+    /* Step 8: Release JPEG decompression object */
 
-  startReading(mem, size, cinfo, jerr);
+    /* This is an important step since it will release a good deal of memory. */
+    jpeg_destroy_decompress(&cinfo);
+  });
+  Q_UNUSED(guard1);
+
+  startReading(mem, size, cinfo);
 
   readInfoFromJpeg(cinfo, info);
-
-  finishReading(cinfo);
 }
 
 void ZImgJpeg::readImg(uint8_t *mem, size_t size, uint8_t *des, size_t desSize)
 {
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
+  createcinfo(cinfo, jerr);
+  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo](void) {
+    /* Step 8: Release JPEG decompression object */
 
-  startReading(mem, size, cinfo, jerr);
+    /* This is an important step since it will release a good deal of memory. */
+    jpeg_destroy_decompress(&cinfo);
+  });
+  Q_UNUSED(guard1);
+
+  startReading(mem, size, cinfo);
 
   ZImg img;
   readImgFromJpeg(cinfo, img, ZImgRegion(), getOrientation(cinfo));
@@ -597,8 +613,6 @@ void ZImgJpeg::readImg(uint8_t *mem, size_t size, uint8_t *des, size_t desSize)
   }
 
   memcpy(des, img.channelData<uint8_t>(0), img.byteNumber());
-
-  finishReading(cinfo);
 }
 
 } // namespace
