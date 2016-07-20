@@ -34,7 +34,7 @@ ZImgIO::ZImgIO()
   m_ioFormats[FileFormat::Jpeg] = std::make_unique<ZImgJpeg>();
   m_ioFormats[FileFormat::JpegXR] = std::make_unique<ZImgJpegXR>();
   m_ioFormats[FileFormat::Png] = std::make_unique<ZImgPng>();
-  //m_ioFormats[FileFormat::FreeImage] = std::make_unique<ZImgFreeImage>();
+  m_ioFormats[FileFormat::FreeImage] = std::make_unique<ZImgFreeImage>();
   m_ioFormats[FileFormat::MetaImage] = std::make_unique<ZImgMetaImage>();
   m_ioFormats[FileFormat::ITKImage] = std::make_unique<ZImgITKImage>();
 #endif

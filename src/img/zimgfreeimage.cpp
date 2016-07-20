@@ -164,9 +164,9 @@ QStringList ZImgFreeImage::extensions() const
 {
   QStringList res;
   res << "bmp" << "cut" << "dds" << "exr" << "g3" << "gif" << "hdr" << "ico"
-      << "iff" << "lbm" << "j2k" << "j2c" << "jng" << "jp2" << "jpg" << "jif"
-      << "jpeg" << "jpe" << "koa" << "mng" << "pbm"
-      << "pcd" << "pcx" << "pfm" << "pgm" << "pct" << "pict" << "pic" << "png"
+      << "iff" << "lbm" << "j2k" << "j2c" << "jng" << "jp2" /*<< "jpg"*/ << "jif"
+      /*<< "jpeg"*/ << "jpe" << "koa" << "mng" << "pbm"
+      << "pcd" << "pcx" << "pfm" << "pgm" << "pct" << "pict" << "pic" /*<< "png"*/
       << "ppm" << "psd" << "ras" << "sgi" << "tga" << "targa" << "wbmp" << "xbm"
       << "webp" << "xpm" << "3fr" << "arw" << "bay" << "bmp" << "cap" << "cine"
       << "cr2" << "crw" << "cs1" << "dc2" << "dcr" << "dng" << "drf" << "dsc"
