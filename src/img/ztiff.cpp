@@ -1786,6 +1786,8 @@ ZTiffWriter::ZTiffWriter()
 
 void ZTiffWriter::startWriting(const QString &filename, Compression comp, int extraSample, bool bigTiff)
 {
+  m_tif.reset();
+
   if (comp == Compression::AUTO) {
     comp = defaultCompression(nullptr);
   } else {
@@ -1797,7 +1799,7 @@ void ZTiffWriter::startWriting(const QString &filename, Compression comp, int ex
 
   m_compression = comp;
   m_extraSample = extraSample;
-  finishWriting();
+
   TIFFSetWarningHandler(0);
   TIFFSetErrorHandler(LibtiffErrorHandler);
 #if defined(_WIN32) || defined(_WIN64)

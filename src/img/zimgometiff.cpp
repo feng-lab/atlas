@@ -111,7 +111,6 @@ void ZImgOmeTiff::writeImg(const QString &filename, const ZImg &img, Compression
       }
     }
   }
-  tiffWriter.finishWriting();
 }
 
 void ZImgOmeTiff::writeImg(const QString &filename, const ZImgSliceProvider &imgSliceProvider, Compression comp)
@@ -136,8 +135,6 @@ void ZImgOmeTiff::writeImg(const QString &filename, const ZImgSliceProvider &img
       }
     }
   }
-
-  tiffWriter.finishWriting();
 }
 
 bool ZImgOmeTiff::supportRead() const

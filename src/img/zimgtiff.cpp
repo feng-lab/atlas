@@ -153,7 +153,6 @@ void ZImgTiff::writeImg(const QString &filename, const ZImg &img, Compression co
       tiffWriter.writeIFD(img, z, t, -1, true);
     }
   }
-  tiffWriter.finishWriting();
 }
 
 void ZImgTiff::writeImg(const QString &filename, const ZImgSliceProvider &imgSliceProvider, Compression comp)
@@ -169,7 +168,6 @@ void ZImgTiff::writeImg(const QString &filename, const ZImgSliceProvider &imgSli
       tiffWriter.writeIFD(imgSliceProvider.slice(z,t), 0, 0, -1, true);
     }
   }
-  tiffWriter.finishWriting();
 }
 
 bool ZImgTiff::supportRead() const
