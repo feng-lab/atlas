@@ -1,13 +1,10 @@
-#define USE_LIBPNG
-
-#ifdef USE_LIBPNG
-
 #include "zimgpng.h"
 #include "png.h"
 #include "zioutils.h"
 #include <memory>
-#include "zscopeguard.h"
 #include <QFile>
+#include "zbenchtimer.h"
+#include "folly/ScopeGuard.h"
 
 namespace {
 
@@ -29,23 +26,45 @@ void pngReadWarningFunction(png_structp, const char *message)
   LWARN() << "Libpng warning:" << message;
 }
 
-//void readMetaDataFromState(const lodepng::State &state, ZImgMetadata &meta)
-//{
-//  if (state.info_png.time_defined) {
-//    LodePNGTime time = state.info_png.time;
-//    meta.attachToTopLevel(ZImgMetatag("Time", QString("%1-%2-%3T%4:%5:%6")
-//                                      .arg(time.year).arg(time.month).arg(time.day)
-//                                      .arg(time.hour).arg(time.minute).arg(time.second)));
-//  }
-//  for (size_t i=0; i<state.info_png.text_num; ++i) {
-//    meta.attachToTopLevel(ZImgMetatag(QString::fromUtf8(state.info_png.text_keys[i]),
-//                                      QString::fromUtf8(state.info_png.text_strings[i])));
-//  }
-//  for (size_t i=0; i<state.info_png.itext_num; ++i) {
-//    meta.attachToTopLevel(ZImgMetatag(QString::fromUtf8(state.info_png.itext_keys[i]),
-//                                      QString::fromUtf8(state.info_png.itext_strings[i])));
-//  }
-//}
+int skipIDATChunk(png_structp, png_unknown_chunkp chunk)
+{
+  //LINFO() << reinterpret_cast<const char*>(chunk->name);
+  if (chunk->name[0] == 'I' && chunk->name[1] == 'D' && chunk->name[2] == 'A' && chunk->name[3] == 'T') {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+void readMetaDataFromState(png_const_structrp pngPtr, png_inforp infoPtr, png_inforp endPtr,
+                           ZImgMetadata &meta)
+{
+  png_timep modTime;
+  if (png_get_tIME(pngPtr, infoPtr, &modTime)) {
+    meta.attachToTopLevel(ZImgMetatag("Time", QString("%1-%2-%3T%4:%5:%6")
+                                      .arg(modTime->year).arg(modTime->month).arg(modTime->day)
+                                      .arg(modTime->hour).arg(modTime->minute).arg(modTime->second)));
+  }
+  if (png_get_tIME(pngPtr, endPtr, &modTime)) {
+    meta.attachToTopLevel(ZImgMetatag("Time", QString("%1-%2-%3T%4:%5:%6")
+                                      .arg(modTime->year).arg(modTime->month).arg(modTime->day)
+                                      .arg(modTime->hour).arg(modTime->minute).arg(modTime->second)));
+  }
+  png_textp textPtr;
+  int numText;
+  if (png_get_text(pngPtr, infoPtr, &textPtr, &numText)) {
+    for (int i=0; i<numText; ++i) {
+      meta.attachToTopLevel(ZImgMetatag(QString::fromUtf8(textPtr[i].key),
+                                        QString::fromUtf8(textPtr[i].text)));
+    }
+  }
+  if (png_get_text(pngPtr, endPtr, &textPtr, &numText)) {
+    for (int i=0; i<numText; ++i) {
+      meta.attachToTopLevel(ZImgMetatag(QString::fromUtf8(textPtr[i].key),
+                                        QString::fromUtf8(textPtr[i].text)));
+    }
+  }
+}
 
 void readInfoFromBuf(png_const_structrp pngPtr, png_const_inforp infoPtr, ZImgInfo &info)
 {
@@ -197,6 +216,8 @@ QStringList ZImgPng::extensions() const
 void ZImgPng::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
                        std::vector<std::set<size_t>> *pyramidalRatios)
 {
+  //ZBenchTimer bt("a");
+  //bt.start();
 #ifdef _MSC_VER
   FILE *tmpf = nullptr;
   if (_wfopen_s(&tmpf, filename.toStdWString().c_str(), L"rb") != 0) {
@@ -212,28 +233,44 @@ void ZImgPng::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, st
 
   PngPack png;
   png.pngPtr = png_create_read_struct(PNG_LIBPNG_VER_STRING, &png, pngReadErrorFunction, pngReadWarningFunction);
-  if (!png.pngPtr) {
+  if (png.pngPtr) {
+    png.infoPtr = png_create_info_struct(png.pngPtr);
+    png.endPtr = png_create_info_struct(png.pngPtr);
+  }
+  if (!png.pngPtr || !png.infoPtr || !png.endPtr) {
+    png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
     throw ZIOException("Libpng read error");
   }
 
-  png.infoPtr = png_create_info_struct(png.pngPtr);
-  if (!png.infoPtr) {
-    png_destroy_read_struct(&png.pngPtr, nullptr, nullptr);
-  }
-
-  scope_guard guard1([&png](void) { // Use C++11 lambda.
+  folly::ScopeGuard guard1 = folly::makeGuard([&png](void) {
     png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
   });
+  Q_UNUSED(guard1);
 
   png_init_io(png.pngPtr, infile.get());
   png_set_crc_action(png.pngPtr, PNG_CRC_DEFAULT, PNG_CRC_DEFAULT);
 
+  png_set_read_user_chunk_fn(png.pngPtr, nullptr, skipIDATChunk);
+  unsigned char name[] = "IDAT";
+  png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, nullptr, 0);
+  png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, name, 1);
+
   png_read_info(png.pngPtr, png.infoPtr);
+  png_read_end(png.pngPtr, png.endPtr);
 
   infos.resize(1);
   readInfoFromBuf(png.pngPtr, png.infoPtr, infos[0]);
+  // looking for resolution at end part if we don't have it
+  if (infos[0].voxelSizeUnit == VoxelSizeUnit::none &&
+      png_get_x_pixels_per_meter(png.pngPtr, png.endPtr) > 0 &&
+      png_get_y_pixels_per_meter(png.pngPtr, png.endPtr) > 0) {
+    infos[0].voxelSizeUnit = VoxelSizeUnit::m;
+    infos[0].voxelSizeX = 1.0 / png_get_x_pixels_per_meter(png.pngPtr, png.endPtr);
+    infos[0].voxelSizeY = 1.0 / png_get_y_pixels_per_meter(png.pngPtr, png.endPtr);
+  }
 
   createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
+  //bt.stopAndLog();
 }
 
 void ZImgPng::readMetadata(const QString &filename, ZImgMetadata &meta, size_t scene)
@@ -241,23 +278,48 @@ void ZImgPng::readMetadata(const QString &filename, ZImgMetadata &meta, size_t s
   if (scene != 0) {
     throw ZIOException("invalid scene");
   }
-//  std::ifstream ifs;
-//  openFileStream(ifs, filename, std::ios_base::in | std::ios_base::binary);
 
-//  std::vector<char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+#ifdef _MSC_VER
+  FILE *tmpf = nullptr;
+  if (_wfopen_s(&tmpf, filename.toStdWString().c_str(), L"rb") != 0) {
+    throw ZIOException("can't open file");
+  }
+  std::unique_ptr<FILE, int (*)(FILE*)> infile(tmpf, fclose);
+#else
+  std::unique_ptr<FILE, int (*)(FILE*)> infile(fopen(QFile::encodeName(filename).constData(), "rb"), fclose);
+  if (!infile) {
+    throw ZIOException("can't open file");
+  }
+#endif
 
-//  lodepng::State state;
+  PngPack png;
+  png.pngPtr = png_create_read_struct(PNG_LIBPNG_VER_STRING, &png, pngReadErrorFunction, pngReadWarningFunction);
+  if (png.pngPtr) {
+    png.infoPtr = png_create_info_struct(png.pngPtr);
+    png.endPtr = png_create_info_struct(png.pngPtr);
+  }
+  if (!png.pngPtr || !png.infoPtr || !png.endPtr) {
+    png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
+    throw ZIOException("Libpng read error");
+  }
 
-//  state.decoder.read_text_chunks = 1;
-//  state.decoder.remember_unknown_chunks = 1;
+  folly::ScopeGuard guard1 = folly::makeGuard([&png](void) {
+    png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
+  });
+  Q_UNUSED(guard1);
 
-//  uint8_t* outRaw = nullptr;
-//  uint32_t w, h;
-//  lodepng_decode(&outRaw, &w, &h, &state, reinterpret_cast<uint8_t*>(buf.data()), buf.size());
-//  free(outRaw);
-//  checkPngError(state);
+  png_init_io(png.pngPtr, infile.get());
+  png_set_crc_action(png.pngPtr, PNG_CRC_DEFAULT, PNG_CRC_DEFAULT);
 
-//  readMetaDataFromState(state, meta);
+  png_set_read_user_chunk_fn(png.pngPtr, nullptr, skipIDATChunk);
+  unsigned char name[] = "IDAT";
+  png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, nullptr, 0);
+  png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, name, 1);
+
+  png_read_info(png.pngPtr, png.infoPtr);
+  png_read_end(png.pngPtr, png.endPtr);
+
+  readMetaDataFromState(png.pngPtr, png.infoPtr, png.endPtr, meta);
 }
 
 void ZImgPng::readThumbnail(const QString &, ZImgThumbernail &, const ZImgRegion &, size_t)
@@ -267,9 +329,12 @@ void ZImgPng::readThumbnail(const QString &, ZImgThumbernail &, const ZImgRegion
 
 void ZImgPng::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
 {
+  //ZBenchTimer bt("b");
+  //bt.start();
   if (scene != 0) {
     throw ZIOException("invalid scene");
   }
+
 #ifdef _MSC_VER
   FILE *tmpf = nullptr;
   if (_wfopen_s(&tmpf, filename.toStdWString().c_str(), L"rb") != 0) {
@@ -285,19 +350,19 @@ void ZImgPng::readImg(const QString &filename, ZImg &img, const ZImgRegion &regi
 
   PngPack png;
   png.pngPtr = png_create_read_struct(PNG_LIBPNG_VER_STRING, &png, pngReadErrorFunction, pngReadWarningFunction);
-  if (!png.pngPtr) {
+  if (png.pngPtr) {
+    png.infoPtr = png_create_info_struct(png.pngPtr);
+    png.endPtr = png_create_info_struct(png.pngPtr);
+  }
+  if (!png.pngPtr || !png.infoPtr || !png.endPtr) {
+    png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
     throw ZIOException("Libpng read error");
   }
 
-  png.infoPtr = png_create_info_struct(png.pngPtr);
-  png.endPtr = png_create_info_struct(png.pngPtr);
-  if (!png.infoPtr || !png.endPtr) {
-    png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
-  }
-
-  scope_guard guard1([&png](void) { // Use C++11 lambda.
+  folly::ScopeGuard guard1 = folly::makeGuard([&png](void) {
     png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
   });
+  Q_UNUSED(guard1);
 
   png_init_io(png.pngPtr, infile.get());
   png_set_crc_action(png.pngPtr, PNG_CRC_DEFAULT, PNG_CRC_DEFAULT);
@@ -319,13 +384,13 @@ void ZImgPng::readImg(const QString &filename, ZImg &img, const ZImgRegion &regi
   if (png_get_valid(png.pngPtr, png.infoPtr, PNG_INFO_tRNS) &&
       colorType != PNG_COLOR_TYPE_GRAY_ALPHA &&
       colorType != PNG_COLOR_TYPE_RGB_ALPHA) {
-    png_set_tRNS_to_alpha(png.pngPtr);
+    png_set_tRNS_to_alpha(png.pngPtr);   // will 1 2 4-bit image value to range 0-255
   }
   if (colorType == PNG_COLOR_TYPE_GRAY && bitDepth < 8) {
-    //png_set_expand_gray_1_2_4_to_8(png.pngPtr);
+    //png_set_expand_gray_1_2_4_to_8(png.pngPtr);  // will scale value to range 0-255
     png_set_packing(png.pngPtr);
   }
-  //if (bitDepth == 16) {
+  //if (bitDepth == 16) {     // we do it later with separateChannel
     //png_set_swap(png.pngPtr);
   //}
   png_set_interlace_handling(png.pngPtr);
@@ -345,7 +410,9 @@ void ZImgPng::readImg(const QString &filename, ZImg &img, const ZImgRegion &regi
 
   ZImg imgTmp(region.clip(info));
   separateChannel(outRaw.data(), info, region, imgTmp);
-  //readMetaDataFromState(state, imgTmp.metadataRef());
+
+  readMetaDataFromState(png.pngPtr, png.infoPtr, png.endPtr, imgTmp.metadataRef());
+  // looking for resolution at end part if we don't have it
   if (imgTmp.infoRef().voxelSizeUnit == VoxelSizeUnit::none &&
       png_get_x_pixels_per_meter(png.pngPtr, png.endPtr) > 0 &&
       png_get_y_pixels_per_meter(png.pngPtr, png.endPtr) > 0) {
@@ -358,6 +425,7 @@ void ZImgPng::readImg(const QString &filename, ZImg &img, const ZImgRegion &regi
   if (ratio > 1) {
     img.zoom(1.0 / ratio, 1.0 / ratio);
   }
+  //bt.stopAndLog();
 }
 
 bool ZImgPng::supportRead() const
@@ -371,285 +439,3 @@ bool ZImgPng::supportWrite() const
 }
 
 } // namespace nim
-
-#else  // USE_LODEPNG
-
-#include "zimgpng.h"
-#include <lodepng/lodepng.h>
-#include "zioutils.h"
-#include <memory>
-
-namespace {
-
-using namespace nim;
-
-inline void checkPngError(const lodepng::State &state)
-{
-  if (state.error != 0) {
-    throw ZIOException(lodepng_error_text(state.error));
-  }
-}
-
-void readMetaDataFromState(const lodepng::State &state, ZImgMetadata &meta)
-{
-  if (state.info_png.time_defined) {
-    LodePNGTime time = state.info_png.time;
-    meta.attachToTopLevel(ZImgMetatag("Time", QString("%1-%2-%3T%4:%5:%6")
-                                      .arg(time.year).arg(time.month).arg(time.day)
-                                      .arg(time.hour).arg(time.minute).arg(time.second)));
-  }
-  for (size_t i=0; i<state.info_png.text_num; ++i) {
-    meta.attachToTopLevel(ZImgMetatag(QString::fromUtf8(state.info_png.text_keys[i]),
-                                      QString::fromUtf8(state.info_png.text_strings[i])));
-  }
-  for (size_t i=0; i<state.info_png.itext_num; ++i) {
-    meta.attachToTopLevel(ZImgMetatag(QString::fromUtf8(state.info_png.itext_keys[i]),
-                                      QString::fromUtf8(state.info_png.itext_strings[i])));
-  }
-}
-
-void readInfoFromBuf(const std::vector<char>& buf, lodepng::State &state, ZImgInfo &info)
-{
-  uint32_t w;
-  uint32_t h;
-
-  state.decoder.ignore_crc = 1;
-  lodepng_inspect(&w, &h, &state, reinterpret_cast<const uint8_t*>(buf.data()), buf.size());
-  checkPngError(state);
-
-  info.width = w;
-  info.height = h;
-  info.depth = 1;
-  switch (state.info_png.color.colortype) {
-  case LCT_GREY:
-    info.numChannels = 1;
-    break;
-  case LCT_GREY_ALPHA:
-    info.numChannels = 2;
-    info.lastChannelIsAlphaChannel = true;
-    break;
-  case LCT_RGB:
-    info.numChannels = 3;
-    break;
-  case LCT_RGBA:
-  case LCT_PALETTE:
-    info.numChannels = 4;
-    info.lastChannelIsAlphaChannel = true;
-    break;
-  default:
-    throw ZIOException("not supported png colortype");
-    break;
-  }
-  info.numTimes = 1;
-
-  info.voxelFormat = VoxelFormat::Unsigned;
-  info.bytesPerVoxel = std::max(static_cast<uint32_t>(1), state.info_png.color.bitdepth / 8);
-
-  info.createDefaultDescriptions();
-
-  if (state.info_png.phys_defined && state.info_png.phys_unit == 1) {
-    info.voxelSizeUnit = VoxelSizeUnit::m;
-    info.voxelSizeX = 1.0 / state.info_png.phys_x;
-    info.voxelSizeY = 1.0 / state.info_png.phys_y;
-  }
-}
-
-// convert RGBARGBA..... to RRR...GGG...BBB...AAA... and perform crop
-void separateChannel(uint8_t *bufImg, const ZImgInfo &info, const ZImgRegion &region, ZImg &img)
-{
-  if (region.containsWholeChannel(info)) {
-    for (size_t c=0; c<img.numChannels(); ++c) {
-      switch (img.voxelByteNumber()) {
-      case 1: {
-        uint8_t *des = img.channelData<uint8_t>(c);
-        const uint8_t *src = bufImg + c + region.start.c;
-        size_t numCh = img.numChannels();
-        size_t i=0;
-        while (i++ < img.channelVoxelNumber()) {
-          *des++ = *src;
-          src += numCh;
-        }
-      }
-        break;
-      case 2: {
-        uint16_t *des = img.channelData<uint16_t>(c);
-        const uint16_t *src = reinterpret_cast<uint16_t*>(bufImg) + c + region.start.c;
-        size_t numCh = img.numChannels();
-        size_t i=0;
-        while (i++ < img.channelVoxelNumber()) {
-          *des++ = ((*src & 0xff) << 8) | ((*src & 0xff00) >> 8);
-          src += numCh;
-        }
-      }
-        break;
-      default:
-        throw ZIOException(QString("Not support png with voxelByteNumber %1").arg(img.voxelByteNumber()));
-        break;
-      }
-    }
-  } else {
-    if (img.voxelByteNumber() == 1) {
-      for (size_t c=0; c<img.numChannels(); ++c) {
-        for (size_t y=0; y<img.height(); ++y) {
-          for (size_t x=0; x<img.width(); ++x) {
-            uint8_t *des = img.data<uint8_t>(x, y, 0, c);
-            uint8_t *src = bufImg + (y+region.start.y) * info.rowVoxelNumber() * info.numChannels +
-                (x+region.start.x) * info.numChannels + c + region.start.c;
-            *des = *src;
-          }
-        }
-      }
-    } else if (img.voxelByteNumber() == 2) {
-      for (size_t c=0; c<img.numChannels(); ++c) {
-        for (size_t y=0; y<img.height(); ++y) {
-          for (size_t x=0; x<img.width(); ++x) {
-            uint16_t *des = img.data<uint16_t>(x, y, 0, c);
-            uint16_t *src = reinterpret_cast<uint16_t*>(bufImg) + (y+region.start.y) * info.rowVoxelNumber() * info.numChannels +
-                (x+region.start.x) * info.numChannels + c + region.start.c;
-            *des = ((*src & 0xff) << 8) | ((*src & 0xff00) >> 8);
-          }
-        }
-      }
-    } else {
-      throw ZIOException(QString("Not support png with voxelByteNumber %1").arg(img.voxelByteNumber()));
-    }
-  }
-}
-
-}
-
-namespace nim {
-
-ZImgPng::ZImgPng()
-{
-}
-
-QString ZImgPng::shortName() const
-{
-  return "Png";
-}
-
-QString ZImgPng::fullName() const
-{
-  return "Png";
-}
-
-QStringList ZImgPng::extensions() const
-{
-  QStringList res;
-  res << "png";
-  return res;
-}
-
-void ZImgPng::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                       std::vector<std::set<size_t>> *pyramidalRatios)
-{
-  std::ifstream is;
-  openFileStream(is, filename, std::ios_base::in | std::ios_base::binary);
-
-  // this will not read the physical size, to read physical size, we need to read all chunks
-  std::vector<char> buf(33);
-  readStream(is, buf.data(), buf.size());
-
-  lodepng::State state;
-
-  infos.resize(1);
-  readInfoFromBuf(buf, state, infos[0]);
-
-  createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
-}
-
-void ZImgPng::readMetadata(const QString &filename, ZImgMetadata &meta, size_t scene)
-{
-  if (scene != 0) {
-    throw ZIOException("invalid scene");
-  }
-  std::ifstream ifs;
-  openFileStream(ifs, filename, std::ios_base::in | std::ios_base::binary);
-
-  std::vector<char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-
-  lodepng::State state;
-
-  state.decoder.read_text_chunks = 1;
-  state.decoder.remember_unknown_chunks = 1;
-
-  uint8_t* outRaw = nullptr;
-  uint32_t w, h;
-  lodepng_decode(&outRaw, &w, &h, &state, reinterpret_cast<uint8_t*>(buf.data()), buf.size());
-  free(outRaw);
-  checkPngError(state);
-
-  readMetaDataFromState(state, meta);
-}
-
-void ZImgPng::readThumbnail(const QString &, ZImgThumbernail &, const ZImgRegion &, size_t)
-{
-  // png does not have standard thumbnail chunk
-}
-
-void ZImgPng::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
-{
-  if (scene != 0) {
-    throw ZIOException("invalid scene");
-  }
-  std::ifstream ifs;
-  openFileStream(ifs, filename, std::ios_base::in | std::ios_base::binary);
-
-  std::vector<char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-
-  lodepng::State state;
-  ZImgInfo info;
-  readInfoFromBuf(buf, state, info);
-
-  if (region.isEmpty() || !region.isValid(info)) {
-    throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString()).arg(region.toQString()));
-  }
-
-  state.decoder.read_text_chunks = 1;
-  state.decoder.remember_unknown_chunks = 1;
-
-  state.info_raw = state.info_png.color;
-  if (state.info_raw.bitdepth < 8) {
-    state.info_raw.bitdepth = 8;
-  }
-  if (state.info_raw.colortype == LCT_PALETTE) {
-    state.info_raw.colortype = LCT_RGBA;
-  }
-
-  uint8_t* outRaw = nullptr;
-  uint32_t w, h;
-  lodepng_decode(&outRaw, &w, &h, &state, reinterpret_cast<uint8_t*>(buf.data()), buf.size());
-  checkPngError(state);
-
-  if (state.info_png.phys_defined && state.info_png.phys_unit == 1) {
-    info.voxelSizeUnit = VoxelSizeUnit::m;
-    info.voxelSizeX = 1.0 / state.info_png.phys_x;
-    info.voxelSizeY = 1.0 / state.info_png.phys_y;
-  }
-
-  ZImg imgTmp(region.clip(info));
-  separateChannel(outRaw, info, region, imgTmp);
-  free(outRaw);
-  readMetaDataFromState(state, imgTmp.metadataRef());
-
-  imgTmp.swap(img);
-
-  if (ratio > 1) {
-    img.zoom(1.0 / ratio, 1.0 / ratio);
-  }
-}
-
-bool ZImgPng::supportRead() const
-{
-  return true;
-}
-
-bool ZImgPng::supportWrite() const
-{
-  return false;
-}
-
-} // namespace nim
-
-#endif // USE_LODEPNG

@@ -11,6 +11,9 @@ then
   rm -rf $installDIR
 fi
 
+# patch to ignore libpng warnings if we want to skip IDAT chunks, line 809
+$currDIR/massedit.py -w -e "re.sub(r'                \|\| \(png_ptr->mode & PNG_HAVE_CHUNK_AFTER_IDAT\) != 0\)', r'&& 0)', line)" $srcDIR/pngread.c
+
 if [ -d $buildDIR ]
 then
   rm -rf $buildDIR
@@ -21,6 +24,9 @@ cd $buildDIR
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.8 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk -DPNG_TESTS:BOOL="0" -DPNG_SHARED:BOOL="0" $srcDIR
 
 make -j $numCores install
+
+# unpatch
+mv -f $srcDIR/pngread.c.bak $srcDIR/pngread.c
 
 cd $currDIR
 rm -rf $buildDIR

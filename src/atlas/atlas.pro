@@ -8,7 +8,8 @@ CONFIG(debug, debug|release) {
 
 macx {
 # suppress warnings from 3rd party library, works for gcc and clang
-QMAKE_CXXFLAGS += -isystem $$PWD/../3rdparty -isystem $$PWD/../3rdparty/eigen -isystem $$PWD/../3rdparty/boost -isystem $$PWD/../3rdparty/glm \
+QMAKE_CXXFLAGS += -isystem $$PWD/../3rdparty -isystem $$PWD/../3rdparty/eigen -isystem $$PWD/../3rdparty/boost \
+  -isystem $$PWD/../3rdparty/glm -isystem $$PWD/../3rdparty/folly \
   -mllvm -inline-threshold=600 #--analyze
 QMAKE_LFLAGS += -rpath @executable_path/../Frameworks
 }
@@ -20,7 +21,7 @@ QMAKE_LFLAGS += /LTCG # Link-time Code Generation
 DEFINES += _CRT_SECURE_NO_WARNINGS NOMINMAX
 #DEFINES += _USE_MSVC2013_
 
-INCLUDEPATH += $$PWD/../3rdparty $$PWD/3rdparty/../eigen $$PWD/../3rdparty/boost $$PWD/../3rdparty/glm
+INCLUDEPATH += $$PWD/../3rdparty $$PWD/3rdparty/../eigen $$PWD/../3rdparty/boost $$PWD/../3rdparty/glm $$PWD/../3rdparty/folly
 
 QMAKE_CXXFLAGS += /wd4267 # 'var' : conversion from 'size_t' to 'type', possible loss of data
 QMAKE_CXXFLAGS += /wd4244 # 'argument' : conversion from 'type1' to 'type2', possible loss of data
