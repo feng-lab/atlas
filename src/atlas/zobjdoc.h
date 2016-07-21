@@ -53,9 +53,9 @@ public:
   virtual QString objPath(size_t id) const = 0;
   virtual bool objHasUnsavedChange(size_t id) const = 0;
   virtual QString objInfo(size_t id) const = 0;
-  virtual QString objDetailedInfo(size_t id) const { static QString str; Q_UNUSED(id); return str; }
+  virtual QString objDetailedInfo(size_t id) const { static QString str; Q_UNUSED(id) return str; }
   virtual QString objTooltip(size_t id) const = 0;
-  virtual QUndoStack* objUndoStack(size_t id) { Q_UNUSED(id); return nullptr; }
+  virtual QUndoStack* objUndoStack(size_t id) { Q_UNUSED(id) return nullptr; }
   virtual QJsonValue jsonValue(size_t id) const = 0;
   virtual bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const = 0;
   // make alias of obj (many id point to same actual object)

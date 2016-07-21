@@ -715,8 +715,10 @@ public:
   // from alpha pre-multiplied color to normal color, assume last channel is alpha channel
   ZImg& correctPreMultipliedColor();
 
+#ifdef _NEUTUBE_
   // only for interface with zstack
   void releaseTimeData(size_t t) { m_data[t] = nullptr; }
+#endif
 
 protected:
   void clearData();

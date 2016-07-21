@@ -318,7 +318,7 @@ void LibtiffErrorHandler(const char* module, const char* fmt, va_list ap)
   char buf[2048];
 
   int off = 0;
-  Q_UNUSED(module);
+  Q_UNUSED(module)
   //if (module)
     //off = snprintf(buf, 2048, "libtiff %s: ", module);
   //else
@@ -332,7 +332,7 @@ void LibtiffErrorHandlerIgnoreColormapError(const char* module, const char* fmt,
   char buf[2048];
 
   int off = 0;
-  Q_UNUSED(module);
+  Q_UNUSED(module)
   //if (module)
     //off = snprintf(buf, 2048, "libtiff %s: ", module);
   //else

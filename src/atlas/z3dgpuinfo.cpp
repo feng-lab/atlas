@@ -82,7 +82,7 @@ QString Z3DGpuInfo::glShadingLanguageVersionString() const
 }
 
 void Z3DGpuInfo::getDataScaleForTexture(uint64_t width, uint64_t height, uint64_t depth,
-                                 double &widthScale, double &heightScale, double &depthScale) const
+                                        double &widthScale, double &heightScale, double &depthScale) const
 {
   bool scaleZ = depth > std::pow(textureSizeLimit()*1.0, 1/3.0);
   double scale = 1.0;
@@ -324,14 +324,14 @@ void Z3DGpuInfo::detectGpuInfo()
                (m_glRendererString.contains("RADEON X", Qt::CaseInsensitive)||
                 m_glRendererString.contains("RADEON 9", Qt::CaseInsensitive))) { //from http://www.opengl.org/wiki/NPOT_Texture
       m_isSupported = false;
-      m_notSupportedReason = "The R300 and R400-based cards (Radeon 9500+ and X500+) are incapable of generic NPOT usage. You can use NPOTs, \
-          but only if the texture has no mipmaps.";
+      m_notSupportedReason = "The R300 and R400-based cards (Radeon 9500+ and X500+) are incapable of generic NPOT usage. You can use NPOTs, "
+                             "but only if the texture has no mipmaps.";
       return;
     } else if (gpuVendor() == GpuVendor::NVIDIA && isNonPowerOfTwoTextureSupported() &&
                m_glRendererString.contains("GeForce FX", Qt::CaseInsensitive)) { //from http://www.opengl.org/wiki/NPOT_Texture
       m_isSupported = false;
-      m_notSupportedReason = "NV30-based cards (GeForce FX of any kind) are incapable of NPOTs at all, despite implementing OpenGL 2.0 \
-          (which requires NPOT). It will do software rendering if you try to use it. ";
+      m_notSupportedReason = "NV30-based cards (GeForce FX of any kind) are incapable of NPOTs at all, despite implementing OpenGL 2.0 "
+                             "(which requires NPOT). It will do software rendering if you try to use it. ";
       return;
     } else {
       m_isSupported = true;

@@ -117,7 +117,6 @@ ZImgPack::ZImgPack(ZImg &img, const QString &fileName)
   , m_imgSource(fileName)
   , m_numScenes(1), m_hasUnsavedChange(false)
   , m_offsetX(0), m_offsetY(0), m_offsetZ(0), m_offsetT(0)
-  , m_minMaxState(MinMaxState::Invalid)
   , m_diskCached(true)
 {
   if (m_imgInfo.isEmpty()) {
@@ -126,6 +125,9 @@ ZImgPack::ZImgPack(ZImg &img, const QString &fileName)
 
   m_rangeMin = m_imgInfo.dataRangeMin<double>();
   m_rangeMax = m_imgInfo.dataRangeMax<double>();
+  m_minIntensity = m_rangeMin;
+  m_maxIntensity = m_rangeMax;
+  m_minMaxState = MinMaxState::Partial;
 
   //createPyramidalFolder(m_imgSource.filenames[0]);
   buildPyramidal(img);
@@ -138,7 +140,6 @@ ZImgPack::ZImgPack(const QString &fileName, size_t scene, FileFormat format, siz
   : m_imgSource(fileName, ZImgRegion(), scene, format)
   , m_hasUnsavedChange(false)
   , m_offsetX(0), m_offsetY(0), m_offsetZ(0), m_offsetT(0)
-  , m_minMaxState(MinMaxState::Invalid)
   , m_diskCached(true)
 {
   const std::vector<std::shared_ptr<ZImgSubBlock>> *sceneSubBlock = nullptr;
@@ -165,6 +166,9 @@ ZImgPack::ZImgPack(const QString &fileName, size_t scene, FileFormat format, siz
 
   m_rangeMin = m_imgInfo.dataRangeMin<double>();
   m_rangeMax = m_imgInfo.dataRangeMax<double>();
+  m_minIntensity = m_rangeMin;
+  m_maxIntensity = m_rangeMax;
+  m_minMaxState = MinMaxState::Partial;
 
   bool hasPyramidal = false;
   for (size_t i=0; i<sceneSubBlock->size(); ++i) {
@@ -179,10 +183,8 @@ ZImgPack::ZImgPack(const QString &fileName, size_t scene, FileFormat format, siz
     m_diskCached = false;
     ZImgIOInstance.readImg(m_imgSource, m_img);
   } else if (hasPyramidal || !needScale) {
-    //buildFastReadIndex(*sceneSubBlock);
-    buildPyramidal();
+    buildFastReadIndex(*sceneSubBlock);
   } else {
-    //buildFastReadIndex(*sceneSubBlock);
     buildPyramidal();
   }
 
@@ -194,7 +196,6 @@ ZImgPack::ZImgPack(const QStringList &files, Dimension catDim, size_t scene, Fil
   : m_imgSource(files, catDim, ZImgRegion(), scene, format, true)
   , m_hasUnsavedChange(false)
   , m_offsetX(0), m_offsetY(0), m_offsetZ(0), m_offsetT(0)
-  , m_minMaxState(MinMaxState::Invalid)
   , m_diskCached(true)
 {
   const std::vector<std::shared_ptr<ZImgSubBlock>> *sceneSubBlock = nullptr;
@@ -221,6 +222,9 @@ ZImgPack::ZImgPack(const QStringList &files, Dimension catDim, size_t scene, Fil
 
   m_rangeMin = m_imgInfo.dataRangeMin<double>();
   m_rangeMax = m_imgInfo.dataRangeMax<double>();
+  m_minIntensity = m_rangeMin;
+  m_maxIntensity = m_rangeMax;
+  m_minMaxState = MinMaxState::Partial;
 
   bool hasPyramidal = false;
   for (size_t i=0; i<sceneSubBlock->size(); ++i) {
@@ -542,6 +546,7 @@ ZImg ZImgPack::crop(const ZImgRegion &region) const
 
 ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) const
 {
+  LINFO() << width << height << depth;
   assert(width <= m_imgInfo.width && height <= m_imgInfo.height && depth <= m_imgInfo.depth &&
          width > 0 && height > 0 && depth > 0);
   ZImg res;
@@ -578,6 +583,7 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
       res.resize(width, height, depth);
     }
   }
+  LINFO() << "end";
   return res;
 }
 

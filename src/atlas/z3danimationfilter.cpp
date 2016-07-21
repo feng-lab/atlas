@@ -152,6 +152,7 @@ void Z3DAnimationFilter::renderTransparent(Z3DEye eye)
 
 void Z3DAnimationFilter::renderPicking(Z3DEye eye)
 {
+  Q_UNUSED(eye)
   if (!m_pickingObjectsRegistered)
     registerPickingObjects();
 

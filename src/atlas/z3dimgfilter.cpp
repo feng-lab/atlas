@@ -439,6 +439,9 @@ void Z3DImgFilter::adjustWidget()
 
 void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent *e, int w, int h)
 {
+  Q_UNUSED(e)
+  Q_UNUSED(w)
+  Q_UNUSED(h)
   //  e->ignore();
   //  if (!m_imgRaycasterRenderer.hasVisibleRendering())
   //    return;

@@ -104,6 +104,7 @@ Z3DPunctaFilter::~Z3DPunctaFilter()
 
 void Z3DPunctaFilter::process(Z3DEye eye)
 {
+  Q_UNUSED(eye)
   if (m_dataIsInvalid) {
     prepareData();
   }
@@ -477,6 +478,7 @@ void Z3DPunctaFilter::adjustWidgets()
 
 void Z3DPunctaFilter::selectPuncta(QMouseEvent *e, int, int h)
 {
+  Q_UNUSED(h)
   if (m_punctaList.empty())
     return;
 

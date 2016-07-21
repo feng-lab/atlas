@@ -86,6 +86,8 @@ Qt::ItemFlags ZRegionAnnotationTreeModel::flags(const QModelIndex &index) const
 
 bool ZRegionAnnotationTreeModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
+  Q_UNUSED(value)
+  Q_UNUSED(role)
   if (!index.isValid())
     return false;
 
@@ -208,6 +210,7 @@ int ZRegionAnnotationTreeModel::columnCount(const QModelIndex &) const
 
 void ZRegionAnnotationTreeModel::clicked(const QModelIndex &idxIn)
 {
+  Q_UNUSED(idxIn)
   //  if (idxIn.isValid()) {
   //    if (idxIn.column() == ViewSettingColumn) {
   //      ObjItem *item = static_cast<ObjItem*>(idxIn.internalPointer());
@@ -251,6 +254,7 @@ void ZRegionAnnotationTreeModel::doubleClicked(const QModelIndex &)
 
 void ZRegionAnnotationTreeModel::activated(const QModelIndex &idxIn)
 {
+  Q_UNUSED(idxIn)
   //  size_t id = indexToId(idxIn);
   //  if (id > 0) {
   //    //LINFO() << id;

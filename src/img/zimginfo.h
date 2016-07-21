@@ -83,9 +83,9 @@ struct ZImgInfo
   // property of img type
   // intensity range of current img type, for float img, range is [0.0 1.0]
   // use template return type because img can be any type, and even double type can not represent all 64-bit integer type value
-  template<typename TValue>
+  template<typename TValue = double>
   TValue dataRangeMin() const;
-  template<typename TValue>
+  template<typename TValue = double>
   TValue dataRangeMax() const;
 
   size_t width;

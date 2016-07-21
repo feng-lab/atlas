@@ -62,16 +62,16 @@ bool ZImgFormat::canWrite(const QString &filename) const
 
 void ZImgFormat::writeImg(const QString &filename, const ZImg &img, Compression comp)
 {
-  Q_UNUSED(filename);
-  Q_UNUSED(img);
-  Q_UNUSED(comp);
+  Q_UNUSED(filename)
+  Q_UNUSED(img)
+  Q_UNUSED(comp)
 }
 
 void ZImgFormat::writeImg(const QString &filename, const ZImgSliceProvider &imgSliceProvider, Compression comp)
 {
-  Q_UNUSED(filename);
-  Q_UNUSED(imgSliceProvider);
-  Q_UNUSED(comp);
+  Q_UNUSED(filename)
+  Q_UNUSED(imgSliceProvider)
+  Q_UNUSED(comp)
 }
 
 ZImg ZImgFormat::readRawImg(const QString &filename, const ZImgInfo &imgInfo, const QString &dimensionOrder,

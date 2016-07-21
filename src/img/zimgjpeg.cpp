@@ -358,13 +358,13 @@ void ZImgJpeg::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, s
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo](void) {
+  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
     jpeg_destroy_decompress(&cinfo);
   });
-  Q_UNUSED(guard1);
+  Q_UNUSED(guard1)
 
   startReading(infile.get(), cinfo);
 
@@ -395,13 +395,13 @@ void ZImgJpeg::readMetadata(const QString &filename, ZImgMetadata &meta, size_t 
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo](void) {
+  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
     jpeg_destroy_decompress(&cinfo);
   });
-  Q_UNUSED(guard1);
+  Q_UNUSED(guard1)
 
   startReading(infile.get(), cinfo);
 
@@ -450,13 +450,13 @@ void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo](void) {
+  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
     jpeg_destroy_decompress(&cinfo);
   });
-  Q_UNUSED(guard1);
+  Q_UNUSED(guard1)
 
   startReading(infile.get(), cinfo);
 
@@ -483,13 +483,13 @@ void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
               struct jpeg_decompress_struct thumbCinfo;
               my_error_mgr thumbJerr;
               createcinfo(thumbCinfo, thumbJerr);
-              folly::ScopeGuard guard2 = folly::makeGuard([&thumbCinfo](void) {
+              folly::ScopeGuard guard2 = folly::makeGuard([&thumbCinfo]() {
                 /* Step 8: Release JPEG decompression object */
 
                 /* This is an important step since it will release a good deal of memory. */
                 jpeg_destroy_decompress(&thumbCinfo);
               });
-              Q_UNUSED(guard2);
+              Q_UNUSED(guard2)
 
               // don't slice thumbnail in x, y, c
               ZImgRegion thumbRegion = region;
@@ -542,13 +542,13 @@ void ZImgJpeg::readImg(const QString &filename, ZImg &img, const ZImgRegion &reg
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo](void) {
+  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
     jpeg_destroy_decompress(&cinfo);
   });
-  Q_UNUSED(guard1);
+  Q_UNUSED(guard1)
 
   startReading(infile.get(), cinfo);
 
@@ -577,13 +577,13 @@ void ZImgJpeg::readInfo(uint8_t *mem, size_t size, ZImgInfo &info)
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo](void) {
+  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
     jpeg_destroy_decompress(&cinfo);
   });
-  Q_UNUSED(guard1);
+  Q_UNUSED(guard1)
 
   startReading(mem, size, cinfo);
 
@@ -595,13 +595,13 @@ void ZImgJpeg::readImg(uint8_t *mem, size_t size, uint8_t *des, size_t desSize)
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo](void) {
+  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
     jpeg_destroy_decompress(&cinfo);
   });
-  Q_UNUSED(guard1);
+  Q_UNUSED(guard1)
 
   startReading(mem, size, cinfo);
 

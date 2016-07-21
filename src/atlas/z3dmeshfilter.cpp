@@ -401,6 +401,7 @@ void Z3DMeshFilter::adjustWidgets()
 
 void Z3DMeshFilter::selectMesh(QMouseEvent *e, int , int h)
 {
+  Q_UNUSED(h)
   if (m_meshList.empty())
     return;
 

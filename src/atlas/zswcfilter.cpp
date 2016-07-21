@@ -65,7 +65,7 @@ QRectF ZSwcGraphicsItem::boundingRect() const
 
 void ZSwcGraphicsItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
 {
-  Q_UNUSED(option);
+  Q_UNUSED(option)
   if (m_mip) {
     m_outlineColor.setAlpha(m_opacity * 255);
     painter->setPen(QPen(m_outlineColor, 1));

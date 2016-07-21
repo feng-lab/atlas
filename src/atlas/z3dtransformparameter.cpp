@@ -6,6 +6,7 @@
 
 namespace {
 
+#if 0   //not used for now
 /**
  * @brief Determine whether this matrix represents an affine transform or not.
  * @return true if this matrix is an affine transform, false if not.
@@ -111,6 +112,7 @@ void decompose(const glm::mat4& m, glm::vec3& translation, glm::vec3& scale, glm
     scale.x *= -1;
   }
 }
+#endif
 
 }
 
@@ -324,6 +326,7 @@ void Z3DTransformParameter::beforeChange(glm::mat4 &value)
 
 void Z3DTransformParameter::updateWidget(const glm::mat4 &value)
 {
+  Q_UNUSED(value)
   m_receiveWidgetSignal = false;
   //  m_eye.set(value.getEye());
   //  m_center.set(value.getCenter());

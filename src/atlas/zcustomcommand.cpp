@@ -722,9 +722,9 @@ void moveObjectToCorrectLocation()
   for (int metaIdx=1; metaIdx<metaData.size(); ++metaIdx) {
     QString cellName = metaData[metaIdx][0];
     double Anterior_Posterior = metaData[metaIdx][1].toDouble();
-    double ML_pt = metaData[metaIdx][2].toDouble();
-    double DV_pt = metaData[metaIdx][3].toDouble();
-    double DV_dura_pt = metaData[metaIdx][4].toDouble();
+    //double ML_pt = metaData[metaIdx][2].toDouble();
+    //double DV_pt = metaData[metaIdx][3].toDouble();
+    //double DV_dura_pt = metaData[metaIdx][4].toDouble();
     double Medial_Lateral = metaData[metaIdx][5].toDouble();
     double Deep_Superficial = metaData[metaIdx][6].toDouble();
 

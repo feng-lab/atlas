@@ -85,7 +85,7 @@ public:
   void releaseItemsOwnership();
 
   void setVisible(bool v) { m_visible.set(v); }
-  void setSelected(bool v) { Q_UNUSED(v); }
+  void setSelected(bool v) { Q_UNUSED(v) }
   void setNormalView(int z, int t) override;
   void setMaxZProjView(int t) override;
 

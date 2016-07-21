@@ -657,7 +657,7 @@ void ZImgZeissCZI::readMetadata(const QString &filename, ZImgMetadata &meta, siz
 {
   clearInternalState();
 
-  Q_UNUSED(scene);
+  Q_UNUSED(scene)
 
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
@@ -693,10 +693,10 @@ void ZImgZeissCZI::readMetadata(const QString &filename, ZImgMetadata &meta, siz
 void ZImgZeissCZI::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail, const ZImgRegion &region, size_t scene)
 {
   // todo
-  Q_UNUSED(filename);
-  Q_UNUSED(thumbnail);
-  Q_UNUSED(region);
-  Q_UNUSED(scene);
+  Q_UNUSED(filename)
+  Q_UNUSED(thumbnail)
+  Q_UNUSED(region)
+  Q_UNUSED(scene)
 }
 
 void ZImgZeissCZI::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)

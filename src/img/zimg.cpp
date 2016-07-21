@@ -1759,7 +1759,8 @@ template ZImg ZImg::combine_Impl<double>(const std::vector<const ZImg*>&, Combin
 template<typename TVoxel>
 ZImg& ZImg::normalize_Impl()
 {
-  TVoxel minV, maxV;
+  TVoxel minV = 0;
+  TVoxel maxV = 0;
   computeMinMax(minV, maxV);
   return normalize(minV, maxV);
 }

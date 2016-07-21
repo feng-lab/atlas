@@ -283,7 +283,7 @@ typedef std::vector<int64_t> vtkCCSPolyEdges;
 // by originalEdges.  If scalars is not null, then add a scalar for
 // each triangle.
 void vtkCCSInsertTriangle(
-    std::vector<glm::i64vec3> &polys, const std::vector<int64_t> &poly, const size_t trids[3],
+    std::vector<glm::i64vec3> &polys, const std::vector<int64_t> &poly, const size_t *trids,
     const std::vector<int64_t> &polyEdges, std::vector<std::vector<int64_t>> &originalEdges)
 {
   static const size_t nextVert[3] = { 1, 2, 0 };

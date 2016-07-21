@@ -45,8 +45,8 @@ QRectF ZPunctaGraphicsItem::boundingRect() const
 
 void ZPunctaGraphicsItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
 {
-  Q_UNUSED(option);
-  Q_UNUSED(widget);
+  Q_UNUSED(option)
+  Q_UNUSED(widget)
   m_outlineColor.setAlpha(m_opacity * 255);
   painter->setPen(QPen(m_outlineColor, 1));
   if (m_mip) {

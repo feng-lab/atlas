@@ -20,10 +20,10 @@ public:
 
   virtual void setNormalView(int z, int t) = 0;
   virtual void setMaxZProjView(int t) = 0;
-  virtual void setViewport(const QRectF &rect, double scale) { Q_UNUSED(rect); Q_UNUSED(scale); }
+  virtual void setViewport(const QRectF &rect, double scale) { Q_UNUSED(rect) Q_UNUSED(scale) }
   virtual void deleteKeyPressed() {}
-  virtual void mousePressed(const QPointF &scenePos) { Q_UNUSED(scenePos); }
-  virtual void mouseReleased(const QPointF &scenePos) { Q_UNUSED(scenePos); }
+  virtual void mousePressed(const QPointF &scenePos) { Q_UNUSED(scenePos) }
+  virtual void mouseReleased(const QPointF &scenePos) { Q_UNUSED(scenePos) }
   virtual void rotateClockwise() {}
   virtual void rotateCounterclockwise() {}
 
