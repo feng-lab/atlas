@@ -563,8 +563,8 @@ void ZImg::scale_Impl(TVoxel minData, TVoxel maxData, const ZImg *src, ZImg *des
   TDesVoxel dataRangeMin = std::numeric_limits<TDesVoxel>::min();
   TDesVoxel dataRangeMax = std::numeric_limits<TDesVoxel>::max();
   if (des->voxelFormat() == VoxelFormat::Float) {
-    dataRangeMin = (TDesVoxel)0.0;
-    dataRangeMax = (TDesVoxel)1.0;
+    dataRangeMin = TDesVoxel(0.0);
+    dataRangeMax = TDesVoxel(1.0);
   }
 
   if (minData == maxData) {
@@ -578,7 +578,7 @@ void ZImg::scale_Impl(TVoxel minData, TVoxel maxData, const ZImg *src, ZImg *des
   }
 
   if (src->voxelFormat() != VoxelFormat::Float && std::is_same<TVoxel, TDesVoxel>::value &&
-      dataRangeMin == (TDesVoxel)minData && dataRangeMax == (TDesVoxel)maxData) {
+      dataRangeMin == TDesVoxel(minData) && dataRangeMax == TDesVoxel(maxData)) {
     if (src != des) {
       for (size_t t=0; t<src->numTimes(); ++t) {
         memcpy(des->timeData(t), src->timeData(t), src->timeByteNumber());

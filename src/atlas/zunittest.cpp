@@ -32,7 +32,7 @@ int ZUnitTest::run()
 {
   char arg0[] = "atlas_test";
   char* argv[] = { &arg0[0], nullptr };
-  int argc = (int)std::extent<decltype(argv)>::value - 1;
+  int argc = std::extent<decltype(argv)>::value - 1;
 
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

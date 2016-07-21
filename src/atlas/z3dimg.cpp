@@ -63,13 +63,13 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
 #endif
 
     m_pageTableCacheSize = glm::ivec3(m_pageTableBlockSize * m_pageTableCacheNumBlocks);
-    m_pageTableCacheTexture.reset(new Z3DTexture((GLint)GL_RGBA32I, glm::uvec3(m_pageTableCacheSize), GL_RGBA_INTEGER, GL_INT));
+    m_pageTableCacheTexture.reset(new Z3DTexture(GLint(GL_RGBA32I), glm::uvec3(m_pageTableCacheSize), GL_RGBA_INTEGER, GL_INT));
     m_pageTableCache.resize(m_pageTableCacheTexture->numPixels(), glm::ivec4(0,0,0,m_unmappedFlag));
-    m_pageTableCacheTexture->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+    m_pageTableCacheTexture->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
     m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
 
     for (size_t c=0; c<m_imgPack.imgInfo().numChannels; ++c) {
-      m_imageCacheTextures.emplace_back(new Z3DTexture((GLint)GL_R8, (m_imageBlockSize+uint32_t(2)) * m_imageCacheNumBlocks, GL_RED, GL_UNSIGNED_BYTE));
+      m_imageCacheTextures.emplace_back(new Z3DTexture(GLint(GL_R8), (m_imageBlockSize+uint32_t(2)) * m_imageCacheNumBlocks, GL_RED, GL_UNSIGNED_BYTE));
       m_imageCacheTextures[c]->uploadImage();
     }
 
@@ -282,10 +282,10 @@ void Z3DImg::setScale(const glm::vec3 &scale)
   }
 
   // content of RGBA32I texture
-  m_pageDirectoryTexture.reset(new Z3DTexture(GL_TEXTURE_3D, (GLint)GL_RGBA32I, glm::uvec3(m_pageDirectorySize), GL_RGBA_INTEGER, GL_INT));
+  m_pageDirectoryTexture.reset(new Z3DTexture(GL_TEXTURE_3D, GLint(GL_RGBA32I), glm::uvec3(m_pageDirectorySize), GL_RGBA_INTEGER, GL_INT));
   m_pageDirectory.resize(m_pageDirectoryTexture->numPixels());
   memset(m_pageDirectory.data(), 0, m_pageDirectory.size() * sizeof(glm::ivec4));
-  m_pageDirectoryTexture->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  m_pageDirectoryTexture->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
 
   memset(m_pageTableCache.data(), 0, m_pageTableCache.size() * sizeof(glm::ivec4));

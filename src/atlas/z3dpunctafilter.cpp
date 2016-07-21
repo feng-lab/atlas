@@ -491,7 +491,7 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent *e, int, int h)
       emit objDeselected();
       return;
     }
-    bool hit = std::find(m_punctaList.begin(), m_punctaList.end(), (ZPunctum*)obj) != m_punctaList.end();
+    bool hit = std::find(m_punctaList.begin(), m_punctaList.end(), static_cast<const ZPunctum*>(obj)) != m_punctaList.end();
     if (hit) {
       emit objSelected(appending);
       e->accept();

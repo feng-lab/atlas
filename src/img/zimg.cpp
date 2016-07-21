@@ -16,7 +16,7 @@ struct MinOp {
   template<typename TVoxel, typename TVoxelOther>
   TVoxel operator()(TVoxel voxelRef, TVoxelOther otherVoxel) const
   {
-    return std::min(voxelRef, (TVoxel)otherVoxel);
+    return std::min(voxelRef, static_cast<TVoxel>(otherVoxel));
   }
 };
 
@@ -24,7 +24,7 @@ struct MaxOp {
   template<typename TVoxel, typename TVoxelOther>
   TVoxel operator()(TVoxel voxelRef, TVoxelOther otherVoxel) const
   {
-    return std::max(voxelRef, (TVoxel)otherVoxel);
+    return std::max(voxelRef, static_cast<TVoxel>(otherVoxel));
   }
 };
 
@@ -787,11 +787,11 @@ ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate &start)
     return *this;
   }
 
-  if ((start.x < 0 && start.x + (TCoordinate)img.width() <= 0) || start.x >= (TCoordinate)width() ||
-      (start.y < 0 && start.y + (TCoordinate)img.height() <= 0) || start.y >= (TCoordinate)height() ||
-      (start.z < 0 && start.z + (TCoordinate)img.depth() <= 0) || start.z >= (TCoordinate)depth() ||
-      (start.c < 0 && start.c + (TCoordinate)img.numChannels() <= 0) || start.c >= (TCoordinate)numChannels() ||
-      (start.t < 0 && start.t + (TCoordinate)img.numTimes() <= 0) || start.t >= (TCoordinate)numTimes()) {
+  if ((start.x < 0 && start.x + static_cast<TCoordinate>(img.width()) <= 0) || start.x >= static_cast<TCoordinate>(width()) ||
+      (start.y < 0 && start.y + static_cast<TCoordinate>(img.height()) <= 0) || start.y >= static_cast<TCoordinate>(height()) ||
+      (start.z < 0 && start.z + static_cast<TCoordinate>(img.depth()) <= 0) || start.z >= static_cast<TCoordinate>(depth()) ||
+      (start.c < 0 && start.c + static_cast<TCoordinate>(img.numChannels()) <= 0) || start.c >= static_cast<TCoordinate>(numChannels()) ||
+      (start.t < 0 && start.t + static_cast<TCoordinate>(img.numTimes()) <= 0) || start.t >= static_cast<TCoordinate>(numTimes())) {
     LWARN() << "Trying to paste img with no overlap region, abort";
     return *this;
   }
@@ -799,20 +799,20 @@ ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate &start)
   if (isSameType(img)) {
     size_t desX = std::max(start.x, TCoordinate(0));
     size_t srcX = desX - start.x;
-    size_t desXEnd = std::min(start.x + (TCoordinate)img.width(), (TCoordinate)width());
+    size_t desXEnd = std::min(start.x + static_cast<TCoordinate>(img.width()), static_cast<TCoordinate>(width()));
     size_t rowByteNumber = (desXEnd - desX) * m_info.bytesPerVoxel;
 
     for (TCoordinate desT = std::max(start.t, TCoordinate(0));
-         desT < std::min(start.t + (TCoordinate)img.numTimes(), (TCoordinate)numTimes()); ++desT) {
+         desT < std::min(start.t + static_cast<TCoordinate>(img.numTimes()), static_cast<TCoordinate>(numTimes())); ++desT) {
       size_t srcT = desT - start.t;
       for (TCoordinate desC = std::max(start.c, TCoordinate(0));
-           desC < std::min(start.c + (TCoordinate)img.numChannels(), (TCoordinate)numChannels()); ++desC) {
+           desC < std::min(start.c + static_cast<TCoordinate>(img.numChannels()), static_cast<TCoordinate>(numChannels())); ++desC) {
         size_t srcC = desC - start.c;
         for (TCoordinate desZ = std::max(start.z, TCoordinate(0));
-             desZ < std::min(start.z + (TCoordinate)img.depth(), (TCoordinate)depth()); ++desZ) {
+             desZ < std::min(start.z + static_cast<TCoordinate>(img.depth()), static_cast<TCoordinate>(depth())); ++desZ) {
           size_t srcZ = desZ - start.z;
           for (TCoordinate desY = std::max(start.y, TCoordinate(0));
-               desY < std::min(start.y + (TCoordinate)img.height(), (TCoordinate)height()); ++desY) {
+               desY < std::min(start.y + static_cast<TCoordinate>(img.height()), static_cast<TCoordinate>(height())); ++desY) {
             size_t srcY = desY - start.y;
 
             memcpy(data(desX, desY, desZ, desC, desT),
@@ -838,11 +838,11 @@ ZImg& ZImg::pasteImgMax(const ZImg &img, const ZVoxelCoordinate &start)
     return *this;
   }
 
-  if ((start.x < 0 && start.x + (TCoordinate)img.width() <= 0) || start.x >= (TCoordinate)width() ||
-      (start.y < 0 && start.y + (TCoordinate)img.height() <= 0) || start.y >= (TCoordinate)height() ||
-      (start.z < 0 && start.z + (TCoordinate)img.depth() <= 0) || start.z >= (TCoordinate)depth() ||
-      (start.c < 0 && start.c + (TCoordinate)img.numChannels() <= 0) || start.c >= (TCoordinate)numChannels() ||
-      (start.t < 0 && start.t + (TCoordinate)img.numTimes() <= 0) || start.t >= (TCoordinate)numTimes()) {
+  if ((start.x < 0 && start.x + static_cast<TCoordinate>(img.width()) <= 0) || start.x >= static_cast<TCoordinate>(width()) ||
+      (start.y < 0 && start.y + static_cast<TCoordinate>(img.height()) <= 0) || start.y >= static_cast<TCoordinate>(height()) ||
+      (start.z < 0 && start.z + static_cast<TCoordinate>(img.depth()) <= 0) || start.z >= static_cast<TCoordinate>(depth()) ||
+      (start.c < 0 && start.c + static_cast<TCoordinate>(img.numChannels()) <= 0) || start.c >= static_cast<TCoordinate>(numChannels()) ||
+      (start.t < 0 && start.t + static_cast<TCoordinate>(img.numTimes()) <= 0) || start.t >= static_cast<TCoordinate>(numTimes())) {
     LWARN() << "Trying to paste img with no overlap region, abort";
     return *this;
   }
@@ -1624,20 +1624,20 @@ void ZImg::pasteImg_Impl(const ZImg& img, const ZVoxelCoordinate &start)
   typedef ZVoxelCoordinate::value_type TCoordinate;
   size_t desX = std::max(start.x, TCoordinate(0));
   size_t srcX = desX - start.x;
-  size_t desXEnd = std::min(start.x + (TCoordinate)img.width(), (TCoordinate)width());
+  size_t desXEnd = std::min(start.x + static_cast<TCoordinate>(img.width()), static_cast<TCoordinate>(width()));
   size_t rowVoxelNumber = desXEnd - desX;
 
   for (TCoordinate desT = std::max(start.t, TCoordinate(0));
-       desT < std::min(start.t + (TCoordinate)img.numTimes(), (TCoordinate)numTimes()); ++desT) {
+       desT < std::min(start.t + static_cast<TCoordinate>(img.numTimes()), static_cast<TCoordinate>(numTimes())); ++desT) {
     size_t srcT = desT - start.t;
     for (TCoordinate desC = std::max(start.c, TCoordinate(0));
-         desC < std::min(start.c + (TCoordinate)img.numChannels(), (TCoordinate)numChannels()); ++desC) {
+         desC < std::min(start.c + static_cast<TCoordinate>(img.numChannels()), static_cast<TCoordinate>(numChannels())); ++desC) {
       size_t srcC = desC - start.c;
       for (TCoordinate desZ = std::max(start.z, TCoordinate(0));
-           desZ < std::min(start.z + (TCoordinate)img.depth(), (TCoordinate)depth()); ++desZ) {
+           desZ < std::min(start.z + static_cast<TCoordinate>(img.depth()), static_cast<TCoordinate>(depth())); ++desZ) {
         size_t srcZ = desZ - start.z;
         for (TCoordinate desY = std::max(start.y, TCoordinate(0));
-             desY < std::min(start.y + (TCoordinate)img.height(), (TCoordinate)height()); ++desY) {
+             desY < std::min(start.y + static_cast<TCoordinate>(img.height()), static_cast<TCoordinate>(height())); ++desY) {
           size_t srcY = desY - start.y;
 
           TVoxel* desData = data<TVoxel>(desX, desY, desZ, desC, desT);
@@ -1657,20 +1657,20 @@ void ZImg::pasteImgMax_Impl(const ZImg& img, const ZVoxelCoordinate &start)
   typedef ZVoxelCoordinate::value_type TCoordinate;
   size_t desX = std::max(start.x, TCoordinate(0));
   size_t srcX = desX - start.x;
-  size_t desXEnd = std::min(start.x + (TCoordinate)img.width(), (TCoordinate)width());
+  size_t desXEnd = std::min(start.x + static_cast<TCoordinate>(img.width()), static_cast<TCoordinate>(width()));
   size_t rowVoxelNumber = desXEnd - desX;
 
   for (TCoordinate desT = std::max(start.t, TCoordinate(0));
-       desT < std::min(start.t + (TCoordinate)img.numTimes(), (TCoordinate)numTimes()); ++desT) {
+       desT < std::min(start.t + static_cast<TCoordinate>(img.numTimes()), static_cast<TCoordinate>(numTimes())); ++desT) {
     size_t srcT = desT - start.t;
     for (TCoordinate desC = std::max(start.c, TCoordinate(0));
-         desC < std::min(start.c + (TCoordinate)img.numChannels(), (TCoordinate)numChannels()); ++desC) {
+         desC < std::min(start.c + static_cast<TCoordinate>(img.numChannels()), static_cast<TCoordinate>(numChannels())); ++desC) {
       size_t srcC = desC - start.c;
       for (TCoordinate desZ = std::max(start.z, TCoordinate(0));
-           desZ < std::min(start.z + (TCoordinate)img.depth(), (TCoordinate)depth()); ++desZ) {
+           desZ < std::min(start.z + static_cast<TCoordinate>(img.depth()), static_cast<TCoordinate>(depth())); ++desZ) {
         size_t srcZ = desZ - start.z;
         for (TCoordinate desY = std::max(start.y, TCoordinate(0));
-             desY < std::min(start.y + (TCoordinate)img.height(), (TCoordinate)height()); ++desY) {
+             desY < std::min(start.y + static_cast<TCoordinate>(img.height()), static_cast<TCoordinate>(height())); ++desY) {
           size_t srcY = desY - start.y;
 
           TVoxel* desData = data<TVoxel>(desX, desY, desZ, desC, desT);

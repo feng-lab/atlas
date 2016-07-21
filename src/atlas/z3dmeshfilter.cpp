@@ -414,7 +414,7 @@ void Z3DMeshFilter::selectMesh(QMouseEvent *e, int , int h)
       emit objDeselected();
       return;
     }
-    bool hit = std::find(m_meshList.begin(), m_meshList.end(), (ZMesh*)obj) != m_meshList.end();
+    bool hit = std::find(m_meshList.begin(), m_meshList.end(), static_cast<const ZMesh*>(obj)) != m_meshList.end();
     if (hit) {
       emit objSelected(appending);
       e->accept();

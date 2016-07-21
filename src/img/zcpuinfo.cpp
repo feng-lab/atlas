@@ -220,7 +220,7 @@ void ZCpuInfo::detectCpuInfo()
   memset(CPUString, 0, sizeof(CPUString));
   char CPUBrandString[0x40];
   memset(CPUBrandString, 0, sizeof(CPUBrandString));
-  int CPUInfo[4] = {-1};
+  int32_t CPUInfo[4] = {-1};
 
   // __cpuid with an InfoType argument of 0 returns the number of
   // valid Ids in CPUInfo[0] and the CPU identification string in
@@ -230,9 +230,9 @@ void ZCpuInfo::detectCpuInfo()
   __cpuid(CPUInfo, 0);
   uint32_t nIds = CPUInfo[0];
 
-  *((int*)CPUString) = CPUInfo[1];
-  *((int*)(CPUString+4)) = CPUInfo[3];
-  *((int*)(CPUString+8)) = CPUInfo[2];
+  memcpy(CPUString, &CPUInfo[1], sizeof(int32_t));
+  memcpy(CPUString+4, &CPUInfo[3], sizeof(int32_t));
+  memcpy(CPUString+8, &CPUInfo[2], sizeof(int32_t));
   sCPU = CPUString;
 
   bool osXSAVE = false;

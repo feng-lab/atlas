@@ -223,7 +223,7 @@ size_t Z3DTexture::bypePerPixel(GLenum dataFormat, GLenum dataType)
 size_t Z3DTexture::bypePerPixel(GLint internalFormat)
 {
   size_t bpp = 0;
-  switch ((GLenum)internalFormat) {
+  switch (GLenum(internalFormat)) {
   case GL_COLOR_INDEX:
   case GL_RED:
   case GL_GREEN:

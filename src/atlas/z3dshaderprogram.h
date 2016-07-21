@@ -178,16 +178,16 @@ public:
   void setUniformArray(const QString& name, const glm::uvec3* values, int count) { setUniformArray(uniformLocation(name), values, count); }
   void setUniformArray(const QString& name, const glm::uvec4* values, int count) { setUniformArray(uniformLocation(name), values, count); }
 
-  void setUniform(GLint loc, const glm::mat2& value, bool transpose = false) { if (loc != -1) { glUniformMatrix2fv(loc, 1, (GLboolean)transpose, &value[0][0]); } }
-  void setUniform(GLint loc, const glm::mat3& value, bool transpose = false) { if (loc != -1) { glUniformMatrix3fv(loc, 1, (GLboolean)transpose, &value[0][0]); } }
-  void setUniform(GLint loc, const glm::mat4& value, bool transpose = false) { if (loc != -1) { glUniformMatrix4fv(loc, 1, (GLboolean)transpose, &value[0][0]); } }
+  void setUniform(GLint loc, const glm::mat2& value, bool transpose = false) { if (loc != -1) { glUniformMatrix2fv(loc, 1, GLboolean(transpose), &value[0][0]); } }
+  void setUniform(GLint loc, const glm::mat3& value, bool transpose = false) { if (loc != -1) { glUniformMatrix3fv(loc, 1, GLboolean(transpose), &value[0][0]); } }
+  void setUniform(GLint loc, const glm::mat4& value, bool transpose = false) { if (loc != -1) { glUniformMatrix4fv(loc, 1, GLboolean(transpose), &value[0][0]); } }
   void setUniform(const QString& name, const glm::mat2& value, bool transpose = false) { setUniform(uniformLocation(name), value, transpose); }
   void setUniform(const QString& name, const glm::mat3& value, bool transpose = false) { setUniform(uniformLocation(name), value, transpose); }
   void setUniform(const QString& name, const glm::mat4& value, bool transpose = false) { setUniform(uniformLocation(name), value, transpose); }
 
-  void setUniformArray(GLint loc, const glm::mat2* values, int count, bool transpose = false) { if (loc != -1) { glUniformMatrix2fv(loc, count, (GLboolean)transpose, &(values[0][0][0])); } }
-  void setUniformArray(GLint loc, const glm::mat3* values, int count, bool transpose = false) { if (loc != -1) { glUniformMatrix3fv(loc, count, (GLboolean)transpose, &(values[0][0][0])); } }
-  void setUniformArray(GLint loc, const glm::mat4* values, int count, bool transpose = false) { if (loc != -1) { glUniformMatrix4fv(loc, count, (GLboolean)transpose, &(values[0][0][0])); } }
+  void setUniformArray(GLint loc, const glm::mat2* values, int count, bool transpose = false) { if (loc != -1) { glUniformMatrix2fv(loc, count, GLboolean(transpose), &(values[0][0][0])); } }
+  void setUniformArray(GLint loc, const glm::mat3* values, int count, bool transpose = false) { if (loc != -1) { glUniformMatrix3fv(loc, count, GLboolean(transpose), &(values[0][0][0])); } }
+  void setUniformArray(GLint loc, const glm::mat4* values, int count, bool transpose = false) { if (loc != -1) { glUniformMatrix4fv(loc, count, GLboolean(transpose), &(values[0][0][0])); } }
   void setUniformArray(const QString& name, const glm::mat2* values, int count, bool transpose = false) { setUniformArray(uniformLocation(name), values, count, transpose); }
   void setUniformArray(const QString& name, const glm::mat3* values, int count, bool transpose = false) { setUniformArray(uniformLocation(name), values, count, transpose); }
   void setUniformArray(const QString& name, const glm::mat4* values, int count, bool transpose = false) { setUniformArray(uniformLocation(name), values, count, transpose); }

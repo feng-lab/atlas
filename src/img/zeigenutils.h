@@ -233,7 +233,7 @@ public:
   template<class T>
   inline static typename Eigen::NumTraits<T>::NonInteger digamma(const T x)
   {
-    return boost::math::digamma((typename Eigen::NumTraits<T>::NonInteger)x);
+    return boost::math::digamma(static_cast<typename Eigen::NumTraits<T>::NonInteger>(x));
   }
 
   template<typename Derived>
@@ -246,7 +246,7 @@ public:
   template<class T>
   inline static typename Eigen::NumTraits<T>::NonInteger gammaln(const T x)
   {
-    return boost::math::lgamma((typename Eigen::NumTraits<T>::NonInteger)x);
+    return boost::math::lgamma(static_cast<typename Eigen::NumTraits<T>::NonInteger>(x));
   }
 
   // Compute log(det(x)) where x is positive-definite

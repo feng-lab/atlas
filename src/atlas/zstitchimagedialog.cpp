@@ -1992,17 +1992,17 @@ void ZStitchImageDialog::stitchStacks()
       const ZImg& movingImg = imgs[it->first.second];
       ZVoxelCoordinate movingImgOffset;
       if (posHint.testFlag(ZImgNCCMatch::Left)) {
-        movingImgOffset.x = -(ZVoxelCoordinate::value_type)movingImg.width();
+        movingImgOffset.x = -static_cast<ZVoxelCoordinate::value_type>(movingImg.width());
       } else if (posHint.testFlag(ZImgNCCMatch::Right)) {
         movingImgOffset.x = fixedImg.width();
       }
       if (posHint.testFlag(ZImgNCCMatch::Up)) {
-        movingImgOffset.y = -(ZVoxelCoordinate::value_type)movingImg.height();
+        movingImgOffset.y = -static_cast<ZVoxelCoordinate::value_type>(movingImg.height());
       } else if (posHint.testFlag(ZImgNCCMatch::Down)) {
         movingImgOffset.y = fixedImg.height();
       }
       if (posHint.testFlag(ZImgNCCMatch::Front)) {
-        movingImgOffset.z = -(ZVoxelCoordinate::value_type)movingImg.depth();
+        movingImgOffset.z = -static_cast<ZVoxelCoordinate::value_type>(movingImg.depth());
       } else if (posHint.testFlag(ZImgNCCMatch::Back)) {
         movingImgOffset.z = fixedImg.depth();
       }

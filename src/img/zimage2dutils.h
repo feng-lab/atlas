@@ -72,7 +72,8 @@ TPixel getImage2DPixelValue(const TPixel *img, size_t width, size_t height,
                             SignedIntegerType x, SignedIntegerType y,
                             PadOption padOption = PadOption::Constant, TPixel padValue = TPixel(0))
 {
-  if (x >= 0 && x < (SignedIntegerType)width && y >= 0 && y < (SignedIntegerType)height)
+  if (x >= 0 && x < static_cast<SignedIntegerType>(width) &&
+      y >= 0 && y < static_cast<SignedIntegerType>(height))
     return img[y*width+x];
 
   if (padOption == PadOption::Constant) {
@@ -105,7 +106,7 @@ void image2DPad(const TPixel *img, size_t width, size_t height,
 
     // boundary
     if (padOption == PadOption::Constant) {
-      std::fill(imgOut, imgOut+desWidth*desHeight, (TPixel)padValue);
+      std::fill(imgOut, imgOut+desWidth*desHeight, static_cast<TPixel>(padValue));
     } else if (padOption == PadOption::Symmetric) {
       // corner
       for (size_t j=0; j<upPad; ++j) {

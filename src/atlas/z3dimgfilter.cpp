@@ -27,13 +27,13 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   , m_entryTarget(glm::uvec2(32,32))
   , m_exitTarget(glm::uvec2(32,32))
   , m_layerTarget(glm::uvec2(32,32))
-  , m_layerColorTexture(GL_TEXTURE_2D_ARRAY, (GLint)GL_RGBA16, glm::uvec3(32,32,3), GL_RGBA, GL_FLOAT)
-  , m_layerDepthTexture(GL_TEXTURE_2D_ARRAY, (GLint)GL_DEPTH_COMPONENT24, glm::uvec3(32,32,3), GL_DEPTH_COMPONENT, GL_FLOAT)
-  , m_missBlocksTexture1(GL_TEXTURE_2D, (GLint)GL_RGBA32UI, glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_missBlocksTexture2(GL_TEXTURE_2D, (GLint)GL_RGBA32UI, glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_usedBlocksTexture1(GL_TEXTURE_2D, (GLint)GL_RGBA32UI, glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_usedBlocksTexture2(GL_TEXTURE_2D, (GLint)GL_RGBA32UI, glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_usedBlocksTexture3(GL_TEXTURE_2D, (GLint)GL_RGBA32UI, glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
+  , m_layerColorTexture(GL_TEXTURE_2D_ARRAY, GLint(GL_RGBA16), glm::uvec3(32,32,3), GL_RGBA, GL_FLOAT)
+  , m_layerDepthTexture(GL_TEXTURE_2D_ARRAY, GLint(GL_DEPTH_COMPONENT24), glm::uvec3(32,32,3), GL_DEPTH_COMPONENT, GL_FLOAT)
+  , m_missBlocksTexture1(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
+  , m_missBlocksTexture2(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
+  , m_usedBlocksTexture1(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
+  , m_usedBlocksTexture2(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
+  , m_usedBlocksTexture3(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
   , m_blockIDsRenderTarget(glm::uvec2(32,32))
   , m_outport("Image", true, InvalidMonoViewResult)
   , m_leftEyeOutport("LeftEyeImage", true, InvalidLeftEyeResult)
@@ -77,20 +77,20 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   addParameter(m_smoothInteraction);
 
   Z3DTexture* g_TexId[2];
-  g_TexId[0] = new Z3DTexture((GLint)GL_RGBA32F, glm::uvec3(32,32,1), GL_RGBA, GL_FLOAT);
-  g_TexId[0]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  g_TexId[0] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32,32,1), GL_RGBA, GL_FLOAT);
+  g_TexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   g_TexId[0]->uploadImage();
-  g_TexId[1] = new Z3DTexture((GLint)GL_RGBA32F, glm::uvec3(32,32,1), GL_RGBA, GL_FLOAT);
-  g_TexId[1]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  g_TexId[1] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32,32,1), GL_RGBA, GL_FLOAT);
+  g_TexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   g_TexId[1]->uploadImage();
   m_entryTarget.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0);
   m_entryTarget.attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1);
   m_entryTarget.isFBOComplete();
-  g_TexId[0] = new Z3DTexture((GLint)GL_RGBA32F, glm::uvec3(32,32,1), GL_RGBA, GL_FLOAT);
-  g_TexId[0]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  g_TexId[0] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32,32,1), GL_RGBA, GL_FLOAT);
+  g_TexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   g_TexId[0]->uploadImage();
-  g_TexId[1] = new Z3DTexture((GLint)GL_RGBA32F, glm::uvec3(32,32,1), GL_RGBA, GL_FLOAT);
-  g_TexId[1]->setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  g_TexId[1] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32,32,1), GL_RGBA, GL_FLOAT);
+  g_TexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   g_TexId[1]->uploadImage();
   m_exitTarget.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0);
   m_exitTarget.attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1);
@@ -101,11 +101,11 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   m_layerTarget.attachTextureToFBO(&m_layerDepthTexture, GL_DEPTH_ATTACHMENT, false);
   m_layerTarget.isFBOComplete();
 
-  m_missBlocksTexture1.setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
-  m_missBlocksTexture2.setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
-  m_usedBlocksTexture1.setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
-  m_usedBlocksTexture2.setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
-  m_usedBlocksTexture3.setFilter((GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  m_missBlocksTexture1.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+  m_missBlocksTexture2.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+  m_usedBlocksTexture1.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+  m_usedBlocksTexture2.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+  m_usedBlocksTexture3.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   m_missBlocksTexture1.uploadImage();
   m_missBlocksTexture2.uploadImage();
   m_usedBlocksTexture1.uploadImage();

@@ -64,13 +64,13 @@ struct col4 {
     : r(0), g(0), b(0), a(255)
   {}
 
-  col4(uint8_t const & r, uint8_t const & g, uint8_t const & b, uint8_t const & a = (uint8_t)255)
+  col4(uint8_t const & r, uint8_t const & g, uint8_t const & b, uint8_t const & a = uint8_t(255))
     : r(r), g(g), b(b), a(a)
   {}
 
   template <typename A, typename B, typename C, typename D>
-  col4(A const & r, B const & g, C const & b, D const & a = (D)255)
-    : r((uint8_t)r), g((uint8_t)g), b((uint8_t)b), a((uint8_t)a)
+  col4(A const & r, B const & g, C const & b, D const & a = D(255))
+    : r(uint8_t(r)), g(uint8_t(g)), b(uint8_t(b)), a(uint8_t(a))
   {}
 
   bool operator==(const col4& c) const

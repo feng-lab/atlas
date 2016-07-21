@@ -102,7 +102,7 @@ void ZParameterKey::updateEasingCurve()
   if (m_type->isSelected("Switch")) {
     m_curve.setCustomType(myEasingFunction);
   } else {
-    m_curve.setType((QEasingCurve::Type)(m_type->associatedData()));
+    m_curve.setType(static_cast<QEasingCurve::Type>(m_type->associatedData()));
   }
 }
 

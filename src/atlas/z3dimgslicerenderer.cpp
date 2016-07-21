@@ -70,7 +70,7 @@ void Z3DImgSliceRenderer::bindVolumes(Z3DShaderProgram &shader)
   for (size_t i=0; i<m_img->numChannels(); ++i) {
     // volumes
     shader.bindTexture(m_volumeUniformNames[idx], m_img->volumes().at(i)->texture(),
-                       (GLint)GL_NEAREST, (GLint)GL_NEAREST);
+                       GLint(GL_NEAREST), GLint(GL_NEAREST));
 
     // colormap
     shader.bindTexture(m_colormapUniformNames[idx++], m_colormaps->at(i)->get().texture1D());
@@ -83,7 +83,7 @@ void Z3DImgSliceRenderer::bindVolume(Z3DShaderProgram &shader, size_t idx)
 {
   // volumes
   shader.bindTexture(m_volumeUniformNames[0], m_img->volumes().at(idx)->texture(),
-      (GLint)GL_NEAREST, (GLint)GL_NEAREST);
+      GLint(GL_NEAREST), GLint(GL_NEAREST));
 
   // colormap
   shader.bindTexture(m_colormapUniformNames[0], m_colormaps->at(idx)->get().texture1D());
@@ -225,7 +225,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
         m_layerTarget->attachSlice(i);
 
         //if (i == 1) {
-          //m_layerTarget->saveAsColorImage("/Users/feng/Downloads/abcd_b.tif");
+        //m_layerTarget->saveAsColorImage("/Users/feng/Downloads/abcd_b.tif");
         //}
 
         m_layerTarget->bind();
@@ -240,7 +240,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
         m_layerTarget->release();
 
         //if (i == 1) {
-          //m_layerTarget->saveAsColorImage("/Users/feng/Downloads/abcd.tif");
+        //m_layerTarget->saveAsColorImage("/Users/feng/Downloads/abcd.tif");
         //}
       }
     }

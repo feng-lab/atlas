@@ -70,7 +70,7 @@ void Z3DImage2DRenderer::bindVolumes(Z3DShaderProgram &shader)
       continue;
 
     // volumes
-    shader.bindTexture(m_volumeUniformNames[idx], volume->texture(), (GLint)GL_NEAREST, (GLint)GL_NEAREST);
+    shader.bindTexture(m_volumeUniformNames[idx], volume->texture(), GLint(GL_NEAREST), GLint(GL_NEAREST));
 
     // colormap
     shader.bindTexture(m_colormapUniformNames[idx++], m_colormaps[i]->get().texture1D());
@@ -82,7 +82,7 @@ void Z3DImage2DRenderer::bindVolumes(Z3DShaderProgram &shader)
 void Z3DImage2DRenderer::bindVolume(Z3DShaderProgram &shader, size_t idx)
 {
   // volumes
-  shader.bindTexture(m_volumeUniformNames[0], m_volumes[idx]->texture(), (GLint)GL_NEAREST, (GLint)GL_NEAREST);
+  shader.bindTexture(m_volumeUniformNames[0], m_volumes[idx]->texture(), GLint(GL_NEAREST), GLint(GL_NEAREST));
 
   // colormap
   shader.bindTexture(m_colormapUniformNames[0], m_colormaps[idx]->get().texture1D());

@@ -13,14 +13,14 @@ class Z3DRenderTarget
 {
 public:
   // create one color and one depth attachment
-  Z3DRenderTarget(GLint internalColorFormat = (GLint)GL_RGBA16, GLint internalDepthFormat = (GLint)GL_DEPTH_COMPONENT24,
+  Z3DRenderTarget(GLint internalColorFormat = GLint(GL_RGBA16), GLint internalDepthFormat = GLint(GL_DEPTH_COMPONENT24),
                   glm::uvec2 size = glm::uvec2(32,32), bool multisample = false, int sample = 4);
   // empty fbo with no attachment
   Z3DRenderTarget(glm::uvec2 size);
   virtual ~Z3DRenderTarget();
 
-  void createColorAttachment(GLint internalColorFormat = (GLint)GL_RGBA16, GLenum attachment = GL_COLOR_ATTACHMENT0);
-  void createDepthAttachment(GLint internalDepthFormat = (GLint)GL_DEPTH_COMPONENT24);
+  void createColorAttachment(GLint internalColorFormat = GLint(GL_RGBA16), GLenum attachment = GL_COLOR_ATTACHMENT0);
+  void createDepthAttachment(GLint internalDepthFormat = GLint(GL_DEPTH_COMPONENT24));
 
   void bind();
   void release();

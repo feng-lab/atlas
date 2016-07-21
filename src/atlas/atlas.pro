@@ -10,7 +10,7 @@ macx {
 # suppress warnings from 3rd party library, works for gcc and clang
 QMAKE_CXXFLAGS += -isystem $$PWD/../3rdparty -isystem $$PWD/../3rdparty/eigen -isystem $$PWD/../3rdparty/boost \
   -isystem $$PWD/../3rdparty/glm -isystem $$PWD/../3rdparty/folly \
-  -mllvm -inline-threshold=600 #--analyze
+  -mllvm -inline-threshold=600 #-Wold-style-cast #--analyze
 QMAKE_LFLAGS += -rpath @executable_path/../Frameworks
 }
 

@@ -18,7 +18,7 @@ struct MaxOp {
   template<typename TVoxel, typename TVoxelOther>
   TVoxel operator()(TVoxel voxelRef, TVoxelOther otherVoxel) const
   {
-    return std::max(voxelRef, (TVoxel)otherVoxel);
+    return std::max(voxelRef, static_cast<TVoxel>(otherVoxel));
   }
 };
 
@@ -529,8 +529,8 @@ ZImg ZImgPack::crop(const ZImgRegion &region) const
           const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
           ZVoxelCoordinate tileStart(tile.x, tile.y, z, 0, t);
           ZVoxelCoordinate start = tileStart - rgn.start;
-          if ((start.x < 0 && start.x + (TCoordinate)tile.width <= 0) || start.x >= (TCoordinate)res.width() ||
-              (start.y < 0 && start.y + (TCoordinate)tile.height <= 0) || start.y >= (TCoordinate)res.height()) {
+          if ((start.x < 0 && start.x + static_cast<TCoordinate>(tile.width) <= 0) || start.x >= static_cast<TCoordinate>(res.width()) ||
+              (start.y < 0 && start.y + static_cast<TCoordinate>(tile.height) <= 0) || start.y >= static_cast<TCoordinate>(res.height())) {
             continue;
           }
 
@@ -591,11 +591,11 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
 {
   size_t readRatio = readRatioOf(xyRatio);
   if (readRatio == xyRatio) {
-    TileBoxType queryBox(TileCornerType(sx * (int64_t)xyRatio, sy * (int64_t)xyRatio),
-                         TileCornerType((sx + (int64_t)res.width()) * (int64_t)xyRatio - 1, (sy + (int64_t)res.height()) * (int64_t)xyRatio - 1));
-    int64_t zEnd = std::min((int64_t)m_imgInfo.depth, (sz+(int64_t)res.depth()) * (int64_t)zRatio);
+    TileBoxType queryBox(TileCornerType(sx * int64_t(xyRatio), sy * int64_t(xyRatio)),
+                         TileCornerType((sx + int64_t(res.width())) * int64_t(xyRatio) - 1, (sy + int64_t(res.height())) * int64_t(xyRatio) - 1));
+    int64_t zEnd = std::min(int64_t(m_imgInfo.depth), (sz+int64_t(res.depth())) * int64_t(zRatio));
     size_t zIdx = 0;
-    for (int64_t z=sz*(int64_t)zRatio; z<zEnd; z+=(int64_t)zRatio, ++zIdx) {
+    for (int64_t z=sz*int64_t(zRatio); z<zEnd; z+=int64_t(zRatio), ++zIdx) {
       if (z < 0)
         continue;
 

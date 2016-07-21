@@ -53,72 +53,72 @@ template<typename _Tp> static inline _Tp saturate_cast(float v) { return _Tp(v);
 template<typename _Tp> static inline _Tp saturate_cast(double v) { return _Tp(v); }
 template<typename _Tp> static inline _Tp saturate_cast(long double v) { return _Tp(v); }
 
-template<> inline uint8_t saturate_cast<uint8_t>(int8_t v) { return (uint8_t)std::max((int32_t)v, 0); }
-template<> inline uint8_t saturate_cast<uint8_t>(uint16_t v) { return (uint8_t)std::min((uint32_t)v, (uint32_t)UINT8_MAX); }
-template<> inline uint8_t saturate_cast<uint8_t>(int32_t v) { return (uint8_t)((uint32_t)v <= UINT8_MAX ? v : v > 0 ? UINT8_MAX : 0); }
-template<> inline uint8_t saturate_cast<uint8_t>(int16_t v) { return saturate_cast<uint8_t>((int32_t)v); }
-template<> inline uint8_t saturate_cast<uint8_t>(uint32_t v) { return (uint8_t)std::min(v, (uint32_t)UINT8_MAX); }
-template<> inline uint8_t saturate_cast<uint8_t>(int64_t v) { return (uint8_t)((uint64_t)v <= (uint64_t)UINT8_MAX ? v : v > 0 ? UINT8_MAX : 0); }
-template<> inline uint8_t saturate_cast<uint8_t>(uint64_t v) { return (uint8_t)std::min(v, (uint64_t)UINT8_MAX); }
+template<> inline uint8_t saturate_cast<uint8_t>(int8_t v) { return uint8_t(std::max(int32_t(v), 0)); }
+template<> inline uint8_t saturate_cast<uint8_t>(uint16_t v) { return uint8_t(std::min(uint32_t(v), uint32_t(UINT8_MAX))); }
+template<> inline uint8_t saturate_cast<uint8_t>(int32_t v) { return uint8_t(uint32_t(v) <= UINT8_MAX ? v : v > 0 ? UINT8_MAX : 0); }
+template<> inline uint8_t saturate_cast<uint8_t>(int16_t v) { return saturate_cast<uint8_t>(int32_t(v)); }
+template<> inline uint8_t saturate_cast<uint8_t>(uint32_t v) { return uint8_t(std::min(v, uint32_t(UINT8_MAX))); }
+template<> inline uint8_t saturate_cast<uint8_t>(int64_t v) { return uint8_t(uint64_t(v) <= uint64_t(UINT8_MAX) ? v : v > 0 ? UINT8_MAX : 0); }
+template<> inline uint8_t saturate_cast<uint8_t>(uint64_t v) { return uint8_t(std::min(v, uint64_t(UINT8_MAX))); }
 template<> inline uint8_t saturate_cast<uint8_t>(float v) { return roundTo<uint8_t>(v); }
 template<> inline uint8_t saturate_cast<uint8_t>(double v) { return roundTo<uint8_t>(v);  }
 template<> inline uint8_t saturate_cast<uint8_t>(long double v) { return roundTo<uint8_t>(v);  }
 
-template<> inline int8_t saturate_cast<int8_t>(uint8_t v) { return (int8_t)std::min((int32_t)v, (int32_t)INT8_MAX); }
-template<> inline int8_t saturate_cast<int8_t>(uint16_t v) { return (int8_t)std::min((uint32_t)v, (uint32_t)INT8_MAX); }
-template<> inline int8_t saturate_cast<int8_t>(int32_t v) { return (int8_t)((uint32_t)(v-INT8_MIN) <= (uint32_t)UINT8_MAX ? v : v > 0 ? INT8_MAX : INT8_MIN); }
-template<> inline int8_t saturate_cast<int8_t>(int16_t v) { return saturate_cast<int8_t>((int32_t)v); }
-template<> inline int8_t saturate_cast<int8_t>(uint32_t v) { return (int8_t)std::min(v, (uint32_t)INT8_MAX); }
-template<> inline int8_t saturate_cast<int8_t>(int64_t v) { return (int8_t)((uint64_t)(v-INT8_MIN) <= (uint64_t)UINT8_MAX ? v : v > 0 ? INT8_MAX : INT8_MIN); }
-template<> inline int8_t saturate_cast<int8_t>(uint64_t v) { return (int8_t)std::min(v, (uint64_t)INT8_MAX); }
+template<> inline int8_t saturate_cast<int8_t>(uint8_t v) { return int8_t(std::min(int32_t(v), int32_t(INT8_MAX))); }
+template<> inline int8_t saturate_cast<int8_t>(uint16_t v) { return int8_t(std::min(uint32_t(v), uint32_t(INT8_MAX))); }
+template<> inline int8_t saturate_cast<int8_t>(int32_t v) { return int8_t(uint32_t(v-INT8_MIN) <= uint32_t(UINT8_MAX) ? v : v > 0 ? INT8_MAX : INT8_MIN); }
+template<> inline int8_t saturate_cast<int8_t>(int16_t v) { return saturate_cast<int8_t>(int32_t(v)); }
+template<> inline int8_t saturate_cast<int8_t>(uint32_t v) { return int8_t(std::min(v, uint32_t(INT8_MAX))); }
+template<> inline int8_t saturate_cast<int8_t>(int64_t v) { return int8_t(uint64_t(v-INT8_MIN) <= uint64_t(UINT8_MAX) ? v : v > 0 ? INT8_MAX : INT8_MIN); }
+template<> inline int8_t saturate_cast<int8_t>(uint64_t v) { return int8_t(std::min(v, uint64_t(INT8_MAX))); }
 template<> inline int8_t saturate_cast<int8_t>(float v) { return roundTo<int8_t>(v);  }
 template<> inline int8_t saturate_cast<int8_t>(double v) { return roundTo<int8_t>(v);  }
 template<> inline int8_t saturate_cast<int8_t>(long double v) { return roundTo<int8_t>(v);  }
 
-template<> inline uint16_t saturate_cast<uint16_t>(int8_t v) { return (uint16_t)std::max((int32_t)v, 0); }
-template<> inline uint16_t saturate_cast<uint16_t>(int16_t v) { return (uint16_t)std::max((int32_t)v, 0); }
-template<> inline uint16_t saturate_cast<uint16_t>(int32_t v) { return (uint16_t)((uint32_t)v <= (uint32_t)UINT16_MAX ? v : v > 0 ? UINT16_MAX : 0); }
-template<> inline uint16_t saturate_cast<uint16_t>(uint32_t v) { return (uint16_t)std::min(v, (uint32_t)UINT16_MAX); }
-template<> inline uint16_t saturate_cast<uint16_t>(int64_t v) { return (uint16_t)((uint64_t)v <= (uint64_t)UINT16_MAX ? v : v > 0 ? UINT16_MAX : 0); }
-template<> inline uint16_t saturate_cast<uint16_t>(uint64_t v) { return (uint16_t)std::min(v, (uint64_t)UINT16_MAX); }
+template<> inline uint16_t saturate_cast<uint16_t>(int8_t v) { return uint16_t(std::max(int32_t(v), 0)); }
+template<> inline uint16_t saturate_cast<uint16_t>(int16_t v) { return uint16_t(std::max(int32_t(v), 0)); }
+template<> inline uint16_t saturate_cast<uint16_t>(int32_t v) { return uint16_t(uint32_t(v) <= uint32_t(UINT16_MAX) ? v : v > 0 ? UINT16_MAX : 0); }
+template<> inline uint16_t saturate_cast<uint16_t>(uint32_t v) { return uint16_t(std::min(v, uint32_t(UINT16_MAX))); }
+template<> inline uint16_t saturate_cast<uint16_t>(int64_t v) { return uint16_t(uint64_t(v) <= uint64_t(UINT16_MAX) ? v : v > 0 ? UINT16_MAX : 0); }
+template<> inline uint16_t saturate_cast<uint16_t>(uint64_t v) { return uint16_t(std::min(v, uint64_t(UINT16_MAX))); }
 template<> inline uint16_t saturate_cast<uint16_t>(float v) { return roundTo<uint16_t>(v);  }
 template<> inline uint16_t saturate_cast<uint16_t>(double v) { return roundTo<uint16_t>(v); }
 template<> inline uint16_t saturate_cast<uint16_t>(long double v) { return roundTo<uint16_t>(v); }
 
-template<> inline int16_t saturate_cast<int16_t>(uint16_t v) { return (int16_t)std::min((int)v, (int)INT16_MAX); }
-template<> inline int16_t saturate_cast<int16_t>(int32_t v) { return (int16_t)((uint32_t)(v-INT16_MIN) <= (uint32_t)UINT16_MAX ? v : v > 0 ? INT16_MAX : INT16_MIN); }
-template<> inline int16_t saturate_cast<int16_t>(uint32_t v) { return (int16_t)std::min(v, (uint32_t)INT16_MAX); }
-template<> inline int16_t saturate_cast<int16_t>(int64_t v) { return (int16_t)((uint64_t)(v-INT16_MIN) <= (uint64_t)UINT16_MAX ? v : v > 0 ? INT16_MAX : INT16_MIN); }
-template<> inline int16_t saturate_cast<int16_t>(uint64_t v) { return (int16_t)std::min(v, (uint64_t)INT16_MAX); }
+template<> inline int16_t saturate_cast<int16_t>(uint16_t v) { return int16_t(std::min(int(v), int(INT16_MAX))); }
+template<> inline int16_t saturate_cast<int16_t>(int32_t v) { return int16_t(uint32_t(v-INT16_MIN) <= uint32_t(UINT16_MAX) ? v : v > 0 ? INT16_MAX : INT16_MIN); }
+template<> inline int16_t saturate_cast<int16_t>(uint32_t v) { return int16_t(std::min(v, uint32_t(INT16_MAX))); }
+template<> inline int16_t saturate_cast<int16_t>(int64_t v) { return int16_t(uint64_t(v-INT16_MIN) <= uint64_t(UINT16_MAX) ? v : v > 0 ? INT16_MAX : INT16_MIN); }
+template<> inline int16_t saturate_cast<int16_t>(uint64_t v) { return int16_t(std::min(v, uint64_t(INT16_MAX))); }
 template<> inline int16_t saturate_cast<int16_t>(float v) { return roundTo<int16_t>(v); }
 template<> inline int16_t saturate_cast<int16_t>(double v) { return roundTo<int16_t>(v); }
 template<> inline int16_t saturate_cast<int16_t>(long double v) { return roundTo<int16_t>(v); }
 
-template<> inline int32_t saturate_cast<int32_t>(uint32_t v) { return (int32_t)std::min(v, (uint32_t)INT32_MAX); }
-template<> inline int32_t saturate_cast<int32_t>(int64_t v) { return (int32_t)((uint64_t)(v - INT32_MIN) <= (uint64_t)UINT32_MAX ? v : v > 0 ? INT32_MAX : INT32_MIN); }
-template<> inline int32_t saturate_cast<int32_t>(uint64_t v) { return (int32_t)std::min(v, (uint64_t)INT32_MAX); }
+template<> inline int32_t saturate_cast<int32_t>(uint32_t v) { return int32_t(std::min(v, uint32_t(INT32_MAX))); }
+template<> inline int32_t saturate_cast<int32_t>(int64_t v) { return int32_t(uint64_t(v - INT32_MIN) <= uint64_t(UINT32_MAX) ? v : v > 0 ? INT32_MAX : INT32_MIN); }
+template<> inline int32_t saturate_cast<int32_t>(uint64_t v) { return int32_t(std::min(v, uint64_t(INT32_MAX))); }
 template<> inline int32_t saturate_cast<int32_t>(float v) { return roundTo<int32_t>(v); }
 template<> inline int32_t saturate_cast<int32_t>(double v) { return roundTo<int32_t>(v); }
 template<> inline int32_t saturate_cast<int32_t>(long double v) { return roundTo<int32_t>(v); }
 
-template<> inline uint32_t saturate_cast<uint32_t>(int8_t v) { return (uint32_t)std::max((int32_t)v, 0); }
-template<> inline uint32_t saturate_cast<uint32_t>(int16_t v) { return (uint32_t)std::max((int32_t)v, 0); }
-template<> inline uint32_t saturate_cast<uint32_t>(int32_t v) { return (uint32_t)std::max(v, 0); }
-template<> inline uint32_t saturate_cast<uint32_t>(int64_t v) { return (uint32_t)((uint64_t)v <= (uint64_t)UINT32_MAX ? v : v > 0 ? UINT32_MAX : 0); }
-template<> inline uint32_t saturate_cast<uint32_t>(uint64_t v) { return (uint32_t)std::min(v, (uint64_t)UINT32_MAX); }
+template<> inline uint32_t saturate_cast<uint32_t>(int8_t v) { return uint32_t(std::max(int32_t(v), 0)); }
+template<> inline uint32_t saturate_cast<uint32_t>(int16_t v) { return uint32_t(std::max(int32_t(v), 0)); }
+template<> inline uint32_t saturate_cast<uint32_t>(int32_t v) { return uint32_t(std::max(v, 0)); }
+template<> inline uint32_t saturate_cast<uint32_t>(int64_t v) { return uint32_t(uint64_t(v) <= uint64_t(UINT32_MAX) ? v : v > 0 ? UINT32_MAX : 0); }
+template<> inline uint32_t saturate_cast<uint32_t>(uint64_t v) { return uint32_t(std::min(v, uint64_t(UINT32_MAX))); }
 template<> inline uint32_t saturate_cast<uint32_t>(float v) { return roundTo<uint32_t>(v); }
 template<> inline uint32_t saturate_cast<uint32_t>(double v) { return roundTo<uint32_t>(v); }
 template<> inline uint32_t saturate_cast<uint32_t>(long double v) { return roundTo<uint32_t>(v); }
 
-template<> inline int64_t saturate_cast<int64_t>(uint64_t v) { return (int64_t)std::min(v, (uint64_t)(INT64_MAX)); }
+template<> inline int64_t saturate_cast<int64_t>(uint64_t v) { return int64_t(std::min(v, uint64_t(INT64_MAX))); }
 template<> inline int64_t saturate_cast<int64_t>(float v) { return roundTo<int64_t>(v); }
 template<> inline int64_t saturate_cast<int64_t>(double v) { return roundTo<int64_t>(v); }
 template<> inline int64_t saturate_cast<int64_t>(long double v) { return roundTo<int64_t>(v); }
 
-template<> inline uint64_t saturate_cast<uint64_t>(int8_t v) { return (uint64_t)std::max((int32_t)v, 0); }
-template<> inline uint64_t saturate_cast<uint64_t>(int16_t v) { return (uint64_t)std::max((int32_t)v, 0); }
-template<> inline uint64_t saturate_cast<uint64_t>(int32_t v) { return (uint64_t)std::max(v, 0); }
-template<> inline uint64_t saturate_cast<uint64_t>(int64_t v) { return (uint64_t)std::max(v, (int64_t)0); }
+template<> inline uint64_t saturate_cast<uint64_t>(int8_t v) { return uint64_t(std::max(int32_t(v), 0)); }
+template<> inline uint64_t saturate_cast<uint64_t>(int16_t v) { return uint64_t(std::max(int32_t(v), 0)); }
+template<> inline uint64_t saturate_cast<uint64_t>(int32_t v) { return uint64_t(std::max(v, 0)); }
+template<> inline uint64_t saturate_cast<uint64_t>(int64_t v) { return uint64_t(std::max(v, int64_t(0))); }
 template<> inline uint64_t saturate_cast<uint64_t>(float v) { return roundTo<uint64_t>(v); }
 template<> inline uint64_t saturate_cast<uint64_t>(double v) { return roundTo<uint64_t>(v); }
 template<> inline uint64_t saturate_cast<uint64_t>(long double v) { return roundTo<uint64_t>(v); }
@@ -322,19 +322,19 @@ inline int64_t saturate_sub(int64_t x, uint64_t y)
 inline uint8_t saturate_mul(uint8_t x, uint8_t y)
 {
   uint32_t res = uint32_t(x) * uint32_t(y);
-  return (-!!(res >> 8)) | (uint8_t)res;
+  return (-!!(res >> 8)) | uint8_t(res);
 }
 
 inline uint16_t saturate_mul(uint16_t x, uint16_t y)
 {
   uint32_t res = uint32_t(x) * uint32_t(y);
-  return (-!!(res >> 16)) | (uint16_t)res;
+  return (-!!(res >> 16)) | uint16_t(res);
 }
 
 inline uint32_t saturate_mul(uint32_t x, uint32_t y)
 {
   uint64_t res = uint64_t(x) * uint64_t(y);
-  return (-!!(res >> 32)) | (uint32_t)res;
+  return (-!!(res >> 32)) | uint32_t(res);
 }
 
 inline uint64_t saturate_mul(uint64_t x, uint64_t y)

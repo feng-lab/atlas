@@ -178,9 +178,9 @@ void Z3DSDFont::createTexture()
 {
   if (m_isEmpty || m_texture)
     return;
-  m_texture.reset(new Z3DTexture((GLint)GL_RGBA8, glm::uvec3(m_GLFormattedImage.width(), m_GLFormattedImage.height(), 1),
+  m_texture.reset(new Z3DTexture(GLint(GL_RGBA8), glm::uvec3(m_GLFormattedImage.width(), m_GLFormattedImage.height(), 1),
                                  GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV));
-  m_texture->setWrap((GLint)GL_REPEAT);
+  m_texture->setWrap(GLint(GL_REPEAT));
   m_texture->uploadImage(m_GLFormattedImage.bits());
   CHECK_GL_ERROR;
 }

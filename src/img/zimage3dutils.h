@@ -31,7 +31,9 @@ TPixel getImage3DPixelValue(const TPixel *img, size_t width, size_t height, size
                             SignedIntegerType x, SignedIntegerType y, SignedIntegerType z,
                             PadOption padOption = PadOption::Constant, TPixel padValue = TPixel(0))
 {
-  if (x >= 0 && x < (SignedIntegerType)width && y >= 0 && y < (SignedIntegerType)height && z >= 0 && z < (SignedIntegerType)depth)
+  if (x >= 0 && x < static_cast<SignedIntegerType>(width) &&
+      y >= 0 && y < static_cast<SignedIntegerType>(height) &&
+      z >= 0 && z < static_cast<SignedIntegerType>(depth))
     return img[static_cast<size_t>(z)*width*height+y*width+x];
 
   if (padOption == PadOption::Constant) {

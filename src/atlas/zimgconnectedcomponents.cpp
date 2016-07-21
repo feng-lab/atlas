@@ -13,7 +13,7 @@ struct EqualToLabel {
   template<typename TVoxel>
   inline bool operator()(TVoxel v) const
   {
-    return v == (TVoxel)m_label;
+    return v == static_cast<TVoxel>(m_label);
   }
 private:
   size_t m_label;

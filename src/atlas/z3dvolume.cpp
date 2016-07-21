@@ -287,15 +287,15 @@ void Z3DVolume::generateTexture()
   GLenum dataType;
   if (m_img.isType<uint8_t>()) {
     format = GL_RED;
-    internalFormat = (GLint)GL_R8;
+    internalFormat = GLint(GL_R8);
     dataType = GL_UNSIGNED_BYTE;
   } else if (m_img.isType<uint16_t>()) {
     format = GL_RED;
-    internalFormat = (GLint)GL_R16;
+    internalFormat = GLint(GL_R16);
     dataType = GL_UNSIGNED_SHORT;
   } else if (m_img.isType<float>()) {
     format = GL_RED;
-    internalFormat = (GLint)GL_R32F;
+    internalFormat = GLint(GL_R32F);
     dataType = GL_FLOAT;
   } else {
     LERROR() << "Only GREY, GREY16 or FLOAT32 stack formats are supported";

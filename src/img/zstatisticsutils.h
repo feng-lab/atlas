@@ -317,7 +317,7 @@ double median(RandomAccessIterator begin, RandomAccessIterator end)
   std::nth_element(vec.begin(), target, vec.end());
 
   if(size % 2 != 0){ //Odd number of elements
-    return (ResultType)*target;
+    return static_cast<ResultType>(*target);
   } else{            //Even number of elements
     ResultType a = *target;
     return (a + *std::max_element(vec.begin(), target))/2.0;
@@ -339,7 +339,7 @@ double medianInPlace(RandomAccessIterator begin, RandomAccessIterator end)
   std::nth_element(begin, target, end);
 
   if(size % 2 != 0){ //Odd number of elements
-    return (ResultType)*target;
+    return static_cast<ResultType>(*target);
   } else{            //Even number of elements
     ResultType a = *target;
     return (a + *std::max_element(begin, target))/2.0;

@@ -296,14 +296,14 @@ void Z3DGpuInfo::detectGpuInfo()
   if (GLVersionGE(3, 0)) {
     GLint contextFlags;
     glGetIntegerv(GL_CONTEXT_FLAGS, &contextFlags);
-    m_contextFlagForwardCompatibleBit = contextFlags & (GLint)GL_CONTEXT_FLAG_FORWARD_COMPATIBLE_BIT;
-    m_contextFlagDebugBit = contextFlags & (GLint)GL_CONTEXT_FLAG_DEBUG_BIT;
-    m_contextFlagRobustAccessBit = contextFlags & (GLint)GL_CONTEXT_FLAG_ROBUST_ACCESS_BIT;
+    m_contextFlagForwardCompatibleBit = contextFlags & GLint(GL_CONTEXT_FLAG_FORWARD_COMPATIBLE_BIT);
+    m_contextFlagDebugBit = contextFlags & GLint(GL_CONTEXT_FLAG_DEBUG_BIT);
+    m_contextFlagRobustAccessBit = contextFlags & GLint(GL_CONTEXT_FLAG_ROBUST_ACCESS_BIT);
     if (GLVersionGE(3, 2)) {
       GLint contextProfileMask;
       glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &contextProfileMask);
-      m_contextCoreProfileBit = contextProfileMask & (GLint)GL_CONTEXT_CORE_PROFILE_BIT;
-      m_contextCompatibilityProfileBit = contextProfileMask & (GLint)GL_CONTEXT_COMPATIBILITY_PROFILE_BIT;
+      m_contextCoreProfileBit = contextProfileMask & GLint(GL_CONTEXT_CORE_PROFILE_BIT);
+      m_contextCompatibilityProfileBit = contextProfileMask & GLint(GL_CONTEXT_COMPATIBILITY_PROFILE_BIT);
     }
     if (!m_contextFlagForwardCompatibleBit) {
       m_glExtensionsString = QString(reinterpret_cast<const char*>(glGetString(GL_EXTENSIONS)));

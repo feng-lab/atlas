@@ -74,7 +74,7 @@ bool checkGLState(GLenum pname, GLenum value)
 {
   GLint i;
   glGetIntegerv(pname, &i);
-  return ((GLenum)i == value);
+  return (GLenum(i) == value);
 }
 
 bool checkGLState(GLenum pname, GLfloat value)

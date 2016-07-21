@@ -17,10 +17,10 @@ public:
 
   // default is GL_LINEAR and GL_LINEAR.
   // note: openGL default is GL_NEAREST_MIPMAP_LINEAR and GL_LINEAR.
-  void setFilter(GLint minFilter = (GLint)GL_LINEAR, GLint magFilter = (GLint)GL_LINEAR) const;
+  void setFilter(GLint minFilter = GLint(GL_LINEAR), GLint magFilter = GLint(GL_LINEAR)) const;
   // default is GL_CLAMP_TO_EDGE
   // note: openGL default is GL_REPEAT !!
-  void setWrap(GLint wrap = (GLint)GL_CLAMP_TO_EDGE) const;
+  void setWrap(GLint wrap = GLint(GL_CLAMP_TO_EDGE)) const;
   //
   void generateMipmap() const;
 

@@ -63,7 +63,7 @@ double ZImageInterpolation::sample(const TPixel *img, size_t width, size_t heigh
     return m_fillValue;
 
   if (m_interpolant == Interpolant::Nearest) {
-    return getImage2DPixelValue(img, width, height, roundTo<int>(x), roundTo<int>(y), m_padOption, (TPixel)m_fillValue);
+    return getImage2DPixelValue(img, width, height, roundTo<int>(x), roundTo<int>(y), m_padOption, TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Linear) {
     double perc[4];
     double xCom, yCom;
@@ -80,10 +80,10 @@ double ZImageInterpolation::sample(const TPixel *img, size_t width, size_t heigh
     perc[2] = xCom * (1 - yCom);
     perc[3] = xCom * yCom;
 
-    return perc[0] * getImage2DPixelValue(img, width, height, xBas0, yBas0, m_padOption, (TPixel)m_fillValue) +
-        perc[1] * getImage2DPixelValue(img, width, height, xBas0, yBas1, m_padOption, (TPixel)m_fillValue) +
-        perc[2] * getImage2DPixelValue(img, width, height, xBas1, yBas0, m_padOption, (TPixel)m_fillValue) +
-        perc[3] * getImage2DPixelValue(img, width, height, xBas1, yBas1, m_padOption, (TPixel)m_fillValue);
+    return perc[0] * getImage2DPixelValue(img, width, height, xBas0, yBas0, m_padOption, TPixel(m_fillValue)) +
+        perc[1] * getImage2DPixelValue(img, width, height, xBas0, yBas1, m_padOption, TPixel(m_fillValue)) +
+        perc[2] * getImage2DPixelValue(img, width, height, xBas1, yBas0, m_padOption, TPixel(m_fillValue)) +
+        perc[3] * getImage2DPixelValue(img, width, height, xBas1, yBas1, m_padOption, TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Cubic) {
     // http://en.wikipedia.org/wiki/Bicubic_interpolation
     int xn[4], yn[4];
@@ -119,10 +119,10 @@ double ZImageInterpolation::sample(const TPixel *img, size_t width, size_t heigh
     // First do interpolation in the x direction followed by interpolation in the y direction
     double res = 0.0;
     for(int i=0; i<4; ++i) {
-      res += vecPTy[i] * (vecPTx[0] * getImage2DPixelValue(img, width, height, xn[0], yn[i], m_padOption, (TPixel)m_fillValue) +
-          vecPTx[1] * getImage2DPixelValue(img, width, height, xn[1], yn[i], m_padOption, (TPixel)m_fillValue) +
-          vecPTx[2] * getImage2DPixelValue(img, width, height, xn[2], yn[i], m_padOption, (TPixel)m_fillValue) +
-          vecPTx[3] * getImage2DPixelValue(img, width, height, xn[3], yn[i], m_padOption, (TPixel)m_fillValue));
+      res += vecPTy[i] * (vecPTx[0] * getImage2DPixelValue(img, width, height, xn[0], yn[i], m_padOption, TPixel(m_fillValue)) +
+          vecPTx[1] * getImage2DPixelValue(img, width, height, xn[1], yn[i], m_padOption, TPixel(m_fillValue)) +
+          vecPTx[2] * getImage2DPixelValue(img, width, height, xn[2], yn[i], m_padOption, TPixel(m_fillValue)) +
+          vecPTx[3] * getImage2DPixelValue(img, width, height, xn[3], yn[i], m_padOption, TPixel(m_fillValue)));
     }
     return res;
   }
@@ -139,7 +139,7 @@ double ZImageInterpolation::sample(const TPixel *img, size_t width, size_t heigh
   if (m_interpolant == Interpolant::Nearest) {
     return getImage3DPixelValue(img, width, height, depth,
                                 roundTo<int>(x), roundTo<int>(y), roundTo<int>(z),
-                                m_padOption, (TPixel)m_fillValue);
+                                m_padOption, TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Linear) {
     double perc[8];
     double xCom, yCom, zCom;
@@ -162,21 +162,21 @@ double ZImageInterpolation::sample(const TPixel *img, size_t width, size_t heigh
     perc[6] = xCom * yCom;   perc[7] = perc[6] * zCom; perc[6] = perc[6] * zComi;
 
     return perc[0] * getImage3DPixelValue(img, width, height, depth,
-        xBas0, yBas0, zBas0, m_padOption, (TPixel)m_fillValue) +
+        xBas0, yBas0, zBas0, m_padOption, TPixel(m_fillValue)) +
         perc[1] * getImage3DPixelValue(img, width, height, depth,
-        xBas0, yBas0, zBas1, m_padOption, (TPixel)m_fillValue) +
+        xBas0, yBas0, zBas1, m_padOption, TPixel(m_fillValue)) +
         perc[2] * getImage3DPixelValue(img, width, height, depth,
-        xBas0, yBas1, zBas0, m_padOption, (TPixel)m_fillValue) +
+        xBas0, yBas1, zBas0, m_padOption, TPixel(m_fillValue)) +
         perc[3] * getImage3DPixelValue(img, width, height, depth,
-        xBas0, yBas1, zBas1, m_padOption, (TPixel)m_fillValue) +
+        xBas0, yBas1, zBas1, m_padOption, TPixel(m_fillValue)) +
         perc[4] * getImage3DPixelValue(img, width, height, depth,
-        xBas1, yBas0, zBas0, m_padOption, (TPixel)m_fillValue) +
+        xBas1, yBas0, zBas0, m_padOption, TPixel(m_fillValue)) +
         perc[5] * getImage3DPixelValue(img, width, height, depth,
-        xBas1, yBas0, zBas1, m_padOption, (TPixel)m_fillValue) +
+        xBas1, yBas0, zBas1, m_padOption, TPixel(m_fillValue)) +
         perc[6] * getImage3DPixelValue(img, width, height, depth,
-        xBas1, yBas1, zBas0, m_padOption, (TPixel)m_fillValue) +
+        xBas1, yBas1, zBas0, m_padOption, TPixel(m_fillValue)) +
         perc[7] * getImage3DPixelValue(img, width, height, depth,
-        xBas1, yBas1, zBas1, m_padOption, (TPixel)m_fillValue);
+        xBas1, yBas1, zBas1, m_padOption, TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Cubic) {
     // http://en.wikipedia.org/wiki/Bicubic_interpolation
     int xn[4], yn[4], zn[4];
@@ -223,13 +223,13 @@ double ZImageInterpolation::sample(const TPixel *img, size_t width, size_t heigh
       double Ipixelxy = 0.0;
       for(int i=0; i<4; ++i) {
         Ipixelxy += vecPTy[i] * (vecPTx[0] * getImage3DPixelValue(img, width, height, depth,
-                                                                  xn[0], yn[i], zn[j], m_padOption, (TPixel)m_fillValue) +
+                                                                  xn[0], yn[i], zn[j], m_padOption, TPixel(m_fillValue)) +
             vecPTx[1] * getImage3DPixelValue(img, width, height, depth,
-                                             xn[1], yn[i], zn[j], m_padOption, (TPixel)m_fillValue) +
+                                             xn[1], yn[i], zn[j], m_padOption, TPixel(m_fillValue)) +
             vecPTx[2] * getImage3DPixelValue(img, width, height, depth,
-                                             xn[2], yn[i], zn[j], m_padOption, (TPixel)m_fillValue) +
+                                             xn[2], yn[i], zn[j], m_padOption, TPixel(m_fillValue)) +
             vecPTx[3] * getImage3DPixelValue(img, width, height, depth,
-                                             xn[3], yn[i], zn[j], m_padOption, (TPixel)m_fillValue));
+                                             xn[3], yn[i], zn[j], m_padOption, TPixel(m_fillValue)));
       }
       res += vecPTz[j] * Ipixelxy;
     }

@@ -81,27 +81,27 @@ struct ZImgRegion
 
   inline bool containsWholeRow(const ZImgInfo &info) const
   {
-    return start.x == 0 && (end.x == -1 || end.x == (value_type)info.width);
+    return start.x == 0 && (end.x == -1 || end.x == static_cast<value_type>(info.width));
   }
   inline bool containsWholePlane(const ZImgInfo &info) const
   {
     return containsWholeRow(info) &&
-        start.y == 0 && (end.y == -1 || end.y == (value_type)info.height);
+        start.y == 0 && (end.y == -1 || end.y == static_cast<value_type>(info.height));
   }
   inline bool containsWholeChannel(const ZImgInfo &info) const
   {
     return containsWholePlane(info) &&
-        start.z == 0 && (end.z == -1 || end.z == (value_type)info.depth);
+        start.z == 0 && (end.z == -1 || end.z == static_cast<value_type>(info.depth));
   }
   inline bool containsWholeTime(const ZImgInfo &info) const
   {
     return containsWholeChannel(info) &&
-        start.c == 0 && (end.c == -1 || end.c == (value_type)info.numChannels);
+        start.c == 0 && (end.c == -1 || end.c == static_cast<value_type>(info.numChannels));
   }
   inline bool containsWholeImg(const ZImgInfo &info) const
   {
     return containsWholeTime(info) &&
-        start.t == 0 && (end.t == -1 || end.t == (value_type)info.numTimes);
+        start.t == 0 && (end.t == -1 || end.t == static_cast<value_type>(info.numTimes));
   }
 
   QString toQString() const;

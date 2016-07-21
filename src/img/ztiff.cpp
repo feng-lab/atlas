@@ -55,7 +55,7 @@ union
 bool hostIsLittleEndian()
 {
   int num = 1;
-  return *(char *)&num == 1;
+  return *reinterpret_cast<char*>(&num) == 1;
 }
 
 static const struct tiftagname {
@@ -1057,16 +1057,14 @@ void ZTiff::writeTiffHeader(uint8_t *mem, size_t width, size_t height, size_t bi
 
 uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigtiff, bool swabflag) const
 {
-  uint16_t dircount;
-  uint32_t direntrysize;
-  char* dirmem = nullptr;
   uint64_t nextdiroff = 0;
-  uint32_t n;
-  char* dp;
 
   if (off == 0)			/* no more directories */
     return 0;
   fs.seekg(off);
+
+  uint16_t dircount;
+  uint32_t direntrysize;
   if (!bigtiff) {
     readStream(fs, &dircount, sizeof(uint16_t));
     if (swabflag)
@@ -1085,10 +1083,9 @@ uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigt
   }
 
   std::vector<char> dirmemvector(dircount * direntrysize);
-  dirmem = dirmemvector.data();
-  fs.read(dirmem, dircount * direntrysize);
-  n = fs.gcount();
-  if (n != dircount*direntrysize) {
+  fs.read(dirmemvector.data(), dirmemvector.size());
+  uint32_t n = fs.gcount();
+  if (n != dirmemvector.size()) {
     n /= direntrysize;
     LWARN() << "Could only read" << n << "of" << dircount
             << "entries in directory at offset" << off;
@@ -1115,50 +1112,48 @@ uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigt
   }
   fs.clear();
 
-  for (dp = dirmem, n = dircount; n > 0; n--) {
+  for (char* dp = dirmemvector.data(), n = dircount; n > 0; n--) {
     ZImgMetatag field;
+
     uint16_t tag;
-    uint16_t type;
-    uint64_t count;
-    bool datafits;
-    uint64_t dataoffset;
     memcpy(&tag, dp, sizeof(tag));
+    dp += sizeof(uint16_t);
     if (swabflag)
       boost::endian::endian_reverse_inplace(tag);
-    dp += sizeof(uint16_t);
+    field.setTag(tag);
+    field.setName(tagToName(tag));
+
+    uint16_t type;
     memcpy(&type, dp, sizeof(type));
     dp += sizeof(uint16_t);
     if (swabflag)
       boost::endian::endian_reverse_inplace(type);
-    field.setTag(tag);
-    field.setName(tagToName(tag));
-
     if (!isValidDataType(type))
       throw ZIOException(QString("Wrong tiff tag dataType: %1").arg(type));
     field.setDataType(static_cast<DataType>(type));
 
+    uint64_t count;
     if (!bigtiff) {
       uint32_t count32;
       memcpy(&count32, dp, sizeof(count32));
+      dp += sizeof(uint32_t);
       if (swabflag)
         boost::endian::endian_reverse_inplace(count32);
-      dp += sizeof(uint32_t);
       count = count32;
     } else {
       memcpy(&count, dp, sizeof(count));
+      dp += sizeof(uint64_t);
       if (swabflag)
         boost::endian::endian_reverse_inplace(count);
-      dp += sizeof(uint64_t);
     }
     field.setCount(count);
 
-    datafits = true;
-
-    dataoffset = 0;
+    bool datafits = true;
+    uint64_t dataoffset = 0;
     if (!bigtiff) {
       if (field.dataByteNumber() > 4) {
-        uint32_t dataoffset32;
         datafits = false;
+        uint32_t dataoffset32;
         memcpy(&dataoffset32, dp, sizeof(dataoffset32));
         if (swabflag)
           boost::endian::endian_reverse_inplace(dataoffset32);
@@ -1262,7 +1257,7 @@ uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigt
   }
   ifd.setOffset(off);
   ifd.setNextIFDOffset(nextdiroff);
-  return (nextdiroff);
+  return nextdiroff;
 }
 
 QString ZTiff::tagToName(uint32_t tag) const
@@ -1554,7 +1549,7 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t *buf, size_t width, size_t heigh
   uint16 bitspersample;
   TIFFGetFieldDefaulted(m_tif.get(), TIFFTAG_BITSPERSAMPLE, &bitspersample);
   if (bitspersample % 8 == 0) {
-    size_t read = TIFFReadEncodedStrip(m_tif.get(), strip, buf, (tmsize_t)-1);
+    size_t read = TIFFReadEncodedStrip(m_tif.get(), strip, buf, static_cast<tmsize_t>(-1));
     if (invert) {
       switch (bitspersample / 8) {
       case 1: {
@@ -1588,7 +1583,7 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t *buf, size_t width, size_t heigh
     return read;
   } else if (bitspersample == 1) {
     std::vector<uint8_t> packedBuf(TIFFStripSize(m_tif.get()));
-    TIFFReadEncodedStrip(m_tif.get(), strip, packedBuf.data(), (tmsize_t)-1);
+    TIFFReadEncodedStrip(m_tif.get(), strip, packedBuf.data(), static_cast<tmsize_t>(-1));
     uint8_t *buf8 = buf;
     size_t bytesPerRow = (width*nChannel+7)/8;
     if (packedBuf.size() < bytesPerRow*height) {
@@ -1605,7 +1600,7 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t *buf, size_t width, size_t heigh
     return height*width*nChannel;
   } else if (bitspersample == 2) {
     std::vector<uint8_t> packedBuf(TIFFStripSize(m_tif.get()));
-    TIFFReadEncodedStrip(m_tif.get(), strip, packedBuf.data(), (tmsize_t)-1);
+    TIFFReadEncodedStrip(m_tif.get(), strip, packedBuf.data(), static_cast<tmsize_t>(-1));
     uint8_t *buf8 = buf;
     size_t bytesPerRow = (width*nChannel+3)/4;
     if (packedBuf.size() < bytesPerRow*height) {
@@ -1622,7 +1617,7 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t *buf, size_t width, size_t heigh
     return height*width*nChannel;
   } else if (bitspersample == 4) {
     std::vector<uint8_t> packedBuf(TIFFStripSize(m_tif.get()));
-    TIFFReadEncodedStrip(m_tif.get(), strip, packedBuf.data(), (tmsize_t)-1);
+    TIFFReadEncodedStrip(m_tif.get(), strip, packedBuf.data(), static_cast<tmsize_t>(-1));
     uint8_t *buf8 = buf;
     size_t bytesPerRow = (width*nChannel+1)/2;
     if (packedBuf.size() < bytesPerRow*height) {
@@ -1648,7 +1643,7 @@ void ZTiff::readTile(uint32_t tile, uint8_t *buf, size_t tileWidth, size_t tileH
   uint16 bitspersample;
   TIFFGetFieldDefaulted(m_tif.get(), TIFFTAG_BITSPERSAMPLE, &bitspersample);
   if (bitspersample % 8 == 0) {
-    size_t read = TIFFReadEncodedTile(m_tif.get(), tile, buf, (tmsize_t)-1);
+    size_t read = TIFFReadEncodedTile(m_tif.get(), tile, buf, static_cast<tmsize_t>(-1));
     if (invert) {
       switch (bitspersample / 8) {
       case 1: {
@@ -1681,7 +1676,7 @@ void ZTiff::readTile(uint32_t tile, uint8_t *buf, size_t tileWidth, size_t tileH
     }
   } else if (bitspersample == 1) {
     std::vector<uint8_t> packedBuf(TIFFTileSize(m_tif.get()));
-    TIFFReadEncodedTile(m_tif.get(), tile, packedBuf.data(), (tmsize_t)-1);
+    TIFFReadEncodedTile(m_tif.get(), tile, packedBuf.data(), static_cast<tmsize_t>(-1));
     uint8_t *buf8 = buf;
     size_t bytesPerRow = packedBuf.size() / tileHeight;
     for (size_t r=0; r<tileHeight; ++r) {
@@ -1693,7 +1688,7 @@ void ZTiff::readTile(uint32_t tile, uint8_t *buf, size_t tileWidth, size_t tileH
     }
   } else if (bitspersample == 2) {
     std::vector<uint8_t> packedBuf(TIFFTileSize(m_tif.get()));
-    TIFFReadEncodedTile(m_tif.get(), tile, packedBuf.data(), (tmsize_t)-1);
+    TIFFReadEncodedTile(m_tif.get(), tile, packedBuf.data(), static_cast<tmsize_t>(-1));
     uint8_t *buf8 = buf;
     size_t bytesPerRow = packedBuf.size() / tileHeight;
     for (size_t r=0; r<tileHeight; ++r) {
@@ -1705,7 +1700,7 @@ void ZTiff::readTile(uint32_t tile, uint8_t *buf, size_t tileWidth, size_t tileH
     }
   } else if (bitspersample == 4) {
     std::vector<uint8_t> packedBuf(TIFFTileSize(m_tif.get()));
-    TIFFReadEncodedTile(m_tif.get(), tile, packedBuf.data(), (tmsize_t)-1);
+    TIFFReadEncodedTile(m_tif.get(), tile, packedBuf.data(), static_cast<tmsize_t>(-1));
     uint8_t *buf8 = buf;
     size_t bytesPerRow = packedBuf.size() / tileHeight;
     for (size_t r=0; r<tileHeight; ++r) {
