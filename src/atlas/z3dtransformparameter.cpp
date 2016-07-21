@@ -120,13 +120,13 @@ namespace nim {
 
 Z3DTransformParameter::Z3DTransformParameter(const QString &name, QObject *parent)
   : ZSingleValueParameter<glm::mat4>(name, glm::mat4(1.f), parent)
-  , m_scale("Scale", glm::vec3(1.f), glm::vec3(-std::numeric_limits<float>::max()),
+  , m_scale("Scale", glm::vec3(1.f), glm::vec3(std::numeric_limits<float>::lowest()),
             glm::vec3(std::numeric_limits<float>::max()))
-  , m_translation("Translation", glm::vec3(0.f), glm::vec3(-std::numeric_limits<float>::max()),
+  , m_translation("Translation", glm::vec3(0.f), glm::vec3(std::numeric_limits<float>::lowest()),
              glm::vec3(std::numeric_limits<float>::max()))
-  , m_rotation("Rotation", glm::vec4(0,0,1,0), glm::vec4(-std::numeric_limits<float>::max()),
+  , m_rotation("Rotation", glm::vec4(0,0,1,0), glm::vec4(std::numeric_limits<float>::lowest()),
                glm::vec4(std::numeric_limits<float>::max()))
-  , m_center("Rotation Center", glm::vec3(0.f), glm::vec3(-std::numeric_limits<float>::max()),
+  , m_center("Rotation Center", glm::vec3(0.f), glm::vec3(std::numeric_limits<float>::lowest()),
              glm::vec3(std::numeric_limits<float>::max()))
   , m_receiveWidgetSignal(true)
 {
@@ -164,13 +164,13 @@ Z3DTransformParameter::Z3DTransformParameter(const QString &name, QObject *paren
 
 Z3DTransformParameter::Z3DTransformParameter(const QString &name, const glm::mat4 &value, QObject *parent)
   : ZSingleValueParameter<glm::mat4>(name, value, parent)
-  , m_scale("Scale", glm::vec3(1.f), glm::vec3(-std::numeric_limits<float>::max()),
+  , m_scale("Scale", glm::vec3(1.f), glm::vec3(std::numeric_limits<float>::lowest()),
             glm::vec3(std::numeric_limits<float>::max()))
-  , m_translation("Translation", glm::vec3(0.f), glm::vec3(-std::numeric_limits<float>::max()),
+  , m_translation("Translation", glm::vec3(0.f), glm::vec3(std::numeric_limits<float>::lowest()),
              glm::vec3(std::numeric_limits<float>::max()))
-  , m_rotation("Rotation", glm::vec4(0,0,1,0), glm::vec4(-std::numeric_limits<float>::max()),
+  , m_rotation("Rotation", glm::vec4(0,0,1,0), glm::vec4(std::numeric_limits<float>::lowest()),
                glm::vec4(std::numeric_limits<float>::max()))
-  , m_center("Rotation Center", glm::vec3(0.f), glm::vec3(-std::numeric_limits<float>::max()),
+  , m_center("Rotation Center", glm::vec3(0.f), glm::vec3(std::numeric_limits<float>::lowest()),
              glm::vec3(std::numeric_limits<float>::max()))
   , m_receiveWidgetSignal(true)
 {

@@ -168,7 +168,7 @@ QWidget *Z3DView::axisWidget()
 void Z3DView::updateBoundBox()
 {
   m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = std::numeric_limits<double>::max();
-  m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = -std::numeric_limits<double>::max();
+  m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = std::numeric_limits<double>::lowest();
   for (int i=0; i<m_3dObjViews.size(); ++i) {
     std::vector<double> boundBox = m_3dObjViews[i]->boundBox();
     m_boundBox[0] = std::min(boundBox[0], m_boundBox[0]);

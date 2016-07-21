@@ -20,8 +20,7 @@ namespace nim {
 #endif
 
 #define DECLARE_SWAP(TYPE) \
-  inline void swap(TYPE &value1, TYPE &value2) \
-  { value1.swap(value2); }
+  inline void swap(TYPE &value1, TYPE &value2) { value1.swap(value2); }
 
 template<typename TEnum>
 constexpr typename std::underlying_type<TEnum>::type enumToUnderlyingType(TEnum e) noexcept
@@ -51,11 +50,16 @@ constexpr const char* enumToString(TEnum e)
   return EnumStrings<TEnum>::data[static_cast<typename std::underlying_type<TEnum>::type>(e)];
 }
 
-// https://chromium.googlesource.com/chromium/src/+/master/base/macros.h
+// https://chromium.googlesource.com/chromium/src/+/master/base/bit_cast.h
 template <class Dest, class Source>
 inline Dest bit_cast(const Source& source)
 {
-  static_assert(sizeof(Dest) == sizeof(Source), "VerifySizesAreEqual");
+  static_assert(sizeof(Dest) == sizeof(Source),
+                "bit_cast requires source and destination to be the same size");
+  static_assert(std::is_trivially_copyable<Dest>::value,
+                "non-trivially-copyable bit_cast is undefined");
+  static_assert(std::is_trivially_copyable<Source>::value,
+                "non-trivially-copyable bit_cast is undefined");
   Dest dest;
   memcpy(&dest, &source, sizeof(dest));
   return dest;

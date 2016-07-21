@@ -9,10 +9,10 @@
 namespace nim {
 
 ZQuatParameter::ZQuatParameter(const QString &name, QObject *parent)
-  : ZNumericVectorParameter<glm::quat>(name, glm::quat(), glm::quat(-std::numeric_limits<float>::max(),
-                                                                    -std::numeric_limits<float>::max(),
-                                                                    -std::numeric_limits<float>::max(),
-                                                                    -std::numeric_limits<float>::max()),
+  : ZNumericVectorParameter<glm::quat>(name, glm::quat(), glm::quat(std::numeric_limits<float>::lowest(),
+                                                                    std::numeric_limits<float>::lowest(),
+                                                                    std::numeric_limits<float>::lowest(),
+                                                                    std::numeric_limits<float>::lowest()),
                                        glm::quat(std::numeric_limits<float>::max(),
                                                  std::numeric_limits<float>::max(),
                                                  std::numeric_limits<float>::max(),
@@ -22,10 +22,10 @@ ZQuatParameter::ZQuatParameter(const QString &name, QObject *parent)
 }
 
 ZQuatParameter::ZQuatParameter(const QString &name, glm::quat value, QObject *parent)
-  : ZNumericVectorParameter<glm::quat>(name, value, glm::quat(-std::numeric_limits<float>::max(),
-                                                              -std::numeric_limits<float>::max(),
-                                                              -std::numeric_limits<float>::max(),
-                                                              -std::numeric_limits<float>::max()),
+  : ZNumericVectorParameter<glm::quat>(name, value, glm::quat(std::numeric_limits<float>::lowest(),
+                                                              std::numeric_limits<float>::lowest(),
+                                                              std::numeric_limits<float>::lowest(),
+                                                              std::numeric_limits<float>::lowest()),
                                  glm::quat(std::numeric_limits<float>::max(),
                                            std::numeric_limits<float>::max(),
                                            std::numeric_limits<float>::max(),

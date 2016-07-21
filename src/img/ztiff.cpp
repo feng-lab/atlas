@@ -7,6 +7,7 @@
 #include "QsLog.h"
 #include <cmath>
 #include <boost/endian/conversion.hpp>
+#include <boost/align/aligned_allocator.hpp>
 #include <cassert>
 #include "zimage2dutils.h"
 #include "zioutils.h"
@@ -977,72 +978,81 @@ ZImg ZTiff::readThumbnailFromIFD(const ZTiffIFD &ifd)
   return res;
 }
 
+#pragma pack(push, 1)
+struct ZTiffHeader
+{
+  TIFFHeaderBig header = {TIFF_LITTLEENDIAN, 43, 8, 0, 16};
+  uint64_t dircount = 8;
+
+  uint16_t tag1 = TIFFTAG_IMAGEWIDTH;
+  uint16_t type1 = enumToUnderlyingType(DataType::Long);
+  uint64_t count1 = 1;
+  uint32_t width = 0;
+  uint32_t fill1 = 0;
+
+  uint16_t tag2 = TIFFTAG_IMAGELENGTH;
+  uint16_t type2 = enumToUnderlyingType(DataType::Long);
+  uint64_t count2 = 1;
+  uint32_t height = 0;
+  uint32_t fill2 = 0;
+
+  uint16_t tag3 = TIFFTAG_BITSPERSAMPLE;
+  uint16_t type3 = enumToUnderlyingType(DataType::Short);
+  uint64_t count3 = 1;
+  uint16_t bitPerSample = 0;
+  uint16_t fill31 = 0;
+  uint32_t fill32 = 0;
+
+  uint16_t tag4 = TIFFTAG_SAMPLESPERPIXEL;
+  uint16_t type4 = enumToUnderlyingType(DataType::Short);
+  uint64_t count4 = 1;
+  uint16_t samplesPerPixel = 0;
+  uint16_t fill41 = 0;
+  uint32_t fill42 = 0;
+
+  uint16_t tag5 = TIFFTAG_COMPRESSION;
+  uint16_t type5 = enumToUnderlyingType(DataType::Short);
+  uint64_t count5 = 1;
+  uint16_t compression = 0;
+  uint16_t fill51 = 0;
+  uint32_t fill52 = 0;
+
+  uint16_t tag6 = TIFFTAG_PHOTOMETRIC;
+  uint16_t type6 = enumToUnderlyingType(DataType::Short);
+  uint64_t count6 = 1;
+  uint16_t photoMetric = 1;
+  uint16_t fill61 = 0;
+  uint32_t fill62 = 0;
+
+  uint16_t tag7 = TIFFTAG_STRIPOFFSETS;
+  uint16_t type7 = enumToUnderlyingType(DataType::Long8);
+  uint64_t count7 = 1;
+  uint64_t stripOffset = 0;
+
+  uint16_t tag8 = TIFFTAG_STRIPBYTECOUNTS;
+  uint16_t type8 = enumToUnderlyingType(DataType::Long8);
+  uint64_t count8 = 1;
+  uint64_t stripByteCount = 0;
+
+  uint64_t nextdiroff = 0;
+};
+
+#pragma pack(pop)
+
 void ZTiff::writeTiffHeader(uint8_t *mem, size_t width, size_t height, size_t bitsPerSample, size_t samplesPerPixel, size_t compression,
                             uint64_t stripOffset, uint64_t stripByteCount)
 {
+  static_assert(sizeof(ZTiffHeader) == 192, "wrong tiff header size");
   assert(stripOffset >= 192);
-  TIFFHeaderBig big;
-  big.tiff_magic = TIFF_LITTLEENDIAN;
-  big.tiff_version = 43;
-  big.tiff_unused = 0;
-  big.tiff_offsetsize = 8;
-  big.tiff_diroff = 16;
-  memcpy(mem, &big, sizeof(TIFFHeaderBig));
-  uint8 *dp = mem + sizeof(TIFFHeaderBig);
-
-  *reinterpret_cast<uint64_t*>(dp) = 8;   // dircount
-  dp += 8;
-
-  *reinterpret_cast<uint16_t*>(dp) = TIFFTAG_IMAGEWIDTH;
-  *reinterpret_cast<uint16_t*>(dp+2) = enumToUnderlyingType(DataType::Long);
-  *reinterpret_cast<uint64_t*>(dp+4) = 1;
-  *reinterpret_cast<uint32_t*>(dp+12) = width;
-  dp += 20;
-
-  *reinterpret_cast<uint16_t*>(dp) = TIFFTAG_IMAGELENGTH;
-  *reinterpret_cast<uint16_t*>(dp+2) = enumToUnderlyingType(DataType::Long);
-  *reinterpret_cast<uint64_t*>(dp+4) = 1;
-  *reinterpret_cast<uint32_t*>(dp+12) = height;
-  dp += 20;
-
-  *reinterpret_cast<uint16_t*>(dp) = TIFFTAG_BITSPERSAMPLE;
-  *reinterpret_cast<uint16_t*>(dp+2) = enumToUnderlyingType(DataType::Short);
-  *reinterpret_cast<uint64_t*>(dp+4) = 1;
-  *reinterpret_cast<uint16_t*>(dp+12) = bitsPerSample;
-  dp += 20;
-
-  *reinterpret_cast<uint16_t*>(dp) = TIFFTAG_SAMPLESPERPIXEL;
-  *reinterpret_cast<uint16_t*>(dp+2) = enumToUnderlyingType(DataType::Short);
-  *reinterpret_cast<uint64_t*>(dp+4) = 1;
-  *reinterpret_cast<uint16_t*>(dp+12) = samplesPerPixel;
-  dp += 20;
-
-  *reinterpret_cast<uint16_t*>(dp) = TIFFTAG_COMPRESSION;
-  *reinterpret_cast<uint16_t*>(dp+2) = enumToUnderlyingType(DataType::Short);
-  *reinterpret_cast<uint64_t*>(dp+4) = 1;
-  *reinterpret_cast<uint16_t*>(dp+12) = compression;
-  dp += 20;
-
-  *reinterpret_cast<uint16_t*>(dp) = TIFFTAG_PHOTOMETRIC;
-  *reinterpret_cast<uint16_t*>(dp+2) = enumToUnderlyingType(DataType::Short);
-  *reinterpret_cast<uint64_t*>(dp+4) = 1;
-  *reinterpret_cast<uint16_t*>(dp+12) = 1;
-  dp += 20;
-
-  *reinterpret_cast<uint16_t*>(dp) = TIFFTAG_STRIPOFFSETS;
-  *reinterpret_cast<uint16_t*>(dp+2) = enumToUnderlyingType(DataType::Long8);
-  *reinterpret_cast<uint64_t*>(dp+4) = 1;
-  *reinterpret_cast<uint64_t*>(dp+12) = stripOffset;
-  dp += 20;
-
-  *reinterpret_cast<uint16_t*>(dp) = TIFFTAG_STRIPBYTECOUNTS;
-  *reinterpret_cast<uint16_t*>(dp+2) = enumToUnderlyingType(DataType::Long8);
-  *reinterpret_cast<uint64_t*>(dp+4) = 1;
-  *reinterpret_cast<uint64_t*>(dp+12) = stripByteCount;
-  dp += 20;
-
-  assert(dp == mem+184);
-  *reinterpret_cast<uint64_t*>(dp) = 0;  // nextdiroff
+  ZTiffHeader header;
+  header.width = width;
+  header.height = height;
+  header.bitPerSample = bitsPerSample;
+  header.samplesPerPixel = samplesPerPixel;
+  header.compression = compression;
+  header.stripOffset = stripOffset;
+  header.stripByteCount = stripByteCount;
+  memcpy(mem, &header, sizeof(header));
 }
 
 uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigtiff, bool swabflag) const
@@ -1087,6 +1097,8 @@ uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigt
   } else {
     if (!bigtiff) {
       uint32_t nextdiroff32;
+      // reinterpret_cast allowed (AliasedType is char or unsigned char: this permits
+      // examination of the object representation of any object as an array of unsigned char.)
       fs.read(reinterpret_cast<char*>(&nextdiroff32), sizeof(uint32_t));
       if (static_cast<size_t>(fs.gcount()) != sizeof(uint32_t))
         nextdiroff32 = 0;
@@ -1110,11 +1122,11 @@ uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigt
     uint64_t count;
     bool datafits;
     uint64_t dataoffset;
-    tag = *reinterpret_cast<uint16_t*>(dp);
+    memcpy(&tag, dp, sizeof(tag));
     if (swabflag)
       boost::endian::endian_reverse_inplace(tag);
     dp += sizeof(uint16_t);
-    type = *reinterpret_cast<uint16_t*>(dp);
+    memcpy(&type, dp, sizeof(type));
     dp += sizeof(uint16_t);
     if (swabflag)
       boost::endian::endian_reverse_inplace(type);
@@ -1127,13 +1139,13 @@ uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigt
 
     if (!bigtiff) {
       uint32_t count32;
-      count32 = *reinterpret_cast<uint32_t*>(dp);
+      memcpy(&count32, dp, sizeof(count32));
       if (swabflag)
         boost::endian::endian_reverse_inplace(count32);
       dp += sizeof(uint32_t);
       count = count32;
     } else {
-      count = *reinterpret_cast<uint64_t*>(dp);
+      memcpy(&count, dp, sizeof(count));
       if (swabflag)
         boost::endian::endian_reverse_inplace(count);
       dp += sizeof(uint64_t);
@@ -1147,22 +1159,22 @@ uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigt
       if (field.dataByteNumber() > 4) {
         uint32_t dataoffset32;
         datafits = false;
-        dataoffset32 = *reinterpret_cast<uint32_t*>(dp);
+        memcpy(&dataoffset32, dp, sizeof(dataoffset32));
         if (swabflag)
           boost::endian::endian_reverse_inplace(dataoffset32);
         dataoffset = dataoffset32;
       } else {
-        memcpy(field.dataArray(), dp, 4);
+        memcpy(field.dataArray(), dp, field.dataByteNumber());
       }
       dp += sizeof(uint32_t);
     } else {
       if (field.dataByteNumber() > 8) {
         datafits = false;
-        dataoffset = *reinterpret_cast<uint64_t*>(dp);
+        memcpy(&dataoffset, dp, sizeof(dataoffset));
         if (swabflag)
           boost::endian::endian_reverse_inplace(dataoffset);
       } else {
-        memcpy(field.dataArray(), dp, 8);
+        memcpy(field.dataArray(), dp, field.dataByteNumber());
       }
       dp += sizeof(uint64_t);
     }
@@ -1407,7 +1419,7 @@ void ZTiff::readImg(ZImg &img, bool divideByAlpha)
       if (separatePlane || img.numChannels() == 1) {
         uint32_t tilesPerChannel = TIFFNumberOfTiles(m_tif.get()) / img.numChannels();
 
-        std::vector<uint8_t> tileBuf(tileWidth * tileHeight * img.voxelByteNumber());
+        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> tileBuf(tileWidth * tileHeight * img.voxelByteNumber());
 
         for (size_t c=0; c<img.numChannels(); ++c) {
           for (uint32_t tile = c * tilesPerChannel; tile < (c+1) * tilesPerChannel; tile++) {
@@ -1420,7 +1432,7 @@ void ZTiff::readImg(ZImg &img, bool divideByAlpha)
           }
         }
       } else {
-        std::vector<uint8_t> tileBuf(tileWidth * tileHeight * img.voxelByteNumber() * img.numChannels());
+        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> tileBuf(tileWidth * tileHeight * img.voxelByteNumber() * img.numChannels());
 
         for (uint32_t tile = 0; tile < TIFFNumberOfTiles(m_tif.get()); tile++) {
           size_t tileRow = (tile) / numTilePerRow;
@@ -1548,27 +1560,25 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t *buf, size_t width, size_t heigh
       case 1: {
         uint8_t *pt = buf;
         for (size_t i=0; i<read; ++i)
-          pt[i] = 255-pt[i];
+          pt[i] = std::numeric_limits<uint8_t>::max()-pt[i];
       }
         break;
       case 2: {
-        uint16_t *pt = reinterpret_cast<uint16_t*>(buf);
+        uint16_t *pt = bit_cast<uint16_t*>(buf);
         for (size_t i=0; i<read; ++i)
-          pt[i] = 65535-pt[i];
+          pt[i] = std::numeric_limits<uint16_t>::max()-pt[i];
       }
         break;
       case 4: {
-        uint32_t max4 = std::numeric_limits<uint32_t>::max();
-        uint32_t *pt = reinterpret_cast<uint32_t*>(buf);
+        uint32_t *pt = bit_cast<uint32_t*>(buf);
         for (size_t i=0; i<read; ++i)
-          pt[i] = max4-pt[i];
+          pt[i] = std::numeric_limits<uint32_t>::max()-pt[i];
       }
         break;
       case 8: {
-        uint64_t max8 = std::numeric_limits<uint64_t>::max();
-        uint64_t *pt = reinterpret_cast<uint64_t*>(buf);
+        uint64_t *pt = bit_cast<uint64_t*>(buf);
         for (size_t i=0; i<read; ++i)
-          pt[i] = max8-pt[i];
+          pt[i] = std::numeric_limits<uint64_t>::max()-pt[i];
       }
         break;
       default:
@@ -1644,27 +1654,25 @@ void ZTiff::readTile(uint32_t tile, uint8_t *buf, size_t tileWidth, size_t tileH
       case 1: {
         uint8_t *pt = buf;
         for (size_t i=0; i<read; ++i)
-          pt[i] = 255-pt[i];
+          pt[i] = std::numeric_limits<uint8_t>::max()-pt[i];
       }
         break;
       case 2: {
-        uint16_t *pt = reinterpret_cast<uint16_t*>(buf);
+        uint16_t *pt = bit_cast<uint16_t*>(buf);
         for (size_t i=0; i<read; ++i)
-          pt[i] = 65535-pt[i];
+          pt[i] = std::numeric_limits<uint16_t>::max()-pt[i];
       }
         break;
       case 4: {
-        uint32_t max4 = std::numeric_limits<uint32_t>::max();
-        uint32_t *pt = reinterpret_cast<uint32_t*>(buf);
+        uint32_t *pt = bit_cast<uint32_t*>(buf);
         for (size_t i=0; i<read; ++i)
-          pt[i] = max4-pt[i];
+          pt[i] = std::numeric_limits<uint32_t>::max()-pt[i];
       }
         break;
       case 8: {
-        uint64_t max8 = std::numeric_limits<uint64_t>::max();
-        uint64_t *pt = reinterpret_cast<uint64_t*>(buf);
+        uint64_t *pt = bit_cast<uint64_t*>(buf);
         for (size_t i=0; i<read; ++i)
-          pt[i] = max8-pt[i];
+          pt[i] = std::numeric_limits<uint64_t>::max()-pt[i];
       }
         break;
       default:

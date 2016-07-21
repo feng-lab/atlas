@@ -138,29 +138,6 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
   }
 }
 
-//template<typename TVoxel>
-//void ZImgDisplay::setQImageDataBlockCM(QImage &qim, size_t startLine, size_t endLine,
-//                                       const std::vector<size_t>& channels,
-//                                       const std::vector<ZImgVoxelColormap<TVoxel>> &colormaps) const
-//{
-//  std::vector<const TVoxel*> imgDatas(channels.size());
-//  for (size_t c=0; c<channels.size(); ++c) {
-//    imgDatas[c] = m_img.rowData<TVoxel>(startLine, m_z, channels[c], m_t, m_l);
-//  }
-//  for (size_t i=startLine; i<endLine; ++i) {
-//    QRgb* qimData = reinterpret_cast<QRgb*>(qim.scanLine(i));
-
-//    for (int j=0; j<qim.width(); ++j) {
-//      col4 col = colormaps[0].color(*(imgDatas[0])++);
-//      for (size_t c=1; c<channels.size(); ++c) {
-//        col.max(colormaps[c].color(*(imgDatas[c])++));
-//      }
-
-//      qimData[j] = qRgba(col.r, col.g, col.b, col.a);
-//    }
-//  }
-//}
-
 template<typename TVoxel>
 #ifndef _USE_QTCONCURRENT_
 void ZImgPackDisplay::setQImageDataBlockCM(const ZImg *img, QImage *qim, const tbb::blocked_range<size_t> &rowRange,
@@ -182,7 +159,7 @@ void ZImgPackDisplay::setQImageDataBlockCM(const ZImg *img, QImage *qim, std::pa
   }
   for (size_t i=rowRange.first; i<rowRange.second; ++i) {
 #endif
-    QRgb* qimData = reinterpret_cast<QRgb*>(qim->scanLine(i));
+    QRgb* qimData = bit_cast<QRgb*>(qim->scanLine(i));
 
     for (int j=0; j<qim->width(); ++j) {
       col4 col = colormaps->at(0).color(*(imgDatas[0])++);
@@ -216,7 +193,7 @@ void ZImgPackDisplay::setQImageDataBlockCMMultAlpha(const ZImg *img, QImage *qim
   }
   for (size_t i=rowRange.first; i<rowRange.second; ++i) {
 #endif
-    QRgb* qimData = reinterpret_cast<QRgb*>(qim->scanLine(i));
+    QRgb* qimData = bit_cast<QRgb*>(qim->scanLine(i));
 
     for (int j=0; j<qim->width(); ++j) {
       col4 col = colormaps->at(0).color(*(imgDatas[0])++);
@@ -343,37 +320,6 @@ void ZImgPackDisplay::setQImageDataCM(const ZImg &img, QImage &qim) const
 #endif
 }
 
-//template<typename TVoxel>
-//void ZImgDisplay::setQImageDataBlock(QImage &qim, size_t startLine, size_t endLine,
-//                                     const std::vector<size_t> &channels) const
-//{
-//  std::vector<const TVoxel*> imgDatas(channels.size());
-//  std::vector<double> chMinValue(channels.size());
-//  std::vector<double> chMaxValue(channels.size());
-//  std::vector<col4> chCol(channels.size());
-//  for (size_t c=0; c<channels.size(); ++c) {
-//    size_t ch = channels[c];
-//    imgDatas[c] = m_img.rowData<TVoxel>(startLine, m_z, ch, m_t, m_l);
-//    chMinValue[c] = m_channels.at(ch).first;
-//    chMaxValue[c] = m_channels.at(ch).second;
-//    chCol[c] = m_img.channelColor(ch);
-//  }
-//  for (size_t i=startLine; i<endLine; ++i) {
-//    QRgb* qimData = reinterpret_cast<QRgb*>(qim.scanLine(i));
-
-//    for (int j=0; j<qim.width(); ++j) {
-//      TVoxel v = *(imgDatas[0])++;
-//      col4 col = scaleDownColorRGB(chCol[0], (v-chMinValue[0]) / (chMaxValue[0]-chMinValue[0]));
-//      for (size_t c=1; c<channels.size(); ++c) {
-//        v = *(imgDatas[c])++;
-//        col.max(scaleDownColorRGB(chCol[c], (v-chMinValue[c]) / (chMaxValue[c]-chMinValue[c])));
-//      }
-
-//      qimData[j] = qRgba(col.r, col.g, col.b, col.a);
-//    }
-//  }
-//}
-
 template<typename TVoxel>
 #ifndef _USE_QTCONCURRENT_
 void ZImgPackDisplay::setQImageDataBlock(const ZImg *img, QImage *qim, const tbb::blocked_range<size_t> &rowRange,
@@ -407,7 +353,7 @@ void ZImgPackDisplay::setQImageDataBlock(const ZImg *img, QImage *qim, std::pair
 #else
     for (size_t i=rowRange.first; i<rowRange.second; ++i) {
 #endif
-      QRgb* qimData = reinterpret_cast<QRgb*>(qim->scanLine(i));
+      QRgb* qimData = bit_cast<QRgb*>(qim->scanLine(i));
 
       for (int j=0; j<qim->width(); ++j) {
         TVoxel v = *(imgDatas[0])++;
@@ -427,7 +373,7 @@ void ZImgPackDisplay::setQImageDataBlock(const ZImg *img, QImage *qim, std::pair
 #else
       for (size_t i=rowRange.first; i<rowRange.second; ++i) {
 #endif
-        QRgb* qimData = reinterpret_cast<QRgb*>(qim->scanLine(i));
+        QRgb* qimData = bit_cast<QRgb*>(qim->scanLine(i));
 
         for (int j=0; j<qim->width(); ++j) {
           TVoxel v = *(imgDatas[0])++;
@@ -444,7 +390,7 @@ void ZImgPackDisplay::setQImageDataBlock(const ZImg *img, QImage *qim, std::pair
 #else
       for (size_t i=rowRange.first; i<rowRange.second; ++i) {
 #endif
-        QRgb* qimData = reinterpret_cast<QRgb*>(qim->scanLine(i));
+        QRgb* qimData = bit_cast<QRgb*>(qim->scanLine(i));
 
         for (int j=0; j<qim->width(); ++j) {
           size_t c = 0;

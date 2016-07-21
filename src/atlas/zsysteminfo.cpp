@@ -471,9 +471,9 @@ void ZSystemInfo::detectOS()
       m_osString = "Windows XP (operating system version 5.1)";
       break;
     case QSysInfo::WV_2003:
-      m_osString = "Windows Server 2003, Windows Server 2003 R2, Windows Home Server, \
-          Windows XP Professional x64 Edition (operating system version 5.2)";
-          break;
+      m_osString = "Windows Server 2003, Windows Server 2003 R2, Windows Home Server, "
+                   "Windows XP Professional x64 Edition (operating system version 5.2)";
+      break;
     case QSysInfo::WV_VISTA:
       m_osString = "Windows Vista, Windows Server 2008 (operating system version 6.0)";
       break;

@@ -704,7 +704,7 @@ void ZImg::firstMaxValueCoord_Impl(ZVoxelCoordinate& res, TValue& max, const ZIm
 {
   TVoxel maxValue = std::numeric_limits<TVoxel>::min();
   if (voxelFormat() == VoxelFormat::Float)
-    maxValue = -std::numeric_limits<TVoxel>::max();
+    maxValue = std::numeric_limits<TVoxel>::lowest();
   if (region.containsWholeTime(m_info)) {
     for (size_t t=region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
       const TVoxel* data = timeData<TVoxel>(t);
@@ -744,7 +744,7 @@ void ZImg::maxValueCoords_Impl(std::vector<ZVoxelCoordinate>& res, TValue& max, 
 {
   TVoxel maxValue = std::numeric_limits<TVoxel>::min();
   if (voxelFormat() == VoxelFormat::Float)
-    maxValue = -std::numeric_limits<TVoxel>::max();
+    maxValue = std::numeric_limits<TVoxel>::lowest();
   if (region.containsWholeTime(m_info)) {
     for (size_t t=region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
       const TVoxel* data = timeData<TVoxel>(t);

@@ -352,9 +352,9 @@ void Z3DPunctaFilter::punctumBound(const ZPunctum &p, std::vector<double> &resul
 void Z3DPunctaFilter::updateData()
 {
   double minMeanInten = std::numeric_limits<double>::max();
-  double maxMeanInten = -std::numeric_limits<double>::max();
+  double maxMeanInten = std::numeric_limits<double>::lowest();
   double minMaxInten = std::numeric_limits<double>::max();
-  double maxMaxInten = -std::numeric_limits<double>::max();
+  double maxMaxInten = std::numeric_limits<double>::lowest();
   for (ZPuncta::const_iterator it=m_origPuncta->begin(); it != m_origPuncta->end(); ++it) {
     minMeanInten = std::min(minMeanInten, it->meanIntensity());
     maxMeanInten = std::max(maxMeanInten, it->meanIntensity());
@@ -386,7 +386,7 @@ void Z3DPunctaFilter::notTransformedPunctumBound(const ZPunctum &p, std::vector<
 //void Z3DPunctaFilter::updateAxisAlignedBoundBoxImpl()
 //{
 //  m_axisAlignedBoundBox[0] = m_axisAlignedBoundBox[2] = m_axisAlignedBoundBox[4] = std::numeric_limits<double>::max();
-//  m_axisAlignedBoundBox[1] = m_axisAlignedBoundBox[3] = m_axisAlignedBoundBox[5] = -std::numeric_limits<double>::max();
+//  m_axisAlignedBoundBox[1] = m_axisAlignedBoundBox[3] = m_axisAlignedBoundBox[5] = std::numeric_limits<double>::lowest();
 //  std::vector<double> boundBox(6);
 //  for (size_t i=0; i<m_origPunctaList.size(); ++i) {
 //    getPunctumBound(m_origPunctaList[i], boundBox);
@@ -402,7 +402,7 @@ void Z3DPunctaFilter::notTransformedPunctumBound(const ZPunctum &p, std::vector<
 void Z3DPunctaFilter::updateNotTransformedBoundBoxImpl()
 {
   m_notTransformedBoundBox[0] = m_notTransformedBoundBox[2] = m_notTransformedBoundBox[4] = std::numeric_limits<double>::max();
-  m_notTransformedBoundBox[1] = m_notTransformedBoundBox[3] = m_notTransformedBoundBox[5] = -std::numeric_limits<double>::max();
+  m_notTransformedBoundBox[1] = m_notTransformedBoundBox[3] = m_notTransformedBoundBox[5] = std::numeric_limits<double>::lowest();
   std::vector<double> boundBox(6);
   for (ZPuncta::const_iterator it=m_origPuncta->begin(); it != m_origPuncta->end(); ++it) {
     notTransformedPunctumBound(*it, boundBox);

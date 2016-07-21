@@ -14,7 +14,7 @@ namespace nim {
 ZSwc::SwcTreeNode ZSwc::thickestNode()
 {
   SwcTreeNode thickestNode;
-  double maxRadius = -std::numeric_limits<double>::max();
+  double maxRadius = std::numeric_limits<double>::lowest();
   for (SwcTreeNode tn = begin(); tn != end(); ++tn) {
     if (tn->radius > maxRadius) {
       maxRadius = tn->radius;
@@ -28,7 +28,7 @@ ZSwc::SwcTreeNode ZSwc::thickestNode(const ZSwc::SwcTreeNode &subtree)
 {
   assert(subtree.node && subtree.node != m_head && subtree.node != m_tail);
   SwcTreeNode thickestNode;
-  double maxRadius = -std::numeric_limits<double>::max();
+  double maxRadius = std::numeric_limits<double>::lowest();
   for (SwcTreeNode tn = begin(subtree); tn != end(subtree); ++tn) {
     if (tn->radius > maxRadius) {
       maxRadius = tn->radius;

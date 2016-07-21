@@ -278,6 +278,8 @@ void ZImg::wrapData(void *data, const ZImgInfo &info)
   m_data.resize(m_info.numTimes);
 
   for (size_t i=0; i<m_info.numTimes; ++i) {
+    // reinterpret_cast allowed (AliasedType is char or unsigned char: this permits
+    // examination of the object representation of any object as an array of unsigned char.)
     m_data[i] = reinterpret_cast<uint8_t*>(data) + i * info.timeVoxelNumber();
   }
 }

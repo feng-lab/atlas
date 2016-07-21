@@ -21,6 +21,7 @@ ZComplexImg fft(const ZImg &img, size_t outWidth, size_t outHeight, size_t outDe
   // from fftw benchmark, 3d inplace is faster than outofplace, so we
   // first copy real data to complex img
   ZImg wrapImg;
+  // reinterpret_cast allowed (section "Complex numbers")
   wrapImg.wrapData(reinterpret_cast<double*>(res.rawData()), width*2, outHeight, outDepth);
   wrapImg.pasteImg(img);
   wrapImg.clear();   // copy data finished
@@ -28,7 +29,7 @@ ZComplexImg fft(const ZImg &img, size_t outWidth, size_t outHeight, size_t outDe
   // do fft
   fftw_plan p = fftw_plan_dft_r2c_3d(outDepth, outHeight, outWidth,
                                      reinterpret_cast<double*>(res.rawData()),
-                                     reinterpret_cast<fftw_complex*>(res.rawData()),
+                                     bit_cast<fftw_complex*>(res.rawData()),
                                      FFTW_ESTIMATE);
   fftw_execute(p);
   fftw_destroy_plan(p);
@@ -43,7 +44,7 @@ ZImg ifft(ZComplexImg &cimg, size_t width, size_t outWidth, size_t outHeight, si
     return res;
 
   fftw_plan p = fftw_plan_dft_c2r_3d(cimg.depth(), cimg.height(), width,
-                                     reinterpret_cast<fftw_complex*>(cimg.rawData()),
+                                     bit_cast<fftw_complex*>(cimg.rawData()),
                                      reinterpret_cast<double*>(cimg.rawData()),
                                      FFTW_ESTIMATE);
   fftw_execute(p);

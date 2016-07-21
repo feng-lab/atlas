@@ -467,7 +467,7 @@ QString ZImgOmeTiff::createOmeXml(const ZImgInfo &info, const QString& dimension
     col4 col = info.channelColors[i];
     col.a = 0;
     std::swap(col.r, col.b);
-    int color = *reinterpret_cast<const int*>(&col);
+    int color = bit_cast<int>(col);
     xml.writeAttribute("Color", QString("%1").arg(color));
     xml.writeEndElement();
   }

@@ -39,13 +39,13 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation &paraAnimatio
     connect(m_para, &ZParameter::valueChanged, m_paraAnimation.boundParameter(), &ZParameter::updateFromSender);
     m_para->setStyle("SPINBOX");
     if (m_para->type() == "IntSpan") {
-      static_cast<ZIntSpanParameter*>(m_para)->setRange(std::numeric_limits<int>::min(),
+      static_cast<ZIntSpanParameter*>(m_para)->setRange(std::numeric_limits<int>::lowest(),
                                                         std::numeric_limits<int>::max());
     } else if (m_para->type() == "FloatSpan") {
-      static_cast<ZFloatSpanParameter*>(m_para)->setRange(-std::numeric_limits<float>::max(),
+      static_cast<ZFloatSpanParameter*>(m_para)->setRange(std::numeric_limits<float>::lowest(),
                                                           std::numeric_limits<float>::max());
     } else if (m_para->type() == "DoubleSpan") {
-      static_cast<ZDoubleSpanParameter*>(m_para)->setRange(-std::numeric_limits<double>::max(),
+      static_cast<ZDoubleSpanParameter*>(m_para)->setRange(std::numeric_limits<double>::lowest(),
                                                            std::numeric_limits<double>::max());
     }
     addWidget(m_para->createNameLabel(this), m_para->createWidget(this), lo);

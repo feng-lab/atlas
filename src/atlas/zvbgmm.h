@@ -62,7 +62,7 @@ public:
 
   struct Params {
     Params()
-      : loglikHist(-std::numeric_limits<ResultDataType>::max())
+      : loglikHist(std::numeric_limits<ResultDataType>::lowest())
       , iter(0)
     {}
 
@@ -131,6 +131,7 @@ public:
       m_logLevel(logLevel), m_hasWeight(false), m_hasInitData(false)
   {
     if (std::is_same<T,ResultDataType>::value) {
+      // reinterpret_cast allowed (AliasedType is (possibly cv-qualified) DynamicType)
       m_pData = reinterpret_cast<const MatrixXrt *>(&data);
     } else {
       m_NonIntegerData = data.template cast<ResultDataType>();
@@ -239,7 +240,7 @@ public:
       return result.loglikHist;
     }
 
-    ResultDataType bestLogLikHist = -std::numeric_limits<ResultDataType>::max();
+    ResultDataType bestLogLikHist = std::numeric_limits<ResultDataType>::lowest();
     size_t finalIter = 0;
     for (size_t i=0; i<m_nattemps; ++i) {
       //m_post.display("before init");

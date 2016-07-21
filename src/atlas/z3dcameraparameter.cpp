@@ -8,9 +8,9 @@ namespace nim {
 Z3DCameraParameter::Z3DCameraParameter(const QString &name, QObject *parent)
   : ZSingleValueParameter<Z3DCamera>(name, parent)
   , m_projectionType("Projection Type")
-  , m_eye("Eye Position", m_value.eye(), glm::vec3(-std::numeric_limits<float>::max()),
+  , m_eye("Eye Position", m_value.eye(), glm::vec3(std::numeric_limits<float>::lowest()),
           glm::vec3(std::numeric_limits<float>::max()))
-  , m_center("Center Position", m_value.center(), glm::vec3(-std::numeric_limits<float>::max()),
+  , m_center("Center Position", m_value.center(), glm::vec3(std::numeric_limits<float>::lowest()),
              glm::vec3(std::numeric_limits<float>::max()))
   , m_upVector("Up Vector", m_value.upVector(), glm::vec3(-1.f), glm::vec3(1.f))
   , m_eyeSeparationAngle("Eye Separation Angle", glm::degrees(m_value.eyeSeparationAngle()), 1.f, 80.f)
@@ -67,9 +67,9 @@ Z3DCameraParameter::Z3DCameraParameter(const QString &name, QObject *parent)
 Z3DCameraParameter::Z3DCameraParameter(const QString &name, const Z3DCamera &value, QObject *parent)
   : ZSingleValueParameter<Z3DCamera>(name, value, parent)
   , m_projectionType("Projection Type")
-  , m_eye("Eye Position", m_value.eye(), glm::vec3(-std::numeric_limits<float>::max()),
+  , m_eye("Eye Position", m_value.eye(), glm::vec3(std::numeric_limits<float>::lowest()),
           glm::vec3(std::numeric_limits<float>::max()))
-  , m_center("Center Position", m_value.center(), glm::vec3(-std::numeric_limits<float>::max()),
+  , m_center("Center Position", m_value.center(), glm::vec3(std::numeric_limits<float>::lowest()),
              glm::vec3(std::numeric_limits<float>::max()))
   , m_upVector("Up Vector", m_value.upVector(), glm::vec3(-1.f), glm::vec3(1.f))
   , m_eyeSeparationAngle("Eye Separation Angle", glm::degrees(m_value.eyeSeparationAngle()), 1.f, 80.f)

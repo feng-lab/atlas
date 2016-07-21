@@ -148,6 +148,8 @@ uint16_t getOrientation(jpeg_decompress_struct &cinfo)
   while (marker) {
     if (marker->data_length > 6 && std::equal(marker->data, marker->data+6, "Exif\0\0")) {
       typedef boost::iostreams::basic_array_source<char> Device;
+      // reinterpret_cast allowed (AliasedType is char or unsigned char: this permits
+      // examination of the object representation of any object as an array of unsigned char.)
       boost::iostreams::stream<Device> exifs(reinterpret_cast<char*>(marker->data)+6, marker->data_length-6);
       ZTiff exif;
       exif.load(exifs, true);

@@ -289,7 +289,7 @@ std::vector<double> ZMesh::boundBox() const
 {
   std::vector<double> result(6);
   result[0] = result[2] = result[4] = std::numeric_limits<double>::max();
-  result[1] = result[3] = result[5] = -std::numeric_limits<double>::max();
+  result[1] = result[3] = result[5] = std::numeric_limits<double>::lowest();
   for (size_t i=0; i<m_vertices.size(); ++i) {
     result[0] = std::min(result[0], static_cast<double>(m_vertices[i].x));
     result[1] = std::max(result[1], static_cast<double>(m_vertices[i].x));
@@ -305,7 +305,7 @@ std::vector<double> ZMesh::boundBox(const glm::mat4 &transform) const
 {
   std::vector<double> result(6);
   result[0] = result[2] = result[4] = std::numeric_limits<double>::max();
-  result[1] = result[3] = result[5] = -std::numeric_limits<double>::max();
+  result[1] = result[3] = result[5] = std::numeric_limits<double>::lowest();
   for (size_t i=0; i<m_vertices.size(); ++i) {
     glm::vec3 vert = glm::applyMatrix(transform, m_vertices[i]);
     result[0] = std::min(result[0], static_cast<double>(vert.x));
@@ -1358,7 +1358,7 @@ double ZMesh::signedVolumeOfTriangle(const glm::vec3 &v1, const glm::vec3 &v2, c
 size_t ZMesh::numCoverCubes(double cubeEdgeLength)
 {
   float minx = std::numeric_limits<float>::max();
-  float maxx = -std::numeric_limits<float>::max();
+  float maxx = std::numeric_limits<float>::lowest();
   float miny = minx;
   float maxy = maxx;
   float minz = minx;

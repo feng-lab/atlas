@@ -15,7 +15,7 @@ QWidget *ZItemEditorFactory::createEditor(int type, QWidget *parent) const
     sb->setFrame(false);
     sb->setDecimals(10);
     sb->setSingleStep(1e-10);
-    sb->setMinimum(-std::numeric_limits<double>::max());
+    sb->setMinimum(std::numeric_limits<double>::lowest());
     sb->setMaximum(std::numeric_limits<double>::max());
     return sb;
   } else {

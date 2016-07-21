@@ -417,7 +417,7 @@ void Z3DBoundedFilter::updateAxisAlignedBoundBoxImpl()
       m_notTransformedBoundBox[2] > m_notTransformedBoundBox[3] ||
       m_notTransformedBoundBox[4] > m_notTransformedBoundBox[5]) {
     m_axisAlignedBoundBox[0] = m_axisAlignedBoundBox[2] = m_axisAlignedBoundBox[4] = std::numeric_limits<double>::max();
-    m_axisAlignedBoundBox[1] = m_axisAlignedBoundBox[3] = m_axisAlignedBoundBox[5] = -std::numeric_limits<double>::max();
+    m_axisAlignedBoundBox[1] = m_axisAlignedBoundBox[3] = m_axisAlignedBoundBox[5] = std::numeric_limits<double>::lowest();
     return;
   }
 

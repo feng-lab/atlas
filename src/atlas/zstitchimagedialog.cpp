@@ -1141,10 +1141,10 @@ void ZStitchImageDialog::stitchStacks2()
         // first check number of input stacks and selected stacks
         m_commandOutputEdit->setText(tr("checking file numbers..."));
         if (m_inputStack1Filenames.size() != m_nSel && m_inputStack1Filenames.size() != m_tileList.size()) {
-          throw ZStitchException(QString("The number of input stacks (%1) is not equal to either \
-                                              number of selected tiles (%2) or number of all tiles (%3). \
-                                              Can not decide which files should be stitiched.  \
-                                              Abort.").arg(m_inputStack1Filenames.size()).arg(m_nSel).arg(m_tileList.size()));
+          throw ZStitchException(QString("The number of input stacks (%1) is not equal to either "
+                                         "number of selected tiles (%2) or number of all tiles (%3). "
+                                         "Can not decide which files should be stitiched. "
+                                         "Abort.").arg(m_inputStack1Filenames.size()).arg(m_nSel).arg(m_tileList.size()));
         }
         nstack = m_nSel;
 
@@ -1789,10 +1789,10 @@ void ZStitchImageDialog::stitchStacks()
         // first check number of input stacks and selected stacks
         m_commandOutputEdit->setText(tr("checking file numbers..."));
         if (m_inputStack1Filenames.size() != m_nSel && m_inputStack1Filenames.size() != m_tileList.size()) {
-          throw ZStitchException(QString("The number of input stacks (%1) is not equal to either \
-                                         number of selected tiles (%2) or number of all tiles (%3). \
-                                         Can not decide which files should be stitiched.  \
-                                         Abort.").arg(m_inputStack1Filenames.size()).arg(m_nSel).arg(m_tileList.size()));
+          throw ZStitchException(QString("The number of input stacks (%1) is not equal to either "
+                                         "number of selected tiles (%2) or number of all tiles (%3). "
+                                         "Can not decide which files should be stitiched. "
+                                         "Abort.").arg(m_inputStack1Filenames.size()).arg(m_nSel).arg(m_tileList.size()));
         }
         nstack = m_nSel;
 

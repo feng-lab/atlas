@@ -28,6 +28,7 @@ public:
       m_logLevel(logLevel), m_hasWeight(false), m_labelsNeedUpdate(false), m_hasInitData(false)
   {
     if (std::is_same<T,ResultDataType>::value) {
+      // reinterpret_cast allowed (AliasedType is (possibly cv-qualified) DynamicType)
       m_pData = reinterpret_cast<const MatrixXrt *>(&data);
     } else {
       m_NonIntegerData = data.template cast<ResultDataType>();

@@ -187,7 +187,7 @@ void Z3DAnimationFilter::deregisterPickingObjects()
 void Z3DAnimationFilter::updateNotTransformedBoundBoxImpl()
 {
   m_notTransformedBoundBox[0] = m_notTransformedBoundBox[2] = m_notTransformedBoundBox[4] = std::numeric_limits<double>::max();
-  m_notTransformedBoundBox[1] = m_notTransformedBoundBox[3] = m_notTransformedBoundBox[5] = -std::numeric_limits<double>::max();
+  m_notTransformedBoundBox[1] = m_notTransformedBoundBox[3] = m_notTransformedBoundBox[5] = std::numeric_limits<double>::lowest();
   for (size_t i=0; i<m_lines.size(); ++i) {
     m_notTransformedBoundBox[0] = std::min(double(m_lines[i].x), m_notTransformedBoundBox[0]);
     m_notTransformedBoundBox[1] = std::max(double(m_lines[i].x), m_notTransformedBoundBox[1]);

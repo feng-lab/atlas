@@ -567,7 +567,7 @@ void Z3DSwcFilter::prepareData()
 void Z3DSwcFilter::treeBound(ZSwc *tree, std::vector<double> &res) const
 {
   res[0] = res[2] = res[4] = std::numeric_limits<double>::max();
-  res[1] = res[3] = res[5] = -std::numeric_limits<double>::max();
+  res[1] = res[3] = res[5] = std::numeric_limits<double>::lowest();
   std::vector<double> nodeBound(6);
   for (ZSwc::Iterator tn = tree->begin(); tn != tree->end(); ++tn) {
     treeNodeBound(tn, nodeBound);
@@ -594,7 +594,7 @@ void Z3DSwcFilter::treeNodeBound(const SwcTreeNode &tn, std::vector<double> &res
 void Z3DSwcFilter::notTransformedTreeBound(ZSwc *tree, std::vector<double> &res) const
 {
   res[0] = res[2] = res[4] = std::numeric_limits<double>::max();
-  res[1] = res[3] = res[5] = -std::numeric_limits<double>::max();
+  res[1] = res[3] = res[5] = std::numeric_limits<double>::lowest();
   std::vector<double> nodeBound(6);
   for (ZSwc::Iterator tn = tree->begin(); tn != tree->end(); ++tn) {
     notTransformedTreeNodeBound(tn, nodeBound);

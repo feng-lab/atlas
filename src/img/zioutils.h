@@ -16,6 +16,8 @@ void readStream_impl(std::istream &fs, char *buf, size_t count);
 template<typename T>
 inline void readStream(std::istream &fs, T *buf, size_t count)
 {
+  // reinterpret_cast allowed (AliasedType is char or unsigned char: this permits
+  // examination of the object representation of any object as an array of unsigned char.)
   readStream_impl(fs, reinterpret_cast<char*>(buf), count);
 }
 
@@ -24,6 +26,8 @@ void writeStream_impl(std::ostream &fs, const char *buf, size_t count);
 template<typename T>
 inline void writeStream(std::ostream &fs, const T *buf, size_t count)
 {
+  // reinterpret_cast allowed (AliasedType is char or unsigned char: this permits
+  // examination of the object representation of any object as an array of unsigned char.)
   writeStream_impl(fs, reinterpret_cast<const char*>(buf), count);
 }
 

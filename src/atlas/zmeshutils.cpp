@@ -433,7 +433,7 @@ double ComputePolygonTriangleMeasure(size_t centerVertexIdx, glm::dvec3 normal, 
   if ( (area=glm::dot(v4, normal)) < 0.0 ) {
     return -1.0; //concave or bad triangle
   } else if ( area == 0.0 ) {
-    return -std::numeric_limits<double>::max(); //concave or bad triangle
+    return std::numeric_limits<double>::lowest(); //concave or bad triangle
   } else {
     double perimeter = glm::length(v1) + glm::length(v2) +
         glm::length(v3);

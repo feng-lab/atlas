@@ -5,6 +5,7 @@
 #include <QFile>
 #include "zbenchtimer.h"
 #include "folly/ScopeGuard.h"
+#include <boost/align/aligned_allocator.hpp>
 
 namespace {
 
@@ -145,7 +146,7 @@ void separateChannel(uint8_t *bufImg, const ZImgInfo &info, const ZImgRegion &re
         break;
       case 2: {
         uint16_t *des = img.channelData<uint16_t>(c);
-        const uint16_t *src = reinterpret_cast<uint16_t*>(bufImg) + c + region.start.c;
+        const uint16_t *src = bit_cast<uint16_t*>(bufImg) + c + region.start.c;
         size_t numCh = img.numChannels();
         size_t i=0;
         while (i++ < img.channelVoxelNumber()) {
@@ -176,7 +177,7 @@ void separateChannel(uint8_t *bufImg, const ZImgInfo &info, const ZImgRegion &re
         for (size_t y=0; y<img.height(); ++y) {
           for (size_t x=0; x<img.width(); ++x) {
             uint16_t *des = img.data<uint16_t>(x, y, 0, c);
-            uint16_t *src = reinterpret_cast<uint16_t*>(bufImg) + (y+region.start.y) * info.rowVoxelNumber() * info.numChannels +
+            uint16_t *src = bit_cast<uint16_t*>(bufImg) + (y+region.start.y) * info.rowVoxelNumber() * info.numChannels +
                 (x+region.start.x) * info.numChannels + c + region.start.c;
             *des = ((*src & 0xff) << 8) | ((*src & 0xff00) >> 8);
           }
@@ -400,7 +401,7 @@ void ZImgPng::readImg(const QString &filename, ZImg &img, const ZImgRegion &regi
   if (rowBytes * info.height != info.byteNumber()) {
     throw ZIOException("fatal png read error");
   }
-  std::vector<png_byte> outRaw(info.byteNumber());
+  std::vector<png_byte, boost::alignment::aligned_allocator<png_byte, 32>> outRaw(info.byteNumber());
   std::vector<png_bytep> rowPointers(info.height);
   for (size_t i=0; i<rowPointers.size(); ++i) {
     rowPointers[i] = outRaw.data() + i * rowBytes;

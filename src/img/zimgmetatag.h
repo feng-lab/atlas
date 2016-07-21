@@ -46,22 +46,22 @@ public:
   template <typename T = uint8_t>
   inline const T* dataArray() const
   {
-    return reinterpret_cast<const T*>(m_data.data());
+    return bit_cast<const T*>(m_data.data());
   }
   template <typename T = uint8_t>
   inline T* dataArray()
   {
-    return reinterpret_cast<T*>(m_data.data());
+    return bit_cast<T*>(m_data.data());
   }
   template <typename T>
   inline T dataAt(size_t idx) const
   {
-    return *(reinterpret_cast<const T*>(m_data.data()) + idx);
+    return *(bit_cast<const T*>(m_data.data()) + idx);
   }
   template <typename T>
   inline T& dataAt(size_t idx)
   {
-    return *(reinterpret_cast<T*>(m_data.data()) + idx);
+    return *(bit_cast<T*>(m_data.data()) + idx);
   }
 
 private:

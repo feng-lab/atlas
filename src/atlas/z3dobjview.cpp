@@ -21,7 +21,7 @@ void Z3DObjView::resetBoundBox()
 {
   m_boundBox.resize(6);
   m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = std::numeric_limits<double>::max();
-  m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = -std::numeric_limits<double>::max();
+  m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = std::numeric_limits<double>::lowest();
 }
 
 void Z3DObjView::expandBoundBox(const std::vector<double> &boundBox)

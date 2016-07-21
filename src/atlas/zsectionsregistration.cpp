@@ -136,7 +136,7 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
   const ImagePixelType* fixedImageDataSrc = m_img.planeData<ImagePixelType>(fixedImageIndex, m_referenceChannel);
   const ImagePixelType* movingImageDataSrc = m_img.planeData<ImagePixelType>(movingImageIndex, m_referenceChannel);
   double fixedMin = std::numeric_limits<double>::max();
-  double fixedMax = -std::numeric_limits<double>::max();
+  double fixedMax = std::numeric_limits<double>::lowest();
   double movingMin = fixedMin;
   double movingMax = fixedMax;
   for (size_t i=0; i<length; ++i) {
@@ -326,7 +326,7 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
   const ImagePixelType* fixedImageDataSrc = m_registeredImg.planeData<ImagePixelType>(fixedImageIndex, m_referenceChannel);
   const ImagePixelType* movingImageDataSrc = m_img.planeData<ImagePixelType>(movingImageIndex, m_referenceChannel);
   double fixedMin = std::numeric_limits<double>::max();
-  double fixedMax = -std::numeric_limits<double>::max();
+  double fixedMax = std::numeric_limits<double>::lowest();
   double movingMin = fixedMin;
   double movingMax = fixedMax;
   for (size_t i=0; i<length; ++i) {
@@ -568,7 +568,7 @@ void ZSectionsRegistration::calcSecInfs()
 {
   m_sectionInfos.resize(m_img.depth());
   m_minValue = std::numeric_limits<double>::max();
-  m_maxValue = -std::numeric_limits<double>::max();
+  m_maxValue = std::numeric_limits<double>::lowest();
   size_t length = m_img.planeVoxelNumber();
   for (size_t i=0; i<m_img.depth(); ++i) {
     const ImagePixelType* data = m_img.planeData<ImagePixelType>(i, m_referenceChannel);

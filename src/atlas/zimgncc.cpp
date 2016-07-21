@@ -427,17 +427,17 @@ ZImg xCorrFFT(const ZImg &fixedImg, ZImg &movingImg, bool reflectMovingImg)
 
   ZComplexImg cfixed = fft(fixedImg, optimalWidth, optimalHeight, optimalDepth);
   //ZImg img;
-  //img.mapData((double*)cfixed.rawData(), cfixed.width()*2, cfixed.height(), cfixed.depth());
+  //img.mapData(reinterpret_cast<double*>(cfixed.rawData()), cfixed.width()*2, cfixed.height(), cfixed.depth());
   //img.write("/Users/feng/Downloads/test_xcorr_fixedfft.tif");
   if (reflectMovingImg) {
     cfixed *= fft(movingImg.reflect(), optimalWidth, optimalHeight, optimalDepth);
     movingImg.reflect();
   } else {
     //    ZComplexImg tmp = fft(movingImg, optimalWidth, optimalHeight, optimalDepth);
-    //    img.mapData((double*)tmp.rawData(), tmp.width()*2, tmp.height(), tmp.depth());
+    //    img.mapData(reinterpret_cast<double*>(tmp.rawData()), tmp.width()*2, tmp.height(), tmp.depth());
     //    img.write("/Users/feng/Downloads/test_xcorr_movingfft.tif");
     cfixed *= fft(movingImg, optimalWidth, optimalHeight, optimalDepth);
-    //img.mapData((double*)cfixed.rawData(), cfixed.width()*2, cfixed.height(), cfixed.depth());
+    //img.mapData(reinterpret_cast<double*>(cfixed.rawData()), cfixed.width()*2, cfixed.height(), cfixed.depth());
     //img.write("/Users/feng/Downloads/test_xcorr_fixedmovingfft.tif");
   }
   return ifft(cfixed, optimalWidth, outWidth, outHeight, outDepth);

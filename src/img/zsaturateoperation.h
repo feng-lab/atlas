@@ -127,8 +127,8 @@ template<> inline float saturate_cast<float>(double v)
 {
   if (v >= std::numeric_limits<float>::max())
     return std::numeric_limits<float>::max();
-  else if (v <= -std::numeric_limits<float>::max())
-    return -std::numeric_limits<float>::max();
+  else if (v <= std::numeric_limits<float>::lowest())
+    return std::numeric_limits<float>::lowest();
   else
     return v;
 }
@@ -136,8 +136,8 @@ template<> inline float saturate_cast<float>(long double v)
 {
   if (v >= std::numeric_limits<float>::max())
     return std::numeric_limits<float>::max();
-  else if (v <= -std::numeric_limits<float>::max())
-    return -std::numeric_limits<float>::max();
+  else if (v <= std::numeric_limits<float>::lowest())
+    return std::numeric_limits<float>::lowest();
   else
     return v;
 }
@@ -146,8 +146,8 @@ template<> inline double saturate_cast<double>(long double v)
 {
   if (v >= std::numeric_limits<double>::max())
     return std::numeric_limits<double>::max();
-  else if (v <= -std::numeric_limits<double>::max())
-    return -std::numeric_limits<double>::max();
+  else if (v <= std::numeric_limits<double>::lowest())
+    return std::numeric_limits<double>::lowest();
   else
     return v;
 }

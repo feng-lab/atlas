@@ -288,6 +288,7 @@ bool Z3DGpuInfo::isLinkedListSupported() const
 
 void Z3DGpuInfo::detectGpuInfo()
 {
+  // reinterpret_cast allowed (AliasedType is the (possibly cv-qualified) signed or unsigned variant of DynamicType)
   m_glVersionString = QString(reinterpret_cast<const char*>(glGetString(GL_VERSION)));
   m_glVendorString  = QString(reinterpret_cast<const char*>(glGetString(GL_VENDOR)));
   m_glRendererString  = QString(reinterpret_cast<const char*>(glGetString(GL_RENDERER)));

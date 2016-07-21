@@ -73,7 +73,7 @@ void ZIntParameter::changeRange()
 }
 
 ZDoubleParameter::ZDoubleParameter(const QString &name, QObject *parent)
-  : ZNumericParameter<double>(name, 0.0, -std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), parent)
+  : ZNumericParameter<double>(name, 0.0, std::numeric_limits<double>::lowest(), std::numeric_limits<double>::max(), parent)
 {
   addStyle("SPINBOX");
 }
@@ -129,7 +129,7 @@ void ZDoubleParameter::changeRange()
 }
 
 ZFloatParameter::ZFloatParameter(const QString &name, QObject *parent)
-  : ZNumericParameter<float>(name, 0.f, -std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), parent)
+  : ZNumericParameter<float>(name, 0.f, std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max(), parent)
 {
   addStyle("SPINBOX");
 }
@@ -187,7 +187,7 @@ void ZFloatParameter::changeRange()
 //---------------------------------------------------------------------------------------------------------------
 
 ZVec2Parameter::ZVec2Parameter(const QString &name, QObject *parent)
-  : ZNumericVectorParameter<glm::vec2>(name, glm::vec2(0.0), glm::vec2(-std::numeric_limits<float>::max()),
+  : ZNumericVectorParameter<glm::vec2>(name, glm::vec2(0.0), glm::vec2(std::numeric_limits<float>::lowest()),
                                        glm::vec2(std::numeric_limits<float>::max()), parent)
 {
   addStyle("SPINBOX");
@@ -339,7 +339,7 @@ QWidget *ZVec2Parameter::actualCreateWidget(QWidget *parent)
 //---------------------------------------------------------------------------------------------------------------
 
 ZVec3Parameter::ZVec3Parameter(const QString &name, QObject *parent)
-  : ZNumericVectorParameter<glm::vec3>(name, glm::vec3(0.0), glm::vec3(-std::numeric_limits<float>::max()),
+  : ZNumericVectorParameter<glm::vec3>(name, glm::vec3(0.0), glm::vec3(std::numeric_limits<float>::lowest()),
                                        glm::vec3(std::numeric_limits<float>::max()), parent)
 {
   addStyle("SPINBOX");
@@ -553,7 +553,7 @@ QWidget *ZVec3Parameter::actualCreateWidget(QWidget *parent)
 //---------------------------------------------------------------------------------------------------------------
 
 ZVec4Parameter::ZVec4Parameter(const QString &name, QObject *parent)
-  : ZNumericVectorParameter<glm::vec4>(name, glm::vec4(0.0), glm::vec4(-std::numeric_limits<float>::max()),
+  : ZNumericVectorParameter<glm::vec4>(name, glm::vec4(0.0), glm::vec4(std::numeric_limits<float>::lowest()),
                                        glm::vec4(std::numeric_limits<float>::max()), parent)
 {
   addStyle("SPINBOX");
@@ -824,7 +824,7 @@ QWidget *ZVec4Parameter::actualCreateWidget(QWidget *parent)
 //---------------------------------------------------------------------------------------------------------------
 
 ZDVec2Parameter::ZDVec2Parameter(const QString &name, QObject *parent)
-  : ZNumericVectorParameter<glm::dvec2>(name, glm::dvec2(0.0), glm::dvec2(-std::numeric_limits<double>::max()),
+  : ZNumericVectorParameter<glm::dvec2>(name, glm::dvec2(0.0), glm::dvec2(std::numeric_limits<double>::lowest()),
                                         glm::dvec2(std::numeric_limits<double>::max()), parent)
 {
   addStyle("SPINBOX");
@@ -976,7 +976,7 @@ QWidget *ZDVec2Parameter::actualCreateWidget(QWidget *parent)
 //---------------------------------------------------------------------------------------------------------------
 
 ZDVec3Parameter::ZDVec3Parameter(const QString &name, QObject *parent)
-  : ZNumericVectorParameter<glm::dvec3>(name, glm::dvec3(0.0), glm::dvec3(-std::numeric_limits<double>::max()),
+  : ZNumericVectorParameter<glm::dvec3>(name, glm::dvec3(0.0), glm::dvec3(std::numeric_limits<double>::lowest()),
                                         glm::dvec3(std::numeric_limits<double>::max()), parent)
 {
   addStyle("SPINBOX");
@@ -1190,7 +1190,7 @@ QWidget *ZDVec3Parameter::actualCreateWidget(QWidget *parent)
 //---------------------------------------------------------------------------------------------------------------
 
 ZDVec4Parameter::ZDVec4Parameter(const QString &name, QObject *parent)
-  : ZNumericVectorParameter<glm::dvec4>(name, glm::dvec4(0.0), glm::dvec4(-std::numeric_limits<double>::max()),
+  : ZNumericVectorParameter<glm::dvec4>(name, glm::dvec4(0.0), glm::dvec4(std::numeric_limits<double>::lowest()),
                                         glm::dvec4(std::numeric_limits<double>::max()), parent)
 {
   addStyle("SPINBOX");
@@ -1930,7 +1930,7 @@ void ZIntSpanParameter::changeRange()
 }
 
 ZFloatSpanParameter::ZFloatSpanParameter(const QString &name, QObject *parent)
-  : ZNumericSpanParameter<glm::vec2>(name, glm::vec2(0.f,0.f), -std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), parent)
+  : ZNumericSpanParameter<glm::vec2>(name, glm::vec2(0.f,0.f), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max(), parent)
 {
   addStyle("SPINBOX");
 }
@@ -2048,7 +2048,7 @@ void ZFloatSpanParameter::changeRange()
 
 
 ZDoubleSpanParameter::ZDoubleSpanParameter(const QString &name, QObject *parent)
-  : ZNumericSpanParameter<glm::dvec2>(name, glm::dvec2(0.0,0.0), -std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), parent)
+  : ZNumericSpanParameter<glm::dvec2>(name, glm::dvec2(0.0,0.0), std::numeric_limits<double>::lowest(), std::numeric_limits<double>::max(), parent)
 {
 }
 
