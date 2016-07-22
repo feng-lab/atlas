@@ -1,5 +1,6 @@
 #include "zioutils.h"
 #include "zexception.h"
+#include "zglobal.h"
 #include <vector>
 #include <QFile>
 #include <QTextStream>
@@ -33,13 +34,13 @@ void openFileStream(std::ofstream &fs, const QString &filename, std::ios_base::o
 void readStream_impl(std::istream &fs, char *buf, size_t count)
 {
 #if defined(__APPLE__)
-  if (count < size_t(1024)*1024*1024*2) {
+  if (count < 1024_usize*1024*1024*2) {
     if (!fs.read(buf, count)) {
       throw ZIOException(QString("Expect %1 bytes, only read %2 bytes.").arg(count).arg(fs.gcount()));
     }
     return;
   }
-  static size_t chunkSize = size_t(1024)*1024*1024;
+  static size_t chunkSize = 1024_usize*1024*1024;
   size_t bytesRemaining = count;
   while (bytesRemaining > 0) {
     size_t bytesToRead = std::min(bytesRemaining, chunkSize);

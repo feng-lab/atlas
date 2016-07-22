@@ -982,7 +982,7 @@ void image3DResize(const TPixel *img, size_t width, size_t height, size_t depth,
 #ifndef _USE_QTCONCURRENT_
     func(tbb::blocked_range<size_t>(0, outDepth));
 #else
-    func(std::make_pair(size_t(0), outDepth));
+    func(std::pair<size_t,size_t>(0, outDepth));
 #endif
   } else {
 #ifndef _USE_QTCONCURRENT_

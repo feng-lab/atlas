@@ -69,7 +69,7 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
     m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
 
     for (size_t c=0; c<m_imgPack.imgInfo().numChannels; ++c) {
-      m_imageCacheTextures.emplace_back(new Z3DTexture(GLint(GL_R8), (m_imageBlockSize+uint32_t(2)) * m_imageCacheNumBlocks, GL_RED, GL_UNSIGNED_BYTE));
+      m_imageCacheTextures.emplace_back(new Z3DTexture(GLint(GL_R8), (m_imageBlockSize+2_u32) * m_imageCacheNumBlocks, GL_RED, GL_UNSIGNED_BYTE));
       m_imageCacheTextures[c]->uploadImage();
     }
 
@@ -185,7 +185,7 @@ void Z3DImg::setScale(const glm::vec3 &scale)
   }
 
   m_pageTableCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
-  m_imageCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_imageBlockSize+uint32_t(2), m_imageCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
+  m_imageCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_imageBlockSize+2_u32, m_imageCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
   for (size_t c=0; c<m_channelPendingUpdates.size(); ++c) {
     m_channelPendingUpdates[c].clear();
   }
@@ -246,7 +246,7 @@ void Z3DImg::setScale(const glm::vec3 &scale)
         m_levelScales[l][sortedIndex[1]] = m_levelScales[l-1][sortedIndex[1]];
         m_levelScales[l][sortedIndex[0]] = m_levelScales[l-1][sortedIndex[0]] * 2;
       } else {
-        m_levelScales[l] = m_levelScales[l-1] * uint32_t(2);
+        m_levelScales[l] = m_levelScales[l-1] * 2_u32;
       }
     }
     assert(m_levelScales[l].x == m_levelScales[l].y);
@@ -254,9 +254,9 @@ void Z3DImg::setScale(const glm::vec3 &scale)
     m_imageDimensions[l] = glm::uvec3((info.width + m_levelScales[l].x - 1) / m_levelScales[l].x,
                                       (info.height + m_levelScales[l].y - 1) / m_levelScales[l].y,
                                       (info.depth + m_levelScales[l].z - 1) / m_levelScales[l].z);
-    m_imageBounds[l] = m_imageDimensions[l]-uint32_t(1);
-    m_pageTableDimensions[l] = glm::uvec3(m_imageDimensions[l] + m_imageBlockSize - uint32_t(1)) / m_imageBlockSize;
-    m_pageDirectoryDimensions[l] = glm::uvec3(m_pageTableDimensions[l] + m_pageTableBlockSize - uint32_t(1)) / m_pageTableBlockSize;
+    m_imageBounds[l] = m_imageDimensions[l]-1_u32;
+    m_pageTableDimensions[l] = glm::uvec3(m_imageDimensions[l] + m_imageBlockSize - 1_u32) / m_imageBlockSize;
+    m_pageDirectoryDimensions[l] = glm::uvec3(m_pageTableDimensions[l] + m_pageTableBlockSize - 1_u32) / m_pageTableBlockSize;
 
     // id starts from 1
     m_posToBlockIDs[l] = glm::uvec4(1,
@@ -320,7 +320,7 @@ void Z3DImg::bindFullResRenderShader(Z3DShaderProgram &shader) const
   shader.setUniformArray("image_dimensions", m_imageBounds.data(), m_numLevels);
   shader.setUniformArray("voxel_world_sizes", m_voxelWorldSizes.data(), m_numLevels);
   shader.setUniform("image_block_size", glm::ivec3(m_imageBlockSize));
-  shader.setUniform("image_address_to_normalized_texture_coord", 1.f / glm::vec3(m_imageCacheTextures[0]->dimension() * uint32_t(2)));
+  shader.setUniform("image_address_to_normalized_texture_coord", 1.f / glm::vec3(m_imageCacheTextures[0]->dimension() * 2_u32));
 }
 
 void Z3DImg::bindImageCacheToFullResRenderShader(Z3DShaderProgram &shader, size_t c) const
@@ -487,7 +487,7 @@ void Z3DImg::uploadImageCache(size_t channel)
       const glm::ivec4& blockImagePos = it->second;
       m_imgPack.readRegionToImg(m_levelScales[blockImagePos.x].x, m_levelScales[blockImagePos.x].z,
           blockImagePos.y-1, blockImagePos.z-1, blockImagePos.w-1, channel, 0, img);
-      m_imageCacheTextures[channel]->uploadSubImage(it->first, m_imageBlockSize+uint32_t(2), img.channelData(0));
+      m_imageCacheTextures[channel]->uploadSubImage(it->first, m_imageBlockSize+2_u32, img.channelData(0));
       img.fill(0);
     }
   } else {
@@ -504,7 +504,7 @@ void Z3DImg::uploadImageCache(size_t channel)
       for (size_t i=0; i<it->second.size(); ++i) {
         glm::ivec3 startCoord = it->first.yzw() - it->second[i].first.yzw();
         img.pasteImg(bigImg, ZVoxelCoordinate(startCoord.x, startCoord.y, startCoord.z));
-        m_imageCacheTextures[channel]->uploadSubImage(it->second[i].second, m_imageBlockSize+uint32_t(2), img.channelData(0));
+        m_imageCacheTextures[channel]->uploadSubImage(it->second[i].second, m_imageBlockSize+2_u32, img.channelData(0));
       }
       bigImg.fill(0);
     }
@@ -543,9 +543,9 @@ void Z3DImg::readVolumes()
     m_isVolumeDownsampled = true;
 
     if (m_imgPack.imgInfo().depth > 1) {
-      widthScale = info.width <= size_t(512) ? 1.0 : 512.0 / info.width;
-      heightScale = info.height <= size_t(512) ? 1.0 : 512.0 / info.height;
-      depthScale = info.depth <= size_t(512) ? 1.0 : 512.0 / info.depth;
+      widthScale = info.width <= 512_usize ? 1.0 : 512.0 / info.width;
+      heightScale = info.height <= 512_usize ? 1.0 : 512.0 / info.height;
+      depthScale = info.depth <= 512_usize ? 1.0 : 512.0 / info.depth;
     }
 
     //return;

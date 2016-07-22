@@ -2025,7 +2025,7 @@ void ZImg::histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxDa
 
   // special case
   if (voxelFormat() != VoxelFormat::Float) {
-    size_t numData = maxData - minData + size_t(1);
+    size_t numData = maxData - minData + 1_usize;
     if (numData == res.size()) {
       if (minData == dataRangeMin<TVoxel>() && maxData == dataRangeMax<TVoxel>()) {
         for (size_t t=0; t<numTimes(); ++t) {
@@ -2094,7 +2094,7 @@ void ZImg::histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel m
 
   // special case
   if (voxelFormat() != VoxelFormat::Float) {
-    size_t numData = maxData - minData + size_t(1);
+    size_t numData = maxData - minData + 1_usize;
     if (numData == res.size()) {
       if (minData == dataRangeMin<TVoxel>() && maxData == dataRangeMax<TVoxel>()) {
         for (size_t t=0; t<numTimes(); ++t) {

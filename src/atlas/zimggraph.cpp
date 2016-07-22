@@ -15,7 +15,7 @@ public:
                      const std::vector<Vertex>& goals, double weight, bool useVoxelSize, const ZNeighborhood &nb)
     : m_region(region), m_regionInfo(regionInfo), m_goals(goals), m_weight(weight), m_useVoxelSize(useVoxelSize)
   {
-    if (nb.size() == size_t(2) || nb.size() == size_t(3)) {
+    if (nb.size() == 2_usize || nb.size() == 3_usize) {
       // no diagonal connection
       m_wxyz = m_useVoxelSize ? (m_regionInfo.voxelSizeX + m_regionInfo.voxelSizeY + m_regionInfo.voxelSizeZ) : 3.0;
       m_wxy = m_useVoxelSize ? (m_regionInfo.voxelSizeX + m_regionInfo.voxelSizeY) : 2.0;
@@ -239,7 +239,7 @@ std::tuple<double, size_t> ZImgGraph::shortestPath(size_t startIdx, const std::v
   }
 
   throw ZImgException(QString("Didn't find a path from %1 to target points").arg(startIdx));
-  return std::make_tuple(-1, size_t(-1));
+  return std::tuple<double,size_t>(-1, -1);
 }
 
 void ZImgGraph::updateNeighborDistances()

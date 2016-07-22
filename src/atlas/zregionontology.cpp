@@ -576,7 +576,7 @@ void binaryImgToROI(const ZImg &img, ZROI &roi)
         if (contours[c].size() < 15) {
           continue;
         } else {
-          size_t dst = std::max(size_t(1), std::min(size_t(30), contours[c].size() / 20));
+          size_t dst = std::max<size_t>(1, std::min<size_t>(30, contours[c].size() / 20));
           QPolygonF poly;
           for (size_t p=0; p<contours[c].size(); p+=dst) {
             poly.push_back(QPointF(contours[c][p].x, contours[c][p].y));

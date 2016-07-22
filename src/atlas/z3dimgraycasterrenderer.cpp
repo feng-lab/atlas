@@ -518,7 +518,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       missingBlockIDs.insert(m_blockIDs.begin(), m_blockIDs.end());
       m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT1)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
       missingBlockIDs.insert(m_blockIDs.begin(), m_blockIDs.end());
-      missingBlockIDs.erase(uint32_t(0));
+      missingBlockIDs.erase(0_u32);
       if (!missingBlockIDs.empty()) {
         m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT2)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
         usedBlockIDs.insert(m_blockIDs.begin(), m_blockIDs.end());
@@ -526,7 +526,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         usedBlockIDs.insert(m_blockIDs.begin(), m_blockIDs.end());
         m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT4)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
         usedBlockIDs.insert(m_blockIDs.begin(), m_blockIDs.end());
-        usedBlockIDs.erase(uint32_t(0));
+        usedBlockIDs.erase(0_u32);
       }
 #else
       tbb::concurrent_unordered_set<uint32_t> ccSet;
@@ -543,7 +543,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         ccSet.insert(range.begin(), range.end()); // inserts a sequence
       }
       );
-      ccSet.unsafe_erase(uint32_t(0));
+      ccSet.unsafe_erase(0_u32);
 
       if (!ccSet.empty()) {
         missingBlockIDs.insert(ccSet.begin(), ccSet.end());
@@ -571,20 +571,20 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         }
         );
         usedBlockIDs.insert(ccSet.begin(), ccSet.end());
-        usedBlockIDs.erase(uint32_t(0));
+        usedBlockIDs.erase(0_u32);
       }
 #endif
 #if 0
 #if 0
       m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT1)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data() + missingBlockIDsTexture->numPixels() * 4);
       missingBlockIDs.insert(m_blockIDs.begin(), m_blockIDs.begin() + missingBlockIDsTexture->numPixels() * 8);
-      missingBlockIDs.erase(uint32_t(0));
+      missingBlockIDs.erase(0_u32);
       if (!missingBlockIDs.empty()) {
         m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT2)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
         m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT3)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data() + missingBlockIDsTexture->numPixels() * 4);
         m_blockIDsRenderTarget.attachment(GL_COLOR_ATTACHMENT4)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data() + missingBlockIDsTexture->numPixels() * 8);
         usedBlockIDs.insert(m_blockIDs.begin(), m_blockIDs.end());
-        usedBlockIDs.erase(uint32_t(0));
+        usedBlockIDs.erase(0_u32);
       }
 #else
       tbb::concurrent_unordered_set<uint32_t> ccSet;
@@ -595,7 +595,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         ccSet.insert(range.begin(), range.end()); // inserts a sequence
       }
       );
-      ccSet.unsafe_erase(uint32_t(0));
+      ccSet.unsafe_erase(0_u32);
 
       if (!ccSet.empty()) {
         missingBlockIDs.insert(ccSet.begin(), ccSet.end());
@@ -611,7 +611,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         }
         );
         usedBlockIDs.insert(ccSet.begin(), ccSet.end());
-        usedBlockIDs.erase(uint32_t(0));
+        usedBlockIDs.erase(0_u32);
       }
 #endif
 #endif

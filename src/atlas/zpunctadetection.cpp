@@ -360,7 +360,7 @@ void ZPunctaDetection::detectImpl(ZImg& img, int thre, ZPuncta &resList, ZPuncta
 
   for (size_t z=0; z<img.depth(); ++z) {
     image2DGaussianFilter(img.planeData<uint8_t>(z), img.width(), img.height(), 1., 1.,
-                          img.planeData<uint8_t>(z), 3, 3, PadOption::Constant, uint8_t(0), m_useMultithreading);
+                          img.planeData<uint8_t>(z), 3, 3, PadOption::Constant, 0_u8, m_useMultithreading);
     reportProgress(baseWeight + weight * .5 * z / img.depth());
   }
   reportProgress(baseWeight + weight * .5);

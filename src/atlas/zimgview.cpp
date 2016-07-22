@@ -26,7 +26,8 @@ QString ZImgView::infoOfPos(double x, double y)
     const ZImgPack& imgPack = m_doc.imgPack(id);
     int lx = x - imgPack.offsetX();
     int ly = y - imgPack.offsetY();
-    if (lx >= 0 && size_t(lx) < imgPack.imgInfo().width && ly >= 0 && size_t(ly) < imgPack.imgInfo().height) {
+    if (lx >= 0 && static_cast<size_t>(lx) < imgPack.imgInfo().width &&
+        ly >= 0 && static_cast<size_t>(ly) < imgPack.imgInfo().height) {
       int lz = m_view.isNormalView() ? viewControl->imgSlice() : 0;
       int lt = viewControl->imgTime();
       info += imgPack.sizeInfo();

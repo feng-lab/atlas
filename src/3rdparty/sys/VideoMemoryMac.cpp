@@ -31,7 +31,7 @@ uint64_t getDedicatedVideoMemoryMB()
     std::cout << "Video Memory = " << videoMemory << " MB" << std::endl;
 
     if (online)
-      res = std::max(res, uint64_t(videoMemory));
+      res = std::max<uint64_t>(res, videoMemory);
   }
   CGLDestroyRendererInfo(rend);
   return res;

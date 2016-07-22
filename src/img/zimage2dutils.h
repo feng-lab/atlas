@@ -954,7 +954,7 @@ void image2DResize(const TPixel *img, size_t width, size_t height,
 #ifndef _USE_QTCONCURRENT_
     func(tbb::blocked_range<size_t>(0, outHeight));
 #else
-    func(std::make_pair(size_t(0), outHeight));
+    func(std::pair<size_t,size_t>(0, outHeight));
 #endif
   } else {
 #ifndef _USE_QTCONCURRENT_

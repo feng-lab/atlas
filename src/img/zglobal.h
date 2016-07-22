@@ -45,7 +45,7 @@ struct EnumStrings
 
 // crash if enum e is not valid
 template<typename TEnum>
-constexpr const char* enumToString(TEnum e)
+constexpr const char* enumToString(TEnum e) noexcept
 {
   return EnumStrings<TEnum>::data[static_cast<typename std::underlying_type<TEnum>::type>(e)];
 }
@@ -80,6 +80,19 @@ efficientAddOrUpdate(MapType& m, const KeyArgType& k, const ValueArgtype& v)
     return m.emplace_hint(lb, k, v); // add pair(k, v) to m and return an iterator to the new map element
   }
 }
+
+// literal
+constexpr size_t operator "" _usize(unsigned long long int n) noexcept { return n; }
+constexpr ptrdiff_t operator "" _isize(unsigned long long int n) noexcept { return n; }
+constexpr uint8_t operator "" _u8(unsigned long long int n) noexcept { return n; }
+constexpr int8_t operator "" _i8(unsigned long long int n) noexcept { return n; }
+constexpr uint16_t operator "" _u16(unsigned long long int n) noexcept { return n; }
+constexpr int16_t operator "" _i16(unsigned long long int n) noexcept { return n; }
+constexpr uint32_t operator "" _u32(unsigned long long int n) noexcept { return n; }
+constexpr int32_t operator "" _i32(unsigned long long int n) noexcept { return n; }
+constexpr uint64_t operator "" _u64(unsigned long long int n) noexcept { return n; }
+constexpr int64_t operator "" _i64(unsigned long long int n) noexcept { return n; }
+
 
 } // namespace nim
 

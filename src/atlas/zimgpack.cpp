@@ -432,13 +432,14 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
   if (m_diskCached) {
     if (m_imgInfo.depth == 1)
       mip = false;
-    auto tiit = m_rtzToTileIndice.find(std::make_tuple(size_t(1), t, mip ? -1 : int(z)));
+    auto tiit = m_rtzToTileIndice.find(std::tuple<size_t,size_t,int>(1, t, mip ? -1 : static_cast<int>(z)));
     if (tiit != m_rtzToTileIndice.end()) {
       const std::vector<size_t>& tileIndice = tiit->second;
       for (size_t i=0; i<tileIndice.size(); ++i) {
         const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
         assert(tile.x >= 0 && tile.y >= 0);
-        if (int64_t(x) >= tile.x && int64_t(x) < tile.x + tile.width && int64_t(y) >= tile.y && int64_t(y) < tile.y + tile.height) {
+        if (static_cast<int64_t>(x) >= tile.x && static_cast<int64_t>(x) < tile.x + tile.width &&
+            static_cast<int64_t>(y) >= tile.y && static_cast<int64_t>(y) < tile.y + tile.height) {
           std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(HashKeyType(this, tileIndice[i])), tile);
           return (*imgPtr)->value<double>(x-tile.x, y-tile.y, 0, c, 0);
         }
@@ -522,7 +523,7 @@ ZImg ZImgPack::crop(const ZImgRegion &region) const
 
   for (TCoordinate t=rgn.tStart(); t<rgn.tEnd(); ++t) {
     for (TCoordinate z=rgn.zStart(); z<rgn.zEnd(); ++z) {
-      auto tiit = m_rtzToTileIndice.find(std::make_tuple(size_t(1), size_t(t), int(z)));
+      auto tiit = m_rtzToTileIndice.find(std::tuple<size_t,size_t,int>(1, t, z));
       if (tiit != m_rtzToTileIndice.end()) {
         const std::vector<size_t>& tileIndice = tiit->second;
         for (size_t i=0; i<tileIndice.size(); ++i) {
@@ -591,11 +592,13 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
 {
   size_t readRatio = readRatioOf(xyRatio);
   if (readRatio == xyRatio) {
-    TileBoxType queryBox(TileCornerType(sx * int64_t(xyRatio), sy * int64_t(xyRatio)),
-                         TileCornerType((sx + int64_t(res.width())) * int64_t(xyRatio) - 1, (sy + int64_t(res.height())) * int64_t(xyRatio) - 1));
-    int64_t zEnd = std::min(int64_t(m_imgInfo.depth), (sz+int64_t(res.depth())) * int64_t(zRatio));
+    TileBoxType queryBox(TileCornerType(sx * static_cast<int64_t>(xyRatio),
+                                        sy * static_cast<int64_t>(xyRatio)),
+                         TileCornerType((sx + static_cast<int64_t>(res.width())) * static_cast<int64_t>(xyRatio) - 1,
+                                        (sy + static_cast<int64_t>(res.height())) * static_cast<int64_t>(xyRatio) - 1));
+    int64_t zEnd = std::min(static_cast<int64_t>(m_imgInfo.depth), (sz+static_cast<int64_t>(res.depth())) * static_cast<int64_t>(zRatio));
     size_t zIdx = 0;
-    for (int64_t z=sz*int64_t(zRatio); z<zEnd; z+=int64_t(zRatio), ++zIdx) {
+    for (int64_t z=sz*static_cast<int64_t>(zRatio); z<zEnd; z+=static_cast<int64_t>(zRatio), ++zIdx) {
       if (z < 0)
         continue;
 
@@ -605,8 +608,8 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
         tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
         for (size_t i=0; i<queryResult.size(); ++i) {
           const ZImgSubBlock& tile = *m_allTiles[queryResult[i].second].get();
-          ZVoxelCoordinate start(tile.x / int64_t(xyRatio) - sx,
-                                 tile.y / int64_t(xyRatio) - sy,
+          ZVoxelCoordinate start(tile.x / static_cast<int64_t>(xyRatio) - sx,
+                                 tile.y / static_cast<int64_t>(xyRatio) - sy,
                                  zIdx,
                                  -ZVoxelCoordinate::value_type(sc),
                                  0);
@@ -674,7 +677,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
       m_allTiles.emplace_back(new ZImgPackSubBlock(m_imgSource, 1, t, z, 0, 0, img->width(), img->height()));
     }
     ZImgCacheInstance.insert(boost::hash_value(HashKeyType(this, m_allTiles.size()-1)),
-                             new std::shared_ptr<ZImg>(img), std::max(size_t(1), img->byteNumber() / 1024 / 1024));
+                             new std::shared_ptr<ZImg>(img), std::max<size_t>(1, img->byteNumber() / 1024 / 1024));
     return;
   }
 
@@ -693,7 +696,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
           m_allTiles.emplace_back(new ZImgPackSubBlock(simg, ratio, t, z, 0, 0, width, height));
         }
         ZImgCacheInstance.insert(boost::hash_value(HashKeyType(this, m_allTiles.size()-1)),
-                                 new std::shared_ptr<ZImg>(simg), std::max(size_t(1), simg->byteNumber() / 1024 / 1024));
+                                 new std::shared_ptr<ZImg>(simg), std::max<size_t>(1, simg->byteNumber() / 1024 / 1024));
         break;
       } else {
         std::shared_ptr<ZImg> simg(new ZImg(*img));
@@ -703,7 +706,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
           m_allTiles.emplace_back(new ZImgPackSubBlock(simg, ratio, t, z, 0, 0, width, height));
         }
         ZImgCacheInstance.insert(boost::hash_value(HashKeyType(this, m_allTiles.size()-1)),
-                                 new std::shared_ptr<ZImg>(simg), std::max(size_t(1), simg->byteNumber() / 1024 / 1024));
+                                 new std::shared_ptr<ZImg>(simg), std::max<size_t>(1, simg->byteNumber() / 1024 / 1024));
 
         img->zoom(0.5, 0.5);
         ratio *= 2;
@@ -729,7 +732,7 @@ void ZImgPack::createSliceTiles(ZImg *img, size_t z, size_t t, bool mip)
             m_allTiles.emplace_back(new ZImgPackSubBlock(cropped, ratio, t, z, startX, startY, width, height));
           }
           ZImgCacheInstance.insert(boost::hash_value(HashKeyType(this, m_allTiles.size()-1)),
-                                   new std::shared_ptr<ZImg>(cropped), std::max(size_t(1), cropped->byteNumber() / 1024 / 1024));
+                                   new std::shared_ptr<ZImg>(cropped), std::max<size_t>(1, cropped->byteNumber() / 1024 / 1024));
         }
       }
 

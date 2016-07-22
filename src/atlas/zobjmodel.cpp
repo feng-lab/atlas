@@ -242,7 +242,7 @@ size_t ZObjModel::numObjs() const
 {
   int num = 0;
   for (size_t i=0; i<m_rootItem->children.size(); ++i) {
-    num += std::max(m_rootItem->children[i]->children.size(), size_t(1));
+    num += std::max<size_t>(m_rootItem->children[i]->children.size(), 1);
   }
   return num;
 }

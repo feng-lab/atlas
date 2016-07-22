@@ -1236,7 +1236,7 @@ void ZStitchImageDialog::stitchStacks2()
 
   if (m_useConfigRadioButton->isChecked()) {
     if (nstack == 2) {
-      std::pair<size_t, size_t> stackPair = std::make_pair(size_t(0), size_t(1));
+      std::pair<size_t, size_t> stackPair = std::pair<size_t, size_t>(0, 1);
       conn[stackPair] = ZImgNCCMatch::None;
       if (m_configDim1ComboBox->currentIndex() == 0)
         conn[stackPair] |= ZImgNCCMatch::Left;
@@ -1881,7 +1881,7 @@ void ZStitchImageDialog::stitchStacks()
 
   if (m_useConfigRadioButton->isChecked()) {
     if (nstack == 2) {
-      std::pair<size_t, size_t> stackPair = std::make_pair(size_t(0), size_t(1));
+      std::pair<size_t, size_t> stackPair = std::pair<size_t, size_t>(0, 1);
       conn[stackPair] = ZImgNCCMatch::None;
       if (m_configDim1ComboBox->currentIndex() == 0)
         conn[stackPair] |= ZImgNCCMatch::Left;

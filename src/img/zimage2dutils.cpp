@@ -209,7 +209,7 @@ void _resizeContributions(size_t inLength, size_t outLength, Interpolant interpo
     for (Index c=0; c<weights.cols(); ++c) {
       if (validCols(c)) {
         weightsOut[idx] = weights(r,c);
-        indicesOut[idx++] = std::max(int64_t(0), std::min(int64_t(inLength)-1, int64_t(indices(r,c))));
+        indicesOut[idx++] = std::max<int64_t>(0, std::min<int64_t>(inLength-1, indices(r,c)));
       }
     }
   }

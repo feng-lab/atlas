@@ -918,7 +918,7 @@ public:
     size_t i1 = chain1.size() - 1;
     size_t i2 = chain2.size() - 1;
     TreeNode* res = nullptr;
-    while (i1 != size_t(-1) && i2 != size_t(-1) && chain1[i1] == chain2[i2]) {
+    while (i1 != static_cast<size_t>(-1) && i2 != static_cast<size_t>(-1) && chain1[i1] == chain2[i2]) {
       res = chain1[i1].node;
       --i1;
       --i2;

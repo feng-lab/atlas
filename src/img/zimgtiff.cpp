@@ -144,7 +144,7 @@ void ZImgTiff::writeImg(const QString &filename, const ZImg &img, Compression co
 {
   ZTiffWriter tiffWriter;
   int extraSample = img.info().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
-  if (img.byteNumber() > size_t(1024)*1024*3600)
+  if (img.byteNumber() > 1024_usize*1024*3600)
     tiffWriter.startWriting(filename, comp, extraSample, true);
   else
     tiffWriter.startWriting(filename, comp, extraSample, false);
@@ -159,7 +159,7 @@ void ZImgTiff::writeImg(const QString &filename, const ZImgSliceProvider &imgSli
 {
   ZTiffWriter tiffWriter;
   int extraSample = imgSliceProvider.imgInfo().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
-  if (imgSliceProvider.imgInfo().byteNumber() > size_t(1024)*1024*3600)
+  if (imgSliceProvider.imgInfo().byteNumber() > 1024_usize*1024*3600)
     tiffWriter.startWriting(filename, comp, extraSample, true);
   else
     tiffWriter.startWriting(filename, comp, extraSample, false);

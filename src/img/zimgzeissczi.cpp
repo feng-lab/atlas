@@ -309,7 +309,7 @@ ZImg ZImgZeissCZI::stackTiles(const QString &filename, size_t ch, size_t scene)
 
   std::vector<ZImg> imgs;
   for (auto it=m_sceneTiles[scene].cbegin(); it != m_sceneTiles[scene].cend(); ++it) {
-    if (it->ratio == size_t(1) && it->start.c == static_cast<int>(ch)) {
+    if (it->ratio == 1_usize && it->start.c == static_cast<int>(ch)) {
       imgs.push_back(readCZITile(inputFileStream, *it));
     }
   }
@@ -352,7 +352,7 @@ ZImg ZImgZeissCZI::stackTiles(const QString &filename, size_t ch, size_t scene, 
 
   std::vector<ZImg> imgs;
   for (auto it=m_sceneTiles[scene].cbegin(); it != m_sceneTiles[scene].cend(); ++it) {
-    if (it->ratio == size_t(1) && it->start.c == static_cast<int>(ch)) {
+    if (it->ratio == 1_usize && it->start.c == static_cast<int>(ch)) {
       int startX = std::max(0.0, std::floor(it->start.x * scale));
       int endX = std::min(inverseMask.width() * 1.0, startX + std::ceil(it->size.x * scale));
       int startY = std::max(0.0, std::floor(it->start.y * scale));
@@ -421,7 +421,7 @@ ZImg ZImgZeissCZI::correctShading(const QString &filename, size_t ch, size_t sce
     meanZ = mean(modelZ.channelData<double>(0), modelZ.channelData<double>(0) + modelZ.channelVoxelNumber());
   }
   for (auto it=m_sceneTiles[scene].cbegin(); it != m_sceneTiles[scene].cend(); ++it) {
-    if (it->ratio == size_t(1) && it->start.c == static_cast<int>(ch)) {
+    if (it->ratio == 1_usize && it->start.c == static_cast<int>(ch)) {
       ZImg origtile = readCZITile(inputFileStream, *it);
       ZImg tile = origtile.castTo<double>();
       origtile.clear();
@@ -519,7 +519,7 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
         int currentT = -1;
         for (auto it = m_sceneTiles[s].cbegin(); it != m_sceneTiles[s].cend(); ++it) {
           const CZITile &tile = *it;
-          if (currnetRatio < size_t(1) || tile.ratio != currnetRatio || tile.start.x != currentX || tile.start.y != currentY ||
+          if (currnetRatio < 1_usize || tile.ratio != currnetRatio || tile.start.x != currentX || tile.start.y != currentY ||
               tile.start.z != currentZ || tile.start.t != currentT) {
             if (tiles.size() > infos[s].numChannels) {
               throw ZIOException("invalid tiles: too many channels");
@@ -569,7 +569,7 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
         int currentT = -1;
         for (auto it = m_sceneTiles[s].cbegin(); it != m_sceneTiles[s].cend(); ++it) {
           const CZITile &tile = *it;
-          if (currnetRatio < size_t(1) || tile.ratio != currnetRatio || tile.start.x != currentX || tile.start.y != currentY ||
+          if (currnetRatio < 1_usize || tile.ratio != currnetRatio || tile.start.x != currentX || tile.start.y != currentY ||
               tile.start.z != currentZ || tile.start.t != currentT) {
             if (tiles.size() == infos[s].numChannels) {
               subBlocks->at(s).emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles));
@@ -617,7 +617,7 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
           currentT = -1;
           for (auto it = allMixedTiles.cbegin(); it != allMixedTiles.cend(); ++it) {
             const CZITile &tile = *it;
-            if (currnetRatio < size_t(1) || tile.ratio != currnetRatio || tile.start.z != currentZ || tile.start.t != currentT) {
+            if (currnetRatio < 1_usize || tile.ratio != currnetRatio || tile.start.z != currentZ || tile.start.t != currentT) {
               if (!tiles.empty()) {
                 subBlocks->at(s).emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles, true, infos[s].numChannels, infos[s].bytesPerVoxel,
                                                                                 infos[s].voxelFormat));
@@ -1274,7 +1274,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
             tileValid = false;
             break;
           }
-          if (tile.ratio > size_t(1) && tile.ratio != l) {
+          if (tile.ratio > 1_usize && tile.ratio != l) {
             throw ZIOException("level does not match");
           } else {
             tile.ratio = l;
@@ -1294,7 +1294,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
             tileValid = false;
             break;
           }
-          if (tile.ratio > size_t(1) && tile.ratio != l) {
+          if (tile.ratio > 1_usize && tile.ratio != l) {
             throw ZIOException("level does not match");
           } else {
             tile.ratio = l;
@@ -1426,7 +1426,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
 
     for (size_t i=0; i<it->second.size(); ++i) {
       const CZITile &tile = it->second.at(i);
-      if (tile.ratio != size_t(1))
+      if (tile.ratio != 1_usize)
         continue;
       start = min(start, tile.start);
       end = max(end, tile.start + tile.size);

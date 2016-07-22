@@ -46,7 +46,7 @@ std::shared_ptr<ZImg> *ZImgCache::getOrRead(size_t key, const ZImgSubBlock &imgB
   std::shared_ptr<ZImg> *res = ZImgCacheInstance.object(key);
   if (!res) {
     res = new std::shared_ptr<ZImg>(imgBlock.read());
-    QCache<size_t, std::shared_ptr<ZImg>>::insert(key, res, std::max(size_t(1), (*res)->byteNumber() / 1024 / 1024));
+    QCache<size_t, std::shared_ptr<ZImg>>::insert(key, res, std::max<size_t>(1, (*res)->byteNumber() / 1024 / 1024));
   }
   return res;
 }

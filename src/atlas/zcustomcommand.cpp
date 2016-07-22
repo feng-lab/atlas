@@ -16,6 +16,7 @@
 #include "zregionontology.h"
 #include "include/reader.h"
 #include "zjson.h"
+#include <boost/multiprecision/cpp_int.hpp>
 
 namespace nim {
 
@@ -778,6 +779,25 @@ void moveObjectToCorrectLocation()
   }
 }
 
+void tmp()
+{
+  //using namespace boost::multiprecision;
+
+  boost::multiprecision::int128_t res = static_cast<boost::multiprecision::int128_t>(INT64_MIN) * static_cast<boost::multiprecision::int128_t>(1);
+  int64_t r = res < static_cast<boost::multiprecision::int128_t>(INT64_MIN) ? INT64_MIN :
+                                                       res > static_cast<boost::multiprecision::int128_t>(INT64_MAX) ? INT64_MAX :
+                                                                                                static_cast<int64_t>(res);
+  LINFO() << r << (res < static_cast<boost::multiprecision::int128_t>(INT64_MIN)) << INT64_MIN << (res > static_cast<boost::multiprecision::int128_t>(INT64_MAX)) << static_cast<int64_t>(res);
+  std::cout << res << std::endl;
+
+  std::cout << r << " "
+            << (res < static_cast<boost::multiprecision::int128_t>(INT64_MIN)) << " "
+            << INT64_MIN << " "
+            << (res > static_cast<boost::multiprecision::int128_t>(INT64_MAX)) << " "
+            << static_cast<int64_t>(res) << " "
+            << res << std::endl;
+}
+
 
 }
 
@@ -789,7 +809,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  calcSwcVolume();
+  tmp();
   LINFO() << "done";
 }
 

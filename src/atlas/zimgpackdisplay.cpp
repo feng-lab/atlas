@@ -299,7 +299,7 @@ void ZImgPackDisplay::setQImageDataCM(const ZImg &img, QImage &qim) const
   }
 #endif
 #else
-  size_t numBlock = std::min(img.height(), size_t(32));
+  size_t numBlock = std::min<size_t>(img.height(), 32);
   size_t blockHeight = img.height() / numBlock;
   std::vector<QFuture<void>> res(numBlock);
   for (size_t i=0; i<numBlock; ++i) {
@@ -437,7 +437,7 @@ void ZImgPackDisplay::setQImageData(const ZImg &img, QImage &qim) const
                               std::placeholders::_1, &channels));
 #endif
 #else
-  size_t numBlock = std::min(img.height(), size_t(32));
+  size_t numBlock = std::min<size_t>(img.height(), 32);
   size_t blockHeight = img.height() / numBlock;
   std::vector<QFuture<void>> res(numBlock);
   for (size_t i=0; i<numBlock; ++i) {

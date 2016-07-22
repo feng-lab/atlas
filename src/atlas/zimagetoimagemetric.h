@@ -296,7 +296,7 @@ double ZImageToImageMetric::value(const TPixel1 *img1, const TPixel2 *img2, size
     func(tbb::blocked_range<size_t>(0, size));
     return func.m_metric;
 #else
-    return func(std::make_pair(size_t(0), size));
+    return func(std::pair<size_t,size_t>(0, size));
 #endif
   } else {
 #ifndef _USE_QTCONCURRENT_

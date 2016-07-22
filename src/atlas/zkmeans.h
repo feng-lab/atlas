@@ -558,7 +558,7 @@ public:
       m_termCriteria.setEpsilon(m_termCriteria.epsilon() * m_termCriteria.epsilon());  //compare square dist
     }
     if (m_termCriteria.willTestMaxIter()) {
-      m_termCriteria.setMaxIter(std::max(m_termCriteria.maxIter(), size_t(2)));
+      m_termCriteria.setMaxIter(std::max<size_t>(m_termCriteria.maxIter(), 2));
     }
 
     if (m_nclasses == 1) {
@@ -808,7 +808,7 @@ protected:
 
   void initializeCentroidsRandom(MatrixXrt &centroids) const
   {
-    std::vector<size_t> randNumbers = ZRandomInstance.randPermutation(static_cast<size_t>(m_pData->rows())-1, size_t(0));
+    std::vector<size_t> randNumbers = ZRandomInstance.randPermutation<size_t>(m_pData->rows()-1, 0);
 
     centroids.row(0) = m_pData->row(randNumbers[0]);
 

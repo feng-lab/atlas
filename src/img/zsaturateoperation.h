@@ -11,6 +11,9 @@
 #include <cmath>
 #include <limits>
 #include <immintrin.h>
+#if 0
+#include <boost/multiprecision/cpp_int.hpp>
+#endif
 
 namespace nim {
 
@@ -29,96 +32,96 @@ inline T roundTo(Float x)
 {
   if (std::isnan(x))
     return 0;
-  if (x <= std::numeric_limits<T>::min())
+  else if (x <= std::numeric_limits<T>::min())
     return std::numeric_limits<T>::min();
   else if (x >= std::numeric_limits<T>::max())
     return std::numeric_limits<T>::max();
   else
-    return x >= 0 ? static_cast<T>(x+0.5) : static_cast<T>(x-0.5);
+    return std::round(x);
 }
 
 /////////////// saturate_cast (modified from opencv, add (u)int32_t and (u)int64_t suppport) ///////////////////
 ///     for float type, do round cast
 ///
 
-template<typename _Tp> static inline _Tp saturate_cast(uint8_t v) { return _Tp(v); }
-template<typename _Tp> static inline _Tp saturate_cast(int8_t v) { return _Tp(v); }
-template<typename _Tp> static inline _Tp saturate_cast(uint16_t v) { return _Tp(v); }
-template<typename _Tp> static inline _Tp saturate_cast(int16_t v) { return _Tp(v); }
-template<typename _Tp> static inline _Tp saturate_cast(uint32_t v) { return _Tp(v); }
-template<typename _Tp> static inline _Tp saturate_cast(int32_t v) { return _Tp(v); }
-template<typename _Tp> static inline _Tp saturate_cast(uint64_t v) { return _Tp(v); }
-template<typename _Tp> static inline _Tp saturate_cast(int64_t v) { return _Tp(v); }
-template<typename _Tp> static inline _Tp saturate_cast(float v) { return _Tp(v); }
-template<typename _Tp> static inline _Tp saturate_cast(double v) { return _Tp(v); }
-template<typename _Tp> static inline _Tp saturate_cast(long double v) { return _Tp(v); }
+template<typename _Tp> static inline _Tp saturate_cast(uint8_t v) { return static_cast<_Tp>(v); }
+template<typename _Tp> static inline _Tp saturate_cast(int8_t v) { return static_cast<_Tp>(v); }
+template<typename _Tp> static inline _Tp saturate_cast(uint16_t v) { return static_cast<_Tp>(v); }
+template<typename _Tp> static inline _Tp saturate_cast(int16_t v) { return static_cast<_Tp>(v); }
+template<typename _Tp> static inline _Tp saturate_cast(uint32_t v) { return static_cast<_Tp>(v); }
+template<typename _Tp> static inline _Tp saturate_cast(int32_t v) { return static_cast<_Tp>(v); }
+template<typename _Tp> static inline _Tp saturate_cast(uint64_t v) { return static_cast<_Tp>(v); }
+template<typename _Tp> static inline _Tp saturate_cast(int64_t v) { return static_cast<_Tp>(v); }
+template<typename _Tp> static inline _Tp saturate_cast(float v) { return static_cast<_Tp>(v); }
+template<typename _Tp> static inline _Tp saturate_cast(double v) { return static_cast<_Tp>(v); }
+template<typename _Tp> static inline _Tp saturate_cast(long double v) { return static_cast<_Tp>(v); }
 
-template<> inline uint8_t saturate_cast<uint8_t>(int8_t v) { return uint8_t(std::max(int32_t(v), 0)); }
-template<> inline uint8_t saturate_cast<uint8_t>(uint16_t v) { return uint8_t(std::min(uint32_t(v), uint32_t(UINT8_MAX))); }
-template<> inline uint8_t saturate_cast<uint8_t>(int32_t v) { return uint8_t(uint32_t(v) <= UINT8_MAX ? v : v > 0 ? UINT8_MAX : 0); }
-template<> inline uint8_t saturate_cast<uint8_t>(int16_t v) { return saturate_cast<uint8_t>(int32_t(v)); }
-template<> inline uint8_t saturate_cast<uint8_t>(uint32_t v) { return uint8_t(std::min(v, uint32_t(UINT8_MAX))); }
-template<> inline uint8_t saturate_cast<uint8_t>(int64_t v) { return uint8_t(uint64_t(v) <= uint64_t(UINT8_MAX) ? v : v > 0 ? UINT8_MAX : 0); }
-template<> inline uint8_t saturate_cast<uint8_t>(uint64_t v) { return uint8_t(std::min(v, uint64_t(UINT8_MAX))); }
+template<> inline uint8_t saturate_cast<uint8_t>(int8_t v) { return static_cast<uint8_t>(std::max<int32_t>(v, 0)); }
+template<> inline uint8_t saturate_cast<uint8_t>(uint16_t v) { return static_cast<uint8_t>(std::min<int32_t>(v, UINT8_MAX)); }
+template<> inline uint8_t saturate_cast<uint8_t>(int32_t v) { return static_cast<uint8_t>(static_cast<uint32_t>(v) <= static_cast<uint32_t>(UINT8_MAX) ? v : v > 0 ? UINT8_MAX : 0); }
+template<> inline uint8_t saturate_cast<uint8_t>(int16_t v) { return saturate_cast<uint8_t>(static_cast<int32_t>(v)); }
+template<> inline uint8_t saturate_cast<uint8_t>(uint32_t v) { return static_cast<uint8_t>(std::min<uint32_t>(v, UINT8_MAX)); }
+template<> inline uint8_t saturate_cast<uint8_t>(int64_t v) { return static_cast<uint8_t>(static_cast<uint64_t>(v) <= static_cast<uint64_t>(UINT8_MAX) ? v : v > 0 ? UINT8_MAX : 0); }
+template<> inline uint8_t saturate_cast<uint8_t>(uint64_t v) { return static_cast<uint8_t>(std::min<uint64_t>(v, UINT8_MAX)); }
 template<> inline uint8_t saturate_cast<uint8_t>(float v) { return roundTo<uint8_t>(v); }
 template<> inline uint8_t saturate_cast<uint8_t>(double v) { return roundTo<uint8_t>(v);  }
 template<> inline uint8_t saturate_cast<uint8_t>(long double v) { return roundTo<uint8_t>(v);  }
 
-template<> inline int8_t saturate_cast<int8_t>(uint8_t v) { return int8_t(std::min(int32_t(v), int32_t(INT8_MAX))); }
-template<> inline int8_t saturate_cast<int8_t>(uint16_t v) { return int8_t(std::min(uint32_t(v), uint32_t(INT8_MAX))); }
-template<> inline int8_t saturate_cast<int8_t>(int32_t v) { return int8_t(uint32_t(v-INT8_MIN) <= uint32_t(UINT8_MAX) ? v : v > 0 ? INT8_MAX : INT8_MIN); }
-template<> inline int8_t saturate_cast<int8_t>(int16_t v) { return saturate_cast<int8_t>(int32_t(v)); }
-template<> inline int8_t saturate_cast<int8_t>(uint32_t v) { return int8_t(std::min(v, uint32_t(INT8_MAX))); }
-template<> inline int8_t saturate_cast<int8_t>(int64_t v) { return int8_t(uint64_t(v-INT8_MIN) <= uint64_t(UINT8_MAX) ? v : v > 0 ? INT8_MAX : INT8_MIN); }
-template<> inline int8_t saturate_cast<int8_t>(uint64_t v) { return int8_t(std::min(v, uint64_t(INT8_MAX))); }
+template<> inline int8_t saturate_cast<int8_t>(uint8_t v) { return static_cast<int8_t>(std::min<int32_t>(v, INT8_MAX)); }
+template<> inline int8_t saturate_cast<int8_t>(uint16_t v) { return static_cast<int8_t>(std::min<int32_t>(v, INT8_MAX)); }
+template<> inline int8_t saturate_cast<int8_t>(int32_t v) { return static_cast<int8_t>(static_cast<uint32_t>(v-INT8_MIN) <= static_cast<uint32_t>(UINT8_MAX) ? v : v > 0 ? INT8_MAX : INT8_MIN); }
+template<> inline int8_t saturate_cast<int8_t>(int16_t v) { return saturate_cast<int8_t>(static_cast<int32_t>(v)); }
+template<> inline int8_t saturate_cast<int8_t>(uint32_t v) { return static_cast<int8_t>(std::min<uint32_t>(v, INT8_MAX)); }
+template<> inline int8_t saturate_cast<int8_t>(int64_t v) { return static_cast<int8_t>(static_cast<uint64_t>(v-INT8_MIN) <= static_cast<uint64_t>(UINT8_MAX) ? v : v > 0 ? INT8_MAX : INT8_MIN); }
+template<> inline int8_t saturate_cast<int8_t>(uint64_t v) { return static_cast<int8_t>(std::min<uint64_t>(v, INT8_MAX)); }
 template<> inline int8_t saturate_cast<int8_t>(float v) { return roundTo<int8_t>(v);  }
 template<> inline int8_t saturate_cast<int8_t>(double v) { return roundTo<int8_t>(v);  }
 template<> inline int8_t saturate_cast<int8_t>(long double v) { return roundTo<int8_t>(v);  }
 
-template<> inline uint16_t saturate_cast<uint16_t>(int8_t v) { return uint16_t(std::max(int32_t(v), 0)); }
-template<> inline uint16_t saturate_cast<uint16_t>(int16_t v) { return uint16_t(std::max(int32_t(v), 0)); }
-template<> inline uint16_t saturate_cast<uint16_t>(int32_t v) { return uint16_t(uint32_t(v) <= uint32_t(UINT16_MAX) ? v : v > 0 ? UINT16_MAX : 0); }
-template<> inline uint16_t saturate_cast<uint16_t>(uint32_t v) { return uint16_t(std::min(v, uint32_t(UINT16_MAX))); }
-template<> inline uint16_t saturate_cast<uint16_t>(int64_t v) { return uint16_t(uint64_t(v) <= uint64_t(UINT16_MAX) ? v : v > 0 ? UINT16_MAX : 0); }
-template<> inline uint16_t saturate_cast<uint16_t>(uint64_t v) { return uint16_t(std::min(v, uint64_t(UINT16_MAX))); }
+template<> inline uint16_t saturate_cast<uint16_t>(int8_t v) { return static_cast<uint16_t>(std::max<int32_t>(v, 0)); }
+template<> inline uint16_t saturate_cast<uint16_t>(int16_t v) { return static_cast<uint16_t>(std::max<int32_t>(v, 0)); }
+template<> inline uint16_t saturate_cast<uint16_t>(int32_t v) { return static_cast<uint16_t>(static_cast<uint32_t>(v) <= static_cast<uint32_t>(UINT16_MAX) ? v : v > 0 ? UINT16_MAX : 0); }
+template<> inline uint16_t saturate_cast<uint16_t>(uint32_t v) { return static_cast<uint16_t>(std::min<uint32_t>(v, UINT16_MAX)); }
+template<> inline uint16_t saturate_cast<uint16_t>(int64_t v) { return static_cast<uint16_t>(static_cast<uint64_t>(v) <= static_cast<uint64_t>(UINT16_MAX) ? v : v > 0 ? UINT16_MAX : 0); }
+template<> inline uint16_t saturate_cast<uint16_t>(uint64_t v) { return static_cast<uint16_t>(std::min<uint64_t>(v, UINT16_MAX)); }
 template<> inline uint16_t saturate_cast<uint16_t>(float v) { return roundTo<uint16_t>(v);  }
 template<> inline uint16_t saturate_cast<uint16_t>(double v) { return roundTo<uint16_t>(v); }
 template<> inline uint16_t saturate_cast<uint16_t>(long double v) { return roundTo<uint16_t>(v); }
 
-template<> inline int16_t saturate_cast<int16_t>(uint16_t v) { return int16_t(std::min(int(v), int(INT16_MAX))); }
-template<> inline int16_t saturate_cast<int16_t>(int32_t v) { return int16_t(uint32_t(v-INT16_MIN) <= uint32_t(UINT16_MAX) ? v : v > 0 ? INT16_MAX : INT16_MIN); }
-template<> inline int16_t saturate_cast<int16_t>(uint32_t v) { return int16_t(std::min(v, uint32_t(INT16_MAX))); }
-template<> inline int16_t saturate_cast<int16_t>(int64_t v) { return int16_t(uint64_t(v-INT16_MIN) <= uint64_t(UINT16_MAX) ? v : v > 0 ? INT16_MAX : INT16_MIN); }
-template<> inline int16_t saturate_cast<int16_t>(uint64_t v) { return int16_t(std::min(v, uint64_t(INT16_MAX))); }
+template<> inline int16_t saturate_cast<int16_t>(uint16_t v) { return static_cast<int16_t>(std::min<int32_t>(v, INT16_MAX)); }
+template<> inline int16_t saturate_cast<int16_t>(int32_t v) { return static_cast<int16_t>(static_cast<uint32_t>(v-INT16_MIN) <= static_cast<uint32_t>(UINT16_MAX) ? v : v > 0 ? INT16_MAX : INT16_MIN); }
+template<> inline int16_t saturate_cast<int16_t>(uint32_t v) { return static_cast<int16_t>(std::min<uint32_t>(v, INT16_MAX)); }
+template<> inline int16_t saturate_cast<int16_t>(int64_t v) { return static_cast<int16_t>(static_cast<uint64_t>(v-INT16_MIN) <= static_cast<uint64_t>(UINT16_MAX) ? v : v > 0 ? INT16_MAX : INT16_MIN); }
+template<> inline int16_t saturate_cast<int16_t>(uint64_t v) { return static_cast<int16_t>(std::min<uint64_t>(v, INT16_MAX)); }
 template<> inline int16_t saturate_cast<int16_t>(float v) { return roundTo<int16_t>(v); }
 template<> inline int16_t saturate_cast<int16_t>(double v) { return roundTo<int16_t>(v); }
 template<> inline int16_t saturate_cast<int16_t>(long double v) { return roundTo<int16_t>(v); }
 
-template<> inline int32_t saturate_cast<int32_t>(uint32_t v) { return int32_t(std::min(v, uint32_t(INT32_MAX))); }
-template<> inline int32_t saturate_cast<int32_t>(int64_t v) { return int32_t(uint64_t(v - INT32_MIN) <= uint64_t(UINT32_MAX) ? v : v > 0 ? INT32_MAX : INT32_MIN); }
-template<> inline int32_t saturate_cast<int32_t>(uint64_t v) { return int32_t(std::min(v, uint64_t(INT32_MAX))); }
+template<> inline int32_t saturate_cast<int32_t>(uint32_t v) { return static_cast<int32_t>(std::min<uint32_t>(v, INT32_MAX)); }
+template<> inline int32_t saturate_cast<int32_t>(int64_t v) { return static_cast<int32_t>(static_cast<uint64_t>(v-INT32_MIN) <= static_cast<uint64_t>(UINT32_MAX) ? v : v > 0 ? INT32_MAX : INT32_MIN); }
+template<> inline int32_t saturate_cast<int32_t>(uint64_t v) { return static_cast<int32_t>(std::min<uint64_t>(v, INT32_MAX)); }
 template<> inline int32_t saturate_cast<int32_t>(float v) { return roundTo<int32_t>(v); }
 template<> inline int32_t saturate_cast<int32_t>(double v) { return roundTo<int32_t>(v); }
 template<> inline int32_t saturate_cast<int32_t>(long double v) { return roundTo<int32_t>(v); }
 
-template<> inline uint32_t saturate_cast<uint32_t>(int8_t v) { return uint32_t(std::max(int32_t(v), 0)); }
-template<> inline uint32_t saturate_cast<uint32_t>(int16_t v) { return uint32_t(std::max(int32_t(v), 0)); }
-template<> inline uint32_t saturate_cast<uint32_t>(int32_t v) { return uint32_t(std::max(v, 0)); }
-template<> inline uint32_t saturate_cast<uint32_t>(int64_t v) { return uint32_t(uint64_t(v) <= uint64_t(UINT32_MAX) ? v : v > 0 ? UINT32_MAX : 0); }
-template<> inline uint32_t saturate_cast<uint32_t>(uint64_t v) { return uint32_t(std::min(v, uint64_t(UINT32_MAX))); }
+template<> inline uint32_t saturate_cast<uint32_t>(int8_t v) { return static_cast<uint32_t>(std::max<int32_t>(v, 0)); }
+template<> inline uint32_t saturate_cast<uint32_t>(int16_t v) { return static_cast<uint32_t>(std::max<int32_t>(v, 0)); }
+template<> inline uint32_t saturate_cast<uint32_t>(int32_t v) { return static_cast<uint32_t>(std::max(v, 0)); }
+template<> inline uint32_t saturate_cast<uint32_t>(int64_t v) { return static_cast<uint32_t>(static_cast<uint64_t>(v) <= static_cast<uint64_t>(UINT32_MAX) ? v : v > 0 ? UINT32_MAX : 0); }
+template<> inline uint32_t saturate_cast<uint32_t>(uint64_t v) { return static_cast<uint32_t>(std::min<uint64_t>(v, UINT32_MAX)); }
 template<> inline uint32_t saturate_cast<uint32_t>(float v) { return roundTo<uint32_t>(v); }
 template<> inline uint32_t saturate_cast<uint32_t>(double v) { return roundTo<uint32_t>(v); }
 template<> inline uint32_t saturate_cast<uint32_t>(long double v) { return roundTo<uint32_t>(v); }
 
-template<> inline int64_t saturate_cast<int64_t>(uint64_t v) { return int64_t(std::min(v, uint64_t(INT64_MAX))); }
+template<> inline int64_t saturate_cast<int64_t>(uint64_t v) { return static_cast<int64_t>(std::min<uint64_t>(v, INT64_MAX)); }
 template<> inline int64_t saturate_cast<int64_t>(float v) { return roundTo<int64_t>(v); }
 template<> inline int64_t saturate_cast<int64_t>(double v) { return roundTo<int64_t>(v); }
 template<> inline int64_t saturate_cast<int64_t>(long double v) { return roundTo<int64_t>(v); }
 
-template<> inline uint64_t saturate_cast<uint64_t>(int8_t v) { return uint64_t(std::max(int32_t(v), 0)); }
-template<> inline uint64_t saturate_cast<uint64_t>(int16_t v) { return uint64_t(std::max(int32_t(v), 0)); }
-template<> inline uint64_t saturate_cast<uint64_t>(int32_t v) { return uint64_t(std::max(v, 0)); }
-template<> inline uint64_t saturate_cast<uint64_t>(int64_t v) { return uint64_t(std::max(v, int64_t(0))); }
+template<> inline uint64_t saturate_cast<uint64_t>(int8_t v) { return static_cast<uint64_t>(std::max<int32_t>(v, 0)); }
+template<> inline uint64_t saturate_cast<uint64_t>(int16_t v) { return static_cast<uint64_t>(std::max<int32_t>(v, 0)); }
+template<> inline uint64_t saturate_cast<uint64_t>(int32_t v) { return static_cast<uint64_t>(std::max(v, 0)); }
+template<> inline uint64_t saturate_cast<uint64_t>(int64_t v) { return static_cast<uint64_t>(std::max<int64_t>(v, 0)); }
 template<> inline uint64_t saturate_cast<uint64_t>(float v) { return roundTo<uint64_t>(v); }
 template<> inline uint64_t saturate_cast<uint64_t>(double v) { return roundTo<uint64_t>(v); }
 template<> inline uint64_t saturate_cast<uint64_t>(long double v) { return roundTo<uint64_t>(v); }
@@ -217,20 +220,20 @@ inline int64_t saturate_add(int64_t x, int64_t y)
 inline uint64_t saturate_add(uint64_t x, int64_t y)
 {
   if (y <= 0)
-    return x > uint64_t(-y) ? x - uint64_t(-y) : 0;
+    return x > static_cast<uint64_t>(-y) ? x - static_cast<uint64_t>(-y) : 0;
   else
-    return saturate_add(x, uint64_t(y));
+    return saturate_add(x, static_cast<uint64_t>(y));
 }
 
 inline int64_t saturate_add(int64_t x, uint64_t y)
 {
-  if (uint64_t(INT64_MAX - x) <= y) {
+  if (static_cast<uint64_t>(INT64_MAX - x) <= y) {
     return INT64_MAX;
   } else {
     if (y > INT64_MAX) { // x must less than zero
-      return y - uint64_t(-x);
+      return y - static_cast<uint64_t>(-x);
     } else {
-      return x + int64_t(y);
+      return x + static_cast<int64_t>(y);
     }
   }
 }
@@ -299,21 +302,21 @@ inline int64_t saturate_sub(int64_t x, int64_t y)
 inline uint64_t saturate_sub(uint64_t x, int64_t y)
 {
   if (y < 0) {
-    return saturate_add(x, uint64_t(-y));
+    return saturate_add(x, static_cast<uint64_t>(-y));
   } else {
-    return x > uint64_t(y) ? (x -  uint64_t(y)) : 0;
+    return x > static_cast<uint64_t>(y) ? (x -  static_cast<uint64_t>(y)) : 0;
   }
 }
 
 inline int64_t saturate_sub(int64_t x, uint64_t y)
 {
-  if (uint64_t(x - INT64_MIN) <= y) {
+  if (static_cast<uint64_t>(x - INT64_MIN) <= y) {
     return INT64_MIN;
   } else {
     if (y > INT64_MAX) { // x must large than zero
-      return uint64_t(x) - y;
+      return static_cast<uint64_t>(x) - y;
     } else {
-      return x - int64_t(y);
+      return x - static_cast<int64_t>(y);
     }
   }
 }
@@ -321,20 +324,20 @@ inline int64_t saturate_sub(int64_t x, uint64_t y)
 
 inline uint8_t saturate_mul(uint8_t x, uint8_t y)
 {
-  uint32_t res = uint32_t(x) * uint32_t(y);
-  return (-!!(res >> 8)) | uint8_t(res);
+  uint32_t res = static_cast<uint32_t>(x) * static_cast<uint32_t>(y);
+  return (-!!(res >> 8)) | static_cast<uint8_t>(res);
 }
 
 inline uint16_t saturate_mul(uint16_t x, uint16_t y)
 {
-  uint32_t res = uint32_t(x) * uint32_t(y);
-  return (-!!(res >> 16)) | uint16_t(res);
+  uint32_t res = static_cast<uint32_t>(x) * static_cast<uint32_t>(y);
+  return (-!!(res >> 16)) | static_cast<uint16_t>(res);
 }
 
 inline uint32_t saturate_mul(uint32_t x, uint32_t y)
 {
-  uint64_t res = uint64_t(x) * uint64_t(y);
-  return (-!!(res >> 32)) | uint32_t(res);
+  uint64_t res = static_cast<uint64_t>(x) * static_cast<uint64_t>(y);
+  return (-!!(res >> 32)) | static_cast<uint32_t>(res);
 }
 
 inline uint64_t saturate_mul(uint64_t x, uint64_t y)
@@ -349,58 +352,77 @@ inline uint64_t saturate_mul(uint64_t x, uint64_t y)
 
 inline int8_t saturate_mul(int8_t x, int8_t y)
 {
-  int16_t res = int16_t(x) * int16_t(y);
   // for this to work, compiler need to do arithmetic right shift
-  if (int8_t(res >> 8) != (int8_t(res) >> 7))
-    res = (uint8_t(x ^ y) >> 7) + INT8_MAX;
+  static_assert((static_cast<int16_t>(-1) >> 1) == static_cast<int16_t>(-1), "Arithmetic shift unsupported.");
+  static_assert((static_cast<int8_t>(-1) >> 1) == static_cast<int8_t>(-1), "Arithmetic shift unsupported.");
+
+  int16_t res = static_cast<int16_t>(x) * static_cast<int16_t>(y);
+  if (static_cast<int8_t>(res >> 8) != (static_cast<int8_t>(res) >> 7))
+    res = (static_cast<uint8_t>(x ^ y) >> 7) + INT8_MAX;
   return res;
 }
 
 inline int16_t saturate_mul(int16_t x, int16_t y)
 {
-  int32_t res = int32_t(x) * int32_t(y);
-  if (int16_t(res >> 16) != (int16_t(res) >> 15))
-    res = (uint16_t(x ^ y) >> 15) + INT16_MAX;
+  static_assert((static_cast<int16_t>(-1) >> 1) == static_cast<int16_t>(-1), "arithmetic shift unsupported.");
+  static_assert((static_cast<int32_t>(-1) >> 1) == static_cast<int32_t>(-1), "arithmetic shift unsupported.");
+
+  int32_t res = static_cast<int32_t>(x) * static_cast<int32_t>(y);
+  if (static_cast<int16_t>(res >> 16) != (static_cast<int16_t>(res) >> 15))
+    res = (static_cast<uint16_t>(x ^ y) >> 15) + INT16_MAX;
   return res;
 }
 
 inline int32_t saturate_mul(int32_t x, int32_t y)
 {
-  int64_t res = int64_t(x) * int64_t(y);
-  if (int32_t(res >> 32) != (int32_t(res) >> 31))
-    res = (uint32_t(x ^ y) >> 31) + INT32_MAX;
+  static_assert((static_cast<int64_t>(-1) >> 1) == static_cast<int64_t>(-1), "arithmetic shift unsupported.");
+  static_assert((static_cast<int32_t>(-1) >> 1) == static_cast<int32_t>(-1), "arithmetic shift unsupported.");
+
+  int64_t res = static_cast<int64_t>(x) * static_cast<int64_t>(y);
+  if (static_cast<int32_t>(res >> 32) != (static_cast<int32_t>(res) >> 31))
+    res = (static_cast<uint32_t>(x ^ y) >> 31) + INT32_MAX;
   return res;
 }
 
 inline int64_t saturate_mul(int64_t x, int64_t y)
 {
+#if 0
+  using namespace boost::multiprecision;
+
+  int128_t res = static_cast<int128_t>(x) * static_cast<int128_t>(y);
+  return res < static_cast<int128_t>(INT64_MIN) ? INT64_MIN :
+                                                  res > static_cast<int128_t>(INT64_MAX) ? INT64_MAX :
+                                                                                           static_cast<int64_t>(res);
+#else
+  static_assert(-std::numeric_limits<int64_t>::max() > std::numeric_limits<int64_t>::min(),
+                "integer representation is not two's complement");
   if (x == 0 || y == 0) {
     return 0;
   } else if (x > 0 && y < 0) {
-    return -int64_t(std::min(uint64_t(-INT64_MIN), saturate_mul(uint64_t(x), uint64_t(-y))));
+    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX)+1, saturate_mul(static_cast<uint64_t>(x), static_cast<uint64_t>(-y))));
   } else if (x < 0 && y > 0) {
-    return -int64_t(std::min(uint64_t(-INT64_MIN), saturate_mul(uint64_t(-x), uint64_t(y))));
+    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX)+1, saturate_mul(static_cast<uint64_t>(-x), static_cast<uint64_t>(y))));
   } else if (x > 0) {
-    return std::min(uint64_t(INT64_MAX), saturate_mul(uint64_t(x), uint64_t(y)));
+    return std::min<uint64_t>(INT64_MAX, saturate_mul(static_cast<uint64_t>(x), static_cast<uint64_t>(y)));
   } else {
-    return std::min(uint64_t(INT64_MAX), saturate_mul(uint64_t(-x), uint64_t(-y)));
+    return std::min<uint64_t>(INT64_MAX, saturate_mul(static_cast<uint64_t>(-x), static_cast<uint64_t>(-y)));
   }
+#endif
 }
 
 inline uint64_t saturate_mul(uint64_t x, int64_t y)
 {
-  return y <= 0 ? 0 : saturate_mul(x, uint64_t(y));
+  return y <= 0 ? 0 : saturate_mul(x, static_cast<uint64_t>(y));
 }
 
 inline int64_t saturate_mul(int64_t x, uint64_t y)
 {
   if (x >= 0) {
-    return std::min(saturate_mul(uint64_t(x), y), uint64_t(INT64_MAX));
+    return std::min<uint64_t>(INT64_MAX, saturate_mul(static_cast<uint64_t>(x), y));
   } else {
-    return -int64_t(std::min(saturate_mul(uint64_t(-x), y), uint64_t(-INT64_MIN)));
+    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX)+1, saturate_mul(static_cast<uint64_t>(-x), y)));
   }
 }
-
 
 inline uint8_t saturate_div(uint8_t x, uint8_t y)
 {
@@ -467,7 +489,7 @@ inline uint64_t saturate_div(uint64_t x, int64_t y)
 {
   if (y == 0)
     return x > 0 ? UINT64_MAX : 0;
-  return y < 0 ? 0 : x / uint64_t(y);
+  return y < 0 ? 0 : x / static_cast<uint64_t>(y);
 }
 
 inline int64_t saturate_div(int64_t x, uint64_t y)
@@ -475,88 +497,88 @@ inline int64_t saturate_div(int64_t x, uint64_t y)
   if (y == 0)
     return x > 0 ? INT64_MAX : x < 0 ? INT64_MIN : 0;
   if (x >= 0) {
-    return uint64_t(x) / y;
+    return static_cast<uint64_t>(x) / y;
   } else {
-    return -int64_t(uint64_t(-x) / y);
+    return -static_cast<int64_t>(static_cast<uint64_t>(-x) / y);
   }
 }
 
 
-inline uint64_t saturate_add(uint64_t x, int8_t y) { return saturate_add(x, int64_t(y)); }
-inline uint64_t saturate_add(uint64_t x, int16_t y) { return saturate_add(x, int64_t(y)); }
-inline uint64_t saturate_add(uint64_t x, int32_t y) { return saturate_add(x, int64_t(y)); }
-inline uint64_t saturate_add(uint64_t x, uint8_t y) { return saturate_add(x, uint64_t(y)); }
-inline uint64_t saturate_add(uint64_t x, uint16_t y) { return saturate_add(x, uint64_t(y)); }
-inline uint64_t saturate_add(uint64_t x, uint32_t y) { return saturate_add(x, uint64_t(y)); }
+inline uint64_t saturate_add(uint64_t x, int8_t y) { return saturate_add(x, static_cast<int64_t>(y)); }
+inline uint64_t saturate_add(uint64_t x, int16_t y) { return saturate_add(x, static_cast<int64_t>(y)); }
+inline uint64_t saturate_add(uint64_t x, int32_t y) { return saturate_add(x, static_cast<int64_t>(y)); }
+inline uint64_t saturate_add(uint64_t x, uint8_t y) { return saturate_add(x, static_cast<uint64_t>(y)); }
+inline uint64_t saturate_add(uint64_t x, uint16_t y) { return saturate_add(x, static_cast<uint64_t>(y)); }
+inline uint64_t saturate_add(uint64_t x, uint32_t y) { return saturate_add(x, static_cast<uint64_t>(y)); }
 inline uint64_t saturate_add(uint64_t x, float y) { return saturate_cast<uint64_t>(x+y); }
 inline uint64_t saturate_add(uint64_t x, double y) { return saturate_cast<uint64_t>(x+y); }
 
-inline int64_t saturate_add(int64_t x, int8_t y) { return saturate_add(x, int64_t(y)); }
-inline int64_t saturate_add(int64_t x, int16_t y) { return saturate_add(x, int64_t(y)); }
-inline int64_t saturate_add(int64_t x, int32_t y) { return saturate_add(x, int64_t(y)); }
-inline int64_t saturate_add(int64_t x, uint8_t y) { return saturate_add(x, uint64_t(y)); }
-inline int64_t saturate_add(int64_t x, uint16_t y) { return saturate_add(x, uint64_t(y)); }
-inline int64_t saturate_add(int64_t x, uint32_t y) { return saturate_add(x, uint64_t(y)); }
+inline int64_t saturate_add(int64_t x, int8_t y) { return saturate_add(x, static_cast<int64_t>(y)); }
+inline int64_t saturate_add(int64_t x, int16_t y) { return saturate_add(x, static_cast<int64_t>(y)); }
+inline int64_t saturate_add(int64_t x, int32_t y) { return saturate_add(x, static_cast<int64_t>(y)); }
+inline int64_t saturate_add(int64_t x, uint8_t y) { return saturate_add(x, static_cast<uint64_t>(y)); }
+inline int64_t saturate_add(int64_t x, uint16_t y) { return saturate_add(x, static_cast<uint64_t>(y)); }
+inline int64_t saturate_add(int64_t x, uint32_t y) { return saturate_add(x, static_cast<uint64_t>(y)); }
 inline int64_t saturate_add(int64_t x, float y) { return saturate_cast<int64_t>(x+y); }
 inline int64_t saturate_add(int64_t x, double y) { return saturate_cast<int64_t>(x+y); }
 
-inline uint32_t saturate_add(uint32_t x, int8_t y) { return saturate_cast<uint32_t>(saturate_add(int64_t(x), int64_t(y))); }
-inline uint32_t saturate_add(uint32_t x, int16_t y) { return saturate_cast<uint32_t>(saturate_add(int64_t(x), int64_t(y))); }
-inline uint32_t saturate_add(uint32_t x, int32_t y) { return saturate_cast<uint32_t>(saturate_add(int64_t(x), int64_t(y))); }
-inline uint32_t saturate_add(uint32_t x, int64_t y) { return saturate_cast<uint32_t>(saturate_add(int64_t(x), y)); }
-inline uint32_t saturate_add(uint32_t x, uint8_t y) { return saturate_add(x, uint32_t(y)); }
-inline uint32_t saturate_add(uint32_t x, uint16_t y) { return saturate_add(x, uint32_t(y)); }
-inline uint32_t saturate_add(uint32_t x, uint64_t y) { return saturate_cast<uint32_t>(saturate_add(uint64_t(x), y)); }
+inline uint32_t saturate_add(uint32_t x, int8_t y) { return saturate_cast<uint32_t>(saturate_add(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline uint32_t saturate_add(uint32_t x, int16_t y) { return saturate_cast<uint32_t>(saturate_add(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline uint32_t saturate_add(uint32_t x, int32_t y) { return saturate_cast<uint32_t>(saturate_add(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline uint32_t saturate_add(uint32_t x, int64_t y) { return saturate_cast<uint32_t>(saturate_add(static_cast<int64_t>(x), y)); }
+inline uint32_t saturate_add(uint32_t x, uint8_t y) { return saturate_add(x, static_cast<uint32_t>(y)); }
+inline uint32_t saturate_add(uint32_t x, uint16_t y) { return saturate_add(x, static_cast<uint32_t>(y)); }
+inline uint32_t saturate_add(uint32_t x, uint64_t y) { return saturate_cast<uint32_t>(saturate_add(static_cast<uint64_t>(x), y)); }
 inline uint32_t saturate_add(uint32_t x, float y) { return saturate_cast<uint32_t>(x+y); }
 inline uint32_t saturate_add(uint32_t x, double y) { return saturate_cast<uint32_t>(x+y); }
 
-inline int32_t saturate_add(int32_t x, int8_t y) { return saturate_add(x, int32_t(y)); }
-inline int32_t saturate_add(int32_t x, int16_t y) { return saturate_add(x, int32_t(y)); }
-inline int32_t saturate_add(int32_t x, int64_t y) { return saturate_cast<int32_t>(saturate_add(int64_t(x), y)); }
-inline int32_t saturate_add(int32_t x, uint8_t y) { return saturate_add(x, int32_t(y)); }
-inline int32_t saturate_add(int32_t x, uint16_t y) { return saturate_add(x, int32_t(y)); }
-inline int32_t saturate_add(int32_t x, uint32_t y) { return saturate_cast<int32_t>(saturate_add(int64_t(x), int64_t(y))); }
-inline int32_t saturate_add(int32_t x, uint64_t y) { return saturate_cast<int32_t>(saturate_add(int64_t(x), y)); }
+inline int32_t saturate_add(int32_t x, int8_t y) { return saturate_add(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_add(int32_t x, int16_t y) { return saturate_add(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_add(int32_t x, int64_t y) { return saturate_cast<int32_t>(saturate_add(static_cast<int64_t>(x), y)); }
+inline int32_t saturate_add(int32_t x, uint8_t y) { return saturate_add(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_add(int32_t x, uint16_t y) { return saturate_add(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_add(int32_t x, uint32_t y) { return saturate_cast<int32_t>(saturate_add(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline int32_t saturate_add(int32_t x, uint64_t y) { return saturate_cast<int32_t>(saturate_add(static_cast<int64_t>(x), y)); }
 inline int32_t saturate_add(int32_t x, float y) { return saturate_cast<int32_t>(x+y); }
 inline int32_t saturate_add(int32_t x, double y) { return saturate_cast<int32_t>(x+y); }
 
-inline uint16_t saturate_add(uint16_t x, int8_t y) { return saturate_cast<uint16_t>(saturate_add(int32_t(x), int32_t(y))); }
-inline uint16_t saturate_add(uint16_t x, int16_t y) { return saturate_cast<uint16_t>(saturate_add(int32_t(x), int32_t(y))); }
-inline uint16_t saturate_add(uint16_t x, int32_t y) { return saturate_cast<uint16_t>(saturate_add(int32_t(x), y)); }
-inline uint16_t saturate_add(uint16_t x, int64_t y) { return saturate_cast<uint16_t>(saturate_add(int64_t(x), y)); }
-inline uint16_t saturate_add(uint16_t x, uint8_t y) { return saturate_cast<uint16_t>(saturate_add(uint32_t(x), uint32_t(y))); }
-inline uint16_t saturate_add(uint16_t x, uint32_t y) { return saturate_cast<uint16_t>(saturate_add(uint32_t(x), y)); }
-inline uint16_t saturate_add(uint16_t x, uint64_t y) { return saturate_cast<uint16_t>(saturate_add(uint64_t(x), y)); }
+inline uint16_t saturate_add(uint16_t x, int8_t y) { return saturate_cast<uint16_t>(saturate_add(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint16_t saturate_add(uint16_t x, int16_t y) { return saturate_cast<uint16_t>(saturate_add(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint16_t saturate_add(uint16_t x, int32_t y) { return saturate_cast<uint16_t>(saturate_add(static_cast<int32_t>(x), y)); }
+inline uint16_t saturate_add(uint16_t x, int64_t y) { return saturate_cast<uint16_t>(saturate_add(static_cast<int64_t>(x), y)); }
+inline uint16_t saturate_add(uint16_t x, uint8_t y) { return saturate_cast<uint16_t>(saturate_add(static_cast<uint32_t>(x), static_cast<uint32_t>(y))); }
+inline uint16_t saturate_add(uint16_t x, uint32_t y) { return saturate_cast<uint16_t>(saturate_add(static_cast<uint32_t>(x), y)); }
+inline uint16_t saturate_add(uint16_t x, uint64_t y) { return saturate_cast<uint16_t>(saturate_add(static_cast<uint64_t>(x), y)); }
 inline uint16_t saturate_add(uint16_t x, float y) { return saturate_cast<uint16_t>(x+y); }
 inline uint16_t saturate_add(uint16_t x, double y) { return saturate_cast<uint16_t>(x+y); }
 
-inline int16_t saturate_add(int16_t x, int8_t y) { return saturate_cast<int16_t>(saturate_add(int32_t(x), int32_t(y))); }
-inline int16_t saturate_add(int16_t x, int32_t y) { return saturate_cast<int16_t>(saturate_add(int32_t(x), y)); }
-inline int16_t saturate_add(int16_t x, int64_t y) { return saturate_cast<int16_t>(saturate_add(int64_t(x), y)); }
-inline int16_t saturate_add(int16_t x, uint8_t y) { return saturate_cast<int16_t>(saturate_add(int32_t(x), int32_t(y))); }
-inline int16_t saturate_add(int16_t x, uint16_t y) { return saturate_cast<int16_t>(saturate_add(int32_t(x), int32_t(y))); }
-inline int16_t saturate_add(int16_t x, uint32_t y) { return saturate_cast<int16_t>(saturate_add(int64_t(x), int64_t(y))); }
-inline int16_t saturate_add(int16_t x, uint64_t y) { return saturate_cast<int16_t>(saturate_add(int64_t(x), y)); }
+inline int16_t saturate_add(int16_t x, int8_t y) { return saturate_cast<int16_t>(saturate_add(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int16_t saturate_add(int16_t x, int32_t y) { return saturate_cast<int16_t>(saturate_add(static_cast<int32_t>(x), y)); }
+inline int16_t saturate_add(int16_t x, int64_t y) { return saturate_cast<int16_t>(saturate_add(static_cast<int64_t>(x), y)); }
+inline int16_t saturate_add(int16_t x, uint8_t y) { return saturate_cast<int16_t>(saturate_add(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int16_t saturate_add(int16_t x, uint16_t y) { return saturate_cast<int16_t>(saturate_add(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int16_t saturate_add(int16_t x, uint32_t y) { return saturate_cast<int16_t>(saturate_add(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline int16_t saturate_add(int16_t x, uint64_t y) { return saturate_cast<int16_t>(saturate_add(static_cast<int64_t>(x), y)); }
 inline int16_t saturate_add(int16_t x, float y) { return saturate_cast<int16_t>(x+y); }
 inline int16_t saturate_add(int16_t x, double y) { return saturate_cast<int16_t>(x+y); }
 
-inline uint8_t saturate_add(uint8_t x, int8_t y) { return saturate_cast<uint8_t>(saturate_add(int32_t(x), int32_t(y))); }
-inline uint8_t saturate_add(uint8_t x, int16_t y) { return saturate_cast<uint8_t>(saturate_add(int32_t(x), int32_t(y))); }
-inline uint8_t saturate_add(uint8_t x, int32_t y) { return saturate_cast<uint8_t>(saturate_add(int32_t(x), y)); }
-inline uint8_t saturate_add(uint8_t x, int64_t y) { return saturate_cast<uint8_t>(saturate_add(int64_t(x), y)); }
-inline uint8_t saturate_add(uint8_t x, uint16_t y) { return saturate_cast<uint8_t>(saturate_add(uint32_t(x), uint32_t(y))); }
-inline uint8_t saturate_add(uint8_t x, uint32_t y) { return saturate_cast<uint8_t>(saturate_add(uint32_t(x), y)); }
-inline uint8_t saturate_add(uint8_t x, uint64_t y) { return saturate_cast<uint8_t>(saturate_add(uint64_t(x), y)); }
+inline uint8_t saturate_add(uint8_t x, int8_t y) { return saturate_cast<uint8_t>(saturate_add(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint8_t saturate_add(uint8_t x, int16_t y) { return saturate_cast<uint8_t>(saturate_add(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint8_t saturate_add(uint8_t x, int32_t y) { return saturate_cast<uint8_t>(saturate_add(static_cast<int32_t>(x), y)); }
+inline uint8_t saturate_add(uint8_t x, int64_t y) { return saturate_cast<uint8_t>(saturate_add(static_cast<int64_t>(x), y)); }
+inline uint8_t saturate_add(uint8_t x, uint16_t y) { return saturate_cast<uint8_t>(saturate_add(static_cast<uint32_t>(x), static_cast<uint32_t>(y))); }
+inline uint8_t saturate_add(uint8_t x, uint32_t y) { return saturate_cast<uint8_t>(saturate_add(static_cast<uint32_t>(x), y)); }
+inline uint8_t saturate_add(uint8_t x, uint64_t y) { return saturate_cast<uint8_t>(saturate_add(static_cast<uint64_t>(x), y)); }
 inline uint8_t saturate_add(uint8_t x, float y) { return saturate_cast<uint8_t>(x+y); }
 inline uint8_t saturate_add(uint8_t x, double y) { return saturate_cast<uint8_t>(x+y); }
 
-inline int8_t saturate_add(int8_t x, int16_t y) { return saturate_cast<int8_t>(saturate_add(int32_t(x), int32_t(y))); }
-inline int8_t saturate_add(int8_t x, int32_t y) { return saturate_cast<int8_t>(saturate_add(int32_t(x), y)); }
-inline int8_t saturate_add(int8_t x, int64_t y) { return saturate_cast<int8_t>(saturate_add(int64_t(x), y)); }
-inline int8_t saturate_add(int8_t x, uint8_t y) { return saturate_cast<int8_t>(saturate_add(int32_t(x), int32_t(y))); }
-inline int8_t saturate_add(int8_t x, uint16_t y) { return saturate_cast<int8_t>(saturate_add(int32_t(x), int32_t(y))); }
-inline int8_t saturate_add(int8_t x, uint32_t y) { return saturate_cast<int8_t>(saturate_add(int64_t(x), int64_t(y))); }
-inline int8_t saturate_add(int8_t x, uint64_t y) { return saturate_cast<int8_t>(saturate_add(int64_t(x), y)); }
+inline int8_t saturate_add(int8_t x, int16_t y) { return saturate_cast<int8_t>(saturate_add(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int8_t saturate_add(int8_t x, int32_t y) { return saturate_cast<int8_t>(saturate_add(static_cast<int32_t>(x), y)); }
+inline int8_t saturate_add(int8_t x, int64_t y) { return saturate_cast<int8_t>(saturate_add(static_cast<int64_t>(x), y)); }
+inline int8_t saturate_add(int8_t x, uint8_t y) { return saturate_cast<int8_t>(saturate_add(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int8_t saturate_add(int8_t x, uint16_t y) { return saturate_cast<int8_t>(saturate_add(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int8_t saturate_add(int8_t x, uint32_t y) { return saturate_cast<int8_t>(saturate_add(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline int8_t saturate_add(int8_t x, uint64_t y) { return saturate_cast<int8_t>(saturate_add(static_cast<int64_t>(x), y)); }
 inline int8_t saturate_add(int8_t x, float y) { return saturate_cast<int8_t>(x+y); }
 inline int8_t saturate_add(int8_t x, double y) { return saturate_cast<int8_t>(x+y); }
 
@@ -583,81 +605,81 @@ inline double saturate_add(double x, float y) { return x+y; }
 inline double saturate_add(double x, double y) { return x+y; }
 
 // sub
-inline uint64_t saturate_sub(uint64_t x, int8_t y) { return saturate_sub(x, int64_t(y)); }
-inline uint64_t saturate_sub(uint64_t x, int16_t y) { return saturate_sub(x, int64_t(y)); }
-inline uint64_t saturate_sub(uint64_t x, int32_t y) { return saturate_sub(x, int64_t(y)); }
-inline uint64_t saturate_sub(uint64_t x, uint8_t y) { return saturate_sub(x, uint64_t(y)); }
-inline uint64_t saturate_sub(uint64_t x, uint16_t y) { return saturate_sub(x, uint64_t(y)); }
-inline uint64_t saturate_sub(uint64_t x, uint32_t y) { return saturate_sub(x, uint64_t(y)); }
+inline uint64_t saturate_sub(uint64_t x, int8_t y) { return saturate_sub(x, static_cast<int64_t>(y)); }
+inline uint64_t saturate_sub(uint64_t x, int16_t y) { return saturate_sub(x, static_cast<int64_t>(y)); }
+inline uint64_t saturate_sub(uint64_t x, int32_t y) { return saturate_sub(x, static_cast<int64_t>(y)); }
+inline uint64_t saturate_sub(uint64_t x, uint8_t y) { return saturate_sub(x, static_cast<uint64_t>(y)); }
+inline uint64_t saturate_sub(uint64_t x, uint16_t y) { return saturate_sub(x, static_cast<uint64_t>(y)); }
+inline uint64_t saturate_sub(uint64_t x, uint32_t y) { return saturate_sub(x, static_cast<uint64_t>(y)); }
 inline uint64_t saturate_sub(uint64_t x, float y) { return saturate_cast<uint64_t>(x-y); }
 inline uint64_t saturate_sub(uint64_t x, double y) { return saturate_cast<uint64_t>(x-y); }
 
-inline int64_t saturate_sub(int64_t x, int8_t y) { return saturate_sub(x, int64_t(y)); }
-inline int64_t saturate_sub(int64_t x, int16_t y) { return saturate_sub(x, int64_t(y)); }
-inline int64_t saturate_sub(int64_t x, int32_t y) { return saturate_sub(x, int64_t(y)); }
-inline int64_t saturate_sub(int64_t x, uint8_t y) { return saturate_sub(x, uint64_t(y)); }
-inline int64_t saturate_sub(int64_t x, uint16_t y) { return saturate_sub(x, uint64_t(y)); }
-inline int64_t saturate_sub(int64_t x, uint32_t y) { return saturate_sub(x, uint64_t(y)); }
+inline int64_t saturate_sub(int64_t x, int8_t y) { return saturate_sub(x, static_cast<int64_t>(y)); }
+inline int64_t saturate_sub(int64_t x, int16_t y) { return saturate_sub(x, static_cast<int64_t>(y)); }
+inline int64_t saturate_sub(int64_t x, int32_t y) { return saturate_sub(x, static_cast<int64_t>(y)); }
+inline int64_t saturate_sub(int64_t x, uint8_t y) { return saturate_sub(x, static_cast<uint64_t>(y)); }
+inline int64_t saturate_sub(int64_t x, uint16_t y) { return saturate_sub(x, static_cast<uint64_t>(y)); }
+inline int64_t saturate_sub(int64_t x, uint32_t y) { return saturate_sub(x, static_cast<uint64_t>(y)); }
 inline int64_t saturate_sub(int64_t x, float y) { return saturate_cast<int64_t>(x-y); }
 inline int64_t saturate_sub(int64_t x, double y) { return saturate_cast<int64_t>(x-y); }
 
-inline uint32_t saturate_sub(uint32_t x, int8_t y) { return saturate_cast<uint32_t>(saturate_sub(int64_t(x), int64_t(y))); }
-inline uint32_t saturate_sub(uint32_t x, int16_t y) { return saturate_cast<uint32_t>(saturate_sub(int64_t(x), int64_t(y))); }
-inline uint32_t saturate_sub(uint32_t x, int32_t y) { return saturate_cast<uint32_t>(saturate_sub(int64_t(x), int64_t(y))); }
-inline uint32_t saturate_sub(uint32_t x, int64_t y) { return saturate_cast<uint32_t>(saturate_sub(int64_t(x), y)); }
-inline uint32_t saturate_sub(uint32_t x, uint8_t y) { return saturate_sub(x, uint32_t(y)); }
-inline uint32_t saturate_sub(uint32_t x, uint16_t y) { return saturate_sub(x, uint32_t(y)); }
-inline uint32_t saturate_sub(uint32_t x, uint64_t y) { return saturate_cast<uint32_t>(saturate_sub(uint64_t(x), y)); }
+inline uint32_t saturate_sub(uint32_t x, int8_t y) { return saturate_cast<uint32_t>(saturate_sub(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline uint32_t saturate_sub(uint32_t x, int16_t y) { return saturate_cast<uint32_t>(saturate_sub(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline uint32_t saturate_sub(uint32_t x, int32_t y) { return saturate_cast<uint32_t>(saturate_sub(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline uint32_t saturate_sub(uint32_t x, int64_t y) { return saturate_cast<uint32_t>(saturate_sub(static_cast<int64_t>(x), y)); }
+inline uint32_t saturate_sub(uint32_t x, uint8_t y) { return saturate_sub(x, static_cast<uint32_t>(y)); }
+inline uint32_t saturate_sub(uint32_t x, uint16_t y) { return saturate_sub(x, static_cast<uint32_t>(y)); }
+inline uint32_t saturate_sub(uint32_t x, uint64_t y) { return saturate_cast<uint32_t>(saturate_sub(static_cast<uint64_t>(x), y)); }
 inline uint32_t saturate_sub(uint32_t x, float y) { return saturate_cast<uint32_t>(x-y); }
 inline uint32_t saturate_sub(uint32_t x, double y) { return saturate_cast<uint32_t>(x-y); }
 
-inline int32_t saturate_sub(int32_t x, int8_t y) { return saturate_sub(x, int32_t(y)); }
-inline int32_t saturate_sub(int32_t x, int16_t y) { return saturate_sub(x, int32_t(y)); }
-inline int32_t saturate_sub(int32_t x, int64_t y) { return saturate_cast<int32_t>(saturate_sub(int64_t(x), y)); }
-inline int32_t saturate_sub(int32_t x, uint8_t y) { return saturate_sub(x, int32_t(y)); }
-inline int32_t saturate_sub(int32_t x, uint16_t y) { return saturate_sub(x, int32_t(y)); }
-inline int32_t saturate_sub(int32_t x, uint32_t y) { return saturate_cast<int32_t>(saturate_sub(int64_t(x), int64_t(y))); }
-inline int32_t saturate_sub(int32_t x, uint64_t y) { return saturate_cast<int32_t>(saturate_sub(int64_t(x), y)); }
+inline int32_t saturate_sub(int32_t x, int8_t y) { return saturate_sub(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_sub(int32_t x, int16_t y) { return saturate_sub(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_sub(int32_t x, int64_t y) { return saturate_cast<int32_t>(saturate_sub(static_cast<int64_t>(x), y)); }
+inline int32_t saturate_sub(int32_t x, uint8_t y) { return saturate_sub(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_sub(int32_t x, uint16_t y) { return saturate_sub(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_sub(int32_t x, uint32_t y) { return saturate_cast<int32_t>(saturate_sub(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline int32_t saturate_sub(int32_t x, uint64_t y) { return saturate_cast<int32_t>(saturate_sub(static_cast<int64_t>(x), y)); }
 inline int32_t saturate_sub(int32_t x, float y) { return saturate_cast<int32_t>(x-y); }
 inline int32_t saturate_sub(int32_t x, double y) { return saturate_cast<int32_t>(x-y); }
 
-inline uint16_t saturate_sub(uint16_t x, int8_t y) { return saturate_cast<uint16_t>(saturate_sub(int32_t(x), int32_t(y))); }
-inline uint16_t saturate_sub(uint16_t x, int16_t y) { return saturate_cast<uint16_t>(saturate_sub(int32_t(x), int32_t(y))); }
-inline uint16_t saturate_sub(uint16_t x, int32_t y) { return saturate_cast<uint16_t>(saturate_sub(int32_t(x), y)); }
-inline uint16_t saturate_sub(uint16_t x, int64_t y) { return saturate_cast<uint16_t>(saturate_sub(int64_t(x), y)); }
-inline uint16_t saturate_sub(uint16_t x, uint8_t y) { return saturate_cast<uint16_t>(saturate_sub(uint32_t(x), uint32_t(y))); }
-inline uint16_t saturate_sub(uint16_t x, uint32_t y) { return saturate_cast<uint16_t>(saturate_sub(uint32_t(x), y)); }
-inline uint16_t saturate_sub(uint16_t x, uint64_t y) { return saturate_cast<uint16_t>(saturate_sub(uint64_t(x), y)); }
+inline uint16_t saturate_sub(uint16_t x, int8_t y) { return saturate_cast<uint16_t>(saturate_sub(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint16_t saturate_sub(uint16_t x, int16_t y) { return saturate_cast<uint16_t>(saturate_sub(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint16_t saturate_sub(uint16_t x, int32_t y) { return saturate_cast<uint16_t>(saturate_sub(static_cast<int32_t>(x), y)); }
+inline uint16_t saturate_sub(uint16_t x, int64_t y) { return saturate_cast<uint16_t>(saturate_sub(static_cast<int64_t>(x), y)); }
+inline uint16_t saturate_sub(uint16_t x, uint8_t y) { return saturate_cast<uint16_t>(saturate_sub(static_cast<uint32_t>(x), static_cast<uint32_t>(y))); }
+inline uint16_t saturate_sub(uint16_t x, uint32_t y) { return saturate_cast<uint16_t>(saturate_sub(static_cast<uint32_t>(x), y)); }
+inline uint16_t saturate_sub(uint16_t x, uint64_t y) { return saturate_cast<uint16_t>(saturate_sub(static_cast<uint64_t>(x), y)); }
 inline uint16_t saturate_sub(uint16_t x, float y) { return saturate_cast<uint16_t>(x-y); }
 inline uint16_t saturate_sub(uint16_t x, double y) { return saturate_cast<uint16_t>(x-y); }
 
-inline int16_t saturate_sub(int16_t x, int8_t y) { return saturate_cast<int16_t>(saturate_sub(int32_t(x), int32_t(y))); }
-inline int16_t saturate_sub(int16_t x, int32_t y) { return saturate_cast<int16_t>(saturate_sub(int32_t(x), y)); }
-inline int16_t saturate_sub(int16_t x, int64_t y) { return saturate_cast<int16_t>(saturate_sub(int64_t(x), y)); }
-inline int16_t saturate_sub(int16_t x, uint8_t y) { return saturate_cast<int16_t>(saturate_sub(int32_t(x), int32_t(y))); }
-inline int16_t saturate_sub(int16_t x, uint16_t y) { return saturate_cast<int16_t>(saturate_sub(int32_t(x), int32_t(y))); }
-inline int16_t saturate_sub(int16_t x, uint32_t y) { return saturate_cast<int16_t>(saturate_sub(int64_t(x), int64_t(y))); }
-inline int16_t saturate_sub(int16_t x, uint64_t y) { return saturate_cast<int16_t>(saturate_sub(int64_t(x), y)); }
+inline int16_t saturate_sub(int16_t x, int8_t y) { return saturate_cast<int16_t>(saturate_sub(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int16_t saturate_sub(int16_t x, int32_t y) { return saturate_cast<int16_t>(saturate_sub(static_cast<int32_t>(x), y)); }
+inline int16_t saturate_sub(int16_t x, int64_t y) { return saturate_cast<int16_t>(saturate_sub(static_cast<int64_t>(x), y)); }
+inline int16_t saturate_sub(int16_t x, uint8_t y) { return saturate_cast<int16_t>(saturate_sub(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int16_t saturate_sub(int16_t x, uint16_t y) { return saturate_cast<int16_t>(saturate_sub(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int16_t saturate_sub(int16_t x, uint32_t y) { return saturate_cast<int16_t>(saturate_sub(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline int16_t saturate_sub(int16_t x, uint64_t y) { return saturate_cast<int16_t>(saturate_sub(static_cast<int64_t>(x), y)); }
 inline int16_t saturate_sub(int16_t x, float y) { return saturate_cast<int16_t>(x-y); }
 inline int16_t saturate_sub(int16_t x, double y) { return saturate_cast<int16_t>(x-y); }
 
-inline uint8_t saturate_sub(uint8_t x, int8_t y) { return saturate_cast<uint8_t>(saturate_sub(int32_t(x), int32_t(y))); }
-inline uint8_t saturate_sub(uint8_t x, int16_t y) { return saturate_cast<uint8_t>(saturate_sub(int32_t(x), int32_t(y))); }
-inline uint8_t saturate_sub(uint8_t x, int32_t y) { return saturate_cast<uint8_t>(saturate_sub(int32_t(x), y)); }
-inline uint8_t saturate_sub(uint8_t x, int64_t y) { return saturate_cast<uint8_t>(saturate_sub(int64_t(x), y)); }
-inline uint8_t saturate_sub(uint8_t x, uint16_t y) { return saturate_cast<uint8_t>(saturate_sub(uint32_t(x), uint32_t(y))); }
-inline uint8_t saturate_sub(uint8_t x, uint32_t y) { return saturate_cast<uint8_t>(saturate_sub(uint32_t(x), y)); }
-inline uint8_t saturate_sub(uint8_t x, uint64_t y) { return saturate_cast<uint8_t>(saturate_sub(uint64_t(x), y)); }
+inline uint8_t saturate_sub(uint8_t x, int8_t y) { return saturate_cast<uint8_t>(saturate_sub(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint8_t saturate_sub(uint8_t x, int16_t y) { return saturate_cast<uint8_t>(saturate_sub(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint8_t saturate_sub(uint8_t x, int32_t y) { return saturate_cast<uint8_t>(saturate_sub(static_cast<int32_t>(x), y)); }
+inline uint8_t saturate_sub(uint8_t x, int64_t y) { return saturate_cast<uint8_t>(saturate_sub(static_cast<int64_t>(x), y)); }
+inline uint8_t saturate_sub(uint8_t x, uint16_t y) { return saturate_cast<uint8_t>(saturate_sub(static_cast<uint32_t>(x), static_cast<uint32_t>(y))); }
+inline uint8_t saturate_sub(uint8_t x, uint32_t y) { return saturate_cast<uint8_t>(saturate_sub(static_cast<uint32_t>(x), y)); }
+inline uint8_t saturate_sub(uint8_t x, uint64_t y) { return saturate_cast<uint8_t>(saturate_sub(static_cast<uint64_t>(x), y)); }
 inline uint8_t saturate_sub(uint8_t x, float y) { return saturate_cast<uint8_t>(x-y); }
 inline uint8_t saturate_sub(uint8_t x, double y) { return saturate_cast<uint8_t>(x-y); }
 
-inline int8_t saturate_sub(int8_t x, int16_t y) { return saturate_cast<int8_t>(saturate_sub(int32_t(x), int32_t(y))); }
-inline int8_t saturate_sub(int8_t x, int32_t y) { return saturate_cast<int8_t>(saturate_sub(int32_t(x), y)); }
-inline int8_t saturate_sub(int8_t x, int64_t y) { return saturate_cast<int8_t>(saturate_sub(int64_t(x), y)); }
-inline int8_t saturate_sub(int8_t x, uint8_t y) { return saturate_cast<int8_t>(saturate_sub(int32_t(x), int32_t(y))); }
-inline int8_t saturate_sub(int8_t x, uint16_t y) { return saturate_cast<int8_t>(saturate_sub(int32_t(x), int32_t(y))); }
-inline int8_t saturate_sub(int8_t x, uint32_t y) { return saturate_cast<int8_t>(saturate_sub(int64_t(x), int64_t(y))); }
-inline int8_t saturate_sub(int8_t x, uint64_t y) { return saturate_cast<int8_t>(saturate_sub(int64_t(x), y)); }
+inline int8_t saturate_sub(int8_t x, int16_t y) { return saturate_cast<int8_t>(saturate_sub(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int8_t saturate_sub(int8_t x, int32_t y) { return saturate_cast<int8_t>(saturate_sub(static_cast<int32_t>(x), y)); }
+inline int8_t saturate_sub(int8_t x, int64_t y) { return saturate_cast<int8_t>(saturate_sub(static_cast<int64_t>(x), y)); }
+inline int8_t saturate_sub(int8_t x, uint8_t y) { return saturate_cast<int8_t>(saturate_sub(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int8_t saturate_sub(int8_t x, uint16_t y) { return saturate_cast<int8_t>(saturate_sub(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int8_t saturate_sub(int8_t x, uint32_t y) { return saturate_cast<int8_t>(saturate_sub(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline int8_t saturate_sub(int8_t x, uint64_t y) { return saturate_cast<int8_t>(saturate_sub(static_cast<int64_t>(x), y)); }
 inline int8_t saturate_sub(int8_t x, float y) { return saturate_cast<int8_t>(x-y); }
 inline int8_t saturate_sub(int8_t x, double y) { return saturate_cast<int8_t>(x-y); }
 
@@ -684,81 +706,81 @@ inline double saturate_sub(double x, float y) { return x-y; }
 inline double saturate_sub(double x, double y) { return x-y; }
 
 // mul
-inline uint64_t saturate_mul(uint64_t x, int8_t y) { return saturate_mul(x, int64_t(y)); }
-inline uint64_t saturate_mul(uint64_t x, int16_t y) { return saturate_mul(x, int64_t(y)); }
-inline uint64_t saturate_mul(uint64_t x, int32_t y) { return saturate_mul(x, int64_t(y)); }
-inline uint64_t saturate_mul(uint64_t x, uint8_t y) { return saturate_mul(x, uint64_t(y)); }
-inline uint64_t saturate_mul(uint64_t x, uint16_t y) { return saturate_mul(x, uint64_t(y)); }
-inline uint64_t saturate_mul(uint64_t x, uint32_t y) { return saturate_mul(x, uint64_t(y)); }
+inline uint64_t saturate_mul(uint64_t x, int8_t y) { return saturate_mul(x, static_cast<int64_t>(y)); }
+inline uint64_t saturate_mul(uint64_t x, int16_t y) { return saturate_mul(x, static_cast<int64_t>(y)); }
+inline uint64_t saturate_mul(uint64_t x, int32_t y) { return saturate_mul(x, static_cast<int64_t>(y)); }
+inline uint64_t saturate_mul(uint64_t x, uint8_t y) { return saturate_mul(x, static_cast<uint64_t>(y)); }
+inline uint64_t saturate_mul(uint64_t x, uint16_t y) { return saturate_mul(x, static_cast<uint64_t>(y)); }
+inline uint64_t saturate_mul(uint64_t x, uint32_t y) { return saturate_mul(x, static_cast<uint64_t>(y)); }
 inline uint64_t saturate_mul(uint64_t x, float y) { return saturate_cast<uint64_t>(x*y); }
 inline uint64_t saturate_mul(uint64_t x, double y) { return saturate_cast<uint64_t>(x*y); }
 
-inline int64_t saturate_mul(int64_t x, int8_t y) { return saturate_mul(x, int64_t(y)); }
-inline int64_t saturate_mul(int64_t x, int16_t y) { return saturate_mul(x, int64_t(y)); }
-inline int64_t saturate_mul(int64_t x, int32_t y) { return saturate_mul(x, int64_t(y)); }
-inline int64_t saturate_mul(int64_t x, uint8_t y) { return saturate_mul(x, uint64_t(y)); }
-inline int64_t saturate_mul(int64_t x, uint16_t y) { return saturate_mul(x, uint64_t(y)); }
-inline int64_t saturate_mul(int64_t x, uint32_t y) { return saturate_mul(x, uint64_t(y)); }
+inline int64_t saturate_mul(int64_t x, int8_t y) { return saturate_mul(x, static_cast<int64_t>(y)); }
+inline int64_t saturate_mul(int64_t x, int16_t y) { return saturate_mul(x, static_cast<int64_t>(y)); }
+inline int64_t saturate_mul(int64_t x, int32_t y) { return saturate_mul(x, static_cast<int64_t>(y)); }
+inline int64_t saturate_mul(int64_t x, uint8_t y) { return saturate_mul(x, static_cast<uint64_t>(y)); }
+inline int64_t saturate_mul(int64_t x, uint16_t y) { return saturate_mul(x, static_cast<uint64_t>(y)); }
+inline int64_t saturate_mul(int64_t x, uint32_t y) { return saturate_mul(x, static_cast<uint64_t>(y)); }
 inline int64_t saturate_mul(int64_t x, float y) { return saturate_cast<int64_t>(x*y); }
 inline int64_t saturate_mul(int64_t x, double y) { return saturate_cast<int64_t>(x*y); }
 
-inline uint32_t saturate_mul(uint32_t x, int8_t y) { return saturate_cast<uint32_t>(saturate_mul(int64_t(x), int64_t(y))); }
-inline uint32_t saturate_mul(uint32_t x, int16_t y) { return saturate_cast<uint32_t>(saturate_mul(int64_t(x), int64_t(y))); }
-inline uint32_t saturate_mul(uint32_t x, int32_t y) { return saturate_cast<uint32_t>(saturate_mul(int64_t(x), int64_t(y))); }
-inline uint32_t saturate_mul(uint32_t x, int64_t y) { return saturate_cast<uint32_t>(saturate_mul(int64_t(x), y)); }
-inline uint32_t saturate_mul(uint32_t x, uint8_t y) { return saturate_mul(x, uint32_t(y)); }
-inline uint32_t saturate_mul(uint32_t x, uint16_t y) { return saturate_mul(x, uint32_t(y)); }
-inline uint32_t saturate_mul(uint32_t x, uint64_t y) { return saturate_cast<uint32_t>(saturate_mul(uint64_t(x), y)); }
+inline uint32_t saturate_mul(uint32_t x, int8_t y) { return saturate_cast<uint32_t>(saturate_mul(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline uint32_t saturate_mul(uint32_t x, int16_t y) { return saturate_cast<uint32_t>(saturate_mul(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline uint32_t saturate_mul(uint32_t x, int32_t y) { return saturate_cast<uint32_t>(saturate_mul(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline uint32_t saturate_mul(uint32_t x, int64_t y) { return saturate_cast<uint32_t>(saturate_mul(static_cast<int64_t>(x), y)); }
+inline uint32_t saturate_mul(uint32_t x, uint8_t y) { return saturate_mul(x, static_cast<uint32_t>(y)); }
+inline uint32_t saturate_mul(uint32_t x, uint16_t y) { return saturate_mul(x, static_cast<uint32_t>(y)); }
+inline uint32_t saturate_mul(uint32_t x, uint64_t y) { return saturate_cast<uint32_t>(saturate_mul(static_cast<uint64_t>(x), y)); }
 inline uint32_t saturate_mul(uint32_t x, float y) { return saturate_cast<uint32_t>(x*y); }
 inline uint32_t saturate_mul(uint32_t x, double y) { return saturate_cast<uint32_t>(x*y); }
 
-inline int32_t saturate_mul(int32_t x, int8_t y) { return saturate_mul(x, int32_t(y)); }
-inline int32_t saturate_mul(int32_t x, int16_t y) { return saturate_mul(x, int32_t(y)); }
-inline int32_t saturate_mul(int32_t x, int64_t y) { return saturate_cast<int32_t>(saturate_mul(int64_t(x), y)); }
-inline int32_t saturate_mul(int32_t x, uint8_t y) { return saturate_mul(x, int32_t(y)); }
-inline int32_t saturate_mul(int32_t x, uint16_t y) { return saturate_mul(x, int32_t(y)); }
-inline int32_t saturate_mul(int32_t x, uint32_t y) { return saturate_cast<int32_t>(saturate_mul(int64_t(x), int64_t(y))); }
-inline int32_t saturate_mul(int32_t x, uint64_t y) { return saturate_cast<int32_t>(saturate_mul(int64_t(x), y)); }
+inline int32_t saturate_mul(int32_t x, int8_t y) { return saturate_mul(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_mul(int32_t x, int16_t y) { return saturate_mul(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_mul(int32_t x, int64_t y) { return saturate_cast<int32_t>(saturate_mul(static_cast<int64_t>(x), y)); }
+inline int32_t saturate_mul(int32_t x, uint8_t y) { return saturate_mul(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_mul(int32_t x, uint16_t y) { return saturate_mul(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_mul(int32_t x, uint32_t y) { return saturate_cast<int32_t>(saturate_mul(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline int32_t saturate_mul(int32_t x, uint64_t y) { return saturate_cast<int32_t>(saturate_mul(static_cast<int64_t>(x), y)); }
 inline int32_t saturate_mul(int32_t x, float y) { return saturate_cast<int32_t>(x*y); }
 inline int32_t saturate_mul(int32_t x, double y) { return saturate_cast<int32_t>(x*y); }
 
-inline uint16_t saturate_mul(uint16_t x, int8_t y) { return saturate_cast<uint16_t>(saturate_mul(int32_t(x), int32_t(y))); }
-inline uint16_t saturate_mul(uint16_t x, int16_t y) { return saturate_cast<uint16_t>(saturate_mul(int32_t(x), int32_t(y))); }
-inline uint16_t saturate_mul(uint16_t x, int32_t y) { return saturate_cast<uint16_t>(saturate_mul(int32_t(x), y)); }
-inline uint16_t saturate_mul(uint16_t x, int64_t y) { return saturate_cast<uint16_t>(saturate_mul(int64_t(x), y)); }
-inline uint16_t saturate_mul(uint16_t x, uint8_t y) { return saturate_cast<uint16_t>(saturate_mul(uint32_t(x), uint32_t(y))); }
-inline uint16_t saturate_mul(uint16_t x, uint32_t y) { return saturate_cast<uint16_t>(saturate_mul(uint32_t(x), y)); }
-inline uint16_t saturate_mul(uint16_t x, uint64_t y) { return saturate_cast<uint16_t>(saturate_mul(uint64_t(x), y)); }
+inline uint16_t saturate_mul(uint16_t x, int8_t y) { return saturate_cast<uint16_t>(saturate_mul(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint16_t saturate_mul(uint16_t x, int16_t y) { return saturate_cast<uint16_t>(saturate_mul(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint16_t saturate_mul(uint16_t x, int32_t y) { return saturate_cast<uint16_t>(saturate_mul(static_cast<int32_t>(x), y)); }
+inline uint16_t saturate_mul(uint16_t x, int64_t y) { return saturate_cast<uint16_t>(saturate_mul(static_cast<int64_t>(x), y)); }
+inline uint16_t saturate_mul(uint16_t x, uint8_t y) { return saturate_cast<uint16_t>(saturate_mul(static_cast<uint32_t>(x), static_cast<uint32_t>(y))); }
+inline uint16_t saturate_mul(uint16_t x, uint32_t y) { return saturate_cast<uint16_t>(saturate_mul(static_cast<uint32_t>(x), y)); }
+inline uint16_t saturate_mul(uint16_t x, uint64_t y) { return saturate_cast<uint16_t>(saturate_mul(static_cast<uint64_t>(x), y)); }
 inline uint16_t saturate_mul(uint16_t x, float y) { return saturate_cast<uint16_t>(x*y); }
 inline uint16_t saturate_mul(uint16_t x, double y) { return saturate_cast<uint16_t>(x*y); }
 
-inline int16_t saturate_mul(int16_t x, int8_t y) { return saturate_cast<int16_t>(saturate_mul(int32_t(x), int32_t(y))); }
-inline int16_t saturate_mul(int16_t x, int32_t y) { return saturate_cast<int16_t>(saturate_mul(int32_t(x), y)); }
-inline int16_t saturate_mul(int16_t x, int64_t y) { return saturate_cast<int16_t>(saturate_mul(int64_t(x), y)); }
-inline int16_t saturate_mul(int16_t x, uint8_t y) { return saturate_cast<int16_t>(saturate_mul(int32_t(x), int32_t(y))); }
-inline int16_t saturate_mul(int16_t x, uint16_t y) { return saturate_cast<int16_t>(saturate_mul(int32_t(x), int32_t(y))); }
-inline int16_t saturate_mul(int16_t x, uint32_t y) { return saturate_cast<int16_t>(saturate_mul(int64_t(x), int64_t(y))); }
-inline int16_t saturate_mul(int16_t x, uint64_t y) { return saturate_cast<int16_t>(saturate_mul(int64_t(x), y)); }
+inline int16_t saturate_mul(int16_t x, int8_t y) { return saturate_cast<int16_t>(saturate_mul(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int16_t saturate_mul(int16_t x, int32_t y) { return saturate_cast<int16_t>(saturate_mul(static_cast<int32_t>(x), y)); }
+inline int16_t saturate_mul(int16_t x, int64_t y) { return saturate_cast<int16_t>(saturate_mul(static_cast<int64_t>(x), y)); }
+inline int16_t saturate_mul(int16_t x, uint8_t y) { return saturate_cast<int16_t>(saturate_mul(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int16_t saturate_mul(int16_t x, uint16_t y) { return saturate_cast<int16_t>(saturate_mul(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int16_t saturate_mul(int16_t x, uint32_t y) { return saturate_cast<int16_t>(saturate_mul(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline int16_t saturate_mul(int16_t x, uint64_t y) { return saturate_cast<int16_t>(saturate_mul(static_cast<int64_t>(x), y)); }
 inline int16_t saturate_mul(int16_t x, float y) { return saturate_cast<int16_t>(x*y); }
 inline int16_t saturate_mul(int16_t x, double y) { return saturate_cast<int16_t>(x*y); }
 
-inline uint8_t saturate_mul(uint8_t x, int8_t y) { return saturate_cast<uint8_t>(saturate_mul(int32_t(x), int32_t(y))); }
-inline uint8_t saturate_mul(uint8_t x, int16_t y) { return saturate_cast<uint8_t>(saturate_mul(int32_t(x), int32_t(y))); }
-inline uint8_t saturate_mul(uint8_t x, int32_t y) { return saturate_cast<uint8_t>(saturate_mul(int32_t(x), y)); }
-inline uint8_t saturate_mul(uint8_t x, int64_t y) { return saturate_cast<uint8_t>(saturate_mul(int64_t(x), y)); }
-inline uint8_t saturate_mul(uint8_t x, uint16_t y) { return saturate_cast<uint8_t>(saturate_mul(uint32_t(x), uint32_t(y))); }
-inline uint8_t saturate_mul(uint8_t x, uint32_t y) { return saturate_cast<uint8_t>(saturate_mul(uint32_t(x), y)); }
-inline uint8_t saturate_mul(uint8_t x, uint64_t y) { return saturate_cast<uint8_t>(saturate_mul(uint64_t(x), y)); }
+inline uint8_t saturate_mul(uint8_t x, int8_t y) { return saturate_cast<uint8_t>(saturate_mul(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint8_t saturate_mul(uint8_t x, int16_t y) { return saturate_cast<uint8_t>(saturate_mul(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint8_t saturate_mul(uint8_t x, int32_t y) { return saturate_cast<uint8_t>(saturate_mul(static_cast<int32_t>(x), y)); }
+inline uint8_t saturate_mul(uint8_t x, int64_t y) { return saturate_cast<uint8_t>(saturate_mul(static_cast<int64_t>(x), y)); }
+inline uint8_t saturate_mul(uint8_t x, uint16_t y) { return saturate_cast<uint8_t>(saturate_mul(static_cast<uint32_t>(x), static_cast<uint32_t>(y))); }
+inline uint8_t saturate_mul(uint8_t x, uint32_t y) { return saturate_cast<uint8_t>(saturate_mul(static_cast<uint32_t>(x), y)); }
+inline uint8_t saturate_mul(uint8_t x, uint64_t y) { return saturate_cast<uint8_t>(saturate_mul(static_cast<uint64_t>(x), y)); }
 inline uint8_t saturate_mul(uint8_t x, float y) { return saturate_cast<uint8_t>(x*y); }
 inline uint8_t saturate_mul(uint8_t x, double y) { return saturate_cast<uint8_t>(x*y); }
 
-inline int8_t saturate_mul(int8_t x, int16_t y) { return saturate_cast<int8_t>(saturate_mul(int32_t(x), int32_t(y))); }
-inline int8_t saturate_mul(int8_t x, int32_t y) { return saturate_cast<int8_t>(saturate_mul(int32_t(x), y)); }
-inline int8_t saturate_mul(int8_t x, int64_t y) { return saturate_cast<int8_t>(saturate_mul(int64_t(x), y)); }
-inline int8_t saturate_mul(int8_t x, uint8_t y) { return saturate_cast<int8_t>(saturate_mul(int32_t(x), int32_t(y))); }
-inline int8_t saturate_mul(int8_t x, uint16_t y) { return saturate_cast<int8_t>(saturate_mul(int32_t(x), int32_t(y))); }
-inline int8_t saturate_mul(int8_t x, uint32_t y) { return saturate_cast<int8_t>(saturate_mul(int64_t(x), int64_t(y))); }
-inline int8_t saturate_mul(int8_t x, uint64_t y) { return saturate_cast<int8_t>(saturate_mul(int64_t(x), y)); }
+inline int8_t saturate_mul(int8_t x, int16_t y) { return saturate_cast<int8_t>(saturate_mul(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int8_t saturate_mul(int8_t x, int32_t y) { return saturate_cast<int8_t>(saturate_mul(static_cast<int32_t>(x), y)); }
+inline int8_t saturate_mul(int8_t x, int64_t y) { return saturate_cast<int8_t>(saturate_mul(static_cast<int64_t>(x), y)); }
+inline int8_t saturate_mul(int8_t x, uint8_t y) { return saturate_cast<int8_t>(saturate_mul(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int8_t saturate_mul(int8_t x, uint16_t y) { return saturate_cast<int8_t>(saturate_mul(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int8_t saturate_mul(int8_t x, uint32_t y) { return saturate_cast<int8_t>(saturate_mul(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline int8_t saturate_mul(int8_t x, uint64_t y) { return saturate_cast<int8_t>(saturate_mul(static_cast<int64_t>(x), y)); }
 inline int8_t saturate_mul(int8_t x, float y) { return saturate_cast<int8_t>(x*y); }
 inline int8_t saturate_mul(int8_t x, double y) { return saturate_cast<int8_t>(x*y); }
 
@@ -785,81 +807,81 @@ inline double saturate_mul(double x, float y) { return x*y; }
 inline double saturate_mul(double x, double y) { return x*y; }
 
 // div
-inline uint64_t saturate_div(uint64_t x, int8_t y) { return saturate_div(x, int64_t(y)); }
-inline uint64_t saturate_div(uint64_t x, int16_t y) { return saturate_div(x, int64_t(y)); }
-inline uint64_t saturate_div(uint64_t x, int32_t y) { return saturate_div(x, int64_t(y)); }
-inline uint64_t saturate_div(uint64_t x, uint8_t y) { return saturate_div(x, uint64_t(y)); }
-inline uint64_t saturate_div(uint64_t x, uint16_t y) { return saturate_div(x, uint64_t(y)); }
-inline uint64_t saturate_div(uint64_t x, uint32_t y) { return saturate_div(x, uint64_t(y)); }
+inline uint64_t saturate_div(uint64_t x, int8_t y) { return saturate_div(x, static_cast<int64_t>(y)); }
+inline uint64_t saturate_div(uint64_t x, int16_t y) { return saturate_div(x, static_cast<int64_t>(y)); }
+inline uint64_t saturate_div(uint64_t x, int32_t y) { return saturate_div(x, static_cast<int64_t>(y)); }
+inline uint64_t saturate_div(uint64_t x, uint8_t y) { return saturate_div(x, static_cast<uint64_t>(y)); }
+inline uint64_t saturate_div(uint64_t x, uint16_t y) { return saturate_div(x, static_cast<uint64_t>(y)); }
+inline uint64_t saturate_div(uint64_t x, uint32_t y) { return saturate_div(x, static_cast<uint64_t>(y)); }
 inline uint64_t saturate_div(uint64_t x, float y) { return saturate_cast<uint64_t>(x/y); }
 inline uint64_t saturate_div(uint64_t x, double y) { return saturate_cast<uint64_t>(x/y); }
 
-inline int64_t saturate_div(int64_t x, int8_t y) { return saturate_div(x, int64_t(y)); }
-inline int64_t saturate_div(int64_t x, int16_t y) { return saturate_div(x, int64_t(y)); }
-inline int64_t saturate_div(int64_t x, int32_t y) { return saturate_div(x, int64_t(y)); }
-inline int64_t saturate_div(int64_t x, uint8_t y) { return saturate_div(x, uint64_t(y)); }
-inline int64_t saturate_div(int64_t x, uint16_t y) { return saturate_div(x, uint64_t(y)); }
-inline int64_t saturate_div(int64_t x, uint32_t y) { return saturate_div(x, uint64_t(y)); }
+inline int64_t saturate_div(int64_t x, int8_t y) { return saturate_div(x, static_cast<int64_t>(y)); }
+inline int64_t saturate_div(int64_t x, int16_t y) { return saturate_div(x, static_cast<int64_t>(y)); }
+inline int64_t saturate_div(int64_t x, int32_t y) { return saturate_div(x, static_cast<int64_t>(y)); }
+inline int64_t saturate_div(int64_t x, uint8_t y) { return saturate_div(x, static_cast<uint64_t>(y)); }
+inline int64_t saturate_div(int64_t x, uint16_t y) { return saturate_div(x, static_cast<uint64_t>(y)); }
+inline int64_t saturate_div(int64_t x, uint32_t y) { return saturate_div(x, static_cast<uint64_t>(y)); }
 inline int64_t saturate_div(int64_t x, float y) { return saturate_cast<int64_t>(x/y); }
 inline int64_t saturate_div(int64_t x, double y) { return saturate_cast<int64_t>(x/y); }
 
-inline uint32_t saturate_div(uint32_t x, int8_t y) { return saturate_cast<uint32_t>(saturate_div(int64_t(x), int64_t(y))); }
-inline uint32_t saturate_div(uint32_t x, int16_t y) { return saturate_cast<uint32_t>(saturate_div(int64_t(x), int64_t(y))); }
-inline uint32_t saturate_div(uint32_t x, int32_t y) { return saturate_cast<uint32_t>(saturate_div(int64_t(x), int64_t(y))); }
-inline uint32_t saturate_div(uint32_t x, int64_t y) { return saturate_cast<uint32_t>(saturate_div(int64_t(x), y)); }
-inline uint32_t saturate_div(uint32_t x, uint8_t y) { return saturate_div(x, uint32_t(y)); }
-inline uint32_t saturate_div(uint32_t x, uint16_t y) { return saturate_div(x, uint32_t(y)); }
-inline uint32_t saturate_div(uint32_t x, uint64_t y) { return saturate_cast<uint32_t>(saturate_div(uint64_t(x), y)); }
+inline uint32_t saturate_div(uint32_t x, int8_t y) { return saturate_cast<uint32_t>(saturate_div(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline uint32_t saturate_div(uint32_t x, int16_t y) { return saturate_cast<uint32_t>(saturate_div(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline uint32_t saturate_div(uint32_t x, int32_t y) { return saturate_cast<uint32_t>(saturate_div(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline uint32_t saturate_div(uint32_t x, int64_t y) { return saturate_cast<uint32_t>(saturate_div(static_cast<int64_t>(x), y)); }
+inline uint32_t saturate_div(uint32_t x, uint8_t y) { return saturate_div(x, static_cast<uint32_t>(y)); }
+inline uint32_t saturate_div(uint32_t x, uint16_t y) { return saturate_div(x, static_cast<uint32_t>(y)); }
+inline uint32_t saturate_div(uint32_t x, uint64_t y) { return saturate_cast<uint32_t>(saturate_div(static_cast<uint64_t>(x), y)); }
 inline uint32_t saturate_div(uint32_t x, float y) { return saturate_cast<uint32_t>(x/y); }
 inline uint32_t saturate_div(uint32_t x, double y) { return saturate_cast<uint32_t>(x/y); }
 
-inline int32_t saturate_div(int32_t x, int8_t y) { return saturate_div(x, int32_t(y)); }
-inline int32_t saturate_div(int32_t x, int16_t y) { return saturate_div(x, int32_t(y)); }
-inline int32_t saturate_div(int32_t x, int64_t y) { return saturate_cast<int32_t>(saturate_div(int64_t(x), y)); }
-inline int32_t saturate_div(int32_t x, uint8_t y) { return saturate_div(x, int32_t(y)); }
-inline int32_t saturate_div(int32_t x, uint16_t y) { return saturate_div(x, int32_t(y)); }
-inline int32_t saturate_div(int32_t x, uint32_t y) { return saturate_cast<int32_t>(saturate_div(int64_t(x), int64_t(y))); }
-inline int32_t saturate_div(int32_t x, uint64_t y) { return saturate_cast<int32_t>(saturate_div(int64_t(x), y)); }
+inline int32_t saturate_div(int32_t x, int8_t y) { return saturate_div(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_div(int32_t x, int16_t y) { return saturate_div(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_div(int32_t x, int64_t y) { return saturate_cast<int32_t>(saturate_div(static_cast<int64_t>(x), y)); }
+inline int32_t saturate_div(int32_t x, uint8_t y) { return saturate_div(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_div(int32_t x, uint16_t y) { return saturate_div(x, static_cast<int32_t>(y)); }
+inline int32_t saturate_div(int32_t x, uint32_t y) { return saturate_cast<int32_t>(saturate_div(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline int32_t saturate_div(int32_t x, uint64_t y) { return saturate_cast<int32_t>(saturate_div(static_cast<int64_t>(x), y)); }
 inline int32_t saturate_div(int32_t x, float y) { return saturate_cast<int32_t>(x/y); }
 inline int32_t saturate_div(int32_t x, double y) { return saturate_cast<int32_t>(x/y); }
 
-inline uint16_t saturate_div(uint16_t x, int8_t y) { return saturate_cast<uint16_t>(saturate_div(int32_t(x), int32_t(y))); }
-inline uint16_t saturate_div(uint16_t x, int16_t y) { return saturate_cast<uint16_t>(saturate_div(int32_t(x), int32_t(y))); }
-inline uint16_t saturate_div(uint16_t x, int32_t y) { return saturate_cast<uint16_t>(saturate_div(int32_t(x), y)); }
-inline uint16_t saturate_div(uint16_t x, int64_t y) { return saturate_cast<uint16_t>(saturate_div(int64_t(x), y)); }
-inline uint16_t saturate_div(uint16_t x, uint8_t y) { return saturate_cast<uint16_t>(saturate_div(uint32_t(x), uint32_t(y))); }
-inline uint16_t saturate_div(uint16_t x, uint32_t y) { return saturate_cast<uint16_t>(saturate_div(uint32_t(x), y)); }
-inline uint16_t saturate_div(uint16_t x, uint64_t y) { return saturate_cast<uint16_t>(saturate_div(uint64_t(x), y)); }
+inline uint16_t saturate_div(uint16_t x, int8_t y) { return saturate_cast<uint16_t>(saturate_div(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint16_t saturate_div(uint16_t x, int16_t y) { return saturate_cast<uint16_t>(saturate_div(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint16_t saturate_div(uint16_t x, int32_t y) { return saturate_cast<uint16_t>(saturate_div(static_cast<int32_t>(x), y)); }
+inline uint16_t saturate_div(uint16_t x, int64_t y) { return saturate_cast<uint16_t>(saturate_div(static_cast<int64_t>(x), y)); }
+inline uint16_t saturate_div(uint16_t x, uint8_t y) { return saturate_cast<uint16_t>(saturate_div(static_cast<uint32_t>(x), static_cast<uint32_t>(y))); }
+inline uint16_t saturate_div(uint16_t x, uint32_t y) { return saturate_cast<uint16_t>(saturate_div(static_cast<uint32_t>(x), y)); }
+inline uint16_t saturate_div(uint16_t x, uint64_t y) { return saturate_cast<uint16_t>(saturate_div(static_cast<uint64_t>(x), y)); }
 inline uint16_t saturate_div(uint16_t x, float y) { return saturate_cast<uint16_t>(x/y); }
 inline uint16_t saturate_div(uint16_t x, double y) { return saturate_cast<uint16_t>(x/y); }
 
-inline int16_t saturate_div(int16_t x, int8_t y) { return saturate_cast<int16_t>(saturate_div(int32_t(x), int32_t(y))); }
-inline int16_t saturate_div(int16_t x, int32_t y) { return saturate_cast<int16_t>(saturate_div(int32_t(x), y)); }
-inline int16_t saturate_div(int16_t x, int64_t y) { return saturate_cast<int16_t>(saturate_div(int64_t(x), y)); }
-inline int16_t saturate_div(int16_t x, uint8_t y) { return saturate_cast<int16_t>(saturate_div(int32_t(x), int32_t(y))); }
-inline int16_t saturate_div(int16_t x, uint16_t y) { return saturate_cast<int16_t>(saturate_div(int32_t(x), int32_t(y))); }
-inline int16_t saturate_div(int16_t x, uint32_t y) { return saturate_cast<int16_t>(saturate_div(int64_t(x), int64_t(y))); }
-inline int16_t saturate_div(int16_t x, uint64_t y) { return saturate_cast<int16_t>(saturate_div(int64_t(x), y)); }
+inline int16_t saturate_div(int16_t x, int8_t y) { return saturate_cast<int16_t>(saturate_div(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int16_t saturate_div(int16_t x, int32_t y) { return saturate_cast<int16_t>(saturate_div(static_cast<int32_t>(x), y)); }
+inline int16_t saturate_div(int16_t x, int64_t y) { return saturate_cast<int16_t>(saturate_div(static_cast<int64_t>(x), y)); }
+inline int16_t saturate_div(int16_t x, uint8_t y) { return saturate_cast<int16_t>(saturate_div(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int16_t saturate_div(int16_t x, uint16_t y) { return saturate_cast<int16_t>(saturate_div(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int16_t saturate_div(int16_t x, uint32_t y) { return saturate_cast<int16_t>(saturate_div(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline int16_t saturate_div(int16_t x, uint64_t y) { return saturate_cast<int16_t>(saturate_div(static_cast<int64_t>(x), y)); }
 inline int16_t saturate_div(int16_t x, float y) { return saturate_cast<int16_t>(x/y); }
 inline int16_t saturate_div(int16_t x, double y) { return saturate_cast<int16_t>(x/y); }
 
-inline uint8_t saturate_div(uint8_t x, int8_t y) { return saturate_cast<uint8_t>(saturate_div(int32_t(x), int32_t(y))); }
-inline uint8_t saturate_div(uint8_t x, int16_t y) { return saturate_cast<uint8_t>(saturate_div(int32_t(x), int32_t(y))); }
-inline uint8_t saturate_div(uint8_t x, int32_t y) { return saturate_cast<uint8_t>(saturate_div(int32_t(x), y)); }
-inline uint8_t saturate_div(uint8_t x, int64_t y) { return saturate_cast<uint8_t>(saturate_div(int64_t(x), y)); }
-inline uint8_t saturate_div(uint8_t x, uint16_t y) { return saturate_cast<uint8_t>(saturate_div(uint32_t(x), uint32_t(y))); }
-inline uint8_t saturate_div(uint8_t x, uint32_t y) { return saturate_cast<uint8_t>(saturate_div(uint32_t(x), y)); }
-inline uint8_t saturate_div(uint8_t x, uint64_t y) { return saturate_cast<uint8_t>(saturate_div(uint64_t(x), y)); }
+inline uint8_t saturate_div(uint8_t x, int8_t y) { return saturate_cast<uint8_t>(saturate_div(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint8_t saturate_div(uint8_t x, int16_t y) { return saturate_cast<uint8_t>(saturate_div(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline uint8_t saturate_div(uint8_t x, int32_t y) { return saturate_cast<uint8_t>(saturate_div(static_cast<int32_t>(x), y)); }
+inline uint8_t saturate_div(uint8_t x, int64_t y) { return saturate_cast<uint8_t>(saturate_div(static_cast<int64_t>(x), y)); }
+inline uint8_t saturate_div(uint8_t x, uint16_t y) { return saturate_cast<uint8_t>(saturate_div(static_cast<uint32_t>(x), static_cast<uint32_t>(y))); }
+inline uint8_t saturate_div(uint8_t x, uint32_t y) { return saturate_cast<uint8_t>(saturate_div(static_cast<uint32_t>(x), y)); }
+inline uint8_t saturate_div(uint8_t x, uint64_t y) { return saturate_cast<uint8_t>(saturate_div(static_cast<uint64_t>(x), y)); }
 inline uint8_t saturate_div(uint8_t x, float y) { return saturate_cast<uint8_t>(x/y); }
 inline uint8_t saturate_div(uint8_t x, double y) { return saturate_cast<uint8_t>(x/y); }
 
-inline int8_t saturate_div(int8_t x, int16_t y) { return saturate_cast<int8_t>(saturate_div(int32_t(x), int32_t(y))); }
-inline int8_t saturate_div(int8_t x, int32_t y) { return saturate_cast<int8_t>(saturate_div(int32_t(x), y)); }
-inline int8_t saturate_div(int8_t x, int64_t y) { return saturate_cast<int8_t>(saturate_div(int64_t(x), y)); }
-inline int8_t saturate_div(int8_t x, uint8_t y) { return saturate_cast<int8_t>(saturate_div(int32_t(x), int32_t(y))); }
-inline int8_t saturate_div(int8_t x, uint16_t y) { return saturate_cast<int8_t>(saturate_div(int32_t(x), int32_t(y))); }
-inline int8_t saturate_div(int8_t x, uint32_t y) { return saturate_cast<int8_t>(saturate_div(int64_t(x), int64_t(y))); }
-inline int8_t saturate_div(int8_t x, uint64_t y) { return saturate_cast<int8_t>(saturate_div(int64_t(x), y)); }
+inline int8_t saturate_div(int8_t x, int16_t y) { return saturate_cast<int8_t>(saturate_div(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int8_t saturate_div(int8_t x, int32_t y) { return saturate_cast<int8_t>(saturate_div(static_cast<int32_t>(x), y)); }
+inline int8_t saturate_div(int8_t x, int64_t y) { return saturate_cast<int8_t>(saturate_div(static_cast<int64_t>(x), y)); }
+inline int8_t saturate_div(int8_t x, uint8_t y) { return saturate_cast<int8_t>(saturate_div(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int8_t saturate_div(int8_t x, uint16_t y) { return saturate_cast<int8_t>(saturate_div(static_cast<int32_t>(x), static_cast<int32_t>(y))); }
+inline int8_t saturate_div(int8_t x, uint32_t y) { return saturate_cast<int8_t>(saturate_div(static_cast<int64_t>(x), static_cast<int64_t>(y))); }
+inline int8_t saturate_div(int8_t x, uint64_t y) { return saturate_cast<int8_t>(saturate_div(static_cast<int64_t>(x), y)); }
 inline int8_t saturate_div(int8_t x, float y) { return saturate_cast<int8_t>(x/y); }
 inline int8_t saturate_div(int8_t x, double y) { return saturate_cast<int8_t>(x/y); }
 

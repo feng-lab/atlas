@@ -106,9 +106,9 @@ void Z3DTransferFunction::fitDimensions(uint32_t& width, uint32_t& height, uint3
 {
   uint32_t maxTexSize;
   if (depth == 1)
-    maxTexSize = uint32_t(Z3DGpuInfoInstance.maxTextureSize());
+    maxTexSize = static_cast<uint32_t>(Z3DGpuInfoInstance.maxTextureSize());
   else
-    maxTexSize = uint32_t(Z3DGpuInfoInstance.max3DTextureSize());
+    maxTexSize = static_cast<uint32_t>(Z3DGpuInfoInstance.max3DTextureSize());
 
   if (maxTexSize < width)
     width = maxTexSize;

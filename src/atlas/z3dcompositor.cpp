@@ -260,7 +260,7 @@ void Z3DCompositor::process(Z3DEye eye)
     if (!currentInport.isReady()) {  // no volume, only geometrys to render
       if (numNormalFilters == 0 || numOnTopFilters == 0) {
         if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) { // render to tempport (twice larger than outport) then copy to outport
-          m_tempPort.resize(currentOutport.size() * uint32_t(2));
+          m_tempPort.resize(currentOutport.size() * 2_u32);
         } else {  // render to tempport then copy to outport
           m_tempPort.resize(currentOutport.size());
         }
@@ -301,8 +301,8 @@ void Z3DCompositor::process(Z3DEye eye)
         CHECK_GL_ERROR;
       } else {
         if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
-          m_tempPort.resize(currentOutport.size() * uint32_t(2));
-          m_tempPort2.resize(currentOutport.size() * uint32_t(2));
+          m_tempPort.resize(currentOutport.size() * 2_u32);
+          m_tempPort2.resize(currentOutport.size() * 2_u32);
         } else {
           m_tempPort.resize(currentOutport.size());
           m_tempPort2.resize(currentOutport.size());
@@ -380,7 +380,7 @@ void Z3DCompositor::process(Z3DEye eye)
         CHECK_GL_ERROR;
       } else if (numNormalFilters == 0 || numOnTopFilters == 0) {  // render geometries into one temp port then blend with volume
         if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
-          m_tempPort.resize(currentOutport.size() * uint32_t(2));
+          m_tempPort.resize(currentOutport.size() * 2_u32);
         } else {
           m_tempPort.resize(currentOutport.size());
         }
@@ -435,8 +435,8 @@ void Z3DCompositor::process(Z3DEye eye)
       } else { // render normal geometries into tempport, then blend inport and tempport into tempport2, then render on top geometries into tempport, then
         // blend temport and temport2 into outport
         if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
-          m_tempPort.resize(currentOutport.size() * uint32_t(2));
-          m_tempPort2.resize(currentOutport.size() * uint32_t(2));
+          m_tempPort.resize(currentOutport.size() * 2_u32);
+          m_tempPort2.resize(currentOutport.size() * 2_u32);
         } else {
           m_tempPort.resize(currentOutport.size());
           m_tempPort2.resize(currentOutport.size());
@@ -507,7 +507,7 @@ void Z3DCompositor::process(Z3DEye eye)
     numNormalFilters = normalOpaqueFilters.size() + normalTransparentFilters.size();
     if (numNormalFilters == 0 || numOnTopFilters == 0) {
       if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) { // render to tempport (twice larger than outport) then copy to outport
-        m_tempPort.resize(currentOutport.size() * uint32_t(2));
+        m_tempPort.resize(currentOutport.size() * 2_u32);
       } else {  // render to tempport then copy to outport
         m_tempPort.resize(currentOutport.size());
       }
@@ -548,8 +548,8 @@ void Z3DCompositor::process(Z3DEye eye)
       CHECK_GL_ERROR;
     } else {
       if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
-        m_tempPort.resize(currentOutport.size() * uint32_t(2));
-        m_tempPort2.resize(currentOutport.size() * uint32_t(2));
+        m_tempPort.resize(currentOutport.size() * 2_u32);
+        m_tempPort2.resize(currentOutport.size() * 2_u32);
       } else {
         m_tempPort.resize(currentOutport.size());
         m_tempPort2.resize(currentOutport.size());
