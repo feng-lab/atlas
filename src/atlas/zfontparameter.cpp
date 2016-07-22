@@ -1,6 +1,6 @@
 #include "zfontparameter.h"
 
-#include "QsLog.h"
+#include <QsLog.h>
 #include "zfontwidget.h"
 
 namespace nim {

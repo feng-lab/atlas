@@ -3,7 +3,7 @@
 
 #include <QMainWindow>
 
-#include "QsLogDest.h"
+#include <QsLogDest.h>
 
 class QAction;
 class QActionGroup;

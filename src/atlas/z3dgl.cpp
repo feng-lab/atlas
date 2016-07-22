@@ -1,5 +1,5 @@
 #include "z3dgl.h"
-#include "QsLog.h"
+#include <QsLog.h>
 
 #ifndef _USE_GLEW_
 

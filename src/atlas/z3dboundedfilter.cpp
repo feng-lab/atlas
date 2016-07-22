@@ -1,6 +1,6 @@
 #include "z3dboundedfilter.h"
 
-#include "Mathematics/GteDistLineRay.h"
+#include <Mathematics/GteDistLineRay.h>
 #include <QtMath>  // for M_PI
 
 namespace nim {

@@ -6,7 +6,7 @@
 #include "zglmutils.h"
 #include <QList>
 #include <QString>
-#include "QsLog.h"
+#include <QsLog.h>
 
 namespace nim {
 

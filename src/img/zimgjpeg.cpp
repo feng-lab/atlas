@@ -1,5 +1,5 @@
 #include "zimgjpeg.h"
-#include "QsLog.h"
+#include <QsLog.h>
 #include <cassert>
 #include "ztiff.h"
 #include <boost/iostreams/device/array.hpp>
@@ -10,7 +10,7 @@
 #include "zimage2dutils.h"
 #include <memory>
 #include <QFile>
-#include "folly/ScopeGuard.h"
+#include <folly/ScopeGuard.h>
 
 namespace {
 

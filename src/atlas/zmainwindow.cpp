@@ -48,7 +48,7 @@
 #include "zregionannotationdoc.h"
 #include "zregionannotationview.h"
 
-#include "QsLogWindow.h"
+#include <QsLogWindow.h>
 
 #ifdef Q_OS_OSX
 void qt_mac_set_dock_menu(QMenu *menu);

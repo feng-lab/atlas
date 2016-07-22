@@ -2,7 +2,7 @@
 
 #include <QGraphicsSceneMouseEvent>
 #include "zview.h"
-#include "QsLog.h"
+#include <QsLog.h>
 
 namespace nim {
 

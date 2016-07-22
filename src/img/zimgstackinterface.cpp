@@ -4,7 +4,7 @@
 #include "zimgstackinterface.h"
 
 #include "zimg.h"
-#include "QsLog.h"
+#include <QsLog.h>
 #include <QDir>
 
 #include <boost/align/aligned_alloc.hpp>

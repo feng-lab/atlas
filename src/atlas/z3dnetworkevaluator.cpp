@@ -6,7 +6,7 @@
 #include <boost/graph/topological_sort.hpp>
 #include "z3dcanvaspainter.h"
 #include "z3dfilter.h"
-#include "QsLog.h"
+#include <QsLog.h>
 #include "z3dtexture.h"
 #include "z3drendertarget.h"
 #include "z3dmeshfilter.h"

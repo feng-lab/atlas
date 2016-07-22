@@ -3,7 +3,7 @@
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QScrollArea>
-#include "QsLog.h"
+#include <QsLog.h>
 #include "zobjdoc.h"
 
 namespace nim {

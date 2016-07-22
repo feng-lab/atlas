@@ -4,7 +4,7 @@
 #include <QGraphicsEllipseItem>
 #include <QGraphicsTextItem>
 #include "ztimelineobjscene.h"
-#include "QsLog.h"
+#include <QsLog.h>
 #include <QScrollBar>
 
 namespace nim {

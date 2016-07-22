@@ -2,7 +2,7 @@
 #include "ztiff.h"
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
-#include "QsLog.h"
+#include <QsLog.h>
 #include "zimgsliceprovider.h"
 
 namespace nim {

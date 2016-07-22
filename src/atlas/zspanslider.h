@@ -2,7 +2,7 @@
 #define ZSPANSLIDER_H
 
 #include <QtGui>
-#include "qxtspanslider.h"
+#include <qxtspanslider.h>
 #include "zspinbox.h"
 
 namespace nim {

@@ -1,7 +1,7 @@
 #include "z3dinteractionhandler.h"
 
 #include "z3dcameraparameter.h"
-#include "QsLog.h"
+#include <QsLog.h>
 
 #include <QtMath>
 #include <cassert>

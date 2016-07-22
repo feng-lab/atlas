@@ -1,5 +1,5 @@
 #include "zimageavx.h"
-#include "immintrin.h"
+#include <immintrin.h>
 
 namespace nim {
 

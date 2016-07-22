@@ -2,11 +2,11 @@
 
 #include <QFile>
 #include <QTextStream>
-#include "QsLog.h"
+#include <QsLog.h>
 #include <QUrl>
-#include "include/reader.h"
-#include "include/variantdata.h"
-#include "include/writer.h"
+#include <include/reader.h>
+#include <include/variantdata.h>
+#include <include/writer.h>
 
 namespace nim {
 

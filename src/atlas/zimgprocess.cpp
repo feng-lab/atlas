@@ -1,6 +1,6 @@
 #include "zimgprocess.h"
-#include "QsLog.h"
-#include "QsLogDest.h"
+#include <QsLog.h>
+#include <QsLogDest.h>
 #include <QThread>
 
 namespace nim {

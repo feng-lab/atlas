@@ -6,7 +6,7 @@
 #include <QTabWidget>
 #include "zdoc.h"
 
-#include "QsLogDest.h"
+#include <QsLogDest.h>
 
 namespace QsLogging
 {

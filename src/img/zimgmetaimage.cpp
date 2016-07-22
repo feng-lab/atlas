@@ -3,7 +3,7 @@
 #include <QStringList>
 #include <QFileInfo>
 #include <QDir>
-#include "metaImage.h"
+#include <metaImage.h>
 #include "zimgsliceprovider.h"
 
 namespace nim {

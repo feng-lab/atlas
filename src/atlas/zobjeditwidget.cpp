@@ -1,7 +1,7 @@
 #include "zobjeditwidget.h"
 
 #include <QTabBar>
-#include "QsLog.h"
+#include <QsLog.h>
 #include <QApplication>
 #include <QScrollBar>
 #include "zobjdoc.h"

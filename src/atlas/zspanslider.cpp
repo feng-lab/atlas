@@ -1,7 +1,7 @@
 #include "zspanslider.h"
 #include <limits>
 #include <QBoxLayout>
-#include "QsLog.h"
+#include <QsLog.h>
 
 namespace nim {
 

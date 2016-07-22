@@ -2,7 +2,7 @@
 #include "zimginterface.h"
 #include <algorithm>
 #include <functional>
-#include "QsLog.h"
+#include <QsLog.h>
 
 namespace nim {
 

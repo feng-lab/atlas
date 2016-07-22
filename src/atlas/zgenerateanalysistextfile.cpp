@@ -7,7 +7,7 @@
 #include "zimgautothreshold.h"
 #include "zglmutils.h"
 #include "zioutils.h"
-#include "include/reader.h"
+#include <include/reader.h>
 
 namespace nim {
 

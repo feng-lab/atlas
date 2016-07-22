@@ -1,6 +1,6 @@
 #include "zparameteranimation.h"
 
-#include "QsLog.h"
+#include <QsLog.h>
 #include "zglmutils.h"
 #include <QJsonArray>
 #include "zparameterfactory.h"

@@ -9,7 +9,7 @@
 #include "zexception.h"
 #include <cassert>
 #include "zanimationwidget.h"
-#include "QsLog.h"
+#include <QsLog.h>
 #include "zview.h"
 
 namespace nim {

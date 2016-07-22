@@ -1,6 +1,6 @@
 #include "zimg.h"
 #include "zimgio.h"
-#include "QsLog.h"
+#include <QsLog.h>
 #include "zimage3dutils.h"
 #include "zstatisticsutils.h"
 #include <algorithm>

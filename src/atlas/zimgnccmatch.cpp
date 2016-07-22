@@ -1,6 +1,6 @@
 #include "zimgnccmatch.h"
 
-#include "QsLog.h"
+#include <QsLog.h>
 #include <algorithm>
 #include "zimgncc.h"
 #include "zimgautothreshold.h"

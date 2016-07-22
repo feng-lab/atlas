@@ -4,7 +4,7 @@
 #include <algorithm>
 #include "z3dcanvaseventlistener.h"
 #include "z3dscene.h"
-#include "QsLog.h"
+#include <QsLog.h>
 #include <QWindow>
 #include <QOpenGLWidget>
 

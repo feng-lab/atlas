@@ -1,5 +1,5 @@
 #include "zimagesse3.h"
-#include "immintrin.h"
+#include <immintrin.h>
 
 namespace nim {
 

@@ -1,7 +1,7 @@
 #include "zassignpuncta.h"
 
 #include "zimg.h"
-#include "QsLog.h"
+#include <QsLog.h>
 #include "zglmutils.h"
 #include "zimggraph.h"
 #include "zimgautothreshold.h"

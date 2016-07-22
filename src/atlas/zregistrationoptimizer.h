@@ -2,8 +2,8 @@
 #define ZREGISTRATIONOPTIMIZER_H
 
 #include "zregistrationcostfunction.h"
-#include "gradient_problem_solver.h"
-#include "solver.h"
+#include <gradient_problem_solver.h>
+#include <solver.h>
 
 namespace nim {
 

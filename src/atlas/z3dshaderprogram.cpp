@@ -3,7 +3,7 @@
 
 #include "zsysteminfo.h"
 #include <QFile>
-#include "QsLog.h"
+#include <QsLog.h>
 #include "zexception.h"
 #include "z3dshadermanager.h"
 #include "zexception.h"

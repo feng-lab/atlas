@@ -3,7 +3,7 @@
 
 #include <QStringList>
 #include <QProcess>
-#include "QsLog.h"
+#include <QsLog.h>
 
 uint64_t getDedicatedVideoMemoryMB();
 

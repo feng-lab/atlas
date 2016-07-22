@@ -4,7 +4,7 @@
 #else
 #include <QtConcurrentRun>
 #endif
-#include "QsLog.h"
+#include <QsLog.h>
 #include <functional>
 #ifdef _USE_MSVC2013_
 #include <boost/bind.hpp>

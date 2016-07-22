@@ -1,7 +1,7 @@
 #include "z3dgl.h"
 #include "zsysteminfo.h"
 
-#include "QsLog.h"
+#include <QsLog.h>
 #include "z3dgpuinfo.h"
 #include <QStandardPaths>
 #include <QStorageInfo>

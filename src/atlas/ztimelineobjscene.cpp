@@ -7,7 +7,7 @@
 #include <QTextDocument>
 #include <QPainter>
 #include <QColorDialog>
-#include "QsLog.h"
+#include <QsLog.h>
 #include "zanimation.h"
 #include "zbenchtimer.h"
 #include "zparameteranimation.h"

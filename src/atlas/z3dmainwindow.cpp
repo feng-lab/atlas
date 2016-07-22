@@ -26,7 +26,7 @@
 #include "zmainwindow.h"
 #include "zsysteminfo.h"
 
-#include "QsLogWindow.h"
+#include <QsLogWindow.h>
 
 namespace nim {
 

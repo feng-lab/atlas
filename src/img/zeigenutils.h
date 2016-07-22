@@ -5,7 +5,7 @@
 #include <Eigen/Dense>
 #include <fstream>
 #include <sstream>
-#include "QsLog.h"
+#include <QsLog.h>
 #include <map>
 #include <set>
 #include <limits>

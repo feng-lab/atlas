@@ -9,7 +9,7 @@
 #include <set>
 #include <cassert>
 #include "zmainwindow.h"
-#include "QsLog.h"
+#include <QsLog.h>
 #include "zfileutils.h"
 #include "zsysteminfo.h"
 #include "zchooseobjdialog.h"

@@ -1,10 +1,10 @@
 #include "zimgpng.h"
-#include "png.h"
+#include <png.h>
 #include "zioutils.h"
 #include <memory>
 #include <QFile>
 #include "zbenchtimer.h"
-#include "folly/ScopeGuard.h"
+#include <folly/ScopeGuard.h>
 #include <boost/align/aligned_allocator.hpp>
 
 namespace {

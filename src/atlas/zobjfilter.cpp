@@ -2,7 +2,7 @@
 
 #include "zparameter.h"
 #include <cassert>
-#include "QsLog.h"
+#include <QsLog.h>
 
 namespace nim {
 

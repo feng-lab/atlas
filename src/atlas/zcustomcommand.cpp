@@ -9,13 +9,13 @@
 #include "zswc.h"
 #include "zimgio.h"
 #include "zmesh.h"
-#include "itkMath.h"
+#include <itkMath.h>
 #include "zimgautothreshold.h"
 #include "zimggraph.h"
 #include <tbb/task_scheduler_init.h>
 #include "zregionontology.h"
-#include "include/reader.h"
-#include "zjson.h"
+#include <include/reader.h>
+#include <zjson.h>
 #include <boost/multiprecision/cpp_int.hpp>
 
 namespace nim {

@@ -1,8 +1,8 @@
 #include "zregionannotationtreemodel.h"
 
 #include "zobjdoc.h"
-#include "cassert"
-#include "QsLog.h"
+#include <cassert>
+#include <QsLog.h>
 
 namespace nim {
 

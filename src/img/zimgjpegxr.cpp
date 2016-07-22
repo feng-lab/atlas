@@ -1,6 +1,6 @@
 #include "zimgjpegxr.h"
 
-#include "JXRGlue.h"
+#include <JXRGlue.h>
 #include <cmath>
 #include <QFile>
 

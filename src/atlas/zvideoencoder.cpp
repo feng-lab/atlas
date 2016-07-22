@@ -1,6 +1,6 @@
 #include "zvideoencoder.h"
 
-#include "QsLog.h"
+#include <QsLog.h>
 #include <QApplication>
 
 namespace nim {

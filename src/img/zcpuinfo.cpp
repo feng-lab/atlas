@@ -1,7 +1,7 @@
 #include "zcpuinfo.h"
 
 #include "zbitset.h"
-#include "QsLog.h"
+#include <QsLog.h>
 #include <QProcess>
 #include <QThread>
 #include <algorithm>

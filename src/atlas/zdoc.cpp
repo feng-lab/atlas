@@ -13,7 +13,7 @@
 #include "zobjmodel.h"
 #include "zitemselectionmodel.h"
 #include "zobjwidget.h"
-#include "QsLog.h"
+#include <QsLog.h>
 #include "zsaveobjsdialog.h"
 #include "zimgdoc.h"
 #include "z2danimationdoc.h"

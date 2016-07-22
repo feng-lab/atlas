@@ -2,9 +2,9 @@
 
 #include "zmainwindow.h"
 
-#include "QsLog.h"
-#include "QsLogDest.h"
-#include "QsLogDestModel.h"
+#include <QsLog.h>
+#include <QsLogDest.h>
+#include <QsLogDestModel.h>
 #include <QDir>
 #include "zcpuinfo.h"
 #include "zsysteminfo.h"

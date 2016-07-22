@@ -2,7 +2,7 @@
 #include "z3dpickingmanager.h"
 
 #include "z3dtexture.h"
-#include "QsLog.h"
+#include <QsLog.h>
 #include <QApplication>
 #include <functional>
 #include <memory>

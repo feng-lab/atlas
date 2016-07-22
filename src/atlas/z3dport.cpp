@@ -1,5 +1,5 @@
 #include "z3dport.h"
-#include "QsLog.h"
+#include <QsLog.h>
 
 namespace nim {
 

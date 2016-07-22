@@ -1,6 +1,6 @@
 #include "zeventlistenerparameter.h"
 #include <QLabel>
-#include "QsLog.h"
+#include <QsLog.h>
 
 namespace nim {
 

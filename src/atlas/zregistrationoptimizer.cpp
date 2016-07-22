@@ -1,10 +1,10 @@
 #include "zregistrationoptimizer.h"
 
-#include "autodiff_cost_function.h"
-#include "numeric_diff_cost_function.h"
-#include "gradient_problem.h"
-#include "problem.h"
-#include "local_parameterization.h"
+#include <autodiff_cost_function.h>
+#include <numeric_diff_cost_function.h>
+#include <gradient_problem.h>
+#include <problem.h>
+#include <local_parameterization.h>
 
 using namespace ceres;
 
