@@ -57,6 +57,7 @@ isEqual(QT_MAJOR_VERSION,5) | greaterThan(QT_MAJOR_VERSION,5) {
 CONFIG += rtti exceptions
 
 CONFIG += static_libtiff
+#CONFIG += use_glog
 
 DEFINES *= QT_USE_QSTRINGBUILDER
 DEFINES += QT_NO_CAST_FROM_BYTEARRAY
@@ -151,8 +152,14 @@ contains(CONFIG, static_libtiff) {
     LIBS += -ltiff -llzma
 }
 
+contains(CONFIG, use_glog) {
+    include($$PWD/../3rdparty/glog.pri)
+} else {
+    DEFINES += _USE_QSLOG_
+    include($$PWD/../3rdparty/QsLog/QsLog.pri)
+}
+
 include($$PWD/../3rdparty/eigen.pri)
-include($$PWD/../3rdparty/QsLog/QsLog.pri)
 
 macx {
     SSE3_SOURCES = zimagesse3.cpp

@@ -1,6 +1,5 @@
 #include "zlog.h"
 
-#include <cassert>
 #include <QStandardPaths>
 
 namespace nim {
@@ -48,3 +47,16 @@ void removeLogSink(const LogSinkPtr &sink)
 }
 
 } // namespace nim
+
+// support std string
+QDebug operator << (QDebug s, const std::string& m)
+{
+  s.nospace() << QString::fromLocal8Bit(m.c_str());
+  return s.space();
+}
+
+QDebug operator << (QDebug s, const std::basic_string<wchar_t>& m)
+{
+  s.nospace() << QString::fromStdWString(m);
+  return s.space();
+}

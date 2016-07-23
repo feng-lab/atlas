@@ -53,6 +53,7 @@ isEqual(QT_MAJOR_VERSION,5) | greaterThan(QT_MAJOR_VERSION,5) {
 CONFIG += rtti exceptions
 
 CONFIG += use_glbinding
+#CONFIG += use_glog
 CONFIG += with_tests
 
 DEFINES *= QT_USE_QSTRINGBUILDER
@@ -506,6 +507,13 @@ contains(CONFIG, use_glbinding) {
     include($$PWD/../3rdparty/glew.pri)
 }
 
+contains(CONFIG, use_glog) {
+    include($$PWD/../3rdparty/glog.pri)
+} else {
+    DEFINES += _USE_QSLOG_
+    include($$PWD/../3rdparty/QsLog/QsLogGUI.pri)
+}
+
 contains(CONFIG, with_tests) {
     DEFINES += _WITH_TESTS_
     include($$PWD/../3rdparty/googletest.pri)
@@ -533,7 +541,6 @@ contains(CONFIG, with_tests) {
 #include($$PWD/../3rdparty/qwt/qwt.pri)
 include($$PWD/../3rdparty/optimization/optimization.pri)
 include($$PWD/../3rdparty/libqxt.pri)
-include($$PWD/../3rdparty/QsLog/QsLogGUI.pri)
 include($$PWD/../3rdparty/eigenGUI.pri)
 include($$PWD/../3rdparty/qtcsv/qtcsv.pri)
 
