@@ -20,7 +20,7 @@ public:
   void updateEditWidgetTitleOfObj(size_t id);
 
 private:
-  void writeLogMessage(const LogMessageType &message);
+  void writeLogMessage(const LogMessage &message);
 
   void removeObjEditWidgetOfObj(size_t id);
   void closeTab(int index);
@@ -37,7 +37,7 @@ protected:
   QTextCharFormat m_normalFormat;
   QTextCharFormat m_errorFormat;
   QList<SubWidget> m_subWidgets;
-  LogSinkType m_logOutputDestination;
+  LogSinkPtr m_logOutputDestination;
 };
 
 } // namespace nim

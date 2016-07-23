@@ -3,6 +3,7 @@
 #include "zmainwindow.h"
 
 #include "zlog.h"
+#include "zlogmodelsink.h"
 #include <QDir>
 #include "zcpuinfo.h"
 #include "zsysteminfo.h"
@@ -117,6 +118,7 @@ int main(int argc, char *argv[])
 
   // init the logging mechanism
   nim::initLogging(ZSystemInfoInstance.logDir().filePath("atlas_log.txt"));
+  nim::addLogSink(nim::logModelSinkInstance());
 
   qInstallMessageHandler(myMessageOutput);
 

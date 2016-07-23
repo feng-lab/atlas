@@ -12,9 +12,9 @@ ZImgProcess::ZImgProcess()
 
 void ZImgProcess::run()
 {
-  LogSinkType fileDestination = addFileLogSink(m_logFile);
+  LogSinkPtr fileDestination = addFileLogSink(m_logFile);
   folly::ScopeGuard guard1 = folly::makeGuard([&fileDestination]() {
-    removeLogSink(fileDestination);
+    if (fileDestination) removeLogSink(fileDestination);
   });
   Q_UNUSED(guard1)
 

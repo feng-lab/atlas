@@ -8,15 +8,22 @@ namespace nim {
 
 void initLogging(const QString &filename);
 
-typedef QsLogging::DestinationPtr LogSinkType;
-typedef QsLogging::LogMessage LogMessageType;
-LogSinkType logModelSinkInstance();
-const std::deque<QsLogging::LogMessage>& logMessages();
+typedef QsLogging::Destination LogSink;
+typedef QsLogging::DestinationPtr LogSinkPtr;
+typedef QsLogging::LogMessage LogMessage;
+typedef QsLogging::Level LogSeverity;
+const LogSeverity FatalLevel   = QsLogging::FatalLevel;
+const LogSeverity ErrorLevel   = QsLogging::ErrorLevel;
+const LogSeverity WarnLevel    = QsLogging::WarnLevel;
+const LogSeverity InfoLevel    = QsLogging::InfoLevel;
+const LogSeverity DebugLevel   = QsLogging::DebugLevel;
+const LogSeverity TraceLevel   = QsLogging::TraceLevel;
+const LogSeverity OffLevel   = QsLogging::OffLevel;
 
-LogSinkType addFileLogSink(const QString &filename);
-LogSinkType createFunctorLogSink(QsLogging::Destination::LogFunction f);
-void addLogSink(LogSinkType sink);
-void removeLogSink(const LogSinkType& sink);
+LogSinkPtr addFileLogSink(const QString &filename);
+LogSinkPtr createFunctorLogSink(QsLogging::Destination::LogFunction f);
+void addLogSink(LogSinkPtr sink);
+void removeLogSink(const LogSinkPtr& sink);
 
 // container
 template<class IteratorType>
@@ -25,7 +32,7 @@ void logContainer(QsLogging::Level severity, const IteratorType &begin, const It
 {
   if (QsLogging::Logger::instance().loggingLevel() > severity)
     return;
-  if (severity == INFO)
+  if (severity == InfoLevel)
     LINFO() << "Start container" << name;
   else
     LOG(severity) << "Start container" << name;
@@ -39,7 +46,7 @@ void logContainer(QsLogging::Level severity, const IteratorType &begin, const It
       ++num;
     }
   }
-  if (severity == INFO)
+  if (severity == InfoLevel)
     LINFO() << "End container" << name;
   else
     LOG(severity) << "End container" << name ;

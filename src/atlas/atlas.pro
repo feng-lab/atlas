@@ -60,7 +60,9 @@ DEFINES += QT_NO_CAST_FROM_BYTEARRAY
 DEFINES += QT_NO_CAST_TO_ASCII
 DEFINES += _USE_CORE_PROFILE_
 
-RESOURCES = atlas.qrc
+FORMS   += LogDialog.ui
+RESOURCES += LogDialog.qrc
+RESOURCES += atlas.qrc
 HEADERS += \
     zimageinterpolation.h \
     zimgdisplay.h \
@@ -282,7 +284,8 @@ HEADERS += \
     zregionontology.h \
     zobjdetailedinfowidget.h \
     zjson.h \
-    zlogdialog.h
+    zlogdialog.h \
+    zlogmodelsink.h
 
 SOURCES += \
     main.cpp \
@@ -493,7 +496,8 @@ SOURCES += \
     zregionontology.cpp \
     zobjdetailedinfowidget.cpp \
     zjson.cpp \
-    zlogdialog.cpp
+    zlogdialog.cpp \
+    zlogmodelsink.cpp
 
 contains(CONFIG, use_glbinding) {
     include($$PWD/../3rdparty/glbinding.pri)

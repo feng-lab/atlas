@@ -23,54 +23,62 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 // OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef ZLOGDIALOG_H
-#define ZLOGDIALOG_H
+#ifndef ZLOGMODELSINK_H
+#define ZLOGMODELSINK_H
 
 #include "zlog.h"
-#include "zlogmodelsink.h"
-#include <QDialog>
-#include <QSharedPointer>
-class QModelIndex;
 
-namespace Ui {
-class LogWindow;
-}
+#include <QAbstractTableModel>
+#include <QReadWriteLock>
+
+#include <limits>
+#include <deque>
 
 namespace nim {
 
-class ZLogFilterProxyModel;
+LogSinkPtr logModelSinkInstance();
+const std::deque<LogMessage>& logMessages();
 
-class ZLogDialog : public QDialog
+class ZLogModelSink : public QAbstractTableModel, public LogSink
 {
   Q_OBJECT
-
 public:
-  explicit ZLogDialog(LogSinkPtr destination, QWidget* parent = 0);
-  virtual ~ZLogDialog();
+  static const char* const Type;
 
-  virtual bool eventFilter(QObject* obj, QEvent* event);
+  enum Column
+  {
+    TimeColumn = 0,
+    LevelNameColumn = 1,
+    MessageColumn = 2,
+    FormattedMessageColumn = 100
+  };
 
-private slots:
-  void OnPauseClicked();
-  void OnSaveClicked();
-  void OnClearClicked();
-  void OnCopyClicked();
-  void OnLevelChanged(int value);
-  void OnAutoScrollChanged(bool checked);
-  void ModelRowsInserted(const QModelIndex& parent, int start, int last);
+  explicit ZLogModelSink(size_t max_items = std::numeric_limits<size_t>::max());
+  virtual ~ZLogModelSink();
+
+  void addEntry(const LogMessage& message);
+  void clear();
+  LogMessage at(size_t index);
+
+  // Destination overrides
+  virtual void write(const LogMessage& message);
+  virtual bool isValid();
+  virtual QString type() const;
+
+  // QAbstractTableModel overrides
+  virtual int columnCount(const QModelIndex& parent = QModelIndex()) const;
+  virtual int rowCount(const QModelIndex& parent = QModelIndex()) const;
+  virtual QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
+  virtual QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+
+  const std::deque<LogMessage>& logMessages() const { return mLogMessages; }
 
 private:
-  void copySelection() const;
-  void saveSelection();
-  QString getSelectionText() const;
-
-  QSharedPointer<ZLogModelSink> mModelDestination;
-  Ui::LogWindow* mUi;
-  ZLogFilterProxyModel* mProxyModel;
-  bool mIsPaused;
-  bool mHasAutoScroll;
+  std::deque<LogMessage> mLogMessages;
+  mutable QReadWriteLock mMessagesLock;
+  size_t mMaxItems;
 };
 
-}
+} // namespace nim
 
-#endif // ZLOGDIALOG_H
+#endif // ZLOGMODELSINK_H

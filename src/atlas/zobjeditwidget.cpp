@@ -2,6 +2,7 @@
 
 #include <QTabBar>
 #include "zlog.h"
+#include "zlogmodelsink.h"
 #include <QApplication>
 #include <QScrollBar>
 #include "zobjdoc.h"
@@ -72,10 +73,10 @@ void ZObjEditWidget::updateEditWidgetTitleOfObj(size_t id)
   }
 }
 
-void ZObjEditWidget::writeLogMessage(const LogMessageType &message)
+void ZObjEditWidget::writeLogMessage(const LogMessage &message)
 {
   bool atBottom = m_logWidget->verticalScrollBar()->value() == m_logWidget->verticalScrollBar()->maximum();
-  if (message.level <= INFO) {
+  if (message.level <= InfoLevel) {
     m_logWidget->appendPlainText(message.formatted);
   } else {
     m_logWidget->setCurrentCharFormat(m_errorFormat);
