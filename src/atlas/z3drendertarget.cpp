@@ -1,7 +1,7 @@
 #include "z3drendertarget.h"
 
 #include "z3dtexture.h"
-#include <QsLog.h>
+#include "zlog.h"
 #include "zbenchtimer.h"
 #include "z3dgpuinfo.h"
 #include <QImage>

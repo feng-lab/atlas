@@ -5,25 +5,7 @@
 #include <QPlainTextEdit>
 #include <QTabWidget>
 #include "zdoc.h"
-
-#include <QsLogDest.h>
-
-namespace QsLogging
-{
-class TextEditDestination : public Destination
-{
-public:
-  explicit TextEditDestination(QPlainTextEdit& edit);
-
-  virtual void write(const LogMessage& message) override;
-  virtual bool isValid() override { return true; }
-
-private:
-  QPlainTextEdit& m_edit;
-  QTextCharFormat m_normalFormat;
-  QTextCharFormat m_errorFormat;
-};
-}
+#include "zlog.h"
 
 namespace nim {
 
@@ -37,10 +19,9 @@ public:
   bool showObjEditWidgetOfObj(size_t id);
   void updateEditWidgetTitleOfObj(size_t id);
 
-private slots:
-  void writeLogMessage(const QsLogging::LogMessage &message);
-
 private:
+  void writeLogMessage(const LogMessageType &message);
+
   void removeObjEditWidgetOfObj(size_t id);
   void closeTab(int index);
 
@@ -56,7 +37,7 @@ protected:
   QTextCharFormat m_normalFormat;
   QTextCharFormat m_errorFormat;
   QList<SubWidget> m_subWidgets;
-  QsLogging::DestinationPtr m_logOutputDestination;
+  LogSinkType m_logOutputDestination;
 };
 
 } // namespace nim

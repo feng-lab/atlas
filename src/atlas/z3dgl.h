@@ -16,7 +16,7 @@ using namespace gl;
 
 #include "zglobal.h"
 #include "zglmutils.h"
-#include <QsLog.h>
+#include "zlog.h"
 
 namespace nim {
 

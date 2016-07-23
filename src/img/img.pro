@@ -108,7 +108,8 @@ HEADERS += \
     zimgneighborhooditerator.h \
     zimgneighborhoodwithcoorditerator.h \
     zneighborhood.h \
-    zimgneighborhoodwithptriterator.h
+    zimgneighborhoodwithptriterator.h \
+    zlog.h
 
 SOURCES += \
     zbenchtimer.cpp \
@@ -141,7 +142,8 @@ SOURCES += \
     zrandom.cpp \
     zstringutils.cpp \
     ztiff.cpp \
-    zneighborhood.cpp
+    zneighborhood.cpp \
+    zlog.cpp
 
 contains(CONFIG, static_libtiff) {
     include($$PWD/../3rdparty/libtiff.pri)

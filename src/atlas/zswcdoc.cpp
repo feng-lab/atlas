@@ -6,7 +6,7 @@
 #include <QApplication>
 #include <QIcon>
 #include <cassert>
-#include <QsLog.h>
+#include "zlog.h"
 #include "zexception.h"
 #include <set>
 

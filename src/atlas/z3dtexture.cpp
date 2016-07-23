@@ -1,5 +1,5 @@
 #include "z3dtexture.h"
-#include <QsLog.h>
+#include "zlog.h"
 #include "z3dgpuinfo.h"
 #include <QImage>
 #include <QImageWriter>

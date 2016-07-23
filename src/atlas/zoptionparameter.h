@@ -7,7 +7,7 @@
 #include <QList>
 #include <QString>
 #include <cassert>
-#include <QsLog.h>
+#include "zlog.h"
 
 namespace nim {
 

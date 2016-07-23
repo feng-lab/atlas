@@ -2,7 +2,7 @@
 #include <limits>
 #include <algorithm>
 #include <QWidget>
-#include <QsLog.h>
+#include "zlog.h"
 #include <QJsonArray>
 #include "z3dtexture.h"
 #include "z3dgpuinfo.h"

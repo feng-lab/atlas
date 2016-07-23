@@ -3,7 +3,7 @@
 
 #include "z3dcanvas.h"
 #include "z3dtexture.h"
-#include <QsLog.h>
+#include "zlog.h"
 #include "z3dgpuinfo.h"
 #include "zexception.h"
 

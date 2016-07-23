@@ -10,7 +10,7 @@
 #include <cassert>
 #include "zanimationwidget.h"
 #include "z3dview.h"
-#include <QsLog.h>
+#include "zlog.h"
 
 namespace nim {
 

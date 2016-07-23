@@ -6,7 +6,7 @@
 #include <QGraphicsRectItem>
 #include <QGraphicsLineItem>
 #include <QScrollBar>
-#include <QsLog.h>
+#include "zlog.h"
 #include "zsaturateoperation.h"
 
 namespace nim {

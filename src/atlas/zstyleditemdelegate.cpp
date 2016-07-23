@@ -6,7 +6,7 @@
 #include <QPushButton>
 #include <QPainter>
 #include <QAbstractItemView>
-#include <QsLog.h>
+#include "zlog.h"
 #endif
 
 namespace nim {

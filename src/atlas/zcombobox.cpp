@@ -1,6 +1,6 @@
 #include "zcombobox.h"
 #include <QEvent>
-#include <QsLog.h>
+#include "zlog.h"
 
 namespace nim {
 

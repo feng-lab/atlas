@@ -6,7 +6,7 @@
 #include <QTextOption>
 #include <QTextDocument>
 #include <QPainter>
-#include <QsLog.h>
+#include "zlog.h"
 #include <cmath>
 #include "zanimation.h"
 #include "zbenchtimer.h"

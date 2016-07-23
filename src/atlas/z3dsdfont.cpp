@@ -3,7 +3,7 @@
 #include <QFile>
 #include <QTextStream>
 #include <QStringList>
-#include <QsLog.h>
+#include "zlog.h"
 
 namespace nim {
 

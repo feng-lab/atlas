@@ -1,6 +1,6 @@
 #include "zimgzeisslsm.h"
 #include "ztiff.h"
-#include <QsLog.h>
+#include "zlog.h"
 #include "zioutils.h"
 
 namespace nim {

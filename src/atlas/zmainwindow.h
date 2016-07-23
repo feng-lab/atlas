@@ -3,8 +3,6 @@
 
 #include <QMainWindow>
 
-#include <QsLogDest.h>
-
 class QAction;
 class QActionGroup;
 class QMenu;
@@ -23,7 +21,7 @@ class ZMainWindow : public QMainWindow
   Q_OBJECT
 
 public:
-  ZMainWindow(QsLogging::DestinationPtr logDestModel);
+  ZMainWindow();
 
   void initOpenglContext();
 
@@ -67,7 +65,7 @@ private:
 
   void openNewInstance();
 
-  void init(QsLogging::DestinationPtr logDestModel);
+  void init();
   void createActions();
   void createMenus();
   void createToolBars();

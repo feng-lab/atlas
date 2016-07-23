@@ -215,8 +215,8 @@ void _resizeContributions(size_t inLength, size_t outLength, Interpolant interpo
   }
   assert(idx == weightsOut.size());
 
-  //logContainer(QsLogging::InfoLevel, weightsOut.begin(), weightsOut.end(), kernelWidthOut, "weights");
-  //logContainer(QsLogging::InfoLevel, indicesOut.begin(), indicesOut.end(), kernelWidthOut, "indices");
+  //logContainer(INFO, weightsOut.begin(), weightsOut.end(), kernelWidthOut, "weights");
+  //logContainer(INFO, indicesOut.begin(), indicesOut.end(), kernelWidthOut, "indices");
 }
 
 } // namespace nim

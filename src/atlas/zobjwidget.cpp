@@ -8,7 +8,7 @@
 #include "zshareitemselectionmodel.h"
 #include "zobjmodel.h"
 #include "zstyleditemdelegate.h"
-#include <QsLog.h>
+#include "zlog.h"
 
 namespace nim {
 

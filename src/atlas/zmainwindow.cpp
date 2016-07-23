@@ -48,7 +48,7 @@
 #include "zregionannotationdoc.h"
 #include "zregionannotationview.h"
 
-#include <QsLogWindow.h>
+#include "zlogdialog.h"
 
 #ifdef Q_OS_OSX
 void qt_mac_set_dock_menu(QMenu *menu);
@@ -56,13 +56,13 @@ void qt_mac_set_dock_menu(QMenu *menu);
 
 namespace nim {
 
-ZMainWindow::ZMainWindow(QsLogging::DestinationPtr logDestModel)
+ZMainWindow::ZMainWindow()
   : QMainWindow()
   , m_3dWindow(nullptr)
   , m_isClosed(false)
   , m_versionString(__DATE__)
 {
-  init(logDestModel);
+  init();
   setWindowTitle(QString("Atlas ver. %1").arg(m_versionString));
   //setCurrentFile("");
 }
@@ -273,7 +273,7 @@ void ZMainWindow::openScreenshotPanel()
 
 void ZMainWindow::viewLog()
 {
-  QsLogging::Window logDialog(m_doc->logDestModel(), this);
+  ZLogDialog logDialog(logModelSinkInstance(), this);
   logDialog.exec();
 }
 
@@ -398,12 +398,12 @@ void ZMainWindow::openNewInstance()
 #endif
 }
 
-void ZMainWindow::init(QsLogging::DestinationPtr logDestModel)
+void ZMainWindow::init()
 {
   setAttribute(Qt::WA_DeleteOnClose);
   setAcceptDrops(true);
 
-  m_doc = new ZDoc(logDestModel, this);
+  m_doc = new ZDoc(this);
   m_view = new ZView(*m_doc, this);
 
   //packages

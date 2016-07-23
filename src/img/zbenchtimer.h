@@ -13,7 +13,7 @@
   */
 
 //This header has to be ahead of windows.h to avoid macro conflict (ERROR)
-#include <QsLog.h>
+#include "zlog.h"
 
 #if defined(_WIN32) || defined(_WIN64)
 # include <windows.h>

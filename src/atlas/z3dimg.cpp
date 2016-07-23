@@ -1,7 +1,7 @@
 #include "z3dimg.h"
 #include <algorithm>
 #include <QString>
-#include <QsLog.h>
+#include "zlog.h"
 #include "z3dshaderprogram.h"
 #include "z3dgpuinfo.h"
 #include "z3dtexture.h"

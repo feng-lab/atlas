@@ -5,7 +5,7 @@
 #include <QWheelEvent>
 #include <QScrollBar>
 #include <cassert>
-#include <QsLog.h>
+#include "zlog.h"
 #include <QGraphicsPolygonItem>
 #include <QGraphicsRectItem>
 #include <QGraphicsEllipseItem>

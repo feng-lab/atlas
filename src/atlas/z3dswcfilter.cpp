@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include "zrandom.h"
-#include <QsLog.h>
+#include "zlog.h"
 #include <QMessageBox>
 #include <QApplication>
 

@@ -4,7 +4,7 @@
 #include <tiffio.hxx>
 //#include "zxtiffio.h"
 #include "zimgformat.h"
-#include <QsLog.h>
+#include "zlog.h"
 #include <cmath>
 #include <boost/endian/conversion.hpp>
 #include <boost/align/aligned_allocator.hpp>

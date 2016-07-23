@@ -1,6 +1,6 @@
 #include "zroi.h"
 
-#include <QsLog.h>
+#include "zlog.h"
 #include <cmath>
 #include <Mathematics/GteNaturalSplineCurve.h>
 #include "zsaturateoperation.h"

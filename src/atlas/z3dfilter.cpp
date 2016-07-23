@@ -1,6 +1,6 @@
 #include "z3dfilter.h"
 
-#include <QsLog.h>
+#include "zlog.h"
 #include "zsysteminfo.h"
 #include "z3dport.h"
 #include "z3dinteractionhandler.h"

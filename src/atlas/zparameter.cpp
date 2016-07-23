@@ -2,7 +2,7 @@
 #include <QWidget>
 #include <QLabel>
 #include <QCheckBox>
-#include <QsLog.h>
+#include "zlog.h"
 
 namespace nim {
 

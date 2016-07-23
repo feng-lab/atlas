@@ -5,7 +5,7 @@
 #include <QHeaderView>
 #include <QMenu>
 #include "zstyleditemdelegate.h"
-#include <QsLog.h>
+#include "zlog.h"
 #include "zbuttoncolumndelegate.h"
 #include "zroidoc.h"
 #include "zmeshdoc.h"

@@ -6,7 +6,7 @@
 #include <cstddef>
 #include "zexception.h"
 #include "zglmutils.h"
-//#include <QsLog.h>
+//#include "zlog.h"
 
 namespace nim {
 

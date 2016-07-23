@@ -2,7 +2,7 @@
 #include "ztiff.h"
 #include <set>
 #include <cmath>
-#include <QsLog.h>
+#include "zlog.h"
 #include "zimgsliceprovider.h"
 
 namespace nim {

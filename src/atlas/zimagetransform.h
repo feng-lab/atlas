@@ -10,7 +10,7 @@
 #include "zimageinterpolation.h"
 #include "zsaturateoperation.h"
 #include "zstatisticsutils.h"
-#include <QsLog.h>
+#include "zlog.h"
 #include <utility>
 
 namespace nim {

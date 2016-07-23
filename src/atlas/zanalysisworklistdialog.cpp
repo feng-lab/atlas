@@ -3,7 +3,7 @@
 #include <QtGui>
 #include <QtWidgets>
 #include <QTableView>
-#include <QsLog.h>
+#include "zlog.h"
 #include "zanalysisworklistmodel.h"
 #include "zstyleditemdelegate.h"
 

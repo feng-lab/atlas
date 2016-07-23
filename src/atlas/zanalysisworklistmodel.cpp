@@ -2,7 +2,7 @@
 
 #include <QFile>
 #include <QTextStream>
-#include <QsLog.h>
+#include "zlog.h"
 #include <QUrl>
 #include <include/reader.h>
 #include <include/variantdata.h>

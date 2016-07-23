@@ -5,7 +5,7 @@
 #include <cmath>
 #include <algorithm>
 #include <numeric>
-#include <QsLog.h>
+#include "zlog.h"
 //#include "zbenchtimer.h"
 #ifndef _USE_QTCONCURRENT_
 #include <tbb/parallel_for.h>

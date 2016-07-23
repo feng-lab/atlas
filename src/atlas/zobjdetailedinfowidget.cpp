@@ -4,7 +4,7 @@
 #include <QLabel>
 #include <QScrollArea>
 #include "zwidgetsgroup.h"
-#include <QsLog.h>
+#include "zlog.h"
 #include "zobjdoc.h"
 
 namespace nim {

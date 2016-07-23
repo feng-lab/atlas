@@ -1,7 +1,7 @@
 #include "zobjmodel.h"
 #include "zobjdoc.h"
 #include <cassert>
-#include <QsLog.h>
+#include "zlog.h"
 
 namespace nim {
 

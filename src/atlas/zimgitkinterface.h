@@ -4,7 +4,7 @@
 #include "zimg.h"
 #include <itkImage.h>
 #include <itkImportImageFilter.h>
-#include <QsLog.h>
+#include "zlog.h"
 
 // On mac system,
 // qglobal.h force min mac version to 1040 which breaks ITK

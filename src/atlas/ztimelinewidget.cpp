@@ -9,7 +9,7 @@
 #include "ztimelineaxisview.h"
 #include <QToolBar>
 #include <QAction>
-#include <QsLog.h>
+#include "zlog.h"
 #include "znumericparameter.h"
 
 namespace nim {

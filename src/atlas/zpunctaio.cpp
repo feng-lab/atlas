@@ -3,7 +3,7 @@
 #include "zpuncta.h"
 #include "zexception.h"
 #include <QFile>
-#include <QsLog.h>
+#include "zlog.h"
 #include "zeigenutils.h"
 #include <H5Cpp.h>
 #include <cassert>

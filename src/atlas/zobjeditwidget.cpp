@@ -1,34 +1,10 @@
 #include "zobjeditwidget.h"
 
 #include <QTabBar>
-#include <QsLog.h>
+#include "zlog.h"
 #include <QApplication>
 #include <QScrollBar>
 #include "zobjdoc.h"
-
-QsLogging::TextEditDestination::TextEditDestination(QPlainTextEdit &edit)
-  : m_edit(edit)
-{
-  m_normalFormat = m_edit.currentCharFormat();
-  m_errorFormat = m_normalFormat;
-  m_errorFormat.setForeground(QBrush(QColor(176,0,0)));
-}
-
-void QsLogging::TextEditDestination::write(const LogMessage &message)
-{
-  bool atBottom = m_edit.verticalScrollBar()->value() == m_edit.verticalScrollBar()->maximum();
-  if (message.level <= QsLogging::InfoLevel) {
-    m_edit.appendPlainText(message.formatted);
-  } else {
-    m_edit.setCurrentCharFormat(m_errorFormat);
-    m_edit.appendPlainText(message.formatted);
-    m_edit.setCurrentCharFormat(m_normalFormat);
-  }
-  if (atBottom) {
-    m_edit.verticalScrollBar()->setValue(m_edit.verticalScrollBar()->maximum());
-    m_edit.verticalScrollBar()->setValue(m_edit.verticalScrollBar()->maximum());
-  }
-}
 
 namespace nim {
 
@@ -36,8 +12,7 @@ ZObjEditWidget::ZObjEditWidget(ZDoc *doc, QWidget *mw)
   : QTabWidget(mw)
   , m_doc(doc)
   , m_logWidget(new QPlainTextEdit(this))
-  //, m_logOutputDestination(new QsLogging::TextEditDestination(*m_logWidget))
-  , m_logOutputDestination(QsLogging::DestinationFactory::MakeFunctorDestination(this, SLOT(writeLogMessage(QsLogging::LogMessage))))
+  , m_logOutputDestination(createFunctorLogSink(std::bind(&ZObjEditWidget::writeLogMessage, this, std::placeholders::_1)))
 {
   addTab(m_logWidget, "Log Output");
   connect(m_doc, &ZDoc::objAboutToBeRemoved, this, &ZObjEditWidget::removeObjEditWidgetOfObj);
@@ -54,15 +29,15 @@ ZObjEditWidget::ZObjEditWidget(ZDoc *doc, QWidget *mw)
   m_normalFormat = m_logWidget->currentCharFormat();
   m_errorFormat = m_normalFormat;
   m_errorFormat.setForeground(QBrush(QColor(176,0,0)));
-  for (auto const &lm : m_doc->logMessages()) {
+  for (auto const &lm : logMessages()) {
     writeLogMessage(lm);
   }
-  QsLogging::Logger::instance().addDestination(m_logOutputDestination);
+  addLogSink(m_logOutputDestination);
 }
 
 ZObjEditWidget::~ZObjEditWidget()
 {
-  QsLogging::Logger::instance().removeDestination(m_logOutputDestination);
+  removeLogSink(m_logOutputDestination);
 }
 
 bool ZObjEditWidget::showObjEditWidgetOfObj(size_t id)
@@ -97,10 +72,10 @@ void ZObjEditWidget::updateEditWidgetTitleOfObj(size_t id)
   }
 }
 
-void ZObjEditWidget::writeLogMessage(const QsLogging::LogMessage &message)
+void ZObjEditWidget::writeLogMessage(const LogMessageType &message)
 {
   bool atBottom = m_logWidget->verticalScrollBar()->value() == m_logWidget->verticalScrollBar()->maximum();
-  if (message.level <= QsLogging::InfoLevel) {
+  if (message.level <= INFO) {
     m_logWidget->appendPlainText(message.formatted);
   } else {
     m_logWidget->setCurrentCharFormat(m_errorFormat);

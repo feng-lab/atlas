@@ -1,5 +1,5 @@
 #include "zimgncc.h"
-#include <QsLog.h>
+#include "zlog.h"
 #include <algorithm>
 #include "zfft.h"
 #include "zimagetoimagemetric.h"

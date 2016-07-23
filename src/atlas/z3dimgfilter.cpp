@@ -4,7 +4,7 @@
 #include "zimg.h"
 #include "zeventlistenerparameter.h"
 #include "zmesh.h"
-#include <QsLog.h>
+#include "zlog.h"
 #include "zbenchtimer.h"
 #include "zmeshutils.h"
 

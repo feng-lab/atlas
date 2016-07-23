@@ -5,7 +5,7 @@
 #include <QStylePainter>
 #include <QDebug>
 #include <QAbstractItemView>
-#include <QsLog.h>
+#include "zlog.h"
 
 namespace nim {
 

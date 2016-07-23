@@ -6,7 +6,7 @@
 #include <QStringList>
 #include "zexception.h"
 #include <map>
-#include <QsLog.h>
+#include "zlog.h"
 #include "zstringutils.h"
 
 namespace nim {

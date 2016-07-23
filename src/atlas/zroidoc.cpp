@@ -8,7 +8,7 @@
 #include "zexception.h"
 #include <cassert>
 #include <set>
-#include <QsLog.h>
+#include "zlog.h"
 #include "zimg.h"
 #include "zimgdoc.h"
 #include "zimgsigneddistancemap.h"

@@ -5,7 +5,7 @@
 #include <QTemporaryDir>
 #include "zexception.h"
 #include "zioutils.h"
-#include <QsLog.h>
+#include "zlog.h"
 #include "zimgconnectedcomponents.h"
 #include "zimgsigneddistancemap.h"
 #include "zimgfillhole.h"

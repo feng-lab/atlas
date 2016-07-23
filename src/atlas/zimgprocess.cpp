@@ -1,7 +1,7 @@
 #include "zimgprocess.h"
-#include <QsLog.h>
-#include <QsLogDest.h>
+#include "zlog.h"
 #include <QThread>
+#include <folly/ScopeGuard.h>
 
 namespace nim {
 
@@ -12,12 +12,12 @@ ZImgProcess::ZImgProcess()
 
 void ZImgProcess::run()
 {
-  QsLogging::DestinationPtr fileDestination;
-  QsLogging::Logger& logger = QsLogging::Logger::instance();
-  if (!m_logFile.isEmpty()) {
-    fileDestination = QsLogging::DestinationFactory::MakeFileDestination(m_logFile);
-    logger.addDestination(fileDestination);
-  }
+  LogSinkType fileDestination = addFileLogSink(m_logFile);
+  folly::ScopeGuard guard1 = folly::makeGuard([&fileDestination]() {
+    removeLogSink(fileDestination);
+  });
+  Q_UNUSED(guard1)
+
   try {
     LDEBUG() << "run " << QThread::currentThreadId();
     doWork();
@@ -28,8 +28,6 @@ void ZImgProcess::run()
     emit canceled();
     if (hasParent()) {
       LERROR() << "notifying parent operation..";
-      if (!m_logFile.isEmpty())
-        logger.removeDestination(fileDestination);
       throw;  // notify parent
     }
   }
@@ -38,8 +36,6 @@ void ZImgProcess::run()
     emit processError(QString(excp.GetDescription()));
     if (hasParent()) {
       LERROR() << "notifying parent operation..";
-      if (!m_logFile.isEmpty())
-        logger.removeDestination(fileDestination);
       throw;  // notify parent
     }
   }
@@ -48,8 +44,6 @@ void ZImgProcess::run()
     emit canceled();
     if (hasParent()) {
       LERROR() << "notifying parent operation..";
-      if (!m_logFile.isEmpty())
-        logger.removeDestination(fileDestination);
       throw;  // notify parent
     }
   }
@@ -58,14 +52,9 @@ void ZImgProcess::run()
     emit processError(e.what());
     if (hasParent()) {
       LERROR() << "notifying parent operation..";
-      if (!m_logFile.isEmpty())
-        logger.removeDestination(fileDestination);
       throw;  // notify parent
     }
   }
-
-  if (!m_logFile.isEmpty())
-    logger.removeDestination(fileDestination);
 }
 
 } // namespace nim

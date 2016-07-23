@@ -8,7 +8,7 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <assimp/material.h>
-#include <QsLog.h>
+#include "zlog.h"
 #include <memory>
 #include <QFile>
 

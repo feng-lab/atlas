@@ -3,7 +3,7 @@
 #include <QtWidgets>
 #include "zcolormap.h"
 #include "zcolormapeditor.h"
-#include <QsLog.h>
+#include "zlog.h"
 
 namespace nim {
 

@@ -281,7 +281,8 @@ HEADERS += \
     z3dimgslicerenderer.h \
     zregionontology.h \
     zobjdetailedinfowidget.h \
-    zjson.h
+    zjson.h \
+    zlogdialog.h
 
 SOURCES += \
     main.cpp \
@@ -491,7 +492,8 @@ SOURCES += \
     z3dimgslicerenderer.cpp \
     zregionontology.cpp \
     zobjdetailedinfowidget.cpp \
-    zjson.cpp
+    zjson.cpp \
+    zlogdialog.cpp
 
 contains(CONFIG, use_glbinding) {
     include($$PWD/../3rdparty/glbinding.pri)

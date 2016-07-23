@@ -2,9 +2,7 @@
 
 #include "zmainwindow.h"
 
-#include <QsLog.h>
-#include <QsLogDest.h>
-#include <QsLogDestModel.h>
+#include "zlog.h"
 #include <QDir>
 #include "zcpuinfo.h"
 #include "zsysteminfo.h"
@@ -118,22 +116,7 @@ int main(int argc, char *argv[])
   app.setOrganizationName("Atlas");
 
   // init the logging mechanism
-  QsLogging::Logger& logger = QsLogging::Logger::instance();
-  const QString sLogPath(ZSystemInfoInstance.logDir().filePath("atlas_log.txt"));
-  QsLogging::DestinationPtr fileDestination(
-        QsLogging::DestinationFactory::MakeFileDestination(sLogPath, QsLogging::EnableLogRotation,
-                                                           QsLogging::MaxSizeBytes(1e7), QsLogging::MaxOldLogCount(20)));
-  QsLogging::DestinationPtr debugOutputDestination(
-        QsLogging::DestinationFactory::MakeDebugOutputDestination());
-  QsLogging::DestinationPtr modelDestination(new QsLogging::ModelDestination());
-  logger.addDestination(debugOutputDestination);
-  logger.addDestination(fileDestination);
-  logger.addDestination(modelDestination);
-#if defined _DEBUG_
-  logger.setLoggingLevel(QsLogging::DebugLevel);
-#else
-  logger.setLoggingLevel(QsLogging::InfoLevel);
-#endif
+  nim::initLogging(ZSystemInfoInstance.logDir().filePath("atlas_log.txt"));
 
   qInstallMessageHandler(myMessageOutput);
 
@@ -200,7 +183,7 @@ int main(int argc, char *argv[])
   //qApp->installEventFilter(new MacEventFilter(qApp));
 
   // Our MainWindow has Qt::WA_DeleteOnClose attribute, don't delete again.
-  nim::ZMainWindow *mainWin = new nim::ZMainWindow(modelDestination);
+  nim::ZMainWindow *mainWin = new nim::ZMainWindow();
   mainWin->show();
   mainWin->initOpenglContext();
 

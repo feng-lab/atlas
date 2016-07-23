@@ -26,7 +26,7 @@
 #include "zmainwindow.h"
 #include "zsysteminfo.h"
 
-#include <QsLogWindow.h>
+#include "zlogdialog.h"
 
 namespace nim {
 
@@ -167,7 +167,7 @@ void Z3DMainWindow::activateWindowIfNot()
 
 void Z3DMainWindow::viewLog()
 {
-  QsLogging::Window logDialog(m_doc->logDestModel(), this);
+  ZLogDialog logDialog(logModelSinkInstance(), this);
   logDialog.exec();
 }
 
