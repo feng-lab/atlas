@@ -1,0 +1,69 @@
+#!/bin/bash
+
+currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
+srcDIR=$currDIR/../../../gflags
+buildDIR=$srcDIR/../__gflags-build
+installDIR=$currDIR/gflags
+numCores=$( sysctl -n hw.logicalcpu )
+
+if [ -d $installDIR ]
+then
+  rm -rf $installDIR
+fi
+
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  git pull
+else
+  git clone git@github.com:gflags/gflags.git $srcDIR
+fi
+
+if [ -d $buildDIR ]
+then
+  rm -rf $buildDIR
+fi
+mkdir $buildDIR
+cd $buildDIR
+
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.8 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++14" $srcDIR
+
+make -j $numCores install
+
+cd $currDIR
+rm -rf $buildDIR
+
+#
+srcDIR=$currDIR/../../../glog
+buildDIR=$srcDIR/../__glog-build
+installDIR=$currDIR/glog
+
+if [ -d $installDIR ]
+then
+  rm -rf $installDIR
+fi
+
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  git pull
+else
+  git clone git@github.com:google/glog.git $srcDIR
+fi
+
+if [ -d $buildDIR ]
+then
+  rm -rf $buildDIR
+fi
+mkdir $buildDIR
+cd $buildDIR
+
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.8 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk -Dgflags_DIR:PATH=$currDIR/gflags/lib/cmake/gflags -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++14" $srcDIR
+
+make -j $numCores install
+
+cd $currDIR
+rm -rf $buildDIR
+
+
+

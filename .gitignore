@@ -42,6 +42,8 @@
 /src/3rdparty/eigen/
 /src/3rdparty/glm/
 /src/3rdparty/googletest/
+/src/3rdparty/gflags/
+/src/3rdparty/glog/
 /src/3rdparty/folly/
 ffmpeg
 
