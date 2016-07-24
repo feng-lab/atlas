@@ -5,6 +5,7 @@
 #include "zlog.h"
 #include "zlogmodelsink.h"
 #include <QDir>
+#include <QFileInfo>
 #include "zcpuinfo.h"
 #include "zsysteminfo.h"
 #include <fftw3.h>
@@ -113,6 +114,17 @@ extern "C" {
 }
 #endif
 
+void removeOldLogs(const QDir& dir, int numberToKeep = 20)
+{
+  QStringList filters;
+  filters << "atlas*_log.txt";
+  QFileInfoList list = dir.entryInfoList(filters,
+                                         QDir::Files | QDir::NoSymLinks,
+                                         QDir::Time);  // sorted by modification time
+  for (int i=numberToKeep-1; i < list.size(); ++i) {
+    QFile::remove(list.at(i).absoluteFilePath());
+  }
+}
 
 int main(int argc, char *argv[])
 {
@@ -133,7 +145,9 @@ int main(int argc, char *argv[])
   app.setOrganizationName("Atlas");
 
   // init the logging mechanism
-  nim::initLogging(argv[0], ZSystemInfoInstance.logDir().filePath("atlas_log.txt"));
+  QDir logDir = ZSystemInfoInstance.logDir();
+  removeOldLogs(logDir);
+  nim::initLogging(argv[0], logDir.filePath("atlas"));
   nim::addLogSink(nim::logModelSinkInstance());
 
   qInstallMessageHandler(myMessageOutput);

@@ -52,7 +52,7 @@ else
 fi
 
 # patch
-$currDIR/massedit.py -w -e "re.sub(r'                           time_pid_string', r'\"\"', line)" -e "re.sub(r'O_CREAT \| O_EXCL', r'O_CREAT | O_APPEND', line)" -e "re.sub(r'    fwrite\(message, len, 1, stderr\);', r'fwrite(message, len, 1, severity > 0 ? stderr : stdout);', line)" $srcDIR/src/logging.cc
+$currDIR/massedit.py -w -e "re.sub(r'                           time_pid_string', r'time_pid_string+\"_log.txt\"', line)" -e "re.sub(r'    fwrite\(message, len, 1, stderr\);', r'fwrite(message, len, 1, severity > 0 ? stderr : stdout);', line)" $srcDIR/src/logging.cc
 
 if [ -d $buildDIR ]
 then
