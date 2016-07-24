@@ -65,6 +65,7 @@ std::ostream& operator << (std::ostream& s, const ZVoxelRegion& m)
   return s;
 }
 
+#ifdef _USE_QSLOG_
 QDebug operator << (QDebug s, const ZVoxelRegion& m)
 {
   std::ostringstream oss;
@@ -72,7 +73,7 @@ QDebug operator << (QDebug s, const ZVoxelRegion& m)
   s.nospace() << oss.str().c_str();
   return s.space();
 }
-
+#endif
 
 
 } // namespace nim

@@ -12,14 +12,16 @@ ZImgProcess::ZImgProcess()
 
 void ZImgProcess::run()
 {
-  LogSinkPtr fileDestination = addFileLogSink(m_logFile);
+  LogSinkPtr fileDestination = createFileLogSink(m_logFile);
+  if (fileDestination)
+    addLogSink(fileDestination);
   folly::ScopeGuard guard1 = folly::makeGuard([&fileDestination]() {
-    if (fileDestination) removeLogSink(fileDestination);
+    if (fileDestination) { removeLogSink(fileDestination); }
   });
   Q_UNUSED(guard1)
 
   try {
-    LDEBUG() << "run " << QThread::currentThreadId();
+    LINFO() << "run " << QThread::currentThreadId();
     doWork();
     emit finished();
   }

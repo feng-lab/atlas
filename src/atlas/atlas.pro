@@ -52,7 +52,7 @@ isEqual(QT_MAJOR_VERSION,5) | greaterThan(QT_MAJOR_VERSION,5) {
 CONFIG += rtti exceptions
 
 CONFIG += use_glbinding
-#CONFIG += use_glog
+CONFIG += use_glog
 CONFIG += with_tests
 
 DEFINES *= QT_USE_QSTRINGBUILDER

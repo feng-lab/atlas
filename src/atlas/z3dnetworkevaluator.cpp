@@ -51,7 +51,7 @@ void Z3DNetworkEvaluator::process(bool stereo)
     return;
 
   if (m_locked) {
-    LDEBUG() << "locked. Scheduling.";
+    LINFO() << "locked. Scheduling.";
     //m_processPending = true;
     return;
   }
@@ -141,7 +141,7 @@ void Z3DNetworkEvaluator::process(bool stereo)
 void Z3DNetworkEvaluator::initializeNetwork()
 {
   if (m_locked) {
-    LDEBUG() << "locked.";
+    LINFO() << "locked.";
   }
 
   lock();

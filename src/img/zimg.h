@@ -3,7 +3,7 @@
 
 #include <cstdint>
 #include <vector>
-#include <QString>
+#include <QStringList>
 #include <memory>
 #include "zimginfo.h"
 #include "zimgregion.h"

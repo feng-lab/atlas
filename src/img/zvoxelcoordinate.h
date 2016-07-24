@@ -2,8 +2,11 @@
 #define ZVOXELCOORDINATE_H
 
 #include <sstream>
+#ifdef _USE_QSLOG_
 #include <QDebug>
+#endif
 #include <tuple>
+#include <QString>
 #include "zglobal.h"
 
 namespace nim {
@@ -289,11 +292,13 @@ inline std::ostream& operator<<(std::ostream& cout, const ZVoxelCoordinate& c)
 {
   return cout << qPrintable(c.toQString());
 }
+#ifdef _USE_QSLOG_
 inline QDebug operator<<(QDebug s, const ZVoxelCoordinate& c)
 {
   s.nospace() << qPrintable(c.toQString());
   return s.space();
 }
+#endif
 
 } // namespace nim
 

@@ -9,6 +9,7 @@
 #include <QFileDialog>
 #include <QtGlobal>
 #include <cstddef>
+#include <QTextStream>
 
 namespace nim {
 
@@ -60,7 +61,7 @@ protected:
     Q_UNUSED(source_parent);
     if (!mLastVisibleRow) {
       ZLogModelSink* model = dynamic_cast<ZLogModelSink*>(sourceModel());
-      const LogMessage& d = model->at(source_row);
+      const LogData& d = model->at(source_row);
       return d.level >= mLevel;
     }
 
@@ -79,8 +80,13 @@ ZLogDialog::ZLogDialog(LogSinkPtr destination, QWidget* parent)
   , mIsPaused(false)
   , mHasAutoScroll(true)
 {
-  mModelDestination = destination.dynamicCast<ZLogModelSink>();
-  Q_ASSERT_X(destination.data(), "Window", "log window needs a destination of type ModelDestination");
+#ifdef _USE_QSLOG_
+  mModelDestination = dynamic_cast<ZLogModelSink*>(destination.data());
+  Q_ASSERT_X(mModelDestination, "Window", "log window needs a destination of type ModelDestination");
+#else
+  mModelDestination = dynamic_cast<ZLogModelSink*>(destination.get());
+  Q_ASSERT_X(mModelDestination, "Window", "log window needs a destination of type ModelDestination");
+#endif
 
   mUi = new Ui::LogWindow();
   mUi->setupUi(this);
@@ -91,11 +97,11 @@ ZLogDialog::ZLogDialog(LogSinkPtr destination, QWidget* parent)
   connect(mUi->toolButtonCopy, SIGNAL(clicked()), SLOT(OnCopyClicked()));
   connect(mUi->comboBoxLevel, SIGNAL(currentIndexChanged(int)), SLOT(OnLevelChanged(int)));
   connect(mUi->checkBoxAutoScroll, SIGNAL(toggled(bool)), SLOT(OnAutoScrollChanged(bool)));
-  connect(mModelDestination.data(), SIGNAL(rowsInserted(const QModelIndex&, int, int)), SLOT(ModelRowsInserted(const QModelIndex&, int, int)));
+  connect(mModelDestination, SIGNAL(rowsInserted(const QModelIndex&, int, int)), SLOT(ModelRowsInserted(const QModelIndex&, int, int)));
 
   // Install the sort / filter model
-  mProxyModel = new ZLogFilterProxyModel(InfoLevel, this);
-  mProxyModel->setSourceModel(mModelDestination.data());
+  mProxyModel = new ZLogFilterProxyModel(INFO, this);
+  mProxyModel->setSourceModel(mModelDestination);
   mUi->tableViewMessages->setModel(mProxyModel);
 
   mUi->tableViewMessages->installEventFilter(this);
@@ -114,11 +120,11 @@ ZLogDialog::ZLogDialog(LogSinkPtr destination, QWidget* parent)
 #endif
 
   // Initialize log level selection
-  for (int l = TraceLevel; l < OffLevel; l++) {
-    const QString ln = LocalizedLevelName(static_cast<LogSeverity>(l));
+  for (int l = INFO; l < OFFLEVEL; l++) {
+    const QString ln = levelToString(static_cast<LogSeverity>(l));
     mUi->comboBoxLevel->addItem(ln, l);
   }
-  mUi->comboBoxLevel->setCurrentIndex(InfoLevel);
+  mUi->comboBoxLevel->setCurrentIndex(INFO);
 }
 
 ZLogDialog::~ZLogDialog()

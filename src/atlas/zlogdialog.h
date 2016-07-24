@@ -64,7 +64,7 @@ private:
   void saveSelection();
   QString getSelectionText() const;
 
-  QSharedPointer<ZLogModelSink> mModelDestination;
+  ZLogModelSink* mModelDestination;
   Ui::LogWindow* mUi;
   ZLogFilterProxyModel* mProxyModel;
   bool mIsPaused;

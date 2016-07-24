@@ -6,6 +6,7 @@
 #include "zlog.h"
 #include "z3dshader.h"
 #include <cassert>
+#include <QTextStream>
 
 namespace nim {
 

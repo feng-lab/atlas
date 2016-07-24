@@ -5,6 +5,7 @@
 #include "zbbox.h"
 #include <boost/iterator/iterator_facade.hpp>
 #include <type_traits>
+#include <vector>
 
 namespace nim {
 
@@ -169,7 +170,9 @@ private:
 };
 
 std::ostream& operator << (std::ostream& s, const ZVoxelRegion& m);
+#ifdef _USE_QSLOG_
 QDebug operator << (QDebug s, const ZVoxelRegion& m);
+#endif
 
 } // namespace nim
 

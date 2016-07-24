@@ -39,11 +39,12 @@ std::ostream& operator << (std::ostream& s, const nim::ZImageTransform& tfm)
   return (s << qPrintable(tfm.toQString()));
 }
 
+#ifdef _USE_QSLOG_
 QDebug operator << (QDebug s, const nim::ZImageTransform& tfm)
 {
   s.nospace() << tfm.toQString();
   return s.space();
 }
-
+#endif
 
 } // namespace nim

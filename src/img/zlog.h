@@ -1,28 +1,108 @@
 #ifndef ZLOG_H
 #define ZLOG_H
 
+#ifdef _WIN32
+#undef ERROR
+#endif
+
+#ifndef _USE_QSLOG_
+
+#define GOOGLE_STRIP_LOG 0
+#include <glog/logging.h>
+#include <QString>
+#include <QDateTime>
+#include <QDataStream>
+class QPointF;
+
+namespace nim {
+
+void initLogging(const char* argv0, const QString &filename);
+void shutdownLogging();
+
+typedef google::LogSink LogSink;
+typedef std::shared_ptr<google::LogSink> LogSinkPtr;
+typedef google::LogSeverity LogSeverity;
+const LogSeverity INFO = google::INFO;
+const LogSeverity WARNING = google::WARNING;
+const LogSeverity ERROR = google::ERROR;
+const LogSeverity FATAL = google::FATAL;
+const LogSeverity OFFLEVEL = google::FATAL + 1;
+struct LogData
+{
+  LogData(LogSeverity severity, const char* full_filename,
+          const char* base_filename, int line,
+          const struct ::tm* tm_time,
+          const char* message, size_t message_len);
+
+  LogSeverity level;
+  QString fullFilename;
+  QString baseFilename;
+  int line;
+  QDateTime time;
+  QString message;
+  //Formatted log message
+  QString formatted;
+};
+typedef std::function<void(const LogData&)> LogFunction;
+
+// might return nullptr
+LogSinkPtr createFileLogSink(const QString &filename);
+LogSinkPtr createFunctorLogSink(LogFunction f);
+void addLogSink(LogSinkPtr sink);
+void removeLogSink(LogSinkPtr sink);
+
+QString levelToString(LogSeverity theLevel);
+
+} // namespace nim
+
+#define LTRACE() VLOG(2)
+#define LDEBUG() VLOG(1)
+#define LINFO() LOG(INFO)
+#define LWARN() LOG(WARNING)
+#define LERROR() LOG(ERROR)
+#define LFATAL() LOG(FATAL)
+
+#define LINFOF(file, line, function) google::LogMessage(file, line, google::GLOG_INFO).stream()
+#define LWARNF(file, line, function) google::LogMessage(file, line, google::GLOG_WARNING).stream()
+#define LERRORF(file, line, function) google::LogMessage(file, line, google::GLOG_ERROR).stream()
+#define LFATALF(file, line, function) google::LogMessage(file, line, google::GLOG_FATAL).stream()
+
+inline std::ostream& operator << (std::ostream& s, const QString& q)
+{
+  return (s << qPrintable(q));
+}
+
+template<typename T>
+inline QByteArray qtTypeToQByteArray(const T& v)
+{
+  QByteArray buffer;
+  QDataStream out(&buffer, QIODevice::WriteOnly);
+  out << v;
+  return buffer;
+}
+
+std::ostream& operator << (std::ostream& s, const QPointF& v);
+
+#else
+
 #include <QsLog.h>
 
 namespace nim {
 
-void initLogging(const QString &filename);
+void initLogging(const char* argv0, const QString &filename);
+inline void shutdownLogging() {}
 
 typedef QsLogging::Destination LogSink;
 typedef QsLogging::DestinationPtr LogSinkPtr;
-typedef QsLogging::LogMessage LogMessage;
+typedef QsLogging::LogMessage LogData;
 typedef QsLogging::Level LogSeverity;
-const LogSeverity FatalLevel   = QsLogging::FatalLevel;
-const LogSeverity ErrorLevel   = QsLogging::ErrorLevel;
-const LogSeverity WarnLevel    = QsLogging::WarnLevel;
-const LogSeverity InfoLevel    = QsLogging::InfoLevel;
-const LogSeverity DebugLevel   = QsLogging::DebugLevel;
-const LogSeverity TraceLevel   = QsLogging::TraceLevel;
-const LogSeverity OffLevel     = QsLogging::OffLevel;
 
-LogSinkPtr addFileLogSink(const QString &filename);
+LogSinkPtr createFileLogSink(const QString &filename);
 LogSinkPtr createFunctorLogSink(QsLogging::Destination::LogFunction f);
 void addLogSink(LogSinkPtr sink);
 void removeLogSink(const LogSinkPtr& sink);
+
+QString levelToString(LogSeverity theLevel);
 
 // ---------------------- Logging Macro definitions --------------------------
 
@@ -116,15 +196,13 @@ void removeLogSink(const LogSinkPtr& sink);
 } // namespace nim
 
 // Log severity level constants.
-#ifdef _WIN32
-#undef ERROR
-#endif
 const QsLogging::Level FATAL   = QsLogging::FatalLevel;
 const QsLogging::Level ERROR   = QsLogging::ErrorLevel;
 const QsLogging::Level WARNING = QsLogging::WarnLevel;
 const QsLogging::Level INFO    = QsLogging::InfoLevel;
 const QsLogging::Level DEBUG   = QsLogging::DebugLevel;
 const QsLogging::Level TRACE   = QsLogging::TraceLevel;
+const QsLogging::Level OFFLEVEL = QsLogging::OffLevel;
 
 // glog style
 
@@ -263,5 +341,7 @@ void logContainer(QsLogging::Level severity, const IteratorType &begin, const It
   else
     LOG(severity) << "End container" << name ;
 }
+
+#endif //_USE_QSLOG_
 
 #endif // ZLOG_H

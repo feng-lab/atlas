@@ -51,6 +51,9 @@ else
   git clone git@github.com:google/glog.git $srcDIR
 fi
 
+# patch
+$currDIR/massedit.py -w -e "re.sub(r'                           time_pid_string', r'\"\"', line)" -e "re.sub(r'O_CREAT \| O_EXCL', r'O_APPEND', line)" $srcDIR/src/logging.cc
+
 if [ -d $buildDIR ]
 then
   rm -rf $buildDIR
@@ -61,6 +64,9 @@ cd $buildDIR
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.8 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk -Dgflags_DIR:PATH=$currDIR/gflags/lib/cmake/gflags -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++14" $srcDIR
 
 make -j $numCores install
+
+# unpatch
+mv -f $srcDIR/src/logging.cc.bak $srcDIR/src/logging.cc
 
 cd $currDIR
 rm -rf $buildDIR

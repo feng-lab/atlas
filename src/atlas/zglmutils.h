@@ -24,7 +24,9 @@
 #include <iostream>
 #include <sstream>
 #include <tuple>
+#ifdef _USE_QSLOG_
 #include <QDebug>
+#endif
 #include <QRegExp>
 #include <QStringList>
 #include <QColor>
@@ -392,6 +394,7 @@ std::ostream& operator << (std::ostream& s, const glm::tquat<T,P>& q)
   return (s << qPrintable(toQString(q)));
 }
 
+#ifdef _USE_QSLOG_
 //-------------------------------------------------------------------------------------------------------------------------
 // qDebug print
 
@@ -443,6 +446,7 @@ QDebug operator << (QDebug s, const glm::tquat<T,P>& q)
   s.nospace() << qPrintable(toQString(q));
   return s.space();
 }
+#endif
 
 } // namespace nim
 

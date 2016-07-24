@@ -13,7 +13,7 @@ ZObjEditWidget::ZObjEditWidget(ZDoc *doc, QWidget *mw)
   : QTabWidget(mw)
   , m_doc(doc)
   , m_logWidget(new QPlainTextEdit(this))
-  , m_logOutputDestination(createFunctorLogSink([this](const LogMessage &message) { writeLogMessage(message); }))
+  , m_logOutputDestination(createFunctorLogSink([this](const LogData &message) { writeLogData(message); }))
 {
   addTab(m_logWidget, "Log Output");
   connect(m_doc, &ZDoc::objAboutToBeRemoved, this, &ZObjEditWidget::removeObjEditWidgetOfObj);
@@ -31,7 +31,7 @@ ZObjEditWidget::ZObjEditWidget(ZDoc *doc, QWidget *mw)
   m_errorFormat = m_normalFormat;
   m_errorFormat.setForeground(QBrush(QColor(176,0,0)));
   for (auto const &lm : logMessages()) {
-    writeLogMessage(lm);
+    writeLogData(lm);
   }
   addLogSink(m_logOutputDestination);
 }
@@ -73,10 +73,10 @@ void ZObjEditWidget::updateEditWidgetTitleOfObj(size_t id)
   }
 }
 
-void ZObjEditWidget::writeLogMessage(const LogMessage &message)
+void ZObjEditWidget::writeLogData(const LogData &message)
 {
   bool atBottom = m_logWidget->verticalScrollBar()->value() == m_logWidget->verticalScrollBar()->maximum();
-  if (message.level <= InfoLevel) {
+  if (message.level <= INFO) {
     m_logWidget->appendPlainText(message.formatted);
   } else {
     m_logWidget->setCurrentCharFormat(m_errorFormat);

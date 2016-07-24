@@ -20,7 +20,7 @@ public:
   void updateEditWidgetTitleOfObj(size_t id);
 
 private:
-  void writeLogMessage(const LogMessage &message);
+  void writeLogData(const LogData &message);
 
   void removeObjEditWidgetOfObj(size_t id);
   void closeTab(int index);

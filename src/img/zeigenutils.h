@@ -18,6 +18,7 @@
 
 namespace nim {
 
+#ifdef _USE_QSLOG_
 // qDebug output of eigen matrix and vector
 template<typename Derived>
 QDebug operator << (QDebug s, const Eigen::DenseBase<Derived> & m)
@@ -36,6 +37,7 @@ QDebug operator << (QDebug s, const Eigen::WithFormat<ExpressionType> & m)
   s.nospace() << oss.str().c_str();
   return s.space();
 }
+#endif
 
 template<typename Derived>
 QString matrixToQString(const Eigen::DenseBase<Derived> & m)

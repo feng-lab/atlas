@@ -168,18 +168,18 @@ ZCpuInfo::ZCpuInfo()
 
 void ZCpuInfo::logCpuInfo() const
 {
-  LINFO() << "CPU String:" << sCPU;
-  LINFO() << "CPU Brand String:" << sCPUBrand;
-  LINFO() << "Stepping ID:" << nSteppingID << " Model ID:" << nModel << " Family ID:" << nFamily << " Type:" << nProcessorType
-          << " Ext.Model ID:" << nExtendedmodel << " Ext.Family ID:" << nExtendedfamily;
-  LINFO() << "Number of Cores:" << nPhysicalCores;
-  LINFO() << "Number of Threads:" << nLogicalCores;
-  LINFO() << "Cache Line:" << nCacheLine;
-  LINFO() << "L1ICache:" << nL1ICacheSize;
-  LINFO() << "L1DCache:" << nL1DCacheSize;
-  LINFO() << "L2Cache:" << nL2CacheSize;
-  LINFO() << "L3Cache:" << nL3CacheSize;
-  LINFO() << "RAM:" << nPhysicalRAM;
+  LINFO() << "CPU String: " << sCPU;
+  LINFO() << "CPU Brand String: " << sCPUBrand;
+  LINFO() << "Stepping ID: " << nSteppingID << " Model ID: " << nModel << " Family ID: " << nFamily << " Type: " << nProcessorType
+          << " Ext.Model ID: " << nExtendedmodel << " Ext.Family ID: " << nExtendedfamily;
+  LINFO() << "Number of Cores: " << nPhysicalCores;
+  LINFO() << "Number of Threads: " << nLogicalCores;
+  LINFO() << "Cache Line: " << nCacheLine;
+  LINFO() << "L1ICache: " << nL1ICacheSize;
+  LINFO() << "L1DCache: " << nL1DCacheSize;
+  LINFO() << "L2Cache: " << nL2CacheSize;
+  LINFO() << "L3Cache: " << nL3CacheSize;
+  LINFO() << "RAM: " << nPhysicalRAM;
 
   QString instructions = QString(b64Available ? "64 bit Technology" : "") +
       QString(bXOP ? "; XOP" : "") +

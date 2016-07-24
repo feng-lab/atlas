@@ -3,7 +3,9 @@
 
 #include <limits>
 #include <iostream>
+#ifdef _USE_QSLOG_
 #include <QDebug>
+#endif
 
 namespace nim {
 
@@ -136,11 +138,13 @@ template<typename T> inline std::ostream& operator<<(std::ostream& cout, const Z
 {
   return cout << "[" << box.minCorner() << "; " << box.maxCorner() << "]";
 }
+#ifdef _USE_QSLOG_
 template<typename T> QDebug operator<<(QDebug s, const ZBBox<T>& box)
 {
   s.nospace() << "[" << box.minCorner() << "; " << box.maxCorner() << "]";
   return s.space();
 }
+#endif
 
 } // namespace nim
 

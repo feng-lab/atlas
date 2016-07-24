@@ -19,7 +19,7 @@ void FreeImageErrorHandler(FREE_IMAGE_FORMAT fif, const char *message)
     msg = QString("FreeImage %1 Format: %2").arg(FreeImage_GetFormatFromFIF(fif)).arg(message);
   }
   msg = QString("FreeImage: %1").arg(message);
-  LWARN_NLN() << msg;
+  LWARN() << msg;
 }
 
 ZImgInfo readInfoFromFIPImage(fipImage &fipImg)

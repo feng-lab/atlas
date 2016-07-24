@@ -9,6 +9,7 @@
 #include <cassert>
 #include "zioutils.h"
 #include "zstringutils.h"
+#include <QTextStream>
 
 namespace nim {
 

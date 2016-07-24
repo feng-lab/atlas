@@ -11,12 +11,21 @@ LogSinkPtr logModelSinkInstance()
   return modelDestination;
 }
 
-const std::deque<LogMessage>& logMessages()
+#ifdef _USE_QSLOG_
+const std::deque<LogData>& logMessages()
 {
   ZLogModelSink *md = dynamic_cast<ZLogModelSink*>(logModelSinkInstance().data());
   assert(md);
   return md->logMessages();
 }
+#else
+const std::deque<LogData>& logMessages()
+{
+  ZLogModelSink *md = dynamic_cast<ZLogModelSink*>(logModelSinkInstance().get());
+  assert(md);
+  return md->logMessages();
+}
+#endif
 
 const char* const ZLogModelSink::Type = "window";
 
@@ -29,7 +38,8 @@ ZLogModelSink::~ZLogModelSink()
 {
 }
 
-void ZLogModelSink::write(const LogMessage& message)
+#ifdef _USE_QSLOG_
+void ZLogModelSink::write(const LogData& message)
 {
   addEntry(message);
 }
@@ -43,25 +53,33 @@ QString ZLogModelSink::type() const
 {
   return QString::fromLatin1(Type);
 }
-
-void ZLogModelSink::addEntry(const LogMessage& message)
+#else
+void ZLogModelSink::send(LogSeverity severity, const char *full_filename, const char *base_filename, int line,
+                         const tm *tm_time, const char *message, size_t message_len)
 {
-  const int next_idx = static_cast<int>(mLogMessages.size());
+  addEntry(LogData(severity, full_filename, base_filename, line, tm_time, message, message_len));
+}
+
+#endif
+
+void ZLogModelSink::addEntry(const LogData& message)
+{
+  const int next_idx = static_cast<int>(mLogDatas.size());
   beginInsertRows(QModelIndex(), next_idx, next_idx);
   {
     QWriteLocker lock(&mMessagesLock);
-    mLogMessages.push_back(message);
+    mLogDatas.push_back(message);
   }
   endInsertRows();
 
-  if (mMaxItems < std::numeric_limits<size_t>::max() && mLogMessages.size() > mMaxItems) {
+  if (mMaxItems < std::numeric_limits<size_t>::max() && mLogDatas.size() > mMaxItems) {
     {
       QWriteLocker lock(&mMessagesLock);
-      mLogMessages.pop_front();
+      mLogDatas.pop_front();
     }
     // Every item changed
     const QModelIndex idx1 = index(0, 0);
-    const QModelIndex idx2 = index(static_cast<int>(mLogMessages.size()), rowCount());
+    const QModelIndex idx2 = index(static_cast<int>(mLogDatas.size()), rowCount());
     emit dataChanged(idx1, idx2);
   }
 }
@@ -71,14 +89,14 @@ void ZLogModelSink::clear()
   beginResetModel();
   {
     QWriteLocker lock(&mMessagesLock);
-    mLogMessages.clear();
+    mLogDatas.clear();
   }
   endResetModel();
 }
 
-LogMessage ZLogModelSink::at(size_t index)
+LogData ZLogModelSink::at(size_t index)
 {
-  return mLogMessages[index];
+  return mLogDatas[index];
 }
 
 int ZLogModelSink::columnCount(const QModelIndex& parent) const
@@ -92,7 +110,7 @@ int ZLogModelSink::rowCount(const QModelIndex& parent) const
   Q_UNUSED(parent);
   QReadLocker lock(&mMessagesLock);
 
-  return static_cast<int>(mLogMessages.size());
+  return static_cast<int>(mLogDatas.size());
 }
 
 QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
@@ -103,13 +121,13 @@ QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
   if (role == Qt::DisplayRole) {
     QReadLocker lock(&mMessagesLock);
 
-    const LogMessage& item = mLogMessages.at(index.row());
+    const LogData& item = mLogDatas.at(index.row());
 
     switch (index.column()) {
     case TimeColumn:
       return item.time.toLocalTime().toString();
     case LevelNameColumn:
-      return LocalizedLevelName(item.level);
+      return levelToString(item.level);
     case MessageColumn:
       return item.message;
     case FormattedMessageColumn:
@@ -124,15 +142,15 @@ QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
   if (role == Qt::BackgroundColorRole) {
     QReadLocker lock(&mMessagesLock);
 
-    const LogMessage& item = mLogMessages.at(index.row());
+    const LogData& item = mLogDatas.at(index.row());
 
     switch (item.level)
     {
-    case WarnLevel:
+    case WARNING:
       return QVariant(QColor(255, 255, 128));
-    case ErrorLevel:
+    case ERROR:
       return QVariant(QColor(255, 128, 128));
-    case FatalLevel:
+    case FATAL:
       return QVariant(QColor(255, 0, 0));
     default:
       break;

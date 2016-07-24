@@ -140,6 +140,7 @@ std::ostream& ZBenchTimer::print(std::ostream& s) const
   return s;
 }
 
+#ifdef _USE_QSLOG_
 // qDebug output
 QDebug operator << (QDebug s, const ZBenchTimer& m)
 {
@@ -151,5 +152,6 @@ QDebug operator << (QDebug s, const ZBenchTimer& m)
   s.nospace() << outstr.c_str();
   return s.space();
 }
+#endif
 
 } // namespace nim

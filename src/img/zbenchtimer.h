@@ -183,8 +183,10 @@ inline std::ostream& operator <<(std::ostream & s, const ZBenchTimer& m)
   return m.print(s);
 }
 
+#ifdef _USE_QSLOG_
 // qDebug output
 QDebug operator << (QDebug s, const ZBenchTimer& m);
+#endif
 
 } // namespace nim
 

@@ -88,12 +88,12 @@ void ZVideoEncoder::ffmpegFinished(int exitCode, QProcess::ExitStatus exitStatus
 
 void ZVideoEncoder::logStandardError()
 {
-  LERROR() << m_ffmpegProcess->readAllStandardError();
+  LERROR() << m_ffmpegProcess->readAllStandardError().constData();
 }
 
 void ZVideoEncoder::logStandardOutput()
 {
-  LINFO() << m_ffmpegProcess->readAllStandardOutput();
+  LINFO() << m_ffmpegProcess->readAllStandardOutput().constData();
 }
 
 } // namespace nim

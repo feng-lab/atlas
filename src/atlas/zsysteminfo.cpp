@@ -241,15 +241,15 @@ ZSystemInfo::~ZSystemInfo()
 
 void ZSystemInfo::logOSInfo() const
 {
-  //LINFO() << "OS:" << m_osString;
-  LINFO() << "OS:" << QSysInfo::prettyProductName();
-  LINFO() << "Kernel:" << QSysInfo::kernelType() + " " + QSysInfo::kernelVersion();
-  LINFO() << "Build ABI:" << QSysInfo::buildAbi();
-  //LINFO() << "Build CPU:" << QSysInfo::buildCpuArchitecture();
-  LINFO() << "Current CPU:" << QSysInfo::currentCpuArchitecture();
-  LINFO() << "Machine Host Name:" << QSysInfo::machineHostName();
-  //LINFO() << "Product Type:" << QSysInfo::productType();
-  //LINFO() << "Product Version:" << QSysInfo::productVersion();
+  //LINFO() << "OS: " << m_osString;
+  LINFO() << "OS: " << QSysInfo::prettyProductName();
+  LINFO() << "Kernel: " << QSysInfo::kernelType() + " " + QSysInfo::kernelVersion();
+  LINFO() << "Build ABI: " << QSysInfo::buildAbi();
+  //LINFO() << "Build CPU: " << QSysInfo::buildCpuArchitecture();
+  LINFO() << "Current CPU: " << QSysInfo::currentCpuArchitecture();
+  LINFO() << "Machine Host Name: " << QSysInfo::machineHostName();
+  //LINFO() << "Product Type: " << QSysInfo::productType();
+  //LINFO() << "Product Version: " << QSysInfo::productVersion();
 }
 
 bool ZSystemInfo::initializeGL()

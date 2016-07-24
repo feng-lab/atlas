@@ -56,7 +56,7 @@ isEqual(QT_MAJOR_VERSION,5) | greaterThan(QT_MAJOR_VERSION,5) {
 CONFIG += rtti exceptions
 
 CONFIG += static_libtiff
-#CONFIG += use_glog
+CONFIG += use_glog
 
 DEFINES *= QT_USE_QSTRINGBUILDER
 DEFINES += QT_NO_CAST_FROM_BYTEARRAY

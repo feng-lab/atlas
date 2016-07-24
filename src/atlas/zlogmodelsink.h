@@ -37,7 +37,7 @@
 namespace nim {
 
 LogSinkPtr logModelSinkInstance();
-const std::deque<LogMessage>& logMessages();
+const std::deque<LogData>& logMessages();
 
 class ZLogModelSink : public QAbstractTableModel, public LogSink
 {
@@ -56,25 +56,32 @@ public:
   explicit ZLogModelSink(size_t max_items = std::numeric_limits<size_t>::max());
   virtual ~ZLogModelSink();
 
-  void addEntry(const LogMessage& message);
+  void addEntry(const LogData& message);
   void clear();
-  LogMessage at(size_t index);
+  LogData at(size_t index);
 
+#ifdef _USE_QSLOG_
   // Destination overrides
-  virtual void write(const LogMessage& message);
-  virtual bool isValid();
-  virtual QString type() const;
+  virtual void write(const LogData& message) override;
+  virtual bool isValid() override;
+  virtual QString type() const override;
+#else
+  // LogSink interface
+public:
+  virtual void send(LogSeverity severity, const char *full_filename, const char *base_filename, int line,
+                    const tm *tm_time, const char *message, size_t message_len) override;
+#endif
 
   // QAbstractTableModel overrides
-  virtual int columnCount(const QModelIndex& parent = QModelIndex()) const;
-  virtual int rowCount(const QModelIndex& parent = QModelIndex()) const;
-  virtual QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
-  virtual QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+  virtual int columnCount(const QModelIndex& parent = QModelIndex()) const override;
+  virtual int rowCount(const QModelIndex& parent = QModelIndex()) const override;
+  virtual QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
+  virtual QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
-  const std::deque<LogMessage>& logMessages() const { return mLogMessages; }
+  const std::deque<LogData>& logMessages() const { return mLogDatas; }
 
 private:
-  std::deque<LogMessage> mLogMessages;
+  std::deque<LogData> mLogDatas;
   mutable QReadWriteLock mMessagesLock;
   size_t mMaxItems;
 };

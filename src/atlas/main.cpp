@@ -69,24 +69,40 @@ struct MacEventFilter : public QObject
 
 void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
-  switch (type) {
-  case QtDebugMsg:
-    LDEBUGF(context.file, context.line, context.function) << qPrintable(msg);
-    break;
-  case QtInfoMsg:
-    LINFOF(context.file, context.line, context.function) << qPrintable(msg);
-    break;
-  case QtWarningMsg:
-    LWARNF(context.file, context.line, context.function) << qPrintable(msg);
-    break;
-  case QtCriticalMsg:
-    LERRORF(context.file, context.line, context.function) << qPrintable(msg);
-    break;
-  case QtFatalMsg:
-    LFATALF(context.file, context.line, context.function) << qPrintable(msg);
-    abort();
-  default:
-    break;
+  if (context.file && context.line) {
+    switch (type) {
+    case QtInfoMsg:
+      LINFOF(context.file, context.line, context.function) << qPrintable(msg);
+      break;
+    case QtWarningMsg:
+      LWARNF(context.file, context.line, context.function) << qPrintable(msg);
+      break;
+    case QtCriticalMsg:
+      LERRORF(context.file, context.line, context.function) << qPrintable(msg);
+      break;
+    case QtFatalMsg:
+      LFATALF(context.file, context.line, context.function) << qPrintable(msg);
+      abort();
+    default:
+      break;
+    }
+  } else {
+    switch (type) {
+    case QtInfoMsg:
+      LINFO() << qPrintable(msg);
+      break;
+    case QtWarningMsg:
+      LWARN() << qPrintable(msg);
+      break;
+    case QtCriticalMsg:
+      LERROR() << qPrintable(msg);
+      break;
+    case QtFatalMsg:
+      LFATAL() << qPrintable(msg);
+      abort();
+    default:
+      break;
+    }
   }
 }
 
@@ -117,7 +133,7 @@ int main(int argc, char *argv[])
   app.setOrganizationName("Atlas");
 
   // init the logging mechanism
-  nim::initLogging(ZSystemInfoInstance.logDir().filePath("atlas_log.txt"));
+  nim::initLogging(argv[0], ZSystemInfoInstance.logDir().filePath("atlas_log.txt"));
   nim::addLogSink(nim::logModelSinkInstance());
 
   qInstallMessageHandler(myMessageOutput);
@@ -132,7 +148,11 @@ int main(int argc, char *argv[])
   // todo: check this for amd cpu
   MKLVersion mklVer;
   MKL_Get_Version(&mklVer);
-  LINFO() << "MKL:" << mklVer.Platform << mklVer.Processor << mklVer.MajorVersion << mklVer.MinorVersion << mklVer.UpdateVersion << mklVer.Build;
+  LINFO() << "MKL: " << mklVer.Platform << mklVer.Processor << " "
+          << mklVer.MajorVersion << " "
+          << mklVer.MinorVersion << " "
+          << mklVer.UpdateVersion << " "
+          << mklVer.Build;
   LINFO() << "";
 #endif
 
@@ -173,7 +193,12 @@ int main(int argc, char *argv[])
 
   // pointer to static data, no need to delete
   const IppLibraryVersion* ippVer = ippiGetLibVersion();
-  LINFO() << "IPP:" << ippVer->Name << ippVer->Version << ippVer->major << ippVer->minor << ippVer->majorBuild << ippVer->build;
+  LINFO() << "IPP: " << ippVer->Name << " "
+          << ippVer->Version << " "
+          << ippVer->major << " "
+          << ippVer->minor << " "
+          << ippVer->majorBuild << " "
+          << ippVer->build;
   LINFO() << "";
 #endif
 
@@ -198,6 +223,7 @@ int main(int argc, char *argv[])
   }
 
   fftw_cleanup_threads();
+  nim::shutdownLogging();
 
   return result;
 }

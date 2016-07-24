@@ -3,7 +3,6 @@
 #include <QPainter>
 #include <QPushButton>
 #include <QStylePainter>
-#include <QDebug>
 #include <QAbstractItemView>
 #include "zlog.h"
 
