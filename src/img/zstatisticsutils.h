@@ -228,8 +228,6 @@ struct StandardDeviationMap {
 
   ResultType
   operator()(const std::pair<size_t,size_t> &range) const {
-    //std::transform(begin+range.first, begin+range.second, diffbegin+range.first,
-    //               std::bind2nd(std::minus<double>(), meanV));
     ResultType meanVLocal = m_meanV;
     std::transform(m_begin+range.first, m_begin+range.second, m_diffbegin+range.first,
                    [meanVLocal](ResultType v) { return v - meanVLocal; });
@@ -257,8 +255,6 @@ void meanAndStandardDeviation(RandomAccessIterator begin, RandomAccessIterator e
   meanV = mean(begin, end, useMultithreading);
   ResultType sq_sum;
   if (!useMultithreading || end-begin < MULTITHREAD_THRESHOLD) {
-    //std::transform(begin, end, diff.begin(),
-    //               std::bind2nd(std::minus<double>(), meanV));
     std::transform(begin, end, diff.begin(),
                    [meanV](ResultType v) { return v - meanV; });
     sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);

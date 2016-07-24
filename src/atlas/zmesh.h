@@ -48,10 +48,8 @@ public:
   explicit ZMesh(const QString &filename);
   virtual ~ZMesh();
 
-#ifndef _USE_MSVC2013_
   ZMesh(ZMesh&&) = default;
   ZMesh& operator=(ZMesh&&) = default;
-#endif
   ZMesh(const ZMesh&) = default;
   ZMesh& operator=(const ZMesh&) = default;
 

@@ -331,7 +331,7 @@ void stnTrajectory()
 
   tbb::parallel_for(
         tbb::blocked_range<size_t>(0, exps.size()),
-        [&](const tbb::blocked_range<size_t>& range){
+        [&](const tbb::blocked_range<size_t>& range) {
     for (size_t expIdx = range.begin(); expIdx != range.end(); ++expIdx) {
       const QString& str = exps[expIdx];
 //      if (!str.contains("298000880") &&

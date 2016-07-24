@@ -14,10 +14,8 @@ public:
   ZPunctum();
   ZPunctum(double x, double y, double z, double r);
 
-#ifndef _USE_MSVC2013_
   ZPunctum(ZPunctum&&) = default;
   ZPunctum& operator=(ZPunctum&&) = default;
-#endif
   ZPunctum(const ZPunctum&) = default;
   ZPunctum& operator=(const ZPunctum&) = default;
 

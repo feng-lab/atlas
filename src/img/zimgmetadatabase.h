@@ -37,10 +37,8 @@ public:
   virtual ~ZImgMetadataBase()
   {}
 
-#ifndef _USE_MSVC2013_
   ZImgMetadataBase(ZImgMetadataBase&&) = default;
   ZImgMetadataBase& operator=(ZImgMetadataBase&&) = default;
-#endif
   ZImgMetadataBase(const ZImgMetadataBase&) = default;
   ZImgMetadataBase& operator=(const ZImgMetadataBase&) = default;
 

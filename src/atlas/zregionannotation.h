@@ -20,10 +20,8 @@ public:
 
   void clear();
 
-#ifndef _USE_MSVC2013_
   ZRegionAnnotation(ZRegionAnnotation&&) = default;
   ZRegionAnnotation& operator=(ZRegionAnnotation&&) = default;
-#endif
   ZRegionAnnotation(const ZRegionAnnotation&) = default;
   ZRegionAnnotation& operator=(const ZRegionAnnotation&) = default;
 

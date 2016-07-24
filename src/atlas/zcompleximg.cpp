@@ -67,7 +67,6 @@ ZComplexImg ZComplexImg::conj(const ZComplexImg &img)
 
 ZComplexImg& ZComplexImg::operator+=(const std::complex<double>& rhs)
 {
-  //std::transform(m_data.begin(), m_data.end(), m_data.begin(), std::bind2nd(std::plus<std::complex<double>>(), rhs));
   for (std::complex<double> &v : m_data)
     v += rhs;
   return *this;
@@ -99,7 +98,6 @@ ZComplexImg ZComplexImg::operator+(const ZComplexImg& rhs) const
 
 ZComplexImg& ZComplexImg::operator-=(const std::complex<double>& rhs)
 {
-  //std::transform(m_data.begin(), m_data.end(), m_data.begin(), std::bind2nd(std::minus<std::complex<double>>(), rhs));
   for (std::complex<double> &v : m_data)
     v -= rhs;
   return *this;
@@ -138,7 +136,6 @@ ZComplexImg ZComplexImg::operator-() const
 
 ZComplexImg& ZComplexImg::operator*=(const std::complex<double>& rhs)
 {
-  //std::transform(m_data.begin(), m_data.end(), m_data.begin(), std::bind2nd(std::multiplies<std::complex<double>>(), rhs));
   for (std::complex<double> &v : m_data)
     v *= rhs;
   return *this;
@@ -170,7 +167,6 @@ ZComplexImg ZComplexImg::operator*(const ZComplexImg& rhs) const
 
 ZComplexImg& ZComplexImg::operator/=(const std::complex<double>& rhs)
 {
-  //std::transform(m_data.begin(), m_data.end(), m_data.begin(), std::bind2nd(std::divides<std::complex<double>>(), rhs));
   for (std::complex<double> &v : m_data)
     v /= rhs;
   return *this;

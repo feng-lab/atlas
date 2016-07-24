@@ -6,9 +6,6 @@
 #endif
 #include "zlog.h"
 #include <functional>
-#ifdef _USE_MSVC2013_
-#include <boost/bind.hpp>
-#endif
 #include "zimgdisplay.h"
 
 namespace nim {
@@ -277,27 +274,17 @@ void ZImgPackDisplay::setQImageDataCM(const ZImg &img, QImage &qim) const
   //return;
 
 #ifndef _USE_QTCONCURRENT_
-#ifdef _USE_MSVC2013_
   if (alphaChannelIdx < 0) {
     tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),
-                      boost::bind(&ZImgPackDisplay::setQImageDataBlockCM<TVoxel>, this, &img, &qim,
-                                  _1, &channels, &colormaps));
+                      [&](const tbb::blocked_range<size_t>& range) {
+      setQImageDataBlockCM<TVoxel>(&img, &qim, range, &channels, &colormaps);
+    });
   } else {
     tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),
-                      boost::bind(&ZImgPackDisplay::setQImageDataBlockCMMultAlpha<TVoxel>, this, &img, &qim,
-                                  _1, &channels, &colormaps));
+                      [&](const tbb::blocked_range<size_t>& range) {
+      setQImageDataBlockCMMultAlpha<TVoxel>(&img, &qim, range, &channels, &colormaps);
+    });
   }
-#else
-  if (alphaChannelIdx < 0) {
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),
-                      std::bind(&ZImgPackDisplay::setQImageDataBlockCM<TVoxel>, this, &img, &qim,
-                                std::placeholders::_1, &channels, &colormaps));
-  } else {
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),
-                      std::bind(&ZImgPackDisplay::setQImageDataBlockCMMultAlpha<TVoxel>, this, &img, &qim,
-                                std::placeholders::_1, &channels, &colormaps));
-  }
-#endif
 #else
   size_t numBlock = std::min<size_t>(img.height(), 32);
   size_t blockHeight = img.height() / numBlock;
@@ -427,15 +414,10 @@ void ZImgPackDisplay::setQImageData(const ZImg &img, QImage &qim) const
   }
 
 #ifndef _USE_QTCONCURRENT_
-#ifdef _USE_MSVC2013_
   tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),
-                    boost::bind(&ZImgPackDisplay::setQImageDataBlock<TVoxel>, this, &img, &qim,
-                                _1, &channels));
-#else
-  tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),
-                    std::bind(&ZImgPackDisplay::setQImageDataBlock<TVoxel>, this, &img, &qim,
-                              std::placeholders::_1, &channels));
-#endif
+                    [&](const tbb::blocked_range<size_t>& range) {
+    setQImageDataBlock<TVoxel>(&img, &qim, range, &channels);
+  });
 #else
   size_t numBlock = std::min<size_t>(img.height(), 32);
   size_t blockHeight = img.height() / numBlock;

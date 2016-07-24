@@ -13,7 +13,7 @@ ZObjEditWidget::ZObjEditWidget(ZDoc *doc, QWidget *mw)
   : QTabWidget(mw)
   , m_doc(doc)
   , m_logWidget(new QPlainTextEdit(this))
-  , m_logOutputDestination(createFunctorLogSink(std::bind(&ZObjEditWidget::writeLogMessage, this, std::placeholders::_1)))
+  , m_logOutputDestination(createFunctorLogSink([this](const LogMessage &message) { writeLogMessage(message); }))
 {
   addTab(m_logWidget, "Log Output");
   connect(m_doc, &ZDoc::objAboutToBeRemoved, this, &ZObjEditWidget::removeObjEditWidgetOfObj);

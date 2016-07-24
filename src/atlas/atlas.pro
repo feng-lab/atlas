@@ -21,7 +21,6 @@ QMAKE_CXXFLAGS += /bigobj /GL # Enables whole program optimization.
 QMAKE_LFLAGS += /LTCG # Link-time Code Generation
 
 DEFINES += _CRT_SECURE_NO_WARNINGS NOMINMAX
-#DEFINES += _USE_MSVC2013_
 
 INCLUDEPATH += $$PWD/../3rdparty $$PWD/3rdparty/../eigen $$PWD/../3rdparty/boost $$PWD/../3rdparty/glm $$PWD/../3rdparty/folly
 

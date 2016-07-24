@@ -172,7 +172,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
       m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
       tbb::parallel_for(
             tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-            [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range){
+            [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
         ccSet.insert(range.begin(), range.end()); // inserts a sequence
       }
       );
@@ -183,7 +183,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
       m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
       tbb::parallel_for(
             tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-            [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range){
+            [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
         ccSet.insert(range.begin(), range.end()); // inserts a sequence
       }
       );

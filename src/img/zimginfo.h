@@ -18,10 +18,8 @@ struct ZImgInfo
   void clear();
   void swap(ZImgInfo &other) noexcept;
 
-#ifndef _USE_MSVC2013_
   ZImgInfo(ZImgInfo&&) = default;
   ZImgInfo& operator=(ZImgInfo&&) = default;
-#endif
   ZImgInfo(const ZImgInfo&) = default;
   ZImgInfo& operator=(const ZImgInfo&) = default;
 

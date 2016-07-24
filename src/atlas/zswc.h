@@ -60,10 +60,8 @@ public:
   // might throw ZIOException
   explicit ZSwc(const QString &filename) { load(filename); }
 
-#ifndef _USE_MSVC2013_
   ZSwc(ZSwc&&) = default;
   ZSwc& operator=(ZSwc&&) = default;
-#endif
   ZSwc(const ZSwc&) = default;
   ZSwc& operator=(const ZSwc&) = default;
 

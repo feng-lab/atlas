@@ -18,10 +18,9 @@ public:
   ZComplexImg(size_t width, size_t height, size_t depth);
   ~ZComplexImg();
 
-#ifndef _USE_MSVC2013_
+
   ZComplexImg(ZComplexImg&&) = default;
   ZComplexImg& operator=(ZComplexImg&&) = default;
-#endif
   ZComplexImg(const ZComplexImg&) = default;
   ZComplexImg& operator=(const ZComplexImg&) = default;
 

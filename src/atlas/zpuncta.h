@@ -19,10 +19,8 @@ public:
   // might throw ZIOException
   explicit ZPuncta(const QString &filename);
 
-#ifndef _USE_MSVC2013_
   ZPuncta(ZPuncta&&) = default;
   ZPuncta& operator=(ZPuncta&&) = default;
-#endif
   ZPuncta(const ZPuncta&) = default;
   ZPuncta& operator=(const ZPuncta&) = default;
 
