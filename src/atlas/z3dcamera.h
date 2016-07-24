@@ -5,6 +5,7 @@
 #include "zglmutils.h"
 #include <map>
 #include <QFlags>
+#include <vector>
 
 namespace nim {
 

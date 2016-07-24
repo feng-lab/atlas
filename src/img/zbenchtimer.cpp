@@ -1,3 +1,5 @@
+//This header has to be ahead of windows.h to avoid macro conflict (ERROR)
+#include "zlog.h"
 #include "zbenchtimer.h"
 
 namespace nim {

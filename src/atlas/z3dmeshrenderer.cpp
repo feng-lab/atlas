@@ -5,6 +5,7 @@
 #include "zmesh.h"
 #include "z3dtexture.h"
 #include "z3dshaderprogram.h"
+#include "zlog.h"
 
 namespace nim {
 

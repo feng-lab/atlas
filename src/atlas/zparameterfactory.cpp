@@ -8,6 +8,7 @@
 #include "zoptionparameter.h"
 #include "zstringparameter.h"
 #include "zfontparameter.h"
+#include "zlog.h"
 
 namespace nim {
 

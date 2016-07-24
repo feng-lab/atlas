@@ -18,6 +18,8 @@
 #include <vtkAppendPolyData.h>
 
 #include "zswc.h"
+#include "zlog.h"
+#include <map>
 
 namespace {
 

@@ -12,9 +12,6 @@
     bt.stopAndPrint();
   */
 
-//This header has to be ahead of windows.h to avoid macro conflict (ERROR)
-#include "zlog.h"
-
 #if defined(_WIN32) || defined(_WIN64)
 # include <windows.h>
 #elif defined(__APPLE__) && defined(__MACH__)

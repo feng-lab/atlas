@@ -2,6 +2,7 @@
 
 #include "z3dgl.h"
 #include "zexception.h"
+#include <vector>
 
 namespace nim {
 

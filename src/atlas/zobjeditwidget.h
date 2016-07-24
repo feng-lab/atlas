@@ -9,6 +9,8 @@
 
 namespace nim {
 
+struct LogData;
+
 class ZObjEditWidget : public QTabWidget
 {
   Q_OBJECT

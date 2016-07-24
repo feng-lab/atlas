@@ -1,6 +1,8 @@
 #ifndef ZIMGVOXELCOLORMAP
 #define ZIMGVOXELCOLORMAP
 
+#include <QImage>
+
 namespace nim {
 
 // only works for integer pixel

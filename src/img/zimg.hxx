@@ -1,7 +1,6 @@
 #ifndef ZIMG_HXX
 #define ZIMG_HXX
 
-#include "zlog.h"
 #include <cassert>
 #include "zsaturateoperation.h"
 #include "zimg.h"

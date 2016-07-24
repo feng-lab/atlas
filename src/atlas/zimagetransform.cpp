@@ -1,5 +1,6 @@
 #include "zimagetransform.h"
 #include <sstream>
+#include "zlog.h"
 
 namespace nim {
 

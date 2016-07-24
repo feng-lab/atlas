@@ -11,6 +11,7 @@
 #include <boost/functional/hash.hpp>
 #include <boost/function_output_iterator.hpp>
 #include "z3dgpuinfo.h"
+#include "zlog.h"
 
 namespace {
 
@@ -547,7 +548,7 @@ ZImg ZImgPack::crop(const ZImgRegion &region) const
 
 ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) const
 {
-  LINFO() << width << height << depth;
+  LINFO() << width << " " << height << " " << depth;
   assert(width <= m_imgInfo.width && height <= m_imgInfo.height && depth <= m_imgInfo.depth &&
          width > 0 && height > 0 && depth > 0);
   ZImg res;

@@ -2,6 +2,7 @@
 
 #include <FreeImagePlus.h>
 #include <QFile>
+#include "zlog.h"
 
 namespace {
 

@@ -5,6 +5,8 @@
 #include "zglmutils.h"
 #include "z3dshader.h"
 #include "z3dcontext.h"
+#include <map>
+#include <vector>
 
 #ifdef _USE_GLEW_
 #ifdef __APPLE__

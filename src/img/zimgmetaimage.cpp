@@ -5,6 +5,7 @@
 #include <QDir>
 #include <metaImage.h>
 #include "zimgsliceprovider.h"
+#include "zlog.h"
 
 namespace nim {
 

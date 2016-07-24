@@ -7,6 +7,7 @@
 #include <tbb/concurrent_unordered_set.h>
 #include <QApplication>
 #include "zbenchtimer.h"
+#include "zlog.h"
 
 namespace nim {
 

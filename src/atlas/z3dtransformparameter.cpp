@@ -3,6 +3,7 @@
 #include <QGroupBox>
 #include <QPushButton>
 #include "zwidgetsgroup.h"
+#include "zlog.h"
 
 namespace {
 

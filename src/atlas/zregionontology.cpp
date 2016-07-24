@@ -6,6 +6,7 @@
 #include <QJsonArray>
 #include <QObject>
 #include "zexception.h"
+#include "zlog.h"
 
 //#include <CGAL/Surface_mesh_default_triangulation_3.h>
 //#include <CGAL/Surface_mesh_default_criteria_3.h>

@@ -6,7 +6,6 @@
 #include "zglmutils.h"
 #include <QList>
 #include <QString>
-#include "zlog.h"
 
 namespace nim {
 
@@ -208,10 +207,8 @@ public:
 
   void setNameForEachValue(const QList<QString> &other)
   {
-    if (static_cast<size_t>(other.size()) >= this->m_value.length())
-      m_nameOfEachValue = other;
-    else
-      LERROR() << "input names do not have enough member";
+    assert(static_cast<size_t>(other.size()) >= this->m_value.length());
+    m_nameOfEachValue = other;
   }
 
   // for some widget style all subwidgets be bound by a groupbox
@@ -499,10 +496,8 @@ public:
 
   void setNameForEachValue(const QList<QString> &other)
   {
-    if (other.size() >= 2)
-      m_nameOfEachValue = other;
-    else
-      LERROR() << "input names do not have enough member";
+    assert(other.size() >= 2);
+    m_nameOfEachValue = other;
   }
 
   void setRange(typename T::value_type min, typename T::value_type max)

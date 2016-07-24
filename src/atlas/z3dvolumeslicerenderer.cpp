@@ -3,6 +3,7 @@
 #include "z3dtexture.h"
 #include "z3dvolume.h"
 #include "z3dimg.h"
+#include "zlog.h"
 
 namespace nim {
 

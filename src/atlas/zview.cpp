@@ -15,6 +15,7 @@
 #include "zactiongroup.h"
 #include "zroidoc.h"
 #include "ztakescreenshotwidget.h"
+#include "zlog.h"
 
 namespace nim {
 

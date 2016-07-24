@@ -14,6 +14,7 @@
 #include "ztiff.h"
 #include "zstatisticsutils.h"
 #include "zimgregioniterator.h"
+#include "zlog.h"
 
 //#define DUMP_CZI_INFO
 #define NO_MIXED_TILE

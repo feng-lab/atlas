@@ -3,6 +3,7 @@
 
 #include <QStringList>
 #include "z3dgl.h"
+#include <vector>
 
 namespace nim {
 

@@ -6,6 +6,7 @@
 #include "zbenchtimer.h"
 #include <folly/ScopeGuard.h>
 #include <boost/align/aligned_allocator.hpp>
+#include "zlog.h"
 
 namespace {
 

@@ -6,6 +6,7 @@
 #include <QApplication>
 #include <functional>
 #include <memory>
+#include <vector>
 
  namespace nim {
 

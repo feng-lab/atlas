@@ -11,6 +11,7 @@
 #include "zimgmerge.h"
 #include "zstringutils.h"
 #include "zsysteminfo.h"
+#include "zlog.h"
 
 namespace {
 

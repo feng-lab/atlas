@@ -4,6 +4,7 @@
 #include <boost/graph/connected_components.hpp>
 #include <boost/graph/kruskal_min_spanning_tree.hpp>
 #include <boost/graph/filtered_graph.hpp>
+#include "zlog.h"
 
 namespace {
 

@@ -6,6 +6,7 @@
 #include "z3dtexture.h"
 #include <QLabel>
 #include <QJsonArray>
+#include "zlog.h"
 
 namespace nim {
 
