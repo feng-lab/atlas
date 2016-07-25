@@ -198,7 +198,7 @@ void initLogging(const char*, const QString &filename)
   QsLogging::Logger& logger = QsLogging::Logger::instance();
   QsLogging::DestinationPtr fileDestination(
         QsLogging::DestinationFactory::MakeFileDestination(filename + "_log.txt", QsLogging::EnableLogRotation,
-                                                           QsLogging::MaxSizeBytes(5e7), QsLogging::MaxOldLogCount(20)));
+                                                           QsLogging::MaxSizeBytes(1e9), QsLogging::MaxOldLogCount(20)));
   QsLogging::DestinationPtr debugOutputDestination(
         QsLogging::DestinationFactory::MakeDebugOutputDestination());
   logger.addDestination(debugOutputDestination);

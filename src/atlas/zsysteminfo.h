@@ -47,6 +47,7 @@ protected:
 
 private:
   void detectOS();
+  QDir createLogDir() const;
 
 protected:
   QString m_osString;

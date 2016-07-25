@@ -26,7 +26,7 @@
 #include "zmainwindow.h"
 #include "zsysteminfo.h"
 
-#include "zlogdialog.h"
+//#include "zlogdialog.h"
 
 namespace nim {
 
@@ -167,8 +167,16 @@ void Z3DMainWindow::activateWindowIfNot()
 
 void Z3DMainWindow::viewLog()
 {
-  ZLogDialog logDialog(logModelSinkInstance(), this);
-  logDialog.exec();
+  //ZLogDialog logDialog(logModelSinkInstance(), this);
+  //logDialog.exec();
+  QStringList filters;
+  filters << "atlas*_log.txt";
+  QFileInfoList list = ZSystemInfoInstance.logDir().entryInfoList(filters,
+                                                                  QDir::Files | QDir::NoSymLinks,
+                                                                  QDir::Name);  // sorted by modification time
+  if (!list.isEmpty()) {
+    QDesktopServices::openUrl(QUrl::fromLocalFile(list.last().absoluteFilePath()));
+  }
 }
 
 void Z3DMainWindow::openLogFolder()

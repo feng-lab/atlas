@@ -9,6 +9,7 @@
 #include "zmainwindow.h"
 #include "z3dmainwindow.h"
 #include <QApplication>
+#include <QDateTime>
 
 #ifndef _USE_GLEW_
 #include <glbinding/Binding.h>
@@ -385,24 +386,8 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes) const
 
 QDir ZSystemInfo::logDir() const
 {
-  QDir dir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation));
-  if (!dir.exists())
-    dir.mkpath(".");
-  QString logFolderName = "Logs";
-#ifdef __APPLE__
-  QDir osxLogDir = dir;
-  // from ~/Library/Application Support/company/app to ~/Library/Logs
-  if (osxLogDir.cdUp() && osxLogDir.cdUp() && osxLogDir.cdUp() && osxLogDir.cd("Logs")) {
-    dir = osxLogDir;
-    logFolderName = QCoreApplication::applicationName();
-  }
-#endif
-  if (!dir.mkpath(logFolderName))
-    dir.remove(logFolderName);
-  if (dir.mkpath(logFolderName))
-    return QDir(dir.absoluteFilePath(logFolderName));
-  else
-    return dir;
+  static QDir dir = createLogDir();
+  return dir;
 }
 
 QString ZSystemInfo::lastOpenedObjPath(const QString &typeName) const
@@ -525,6 +510,29 @@ void ZSystemInfo::detectOS()
   m_osString = QString("%1 %2 %3 %4").arg(name.sysname).arg(name.release).arg(name.version).arg(name.machine);
 
 #endif // Q_OS_WIN
+}
+
+QDir ZSystemInfo::createLogDir() const
+{
+  QDir dir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation));
+  if (!dir.exists())
+    dir.mkpath(".");
+  QString logFolderName = "Logs";
+#ifdef __APPLE__
+  QDir osxLogDir = dir;
+  // from ~/Library/Application Support/company/app to ~/Library/Logs
+  if (osxLogDir.cdUp() && osxLogDir.cdUp() && osxLogDir.cdUp() && osxLogDir.cd("Logs")) {
+    dir = osxLogDir;
+    logFolderName = QCoreApplication::applicationName();
+  }
+#endif
+  logFolderName += QString("/%1_LOG").arg(QDateTime::currentDateTime().toString("yyyyMMdd-hhmmss.zzz"));
+  if (!dir.mkpath(logFolderName))
+    dir.remove(logFolderName);
+  if (dir.mkpath(logFolderName))
+    return QDir(dir.absoluteFilePath(logFolderName));
+  else
+    return dir;
 }
 
 } // namespace nim

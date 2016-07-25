@@ -48,7 +48,7 @@
 #include "zregionannotationdoc.h"
 #include "zregionannotationview.h"
 
-#include "zlogdialog.h"
+//#include "zlogdialog.h"
 
 #ifdef Q_OS_OSX
 void qt_mac_set_dock_menu(QMenu *menu);
@@ -273,8 +273,16 @@ void ZMainWindow::openScreenshotPanel()
 
 void ZMainWindow::viewLog()
 {
-  ZLogDialog logDialog(logModelSinkInstance(), this);
-  logDialog.exec();
+  //ZLogDialog logDialog(logModelSinkInstance(), this);
+  //logDialog.exec();
+  QStringList filters;
+  filters << "atlas*_log.txt";
+  QFileInfoList list = ZSystemInfoInstance.logDir().entryInfoList(filters,
+                                                                  QDir::Files | QDir::NoSymLinks,
+                                                                  QDir::Name);  // sorted by modification time
+  if (!list.isEmpty()) {
+    QDesktopServices::openUrl(QUrl::fromLocalFile(list.last().absoluteFilePath()));
+  }
 }
 
 void ZMainWindow::openLogFolder()

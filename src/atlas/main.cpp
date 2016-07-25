@@ -114,19 +114,20 @@ extern "C" {
 }
 #endif
 
-#ifndef _USE_QSLOG_
 void removeOldLogs(const QDir& dir, int numberToKeep = 20)
 {
+  QDir ld(dir);
+  ld.cdUp();
   QStringList filters;
-  filters << "atlas*_log.txt";
-  QFileInfoList list = dir.entryInfoList(filters,
-                                         QDir::Files | QDir::NoSymLinks,
-                                         QDir::Time);  // sorted by modification time
-  for (int i=numberToKeep-1; i < list.size(); ++i) {
-    QFile::remove(list.at(i).absoluteFilePath());
+  filters << "????????""-??????.???_LOG";
+  QFileInfoList list = ld.entryInfoList(filters,
+                                        QDir::Dirs | QDir::NoSymLinks,
+                                        QDir::Name);
+  for (int i=0; i < list.size() - numberToKeep; ++i) {
+    QDir logDir(list.at(i).absoluteFilePath());
+    logDir.removeRecursively();
   }
 }
-#endif
 
 int main(int argc, char *argv[])
 {
@@ -148,9 +149,7 @@ int main(int argc, char *argv[])
 
   // init the logging mechanism
   QDir logDir = ZSystemInfoInstance.logDir();
-#ifndef _USE_QSLOG_
   removeOldLogs(logDir);
-#endif
   nim::initLogging(argv[0], logDir.filePath("atlas"));
   nim::addLogSink(nim::logModelSinkInstance());
 
