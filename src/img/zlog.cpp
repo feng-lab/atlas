@@ -70,24 +70,23 @@ LogData::LogData(LogSeverity severity, const char *full_filename, const char *ba
   , time(QDate(tm_time->tm_year + 1900, tm_time->tm_mon + 1, tm_time->tm_mday),
          QTime(tm_time->tm_hour, tm_time->tm_min, tm_time->tm_sec))
   , message(msg, message_len)
-  , formatted(QString::fromUtf8(msg-40, message_len+40))
   //, formatted(QString::fromStdString(google::LogSink::ToString(severity, base_filename, line,
   //                                                             tm_time, msg, message_len)))
 {
-//  // from glog source code, we move back message pointer to let it point to formatted text
-//  const char* m = msg - 2;
-//  assert(m[1] == ' ');
-//  int numSpace = 0;
-//  while (numSpace != 3) {
-//    --m;
-//    if (*m == ' ')
-//      ++numSpace;
-//  }
-//  m -= 5;
-//  while (*m != 'I' && *m != 'W' && *m != 'E' && *m != 'F') {
-//    --m;
-//  }
-//  formatted = QString::fromUtf8(m, (msg - m) + message_len);
+  // from glog source code, we move back message pointer to let it point to formatted text
+  const char* m = msg - 2;
+  assert(m[1] == ' ');
+  int numSpace = 0;
+  while (numSpace != 3) {
+    --m;
+    if (*m == ' ')
+      ++numSpace;
+  }
+  m -= 5;
+  while (*m != 'I' && *m != 'W' && *m != 'E' && *m != 'F') {
+    --m;
+  }
+  formatted = QString::fromUtf8(m, (msg - m) + message_len);
 }
 
 class FileLogSink : public LogSink

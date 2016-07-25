@@ -3,7 +3,7 @@
 #include "zmainwindow.h"
 
 #include "zlog.h"
-#include "zlogmodelsink.h"
+//#include "zlogmodelsink.h"
 #include <QDir>
 #include <QFileInfo>
 #include "zcpuinfo.h"
@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
   QDir logDir = ZSystemInfoInstance.logDir();
   removeOldLogs(logDir);
   nim::initLogging(argv[0], logDir.filePath("atlas"));
-  nim::addLogSink(nim::logModelSinkInstance());
+  //nim::addLogSink(nim::logModelSinkInstance());
 
   qInstallMessageHandler(myMessageOutput);
 
