@@ -33,13 +33,8 @@ enum class Z3DScreenShotType
 bool GLVersionGE(int majorVersion, int minorVersion);
 #endif
 
-#ifdef _USE_QSLOG_
 GLenum _CheckGLError(const char* file, int line, const char* function);
 #define CHECK_GL_ERROR _CheckGLError(__FILE__, __LINE__, __PRETTY_FUNCTION__)
-#else
-GLenum _CheckGLError(const char* file, int line);
-#define CHECK_GL_ERROR _CheckGLError(__FILE__, __LINE__)
-#endif
 
 bool checkGLState(GLenum pname, bool value);
 bool checkGLState(GLenum pname, GLint value);

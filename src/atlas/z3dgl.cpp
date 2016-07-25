@@ -17,7 +17,6 @@ bool GLVersionGE(int majorVersion, int minorVersion)
 }
 #endif
 
-#ifdef _USE_QSLOG_
 GLenum _CheckGLError(const char* file, int line, const char* function)
 {
   GLenum err = glGetError();
@@ -51,51 +50,16 @@ GLenum _CheckGLError(const char* file, int line, const char* function)
       break;
     }
 
+#ifdef _USE_QSLOG_
     LERRORF(file, line, function) << errStr;
-  }
-
-  return err;
-}
 #else
-GLenum _CheckGLError(const char *file, int line)
-{
-  GLenum err = glGetError();
-
-  if (err != GL_NO_ERROR) {
-    QString errStr;
-    switch (err) {
-    case GL_INVALID_ENUM:
-      errStr = "openGL invalid enumerant";
-      break;
-    case GL_INVALID_VALUE:
-      errStr = "openGL invalid value";
-      break;
-    case GL_INVALID_OPERATION:
-      errStr = "openGL invalid operation";
-      break;
-    case GL_INVALID_FRAMEBUFFER_OPERATION:
-      errStr = "openGL invalid framebuffer operation";
-      break;
-    case GL_STACK_OVERFLOW:
-      errStr = "openGL stack overflow";
-      break;
-    case GL_STACK_UNDERFLOW:
-      errStr = "openGL stack underflow";
-      break;
-    case GL_OUT_OF_MEMORY:
-      errStr = "openGL out of memory";
-      break;
-    default:
-      errStr = "openGL unknown error";
-      break;
-    }
-
+    Q_UNUSED(function)
     LERRORF(file, line, "") << errStr;
+#endif
   }
 
   return err;
 }
-#endif
 
 bool checkGLState(GLenum pname, bool value)
 {

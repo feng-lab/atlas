@@ -55,8 +55,6 @@ QString levelToString(LogSeverity theLevel);
 
 } // namespace nim
 
-#define LTRACE() VLOG(2)
-#define LDEBUG() VLOG(1)
 #define LINFO() LOG(INFO)
 #define LWARN() LOG(WARNING)
 #define LERROR() LOG(ERROR)

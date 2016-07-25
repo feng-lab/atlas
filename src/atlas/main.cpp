@@ -70,41 +70,30 @@ struct MacEventFilter : public QObject
 
 void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
-  if (context.file && context.line) {
     switch (type) {
     case QtInfoMsg:
-      LINFOF(context.file, context.line, context.function) << qUtf8Printable(msg);
+      LINFOF(context.file ? context.file : "QtFile",
+             context.line,
+             context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
       break;
     case QtWarningMsg:
-      LWARNF(context.file, context.line, context.function) << qUtf8Printable(msg);
+      LWARNF(context.file ? context.file : "QtFile",
+             context.line,
+             context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
       break;
     case QtCriticalMsg:
-      LERRORF(context.file, context.line, context.function) << qUtf8Printable(msg);
+      LERRORF(context.file ? context.file : "QtFile",
+              context.line,
+              context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
       break;
     case QtFatalMsg:
-      LFATALF(context.file, context.line, context.function) << qUtf8Printable(msg);
+      LFATALF(context.file ? context.file : "QtFile",
+              context.line,
+              context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
       abort();
     default:
       break;
     }
-  } else {
-    switch (type) {
-    case QtInfoMsg:
-      LINFO() << qUtf8Printable(msg);
-      break;
-    case QtWarningMsg:
-      LWARN() << qUtf8Printable(msg);
-      break;
-    case QtCriticalMsg:
-      LERROR() << qUtf8Printable(msg);
-      break;
-    case QtFatalMsg:
-      LFATAL() << qUtf8Printable(msg);
-      abort();
-    default:
-      break;
-    }
-  }
 }
 
 // force NVidia Optimus to used dedicated graphics

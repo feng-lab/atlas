@@ -77,12 +77,12 @@ LogData::LogData(LogSeverity severity, const char *full_filename, const char *ba
   const char* m = msg - 2;
   assert(m[1] == ' ');
   int numSpace = 0;
-  while (numSpace != 3) {
+  while (numSpace != 2) {
     --m;
     if (*m == ' ')
       ++numSpace;
   }
-  m -= 5;
+  m -= 21;
   while (*m != 'I' && *m != 'W' && *m != 'E' && *m != 'F') {
     --m;
   }

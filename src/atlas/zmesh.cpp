@@ -413,7 +413,6 @@ void ZMesh::interpolate(const ZMesh &ref)
       }
     }
     if (!match) {
-      LDEBUG() << "here";
       if (!ref.m_1DTextureCoordinates.empty())
         m_1DTextureCoordinates.push_back(0.0);
       if (!ref.m_2DTextureCoordinates.empty())
