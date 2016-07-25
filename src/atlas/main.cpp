@@ -73,16 +73,16 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
   if (context.file && context.line) {
     switch (type) {
     case QtInfoMsg:
-      LINFOF(context.file, context.line, context.function) << qPrintable(msg);
+      LINFOF(context.file, context.line, context.function) << qUtf8Printable(msg);
       break;
     case QtWarningMsg:
-      LWARNF(context.file, context.line, context.function) << qPrintable(msg);
+      LWARNF(context.file, context.line, context.function) << qUtf8Printable(msg);
       break;
     case QtCriticalMsg:
-      LERRORF(context.file, context.line, context.function) << qPrintable(msg);
+      LERRORF(context.file, context.line, context.function) << qUtf8Printable(msg);
       break;
     case QtFatalMsg:
-      LFATALF(context.file, context.line, context.function) << qPrintable(msg);
+      LFATALF(context.file, context.line, context.function) << qUtf8Printable(msg);
       abort();
     default:
       break;
@@ -90,16 +90,16 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
   } else {
     switch (type) {
     case QtInfoMsg:
-      LINFO() << qPrintable(msg);
+      LINFO() << qUtf8Printable(msg);
       break;
     case QtWarningMsg:
-      LWARN() << qPrintable(msg);
+      LWARN() << qUtf8Printable(msg);
       break;
     case QtCriticalMsg:
-      LERROR() << qPrintable(msg);
+      LERROR() << qUtf8Printable(msg);
       break;
     case QtFatalMsg:
-      LFATAL() << qPrintable(msg);
+      LFATAL() << qUtf8Printable(msg);
       abort();
     default:
       break;
@@ -114,6 +114,7 @@ extern "C" {
 }
 #endif
 
+#ifndef _USE_QSLOG_
 void removeOldLogs(const QDir& dir, int numberToKeep = 20)
 {
   QStringList filters;
@@ -125,6 +126,7 @@ void removeOldLogs(const QDir& dir, int numberToKeep = 20)
     QFile::remove(list.at(i).absoluteFilePath());
   }
 }
+#endif
 
 int main(int argc, char *argv[])
 {
@@ -146,7 +148,9 @@ int main(int argc, char *argv[])
 
   // init the logging mechanism
   QDir logDir = ZSystemInfoInstance.logDir();
+#ifndef _USE_QSLOG_
   removeOldLogs(logDir);
+#endif
   nim::initLogging(argv[0], logDir.filePath("atlas"));
   nim::addLogSink(nim::logModelSinkInstance());
 

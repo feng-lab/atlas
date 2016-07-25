@@ -92,7 +92,7 @@ void Z3DShaderProgram::link()
       std::vector<char> logbuf(value);
       GLint len;
       glGetProgramInfoLog(m_id, value, &len, logbuf.data());
-      log = QString::fromLatin1(logbuf.data());
+      log = QString::fromUtf8(logbuf.data());
     } else {
       log = "failed";
     }

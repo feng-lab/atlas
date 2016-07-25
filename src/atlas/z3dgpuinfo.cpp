@@ -259,7 +259,7 @@ void Z3DGpuInfo::logGpuInfo() const
 {
   QStringList info = gpuInfo();
   for (int i=0; i<info.size(); ++i) {
-    LINFO() << qPrintable(info[i]);
+    LINFO() << qUtf8Printable(info[i]);
   }
 
   LINFO() << "";

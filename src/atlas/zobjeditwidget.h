@@ -9,7 +9,9 @@
 
 namespace nim {
 
+#ifndef _USE_QSLOG_
 struct LogData;
+#endif
 
 class ZObjEditWidget : public QTabWidget
 {

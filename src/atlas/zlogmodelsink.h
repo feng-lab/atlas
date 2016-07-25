@@ -54,7 +54,6 @@ public:
   };
 
   explicit ZLogModelSink(size_t max_items = std::numeric_limits<size_t>::max());
-  virtual ~ZLogModelSink();
 
   void addEntry(const LogData& message);
   void clear();

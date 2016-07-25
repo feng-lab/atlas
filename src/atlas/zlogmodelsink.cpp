@@ -34,10 +34,6 @@ ZLogModelSink::ZLogModelSink(size_t max_items) :
 {
 }
 
-ZLogModelSink::~ZLogModelSink()
-{
-}
-
 #ifdef _USE_QSLOG_
 void ZLogModelSink::write(const LogData& message)
 {
@@ -51,7 +47,7 @@ bool ZLogModelSink::isValid()
 
 QString ZLogModelSink::type() const
 {
-  return QString::fromLatin1(Type);
+  return QString(Type);
 }
 #else
 void ZLogModelSink::send(LogSeverity severity, const char *full_filename, const char *base_filename, int line,

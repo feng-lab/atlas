@@ -35,11 +35,11 @@ struct LogData
           const char* message, size_t message_len);
 
   LogSeverity level;
-  QString fullFilename;
-  QString baseFilename;
+  QByteArray fullFilename;
+  QByteArray baseFilename;
   int line;
   QDateTime time;
-  QString message;
+  QByteArray message;
   //Formatted log message
   QString formatted;
 };
@@ -69,7 +69,7 @@ QString levelToString(LogSeverity theLevel);
 
 inline std::ostream& operator << (std::ostream& s, const QString& q)
 {
-  return (s << qPrintable(q));
+  return (s << qUtf8Printable(q));
 }
 
 template<typename T>
@@ -331,7 +331,7 @@ void logContainer(QsLogging::Level severity, const IteratorType &begin, const It
     QsLogging::Logger::Helper helper(severity);
     int num = 0;
     while (num < numberPerLine && it != end) {
-      helper.stream() << qPrintable(QString("%1%2").arg(*it).arg(delimiter));
+      helper.stream() << qUtf8Printable(QString("%1%2").arg(*it).arg(delimiter));
       ++it;
       ++num;
     }

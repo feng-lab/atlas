@@ -5,6 +5,7 @@
 #include <QTextCodec>
 #include <QTextStream>
 #include <QPointF>
+#include <cassert>
 
 #ifndef _USE_QSLOG_
 
@@ -48,7 +49,7 @@ void initLogging(const char* argv0, const QString &filename)
   // verbose
   FLAGS_v = 0;  // in vlog_is_on.cc
   // Sets the maximum log file size (in MB).
-  FLAGS_max_log_size = 50;
+  FLAGS_max_log_size = 1800;
   // Sets whether to avoid logging to the disk if the disk is full.
   FLAGS_stop_logging_if_full_disk = true;
 
@@ -61,17 +62,32 @@ void shutdownLogging()
 }
 
 LogData::LogData(LogSeverity severity, const char *full_filename, const char *base_filename, int line,
-                 const tm *tm_time, const char *message, size_t message_len)
+                 const tm *tm_time, const char *msg, size_t message_len)
   : level(severity)
   , fullFilename(full_filename)
   , baseFilename(base_filename)
   , line(line)
   , time(QDate(tm_time->tm_year + 1900, tm_time->tm_mon + 1, tm_time->tm_mday),
          QTime(tm_time->tm_hour, tm_time->tm_min, tm_time->tm_sec))
-  , message(QByteArray(message, message_len))
-  , formatted(QString::fromLocal8Bit(google::LogSink::ToString(severity, base_filename, line,
-                                                               tm_time, message, message_len).c_str()))
+  , message(msg, message_len)
+  , formatted(QString::fromUtf8(msg-40, message_len+40))
+  //, formatted(QString::fromStdString(google::LogSink::ToString(severity, base_filename, line,
+  //                                                             tm_time, msg, message_len)))
 {
+//  // from glog source code, we move back message pointer to let it point to formatted text
+//  const char* m = msg - 2;
+//  assert(m[1] == ' ');
+//  int numSpace = 0;
+//  while (numSpace != 3) {
+//    --m;
+//    if (*m == ' ')
+//      ++numSpace;
+//  }
+//  m -= 5;
+//  while (*m != 'I' && *m != 'W' && *m != 'E' && *m != 'F') {
+//    --m;
+//  }
+//  formatted = QString::fromUtf8(m, (msg - m) + message_len);
 }
 
 class FileLogSink : public LogSink
@@ -83,7 +99,7 @@ public:
   {
     m_file.setFileName(filename);
     if (!m_file.open(QFile::WriteOnly | QFile::Text | QFile::Append)) {
-        LOG(ERROR) << "glog: could not open log file " << qPrintable(filename);
+        LOG(ERROR) << "glog: could not open log file: " << filename;
     } else {
       m_outputStream.setDevice(&m_file);
       m_outputStream.setCodec(QTextCodec::codecForName("UTF-8"));
@@ -98,8 +114,8 @@ public:
                     const tm *tm_time, const char *message, size_t message_len) override
   {
     if (isValid()) {
-      m_outputStream << QString::fromLocal8Bit(google::LogSink::ToString(severity, base_filename, line,
-                                                                         tm_time, message, message_len).c_str())
+      m_outputStream << google::LogSink::ToString(severity, base_filename, line,
+                                                  tm_time, message, message_len).c_str()
                      << endl;
       m_outputStream.flush();
     }
@@ -181,8 +197,8 @@ void initLogging(const char*, const QString &filename)
 {
   QsLogging::Logger& logger = QsLogging::Logger::instance();
   QsLogging::DestinationPtr fileDestination(
-        QsLogging::DestinationFactory::MakeFileDestination(filename, QsLogging::EnableLogRotation,
-                                                           QsLogging::MaxSizeBytes(1e7), QsLogging::MaxOldLogCount(20)));
+        QsLogging::DestinationFactory::MakeFileDestination(filename + "_log.txt", QsLogging::EnableLogRotation,
+                                                           QsLogging::MaxSizeBytes(5e7), QsLogging::MaxOldLogCount(20)));
   QsLogging::DestinationPtr debugOutputDestination(
         QsLogging::DestinationFactory::MakeDebugOutputDestination());
   logger.addDestination(debugOutputDestination);
@@ -230,7 +246,7 @@ QString levelToString(LogSeverity theLevel)
 // support std string
 QDebug operator << (QDebug s, const std::string& m)
 {
-  s.nospace() << QString::fromLocal8Bit(m.c_str());
+  s.nospace() << m.c_str();
   return s.space();
 }
 

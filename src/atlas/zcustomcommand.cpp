@@ -574,7 +574,7 @@ void calcSwcVolume()
     branchMesh.save(outFolder.filePath(fileInfo.baseName() + "_neurite.obj"));
     auto rootProp = rootMesh.properties();
     auto branchProp = branchMesh.properties();
-    LINFO() << qPrintable(fileInfo.baseName()) << ","
+    LINFO() << qUtf8Printable(fileInfo.baseName()) << ","
             << rootProp.surfaceArea*(1.0/9.66/9.66) << ","
             << rootProp.volume*(1.0/9.66/9.66/9.66) << ","
             << branchProp.surfaceArea*(1.0/9.66/9.66) << ","
@@ -869,8 +869,29 @@ void benchSaturateMul()
   bt5.stopAndLog();
 }
 
+QString GetRandomString()
+{
+  const QString possibleCharacters("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+  const int randomStringLength = 100; // assuming you want random strings of 12 characters
+
+  QString randomString;
+  for(int i=0; i<randomStringLength; ++i)
+  {
+    int index = qrand() % possibleCharacters.length();
+    QChar nextChar = possibleCharacters.at(index);
+    randomString.append(nextChar);
+  }
+  return randomString;
+}
+
 void tmp()
 {
+  QStringList logList;
+  for (int i=0; i<1000000; ++i)
+    logList << GetRandomString();
+  for (int i=0; i<logList.size(); ++i)
+    LINFO() << logList.at(i);
+
   using namespace boost::multiprecision;
 
   boost::multiprecision::int128_t res = static_cast<boost::multiprecision::int128_t>(INT64_MIN) * static_cast<boost::multiprecision::int128_t>(1);
@@ -899,7 +920,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  benchSaturateMul();
+  tmp();
   LINFO() << "done";
 }
 

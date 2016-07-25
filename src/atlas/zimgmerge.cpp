@@ -248,7 +248,7 @@ ZImg ZImgMerge::merge(Mode mode, QString *summary) const
   resolveLocations(imgs, refImg, minCost, summ);
   mergeImgs(res, imgs, mode, summ);
 
-  LINFO() << "merge summary:\n" << qPrintable(summ);
+  LINFO() << "merge summary:\n" << qUtf8Printable(summ);
   if (summary)
     summ.swap(*summary);
 

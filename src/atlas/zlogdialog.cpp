@@ -15,13 +15,13 @@ namespace nim {
 
 static const QIcon& pauseIcon()
 {
-  static QIcon icon(QString::fromLatin1(":/LogDialog/images/icon-pause-16.png"));
+  static QIcon icon(QString(":/LogDialog/images/icon-pause-16.png"));
   return icon;
 }
 
 static const QIcon& playIcon()
 {
-  static QIcon icon(QString::fromLatin1(":/LogDialog/images/icon-resume-16.png"));
+  static QIcon icon(QString(":/LogDialog/images/icon-resume-16.png"));
   return icon;
 }
 

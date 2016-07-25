@@ -37,7 +37,7 @@ QString ZImageTransform::paraQString() const
 
 std::ostream& operator << (std::ostream& s, const nim::ZImageTransform& tfm)
 {
-  return (s << qPrintable(tfm.toQString()));
+  return (s << qUtf8Printable(tfm.toQString()));
 }
 
 #ifdef _USE_QSLOG_

@@ -290,12 +290,12 @@ inline ZVoxelCoordinate min(ZVoxelCoordinate::value_type b, const ZVoxelCoordina
 //
 inline std::ostream& operator<<(std::ostream& cout, const ZVoxelCoordinate& c)
 {
-  return cout << qPrintable(c.toQString());
+  return cout << qUtf8Printable(c.toQString());
 }
 #ifdef _USE_QSLOG_
 inline QDebug operator<<(QDebug s, const ZVoxelCoordinate& c)
 {
-  s.nospace() << qPrintable(c.toQString());
+  s.nospace() << qUtf8Printable(c.toQString());
   return s.space();
 }
 #endif

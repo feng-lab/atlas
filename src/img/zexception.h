@@ -20,7 +20,7 @@ public:
   {}
   explicit inline ZException(const std::string& what)
   {
-    m_what = QString::fromLocal8Bit(what.c_str());
+    m_what = QString::fromUtf8(what.c_str());
   }
   explicit inline ZException(const QString& what)
     : m_what(what)
