@@ -68,7 +68,7 @@ public:
   // LogSink interface
 public:
   virtual void send(LogSeverity severity, const char *full_filename, const char *base_filename, int line,
-                    const tm *tm_time, const char *message, size_t message_len) override;
+                    const tm *tm_time, const char *message, size_t prefix_len, size_t message_len) override;
 #endif
 
   // QAbstractTableModel overrides

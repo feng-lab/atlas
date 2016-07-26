@@ -32,7 +32,7 @@ struct LogData
   LogData(LogSeverity severity, const char* full_filename,
           const char* base_filename, int line,
           const struct ::tm* tm_time,
-          const char* message, size_t message_len);
+          const char* message, size_t prefix_len, size_t message_len);
 
   LogSeverity level;
   QByteArray fullFilename;
