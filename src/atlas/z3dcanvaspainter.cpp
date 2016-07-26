@@ -161,24 +161,24 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, Z3DScreenShotType 
       if (sst == Z3DScreenShotType::MonoView) {
         m_monoImg.infoRef().lastChannelIsAlphaChannel = true;
         m_monoImg.correctPreMultipliedColor().flip(Dimension::Y).save(filename);
-        LINFO() << "Saved rendering (" << m_monoImg.width() << "," <<
-                   m_monoImg.height() << ")" << "to file:" << filename;
+        LINFO() << "Saved rendering (" << m_monoImg.width() << ", " <<
+                   m_monoImg.height() << ") to file: " << filename;
       } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
         m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
         m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
         ZImg::cat(m_leftImg, m_rightImg, Dimension::X).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
-        LINFO() << "Saved stereo rendering (" << m_leftImg.width() << "x 2," <<
-                   m_leftImg.height() << ")" << "to file:" << filename;
+        LINFO() << "Saved stereo rendering (" << m_leftImg.width() << " x 2, " <<
+                   m_leftImg.height() << ") to file: " << filename;
       } else {
         m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
         m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
         ZImg::cat(m_leftImg, m_rightImg, Dimension::X).zoom(0.5, 1).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
-        LINFO() << "Saved half sbs stereo rendering (" << m_leftImg.width() << "," <<
-                   m_leftImg.height() << ")" << "to file:" << filename;
+        LINFO() << "Saved half sbs stereo rendering (" << m_leftImg.width() << ", " <<
+                   m_leftImg.height() << ") to file: " << filename;
       }
     }
     catch (ZException const & e) {
-      LERROR() << "Exception:" << e.what();
+      LERROR() << "Exception: " << e.what();
       m_renderToImageError = e.what();
     }
   }
@@ -291,24 +291,24 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, int width, int hei
       if (sst == Z3DScreenShotType::MonoView) {
         m_monoImg.infoRef().lastChannelIsAlphaChannel = true;
         m_monoImg.correctPreMultipliedColor().flip(Dimension::Y).save(filename);
-        LINFO() << "Saved rendering (" << m_monoImg.width() << "," <<
-                   m_monoImg.height() << ")" << "to file:" << filename;
+        LINFO() << "Saved rendering (" << m_monoImg.width() << ", " <<
+                   m_monoImg.height() << ") to file:" << filename;
       } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
         m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
         m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
         ZImg::cat(m_leftImg, m_rightImg, Dimension::X).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
-        LINFO() << "Saved stereo rendering (" << m_leftImg.width() << "x 2," <<
-                   m_leftImg.height() << ")" << "to file:" << filename;
+        LINFO() << "Saved stereo rendering (" << m_leftImg.width() << " x 2, " <<
+                   m_leftImg.height() << ") to file: " << filename;
       } else {
         m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
         m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
         ZImg::cat(m_leftImg, m_rightImg, Dimension::X).zoom(0.5, 1).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
-        LINFO() << "Saved half sbs stereo rendering (" << m_leftImg.width() << "," <<
-                   m_leftImg.height() << ")" << "to file:" << filename;
+        LINFO() << "Saved half sbs stereo rendering (" << m_leftImg.width() << ", " <<
+                   m_leftImg.height() << ") to file:" << filename;
       }
     }
     catch (ZException const & e) {
-      LERROR() << "Exception:" << e.what();
+      LERROR() << "Exception: " << e.what();
       m_renderToImageError = e.what();
     }
   }
@@ -337,7 +337,7 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
     GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
 
     //    if (m_tiledRendering) {
-    //      LINFO() << m_tileStartX << m_tileStartY;
+    //      LINFO() << m_tileStartX << " " << m_tileStartY;
     //    }
 
     if (eye == Z3DEye::Mono) {
@@ -389,7 +389,7 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
     }
   }
   catch (ZException const & e) {
-    LERROR() << "Exception:" << e.what();
+    LERROR() << "Exception: " << e.what();
     m_renderToImageError = e.what();
   }
 }

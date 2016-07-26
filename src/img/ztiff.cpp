@@ -826,7 +826,7 @@ void ZTiff::load(const QString &filename, bool tagOnly)
       QString err(e.what());
       if (err.contains("Colormap", Qt::CaseInsensitive)) {
         m_tif.reset();
-        LWARN() << "Disable colormap because of error" << err;
+        LWARN() << "Disable colormap because of error " << err;
         m_useColormap = false;
         TIFFSetErrorHandler(LibtiffErrorHandlerIgnoreColormapError);
 #if defined(_WIN32) || defined(_WIN64)
@@ -871,7 +871,7 @@ void ZTiff::load(std::istream &fs, bool tagOnly)
       QString err(e.what());
       if (err.contains("Colormap", Qt::CaseInsensitive)) {
         m_tif.reset();
-        LWARN() << "Disable colormap because of error" << err;
+        LWARN() << "Disable colormap because of error " << err;
         m_useColormap = false;
         TIFFSetErrorHandler(LibtiffErrorHandlerIgnoreColormapError);
         m_tif.reset(TIFFStreamOpen("MemTiff", &fs));
@@ -970,7 +970,7 @@ ZImg ZTiff::readThumbnailFromIFD(const ZTiffIFD &ifd)
       readImgFromIFD(ifd, res);
     }
     catch (const ZIOException & e) {
-      LWARN() << "read thumbnail from tif ifd failed:" << e.what();
+      LWARN() << "read thumbnail from tif ifd failed: " << e.what();
       res.clear();
     }
   }
@@ -1087,8 +1087,8 @@ uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigt
   uint32_t n = fs.gcount();
   if (n != dirmemvector.size()) {
     n /= direntrysize;
-    LWARN() << "Could only read" << n << "of" << dircount
-            << "entries in directory at offset" << off;
+    LWARN() << "Could only read " << n << " of " << dircount
+            << " entries in directory at offset " << off;
     dircount = n;
     nextdiroff = 0;
   } else {

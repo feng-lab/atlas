@@ -421,7 +421,7 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs, std
         imgs.push_back(*imgPtr);
         locs.push_back(QPoint(tile.x, tile.y));
         scales.push_back(readRatio);
-        //LINFO() << level << (1<<level) << x << y << width << height;
+        //LINFO() << level << " " << (1<<level) << " " << x << " " << y << " " << width << " " << height;
       }
     }
   }
@@ -915,14 +915,14 @@ ZImg ZImgPack::assembleImg(size_t ratio) const
     }
   }
 
-  //LINFO() << "end assemble level" << level;
+  //LINFO() << "end assemble level " << level;
   return res;
 }
 
 ZImg ZImgPack::assembleImg(size_t ratio, size_t t) const
 {
   assert(ratio >= 1);
-  //LINFO() << "assemble level" << level;
+  //LINFO() << "assemble level " << level;
   ZImgRegion rgn(0,-1,0,-1,0,-1,0,-1,t,t+1);
   ZImgInfo info = rgn.clip(m_imgInfo);
   if (ratio > 1) {
@@ -944,7 +944,7 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t) const
       }
     }
   }
-  //LINFO() << "end assemble level" << level;
+  //LINFO() << "end assemble level " << level;
   return res;
 }
 

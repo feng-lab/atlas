@@ -39,7 +39,7 @@ void Z3DSwcView::docSwcsAdded(const QList<size_t> &objs)
     }
   }
   catch (const ZException & e) {
-    LERROR() << "Failed to render swc:" << e.what();
+    LERROR() << "Failed to render swc: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render swc"), e.what());
   }
 }
@@ -66,7 +66,7 @@ void Z3DSwcView::docSwcAdded(size_t id)
     emit objViewReady(id);
   }
   catch (const ZException & e) {
-    LERROR() << "Failed to render swc:" << e.what();
+    LERROR() << "Failed to render swc: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render swc"), e.what());
   }
 }

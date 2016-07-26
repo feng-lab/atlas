@@ -26,7 +26,7 @@ void ZImgProcess::run()
     emit finished();
   }
   catch (itk::ProcessAborted const & e) {
-    LERROR() << "Process Aborted by User." << e.GetDescription();
+    LERROR() << "Process Aborted by User. " << e.GetDescription();
     emit canceled();
     if (hasParent()) {
       LERROR() << "notifying parent operation..";
@@ -34,7 +34,7 @@ void ZImgProcess::run()
     }
   }
   catch (itk::ExceptionObject const & excp) {
-    LERROR() << "Caught itk exception" << excp.GetDescription();
+    LERROR() << "Caught itk exception: " << excp.GetDescription();
     emit processError(QString(excp.GetDescription()));
     if (hasParent()) {
       LERROR() << "notifying parent operation..";
@@ -42,7 +42,7 @@ void ZImgProcess::run()
     }
   }
   catch (ZProcessAbortException const & e) {
-    LERROR() << "Process Aborted by User." << e.what();
+    LERROR() << "Process Aborted by User. " << e.what();
     emit canceled();
     if (hasParent()) {
       LERROR() << "notifying parent operation..";
@@ -50,7 +50,7 @@ void ZImgProcess::run()
     }
   }
   catch (ZException const & e) {
-    LERROR() << "Caught exception" << e.what();
+    LERROR() << "Caught exception: " << e.what();
     emit processError(e.what());
     if (hasParent()) {
       LERROR() << "notifying parent operation..";

@@ -125,7 +125,7 @@ void Z3DRenderTarget::release()
   //                      GL_LINEAR);
   //    CHECK_GL_ERROR;
   //  }
-  //LINFO() << m_previousDrawFBOID << m_previousReadFBOID;
+  //LINFO() << m_previousDrawFBOID << " " << m_previousReadFBOID;
   glBindFramebuffer(GL_READ_FRAMEBUFFER, m_previousReadFBOID);
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_previousDrawFBOID);
   glViewport(m_previousViewport.x, m_previousViewport.y, m_previousViewport.z, m_previousViewport.w);
@@ -186,12 +186,12 @@ bool Z3DRenderTarget::resize(glm::uvec2 newsize)
   if (newsize == m_size)
     return false;
   if (newsize == glm::uvec2(0)) {
-    LWARN() << "invalid size:" << newsize;
+    LWARN() << "invalid size: " << newsize;
     return false;
   }
   if (newsize.x > static_cast<uint32_t>(Z3DGpuInfoInstance.maxTextureSize()) ||
       newsize.y > static_cast<uint32_t>(Z3DGpuInfoInstance.maxTextureSize())) {
-    LWARN() << "size" << newsize << "exceeds texture size limit:"
+    LWARN() << "size " << newsize << " exceeds texture size limit: "
             << Z3DGpuInfoInstance.maxTextureSize();
     return false;
   }
@@ -327,7 +327,7 @@ void Z3DRenderTarget::attachTextureToFBO(Z3DTexture *texture, GLenum attachment,
     glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, attachment, texture->textureTarget(), texture->id(), 0);
     break;
   }
-  //LINFO() << texture->getId() << texture->getTextureTarget() << GL_TEXTURE_RECTANGLE << texture->getDimensions();
+  //LINFO() << texture->getId() << " " << texture->getTextureTarget() << " " << GL_TEXTURE_RECTANGLE << " " << texture->getDimensions();
   CHECK_GL_ERROR;
   release();
   m_attachments[attachment] = texture;
@@ -391,7 +391,7 @@ void Z3DRenderTarget::saveAsColorImage(const QString &filename)
   }
   catch (ZException const & e) {
     release();
-    LERROR() << "Exception:" << e.what();
+    LERROR() << "Exception: " << e.what();
   }
   release();
 }
@@ -412,7 +412,7 @@ void Z3DRenderTarget::saveAsDepthImage(const QString &filename)
   }
   catch (ZException const & e) {
     release();
-    LERROR() << "Exception:" << e.what();
+    LERROR() << "Exception: " << e.what();
   }
   release();
 }

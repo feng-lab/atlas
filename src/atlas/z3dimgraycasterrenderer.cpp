@@ -388,7 +388,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         //glFinish();
         bt.stopAndLog();
 
-        LINFO() << missingBlockIDs.size() << usedBlockIDs.size();
+        LINFO() << missingBlockIDs.size() << " " << usedBlockIDs.size();
 
         if (!missingBlockIDs.empty()) {
           m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs);
@@ -617,7 +617,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 #endif
 #endif
 
-      LINFO() << missingBlockIDs.size() << usedBlockIDs.size();
+      LINFO() << missingBlockIDs.size() << " " << usedBlockIDs.size();
       bt.stopAndLog();
 
       if (!missingBlockIDs.empty()) {

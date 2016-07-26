@@ -665,21 +665,21 @@ void ZMesh::logProperties(const ZMeshProperties &prop, const QString &str)
   if (!str.isEmpty()) {
     LINFO() << str;
   }
-  LINFO() << "Vertices Number:" << prop.numVertices;
-  LINFO() << "Triangles Number:" << prop.numTriangles;
-  //LINFO() << "volume old:" << volume();
-  LINFO() << "Surface Area:" << prop.surfaceArea;
-  LINFO() << "Min Triangle Area:" << prop.minTriangleArea;
-  LINFO() << "Max Triangle Area:" << prop.maxTriangleArea;
-  LINFO() << "Volume:" << prop.volume;
-  LINFO() << "Volume Projected:" << prop.volumeProjected;
-  LINFO() << "Volume X:" << prop.volumeX;
-  LINFO() << "Volume Y:" << prop.volumeY;
-  LINFO() << "Volume Z:" << prop.volumeZ;
-  LINFO() << "Kx:" << prop.kx;
-  LINFO() << "Ky:" << prop.ky;
-  LINFO() << "Kz:" << prop.kz;
-  LINFO() << "Normalized Shape Index:" << prop.normalizedShapeIndex;
+  LINFO() << "Vertices Number: " << prop.numVertices;
+  LINFO() << "Triangles Number: " << prop.numTriangles;
+  //LINFO() << "volume old: " << volume();
+  LINFO() << "Surface Area: " << prop.surfaceArea;
+  LINFO() << "Min Triangle Area: " << prop.minTriangleArea;
+  LINFO() << "Max Triangle Area: " << prop.maxTriangleArea;
+  LINFO() << "Volume: " << prop.volume;
+  LINFO() << "Volume Projected: " << prop.volumeProjected;
+  LINFO() << "Volume X: " << prop.volumeX;
+  LINFO() << "Volume Y: " << prop.volumeY;
+  LINFO() << "Volume Z: " << prop.volumeZ;
+  LINFO() << "Kx: " << prop.kx;
+  LINFO() << "Ky: " << prop.ky;
+  LINFO() << "Kz: " << prop.kz;
+  LINFO() << "Normalized Shape Index: " << prop.normalizedShapeIndex;
   LINFO() << "";
 }
 

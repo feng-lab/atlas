@@ -177,7 +177,7 @@ public:
         e = -prob.array().log().sum();
 
       if (m_logLevel == IterAlgorithmLogLevel::Iter) {
-        LINFO() << "GMM Iter:" << iter << "Negative Loglikelihood:" << e;
+        LINFO() << "GMM Iter: " << iter << " Negative Loglikelihood: " << e;
         LINFO() << "GMM Centroids:\n" << m_centroids;
       }
       if (m_termCriteria.willTestEPS()) {
@@ -185,7 +185,7 @@ public:
         if (m_termCriteria.meet(iter, likelihoodChange)) {
           if (m_logLevel == IterAlgorithmLogLevel::Iter || m_logLevel == IterAlgorithmLogLevel::Final) {
             LINFO() << "GMM Final Centroids:\n" << m_centroids;
-            LINFO() << "GMM Final Negative Loglikelihood:" << e;
+            LINFO() << "GMM Final Negative Loglikelihood: " << e;
           }
           return e;
         } else {
@@ -341,7 +341,7 @@ public:
                 << ") has been exceeded.";
       }
       LINFO() << "GMM Final Centroids:\n" << m_centroids;
-      LINFO() << "GMM Final Negative Loglikelihood:" << e;
+      LINFO() << "GMM Final Negative Loglikelihood: " << e;
     }
     return e;
   }

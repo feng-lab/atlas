@@ -77,16 +77,12 @@ LogData::LogData(LogSeverity severity, const char *full_filename, const char *ba
 class FileLogSink : public LogSink
 {
   QFile m_file;
-  QTextStream m_outputStream;
 public:
   explicit FileLogSink(const QString& filename)
   {
     m_file.setFileName(filename);
-    if (!m_file.open(QFile::WriteOnly | QFile::Text | QFile::Append)) {
+    if (!m_file.open(QFile::WriteOnly | QFile::Text)) {
         LOG(ERROR) << "glog: could not open log file: " << filename;
-    } else {
-      m_outputStream.setDevice(&m_file);
-      m_outputStream.setCodec(QTextCodec::codecForName("UTF-8"));
     }
   }
 
@@ -98,8 +94,8 @@ public:
                     const tm *, const char *message, size_t, size_t message_len) override
   {
     if (isValid()) {
-      m_outputStream << QByteArray(message, message_len) << endl;
-      m_outputStream.flush();
+      m_file.write(message, message_len + 1);  // glog: after message_len is '\n'
+      m_file.flush();
     }
   }
 };
@@ -136,10 +132,22 @@ LogSinkPtr createFunctorLogSink(LogFunction f)
   return res->isValid() ? res : LogSinkPtr();
 }
 
+void addLogSink(LogSink *sink)
+{
+  if (sink)
+    google::AddLogSink(sink);
+}
+
 void addLogSink(LogSinkPtr sink)
 {
   if (sink)
     google::AddLogSink(sink.get());
+}
+
+void removeLogSink(LogSink *sink)
+{
+  if (sink)
+    google::RemoveLogSink(sink);
 }
 
 void removeLogSink(LogSinkPtr sink)

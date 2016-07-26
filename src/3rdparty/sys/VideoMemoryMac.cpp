@@ -3,6 +3,7 @@
 #include <CGLCurrent.h>
 #include <OpenGL.h>
 #include <iostream>
+#include "zlog.h"
 
 uint64_t getDedicatedVideoMemoryMB()
 {
@@ -23,12 +24,10 @@ uint64_t getDedicatedVideoMemoryMB()
 
     CGLDescribeRenderer(rend, i, kCGLRPRendererID, &thisRendererID);
     CGLDescribeRenderer(rend, i, kCGLRPOnline, &online);
-    //LINFO() << "Renderer ID =" << thisRendererID << "online =" << online;
-    std::cout << "Renderer ID = " << thisRendererID << " online = " << online << std::endl;
+    LINFO() << "Renderer ID = " << thisRendererID << " online = " << online;
 
     CGLDescribeRenderer(rend, i, kCGLRPVideoMemoryMegabytes, &videoMemory);
-    //LINFO() << "Video Memory =" << videoMemory << "MB";
-    std::cout << "Video Memory = " << videoMemory << " MB" << std::endl;
+    LINFO() << "Video Memory = " << videoMemory << " MB";
 
     if (online)
       res = std::max<uint64_t>(res, videoMemory);

@@ -36,9 +36,6 @@
 
 namespace nim {
 
-LogSinkPtr logModelSinkInstance();
-const std::deque<LogData>& logMessages();
-
 class ZLogModelSink : public QAbstractTableModel, public LogSink
 {
   Q_OBJECT
@@ -79,11 +76,27 @@ public:
 
   const std::deque<LogData>& logMessages() const { return mLogDatas; }
 
+signals:
+  void logDataReady(const LogData* message);
+
 private:
   std::deque<LogData> mLogDatas;
   mutable QReadWriteLock mMessagesLock;
   size_t mMaxItems;
 };
+
+#ifdef _USE_QSLOG_
+LogSinkPtr logModelSinkInstance();
+const std::deque<LogData>& logMessagesSoFar();
+#else
+ZLogModelSink* logModelSinkInstance();
+inline const std::deque<LogData>& logMessagesSoFar() { return logModelSinkInstance()->logMessages(); }
+#endif
+template <typename Func1>
+inline QMetaObject::Connection receiveFutureLogMessages(const typename QtPrivate::FunctionPointer<Func1>::Object *receiver, Func1 slot)
+{
+  return QObject::connect(logModelSinkInstance(), &ZLogModelSink::logDataReady, receiver, slot, Qt::QueuedConnection);
+}
 
 } // namespace nim
 

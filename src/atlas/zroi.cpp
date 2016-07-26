@@ -42,7 +42,7 @@ QPainterPath splineToQPainterPath(const QPolygonF& spline, bool showLastSeg = tr
       gte::Vector<2,double> &m1 = values1[1];
       m0 *= times[i+1] - times[i];
       m1 *= times[i+1] - times[i];
-      //LINFO() << m0.X() << m0.Y() << m1.X() << m1.Y() << cspline[i] << cspline[i+1];
+      //LINFO() << m0.X() << " " << m0.Y() << " " << m1.X() << " " << m1.Y() << " " << cspline[i] << " " << cspline[i+1];
       res.cubicTo(spline[i].x() + 1./3.*m0[0], spline[i].y() + 1./3.*m0[1],
                   spline[i+1].x() - 1./3.*m1[0], spline[i+1].y() - 1./3.*m1[1],
           spline[i+1].x(), spline[i+1].y());
@@ -60,7 +60,7 @@ QPainterPath splineToQPainterPath(const QPolygonF& spline, bool showLastSeg = tr
       gte::Vector<2,double> &m1 = values1[1];
       m0 *= times[i+1] - times[i];
       m1 *= times[i+1] - times[i];
-      //LINFO() << m0.X() << m0.Y() << m1.X() << m1.Y() << cspline[i] << cspline[i+1];
+      //LINFO() << m0.X() << " " << m0.Y() << " " << m1.X() << " " << m1.Y() << " " << cspline[i] << " " << cspline[i+1];
       res.cubicTo(spline[i].x() + 1./3.*m0[0], spline[i].y() + 1./3.*m0[1],
                   spline[i+1].x() - 1./3.*m1[0], spline[i+1].y() - 1./3.*m1[1],
           spline[i+1].x(), spline[i+1].y());
@@ -220,7 +220,7 @@ void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::set<size_t>> &shape
     bool deleteAll = shapeOp.type == ROIType::Rect ||
         shapeOp.type == ROIType::Ellipse ||
         (shapeOp.poly.size() - static_cast<int>(pointIndices.size()) < 4);
-    //LINFO() << m_shapeOperations.size() << shapeOp->poly.size();
+    //LINFO() << m_shapeOperations.size() << " " << shapeOp->poly.size();
     if (deleteAll) {
       m_shapeOperations.removeAt(i);
       ++shapeOpIndexSubtract;

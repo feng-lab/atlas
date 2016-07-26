@@ -3,6 +3,7 @@
 #include "zmainwindow.h"
 
 #include "zlog.h"
+#include <iostream>
 #include "zlogmodelsink.h"
 #include <QDir>
 #include <QFileInfo>
@@ -70,30 +71,31 @@ struct MacEventFilter : public QObject
 
 void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
-    switch (type) {
-    case QtInfoMsg:
-      LINFOF(context.file ? context.file : "QtFile",
-             context.line,
-             context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
-      break;
-    case QtWarningMsg:
-      LWARNF(context.file ? context.file : "QtFile",
-             context.line,
-             context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
-      break;
-    case QtCriticalMsg:
-      LERRORF(context.file ? context.file : "QtFile",
-              context.line,
-              context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
-      break;
-    case QtFatalMsg:
-      LFATALF(context.file ? context.file : "QtFile",
-              context.line,
-              context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
-      abort();
-    default:
-      break;
-    }
+  std::cout << qUtf8Printable(msg) << std::endl;
+  switch (type) {
+  case QtInfoMsg:
+    LINFOF(context.file ? context.file : "QtFile",
+           context.line,
+           context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
+    break;
+  case QtWarningMsg:
+    LWARNF(context.file ? context.file : "QtFile",
+           context.line,
+           context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
+    break;
+  case QtCriticalMsg:
+    LERRORF(context.file ? context.file : "QtFile",
+            context.line,
+            context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
+    break;
+  case QtFatalMsg:
+    LFATALF(context.file ? context.file : "QtFile",
+            context.line,
+            context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
+    abort();
+  default:
+    break;
+  }
 }
 
 // force NVidia Optimus to used dedicated graphics

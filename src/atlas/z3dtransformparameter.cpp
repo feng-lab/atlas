@@ -292,7 +292,7 @@ void Z3DTransformParameter::updateMatrix()
 
 void Z3DTransformParameter::showTransformMatrix()
 {
-  LINFO() << "Transform:" << m_value;
+  LINFO() << "Transform: " << m_value;
   LINFO() << "Inverse Transform: " << glm::affineInverse(m_value);
   LINFO() << "";
 }

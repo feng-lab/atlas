@@ -584,7 +584,7 @@ public:
       if (m_logLevel == IterAlgorithmLogLevel::Iter || m_logLevel == IterAlgorithmLogLevel::Final) {
         LINFO() << "KMeans Initial Centroids:\n" << m_initCentroids;
         LINFO() << "KMeans Final Centroids:\n" << m_centroids;
-        LINFO() << "KMeans Final Potential:" << result.compactness;
+        LINFO() << "KMeans Final Potential: " << result.compactness;
       }
       return result.compactness;
     }
@@ -631,7 +631,7 @@ public:
         }
 
         if (m_logLevel == IterAlgorithmLogLevel::Iter) {
-          LINFO() << "KMeans attempt" << a <<  "Iter:" << iter << "Potential:" << compactness;
+          LINFO() << "KMeans attempt " << a <<  " Iter: " << iter << " Potential: " << compactness;
           LINFO() << "KMeans Centroids:\n" << centroids;
         }
       }
@@ -740,7 +740,7 @@ protected:
       }
 
       if (m_logLevel == IterAlgorithmLogLevel::Iter) {
-        LINFO() << "KMeans Iter:" << iter << "Potential:" << result.compactness;
+        LINFO() << "KMeans Iter: " << iter << " Potential: " << result.compactness;
         LINFO() << "KMeans Centroids:\n" << result.centroids;
       }
     }

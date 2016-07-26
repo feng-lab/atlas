@@ -346,7 +346,7 @@ bool ZDoc::saveOrDiscard(const QList<size_t> &objs)
     bool saveSuccess = true;
     const QList<size_t> &sobjs = dlg.objsToSave();
     for (int i=0; i<sobjs.size(); ++i) {
-      //LINFO() << "save" << m_objModel->idToDoc(sobjs[i])->objName(sobjs[i]);
+      //LINFO() << "save " << m_objModel->idToDoc(sobjs[i])->objName(sobjs[i]);
       saveSuccess = saveSuccess && m_objModel->idToDoc(sobjs[i])->save(sobjs[i]);
     }
     return saveSuccess;

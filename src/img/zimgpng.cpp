@@ -25,7 +25,7 @@ void pngReadErrorFunction(png_structp, const char *message)
 
 void pngReadWarningFunction(png_structp, const char *message)
 {
-  LWARN() << "Libpng warning:" << message;
+  LWARN() << "Libpng warning: " << message;
 }
 
 int skipIDATChunk(png_structp, png_unknown_chunkp chunk)

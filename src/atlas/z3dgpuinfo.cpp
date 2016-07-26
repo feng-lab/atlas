@@ -26,7 +26,7 @@ int Z3DGpuInfo::glslMajorVersion() const
   if (isSupported()) {
     return m_glslMajorVersion;
   } else {
-    LERROR() << "Current GPU card not supported. This function call should not happen.";
+    LFATAL() << "Current GPU card not supported. This function call should not happen.";
     return -1;
   }
 }
@@ -36,7 +36,7 @@ int Z3DGpuInfo::glslMinorVersion() const
   if (isSupported()) {
     return m_glslMinorVersion;
   } else {
-    LERROR() << "Current GPU card not supported. This function call should not happen.";
+    LFATAL() << "Current GPU card not supported. This function call should not happen.";
     return -1;
   }
 }
@@ -46,7 +46,7 @@ int Z3DGpuInfo::glslReleaseVersion() const
   if (isSupported()) {
     return m_glslReleaseVersion;
   } else {
-    LERROR() << "Current GPU card not supported. This function call should not happen.";
+    LFATAL() << "Current GPU card not supported. This function call should not happen.";
     return -1;
   }
 }
@@ -346,7 +346,7 @@ void Z3DGpuInfo::detectGpuInfo()
       m_glslVersionString = "";
 
     if (!parseVersionString(m_glVersionString, m_glMajorVersion, m_glMinorVersion, m_glReleaseVersion)) {
-      LERROR() << "Malformed OpenGL version string:" << m_glVersionString;
+      LERROR() << "Malformed OpenGL version string: " << m_glVersionString;
     }
 
     // GPU Vendor
@@ -363,7 +363,7 @@ void Z3DGpuInfo::detectGpuInfo()
     // Shaders
     if (!parseVersionString(m_glslVersionString, m_glslMajorVersion, m_glslMinorVersion,
                             m_glslReleaseVersion)) {
-      LERROR() << "Malformed GLSL version string:" << m_glslVersionString;
+      LERROR() << "Malformed GLSL version string: " << m_glslVersionString;
       m_isSupported = false;
       m_notSupportedReason = QString("Malformed GLSL version string: %1").arg(m_glslVersionString);
     }

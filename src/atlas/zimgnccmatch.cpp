@@ -552,8 +552,8 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc(ZImg &fixedImg, ZImg &movingImg,
                                           maxNCC, maxWeightedNCC, numOverlapVoxels);
   ZVoxelCoordinate maxNCCCoord = nccImg.indexToCoord(maxNCCIdx);
   ZVoxelCoordinate offset = maxNCCCoord + nccImgValidRegion.start - ZVoxelCoordinate(movingImgInfo.width-1, movingImgInfo.height-1, movingImgInfo.depth-1);
-  LINFO() << "max NCC coord:" << maxNCCCoord;
-  LINFO() << "moving image offset:" << offset;
+  LINFO() << "max NCC coord: " << maxNCCCoord;
+  LINFO() << "moving image offset: " << offset;
 
   return offset;
 }
@@ -581,9 +581,9 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc_S(ZImg &fixedImg, ZImg &movingImg
                                           maxNCC, maxWeightedNCC, numOverlapVoxels);
   ZVoxelCoordinate maxNCCCoord = nccImg.indexToCoord(maxNCCIdx);
   ZVoxelCoordinate offset = maxNCCCoord + nccImgValidRegion.start - ZVoxelCoordinate(movingImgInfo.width-1, movingImgInfo.height-1, movingImgInfo.depth-1);
-  LINFO() << "max NCC coord:" << maxNCCCoord;
+  LINFO() << "max NCC coord: " << maxNCCCoord;
   LINFO() << nccImgValidRegion.toQString();
-  LINFO() << "moving image offset:" << offset;
+  LINFO() << "moving image offset: " << offset;
 
   return offset;
 }
@@ -605,8 +605,8 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLocPart(ZImg &fixedImg, ZImg &movingI
   ZVoxelCoordinate maxNCCCoord = nccImg.indexToCoord(maxNCCIdx);
   ZVoxelCoordinate offset = maxNCCCoord + ZVoxelCoordinate(xStart, yStart, zStart)
       - ZVoxelCoordinate(movingImgInfo.width-1, movingImgInfo.height-1, movingImgInfo.depth-1);
-  LINFO() << "max NCC coord:" << maxNCCCoord << "region" << xStart << xEnd << yStart << yEnd << zStart << zEnd;
-  LINFO() << "moving image offset:" << offset;
+  LINFO() << "max NCC coord: " << maxNCCCoord << " region " << xStart << xEnd << yStart << yEnd << zStart << zEnd;
+  LINFO() << "moving image offset: " << offset;
 
   return offset;
 }
@@ -672,7 +672,7 @@ size_t ZImgNCCMatch::getMaxWeightedNCCIdx(const double *NCCs, const double *over
       numOverlapVoxels = overlapVoxels[i];
     }
   }
-  LINFO() << "max NCC:" << NCCs[maxNCCIdx] << "max weighted NCC:" << maxWeightedNCCTmp << "number of overlap voxels:" << overlapVoxels[maxNCCIdx];
+  LINFO() << "max NCC: " << NCCs[maxNCCIdx] << " max weighted NCC: " << maxWeightedNCCTmp << " number of overlap voxels: " << overlapVoxels[maxNCCIdx];
   maxWeightedNCC = maxWeightedNCCTmp;
   return maxNCCIdx;
 }
@@ -832,7 +832,7 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(const PositionHint &movi
       }
     }
   }
-  //LINFO() << "max NCC of full scale img:" << maxNCC << "offset:" << res;
+  //LINFO() << "max NCC of full scale img: " << maxNCC << " offset: " << res;
 #else
   ZImg subFixedImg;
   ZImg subMovingImg;
@@ -849,7 +849,7 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(const PositionHint &movi
   res = maxNormXCorrLocPart(subFixedImg, subMovingImg, xStart, xEnd, yStart, yEnd, zStart, zEnd, maxNCC, maxWeightedNCC, numOverlapVoxels);
   res += offset;
   res = mapOffsetToSrcImg(res, fixedRgn, movingRgn);
-  //LINFO() << "final offset:" << res;
+  //LINFO() << "final offset: " << res;
 #endif
 
   return res;

@@ -546,7 +546,7 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
         }
 
         if (hasMissingTiles) {
-          LINFO() << "scene" << s << "has missing tiles";
+          LINFO() << "scene " << s << " has missing tiles";
         }
 #else
         std::set<CZITile, MixedTilesSort> allMixedTiles;
@@ -581,7 +581,7 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
 //              LINFO() << "";
 //              LINFO() << "";
 //              for (size_t tp=0; tp<tiles.size(); ++tp) {
-//                LINFO() << tiles[tp].ratio << tiles[tp].start << tiles[tp].size;
+//                LINFO() << tiles[tp].ratio << " " << tiles[tp].start << " " << tiles[tp].size;
 //              }
 
               if(mixAllTilesIfNecessary) {
@@ -606,7 +606,7 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
         }
 
         if (hasMixedTiles) {
-          LINFO() << "scene" << s << "with mixed tiles";
+          LINFO() << "scene " << s << " with mixed tiles";
           if (mixAllTilesIfNecessary) {
             assert(allMixedTiles.empty());
             allMixedTiles.insert(m_sceneTiles[s].cbegin(), m_sceneTiles[s].cend());
@@ -965,7 +965,7 @@ void ZImgZeissCZI::parseMetadata(QXmlStreamReader &xml)
     m_voxelSizeX *= 1e6;
     m_voxelSizeY *= 1e6;
     m_voxelSizeZ = m_voxelSizeZ <= 0 ? 1 : (m_voxelSizeZ * 1e6);
-    //LINFO() << m_voxelSizeX << m_voxelSizeY << m_voxelSizeZ;
+    //LINFO() << m_voxelSizeX << " " << m_voxelSizeY << " " << m_voxelSizeZ;
   }
 
   if (m_channelColors.size() < m_channelNames.size()) {
@@ -990,7 +990,7 @@ void ZImgZeissCZI::parseMetadata(QXmlStreamReader &xml)
       m_channelColors = m_channelColorsFromDisplaySettings;
   }
 //  for (size_t i=0; i<channelNames.size(); ++i) {
-//    LINFO() << channelNames[i] << channelIs12Bit[i] << channelPixelType[i];
+//    LINFO() << channelNames[i] << " " << channelIs12Bit[i] << " " << channelPixelType[i];
 //  }
   // channels have different data types
   for (size_t i=1; i<m_channelPixelType.size(); ++i) {
@@ -1045,7 +1045,7 @@ void ZImgZeissCZI::parseChannel(QXmlStreamReader &xml)
           col.a = 255;
           hasColor = true;
         } else {
-          LWARN() << "can not parse czi channel color" << colorStr;
+          LWARN() << "can not parse czi channel color " << colorStr;
         }
       }
     } else if (xml.name() == "PixelType") {
@@ -1196,7 +1196,7 @@ void ZImgZeissCZI::parseDisplaySettingChannel(QXmlStreamReader &xml)
           col.a = 255;
           hasColor = true;
         } else {
-          LWARN() << "can not parse czi channel color" << colorStr;
+          LWARN() << "can not parse czi channel color " << colorStr;
         }
       }
     } else {
@@ -1579,7 +1579,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
     }
     for (auto it=m_sceneTiles[m_sceneTiles.size()-1].cbegin();
          it != m_sceneTiles[m_sceneTiles.size()-1].cend(); ++it) {
-      LINFO() << it->ratio << it->start << it->size << it->storedSize;
+      LINFO() << it->ratio << " " << it->start << " " << it->size << " " << it->storedSize;
     }
 #endif
   }

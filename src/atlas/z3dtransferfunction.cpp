@@ -234,7 +234,7 @@ void Z3DTransferFunctionParameter::readValue(const QJsonValue &jsonValue)
       key.m_split = keyObj["split"].toBool();
       m_value.m_keys.emplace_back(key, false);
     } else {
-      LWARN() << "Invalid transfer function key" << keyObj.keys().join("  ");
+      LWARN() << "Invalid transfer function key " << keyObj.keys().join("  ");
     }
   }
   m_value.invalidateTexture();

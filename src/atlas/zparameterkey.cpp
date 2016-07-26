@@ -140,7 +140,7 @@ bool ZParameterKey::readValue(const QJsonValue &value)
   if (!obj.contains("time") ||
       !obj.contains("type") ||
       !obj.contains("value")) {
-    LWARN() << "Invalid key" << obj.keys().join("  ") << "time, type and value are required field.";
+    LWARN() << "Invalid key " << obj.keys().join("  ") << " time, type and value are required field.";
     return false;
   }
   m_time = obj.value("time").toDouble();

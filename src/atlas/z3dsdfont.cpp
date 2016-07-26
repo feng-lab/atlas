@@ -41,7 +41,7 @@ Z3DTexture *Z3DSDFont::texture()
 void Z3DSDFont::loadImage()
 {
   if(!m_GLFormattedImage.load(m_imageFileName)) {
-    LERROR() << QString("error loading image: %1").arg(m_imageFileName);
+    LERROR() << "error loading image: " << m_imageFileName;
     m_isEmpty = true;
     return;
   }

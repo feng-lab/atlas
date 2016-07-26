@@ -305,8 +305,8 @@ void ZGenerateAnalysisTextFile::getAxonFeature(const ZSwc &tree, std::map<ConstS
       if (count > 0) {
         intensity /= count;
       } else {
-        LWARN() << "node" << tn->x << tn->y << tn->z << tn->radius;
-        LWARN() << "img info" << axonImg.info().toQString();
+        LWARN() << "node " << tn->x << " " << tn->y << " " << tn->z << " " << tn->radius;
+        LWARN() << "img info " << axonImg.info().toQString();
         throw ZImgException("Swc root don't overlap with img?");
       }
 
@@ -348,9 +348,9 @@ void ZGenerateAnalysisTextFile::getAxonFeature(const ZSwc &tree, std::map<ConstS
       if (count > 0) {
         intensity /= count;
       } else {
-        LWARN() << "node" << tn->x << tn->y << tn->z << tn->radius;
-        LWARN() << "parent node" << parent->x << parent->y << parent->z << parent->radius;
-        LWARN() << "img info" << axonImg.info().toQString();
+        LWARN() << "node " << tn->x << " " << tn->y << " " << tn->z << " " << tn->radius;
+        LWARN() << "parent node " << parent->x << " " << parent->y << " " << parent->z << " " << parent->radius;
+        LWARN() << "img info " << axonImg.info().toQString();
         throw ZImgException("Swc seg don't overlap with img?");
       }
 
@@ -365,8 +365,8 @@ void ZGenerateAnalysisTextFile::getLayerFeature(const ZSwc &tree, const ZSwc &la
   ConstSwcTreeNode layerTn = layerTree.begin();
   while (tn != tree.end()) {
     if (glm::length(glm::dvec3(tn->x - layerTn->x, tn->y - layerTn->y, tn->z - layerTn->z)) > 1.) {
-      LWARN() << "node" << tn->x << tn->y << tn->z << tn->radius;
-      LWARN() << "layer node" << layerTn->x << layerTn->y << layerTn->z << layerTn->radius;
+      LWARN() << "node " << tn->x << " " << tn->y << " " << tn->z << " " << tn->radius;
+      LWARN() << "layer node " << layerTn->x << " " << layerTn->y << " " << layerTn->z << " " << layerTn->radius;
       throw ZImgException("wrong layer node match");
     }
     nodeToLayer[tn] = layerTn->type;
@@ -381,8 +381,8 @@ void ZGenerateAnalysisTextFile::getSubclassFeature(const ZSwc &tree, const ZSwc 
   ConstSwcTreeNode layerTn = subclassTree.begin();
   while (tn != tree.end()) {
     if (glm::length(glm::dvec3(tn->x - layerTn->x, tn->y - layerTn->y, tn->z - layerTn->z)) > 1.) {
-      LWARN() << "node" << tn->x << tn->y << tn->z << tn->radius;
-      LWARN() << "subclass node" << layerTn->x << layerTn->y << layerTn->z << layerTn->radius;
+      LWARN() << "node " << tn->x << " " << tn->y << " " << tn->z << " " << tn->radius;
+      LWARN() << "subclass node " << layerTn->x << " " << layerTn->y << " " << layerTn->z << " " << layerTn->radius;
       throw ZImgException("wrong subclass node match");
     }
     nodeToSubclass[tn] = layerTn->type;
@@ -685,9 +685,9 @@ ZGenerateAnalysisTextFile::ConstSwcTreeNode ZGenerateAnalysisTextFile::getNodeSe
     return res;
   } else if (nodesWithinRange.size() == 0) { // zero branch in range
     //throw ZImgException("Need check");
-    LWARN() << "Check Punctum from (no branch)" << m_input.punctaFilename << ":"
-            << punctum.x() << punctum.y() << punctum.z() << punctum.radius()
-            << punctum.maxIntensity() << punctum.meanIntensity();
+    LWARN() << "Check Punctum from (no branch) " << m_input.punctaFilename << " : "
+            << punctum.x() << " " << punctum.y() << " " << punctum.z() << " " << punctum.radius() << " "
+            << punctum.maxIntensity() << " " << punctum.meanIntensity();
     return ConstSwcTreeNode();
   } else if (nodesWithinRange.size() == 1) {
     return res;
@@ -697,9 +697,9 @@ ZGenerateAnalysisTextFile::ConstSwcTreeNode ZGenerateAnalysisTextFile::getNodeSe
   res = intensityWeightedNearestNode(punctum.x(), punctum.y(), punctum.z(), nodesWithinRange);
 
 //  if (nearestNode(punctum.x(), punctum.y(), punctum.z(), nodesWithinRange) != res) {
-//    LWARN() << "Punctum assign example from" << m_input.punctaFilename << ":"
-//            << punctum.x() << punctum.y() << punctum.z() << punctum.radius()
-//            << punctum.maxIntensity() << punctum.meanIntensity();
+//    LWARN() << "Punctum assign example from " << m_input.punctaFilename << " : "
+//            << punctum.x() << " " << punctum.y() << " " << punctum.z() << " " << punctum.radius() << " "
+//            << punctum.maxIntensity() << " " << punctum.meanIntensity();
 //  }
   return res;
 }
@@ -767,9 +767,9 @@ ZGenerateAnalysisTextFile::ConstSwcTreeNode ZGenerateAnalysisTextFile::intensity
   }
 
   size_t minIndex = std::min_element(nodeMinDists.begin(), nodeMinDists.end()) - nodeMinDists.begin();
-  //LINFO() << " min dist" << nodeMinDists[minIndex];
+  //LINFO() << " min dist " << nodeMinDists[minIndex];
   //nodeMinDists[minIndex] = std::numeric_limits<double>::max();
-  //LINFO() << " second min dist" << *std::min_element(nodeMinDists.begin(), nodeMinDists.end());
+  //LINFO() << " second min dist " << *std::min_element(nodeMinDists.begin(), nodeMinDists.end());
 
   return nodes[minIndex];
 }

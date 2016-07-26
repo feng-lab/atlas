@@ -388,7 +388,7 @@ void ZImgFilter::updateImgItems()
   assert(m_isVisible);
 
   ZImgPackDisplay *curDisplay = getDisplay();
-  //LINFO() << curDisplay->slice() << m_lastSlice << m_view.currentSlice();
+  //LINFO() << curDisplay->slice() << " " << m_lastSlice << " " << m_view.currentSlice();
   if (!m_imgItems.empty() && m_displayValid &&
       curDisplay == m_lastDisplay && m_lastSlice == m_view.currentSlice() && m_lastTime == m_view.currentTime()) {
     //LINFO() << "0";

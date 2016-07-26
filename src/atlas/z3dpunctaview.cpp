@@ -39,7 +39,7 @@ void Z3DPunctaView::docPunctasAdded(const QList<size_t> &objs)
     }
   }
   catch (const ZException & e) {
-    LERROR() << "Failed to render puncta:" << e.what();
+    LERROR() << "Failed to render puncta: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render puncta"), e.what());
   }
 }
@@ -66,7 +66,7 @@ void Z3DPunctaView::docPunctaAdded(size_t id)
     emit objViewReady(id);
   }
   catch (const ZException & e) {
-    LERROR() << "Failed to render puncta:" << e.what();
+    LERROR() << "Failed to render puncta: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render puncta"), e.what());
   }
 }

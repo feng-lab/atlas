@@ -5,25 +5,23 @@
 
 namespace nim {
 
+#ifdef _USE_QSLOG_
 LogSinkPtr logModelSinkInstance()
 {
   static LogSinkPtr modelDestination(new ZLogModelSink());
   return modelDestination;
 }
-
-#ifdef _USE_QSLOG_
-const std::deque<LogData>& logMessages()
+const std::deque<LogData>& logMessagesSoFar()
 {
   ZLogModelSink *md = dynamic_cast<ZLogModelSink*>(logModelSinkInstance().data());
   assert(md);
   return md->logMessages();
 }
 #else
-const std::deque<LogData>& logMessages()
+ZLogModelSink *logModelSinkInstance()
 {
-  ZLogModelSink *md = dynamic_cast<ZLogModelSink*>(logModelSinkInstance().get());
-  assert(md);
-  return md->logMessages();
+  static ZLogModelSink modelDestination;
+  return &modelDestination;
 }
 #endif
 
@@ -67,6 +65,7 @@ void ZLogModelSink::addEntry(const LogData& message)
     mLogDatas.push_back(message);
   }
   endInsertRows();
+  emit logDataReady(&mLogDatas.back());
 
   if (mMaxItems < std::numeric_limits<size_t>::max() && mLogDatas.size() > mMaxItems) {
     {

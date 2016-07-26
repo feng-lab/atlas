@@ -71,7 +71,7 @@ std::map<size_t, size_t> ZObjDoc::read(const QList<QPair<QString, QJsonValue>> &
     if (keyString.length() > typeName().length() + 1) {
       keyString.remove(0, typeName().length()+1);
       if (keyString.trimmed().isEmpty()) {
-        LWARN() << "Invalid object key" << docKeyValueList[i].first;
+        LWARN() << "Invalid object key " << docKeyValueList[i].first;
         continue;
       }
       id = keyString.toLongLong(&ok);
@@ -79,7 +79,7 @@ std::map<size_t, size_t> ZObjDoc::read(const QList<QPair<QString, QJsonValue>> &
     if (ok && id > 0) {
       idToJsonValue[id] = docKeyValueList[i].second;
     } else {
-      LWARN() << "Invalid object key" << docKeyValueList[i].first;
+      LWARN() << "Invalid object key " << docKeyValueList[i].first;
     }
   }
 

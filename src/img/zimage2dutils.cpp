@@ -66,7 +66,7 @@ bool seperate2DKernel(const double *kernel, size_t width, size_t height,
       if (s(i) > tol)
         ++rank;
     if (rank == 1) {
-      //LINFO() << "rank" << rank;
+      //LINFO() << "rank " << rank;
       //LINFO() << svd.matrixU();
       //LINFO() << svd.matrixV();
       Map<VectorXd>(colKernel, height) = svd.matrixU().col(0) * sqrt(s(0));
@@ -146,8 +146,8 @@ void _resizeContributions(size_t inLength, size_t outLength, Interpolant interpo
     indices.col(i) = indices.col(i-1) + 1;
   }
 
-  //LINFO() << "incoord" << inCoord;
-  //LINFO() << "indices" << indices;
+  //LINFO() << "incoord " << inCoord;
+  //LINFO() << "indices " << indices;
 
   ArrayXXd weights = -indices;
   weights.colwise() += inCoord;
@@ -195,8 +195,8 @@ void _resizeContributions(size_t inLength, size_t outLength, Interpolant interpo
 
   weights.colwise() /= weights.rowwise().sum();
 
-  //LINFO() << "weights" << weights;
-  //LINFO() << "indices" << indices;
+  //LINFO() << "weights " << weights;
+  //LINFO() << "indices " << indices;
 
   auto validCols = (weights != 0).colwise().any();
 

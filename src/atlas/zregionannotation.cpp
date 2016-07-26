@@ -161,7 +161,7 @@ void ZRegionAnnotation::importLabelImage(const QString &fn, FileFormat format, b
 
   LINFO() << "Importing Label Image...";
   for (auto it = m_ontology.beginPost(); it != m_ontology.endPost(); ++it) {
-    LINFO() << "Processing region" << it->abbreviation << it->id << "...";
+    LINFO() << "Processing region " << it->abbreviation << " " << it->id << "...";
     if (it->id > maxPossibleLabelInImg || it->id < minPossibleLabelInImg ||
         labels.find(it->id) == labels.end()) {
       continue;
@@ -229,7 +229,7 @@ void ZRegionAnnotation::exportLabelImage(const QString &fn, FileFormat format, C
   info.voxelSizeZ = m_voxelSizeZ;
   ZImg res(info);
   for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
-    LINFO() << "Processing region" << it->abbreviation << it->id << "...";
+    LINFO() << "Processing region " << it->abbreviation << " " << it->id << "...";
     if (it->roi) {
       ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), false);
       res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
@@ -238,7 +238,7 @@ void ZRegionAnnotation::exportLabelImage(const QString &fn, FileFormat format, C
   for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
     if (it->abbreviation.compare("GPe", Qt::CaseInsensitive) == 0 ||
         it->abbreviation.compare("STN", Qt::CaseInsensitive) == 0) {
-      LINFO() << "Post Processing Region" << it->abbreviation << it->id << "...";
+      LINFO() << "Post Processing Region " << it->abbreviation << " " << it->id << "...";
       if (it->roi) {
         ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), false);
         res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));

@@ -12,7 +12,6 @@
 #include <QString>
 #include <QDateTime>
 #include <QDataStream>
-class QPointF;
 
 namespace nim {
 
@@ -48,7 +47,9 @@ typedef std::function<void(const LogData&)> LogFunction;
 // might return nullptr
 LogSinkPtr createFileLogSink(const QString &filename);
 LogSinkPtr createFunctorLogSink(LogFunction f);
+void addLogSink(LogSink* sink);
 void addLogSink(LogSinkPtr sink);
+void removeLogSink(LogSink* sink);
 void removeLogSink(LogSinkPtr sink);
 
 QString levelToString(LogSeverity theLevel);
@@ -65,10 +66,8 @@ QString levelToString(LogSeverity theLevel);
 #define LERRORF(file, line, function) google::LogMessage(file, line, google::GLOG_ERROR).stream()
 #define LFATALF(file, line, function) google::LogMessage(file, line, google::GLOG_FATAL).stream()
 
-inline std::ostream& operator << (std::ostream& s, const QString& q)
-{
-  return (s << qUtf8Printable(q));
-}
+inline std::ostream& operator << (std::ostream& s, const QByteArray& q) { return (s << q.constData()); }
+inline std::ostream& operator << (std::ostream& s, const QString& q) { return (s << qUtf8Printable(q)); }
 
 template<typename T>
 inline QByteArray qtTypeToQByteArray(const T& v)
@@ -321,9 +320,9 @@ void logContainer(QsLogging::Level severity, const IteratorType &begin, const It
   if (QsLogging::Logger::instance().loggingLevel() > severity)
     return;
   if (severity == INFO)
-    LINFO() << "Start container" << name;
+    LINFO() << "Start container " << name;
   else
-    LOG(severity) << "Start container" << name;
+    LOG(severity) << "Start container " << name;
   IteratorType it = begin;
   while (it != end) {
     QsLogging::Logger::Helper helper(severity);
@@ -335,9 +334,9 @@ void logContainer(QsLogging::Level severity, const IteratorType &begin, const It
     }
   }
   if (severity == INFO)
-    LINFO() << "End container" << name;
+    LINFO() << "End container " << name;
   else
-    LOG(severity) << "End container" << name ;
+    LOG(severity) << "End container " << name ;
 }
 
 #endif //_USE_QSLOG_

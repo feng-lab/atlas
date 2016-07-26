@@ -462,7 +462,7 @@ void ZAnimation::export3DAnimation(const QDir &dir, const QString &fn, double fr
     --w;
   }
   if (canvas.width() % 2 == 1 || canvas.height() % 2 == 1) {
-    LINFO() << "Resize canvas size from (" << canvas.width() << "," << canvas.height() << ") to (" << w << "," << h << ").";
+    LINFO() << "Resize canvas size from (" << canvas.width() << ", " << canvas.height() << ") to (" << w << ", " << h << ").";
     canvas.resize(w, h);
   }
   int numFrame = std::ceil(m_duration * framePerSecond);

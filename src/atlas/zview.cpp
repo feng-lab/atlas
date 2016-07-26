@@ -253,8 +253,8 @@ void ZView::read(size_t id, const QJsonObject &json)
       if (json.value("ViewObjType").toString() == m_objViews[i]->doc().typeName()) {
         m_objViews[i]->read(id, json);
       } else {
-        LWARN() << "view object type" << json.value("ViewObjType").toString()
-                << "does not match object type" << m_objViews[i]->doc().typeName() << ". abort.";
+        LWARN() << "view object type " << json.value("ViewObjType").toString()
+                << " does not match object type " << m_objViews[i]->doc().typeName() << ". abort.";
       }
       return;
     }
@@ -389,7 +389,7 @@ void ZView::takeScreenShot(QString filename)
 
 void ZView::viewportChanged()
 {
-  //LINFO() << m_view->getCurrrentlyVisibleRegion().intersected(m_scene->sceneRect()) << m_view->currentScale();
+  //LINFO() << m_view->getCurrrentlyVisibleRegion().intersected(m_scene->sceneRect()) << " " << m_view->currentScale();
   for (int i=0; i<m_objViews.size(); ++i) {
     m_objViews[i]->setViewport(m_view->getCurrrentlyVisibleRegion().intersected(m_scene->sceneRect()), m_view->currentScale());
   }

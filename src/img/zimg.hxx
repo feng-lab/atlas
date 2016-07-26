@@ -552,7 +552,7 @@ void ZImg::convert_Impl(bool normalize, const ZImg *src, ZImg *des)
     minv = src->dataRangeMin<TVoxel>();
     maxv = src->dataRangeMax<TVoxel>();
   }
-  //LINFO() << minv << maxv;
+  //LINFO() << minv << " " << maxv;
   scale_Impl<TVoxel, TDesVoxel>(minv, maxv, src, des);
 }
 

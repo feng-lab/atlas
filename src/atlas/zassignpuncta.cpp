@@ -58,15 +58,15 @@ void ZAssignPuncta::doWork()
   }
   if (m_dendriteChannel < m_img.numChannels()) {
     LINFO() << "Start Assign Puncta.";
-    LINFO() << "Dendrite Channel:" << m_dendriteChannel+1 << "(start from 1)";
-    LINFO() << "Voxel Size X:" << m_img.voxelSizeXInUm() << "um";
-    LINFO() << "Voxel Size Y:" << m_img.voxelSizeYInUm() << "um";
-    LINFO() << "Voxel Size Z:" << m_img.voxelSizeZInUm() << "um";
-    LINFO() << "Max Distance To Branch:" << m_maxDistToBranch << "um";
-    LINFO() << "Ambiguous Factor:" << m_ambiguousFactor;
-    LINFO() << "Number of Puncta:" << m_puncta.size();
-    LINFO() << "Number of Soma Puncta:" << m_somaPuncta.size();
-    LINFO() << "Number of Swc Trees:" << m_swcTreeToPuncta.size();
+    LINFO() << "Dendrite Channel: " << m_dendriteChannel+1 << " (start from 1)";
+    LINFO() << "Voxel Size X: " << m_img.voxelSizeXInUm() << " um";
+    LINFO() << "Voxel Size Y: " << m_img.voxelSizeYInUm() << " um";
+    LINFO() << "Voxel Size Z: " << m_img.voxelSizeZInUm() << " um";
+    LINFO() << "Max Distance To Branch: " << m_maxDistToBranch << " um";
+    LINFO() << "Ambiguous Factor: " << m_ambiguousFactor;
+    LINFO() << "Number of Puncta: " << m_puncta.size();
+    LINFO() << "Number of Soma Puncta: " << m_somaPuncta.size();
+    LINFO() << "Number of Swc Trees: " << m_swcTreeToPuncta.size();
   } else {
     throw ZImgException(QString("Wrong dendrite channel: %1. Abort.").arg(m_dendriteChannel));
   }
@@ -119,7 +119,7 @@ void ZAssignPuncta::separatePuncta()
   double punctaSize = m_puncta.size();
   size_t idx = 1;
   for (ZPuncta::const_iterator pit = m_puncta.begin(); pit != m_puncta.end(); ++pit) {
-    LINFO() << "Start Puncta" << idx;
+    LINFO() << "Start Puncta " << idx;
     nodeToTree.clear();
     std::vector<SwcTreeNode> nodes;
     size_t numTreeInRange = 0;
@@ -141,9 +141,9 @@ void ZAssignPuncta::separatePuncta()
       SwcTreeNode tn = intensityWeightedNearestNode(pit->x(), pit->y(), pit->z(),
                                                     nodes, isAmbiguous);
       if (nearestNode(pit->x(), pit->y(), pit->z(), nodes) != tn) {
-        LWARN() << "Check Punctum:"
-                << pit->x() << pit->y() << pit->z() << pit->radius()
-                << pit->maxIntensity() << pit->meanIntensity();
+        LWARN() << "Check Punctum: "
+                << pit->x() << " " << pit->y() << " " << pit->z() << " " << pit->radius() << " "
+                << pit->maxIntensity() << " " << pit->meanIntensity();
       }
       if (isAmbiguous) {
         m_ambiguousPuncta.push_back(*pit);
@@ -164,7 +164,7 @@ void ZAssignPuncta::separateSomaPuncta()
   double punctaSize = m_somaPuncta.size();
   size_t idx = 1;
   for (ZPuncta::const_iterator pit = m_somaPuncta.begin(); pit != m_somaPuncta.end(); ++pit) {
-    LINFO() << "Start Soma Puncta" << idx;
+    LINFO() << "Start Soma Puncta " << idx;
     double min_dist = std::numeric_limits<double>::max();
     ZSwc *tree = nullptr;
     for (it = m_swcTreeToSomaPuncta.begin(); it != m_swcTreeToSomaPuncta.end(); ++it) {
@@ -338,8 +338,8 @@ ZAssignPuncta::SwcTreeNode ZAssignPuncta::intensityWeightedNearestNode(double x,
   double minDist = nodeMinDists[minIndex];
   nodeMinDists[minIndex] = std::numeric_limits<double>::max();
   double secondMinDist = *std::min_element(nodeMinDists.begin(), nodeMinDists.end());
-  //LINFO() << " min dist" << minDist;
-  //LINFO() << " second min dist" << secondMinDist;
+  //LINFO() << " min dist " << minDist;
+  //LINFO() << " second min dist " << secondMinDist;
   isAmbiguous = secondMinDist < m_ambiguousFactor*minDist;
 
   return nodes[minIndex];

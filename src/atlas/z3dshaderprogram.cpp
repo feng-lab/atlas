@@ -276,7 +276,7 @@ int Z3DShaderProgram::uniformLocation(const QString &name) const
     return it->second.location;
   }
   if (logUniformLocationError()) {
-    LWARN() << "Failed to locate uniform:" << name;
+    LWARN() << "Failed to locate uniform: " << name;
   }
   return -1;
 }
@@ -288,7 +288,7 @@ int Z3DShaderProgram::attributeLocation(const QString &name) const
     return it->second.location;
   }
   if (logUniformLocationError()) {
-    LWARN() << "Failed to locate attribute:" << name;
+    LWARN() << "Failed to locate attribute: " << name;
   }
   return -1;
 }

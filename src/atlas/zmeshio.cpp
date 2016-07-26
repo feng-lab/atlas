@@ -217,7 +217,7 @@ void ZMeshIO::load(const QString &filename, ZMesh &mesh) const
     }
 
     if (scene->mNumMeshes == 0) {
-      LWARN() << "File" << filename << "does not contain any mesh.";
+      LWARN() << "File " << filename << " does not contain any mesh.";
       return;
     }
 

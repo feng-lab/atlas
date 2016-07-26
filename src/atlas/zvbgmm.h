@@ -85,17 +85,17 @@ public:
     }
 
     void display(const QString &paraName = "") const {
-      LINFO() << "VBGMM" << paraName << "alpha:" << alpha;
-      LINFO() << "VBGMM" << paraName << "beta:" << beta;
-      LINFO() << "VBGMM" << paraName << "v:" << v;
-      LINFO() << "VBGMM" << paraName << "m:" << m;
-      LINFO() << "VBGMM" << paraName << "logPiTilde:" << logPiTilde;
-      LINFO() << "VBGMM" << paraName << "logLambdaTilde:" << logLambdaTilde;
-      LINFO() << "VBGMM" << paraName << "logWishartConst:" << logWishartConst;
-      LINFO() << "VBGMM" << paraName << "entropy:" << entropy;
-      LINFO() << "VBGMM" << paraName << "logDirConst:" << logDirConst;
-      LINFO() << "VBGMM" << paraName << "rnk:" << rnk;
-      LINFO() << "VBGMM" << paraName << "logrnk:" << logrnk;
+      LINFO() << "VBGMM " << paraName << " alpha: " << alpha;
+      LINFO() << "VBGMM " << paraName << " beta: " << beta;
+      LINFO() << "VBGMM " << paraName << " v: " << v;
+      LINFO() << "VBGMM " << paraName << " m: " << m;
+      LINFO() << "VBGMM " << paraName << " logPiTilde: " << logPiTilde;
+      LINFO() << "VBGMM " << paraName << " logLambdaTilde: " << logLambdaTilde;
+      LINFO() << "VBGMM " << paraName << " logWishartConst: " << logWishartConst;
+      LINFO() << "VBGMM " << paraName << " entropy: " << entropy;
+      LINFO() << "VBGMM " << paraName << " logDirConst: " << logDirConst;
+      LINFO() << "VBGMM " << paraName << " rnk: " << rnk;
+      LINFO() << "VBGMM " << paraName << " logrnk: " << logrnk;
     }
 
     VectorXrt alpha;
@@ -234,7 +234,7 @@ public:
                   << m_termCriteria.maxIter()
                   << ") has been exceeded.";
         }
-        LINFO() << "VBGMM Final Loglikelihood:" << result.loglikHist;
+        LINFO() << "VBGMM Final Loglikelihood: " << result.loglikHist;
         LINFO() << "VBGMM Final Centroids:\n" << centroids();
       }
       return result.loglikHist;
@@ -280,7 +280,7 @@ public:
           ResultDataType avg = (std::abs(loglikHist) + std::abs(oldLoglikHist) + std::numeric_limits<ResultDataType>::epsilon()) / 2;
           ResultDataType slope = std::abs(loglikHist-oldLoglikHist) / avg;
           if (iter > 0 && loglikHist - oldLoglikHist < -1.) {
-            LWARN() << "Objective decreased!" << loglikHist << oldLoglikHist;
+            LWARN() << "Objective decreased! " << loglikHist << " " << oldLoglikHist;
           }
           done = m_termCriteria.meet(iter, slope);
         } else {
@@ -289,9 +289,9 @@ public:
 
         if (m_logLevel == IterAlgorithmLogLevel::Iter) {
           if (m_nattemps == 1) {
-            LINFO() << "VBGMM Iter:" << iter << "Loglikelihood:" << loglikHist;
+            LINFO() << "VBGMM Iter: " << iter << " Loglikelihood: " << loglikHist;
           } else {
-            LINFO() << "VBGMM attempt" << i+1 << "Iter:" << iter << "Loglikelihood:" << loglikHist;
+            LINFO() << "VBGMM attempt " << i+1 << " Iter: " << iter << " Loglikelihood: " << loglikHist;
           }
         }
         iter++;
@@ -309,7 +309,7 @@ public:
                 << m_termCriteria.maxIter()
                 << ") has been exceeded.";
       }
-      LINFO() << "VBGMM Final Loglikelihood:" << bestLogLikHist;
+      LINFO() << "VBGMM Final Loglikelihood: " << bestLogLikHist;
       LINFO() << "VBGMM Final Centroids:\n" << centroids();
     }
     return bestLogLikHist;
@@ -649,7 +649,7 @@ protected:
         ResultDataType avg = (std::abs(loglikHist) + std::abs(post.loglikHist) + std::numeric_limits<ResultDataType>::epsilon()) / 2;
         ResultDataType slope = std::abs(loglikHist-post.loglikHist) / avg;
         if (iter > 0 && loglikHist - post.loglikHist < -1.) {
-          LWARN() << "Objective decreased!" << loglikHist << post.loglikHist;
+          LWARN() << "Objective decreased! " << loglikHist << " " << post.loglikHist;
         }
         done = m_termCriteria.meet(iter, slope);
       } else {
@@ -657,7 +657,7 @@ protected:
       }
 
       if (m_logLevel == IterAlgorithmLogLevel::Iter) {
-        LINFO() << "VBGMM Iter:" << iter << "Loglikelihood:" << loglikHist;
+        LINFO() << "VBGMM Iter: " << iter << " Loglikelihood: " << loglikHist;
       }
       iter++;
       post.loglikHist = loglikHist;

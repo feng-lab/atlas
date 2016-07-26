@@ -39,7 +39,7 @@ void Z3DMeshView::docMeshesAdded(const QList<size_t> &objs)
     }
   }
   catch (const ZException & e) {
-    LERROR() << "Failed to render mesh:" << e.what();
+    LERROR() << "Failed to render mesh: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render mesh"), e.what());
   }
 }
@@ -66,7 +66,7 @@ void Z3DMeshView::docMeshAdded(size_t id)
     emit objViewReady(id);
   }
   catch (const ZException & e) {
-    LERROR() << "Failed to render mesh:" << e.what();
+    LERROR() << "Failed to render mesh: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render mesh"), e.what());
   }
 }

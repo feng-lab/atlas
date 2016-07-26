@@ -126,7 +126,7 @@ void Z3DMeshFilter::setData(std::vector<ZMesh *> *meshList)
   m_origMeshList.clear();
   if (meshList) {
     m_origMeshList = *meshList;
-    LINFO() << className() << "Read" << m_origMeshList.size() << "meshes.";
+    LINFO() << className() << " read " << m_origMeshList.size() << " meshes.";
   }
   getVisibleData();
   m_dataIsInvalid = true;
@@ -141,7 +141,7 @@ void Z3DMeshFilter::setData(QList<ZMesh *> *meshList)
   if (meshList) {
     for (int i=0; i<meshList->size(); i++)
       m_origMeshList.push_back(meshList->at(i));
-    LINFO() << className() << "Read" << m_origMeshList.size() << "meshes.";
+    LINFO() << className() << " read " << m_origMeshList.size() << " meshes.";
   }
   getVisibleData();
   m_dataIsInvalid = true;

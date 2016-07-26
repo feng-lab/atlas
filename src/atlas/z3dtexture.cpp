@@ -350,7 +350,7 @@ void Z3DTexture::saveAsColorImage(const QString &filename) const
     }
   }
   catch (ZException const & e) {
-    LERROR() << "Exception:" << e.what();
+    LERROR() << "Exception: " << e.what();
   }
 }
 
@@ -367,7 +367,7 @@ void Z3DTexture::saveAsDepthImage(const QString &filename) const
     img.save(filename);
   }
   catch (ZException const & e) {
-    LERROR() << "Exception:" << e.what();
+    LERROR() << "Exception: " << e.what();
   }
 }
 

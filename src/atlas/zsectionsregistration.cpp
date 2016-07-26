@@ -41,12 +41,12 @@ void ZSectionsRegistration::doWork()
   //  if (!m_stack.sourcePath()) {
   //    LINFO() << "Start Registering Sections";
   //  } else {
-  //    LINFO() << "Start Registering Sections for Image" << m_stack.sourcePath();
+  //    LINFO() << "Start Registering Sections for Image " << m_stack.sourcePath();
   //  }
   //  LINFO() << "";
 
   if (m_fixedSliceIndex >= 0 && static_cast<size_t>(m_fixedSliceIndex) < m_img.depth()) {
-    LINFO() << "Fixed Image Index:" << m_fixedSliceIndex+1 << "(start from 1)";
+    LINFO() << "Fixed Image Index: " << m_fixedSliceIndex+1 << " (start from 1)";
   } else {
     throw ZImgException(QString("Wrong fixed image index: %1. Abort.").arg(m_fixedSliceIndex));
   }
@@ -60,18 +60,18 @@ void ZSectionsRegistration::doWork()
   }
 
   if (m_referenceChannel >= 0 && static_cast<size_t>(m_referenceChannel) < m_img.numChannels()) {
-    LINFO() << "Reference Channel:" << m_referenceChannel+1 << "(start from 1)";
+    LINFO() << "Reference Channel: " << m_referenceChannel+1 << " (start from 1)";
   } else {
     throw ZImgException(QString("Wrong reference channel: %1. Abort").arg(m_referenceChannel));
   }
 
-  LINFO() << "Remove Background:" << m_removeBackground;
-  LINFO() << "Remove High Foreground:" << m_removeHighForeground;
-  LINFO() << "Allow Flip:" << m_allowFlip;
-  LINFO() << "Multithreading:" << m_useMultithreading;
-  LINFO() << "Metirc:" << m_metric;
-  LINFO() << "Transform:" << m_transform;
-  LINFO() << "Optimizer:" << m_optimizer;
+  LINFO() << "Remove Background: " << m_removeBackground;
+  LINFO() << "Remove High Foreground: " << m_removeHighForeground;
+  LINFO() << "Allow Flip: " << m_allowFlip;
+  LINFO() << "Multithreading: " << m_useMultithreading;
+  LINFO() << "Metirc: " << m_metric;
+  LINFO() << "Transform: " << m_transform;
+  LINFO() << "Optimizer: " << m_optimizer;
 
   IMG_TYPED_CALL(calcSecInfs, m_img);
 
@@ -127,7 +127,7 @@ template <typename ImagePixelType>
 void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageIndex, double &cost, ZImageTransform*& transform)
 {
   LINFO() << "";
-  LINFO() << "Registering Image" << (movingImageIndex) << "to Image " << (fixedImageIndex);
+  LINFO() << "Registering Image " << (movingImageIndex) << " to Image " << (fixedImageIndex);
 
   size_t length = m_img.planeVoxelNumber();
   std::vector<double> fixedImageData(length);
@@ -317,7 +317,7 @@ template <typename ImagePixelType>
 void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageIndex)
 {
   LINFO() << "";
-  LINFO() << "Registering Image" << (movingImageIndex) << "to Image " << (fixedImageIndex);
+  LINFO() << "Registering Image " << (movingImageIndex) << " to Image " << (fixedImageIndex);
 
   size_t length = m_img.planeVoxelNumber();
   std::vector<double> fixedImageData(length);
@@ -519,7 +519,7 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
     double flipCost = registration.run();
     if (flipCost < cost) {
       flip = true;
-      LINFO() << "** Flip slice" << movingImageIndex;
+      LINFO() << "** Flip slice " << movingImageIndex;
       transform = std::move(flipTransform);
     }
   }

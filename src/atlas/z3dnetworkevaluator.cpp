@@ -344,10 +344,10 @@ void Z3DCheckOpenGLStateFilterWrapper::checkState(const Z3DFilter *p)
 void Z3DCheckOpenGLStateFilterWrapper::warn(const Z3DFilter* p, const QString& message)
 {
   if (p) {
-    LWARN() << "Invalid OpenGL state after processing" << p->className() << ":" << message;
+    LWARN() << "Invalid OpenGL state after processing " << p->className() << " : " << message;
   }
   else {
-    LWARN() << "Invalid OpenGL state before network processing:" << message;
+    LWARN() << "Invalid OpenGL state before network processing: " << message;
   }
 }
 
@@ -360,7 +360,7 @@ void Z3DProfileFilterWrapper::beforeFilterProcess(const Z3DFilter *)
 void Z3DProfileFilterWrapper::afterFilterProcess(const Z3DFilter *p)
 {
   m_benchTimer.stop();
-  LINFO() << "Filter" << p->className() << "took time:" << m_benchTimer.time() << "seconds.";
+  LINFO() << "Filter " << p->className() << " took time: " << m_benchTimer.time() << " seconds.";
 }
 
 void Z3DProfileFilterWrapper::beforeNetworkProcess()
@@ -370,7 +370,7 @@ void Z3DProfileFilterWrapper::beforeNetworkProcess()
 
 void Z3DProfileFilterWrapper::afterNetworkProcess()
 {
-  LINFO() << "Network took time:" << m_benchTimer.total() << "seconds.";
+  LINFO() << "Network took time: " << m_benchTimer.total() << " seconds.";
 }
 
 } // namespace nim

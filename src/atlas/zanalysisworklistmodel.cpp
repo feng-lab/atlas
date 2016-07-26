@@ -347,7 +347,7 @@ bool ZAnalysisWorklistModel::dropMimeData(const QMimeData *data, Qt::DropAction 
 {
   Q_UNUSED(row)
   Q_UNUSED(column)
-  //LINFO() << row << column << action << parent.row() << parent.column();
+  //LINFO() << row << " " << column << " " << action << " " << parent.row() << " " << parent.column();
 
   if (action == Qt::IgnoreAction)
     return true;

@@ -278,7 +278,12 @@ void Z3DImg::setScale(const glm::vec3 &scale)
         m_pageDirectorySize.z > Z3DGpuInfoInstance.max3DTextureSize()) {
       throw ZGLException(QString("Image (%1) is not supported").arg(info.toQString()));
     }
-    LINFO() << l << m_pageDirectoryDimensions[l] << m_pageTableDimensions[l] << m_imageDimensions[l] << m_levelScales[l] << m_posToBlockIDs[l];
+    LINFO() << l << " "
+            << m_pageDirectoryDimensions[l] << " "
+            << m_pageTableDimensions[l] << " "
+            << m_imageDimensions[l] << " "
+            << m_levelScales[l] << " "
+            << m_posToBlockIDs[l];
   }
 
   // content of RGBA32I texture
@@ -376,7 +381,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t> &missin
     pageTableEntryKey.y -= pageTableEntryKey.z * m_posToBlockIDs[level].y;
     if (!glm::all(glm::lessThan(pageTableEntryKey.yzw(), glm::ivec3(m_pageTableDimensions[level]))) ||
         !glm::all(glm::greaterThanEqual(pageTableEntryKey.yzw(), glm::ivec3(0)))) {
-      LINFO() << pageTableEntryKey << m_pageTableDimensions[level];
+      LINFO() << pageTableEntryKey << " " << m_pageTableDimensions[level];
       assert(false);
     }
     glm::ivec4 pageDirectoryEntryKey = pageTableEntryKey / glm::ivec4(1, m_pageTableBlockSize);
@@ -389,13 +394,13 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t> &missin
       pageTableEntryCoord = pageDirectoryEntry.xyz() + pageTableEntryKey.yzw() % glm::ivec3(m_pageTableBlockSize);
       if (m_pageTableCache[pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
           pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x].w != 0) {
-        LERROR() << "missing block is already mapped!" << pageTableEntryKey << pageDirectoryEntryKey;
+        LERROR() << "missing block is already mapped! " << pageTableEntryKey << " " << pageDirectoryEntryKey;
         continue;
       }
     }
 
     glm::ivec3 imageBlockCachePos = m_imageCacheManager->insert(pageTableEntryKey, erasedKey);
-    //LINFO() << blockKey << erasedKey << m_posToBlockIDs[level] << blockID << level;
+    //LINFO() << blockKey << " " << erasedKey << " " << m_posToBlockIDs[level] << " " << blockID << " " << level;
     if (erasedKey.x >= 0) { //valid
       glm::ivec4 erasedKeyPageDirectoryEntryKey = erasedKey / glm::ivec4(1, glm::ivec3(m_pageTableBlockSize));
       glm::ivec3 erasedKeyPageDirectoryEntryCoord = m_pageDirectoryBases[erasedKeyPageDirectoryEntryKey.x] + erasedKeyPageDirectoryEntryKey.yzw();

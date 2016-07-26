@@ -112,10 +112,10 @@ bool writeZStack(const std::string &filename, const ZStack &stack, QString *erro
 
   try {
     img.save(QString::fromLocal8Bit(filename.c_str()));
-    LINFO() << "Wrote image:" << filename;
+    LINFO() << "Wrote image: " << filename;
     return true;
   } catch (const ZIOException & e) {
-    LERROR() << "Failed to write image" << filename << ". error: " << e.what();
+    LERROR() << "Failed to write image " << filename << ". error: " << e.what();
     if (error) *error = e.what();
   }
   return false;

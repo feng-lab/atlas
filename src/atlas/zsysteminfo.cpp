@@ -315,7 +315,7 @@ bool ZSystemInfo::initializeGL()
 #endif
   glbinding::setUnresolvedCallback([](const glbinding::AbstractFunction & call)
   {
-    LERROR() << "OpengGL function" << call.name() << "can not be resolved.";
+    LERROR() << "OpengGL function " << call.name() << " can not be resolved.";
   });
   glbinding::Binding::addContextSwitchCallback([](glbinding::ContextHandle handle) {
       LINFO() << "Switching to openGL context " << handle;
@@ -349,7 +349,7 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes) const
   if (!dir.exists())
     dir.mkpath(".");
   QStorageInfo volumeInfo(folder);
-  //LINFO() << folder << volumeInfo.bytesAvailable();
+  //LINFO() << folder << " " << volumeInfo.bytesAvailable();
   if (!volumeInfo.isValid() || !volumeInfo.isReady() || volumeInfo.isReadOnly() || static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes)
     folder.clear();
 
@@ -359,7 +359,7 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes) const
     if (!dir.exists())
       dir.mkpath(".");
     volumeInfo = QStorageInfo(folder);
-    //LINFO() << folder << volumeInfo.bytesAvailable();
+    //LINFO() << folder << " " << volumeInfo.bytesAvailable();
     if (!volumeInfo.isValid() || !volumeInfo.isReady() || volumeInfo.isReadOnly() || static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes)
       folder.clear();
   }
@@ -368,7 +368,7 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes) const
   if (folder.isEmpty()) {
     QList<QStorageInfo> vols = QStorageInfo::mountedVolumes();
     for (int i=0; i<vols.size(); ++i) {
-      //LINFO() << vols[i].bytesAvailable() << vols[i].rootPath();
+      //LINFO() << vols[i].bytesAvailable() << " " << vols[i].rootPath();
       if (!vols[i].isRoot() && vols[i].isValid() && vols[i].isReady() && !vols[i].isReadOnly() && static_cast<size_t>(vols[i].bytesAvailable()) >= requiredSpaceInBytes) {
         folder = vols[i].rootPath();
         break;

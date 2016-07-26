@@ -124,7 +124,7 @@ void ZAnalysisWorklistDialog::onGenerate()
     }
     catch (const ZException & e) {
       progress.setValue(list.size());
-      LERROR() << "Error while generating analysis files:" << e.what();
+      LERROR() << "Error while generating analysis files: " << e.what();
       QMessageBox::critical(this, "Error while generating analysis files", e.what());
     }
   } else {

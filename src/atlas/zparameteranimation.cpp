@@ -100,18 +100,18 @@ ZParameterAnimation *ZParameterAnimation::create(const QString &key, const QJson
 {
   int spaceIdx = key.lastIndexOf(QChar(' '));
   if (spaceIdx == -1) {
-    LWARN() << "Invalid Animation Parameter" << key;
+    LWARN() << "Invalid Animation Parameter " << key;
     return nullptr;
   }
   QString name = key.left(spaceIdx);
   QString type = key.mid(spaceIdx+1);
   QColor color(0,0,0,255);
   if (!ZParameterFactoryInstance.isTypeValid(type)) {
-    LWARN() << "Invalid Animation Parameter" << key;
+    LWARN() << "Invalid Animation Parameter " << key;
     return nullptr;
   }
   if (!value.isObject()) {
-    LWARN() << "Invalid Animation Parameter" << key << "value";
+    LWARN() << "Invalid Animation Parameter " << key << " value";
     return nullptr;
   }
   QJsonObject obj = value.toObject();

@@ -150,7 +150,7 @@ void normXCorr(ZImg &fixedImg, ZImg &movingImg, ZImg &nccImg, ZImg &numberOfOver
 
   movingImg.reflect();
 
-  //LINFO() << movingImg.info().toQString() << fixedImg.info().toQString();
+  //LINFO() << movingImg.info().toQString() << " " << fixedImg.info().toQString();
 
   ZImgInfo info = fixedImg.info();
   numberOfOverlapVoxelsImg = ZImg(info);  //1
@@ -223,13 +223,13 @@ void normXCorr_S(ZImg &fixedImg, ZImg &movingImg, ZImg &nccImg, ZImg &numberOfOv
   }
 
   //  ZVoxelCoordinate offset1(0,5,0);
-  //  LINFO() << offset1 << getNCCOfOffset(fixedImg, movingImg, offset1);
+  //  LINFO() << offset1 << " " << getNCCOfOffset(fixedImg, movingImg, offset1);
   //  offset1 = ZVoxelCoordinate(0, 255, 0);
-  //  LINFO() << offset1 << getNCCOfOffset(fixedImg, movingImg, offset1);
+  //  LINFO() << offset1 << " " << getNCCOfOffset(fixedImg, movingImg, offset1);
 
   movingImg.reflect();
 
-  //LINFO() << movingImg.info().toQString() << fixedImg.info().toQString();
+  //LINFO() << movingImg.info().toQString() << " " << fixedImg.info().toQString();
 
   //LWARN() << "1";
   nccImg = xCorrFFT(fixedImg, movingImg, false);  //1, I think peak is 3
@@ -340,15 +340,15 @@ void normXCorrPart(ZImg& fixedImg, ZImg& movingImg, size_t xStart, size_t xEnd,
   }
 
   //ZVoxelCoordinate offset1(0,0,0);
-  //LINFO() << offset1 << getNCCOfOffset(fixedImg, movingImg, offset1);
+  //LINFO() << offset1 << " " << getNCCOfOffset(fixedImg, movingImg, offset1);
   //offset1 = ZVoxelCoordinate(0, 255, 0);
-  //LINFO() << offset1 << getNCCOfOffset(fixedImg, movingImg, offset1);
+  //LINFO() << offset1 << " " << getNCCOfOffset(fixedImg, movingImg, offset1);
 
   nccImg = xCorrPart(fixedImg, movingImg, xStart, xEnd, yStart, yEnd, zStart, zEnd);  //
 
   movingImg.reflect();
 
-  //LINFO() << movingImg.info().toQString() << fixedImg.info().toQString();
+  //LINFO() << movingImg.info().toQString() << " " << fixedImg.info().toQString();
 
   ZImgInfo info = fixedImg.info();
   numberOfOverlapVoxelsImg = ZImg(info);  //
@@ -423,7 +423,7 @@ ZImg xCorrFFT(const ZImg &fixedImg, ZImg &movingImg, bool reflectMovingImg)
   size_t optimalWidth = findClosestValidDimension(outWidth);
   size_t optimalHeight = findClosestValidDimension(outHeight);
   size_t optimalDepth = findClosestValidDimension(outDepth);
-  //LINFO() << optimalWidth << optimalHeight << optimalDepth;
+  //LINFO() << optimalWidth << " " << optimalHeight << " " << optimalDepth;
 
   ZComplexImg cfixed = fft(fixedImg, optimalWidth, optimalHeight, optimalDepth);
   //ZImg img;

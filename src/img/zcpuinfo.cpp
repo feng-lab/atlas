@@ -400,7 +400,7 @@ void ZCpuInfo::detectCoreAndThreadNumber()
       }
       else
       {
-        LERROR() << "Error" << GetLastError();
+        LERROR() << "Error " << GetLastError();
         nPhysicalCores = QThread::idealThreadCount();
         if (nPhysicalCores < 0) {
           nPhysicalCores = 1;
@@ -477,8 +477,8 @@ void ZCpuInfo::detectCoreAndThreadNumber()
     ptr++;
   }
 
-  LINFO() << "Number of NUMA nodes:" << numaNodeCount;
-  LINFO() << "Number of physical processor packages:" << processorPackageCount;
+  LINFO() << "Number of NUMA nodes: " << numaNodeCount;
+  LINFO() << "Number of physical processor packages: " << processorPackageCount;
   nPhysicalCores = processorCoreCount;
   nLogicalCores = logicalProcessorCount;
 

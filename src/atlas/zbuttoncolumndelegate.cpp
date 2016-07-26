@@ -42,7 +42,7 @@ void ZButtonColumnDelegate::setEditorData(QWidget *editor, const QModelIndex &in
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
     QPushButton * btn = qobject_cast<QPushButton*>(editor);
     btn->setProperty("user_data", index.data(Qt::UserRole));
-    //LINFO() << "set" << btn->property("user_data");
+    //LINFO() << "set " << btn->property("user_data");
   } else {
     QStyledItemDelegate::setEditorData(editor, index);
   }

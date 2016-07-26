@@ -180,7 +180,7 @@ void extractNeuronChannel()
   list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
   for (int i=0; i<list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
-    LINFO() << i << list.size() << fileInfo.absoluteFilePath();
+    LINFO() << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,1,2));
     QString outname = outFolder + fileInfo.baseName() + "_ch2.v3draw";
     img.save(outname);
@@ -202,7 +202,7 @@ void convertImagesFormat()
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
   for (int i=0; i<list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
-    LINFO() << i << list.size() << fileInfo.absoluteFilePath();
+    LINFO() << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
     QString outname = outFolder + fileInfo.baseName() + ".tif";
     img.save(outname);
@@ -227,7 +227,7 @@ void resizeInjectionCoreImgs()
     QFileInfo fileInfo = list.at(i);
     QString fileName = fileInfo.fileName();
     size_t scene = fileName.at(fileName.size()-5).toLatin1() - '1';
-    LINFO() << i << list.size() << fileInfo.absoluteFilePath() << scene;
+    LINFO() << i << " " << list.size() << " " << fileInfo.absoluteFilePath() << " " << scene;
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(), scene);
     img.zoom(0.3, 0.3);
     QString outname = outFolder + fileInfo.baseName() + ".ome.tif";
@@ -395,7 +395,7 @@ void stnTrajectory()
       double scale = 0.5;
       thre1 = 0.15;
 #endif
-      LINFO() << str << scale << thre1;
+      LINFO() << str << " " << scale << " " << thre1;
       imgGraph.build(ZImgGraph::EdgeWeight3(thre1, scale));
 
       std::vector<std::vector<glm::dvec3>> lines;
@@ -558,7 +558,7 @@ void calcSwcVolume()
   QDir outFolder("/Users/feng/Documents/PV/mesh");
   QStringList filters;
   QFileInfoList dirlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks | QDir::NoDotAndDotDot);
-  //LINFO() << dirlist.size() << dirlist.at(0).absolutePath();
+  //LINFO() << dirlist.size() << " " << dirlist.at(0).absolutePath();
   ZMesh rootMesh;
   ZMesh branchMesh;
   filters << "*c.swc";
@@ -574,10 +574,10 @@ void calcSwcVolume()
     branchMesh.save(outFolder.filePath(fileInfo.baseName() + "_neurite.obj"));
     auto rootProp = rootMesh.properties();
     auto branchProp = branchMesh.properties();
-    LINFO() << qUtf8Printable(fileInfo.baseName()) << ","
-            << rootProp.surfaceArea*(1.0/9.66/9.66) << ","
-            << rootProp.volume*(1.0/9.66/9.66/9.66) << ","
-            << branchProp.surfaceArea*(1.0/9.66/9.66) << ","
+    LINFO() << qUtf8Printable(fileInfo.baseName()) << ", "
+            << rootProp.surfaceArea*(1.0/9.66/9.66) << ", "
+            << rootProp.volume*(1.0/9.66/9.66/9.66) << ", "
+            << branchProp.surfaceArea*(1.0/9.66/9.66) << ", "
             << branchProp.volume*(1.0/9.66/9.66/9.66);
   }
 }
@@ -593,7 +593,7 @@ void changeImgCompressionType()
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
   for (int i=0; i<list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
-    LINFO() << i << list.size() << fileInfo.absoluteFilePath();
+    LINFO() << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
     QString outname = outFolder + fileInfo.baseName() + ".tif";
     img.save(outname, FileFormat::Tiff, Compression::LZW);
@@ -609,7 +609,7 @@ void makeSWCPyramidal()
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
   for (int i=0; i<list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
-    LINFO() << i << list.size() << fileInfo.absoluteFilePath();
+    LINFO() << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZSwc tree(fileInfo.absoluteFilePath());
     tree.labelSomaAndOthers(3.0 / 0.104);  // soma radius at least 3um
     tree.resortPyramidal();
@@ -634,7 +634,7 @@ void makeAxonChannelImages()
     if (QFileInfo::exists(outname) && QFileInfo::exists(outname1)) {
       continue;
     }
-    LINFO() << i << list.size() << fileInfo.absoluteFilePath();
+    LINFO() << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,axonChannel,axonChannel+1));
     img.zoom(0.25, 0.25);
     ZImg img1 = img;
@@ -656,7 +656,7 @@ void makeAxonChannelImages()
     if (QFileInfo::exists(outname) && QFileInfo::exists(outname1)) {
       continue;
     }
-    LINFO() << i << list.size() << fileInfo.absoluteFilePath();
+    LINFO() << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,axonChannel,axonChannel+1));
     img.zoom(0.25, 0.25);
     ZImg img1 = img;
@@ -678,7 +678,7 @@ void makeAxonChannelImages()
     if (QFileInfo::exists(outname) && QFileInfo::exists(outname1)) {
       continue;
     }
-    LINFO() << i << list.size() << fileInfo.absoluteFilePath();
+    LINFO() << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,axonChannel,axonChannel+1));
     img.zoom(0.25, 0.25);
     ZImg img1 = img;
@@ -859,7 +859,7 @@ void benchSaturateMul()
     int16_t g = saturate_mul(a16, b16);
     bt5.pause();
     if (c != d || d > e) {
-      LINFO() << c << d << e << a << b << f << g;
+      LINFO() << c << " " << d << " " << e << " " << a << " " << b << " " << f << " " << g;
     }
   }
   bt1.stopAndLog();
@@ -898,7 +898,6 @@ void tmp()
   int64_t r = res < static_cast<boost::multiprecision::int128_t>(INT64_MIN) ? INT64_MIN :
                                                                               res > static_cast<boost::multiprecision::int128_t>(INT64_MAX) ? INT64_MAX :
                                                                                                                                               static_cast<int64_t>(res);
-  LINFO() << r << (res < static_cast<boost::multiprecision::int128_t>(INT64_MIN)) << INT64_MIN << (res > static_cast<boost::multiprecision::int128_t>(INT64_MAX)) << static_cast<int64_t>(res);
   std::cout << res << std::endl;
 
   std::cout << r << " "

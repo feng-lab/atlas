@@ -326,7 +326,7 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
     imgCoords[refImg] = ZVoxelCoordinate();
 
   //  for (std::list<Edge>::iterator it = tree.begin(); it != tree.end(); ++it) {
-  //    LINFO() << graph[boost::source(*it, graph)].idx << graph[boost::target(*it, graph)].idx << graph[*it].cost;
+  //    LINFO() << graph[boost::source(*it, graph)].idx << " " << graph[boost::target(*it, graph)].idx << " " << graph[*it].cost;
   //  }
 
   while (!tree.empty()) {

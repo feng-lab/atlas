@@ -124,7 +124,7 @@ void ZImgTiff::readImg(const QString &filename, ZImg &img, const ZImgRegion &reg
           (static_cast<int>(scene) == l)) {
         tiff.readImgFromIFD(i, buf2DImg);
         int desc = c == -1 ? c : c-region.start.c;
-        //LINFO() << ifdIdx << z << c << t << l;
+        //LINFO() << ifdIdx << " " << z << " " << c << " " << t << " " << l;
         cpyImg(buf2DImg, region, imgTmp, z-region.start.z, desc, t-region.start.t);
       }
       ifdIdx++;
@@ -241,7 +241,7 @@ void ZImgTiff::detectImgInfo(ZTiff &tiff)
     m_imgInfo[0].validBitCount = *validBitCounts.begin();
 
     if (m_imageDescription.startsWith("ImageJ=") && m_imageDescription.contains("images=")) {
-      LINFO() << "ImageJ Tiff:" << m_imageDescription;
+      LINFO() << "ImageJ Tiff: " << m_imageDescription;
       m_isImageJTiff = true;
       size_t images = 0;
       size_t channels = 1;
@@ -452,8 +452,8 @@ bool ZImgTiff::IFDToLoc(size_t ifdIdx, int &z, int &c, int &t, int &l,
     c = -1;
   }
 
-  //LINFO() << ifdIdx << z << c << t << l << startIFDIndex << dimensionOrder << imgInfo.toQString()
-    //         << startZ << startC << startT << startL;
+  //LINFO() << ifdIdx << " " << z << " " << c << " " << t << " " << l << " " << startIFDIndex << " " << dimensionOrder << " " << imgInfo.toQString() << " "
+    //         << startZ << " " << startC << " " << startT << " " << startL;
   return true;
 }
 

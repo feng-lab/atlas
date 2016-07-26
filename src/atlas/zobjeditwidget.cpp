@@ -1,11 +1,11 @@
 #include "zobjeditwidget.h"
 
 #include <QTabBar>
-#include "zlog.h"
-#include "zlogmodelsink.h"
 #include <QApplication>
 #include <QScrollBar>
 #include "zobjdoc.h"
+#include "zlog.h"
+#include "zlogmodelsink.h"
 
 namespace nim {
 
@@ -13,7 +13,6 @@ ZObjEditWidget::ZObjEditWidget(ZDoc *doc, QWidget *mw)
   : QTabWidget(mw)
   , m_doc(doc)
   , m_logWidget(new QPlainTextEdit(this))
-  , m_logOutputDestination(createFunctorLogSink([this](const LogData &message) { writeLogData(message); }))
 {
   addTab(m_logWidget, "Log Output");
   connect(m_doc, &ZDoc::objAboutToBeRemoved, this, &ZObjEditWidget::removeObjEditWidgetOfObj);
@@ -30,15 +29,10 @@ ZObjEditWidget::ZObjEditWidget(ZDoc *doc, QWidget *mw)
   m_normalFormat = m_logWidget->currentCharFormat();
   m_errorFormat = m_normalFormat;
   m_errorFormat.setForeground(QBrush(QColor(176,0,0)));
-  for (auto const &lm : logMessages()) {
-    writeLogData(lm);
+  for (auto const &lm : logMessagesSoFar()) {
+    writeLogData(&lm);
   }
-  addLogSink(m_logOutputDestination);
-}
-
-ZObjEditWidget::~ZObjEditWidget()
-{
-  removeLogSink(m_logOutputDestination);
+  receiveFutureLogMessages(this, &ZObjEditWidget::writeLogData);
 }
 
 bool ZObjEditWidget::showObjEditWidgetOfObj(size_t id)
@@ -73,14 +67,14 @@ void ZObjEditWidget::updateEditWidgetTitleOfObj(size_t id)
   }
 }
 
-void ZObjEditWidget::writeLogData(const LogData &message)
+void ZObjEditWidget::writeLogData(const LogData *message)
 {
   bool atBottom = m_logWidget->verticalScrollBar()->value() == m_logWidget->verticalScrollBar()->maximum();
-  if (message.level <= INFO) {
-    //m_logWidget->appendPlainText(message.formatted);
+  if (message->level <= INFO) {
+    m_logWidget->appendPlainText(message->formatted);
   } else {
     m_logWidget->setCurrentCharFormat(m_errorFormat);
-    m_logWidget->appendPlainText(message.formatted);
+    m_logWidget->appendPlainText(message->formatted);
     m_logWidget->setCurrentCharFormat(m_normalFormat);
   }
   if (atBottom) {
