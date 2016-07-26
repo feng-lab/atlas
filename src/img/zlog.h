@@ -11,7 +11,6 @@
 #include <glog/logging.h>
 #include <QString>
 #include <QDateTime>
-#include <QDataStream>
 
 namespace nim {
 
@@ -31,26 +30,34 @@ struct LogData
   LogData(LogSeverity severity, const char* full_filename,
           const char* base_filename, int line,
           const struct ::tm* tm_time,
-          const char* message, size_t prefix_len, size_t message_len);
+          const char* msg, size_t prefix_len, size_t message_len)
+    : level(severity)
+    , fullFilename(full_filename)
+    , baseFilename(base_filename)
+    , line(line)
+    , time(QDate(tm_time->tm_year + 1900, tm_time->tm_mon + 1, tm_time->tm_mday),
+           QTime(tm_time->tm_hour, tm_time->tm_min, tm_time->tm_sec))
+    , message(msg + prefix_len, message_len - prefix_len)
+    , formatted(QString::fromUtf8(msg, message_len))
+  {}
 
   LogSeverity level;
   QByteArray fullFilename;
   QByteArray baseFilename;
   int line;
   QDateTime time;
-  QByteArray message;
-  //Formatted log message
-  QString formatted;
+  QByteArray message; // main log message
+  QString formatted; // formatted log message with level, time, threadid, filename, line, and message
 };
 typedef std::function<void(const LogData&)> LogFunction;
 
 // might return nullptr
 LogSinkPtr createFileLogSink(const QString &filename);
 LogSinkPtr createFunctorLogSink(LogFunction f);
-void addLogSink(LogSink* sink);
-void addLogSink(LogSinkPtr sink);
-void removeLogSink(LogSink* sink);
-void removeLogSink(LogSinkPtr sink);
+inline void addLogSink(LogSink* sink) { if (sink) google::AddLogSink(sink); }
+inline void addLogSink(LogSinkPtr sink) { if (sink) google::AddLogSink(sink.get()); }
+inline void removeLogSink(LogSink* sink) { if (sink) google::RemoveLogSink(sink); }
+inline void removeLogSink(LogSinkPtr sink) { if (sink) google::RemoveLogSink(sink.get()); }
 
 QString levelToString(LogSeverity theLevel);
 
@@ -66,19 +73,9 @@ QString levelToString(LogSeverity theLevel);
 #define LERRORF(file, line, function) google::LogMessage(file, line, google::GLOG_ERROR).stream()
 #define LFATALF(file, line, function) google::LogMessage(file, line, google::GLOG_FATAL).stream()
 
-inline std::ostream& operator << (std::ostream& s, const QByteArray& q) { return (s << q.constData()); }
-inline std::ostream& operator << (std::ostream& s, const QString& q) { return (s << qUtf8Printable(q)); }
-
-template<typename T>
-inline QByteArray qtTypeToQByteArray(const T& v)
-{
-  QByteArray buffer;
-  QDataStream out(&buffer, QIODevice::WriteOnly);
-  out << v;
-  return buffer;
-}
-
-std::ostream& operator << (std::ostream& s, const QPointF& v);
+inline std::ostream& operator<<(std::ostream& s, const QByteArray& q) { return (s << q.constData()); }
+inline std::ostream& operator<<(std::ostream& s, const QString& q) { return (s << q.toUtf8().constData()); }
+inline std::ostream& operator<<(std::ostream& s, const QStringRef& q) { return (s << q.toUtf8().constData()); }
 
 #else
 

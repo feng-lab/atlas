@@ -12,6 +12,7 @@
 #include "zroi.h"
 #include "zroifilter.h"
 #include <QImageWriter>
+#include "zlogqttypesupport.h"
 
 namespace nim {
 

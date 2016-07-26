@@ -109,7 +109,8 @@ HEADERS += \
     zimgneighborhoodwithcoorditerator.h \
     zneighborhood.h \
     zimgneighborhoodwithptriterator.h \
-    zlog.h
+    zlog.h \
+    zlogqttypesupport.h
 
 SOURCES += \
     zbenchtimer.cpp \

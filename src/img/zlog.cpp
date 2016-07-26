@@ -1,10 +1,6 @@
 #include "zlog.h"
 
-#include <QStandardPaths>
 #include <QFile>
-#include <QTextCodec>
-#include <QTextStream>
-#include <QPointF>
 #include <cassert>
 
 #ifndef _USE_QSLOG_
@@ -59,19 +55,6 @@ void initLogging(const char* argv0, const QString &filename)
 void shutdownLogging()
 {
   google::ShutdownGoogleLogging();
-}
-
-LogData::LogData(LogSeverity severity, const char *full_filename, const char *base_filename, int line,
-                 const tm *tm_time, const char *msg, size_t prefix_len, size_t message_len)
-  : level(severity)
-  , fullFilename(full_filename)
-  , baseFilename(base_filename)
-  , line(line)
-  , time(QDate(tm_time->tm_year + 1900, tm_time->tm_mon + 1, tm_time->tm_mday),
-         QTime(tm_time->tm_hour, tm_time->tm_min, tm_time->tm_sec))
-  , message(msg + prefix_len, message_len - prefix_len)
-  , formatted(QString::fromUtf8(msg, message_len))
-{
 }
 
 class FileLogSink : public LogSink
@@ -132,30 +115,6 @@ LogSinkPtr createFunctorLogSink(LogFunction f)
   return res->isValid() ? res : LogSinkPtr();
 }
 
-void addLogSink(LogSink *sink)
-{
-  if (sink)
-    google::AddLogSink(sink);
-}
-
-void addLogSink(LogSinkPtr sink)
-{
-  if (sink)
-    google::AddLogSink(sink.get());
-}
-
-void removeLogSink(LogSink *sink)
-{
-  if (sink)
-    google::RemoveLogSink(sink);
-}
-
-void removeLogSink(LogSinkPtr sink)
-{
-  if (sink)
-    google::RemoveLogSink(sink.get());
-}
-
 QString levelToString(LogSeverity theLevel)
 {
   switch (theLevel) {
@@ -168,16 +127,11 @@ QString levelToString(LogSeverity theLevel)
   case FATAL:
     return QObject::tr("Fatal");
   default:
-    return QString();
+    return QString("Unknown");
   }
 }
 
 } // namespace nim
-
-std::ostream &operator <<(std::ostream &s, const QPointF &v)
-{
-  return (s << qtTypeToQByteArray(v).constData());
-}
 
 #else
 
