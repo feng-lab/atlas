@@ -271,7 +271,7 @@ void ZTimelineEventScene::updateItems()
   m_currentTimeItem->setPos(m_timeline.timeToX(m_timeline.currentTime()), 0);
   addItem(m_currentTimeItem);
   //bt.stop();
-  //LINFO() << bt;
+  //LOG(INFO) << bt;
 }
 
 void ZTimelineEventScene::removeSelectedKeys()

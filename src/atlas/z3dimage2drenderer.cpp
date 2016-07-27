@@ -56,7 +56,7 @@ void Z3DImage2DRenderer::addQuad(const ZMesh &quad)
   if (quad.empty() ||
       (quad.numVertices() != 4 && quad.numVertices() != 6) ||
       quad.numVertices() != quad.num2DTextureCoordinates()) {
-    LFATAL() << "Input quad should be 2D slice with 2D texture coordinates";
+    LOG(FATAL) << "Input quad should be 2D slice with 2D texture coordinates";
     return;
   }
   m_quads.push_back(quad);

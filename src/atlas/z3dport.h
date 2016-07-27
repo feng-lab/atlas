@@ -281,7 +281,7 @@ protected:
     Z3DOutputPortBase::setFilter(p);
     T* tp = dynamic_cast<T*>(p);
     if (!tp) {
-      LERROR() << "Port " << name() << " attached to filter of wrong type " << p->className();
+      LOG(ERROR) << "Port " << name() << " attached to filter of wrong type " << p->className();
     }
   }
 };

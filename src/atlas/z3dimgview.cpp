@@ -43,7 +43,7 @@ void Z3DImgView::docImgsAdded(const QList<size_t> &objs)
     }
   }
   catch (const ZException & e) {
-    LERROR() << "Failed to render image: " << e.what();
+    LOG(ERROR) << "Failed to render image: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render image"), e.what());
   }
 }
@@ -74,7 +74,7 @@ void Z3DImgView::docImgAdded(size_t id)
     emit objViewReady(id);
   }
   catch (const ZException & e) {
-    LERROR() << "Failed to render image: " << e.what();
+    LOG(ERROR) << "Failed to render image: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render image"), e.what());
   }
 }

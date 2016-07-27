@@ -72,7 +72,7 @@ ZParameter *ZParameterFactory::create(const QString &name, const QString &type, 
 void ZParameterFactory::registerMaker(const QString &typeName, ZParameterMakerInterface *maker)
 {
   if (m_makers.find(typeName) != m_makers.end()) {
-    LWARN() << "Multiple makers for type " << typeName;
+    LOG(WARNING) << "Multiple makers for type " << typeName;
   }
   m_makers[typeName].reset(maker);
 }

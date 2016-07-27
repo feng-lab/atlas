@@ -52,7 +52,7 @@ void Z3DCamera::setTileFrustum(double left, double right, double bottom, double 
   m_bottom = -halfheight + 2 * halfheight * bottom;
   m_top = -halfheight + 2 * halfheight * top;
 
-  //LINFO() << m_left << m_right << m_bottom << m_top << halfheight << halfwidth;
+  //LOG(INFO) << m_left << m_right << m_bottom << m_top << halfheight << halfwidth;
 
   makeProjectionMatrices();
 }
@@ -337,7 +337,7 @@ void Z3DCamera::updateCamera()
   m_centerDist = glm::length(m_center - m_eye);
   // make sure upVector is not parallel to viewVector
   if (std::abs(glm::dot(m_upVector, m_viewVector)) >= 0.9) {
-    LWARN() << "Resetting view up since view plane normal is parallel";
+    LOG(WARNING) << "Resetting view up since view plane normal is parallel";
     m_upVector = glm::cross(m_viewVector, glm::vec3(1.f, 0.f, 0.f));
     if (glm::dot(m_upVector,m_upVector) < 0.001)
       m_upVector = glm::cross(m_viewVector, glm::vec3(0.f, 1.f, 0.f));
@@ -403,7 +403,7 @@ void Z3DCamera::makeProjectionMatrices()
     m_inverseProjectionMatrices[enumToUnderlyingType(Z3DEye::Mono)] = pmat;
     m_inverseProjectionMatrices[enumToUnderlyingType(Z3DEye::Right)] = pmat;
   } else {
-    //LINFO() << m_left << m_right << m_bottom << m_top;
+    //LOG(INFO) << m_left << m_right << m_bottom << m_top;
     m_projectionMatrices[enumToUnderlyingType(Z3DEye::Mono)] = glm::frustum(m_left, m_right, m_bottom, m_top, m_nearDist, m_farDist);
     float frustumShift = 0.5f * m_eyeSeparation * m_nearDist / m_focusDistance;
     m_projectionMatrices[enumToUnderlyingType(Z3DEye::Left)] = glm::frustum(m_left+frustumShift, m_right+frustumShift,

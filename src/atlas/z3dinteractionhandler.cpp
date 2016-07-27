@@ -417,7 +417,7 @@ void Z3DTrackballInteractionHandler::dolly(glm::ivec2 mouseStart, glm::ivec2 mou
   float factor = dPos.y * deltaFactor;
 
   m_camera->dollyToCenterDistance(std::pow(1.1f, factor) * centerDistStart);
-  //LINFO() << centerDistStart << std::pow(1.1f, factor) * centerDistStart << factor << dPos << deltaFactor << mouseStart << mouseEnd;
+  //LOG(INFO) << centerDistStart << std::pow(1.1f, factor) * centerDistStart << factor << dPos << deltaFactor << mouseStart << mouseEnd;
 }
 
 } // namespace nim

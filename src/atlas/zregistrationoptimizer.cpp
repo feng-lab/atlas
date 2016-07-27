@@ -154,10 +154,10 @@ void ZRegistrationOptimizer::minimize()
 void ZRegistrationOptimizer::checkParameterNumber() const
 {
   if (m_costFunction && static_cast<int>(m_initialParameters.size()) != m_costFunction->numParameters()) {
-    LFATAL() << "Number of Optimizer Parameters don't match number of Cost Function Parameters.";
+    LOG(FATAL) << "Number of Optimizer Parameters don't match number of Cost Function Parameters.";
   }
   if (!m_parameterScales.empty() && m_parameterScales.size() != m_initialParameters.size()) {
-    LFATAL() << "Number of Parameter Scales don't match number of Parameters.";
+    LOG(FATAL) << "Number of Parameter Scales don't match number of Parameters.";
   }
 }
 

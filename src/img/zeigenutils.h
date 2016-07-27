@@ -21,7 +21,7 @@ namespace nim {
 #ifdef _USE_QSLOG_
 // qDebug output of eigen matrix and vector
 template<typename Derived>
-QDebug operator << (QDebug s, const Eigen::DenseBase<Derived> & m)
+inline QDebug operator<<(QDebug s, const Eigen::DenseBase<Derived>& m)
 {
   std::ostringstream oss;
   oss << m;
@@ -30,7 +30,7 @@ QDebug operator << (QDebug s, const Eigen::DenseBase<Derived> & m)
 }
 
 template<typename ExpressionType>
-QDebug operator << (QDebug s, const Eigen::WithFormat<ExpressionType> & m)
+inline QDebug operator<<(QDebug s, const Eigen::WithFormat<ExpressionType>& m)
 {
   std::ostringstream oss;
   oss << m;
@@ -139,7 +139,7 @@ public:
       endCol = mat.cols();
     if (startRow < 0 || startCol < 0 || endRow <= startRow || endCol <= startCol || endRow > mat.rows()
         || endCol > mat.cols()) {
-      LERROR() << "writeMatrix: wrong matrix range";
+      LOG(ERROR) << "writeMatrix: wrong matrix range";
       return false;
     }
 
@@ -263,7 +263,7 @@ public:
       MatrixXni c = chol.matrixU();
       return c.diagonal().array().log().sum() * 2;
     } else {
-      LERROR() << "logdet: Matrix is not positive definite";
+      LOG(ERROR) << "logdet: Matrix is not positive definite";
       return 0;
     }
   }

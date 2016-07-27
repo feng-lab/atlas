@@ -88,15 +88,21 @@ private:
 #ifdef _USE_QSLOG_
 LogSinkPtr logModelSinkInstance();
 const std::deque<LogData>& logMessagesSoFar();
+template <typename Func1>
+inline QMetaObject::Connection receiveFutureLogMessages(const typename QtPrivate::FunctionPointer<Func1>::Object *receiver, Func1 slot)
+{
+  return QObject::connect(dynamic_cast<ZLogModelSink*>(logModelSinkInstance().data()), &ZLogModelSink::logDataReady,
+                          receiver, slot, Qt::QueuedConnection);
+}
 #else
 ZLogModelSink* logModelSinkInstance();
 inline const std::deque<LogData>& logMessagesSoFar() { return logModelSinkInstance()->logMessages(); }
-#endif
 template <typename Func1>
 inline QMetaObject::Connection receiveFutureLogMessages(const typename QtPrivate::FunctionPointer<Func1>::Object *receiver, Func1 slot)
 {
   return QObject::connect(logModelSinkInstance(), &ZLogModelSink::logDataReady, receiver, slot, Qt::QueuedConnection);
 }
+#endif
 
 } // namespace nim
 

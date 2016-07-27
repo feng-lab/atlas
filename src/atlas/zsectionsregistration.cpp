@@ -36,17 +36,17 @@ ZSectionsRegistration::ZSectionsRegistration(const ZImg &img, int fixedSliceInde
 
 void ZSectionsRegistration::doWork()
 {
-  LINFO() << "";
+  LOG(INFO) << "";
   // todo : add back
   //  if (!m_stack.sourcePath()) {
-  //    LINFO() << "Start Registering Sections";
+  //    LOG(INFO) << "Start Registering Sections";
   //  } else {
-  //    LINFO() << "Start Registering Sections for Image " << m_stack.sourcePath();
+  //    LOG(INFO) << "Start Registering Sections for Image " << m_stack.sourcePath();
   //  }
-  //  LINFO() << "";
+  //  LOG(INFO) << "";
 
   if (m_fixedSliceIndex >= 0 && static_cast<size_t>(m_fixedSliceIndex) < m_img.depth()) {
-    LINFO() << "Fixed Image Index: " << m_fixedSliceIndex+1 << " (start from 1)";
+    LOG(INFO) << "Fixed Image Index: " << m_fixedSliceIndex+1 << " (start from 1)";
   } else {
     throw ZImgException(QString("Wrong fixed image index: %1. Abort.").arg(m_fixedSliceIndex));
   }
@@ -60,18 +60,18 @@ void ZSectionsRegistration::doWork()
   }
 
   if (m_referenceChannel >= 0 && static_cast<size_t>(m_referenceChannel) < m_img.numChannels()) {
-    LINFO() << "Reference Channel: " << m_referenceChannel+1 << " (start from 1)";
+    LOG(INFO) << "Reference Channel: " << m_referenceChannel+1 << " (start from 1)";
   } else {
     throw ZImgException(QString("Wrong reference channel: %1. Abort").arg(m_referenceChannel));
   }
 
-  LINFO() << "Remove Background: " << m_removeBackground;
-  LINFO() << "Remove High Foreground: " << m_removeHighForeground;
-  LINFO() << "Allow Flip: " << m_allowFlip;
-  LINFO() << "Multithreading: " << m_useMultithreading;
-  LINFO() << "Metirc: " << m_metric;
-  LINFO() << "Transform: " << m_transform;
-  LINFO() << "Optimizer: " << m_optimizer;
+  LOG(INFO) << "Remove Background: " << m_removeBackground;
+  LOG(INFO) << "Remove High Foreground: " << m_removeHighForeground;
+  LOG(INFO) << "Allow Flip: " << m_allowFlip;
+  LOG(INFO) << "Multithreading: " << m_useMultithreading;
+  LOG(INFO) << "Metirc: " << m_metric;
+  LOG(INFO) << "Transform: " << m_transform;
+  LOG(INFO) << "Optimizer: " << m_optimizer;
 
   IMG_TYPED_CALL(calcSecInfs, m_img);
 
@@ -126,8 +126,8 @@ void ZSectionsRegistration::doWork()
 template <typename ImagePixelType>
 void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageIndex, double &cost, ZImageTransform*& transform)
 {
-  LINFO() << "";
-  LINFO() << "Registering Image " << (movingImageIndex) << " to Image " << (fixedImageIndex);
+  LOG(INFO) << "";
+  LOG(INFO) << "Registering Image " << (movingImageIndex) << " to Image " << (fixedImageIndex);
 
   size_t length = m_img.planeVoxelNumber();
   std::vector<double> fixedImageData(length);
@@ -151,7 +151,7 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
   }
 
   if (fixedMin == fixedMax || movingMin == movingMax) {
-    LINFO() << "At least one image is empty, skip registratering.";
+    LOG(INFO) << "At least one image is empty, skip registratering.";
     cost = 1e10;  // a large cost
     transform = new ZImageRigid2DTransform();  // no transform
     return;
@@ -211,7 +211,7 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
   }
 
   if (fixedMin == fixedMax || movingMin == movingMax) {
-    LINFO() << "At least one image is empty, skip registratering.";
+    LOG(INFO) << "At least one image is empty, skip registratering.";
     cost = 1e10;  // a large cost
     transform = new ZImageRigid2DTransform();  // no transform
     return;
@@ -253,7 +253,7 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
   else if (m_metric == "Normalized Mutual Information")
     metric.setType(ZImageToImageMetric::Type::NormalizedMutualInformation);
   else
-    LFATAL() << "impossible transform type selection";
+    LOG(FATAL) << "impossible transform type selection";
 
   if (m_transform == "YTranslation") {
     ZImageYTranslation2DTransform *tfm = new ZImageYTranslation2DTransform();
@@ -274,7 +274,7 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
     tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
     transform = tfm;
   } else {
-    LFATAL() << "impossible transform type selection";
+    LOG(FATAL) << "impossible transform type selection";
   }
   transform->setImageInterpolation(ZImageInterpolation(Interpolant::Linear, PadOption::Replicate));
 
@@ -316,8 +316,8 @@ void ZSectionsRegistration::transformSections(const std::map<size_t, std::unique
 template <typename ImagePixelType>
 void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageIndex)
 {
-  LINFO() << "";
-  LINFO() << "Registering Image " << (movingImageIndex) << " to Image " << (fixedImageIndex);
+  LOG(INFO) << "";
+  LOG(INFO) << "Registering Image " << (movingImageIndex) << " to Image " << (fixedImageIndex);
 
   size_t length = m_img.planeVoxelNumber();
   std::vector<double> fixedImageData(length);
@@ -341,7 +341,7 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
   }
 
   if (fixedMin == fixedMax || movingMin == movingMax) {
-    LINFO() << "At least one image is empty, skip registratering.";
+    LOG(INFO) << "At least one image is empty, skip registratering.";
     // we already copied the img, so do nothing
     return;
   }
@@ -400,7 +400,7 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
   }
 
   if (fixedMin == fixedMax || movingMin == movingMax) {
-    LINFO() << "At least one image is empty, skip registratering.";
+    LOG(INFO) << "At least one image is empty, skip registratering.";
     // we already copied the img, so do nothing
     return;
   }
@@ -441,7 +441,7 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
   else if (m_metric == "Normalized Mutual Information")
     metric.setType(ZImageToImageMetric::Type::NormalizedMutualInformation);
   else
-    LFATAL() << "impossible transform type selection";
+    LOG(FATAL) << "impossible transform type selection";
 
   std::unique_ptr<ZImageTransform> transform;
   if (m_transform == "YTranslation") {
@@ -463,7 +463,7 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
     tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
     transform.reset(tfm);
   } else {
-    LFATAL() << "impossible transform type selection";
+    LOG(FATAL) << "impossible transform type selection";
   }
   transform->setImageInterpolation(ZImageInterpolation(Interpolant::Linear, PadOption::Replicate));
 
@@ -507,19 +507,19 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
       tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
       flipTransform.reset(tfm);
     } else {
-      LFATAL() << "impossible transform type selection";
+      LOG(FATAL) << "impossible transform type selection";
     }
     flipTransform->setImageInterpolation(ZImageInterpolation(Interpolant::Linear, PadOption::Replicate));
     registration.setInitialTransform(*flipTransform.get());
 
-    LINFO() << "";
-    LINFO() << "Align fixed image with flipped moving image: ";
+    LOG(INFO) << "";
+    LOG(INFO) << "Align fixed image with flipped moving image: ";
     movingImg.wrapData(filteredMovingImageData.data(), m_img.width(), m_img.height());
     registration.setMovingImg(movingImg);
     double flipCost = registration.run();
     if (flipCost < cost) {
       flip = true;
-      LINFO() << "** Flip slice " << movingImageIndex;
+      LOG(INFO) << "** Flip slice " << movingImageIndex;
       transform = std::move(flipTransform);
     }
   }

@@ -146,7 +146,7 @@ QString Z3DFontRenderer::generateHeader()
 void Z3DFontRenderer::render(Z3DEye eye)
 {
   if (m_allFontNames.isEmpty()) {
-    LERROR() << "Can not find any font.";
+    LOG(ERROR) << "Can not find any font.";
     return;
   }
   if (!m_positionsPt || m_positionsPt->empty()
@@ -254,7 +254,7 @@ void Z3DFontRenderer::render(Z3DEye eye)
 void Z3DFontRenderer::renderPicking(Z3DEye)
 {
   if (m_allFontNames.isEmpty()) {
-    LERROR() << "Can not find any font.";
+    LOG(ERROR) << "Can not find any font.";
     return;
   }
   if (!m_pickingColorsPt || m_pickingColorsPt->empty()

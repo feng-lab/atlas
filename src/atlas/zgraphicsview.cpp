@@ -293,8 +293,8 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
         scene()->addItem(m_startPtItem);
         m_polygon.clear();
         m_polygon << m_startScenePt << m_startScenePt;  // pt and next potential pt
-        LINFO() << "";
-        LINFO() << "first: " << m_startScenePt;
+        LOG(INFO) << "";
+        LOG(INFO) << "first: " << m_startScenePt;
         QPainterPath path;
         path.addPolygon(m_polygon);
         m_polygonItem = new QGraphicsPathItem(path);
@@ -321,12 +321,12 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
           m_polygonItem = nullptr;
         } else if (!isScenePtOverlap(m_polygon.last(), m_polygon[m_polygon.size()-2])) {
           if (m_polygon.size() == 2) {
-            LINFO() << "second: " << scenePt;
+            LOG(INFO) << "second: " << scenePt;
             double xdiff1 = m_polygon[0].x() - m_polygon[1].x();
             double ydiff1 = m_polygon[0].y() - m_polygon[1].y();
-            LINFO() << "soma Length: " << std::sqrt(xdiff1*xdiff1 + ydiff1*ydiff1);
+            LOG(INFO) << "soma Length: " << std::sqrt(xdiff1*xdiff1 + ydiff1*ydiff1);
           } else if (m_polygon.size() == 3) {
-            //LINFO() << "third: " << scenePt;
+            //LOG(INFO) << "third: " << scenePt;
             //            double xdiff1 = m_polygon[0].x() - m_polygon[1].x();
             //            double ydiff1 = m_polygon[0].y() - m_polygon[1].y();
             //            double xdiff2 = m_polygon[2].x() - m_polygon[1].x();
@@ -334,7 +334,7 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
             //            double len1 = std::sqrt(xdiff1*xdiff1 + ydiff1*ydiff1);
             //            double len2 = std::sqrt(xdiff2*xdiff2 + ydiff2*ydiff2);
 
-            //            LINFO() << "length1: " << len1
+            //            LOG(INFO) << "length1: " << len1
             //                    << "length2: " << len2
             //                    << "ratio: " << (len1 / (len1 + len2));
           } else if (m_polygon.size() == 4) {
@@ -347,7 +347,7 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
             double len1 = std::sqrt(xdiff1*xdiff1 + ydiff1*ydiff1);
             double len2 = std::sqrt(xdiff2*xdiff2 + ydiff2*ydiff2);
             double len3 = std::sqrt(xdiff3*xdiff3 + ydiff3*ydiff3);
-            LINFO() << len1 << " " << len2 << " " << len3;
+            LOG(INFO) << len1 << " " << len2 << " " << len3;
           }
 
           QPolygonF ctrlPoly = mapToScene(event->x()-4, event->y()-4, 8, 8);
@@ -446,7 +446,7 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
     scene()->addItem(m_ellipseItem);
   } else {
     QPointF scenePt = mapToScene(event->x(), event->y());
-    LINFO() << scenePt.x() << " " << scenePt.y() << " " << m_view->currentSlice();
+    LOG(INFO) << scenePt.x() << " " << scenePt.y() << " " << m_view->currentSlice();
     QGraphicsView::mousePressEvent(event);
     //viewport()->setCursor(Qt::ArrowCursor);
   }

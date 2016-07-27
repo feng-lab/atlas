@@ -201,8 +201,8 @@ void Z3DView::read(size_t id, const QJsonObject &json)
       if (json.value("ViewObjType").toString() == m_3dObjViews[i]->doc().typeName()) {
         m_3dObjViews[i]->read(id, json);
       } else {
-        LWARN() << "view object type " << json.value("ViewObjType").toString()
-                << " dones't match object type " << m_3dObjViews[i]->doc().typeName() << ". abort.";
+        LOG(WARNING) << "view object type " << json.value("ViewObjType").toString()
+                     << " dones't match object type " << m_3dObjViews[i]->doc().typeName() << ". abort.";
       }
       return;
     }
@@ -291,7 +291,7 @@ bool Z3DView::takeScreenShot(QString filename, Z3DScreenShotType sst)
     ++w;
   }
   if (m_canvas->width() % 2 == 1 || m_canvas->height() % 2 == 1) {
-    LINFO() << "Resize canvas size from (" << m_canvas->width() << ", " << m_canvas->height() << ") to (" << w << ", " << h << ").";
+    LOG(INFO) << "Resize canvas size from (" << m_canvas->width() << ", " << m_canvas->height() << ") to (" << w << ", " << h << ").";
     m_canvas->resize(w, h);
   }
   bool res = true;
@@ -380,7 +380,7 @@ void Z3DView::init()
   m_compositor.reset(new Z3DCompositor(m_globalParas));
   //ZStringIntOptionParameter* transparentMethod = dynamic_cast<ZStringIntOptionParameter*>(m_compositor->getParameter("Transparency"));
   //if (Z3DGpuInfoInstance.isWeightedAverageSupported())
-    //transparentMethod->select("Weighted Average");
+  //transparentMethod->select("Weighted Average");
 
   m_canvasPainter.reset(new Z3DCanvasPainter(m_globalParas));
   m_canvasPainter->setCanvas(m_canvas);

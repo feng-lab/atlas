@@ -112,7 +112,7 @@ void Z3DRenderTarget::bind()
   if (!m_multisample)
     glBindFramebuffer(GL_FRAMEBUFFER, m_fboID);
   //else
-    //glBindFramebuffer(GL_FRAMEBUFFER, m_multisampleFBOID);
+  //glBindFramebuffer(GL_FRAMEBUFFER, m_multisampleFBOID);
 }
 
 void Z3DRenderTarget::release()
@@ -125,7 +125,7 @@ void Z3DRenderTarget::release()
   //                      GL_LINEAR);
   //    CHECK_GL_ERROR;
   //  }
-  //LINFO() << m_previousDrawFBOID << " " << m_previousReadFBOID;
+  //LOG(INFO) << m_previousDrawFBOID << " " << m_previousReadFBOID;
   glBindFramebuffer(GL_READ_FRAMEBUFFER, m_previousReadFBOID);
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_previousDrawFBOID);
   glViewport(m_previousViewport.x, m_previousViewport.y, m_previousViewport.z, m_previousViewport.w);
@@ -140,7 +140,7 @@ bool Z3DRenderTarget::isBound() const
 void Z3DRenderTarget::clear() const
 {
   if (!isBound())
-    LERROR() << "RenderTarget is not bound, can not clear.";
+    LOG(ERROR) << "RenderTarget is not bound, can not clear.";
   else
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
@@ -186,13 +186,13 @@ bool Z3DRenderTarget::resize(glm::uvec2 newsize)
   if (newsize == m_size)
     return false;
   if (newsize == glm::uvec2(0)) {
-    LWARN() << "invalid size: " << newsize;
+    LOG(WARNING) << "invalid size: " << newsize;
     return false;
   }
   if (newsize.x > static_cast<uint32_t>(Z3DGpuInfoInstance.maxTextureSize()) ||
       newsize.y > static_cast<uint32_t>(Z3DGpuInfoInstance.maxTextureSize())) {
-    LWARN() << "size " << newsize << " exceeds texture size limit: "
-            << Z3DGpuInfoInstance.maxTextureSize();
+    LOG(WARNING) << "size " << newsize << " exceeds texture size limit: "
+                 << Z3DGpuInfoInstance.maxTextureSize();
     return false;
   }
 
@@ -267,41 +267,41 @@ bool Z3DRenderTarget::isFBOComplete()
     complete = true;
     break;
   case GL_FRAMEBUFFER_UNDEFINED:
-    LERROR() << "GL_FRAMEBUFFER_UNDEFINED: target is the default framebuffer, but the default framebuffer does not exist.";
+    LOG(ERROR) << "GL_FRAMEBUFFER_UNDEFINED: target is the default framebuffer, but the default framebuffer does not exist.";
     break;
   case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
-    LERROR() << "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: some of the framebuffer attachment points are framebuffer incomplete.";
+    LOG(ERROR) << "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: some of the framebuffer attachment points are framebuffer incomplete.";
     break;
   case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
-    LERROR() << "GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: framebuffer does not have at least one image attached to it.";
+    LOG(ERROR) << "GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: framebuffer does not have at least one image attached to it.";
     break;
   case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
-    LERROR() << "GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER: the value of GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE "
-                "is GL_NONE for some color attachment point(s) named by GL_DRAWBUFFERi.";
+    LOG(ERROR) << "GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER: the value of GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE "
+                  "is GL_NONE for some color attachment point(s) named by GL_DRAWBUFFERi.";
     break;
   case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
-    LERROR() << "GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER: GL_READ_BUFFER is not GL_NONE "
-                "and the value of GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE is GL_NONE for the color attachment point named "
-                "by GL_READ_BUFFER.";
+    LOG(ERROR) << "GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER: GL_READ_BUFFER is not GL_NONE "
+                  "and the value of GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE is GL_NONE for the color attachment point named "
+                  "by GL_READ_BUFFER.";
     break;
   case GL_FRAMEBUFFER_UNSUPPORTED:
-    LERROR() << "GL_FRAMEBUFFER_UNSUPPORTED: the combination of internal formats of the attached images violates "
-                "an implementation-dependent set of restrictions";
+    LOG(ERROR) << "GL_FRAMEBUFFER_UNSUPPORTED: the combination of internal formats of the attached images violates "
+                  "an implementation-dependent set of restrictions";
     break;
   case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:
-    LERROR() << "GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE: the value of GL_RENDERBUFFER_SAMPLES is not the same "
-                "for all attached renderbuffers; the value of GL_TEXTURE_SAMPLES is the not same for all attached textures; "
-                "or, if the attached images are a mix of renderbuffers and textures, the value of GL_RENDERBUFFER_SAMPLES "
-                "does not match the value of GL_TEXTURE_SAMPLES; or, the value of GL_TEXTURE_FIXED_SAMPLE_LOCATIONS is "
-                "not the same for all attached textures; or, if the attached images are a mix of renderbuffers and textures, "
-                "the value of GL_TEXTURE_FIXED_SAMPLE_LOCATIONS is not GL_TRUE for all attached textures.";
+    LOG(ERROR) << "GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE: the value of GL_RENDERBUFFER_SAMPLES is not the same "
+                  "for all attached renderbuffers; the value of GL_TEXTURE_SAMPLES is the not same for all attached textures; "
+                  "or, if the attached images are a mix of renderbuffers and textures, the value of GL_RENDERBUFFER_SAMPLES "
+                  "does not match the value of GL_TEXTURE_SAMPLES; or, the value of GL_TEXTURE_FIXED_SAMPLE_LOCATIONS is "
+                  "not the same for all attached textures; or, if the attached images are a mix of renderbuffers and textures, "
+                  "the value of GL_TEXTURE_FIXED_SAMPLE_LOCATIONS is not GL_TRUE for all attached textures.";
     break;
   case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS:
-    LERROR() << "GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS: some framebuffer attachment is layered, and some populated "
-                "attachment is not layered, or all populated color attachments are not from textures of the same target.";
+    LOG(ERROR) << "GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS: some framebuffer attachment is layered, and some populated "
+                  "attachment is not layered, or all populated color attachments are not from textures of the same target.";
     break;
   default:
-    LERROR() << "Unknown error!";
+    LOG(ERROR) << "Unknown error!";
   }
 
   release();
@@ -312,7 +312,7 @@ void Z3DRenderTarget::attachTextureToFBO(Z3DTexture *texture, GLenum attachment,
 {
   assert(texture);
   if (m_size != texture->dimension().xy()) {
-    LWARN() << "attached texture has imcompatible size with current fbo";
+    LOG(WARNING) << "attached texture has imcompatible size with current fbo";
   }
   bind();
   switch(texture->textureTarget()) {
@@ -327,7 +327,7 @@ void Z3DRenderTarget::attachTextureToFBO(Z3DTexture *texture, GLenum attachment,
     glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, attachment, texture->textureTarget(), texture->id(), 0);
     break;
   }
-  //LINFO() << texture->getId() << " " << texture->getTextureTarget() << " " << GL_TEXTURE_RECTANGLE << " " << texture->getDimensions();
+  //LOG(INFO) << texture->getId() << " " << texture->getTextureTarget() << " " << GL_TEXTURE_RECTANGLE << " " << texture->getDimensions();
   CHECK_GL_ERROR;
   release();
   m_attachments[attachment] = texture;
@@ -386,12 +386,12 @@ void Z3DRenderTarget::saveAsColorImage(const QString &filename)
     QImageWriter writer(filename);
     writer.setCompression(1);
     if(!writer.write(image)) {
-      LERROR() << writer.errorString();
+      LOG(ERROR) << writer.errorString();
     }
   }
   catch (ZException const & e) {
     release();
-    LERROR() << "Exception: " << e.what();
+    LOG(ERROR) << "Exception: " << e.what();
   }
   release();
 }
@@ -412,7 +412,7 @@ void Z3DRenderTarget::saveAsDepthImage(const QString &filename)
   }
   catch (ZException const & e) {
     release();
-    LERROR() << "Exception: " << e.what();
+    LOG(ERROR) << "Exception: " << e.what();
   }
   release();
 }
@@ -433,7 +433,7 @@ void Z3DRenderTarget::generateId()
   //      glGenRenderbuffers(1, &m_colorBufferID);
   //      glGenRenderbuffers(1, &m_depthBufferID);
   //    } else {
-  //      LWARN() << "Multisample not supported?";
+  //      LOG(WARNING) << "Multisample not supported?";
   //      m_multisample = false;
   //    }
   //  }

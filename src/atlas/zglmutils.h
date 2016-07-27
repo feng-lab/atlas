@@ -317,79 +317,79 @@ inline void toVal(const QString &str, glm::tquat<T,P>& q)
 // std iostream print
 
 template<typename T, glm::precision P>
-std::ostream& operator << (std::ostream& s, const glm::tvec2<T,P>& v)
+inline std::ostream& operator<<(std::ostream& s, const glm::tvec2<T,P>& v)
 {
   return (s << qUtf8Printable(toQString(v)));
 }
 
 template<typename T, glm::precision P>
-std::ostream& operator << (std::ostream& s, const glm::tvec3<T,P>& v)
+inline std::ostream& operator<<(std::ostream& s, const glm::tvec3<T,P>& v)
 {
   return (s << qUtf8Printable(toQString(v)));
 }
 
 template<typename T, glm::precision P>
-std::ostream& operator << (std::ostream& s, const glm::tvec4<T,P>& v)
+inline std::ostream& operator<<(std::ostream& s, const glm::tvec4<T,P>& v)
 {
   return (s << qUtf8Printable(toQString(v)));
 }
 
 template<>
-inline std::ostream& operator << <unsigned char,glm::highp>(std::ostream& s, const glm::tvec2<unsigned char,glm::highp>& v)
+inline std::ostream& operator<< <unsigned char,glm::highp>(std::ostream& s, const glm::tvec2<unsigned char,glm::highp>& v)
 {
   return (s << glm::tvec2<int,glm::highp>(v));
 }
 
 template<>
-inline std::ostream& operator << <unsigned char,glm::highp>(std::ostream& s, const glm::tvec3<unsigned char,glm::highp>& v)
+inline std::ostream& operator<< <unsigned char,glm::highp>(std::ostream& s, const glm::tvec3<unsigned char,glm::highp>& v)
 {
   return (s << glm::tvec3<int,glm::highp>(v));
 }
 
 template<>
-inline std::ostream& operator << <unsigned char,glm::highp>(std::ostream& s, const glm::tvec4<unsigned char,glm::highp>& v)
+inline std::ostream& operator<< <unsigned char,glm::highp>(std::ostream& s, const glm::tvec4<unsigned char,glm::highp>& v)
 {
   return (s << glm::tvec4<int,glm::highp>(v));
 }
 
 template<>
-inline std::ostream& operator << <char,glm::highp>(std::ostream& s, const glm::tvec2<char,glm::highp>& v)
+inline std::ostream& operator<< <char,glm::highp>(std::ostream& s, const glm::tvec2<char,glm::highp>& v)
 {
   return (s << glm::tvec2<int,glm::highp>(v));
 }
 
 template<>
-inline std::ostream& operator << <char,glm::highp>(std::ostream& s, const glm::tvec3<char,glm::highp>& v)
+inline std::ostream& operator<< <char,glm::highp>(std::ostream& s, const glm::tvec3<char,glm::highp>& v)
 {
   return (s << glm::tvec3<int,glm::highp>(v));
 }
 
 template<>
-inline std::ostream& operator << <char,glm::highp>(std::ostream& s, const glm::tvec4<char,glm::highp>& v)
+inline std::ostream& operator<< <char,glm::highp>(std::ostream& s, const glm::tvec4<char,glm::highp>& v)
 {
   return (s << glm::tvec4<int,glm::highp>(v));
 }
 
 template<typename T, glm::precision P>
-std::ostream& operator << (std::ostream& s, const glm::tmat2x2<T,P>& m)
+inline std::ostream& operator<<(std::ostream& s, const glm::tmat2x2<T,P>& m)
 {
   return (s << qUtf8Printable(toQString(m)));
 }
 
 template<typename T, glm::precision P>
-std::ostream& operator << (std::ostream& s, const glm::tmat3x3<T,P>& m)
+inline std::ostream& operator<<(std::ostream& s, const glm::tmat3x3<T,P>& m)
 {
   return (s << qUtf8Printable(toQString(m)));
 }
 
 template<typename T, glm::precision P>
-std::ostream& operator << (std::ostream& s, const glm::tmat4x4<T,P>& m)
+inline std::ostream& operator<<(std::ostream& s, const glm::tmat4x4<T,P>& m)
 {
   return (s << qUtf8Printable(toQString(m)));
 }
 
 template<typename T, glm::precision P>
-std::ostream& operator << (std::ostream& s, const glm::tquat<T,P>& q)
+inline std::ostream& operator<<(std::ostream& s, const glm::tquat<T,P>& q)
 {
   return (s << qUtf8Printable(toQString(q)));
 }
@@ -399,49 +399,49 @@ std::ostream& operator << (std::ostream& s, const glm::tquat<T,P>& q)
 // qDebug print
 
 template<typename T, glm::precision P>
-QDebug operator << (QDebug s, const glm::tvec2<T,P>& v)
+inline QDebug operator<<(QDebug s, const glm::tvec2<T,P>& v)
 {
   s.nospace() << qUtf8Printable(toQString(v));
   return s.space();
 }
 
 template<typename T, glm::precision P>
-QDebug operator << (QDebug s, const glm::tvec3<T,P>& v)
+inline QDebug operator<<(QDebug s, const glm::tvec3<T,P>& v)
 {
   s.nospace() << qUtf8Printable(toQString(v));
   return s.space();
 }
 
 template<typename T, glm::precision P>
-QDebug operator << (QDebug s, const glm::tvec4<T,P>& v)
+inline QDebug operator<<(QDebug s, const glm::tvec4<T,P>& v)
 {
   s.nospace() << qUtf8Printable(toQString(v));
   return s.space();
 }
 
 template<typename T, glm::precision P>
-QDebug operator << (QDebug s, const glm::tmat2x2<T,P>& m)
+inline QDebug operator<<(QDebug s, const glm::tmat2x2<T,P>& m)
 {
   s.nospace() << qUtf8Printable(toQString(m));
   return s.space();
 }
 
 template<typename T, glm::precision P>
-QDebug operator << (QDebug s, const glm::tmat3x3<T,P>& m)
+inline QDebug operator<<(QDebug s, const glm::tmat3x3<T,P>& m)
 {
   s.nospace() << qUtf8Printable(toQString(m));
   return s.space();
 }
 
 template<typename T, glm::precision P>
-QDebug operator << (QDebug s, const glm::tmat4x4<T,P>& m)
+inline QDebug operator<<(QDebug s, const glm::tmat4x4<T,P>& m)
 {
   s.nospace() << qUtf8Printable(toQString(m));
   return s.space();
 }
 
 template<typename T, glm::precision P>
-QDebug operator << (QDebug s, const glm::tquat<T,P>& q)
+inline QDebug operator<<(QDebug s, const glm::tquat<T,P>& q)
 {
   s.nospace() << qUtf8Printable(toQString(q));
   return s.space();

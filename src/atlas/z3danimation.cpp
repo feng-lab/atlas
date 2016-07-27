@@ -39,7 +39,7 @@ void Z3DAnimation::load(const QString &fn)
 {
   readContent(fn, "Animation3D");
   m_cameraParameterAnimation = static_cast<ZCameraParameterAnimation*>(m_globalParaAnimations[0].get());
-  LINFO() << "Finish loading animation";
+  LOG(INFO) << "Finish loading animation";
 }
 
 void Z3DAnimation::save(const QString &fn)

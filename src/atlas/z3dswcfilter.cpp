@@ -414,7 +414,7 @@ void Z3DSwcFilter::addSelectionBox(
   float tRadius = std::max(.5, n2->radius) * m_rendererBase.sizeScale();
   glm::vec3 axis = tPos - bPos;
   if (glm::length(axis) < std::numeric_limits<float>::epsilon() * 1e2) {
-    LWARN() << "node and parent node too close";
+    LOG(WARNING) << "node and parent node too close";
     return;
   }
   // vector perpendicular to axis

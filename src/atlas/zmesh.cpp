@@ -661,26 +661,26 @@ ZMeshProperties ZMesh::properties() const
 
 void ZMesh::logProperties(const ZMeshProperties &prop, const QString &str)
 {
-  LINFO() << "";
+  LOG(INFO) << "";
   if (!str.isEmpty()) {
-    LINFO() << str;
+    LOG(INFO) << str;
   }
-  LINFO() << "Vertices Number: " << prop.numVertices;
-  LINFO() << "Triangles Number: " << prop.numTriangles;
-  //LINFO() << "volume old: " << volume();
-  LINFO() << "Surface Area: " << prop.surfaceArea;
-  LINFO() << "Min Triangle Area: " << prop.minTriangleArea;
-  LINFO() << "Max Triangle Area: " << prop.maxTriangleArea;
-  LINFO() << "Volume: " << prop.volume;
-  LINFO() << "Volume Projected: " << prop.volumeProjected;
-  LINFO() << "Volume X: " << prop.volumeX;
-  LINFO() << "Volume Y: " << prop.volumeY;
-  LINFO() << "Volume Z: " << prop.volumeZ;
-  LINFO() << "Kx: " << prop.kx;
-  LINFO() << "Ky: " << prop.ky;
-  LINFO() << "Kz: " << prop.kz;
-  LINFO() << "Normalized Shape Index: " << prop.normalizedShapeIndex;
-  LINFO() << "";
+  LOG(INFO) << "Vertices Number: " << prop.numVertices;
+  LOG(INFO) << "Triangles Number: " << prop.numTriangles;
+  //LOG(INFO) << "volume old: " << volume();
+  LOG(INFO) << "Surface Area: " << prop.surfaceArea;
+  LOG(INFO) << "Min Triangle Area: " << prop.minTriangleArea;
+  LOG(INFO) << "Max Triangle Area: " << prop.maxTriangleArea;
+  LOG(INFO) << "Volume: " << prop.volume;
+  LOG(INFO) << "Volume Projected: " << prop.volumeProjected;
+  LOG(INFO) << "Volume X: " << prop.volumeX;
+  LOG(INFO) << "Volume Y: " << prop.volumeY;
+  LOG(INFO) << "Volume Z: " << prop.volumeZ;
+  LOG(INFO) << "Kx: " << prop.kx;
+  LOG(INFO) << "Ky: " << prop.ky;
+  LOG(INFO) << "Kz: " << prop.kz;
+  LOG(INFO) << "Normalized Shape Index: " << prop.normalizedShapeIndex;
+  LOG(INFO) << "";
 }
 
 ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3> &coordLlfs, const std::vector<glm::vec3> &coordUrbs)
@@ -1278,7 +1278,7 @@ void ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootType, ZMesh &
 //    if (i < 20) {
 //      meshes[meshes.size()-1].save(QString("/Users/feng/Downloads/tubetest%1.obj").arg(i++));
 //    }
-//    LINFO() << branch[0]->type;
+//    LOG(INFO) << branch[0]->type;
   }
   branchMesh = merge(meshes);
 
@@ -1297,7 +1297,7 @@ void ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootType, ZMesh &
 //    logProperties(prop, "Merge Result");
 //    res.save("/Users/feng/Downloads/combtest.obj");
 //  }
-//  LINFO() << sumVolume;
+//  LOG(INFO) << sumVolume;
 //  return res;
 }
 

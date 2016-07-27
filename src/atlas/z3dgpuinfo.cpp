@@ -26,7 +26,7 @@ int Z3DGpuInfo::glslMajorVersion() const
   if (isSupported()) {
     return m_glslMajorVersion;
   } else {
-    LFATAL() << "Current GPU card not supported. This function call should not happen.";
+    LOG(FATAL) << "Current GPU card not supported. This function call should not happen.";
     return -1;
   }
 }
@@ -36,7 +36,7 @@ int Z3DGpuInfo::glslMinorVersion() const
   if (isSupported()) {
     return m_glslMinorVersion;
   } else {
-    LFATAL() << "Current GPU card not supported. This function call should not happen.";
+    LOG(FATAL) << "Current GPU card not supported. This function call should not happen.";
     return -1;
   }
 }
@@ -46,7 +46,7 @@ int Z3DGpuInfo::glslReleaseVersion() const
   if (isSupported()) {
     return m_glslReleaseVersion;
   } else {
-    LFATAL() << "Current GPU card not supported. This function call should not happen.";
+    LOG(FATAL) << "Current GPU card not supported. This function call should not happen.";
     return -1;
   }
 }
@@ -259,10 +259,10 @@ void Z3DGpuInfo::logGpuInfo() const
 {
   QStringList info = gpuInfo();
   for (int i=0; i<info.size(); ++i) {
-    LINFO() << qUtf8Printable(info[i]);
+    LOG(INFO) << qUtf8Printable(info[i]);
   }
 
-  LINFO() << "";
+  LOG(INFO) << "";
 }
 
 bool Z3DGpuInfo::isWeightedAverageSupported() const
@@ -346,7 +346,7 @@ void Z3DGpuInfo::detectGpuInfo()
       m_glslVersionString = "";
 
     if (!parseVersionString(m_glVersionString, m_glMajorVersion, m_glMinorVersion, m_glReleaseVersion)) {
-      LERROR() << "Malformed OpenGL version string: " << m_glVersionString;
+      LOG(ERROR) << "Malformed OpenGL version string: " << m_glVersionString;
     }
 
     // GPU Vendor
@@ -363,7 +363,7 @@ void Z3DGpuInfo::detectGpuInfo()
     // Shaders
     if (!parseVersionString(m_glslVersionString, m_glslMajorVersion, m_glslMinorVersion,
                             m_glslReleaseVersion)) {
-      LERROR() << "Malformed GLSL version string: " << m_glslVersionString;
+      LOG(ERROR) << "Malformed GLSL version string: " << m_glslVersionString;
       m_isSupported = false;
       m_notSupportedReason = QString("Malformed GLSL version string: %1").arg(m_glslVersionString);
     }
@@ -494,7 +494,7 @@ void Z3DGpuInfo::detectDedicatedVideoMemory()
     m_dedicatedVideoMemoryMB = getDedicatedVideoMemoryMB();
   }
   if (m_dedicatedVideoMemoryMB == 0) {
-    LERROR() << "Can not detect dedicated video memory, use 256";
+    LOG(ERROR) << "Can not detect dedicated video memory, use 256";
     m_dedicatedVideoMemoryMB = 256;
   }
 }

@@ -59,7 +59,7 @@ QStringList ZImgITKImage::extensions() const
   while( itr != allobjects.end() ) {
     IOBaseType * io = dynamic_cast< IOBaseType * >( itr->GetPointer() );
     if( io ) {
-      //LINFO() << "ImageIO: " << io->GetNameOfClass();
+      //LOG(INFO) << "ImageIO: " << io->GetNameOfClass();
       const ArrayOfExtensionsType & readExtensions  = io->GetSupportedReadExtensions();
       ArrayOfExtensionsType::const_iterator readItr  = readExtensions.begin();
 

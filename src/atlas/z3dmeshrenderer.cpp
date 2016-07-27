@@ -121,7 +121,7 @@ void Z3DMeshRenderer::prepareMesh()
     }
   }
   if (m_meshNeedSplit) {
-    LINFO() << "Number of meshes before spliting " << m_meshPt->size();
+    LOG(INFO) << "Number of meshes before spliting " << m_meshPt->size();
     for (size_t i=0; i<m_meshPt->size(); ++i) {
       if (m_meshPt->at(i)->numTriangles() <= numTriThre) {
         m_splitMeshes.push_back(*(m_meshPt->at(i)));
@@ -144,7 +144,7 @@ void Z3DMeshRenderer::prepareMesh()
       m_splitMeshesWrapper.push_back(&m_splitMeshes[i]);
     }
     m_meshPt = &m_splitMeshesWrapper;
-    LINFO() << "Number of meshes after spliting " << m_meshPt->size();
+    LOG(INFO) << "Number of meshes after spliting " << m_meshPt->size();
   }
 }
 

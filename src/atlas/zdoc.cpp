@@ -342,18 +342,18 @@ bool ZDoc::saveOrDiscard(const QList<size_t> &objs)
   int ret = dlg.exec();
   switch (ret) {
   case QDialog::Accepted: {
-    //LINFO() << "Save or Discard was clicked";
+    //LOG(INFO) << "Save or Discard was clicked";
     bool saveSuccess = true;
     const QList<size_t> &sobjs = dlg.objsToSave();
     for (int i=0; i<sobjs.size(); ++i) {
-      //LINFO() << "save " << m_objModel->idToDoc(sobjs[i])->objName(sobjs[i]);
+      //LOG(INFO) << "save " << m_objModel->idToDoc(sobjs[i])->objName(sobjs[i]);
       saveSuccess = saveSuccess && m_objModel->idToDoc(sobjs[i])->save(sobjs[i]);
     }
     return saveSuccess;
     break;
   }
   case QDialog::Rejected:
-    //LINFO() << "Cancel was clicked";
+    //LOG(INFO) << "Cancel was clicked";
     break;
   default:
     // should never be reached

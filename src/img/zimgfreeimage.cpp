@@ -20,7 +20,7 @@ void FreeImageErrorHandler(FREE_IMAGE_FORMAT fif, const char *message)
     msg = QString("FreeImage %1 Format: %2").arg(FreeImage_GetFormatFromFIF(fif)).arg(message);
   }
   msg = QString("FreeImage: %1").arg(message);
-  LWARN() << msg;
+  LOG(WARNING) << msg;
 }
 
 ZImgInfo readInfoFromFIPImage(fipImage &fipImg)
@@ -189,7 +189,7 @@ void ZImgFreeImage::readInfo(const QString &filename, std::vector<ZImgInfo> &inf
   if (fmt == FIF_UNKNOWN) {
     throw ZIOException("Can not identify image format");
   } /*else {
-    LINFO() << FreeImage_GetFIFDescription(fmt);
+    LOG(INFO) << FreeImage_GetFIFDescription(fmt);
   }*/
   fipMultiPage fipMp(true);
   bool multipage = fmt == FIF_GIF
@@ -262,7 +262,7 @@ void ZImgFreeImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
 
     switch (fipImg.getColorType()) {
     case FIC_CMYK:
-      LINFO() << "cmyk";
+      LOG(INFO) << "cmyk";
       if (!fipImg.convertTo24Bits()) {
         throw ZIOException("convert CMYK to 24bit error");
       }
@@ -307,7 +307,7 @@ void ZImgFreeImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
 
       switch (fipImg.getColorType()) {
       case FIC_CMYK:
-        LINFO() << "cmyk";
+        LOG(INFO) << "cmyk";
         if (!fipImg.convertTo24Bits()) {
           throw ZIOException("convert CMYK to 24bit error");
         }
@@ -385,7 +385,7 @@ void ZImgFreeImage::readImg(uint8_t *mem, size_t size, uint8_t *des, size_t desS
 
   switch (fipImg.getColorType()) {
   case FIC_CMYK:
-    LINFO() << "cmyk";
+    LOG(INFO) << "cmyk";
     if (!fipImg.convertTo24Bits()) {
       throw ZIOException("convert CMYK to 24bit error");
     }

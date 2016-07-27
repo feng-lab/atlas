@@ -59,7 +59,7 @@ void Z3DImgSliceRenderer::addQuad(const ZMesh &quad)
   if (quad.empty() ||
       (quad.numVertices() != 4 && quad.numVertices() != 6) ||
       quad.numVertices() != quad.num3DTextureCoordinates()) {
-    LFATAL() << "Input quad should be 2D slice with 3D texture coordinates";
+    LOG(FATAL) << "Input quad should be 2D slice with 3D texture coordinates";
     return;
   }
   m_quads.push_back(quad);
@@ -137,7 +137,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
     glm::vec2 pixelEyeSpaceSize = m_rendererBase.camera().frustumNearPlaneSize() / glm::vec2(m_layerTarget->size());
     float ze_to_screen_pixel_voxel_size = -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio();
 
-    LINFO() << "";
+    LOG(INFO) << "";
     ZBenchTimer bt("render and collect blockids");
     bt.start();
 
@@ -199,7 +199,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
     //glFinish();
     bt.stopAndLog();
 
-    LINFO() << missingBlockIDs.size() << " " << usedBlockIDs.size();
+    LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
 
     if (!missingBlockIDs.empty()) {
       m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs);

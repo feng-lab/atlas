@@ -125,7 +125,7 @@ void Z3DImgRaycasterRenderer::addQuad(const ZMesh &quad)
       (quad.numVertices() != 4 && quad.numVertices() != 6) ||
       (quad.numVertices() != quad.num2DTextureCoordinates() &&
        quad.numVertices() != quad.num3DTextureCoordinates())) {
-    LERROR() << "Input quad should be 2D slice with either 2D or 3D texture coordinates";
+    LOG(ERROR) << "Input quad should be 2D slice with either 2D or 3D texture coordinates";
     return;
   }
   m_quads.push_back(quad);
@@ -326,7 +326,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         glm::vec2 pixelEyeSpaceSize = m_rendererBase.camera().frustumNearPlaneSize() / glm::vec2(m_layerTarget->size());
         float ze_to_screen_pixel_voxel_size = -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio();
 
-        LINFO() << "";
+        LOG(INFO) << "";
         ZBenchTimer bt("render and collect blockids");
         bt.start();
 
@@ -388,7 +388,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         //glFinish();
         bt.stopAndLog();
 
-        LINFO() << missingBlockIDs.size() << " " << usedBlockIDs.size();
+        LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
 
         if (!missingBlockIDs.empty()) {
           m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs);
@@ -469,7 +469,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       float ze_to_zw_b = 0.5f * (f+n)/(f-n) + 0.5f;
       float ze_to_screen_pixel_voxel_size = -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio();
 
-      LINFO() << "";
+      LOG(INFO) << "";
       ZBenchTimer bt("render blockids");
       bt.start();
 
@@ -617,7 +617,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 #endif
 #endif
 
-      LINFO() << missingBlockIDs.size() << " " << usedBlockIDs.size();
+      LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
       bt.stopAndLog();
 
       if (!missingBlockIDs.empty()) {

@@ -45,7 +45,7 @@ void ZImgTiff::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, s
   createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 
   if (!m_imageDescription.isEmpty()) {
-    LINFO() << m_imageDescription;
+    LOG(INFO) << m_imageDescription;
   }
 }
 
@@ -103,11 +103,11 @@ void ZImgTiff::readImg(const QString &filename, ZImg &img, const ZImgRegion &reg
   if (m_dimensionOrder.contains(QChar('C')))
     imgInfo2D.numChannels = 1;
   ZImg buf2DImg(imgInfo2D);
-  //LINFO() << imgInfo2D.toQString();
+  //LOG(INFO) << imgInfo2D.toQString();
 
   ZImgInfo partialImgInfo = region.clip(m_imgInfo[scene]);
   ZImg imgTmp(partialImgInfo);
-  //LINFO() << partialImgInfo.toQString();
+  //LOG(INFO) << partialImgInfo.toQString();
 
   int z = 0;
   int c = 0;
@@ -124,7 +124,7 @@ void ZImgTiff::readImg(const QString &filename, ZImg &img, const ZImgRegion &reg
           (static_cast<int>(scene) == l)) {
         tiff.readImgFromIFD(i, buf2DImg);
         int desc = c == -1 ? c : c-region.start.c;
-        //LINFO() << ifdIdx << " " << z << " " << c << " " << t << " " << l;
+        //LOG(INFO) << ifdIdx << " " << z << " " << c << " " << t << " " << l;
         cpyImg(buf2DImg, region, imgTmp, z-region.start.z, desc, t-region.start.t);
       }
       ifdIdx++;
@@ -241,7 +241,7 @@ void ZImgTiff::detectImgInfo(ZTiff &tiff)
     m_imgInfo[0].validBitCount = *validBitCounts.begin();
 
     if (m_imageDescription.startsWith("ImageJ=") && m_imageDescription.contains("images=")) {
-      LINFO() << "ImageJ Tiff: " << m_imageDescription;
+      LOG(INFO) << "ImageJ Tiff: " << m_imageDescription;
       m_isImageJTiff = true;
       size_t images = 0;
       size_t channels = 1;
@@ -452,8 +452,8 @@ bool ZImgTiff::IFDToLoc(size_t ifdIdx, int &z, int &c, int &t, int &l,
     c = -1;
   }
 
-  //LINFO() << ifdIdx << " " << z << " " << c << " " << t << " " << l << " " << startIFDIndex << " " << dimensionOrder << " " << imgInfo.toQString() << " "
-    //         << startZ << " " << startC << " " << startT << " " << startL;
+  //LOG(INFO) << ifdIdx << " " << z << " " << c << " " << t << " " << l << " " << startIFDIndex << " " << dimensionOrder << " " << imgInfo.toQString() << " "
+  //         << startZ << " " << startC << " " << startT << " " << startL;
   return true;
 }
 

@@ -462,7 +462,7 @@ void ZAnimation::export3DAnimation(const QDir &dir, const QString &fn, double fr
     --w;
   }
   if (canvas.width() % 2 == 1 || canvas.height() % 2 == 1) {
-    LINFO() << "Resize canvas size from (" << canvas.width() << ", " << canvas.height() << ") to (" << w << ", " << h << ").";
+    LOG(INFO) << "Resize canvas size from (" << canvas.width() << ", " << canvas.height() << ") to (" << w << ", " << h << ").";
     canvas.resize(w, h);
   }
   int numFrame = std::ceil(m_duration * framePerSecond);
@@ -982,7 +982,7 @@ void ZAnimation::readContent(const QString &fn, const QString &jsonKey)
 
   if (!err.isEmpty()) {
     QMessageBox::critical(QApplication::activeWindow(), "load file error", err);
-    LWARN() << err;
+    LOG(WARNING) << err;
   }
 
   updateObjAnimation();

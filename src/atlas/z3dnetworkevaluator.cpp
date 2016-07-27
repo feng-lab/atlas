@@ -51,7 +51,7 @@ void Z3DNetworkEvaluator::process(bool stereo)
     return;
 
   if (m_locked) {
-    LINFO() << "locked. Scheduling.";
+    LOG(INFO) << "locked. Scheduling.";
     //m_processPending = true;
     return;
   }
@@ -141,7 +141,7 @@ void Z3DNetworkEvaluator::process(bool stereo)
 void Z3DNetworkEvaluator::initializeNetwork()
 {
   if (m_locked) {
-    LINFO() << "locked.";
+    LOG(INFO) << "locked.";
   }
 
   lock();
@@ -212,11 +212,11 @@ void Z3DNetworkEvaluator::buildNetwork()
     m_renderingOrder.push_back(m_filterGraph[*rit].filter);
   }
 
-  LINFO() << "Rendering Order: ";
+  LOG(INFO) << "Rendering Order: ";
   for (size_t i=0; i<m_renderingOrder.size(); i++) {
-    LINFO() << "  " << i << ": " << m_renderingOrder[i]->className();
+    LOG(INFO) << "  " << i << ": " << m_renderingOrder[i]->className();
   }
-  LINFO() << "";
+  LOG(INFO) << "";
 
   // update reverse sorted filters
   m_reverseSortedFilters = m_renderingOrder;
@@ -344,10 +344,10 @@ void Z3DCheckOpenGLStateFilterWrapper::checkState(const Z3DFilter *p)
 void Z3DCheckOpenGLStateFilterWrapper::warn(const Z3DFilter* p, const QString& message)
 {
   if (p) {
-    LWARN() << "Invalid OpenGL state after processing " << p->className() << " : " << message;
+    LOG(WARNING) << "Invalid OpenGL state after processing " << p->className() << " : " << message;
   }
   else {
-    LWARN() << "Invalid OpenGL state before network processing: " << message;
+    LOG(WARNING) << "Invalid OpenGL state before network processing: " << message;
   }
 }
 
@@ -360,7 +360,7 @@ void Z3DProfileFilterWrapper::beforeFilterProcess(const Z3DFilter *)
 void Z3DProfileFilterWrapper::afterFilterProcess(const Z3DFilter *p)
 {
   m_benchTimer.stop();
-  LINFO() << "Filter " << p->className() << " took time: " << m_benchTimer.time() << " seconds.";
+  LOG(INFO) << "Filter " << p->className() << " took time: " << m_benchTimer.time() << " seconds.";
 }
 
 void Z3DProfileFilterWrapper::beforeNetworkProcess()
@@ -370,7 +370,7 @@ void Z3DProfileFilterWrapper::beforeNetworkProcess()
 
 void Z3DProfileFilterWrapper::afterNetworkProcess()
 {
-  LINFO() << "Network took time: " << m_benchTimer.total() << " seconds.";
+  LOG(INFO) << "Network took time: " << m_benchTimer.total() << " seconds.";
 }
 
 } // namespace nim

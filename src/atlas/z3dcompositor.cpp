@@ -838,7 +838,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*> &f
 {
   if (!m_ddpRT)
     if (!createDDPRenderTarget(port.size())) {
-      LERROR() << "Can not create fbo for dual depth peeling rendering";
+      LOG(ERROR) << "Can not create fbo for dual depth peeling rendering";
       return;
     }
   m_ddpRT->resize(port.size());
@@ -1114,7 +1114,7 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*> &fi
 {
   if (!m_waRT)
     if (!createWARenderTarget(port.size())) {
-      LERROR() << "Can not create fbo for weighted average rendering";
+      LOG(ERROR) << "Can not create fbo for weighted average rendering";
       return;
     }
   m_waRT->resize(port.size());

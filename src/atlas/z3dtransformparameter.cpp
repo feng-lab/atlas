@@ -292,9 +292,9 @@ void Z3DTransformParameter::updateMatrix()
 
 void Z3DTransformParameter::showTransformMatrix()
 {
-  LINFO() << "Transform: " << m_value;
-  LINFO() << "Inverse Transform: " << glm::affineInverse(m_value);
-  LINFO() << "";
+  LOG(INFO) << "Transform: " << m_value;
+  LOG(INFO) << "Inverse Transform: " << glm::affineInverse(m_value);
+  LOG(INFO) << "";
 }
 
 QWidget *Z3DTransformParameter::actualCreateWidget(QWidget *parent)

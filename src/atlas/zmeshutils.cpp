@@ -832,7 +832,7 @@ bool TriangulatePolygon2(const std::vector<int64_t> &poly, const std::vector<glm
 
   glm::dvec3 normal = ComputePolygonNormal(poly, vertices);
   if (glm::dot(normal, normal) == 0.0) {
-    LERROR() << "Degenerate polygon encountered during triangulation in TriangulatePolygon2 1";
+    LOG(ERROR) << "Degenerate polygon encountered during triangulation in TriangulatePolygon2 1";
     return false;
   }
 
@@ -924,7 +924,7 @@ bool TriangulatePolygon2(const std::vector<int64_t> &poly, const std::vector<glm
 
   if ( polyCopy.size() > 2 ) //couldn't triangulate
   {
-    LERROR() << "Degenerate polygon encountered during triangulation in TriangulatePolygon2 2";
+    LOG(ERROR) << "Degenerate polygon encountered during triangulation in TriangulatePolygon2 2";
     return false;
   }
   return true;
@@ -2556,7 +2556,7 @@ void MakePolysFromContours(
 
   if (!vtkCCSCutHoleyPolys(newPolys, vertices, polyGroups, polyEdges, normal))
   {
-    LERROR() << "Triangulation failed, data may not be watertight.";
+    LOG(ERROR) << "Triangulation failed, data may not be watertight.";
   }
 
   // Some polys might be self-intersecting.  Split the polys at each
@@ -2585,7 +2585,7 @@ void MakePolysFromContours(
 
   if (triangulationFailure)
   {
-    LERROR() << "Triangulation failed, surface may not be watertight in MakePolysFromContours.";
+    LOG(ERROR) << "Triangulation failed, surface may not be watertight in MakePolysFromContours.";
   }
 }
 
@@ -2689,7 +2689,7 @@ void ClipAndContourPolys(
       // Triangulate the poly and insert triangles into output.
       if (!TriangulatePolygon(polygon, vertices, outputTriangles))
       {
-        LERROR() << "Triangulation failed, output may not be watertight";
+        LOG(ERROR) << "Triangulation failed, output may not be watertight";
       }
     }
     else if (numPoints == 3)

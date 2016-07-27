@@ -26,11 +26,11 @@ void ZRegistrationNumericDiffCostFunction::setUseMultithreading(bool i)
 bool ZRegistrationNumericDiffCostFunction::evaluate(const double * const parameters, double *cost, double *gradient) const
 {
   if (!m_metric || !m_transform) {
-    LFATAL() << "Metric or Transform is not set";
+    LOG(FATAL) << "Metric or Transform is not set";
   }
   // do img check in ZImgRegistration
 
-  //LINFO() << "Func Eval Once";
+  //LOG(INFO) << "Func Eval Once";
   //ZBenchTimer bt("Func Eval");
   //bt.start();
 

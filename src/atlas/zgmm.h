@@ -119,9 +119,9 @@ public:
   {
     if (!m_hasEnoughData) {
       if (m_logLevel == IterAlgorithmLogLevel::Iter || m_logLevel == IterAlgorithmLogLevel::Final) {
-        LINFO() << "GMM Data is not enough";
-        LINFO() << "GMM Final Centroids:\n" << m_centroids;
-        LINFO() << "GMM Final Loglikelihood: -1";
+        LOG(INFO) << "GMM Data is not enough";
+        LOG(INFO) << "GMM Final Centroids:\n" << m_centroids;
+        LOG(INFO) << "GMM Final Loglikelihood: -1";
       }
       return -1;
     }
@@ -177,15 +177,15 @@ public:
         e = -prob.array().log().sum();
 
       if (m_logLevel == IterAlgorithmLogLevel::Iter) {
-        LINFO() << "GMM Iter: " << iter << " Negative Loglikelihood: " << e;
-        LINFO() << "GMM Centroids:\n" << m_centroids;
+        LOG(INFO) << "GMM Iter: " << iter << " Negative Loglikelihood: " << e;
+        LOG(INFO) << "GMM Centroids:\n" << m_centroids;
       }
       if (m_termCriteria.willTestEPS()) {
         likelihoodChange = std::abs(e-eold);
         if (m_termCriteria.meet(iter, likelihoodChange)) {
           if (m_logLevel == IterAlgorithmLogLevel::Iter || m_logLevel == IterAlgorithmLogLevel::Final) {
-            LINFO() << "GMM Final Centroids:\n" << m_centroids;
-            LINFO() << "GMM Final Negative Loglikelihood: " << e;
+            LOG(INFO) << "GMM Final Centroids:\n" << m_centroids;
+            LOG(INFO) << "GMM Final Negative Loglikelihood: " << e;
           }
           return e;
         } else {
@@ -245,7 +245,7 @@ public:
             if (m_checkCovars && ZEigenUtils::rank(covar) < m_dimension) {
               // don't change covar
               if (m_logLevel == IterAlgorithmLogLevel::Iter) {
-                LINFO() << "GMM check covars is on, rank of covar low:\n" << covar;
+                LOG(INFO) << "GMM check covars is on, rank of covar low:\n" << covar;
               }
             } else {
               m_covars[j] = covar;
@@ -308,7 +308,7 @@ public:
             if (m_checkCovars && ZEigenUtils::rank(covar) < m_dimension) {
               // don't change covar
               if (m_logLevel == IterAlgorithmLogLevel::Iter) {
-                LINFO() << "GMM check covars is on, rank of covar low:\n" << covar;
+                LOG(INFO) << "GMM check covars is on, rank of covar low:\n" << covar;
               }
             } else {
               m_covars[j] = covar;
@@ -336,12 +336,12 @@ public:
       e = -prob.array().log().sum();
     if (m_logLevel == IterAlgorithmLogLevel::Iter || m_logLevel == IterAlgorithmLogLevel::Final) {
       if (iter >= m_termCriteria.maxIter()) {
-        LINFO() << "GMM maximum number of iterations ("
-                << m_termCriteria.maxIter()
-                << ") has been exceeded.";
+        LOG(INFO) << "GMM maximum number of iterations ("
+                  << m_termCriteria.maxIter()
+                  << ") has been exceeded.";
       }
-      LINFO() << "GMM Final Centroids:\n" << m_centroids;
-      LINFO() << "GMM Final Negative Loglikelihood: " << e;
+      LOG(INFO) << "GMM Final Centroids:\n" << m_centroids;
+      LOG(INFO) << "GMM Final Negative Loglikelihood: " << e;
     }
     return e;
   }
@@ -433,14 +433,14 @@ protected:
     if (m_nclasses == 0 || m_pData->rows() == 0) {
       m_hasEnoughData = false;
       m_nclasses = 0;
-      LERROR() << "number of class or number of data points is 0";
+      LOG(ERROR) << "number of class or number of data points is 0";
       return false;
     }
     if (m_hasWeight && m_pWeight->size() < m_pData->rows()) {
       m_hasEnoughData = false;
       m_nclasses = 0;
-      LERROR() << "weight data is not enough: number of weight value is " << m_pWeight->size()
-               << " , number of data points is " << m_pData->rows();
+      LOG(ERROR) << "weight data is not enough: number of weight value is " << m_pWeight->size()
+                 << " , number of data points is " << m_pData->rows();
       return false;
     }
 
@@ -548,7 +548,7 @@ protected:
     VectorXrt s = m_responsibilities.rowwise().sum();
     for (int i=0; i<s.size(); i++) {
       if (s(i) == 0) {
-        LWARN() << "Some zero posterior probabilities";
+        LOG(WARNING) << "Some zero posterior probabilities";
         s(i) = 1;
         m_responsibilities.row(i) = RowVectorXrt::Ones(m_nclasses) / m_nclasses;
       }

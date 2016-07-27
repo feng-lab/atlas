@@ -95,12 +95,12 @@ ZStack *readZStack(const std::string &filename, ZStack *data, QString *error)
       size_t newHeight = static_cast<size_t>(std::floor(img.height() * scale));
       ZImgInfo oldInfo = img.info();
       img.resize(newWidth, newHeight, img.depth(), Interpolant::Cubic);
-      LWARN() << QString("Image <%1> is too big for Qt to display, resize to <%2>").arg(oldInfo.toQString()).arg(img.info().toQString());
+      LOG(WARNING) << QString("Image <%1> is too big for Qt to display, resize to <%2>").arg(oldInfo.toQString()).arg(img.info().toQString());
     }
 
     return imgToZStack(img, data);
   } catch (const ZIOException & e) {
-    LERROR() << e.what();
+    LOG(ERROR) << e.what();
     if (error) *error = e.what();
   }
   return nullptr;
@@ -112,10 +112,10 @@ bool writeZStack(const std::string &filename, const ZStack &stack, QString *erro
 
   try {
     img.save(QString::fromLocal8Bit(filename.c_str()));
-    LINFO() << "Wrote image: " << filename;
+    LOG(INFO) << "Wrote image: " << filename;
     return true;
   } catch (const ZIOException & e) {
-    LERROR() << "Failed to write image " << filename << ". error: " << e.what();
+    LOG(ERROR) << "Failed to write image " << filename << ". error: " << e.what();
     if (error) *error = e.what();
   }
   return false;
@@ -133,12 +133,12 @@ ZStack *readZStack(const QStringList &fileList, Dimension catDim, QString *error
       size_t newHeight = static_cast<size_t>(std::floor(img.height() * scale));
       ZImgInfo oldInfo = img.info();
       img.resize(newWidth, newHeight, img.depth(), Interpolant::Cubic);
-      LWARN() << QString("Image <%1> is too big for Qt to display, resize to <%2>").arg(oldInfo.toQString()).arg(img.info().toQString());
+      LOG(WARNING) << QString("Image <%1> is too big for Qt to display, resize to <%2>").arg(oldInfo.toQString()).arg(img.info().toQString());
     }
 
     return imgToZStack(img);
   } catch (const ZIOException & e) {
-    LERROR() << e.what();
+    LOG(ERROR) << e.what();
     if (error) *error = e.what();
   }
   return nullptr;

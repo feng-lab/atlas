@@ -42,7 +42,7 @@ QPainterPath splineToQPainterPath(const QPolygonF& spline, bool showLastSeg = tr
       gte::Vector<2,double> &m1 = values1[1];
       m0 *= times[i+1] - times[i];
       m1 *= times[i+1] - times[i];
-      //LINFO() << m0.X() << " " << m0.Y() << " " << m1.X() << " " << m1.Y() << " " << cspline[i] << " " << cspline[i+1];
+      //LOG(INFO) << m0.X() << " " << m0.Y() << " " << m1.X() << " " << m1.Y() << " " << cspline[i] << " " << cspline[i+1];
       res.cubicTo(spline[i].x() + 1./3.*m0[0], spline[i].y() + 1./3.*m0[1],
                   spline[i+1].x() - 1./3.*m1[0], spline[i+1].y() - 1./3.*m1[1],
           spline[i+1].x(), spline[i+1].y());
@@ -60,7 +60,7 @@ QPainterPath splineToQPainterPath(const QPolygonF& spline, bool showLastSeg = tr
       gte::Vector<2,double> &m1 = values1[1];
       m0 *= times[i+1] - times[i];
       m1 *= times[i+1] - times[i];
-      //LINFO() << m0.X() << " " << m0.Y() << " " << m1.X() << " " << m1.Y() << " " << cspline[i] << " " << cspline[i+1];
+      //LOG(INFO) << m0.X() << " " << m0.Y() << " " << m1.X() << " " << m1.Y() << " " << cspline[i] << " " << cspline[i+1];
       res.cubicTo(spline[i].x() + 1./3.*m0[0], spline[i].y() + 1./3.*m0[1],
                   spline[i+1].x() - 1./3.*m1[0], spline[i+1].y() - 1./3.*m1[1],
           spline[i+1].x(), spline[i+1].y());
@@ -220,7 +220,7 @@ void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::set<size_t>> &shape
     bool deleteAll = shapeOp.type == ROIType::Rect ||
         shapeOp.type == ROIType::Ellipse ||
         (shapeOp.poly.size() - static_cast<int>(pointIndices.size()) < 4);
-    //LINFO() << m_shapeOperations.size() << " " << shapeOp->poly.size();
+    //LOG(INFO) << m_shapeOperations.size() << " " << shapeOp->poly.size();
     if (deleteAll) {
       m_shapeOperations.removeAt(i);
       ++shapeOpIndexSubtract;
@@ -238,7 +238,7 @@ void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::set<size_t>> &shape
         }
       }
     }
-    //LINFO() << m_shapeOperations.size();
+    //LOG(INFO) << m_shapeOperations.size();
   }
   updateROI(false);
 }
@@ -484,7 +484,7 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
       if (it->first < 0)
         continue;
       size_t slice = it->first;
-      //LINFO() << slice;
+      //LOG(INFO) << slice;
       const ZSliceROI &sliceROI = it->second;
       const QPainterPath& path = sliceROI.paintPath();
       QRectF pathRect = path.boundingRect();
@@ -580,7 +580,7 @@ std::set<int> ZROI::mergeWith_Impl(const std::map<int, ZSliceROI> &sliceROIs)
   std::set<int> changedSlices;
   for (auto it = sliceROIs.begin(); it != sliceROIs.end(); ++it) {
     if (!it->second.isEmpty()) {
-      //LINFO() << getOrCreateSliceROI(it->first).isEmpty();
+      //LOG(INFO) << getOrCreateSliceROI(it->first).isEmpty();
       changedSlices.insert(it->first);
       m_sliceROIs[it->first].mergeWith(it->second);
       onSliceROIUpdated(it->first);
@@ -988,7 +988,7 @@ void ZROI::resetBoundBox()
 
 void ZROI::onSliceROIUpdated(int slice)
 {
-  //LINFO() << "..";
+  //LOG(INFO) << "..";
   if (m_sliceROIs.at(slice).isEmpty()) {
     deleteSliceROI_Impl(slice);
     resetBoundBox();

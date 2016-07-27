@@ -118,7 +118,7 @@ void ZRegionAnnotation::importLabelImage(const QString &fn, FileFormat format, b
   }
 
   ZImg origLabelImg(fn, ZImgRegion(), 0, format);
-  //LINFO() << origLabelImg.info().toQString();
+  //LOG(INFO) << origLabelImg.info().toQString();
   m_width = origLabelImg.width();
   m_height = origLabelImg.height();
   m_depth = origLabelImg.depth();
@@ -159,9 +159,9 @@ void ZRegionAnnotation::importLabelImage(const QString &fn, FileFormat format, b
   imFill.setFullyConnected(true);
   imFill.setForegroundValue(1);
 
-  LINFO() << "Importing Label Image...";
+  LOG(INFO) << "Importing Label Image...";
   for (auto it = m_ontology.beginPost(); it != m_ontology.endPost(); ++it) {
-    LINFO() << "Processing region " << it->abbreviation << " " << it->id << "...";
+    LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
     if (it->id > maxPossibleLabelInImg || it->id < minPossibleLabelInImg ||
         labels.find(it->id) == labels.end()) {
       continue;
@@ -207,7 +207,7 @@ void ZRegionAnnotation::importLabelImage(const QString &fn, FileFormat format, b
       m_ontology.eraseChildren(it);
     }
   }
-  LINFO() << "Finish importing label image";
+  LOG(INFO) << "Finish importing label image";
 
   bt.stopAndPrint();
 
@@ -221,7 +221,7 @@ void ZRegionAnnotation::importLabelImage(const QString &fn, FileFormat format, b
 
 void ZRegionAnnotation::exportLabelImage(const QString &fn, FileFormat format, Compression comp) const
 {
-  LINFO() << "Exporting Label Image...";
+  LOG(INFO) << "Exporting Label Image...";
   ZImgInfo info(m_width, m_height, m_depth, 1, 1, 2);
   info.voxelSizeUnit = VoxelSizeUnit::um;
   info.voxelSizeX = m_voxelSizeX;
@@ -229,7 +229,7 @@ void ZRegionAnnotation::exportLabelImage(const QString &fn, FileFormat format, C
   info.voxelSizeZ = m_voxelSizeZ;
   ZImg res(info);
   for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
-    LINFO() << "Processing region " << it->abbreviation << " " << it->id << "...";
+    LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
     if (it->roi) {
       ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), false);
       res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
@@ -238,7 +238,7 @@ void ZRegionAnnotation::exportLabelImage(const QString &fn, FileFormat format, C
   for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
     if (it->abbreviation.compare("GPe", Qt::CaseInsensitive) == 0 ||
         it->abbreviation.compare("STN", Qt::CaseInsensitive) == 0) {
-      LINFO() << "Post Processing Region " << it->abbreviation << " " << it->id << "...";
+      LOG(INFO) << "Post Processing Region " << it->abbreviation << " " << it->id << "...";
       if (it->roi) {
         ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), false);
         res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
@@ -246,7 +246,7 @@ void ZRegionAnnotation::exportLabelImage(const QString &fn, FileFormat format, C
     }
   }
   res.save(fn, format, comp);
-  LINFO() << "Finish exporting label image";
+  LOG(INFO) << "Finish exporting label image";
 }
 
 void ZRegionAnnotation::mergeROIToRegion(const ZROI &roi, int64_t regionID)

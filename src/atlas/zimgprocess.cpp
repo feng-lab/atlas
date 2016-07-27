@@ -21,39 +21,39 @@ void ZImgProcess::run()
   Q_UNUSED(guard1)
 
   try {
-    LINFO() << "run " << QThread::currentThreadId();
+    LOG(INFO) << "run " << QThread::currentThreadId();
     doWork();
     emit finished();
   }
   catch (itk::ProcessAborted const & e) {
-    LERROR() << "Process Aborted by User. " << e.GetDescription();
+    LOG(ERROR) << "Process Aborted by User. " << e.GetDescription();
     emit canceled();
     if (hasParent()) {
-      LERROR() << "notifying parent operation..";
+      LOG(ERROR) << "notifying parent operation..";
       throw;  // notify parent
     }
   }
   catch (itk::ExceptionObject const & excp) {
-    LERROR() << "Caught itk exception: " << excp.GetDescription();
+    LOG(ERROR) << "Caught itk exception: " << excp.GetDescription();
     emit processError(QString(excp.GetDescription()));
     if (hasParent()) {
-      LERROR() << "notifying parent operation..";
+      LOG(ERROR) << "notifying parent operation..";
       throw;  // notify parent
     }
   }
   catch (ZProcessAbortException const & e) {
-    LERROR() << "Process Aborted by User. " << e.what();
+    LOG(ERROR) << "Process Aborted by User. " << e.what();
     emit canceled();
     if (hasParent()) {
-      LERROR() << "notifying parent operation..";
+      LOG(ERROR) << "notifying parent operation..";
       throw;  // notify parent
     }
   }
   catch (ZException const & e) {
-    LERROR() << "Caught exception: " << e.what();
+    LOG(ERROR) << "Caught exception: " << e.what();
     emit processError(e.what());
     if (hasParent()) {
-      LERROR() << "notifying parent operation..";
+      LOG(ERROR) << "notifying parent operation..";
       throw;  // notify parent
     }
   }

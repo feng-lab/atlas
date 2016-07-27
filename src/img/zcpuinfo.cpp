@@ -33,18 +33,18 @@ typedef BOOL (WINAPI *LPFN_GLPI)(
 // Helper function to count set bits in the processor mask.
 DWORD CountSetBits(ULONG_PTR bitMask)
 {
-    DWORD LSHIFT = sizeof(ULONG_PTR)*8 - 1;
-    DWORD bitSetCount = 0;
-    ULONG_PTR bitTest = (ULONG_PTR)1 << LSHIFT;
-    DWORD i;
+  DWORD LSHIFT = sizeof(ULONG_PTR)*8 - 1;
+  DWORD bitSetCount = 0;
+  ULONG_PTR bitTest = (ULONG_PTR)1 << LSHIFT;
+  DWORD i;
 
-    for (i = 0; i <= LSHIFT; ++i)
-    {
-        bitSetCount += ((bitMask & bitTest)?1:0);
-        bitTest/=2;
-    }
+  for (i = 0; i <= LSHIFT; ++i)
+  {
+    bitSetCount += ((bitMask & bitTest)?1:0);
+    bitTest/=2;
+  }
 
-    return bitSetCount;
+  return bitSetCount;
 }
 
 #else
@@ -54,23 +54,23 @@ DWORD CountSetBits(ULONG_PTR bitMask)
 inline void __cpuid(int cpu_info[4], int info_type)
 {
   __asm__ volatile (
-    "mov %%ebx, %%edi\n"
-    "cpuid\n"
-    "xchg %%edi, %%ebx\n"
-    : "=a"(cpu_info[0]), "=D"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
+        "mov %%ebx, %%edi\n"
+        "cpuid\n"
+        "xchg %%edi, %%ebx\n"
+        : "=a"(cpu_info[0]), "=D"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
     : "a"(info_type)
-  );
+    );
 }
 
 inline void __cpuidex(int cpu_info[4], int info_type, int info_index)
 {
   __asm__ volatile (
-    "mov %%ebx, %%edi\n"
-    "cpuid\n"
-    "xchg %%edi, %%ebx\n"
-    : "=a"(cpu_info[0]), "=D"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
+        "mov %%ebx, %%edi\n"
+        "cpuid\n"
+        "xchg %%edi, %%ebx\n"
+        : "=a"(cpu_info[0]), "=D"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
     : "a"(info_type), "c"(info_index)
-  );
+    );
 }
 
 #else
@@ -78,19 +78,19 @@ inline void __cpuidex(int cpu_info[4], int info_type, int info_index)
 inline void __cpuid(int cpu_info[4], int info_type)
 {
   __asm__ volatile (
-    "cpuid \n\t"
-    : "=a"(cpu_info[0]), "=b"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
+        "cpuid \n\t"
+        : "=a"(cpu_info[0]), "=b"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
     : "a"(info_type)
-  );
+    );
 }
 
 inline void __cpuidex(int cpu_info[4], int info_type, int info_index)
 {
   __asm__ volatile (
-    "cpuid \n\t"
-    : "=a"(cpu_info[0]), "=b"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
+        "cpuid \n\t"
+        : "=a"(cpu_info[0]), "=b"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
     : "a"(info_type), "c"(info_index)
-  );
+    );
 }
 
 inline uint64_t _xgetbv(unsigned int index)
@@ -168,18 +168,18 @@ ZCpuInfo::ZCpuInfo()
 
 void ZCpuInfo::logCpuInfo() const
 {
-  LINFO() << "CPU String: " << sCPU;
-  LINFO() << "CPU Brand String: " << sCPUBrand;
-  LINFO() << "Stepping ID: " << nSteppingID << " Model ID: " << nModel << " Family ID: " << nFamily << " Type: " << nProcessorType
-          << " Ext.Model ID: " << nExtendedmodel << " Ext.Family ID: " << nExtendedfamily;
-  LINFO() << "Number of Cores: " << nPhysicalCores;
-  LINFO() << "Number of Threads: " << nLogicalCores;
-  LINFO() << "Cache Line: " << nCacheLine;
-  LINFO() << "L1ICache: " << nL1ICacheSize;
-  LINFO() << "L1DCache: " << nL1DCacheSize;
-  LINFO() << "L2Cache: " << nL2CacheSize;
-  LINFO() << "L3Cache: " << nL3CacheSize;
-  LINFO() << "RAM: " << nPhysicalRAM;
+  LOG(INFO) << "CPU String: " << sCPU;
+  LOG(INFO) << "CPU Brand String: " << sCPUBrand;
+  LOG(INFO) << "Stepping ID: " << nSteppingID << " Model ID: " << nModel << " Family ID: " << nFamily << " Type: " << nProcessorType
+            << " Ext.Model ID: " << nExtendedmodel << " Ext.Family ID: " << nExtendedfamily;
+  LOG(INFO) << "Number of Cores: " << nPhysicalCores;
+  LOG(INFO) << "Number of Threads: " << nLogicalCores;
+  LOG(INFO) << "Cache Line: " << nCacheLine;
+  LOG(INFO) << "L1ICache: " << nL1ICacheSize;
+  LOG(INFO) << "L1DCache: " << nL1DCacheSize;
+  LOG(INFO) << "L2Cache: " << nL2CacheSize;
+  LOG(INFO) << "L3Cache: " << nL3CacheSize;
+  LOG(INFO) << "RAM: " << nPhysicalRAM;
 
   QString instructions = QString(b64Available ? "64 bit Technology" : "") +
       QString(bXOP ? "; XOP" : "") +
@@ -201,7 +201,7 @@ void ZCpuInfo::logCpuInfo() const
       QString(bBMI ? "; BMI" : "") +
       QString(bMOVBE ? "; MOVBE" : "");
 
-  LINFO() << instructions;
+  LOG(INFO) << instructions;
 
   instructions = QString(bCMPXCHG8B ? "CMPXCHG8B" : "") +
       QString(bCMPXCHG16B ? "; CMPXCHG16B" : "") +
@@ -209,9 +209,9 @@ void ZCpuInfo::logCpuInfo() const
       QString(bLZCNT ? "; LZCNT" : "") +
       QString(bRDTSCP ? "; RDTSCP" : "");
 
-  LINFO() << instructions;
+  LOG(INFO) << instructions;
 
-  LINFO() << "";
+  LOG(INFO) << "";
 }
 
 void ZCpuInfo::detectCpuInfo()
@@ -360,7 +360,7 @@ void ZCpuInfo::detectCoreAndThreadNumber()
         "GetLogicalProcessorInformation");
   if (!glpi)
   {
-    LERROR() << "GetLogicalProcessorInformation is not supported.";
+    LOG(ERROR) << "GetLogicalProcessorInformation is not supported.";
     nPhysicalCores = QThread::idealThreadCount();
     if (nPhysicalCores < 0) {
       nPhysicalCores = 1;
@@ -387,7 +387,7 @@ void ZCpuInfo::detectCoreAndThreadNumber()
 
         if (!buffer)
         {
-          LERROR() << "Allocation PSYSTEM_LOGICAL_PROCESSOR_INFORMATION failure";
+          LOG(ERROR) << "Allocation PSYSTEM_LOGICAL_PROCESSOR_INFORMATION failure";
           nPhysicalCores = QThread::idealThreadCount();
           if (nPhysicalCores < 0) {
             nPhysicalCores = 1;
@@ -400,7 +400,7 @@ void ZCpuInfo::detectCoreAndThreadNumber()
       }
       else
       {
-        LERROR() << "Error " << GetLastError();
+        LOG(ERROR) << "Error " << GetLastError();
         nPhysicalCores = QThread::idealThreadCount();
         if (nPhysicalCores < 0) {
           nPhysicalCores = 1;
@@ -470,15 +470,15 @@ void ZCpuInfo::detectCoreAndThreadNumber()
       break;
 
     default:
-      LERROR() << "Unsupported LOGICAL_PROCESSOR_RELATIONSHIP value.";
+      LOG(ERROR) << "Unsupported LOGICAL_PROCESSOR_RELATIONSHIP value.";
       break;
     }
     byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
     ptr++;
   }
 
-  LINFO() << "Number of NUMA nodes: " << numaNodeCount;
-  LINFO() << "Number of physical processor packages: " << processorPackageCount;
+  LOG(INFO) << "Number of NUMA nodes: " << numaNodeCount;
+  LOG(INFO) << "Number of physical processor packages: " << processorPackageCount;
   nPhysicalCores = processorCoreCount;
   nLogicalCores = logicalProcessorCount;
 

@@ -172,7 +172,7 @@ void ZImgV3DRaw::readImg(const QString &filename, ZImg &img, const ZImgRegion &r
 void ZImgV3DRaw::writeImg(const QString &filename, const ZImg &img, Compression comp)
 {
   if (comp != Compression::AUTO && comp != Compression::NONE) {
-    LWARN() << "compression is not supported for V3DRaw";
+    LOG(WARNING) << "compression is not supported for V3DRaw";
   }
   if (img.numTimes() != 1) {
     throw ZIOException("time sequence is not supported");
@@ -202,7 +202,7 @@ void ZImgV3DRaw::writeImg(const QString &filename, const ZImg &img, Compression 
 void ZImgV3DRaw::writeImg(const QString &filename, const ZImgSliceProvider &imgSliceProvider, Compression comp)
 {
   if (comp != Compression::AUTO && comp != Compression::NONE) {
-    LWARN() << "compression is not supported for V3DRaw";
+    LOG(WARNING) << "compression is not supported for V3DRaw";
   }
   if (imgSliceProvider.imgInfo().numTimes != 1) {
     throw ZIOException("time sequence is not supported");

@@ -5,6 +5,9 @@
 #include <QPlainTextEdit>
 #include <QTabWidget>
 #include "zdoc.h"
+#ifdef _USE_QSLOG_
+#include "zlog.h"
+#endif
 
 namespace nim {
 

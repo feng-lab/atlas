@@ -41,7 +41,7 @@ void ZImgRegistration::setOptimizer(const QString &str)
   } else if (str == "Nonlinear Conjugate Gradient") {
     m_optimizer.setLineSearchDirectionType(ceres::NONLINEAR_CONJUGATE_GRADIENT);
   } else {
-    LFATAL() << "impossible optimizer type selection";
+    LOG(FATAL) << "impossible optimizer type selection";
   }
 }
 
@@ -109,7 +109,7 @@ double ZImgRegistration::run()
 //      }
 //      img.save("/Users/feng/Downloads/gridres.tif");
 //      //parameters = bestParams;
-//      LINFO() << bestParams[0] << " " << bestParams[1] << " " << bestParams[2];
+//      LOG(INFO) << bestParams[0] << " " << bestParams[1] << " " << bestParams[2];
 //    }
 
 //    // shift centers of two images to one point, make sure two imgs have overlap
@@ -177,19 +177,19 @@ double ZImgRegistration::run()
 //      }
 //    }
 
-    LINFO() << "";
-    LINFO() << "  " << "MultiResolution Level: " << i;
+    LOG(INFO) << "";
+    LOG(INFO) << "  " << "MultiResolution Level: " << i;
 
     if (i < m_numScales - 1) {
       m_transform->adaptParameters(i+1, i);
     }
-    LINFO() << "  " << "Initial Parameters: " << m_transform->paraQString();
+    LOG(INFO) << "  " << "Initial Parameters: " << m_transform->paraQString();
     std::vector<double> scales = m_transform->estimateParameterScales(dims);
     QString scalesQString = QString("%1").arg(scales[0]);
     for (size_t i=1; i<scales.size(); ++i) {
       scalesQString += QString(" %1").arg(scales[i]);
     }
-    LINFO() << "  " << "Parameter Scales: " << scalesQString;
+    LOG(INFO) << "  " << "Parameter Scales: " << scalesQString;
 
     m_optimizer.setParameterScales(scales);
     m_optimizer.setInitialParameters(m_transform->parameters());
@@ -198,8 +198,8 @@ double ZImgRegistration::run()
 
     m_transform->setParameters(m_optimizer.currentParameters());
 
-    LINFO() << "  " << "Final Parameters: " << m_transform->paraQString();
-    LINFO() << "Optimizer brief report: " << m_optimizer.briefReport();
+    LOG(INFO) << "  " << "Final Parameters: " << m_transform->paraQString();
+    LOG(INFO) << "Optimizer brief report: " << m_optimizer.briefReport();
   }
   return m_optimizer.finalCost();
 }

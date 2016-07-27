@@ -248,7 +248,7 @@ ZImg ZImgMerge::merge(Mode mode, QString *summary) const
   resolveLocations(imgs, refImg, minCost, summ);
   mergeImgs(res, imgs, mode, summ);
 
-  LINFO() << "merge summary:\n" << qUtf8Printable(summ);
+  LOG(INFO) << "merge summary:\n" << qUtf8Printable(summ);
   if (summary)
     summ.swap(*summary);
 
@@ -326,7 +326,7 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
     imgCoords[refImg] = ZVoxelCoordinate();
 
   //  for (std::list<Edge>::iterator it = tree.begin(); it != tree.end(); ++it) {
-  //    LINFO() << graph[boost::source(*it, graph)].idx << " " << graph[boost::target(*it, graph)].idx << " " << graph[*it].cost;
+  //    LOG(INFO) << graph[boost::source(*it, graph)].idx << " " << graph[boost::target(*it, graph)].idx << " " << graph[*it].cost;
   //  }
 
   while (!tree.empty()) {
@@ -510,7 +510,7 @@ void ZImgMerge::mergeImgs(ZImg &res, const std::map<const ZImg*, ZVoxelCoordinat
     }
   }
   if (!neededChannelInfo.empty() || !neededTimeStamp.empty()) {
-    LFATAL() << "check";
+    LOG(FATAL) << "check";
   }
 
   if (mode != Mode::First && mode != Mode::Max) {

@@ -33,7 +33,7 @@ void Z3DAnimationView::docAnimationsAdded(const QList<size_t> &objs)
     }
   }
   catch (const ZException & e) {
-    LERROR() << "Failed to render 3d animation: " << e.what();
+    LOG(ERROR) << "Failed to render 3d animation: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render 3d animation"), e.what());
   }
 }
@@ -56,7 +56,7 @@ void Z3DAnimationView::docAnimationAdded(size_t id)
     emit objViewReady(id);
   }
   catch (const ZException & e) {
-    LERROR() << "Failed to render 3d animation: " << e.what();
+    LOG(ERROR) << "Failed to render 3d animation: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render 3d animation"), e.what());
   }
 }

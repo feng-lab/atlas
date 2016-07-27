@@ -27,7 +27,7 @@ QSize ZComboBox::minimumSizeHint() const
 
 void ZComboBox::addItemSlot(const QString &text)
 {
-  //LINFO() << text;
+  //LOG(INFO) << text;
   addItem(text);
 }
 

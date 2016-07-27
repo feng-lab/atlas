@@ -321,7 +321,7 @@ void ZMainWindow::open3DWindow()
       m_3dWindow->raise();
     }
     catch (const ZException & e) {
-      LERROR() << "Failed to open 3D window: " << e.what();
+      LOG(ERROR) << "Failed to open 3D window: " << e.what();
       QMessageBox::critical(this, tr("Failed to open 3D window"), e.what());
       delete m_3dWindow;
       m_3dWindow = nullptr;
@@ -804,7 +804,7 @@ bool ZMainWindow::loadJsonSceneImpl(const QString &fn, QString &err)
   }
 
   if (idmap.empty()) {
-    LWARN() << "Scene " << fn << " contains zero objects";
+    LOG(WARNING) << "Scene " << fn << " contains zero objects";
   }
 
   for (QJsonObject::const_iterator it = sceneObj.begin();
@@ -837,7 +837,7 @@ bool ZMainWindow::loadJsonSceneImpl(const QString &fn, QString &err)
     }
   }
   QApplication::processEvents();
-  LINFO() << "Finish loading scene";
+  LOG(INFO) << "Finish loading scene";
 
   return true;
 }

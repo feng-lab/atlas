@@ -41,7 +41,7 @@ Z3DTexture *Z3DSDFont::texture()
 void Z3DSDFont::loadImage()
 {
   if(!m_GLFormattedImage.load(m_imageFileName)) {
-    LERROR() << "error loading image: " << m_imageFileName;
+    LOG(ERROR) << "error loading image: " << m_imageFileName;
     m_isEmpty = true;
     return;
   }
@@ -72,7 +72,7 @@ void Z3DSDFont::parseFontFile()
       if (ok)
         continue;
       else {
-        LERROR() << "char count can not be converted to int, wrong file maybe, abort";
+        LOG(ERROR) << "char count can not be converted to int, wrong file maybe, abort";
         m_isEmpty = true;
         return;
       }
@@ -137,14 +137,14 @@ void Z3DSDFont::parseFontFile()
           else if (tokenIndex == 9)
             chnl = value.toInt(&ok);
           if (!ok) {
-            LERROR() << "some number convertion error, abort";
+            LOG(ERROR) << "some number convertion error, abort";
             m_charInfos.clear();
             m_isEmpty = true;
             return;
           }
           continue;
         } else {
-          LERROR() << "found unknown token, wrong file, abort";
+          LOG(ERROR) << "found unknown token, wrong file, abort";
           m_charInfos.clear();
           m_isEmpty = true;
           return;
@@ -158,7 +158,7 @@ void Z3DSDFont::parseFontFile()
                                        m_GLFormattedImage.height()));
         m_maxFontHeight = std::max(m_maxFontHeight, height);
       } else {
-        LERROR() << "some tokens are missing, abort";
+        LOG(ERROR) << "some tokens are missing, abort";
         m_charInfos.clear();
         m_isEmpty = true;
         return;
@@ -166,7 +166,7 @@ void Z3DSDFont::parseFontFile()
     }
   }
   if (m_charInfos.size() != numCharFromFile) {
-    LERROR() << "font char count dont match with txt file, abort";
+    LOG(ERROR) << "font char count dont match with txt file, abort";
     m_charInfos.clear();
     m_maxFontHeight = 0;
     m_isEmpty = true;

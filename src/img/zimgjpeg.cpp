@@ -421,7 +421,7 @@ void ZImgJpeg::readMetadata(const QString &filename, ZImgMetadata &meta, size_t 
         }
       }
       catch (const ZIOException & e) {
-        LWARN() << "failed to read metadata from jpeg: " << e.what();
+        LOG(WARNING) << "failed to read metadata from jpeg: " << e.what();
       }
       break;
     }
@@ -513,7 +513,7 @@ void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
         }
       }
       catch (const ZIOException & e) {
-        LWARN() << "failed to read thumbnail from jpeg: " << e.what();
+        LOG(WARNING) << "failed to read thumbnail from jpeg: " << e.what();
       }
       break;
     }

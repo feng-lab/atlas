@@ -278,7 +278,7 @@ void Z3DVolume::generateTexture()
   if (dimensions().x == 0 || dimensions().y == 0 || dimensions().z == 0) {
     QString message = QString("OpenGL volumes must have a size greater than 0 in all dimensions. Actual size: (%1, %2, %3)")
         .arg(m_img.width()).arg(m_img.height()).arg(m_img.depth());
-    LERROR() << message;
+    LOG(ERROR) << message;
     return;
   }
 
@@ -298,7 +298,7 @@ void Z3DVolume::generateTexture()
     internalFormat = GLint(GL_R32F);
     dataType = GL_FLOAT;
   } else {
-    LERROR() << "Only GREY, GREY16 or FLOAT32 stack formats are supported";
+    LOG(ERROR) << "Only GREY, GREY16 or FLOAT32 stack formats are supported";
     return;
   }
 

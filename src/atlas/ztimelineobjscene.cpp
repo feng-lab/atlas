@@ -192,7 +192,7 @@ void ZTimelineObjScene::updateItems()
   }
 
   //bt.stop();
-  //LINFO() << bt;
+  //LOG(INFO) << bt;
 }
 
 } // namespace nim

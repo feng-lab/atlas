@@ -29,7 +29,7 @@ public:
       for (uint32_t y=0; y<m_numBlocks.y; ++y) {
         for (uint32_t x=0; x<m_numBlocks.x; ++x) {
           m_cacheItemsList.push_front(KeyValuePairType(m_invalidKey, glm::ivec3(x*m_blockSize.x, y*m_blockSize.y, z*m_blockSize.z)));
-          //LINFO() << glm::ivec3(x*m_blockSize.x, y*m_blockSize.y, z*m_blockSize.z);
+          //LOG(INFO) << glm::ivec3(x*m_blockSize.x, y*m_blockSize.y, z*m_blockSize.z);
         }
       }
     }

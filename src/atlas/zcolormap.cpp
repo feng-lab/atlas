@@ -426,7 +426,7 @@ bool ZColorMap::setDomainMax(double max, bool rescaleKeys)
 void ZColorMap::setDomain(double min, double max, bool rescaleKeys)
 {
   if (min >= max) {
-    LERROR() << "wrong input";
+    LOG(ERROR) << "wrong input";
     return;
   }
   if (min == domainMin() && max == domainMax())
@@ -967,7 +967,7 @@ void ZColorMapParameter::readValue(const QJsonValue &jsonValue)
       key.m_split = keyObj["split"].toBool();
       m_value.m_keys.emplace_back(key, false);
     } else {
-      LWARN() << "Invalid transfer function key " << keyObj.keys().join("  ");
+      LOG(WARNING) << "Invalid transfer function key " << keyObj.keys().join("  ");
     }
   }
   emit valueChanged();

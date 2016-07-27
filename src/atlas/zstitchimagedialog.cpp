@@ -1362,7 +1362,7 @@ void ZStitchImageDialog::stitchStacks2()
           .arg(f + 1).arg(f+nstack + 1).arg(movingImgOffset.toQString()).arg(maxNCC);
       m_commandOutputEdit->append(info);
       QApplication::processEvents();
-      LINFO() << info;
+      LOG(INFO) << info;
     }
     for (size_t m=f+1; m<nstack; ++m) { // moving
       // no connection
@@ -1417,7 +1417,7 @@ void ZStitchImageDialog::stitchStacks2()
             .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(maxNCC);
         m_commandOutputEdit->append(info);
         QApplication::processEvents();
-        LINFO() << info;
+        LOG(INFO) << info;
       }
       // img2
       {
@@ -1451,7 +1451,7 @@ void ZStitchImageDialog::stitchStacks2()
             .arg(f +nstack+ 1).arg(m+nstack + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(maxNCC);
         m_commandOutputEdit->append(info);
         QApplication::processEvents();
-        LINFO() << info;
+        LOG(INFO) << info;
       }
     }
   }
@@ -2085,7 +2085,7 @@ void ZStitchImageDialog::stitchStacks()
             .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(maxNCC);
         m_commandOutputEdit->append(info);
         QApplication::processEvents();
-        LINFO() << info;
+        LOG(INFO) << info;
       }
     }
 

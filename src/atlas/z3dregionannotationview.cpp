@@ -39,7 +39,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const QList<size_t> &obj
     }
   }
   catch (const ZException & e) {
-    LERROR() << "Failed to render regionAnnotation: " << e.what();
+    LOG(ERROR) << "Failed to render regionAnnotation: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render regionAnnotation"), e.what());
   }
 }
@@ -66,7 +66,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationAdded(size_t id)
     emit objViewReady(id);
   }
   catch (const ZException & e) {
-    LERROR() << "Failed to render regionAnnotation: " << e.what();
+    LOG(ERROR) << "Failed to render regionAnnotation: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render regionAnnotation"), e.what());
   }
 }

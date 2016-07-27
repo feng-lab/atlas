@@ -421,7 +421,7 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs, std
         imgs.push_back(*imgPtr);
         locs.push_back(QPoint(tile.x, tile.y));
         scales.push_back(readRatio);
-        //LINFO() << level << " " << (1<<level) << " " << x << " " << y << " " << width << " " << height;
+        //LOG(INFO) << level << " " << (1<<level) << " " << x << " " << y << " " << width << " " << height;
       }
     }
   }
@@ -548,7 +548,7 @@ ZImg ZImgPack::crop(const ZImgRegion &region) const
 
 ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) const
 {
-  LINFO() << width << " " << height << " " << depth;
+  LOG(INFO) << width << " " << height << " " << depth;
   assert(width <= m_imgInfo.width && height <= m_imgInfo.height && depth <= m_imgInfo.depth &&
          width > 0 && height > 0 && depth > 0);
   ZImg res;
@@ -585,7 +585,7 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
       res.resize(width, height, depth);
     }
   }
-  LINFO() << "end";
+  LOG(INFO) << "end";
   return res;
 }
 
@@ -896,7 +896,7 @@ ZImg ZImgPack::assembleImg(size_t ratio) const
     info.width = m_ratioToSize.at(ratio).width();
     info.height = m_ratioToSize.at(ratio).height();
   }
-  //LINFO() << info.toQString();
+  //LOG(INFO) << info.toQString();
   ZImg res(info);
 
   for (size_t t=0; t<m_imgInfo.numTimes; ++t) {
@@ -915,14 +915,14 @@ ZImg ZImgPack::assembleImg(size_t ratio) const
     }
   }
 
-  //LINFO() << "end assemble level " << level;
+  //LOG(INFO) << "end assemble level " << level;
   return res;
 }
 
 ZImg ZImgPack::assembleImg(size_t ratio, size_t t) const
 {
   assert(ratio >= 1);
-  //LINFO() << "assemble level " << level;
+  //LOG(INFO) << "assemble level " << level;
   ZImgRegion rgn(0,-1,0,-1,0,-1,0,-1,t,t+1);
   ZImgInfo info = rgn.clip(m_imgInfo);
   if (ratio > 1) {
@@ -944,7 +944,7 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t) const
       }
     }
   }
-  //LINFO() << "end assemble level " << level;
+  //LOG(INFO) << "end assemble level " << level;
   return res;
 }
 
@@ -975,7 +975,7 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t, size_t z) const
 
 void ZImgPack::updateDerivedData()
 {
-  //LINFO() << m_imgInfo.toQString();
+  //LOG(INFO) << m_imgInfo.toQString();
   if (!m_diskCached) {
     m_maximumProjectedAlongZImg.clear();
     m_img.computeMinMax(m_minIntensity, m_maxIntensity);

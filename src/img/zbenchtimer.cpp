@@ -121,29 +121,28 @@ void ZBenchTimer::resume()
 void ZBenchTimer::stopAndLog()
 {
   stop();
-  LINFO() << *this;
+  LOG(INFO) << *this;
 }
 
-std::ostream& ZBenchTimer::print(std::ostream& s) const
+std::ostream& operator<<(std::ostream& s, const ZBenchTimer& m)
 {
-  if (m_rep == 1) {
-    s << "Function " << m_name << " took " << m_time << " seconds." << std::endl;
-    if (m_pauseTime > 0)
-      s << "Function " << m_name << " pause " << m_pauseTime << " seconds." << std::endl;
-  } else if (m_rep > 1) {
-    s << "Function " << m_name << " took on average " << m_average << " seconds.";
-    s << " (out of " << m_rep << " repeats. best: " << m_best << "  worst: ";
-    s << m_worst << ")" << std::endl;
-    if (m_averagePauseTime > 0)
-      s << "Function " << m_name << " pause on average " << m_averagePauseTime << " seconds." << std::endl;
+  if (m.m_rep == 1) {
+    s << "Function " << m.m_name << " took " << m.m_time << " seconds." << std::endl;
+    if (m.m_pauseTime > 0)
+      s << "Function " << m.m_name << " pause " << m.m_pauseTime << " seconds." << std::endl;
+  } else if (m.m_rep > 1) {
+    s << "Function " << m.m_name << " took on average " << m.m_average << " seconds.";
+    s << " (out of " << m.m_rep << " repeats. best: " << m.m_best << "  worst: ";
+    s << m.m_worst << ")" << std::endl;
+    if (m.m_averagePauseTime > 0)
+      s << "Function " << m.m_name << " pause on average " << m.m_averagePauseTime << " seconds." << std::endl;
   }
-  s.flush();
   return s;
 }
 
 #ifdef _USE_QSLOG_
 // qDebug output
-QDebug operator << (QDebug s, const ZBenchTimer& m)
+QDebug operator<<(QDebug s, const ZBenchTimer& m)
 {
   std::ostringstream oss;
   oss << m;

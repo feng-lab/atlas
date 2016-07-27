@@ -7,7 +7,7 @@
 
 namespace nim {
 
-void initLogging(const char* argv0, const QString &filename)
+void initLogging(const char* argv0, const QString& filename)
 {
   google::SetLogDestination(google::GLOG_INFO, QFile::encodeName(filename).constData());
   google::SetLogDestination(google::GLOG_ERROR, "");
@@ -67,7 +67,7 @@ public:
   {
     m_file.setFileName(filename);
     if (!m_file.open(QFile::WriteOnly | QFile::Text)) {
-        LOG(ERROR) << "glog: could not open log file: " << filename;
+      LOG(ERROR) << "glog: could not open log file: " << filename;
     }
   }
 
@@ -75,8 +75,8 @@ public:
 
   // LogSink interface
 public:
-  virtual void send(LogSeverity, const char *, const char *, int,
-                    const tm *, const char *message, size_t, size_t message_len) override
+  virtual void send(LogSeverity, const char*, const char*, int,
+                    const ::tm*, const char* message, size_t, size_t message_len) override
   {
     if (isValid()) {
       m_file.write(message, message_len + 1);  // glog: after message_len is '\n'
@@ -96,8 +96,8 @@ public:
 
   // LogSink interface
 public:
-  virtual void send(LogSeverity severity, const char *full_filename, const char *base_filename, int line,
-                    const tm *tm_time, const char *message, size_t prefix_len, size_t message_len) override
+  virtual void send(LogSeverity severity, const char* full_filename, const char* base_filename, int line,
+                    const tm* tm_time, const char* message, size_t prefix_len, size_t message_len) override
   {
     if (isValid()) {
       m_logFunction(LogData(severity, full_filename, base_filename, line, tm_time, message, prefix_len, message_len));
@@ -105,7 +105,7 @@ public:
   }
 };
 
-LogSinkPtr createFileLogSink(const QString &filename)
+LogSinkPtr createFileLogSink(const QString& filename)
 {
   auto res = std::make_shared<FileLogSink>(filename);
   return res->isValid() ? res : LogSinkPtr();
@@ -120,13 +120,13 @@ LogSinkPtr createFunctorLogSink(LogFunction f)
 QString levelToString(LogSeverity theLevel)
 {
   switch (theLevel) {
-  case INFO:
+  case google::GLOG_INFO:
     return QObject::tr("Info");
-  case WARNING:
+  case google::GLOG_WARNING:
     return QObject::tr("Warning");
-  case ERROR:
+  case google::GLOG_ERROR:
     return QObject::tr("Error");
-  case FATAL:
+  case google::GLOG_FATAL:
     return QObject::tr("Fatal");
   default:
     return QString("Unknown");
@@ -190,13 +190,13 @@ QString levelToString(LogSeverity theLevel)
 } // namespace nim
 
 // support std string
-QDebug operator << (QDebug s, const std::string& m)
+QDebug operator<<(QDebug s, const std::string& m)
 {
   s.nospace() << m.c_str();
   return s.space();
 }
 
-QDebug operator << (QDebug s, const std::basic_string<wchar_t>& m)
+QDebug operator<<(QDebug s, const std::basic_string<wchar_t>& m)
 {
   s.nospace() << QString::fromStdWString(m);
   return s.space();

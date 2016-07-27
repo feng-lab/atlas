@@ -99,7 +99,7 @@ void ZImgAlgorithmBaseWithProgressReporter::processITKEvent(itk::Object *caller,
     if (m_cancelFlag && *m_cancelFlag) {
       if (process->GetAbortGenerateData() == false) {
         process->AbortGenerateDataOn();
-        LINFO() << "abort itk 1";
+        LOG(INFO) << "abort itk 1";
       }
     } else {
       subOperationProgressChanged(clamp(process->GetProgress()), process);
@@ -114,7 +114,7 @@ void ZImgAlgorithmBaseWithProgressReporter::constProcessITKEvent(const itk::Obje
     if (m_cancelFlag && *m_cancelFlag) {
       if (process->GetAbortGenerateData() == false) {
         process->AbortGenerateDataOn();
-        LINFO() << "abort itk 2";
+        LOG(INFO) << "abort itk 2";
       }
     } else {
       subOperationProgressChanged(clamp(process->GetProgress()), process);

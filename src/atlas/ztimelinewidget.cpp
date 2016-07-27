@@ -172,7 +172,7 @@ void ZTimelineWidget::objViewVerticalScrollBarRangeChanged(int min, int max)
 
 void ZTimelineWidget::showValue(int i)
 {
-  LINFO() << i;
+  LOG(INFO) << i;
 }
 
 void ZTimelineWidget::resizeEvent(QResizeEvent *event)

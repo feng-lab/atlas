@@ -70,7 +70,7 @@ void ZObjEditWidget::updateEditWidgetTitleOfObj(size_t id)
 void ZObjEditWidget::writeLogData(const LogData *message)
 {
   bool atBottom = m_logWidget->verticalScrollBar()->value() == m_logWidget->verticalScrollBar()->maximum();
-  if (message->level <= INFO) {
+  if (message->level <= InfoLevel) {
     m_logWidget->appendPlainText(message->formatted);
   } else {
     m_logWidget->setCurrentCharFormat(m_errorFormat);

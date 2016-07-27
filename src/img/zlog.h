@@ -14,22 +14,22 @@
 
 namespace nim {
 
-void initLogging(const char* argv0, const QString &filename);
+void initLogging(const char* argv0, const QString& filename);
 void shutdownLogging();
 
 typedef google::LogSink LogSink;
 typedef std::shared_ptr<google::LogSink> LogSinkPtr;
 typedef google::LogSeverity LogSeverity;
-const LogSeverity INFO = google::INFO;
-const LogSeverity WARNING = google::WARNING;
-const LogSeverity ERROR = google::ERROR;
-const LogSeverity FATAL = google::FATAL;
-const LogSeverity OFFLEVEL = google::FATAL + 1;
+const LogSeverity InfoLevel = google::GLOG_INFO;
+const LogSeverity WarningLevel = google::GLOG_WARNING;
+const LogSeverity ErrorLevel = google::GLOG_ERROR;
+const LogSeverity FatalLevel = google::GLOG_FATAL;
+const LogSeverity OffLevel = google::GLOG_FATAL + 1;
 struct LogData
 {
   LogData(LogSeverity severity, const char* full_filename,
           const char* base_filename, int line,
-          const struct ::tm* tm_time,
+          const ::tm* tm_time,
           const char* msg, size_t prefix_len, size_t message_len)
     : level(severity)
     , fullFilename(full_filename)
@@ -52,7 +52,7 @@ struct LogData
 typedef std::function<void(const LogData&)> LogFunction;
 
 // might return nullptr
-LogSinkPtr createFileLogSink(const QString &filename);
+LogSinkPtr createFileLogSink(const QString& filename);
 LogSinkPtr createFunctorLogSink(LogFunction f);
 inline void addLogSink(LogSink* sink) { if (sink) google::AddLogSink(sink); }
 inline void addLogSink(LogSinkPtr sink) { if (sink) google::AddLogSink(sink.get()); }
@@ -62,11 +62,6 @@ inline void removeLogSink(LogSinkPtr sink) { if (sink) google::RemoveLogSink(sin
 QString levelToString(LogSeverity theLevel);
 
 } // namespace nim
-
-#define LINFO() LOG(INFO)
-#define LWARN() LOG(WARNING)
-#define LERROR() LOG(ERROR)
-#define LFATAL() LOG(FATAL)
 
 #define LINFOF(file, line, function) google::LogMessage(file, line, google::GLOG_INFO).stream()
 #define LWARNF(file, line, function) google::LogMessage(file, line, google::GLOG_WARNING).stream()
@@ -306,8 +301,8 @@ T& CheckNotNull(const char *file, int line, const char *names, T& t) {
 #endif  // _DEBUG_
 
 // support std string
-QDebug operator << (QDebug s, const std::string& m);
-QDebug operator << (QDebug s, const std::basic_string<wchar_t>& m);
+QDebug operator<<(QDebug s, const std::string& m);
+QDebug operator<<(QDebug s, const std::basic_string<wchar_t>& m);
 
 // container
 template<class IteratorType>
@@ -317,7 +312,7 @@ void logContainer(QsLogging::Level severity, const IteratorType &begin, const It
   if (QsLogging::Logger::instance().loggingLevel() > severity)
     return;
   if (severity == INFO)
-    LINFO() << "Start container " << name;
+    LOG(INFO) << "Start container " << name;
   else
     LOG(severity) << "Start container " << name;
   IteratorType it = begin;
@@ -331,7 +326,7 @@ void logContainer(QsLogging::Level severity, const IteratorType &begin, const It
     }
   }
   if (severity == INFO)
-    LINFO() << "End container " << name;
+    LOG(INFO) << "End container " << name;
   else
     LOG(severity) << "End container " << name ;
 }

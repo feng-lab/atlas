@@ -40,7 +40,7 @@ void ZPunctum::updateFromVoxelsList(double conf)
 {
   assert(m_voxelIntensities.size() == m_voxelLocations.rows());
   if (m_voxelIntensities.size() <= 0) {
-    LERROR() << "Zero element in voxel list.";
+    LOG(ERROR) << "Zero element in voxel list.";
     return;
   }
 

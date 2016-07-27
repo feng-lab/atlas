@@ -74,7 +74,7 @@ void Z3DFilter::onEvent(QEvent *e, int w, int h)
 {
   e->ignore();
 
-  //LWARN() << e << " " << className();
+  //LOG(WARNING) << e << " " << className();
   // propagate to interaction handlers
   for (size_t i=0; i<m_interactionHandlers.size() && !e->isAccepted(); ++i) {
     m_interactionHandlers[i]->onEvent(e, w, h);
@@ -156,7 +156,7 @@ void Z3DFilter::addPort(Z3DInputPortBase &port)
   if (it == m_inputPortMap.end())
     m_inputPortMap.emplace(port.name(), &port);
   else {
-    LERROR() << className() << " port " << port.name() << " has already been inserted!";
+    LOG(ERROR) << className() << " port " << port.name() << " has already been inserted!";
     assert(false);
   }
 }
@@ -169,7 +169,7 @@ void Z3DFilter::addPort(Z3DOutputPortBase &port)
   if (it == m_outputPortMap.end())
     m_outputPortMap.emplace(port.name(), &port);
   else {
-    LERROR() << className() << " port " << port.name() << " has already been inserted!";
+    LOG(ERROR) << className() << " port " << port.name() << " has already been inserted!";
     assert(false);
   }
 }
@@ -182,7 +182,7 @@ void Z3DFilter::removePort(Z3DInputPortBase &port)
   if (inIt != m_inputPortMap.end())
     m_inputPortMap.erase(inIt);
   else {
-    LERROR() << className() << " port " << port.name() << " was not found!";
+    LOG(ERROR) << className() << " port " << port.name() << " was not found!";
     assert(false);
   }
 }
@@ -195,7 +195,7 @@ void Z3DFilter::removePort(Z3DOutputPortBase &port)
   if (outIt != m_outputPortMap.end())
     m_outputPortMap.erase(outIt);
   else {
-    LERROR() << className() << " port " << port.name() << " was not found!";
+    LOG(ERROR) << className() << " port " << port.name() << " was not found!";
     assert(false);
   }
 }
@@ -203,7 +203,7 @@ void Z3DFilter::removePort(Z3DOutputPortBase &port)
 void Z3DFilter::addParameter(ZParameter &para, InvalidationState inv)
 {
   if (m_parameterNames.find(para.name()) != m_parameterNames.end()) {
-    LFATAL() << "Duplicated para name " << para.name();
+    LOG(FATAL) << "Duplicated para name " << para.name();
   }
   m_parameters.push_back(&para);
   m_parameterNames.insert(para.name());
@@ -215,7 +215,7 @@ void Z3DFilter::addParameter(ZParameter &para, InvalidationState inv)
 void Z3DFilter::removeParameter(ZParameter &para)
 {
   if (!parameter(para.name())) {
-    LERROR() << className() << " parameter " << para.name() << " cannot be removed, it does not exist";
+    LOG(ERROR) << className() << " parameter " << para.name() << " cannot be removed, it does not exist";
   } else {
     para.disconnect(this);
     m_parameters.erase(std::find(m_parameters.begin(), m_parameters.end(), &para));
@@ -269,7 +269,7 @@ void Z3DFilter::addPrivateRenderPort(Z3DRenderOutputPort& port)
   if (it == m_outputPortMap.end())
     m_outputPortMap.emplace(port.name(), &port);
   else {
-    LERROR() << className() << " port " << port.name() << " has already been inserted!";
+    LOG(ERROR) << className() << " port " << port.name() << " has already been inserted!";
     assert(false);
   }
 }

@@ -65,9 +65,9 @@ protected:
   std::vector<double> m_parameters;
 };
 
-std::ostream& operator << (std::ostream& s, const nim::ZImageTransform& tfm);
+std::ostream& operator<<(std::ostream& s, const ZImageTransform& tfm);
 #ifdef _USE_QSLOG_
-QDebug operator << (QDebug s, const nim::ZImageTransform& tfm);
+QDebug operator<<(QDebug s, const ZImageTransform& tfm);
 #endif
 
 template<typename TPixel, typename TPixelOut>

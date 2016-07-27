@@ -59,16 +59,16 @@ bool seperate2DKernel(const double *kernel, size_t width, size_t height,
     Map<const Matrix<double,Dynamic,Dynamic,RowMajor>> knl(kernel,height,width);
     JacobiSVD<Matrix<double,Dynamic,Dynamic,RowMajor>> svd(knl, ComputeThinU | ComputeThinV);
     VectorXd s = svd.singularValues();
-    //LINFO() << s;
+    //LOG(INFO) << s;
     double tol = std::numeric_limits<double>::epsilon() * s(0) * std::max(width, height);
     int rank = 1;
     for (int i=1; i<s.size(); ++i)
       if (s(i) > tol)
         ++rank;
     if (rank == 1) {
-      //LINFO() << "rank " << rank;
-      //LINFO() << svd.matrixU();
-      //LINFO() << svd.matrixV();
+      //LOG(INFO) << "rank " << rank;
+      //LOG(INFO) << svd.matrixU();
+      //LOG(INFO) << svd.matrixV();
       Map<VectorXd>(colKernel, height) = svd.matrixU().col(0) * sqrt(s(0));
       Map<VectorXd>(rowKernel, width) = svd.matrixV().col(0) * sqrt(s(0));
       //      std::vector<double> show;
@@ -146,8 +146,8 @@ void _resizeContributions(size_t inLength, size_t outLength, Interpolant interpo
     indices.col(i) = indices.col(i-1) + 1;
   }
 
-  //LINFO() << "incoord " << inCoord;
-  //LINFO() << "indices " << indices;
+  //LOG(INFO) << "incoord " << inCoord;
+  //LOG(INFO) << "indices " << indices;
 
   ArrayXXd weights = -indices;
   weights.colwise() += inCoord;
@@ -195,8 +195,8 @@ void _resizeContributions(size_t inLength, size_t outLength, Interpolant interpo
 
   weights.colwise() /= weights.rowwise().sum();
 
-  //LINFO() << "weights " << weights;
-  //LINFO() << "indices " << indices;
+  //LOG(INFO) << "weights " << weights;
+  //LOG(INFO) << "indices " << indices;
 
   auto validCols = (weights != 0).colwise().any();
 

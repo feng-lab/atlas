@@ -242,21 +242,21 @@ ZSystemInfo::~ZSystemInfo()
 
 void ZSystemInfo::logOSInfo() const
 {
-  //LINFO() << "OS: " << m_osString;
-  LINFO() << "OS: " << QSysInfo::prettyProductName();
-  LINFO() << "Kernel: " << QSysInfo::kernelType() + " " + QSysInfo::kernelVersion();
-  LINFO() << "Build ABI: " << QSysInfo::buildAbi();
-  //LINFO() << "Build CPU: " << QSysInfo::buildCpuArchitecture();
-  LINFO() << "Current CPU: " << QSysInfo::currentCpuArchitecture();
-  LINFO() << "Machine Host Name: " << QSysInfo::machineHostName();
-  //LINFO() << "Product Type: " << QSysInfo::productType();
-  //LINFO() << "Product Version: " << QSysInfo::productVersion();
+  //LOG(INFO) << "OS: " << m_osString;
+  LOG(INFO) << "OS: " << QSysInfo::prettyProductName();
+  LOG(INFO) << "Kernel: " << QSysInfo::kernelType() + " " + QSysInfo::kernelVersion();
+  LOG(INFO) << "Build ABI: " << QSysInfo::buildAbi();
+  //LOG(INFO) << "Build CPU: " << QSysInfo::buildCpuArchitecture();
+  LOG(INFO) << "Current CPU: " << QSysInfo::currentCpuArchitecture();
+  LOG(INFO) << "Machine Host Name: " << QSysInfo::machineHostName();
+  //LOG(INFO) << "Product Type: " << QSysInfo::productType();
+  //LOG(INFO) << "Product Version: " << QSysInfo::productVersion();
 }
 
 bool ZSystemInfo::initializeGL()
 {
   if (m_glInitialized) {
-    LINFO() << "OpenGL already initialized. Skip.";
+    LOG(INFO) << "OpenGL already initialized. Skip.";
     return false;
   }
 
@@ -265,18 +265,18 @@ bool ZSystemInfo::initializeGL()
   if (err != GLEW_OK) {
     m_errorMsg = "glewInit failed, error: ";
     m_errorMsg += reinterpret_cast<const char*>(glewGetErrorString(err));
-    LERROR() << m_errorMsg;
-    LWARN() << "3D functions will be disabled.";
+    LOG(ERROR) << m_errorMsg;
+    LOG(WARNING) << "3D functions will be disabled.";
     return false;
   } else {
-    LINFO() << "GLEW version:" << (const char*)(glewGetString(GLEW_VERSION));
+    LOG(INFO) << "GLEW version:" << (const char*)(glewGetString(GLEW_VERSION));
     Z3DGpuInfoInstance.logGpuInfo();
     if (Z3DGpuInfoInstance.isSupported()) {
       m_glInitialized = true;
       return m_glInitialized;
     } else {
       m_errorMsg = Z3DGpuInfoInstance.notSupportedReason();
-      LERROR() << m_errorMsg;
+      LOG(ERROR) << m_errorMsg;
       m_glInitialized = false;
       return m_glInitialized;
     }
@@ -315,17 +315,17 @@ bool ZSystemInfo::initializeGL()
 #endif
   glbinding::setUnresolvedCallback([](const glbinding::AbstractFunction & call)
   {
-    LERROR() << "OpengGL function " << call.name() << " can not be resolved.";
+    LOG(ERROR) << "OpengGL function " << call.name() << " can not be resolved.";
   });
   glbinding::Binding::addContextSwitchCallback([](glbinding::ContextHandle handle) {
-      LINFO() << "Switching to openGL context " << handle;
+      LOG(INFO) << "Switching to openGL context " << handle;
   });
   if (Z3DGpuInfoInstance.isSupported()) {
     m_glInitialized = true;
     return m_glInitialized;
   } else {
     m_errorMsg = Z3DGpuInfoInstance.notSupportedReason();
-    LERROR() << m_errorMsg;
+    LOG(ERROR) << m_errorMsg;
     m_glInitialized = false;
     return m_glInitialized;
   }
@@ -349,7 +349,7 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes) const
   if (!dir.exists())
     dir.mkpath(".");
   QStorageInfo volumeInfo(folder);
-  //LINFO() << folder << " " << volumeInfo.bytesAvailable();
+  //LOG(INFO) << folder << " " << volumeInfo.bytesAvailable();
   if (!volumeInfo.isValid() || !volumeInfo.isReady() || volumeInfo.isReadOnly() || static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes)
     folder.clear();
 
@@ -359,7 +359,7 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes) const
     if (!dir.exists())
       dir.mkpath(".");
     volumeInfo = QStorageInfo(folder);
-    //LINFO() << folder << " " << volumeInfo.bytesAvailable();
+    //LOG(INFO) << folder << " " << volumeInfo.bytesAvailable();
     if (!volumeInfo.isValid() || !volumeInfo.isReady() || volumeInfo.isReadOnly() || static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes)
       folder.clear();
   }
@@ -368,7 +368,7 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes) const
   if (folder.isEmpty()) {
     QList<QStorageInfo> vols = QStorageInfo::mountedVolumes();
     for (int i=0; i<vols.size(); ++i) {
-      //LINFO() << vols[i].bytesAvailable() << " " << vols[i].rootPath();
+      //LOG(INFO) << vols[i].bytesAvailable() << " " << vols[i].rootPath();
       if (!vols[i].isRoot() && vols[i].isValid() && vols[i].isReady() && !vols[i].isReadOnly() && static_cast<size_t>(vols[i].bytesAvailable()) >= requiredSpaceInBytes) {
         folder = vols[i].rootPath();
         break;

@@ -25,7 +25,7 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const ZImg& imgIn, s
   this->registerSubOperation(&regionalExtrema, .4);
   ZImg locmaxMask = regionalExtrema.regionalMax(img, conn);
   //bt.stop();
-  //LINFO() << bt;
+  //LOG(INFO) << bt;
 
   //bt.reset();
   //bt.start();
@@ -33,7 +33,7 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const ZImg& imgIn, s
   this->registerSubOperation(&conncomp, .4);
   ConnComp CC = conncomp.runLabelModifyInput(locmaxMask, conn);
   //bt.stop();
-  //LINFO() << bt;
+  //LOG(INFO) << bt;
 
   locmaxMask.fill(0);
   uint8_t* locmaxMaskData = locmaxMask.timeData<uint8_t>(0);

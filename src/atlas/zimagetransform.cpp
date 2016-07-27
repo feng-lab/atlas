@@ -35,13 +35,13 @@ QString ZImageTransform::paraQString() const
   return res;
 }
 
-std::ostream& operator << (std::ostream& s, const nim::ZImageTransform& tfm)
+std::ostream& operator<<(std::ostream& s, const ZImageTransform& tfm)
 {
   return (s << qUtf8Printable(tfm.toQString()));
 }
 
 #ifdef _USE_QSLOG_
-QDebug operator << (QDebug s, const nim::ZImageTransform& tfm)
+QDebug operator<<(QDebug s, const ZImageTransform& tfm)
 {
   s.nospace() << tfm.toQString();
   return s.space();

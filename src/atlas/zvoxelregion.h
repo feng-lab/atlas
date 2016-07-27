@@ -137,8 +137,6 @@ public:
   ZVoxelRegion& intersect(const ZVoxelRegion& other);
   static ZVoxelRegion intersect(const ZVoxelRegion& r1, const ZVoxelRegion& r2);
 
-  friend std::ostream& operator<< (std::ostream &s, const ZVoxelRegion &m);
-
 protected:
   typedef ZBBox<ZVoxelCoordinate> BoxType;
 
@@ -165,13 +163,14 @@ protected:
   }
 
 private:
+  friend std::ostream& operator<<(std::ostream &s, const ZVoxelRegion& m);
   template<typename T> friend class impl::voxel_iter;
   std::vector<BoxType> m_boxes;
 };
 
-std::ostream& operator << (std::ostream& s, const ZVoxelRegion& m);
+std::ostream& operator<<(std::ostream& s, const ZVoxelRegion& m);
 #ifdef _USE_QSLOG_
-QDebug operator << (QDebug s, const ZVoxelRegion& m);
+QDebug operator<<(QDebug s, const ZVoxelRegion& m);
 #endif
 
 } // namespace nim

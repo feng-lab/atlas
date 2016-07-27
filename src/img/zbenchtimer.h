@@ -1,17 +1,6 @@
 #ifndef ZBENCHTIMER_H
 #define ZBENCHTIMER_H
 
-/* usage:
-  bench with repeats:
-    ZBenchTimer bt;
-    BENCHANDPRINT(bt,10,5,testFun());
-  bench without repeats:
-    ZBenchTimer bt;
-    bt.start();
-    testFun();
-    bt.stopAndPrint();
-  */
-
 #if defined(_WIN32) || defined(_WIN64)
 #include "zwindowsheader.h"
 #elif defined(__APPLE__) && defined(__MACH__)
@@ -25,18 +14,20 @@
 #include <limits>
 #include <sstream>
 
+#ifdef _USE_QSLOG_
+#include <QDebug>
+#endif
 
-#define BENCH(TIMER,TRIES,REP,CODE,FUNCNAME) { \
-  TIMER.reset(); \
-  TIMER.setName(FUNCNAME); \
-  for(int i=0; i<TRIES; ++i){ \
-    TIMER.start(); \
-    for(int j=0; j<REP; ++j){ \
-      CODE; \
-    } \
-    TIMER.stop(); \
-  } \
-}
+/* usage:
+  bench with repeats:
+    ZBenchTimer bt;
+    BENCHANDPRINT(bt,10,5,testFun());
+  bench without repeats:
+    ZBenchTimer bt;
+    bt.start();
+    testFun();
+    bt.stopAndPrint();
+  */
 
 #define BENCHANDPRINT(TIMER,TRIES,REP,CODE,FUNCNAME) { \
   TIMER.reset(); \
@@ -48,7 +39,7 @@
     } \
     TIMER.stop(); \
   } \
-  TIMER.print(); \
+  std::cout << TIMER; \
 }
 
 namespace nim {
@@ -102,7 +93,8 @@ public:
   inline void stopAndPrint(std::ostream& s = std::cout)
   {
     stop();
-    print(s);
+    s << *this;
+    s.flush();
   }
 
   void stopAndLog();
@@ -126,8 +118,6 @@ public:
   inline double totalPauseTime() { return m_totalPauseTime; }
 
   inline void setName(const std::string &str) { m_name = str; }
-
-  std::ostream& print(std::ostream& s = std::cout) const;
 
 #if defined(_WIN32) || defined(_WIN64)
   inline LARGE_INTEGER getCpuTicks()
@@ -153,6 +143,8 @@ public:
 #endif
 
 protected:
+  friend std::ostream& operator<<(std::ostream& s, const ZBenchTimer& m);
+
 #if defined(_WIN32) || defined(_WIN64)
   double m_frequency;
   LARGE_INTEGER m_start;
@@ -175,14 +167,11 @@ protected:
   bool m_paused;
 };
 
-inline std::ostream& operator <<(std::ostream & s, const ZBenchTimer& m)
-{
-  return m.print(s);
-}
+std::ostream& operator<<(std::ostream& s, const ZBenchTimer& m);
 
 #ifdef _USE_QSLOG_
 // qDebug output
-QDebug operator << (QDebug s, const ZBenchTimer& m);
+QDebug operator<<(QDebug s, const ZBenchTimer& m);
 #endif
 
 } // namespace nim

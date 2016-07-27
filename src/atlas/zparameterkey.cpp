@@ -133,14 +133,14 @@ void ZParameterKey::interpolate(const ZParameterKey &prev, double time, ZParamet
 bool ZParameterKey::readValue(const QJsonValue &value)
 {
   if (!value.isObject()) {
-    LWARN() << "Invalid key";
+    LOG(WARNING) << "Invalid key";
     return false;
   }
   QJsonObject obj = value.toObject();
   if (!obj.contains("time") ||
       !obj.contains("type") ||
       !obj.contains("value")) {
-    LWARN() << "Invalid key " << obj.keys().join("  ") << " time, type and value are required field.";
+    LOG(WARNING) << "Invalid key " << obj.keys().join("  ") << " time, type and value are required field.";
     return false;
   }
   m_time = obj.value("time").toDouble();

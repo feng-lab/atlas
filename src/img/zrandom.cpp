@@ -26,7 +26,7 @@ namespace nim {
 ZRandom::ZRandom()
 {
   m_eng.seed(rdtsc());
-  //LERROR() << "a new zrandom!";
+  //LOG(ERROR) << "a new zrandom!";
 }
 
 ZRandom &ZRandom::instance()

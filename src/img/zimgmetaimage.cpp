@@ -44,7 +44,7 @@ void ZImgMetaImage::readInfo(const QString &filename, std::vector<ZImgInfo> &inf
   }
   infos.resize(1);
   parseInfo(metaImage, infos[0]);
-  LINFO() << infos[0].toQString();
+  LOG(INFO) << infos[0].toQString();
 
   createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 }

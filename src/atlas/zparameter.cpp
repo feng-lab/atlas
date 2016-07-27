@@ -93,7 +93,7 @@ void ZParameter::read(const QJsonObject &json)
   if (json.contains(jsonKey())) {
     readValue(json[jsonKey()]);
   } else {
-    LWARN() << "Parameter " << jsonKey() << " not found, abort reading.";
+    LOG(WARNING) << "Parameter " << jsonKey() << " not found, abort reading.";
   }
 }
 
@@ -133,8 +133,8 @@ void ZParameter::updateFromSender()
   if (isSameType(*para)) {
     setValueSameAs(*para);
   } else {
-    LERROR() << "can not update parameter " << name() << " with type " << type()
-             << " from different type parameter " << para->name() << " type " << para->type();
+    LOG(ERROR) << "can not update parameter " << name() << " with type " << type()
+               << " from different type parameter " << para->name() << " type " << para->type();
   }
 }
 

@@ -373,7 +373,7 @@ void binaryImgToMesh1(const ZImg &img, ZMesh &msh)
       // Carefully choosen bounding sphere: the center must be inside the
       // surface defined by 'image' and the radius must be high enough so that
       // the sphere actually bounds the whole image.
-      LINFO() << toQString(centers[i]) << " " << squaredRadius[i];
+      LOG(INFO) << toQString(centers[i]) << " " << squaredRadius[i];
       GT::Point_3 bounding_sphere_center(centers[i].x, centers[i].y, centers[i].z);
       GT::FT bounding_sphere_squared_radius = squaredRadius[i];
       GT::Sphere_3 bounding_sphere(bounding_sphere_center, bounding_sphere_squared_radius);
@@ -392,7 +392,7 @@ void binaryImgToMesh1(const ZImg &img, ZMesh &msh)
       allIndices.insert(allIndices.end(), indices.begin(), indices.end());
     }
     catch (const CGAL::Failure_exception& e) {
-      LERROR() << e.what();
+      LOG(ERROR) << e.what();
     }
   }
 
@@ -463,7 +463,7 @@ void binaryImgToMesh(const ZImg &img, ZMesh &msh)
     baseRate = std::min(1., 200. / numTriangles);
   }
 
-  LINFO() << baseRate << " " << numTriangles;
+  LOG(INFO) << baseRate << " " << numTriangles;
   vtkSmartPointer<vtkQuadricDecimation> decimate = vtkSmartPointer<vtkQuadricDecimation>::New();
   decimate->SetInputConnection(geometry->GetOutputPort());
   decimate->SetTargetReduction(1.0 - baseRate);
@@ -572,7 +572,7 @@ void binaryImgToROI(const ZImg &img, ZROI &roi)
       }
 
       for (auto it = contoursTree.cbeginBreadthFirst(); it != contoursTree.cendBreadthFirst(); ++it) {
-        //LINFO() << it->index << " " << contours[it->index].size();
+        //LOG(INFO) << it->index << " " << contours[it->index].size();
         size_t c = it->index;
         if (contours[c].size() < 15) {
           continue;
@@ -594,7 +594,7 @@ void binaryImgToROI(const ZImg &img, ZROI &roi)
       }
     }
     catch (const cv::Exception& e) {
-      LERROR() << e.what();
+      LOG(ERROR) << e.what();
     }
   }
 }

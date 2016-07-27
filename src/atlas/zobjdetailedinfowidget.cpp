@@ -90,7 +90,7 @@ void ZObjDetailedInfoWidget::removeWidgetOfObj(size_t id)
 
 void ZObjDetailedInfoWidget::updateWidgetLabelOfObj(size_t id)
 {
-  //LINFO() << "..";
+  //LOG(INFO) << "..";
   for (size_t i=0; i<m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       m_subWidgets[i].infoLabel->setText(m_doc->objDetailedInfo(id));

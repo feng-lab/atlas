@@ -353,7 +353,7 @@ protected:
 //   for (size_t i = 0; i < it.numNeighbors(); ++i) {
 //     if (it.inBound(i))
 //       it.valueRef(i) = 0;  // set neighbour value if in bound
-//     LINFO() << "nb coord: " << it.coord(i) << " center coord: " << it.coord() << " nb address: " << it.valuePtr();
+//     LOG(INFO) << "nb coord: " << it.coord(i) << " center coord: " << it.coord() << " nb address: " << it.valuePtr();
 //   }
 // }
 

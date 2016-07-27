@@ -24,10 +24,10 @@ uint64_t getDedicatedVideoMemoryMB()
 
     CGLDescribeRenderer(rend, i, kCGLRPRendererID, &thisRendererID);
     CGLDescribeRenderer(rend, i, kCGLRPOnline, &online);
-    LINFO() << "Renderer ID = " << thisRendererID << " online = " << online;
+    LOG(INFO) << "Renderer ID = " << thisRendererID << " online = " << online;
 
     CGLDescribeRenderer(rend, i, kCGLRPVideoMemoryMegabytes, &videoMemory);
-    LINFO() << "Video Memory = " << videoMemory << " MB";
+    LOG(INFO) << "Video Memory = " << videoMemory << " MB";
 
     if (online)
       res = std::max<uint64_t>(res, videoMemory);

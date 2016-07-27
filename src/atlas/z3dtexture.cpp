@@ -173,7 +173,7 @@ size_t Z3DTexture::bypePerPixel(GLenum dataFormat, GLenum dataType)
     break;
 
   default:
-    LWARN() << "unknown data format";
+    LOG(WARNING) << "unknown data format";
   }
 
   double typeSize = 0;
@@ -214,7 +214,7 @@ size_t Z3DTexture::bypePerPixel(GLenum dataFormat, GLenum dataType)
     break;
 
   default:
-    LWARN() << "unknown data type";
+    LOG(WARNING) << "unknown data type";
   }
 
   return std::round(typeSize * numChannels);
@@ -319,7 +319,7 @@ size_t Z3DTexture::bypePerPixel(GLint internalFormat)
     break;
 
   default:
-    LWARN() << "unknown internal format";
+    LOG(WARNING) << "unknown internal format";
     break;
   }
 
@@ -346,11 +346,11 @@ void Z3DTexture::saveAsColorImage(const QString &filename) const
     QImageWriter writer(filename);
     writer.setCompression(1);
     if(!writer.write(image)) {
-      LERROR() << writer.errorString();
+      LOG(ERROR) << writer.errorString();
     }
   }
   catch (ZException const & e) {
-    LERROR() << "Exception: " << e.what();
+    LOG(ERROR) << "Exception: " << e.what();
   }
 }
 
@@ -367,7 +367,7 @@ void Z3DTexture::saveAsDepthImage(const QString &filename) const
     img.save(filename);
   }
   catch (ZException const & e) {
-    LERROR() << "Exception: " << e.what();
+    LOG(ERROR) << "Exception: " << e.what();
   }
 }
 
@@ -436,16 +436,16 @@ void Z3DTextureUnitManager::nextAvailableUnit()
 {
   ++m_currentUnitNumber;
   if (m_currentUnitNumber >= m_maxTextureUnits) {
-    LERROR() << "No more avalable texture units!";
+    LOG(ERROR) << "No more avalable texture units!";
   }
 }
 
 void Z3DTextureUnitManager::activateCurrentUnit()
 {
   if (m_currentUnitNumber < 0) {
-    LERROR() << "Call nextAvailableUnit() to get a valid unit first!";
+    LOG(ERROR) << "Call nextAvailableUnit() to get a valid unit first!";
   } else if (m_currentUnitNumber >= m_maxTextureUnits) {
-    LERROR() << "Exceed max number of texture units.";
+    LOG(ERROR) << "Exceed max number of texture units.";
   }
   glActiveTexture(currentUnitEnum());
   CHECK_GL_ERROR;

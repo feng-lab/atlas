@@ -85,17 +85,17 @@ public:
     }
 
     void display(const QString &paraName = "") const {
-      LINFO() << "VBGMM " << paraName << " alpha: " << alpha;
-      LINFO() << "VBGMM " << paraName << " beta: " << beta;
-      LINFO() << "VBGMM " << paraName << " v: " << v;
-      LINFO() << "VBGMM " << paraName << " m: " << m;
-      LINFO() << "VBGMM " << paraName << " logPiTilde: " << logPiTilde;
-      LINFO() << "VBGMM " << paraName << " logLambdaTilde: " << logLambdaTilde;
-      LINFO() << "VBGMM " << paraName << " logWishartConst: " << logWishartConst;
-      LINFO() << "VBGMM " << paraName << " entropy: " << entropy;
-      LINFO() << "VBGMM " << paraName << " logDirConst: " << logDirConst;
-      LINFO() << "VBGMM " << paraName << " rnk: " << rnk;
-      LINFO() << "VBGMM " << paraName << " logrnk: " << logrnk;
+      LOG(INFO) << "VBGMM " << paraName << " alpha: " << alpha;
+      LOG(INFO) << "VBGMM " << paraName << " beta: " << beta;
+      LOG(INFO) << "VBGMM " << paraName << " v: " << v;
+      LOG(INFO) << "VBGMM " << paraName << " m: " << m;
+      LOG(INFO) << "VBGMM " << paraName << " logPiTilde: " << logPiTilde;
+      LOG(INFO) << "VBGMM " << paraName << " logLambdaTilde: " << logLambdaTilde;
+      LOG(INFO) << "VBGMM " << paraName << " logWishartConst: " << logWishartConst;
+      LOG(INFO) << "VBGMM " << paraName << " entropy: " << entropy;
+      LOG(INFO) << "VBGMM " << paraName << " logDirConst: " << logDirConst;
+      LOG(INFO) << "VBGMM " << paraName << " rnk: " << rnk;
+      LOG(INFO) << "VBGMM " << paraName << " logrnk: " << logrnk;
     }
 
     VectorXrt alpha;
@@ -210,7 +210,7 @@ public:
   ResultDataType runEM(bool useMultithreading = true)
   {
     if (!m_hasEnoughData) {
-      LERROR() << "Abort, Please check input data.";
+      LOG(ERROR) << "Abort, Please check input data.";
       return -1;
     }
 
@@ -230,12 +230,12 @@ public:
 
       if (m_logLevel == IterAlgorithmLogLevel::Final || m_logLevel == IterAlgorithmLogLevel::Iter) {
         if (result.iter >= m_termCriteria.maxIter()) {
-          LINFO() << "VBGMM maximum number of iterations ("
-                  << m_termCriteria.maxIter()
-                  << ") has been exceeded.";
+          LOG(INFO) << "VBGMM maximum number of iterations ("
+                    << m_termCriteria.maxIter()
+                    << ") has been exceeded.";
         }
-        LINFO() << "VBGMM Final Loglikelihood: " << result.loglikHist;
-        LINFO() << "VBGMM Final Centroids:\n" << centroids();
+        LOG(INFO) << "VBGMM Final Loglikelihood: " << result.loglikHist;
+        LOG(INFO) << "VBGMM Final Centroids:\n" << centroids();
       }
       return result.loglikHist;
     }
@@ -254,7 +254,7 @@ public:
       ResultDataType loglikHist;
       //m_post.display("before loop");
       while (!done) {
-        //LINFO() << "-1";
+        //LOG(INFO) << "-1";
         // E step
         //m_post.display("before infer");
         mixGaussBayesInfer(m_post);
@@ -263,13 +263,13 @@ public:
         MatrixXrt xbar;
         std::vector<MatrixXrt> S;
         computeEss(Nk, xbar, S, m_post);
-        //LINFO() << Nk;
+        //LOG(INFO) << Nk;
         loglikHist = lowerBound(Nk, xbar, S, m_post);
-        //LINFO() << "out E";
+        //LOG(INFO) << "out E";
         // M step
         Mstep(Nk, xbar, S, m_post);
         //m_post.display("after M");
-        //LINFO() << "out M";
+        //LOG(INFO) << "out M";
 
         bool useSlopeCovergeTest = true;
 
@@ -280,7 +280,7 @@ public:
           ResultDataType avg = (std::abs(loglikHist) + std::abs(oldLoglikHist) + std::numeric_limits<ResultDataType>::epsilon()) / 2;
           ResultDataType slope = std::abs(loglikHist-oldLoglikHist) / avg;
           if (iter > 0 && loglikHist - oldLoglikHist < -1.) {
-            LWARN() << "Objective decreased! " << loglikHist << " " << oldLoglikHist;
+            LOG(WARNING) << "Objective decreased! " << loglikHist << " " << oldLoglikHist;
           }
           done = m_termCriteria.meet(iter, slope);
         } else {
@@ -289,9 +289,9 @@ public:
 
         if (m_logLevel == IterAlgorithmLogLevel::Iter) {
           if (m_nattemps == 1) {
-            LINFO() << "VBGMM Iter: " << iter << " Loglikelihood: " << loglikHist;
+            LOG(INFO) << "VBGMM Iter: " << iter << " Loglikelihood: " << loglikHist;
           } else {
-            LINFO() << "VBGMM attempt " << i+1 << " Iter: " << iter << " Loglikelihood: " << loglikHist;
+            LOG(INFO) << "VBGMM attempt " << i+1 << " Iter: " << iter << " Loglikelihood: " << loglikHist;
           }
         }
         iter++;
@@ -305,12 +305,12 @@ public:
     }
     if (m_logLevel == IterAlgorithmLogLevel::Final || m_logLevel == IterAlgorithmLogLevel::Iter) {
       if (finalIter >= m_termCriteria.maxIter()) {
-        LINFO() << "VBGMM maximum number of iterations ("
-                << m_termCriteria.maxIter()
-                << ") has been exceeded.";
+        LOG(INFO) << "VBGMM maximum number of iterations ("
+                  << m_termCriteria.maxIter()
+                  << ") has been exceeded.";
       }
-      LINFO() << "VBGMM Final Loglikelihood: " << bestLogLikHist;
-      LINFO() << "VBGMM Final Centroids:\n" << centroids();
+      LOG(INFO) << "VBGMM Final Loglikelihood: " << bestLogLikHist;
+      LOG(INFO) << "VBGMM Final Centroids:\n" << centroids();
     }
     return bestLogLikHist;
   }
@@ -332,14 +332,14 @@ protected:
     if (m_nclasses == 0 || m_pData->rows() == 0) {
       m_nclasses = 0;
       m_hasEnoughData = false;
-      LERROR() << "number of initial class or number of data points is 0";
+      LOG(ERROR) << "number of initial class or number of data points is 0";
       return false;
     }
     if (m_hasWeight && m_pWeight->size() < m_pData->rows()) {
       m_nclasses = 0;
       m_hasEnoughData = false;
-      LERROR() << "weight data is not enough: number of weight value is " << m_pWeight->size()
-                << " , number of data points is " << m_pData->rows();
+      LOG(ERROR) << "weight data is not enough: number of weight value is " << m_pWeight->size()
+                 << " , number of data points is " << m_pData->rows();
       return false;
     }
 
@@ -401,7 +401,7 @@ protected:
     if (m_hasWeight) {
       ResultDataType numData = m_pWeight->sum();
       ZGMM<ResultDataType, ResultDataType> gmm(*m_pData, *m_pWeight, m_nclasses,
-                                       true, ZGMM<ResultDataType, ResultDataType>::CovarianceType::Full, ZTermCriteria<ResultDataType>(200,1e-5));
+                                               true, ZGMM<ResultDataType, ResultDataType>::CovarianceType::Full, ZTermCriteria<ResultDataType>(200,1e-5));
       gmm.setLogLevel(m_logLevel);
       gmm.runEM();
 
@@ -423,7 +423,7 @@ protected:
     } else {
       ResultDataType numData = m_pData->rows();
       ZGMM<ResultDataType, ResultDataType> gmm(*m_pData, m_nclasses,
-                                       true, ZGMM<ResultDataType, ResultDataType>::CovarianceType::Full, ZTermCriteria<ResultDataType>(200,1e-5));
+                                               true, ZGMM<ResultDataType, ResultDataType>::CovarianceType::Full, ZTermCriteria<ResultDataType>(200,1e-5));
       gmm.setLogLevel(m_logLevel);
       gmm.runEM();
 
@@ -494,9 +494,9 @@ protected:
     for (size_t k=0; k<m_nclasses; k++) {
       RowVectorXrt xbarc = xbar.row(k) - post.m.row(k);
       ElogpXall(k) = 0.5*Nk(k)*(post.logLambdaTilde(k) - m_dimension/post.beta(k)
-                             - (post.v(k)*S[k]*post.W[k]).trace()
-                             - post.v(k)*(((xbarc*post.W[k]).array()*xbarc.array()).sum())
-                             - m_dimension*std::log(2*M_PI));
+                                - (post.v(k)*S[k]*post.W[k]).trace()
+                                - post.v(k)*(((xbarc*post.W[k]).array()*xbarc.array()).sum())
+                                - m_dimension*std::log(2*M_PI));
     }
     ResultDataType ElogpX = ElogpXall.sum();
 
@@ -599,8 +599,8 @@ protected:
       }
     }
     // precompute various functions of the distribution for speed
-    //LINFO() << out.alpha;
-    //LINFO() << out.alpha.sum();
+    //LOG(INFO) << out.alpha;
+    //LOG(INFO) << out.alpha.sum();
     //out.display();
     out.logPiTilde = ZEigenUtils::matrixDigamma(out.alpha).array() -ZEigenUtils::digamma(out.alpha.sum());  //10.66
     out.logDirConst = ZEigenUtils::gammaln(out.alpha.sum()) - ZEigenUtils::matrixGammaln(out.alpha).sum(); // B.23
@@ -649,7 +649,7 @@ protected:
         ResultDataType avg = (std::abs(loglikHist) + std::abs(post.loglikHist) + std::numeric_limits<ResultDataType>::epsilon()) / 2;
         ResultDataType slope = std::abs(loglikHist-post.loglikHist) / avg;
         if (iter > 0 && loglikHist - post.loglikHist < -1.) {
-          LWARN() << "Objective decreased! " << loglikHist << " " << post.loglikHist;
+          LOG(WARNING) << "Objective decreased! " << loglikHist << " " << post.loglikHist;
         }
         done = m_termCriteria.meet(iter, slope);
       } else {
@@ -657,7 +657,7 @@ protected:
       }
 
       if (m_logLevel == IterAlgorithmLogLevel::Iter) {
-        LINFO() << "VBGMM Iter: " << iter << " Loglikelihood: " << loglikHist;
+        LOG(INFO) << "VBGMM Iter: " << iter << " Loglikelihood: " << loglikHist;
       }
       iter++;
       post.loglikHist = loglikHist;

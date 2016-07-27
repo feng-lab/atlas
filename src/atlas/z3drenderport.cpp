@@ -33,7 +33,7 @@ void Z3DRenderOutputPort::invalidate()
 void Z3DRenderOutputPort::clearTarget() const
 {
   if (!isBound())
-    LERROR() << "RenderTarget is not bound, can not clear.";
+    LOG(ERROR) << "RenderTarget is not bound, can not clear.";
   else
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }

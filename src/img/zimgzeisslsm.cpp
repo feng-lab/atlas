@@ -123,7 +123,7 @@ void ZImgZeissLsm::readLsmInfo(const QString &filename, ZTiff &tiff)
     readStream(inputFileStream, chStruct.data(), chStruct.size());
     m_lsmImgInfo.channelColors.resize(m_lsmChannelColors.s32NumberColors);
     memcpy(m_lsmImgInfo.channelColors.data(), chStruct.data()+m_lsmChannelColors.s32ColorsOffset,
-        sizeof(uint32_t)*m_lsmChannelColors.s32NumberColors);
+           sizeof(uint32_t)*m_lsmChannelColors.s32NumberColors);
 
     size_t offset = m_lsmChannelColors.s32NamesOffset;
     int nameIdx = 0;
@@ -226,82 +226,82 @@ void ZImgZeissLsm::readLsmInfo(const QString &filename, ZTiff &tiff)
 
 void ZImgZeissLsm::logLsmInfo(const QString &filename)
 {
-  LINFO() << "Start LSM Info for " << filename;
+  LOG(INFO) << "Start LSM Info for " << filename;
 #ifdef _USE_QSLOG_
-  LINFO() << "MagicNumber: " << hex << m_lsmInfo.u32MagicNumber;
+  LOG(INFO) << "MagicNumber: " << hex << m_lsmInfo.u32MagicNumber;
 #else
-  LINFO() << "MagicNumber: " << std::hex << m_lsmInfo.u32MagicNumber;
+  LOG(INFO) << "MagicNumber: " << std::hex << m_lsmInfo.u32MagicNumber;
 #endif
-  LINFO() << "DimensionX: " << m_lsmInfo.s32DimensionX;
-  LINFO() << "DimensionY: " << m_lsmInfo.s32DimensionY;
-  LINFO() << "DimensionZ: " << m_lsmInfo.s32DimensionZ;
-  LINFO() << "DimensionChannels: " << m_lsmInfo.s32DimensionChannels;
-  LINFO() << "DimensionTime: " << m_lsmInfo.s32DimensionTime;
-  LINFO() << "DimensionP: " << m_lsmInfo.s32DimensionP;
-  LINFO() << "DimensionM: " << m_lsmInfo.s32DimensionM;
+  LOG(INFO) << "DimensionX: " << m_lsmInfo.s32DimensionX;
+  LOG(INFO) << "DimensionY: " << m_lsmInfo.s32DimensionY;
+  LOG(INFO) << "DimensionZ: " << m_lsmInfo.s32DimensionZ;
+  LOG(INFO) << "DimensionChannels: " << m_lsmInfo.s32DimensionChannels;
+  LOG(INFO) << "DimensionTime: " << m_lsmInfo.s32DimensionTime;
+  LOG(INFO) << "DimensionP: " << m_lsmInfo.s32DimensionP;
+  LOG(INFO) << "DimensionM: " << m_lsmInfo.s32DimensionM;
   switch (m_lsmInfo.s32DataType) {
-  case 1: LINFO() << "DataType: " << "8-bit unsigned integer"; break;
-  case 2: LINFO() << "DataType: " << "12-bit unsigned integer"; break;
-  case 5: LINFO() << "DataType: " << "32-bit float(for \"Time Series Mean-of-ROIs\")"; break;
-  //case 0: LINFO() << "DataType: " << "different data types for different channels, see 32OffsetChannelDataTypes"; break;
+  case 1: LOG(INFO) << "DataType: " << "8-bit unsigned integer"; break;
+  case 2: LOG(INFO) << "DataType: " << "12-bit unsigned integer"; break;
+  case 5: LOG(INFO) << "DataType: " << "32-bit float(for \"Time Series Mean-of-ROIs\")"; break;
+    //case 0: LOG(INFO) << "DataType: " << "different data types for different channels, see 32OffsetChannelDataTypes"; break;
   }
   for (size_t i=0; i<m_channelDataTypes.size(); ++i) {
     switch (m_channelDataTypes[i]) {
-    case 1: LINFO() << "Channel " << i+1 << " DataType: " << "8-bit unsigned integer"; break;
-    case 2: LINFO() << "Channel " << i+1 << " DataType: " << "12-bit unsigned integer"; break;
-    case 5: LINFO() << "Channel " << i+1 << " DataType: " << "32-bit float(for \"Time Series Mean-of-ROIs\")"; break;
+    case 1: LOG(INFO) << "Channel " << i+1 << " DataType: " << "8-bit unsigned integer"; break;
+    case 2: LOG(INFO) << "Channel " << i+1 << " DataType: " << "12-bit unsigned integer"; break;
+    case 5: LOG(INFO) << "Channel " << i+1 << " DataType: " << "32-bit float(for \"Time Series Mean-of-ROIs\")"; break;
     }
   }
-  LINFO() << "ThumbnailX: " << m_lsmInfo.s32ThumbnailX;
-  LINFO() << "ThumbnailY: " << m_lsmInfo.s32ThumbnailY;
-  LINFO() << "VoxelSizeX in meter: " << m_lsmInfo.f64VoxelSizeX;
-  LINFO() << "VoxelSizeY in meter: " << m_lsmInfo.f64VoxelSizeY;
-  LINFO() << "VoxelSizeZ in meter: " << m_lsmInfo.f64VoxelSizeZ;
+  LOG(INFO) << "ThumbnailX: " << m_lsmInfo.s32ThumbnailX;
+  LOG(INFO) << "ThumbnailY: " << m_lsmInfo.s32ThumbnailY;
+  LOG(INFO) << "VoxelSizeX in meter: " << m_lsmInfo.f64VoxelSizeX;
+  LOG(INFO) << "VoxelSizeY in meter: " << m_lsmInfo.f64VoxelSizeY;
+  LOG(INFO) << "VoxelSizeZ in meter: " << m_lsmInfo.f64VoxelSizeZ;
   switch (m_lsmInfo.u16ScanType) {
-  case 0: LINFO() << "ScanType: " << "normal x-y-z-scan"; break;
-  case 1: LINFO() << "ScanType: " << "z-Scan (x-z-plane)"; break;
-  case 2: LINFO() << "ScanType: " << "line scan"; break;
-  case 3: LINFO() << "ScanType: " << "time series x-y"; break;
-  case 4: LINFO() << "ScanType: " << "time series x-z (release 2.0 or later)"; break;
-  case 5: LINFO() << "ScanType: " << "time series \"Mean of ROIs\" (release 2.0 or later)"; break;
-  case 6: LINFO() << "ScanType: " << "time series x-y-z (release 2.3 or later)"; break;
-  case 7: LINFO() << "ScanType: " << "spline scan (release 2.5 or later)"; break;
-  case 8: LINFO() << "ScanType: " << "spline plane x-z (release 2.5 or later)"; break;
-  case 9: LINFO() << "ScanType: " << "time series spline plane x-z (release 2.5 or later)"; break;
-  case 10: LINFO() << "ScanType: " << "point mode (release 3.0 or later)"; break;
+  case 0: LOG(INFO) << "ScanType: " << "normal x-y-z-scan"; break;
+  case 1: LOG(INFO) << "ScanType: " << "z-Scan (x-z-plane)"; break;
+  case 2: LOG(INFO) << "ScanType: " << "line scan"; break;
+  case 3: LOG(INFO) << "ScanType: " << "time series x-y"; break;
+  case 4: LOG(INFO) << "ScanType: " << "time series x-z (release 2.0 or later)"; break;
+  case 5: LOG(INFO) << "ScanType: " << "time series \"Mean of ROIs\" (release 2.0 or later)"; break;
+  case 6: LOG(INFO) << "ScanType: " << "time series x-y-z (release 2.3 or later)"; break;
+  case 7: LOG(INFO) << "ScanType: " << "spline scan (release 2.5 or later)"; break;
+  case 8: LOG(INFO) << "ScanType: " << "spline plane x-z (release 2.5 or later)"; break;
+  case 9: LOG(INFO) << "ScanType: " << "time series spline plane x-z (release 2.5 or later)"; break;
+  case 10: LOG(INFO) << "ScanType: " << "point mode (release 3.0 or later)"; break;
   }
   switch (m_lsmInfo.u16SpectralScan) {
-  case 0: LINFO() << "SpectralScan: " << "no spectral scan"; break;
-  case 1: LINFO() << "SpectralScan: " << "image has been acquired in spectral scan mode with a META detector (release 3.0 or later)"; break;
+  case 0: LOG(INFO) << "SpectralScan: " << "no spectral scan"; break;
+  case 1: LOG(INFO) << "SpectralScan: " << "image has been acquired in spectral scan mode with a META detector (release 3.0 or later)"; break;
   }
   switch (m_lsmInfo.u32DataType) {
-  case 0: LINFO() << "DataType: " << "Original scan data"; break;
-  case 1: LINFO() << "DataType: " << "Calculated data"; break;
-  case 2: LINFO() << "DataType: " << "Animation"; break;
+  case 0: LOG(INFO) << "DataType: " << "Original scan data"; break;
+  case 1: LOG(INFO) << "DataType: " << "Calculated data"; break;
+  case 2: LOG(INFO) << "DataType: " << "Animation"; break;
   }
   if (m_lsmInfo.f64TimeInterval != 0) {
-    LINFO() << "TimeInterval in s: " << m_lsmInfo.f64TimeInterval;
+    LOG(INFO) << "TimeInterval in s: " << m_lsmInfo.f64TimeInterval;
   }
   for (size_t i=0; i<m_lsmImgInfo.timeStamps.size(); ++i) {
-    LINFO() << "TimeStamp " << i+1 << " in s: " << m_lsmImgInfo.timeStamps[i];
+    LOG(INFO) << "TimeStamp " << i+1 << " in s: " << m_lsmImgInfo.timeStamps[i];
   }
 
   for (size_t i=0; i<m_positions.size(); ++i) {
-    LINFO() << "Position " << i+1 << " : " << m_positions[i].x << " " << m_positions[i].y << " " << m_positions[i].z;
+    LOG(INFO) << "Position " << i+1 << " : " << m_positions[i].x << " " << m_positions[i].y << " " << m_positions[i].z;
   }
   for (size_t i=0; i<m_tilePositions.size(); ++i) {
-    LINFO() << "TilePosition " << i+1 << " : " << m_tilePositions[i].x << " " << m_tilePositions[i].y << " " << m_tilePositions[i].z;
+    LOG(INFO) << "TilePosition " << i+1 << " : " << m_tilePositions[i].x << " " << m_tilePositions[i].y << " " << m_tilePositions[i].z;
   }
-  LINFO() << "DisplayAspectX: " << m_lsmInfo.f64DisplayAspectX;
-  LINFO() << "DisplayAspectY: " << m_lsmInfo.f64DisplayAspectY;
-  LINFO() << "DisplayAspectZ: " << m_lsmInfo.f64DisplayAspectZ;
-  LINFO() << "DisplayAspectTime: " << m_lsmInfo.f64DisplayAspectTime;
-  LINFO() << "ObjectiveSphereCorrection: " << m_lsmInfo.f64ObjectiveSphereCorrection;
+  LOG(INFO) << "DisplayAspectX: " << m_lsmInfo.f64DisplayAspectX;
+  LOG(INFO) << "DisplayAspectY: " << m_lsmInfo.f64DisplayAspectY;
+  LOG(INFO) << "DisplayAspectZ: " << m_lsmInfo.f64DisplayAspectZ;
+  LOG(INFO) << "DisplayAspectTime: " << m_lsmInfo.f64DisplayAspectTime;
+  LOG(INFO) << "ObjectiveSphereCorrection: " << m_lsmInfo.f64ObjectiveSphereCorrection;
   for (size_t i=0; i<m_lsmImgInfo.channelColors.size(); ++i) {
-    LINFO() << "Channel " << i+1 << " Name: " << m_lsmImgInfo.channelNames[i] << " Color(RGB): " << m_lsmImgInfo.channelColors[i].r << " "
-            << m_lsmImgInfo.channelColors[i].g << " " << m_lsmImgInfo.channelColors[i].b << " " << m_lsmImgInfo.channelColors[i].a;
+    LOG(INFO) << "Channel " << i+1 << " Name: " << m_lsmImgInfo.channelNames[i] << " Color(RGB): " << m_lsmImgInfo.channelColors[i].r << " "
+              << m_lsmImgInfo.channelColors[i].g << " " << m_lsmImgInfo.channelColors[i].b << " " << m_lsmImgInfo.channelColors[i].a;
   }
-  LINFO() << "End LSM Info for " << filename;
+  LOG(INFO) << "End LSM Info for " << filename;
 }
 
 

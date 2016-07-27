@@ -102,7 +102,7 @@ void ZSectionsRegistrationDialog::registerSections()
       QMessageBox::critical(this, "only one slice", QString("Do not need align"));
       return;
     } else if (!img.is3DImg()) {
-      LINFO() << img.info().toQString();
+      LOG(INFO) << img.info().toQString();
       QMessageBox::critical(this, "time sequence not supported", QString("Can not align time sequence image"));
       return;
     }

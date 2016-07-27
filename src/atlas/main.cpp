@@ -100,7 +100,7 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
 // force NVidia Optimus to used dedicated graphics
 #ifdef _WIN32
 extern "C" {
-  __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+__declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
 }
 #endif
 
@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
 
   qInstallMessageHandler(myMessageOutput);
 
-  LINFO() << "--- App Log Started ---";
+  LOG(INFO) << "--- App Log Started ---";
   ZSystemInfoInstance.logOSInfo();
   ZCpuInfoInstance.logCpuInfo();
   fftw_init_threads();
@@ -155,12 +155,12 @@ int main(int argc, char *argv[])
   // todo: check this for amd cpu
   MKLVersion mklVer;
   MKL_Get_Version(&mklVer);
-  LINFO() << "MKL: " << mklVer.Platform << mklVer.Processor << " "
-          << mklVer.MajorVersion << " "
-          << mklVer.MinorVersion << " "
-          << mklVer.UpdateVersion << " "
-          << mklVer.Build;
-  LINFO() << "";
+  LOG(INFO) << "MKL: " << mklVer.Platform << mklVer.Processor << " "
+            << mklVer.MajorVersion << " "
+            << mklVer.MinorVersion << " "
+            << mklVer.UpdateVersion << " "
+            << mklVer.Build;
+  LOG(INFO) << "";
 #endif
 
 #ifdef _USE_IPP_
@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
     IppStatus st = ippGetCpuFeatures(&featureMask, NULL);
     if (st != ippStsNoErr) {
       if (st == ippStsNotSupportedCpu) {
-        LWARN() << "IPP error: not supported cpu.";
+        LOG(WARNING) << "IPP error: not supported cpu.";
         // manual set mask
         if (ZCpuInfoInstance.bMMX)
           featureMask |= 1;
@@ -191,22 +191,22 @@ int main(int argc, char *argv[])
           featureMask |= 128;
         if (ZCpuInfoInstance.bAVX)
           featureMask |= 256;
-        LINFO() << ippSetCpuFeatures(featureMask);
+        LOG(INFO) << ippSetCpuFeatures(featureMask);
       }
     } else {
-      LINFO() << ippSetCpuFeatures(featureMask);
+      LOG(INFO) << ippSetCpuFeatures(featureMask);
     }
   }
 
   // pointer to static data, no need to delete
   const IppLibraryVersion* ippVer = ippiGetLibVersion();
-  LINFO() << "IPP: " << ippVer->Name << " "
-          << ippVer->Version << " "
-          << ippVer->major << " "
-          << ippVer->minor << " "
-          << ippVer->majorBuild << " "
-          << ippVer->build;
-  LINFO() << "";
+  LOG(INFO) << "IPP: " << ippVer->Name << " "
+            << ippVer->Version << " "
+            << ippVer->major << " "
+            << ippVer->minor << " "
+            << ippVer->majorBuild << " "
+            << ippVer->build;
+  LOG(INFO) << "";
 #endif
 
   if (!ZCpuInfoInstance.bSSE3) {
@@ -226,7 +226,7 @@ int main(int argc, char *argv[])
     result =  app.exec();
   }
   catch (const nim::ZException & e) {
-    LFATAL() << e.what();
+    LOG(FATAL) << e.what();
   }
 
   fftw_cleanup_threads();

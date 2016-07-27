@@ -546,9 +546,9 @@ public:
       m_centroids = m_uniqueDatas;
       m_labels = m_uniqueLabels;
       if (m_logLevel == IterAlgorithmLogLevel::Iter || m_logLevel == IterAlgorithmLogLevel::Final) {
-        LINFO() << "KMeans Data is not enough";
-        LINFO() << "KMeans Final Centroids:\n" << m_centroids;
-        LINFO() << "KMeans Final Potential: 0";
+        LOG(INFO) << "KMeans Data is not enough";
+        LOG(INFO) << "KMeans Final Centroids:\n" << m_centroids;
+        LOG(INFO) << "KMeans Final Potential: 0";
       }
       return -1;
     }
@@ -582,9 +582,9 @@ public:
       m_initCentroids.swap(result.initCentroids);
       m_labels.swap(result.labels);
       if (m_logLevel == IterAlgorithmLogLevel::Iter || m_logLevel == IterAlgorithmLogLevel::Final) {
-        LINFO() << "KMeans Initial Centroids:\n" << m_initCentroids;
-        LINFO() << "KMeans Final Centroids:\n" << m_centroids;
-        LINFO() << "KMeans Final Potential: " << result.compactness;
+        LOG(INFO) << "KMeans Initial Centroids:\n" << m_initCentroids;
+        LOG(INFO) << "KMeans Final Centroids:\n" << m_centroids;
+        LOG(INFO) << "KMeans Final Potential: " << result.compactness;
       }
       return result.compactness;
     }
@@ -631,8 +631,8 @@ public:
         }
 
         if (m_logLevel == IterAlgorithmLogLevel::Iter) {
-          LINFO() << "KMeans attempt " << a <<  " Iter: " << iter << " Potential: " << compactness;
-          LINFO() << "KMeans Centroids:\n" << centroids;
+          LOG(INFO) << "KMeans attempt " << a <<  " Iter: " << iter << " Potential: " << compactness;
+          LOG(INFO) << "KMeans Centroids:\n" << centroids;
         }
       }
 
@@ -645,9 +645,9 @@ public:
     }
 
     if (m_logLevel == IterAlgorithmLogLevel::Iter || m_logLevel == IterAlgorithmLogLevel::Final) {
-      LINFO() << "KMeans Initial Centroids:\n" << m_initCentroids;
-      LINFO() << "KMeans Final Centroids:\n" << m_centroids;
-      LINFO() << "KMeans Final Potential: " << bestCompactness;
+      LOG(INFO) << "KMeans Initial Centroids:\n" << m_initCentroids;
+      LOG(INFO) << "KMeans Final Centroids:\n" << m_centroids;
+      LOG(INFO) << "KMeans Final Potential: " << bestCompactness;
     }
     return bestCompactness;
   }
@@ -663,14 +663,14 @@ protected:
     if (m_nclasses == 0 || m_pData->rows() == 0) {
       m_hasEnoughData = false;
       m_nclasses = 0;
-      LERROR() << "number of class or number of data points is 0";
+      LOG(ERROR) << "number of class or number of data points is 0";
       return false;
     }
     if (m_hasWeight && m_pWeight->size() < m_pData->rows()) {
       m_hasEnoughData = false;
       m_nclasses = 0;
-      LERROR() << "weight data is not enough: number of weight value is " << m_pWeight->size()
-                << " , number of data points is " << m_pData->rows();
+      LOG(ERROR) << "weight data is not enough: number of weight value is " << m_pWeight->size()
+                 << " , number of data points is " << m_pData->rows();
       return false;
     }
 
@@ -740,8 +740,8 @@ protected:
       }
 
       if (m_logLevel == IterAlgorithmLogLevel::Iter) {
-        LINFO() << "KMeans Iter: " << iter << " Potential: " << result.compactness;
-        LINFO() << "KMeans Centroids:\n" << result.centroids;
+        LOG(INFO) << "KMeans Iter: " << iter << " Potential: " << result.compactness;
+        LOG(INFO) << "KMeans Centroids:\n" << result.centroids;
       }
     }
     return result;

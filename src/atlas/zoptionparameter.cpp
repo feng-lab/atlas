@@ -39,7 +39,7 @@ bool ZOptionParameter<T, T2>::isSelected(const T &value) const
 {
 #if defined(_DEBUG_)
   if (!m_options.contains(value)) {
-    LERROR() << QString("Option <%1> does not exist.").arg(value);
+    LOG(ERROR) << QString("Option <%1> does not exist.").arg(value);
   }
 #endif
   return value == this->m_value;
@@ -82,14 +82,14 @@ template<class T, class T2>
 void ZOptionParameter<T, T2>::makeValid(T &value) const
 {
   if (!m_options.contains(value)) {
-    LERROR() << QString("Optiong value <%1> does not exist.").arg(value);
+    LOG(ERROR) << QString("Optiong value <%1> does not exist.").arg(value);
     if (m_options.empty())
-      LERROR() << QString("Error: Try to select <%1> from empty options list. Call addOptions() first!").arg(value);
+      LOG(ERROR) << QString("Error: Try to select <%1> from empty options list. Call addOptions() first!").arg(value);
     else if (m_dataIsValid) {
-      LERROR() << QString("Warning: Select failed, value is still <%1>").arg(this->m_value);
+      LOG(ERROR) << QString("Warning: Select failed, value is still <%1>").arg(this->m_value);
       value = this->m_value;
     } else {
-      LERROR() << QString("Default to first option <%1>").arg(m_options[0]);
+      LOG(ERROR) << QString("Default to first option <%1>").arg(m_options[0]);
       value = m_options[0];
     }
   }

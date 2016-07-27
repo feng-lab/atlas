@@ -47,7 +47,7 @@ void Z3DVolumeSliceRenderer::addQuad(const ZMesh &quad)
   if (quad.empty() ||
       (quad.numVertices() != 4 && quad.numVertices() != 6) ||
       quad.numVertices() != quad.num3DTextureCoordinates()) {
-    LFATAL() << "Input quad should be 2D slice with 3D texture coordinates";
+    LOG(FATAL) << "Input quad should be 2D slice with 3D texture coordinates";
     return;
   }
   m_quads.push_back(quad);

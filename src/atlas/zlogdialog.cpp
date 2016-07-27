@@ -100,7 +100,7 @@ ZLogDialog::ZLogDialog(LogSinkPtr destination, QWidget* parent)
   connect(mModelDestination, SIGNAL(rowsInserted(const QModelIndex&, int, int)), SLOT(ModelRowsInserted(const QModelIndex&, int, int)));
 
   // Install the sort / filter model
-  mProxyModel = new ZLogFilterProxyModel(INFO, this);
+  mProxyModel = new ZLogFilterProxyModel(InfoLevel, this);
   mProxyModel->setSourceModel(mModelDestination);
   mUi->tableViewMessages->setModel(mProxyModel);
 
@@ -120,11 +120,11 @@ ZLogDialog::ZLogDialog(LogSinkPtr destination, QWidget* parent)
 #endif
 
   // Initialize log level selection
-  for (int l = INFO; l < OFFLEVEL; l++) {
+  for (int l = InfoLevel; l < OffLevel; l++) {
     const QString ln = levelToString(static_cast<LogSeverity>(l));
     mUi->comboBoxLevel->addItem(ln, l);
   }
-  mUi->comboBoxLevel->setCurrentIndex(INFO);
+  mUi->comboBoxLevel->setCurrentIndex(InfoLevel);
 }
 
 ZLogDialog::~ZLogDialog()

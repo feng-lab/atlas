@@ -32,7 +32,7 @@ void ZVideoEncoder::encode(const QDir &dir, const QString &namePrefix, int field
             << (QString("%1/%2% 0%3d.tif").arg(dir.absolutePath()).arg(namePrefix).arg(fieldWidth).replace("% 0", "%0"))
             << "-c:v" << "libx264" << "-crf" << "18" << "-pix_fmt" << "yuv420p"
             << "-r" << QString::number(framesPerSecond, 'f', 2) << outputFilename;
-  LINFO() << program << " " << arguments.join(" ");
+  LOG(INFO) << program << " " << arguments.join(" ");
   m_ffmpegProcess->start(program, arguments);
 }
 
@@ -88,12 +88,12 @@ void ZVideoEncoder::ffmpegFinished(int exitCode, QProcess::ExitStatus exitStatus
 
 void ZVideoEncoder::logStandardError()
 {
-  LERROR() << m_ffmpegProcess->readAllStandardError();
+  LOG(ERROR) << m_ffmpegProcess->readAllStandardError();
 }
 
 void ZVideoEncoder::logStandardOutput()
 {
-  LINFO() << m_ffmpegProcess->readAllStandardOutput();
+  LOG(INFO) << m_ffmpegProcess->readAllStandardOutput();
 }
 
 } // namespace nim

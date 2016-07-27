@@ -36,7 +36,7 @@ void ZEventListenerParameter::sendEvent(QEvent *e, int w, int h)
 
   if (QMouseEvent* mouseEvent = dynamic_cast<QMouseEvent*>(e)) {
     bool accept = false;
-    //LINFO() << mouseEvent->modifiers() << " " << mouseEvent->button() << " " << mouseEvent->buttons();
+    //LOG(INFO) << mouseEvent->modifiers() << " " << mouseEvent->button() << " " << mouseEvent->buttons();
     for (int i=0; i<m_mouseEvents.size(); i++) {
       accept = true;
       accept &= (mouseEvent->modifiers() == m_mouseEvents[i].modifiers);
