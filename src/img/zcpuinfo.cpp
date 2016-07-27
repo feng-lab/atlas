@@ -7,7 +7,7 @@
 #include <algorithm>
 
 #ifdef _WIN32
-#include <windows.h>
+#include "zwindowsheader.h"
 #elif defined(__APPLE__)
 #include <sys/param.h>
 #include <sys/sysctl.h>

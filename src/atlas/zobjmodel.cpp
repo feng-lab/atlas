@@ -9,8 +9,8 @@ ZObjModel::ZObjModel(ZDoc *doc)
   : QAbstractItemModel(doc)
   , m_doc(doc)
   , m_settingIcon(":/icons/settings-512.png")
-  , m_eyeOpenIcon(":/icons/eye_open-512.png")
-  , m_eyeCloseIcon(":/icons/eye_close-512.png")
+  , m_visibleIcon(":/icons/visible.png")
+  , m_invisibleIcon(":/icons/invisible.png")
   , m_lockIcon(":/icons/lock-512.png")
   , m_unlockIcon(":/icons/unlock-512.png")
   , m_rootItem(std::make_unique<ObjItem>(0, nullptr, nullptr))
@@ -65,7 +65,7 @@ QVariant ZObjModel::data(const QModelIndex &index, int role) const
   if (role == Qt::DecorationRole) {
     switch (index.column()) {
     case ShowHideColumn:
-      return item->show ? m_eyeOpenIcon : m_eyeCloseIcon;
+      return item->show ? m_visibleIcon : m_invisibleIcon;
     case LockColumn:
       return item->locked ? m_lockIcon : m_unlockIcon;
     case ViewSettingColumn:

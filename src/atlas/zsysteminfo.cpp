@@ -22,7 +22,7 @@
 #endif
 
 #ifdef Q_OS_WIN
-#include <windows.h>
+#include "zwindowsheader.h"
 #include <string>
 #include <sstream>
 typedef void (WINAPI *PGNSI)(LPSYSTEM_INFO);

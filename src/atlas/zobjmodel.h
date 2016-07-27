@@ -89,8 +89,8 @@ protected:
   };
 
   QIcon m_settingIcon;
-  QIcon m_eyeOpenIcon;
-  QIcon m_eyeCloseIcon;
+  QIcon m_visibleIcon;
+  QIcon m_invisibleIcon;
   QIcon m_lockIcon;
   QIcon m_unlockIcon;
   std::unique_ptr<ObjItem> m_rootItem;
