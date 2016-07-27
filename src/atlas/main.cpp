@@ -71,7 +71,6 @@ struct MacEventFilter : public QObject
 
 void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
-  std::cout << qUtf8Printable(msg) << std::endl;
   switch (type) {
   case QtInfoMsg:
     LINFOF(context.file ? context.file : "QtFile",
