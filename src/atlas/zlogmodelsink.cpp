@@ -2,6 +2,7 @@
 
 #include <QColor>
 #include <cassert>
+#include <QTimer>
 
 namespace nim {
 
@@ -27,9 +28,12 @@ ZLogModelSink *logModelSinkInstance()
 
 const char* const ZLogModelSink::Type = "window";
 
-ZLogModelSink::ZLogModelSink(size_t max_items) :
-  mMaxItems(max_items)
+ZLogModelSink::ZLogModelSink(int max_items)
+  : m_maxItems(max_items)
+  , m_timer(new QTimer(this))
 {
+  m_timer->setSingleShot(true);
+  connect(m_timer, &QTimer::timeout, this, &ZLogModelSink::sendLogData);
 }
 
 #ifdef _USE_QSLOG_
@@ -58,23 +62,25 @@ void ZLogModelSink::send(LogSeverity severity, const char *full_filename, const 
 
 void ZLogModelSink::addEntry(const LogData& message)
 {
-  const int next_idx = static_cast<int>(mLogDatas.size());
+  const int next_idx = m_logDatas.size();
   beginInsertRows(QModelIndex(), next_idx, next_idx);
   {
-    QWriteLocker lock(&mMessagesLock);
-    mLogDatas.push_back(message);
+    QWriteLocker lock(&m_messagesLock);
+    m_logDatas.push_back(message);
   }
   endInsertRows();
-  emit logDataReady(&mLogDatas.back());
+  if (!m_timer->isActive()) {
+    m_timer->start(200);
+  }
 
-  if (mMaxItems < std::numeric_limits<size_t>::max() && mLogDatas.size() > mMaxItems) {
+  if (m_maxItems < std::numeric_limits<int>::max() && m_logDatas.size() > m_maxItems) {
     {
-      QWriteLocker lock(&mMessagesLock);
-      mLogDatas.pop_front();
+      QWriteLocker lock(&m_messagesLock);
+      m_logDatas.pop_front();
     }
     // Every item changed
     const QModelIndex idx1 = index(0, 0);
-    const QModelIndex idx2 = index(static_cast<int>(mLogDatas.size()), rowCount());
+    const QModelIndex idx2 = index(m_logDatas.size(), rowCount());
     emit dataChanged(idx1, idx2);
   }
 }
@@ -83,15 +89,15 @@ void ZLogModelSink::clear()
 {
   beginResetModel();
   {
-    QWriteLocker lock(&mMessagesLock);
-    mLogDatas.clear();
+    QWriteLocker lock(&m_messagesLock);
+    m_logDatas.clear();
   }
   endResetModel();
 }
 
 LogData ZLogModelSink::at(size_t index)
 {
-  return mLogDatas[index];
+  return m_logDatas[index];
 }
 
 int ZLogModelSink::columnCount(const QModelIndex& parent) const
@@ -103,9 +109,9 @@ int ZLogModelSink::columnCount(const QModelIndex& parent) const
 int ZLogModelSink::rowCount(const QModelIndex& parent) const
 {
   Q_UNUSED(parent);
-  QReadLocker lock(&mMessagesLock);
+  QReadLocker lock(&m_messagesLock);
 
-  return static_cast<int>(mLogDatas.size());
+  return m_logDatas.size();
 }
 
 QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
@@ -114,9 +120,9 @@ QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
     return QVariant();
 
   if (role == Qt::DisplayRole) {
-    QReadLocker lock(&mMessagesLock);
+    QReadLocker lock(&m_messagesLock);
 
-    const LogData& item = mLogDatas.at(index.row());
+    const LogData& item = m_logDatas.at(index.row());
 
     switch (index.column()) {
     case TimeColumn:
@@ -135,9 +141,9 @@ QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
   }
 
   if (role == Qt::BackgroundColorRole) {
-    QReadLocker lock(&mMessagesLock);
+    QReadLocker lock(&m_messagesLock);
 
-    const LogData& item = mLogDatas.at(index.row());
+    const LogData& item = m_logDatas.at(index.row());
 
     switch (item.level)
     {
@@ -171,6 +177,13 @@ QVariant ZLogModelSink::headerData(int section, Qt::Orientation orientation, int
   }
 
   return QVariant();
+}
+
+void ZLogModelSink::sendLogData()
+{
+  int start = m_unsendLogDataStart;
+  m_unsendLogDataStart = m_logDatas.size();
+  emit logDataReady(&m_logDatas, start, m_unsendLogDataStart);
 }
 
 } // namespace nim

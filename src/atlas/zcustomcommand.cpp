@@ -884,14 +884,17 @@ QString GetRandomString()
   return randomString;
 }
 
-void tmp()
+void testLogSpeed()
 {
   QStringList logList;
   for (int i=0; i<1000000; ++i)
     logList << GetRandomString();
   for (int i=0; i<logList.size(); ++i)
     LOG(INFO) << logList.at(i);
+}
 
+void tmp()
+{
   using namespace boost::multiprecision;
 
   boost::multiprecision::int128_t res = static_cast<boost::multiprecision::int128_t>(INT64_MIN) * static_cast<boost::multiprecision::int128_t>(1);
@@ -919,7 +922,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  tmp();
+  testLogSpeed();
   LOG(INFO) << "done";
 }
 

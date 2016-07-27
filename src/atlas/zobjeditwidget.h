@@ -25,7 +25,7 @@ public:
   void updateEditWidgetTitleOfObj(size_t id);
 
 private:
-  void writeLogData(const LogData *message);
+  void writeLogData(const QList<LogData>* messages, int start, int end);
 
   void removeObjEditWidgetOfObj(size_t id);
   void closeTab(int index);

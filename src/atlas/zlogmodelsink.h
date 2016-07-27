@@ -32,7 +32,8 @@
 #include <QReadWriteLock>
 
 #include <limits>
-#include <deque>
+#include <QList>
+class QTimer;
 
 namespace nim {
 
@@ -50,7 +51,7 @@ public:
     FormattedMessageColumn = 100
   };
 
-  explicit ZLogModelSink(size_t max_items = std::numeric_limits<size_t>::max());
+  explicit ZLogModelSink(int max_items = std::numeric_limits<int>::max());
 
   void addEntry(const LogData& message);
   void clear();
@@ -74,15 +75,20 @@ public:
   virtual QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
   virtual QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
-  const std::deque<LogData>& logMessages() const { return mLogDatas; }
-
-signals:
-  void logDataReady(const LogData* message);
+  const QList<LogData>& logMessages() const { return m_logDatas; }
 
 private:
-  std::deque<LogData> mLogDatas;
-  mutable QReadWriteLock mMessagesLock;
-  size_t mMaxItems;
+  void sendLogData();
+
+signals:
+  void logDataReady(const QList<LogData>* messages, int start, int end);
+
+private:
+  QList<LogData> m_logDatas;
+  mutable QReadWriteLock m_messagesLock;
+  int m_maxItems;
+  QTimer* m_timer;
+  int m_unsendLogDataStart = 0;
 };
 
 #ifdef _USE_QSLOG_
@@ -96,7 +102,7 @@ inline QMetaObject::Connection receiveFutureLogMessages(const typename QtPrivate
 }
 #else
 ZLogModelSink* logModelSinkInstance();
-inline const std::deque<LogData>& logMessagesSoFar() { return logModelSinkInstance()->logMessages(); }
+inline const QList<LogData>& logMessagesSoFar() { return logModelSinkInstance()->logMessages(); }
 template <typename Func1>
 inline QMetaObject::Connection receiveFutureLogMessages(const typename QtPrivate::FunctionPointer<Func1>::Object *receiver, Func1 slot)
 {
