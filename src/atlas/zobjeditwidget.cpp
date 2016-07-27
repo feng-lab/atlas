@@ -26,6 +26,7 @@ ZObjEditWidget::ZObjEditWidget(ZDoc *doc, QWidget *mw)
   tabBar()->tabButton(0, QTabBar::RightSide)->hide();
 #endif
 
+  m_logWidget->setCenterOnScroll(true);
   m_normalFormat = m_logWidget->currentCharFormat();
   m_errorFormat = m_normalFormat;
   m_errorFormat.setForeground(QBrush(QColor(176,0,0)));
@@ -69,16 +70,12 @@ void ZObjEditWidget::updateEditWidgetTitleOfObj(size_t id)
 
 void ZObjEditWidget::writeLogData(const LogData *message)
 {
-  bool atBottom = m_logWidget->verticalScrollBar()->value() == m_logWidget->verticalScrollBar()->maximum();
   if (message->level <= InfoLevel) {
     m_logWidget->appendPlainText(message->formatted);
   } else {
     m_logWidget->setCurrentCharFormat(m_errorFormat);
     m_logWidget->appendPlainText(message->formatted);
     m_logWidget->setCurrentCharFormat(m_normalFormat);
-  }
-  if (atBottom) {
-    m_logWidget->verticalScrollBar()->setValue(m_logWidget->verticalScrollBar()->maximum());
   }
 }
 
