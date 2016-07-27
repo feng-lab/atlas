@@ -49,6 +49,8 @@ void initLogging(const char* argv0, const QString &filename)
   // Sets whether to avoid logging to the disk if the disk is full.
   FLAGS_stop_logging_if_full_disk = true;
 
+  google::InstallFailureSignalHandler();
+
   google::InitGoogleLogging(argv0);
 }
 
