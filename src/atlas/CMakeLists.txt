@@ -59,253 +59,898 @@ else (WIN32)
   set(IPP_LIBRARIES ${IPP_LIBRARIES} ${IPP_PATH}/lib/libippi.a ${IPP_PATH}/lib/libippcore.a ${IPP_PATH}/lib/libippvm.a ${IPP_PATH}/lib/libipps.a ${IPP_PATH}/lib/libippcv.a ${IPP_PATH}/lib/libippcc.a ${INTEL_PATH}/lib/libirc.a)
 endif (WIN32)
 
-find_package(VTK REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/vtk NO_DEFAULT_PATH)
+find_package(VTK REQUIRED COMPONENTS vtkFiltersGeometry vtkFiltersSources PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/vtk NO_DEFAULT_PATH)
 message(${VTK_DIR})
 message(${VTK_USE_FILE})
 include(${VTK_USE_FILE})
 message("${VTK_INCLUDE_DIRS}")
 message("${VTK_LIBRARIES}")
-message("${VTK_LIBRARY_DIRS}")
 
 set(WILDMAGIC_INCLUDE_DIRS ${WILDMAGIC_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/wildmagic/include)
 if (WIN32)
-  set(WILDMAGIC_LIBRARIES ${WILDMAGIC_LIBRARIES} ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/wildmagic/lib/libGTEngine.a)
-else (WIN32)
   set(WILDMAGIC_LIBRARIES ${WILDMAGIC_LIBRARIES} ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/wildmagic/lib/GTEngine.lib)
+else (WIN32)
+  set(WILDMAGIC_LIBRARIES ${WILDMAGIC_LIBRARIES} ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/wildmagic/lib/libGTEngine.a)
 endif (WIN32)
 
-find_package(HDF5 REQUIRED COMPONENTS C CXX PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/HDF5 NO_DEFAULT_PATH)
-message(${HDF5_INCLUDE_DIRS})
-message(${HDF5_CXX_LIBRARIES})
-message(${HDF5_LIBRARIES})
+find_package(HDF5 REQUIRED COMPONENTS C CXX static PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/share NO_DEFAULT_PATH)
+message(${HDF5_INCLUDE_DIR})
+message(${HDF5_C_STATIC_LIBRARY})
+message(${HDF5_CXX_STATIC_LIBRARY})
 
 find_package(ASSIMP REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/assimp NO_DEFAULT_PATH)
 message(${ASSIMP_INCLUDE_DIRS})
 message(${ASSIMP_LIBRARIES})
 
-find_package(OPENCV REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/opencv NO_DEFAULT_PATH)
+find_package(OpenCV REQUIRED COMPONENTS imgproc core PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/opencv NO_DEFAULT_PATH)
+message("${OpenCV_INCLUDE_DIRS}")
+message("${OpenCV_LIBS}")
 
 find_package(GLBINDING REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glbinding NO_DEFAULT_PATH)
 
-
-
-
-
-
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
 
 find_package(Qt5Core REQUIRED PATHS /Users/feng/Qt/5.7/clang_64 NO_DEFAULT_PATH)
 find_package(Qt5Widgets REQUIRED PATHS /Users/feng/Qt/5.7/clang_64 NO_DEFAULT_PATH)
-find_package(Qt5OpenGL REQUIRED PATHS /Users/feng/Qt/5.7/clang_64 NO_DEFAULT_PATH)
 find_package(Qt5Network REQUIRED PATHS /Users/feng/Qt/5.7/clang_64 NO_DEFAULT_PATH)
-find_package(Qt5SVG REQUIRED PATHS /Users/feng/Qt/5.7/clang_64 NO_DEFAULT_PATH)
+find_package(Qt5Svg REQUIRED PATHS /Users/feng/Qt/5.7/clang_64 NO_DEFAULT_PATH)
 
-# main srcs
-set(IMG_HEADERS
-  zbbox.h
-  zbenchtimer.h
-  zbitset.h
-  zcpuinfo.h
-  zeigenutils.h
-  zexception.h
-  zglobal.h
-  zimage2dutils.h
-  zimage3dutils.h
-  zimageavx.h
-  zimagefilterkernel.h
-  zimagesse3.h
-  zimg.h
-  zimg.hxx
-  zimgformat.h
-  zimgfreeimage.h
-  zimginfo.h
-  zimginterface.h
-  zimgio.h
-  zimgitkimage.h
-  zimgjpeg.h
-  zimgjpegxr.h
-  zimgmetadatabase.h
-  zimgmetaimage.h
-  zimgmetatag.h
-  zimgometiff.h
-  zimgpng.h
-  zimgregion.h
-  zimgsliceprovider.h
-  zimgstackinterface.h
-  zimgtiff.h
-  zimgv3draw.h
-  zimgzeissczi.h
-  zimgzeisslsm.h
-  zioutils.h
-  zrandom.h
-  zsaturateoperation.h
-  zstatisticsutils.h
-  zstringutils.h
-  ztiff.h
-  zvoxelcoordinate.h
-  zimgregioniterator.h
-  zimgneighborhooditerator.h
-  zimgneighborhoodwithcoorditerator.h
-  zneighborhood.h
-  zimgneighborhoodwithptriterator.h
-  zlog.h
-  zlogqttypesupport.h
-  zwindowsheader.h
+set(FORMS
+  LogDialog.ui
   )
 
-set(IMG_SOURCES
-  zbenchtimer.cpp
-  zcpuinfo.cpp
-  zeigenutils.cpp
-  zexception.cpp
-  zimage2dutils.cpp
-  zimage3dutils.cpp
-  zimagefilterkernel.cpp
-  zimg.cpp
-  zimgformat.cpp
-  zimgfreeimage.cpp
-  zimginfo.cpp
-  zimginterface.cpp
-  zimgio.cpp
-  zimgitkimage.cpp
-  zimgjpeg.cpp
-  zimgmetaimage.cpp
-  zimgmetatag.cpp
-  zimgometiff.cpp
-  zimgpng.cpp
-  zimgregion.cpp
-  zimgsliceprovider.cpp
-  zimgstackinterface.cpp
-  zimgtiff.cpp
-  zimgv3draw.cpp
-  zimgzeissczi.cpp
-  zimgzeisslsm.cpp
-  zioutils.cpp
-  zrandom.cpp
-  zstringutils.cpp
-  ztiff.cpp
-  zneighborhood.cpp
-  zlog.cpp
-  zimagesse3.cpp
-  zimageavx.cpp
-  zimgjpegxr.cpp
+set(RESOURCES
+  LogDialog.qrc
+  atlas.qrc
   )
 
-# tiff srcs
-set(TIFFDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libtiff/libtiff)
-set(TIFF_SOURCES
-  ${TIFFDIR}/tif_aux.c
-  ${TIFFDIR}/tif_close.c
-  ${TIFFDIR}/tif_codec.c
-  ${TIFFDIR}/tif_color.c
-  ${TIFFDIR}/tif_compress.c
-  ${TIFFDIR}/tif_dir.c
-  ${TIFFDIR}/tif_dirinfo.c
-  ${TIFFDIR}/tif_dirread.c
-  ${TIFFDIR}/tif_dirwrite.c
-  ${TIFFDIR}/tif_dumpmode.c
-  ${TIFFDIR}/tif_error.c
-  ${TIFFDIR}/tif_extension.c
-  ${TIFFDIR}/tif_fax3.c
-  ${TIFFDIR}/tif_fax3sm.c
-  ${TIFFDIR}/tif_flush.c
-  ${TIFFDIR}/tif_getimage.c
-  ${TIFFDIR}/tif_luv.c
-  ${TIFFDIR}/tif_lzw.c
-  ${TIFFDIR}/tif_next.c
-  ${TIFFDIR}/tif_open.c
-  ${TIFFDIR}/tif_packbits.c
-  ${TIFFDIR}/tif_pixarlog.c
-  ${TIFFDIR}/tif_predict.c
-  ${TIFFDIR}/tif_print.c
-  ${TIFFDIR}/tif_read.c
-  ${TIFFDIR}/tif_strip.c
-  ${TIFFDIR}/tif_swab.c
-  ${TIFFDIR}/tif_thunder.c
-  ${TIFFDIR}/tif_tile.c
-  ${TIFFDIR}/tif_version.c
-  ${TIFFDIR}/tif_warning.c
-  ${TIFFDIR}/tif_write.c
-  ${TIFFDIR}/tif_zip.c
-  ${TIFFDIR}/tif_ojpeg.c
-  ${TIFFDIR}/tif_jpeg.c
-  ${TIFFDIR}/tif_jbig.c
-  ${TIFFDIR}/tif_stream.cxx
+set(HEADERS
+  zimageinterpolation.h
+  zimgdisplay.h
+  zimgmerge.h
+  zimgtile.h
+  zvoxelregion.h
+  zimgncc.h
+  zcompleximg.h
+  zfft.h
+  zimagetoimagemetric.h
+  zregistrationoptimizer.h
+  zregistrationcostfunction.h
+  zsectionsregistrationdialog.h
+  zsectionsregistration.h
+  zstitchimagedialog.h
+  zpunctadetectiondialog.h
+  zpunctadetection.h
+  zassignpuncta.h
+  zgenerateanalysistextfile.h
+  zanalysisworklistdialog.h
+  zanalysisworklistmodel.h
+  zstyleditemdelegate.h
+  zitemeditorfactory.h
+  zimgalgorithm.h
+  zimgconnectedcomponents.h
+  zimgregionalextrema.h
+  zimgautothreshold.h
+  zimgitkinterface.h
+  zimgprocess.h
+  zimgsigneddistancemap.h
+  zimggraph.h
+  zimgnccmatch.h
+  zmainwindow.h
+  zimgdoc.h
+  zimgview.h
+  zspinboxwithscrollbar.h
+  zgraphicsview.h
+  zview.h
+  zdoc.h
+  zobjdoc.h
+  zobjview.h
+  zimgfilter.h
+  zobjmodel.h
+  zobjwidget.h
+  zshareitemselectionmodel.h
+  zitemselectionmodel.h
+  zviewsettingwidget.h
+  z3dmainwindow.h
+  z3dview.h
+  z3dobjview.h
+  z3dimgview.h
+  zviewsettinginterface.h
+  zpunctadoc.h
+  z3dpunctaview.h
+  z3dpunctafilter.h
+  z3dmeshfilter.h
+  z3dswcfilter.h
+  zmeshdoc.h
+  zswcdoc.h
+  z3dswcview.h
+  z3dmeshview.h
+  zobjfilter.h
+  zanimation.h
+  zparameteranimation.h
+  zparameterkey.h
+  zcameraparameterkey.h
+  zcameraparameteranimation.h
+  z3danimation.h
+  z3danimationdoc.h
+  zsaveobjsdialog.h
+  zanimationwidget.h
+  zobjeditwidget.h
+  zparameterfactory.h
+  zfontparameter.h
+  zfontwidget.h
+  z2danimation.h
+  z2danimationdoc.h
+  ztimelinewidget.h
+  ztimelineobjview.h
+  ztimelineeventview.h
+  ztimelineobjscene.h
+  ztimelineeventscene.h
+  ztimelineaxisview.h
+  ztimelinekeyeditdialog.h
+  zdockwidget.h
+  z3danimationview.h
+  z3danimationfilter.h
+  z3dcompositor.h
+  z3dgeometryfilter.h
+  z3daxisfilter.h
+  z3dboundedfilter.h
+  z3dvolumeslicerenderer.h
+  z3dmeshrenderer.h
+  z3dtexturecopyrenderer.h
+  z3dtexturecoordinaterenderer.h
+  z3dtextureblendrenderer.h
+  z3dsphererenderer.h
+  z3dlinewithfixedwidthcolorrenderer.h
+  z3dlinerenderer.h
+  z3dimage2drenderer.h
+  z3dfontrenderer.h
+  z3dellipsoidrenderer.h
+  z3dconerenderer.h
+  z3dbackgroundrenderer.h
+  z3darrowrenderer.h
+  z3drendererbase.h
+  z3dprimitiverenderer.h
+  z3dcanvaspainter.h
+  z3dnetworkevaluator.h
+  z3dcanvas.h
+  z3dscene.h
+  z3dshadergroup.h
+  z3dport.h
+  z3drenderport.h
+  z3dglobalparameters.h
+  z3dshaderprogram.h
+  z3dvolume.h
+  z3dtransferfunction.h
+  z3dtransferfunctioneditor.h
+  z3dtransferfunctionwidgetwitheditorwindow.h
+  zclickablelabel.h
+  zcolormap.h
+  zcolormapeditor.h
+  zcolormapwidgetwitheditorwindow.h
+  zvertexarrayobject.h
+  zvertexbufferobject.h
+  z3dpickingmanager.h
+  z3dfilterview.h
+  zroi.h
+  zroidoc.h
+  zfilterview.h
+  zroiview.h
+  zroifilter.h
+  zactiongroup.h
+  zboostgeometryadaptor.h
+  zquatparameter.h
+  z3dshadermanager.h
+  zanimationexportwidget.h
+  zvideoencoder.h
+  zmesh.h
+  zmeshio.h
+  zmeshutils.h
+  zpuncta.h
+  zpunctaio.h
+  zpunctum.h
+  zgmm.h
+  zkmeans.h
+  zvbgmm.h
+  zswcfilter.h
+  zswcview.h
+  zpunctafilter.h
+  zpunctaview.h
+  zswc.h
+  ztree.hpp
+  znumericparameter.h
+  zoptionparameter.h
+  zparameter.h
+  zglmutils.h
+  zcombobox.h
+  zselectfilewidget.h
+  zloadimagesequencedialog.h
+  zspinbox.h
+  zspinboxwithslider.h
+  zwidgetsgroup.h
+  z3dcamera.h
+  z3dcameraparameter.h
+  z3drendertarget.h
+  z3dinteractionhandler.h
+  zeventlistenerparameter.h
+  z3dcanvaseventlistener.h
+  z3dtexture.h
+  z3dtransformparameter.h
+  z3dgpuinfo.h
+  zstringparameter.h
+  z3dsdfont.h
+  zspanslider.h
+  zcustomcommand.h
+  zaffine2d.h
+  zaffine3d.h
+  ztakescreenshotwidget.h
+  zimgregistration.h
+  zimagetransform.h
+  zimagematrix2dtransform.h
+  zimagematrix3dtransform.h
+  zregistrationnumericdiffcostfunction.h
+  zimagecompositetransform.h
+  zimagetransformresolve.h
+  z3dshader.h
+  z3dcontext.h
+  z3dgl.h
+  zimgpack.h
+  zimgpackdisplay.h
+  zimgvoxelcolormap.h
+  zimgcache.h
+  zsysteminfo.h
+  zfileutils.h
+  zregionannotation.h
+  zregionannotationdoc.h
+  z3dregionannotationview.h
+  zregionannotationview.h
+  zregionannotationfilter.h
+  z3dregionannotationfilter.h
+  zimgfillhole.h
+  zregionannotationwidget.h
+  zregionannotationtreemodel.h
+  zregionannotationtreeview.h
+  zbuttoncolumndelegate.h
+  zchooseobjdialog.h
+  zgraphicsscene.h
+  z3dfilter.h
+  z3dtextureglowrenderer.h
+  z3dcameracontrolwidget.h
+  z3dtextureandeyecoordinaterenderer.h
+  z3dimgraycasterrenderer.h
+  z3dimg.h
+  z3dimgfilter.h
+  z3dblockcache.h
+  z3dimgslicerenderer.h
+  zregionontology.h
+  zobjdetailedinfowidget.h
+  zjson.h
+  zlogdialog.h
+  zlogmodelsink.h
   )
+
+set(SOURCES
+  main.cpp
+  zimageinterpolation.cpp
+  zimgdisplay.cpp
+  zimgmerge.cpp
+  zimgtile.cpp
+  zvoxelregion.cpp
+  zimgncc.cpp
+  zcompleximg.cpp
+  zfft.cpp
+  zimagetoimagemetric.cpp
+  zregistrationoptimizer.cpp
+  zregistrationcostfunction.cpp
+  zsectionsregistrationdialog.cpp
+  zsectionsregistration.cpp
+  zstitchimagedialog.cpp
+  zpunctadetectiondialog.cpp
+  zpunctadetection.cpp
+  zassignpuncta.cpp
+  zgenerateanalysistextfile.cpp
+  zanalysisworklistdialog.cpp
+  zanalysisworklistmodel.cpp
+  zstyleditemdelegate.cpp
+  zitemeditorfactory.cpp
+  zimgalgorithm.cpp
+  zimgprocess.cpp
+  zimggraph.cpp
+  zimgnccmatch.cpp
+  zimgsigneddistancemap.cpp
+  zimgconnectedcomponents.cpp
+  zimgautothreshold.cpp
+  zimgregionalextrema.cpp
+  zmainwindow.cpp
+  zimgdoc.cpp
+  zimgview.cpp
+  zspinboxwithscrollbar.cpp
+  zgraphicsview.cpp
+  zview.cpp
+  zdoc.cpp
+  zobjdoc.cpp
+  zobjview.cpp
+  zimgfilter.cpp
+  zobjmodel.cpp
+  zobjwidget.cpp
+  zshareitemselectionmodel.cpp
+  zitemselectionmodel.cpp
+  zviewsettingwidget.cpp
+  z3dmainwindow.cpp
+  z3dview.cpp
+  z3dobjview.cpp
+  z3dimgview.cpp
+  zpunctadoc.cpp
+  z3dpunctaview.cpp
+  z3dpunctafilter.cpp
+  z3dmeshfilter.cpp
+  z3dswcfilter.cpp
+  zmeshdoc.cpp
+  zswcdoc.cpp
+  z3dswcview.cpp
+  z3dmeshview.cpp
+  zobjfilter.cpp
+  zanimation.cpp
+  zparameteranimation.cpp
+  zparameterkey.cpp
+  zcameraparameterkey.cpp
+  zcameraparameteranimation.cpp
+  z3danimation.cpp
+  z3danimationdoc.cpp
+  zsaveobjsdialog.cpp
+  zanimationwidget.cpp
+  zobjeditwidget.cpp
+  zparameterfactory.cpp
+  zfontparameter.cpp
+  zfontwidget.cpp
+  z2danimation.cpp
+  z2danimationdoc.cpp
+  ztimelinewidget.cpp
+  ztimelineobjview.cpp
+  ztimelineeventview.cpp
+  ztimelineobjscene.cpp
+  ztimelineeventscene.cpp
+  ztimelineaxisview.cpp
+  ztimelinekeyeditdialog.cpp
+  zdockwidget.cpp
+  z3danimationview.cpp
+  z3danimationfilter.cpp
+  z3dcompositor.cpp
+  z3dgeometryfilter.cpp
+  z3daxisfilter.cpp
+  z3dboundedfilter.cpp
+  z3dvolumeslicerenderer.cpp
+  z3dmeshrenderer.cpp
+  z3dtexturecopyrenderer.cpp
+  z3dtexturecoordinaterenderer.cpp
+  z3dtextureblendrenderer.cpp
+  z3dsphererenderer.cpp
+  z3dprimitiverenderer.cpp
+  z3dlinewithfixedwidthcolorrenderer.cpp
+  z3dlinerenderer.cpp
+  z3dimage2drenderer.cpp
+  z3dfontrenderer.cpp
+  z3dellipsoidrenderer.cpp
+  z3dconerenderer.cpp
+  z3dbackgroundrenderer.cpp
+  z3darrowrenderer.cpp
+  z3drendererbase.cpp
+  z3dcanvaspainter.cpp
+  z3dnetworkevaluator.cpp
+  z3dcanvas.cpp
+  z3dscene.cpp
+  z3dshadergroup.cpp
+  z3dport.cpp
+  z3drenderport.cpp
+  z3dglobalparameters.cpp
+  z3dshaderprogram.cpp
+  z3dvolume.cpp
+  z3dtransferfunction.cpp
+  z3dtransferfunctioneditor.cpp
+  z3dtransferfunctionwidgetwitheditorwindow.cpp
+  zclickablelabel.cpp
+  zcolormap.cpp
+  zcolormapeditor.cpp
+  zcolormapwidgetwitheditorwindow.cpp
+  zvertexarrayobject.cpp
+  zvertexbufferobject.cpp
+  z3dpickingmanager.cpp
+  zroi.cpp
+  zroidoc.cpp
+  zroiview.cpp
+  zroifilter.cpp
+  zactiongroup.cpp
+  zquatparameter.cpp
+  z3dshadermanager.cpp
+  zanimationexportwidget.cpp
+  zvideoencoder.cpp
+  zmesh.cpp
+  zmeshio.cpp
+  zmeshutils.cpp
+  zpuncta.cpp
+  zpunctaio.cpp
+  zpunctum.cpp
+  zswcfilter.cpp
+  zswcview.cpp
+  zpunctafilter.cpp
+  zpunctaview.cpp
+  zswc.cpp
+  znumericparameter.cpp
+  zoptionparameter.cpp
+  zparameter.cpp
+  zcombobox.cpp
+  zselectfilewidget.cpp
+  zloadimagesequencedialog.cpp
+  zspinbox.cpp
+  zspinboxwithslider.cpp
+  zwidgetsgroup.cpp
+  z3dcamera.cpp
+  z3dcameraparameter.cpp
+  z3drendertarget.cpp
+  z3dinteractionhandler.cpp
+  zeventlistenerparameter.cpp
+  z3dtexture.cpp
+  z3dtransformparameter.cpp
+  z3dgpuinfo.cpp
+  zstringparameter.cpp
+  z3dsdfont.cpp
+  zspanslider.cpp
+  zcustomcommand.cpp
+  zaffine2d.cpp
+  zaffine3d.cpp
+  ztakescreenshotwidget.cpp
+  zimgregistration.cpp
+  zimagetransform.cpp
+  zimagematrix2dtransform.cpp
+  zimagematrix3dtransform.cpp
+  zregistrationnumericdiffcostfunction.cpp
+  zimagecompositetransform.cpp
+  zimagetransformresolve.cpp
+  z3dshader.cpp
+  z3dcontext.cpp
+  z3dgl.cpp
+  zimgpack.cpp
+  zimgpackdisplay.cpp
+  zimgcache.cpp
+  zsysteminfo.cpp
+  zfileutils.cpp
+  zregionannotation.cpp
+  zregionannotationdoc.cpp
+  z3dregionannotationview.cpp
+  zregionannotationview.cpp
+  zregionannotationfilter.cpp
+  z3dregionannotationfilter.cpp
+  zimgfillhole.cpp
+  zregionannotationwidget.cpp
+  zregionannotationtreemodel.cpp
+  zregionannotationtreeview.cpp
+  zbuttoncolumndelegate.cpp
+  zchooseobjdialog.cpp
+  zgraphicsscene.cpp
+  z3dfilter.cpp
+  z3dtextureglowrenderer.cpp
+  z3dcameracontrolwidget.cpp
+  z3dtextureandeyecoordinaterenderer.cpp
+  z3dimgraycasterrenderer.cpp
+  z3dimg.cpp
+  z3dimgfilter.cpp
+  z3dimgslicerenderer.cpp
+  zregionontology.cpp
+  zobjdetailedinfowidget.cpp
+  zjson.cpp
+  zlogdialog.cpp
+  zlogmodelsink.cpp
+  )
+
+option(BUILD_TESTING "Enable tests" ON)
+if (BUILD_TESTING)
+  add_definitions(-D_WITH_TESTS)
+  set(HEADERS
+    ${HEADERS}
+    zunittest.h
+    test/zimggraphtest.h
+    test/zimagetoimagemetrictest.h
+    test/zimageutilstest.h
+    test/zimageaffinetransformtest.h
+    test/zimgncctest.h
+    test/zfilereadtest.h
+    test/zimgiteratortest.h
+    test/zsaturateoperationtest.h
+    test/zclustertest.h
+    test/zimgtest.h
+    test/zimgconnectedcomponentstest.h
+    test/zimgsigneddistancemaptest.h
+    test/zimgautothresholdtest.h
+    test/zimgregionalextrematest.h
+    )
+
+  set(SOURCES
+    ${SOURCES}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc
+    zunittest.cpp
+    )
+  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/include)
+endif (BUILD_TESTING)
+
+# ceres solver srcs
+add_definitions(-DCERES_USE_CXX11 -DCERES_NO_SUITESPARSE -DCERES_NO_CXSPARSE -DCERES_NO_THREADS -DCERES_STD_UNORDERED_MAP)
+set(CERESSOLVERDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/optimization)
+set(CERESSOLVER_HEADERS
+  ${CERESSOLVERDIR}/autodiff_cost_function.h
+  ${CERESSOLVERDIR}/autodiff_local_parameterization.h
+  ${CERESSOLVERDIR}/ceres.h
+  ${CERESSOLVERDIR}/conditioned_cost_function.h
+  ${CERESSOLVERDIR}/cost_function.h
+  ${CERESSOLVERDIR}/cost_function_to_functor.h
+  ${CERESSOLVERDIR}/covariance.h
+  ${CERESSOLVERDIR}/crs_matrix.h
+  ${CERESSOLVERDIR}/cubic_interpolation.h
+  ${CERESSOLVERDIR}/dynamic_autodiff_cost_function.h
+  ${CERESSOLVERDIR}/dynamic_cost_function_to_functor.h
+  ${CERESSOLVERDIR}/dynamic_numeric_diff_cost_function.h
+  ${CERESSOLVERDIR}/fpclassify.h
+  ${CERESSOLVERDIR}/gradient_checker.h
+  ${CERESSOLVERDIR}/gradient_problem.h
+  ${CERESSOLVERDIR}/gradient_problem_solver.h
+  ${CERESSOLVERDIR}/iteration_callback.h
+  ${CERESSOLVERDIR}/jet.h
+  ${CERESSOLVERDIR}/local_parameterization.h
+  ${CERESSOLVERDIR}/loss_function.h
+  ${CERESSOLVERDIR}/normal_prior.h
+  ${CERESSOLVERDIR}/numeric_diff_cost_function.h
+  ${CERESSOLVERDIR}/numeric_diff_options.h
+  ${CERESSOLVERDIR}/ordered_groups.h
+  ${CERESSOLVERDIR}/problem.h
+  ${CERESSOLVERDIR}/rotation.h
+  ${CERESSOLVERDIR}/sized_cost_function.h
+  ${CERESSOLVERDIR}/solver.h
+  ${CERESSOLVERDIR}/types.h
+  ${CERESSOLVERDIR}/version.h
+  ${CERESSOLVERDIR}/internal/array_utils.h
+  ${CERESSOLVERDIR}/internal/autodiff.h
+  ${CERESSOLVERDIR}/internal/blas.h
+  ${CERESSOLVERDIR}/internal/block_evaluate_preparer.h
+  ${CERESSOLVERDIR}/internal/block_jacobi_preconditioner.h
+  ${CERESSOLVERDIR}/internal/block_jacobian_writer.h
+  ${CERESSOLVERDIR}/internal/block_random_access_dense_matrix.h
+  ${CERESSOLVERDIR}/internal/block_random_access_diagonal_matrix.h
+  ${CERESSOLVERDIR}/internal/block_random_access_matrix.h
+  ${CERESSOLVERDIR}/internal/block_random_access_sparse_matrix.h
+  ${CERESSOLVERDIR}/internal/block_sparse_matrix.h
+  ${CERESSOLVERDIR}/internal/block_structure.h
+  ${CERESSOLVERDIR}/internal/callbacks.h
+  ${CERESSOLVERDIR}/internal/canonical_views_clustering.h
+  ${CERESSOLVERDIR}/internal/casts.h
+  ${CERESSOLVERDIR}/internal/cgnr_linear_operator.h
+  ${CERESSOLVERDIR}/internal/cgnr_solver.h
+  ${CERESSOLVERDIR}/internal/collections_port.h
+  ${CERESSOLVERDIR}/internal/compressed_col_sparse_matrix_utils.h
+  ${CERESSOLVERDIR}/internal/compressed_row_jacobian_writer.h
+  ${CERESSOLVERDIR}/internal/compressed_row_sparse_matrix.h
+  ${CERESSOLVERDIR}/internal/conjugate_gradients_solver.h
+  ${CERESSOLVERDIR}/internal/coordinate_descent_minimizer.h
+  ${CERESSOLVERDIR}/internal/corrector.h
+  ${CERESSOLVERDIR}/internal/covariance_impl.h
+  ${CERESSOLVERDIR}/internal/cxsparse.h
+  ${CERESSOLVERDIR}/internal/dense_jacobian_writer.h
+  ${CERESSOLVERDIR}/internal/dense_normal_cholesky_solver.h
+  ${CERESSOLVERDIR}/internal/dense_qr_solver.h
+  ${CERESSOLVERDIR}/internal/dense_sparse_matrix.h
+  ${CERESSOLVERDIR}/internal/detect_structure.h
+  ${CERESSOLVERDIR}/internal/disable_warnings.h
+  ${CERESSOLVERDIR}/internal/dogleg_strategy.h
+  ${CERESSOLVERDIR}/internal/dynamic_compressed_row_finalizer.h
+  ${CERESSOLVERDIR}/internal/dynamic_compressed_row_jacobian_writer.h
+  ${CERESSOLVERDIR}/internal/dynamic_compressed_row_sparse_matrix.h
+  ${CERESSOLVERDIR}/internal/eigen.h
+  ${CERESSOLVERDIR}/internal/evaluator.h
+  ${CERESSOLVERDIR}/internal/execution_summary.h
+  ${CERESSOLVERDIR}/internal/file.h
+  ${CERESSOLVERDIR}/internal/fixed_array.h
+  ${CERESSOLVERDIR}/internal/gradient_checking_cost_function.h
+  ${CERESSOLVERDIR}/internal/gradient_problem_evaluator.h
+  ${CERESSOLVERDIR}/internal/graph.h
+  ${CERESSOLVERDIR}/internal/graph_algorithms.h
+  ${CERESSOLVERDIR}/internal/householder_vector.h
+  ${CERESSOLVERDIR}/internal/implicit_schur_complement.h
+  ${CERESSOLVERDIR}/internal/integral_types.h
+  ${CERESSOLVERDIR}/internal/iterative_schur_complement_solver.h
+  ${CERESSOLVERDIR}/internal/lapack.h
+  ${CERESSOLVERDIR}/internal/levenberg_marquardt_strategy.h
+  ${CERESSOLVERDIR}/internal/line_search.h
+  ${CERESSOLVERDIR}/internal/line_search_direction.h
+  ${CERESSOLVERDIR}/internal/line_search_minimizer.h
+  ${CERESSOLVERDIR}/internal/line_search_preprocessor.h
+  ${CERESSOLVERDIR}/internal/linear_least_squares_problems.h
+  ${CERESSOLVERDIR}/internal/linear_operator.h
+  ${CERESSOLVERDIR}/internal/linear_solver.h
+  ${CERESSOLVERDIR}/internal/low_rank_inverse_hessian.h
+  ${CERESSOLVERDIR}/internal/macros.h
+  ${CERESSOLVERDIR}/internal/manual_constructor.h
+  ${CERESSOLVERDIR}/internal/map_util.h
+  ${CERESSOLVERDIR}/internal/minimizer.h
+  ${CERESSOLVERDIR}/internal/mutex.h
+  ${CERESSOLVERDIR}/internal/numeric_diff.h
+  ${CERESSOLVERDIR}/internal/parameter_block.h
+  ${CERESSOLVERDIR}/internal/parameter_block_ordering.h
+  ${CERESSOLVERDIR}/internal/partitioned_matrix_view.h
+  ${CERESSOLVERDIR}/internal/partitioned_matrix_view_impl.h
+  ${CERESSOLVERDIR}/internal/polynomial.h
+  ${CERESSOLVERDIR}/internal/port.h
+  ${CERESSOLVERDIR}/internal/preconditioner.h
+  ${CERESSOLVERDIR}/internal/preprocessor.h
+  ${CERESSOLVERDIR}/internal/problem_impl.h
+  ${CERESSOLVERDIR}/internal/program.h
+  ${CERESSOLVERDIR}/internal/program_evaluator.h
+  ${CERESSOLVERDIR}/internal/random.h
+  ${CERESSOLVERDIR}/internal/reenable_warnings.h
+  ${CERESSOLVERDIR}/internal/reorder_program.h
+  ${CERESSOLVERDIR}/internal/residual_block.h
+  ${CERESSOLVERDIR}/internal/residual_block_utils.h
+  ${CERESSOLVERDIR}/internal/schur_complement_solver.h
+  ${CERESSOLVERDIR}/internal/schur_eliminator.h
+  ${CERESSOLVERDIR}/internal/schur_eliminator_impl.h
+  ${CERESSOLVERDIR}/internal/schur_jacobi_preconditioner.h
+  ${CERESSOLVERDIR}/internal/scoped_ptr.h
+  ${CERESSOLVERDIR}/internal/scratch_evaluate_preparer.h
+  ${CERESSOLVERDIR}/internal/single_linkage_clustering.h
+  ${CERESSOLVERDIR}/internal/small_blas.h
+  ${CERESSOLVERDIR}/internal/solver_utils.h
+  ${CERESSOLVERDIR}/internal/sparse_matrix.h
+  ${CERESSOLVERDIR}/internal/sparse_normal_cholesky_solver.h
+  ${CERESSOLVERDIR}/internal/split.h
+  ${CERESSOLVERDIR}/internal/stl_util.h
+  ${CERESSOLVERDIR}/internal/stringprintf.h
+  ${CERESSOLVERDIR}/internal/suitesparse.h
+  ${CERESSOLVERDIR}/internal/test_util.h
+  ${CERESSOLVERDIR}/internal/triplet_sparse_matrix.h
+  ${CERESSOLVERDIR}/internal/trust_region_minimizer.h
+  ${CERESSOLVERDIR}/internal/trust_region_preprocessor.h
+  ${CERESSOLVERDIR}/internal/trust_region_step_evaluator.h
+  ${CERESSOLVERDIR}/internal/trust_region_strategy.h
+  ${CERESSOLVERDIR}/internal/variadic_evaluate.h
+  ${CERESSOLVERDIR}/internal/visibility.h
+  ${CERESSOLVERDIR}/internal/visibility_based_preconditioner.h
+  ${CERESSOLVERDIR}/internal/wall_time.h
+  )
+set(CERESSOLVER_SOURCES
+  ${CERESSOLVERDIR}/internal/array_utils.cc
+  ${CERESSOLVERDIR}/internal/blas.cc
+  ${CERESSOLVERDIR}/internal/block_evaluate_preparer.cc
+  ${CERESSOLVERDIR}/internal/block_jacobi_preconditioner.cc
+  ${CERESSOLVERDIR}/internal/block_jacobian_writer.cc
+  ${CERESSOLVERDIR}/internal/block_random_access_dense_matrix.cc
+  ${CERESSOLVERDIR}/internal/block_random_access_diagonal_matrix.cc
+  ${CERESSOLVERDIR}/internal/block_random_access_matrix.cc
+  ${CERESSOLVERDIR}/internal/block_random_access_sparse_matrix.cc
+  ${CERESSOLVERDIR}/internal/block_sparse_matrix.cc
+  ${CERESSOLVERDIR}/internal/block_structure.cc
+  ${CERESSOLVERDIR}/internal/callbacks.cc
+  ${CERESSOLVERDIR}/internal/canonical_views_clustering.cc
+  ${CERESSOLVERDIR}/internal/cgnr_solver.cc
+  ${CERESSOLVERDIR}/internal/compressed_col_sparse_matrix_utils.cc
+  ${CERESSOLVERDIR}/internal/compressed_row_jacobian_writer.cc
+  ${CERESSOLVERDIR}/internal/compressed_row_sparse_matrix.cc
+  ${CERESSOLVERDIR}/internal/conditioned_cost_function.cc
+  ${CERESSOLVERDIR}/internal/conjugate_gradients_solver.cc
+  ${CERESSOLVERDIR}/internal/coordinate_descent_minimizer.cc
+  ${CERESSOLVERDIR}/internal/corrector.cc
+  ${CERESSOLVERDIR}/internal/covariance.cc
+  ${CERESSOLVERDIR}/internal/covariance_impl.cc
+  ${CERESSOLVERDIR}/internal/cxsparse.cc
+  ${CERESSOLVERDIR}/internal/dense_normal_cholesky_solver.cc
+  ${CERESSOLVERDIR}/internal/dense_qr_solver.cc
+  ${CERESSOLVERDIR}/internal/dense_sparse_matrix.cc
+  ${CERESSOLVERDIR}/internal/detect_structure.cc
+  ${CERESSOLVERDIR}/internal/dogleg_strategy.cc
+  ${CERESSOLVERDIR}/internal/dynamic_compressed_row_jacobian_writer.cc
+  ${CERESSOLVERDIR}/internal/dynamic_compressed_row_sparse_matrix.cc
+  ${CERESSOLVERDIR}/internal/evaluator.cc
+  ${CERESSOLVERDIR}/internal/file.cc
+  ${CERESSOLVERDIR}/internal/gradient_checking_cost_function.cc
+  ${CERESSOLVERDIR}/internal/gradient_problem.cc
+  ${CERESSOLVERDIR}/internal/gradient_problem_solver.cc
+  ${CERESSOLVERDIR}/internal/implicit_schur_complement.cc
+  ${CERESSOLVERDIR}/internal/iterative_schur_complement_solver.cc
+  ${CERESSOLVERDIR}/internal/lapack.cc
+  ${CERESSOLVERDIR}/internal/levenberg_marquardt_strategy.cc
+  ${CERESSOLVERDIR}/internal/line_search.cc
+  ${CERESSOLVERDIR}/internal/line_search_direction.cc
+  ${CERESSOLVERDIR}/internal/line_search_minimizer.cc
+  ${CERESSOLVERDIR}/internal/line_search_preprocessor.cc
+  ${CERESSOLVERDIR}/internal/linear_least_squares_problems.cc
+  ${CERESSOLVERDIR}/internal/linear_operator.cc
+  ${CERESSOLVERDIR}/internal/linear_solver.cc
+  ${CERESSOLVERDIR}/internal/local_parameterization.cc
+  ${CERESSOLVERDIR}/internal/loss_function.cc
+  ${CERESSOLVERDIR}/internal/low_rank_inverse_hessian.cc
+  ${CERESSOLVERDIR}/internal/minimizer.cc
+  ${CERESSOLVERDIR}/internal/normal_prior.cc
+  ${CERESSOLVERDIR}/internal/parameter_block_ordering.cc
+  ${CERESSOLVERDIR}/internal/partitioned_matrix_view.cc
+  ${CERESSOLVERDIR}/internal/polynomial.cc
+  ${CERESSOLVERDIR}/internal/preconditioner.cc
+  ${CERESSOLVERDIR}/internal/preprocessor.cc
+  ${CERESSOLVERDIR}/internal/problem.cc
+  ${CERESSOLVERDIR}/internal/problem_impl.cc
+  ${CERESSOLVERDIR}/internal/program.cc
+  ${CERESSOLVERDIR}/internal/reorder_program.cc
+  ${CERESSOLVERDIR}/internal/residual_block.cc
+  ${CERESSOLVERDIR}/internal/residual_block_utils.cc
+  ${CERESSOLVERDIR}/internal/schur_complement_solver.cc
+  ${CERESSOLVERDIR}/internal/schur_eliminator.cc
+  ${CERESSOLVERDIR}/internal/schur_jacobi_preconditioner.cc
+  ${CERESSOLVERDIR}/internal/scratch_evaluate_preparer.cc
+  ${CERESSOLVERDIR}/internal/single_linkage_clustering.cc
+  ${CERESSOLVERDIR}/internal/solver.cc
+  ${CERESSOLVERDIR}/internal/solver_utils.cc
+  ${CERESSOLVERDIR}/internal/sparse_matrix.cc
+  ${CERESSOLVERDIR}/internal/sparse_normal_cholesky_solver.cc
+  ${CERESSOLVERDIR}/internal/split.cc
+  ${CERESSOLVERDIR}/internal/stringprintf.cc
+  ${CERESSOLVERDIR}/internal/suitesparse.cc
+  ${CERESSOLVERDIR}/internal/triplet_sparse_matrix.cc
+  ${CERESSOLVERDIR}/internal/trust_region_minimizer.cc
+  ${CERESSOLVERDIR}/internal/trust_region_preprocessor.cc
+  ${CERESSOLVERDIR}/internal/trust_region_step_evaluator.cc
+  ${CERESSOLVERDIR}/internal/trust_region_strategy.cc
+  ${CERESSOLVERDIR}/internal/types.cc
+  ${CERESSOLVERDIR}/internal/visibility.cc
+  ${CERESSOLVERDIR}/internal/visibility_based_preconditioner.cc
+  ${CERESSOLVERDIR}/internal/wall_time.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_2_2.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_2_3.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_2_4.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_2_d.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_3_3.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_3_4.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_3_6.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_3_9.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_3_d.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_4_3.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_4_4.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_4_8.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_4_9.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_4_d.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_d_d.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_4_4_2.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_4_4_3.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_4_4_4.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_4_4_d.cc
+  ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_d_d_d.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_2_2.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_2_3.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_2_4.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_2_d.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_3_3.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_3_4.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_3_6.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_3_9.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_3_d.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_4_3.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_4_4.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_4_8.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_4_9.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_4_d.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_d_d.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_4_4_2.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_4_4_3.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_4_4_4.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_4_4_d.cc
+  ${CERESSOLVERDIR}/internal/generated/schur_eliminator_d_d_d.cc
+  )
+source_group(CeresSolver FILES ${CERESSOLVER_HEADERS} ${CERESSOLVER_SOURCES})
+
+#libqxt srcs
+set(LIBQXTDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libqxt)
+set(LIBQXT_HEADERS
+  ${LIBQXTDIR}/core/qxtglobal.h
+  ${LIBQXTDIR}/core/qxtcsvmodel.h
+  ${LIBQXTDIR}/widgets/qxtspanslider.h
+  ${LIBQXTDIR}/widgets/qxtspanslider_p.h
+  ${LIBQXTDIR}/core/qxtnamespace.h
+  )
+set(LIBQXT_SOURCES
+  ${LIBQXTDIR}/core/qxtglobal.cpp
+  ${LIBQXTDIR}/core/qxtcsvmodel.cpp
+  ${LIBQXTDIR}/widgets/qxtspanslider.cpp
+  )
+source_group(libqxt FILES ${LIBQXT_HEADERS} ${LIBQXT_SOURCES})
+
+#qtcsv srcs
+add_definitions(-DBUILD_QXT -DBUILD_QXT_OBJECT)
+set(QTCSVDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/qtcsv)
+set(QTCSV_HEADERS
+  ${QTCSVDIR}/include/qtcsv_global.h
+  ${QTCSVDIR}/include/writer.h
+  ${QTCSVDIR}/include/variantdata.h
+  ${QTCSVDIR}/include/stringdata.h
+  ${QTCSVDIR}/include/reader.h
+  ${QTCSVDIR}/include/abstractdata.h
+  ${QTCSVDIR}/sources/filechecker.h
+  ${QTCSVDIR}/sources/contentiterator.h
+  ${QTCSVDIR}/sources/symbols.h
+  )
+set(QTCSV_SOURCES
+  ${QTCSVDIR}/sources/writer.cpp
+  ${QTCSVDIR}/sources/variantdata.cpp
+  ${QTCSVDIR}/sources/stringdata.cpp
+  ${QTCSVDIR}/sources/reader.cpp
+  ${QTCSVDIR}/sources/contentiterator.cpp
+  )
+source_group(qtcsv FILES ${QTCSV_HEADERS} ${QTCSV_SOURCES})
+
+# video memory sources
+set(SYSDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/sys)
 if (WIN32)
-  set(TIFF_SOURCES ${TIFF_SOURCES} ${TIFFDIR}/tif_win32.c)
+set(SYS_SOURCES
+  ${SYSDIR}/VideoMemoryWin.cpp
+  ${SYSDIR}/VidMemViaD3D9.cpp
+  ${SYSDIR}/VidMemViaDDraw.cpp
+  ${SYSDIR}/VidMemViaDxDiag.cpp
+  )
 else (WIN32)
-  set(TIFF_SOURCES ${TIFF_SOURCES} ${TIFFDIR}/tif_unix.c)
+set(SYS_SOURCES
+  ${SYSDIR}/VideoMemoryMac.cpp
+  )
 endif (WIN32)
-source_group(libtiff FILES ${TIFF_SOURCES})
+source_group(sys FILES ${SYS_SOURCES})
 
 # our target
-set(LIBRARY_NAME atlas)
-add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${IMG_SOURCES} ${IMG_HEADERS})
+set(APP_NAME atlas)
+add_executable(${APP_NAME} ${SYS_SOURCES} ${QTCSV_HEADERS} ${QTCSV_SOURCES} ${LIBQXT_HEADERS} ${LIBQXT_SOURCES} ${CERESSOLVER_HEADERS} ${CERESSOLVER_SOURCES} ${HEADERS} ${SOURCES} ${FORMS} ${RESOURCES})
 
-target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(${LIBRARY_NAME} PUBLIC ${TBB_INCLUDE_DIRS})
-target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/eigen)
-target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/boost)
-target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glm)
-target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/folly)
-target_compile_definitions(${LIBRARY_NAME} PUBLIC EIGEN_NO_DEBUG EIGEN_DONT_PARALLELIZE EIGEN_MPL2_ONLY)
-target_compile_definitions(${LIBRARY_NAME} PUBLIC QT_USE_QSTRINGBUILDER QT_NO_CAST_FROM_BYTEARRAY QT_NO_CAST_TO_ASCII)
+target_include_directories(${APP_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(${APP_NAME} PUBLIC ${TBB_INCLUDE_DIRS})
+target_include_directories(${APP_NAME} PUBLIC ${MKL_INCLUDE_DIRS})
+target_include_directories(${APP_NAME} PUBLIC ${IPP_INCLUDE_DIRS})
+target_include_directories(${APP_NAME} PUBLIC ${WILDMAGIC_INCLUDE_DIRS})
+target_include_directories(${APP_NAME} PUBLIC ${HDF5_INCLUDE_DIR})
+target_include_directories(${APP_NAME} PUBLIC ${ASSIMP_INCLUDE_DIRS})
+target_include_directories(${APP_NAME} PUBLIC ${CERESSOLVERDIR})
+target_include_directories(${APP_NAME} PUBLIC ${QTCSVDIR})
+target_include_directories(${APP_NAME} PUBLIC ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
+target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/eigen)
+target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/boost)
+target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glm)
+target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/folly)
+target_compile_definitions(${APP_NAME} PUBLIC EIGEN_NO_DEBUG EIGEN_DONT_PARALLELIZE EIGEN_MPL2_ONLY)
+target_compile_definitions(${APP_NAME} PUBLIC EIGEN_USE_BLAS EIGEN_USE_LAPACKE_STRICT EIGEN_USE_MKL_VML)
+target_compile_definitions(${APP_NAME} PUBLIC QT_USE_QSTRINGBUILDER QT_NO_CAST_FROM_BYTEARRAY QT_NO_CAST_TO_ASCII)
+target_compile_definitions(${APP_NAME} PUBLIC _USE_CORE_PROFILE_ _USE_MKL_ _USE_IPP_)
 if (WIN32)
-  target_compile_definitions(${LIBRARY_NAME} PRIVATE USE_WIN32_FILEIO) # libtiff
-  target_compile_definitions(${LIBRARY_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN)
+  target_compile_definitions(${APP_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN)
 
-  target_compile_options(${LIBRARY_NAME} PUBLIC /GR) # Enable Run-Time Type Information
-  target_compile_options(${LIBRARY_NAME} PUBLIC /EHsc) # exception handling model, https://msdn.microsoft.com/en-us/library/1deeycx5.aspx
-  target_compile_options(${LIBRARY_NAME} PUBLIC /Wall)
-  target_compile_options(${LIBRARY_NAME} PUBLIC /bigobj /GL) # Enables whole program optimization.
-  target_compile_options(${LIBRARY_NAME} PUBLIC /wd4267) # 'var' : conversion from 'size_t' to 'type', possible loss of data
-  target_compile_options(${LIBRARY_NAME} PUBLIC /wd4244) # 'argument' : conversion from 'type1' to 'type2', possible loss of data
-  target_compile_options(${LIBRARY_NAME} PUBLIC /wd4305) # 'identifier' : truncation from 'type1' to 'type2'
-  target_compile_options(${LIBRARY_NAME} PUBLIC /wd4819) # The file contains a character that cannot be represented in the current code page (number). Save the file in Unicode format to prevent data loss.
-  target_compile_options(${LIBRARY_NAME} PUBLIC /utf-8)  # https://blogs.msdn.microsoft.com/vcblog/2016/02/22/new-options-for-managing-character-sets-in-the-microsoft-cc-compiler/
+  target_compile_options(${APP_NAME} PUBLIC /GR) # Enable Run-Time Type Information
+  target_compile_options(${APP_NAME} PUBLIC /EHsc) # exception handling model, https://msdn.microsoft.com/en-us/library/1deeycx5.aspx
+  target_compile_options(${APP_NAME} PUBLIC /Wall)
+  target_compile_options(${APP_NAME} PUBLIC /bigobj /GL) # Enables whole program optimization.
+  target_compile_options(${APP_NAME} PUBLIC /wd4267) # 'var' : conversion from 'size_t' to 'type', possible loss of data
+  target_compile_options(${APP_NAME} PUBLIC /wd4244) # 'argument' : conversion from 'type1' to 'type2', possible loss of data
+  target_compile_options(${APP_NAME} PUBLIC /wd4305) # 'identifier' : truncation from 'type1' to 'type2'
+  target_compile_options(${APP_NAME} PUBLIC /wd4819) # The file contains a character that cannot be represented in the current code page (number). Save the file in Unicode format to prevent data loss.
+  target_compile_options(${APP_NAME} PUBLIC /utf-8)  # https://blogs.msdn.microsoft.com/vcblog/2016/02/22/new-options-for-managing-character-sets-in-the-microsoft-cc-compiler/
 
-  target_link_libraries(${LIBRARY_NAME} PUBLIC /LTCG) # Link-time Code Generation
+  target_link_libraries(${APP_NAME} PUBLIC /LTCG) # Link-time Code Generation
 
   # for some files
-  set_source_files_properties(zimageavx.cpp PROPERTIES COMPILE_FLAGS /arch:AVX)
-
-  set_source_files_properties(ztiff.cpp PROPERTIES COMPILE_FLAGS /I${TIFFDIR})
-  set_source_files_properties(${TIFFDIR}/tif_ojpeg.c PROPERTIES COMPILE_FLAGS /I${JPEGTURBO_INCLUDE_DIRS})
-  set_source_files_properties(${TIFFDIR}/tif_jpeg.c PROPERTIES COMPILE_FLAGS /I${JPEGTURBO_INCLUDE_DIRS})
-  set_source_files_properties(zimgjpeg.cpp PROPERTIES COMPILE_FLAGS /I${JPEGTURBO_INCLUDE_DIRS})
-  set_source_files_properties(zimgpng.cpp PROPERTIES COMPILE_FLAGS /I${PNG_INCLUDE_DIRS})
-  foreach (item IN LISTS JPEGXR_INCLUDE_DIRS)
-    message(${item})
-    set(JXRINC "${JXRINC} /I${item}")
-  endforeach()
-  set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_FLAGS ${JXRINC})
-  set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "__ANSI__;DISABLE_PERF_MEASUREMENT")
-  set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS /I${FREEIMAGE_INCLUDE_DIRS})
+  set_source_files_properties(${CERESSOLVER_SOURCES} PROPERTIES COMPILE_FLAGS /wd4100) # 'identifier' : unreferenced formal parameter)
+  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc PROPERTIES COMPILE_FLAGS /I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest)
 else (WIN32)
-  target_compile_options(${LIBRARY_NAME} PUBLIC -frtti)
-  target_compile_options(${LIBRARY_NAME} PUBLIC -fexceptions)
-  target_compile_options(${LIBRARY_NAME} PUBLIC -Wall -Wextra)
-  target_compile_options(${LIBRARY_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
+  target_compile_options(${APP_NAME} PUBLIC -frtti)
+  target_compile_options(${APP_NAME} PUBLIC -fexceptions)
+  target_compile_options(${APP_NAME} PUBLIC -Wall -Wextra)
+  target_compile_options(${APP_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
 
-  target_link_libraries(${LIBRARY_NAME} PUBLIC -stdlib=libc++)
+  target_link_libraries(${APP_NAME} PUBLIC -stdlib=libc++ "-rpath @executable_path/../Frameworks")
 
   # for some files
-  set_source_files_properties(zimagesse3.cpp PROPERTIES COMPILE_FLAGS -msse3)
-  set_source_files_properties(zimageavx.cpp PROPERTIES COMPILE_FLAGS -mavx)
-
-  set_source_files_properties(ztiff.cpp PROPERTIES COMPILE_FLAGS -I${TIFFDIR})
-  set_source_files_properties(${TIFFDIR}/tif_ojpeg.c PROPERTIES COMPILE_FLAGS -I${JPEGTURBO_INCLUDE_DIRS})
-  set_source_files_properties(${TIFFDIR}/tif_jpeg.c PROPERTIES COMPILE_FLAGS -I${JPEGTURBO_INCLUDE_DIRS})
-  set_source_files_properties(zimgjpeg.cpp PROPERTIES COMPILE_FLAGS -I${JPEGTURBO_INCLUDE_DIRS})
-  set_source_files_properties(zimgpng.cpp PROPERTIES COMPILE_FLAGS -I${PNG_INCLUDE_DIRS})
-  foreach (item IN LISTS JPEGXR_INCLUDE_DIRS)
-    message(${item})
-    set(JXRINC "${JXRINC} -I${item}")
-  endforeach()
-  set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_FLAGS ${JXRINC})
-  set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "__ANSI__;DISABLE_PERF_MEASUREMENT")
-  set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS -I${FREEIMAGE_INCLUDE_DIRS})
+  set_source_files_properties(${CERESSOLVER_SOURCES} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-sign-compare")
+  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest)
 endif (WIN32)
 
-target_link_libraries(${LIBRARY_NAME} PUBLIC ${TBB_LIBRARIES} ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES} ${PNG_LIBRARIES} ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} glog::glog Qt5::Core)
+target_link_libraries(${APP_NAME} PUBLIC ${TBB_LIBRARIES} ${VTK_LIBRARIES} glbinding::glbinding assimp hdf5_cpp-static hdf5-static img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg)
 

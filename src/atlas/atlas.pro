@@ -31,7 +31,7 @@ QMAKE_CXXFLAGS += /wd4819 # The file contains a character that cannot be represe
 QMAKE_CXXFLAGS += /utf-8  # https://blogs.msdn.microsoft.com/vcblog/2016/02/22/new-options-for-managing-character-sets-in-the-microsoft-cc-compiler/
 }
 
-QT += opengl network svg
+QT += network svg
 
 #Qt5
 isEqual(QT_MAJOR_VERSION,5) | greaterThan(QT_MAJOR_VERSION,5) {
