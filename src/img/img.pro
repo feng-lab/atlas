@@ -28,7 +28,7 @@ QMAKE_LFLAGS += /LTCG # Link-time Code Generation
 
 DEFINES += _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN
 
-INCLUDEPATH += $$PWD/../3rdparty $$PWD/../3rdparty/eigen $$PWD/../3rdparty/boost $$PWD/../3rdparty/glm $$PWD/../3rdparty/folly
+INCLUDEPATH += $$PWD/../3rdparty/eigen $$PWD/../3rdparty/boost $$PWD/../3rdparty/glm $$PWD/../3rdparty/folly
 
 QMAKE_CXXFLAGS += /wd4267 # 'var' : conversion from 'size_t' to 'type', possible loss of data
 QMAKE_CXXFLAGS += /wd4244 # 'argument' : conversion from 'type1' to 'type2', possible loss of data

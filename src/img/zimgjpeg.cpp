@@ -6,13 +6,23 @@
 #include <boost/iostreams/stream.hpp>
 #include <jpeglib.h>
 //#include <setjmp.h>
-#include <tiff.h>
 #include "zimage2dutils.h"
 #include <memory>
 #include <QFile>
 #include <folly/ScopeGuard.h>
 
 namespace {
+
+#define	TIFFTAG_ORIENTATION		274	/* +image orientation */
+#define	    ORIENTATION_TOPLEFT		1	/* row 0 top, col 0 lhs */
+#define	    ORIENTATION_TOPRIGHT	2	/* row 0 top, col 0 rhs */
+#define	    ORIENTATION_BOTRIGHT	3	/* row 0 bottom, col 0 rhs */
+#define	    ORIENTATION_BOTLEFT		4	/* row 0 bottom, col 0 lhs */
+#define	    ORIENTATION_LEFTTOP		5	/* row 0 lhs, col 0 top */
+#define	    ORIENTATION_RIGHTTOP	6	/* row 0 rhs, col 0 top */
+#define	    ORIENTATION_RIGHTBOT	7	/* row 0 rhs, col 0 bottom */
+#define	    ORIENTATION_LEFTBOT		8	/* row 0 lhs, col 0 bottom */
+#define	TIFFTAG_JPEGIFOFFSET		513	/* !pointer to SOI marker */
 
 using namespace nim;
 
