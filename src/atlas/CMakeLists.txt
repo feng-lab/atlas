@@ -80,7 +80,9 @@ message(${HDF5_CXX_STATIC_LIBRARY})
 
 find_package(ASSIMP REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/assimp NO_DEFAULT_PATH)
 message(${ASSIMP_INCLUDE_DIRS})
+message(${ASSIMP_LIBRARY_DIRS})
 message(${ASSIMP_LIBRARIES})
+link_directories(${ASSIMP_LIBRARY_DIRS})  # need to do this before creating target
 
 find_package(OpenCV REQUIRED COMPONENTS imgproc core PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/opencv NO_DEFAULT_PATH)
 message("${OpenCV_INCLUDE_DIRS}")
@@ -97,6 +99,11 @@ find_package(Qt5Core REQUIRED PATHS /Users/feng/Qt/5.7/clang_64 NO_DEFAULT_PATH)
 find_package(Qt5Widgets REQUIRED PATHS /Users/feng/Qt/5.7/clang_64 NO_DEFAULT_PATH)
 find_package(Qt5Network REQUIRED PATHS /Users/feng/Qt/5.7/clang_64 NO_DEFAULT_PATH)
 find_package(Qt5Svg REQUIRED PATHS /Users/feng/Qt/5.7/clang_64 NO_DEFAULT_PATH)
+
+# get_cmake_property(_variableNames VARIABLES)
+# foreach (_variableName ${_variableNames})
+#   message(STATUS "${_variableName}=${${_variableName}}")
+# endforeach()
 
 set(FORMS
   LogDialog.ui
@@ -899,9 +906,19 @@ set(SYS_SOURCES
 endif (WIN32)
 source_group(sys FILES ${SYS_SOURCES})
 
+set(SRCS ${SRCS} ${SYS_SOURCES} ${QTCSV_HEADERS} ${QTCSV_SOURCES} ${LIBQXT_HEADERS} ${LIBQXT_SOURCES} ${CERESSOLVER_HEADERS} ${CERESSOLVER_SOURCES} ${HEADERS} ${SOURCES} ${FORMS} ${RESOURCES})
+if(WIN32)
+  set(SRCS ${SRCS} ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.rc)
+endif()
+if(APPLE)
+  set(SRCS ${SRCS} ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns)
+  set(MACOSX_BUNDLE_ICON_FILE app.icns)
+  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+endif()
+
 # our target
 set(APP_NAME atlas)
-add_executable(${APP_NAME} ${SYS_SOURCES} ${QTCSV_HEADERS} ${QTCSV_SOURCES} ${LIBQXT_HEADERS} ${LIBQXT_SOURCES} ${CERESSOLVER_HEADERS} ${CERESSOLVER_SOURCES} ${HEADERS} ${SOURCES} ${FORMS} ${RESOURCES})
+add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE ${SRCS})
 
 target_include_directories(${APP_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(${APP_NAME} PUBLIC ${TBB_INCLUDE_DIRS})
@@ -952,5 +969,18 @@ else (WIN32)
   set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest)
 endif (WIN32)
 
-target_link_libraries(${APP_NAME} PUBLIC ${TBB_LIBRARIES} ${VTK_LIBRARIES} glbinding::glbinding assimp hdf5_cpp-static hdf5-static img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg)
+target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding hdf5_cpp-static hdf5-static img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${WILDMAGIC_LIBRARIES} ${ASSIMP_LIBRARIES} ${MKL_LIBRARIES} ${IPP_LIBRARIES} ${TBB_LIBRARIES})
+
+if(APPLE)
+  set(copyright_line "Copyright 2011-2016 Linqing Feng @ JinnyLab")
+
+  set_target_properties(${APP_NAME} PROPERTIES
+    OUTPUT_NAME Atlas
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Info.plist.in"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${CMAKE_BUNDLE_VERSION}"
+    # TBD: MACOSX_BUNDLE_BUNDLE_VERSION "${CMAKE_BUNDLE_VERSION}"
+    MACOSX_BUNDLE_COPYRIGHT "${copyright_line}"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "org.atlas.atlas"
+    )
+endif()
 

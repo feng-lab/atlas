@@ -53,7 +53,7 @@ else (WIN32)
   set(JPEGTURBO_LIBRARIES ${JPEGTURBO_LIBRARIES} ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libjpeg-turbo/lib/libjpeg.a)
 endif (WIN32)
 
-#find_package(PNG REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libpng NO_DEFAULT_PATH)
+#find_package(libpng16 REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libpng NO_DEFAULT_PATH)
 set(PNG_INCLUDE_DIRS ${PNG_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libpng/include)
 if (WIN32)
   set(PNG_LIBRARIES ${PNG_LIBRARIES} ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libpng/lib/png-static.lib)
