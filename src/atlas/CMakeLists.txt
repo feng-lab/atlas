@@ -135,6 +135,344 @@ find_package(Qt5Svg REQUIRED PATHS /Users/feng/Qt/5.7/clang_64 NO_DEFAULT_PATH)
 #   message(STATUS "${_variableName}=${${_variableName}}")
 # endforeach()
 
+# ceres solver srcs
+add_definitions(-DCERES_USE_CXX11 -DCERES_NO_SUITESPARSE -DCERES_NO_CXSPARSE
+                -DCERES_NO_THREADS -DCERES_STD_UNORDERED_MAP)
+set(CERESSOLVERDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/optimization)
+set(CERESSOLVER_HEADERS
+    ${CERESSOLVERDIR}/autodiff_cost_function.h
+    ${CERESSOLVERDIR}/autodiff_local_parameterization.h
+    ${CERESSOLVERDIR}/ceres.h
+    ${CERESSOLVERDIR}/conditioned_cost_function.h
+    ${CERESSOLVERDIR}/cost_function.h
+    ${CERESSOLVERDIR}/cost_function_to_functor.h
+    ${CERESSOLVERDIR}/covariance.h
+    ${CERESSOLVERDIR}/crs_matrix.h
+    ${CERESSOLVERDIR}/cubic_interpolation.h
+    ${CERESSOLVERDIR}/dynamic_autodiff_cost_function.h
+    ${CERESSOLVERDIR}/dynamic_cost_function_to_functor.h
+    ${CERESSOLVERDIR}/dynamic_numeric_diff_cost_function.h
+    ${CERESSOLVERDIR}/fpclassify.h
+    ${CERESSOLVERDIR}/gradient_checker.h
+    ${CERESSOLVERDIR}/gradient_problem.h
+    ${CERESSOLVERDIR}/gradient_problem_solver.h
+    ${CERESSOLVERDIR}/iteration_callback.h
+    ${CERESSOLVERDIR}/jet.h
+    ${CERESSOLVERDIR}/local_parameterization.h
+    ${CERESSOLVERDIR}/loss_function.h
+    ${CERESSOLVERDIR}/normal_prior.h
+    ${CERESSOLVERDIR}/numeric_diff_cost_function.h
+    ${CERESSOLVERDIR}/numeric_diff_options.h
+    ${CERESSOLVERDIR}/ordered_groups.h
+    ${CERESSOLVERDIR}/problem.h
+    ${CERESSOLVERDIR}/rotation.h
+    ${CERESSOLVERDIR}/sized_cost_function.h
+    ${CERESSOLVERDIR}/solver.h
+    ${CERESSOLVERDIR}/types.h
+    ${CERESSOLVERDIR}/version.h
+    ${CERESSOLVERDIR}/internal/array_utils.h
+    ${CERESSOLVERDIR}/internal/autodiff.h
+    ${CERESSOLVERDIR}/internal/blas.h
+    ${CERESSOLVERDIR}/internal/block_evaluate_preparer.h
+    ${CERESSOLVERDIR}/internal/block_jacobi_preconditioner.h
+    ${CERESSOLVERDIR}/internal/block_jacobian_writer.h
+    ${CERESSOLVERDIR}/internal/block_random_access_dense_matrix.h
+    ${CERESSOLVERDIR}/internal/block_random_access_diagonal_matrix.h
+    ${CERESSOLVERDIR}/internal/block_random_access_matrix.h
+    ${CERESSOLVERDIR}/internal/block_random_access_sparse_matrix.h
+    ${CERESSOLVERDIR}/internal/block_sparse_matrix.h
+    ${CERESSOLVERDIR}/internal/block_structure.h
+    ${CERESSOLVERDIR}/internal/callbacks.h
+    ${CERESSOLVERDIR}/internal/canonical_views_clustering.h
+    ${CERESSOLVERDIR}/internal/casts.h
+    ${CERESSOLVERDIR}/internal/cgnr_linear_operator.h
+    ${CERESSOLVERDIR}/internal/cgnr_solver.h
+    ${CERESSOLVERDIR}/internal/collections_port.h
+    ${CERESSOLVERDIR}/internal/compressed_col_sparse_matrix_utils.h
+    ${CERESSOLVERDIR}/internal/compressed_row_jacobian_writer.h
+    ${CERESSOLVERDIR}/internal/compressed_row_sparse_matrix.h
+    ${CERESSOLVERDIR}/internal/conjugate_gradients_solver.h
+    ${CERESSOLVERDIR}/internal/coordinate_descent_minimizer.h
+    ${CERESSOLVERDIR}/internal/corrector.h
+    ${CERESSOLVERDIR}/internal/covariance_impl.h
+    ${CERESSOLVERDIR}/internal/cxsparse.h
+    ${CERESSOLVERDIR}/internal/dense_jacobian_writer.h
+    ${CERESSOLVERDIR}/internal/dense_normal_cholesky_solver.h
+    ${CERESSOLVERDIR}/internal/dense_qr_solver.h
+    ${CERESSOLVERDIR}/internal/dense_sparse_matrix.h
+    ${CERESSOLVERDIR}/internal/detect_structure.h
+    ${CERESSOLVERDIR}/internal/disable_warnings.h
+    ${CERESSOLVERDIR}/internal/dogleg_strategy.h
+    ${CERESSOLVERDIR}/internal/dynamic_compressed_row_finalizer.h
+    ${CERESSOLVERDIR}/internal/dynamic_compressed_row_jacobian_writer.h
+    ${CERESSOLVERDIR}/internal/dynamic_compressed_row_sparse_matrix.h
+    ${CERESSOLVERDIR}/internal/eigen.h
+    ${CERESSOLVERDIR}/internal/evaluator.h
+    ${CERESSOLVERDIR}/internal/execution_summary.h
+    ${CERESSOLVERDIR}/internal/file.h
+    ${CERESSOLVERDIR}/internal/fixed_array.h
+    ${CERESSOLVERDIR}/internal/gradient_checking_cost_function.h
+    ${CERESSOLVERDIR}/internal/gradient_problem_evaluator.h
+    ${CERESSOLVERDIR}/internal/graph.h
+    ${CERESSOLVERDIR}/internal/graph_algorithms.h
+    ${CERESSOLVERDIR}/internal/householder_vector.h
+    ${CERESSOLVERDIR}/internal/implicit_schur_complement.h
+    ${CERESSOLVERDIR}/internal/integral_types.h
+    ${CERESSOLVERDIR}/internal/iterative_schur_complement_solver.h
+    ${CERESSOLVERDIR}/internal/lapack.h
+    ${CERESSOLVERDIR}/internal/levenberg_marquardt_strategy.h
+    ${CERESSOLVERDIR}/internal/line_search.h
+    ${CERESSOLVERDIR}/internal/line_search_direction.h
+    ${CERESSOLVERDIR}/internal/line_search_minimizer.h
+    ${CERESSOLVERDIR}/internal/line_search_preprocessor.h
+    ${CERESSOLVERDIR}/internal/linear_least_squares_problems.h
+    ${CERESSOLVERDIR}/internal/linear_operator.h
+    ${CERESSOLVERDIR}/internal/linear_solver.h
+    ${CERESSOLVERDIR}/internal/low_rank_inverse_hessian.h
+    ${CERESSOLVERDIR}/internal/macros.h
+    ${CERESSOLVERDIR}/internal/manual_constructor.h
+    ${CERESSOLVERDIR}/internal/map_util.h
+    ${CERESSOLVERDIR}/internal/minimizer.h
+    ${CERESSOLVERDIR}/internal/mutex.h
+    ${CERESSOLVERDIR}/internal/numeric_diff.h
+    ${CERESSOLVERDIR}/internal/parameter_block.h
+    ${CERESSOLVERDIR}/internal/parameter_block_ordering.h
+    ${CERESSOLVERDIR}/internal/partitioned_matrix_view.h
+    ${CERESSOLVERDIR}/internal/partitioned_matrix_view_impl.h
+    ${CERESSOLVERDIR}/internal/polynomial.h
+    ${CERESSOLVERDIR}/internal/port.h
+    ${CERESSOLVERDIR}/internal/preconditioner.h
+    ${CERESSOLVERDIR}/internal/preprocessor.h
+    ${CERESSOLVERDIR}/internal/problem_impl.h
+    ${CERESSOLVERDIR}/internal/program.h
+    ${CERESSOLVERDIR}/internal/program_evaluator.h
+    ${CERESSOLVERDIR}/internal/random.h
+    ${CERESSOLVERDIR}/internal/reenable_warnings.h
+    ${CERESSOLVERDIR}/internal/reorder_program.h
+    ${CERESSOLVERDIR}/internal/residual_block.h
+    ${CERESSOLVERDIR}/internal/residual_block_utils.h
+    ${CERESSOLVERDIR}/internal/schur_complement_solver.h
+    ${CERESSOLVERDIR}/internal/schur_eliminator.h
+    ${CERESSOLVERDIR}/internal/schur_eliminator_impl.h
+    ${CERESSOLVERDIR}/internal/schur_jacobi_preconditioner.h
+    ${CERESSOLVERDIR}/internal/scoped_ptr.h
+    ${CERESSOLVERDIR}/internal/scratch_evaluate_preparer.h
+    ${CERESSOLVERDIR}/internal/single_linkage_clustering.h
+    ${CERESSOLVERDIR}/internal/small_blas.h
+    ${CERESSOLVERDIR}/internal/solver_utils.h
+    ${CERESSOLVERDIR}/internal/sparse_matrix.h
+    ${CERESSOLVERDIR}/internal/sparse_normal_cholesky_solver.h
+    ${CERESSOLVERDIR}/internal/split.h
+    ${CERESSOLVERDIR}/internal/stl_util.h
+    ${CERESSOLVERDIR}/internal/stringprintf.h
+    ${CERESSOLVERDIR}/internal/suitesparse.h
+    ${CERESSOLVERDIR}/internal/test_util.h
+    ${CERESSOLVERDIR}/internal/triplet_sparse_matrix.h
+    ${CERESSOLVERDIR}/internal/trust_region_minimizer.h
+    ${CERESSOLVERDIR}/internal/trust_region_preprocessor.h
+    ${CERESSOLVERDIR}/internal/trust_region_step_evaluator.h
+    ${CERESSOLVERDIR}/internal/trust_region_strategy.h
+    ${CERESSOLVERDIR}/internal/variadic_evaluate.h
+    ${CERESSOLVERDIR}/internal/visibility.h
+    ${CERESSOLVERDIR}/internal/visibility_based_preconditioner.h
+    ${CERESSOLVERDIR}/internal/wall_time.h
+    )
+set(CERESSOLVER_SOURCES
+    ${CERESSOLVERDIR}/internal/array_utils.cc
+    ${CERESSOLVERDIR}/internal/blas.cc
+    ${CERESSOLVERDIR}/internal/block_evaluate_preparer.cc
+    ${CERESSOLVERDIR}/internal/block_jacobi_preconditioner.cc
+    ${CERESSOLVERDIR}/internal/block_jacobian_writer.cc
+    ${CERESSOLVERDIR}/internal/block_random_access_dense_matrix.cc
+    ${CERESSOLVERDIR}/internal/block_random_access_diagonal_matrix.cc
+    ${CERESSOLVERDIR}/internal/block_random_access_matrix.cc
+    ${CERESSOLVERDIR}/internal/block_random_access_sparse_matrix.cc
+    ${CERESSOLVERDIR}/internal/block_sparse_matrix.cc
+    ${CERESSOLVERDIR}/internal/block_structure.cc
+    ${CERESSOLVERDIR}/internal/callbacks.cc
+    ${CERESSOLVERDIR}/internal/canonical_views_clustering.cc
+    ${CERESSOLVERDIR}/internal/cgnr_solver.cc
+    ${CERESSOLVERDIR}/internal/compressed_col_sparse_matrix_utils.cc
+    ${CERESSOLVERDIR}/internal/compressed_row_jacobian_writer.cc
+    ${CERESSOLVERDIR}/internal/compressed_row_sparse_matrix.cc
+    ${CERESSOLVERDIR}/internal/conditioned_cost_function.cc
+    ${CERESSOLVERDIR}/internal/conjugate_gradients_solver.cc
+    ${CERESSOLVERDIR}/internal/coordinate_descent_minimizer.cc
+    ${CERESSOLVERDIR}/internal/corrector.cc
+    ${CERESSOLVERDIR}/internal/covariance.cc
+    ${CERESSOLVERDIR}/internal/covariance_impl.cc
+    ${CERESSOLVERDIR}/internal/cxsparse.cc
+    ${CERESSOLVERDIR}/internal/dense_normal_cholesky_solver.cc
+    ${CERESSOLVERDIR}/internal/dense_qr_solver.cc
+    ${CERESSOLVERDIR}/internal/dense_sparse_matrix.cc
+    ${CERESSOLVERDIR}/internal/detect_structure.cc
+    ${CERESSOLVERDIR}/internal/dogleg_strategy.cc
+    ${CERESSOLVERDIR}/internal/dynamic_compressed_row_jacobian_writer.cc
+    ${CERESSOLVERDIR}/internal/dynamic_compressed_row_sparse_matrix.cc
+    ${CERESSOLVERDIR}/internal/evaluator.cc
+    ${CERESSOLVERDIR}/internal/file.cc
+    ${CERESSOLVERDIR}/internal/gradient_checking_cost_function.cc
+    ${CERESSOLVERDIR}/internal/gradient_problem.cc
+    ${CERESSOLVERDIR}/internal/gradient_problem_solver.cc
+    ${CERESSOLVERDIR}/internal/implicit_schur_complement.cc
+    ${CERESSOLVERDIR}/internal/iterative_schur_complement_solver.cc
+    ${CERESSOLVERDIR}/internal/lapack.cc
+    ${CERESSOLVERDIR}/internal/levenberg_marquardt_strategy.cc
+    ${CERESSOLVERDIR}/internal/line_search.cc
+    ${CERESSOLVERDIR}/internal/line_search_direction.cc
+    ${CERESSOLVERDIR}/internal/line_search_minimizer.cc
+    ${CERESSOLVERDIR}/internal/line_search_preprocessor.cc
+    ${CERESSOLVERDIR}/internal/linear_least_squares_problems.cc
+    ${CERESSOLVERDIR}/internal/linear_operator.cc
+    ${CERESSOLVERDIR}/internal/linear_solver.cc
+    ${CERESSOLVERDIR}/internal/local_parameterization.cc
+    ${CERESSOLVERDIR}/internal/loss_function.cc
+    ${CERESSOLVERDIR}/internal/low_rank_inverse_hessian.cc
+    ${CERESSOLVERDIR}/internal/minimizer.cc
+    ${CERESSOLVERDIR}/internal/normal_prior.cc
+    ${CERESSOLVERDIR}/internal/parameter_block_ordering.cc
+    ${CERESSOLVERDIR}/internal/partitioned_matrix_view.cc
+    ${CERESSOLVERDIR}/internal/polynomial.cc
+    ${CERESSOLVERDIR}/internal/preconditioner.cc
+    ${CERESSOLVERDIR}/internal/preprocessor.cc
+    ${CERESSOLVERDIR}/internal/problem.cc
+    ${CERESSOLVERDIR}/internal/problem_impl.cc
+    ${CERESSOLVERDIR}/internal/program.cc
+    ${CERESSOLVERDIR}/internal/reorder_program.cc
+    ${CERESSOLVERDIR}/internal/residual_block.cc
+    ${CERESSOLVERDIR}/internal/residual_block_utils.cc
+    ${CERESSOLVERDIR}/internal/schur_complement_solver.cc
+    ${CERESSOLVERDIR}/internal/schur_eliminator.cc
+    ${CERESSOLVERDIR}/internal/schur_jacobi_preconditioner.cc
+    ${CERESSOLVERDIR}/internal/scratch_evaluate_preparer.cc
+    ${CERESSOLVERDIR}/internal/single_linkage_clustering.cc
+    ${CERESSOLVERDIR}/internal/solver.cc
+    ${CERESSOLVERDIR}/internal/solver_utils.cc
+    ${CERESSOLVERDIR}/internal/sparse_matrix.cc
+    ${CERESSOLVERDIR}/internal/sparse_normal_cholesky_solver.cc
+    ${CERESSOLVERDIR}/internal/split.cc
+    ${CERESSOLVERDIR}/internal/stringprintf.cc
+    ${CERESSOLVERDIR}/internal/suitesparse.cc
+    ${CERESSOLVERDIR}/internal/triplet_sparse_matrix.cc
+    ${CERESSOLVERDIR}/internal/trust_region_minimizer.cc
+    ${CERESSOLVERDIR}/internal/trust_region_preprocessor.cc
+    ${CERESSOLVERDIR}/internal/trust_region_step_evaluator.cc
+    ${CERESSOLVERDIR}/internal/trust_region_strategy.cc
+    ${CERESSOLVERDIR}/internal/types.cc
+    ${CERESSOLVERDIR}/internal/visibility.cc
+    ${CERESSOLVERDIR}/internal/visibility_based_preconditioner.cc
+    ${CERESSOLVERDIR}/internal/wall_time.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_2_2.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_2_3.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_2_4.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_2_d.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_3_3.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_3_4.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_3_6.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_3_9.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_3_d.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_4_3.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_4_4.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_4_8.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_4_9.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_4_d.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_d_d.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_4_4_2.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_4_4_3.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_4_4_4.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_4_4_d.cc
+    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_d_d_d.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_2_2.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_2_3.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_2_4.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_2_d.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_3_3.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_3_4.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_3_6.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_3_9.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_3_d.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_4_3.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_4_4.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_4_8.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_4_9.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_4_d.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_d_d.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_4_4_2.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_4_4_3.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_4_4_4.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_4_4_d.cc
+    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_d_d_d.cc
+    )
+source_group(CeresSolver FILES ${CERESSOLVER_HEADERS} ${CERESSOLVER_SOURCES})
+
+#libqxt srcs
+set(LIBQXTDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libqxt)
+set(LIBQXT_HEADERS
+    ${LIBQXTDIR}/core/qxtglobal.h
+    ${LIBQXTDIR}/core/qxtcsvmodel.h
+    ${LIBQXTDIR}/widgets/qxtspanslider.h
+    ${LIBQXTDIR}/widgets/qxtspanslider_p.h
+    ${LIBQXTDIR}/core/qxtnamespace.h
+    )
+set(LIBQXT_SOURCES
+    ${LIBQXTDIR}/core/qxtglobal.cpp
+    ${LIBQXTDIR}/core/qxtcsvmodel.cpp
+    ${LIBQXTDIR}/widgets/qxtspanslider.cpp
+    )
+source_group(libqxt FILES ${LIBQXT_HEADERS} ${LIBQXT_SOURCES})
+
+#qtcsv srcs
+add_definitions(-DBUILD_QXT -DBUILD_QXT_OBJECT)
+set(QTCSVDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/qtcsv)
+set(QTCSV_HEADERS
+    ${QTCSVDIR}/include/qtcsv_global.h
+    ${QTCSVDIR}/include/writer.h
+    ${QTCSVDIR}/include/variantdata.h
+    ${QTCSVDIR}/include/stringdata.h
+    ${QTCSVDIR}/include/reader.h
+    ${QTCSVDIR}/include/abstractdata.h
+    ${QTCSVDIR}/sources/filechecker.h
+    ${QTCSVDIR}/sources/contentiterator.h
+    ${QTCSVDIR}/sources/symbols.h
+    )
+set(QTCSV_SOURCES
+    ${QTCSVDIR}/sources/writer.cpp
+    ${QTCSVDIR}/sources/variantdata.cpp
+    ${QTCSVDIR}/sources/stringdata.cpp
+    ${QTCSVDIR}/sources/reader.cpp
+    ${QTCSVDIR}/sources/contentiterator.cpp
+    )
+source_group(qtcsv FILES ${QTCSV_HEADERS} ${QTCSV_SOURCES})
+
+# video memory sources
+set(SYSDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/sys)
+if (WIN32)
+  set(SYS_SOURCES
+      ${SYSDIR}/VideoMemoryWin.cpp
+      ${SYSDIR}/VidMemViaD3D9.cpp
+      ${SYSDIR}/VidMemViaDDraw.cpp
+      ${SYSDIR}/VidMemViaDxDiag.cpp
+      )
+else (WIN32)
+  set(SYS_SOURCES
+      ${SYSDIR}/VideoMemoryMac.cpp
+      )
+endif (WIN32)
+source_group(sys FILES ${SYS_SOURCES})
+
+# main srcs
+
+if (WIN32)
+  set(ASSETS
+      ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.rc)
+endif ()
+if (APPLE)
+  set(ASSETS
+      ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns
+      ${CMAKE_CURRENT_SOURCE_DIR}/../../ffmpeg)
+  set(MACOSX_BUNDLE_ICON_FILE app.icns)
+endif ()
+
 set(FORMS
     LogDialog.ui
     )
@@ -143,6 +481,31 @@ set(RESOURCES
     LogDialog.qrc
     atlas.qrc
     )
+
+option(BUILD_TESTING "Enable tests" ON)
+if (BUILD_TESTING)
+  add_definitions(-D_WITH_TESTS_)
+  set(TESTS
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc
+      test/zimggraphtest.h
+      test/zimagetoimagemetrictest.h
+      test/zimageutilstest.h
+      test/zimageaffinetransformtest.h
+      test/zimgncctest.h
+      test/zfilereadtest.h
+      test/zimgiteratortest.h
+      test/zsaturateoperationtest.h
+      test/zclustertest.h
+      test/zimgtest.h
+      test/zimgconnectedcomponentstest.h
+      test/zimgsigneddistancemaptest.h
+      test/zimgautothresholdtest.h
+      test/zimgregionalextrematest.h
+      zunittest.h
+      zunittest.cpp
+      )
+  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/include)
+endif (BUILD_TESTING)
 
 set(SOURCES
     zimageinterpolation.h
@@ -579,376 +942,15 @@ set(SOURCES
     zlogmodelsink.cpp
     )
 
-option(BUILD_TESTING "Enable tests" ON)
-if (BUILD_TESTING)
-  add_definitions(-D_WITH_TESTS_)
-  set(HEADERS
-      ${HEADERS}
-      zunittest.h
-      test/zimggraphtest.h
-      test/zimagetoimagemetrictest.h
-      test/zimageutilstest.h
-      test/zimageaffinetransformtest.h
-      test/zimgncctest.h
-      test/zfilereadtest.h
-      test/zimgiteratortest.h
-      test/zsaturateoperationtest.h
-      test/zclustertest.h
-      test/zimgtest.h
-      test/zimgconnectedcomponentstest.h
-      test/zimgsigneddistancemaptest.h
-      test/zimgautothresholdtest.h
-      test/zimgregionalextrematest.h
-      )
-
-  set(SOURCES
-      ${SOURCES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc
-      zunittest.cpp
-      )
-  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/include)
-endif (BUILD_TESTING)
-
-# ceres solver srcs
-add_definitions(-DCERES_USE_CXX11 -DCERES_NO_SUITESPARSE -DCERES_NO_CXSPARSE
-                -DCERES_NO_THREADS -DCERES_STD_UNORDERED_MAP)
-set(CERESSOLVERDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/optimization)
-set(CERESSOLVER_HEADERS
-    ${CERESSOLVERDIR}/autodiff_cost_function.h
-    ${CERESSOLVERDIR}/autodiff_local_parameterization.h
-    ${CERESSOLVERDIR}/ceres.h
-    ${CERESSOLVERDIR}/conditioned_cost_function.h
-    ${CERESSOLVERDIR}/cost_function.h
-    ${CERESSOLVERDIR}/cost_function_to_functor.h
-    ${CERESSOLVERDIR}/covariance.h
-    ${CERESSOLVERDIR}/crs_matrix.h
-    ${CERESSOLVERDIR}/cubic_interpolation.h
-    ${CERESSOLVERDIR}/dynamic_autodiff_cost_function.h
-    ${CERESSOLVERDIR}/dynamic_cost_function_to_functor.h
-    ${CERESSOLVERDIR}/dynamic_numeric_diff_cost_function.h
-    ${CERESSOLVERDIR}/fpclassify.h
-    ${CERESSOLVERDIR}/gradient_checker.h
-    ${CERESSOLVERDIR}/gradient_problem.h
-    ${CERESSOLVERDIR}/gradient_problem_solver.h
-    ${CERESSOLVERDIR}/iteration_callback.h
-    ${CERESSOLVERDIR}/jet.h
-    ${CERESSOLVERDIR}/local_parameterization.h
-    ${CERESSOLVERDIR}/loss_function.h
-    ${CERESSOLVERDIR}/normal_prior.h
-    ${CERESSOLVERDIR}/numeric_diff_cost_function.h
-    ${CERESSOLVERDIR}/numeric_diff_options.h
-    ${CERESSOLVERDIR}/ordered_groups.h
-    ${CERESSOLVERDIR}/problem.h
-    ${CERESSOLVERDIR}/rotation.h
-    ${CERESSOLVERDIR}/sized_cost_function.h
-    ${CERESSOLVERDIR}/solver.h
-    ${CERESSOLVERDIR}/types.h
-    ${CERESSOLVERDIR}/version.h
-    ${CERESSOLVERDIR}/internal/array_utils.h
-    ${CERESSOLVERDIR}/internal/autodiff.h
-    ${CERESSOLVERDIR}/internal/blas.h
-    ${CERESSOLVERDIR}/internal/block_evaluate_preparer.h
-    ${CERESSOLVERDIR}/internal/block_jacobi_preconditioner.h
-    ${CERESSOLVERDIR}/internal/block_jacobian_writer.h
-    ${CERESSOLVERDIR}/internal/block_random_access_dense_matrix.h
-    ${CERESSOLVERDIR}/internal/block_random_access_diagonal_matrix.h
-    ${CERESSOLVERDIR}/internal/block_random_access_matrix.h
-    ${CERESSOLVERDIR}/internal/block_random_access_sparse_matrix.h
-    ${CERESSOLVERDIR}/internal/block_sparse_matrix.h
-    ${CERESSOLVERDIR}/internal/block_structure.h
-    ${CERESSOLVERDIR}/internal/callbacks.h
-    ${CERESSOLVERDIR}/internal/canonical_views_clustering.h
-    ${CERESSOLVERDIR}/internal/casts.h
-    ${CERESSOLVERDIR}/internal/cgnr_linear_operator.h
-    ${CERESSOLVERDIR}/internal/cgnr_solver.h
-    ${CERESSOLVERDIR}/internal/collections_port.h
-    ${CERESSOLVERDIR}/internal/compressed_col_sparse_matrix_utils.h
-    ${CERESSOLVERDIR}/internal/compressed_row_jacobian_writer.h
-    ${CERESSOLVERDIR}/internal/compressed_row_sparse_matrix.h
-    ${CERESSOLVERDIR}/internal/conjugate_gradients_solver.h
-    ${CERESSOLVERDIR}/internal/coordinate_descent_minimizer.h
-    ${CERESSOLVERDIR}/internal/corrector.h
-    ${CERESSOLVERDIR}/internal/covariance_impl.h
-    ${CERESSOLVERDIR}/internal/cxsparse.h
-    ${CERESSOLVERDIR}/internal/dense_jacobian_writer.h
-    ${CERESSOLVERDIR}/internal/dense_normal_cholesky_solver.h
-    ${CERESSOLVERDIR}/internal/dense_qr_solver.h
-    ${CERESSOLVERDIR}/internal/dense_sparse_matrix.h
-    ${CERESSOLVERDIR}/internal/detect_structure.h
-    ${CERESSOLVERDIR}/internal/disable_warnings.h
-    ${CERESSOLVERDIR}/internal/dogleg_strategy.h
-    ${CERESSOLVERDIR}/internal/dynamic_compressed_row_finalizer.h
-    ${CERESSOLVERDIR}/internal/dynamic_compressed_row_jacobian_writer.h
-    ${CERESSOLVERDIR}/internal/dynamic_compressed_row_sparse_matrix.h
-    ${CERESSOLVERDIR}/internal/eigen.h
-    ${CERESSOLVERDIR}/internal/evaluator.h
-    ${CERESSOLVERDIR}/internal/execution_summary.h
-    ${CERESSOLVERDIR}/internal/file.h
-    ${CERESSOLVERDIR}/internal/fixed_array.h
-    ${CERESSOLVERDIR}/internal/gradient_checking_cost_function.h
-    ${CERESSOLVERDIR}/internal/gradient_problem_evaluator.h
-    ${CERESSOLVERDIR}/internal/graph.h
-    ${CERESSOLVERDIR}/internal/graph_algorithms.h
-    ${CERESSOLVERDIR}/internal/householder_vector.h
-    ${CERESSOLVERDIR}/internal/implicit_schur_complement.h
-    ${CERESSOLVERDIR}/internal/integral_types.h
-    ${CERESSOLVERDIR}/internal/iterative_schur_complement_solver.h
-    ${CERESSOLVERDIR}/internal/lapack.h
-    ${CERESSOLVERDIR}/internal/levenberg_marquardt_strategy.h
-    ${CERESSOLVERDIR}/internal/line_search.h
-    ${CERESSOLVERDIR}/internal/line_search_direction.h
-    ${CERESSOLVERDIR}/internal/line_search_minimizer.h
-    ${CERESSOLVERDIR}/internal/line_search_preprocessor.h
-    ${CERESSOLVERDIR}/internal/linear_least_squares_problems.h
-    ${CERESSOLVERDIR}/internal/linear_operator.h
-    ${CERESSOLVERDIR}/internal/linear_solver.h
-    ${CERESSOLVERDIR}/internal/low_rank_inverse_hessian.h
-    ${CERESSOLVERDIR}/internal/macros.h
-    ${CERESSOLVERDIR}/internal/manual_constructor.h
-    ${CERESSOLVERDIR}/internal/map_util.h
-    ${CERESSOLVERDIR}/internal/minimizer.h
-    ${CERESSOLVERDIR}/internal/mutex.h
-    ${CERESSOLVERDIR}/internal/numeric_diff.h
-    ${CERESSOLVERDIR}/internal/parameter_block.h
-    ${CERESSOLVERDIR}/internal/parameter_block_ordering.h
-    ${CERESSOLVERDIR}/internal/partitioned_matrix_view.h
-    ${CERESSOLVERDIR}/internal/partitioned_matrix_view_impl.h
-    ${CERESSOLVERDIR}/internal/polynomial.h
-    ${CERESSOLVERDIR}/internal/port.h
-    ${CERESSOLVERDIR}/internal/preconditioner.h
-    ${CERESSOLVERDIR}/internal/preprocessor.h
-    ${CERESSOLVERDIR}/internal/problem_impl.h
-    ${CERESSOLVERDIR}/internal/program.h
-    ${CERESSOLVERDIR}/internal/program_evaluator.h
-    ${CERESSOLVERDIR}/internal/random.h
-    ${CERESSOLVERDIR}/internal/reenable_warnings.h
-    ${CERESSOLVERDIR}/internal/reorder_program.h
-    ${CERESSOLVERDIR}/internal/residual_block.h
-    ${CERESSOLVERDIR}/internal/residual_block_utils.h
-    ${CERESSOLVERDIR}/internal/schur_complement_solver.h
-    ${CERESSOLVERDIR}/internal/schur_eliminator.h
-    ${CERESSOLVERDIR}/internal/schur_eliminator_impl.h
-    ${CERESSOLVERDIR}/internal/schur_jacobi_preconditioner.h
-    ${CERESSOLVERDIR}/internal/scoped_ptr.h
-    ${CERESSOLVERDIR}/internal/scratch_evaluate_preparer.h
-    ${CERESSOLVERDIR}/internal/single_linkage_clustering.h
-    ${CERESSOLVERDIR}/internal/small_blas.h
-    ${CERESSOLVERDIR}/internal/solver_utils.h
-    ${CERESSOLVERDIR}/internal/sparse_matrix.h
-    ${CERESSOLVERDIR}/internal/sparse_normal_cholesky_solver.h
-    ${CERESSOLVERDIR}/internal/split.h
-    ${CERESSOLVERDIR}/internal/stl_util.h
-    ${CERESSOLVERDIR}/internal/stringprintf.h
-    ${CERESSOLVERDIR}/internal/suitesparse.h
-    ${CERESSOLVERDIR}/internal/test_util.h
-    ${CERESSOLVERDIR}/internal/triplet_sparse_matrix.h
-    ${CERESSOLVERDIR}/internal/trust_region_minimizer.h
-    ${CERESSOLVERDIR}/internal/trust_region_preprocessor.h
-    ${CERESSOLVERDIR}/internal/trust_region_step_evaluator.h
-    ${CERESSOLVERDIR}/internal/trust_region_strategy.h
-    ${CERESSOLVERDIR}/internal/variadic_evaluate.h
-    ${CERESSOLVERDIR}/internal/visibility.h
-    ${CERESSOLVERDIR}/internal/visibility_based_preconditioner.h
-    ${CERESSOLVERDIR}/internal/wall_time.h
-    )
-set(CERESSOLVER_SOURCES
-    ${CERESSOLVERDIR}/internal/array_utils.cc
-    ${CERESSOLVERDIR}/internal/blas.cc
-    ${CERESSOLVERDIR}/internal/block_evaluate_preparer.cc
-    ${CERESSOLVERDIR}/internal/block_jacobi_preconditioner.cc
-    ${CERESSOLVERDIR}/internal/block_jacobian_writer.cc
-    ${CERESSOLVERDIR}/internal/block_random_access_dense_matrix.cc
-    ${CERESSOLVERDIR}/internal/block_random_access_diagonal_matrix.cc
-    ${CERESSOLVERDIR}/internal/block_random_access_matrix.cc
-    ${CERESSOLVERDIR}/internal/block_random_access_sparse_matrix.cc
-    ${CERESSOLVERDIR}/internal/block_sparse_matrix.cc
-    ${CERESSOLVERDIR}/internal/block_structure.cc
-    ${CERESSOLVERDIR}/internal/callbacks.cc
-    ${CERESSOLVERDIR}/internal/canonical_views_clustering.cc
-    ${CERESSOLVERDIR}/internal/cgnr_solver.cc
-    ${CERESSOLVERDIR}/internal/compressed_col_sparse_matrix_utils.cc
-    ${CERESSOLVERDIR}/internal/compressed_row_jacobian_writer.cc
-    ${CERESSOLVERDIR}/internal/compressed_row_sparse_matrix.cc
-    ${CERESSOLVERDIR}/internal/conditioned_cost_function.cc
-    ${CERESSOLVERDIR}/internal/conjugate_gradients_solver.cc
-    ${CERESSOLVERDIR}/internal/coordinate_descent_minimizer.cc
-    ${CERESSOLVERDIR}/internal/corrector.cc
-    ${CERESSOLVERDIR}/internal/covariance.cc
-    ${CERESSOLVERDIR}/internal/covariance_impl.cc
-    ${CERESSOLVERDIR}/internal/cxsparse.cc
-    ${CERESSOLVERDIR}/internal/dense_normal_cholesky_solver.cc
-    ${CERESSOLVERDIR}/internal/dense_qr_solver.cc
-    ${CERESSOLVERDIR}/internal/dense_sparse_matrix.cc
-    ${CERESSOLVERDIR}/internal/detect_structure.cc
-    ${CERESSOLVERDIR}/internal/dogleg_strategy.cc
-    ${CERESSOLVERDIR}/internal/dynamic_compressed_row_jacobian_writer.cc
-    ${CERESSOLVERDIR}/internal/dynamic_compressed_row_sparse_matrix.cc
-    ${CERESSOLVERDIR}/internal/evaluator.cc
-    ${CERESSOLVERDIR}/internal/file.cc
-    ${CERESSOLVERDIR}/internal/gradient_checking_cost_function.cc
-    ${CERESSOLVERDIR}/internal/gradient_problem.cc
-    ${CERESSOLVERDIR}/internal/gradient_problem_solver.cc
-    ${CERESSOLVERDIR}/internal/implicit_schur_complement.cc
-    ${CERESSOLVERDIR}/internal/iterative_schur_complement_solver.cc
-    ${CERESSOLVERDIR}/internal/lapack.cc
-    ${CERESSOLVERDIR}/internal/levenberg_marquardt_strategy.cc
-    ${CERESSOLVERDIR}/internal/line_search.cc
-    ${CERESSOLVERDIR}/internal/line_search_direction.cc
-    ${CERESSOLVERDIR}/internal/line_search_minimizer.cc
-    ${CERESSOLVERDIR}/internal/line_search_preprocessor.cc
-    ${CERESSOLVERDIR}/internal/linear_least_squares_problems.cc
-    ${CERESSOLVERDIR}/internal/linear_operator.cc
-    ${CERESSOLVERDIR}/internal/linear_solver.cc
-    ${CERESSOLVERDIR}/internal/local_parameterization.cc
-    ${CERESSOLVERDIR}/internal/loss_function.cc
-    ${CERESSOLVERDIR}/internal/low_rank_inverse_hessian.cc
-    ${CERESSOLVERDIR}/internal/minimizer.cc
-    ${CERESSOLVERDIR}/internal/normal_prior.cc
-    ${CERESSOLVERDIR}/internal/parameter_block_ordering.cc
-    ${CERESSOLVERDIR}/internal/partitioned_matrix_view.cc
-    ${CERESSOLVERDIR}/internal/polynomial.cc
-    ${CERESSOLVERDIR}/internal/preconditioner.cc
-    ${CERESSOLVERDIR}/internal/preprocessor.cc
-    ${CERESSOLVERDIR}/internal/problem.cc
-    ${CERESSOLVERDIR}/internal/problem_impl.cc
-    ${CERESSOLVERDIR}/internal/program.cc
-    ${CERESSOLVERDIR}/internal/reorder_program.cc
-    ${CERESSOLVERDIR}/internal/residual_block.cc
-    ${CERESSOLVERDIR}/internal/residual_block_utils.cc
-    ${CERESSOLVERDIR}/internal/schur_complement_solver.cc
-    ${CERESSOLVERDIR}/internal/schur_eliminator.cc
-    ${CERESSOLVERDIR}/internal/schur_jacobi_preconditioner.cc
-    ${CERESSOLVERDIR}/internal/scratch_evaluate_preparer.cc
-    ${CERESSOLVERDIR}/internal/single_linkage_clustering.cc
-    ${CERESSOLVERDIR}/internal/solver.cc
-    ${CERESSOLVERDIR}/internal/solver_utils.cc
-    ${CERESSOLVERDIR}/internal/sparse_matrix.cc
-    ${CERESSOLVERDIR}/internal/sparse_normal_cholesky_solver.cc
-    ${CERESSOLVERDIR}/internal/split.cc
-    ${CERESSOLVERDIR}/internal/stringprintf.cc
-    ${CERESSOLVERDIR}/internal/suitesparse.cc
-    ${CERESSOLVERDIR}/internal/triplet_sparse_matrix.cc
-    ${CERESSOLVERDIR}/internal/trust_region_minimizer.cc
-    ${CERESSOLVERDIR}/internal/trust_region_preprocessor.cc
-    ${CERESSOLVERDIR}/internal/trust_region_step_evaluator.cc
-    ${CERESSOLVERDIR}/internal/trust_region_strategy.cc
-    ${CERESSOLVERDIR}/internal/types.cc
-    ${CERESSOLVERDIR}/internal/visibility.cc
-    ${CERESSOLVERDIR}/internal/visibility_based_preconditioner.cc
-    ${CERESSOLVERDIR}/internal/wall_time.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_2_2.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_2_3.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_2_4.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_2_d.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_3_3.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_3_4.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_3_6.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_3_9.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_3_d.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_4_3.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_4_4.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_4_8.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_4_9.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_4_d.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_2_d_d.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_4_4_2.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_4_4_3.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_4_4_4.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_4_4_d.cc
-    ${CERESSOLVERDIR}/internal/generated/partitioned_matrix_view_d_d_d.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_2_2.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_2_3.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_2_4.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_2_d.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_3_3.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_3_4.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_3_6.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_3_9.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_3_d.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_4_3.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_4_4.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_4_8.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_4_9.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_4_d.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_2_d_d.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_4_4_2.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_4_4_3.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_4_4_4.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_4_4_d.cc
-    ${CERESSOLVERDIR}/internal/generated/schur_eliminator_d_d_d.cc
-    )
-source_group(CeresSolver FILES ${CERESSOLVER_HEADERS} ${CERESSOLVER_SOURCES})
-
-#libqxt srcs
-set(LIBQXTDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libqxt)
-set(LIBQXT_HEADERS
-    ${LIBQXTDIR}/core/qxtglobal.h
-    ${LIBQXTDIR}/core/qxtcsvmodel.h
-    ${LIBQXTDIR}/widgets/qxtspanslider.h
-    ${LIBQXTDIR}/widgets/qxtspanslider_p.h
-    ${LIBQXTDIR}/core/qxtnamespace.h
-    )
-set(LIBQXT_SOURCES
-    ${LIBQXTDIR}/core/qxtglobal.cpp
-    ${LIBQXTDIR}/core/qxtcsvmodel.cpp
-    ${LIBQXTDIR}/widgets/qxtspanslider.cpp
-    )
-source_group(libqxt FILES ${LIBQXT_HEADERS} ${LIBQXT_SOURCES})
-
-#qtcsv srcs
-add_definitions(-DBUILD_QXT -DBUILD_QXT_OBJECT)
-set(QTCSVDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/qtcsv)
-set(QTCSV_HEADERS
-    ${QTCSVDIR}/include/qtcsv_global.h
-    ${QTCSVDIR}/include/writer.h
-    ${QTCSVDIR}/include/variantdata.h
-    ${QTCSVDIR}/include/stringdata.h
-    ${QTCSVDIR}/include/reader.h
-    ${QTCSVDIR}/include/abstractdata.h
-    ${QTCSVDIR}/sources/filechecker.h
-    ${QTCSVDIR}/sources/contentiterator.h
-    ${QTCSVDIR}/sources/symbols.h
-    )
-set(QTCSV_SOURCES
-    ${QTCSVDIR}/sources/writer.cpp
-    ${QTCSVDIR}/sources/variantdata.cpp
-    ${QTCSVDIR}/sources/stringdata.cpp
-    ${QTCSVDIR}/sources/reader.cpp
-    ${QTCSVDIR}/sources/contentiterator.cpp
-    )
-source_group(qtcsv FILES ${QTCSV_HEADERS} ${QTCSV_SOURCES})
-
-# video memory sources
-set(SYSDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/sys)
-if (WIN32)
-  set(SYS_SOURCES
-      ${SYSDIR}/VideoMemoryWin.cpp
-      ${SYSDIR}/VidMemViaD3D9.cpp
-      ${SYSDIR}/VidMemViaDDraw.cpp
-      ${SYSDIR}/VidMemViaDxDiag.cpp
-      )
-else (WIN32)
-  set(SYS_SOURCES
-      ${SYSDIR}/VideoMemoryMac.cpp
-      )
-endif (WIN32)
-source_group(sys FILES ${SYS_SOURCES})
-
-set(SRCS ${SRCS} ${SYS_SOURCES} ${QTCSV_HEADERS} ${QTCSV_SOURCES} ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
-    ${CERESSOLVER_HEADERS} ${CERESSOLVER_SOURCES} ${SOURCES} ${FORMS} ${RESOURCES})
-if (WIN32)
-  set(SRCS ${SRCS} ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.rc)
-endif ()
-if (APPLE)
-  set(SRCS ${SRCS} ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns)
-  set(MACOSX_BUNDLE_ICON_FILE app.icns)
-
-  set(SRCS ${SRCS} ${CMAKE_CURRENT_SOURCE_DIR}/../../ffmpeg)
-endif ()
-
 # our target
-set(APP_NAME atlas)
-add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE ${SRCS})
+set(APP_NAME Atlas)
+add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
+               ${SYS_SOURCES}
+               ${QTCSV_HEADERS} ${QTCSV_SOURCES}
+               ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
+               ${CERESSOLVER_HEADERS} ${CERESSOLVER_SOURCES}
+               ${SOURCES} ${FORMS} ${RESOURCES} ${ASSETS}
+               ${TESTS})
 
 target_include_directories(${APP_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(${APP_NAME} PUBLIC ${TBB_INCLUDE_DIRS})
@@ -1012,7 +1014,7 @@ if (APPLE)
   set(copyright_line "Copyright 2011-2016 Linqing Feng @ JinnyLab")
 
   set_target_properties(${APP_NAME} PROPERTIES
-                        OUTPUT_NAME Atlas
+                        OUTPUT_NAME "${APP_NAME}"
                         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Info.plist.in"
                         MACOSX_BUNDLE_SHORT_VERSION_STRING "${CMAKE_BUNDLE_VERSION}"
                         # TBD: MACOSX_BUNDLE_BUNDLE_VERSION "${CMAKE_BUNDLE_VERSION}"

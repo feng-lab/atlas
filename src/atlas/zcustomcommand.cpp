@@ -574,7 +574,7 @@ void calcSwcVolume()
     branchMesh.save(outFolder.filePath(fileInfo.baseName() + "_neurite.obj"));
     auto rootProp = rootMesh.properties();
     auto branchProp = branchMesh.properties();
-    LOG(INFO) << qUtf8Printable(fileInfo.baseName()) << ", "
+    LOG(INFO) << fileInfo.baseName() << ", "
               << rootProp.surfaceArea*(1.0/9.66/9.66) << ", "
               << rootProp.volume*(1.0/9.66/9.66/9.66) << ", "
               << branchProp.surfaceArea*(1.0/9.66/9.66) << ", "

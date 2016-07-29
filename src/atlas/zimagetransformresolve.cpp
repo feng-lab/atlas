@@ -200,7 +200,8 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
     }
   }
 
-  LOG(INFO) << "transform resolve summary:\n" << qUtf8Printable(summ);
+  LOG(INFO) << "transform resolve summary:";
+  LOG(INFO) << summ;
   if (summary)
     summ.swap(*summary);
 

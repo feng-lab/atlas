@@ -75,22 +75,22 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
   case QtInfoMsg:
     LINFOF(context.file ? context.file : "QtFile",
            context.line,
-           context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
+           context.function ? context.function : "QtFunction") << msg;
     break;
   case QtWarningMsg:
     LWARNF(context.file ? context.file : "QtFile",
            context.line,
-           context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
+           context.function ? context.function : "QtFunction") << msg;
     break;
   case QtCriticalMsg:
     LERRORF(context.file ? context.file : "QtFile",
             context.line,
-            context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
+            context.function ? context.function : "QtFunction") << msg;
     break;
   case QtFatalMsg:
     LFATALF(context.file ? context.file : "QtFile",
             context.line,
-            context.function ? context.function : "QtFunction") << qUtf8Printable(msg);
+            context.function ? context.function : "QtFunction") << msg;
     abort();
   default:
     break;

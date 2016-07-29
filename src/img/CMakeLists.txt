@@ -106,6 +106,55 @@ find_package(glog REQUIRED
 
 find_package(Qt5Core REQUIRED PATHS /Users/feng/Qt/5.7/clang_64 NO_DEFAULT_PATH)
 
+
+# tiff srcs
+set(TIFFDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libtiff/libtiff)
+set(TIFF_SOURCES
+    ${TIFFDIR}/tif_aux.c
+    ${TIFFDIR}/tif_close.c
+    ${TIFFDIR}/tif_codec.c
+    ${TIFFDIR}/tif_color.c
+    ${TIFFDIR}/tif_compress.c
+    ${TIFFDIR}/tif_dir.c
+    ${TIFFDIR}/tif_dirinfo.c
+    ${TIFFDIR}/tif_dirread.c
+    ${TIFFDIR}/tif_dirwrite.c
+    ${TIFFDIR}/tif_dumpmode.c
+    ${TIFFDIR}/tif_error.c
+    ${TIFFDIR}/tif_extension.c
+    ${TIFFDIR}/tif_fax3.c
+    ${TIFFDIR}/tif_fax3sm.c
+    ${TIFFDIR}/tif_flush.c
+    ${TIFFDIR}/tif_getimage.c
+    ${TIFFDIR}/tif_luv.c
+    ${TIFFDIR}/tif_lzw.c
+    ${TIFFDIR}/tif_next.c
+    ${TIFFDIR}/tif_open.c
+    ${TIFFDIR}/tif_packbits.c
+    ${TIFFDIR}/tif_pixarlog.c
+    ${TIFFDIR}/tif_predict.c
+    ${TIFFDIR}/tif_print.c
+    ${TIFFDIR}/tif_read.c
+    ${TIFFDIR}/tif_strip.c
+    ${TIFFDIR}/tif_swab.c
+    ${TIFFDIR}/tif_thunder.c
+    ${TIFFDIR}/tif_tile.c
+    ${TIFFDIR}/tif_version.c
+    ${TIFFDIR}/tif_warning.c
+    ${TIFFDIR}/tif_write.c
+    ${TIFFDIR}/tif_zip.c
+    ${TIFFDIR}/tif_ojpeg.c
+    ${TIFFDIR}/tif_jpeg.c
+    ${TIFFDIR}/tif_jbig.c
+    ${TIFFDIR}/tif_stream.cxx
+    )
+if (WIN32)
+  set(TIFF_SOURCES ${TIFF_SOURCES} ${TIFFDIR}/tif_win32.c)
+else (WIN32)
+  set(TIFF_SOURCES ${TIFF_SOURCES} ${TIFFDIR}/tif_unix.c)
+endif (WIN32)
+source_group(libtiff FILES ${TIFF_SOURCES})
+
 # main srcs
 set(IMG_SOURCES
     zbbox.h
@@ -193,54 +242,6 @@ set(IMG_SOURCES
     zimageavx.cpp
     zimgjpegxr.cpp
     )
-
-# tiff srcs
-set(TIFFDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libtiff/libtiff)
-set(TIFF_SOURCES
-    ${TIFFDIR}/tif_aux.c
-    ${TIFFDIR}/tif_close.c
-    ${TIFFDIR}/tif_codec.c
-    ${TIFFDIR}/tif_color.c
-    ${TIFFDIR}/tif_compress.c
-    ${TIFFDIR}/tif_dir.c
-    ${TIFFDIR}/tif_dirinfo.c
-    ${TIFFDIR}/tif_dirread.c
-    ${TIFFDIR}/tif_dirwrite.c
-    ${TIFFDIR}/tif_dumpmode.c
-    ${TIFFDIR}/tif_error.c
-    ${TIFFDIR}/tif_extension.c
-    ${TIFFDIR}/tif_fax3.c
-    ${TIFFDIR}/tif_fax3sm.c
-    ${TIFFDIR}/tif_flush.c
-    ${TIFFDIR}/tif_getimage.c
-    ${TIFFDIR}/tif_luv.c
-    ${TIFFDIR}/tif_lzw.c
-    ${TIFFDIR}/tif_next.c
-    ${TIFFDIR}/tif_open.c
-    ${TIFFDIR}/tif_packbits.c
-    ${TIFFDIR}/tif_pixarlog.c
-    ${TIFFDIR}/tif_predict.c
-    ${TIFFDIR}/tif_print.c
-    ${TIFFDIR}/tif_read.c
-    ${TIFFDIR}/tif_strip.c
-    ${TIFFDIR}/tif_swab.c
-    ${TIFFDIR}/tif_thunder.c
-    ${TIFFDIR}/tif_tile.c
-    ${TIFFDIR}/tif_version.c
-    ${TIFFDIR}/tif_warning.c
-    ${TIFFDIR}/tif_write.c
-    ${TIFFDIR}/tif_zip.c
-    ${TIFFDIR}/tif_ojpeg.c
-    ${TIFFDIR}/tif_jpeg.c
-    ${TIFFDIR}/tif_jbig.c
-    ${TIFFDIR}/tif_stream.cxx
-    )
-if (WIN32)
-  set(TIFF_SOURCES ${TIFF_SOURCES} ${TIFFDIR}/tif_win32.c)
-else (WIN32)
-  set(TIFF_SOURCES ${TIFF_SOURCES} ${TIFFDIR}/tif_unix.c)
-endif (WIN32)
-source_group(libtiff FILES ${TIFF_SOURCES})
 
 # our target
 set(LIBRARY_NAME img)

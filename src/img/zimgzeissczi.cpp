@@ -1603,7 +1603,7 @@ void ZImgZeissCZI::dump(const QString &filename)
 
   QString str("\n");
   dumpCZIStream(inputFileStream, filesize, 0, str, 0);
-  LOG(INFO) << qUtf8Printable(str);
+  LOG(INFO) << str;
 }
 
 void ZImgZeissCZI::dumpCZIStream(std::ifstream &inputFileStream, int64_t filesize, int64_t offset, QString &str, int indent)
