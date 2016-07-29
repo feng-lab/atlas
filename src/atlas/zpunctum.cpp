@@ -38,7 +38,7 @@ ZPunctum::ZPunctum(double x, double y, double z, double r)
 
 void ZPunctum::updateFromVoxelsList(double conf)
 {
-  assert(m_voxelIntensities.size() == m_voxelLocations.rows());
+  CHECK(m_voxelIntensities.size() == m_voxelLocations.rows());
   if (m_voxelIntensities.size() <= 0) {
     LOG(ERROR) << "Zero element in voxel list.";
     return;

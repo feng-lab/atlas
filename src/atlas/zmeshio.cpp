@@ -49,7 +49,7 @@ aiMesh* createAIMesh(const ZMesh& mesh)
   pMesh->mNormals = new aiVector3D[pMesh->mNumVertices];
   const std::vector<glm::vec3>& vertices = mesh.vertices();
   const std::vector<glm::vec3>& normals = mesh.normals();
-  assert(normals.size() >= vertices.size());
+  CHECK(normals.size() >= vertices.size());
   memcpy(pMesh->mVertices, vertices.data(), sizeof(float) * 3 * vertices.size());
   memcpy(pMesh->mNormals, normals.data(), sizeof(float) * 3 * vertices.size());
 
@@ -60,7 +60,7 @@ aiMesh* createAIMesh(const ZMesh& mesh)
 void appendChildToParentNode(aiNode *pParent, aiNode *pChild)
 {
   // Checking preconditions
-  assert(pParent && pChild);
+  CHECK(pParent && pChild);
 
   // Assign parent to child
   pChild->mParent = pParent;
@@ -68,7 +68,7 @@ void appendChildToParentNode(aiNode *pParent, aiNode *pChild)
   // If already children was assigned to the parent node, store them in a
   std::vector<aiNode*> temp;
   if (pParent->mChildren != nullptr) {
-    assert(0 != pParent->mNumChildren);
+    CHECK(0 != pParent->mNumChildren);
     for (size_t index = 0; index < pParent->mNumChildren; index++) {
       temp.push_back(pParent->mChildren[index]);
     }
@@ -271,7 +271,7 @@ void ZMeshIO::save(const ZMesh &mesh, const QString &filename, std::string forma
         format = m_writeFormats[i];
     }
   }
-  assert(m_writeFormats.contains(format));
+  CHECK(m_writeFormats.contains(format));
 
   auto sc = std::make_unique<aiScene>();
   sc->mRootNode = new aiNode;

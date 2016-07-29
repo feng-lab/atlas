@@ -166,7 +166,7 @@ QJsonValue ZPunctaDoc::jsonValue(size_t id) const
 
 bool ZPunctaDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
 {
-  assert(v1.isString() && v2.isString());
+  CHECK(v1.isString() && v2.isString());
   if (v1 == v2)
     return true;
   QString f1 = v1.toString();
@@ -178,7 +178,7 @@ bool ZPunctaDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
 
 size_t ZPunctaDoc::makeAlias(size_t id)
 {
-  assert(m_idToPunctaPacks.find(id) != m_idToPunctaPacks.end());
+  CHECK(m_idToPunctaPacks.find(id) != m_idToPunctaPacks.end());
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToPunctaPacks[aliasId] = m_idToPunctaPacks[id];
@@ -190,7 +190,7 @@ size_t ZPunctaDoc::makeAlias(size_t id)
 
 bool ZPunctaDoc::isAlias(size_t id) const
 {
-  assert(m_idToPunctaPacks.find(id) != m_idToPunctaPacks.end());
+  CHECK(m_idToPunctaPacks.find(id) != m_idToPunctaPacks.end());
 
   auto& pack = m_idToPunctaPacks.at(id);
   for (auto it = m_idToPunctaPacks.cbegin(); it != m_idToPunctaPacks.cend(); ++it) {

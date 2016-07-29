@@ -74,7 +74,7 @@ RowVectorXd ZEigenUtils::readRowVector(const std::string &iline, const char *uSe
   std::string possiblespace = " \t\r";
   if (strictDelimiter) {
     sep = uSep;
-    assert(sep.size() == 1 && sep.find_first_not_of(possiblespace) != std::string::npos);
+    CHECK(sep.size() == 1 && sep.find_first_not_of(possiblespace) != std::string::npos);
   } else {
     sep = ",:; \t\r[]";   // \r for windows file
     sep += uSep;

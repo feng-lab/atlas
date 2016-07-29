@@ -1043,7 +1043,7 @@ void ZTiff::writeTiffHeader(uint8_t *mem, size_t width, size_t height, size_t bi
                             uint64_t stripOffset, uint64_t stripByteCount)
 {
   static_assert(sizeof(ZTiffHeader) == 192, "wrong tiff header size");
-  assert(stripOffset >= 192);
+  CHECK(stripOffset >= 192);
   ZTiffHeader header;
   header.width = width;
   header.height = height;
@@ -1823,7 +1823,7 @@ void ZTiffWriter::startWriting(const QString &filename, Compression comp, int ex
 void ZTiffWriter::writeIFD(const ZImg &img, int z, int t, int c, bool writeThumbnails,
                            const std::vector<ZImgMetatag> &additionalTags)
 {
-  assert(m_tif);
+  CHECK(m_tif);
   for (size_t i=0; i<additionalTags.size(); ++i) {
     const ZImgMetatag &atag = additionalTags[i];
     if (atag.tag() > 0 && atag.tag() < 65535)

@@ -112,7 +112,7 @@ void ZColorMapWidget::mouseMoveEvent(QMouseEvent *e)
     }
   }
   //LOG(INFO) << edgeKeyIndex << " " << m_colorMap->get().numKeys();
-  assert(edgeKeyIndex != m_colorMap->get().numKeys());
+  CHECK(edgeKeyIndex != m_colorMap->get().numKeys());
 
   if (change) {
     double intensityChange = dist/m_intensityScreenWidth;

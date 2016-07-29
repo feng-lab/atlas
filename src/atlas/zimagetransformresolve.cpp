@@ -85,7 +85,7 @@ void ZImageTransformResolve::addImagePair(size_t fixedIdx, size_t movingIdx, con
 
 std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResolve::resolve(QString *summary) const
 {
-  assert(!m_idxTransforms.empty());
+  CHECK(!m_idxTransforms.empty());
   std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> res;
   for (auto it = m_idxTransforms.cbegin(); it != m_idxTransforms.cend(); ++it) {
     res[it->first] = std::make_unique<ZImageCompositeTransform>();
@@ -196,7 +196,7 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
       }
       summ += QString("%1 connects to %2 with cost %3\n").arg(img1).arg(img2).arg(pairIt->second.second);
     } else {
-      assert(img1HasLocation && img2HasLocation);
+      CHECK(img1HasLocation && img2HasLocation);
     }
   }
 

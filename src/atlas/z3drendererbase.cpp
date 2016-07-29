@@ -5,6 +5,7 @@
 #include "z3dprimitiverenderer.h"
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -209,7 +210,7 @@ QString Z3DRendererBase::generateGeomHeader() const
 
 void Z3DRendererBase::registerRenderer(Z3DPrimitiveRenderer *renderer)
 {
-  assert(renderer && m_renderers.find(renderer) == m_renderers.end());
+  CHECK(renderer && m_renderers.find(renderer) == m_renderers.end());
 
 #ifndef _USE_CORE_PROFILE_
   connect(renderer, &Z3DPrimitiveRenderer::openglRendererInvalid, this, &Z3DRendererBase::invalidateDisplayList);
@@ -221,7 +222,7 @@ void Z3DRendererBase::registerRenderer(Z3DPrimitiveRenderer *renderer)
 
 void Z3DRendererBase::unregisterRenderer(Z3DPrimitiveRenderer *renderer)
 {
-  assert(renderer && m_renderers.find(renderer) != m_renderers.end());
+  CHECK(renderer && m_renderers.find(renderer) != m_renderers.end());
 
   m_renderers.erase(renderer);
 }
@@ -251,7 +252,7 @@ void Z3DRendererBase::setClipPlanes(std::vector<glm::vec4> *clipPlanes)
 
 void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer *renderer)
 {
-  assert(m_renderers.find(renderer) != m_renderers.end());
+  CHECK(m_renderers.find(renderer) != m_renderers.end());
   std::vector<Z3DPrimitiveRenderer*> renderers;
   renderers.push_back(renderer);
   render(eye, renderers);
@@ -259,8 +260,8 @@ void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer *renderer)
 
 void Z3DRendererBase::render(Z3DEye eye, nim::Z3DPrimitiveRenderer *renderer1, nim::Z3DPrimitiveRenderer *renderer2)
 {
-  assert(m_renderers.find(renderer1) != m_renderers.end());
-  assert(m_renderers.find(renderer2) != m_renderers.end());
+  CHECK(m_renderers.find(renderer1) != m_renderers.end());
+  CHECK(m_renderers.find(renderer2) != m_renderers.end());
   std::vector<Z3DPrimitiveRenderer*> renderers;
   renderers.push_back(renderer1);
   renderers.push_back(renderer2);
@@ -269,9 +270,9 @@ void Z3DRendererBase::render(Z3DEye eye, nim::Z3DPrimitiveRenderer *renderer1, n
 
 void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer *renderer1, Z3DPrimitiveRenderer *renderer2, Z3DPrimitiveRenderer *renderer3)
 {
-  assert(m_renderers.find(renderer1) != m_renderers.end());
-  assert(m_renderers.find(renderer2) != m_renderers.end());
-  assert(m_renderers.find(renderer3) != m_renderers.end());
+  CHECK(m_renderers.find(renderer1) != m_renderers.end());
+  CHECK(m_renderers.find(renderer2) != m_renderers.end());
+  CHECK(m_renderers.find(renderer3) != m_renderers.end());
   std::vector<Z3DPrimitiveRenderer*> renderers;
   renderers.push_back(renderer1);
   renderers.push_back(renderer2);
@@ -282,10 +283,10 @@ void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer *renderer1, Z3DPri
 void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer *renderer1, Z3DPrimitiveRenderer *renderer2,
                              Z3DPrimitiveRenderer *renderer3, Z3DPrimitiveRenderer *renderer4)
 {
-  assert(m_renderers.find(renderer1) != m_renderers.end());
-  assert(m_renderers.find(renderer2) != m_renderers.end());
-  assert(m_renderers.find(renderer3) != m_renderers.end());
-  assert(m_renderers.find(renderer4) != m_renderers.end());
+  CHECK(m_renderers.find(renderer1) != m_renderers.end());
+  CHECK(m_renderers.find(renderer2) != m_renderers.end());
+  CHECK(m_renderers.find(renderer3) != m_renderers.end());
+  CHECK(m_renderers.find(renderer4) != m_renderers.end());
   std::vector<Z3DPrimitiveRenderer*> renderers;
   renderers.push_back(renderer1);
   renderers.push_back(renderer2);
@@ -343,7 +344,7 @@ void Z3DRendererBase::render(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer 
 
 void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DPrimitiveRenderer *renderer)
 {
-  assert(m_renderers.find(renderer) != m_renderers.end());
+  CHECK(m_renderers.find(renderer) != m_renderers.end());
   std::vector<Z3DPrimitiveRenderer*> renderers;
   renderers.push_back(renderer);
   renderPicking(eye, renderers);
@@ -351,8 +352,8 @@ void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DPrimitiveRenderer *renderer)
 
 void Z3DRendererBase::renderPicking(Z3DEye eye, nim::Z3DPrimitiveRenderer *renderer1, nim::Z3DPrimitiveRenderer *renderer2)
 {
-  assert(m_renderers.find(renderer1) != m_renderers.end());
-  assert(m_renderers.find(renderer2) != m_renderers.end());
+  CHECK(m_renderers.find(renderer1) != m_renderers.end());
+  CHECK(m_renderers.find(renderer2) != m_renderers.end());
   std::vector<Z3DPrimitiveRenderer*> renderers;
   renderers.push_back(renderer1);
   renderers.push_back(renderer2);
@@ -361,9 +362,9 @@ void Z3DRendererBase::renderPicking(Z3DEye eye, nim::Z3DPrimitiveRenderer *rende
 
 void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DPrimitiveRenderer *renderer1, Z3DPrimitiveRenderer *renderer2, Z3DPrimitiveRenderer *renderer3)
 {
-  assert(m_renderers.find(renderer1) != m_renderers.end());
-  assert(m_renderers.find(renderer2) != m_renderers.end());
-  assert(m_renderers.find(renderer3) != m_renderers.end());
+  CHECK(m_renderers.find(renderer1) != m_renderers.end());
+  CHECK(m_renderers.find(renderer2) != m_renderers.end());
+  CHECK(m_renderers.find(renderer3) != m_renderers.end());
   std::vector<Z3DPrimitiveRenderer*> renderers;
   renderers.push_back(renderer1);
   renderers.push_back(renderer2);

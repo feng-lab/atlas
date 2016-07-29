@@ -42,7 +42,7 @@ double ZImageInterpolation::tricubicInterpolate(double p[][4][4], double x, doub
 
 double ZImageInterpolation::nCubicInterpolate(int n, double *p, double coordinates[]) const
 {
-  assert(n > 0);
+  CHECK(n > 0);
   if (n == 1) {
     return cubicInterpolate(p, *coordinates);
   } else {

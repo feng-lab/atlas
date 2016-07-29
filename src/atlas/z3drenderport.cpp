@@ -94,7 +94,7 @@ size_t Z3DRenderInputPort::numValidInputs() const
   size_t res = 0;
   for (size_t i=0; i<m_connectedOutputPorts.size(); ++i) {
     const Z3DRenderOutputPort* p = dynamic_cast<const Z3DRenderOutputPort*>(m_connectedOutputPorts[i]);
-    assert(p);
+    CHECK(p);
     if (p->hasValidData())
       ++res;
   }
@@ -132,7 +132,7 @@ const Z3DRenderTarget *Z3DRenderInputPort::renderTarget(size_t idx) const
   size_t res = 0;
   for (size_t i=0; i<m_connectedOutputPorts.size(); ++i) {
     const Z3DRenderOutputPort* p = dynamic_cast<const Z3DRenderOutputPort*>(m_connectedOutputPorts[i]);
-    assert(p);
+    CHECK(p);
     if (p->hasValidData())
       ++res;
     if (idx == res - 1)

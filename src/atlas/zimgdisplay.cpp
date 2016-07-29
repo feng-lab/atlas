@@ -12,7 +12,7 @@ namespace nim {
 ZImgDisplay::ZImgDisplay(const ZImg &img)
   : m_img(img)
 {
-  assert(!m_img.isEmpty());
+  CHECK(!m_img.isEmpty());
   reset();
 }
 
@@ -31,7 +31,7 @@ void ZImgDisplay::reset()
 
 void ZImgDisplay::showChannel(size_t ch, double minData, double maxData)
 {
-  assert(minData <= maxData);
+  CHECK(minData <= maxData);
 
   if (minData == maxData) {
     if (minData > m_img.dataRangeMin<double>())
@@ -54,7 +54,7 @@ void ZImgDisplay::hideChannel(size_t ch)
 
 void ZImgDisplay::showAllChannels(double minData, double maxData)
 {
-  assert(minData <= maxData);
+  CHECK(minData <= maxData);
 
   m_channels.clear();
 
@@ -82,7 +82,7 @@ size_t ZImgDisplay::toQImageSizeLimit()
 
 QImage ZImgDisplay::toQImage() const
 {
-  assert(m_img.width() <= toQImageSizeLimit() && m_img.height() <= toQImageSizeLimit());
+  CHECK(m_img.width() <= toQImageSizeLimit() && m_img.height() <= toQImageSizeLimit());
 
   QImage res(m_img.width(), m_img.height(), QImage::Format_ARGB32_Premultiplied);
   fillQImage(m_img, res);

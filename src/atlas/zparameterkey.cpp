@@ -32,7 +32,7 @@ ZParameterKey::ZParameterKey(double tm, ZParameter *p)
   : m_time(std::max(tm,0.0))
   , m_paraAnimation(nullptr)
 {
-  assert(p);
+  CHECK(p);
   m_value.reset(p);
   setDefaultType();
 }
@@ -42,7 +42,7 @@ ZParameterKey::ZParameterKey(const QString &type)
   , m_paraAnimation(nullptr)
 {
   m_value.reset(ZParameterFactoryInstance.create("",type));
-  assert(m_value);
+  CHECK(m_value);
   setDefaultType();
 }
 
@@ -113,9 +113,9 @@ double ZParameterKey::timeToProgress(const ZParameterKey &prev, double time)
 
 void ZParameterKey::interpolate(const ZParameterKey &prev, double time, ZParameter &dest) const
 {
-  assert(time >= prev.time() && time <= m_time);
-  assert(m_value->isSameType(prev.value()));
-  assert(m_value->isSameType(dest));
+  CHECK(time >= prev.time() && time <= m_time);
+  CHECK(m_value->isSameType(prev.value()));
+  CHECK(m_value->isSameType(dest));
 
   if (m_time - prev.time() < 0.0001) {  // less than 0.0001s, pointless, just use prev value
     dest.setValueSameAs(prev.value());

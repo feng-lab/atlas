@@ -489,7 +489,7 @@ void ZObjModel::activated(const QModelIndex &idxIn)
 
 void ZObjModel::updateChildCheckState(const QModelIndex &parent, Qt::CheckState cs)
 {
-  assert(cs != Qt::PartiallyChecked);
+  CHECK(cs != Qt::PartiallyChecked);
   for (int i=0; i<rowCount(parent); i++) {
     QModelIndex child = index(i, ShowHideNameColumn, parent);
     if (!needCheckbox(child))
@@ -531,10 +531,10 @@ void ZObjModel::updateParentCheckState(const QModelIndex &child)
   } else if (numChecked > 0 && numUnChecked > 0) {
     newCheckState = Qt::PartiallyChecked;
   } else if (numChecked == 0) {
-    assert(numUnChecked > 0);
+    CHECK(numUnChecked > 0);
     newCheckState = Qt::Unchecked;
   } else {   // numUnChecked == 0
-    assert(numChecked > 0);
+    CHECK(numChecked > 0);
     newCheckState = Qt::Checked;
   }
 

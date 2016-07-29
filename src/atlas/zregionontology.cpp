@@ -49,16 +49,16 @@ void readOntology(const QJsonObject &obj, ZTree<RegionNode>::Iterator &parentIt,
       node.name = it.value().toString();
     } else if (it.key() == "color_hex_triplet") {
       QString colorStr = it.value().toString();
-      assert(colorStr.size() == 6);
+      CHECK(colorStr.size() == 6);
       bool ok;
       node.red = colorStr.mid(0,2).toInt(&ok, 16);
-      assert(ok);
+      CHECK(ok);
       node.green = colorStr.mid(2,2).toInt(&ok, 16);
-      assert(ok);
+      CHECK(ok);
       node.blue = colorStr.mid(4,2).toInt(&ok, 16);
-      assert(ok);
+      CHECK(ok);
     } else if (it.key() == "children") {
-      assert(it.value().isArray());
+      CHECK(it.value().isArray());
       children = it.value().toArray();
     }
   }
@@ -112,16 +112,16 @@ void readMouseBrainAtlasOntology(ZTree<RegionNode> &ontology)
       node.name = it.value().toString();
     } else if (it.key() == "color_hex_triplet") {
       QString colorStr = it.value().toString();
-      assert(colorStr.size() == 6);
+      CHECK(colorStr.size() == 6);
       bool ok;
       node.red = colorStr.mid(0,2).toInt(&ok, 16);
-      assert(ok);
+      CHECK(ok);
       node.green = colorStr.mid(2,2).toInt(&ok, 16);
-      assert(ok);
+      CHECK(ok);
       node.blue = colorStr.mid(4,2).toInt(&ok, 16);
-      assert(ok);
+      CHECK(ok);
     } else if (it.key() == "children") {
-      assert(it.value().isArray());
+      CHECK(it.value().isArray());
       children = it.value().toArray();
     }
   }
@@ -164,16 +164,16 @@ void readMouseBrainAtlasOntology(const QStringList &regionAbbrevs, ZTree<RegionN
       node.name = it.value().toString();
     } else if (it.key() == "color_hex_triplet") {
       QString colorStr = it.value().toString();
-      assert(colorStr.size() == 6);
+      CHECK(colorStr.size() == 6);
       bool ok;
       node.red = colorStr.mid(0,2).toInt(&ok, 16);
-      assert(ok);
+      CHECK(ok);
       node.green = colorStr.mid(2,2).toInt(&ok, 16);
-      assert(ok);
+      CHECK(ok);
       node.blue = colorStr.mid(4,2).toInt(&ok, 16);
-      assert(ok);
+      CHECK(ok);
     } else if (it.key() == "children") {
-      assert(it.value().isArray());
+      CHECK(it.value().isArray());
       children = it.value().toArray();
     }
   }
@@ -405,7 +405,7 @@ void binaryImgToMesh1(const ZImg &img, ZMesh &msh)
 
 void binaryImgToMesh(const ZImg &img, ZMesh &msh)
 {
-  assert(img.isType<uint8_t>() && !img.isTimeSeries() && !img.isMultiChannelsImg());
+  CHECK(img.isType<uint8_t>() && !img.isTimeSeries() && !img.isMultiChannelsImg());
   vtkSmartPointer<vtkImageData> vimg = vtkSmartPointer<vtkImageData>::New();
   vimg->SetExtent(0, img.width(), 0, img.height(), 0, img.depth());
   vimg->SetSpacing(1, 1, 1);
@@ -487,7 +487,7 @@ void binaryImgToMesh(const ZImg &img, ZMesh &msh)
 
   std::vector<glm::dvec3> vertices(points->GetNumberOfPoints());
   //std::vector<glm::dvec3> normals(pointsNormals->GetNumberOfTuples());
-  //assert(vertices.size() == normals.size());
+  //CHECK(vertices.size() == normals.size());
   std::vector<GLuint> indices;
   for (vtkIdType id=0; id<points->GetNumberOfPoints(); ++id) {
     points->GetPoint(id, &vertices[id][0]);
@@ -521,7 +521,7 @@ struct ContourNode {
 
 void binaryImgToROI(const ZImg &img, ZROI &roi)
 {
-  assert(img.isType<uint8_t>() && !img.isTimeSeries() && !img.isMultiChannelsImg());
+  CHECK(img.isType<uint8_t>() && !img.isTimeSeries() && !img.isMultiChannelsImg());
   roi.clear();
 
   for (size_t s = 0; s < img.depth(); ++s) {

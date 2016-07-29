@@ -7,6 +7,7 @@
 #include <QIcon>
 #include <set>
 #include "zexception.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -193,7 +194,7 @@ QJsonValue ZMeshDoc::jsonValue(size_t id) const
 
 bool ZMeshDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
 {
-  assert(v1.isString() && v2.isString());
+  CHECK(v1.isString() && v2.isString());
   if (v1 == v2)
     return true;
   QString f1 = v1.toString();
@@ -205,7 +206,7 @@ bool ZMeshDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
 
 size_t ZMeshDoc::makeAlias(size_t id)
 {
-  assert(m_idToMeshPacks.find(id) != m_idToMeshPacks.end());
+  CHECK(m_idToMeshPacks.find(id) != m_idToMeshPacks.end());
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToMeshPacks[aliasId] = m_idToMeshPacks[id];
@@ -217,7 +218,7 @@ size_t ZMeshDoc::makeAlias(size_t id)
 
 bool ZMeshDoc::isAlias(size_t id) const
 {
-  assert(m_idToMeshPacks.find(id) != m_idToMeshPacks.end());
+  CHECK(m_idToMeshPacks.find(id) != m_idToMeshPacks.end());
 
   auto& pack = m_idToMeshPacks.at(id);
   for (auto it = m_idToMeshPacks.cbegin(); it != m_idToMeshPacks.cend(); ++it) {

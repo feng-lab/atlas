@@ -9,6 +9,7 @@
 #include <set>
 #include "zregionannotationwidget.h"
 #include "zsysteminfo.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -168,7 +169,7 @@ QJsonValue ZRegionAnnotationDoc::jsonValue(size_t id) const
 
 bool ZRegionAnnotationDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
 {
-  assert(v1.isString() && v2.isString());
+  CHECK(v1.isString() && v2.isString());
   if (v1 == v2)
     return true;
   QString f1 = v1.toString();
@@ -180,7 +181,7 @@ bool ZRegionAnnotationDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2)
 
 size_t ZRegionAnnotationDoc::makeAlias(size_t id)
 {
-  assert(m_idToRegionAnnotationPacks.find(id) != m_idToRegionAnnotationPacks.end());
+  CHECK(m_idToRegionAnnotationPacks.find(id) != m_idToRegionAnnotationPacks.end());
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToRegionAnnotationPacks[aliasId] = m_idToRegionAnnotationPacks[id];
@@ -192,7 +193,7 @@ size_t ZRegionAnnotationDoc::makeAlias(size_t id)
 
 bool ZRegionAnnotationDoc::isAlias(size_t id) const
 {
-  assert(m_idToRegionAnnotationPacks.find(id) != m_idToRegionAnnotationPacks.end());
+  CHECK(m_idToRegionAnnotationPacks.find(id) != m_idToRegionAnnotationPacks.end());
 
   auto& pack = m_idToRegionAnnotationPacks.at(id);
   for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
@@ -204,7 +205,7 @@ bool ZRegionAnnotationDoc::isAlias(size_t id) const
 
 QWidget *ZRegionAnnotationDoc::createObjEditWidget(size_t id)
 {
-  assert(m_idToRegionAnnotationPacks.find(id) != m_idToRegionAnnotationPacks.end());
+  CHECK(m_idToRegionAnnotationPacks.find(id) != m_idToRegionAnnotationPacks.end());
 
   auto& pack = m_idToRegionAnnotationPacks.at(id);
   return new ZRegionAnnotationWidget(*pack->regionAnnotation, m_doc);

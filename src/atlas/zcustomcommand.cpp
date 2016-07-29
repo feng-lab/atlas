@@ -423,7 +423,7 @@ void stnTrajectory()
           if (curIdx == idx) {
             break;
           }
-          assert(predecessor[curIdx] != curIdx);
+          CHECK(predecessor[curIdx] != curIdx);
           curIdx = predecessor[curIdx];
         }
 #endif
@@ -567,7 +567,7 @@ void calcSwcVolume()
     QFileInfo dirInfo = dirlist.at(i);
     QDir subDir(dirInfo.absoluteFilePath());
     QFileInfoList list = subDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-    assert(list.size() == 1);
+    CHECK(list.size() == 1);
     QFileInfo fileInfo = list.at(0);
     ZMesh::createSwcMesh(ZSwc(fileInfo.absoluteFilePath()), 5, 1, rootMesh, branchMesh);
     rootMesh.save(outFolder.filePath(fileInfo.baseName() + "_soma.obj"));

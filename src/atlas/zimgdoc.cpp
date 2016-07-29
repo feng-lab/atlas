@@ -10,6 +10,7 @@
 #include <set>
 #include <QJsonArray>
 #include "zsectionsregistrationdialog.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -224,7 +225,7 @@ QJsonValue ZImgDoc::jsonValue(size_t id) const
 
 bool ZImgDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
 {
-  assert(v1.isObject() && v2.isObject());
+  CHECK(v1.isObject() && v2.isObject());
   if (v1 == v2)
     return true;
   QJsonObject f1 = v1.toObject();
@@ -270,7 +271,7 @@ bool ZImgDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
 
 size_t ZImgDoc::makeAlias(size_t id)
 {
-  assert(m_idToImgPacks.find(id) != m_idToImgPacks.end());
+  CHECK(m_idToImgPacks.find(id) != m_idToImgPacks.end());
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToImgPacks[aliasId] = m_idToImgPacks[id];
@@ -282,7 +283,7 @@ size_t ZImgDoc::makeAlias(size_t id)
 
 bool ZImgDoc::isAlias(size_t id) const
 {
-  assert(m_idToImgPacks.find(id) != m_idToImgPacks.end());
+  CHECK(m_idToImgPacks.find(id) != m_idToImgPacks.end());
 
   auto& pack = m_idToImgPacks.at(id);
   for (auto it = m_idToImgPacks.cbegin(); it != m_idToImgPacks.cend(); ++it) {
@@ -386,7 +387,7 @@ void ZImgDoc::alignSections()
 
 size_t ZImgDoc::addImgPack(ZImgPack *imgPack)
 {
-  assert(imgPack);
+  CHECK(imgPack);
 
   size_t id = m_doc.getNewObjId();
   m_idToImgPacks[id] = std::shared_ptr<ZImgPack>(imgPack);
@@ -482,7 +483,7 @@ size_t ZImgDoc::loadImg(const QStringList &files, Dimension catDim, size_t scene
 
 void ZImgDoc::sendChangedSignal(size_t id)
 {
-  assert(m_idToImgPacks.find(id) != m_idToImgPacks.end());
+  CHECK(m_idToImgPacks.find(id) != m_idToImgPacks.end());
 
   auto& pack = m_idToImgPacks.at(id);
   for (auto it = m_idToImgPacks.cbegin(); it != m_idToImgPacks.cend(); ++it) {

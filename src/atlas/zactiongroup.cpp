@@ -1,6 +1,6 @@
 #include "zactiongroup.h"
 
-#include <cassert>
+#include "zlog.h"
 
 namespace nim {
 
@@ -69,7 +69,7 @@ void ZActionGroup::setVisible(bool v)
 void ZActionGroup::actionChanged()
 {
   QAction *action = qobject_cast<QAction*>(sender());
-  assert(action);
+  CHECK(action);
   if (action->isChecked()) {
     if (action != m_current) {
       if (m_current)
@@ -84,21 +84,21 @@ void ZActionGroup::actionChanged()
 void ZActionGroup::actionToggled(bool checked)
 {
   QAction *action = qobject_cast<QAction*>(sender());
-  assert(action);
+  CHECK(action);
   emit toggled(action, checked);
 }
 
 void ZActionGroup::actionTriggered()
 {
   QAction *action = qobject_cast<QAction*>(sender());
-  assert(action);
+  CHECK(action);
   emit triggered(action);
 }
 
 void ZActionGroup::actionHovered()
 {
   QAction *action = qobject_cast<QAction*>(sender());
-  assert(action);
+  CHECK(action);
   emit hovered(action);
 }
 

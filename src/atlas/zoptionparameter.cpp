@@ -27,7 +27,7 @@ void ZOptionParameter<T, T2>::selectNext()
     m_dataIsValid = true;
   } else {
     int index = m_options.indexOf(this->m_value);
-    assert(index >= 0);
+    CHECK(index >= 0);
     if (++index >= m_options.size())
       index = 0;
     select(m_options[index]);
@@ -112,7 +112,7 @@ void ZOptionParameter<T, T2>::beforeChange(T &value)
 template<class T, class T2>
 void ZOptionParameter<T,T2>::setSameAs(const ZParameter &rhs)
 {
-  assert(this->isSameType(rhs));
+  CHECK(this->isSameType(rhs));
   const ZOptionParameter<T,T2>* src = static_cast<const ZOptionParameter<T,T2>*>(&rhs);
   m_prefix = src->m_prefix;
   m_suffix = src->m_suffix;
@@ -147,7 +147,7 @@ void ZOptionParameter<T,T2>::readValue(const QJsonValue &jsonValue)
 template<class T, class T2>
 void ZOptionParameter<T,T2>::forceSetValueSameAs(const ZParameter &rhs)
 {
-  assert(this->isSameType(rhs));
+  CHECK(this->isSameType(rhs));
   const ZOptionParameter<T,T2>* src = static_cast<const ZOptionParameter<T,T2>*>(&rhs);
   if (hasOption(src->get())) {
     select(src->get());

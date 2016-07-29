@@ -35,7 +35,7 @@ QWidget *ZFontParameter::actualCreateWidget(QWidget *parent)
 
 void ZFontParameter::setSameAs(const ZParameter &rhs)
 {
-  assert(this->isSameType(rhs));
+  CHECK(this->isSameType(rhs));
   set(static_cast<const ZFontParameter*>(&rhs)->get());
   ZSingleValueParameter<QFont>::setSameAs(rhs);
 }

@@ -1,6 +1,7 @@
 #include "zcameraparameterkey.h"
 
 #include "zparameterfactory.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -67,7 +68,7 @@ bool ZCameraParameterKey::readValue(const QJsonValue &value)
 QJsonValue ZCameraParameterKey::jsonValue() const
 {
   QJsonValue val = ZParameterKey::jsonValue();
-  assert(val.isObject());
+  CHECK(val.isObject());
   QJsonObject obj = val.toObject();
   obj["posTension"] = m_posTension;
   obj["posContinuity"] = m_posContinuity;

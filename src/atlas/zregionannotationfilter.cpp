@@ -5,6 +5,7 @@
 #include "zgraphicsview.h"
 #include "zsaturateoperation.h"
 #include "zgraphicsscene.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -115,7 +116,7 @@ void ZRegionAnnotationFilter::visibleChanged()
 
 void ZRegionAnnotationFilter::regionROIAdded(int64_t id, ZROI *roi)
 {
-  assert(roi);
+  CHECK(roi);
   m_idToROIFilters.at(id)->setData(*roi);
 }
 

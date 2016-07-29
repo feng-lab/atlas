@@ -34,7 +34,7 @@ void ZAssignPuncta::clearAllSwcTrees()
 
 void ZAssignPuncta::addSwcTree(ZSwc *tree)
 {
-  assert(tree);
+  CHECK(tree);
   m_swcTreeToPuncta[tree] = ZPuncta();
   m_swcTreeToSomaPuncta[tree] = ZPuncta();
 }
@@ -357,7 +357,7 @@ ZAssignPuncta::SwcTreeNode ZAssignPuncta::nearestNode(double x, double y, double
       res = node;
     }
   }
-  assert(!ZSwc::isNull(res));
+  CHECK(!ZSwc::isNull(res));
   return res;
 }
 

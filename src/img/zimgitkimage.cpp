@@ -232,7 +232,7 @@ void ZImgITKImage::writeImg(const QString &filename, const ZImg &img, Compressio
   Q_UNUSED(filename)
   Q_UNUSED(img)
   Q_UNUSED(comp)
-//  assert(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
+//  CHECK(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
 //  if (img.numTimes() != 1) {
 //    throw ZIOException("time sequence image is not supported");
 //  }
@@ -282,7 +282,7 @@ void ZImgITKImage::writeImg(const QString &filename, const ZImg &img, Compressio
 //      elementType = multipleChannel ? MET_LONG_LONG_ARRAY : MET_LONG_LONG;
 //      break;
 //    default:
-//      assert(false);
+//      CHECK(false);
 //      break;
 //    }
 //    break;
@@ -301,7 +301,7 @@ void ZImgITKImage::writeImg(const QString &filename, const ZImg &img, Compressio
 //      elementType = multipleChannel ? MET_ULONG_LONG_ARRAY : MET_ULONG_LONG;
 //      break;
 //    default:
-//      assert(false);
+//      CHECK(false);
 //      break;
 //    }
 //    break;
@@ -314,7 +314,7 @@ void ZImgITKImage::writeImg(const QString &filename, const ZImg &img, Compressio
 //      elementType = multipleChannel ? MET_DOUBLE_ARRAY : MET_DOUBLE;
 //      break;
 //    default:
-//      assert(false);
+//      CHECK(false);
 //      break;
 //    }
 //  }
@@ -335,7 +335,7 @@ void ZImgITKImage::writeImg(const QString &filename, const ZImgSliceProvider &im
   Q_UNUSED(filename)
   Q_UNUSED(imgSliceProvider)
   Q_UNUSED(comp)
-//  assert(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
+//  CHECK(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
 //  if (imgSliceProvider.imgInfo().numTimes != 1) {
 //    throw ZIOException("time sequence image is not supported");
 //  }

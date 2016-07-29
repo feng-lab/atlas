@@ -18,7 +18,7 @@ Z3DPickingManager::Z3DPickingManager()
 
 void Z3DPickingManager::setRenderTarget(Z3DRenderTarget &rt)
 {
-  assert(rt.attachment(GL_COLOR_ATTACHMENT0)->internalFormat() == GL_RGBA8);
+  CHECK(rt.attachment(GL_COLOR_ATTACHMENT0)->internalFormat() == GL_RGBA8);
   m_renderTarget = &rt;
 }
 

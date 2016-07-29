@@ -92,7 +92,7 @@ void ZSliceROI::updateROI(bool moveOnly)
       tmp.addPath(splineToQPainterPath(m_shapeOperations[i].poly));
       break;
     default:
-      assert(false);
+      CHECK(false);
       break;
     }
     if (m_shapeOperations[i].isAdd) {
@@ -363,7 +363,7 @@ void ZSliceROI::load(H5::Group &sliceGrp)
         m_shapeOperations.push_back(ZROIShapeOperation(isAdd, ROIType::Spline, poly));
         break;
       default:
-        assert(false);
+        CHECK(false);
         break;
       }
     }
@@ -408,7 +408,7 @@ void ZSliceROI::save(H5::Group &sliceGrp) const
         type.write(strType, std::string("Spline"));
         break;
       default:
-        assert(false);
+        CHECK(false);
         break;
       }
 
@@ -418,7 +418,7 @@ void ZSliceROI::save(H5::Group &sliceGrp) const
 
       hsize_t pointListDim[2];
       pointListDim[1] = 2;
-      assert(m_shapeOperations[i].poly.size() >= 2);
+      CHECK(m_shapeOperations[i].poly.size() >= 2);
       pointListDim[0] = m_shapeOperations[i].poly.size();
       H5::DataSpace pointListDataspace(2, pointListDim);
       H5::DataSet pointList = shapeGrp.createDataSet("Points", doubleType, pointListDataspace);
@@ -726,7 +726,7 @@ QPointF ZROI::controlPointCoord(const ZROIControlPoint &ctrlPt) const
     return shapeOp.poly.at(ctrlPt.pointIndex);
     break;
   default:
-    assert(false);
+    CHECK(false);
     return QPointF();
     break;
   }
@@ -802,7 +802,7 @@ QPointF ZROI::setControlPointCoord(const ZROIControlPoint &ctrlPt, const QPointF
       shapeOp.poly.last() = newPos;
     break;
   default:
-    assert(false);
+    CHECK(false);
     break;
   }
 
@@ -824,7 +824,7 @@ void ZROI::sliceAddCtrlPoint(int slice, const QPointF &pt)
 
 void ZROI::startMoveSelectedControlPointsCommand()
 {
-  assert(!m_moveSelectedControlPointsCommand);
+  CHECK(!m_moveSelectedControlPointsCommand);
   m_changedSlices.clear();
   m_moveSelectedControlPointsCommand = new ZROISliceMoveSelectedControlPointsCommand(*this);
 }

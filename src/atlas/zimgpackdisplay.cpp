@@ -32,7 +32,7 @@ void ZImgPackDisplay::reset()
 
 void ZImgPackDisplay::showChannel(size_t ch, double minData, double maxData)
 {
-  assert(minData <= maxData);
+  CHECK(minData <= maxData);
 
   if (minData == maxData) {
     if (minData > m_imgPack.rangeMin())
@@ -55,7 +55,7 @@ void ZImgPackDisplay::hideChannel(size_t ch)
 
 void ZImgPackDisplay::showAllChannels(double minData, double maxData)
 {
-  assert(minData <= maxData);
+  CHECK(minData <= maxData);
   m_channels.clear();
 
   if (minData == maxData) {
@@ -77,7 +77,7 @@ void ZImgPackDisplay::hideAllChannels()
 
 ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) const
 {
-  assert(!m_viewport.isNull() && m_scale > 0);
+  CHECK(!m_viewport.isNull() && m_scale > 0);
 
   if (!m_imgPack.isDiskCached()) {
     ZImgDisplay display(m_mip ? m_imgPack.maxZProjectedImg() : m_imgPack.img());

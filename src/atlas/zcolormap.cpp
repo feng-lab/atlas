@@ -856,7 +856,7 @@ Z3DTexture *ZColorMap::texture1D()
 {
   if (!m_texture)
     create1DTexture(256);
-  assert(m_texture);
+  CHECK(m_texture);
   if (m_textureIsInvalid)
     update1DTexture();
 
@@ -926,7 +926,7 @@ QWidget *ZColorMapParameter::actualCreateWidget(QWidget *parent)
 
 void ZColorMapParameter::setSameAs(const ZParameter &rhs)
 {
-  assert(this->isSameType(rhs));
+  CHECK(this->isSameType(rhs));
   const ZColorMapParameter* src = static_cast<const ZColorMapParameter*>(&rhs);
   if (m_value != src->get()) {
     m_value = src->get();

@@ -212,7 +212,7 @@ QJsonValue ZROIDoc::jsonValue(size_t id) const
 
 bool ZROIDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
 {
-  assert(v1.isString() && v2.isString());
+  CHECK(v1.isString() && v2.isString());
   if (v1 == v2)
     return true;
   QString f1 = v1.toString();
@@ -229,7 +229,7 @@ size_t ZROIDoc::makeAlias(size_t)
 
 bool ZROIDoc::isAlias(size_t id) const
 {
-  assert(m_idToROIPacks.find(id) != m_idToROIPacks.end());
+  CHECK(m_idToROIPacks.find(id) != m_idToROIPacks.end());
 
   auto& pack = m_idToROIPacks.at(id);
   for (auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {

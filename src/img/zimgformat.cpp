@@ -2,6 +2,7 @@
 
 #include "zioutils.h"
 #include "zimgsliceprovider.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -148,10 +149,10 @@ ZImg ZImgFormat::readRawImg(const QString &filename, const ZImgInfo &imgInfo, co
 
 void ZImgFormat::CXYZtoXYZC(const ZImg &bufImg, ZImg &img, bool BGRtoRGB, bool ARGBtoRGBA)
 {
-  assert(bufImg.isSameSize(img) && bufImg.isSameType(img) && img.channelData<uint8_t>(0) != bufImg.channelData<uint8_t>(0));
+  CHECK(bufImg.isSameSize(img) && bufImg.isSameType(img) && img.channelData<uint8_t>(0) != bufImg.channelData<uint8_t>(0));
 
   if (bufImg.numChannels() == 1) {
-    assert(false);
+    CHECK(false);
     for (size_t t=0; t<img.numTimes(); ++t)
       memcpy(img.timeData<uint8_t>(t),
              bufImg.timeData<uint8_t>(t),
@@ -218,10 +219,10 @@ void ZImgFormat::CXYZtoXYZC(const ZImg &bufImg, ZImg &img, bool BGRtoRGB, bool A
 
 void ZImgFormat::XYZCtoCXYZ(const ZImg &bufImg, ZImg &img)
 {
-  assert(bufImg.isSameSize(img) && bufImg.isSameType(img) && img.channelData<uint8_t>(0) != bufImg.channelData<uint8_t>(0));
+  CHECK(bufImg.isSameSize(img) && bufImg.isSameType(img) && img.channelData<uint8_t>(0) != bufImg.channelData<uint8_t>(0));
 
   if (bufImg.numChannels() == 1) {
-    assert(false);
+    CHECK(false);
     for (size_t t=0; t<img.numTimes(); ++t)
       memcpy(img.timeData<uint8_t>(t),
              bufImg.timeData<uint8_t>(t),
@@ -276,7 +277,7 @@ void ZImgFormat::XYZCtoCXYZ(const ZImg &bufImg, ZImg &img)
 
 void ZImgFormat::fixDimensionOrder(const uint8_t *buf, const QString &dimensionOrder, ZImg &img, bool BGRtoRGB)
 {
-  assert(dimensionOrder.size() == 5);
+  CHECK(dimensionOrder.size() == 5);
   QString desOrder("XYZCT");
   QString srcOrder = dimensionOrder;
   if (img.numTimes() == 1) {
@@ -348,7 +349,7 @@ void ZImgFormat::fixDimensionOrder(const uint8_t *buf, const QString &dimensionO
       srcDimIdxToDesDimIdx[i] = 4;
       break;
     default:
-      assert(false);
+      CHECK(false);
       break;
     }
   }

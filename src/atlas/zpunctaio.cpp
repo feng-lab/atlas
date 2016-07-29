@@ -87,7 +87,7 @@ void ZPunctaIO::save(const ZPuncta &puncta, const QString &filename, QString for
         format = m_writeFormats[i];
     }
   }
-  assert(m_writeFormats.contains(format));
+  CHECK(m_writeFormats.contains(format));
 
   if (format == "nimp") {
     writeNimpFile(puncta, filename);

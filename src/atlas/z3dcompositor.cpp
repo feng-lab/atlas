@@ -1235,7 +1235,7 @@ void Z3DCompositor::renderImages(Z3DRenderInputPort &currentInport, Z3DRenderOut
 {
   size_t numImages = currentInport.numValidInputs();
   if (numImages == 0) {
-    assert(false);
+    CHECK(false);
   }
   if (numImages == 1) {
     colorTex = currentInport.colorTexture(0);

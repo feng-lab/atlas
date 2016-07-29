@@ -26,7 +26,7 @@ ZSwc::SwcTreeNode ZSwc::thickestNode()
 
 ZSwc::SwcTreeNode ZSwc::thickestNode(const ZSwc::SwcTreeNode &subtree)
 {
-  assert(subtree.node && subtree.node != m_head && subtree.node != m_tail);
+  CHECK(subtree.node && subtree.node != m_head && subtree.node != m_tail);
   SwcTreeNode thickestNode;
   double maxRadius = std::numeric_limits<double>::lowest();
   for (SwcTreeNode tn = begin(subtree); tn != end(subtree); ++tn) {
@@ -63,9 +63,9 @@ void ZSwc::resortPyramidal(int basalType, int apicalType, int somaType)
 {
   if (empty())
     return;
-  assert(numRoots() == 1);
+  CHECK(numRoots() == 1);
   SwcTreeNode soma = begin();
-  assert(thickestNode() == soma);  // soma must be correct
+  CHECK(thickestNode() == soma);  // soma must be correct
   std::vector<SwcTreeNode> somaChildren;
   SwcTreeNode it = begin();
   for (++it; it != end(); ++it) {

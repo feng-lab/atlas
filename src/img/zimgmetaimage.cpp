@@ -129,7 +129,7 @@ void ZImgMetaImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
 
 void ZImgMetaImage::writeImg(const QString &filename, const ZImg &img, Compression comp)
 {
-  assert(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
+  CHECK(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
   if (img.numTimes() != 1) {
     throw ZIOException("time sequence image is not supported");
   }
@@ -179,7 +179,7 @@ void ZImgMetaImage::writeImg(const QString &filename, const ZImg &img, Compressi
       elementType = multipleChannel ? MET_LONG_LONG_ARRAY : MET_LONG_LONG;
       break;
     default:
-      assert(false);
+      CHECK(false);
       break;
     }
     break;
@@ -198,7 +198,7 @@ void ZImgMetaImage::writeImg(const QString &filename, const ZImg &img, Compressi
       elementType = multipleChannel ? MET_ULONG_LONG_ARRAY : MET_ULONG_LONG;
       break;
     default:
-      assert(false);
+      CHECK(false);
       break;
     }
     break;
@@ -211,7 +211,7 @@ void ZImgMetaImage::writeImg(const QString &filename, const ZImg &img, Compressi
       elementType = multipleChannel ? MET_DOUBLE_ARRAY : MET_DOUBLE;
       break;
     default:
-      assert(false);
+      CHECK(false);
       break;
     }
   }
@@ -229,7 +229,7 @@ void ZImgMetaImage::writeImg(const QString &filename, const ZImg &img, Compressi
 
 void ZImgMetaImage::writeImg(const QString &filename, const ZImgSliceProvider &imgSliceProvider, Compression comp)
 {
-  assert(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
+  CHECK(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
   if (imgSliceProvider.imgInfo().numTimes != 1) {
     throw ZIOException("time sequence image is not supported");
   }

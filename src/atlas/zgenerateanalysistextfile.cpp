@@ -786,7 +786,7 @@ ZGenerateAnalysisTextFile::ConstSwcTreeNode ZGenerateAnalysisTextFile::nearestNo
       res = node;
     }
   }
-  assert(!ZSwc::isNull(res));
+  CHECK(!ZSwc::isNull(res));
   return res;
 }
 
@@ -1168,7 +1168,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc &tree,
         currentBranchFolder = &apicalTuftBranchFolder;
         currentBranchIndex = &apicalTuftIndex;
       } else {
-        assert(false);
+        CHECK(false);
       }
 
       QString outSwcName = currentBranchFolder->filePath(QString("branch_%1.swc")
@@ -1259,7 +1259,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc &tree,
           currentBranchFolder = nodeIsLeaf ? &basalTerminalBranchFolder : &basalIntermediateBranchFolder;
           currentBranchIndex = nodeIsLeaf ? &basalTerminalIndex : &basalIntermediateIndex;
         } else {
-          assert(false);
+          CHECK(false);
         }
 
         QString outSwcName = currentBranchFolder->filePath(QString("branch_%1.swc")

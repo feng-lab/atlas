@@ -2,6 +2,7 @@
 #include <QWidget>
 #include <QGroupBox>
 #include "zwidgetsgroup.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -263,7 +264,7 @@ void Z3DCameraParameter::updateWidget(Z3DCamera &value)
 
 void Z3DCameraParameter::setSameAs(const ZParameter &rhs)
 {
-  assert(this->isSameType(rhs));
+  CHECK(this->isSameType(rhs));
   const Z3DCameraParameter* src = static_cast<const Z3DCameraParameter*>(&rhs);
   m_value = src->get();
   updatePara();
@@ -272,7 +273,7 @@ void Z3DCameraParameter::setSameAs(const ZParameter &rhs)
 
 void Z3DCameraParameter::setValueSameAs(const ZParameter &rhs)
 {
-  assert(this->isSameType(rhs));
+  CHECK(this->isSameType(rhs));
   const Z3DCameraParameter* src = static_cast<const Z3DCameraParameter*>(&rhs);
   m_value.setProjectionType(src->get().projectionType());
   m_value.setCamera(src->get().eye(), src->get().center(), src->get().upVector());

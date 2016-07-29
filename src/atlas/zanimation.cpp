@@ -118,8 +118,8 @@ ZAnimation::~ZAnimation()
 
 void ZAnimation::addKeyFrame(double time)
 {
-  assert(time >= 0.0);
-  assert(m_view);
+  CHECK(time >= 0.0);
+  CHECK(m_view);
 
   bool objChange = false;
   bool sorted = false;
@@ -298,7 +298,7 @@ void ZAnimation::rebindView()
     if (id == 0)
       continue;
     std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
-    assert(wg);
+    CHECK(wg);
     connect(wg.get(), &ZWidgetsGroup::widgetsGroupChanged, this, &ZAnimation::rebindView);
     sorted = bind(m_objList[k]->objParaAnimations, wg->getParameterList()) || sorted;
   }
@@ -319,7 +319,7 @@ void ZAnimation::releaseView()
 
 void ZAnimation::exportFixedSize3DAnimation(const QDir &dir, const QString &fn, double framePerSecond, int width, int height, Z3DScreenShotType sst)
 {
-  assert(m_view);
+  CHECK(m_view);
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
       QMessageBox::critical(QApplication::activeWindow(), "Error", QString("Can not create folder %1").arg(dir.path()));
@@ -427,7 +427,7 @@ void ZAnimation::exportFixedSize3DAnimation(const QDir &dir, const QString &fn, 
 
 void ZAnimation::export3DAnimation(const QDir &dir, const QString &fn, double framePerSecond, Z3DScreenShotType sst)
 {
-  assert(m_view);
+  CHECK(m_view);
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
       QMessageBox::critical(QApplication::activeWindow(), "Error", QString("Can not create folder %1").arg(dir.path()));
@@ -541,7 +541,7 @@ void ZAnimation::export3DAnimation(const QDir &dir, const QString &fn, double fr
 
 void ZAnimation::exportFixedSize2DAnimation(const QDir &dir, const QString &fn, double framePerSecond, int width, int height)
 {
-  assert(m_view);
+  CHECK(m_view);
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
       QMessageBox::critical(QApplication::activeWindow(), "Error", QString("Can not create folder %1").arg(dir.path()));
@@ -647,7 +647,7 @@ void ZAnimation::exportFixedSize2DAnimation(const QDir &dir, const QString &fn, 
 
 void ZAnimation::export2DAnimation(const QDir &dir, const QString &fn, double framePerSecond)
 {
-  assert(m_view);
+  CHECK(m_view);
   ZGraphicsView& canvasPainter = static_cast<ZView*>(m_view)->graphicsView();
   exportFixedSize2DAnimation(dir, fn, framePerSecond, canvasPainter.viewportSize().width(), canvasPainter.viewportSize().height());
 }
@@ -674,7 +674,7 @@ void ZAnimation::tryLinkAnimationWith(size_t id)
     if (m_objList[i]->boundId == 0 && m_objList[i]->objType == doc->typeName() && doc->isSameObj(m_objList[i]->objJsonValue, jv)) {
       m_objList[i]->boundId = id;
       std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
-      assert(wg);
+      CHECK(wg);
       bind(m_objList[i]->objParaAnimations, wg->getParameterList());
       buildDisplayPacks();
       emit objViewChanged();

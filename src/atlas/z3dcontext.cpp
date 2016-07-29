@@ -1,14 +1,14 @@
 #include "z3dcontext.h"
 
 #include <QOpenGLContext>
-#include <cassert>
+#include "zlog.h"
 
 namespace nim {
 
 Z3DContext::Z3DContext()
   : m_context(QOpenGLContext::currentContext()->shareGroup())
 {
-  assert(m_context);
+  CHECK(m_context);
 }
 
 Z3DContext::~Z3DContext()

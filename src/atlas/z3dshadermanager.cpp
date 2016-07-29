@@ -45,7 +45,7 @@ Z3DShader &Z3DShaderManager::shader(const QString &fn, const QString &header, co
     fileStream.setCodec("UTF-8");
     QString src = header + fileStream.readAll();
 
-    assert(context == Z3DContext());
+    CHECK(context == Z3DContext());
     auto shdr = std::make_unique<Z3DShader>(type);
     shdr->compileSourceCode(src);
     Z3DShader *res = shdr.get();

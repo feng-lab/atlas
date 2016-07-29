@@ -25,14 +25,14 @@ namespace {
 
 nim::ZMesh vtkPolyDataToMesh(vtkPolyData *polyData)
 {
-  assert(polyData);
+  CHECK(polyData);
   vtkPoints* points = polyData->GetPoints();
   vtkCellArray* polys = polyData->GetPolys();
   vtkDataArray* pointsNormals = polyData->GetPointData()->GetNormals();
 
   std::vector<glm::dvec3> vertices(points->GetNumberOfPoints());
   std::vector<glm::dvec3> normals(pointsNormals->GetNumberOfTuples());
-  assert(vertices.size() == normals.size());
+  CHECK(vertices.size() == normals.size());
   std::vector<GLuint> indices;
   for (vtkIdType id=0; id<points->GetNumberOfPoints(); ++id) {
     points->GetPoint(id, &vertices[id][0]);
@@ -71,7 +71,7 @@ vtkSmartPointer<vtkPolyData> meshToVtkPolyData(const nim::ZMesh &mesh)
 
   vtkSmartPointer<vtkFloatArray> nrmls = vtkSmartPointer<vtkFloatArray>::New();
   const std::vector<glm::vec3>& normals = mesh.normals();
-  assert(normals.size() == vertices.size());
+  CHECK(normals.size() == vertices.size());
   nrmls->SetNumberOfComponents(3);
   nrmls->Allocate(3*normals.size());
   nrmls->SetName("Normals");
@@ -162,7 +162,7 @@ void ZMesh::save(const QString &filename, const std::string &format) const
 
 void ZMesh::load(H5::Group &allGrp)
 {
-  assert(m_type == GL_TRIANGLES && numVertices() == numNormals());
+  CHECK(m_type == GL_TRIANGLES && numVertices() == numNormals());
   clear();
 
   try {
@@ -256,13 +256,13 @@ void ZMesh::save(H5::Group &allGrp) const
       type.write(strType, std::string("TRIANGLE_FAN"));
       break;
     default:
-      assert(false);
+      CHECK(false);
       break;
     }
 
     hsize_t verticesDim[2];
     verticesDim[1] = 3;
-    assert(numVertices() >= 3);
+    CHECK(numVertices() >= 3);
     verticesDim[0] = numVertices();
     H5::DataSpace verticesDataspace(2, verticesDim);
     H5::DataSet vertices = allGrp.createDataSet("Vertices", floatType, verticesDataspace);
@@ -270,7 +270,7 @@ void ZMesh::save(H5::Group &allGrp) const
 
     hsize_t normalsDim[2];
     normalsDim[1] = 3;
-    assert(numNormals() >= 3);
+    CHECK(numNormals() >= 3);
     normalsDim[0] = numNormals();
     H5::DataSpace normalsDataspace(2, normalsDim);
     H5::DataSet normals = allGrp.createDataSet("Normals", floatType, normalsDataspace);
@@ -517,7 +517,7 @@ std::vector<glm::uvec3> ZMesh::triangleIndices() const
 glm::uvec3 ZMesh::triangleIndices(size_t index) const
 {
   glm::uvec3 triangle;
-  assert(index < numTriangles());
+  CHECK(index < numTriangles());
   if (m_indices.empty()) {
     if (m_type == GL_TRIANGLES) {
       triangle[0] = index*3;
@@ -562,7 +562,7 @@ glm::uvec3 ZMesh::triangleIndices(size_t index) const
 
 glm::vec3 ZMesh::triangleVertex(size_t triangleIndex, size_t vertexIndex) const
 {
-  assert(vertexIndex <= 2);
+  CHECK(vertexIndex <= 2);
   return triangleVertices(triangleIndex)[vertexIndex];
 }
 
@@ -685,7 +685,7 @@ void ZMesh::logProperties(const ZMeshProperties &prop, const QString &str)
 
 ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3> &coordLlfs, const std::vector<glm::vec3> &coordUrbs)
 {
-  assert(coordLlfs.size() == coordUrbs.size());
+  CHECK(coordLlfs.size() == coordUrbs.size());
   ZMesh cubes(GL_TRIANGLES);
   std::vector<glm::vec3> vertices;
   std::vector<glm::vec3> normals;
@@ -693,7 +693,7 @@ ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3> &coordLlfs, cons
   GLuint idxes[6] = {0, 1, 2, 2, 1, 3};
 
   for (size_t i=0; i<coordLlfs.size(); ++i) {
-    //assert(coordUrbs[i].z > coordLlfs[i].z && coordUrbs[i].y > coordLlfs[i].y && coordUrbs[i].x > coordLlfs[i].x);
+    //CHECK(coordUrbs[i].z > coordLlfs[i].z && coordUrbs[i].y > coordLlfs[i].y && coordUrbs[i].x > coordLlfs[i].x);
     glm::vec3 p0(coordLlfs[i][0], coordLlfs[i][1], coordUrbs[i][2]);
     glm::vec3 p1(coordUrbs[i][0], coordLlfs[i][1], coordUrbs[i][2]);
     glm::vec3 p2(coordLlfs[i][0], coordUrbs[i][1], coordUrbs[i][2]);
@@ -1011,7 +1011,7 @@ ZMesh ZMesh::createSphereMesh(const glm::vec3 &center, float radius,
 ZMesh ZMesh::createTubeMesh(const std::vector<glm::vec3> &line, const std::vector<float> &radius,
                             int numberOfSides, bool capping)
 {
-  assert(line.size() == radius.size());
+  CHECK(line.size() == radius.size());
   vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
   points->SetDataType(VTK_FLOAT);
   for (size_t i=0; i<line.size(); ++i) {
@@ -1055,7 +1055,7 @@ ZMesh ZMesh::createTubeMesh(const std::vector<glm::vec3> &line, const std::vecto
 ZMesh ZMesh::createConeMesh(glm::vec3 base, float baseRadius, glm::vec3 top, float topRadius,
                             int numberOfSides, bool capping)
 {
-  assert(baseRadius >= 0 && topRadius >= 0 &&  numberOfSides > 2);
+  CHECK(baseRadius >= 0 && topRadius >= 0 &&  numberOfSides > 2);
   if (baseRadius > topRadius) {
     std::swap(base, top);
     std::swap(baseRadius, topRadius);
@@ -1230,7 +1230,7 @@ void ZMesh::createSwcMesh(const ZSwc &tree, double zScale, int rootType, ZMesh &
   }
 
   for (std::vector<SwcTreeNode>& branch : allBranches) {
-    assert(branch.size() >= 1);
+    CHECK(branch.size() >= 1);
     size_t lastRootNodeIndex = branch.size();
     for (size_t i = branch.size()-1; i>0; --i) {
       if (branch[i]->type == rootType) {

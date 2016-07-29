@@ -2,6 +2,7 @@
 
 #include <Mathematics/GteDistLineRay.h>
 #include <QtMath>  // for M_PI
+#include "zlog.h"
 
 namespace nim {
 
@@ -680,11 +681,11 @@ void Z3DBoundedFilter::updateSelectedHandle(int handleIdx)
       m_handleArrowRenderer.setArrowColors(&m_handleArrowColors);
       break;
     default:
-      assert(false);
+      CHECK(false);
     }
     interactionHandler().setEnabled(true);
   } else {
-    assert(m_selectedHandle == 0);
+    CHECK(m_selectedHandle == 0);
     float av = 95.f / 255.f;
     switch (handleIdx) {
     case 1:
@@ -704,7 +705,7 @@ void Z3DBoundedFilter::updateSelectedHandle(int handleIdx)
       m_handleArrowRenderer.setArrowColors(&m_handleArrowColors);
       break;
     default:
-      assert(false);
+      CHECK(false);
     }
     interactionHandler().setEnabled(false);
   }

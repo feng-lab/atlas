@@ -107,7 +107,7 @@ std::shared_ptr<ZImg> ZImgPackSubBlock::read() const
     }
     break;
   default:
-    assert(false);
+    CHECK(false);
     break;
   }
   return res;
@@ -297,7 +297,7 @@ const QString &ZImgPack::detailedInfo() const
 
 void ZImgPack::setChannelColor(size_t c, col4 col)
 {
-  assert(c < m_imgInfo.numChannels);
+  CHECK(c < m_imgInfo.numChannels);
   m_imgInfo.channelColors[c] = col;
   if (!m_diskCached) {
     m_img.infoRef().channelColors[c] = col;
@@ -322,7 +322,7 @@ void ZImgPack::save(QString fileName, FileFormat format, Compression comp)
   std::vector<ZImgInfo> infos;
   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
   ZImgIOInstance.readInfo(m_imgSource.filenames[0], infos, &subBlocks, nullptr, m_imgSource.format);
-  assert(!infos.empty() && !subBlocks.empty());
+  CHECK(!infos.empty() && !subBlocks.empty());
   m_imgInfo = infos[0];
   m_numScenes = infos.size();
   buildFastReadIndex(subBlocks[0]);
@@ -383,7 +383,7 @@ bool ZImgPack::needUpdate(const QRectF &viewport, double scale, const QRectF &ol
 void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>> &imgs, std::vector<QPoint> &locs, std::vector<double> &scales,
                                    size_t z, size_t t, const QRectF &viewport, double scale, bool mip) const
 {
-  assert(m_diskCached);
+  CHECK(m_diskCached);
 
   imgs.clear();
   locs.clear();
@@ -438,7 +438,7 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
       const std::vector<size_t>& tileIndice = tiit->second;
       for (size_t i=0; i<tileIndice.size(); ++i) {
         const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
-        assert(tile.x >= 0 && tile.y >= 0);
+        CHECK(tile.x >= 0 && tile.y >= 0);
         if (static_cast<int64_t>(x) >= tile.x && static_cast<int64_t>(x) < tile.x + tile.width &&
             static_cast<int64_t>(y) >= tile.y && static_cast<int64_t>(y) < tile.y + tile.height) {
           std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(HashKeyType(this, tileIndice[i])), tile);
@@ -449,7 +449,7 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
     return 0;
   } else {
     if (mip) {
-      assert(!m_maximumProjectedAlongZImg.isEmpty());
+      CHECK(!m_maximumProjectedAlongZImg.isEmpty());
       return m_maximumProjectedAlongZImg.value<double>(x, y, 0, c, t);
     } else {
       return m_img.value<double>(x, y, z, c, t);
@@ -488,7 +488,7 @@ double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, 
     return hasTile ? value(x, y, z, c, t, mip) : 0;
   } else {
     if (mip) {
-      assert(!m_maximumProjectedAlongZImg.isEmpty());
+      CHECK(!m_maximumProjectedAlongZImg.isEmpty());
       return m_maximumProjectedAlongZImg.value<double>(x, y, 0, c, t);
     } else {
       return m_img.value<double>(x, y, z, c, t);
@@ -549,7 +549,7 @@ ZImg ZImgPack::crop(const ZImgRegion &region) const
 ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) const
 {
   LOG(INFO) << width << " " << height << " " << depth;
-  assert(width <= m_imgInfo.width && height <= m_imgInfo.height && depth <= m_imgInfo.depth &&
+  CHECK(width <= m_imgInfo.width && height <= m_imgInfo.height && depth <= m_imgInfo.depth &&
          width > 0 && height > 0 && depth > 0);
   ZImg res;
 
@@ -641,7 +641,7 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
 
 const ZImg &ZImgPack::maxZProjectedImg() const
 {
-  assert(!m_diskCached);
+  CHECK(!m_diskCached);
   if (m_maximumProjectedAlongZImg.isEmpty()) {
     m_img.maximumZProjection().swap(m_maximumProjectedAlongZImg);
   }
@@ -650,7 +650,7 @@ const ZImg &ZImgPack::maxZProjectedImg() const
 
 ZImg &ZImgPack::maxZProjectedImg()
 {
-  assert(!m_diskCached);
+  CHECK(!m_diskCached);
   if (m_maximumProjectedAlongZImg.isEmpty()) {
     m_img.maximumZProjection().swap(m_maximumProjectedAlongZImg);
   }
@@ -659,13 +659,13 @@ ZImg &ZImgPack::maxZProjectedImg()
 
 ZImg ZImgPack::slice(size_t z, size_t t) const
 {
-  assert(m_diskCached);
+  CHECK(m_diskCached);
   return assembleImg(1, t, z);
 }
 
 ZImg ZImgPack::allSlices(size_t t) const
 {
-  assert(m_diskCached);
+  CHECK(m_diskCached);
   return assembleImg(1, t);
 }
 
@@ -890,7 +890,7 @@ void ZImgPack::createTileIndexStructure()
 
 ZImg ZImgPack::assembleImg(size_t ratio) const
 {
-  assert(ratio >= 1);
+  CHECK(ratio >= 1);
   ZImgInfo info = m_imgInfo;
   if (ratio > 1) {
     info.width = m_ratioToSize.at(ratio).width();
@@ -921,7 +921,7 @@ ZImg ZImgPack::assembleImg(size_t ratio) const
 
 ZImg ZImgPack::assembleImg(size_t ratio, size_t t) const
 {
-  assert(ratio >= 1);
+  CHECK(ratio >= 1);
   //LOG(INFO) << "assemble level " << level;
   ZImgRegion rgn(0,-1,0,-1,0,-1,0,-1,t,t+1);
   ZImgInfo info = rgn.clip(m_imgInfo);
@@ -950,7 +950,7 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t) const
 
 ZImg ZImgPack::assembleImg(size_t ratio, size_t t, size_t z) const
 {
-  assert(ratio >= 1);
+  CHECK(ratio >= 1);
   ZImgRegion rgn(0,-1,0,-1,z,z+1,0,-1,t,t+1);
   ZImgInfo info = rgn.clip(m_imgInfo);
   if (ratio > 1) {
@@ -1021,7 +1021,7 @@ void ZImgPack::updateNameTootip()
 
 size_t ZImgPack::ratioForScale(double scale) const
 {
-  assert(!m_ratioToSize.empty());
+  CHECK(!m_ratioToSize.empty());
   size_t needRatio = std::max(1.0, std::floor(1.0 / scale));
   return readRatioOf(needRatio);
 }

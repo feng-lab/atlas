@@ -18,6 +18,7 @@
 #include <QMessageBox>
 
 #include "z3dshaderprogram.h"
+#include "zlog.h"
 
 #include <math.h>
 
@@ -847,7 +848,7 @@ void Z3DTransferFunctionEditor::changeHistogramNormalizeMethod()
 
 void Z3DTransferFunctionEditor::updateFromTransferFunction()
 {
-  assert(m_transferFunction);
+  CHECK(m_transferFunction);
 
   // check whether the volume associated with the TransFuncProperty has changed
   Z3DVolume* newVolume = m_transferFunction->volume();

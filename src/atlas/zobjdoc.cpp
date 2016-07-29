@@ -65,7 +65,7 @@ std::map<size_t, size_t> ZObjDoc::read(const QList<QPair<QString, QJsonValue>> &
   std::map<size_t,QJsonValue> idToJsonValue;
   for (int i=0; i<docKeyValueList.size(); ++i) {
     QString keyString = docKeyValueList[i].first;
-    assert(keyString.startsWith(typeName()));
+    CHECK(keyString.startsWith(typeName()));
     bool ok = false;
     size_t id = 0;
     if (keyString.length() > typeName().length() + 1) {

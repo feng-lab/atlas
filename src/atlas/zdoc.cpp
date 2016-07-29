@@ -140,7 +140,7 @@ QString ZDoc::objName(size_t id) const
   } else if (id == 3) {
     return QString("Lighting");
   } else {
-    assert(false);
+    CHECK(false);
     return "";
   }
 }
@@ -156,7 +156,7 @@ QString ZDoc::objNameWithModifiedMarker(size_t id) const
   } else if (id == 3) {
     return QString("Lighting");
   } else {
-    assert(false);
+    CHECK(false);
     return "";
   }
 }
@@ -172,7 +172,7 @@ QString ZDoc::objNameWithModifiedMarkerAndID(size_t id) const
   } else if (id == 3) {
     return QString("Lighting");
   } else {
-    assert(false);
+    CHECK(false);
     return "";
   }
 }
@@ -182,7 +182,7 @@ QString ZDoc::objDetailedInfo(size_t id) const
   if (id >= 100) {
     return idToDoc(id)->objDetailedInfo(id);
   } else {
-    assert(false);
+    CHECK(false);
     return "";
   }
 }

@@ -103,7 +103,7 @@ Z3DView::Z3DView(ZDoc *doc, bool stereo, Z3DMainWindow *parent)
   , m_numObjsBefore(m_doc->numObjs())
   , m_lock(false)
 {
-  assert(m_doc);
+  CHECK(m_doc);
   m_canvas = new Z3DCanvas("", 512, 512);
   init();
 

@@ -174,7 +174,7 @@ QWidget *ZBoolParameter::actualCreateWidget(QWidget *parent)
 
 void ZBoolParameter::setSameAs(const ZParameter &rhs)
 {
-  assert(this->isSameType(rhs));
+  CHECK(this->isSameType(rhs));
   set(static_cast<const ZBoolParameter*>(&rhs)->get());
   ZSingleValueParameter<bool>::setSameAs(rhs);
 }

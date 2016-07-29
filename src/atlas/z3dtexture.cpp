@@ -15,7 +15,7 @@ Z3DTexture::Z3DTexture(GLenum textureTarget, GLint internalFormat, const glm::uv
   , m_dataFormat(dataFormat)
   , m_dataType(dataType)
 {
-  assert(m_dimension.x > 0 && m_dimension.y > 0 && m_dimension.z > 0);
+  CHECK(m_dimension.x > 0 && m_dimension.y > 0 && m_dimension.z > 0);
   getType();
   glGenTextures(1, &m_id);
   setFilter();
@@ -29,7 +29,7 @@ Z3DTexture::Z3DTexture(GLint internalFormat, const glm::uvec3 &dimension, GLenum
   , m_dataFormat(dataFormat)
   , m_dataType(dataType)
 {
-  assert(m_dimension.x > 0 && m_dimension.y > 0 && m_dimension.z > 0);
+  CHECK(m_dimension.x > 0 && m_dimension.y > 0 && m_dimension.z > 0);
   if (m_dimension.z > 1) {
     m_textureTarget = GL_TEXTURE_3D;
   } else if (m_dimension.y > 1) {
@@ -106,7 +106,7 @@ void Z3DTexture::uploadImage(const GLvoid *data) const
 
 void Z3DTexture::uploadSubImage(const glm::uvec3 &offset, const glm::uvec3 &size, const GLvoid *data) const
 {
-  assert(data);
+  CHECK(data);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
   bind();
@@ -418,7 +418,7 @@ void Z3DTexture::getType()
   } else if (is1DTexture()) {
     m_type = 1;
   } else {
-    assert(false);
+    CHECK(false);
   }
 }
 

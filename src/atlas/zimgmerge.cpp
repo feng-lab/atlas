@@ -59,7 +59,7 @@ void mergeMean_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord
       if (tiles[i].contains(*it))
         buf.push_back(tiles[i].value<TVoxel>(*it));
     }
-    assert(buf.size() > 1);
+    CHECK(buf.size() > 1);
 
     ZVoxelCoordinate locInRes = *it - minCoord;
     *res.data<TVoxel>(locInRes) = static_cast<TVoxel>(mean(buf.begin(), buf.end()));;
@@ -76,7 +76,7 @@ void mergeMedian_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoo
       if (tiles[i].contains(*it))
         buf.push_back(tiles[i].value<TVoxel>(*it));
     }
-    assert(buf.size() > 1);
+    CHECK(buf.size() > 1);
 
     ZVoxelCoordinate locInRes = *it - minCoord;
     *res.data<TVoxel>(locInRes) = static_cast<TVoxel>(medianInPlace(buf.begin(), buf.end()));;
@@ -421,7 +421,7 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
           .arg(m_imgNames.at(img2))
           .arg(pairIt->second.second);
     } else {
-      assert(img1HasLocation && img2HasLocation);
+      CHECK(img1HasLocation && img2HasLocation);
     }
   }
 #endif

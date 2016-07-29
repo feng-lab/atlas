@@ -62,7 +62,7 @@ void ZImageMatrix2DTransform::transformRange(double inXMin, double inXMax, doubl
 
 void ZImageMatrix2DTransform::transformPointInverse(double *inoutCoords) const
 {
-  assert(inoutCoords);
+  CHECK(inoutCoords);
   const Eigen::Matrix3d& mat = m_tform.inverseTransformMatrix();
 
   double inCoords[2];
@@ -99,7 +99,7 @@ void ZImageMatrix2DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 
 void ZImageMatrix2DTransform::transformPoint(double *inoutCoords) const
 {
-  assert(inoutCoords);
+  CHECK(inoutCoords);
   const Eigen::Matrix3d& mat = m_tform.transformMatrix();
 
   double inCoords[2];
@@ -155,7 +155,7 @@ void ZImageYTranslation2DTransform::adaptParameters(size_t fromLevel, size_t toL
 
 void ZImageYTranslation2DTransform::transformPoint(double *inoutCoords) const
 {
-  assert(inoutCoords);
+  CHECK(inoutCoords);
   const Eigen::Matrix3d& mat = m_tform.transformMatrix();
 
   inoutCoords[1] += mat(1,2);
@@ -208,7 +208,7 @@ void ZImageTranslation2DTransform::adaptParameters(size_t fromLevel, size_t toLe
 
 void ZImageTranslation2DTransform::transformPoint(double *inoutCoords) const
 {
-  assert(inoutCoords);
+  CHECK(inoutCoords);
   const Eigen::Matrix3d& mat = m_tform.transformMatrix();
 
   inoutCoords[0] += mat(0,2);

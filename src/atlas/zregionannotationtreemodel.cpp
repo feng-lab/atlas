@@ -144,13 +144,13 @@ QModelIndex ZRegionAnnotationTreeModel::index(int row, int column, const QModelI
     return QModelIndex();
 
   if (!parent.isValid()) {
-    assert(row < static_cast<int>(m_annotationTree.numRoots()));
+    CHECK(row < static_cast<int>(m_annotationTree.numRoots()));
     auto it = m_annotationTree.beginRoot();
     std::advance(it, row);
     RegionNode* node = &(*it);
     return createIndex(row, column, node);
   } else {
-    assert(row < static_cast<int>(m_annotationTree.numChildren(m_nodeToIter.at(static_cast<RegionNode*>(parent.internalPointer())))));
+    CHECK(row < static_cast<int>(m_annotationTree.numChildren(m_nodeToIter.at(static_cast<RegionNode*>(parent.internalPointer())))));
     auto it = m_annotationTree.beginChild(m_nodeToIter.at(static_cast<RegionNode*>(parent.internalPointer())));
     std::advance(it, row);
     RegionNode* node = &(*it);

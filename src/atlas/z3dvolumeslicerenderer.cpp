@@ -26,7 +26,7 @@ Z3DVolumeSliceRenderer::Z3DVolumeSliceRenderer(Z3DRendererBase &rendererBase)
 
 void Z3DVolumeSliceRenderer::setData(const Z3DImg &img, const std::vector<std::unique_ptr<ZColorMapParameter> > &colormaps)
 {
-  assert(colormaps.size() >= img.numChannels() && img.is3DData());
+  CHECK(colormaps.size() >= img.numChannels() && img.is3DData());
 
   m_img = &img;
   m_colormaps = &colormaps;

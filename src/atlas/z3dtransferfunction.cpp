@@ -125,7 +125,7 @@ void Z3DTransferFunction::updateTexture()
 {
   if (!m_texture || (m_texture->dimension() != glm::uvec3(m_dimensions)))
     createTexture();
-  assert(m_texture);
+  CHECK(m_texture);
 
   std::vector<glm::col4> tfData(m_dimensions.x);
   for (size_t x = 0; x < tfData.size(); ++x)
@@ -192,7 +192,7 @@ QWidget *Z3DTransferFunctionParameter::actualCreateWidget(QWidget *parent)
 
 void Z3DTransferFunctionParameter::setSameAs(const ZParameter &rhs)
 {
-  assert(this->isSameType(rhs));
+  CHECK(this->isSameType(rhs));
   const Z3DTransferFunctionParameter* src = static_cast<const Z3DTransferFunctionParameter*>(&rhs);
   if (m_value != src->get()) {
     m_value = src->get();

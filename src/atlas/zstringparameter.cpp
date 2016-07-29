@@ -1,6 +1,7 @@
 #include "zstringparameter.h"
 #include <QtGui>
 #include <QtWidgets>
+#include "zlog.h"
 
 namespace nim {
 
@@ -35,7 +36,7 @@ void ZStringParameter::afterChange(QString &)
 
 void ZStringParameter::setSameAs(const ZParameter &rhs)
 {
-  assert(this->isSameType(rhs));
+  CHECK(this->isSameType(rhs));
   const ZStringParameter* src = static_cast<const ZStringParameter*>(&rhs);
   this->set(src->get());
   ZParameter::setSameAs(rhs);

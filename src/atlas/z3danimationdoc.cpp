@@ -185,7 +185,7 @@ QJsonValue Z3DAnimationDoc::jsonValue(size_t id) const
 
 bool Z3DAnimationDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
 {
-  assert(v1.isString() && v2.isString());
+  CHECK(v1.isString() && v2.isString());
   if (v1 == v2)
     return true;
   QString f1 = v1.toString();
@@ -202,7 +202,7 @@ size_t Z3DAnimationDoc::makeAlias(size_t)
 
 bool Z3DAnimationDoc::isAlias(size_t id) const
 {
-  assert(m_idToAnimationPacks.find(id) != m_idToAnimationPacks.end());
+  CHECK(m_idToAnimationPacks.find(id) != m_idToAnimationPacks.end());
 
   auto& pack = m_idToAnimationPacks.at(id);
   for (auto it = m_idToAnimationPacks.cbegin(); it != m_idToAnimationPacks.cend(); ++it) {
@@ -214,7 +214,7 @@ bool Z3DAnimationDoc::isAlias(size_t id) const
 
 QWidget *Z3DAnimationDoc::createObjEditWidget(size_t id)
 {
-  assert(m_idToAnimationPacks.find(id) != m_idToAnimationPacks.end());
+  CHECK(m_idToAnimationPacks.find(id) != m_idToAnimationPacks.end());
 
   auto& pack = m_idToAnimationPacks.at(id);
   return new ZAnimationWidget(*pack->animation);

@@ -146,7 +146,7 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, Z3DScreenShotType 
   m_renderToImage = true;
   m_renderToImageError.clear();
   m_renderToImageType = sst;
-  assert(m_monoImg.isEmpty() && m_leftImg.isEmpty() && m_rightImg.isEmpty());
+  CHECK(m_monoImg.isEmpty() && m_leftImg.isEmpty() && m_rightImg.isEmpty());
   m_tiledRendering = false;
 
   // force rendering pass
@@ -217,7 +217,7 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, int width, int hei
   m_renderToImage = true;
   m_renderToImageError.clear();
   m_renderToImageType = sst;
-  assert(m_monoImg.isEmpty() && m_leftImg.isEmpty() && m_rightImg.isEmpty());
+  CHECK(m_monoImg.isEmpty() && m_leftImg.isEmpty() && m_rightImg.isEmpty());
 
   const int tileSize = 2048;
   const int tileBorder = 128;
@@ -347,7 +347,7 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
       ZImg bufImg;
       bufImg.wrapData(colorBuffer.get(), ZImgInfo(tex->width(), tex->height(), 1, 4));
       if (m_tiledRendering) {
-        assert(!m_monoImg.isEmpty());
+        CHECK(!m_monoImg.isEmpty());
         ZImg tmpImg = ZImg(bufImg.info());
         ZImgFormat::CXYZtoXYZC(bufImg, tmpImg, true);
         m_monoImg.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
@@ -366,7 +366,7 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
       bufImg.wrapData(colorBuffer.get(), ZImgInfo(tex->width(), tex->height(), 1, 4));
       ZImg tmpImg;
       if (m_tiledRendering) {
-        assert(!m_leftImg.isEmpty());
+        CHECK(!m_leftImg.isEmpty());
         tmpImg = ZImg(bufImg.info());
         ZImgFormat::CXYZtoXYZC(bufImg, tmpImg, true);
         m_leftImg.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
@@ -379,7 +379,7 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
       tex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
       bufImg.wrapData(colorBuffer.get(), ZImgInfo(tex->width(), tex->height(), 1, 4));
       if (m_tiledRendering) {
-        assert(!m_rightImg.isEmpty());
+        CHECK(!m_rightImg.isEmpty());
         ZImgFormat::CXYZtoXYZC(bufImg, tmpImg, true);
         m_rightImg.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
       } else {

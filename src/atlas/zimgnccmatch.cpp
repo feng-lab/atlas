@@ -61,7 +61,7 @@ void ZImgNCCMatch::setMovingImgPositionHint(PositionHint hint, double maxOverlap
     hint ^= Back;
   }
   m_movingImgPosHint = hint;
-  assert(maxOverlapRate >= 0.01 && maxOverlapRate <= 1.0);
+  CHECK(maxOverlapRate >= 0.01 && maxOverlapRate <= 1.0);
   m_maxOverlapRate = maxOverlapRate;
 }
 
@@ -542,7 +542,7 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc(ZImg &fixedImg, ZImg &movingImg,
   ZImg numberOfOverlapVoxelsImg;
   normXCorr(fixedImg, movingImg, nccImg, numberOfOverlapVoxelsImg);
 
-  assert(!nccImg.isTimeSeries() && !nccImg.isMultiChannelsImg());
+  CHECK(!nccImg.isTimeSeries() && !nccImg.isMultiChannelsImg());
   if (!nccImgValidRegion.containsWholeImg(nccImg.info())) {
     nccImg = nccImg.crop(nccImgValidRegion);
     numberOfOverlapVoxelsImg = numberOfOverlapVoxelsImg.crop(nccImgValidRegion);
@@ -571,7 +571,7 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc_S(ZImg &fixedImg, ZImg &movingImg
   ZImg numberOfOverlapVoxelsImg;
   normXCorr(fixedImg, movingImg, nccImg, numberOfOverlapVoxelsImg);
 
-  assert(!nccImg.isTimeSeries() && !nccImg.isMultiChannelsImg());
+  CHECK(!nccImg.isTimeSeries() && !nccImg.isMultiChannelsImg());
   if (!nccImgValidRegion.containsWholeImg(nccImg.info())) {
     nccImg = nccImg.crop(nccImgValidRegion);
     numberOfOverlapVoxelsImg = numberOfOverlapVoxelsImg.crop(nccImgValidRegion);
@@ -686,34 +686,34 @@ std::pair<ZImgRegion, ZImgRegion> ZImgNCCMatch::getRequiredSrcImgRegion(const Po
   if (hint.testFlag(Left)) {
     size_t maxNumOverlapPixelsX = std::ceil(std::min(fixedImg.width(), movingImg.width()) * overlapRate);
     fixedRgn.end.x = std::min(maxNumOverlapPixelsX, fixedImg.width());
-    assert(movingImg.width() >= maxNumOverlapPixelsX);
+    CHECK(movingImg.width() >= maxNumOverlapPixelsX);
     movingRgn.start.x = movingImg.width() - maxNumOverlapPixelsX;
   } else if (hint.testFlag(Right)) {
     size_t maxNumOverlapPixelsX = std::ceil(std::min(fixedImg.width(), movingImg.width()) * overlapRate);
     movingRgn.end.x = std::min(maxNumOverlapPixelsX, movingImg.width());
-    assert(fixedImg.width() >= maxNumOverlapPixelsX);
+    CHECK(fixedImg.width() >= maxNumOverlapPixelsX);
     fixedRgn.start.x = fixedImg.width() - maxNumOverlapPixelsX;
   }
   if (hint.testFlag(Up)) {
     size_t maxNumOverlapPixelsY = std::ceil(std::min(fixedImg.height(), movingImg.height()) * overlapRate);
     fixedRgn.end.y = std::min(maxNumOverlapPixelsY, fixedImg.height());
-    assert(movingImg.height() >= maxNumOverlapPixelsY);
+    CHECK(movingImg.height() >= maxNumOverlapPixelsY);
     movingRgn.start.y = movingImg.height() - maxNumOverlapPixelsY;
   } else if (hint.testFlag(Down)) {
     size_t maxNumOverlapPixelsY = std::ceil(std::min(fixedImg.height(), movingImg.height()) * overlapRate);
     movingRgn.end.y = std::min(maxNumOverlapPixelsY, movingImg.height());
-    assert(fixedImg.height() >= maxNumOverlapPixelsY);
+    CHECK(fixedImg.height() >= maxNumOverlapPixelsY);
     fixedRgn.start.y = fixedImg.height() - maxNumOverlapPixelsY;
   }
   if (hint.testFlag(Front)) {
     size_t maxNumOverlapPixelsZ = std::ceil(std::min(fixedImg.depth(), movingImg.depth()) * overlapRate);
     fixedRgn.end.z = std::min(maxNumOverlapPixelsZ, fixedImg.depth());
-    assert(movingImg.depth() >= maxNumOverlapPixelsZ);
+    CHECK(movingImg.depth() >= maxNumOverlapPixelsZ);
     movingRgn.start.z = movingImg.depth() - maxNumOverlapPixelsZ;
   } else if (hint.testFlag(Back)) {
     size_t maxNumOverlapPixelsZ = std::ceil(std::min(fixedImg.depth(), movingImg.depth()) * overlapRate);
     movingRgn.end.z = std::min(maxNumOverlapPixelsZ, movingImg.depth());
-    assert(fixedImg.depth() >= maxNumOverlapPixelsZ);
+    CHECK(fixedImg.depth() >= maxNumOverlapPixelsZ);
     fixedRgn.start.z = fixedImg.depth() - maxNumOverlapPixelsZ;
   }
 

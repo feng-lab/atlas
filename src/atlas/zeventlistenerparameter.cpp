@@ -100,7 +100,7 @@ QWidget *ZEventListenerParameter::actualCreateWidget(QWidget *parent)
 
 void ZEventListenerParameter::setSameAs(const ZParameter &rhs)
 {
-  assert(this->isSameType(rhs));
+  CHECK(this->isSameType(rhs));
   const ZEventListenerParameter* src = static_cast<const ZEventListenerParameter*>(&rhs);
   m_sharing = src->m_sharing;
   m_mouseEvents = src->m_mouseEvents;
@@ -110,13 +110,13 @@ void ZEventListenerParameter::setSameAs(const ZParameter &rhs)
 
 void ZEventListenerParameter::setValueSameAs(const ZParameter &rhs)
 {
-  assert(this->isSameType(rhs));
+  CHECK(this->isSameType(rhs));
 }
 
 void ZEventListenerParameter::interpolate(const ZParameter &prev, double progress, ZParameter &dest)
 {
   Q_UNUSED(progress)
-  assert(this->isSameType(prev) && this->isSameType(dest));
+  CHECK(this->isSameType(prev) && this->isSameType(dest));
 }
 
 QJsonValue ZEventListenerParameter::jsonValue() const

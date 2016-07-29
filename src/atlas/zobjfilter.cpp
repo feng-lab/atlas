@@ -35,7 +35,7 @@ void ZObjFilter::write(QJsonObject &json) const
 
 void ZObjFilter::addParameter(ZParameter *para)
 {
-  assert(para);
+  CHECK(para);
   m_parameters.push_back(para);
 }
 

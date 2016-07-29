@@ -14,6 +14,7 @@
 #include "zimgmetaimage.h"
 #include "zimgitkimage.h"
 #endif
+#include "zlog.h"
 
 namespace nim {
 
@@ -106,7 +107,7 @@ void ZImgIO::readInfo(const QStringList &fileList, Dimension catDim, std::vector
   }
 
   if (catDim == Dimension::C) {
-    assert(!subBlocks);   // not supported
+    CHECK(!subBlocks);   // not supported
   }
 
   readInfo(fileList[0], res, subBlocks, nullptr, format);
@@ -114,7 +115,7 @@ void ZImgIO::readInfo(const QStringList &fileList, Dimension catDim, std::vector
     throw ZIOException("Read sequence failed: img 0 is empty");
   }
   if (expandXY) {
-    assert(catDim != Dimension::X && catDim != Dimension::Y);
+    CHECK(catDim != Dimension::X && catDim != Dimension::Y);
   }
   for (int i=1; i<fileList.size(); ++i) {
     std::vector<ZImgInfo> tmpInfo;
@@ -163,7 +164,7 @@ void ZImgIO::readInfo(const QStringList &fileList, Dimension catDim, std::vector
                 tmpSubBlocks[s][tsidx]->t += res[s].size(d);
                 break;
               default:
-                assert(false);
+                CHECK(false);
                 break;
               }
               subBlocks->at(s).push_back(tmpSubBlocks[s][tsidx]);

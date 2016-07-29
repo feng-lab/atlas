@@ -861,7 +861,7 @@ std::vector<Eigen::MatrixXi> ZPunctaDetection::watershedSplit(const ZImg &imgIn)
   ZImgNeighborhoodConstIterator<uint32_t> nit(26, labelImg);
   for (size_t i=0; i<m_barrierVoxels.size(); ++i) {
     nit.goToIndex(m_barrierVoxels[i]);
-    assert(*nit == 0);
+    CHECK(*nit == 0);
     for (size_t nb = 0; nb < nit.numNeighbors(); ++nb) {
       if (nit.isInBound(nb) && nit.valueRef(nb) > 0) {
         CC.voxelIdxList[nit.valueRef(nb)-1].push_back(m_barrierVoxels[i]);

@@ -15,7 +15,7 @@ LogSinkPtr logModelSinkInstance()
 const std::deque<LogData>& logMessagesSoFar()
 {
   ZLogModelSink *md = dynamic_cast<ZLogModelSink*>(logModelSinkInstance().data());
-  assert(md);
+  CHECK(md);
   return md->logMessages();
 }
 #else

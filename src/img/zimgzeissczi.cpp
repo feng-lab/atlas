@@ -80,7 +80,7 @@ ZImg readCZITile(std::ifstream &inputFileStream, const CZITile &tile)
       info.voxelFormat = VoxelFormat::Float;
       break;
     case 3:
-      assert(info.numChannels == 1);
+      CHECK(info.numChannels == 1);
       dimensionOrder.remove('C');
       dimensionOrder.push_front('C');
       info.numChannels = 3;
@@ -88,7 +88,7 @@ ZImg readCZITile(std::ifstream &inputFileStream, const CZITile &tile)
       info.voxelFormat = VoxelFormat::Unsigned;
       break;
     case 4:
-      assert(info.numChannels == 1);
+      CHECK(info.numChannels == 1);
       dimensionOrder.remove('C');
       dimensionOrder.push_front('C');
       info.numChannels = 3;
@@ -96,7 +96,7 @@ ZImg readCZITile(std::ifstream &inputFileStream, const CZITile &tile)
       info.voxelFormat = VoxelFormat::Unsigned;
       break;
     case 8:
-      assert(info.numChannels == 1);
+      CHECK(info.numChannels == 1);
       dimensionOrder.remove('C');
       dimensionOrder.push_front('C');
       info.numChannels = 3;
@@ -104,7 +104,7 @@ ZImg readCZITile(std::ifstream &inputFileStream, const CZITile &tile)
       info.voxelFormat = VoxelFormat::Float;
       break;
     case 9:
-      assert(info.numChannels == 1);
+      CHECK(info.numChannels == 1);
       dimensionOrder.remove('C');
       dimensionOrder.push_front('C');
       info.numChannels = 4;
@@ -348,7 +348,7 @@ ZImg ZImgZeissCZI::stackTiles(const QString &filename, size_t ch, size_t scene, 
   }
 
   ZImg inverseMask(inverseMaskFile);
-  assert(inverseMask.isType<uint8_t>());
+  CHECK(inverseMask.isType<uint8_t>());
   double scale = std::pow(0.5, maskFilePyramidalLevel);
 
   std::vector<ZImg> imgs;
@@ -380,7 +380,7 @@ ZImg ZImgZeissCZI::stackTiles(const QString &filename, size_t ch, size_t scene, 
 ZImg ZImgZeissCZI::correctShading(const QString &filename, size_t ch, size_t scene,
                                   const ZImg &modelZ, const ZImg &modelV, ZImgZeissCZI::CorrectionMode cm)
 {
-  assert(modelZ.isType<double>() && modelV.isType<double>() && modelZ.isSameSize(modelV));
+  CHECK(modelZ.isType<double>() && modelV.isType<double>() && modelZ.isSameSize(modelV));
   clearInternalState();
 
   std::ifstream inputFileStream;
@@ -608,7 +608,7 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
         if (hasMixedTiles) {
           LOG(INFO) << "scene " << s << " with mixed tiles";
           if (mixAllTilesIfNecessary) {
-            assert(allMixedTiles.empty());
+            CHECK(allMixedTiles.empty());
             allMixedTiles.insert(m_sceneTiles[s].cbegin(), m_sceneTiles[s].cend());
           }
 
@@ -642,7 +642,7 @@ void ZImgZeissCZI::readInfo(const QString &filename, std::vector<ZImgInfo> &info
       pyramidalRatios->resize(infos.size());
       for (size_t s=0; s<infos.size(); ++s) {
         for (auto it=m_sceneTiles[s].cbegin(); it != m_sceneTiles[s].cend(); ++it) {
-          assert(it->ratio >= 1);
+          CHECK(it->ratio >= 1);
           pyramidalRatios->at(s).insert(it->ratio);
         }
       }
@@ -737,11 +737,11 @@ void ZImgZeissCZI::readImg(const QString &filename, ZImg &img, const ZImgRegion 
 
   std::set<size_t> pyRatios;
   for (auto it = m_sceneTiles[scene].cbegin(); it != m_sceneTiles[scene].cend(); ++it) {
-    assert(it->ratio >= 1);
+    CHECK(it->ratio >= 1);
     pyRatios.insert(it->ratio);
   }
 
-  assert(ratio >= 1);
+  CHECK(ratio >= 1);
   size_t readRatio = 0;
   for (auto it = pyRatios.cbegin(); it != pyRatios.cend(); ++it) {
     if (*it <= ratio) {
@@ -1408,7 +1408,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
     if (!m_shouldSeparateChannelsToDifferentScenes) { // remove channel info from scene idx
       allTiles[i].sceneIdx[5] = 0;
     } else {   // split channels to different scenes
-      assert(allTiles[i].size.c == 1);
+      CHECK(allTiles[i].size.c == 1);
       allTiles[i].start.c = 0;
     }
     sceneIdxToTiles[allTiles[i].sceneIdx].push_back(allTiles[i]);
@@ -1469,25 +1469,25 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
       info.voxelFormat = VoxelFormat::Float;
       break;
     case 3:
-      assert(info.numChannels == 1);
+      CHECK(info.numChannels == 1);
       info.numChannels = 3;
       info.bytesPerVoxel = 1;
       info.voxelFormat = VoxelFormat::Unsigned;
       break;
     case 4:
-      assert(info.numChannels == 1);
+      CHECK(info.numChannels == 1);
       info.numChannels = 3;
       info.bytesPerVoxel = 2;
       info.voxelFormat = VoxelFormat::Unsigned;
       break;
     case 8:
-      assert(info.numChannels == 1);
+      CHECK(info.numChannels == 1);
       info.numChannels = 3;
       info.bytesPerVoxel = 4;
       info.voxelFormat = VoxelFormat::Float;
       break;
     case 9:
-      assert(info.numChannels == 1);
+      CHECK(info.numChannels == 1);
       info.numChannels = 4;
       info.lastChannelIsAlphaChannel = true;
       info.bytesPerVoxel = 1;
@@ -1516,9 +1516,9 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
       if (m_channelNames.size() == info.numChannels) {
         info.channelNames = m_channelNames;
       } else if (m_channelNames.size() > info.numChannels && info.numChannels == 1) {  // channels are separated to different scenes
-        assert(m_shouldSeparateChannelsToDifferentScenes);
+        CHECK(m_shouldSeparateChannelsToDifferentScenes);
         int chIdx =  it->first.at(5) - channelStart;
-        assert(chIdx >= 0);
+        CHECK(chIdx >= 0);
         if (chIdx >= static_cast<int>(m_channelNames.size())) {
           throw ZIOException("channel number does not match metadata");
         }
@@ -1528,9 +1528,9 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
       if (m_channelColors.size() == info.numChannels) {
         info.channelColors = m_channelColors;
       } else if (m_channelColors.size() > info.numChannels && info.numChannels == 1) {  // channels are separated to different scenes
-        assert(m_shouldSeparateChannelsToDifferentScenes);
+        CHECK(m_shouldSeparateChannelsToDifferentScenes);
         int chIdx =  it->first.at(5) - channelStart;
-        assert(chIdx >= 0);
+        CHECK(chIdx >= 0);
         if (chIdx >= static_cast<int>(m_channelColors.size())) {
           throw ZIOException("channel number does not match metadata");
         }
@@ -1544,9 +1544,9 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inpu
           for (size_t idx = 1; idx < m_channelValidBitCount.size(); ++idx)
             info.validBitCount = std::max(info.validBitCount, m_channelValidBitCount[idx]);
         } else if (m_channelValidBitCount.size() > info.numChannels && info.numChannels == 1) { // channels are separated to different scenes
-          assert(m_shouldSeparateChannelsToDifferentScenes);
+          CHECK(m_shouldSeparateChannelsToDifferentScenes);
           int chIdx =  it->first.at(5) - channelStart;
-          assert(chIdx >= 0);
+          CHECK(chIdx >= 0);
           if (chIdx >= static_cast<int>(m_channelValidBitCount.size())) {
             throw ZIOException("channel number does not match metadata");
           }

@@ -172,14 +172,14 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
       || event->modifiers() == Qt::ControlModifier
       || event->modifiers() == Qt::AltModifier;
 
-  assert(!m_rectItem);
-  assert(!m_ellipseItem);
+  CHECK(!m_rectItem);
+  CHECK(!m_ellipseItem);
   if ((m_splineItem || m_view->state() == ZView::State::ROISpline) && canUpdateROI) {
     QPointF scenePt = mapToScene(event->x(), event->y());
     if (event->button() == Qt::LeftButton) {
       if (!m_splineItem) {  //new
-        assert(!m_startPtItem);
-        assert(m_ctrlPtsItem.empty());
+        CHECK(!m_startPtItem);
+        CHECK(m_ctrlPtsItem.empty());
         m_startScenePt = scenePt;
         switch (event->modifiers()) {
         case Qt::ControlModifier :
@@ -267,8 +267,8 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
     QPointF scenePt = mapToScene(event->x(), event->y());
     if (event->button() == Qt::LeftButton) {
       if (!m_polygonItem) {  //new
-        assert(!m_startPtItem);
-        assert(m_ctrlPtsItem.empty());
+        CHECK(!m_startPtItem);
+        CHECK(m_ctrlPtsItem.empty());
         m_startScenePt = scenePt;
         switch (event->modifiers()) {
         case Qt::ControlModifier :
@@ -390,7 +390,7 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
     }
   } else if (m_view->state() == ZView::State::ROIRect && event->button() == Qt::LeftButton && canUpdateROI) {
     QPointF scenePt = mapToScene(event->x(), event->y());
-    assert(!m_startPtItem);
+    CHECK(!m_startPtItem);
     m_startScenePt = scenePt;
     switch (event->modifiers()) {
     case Qt::ControlModifier :
@@ -418,7 +418,7 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
     scene()->addItem(m_rectItem);
   } else if (m_view->state() == ZView::State::ROIEllipse && event->button() == Qt::LeftButton && canUpdateROI) {
     QPointF scenePt = mapToScene(event->x(), event->y());
-    assert(!m_startPtItem);
+    CHECK(!m_startPtItem);
     m_startScenePt = scenePt;
     switch (event->modifiers()) {
     case Qt::ControlModifier :

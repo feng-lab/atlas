@@ -1,7 +1,7 @@
 #include "zshareitemselectionmodel.h"
 
 #include <QAbstractProxyModel>
-#include <cassert>
+#include "zlog.h"
 
 namespace nim {
 
@@ -13,14 +13,14 @@ ZShareItemSelectionModel::ZShareItemSelectionModel(QAbstractItemModel *model,
   const QAbstractItemModel *srcModel = m_srcSelectionModel->model();
   if (srcModel != model) {
     const QAbstractProxyModel *proxyModel = qobject_cast<const QAbstractProxyModel*>(model);
-    assert(proxyModel);
+    CHECK(proxyModel);
     while (true) {
       m_proxyChain.prepend(proxyModel);
       if (proxyModel->sourceModel() == srcModel) {
         break;
       } else {
         proxyModel = qobject_cast<const QAbstractProxyModel*>(proxyModel->sourceModel());
-        assert(proxyModel);
+        CHECK(proxyModel);
       }
     }
   }

@@ -156,7 +156,7 @@ QJsonValue ZSwcDoc::jsonValue(size_t id) const
 
 bool ZSwcDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
 {
-  assert(v1.isString() && v2.isString());
+  CHECK(v1.isString() && v2.isString());
   if (v1 == v2)
     return true;
   QString f1 = v1.toString();
@@ -168,7 +168,7 @@ bool ZSwcDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
 
 size_t ZSwcDoc::makeAlias(size_t id)
 {
-  assert(m_idToSwcPacks.find(id) != m_idToSwcPacks.end());
+  CHECK(m_idToSwcPacks.find(id) != m_idToSwcPacks.end());
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToSwcPacks[aliasId] = m_idToSwcPacks[id];

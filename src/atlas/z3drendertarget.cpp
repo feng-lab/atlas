@@ -310,7 +310,7 @@ bool Z3DRenderTarget::isFBOComplete()
 
 void Z3DRenderTarget::attachTextureToFBO(Z3DTexture *texture, GLenum attachment, bool takeOwnership)
 {
-  assert(texture);
+  CHECK(texture);
   if (m_size != texture->dimension().xy()) {
     LOG(WARNING) << "attached texture has imcompatible size with current fbo";
   }
@@ -348,8 +348,8 @@ void Z3DRenderTarget::attachSlice(size_t zSlice)
   bind();
   for (auto it = m_attachments.begin(); it != m_attachments.end(); ++it) {
     Z3DTexture* texture = it->second;
-    assert(texture->textureTarget() == GL_TEXTURE_2D_ARRAY || texture->textureTarget() == GL_TEXTURE_3D);
-    assert(zSlice < texture->depth());
+    CHECK(texture->textureTarget() == GL_TEXTURE_2D_ARRAY || texture->textureTarget() == GL_TEXTURE_3D);
+    CHECK(zSlice < texture->depth());
     glFramebufferTextureLayer(GL_DRAW_FRAMEBUFFER, it->first, texture->id(), 0, zSlice);
   }
   isFBOComplete();
@@ -374,7 +374,7 @@ GLuint Z3DRenderTarget::currentBoundReadFBO()
 
 void Z3DRenderTarget::saveAsColorImage(const QString &filename)
 {
-  assert(!isBound());
+  CHECK(!isBound());
   bind();
   try {
     GLenum dataFormat = GL_BGRA;
@@ -398,7 +398,7 @@ void Z3DRenderTarget::saveAsColorImage(const QString &filename)
 
 void Z3DRenderTarget::saveAsDepthImage(const QString &filename)
 {
-  assert(!isBound());
+  CHECK(!isBound());
   bind();
   try {
     GLenum dataFormat = GL_DEPTH_COMPONENT;

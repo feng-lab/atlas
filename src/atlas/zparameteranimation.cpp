@@ -22,7 +22,7 @@ ZParameterAnimation::~ZParameterAnimation()
 
 void ZParameterAnimation::bindParameter(ZParameter &para)
 {
-  assert(para.type() == m_type);
+  CHECK(para.type() == m_type);
   m_boundPara = &para;
 }
 
@@ -44,9 +44,9 @@ void ZParameterAnimation::deleteKey(ZParameterKey *key)
 void ZParameterAnimation::addKey(ZParameterKey *keyIn, bool keepRedundant)
 {
   std::unique_ptr<ZParameterKey> key(keyIn);
-  assert(key);
-  assert(key->time() >= 0.0);
-  assert(key->value().type() == m_type);
+  CHECK(key);
+  CHECK(key->time() >= 0.0);
+  CHECK(key->value().type() == m_type);
 
   key->setParaAnimation(this);
 
@@ -161,8 +161,8 @@ void ZParameterAnimation::write(QJsonObject &json) const
 
 ZParameterKey *ZParameterAnimation::createKey(double secs) const
 {
-  assert(secs >= 0);
-  assert(m_boundPara);
+  CHECK(secs >= 0);
+  CHECK(m_boundPara);
 
   return new ZParameterKey(secs, *m_boundPara);
 }
@@ -176,8 +176,8 @@ void ZParameterAnimation::setCurrentTime(double secs)
 
 void ZParameterAnimation::updateParaToTime(double secs, ZParameter *para) const
 {
-  assert(para->type() == m_type);
-  assert(secs >= 0);
+  CHECK(para->type() == m_type);
+  CHECK(secs >= 0);
 
   if (m_keys.empty())
     return;

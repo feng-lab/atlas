@@ -157,7 +157,7 @@ void Z3DFilter::addPort(Z3DInputPortBase &port)
     m_inputPortMap.emplace(port.name(), &port);
   else {
     LOG(ERROR) << className() << " port " << port.name() << " has already been inserted!";
-    assert(false);
+    CHECK(false);
   }
 }
 
@@ -170,7 +170,7 @@ void Z3DFilter::addPort(Z3DOutputPortBase &port)
     m_outputPortMap.emplace(port.name(), &port);
   else {
     LOG(ERROR) << className() << " port " << port.name() << " has already been inserted!";
-    assert(false);
+    CHECK(false);
   }
 }
 
@@ -183,7 +183,7 @@ void Z3DFilter::removePort(Z3DInputPortBase &port)
     m_inputPortMap.erase(inIt);
   else {
     LOG(ERROR) << className() << " port " << port.name() << " was not found!";
-    assert(false);
+    CHECK(false);
   }
 }
 
@@ -196,7 +196,7 @@ void Z3DFilter::removePort(Z3DOutputPortBase &port)
     m_outputPortMap.erase(outIt);
   else {
     LOG(ERROR) << className() << " port " << port.name() << " was not found!";
-    assert(false);
+    CHECK(false);
   }
 }
 
@@ -270,7 +270,7 @@ void Z3DFilter::addPrivateRenderPort(Z3DRenderOutputPort& port)
     m_outputPortMap.emplace(port.name(), &port);
   else {
     LOG(ERROR) << className() << " port " << port.name() << " has already been inserted!";
-    assert(false);
+    CHECK(false);
   }
 }
 

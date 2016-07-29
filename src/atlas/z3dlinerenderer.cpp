@@ -3,6 +3,7 @@
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 #include "z3dtexture.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -11,13 +12,13 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase &rendererBase)
   , m_lineShaderGrp(rendererBase)
   , m_smoothLineShaderGrp(rendererBase)
   , m_smoothLineShaderGrp1(rendererBase)
-  , m_linesPt(NULL)
-  , m_lineColorsPt(NULL)
-  , m_linePickingColorsPt(NULL)
+  , m_linesPt(nullptr)
+  , m_lineColorsPt(nullptr)
+  , m_linePickingColorsPt(nullptr)
   , m_useSmoothLine(true)
   , m_srcLineWidth(1)
   , m_enableMultisample(true)
-  , m_texture(NULL)
+  , m_texture(nullptr)
   , m_VAO(1)
   , m_pickingVAO(1)
   , m_VBOs(2)
@@ -183,7 +184,7 @@ void Z3DLineRenderer::setTexture(Z3DTexture *tex)
       m_dataChanged = true;
     }
     m_texture = tex;
-    assert(m_texture->textureTarget() == GL_TEXTURE_1D);
+    CHECK(m_texture->textureTarget() == GL_TEXTURE_1D);
   }
 }
 

@@ -251,7 +251,7 @@ void Z3DTransformParameter::rotate(const glm::vec3 &axis, float ang, const glm::
 
 void Z3DTransformParameter::setValueSameAs(const ZParameter &rhs)
 {
-  assert(this->isSameType(rhs));
+  CHECK(this->isSameType(rhs));
   const Z3DTransformParameter& src = static_cast<const Z3DTransformParameter&>(rhs);
   m_scale.set(src.m_scale.get());
   m_translation.set(src.m_translation.get());
@@ -261,7 +261,7 @@ void Z3DTransformParameter::setValueSameAs(const ZParameter &rhs)
 
 void Z3DTransformParameter::interpolate(const ZParameter &prev, double progress, ZParameter &dest)
 {
-  assert(this->isSameType(prev) && this->isSameType(dest));
+  CHECK(this->isSameType(prev) && this->isSameType(dest));
   const Z3DTransformParameter& prevPara = static_cast<const Z3DTransformParameter&>(prev);
   Z3DTransformParameter& desPara = static_cast<Z3DTransformParameter&>(dest);
   desPara.setScale(glm::mix(prevPara.scale(), scale(), progress));

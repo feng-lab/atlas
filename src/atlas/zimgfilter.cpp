@@ -7,6 +7,7 @@
 #include "zimgpackdisplay.h"
 #include "znumericparameter.h"
 #include "zwidgetsgroup.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -267,7 +268,7 @@ void ZImgFilter::channelVisibleChanged()
     }
     m_displayValid = false;
   } else {
-    assert(false);
+    CHECK(false);
   }
   if (!m_isVisible) {
     destroyImgItems(); // will create new one next time
@@ -316,7 +317,7 @@ void ZImgFilter::channelColorChanged()
       m_displayValid = false;
     }
   } else {
-    assert(false);
+    CHECK(false);
   }
   if (!m_isVisible) {
     destroyImgItems(); // will create new one next time
@@ -385,7 +386,7 @@ void ZImgFilter::destroyImgItems()
 
 void ZImgFilter::updateImgItems()
 {
-  assert(m_isVisible);
+  CHECK(m_isVisible);
 
   ZImgPackDisplay *curDisplay = getDisplay();
   //LOG(INFO) << curDisplay->slice() << " " << m_lastSlice << " " << m_view.currentSlice();

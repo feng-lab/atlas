@@ -43,16 +43,16 @@ ZCameraParameterAnimation::~ZCameraParameterAnimation()
 
 ZParameterKey *ZCameraParameterAnimation::createKey(double secs) const
 {
-  assert(secs >= 0);
-  assert(m_boundPara);
+  CHECK(secs >= 0);
+  CHECK(m_boundPara);
 
   return new ZCameraParameterKey(secs, *static_cast<Z3DCameraParameter*>(m_boundPara));
 }
 
 void ZCameraParameterAnimation::updateParaToTime(double secs, ZParameter *para) const
 {
-  assert(para->type() == m_type);
-  assert(secs >= 0);
+  CHECK(para->type() == m_type);
+  CHECK(secs >= 0);
 
   if (m_keys.empty())
     return;

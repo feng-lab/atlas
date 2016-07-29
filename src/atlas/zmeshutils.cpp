@@ -348,8 +348,8 @@ void vtkCCSInsertTriangle(
       {
         int64_t npts = originalEdges[edgeLocs[i]].size();
         int64_t *pts = originalEdges[edgeLocs[i]].data();
-        assert(edgePts[i][0] == pts[0]);
-        assert(edgePts[i][1] == pts[npts-1]);
+        CHECK(edgePts[i][0] == pts[0]);
+        CHECK(edgePts[i][1] == pts[npts-1]);
         if (npts > maxPoints)
         {
           maxPoints = npts;
@@ -5139,8 +5139,8 @@ static void vtkCCSInsertTriangle(
       {
         int64_t npts, *pts;
         originalEdges->GetCell(edgeLocs[i], npts, pts);
-        assert(edgePts[i][0] == pts[0]);
-        assert(edgePts[i][1] == pts[npts-1]);
+        CHECK(edgePts[i][0] == pts[0]);
+        CHECK(edgePts[i][1] == pts[npts-1]);
         if (npts > maxPoints)
         {
           maxPoints = npts;

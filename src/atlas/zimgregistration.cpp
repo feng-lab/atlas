@@ -47,10 +47,10 @@ void ZImgRegistration::setOptimizer(const QString &str)
 
 double ZImgRegistration::run()
 {
-  assert(m_transform);
-  assert(m_costFunction);
-  assert(m_fixedImg && m_movingImg && !m_fixedImg->isEmpty() && !m_movingImg->isEmpty());
-  assert(!m_fixedImg->isTimeSeries() && !m_fixedImg->isMultiChannelsImg());
+  CHECK(m_transform);
+  CHECK(m_costFunction);
+  CHECK(m_fixedImg && m_movingImg && !m_fixedImg->isEmpty() && !m_movingImg->isEmpty());
+  CHECK(!m_fixedImg->isTimeSeries() && !m_fixedImg->isMultiChannelsImg());
 
   m_costFunction->setTransform(*m_transform);
   m_optimizer.setCostFunction(*m_costFunction);

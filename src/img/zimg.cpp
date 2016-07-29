@@ -1224,7 +1224,7 @@ ZImg ZImg::castTo(VoxelFormat vf, size_t bytePerVoxel)
 ZImg ZImg::resized(size_t desWidth, size_t desHeight, size_t desDepth,
                    Interpolant interpolant, bool antialiasing, bool antialiasingForNearest) const
 {
-  assert(desWidth > 0 && desHeight > 0 && desDepth > 0);
+  CHECK(desWidth > 0 && desHeight > 0 && desDepth > 0);
 
   ZImg res;
 
