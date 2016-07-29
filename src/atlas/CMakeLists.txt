@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6.1)
+cmake_minimum_required(VERSION 3.5.2)
 project(atlas)
 
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -554,7 +554,7 @@ set(SOURCES
 
 option(BUILD_TESTING "Enable tests" ON)
 if (BUILD_TESTING)
-  add_definitions(-D_WITH_TESTS)
+  add_definitions(-D_WITH_TESTS_)
   set(HEADERS
     ${HEADERS}
     zunittest.h

@@ -46,6 +46,7 @@
 /src/3rdparty/glog/
 /src/3rdparty/folly/
 ffmpeg
+/src/.idea/
 
 # binary file
 obj/
@@ -61,8 +62,7 @@ gui-build-Desktop-*/
 gui-build-Desktop*-*/
 build-gui-Desktop-*/
 build-gui-Desktop*-*/
-build-atlas-Desktop-*/
-build-atlas-Desktop*-*/
+build-atlas*/
 build-img-Desktop-*/
 build-img-Desktop*-*/
 CMakeFiles/
