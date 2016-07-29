@@ -913,7 +913,8 @@ endif()
 if(APPLE)
   set(SRCS ${SRCS} ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns)
   set(MACOSX_BUNDLE_ICON_FILE app.icns)
-  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+
+  set(SRCS ${SRCS} ${CMAKE_CURRENT_SOURCE_DIR}/../../ffmpeg)
 endif()
 
 # our target
@@ -967,6 +968,9 @@ else (WIN32)
   # for some files
   set_source_files_properties(${CERESSOLVER_SOURCES} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-sign-compare")
   set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest)
+
+  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../../ffmpeg PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 endif (WIN32)
 
 target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding hdf5_cpp-static hdf5-static img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${WILDMAGIC_LIBRARIES} ${ASSIMP_LIBRARIES} ${MKL_LIBRARIES} ${IPP_LIBRARIES} ${TBB_LIBRARIES})
