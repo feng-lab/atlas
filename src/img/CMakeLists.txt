@@ -107,7 +107,7 @@ find_package(glog REQUIRED
 find_package(Qt5Core REQUIRED PATHS /Users/feng/Qt/5.7/clang_64 NO_DEFAULT_PATH)
 
 # main srcs
-set(IMG_HEADERS
+set(IMG_SOURCES
     zbbox.h
     zbenchtimer.h
     zbitset.h
@@ -157,9 +157,6 @@ set(IMG_HEADERS
     zlog.h
     zlogqttypesupport.h
     zwindowsheader.h
-    )
-
-set(IMG_SOURCES
     zbenchtimer.cpp
     zcpuinfo.cpp
     zeigenutils.cpp
@@ -247,7 +244,7 @@ source_group(libtiff FILES ${TIFF_SOURCES})
 
 # our target
 set(LIBRARY_NAME img)
-add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${IMG_SOURCES} ${IMG_HEADERS})
+add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${IMG_SOURCES})
 
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(${LIBRARY_NAME} PUBLIC ${TBB_INCLUDE_DIRS})

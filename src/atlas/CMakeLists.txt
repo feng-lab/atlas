@@ -144,7 +144,7 @@ set(RESOURCES
     atlas.qrc
     )
 
-set(HEADERS
+set(SOURCES
     zimageinterpolation.h
     zimgdisplay.h
     zimgmerge.h
@@ -367,9 +367,6 @@ set(HEADERS
     zjson.h
     zlogdialog.h
     zlogmodelsink.h
-    )
-
-set(SOURCES
     main.cpp
     zimageinterpolation.cpp
     zimgdisplay.cpp
@@ -938,7 +935,7 @@ endif (WIN32)
 source_group(sys FILES ${SYS_SOURCES})
 
 set(SRCS ${SRCS} ${SYS_SOURCES} ${QTCSV_HEADERS} ${QTCSV_SOURCES} ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
-    ${CERESSOLVER_HEADERS} ${CERESSOLVER_SOURCES} ${HEADERS} ${SOURCES} ${FORMS} ${RESOURCES})
+    ${CERESSOLVER_HEADERS} ${CERESSOLVER_SOURCES} ${SOURCES} ${FORMS} ${RESOURCES})
 if (WIN32)
   set(SRCS ${SRCS} ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.rc)
 endif ()
