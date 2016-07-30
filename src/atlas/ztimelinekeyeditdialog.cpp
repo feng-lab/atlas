@@ -12,7 +12,8 @@
 
 namespace nim {
 
-ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation &paraAnimation, ZParameterKey &paraKey, QWidget *parent)
+ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimation, ZParameterKey& paraKey,
+                                               QWidget* parent)
   : QDialog(parent)
   , m_paraAnimation(paraAnimation)
   , m_paraKey(paraKey)
@@ -25,7 +26,7 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation &paraAnimatio
 {
   setModal(false);
 
-  QGridLayout *lo = new QGridLayout;
+  QGridLayout* lo = new QGridLayout;
 
   m_time.set(m_paraKey.time());
   m_time.setStyle("SPINBOX");
@@ -34,7 +35,8 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation &paraAnimatio
   addWidget(m_type.createNameLabel(this), m_type.createWidget(this), lo);
 
   if (m_paraAnimation.boundParameter()->type().contains("Span")) {
-    m_para = ZParameterFactoryInstance.create(m_paraAnimation.boundParameter()->name(), m_paraAnimation.boundParameter()->type(), this);
+    m_para = ZParameterFactoryInstance.create(m_paraAnimation.boundParameter()->name(),
+                                              m_paraAnimation.boundParameter()->type(), this);
     m_para->setSameAs(*m_paraAnimation.boundParameter());
     connect(m_para, &ZParameter::valueChanged, m_paraAnimation.boundParameter(), &ZParameter::updateFromSender);
     m_para->setStyle("SPINBOX");
@@ -51,12 +53,14 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation &paraAnimatio
     addWidget(m_para->createNameLabel(this), m_para->createWidget(this), lo);
     connect(m_para, &ZParameter::valueChanged, this, &ZTimelineKeyEditDialog::raiseAndActivate);
   } else {
-    addWidget(m_paraAnimation.boundParameter()->createNameLabel(this), m_paraAnimation.boundParameter()->createWidget(this), lo);
-    connect(m_paraAnimation.boundParameter(), &ZParameter::valueChanged, this, &ZTimelineKeyEditDialog::raiseAndActivate);
+    addWidget(m_paraAnimation.boundParameter()->createNameLabel(this),
+              m_paraAnimation.boundParameter()->createWidget(this), lo);
+    connect(m_paraAnimation.boundParameter(), &ZParameter::valueChanged, this,
+            &ZTimelineKeyEditDialog::raiseAndActivate);
   }
 
   if (m_paraAnimation.type() == "3DCamera") {
-    ZCameraParameterKey *cpk = static_cast<ZCameraParameterKey*>(&m_paraKey);
+    ZCameraParameterKey* cpk = static_cast<ZCameraParameterKey*>(&m_paraKey);
 
     m_posTension.set(cpk->posTension());
     addWidget(m_posTension.createNameLabel(this), m_posTension.createWidget(this), lo);
@@ -66,9 +70,9 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation &paraAnimatio
     addWidget(m_posBias.createNameLabel(this), m_posBias.createWidget(this), lo);
   }
 
-  QVBoxLayout *vlo = new QVBoxLayout(this);
+  QVBoxLayout* vlo = new QVBoxLayout(this);
   vlo->addLayout(lo);
-  QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+  QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
   vlo->addWidget(buttonBox);
 
   connect(buttonBox, &QDialogButtonBox::accepted, this, &ZTimelineKeyEditDialog::accept);
@@ -97,11 +101,11 @@ void ZTimelineKeyEditDialog::accept()
   else
     m_paraKey.setValue(*m_paraAnimation.boundParameter());
   if (m_paraAnimation.type() == "3DCamera") {
-    ZCameraParameterKey *cpk = static_cast<ZCameraParameterKey*>(&m_paraKey);
+    ZCameraParameterKey* cpk = static_cast<ZCameraParameterKey*>(&m_paraKey);
     cpk->setPosTension(m_posTension.get());
     cpk->setPosContinuity(m_posContinuity.get());
     cpk->setPosBias(m_posBias.get());
-    ZCameraParameterAnimation *cpa = static_cast<ZCameraParameterAnimation*>(&m_paraAnimation);
+    ZCameraParameterAnimation* cpa = static_cast<ZCameraParameterAnimation*>(&m_paraAnimation);
     cpa->buildSpline();
   }
   m_paraAnimation.blockSignals(false);
@@ -125,7 +129,7 @@ void ZTimelineKeyEditDialog::raiseAndActivate()
   activateWindow();
 }
 
-void ZTimelineKeyEditDialog::addWidget(QLabel *label, QWidget *wg, QGridLayout *lo)
+void ZTimelineKeyEditDialog::addWidget(QLabel* label, QWidget* wg, QGridLayout* lo)
 {
   //QHBoxLayout *hbl = new QHBoxLayout;
   label->setMinimumWidth(125);

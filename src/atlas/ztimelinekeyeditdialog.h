@@ -16,23 +16,27 @@ namespace nim {
 
 class ZTimelineKeyEditDialog : public QDialog
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit ZTimelineKeyEditDialog(ZParameterAnimation &paraAnimation, ZParameterKey &paraKey, QWidget *parent = nullptr);
+  explicit ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimation, ZParameterKey& paraKey,
+                                  QWidget* parent = nullptr);
+
   void setInitialValue();
 
 signals:
 
 protected:
   virtual void accept() override;
+
   virtual void reject() override;
+
   void raiseAndActivate();
 
-  void addWidget(QLabel* label, QWidget *wg, QGridLayout *lo);
+  void addWidget(QLabel* label, QWidget* wg, QGridLayout* lo);
 
 protected:
-  ZParameterAnimation &m_paraAnimation;
-  ZParameterKey &m_paraKey;
+  ZParameterAnimation& m_paraAnimation;
+  ZParameterKey& m_paraKey;
 
   ZDoubleParameter m_time;
   ZStringIntOptionParameter m_type;
@@ -41,7 +45,7 @@ protected:
   ZFloatParameter m_posContinuity;
   ZFloatParameter m_posBias;
 
-  ZParameter *m_para;
+  ZParameter* m_para;
 };
 
 } // namespace nim

@@ -11,7 +11,7 @@ namespace {
 using namespace nim;
 
 template<typename TVoxel>
-void removeBG(ZImg &img)
+void removeBG(ZImg& img)
 {
   ZImgAutoThreshold<> autoThre;
   img -= autoThre.typedMaxHistThre<TVoxel>(img);
@@ -23,10 +23,13 @@ struct WeightNCCTing
   WeightNCCTing(double overlapThre)
     : m_overlapThre(overlapThre)
   {}
+
   inline double operator()(double v, double numOverlap)
   {
-    return numOverlap < m_overlapThre ? 0 : v <= 0 ? v : v * std::log(v * std::sqrt((numOverlap-2)/(1.0001-v*v)));
+    return numOverlap < m_overlapThre ? 0 : v <= 0 ? v : v *
+                                                         std::log(v * std::sqrt((numOverlap - 2) / (1.0001 - v * v)));
   }
+
 private:
   double m_overlapThre;
 };
@@ -70,7 +73,7 @@ QString ZImgNCCMatch::positionHintToQString() const
   return positionHintToQString(m_movingImgPosHint, m_maxOverlapRate);
 }
 
-void ZImgNCCMatch::reversePositionHint(PositionHint &hint)
+void ZImgNCCMatch::reversePositionHint(PositionHint& hint)
 {
   // make it correct
   if (hint.testFlag(Left) && hint.testFlag(Right)) {
@@ -187,26 +190,26 @@ void ZImgNCCMatch::useMovingImgChannel(size_t ch1, size_t ch2, size_t ch3)
   useMovingImgChannel(chs);
 }
 
-void ZImgNCCMatch::useFixedImgChannel(const std::vector<size_t> &chs)
+void ZImgNCCMatch::useFixedImgChannel(const std::vector<size_t>& chs)
 {
-  for (size_t i=0; i<chs.size(); ++i) {
+  for (size_t i = 0; i < chs.size(); ++i) {
     checkFixedImgChannel(chs[i]);
   }
 
   m_fixedImgChannelsToUse.clear();
-  for (size_t i=0; i<chs.size(); ++i) {
+  for (size_t i = 0; i < chs.size(); ++i) {
     m_fixedImgChannelsToUse.insert(chs[i]);
   }
 }
 
-void ZImgNCCMatch::useMovingImgChannel(const std::vector<size_t> &chs)
+void ZImgNCCMatch::useMovingImgChannel(const std::vector<size_t>& chs)
 {
-  for (size_t i=0; i<chs.size(); ++i) {
+  for (size_t i = 0; i < chs.size(); ++i) {
     checkMovingImgChannel(chs[i]);
   }
 
   m_movingImgChannelsToUse.clear();
-  for (size_t i=0; i<chs.size(); ++i) {
+  for (size_t i = 0; i < chs.size(); ++i) {
     m_movingImgChannelsToUse.insert(chs[i]);
   }
 }
@@ -214,14 +217,14 @@ void ZImgNCCMatch::useMovingImgChannel(const std::vector<size_t> &chs)
 void ZImgNCCMatch::useAllFixedImgChannels()
 {
   m_fixedImgChannelsToUse.clear();
-  for (size_t c=0; c<m_fixedImg.numChannels(); ++c)
+  for (size_t c = 0; c < m_fixedImg.numChannels(); ++c)
     m_fixedImgChannelsToUse.insert(c);
 }
 
 void ZImgNCCMatch::useAllMovingImgChannels()
 {
   m_movingImgChannelsToUse.clear();
-  for (size_t c=0; c<m_movingImg.numChannels(); ++c)
+  for (size_t c = 0; c < m_movingImg.numChannels(); ++c)
     m_movingImgChannelsToUse.insert(c);
 }
 
@@ -251,13 +254,13 @@ void ZImgNCCMatch::disableRemoveBackgroundForMovingImgChannel(size_t ch)
 
 void ZImgNCCMatch::enableRemoveBackgroundForAllFixedImgChannels()
 {
-  for (size_t c=0; c<m_fixedImg.numChannels(); ++c)
+  for (size_t c = 0; c < m_fixedImg.numChannels(); ++c)
     m_fixedImgChannelsToRemoveBackground.insert(c);
 }
 
 void ZImgNCCMatch::enableRemoveBackgroundForAllMovingImgChannels()
 {
-  for (size_t c=0; c<m_movingImg.numChannels(); ++c)
+  for (size_t c = 0; c < m_movingImg.numChannels(); ++c)
     m_movingImgChannelsToRemoveBackground.insert(c);
 }
 
@@ -271,7 +274,7 @@ void ZImgNCCMatch::disableRemoveBackgroundForAllMovingImgChannels()
   m_movingImgChannelsToRemoveBackground.clear();
 }
 
-ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffset(double *maxNCC, double *maxWeightedNCC, double *numOverlapVoxels)
+ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffset(double* maxNCC, double* maxWeightedNCC, double* numOverlapVoxels)
 {
   if (m_fixedImg.isEmpty() || m_movingImg.isEmpty()) {
     throw ZImgException("computeMovingImgOffset: Can not match empty imgs");
@@ -308,8 +311,10 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffset(double *maxNCC, double *ma
 }
 
 ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(size_t intvX, size_t intvY, size_t intvZ,
-                                                        double *maxNCC, double *maxWeightedNCC, double *numOverlapVoxels,
-                                                        double *lowResMaxNCC, double *lowResMaxWeightedNCC, double *lowResNumOverlapVoxels)
+                                                        double* maxNCC, double* maxWeightedNCC,
+                                                        double* numOverlapVoxels,
+                                                        double* lowResMaxNCC, double* lowResMaxWeightedNCC,
+                                                        double* lowResNumOverlapVoxels)
 {
   if (m_fixedImg.isEmpty() || m_movingImg.isEmpty()) {
     throw ZImgException("computeMovingImgOffset: Can not match empty imgs");
@@ -328,7 +333,8 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(size_t intvX, size_t int
       ZVoxelCoordinate tmpRes = computeMovingImgOffsetMR(hint, m_maxOverlapRate,
                                                          intvX, intvY, intvZ,
                                                          tmpMaxNCC, tmpMaxWeightedNCC, tmpNumOverlapVoxels,
-                                                         tmpLowResMaxNCC, tmpLowResMaxWeightedNCC, tmpLowResNumOverlapVoxels);
+                                                         tmpLowResMaxNCC, tmpLowResMaxWeightedNCC,
+                                                         tmpLowResNumOverlapVoxels);
       if (tmpMaxWeightedNCC > wncc) {
         wncc = tmpMaxWeightedNCC;
         res = tmpRes;
@@ -361,7 +367,7 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(size_t intvX, size_t int
   return res;
 }
 
-double ZImgNCCMatch::computeNCCOfOffset(const ZVoxelCoordinate &offset)
+double ZImgNCCMatch::computeNCCOfOffset(const ZVoxelCoordinate& offset)
 {
   if (m_fixedImg.isEmpty() || m_movingImg.isEmpty()) {
     throw ZImgException("computeNCCOfOffset: Can not match empty imgs");
@@ -398,7 +404,7 @@ void ZImgNCCMatch::checkMovingImgChannel(size_t ch)
   }
 }
 
-void ZImgNCCMatch::constructSingleChannelFixedImg(const ZImgRegion &rgn, ZImg &fixedImg)
+void ZImgNCCMatch::constructSingleChannelFixedImg(const ZImgRegion& rgn, ZImg& fixedImg)
 {
   ZImgInfo info = m_fixedImg.info();
   info.numChannels = 1;
@@ -433,9 +439,9 @@ void ZImgNCCMatch::constructSingleChannelFixedImg(const ZImgRegion &rgn, ZImg &f
       size_t ch = *(m_fixedImgChannelsToUse.begin());
       ZImgRegion tmpRgn = rgn;
       tmpRgn.start.c = ch;
-      tmpRgn.end.c = ch+1;
+      tmpRgn.end.c = ch + 1;
       tmpRgn.start.t = m_fixedT;
-      tmpRgn.end.t = m_fixedT+1;
+      tmpRgn.end.t = m_fixedT + 1;
       fixedImg = m_fixedImg.crop(tmpRgn);
       if (m_fixedImgChannelsToRemoveBackground.find(ch) != m_fixedImgChannelsToRemoveBackground.end()) {
         removeBackground(fixedImg);
@@ -448,9 +454,9 @@ void ZImgNCCMatch::constructSingleChannelFixedImg(const ZImgRegion &rgn, ZImg &f
         size_t ch = *it;
         ZImgRegion tmpRgn = rgn;
         tmpRgn.start.c = ch;
-        tmpRgn.end.c = ch+1;
+        tmpRgn.end.c = ch + 1;
         tmpRgn.start.t = m_fixedT;
-        tmpRgn.end.t = m_fixedT+1;
+        tmpRgn.end.t = m_fixedT + 1;
         imgs[idx] = m_fixedImg.crop(tmpRgn);
         if (m_fixedImgChannelsToRemoveBackground.find(ch) != m_fixedImgChannelsToRemoveBackground.end()) {
           removeBackground(imgs[idx]);
@@ -462,7 +468,7 @@ void ZImgNCCMatch::constructSingleChannelFixedImg(const ZImgRegion &rgn, ZImg &f
   }
 }
 
-void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion &rgn, ZImg &movingImg)
+void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg& movingImg)
 {
   ZImgInfo info = m_movingImg.info();
   info.numChannels = 1;
@@ -497,9 +503,9 @@ void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion &rgn, ZImg &
       size_t ch = *(m_movingImgChannelsToUse.begin());
       ZImgRegion tmpRgn = rgn;
       tmpRgn.start.c = ch;
-      tmpRgn.end.c = ch+1;
+      tmpRgn.end.c = ch + 1;
       tmpRgn.start.t = m_movingT;
-      tmpRgn.end.t = m_movingT+1;
+      tmpRgn.end.t = m_movingT + 1;
       movingImg = m_movingImg.crop(tmpRgn);
       if (m_movingImgChannelsToRemoveBackground.find(ch) != m_movingImgChannelsToRemoveBackground.end()) {
         removeBackground(movingImg);
@@ -512,9 +518,9 @@ void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion &rgn, ZImg &
         size_t ch = *it;
         ZImgRegion tmpRgn = rgn;
         tmpRgn.start.c = ch;
-        tmpRgn.end.c = ch+1;
+        tmpRgn.end.c = ch + 1;
         tmpRgn.start.t = m_movingT;
-        tmpRgn.end.t = m_movingT+1;
+        tmpRgn.end.t = m_movingT + 1;
         imgs[idx] = m_movingImg.crop(tmpRgn);
         if (m_movingImgChannelsToRemoveBackground.find(ch) != m_movingImgChannelsToRemoveBackground.end()) {
           removeBackground(imgs[idx]);
@@ -526,15 +532,16 @@ void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion &rgn, ZImg &
   }
 }
 
-void ZImgNCCMatch::removeBackground(ZImg &img)
+void ZImgNCCMatch::removeBackground(ZImg& img)
 {
   IMG_TYPED_CALL(removeBG, img, img);
 }
 
 // reference: matlab code normxcorr2_general.m
-ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc(ZImg &fixedImg, ZImg &movingImg,
-                                               const ZImgRegion &nccImgValidRegion, double requiredNumberOfOverlapPixels,
-                                               double &maxNCC, double &maxWeightedNCC, double &numOverlapVoxels)
+ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc(ZImg& fixedImg, ZImg& movingImg,
+                                               const ZImgRegion& nccImgValidRegion,
+                                               double requiredNumberOfOverlapPixels,
+                                               double& maxNCC, double& maxWeightedNCC, double& numOverlapVoxels)
 {
   ZImgInfo movingImgInfo = movingImg.info();
 
@@ -547,20 +554,24 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc(ZImg &fixedImg, ZImg &movingImg,
     nccImg = nccImg.crop(nccImgValidRegion);
     numberOfOverlapVoxelsImg = numberOfOverlapVoxelsImg.crop(nccImgValidRegion);
   }
-  size_t maxNCCIdx = getMaxWeightedNCCIdx(nccImg.channelData<double>(0), numberOfOverlapVoxelsImg.channelData<double>(0),
+  size_t maxNCCIdx = getMaxWeightedNCCIdx(nccImg.channelData<double>(0),
+                                          numberOfOverlapVoxelsImg.channelData<double>(0),
                                           requiredNumberOfOverlapPixels, nccImg.channelVoxelNumber(),
                                           maxNCC, maxWeightedNCC, numOverlapVoxels);
   ZVoxelCoordinate maxNCCCoord = nccImg.indexToCoord(maxNCCIdx);
-  ZVoxelCoordinate offset = maxNCCCoord + nccImgValidRegion.start - ZVoxelCoordinate(movingImgInfo.width-1, movingImgInfo.height-1, movingImgInfo.depth-1);
+  ZVoxelCoordinate offset = maxNCCCoord + nccImgValidRegion.start -
+                            ZVoxelCoordinate(movingImgInfo.width - 1, movingImgInfo.height - 1,
+                                             movingImgInfo.depth - 1);
   LOG(INFO) << "max NCC coord: " << maxNCCCoord;
   LOG(INFO) << "moving image offset: " << offset;
 
   return offset;
 }
 
-ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc_S(ZImg &fixedImg, ZImg &movingImg,
-                                                 const ZImgRegion &nccImgValidRegion, double requiredNumberOfOverlapPixels,
-                                                 double &maxNCC, double &maxWeightedNCC, double &numOverlapVoxels)
+ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc_S(ZImg& fixedImg, ZImg& movingImg,
+                                                 const ZImgRegion& nccImgValidRegion,
+                                                 double requiredNumberOfOverlapPixels,
+                                                 double& maxNCC, double& maxWeightedNCC, double& numOverlapVoxels)
 {
   ZImgInfo fixedImgInfo = fixedImg.info();
   ZImgInfo movingImgInfo = movingImg.info();
@@ -576,11 +587,14 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc_S(ZImg &fixedImg, ZImg &movingImg
     nccImg = nccImg.crop(nccImgValidRegion);
     numberOfOverlapVoxelsImg = numberOfOverlapVoxelsImg.crop(nccImgValidRegion);
   }
-  size_t maxNCCIdx = getMaxWeightedNCCIdx(nccImg.channelData<double>(0), numberOfOverlapVoxelsImg.channelData<double>(0),
+  size_t maxNCCIdx = getMaxWeightedNCCIdx(nccImg.channelData<double>(0),
+                                          numberOfOverlapVoxelsImg.channelData<double>(0),
                                           requiredNumberOfOverlapPixels, nccImg.channelVoxelNumber(),
                                           maxNCC, maxWeightedNCC, numOverlapVoxels);
   ZVoxelCoordinate maxNCCCoord = nccImg.indexToCoord(maxNCCIdx);
-  ZVoxelCoordinate offset = maxNCCCoord + nccImgValidRegion.start - ZVoxelCoordinate(movingImgInfo.width-1, movingImgInfo.height-1, movingImgInfo.depth-1);
+  ZVoxelCoordinate offset = maxNCCCoord + nccImgValidRegion.start -
+                            ZVoxelCoordinate(movingImgInfo.width - 1, movingImgInfo.height - 1,
+                                             movingImgInfo.depth - 1);
   LOG(INFO) << "max NCC coord: " << maxNCCCoord;
   LOG(INFO) << nccImgValidRegion.toQString();
   LOG(INFO) << "moving image offset: " << offset;
@@ -588,9 +602,9 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc_S(ZImg &fixedImg, ZImg &movingImg
   return offset;
 }
 
-ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLocPart(ZImg &fixedImg, ZImg &movingImg, size_t xStart, size_t xEnd,
+ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLocPart(ZImg& fixedImg, ZImg& movingImg, size_t xStart, size_t xEnd,
                                                    size_t yStart, size_t yEnd, size_t zStart, size_t zEnd,
-                                                   double &maxNCC, double &maxWeightedNCC, double &numOverlapVoxels)
+                                                   double& maxNCC, double& maxWeightedNCC, double& numOverlapVoxels)
 {
   ZImgInfo fixedImgInfo = fixedImg.info();
   ZImgInfo movingImgInfo = movingImg.info();
@@ -599,19 +613,22 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLocPart(ZImg &fixedImg, ZImg &movingI
   ZImg numberOfOverlapVoxelsImg;
   normXCorrPart(fixedImg, movingImg, xStart, xEnd, yStart, yEnd, zStart, zEnd, nccImg, numberOfOverlapVoxelsImg);
 
-  size_t maxNCCIdx = getMaxWeightedNCCIdx(nccImg.channelData<double>(0), numberOfOverlapVoxelsImg.channelData<double>(0),
+  size_t maxNCCIdx = getMaxWeightedNCCIdx(nccImg.channelData<double>(0),
+                                          numberOfOverlapVoxelsImg.channelData<double>(0),
                                           1, nccImg.channelVoxelNumber(),
                                           maxNCC, maxWeightedNCC, numOverlapVoxels);
   ZVoxelCoordinate maxNCCCoord = nccImg.indexToCoord(maxNCCIdx);
   ZVoxelCoordinate offset = maxNCCCoord + ZVoxelCoordinate(xStart, yStart, zStart)
-      - ZVoxelCoordinate(movingImgInfo.width-1, movingImgInfo.height-1, movingImgInfo.depth-1);
+                            - ZVoxelCoordinate(movingImgInfo.width - 1, movingImgInfo.height - 1,
+                                               movingImgInfo.depth - 1);
   LOG(INFO) << "max NCC coord: " << maxNCCCoord << " region " << xStart << xEnd << yStart << yEnd << zStart << zEnd;
   LOG(INFO) << "moving image offset: " << offset;
 
   return offset;
 }
 
-ZImgRegion ZImgNCCMatch::getNccImgValidRegion(const PositionHint &hint, const ZImgInfo &fixedImgInfo, const ZImgInfo &movingImgInfo)
+ZImgRegion ZImgNCCMatch::getNccImgValidRegion(const PositionHint& hint, const ZImgInfo& fixedImgInfo,
+                                              const ZImgInfo& movingImgInfo)
 {
   ZImgRegion rgn;
   if (hint.testFlag(Left)) {
@@ -632,8 +649,8 @@ ZImgRegion ZImgNCCMatch::getNccImgValidRegion(const PositionHint &hint, const ZI
   return rgn;
 }
 
-double ZImgNCCMatch::getRequiredNumberOfOverlapPixels(const PositionHint &hint, double minOverlapRate,
-                                                      const ZImgInfo &fixedImgInfo, const ZImgInfo &movingImgInfo)
+double ZImgNCCMatch::getRequiredNumberOfOverlapPixels(const PositionHint& hint, double minOverlapRate,
+                                                      const ZImgInfo& fixedImgInfo, const ZImgInfo& movingImgInfo)
 {
   double res = std::min(fixedImgInfo.channelVoxelNumber(), movingImgInfo.channelVoxelNumber()) * minOverlapRate;
   double l = 0;
@@ -654,16 +671,17 @@ double ZImgNCCMatch::getRequiredNumberOfOverlapPixels(const PositionHint &hint, 
   return std::max(res, 1e4);
 }
 
-size_t ZImgNCCMatch::getMaxWeightedNCCIdx(const double *NCCs, const double *overlapVoxels, double overlapVoxelThre, size_t dataLength,
-                                          double &maxNCC, double &maxWeightedNCC, double &numOverlapVoxels)
+size_t ZImgNCCMatch::getMaxWeightedNCCIdx(const double* NCCs, const double* overlapVoxels, double overlapVoxelThre,
+                                          size_t dataLength,
+                                          double& maxNCC, double& maxWeightedNCC, double& numOverlapVoxels)
 {
   WeightNCCTing weightNCC(overlapVoxelThre);
-  size_t i=0;
+  size_t i = 0;
   size_t maxNCCIdx = i;
   maxNCC = NCCs[i];
   numOverlapVoxels = overlapVoxels[i];
   double maxWeightedNCCTmp = weightNCC(NCCs[i], overlapVoxels[i]);
-  for (i=1; i<dataLength; ++i) {
+  for (i = 1; i < dataLength; ++i) {
     double weightedNCC = weightNCC(NCCs[i], overlapVoxels[i]);
     if (weightedNCC > maxWeightedNCCTmp) {
       maxWeightedNCCTmp = weightedNCC;
@@ -672,13 +690,15 @@ size_t ZImgNCCMatch::getMaxWeightedNCCIdx(const double *NCCs, const double *over
       numOverlapVoxels = overlapVoxels[i];
     }
   }
-  LOG(INFO) << "max NCC: " << NCCs[maxNCCIdx] << " max weighted NCC: " << maxWeightedNCCTmp << " number of overlap voxels: " << overlapVoxels[maxNCCIdx];
+  LOG(INFO) << "max NCC: " << NCCs[maxNCCIdx] << " max weighted NCC: " << maxWeightedNCCTmp
+            << " number of overlap voxels: " << overlapVoxels[maxNCCIdx];
   maxWeightedNCC = maxWeightedNCCTmp;
   return maxNCCIdx;
 }
 
-std::pair<ZImgRegion, ZImgRegion> ZImgNCCMatch::getRequiredSrcImgRegion(const PositionHint& hint, const ZImg &fixedImg, const ZImg &movingImg,
-                                                                        double overlapRate)
+std::pair<ZImgRegion, ZImgRegion>
+ZImgNCCMatch::getRequiredSrcImgRegion(const PositionHint& hint, const ZImg& fixedImg, const ZImg& movingImg,
+                                      double overlapRate)
 {
   ZImgRegion fixedRgn;
   ZImgRegion movingRgn;
@@ -721,13 +741,13 @@ std::pair<ZImgRegion, ZImgRegion> ZImgNCCMatch::getRequiredSrcImgRegion(const Po
 }
 
 ZVoxelCoordinate ZImgNCCMatch::mapOffsetToSrcImg(ZVoxelCoordinate offset,
-                                                 const ZImgRegion &fixedRgn, const ZImgRegion &movingRgn)
+                                                 const ZImgRegion& fixedRgn, const ZImgRegion& movingRgn)
 {
   return offset - movingRgn.start + fixedRgn.start;
 }
 
-ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffset(const PositionHint &movingImgPosHint, double maxOverlapRate,
-                                                      double &maxNCC, double &maxWeightedNCC, double &numOverlapVoxels)
+ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffset(const PositionHint& movingImgPosHint, double maxOverlapRate,
+                                                      double& maxNCC, double& maxWeightedNCC, double& numOverlapVoxels)
 {
   ZVoxelCoordinate res;
 
@@ -745,23 +765,26 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffset(const PositionHint &moving
 
   res = maxNormXCorrLoc_S(fixedImg, movingImg,
                           getNccImgValidRegion(movingImgPosHint, fixedImg.info(), movingImg.info()),
-                          getRequiredNumberOfOverlapPixels(movingImgPosHint, std::min(0.01, maxOverlapRate / 10), fixedImg.info(), movingImg.info()),
+                          getRequiredNumberOfOverlapPixels(movingImgPosHint, std::min(0.01, maxOverlapRate / 10),
+                                                           fixedImg.info(), movingImg.info()),
                           maxNCC, maxWeightedNCC, numOverlapVoxels);
   res = mapOffsetToSrcImg(res, fixedRgn, movingRgn);
 
   return res;
 }
 
-ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(const PositionHint &movingImgPosHint, double maxOverlapRate,
+ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(const PositionHint& movingImgPosHint, double maxOverlapRate,
                                                         size_t intvX, size_t intvY, size_t intvZ,
-                                                        double &maxNCC, double &maxWeightedNCC, double &numOverlapVoxels,
-                                                        double &lowResMaxNCC, double &lowResMaxWeightedNCC, double &lowResNumOverlapVoxels)
+                                                        double& maxNCC, double& maxWeightedNCC,
+                                                        double& numOverlapVoxels,
+                                                        double& lowResMaxNCC, double& lowResMaxWeightedNCC,
+                                                        double& lowResNumOverlapVoxels)
 {
   ZVoxelCoordinate res;
 
-  intvX = std::min(intvX, std::min(m_fixedImg.width()-1, m_movingImg.width()-1));
-  intvY = std::min(intvY, std::min(m_fixedImg.height()-1, m_movingImg.height()-1));
-  intvZ = std::min(intvZ, std::min(m_fixedImg.depth()-1, m_movingImg.depth()-1));
+  intvX = std::min(intvX, std::min(m_fixedImg.width() - 1, m_movingImg.width() - 1));
+  intvY = std::min(intvY, std::min(m_fixedImg.height() - 1, m_movingImg.height() - 1));
+  intvZ = std::min(intvZ, std::min(m_fixedImg.depth() - 1, m_movingImg.depth() - 1));
   if (intvX == 0 && intvY == 0 && intvZ == 0) {
     double ncc;
     double wncc;
@@ -795,8 +818,8 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(const PositionHint &movi
   ZImg dsFixedImg = fixedImg.zoomed(scaleX, scaleY, scaleZ, Interpolant::Cubic);
   ZImg dsMovingImg = movingImg.zoomed(scaleX, scaleY, scaleZ, Interpolant::Cubic);
 #else
-  ZImg dsFixedImg = fixedImg.blockDownsampled(intvX+1, intvY+1, intvZ+1, ZImg::CombineMode::Mean);
-  ZImg dsMovingImg = movingImg.blockDownsampled(intvX+1, intvY+1, intvZ+1, ZImg::CombineMode::Mean);
+  ZImg dsFixedImg = fixedImg.blockDownsampled(intvX + 1, intvY + 1, intvZ + 1, ZImg::CombineMode::Mean);
+  ZImg dsMovingImg = movingImg.blockDownsampled(intvX + 1, intvY + 1, intvZ + 1, ZImg::CombineMode::Mean);
 #endif
 
   ZImgInfo fixedInfo = m_fixedImg.info();
@@ -808,14 +831,20 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(const PositionHint &movi
   movingInfo.height /= double(intvY + 1);
   movingInfo.depth /= double(intvZ + 1);
   ZVoxelCoordinate offset = maxNormXCorrLoc_S(dsFixedImg, dsMovingImg,
-                                              getNccImgValidRegion(movingImgPosHint, dsFixedImg.info(), dsMovingImg.info()),
-                                              getRequiredNumberOfOverlapPixels(movingImgPosHint, std::min(0.01, maxOverlapRate / 10), fixedInfo, movingInfo),
+                                              getNccImgValidRegion(movingImgPosHint, dsFixedImg.info(),
+                                                                   dsMovingImg.info()),
+                                              getRequiredNumberOfOverlapPixels(movingImgPosHint,
+                                                                               std::min(0.01, maxOverlapRate / 10),
+                                                                               fixedInfo, movingInfo),
                                               lowResMaxNCC, lowResMaxWeightedNCC, lowResNumOverlapVoxels);
 
-  offset *= ZVoxelCoordinate(intvX+1, intvY+1, intvZ+1, 1, 1);
-  offset.x = std::max(1 - static_cast<int>(movingImg.width()), std::min(static_cast<int>(fixedImg.width()) - 1, offset.x));
-  offset.y = std::max(1 - static_cast<int>(movingImg.height()), std::min(static_cast<int>(fixedImg.height()) - 1, offset.y));
-  offset.z = std::max(1 - static_cast<int>(movingImg.depth()), std::min(static_cast<int>(fixedImg.depth()) - 1, offset.z));
+  offset *= ZVoxelCoordinate(intvX + 1, intvY + 1, intvZ + 1, 1, 1);
+  offset.x = std::max(1 - static_cast<int>(movingImg.width()),
+                      std::min(static_cast<int>(fixedImg.width()) - 1, offset.x));
+  offset.y = std::max(1 - static_cast<int>(movingImg.height()),
+                      std::min(static_cast<int>(fixedImg.height()) - 1, offset.y));
+  offset.z = std::max(1 - static_cast<int>(movingImg.depth()),
+                      std::min(static_cast<int>(fixedImg.depth()) - 1, offset.z));
 
 #if 0
   double maxNCC = std::numeric_limits<double>::min();
@@ -840,13 +869,14 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(const PositionHint &movi
   size_t xEnd = subMovingImg.width() + subFixedImg.width() - 1;
   size_t yEnd = subMovingImg.height() + subFixedImg.height() - 1;
   size_t zEnd = subMovingImg.depth() + subFixedImg.depth() - 1;
-  size_t xStart = std::max(0, static_cast<int>(subMovingImg.width())-1-static_cast<int>(intvX)-1);
-  xEnd = std::min(xEnd, subMovingImg.width()-1+intvX+1+1);
-  size_t yStart = std::max(0, static_cast<int>(subMovingImg.height())-1-static_cast<int>(intvY)-1);
-  yEnd = std::min(yEnd, subMovingImg.height()-1+intvY+1+1);
-  size_t zStart = std::max(0, static_cast<int>(subMovingImg.depth())-1-static_cast<int>(intvZ)-1);
-  zEnd = std::min(zEnd, subMovingImg.depth()-1+intvZ+1+1);
-  res = maxNormXCorrLocPart(subFixedImg, subMovingImg, xStart, xEnd, yStart, yEnd, zStart, zEnd, maxNCC, maxWeightedNCC, numOverlapVoxels);
+  size_t xStart = std::max(0, static_cast<int>(subMovingImg.width()) - 1 - static_cast<int>(intvX) - 1);
+  xEnd = std::min(xEnd, subMovingImg.width() - 1 + intvX + 1 + 1);
+  size_t yStart = std::max(0, static_cast<int>(subMovingImg.height()) - 1 - static_cast<int>(intvY) - 1);
+  yEnd = std::min(yEnd, subMovingImg.height() - 1 + intvY + 1 + 1);
+  size_t zStart = std::max(0, static_cast<int>(subMovingImg.depth()) - 1 - static_cast<int>(intvZ) - 1);
+  zEnd = std::min(zEnd, subMovingImg.depth() - 1 + intvZ + 1 + 1);
+  res = maxNormXCorrLocPart(subFixedImg, subMovingImg, xStart, xEnd, yStart, yEnd, zStart, zEnd, maxNCC, maxWeightedNCC,
+                            numOverlapVoxels);
   res += offset;
   res = mapOffsetToSrcImg(res, fixedRgn, movingRgn);
   //LOG(INFO) << "final offset: " << res;

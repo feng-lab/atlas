@@ -31,7 +31,7 @@
 
 namespace {
 // generic solution
-template <class T>
+template<class T>
 int numDigits(T number)
 {
   int digits = 0;
@@ -94,7 +94,7 @@ int numDigits(int32_t x)
 
 namespace nim {
 
-Z3DView::Z3DView(ZDoc *doc, bool stereo, Z3DMainWindow *parent)
+Z3DView::Z3DView(ZDoc* doc, bool stereo, Z3DMainWindow* parent)
   : QObject(parent)
   , m_doc(doc)
   , m_isStereoView(stereo)
@@ -124,7 +124,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DView::viewSettingWidgetsGroupOf(size_t id)
   } else if (id == 3) {
     return m_globalParas.widgetsGroup(false);
   } else {
-    for (int i=0; i<m_3dObjViews.size(); ++i) {
+    for (int i = 0; i < m_3dObjViews.size(); ++i) {
       std::shared_ptr<ZWidgetsGroup> wg = m_3dObjViews[i]->viewSettingWidgetsGroupOf(id);
       if (wg)
         return wg;
@@ -133,15 +133,15 @@ std::shared_ptr<ZWidgetsGroup> Z3DView::viewSettingWidgetsGroupOf(size_t id)
   return std::shared_ptr<ZWidgetsGroup>();
 }
 
-QWidget *Z3DView::globalParasWidget()
+QWidget* Z3DView::globalParasWidget()
 {
   return m_globalParas.widgetsGroup(true)->createWidget(false);
 }
 
-QWidget *Z3DView::captureWidget()
+QWidget* Z3DView::captureWidget()
 {
-  QScrollArea *res = new QScrollArea();
-  ZTakeScreenShotWidget *m_screenShotWidget = new ZTakeScreenShotWidget(false, false, nullptr);
+  QScrollArea* res = new QScrollArea();
+  ZTakeScreenShotWidget* m_screenShotWidget = new ZTakeScreenShotWidget(false, false, nullptr);
   m_screenShotWidget->setCaptureStereoImage(m_isStereoView);
   connect(m_screenShotWidget, &ZTakeScreenShotWidget::take3DScreenShot,
           this, &Z3DView::takeScreenShot);
@@ -155,12 +155,12 @@ QWidget *Z3DView::captureWidget()
   return res;
 }
 
-QWidget *Z3DView::backgroundWidget()
+QWidget* Z3DView::backgroundWidget()
 {
   return m_compositor->backgroundWidgetsGroup()->createWidget(false);
 }
 
-QWidget *Z3DView::axisWidget()
+QWidget* Z3DView::axisWidget()
 {
   return m_compositor->axisWidgetsGroup()->createWidget(false);
 }
@@ -169,7 +169,7 @@ void Z3DView::updateBoundBox()
 {
   m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = std::numeric_limits<double>::max();
   m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = std::numeric_limits<double>::lowest();
-  for (int i=0; i<m_3dObjViews.size(); ++i) {
+  for (int i = 0; i < m_3dObjViews.size(); ++i) {
     std::vector<double> boundBox = m_3dObjViews[i]->boundBox();
     m_boundBox[0] = std::min(boundBox[0], m_boundBox[0]);
     m_boundBox[1] = std::max(boundBox[1], m_boundBox[1]);
@@ -180,8 +180,8 @@ void Z3DView::updateBoundBox()
   }
   if (m_boundBox[0] > m_boundBox[1] || m_boundBox[2] > m_boundBox[3] || m_boundBox[4] > m_boundBox[5]) {
     // nothing visible
-    m_boundBox[0] = m_boundBox [2] = m_boundBox[4] = 0.0;
-    m_boundBox[1] = m_boundBox [3] = m_boundBox[5] = 1.0;
+    m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = 0.0;
+    m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = 1.0;
   }
   m_boundBox[1] = std::max(m_boundBox[1], m_boundBox[0] + 1.0);
   m_boundBox[3] = std::max(m_boundBox[3], m_boundBox[2] + 1.0);
@@ -194,9 +194,9 @@ void Z3DView::updateBoundBox()
   m_numObjsBefore = m_doc->numObjs();
 }
 
-void Z3DView::read(size_t id, const QJsonObject &json)
+void Z3DView::read(size_t id, const QJsonObject& json)
 {
-  for (int i=0; i<m_3dObjViews.size(); ++i) {
+  for (int i = 0; i < m_3dObjViews.size(); ++i) {
     if (m_3dObjViews[i]->hasObj(id)) {
       if (json.value("ViewObjType").toString() == m_3dObjViews[i]->doc().typeName()) {
         m_3dObjViews[i]->read(id, json);
@@ -209,9 +209,9 @@ void Z3DView::read(size_t id, const QJsonObject &json)
   }
 }
 
-void Z3DView::write(size_t id, QJsonObject &json) const
+void Z3DView::write(size_t id, QJsonObject& json) const
 {
-  for (int i=0; i<m_3dObjViews.size(); ++i) {
+  for (int i = 0; i < m_3dObjViews.size(); ++i) {
     if (m_3dObjViews[i]->hasObj(id)) {
       json.insert("ViewObjType", m_3dObjViews[i]->doc().typeName());
       json.insert("ViewVersion", QJsonValue(1.0));
@@ -221,7 +221,7 @@ void Z3DView::write(size_t id, QJsonObject &json) const
   }
 }
 
-void Z3DView::read(const QJsonObject &json)
+void Z3DView::read(const QJsonObject& json)
 {
   if (json.contains("Compositor") && json.value("Compositor").isObject()) {
     m_compositor->read(json.value("Compositor").toObject());
@@ -231,7 +231,7 @@ void Z3DView::read(const QJsonObject &json)
   }
 }
 
-void Z3DView::write(QJsonObject &json) const
+void Z3DView::write(QJsonObject& json) const
 {
   QJsonObject compObj;
   m_compositor->write(compObj);
@@ -291,7 +291,8 @@ bool Z3DView::takeScreenShot(QString filename, Z3DScreenShotType sst)
     ++w;
   }
   if (m_canvas->width() % 2 == 1 || m_canvas->height() % 2 == 1) {
-    LOG(INFO) << "Resize canvas size from (" << m_canvas->width() << ", " << m_canvas->height() << ") to (" << w << ", " << h << ").";
+    LOG(INFO) << "Resize canvas size from (" << m_canvas->width() << ", " << m_canvas->height() << ") to (" << w << ", "
+              << h << ").";
     m_canvas->resize(w, h);
   }
   bool res = true;
@@ -302,7 +303,7 @@ bool Z3DView::takeScreenShot(QString filename, Z3DScreenShotType sst)
   return res;
 }
 
-bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir &dir, const QString &namePrefix, glm::vec3 axis,
+bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, glm::vec3 axis,
                                             bool clockWise, int numFrame, int width, int height, Z3DScreenShotType sst)
 {
   QString title = "Capturing Images...";
@@ -315,7 +316,7 @@ bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir &dir, const QString &name
   progress.show();
   double rAngle = M_PI * 2. / numFrame;
   bool res = true;
-  for (int i=0; i<numFrame; i++) {
+  for (int i = 0; i < numFrame; i++) {
     progress.setValue(i);
     if (progress.wasCanceled())
       break;
@@ -337,7 +338,7 @@ bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir &dir, const QString &name
   return res;
 }
 
-bool Z3DView::takeSeriesScreenShot(const QDir &dir, const QString &namePrefix, glm::vec3 axis,
+bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, glm::vec3 axis,
                                    bool clockWise, int numFrame, Z3DScreenShotType sst)
 {
   QString title = "Capturing Images...";
@@ -350,7 +351,7 @@ bool Z3DView::takeSeriesScreenShot(const QDir &dir, const QString &namePrefix, g
   progress.show();
   double rAngle = M_PI * 2. / numFrame;
   bool res = true;
-  for (int i=0; i<numFrame; i++) {
+  for (int i = 0; i < numFrame; i++) {
     progress.setValue(i);
     if (progress.wasCanceled())
       break;
@@ -403,35 +404,35 @@ void Z3DView::init()
 
   //packages
   QList<ZObjDoc*> objDocs = m_doc->objDocs();
-  for (int i=0; i<objDocs.size(); ++i) {
+  for (int i = 0; i < objDocs.size(); ++i) {
     if (objDocs[i]->typeName() == "Image") {
       ZImgDoc* imgDoc = qobject_cast<ZImgDoc*>(objDocs[i]);
-      Z3DImgView *imgView = new Z3DImgView(*imgDoc, *this);
+      Z3DImgView* imgView = new Z3DImgView(*imgDoc, *this);
       connect(imgView, &Z3DImgView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(imgView);
     } else if (objDocs[i]->typeName() == "Puncta") {
-      ZPunctaDoc *punctaDoc = qobject_cast<ZPunctaDoc*>(objDocs[i]);
-      Z3DPunctaView *punctaView = new Z3DPunctaView(*punctaDoc, *this);
+      ZPunctaDoc* punctaDoc = qobject_cast<ZPunctaDoc*>(objDocs[i]);
+      Z3DPunctaView* punctaView = new Z3DPunctaView(*punctaDoc, *this);
       connect(punctaView, &Z3DPunctaView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(punctaView);
     } else if (objDocs[i]->typeName() == "Swc") {
-      ZSwcDoc *swcDoc = qobject_cast<ZSwcDoc*>(objDocs[i]);
-      Z3DSwcView *swcView = new Z3DSwcView(*swcDoc, *this);
+      ZSwcDoc* swcDoc = qobject_cast<ZSwcDoc*>(objDocs[i]);
+      Z3DSwcView* swcView = new Z3DSwcView(*swcDoc, *this);
       connect(swcView, &Z3DSwcView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(swcView);
     } else if (objDocs[i]->typeName() == "Mesh") {
-      ZMeshDoc *meshDoc = qobject_cast<ZMeshDoc*>(objDocs[i]);
-      Z3DMeshView *meshView = new Z3DMeshView(*meshDoc, *this);
+      ZMeshDoc* meshDoc = qobject_cast<ZMeshDoc*>(objDocs[i]);
+      Z3DMeshView* meshView = new Z3DMeshView(*meshDoc, *this);
       connect(meshView, &Z3DMeshView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(meshView);
     } else if (objDocs[i]->typeName() == "Animation3D") {
-      Z3DAnimationDoc *aniDoc = qobject_cast<Z3DAnimationDoc*>(objDocs[i]);
-      Z3DAnimationView *aniView = new Z3DAnimationView(*aniDoc, *this);
+      Z3DAnimationDoc* aniDoc = qobject_cast<Z3DAnimationDoc*>(objDocs[i]);
+      Z3DAnimationView* aniView = new Z3DAnimationView(*aniDoc, *this);
       connect(aniView, &Z3DAnimationView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(aniView);
     } else if (objDocs[i]->typeName() == "RegionAnnotation") {
-      ZRegionAnnotationDoc *aniDoc = qobject_cast<ZRegionAnnotationDoc*>(objDocs[i]);
-      Z3DRegionAnnotationView *aniView = new Z3DRegionAnnotationView(*aniDoc, *this);
+      ZRegionAnnotationDoc* aniDoc = qobject_cast<ZRegionAnnotationDoc*>(objDocs[i]);
+      Z3DRegionAnnotationView* aniView = new Z3DRegionAnnotationView(*aniDoc, *this);
       connect(aniView, &Z3DRegionAnnotationView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(aniView);
     }

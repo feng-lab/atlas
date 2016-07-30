@@ -10,7 +10,7 @@ ZRegistrationNumericDiffCostFunction::ZRegistrationNumericDiffCostFunction(doubl
 {
 }
 
-void ZRegistrationNumericDiffCostFunction::setMetric(ZImageToImageMetric &metric)
+void ZRegistrationNumericDiffCostFunction::setMetric(ZImageToImageMetric& metric)
 {
   m_metric = &metric;
   m_metric->setUseMultithreading(m_useMultithreading);
@@ -23,7 +23,8 @@ void ZRegistrationNumericDiffCostFunction::setUseMultithreading(bool i)
     m_metric->setUseMultithreading(i);
 }
 
-bool ZRegistrationNumericDiffCostFunction::evaluate(const double * const parameters, double *cost, double *gradient) const
+bool
+ZRegistrationNumericDiffCostFunction::evaluate(const double* const parameters, double* cost, double* gradient) const
 {
   if (!m_metric || !m_transform) {
     LOG(FATAL) << "Metric or Transform is not set";
@@ -40,13 +41,13 @@ bool ZRegistrationNumericDiffCostFunction::evaluate(const double * const paramet
   if (gradient) {
     std::vector<double> paras(parameters, parameters + numParameters());
     double fallbackdelta = 0.0;
-    for (size_t i=0; i<paras.size(); ++i) {
+    for (size_t i = 0; i < paras.size(); ++i) {
       fallbackdelta += std::abs(paras[i]) * m_relativeStepSize;
     }
     fallbackdelta = (fallbackdelta == 0) ? m_relativeStepSize : (fallbackdelta / paras.size());
 
     std::vector<double> paraPlusDelta = paras;
-    for (size_t i=0; i<paras.size(); ++i) {
+    for (size_t i = 0; i < paras.size(); ++i) {
       double delta = std::abs(paras[i]) * m_relativeStepSize;
       if (delta == 0.0)
         delta = fallbackdelta;
@@ -64,10 +65,12 @@ bool ZRegistrationNumericDiffCostFunction::evaluate(const double * const paramet
 }
 
 template<typename TFixed, typename TMoving>
-void ZRegistrationNumericDiffCostFunction::evaluate_Impl(const double * const parameters, double *value) const
+void ZRegistrationNumericDiffCostFunction::evaluate_Impl(const double* const parameters, double* value) const
 {
   m_transform->setParameters(parameters);
-  ZImg movingBuffer(ZImgInfo(m_fixedImg->width(), m_fixedImg->height(), m_fixedImg->depth(), 1, 1, m_movingImg->bytesPerVoxel(), m_movingImg->voxelFormat()));
+  ZImg movingBuffer(
+    ZImgInfo(m_fixedImg->width(), m_fixedImg->height(), m_fixedImg->depth(), 1, 1, m_movingImg->bytesPerVoxel(),
+             m_movingImg->voxelFormat()));
   if (m_transform->is2DTransform()) {
     m_transform->transformImage(m_movingImg->channelData<TMoving>(0), m_movingImg->width(), m_movingImg->height(),
                                 movingBuffer.channelData<TMoving>(0), 0, m_fixedImg->width(), 0, m_fixedImg->height());

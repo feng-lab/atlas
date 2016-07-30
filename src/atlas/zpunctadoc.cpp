@@ -11,7 +11,7 @@
 
 namespace nim {
 
-ZPunctaDoc::ZPunctaDoc(ZDoc &doc)
+ZPunctaDoc::ZPunctaDoc(ZDoc& doc)
   : ZObjDoc(doc)
 {
   createActions();
@@ -63,12 +63,12 @@ bool ZPunctaDoc::saveAs(size_t id)
   return false;
 }
 
-bool ZPunctaDoc::canReadFile(const QString &fileName)
+bool ZPunctaDoc::canReadFile(const QString& fileName)
 {
   return ZPuncta::canReadFile(fileName);
 }
 
-size_t ZPunctaDoc::loadFile(const QString &fileName, QString &errorMsg)
+size_t ZPunctaDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
   for (auto it = m_idToPunctaPacks.begin(); it != m_idToPunctaPacks.end(); ++it) {
     if (it->second->path == fileName)
@@ -81,13 +81,13 @@ size_t ZPunctaDoc::loadFile(const QString &fileName, QString &errorMsg)
     setLastOpenedObjPath(fileName);
     return id;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = e.what();
     return 0;
   }
 }
 
-size_t ZPunctaDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
+size_t ZPunctaDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
 {
   if (!jValue.isString() || jValue.toString().trimmed().isEmpty()) {
     errorMsg = QString("File path is not string or is empty");
@@ -105,20 +105,20 @@ size_t ZPunctaDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
     setLastOpenedObjPath(fileName);
     return id;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = e.what();
     return 0;
   }
 }
 
-QList<QAction *> ZPunctaDoc::loadFileActions() const
+QList<QAction*> ZPunctaDoc::loadFileActions() const
 {
   QList<QAction*> res;
   res.push_back(m_loadPunctaAction);
   return res;
 }
 
-QMenu *ZPunctaDoc::processObjMenu() const
+QMenu* ZPunctaDoc::processObjMenu() const
 {
   QMenu* res = new QMenu(typeName());
   res->addAction(m_detectPunctaAction);
@@ -164,7 +164,7 @@ QJsonValue ZPunctaDoc::jsonValue(size_t id) const
   return QJsonValue(m_idToPunctaPacks.at(id)->path);
 }
 
-bool ZPunctaDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
+bool ZPunctaDoc::isSameObj(const QJsonValue& v1, const QJsonValue& v2) const
 {
   CHECK(v1.isString() && v2.isString());
   if (v1 == v2)
@@ -210,7 +210,7 @@ void ZPunctaDoc::loadPuncta()
   if (dialog.exec()) {
     QString errorMsg;
     //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    for (int i=0; i<dialog.selectedFiles().size(); ++i) {
+    for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
         QMessageBox::critical(QApplication::activeWindow(), tr("Can not read puncta"),
                               errorMsg);
@@ -232,7 +232,7 @@ void ZPunctaDoc::generateAnalysisTextFiles()
   dia.exec();
 }
 
-size_t ZPunctaDoc::addPuncta(ZPuncta &puncta, const QString &path)
+size_t ZPunctaDoc::addPuncta(ZPuncta& puncta, const QString& path)
 {
   size_t id = m_doc.getNewObjId();
   m_idToPunctaPacks[id] = std::make_shared<PunctaPack>(puncta, path);
@@ -242,7 +242,7 @@ size_t ZPunctaDoc::addPuncta(ZPuncta &puncta, const QString &path)
   return id;
 }
 
-ZPunctaDoc::PunctaPack::PunctaPack(ZPuncta &punctaIn, const QString &path)
+ZPunctaDoc::PunctaPack::PunctaPack(ZPuncta& punctaIn, const QString& path)
   : path(QFileInfo(path).canonicalFilePath()), hasUnsavedChange(false)
 {
   puncta.swap(punctaIn);
@@ -260,7 +260,7 @@ void ZPunctaDoc::PunctaPack::updateDerivedData()
   m_tooltip = path;
 }
 
-const QString &ZPunctaDoc::PunctaPack::info() const
+const QString& ZPunctaDoc::PunctaPack::info() const
 {
   if (m_info.isEmpty()) {
     m_info = QString("%1 puncta").arg(puncta.size());
@@ -283,7 +283,7 @@ void ZPunctaDoc::createActions()
   connect(m_generateAnalysisTextFilesAction, &QAction::triggered, this, &ZPunctaDoc::generateAnalysisTextFiles);
 }
 
-bool ZPunctaDoc::savePuncta(PunctaPack *pack, const QString &fileName, QString &errorMsg, const QString& format)
+bool ZPunctaDoc::savePuncta(PunctaPack* pack, const QString& fileName, QString& errorMsg, const QString& format)
 {
   try {
     pack->puncta.save(fileName, format);
@@ -295,13 +295,13 @@ bool ZPunctaDoc::savePuncta(PunctaPack *pack, const QString &fileName, QString &
     setLastOpenedObjPath(fileName);
     return true;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = e.what();
     return false;
   }
 }
 
-void ZPunctaDoc::packInfoUpdated(PunctaPack *pack)
+void ZPunctaDoc::packInfoUpdated(PunctaPack* pack)
 {
   for (auto it = m_idToPunctaPacks.begin(); it != m_idToPunctaPacks.end(); ++it) {
     if (it->second.get() == pack)

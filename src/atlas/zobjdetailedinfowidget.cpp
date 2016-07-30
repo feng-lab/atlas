@@ -9,11 +9,11 @@
 
 namespace nim {
 
-ZObjDetailedInfoWidget::ZObjDetailedInfoWidget(ZDoc *doc, QWidget *mw)
+ZObjDetailedInfoWidget::ZObjDetailedInfoWidget(ZDoc* doc, QWidget* mw)
   : QWidget(mw)
   , m_doc(doc)
 {
-  QVBoxLayout *layout = new QVBoxLayout;
+  QVBoxLayout* layout = new QVBoxLayout;
   m_widget = new QStackedWidget;
   m_defaultWidget = new QWidget(this);
   m_widget->addWidget(m_defaultWidget);
@@ -34,7 +34,7 @@ void ZObjDetailedInfoWidget::showDefaultWidget()
 
 void ZObjDetailedInfoWidget::showWidgetOfObj(size_t id)
 {
-  for (size_t i=0; i<m_subWidgets.size(); ++i) {
+  for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       m_widget->setCurrentWidget(m_subWidgets[i].widget);
       return;
@@ -44,14 +44,14 @@ void ZObjDetailedInfoWidget::showWidgetOfObj(size_t id)
   QString info = m_doc->objDetailedInfo(id);
   if (!info.isEmpty()) {
     ZWidgetsGroup wg("Info", 1);
-    QLabel *infoLabel = new QLabel(info);
+    QLabel* infoLabel = new QLabel(info);
     infoLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     infoLabel->setWordWrap(true);
     wg.addChild(*infoLabel, 1);
     QLabel* label = new QLabel(m_doc->objNameWithModifiedMarkerAndID(id));
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setWordWrap(true);
-    QWidget *wt = wg.createWidget(false, true, label);
+    QWidget* wt = wg.createWidget(false, true, label);
     m_subWidgets.emplace_back(id, infoLabel, label, wt);
     m_widget->setCurrentIndex(m_widget->addWidget(wt));
   } else {
@@ -64,7 +64,7 @@ void ZObjDetailedInfoWidget::hideWidget()
   m_widget->setCurrentWidget(m_defaultWidget);
 }
 
-void ZObjDetailedInfoWidget::setDefaultWidget(QWidget *widget)
+void ZObjDetailedInfoWidget::setDefaultWidget(QWidget* widget)
 {
   if (m_widget->currentWidget() == m_defaultWidget) {
     m_widget->setCurrentIndex(m_widget->addWidget(widget));
@@ -76,7 +76,7 @@ void ZObjDetailedInfoWidget::setDefaultWidget(QWidget *widget)
 
 void ZObjDetailedInfoWidget::removeWidgetOfObj(size_t id)
 {
-  for (size_t i=0; i<m_subWidgets.size(); ++i) {
+  for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       if (m_widget->currentWidget() == m_subWidgets[i].widget)
         m_widget->setCurrentWidget(m_defaultWidget);
@@ -91,7 +91,7 @@ void ZObjDetailedInfoWidget::removeWidgetOfObj(size_t id)
 void ZObjDetailedInfoWidget::updateWidgetLabelOfObj(size_t id)
 {
   //LOG(INFO) << "..";
-  for (size_t i=0; i<m_subWidgets.size(); ++i) {
+  for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       m_subWidgets[i].infoLabel->setText(m_doc->objDetailedInfo(id));
       m_subWidgets[i].label->setText(m_doc->objNameWithModifiedMarkerAndID(id));

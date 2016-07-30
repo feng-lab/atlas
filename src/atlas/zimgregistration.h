@@ -14,33 +14,45 @@ class ZImgRegistration
 public:
   ZImgRegistration();
 
-  const ZImg& fixedImg() const { return *m_fixedImg; }
-  void setFixedImg(const ZImg& img) { m_fixedImg = &img; }
-  const ZImg& movingImg() const { return *m_movingImg; }
-  void setMovingImg(const ZImg& img) { m_movingImg = &img; }
+  const ZImg& fixedImg() const
+  { return *m_fixedImg; }
+
+  void setFixedImg(const ZImg& img)
+  { m_fixedImg = &img; }
+
+  const ZImg& movingImg() const
+  { return *m_movingImg; }
+
+  void setMovingImg(const ZImg& img)
+  { m_movingImg = &img; }
+
   //
-  void setCostFunction(ZRegistrationCostFunction &costFunction);
+  void setCostFunction(ZRegistrationCostFunction& costFunction);
+
   //
-  void setInitialTransform(ZImageTransform &tfm);
+  void setInitialTransform(ZImageTransform& tfm);
+
   //
-  void setOptimizer(const QString &str);
+  void setOptimizer(const QString& str);
 
   // default is true
-  void setUseMultithreading(bool v) { m_useMultithreading = v; }
+  void setUseMultithreading(bool v)
+  { m_useMultithreading = v; }
 
   // use multiscale registration if number of scale > 1, default is 1
-  void setNumScales(int i) { m_numScales = std::max(1, i); }
+  void setNumScales(int i)
+  { m_numScales = std::max(1, i); }
 
   // return cost value
   double run();
 
 private:
-  const ZImg *m_fixedImg;
-  const ZImg *m_movingImg;
+  const ZImg* m_fixedImg;
+  const ZImg* m_movingImg;
 
   ZRegistrationOptimizer m_optimizer;
-  ZRegistrationCostFunction *m_costFunction;
-  ZImageTransform *m_transform;
+  ZRegistrationCostFunction* m_costFunction;
+  ZImageTransform* m_transform;
 
   int m_useMultithreading;
   int m_numScales;

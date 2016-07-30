@@ -13,7 +13,7 @@
 
 namespace nim {
 
-Z3DFilter::Z3DFilter(QObject *parent)
+Z3DFilter::Z3DFilter(QObject* parent)
   : QObject(parent)
   , m_invalidationState(InvalidAllResult)
   , m_invalidationVisited(false)
@@ -24,13 +24,13 @@ Z3DFilter::~Z3DFilter()
 {
 }
 
-ZParameter* Z3DFilter::parameter(const QString &name) const
+ZParameter* Z3DFilter::parameter(const QString& name) const
 {
-  for (size_t i=0; i<m_parameters.size(); i++) {
+  for (size_t i = 0; i < m_parameters.size(); i++) {
     if (m_parameters[i]->name() == name)
       return m_parameters[i];
   }
-  return NULL;
+  return nullptr;
 }
 
 void Z3DFilter::invalidate(InvalidationState inv)
@@ -43,40 +43,40 @@ void Z3DFilter::invalidate(InvalidationState inv)
   if (!m_invalidationVisited) {
     m_invalidationVisited = true;
 
-    for (size_t i=0; i<m_outputPorts.size(); ++i)
+    for (size_t i = 0; i < m_outputPorts.size(); ++i)
       m_outputPorts[i]->invalidate();
 
     m_invalidationVisited = false;
   }
 }
 
-Z3DInputPortBase *Z3DFilter::inputPort(const QString &name) const
+Z3DInputPortBase* Z3DFilter::inputPort(const QString& name) const
 {
-  for (size_t i=0; i < m_inputPorts.size(); i++) {
+  for (size_t i = 0; i < m_inputPorts.size(); i++) {
     if (m_inputPorts[i]->name() == name)
       return m_inputPorts[i];
   }
 
-  return NULL;
+  return nullptr;
 }
 
-Z3DOutputPortBase *Z3DFilter::outputPort(const QString &name) const
+Z3DOutputPortBase* Z3DFilter::outputPort(const QString& name) const
 {
-  for (size_t i=0; i < m_outputPorts.size(); i++) {
+  for (size_t i = 0; i < m_outputPorts.size(); i++) {
     if (m_outputPorts[i]->name() == name)
       return m_outputPorts[i];
   }
 
-  return NULL;
+  return nullptr;
 }
 
-void Z3DFilter::onEvent(QEvent *e, int w, int h)
+void Z3DFilter::onEvent(QEvent* e, int w, int h)
 {
   e->ignore();
 
   //LOG(WARNING) << e << " " << className();
   // propagate to interaction handlers
-  for (size_t i=0; i<m_interactionHandlers.size() && !e->isAccepted(); ++i) {
+  for (size_t i = 0; i < m_interactionHandlers.size() && !e->isAccepted(); ++i) {
     m_interactionHandlers[i]->onEvent(e, w, h);
   }
 
@@ -96,16 +96,16 @@ void Z3DFilter::disconnectAllPorts()
   }
 }
 
-void Z3DFilter::read(const QJsonObject &json)
+void Z3DFilter::read(const QJsonObject& json)
 {
-  for (size_t i=0; i<m_parameters.size(); ++i) {
+  for (size_t i = 0; i < m_parameters.size(); ++i) {
     m_parameters[i]->read(json);
   }
 }
 
-void Z3DFilter::write(QJsonObject &json) const
+void Z3DFilter::write(QJsonObject& json) const
 {
-  for (size_t i=0; i<m_parameters.size(); ++i) {
+  for (size_t i = 0; i < m_parameters.size(); ++i) {
     m_parameters[i]->write(json);
   }
 }
@@ -119,7 +119,7 @@ void Z3DFilter::setValid(Z3DEye eye)
   else
     m_invalidationState &= ~InvalidRightEyeResult;
 
-  for (size_t i=0; i<m_inputPorts.size(); ++i)
+  for (size_t i = 0; i < m_inputPorts.size(); ++i)
     m_inputPorts[i]->setValid();
 }
 
@@ -135,18 +135,18 @@ bool Z3DFilter::isValid(Z3DEye eye) const
 
 bool Z3DFilter::isReady(Z3DEye) const
 {
-  for(size_t i=0; i<m_inputPorts.size(); ++i)
+  for (size_t i = 0; i < m_inputPorts.size(); ++i)
     if (!m_inputPorts[i]->isReady())
       return false;
 
-  for (size_t i=0; i<m_outputPorts.size(); ++i)
-    if(!m_outputPorts[i]->isReady())
+  for (size_t i = 0; i < m_outputPorts.size(); ++i)
+    if (!m_outputPorts[i]->isReady())
       return false;
 
   return true;
 }
 
-void Z3DFilter::addPort(Z3DInputPortBase &port)
+void Z3DFilter::addPort(Z3DInputPortBase& port)
 {
   port.setFilter(this);
 
@@ -161,7 +161,7 @@ void Z3DFilter::addPort(Z3DInputPortBase &port)
   }
 }
 
-void Z3DFilter::addPort(Z3DOutputPortBase &port)
+void Z3DFilter::addPort(Z3DOutputPortBase& port)
 {
   port.setFilter(this);
   m_outputPorts.push_back(&port);
@@ -174,7 +174,7 @@ void Z3DFilter::addPort(Z3DOutputPortBase &port)
   }
 }
 
-void Z3DFilter::removePort(Z3DInputPortBase &port)
+void Z3DFilter::removePort(Z3DInputPortBase& port)
 {
   m_inputPorts.erase(std::find(m_inputPorts.begin(), m_inputPorts.end(), &port));
 
@@ -187,7 +187,7 @@ void Z3DFilter::removePort(Z3DInputPortBase &port)
   }
 }
 
-void Z3DFilter::removePort(Z3DOutputPortBase &port)
+void Z3DFilter::removePort(Z3DOutputPortBase& port)
 {
   m_outputPorts.erase(std::find(m_outputPorts.begin(), m_outputPorts.end(), &port));
 
@@ -200,7 +200,7 @@ void Z3DFilter::removePort(Z3DOutputPortBase &port)
   }
 }
 
-void Z3DFilter::addParameter(ZParameter &para, InvalidationState inv)
+void Z3DFilter::addParameter(ZParameter& para, InvalidationState inv)
 {
   if (m_parameterNames.find(para.name()) != m_parameterNames.end()) {
     LOG(FATAL) << "Duplicated para name " << para.name();
@@ -212,7 +212,7 @@ void Z3DFilter::addParameter(ZParameter &para, InvalidationState inv)
   }
 }
 
-void Z3DFilter::removeParameter(ZParameter &para)
+void Z3DFilter::removeParameter(ZParameter& para)
 {
   if (!parameter(para.name())) {
     LOG(ERROR) << className() << " parameter " << para.name() << " cannot be removed, it does not exist";
@@ -223,13 +223,13 @@ void Z3DFilter::removeParameter(ZParameter &para)
   }
 }
 
-void Z3DFilter::addEventListener(ZEventListenerParameter &para)
+void Z3DFilter::addEventListener(ZEventListenerParameter& para)
 {
   addParameter(para);
   m_eventListeners.push_back(&para);
 }
 
-void Z3DFilter::addInteractionHandler(Z3DInteractionHandler &handler)
+void Z3DFilter::addInteractionHandler(Z3DInteractionHandler& handler)
 {
   m_interactionHandlers.push_back(&handler);
 }
@@ -274,12 +274,12 @@ void Z3DFilter::addPrivateRenderPort(Z3DRenderOutputPort& port)
   }
 }
 
-void Z3DFilter::addPrivateRenderTarget(Z3DRenderTarget &target)
+void Z3DFilter::addPrivateRenderTarget(Z3DRenderTarget& target)
 {
   m_privateRenderTargets.push_back(&target);
 }
 
-void Z3DFilter::renderScreenQuad(const ZVertexArrayObject &vao, const Z3DShaderProgram &shader)
+void Z3DFilter::renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader)
 {
   if (!shader.isLinked())
     return;
@@ -299,7 +299,7 @@ void Z3DFilter::renderScreenQuad(const ZVertexArrayObject &vao, const Z3DShaderP
 
   glEnableVertexAttribArray(attr_vertex);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[0]);
-  glBufferData(GL_ARRAY_BUFFER, 3*4*sizeof(GLfloat), vertices, GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, 3 * 4 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
   glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
   glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -318,7 +318,7 @@ void Z3DFilter::updateSize()
 {
   // 1. update outport size
   glm::uvec2 maxOutportSize(0, 0);
-  for(size_t i=0; i<m_outputPorts.size(); ++i) {
+  for (size_t i = 0; i < m_outputPorts.size(); ++i) {
     glm::uvec2 outportSize = m_outputPorts[i]->expectedSize();
     if (outportSize.x > 0 && outportSize != m_outputPorts[i]->size()) {
       m_outputPorts[i]->resize(outportSize);
@@ -328,15 +328,15 @@ void Z3DFilter::updateSize()
   }
 
   // 2. update private ports
-  for (size_t i=0; i<m_privateRenderPorts.size(); ++i) {
+  for (size_t i = 0; i < m_privateRenderPorts.size(); ++i) {
     m_privateRenderPorts[i]->resize(maxOutportSize);
   }
-  for (size_t i=0; i<m_privateRenderTargets.size(); ++i) {
+  for (size_t i = 0; i < m_privateRenderTargets.size(); ++i) {
     m_privateRenderTargets[i]->resize(maxOutportSize);
   }
 
   // 3. update inport expected size
-  for (size_t i=0; i<m_inputPorts.size(); i++) {
+  for (size_t i = 0; i < m_inputPorts.size(); i++) {
     m_inputPorts[i]->setExpectedSize(maxOutportSize);
   }
 

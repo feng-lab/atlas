@@ -7,7 +7,7 @@
 
 namespace nim {
 
-Z3DSDFont::Z3DSDFont(const QString &imageFileName, const QString &txtFileName)
+Z3DSDFont::Z3DSDFont(const QString& imageFileName, const QString& txtFileName)
   : m_imageFileName(imageFileName)
   , m_txtFileName(txtFileName)
   , m_isEmpty(false)
@@ -20,7 +20,7 @@ Z3DSDFont::Z3DSDFont(const QString &imageFileName, const QString &txtFileName)
 Z3DSDFont::CharInfo Z3DSDFont::charInfo(int id) const
 {
   CharInfo space;
-  for (int i=0; i<m_charInfos.size(); i++) {
+  for (int i = 0; i < m_charInfos.size(); i++) {
     if (m_charInfos[i].id == id)
       return m_charInfos[i];
     else if (m_charInfos[i].id == 32)
@@ -29,10 +29,10 @@ Z3DSDFont::CharInfo Z3DSDFont::charInfo(int id) const
   return space;
 }
 
-Z3DTexture *Z3DSDFont::texture()
+Z3DTexture* Z3DSDFont::texture()
 {
   if (m_isEmpty)
-    return NULL;
+    return nullptr;
   if (!m_texture)
     createTexture();
   return m_texture.get();
@@ -40,7 +40,7 @@ Z3DTexture *Z3DSDFont::texture()
 
 void Z3DSDFont::loadImage()
 {
-  if(!m_GLFormattedImage.load(m_imageFileName)) {
+  if (!m_GLFormattedImage.load(m_imageFileName)) {
     LOG(ERROR) << "error loading image: " << m_imageFileName;
     m_isEmpty = true;
     return;
@@ -80,9 +80,9 @@ void Z3DSDFont::parseFontFile()
     //char id=32    x=208   y=249   width=4     height=4     xoffset=-1.500    yoffset=1.500     xadvance=15.625      page=0  chnl=0
     if (line.startsWith("char ")) {
       line = line.mid(5).trimmed();
-      int	id = 0, x = 0, y = 0, width = 0, height = 0;
-      float	xoffset = 0.f, yoffset = 0.f, xadvance = 0.f;
-      int	page = 0, chnl = 0;
+      int id = 0, x = 0, y = 0, width = 0, height = 0;
+      float xoffset = 0.f, yoffset = 0.f, xadvance = 0.f;
+      int page = 0, chnl = 0;
       QStringList tokens;
       tokens.push_back("id=");
       tokens.push_back("x=");
@@ -99,7 +99,7 @@ void Z3DSDFont::parseFontFile()
         line = line.trimmed();
         int tokenIndex = -1;
         QString value;
-        for (int i=0; i<tokens.size(); i++) {
+        for (int i = 0; i < tokens.size(); i++) {
           if (line.startsWith(tokens[i])) {
             if (line.indexOf(' ') == -1) {
               value = line.mid(tokens[i].size());
@@ -178,8 +178,9 @@ void Z3DSDFont::createTexture()
 {
   if (m_isEmpty || m_texture)
     return;
-  m_texture.reset(new Z3DTexture(GLint(GL_RGBA8), glm::uvec3(m_GLFormattedImage.width(), m_GLFormattedImage.height(), 1),
-                                 GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV));
+  m_texture.reset(
+    new Z3DTexture(GLint(GL_RGBA8), glm::uvec3(m_GLFormattedImage.width(), m_GLFormattedImage.height(), 1),
+                   GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV));
   m_texture->setWrap(GLint(GL_REPEAT));
   m_texture->uploadImage(m_GLFormattedImage.bits());
   CHECK_GL_ERROR;

@@ -6,28 +6,34 @@ namespace nim {
 
 namespace impl {
 
-struct EqualToLabel {
+struct EqualToLabel
+{
   EqualToLabel(size_t label)
     : m_label(label)
   {}
+
   template<typename TVoxel>
   inline bool operator()(TVoxel v) const
   {
     return v == static_cast<TVoxel>(m_label);
   }
+
 private:
   size_t m_label;
 };
 
-struct ContainerSizeLessThan {
+struct ContainerSizeLessThan
+{
   ContainerSizeLessThan(size_t thre)
     : m_thre(thre)
   {}
+
   template<typename Container>
   inline bool operator()(const Container& c) const
   {
     return c.size() < m_thre;
   }
+
 private:
   size_t m_thre;
 };
@@ -61,7 +67,7 @@ void ConnComp::removeSmallObject(size_t sizeThre, bool includeThre)
 size_t ConnComp::toatalNumVoxels() const
 {
   size_t res = 0;
-  for (size_t o=0; o<voxelIdxList.size(); ++o) {
+  for (size_t o = 0; o < voxelIdxList.size(); ++o) {
     res += voxelIdxList[o].size();
   }
   return res;
@@ -102,34 +108,44 @@ ZImg ConnComp::createTypedLabelImg() const
   info.setVoxelFormat<TVoxel>();
   info.createDefaultDescriptions();
   ZImg res(info);
-  TVoxel* data = res.channelData<TVoxel>(0,0);
-  for (size_t o=0; o<voxelIdxList.size(); ++o) {
-    for (size_t v=0; v<voxelIdxList[o].size(); ++v) {
-      data[voxelIdxList[o][v]] = o+1;
+  TVoxel* data = res.channelData<TVoxel>(0, 0);
+  for (size_t o = 0; o < voxelIdxList.size(); ++o) {
+    for (size_t v = 0; v < voxelIdxList[o].size(); ++v) {
+      data[voxelIdxList[o][v]] = o + 1;
     }
   }
   return res;
 }
 
 template ZImg ConnComp::createTypedLabelImg<uint8_t>() const;
+
 template ZImg ConnComp::createTypedLabelImg<uint16_t>() const;
+
 template ZImg ConnComp::createTypedLabelImg<uint32_t>() const;
+
 template ZImg ConnComp::createTypedLabelImg<uint64_t>() const;
+
 template ZImg ConnComp::createTypedLabelImg<int8_t>() const;
+
 template ZImg ConnComp::createTypedLabelImg<int16_t>() const;
+
 template ZImg ConnComp::createTypedLabelImg<int32_t>() const;
+
 template ZImg ConnComp::createTypedLabelImg<int64_t>() const;
+
 template ZImg ConnComp::createTypedLabelImg<float>() const;
+
 template ZImg ConnComp::createTypedLabelImg<double>() const;
 
 template<bool ReportProgress>
-ZImgConnectedComponents<ReportProgress>::ZImgConnectedComponents() {}
+ZImgConnectedComponents<ReportProgress>::ZImgConnectedComponents()
+{}
 
 template<bool ReportProgress>
 ConnComp ZImgConnectedComponents<ReportProgress>::run(const ZImg& img, size_t conn, size_t c, size_t t)
 {
   ConnComp res = createRes(img, conn, c, t);
-  ZImg bimg = img.createView(c,t).binarized();
+  ZImg bimg = img.createView(c, t).binarized();
 
   getConnectedComponents_Impl(bimg, res, 1);
 
@@ -137,11 +153,12 @@ ConnComp ZImgConnectedComponents<ReportProgress>::run(const ZImg& img, size_t co
 }
 
 template<bool ReportProgress>
-ConnComp ZImgConnectedComponents<ReportProgress>::runLabel(const ZImg& img, size_t conn, size_t label, size_t c, size_t t)
+ConnComp
+ZImgConnectedComponents<ReportProgress>::runLabel(const ZImg& img, size_t conn, size_t label, size_t c, size_t t)
 {
   if (img.isType<uint8_t>()) {
     ConnComp res = createRes(img, conn, c, t);
-    ZImg bimg = img.extractChannel(c,t);
+    ZImg bimg = img.extractChannel(c, t);
     getConnectedComponents_Impl(bimg, res, label);
     return res;
   } else {
@@ -150,11 +167,12 @@ ConnComp ZImgConnectedComponents<ReportProgress>::runLabel(const ZImg& img, size
 }
 
 template<bool ReportProgress>
-ConnComp ZImgConnectedComponents<ReportProgress>::runLabelModifyInput(ZImg& img, size_t conn, size_t label, size_t c, size_t t)
+ConnComp
+ZImgConnectedComponents<ReportProgress>::runLabelModifyInput(ZImg& img, size_t conn, size_t label, size_t c, size_t t)
 {
   if (img.isType<uint8_t>()) {
     ConnComp res = createRes(img, conn, c, t);
-    ZImg bimg = img.createView(c,t);
+    ZImg bimg = img.createView(c, t);
     getConnectedComponents_Impl(bimg, res, label);
     return res;
   } else {
@@ -196,7 +214,7 @@ void ZImgConnectedComponents<ReportProgress>::getConnectedComponents_Impl(ZImg& 
   size_t conn = res.connectivity;
   size_t voxelNumber = markerImg.voxelNumber();
   ZImgNeighborhoodConstIterator<uint8_t> nit =
-      ZImgNeighborhoodConstIterator<uint8_t>(conn, markerImg);
+    ZImgNeighborhoodConstIterator<uint8_t>(conn, markerImg);
   uint8_t* marker = markerImg.timeData<uint8_t>(0);
 
   std::vector<size_t> idxList;
@@ -246,7 +264,10 @@ void ZImgConnectedComponents<ReportProgress>::getConnectedComponents_Impl(ZImg& 
   this->reportProgress(1.0);
 }
 
-template class ZImgConnectedComponents<true>;
-template class ZImgConnectedComponents<false>;
+template
+class ZImgConnectedComponents<true>;
+
+template
+class ZImgConnectedComponents<false>;
 
 } // namespace nim

@@ -30,6 +30,7 @@
 #include "zlogmodelsink.h"
 #include <QDialog>
 #include <QSharedPointer>
+
 class QModelIndex;
 
 namespace Ui {
@@ -42,26 +43,36 @@ class ZLogFilterProxyModel;
 
 class ZLogDialog : public QDialog
 {
-  Q_OBJECT
+Q_OBJECT
 
 public:
   explicit ZLogDialog(LogSinkPtr destination, QWidget* parent = 0);
+
   virtual ~ZLogDialog();
 
   virtual bool eventFilter(QObject* obj, QEvent* event);
 
 private slots:
+
   void OnPauseClicked();
+
   void OnSaveClicked();
+
   void OnClearClicked();
+
   void OnCopyClicked();
+
   void OnLevelChanged(int value);
+
   void OnAutoScrollChanged(bool checked);
+
   void ModelRowsInserted(const QModelIndex& parent, int start, int last);
 
 private:
   void copySelection() const;
+
   void saveSelection();
+
   QString getSelectionText() const;
 
   ZLogModelSink* mModelDestination;

@@ -4,7 +4,7 @@
 
 namespace nim {
 
-Z3DObjView::Z3DObjView(Z3DView &view)
+Z3DObjView::Z3DObjView(Z3DView& view)
   : QObject(&view)
   , m_view(view)
 {
@@ -24,7 +24,7 @@ void Z3DObjView::resetBoundBox()
   m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = std::numeric_limits<double>::lowest();
 }
 
-void Z3DObjView::expandBoundBox(const std::vector<double> &boundBox)
+void Z3DObjView::expandBoundBox(const std::vector<double>& boundBox)
 {
   m_boundBox[0] = std::min(boundBox[0], m_boundBox[0]);
   m_boundBox[1] = std::max(boundBox[1], m_boundBox[1]);

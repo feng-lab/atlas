@@ -30,7 +30,7 @@
 
 namespace nim {
 
-Z3DMainWindow::Z3DMainWindow(ZDoc *doc, ZMainWindow &win2d, bool stereoView, QWidget *parent)
+Z3DMainWindow::Z3DMainWindow(ZDoc* doc, ZMainWindow& win2d, bool stereoView, QWidget* parent)
   : QMainWindow(parent)
   , m_doc(doc)
   , m_isStereoView(stereoView)
@@ -59,7 +59,7 @@ void Z3DMainWindow::openEditWidget(size_t id)
   }
 }
 
-void Z3DMainWindow::closeEvent(QCloseEvent *event)
+void Z3DMainWindow::closeEvent(QCloseEvent* event)
 {
   if (maybeSave()) {
     writeSettings();
@@ -69,14 +69,14 @@ void Z3DMainWindow::closeEvent(QCloseEvent *event)
   }
 }
 
-void Z3DMainWindow::dragEnterEvent(QDragEnterEvent *event)
+void Z3DMainWindow::dragEnterEvent(QDragEnterEvent* event)
 {
   if (event->mimeData()->hasFormat("text/uri-list")) {
     event->acceptProposedAction();
   }
 }
 
-void Z3DMainWindow::dropEvent(QDropEvent *event)
+void Z3DMainWindow::dropEvent(QDropEvent* event)
 {
   QList<QUrl> urlList = event->mimeData()->urls();
   QStringList fileList;
@@ -86,7 +86,7 @@ void Z3DMainWindow::dropEvent(QDropEvent *event)
     if (dirCheck.isDir()) {
       QDir dir = dirCheck.absoluteDir();
       QFileInfoList list = dir.entryInfoList(QDir::Files | QDir::NoSymLinks);
-      for (int i=0; i<list.size(); i++) {
+      for (int i = 0; i < list.size(); i++) {
         fileList.append(list.at(i).canonicalFilePath());
       }
     } else {
@@ -144,7 +144,7 @@ bool Z3DMainWindow::saveAs()
 
 void Z3DMainWindow::openRecentFile()
 {
-  QAction *action = qobject_cast<QAction*>(sender());
+  QAction* action = qobject_cast<QAction*>(sender());
   if (action) {
     QString fn = action->data().toString();
     if (fn.endsWith(".scene", Qt::CaseInsensitive)) {
@@ -239,7 +239,7 @@ void Z3DMainWindow::init()
 
   //const QList<QAction*> &loadActList = m_doc->loadFileActions();
   //for (int i=0; i<loadActList.size(); ++i)
-    //connect(loadActList[i], &QAction::triggered, this, &Z3DMainWindow::activateWindowIfNot);
+  //connect(loadActList[i], &QAction::triggered, this, &Z3DMainWindow::activateWindowIfNot);
 }
 
 void Z3DMainWindow::createActions()
@@ -322,11 +322,11 @@ void Z3DMainWindow::createMenus()
   m_fileMenu->addAction(m_loadSceneAction);
   m_fileMenu->addAction(m_saveSceneAction);
   m_fileMenu->addSeparator();
-  const QList<QAction*> &fileActList = m_doc->fileActions();
-  for (int i=0; i<fileActList.size(); ++i)
+  const QList<QAction*>& fileActList = m_doc->fileActions();
+  for (int i = 0; i < fileActList.size(); ++i)
     m_fileMenu->addAction(fileActList[i]);
   m_separatorAction = m_fileMenu->addSeparator();
-  const QList<QAction*> &recentFileActions = m_2dWindow.recentFileActions();
+  const QList<QAction*>& recentFileActions = m_2dWindow.recentFileActions();
   for (int i = 0; i < recentFileActions.size(); ++i)
     m_fileMenu->addAction(recentFileActions[i]);
   m_fileMenu->addSeparator();
@@ -347,8 +347,8 @@ void Z3DMainWindow::createMenus()
   m_viewMenu->addSeparator();
   m_viewMenu->addAction(m_screenShotAction);
 
-  const QList<QMenu*> &menuList = m_doc->processObjMenu();
-  for (int i=0; i<menuList.size(); ++i) {
+  const QList<QMenu*>& menuList = m_doc->processObjMenu();
+  for (int i = 0; i < menuList.size(); ++i) {
     menuBar()->addMenu(menuList[i]);
   }
 
@@ -370,13 +370,13 @@ void Z3DMainWindow::createMenus()
 
 void Z3DMainWindow::createToolBars()
 {
-  QSize iconSize(22,22);
+  QSize iconSize(22, 22);
   m_fileToolBar = addToolBar(tr("File"));
   m_fileToolBar->addAction(m_openAction);
   m_fileToolBar->addAction(m_saveAction);
   //const QList<QAction*> &loadFileActList = m_doc->loadFileActions();
   //for (int i=0; i<loadFileActList.size(); ++i)
-    //m_fileToolBar->addAction(loadFileActList[i]);
+  //m_fileToolBar->addAction(loadFileActList[i]);
   m_fileToolBar->setIconSize(iconSize);
 
   m_editToolBar = addToolBar(tr("Edit"));
@@ -408,7 +408,7 @@ void Z3DMainWindow::createDockWindows()
   m_objectsDockWidget = new QDockWidget(tr("Objects Manager"), this);
   m_objectsDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
   m_objectsDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  ZObjWidget *objWidget = m_doc->createObjWidget(this);
+  ZObjWidget* objWidget = m_doc->createObjWidget(this);
   m_objectsDockWidget->setWidget(objWidget);
   connect(m_doc, &ZDoc::openEditWidget, this, &Z3DMainWindow::openEditWidget);
   addDockWidget(Qt::RightDockWidgetArea, m_objectsDockWidget);
@@ -510,7 +510,7 @@ bool Z3DMainWindow::maybeSave()
     QMessageBox::StandardButton ret;
     ret = QMessageBox::warning(this, tr(""),
                                tr("This workspace has been modified.\n"
-                                  "Do you want to save your changes?"),
+                                    "Do you want to save your changes?"),
                                QMessageBox::Save | QMessageBox::Discard
                                | QMessageBox::Cancel);
     if (ret == QMessageBox::Save)
@@ -521,21 +521,21 @@ bool Z3DMainWindow::maybeSave()
   return true;
 }
 
-void Z3DMainWindow::loadWorkspace(const QString &fileName)
+void Z3DMainWindow::loadWorkspace(const QString& fileName)
 {
   setCurrentFile(fileName);
   statusBar()->showMessage(tr("Workspace loaded"), 2000);
   activateWindowIfNot();
 }
 
-bool Z3DMainWindow::saveFile(const QString &fileName)
+bool Z3DMainWindow::saveFile(const QString& fileName)
 {
   setCurrentFile(fileName);
   statusBar()->showMessage(tr("Workspace saved"), 2000);
   return true;
 }
 
-void Z3DMainWindow::setCurrentFile(const QString &fileName)
+void Z3DMainWindow::setCurrentFile(const QString& fileName)
 {
   static int sequenceNumber = 1;
 
@@ -548,12 +548,12 @@ void Z3DMainWindow::setCurrentFile(const QString &fileName)
   setWindowModified(false);
 }
 
-QString Z3DMainWindow::strippedName(const QString &fullFileName)
+QString Z3DMainWindow::strippedName(const QString& fullFileName)
 {
   return QFileInfo(fullFileName).fileName();
 }
 
-Z3DMainWindow *Z3DMainWindow::findMainWindow(const QString &)
+Z3DMainWindow* Z3DMainWindow::findMainWindow(const QString&)
 {
   return 0;
 }

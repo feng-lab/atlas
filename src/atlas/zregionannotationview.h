@@ -10,12 +10,13 @@ namespace nim {
 
 class ZRegionAnnotationView : public ZFilterView<ZRegionAnnotationDoc, ZRegionAnnotationFilter>
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  ZRegionAnnotationView(ZRegionAnnotationDoc &doc, ZView &view);
+  ZRegionAnnotationView(ZRegionAnnotationDoc& doc, ZView& view);
 
 private:
-  void docRegionAnnotationsAdded(const QList<size_t> &objs);
+  void docRegionAnnotationsAdded(const QList<size_t>& objs);
+
   void docRegionAnnotationAdded(size_t id);
 };
 

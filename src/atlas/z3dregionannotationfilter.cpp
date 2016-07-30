@@ -6,7 +6,7 @@
 
 namespace nim {
 
-Z3DRegionAnnotationFilter::Z3DRegionAnnotationFilter(Z3DGlobalParameters &globalParas, QObject *parent)
+Z3DRegionAnnotationFilter::Z3DRegionAnnotationFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   : Z3DGeometryFilter(globalParas, parent)
   , m_visible("Visible", true)
 {
@@ -31,7 +31,7 @@ void Z3DRegionAnnotationFilter::process(Z3DEye eye)
   }
 }
 
-void Z3DRegionAnnotationFilter::setData(ZRegionAnnotation &regAnno)
+void Z3DRegionAnnotationFilter::setData(ZRegionAnnotation& regAnno)
 {
   m_regionAnnotation = &regAnno;
   allMeshChanged();
@@ -51,8 +51,8 @@ std::shared_ptr<ZWidgetsGroup> Z3DRegionAnnotationFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_stayOnTop, 1);
 
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
-    for (size_t i=0; i<paras.size(); i++) {
-      ZParameter *para = paras[i];
+    for (size_t i = 0; i < paras.size(); i++) {
+      ZParameter* para = paras[i];
       if (para->name() == "Coord Transform")
         m_widgetsGroup->addChild(*para, 2);
     }
@@ -115,14 +115,14 @@ void Z3DRegionAnnotationFilter::setShaderHookType(Z3DRendererBase::ShaderHookTyp
   }
 }
 
-void Z3DRegionAnnotationFilter::setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture *t)
+void Z3DRegionAnnotationFilter::setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture* t)
 {
   for (auto it = m_idToMeshFilters.begin(); it != m_idToMeshFilters.end(); ++it) {
     it->second->setShaderHookParaDDPDepthBlenderTexture(t);
   }
 }
 
-void Z3DRegionAnnotationFilter::setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture *t)
+void Z3DRegionAnnotationFilter::setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture* t)
 {
   for (auto it = m_idToMeshFilters.begin(); it != m_idToMeshFilters.end(); ++it) {
     it->second->setShaderHookParaDDPFrontBlenderTexture(t);
@@ -154,19 +154,19 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
   const ZTree<RegionNode>& annoTree = m_regionAnnotation->annotationTree();
   for (auto it = annoTree.begin(); it != annoTree.end(); ++it) {
     int id = it->id;
-    Z3DMeshFilter *flt = new Z3DMeshFilter(m_rendererBase.globalParas());
+    Z3DMeshFilter* flt = new Z3DMeshFilter(m_rendererBase.globalParas());
     if (it->mesh) {
       QList<ZMesh*> meshList;
       meshList.push_back(it->mesh.get());
       flt->setData(&meshList);
     }
     flt->setVisible(false);
-    flt->setMeshColor(glm::vec4(it->red/255.f, it->green/255.f, it->blue/255.f, 1.f));
+    flt->setMeshColor(glm::vec4(it->red / 255.f, it->green / 255.f, it->blue / 255.f, 1.f));
     flt->setOpacity(0.5);
     m_idToRegionNames[id] = QString("%1_%2").arg(it->abbreviation).arg(it->id);
     m_nameToID[m_idToRegionNames[id]] = id;
     std::vector<ZParameter*> paras = flt->parameters();
-    for (size_t i=0; i<paras.size(); ++i) {
+    for (size_t i = 0; i < paras.size(); ++i) {
       if (paras[i]->name().contains("Coord Transform")) {
         connect(&m_rendererBase.coordTransformPara(), &Z3DTransformParameter::valueChanged,
                 paras[i], &ZParameter::updateFromSender);

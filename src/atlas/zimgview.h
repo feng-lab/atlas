@@ -10,17 +10,19 @@ namespace nim {
 
 class ZImgView : public ZFilterView<ZImgDoc, ZImgFilter>
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  ZImgView(ZImgDoc &doc, ZView &view);
+  ZImgView(ZImgDoc& doc, ZView& view);
 
   // ZObjView interface
 public:
   virtual QString infoOfPos(double x, double y) override;
 
 private:
-  void docImgsAdded(const QList<size_t> &objs);
+  void docImgsAdded(const QList<size_t>& objs);
+
   void docImgAdded(size_t id);
+
   void docImgChanged(size_t id);
 };
 

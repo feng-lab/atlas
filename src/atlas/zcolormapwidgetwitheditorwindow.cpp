@@ -7,7 +7,7 @@
 
 namespace nim {
 
-ZColorMapWidgetWithEditorWindow::ZColorMapWidgetWithEditorWindow(ZColorMapParameter *cm, QWidget *parent)
+ZColorMapWidgetWithEditorWindow::ZColorMapWidgetWithEditorWindow(ZColorMapParameter* cm, QWidget* parent)
   : ZClickableColorMapLabel(cm, parent)
   , m_colorMap(cm)
   , m_editorWindow(nullptr)

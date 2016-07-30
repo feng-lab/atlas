@@ -13,7 +13,8 @@
 
 namespace nim {
 
-ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel &objModel, ZRegionAnnotation &anno, ZDoc &doc, QWidget *parent)
+ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel& objModel, ZRegionAnnotation& anno,
+                                                     ZDoc& doc, QWidget* parent)
   : QTreeView(parent)
   , m_ratModel(objModel)
   , m_regionAnnotation(anno)
@@ -42,11 +43,12 @@ ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel 
 
   createContextMenu();
 
-  ZButtonColumnDelegate *delegate = new ZButtonColumnDelegate(this);
+  ZButtonColumnDelegate* delegate = new ZButtonColumnDelegate(this);
   setMouseTracking(true);
   setItemDelegate(delegate);
   connect(this, &ZRegionAnnotationTreeView::entered, delegate, &ZButtonColumnDelegate::cellEntered);
-  connect(delegate, &ZButtonColumnDelegate::buttonClickedForUserData, this, &ZRegionAnnotationTreeView::buttonClickedForUserData);
+  connect(delegate, &ZButtonColumnDelegate::buttonClickedForUserData, this,
+          &ZRegionAnnotationTreeView::buttonClickedForUserData);
 
   connect(m_ratProxyModel, &QSortFilterProxyModel::rowsInserted,
           this, &ZRegionAnnotationTreeView::adaptColumns);
@@ -61,7 +63,7 @@ ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel 
   adaptColumns();
 }
 
-void ZRegionAnnotationTreeView::contextMenu(const QPoint &pos)
+void ZRegionAnnotationTreeView::contextMenu(const QPoint& pos)
 {
   Q_UNUSED(pos)
 //  if (m_doc->numSelectedObjs() > 0) {
@@ -69,17 +71,17 @@ void ZRegionAnnotationTreeView::contextMenu(const QPoint &pos)
 //  }
 }
 
-void ZRegionAnnotationTreeView::indexClicked(const QModelIndex &index)
+void ZRegionAnnotationTreeView::indexClicked(const QModelIndex& index)
 {
   m_ratModel.clicked(m_ratProxyModel->mapToSource(index));
 }
 
-void ZRegionAnnotationTreeView::indexDoubleClicked(const QModelIndex &index)
+void ZRegionAnnotationTreeView::indexDoubleClicked(const QModelIndex& index)
 {
   m_ratModel.doubleClicked(m_ratProxyModel->mapToSource(index));
 }
 
-void ZRegionAnnotationTreeView::indexActivated(const QModelIndex &index)
+void ZRegionAnnotationTreeView::indexActivated(const QModelIndex& index)
 {
   m_ratModel.activated(m_ratProxyModel->mapToSource(index));
 }
@@ -107,19 +109,22 @@ void ZRegionAnnotationTreeView::buttonClickedForUserData(QVariant ud)
       QMessageBox::critical(this, tr("Error"), tr("No ROI to merge, try creating some ROI first"));
       return;
     }
-    size_t objID = m_doc.roiDoc().chooseOneObjWithWidget(QString("Choose ROI to merge into region %1").arg(regionID), this);
+    size_t objID = m_doc.roiDoc().chooseOneObjWithWidget(QString("Choose ROI to merge into region %1").arg(regionID),
+                                                         this);
     if (objID)
       m_regionAnnotation.mergeROIToRegion(m_doc.roiDoc().roi(objID), regionID);
   } else if (action == 2) {
     if (m_regionAnnotation.roiOfRegion(regionID)) {
-      m_doc.roiDoc().askToSave(*m_regionAnnotation.roiOfRegion(regionID), QString("Export ROI of Region %1").arg(regionID));
+      m_doc.roiDoc().askToSave(*m_regionAnnotation.roiOfRegion(regionID),
+                               QString("Export ROI of Region %1").arg(regionID));
     } else {
       QMessageBox::critical(this, tr("Error"), tr("Region %1 is empty and contains no roi").arg(regionID));
       return;
     }
   } else if (action == 3) {
     if (m_regionAnnotation.meshOfRegion(regionID)) {
-      m_doc.meshDoc().askToSave(*m_regionAnnotation.meshOfRegion(regionID), QString("Export Mesh of Region %1").arg(regionID));
+      m_doc.meshDoc().askToSave(*m_regionAnnotation.meshOfRegion(regionID),
+                                QString("Export Mesh of Region %1").arg(regionID));
     } else {
       QMessageBox::critical(this, tr("Error"), tr("Region %1 is empty or contains no mesh").arg(regionID));
       return;
@@ -127,7 +132,7 @@ void ZRegionAnnotationTreeView::buttonClickedForUserData(QVariant ud)
   }
 }
 
-void ZRegionAnnotationTreeView::keyPressEvent(QKeyEvent *e)
+void ZRegionAnnotationTreeView::keyPressEvent(QKeyEvent* e)
 {
   Q_UNUSED(e)
 }

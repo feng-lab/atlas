@@ -7,18 +7,22 @@ namespace nim {
 
 class Z3DLineWithFixedWidthColorRenderer : public Z3DLineRenderer
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   // default use display list but not lighting in opengl mode
-  explicit Z3DLineWithFixedWidthColorRenderer(Z3DRendererBase &base);
+  explicit Z3DLineWithFixedWidthColorRenderer(Z3DRendererBase& base);
 
-  void setData(std::vector<glm::vec3> *linesInput);
+  void setData(std::vector<glm::vec3>* linesInput);
 
-  ZFloatParameter& lineWidthPara() { return m_lineWidth; }
-  ZVec4Parameter& lineColorPara() { return m_lineColor; }
+  ZFloatParameter& lineWidthPara()
+  { return m_lineWidth; }
+
+  ZVec4Parameter& lineColorPara()
+  { return m_lineColor; }
 
 protected:
   void setLineColors();
+
   virtual float lineWidth() const override;
 
 protected:

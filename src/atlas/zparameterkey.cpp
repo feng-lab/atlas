@@ -19,8 +19,8 @@ qreal myEasingFunction(qreal progress)
 
 namespace nim {
 
-ZParameterKey::ZParameterKey(double tm, const ZParameter &p)
-  : m_time(std::max(tm,0.0))
+ZParameterKey::ZParameterKey(double tm, const ZParameter& p)
+  : m_time(std::max(tm, 0.0))
   , m_paraAnimation(nullptr)
 {
   m_value.reset(ZParameterFactoryInstance.create(p.name(), p.type()));
@@ -28,8 +28,8 @@ ZParameterKey::ZParameterKey(double tm, const ZParameter &p)
   setDefaultType();
 }
 
-ZParameterKey::ZParameterKey(double tm, ZParameter *p)
-  : m_time(std::max(tm,0.0))
+ZParameterKey::ZParameterKey(double tm, ZParameter* p)
+  : m_time(std::max(tm, 0.0))
   , m_paraAnimation(nullptr)
 {
   CHECK(p);
@@ -37,17 +37,17 @@ ZParameterKey::ZParameterKey(double tm, ZParameter *p)
   setDefaultType();
 }
 
-ZParameterKey::ZParameterKey(const QString &type)
+ZParameterKey::ZParameterKey(const QString& type)
   : m_time(0)
   , m_paraAnimation(nullptr)
 {
-  m_value.reset(ZParameterFactoryInstance.create("",type));
+  m_value.reset(ZParameterFactoryInstance.create("", type));
   CHECK(m_value);
   setDefaultType();
 }
 
-ZParameterKey::ZParameterKey(const ZParameterKey &key)
-  : m_time(std::max(0.,key.time()))
+ZParameterKey::ZParameterKey(const ZParameterKey& key)
+  : m_time(std::max(0., key.time()))
   , m_paraAnimation(nullptr)
 {
   m_value.reset(ZParameterFactoryInstance.create(key.value().name(), key.value().type()));
@@ -71,7 +71,7 @@ void ZParameterKey::setTime(double t)
     m_paraAnimation->emitKeyChangedSignal(this);
 }
 
-void ZParameterKey::setValue(const ZParameter &v)
+void ZParameterKey::setValue(const ZParameter& v)
 {
   if (m_value->type().endsWith("Option"))
     m_value->forceSetValueSameAs(v);
@@ -86,7 +86,7 @@ QString ZParameterKey::type() const
   return m_type->get();
 }
 
-void ZParameterKey::setType(const QString &t)
+void ZParameterKey::setType(const QString& t)
 {
   if (m_type->isSelected(t))
     return;
@@ -106,12 +106,12 @@ void ZParameterKey::updateEasingCurve()
   }
 }
 
-double ZParameterKey::timeToProgress(const ZParameterKey &prev, double time)
+double ZParameterKey::timeToProgress(const ZParameterKey& prev, double time)
 {
   return m_curve.valueForProgress((time - prev.time()) / (m_time - prev.time()));
 }
 
-void ZParameterKey::interpolate(const ZParameterKey &prev, double time, ZParameter &dest) const
+void ZParameterKey::interpolate(const ZParameterKey& prev, double time, ZParameter& dest) const
 {
   CHECK(time >= prev.time() && time <= m_time);
   CHECK(m_value->isSameType(prev.value()));
@@ -130,7 +130,7 @@ void ZParameterKey::interpolate(const ZParameterKey &prev, double time, ZParamet
   m_value->interpolate(prev.value(), progress, dest);
 }
 
-bool ZParameterKey::readValue(const QJsonValue &value)
+bool ZParameterKey::readValue(const QJsonValue& value)
 {
   if (!value.isObject()) {
     LOG(WARNING) << "Invalid key";
@@ -169,63 +169,64 @@ void ZParameterKey::setDefaultType()
 {
   m_type = new ZStringIntOptionParameter("Type");
   if (!m_value->supportInterpolation()) {
-    m_type->addOptionWithData(qMakePair<QString,int>("Switch", QEasingCurve::Custom));
+    m_type->addOptionWithData(qMakePair<QString, int>("Switch", QEasingCurve::Custom));
     setType("Switch");
   } else {
-    enum Type { // how to interpolate between this key and previous key
-        Linear = 0,
-        InQuad, OutQuad, InOutQuad, OutInQuad,
-        InCubic, OutCubic, InOutCubic, OutInCubic,
-        InQuart, OutQuart, InOutQuart, OutInQuart,
-        InQuint, OutQuint, InOutQuint, OutInQuint,
-        InSine, OutSine, InOutSine, OutInSine,
-        InExpo, OutExpo, InOutExpo, OutInExpo,
-        InCirc, OutCirc, InOutCirc, OutInCirc,
-        InElastic, OutElastic, InOutElastic, OutInElastic,
-        InBack, OutBack, InOutBack, OutInBack,
-        InBounce, OutBounce, InOutBounce, OutInBounce,
-        InCurve, OutCurve, SineCurve, CosineCurve,
-        Switch
+    enum Type
+    { // how to interpolate between this key and previous key
+      Linear = 0,
+      InQuad, OutQuad, InOutQuad, OutInQuad,
+      InCubic, OutCubic, InOutCubic, OutInCubic,
+      InQuart, OutQuart, InOutQuart, OutInQuart,
+      InQuint, OutQuint, InOutQuint, OutInQuint,
+      InSine, OutSine, InOutSine, OutInSine,
+      InExpo, OutExpo, InOutExpo, OutInExpo,
+      InCirc, OutCirc, InOutCirc, OutInCirc,
+      InElastic, OutElastic, InOutElastic, OutInElastic,
+      InBack, OutBack, InOutBack, OutInBack,
+      InBounce, OutBounce, InOutBounce, OutInBounce,
+      InCurve, OutCurve, SineCurve, CosineCurve,
+      Switch
     };
-    m_type->addOptionWithData(qMakePair<QString,int>("Linear", QEasingCurve::Linear));
-    m_type->addOptionWithData(qMakePair<QString,int>("Switch", QEasingCurve::Custom));
-    m_type->addOptionWithData(qMakePair<QString,int>("InQuad", QEasingCurve::InQuad));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutQuad", QEasingCurve::OutQuad));
-    m_type->addOptionWithData(qMakePair<QString,int>("InOutQuad", QEasingCurve::InOutQuad));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutInQuad", QEasingCurve::OutInQuad));
-    m_type->addOptionWithData(qMakePair<QString,int>("InCubic", QEasingCurve::InCubic));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutCubic", QEasingCurve::OutCubic));
-    m_type->addOptionWithData(qMakePair<QString,int>("InOutCubic", QEasingCurve::InOutCubic));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutInCubic", QEasingCurve::OutInCubic));
-    m_type->addOptionWithData(qMakePair<QString,int>("InElastic", QEasingCurve::InElastic));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutElastic", QEasingCurve::OutElastic));
-    m_type->addOptionWithData(qMakePair<QString,int>("InOutElastic", QEasingCurve::InOutElastic));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutInElastic", QEasingCurve::OutInElastic));
-    m_type->addOptionWithData(qMakePair<QString,int>("InBounce", QEasingCurve::InBounce));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutBounce", QEasingCurve::OutBounce));
-    m_type->addOptionWithData(qMakePair<QString,int>("InOutBounce", QEasingCurve::InOutBounce));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutInBounce", QEasingCurve::OutInBounce));
-    m_type->addOptionWithData(qMakePair<QString,int>("InBack", QEasingCurve::InBack));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutBack", QEasingCurve::OutBack));
-    m_type->addOptionWithData(qMakePair<QString,int>("InOutBack", QEasingCurve::InOutBack));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutInBack", QEasingCurve::OutInBack));
+    m_type->addOptionWithData(qMakePair<QString, int>("Linear", QEasingCurve::Linear));
+    m_type->addOptionWithData(qMakePair<QString, int>("Switch", QEasingCurve::Custom));
+    m_type->addOptionWithData(qMakePair<QString, int>("InQuad", QEasingCurve::InQuad));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutQuad", QEasingCurve::OutQuad));
+    m_type->addOptionWithData(qMakePair<QString, int>("InOutQuad", QEasingCurve::InOutQuad));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutInQuad", QEasingCurve::OutInQuad));
+    m_type->addOptionWithData(qMakePair<QString, int>("InCubic", QEasingCurve::InCubic));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutCubic", QEasingCurve::OutCubic));
+    m_type->addOptionWithData(qMakePair<QString, int>("InOutCubic", QEasingCurve::InOutCubic));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutInCubic", QEasingCurve::OutInCubic));
+    m_type->addOptionWithData(qMakePair<QString, int>("InElastic", QEasingCurve::InElastic));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutElastic", QEasingCurve::OutElastic));
+    m_type->addOptionWithData(qMakePair<QString, int>("InOutElastic", QEasingCurve::InOutElastic));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutInElastic", QEasingCurve::OutInElastic));
+    m_type->addOptionWithData(qMakePair<QString, int>("InBounce", QEasingCurve::InBounce));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutBounce", QEasingCurve::OutBounce));
+    m_type->addOptionWithData(qMakePair<QString, int>("InOutBounce", QEasingCurve::InOutBounce));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutInBounce", QEasingCurve::OutInBounce));
+    m_type->addOptionWithData(qMakePair<QString, int>("InBack", QEasingCurve::InBack));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutBack", QEasingCurve::OutBack));
+    m_type->addOptionWithData(qMakePair<QString, int>("InOutBack", QEasingCurve::InOutBack));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutInBack", QEasingCurve::OutInBack));
 
-    m_type->addOptionWithData(qMakePair<QString,int>("InQuart", QEasingCurve::InQuart));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutQuart", QEasingCurve::OutQuart));
-    m_type->addOptionWithData(qMakePair<QString,int>("InOutQuart", QEasingCurve::InOutQuart));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutInQuart", QEasingCurve::OutInQuart));
-    m_type->addOptionWithData(qMakePair<QString,int>("InQuint", QEasingCurve::InQuint));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutQuint", QEasingCurve::OutQuint));
-    m_type->addOptionWithData(qMakePair<QString,int>("InOutQuint", QEasingCurve::InOutQuint));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutInQuint", QEasingCurve::OutInQuint));
-    m_type->addOptionWithData(qMakePair<QString,int>("InSine", QEasingCurve::InSine));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutSine", QEasingCurve::OutSine));
-    m_type->addOptionWithData(qMakePair<QString,int>("InOutSine", QEasingCurve::InOutSine));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutInSine", QEasingCurve::OutInSine));
-    m_type->addOptionWithData(qMakePair<QString,int>("InExpo", QEasingCurve::InExpo));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutExpo", QEasingCurve::OutExpo));
-    m_type->addOptionWithData(qMakePair<QString,int>("InOutExpo", QEasingCurve::InOutExpo));
-    m_type->addOptionWithData(qMakePair<QString,int>("OutInExpo", QEasingCurve::OutInExpo));
+    m_type->addOptionWithData(qMakePair<QString, int>("InQuart", QEasingCurve::InQuart));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutQuart", QEasingCurve::OutQuart));
+    m_type->addOptionWithData(qMakePair<QString, int>("InOutQuart", QEasingCurve::InOutQuart));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutInQuart", QEasingCurve::OutInQuart));
+    m_type->addOptionWithData(qMakePair<QString, int>("InQuint", QEasingCurve::InQuint));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutQuint", QEasingCurve::OutQuint));
+    m_type->addOptionWithData(qMakePair<QString, int>("InOutQuint", QEasingCurve::InOutQuint));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutInQuint", QEasingCurve::OutInQuint));
+    m_type->addOptionWithData(qMakePair<QString, int>("InSine", QEasingCurve::InSine));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutSine", QEasingCurve::OutSine));
+    m_type->addOptionWithData(qMakePair<QString, int>("InOutSine", QEasingCurve::InOutSine));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutInSine", QEasingCurve::OutInSine));
+    m_type->addOptionWithData(qMakePair<QString, int>("InExpo", QEasingCurve::InExpo));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutExpo", QEasingCurve::OutExpo));
+    m_type->addOptionWithData(qMakePair<QString, int>("InOutExpo", QEasingCurve::InOutExpo));
+    m_type->addOptionWithData(qMakePair<QString, int>("OutInExpo", QEasingCurve::OutInExpo));
     setType("Linear");
   }
 }

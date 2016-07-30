@@ -9,7 +9,9 @@
 #include "zstringparameter.h"
 
 class QPushButton;
+
 class QRadioButton;
+
 class QGroupBox;
 
 namespace nim {
@@ -18,25 +20,37 @@ class ZSelectFileWidget;
 
 class ZAnimationExportWidget : public QScrollArea
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit ZAnimationExportWidget(bool is2DAni = false, QWidget *parent = nullptr);
+  explicit ZAnimationExportWidget(bool is2DAni = false, QWidget* parent = nullptr);
 
   // In stereo rendering mode, we can only capture stereo image.
   // In normal rendering mode or if stereo is not supported by graphic card,
   // we can check this checkbox to capture stereo image, or not to capture normal image
-  void setCaptureStereoImage(bool v) { m_captureStereoImage.set(v); if (v) m_captureStereoImage.setVisible(false);}
+  void setCaptureStereoImage(bool v)
+  {
+    m_captureStereoImage.set(v);
+    if (v) m_captureStereoImage.setVisible(false);
+  }
 
   virtual QSize sizeHint() const override;
 
 signals:
-  void exportFixedSize3DAnimation(const QDir& dir, const QString &filename, double framePerSecond, int width, int height, Z3DScreenShotType sst);
-  void export3DAnimation(const QDir& dir, const QString &filename, double framePerSecond, Z3DScreenShotType sst);
-  void exportFixedSize2DAnimation(const QDir& dir, const QString &filename, double framePerSecond, int width, int height);
-  void export2DAnimation(const QDir& dir, const QString &filename, double framePerSecond);
+
+  void
+  exportFixedSize3DAnimation(const QDir& dir, const QString& filename, double framePerSecond, int width, int height,
+                             Z3DScreenShotType sst);
+
+  void export3DAnimation(const QDir& dir, const QString& filename, double framePerSecond, Z3DScreenShotType sst);
+
+  void
+  exportFixedSize2DAnimation(const QDir& dir, const QString& filename, double framePerSecond, int width, int height);
+
+  void export2DAnimation(const QDir& dir, const QString& filename, double framePerSecond);
 
 private:
   void captureButtonPressed();
+
   void updateImageSizeWidget();
 
   void adjustWidget();
@@ -46,7 +60,7 @@ private:
 private:
   bool m_group;
 
-  QGroupBox *m_groupBox;
+  QGroupBox* m_groupBox;
 
   ZBoolParameter m_captureStereoImage;
   ZStringIntOptionParameter m_stereoImageType;
@@ -54,9 +68,9 @@ private:
   ZIVec2Parameter m_customSize;
   ZDoubleParameter m_framePerSecond;
 
-  ZSelectFileWidget *m_folderWidget;
+  ZSelectFileWidget* m_folderWidget;
   ZStringParameter m_filename;
-  QPushButton *m_captureButton;
+  QPushButton* m_captureButton;
 
   QString m_lastFName;
 

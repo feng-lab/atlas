@@ -4,19 +4,19 @@
 
 namespace nim {
 
-Z3DAnimationView::Z3DAnimationView(Z3DAnimationDoc &doc, Z3DView &view)
+Z3DAnimationView::Z3DAnimationView(Z3DAnimationDoc& doc, Z3DView& view)
   : Z3DFilterView<Z3DAnimationDoc, Z3DAnimationFilter>(doc, view)
 {
   docAnimationsAdded(m_doc.objs());
   connect(&m_doc, &Z3DAnimationDoc::objAdded, this, &Z3DAnimationView::docAnimationAdded);
 }
 
-void Z3DAnimationView::docAnimationsAdded(const QList<size_t> &objs)
+void Z3DAnimationView::docAnimationsAdded(const QList<size_t>& objs)
 {
   try {
-    for (int i=0; i<objs.size(); ++i) {
+    for (int i = 0; i < objs.size(); ++i) {
       size_t id = objs[i];
-      Z3DAnimationFilter *viewControl = new Z3DAnimationFilter(globalParas(), this);
+      Z3DAnimationFilter* viewControl = new Z3DAnimationFilter(globalParas(), this);
       viewControl->setData(&m_doc.animation(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
@@ -24,7 +24,8 @@ void Z3DAnimationView::docAnimationsAdded(const QList<size_t> &objs)
 
       viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
       connect(viewControl, &Z3DAnimationFilter::boundBoxChanged, this, &Z3DAnimationView::updateBoundBox);
-      connect(viewControl, &Z3DAnimationFilter::objVisibleChanged, this, &Z3DAnimationView::onObjVisibleChangedFromView);
+      connect(viewControl, &Z3DAnimationFilter::objVisibleChanged, this,
+              &Z3DAnimationView::onObjVisibleChangedFromView);
       emit objViewReady(id);
     }
     if (!objs.empty()) {
@@ -32,7 +33,7 @@ void Z3DAnimationView::docAnimationsAdded(const QList<size_t> &objs)
       m_view.updateBoundBox();
     }
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     LOG(ERROR) << "Failed to render 3d animation: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render 3d animation"), e.what());
   }
@@ -41,7 +42,7 @@ void Z3DAnimationView::docAnimationsAdded(const QList<size_t> &objs)
 void Z3DAnimationView::docAnimationAdded(size_t id)
 {
   try {
-    Z3DAnimationFilter *viewControl = new Z3DAnimationFilter(globalParas(), this);
+    Z3DAnimationFilter* viewControl = new Z3DAnimationFilter(globalParas(), this);
     viewControl->setData(&m_doc.animation(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
@@ -55,7 +56,7 @@ void Z3DAnimationView::docAnimationAdded(size_t id)
 
     emit objViewReady(id);
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     LOG(ERROR) << "Failed to render 3d animation: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render 3d animation"), e.what());
   }

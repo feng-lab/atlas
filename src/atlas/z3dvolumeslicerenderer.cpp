@@ -7,7 +7,7 @@
 
 namespace nim {
 
-Z3DVolumeSliceRenderer::Z3DVolumeSliceRenderer(Z3DRendererBase &rendererBase)
+Z3DVolumeSliceRenderer::Z3DVolumeSliceRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_VAO(1)
 {
@@ -16,7 +16,8 @@ Z3DVolumeSliceRenderer::Z3DVolumeSliceRenderer(Z3DRendererBase &rendererBase)
   //                                         m_rendererBase.generateHeader() + generateHeader());
 
   m_scVolumeSliceShader.bindFragDataLocation(0, "FragData0");
-  m_scVolumeSliceShader.loadFromSourceFile("transform_with_3dtexture.vert", "volume_slice_with_colormap_single_channel.frag",
+  m_scVolumeSliceShader.loadFromSourceFile("transform_with_3dtexture.vert",
+                                           "volume_slice_with_colormap_single_channel.frag",
                                            m_rendererBase.generateHeader() + generateHeader());
   m_mergeChannelShader.bindFragDataLocation(0, "FragData0");
   m_mergeChannelShader.loadFromSourceFile("pass.vert", "image2d_array_compositor.frag",
@@ -24,7 +25,8 @@ Z3DVolumeSliceRenderer::Z3DVolumeSliceRenderer(Z3DRendererBase &rendererBase)
   CHECK_GL_ERROR;
 }
 
-void Z3DVolumeSliceRenderer::setData(const Z3DImg &img, const std::vector<std::unique_ptr<ZColorMapParameter> > &colormaps)
+void
+Z3DVolumeSliceRenderer::setData(const Z3DImg& img, const std::vector<std::unique_ptr<ZColorMapParameter> >& colormaps)
 {
   CHECK(colormaps.size() >= img.numChannels() && img.is3DData());
 
@@ -35,14 +37,14 @@ void Z3DVolumeSliceRenderer::setData(const Z3DImg &img, const std::vector<std::u
     compile();
     m_volumeUniformNames.resize(m_img->numChannels());
     m_colormapUniformNames.resize(m_img->numChannels());
-    for (size_t i=0; i<m_img->numChannels(); ++i) {
-      m_volumeUniformNames[i] = QString("volume_%1").arg(i+1);
-      m_colormapUniformNames[i] = QString("colormap_%1").arg(i+1);
+    for (size_t i = 0; i < m_img->numChannels(); ++i) {
+      m_volumeUniformNames[i] = QString("volume_%1").arg(i + 1);
+      m_colormapUniformNames[i] = QString("colormap_%1").arg(i + 1);
     }
   }
 }
 
-void Z3DVolumeSliceRenderer::addQuad(const ZMesh &quad)
+void Z3DVolumeSliceRenderer::addQuad(const ZMesh& quad)
 {
   if (quad.empty() ||
       (quad.numVertices() != 4 && quad.numVertices() != 6) ||
@@ -53,10 +55,10 @@ void Z3DVolumeSliceRenderer::addQuad(const ZMesh &quad)
   m_quads.push_back(quad);
 }
 
-void Z3DVolumeSliceRenderer::bindVolumes(Z3DShaderProgram &shader)
+void Z3DVolumeSliceRenderer::bindVolumes(Z3DShaderProgram& shader)
 {
   size_t idx = 0;
-  for (size_t i=0; i<m_img->numChannels(); ++i) {
+  for (size_t i = 0; i < m_img->numChannels(); ++i) {
     // volumes
     shader.bindTexture(m_volumeUniformNames[idx], m_img->volumes().at(i)->texture(),
                        GLint(GL_NEAREST), GLint(GL_NEAREST));
@@ -68,11 +70,11 @@ void Z3DVolumeSliceRenderer::bindVolumes(Z3DShaderProgram &shader)
   }
 }
 
-void Z3DVolumeSliceRenderer::bindVolume(Z3DShaderProgram &shader, size_t idx)
+void Z3DVolumeSliceRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx)
 {
   // volumes
   shader.bindTexture(m_volumeUniformNames[0], m_img->volumes().at(idx)->texture(),
-      GLint(GL_NEAREST), GLint(GL_NEAREST));
+                     GLint(GL_NEAREST), GLint(GL_NEAREST));
 
   // colormap
   shader.bindTexture(m_colormapUniformNames[0], m_colormaps->at(idx)->get().texture1D());
@@ -116,16 +118,16 @@ void Z3DVolumeSliceRenderer::render(Z3DEye eye)
 
   if (m_img->numChannels() == 1) {
     bindVolume(m_scVolumeSliceShader, 0);
-    for (size_t i=0; i<m_quads.size(); ++i)
+    for (size_t i = 0; i < m_quads.size(); ++i)
       renderTriangleList(m_VAO, m_scVolumeSliceShader, m_quads[i]);
   } else {
-    for (size_t j=0; j<m_img->numChannels(); ++j) {
+    for (size_t j = 0; j < m_img->numChannels(); ++j) {
       m_layerTarget->attachSlice(j);
       m_layerTarget->bind();
       m_layerTarget->clear();
 
       bindVolume(m_scVolumeSliceShader, j);
-      for (size_t i=0; i<m_quads.size(); ++i)
+      for (size_t i = 0; i < m_quads.size(); ++i)
         renderTriangleList(m_VAO, m_scVolumeSliceShader, m_quads[i]);
 
       m_layerTarget->release();

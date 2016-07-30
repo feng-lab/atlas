@@ -306,16 +306,16 @@ T& CheckNotNull(const char *file, int line, const char *names, T& t) {
 
 // Check that a pointer is not null.
 #define CHECK_NOTNULL(val) \
-  CheckNotNull(__FILE__, __LINE__, "'" #val "' Must be non NULL", (val))
+  CheckNotNull(__FILE__, __LINE__, "'" #val "' Must be non nullptr", (val))
 
 #ifdef _DEBUG_
 // Debug only version of CHECK_NOTNULL
 #define DCHECK_NOTNULL(val) \
-  CheckNotNull(__FILE__, __LINE__, "'" #val "' Must be non NULL", (val))
+  CheckNotNull(__FILE__, __LINE__, "'" #val "' Must be non nullptr", (val))
 #else
 // Optimized version - generates no code.
 #define DCHECK_NOTNULL(val) if (false)\
-  CheckNotNull(__FILE__, __LINE__, "'" #val "' Must be non NULL", (val))
+  CheckNotNull(__FILE__, __LINE__, "'" #val "' Must be non nullptr", (val))
 #endif  // _DEBUG_
 
 // support std string

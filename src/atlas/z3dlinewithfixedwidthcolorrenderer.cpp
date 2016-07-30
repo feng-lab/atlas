@@ -2,7 +2,7 @@
 
 namespace nim {
 
-Z3DLineWithFixedWidthColorRenderer::Z3DLineWithFixedWidthColorRenderer(Z3DRendererBase &base)
+Z3DLineWithFixedWidthColorRenderer::Z3DLineWithFixedWidthColorRenderer(Z3DRendererBase& base)
   : Z3DLineRenderer(base)
   , m_lineWidth("Line Width", 2.0f, 1, 100)
   , m_lineColor("Line Color", glm::vec4(1.f, 1.f, 0.f, 1.f))
@@ -10,13 +10,16 @@ Z3DLineWithFixedWidthColorRenderer::Z3DLineWithFixedWidthColorRenderer(Z3DRender
   setUseSmoothLine(false);
   setUseDisplayList(true);
   m_lineColor.setStyle("COLOR");
-  connect(&m_lineWidth, &ZFloatParameter::valueChanged, this, &Z3DLineWithFixedWidthColorRenderer::invalidateOpenglRenderer);
-  connect(&m_lineWidth, &ZFloatParameter::valueChanged, this, &Z3DLineWithFixedWidthColorRenderer::invalidateOpenglPickingRenderer);
-  connect(&m_lineColor, &ZVec4Parameter::valueChanged, this, &Z3DLineWithFixedWidthColorRenderer::invalidateOpenglRenderer);
+  connect(&m_lineWidth, &ZFloatParameter::valueChanged, this,
+          &Z3DLineWithFixedWidthColorRenderer::invalidateOpenglRenderer);
+  connect(&m_lineWidth, &ZFloatParameter::valueChanged, this,
+          &Z3DLineWithFixedWidthColorRenderer::invalidateOpenglPickingRenderer);
+  connect(&m_lineColor, &ZVec4Parameter::valueChanged, this,
+          &Z3DLineWithFixedWidthColorRenderer::invalidateOpenglRenderer);
   connect(&m_lineColor, &ZVec4Parameter::valueChanged, this, &Z3DLineWithFixedWidthColorRenderer::setLineColors);
 }
 
-void Z3DLineWithFixedWidthColorRenderer::setData(std::vector<glm::vec3> *linesInput)
+void Z3DLineWithFixedWidthColorRenderer::setData(std::vector<glm::vec3>* linesInput)
 {
   Z3DLineRenderer::setData(linesInput);
   setLineColors();
@@ -32,7 +35,7 @@ void Z3DLineWithFixedWidthColorRenderer::setLineColors()
   m_lineColorsPrivate.clear();
   if (!m_linesPt)
     return;
-  for (size_t i=0; i<m_linesPt->size(); i++) {
+  for (size_t i = 0; i < m_linesPt->size(); i++) {
     m_lineColorsPrivate.push_back(m_lineColor.get());
   }
   setDataColors(&m_lineColorsPrivate);

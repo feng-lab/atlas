@@ -4,6 +4,7 @@
 #include <QDialog>
 
 class QTableView;
+
 class QPushButton;
 
 namespace nim {
@@ -12,17 +13,23 @@ class ZAnalysisWorklistModel;
 
 class ZAnalysisWorklistDialog : public QDialog
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit ZAnalysisWorklistDialog(QWidget *parent = 0);
+  explicit ZAnalysisWorklistDialog(QWidget* parent = 0);
+
   virtual ~ZAnalysisWorklistDialog();
 
 protected:
   virtual void reject() override;
+
   void onNew();
+
   void onOpen();
+
   void onSave();
+
   void onSaveAs();
+
   void onGenerate();
 
   void dataModified();

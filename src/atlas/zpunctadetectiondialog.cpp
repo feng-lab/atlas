@@ -7,10 +7,12 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include "zselectfilewidget.h"
+
 #ifdef _NEUTUBE_
 #include "zstack.hxx"
 #include "zstackdoc.h"
 #endif
+
 #include "zpunctadetection.h"
 #include <QThread>
 #include "zimg.h"
@@ -36,11 +38,11 @@ ZPunctaDetectionDialog::ZPunctaDetectionDialog(std::tr1::shared_ptr<ZStackDoc> d
 }
 #endif
 
-ZPunctaDetectionDialog::ZPunctaDetectionDialog(QWidget *parent)
+ZPunctaDetectionDialog::ZPunctaDetectionDialog(QWidget* parent)
   : QDialog(parent)
   , m_useCurrentActiveImage("Use Current Active Image", false)
-  , m_voxelSize("Voxel Size (um)", glm::dvec3(.0,.0,.0), glm::dvec3(.0,.0,.0),
-                glm::dvec3(1e6,1e6,1e6))
+  , m_voxelSize("Voxel Size (um)", glm::dvec3(.0, .0, .0), glm::dvec3(.0, .0, .0),
+                glm::dvec3(1e6, 1e6, 1e6))
   , m_punctaChannel("Puncta Channel", nullptr, "Ch")
   , m_punctaThreshold("Puncta Threshold (-1 means auto detect)", -1, -1, 255)
   , m_dendriteChannel("Tube Channel")
@@ -63,7 +65,7 @@ void ZPunctaDetectionDialog::detect()
     try {
       img.load(m_inputImageFileWidget->getSelectedOpenFile());
 #ifndef _NEUTUBE_
-      ZImg *imgToSend = new ZImg();   // will leak memory if no one receive the signal
+      ZImg* imgToSend = new ZImg();   // will leak memory if no one receive the signal
       imgToSend->swap(img);
       img = imgToSend->createView();
       emit srcImgReady(imgToSend, m_inputImageFileWidget->getSelectedOpenFile());
@@ -74,13 +76,14 @@ void ZPunctaDetectionDialog::detect()
       img = wrapZStackAsZImg(*stack);
 #endif
     }
-    catch (const ZException & e) {
+    catch (const ZException& e) {
       QMessageBox::critical(this, "Read Image Error", e.what());
       return;
     }
     // todo: select time spot
     if (!img.is3DImg() && !img.is2DImg()) {
-      QMessageBox::critical(this, "time sequence not supported", QString("Can not detect puncta from time sequence image"));
+      QMessageBox::critical(this, "time sequence not supported",
+                            QString("Can not detect puncta from time sequence image"));
       return;
     }
   } else {
@@ -119,11 +122,11 @@ void ZPunctaDetectionDialog::detect()
   QStringList swcFiles = m_inputSwcFilesWidget->getSelectedMultipleOpenFiles();
   std::vector<ZSwc> swcTrees(swcFiles.size());
   try {
-    for (int i=0; i<swcFiles.size(); ++i) {
+    for (int i = 0; i < swcFiles.size(); ++i) {
       swcTrees[i] = ZSwc(swcFiles.at(i));
     }
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     QMessageBox::critical(this, "Read Swc Error", e.what());
     return;
   }
@@ -131,7 +134,7 @@ void ZPunctaDetectionDialog::detect()
   m_isCanceled = false;
   m_hasError = false;
 
-  ZPunctaDetection *worker = new ZPunctaDetection(img, punctaChannel);
+  ZPunctaDetection* worker = new ZPunctaDetection(img, punctaChannel);
   worker->setAmbiguousFactor(m_ambiguousFactor.get());
   if (dendriteChannel >= 0)
     worker->setDendriteChannel(dendriteChannel);
@@ -156,7 +159,7 @@ void ZPunctaDetectionDialog::detect()
   connect(worker, &ZPunctaDetection::processError, this, &ZPunctaDetectionDialog::processError);
   connect(m_progressDialog, &QProgressDialog::canceled, this, &ZPunctaDetectionDialog::cancelButtonPressed);
 
-  QThread *thread = new QThread(this);
+  QThread* thread = new QThread(this);
   connect(thread, &QThread::started, worker, &ZPunctaDetection::run);
   connect(worker, &ZPunctaDetection::canceled, thread, &QThread::quit);
   connect(worker, &ZPunctaDetection::finished, thread, &QThread::quit);
@@ -185,7 +188,7 @@ void ZPunctaDetectionDialog::processFinished()
   }
 }
 
-void ZPunctaDetectionDialog::processError(const QString &e)
+void ZPunctaDetectionDialog::processError(const QString& e)
 {
   m_hasError = true;
   QMessageBox::critical(this, "Error",
@@ -204,14 +207,14 @@ void ZPunctaDetectionDialog::cancelButtonPressed()
 //  QDialog::reject();
 //}
 
-void ZPunctaDetectionDialog::keyPressEvent(QKeyEvent *e)
+void ZPunctaDetectionDialog::keyPressEvent(QKeyEvent* e)
 {
   switch (e->key()) {
-  case Qt::Key_Return:
-  case Qt::Key_Enter:
-    break;
-  default:
-    QDialog::keyPressEvent(e);
+    case Qt::Key_Return:
+    case Qt::Key_Enter:
+      break;
+    default:
+      QDialog::keyPressEvent(e);
   }
 }
 
@@ -253,7 +256,7 @@ void ZPunctaDetectionDialog::inputImageChanged()
         updateInterface(fn, info.numChannels, 0, 0, 0);
       }
     }
-    catch (const ZIOException & e) {
+    catch (const ZIOException& e) {
       updateInterface(fn, 0, 0, 0, 0);
       QMessageBox::critical(this, "Can not read input image", e.what());
     }
@@ -278,7 +281,7 @@ void ZPunctaDetectionDialog::detectLSMResolution()
                               "file do not contains resolution information");
       }
     }
-    catch (const ZException & e) {
+    catch (const ZException& e) {
       QMessageBox::critical(this, "Can not detect resolution from lsm file", e.what());
     }
   }
@@ -292,7 +295,7 @@ void ZPunctaDetectionDialog::dendriteChannelChanged()
     m_tubeThreshold.setVisible(true);
 }
 
-void ZPunctaDetectionDialog::updateInterface(const QString &fn, size_t numChannel, double vsx, double vsy, double vsz)
+void ZPunctaDetectionDialog::updateInterface(const QString& fn, size_t numChannel, double vsx, double vsy, double vsz)
 {
   if (QFile::exists(fn)) {
     QFileInfo fi(fn);
@@ -312,10 +315,10 @@ void ZPunctaDetectionDialog::updateInterface(const QString &fn, size_t numChanne
 
   m_punctaChannel.clearOptions();
   m_dendriteChannel.clearOptions();
-  m_dendriteChannel.addOptionWithData(qMakePair<QString,int>("None", 0));
-  for (int i=0; i < static_cast<int>(numChannel); ++i) {
-    m_punctaChannel.addOption(i+1);
-    m_dendriteChannel.addOptionWithData(qMakePair(QString("Ch%1").arg(i+1), i+1));
+  m_dendriteChannel.addOptionWithData(qMakePair<QString, int>("None", 0));
+  for (int i = 0; i < static_cast<int>(numChannel); ++i) {
+    m_punctaChannel.addOption(i + 1);
+    m_dendriteChannel.addOptionWithData(qMakePair(QString("Ch%1").arg(i + 1), i + 1));
   }
 
   m_dendriteChannel.select("None");
@@ -338,9 +341,10 @@ void ZPunctaDetectionDialog::init()
   connect(m_runButton, &QPushButton::clicked, this, &ZPunctaDetectionDialog::detect);
 
   m_tubeThreshold.setVisible(false);
-  connect(&m_dendriteChannel, &ZStringIntOptionParameter::valueChanged, this, &ZPunctaDetectionDialog::dendriteChannelChanged);
+  connect(&m_dendriteChannel, &ZStringIntOptionParameter::valueChanged, this,
+          &ZPunctaDetectionDialog::dendriteChannelChanged);
 
-  QVBoxLayout *mainLayout = new QVBoxLayout;
+  QVBoxLayout* mainLayout = new QVBoxLayout;
   mainLayout->addWidget(m_ioGroupBox);
   mainLayout->addWidget(m_paraGroupBox);
   mainLayout->addWidget(m_buttonBox);
@@ -353,7 +357,7 @@ void ZPunctaDetectionDialog::createIOGroupBox()
 {
   m_ioGroupBox = new QGroupBox(tr("Inputs and Outputs"), this);
   // everything
-  QVBoxLayout *alllayout = new QVBoxLayout;
+  QVBoxLayout* alllayout = new QVBoxLayout;
 
 #ifdef _NEUTUBE_
   QHBoxLayout *hlayout;
@@ -379,11 +383,12 @@ void ZPunctaDetectionDialog::createIOGroupBox()
   alllayout->addWidget(m_inputSwcFilesWidget);
 
   m_outputPunctaFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output All Puncta File:",
-                                                tr("Nimp (*.nimp)"));
+                                                   tr("Nimp (*.nimp)"));
   alllayout->addWidget(m_outputPunctaFileWidget);
 
-  m_outputSomaPunctaFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output All Soma Puncta File:",
-                                                    tr("Nimp (*.nimp)"));
+  m_outputSomaPunctaFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile,
+                                                       "Output All Soma Puncta File:",
+                                                       tr("Nimp (*.nimp)"));
   alllayout->addWidget(m_outputSomaPunctaFileWidget);
 
   m_outputLogFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Log File:",
@@ -397,7 +402,7 @@ void ZPunctaDetectionDialog::createParaGroupBox()
 {
   m_paraGroupBox = new QGroupBox(tr("Parameters"), this);
   // everything
-  QVBoxLayout *alllayout = new QVBoxLayout;
+  QVBoxLayout* alllayout = new QVBoxLayout;
 
   m_voxelSize.setSingleStep(1e-6);
   m_voxelSize.setDecimal(6);
@@ -409,7 +414,7 @@ void ZPunctaDetectionDialog::createParaGroupBox()
   name.push_back("z");
   m_voxelSize.setNameForEachValue(name);
 
-  QHBoxLayout *hlayout= new QHBoxLayout;
+  QHBoxLayout* hlayout = new QHBoxLayout;
   hlayout->addWidget(m_voxelSize.createNameLabel());
   hlayout->addWidget(m_voxelSize.createWidget(), 0, Qt::AlignLeft);
   m_detectResolutionButton = new QPushButton(tr("Detect From File"), this);

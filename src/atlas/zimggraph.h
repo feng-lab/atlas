@@ -17,11 +17,15 @@ public:
   void setConnectivity(size_t n);
 
   // whether to use voxel size of img to calcuate voxel distance, default is true
-  inline void setUseVoxelSize(bool v) { m_useVoxelSize = v; m_graphIsValid = false; }
+  inline void setUseVoxelSize(bool v)
+  {
+    m_useVoxelSize = v;
+    m_graphIsValid = false;
+  }
 
   // EdgeWeightFunctor take voxel distance and voxel intensities as parameter
   // return edge weight as double value
-  template <typename EdgeWeightFunctor>
+  template<typename EdgeWeightFunctor>
   void build(const EdgeWeightFunctor& edgeWeightFunc)
   {
     m_graph.clear();
@@ -29,7 +33,7 @@ public:
 
     updateNeighborDistances();
 
-    for (size_t i=0; i<m_regionInfo.voxelNumber(); ++i) {
+    for (size_t i = 0; i < m_regionInfo.voxelNumber(); ++i) {
       boost::add_vertex(m_graph);
     }
 
@@ -44,26 +48,26 @@ public:
 
   // return shortest distance from startIdx (idx of region) to other voxels
   // optionally return predecessor of each voxel if predecessor is not nullptr
-  std::vector<double> shortestPaths(size_t startIdx, std::vector<size_t> *predecessor = nullptr);
+  std::vector<double> shortestPaths(size_t startIdx, std::vector<size_t>* predecessor = nullptr);
 
   // overload, accept img coord rather than region idx
-  std::vector<double> shortestPaths(const ZVoxelCoordinate& startCoord, std::vector<size_t> *predecessor = nullptr);
+  std::vector<double> shortestPaths(const ZVoxelCoordinate& startCoord, std::vector<size_t>* predecessor = nullptr);
 
   // astar version, return cost and first reached target idx
   std::tuple<double, size_t> shortestPath(size_t startIdx, const std::vector<size_t>& targetIdxs,
-                                          std::vector<size_t> *resPath = nullptr);
+                                          std::vector<size_t>* resPath = nullptr);
 
 protected:
   void updateNeighborDistances();
 
-  template <typename TVoxel, typename EdgeWeightFunctor>
+  template<typename TVoxel, typename EdgeWeightFunctor>
   void addEdges_Opt(const EdgeWeightFunctor& edgeWeightFunc)
   {
     ZImgNeighborhoodConstIterator<TVoxel> nit =
-        ZImgNeighborhoodConstIterator<TVoxel>(m_neighborhood, m_img, m_region);
+      ZImgNeighborhoodConstIterator<TVoxel>(m_neighborhood, m_img, m_region);
     const TVoxel* data = m_img.planeData<TVoxel>(m_region.zStart(), m_region.cStart(), m_region.tStart());
     for (; !nit.isAtEnd(); ++nit) {
-      for (size_t n=0; n<nit.numNeighbors(); ++n) {
+      for (size_t n = 0; n < nit.numNeighbors(); ++n) {
         if (nit.isInBound(n)) {
           size_t nidx = nit.index(n);
           double weight = edgeWeightFunc(m_dists[n], data[nit.index()], data[nidx]);
@@ -74,13 +78,13 @@ protected:
     }
   }
 
-  template <typename TVoxel, typename EdgeWeightFunctor>
+  template<typename TVoxel, typename EdgeWeightFunctor>
   void addEdges(const EdgeWeightFunctor& edgeWeightFunc)
   {
     ZImgNeighborhoodWithPtrConstIterator<TVoxel> nit =
-        ZImgNeighborhoodWithPtrConstIterator<TVoxel>(m_neighborhood, m_img, m_region);
+      ZImgNeighborhoodWithPtrConstIterator<TVoxel>(m_neighborhood, m_img, m_region);
     for (; !nit.isAtEnd(); ++nit) {
-      for (size_t n=0; n<nit.numNeighbors(); ++n) {
+      for (size_t n = 0; n < nit.numNeighbors(); ++n) {
         if (nit.isInBound(n)) {
           double weight = edgeWeightFunc(m_dists[n], *nit, nit.valueRef(n));
           boost::add_edge(nit.index(), nit.index(n), EdgeInfo(weight), m_graph);
@@ -104,12 +108,13 @@ private:
     EdgeInfo(double w)
       : weight(w)
     {}
+
     double weight;
   };
 
   typedef boost::adjacency_list<boost::vecS, boost::vecS,
-      boost::undirectedS, boost::no_property, EdgeInfo,
-      boost::no_property, boost::vecS> GraphT;
+    boost::undirectedS, boost::no_property, EdgeInfo,
+    boost::no_property, boost::vecS> GraphT;
   typedef boost::graph_traits<GraphT>::vertex_descriptor Vertex;
   typedef boost::graph_traits<GraphT>::edge_descriptor Edge;
 
@@ -132,13 +137,15 @@ public:
     EdgeWeight2(double thre, double scale)
       : m_thre(thre), m_scale(scale)
     {}
+
     inline double operator()(double dist, double v1, double v2) const
     {
       return dist *
-          (1.0 / (1.0 + std::exp((v1 - m_thre) / m_scale))
-           + 1.0 / (1.0 + std::exp((v2 - m_thre) / m_scale))
-           + 0.00001);
+             (1.0 / (1.0 + std::exp((v1 - m_thre) / m_scale))
+              + 1.0 / (1.0 + std::exp((v2 - m_thre) / m_scale))
+              + 0.00001);
     }
+
   private:
     double m_thre;
     double m_scale;
@@ -149,17 +156,19 @@ public:
     EdgeWeight3(double thre, double scale)
       : m_thre(thre), m_scale(scale)
     {}
+
     inline double operator()(double dist, double v1, double v2) const
     {
       if (v1 < m_thre || v2 < m_thre) {
         return 1000;
       } else {
         return dist *
-            (1.0 / (1.0 + std::exp((v1 - m_thre) / m_scale))
-             + 1.0 / (1.0 + std::exp((v2 - m_thre) / m_scale))
-             + 0.00001);
+               (1.0 / (1.0 + std::exp((v1 - m_thre) / m_scale))
+                + 1.0 / (1.0 + std::exp((v2 - m_thre) / m_scale))
+                + 0.00001);
       }
     }
+
   private:
     double m_thre;
     double m_scale;

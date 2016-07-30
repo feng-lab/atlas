@@ -8,15 +8,15 @@
 #include <memory>
 #include <vector>
 
- namespace nim {
+namespace nim {
 
 Z3DPickingManager::Z3DPickingManager()
   : m_renderTarget(nullptr)
-  , m_currentColor(0,0,0,128)
+  , m_currentColor(0, 0, 0, 128)
 {
 }
 
-void Z3DPickingManager::setRenderTarget(Z3DRenderTarget &rt)
+void Z3DPickingManager::setRenderTarget(Z3DRenderTarget& rt)
 {
   CHECK(rt.attachment(GL_COLOR_ATTACHMENT0)->internalFormat() == GL_RGBA8);
   m_renderTarget = &rt;
@@ -48,29 +48,29 @@ void Z3DPickingManager::clearRegisteredObjects()
 {
   m_colorToObject.clear();
   m_objectToColor.clear();
-  m_currentColor = glm::col4(0,0,0,128);
+  m_currentColor = glm::col4(0, 0, 0, 128);
 }
 
 glm::col4 Z3DPickingManager::colorOfObject(const void* obj)
 {
   if (!obj)
-    return glm::col4(0,0,0,0);
+    return glm::col4(0, 0, 0, 0);
 
   if (isRegistered(obj)) {
     return m_objectToColor[obj];
   } else
-    return glm::col4(0,0,0,0);
+    return glm::col4(0, 0, 0, 0);
 }
 
 const void* Z3DPickingManager::objectOfColor(glm::col4 col)
 {
   if (col.a == 0)
-    return NULL;
+    return nullptr;
 
   if (isRegistered(col))
     return m_colorToObject[col];
   else
-    return NULL;
+    return nullptr;
 }
 
 const void* Z3DPickingManager::objectAtWidgetPos(glm::ivec2 pos)
@@ -79,14 +79,14 @@ const void* Z3DPickingManager::objectAtWidgetPos(glm::ivec2 pos)
   pos[1] = pos[1] * qApp->devicePixelRatio();
 
   glm::ivec3 texSize = glm::ivec3(m_renderTarget->attachment(GL_COLOR_ATTACHMENT0)->dimension());
-  pos[1] = texSize[1]- pos[1];
+  pos[1] = texSize[1] - pos[1];
   return objectOfColor(m_renderTarget->colorAtPos(pos));
 }
 
-std::vector<const void *> Z3DPickingManager::sortObjectsByDistanceToPos(glm::ivec2 pos, int radius, bool ascend)
+std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(glm::ivec2 pos, int radius, bool ascend)
 {
   std::map<glm::col4, int, Col4Compare> col2dist;
-  const Z3DTexture *tex = m_renderTarget->attachment(GL_COLOR_ATTACHMENT0);
+  const Z3DTexture* tex = m_renderTarget->attachment(GL_COLOR_ATTACHMENT0);
   GLenum dataFormat = GL_BGRA;
   GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
   auto buf = std::make_unique<glm::col4[]>(tex->bypePerPixel(dataFormat, dataType) * tex->numPixels() / 4);
@@ -94,38 +94,38 @@ std::vector<const void *> Z3DPickingManager::sortObjectsByDistanceToPos(glm::ive
   glm::ivec2 texSize = glm::ivec2(m_renderTarget->size());
   if (radius < 0)
     radius = std::max(texSize.x, texSize.y);
-  for(int y = std::max(0, pos.y-radius); y <= std::min(texSize.y-1, pos.y+radius); ++y) {
-    for(int x = std::max(0, pos.x-radius); x <= std::min(texSize.x-1, pos.x+radius); ++x) {
-      glm::col4 col = buf[(y*texSize.x) + x];
+  for (int y = std::max(0, pos.y - radius); y <= std::min(texSize.y - 1, pos.y + radius); ++y) {
+    for (int x = std::max(0, pos.x - radius); x <= std::min(texSize.x - 1, pos.x + radius); ++x) {
+      glm::col4 col = buf[(y * texSize.x) + x];
       std::swap(col.r, col.b);
       if (col2dist[col] == 0)
-        col2dist[col] = (x-pos.x)*(x-pos.x) + (y-pos.y)*(y-pos.y);
+        col2dist[col] = (x - pos.x) * (x - pos.x) + (y - pos.y) * (y - pos.y);
       else
-        col2dist[col] = std::min(col2dist[col], (x-pos.x)*(x-pos.x) + (y-pos.y)*(y-pos.y));
+        col2dist[col] = std::min(col2dist[col], (x - pos.x) * (x - pos.x) + (y - pos.y) * (y - pos.y));
     }
   }
-  std::vector<const void *> res;
+  std::vector<const void*> res;
   if (ascend) {
-    std::multimap<int, const void *> dist2obj;
+    std::multimap<int, const void*> dist2obj;
     for (std::map<glm::col4, int>::const_iterator it = col2dist.begin();
          it != col2dist.end(); ++it) {
-      const void *obj = objectOfColor(it->first);
+      const void* obj = objectOfColor(it->first);
       if (obj)
-        dist2obj.emplace(it->second,obj);
+        dist2obj.emplace(it->second, obj);
     }
-    for (std::multimap<int, const void *>::const_iterator it = dist2obj.begin();
+    for (std::multimap<int, const void*>::const_iterator it = dist2obj.begin();
          it != dist2obj.end(); ++it) {
       res.push_back(it->second);
     }
   } else {
-    std::multimap<int, const void *, std::greater<int>> dist2obj;
+    std::multimap<int, const void*, std::greater<int>> dist2obj;
     for (std::map<glm::col4, int>::const_iterator it = col2dist.begin();
          it != col2dist.end(); ++it) {
-      const void *obj = objectOfColor(it->first);
+      const void* obj = objectOfColor(it->first);
       if (obj)
-        dist2obj.emplace(it->second,obj);
+        dist2obj.emplace(it->second, obj);
     }
-    for (std::multimap<int, const void *>::const_iterator it = dist2obj.begin();
+    for (std::multimap<int, const void*>::const_iterator it = dist2obj.begin();
          it != dist2obj.end(); ++it) {
       res.push_back(it->second);
     }
@@ -145,7 +145,7 @@ void Z3DPickingManager::increaseColor()
     ++col;
     m_currentColor = bit_cast<glm::col4>(col);
   } else {
-    m_currentColor = glm::col4(0,0,0,128);
+    m_currentColor = glm::col4(0, 0, 0, 128);
     //LOG(ERROR) << "Out of colors...";
   }
 }

@@ -7,31 +7,35 @@
 namespace nim {
 
 class ZView;
+
 class ZParameterAnimation;
 
 class Z2DAnimation : public ZAnimation
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit Z2DAnimation(ZDoc &doc, QObject *parent = nullptr);
+  explicit Z2DAnimation(ZDoc& doc, QObject* parent = nullptr);
 
-  void bindView(ZView *v);
+  void bindView(ZView* v);
 
-  void load(const QString &filename);
-  void save(const QString &filename);
+  void load(const QString& filename);
 
-  virtual bool is2DAnimation() const override { return true; }
+  void save(const QString& filename);
+
+  virtual bool is2DAnimation() const override
+  { return true; }
 
 protected:
   virtual void bindGlobalParameters() override;
+
   virtual void addGlobalKey(double time) override;
 
 protected:
   // managed by parent class
-  ZParameterAnimation *m_sliceAnimation;
-  ZParameterAnimation *m_timeAnimation;
-  ZParameterAnimation *m_mipAnimation;
-  ZParameterAnimation *m_viewportAnimation;
+  ZParameterAnimation* m_sliceAnimation;
+  ZParameterAnimation* m_timeAnimation;
+  ZParameterAnimation* m_mipAnimation;
+  ZParameterAnimation* m_viewportAnimation;
 };
 
 } // namespace nim

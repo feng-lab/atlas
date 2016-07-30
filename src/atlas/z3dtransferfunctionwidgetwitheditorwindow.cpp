@@ -5,7 +5,8 @@
 
 namespace nim {
 
-Z3DTransferFunctionWidgetWithEditorWindow::Z3DTransferFunctionWidgetWithEditorWindow(Z3DTransferFunctionParameter *tf, QWidget *parent)
+Z3DTransferFunctionWidgetWithEditorWindow::Z3DTransferFunctionWidgetWithEditorWindow(Z3DTransferFunctionParameter* tf,
+                                                                                     QWidget* parent)
   : ZClickableTransferFunctionLabel(tf, parent)
   , m_transferFunction(tf)
 {

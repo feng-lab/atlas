@@ -12,7 +12,7 @@
 
 namespace nim {
 
-ZSwcDoc::ZSwcDoc(ZDoc &doc)
+ZSwcDoc::ZSwcDoc(ZDoc& doc)
   : ZObjDoc(doc)
 {
   createActions();
@@ -60,12 +60,12 @@ bool ZSwcDoc::saveAs(size_t id)
   return false;
 }
 
-bool ZSwcDoc::canReadFile(const QString &fileName)
+bool ZSwcDoc::canReadFile(const QString& fileName)
 {
   return ZSwc::canReadFile(fileName);
 }
 
-size_t ZSwcDoc::loadFile(const QString &fileName, QString &errorMsg)
+size_t ZSwcDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
   for (auto it = m_idToSwcPacks.begin(); it != m_idToSwcPacks.end(); ++it) {
     if (it->second->path == fileName)
@@ -79,13 +79,13 @@ size_t ZSwcDoc::loadFile(const QString &fileName, QString &errorMsg)
 
     return id;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = e.what();
     return 0;
   }
 }
 
-size_t ZSwcDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
+size_t ZSwcDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
 {
   if (!jValue.isString() || jValue.toString().trimmed().isEmpty()) {
     errorMsg = QString("File path is not string or is empty");
@@ -103,13 +103,13 @@ size_t ZSwcDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
     setLastOpenedObjPath(fileName);
     return id;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = e.what();
     return 0;
   }
 }
 
-QList<QAction *> ZSwcDoc::loadFileActions() const
+QList<QAction*> ZSwcDoc::loadFileActions() const
 {
   QList<QAction*> res;
   res.push_back(m_loadSwcAction);
@@ -154,7 +154,7 @@ QJsonValue ZSwcDoc::jsonValue(size_t id) const
   return QJsonValue(m_idToSwcPacks.at(id)->path);
 }
 
-bool ZSwcDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
+bool ZSwcDoc::isSameObj(const QJsonValue& v1, const QJsonValue& v2) const
 {
   CHECK(v1.isString() && v2.isString());
   if (v1 == v2)
@@ -198,7 +198,7 @@ void ZSwcDoc::loadSwc()
   if (dialog.exec()) {
     QString errorMsg;
     //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    for (int i=0; i<dialog.selectedFiles().size(); ++i) {
+    for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
         QMessageBox::critical(QApplication::activeWindow(), tr("Can not read swc"),
                               errorMsg);
@@ -207,7 +207,7 @@ void ZSwcDoc::loadSwc()
   }
 }
 
-size_t ZSwcDoc::addSwc(ZSwc &tree, const QString &path)
+size_t ZSwcDoc::addSwc(ZSwc& tree, const QString& path)
 {
   size_t id = m_doc.getNewObjId();
   m_idToSwcPacks[id] = std::make_shared<SwcPack>(tree, path);
@@ -217,7 +217,7 @@ size_t ZSwcDoc::addSwc(ZSwc &tree, const QString &path)
   return id;
 }
 
-ZSwcDoc::SwcPack::SwcPack(ZSwc &tree, const QString &path)
+ZSwcDoc::SwcPack::SwcPack(ZSwc& tree, const QString& path)
   : path(QFileInfo(path).canonicalFilePath()), hasUnsavedChange(false)
 {
   swc.swap(tree);
@@ -235,7 +235,7 @@ void ZSwcDoc::SwcPack::updateDerivedData()
   m_tooltip = path;
 }
 
-const QString &ZSwcDoc::SwcPack::info() const
+const QString& ZSwcDoc::SwcPack::info() const
 {
   if (m_info.isEmpty()) {
     m_info = QString("size %1").arg(swc.size());
@@ -250,7 +250,7 @@ void ZSwcDoc::createActions()
   connect(m_loadSwcAction, &QAction::triggered, this, &ZSwcDoc::loadSwc);
 }
 
-bool ZSwcDoc::saveSwc(SwcPack *pack, const QString &fileName, QString &errorMsg)
+bool ZSwcDoc::saveSwc(SwcPack* pack, const QString& fileName, QString& errorMsg)
 {
   try {
     pack->swc.resortID();
@@ -263,13 +263,13 @@ bool ZSwcDoc::saveSwc(SwcPack *pack, const QString &fileName, QString &errorMsg)
     setLastOpenedObjPath(fileName);
     return true;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = e.what();
     return false;
   }
 }
 
-void ZSwcDoc::packInfoUpdated(SwcPack *pack)
+void ZSwcDoc::packInfoUpdated(SwcPack* pack)
 {
   for (auto it = m_idToSwcPacks.begin(); it != m_idToSwcPacks.end(); ++it) {
     if (it->second.get() == pack)

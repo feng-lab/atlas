@@ -7,14 +7,21 @@ namespace nim {
 
 class Z3DBackgroundRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit Z3DBackgroundRenderer(Z3DRendererBase &rendererBase);
+  explicit Z3DBackgroundRenderer(Z3DRendererBase& rendererBase);
 
-  ZStringIntOptionParameter& modePara() { return m_mode; }
-  ZVec4Parameter& firstColorPara() { return m_firstColor; }
-  ZVec4Parameter& secondColorPara() { return m_secondColor; }
-  ZStringIntOptionParameter& gradientOrientationPara() { return m_gradientOrientation; }
+  ZStringIntOptionParameter& modePara()
+  { return m_mode; }
+
+  ZVec4Parameter& firstColorPara()
+  { return m_firstColor; }
+
+  ZVec4Parameter& secondColorPara()
+  { return m_secondColor; }
+
+  ZStringIntOptionParameter& gradientOrientationPara()
+  { return m_gradientOrientation; }
 
   void setRenderingRegion(double left = 0., double right = 1., double bottom = 0., double top = 1.);
 
@@ -22,6 +29,7 @@ protected:
   void adjustWidgets();
 
   virtual void compile() override;
+
   QString generateHeader();
 
 #ifndef _USE_CORE_PROFILE_
@@ -30,6 +38,7 @@ protected:
 #endif
 
   virtual void render(Z3DEye eye) override;
+
   virtual void renderPicking(Z3DEye) override;
 
 protected:

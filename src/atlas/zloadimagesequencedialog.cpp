@@ -13,13 +13,14 @@
 
 namespace nim {
 
-ZLoadImageSequenceDialog::ZLoadImageSequenceDialog(const QString &title, const QString &startDir, QWidget *parent)
+ZLoadImageSequenceDialog::ZLoadImageSequenceDialog(const QString& title, const QString& startDir, QWidget* parent)
   : QDialog(parent)
 {
   QStringList filters;
   QList<nim::FileFormat> formats;
   nim::ZImg::getQtReadNameFilter(filters, formats);
-  m_inputImagesFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenMultipleFilesWithFilter, "Input Sequence:",
+  m_inputImagesFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenMultipleFilesWithFilter,
+                                                  "Input Sequence:",
                                                   filters.join(";;"), QBoxLayout::LeftToRight, startDir);
   m_inputImagesFileWidget->setCompareFunc(naturalSortLessThan);
 
@@ -27,7 +28,7 @@ ZLoadImageSequenceDialog::ZLoadImageSequenceDialog(const QString &title, const Q
   connect(m_buttonBox, &QDialogButtonBox::accepted, this, &ZLoadImageSequenceDialog::accept);
   connect(m_buttonBox, &QDialogButtonBox::rejected, this, &ZLoadImageSequenceDialog::reject);
 
-  QVBoxLayout *mainLayout = new QVBoxLayout;
+  QVBoxLayout* mainLayout = new QVBoxLayout;
   mainLayout->addWidget(m_inputImagesFileWidget);
   mainLayout->addWidget(m_buttonBox);
   setLayout(mainLayout);

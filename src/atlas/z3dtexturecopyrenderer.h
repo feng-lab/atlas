@@ -7,7 +7,7 @@ namespace nim {
 
 class Z3DTextureCopyRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   // Multiply_Alpha : output color will be multiplied by alpha value (convert to premultiplied format)
   // None (default): just copy
@@ -17,25 +17,30 @@ public:
     NoChange, DivideByAlpha, MultiplyAlpha
   };
 
-  explicit Z3DTextureCopyRenderer(Z3DRendererBase &rendererBase, OutputColorOption mode = OutputColorOption::NoChange);
+  explicit Z3DTextureCopyRenderer(Z3DRendererBase& rendererBase, OutputColorOption mode = OutputColorOption::NoChange);
 
-  void setColorTexture(const Z3DTexture *colorTex) { m_colorTexture = colorTex; }
-  void setDepthTexture(const Z3DTexture *depthTex) { m_depthTexture = depthTex; }
+  void setColorTexture(const Z3DTexture* colorTex)
+  { m_colorTexture = colorTex; }
+
+  void setDepthTexture(const Z3DTexture* depthTex)
+  { m_depthTexture = depthTex; }
 
   // if true, color with zero alpha value should be discarded, which might save many depth texture lookup. default is false
   // Make sure your color and depth buffer are cleared before if set to true
   // glClear + discard transparent  is usually faster than   not discard transparent if many pixels are empty
-  void setDiscardTransparent(bool v) { m_discardTransparent = v; }
+  void setDiscardTransparent(bool v)
+  { m_discardTransparent = v; }
 
 protected:
   virtual void compile() override;
+
   QString generateHeader() const;
 
   virtual void render(Z3DEye eye) override;
 
 protected:
-  const Z3DTexture *m_colorTexture;
-  const Z3DTexture *m_depthTexture;
+  const Z3DTexture* m_colorTexture;
+  const Z3DTexture* m_depthTexture;
 
   Z3DShaderGroup m_copyTextureShaderGrp;
   bool m_discardTransparent;

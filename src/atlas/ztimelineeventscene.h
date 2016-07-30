@@ -14,19 +14,20 @@
 namespace nim {
 
 class ZTimelineEventScene;
+
 class ZTimelineEventView;
 
 class EventBoundRectItem : public QGraphicsRectItem
 {
 public:
-  EventBoundRectItem(const ZAnimationDisplayPack &pack, ZTimelineWidget &timeline, QGraphicsItem *parent = nullptr);
+  EventBoundRectItem(const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline, QGraphicsItem* parent = nullptr);
 
 protected:
-  virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent *event) override;
+  virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
 
 private:
-  const ZAnimationDisplayPack &m_displayPack;
-  ZTimelineWidget &m_timeline;
+  const ZAnimationDisplayPack& m_displayPack;
+  ZTimelineWidget& m_timeline;
 };
 
 class ZTimelineKeyEditDialog;
@@ -34,69 +35,89 @@ class ZTimelineKeyEditDialog;
 class ParameterKeysItem : public QGraphicsRectItem
 {
 public:
-  enum { Type = UserType + 4 };
-  int type() const override { return Type; }
-  ParameterKeysItem(ZParameterKey &paraKey, ZParameterAnimation &paraAnimation, const ZAnimationDisplayPack &pack,
-                    ZTimelineWidget &timeline, QGraphicsItem *parent);
+  enum
+  {
+    Type = UserType + 4
+  };
+
+  int type() const override
+  { return Type; }
+
+  ParameterKeysItem(ZParameterKey& paraKey, ZParameterAnimation& paraAnimation, const ZAnimationDisplayPack& pack,
+                    ZTimelineWidget& timeline, QGraphicsItem* parent);
 
   void updateValue();
 
-  ZParameterKey& paraKey() { return m_paraKey; }
-  ZParameterAnimation& paraAnimation() { return m_paraAnimation; }
+  ZParameterKey& paraKey()
+  { return m_paraKey; }
+
+  ZParameterAnimation& paraAnimation()
+  { return m_paraAnimation; }
 
 protected:
-  virtual QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
-  virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
-  virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent *event) override;
-  virtual void hoverEnterEvent(QGraphicsSceneHoverEvent *event) override;
-  virtual void mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event) override;
+  virtual QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
+
+  virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
+
+  virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
+
+  virtual void hoverEnterEvent(QGraphicsSceneHoverEvent* event) override;
+
+  virtual void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
 
 private:
-  ZParameterKey &m_paraKey;
-  ZParameterAnimation &m_paraAnimation;
-  const ZAnimationDisplayPack &m_displayPack;
-  ZTimelineWidget &m_timeline;
+  ZParameterKey& m_paraKey;
+  ZParameterAnimation& m_paraAnimation;
+  const ZAnimationDisplayPack& m_displayPack;
+  ZTimelineWidget& m_timeline;
   std::unique_ptr<ZTimelineKeyEditDialog> m_editDialog;
 };
 
 class CurrentTimeLineItem : public QGraphicsLineItem
 {
 public:
-  CurrentTimeLineItem(ZTimelineWidget &timeline, QGraphicsItem * parent = nullptr);
+  CurrentTimeLineItem(ZTimelineWidget& timeline, QGraphicsItem* parent = nullptr);
 
 protected:
-  virtual QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
-  virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
+  virtual QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
 
-  ZTimelineWidget &m_timeline;
+  virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
+
+  ZTimelineWidget& m_timeline;
 };
 
 class ZTimelineEventScene : public QGraphicsScene
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit ZTimelineEventScene(ZTimelineWidget &timeline, ZTimelineEventView *view);
+  explicit ZTimelineEventScene(ZTimelineWidget& timeline, ZTimelineEventView* view);
 
-  void updateKey(ZParameterKey *paraKey);
-  void updateParameterAnimation(ZParameterAnimation *pa);
+  void updateKey(ZParameterKey* paraKey);
+
+  void updateParameterAnimation(ZParameterAnimation* pa);
+
   void updateItems();
+
   void removeSelectedKeys();
 
 protected:
   void resizeRects();
+
   void moveKeys();
+
   void moveCurrentTime();
-  void deleteKeyItem(ZParameterKey *paraKey);
+
+  void deleteKeyItem(ZParameterKey* paraKey);
 
 private:
-  ZTimelineWidget &m_timeline;
-  ZTimelineEventView *m_view;
+  ZTimelineWidget& m_timeline;
+  ZTimelineEventView* m_view;
 
   std::map<EventBoundRectItem*, const ZAnimationDisplayPack*> m_itemToDisplayPack;
-  CurrentTimeLineItem *m_currentTimeItem;
-  std::map<ZParameterKey*,ParameterKeysItem*> m_globalParaKeyToItem;
-  std::map<ZParameterKey*,ParameterKeysItem*> m_ObjKeyToItem;
-  std::map<ZParameterKey*,ParameterKeysItem*> m_ObjParaKeyToItem;
+  CurrentTimeLineItem* m_currentTimeItem;
+  std::map<ZParameterKey*, ParameterKeysItem*> m_globalParaKeyToItem;
+  std::map<ZParameterKey*, ParameterKeysItem*> m_ObjKeyToItem;
+  std::map<ZParameterKey*, ParameterKeysItem*> m_ObjParaKeyToItem;
 };
 
 } // namespace nim

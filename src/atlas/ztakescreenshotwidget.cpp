@@ -12,14 +12,13 @@
 
 namespace nim {
 
-ZTakeScreenShotWidget::ZTakeScreenShotWidget(bool is2D, bool group, QWidget *parent)
+ZTakeScreenShotWidget::ZTakeScreenShotWidget(bool is2D, bool group, QWidget* parent)
   : QScrollArea(parent)
   , m_group(group)
   , m_mode("Mode")
   , m_captureStereoImage("Capture Stereo Image", false)
   , m_stereoImageType("Stereo Image Type")
   , m_useWindowSize("Use Window Size as Image Size", true)
-  // todo: use max texture size?
   , m_customSize("Use Custom Image Size", glm::ivec2(1920, 1080), glm::ivec2(128, 128),
                  glm::ivec2(std::numeric_limits<int>::max(),
                             std::numeric_limits<int>::max()))
@@ -61,8 +60,8 @@ void ZTakeScreenShotWidget::captureButtonPressed()
   QString filepath;
   if (m_useManualName->isChecked()) {
     filepath = QFileDialog::getSaveFileName(
-          this, "Save Capture", m_lastFName, "",
-          NULL/*, QFileDialog::DontUseNativeDialog*/);
+      this, "Save Capture", m_lastFName, "",
+      nullptr/*, QFileDialog::DontUseNativeDialog*/);
     if (!filepath.isEmpty()) {
       m_lastFName = filepath;
     }
@@ -194,11 +193,11 @@ void ZTakeScreenShotWidget::adjustWidget()
 
 void ZTakeScreenShotWidget::createWidget()
 {
-  QVBoxLayout *lo = new QVBoxLayout;
+  QVBoxLayout* lo = new QVBoxLayout;
 
-  QHBoxLayout *hlo = nullptr;
-  QWidget *wg = nullptr;
-  QLabel *label = nullptr;
+  QHBoxLayout* hlo = nullptr;
+  QWidget* wg = nullptr;
+  QLabel* label = nullptr;
 
   if (!m_is2D) {
     hlo = new QHBoxLayout;
@@ -325,14 +324,15 @@ void ZTakeScreenShotWidget::createWidget()
   int right;
   int bottom;
   hlo->getContentsMargins(&left, &top, &right, &bottom);
-  hlo->setContentsMargins(left+20, top, right, bottom);
+  hlo->setContentsMargins(left + 20, top, right, bottom);
   m_folderWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::Directory, "output folder:", QString(),
-                                         QBoxLayout::LeftToRight, QStandardPaths::writableLocation(QStandardPaths::DesktopLocation), this);
+                                         QBoxLayout::LeftToRight,
+                                         QStandardPaths::writableLocation(QStandardPaths::DesktopLocation), this);
   hlo->addWidget(m_folderWidget);
   lo->addLayout(hlo);
 
   hlo = new QHBoxLayout;
-  hlo->setContentsMargins(left+20, top, right, bottom);
+  hlo->setContentsMargins(left + 20, top, right, bottom);
   label = m_namePrefix.createNameLabel();
   label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   label->setMinimumWidth(50);
@@ -356,7 +356,7 @@ void ZTakeScreenShotWidget::createWidget()
 
   m_useAutoName->click();
 
-  QWidget *widget = new QWidget();
+  QWidget* widget = new QWidget();
   if (m_group) {
     m_groupBox = new QGroupBox(tr("capture"), this);
     m_groupBox->setLayout(lo);

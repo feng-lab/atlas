@@ -11,9 +11,9 @@
 
 namespace nim {
 
-ZStyledItemDelegate::ZStyledItemDelegate(QObject *parent)
+ZStyledItemDelegate::ZStyledItemDelegate(QObject* parent)
   : QStyledItemDelegate(parent)
-  //, m_settingIcon(":/icons/settings-512.png")
+//, m_settingIcon(":/icons/settings-512.png")
 {
   setItemEditorFactory(&m_factory);
 

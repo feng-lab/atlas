@@ -118,12 +118,6 @@ void ZBenchTimer::resume()
   m_start = getCpuTicks();
 }
 
-void ZBenchTimer::stopAndLog()
-{
-  stop();
-  LOG(INFO) << *this;
-}
-
 std::ostream& operator<<(std::ostream& s, const ZBenchTimer& m)
 {
   if (m.m_rep == 1) {

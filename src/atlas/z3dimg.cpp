@@ -13,7 +13,7 @@
 
 namespace nim {
 
-Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
+Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent)
   : QObject(parent)
   , m_imgPack(imgPack)
   , m_isVolumeDownsampled(false)
@@ -48,28 +48,30 @@ Z3DImg::Z3DImg(const ZImgPack &imgPack, const glm::vec3 &scale, QObject *parent)
     m_imageBlockSize = imageBlockSize();
     m_imageBlockReadSize = glm::ivec3(510, 510, 30);
     if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 4096) {
-      m_imageCacheNumBlocks = glm::uvec3(32,32,32); // 1G
+      m_imageCacheNumBlocks = glm::uvec3(32, 32, 32); // 1G
       m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 2); // 256*256*64*4*4   64MB
     } else if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 2048) {
-      m_imageCacheNumBlocks = glm::uvec3(32,32,16);
+      m_imageCacheNumBlocks = glm::uvec3(32, 32, 16);
       m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 1); // 256*256*32*4*4   32MB
     } else if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 1024) {
-      m_imageCacheNumBlocks = glm::uvec3(32,32,8);
+      m_imageCacheNumBlocks = glm::uvec3(32, 32, 8);
       m_pageTableCacheNumBlocks = glm::uvec3(4, 4, 2); // 128*128*64*4*4   16MB
     } else {
-      m_imageCacheNumBlocks = glm::uvec3(32,32,4);
+      m_imageCacheNumBlocks = glm::uvec3(32, 32, 4);
       m_pageTableCacheNumBlocks = glm::uvec3(4, 4, 1); // 128*128*32*4*4   8MB
     }
 #endif
 
     m_pageTableCacheSize = glm::ivec3(m_pageTableBlockSize * m_pageTableCacheNumBlocks);
-    m_pageTableCacheTexture.reset(new Z3DTexture(GLint(GL_RGBA32I), glm::uvec3(m_pageTableCacheSize), GL_RGBA_INTEGER, GL_INT));
-    m_pageTableCache.resize(m_pageTableCacheTexture->numPixels(), glm::ivec4(0,0,0,m_unmappedFlag));
+    m_pageTableCacheTexture.reset(
+      new Z3DTexture(GLint(GL_RGBA32I), glm::uvec3(m_pageTableCacheSize), GL_RGBA_INTEGER, GL_INT));
+    m_pageTableCache.resize(m_pageTableCacheTexture->numPixels(), glm::ivec4(0, 0, 0, m_unmappedFlag));
     m_pageTableCacheTexture->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
     m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
 
-    for (size_t c=0; c<m_imgPack.imgInfo().numChannels; ++c) {
-      m_imageCacheTextures.emplace_back(new Z3DTexture(GLint(GL_R8), (m_imageBlockSize+2_u32) * m_imageCacheNumBlocks, GL_RED, GL_UNSIGNED_BYTE));
+    for (size_t c = 0; c < m_imgPack.imgInfo().numChannels; ++c) {
+      m_imageCacheTextures.emplace_back(
+        new Z3DTexture(GLint(GL_R8), (m_imageBlockSize + 2_u32) * m_imageCacheNumBlocks, GL_RED, GL_UNSIGNED_BYTE));
       m_imageCacheTextures[c]->uploadImage();
     }
 
@@ -94,8 +96,8 @@ std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeXSliceVolume(size_t x)
 {
   std::vector<std::unique_ptr<Z3DVolume>> res;
   size_t maxTextureSize = Z3DGpuInfoInstance.maxTextureSize();
-  for (size_t c=0; c<m_nChannels; ++c) {
-    ZImg croped = m_imgPack.crop(ZImgRegion(x,x+1,0,-1,0,-1,c,c+1,0,1));
+  for (size_t c = 0; c < m_nChannels; ++c) {
+    ZImg croped = m_imgPack.crop(ZImgRegion(x, x + 1, 0, -1, 0, -1, c, c + 1, 0, 1));
     croped.infoRef().width = m_imgPack.imgInfo().height;
     croped.infoRef().height = m_imgPack.imgInfo().depth;
     croped.infoRef().depth = 1;
@@ -107,7 +109,7 @@ std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeXSliceVolume(size_t x)
       croped = croped.convertTo<uint8_t>(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
     else
       croped.normalize(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
-    Z3DVolume *vh = new Z3DVolume(croped);
+    Z3DVolume* vh = new Z3DVolume(croped);
     vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
                               m_imgPack.imgInfo().channelColors[c].g / 255.,
                               m_imgPack.imgInfo().channelColors[c].b / 255.));
@@ -120,8 +122,8 @@ std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeYSliceVolume(size_t y)
 {
   std::vector<std::unique_ptr<Z3DVolume>> res;
   size_t maxTextureSize = Z3DGpuInfoInstance.maxTextureSize();
-  for (size_t c=0; c<m_nChannels; ++c) {
-    ZImg croped = m_imgPack.crop(ZImgRegion(0,-1,y,y+1,0,-1,c,c+1,0,1));
+  for (size_t c = 0; c < m_nChannels; ++c) {
+    ZImg croped = m_imgPack.crop(ZImgRegion(0, -1, y, y + 1, 0, -1, c, c + 1, 0, 1));
     croped.infoRef().height = m_imgPack.imgInfo().depth;
     croped.infoRef().depth = 1;
     if (croped.width() > maxTextureSize || croped.height() > maxTextureSize) {
@@ -132,7 +134,7 @@ std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeYSliceVolume(size_t y)
       croped = croped.convertTo<uint8_t>(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
     else
       croped.normalize(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
-    Z3DVolume *vh = new Z3DVolume(croped);
+    Z3DVolume* vh = new Z3DVolume(croped);
     vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
                               m_imgPack.imgInfo().channelColors[c].g / 255.,
                               m_imgPack.imgInfo().channelColors[c].b / 255.));
@@ -145,8 +147,8 @@ std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeZSliceVolume(size_t z)
 {
   std::vector<std::unique_ptr<Z3DVolume>> res;
   size_t maxTextureSize = Z3DGpuInfoInstance.maxTextureSize();
-  for (size_t c=0; c<m_nChannels; ++c) {
-    ZImg croped = m_imgPack.crop(ZImgRegion(0,-1,0,-1,z,z+1,c,c+1,0,1));
+  for (size_t c = 0; c < m_nChannels; ++c) {
+    ZImg croped = m_imgPack.crop(ZImgRegion(0, -1, 0, -1, z, z + 1, c, c + 1, 0, 1));
     if (croped.width() > maxTextureSize || croped.height() > maxTextureSize) {
       croped = croped.resize(std::min(maxTextureSize, croped.width()),
                              std::min(maxTextureSize, croped.height()), 1);
@@ -155,7 +157,7 @@ std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeZSliceVolume(size_t z)
       croped = croped.convertTo<uint8_t>(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
     else
       croped.normalize(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
-    Z3DVolume *vh = new Z3DVolume(croped);
+    Z3DVolume* vh = new Z3DVolume(croped);
     vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
                               m_imgPack.imgInfo().channelColors[c].g / 255.,
                               m_imgPack.imgInfo().channelColors[c].b / 255.));
@@ -178,15 +180,17 @@ std::vector<double> Z3DImg::physicalBoundBox() const
   return res;
 }
 
-void Z3DImg::setScale(const glm::vec3 &scale)
+void Z3DImg::setScale(const glm::vec3& scale)
 {
   if (!m_isVolumeDownsampled) {
     return;
   }
 
-  m_pageTableCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
-  m_imageCacheManager.reset(new Z3DBlockCache<glm::ivec4>(m_imageBlockSize+2_u32, m_imageCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
-  for (size_t c=0; c<m_channelPendingUpdates.size(); ++c) {
+  m_pageTableCacheManager.reset(
+    new Z3DBlockCache<glm::ivec4>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
+  m_imageCacheManager.reset(
+    new Z3DBlockCache<glm::ivec4>(m_imageBlockSize + 2_u32, m_imageCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
+  for (size_t c = 0; c < m_channelPendingUpdates.size(); ++c) {
     m_channelPendingUpdates[c].clear();
   }
 
@@ -206,14 +210,14 @@ void Z3DImg::setScale(const glm::vec3 &scale)
   std::vector<size_t> sortedIndex = argSort(&relativeResolution[0], &relativeResolution[0] + 3);
   std::vector<size_t> stayRounds(3, 0);
   CHECK(relativeResolution[sortedIndex[0]] == 1.0);
-  for (size_t i=1; i<3; ++i) {
+  for (size_t i = 1; i < 3; ++i) {
     double res = relativeResolution[sortedIndex[0]];
     while (true) {
-      if (res*2 < relativeResolution[sortedIndex[i]]) {
+      if (res * 2 < relativeResolution[sortedIndex[i]]) {
         res *= 2;
         ++stayRounds[sortedIndex[i]];
       } else {
-        if ((res*2 - relativeResolution[sortedIndex[i]]) < (relativeResolution[sortedIndex[i]] - res)) {
+        if ((res * 2 - relativeResolution[sortedIndex[i]]) < (relativeResolution[sortedIndex[i]] - res)) {
           ++stayRounds[sortedIndex[i]];
         }
         break;
@@ -229,24 +233,24 @@ void Z3DImg::setScale(const glm::vec3 &scale)
   m_pageDirectoryDimensions.resize(m_numLevels);
   m_posToBlockIDs.resize(m_numLevels);
   m_pageDirectoryBases.resize(m_numLevels);
-  for (size_t l=0; l<m_numLevels; ++l) {
+  for (size_t l = 0; l < m_numLevels; ++l) {
     if (l == 0) {
       m_levelScales[l] = glm::uvec3(1, 1, 1);
     } else {
       if (stayRounds[sortedIndex[2]] > stayRounds[sortedIndex[1]]) {
         --stayRounds[sortedIndex[2]];
-        m_levelScales[l][sortedIndex[2]] = m_levelScales[l-1][sortedIndex[2]];
-        m_levelScales[l][sortedIndex[1]] = m_levelScales[l-1][sortedIndex[1]] * 2;
-        m_levelScales[l][sortedIndex[0]] = m_levelScales[l-1][sortedIndex[0]] * 2;
+        m_levelScales[l][sortedIndex[2]] = m_levelScales[l - 1][sortedIndex[2]];
+        m_levelScales[l][sortedIndex[1]] = m_levelScales[l - 1][sortedIndex[1]] * 2;
+        m_levelScales[l][sortedIndex[0]] = m_levelScales[l - 1][sortedIndex[0]] * 2;
       } else if (stayRounds[sortedIndex[2]] > 0) {
         CHECK(stayRounds[sortedIndex[2]] == stayRounds[sortedIndex[1]]);
         --stayRounds[sortedIndex[2]];
         --stayRounds[sortedIndex[1]];
-        m_levelScales[l][sortedIndex[2]] = m_levelScales[l-1][sortedIndex[2]];
-        m_levelScales[l][sortedIndex[1]] = m_levelScales[l-1][sortedIndex[1]];
-        m_levelScales[l][sortedIndex[0]] = m_levelScales[l-1][sortedIndex[0]] * 2;
+        m_levelScales[l][sortedIndex[2]] = m_levelScales[l - 1][sortedIndex[2]];
+        m_levelScales[l][sortedIndex[1]] = m_levelScales[l - 1][sortedIndex[1]];
+        m_levelScales[l][sortedIndex[0]] = m_levelScales[l - 1][sortedIndex[0]] * 2;
       } else {
-        m_levelScales[l] = m_levelScales[l-1] * 2_u32;
+        m_levelScales[l] = m_levelScales[l - 1] * 2_u32;
       }
     }
     CHECK(m_levelScales[l].x == m_levelScales[l].y);
@@ -254,25 +258,29 @@ void Z3DImg::setScale(const glm::vec3 &scale)
     m_imageDimensions[l] = glm::uvec3((info.width + m_levelScales[l].x - 1) / m_levelScales[l].x,
                                       (info.height + m_levelScales[l].y - 1) / m_levelScales[l].y,
                                       (info.depth + m_levelScales[l].z - 1) / m_levelScales[l].z);
-    m_imageBounds[l] = m_imageDimensions[l]-1_u32;
+    m_imageBounds[l] = m_imageDimensions[l] - 1_u32;
     m_pageTableDimensions[l] = glm::uvec3(m_imageDimensions[l] + m_imageBlockSize - 1_u32) / m_imageBlockSize;
-    m_pageDirectoryDimensions[l] = glm::uvec3(m_pageTableDimensions[l] + m_pageTableBlockSize - 1_u32) / m_pageTableBlockSize;
+    m_pageDirectoryDimensions[l] =
+      glm::uvec3(m_pageTableDimensions[l] + m_pageTableBlockSize - 1_u32) / m_pageTableBlockSize;
 
     // id starts from 1
     m_posToBlockIDs[l] = glm::uvec4(1,
                                     m_pageTableDimensions[l].x,
                                     m_pageTableDimensions[l].x * m_pageTableDimensions[l].y,
-                                    l == 0 ? 1 : (m_posToBlockIDs[l-1].w + m_pageTableDimensions[l-1].x * m_pageTableDimensions[l-1].y * m_pageTableDimensions[l-1].z));
+                                    l == 0 ? 1 : (m_posToBlockIDs[l - 1].w +
+                                                  m_pageTableDimensions[l - 1].x * m_pageTableDimensions[l - 1].y *
+                                                  m_pageTableDimensions[l - 1].z));
     if (l == 0) {
       m_pageDirectoryBases[l] = glm::ivec3(0, 0, 0);
     } else if (l == 1) {
-      m_pageDirectoryBases[l] = m_pageDirectoryBases[l-1];
-      m_pageDirectoryBases[l][sortedIndex[1]] += m_pageDirectoryDimensions[l-1][sortedIndex[1]];
+      m_pageDirectoryBases[l] = m_pageDirectoryBases[l - 1];
+      m_pageDirectoryBases[l][sortedIndex[1]] += m_pageDirectoryDimensions[l - 1][sortedIndex[1]];
     } else {
-      m_pageDirectoryBases[l] = m_pageDirectoryBases[l-1];
-      m_pageDirectoryBases[l][sortedIndex[0]] += m_pageDirectoryDimensions[l-1][sortedIndex[0]];
+      m_pageDirectoryBases[l] = m_pageDirectoryBases[l - 1];
+      m_pageDirectoryBases[l][sortedIndex[0]] += m_pageDirectoryDimensions[l - 1][sortedIndex[0]];
     }
-    m_pageDirectorySize = glm::max(m_pageDirectorySize, m_pageDirectoryBases[l] + glm::ivec3(m_pageDirectoryDimensions[l]));
+    m_pageDirectorySize = glm::max(m_pageDirectorySize,
+                                   m_pageDirectoryBases[l] + glm::ivec3(m_pageDirectoryDimensions[l]));
     if (m_pageDirectorySize.x > Z3DGpuInfoInstance.max3DTextureSize() ||
         m_pageDirectorySize.y > Z3DGpuInfoInstance.max3DTextureSize() ||
         m_pageDirectorySize.z > Z3DGpuInfoInstance.max3DTextureSize()) {
@@ -287,7 +295,8 @@ void Z3DImg::setScale(const glm::vec3 &scale)
   }
 
   // content of RGBA32I texture
-  m_pageDirectoryTexture.reset(new Z3DTexture(GL_TEXTURE_3D, GLint(GL_RGBA32I), glm::uvec3(m_pageDirectorySize), GL_RGBA_INTEGER, GL_INT));
+  m_pageDirectoryTexture.reset(
+    new Z3DTexture(GL_TEXTURE_3D, GLint(GL_RGBA32I), glm::uvec3(m_pageDirectorySize), GL_RGBA_INTEGER, GL_INT));
   m_pageDirectory.resize(m_pageDirectoryTexture->numPixels());
   memset(m_pageDirectory.data(), 0, m_pageDirectory.size() * sizeof(glm::ivec4));
   m_pageDirectoryTexture->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
@@ -298,13 +307,14 @@ void Z3DImg::setScale(const glm::vec3 &scale)
 
   m_voxelWorldDimensions.resize(m_numLevels);
   m_voxelWorldSizes.resize(m_numLevels);
-  for (size_t l=0; l<m_numLevels; ++l) {
+  for (size_t l = 0; l < m_numLevels; ++l) {
     m_voxelWorldDimensions[l] = scale * glm::vec3(m_levelScales[l]);
-    m_voxelWorldSizes[l] = std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y), m_voxelWorldDimensions[l].z);
+    m_voxelWorldSizes[l] = std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y),
+                                    m_voxelWorldDimensions[l].z);
   }
 }
 
-void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram &shader) const
+void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram& shader) const
 {
   shader.bindTexture("page_directory", m_pageDirectoryTexture.get());
   shader.setUniformArray("page_directory_bases", m_pageDirectoryBases.data(), m_numLevels);
@@ -316,7 +326,7 @@ void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram &shader) const
   shader.setUniformArray("pos_to_block_ids", m_posToBlockIDs.data(), m_numLevels);
 }
 
-void Z3DImg::bindFullResRenderShader(Z3DShaderProgram &shader) const
+void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader) const
 {
   shader.bindTexture("page_directory", m_pageDirectoryTexture.get());
   shader.setUniformArray("page_directory_bases", m_pageDirectoryBases.data(), m_numLevels);
@@ -325,15 +335,17 @@ void Z3DImg::bindFullResRenderShader(Z3DShaderProgram &shader) const
   shader.setUniformArray("image_dimensions", m_imageBounds.data(), m_numLevels);
   shader.setUniformArray("voxel_world_sizes", m_voxelWorldSizes.data(), m_numLevels);
   shader.setUniform("image_block_size", glm::ivec3(m_imageBlockSize));
-  shader.setUniform("image_address_to_normalized_texture_coord", 1.f / glm::vec3(m_imageCacheTextures[0]->dimension() * 2_u32));
+  shader.setUniform("image_address_to_normalized_texture_coord",
+                    1.f / glm::vec3(m_imageCacheTextures[0]->dimension() * 2_u32));
 }
 
-void Z3DImg::bindImageCacheToFullResRenderShader(Z3DShaderProgram &shader, size_t c) const
+void Z3DImg::bindImageCacheToFullResRenderShader(Z3DShaderProgram& shader, size_t c) const
 {
   shader.bindTexture("image_cache", m_imageCacheTextures[c].get());
 }
 
-bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t> &missingBlockIDs, const std::set<uint32_t> &usedBlockIDs)
+bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missingBlockIDs,
+                                                const std::set<uint32_t>& usedBlockIDs)
 {
   int numBlocksToRead = int(m_imageCacheManager->size()) - int(usedBlockIDs.size());
   if (missingBlockIDs.empty() || numBlocksToRead <= 0)
@@ -345,7 +357,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t> &missin
   std::set<glm::ivec4, Vec4Compare<int, glm::highp>> usedPageTableKeys;
   size_t level = 0;
   for (uint32_t blockID : usedBlockIDs) {  // blockID must be ordered, can not use unordered_set here
-    while (level+1 < m_numLevels && blockID >= m_posToBlockIDs[level+1].w) {
+    while (level + 1 < m_numLevels && blockID >= m_posToBlockIDs[level + 1].w) {
       ++level;
     }
 
@@ -369,7 +381,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t> &missin
   CHECK(numAvailablePageCacheBlock >= 0);
   for (auto it = missingBlockIDs.begin(); it != missingBlockIDs.end() && count < numBlocksToRead; ++it) {
     uint32_t blockID = *it;
-    while (level+1 < m_numLevels && blockID >= m_posToBlockIDs[level+1].w) {
+    while (level + 1 < m_numLevels && blockID >= m_posToBlockIDs[level + 1].w) {
       ++level;
     }
 
@@ -386,14 +398,15 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t> &missin
     }
     glm::ivec4 pageDirectoryEntryKey = pageTableEntryKey / glm::ivec4(1, m_pageTableBlockSize);
     glm::ivec3 pageDirectoryEntryCoord = m_pageDirectoryBases[pageDirectoryEntryKey.x] + pageDirectoryEntryKey.yzw();
-    glm::ivec4& pageDirectoryEntry = m_pageDirectory[pageDirectoryEntryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
-        pageDirectoryEntryCoord.y * m_pageDirectorySize.x + pageDirectoryEntryCoord.x];
+    glm::ivec4& pageDirectoryEntry = m_pageDirectory[
+      pageDirectoryEntryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
+      pageDirectoryEntryCoord.y * m_pageDirectorySize.x + pageDirectoryEntryCoord.x];
     glm::ivec3 pageTableEntryCoord;
 
     if (pageDirectoryEntry.w > 0) {
       pageTableEntryCoord = pageDirectoryEntry.xyz() + pageTableEntryKey.yzw() % glm::ivec3(m_pageTableBlockSize);
       if (m_pageTableCache[pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-          pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x].w != 0) {
+                           pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x].w != 0) {
         LOG(ERROR) << "missing block is already mapped! " << pageTableEntryKey << " " << pageDirectoryEntryKey;
         continue;
       }
@@ -403,14 +416,18 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t> &missin
     //LOG(INFO) << blockKey << " " << erasedKey << " " << m_posToBlockIDs[level] << " " << blockID << " " << level;
     if (erasedKey.x >= 0) { //valid
       glm::ivec4 erasedKeyPageDirectoryEntryKey = erasedKey / glm::ivec4(1, glm::ivec3(m_pageTableBlockSize));
-      glm::ivec3 erasedKeyPageDirectoryEntryCoord = m_pageDirectoryBases[erasedKeyPageDirectoryEntryKey.x] + erasedKeyPageDirectoryEntryKey.yzw();
-      glm::ivec4& erasedKeyPageDirectoryEntry = m_pageDirectory[erasedKeyPageDirectoryEntryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
-          erasedKeyPageDirectoryEntryCoord.y * m_pageDirectorySize.x + erasedKeyPageDirectoryEntryCoord.x];
+      glm::ivec3 erasedKeyPageDirectoryEntryCoord =
+        m_pageDirectoryBases[erasedKeyPageDirectoryEntryKey.x] + erasedKeyPageDirectoryEntryKey.yzw();
+      glm::ivec4& erasedKeyPageDirectoryEntry = m_pageDirectory[
+        erasedKeyPageDirectoryEntryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
+        erasedKeyPageDirectoryEntryCoord.y * m_pageDirectorySize.x + erasedKeyPageDirectoryEntryCoord.x];
 
       if (erasedKeyPageDirectoryEntry.w > 0) {
-        glm::ivec3 erasedKeyPageTableEntryCoord = erasedKeyPageDirectoryEntry.xyz() + erasedKey.yzw() % glm::ivec3(m_pageTableBlockSize);
-        glm::ivec4& erasedKeyPageTableEntry = m_pageTableCache[erasedKeyPageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-            erasedKeyPageTableEntryCoord.y * m_pageTableCacheSize.x + erasedKeyPageTableEntryCoord.x];
+        glm::ivec3 erasedKeyPageTableEntryCoord =
+          erasedKeyPageDirectoryEntry.xyz() + erasedKey.yzw() % glm::ivec3(m_pageTableBlockSize);
+        glm::ivec4& erasedKeyPageTableEntry = m_pageTableCache[
+          erasedKeyPageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+          erasedKeyPageTableEntryCoord.y * m_pageTableCacheSize.x + erasedKeyPageTableEntryCoord.x];
         if (erasedKeyPageTableEntry.w > 0) {
           erasedKeyPageTableEntry.w = 0;
           --erasedKeyPageDirectoryEntry.w;
@@ -429,24 +446,27 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t> &missin
         pageDirectoryEntry = glm::ivec4(pageTableBlockCachePos, 1);
 
         if (erasedKey.x >= 0) {
-          for (size_t z=0; z<m_pageTableBlockSize.z; ++z) {
-            for (size_t y=0; y<m_pageTableBlockSize.y; ++y) {
-              memset(&m_pageTableCache[(pageTableBlockCachePos.z+z) * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-                  (pageTableBlockCachePos.y+y) * m_pageTableCacheSize.x + pageTableBlockCachePos.x],
-                  0,
-                  m_pageTableBlockSize.x * sizeof(glm::ivec4));
+          for (size_t z = 0; z < m_pageTableBlockSize.z; ++z) {
+            for (size_t y = 0; y < m_pageTableBlockSize.y; ++y) {
+              memset(
+                &m_pageTableCache[(pageTableBlockCachePos.z + z) * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+                                  (pageTableBlockCachePos.y + y) * m_pageTableCacheSize.x + pageTableBlockCachePos.x],
+                0,
+                m_pageTableBlockSize.x * sizeof(glm::ivec4));
             }
           }
 
           glm::ivec3 erasedKeyPageDirectoryEntryCoord = m_pageDirectoryBases[erasedKey.x] + erasedKey.yzw();
-          glm::ivec4& erasedKeyPageDirectoryEntry = m_pageDirectory[erasedKeyPageDirectoryEntryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
-              erasedKeyPageDirectoryEntryCoord.y * m_pageDirectorySize.x + erasedKeyPageDirectoryEntryCoord.x];
+          glm::ivec4& erasedKeyPageDirectoryEntry = m_pageDirectory[
+            erasedKeyPageDirectoryEntryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
+            erasedKeyPageDirectoryEntryCoord.y * m_pageDirectorySize.x + erasedKeyPageDirectoryEntryCoord.x];
           erasedKeyPageDirectoryEntry.w = 0;
         }
 
         pageTableEntryCoord = pageDirectoryEntry.xyz() + pageTableEntryKey.yzw() % glm::ivec3(m_pageTableBlockSize);
-        glm::ivec4& pageTableEntry = m_pageTableCache[pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-            pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
+        glm::ivec4& pageTableEntry = m_pageTableCache[
+          pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+          pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
         pageTableEntry = glm::ivec4(imageBlockCachePos, 1);
         --numAvailablePageCacheBlock;
       } else {
@@ -457,13 +477,14 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t> &missin
     } else { // page directory mapped
       CHECK(pageDirectoryEntry.w > 0);
       m_pageTableCache[pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-          pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x] = glm::ivec4(imageBlockCachePos, 1);
+                       pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x] = glm::ivec4(
+        imageBlockCachePos, 1);
       ++pageDirectoryEntry.w;
     }
 
     glm::ivec4 blockImagePos = pageTableEntryKey * glm::ivec4(1, glm::ivec3(m_imageBlockSize));
     glm::uvec3 blockCachePos = glm::uvec3(imageBlockCachePos);
-    for (size_t c=0; c<m_channelPendingUpdates.size(); ++c) {
+    for (size_t c = 0; c < m_channelPendingUpdates.size(); ++c) {
       m_channelPendingUpdates[c][blockCachePos] = blockImagePos;
     }
     ++count;
@@ -471,7 +492,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t> &missin
   m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
   m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
   //glFinish();
-  bt.stopAndLog();
+  STOP_AND_LOG(bt);
 
   //checkPageSystemError();
 
@@ -486,18 +507,18 @@ void Z3DImg::uploadImageCache(size_t channel)
   ZBenchTimer bt("upload image cache");
   bt.start();
 
-  ZImg img(ZImgInfo(m_imageBlockSize.x+2, m_imageBlockSize.y+2, m_imageBlockSize.z+2, 1));
+  ZImg img(ZImgInfo(m_imageBlockSize.x + 2, m_imageBlockSize.y + 2, m_imageBlockSize.z + 2, 1));
   if (m_imageBlockReadSize == glm::ivec3(m_imageBlockSize)) {
     for (auto it = m_channelPendingUpdates[channel].cbegin(); it != m_channelPendingUpdates[channel].cend(); ++it) {
       const glm::ivec4& blockImagePos = it->second;
       m_imgPack.readRegionToImg(m_levelScales[blockImagePos.x].x, m_levelScales[blockImagePos.x].z,
-          blockImagePos.y-1, blockImagePos.z-1, blockImagePos.w-1, channel, 0, img);
-      m_imageCacheTextures[channel]->uploadSubImage(it->first, m_imageBlockSize+2_u32, img.channelData(0));
+                                blockImagePos.y - 1, blockImagePos.z - 1, blockImagePos.w - 1, channel, 0, img);
+      m_imageCacheTextures[channel]->uploadSubImage(it->first, m_imageBlockSize + 2_u32, img.channelData(0));
       img.fill(0);
     }
   } else {
-    ZImg bigImg(ZImgInfo(m_imageBlockReadSize.x+2, m_imageBlockReadSize.y+2, m_imageBlockReadSize.z+2, 1));
-    std::map<glm::ivec4, std::vector<std::pair<glm::ivec4, glm::uvec3>>, Vec4Compare<int,glm::highp>> bigToSmall;
+    ZImg bigImg(ZImgInfo(m_imageBlockReadSize.x + 2, m_imageBlockReadSize.y + 2, m_imageBlockReadSize.z + 2, 1));
+    std::map<glm::ivec4, std::vector<std::pair<glm::ivec4, glm::uvec3>>, Vec4Compare<int, glm::highp>> bigToSmall;
     glm::ivec4 tmp(1, m_imageBlockReadSize.x, m_imageBlockReadSize.y, m_imageBlockReadSize.z);
     for (auto it = m_channelPendingUpdates[channel].cbegin(); it != m_channelPendingUpdates[channel].cend(); ++it) {
       bigToSmall[it->second / tmp * tmp].push_back(std::make_pair(it->second, it->first));
@@ -505,18 +526,19 @@ void Z3DImg::uploadImageCache(size_t channel)
     for (auto it = bigToSmall.begin(); it != bigToSmall.end(); ++it) {
       // read from it->first level x y z
       m_imgPack.readRegionToImg(m_levelScales[it->first.x].x, m_levelScales[it->first.x].z,
-          it->first.y-1, it->first.z-1, it->first.w-1, channel, 0, bigImg);
-      for (size_t i=0; i<it->second.size(); ++i) {
+                                it->first.y - 1, it->first.z - 1, it->first.w - 1, channel, 0, bigImg);
+      for (size_t i = 0; i < it->second.size(); ++i) {
         glm::ivec3 startCoord = it->first.yzw() - it->second[i].first.yzw();
         img.pasteImg(bigImg, ZVoxelCoordinate(startCoord.x, startCoord.y, startCoord.z));
-        m_imageCacheTextures[channel]->uploadSubImage(it->second[i].second, m_imageBlockSize+2_u32, img.channelData(0));
+        m_imageCacheTextures[channel]->uploadSubImage(it->second[i].second, m_imageBlockSize + 2_u32,
+                                                      img.channelData(0));
       }
       bigImg.fill(0);
     }
   }
   m_channelPendingUpdates[channel].clear();
   //glFinish();
-  bt.stopAndLog();
+  STOP_AND_LOG(bt);
 }
 
 void Z3DImg::readVolumes()
@@ -535,7 +557,8 @@ void Z3DImg::readVolumes()
 #endif
   if (m_nChannels > maxPossibleChannels) {
     QMessageBox::warning(QApplication::activeWindow(), "Too many channels",
-                         QString("Due to hardware limit, only first %1 channels of this image will be shown").arg(maxPossibleChannels));
+                         QString("Due to hardware limit, only first %1 channels of this image will be shown").arg(
+                           maxPossibleChannels));
     m_nChannels = maxPossibleChannels;
   }
 
@@ -556,9 +579,9 @@ void Z3DImg::readVolumes()
     //return;
   }
 
-  ZImg img = m_imgPack.resizedImg(info.width*widthScale,
-                                  info.height*heightScale,
-                                  info.depth*depthScale,
+  ZImg img = m_imgPack.resizedImg(info.width * widthScale,
+                                  info.height * heightScale,
+                                  info.depth * depthScale,
                                   0);
   if (!img.isType<uint8_t>()) {
     img = img.convertTo<uint8_t>(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
@@ -566,23 +589,23 @@ void Z3DImg::readVolumes()
     img.normalize(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
   }
   if (m_nChannels == 1) {
-    Z3DVolume *vh = new Z3DVolume(img,
-                                  glm::vec3(1.f/widthScale, 1.f/heightScale, 1.f/depthScale),
+    Z3DVolume* vh = new Z3DVolume(img,
+                                  glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale),
                                   glm::vec3(.0));
 
     m_volumes.emplace_back(vh);
   } else {
-    for (size_t i=0; i<m_nChannels; i++) {
-      ZImg cImg = img.crop(ZImgRegion(0,-1,0,-1,0,-1,i,i+1));
-      Z3DVolume *vh = new Z3DVolume(cImg,
-                                    glm::vec3(1.f/widthScale, 1.f/heightScale, 1.f/depthScale),
+    for (size_t i = 0; i < m_nChannels; i++) {
+      ZImg cImg = img.crop(ZImgRegion(0, -1, 0, -1, 0, -1, i, i + 1));
+      Z3DVolume* vh = new Z3DVolume(cImg,
+                                    glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale),
                                     glm::vec3(.0));
 
       m_volumes.emplace_back(vh);
     } //for each cannel
   }
 
-  for (size_t i=0; i<m_nChannels; i++) {
+  for (size_t i = 0; i < m_nChannels; i++) {
     m_volumes[i]->setVolColor(glm::vec3(info.channelColors[i].r / 255.,
                                         info.channelColors[i].g / 255.,
                                         info.channelColors[i].b / 255.));
@@ -591,7 +614,7 @@ void Z3DImg::readVolumes()
 
 void Z3DImg::checkPageSystemError()
 {
-  for (size_t i=0; i<m_pageDirectory.size(); ++i) {
+  for (size_t i = 0; i < m_pageDirectory.size(); ++i) {
     if (m_pageDirectory[i].w == 0) {
       continue;
     }
@@ -606,7 +629,7 @@ void Z3DImg::checkPageSystemError()
 
     size_t level = 100000;
 
-    for (size_t l=0; l<m_numLevels; ++l) {
+    for (size_t l = 0; l < m_numLevels; ++l) {
       if (glm::all(glm::greaterThanEqual(pdLoc, m_pageDirectoryBases[l])) &&
           glm::all(glm::lessThan(pdLoc, m_pageDirectoryBases[l] + glm::ivec3(m_pageDirectoryDimensions[l])))) {
         level = l;
@@ -620,22 +643,23 @@ void Z3DImg::checkPageSystemError()
     glm::ivec4 pageTableKey(level, pdLoc);
     CHECK(m_pageTableCacheManager->exists(pageTableKey));
     CHECK(m_pageTableCacheManager->get(pageTableKey) == m_pageDirectory[i].xyz());
-    CHECK(glm::all(glm::greaterThanEqual(m_pageDirectory[i].xyz(), glm::ivec3(0,0,0))) &&
-           glm::all(glm::lessThan(m_pageDirectory[i].xyz(), m_pageTableCacheSize)));
+    CHECK(glm::all(glm::greaterThanEqual(m_pageDirectory[i].xyz(), glm::ivec3(0, 0, 0))) &&
+          glm::all(glm::lessThan(m_pageDirectory[i].xyz(), m_pageTableCacheSize)));
 
     int numValidEntry = 0;
-    for (size_t z=0; z<m_pageTableBlockSize.z; ++z) {
-      for (size_t y=0; y<m_pageTableBlockSize.y; ++y) {
-        for (size_t x=0; x<m_pageTableBlockSize.x; ++x) {
-          glm::ivec4 pageTableEntry = m_pageTableCache[(m_pageDirectory[i].z + z) * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-              (m_pageDirectory[i].y + y) * m_pageTableCacheSize.x + m_pageDirectory[i].x + x];
+    for (size_t z = 0; z < m_pageTableBlockSize.z; ++z) {
+      for (size_t y = 0; y < m_pageTableBlockSize.y; ++y) {
+        for (size_t x = 0; x < m_pageTableBlockSize.x; ++x) {
+          glm::ivec4 pageTableEntry = m_pageTableCache[
+            (m_pageDirectory[i].z + z) * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+            (m_pageDirectory[i].y + y) * m_pageTableCacheSize.x + m_pageDirectory[i].x + x];
           if (pageTableEntry.w > 0) {
             ++numValidEntry;
-            glm::ivec4 imageCacheKey(level, glm::ivec3(x,y,z) + pdLoc * glm::ivec3(m_pageTableBlockSize));
+            glm::ivec4 imageCacheKey(level, glm::ivec3(x, y, z) + pdLoc * glm::ivec3(m_pageTableBlockSize));
             CHECK(m_imageCacheManager->exists(imageCacheKey));
             CHECK(m_imageCacheManager->get(imageCacheKey) == pageTableEntry.xyz());
-            CHECK(glm::all(glm::greaterThanEqual(pageTableEntry.xyz(), glm::ivec3(0,0,0))) &&
-                   glm::all(glm::lessThan(pageTableEntry.xyz(), glm::ivec3(m_imageCacheTextures[0]->dimension()))));
+            CHECK(glm::all(glm::greaterThanEqual(pageTableEntry.xyz(), glm::ivec3(0, 0, 0))) &&
+                  glm::all(glm::lessThan(pageTableEntry.xyz(), glm::ivec3(m_imageCacheTextures[0]->dimension()))));
           }
         }
       }

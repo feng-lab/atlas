@@ -17,26 +17,34 @@ class ZDoubleSpanParameter;
 
 class ZImgFilter : public ZObjFilter
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  ZImgFilter(ZView &view);
+  ZImgFilter(ZView& view);
 
-  void setData(ZImgPack &pack);
+  void setData(ZImgPack& pack);
 
   void releaseItemsOwnership();
 
-  void setVisible(bool v) { m_visible.set(v); }
-  void setSelected(bool v) { Q_UNUSED(v) }
-  void setNormalView(int z, int t) override;
-  void setMaxZProjView(int t) override;
-  void setViewport(const QRectF &rect, double scale) override;
+  void setVisible(bool v)
+  { m_visible.set(v); }
 
-  inline bool isVisible() const { return m_isVisible; }
+  void setSelected(bool v)
+  { Q_UNUSED(v) }
+
+  void setNormalView(int z, int t) override;
+
+  void setMaxZProjView(int t) override;
+
+  void setViewport(const QRectF& rect, double scale) override;
+
+  inline bool isVisible() const
+  { return m_isVisible; }
 
   std::vector<int> boundBox() const;
 
   // location within img, can be out of img range
   int imgSlice() const;
+
   int imgTime() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
@@ -48,17 +56,25 @@ protected:
 
 private:
   void channelVisibleChanged();
+
   void channelRangeChanged();
+
   void channelColorChanged();
+
   void opacityChanged();
+
   void visibleChanged();
 
   ZImgPackDisplay* getDisplay() const;
+
   void hideImgItems();
+
   void destroyImgItems();
+
   void updateImgItems();
 
   double getLowerChannelRange(size_t c) const;
+
   double getUpperChannelRange(size_t c) const;
 
 private:
@@ -80,7 +96,7 @@ private:
   mutable std::unique_ptr<ZImgPackDisplay> m_maxZProjDisplay;
   bool m_displayValid;
 
-  ZImgPackDisplay *m_lastDisplay;
+  ZImgPackDisplay* m_lastDisplay;
   int m_lastSlice;
   int m_lastTime;
   double m_lastScale;

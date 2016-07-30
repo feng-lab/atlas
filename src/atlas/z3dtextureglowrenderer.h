@@ -9,27 +9,38 @@ namespace nim {
 
 class Z3DTextureGlowRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit Z3DTextureGlowRenderer(Z3DRendererBase &rendererBase);
+  explicit Z3DTextureGlowRenderer(Z3DRendererBase& rendererBase);
 
-  void setColorTexture(const Z3DTexture *colorTex) { m_colorTexture = colorTex; }
-  void setDepthTexture(const Z3DTexture *depthTex) { m_depthTexture = depthTex; }
+  void setColorTexture(const Z3DTexture* colorTex)
+  { m_colorTexture = colorTex; }
 
-  ZStringStringOptionParameter& glowModePara() { return m_glowMode; }
-  ZIntParameter& blurRadiusPara() { return m_blurRadius; }
-  ZFloatParameter& blurScalePara() { return m_blurScale; }
-  ZFloatParameter& blurStrengthPara() { return m_blurStrength; }
+  void setDepthTexture(const Z3DTexture* depthTex)
+  { m_depthTexture = depthTex; }
+
+  ZStringStringOptionParameter& glowModePara()
+  { return m_glowMode; }
+
+  ZIntParameter& blurRadiusPara()
+  { return m_blurRadius; }
+
+  ZFloatParameter& blurScalePara()
+  { return m_blurScale; }
+
+  ZFloatParameter& blurStrengthPara()
+  { return m_blurStrength; }
 
 protected:
   virtual void compile() override;
+
   QString generateHeader();
 
   virtual void render(Z3DEye eye) override;
 
 protected:
-  const Z3DTexture *m_colorTexture = nullptr;
-  const Z3DTexture *m_depthTexture = nullptr;
+  const Z3DTexture* m_colorTexture = nullptr;
+  const Z3DTexture* m_depthTexture = nullptr;
 
   Z3DRenderTarget m_blurXTarget;
   Z3DRenderTarget m_blurYTarget;

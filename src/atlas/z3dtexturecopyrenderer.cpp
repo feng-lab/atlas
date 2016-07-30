@@ -5,7 +5,7 @@
 
 namespace nim {
 
-Z3DTextureCopyRenderer::Z3DTextureCopyRenderer(Z3DRendererBase &rendererBase, OutputColorOption mode)
+Z3DTextureCopyRenderer::Z3DTextureCopyRenderer(Z3DRendererBase& rendererBase, OutputColorOption mode)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_copyTextureShaderGrp(rendererBase)
   , m_discardTransparent(false)
@@ -42,7 +42,7 @@ void Z3DTextureCopyRenderer::render(Z3DEye eye)
     return;
 
   m_copyTextureShaderGrp.bind();
-  Z3DShaderProgram &shader = m_copyTextureShaderGrp.get();
+  Z3DShaderProgram& shader = m_copyTextureShaderGrp.get();
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   shader.setUniform("discard_transparent", m_discardTransparent);
 

@@ -10,13 +10,13 @@
 
 namespace nim {
 
-ZAnalysisWorklistModel::ZAnalysisWorklistModel(QObject *parent)
+ZAnalysisWorklistModel::ZAnalysisWorklistModel(QObject* parent)
   : QAbstractTableModel(parent)
 {
   reset();
 }
 
-ZAnalysisWorklistModel::ZAnalysisWorklistModel(const QString &filename, QObject *parent)
+ZAnalysisWorklistModel::ZAnalysisWorklistModel(const QString& filename, QObject* parent)
   : QAbstractTableModel(parent)
 {
   setSource(filename);
@@ -26,7 +26,7 @@ ZAnalysisWorklistModel::~ZAnalysisWorklistModel()
 {
 }
 
-QString ZAnalysisWorklistModel::setSource(const QString &filename, QTextCodec *codec)
+QString ZAnalysisWorklistModel::setSource(const QString& filename, QTextCodec* codec)
 {
   QStringList res;
   beginResetModel();
@@ -116,9 +116,9 @@ QString ZAnalysisWorklistModel::setSource(const QString &filename, QTextCodec *c
   }
 
   size_t row = 0;
-  for (QList<ZAnalysisTextFileInput>::iterator it=m_inputs.begin();
+  for (QList<ZAnalysisTextFileInput>::iterator it = m_inputs.begin();
        it != m_inputs.end(); ++it) {
-    ZAnalysisTextFileInput &input = *it;
+    ZAnalysisTextFileInput& input = *it;
     m_rowToInput[row++] = &input;
   }
   m_rowCount += m_inputs.size();
@@ -128,13 +128,13 @@ QString ZAnalysisWorklistModel::setSource(const QString &filename, QTextCodec *c
   return res.join("\n");
 }
 
-QString ZAnalysisWorklistModel::toCSV(const QString filename, bool withHeader, QChar separator, QTextCodec *codec) const
+QString ZAnalysisWorklistModel::toCSV(const QString filename, bool withHeader, QChar separator, QTextCodec* codec) const
 {
   QtCSV::VariantData vd;
   if (withHeader) {
     vd.addRow(m_header);
   }
-  for(size_t row = 0; row < static_cast<size_t>(rowCount()); ++row) {
+  for (size_t row = 0; row < static_cast<size_t>(rowCount()); ++row) {
     std::map<size_t, ZAnalysisTextFileInput*>::const_iterator it = m_rowToInput.find(row);
     if (it != m_rowToInput.end()) {
       const ZAnalysisTextFileInput* input = it->second;
@@ -156,7 +156,8 @@ QString ZAnalysisWorklistModel::toCSV(const QString filename, bool withHeader, Q
       vd.addRow(values);
     }
   }
-  if (!QtCSV::Writer::write(filename, vd, separator, QString(""), QtCSV::Writer::REWRITE, QStringList(), QStringList(), codec)) {
+  if (!QtCSV::Writer::write(filename, vd, separator, QString(""), QtCSV::Writer::REWRITE, QStringList(), QStringList(),
+                            codec)) {
     return QString("Can not write csv to file (%1).").arg(filename);
   } else {
     return QString();
@@ -177,125 +178,125 @@ int ZAnalysisWorklistModel::columnCount(const QModelIndex& parent) const
 
 QVariant ZAnalysisWorklistModel::data(const QModelIndex& index, int role) const
 {
-  if(index.parent() != QModelIndex()) return QVariant();
-  if(role == Qt::DisplayRole || role == Qt::EditRole || role == Qt::UserRole) {
-    if(index.row() < 0 || index.column() < 0 ||
-       m_rowToInput.find(index.row()) == m_rowToInput.end() ||
-       index.column() >= columnCount())
+  if (index.parent() != QModelIndex()) return QVariant();
+  if (role == Qt::DisplayRole || role == Qt::EditRole || role == Qt::UserRole) {
+    if (index.row() < 0 || index.column() < 0 ||
+        m_rowToInput.find(index.row()) == m_rowToInput.end() ||
+        index.column() >= columnCount())
       return QVariant();
     std::map<size_t, ZAnalysisTextFileInput*>::const_iterator it = m_rowToInput.find(index.row());
     const ZAnalysisTextFileInput* input = it->second;
     switch (index.column()) {
-    case 0:
-      return input->imgFilename;
-      break;
-    case 1:
-      return input->swcFilename;
-      break;
-    case 2:
-      return input->punctaFilename;
-      break;
-    case 3:
-      return input->voxelSizeX;
-      break;
-    case 4:
-      return input->voxelSizeY;
-      break;
-    case 5:
-      return input->voxelSizeZ;
-      break;
-    case 6:
-      return input->dendriteChannel;
-      break;
-    case 7:
-      return input->axonChannel;
-      break;
-    case 8:
-      return input->maxDistToBranch;
-      break;
-    case 9:
-      return input->bluenessExtend;
-      break;
-    case 10:
-      return input->outputFolder;
-      break;
-    case 11:
-      return input->doPyramidalFunctionalSeparation ? "yes" : "no";
-      break;
-    case 12:
-      return input->doPyramidalSubclassSeparation ? "yes" : "no";
-      break;
-    case 13:
-      return input->somaPunctaFilename;
-      break;
-    default:
-      break;
+      case 0:
+        return input->imgFilename;
+        break;
+      case 1:
+        return input->swcFilename;
+        break;
+      case 2:
+        return input->punctaFilename;
+        break;
+      case 3:
+        return input->voxelSizeX;
+        break;
+      case 4:
+        return input->voxelSizeY;
+        break;
+      case 5:
+        return input->voxelSizeZ;
+        break;
+      case 6:
+        return input->dendriteChannel;
+        break;
+      case 7:
+        return input->axonChannel;
+        break;
+      case 8:
+        return input->maxDistToBranch;
+        break;
+      case 9:
+        return input->bluenessExtend;
+        break;
+      case 10:
+        return input->outputFolder;
+        break;
+      case 11:
+        return input->doPyramidalFunctionalSeparation ? "yes" : "no";
+        break;
+      case 12:
+        return input->doPyramidalSubclassSeparation ? "yes" : "no";
+        break;
+      case 13:
+        return input->somaPunctaFilename;
+        break;
+      default:
+        break;
     }
   }
   return QVariant();
 }
 
-bool ZAnalysisWorklistModel::setData(const QModelIndex &index, const QVariant &data, int role)
+bool ZAnalysisWorklistModel::setData(const QModelIndex& index, const QVariant& data, int role)
 {
   if (index.parent() != QModelIndex()) return false;
 
-  if(role == Qt::DisplayRole || role == Qt::EditRole || role == Qt::UserRole) {
+  if (role == Qt::DisplayRole || role == Qt::EditRole || role == Qt::UserRole) {
     if (index.row() >= rowCount() || index.column() >= columnCount() || index.row() < 0 || index.column() < 0)
       return false;
     ZAnalysisTextFileInput* input = nullptr;
     if (m_rowToInput.find(index.row()) == m_rowToInput.end()) {
       m_inputs.push_back(ZAnalysisTextFileInput());
-      input = &(m_inputs[m_inputs.size()-1]);
+      input = &(m_inputs[m_inputs.size() - 1]);
       m_rowToInput[index.row()] = input;
     } else {
       input = m_rowToInput[index.row()];
     }
 
     switch (index.column()) {
-    case 0:
-      input->imgFilename = data.toString();
-      break;
-    case 1:
-      input->swcFilename = data.toString();
-      break;
-    case 2:
-      input->punctaFilename = data.toString();
-      break;
-    case 3:
-      input->voxelSizeX = data.toDouble();
-      break;
-    case 4:
-      input->voxelSizeY = data.toDouble();
-      break;
-    case 5:
-      input->voxelSizeZ = data.toDouble();
-      break;
-    case 6:
-      input->dendriteChannel = data.toInt();
-      break;
-    case 7:
-      input->axonChannel = data.toInt();
-      break;
-    case 8:
-      input->maxDistToBranch = data.toDouble();
-      break;
-    case 9:
-      input->bluenessExtend = data.toDouble();
-      break;
-    case 10:
-      input->outputFolder = data.toString();
-      break;
-    case 11:
-      input->doPyramidalFunctionalSeparation = data.toString().compare("yes", Qt::CaseInsensitive) == 0;
-      break;
-    case 12:
-      input->doPyramidalSubclassSeparation = data.toString().compare("yes", Qt::CaseInsensitive) == 0;
-      break;
-    case 13:
-      input->somaPunctaFilename = data.toString();
-      break;
-    default:
-      break;
+      case 0:
+        input->imgFilename = data.toString();
+        break;
+      case 1:
+        input->swcFilename = data.toString();
+        break;
+      case 2:
+        input->punctaFilename = data.toString();
+        break;
+      case 3:
+        input->voxelSizeX = data.toDouble();
+        break;
+      case 4:
+        input->voxelSizeY = data.toDouble();
+        break;
+      case 5:
+        input->voxelSizeZ = data.toDouble();
+        break;
+      case 6:
+        input->dendriteChannel = data.toInt();
+        break;
+      case 7:
+        input->axonChannel = data.toInt();
+        break;
+      case 8:
+        input->maxDistToBranch = data.toDouble();
+        break;
+      case 9:
+        input->bluenessExtend = data.toDouble();
+        break;
+      case 10:
+        input->outputFolder = data.toString();
+        break;
+      case 11:
+        input->doPyramidalFunctionalSeparation = data.toString().compare("yes", Qt::CaseInsensitive) == 0;
+        break;
+      case 12:
+        input->doPyramidalSubclassSeparation = data.toString().compare("yes", Qt::CaseInsensitive) == 0;
+        break;
+      case 13:
+        input->somaPunctaFilename = data.toString();
+        break;
+      default:
+        break;
     }
 
     emit dataChanged(index, index);
@@ -306,13 +307,14 @@ bool ZAnalysisWorklistModel::setData(const QModelIndex &index, const QVariant &d
 
 QVariant ZAnalysisWorklistModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
-  if(section < m_header.count() && orientation == Qt::Horizontal && (role == Qt::DisplayRole || role == Qt::EditRole || role == Qt::UserRole))
+  if (section < m_header.count() && orientation == Qt::Horizontal &&
+      (role == Qt::DisplayRole || role == Qt::EditRole || role == Qt::UserRole))
     return m_header[section];
   else
     return QAbstractTableModel::headerData(section, orientation, role);
 }
 
-Qt::ItemFlags ZAnalysisWorklistModel::flags(const QModelIndex &index) const
+Qt::ItemFlags ZAnalysisWorklistModel::flags(const QModelIndex& index) const
 {
   return Qt::ItemIsEditable | Qt::ItemIsDropEnabled | QAbstractTableModel::flags(index);
 }
@@ -322,7 +324,7 @@ void ZAnalysisWorklistModel::reset()
   m_header.clear();
   m_header << "# imageName" << "swcName" << "punctaName" << "voxelSizeXInUm" << "voxelSizeYInUm"
            << "voxelSizeZInUm" << "dendriteChannel" << "axonChannel(can be empty)"
-           << "maxDistToBranch"  << "bluenessExtend" << "outputFolder(can be empty)"
+           << "maxDistToBranch" << "bluenessExtend" << "outputFolder(can be empty)"
            << "doPyramidalFunctionalSeparation(yes or no)" << "doPyramidalSubclassSeparation(yes or no)"
            << "somaPunctaName";
   m_inputs.clear();
@@ -342,8 +344,8 @@ Qt::DropActions ZAnalysisWorklistModel::supportedDropActions() const
   return Qt::MoveAction | Qt::CopyAction | Qt::LinkAction;
 }
 
-bool ZAnalysisWorklistModel::dropMimeData(const QMimeData *data, Qt::DropAction action,
-                                          int row, int column, const QModelIndex &parent)
+bool ZAnalysisWorklistModel::dropMimeData(const QMimeData* data, Qt::DropAction action,
+                                          int row, int column, const QModelIndex& parent)
 {
   Q_UNUSED(row)
   Q_UNUSED(column)
@@ -372,7 +374,6 @@ bool ZAnalysisWorklistModel::dropMimeData(const QMimeData *data, Qt::DropAction 
 
   return true;
 }
-
 
 
 } // namespace nim

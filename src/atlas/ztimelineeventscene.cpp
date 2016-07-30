@@ -20,14 +20,15 @@
 
 namespace nim {
 
-EventBoundRectItem::EventBoundRectItem(const ZAnimationDisplayPack &pack, ZTimelineWidget &timeline, QGraphicsItem *parent)
+EventBoundRectItem::EventBoundRectItem(const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline,
+                                       QGraphicsItem* parent)
   : QGraphicsRectItem(parent)
   , m_displayPack(pack)
   , m_timeline(timeline)
 {
 }
 
-void EventBoundRectItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
+void EventBoundRectItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
   if (m_displayPack.type == ZAnimationDisplayPack::Type::Object)
     return;
@@ -37,8 +38,8 @@ void EventBoundRectItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
     time = 0;
   QMenu menu;
   //QAction *addKeyAction = menu.addAction("Add Key...");
-  QAction *addKeyHereAction = menu.addAction("Add Key Here");
-  QAction *selectedAction = menu.exec(event->screenPos());
+  QAction* addKeyHereAction = menu.addAction("Add Key Here");
+  QAction* selectedAction = menu.exec(event->screenPos());
   /*if (selectedAction == addKeyAction) {
     ZParameterKey *key = m_displayPack.paraAnimation->createKey(time);
     ZTimelineKeyEditDialog dlg(*m_displayPack.paraAnimation, *key, &m_timeline);
@@ -53,8 +54,9 @@ void EventBoundRectItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
   }
 }
 
-ParameterKeysItem::ParameterKeysItem(ZParameterKey &paraKey, ZParameterAnimation &paraAnimation, const ZAnimationDisplayPack &pack,
-                                     ZTimelineWidget &timeline, QGraphicsItem *parent)
+ParameterKeysItem::ParameterKeysItem(ZParameterKey& paraKey, ZParameterAnimation& paraAnimation,
+                                     const ZAnimationDisplayPack& pack,
+                                     ZTimelineWidget& timeline, QGraphicsItem* parent)
   : QGraphicsRectItem(parent)
   , m_paraKey(paraKey)
   , m_paraAnimation(paraAnimation)
@@ -68,7 +70,7 @@ ParameterKeysItem::ParameterKeysItem(ZParameterKey &paraKey, ZParameterAnimation
     setFlags(QGraphicsItem::ItemIsSelectable);
   }
   setPos(m_timeline.timeToX(m_paraKey.time()), 0);
-  setRect(-5, 5, 10, m_timeline.rowHeight()-10);
+  setRect(-5, 5, 10, m_timeline.rowHeight() - 10);
   setAcceptHoverEvents(true);
 }
 
@@ -79,7 +81,7 @@ void ParameterKeysItem::updateValue()
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
 
-QVariant ParameterKeysItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)
+QVariant ParameterKeysItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
 {
   if (change == ItemPositionChange) {
     double time = m_timeline.xToTime(value.toPointF().x());
@@ -89,7 +91,7 @@ QVariant ParameterKeysItem::itemChange(QGraphicsItem::GraphicsItemChange change,
   return QGraphicsRectItem::itemChange(change, value);
 }
 
-void ParameterKeysItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void ParameterKeysItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*)
 {
   painter->setRenderHint(QPainter::Antialiasing);
   QPen pen(m_paraAnimation.color());
@@ -98,7 +100,7 @@ void ParameterKeysItem::paint(QPainter *painter, const QStyleOptionGraphicsItem 
     pen.setStyle(Qt::DashLine);
     painter->setPen(pen);
     QRectF rct = this->rect();
-    rct.adjust(-2,-2,2,2);
+    rct.adjust(-2, -2, 2, 2);
     painter->drawRect(rct);
     pen.setStyle(Qt::SolidLine);
   }
@@ -108,17 +110,18 @@ void ParameterKeysItem::paint(QPainter *painter, const QStyleOptionGraphicsItem 
   painter->setRenderHint(QPainter::Antialiasing, false);
 }
 
-void ParameterKeysItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
+void ParameterKeysItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
   event->accept();
 }
 
-void ParameterKeysItem::hoverEnterEvent(QGraphicsSceneHoverEvent *)
+void ParameterKeysItem::hoverEnterEvent(QGraphicsSceneHoverEvent*)
 {
-  setToolTip(QString("Parameter:%1\n%2Object:%3").arg(m_paraAnimation.name()).arg(m_paraKey.info()).arg(m_displayPack.objInfo));
+  setToolTip(
+    QString("Parameter:%1\n%2Object:%3").arg(m_paraAnimation.name()).arg(m_paraKey.info()).arg(m_displayPack.objInfo));
 }
 
-void ParameterKeysItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *)
+void ParameterKeysItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent*)
 {
   if (m_paraAnimation.boundParameter()) {
     if (!m_editDialog)
@@ -129,16 +132,16 @@ void ParameterKeysItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *)
   }
 }
 
-CurrentTimeLineItem::CurrentTimeLineItem(ZTimelineWidget &timeline, QGraphicsItem *parent)
+CurrentTimeLineItem::CurrentTimeLineItem(ZTimelineWidget& timeline, QGraphicsItem* parent)
   : QGraphicsLineItem(parent)
   , m_timeline(timeline)
 {
   setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable);
-  QPen pen(QColor(25,147,255));
+  QPen pen(QColor(25, 147, 255));
   setPen(pen);
 }
 
-QVariant CurrentTimeLineItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)
+QVariant CurrentTimeLineItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
 {
   if (change == ItemPositionChange) {
     double time = m_timeline.xToTime(value.toPointF().x());
@@ -148,14 +151,14 @@ QVariant CurrentTimeLineItem::itemChange(QGraphicsItem::GraphicsItemChange chang
   return QGraphicsLineItem::itemChange(change, value);
 }
 
-void CurrentTimeLineItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
+void CurrentTimeLineItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
   painter->setRenderHint(QPainter::Antialiasing);
   QGraphicsLineItem::paint(painter, option, widget);
   painter->setRenderHint(QPainter::Antialiasing, false);
 }
 
-ZTimelineEventScene::ZTimelineEventScene(ZTimelineWidget &timeline, ZTimelineEventView *view)
+ZTimelineEventScene::ZTimelineEventScene(ZTimelineWidget& timeline, ZTimelineEventView* view)
   : QGraphicsScene(view)
   , m_timeline(timeline)
   , m_view(view)
@@ -176,9 +179,9 @@ ZTimelineEventScene::ZTimelineEventScene(ZTimelineWidget &timeline, ZTimelineEve
           this, &ZTimelineEventScene::updateParameterAnimation);
 }
 
-void ZTimelineEventScene::updateKey(ZParameterKey *paraKey)
+void ZTimelineEventScene::updateKey(ZParameterKey* paraKey)
 {
-  std::map<ZParameterKey*,ParameterKeysItem*>::iterator it = m_globalParaKeyToItem.find(paraKey);
+  std::map<ZParameterKey*, ParameterKeysItem*>::iterator it = m_globalParaKeyToItem.find(paraKey);
   if (it != m_globalParaKeyToItem.end()) {
     it->second->updateValue();
     return;
@@ -193,10 +196,10 @@ void ZTimelineEventScene::updateKey(ZParameterKey *paraKey)
   }
 }
 
-void ZTimelineEventScene::updateParameterAnimation(ZParameterAnimation *pa)
+void ZTimelineEventScene::updateParameterAnimation(ZParameterAnimation* pa)
 {
   const auto& keys = pa->keys();
-  for (size_t i=0; i<keys.size(); ++i) {
+  for (size_t i = 0; i < keys.size(); ++i) {
     updateKey(keys[i].get());
   }
 }
@@ -206,7 +209,8 @@ void ZTimelineEventScene::updateItems()
   //ZBenchTimer bt;
   //bt.start();
   const auto& dps = m_timeline.animation().displayPacks();
-  int height = (dps.size() + 2) * m_timeline.rowHeight() - m_view->horizontalScrollBar()->height();  // leave space for horizonal scrollbar
+  int height = (dps.size() + 2) * m_timeline.rowHeight() -
+               m_view->horizontalScrollBar()->height();  // leave space for horizonal scrollbar
   setSceneRect(0, 0, m_timeline.eventViewWidth() - m_view->verticalScrollBar()->width(), height);
   this->clear();
   m_itemToDisplayPack.clear();
@@ -214,35 +218,36 @@ void ZTimelineEventScene::updateItems()
   m_ObjKeyToItem.clear();
   m_ObjParaKeyToItem.clear();
 
-  for (size_t dpi=0; dpi<dps.size(); ++dpi) {
-    const ZAnimationDisplayPack &pack = dps[dpi];
+  for (size_t dpi = 0; dpi < dps.size(); ++dpi) {
+    const ZAnimationDisplayPack& pack = dps[dpi];
     if (pack.type == ZAnimationDisplayPack::Type::GlobalPara) {
       EventBoundRectItem* rect = new EventBoundRectItem(pack, m_timeline);
-      rect->setRect(-1, 0, m_timeline.eventViewWidth()+2, m_timeline.rowHeight());
-      rect->setPen(QPen(QColor(133,133,133)));
-      rect->setBrush(QBrush(QColor(235+20,235+20,235+20)));
+      rect->setRect(-1, 0, m_timeline.eventViewWidth() + 2, m_timeline.rowHeight());
+      rect->setPen(QPen(QColor(133, 133, 133)));
+      rect->setBrush(QBrush(QColor(235 + 20, 235 + 20, 235 + 20)));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
 
       const auto& keys = pack.paraAnimation->keys();
-      for (size_t i=0; i<keys.size(); ++i) {
-        m_globalParaKeyToItem[keys[i].get()] = new ParameterKeysItem(*keys[i], *pack.paraAnimation, pack, m_timeline, rect);
+      for (size_t i = 0; i < keys.size(); ++i) {
+        m_globalParaKeyToItem[keys[i].get()] = new ParameterKeysItem(*keys[i], *pack.paraAnimation, pack, m_timeline,
+                                                                     rect);
       }
 
       addItem(rect);
       m_itemToDisplayPack[rect] = &pack;
     } else if (pack.type == ZAnimationDisplayPack::Type::Object) {
       EventBoundRectItem* rect = new EventBoundRectItem(pack, m_timeline);
-      rect->setRect(-1, 0, m_timeline.eventViewWidth()+2, m_timeline.rowHeight());
-      rect->setPen(QPen(QColor(133,133,133)));
-      rect->setBrush(QBrush(QColor(220+20,220+20,220+20)));
+      rect->setRect(-1, 0, m_timeline.eventViewWidth() + 2, m_timeline.rowHeight());
+      rect->setPen(QPen(QColor(133, 133, 133)));
+      rect->setBrush(QBrush(QColor(220 + 20, 220 + 20, 220 + 20)));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
 
       const auto& paraAnimationList = m_timeline.animation().paraAnimationList(pack.id);
-      for (size_t j=0; j<paraAnimationList.size(); ++j) {
+      for (size_t j = 0; j < paraAnimationList.size(); ++j) {
         ZParameterAnimation* paraAnimation = paraAnimationList[j].get();
         const auto& keys = paraAnimation->keys();
-        for (size_t i=0; i<keys.size(); ++i) {
-          ParameterKeysItem *ki = new ParameterKeysItem(*keys[i], *paraAnimation, pack, m_timeline, rect);
+        for (size_t i = 0; i < keys.size(); ++i) {
+          ParameterKeysItem* ki = new ParameterKeysItem(*keys[i], *paraAnimation, pack, m_timeline, rect);
           m_ObjKeyToItem[keys[i].get()] = ki;
         }
       }
@@ -251,14 +256,15 @@ void ZTimelineEventScene::updateItems()
       m_itemToDisplayPack[rect] = &pack;
     } else if (pack.type == ZAnimationDisplayPack::Type::ObjectPara) {
       EventBoundRectItem* rect = new EventBoundRectItem(pack, m_timeline);
-      rect->setRect(-1, 0, m_timeline.eventViewWidth()+2, m_timeline.rowHeight());
-      rect->setPen(QPen(QColor(200,200,200)));
-      rect->setBrush(QBrush(QColor(235+20,235+20,235+20)));
+      rect->setRect(-1, 0, m_timeline.eventViewWidth() + 2, m_timeline.rowHeight());
+      rect->setPen(QPen(QColor(200, 200, 200)));
+      rect->setBrush(QBrush(QColor(235 + 20, 235 + 20, 235 + 20)));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
 
       const auto& keys = pack.paraAnimation->keys();
-      for (size_t i=0; i<keys.size(); ++i) {
-        m_ObjParaKeyToItem[keys[i].get()] = new ParameterKeysItem(*keys[i], *pack.paraAnimation, pack, m_timeline, rect);
+      for (size_t i = 0; i < keys.size(); ++i) {
+        m_ObjParaKeyToItem[keys[i].get()] = new ParameterKeysItem(*keys[i], *pack.paraAnimation, pack, m_timeline,
+                                                                  rect);
       }
 
       addItem(rect);
@@ -267,7 +273,7 @@ void ZTimelineEventScene::updateItems()
   }
 
   m_currentTimeItem = new CurrentTimeLineItem(m_timeline);
-  m_currentTimeItem->setLine(0,0,0,dps.size()*m_timeline.rowHeight());
+  m_currentTimeItem->setLine(0, 0, 0, dps.size() * m_timeline.rowHeight());
   m_currentTimeItem->setPos(m_timeline.timeToX(m_timeline.currentTime()), 0);
   addItem(m_currentTimeItem);
   //bt.stop();
@@ -279,8 +285,8 @@ void ZTimelineEventScene::removeSelectedKeys()
   QList<QGraphicsItem*> items = selectedItems();
   // make sure key delete only once
   std::map<ZParameterKey*, ZParameterAnimation*> keyAniMap;
-  for (int i=0; i<items.size(); ++i) {
-    ParameterKeysItem *item = qgraphicsitem_cast<ParameterKeysItem*>(items[i]);
+  for (int i = 0; i < items.size(); ++i) {
+    ParameterKeysItem* item = qgraphicsitem_cast<ParameterKeysItem*>(items[i]);
     if (item) {
       keyAniMap[&item->paraKey()] = &item->paraAnimation();
     }
@@ -298,21 +304,21 @@ void ZTimelineEventScene::resizeRects()
   setSceneRect(rect);
   for (std::map<EventBoundRectItem*, const ZAnimationDisplayPack*>::iterator it = m_itemToDisplayPack.begin();
        it != m_itemToDisplayPack.end(); ++it) {
-    it->first->setRect(-1, 0, m_timeline.eventViewWidth()+2, m_timeline.rowHeight());
+    it->first->setRect(-1, 0, m_timeline.eventViewWidth() + 2, m_timeline.rowHeight());
   }
 }
 
 void ZTimelineEventScene::moveKeys()
 {
-  for (std::map<ZParameterKey*,ParameterKeysItem*>::iterator it = m_globalParaKeyToItem.begin();
+  for (std::map<ZParameterKey*, ParameterKeysItem*>::iterator it = m_globalParaKeyToItem.begin();
        it != m_globalParaKeyToItem.end(); ++it) {
     it->second->updateValue();
   }
-  for (std::map<ZParameterKey*,ParameterKeysItem*>::iterator it = m_ObjKeyToItem.begin();
+  for (std::map<ZParameterKey*, ParameterKeysItem*>::iterator it = m_ObjKeyToItem.begin();
        it != m_ObjKeyToItem.end(); ++it) {
     it->second->updateValue();
   }
-  for (std::map<ZParameterKey*,ParameterKeysItem*>::iterator it = m_ObjParaKeyToItem.begin();
+  for (std::map<ZParameterKey*, ParameterKeysItem*>::iterator it = m_ObjParaKeyToItem.begin();
        it != m_ObjParaKeyToItem.end(); ++it) {
     it->second->updateValue();
   }
@@ -325,9 +331,9 @@ void ZTimelineEventScene::moveCurrentTime()
   m_currentTimeItem->setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
 
-void ZTimelineEventScene::deleteKeyItem(ZParameterKey *paraKey)
+void ZTimelineEventScene::deleteKeyItem(ZParameterKey* paraKey)
 {
-  std::map<ZParameterKey*,ParameterKeysItem*>::iterator it = m_globalParaKeyToItem.find(paraKey);
+  std::map<ZParameterKey*, ParameterKeysItem*>::iterator it = m_globalParaKeyToItem.find(paraKey);
   if (it != m_globalParaKeyToItem.end()) {
     removeItem(it->second);
     delete it->second;

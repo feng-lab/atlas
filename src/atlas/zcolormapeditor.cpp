@@ -6,9 +6,9 @@
 
 namespace nim {
 
-ZColorMapWidget::ZColorMapWidget(ZColorMapParameter *colorMap, QWidget *parent) :
+ZColorMapWidget::ZColorMapWidget(ZColorMapParameter* colorMap, QWidget* parent) :
   QWidget(parent), m_colorMap(colorMap), m_sliderWidth(14), m_sliderHeight(18), m_isDragging(false)
-, m_dragStartX(-1)
+  , m_dragStartX(-1)
 {
   setFocusPolicy(Qt::StrongFocus);
 
@@ -16,38 +16,36 @@ ZColorMapWidget::ZColorMapWidget(ZColorMapParameter *colorMap, QWidget *parent) 
   int l, t, r, b;
   getContentsMargins(&l, &t, &r, &b);
   int margin = 15;
-  setContentsMargins(l+margin, t+margin, r+margin, b + m_sliderHeight - 1 + margin);
+  setContentsMargins(l + margin, t + margin, r + margin, b + m_sliderHeight - 1 + margin);
   connect(m_colorMap, &ZColorMapParameter::valueChanged, this, &ZColorMapWidget::updateIntensityScreenWidth);
   updateIntensityScreenWidth();
 }
 
 void ZColorMapWidget::editLColor(size_t index)
 {
-  if(!m_colorMap || !(index < m_colorMap->get().numKeys()))
+  if (!m_colorMap || !(index < m_colorMap->get().numKeys()))
     return;
 
   ZColorMapKey key = m_colorMap->get().key(index);
   QColor newColor = QColorDialog::getColor(key.qColorL());
-  if(newColor.isValid())
-  {
+  if (newColor.isValid()) {
     m_colorMap->get().setKeyColorL(index, newColor);
   }
 }
 
 void ZColorMapWidget::editRColor(size_t index)
 {
-  if(!m_colorMap || !(index < m_colorMap->get().numKeys()))
+  if (!m_colorMap || !(index < m_colorMap->get().numKeys()))
     return;
 
   ZColorMapKey key = m_colorMap->get().key(index);
   QColor newColor = QColorDialog::getColor(key.qColorR());
-  if(newColor.isValid())
-  {
+  if (newColor.isValid()) {
     m_colorMap->get().setKeyColorR(index, newColor);
   }
 }
 
-void ZColorMapWidget::mousePressEvent(QMouseEvent *e)
+void ZColorMapWidget::mousePressEvent(QMouseEvent* e)
 {
   if (e->button() != Qt::LeftButton)
     return;
@@ -61,7 +59,7 @@ void ZColorMapWidget::mousePressEvent(QMouseEvent *e)
       if (e->modifiers() & Qt::ControlModifier) {
         m_colorMap->get().setKeySelected(index, true);
       } else {
-        for (size_t i=1; i<m_colorMap->get().numKeys()-1; i++) {
+        for (size_t i = 1; i < m_colorMap->get().numKeys() - 1; i++) {
           if (index == i)
             m_colorMap->get().setKeySelected(i, true);
           else
@@ -73,13 +71,13 @@ void ZColorMapWidget::mousePressEvent(QMouseEvent *e)
     m_isDragging = true;
   } else {
     if (!(e->modifiers() & Qt::ControlModifier))
-      for (size_t i=0; i<m_colorMap->get().numKeys(); i++) {
+      for (size_t i = 0; i < m_colorMap->get().numKeys(); i++) {
         m_colorMap->get().setKeySelected(i, false);
       }
   }
 }
 
-void ZColorMapWidget::mouseMoveEvent(QMouseEvent *e)
+void ZColorMapWidget::mouseMoveEvent(QMouseEvent* e)
 {
   if (!m_isDragging)
     return;
@@ -91,7 +89,7 @@ void ZColorMapWidget::mouseMoveEvent(QMouseEvent *e)
   if (dist < 0) {
     // need to check from index 0 since selected key might be inserted before first key
     // during move, but it is impossible to go after last key because the clamp below
-    for (size_t i=0; i<m_colorMap->get().numKeys()-1; i++) {
+    for (size_t i = 0; i < m_colorMap->get().numKeys() - 1; i++) {
       //LOG(INFO) << m_colorMap->get().isKeySelected(i) << " " << m_colorMap->get().key(i).intensity() << " " << m_colorMap->get().domainMin();
       if (m_colorMap->get().isKeySelected(i)) {
         if (m_colorMap->get().key(i).intensity() == m_colorMap->get().domainMin())
@@ -101,7 +99,7 @@ void ZColorMapWidget::mouseMoveEvent(QMouseEvent *e)
       }
     }
   } else {
-    for (int i=int(m_colorMap->get().numKeys())-2; i>=0; i--) {
+    for (int i = int(m_colorMap->get().numKeys()) - 2; i >= 0; i--) {
       //LOG(INFO) << m_colorMap->get().isKeySelected(i) << " " << m_colorMap->get().key(i).intensity() << " " << m_colorMap->get().domainMax();
       if (m_colorMap->get().isKeySelected(i)) {
         if (m_colorMap->get().key(i).intensity() == m_colorMap->get().domainMax())
@@ -115,16 +113,16 @@ void ZColorMapWidget::mouseMoveEvent(QMouseEvent *e)
   CHECK(edgeKeyIndex != m_colorMap->get().numKeys());
 
   if (change) {
-    double intensityChange = dist/m_intensityScreenWidth;
+    double intensityChange = dist / m_intensityScreenWidth;
     if (dist < 0) {
       intensityChange = std::max(intensityChange, m_colorMap->get().domainMin() -
-                                 m_colorMap->get().keyIntensity(edgeKeyIndex));
+                                                  m_colorMap->get().keyIntensity(edgeKeyIndex));
     } else {
       intensityChange = std::min(intensityChange, m_colorMap->get().domainMax() -
-                                 m_colorMap->get().keyIntensity(edgeKeyIndex));
+                                                  m_colorMap->get().keyIntensity(edgeKeyIndex));
     }
     std::vector<ZColorMapKey> newKeys;
-    for (size_t i=0; i<m_colorMap->get().numKeys()-1; ++i) {
+    for (size_t i = 0; i < m_colorMap->get().numKeys() - 1; ++i) {
       if (m_colorMap->get().isKeySelected(i)) {
         ZColorMapKey newKey = m_colorMap->get().key(i);
         double newIntensity = newKey.intensity() + intensityChange;
@@ -137,24 +135,24 @@ void ZColorMapWidget::mouseMoveEvent(QMouseEvent *e)
       }
     }
     m_colorMap->get().removeSelectedKeys();
-    for (size_t i=0; i<newKeys.size(); ++i) {
+    for (size_t i = 0; i < newKeys.size(); ++i) {
       m_colorMap->get().addKey(newKeys[i], true);
     }
   }
   m_dragStartX = e->pos().x();
 }
 
-void ZColorMapWidget::mouseReleaseEvent(QMouseEvent *e)
+void ZColorMapWidget::mouseReleaseEvent(QMouseEvent* e)
 {
   if (e->button() != Qt::LeftButton)
     return;
   m_isDragging = false;
   m_colorMap->get().removeDuplicatedKeys();
   m_colorMap->get().setKeySelected(0, false);
-  m_colorMap->get().setKeySelected(m_colorMap->get().numKeys()-1, false);
+  m_colorMap->get().setKeySelected(m_colorMap->get().numKeys() - 1, false);
 }
 
-void ZColorMapWidget::mouseDoubleClickEvent(QMouseEvent *e)
+void ZColorMapWidget::mouseDoubleClickEvent(QMouseEvent* e)
 {
   if (e->button() != Qt::LeftButton) {
     e->ignore();
@@ -174,19 +172,19 @@ void ZColorMapWidget::mouseDoubleClickEvent(QMouseEvent *e)
   }
 }
 
-void ZColorMapWidget::contextMenuEvent(QContextMenuEvent *e)
+void ZColorMapWidget::contextMenuEvent(QContextMenuEvent* e)
 {
   size_t index;
   if (findkey(e->pos(), index) != ZColorMapWidget::NONE) {
     QMenu contextMenu(this);
-    contextMenu.setTitle(QString("Key %1").arg(index+1));
+    contextMenu.setTitle(QString("Key %1").arg(index + 1));
     bool isSplit = m_colorMap->get().key(index).isSplit();
-    QAction *mergeAction = nullptr;
-    QAction *editLColorAction = nullptr;
-    QAction *editRColorAction = nullptr;
-    QAction *splitAction = nullptr;
-    QAction *editIntensityAction = nullptr;
-    QAction *removeAction = nullptr;
+    QAction* mergeAction = nullptr;
+    QAction* editLColorAction = nullptr;
+    QAction* editRColorAction = nullptr;
+    QAction* splitAction = nullptr;
+    QAction* editIntensityAction = nullptr;
+    QAction* removeAction = nullptr;
     if (isSplit) {
       editLColorAction = contextMenu.addAction("Change Left Color");
       editRColorAction = contextMenu.addAction("Change Right Color");
@@ -198,12 +196,12 @@ void ZColorMapWidget::contextMenuEvent(QContextMenuEvent *e)
       splitAction = contextMenu.addAction("Split Key");
     }
     removeAction = contextMenu.addAction("Delete");
-    QAction *action = contextMenu.exec(e->globalPos());
+    QAction* action = contextMenu.exec(e->globalPos());
     if (action == editLColorAction)
       editLColor(index);
     else if (action == editIntensityAction) {
       bool ok;
-      double newI = QInputDialog::getDouble(this, QString("Key %1").arg(index+1), "Intensity:",
+      double newI = QInputDialog::getDouble(this, QString("Key %1").arg(index + 1), "Intensity:",
                                             m_colorMap->get().key(index).intensity(),
                                             m_colorMap->get().domainMin() + 0.001,
                                             m_colorMap->get().domainMax() - 0.001,
@@ -225,14 +223,14 @@ void ZColorMapWidget::contextMenuEvent(QContextMenuEvent *e)
   } else if (contentsRect().contains(e->pos())) {
     double intensity = screenXPositionToIntensity(e->pos().x());
     QMenu contextMenu(this);
-    QAction *addKeyHereAction = contextMenu.addAction(
-          QString("Add Key Here (%1)").arg(intensity));
-    QAction *addKeyAtAction = contextMenu.addAction("Add Key At Intensity...");
-    QAction *action = contextMenu.exec(e->globalPos());
+    QAction* addKeyHereAction = contextMenu.addAction(
+      QString("Add Key Here (%1)").arg(intensity));
+    QAction* addKeyAtAction = contextMenu.addAction("Add Key At Intensity...");
+    QAction* action = contextMenu.exec(e->globalPos());
 
-    if(action == addKeyHereAction) {
+    if (action == addKeyHereAction) {
       m_colorMap->get().addKeyAtIntensity(intensity);
-    } else if(action == addKeyAtAction) {
+    } else if (action == addKeyAtAction) {
       double newI = QInputDialog::getDouble(this, QString("Add Key At"), "Intensity:",
                                             intensity);
       m_colorMap->get().addKeyAtIntensity(newI);
@@ -240,34 +238,33 @@ void ZColorMapWidget::contextMenuEvent(QContextMenuEvent *e)
   }
 }
 
-void ZColorMapWidget::keyPressEvent(QKeyEvent *e)
+void ZColorMapWidget::keyPressEvent(QKeyEvent* e)
 {
-  switch(e->key())
-  {
-  case Qt::Key_Delete:
-  case Qt::Key_Backspace:
-  {
-    m_colorMap->get().removeSelectedKeys();
-  }
+  switch (e->key()) {
+    case Qt::Key_Delete:
+    case Qt::Key_Backspace: {
+      m_colorMap->get().removeSelectedKeys();
+    }
   }
 }
 
-bool ZColorMapWidget::event(QEvent *e)
+bool ZColorMapWidget::event(QEvent* e)
 {
-  if(e->type() == QEvent::ToolTip)
-  {
+  if (e->type() == QEvent::ToolTip) {
     size_t index;
-    QHelpEvent *helpEvent = dynamic_cast<QHelpEvent *>(e);
+    QHelpEvent* helpEvent = dynamic_cast<QHelpEvent*>(e);
     QRect tipRect;
     QString tipText;
     if (findkey(helpEvent->pos(), index, true) != ZColorMapWidget::NONE) {
       tipRect = sliderBounds(index);
       if (m_colorMap->get().key(index).isSplit())
-        tipText = QString("Key %1\nIntensity: %2\nLeft Color: %3\nRight Color: %4").arg(index+1).arg(m_colorMap->get().key(index).intensity())
-            .arg(m_colorMap->get().key(index).qColorL().name()).arg(m_colorMap->get().key(index).qColorR().name());
+        tipText = QString("Key %1\nIntensity: %2\nLeft Color: %3\nRight Color: %4").arg(index + 1).arg(
+            m_colorMap->get().key(index).intensity())
+          .arg(m_colorMap->get().key(index).qColorL().name()).arg(m_colorMap->get().key(index).qColorR().name());
       else
-        tipText = QString("Key %1\nIntensity: %2\nColor: %3").arg(index+1).arg(m_colorMap->get().key(index).intensity())
-            .arg(m_colorMap->get().key(index).qColorL().name());
+        tipText = QString("Key %1\nIntensity: %2\nColor: %3").arg(index + 1).arg(
+            m_colorMap->get().key(index).intensity())
+          .arg(m_colorMap->get().key(index).qColorL().name());
       QToolTip::showText(helpEvent->globalPos(), tipText, this, tipRect);
     } else if (contentsRect().contains(helpEvent->pos())) {
       tipRect.setCoords(helpEvent->pos().x(), contentsRect().top(), helpEvent->pos().x(), contentsRect().bottom());
@@ -280,13 +277,14 @@ bool ZColorMapWidget::event(QEvent *e)
   return QWidget::event(e);
 }
 
-void ZColorMapWidget::paintEvent(QPaintEvent *)
+void ZColorMapWidget::paintEvent(QPaintEvent*)
 {
   QPainter painter(this);
   //
 
-  for(int x = contentsRect().left(); x <= contentsRect().right(); ++x) {
-    painter.setPen(m_colorMap->get().fractionMappedQColor((x-contentsRect().left()) / (contentsRect().width()*1.0)));
+  for (int x = contentsRect().left(); x <= contentsRect().right(); ++x) {
+    painter.setPen(
+      m_colorMap->get().fractionMappedQColor((x - contentsRect().left()) / (contentsRect().width() * 1.0)));
     painter.drawLine(x, contentsRect().top(), x, contentsRect().bottom());
   }
 
@@ -296,16 +294,18 @@ void ZColorMapWidget::paintEvent(QPaintEvent *)
   pen.setJoinStyle(Qt::RoundJoin);
   painter.setPen(pen);
   QPolygon polygon;
-  polygon << QPoint(-m_sliderWidth/2, static_cast<int>(m_sliderHeight*0.3)) << QPoint(-m_sliderWidth/2, m_sliderHeight)
-          << QPoint(m_sliderWidth/2, m_sliderHeight) << QPoint(m_sliderWidth/2, static_cast<int>(m_sliderHeight*0.3))
+  polygon << QPoint(-m_sliderWidth / 2, static_cast<int>(m_sliderHeight * 0.3))
+          << QPoint(-m_sliderWidth / 2, m_sliderHeight)
+          << QPoint(m_sliderWidth / 2, m_sliderHeight)
+          << QPoint(m_sliderWidth / 2, static_cast<int>(m_sliderHeight * 0.3))
           << QPoint(0, 0);
   polygon.translate(0, contentsRect().bottom() - 1.5);
   double prevPos = -m_sliderWidth;
-  for (size_t i=0; i<m_colorMap->get().numKeys(); i++) {
+  for (size_t i = 0; i < m_colorMap->get().numKeys(); i++) {
     ZColorMapKey key = m_colorMap->get().key(i);
-    double x = intensityToScreenXPosition( m_colorMap->get().key(i).intensity() );
+    double x = intensityToScreenXPosition(m_colorMap->get().key(i).intensity());
     polygon.translate(x - polygon[4].x(), 0);
-    double midPos = (prevPos+x)/2;
+    double midPos = (prevPos + x) / 2;
     QRect cr(static_cast<int>(midPos), 0, width(), height());
     if (key.isSplit())
       cr.setRight(static_cast<int>(x));
@@ -321,9 +321,9 @@ void ZColorMapWidget::paintEvent(QPaintEvent *)
       painter.setPen(pen);
     }
 
-    prevPos = x+1;
+    prevPos = x + 1;
     if (key.isSplit()) {
-      painter.setClipRect(QRect(static_cast<int>(x), 0, width()+m_sliderWidth, height()));
+      painter.setClipRect(QRect(static_cast<int>(x), 0, width() + m_sliderWidth, height()));
       painter.setBrush(key.qColorR());
       if (m_colorMap->get().isKeySelected(i)) {
         pen.setWidth(2.);
@@ -339,17 +339,17 @@ void ZColorMapWidget::paintEvent(QPaintEvent *)
 
 }
 
-void ZColorMapWidget::resizeEvent(QResizeEvent *)
+void ZColorMapWidget::resizeEvent(QResizeEvent*)
 {
   updateIntensityScreenWidth();
 }
 
 QSize ZColorMapWidget::sizeHint() const
 {
-  return QSize(255+30, 50+30);
+  return QSize(255 + 30, 50 + 30);
 }
 
-ZColorMapWidget::FindKeyResult ZColorMapWidget::findkey(const QPoint &pos, size_t &index, bool includeBoundKey) const
+ZColorMapWidget::FindKeyResult ZColorMapWidget::findkey(const QPoint& pos, size_t& index, bool includeBoundKey) const
 {
   if (pos.y() > contentsRect().bottom() + m_sliderHeight - 1 ||
       pos.y() < contentsRect().bottom() - 1)
@@ -358,9 +358,9 @@ ZColorMapWidget::FindKeyResult ZColorMapWidget::findkey(const QPoint &pos, size_
   bool hit = false;
   bool left = true;
   size_t minIndex = 0;
-  for (size_t i=1; i<m_colorMap->get().numKeys()-1; i++) {
+  for (size_t i = 1; i < m_colorMap->get().numKeys() - 1; i++) {
     double dist = intensityToScreenXPosition(m_colorMap->get().key(i).intensity()) - pos.x();
-    if (std::abs(dist) < m_sliderWidth/2 && std::abs(dist) < minDist) {
+    if (std::abs(dist) < m_sliderWidth / 2 && std::abs(dist) < minDist) {
       hit = true;
       minIndex = i;
       left = dist >= 0;
@@ -368,15 +368,16 @@ ZColorMapWidget::FindKeyResult ZColorMapWidget::findkey(const QPoint &pos, size_
   }
   if (includeBoundKey) {
     double dist = std::abs(intensityToScreenXPosition(m_colorMap->get().key(0).intensity()) - pos.x());
-    if (dist < m_sliderWidth/2 && dist < minDist) {
+    if (dist < m_sliderWidth / 2 && dist < minDist) {
       hit = true;
       minIndex = 0;
       left = false;
     }
-    dist = std::abs(intensityToScreenXPosition(m_colorMap->get().key(m_colorMap->get().numKeys()-1).intensity()) - pos.x());
-    if (dist < m_sliderWidth/2 && dist < minDist) {
+    dist = std::abs(
+      intensityToScreenXPosition(m_colorMap->get().key(m_colorMap->get().numKeys() - 1).intensity()) - pos.x());
+    if (dist < m_sliderWidth / 2 && dist < minDist) {
       hit = true;
-      minIndex = m_colorMap->get().numKeys()-1;
+      minIndex = m_colorMap->get().numKeys() - 1;
       left = true;
     }
   }
@@ -397,12 +398,12 @@ double ZColorMapWidget::intensityToScreenXPosition(double intensity) const
 
 double ZColorMapWidget::screenXPositionToIntensity(double x) const
 {
-  return m_colorMap->get().domainMin() + (x-contentsRect().left())/m_intensityScreenWidth;
+  return m_colorMap->get().domainMin() + (x - contentsRect().left()) / m_intensityScreenWidth;
 }
 
 QRect ZColorMapWidget::sliderBounds(size_t index) const
 {
-  QRect result(-m_sliderWidth/2, contentsRect().bottom()+m_sliderHeight-1, m_sliderWidth, m_sliderHeight);
+  QRect result(-m_sliderWidth / 2, contentsRect().bottom() + m_sliderHeight - 1, m_sliderWidth, m_sliderHeight);
   result.translate(intensityToScreenXPosition(m_colorMap->get().key(index).intensity()), -m_sliderHeight);
   return result;
 }
@@ -410,11 +411,11 @@ QRect ZColorMapWidget::sliderBounds(size_t index) const
 void ZColorMapWidget::updateIntensityScreenWidth()
 {
   m_intensityScreenWidth = contentsRect().width() /
-      (m_colorMap->get().domainMax() - m_colorMap->get().domainMin());
+                           (m_colorMap->get().domainMax() - m_colorMap->get().domainMin());
   update();
 }
 
-ZColorMapEditor::ZColorMapEditor(ZColorMapParameter *colorMap, QWidget *parent)
+ZColorMapEditor::ZColorMapEditor(ZColorMapParameter* colorMap, QWidget* parent)
   : QWidget(parent), m_colorMap(colorMap)
 {
   createWidget();
@@ -469,8 +470,8 @@ void ZColorMapEditor::fitDomainToDataRange()
 
 void ZColorMapEditor::createWidget()
 {
-  QVBoxLayout *vlo = new QVBoxLayout;
-  QHBoxLayout *hlo = new QHBoxLayout;
+  QVBoxLayout* vlo = new QVBoxLayout;
+  QHBoxLayout* hlo = new QHBoxLayout;
   m_colorMapWidget = new ZColorMapWidget(m_colorMap, this);
   vlo->addWidget(m_colorMapWidget);
   m_dataMinNameLabel = new QLabel("Data Min: ", this);
@@ -515,7 +516,8 @@ void ZColorMapEditor::createWidget()
   else
     m_fitDomainToDataButton->setEnabled(false);
   m_rescaleKeys = new QCheckBox("Rescale Keys", this);
-  m_rescaleKeys->setToolTip("If set, reserve all keys (by rescaling) while changing the domain. Otherwise out of domain keys will be deleted.");
+  m_rescaleKeys->setToolTip(
+    "If set, reserve all keys (by rescaling) while changing the domain. Otherwise out of domain keys will be deleted.");
   m_rescaleKeys->setChecked(false);
   hlo->addWidget(m_domainMinNameLabel);
   hlo->addWidget(m_domainMinSpinBox);

@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
-#include <cassert>
+#include "zlog.h"
 #include <QList>
 
 #ifndef _USE_QTCONCURRENT_
@@ -88,7 +88,7 @@ template<typename RandomAccessIterator>
 std::pair<RandomAccessIterator, RandomAccessIterator>
 minMaxElement(RandomAccessIterator begin, RandomAccessIterator end, bool useMultithreading = true)
 {
-  assert(end > begin);
+  CHECK(end > begin);
 #ifndef _USE_QTCONCURRENT_
   if (!useMultithreading || end - begin < MULTITHREAD_THRESHOLD) {
     return std::minmax_element(begin, end);
@@ -175,7 +175,7 @@ sumRange(RandomAccessIterator begin, RandomAccessIterator end, ResultType init, 
     tbb::parallel_reduce(tbb::blocked_range<RandomAccessIterator>(begin, end), sum);
     return init + sum.m_sum;
 #else
-    assert(end > begin);
+    CHECK(end > begin);
     size_t size = end - begin;
     size_t numBlock = std::min(size, static_cast<size_t>(QThread::idealThreadCount())*2);
     size_t pixelPerBlock = size / numBlock;
@@ -268,7 +268,7 @@ void meanAndStandardDeviation(RandomAccessIterator begin, RandomAccessIterator e
                               bool useMultithreading = true)
 {
   typedef double ResultType;
-  assert(end > begin);
+  CHECK(end > begin);
   size_t size = end - begin;
 
   std::vector<ResultType> diff(size);
@@ -325,7 +325,7 @@ double median(RandomAccessIterator begin, RandomAccessIterator end)
   typedef typename std::iterator_traits<RandomAccessIterator>::value_type ValueType;
   //typedef typename NumTraits<ValueType>::NonInteger ResultType;
   typedef double ResultType;
-  assert(end > begin);
+  CHECK(end > begin);
   size_t size = end - begin;
   size_t middleIdx = size / 2;
 
@@ -349,7 +349,7 @@ double medianInPlace(RandomAccessIterator begin, RandomAccessIterator end)
   //typedef typename std::iterator_traits<RandomAccessIterator>::value_type ValueType;
   //typedef typename NumTraits<ValueType>::NonInteger ResultType;
   typedef double ResultType;
-  assert(end > begin);
+  CHECK(end > begin);
   size_t size = end - begin;
   size_t middleIdx = size / 2;
 

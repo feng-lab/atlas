@@ -30,16 +30,23 @@ enum class Z3DScreenShotType
 };
 
 #ifndef _USE_GLEW_
+
 bool GLVersionGE(int majorVersion, int minorVersion);
+
 #endif
 
 GLenum _CheckGLError(const char* file, int line, const char* function);
+
 #define CHECK_GL_ERROR _CheckGLError(__FILE__, __LINE__, __PRETTY_FUNCTION__)
 
 bool checkGLState(GLenum pname, bool value);
+
 bool checkGLState(GLenum pname, GLint value);
+
 bool checkGLState(GLenum pname, GLenum value);
+
 bool checkGLState(GLenum pname, GLfloat value);
+
 bool checkGLState(GLenum pname, const glm::vec4 value);
 
 } // namespace nim

@@ -9,17 +9,22 @@ namespace nim {
 
 class ZRegionAnnotationFilter : public ZObjFilter
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  ZRegionAnnotationFilter(ZView &view);
+  ZRegionAnnotationFilter(ZView& view);
 
-  void setData(ZRegionAnnotation &regionAnnotation);
+  void setData(ZRegionAnnotation& regionAnnotation);
 
   void releaseItemsOwnership();
 
-  void setVisible(bool v) { m_visible.set(v); }
-  void setSelected(bool v) { Q_UNUSED(v) }
+  void setVisible(bool v)
+  { m_visible.set(v); }
+
+  void setSelected(bool v)
+  { Q_UNUSED(v) }
+
   void setNormalView(int z, int t) override;
+
   void setMaxZProjView(int t) override;
 
   const std::vector<int>& boundBox() const;
@@ -27,18 +32,24 @@ public:
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
   virtual void deleteKeyPressed() override;
-  virtual void mousePressed(const QPointF &scenePos) override;
-  virtual void mouseReleased(const QPointF &scenePos) override;
+
+  virtual void mousePressed(const QPointF& scenePos) override;
+
+  virtual void mouseReleased(const QPointF& scenePos) override;
+
   virtual void rotateClockwise() override;
+
   virtual void rotateCounterclockwise() override;
 
 private:
   void visibleChanged();
-  void regionROIAdded(int64_t id, ZROI *roi);
+
+  void regionROIAdded(int64_t id, ZROI* roi);
+
   void allROIChanged();
 
 private:
-  ZRegionAnnotation *m_regionAnnotation;
+  ZRegionAnnotation* m_regionAnnotation;
   std::map<int, std::unique_ptr<ZROIFilter>> m_idToROIFilters;
   std::map<int, QString> m_idToRegionNames;
   std::map<QString, int> m_nameToID;
@@ -46,7 +57,7 @@ private:
   ZBoolParameter m_visible;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
-  ZView &m_view;
+  ZView& m_view;
 };
 
 } // namespace nim

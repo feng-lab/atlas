@@ -11,7 +11,7 @@
 
 namespace nim {
 
-ROIGraphicsItem::ROIGraphicsItem(ZROI &roi, int slice, double z, QGraphicsItem *parent)
+ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, double z, QGraphicsItem* parent)
   : QGraphicsPathItem(parent)
   , m_roi(roi)
   , m_slice(slice)
@@ -45,7 +45,7 @@ void ROIGraphicsItem::updateValue()
 void ROIGraphicsItem::setOffset(double x, double y)
 {
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
-  m_offset = QPointF(x,y);
+  m_offset = QPointF(x, y);
   setPos(m_basePos + m_offset);
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
@@ -62,35 +62,35 @@ void ROIGraphicsItem::setOffset(double x, double y)
 //  QGraphicsPathItem::mouseReleaseEvent(event);
 //}
 
-QVariant ROIGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)
+QVariant ROIGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
 {
   if (change == ItemPositionChange && scene()) {
-    QPointF newPos = value.toPointF()-m_offset;
+    QPointF newPos = value.toPointF() - m_offset;
     QRectF boundRect = path().boundingRect();
     QRectF rect = scene()->sceneRect();
     // Keep the item inside the scene rect.
     newPos.setX(qMin(rect.right() - boundRect.width(), qMax(newPos.x(), rect.left())));
     newPos.setY(qMin(rect.bottom() - boundRect.height(), qMax(newPos.y(), rect.top())));
     m_roi.sliceSetTopLeft(m_slice, newPos.x(), newPos.y());
-    return newPos+m_offset;
+    return newPos + m_offset;
   }
   return QGraphicsPathItem::itemChange(change, value);
 }
 
-void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
+void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
   if (m_roi.sliceHasPolyOrSpline(m_slice)) {
     QMenu menu;
-    QAction *addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
-    QAction *selectedAction = menu.exec(event->screenPos());
+    QAction* addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
+    QAction* selectedAction = menu.exec(event->screenPos());
     if (selectedAction == addCtrlPointAction) {
-      m_roi.sliceAddCtrlPoint(m_slice, event->scenePos()-m_offset);
+      m_roi.sliceAddCtrlPoint(m_slice, event->scenePos() - m_offset);
     }
   }
 }
 
-ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI &roi, const ZROIControlPoint &controlPoint,
-                                             double viewScale, double z, QGraphicsItem *parent)
+ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint,
+                                             double viewScale, double z, QGraphicsItem* parent)
   : QGraphicsRectItem(parent)
   , m_roi(roi)
   , m_controlPoint(controlPoint)
@@ -107,9 +107,10 @@ ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI &roi, const ZROIControlPoint &
 
   m_basePos = m_roi.controlPointCoord(m_controlPoint);
   setPos(m_basePos + m_offset);
-  setToolTip(QString("Coord:(%1,%2), Offset:(%3,%4)").arg(m_basePos.x()).arg(m_basePos.y()).arg(m_offset.x()).arg(m_offset.y()));
-  setPen(QPen(QColor(0,0,0), 0));
-  setBrush(QBrush(QColor(255,255,255)));
+  setToolTip(
+    QString("Coord:(%1,%2), Offset:(%3,%4)").arg(m_basePos.x()).arg(m_basePos.y()).arg(m_offset.x()).arg(m_offset.y()));
+  setPen(QPen(QColor(0, 0, 0), 0));
+  setBrush(QBrush(QColor(255, 255, 255)));
   setCursor(Qt::PointingHandCursor);
   setZValue(z);
 }
@@ -119,7 +120,8 @@ void ROICtrlPtGraphicsItem::updateValue()
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
   m_basePos = m_roi.controlPointCoord(m_controlPoint);
   setPos(m_basePos + m_offset);
-  setToolTip(QString("Coord:(%1,%2), Offset:(%3,%4)").arg(m_basePos.x()).arg(m_basePos.y()).arg(m_offset.x()).arg(m_offset.y()));
+  setToolTip(
+    QString("Coord:(%1,%2), Offset:(%3,%4)").arg(m_basePos.x()).arg(m_basePos.y()).arg(m_offset.x()).arg(m_offset.y()));
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
 
@@ -137,7 +139,7 @@ void ROICtrlPtGraphicsItem::setViewScale(double s)
   }
 }
 
-void ROICtrlPtGraphicsItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
+void ROICtrlPtGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
   if (isSelected()) {
     double halfwidth = 6. / m_viewScale;
@@ -154,22 +156,25 @@ void ROICtrlPtGraphicsItem::paint(QPainter *painter, const QStyleOptionGraphicsI
 void ROICtrlPtGraphicsItem::setOffset(double x, double y)
 {
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
-  m_offset = QPointF(x,y);
+  m_offset = QPointF(x, y);
   setPos(m_basePos + m_offset);
-  setToolTip(QString("Coord:(%1,%2), Offset:(%3,%4)").arg(m_basePos.x()).arg(m_basePos.y()).arg(m_offset.x()).arg(m_offset.y()));
+  setToolTip(
+    QString("Coord:(%1,%2), Offset:(%3,%4)").arg(m_basePos.x()).arg(m_basePos.y()).arg(m_offset.x()).arg(m_offset.y()));
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
 
-QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)
+QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
 {
   if (change == ItemPositionChange && scene()) {
-    QPointF newPos = value.toPointF()-m_offset;
+    QPointF newPos = value.toPointF() - m_offset;
     QRectF sceneRect = scene()->sceneRect();
     if (true) {
       // Keep the item inside the scene rect.
       if (m_controlPoint.pos == ZROIControlPoint::Pos::Center) {
-        newPos.setX(qMin(sceneRect.right() - m_shapeOp.rect().width() / 2, qMax(newPos.x(), sceneRect.left() + m_shapeOp.rect().width() / 2)));
-        newPos.setY(qMin(sceneRect.bottom() - m_shapeOp.rect().height() / 2, qMax(newPos.y(), sceneRect.top() + m_shapeOp.rect().height() / 2)));
+        newPos.setX(qMin(sceneRect.right() - m_shapeOp.rect().width() / 2,
+                         qMax(newPos.x(), sceneRect.left() + m_shapeOp.rect().width() / 2)));
+        newPos.setY(qMin(sceneRect.bottom() - m_shapeOp.rect().height() / 2,
+                         qMax(newPos.y(), sceneRect.top() + m_shapeOp.rect().height() / 2)));
       } else {
         newPos.setX(qMin(sceneRect.right(), qMax(newPos.x(), sceneRect.left())));
         newPos.setY(qMin(sceneRect.bottom(), qMax(newPos.y(), sceneRect.top())));
@@ -180,12 +185,12 @@ QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange cha
   return QGraphicsRectItem::itemChange(change, value);
 }
 
-ZROIFilter::ZROIFilter(ZView &view)
+ZROIFilter::ZROIFilter(ZView& view)
   : ZObjFilter(view)
   , m_ROI(nullptr)
   , m_visible("Visible", true)
   , m_showControlPoints("Show Control Points", true)
-  , m_outlineColor("Outline Color", glm::vec3(1,1,0), glm::vec3(0), glm::vec3(1))
+  , m_outlineColor("Outline Color", glm::vec3(1, 1, 0), glm::vec3(0), glm::vec3(1))
   , m_regionColor("Region Color", glm::vec3(.2, .2, .2), glm::vec3(0), glm::vec3(1))
   , m_opacity("Opacity", .5, 0., 1.)
   , m_hasSelectedItems(false)
@@ -207,7 +212,7 @@ ZROIFilter::ZROIFilter(ZView &view)
   connect(&view.graphicsView(), &ZGraphicsView::scaleChanged, this, &ZROIFilter::viewScaleChanged);
 }
 
-void ZROIFilter::setData(ZROI &roi)
+void ZROIFilter::setData(ZROI& roi)
 {
   m_ROI = &roi;
   m_sliceToROIItem.clear();
@@ -215,7 +220,7 @@ void ZROIFilter::setData(ZROI &roi)
   if (!m_ROI->isEmpty()) {
     for (auto it = m_ROI->cbegin(); it != m_ROI->cend(); ++it) {
       int i = it->first;
-      ROIGraphicsItem *roiItem = new ROIGraphicsItem(*m_ROI, i);
+      ROIGraphicsItem* roiItem = new ROIGraphicsItem(*m_ROI, i);
       roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
                                   m_outlineColor.get().y * 255,
                                   m_outlineColor.get().z * 255), 0));
@@ -327,7 +332,7 @@ void ZROIFilter::deleteKeyPressed()
       slices.push_back(it->first);
     }
   }
-  for (size_t i=0; i<slices.size(); ++i) {
+  for (size_t i = 0; i < slices.size(); ++i) {
     m_ROI->deleteSliceROI(slices[i]);
   }
 
@@ -343,7 +348,7 @@ void ZROIFilter::deleteKeyPressed()
     m_ROI->deleteROIControlPoints(controlPoints);
 }
 
-void ZROIFilter::mousePressed(const QPointF &)
+void ZROIFilter::mousePressed(const QPointF&)
 {
   m_hasSelectedItems = false;
   if (m_view.isMaxZProjView()) {
@@ -371,7 +376,7 @@ void ZROIFilter::mousePressed(const QPointF &)
   }
 }
 
-void ZROIFilter::mouseReleased(const QPointF &)
+void ZROIFilter::mouseReleased(const QPointF&)
 {
   if (m_hasSelectedItems) {
     m_ROI->endMoveSelectedControlPointsCommand();
@@ -426,7 +431,8 @@ std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> ZROIFilter::createCtrlPtItem
   std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> items;
   std::vector<ZROIControlPoint> controlPoints = m_ROI->sliceControlPoints(slice);
   for (auto controlPoint : controlPoints) {
-    ROICtrlPtGraphicsItem* rectItem = new ROICtrlPtGraphicsItem(*m_ROI, controlPoint, m_view.graphicsView().currentScale());
+    ROICtrlPtGraphicsItem* rectItem = new ROICtrlPtGraphicsItem(*m_ROI, controlPoint,
+                                                                m_view.graphicsView().currentScale());
     rectItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get() && m_showControlPoints.get());
     rectItem->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
     m_view.scene().addItem(rectItem);
@@ -495,7 +501,7 @@ void ZROIFilter::regionColorChanged()
 void ZROIFilter::onRoiChanged(int slice)
 {
   if (m_sliceToROIItem.find(slice) == m_sliceToROIItem.end()) {
-    ROIGraphicsItem *roiItem = new ROIGraphicsItem(*m_ROI, slice);
+    ROIGraphicsItem* roiItem = new ROIGraphicsItem(*m_ROI, slice);
     roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
                                 m_outlineColor.get().y * 255,
                                 m_outlineColor.get().z * 255), 0));

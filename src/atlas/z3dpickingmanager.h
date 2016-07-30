@@ -16,15 +16,21 @@ public:
   Z3DPickingManager();
 
   // must call
-  void setRenderTarget(Z3DRenderTarget &rt);
+  void setRenderTarget(Z3DRenderTarget& rt);
 
   glm::col4 registerObject(const void* obj);
+
   void deregisterObject(const void* obj);
+
   void deregisterObject(const glm::col4& col);
+
   void clearRegisteredObjects();
 
   glm::col4 colorOfObject(const void* obj);
-  glm::vec4 fColorOfObject(const void* obj) { return glm::vec4(glm::vec4(colorOfObject(obj)) / 255.f); }
+
+  glm::vec4 fColorOfObject(const void* obj)
+  { return glm::vec4(glm::vec4(colorOfObject(obj)) / 255.f); }
+
   const void* objectOfColor(glm::col4 col);
 
   const void* objectAtWidgetPos(glm::ivec2 pos);
@@ -33,14 +39,22 @@ public:
   // if radius is -1, search the whole image
   std::vector<const void*> sortObjectsByDistanceToPos(glm::ivec2 pos, int radius = -1, bool ascend = true);
 
-  void bindTarget() { m_renderTarget->bind(); }
-  void releaseTarget() { m_renderTarget->release(); }
+  void bindTarget()
+  { m_renderTarget->bind(); }
+
+  void releaseTarget()
+  { m_renderTarget->release(); }
+
   void clearTarget();
 
-  Z3DRenderTarget& renderTarget() const { return *m_renderTarget; }
+  Z3DRenderTarget& renderTarget() const
+  { return *m_renderTarget; }
 
-  bool isRegistered(const void* obj) { return m_objectToColor.find(obj) != m_objectToColor.end(); }
-  bool isRegistered(glm::col4 col) { return m_colorToObject.find(col) != m_colorToObject.end(); }
+  bool isRegistered(const void* obj)
+  { return m_objectToColor.find(obj) != m_objectToColor.end(); }
+
+  bool isRegistered(glm::col4 col)
+  { return m_colorToObject.find(col) != m_colorToObject.end(); }
 
 private:
   void increaseColor();

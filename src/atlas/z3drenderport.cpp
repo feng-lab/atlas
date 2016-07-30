@@ -6,8 +6,9 @@
 
 namespace nim {
 
-Z3DRenderOutputPort::Z3DRenderOutputPort(const QString &name, bool allowMultipleConnections,
-                                         Z3DFilter::InvalidationState invalidationState, GLint internalColorFormat, GLint internalDepthFormat)
+Z3DRenderOutputPort::Z3DRenderOutputPort(const QString& name, bool allowMultipleConnections,
+                                         Z3DFilter::InvalidationState invalidationState, GLint internalColorFormat,
+                                         GLint internalDepthFormat)
   : Z3DOutputPortBase(name, allowMultipleConnections, invalidationState)
   , m_resultIsValid(false)
   , m_internalColorFormat(internalColorFormat)
@@ -38,7 +39,7 @@ void Z3DRenderOutputPort::clearTarget() const
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-void Z3DRenderOutputPort::resize(const glm::uvec2 &newsize)
+void Z3DRenderOutputPort::resize(const glm::uvec2& newsize)
 {
   if (m_renderTarget.resize(newsize)) {
     m_resultIsValid = false;
@@ -60,7 +61,7 @@ void Z3DRenderOutputPort::chagneDepthFormat(GLint internalDepthFormat)
   invalidate();
 }
 
-bool Z3DRenderOutputPort::canConnectTo(const Z3DInputPortBase *inport) const
+bool Z3DRenderOutputPort::canConnectTo(const Z3DInputPortBase* inport) const
 {
   if (dynamic_cast<const Z3DRenderInputPort*>(inport))
     return Z3DOutputPortBase::canConnectTo(inport);
@@ -79,7 +80,7 @@ bool Z3DRenderOutputPort::canConnectTo(const Z3DInputPortBase *inport) const
 
 //-----------------------------------------------------------------------------------
 
-Z3DRenderInputPort::Z3DRenderInputPort(const QString &name, bool allowMultipleConnections,
+Z3DRenderInputPort::Z3DRenderInputPort(const QString& name, bool allowMultipleConnections,
                                        Z3DFilter::InvalidationState invalidationState)
   : Z3DInputPortBase(name, allowMultipleConnections, invalidationState)
 {
@@ -92,7 +93,7 @@ Z3DRenderInputPort::~Z3DRenderInputPort()
 size_t Z3DRenderInputPort::numValidInputs() const
 {
   size_t res = 0;
-  for (size_t i=0; i<m_connectedOutputPorts.size(); ++i) {
+  for (size_t i = 0; i < m_connectedOutputPorts.size(); ++i) {
     const Z3DRenderOutputPort* p = dynamic_cast<const Z3DRenderOutputPort*>(m_connectedOutputPorts[i]);
     CHECK(p);
     if (p->hasValidData())
@@ -109,28 +110,28 @@ glm::uvec2 Z3DRenderInputPort::size(size_t idx) const
     return glm::uvec2(0);
 }
 
-const Z3DTexture *Z3DRenderInputPort::colorTexture(size_t idx) const
+const Z3DTexture* Z3DRenderInputPort::colorTexture(size_t idx) const
 {
   if (renderTarget(idx))
     return renderTarget(idx)->attachment(GL_COLOR_ATTACHMENT0);
   else
-    return NULL;
+    return nullptr;
 }
 
-const Z3DTexture *Z3DRenderInputPort::depthTexture(size_t idx) const
+const Z3DTexture* Z3DRenderInputPort::depthTexture(size_t idx) const
 {
   if (renderTarget(idx))
     return renderTarget(idx)->attachment(GL_DEPTH_ATTACHMENT);
   else
-    return NULL;
+    return nullptr;
 }
 
-const Z3DRenderTarget *Z3DRenderInputPort::renderTarget(size_t idx) const
+const Z3DRenderTarget* Z3DRenderInputPort::renderTarget(size_t idx) const
 {
   if (idx >= numValidInputs())
-    return NULL;
+    return nullptr;
   size_t res = 0;
-  for (size_t i=0; i<m_connectedOutputPorts.size(); ++i) {
+  for (size_t i = 0; i < m_connectedOutputPorts.size(); ++i) {
     const Z3DRenderOutputPort* p = dynamic_cast<const Z3DRenderOutputPort*>(m_connectedOutputPorts[i]);
     CHECK(p);
     if (p->hasValidData())

@@ -11,7 +11,7 @@
 
 namespace nim {
 
-ZColorMapKey::ZColorMapKey(double i, const glm::col4 &color)
+ZColorMapKey::ZColorMapKey(double i, const glm::col4& color)
   : m_intensity(i)
   , m_colorL(color)
   , m_colorR(color)
@@ -19,7 +19,7 @@ ZColorMapKey::ZColorMapKey(double i, const glm::col4 &color)
 {
 }
 
-ZColorMapKey::ZColorMapKey(double i, const glm::col4 &colorL, const glm::col4 &colorR)
+ZColorMapKey::ZColorMapKey(double i, const glm::col4& colorL, const glm::col4& colorR)
   : m_intensity(i)
   , m_colorL(colorL)
   , m_colorR(colorR)
@@ -27,7 +27,7 @@ ZColorMapKey::ZColorMapKey(double i, const glm::col4 &colorL, const glm::col4 &c
 {
 }
 
-ZColorMapKey::ZColorMapKey(double i, const glm::vec4 &color)
+ZColorMapKey::ZColorMapKey(double i, const glm::vec4& color)
   : m_intensity(i)
   , m_colorL(glm::col4(color * 255.f))
   , m_colorR(glm::col4(color * 255.f))
@@ -35,7 +35,7 @@ ZColorMapKey::ZColorMapKey(double i, const glm::vec4 &color)
 {
 }
 
-ZColorMapKey::ZColorMapKey(double i, const glm::vec4 &colorL, const glm::vec4 &colorR)
+ZColorMapKey::ZColorMapKey(double i, const glm::vec4& colorL, const glm::vec4& colorR)
   : m_intensity(i)
   , m_colorL(glm::col4(colorL * 255.f))
   , m_colorR(glm::col4(colorR * 255.f))
@@ -43,7 +43,7 @@ ZColorMapKey::ZColorMapKey(double i, const glm::vec4 &colorL, const glm::vec4 &c
 {
 }
 
-ZColorMapKey::ZColorMapKey(double i, const QColor &color)
+ZColorMapKey::ZColorMapKey(double i, const QColor& color)
   : m_intensity(i)
   , m_colorL(color.red(), color.green(), color.blue(), color.alpha())
   , m_colorR(color.red(), color.green(), color.blue(), color.alpha())
@@ -51,7 +51,7 @@ ZColorMapKey::ZColorMapKey(double i, const QColor &color)
 {
 }
 
-ZColorMapKey::ZColorMapKey(double i, const QColor &colorL, const QColor &colorR)
+ZColorMapKey::ZColorMapKey(double i, const QColor& colorL, const QColor& colorR)
   : m_intensity(i)
   , m_colorL(colorL.red(), colorL.green(), colorL.blue(), colorL.alpha())
   , m_colorR(colorR.red(), colorR.green(), colorR.blue(), colorR.alpha())
@@ -59,41 +59,41 @@ ZColorMapKey::ZColorMapKey(double i, const QColor &colorL, const QColor &colorR)
 {
 }
 
-bool ZColorMapKey::operator ==(const ZColorMapKey &key) const
+bool ZColorMapKey::operator==(const ZColorMapKey& key) const
 {
   return m_intensity == key.intensity() && m_colorL == key.colorL()
-      && m_colorR == key.colorR() && m_split == key.isSplit();
+         && m_colorR == key.colorR() && m_split == key.isSplit();
 }
 
-bool ZColorMapKey::operator !=(const ZColorMapKey &key) const
+bool ZColorMapKey::operator!=(const ZColorMapKey& key) const
 {
   return !(*this == key);
 }
 
-bool ZColorMapKey::operator <(const ZColorMapKey &key) const
+bool ZColorMapKey::operator<(const ZColorMapKey& key) const
 {
   return m_intensity < key.m_intensity;
 }
 
-void ZColorMapKey::setColorL(const glm::col4 &color)
+void ZColorMapKey::setColorL(const glm::col4& color)
 {
   m_colorL = color;
   if (!m_split) m_colorR = m_colorL;
 }
 
-void ZColorMapKey::setColorL(const glm::ivec4 &color)
+void ZColorMapKey::setColorL(const glm::ivec4& color)
 {
   m_colorL = glm::col4(color);
   if (!m_split) m_colorR = m_colorL;
 }
 
-void ZColorMapKey::setColorL(const glm::vec4 &color)
+void ZColorMapKey::setColorL(const glm::vec4& color)
 {
   m_colorL = glm::col4(color * 255.f);
   if (!m_split) m_colorR = m_colorL;
 }
 
-void ZColorMapKey::setColorL(const QColor &color)
+void ZColorMapKey::setColorL(const QColor& color)
 {
   m_colorL = glm::col4(color.red(), color.green(), color.blue(), color.alpha());
   if (!m_split) m_colorR = m_colorL;
@@ -104,25 +104,25 @@ QColor ZColorMapKey::qColorL() const
   return QColor(m_colorL.r, m_colorL.g, m_colorL.b, m_colorL.a);
 }
 
-void ZColorMapKey::setColorR(const glm::col4 &color)
+void ZColorMapKey::setColorR(const glm::col4& color)
 {
   m_colorR = color;
   if (!m_split) m_colorL = m_colorR;
 }
 
-void ZColorMapKey::setColorR(const glm::ivec4 &color)
+void ZColorMapKey::setColorR(const glm::ivec4& color)
 {
   m_colorR = glm::col4(color);
   if (!m_split) m_colorL = m_colorR;
 }
 
-void ZColorMapKey::setColorR(const glm::vec4 &color)
+void ZColorMapKey::setColorR(const glm::vec4& color)
 {
   m_colorR = glm::col4(color * 255.f);
   if (!m_split) m_colorL = m_colorR;
 }
 
-void ZColorMapKey::setColorR(const QColor &color)
+void ZColorMapKey::setColorR(const QColor& color)
 {
   m_colorR = glm::col4(color.red(), color.green(), color.blue(), color.alpha());
   if (!m_split) m_colorL = m_colorR;
@@ -148,14 +148,14 @@ void ZColorMapKey::setSplit(bool split, bool useLeft)
 
 void ZColorMapKey::setFloatAlphaR(double a)
 {
-  m_colorR.a = static_cast<uint8_t>(a*255.);
+  m_colorR.a = static_cast<uint8_t>(a * 255.);
   if (!m_split)
     m_colorL.a = m_colorR.a;
 }
 
 void ZColorMapKey::setFloatAlphaL(double a)
 {
-  m_colorL.a = static_cast<uint8_t>(a*255.);
+  m_colorL.a = static_cast<uint8_t>(a * 255.);
   if (!m_split)
     m_colorR.a = m_colorL.a;
 }
@@ -194,7 +194,7 @@ uint8_t ZColorMapKey::alphaL() const
   return m_colorL.a;
 }
 
-ZColorMapKey *ZColorMapKey::clone() const
+ZColorMapKey* ZColorMapKey::clone() const
 {
   if (!m_split)
     return new ZColorMapKey(m_intensity, m_colorL);
@@ -202,8 +202,8 @@ ZColorMapKey *ZColorMapKey::clone() const
     return new ZColorMapKey(m_intensity, m_colorL, m_colorR);
 }
 
-ZColorMap::ZColorMap(double min, double max, const glm::col4 &minColor,
-                     const glm::col4 &maxColor, QObject *parent)
+ZColorMap::ZColorMap(double min, double max, const glm::col4& minColor,
+                     const glm::col4& maxColor, QObject* parent)
   : QObject(parent), m_hasDataRange(false), m_dataMin(0), m_dataMax(0)
 {
   addKey(ZColorMapKey(min, minColor));
@@ -212,8 +212,8 @@ ZColorMap::ZColorMap(double min, double max, const glm::col4 &minColor,
   connect(this, &ZColorMap::changed, this, &ZColorMap::invalidateTexture);
 }
 
-ZColorMap::ZColorMap(double min, double max, const glm::vec4 &minColor,
-                     const glm::vec4 &maxColor, QObject *parent)
+ZColorMap::ZColorMap(double min, double max, const glm::vec4& minColor,
+                     const glm::vec4& maxColor, QObject* parent)
   : QObject(parent), m_hasDataRange(false), m_dataMin(0), m_dataMax(0)
 {
   addKey(ZColorMapKey(min, minColor));
@@ -222,7 +222,7 @@ ZColorMap::ZColorMap(double min, double max, const glm::vec4 &minColor,
   connect(this, &ZColorMap::changed, this, &ZColorMap::invalidateTexture);
 }
 
-ZColorMap::ZColorMap(double min, double max, const QColor &minColor, const QColor &maxColor, QObject *parent)
+ZColorMap::ZColorMap(double min, double max, const QColor& minColor, const QColor& maxColor, QObject* parent)
   : QObject(parent), m_hasDataRange(false), m_dataMin(0), m_dataMax(0)
 {
   addKey(ZColorMapKey(min, minColor));
@@ -231,14 +231,14 @@ ZColorMap::ZColorMap(double min, double max, const QColor &minColor, const QColo
   connect(this, &ZColorMap::changed, this, &ZColorMap::invalidateTexture);
 }
 
-ZColorMap::ZColorMap(const ZColorMap &cm)
+ZColorMap::ZColorMap(const ZColorMap& cm)
   : QObject(cm.parent()), m_hasDataRange(cm.m_hasDataRange), m_dataMin(cm.m_dataMin), m_dataMax(cm.m_dataMax)
 {
   m_keys = cm.m_keys;
   connect(this, &ZColorMap::changed, this, &ZColorMap::invalidateTexture);
 }
 
-ZColorMap::ZColorMap(ZColorMap &&other) noexcept
+ZColorMap::ZColorMap(ZColorMap&& other) noexcept
 {
   swap(other);
 }
@@ -247,7 +247,7 @@ ZColorMap::~ZColorMap()
 {
 }
 
-void ZColorMap::swap(ZColorMap &other) noexcept
+void ZColorMap::swap(ZColorMap& other) noexcept
 {
   m_keys.swap(other.m_keys);
   std::swap(m_hasDataRange, other.m_hasDataRange);
@@ -257,7 +257,7 @@ void ZColorMap::swap(ZColorMap &other) noexcept
   std::swap(m_textureIsInvalid, other.m_textureIsInvalid);
 }
 
-void ZColorMap::reset(double min, double max, const glm::col4 &minColor, const glm::col4 &maxColor)
+void ZColorMap::reset(double min, double max, const glm::col4& minColor, const glm::col4& maxColor)
 {
   m_hasDataRange = false;
   blockSignals(true);
@@ -271,7 +271,7 @@ void ZColorMap::reset(double min, double max, const glm::col4 &minColor, const g
   emit changed();
 }
 
-void ZColorMap::reset(double min, double max, const glm::vec4 &minColor, const glm::vec4 &maxColor)
+void ZColorMap::reset(double min, double max, const glm::vec4& minColor, const glm::vec4& maxColor)
 {
   m_hasDataRange = false;
   blockSignals(true);
@@ -285,7 +285,7 @@ void ZColorMap::reset(double min, double max, const glm::vec4 &minColor, const g
   emit changed();
 }
 
-void ZColorMap::reset(double min, double max, const QColor &minColor, const QColor &maxColor)
+void ZColorMap::reset(double min, double max, const QColor& minColor, const QColor& maxColor)
 {
   m_hasDataRange = false;
   blockSignals(true);
@@ -299,12 +299,12 @@ void ZColorMap::reset(double min, double max, const QColor &minColor, const QCol
   emit changed();
 }
 
-bool ZColorMap::operator ==(const ZColorMap &cm) const
+bool ZColorMap::operator==(const ZColorMap& cm) const
 {
   return equalTo(cm);
 }
 
-bool ZColorMap::operator !=(const ZColorMap &cm) const
+bool ZColorMap::operator!=(const ZColorMap& cm) const
 {
   return !(*this == cm);
 }
@@ -316,7 +316,7 @@ double ZColorMap::domainMin() const
 
 double ZColorMap::domainMax() const
 {
-  return m_keys[m_keys.size()-1].first.intensity();
+  return m_keys[m_keys.size() - 1].first.intensity();
 }
 
 bool ZColorMap::isValidDomainMin(double min) const
@@ -344,12 +344,12 @@ bool ZColorMap::setDomainMin(double min, bool rescaleKeys)
     if (rescaleKeys) {
       double prevDistToMax = domainMax() - domainMin();
       double distToMax = domainMax() - min;
-      double scale = distToMax/prevDistToMax;
+      double scale = distToMax / prevDistToMax;
       double dmax = domainMax();
       std::vector<std::pair<ZColorMapKey, bool>> newKeys;
-      for (size_t i=0; i<m_keys.size(); i++) {
+      for (size_t i = 0; i < m_keys.size(); i++) {
         double inten = keyIntensity(i);
-        double newInten = dmax - (dmax-inten)*scale;
+        double newInten = dmax - (dmax - inten) * scale;
         if (isKeySplit(i))
           newKeys.emplace_back(ZColorMapKey(newInten, keyColorL(i), keyColorR(i)), m_keys[i].second);
         else
@@ -360,7 +360,7 @@ bool ZColorMap::setDomainMin(double min, bool rescaleKeys)
       glm::col4 col = mappedColor(min);
       size_t startIdx = m_keys.size();
       size_t endIdx = 0;
-      for (size_t i=0; i<m_keys.size(); i++) {
+      for (size_t i = 0; i < m_keys.size(); i++) {
         if (keyIntensity(i) <= min) {
           startIdx = std::min(startIdx, i);
           endIdx = std::max(endIdx, i);
@@ -368,7 +368,7 @@ bool ZColorMap::setDomainMin(double min, bool rescaleKeys)
           break;
       }
       if (startIdx < m_keys.size())
-        m_keys.erase(m_keys.begin()+startIdx, m_keys.begin()+endIdx+1);
+        m_keys.erase(m_keys.begin() + startIdx, m_keys.begin() + endIdx + 1);
 
       addKey(ZColorMapKey(min, col));
     }
@@ -388,12 +388,12 @@ bool ZColorMap::setDomainMax(double max, bool rescaleKeys)
     if (rescaleKeys) {
       double prevDistToMin = domainMax() - domainMin();
       double distToMin = max - domainMin();
-      double scale = distToMin/prevDistToMin;
+      double scale = distToMin / prevDistToMin;
       double dmin = domainMin();
       std::vector<std::pair<ZColorMapKey, bool>> newKeys;
-      for (size_t i=0; i<m_keys.size(); i++) {
+      for (size_t i = 0; i < m_keys.size(); i++) {
         double inten = keyIntensity(i);
-        double newInten = dmin + (inten-dmin)*scale;
+        double newInten = dmin + (inten - dmin) * scale;
         if (isKeySplit(i))
           newKeys.emplace_back(ZColorMapKey(newInten, keyColorL(i), keyColorR(i)), m_keys[i].second);
         else
@@ -404,7 +404,7 @@ bool ZColorMap::setDomainMax(double max, bool rescaleKeys)
       glm::col4 col = mappedColor(max);
       size_t startIdx = m_keys.size();
       size_t endIdx = 0;
-      for (int i=static_cast<int>(m_keys.size())-1; i>=0; i--) {
+      for (int i = static_cast<int>(m_keys.size()) - 1; i >= 0; i--) {
         if (keyIntensity(i) >= max) {
           startIdx = std::min(startIdx, static_cast<size_t>(i));
           endIdx = std::max(endIdx, static_cast<size_t>(i));
@@ -412,7 +412,7 @@ bool ZColorMap::setDomainMax(double max, bool rescaleKeys)
           break;
       }
       if (startIdx < m_keys.size())
-        m_keys.erase(m_keys.begin()+startIdx, m_keys.begin()+endIdx+1);
+        m_keys.erase(m_keys.begin() + startIdx, m_keys.begin() + endIdx + 1);
 
       addKey(ZColorMapKey(max, col));
     }
@@ -461,7 +461,7 @@ glm::col4 ZColorMap::mappedColor(double i) const
     return glm::col4(0, 0, 0, 0);
 
   // iterate through all keys until we get to the correct position
-  std::vector<std::pair<ZColorMapKey,bool>>::const_iterator keyIt = m_keys.begin();
+  std::vector<std::pair<ZColorMapKey, bool>>::const_iterator keyIt = m_keys.begin();
 
   while ((keyIt != m_keys.end()) && (i > (*keyIt).first.intensity()))
     keyIt++;
@@ -469,10 +469,10 @@ glm::col4 ZColorMap::mappedColor(double i) const
   if (keyIt == m_keys.begin())
     return m_keys[0].first.colorL();
   else if (keyIt == m_keys.end())
-    return (*(keyIt-1)).first.colorR();
-  else{
+    return (*(keyIt - 1)).first.colorR();
+  else {
     // calculate the value weighted by the destination to the next left and right key
-    ZColorMapKey leftKey = (*(keyIt-1)).first;
+    ZColorMapKey leftKey = (*(keyIt - 1)).first;
     ZColorMapKey rightKey = keyIt->first;
     double fraction = (i - leftKey.intensity()) / (rightKey.intensity() - leftKey.intensity());
     glm::col4 leftDest = leftKey.colorR();
@@ -496,7 +496,7 @@ glm::col4 ZColorMap::mappedColorBGRA(double i) const
 glm::vec4 ZColorMap::mappedFColor(double i) const
 {
   glm::col4 col = mappedColor(i);
-  return glm::vec4(col)/255.f;
+  return glm::vec4(col) / 255.f;
 }
 
 QColor ZColorMap::mappedQColor(double i) const
@@ -512,7 +512,7 @@ glm::col4 ZColorMap::keyColorL(size_t index) const
 
 glm::vec4 ZColorMap::keyFColorL(size_t index) const
 {
-  return glm::vec4(m_keys[index].first.colorL())/255.f;
+  return glm::vec4(m_keys[index].first.colorL()) / 255.f;
 }
 
 QColor ZColorMap::keyQColorL(size_t index) const
@@ -527,7 +527,7 @@ glm::col4 ZColorMap::keyColorR(size_t index) const
 
 glm::vec4 ZColorMap::keyFColorR(size_t index) const
 {
-  return glm::vec4(m_keys[index].first.colorR())/255.f;
+  return glm::vec4(m_keys[index].first.colorR()) / 255.f;
 }
 
 QColor ZColorMap::keyQColorR(size_t index) const
@@ -535,37 +535,37 @@ QColor ZColorMap::keyQColorR(size_t index) const
   return m_keys[index].first.qColorR();
 }
 
-void ZColorMap::setKeyColorL(size_t index, const glm::col4 &color)
+void ZColorMap::setKeyColorL(size_t index, const glm::col4& color)
 {
   m_keys[index].first.setColorL(color);
   emit changed();
 }
 
-void ZColorMap::setKeyColorR(size_t index, const glm::col4 &color)
+void ZColorMap::setKeyColorR(size_t index, const glm::col4& color)
 {
   m_keys[index].first.setColorR(color);
   emit changed();
 }
 
-void ZColorMap::setKeyColorL(size_t index, const glm::vec4 &color)
+void ZColorMap::setKeyColorL(size_t index, const glm::vec4& color)
 {
   m_keys[index].first.setColorL(color);
   emit changed();
 }
 
-void ZColorMap::setKeyColorR(size_t index, const glm::vec4 &color)
+void ZColorMap::setKeyColorR(size_t index, const glm::vec4& color)
 {
   m_keys[index].first.setColorR(color);
   emit changed();
 }
 
-void ZColorMap::setKeyColorL(size_t index, const QColor &color)
+void ZColorMap::setKeyColorL(size_t index, const QColor& color)
 {
   m_keys[index].first.setColorL(color);
   emit changed();
 }
 
-void ZColorMap::setKeyColorR(size_t index, const QColor &color)
+void ZColorMap::setKeyColorR(size_t index, const QColor& color)
 {
   m_keys[index].first.setColorR(color);
   emit changed();
@@ -647,7 +647,7 @@ void ZColorMap::setKeySelected(size_t index, bool v)
 void ZColorMap::deselectAllKeys()
 {
   bool change = false;
-  for (size_t i=0; i<m_keys.size(); i++) {
+  for (size_t i = 0; i < m_keys.size(); i++) {
     if (m_keys[i].second) {
       change = true;
       m_keys[i].second = false;
@@ -660,8 +660,7 @@ void ZColorMap::deselectAllKeys()
 std::vector<size_t> ZColorMap::selectedKeyIndexes() const
 {
   std::vector<size_t> all;
-  for (size_t i=0; i<m_keys.size(); i++)
-  {
+  for (size_t i = 0; i < m_keys.size(); i++) {
     if (m_keys[i].second)
       all.push_back(i);
   }
@@ -699,10 +698,9 @@ QColor ZColorMap::fractionMappedQColor(double fraction) const
   return mappedQColor(i);
 }
 
-bool ZColorMap::setKey(size_t index, const ZColorMapKey &key, bool select)
+bool ZColorMap::setKey(size_t index, const ZColorMapKey& key, bool select)
 {
-  if (index < m_keys.size())
-  {
+  if (index < m_keys.size()) {
     blockSignals(true);
     removeKey(index);
     addKey(key, select);
@@ -713,20 +711,20 @@ bool ZColorMap::setKey(size_t index, const ZColorMapKey &key, bool select)
   return false;
 }
 
-bool ZColorMap::setKeys(const std::vector<ZColorMapKey> &keys)
+bool ZColorMap::setKeys(const std::vector<ZColorMapKey>& keys)
 {
   if (keys.size() < 2)
     return false;
   blockSignals(true);
   clearKeys();
-  for (size_t i=0; i<keys.size(); i++)
+  for (size_t i = 0; i < keys.size(); i++)
     addKey(keys[i]);
   blockSignals(false);
   emit changed();
   return true;
 }
 
-ZColorMapKey& ZColorMap::addKey(const ZColorMapKey &key, bool select)
+ZColorMapKey& ZColorMap::addKey(const ZColorMapKey& key, bool select)
 {
   if (m_keys.empty()) {
     m_keys.emplace_back(key, select);
@@ -753,7 +751,7 @@ void ZColorMap::addKeyAtIntensity(double intensity, bool select)
   addKey(ZColorMapKey(intensity, mappedColor(intensity)), select);
 }
 
-void ZColorMap::addKeyAtIntensity(double intensity, const glm::col4 &color, bool select)
+void ZColorMap::addKeyAtIntensity(double intensity, const glm::col4& color, bool select)
 {
   addKey(ZColorMapKey(intensity, color), select);
 }
@@ -772,7 +770,7 @@ void ZColorMap::addKeyAtIntensity(double intensity, double alpha, bool select)
   addKey(ZColorMapKey(intensity, col), select);
 }
 
-void ZColorMap::addKeyAtFraction(double fraction, const glm::col4 &color, bool select)
+void ZColorMap::addKeyAtFraction(double fraction, const glm::col4& color, bool select)
 {
   double intensity = domainMin() + fraction * (domainMax() - domainMin());
   addKey(ZColorMapKey(intensity, color), select);
@@ -803,13 +801,13 @@ void ZColorMap::addKeyAtFraction(double fraction, double alpha, bool select)
 
 namespace {
 
-bool KeyIntensityEqual(const std::pair<ZColorMapKey, bool> &key1,
-                       const std::pair<ZColorMapKey, bool> &key2)
+bool KeyIntensityEqual(const std::pair<ZColorMapKey, bool>& key1,
+                       const std::pair<ZColorMapKey, bool>& key2)
 {
   return key1.first.intensity() == key2.first.intensity();
 }
 
-bool KeyIsSelected(const std::pair<ZColorMapKey, bool> &key)
+bool KeyIsSelected(const std::pair<ZColorMapKey, bool>& key)
 {
   return key.second;
 }
@@ -820,18 +818,18 @@ bool ZColorMap::removeDuplicatedKeys()
 {
   size_t sizeBefore = m_keys.size();
   m_keys.erase(std::unique(m_keys.begin(), m_keys.end(), KeyIntensityEqual), m_keys.end());
-  if (m_keys.size()!=sizeBefore)
+  if (m_keys.size() != sizeBefore)
     emit changed();
-  return m_keys.size()!=sizeBefore;
+  return m_keys.size() != sizeBefore;
 }
 
 bool ZColorMap::removeSelectedKeys()
 {
   size_t sizeBefore = m_keys.size();
   m_keys.erase(std::remove_if(m_keys.begin(), m_keys.end(), KeyIsSelected), m_keys.end());
-  if (m_keys.size()!=sizeBefore)
+  if (m_keys.size() != sizeBefore)
     emit changed();
-  return m_keys.size()!=sizeBefore;
+  return m_keys.size() != sizeBefore;
 }
 
 void ZColorMap::updateKeys()
@@ -839,7 +837,7 @@ void ZColorMap::updateKeys()
   std::sort(m_keys.begin(), m_keys.end());
 }
 
-void ZColorMap::removeKey(const ZColorMapKey &key)
+void ZColorMap::removeKey(const ZColorMapKey& key)
 {
   m_keys.erase(std::remove(m_keys.begin(), m_keys.end(), std::make_pair(key, false)), m_keys.end());
   m_keys.erase(std::remove(m_keys.begin(), m_keys.end(), std::make_pair(key, true)), m_keys.end());
@@ -848,11 +846,11 @@ void ZColorMap::removeKey(const ZColorMapKey &key)
 
 void ZColorMap::removeKey(size_t index)
 {
-  m_keys.erase(m_keys.begin()+index);
+  m_keys.erase(m_keys.begin() + index);
   emit changed();
 }
 
-Z3DTexture *ZColorMap::texture1D()
+Z3DTexture* ZColorMap::texture1D()
 {
   if (!m_texture)
     create1DTexture(256);
@@ -868,7 +866,7 @@ void ZColorMap::create1DTexture(size_t width)
   size_t maxTexSize = Z3DGpuInfoInstance.maxTextureSize();
   if (maxTexSize < width)
     width = maxTexSize;
-  m_texture.reset(new Z3DTexture(GLint(GL_RGBA8), glm::uvec3(width,1,1), GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV));
+  m_texture.reset(new Z3DTexture(GLint(GL_RGBA8), glm::uvec3(width, 1, 1), GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV));
   CHECK_GL_ERROR;
 }
 
@@ -879,52 +877,55 @@ void ZColorMap::update1DTexture()
 
   std::vector<glm::col4> tfData(m_texture->dimension().x);
   for (size_t x = 0; x < tfData.size(); ++x)
-    tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size()-1));
+    tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size() - 1));
   m_texture->uploadImage(tfData.data());
   CHECK_GL_ERROR;
 
   m_textureIsInvalid = false;
 }
 
-ZColorMapParameter::ZColorMapParameter(const QString &name, QObject *parent)
+ZColorMapParameter::ZColorMapParameter(const QString& name, QObject* parent)
   : ZSingleValueParameter<ZColorMap>(name, parent)
 {
   connect(&m_value, &ZColorMap::changed, this, &ZColorMapParameter::valueChanged);
 }
 
-ZColorMapParameter::ZColorMapParameter(const QString &name, const ZColorMap &cm, QObject *parent)
+ZColorMapParameter::ZColorMapParameter(const QString& name, const ZColorMap& cm, QObject* parent)
   : ZSingleValueParameter<ZColorMap>(name, cm, parent)
 {
   connect(&m_value, &ZColorMap::changed, this, &ZColorMapParameter::valueChanged);
 }
 
-ZColorMapParameter::ZColorMapParameter(const QString &name, double min, double max, const glm::col4 &minColor, const glm::col4 &maxColor, QObject *parent)
+ZColorMapParameter::ZColorMapParameter(const QString& name, double min, double max, const glm::col4& minColor,
+                                       const glm::col4& maxColor, QObject* parent)
   : ZSingleValueParameter<ZColorMap>(name, parent)
 {
   m_value.reset(min, max, minColor, maxColor);
   connect(&m_value, &ZColorMap::changed, this, &ZColorMapParameter::valueChanged);
 }
 
-ZColorMapParameter::ZColorMapParameter(const QString &name, double min, double max, const glm::vec4 &minColor, const glm::vec4 &maxColor, QObject *parent)
+ZColorMapParameter::ZColorMapParameter(const QString& name, double min, double max, const glm::vec4& minColor,
+                                       const glm::vec4& maxColor, QObject* parent)
   : ZSingleValueParameter<ZColorMap>(name, parent)
 {
   m_value.reset(min, max, minColor, maxColor);
   connect(&m_value, &ZColorMap::changed, this, &ZColorMapParameter::valueChanged);
 }
 
-ZColorMapParameter::ZColorMapParameter(const QString &name, double min, double max, const QColor &minColor, const QColor &maxColor, QObject *parent)
+ZColorMapParameter::ZColorMapParameter(const QString& name, double min, double max, const QColor& minColor,
+                                       const QColor& maxColor, QObject* parent)
   : ZSingleValueParameter<ZColorMap>(name, parent)
 {
   m_value.reset(min, max, minColor, maxColor);
   connect(&m_value, &ZColorMap::changed, this, &ZColorMapParameter::valueChanged);
 }
 
-QWidget *ZColorMapParameter::actualCreateWidget(QWidget *parent)
+QWidget* ZColorMapParameter::actualCreateWidget(QWidget* parent)
 {
   return new ZColorMapWidgetWithEditorWindow(this, parent);
 }
 
-void ZColorMapParameter::setSameAs(const ZParameter &rhs)
+void ZColorMapParameter::setSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
   const ZColorMapParameter* src = static_cast<const ZColorMapParameter*>(&rhs);
@@ -950,11 +951,11 @@ QJsonValue ZColorMapParameter::jsonValue() const
   return keyArray;
 }
 
-void ZColorMapParameter::readValue(const QJsonValue &jsonValue)
+void ZColorMapParameter::readValue(const QJsonValue& jsonValue)
 {
   m_value.m_keys.clear();
   QJsonArray keyArray = jsonValue.toArray();
-  for (int i=0; i<keyArray.size(); ++i) {
+  for (int i = 0; i < keyArray.size(); ++i) {
     QJsonObject keyObj = keyArray[i].toObject();
     ZColorMapKey key(0, glm::col4());
     if (keyObj.contains("intensity") &&
@@ -973,9 +974,10 @@ void ZColorMapParameter::readValue(const QJsonValue &jsonValue)
   emit valueChanged();
 }
 
-bool ZColorMap::equalTo(const ZColorMap &cm) const
+bool ZColorMap::equalTo(const ZColorMap& cm) const
 {
-  return m_keys == cm.m_keys && m_hasDataRange == cm.m_hasDataRange && m_dataMin == cm.m_dataMin && m_dataMax == cm.m_dataMax;
+  return m_keys == cm.m_keys && m_hasDataRange == cm.m_hasDataRange && m_dataMin == cm.m_dataMin &&
+         m_dataMax == cm.m_dataMax;
 }
 } // namespace nim
 

@@ -16,7 +16,7 @@ void ZImgAlgorithmBaseWithProgressReporter::setProgressReportInterval(double int
 {
   if (interval != m_reportInterval) {
     m_reportInterval = interval;
-    for (std::map<void*,WeightProgress>::iterator it = m_subOperationsWeightProgress.begin();
+    for (std::map<void*, WeightProgress>::iterator it = m_subOperationsWeightProgress.begin();
          it != m_subOperationsWeightProgress.end(); ++it) {
       ZImgAlgorithmBaseWithProgressReporter* sub = static_cast<ZImgAlgorithmBaseWithProgressReporter*>(it->first);
       sub->setProgressReportInterval(m_reportInterval / it->second.weight);
@@ -24,17 +24,17 @@ void ZImgAlgorithmBaseWithProgressReporter::setProgressReportInterval(double int
   }
 }
 
-void ZImgAlgorithmBaseWithProgressReporter::subOperationProgressChanged(double p, void *sender)
+void ZImgAlgorithmBaseWithProgressReporter::subOperationProgressChanged(double p, void* sender)
 {
   if (false && m_cancelFlag && *m_cancelFlag) {
-    std::set<itk::ProcessObject*>::iterator it = m_itkOperations.find((itk::ProcessObject*)sender);
+    std::set<itk::ProcessObject*>::iterator it = m_itkOperations.find((itk::ProcessObject*) sender);
     if (it != m_itkOperations.end()) {
       (*it)->AbortGenerateDataOn();
     } else {
       throw ZProcessAbortException("");
     }
   } else {
-    std::map<void*,WeightProgress>::iterator it = m_subOperationsWeightProgress.find(sender);
+    std::map<void*, WeightProgress>::iterator it = m_subOperationsWeightProgress.find(sender);
     if (it != m_subOperationsWeightProgress.end() &&
         ((p - it->second.progress) * it->second.weight >= m_reportInterval || p == 1.0)) {
       it->second.progress = p;
@@ -54,7 +54,8 @@ void ZImgAlgorithmBaseWithProgressReporter::reportProgress(double progress)
   }
 }
 
-void ZImgAlgorithmBaseWithProgressReporter::registerSubOperation(ZImgAlgorithmBaseWithProgressReporter *sender, double weight)
+void ZImgAlgorithmBaseWithProgressReporter::registerSubOperation(ZImgAlgorithmBaseWithProgressReporter* sender,
+                                                                 double weight)
 {
   m_subOperationsWeightProgress[sender].weight = weight;
   m_subOperationsWeightProgress[sender].progress = 0.0;
@@ -63,7 +64,7 @@ void ZImgAlgorithmBaseWithProgressReporter::registerSubOperation(ZImgAlgorithmBa
   sender->setParent(this);
 }
 
-void ZImgAlgorithmBaseWithProgressReporter::registerSubOperation(itk::ProcessObject *filter, double weight)
+void ZImgAlgorithmBaseWithProgressReporter::registerSubOperation(itk::ProcessObject* filter, double weight)
 {
   m_subOperationsWeightProgress[filter].weight = weight;
   m_subOperationsWeightProgress[filter].progress = 0.0;
@@ -80,7 +81,7 @@ void ZImgAlgorithmBaseWithProgressReporter::clearRegisteredSubOperations()
 void ZImgAlgorithmBaseWithProgressReporter::sendProgressSignal()
 {
   double currentProgress = m_weight * m_progress;
-  for (std::map<void*,WeightProgress>::iterator it = m_subOperationsWeightProgress.begin();
+  for (std::map<void*, WeightProgress>::iterator it = m_subOperationsWeightProgress.begin();
        it != m_subOperationsWeightProgress.end(); ++it) {
     currentProgress += it->second.weight * it->second.progress;
   }
@@ -92,10 +93,10 @@ void ZImgAlgorithmBaseWithProgressReporter::sendProgressSignal()
   }
 }
 
-void ZImgAlgorithmBaseWithProgressReporter::processITKEvent(itk::Object *caller, const itk::EventObject &event)
+void ZImgAlgorithmBaseWithProgressReporter::processITKEvent(itk::Object* caller, const itk::EventObject& event)
 {
   if (dynamic_cast<const itk::ProgressEvent*>(&event)) {
-    itk::ProcessObject* process =  dynamic_cast<itk::ProcessObject*>(caller);
+    itk::ProcessObject* process = dynamic_cast<itk::ProcessObject*>(caller);
     if (m_cancelFlag && *m_cancelFlag) {
       if (process->GetAbortGenerateData() == false) {
         process->AbortGenerateDataOn();
@@ -107,10 +108,11 @@ void ZImgAlgorithmBaseWithProgressReporter::processITKEvent(itk::Object *caller,
   }
 }
 
-void ZImgAlgorithmBaseWithProgressReporter::constProcessITKEvent(const itk::Object *caller, const itk::EventObject &event)
+void
+ZImgAlgorithmBaseWithProgressReporter::constProcessITKEvent(const itk::Object* caller, const itk::EventObject& event)
 {
   if (dynamic_cast<const itk::ProgressEvent*>(&event)) {
-    itk::ProcessObject* process =  const_cast<itk::ProcessObject*>(dynamic_cast<const itk::ProcessObject*>(caller));
+    itk::ProcessObject* process = const_cast<itk::ProcessObject*>(dynamic_cast<const itk::ProcessObject*>(caller));
     if (m_cancelFlag && *m_cancelFlag) {
       if (process->GetAbortGenerateData() == false) {
         process->AbortGenerateDataOn();

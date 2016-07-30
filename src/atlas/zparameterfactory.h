@@ -13,8 +13,10 @@ namespace nim {
 class ZParameterMakerInterface
 {
 public:
-  virtual ZParameter* create(const QString &name, QObject *parent = nullptr) const = 0;
-  virtual ~ZParameterMakerInterface() {}
+  virtual ZParameter* create(const QString& name, QObject* parent = nullptr) const = 0;
+
+  virtual ~ZParameterMakerInterface()
+  {}
 };
 
 class ZParameterFactory
@@ -24,11 +26,12 @@ public:
 
   ZParameterFactory();
 
-  bool isTypeValid(const QString &type);
-  // return nullptr if failed
-  ZParameter* create(const QString &name, const QString &type, QObject *parent = nullptr) const;
+  bool isTypeValid(const QString& type);
 
-  void registerMaker(const QString &typeName, ZParameterMakerInterface* maker);
+  // return nullptr if failed
+  ZParameter* create(const QString& name, const QString& type, QObject* parent = nullptr) const;
+
+  void registerMaker(const QString& typeName, ZParameterMakerInterface* maker);
 
 private:
   std::map<QString, std::unique_ptr<ZParameterMakerInterface>> m_makers;

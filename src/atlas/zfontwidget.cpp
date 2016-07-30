@@ -7,7 +7,7 @@
 
 namespace nim {
 
-ZFontWidget::ZFontWidget(const QFont &font, QWidget *parent)
+ZFontWidget::ZFontWidget(const QFont& font, QWidget* parent)
   : QWidget(parent)
   , m_font(font)
   , m_followFontSize(false)
@@ -19,8 +19,8 @@ ZFontWidget::ZFontWidget(const QFont &font, QWidget *parent)
   m_button = new QToolButton();
   m_button->setText("...");
   connect(m_button, &QToolButton::clicked, this, &ZFontWidget::chooseFont);
-  QHBoxLayout *lo = new QHBoxLayout(this);
-  lo->setContentsMargins(0,0,0,0);
+  QHBoxLayout* lo = new QHBoxLayout(this);
+  lo->setContentsMargins(0, 0, 0, 0);
   lo->addWidget(m_label);
   lo->addWidget(m_button);
 }
@@ -38,7 +38,7 @@ void ZFontWidget::setLabelFollowFontSize(bool v)
   m_label->home(false);
 }
 
-void ZFontWidget::setFont(const QFont &font)
+void ZFontWidget::setFont(const QFont& font)
 {
   if (font != m_font) {
     m_font = font;

@@ -15,24 +15,28 @@ namespace nim {
 
 class ZCameraParameterAnimation : public ZParameterAnimation
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  ZCameraParameterAnimation(const QString &name,
-                            const QColor &color = QColor(ZRandomInstance.randInt(255),
+  ZCameraParameterAnimation(const QString& name,
+                            const QColor& color = QColor(ZRandomInstance.randInt(255),
                                                          ZRandomInstance.randInt(255),
                                                          ZRandomInstance.randInt(255)),
-                            QObject *parent = 0);
+                            QObject* parent = 0);
+
   ~ZCameraParameterAnimation();
 
-  ZStringIntOptionParameter& interpolationMethodPara() { return m_interpolationMethod; }
+  ZStringIntOptionParameter& interpolationMethodPara()
+  { return m_interpolationMethod; }
 
   // create a new key based on current view
   virtual ZParameterKey* createKey(double secs) const override;
 
   virtual void updateParaToTime(double secs, ZParameter* para) const override;
+
   void buildSpline();
 
 signals:
+
   void interpolationMethodChanged();
 
 protected:
@@ -46,7 +50,9 @@ protected:
     glm::vec3 Velocity(float fU); // P'(u)
     glm::vec3 Acceleration(float fU); // P"(u)
     float Speed(float fU);
+
     float Length(float fU);
+
     // Time interval on which polynomial is valid, tmin <= t <= tmax.
     // The normalized time is u = (t - tmin)/(tmax - tmin). The inverse
     // range 1/(tmax-tmin) is computed once and stored to avoid having to
@@ -63,6 +69,7 @@ protected:
   {
   public:
     glm::quat Q(float fU) const;
+
     // Time interval on which polynomial is valid, tmin <= t <= tmax.
     // The normalized time is u = (t - tmin)/(tmax - tmin). The inverse
     // range 1/(tmax-tmin) is computed once and stored to avoid having to
@@ -72,35 +79,47 @@ protected:
     glm::quat m_kP, m_kA, m_kB, m_kQ;
   };
 
-  struct SplineRange {
+  struct SplineRange
+  {
     SplineRange();
-    SplineRange(QList<ZCameraParameterKey*> &kys);
+
+    SplineRange(QList<ZCameraParameterKey*>& kys);
 
     glm::quat rotation(float fTime) const;
+
     glm::vec3 position(double fTime) const; // X(t)
     glm::vec3 velocity(double fTime); // X'(t)
     glm::vec3 acceleration(double fTime); // X"(t)
     // length of the spline
     double length(double fTime);
+
     double totalLength();
+
     // Evaluate position and derivatives by specifying arc length s along the
     // spline. If L is the total length of the curve, then 0 <= s <= L is
     // required.
     glm::vec3 positionAL(double fS);
+
     glm::vec3 velocityAL(double fS);
-    glm::vec3 accelerationAL (double fS);
+
+    glm::vec3 accelerationAL(double fS);
 
     void buildPosSpline();
+
     void buildRotSpline();
 
     void doPolyLookup(float fTime, int& riI, float& rfU) const;
+
     // support for arc length parameterization of spline
     void invertIntegral(float fS, int& riI, float& rfU);
 
-    double startTime() const { return keys[0]->time(); }
-    double endTime() const { return keys[keys.size()-1]->time(); }
+    double startTime() const
+    { return keys[0]->time(); }
 
-    void swap(SplineRange &rhs) noexcept;
+    double endTime() const
+    { return keys[keys.size() - 1]->time(); }
+
+    void swap(SplineRange& rhs) noexcept;
 
     QList<ZCameraParameterKey*> keys;
     QList<Poly> posSpline;
@@ -111,6 +130,7 @@ protected:
     std::unique_ptr<ZCameraParameterKey> firstKey;
     std::unique_ptr<ZCameraParameterKey> lastKey;
   };
+
   std::vector<SplineRange> m_pathSegments;
   ZStringIntOptionParameter m_interpolationMethod;
 };

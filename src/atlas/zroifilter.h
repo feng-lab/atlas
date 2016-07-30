@@ -19,10 +19,15 @@ namespace nim {
 class ROIGraphicsItem : public QGraphicsPathItem
 {
 public:
-  enum { Type = UserType + 5 };
-  int type() const override { return Type; }
+  enum
+  {
+    Type = UserType + 5
+  };
 
-  ROIGraphicsItem(ZROI &roi, int slice, double z = 100, QGraphicsItem *parent = nullptr);
+  int type() const override
+  { return Type; }
+
+  ROIGraphicsItem(ZROI& roi, int slice, double z = 100, QGraphicsItem* parent = nullptr);
 
   void updateValue();
 
@@ -31,11 +36,12 @@ public:
 protected:
   //virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
   //virtual void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
-  virtual QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
-  virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent *event) override;
+  virtual QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
+
+  virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
 
 private:
-  ZROI &m_roi;
+  ZROI& m_roi;
   int m_slice;
 
   QPointF m_basePos;
@@ -45,30 +51,37 @@ private:
 class ROICtrlPtGraphicsItem : public QGraphicsRectItem
 {
 public:
-  enum { Type = UserType + 6 };
-  int type() const override { return Type; }
+  enum
+  {
+    Type = UserType + 6
+  };
 
-  ROICtrlPtGraphicsItem(ZROI &roi, const ZROIControlPoint &controlPoint,
-                        double viewScale = 1., double z = 100, QGraphicsItem *parent = nullptr);
+  int type() const override
+  { return Type; }
+
+  ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint,
+                        double viewScale = 1., double z = 100, QGraphicsItem* parent = nullptr);
 
   void updateValue();
+
   void setViewScale(double s);
 
-  ZROIControlPoint controlPoint() const { return m_controlPoint; }
+  ZROIControlPoint controlPoint() const
+  { return m_controlPoint; }
 
-  virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
+  virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
 
   void setOffset(double x, double y);
 
 protected:
-  virtual QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
+  virtual QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
 
 private:
-  ZROI &m_roi;
+  ZROI& m_roi;
   ZROIControlPoint m_controlPoint;
   double m_viewScale;
 
-  const ZROIShapeOperation &m_shapeOp;
+  const ZROIShapeOperation& m_shapeOp;
 
   QPointF m_basePos;
   QPointF m_offset;
@@ -76,34 +89,48 @@ private:
 
 class ZROIFilter : public ZObjFilter
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  ZROIFilter(ZView &view);
+  ZROIFilter(ZView& view);
 
-  void setData(ZROI &roi);
+  void setData(ZROI& roi);
 
   void releaseItemsOwnership();
 
-  void setVisible(bool v) { m_visible.set(v); }
-  void setSelected(bool v) { Q_UNUSED(v) }
+  void setVisible(bool v)
+  { m_visible.set(v); }
+
+  void setSelected(bool v)
+  { Q_UNUSED(v) }
+
   void setNormalView(int z, int t) override;
+
   void setMaxZProjView(int t) override;
 
-  void setOutlineColor(glm::vec3 col) { m_outlineColor.set(col); }
-  void setRegionColor(glm::vec3 col) { m_regionColor.set(col); }
+  void setOutlineColor(glm::vec3 col)
+  { m_outlineColor.set(col); }
+
+  void setRegionColor(glm::vec3 col)
+  { m_regionColor.set(col); }
 
   std::vector<int> boundBox() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
+
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupForAnnotationFilter();
 
   virtual void deleteKeyPressed() override;
-  virtual void mousePressed(const QPointF &scenePos) override;
-  virtual void mouseReleased(const QPointF &scenePos) override;
+
+  virtual void mousePressed(const QPointF& scenePos) override;
+
+  virtual void mouseReleased(const QPointF& scenePos) override;
+
   virtual void rotateClockwise() override;
+
   virtual void rotateCounterclockwise() override;
 
-  ZDVec4Parameter& offsetPara() { return m_offsetPara; }
+  ZDVec4Parameter& offsetPara()
+  { return m_offsetPara; }
 
 protected:
   virtual void offsetChanged() override;
@@ -112,16 +139,23 @@ protected:
 
 private:
   void visibleChanged();
+
   void showControlPointsChanged();
+
   void outlineColorChanged();
+
   void regionColorChanged();
+
   void onRoiChanged(int slice);
+
   void onRoiMoved(int slice);
+
   void onRoiDeleted(int slice);
+
   void viewScaleChanged(double s);
 
 private:
-  ZROI *m_ROI;
+  ZROI* m_ROI;
   std::map<int, std::unique_ptr<ROIGraphicsItem>> m_sliceToROIItem;
   std::map<int, std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>>> m_sliceToCtrlPtItems;
 

@@ -22,38 +22,53 @@
 namespace nim {
 
 class ZImg;
+
 class ZMesh;
 
 class Z3DVolumeFilter : public Z3DBoundedFilter
 {
-  Q_OBJECT
+Q_OBJECT
+
   friend class Z3DCompositor;
+
 public:
-  explicit Z3DVolumeFilter(Z3DGlobalParameters &globalParas, QObject *parent = nullptr);
+  explicit Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+
   ~Z3DVolumeFilter();
 
-  void setVisible(bool v) { m_visible.set(v); }
+  void setVisible(bool v)
+  { m_visible.set(v); }
+
   void setOffset(double x, double y, double z);
 
-  void setData(const ZImgPack &img);
+  void setData(const ZImgPack& img);
 
-  virtual bool isStayOnTop() const { return m_stayOnTop.get(); }
-  virtual void setStayOnTop(bool s) { m_stayOnTop.set(s); }
+  virtual bool isStayOnTop() const
+  { return m_stayOnTop.get(); }
+
+  virtual void setStayOnTop(bool s)
+  { m_stayOnTop.set(s); }
 
   // input volPos should be in volume coordinate
   // means it is in range [0 width-1 0 height-1 0 depth-1]
-  bool openZoomInView(const glm::ivec3 &volPos);
+  bool openZoomInView(const glm::ivec3& volPos);
+
   void exitZoomInView();
 
-  std::vector<double> zoomInBound() const { return m_zoomInBound; }
+  std::vector<double> zoomInBound() const
+  { return m_zoomInBound; }
 
   bool volumeNeedDownsample() const;
+
   bool isVolumeDownsampled() const;
-  bool isSubvolume() const { return m_isSubVolume.get(); }
+
+  bool isSubvolume() const
+  { return m_isSubVolume.get(); }
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   virtual void enterInteractionMode() override;
+
   virtual void exitInteractionMode() override;
 
   bool isReady(Z3DEye eye) const override;
@@ -62,62 +77,84 @@ public:
   // check success before using the returned value
   // if first hit 3d position is in volume, success will be true,
   // otherwise don't use the returned value
-  glm::vec3 get3DPosition(int x, int y, int width, int height, bool &success);
+  glm::vec3 get3DPosition(int x, int y, int width, int height, bool& success);
 
   virtual bool hasOpaque(Z3DEye eye) const override;
+
   virtual void renderOpaque(Z3DEye eye) override;
+
   virtual bool hasTransparent(Z3DEye eye) const override;
+
   virtual void renderTransparent(Z3DEye eye) override;
 
 signals:
+
   void pointInVolumeLeftClicked(QPoint pt, glm::ivec3 pos3D);
+
   void pointInVolumeRightClicked(QPoint pt, glm::ivec3 pos3D);
 
 protected slots:
+
   void changeCoordTransform();
+
   void changeZoomInViewSize();
 
   void adjustWidget();
-  void leftMouseButtonPressed(QMouseEvent *e, int w, int h);
+
+  void leftMouseButtonPressed(QMouseEvent* e, int w, int h);
 
   void invalidateFRVolumeZSlice();
+
   void invalidateFRVolumeYSlice();
+
   void invalidateFRVolumeXSlice();
+
   void invalidateFRVolumeZSlice2();
+
   void invalidateFRVolumeYSlice2();
+
   void invalidateFRVolumeXSlice2();
 
   void updateCubeSerieSlices();
 
-  virtual void setClipPlanes() override {}
+  virtual void setClipPlanes() override
+  {}
 
 protected:
   virtual void process(Z3DEye eye) override;
+
   bool hasSlices() const;
+
   void renderSlices(Z3DEye eye);
 
   const std::vector<std::unique_ptr<Z3DVolume>>& getVolumes() const;
 
   virtual void updateNotTransformedBoundBoxImpl() override;
-  virtual void expandCutRange() override {}
+
+  virtual void expandCutRange() override
+  {}
 
 private:
   void readVolumes();
+
   void readSubVolumes(int left, int right, int up, int down, int front, int back);
 
   // check success before using the returned value
   // if first hit 3d position is in volume, success will be true,
   // otherwise don't use the returned value
-  glm::vec3 getFirstHit3DPosition(int x, int y, int width, int height, bool &success);
+  glm::vec3 getFirstHit3DPosition(int x, int y, int width, int height, bool& success);
+
   // use first channel intensity
-  glm::vec3 getMaxInten3DPositionUnderScreenPoint(int x, int y, int width, int height, bool &success);
+  glm::vec3 getMaxInten3DPositionUnderScreenPoint(int x, int y, int width, int height, bool& success);
+
   //get 3D position from 2D screen position
-  glm::vec3 get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderOutputPort &port);
+  glm::vec3 get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderOutputPort& port);
+
   //get 3D position from 2D screen position and depth
   glm::vec3 get3DPosition(glm::ivec2 pos2D, double depth, int width, int height);
 
   // based on context, prepare minimum necessary data and send to raycasterrenderer
-  void prepareDataForRaycaster(Z3DVolume *volume, Z3DEye eye);
+  void prepareDataForRaycaster(Z3DVolume* volume, Z3DEye eye);
 
   void invalidateAllFRVolumeSlices();
 
@@ -129,7 +166,7 @@ private:
   std::vector<std::unique_ptr<Z3DImage2DRenderer>> m_image2DRenderers;
   Z3DTextureCopyRenderer m_textureCopyRenderer;
 
-  const ZImgPack *m_imgPack;
+  const ZImgPack* m_imgPack;
   std::vector<std::unique_ptr<Z3DVolume>> m_volumes;
   std::vector<std::unique_ptr<Z3DVolume>> m_zoomInVolumes;
   ZBoolParameter m_visible;

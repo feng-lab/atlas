@@ -12,9 +12,11 @@
 #include <QDateTime>
 
 #ifndef _USE_GLEW_
+
 #include <glbinding/Binding.h>
 #include <glbinding/Meta.h>
 #include <glbinding/Binding.h>
+
 #endif
 
 #if !defined(Q_OS_WIN) && !defined(Q_OS_DARWIN)
@@ -32,8 +34,10 @@ typedef BOOL (WINAPI *PGPI)(DWORD, DWORD, DWORD, DWORD, PDWORD);
 #endif
 
 #ifdef Q_OS_DARWIN
+
 #include <CoreServices/CoreServices.h>
 #include <CoreFoundation/CFBundle.h>
+
 #endif
 
 namespace {
@@ -52,7 +56,7 @@ bool windowsVersionName(std::wstring &osString)
   if(!bOsVersionInfoEx)
     return false; // Call GetNativeSystemInfo if supported or GetSystemInfo otherwise.
   PGNSI pGNSI = (PGNSI) GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), "GetNativeSystemInfo");
-  if(NULL != pGNSI)
+  if(pGNSI)
     pGNSI(&si);
   else GetSystemInfo(&si); // Check for unsupported OS
   if (VER_PLATFORM_WIN32_NT != osvi.dwPlatformId || osvi.dwMajorVersion <= 4 ) {
@@ -313,12 +317,11 @@ bool ZSystemInfo::initializeGL()
 #else
   glbinding::setCallbackMask(glbinding::CallbackMask::Unresolved);
 #endif
-  glbinding::setUnresolvedCallback([](const glbinding::AbstractFunction & call)
-  {
+  glbinding::setUnresolvedCallback([](const glbinding::AbstractFunction& call) {
     LOG(ERROR) << "OpengGL function " << call.name() << " can not be resolved.";
   });
   glbinding::Binding::addContextSwitchCallback([](glbinding::ContextHandle handle) {
-      LOG(INFO) << "Switching to openGL context " << handle;
+    LOG(INFO) << "Switching to openGL context " << handle;
   });
   if (Z3DGpuInfoInstance.isSupported()) {
     m_glInitialized = true;
@@ -350,7 +353,8 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes) const
     dir.mkpath(".");
   QStorageInfo volumeInfo(folder);
   //LOG(INFO) << folder << " " << volumeInfo.bytesAvailable();
-  if (!volumeInfo.isValid() || !volumeInfo.isReady() || volumeInfo.isReadOnly() || static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes)
+  if (!volumeInfo.isValid() || !volumeInfo.isReady() || volumeInfo.isReadOnly() ||
+      static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes)
     folder.clear();
 
   if (folder.isEmpty()) {
@@ -360,16 +364,18 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes) const
       dir.mkpath(".");
     volumeInfo = QStorageInfo(folder);
     //LOG(INFO) << folder << " " << volumeInfo.bytesAvailable();
-    if (!volumeInfo.isValid() || !volumeInfo.isReady() || volumeInfo.isReadOnly() || static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes)
+    if (!volumeInfo.isValid() || !volumeInfo.isReady() || volumeInfo.isReadOnly() ||
+        static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes)
       folder.clear();
   }
 
   // try other volumes
   if (folder.isEmpty()) {
     QList<QStorageInfo> vols = QStorageInfo::mountedVolumes();
-    for (int i=0; i<vols.size(); ++i) {
+    for (int i = 0; i < vols.size(); ++i) {
       //LOG(INFO) << vols[i].bytesAvailable() << " " << vols[i].rootPath();
-      if (!vols[i].isRoot() && vols[i].isValid() && vols[i].isReady() && !vols[i].isReadOnly() && static_cast<size_t>(vols[i].bytesAvailable()) >= requiredSpaceInBytes) {
+      if (!vols[i].isRoot() && vols[i].isValid() && vols[i].isReady() && !vols[i].isReadOnly() &&
+          static_cast<size_t>(vols[i].bytesAvailable()) >= requiredSpaceInBytes) {
         folder = vols[i].rootPath();
         break;
       }
@@ -390,7 +396,7 @@ QDir ZSystemInfo::logDir() const
   return dir;
 }
 
-QString ZSystemInfo::lastOpenedObjPath(const QString &typeName) const
+QString ZSystemInfo::lastOpenedObjPath(const QString& typeName) const
 {
   QSettings settings;
   QString res = settings.value(QString("%1/lastOpenedPath").arg(typeName)).toString();
@@ -404,7 +410,7 @@ QString ZSystemInfo::lastOpenedObjPath(const QString &typeName) const
   return res;
 }
 
-void ZSystemInfo::setLastOpenedObjPath(const QString &typeName, const QString &path) const
+void ZSystemInfo::setLastOpenedObjPath(const QString& typeName, const QString& path) const
 {
   if (path.isEmpty())
     return;
@@ -413,7 +419,7 @@ void ZSystemInfo::setLastOpenedObjPath(const QString &typeName, const QString &p
   settings.setValue(QString("%1/lastOpenedPath").arg(typeName), dir.absolutePath());
 }
 
-void ZSystemInfo::addFileToRecentFileList(const QString &fileName) const
+void ZSystemInfo::addFileToRecentFileList(const QString& fileName) const
 {
   QSettings settings;
   QStringList files = settings.value("recentFileList").toStringList();
@@ -431,11 +437,11 @@ void ZSystemInfo::addFileToRecentFileList(const QString &fileName) const
 
 void ZSystemInfo::updateRecentFiles() const
 {
-  foreach (QWidget *widget, QApplication::topLevelWidgets()) {
-    ZMainWindow *mainWin = qobject_cast<ZMainWindow*>(widget);
-    if (mainWin)
-      mainWin->updateRecentFileActions();
-  }
+    foreach (QWidget* widget, QApplication::topLevelWidgets()) {
+      ZMainWindow* mainWin = qobject_cast<ZMainWindow*>(widget);
+      if (mainWin)
+        mainWin->updateRecentFileActions();
+    }
 }
 
 void ZSystemInfo::detectOS()
@@ -477,24 +483,24 @@ void ZSystemInfo::detectOS()
   }
 #elif defined(Q_OS_DARWIN)
   switch (QSysInfo::MacintoshVersion) {
-  case QSysInfo::MV_10_7:
-    m_osString = "Mac OS X LION";
-    break;
-  case QSysInfo::MV_10_8:
-    m_osString = "Mac OS X MOUNTAIN LION";
-    break;
-  case QSysInfo::MV_10_9:
-    m_osString = "Mac OS X MAVERICKS";
-    break;
-  case QSysInfo::MV_10_10:
-    m_osString = "Mac OS X YOSEMITE";
-    break;
-  case QSysInfo::MV_10_11:
-    m_osString = "Mac OS X El Capitan";
-    break;
-  default:
-    m_osString = "unknown mac os";
-    return;
+    case QSysInfo::MV_10_7:
+      m_osString = "Mac OS X LION";
+      break;
+    case QSysInfo::MV_10_8:
+      m_osString = "Mac OS X MOUNTAIN LION";
+      break;
+    case QSysInfo::MV_10_9:
+      m_osString = "Mac OS X MAVERICKS";
+      break;
+    case QSysInfo::MV_10_10:
+      m_osString = "Mac OS X YOSEMITE";
+      break;
+    case QSysInfo::MV_10_11:
+      m_osString = "Mac OS X El Capitan";
+      break;
+    default:
+      m_osString = "unknown mac os";
+      return;
   }
   // deprecated from 10.8
   //SInt32 majorVersion,minorVersion,bugFixVersion;

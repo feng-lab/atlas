@@ -4,19 +4,19 @@
 
 namespace nim {
 
-Z3DPunctaView::Z3DPunctaView(ZPunctaDoc &doc, Z3DView &view)
+Z3DPunctaView::Z3DPunctaView(ZPunctaDoc& doc, Z3DView& view)
   : Z3DFilterView<ZPunctaDoc, Z3DPunctaFilter>(doc, view)
 {
   docPunctasAdded(m_doc.objs());
   connect(&m_doc, &ZPunctaDoc::objAdded, this, &Z3DPunctaView::docPunctaAdded);
 }
 
-void Z3DPunctaView::docPunctasAdded(const QList<size_t> &objs)
+void Z3DPunctaView::docPunctasAdded(const QList<size_t>& objs)
 {
   try {
-    for (int i=0; i<objs.size(); ++i) {
+    for (int i = 0; i < objs.size(); ++i) {
       size_t id = objs[i];
-      Z3DPunctaFilter *viewControl = new Z3DPunctaFilter(globalParas(), this);
+      Z3DPunctaFilter* viewControl = new Z3DPunctaFilter(globalParas(), this);
       viewControl->setData(m_doc.puncta(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
@@ -33,12 +33,12 @@ void Z3DPunctaView::docPunctasAdded(const QList<size_t> &objs)
       networkEvaluator().updateNetwork();
       m_view.updateBoundBox();
 
-      for (int i=0; i<objs.size(); ++i) {
+      for (int i = 0; i < objs.size(); ++i) {
         emit objViewReady(objs[i]);
       }
     }
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     LOG(ERROR) << "Failed to render puncta: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render puncta"), e.what());
   }
@@ -47,7 +47,7 @@ void Z3DPunctaView::docPunctasAdded(const QList<size_t> &objs)
 void Z3DPunctaView::docPunctaAdded(size_t id)
 {
   try {
-    Z3DPunctaFilter *viewControl = new Z3DPunctaFilter(globalParas(), this);
+    Z3DPunctaFilter* viewControl = new Z3DPunctaFilter(globalParas(), this);
     viewControl->setData(m_doc.puncta(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
@@ -65,7 +65,7 @@ void Z3DPunctaView::docPunctaAdded(size_t id)
 
     emit objViewReady(id);
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     LOG(ERROR) << "Failed to render puncta: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render puncta"), e.what());
   }

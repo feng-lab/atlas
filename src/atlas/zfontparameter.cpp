@@ -5,35 +5,35 @@
 
 namespace nim {
 
-ZFontParameter::ZFontParameter(const QString &name, QObject *parent)
+ZFontParameter::ZFontParameter(const QString& name, QObject* parent)
   : ZSingleValueParameter<QFont>(name, parent)
 {
 }
 
-ZFontParameter::ZFontParameter(const QString &name, const QFont &font, QObject *parent)
+ZFontParameter::ZFontParameter(const QString& name, const QFont& font, QObject* parent)
   : ZSingleValueParameter<QFont>(name, font, parent)
 {
 }
 
-void ZFontParameter::setValue(const QFont &v)
+void ZFontParameter::setValue(const QFont& v)
 {
   set(v);
 }
 
-void ZFontParameter::beforeChange(QFont &value)
+void ZFontParameter::beforeChange(QFont& value)
 {
   emit valueWillChange(value);
 }
 
-QWidget *ZFontParameter::actualCreateWidget(QWidget *parent)
+QWidget* ZFontParameter::actualCreateWidget(QWidget* parent)
 {
-  ZFontWidget *res = new ZFontWidget(m_value, parent);
+  ZFontWidget* res = new ZFontWidget(m_value, parent);
   connect(res, &ZFontWidget::fontChanged, this, &ZFontParameter::setValue);
   connect(this, &ZFontParameter::valueWillChange, res, &ZFontWidget::setFont);
   return res;
 }
 
-void ZFontParameter::setSameAs(const ZParameter &rhs)
+void ZFontParameter::setSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
   set(static_cast<const ZFontParameter*>(&rhs)->get());
@@ -45,7 +45,7 @@ QJsonValue ZFontParameter::jsonValue() const
   return QJsonValue(this->m_value.toString());
 }
 
-void ZFontParameter::readValue(const QJsonValue &jsonValue)
+void ZFontParameter::readValue(const QJsonValue& jsonValue)
 {
   QString text = jsonValue.toString(this->m_value.toString());
   QFont font;

@@ -13,7 +13,7 @@
 
 namespace nim {
 
-ZPunctaIO &ZPunctaIO::instance()
+ZPunctaIO& ZPunctaIO::instance()
 {
   static ZPunctaIO punctaIO;
   return punctaIO;
@@ -33,76 +33,76 @@ ZPunctaIO::ZPunctaIO()
   m_writeFilters.push_back(QString("n x 4 Matrix files (*.txt)"));
 }
 
-bool ZPunctaIO::canReadFile(const QString &filename)
+bool ZPunctaIO::canReadFile(const QString& filename)
 {
-  for (int i=0; i<m_readExts.size(); ++i) {
+  for (int i = 0; i < m_readExts.size(); ++i) {
     if (filename.endsWith(QString(".%1").arg(m_readExts[i]), Qt::CaseInsensitive))
       return true;
   }
   return false;
 }
 
-bool ZPunctaIO::canWriteFile(const QString &filename)
+bool ZPunctaIO::canWriteFile(const QString& filename)
 {
-  for (int i=0; i<m_writeExts.size(); ++i) {
+  for (int i = 0; i < m_writeExts.size(); ++i) {
     if (filename.endsWith(QString(".%1").arg(m_writeExts[i]), Qt::CaseInsensitive))
       return true;
   }
   return false;
 }
 
-void ZPunctaIO::getQtWriteNameFilter(QStringList &filters, QStringList &formats)
+void ZPunctaIO::getQtWriteNameFilter(QStringList& filters, QStringList& formats)
 {
   filters = m_writeFilters;
   formats = m_writeFormats;
 }
 
-void ZPunctaIO::load(const QString &filename, ZPuncta &puncta) const
+void ZPunctaIO::load(const QString& filename, ZPuncta& puncta) const
 {
   try {
-  puncta.clear();
-  if (filename.endsWith(".nimp", Qt::CaseInsensitive)) {
-    readNimpFile(filename, puncta);
-  } else if (filename.endsWith(".apo", Qt::CaseInsensitive)) {
-    readV3DApoFile(filename, puncta);
-  } else if (filename.endsWith(".marker", Qt::CaseInsensitive)) {
-    readV3DMarkerFile(filename, puncta);
-  } else if (filename.endsWith(".txt", Qt::CaseInsensitive)) {
-    readMatFile(filename, puncta);
-  } else {
-    throw ZIOException("Not supported puncta format");
+    puncta.clear();
+    if (filename.endsWith(".nimp", Qt::CaseInsensitive)) {
+      readNimpFile(filename, puncta);
+    } else if (filename.endsWith(".apo", Qt::CaseInsensitive)) {
+      readV3DApoFile(filename, puncta);
+    } else if (filename.endsWith(".marker", Qt::CaseInsensitive)) {
+      readV3DMarkerFile(filename, puncta);
+    } else if (filename.endsWith(".txt", Qt::CaseInsensitive)) {
+      readMatFile(filename, puncta);
+    } else {
+      throw ZIOException("Not supported puncta format");
+    }
   }
-  }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     throw ZIOException(QString("Can not load puncta %1: %2").arg(filename).arg(e.what()));
   }
 }
 
-void ZPunctaIO::save(const ZPuncta &puncta, const QString &filename, QString format) const
+void ZPunctaIO::save(const ZPuncta& puncta, const QString& filename, QString format) const
 {
   try {
-  if (format.isEmpty()) {
-    for (int i=0; i<m_writeExts.size(); ++i) {
-      if (filename.endsWith(QString(".%1").arg(m_writeExts[i]), Qt::CaseInsensitive))
-        format = m_writeFormats[i];
+    if (format.isEmpty()) {
+      for (int i = 0; i < m_writeExts.size(); ++i) {
+        if (filename.endsWith(QString(".%1").arg(m_writeExts[i]), Qt::CaseInsensitive))
+          format = m_writeFormats[i];
+      }
+    }
+    CHECK(m_writeFormats.contains(format));
+
+    if (format == "nimp") {
+      writeNimpFile(puncta, filename);
+    } else if (format == "apo") {
+      writeV3DApoFile(puncta, filename);
+    } else if (format == "txt") {
+      writeMatFile(puncta, filename);
     }
   }
-  CHECK(m_writeFormats.contains(format));
-
-  if (format == "nimp") {
-    writeNimpFile(puncta, filename);
-  } else if (format == "apo") {
-    writeV3DApoFile(puncta, filename);
-  } else if (format == "txt") {
-    writeMatFile(puncta, filename);
-  }
-  }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     throw ZIOException(QString("Can not save puncta %1: %2").arg(filename).arg(e.what()));
   }
 }
 
-void ZPunctaIO::readNimpFile(const QString &filename, ZPuncta &puncta) const
+void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta) const
 {
   try {
     H5::Exception::dontPrint();
@@ -124,8 +124,8 @@ void ZPunctaIO::readNimpFile(const QString &filename, ZPuncta &puncta) const
     int numPuncta;
     numPunctaAttr.read(intType, &numPuncta);
 
-    for (int i=0; i<numPuncta; ++i) {
-      H5::Group punctumGrp = allGrp.openGroup(qUtf8Printable(QString("Punctum%1").arg(i+1)));
+    for (int i = 0; i < numPuncta; ++i) {
+      H5::Group punctumGrp = allGrp.openGroup(qUtf8Printable(QString("Punctum%1").arg(i + 1)));
       ZPunctum p;
 
       H5std_string strBuf;
@@ -172,7 +172,7 @@ void ZPunctaIO::readNimpFile(const QString &filename, ZPuncta &puncta) const
       p.setScore(punctaInfo[12]);
 
       if (H5Lexists(punctumGrp.getId(), "VoxelIntensities", H5P_DEFAULT) > 0 &&
-          H5Lexists(punctumGrp.getId(), "VoxelLocations", H5P_DEFAULT) > 0 ) {
+          H5Lexists(punctumGrp.getId(), "VoxelLocations", H5P_DEFAULT) > 0) {
         H5::DataSet voxelInten = punctumGrp.openDataSet("VoxelIntensities");
         H5::DataSet voxelList = punctumGrp.openDataSet("VoxelLocations");
         H5::DataSpace voxelListDataspace = voxelList.getSpace();
@@ -185,8 +185,8 @@ void ZPunctaIO::readNimpFile(const QString &filename, ZPuncta &puncta) const
         hsize_t voxelListDim[2];
         hsize_t voxelIntenDim;
 
-        voxelListDataspace.getSimpleExtentDims(voxelListDim, NULL);
-        voxelIntenDataspace.getSimpleExtentDims(&voxelIntenDim, NULL);
+        voxelListDataspace.getSimpleExtentDims(voxelListDim, nullptr);
+        voxelIntenDataspace.getSimpleExtentDims(&voxelIntenDim, nullptr);
 
         if (voxelListDim[1] != 3 || voxelListDim[0] != voxelIntenDim)
           throw ZIOException("Wrong puncta file contents");
@@ -204,13 +204,12 @@ void ZPunctaIO::readNimpFile(const QString &filename, ZPuncta &puncta) const
       puncta.push_back(p);
     }
   }
-  catch(H5::Exception const & e)
-  {
+  catch (H5::Exception const& e) {
     throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
   }
 }
 
-void ZPunctaIO::writeNimpFile(const ZPuncta &puncta, const QString &filename) const
+void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename) const
 {
   try {
     H5::Exception::dontPrint();
@@ -238,8 +237,8 @@ void ZPunctaIO::writeNimpFile(const ZPuncta &puncta, const QString &filename) co
     ver.write(intType, &punctaVer);
 
     int idx = 0;
-    for (ZPuncta::const_iterator it=puncta.begin(); it != puncta.end(); ++it) {
-      H5::Group punctumGrp = allGrp.createGroup(qUtf8Printable(QString("Punctum%1").arg(idx+1)));
+    for (ZPuncta::const_iterator it = puncta.begin(); it != puncta.end(); ++it) {
+      H5::Group punctumGrp = allGrp.createGroup(qUtf8Printable(QString("Punctum%1").arg(idx + 1)));
       ++idx;
       const ZPunctum& p = *it;
 
@@ -298,14 +297,13 @@ void ZPunctaIO::writeNimpFile(const ZPuncta &puncta, const QString &filename) co
     H5::Attribute numPunctaAttr = allGrp.createAttribute("Number", intType, attrDataSpace);
     numPunctaAttr.write(intType, &idx);
   }
-  catch(H5::Exception const & e)
-  {
+  catch (H5::Exception const& e) {
     QFile::remove(filename);
     throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
   }
 }
 
-void ZPunctaIO::readV3DApoFile(const QString &file, ZPuncta &puncta) const
+void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta) const
 {
   QFile qFile(file);
   if (!qFile.open(QIODevice::ReadOnly | QIODevice::Text))
@@ -376,13 +374,13 @@ void ZPunctaIO::readV3DApoFile(const QString &file, ZPuncta &puncta) const
         punctum.setColor(QColor(fieldList[15].toInt(&ok), fieldList[16].toInt(&ok1), fieldList[17].toInt(&ok2)));
         if (!ok || !ok1 || !ok2) {
           if (fieldList[15].isEmpty() && fieldList[16].isEmpty() && fieldList[17].isEmpty()) {
-            punctum.setColor(QColor(0,0,0));
+            punctum.setColor(QColor(0, 0, 0));
           } else {
             throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
           }
         }
       }
-      punctum.setRadius(std::pow(0.75 / M_PI * punctum.volSize(), 1.0/3));
+      punctum.setRadius(std::pow(0.75 / M_PI * punctum.volSize(), 1.0 / 3));
       puncta.push_back(punctum);
     } else if (!line.isEmpty()) {
       throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
@@ -390,7 +388,7 @@ void ZPunctaIO::readV3DApoFile(const QString &file, ZPuncta &puncta) const
   }
 }
 
-void ZPunctaIO::writeV3DApoFile(const ZPuncta &puncta, const QString &file) const
+void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file) const
 {
   QFile qFile(file);
   if (!qFile.open(QIODevice::WriteOnly | QIODevice::Text))
@@ -399,15 +397,18 @@ void ZPunctaIO::writeV3DApoFile(const ZPuncta &puncta, const QString &file) cons
   QTextStream out(&qFile);
   out.setCodec("UTF-8");
   size_t idx = 0;
-  out << "#id, , name, comment, z, x, y, maxIntensity, meanIntensity, sDevOfIntensity, volSize, mass, property1, property2, property3, red, green, blue\n";
+  out
+    << "#id, , name, comment, z, x, y, maxIntensity, meanIntensity, sDevOfIntensity, volSize, mass, property1, property2, property3, red, green, blue\n";
   if (out.status() != QTextStream::Ok) {
     throw ZIOException("Error while writing file.");
   }
-  for (ZPuncta::const_iterator it=puncta.begin(); it != puncta.end(); ++it) {
-    out << QString("%1,,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12,%13,%14,%15,%16,%17\n").arg(idx+1).arg(it->name()).arg(it->comment())
-           .arg(it->z()).arg(it->x()).arg(it->y()).arg(it->maxIntensity()).arg(it->meanIntensity()).arg(it->sDevOfIntensity())
-           .arg(it->volSize()).arg(it->mass()).arg(it->property1()).arg(it->property2()).arg(it->property3())
-           .arg(it->color().red()).arg(it->color().green()).arg(it->color().blue());
+  for (ZPuncta::const_iterator it = puncta.begin(); it != puncta.end(); ++it) {
+    out << QString("%1,,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12,%13,%14,%15,%16,%17\n").arg(idx + 1).arg(it->name()).arg(
+        it->comment())
+      .arg(it->z()).arg(it->x()).arg(it->y()).arg(it->maxIntensity()).arg(it->meanIntensity()).arg(
+        it->sDevOfIntensity())
+      .arg(it->volSize()).arg(it->mass()).arg(it->property1()).arg(it->property2()).arg(it->property3())
+      .arg(it->color().red()).arg(it->color().green()).arg(it->color().blue());
     ++idx;
     if (out.status() != QTextStream::Ok) {
       throw ZIOException("Error while writing file.");
@@ -415,7 +416,7 @@ void ZPunctaIO::writeV3DApoFile(const ZPuncta &puncta, const QString &file) cons
   }
 }
 
-void ZPunctaIO::readV3DMarkerFile(const QString &file, ZPuncta &puncta) const
+void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta) const
 {
   QFile qFile(file);
   if (!qFile.open(QIODevice::ReadOnly | QIODevice::Text))
@@ -464,7 +465,7 @@ void ZPunctaIO::readV3DMarkerFile(const QString &file, ZPuncta &puncta) const
       punctum.setColor(QColor(fieldList[7].toInt(&ok), fieldList[8].toInt(&ok1), fieldList[9].toInt(&ok2)));
       if (!ok || !ok1 || !ok2) {
         if (fieldList[7].isEmpty() && fieldList[8].isEmpty() && fieldList[9].isEmpty())
-          punctum.setColor(QColor(0,0,0));
+          punctum.setColor(QColor(0, 0, 0));
         else {
           throw ZIOException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
         }
@@ -476,18 +477,18 @@ void ZPunctaIO::readV3DMarkerFile(const QString &file, ZPuncta &puncta) const
   }
 }
 
-void ZPunctaIO::readMatFile(const QString &file, ZPuncta &puncta) const
+void ZPunctaIO::readMatFile(const QString& file, ZPuncta& puncta) const
 {
   Eigen::MatrixXd mat = ZEigenUtils::readMatrix(file, "", false, 0, "#");
   mat = ZEigenUtils::removeRowsContainNaNOrInF(mat);
   if (mat.rows() > 0 && mat.cols() == 3) {
-    for (int i=0; i<mat.rows(); ++i) {
-      ZPunctum punctum(mat(i,0), mat(i,1), mat(i,2), 2);
+    for (int i = 0; i < mat.rows(); ++i) {
+      ZPunctum punctum(mat(i, 0), mat(i, 1), mat(i, 2), 2);
       puncta.push_back(punctum);
     }
   } else if (mat.rows() > 0 && mat.cols() == 4) {
-    for (int i=0; i<mat.rows(); ++i) {
-      ZPunctum punctum(mat(i,0), mat(i,1), mat(i,2), mat(i,3));
+    for (int i = 0; i < mat.rows(); ++i) {
+      ZPunctum punctum(mat(i, 0), mat(i, 1), mat(i, 2), mat(i, 3));
       puncta.push_back(punctum);
     }
   } else {
@@ -495,7 +496,7 @@ void ZPunctaIO::readMatFile(const QString &file, ZPuncta &puncta) const
   }
 }
 
-void ZPunctaIO::writeMatFile(const ZPuncta &puncta, const QString &file) const
+void ZPunctaIO::writeMatFile(const ZPuncta& puncta, const QString& file) const
 {
   QFile qFile(file);
   if (!qFile.open(QIODevice::WriteOnly | QIODevice::Text))
@@ -507,7 +508,7 @@ void ZPunctaIO::writeMatFile(const ZPuncta &puncta, const QString &file) const
   if (out.status() != QTextStream::Ok) {
     throw ZIOException("Error while writing file.");
   }
-  for (ZPuncta::const_iterator it=puncta.begin(); it != puncta.end(); ++it) {
+  for (ZPuncta::const_iterator it = puncta.begin(); it != puncta.end(); ++it) {
     out << QString("%1 %2 %3 %4\n").arg(it->x()).arg(it->y()).arg(it->z()).arg(it->radius());
     if (out.status() != QTextStream::Ok) {
       throw ZIOException("Error while writing file.");

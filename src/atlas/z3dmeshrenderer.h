@@ -16,27 +16,35 @@ namespace nim {
 // "CustomColor" : setDataColors must be called to set color of each mesh
 class Z3DMeshRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit Z3DMeshRenderer(Z3DRendererBase &rendererBase);
+  explicit Z3DMeshRenderer(Z3DRendererBase& rendererBase);
 
-  void setData(std::vector<ZMesh*> *meshInput);
+  void setData(std::vector<ZMesh*>* meshInput);
+
   // if set, this color will used instead colors from ZMesh (if any)
   // the number should match the number of meshes
-  void setDataColors(std::vector<glm::vec4> *meshColorsInput);
+  void setDataColors(std::vector<glm::vec4>* meshColorsInput);
+
   // set texture, texture coordinates of each vertex should exist in
   // ZMesh
-  void setTexture(Z3DTexture *tex);
-  void setDataPickingColors(std::vector<glm::vec4> *meshPickingColorsInput = NULL);
+  void setTexture(Z3DTexture* tex);
+
+  void setDataPickingColors(std::vector<glm::vec4>* meshPickingColorsInput = nullptr);
 
   // One of "MeshColor", "Mesh1DTexture", "Mesh2DTexture", "Mesh3DTexture", "CustomColor"
-  void setColorSource(const QString &sc) { m_colorSource.select(sc); }
+  void setColorSource(const QString& sc)
+  { m_colorSource.select(sc); }
 
-  ZStringIntOptionParameter& wireframeModePara() { return m_wireframeMode; }
-  ZVec4Parameter& wireframeColorPara() { return m_wireframeColor; }
+  ZStringIntOptionParameter& wireframeModePara()
+  { return m_wireframeMode; }
+
+  ZVec4Parameter& wireframeColorPara()
+  { return m_wireframeColor; }
 
 protected:
   virtual void compile() override;
+
   QString generateHeader();
 
 #ifndef _USE_CORE_PROFILE_
@@ -45,26 +53,29 @@ protected:
 #endif
 
   virtual void render(Z3DEye eye) override;
+
   virtual void renderPicking(Z3DEye eye) override;
 
   void adjustWidgets();
 
 private:
   void prepareMesh();
+
   void prepareMeshColor();
+
   void prepareMeshPickingColor();
 
 protected:
   Z3DShaderGroup m_meshShaderGrp;
 
-  std::vector<ZMesh*> *m_meshPt;
-  std::vector<glm::vec4> *m_meshColorsPt;
-  std::vector<glm::vec4> *m_meshPickingColorsPt;
-  std::vector<ZMesh*> *m_origMeshPt;
-  std::vector<glm::vec4> *m_origMeshColorsPt;
-  std::vector<glm::vec4> *m_origMeshPickingColorsPt;
+  std::vector<ZMesh*>* m_meshPt;
+  std::vector<glm::vec4>* m_meshColorsPt;
+  std::vector<glm::vec4>* m_meshPickingColorsPt;
+  std::vector<ZMesh*>* m_origMeshPt;
+  std::vector<glm::vec4>* m_origMeshColorsPt;
+  std::vector<glm::vec4>* m_origMeshPickingColorsPt;
 
-  Z3DTexture *m_texture;
+  Z3DTexture* m_texture;
 
 private:
   std::vector<ZMesh> m_splitMeshes;

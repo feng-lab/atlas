@@ -7,7 +7,7 @@
 
 namespace nim {
 
-Z3DCameraControlWidget::Z3DCameraControlWidget(Z3DCameraParameter &camera, QWidget *parent)
+Z3DCameraControlWidget::Z3DCameraControlWidget(Z3DCameraParameter& camera, QWidget* parent)
   : QWidget(parent)
   , m_camera(camera)
 {
@@ -59,13 +59,13 @@ void Z3DCameraControlWidget::createWidget()
   int minDegrees = -360;
   int maxDegrees = 360;
 
-  QVBoxLayout *vlo = new QVBoxLayout;
-  QHBoxLayout *hlo = nullptr;
+  QVBoxLayout* vlo = new QVBoxLayout;
+  QHBoxLayout* hlo = nullptr;
 
   hlo = new QHBoxLayout;
-  QPushButton *azimuthButton = new QPushButton("Azimuth Camera", this);
+  QPushButton* azimuthButton = new QPushButton("Azimuth Camera", this);
   azimuthButton->setToolTip("Rotate the camera about the view up vector centered at the focal point. "
-                            "The result is a horizontal rotation of the camera.");
+                              "The result is a horizontal rotation of the camera.");
   hlo->addWidget(azimuthButton);
   connect(azimuthButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::azimuth);
   m_azimuthDegreeSpinBox = new QSpinBox(this);
@@ -77,10 +77,11 @@ void Z3DCameraControlWidget::createWidget()
   vlo->addLayout(hlo);
 
   hlo = new QHBoxLayout;
-  QPushButton *elevationButton = new QPushButton("Elevation Camera", this);
-  elevationButton->setToolTip("Rotate the camera about the cross product of the view up vector and the view vector (point at left in screen), "
-                              "using the focal point as the center of rotation. "
-                              "The result is a vertical rotation of the scene.");
+  QPushButton* elevationButton = new QPushButton("Elevation Camera", this);
+  elevationButton->setToolTip(
+    "Rotate the camera about the cross product of the view up vector and the view vector (point at left in screen), "
+      "using the focal point as the center of rotation. "
+      "The result is a vertical rotation of the scene.");
   hlo->addWidget(elevationButton);
   connect(elevationButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::elevation);
   m_elevationDegreeSpinBox = new QSpinBox(this);
@@ -92,9 +93,9 @@ void Z3DCameraControlWidget::createWidget()
   vlo->addLayout(hlo);
 
   hlo = new QHBoxLayout;
-  QPushButton *rollButton = new QPushButton("Roll Camera", this);
+  QPushButton* rollButton = new QPushButton("Roll Camera", this);
   rollButton->setToolTip("Rotate the camera about the view vector. "
-                         "This will spin the camera about its axis.");
+                           "This will spin the camera about its axis.");
   hlo->addWidget(rollButton);
   connect(rollButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::roll);
   m_rollDegreeSpinBox = new QSpinBox(this);
@@ -106,10 +107,10 @@ void Z3DCameraControlWidget::createWidget()
   vlo->addLayout(hlo);
 
   hlo = new QHBoxLayout;
-  QPushButton *yawButton = new QPushButton("Yaw Camera", this);
+  QPushButton* yawButton = new QPushButton("Yaw Camera", this);
   yawButton->setToolTip("Rotate the focal point about the view up vector, "
-                        "using the camera's position as the center of rotation. "
-                        "The result is a horizontal rotation of the scene.");
+                          "using the camera's position as the center of rotation. "
+                          "The result is a horizontal rotation of the scene.");
   hlo->addWidget(yawButton);
   connect(yawButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::yaw);
   m_yawDegreeSpinBox = new QSpinBox(this);
@@ -122,10 +123,11 @@ void Z3DCameraControlWidget::createWidget()
 
 
   hlo = new QHBoxLayout;
-  QPushButton *pitchButton = new QPushButton("Pitch Camera", this);
-  pitchButton->setToolTip("Rotate the focal point about the cross product of the view vector and the view up vector (point right in screen), "
-                          "using the camera's position as the center of rotation. "
-                          "The result is a vertical rotation of the camera.");
+  QPushButton* pitchButton = new QPushButton("Pitch Camera", this);
+  pitchButton->setToolTip(
+    "Rotate the focal point about the cross product of the view vector and the view up vector (point right in screen), "
+      "using the camera's position as the center of rotation. "
+      "The result is a vertical rotation of the camera.");
   hlo->addWidget(pitchButton);
   connect(pitchButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::pitch);
   m_pitchDegreeSpinBox = new QSpinBox(this);

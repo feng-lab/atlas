@@ -7,7 +7,7 @@
 
 namespace nim {
 
-Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject *parent)
+Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   : Z3DGeometryFilter(globalParas, parent)
   , m_monoEyeOutport("Image")
   , m_leftEyeOutport("LeftEyeImage")
@@ -19,12 +19,12 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject *pare
   , m_visible("Visible", true)
   , m_colorMode("Color Mode")
   , m_singleColorForAllPuncta("Puncta Color", glm::vec4(ZRandomInstance.randReal<float>(),
-                                                       ZRandomInstance.randReal<float>(),
-                                                       ZRandomInstance.randReal<float>(),
-                                                       1.f))
-  , m_colorMapScore("Score Color Map", -1., 1., QColor(255,255,0), QColor(0,0,255))
-  , m_colorMapMeanIntensity("Mean Intensity Color Map", 0., 1., QColor(255,0,0), QColor(0,0,0))
-  , m_colorMapMaxIntensity("Max Intensity Color Map", 0., 1., QColor(255,0,0), QColor(0,0,0))
+                                                        ZRandomInstance.randReal<float>(),
+                                                        ZRandomInstance.randReal<float>(),
+                                                        1.f))
+  , m_colorMapScore("Score Color Map", -1., 1., QColor(255, 255, 0), QColor(0, 0, 255))
+  , m_colorMapMeanIntensity("Mean Intensity Color Map", 0., 1., QColor(255, 0, 0), QColor(0, 0, 0))
+  , m_colorMapMaxIntensity("Max Intensity Color Map", 0., 1., QColor(255, 0, 0), QColor(0, 0, 0))
   , m_useSameSizeForAllPuncta("Use Same Size", false)
   //  , m_glowSphereRenderer(m_rendererBase)
   //  , m_textureGlowRenderer(m_rendererBase)
@@ -89,7 +89,8 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject *pare
   m_selectPunctumEvent.listenTo("select punctum", Qt::LeftButton,
                                 Qt::ControlModifier, QEvent::MouseButtonDblClick);
   m_selectPunctumEvent.listenTo("append select punctum", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonPress);
-  m_selectPunctumEvent.listenTo("append select punctum", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonRelease);
+  m_selectPunctumEvent.listenTo("append select punctum", Qt::LeftButton, Qt::ControlModifier,
+                                QEvent::MouseButtonRelease);
   connect(&m_selectPunctumEvent, &ZEventListenerParameter::mouseEventTriggered, this, &Z3DPunctaFilter::selectPuncta);
   addEventListener(m_selectPunctumEvent);
 
@@ -163,7 +164,7 @@ void Z3DPunctaFilter::process(Z3DEye eye)
   //  }
 }
 
-void Z3DPunctaFilter::setData(ZPuncta &puncta)
+void Z3DPunctaFilter::setData(ZPuncta& puncta)
 {
   m_origPuncta = &puncta;
   updateData();
@@ -202,8 +203,8 @@ std::shared_ptr<ZWidgetsGroup> Z3DPunctaFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_sphereRenderer.useDynamicMaterialPara(), 7);
 
     const std::vector<ZParameter*>& paras = m_rendererBase.parameters();
-    for (size_t i=0; i<paras.size(); i++) {
-      ZParameter *para = paras[i];
+    for (size_t i = 0; i < paras.size(); i++) {
+      ZParameter* para = paras[i];
       if (para->name() == "Coord Transform")
         m_widgetsGroup->addChild(*para, 2);
       else if (para->name() == "Size Scale")
@@ -277,14 +278,15 @@ void Z3DPunctaFilter::renderPicking(Z3DEye eye)
 void Z3DPunctaFilter::registerPickingObjects()
 {
   if (!m_pickingObjectsRegistered) {
-    for (size_t i=0; i<m_punctaList.size(); i++) {
+    for (size_t i = 0; i < m_punctaList.size(); i++) {
       pickingManager().registerObject(m_punctaList[i]);
     }
     m_registeredPunctaList = m_punctaList;
     m_pointPickingColors.clear();
-    for (size_t i=0; i<m_punctaList.size(); i++) {
+    for (size_t i = 0; i < m_punctaList.size(); i++) {
       glm::col4 pickingColor = pickingManager().colorOfObject(m_punctaList[i]);
-      glm::vec4 fPickingColor(pickingColor[0]/255.f, pickingColor[1]/255.f, pickingColor[2]/255.f, pickingColor[3]/255.f);
+      glm::vec4 fPickingColor(pickingColor[0] / 255.f, pickingColor[1] / 255.f, pickingColor[2] / 255.f,
+                              pickingColor[3] / 255.f);
       m_pointPickingColors.push_back(fPickingColor);
     }
     m_sphereRenderer.setDataPickingColors(&m_pointPickingColors);
@@ -296,7 +298,7 @@ void Z3DPunctaFilter::registerPickingObjects()
 void Z3DPunctaFilter::deregisterPickingObjects()
 {
   if (m_pickingObjectsRegistered) {
-    for (size_t i=0; i<m_registeredPunctaList.size(); i++) {
+    for (size_t i = 0; i < m_registeredPunctaList.size(); i++) {
       pickingManager().deregisterObject(m_registeredPunctaList[i]);
     }
     m_registeredPunctaList.clear();
@@ -315,15 +317,16 @@ void Z3DPunctaFilter::prepareData()
   // convert puncta to format that glsl can use
   m_specularAndShininess.clear();
   m_pointAndRadius.clear();
-  for (size_t i=0; i<m_punctaList.size(); i++) {
+  for (size_t i = 0; i < m_punctaList.size(); i++) {
     if (m_useSameSizeForAllPuncta.get())
       m_pointAndRadius.emplace_back(m_punctaList[i]->x(), m_punctaList[i]->y(), m_punctaList[i]->z(), 2.f);
     else
-      m_pointAndRadius.emplace_back(m_punctaList[i]->x(), m_punctaList[i]->y(), m_punctaList[i]->z(), m_punctaList[i]->radius());
-    m_specularAndShininess.emplace_back(m_punctaList[i]->maxIntensity()/255.f,
-                                        m_punctaList[i]->maxIntensity()/255.f,
-                                        m_punctaList[i]->maxIntensity()/255.f,
-                                        m_punctaList[i]->maxIntensity()/2.f);
+      m_pointAndRadius.emplace_back(m_punctaList[i]->x(), m_punctaList[i]->y(), m_punctaList[i]->z(),
+                                    m_punctaList[i]->radius());
+    m_specularAndShininess.emplace_back(m_punctaList[i]->maxIntensity() / 255.f,
+                                        m_punctaList[i]->maxIntensity() / 255.f,
+                                        m_punctaList[i]->maxIntensity() / 255.f,
+                                        m_punctaList[i]->maxIntensity() / 2.f);
   }
 
   initializeCutRange();
@@ -335,7 +338,7 @@ void Z3DPunctaFilter::prepareData()
   m_dataIsInvalid = false;
 }
 
-void Z3DPunctaFilter::punctumBound(const ZPunctum &p, std::vector<double> &result) const
+void Z3DPunctaFilter::punctumBound(const ZPunctum& p, std::vector<double>& result) const
 {
   double radius = p.radius() * m_rendererBase.sizeScale();
   if (m_useSameSizeForAllPuncta.get())
@@ -355,7 +358,7 @@ void Z3DPunctaFilter::updateData()
   double maxMeanInten = std::numeric_limits<double>::lowest();
   double minMaxInten = std::numeric_limits<double>::max();
   double maxMaxInten = std::numeric_limits<double>::lowest();
-  for (ZPuncta::const_iterator it=m_origPuncta->begin(); it != m_origPuncta->end(); ++it) {
+  for (ZPuncta::const_iterator it = m_origPuncta->begin(); it != m_origPuncta->end(); ++it) {
     minMeanInten = std::min(minMeanInten, it->meanIntensity());
     maxMeanInten = std::max(maxMeanInten, it->meanIntensity());
     minMaxInten = std::min(minMaxInten, it->maxIntensity());
@@ -370,7 +373,7 @@ void Z3DPunctaFilter::updateData()
   updateBoundBox();
 }
 
-void Z3DPunctaFilter::notTransformedPunctumBound(const ZPunctum &p, std::vector<double> &result) const
+void Z3DPunctaFilter::notTransformedPunctumBound(const ZPunctum& p, std::vector<double>& result) const
 {
   double radius = p.radius() * m_rendererBase.sizeScale();
   if (m_useSameSizeForAllPuncta.get())
@@ -404,7 +407,7 @@ void Z3DPunctaFilter::updateNotTransformedBoundBoxImpl()
   m_notTransformedBoundBox[0] = m_notTransformedBoundBox[2] = m_notTransformedBoundBox[4] = std::numeric_limits<double>::max();
   m_notTransformedBoundBox[1] = m_notTransformedBoundBox[3] = m_notTransformedBoundBox[5] = std::numeric_limits<double>::lowest();
   std::vector<double> boundBox(6);
-  for (ZPuncta::const_iterator it=m_origPuncta->begin(); it != m_origPuncta->end(); ++it) {
+  for (ZPuncta::const_iterator it = m_origPuncta->begin(); it != m_origPuncta->end(); ++it) {
     notTransformedPunctumBound(*it, boundBox);
     m_notTransformedBoundBox[0] = std::min(boundBox[0], m_notTransformedBoundBox[0]);
     m_notTransformedBoundBox[1] = std::max(boundBox[1], m_notTransformedBoundBox[1]);
@@ -418,7 +421,7 @@ void Z3DPunctaFilter::updateNotTransformedBoundBoxImpl()
 void Z3DPunctaFilter::addSelectionLines()
 {
   std::vector<double> boundBox(6);
-  for (ZPuncta::const_iterator it=m_origPuncta->begin(); it != m_origPuncta->end(); ++it) {
+  for (ZPuncta::const_iterator it = m_origPuncta->begin(); it != m_origPuncta->end(); ++it) {
     punctumBound(*it, boundBox);
     appendBoundboxLines(boundBox, m_selectionLines);
   }
@@ -429,29 +432,31 @@ void Z3DPunctaFilter::prepareColor()
   m_pointColors.clear();
 
   if (m_colorMode.isSelected("Original Point Color")) {
-    for (size_t i=0; i<m_punctaList.size(); i++) {
-      glm::vec4 color(m_punctaList[i]->color().redF(), m_punctaList[i]->color().greenF(), m_punctaList[i]->color().blueF(), m_punctaList[i]->color().alphaF());
+    for (size_t i = 0; i < m_punctaList.size(); i++) {
+      glm::vec4 color(m_punctaList[i]->color().redF(), m_punctaList[i]->color().greenF(),
+                      m_punctaList[i]->color().blueF(), m_punctaList[i]->color().alphaF());
       m_pointColors.push_back(color);
     }
   } else if (m_colorMode.isSelected("Random Color")) {
-    for (size_t i=0; i<m_punctaList.size(); i++) {
-      glm::vec4 color(ZRandomInstance.randReal<float>(), ZRandomInstance.randReal<float>(), ZRandomInstance.randReal<float>(), 1.0f);
+    for (size_t i = 0; i < m_punctaList.size(); i++) {
+      glm::vec4 color(ZRandomInstance.randReal<float>(), ZRandomInstance.randReal<float>(),
+                      ZRandomInstance.randReal<float>(), 1.0f);
       m_pointColors.push_back(color);
     }
   } else if (m_colorMode.isSelected("Single Color")) {
-    for (size_t i=0; i<m_punctaList.size(); i++) {
+    for (size_t i = 0; i < m_punctaList.size(); i++) {
       m_pointColors.push_back(m_singleColorForAllPuncta.get());
     }
   } else if (m_colorMode.isSelected("Colormap Score")) {
-    for (size_t i=0; i<m_punctaList.size(); i++) {
+    for (size_t i = 0; i < m_punctaList.size(); i++) {
       m_pointColors.push_back(m_colorMapScore.get().mappedFColor(m_punctaList[i]->score()));
     }
   } else if (m_colorMode.isSelected("Colormap Mean Intensity")) {
-    for (size_t i=0; i<m_punctaList.size(); i++) {
+    for (size_t i = 0; i < m_punctaList.size(); i++) {
       m_pointColors.push_back(m_colorMapMeanIntensity.get().mappedFColor(m_punctaList[i]->meanIntensity()));
     }
   } else if (m_colorMode.isSelected("Colormap Max Intensity")) {
-    for (size_t i=0; i<m_punctaList.size(); i++) {
+    for (size_t i = 0; i < m_punctaList.size(); i++) {
       m_pointColors.push_back(m_colorMapMaxIntensity.get().mappedFColor(m_punctaList[i]->maxIntensity()));
     }
   }
@@ -476,7 +481,7 @@ void Z3DPunctaFilter::adjustWidgets()
   //  m_textureGlowRenderer.blurStrengthPara().setVisible(m_randomGlow.get());
 }
 
-void Z3DPunctaFilter::selectPuncta(QMouseEvent *e, int, int h)
+void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int, int h)
 {
   Q_UNUSED(h)
   if (m_punctaList.empty())
@@ -485,13 +490,14 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent *e, int, int h)
   e->ignore();
   if (e->type() == QEvent::MouseButtonDblClick) {
     const void* obj = pickingManager().objectAtWidgetPos(
-          glm::ivec2(e->x(), e->y()));
+      glm::ivec2(e->x(), e->y()));
     bool appending = (e->modifiers() == Qt::ControlModifier);
     if (!obj && !appending && m_isSelected) {
       emit objDeselected();
       return;
     }
-    bool hit = std::find(m_punctaList.begin(), m_punctaList.end(), static_cast<const ZPunctum*>(obj)) != m_punctaList.end();
+    bool hit =
+      std::find(m_punctaList.begin(), m_punctaList.end(), static_cast<const ZPunctum*>(obj)) != m_punctaList.end();
     if (hit) {
       emit objSelected(appending);
       e->accept();
@@ -511,7 +517,7 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent *e, int, int h)
     }
 
     // Check if any point was selected...
-    for (std::vector<ZPunctum*>::iterator it=m_punctaList.begin(); it!=m_punctaList.end(); ++it)
+    for (std::vector<ZPunctum*>::iterator it = m_punctaList.begin(); it != m_punctaList.end(); ++it)
       if (*it == obj) {
         m_pressedPunctum = *it;
         break;
@@ -535,9 +541,9 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent *e, int, int h)
 void Z3DPunctaFilter::getVisibleData()
 {
   m_punctaList.clear();
-  for (ZPuncta::iterator it=m_origPuncta->begin(); it != m_origPuncta->end(); ++it) {
+  for (ZPuncta::iterator it = m_origPuncta->begin(); it != m_origPuncta->end(); ++it) {
     //if (m_origPuncta[i]->isVisible())
-      m_punctaList.push_back(&(*it));
+    m_punctaList.push_back(&(*it));
   }
 }
 
@@ -550,7 +556,7 @@ void Z3DPunctaFilter::updatePunctumVisibleState()
 
 void Z3DPunctaFilter::changePunctaSize()
 {
-  for (size_t i=0; i<m_pointAndRadius.size(); i++) {
+  for (size_t i = 0; i < m_pointAndRadius.size(); i++) {
     if (m_useSameSizeForAllPuncta.get())
       m_pointAndRadius.at(i).w = 2.f;
     else

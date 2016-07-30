@@ -5,11 +5,14 @@
 #include "zstatisticsutils.h"
 
 #ifndef _USE_QTCONCURRENT_
+
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
+
 #else
 #include <QtConcurrent/QtConcurrentMap>
 #endif
+
 #include <QList>
 
 #include <utility>
@@ -22,7 +25,8 @@ namespace nim {
 class ZImageToImageMetric
 {
 public:
-  enum class Type {
+  enum class Type
+  {
     MeanDifferences,
     MeanSquaredDifferences,
     LogAbsoluteDifferences,
@@ -32,22 +36,31 @@ public:
 
   ZImageToImageMetric();
 
-  void setType(Type type) { m_type = type; }
-  Type type() const { return m_type; }
+  void setType(Type type)
+  { m_type = type; }
 
-  void setUseMultithreading(bool v) { m_useMultithreading = v; }
+  Type type() const
+  { return m_type; }
+
+  void setUseMultithreading(bool v)
+  { m_useMultithreading = v; }
 
   // for mutual information
   // number of histogram bins and value range to build histogram
   // default is 128
-  void setNumHistogramBins(size_t nbins) { m_nbins = nbins; }
+  void setNumHistogramBins(size_t nbins)
+  { m_nbins = nbins; }
+
   // if not set, default for float type is 0.0 to 1.0
   // for other type is available range
   void setHistogramRange(double Imin, double Imax)
-    { m_Imin = Imin; m_Imax = Imax; }
+  {
+    m_Imin = Imin;
+    m_Imax = Imax;
+  }
 
   // this method works for both 2d and 3d image, set depth to 1 for 2d image
-  template <typename TPixel1, typename TPixel2>
+  template<typename TPixel1, typename TPixel2>
   double value(const TPixel1* img1, const TPixel2* img2, size_t width, size_t height, size_t depth = 1);
 
 protected:
@@ -79,35 +92,38 @@ private:
 // template
 
 template<typename TPixel1, typename TPixel2>
-struct EvaluateMetricForOneBlock {
-  EvaluateMetricForOneBlock(const TPixel1 *img1,
-                            const TPixel2 *img2,
+struct EvaluateMetricForOneBlock
+{
+  EvaluateMetricForOneBlock(const TPixel1* img1,
+                            const TPixel2* img2,
                             size_t size,
                             ZImageToImageMetric::Type type,
                             double mean1 = 0, double std1 = 0, double mean2 = 0, double std2 = 0)
     : m_img1(img1), m_img2(img2), m_size(size), m_type(type)
     , m_mean1(mean1), m_mean2(mean2), m_std1(std1), m_std2(std2)
-  #ifndef _USE_QTCONCURRENT_
+#ifndef _USE_QTCONCURRENT_
     , m_metric(0)
-  #endif
+#endif
   {
   }
 
 #ifndef _USE_QTCONCURRENT_
-  void operator()(const tbb::blocked_range<size_t>& range) {
+
+  void operator()(const tbb::blocked_range<size_t>& range)
+  {
     if (m_type == ZImageToImageMetric::Type::MeanDifferences) {
-      for (size_t i=range.begin(); i<range.end(); ++i)
+      for (size_t i = range.begin(); i < range.end(); ++i)
         m_metric += (m_img1[i] * 1.0 - m_img2[i]) / m_size;
     } else if (m_type == ZImageToImageMetric::Type::MeanSquaredDifferences) {
-      for (size_t i=range.begin(); i<range.end(); ++i)
+      for (size_t i = range.begin(); i < range.end(); ++i)
         m_metric += (m_img1[i] * 1.0 - m_img2[i]) * (m_img1[i] * 1.0 - m_img2[i]) / m_size;
     } else if (m_type == ZImageToImageMetric::Type::LogAbsoluteDifferences) {
-      for (size_t i=range.begin(); i<range.end(); ++i)
+      for (size_t i = range.begin(); i < range.end(); ++i)
         m_metric += std::log(std::abs(m_img1[i] * 1.0 - m_img2[i]) + 1.0) / m_size;
     } else if (m_type == ZImageToImageMetric::Type::NormalizedCrossCorrelation) {
       double scale = 1. / (m_size * m_std1 * m_std2);
-      for (size_t i=range.begin(); i<range.end(); ++i)
-        m_metric += -(m_img1[i]-m_mean1)*(m_img2[i]-m_mean2) * scale;
+      for (size_t i = range.begin(); i < range.end(); ++i)
+        m_metric += -(m_img1[i] - m_mean1) * (m_img2[i] - m_mean2) * scale;
     }
   }
 
@@ -120,6 +136,7 @@ struct EvaluateMetricForOneBlock {
   {
     m_metric += y.m_metric;
   }
+
 #else
   typedef double result_type;
 
@@ -144,8 +161,8 @@ struct EvaluateMetricForOneBlock {
   }
 #endif
 
-  const TPixel1 *m_img1;
-  const TPixel2 *m_img2;
+  const TPixel1* m_img1;
+  const TPixel2* m_img2;
   double m_size;
   ZImageToImageMetric::Type m_type;
   double m_mean1;
@@ -220,8 +237,8 @@ struct EvaluateMetricForOneBlock {
 //  size_t m_nbins;
 //};
 
-template <typename TPixel1, typename TPixel2>
-double ZImageToImageMetric::value(const TPixel1 *img1, const TPixel2 *img2, size_t width, size_t height, size_t depth)
+template<typename TPixel1, typename TPixel2>
+double ZImageToImageMetric::value(const TPixel1* img1, const TPixel2* img2, size_t width, size_t height, size_t depth)
 {
   size_t size = width * height * depth;
 
@@ -283,8 +300,8 @@ double ZImageToImageMetric::value(const TPixel1 *img1, const TPixel2 *img2, size
 
   double mean1 = 0, mean2 = 0, std1 = 0, std2 = 0;
   if (m_type == Type::NormalizedCrossCorrelation) {
-    meanAndStandardDeviation(img1, img1+size, mean1, std1, true);
-    meanAndStandardDeviation(img2, img2+size, mean2, std2, true);
+    meanAndStandardDeviation(img1, img1 + size, mean1, std1, true);
+    meanAndStandardDeviation(img2, img2 + size, mean2, std2, true);
     if (std1 == 0.0 || std2 == 0.0) {
       return 0;
     }

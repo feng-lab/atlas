@@ -20,18 +20,20 @@
 #include <QDebug>
 #endif
 
+namespace nim {
+
 /* usage:
   bench with repeats:
     ZBenchTimer bt;
-    BENCHANDPRINT(bt,10,5,testFun());
+    BENCH_AND_LOG(bt,10,5,testFun(),"fun1");
   bench without repeats:
     ZBenchTimer bt;
     bt.start();
     testFun();
-    bt.stopAndPrint();
+    STOP_AND_LOG(bt);
   */
 
-#define BENCHANDPRINT(TIMER, TRIES, REP, CODE, FUNCNAME) { \
+#define BENCH_AND_LOG(TIMER, TRIES, REP, CODE, FUNCNAME) { \
   TIMER.reset(); \
   TIMER.setName(FUNCNAME); \
   for(int i=0; i<TRIES; ++i){ \
@@ -41,10 +43,13 @@
     } \
     TIMER.stop(); \
   } \
-  std::cout << TIMER; \
+  LOG(INFO) << TIMER; \
 }
 
-namespace nim {
+#define STOP_AND_LOG(TIMER) { \
+  TIMER.stop(); \
+  LOG(INFO) << TIMER; \
+}
 
 class ZBenchTimer
 {
@@ -73,12 +78,6 @@ public:
     m_start = getCpuTicks();
   }
 
-  inline void resetAndStart()
-  {
-    reset();
-    start();
-  }
-
   inline void resetAndStart(const std::string& newName)
   {
     setName(newName);
@@ -91,15 +90,6 @@ public:
   void pause();
 
   void resume();
-
-  inline void stopAndPrint(std::ostream& s = std::cout)
-  {
-    stop();
-    s << *this;
-    s.flush();
-  }
-
-  void stopAndLog();
 
   // elapsed time in seconds
   inline double time()

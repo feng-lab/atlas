@@ -6,7 +6,7 @@
 
 namespace nim {
 
-Z3DShaderGroup::Z3DShaderGroup(Z3DRendererBase &rendererBase)
+Z3DShaderGroup::Z3DShaderGroup(Z3DRendererBase& rendererBase)
   : m_base(rendererBase)
   , m_geometryInputType(GL_LINES_ADJACENCY)
   , m_geometryOutputType(GL_TRIANGLE_STRIP)
@@ -14,8 +14,8 @@ Z3DShaderGroup::Z3DShaderGroup(Z3DRendererBase &rendererBase)
 {
 }
 
-void Z3DShaderGroup::init(const QStringList &shaderFiles, const QString &header, const QString &geomHeader,
-                          const QStringList &normalShaderFiles)
+void Z3DShaderGroup::init(const QStringList& shaderFiles, const QString& header, const QString& geomHeader,
+                          const QStringList& normalShaderFiles)
 {
   m_shaderFiles = shaderFiles;
   m_header = header;
@@ -43,13 +43,15 @@ void Z3DShaderGroup::addDualDepthPeelingShaders()
     if (!GLVersionGE(3, 2)) {
       m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit]->setGeometryInputType(m_geometryInputType);
       m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit]->setGeometryOutputType(m_geometryOutputType);
-      m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit]->setGeometryOutputVertexCount(m_geometryOutputVertexCount);
+      m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit]->setGeometryOutputVertexCount(
+        m_geometryOutputVertexCount);
     }
     m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel].reset(new Z3DShaderProgram());
     if (!GLVersionGE(3, 2)) {
       m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel]->setGeometryInputType(m_geometryInputType);
       m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel]->setGeometryOutputType(m_geometryOutputType);
-      m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel]->setGeometryOutputVertexCount(m_geometryOutputVertexCount);
+      m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel]->setGeometryOutputVertexCount(
+        m_geometryOutputVertexCount);
     }
     buildDualDepthPeelingInitShader(m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit].get());
     buildDualDepthPeelingPeelShader(m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel].get());
@@ -63,7 +65,8 @@ void Z3DShaderGroup::addWeightedAverageShaders()
     if (!GLVersionGE(3, 2)) {
       m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit]->setGeometryInputType(m_geometryInputType);
       m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit]->setGeometryOutputType(m_geometryOutputType);
-      m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit]->setGeometryOutputVertexCount(m_geometryOutputVertexCount);
+      m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit]->setGeometryOutputVertexCount(
+        m_geometryOutputVertexCount);
     }
     buildWeightedAverageShader(m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit].get());
   }
@@ -89,7 +92,7 @@ Z3DShaderProgram& Z3DShaderGroup::get()
   return *m_shaders[m_base.shaderHookType()];
 }
 
-void Z3DShaderGroup::rebuild(const QString &header, const QString &geomHeader)
+void Z3DShaderGroup::rebuild(const QString& header, const QString& geomHeader)
 {
   m_header = header;
   m_geomHeader = geomHeader;
@@ -97,25 +100,25 @@ void Z3DShaderGroup::rebuild(const QString &header, const QString &geomHeader)
   while (i != m_shaders.end()) {
     i->second->removeAllShaders();
     switch (i->first) {
-    case Z3DRendererBase::ShaderHookType::Normal:
-      buildNormalShader(i->second.get());
-      break;
-    case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
-      buildDualDepthPeelingInitShader(i->second.get());
-      break;
-    case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
-      buildDualDepthPeelingPeelShader(i->second.get());
-      break;
-    case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
-      buildWeightedAverageShader(i->second.get());
-    default:
-      break;
+      case Z3DRendererBase::ShaderHookType::Normal:
+        buildNormalShader(i->second.get());
+        break;
+      case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
+        buildDualDepthPeelingInitShader(i->second.get());
+        break;
+      case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
+        buildDualDepthPeelingPeelShader(i->second.get());
+        break;
+      case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
+        buildWeightedAverageShader(i->second.get());
+      default:
+        break;
     }
     ++i;
   }
 }
 
-void Z3DShaderGroup::buildNormalShader(Z3DShaderProgram *shader)
+void Z3DShaderGroup::buildNormalShader(Z3DShaderProgram* shader)
 {
   if (m_normalShaderFiles.empty()) {
     QStringList allshaders(m_shaderFiles);
@@ -128,7 +131,7 @@ void Z3DShaderGroup::buildNormalShader(Z3DShaderProgram *shader)
   }
 }
 
-void Z3DShaderGroup::buildDualDepthPeelingInitShader(Z3DShaderProgram *shader)
+void Z3DShaderGroup::buildDualDepthPeelingInitShader(Z3DShaderProgram* shader)
 {
   QStringList allshaders(m_shaderFiles);
   allshaders << "dual_peeling_init.frag";
@@ -139,7 +142,7 @@ void Z3DShaderGroup::buildDualDepthPeelingInitShader(Z3DShaderProgram *shader)
 
 //#define USE_RECT_TEX
 
-void Z3DShaderGroup::buildDualDepthPeelingPeelShader(Z3DShaderProgram *shader)
+void Z3DShaderGroup::buildDualDepthPeelingPeelShader(Z3DShaderProgram* shader)
 {
   QStringList allshaders(m_shaderFiles);
   allshaders << "dual_peeling_peel.frag";
@@ -158,7 +161,7 @@ void Z3DShaderGroup::buildDualDepthPeelingPeelShader(Z3DShaderProgram *shader)
 #endif
 }
 
-void Z3DShaderGroup::buildWeightedAverageShader(Z3DShaderProgram *shader)
+void Z3DShaderGroup::buildWeightedAverageShader(Z3DShaderProgram* shader)
 {
   QStringList allshaders(m_shaderFiles);
   allshaders << "wavg_init.frag";

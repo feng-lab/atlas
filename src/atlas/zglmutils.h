@@ -11,6 +11,7 @@
 #define GLM_FORCE_EXPLICIT_CTOR
 //#define GLM_MESSAGES
 #define GLM_SWIZZLE
+
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -24,9 +25,11 @@
 #include <iostream>
 #include <sstream>
 #include <tuple>
+
 #ifdef _USE_QSLOG_
 #include <QDebug>
 #endif
+
 #include <QRegExp>
 #include <QStringList>
 #include <QColor>
@@ -37,28 +40,28 @@ typedef tvec4<unsigned char, highp> col4;
 
 // apply transform matrix
 template<typename T, precision P>
-tvec3<T,P> applyMatrix(const tmat4x4<T,P> &mat, const tvec3<T,P> &vec)
+tvec3<T, P> applyMatrix(const tmat4x4<T, P>& mat, const tvec3<T, P>& vec)
 {
-  tvec4<T,P> res = mat * tvec4<T,P>(vec, T(1));
-  return tvec3<T,P>(res / res.w);
+  tvec4<T, P> res = mat * tvec4<T, P>(vec, T(1));
+  return tvec3<T, P>(res / res.w);
 }
 
 // given vec, get normalized vector e1 and e2 to make (e1,e2,vec) orthogonal to each other
 // **crash** if vec is zero
 template<typename T, precision P>
-void getOrthogonalVectors(const tvec3<T,P> &vec, tvec3<T,P> &e1, tvec3<T,P> &e2)
+void getOrthogonalVectors(const tvec3<T, P>& vec, tvec3<T, P>& e1, tvec3<T, P>& e2)
 {
   GLM_STATIC_ASSERT(std::numeric_limits<T>::is_iec559, "'getOrthogonalVectors' only accept floating-point inputs");
   T eps = std::numeric_limits<T>::epsilon() * 1e2;
 
-  e1 = cross(vec, tvec3<T,P>(T(1), T(0), T(0)));
+  e1 = cross(vec, tvec3<T, P>(T(1), T(0), T(0)));
   if (dot(e1, e1) < eps)
-    e1 = cross(vec, tvec3<T,P>(T(0), T(1), T(0)));
+    e1 = cross(vec, tvec3<T, P>(T(0), T(1), T(0)));
   e1 = normalize(e1);
   e2 = normalize(cross(e1, vec));
 }
 
-inline quat mix(const quat &q1, const quat &q2, double p)
+inline quat mix(const quat& q1, const quat& q2, double p)
 {
   return mix(q1, q2, float(p));
 }
@@ -72,8 +75,10 @@ class Vec2Compare
 {
   bool less;
 public:
-  Vec2Compare(bool less = true) : less(less) {}
-  bool operator() (const glm::tvec2<T,P>& lhs, const glm::tvec2<T,P>& rhs) const
+  Vec2Compare(bool less = true) : less(less)
+  {}
+
+  bool operator()(const glm::tvec2<T, P>& lhs, const glm::tvec2<T, P>& rhs) const
   {
     if (less) {
       return std::tie(lhs.y, lhs.x) < std::tie(rhs.y, rhs.x);
@@ -88,8 +93,10 @@ class Vec3Compare
 {
   bool less;
 public:
-  Vec3Compare(bool less = true) : less(less) {}
-  bool operator() (const glm::tvec3<T,P>& lhs, const glm::tvec3<T,P>& rhs) const
+  Vec3Compare(bool less = true) : less(less)
+  {}
+
+  bool operator()(const glm::tvec3<T, P>& lhs, const glm::tvec3<T, P>& rhs) const
   {
     if (less) {
       return std::tie(lhs.z, lhs.y, lhs.x) < std::tie(rhs.z, rhs.y, rhs.x);
@@ -104,8 +111,10 @@ class Vec4Compare
 {
   bool less;
 public:
-  Vec4Compare(bool less = true) : less(less) {}
-  bool operator() (const glm::tvec4<T,P>& lhs, const glm::tvec4<T,P>& rhs) const
+  Vec4Compare(bool less = true) : less(less)
+  {}
+
+  bool operator()(const glm::tvec4<T, P>& lhs, const glm::tvec4<T, P>& rhs) const
   {
     if (less) {
       return std::tie(lhs.w, lhs.z, lhs.y, lhs.x) < std::tie(rhs.w, rhs.z, rhs.y, rhs.x);
@@ -168,49 +177,49 @@ inline QString toQString(T v)
 }
 
 template<typename T, glm::precision P>
-inline QString toQString(const glm::tvec2<T,P>& v)
+inline QString toQString(const glm::tvec2<T, P>& v)
 {
   return QString("[%1, %2]").arg(v[0]).arg(v[1]);
 }
 
 template<typename T, glm::precision P>
-inline void toVal(const QString &str, glm::tvec2<T,P>& v)
+inline void toVal(const QString& str, glm::tvec2<T, P>& v)
 {
   QRegExp rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
-  for (int i=0; i<std::min(2,numList.size()); ++i) {
+  for (int i = 0; i < std::min(2, numList.size()); ++i) {
     toVal(numList[i], v[i]);
   }
 }
 
 template<typename T, glm::precision P>
-inline QString toQString(const glm::tvec3<T,P>& v)
+inline QString toQString(const glm::tvec3<T, P>& v)
 {
   return QString("[%1, %2, %3]").arg(v[0]).arg(v[1]).arg(v[2]);
 }
 
 template<typename T, glm::precision P>
-inline void toVal(const QString &str, glm::tvec3<T,P>& v)
+inline void toVal(const QString& str, glm::tvec3<T, P>& v)
 {
   QRegExp rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
-  for (int i=0; i<std::min(3,numList.size()); ++i) {
+  for (int i = 0; i < std::min(3, numList.size()); ++i) {
     toVal(numList[i], v[i]);
   }
 }
 
 template<typename T, glm::precision P>
-inline QString toQString(const glm::tvec4<T,P>& v)
+inline QString toQString(const glm::tvec4<T, P>& v)
 {
   return QString("[%1, %2, %3, %4]").arg(v[0]).arg(v[1]).arg(v[2]).arg(v[3]);
 }
 
 template<typename T, glm::precision P>
-inline void toVal(const QString &str, glm::tvec4<T,P>& v)
+inline void toVal(const QString& str, glm::tvec4<T, P>& v)
 {
   QRegExp rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
-  for (int i=0; i<std::min(4,numList.size()); ++i) {
+  for (int i = 0; i < std::min(4, numList.size()); ++i) {
     toVal(numList[i], v[i]);
   }
 }
@@ -220,11 +229,11 @@ inline QString toQString(const QColor& v)
   return QString("[%1, %2, %3, %4]").arg(v.red()).arg(v.green()).arg(v.blue()).arg(v.alpha());
 }
 
-inline void toVal(const QString &str, QColor& v)
+inline void toVal(const QString& str, QColor& v)
 {
   QRegExp rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
-  for (int i=0; i<std::min(4,numList.size()); ++i) {
+  for (int i = 0; i < std::min(4, numList.size()); ++i) {
     int c;
     toVal(numList[i], c);
     if (i == 0) {
@@ -241,74 +250,74 @@ inline void toVal(const QString &str, QColor& v)
 
 
 template<typename T, glm::precision P>
-inline QString toQString(const glm::tmat2x2<T,P> &m)
+inline QString toQString(const glm::tmat2x2<T, P>& m)
 {
   return QString("[%1, %2; %3, %4]").
-      arg(m[0][0]).arg(m[1][0]).
-      arg(m[0][1]).arg(m[1][1]);
+    arg(m[0][0]).arg(m[1][0]).
+    arg(m[0][1]).arg(m[1][1]);
 }
 
 template<typename T, glm::precision P>
-inline void toVal(const QString &str, glm::tmat2x2<T,P>& m)
+inline void toVal(const QString& str, glm::tmat2x2<T, P>& m)
 {
   QRegExp rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
-  for (int i=0; i<std::min(4,numList.size()); ++i) {
-    toVal(numList[i], m[i%2][i/2]);
+  for (int i = 0; i < std::min(4, numList.size()); ++i) {
+    toVal(numList[i], m[i % 2][i / 2]);
   }
 }
 
 template<typename T, glm::precision P>
-inline QString toQString(const glm::tmat3x3<T,P> &m)
+inline QString toQString(const glm::tmat3x3<T, P>& m)
 {
   return QString("[%1, %2, %3; %4, %5, %6; %7, %8, %9]").
-      arg(m[0][0]).arg(m[1][0]).arg(m[2][0]).
-      arg(m[0][1]).arg(m[1][1]).arg(m[2][1]).
-      arg(m[0][2]).arg(m[1][2]).arg(m[2][2]);
+    arg(m[0][0]).arg(m[1][0]).arg(m[2][0]).
+    arg(m[0][1]).arg(m[1][1]).arg(m[2][1]).
+    arg(m[0][2]).arg(m[1][2]).arg(m[2][2]);
 }
 
 template<typename T, glm::precision P>
-inline void toVal(const QString &str, glm::tmat3x3<T,P>& m)
+inline void toVal(const QString& str, glm::tmat3x3<T, P>& m)
 {
   QRegExp rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
-  for (int i=0; i<std::min(9,numList.size()); ++i) {
-    toVal(numList[i], m[i%3][i/3]);
+  for (int i = 0; i < std::min(9, numList.size()); ++i) {
+    toVal(numList[i], m[i % 3][i / 3]);
   }
 }
 
 template<typename T, glm::precision P>
-inline QString toQString(const glm::tmat4x4<T,P> &m)
+inline QString toQString(const glm::tmat4x4<T, P>& m)
 {
   return QString("[%1, %2, %3, %4; %5, %6, %7, %8; %9, %10, %11, %12; %13, %14, %15, %16]").
-      arg(m[0][0]).arg(m[1][0]).arg(m[2][0]).arg(m[3][0]).
-      arg(m[0][1]).arg(m[1][1]).arg(m[2][1]).arg(m[3][1]).
-      arg(m[0][2]).arg(m[1][2]).arg(m[2][2]).arg(m[3][2]).
-      arg(m[0][3]).arg(m[1][3]).arg(m[2][3]).arg(m[3][3]);
+    arg(m[0][0]).arg(m[1][0]).arg(m[2][0]).arg(m[3][0]).
+    arg(m[0][1]).arg(m[1][1]).arg(m[2][1]).arg(m[3][1]).
+    arg(m[0][2]).arg(m[1][2]).arg(m[2][2]).arg(m[3][2]).
+    arg(m[0][3]).arg(m[1][3]).arg(m[2][3]).arg(m[3][3]);
 }
 
 template<typename T, glm::precision P>
-inline void toVal(const QString &str, glm::tmat4x4<T,P>& m)
+inline void toVal(const QString& str, glm::tmat4x4<T, P>& m)
 {
   QRegExp rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
-  for (int i=0; i<std::min(16,numList.size()); ++i) {
-    toVal(numList[i], m[i%4][i/4]);
+  for (int i = 0; i < std::min(16, numList.size()); ++i) {
+    toVal(numList[i], m[i % 4][i / 4]);
   }
 }
 
 template<typename T, glm::precision P>
-inline QString toQString(const glm::tquat<T,P> &q)
+inline QString toQString(const glm::tquat<T, P>& q)
 {
   return QString("[%1, %2, %3, %4]").arg(q[0]).arg(q[1]).arg(q[2]).arg(q[3]);
 }
 
 template<typename T, glm::precision P>
-inline void toVal(const QString &str, glm::tquat<T,P>& q)
+inline void toVal(const QString& str, glm::tquat<T, P>& q)
 {
   QRegExp rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
-  for (int i=0; i<std::min(4,numList.size()); ++i) {
+  for (int i = 0; i < std::min(4, numList.size()); ++i) {
     toVal(numList[i], q[i]);
   }
 }
@@ -317,79 +326,82 @@ inline void toVal(const QString &str, glm::tquat<T,P>& q)
 // std iostream print
 
 template<typename T, glm::precision P>
-inline std::ostream& operator<<(std::ostream& s, const glm::tvec2<T,P>& v)
+inline std::ostream& operator<<(std::ostream& s, const glm::tvec2<T, P>& v)
 {
   return (s << qUtf8Printable(toQString(v)));
 }
 
 template<typename T, glm::precision P>
-inline std::ostream& operator<<(std::ostream& s, const glm::tvec3<T,P>& v)
+inline std::ostream& operator<<(std::ostream& s, const glm::tvec3<T, P>& v)
 {
   return (s << qUtf8Printable(toQString(v)));
 }
 
 template<typename T, glm::precision P>
-inline std::ostream& operator<<(std::ostream& s, const glm::tvec4<T,P>& v)
+inline std::ostream& operator<<(std::ostream& s, const glm::tvec4<T, P>& v)
 {
   return (s << qUtf8Printable(toQString(v)));
 }
 
 template<>
-inline std::ostream& operator<< <unsigned char,glm::highp>(std::ostream& s, const glm::tvec2<unsigned char,glm::highp>& v)
+inline std::ostream&
+operator<<<unsigned char, glm::highp>(std::ostream& s, const glm::tvec2<unsigned char, glm::highp>& v)
 {
-  return (s << glm::tvec2<int,glm::highp>(v));
+  return (s << glm::tvec2<int, glm::highp>(v));
 }
 
 template<>
-inline std::ostream& operator<< <unsigned char,glm::highp>(std::ostream& s, const glm::tvec3<unsigned char,glm::highp>& v)
+inline std::ostream&
+operator<<<unsigned char, glm::highp>(std::ostream& s, const glm::tvec3<unsigned char, glm::highp>& v)
 {
-  return (s << glm::tvec3<int,glm::highp>(v));
+  return (s << glm::tvec3<int, glm::highp>(v));
 }
 
 template<>
-inline std::ostream& operator<< <unsigned char,glm::highp>(std::ostream& s, const glm::tvec4<unsigned char,glm::highp>& v)
+inline std::ostream&
+operator<<<unsigned char, glm::highp>(std::ostream& s, const glm::tvec4<unsigned char, glm::highp>& v)
 {
-  return (s << glm::tvec4<int,glm::highp>(v));
+  return (s << glm::tvec4<int, glm::highp>(v));
 }
 
 template<>
-inline std::ostream& operator<< <char,glm::highp>(std::ostream& s, const glm::tvec2<char,glm::highp>& v)
+inline std::ostream& operator<<<char, glm::highp>(std::ostream& s, const glm::tvec2<char, glm::highp>& v)
 {
-  return (s << glm::tvec2<int,glm::highp>(v));
+  return (s << glm::tvec2<int, glm::highp>(v));
 }
 
 template<>
-inline std::ostream& operator<< <char,glm::highp>(std::ostream& s, const glm::tvec3<char,glm::highp>& v)
+inline std::ostream& operator<<<char, glm::highp>(std::ostream& s, const glm::tvec3<char, glm::highp>& v)
 {
-  return (s << glm::tvec3<int,glm::highp>(v));
+  return (s << glm::tvec3<int, glm::highp>(v));
 }
 
 template<>
-inline std::ostream& operator<< <char,glm::highp>(std::ostream& s, const glm::tvec4<char,glm::highp>& v)
+inline std::ostream& operator<<<char, glm::highp>(std::ostream& s, const glm::tvec4<char, glm::highp>& v)
 {
-  return (s << glm::tvec4<int,glm::highp>(v));
+  return (s << glm::tvec4<int, glm::highp>(v));
 }
 
 template<typename T, glm::precision P>
-inline std::ostream& operator<<(std::ostream& s, const glm::tmat2x2<T,P>& m)
+inline std::ostream& operator<<(std::ostream& s, const glm::tmat2x2<T, P>& m)
 {
   return (s << qUtf8Printable(toQString(m)));
 }
 
 template<typename T, glm::precision P>
-inline std::ostream& operator<<(std::ostream& s, const glm::tmat3x3<T,P>& m)
+inline std::ostream& operator<<(std::ostream& s, const glm::tmat3x3<T, P>& m)
 {
   return (s << qUtf8Printable(toQString(m)));
 }
 
 template<typename T, glm::precision P>
-inline std::ostream& operator<<(std::ostream& s, const glm::tmat4x4<T,P>& m)
+inline std::ostream& operator<<(std::ostream& s, const glm::tmat4x4<T, P>& m)
 {
   return (s << qUtf8Printable(toQString(m)));
 }
 
 template<typename T, glm::precision P>
-inline std::ostream& operator<<(std::ostream& s, const glm::tquat<T,P>& q)
+inline std::ostream& operator<<(std::ostream& s, const glm::tquat<T, P>& q)
 {
   return (s << qUtf8Printable(toQString(q)));
 }

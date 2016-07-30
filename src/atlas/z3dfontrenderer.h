@@ -9,32 +9,54 @@ namespace nim {
 
 class Z3DFontRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit Z3DFontRenderer(Z3DRendererBase &rendererBase);
+  explicit Z3DFontRenderer(Z3DRendererBase& rendererBase);
 
-  void setData(std::vector<glm::vec3> *positions, const QStringList &texts);
-  void setDataColors(std::vector<glm::vec4> *colors);
-  void setDataPickingColors(std::vector<glm::vec4> *pickingColors = NULL);
+  void setData(std::vector<glm::vec3>* positions, const QStringList& texts);
 
-  ZStringIntOptionParameter& allFontNamesPara() { return m_allFontNames; }
-  ZFontParameter& fontPara() { return m_font; }
-  ZFloatParameter& fontSizePara() { return m_fontSize; }
-  ZFloatParameter& fontSoftEdgeScalePara() { return m_fontSoftEdgeScale; }
-  ZBoolParameter& showFontOutlinePara() { return m_showFontOutline; }
-  ZStringIntOptionParameter& fontOutlineModePara() { return m_fontOutlineMode; }
-  ZVec4Parameter& fontOutlineColorPara() { return m_fontOutlineColor; }
-  ZBoolParameter& showFontShadowPara() { return m_showFontShadow; }
-  ZVec4Parameter& fontShadowColorPara() { return m_fontShadowColor; }
+  void setDataColors(std::vector<glm::vec4>* colors);
+
+  void setDataPickingColors(std::vector<glm::vec4>* pickingColors = nullptr);
+
+  ZStringIntOptionParameter& allFontNamesPara()
+  { return m_allFontNames; }
+
+  ZFontParameter& fontPara()
+  { return m_font; }
+
+  ZFloatParameter& fontSizePara()
+  { return m_fontSize; }
+
+  ZFloatParameter& fontSoftEdgeScalePara()
+  { return m_fontSoftEdgeScale; }
+
+  ZBoolParameter& showFontOutlinePara()
+  { return m_showFontOutline; }
+
+  ZStringIntOptionParameter& fontOutlineModePara()
+  { return m_fontOutlineMode; }
+
+  ZVec4Parameter& fontOutlineColorPara()
+  { return m_fontOutlineColor; }
+
+  ZBoolParameter& showFontShadowPara()
+  { return m_showFontShadow; }
+
+  ZVec4Parameter& fontShadowColorPara()
+  { return m_fontShadowColor; }
 
 protected:
   void adjustWidgets();
+
   virtual void compile() override;
 
   std::vector<glm::vec4>* getColors();
+
   QString generateHeader();
 
   virtual void render(Z3DEye eye) override;
+
   virtual void renderPicking(Z3DEye) override;
 
   void prepareFontShaderData(Z3DEye eye);
@@ -55,9 +77,9 @@ protected:
 
   std::vector<std::unique_ptr<Z3DSDFont>> m_allFonts;
 
-  std::vector<glm::vec3> *m_positionsPt;
-  std::vector<glm::vec4> *m_colorsPt;
-  std::vector<glm::vec4> *m_pickingColorsPt;
+  std::vector<glm::vec3>* m_positionsPt;
+  std::vector<glm::vec4>* m_colorsPt;
+  std::vector<glm::vec4>* m_pickingColorsPt;
   QStringList m_texts;
   std::vector<glm::vec4> m_colors;
   std::vector<glm::vec4> m_fontColors;

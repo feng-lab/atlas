@@ -8,7 +8,7 @@
 
 namespace nim {
 
-ZQuatParameter::ZQuatParameter(const QString &name, QObject *parent)
+ZQuatParameter::ZQuatParameter(const QString& name, QObject* parent)
   : ZNumericVectorParameter<glm::quat>(name, glm::quat(), glm::quat(std::numeric_limits<float>::lowest(),
                                                                     std::numeric_limits<float>::lowest(),
                                                                     std::numeric_limits<float>::lowest(),
@@ -21,15 +21,15 @@ ZQuatParameter::ZQuatParameter(const QString &name, QObject *parent)
   addStyle("SPINBOX");
 }
 
-ZQuatParameter::ZQuatParameter(const QString &name, glm::quat value, QObject *parent)
+ZQuatParameter::ZQuatParameter(const QString& name, glm::quat value, QObject* parent)
   : ZNumericVectorParameter<glm::quat>(name, value, glm::quat(std::numeric_limits<float>::lowest(),
                                                               std::numeric_limits<float>::lowest(),
                                                               std::numeric_limits<float>::lowest(),
                                                               std::numeric_limits<float>::lowest()),
-                                 glm::quat(std::numeric_limits<float>::max(),
-                                           std::numeric_limits<float>::max(),
-                                           std::numeric_limits<float>::max(),
-                                           std::numeric_limits<float>::max()), parent)
+                                       glm::quat(std::numeric_limits<float>::max(),
+                                                 std::numeric_limits<float>::max(),
+                                                 std::numeric_limits<float>::max(),
+                                                 std::numeric_limits<float>::max()), parent)
 {
   addStyle("SPINBOX");
 }
@@ -54,7 +54,7 @@ void ZQuatParameter::setValue4(double v)
   set(glm::quat(static_cast<float>(v), m_value.x, m_value.y, m_value.z));
 }
 
-void ZQuatParameter::beforeChange(glm::quat &value)
+void ZQuatParameter::beforeChange(glm::quat& value)
 {
   if (value[0] != m_value[0])
     emit value1WillChange(value[0]);
@@ -66,14 +66,14 @@ void ZQuatParameter::beforeChange(glm::quat &value)
     emit value4WillChange(value[3]);
 }
 
-QWidget *ZQuatParameter::actualCreateWidget(QWidget *parent)
+QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
 {
-  QWidget *w;
+  QWidget* w;
   if (m_widgetOrientation == Qt::Horizontal)
     w = new QWidget(parent);
   else
     w = new QGroupBox(m_groupBoxName, parent);
-  QBoxLayout *lo;
+  QBoxLayout* lo;
   if (m_widgetOrientation == Qt::Horizontal)
     lo = new QHBoxLayout();
   else
@@ -81,7 +81,7 @@ QWidget *ZQuatParameter::actualCreateWidget(QWidget *parent)
 
   if (m_style == "SPINBOX") {
     {
-      ZDoubleSpinBox *sb1 = new ZDoubleSpinBox();
+      ZDoubleSpinBox* sb1 = new ZDoubleSpinBox();
       sb1->setRange(m_min[0], m_max[0]);
       sb1->setValue(m_value[0]);
       sb1->setSingleStep(m_step);
@@ -93,14 +93,14 @@ QWidget *ZQuatParameter::actualCreateWidget(QWidget *parent)
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sb1);
       } else {
-        QLabel *lb = new QLabel(m_nameOfEachValue[0]);
+        QLabel* lb = new QLabel(m_nameOfEachValue[0]);
         lb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
         lb->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         if (m_widgetOrientation == Qt::Horizontal) {
           lo->addWidget(lb);
           lo->addWidget(sb1);
         } else {
-          QHBoxLayout *hlo = new QHBoxLayout();
+          QHBoxLayout* hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb1);
           lo->addLayout(hlo);
@@ -108,7 +108,7 @@ QWidget *ZQuatParameter::actualCreateWidget(QWidget *parent)
       }
     }
     {
-      ZDoubleSpinBox *sb2 = new ZDoubleSpinBox();
+      ZDoubleSpinBox* sb2 = new ZDoubleSpinBox();
       sb2->setRange(m_min[1], m_max[1]);
       sb2->setValue(m_value[1]);
       sb2->setSingleStep(m_step);
@@ -120,14 +120,14 @@ QWidget *ZQuatParameter::actualCreateWidget(QWidget *parent)
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sb2);
       } else {
-        QLabel *lb = new QLabel(m_nameOfEachValue[1]);
+        QLabel* lb = new QLabel(m_nameOfEachValue[1]);
         lb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
         lb->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         if (m_widgetOrientation == Qt::Horizontal) {
           lo->addWidget(lb);
           lo->addWidget(sb2);
         } else {
-          QHBoxLayout *hlo = new QHBoxLayout();
+          QHBoxLayout* hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb2);
           lo->addLayout(hlo);
@@ -135,7 +135,7 @@ QWidget *ZQuatParameter::actualCreateWidget(QWidget *parent)
       }
     }
     {
-      ZDoubleSpinBox *sb3 = new ZDoubleSpinBox();
+      ZDoubleSpinBox* sb3 = new ZDoubleSpinBox();
       sb3->setRange(m_min[2], m_max[2]);
       sb3->setValue(m_value[2]);
       sb3->setSingleStep(m_step);
@@ -147,14 +147,14 @@ QWidget *ZQuatParameter::actualCreateWidget(QWidget *parent)
       if (m_nameOfEachValue.at(2).isEmpty()) {
         lo->addWidget(sb3);
       } else {
-        QLabel *lb = new QLabel(m_nameOfEachValue[2]);
+        QLabel* lb = new QLabel(m_nameOfEachValue[2]);
         lb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
         lb->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         if (m_widgetOrientation == Qt::Horizontal) {
           lo->addWidget(lb);
           lo->addWidget(sb3);
         } else {
-          QHBoxLayout *hlo = new QHBoxLayout();
+          QHBoxLayout* hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb3);
           lo->addLayout(hlo);
@@ -162,7 +162,7 @@ QWidget *ZQuatParameter::actualCreateWidget(QWidget *parent)
       }
     }
     {
-      ZDoubleSpinBox *sb4 = new ZDoubleSpinBox();
+      ZDoubleSpinBox* sb4 = new ZDoubleSpinBox();
       sb4->setRange(m_min[3], m_max[3]);
       sb4->setValue(m_value[3]);
       sb4->setSingleStep(m_step);
@@ -174,14 +174,14 @@ QWidget *ZQuatParameter::actualCreateWidget(QWidget *parent)
       if (m_nameOfEachValue.at(3).isEmpty()) {
         lo->addWidget(sb4);
       } else {
-        QLabel *lb = new QLabel(m_nameOfEachValue[3]);
+        QLabel* lb = new QLabel(m_nameOfEachValue[3]);
         lb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
         lb->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         if (m_widgetOrientation == Qt::Horizontal) {
           lo->addWidget(lb);
           lo->addWidget(sb4);
         } else {
-          QHBoxLayout *hlo = new QHBoxLayout();
+          QHBoxLayout* hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb4);
           lo->addLayout(hlo);
@@ -190,21 +190,21 @@ QWidget *ZQuatParameter::actualCreateWidget(QWidget *parent)
     }
   } else {
     {
-      ZDoubleSpinBoxWithSlider *sbws1 = new ZDoubleSpinBoxWithSlider(m_value[0], m_min[0], m_max[0], m_step,
-          m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws1 = new ZDoubleSpinBoxWithSlider(m_value[0], m_min[0], m_max[0], m_step,
+                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
       connect(sbws1, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZQuatParameter::setValue1);
       connect(this, &ZQuatParameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sbws1);
       } else {
-        QLabel *lb = new QLabel(m_nameOfEachValue[0]);
+        QLabel* lb = new QLabel(m_nameOfEachValue[0]);
         lb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
         lb->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         if (m_widgetOrientation == Qt::Horizontal) {
           lo->addWidget(lb);
           lo->addWidget(sbws1);
         } else {
-          QHBoxLayout *hlo = new QHBoxLayout();
+          QHBoxLayout* hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws1);
           lo->addLayout(hlo);
@@ -212,21 +212,21 @@ QWidget *ZQuatParameter::actualCreateWidget(QWidget *parent)
       }
     }
     {
-      ZDoubleSpinBoxWithSlider *sbws2 = new ZDoubleSpinBoxWithSlider(m_value[1], m_min[1], m_max[1], m_step,
-          m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws2 = new ZDoubleSpinBoxWithSlider(m_value[1], m_min[1], m_max[1], m_step,
+                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
       connect(sbws2, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZQuatParameter::setValue2);
       connect(this, &ZQuatParameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sbws2);
       } else {
-        QLabel *lb = new QLabel(m_nameOfEachValue[1]);
+        QLabel* lb = new QLabel(m_nameOfEachValue[1]);
         lb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
         lb->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         if (m_widgetOrientation == Qt::Horizontal) {
           lo->addWidget(lb);
           lo->addWidget(sbws2);
         } else {
-          QHBoxLayout *hlo = new QHBoxLayout();
+          QHBoxLayout* hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws2);
           lo->addLayout(hlo);
@@ -234,21 +234,21 @@ QWidget *ZQuatParameter::actualCreateWidget(QWidget *parent)
       }
     }
     {
-      ZDoubleSpinBoxWithSlider *sbws3 = new ZDoubleSpinBoxWithSlider(m_value[2], m_min[2], m_max[2], m_step,
-          m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws3 = new ZDoubleSpinBoxWithSlider(m_value[2], m_min[2], m_max[2], m_step,
+                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
       connect(sbws3, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZQuatParameter::setValue3);
       connect(this, &ZQuatParameter::value3WillChange, sbws3, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(2).isEmpty()) {
         lo->addWidget(sbws3);
       } else {
-        QLabel *lb = new QLabel(m_nameOfEachValue[2]);
+        QLabel* lb = new QLabel(m_nameOfEachValue[2]);
         lb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
         lb->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         if (m_widgetOrientation == Qt::Horizontal) {
           lo->addWidget(lb);
           lo->addWidget(sbws3);
         } else {
-          QHBoxLayout *hlo = new QHBoxLayout();
+          QHBoxLayout* hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws3);
           lo->addLayout(hlo);
@@ -256,21 +256,21 @@ QWidget *ZQuatParameter::actualCreateWidget(QWidget *parent)
       }
     }
     {
-      ZDoubleSpinBoxWithSlider *sbws4 = new ZDoubleSpinBoxWithSlider(m_value[3], m_min[3], m_max[3], m_step,
-          m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws4 = new ZDoubleSpinBoxWithSlider(m_value[3], m_min[3], m_max[3], m_step,
+                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
       connect(sbws4, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZQuatParameter::setValue4);
       connect(this, &ZQuatParameter::value4WillChange, sbws4, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(3).isEmpty()) {
         lo->addWidget(sbws4);
       } else {
-        QLabel *lb = new QLabel(m_nameOfEachValue[3]);
+        QLabel* lb = new QLabel(m_nameOfEachValue[3]);
         lb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
         lb->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         if (m_widgetOrientation == Qt::Horizontal) {
           lo->addWidget(lb);
           lo->addWidget(sbws4);
         } else {
-          QHBoxLayout *hlo = new QHBoxLayout();
+          QHBoxLayout* hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws4);
           lo->addLayout(hlo);

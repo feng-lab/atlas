@@ -7,18 +7,22 @@ namespace nim {
 
 class ZImgProcess : public ZImgAlgorithmBaseWithProgressReporter
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   ZImgProcess();
 
   // log output
-  void setLogFile(const QString &logFile) { m_logFile = logFile; }
+  void setLogFile(const QString& logFile)
+  { m_logFile = logFile; }
 
   void run();
 
 signals:
+
   void canceled();
+
   void processError(QString);
+
   void finished();
 
 protected:

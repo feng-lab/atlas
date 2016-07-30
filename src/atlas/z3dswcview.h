@@ -9,12 +9,13 @@ namespace nim {
 
 class Z3DSwcView : public Z3DFilterView<ZSwcDoc, Z3DSwcFilter>
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  Z3DSwcView(ZSwcDoc &doc, Z3DView &view);
+  Z3DSwcView(ZSwcDoc& doc, Z3DView& view);
 
 private:
-  void docSwcsAdded(const QList<size_t> &objs);
+  void docSwcsAdded(const QList<size_t>& objs);
+
   void docSwcAdded(size_t id);
 };
 

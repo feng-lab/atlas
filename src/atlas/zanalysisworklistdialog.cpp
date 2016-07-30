@@ -9,7 +9,7 @@
 
 namespace nim {
 
-ZAnalysisWorklistDialog::ZAnalysisWorklistDialog(QWidget *parent)
+ZAnalysisWorklistDialog::ZAnalysisWorklistDialog(QWidget* parent)
   : QDialog(parent)
 {
   setFocusPolicy(Qt::StrongFocus);
@@ -28,8 +28,8 @@ void ZAnalysisWorklistDialog::reject()
     return;
   }
 
-  int ans =  QMessageBox::question(this, tr("Confirm"), tr("There are unsaved worklist changes. Exit anyway?"),
-                                    QMessageBox::Cancel | QMessageBox::Ok, QMessageBox::Ok);
+  int ans = QMessageBox::question(this, tr("Confirm"), tr("There are unsaved worklist changes. Exit anyway?"),
+                                  QMessageBox::Cancel | QMessageBox::Ok, QMessageBox::Ok);
   if (ans == QMessageBox::Ok) {
     QDialog::reject();
   }
@@ -46,10 +46,10 @@ void ZAnalysisWorklistDialog::onNew()
 void ZAnalysisWorklistDialog::onOpen()
 {
   QString fileName =
-      QFileDialog::getOpenFileName(this, tr("Choose worklist file"),
-                                   m_filename,
-                                   tr("Worklist file (*.csv)"),
-                                   nullptr);
+    QFileDialog::getOpenFileName(this, tr("Choose worklist file"),
+                                 m_filename,
+                                 tr("Worklist file (*.csv)"),
+                                 nullptr);
 
   if (!fileName.isEmpty()) {
     QString res = m_model->setSource(fileName);
@@ -66,10 +66,10 @@ void ZAnalysisWorklistDialog::onSave()
 {
   if (m_filename.isEmpty() && !m_model->worklist().empty()) {
     m_filename =
-        QFileDialog::getSaveFileName(this, tr("Save worklist file as..."),
-                                     m_filename,
-                                     tr("Worklist file (*.csv)"),
-                                     nullptr);
+      QFileDialog::getSaveFileName(this, tr("Save worklist file as..."),
+                                   m_filename,
+                                   tr("Worklist file (*.csv)"),
+                                   nullptr);
   }
   if (!m_filename.isEmpty()) {
     QString res = m_model->toCSV(m_filename, true);
@@ -84,10 +84,10 @@ void ZAnalysisWorklistDialog::onSave()
 void ZAnalysisWorklistDialog::onSaveAs()
 {
   QString fileName =
-      QFileDialog::getSaveFileName(this, tr("Save worklist file as..."),
-                                   m_filename,
-                                   tr("Worklist file (*.csv)"),
-                                   nullptr);
+    QFileDialog::getSaveFileName(this, tr("Save worklist file as..."),
+                                 m_filename,
+                                 tr("Worklist file (*.csv)"),
+                                 nullptr);
 
   if (!fileName.isEmpty()) {
     m_filename = fileName;
@@ -111,7 +111,7 @@ void ZAnalysisWorklistDialog::onGenerate()
     progress.setWindowModality(Qt::WindowModal);
     progress.show();
     try {
-      for (int i=0; i<list.size(); i++) {
+      for (int i = 0; i < list.size(); i++) {
         progress.setValue(i);
         if (progress.wasCanceled())
           break;
@@ -122,7 +122,7 @@ void ZAnalysisWorklistDialog::onGenerate()
       progress.setValue(list.size());
       QMessageBox::information(this, "Analysis files generated", "Analysis files generated!");
     }
-    catch (const ZException & e) {
+    catch (const ZException& e) {
       progress.setValue(list.size());
       LOG(ERROR) << "Error while generating analysis files: " << e.what();
       QMessageBox::critical(this, "Error while generating analysis files", e.what());
@@ -142,18 +142,18 @@ void ZAnalysisWorklistDialog::dataModified()
 
 void ZAnalysisWorklistDialog::createWidget()
 {
-  QVBoxLayout *vlayout = new QVBoxLayout;
-  QHBoxLayout *hlayout = new QHBoxLayout;
-  QPushButton *newButton = new QPushButton(tr("new"), this);
+  QVBoxLayout* vlayout = new QVBoxLayout;
+  QHBoxLayout* hlayout = new QHBoxLayout;
+  QPushButton* newButton = new QPushButton(tr("new"), this);
   connect(newButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::onNew);
   hlayout->addWidget(newButton);
-  QPushButton *openButton = new QPushButton(tr("open"), this);
+  QPushButton* openButton = new QPushButton(tr("open"), this);
   connect(openButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::onOpen);
   hlayout->addWidget(openButton);
   m_saveButton = new QPushButton(tr("save"), this);
   connect(m_saveButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::onSave);
   hlayout->addWidget(m_saveButton);
-  QPushButton *saveAsButton = new QPushButton(tr("save as..."), this);
+  QPushButton* saveAsButton = new QPushButton(tr("save as..."), this);
   connect(saveAsButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::onSaveAs);
   hlayout->addWidget(saveAsButton);
 

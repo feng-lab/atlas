@@ -5,6 +5,7 @@
 #include <QPlainTextEdit>
 #include <QTabWidget>
 #include "zdoc.h"
+
 #ifdef _USE_QSLOG_
 #include "zlog.h"
 #endif
@@ -17,23 +18,26 @@ struct LogData;
 
 class ZObjEditWidget : public QTabWidget
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit ZObjEditWidget(ZDoc *doc, QWidget *mw = nullptr);
+  explicit ZObjEditWidget(ZDoc* doc, QWidget* mw = nullptr);
 
   bool showObjEditWidgetOfObj(size_t id);
+
   void updateEditWidgetTitleOfObj(size_t id);
 
 private:
   void writeLogData(const QList<LogData>* messages, int start, int end);
 
   void removeObjEditWidgetOfObj(size_t id);
+
   void closeTab(int index);
 
 protected:
-  ZDoc *m_doc;
+  ZDoc* m_doc;
 
-  struct SubWidget {
+  struct SubWidget
+  {
     size_t id;
     QWidget* widget;
   };

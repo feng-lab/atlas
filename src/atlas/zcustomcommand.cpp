@@ -29,10 +29,10 @@ void zoomPVRawImages()
   QStringList filters;
   filters << "*.raw";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder + fileInfo.completeBaseName() + "_ds.tif";
-    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,2,3));
+    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0, -1, 0, -1, 0, -1, 2, 3));
     img.zoom(0.248113255269998, 0.248113255269998, 0.414373111494544);
     img.save(outname);
   }
@@ -45,7 +45,7 @@ void zoomRefBrainSlices()
   QStringList filters;
   filters << "*.ome.tiff";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder + fileInfo.fileName();
     ZImg img(fileInfo.absoluteFilePath());
@@ -61,7 +61,7 @@ void zoomRefBrainSlices2()
   QStringList filters;
   filters << "*.ome.tiff";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder + fileInfo.fileName();
     ZImg img(fileInfo.absoluteFilePath());
@@ -83,25 +83,29 @@ void resliceImg()
   ZImageMatrix3DTransform tfm;
   tfm.setImageInterpolation(ZImageInterpolation(Interpolant::Cubic, PadOption::Constant));
   ZAffine3D tform(R[0][0], R[1][0], R[2][0], 0,
-      R[0][1], R[1][1], R[2][1], 0,
-      R[0][2], R[1][2], R[2][2], 0);
+                  R[0][1], R[1][1], R[2][1], 0,
+                  R[0][2], R[1][2], R[2][2], 0);
   tfm.setTransform(tform);
   ZImg img("/Users/feng/Documents/image/SprengelMovies_Global_local/injection_site/stack_uncompressed/inj.tif");
   double xMin, xMax, yMin, yMax, zMin, zMax;
-  tfm.transformRange(0, img.width()-1, 0, img.height()-1, 0, img.depth()-1, xMin, xMax, yMin, yMax, zMin, zMax);
+  tfm.transformRange(0, img.width() - 1, 0, img.height() - 1, 0, img.depth() - 1, xMin, xMax, yMin, yMax, zMin, zMax);
   tfm.setTransform(tform);
 
-  ZImg imgOut(ZImgInfo(std::ceil(xMax)-std::floor(xMin)+1, std::ceil(yMax)-std::floor(yMin)+1, std::ceil(zMax)-std::floor(zMin)+1, 3));
+  ZImg imgOut(ZImgInfo(std::ceil(xMax) - std::floor(xMin) + 1, std::ceil(yMax) - std::floor(yMin) + 1,
+                       std::ceil(zMax) - std::floor(zMin) + 1, 3));
   tfm.transformImage(img.channelData<uint8_t>(0), img.width(), img.height(), img.depth(),
-                     imgOut.channelData<uint8_t>(0), std::floor(xMin), std::ceil(xMax)+1,
-                     std::floor(yMin), std::ceil(yMax)+1, std::floor(zMin), std::ceil(zMax)+1);
-  imgOut.save("/Users/feng/Documents/image/SprengelMovies_Global_local/injection_site/stack_uncompressed/resliced_inj_red.tif");
+                     imgOut.channelData<uint8_t>(0), std::floor(xMin), std::ceil(xMax) + 1,
+                     std::floor(yMin), std::ceil(yMax) + 1, std::floor(zMin), std::ceil(zMax) + 1);
+  imgOut.save(
+    "/Users/feng/Documents/image/SprengelMovies_Global_local/injection_site/stack_uncompressed/resliced_inj_red.tif");
 
-  imgOut = ZImg(ZImgInfo(std::ceil(xMax)-std::floor(xMin)+1, std::ceil(yMax)-std::floor(yMin)+1, std::ceil(zMax)-std::floor(zMin)+1, 3));
+  imgOut = ZImg(ZImgInfo(std::ceil(xMax) - std::floor(xMin) + 1, std::ceil(yMax) - std::floor(yMin) + 1,
+                         std::ceil(zMax) - std::floor(zMin) + 1, 3));
   tfm.transformImage(img.channelData<uint8_t>(1), img.width(), img.height(), img.depth(),
-                     imgOut.channelData<uint8_t>(1), std::floor(xMin), std::ceil(xMax)+1,
-                     std::floor(yMin), std::ceil(yMax)+1, std::floor(zMin), std::ceil(zMax)+1);
-  imgOut.save("/Users/feng/Documents/image/SprengelMovies_Global_local/injection_site/stack_uncompressed/resliced_inj_green.tif");
+                     imgOut.channelData<uint8_t>(1), std::floor(xMin), std::ceil(xMax) + 1,
+                     std::floor(yMin), std::ceil(yMax) + 1, std::floor(zMin), std::ceil(zMax) + 1);
+  imgOut.save(
+    "/Users/feng/Documents/image/SprengelMovies_Global_local/injection_site/stack_uncompressed/resliced_inj_green.tif");
 }
 
 void atlasStep23()
@@ -147,7 +151,7 @@ void convertImages()
   QStringList filters;
   filters << "*.tif";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder + fileInfo.baseName() + ".v3draw";
     ZImg img(fileInfo.absoluteFilePath());
@@ -160,7 +164,7 @@ void convertImages()
 
 void downsampleImage()
 {
-  ZImg img("/Users/feng/Documents/image/bigimage_new/0515_3to33.raw", ZImgRegion(0,-1,0,-1,0,-1,1,2));
+  ZImg img("/Users/feng/Documents/image/bigimage_new/0515_3to33.raw", ZImgRegion(0, -1, 0, -1, 0, -1, 1, 2));
   img.zoom(0.5, 0.5);
   img.save("/Users/feng/Documents/image/bigimage_new/0515_3to33_ds.raw", FileFormat::Vaa3DRaw);
 }
@@ -178,10 +182,10 @@ void extractNeuronChannel()
   list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
   dir = QDir("/Volumes/lq/image/1201_devCA3_CA1/35143_02");
   list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
-    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,1,2));
+    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0, -1, 0, -1, 0, -1, 1, 2));
     QString outname = outFolder + fileInfo.baseName() + "_ch2.v3draw";
     img.save(outname);
   }
@@ -189,7 +193,7 @@ void extractNeuronChannel()
 
 void removeChannel()
 {
-  ZImg img("/Volumes/PVPY/Py/Py0515_s15_1_1.raw", ZImgRegion(0,-1,0,-1,0,-1,0,2));
+  ZImg img("/Volumes/PVPY/Py/Py0515_s15_1_1.raw", ZImgRegion(0, -1, 0, -1, 0, -1, 0, 2));
   img.save("/Volumes/PVPY/Py/Py0515_s15_1_1_ch12.tif");
 }
 
@@ -200,7 +204,7 @@ void convertImagesFormat()
   QStringList filters;
   filters << "*.v3draw";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
@@ -223,10 +227,10 @@ void resizeInjectionCoreImgs()
   QStringList filters;
   filters << "*.czi";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     QString fileName = fileInfo.fileName();
-    size_t scene = fileName.at(fileName.size()-5).toLatin1() - '1';
+    size_t scene = fileName.at(fileName.size() - 5).toLatin1() - '1';
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath() << " " << scene;
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(), scene);
     img.zoom(0.3, 0.3);
@@ -246,12 +250,12 @@ void transfromMesh()
   glm::mat4 mat;
   nim::toVal(QString("[1.03, 0, 0, 0; 0, 6.13928e-08, 1.03, 0; 0, -1.03, 6.13928e-08, 0; 0, 0, 0, 1]"), mat);
 
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     ZMesh msh(fileInfo.absoluteFilePath());
 
     std::vector<glm::vec3> vertices = msh.vertices();
-    for (size_t i=0; i<vertices.size(); ++i) {
+    for (size_t i = 0; i < vertices.size(); ++i) {
       vertices[i] = glm::applyMatrix(mat, vertices[i]);
     }
     msh.setVertices(vertices);
@@ -262,7 +266,8 @@ void transfromMesh()
 
 void transfromMesh2()
 {
-  QDir dir("/Users/feng/Library/Application Support/Brain Explorer 2/Atlases/Allen Mouse Brain Common Coordinate Framework/Spaces/P56/Meshes");
+  QDir dir(
+    "/Users/feng/Library/Application Support/Brain Explorer 2/Atlases/Allen Mouse Brain Common Coordinate Framework/Spaces/P56/Meshes");
   QStringList filters;
   filters << "*.msh";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
@@ -271,12 +276,12 @@ void transfromMesh2()
   glm::mat4 mat;
   nim::toVal(QString("[5.96047e-09, 0, -0.1, 490.6; 0, 0.1, 0, -355.6; 0.1, 0, 5.96047e-09, -513.4; 0, 0, 0, 1]"), mat);
 
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     ZMesh msh(fileInfo.absoluteFilePath());
 
     std::vector<glm::vec3> vertices = msh.vertices();
-    for (size_t i=0; i<vertices.size(); ++i) {
+    for (size_t i = 0; i < vertices.size(); ++i) {
       vertices[i] = glm::applyMatrix(mat, vertices[i]);
     }
     msh.setVertices(vertices);
@@ -303,7 +308,7 @@ void stnTrajectory()
   uint32_t stnID = idOfRegionAbbreviation("STN", ontology);
   std::vector<int64_t> cortexIDs = allIDsWithinRegionAbbreviation("Isocortex", ontology);
   std::vector<size_t> stnIdxs;
-  for (size_t i=0; i<annotation.voxelNumber(); ++i) {
+  for (size_t i = 0; i < annotation.voxelNumber(); ++i) {
     if (annotation.value(i) == stnID) {
       stnIdxs.push_back(i);
     } else if (std::find(cortexIDs.begin(), cortexIDs.end(), annotation.value(i)) != cortexIDs.end()) {
@@ -311,7 +316,7 @@ void stnTrajectory()
     }
   }
 
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     QStringList tokens = fileInfo.fileName().split("_");
     for (auto it = tokens.begin(); it != tokens.end(); ++it) {
@@ -330,162 +335,163 @@ void stnTrajectory()
   double projectionThre = 0.2;
 
   tbb::parallel_for(
-        tbb::blocked_range<size_t>(0, exps.size()),
-        [&](const tbb::blocked_range<size_t>& range) {
-    for (size_t expIdx = range.begin(); expIdx != range.end(); ++expIdx) {
-      const QString& str = exps[expIdx];
-      //      if (!str.contains("298000880") &&
-      //          !str.contains("306491185")) {
-      //        continue;
-      //      }
+    tbb::blocked_range<size_t>(0, exps.size()),
+    [&](const tbb::blocked_range<size_t>& range) {
+      for (size_t expIdx = range.begin(); expIdx != range.end(); ++expIdx) {
+        const QString& str = exps[expIdx];
+        //      if (!str.contains("298000880") &&
+        //          !str.contains("306491185")) {
+        //        continue;
+        //      }
 
-      if (outFolder.exists(str + "_" + resolution + "um_stn_trace.swc")) {
-        continue;
-      }
-
-      LOG(INFO) << str;
-      ZImg mask(dir.filePath(str + "_" + resolution + "um_data_mask.nrrd"));
-      ZImg projection(dir.filePath(str + "_" + resolution + "um_projection_density.nrrd"));
-      projection *= mask;
-
-      std::vector<size_t> projIdxs;
-      for (size_t idx : stnIdxs) {
-        if (projection.value(idx) >= projectionThre) {
-          projIdxs.push_back(idx);
+        if (outFolder.exists(str + "_" + resolution + "um_stn_trace.swc")) {
+          continue;
         }
-      }
 
-      if (projIdxs.empty())
-        continue;
+        LOG(INFO) << str;
+        ZImg mask(dir.filePath(str + "_" + resolution + "um_data_mask.nrrd"));
+        ZImg projection(dir.filePath(str + "_" + resolution + "um_projection_density.nrrd"));
+        projection *= mask;
 
-      ZImg injection(dir.filePath(str + "_" + resolution + "um_injection_density.nrrd"));
-      injection *= mask;
-      //injection *= isoCortexMask;
-
-      std::vector<size_t> injectionIdxs;
-      for (size_t i=0; i<injection.voxelNumber(); ++i) {
-        if (injection.value(i) > 0) {
-          injectionIdxs.push_back(i);
+        std::vector<size_t> projIdxs;
+        for (size_t idx : stnIdxs) {
+          if (projection.value(idx) >= projectionThre) {
+            projIdxs.push_back(idx);
+          }
         }
-      }
 
-      if (injectionIdxs.empty())
-        continue;
+        if (projIdxs.empty())
+          continue;
+
+        ZImg injection(dir.filePath(str + "_" + resolution + "um_injection_density.nrrd"));
+        injection *= mask;
+        //injection *= isoCortexMask;
+
+        std::vector<size_t> injectionIdxs;
+        for (size_t i = 0; i < injection.voxelNumber(); ++i) {
+          if (injection.value(i) > 0) {
+            injectionIdxs.push_back(i);
+          }
+        }
+
+        if (injectionIdxs.empty())
+          continue;
 
 #if 1
-      projection = ZImg(dir.filePath(str + "_" + resolution + "um_projection_energy.nrrd"));
-      projection *= mask;
-      projection.typedUnaryOperation<float>([](float proj) { return std::max(255.f, proj); });
-      //projection.typedBinaryOperation<float, float>(injection, [](float proj, float inj) { return inj > 0.f ? 0.f : proj; });
-      projection.normalize();
+        projection = ZImg(dir.filePath(str + "_" + resolution + "um_projection_energy.nrrd"));
+        projection *= mask;
+        projection.typedUnaryOperation<float>([](float proj) { return std::max(255.f, proj); });
+        //projection.typedBinaryOperation<float, float>(injection, [](float proj, float inj) { return inj > 0.f ? 0.f : proj; });
+        projection.normalize();
 #endif
 
-      ZImgGraph imgGraph(projection);
-      imgGraph.setConnectivity(26);
-      ZImgAutoThreshold<> imgAutoThre;
-      double cent1 = 0;
-      double cent2 = 0;
-      double thre1 = imgAutoThre.centroidThre<double>(cent1, cent2, projection);
+        ZImgGraph imgGraph(projection);
+        imgGraph.setConnectivity(26);
+        ZImgAutoThreshold<> imgAutoThre;
+        double cent1 = 0;
+        double cent2 = 0;
+        double thre1 = imgAutoThre.centroidThre<double>(cent1, cent2, projection);
 #if 0
-      double scale = cent2 - cent1;
-      if (scale < 1.0)
-        scale = 1.0;
-      scale /= 9.2;
+        double scale = cent2 - cent1;
+        if (scale < 1.0)
+          scale = 1.0;
+        scale /= 9.2;
 #else
-      double scale = 0.5;
-      thre1 = 0.15;
+        double scale = 0.5;
+        thre1 = 0.15;
 #endif
-      LOG(INFO) << str << " " << scale << " " << thre1;
-      imgGraph.build(ZImgGraph::EdgeWeight3(thre1, scale));
+        LOG(INFO) << str << " " << scale << " " << thre1;
+        imgGraph.build(ZImgGraph::EdgeWeight3(thre1, scale));
 
-      std::vector<std::vector<glm::dvec3>> lines;
-      for (size_t idx : projIdxs) {
+        std::vector<std::vector<glm::dvec3>> lines;
+        for (size_t idx : projIdxs) {
 #if 0
-        std::vector<size_t> path;
-        imgGraph.shortestPath(idx, injectionIdxs, &path);
-        std::vector<glm::dvec3> line;
-        for (size_t idx : path) {
-          ZVoxelCoordinate coord = ZImg::indexToCoord(idx, projection.info());
-          line.push_back(glm::dvec3(coord.x, coord.y, coord.z));
-        }
-#else
-        std::vector<size_t> predecessor;
-        std::vector<double> dist = imgGraph.shortestPaths(idx, &predecessor);
-        std::vector<double> injectionMinDists;
-        for (size_t injectionIdx : injectionIdxs) {
-          injectionMinDists.push_back(dist[injectionIdx]);
-        }
-        size_t curIdx = injectionIdxs[std::min_element(injectionMinDists.begin(), injectionMinDists.end()) - injectionMinDists.begin()];
-        std::vector<glm::dvec3> line;
-        while (true) {
-          ZVoxelCoordinate coord = ZImg::indexToCoord(curIdx, projection.info());
-          line.push_back(glm::dvec3(coord.x, coord.y, coord.z));
-          if (curIdx == idx) {
-            break;
+          std::vector<size_t> path;
+          imgGraph.shortestPath(idx, injectionIdxs, &path);
+          std::vector<glm::dvec3> line;
+          for (size_t idx : path) {
+            ZVoxelCoordinate coord = ZImg::indexToCoord(idx, projection.info());
+            line.push_back(glm::dvec3(coord.x, coord.y, coord.z));
           }
-          CHECK(predecessor[curIdx] != curIdx);
-          curIdx = predecessor[curIdx];
-        }
+#else
+          std::vector<size_t> predecessor;
+          std::vector<double> dist = imgGraph.shortestPaths(idx, &predecessor);
+          std::vector<double> injectionMinDists;
+          for (size_t injectionIdx : injectionIdxs) {
+            injectionMinDists.push_back(dist[injectionIdx]);
+          }
+          size_t curIdx = injectionIdxs[std::min_element(injectionMinDists.begin(), injectionMinDists.end()) -
+                                        injectionMinDists.begin()];
+          std::vector<glm::dvec3> line;
+          while (true) {
+            ZVoxelCoordinate coord = ZImg::indexToCoord(curIdx, projection.info());
+            line.push_back(glm::dvec3(coord.x, coord.y, coord.z));
+            if (curIdx == idx) {
+              break;
+            }
+            CHECK(predecessor[curIdx] != curIdx);
+            curIdx = predecessor[curIdx];
+          }
 #endif
-        if (line.empty()) {
-          LOG(WARNING) << "WTF";
-        } else {
-          lines.push_back(line);
+          if (line.empty()) {
+            LOG(WARNING) << "WTF";
+          } else {
+            lines.push_back(line);
+          }
         }
-      }
 
-      ZSwc origSwc;
-      for (const auto& line : lines) {
-        origSwc.addLine(line, 1);
-      }
+        ZSwc origSwc;
+        for (const auto& line : lines) {
+          origSwc.addLine(line, 1);
+        }
 
-      ZSwc swc;
-      for (ZSwc::ConstRootIterator oit = origSwc.cbeginRoot(); oit != origSwc.cendRoot(); ++oit) {
-        ZSwc::Iterator desParent;
-        ZSwc::ConstIterator srcChild;
-        for (ZSwc::RootIterator it = swc.beginRoot(); it != swc.endRoot(); ++it) {
-          if (it->x == oit->x && it->y == oit->y && it->z == oit->z) {
-            desParent = it;
-            ZSwc::ConstIterator srcParent = oit;
-            while (swc.numChildren(desParent) > 0 && origSwc.numChildren(srcParent) > 0) {
-              double srcX = ZSwc::firstChild(srcParent)->x;
-              double srcY = ZSwc::firstChild(srcParent)->y;
-              double srcZ = ZSwc::firstChild(srcParent)->z;
+        ZSwc swc;
+        for (ZSwc::ConstRootIterator oit = origSwc.cbeginRoot(); oit != origSwc.cendRoot(); ++oit) {
+          ZSwc::Iterator desParent;
+          ZSwc::ConstIterator srcChild;
+          for (ZSwc::RootIterator it = swc.beginRoot(); it != swc.endRoot(); ++it) {
+            if (it->x == oit->x && it->y == oit->y && it->z == oit->z) {
+              desParent = it;
+              ZSwc::ConstIterator srcParent = oit;
+              while (swc.numChildren(desParent) > 0 && origSwc.numChildren(srcParent) > 0) {
+                double srcX = ZSwc::firstChild(srcParent)->x;
+                double srcY = ZSwc::firstChild(srcParent)->y;
+                double srcZ = ZSwc::firstChild(srcParent)->z;
 
-              ZSwc::Iterator matchDesChild;
-              for (ZSwc::ChildIterator cit = swc.beginChild(desParent); cit != swc.endChild(desParent); ++cit) {
-                if (cit->x == srcX && cit->y == srcY && cit->z == srcZ) {
-                  matchDesChild = cit;
+                ZSwc::Iterator matchDesChild;
+                for (ZSwc::ChildIterator cit = swc.beginChild(desParent); cit != swc.endChild(desParent); ++cit) {
+                  if (cit->x == srcX && cit->y == srcY && cit->z == srcZ) {
+                    matchDesChild = cit;
+                    break;
+                  }
+                }
+
+                if (ZSwc::isNull(matchDesChild)) {
                   break;
+                } else {
+                  desParent = matchDesChild;
+                  srcParent = ZSwc::firstChild(srcParent);
                 }
               }
-
-              if (ZSwc::isNull(matchDesChild)) {
-                break;
-              } else {
-                desParent = matchDesChild;
-                srcParent = ZSwc::firstChild(srcParent);
+              if (origSwc.numChildren(srcParent) > 0) {
+                srcChild = ZSwc::firstChild(srcParent);
               }
+              break;
             }
-            if (origSwc.numChildren(srcParent) > 0) {
-              srcChild = ZSwc::firstChild(srcParent);
-            }
-            break;
+          }
+          if (ZSwc::isNull(desParent)) {
+            swc.copy(swc.appendRoot(*oit), oit);
+          } else if (!ZSwc::isNull(srcChild)) {
+            swc.copy(swc.appendChild(desParent, *srcChild), srcChild);
           }
         }
-        if (ZSwc::isNull(desParent)) {
-          swc.copy(swc.appendRoot(*oit), oit);
-        } else if (!ZSwc::isNull(srcChild)) {
-          swc.copy(swc.appendChild(desParent, *srcChild), srcChild);
+
+        swc.resortID();
+        if (!outFolder.exists(str + "_" + resolution + "um_stn_trace.swc")) {
+          swc.save(outFolder.filePath(str + "_" + resolution + "um_stn_trace.swc"));
         }
       }
-
-      swc.resortID();
-      if (!outFolder.exists(str + "_" + resolution + "um_stn_trace.swc")) {
-        swc.save(outFolder.filePath(str + "_" + resolution + "um_stn_trace.swc"));
-      }
     }
-  }
   );
 }
 
@@ -563,7 +569,7 @@ void calcSwcVolume()
   ZMesh branchMesh;
   filters << "*c.swc";
   LOG(INFO) << "NameOfCell, SomaSurfaceArea, SomaVolume, NeuriteSurfaceArea, NeuriteVolume";
-  for (int i=0; i<dirlist.size(); i++) {
+  for (int i = 0; i < dirlist.size(); i++) {
     QFileInfo dirInfo = dirlist.at(i);
     QDir subDir(dirInfo.absoluteFilePath());
     QFileInfoList list = subDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
@@ -575,10 +581,10 @@ void calcSwcVolume()
     auto rootProp = rootMesh.properties();
     auto branchProp = branchMesh.properties();
     LOG(INFO) << fileInfo.baseName() << ", "
-              << rootProp.surfaceArea*(1.0/9.66/9.66) << ", "
-              << rootProp.volume*(1.0/9.66/9.66/9.66) << ", "
-              << branchProp.surfaceArea*(1.0/9.66/9.66) << ", "
-              << branchProp.volume*(1.0/9.66/9.66/9.66);
+              << rootProp.surfaceArea * (1.0 / 9.66 / 9.66) << ", "
+              << rootProp.volume * (1.0 / 9.66 / 9.66 / 9.66) << ", "
+              << branchProp.surfaceArea * (1.0 / 9.66 / 9.66) << ", "
+              << branchProp.volume * (1.0 / 9.66 / 9.66 / 9.66);
   }
 }
 
@@ -591,7 +597,7 @@ void changeImgCompressionType()
   QStringList filters;
   filters << "*.tif";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
@@ -607,7 +613,7 @@ void makeSWCPyramidal()
   QStringList filters;
   filters << "*c.swc";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZSwc tree(fileInfo.absoluteFilePath());
@@ -627,7 +633,7 @@ void makeAxonChannelImages()
   QStringList filters;
   filters << "*.raw";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
     QString outname1 = outFolder.absoluteFilePath(fileInfo.baseName() + "_rb.tif");
@@ -635,7 +641,7 @@ void makeAxonChannelImages()
       continue;
     }
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
-    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,axonChannel,axonChannel+1));
+    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0, -1, 0, -1, 0, -1, axonChannel, axonChannel + 1));
     img.zoom(0.25, 0.25);
     ZImg img1 = img;
     img.normalize(0, 50);
@@ -649,7 +655,7 @@ void makeAxonChannelImages()
   axonChannel = 0;
 
   list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
     QString outname1 = outFolder.absoluteFilePath(fileInfo.baseName() + "_rb.tif");
@@ -657,7 +663,7 @@ void makeAxonChannelImages()
       continue;
     }
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
-    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,axonChannel,axonChannel+1));
+    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0, -1, 0, -1, 0, -1, axonChannel, axonChannel + 1));
     img.zoom(0.25, 0.25);
     ZImg img1 = img;
     img.normalize(0, 50);
@@ -671,7 +677,7 @@ void makeAxonChannelImages()
   axonChannel = 2;
 
   list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
     QString outname1 = outFolder.absoluteFilePath(fileInfo.baseName() + "_rb.tif");
@@ -679,7 +685,7 @@ void makeAxonChannelImages()
       continue;
     }
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
-    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,0,-1,axonChannel,axonChannel+1));
+    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0, -1, 0, -1, 0, -1, axonChannel, axonChannel + 1));
     img.zoom(0.25, 0.25);
     ZImg img1 = img;
     img.normalize(0, 50);
@@ -722,7 +728,7 @@ void moveObjectToCorrectLocation()
   double swcPixelPerUmz = 2.0;
   glm::dvec3 refSwcLocInBrain = glm::dvec3(-2.25, 1.27, 2.5);   //in mm
   glm::dvec3 refSwcRootImageLoc = glm::dvec3(373, 291, 202);   //roughly get from image
-  for (int metaIdx=1; metaIdx<metaData.size(); ++metaIdx) {
+  for (int metaIdx = 1; metaIdx < metaData.size(); ++metaIdx) {
     QString cellName = metaData[metaIdx][0];
     double Anterior_Posterior = metaData[metaIdx][1].toDouble();
     //double ML_pt = metaData[metaIdx][2].toDouble();
@@ -735,9 +741,9 @@ void moveObjectToCorrectLocation()
     glm::dvec3 swcRootImageLoc = (swcLoc - refSwcLocInBrain) * imagePixelPerUm * 1000. + refSwcRootImageLoc;
     ZSwc swc(QString("/Users/feng/Documents/PV/contra/%1.swc").arg(cellName));
     ZSwc::SwcTreeNode rootn = swc.thickestNode();
-    glm::dvec3 rootLoc(rootn->x, rootn->y, rootn->z * swcPixelPerUmxy/swcPixelPerUmz);
+    glm::dvec3 rootLoc(rootn->x, rootn->y, rootn->z * swcPixelPerUmxy / swcPixelPerUmz);
 
-    glm::dvec3 rootTrans = swcRootImageLoc - rootLoc * imagePixelPerUm/swcPixelPerUmxy;
+    glm::dvec3 rootTrans = swcRootImageLoc - rootLoc * imagePixelPerUm / swcPixelPerUmxy;
     rootTrans = rootTrans * imagescale;
     cellNameToLocations[cellName] = rootTrans;
   }
@@ -755,7 +761,7 @@ void moveObjectToCorrectLocation()
       modifyJsonValue(sceneObj, IDString + ".View3D.Use Same Size Bool", QJsonValue(true));
       modifyJsonValue(sceneObj, IDString + ".View3D.Size Scale Float", QJsonValue("4"));
       modifyJsonValue(sceneObj, IDString + ".View3D.Color Mode StringIntOption", QJsonValue("Single Color"));
-      modifyJsonValue(sceneObj, IDString + ".View3D.Puncta Color Vec4", QJsonValue(toQString(glm::vec4(1,1,0,1))));
+      modifyJsonValue(sceneObj, IDString + ".View3D.Puncta Color Vec4", QJsonValue(toQString(glm::vec4(1, 1, 0, 1))));
     }
     glm::dvec3 loc = cellNameToLocations.at(filename);
     QString locString = toQString(loc);
@@ -788,9 +794,11 @@ inline int64_t saturate_mul_1(int64_t x, int64_t y)
   if (x == 0 || y == 0) {
     return 0;
   } else if (x > 0 && y < 0) {
-    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX)+1, saturate_mul(static_cast<uint64_t>(x), static_cast<uint64_t>(-y))));
+    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX) + 1,
+                                          saturate_mul(static_cast<uint64_t>(x), static_cast<uint64_t>(-y))));
   } else if (x < 0 && y > 0) {
-    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX)+1, saturate_mul(static_cast<uint64_t>(-x), static_cast<uint64_t>(y))));
+    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX) + 1,
+                                          saturate_mul(static_cast<uint64_t>(-x), static_cast<uint64_t>(y))));
   } else if (x > 0) {
     return std::min<uint64_t>(INT64_MAX, saturate_mul(static_cast<uint64_t>(x), static_cast<uint64_t>(y)));
   } else {
@@ -804,8 +812,8 @@ inline int64_t saturate_mul_2(int64_t x, int64_t y)
 
   int128_t res = static_cast<int128_t>(x) * static_cast<int128_t>(y);
   return res < static_cast<int128_t>(INT64_MIN) ? INT64_MIN :
-                                                  res > static_cast<int128_t>(INT64_MAX) ? INT64_MAX :
-                                                                                           static_cast<int64_t>(res);
+         res > static_cast<int128_t>(INT64_MAX) ? INT64_MAX :
+         static_cast<int64_t>(res);
 }
 
 inline int64_t saturate_mul_3(int64_t x, int64_t y)
@@ -836,7 +844,7 @@ void benchSaturateMul()
   bt4.pause();
   bt5.start();
   bt5.pause();
-  for(int j=0; j<1e8; ++j) {
+  for (int j = 0; j < 1e8; ++j) {
     int64_t a = ZRandomInstance.randIntType<int64_t>(INT64_MAX, INT64_MIN) * 1000;
     int64_t b = ZRandomInstance.randIntType<int64_t>(INT64_MAX, INT64_MIN) * 1000;
     int32_t a32 = static_cast<int32_t>(a);
@@ -862,11 +870,11 @@ void benchSaturateMul()
       LOG(INFO) << c << " " << d << " " << e << " " << a << " " << b << " " << f << " " << g;
     }
   }
-  bt1.stopAndLog();
-  bt2.stopAndLog();
-  bt3.stopAndLog();
-  bt4.stopAndLog();
-  bt5.stopAndLog();
+  STOP_AND_LOG(bt1);
+  STOP_AND_LOG(bt2);
+  STOP_AND_LOG(bt3);
+  STOP_AND_LOG(bt4);
+  STOP_AND_LOG(bt5);
 }
 
 QString GetRandomString()
@@ -875,8 +883,7 @@ QString GetRandomString()
   const int randomStringLength = 100; // assuming you want random strings of 12 characters
 
   QString randomString;
-  for(int i=0; i<randomStringLength; ++i)
-  {
+  for (int i = 0; i < randomStringLength; ++i) {
     int index = qrand() % possibleCharacters.length();
     QChar nextChar = possibleCharacters.at(index);
     randomString.append(nextChar);
@@ -887,9 +894,9 @@ QString GetRandomString()
 void testLogSpeed()
 {
   QStringList logList;
-  for (int i=0; i<1000000; ++i)
+  for (int i = 0; i < 1000000; ++i)
     logList << GetRandomString();
-  for (int i=0; i<logList.size(); ++i)
+  for (int i = 0; i < logList.size(); ++i)
     LOG(INFO) << logList.at(i);
 }
 
@@ -897,10 +904,11 @@ void tmp()
 {
   using namespace boost::multiprecision;
 
-  boost::multiprecision::int128_t res = static_cast<boost::multiprecision::int128_t>(INT64_MIN) * static_cast<boost::multiprecision::int128_t>(1);
+  boost::multiprecision::int128_t res =
+    static_cast<boost::multiprecision::int128_t>(INT64_MIN) * static_cast<boost::multiprecision::int128_t>(1);
   int64_t r = res < static_cast<boost::multiprecision::int128_t>(INT64_MIN) ? INT64_MIN :
-                                                                              res > static_cast<boost::multiprecision::int128_t>(INT64_MAX) ? INT64_MAX :
-                                                                                                                                              static_cast<int64_t>(res);
+              res > static_cast<boost::multiprecision::int128_t>(INT64_MAX) ? INT64_MAX :
+              static_cast<int64_t>(res);
   std::cout << res << std::endl;
 
   std::cout << r << " "

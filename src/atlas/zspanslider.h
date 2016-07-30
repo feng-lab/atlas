@@ -8,17 +8,21 @@ namespace nim {
 
 class ZSpanSliderWithSpinBox : public QWidget
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   explicit ZSpanSliderWithSpinBox(int lowerValue, int upperValue, int min, int max, int singleStep = 1,
-                                  bool tracking = true, QWidget *parent = 0);
+                                  bool tracking = true, QWidget* parent = 0);
 
   void setLowerValue(int lower);
+
   void setUpperValue(int upper);
+
   void setDataRange(int min, int max);
 
 signals:
+
   void lowerValueChanged(int lower);
+
   void upperValueChanged(int upper);
 
 private:
@@ -26,8 +30,11 @@ private:
                     bool tracking);
 
   void lowerValueChangedFromSlider(int l);
+
   void upperValueChangedFromSlider(int u);
+
   void valueChangedFromLowerSpinBox(int l);
+
   void valueChangedFromUpperSpinBox(int u);
 
 private:
@@ -38,23 +45,31 @@ private:
 
 class ZDoubleSpanSliderWithSpinBox : public QWidget
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit ZDoubleSpanSliderWithSpinBox(double lowerValue, double upperValue, double min, double max, double singleStep = .01,
-                                        int decimal = 3, bool tracking = true, QWidget *parent = 0);
+  explicit ZDoubleSpanSliderWithSpinBox(double lowerValue, double upperValue, double min, double max,
+                                        double singleStep = .01,
+                                        int decimal = 3, bool tracking = true, QWidget* parent = 0);
 
   void setLowerValue(double lower);
+
   void setUpperValue(double upper);
+
   void setDataRange(double min, double max);
 
 signals:
+
   void lowerValueChanged(double lower);
+
   void upperValueChanged(double upper);
 
 private:
   void lowerValueChangedFromSlider(int l);
+
   void upperValueChangedFromSlider(int u);
+
   void valueChangedFromLowerSpinBox(double l);
+
   void valueChangedFromUpperSpinBox(double u);
 
   void createWidget();

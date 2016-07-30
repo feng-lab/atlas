@@ -11,13 +11,13 @@
 
 namespace nim {
 
-ZMeshDoc::ZMeshDoc(ZDoc &doc)
+ZMeshDoc::ZMeshDoc(ZDoc& doc)
   : ZObjDoc(doc)
 {
   createActions();
 }
 
-void ZMeshDoc::askToSave(const ZMesh &msh, const QString &title)
+void ZMeshDoc::askToSave(const ZMesh& msh, const QString& title)
 {
   QStringList filters;
   QList<std::string> formats;
@@ -42,7 +42,7 @@ void ZMeshDoc::askToSave(const ZMesh &msh, const QString &title)
       ZSystemInfoInstance.addFileToRecentFileList(dialog.selectedFiles().at(0));
       setLastOpenedObjPath(dialog.selectedFiles().at(0));
     }
-    catch (const ZException & e) {
+    catch (const ZException& e) {
       QMessageBox::critical(QApplication::activeWindow(), "Save Mesh Error", e.what());
     }
   }
@@ -94,12 +94,12 @@ bool ZMeshDoc::saveAs(size_t id)
   return false;
 }
 
-bool ZMeshDoc::canReadFile(const QString &fileName)
+bool ZMeshDoc::canReadFile(const QString& fileName)
 {
   return ZMesh::canReadFile(fileName);
 }
 
-size_t ZMeshDoc::loadFile(const QString &fileName, QString &errorMsg)
+size_t ZMeshDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
   for (auto it = m_idToMeshPacks.begin(); it != m_idToMeshPacks.end(); ++it) {
     if (it->second->path == fileName)
@@ -112,13 +112,13 @@ size_t ZMeshDoc::loadFile(const QString &fileName, QString &errorMsg)
     setLastOpenedObjPath(fileName);
     return id;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = e.what();
     return 0;
   }
 }
 
-size_t ZMeshDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
+size_t ZMeshDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
 {
   if (!jValue.isString() || jValue.toString().trimmed().isEmpty()) {
     errorMsg = QString("File path is not string or is empty");
@@ -136,13 +136,13 @@ size_t ZMeshDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
     setLastOpenedObjPath(fileName);
     return id;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = e.what();
     return 0;
   }
 }
 
-QList<QAction *> ZMeshDoc::loadFileActions() const
+QList<QAction*> ZMeshDoc::loadFileActions() const
 {
   QList<QAction*> res;
   res.push_back(m_loadMeshAction);
@@ -192,7 +192,7 @@ QJsonValue ZMeshDoc::jsonValue(size_t id) const
   return QJsonValue(m_idToMeshPacks.at(id)->path);
 }
 
-bool ZMeshDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
+bool ZMeshDoc::isSameObj(const QJsonValue& v1, const QJsonValue& v2) const
 {
   CHECK(v1.isString() && v2.isString());
   if (v1 == v2)
@@ -238,7 +238,7 @@ void ZMeshDoc::loadMesh()
   if (dialog.exec()) {
     QString errorMsg;
     //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    for (int i=0; i<dialog.selectedFiles().size(); ++i) {
+    for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
         QMessageBox::critical(QApplication::activeWindow(), tr("Can not read mesh"),
                               errorMsg);
@@ -247,7 +247,7 @@ void ZMeshDoc::loadMesh()
   }
 }
 
-size_t ZMeshDoc::addMesh(ZMesh &mesh, const QString &path)
+size_t ZMeshDoc::addMesh(ZMesh& mesh, const QString& path)
 {
   size_t id = m_doc.getNewObjId();
   m_idToMeshPacks[id] = std::make_shared<MeshPack>(mesh, path);
@@ -257,7 +257,7 @@ size_t ZMeshDoc::addMesh(ZMesh &mesh, const QString &path)
   return id;
 }
 
-ZMeshDoc::MeshPack::MeshPack(ZMesh &imesh, const QString &path)
+ZMeshDoc::MeshPack::MeshPack(ZMesh& imesh, const QString& path)
   : path(QFileInfo(path).canonicalFilePath()), hasUnsavedChange(false)
 {
   mesh.swap(imesh);
@@ -278,7 +278,7 @@ void ZMeshDoc::MeshPack::updateDerivedData()
   m_tooltip = path;
 }
 
-const QString &ZMeshDoc::MeshPack::info() const
+const QString& ZMeshDoc::MeshPack::info() const
 {
   if (m_info.isEmpty()) {
     m_info = QString("%1 vertices, %2 triangles").arg(mesh.numVertices()).arg(mesh.numTriangles());
@@ -286,7 +286,7 @@ const QString &ZMeshDoc::MeshPack::info() const
   return m_info;
 }
 
-const QString &ZMeshDoc::MeshPack::detailedInfo() const
+const QString& ZMeshDoc::MeshPack::detailedInfo() const
 {
   if (m_detailedInfo.isEmpty()) {
     QStringList info;
@@ -317,7 +317,7 @@ void ZMeshDoc::createActions()
   connect(m_loadMeshAction, &QAction::triggered, this, &ZMeshDoc::loadMesh);
 }
 
-bool ZMeshDoc::saveMesh(MeshPack *pack, const QString &fileName, QString &errorMsg, const std::string& format)
+bool ZMeshDoc::saveMesh(MeshPack* pack, const QString& fileName, QString& errorMsg, const std::string& format)
 {
   try {
     pack->mesh.save(fileName, format);
@@ -329,13 +329,13 @@ bool ZMeshDoc::saveMesh(MeshPack *pack, const QString &fileName, QString &errorM
     setLastOpenedObjPath(fileName);
     return true;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = e.what();
     return false;
   }
 }
 
-void ZMeshDoc::packInfoUpdated(MeshPack *pack)
+void ZMeshDoc::packInfoUpdated(MeshPack* pack)
 {
   for (auto it = m_idToMeshPacks.begin(); it != m_idToMeshPacks.end(); ++it) {
     if (it->second.get() == pack)

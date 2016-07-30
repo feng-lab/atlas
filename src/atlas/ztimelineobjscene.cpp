@@ -16,7 +16,7 @@
 
 namespace nim {
 
-DiagramTextItem::DiagramTextItem(const ZAnimationDisplayPack &pack, QGraphicsItem *parent, Qt::Alignment align)
+DiagramTextItem::DiagramTextItem(const ZAnimationDisplayPack& pack, QGraphicsItem* parent, Qt::Alignment align)
   : QGraphicsTextItem(parent)
   , m_displayPack(pack)
 {
@@ -24,7 +24,7 @@ DiagramTextItem::DiagramTextItem(const ZAnimationDisplayPack &pack, QGraphicsIte
   m_textOp.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
 }
 
-void DiagramTextItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
+void DiagramTextItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
   if (m_displayPack.type == ZAnimationDisplayPack::Type::Object && m_displayPack.boundId == 0) {
     painter->setPen(QPen(QColor(190, 190, 190)));
@@ -34,8 +34,8 @@ void DiagramTextItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *o
     rect.setLeft(rect.left() + 30);
     rect.setWidth(rect.width() - 10);
   } else {
-    rect.setLeft(rect.left()+5);
-    rect.setWidth(rect.width()-10-20);
+    rect.setLeft(rect.left() + 5);
+    rect.setWidth(rect.width() - 10 - 20);
   }
   //  if (m_displayPack.name.length() >= 30) {
   //    QFont fnt = painter->font();
@@ -52,7 +52,8 @@ QRectF DiagramTextItem::boundingRect() const
   return parentItem()->boundingRect();
 }
 
-ExpandArrowPixmapItem::ExpandArrowPixmapItem(const ZAnimationDisplayPack &pack, ZTimelineWidget &timeline, QGraphicsItem *parent)
+ExpandArrowPixmapItem::ExpandArrowPixmapItem(const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline,
+                                             QGraphicsItem* parent)
   : QGraphicsPixmapItem(parent)
   , m_displayPack(pack)
   , m_timeline(timeline)
@@ -60,12 +61,12 @@ ExpandArrowPixmapItem::ExpandArrowPixmapItem(const ZAnimationDisplayPack &pack, 
   setShapeMode(QGraphicsPixmapItem::BoundingRectShape);
 }
 
-void ExpandArrowPixmapItem::mousePressEvent(QGraphicsSceneMouseEvent *)
+void ExpandArrowPixmapItem::mousePressEvent(QGraphicsSceneMouseEvent*)
 {
   m_timeline.animation().toogleExpanded(m_displayPack.id);
 }
 
-ObjBoundRectItem::ObjBoundRectItem(const ZAnimationDisplayPack &pack, ZTimelineWidget &timeline, QGraphicsItem *parent)
+ObjBoundRectItem::ObjBoundRectItem(const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline, QGraphicsItem* parent)
   : QGraphicsRectItem(parent)
   , m_displayPack(pack)
   , m_timeline(timeline)
@@ -74,42 +75,43 @@ ObjBoundRectItem::ObjBoundRectItem(const ZAnimationDisplayPack &pack, ZTimelineW
   setToolTip(m_displayPack.objInfo);
 }
 
-void ObjBoundRectItem::mousePressEvent(QGraphicsSceneMouseEvent *)
+void ObjBoundRectItem::mousePressEvent(QGraphicsSceneMouseEvent*)
 {
   if (m_displayPack.type == ZAnimationDisplayPack::Type::ShowAll) {
     m_timeline.animation().toogleShowAll(m_displayPack.id);
   }
 }
 
-void ObjBoundRectItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *)
+void ObjBoundRectItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent*)
 {
   if (m_displayPack.type == ZAnimationDisplayPack::Type::Object) {
     m_timeline.animation().toogleExpanded(m_displayPack.id);
   }
 }
 
-void ObjBoundRectItem::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
+void ObjBoundRectItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
   if (m_displayPack.type == ZAnimationDisplayPack::Type::Object) {
     QMenu menu;
-    QAction *removeObjFromAnimation = menu.addAction(QString("Remove '%1' From Animation").arg(m_displayPack.name));
-    QAction *selectedAction = menu.exec(event->screenPos());
+    QAction* removeObjFromAnimation = menu.addAction(QString("Remove '%1' From Animation").arg(m_displayPack.name));
+    QAction* selectedAction = menu.exec(event->screenPos());
     if (selectedAction == removeObjFromAnimation) {
       m_timeline.animation().removeObj(m_displayPack.id);
     }
   }
 }
 
-ParameterAnimationColorItem::ParameterAnimationColorItem(const ZAnimationDisplayPack &pack, ZTimelineWidget &timeline, QGraphicsItem *parent)
+ParameterAnimationColorItem::ParameterAnimationColorItem(const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline,
+                                                         QGraphicsItem* parent)
   : QGraphicsRectItem(parent)
   , m_displayPack(pack)
   , m_timeline(timeline)
 {
   setBrush(QBrush(m_displayPack.paraAnimation->color()));
-  setRect(5, 5, m_timeline.rowHeight()-10, m_timeline.rowHeight()-10);
+  setRect(5, 5, m_timeline.rowHeight() - 10, m_timeline.rowHeight() - 10);
 }
 
-void ParameterAnimationColorItem::mousePressEvent(QGraphicsSceneMouseEvent *)
+void ParameterAnimationColorItem::mousePressEvent(QGraphicsSceneMouseEvent*)
 {
   QColor newColor = QColorDialog::getColor(m_displayPack.paraAnimation->color(), &m_timeline,
                                            "New Color");
@@ -119,7 +121,7 @@ void ParameterAnimationColorItem::mousePressEvent(QGraphicsSceneMouseEvent *)
   }
 }
 
-ZTimelineObjScene::ZTimelineObjScene(ZTimelineWidget &timeline, QObject *parent)
+ZTimelineObjScene::ZTimelineObjScene(ZTimelineWidget& timeline, QObject* parent)
   : QGraphicsScene(parent)
   , m_timeline(timeline)
   , m_arrowRight(":/icons/arrow_right.png")
@@ -141,51 +143,51 @@ void ZTimelineObjScene::updateItems()
   this->clear();
   m_itemToDisplayPack.clear();
 
-  for (size_t dpi=0; dpi<dps.size(); ++dpi) {
-    const ZAnimationDisplayPack &pack = dps[dpi];
+  for (size_t dpi = 0; dpi < dps.size(); ++dpi) {
+    const ZAnimationDisplayPack& pack = dps[dpi];
     if (pack.type == ZAnimationDisplayPack::Type::GlobalPara) {
       ObjBoundRectItem* rect = new ObjBoundRectItem(pack, m_timeline);
       rect->setRect(0, 0, m_timeline.objViewWidth(), m_timeline.rowHeight());
-      rect->setPen(QPen(QColor(133,133,133)));
-      rect->setBrush(QBrush(QColor(227,227,227)));
+      rect->setPen(QPen(QColor(133, 133, 133)));
+      rect->setBrush(QBrush(QColor(227, 227, 227)));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
-      new DiagramTextItem(pack, rect, Qt::AlignVCenter|Qt::AlignRight);
+      new DiagramTextItem(pack, rect, Qt::AlignVCenter | Qt::AlignRight);
       new ParameterAnimationColorItem(pack, m_timeline, rect);
       addItem(rect);
       m_itemToDisplayPack[rect] = &pack;
     } else if (pack.type == ZAnimationDisplayPack::Type::Object) {
       ObjBoundRectItem* rect = new ObjBoundRectItem(pack, m_timeline);
       rect->setRect(0, 0, m_timeline.objViewWidth(), m_timeline.rowHeight());
-      rect->setPen(QPen(QColor(133,133,133)));
-      rect->setBrush(QBrush(QColor(220,220,220)));
+      rect->setPen(QPen(QColor(133, 133, 133)));
+      rect->setBrush(QBrush(QColor(220, 220, 220)));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
-      new DiagramTextItem(pack, rect, Qt::AlignVCenter|Qt::AlignLeft);
-      ExpandArrowPixmapItem *arrow = new ExpandArrowPixmapItem(pack, m_timeline, rect);
+      new DiagramTextItem(pack, rect, Qt::AlignVCenter | Qt::AlignLeft);
+      ExpandArrowPixmapItem* arrow = new ExpandArrowPixmapItem(pack, m_timeline, rect);
       if (pack.expanded)
         arrow->setPixmap(m_arrowDown);
       else
         arrow->setPixmap(m_arrowRight);
       arrow->setPos(rect->rect().right() - 8 - m_arrowDown.width(),
-                    (m_timeline.rowHeight() - m_arrowDown.height())/2.);
+                    (m_timeline.rowHeight() - m_arrowDown.height()) / 2.);
       addItem(rect);
       m_itemToDisplayPack[rect] = &pack;
     } else if (pack.type == ZAnimationDisplayPack::Type::ObjectPara) {
       ObjBoundRectItem* rect = new ObjBoundRectItem(pack, m_timeline);
       rect->setRect(0, 0, m_timeline.objViewWidth(), m_timeline.rowHeight());
-      rect->setPen(QPen(QColor(200,200,200)));
-      rect->setBrush(QBrush(QColor(235,235,235)));
+      rect->setPen(QPen(QColor(200, 200, 200)));
+      rect->setBrush(QBrush(QColor(235, 235, 235)));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
-      new DiagramTextItem(pack, rect, Qt::AlignVCenter|Qt::AlignRight);
+      new DiagramTextItem(pack, rect, Qt::AlignVCenter | Qt::AlignRight);
       new ParameterAnimationColorItem(pack, m_timeline, rect);
       addItem(rect);
       m_itemToDisplayPack[rect] = &pack;
     } else if (pack.type == ZAnimationDisplayPack::Type::ShowAll) {
       ObjBoundRectItem* rect = new ObjBoundRectItem(pack, m_timeline);
       rect->setRect(0, 0, m_timeline.objViewWidth(), m_timeline.rowHeight());
-      rect->setPen(QPen(QColor(200,200,200)));
-      rect->setBrush(QBrush(QColor(235,235,235)));
+      rect->setPen(QPen(QColor(200, 200, 200)));
+      rect->setBrush(QBrush(QColor(235, 235, 235)));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
-      new DiagramTextItem(pack, rect, Qt::AlignVCenter|Qt::AlignHCenter);
+      new DiagramTextItem(pack, rect, Qt::AlignVCenter | Qt::AlignHCenter);
       addItem(rect);
       m_itemToDisplayPack[rect] = &pack;
     }

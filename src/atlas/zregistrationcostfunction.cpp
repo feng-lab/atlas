@@ -16,7 +16,7 @@ void ZRegistrationCostFunction::setUseMultithreading(bool i)
     m_transform->setUseMultithreading(i);
 }
 
-void ZRegistrationCostFunction::setTransform(ZImageTransform &transform)
+void ZRegistrationCostFunction::setTransform(ZImageTransform& transform)
 {
   m_transform = &transform;
   m_transform->setUseMultithreading(m_useMultithreading);

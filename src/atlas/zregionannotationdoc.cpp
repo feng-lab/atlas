@@ -13,7 +13,7 @@
 
 namespace nim {
 
-ZRegionAnnotationDoc::ZRegionAnnotationDoc(ZDoc &doc)
+ZRegionAnnotationDoc::ZRegionAnnotationDoc(ZDoc& doc)
   : ZObjDoc(doc)
 {
   createActions();
@@ -60,31 +60,31 @@ bool ZRegionAnnotationDoc::saveAs(size_t id)
   return false;
 }
 
-bool ZRegionAnnotationDoc::canReadFile(const QString &fileName)
+bool ZRegionAnnotationDoc::canReadFile(const QString& fileName)
 {
   return ZRegionAnnotation::canReadFile(fileName);
 }
 
-size_t ZRegionAnnotationDoc::loadFile(const QString &fileName, QString &errorMsg)
+size_t ZRegionAnnotationDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
   for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
     if (it->second->path == fileName)
       return it->first;
   }
   try {
-    ZRegionAnnotation *regionAnnotation = new ZRegionAnnotation(fileName);
+    ZRegionAnnotation* regionAnnotation = new ZRegionAnnotation(fileName);
     size_t id = addRegionAnnotation(regionAnnotation, fileName);
     ZSystemInfoInstance.addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = e.what();
     return 0;
   }
 }
 
-size_t ZRegionAnnotationDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
+size_t ZRegionAnnotationDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
 {
   if (!jValue.isString() || jValue.toString().trimmed().isEmpty()) {
     errorMsg = QString("File path is not string or is empty");
@@ -96,26 +96,26 @@ size_t ZRegionAnnotationDoc::loadFile(const QJsonValue &jValue, QString &errorMs
   }
   QString fileName = jValue.toString();
   try {
-    ZRegionAnnotation *regionAnnotation = new ZRegionAnnotation(fileName);
+    ZRegionAnnotation* regionAnnotation = new ZRegionAnnotation(fileName);
     size_t id = addRegionAnnotation(regionAnnotation, fileName);
     ZSystemInfoInstance.addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = e.what();
     return 0;
   }
 }
 
-QList<QAction *> ZRegionAnnotationDoc::loadFileActions() const
+QList<QAction*> ZRegionAnnotationDoc::loadFileActions() const
 {
   QList<QAction*> res;
   res.push_back(m_loadRegionAnnotationAction);
   return res;
 }
 
-QMenu *ZRegionAnnotationDoc::processObjMenu() const
+QMenu* ZRegionAnnotationDoc::processObjMenu() const
 {
   QMenu* res = new QMenu(typeName());
   res->addAction(m_importLabelImageAction);
@@ -157,7 +157,7 @@ QString ZRegionAnnotationDoc::objTooltip(size_t id) const
   return m_idToRegionAnnotationPacks.at(id)->tooltip();
 }
 
-QUndoStack *ZRegionAnnotationDoc::objUndoStack(size_t id)
+QUndoStack* ZRegionAnnotationDoc::objUndoStack(size_t id)
 {
   return m_idToRegionAnnotationPacks.at(id)->regionAnnotation->undoStack();
 }
@@ -167,7 +167,7 @@ QJsonValue ZRegionAnnotationDoc::jsonValue(size_t id) const
   return QJsonValue(m_idToRegionAnnotationPacks.at(id)->path);
 }
 
-bool ZRegionAnnotationDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
+bool ZRegionAnnotationDoc::isSameObj(const QJsonValue& v1, const QJsonValue& v2) const
 {
   CHECK(v1.isString() && v2.isString());
   if (v1 == v2)
@@ -203,7 +203,7 @@ bool ZRegionAnnotationDoc::isAlias(size_t id) const
   return false;
 }
 
-QWidget *ZRegionAnnotationDoc::createObjEditWidget(size_t id)
+QWidget* ZRegionAnnotationDoc::createObjEditWidget(size_t id)
 {
   CHECK(m_idToRegionAnnotationPacks.find(id) != m_idToRegionAnnotationPacks.end());
 
@@ -221,7 +221,7 @@ void ZRegionAnnotationDoc::loadRegionAnnotation()
   if (dialog.exec()) {
     QString errorMsg;
     //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    for (int i=0; i<dialog.selectedFiles().size(); ++i) {
+    for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
         QMessageBox::critical(QApplication::activeWindow(), tr("Can not read regionAnnotation"),
                               errorMsg);
@@ -253,14 +253,14 @@ void ZRegionAnnotationDoc::importLabelImage()
   QApplication::processEvents();
   if (fmtIdx >= 0 && !fn.isEmpty()) {
     try {
-      ZRegionAnnotation *regionAnnotation = new ZRegionAnnotation();
+      ZRegionAnnotation* regionAnnotation = new ZRegionAnnotation();
       regionAnnotation->importLabelImage(fn, formats[fmtIdx]);
 
       addRegionAnnotation(regionAnnotation, QFileInfo(fn).baseName() + "_anno", true);
       ZSystemInfoInstance.addFileToRecentFileList(fn);
       ZSystemInfoInstance.setLastOpenedImagePath(fn);
     }
-    catch (const ZException & e) {
+    catch (const ZException& e) {
       QMessageBox::critical(QApplication::activeWindow(), tr("Can not import label image"),
                             e.what());
     }
@@ -280,7 +280,8 @@ void ZRegionAnnotationDoc::exportLabelImage()
     return;
   } else if (m_idToRegionAnnotationPacks.size() > 1) {
     QMessageBox::critical(QApplication::activeWindow(), tr("Two many RegionAnnotations"),
-                          tr("Two many RegionAnnotations, don't know which one to export. Right now this function only works when there is only one regionannotation object"));
+                          tr(
+                            "Two many RegionAnnotations, don't know which one to export. Right now this function only works when there is only one regionannotation object"));
     return;
   }
   int id = m_idToRegionAnnotationPacks.begin()->first;
@@ -297,7 +298,7 @@ void ZRegionAnnotationDoc::exportLabelImage()
     dialog.setAcceptMode(QFileDialog::AcceptSave);
     dialog.setFileMode(QFileDialog::AnyFile);
     dialog.setNameFilters(filters);
-    for (int i=0; i<formats.size(); ++i) {
+    for (int i = 0; i < formats.size(); ++i) {
       if (formats[i] == FileFormat::MetaImage) {
         dialog.selectNameFilter(filters[i]);
       }
@@ -313,11 +314,12 @@ void ZRegionAnnotationDoc::exportLabelImage()
   QApplication::processEvents();
   if (fmtIdx >= 0 && !fn.isEmpty()) {
     try {
-      m_idToRegionAnnotationPacks.begin()->second->regionAnnotation->exportLabelImage(fn, formats[fmtIdx], comps[fmtIdx]);
+      m_idToRegionAnnotationPacks.begin()->second->regionAnnotation->exportLabelImage(fn, formats[fmtIdx],
+                                                                                      comps[fmtIdx]);
       ZSystemInfoInstance.addFileToRecentFileList(fn);
       ZSystemInfoInstance.setLastOpenedImagePath(fn);
     }
-    catch (const ZException & e) {
+    catch (const ZException& e) {
       QMessageBox::critical(QApplication::activeWindow(), tr("Can not export label image"),
                             e.what());
     }
@@ -326,9 +328,9 @@ void ZRegionAnnotationDoc::exportLabelImage()
 
 void ZRegionAnnotationDoc::setModified()
 {
-  ZRegionAnnotation *ra = qobject_cast<ZRegionAnnotation*>(sender());
+  ZRegionAnnotation* ra = qobject_cast<ZRegionAnnotation*>(sender());
   if (ra) {
-    for(auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
+    for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
       if (it->second->regionAnnotation == ra && !it->second->hasUnsavedChange) {
         it->second->updateDerivedData();
         it->second->hasUnsavedChange = true;
@@ -341,9 +343,9 @@ void ZRegionAnnotationDoc::setModified()
 
 void ZRegionAnnotationDoc::setModified(bool clean)
 {
-  ZRegionAnnotation *ra = qobject_cast<ZRegionAnnotation*>(sender());
+  ZRegionAnnotation* ra = qobject_cast<ZRegionAnnotation*>(sender());
   if (ra) {
-    for(auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
+    for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
       if (it->second->regionAnnotation == ra) {
         if (clean && it->second->path.endsWith(ZRegionAnnotation::fileExtension(), Qt::CaseInsensitive)) {
           it->second->updateDerivedData();
@@ -360,7 +362,7 @@ void ZRegionAnnotationDoc::setModified(bool clean)
   }
 }
 
-size_t ZRegionAnnotationDoc::addRegionAnnotation(ZRegionAnnotation *regionAnnotation, const QString &path, bool unsaved)
+size_t ZRegionAnnotationDoc::addRegionAnnotation(ZRegionAnnotation* regionAnnotation, const QString& path, bool unsaved)
 {
   size_t id = m_doc.getNewObjId();
   m_idToRegionAnnotationPacks[id] = std::make_shared<RegionAnnotationPack>(regionAnnotation, path, unsaved);
@@ -368,11 +370,13 @@ size_t ZRegionAnnotationDoc::addRegionAnnotation(ZRegionAnnotation *regionAnnota
   m_doc.undoGroup()->addStack(regionAnnotation->undoStack());
 
   emit objAdded(id, this);
-  connect(regionAnnotation, &ZRegionAnnotation::undoStackCleanChanged, this, qOverload<bool>(&ZRegionAnnotationDoc::setModified));
+  connect(regionAnnotation, &ZRegionAnnotation::undoStackCleanChanged, this,
+          qOverload<bool>(&ZRegionAnnotationDoc::setModified));
   return id;
 }
 
-ZRegionAnnotationDoc::RegionAnnotationPack::RegionAnnotationPack(ZRegionAnnotation *regionAnnotationIn, const QString &pathIn, bool unsaved)
+ZRegionAnnotationDoc::RegionAnnotationPack::RegionAnnotationPack(ZRegionAnnotation* regionAnnotationIn,
+                                                                 const QString& pathIn, bool unsaved)
   : path(QFileInfo(pathIn).canonicalFilePath()), hasUnsavedChange(unsaved)
 {
   if (path.isEmpty() && pathIn.endsWith("_anno")) {
@@ -393,7 +397,7 @@ void ZRegionAnnotationDoc::RegionAnnotationPack::updateDerivedData()
   m_tooltip = path;
 }
 
-const QString &ZRegionAnnotationDoc::RegionAnnotationPack::info() const
+const QString& ZRegionAnnotationDoc::RegionAnnotationPack::info() const
 {
   if (m_info.isEmpty()) {
     m_info = QString("%1 regions").arg(regionAnnotation->numRegions());
@@ -416,7 +420,7 @@ void ZRegionAnnotationDoc::createActions()
   connect(m_exportLabelImageAction, &QAction::triggered, this, &ZRegionAnnotationDoc::exportLabelImage);
 }
 
-bool ZRegionAnnotationDoc::saveRegionAnnotation(RegionAnnotationPack *pack, const QString &fileName, QString &errorMsg)
+bool ZRegionAnnotationDoc::saveRegionAnnotation(RegionAnnotationPack* pack, const QString& fileName, QString& errorMsg)
 {
   try {
     pack->regionAnnotation->save(fileName);
@@ -429,13 +433,13 @@ bool ZRegionAnnotationDoc::saveRegionAnnotation(RegionAnnotationPack *pack, cons
     setLastOpenedObjPath(fileName);
     return true;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = e.what();
     return false;
   }
 }
 
-void ZRegionAnnotationDoc::packInfoUpdated(RegionAnnotationPack *pack)
+void ZRegionAnnotationDoc::packInfoUpdated(RegionAnnotationPack* pack)
 {
   for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
     if (it->second.get() == pack)

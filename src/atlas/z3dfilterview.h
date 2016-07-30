@@ -9,7 +9,7 @@ template<class DocType, class FilterType>
 class Z3DFilterView : public Z3DObjView
 {
 public:
-  Z3DFilterView(DocType &doc, Z3DView &view)
+  Z3DFilterView(DocType& doc, Z3DView& view)
     : Z3DObjView(view)
     , m_doc(doc)
   {
@@ -21,17 +21,20 @@ public:
 
   // Z3DObjView interface
 public:
-  virtual const ZObjDoc& doc() const override { return m_doc; }
-  virtual bool hasObj(size_t id) const override { return m_idToFilter.find(id) != m_idToFilter.end(); }
+  virtual const ZObjDoc& doc() const override
+  { return m_doc; }
 
-  virtual void read(size_t id, const QJsonObject &json) override
+  virtual bool hasObj(size_t id) const override
+  { return m_idToFilter.find(id) != m_idToFilter.end(); }
+
+  virtual void read(size_t id, const QJsonObject& json) override
   {
     if (hasObj(id)) {
       m_idToFilter.at(id)->read(json);
     }
   }
 
-  virtual void write(size_t id, QJsonObject &json) const override
+  virtual void write(size_t id, QJsonObject& json) const override
   {
     if (hasObj(id)) {
       m_idToFilter.at(id)->write(json);
@@ -63,7 +66,7 @@ protected:
     auto it = m_idToFilter.find(id);
     if (it == m_idToFilter.end())
       return;
-    FilterType *viewControl = it->second.get();
+    FilterType* viewControl = it->second.get();
     canvas().removeEventListener(viewControl);
     m_view.canvas().getGLFocus();
     m_idToFilter.erase(it);
@@ -76,7 +79,7 @@ protected:
     if (m_idToFilter.empty())
       return;
     for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
-      FilterType *viewControl = it->second.get();
+      FilterType* viewControl = it->second.get();
       canvas().removeEventListener(viewControl);
     }
     m_idToFilter.clear();
@@ -93,15 +96,15 @@ protected:
     updateBoundBox();
   }
 
-  virtual void onSelectionChanged(const QList<size_t> &selected, const QList<size_t> &deselected) override
+  virtual void onSelectionChanged(const QList<size_t>& selected, const QList<size_t>& deselected) override
   {
-    for (int i=0; i<selected.size(); ++i) {
+    for (int i = 0; i < selected.size(); ++i) {
       auto it = m_idToFilter.find(selected[i]);
       if (it == m_idToFilter.end())
         return;
       it->second->setSelected(true);
     }
-    for (int i=0; i<deselected.size(); ++i) {
+    for (int i = 0; i < deselected.size(); ++i) {
       auto it = m_idToFilter.find(deselected[i]);
       if (it == m_idToFilter.end())
         return;

@@ -20,41 +20,62 @@ namespace nim {
 
 class Z3DMeshFilter : public Z3DGeometryFilter
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit Z3DMeshFilter(Z3DGlobalParameters& globalParas, QObject *parent = nullptr);
+  explicit Z3DMeshFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+
   virtual ~Z3DMeshFilter();
 
-  void setVisible(bool v) { m_visible.set(v); }
-  bool isVisible() const { return m_visible.get(); }
-  void setMeshColor(glm::vec4 col) { m_singleColorForAllMesh.set(col); }
+  void setVisible(bool v)
+  { m_visible.set(v); }
 
-  bool isFixed() const { return m_meshList[0]->numVertices() == 96957; }
-  void setGlow(bool v) { m_glow.set(v); }
+  bool isVisible() const
+  { return m_visible.get(); }
+
+  void setMeshColor(glm::vec4 col)
+  { m_singleColorForAllMesh.set(col); }
+
+  bool isFixed() const
+  { return m_meshList[0]->numVertices() == 96957; }
+
+  void setGlow(bool v)
+  { m_glow.set(v); }
 
   virtual void process(Z3DEye eye) override;
 
-  void setData(std::vector<ZMesh*> *meshList);
-  void setData(QList<ZMesh*> *meshList);
-  void setSelectedMeshes(std::set<ZMesh*> *list) { m_selectedMeshes = list; }
+  void setData(std::vector<ZMesh*>* meshList);
+
+  void setData(QList<ZMesh*>* meshList);
+
+  void setSelectedMeshes(std::set<ZMesh*>* list)
+  { m_selectedMeshes = list; }
 
   virtual bool isReady(Z3DEye eye) const override;
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
+
   std::shared_ptr<ZWidgetsGroup> widgetsGroupForAnnotationFilter();
 
-  virtual bool hasOpaque(Z3DEye eye) const override { return Z3DGeometryFilter::hasOpaque(eye) && !m_glow.get(); }
+  virtual bool hasOpaque(Z3DEye eye) const override
+  { return Z3DGeometryFilter::hasOpaque(eye) && !m_glow.get(); }
+
   virtual void renderOpaque(Z3DEye eye) override;
-  virtual bool hasTransparent(Z3DEye eye) const override { return Z3DGeometryFilter::hasTransparent(eye) || m_glow.get(); }
+
+  virtual bool hasTransparent(Z3DEye eye) const override
+  { return Z3DGeometryFilter::hasTransparent(eye) || m_glow.get(); }
+
   virtual void renderTransparent(Z3DEye eye) override;
 
 signals:
+
   void meshSelected(ZMesh*, bool append);
 
 protected:
   void prepareColor();
+
   void adjustWidgets();
-  void selectMesh(QMouseEvent *e, int w, int h);
+
+  void selectMesh(QMouseEvent* e, int w, int h);
 
   void onApplyTransform();
 
@@ -63,9 +84,11 @@ protected:
   void prepareData();
 
   virtual void registerPickingObjects() override;
+
   virtual void deregisterPickingObjects() override;
 
   std::vector<double> meshBound(ZMesh* p);
+
   //virtual void updateAxisAlignedBoundBoxImpl() override;
   virtual void updateNotTransformedBoundBoxImpl() override;
 
@@ -105,8 +128,8 @@ private:
 
   ZEventListenerParameter m_selectMeshEvent;
   glm::ivec2 m_startCoord;
-  ZMesh *m_pressedMesh;
-  std::set<ZMesh*> *m_selectedMeshes;   //point to all selected meshes, managed by other class
+  ZMesh* m_pressedMesh;
+  std::set<ZMesh*>* m_selectedMeshes;   //point to all selected meshes, managed by other class
 
   // generate and save to speed up bound box rendering for big mesh
   std::map<ZMesh*, std::vector<double>> m_meshBoundboxMapper;

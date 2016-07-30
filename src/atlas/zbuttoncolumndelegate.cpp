@@ -8,11 +8,11 @@
 
 namespace nim {
 
-ZButtonColumnDelegate::ZButtonColumnDelegate(QObject *parent)
+ZButtonColumnDelegate::ZButtonColumnDelegate(QObject* parent)
   : QStyledItemDelegate(parent)
   , m_button(nullptr)
 {
-  if (QAbstractItemView *wg = qobject_cast<QAbstractItemView*>(parent)) {
+  if (QAbstractItemView* wg = qobject_cast<QAbstractItemView*>(parent)) {
     m_widget = wg;
     m_button = new QPushButton("...", m_widget);
     m_button->hide();
@@ -25,10 +25,11 @@ ZButtonColumnDelegate::~ZButtonColumnDelegate()
 
 }
 
-QWidget *ZButtonColumnDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &index) const
+QWidget*
+ZButtonColumnDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    QPushButton *btn = new QPushButton(parent);
+    QPushButton* btn = new QPushButton(parent);
     btn->setText(index.data().toString());
     connect(btn, &QPushButton::clicked, this, &ZButtonColumnDelegate::buttonClicked);
     return btn;
@@ -37,10 +38,10 @@ QWidget *ZButtonColumnDelegate::createEditor(QWidget *parent, const QStyleOption
   }
 }
 
-void ZButtonColumnDelegate::setEditorData(QWidget *editor, const QModelIndex &index) const
+void ZButtonColumnDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    QPushButton * btn = qobject_cast<QPushButton*>(editor);
+    QPushButton* btn = qobject_cast<QPushButton*>(editor);
     btn->setProperty("user_data", index.data(Qt::UserRole));
     //LOG(INFO) << "set " << btn->property("user_data");
   } else {
@@ -48,10 +49,10 @@ void ZButtonColumnDelegate::setEditorData(QWidget *editor, const QModelIndex &in
   }
 }
 
-void ZButtonColumnDelegate::setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const
+void ZButtonColumnDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    QPushButton *btn = qobject_cast<QPushButton*>(editor);
+    QPushButton* btn = qobject_cast<QPushButton*>(editor);
     model->setData(index, btn->property("user_data"), Qt::UserRole);
     //LOG(INFO) << btn->property("user_data");
   } else {
@@ -59,7 +60,7 @@ void ZButtonColumnDelegate::setModelData(QWidget *editor, QAbstractItemModel *mo
   }
 }
 
-void ZButtonColumnDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
+void ZButtonColumnDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
     QRect rect = option.rect;
@@ -75,12 +76,13 @@ void ZButtonColumnDelegate::paint(QPainter *painter, const QStyleOptionViewItem 
   }
 }
 
-void ZButtonColumnDelegate::updateEditorGeometry(QWidget *editor, const QStyleOptionViewItem &option, const QModelIndex &) const
+void ZButtonColumnDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option,
+                                                 const QModelIndex&) const
 {
   editor->setGeometry(option.rect);
 }
 
-QSize ZButtonColumnDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
+QSize ZButtonColumnDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
     m_button->setText(index.data().toString());
@@ -92,7 +94,7 @@ QSize ZButtonColumnDelegate::sizeHint(const QStyleOptionViewItem &option, const 
   }
 }
 
-void ZButtonColumnDelegate::cellEntered(const QModelIndex &index)
+void ZButtonColumnDelegate::cellEntered(const QModelIndex& index)
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole) == 1) {
     if (m_isOneCellInEditMode) {
@@ -111,7 +113,7 @@ void ZButtonColumnDelegate::cellEntered(const QModelIndex &index)
 
 void ZButtonColumnDelegate::buttonClicked()
 {
-  QPushButton *btn = qobject_cast<QPushButton*>(sender());
+  QPushButton* btn = qobject_cast<QPushButton*>(sender());
   if (btn) {
     emit buttonClickedForUserData(btn->property("user_data"));
   }

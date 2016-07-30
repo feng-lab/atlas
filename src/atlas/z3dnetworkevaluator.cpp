@@ -16,12 +16,12 @@
 
 namespace nim {
 
-Z3DNetworkEvaluator::Z3DNetworkEvaluator(QObject *parent)
+Z3DNetworkEvaluator::Z3DNetworkEvaluator(QObject* parent)
   : QObject(parent)
-  , m_openGLContext(NULL)
+  , m_openGLContext(nullptr)
   , m_locked(false)
   , m_processPending(false)
-  , m_canvasPainter(NULL)
+  , m_canvasPainter(nullptr)
 {
 #if defined(_DEBUG_)
   m_filterWrappers.emplace_back(std::make_unique<Z3DCheckOpenGLStateFilterWrapper>());
@@ -35,7 +35,7 @@ Z3DNetworkEvaluator::~Z3DNetworkEvaluator()
 {
 }
 
-void Z3DNetworkEvaluator::setNetworkSink(Z3DCanvasPainter *canvasPainter)
+void Z3DNetworkEvaluator::setNetworkSink(Z3DCanvasPainter* canvasPainter)
 {
   if (m_canvasPainter == canvasPainter)
     return;
@@ -85,7 +85,7 @@ void Z3DNetworkEvaluator::process(bool stereo)
     // execute the filter, if it needs processing and is ready
     if (!currentFilter->isValid(eye) && currentFilter->isReady(eye)) {
       // notify filter wrappers
-      for (size_t j=0; j < m_filterWrappers.size(); ++j)
+      for (size_t j = 0; j < m_filterWrappers.size(); ++j)
         m_filterWrappers[j]->beforeFilterProcess(currentFilter);
       CHECK_GL_ERROR;
 
@@ -105,7 +105,7 @@ void Z3DNetworkEvaluator::process(bool stereo)
 
     if (stereo && !currentFilter->isValid(Z3DEye::Right) && currentFilter->isReady(Z3DEye::Right)) {
       // notify filter wrappers
-      for (size_t j=0; j < m_filterWrappers.size(); ++j)
+      for (size_t j = 0; j < m_filterWrappers.size(); ++j)
         m_filterWrappers[j]->beforeFilterProcess(currentFilter);
       CHECK_GL_ERROR;
 
@@ -148,7 +148,7 @@ void Z3DNetworkEvaluator::initializeNetwork()
 
   // update size
   sizeChangedFromFilter();
-  for (size_t i=0; i<m_reverseSortedFilters.size(); i++) {
+  for (size_t i = 0; i < m_reverseSortedFilters.size(); i++) {
     QObject::disconnect(m_reverseSortedFilters[i], &Z3DFilter::requestUpstreamSizeChange, 0, 0);
     connect(m_reverseSortedFilters[i], &Z3DFilter::requestUpstreamSizeChange,
             this, &Z3DNetworkEvaluator::sizeChangedFromFilter);
@@ -183,12 +183,12 @@ void Z3DNetworkEvaluator::buildNetwork()
 
   // build graph of all connected filters
   while (!filterQueue.empty()) {
-    Z3DFilter *filter = filterQueue.front();
+    Z3DFilter* filter = filterQueue.front();
     const std::vector<Z3DInputPortBase*> inports = filter->inputPorts();
     for (size_t i = 0; i < inports.size(); ++i) {
       const std::vector<Z3DOutputPortBase*> connected = inports[i]->connected();
       for (size_t j = 0; j < connected.size(); ++j) {
-        Z3DFilter *outFilter = connected[j]->filter();
+        Z3DFilter* outFilter = connected[j]->filter();
         if (m_filterToVertexMapper.find(outFilter) == m_filterToVertexMapper.end()) {
           filterQueue.push(outFilter);
           Vertex v = boost::add_vertex(VertexInfo(outFilter), m_filterGraph);
@@ -213,7 +213,7 @@ void Z3DNetworkEvaluator::buildNetwork()
   }
 
   LOG(INFO) << "Rendering Order: ";
-  for (size_t i=0; i<m_renderingOrder.size(); i++) {
+  for (size_t i = 0; i < m_renderingOrder.size(); i++) {
     LOG(INFO) << "  " << i << ": " << m_renderingOrder[i]->className();
   }
   LOG(INFO) << "";
@@ -223,11 +223,11 @@ void Z3DNetworkEvaluator::buildNetwork()
   std::reverse(m_reverseSortedFilters.begin(), m_reverseSortedFilters.end());
 }
 
-void Z3DNetworkEvaluator::sizeChangedFromFilter(Z3DFilter *rp)
+void Z3DNetworkEvaluator::sizeChangedFromFilter(Z3DFilter* rp)
 {
   if (rp) {
     bool started = false;
-    for (size_t i=0; i<m_reverseSortedFilters.size(); i++) {
+    for (size_t i = 0; i < m_reverseSortedFilters.size(); i++) {
       if (started)
         m_reverseSortedFilters[i]->updateSize();
       else {
@@ -236,7 +236,7 @@ void Z3DNetworkEvaluator::sizeChangedFromFilter(Z3DFilter *rp)
       }
     }
   } else {
-    for (size_t i=0; i<m_reverseSortedFilters.size(); i++) {
+    for (size_t i = 0; i < m_reverseSortedFilters.size(); i++) {
       m_reverseSortedFilters[i]->updateSize();
     }
   }
@@ -254,7 +254,7 @@ void Z3DCheckOpenGLStateFilterWrapper::beforeNetworkProcess()
   checkState();
 }
 
-void Z3DCheckOpenGLStateFilterWrapper::checkState(const Z3DFilter *p)
+void Z3DCheckOpenGLStateFilterWrapper::checkState(const Z3DFilter* p)
 {
 
   if (!checkGLState(GL_BLEND, false)) {
@@ -352,12 +352,12 @@ void Z3DCheckOpenGLStateFilterWrapper::warn(const Z3DFilter* p, const QString& m
 }
 
 
-void Z3DProfileFilterWrapper::beforeFilterProcess(const Z3DFilter *)
+void Z3DProfileFilterWrapper::beforeFilterProcess(const Z3DFilter*)
 {
   m_benchTimer.start();
 }
 
-void Z3DProfileFilterWrapper::afterFilterProcess(const Z3DFilter *p)
+void Z3DProfileFilterWrapper::afterFilterProcess(const Z3DFilter* p)
 {
   m_benchTimer.stop();
   LOG(INFO) << "Filter " << p->className() << " took time: " << m_benchTimer.time() << " seconds.";

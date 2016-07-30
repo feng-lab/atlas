@@ -7,13 +7,13 @@ ZImageCompositeTransform::ZImageCompositeTransform()
 {
 }
 
-void ZImageCompositeTransform::addTransform(const ZImageTransform &tfm)
+void ZImageCompositeTransform::addTransform(const ZImageTransform& tfm)
 {
   m_tfms.emplace_back(tfm.clone());
   constructParameters();
 }
 
-void ZImageCompositeTransform::addTransform(ZImageTransform *tfm)
+void ZImageCompositeTransform::addTransform(ZImageTransform* tfm)
 {
   m_tfms.emplace_back(tfm);
   constructParameters();
@@ -28,9 +28,9 @@ size_t ZImageCompositeTransform::numParameters() const
   return res;
 }
 
-void ZImageCompositeTransform::setParameters(const double *para)
+void ZImageCompositeTransform::setParameters(const double* para)
 {
-  m_parameters = std::vector<double>(para, para+numParameters());
+  m_parameters = std::vector<double>(para, para + numParameters());
   size_t idx = 0;
   for (auto it = m_tfms.begin(); it != m_tfms.end(); ++it) {
     (*it)->setParameters(&m_parameters[idx]);
@@ -54,7 +54,7 @@ void ZImageCompositeTransform::adaptParameters(size_t fromLevel, size_t toLevel)
   }
 }
 
-std::vector<double> ZImageCompositeTransform::estimateParameterScales(const double *dims) const
+std::vector<double> ZImageCompositeTransform::estimateParameterScales(const double* dims) const
 {
   std::vector<double> res;
   for (auto it = m_tfms.cbegin(); it != m_tfms.cend(); ++it) {
@@ -64,7 +64,7 @@ std::vector<double> ZImageCompositeTransform::estimateParameterScales(const doub
   return res;
 }
 
-void ZImageCompositeTransform::transformPoint(double *inoutCoords) const
+void ZImageCompositeTransform::transformPoint(double* inoutCoords) const
 {
   for (auto it = m_tfms.crbegin(); it != m_tfms.crend(); ++it) {
     (*it)->transformPoint(inoutCoords);
@@ -81,7 +81,7 @@ QString ZImageCompositeTransform::toQString() const
   return res;
 }
 
-ZImageTransform *ZImageCompositeTransform::clone() const
+ZImageTransform* ZImageCompositeTransform::clone() const
 {
   ZImageCompositeTransform* res = new ZImageCompositeTransform();
   for (auto it = m_tfms.cbegin(); it != m_tfms.cend(); ++it) {
@@ -90,7 +90,7 @@ ZImageTransform *ZImageCompositeTransform::clone() const
   return res;
 }
 
-ZImageTransform *ZImageCompositeTransform::makeInverseTransform() const
+ZImageTransform* ZImageCompositeTransform::makeInverseTransform() const
 {
   ZImageCompositeTransform* res = new ZImageCompositeTransform();
   for (auto it = m_tfms.crbegin(); it != m_tfms.crend(); ++it) {

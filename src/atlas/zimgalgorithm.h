@@ -14,19 +14,21 @@
 
 #include <itkCommand.h>
 #include <itkProcessObject.h>
+
 #undef _WIN32_WINNT
 
 namespace nim {
 
 class ZImgAlgorithmBaseWithProgressReporter : public QObject
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   ZImgAlgorithmBaseWithProgressReporter();
 
   // if flag is set to true, current algorithm will abort and throw a ZProcessAbortException
   // or itk::ProcessAborted
-  inline void setCancelFlag(bool *flag) { m_cancelFlag = flag; }
+  inline void setCancelFlag(bool* flag)
+  { m_cancelFlag = flag; }
 
   // default report 1 percent change
   // larger value can reduce the number of signals
@@ -38,11 +40,14 @@ public:
   // The reason for this function is that sub operation can be registered in any stage of the
   // algorithm, but we must know it before the algorithm start to calculate correct progress
   // change this in the middle of operation will cause a little bump
-  inline void setTotalSubOperationWeight(double w) { m_weight = 1 - w; }
+  inline void setTotalSubOperationWeight(double w)
+  { m_weight = 1 - w; }
 
 signals:
+
   // progress from 1 to 100, used for QProgressbar
   void progressChanged(int);
+
   // progress from 0.0 to 1.0
   void progressChanged(double, void* sender);
 
@@ -51,26 +56,36 @@ protected:
 
   // progress from 0.0 to 1.0
   void reportProgress(double progress);
+
   // will change the progress interval of internal operation
-  void registerSubOperation(ZImgAlgorithmBaseWithProgressReporter *sender, double weight);
-  void registerSubOperation(itk::ProcessObject *filter, double weight);
+  void registerSubOperation(ZImgAlgorithmBaseWithProgressReporter* sender, double weight);
+
+  void registerSubOperation(itk::ProcessObject* filter, double weight);
+
   void clearRegisteredSubOperations();
 
-  inline bool hasParent() const { return m_parent; }
+  inline bool hasParent() const
+  { return m_parent; }
 
 private:
   // calculate and send signal
   void sendProgressSignal();
 
-  inline double clamp(double progress, double min=0.0, double max=1.0) { return std::max(min, std::min(progress, max)); }
-  typedef itk::MemberCommand<ZImgAlgorithmBaseWithProgressReporter>  CommandType;
+  inline double clamp(double progress, double min = 0.0, double max = 1.0)
+  { return std::max(min, std::min(progress, max)); }
+
+  typedef itk::MemberCommand<ZImgAlgorithmBaseWithProgressReporter> CommandType;
   typedef CommandType::Pointer CommandPointer;
+
   // call back function for ITK
-  void processITKEvent(itk::Object *caller, const itk::EventObject &event);
-  void constProcessITKEvent(const itk::Object *caller, const itk::EventObject &event);
+  void processITKEvent(itk::Object* caller, const itk::EventObject& event);
+
+  void constProcessITKEvent(const itk::Object* caller, const itk::EventObject& event);
+
   CommandPointer m_CallbackCommand;
 
-  inline void setParent(ZImgAlgorithmBaseWithProgressReporter *p) { m_parent = p; }
+  inline void setParent(ZImgAlgorithmBaseWithProgressReporter* p)
+  { m_parent = p; }
 
 protected:
   struct WeightProgress
@@ -79,39 +94,54 @@ protected:
     double progress;
   };
 
-  std::map<void*,WeightProgress> m_subOperationsWeightProgress;
+  std::map<void*, WeightProgress> m_subOperationsWeightProgress;
   std::set<itk::ProcessObject*> m_itkOperations;
   double m_weight;
   double m_progress;
   double m_reportInterval;
-  bool *m_cancelFlag;
-  ZImgAlgorithmBaseWithProgressReporter *m_parent;
+  bool* m_cancelFlag;
+  ZImgAlgorithmBaseWithProgressReporter* m_parent;
 };
 
 class ZImgAlgorithmBase
 {
 public:
-  ZImgAlgorithmBase() {}
+  ZImgAlgorithmBase()
+  {}
 
 protected:
-  ~ZImgAlgorithmBase() {}
+  ~ZImgAlgorithmBase()
+  {}
 
-  inline void setCancelFlag(bool*) {}
-  inline void setProgressReportInterval(double) {}
-  inline void setTotalSubOperationWeight(double) {}
+  inline void setCancelFlag(bool*)
+  {}
 
-  inline void reportProgress(double) {}
+  inline void setProgressReportInterval(double)
+  {}
+
+  inline void setTotalSubOperationWeight(double)
+  {}
+
+  inline void reportProgress(double)
+  {}
+
   // will change the progress interval of internal operation
-  inline void registerSubOperation(void*, double) {}
-  inline void registerSubOperation(itk::ProcessObject*, double) {}
-  inline void clearRegisteredSubOperations() {}
+  inline void registerSubOperation(void*, double)
+  {}
+
+  inline void registerSubOperation(itk::ProcessObject*, double)
+  {}
+
+  inline void clearRegisteredSubOperations()
+  {}
 };
 
 template<bool ReportProgress = false>
 class ZImgAlgorithm : public ZImgAlgorithmBase
 {
 public:
-  ZImgAlgorithm() {}
+  ZImgAlgorithm()
+  {}
 };
 
 template<>

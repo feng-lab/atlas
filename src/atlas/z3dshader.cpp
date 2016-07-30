@@ -37,7 +37,7 @@ Z3DShader::~Z3DShader()
   CHECK_GL_ERROR;
 }
 
-void Z3DShader::compileSourceCode(const char *source)
+void Z3DShader::compileSourceCode(const char* source)
 {
   if (m_id) {
     GLint length = std::strlen(source);
@@ -49,7 +49,7 @@ void Z3DShader::compileSourceCode(const char *source)
     m_compiled = (value != 0);
 
     if (!m_compiled) {
-      const char *types[] = {
+      const char* types[] = {
         "Fragment",
         "Vertex",
         "Geometry",
@@ -58,22 +58,29 @@ void Z3DShader::compileSourceCode(const char *source)
         "Compute",
         ""
       };
-      const char *type = nullptr;
+      const char* type = nullptr;
       switch (m_type) {
-      case Z3DShader::Type::Fragment:
-        type = types[0]; break;
-      case Z3DShader::Type::Vertex:
-        type = types[1]; break;
-      case Z3DShader::Type::Geometry:
-        type = types[2]; break;
-      case Z3DShader::Type::TessellationControl:
-        type = types[3]; break;
-      case Z3DShader::Type::TessellationEvaluation:
-        type = types[4]; break;
-      case Z3DShader::Type::Compute:
-        type = types[5]; break;
-      default:
-        type = types[6]; break;
+        case Z3DShader::Type::Fragment:
+          type = types[0];
+          break;
+        case Z3DShader::Type::Vertex:
+          type = types[1];
+          break;
+        case Z3DShader::Type::Geometry:
+          type = types[2];
+          break;
+        case Z3DShader::Type::TessellationControl:
+          type = types[3];
+          break;
+        case Z3DShader::Type::TessellationEvaluation:
+          type = types[4];
+          break;
+        case Z3DShader::Type::Compute:
+          type = types[5];
+          break;
+        default:
+          type = types[6];
+          break;
       }
       // Get info and source code lengths
       GLint infoLogLength = 0;
@@ -94,7 +101,8 @@ void Z3DShader::compileSourceCode(const char *source)
         sourceCodeBuffer.resize(sourceCodeLength);
         glGetShaderSource(m_id, sourceCodeLength, &temp, sourceCodeBuffer.data());
       }
-      QString log = QString("Z3DShader::compileSourceCode(%1): %2").arg(type).arg(logBuffer.empty() ? "failed" : logBuffer.data());
+      QString log = QString("Z3DShader::compileSourceCode(%1): %2").arg(type).arg(
+        logBuffer.empty() ? "failed" : logBuffer.data());
       // Dump the source code if we got it
       if (!sourceCodeBuffer.empty()) {
         log += QString("\n*** source code ***\n");
@@ -109,7 +117,7 @@ void Z3DShader::compileSourceCode(const char *source)
   }
 }
 
-void Z3DShader::compileSourceCode(const QString &source)
+void Z3DShader::compileSourceCode(const QString& source)
 {
   compileSourceCode(source.toUtf8().constData());
 }

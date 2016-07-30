@@ -9,7 +9,7 @@
 
 namespace nim {
 
-Z3DRendererBase::Z3DRendererBase(Z3DGlobalParameters &globalParas, QObject *parent)
+Z3DRendererBase::Z3DRendererBase(Z3DGlobalParameters& globalParas, QObject* parent)
   : QObject(parent)
   , m_globalParas(globalParas)
 #ifndef _USE_CORE_PROFILE_
@@ -58,7 +58,8 @@ Z3DRendererBase::Z3DRendererBase(Z3DGlobalParameters &globalParas, QObject *pare
   connect(&m_globalParas.lightCount, &ZIntParameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
 #endif
 
-  connect(&m_coordTransform, &Z3DTransformParameter::valueChanged, this, &Z3DRendererBase::makeCoordTransformNormalMatrix);
+  connect(&m_coordTransform, &Z3DTransformParameter::valueChanged, this,
+          &Z3DRendererBase::makeCoordTransformNormalMatrix);
   connect(&m_coordTransform, &Z3DTransformParameter::valueChanged, this, &Z3DRendererBase::coordTransformChanged);
 #ifndef _USE_CORE_PROFILE_
   connect(&m_coordTransform, &Z3DTransformParameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
@@ -88,7 +89,8 @@ Z3DRendererBase::Z3DRendererBase(Z3DGlobalParameters &globalParas, QObject *pare
   connect(&m_globalParas.fogMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DRendererBase::compile);
 
   makeCoordTransformNormalMatrix();
-  connect(&m_globalParas.camera, &Z3DCameraParameter::valueChanged, this, &Z3DRendererBase::makeCoordTransformNormalMatrix);
+  connect(&m_globalParas.camera, &Z3DCameraParameter::valueChanged, this,
+          &Z3DRendererBase::makeCoordTransformNormalMatrix);
 }
 
 Z3DRendererBase::~Z3DRendererBase()
@@ -101,7 +103,7 @@ Z3DRendererBase::~Z3DRendererBase()
 #endif
 }
 
-void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram &shader, Z3DEye eye)
+void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram& shader, Z3DEye eye)
 {
   shader.setScreenDimUniform(glm::vec2(m_viewport.z, m_viewport.w));
   shader.setScreenDimRCPUniform(1.f / glm::vec2(m_viewport.z, m_viewport.w));
@@ -143,25 +145,28 @@ void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram &shader, Z3DEye
   }
   if (m_globalParas.fogMode.isSelected("Linear")) {
     shader.setFogEndUniform(static_cast<GLfloat>((m_globalParas.fogRange.get().y)));
-    shader.setFogScaleUniform(static_cast<GLfloat>(1.f/ (m_globalParas.fogRange.get().y-m_globalParas.fogRange.get().x)));
+    shader.setFogScaleUniform(
+      static_cast<GLfloat>(1.f / (m_globalParas.fogRange.get().y - m_globalParas.fogRange.get().x)));
   } else if (m_globalParas.fogMode.isSelected("Exponential")) {
     shader.setFogDensityLog2eUniform(m_globalParas.fogDensity.get() * static_cast<float>(M_LOG2E));
   } else if (m_globalParas.fogMode.isSelected("Squared Exponential")) {
-    shader.setFogDensityDensityLog2eUniform(m_globalParas.fogDensity.get() * m_globalParas.fogDensity.get() * static_cast<float>(M_LOG2E));
+    shader.setFogDensityDensityLog2eUniform(
+      m_globalParas.fogDensity.get() * m_globalParas.fogDensity.get() * static_cast<float>(M_LOG2E));
   }
 
   shader.setClipPlanesUniform(m_clipPlanes.data(), m_clipPlanes.size());
   CHECK_GL_ERROR;
 }
 
-void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram *shader, Z3DEye eye)
+void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram* shader, Z3DEye eye)
 {
   setGlobalShaderParameters(*shader, eye);
 }
 
 QString Z3DRendererBase::generateHeader() const
 {
-  QString glslVer = QString("%1%2").arg(Z3DGpuInfoInstance.glslMajorVersion()).arg(Z3DGpuInfoInstance.glslMinorVersion());
+  QString glslVer = QString("%1%2").arg(Z3DGpuInfoInstance.glslMajorVersion()).arg(
+    Z3DGpuInfoInstance.glslMinorVersion());
   if (glslVer.length() < 3)
     glslVer += "0";
 
@@ -193,7 +198,8 @@ QString Z3DRendererBase::generateHeader() const
 
 QString Z3DRendererBase::generateGeomHeader() const
 {
-  QString glslVer = QString("%1%2").arg(Z3DGpuInfoInstance.glslMajorVersion()).arg(Z3DGpuInfoInstance.glslMinorVersion());
+  QString glslVer = QString("%1%2").arg(Z3DGpuInfoInstance.glslMajorVersion()).arg(
+    Z3DGpuInfoInstance.glslMinorVersion());
   if (glslVer.length() < 3)
     glslVer += "0";
 
@@ -208,7 +214,7 @@ QString Z3DRendererBase::generateGeomHeader() const
   return header;
 }
 
-void Z3DRendererBase::registerRenderer(Z3DPrimitiveRenderer *renderer)
+void Z3DRendererBase::registerRenderer(Z3DPrimitiveRenderer* renderer)
 {
   CHECK(renderer && m_renderers.find(renderer) == m_renderers.end());
 
@@ -220,28 +226,28 @@ void Z3DRendererBase::registerRenderer(Z3DPrimitiveRenderer *renderer)
   m_renderers.insert(renderer);
 }
 
-void Z3DRendererBase::unregisterRenderer(Z3DPrimitiveRenderer *renderer)
+void Z3DRendererBase::unregisterRenderer(Z3DPrimitiveRenderer* renderer)
 {
   CHECK(renderer && m_renderers.find(renderer) != m_renderers.end());
 
   m_renderers.erase(renderer);
 }
 
-void Z3DRendererBase::setClipPlanes(std::vector<glm::vec4> *clipPlanes)
+void Z3DRendererBase::setClipPlanes(std::vector<glm::vec4>* clipPlanes)
 {
   size_t nOldClipPlanes = m_clipPlanes.size();
   m_clipPlanes.clear();
   m_doubleClipPlanes.clear();
   if (clipPlanes) {
     glm::mat4 itCoordTrans = glm::inverse(glm::transpose(m_coordTransform.get()));
-    for (size_t i=0; i<clipPlanes->size(); ++i) {
+    for (size_t i = 0; i < clipPlanes->size(); ++i) {
       m_clipPlanes.push_back(itCoordTrans * clipPlanes->at(i));
     }
   }
   size_t nNewClipPlanes = m_clipPlanes.size();
   if (nNewClipPlanes != nOldClipPlanes)  // need to recompile shader to define or undefine HAS_CLIP_PLANE
     compile();
-  for (size_t i=0; i<m_clipPlanes.size(); ++i) {
+  for (size_t i = 0; i < m_clipPlanes.size(); ++i) {
     m_doubleClipPlanes.emplace_back(m_clipPlanes[i]);
   }
 #ifndef _USE_CORE_PROFILE_
@@ -250,7 +256,7 @@ void Z3DRendererBase::setClipPlanes(std::vector<glm::vec4> *clipPlanes)
 #endif
 }
 
-void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer *renderer)
+void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer* renderer)
 {
   CHECK(m_renderers.find(renderer) != m_renderers.end());
   std::vector<Z3DPrimitiveRenderer*> renderers;
@@ -258,7 +264,7 @@ void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer *renderer)
   render(eye, renderers);
 }
 
-void Z3DRendererBase::render(Z3DEye eye, nim::Z3DPrimitiveRenderer *renderer1, nim::Z3DPrimitiveRenderer *renderer2)
+void Z3DRendererBase::render(Z3DEye eye, nim::Z3DPrimitiveRenderer* renderer1, nim::Z3DPrimitiveRenderer* renderer2)
 {
   CHECK(m_renderers.find(renderer1) != m_renderers.end());
   CHECK(m_renderers.find(renderer2) != m_renderers.end());
@@ -268,7 +274,8 @@ void Z3DRendererBase::render(Z3DEye eye, nim::Z3DPrimitiveRenderer *renderer1, n
   render(eye, renderers);
 }
 
-void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer *renderer1, Z3DPrimitiveRenderer *renderer2, Z3DPrimitiveRenderer *renderer3)
+void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer* renderer1, Z3DPrimitiveRenderer* renderer2,
+                             Z3DPrimitiveRenderer* renderer3)
 {
   CHECK(m_renderers.find(renderer1) != m_renderers.end());
   CHECK(m_renderers.find(renderer2) != m_renderers.end());
@@ -280,8 +287,8 @@ void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer *renderer1, Z3DPri
   render(eye, renderers);
 }
 
-void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer *renderer1, Z3DPrimitiveRenderer *renderer2,
-                             Z3DPrimitiveRenderer *renderer3, Z3DPrimitiveRenderer *renderer4)
+void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer* renderer1, Z3DPrimitiveRenderer* renderer2,
+                             Z3DPrimitiveRenderer* renderer3, Z3DPrimitiveRenderer* renderer4)
 {
   CHECK(m_renderers.find(renderer1) != m_renderers.end());
   CHECK(m_renderers.find(renderer2) != m_renderers.end());
@@ -295,7 +302,7 @@ void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer *renderer1, Z3DPri
   render(eye, renderers);
 }
 
-void Z3DRendererBase::render(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer *> &renderers)
+void Z3DRendererBase::render(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers)
 {
 #ifdef _DEBUG_
   if (m_renderMethod.isSelected("Old openGL")) {
@@ -342,7 +349,7 @@ void Z3DRendererBase::render(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer 
 #endif
 }
 
-void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DPrimitiveRenderer *renderer)
+void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DPrimitiveRenderer* renderer)
 {
   CHECK(m_renderers.find(renderer) != m_renderers.end());
   std::vector<Z3DPrimitiveRenderer*> renderers;
@@ -350,7 +357,8 @@ void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DPrimitiveRenderer *renderer)
   renderPicking(eye, renderers);
 }
 
-void Z3DRendererBase::renderPicking(Z3DEye eye, nim::Z3DPrimitiveRenderer *renderer1, nim::Z3DPrimitiveRenderer *renderer2)
+void
+Z3DRendererBase::renderPicking(Z3DEye eye, nim::Z3DPrimitiveRenderer* renderer1, nim::Z3DPrimitiveRenderer* renderer2)
 {
   CHECK(m_renderers.find(renderer1) != m_renderers.end());
   CHECK(m_renderers.find(renderer2) != m_renderers.end());
@@ -360,7 +368,8 @@ void Z3DRendererBase::renderPicking(Z3DEye eye, nim::Z3DPrimitiveRenderer *rende
   renderPicking(eye, renderers);
 }
 
-void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DPrimitiveRenderer *renderer1, Z3DPrimitiveRenderer *renderer2, Z3DPrimitiveRenderer *renderer3)
+void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DPrimitiveRenderer* renderer1, Z3DPrimitiveRenderer* renderer2,
+                                    Z3DPrimitiveRenderer* renderer3)
 {
   CHECK(m_renderers.find(renderer1) != m_renderers.end());
   CHECK(m_renderers.find(renderer2) != m_renderers.end());
@@ -372,7 +381,7 @@ void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DPrimitiveRenderer *renderer1,
   renderPicking(eye, renderers);
 }
 
-void Z3DRendererBase::renderPicking(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer *> &renderers)
+void Z3DRendererBase::renderPicking(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers)
 {
 #ifdef _DEBUG_
   if (m_renderMethod.isSelected("Old openGL")) {
@@ -553,30 +562,30 @@ void Z3DRendererBase::renderPickingInstant(const std::vector<Z3DPrimitiveRendere
 }
 #endif
 
-void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer *> &renderers)
+void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers)
 {
   activateClipPlanesGLSL();
-  for (size_t i=0; i<renderers.size(); ++i) {
+  for (size_t i = 0; i < renderers.size(); ++i) {
     renderers[i]->render(eye);
     CHECK_GL_ERROR;
   }
   deactivateClipPlanesGLSL();
 }
 
-void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer *> &renderers)
+void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers)
 {
   activateClipPlanesGLSL();
-  for (size_t i=0; i<renderers.size(); ++i) {
+  for (size_t i = 0; i < renderers.size(); ++i) {
     renderers[i]->renderPicking(eye);
     CHECK_GL_ERROR;
   }
   deactivateClipPlanesGLSL();
 }
 
-bool Z3DRendererBase::needLighting(const std::vector<Z3DPrimitiveRenderer *> &renderers) const
+bool Z3DRendererBase::needLighting(const std::vector<Z3DPrimitiveRenderer*>& renderers) const
 {
   bool needLighting = false;
-  for (size_t i=0; i<renderers.size(); ++i) {
+  for (size_t i = 0; i < renderers.size(); ++i) {
     needLighting = needLighting || renderers[i]->needLighting();
   }
   return needLighting;
@@ -620,12 +629,12 @@ void Z3DRendererBase::activateClipPlanesGLSL()
 {
   if (!m_clipEnabled)
     return;
-  for (size_t i=0; i<m_clipPlanes.size(); ++i) {
+  for (size_t i = 0; i < m_clipPlanes.size(); ++i) {
     if (GLVersionGE(3, 0)) {
-      glEnable(GL_CLIP_DISTANCE0+i);
+      glEnable(GL_CLIP_DISTANCE0 + i);
     } else {
-      glClipPlane(GL_CLIP_PLANE0+i, glm::value_ptr(m_doubleClipPlanes[i]));
-      glEnable(GL_CLIP_PLANE0+i);
+      glClipPlane(GL_CLIP_PLANE0 + i, glm::value_ptr(m_doubleClipPlanes[i]));
+      glEnable(GL_CLIP_PLANE0 + i);
     }
     CHECK_GL_ERROR;
   }
@@ -635,11 +644,11 @@ void Z3DRendererBase::deactivateClipPlanesGLSL()
 {
   if (!m_clipEnabled)
     return;
-  for (size_t i=0; i<m_clipPlanes.size(); ++i) {
+  for (size_t i = 0; i < m_clipPlanes.size(); ++i) {
     if (GLVersionGE(3, 0)) {
-      glDisable(GL_CLIP_DISTANCE0+i);
+      glDisable(GL_CLIP_DISTANCE0 + i);
     } else {
-      glDisable(GL_CLIP_PLANE0+i);
+      glDisable(GL_CLIP_PLANE0 + i);
     }
     CHECK_GL_ERROR;
   }
@@ -667,11 +676,11 @@ void Z3DRendererBase::makeViewportMatrix()
   float f = 1;
 #endif
   m_viewportMatrix = glm::mat4(
-        glm::vec4((r-l)/2.f, 0.0f, 0.0f, 0.0f),
-        glm::vec4(0.0f, (t-b)/2.f, 0.0f, 0.0f),
-        glm::vec4(0.0f, 0.0f, (f-n)/2.f, 0.0f),
-        glm::vec4((r+l)/2.f, (t+b)/2.f, (f+n)/2.f, 1.0f)
-        );
+    glm::vec4((r - l) / 2.f, 0.0f, 0.0f, 0.0f),
+    glm::vec4(0.0f, (t - b) / 2.f, 0.0f, 0.0f),
+    glm::vec4(0.0f, 0.0f, (f - n) / 2.f, 0.0f),
+    glm::vec4((r + l) / 2.f, (t + b) / 2.f, (f + n) / 2.f, 1.0f)
+  );
   m_inverseViewportMatrix = glm::inverse(m_viewportMatrix);
 }
 
@@ -703,9 +712,12 @@ void Z3DRendererBase::compile()
 
 void Z3DRendererBase::makeCoordTransformNormalMatrix()
 {
-  m_coordTransformNormalMatrices[enumToUnderlyingType(Z3DEye::Left)] = glm::transpose(glm::inverse(glm::mat3(camera().viewMatrix(Z3DEye::Left) * m_coordTransform.get())));
-  m_coordTransformNormalMatrices[enumToUnderlyingType(Z3DEye::Mono)] = glm::transpose(glm::inverse(glm::mat3(camera().viewMatrix(Z3DEye::Mono) * m_coordTransform.get())));
-  m_coordTransformNormalMatrices[enumToUnderlyingType(Z3DEye::Right)] = glm::transpose(glm::inverse(glm::mat3(camera().viewMatrix(Z3DEye::Right) * m_coordTransform.get())));
+  m_coordTransformNormalMatrices[enumToUnderlyingType(Z3DEye::Left)] = glm::transpose(
+    glm::inverse(glm::mat3(camera().viewMatrix(Z3DEye::Left) * m_coordTransform.get())));
+  m_coordTransformNormalMatrices[enumToUnderlyingType(Z3DEye::Mono)] = glm::transpose(
+    glm::inverse(glm::mat3(camera().viewMatrix(Z3DEye::Mono) * m_coordTransform.get())));
+  m_coordTransformNormalMatrices[enumToUnderlyingType(Z3DEye::Right)] = glm::transpose(
+    glm::inverse(glm::mat3(camera().viewMatrix(Z3DEye::Right) * m_coordTransform.get())));
 }
 
 } // namespace nim

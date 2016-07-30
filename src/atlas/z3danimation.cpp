@@ -13,14 +13,14 @@
 
 namespace nim {
 
-Z3DAnimation::Z3DAnimation(ZDoc &doc, QObject *parent)
+Z3DAnimation::Z3DAnimation(ZDoc& doc, QObject* parent)
   : ZAnimation(doc, parent)
 {
-  m_cameraParameterAnimation = new ZCameraParameterAnimation("Camera", QColor(0,255,0));
+  m_cameraParameterAnimation = new ZCameraParameterAnimation("Camera", QColor(0, 255, 0));
   m_globalParaAnimations.emplace_back(m_cameraParameterAnimation);
 }
 
-void Z3DAnimation::bindView(Z3DView *v)
+void Z3DAnimation::bindView(Z3DView* v)
 {
   if (m_view == v)
     return;
@@ -35,14 +35,14 @@ void Z3DAnimation::bindView(Z3DView *v)
   }
 }
 
-void Z3DAnimation::load(const QString &fn)
+void Z3DAnimation::load(const QString& fn)
 {
   readContent(fn, "Animation3D");
   m_cameraParameterAnimation = static_cast<ZCameraParameterAnimation*>(m_globalParaAnimations[0].get());
   LOG(INFO) << "Finish loading animation";
 }
 
-void Z3DAnimation::save(const QString &fn)
+void Z3DAnimation::save(const QString& fn)
 {
   writeContent(fn, "Animation3D");
 }
@@ -56,7 +56,7 @@ void Z3DAnimation::addGlobalKey(double time)
 {
   // camera
   Z3DCameraParameter& camera = static_cast<Z3DView*>(m_view)->camera();
-  ZCameraParameterKey *ckey = new ZCameraParameterKey(time, camera);
+  ZCameraParameterKey* ckey = new ZCameraParameterKey(time, camera);
   m_cameraParameterAnimation->addKey(ckey);
 }
 

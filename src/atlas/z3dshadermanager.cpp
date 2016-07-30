@@ -10,7 +10,7 @@
 
 namespace nim {
 
-Z3DShaderManager &Z3DShaderManager::instance()
+Z3DShaderManager& Z3DShaderManager::instance()
 {
   static Z3DShaderManager sm;
   return sm;
@@ -20,7 +20,7 @@ Z3DShaderManager::Z3DShaderManager()
 {
 }
 
-Z3DShader &Z3DShaderManager::shader(const QString &fn, const QString &header, const Z3DContext& context)
+Z3DShader& Z3DShaderManager::shader(const QString& fn, const QString& header, const Z3DContext& context)
 {
   ShaderKey key(fn, header, context);
   auto lb = m_shaders.lower_bound(key);
@@ -34,12 +34,14 @@ Z3DShader &Z3DShaderManager::shader(const QString &fn, const QString &header, co
     } else if (filename.endsWith(".frag", Qt::CaseInsensitive)) {
       type = Z3DShader::Type::Fragment;
     } else {
-      throw ZGLException(QString("Not supported file extension: %1. Use .vert, .geom or .frag as shader extension").arg(filename));
+      throw ZGLException(
+        QString("Not supported file extension: %1. Use .vert, .geom or .frag as shader extension").arg(filename));
     }
 
     QFile file(filename);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-      throw ZGLException(QString("Can not open vertex shader file: %1.  Error String: %2").arg(filename).arg(file.errorString()));
+      throw ZGLException(
+        QString("Can not open vertex shader file: %1.  Error String: %2").arg(filename).arg(file.errorString()));
     }
     QTextStream fileStream(&file);
     fileStream.setCodec("UTF-8");
@@ -48,7 +50,7 @@ Z3DShader &Z3DShaderManager::shader(const QString &fn, const QString &header, co
     CHECK(context == Z3DContext());
     auto shdr = std::make_unique<Z3DShader>(type);
     shdr->compileSourceCode(src);
-    Z3DShader *res = shdr.get();
+    Z3DShader* res = shdr.get();
     m_shaders.emplace_hint(lb, key, std::move(shdr));
     return *res;
   } else {
@@ -56,7 +58,7 @@ Z3DShader &Z3DShaderManager::shader(const QString &fn, const QString &header, co
   }
 }
 
-bool Z3DShaderManager::ShaderKey::operator<(const Z3DShaderManager::ShaderKey &rhs) const
+bool Z3DShaderManager::ShaderKey::operator<(const Z3DShaderManager::ShaderKey& rhs) const
 {
   return std::tie(filename, context, header) < std::tie(rhs.filename, rhs.context, rhs.header);
 }

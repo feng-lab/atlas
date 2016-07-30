@@ -14,26 +14,36 @@ class QString;
 namespace nim {
 
 class Z3DInputPortBase;
+
 class Z3DOutputPortBase;
+
 class Z3DInteractionHandler;
+
 class ZParameter;
+
 class ZEventListenerParameter;
+
 class Z3DRenderOutputPort;
+
 class Z3DRenderTarget;
+
 class Z3DTexture;
+
 class Z3DShaderProgram;
+
 class ZVertexArrayObject;
 
 class Z3DFilter : public QObject, public Z3DCanvasEventListener
 {
-  Q_OBJECT
+Q_OBJECT
 
   friend class Z3DNetworkEvaluator;
 
 public:
   // specifies the invalidation status of the filter.
   // The networkEvaluator use this value to mark filters that has to be executed
-  enum ___InvalidationState {
+  enum ___InvalidationState
+  {
     Valid = 0x00,
     InvalidMonoViewResult = 0x01,
     InvalidLeftEyeResult = 0x02,
@@ -43,18 +53,29 @@ public:
   };
   Q_DECLARE_FLAGS(InvalidationState, ___InvalidationState)
 
-  Z3DFilter(QObject *parent = NULL);
+  Z3DFilter(QObject* parent = nullptr);
+
   virtual ~Z3DFilter();
 
-  QString className() const {return metaObject()->className();}
-  void setName(const QString& name) { m_name = name; }
-  QString name() const { return m_name; }
+  QString className() const
+  { return metaObject()->className(); }
+
+  void setName(const QString& name)
+  { m_name = name; }
+
+  QString name() const
+  { return m_name; }
 
   // returns all parameters
-  const std::vector<ZParameter*>& parameters() const { return m_parameters; }
-  std::vector<ZParameter*>& parameters() { return m_parameters; }
+  const std::vector<ZParameter*>& parameters() const
+  { return m_parameters; }
+
+  std::vector<ZParameter*>& parameters()
+  { return m_parameters; }
+
   // returns first parameter with the given name. return nullptr if not found
   ZParameter* parameter(const QString& name) const;
+
   // returns all parameters matching the specified type T, including subtypes.
   template<class T>
   std::vector<T*> parametersOfType() const;
@@ -62,26 +83,37 @@ public:
   virtual void invalidate(InvalidationState inv = InvalidAllResult);
 
   // returns the port with the given name, or nullptr if such a port does not exist.
-  Z3DInputPortBase* inputPort(const QString &name) const;
+  Z3DInputPortBase* inputPort(const QString& name) const;
+
   Z3DOutputPortBase* outputPort(const QString& name) const;
+
   // return all inputports or outputports as vector
-  const std::vector<Z3DInputPortBase*>& inputPorts() const { return m_inputPorts; }
-  const std::vector<Z3DOutputPortBase*>& outputPorts() const { return m_outputPorts; }
+  const std::vector<Z3DInputPortBase*>& inputPorts() const
+  { return m_inputPorts; }
+
+  const std::vector<Z3DOutputPortBase*>& outputPorts() const
+  { return m_outputPorts; }
 
   virtual void onEvent(QEvent* e, int w, int h) override;
 
-  const std::vector<ZEventListenerParameter*> eventListeners() const { return m_eventListeners; }
-  const std::vector<Z3DInteractionHandler*>& interactionHandlers() const { return m_interactionHandlers; }
+  const std::vector<ZEventListenerParameter*> eventListeners() const
+  { return m_eventListeners; }
+
+  const std::vector<Z3DInteractionHandler*>& interactionHandlers() const
+  { return m_interactionHandlers; }
 
   // removes all port connections
   void disconnectAllPorts();
 
-  void read(const QJsonObject &json);
-  void write(QJsonObject &json) const;
+  void read(const QJsonObject& json);
 
-  inline void invalidateResult() { invalidate(InvalidAllResult); }
+  void write(QJsonObject& json) const;
+
+  inline void invalidateResult()
+  { invalidate(InvalidAllResult); }
 
 signals:
+
   // emit this only if resize starts from current filter.
   void requestUpstreamSizeChange(Z3DFilter*);
 
@@ -108,29 +140,39 @@ protected:
   // input is current camera (eye), can be left or right in stereo case
   virtual void process(Z3DEye eye) = 0;
 
-  void addPort(Z3DInputPortBase &port);
-  void addPort(Z3DOutputPortBase &port);
+  void addPort(Z3DInputPortBase& port);
 
-  void removePort(Z3DInputPortBase &port);
-  void removePort(Z3DOutputPortBase &port);
+  void addPort(Z3DOutputPortBase& port);
 
-  void addParameter(ZParameter &para, InvalidationState inv = InvalidAllResult);
-  void removeParameter(ZParameter &para);
+  void removePort(Z3DInputPortBase& port);
+
+  void removePort(Z3DOutputPortBase& port);
+
+  void addParameter(ZParameter& para, InvalidationState inv = InvalidAllResult);
+
+  void removeParameter(ZParameter& para);
 
   // listen to some events
-  void addEventListener(ZEventListenerParameter &para);
+  void addEventListener(ZEventListenerParameter& para);
 
   // react to interaction
-  void addInteractionHandler(Z3DInteractionHandler &handler);
+  void addInteractionHandler(Z3DInteractionHandler& handler);
 
-  virtual void enterInteractionMode() {}
-  virtual void exitInteractionMode() {}
+  virtual void enterInteractionMode()
+  {}
+
+  virtual void exitInteractionMode()
+  {}
+
   bool isInInteractionMode() const;
-  void toggleInteractionMode(bool isInInteractionMode, void *source);
+
+  void toggleInteractionMode(bool isInInteractionMode, void* source);
 
   void addPrivateRenderPort(Z3DRenderOutputPort& port);
+
   void addPrivateRenderTarget(Z3DRenderTarget& target);
-  static void renderScreenQuad(const ZVertexArrayObject &vao, const Z3DShaderProgram &shader);
+
+  static void renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader);
 
   // 1. for each outport, get all expected size from all connected inports, and use the maximum one
   //    as the new size of the outport
@@ -170,9 +212,10 @@ protected:
 };
 
 template<class T>
-std::vector<T*> Z3DFilter::parametersOfType() const {
+std::vector<T*> Z3DFilter::parametersOfType() const
+{
   std::vector<T*> result;
-  for (size_t i=0; i<m_parameters.size(); ++i) {
+  for (size_t i = 0; i < m_parameters.size(); ++i) {
     if (dynamic_cast<T*>(m_parameters[i]))
       result.push_back(dynamic_cast<T*>(m_parameters[i]));
   }

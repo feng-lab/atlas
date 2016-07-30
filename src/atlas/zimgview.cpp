@@ -6,7 +6,7 @@
 
 namespace nim {
 
-ZImgView::ZImgView(ZImgDoc &doc, ZView &view)
+ZImgView::ZImgView(ZImgDoc& doc, ZView& view)
   : ZFilterView<ZImgDoc, ZImgFilter>(doc, view)
 {
   docImgsAdded(m_doc.objs());
@@ -18,40 +18,40 @@ QString ZImgView::infoOfPos(double x, double y)
 {
   QString info;
   try {
-  for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
-    ZImgFilter *viewControl = it->second.get();
-    if (!viewControl->isVisible())
-      continue;
-    size_t id = it->first;
-    const ZImgPack& imgPack = m_doc.imgPack(id);
-    int lx = x - imgPack.offsetX();
-    int ly = y - imgPack.offsetY();
-    if (lx >= 0 && static_cast<size_t>(lx) < imgPack.imgInfo().width &&
-        ly >= 0 && static_cast<size_t>(ly) < imgPack.imgInfo().height) {
-      int lz = m_view.isNormalView() ? viewControl->imgSlice() : 0;
-      int lt = viewControl->imgTime();
-      info += imgPack.sizeInfo();
-      if (imgPack.imgInfo().numTimes == 1) {
-        info += QString(" Coord: (%1,%2,%3)").arg(lx).arg(ly).arg(lz);
-      } else {
-        info += QString(" Coord: (%1,%2,%3,%4)").arg(lx).arg(ly).arg(lz).arg(lt);
+    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
+      ZImgFilter* viewControl = it->second.get();
+      if (!viewControl->isVisible())
+        continue;
+      size_t id = it->first;
+      const ZImgPack& imgPack = m_doc.imgPack(id);
+      int lx = x - imgPack.offsetX();
+      int ly = y - imgPack.offsetY();
+      if (lx >= 0 && static_cast<size_t>(lx) < imgPack.imgInfo().width &&
+          ly >= 0 && static_cast<size_t>(ly) < imgPack.imgInfo().height) {
+        int lz = m_view.isNormalView() ? viewControl->imgSlice() : 0;
+        int lt = viewControl->imgTime();
+        info += imgPack.sizeInfo();
+        if (imgPack.imgInfo().numTimes == 1) {
+          info += QString(" Coord: (%1,%2,%3)").arg(lx).arg(ly).arg(lz);
+        } else {
+          info += QString(" Coord: (%1,%2,%3,%4)").arg(lx).arg(ly).arg(lz).arg(lt);
+        }
+        info += QString(" Intensity: (%1").arg(imgPack.displayValue(lx, ly, lz, 0, lt, m_view.isMaxZProjView()));
+        for (size_t c = 1; c < imgPack.imgInfo().numChannels; ++c)
+          info += QString(",%1").arg(imgPack.displayValue(lx, ly, lz, c, lt, m_view.isMaxZProjView()));
+        info += ")      ";
       }
-      info += QString(" Intensity: (%1").arg(imgPack.displayValue(lx,ly,lz,0,lt,m_view.isMaxZProjView()));
-      for (size_t c = 1; c < imgPack.imgInfo().numChannels; ++c)
-        info += QString(",%1").arg(imgPack.displayValue(lx,ly,lz,c,lt,m_view.isMaxZProjView()));
-      info += ")      ";
     }
-  }
-  } catch (const ZException &e) {
+  } catch (const ZException& e) {
     QMessageBox::critical(QApplication::activeWindow(), "Error", e.what());
   }
   return info;
 }
 
-void ZImgView::docImgsAdded(const QList<size_t> &objs)
+void ZImgView::docImgsAdded(const QList<size_t>& objs)
 {
-  for (int i=0; i<objs.size(); ++i) {
-    ZImgFilter *viewControl = new ZImgFilter(m_view);
+  for (int i = 0; i < objs.size(); ++i) {
+    ZImgFilter* viewControl = new ZImgFilter(m_view);
     viewControl->setData(m_doc.imgPack(objs[i]));
     expandBoundBox(viewControl->boundBox());
     m_idToFilter[objs[i]].reset(viewControl);
@@ -67,7 +67,7 @@ void ZImgView::docImgsAdded(const QList<size_t> &objs)
 
 void ZImgView::docImgAdded(size_t id)
 {
-  ZImgFilter *viewControl = new ZImgFilter(m_view);
+  ZImgFilter* viewControl = new ZImgFilter(m_view);
   viewControl->setData(m_doc.imgPack(id));
   expandBoundBox(viewControl->boundBox());
   m_idToFilter[id].reset(viewControl);

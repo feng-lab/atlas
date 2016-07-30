@@ -8,8 +8,8 @@ namespace {
 
 size_t factorizeNumber(size_t n)
 {
-  size_t ifac[3] = {2,3,5};
-  for (int i=0; i<3; ++i) {
+  size_t ifac[3] = {2, 3, 5};
+  for (int i = 0; i < 3; ++i) {
     while (n % ifac[i] == 0)
       n = n / ifac[i];
   }
@@ -50,35 +50,41 @@ inline double secureDivideSqrt2(double v1, double v2)
 using namespace nim;
 
 template<typename TVoxel1, typename TVoxel2>
-void xCorrPart_Impl(const ZImg &fixedImg, const ZImg &movingImg, size_t xStart, size_t xEnd,
+void xCorrPart_Impl(const ZImg& fixedImg, const ZImg& movingImg, size_t xStart, size_t xEnd,
                     size_t yStart, size_t yEnd, size_t zStart, size_t zEnd,
-                    ZImg &res)
+                    ZImg& res)
 {
-  const TVoxel1 *fixedData = fixedImg.channelData<TVoxel1>(0,0);
-  const TVoxel2 *movingData = movingImg.channelData<TVoxel2>(0,0);
-  double *desData = res.channelData<double>(0,0);
+  const TVoxel1* fixedData = fixedImg.channelData<TVoxel1>(0, 0);
+  const TVoxel2* movingData = movingImg.channelData<TVoxel2>(0, 0);
+  double* desData = res.channelData<double>(0, 0);
   size_t fixedPlaneNum = fixedImg.planeVoxelNumber();
   size_t fixedRowNum = fixedImg.rowVoxelNumber();
   size_t movingPlaneNum = movingImg.planeVoxelNumber();
   size_t movingRowNum = movingImg.rowVoxelNumber();
   size_t desOffset = 0;
-  for (size_t z=zStart; z<zEnd; ++z) {
+  for (size_t z = zStart; z < zEnd; ++z) {
     size_t movingStartZ = std::max(0, static_cast<int>(movingImg.depth()) - 1 - static_cast<int>(z));
-    size_t movingEndZ = std::min(static_cast<int>(fixedImg.depth()) + static_cast<int>(movingImg.depth()) - 1 - static_cast<int>(z), static_cast<int>(movingImg.depth()));
+    size_t movingEndZ = std::min(
+      static_cast<int>(fixedImg.depth()) + static_cast<int>(movingImg.depth()) - 1 - static_cast<int>(z),
+      static_cast<int>(movingImg.depth()));
     size_t fixedStartZ = std::max(0, static_cast<int>(z) - static_cast<int>(movingImg.depth()) + 1);
-    for (size_t y=yStart; y<yEnd; ++y) {
+    for (size_t y = yStart; y < yEnd; ++y) {
       size_t movingStartY = std::max(0, static_cast<int>(movingImg.height()) - 1 - static_cast<int>(y));
-      size_t movingEndY = std::min(static_cast<int>(fixedImg.height()) + static_cast<int>(movingImg.height()) - 1 - static_cast<int>(y), static_cast<int>(movingImg.height()));
+      size_t movingEndY = std::min(
+        static_cast<int>(fixedImg.height()) + static_cast<int>(movingImg.height()) - 1 - static_cast<int>(y),
+        static_cast<int>(movingImg.height()));
       size_t fixedStartY = std::max(0, static_cast<int>(y) - static_cast<int>(movingImg.height()) + 1);
-      for (size_t x=xStart; x<xEnd; ++x) {
+      for (size_t x = xStart; x < xEnd; ++x) {
         size_t movingStartX = std::max(0, static_cast<int>(movingImg.width()) - 1 - static_cast<int>(x));
-        size_t movingEndX = std::min(static_cast<int>(fixedImg.width()) + static_cast<int>(movingImg.width()) - 1 - static_cast<int>(x), static_cast<int>(movingImg.width()));
+        size_t movingEndX = std::min(
+          static_cast<int>(fixedImg.width()) + static_cast<int>(movingImg.width()) - 1 - static_cast<int>(x),
+          static_cast<int>(movingImg.width()));
         size_t fixedStartX = std::max(0, static_cast<int>(x) - static_cast<int>(movingImg.width()) + 1);
         size_t fixedOffset = fixedStartZ * fixedPlaneNum + fixedStartY * fixedRowNum + fixedStartX;
         size_t movingOffset = movingStartZ * movingPlaneNum + movingStartY * movingRowNum + movingStartX;
-        for (size_t mz=movingStartZ; mz<movingEndZ; ++mz) {
-          for (size_t my=movingStartY; my<movingEndY; ++my) {
-            for (size_t mx=movingStartX; mx<movingEndX; ++mx) {
+        for (size_t mz = movingStartZ; mz < movingEndZ; ++mz) {
+          for (size_t my = movingStartY; my < movingEndY; ++my) {
+            for (size_t mx = movingStartX; mx < movingEndX; ++mx) {
               desData[desOffset] += static_cast<double>(fixedData[fixedOffset]) * movingData[movingOffset];
               ++fixedOffset;
               ++movingOffset;
@@ -97,7 +103,7 @@ void xCorrPart_Impl(const ZImg &fixedImg, const ZImg &movingImg, size_t xStart, 
 }
 
 template<typename TVoxel>
-double getNCCOfOffset_Impl(const ZImg &fixedImg, const ZImg &movingImg)
+double getNCCOfOffset_Impl(const ZImg& fixedImg, const ZImg& movingImg)
 {
   ZImageToImageMetric metric;
   metric.setType(ZImageToImageMetric::Type::NormalizedCrossCorrelation);
@@ -105,13 +111,13 @@ double getNCCOfOffset_Impl(const ZImg &fixedImg, const ZImg &movingImg)
                        fixedImg.width(), fixedImg.height(), fixedImg.depth());
 }
 
-void checkInputImgs(const ZImg &fixedImg, const ZImg &movingImg, const QString &name = "")
+void checkInputImgs(const ZImg& fixedImg, const ZImg& movingImg, const QString& name = "")
 {
   if (fixedImg.isEmpty() || movingImg.isEmpty() ||
       fixedImg.numChannels() != 1 || fixedImg.numTimes() != 1 ||
       movingImg.numChannels() != 1 || movingImg.numTimes() != 1) {
     throw ZImgException(QString("%1 input img dimension is not supported: fixed img <%1>, moving img <%2>")
-                        .arg(name).arg(fixedImg.info().toQString()).arg(movingImg.info().toQString()));
+                          .arg(name).arg(fixedImg.info().toQString()).arg(movingImg.info().toQString()));
   }
 }
 
@@ -119,7 +125,7 @@ void checkInputImgs(const ZImg &fixedImg, const ZImg &movingImg, const QString &
 
 namespace nim {
 
-double getNCCOfOffset(const ZImg &fixedImgIn, const ZImg &movingImgIn, const ZVoxelCoordinate &offset)
+double getNCCOfOffset(const ZImg& fixedImgIn, const ZImg& movingImgIn, const ZVoxelCoordinate& offset)
 {
   checkInputImgs(fixedImgIn, movingImgIn, "getNCCOfOffset");
   ZImg fixedImg;
@@ -138,7 +144,7 @@ double getNCCOfOffset(const ZImg &fixedImgIn, const ZImg &movingImgIn, const ZVo
 }
 
 // reference: matlab code normxcorr2_general.m
-void normXCorr(ZImg &fixedImg, ZImg &movingImg, ZImg &nccImg, ZImg &numberOfOverlapVoxelsImg)
+void normXCorr(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOverlapVoxelsImg)
 {
   checkInputImgs(fixedImg, movingImg, "normXCorr");
   if (!fixedImg.isType<double>()) {
@@ -155,7 +161,8 @@ void normXCorr(ZImg &fixedImg, ZImg &movingImg, ZImg &nccImg, ZImg &numberOfOver
   ZImgInfo info = fixedImg.info();
   numberOfOverlapVoxelsImg = ZImg(info);  //1
   numberOfOverlapVoxelsImg.fill(1);
-  numberOfOverlapVoxelsImg = numberOfOverlapVoxelsImg.blockSum(movingImg.width(), movingImg.height(), movingImg.depth());
+  numberOfOverlapVoxelsImg = numberOfOverlapVoxelsImg.blockSum(movingImg.width(), movingImg.height(),
+                                                               movingImg.depth());
 
   //fixedImg.write("/Users/feng/Downloads/test_xcorr_fixedImg.tif");
   //movingImg.write("/Users/feng/Downloads/test_xcorr_movingImg.tif");
@@ -212,7 +219,7 @@ void normXCorr(ZImg &fixedImg, ZImg &movingImg, ZImg &nccImg, ZImg &numberOfOver
   numberOfOverlapVoxelsImg = numberOfOverlapVoxelsImg.blockSum(movingImgWidth, movingImgHeight, movingImgDepth);
 }
 
-void normXCorr_S(ZImg &fixedImg, ZImg &movingImg, ZImg &nccImg, ZImg &numberOfOverlapVoxelsImg)
+void normXCorr_S(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOverlapVoxelsImg)
 {
   checkInputImgs(fixedImg, movingImg, "normXCorr_S");
   if (!fixedImg.isType<double>()) {
@@ -246,7 +253,8 @@ void normXCorr_S(ZImg &fixedImg, ZImg &movingImg, ZImg &nccImg, ZImg &numberOfOv
   //LOG(WARNING) << "3";
   numberOfOverlapVoxelsImg = ZImg(info);  //3
   numberOfOverlapVoxelsImg.fill(1);
-  numberOfOverlapVoxelsImg = numberOfOverlapVoxelsImg.blockSum(movingImg.width(), movingImg.height(), movingImg.depth());
+  numberOfOverlapVoxelsImg = numberOfOverlapVoxelsImg.blockSum(movingImg.width(), movingImg.height(),
+                                                               movingImg.depth());
 
   numeratorPart /= numberOfOverlapVoxelsImg;
   nccImg -= numeratorPart;
@@ -281,7 +289,8 @@ void normXCorr_S(ZImg &fixedImg, ZImg &movingImg, ZImg &nccImg, ZImg &numberOfOv
   //LOG(WARNING) << "2";
   numberOfOverlapVoxelsImg = ZImg(info);  //2
   numberOfOverlapVoxelsImg.fill(1);
-  numberOfOverlapVoxelsImg = numberOfOverlapVoxelsImg.blockSum(movingImg.width(), movingImg.height(), movingImg.depth());
+  numberOfOverlapVoxelsImg = numberOfOverlapVoxelsImg.blockSum(movingImg.width(), movingImg.height(),
+                                                               movingImg.depth());
 
   //LOG(WARNING) << "3";
   localSumMoving = movingImg.blockSum(fixedImgWidth, fixedImgHeight, fixedImgDepth);  //3
@@ -320,7 +329,7 @@ void normXCorr_S(ZImg &fixedImg, ZImg &movingImg, ZImg &nccImg, ZImg &numberOfOv
 
 void normXCorrPart(ZImg& fixedImg, ZImg& movingImg, size_t xStart, size_t xEnd,
                    size_t yStart, size_t yEnd, size_t zStart, size_t zEnd,
-                   ZImg &nccImg, ZImg &numberOfOverlapVoxelsImg)
+                   ZImg& nccImg, ZImg& numberOfOverlapVoxelsImg)
 {
   checkInputImgs(fixedImg, movingImg, "normXCorrPart");
   if (xStart >= xEnd || yStart >= yEnd || zStart >= zEnd ||
@@ -328,8 +337,8 @@ void normXCorrPart(ZImg& fixedImg, ZImg& movingImg, size_t xStart, size_t xEnd,
       yEnd > fixedImg.height() + movingImg.height() - 1 ||
       zEnd > fixedImg.depth() + movingImg.depth() - 1) {
     throw ZImgException(QString("normXCorrPart: invalid part (%1:%2,%3:%4,%5:%6) of fixedImg <%7> and movingImg <%8>")
-                        .arg(xStart).arg(xEnd).arg(yStart).arg(yEnd).arg(zStart).arg(zEnd)
-                        .arg(fixedImg.info().toQString()).arg(movingImg.info().toQString()));
+                          .arg(xStart).arg(xEnd).arg(yStart).arg(yEnd).arg(zStart).arg(zEnd)
+                          .arg(fixedImg.info().toQString()).arg(movingImg.info().toQString()));
   }
 
   if (!fixedImg.isType<double>()) {
@@ -353,7 +362,8 @@ void normXCorrPart(ZImg& fixedImg, ZImg& movingImg, size_t xStart, size_t xEnd,
   ZImgInfo info = fixedImg.info();
   numberOfOverlapVoxelsImg = ZImg(info);  //
   numberOfOverlapVoxelsImg.fill(1);
-  numberOfOverlapVoxelsImg = numberOfOverlapVoxelsImg.blockSumPart(movingImg.width(), movingImg.height(), movingImg.depth(),
+  numberOfOverlapVoxelsImg = numberOfOverlapVoxelsImg.blockSumPart(movingImg.width(), movingImg.height(),
+                                                                   movingImg.depth(),
                                                                    xStart, xEnd, yStart, yEnd, zStart, zEnd);
 
   //  ZImg nop(info);
@@ -414,7 +424,7 @@ void normXCorrPart(ZImg& fixedImg, ZImg& movingImg, size_t xStart, size_t xEnd,
   nccImg.typedBinaryOperation<double, double>(denom, secureDivideSqrt2);
 }
 
-ZImg xCorrFFT(const ZImg &fixedImg, ZImg &movingImg, bool reflectMovingImg)
+ZImg xCorrFFT(const ZImg& fixedImg, ZImg& movingImg, bool reflectMovingImg)
 {
   checkInputImgs(fixedImg, movingImg, "xCorrFFT");
   size_t outWidth = fixedImg.width() + movingImg.width() - 1;
@@ -443,7 +453,7 @@ ZImg xCorrFFT(const ZImg &fixedImg, ZImg &movingImg, bool reflectMovingImg)
   return ifft(cfixed, optimalWidth, outWidth, outHeight, outDepth);
 }
 
-ZImg xCorrPart(const ZImg &fixedImg, const ZImg &movingImg, size_t xStart, size_t xEnd,
+ZImg xCorrPart(const ZImg& fixedImg, const ZImg& movingImg, size_t xStart, size_t xEnd,
                size_t yStart, size_t yEnd, size_t zStart, size_t zEnd)
 {
   checkInputImgs(fixedImg, movingImg, "xCorrPart");
@@ -452,8 +462,8 @@ ZImg xCorrPart(const ZImg &fixedImg, const ZImg &movingImg, size_t xStart, size_
       yEnd > fixedImg.height() + movingImg.height() - 1 ||
       zEnd > fixedImg.depth() + movingImg.depth() - 1) {
     throw ZImgException(QString("xCorrPart: invalid part (%1:%2,%3:%4,%5:%6) of fixedImg <%7> and movingImg <%8>")
-                        .arg(xStart).arg(xEnd).arg(yStart).arg(yEnd).arg(zStart).arg(zEnd)
-                        .arg(fixedImg.info().toQString()).arg(movingImg.info().toQString()));
+                          .arg(xStart).arg(xEnd).arg(yStart).arg(yEnd).arg(zStart).arg(zEnd)
+                          .arg(fixedImg.info().toQString()).arg(movingImg.info().toQString()));
   }
 
   ZImgInfo info = fixedImg.info();
@@ -470,15 +480,16 @@ ZImg xCorrPart(const ZImg &fixedImg, const ZImg &movingImg, size_t xStart, size_
   return res;
 }
 
-void cropOverlapSubImg(const ZImg &fixedImgIn, const ZImg &movingImgIn,
-                       const ZVoxelCoordinate &offset, ZImg &subFixedImg, ZImg &subMovingImg)
+void cropOverlapSubImg(const ZImg& fixedImgIn, const ZImg& movingImgIn,
+                       const ZVoxelCoordinate& offset, ZImg& subFixedImg, ZImg& subMovingImg)
 {
   // find overlap region
   ZVoxelCoordinate fixedStart = max(offset, 0);   // max of zero and offset
   ZVoxelCoordinate fixedEnd = min(offset + movingImgIn.endCoord(), fixedImgIn.endCoord());
   if (fixedEnd.anyLessEqual(fixedStart)) {
     throw ZImgException(QString("Trying to crop overlap region of non-overlap img1 <%1> and img2 <%2> with offset: %3")
-                        .arg(fixedImgIn.info().toQString()).arg(movingImgIn.info().toQString()).arg(offset.toQString()));
+                          .arg(fixedImgIn.info().toQString()).arg(movingImgIn.info().toQString()).arg(
+      offset.toQString()));
   }
   ZImgRegion fixedRegion(fixedStart, fixedEnd);
   subFixedImg = fixedImgIn.crop(fixedRegion);

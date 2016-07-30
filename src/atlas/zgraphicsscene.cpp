@@ -6,7 +6,7 @@
 
 namespace nim {
 
-ZGraphicsScene::ZGraphicsScene(ZView *view)
+ZGraphicsScene::ZGraphicsScene(ZView* view)
   : QGraphicsScene(view)
   , m_view(view)
 {
@@ -14,7 +14,7 @@ ZGraphicsScene::ZGraphicsScene(ZView *view)
   setItemIndexMethod(NoIndex);
 }
 
-void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
+void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
   QGraphicsScene::mousePressEvent(event);
   if (!selectedItems().empty() &&
@@ -23,7 +23,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
   }
 }
 
-void ZGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
+void ZGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
   QGraphicsScene::mouseReleaseEvent(event);
   if (!selectedItems().empty() && event->button() == Qt::LeftButton) {
@@ -31,7 +31,7 @@ void ZGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
   }
 }
 
-void ZGraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
+void ZGraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 {
   double x = event->scenePos().x();
   double y = event->scenePos().y();

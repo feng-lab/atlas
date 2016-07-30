@@ -7,19 +7,23 @@ namespace nim {
 
 class Z3DSphereRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   // default use display list and lighting for opengl mode
-  explicit Z3DSphereRenderer(Z3DRendererBase &rendererBase);
+  explicit Z3DSphereRenderer(Z3DRendererBase& rendererBase);
 
-  void setData(std::vector<glm::vec4> *pointAndRadiusInput, std::vector<glm::vec4> *specularAndShininessInput = NULL);
-  void setDataColors(std::vector<glm::vec4> *pointColorsInput);
-  void setDataPickingColors(std::vector<glm::vec4> *pointPickingColorsInput = NULL);
+  void setData(std::vector<glm::vec4>* pointAndRadiusInput, std::vector<glm::vec4>* specularAndShininessInput = nullptr);
 
-  ZBoolParameter& useDynamicMaterialPara() { return m_useDynamicMaterial; }
+  void setDataColors(std::vector<glm::vec4>* pointColorsInput);
+
+  void setDataPickingColors(std::vector<glm::vec4>* pointPickingColorsInput = nullptr);
+
+  ZBoolParameter& useDynamicMaterialPara()
+  { return m_useDynamicMaterial; }
 
 protected:
   virtual void compile() override;
+
   QString generateHeader();
 
 #ifndef _USE_CORE_PROFILE_
@@ -28,6 +32,7 @@ protected:
 #endif
 
   virtual void render(Z3DEye eye) override;
+
   virtual void renderPicking(Z3DEye eye) override;
 
   void appendDefaultColors();

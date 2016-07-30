@@ -10,12 +10,13 @@ namespace nim {
 
 class ZSwcView : public ZFilterView<ZSwcDoc, ZSwcFilter>
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  ZSwcView(ZSwcDoc &doc, ZView &view);
+  ZSwcView(ZSwcDoc& doc, ZView& view);
 
 private:
-  void docSwcsAdded(const QList<size_t> &objs);
+  void docSwcsAdded(const QList<size_t>& objs);
+
   void docSwcAdded(size_t id);
 };
 

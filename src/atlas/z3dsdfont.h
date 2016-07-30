@@ -13,15 +13,15 @@ public:
   struct CharInfo
   {
     CharInfo(int id = 0, int x = 0, int y = 0, int width = 0, int height = 0, float xoffset = 0.f, float yoffset = 0.f,
-             float xadvance = 0.f, int page = 0, int chnl = 0, int texWidth = 1, int texHeight = 1) :
-      id(id), x(x), y(y), width(width), height(height), xoffset(xoffset),
-      yoffset(yoffset), xadvance(xadvance), page(page), chnl(chnl)
+             float xadvance = 0.f, int page = 0, int chnl = 0, int texWidth = 1, int texHeight = 1)
+      : id(id), x(x), y(y), width(width), height(height), xoffset(xoffset), yoffset(yoffset)
+      , xadvance(xadvance), page(page), chnl(chnl)
     {
-      sMin = static_cast<float>(x)/static_cast<float>(texWidth);
-      tMin = static_cast<float>(y+height)/static_cast<float>(texHeight);
+      sMin = static_cast<float>(x) / static_cast<float>(texWidth);
+      tMin = static_cast<float>(y + height) / static_cast<float>(texHeight);
 
-      sMax = static_cast<float>(x+width)/static_cast<float>(texWidth);
-      tMax = static_cast<float>(y)/static_cast<float>(texHeight);
+      sMax = static_cast<float>(x + width) / static_cast<float>(texWidth);
+      tMax = static_cast<float>(y) / static_cast<float>(texHeight);
     }
 
     int id;
@@ -41,17 +41,24 @@ public:
     float tMax;
   };
 
-  Z3DSDFont(const QString &imageFileName, const QString &txtFileName);
+  Z3DSDFont(const QString& imageFileName, const QString& txtFileName);
 
-  inline QString fontName() const { return m_fontName; }
-  inline int maxFontHeight() const { return m_maxFontHeight; }
-  bool isEmpty() const { return m_isEmpty; }
+  inline QString fontName() const
+  { return m_fontName; }
+
+  inline int maxFontHeight() const
+  { return m_maxFontHeight; }
+
+  bool isEmpty() const
+  { return m_isEmpty; }
 
   CharInfo charInfo(int id) const;
+
   Z3DTexture* texture();
 
 protected:
   void loadImage();
+
   void parseFontFile();
 
   void createTexture();

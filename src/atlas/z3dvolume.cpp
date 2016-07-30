@@ -8,11 +8,11 @@
 
 namespace nim {
 
-Z3DVolume::Z3DVolume(nim::ZImg &img, const glm::vec3 &spacing,
-                     const glm::vec3 &offset, const glm::mat4 &transformation, QObject *parent)
+Z3DVolume::Z3DVolume(nim::ZImg& img, const glm::vec3& spacing,
+                     const glm::vec3& offset, const glm::mat4& transformation, QObject* parent)
   : QObject(parent)
   , m_histogramMaxValue(-1)
-  , m_volColor(1.f,1.f,1.f)
+  , m_volColor(1.f, 1.f, 1.f)
 {
   m_img.swap(img);
   m_dimensions = glm::uvec3(m_img.width(), m_img.height(), m_img.depth());
@@ -78,7 +78,7 @@ double Z3DVolume::floatMaxValue() const
 
 double Z3DVolume::value(int x, int y, int z) const
 {
-  return m_img.value<double>(x,y,z);
+  return m_img.value<double>(x, y, z);
 }
 
 double Z3DVolume::value(size_t index) const
@@ -115,7 +115,7 @@ size_t Z3DVolume::histogramValue(size_t index) const
 
 size_t Z3DVolume::histogramValue(double fraction) const
 {
-  size_t index = static_cast<size_t>(fraction * static_cast<double>(histogramBinCount()-1));
+  size_t index = static_cast<size_t>(fraction * static_cast<double>(histogramBinCount() - 1));
   return histogramValue(index);
 }
 
@@ -126,22 +126,22 @@ double Z3DVolume::normalizedHistogramValue(size_t index) const
 
 double Z3DVolume::normalizedHistogramValue(double fraction) const
 {
-  size_t index = static_cast<size_t>(fraction * static_cast<double>(histogramBinCount()-1));
+  size_t index = static_cast<size_t>(fraction * static_cast<double>(histogramBinCount() - 1));
   return normalizedHistogramValue(index);
 }
 
 double Z3DVolume::logNormalizedHistogramValue(size_t index) const
 {
-  return std::log(static_cast<double>(histogramValue(index))+1.0) / std::log(m_histogramMaxValue+1.0);
+  return std::log(static_cast<double>(histogramValue(index)) + 1.0) / std::log(m_histogramMaxValue + 1.0);
 }
 
 double Z3DVolume::logNormalizedHistogramValue(double fraction) const
 {
-  size_t index = static_cast<size_t>(fraction * static_cast<double>(histogramBinCount()-1));
+  size_t index = static_cast<size_t>(fraction * static_cast<double>(histogramBinCount() - 1));
   return logNormalizedHistogramValue(index);
 }
 
-Z3DTexture *Z3DVolume::texture()
+Z3DTexture* Z3DVolume::texture()
 {
   if (!m_texture) {
     generateTexture();
@@ -201,7 +201,7 @@ std::vector<double> Z3DVolume::worldBoundBox() const
   }
 }
 
-void Z3DVolume::setPhysicalToWorldMatrix(const glm::mat4 &transformationMatrix)
+void Z3DVolume::setPhysicalToWorldMatrix(const glm::mat4& transformationMatrix)
 {
   m_transformationMatrix = transformationMatrix;
   if (m_transformationMatrix != glm::mat4(1.0))
@@ -238,7 +238,7 @@ glm::mat4 Z3DVolume::voxelToPhysicalMatrix() const
 glm::mat4 Z3DVolume::physicalToVoxelMatrix() const
 {
   glm::mat4 translate = glm::translate(glm::mat4(1.0), -offset());
-  return glm::scale(translate, 1.f/spacing());
+  return glm::scale(translate, 1.f / spacing());
 }
 
 glm::mat4 Z3DVolume::worldToPhysicalMatrix() const
@@ -263,7 +263,7 @@ glm::mat4 Z3DVolume::textureToVoxelMatrix() const
 
 glm::mat4 Z3DVolume::voxelToTextureMatrix() const
 {
-  return glm::scale(glm::mat4(1.0), 1.0f/glm::vec3(dimensions()));
+  return glm::scale(glm::mat4(1.0), 1.0f / glm::vec3(dimensions()));
 }
 
 void Z3DVolume::setHistogram()
@@ -276,8 +276,9 @@ void Z3DVolume::setHistogram()
 void Z3DVolume::generateTexture()
 {
   if (dimensions().x == 0 || dimensions().y == 0 || dimensions().z == 0) {
-    QString message = QString("OpenGL volumes must have a size greater than 0 in all dimensions. Actual size: (%1, %2, %3)")
-        .arg(m_img.width()).arg(m_img.height()).arg(m_img.depth());
+    QString message = QString(
+      "OpenGL volumes must have a size greater than 0 in all dimensions. Actual size: (%1, %2, %3)")
+      .arg(m_img.width()).arg(m_img.height()).arg(m_img.depth());
     LOG(ERROR) << message;
     return;
   }
@@ -315,7 +316,7 @@ void Z3DVolume::computeHistogramMaxValue()
 }
 
 //-----------------------------------------------------------------------------------
-Z3DVolumeHistogramThread::Z3DVolumeHistogramThread(Z3DVolume *volume, QObject* parent)
+Z3DVolumeHistogramThread::Z3DVolumeHistogramThread(Z3DVolume* volume, QObject* parent)
   : QThread(parent)
   , m_volume(volume)
 {
@@ -323,8 +324,8 @@ Z3DVolumeHistogramThread::Z3DVolumeHistogramThread(Z3DVolume *volume, QObject* p
 
 void Z3DVolumeHistogramThread::run()
 {
-  m_histogram.assign(static_cast<size_t>(m_volume->maxValue()+1), 0);
-  for (size_t i=0; i<m_volume->numVoxels(); i++) {
+  m_histogram.assign(static_cast<size_t>(m_volume->maxValue() + 1), 0);
+  for (size_t i = 0; i < m_volume->numVoxels(); i++) {
     m_histogram[static_cast<size_t>(m_volume->value(i))]++;
   }
 }

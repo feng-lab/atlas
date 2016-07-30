@@ -10,7 +10,8 @@
 namespace nim {
 
 template<typename KeyType>
-class Z3DBlockCache {
+class Z3DBlockCache
+{
 public:
   typedef typename std::pair<KeyType, glm::ivec3> KeyValuePairType;
   typedef typename std::list<KeyValuePairType>::iterator ListIteratorType;
@@ -21,14 +22,15 @@ public:
     , m_numBlocks(numBlocks)
     , m_invalidKey(invalidKey)
   {
-    assert(m_numBlocks.x > 0 && m_numBlocks.y > 0 && m_numBlocks.z > 0 &&
+    CHECK(m_numBlocks.x > 0 && m_numBlocks.y > 0 && m_numBlocks.z > 0 &&
            m_blockSize.x > 0 && m_blockSize.y > 0 && m_blockSize.z > 0);
 
     m_size = m_numBlocks.x * m_numBlocks.y * m_numBlocks.z;
-    for (uint32_t z=0; z<m_numBlocks.z; ++z) {
-      for (uint32_t y=0; y<m_numBlocks.y; ++y) {
-        for (uint32_t x=0; x<m_numBlocks.x; ++x) {
-          m_cacheItemsList.push_front(KeyValuePairType(m_invalidKey, glm::ivec3(x*m_blockSize.x, y*m_blockSize.y, z*m_blockSize.z)));
+    for (uint32_t z = 0; z < m_numBlocks.z; ++z) {
+      for (uint32_t y = 0; y < m_numBlocks.y; ++y) {
+        for (uint32_t x = 0; x < m_numBlocks.x; ++x) {
+          m_cacheItemsList.push_front(
+            KeyValuePairType(m_invalidKey, glm::ivec3(x * m_blockSize.x, y * m_blockSize.y, z * m_blockSize.z)));
           //LOG(INFO) << glm::ivec3(x*m_blockSize.x, y*m_blockSize.y, z*m_blockSize.z);
         }
       }

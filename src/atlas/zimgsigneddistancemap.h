@@ -13,10 +13,15 @@ public:
   ZImgSignedDistanceMap();
 
   // default false
-  inline void setInsideIsPositive(bool v) { m_insideIsPositive = v; }
+  inline void setInsideIsPositive(bool v)
+  { m_insideIsPositive = v; }
+
   // default false
-  inline void setUseSquaredDistance(bool v) { m_useSquaredDistance = v; }
-  inline void setNumberOfThreads(int n) { m_numThreads = n; }
+  inline void setUseSquaredDistance(bool v)
+  { m_useSquaredDistance = v; }
+
+  inline void setNumberOfThreads(int n)
+  { m_numThreads = n; }
 
   template<typename TVoxelOut>
   ZImg run(const ZImg& img, bool useVoxelSize = false);

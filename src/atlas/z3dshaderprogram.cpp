@@ -28,12 +28,13 @@ Z3DShaderProgram::~Z3DShaderProgram()
   CHECK_GL_ERROR;
 }
 
-void Z3DShaderProgram::addShader(Z3DShader &shader)
+void Z3DShaderProgram::addShader(Z3DShader& shader)
 {
   if (std::find(m_shaders.begin(), m_shaders.end(), &shader) != m_shaders.end())
     return;
   if (m_context != shader.context()) {
-    throw ZGLException("Z3DShaderProgram: Add shader failed as program and shader are not associated with same context");
+    throw ZGLException(
+      "Z3DShaderProgram: Add shader failed as program and shader are not associated with same context");
   }
   glAttachShader(m_id, shader.shaderId());
   CHECK_GL_ERROR;
@@ -41,19 +42,19 @@ void Z3DShaderProgram::addShader(Z3DShader &shader)
   m_shaders.push_back(&shader);
 }
 
-void Z3DShaderProgram::addShaderFromSourceCode(Z3DShader::Type type, const char *source)
+void Z3DShaderProgram::addShaderFromSourceCode(Z3DShader::Type type, const char* source)
 {
   m_anonShaders.emplace_back(std::make_unique<Z3DShader>(type));
-  m_anonShaders[m_anonShaders.size()-1]->compileSourceCode(source);
-  addShader(*m_anonShaders[m_anonShaders.size()-1].get());
+  m_anonShaders[m_anonShaders.size() - 1]->compileSourceCode(source);
+  addShader(*m_anonShaders[m_anonShaders.size() - 1].get());
 }
 
 void Z3DShaderProgram::removeAllShaders()
 {
-  for (auto const &shader : m_shaders) {
+  for (auto const& shader : m_shaders) {
     glDetachShader(m_id, shader->shaderId());
   }
-  for (auto const &shader : m_anonShaders) {
+  for (auto const& shader : m_anonShaders) {
     glDetachShader(m_id, shader->shaderId());
   }
   m_shaders.clear();
@@ -114,14 +115,14 @@ void Z3DShaderProgram::release()
   glUseProgram(0);
 }
 
-void Z3DShaderProgram::bindFragDataLocation(GLuint colorNumber, const QString &name)
+void Z3DShaderProgram::bindFragDataLocation(GLuint colorNumber, const QString& name)
 {
   if (GLVersionGE(3, 0)) {
     glBindFragDataLocation(programId(), colorNumber, qUtf8Printable(name));
   }
 }
 
-void Z3DShaderProgram::bindTexture(const QString &name, const Z3DTexture *texture)
+void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* texture)
 {
   if (!texture)
     return;
@@ -148,7 +149,7 @@ void Z3DShaderProgram::bindTexture(const QString &name, const Z3DTexture *textur
   }
 }
 
-void Z3DShaderProgram::bindTexture(const QString &name, const Z3DTexture *texture, GLint minFilter, GLint magFilter)
+void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* texture, GLint minFilter, GLint magFilter)
 {
   if (!texture)
     return;
@@ -176,7 +177,7 @@ void Z3DShaderProgram::bindTexture(const QString &name, const Z3DTexture *textur
   }
 }
 
-void Z3DShaderProgram::bindTexture(const QString &name, GLenum target, GLuint textureId)
+void Z3DShaderProgram::bindTexture(const QString& name, GLenum target, GLuint textureId)
 {
   int loc = uniformLocation(name);
   if (loc != -1) {
@@ -200,8 +201,8 @@ void Z3DShaderProgram::bindTexture(const QString &name, GLenum target, GLuint te
   }
 }
 
-void Z3DShaderProgram::loadFromSourceFile(const QString &vertFilename, const QString &geomFilename,
-                                          const QString &fragFilename, const QString &header, const QString &geomHeader)
+void Z3DShaderProgram::loadFromSourceFile(const QString& vertFilename, const QString& geomFilename,
+                                          const QString& fragFilename, const QString& header, const QString& geomHeader)
 {
   removeAllShaders();
   addShader(Z3DShaderManagerInstance.shader(vertFilename, header, m_context));
@@ -214,16 +215,17 @@ void Z3DShaderProgram::loadFromSourceFile(const QString &vertFilename, const QSt
   m_shaderFiles << vertFilename << fragFilename << geomFilename;
 }
 
-void Z3DShaderProgram::loadFromSourceFile(const QString &vertFilename, const QString &fragFilename,
-                                          const QString &header, const QString &geomHeader)
+void Z3DShaderProgram::loadFromSourceFile(const QString& vertFilename, const QString& fragFilename,
+                                          const QString& header, const QString& geomHeader)
 {
   loadFromSourceFile(vertFilename, "", fragFilename, header, geomHeader);
 }
 
-void Z3DShaderProgram::loadFromSourceFile(const QStringList &shaderFilenames, const QString &header, const QString &geomHeader)
+void Z3DShaderProgram::loadFromSourceFile(const QStringList& shaderFilenames, const QString& header,
+                                          const QString& geomHeader)
 {
   removeAllShaders();
-  for (int i=0; i<shaderFilenames.size(); ++i) {
+  for (int i = 0; i < shaderFilenames.size(); ++i) {
     if (shaderFilenames[i].isEmpty())
       continue;
     if (shaderFilenames[i].endsWith(".geom", Qt::CaseInsensitive)) {
@@ -236,21 +238,21 @@ void Z3DShaderProgram::loadFromSourceFile(const QStringList &shaderFilenames, co
   m_shaderFiles = shaderFilenames;
 }
 
-void Z3DShaderProgram::loadFromSourceCode(const QStringList &vertSrcs, const QStringList &geomSrcs,
-                                          const QStringList &fragSrcs, const QString &header, const QString &geomHeader)
+void Z3DShaderProgram::loadFromSourceCode(const QStringList& vertSrcs, const QStringList& geomSrcs,
+                                          const QStringList& fragSrcs, const QString& header, const QString& geomHeader)
 {
   removeAllShaders();
-  for (int i=0; i<vertSrcs.size(); ++i) {
+  for (int i = 0; i < vertSrcs.size(); ++i) {
     QString vertSrc = header + vertSrcs[i];
     addShaderFromSourceCode(Z3DShader::Type::Vertex, vertSrc);
   }
 
-  for (int i=0; i<geomSrcs.size(); ++i) {
+  for (int i = 0; i < geomSrcs.size(); ++i) {
     QString geomSrc = geomHeader + geomSrcs[i];
     addShaderFromSourceCode(Z3DShader::Type::Geometry, geomSrc);
   }
 
-  for (int i=0; i<fragSrcs.size(); ++i) {
+  for (int i = 0; i < fragSrcs.size(); ++i) {
     QString fragSrc = header + fragSrcs[i];
     addShaderFromSourceCode(Z3DShader::Type::Fragment, fragSrc);
   }
@@ -258,18 +260,18 @@ void Z3DShaderProgram::loadFromSourceCode(const QStringList &vertSrcs, const QSt
   link();
 }
 
-void Z3DShaderProgram::loadFromSourceCode(const QStringList &vertSrcs, const QStringList &fragSrcs,
-                                          const QString &header, const QString &geomHeader)
+void Z3DShaderProgram::loadFromSourceCode(const QStringList& vertSrcs, const QStringList& fragSrcs,
+                                          const QString& header, const QString& geomHeader)
 {
   loadFromSourceCode(vertSrcs, QStringList(), fragSrcs, header, geomHeader);
 }
 
-void Z3DShaderProgram::setHeaderAndRebuild(const QString &header, const QString &geomHeader)
+void Z3DShaderProgram::setHeaderAndRebuild(const QString& header, const QString& geomHeader)
 {
   loadFromSourceFile(m_shaderFiles, header, geomHeader);
 }
 
-int Z3DShaderProgram::uniformLocation(const QString &name) const
+int Z3DShaderProgram::uniformLocation(const QString& name) const
 {
   std::map<QString, Uniform>::const_iterator it = m_uniforms.find(name);
   if (it != m_uniforms.end()) {
@@ -281,7 +283,7 @@ int Z3DShaderProgram::uniformLocation(const QString &name) const
   return -1;
 }
 
-int Z3DShaderProgram::attributeLocation(const QString &name) const
+int Z3DShaderProgram::attributeLocation(const QString& name) const
 {
   std::map<QString, Attribute>::const_iterator it = m_attributes.find(name);
   if (it != m_attributes.end()) {
@@ -341,7 +343,7 @@ void Z3DShaderProgram::storeUniformLocations()
   glGetProgramiv(programId(), GL_ACTIVE_UNIFORMS, &count);
   glGetProgramiv(programId(), GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxLength);
   std::vector<char> name(maxLength);
-  for (GLint i=0; i<count; ++i) {
+  for (GLint i = 0; i < count; ++i) {
     Uniform u;
     glGetActiveUniform(programId(), i, maxLength, nullptr, &u.size, &u.type, name.data());
     u.location = glGetUniformLocation(programId(), name.data());
@@ -451,7 +453,7 @@ void Z3DShaderProgram::storeAttributeLocations()
   glGetProgramiv(programId(), GL_ACTIVE_ATTRIBUTES, &count);
   glGetProgramiv(programId(), GL_ACTIVE_ATTRIBUTE_MAX_LENGTH, &maxLength);
   std::vector<char> name(maxLength);
-  for (GLint i=0; i<count; ++i) {
+  for (GLint i = 0; i < count; ++i) {
     Attribute u;
     glGetActiveAttrib(programId(), i, maxLength, nullptr, &u.size, &u.type, name.data());
     u.location = glGetAttribLocation(programId(), name.data());

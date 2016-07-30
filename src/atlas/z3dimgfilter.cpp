@@ -12,7 +12,7 @@ namespace nim {
 
 //const size_t Z3DImgFilter::m_maxNumOfFullResolutionVolumeSlice = 6;
 
-Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
+Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   : Z3DBoundedFilter(globalParas, parent)
   , m_imgRaycasterRenderer(m_rendererBase)
   , m_imgSliceRenderer(m_rendererBase)
@@ -24,17 +24,18 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   , m_numParas(0)
   //, m_interactionDownsample("Interaction Downsample", 1, 1, 16)
   , m_smoothInteraction("Smooth Interaction", true)
-  , m_entryTarget(glm::uvec2(32,32))
-  , m_exitTarget(glm::uvec2(32,32))
-  , m_layerTarget(glm::uvec2(32,32))
-  , m_layerColorTexture(GL_TEXTURE_2D_ARRAY, GLint(GL_RGBA16), glm::uvec3(32,32,3), GL_RGBA, GL_FLOAT)
-  , m_layerDepthTexture(GL_TEXTURE_2D_ARRAY, GLint(GL_DEPTH_COMPONENT24), glm::uvec3(32,32,3), GL_DEPTH_COMPONENT, GL_FLOAT)
-  , m_missBlocksTexture1(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_missBlocksTexture2(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_usedBlocksTexture1(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_usedBlocksTexture2(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_usedBlocksTexture3(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32,32,1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
-  , m_blockIDsRenderTarget(glm::uvec2(32,32))
+  , m_entryTarget(glm::uvec2(32, 32))
+  , m_exitTarget(glm::uvec2(32, 32))
+  , m_layerTarget(glm::uvec2(32, 32))
+  , m_layerColorTexture(GL_TEXTURE_2D_ARRAY, GLint(GL_RGBA16), glm::uvec3(32, 32, 3), GL_RGBA, GL_FLOAT)
+  , m_layerDepthTexture(GL_TEXTURE_2D_ARRAY, GLint(GL_DEPTH_COMPONENT24), glm::uvec3(32, 32, 3), GL_DEPTH_COMPONENT,
+                        GL_FLOAT)
+  , m_missBlocksTexture1(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
+  , m_missBlocksTexture2(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
+  , m_usedBlocksTexture1(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
+  , m_usedBlocksTexture2(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
+  , m_usedBlocksTexture3(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
+  , m_blockIDsRenderTarget(glm::uvec2(32, 32))
   , m_outport("Image", true, InvalidMonoViewResult)
   , m_leftEyeOutport("LeftEyeImage", true, InvalidLeftEyeResult)
   , m_rightEyeOutport("RightEyeImage", true, InvalidRightEyeResult)
@@ -77,19 +78,19 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent)
   addParameter(m_smoothInteraction);
 
   Z3DTexture* g_TexId[2];
-  g_TexId[0] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32,32,1), GL_RGBA, GL_FLOAT);
+  g_TexId[0] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32, 32, 1), GL_RGBA, GL_FLOAT);
   g_TexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   g_TexId[0]->uploadImage();
-  g_TexId[1] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32,32,1), GL_RGBA, GL_FLOAT);
+  g_TexId[1] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32, 32, 1), GL_RGBA, GL_FLOAT);
   g_TexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   g_TexId[1]->uploadImage();
   m_entryTarget.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0);
   m_entryTarget.attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1);
   m_entryTarget.isFBOComplete();
-  g_TexId[0] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32,32,1), GL_RGBA, GL_FLOAT);
+  g_TexId[0] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32, 32, 1), GL_RGBA, GL_FLOAT);
   g_TexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   g_TexId[0]->uploadImage();
-  g_TexId[1] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32,32,1), GL_RGBA, GL_FLOAT);
+  g_TexId[1] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32, 32, 1), GL_RGBA, GL_FLOAT);
   g_TexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   g_TexId[1]->uploadImage();
   m_exitTarget.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0);
@@ -197,7 +198,7 @@ void Z3DImgFilter::setOffset(double x, double y, double z)
   m_rendererBase.translate(x, y, z);
 }
 
-void Z3DImgFilter::setData(const ZImgPack &imgPack)
+void Z3DImgFilter::setData(const ZImgPack& imgPack)
 {
   if (m_widgetsGroup) {
     for (auto it = m_imgRaycasterRenderer.channelVisibleParas().begin();
@@ -225,9 +226,11 @@ void Z3DImgFilter::setData(const ZImgPack &imgPack)
   updateBlockIDTarget();
 
   if (m_3dImg->numChannels() > m_layerColorTexture.depth()) {
-    m_layerColorTexture.setDimension(glm::uvec3(m_layerColorTexture.width(), m_layerColorTexture.height(), m_3dImg->numChannels()));
+    m_layerColorTexture.setDimension(
+      glm::uvec3(m_layerColorTexture.width(), m_layerColorTexture.height(), m_3dImg->numChannels()));
     m_layerColorTexture.uploadImage();
-    m_layerDepthTexture.setDimension(glm::uvec3(m_layerDepthTexture.width(), m_layerDepthTexture.height(), m_3dImg->numChannels()));
+    m_layerDepthTexture.setDimension(
+      glm::uvec3(m_layerDepthTexture.width(), m_layerDepthTexture.height(), m_3dImg->numChannels()));
     m_layerDepthTexture.uploadImage();
     m_layerTarget.attachTextureToFBO(&m_layerColorTexture, GL_COLOR_ATTACHMENT0, false);
     m_layerTarget.attachTextureToFBO(&m_layerDepthTexture, GL_DEPTH_ATTACHMENT, false);
@@ -236,12 +239,13 @@ void Z3DImgFilter::setData(const ZImgPack &imgPack)
   m_isVolumeDownsampled.set(m_3dImg->isVolumeDownsampled());
 
   m_sliceColormaps.clear();
-  for (size_t c=0; c<m_3dImg->numChannels(); ++c) {
-    m_sliceColormaps.emplace_back(std::make_unique<ZColorMapParameter>(QString("Slice Channel %1 Colormap").arg(c+1)));
+  for (size_t c = 0; c < m_3dImg->numChannels(); ++c) {
+    m_sliceColormaps.emplace_back(
+      std::make_unique<ZColorMapParameter>(QString("Slice Channel %1 Colormap").arg(c + 1)));
     m_sliceColormaps[c]->get().create1DTexture(256);
-    m_sliceColormaps[c]->get().reset(0.0, 1.0, QColor(0,0,0), QColor(m_3dImg->channelColor(c).r,
-                                                                     m_3dImg->channelColor(c).g,
-                                                                     m_3dImg->channelColor(c).b));
+    m_sliceColormaps[c]->get().reset(0.0, 1.0, QColor(0, 0, 0), QColor(m_3dImg->channelColor(c).r,
+                                                                       m_3dImg->channelColor(c).g,
+                                                                       m_3dImg->channelColor(c).b));
   }
 
   bool is2DImage = m_3dImg->is2DData();
@@ -253,14 +257,14 @@ void Z3DImgFilter::setData(const ZImgPack &imgPack)
   m_zCut.setRange(-1, volDim.z);
   m_zCut.set(m_zCut.range());
 
-  m_rendererBase.setRotationCenter(glm::vec3(volDim.x-1, volDim.y-1, volDim.z-1)/2.f);
+  m_rendererBase.setRotationCenter(glm::vec3(volDim.x - 1, volDim.y - 1, volDim.z - 1) / 2.f);
 
-  m_zSlicePosition.setRange(0, volDim.z-1);
-  m_ySlicePosition.setRange(0, volDim.y-1);
-  m_xSlicePosition.setRange(0, volDim.x-1);
-  m_zSlice2Position.setRange(0, volDim.z-1);
-  m_ySlice2Position.setRange(0, volDim.y-1);
-  m_xSlice2Position.setRange(0, volDim.x-1);
+  m_zSlicePosition.setRange(0, volDim.z - 1);
+  m_ySlicePosition.setRange(0, volDim.y - 1);
+  m_xSlicePosition.setRange(0, volDim.x - 1);
+  m_zSlice2Position.setRange(0, volDim.z - 1);
+  m_ySlice2Position.setRange(0, volDim.y - 1);
+  m_xSlice2Position.setRange(0, volDim.x - 1);
   //invalidateAllFRVolumeSlices();
   //m_useFRVolumeSlice.set(!is2DImage);
   //m_useFRVolumeSlice.setVisible(!is2DImage);
@@ -362,8 +366,8 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_rendererBase.coordTransformPara(), 1);
 
     const std::vector<ZParameter*>& paras = parameters();
-    for (size_t i=0; i<paras.size(); i++) {
-      ZParameter *para = paras[i];
+    for (size_t i = 0; i < paras.size(); i++) {
+      ZParameter* para = paras[i];
       if (para->name().contains("Slice") && !para->name().endsWith("2") && !para->name().endsWith("2 Position"))
         m_widgetsGroup->addChild(*para, 11);
       else if (para->name().contains("Slice"))
@@ -386,8 +390,9 @@ bool Z3DImgFilter::hasOpaque(Z3DEye) const
 
 void Z3DImgFilter::renderOpaque(Z3DEye eye)
 {
-  Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
-        m_opaqueOutport : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport : m_opaqueRightEyeOutport;
+  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono) ?
+                                        m_opaqueOutport : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport
+                                                                                : m_opaqueRightEyeOutport;
   m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
   m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
   m_rendererBase.render(eye, m_textureCopyRenderer);
@@ -397,15 +402,15 @@ void Z3DImgFilter::renderOpaque(Z3DEye eye)
 
 bool Z3DImgFilter::hasTransparent(Z3DEye eye) const
 {
-  const Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
-        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+  const Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono) ?
+                                              m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
   return currentOutport.hasValidData();
 }
 
 void Z3DImgFilter::renderTransparent(Z3DEye eye)
 {
-  Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
-        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono) ?
+                                        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
   m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
   m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
   m_rendererBase.render(eye, m_textureCopyRenderer);
@@ -437,7 +442,7 @@ void Z3DImgFilter::adjustWidget()
   m_xSlice2Position.setVisible(m_showXSlice2.get());
 }
 
-void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent *e, int w, int h)
+void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent* e, int w, int h)
 {
   Q_UNUSED(e)
   Q_UNUSED(w)
@@ -527,13 +532,14 @@ void Z3DImgFilter::process(Z3DEye eye)
 bool Z3DImgFilter::hasSlices() const
 {
   return m_showZSlice.get() || m_showXSlice.get() || m_showYSlice.get()
-      || m_showXSlice2.get() || m_showYSlice2.get() || m_showZSlice2.get();
+         || m_showXSlice2.get() || m_showYSlice2.get() || m_showZSlice2.get();
 }
 
 void Z3DImgFilter::renderSlices(Z3DEye eye)
 {
-  Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
-        m_opaqueOutport : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport : m_opaqueRightEyeOutport;
+  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono) ?
+                                        m_opaqueOutport : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport
+                                                                                : m_opaqueRightEyeOutport;
 
   currentOutport.bindTarget();
   currentOutport.clearTarget();
@@ -652,58 +658,58 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
 
   //  } else {
 
-    m_imgSliceRenderer.clearQuads();
+  m_imgSliceRenderer.clearQuads();
 
-    if (m_showZSlice.get()) {
-      float zTexCoord = m_zSlicePosition.get() / static_cast<float>(volDim.z-1);
-      float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
+  if (m_showZSlice.get()) {
+    float zTexCoord = m_zSlicePosition.get() / static_cast<float>(volDim.z - 1);
+    float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
 
-      ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
-      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-      m_imgSliceRenderer.addQuad(slice);
-    }
-    if (m_showYSlice.get()) {
-      float yTexCoord = m_ySlicePosition.get() / static_cast<float>(volDim.y-1);
-      float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
+    ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
+    slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+    m_imgSliceRenderer.addQuad(slice);
+  }
+  if (m_showYSlice.get()) {
+    float yTexCoord = m_ySlicePosition.get() / static_cast<float>(volDim.y - 1);
+    float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
 
-      ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
-      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-      m_imgSliceRenderer.addQuad(slice);
-    }
-    if (m_showXSlice.get()) {
-      float xTexCoord = m_xSlicePosition.get() / static_cast<float>(volDim.x-1);
-      float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
+    ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
+    slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+    m_imgSliceRenderer.addQuad(slice);
+  }
+  if (m_showXSlice.get()) {
+    float xTexCoord = m_xSlicePosition.get() / static_cast<float>(volDim.x - 1);
+    float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
 
-      ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
-      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-      m_imgSliceRenderer.addQuad(slice);
-    }
+    ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
+    slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+    m_imgSliceRenderer.addQuad(slice);
+  }
 
-    if (m_showZSlice2.get()) {
-      float zTexCoord = m_zSlice2Position.get() / static_cast<float>(volDim.z-1);
-      float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
+  if (m_showZSlice2.get()) {
+    float zTexCoord = m_zSlice2Position.get() / static_cast<float>(volDim.z - 1);
+    float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
 
-      ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
-      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-      m_imgSliceRenderer.addQuad(slice);
-    }
-    if (m_showYSlice2.get()) {
-      float yTexCoord = m_ySlice2Position.get() / static_cast<float>(volDim.y-1);
-      float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
+    ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
+    slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+    m_imgSliceRenderer.addQuad(slice);
+  }
+  if (m_showYSlice2.get()) {
+    float yTexCoord = m_ySlice2Position.get() / static_cast<float>(volDim.y - 1);
+    float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
 
-      ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
-      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-      m_imgSliceRenderer.addQuad(slice);
-    }
-    if (m_showXSlice2.get()) {
-      float xTexCoord = m_xSlice2Position.get() / static_cast<float>(volDim.x-1);
-      float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
+    ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
+    slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+    m_imgSliceRenderer.addQuad(slice);
+  }
+  if (m_showXSlice2.get()) {
+    float xTexCoord = m_xSlice2Position.get() / static_cast<float>(volDim.x - 1);
+    float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
 
-      ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
-      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-      m_imgSliceRenderer.addQuad(slice);
-    }
-    m_rendererBase.render(eye, m_imgSliceRenderer);
+    ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
+    slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+    m_imgSliceRenderer.addQuad(slice);
+  }
+  m_rendererBase.render(eye, m_imgSliceRenderer);
   //}
 
   currentOutport.releaseTarget();
@@ -715,12 +721,12 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
 bool Z3DImgFilter::hasImage() const
 {
   return m_imgRaycasterRenderer.hasVisibleRendering() &&
-      m_xCut.upperValue() > m_xCut.minimum() &&
-      m_yCut.upperValue() > m_yCut.minimum() &&
-      m_zCut.upperValue() > m_zCut.minimum() &&
-      m_xCut.lowerValue() < m_xCut.maximum() &&
-      m_yCut.lowerValue() < m_yCut.maximum() &&
-      m_zCut.lowerValue() < m_zCut.maximum();
+         m_xCut.upperValue() > m_xCut.minimum() &&
+         m_yCut.upperValue() > m_yCut.minimum() &&
+         m_zCut.upperValue() > m_zCut.minimum() &&
+         m_xCut.lowerValue() < m_xCut.maximum() &&
+         m_yCut.lowerValue() < m_yCut.maximum() &&
+         m_zCut.lowerValue() < m_zCut.maximum();
 }
 
 void Z3DImgFilter::renderImage(Z3DEye eye)
@@ -728,43 +734,47 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
   glm::vec3 coordLuf = m_3dImg->physicalLUF();
   glm::vec3 coordRdb = m_3dImg->physicalRDB();
 
-  float xTexCoordStart = std::max(m_xCut.lowerValue(), m_xCut.minimum()+1) / (m_xCut.maximum()-1);
-  float xTexCoordEnd = std::min(m_xCut.upperValue(), m_xCut.maximum()-1) / (m_xCut.maximum()-1);
+  float xTexCoordStart = std::max(m_xCut.lowerValue(), m_xCut.minimum() + 1) / (m_xCut.maximum() - 1);
+  float xTexCoordEnd = std::min(m_xCut.upperValue(), m_xCut.maximum() - 1) / (m_xCut.maximum() - 1);
   float xCoordStart = glm::mix(coordLuf.x, coordRdb.x, xTexCoordStart);
   float xCoordEnd = glm::mix(coordLuf.x, coordRdb.x, xTexCoordEnd);
-  float yTexCoordStart = std::max(m_yCut.lowerValue(), m_yCut.minimum()+1) / (m_yCut.maximum()-1);
-  float yTexCoordEnd = std::min(m_yCut.upperValue(), m_yCut.maximum()-1) / (m_yCut.maximum()-1);
+  float yTexCoordStart = std::max(m_yCut.lowerValue(), m_yCut.minimum() + 1) / (m_yCut.maximum() - 1);
+  float yTexCoordEnd = std::min(m_yCut.upperValue(), m_yCut.maximum() - 1) / (m_yCut.maximum() - 1);
   float yCoordStart = glm::mix(coordLuf.y, coordRdb.y, yTexCoordStart);
   float yCoordEnd = glm::mix(coordLuf.y, coordRdb.y, yTexCoordEnd);
-  float zTexCoordStart = std::max(m_zCut.lowerValue(), m_zCut.minimum()+1) / (m_zCut.maximum()-1);
-  float zTexCoordEnd = std::min(m_zCut.upperValue(), m_zCut.maximum()-1) / (m_zCut.maximum()-1);
+  float zTexCoordStart = std::max(m_zCut.lowerValue(), m_zCut.minimum() + 1) / (m_zCut.maximum() - 1);
+  float zTexCoordEnd = std::min(m_zCut.upperValue(), m_zCut.maximum() - 1) / (m_zCut.maximum() - 1);
   float zCoordStart = glm::mix(coordLuf.z, coordRdb.z, zTexCoordStart);
   float zCoordEnd = glm::mix(coordLuf.z, coordRdb.z, zTexCoordEnd);
 
   if (m_3dImg->is2DData()) { // for 2d image
     ZMesh m_2DImageQuad = ZMesh::createImageSlice(0, glm::vec2(xCoordStart, yCoordStart),
-                                                  glm::vec2(xCoordEnd, yCoordEnd), glm::vec2(xTexCoordStart, yTexCoordStart),
+                                                  glm::vec2(xCoordEnd, yCoordEnd),
+                                                  glm::vec2(xTexCoordStart, yTexCoordStart),
                                                   glm::vec2(xTexCoordEnd, yTexCoordEnd));
     m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
     m_imgRaycasterRenderer.clearQuads();
     m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
   } else if (m_zCut.lowerValue() == m_zCut.upperValue()) { // slice of 3d image
     ZMesh m_2DImageQuad = ZMesh::createCubeSlice(zCoordStart, zTexCoordStart, 2, glm::vec2(xCoordStart, yCoordStart),
-                                                 glm::vec2(xCoordEnd, yCoordEnd), glm::vec2(xTexCoordStart, yTexCoordStart),
+                                                 glm::vec2(xCoordEnd, yCoordEnd),
+                                                 glm::vec2(xTexCoordStart, yTexCoordStart),
                                                  glm::vec2(xTexCoordEnd, yTexCoordEnd));
     m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
     m_imgRaycasterRenderer.clearQuads();
     m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
   } else if (m_yCut.lowerValue() == m_yCut.upperValue()) { // slice of 3d image
     ZMesh m_2DImageQuad = ZMesh::createCubeSlice(yCoordStart, yTexCoordStart, 1, glm::vec2(xCoordStart, zCoordStart),
-                                                 glm::vec2(xCoordEnd, zCoordEnd), glm::vec2(xTexCoordStart, zTexCoordStart),
+                                                 glm::vec2(xCoordEnd, zCoordEnd),
+                                                 glm::vec2(xTexCoordStart, zTexCoordStart),
                                                  glm::vec2(xTexCoordEnd, zTexCoordEnd));
     m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
     m_imgRaycasterRenderer.clearQuads();
     m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
   } else if (m_xCut.lowerValue() == m_xCut.upperValue()) { // slice of 3d image
     ZMesh m_2DImageQuad = ZMesh::createCubeSlice(xCoordStart, xTexCoordStart, 0, glm::vec2(yCoordStart, zCoordStart),
-                                                 glm::vec2(yCoordEnd, zCoordEnd), glm::vec2(yTexCoordStart, zTexCoordStart),
+                                                 glm::vec2(yCoordEnd, zCoordEnd),
+                                                 glm::vec2(yTexCoordStart, zTexCoordStart),
                                                  glm::vec2(yTexCoordEnd, zTexCoordEnd));
     m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
     m_imgRaycasterRenderer.clearQuads();
@@ -785,7 +795,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     // render back texture
     const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
                                     GL_COLOR_ATTACHMENT1
-                                   };
+    };
     m_exitTarget.bind();
     glDrawBuffers(2, g_drawBuffers);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -802,7 +812,8 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     glClear(GL_COLOR_BUFFER_BIT);
     glCullFace(GL_BACK);
 
-    float nearPlaneDistToOrigin = glm::dot(globalCamera().eye(), -globalCamera().viewVector()) - globalCamera().nearDist() - 0.01f;
+    float nearPlaneDistToOrigin =
+      glm::dot(globalCamera().eye(), -globalCamera().viewVector()) - globalCamera().nearDist() - 0.01f;
     std::vector<glm::vec4> planes;
     planes.emplace_back(-globalCamera().viewVector(), nearPlaneDistToOrigin);
     ZMesh clipped = ZMeshUtils::clipClosedSurface(cube, planes);
@@ -823,10 +834,10 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
 
 
   glEnable(GL_BLEND);
-  glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+  glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
-  Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
-        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono) ?
+                                        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
 
   currentOutport.bindTarget();
   currentOutport.clearTarget();
@@ -839,7 +850,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
 
   currentOutport.releaseTarget();
 
-  glBlendFunc(GL_ONE,GL_ZERO);
+  glBlendFunc(GL_ONE, GL_ZERO);
   glDisable(GL_BLEND);
 }
 
@@ -857,7 +868,8 @@ void Z3DImgFilter::updateBlockIDTarget()
 {
   if (m_3dImg && m_3dImg->isVolumeDownsampled()) {
     glm::uvec2 size = m_layerTarget.size();
-    uint32_t sizeScale = std::min(std::min(Z3DImg::imageBlockSize().x, Z3DImg::imageBlockSize().y), Z3DImg::imageBlockSize().z) / 6;
+    uint32_t sizeScale =
+      std::min(std::min(Z3DImg::imageBlockSize().x, Z3DImg::imageBlockSize().y), Z3DImg::imageBlockSize().z) / 6;
     size.x = (size.x + sizeScale - 1) / sizeScale;
     size.y = (size.y + sizeScale - 1) / sizeScale;
     m_blockIDsRenderTarget.resize(size);

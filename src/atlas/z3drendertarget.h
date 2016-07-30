@@ -14,16 +14,21 @@ class Z3DRenderTarget
 public:
   // create one color and one depth attachment
   Z3DRenderTarget(GLint internalColorFormat = GLint(GL_RGBA16), GLint internalDepthFormat = GLint(GL_DEPTH_COMPONENT24),
-                  glm::uvec2 size = glm::uvec2(32,32), bool multisample = false, int sample = 4);
+                  glm::uvec2 size = glm::uvec2(32, 32), bool multisample = false, int sample = 4);
+
   // empty fbo with no attachment
   Z3DRenderTarget(glm::uvec2 size);
+
   virtual ~Z3DRenderTarget();
 
   void createColorAttachment(GLint internalColorFormat = GLint(GL_RGBA16), GLenum attachment = GL_COLOR_ATTACHMENT0);
+
   void createDepthAttachment(GLint internalDepthFormat = GLint(GL_DEPTH_COMPONENT24));
 
   void bind();
+
   void release();
+
   bool isBound() const;
 
   void clear() const;
@@ -33,32 +38,44 @@ public:
   GLuint handle() const;
 
   // might crash
-  const Z3DTexture* attachment(GLenum attachment) const { return m_attachments.at(attachment); }
-  Z3DTexture* attachment(GLenum attachment) { return m_attachments.at(attachment); }
+  const Z3DTexture* attachment(GLenum attachment) const
+  { return m_attachments.at(attachment); }
+
+  Z3DTexture* attachment(GLenum attachment)
+  { return m_attachments.at(attachment); }
 
   //Get the color at position pos. This method will bind the RenderTarget!
   glm::vec4 floatColorAtPos(glm::ivec2 pos);
+
   glm::col4 colorAtPos(glm::ivec2 pos);
+
   GLfloat depthAtPos(glm::ivec2 pos);
 
-  glm::uvec2 size() const { return m_size; }
+  glm::uvec2 size() const
+  { return m_size; }
+
   bool resize(glm::uvec2 newsize);
 
   void changeColorAttachmentFormat(GLint internalColorFormat, GLenum attachment = GL_COLOR_ATTACHMENT0);
+
   void changeDepthAttachmentFormat(GLint internalDepthFormat);
 
   bool isFBOComplete();
+
   // attach first layer miplevel 0 of texture to attachment point
   void attachTextureToFBO(Z3DTexture* texture, GLenum attachment, bool takeOwnership = true);
+
   void detach(GLenum attachment);
 
   void attachSlice(size_t zSlice);
 
   static GLuint currentBoundDrawFBO();
+
   static GLuint currentBoundReadFBO();
 
-  void saveAsColorImage(const QString &filename);
-  void saveAsDepthImage(const QString &filename);
+  void saveAsColorImage(const QString& filename);
+
+  void saveAsDepthImage(const QString& filename);
 
 protected:
   void generateId();

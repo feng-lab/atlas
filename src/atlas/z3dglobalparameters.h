@@ -11,40 +11,66 @@
 namespace nim {
 
 class Z3DCanvas;
+
 class ZWidgetsGroup;
 
 class Z3DGlobalParameters : public QObject
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   Z3DGlobalParameters();
+
   ~Z3DGlobalParameters();
-  const std::vector<ZParameter*>& parameters() const { return m_parameters; }
-  void read(const QJsonObject &json);
-  void write(QJsonObject &json) const;
+
+  const std::vector<ZParameter*>& parameters() const
+  { return m_parameters; }
+
+  void read(const QJsonObject& json);
+
+  void write(QJsonObject& json) const;
+
   std::shared_ptr<ZWidgetsGroup> widgetsGroup(bool includeCamera);
 
   // count is lightCount
-  const glm::vec4* lightPositionArray() const { return m_lightPositionArray.data(); }
-  const glm::vec4* lightAmbientArray() const { return m_lightAmbientArray.data(); }
-  const glm::vec4* lightDiffuseArray() const { return m_lightDiffuseArray.data(); }
-  const glm::vec4* lightSpecularArray() const { return m_lightSpecularArray.data(); }
-  const glm::vec3* lightAttenuationArray() const { return m_lightAttenuationArray.data(); }
-  const float* lightSpotCutoffArray() const { return m_lightSpotCutoffArray.data(); }
-  const float* lightSpotExponentArray() const { return m_lightSpotExponentArray.data(); }
-  const glm::vec3* lightSpotDirectionArray() const { return m_lightSpotDirectionArray.data(); }
+  const glm::vec4* lightPositionArray() const
+  { return m_lightPositionArray.data(); }
+
+  const glm::vec4* lightAmbientArray() const
+  { return m_lightAmbientArray.data(); }
+
+  const glm::vec4* lightDiffuseArray() const
+  { return m_lightDiffuseArray.data(); }
+
+  const glm::vec4* lightSpecularArray() const
+  { return m_lightSpecularArray.data(); }
+
+  const glm::vec3* lightAttenuationArray() const
+  { return m_lightAttenuationArray.data(); }
+
+  const float* lightSpotCutoffArray() const
+  { return m_lightSpotCutoffArray.data(); }
+
+  const float* lightSpotExponentArray() const
+  { return m_lightSpotExponentArray.data(); }
+
+  const glm::vec3* lightSpotDirectionArray() const
+  { return m_lightSpotDirectionArray.data(); }
 
   // must call
-  void setCanvas(Z3DCanvas* canvas) { m_canvas = canvas; }
+  void setCanvas(Z3DCanvas* canvas)
+  { m_canvas = canvas; }
+
   void getGLFocus();
 
   // must call
-  void setPickingTarget(Z3DRenderTarget& rt) { pickingManager.setRenderTarget(rt); }
+  void setPickingTarget(Z3DRenderTarget& rt)
+  { pickingManager.setRenderTarget(rt); }
 
 private:
   void updateLightsArray();
 
-  void addParameter(ZParameter &para) { m_parameters.push_back(&para); }
+  void addParameter(ZParameter& para)
+  { m_parameters.push_back(&para); }
 
 public:
   ZStringIntOptionParameter geometriesMultisampleMode;

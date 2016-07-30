@@ -4,7 +4,7 @@
 
 namespace nim {
 
-ZComboBox::ZComboBox(QWidget *parent) :
+ZComboBox::ZComboBox(QWidget* parent) :
   QComboBox(parent)
 {
   installEventFilter(new ZComboBoxEventFilter(this));
@@ -25,44 +25,41 @@ QSize ZComboBox::minimumSizeHint() const
   return size;
 }
 
-void ZComboBox::addItemSlot(const QString &text)
+void ZComboBox::addItemSlot(const QString& text)
 {
   //LOG(INFO) << text;
   addItem(text);
 }
 
-void ZComboBox::removeItemSlot(const QString &text)
+void ZComboBox::removeItemSlot(const QString& text)
 {
   removeItem(findText(text));
 }
 
-void ZComboBox::focusInEvent(QFocusEvent *)
+void ZComboBox::focusInEvent(QFocusEvent*)
 {
   setFocusPolicy(Qt::WheelFocus);
 }
 
-void ZComboBox::focusOutEvent(QFocusEvent *)
+void ZComboBox::focusOutEvent(QFocusEvent*)
 {
   setFocusPolicy(Qt::StrongFocus);
 }
 
-ZComboBoxEventFilter::ZComboBoxEventFilter(QObject *parent)
+ZComboBoxEventFilter::ZComboBoxEventFilter(QObject* parent)
   : QObject(parent)
 {
 }
 
-bool ZComboBoxEventFilter::eventFilter(QObject *obj, QEvent *event)
+bool ZComboBoxEventFilter::eventFilter(QObject* obj, QEvent* event)
 {
-  if(event->type() == QEvent::Wheel &&
-     qobject_cast<QComboBox*>(obj))
-  {
-    if(qobject_cast<QComboBox*>(obj)->focusPolicy() == Qt::WheelFocus)
-    {
+  if (event->type() == QEvent::Wheel &&
+      qobject_cast<QComboBox*>(obj)) {
+    if (qobject_cast<QComboBox*>(obj)->focusPolicy() == Qt::WheelFocus) {
       event->accept();
       return false;
     }
-    else
-    {
+    else {
       event->ignore();
       return true;
     }

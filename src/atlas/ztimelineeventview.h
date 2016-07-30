@@ -9,16 +9,17 @@ namespace nim {
 
 class ZTimelineEventView : public QGraphicsView
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit ZTimelineEventView(ZTimelineWidget &parent);
+  explicit ZTimelineEventView(ZTimelineWidget& parent);
 
-  inline void removeSelectedKeys() { m_scene->removeSelectedKeys(); }
+  inline void removeSelectedKeys()
+  { m_scene->removeSelectedKeys(); }
 
 private:
-  ZTimelineWidget &m_parent;
+  ZTimelineWidget& m_parent;
 
-  ZTimelineEventScene *m_scene;
+  ZTimelineEventScene* m_scene;
 };
 
 } // namespace nim

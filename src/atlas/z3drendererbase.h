@@ -13,7 +13,9 @@
 namespace nim {
 
 class Z3DPrimitiveRenderer;
+
 class Z3DTexture;
+
 class Z3DShaderProgram;
 
 // contains basic properties such as lighting, method, size for rendering.
@@ -22,7 +24,7 @@ class Z3DShaderProgram;
 // (rendering parameters).
 class Z3DRendererBase : public QObject
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   enum class ActivateRendererOption
   {
@@ -36,101 +38,198 @@ public:
 
   struct ShaderHookParameter
   {
-    const Z3DTexture *dualDepthPeelingDepthBlenderTexture;
-    const Z3DTexture *dualDepthPeelingFrontBlenderTexture;
+    const Z3DTexture* dualDepthPeelingDepthBlenderTexture;
+    const Z3DTexture* dualDepthPeelingFrontBlenderTexture;
   };
 
-  explicit Z3DRendererBase(Z3DGlobalParameters &globalParas, QObject *parent = nullptr);
+  explicit Z3DRendererBase(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+
   virtual ~Z3DRendererBase();
 
-  inline void setCamera(const Z3DCamera& c) { m_camera = c; m_hasCustomCamera = true; makeCoordTransformNormalMatrix(); }
-  inline void unsetCamera() { m_hasCustomCamera = false; }
-  inline Z3DCamera& camera() { return m_hasCustomCamera ? m_camera : m_globalParas.camera.get(); }
-  inline Z3DCamera& globalCamera() { return m_globalParas.camera.get(); }
-  inline Z3DCameraParameter& globalCameraPara() { return m_globalParas.camera; }
-  inline Z3DGlobalParameters& globalParas() { return m_globalParas; }
-  inline ZStringIntOptionParameter& geometriesMultisampleModePara() { return m_globalParas.geometriesMultisampleMode; }
-  inline ZStringIntOptionParameter& transparencyMethodPara() { return m_globalParas.transparencyMethod; }
+  inline void setCamera(const Z3DCamera& c)
+  {
+    m_camera = c;
+    m_hasCustomCamera = true;
+    makeCoordTransformNormalMatrix();
+  }
 
-  inline void setViewport(glm::uvec4 viewport) { if (m_viewport != viewport) {m_viewport = viewport; makeViewportMatrix();} }
-  inline void setViewport(glm::uvec2 viewport) { if (m_viewport.zw() != viewport) {m_viewport = glm::ivec4(0,0,viewport); makeViewportMatrix();} }
-  inline glm::uvec4 viewport() const { return m_viewport; }
+  inline void unsetCamera()
+  { m_hasCustomCamera = false; }
+
+  inline Z3DCamera& camera()
+  { return m_hasCustomCamera ? m_camera : m_globalParas.camera.get(); }
+
+  inline Z3DCamera& globalCamera()
+  { return m_globalParas.camera.get(); }
+
+  inline Z3DCameraParameter& globalCameraPara()
+  { return m_globalParas.camera; }
+
+  inline Z3DGlobalParameters& globalParas()
+  { return m_globalParas; }
+
+  inline ZStringIntOptionParameter& geometriesMultisampleModePara()
+  { return m_globalParas.geometriesMultisampleMode; }
+
+  inline ZStringIntOptionParameter& transparencyMethodPara()
+  { return m_globalParas.transparencyMethod; }
+
+  inline void setViewport(glm::uvec4 viewport)
+  {
+    if (m_viewport != viewport) {
+      m_viewport = viewport;
+      makeViewportMatrix();
+    }
+  }
+
+  inline void setViewport(glm::uvec2 viewport)
+  {
+    if (m_viewport.zw() != viewport) {
+      m_viewport = glm::ivec4(0, 0, viewport);
+      makeViewportMatrix();
+    }
+  }
+
+  inline glm::uvec4 viewport() const
+  { return m_viewport; }
 
   // need valid camera and viewport
-  void setGlobalShaderParameters(Z3DShaderProgram &shader, Z3DEye eye);
-  void setGlobalShaderParameters(Z3DShaderProgram *shader, Z3DEye eye);
+  void setGlobalShaderParameters(Z3DShaderProgram& shader, Z3DEye eye);
+
+  void setGlobalShaderParameters(Z3DShaderProgram* shader, Z3DEye eye);
+
   QString generateHeader() const;
+
   QString generateGeomHeader() const;
 
   // renderer's constructor and deconstructor will take care of this
   void registerRenderer(Z3DPrimitiveRenderer* renderer);
+
   void unregisterRenderer(Z3DPrimitiveRenderer* renderer);
 
-  Z3DTransformParameter& coordTransformPara() { return m_coordTransform; }
-  inline void setSizeScale(float s) { m_sizeScale.set(s); }
-  inline void setXScale(float s) { m_coordTransform.setXScale(s); }
-  inline void setYScale(float s) { m_coordTransform.setYScale(s); }
-  inline void setZScale(float s) { m_coordTransform.setZScale(s); }
-  inline void translate(float x, float y, float z) { m_coordTransform.translate(x,y,z); }
-  inline void setRotationCenter(glm::vec3 c) { m_coordTransform.setCenter(c); }
-  inline void setOpacity(float o) { m_opacity.set(o); }
+  Z3DTransformParameter& coordTransformPara()
+  { return m_coordTransform; }
 
-  void setClipPlanes(std::vector<glm::vec4> *clipPlanes);
-  void setClipEnabled(bool v) { m_clipEnabled = v; }
+  inline void setSizeScale(float s)
+  { m_sizeScale.set(s); }
 
-  void addParameter(ZParameter &para) { addParameter(&para); }
-  void addParameter(ZParameter *para) { m_parameters.push_back(para); }
+  inline void setXScale(float s)
+  { m_coordTransform.setXScale(s); }
+
+  inline void setYScale(float s)
+  { m_coordTransform.setYScale(s); }
+
+  inline void setZScale(float s)
+  { m_coordTransform.setZScale(s); }
+
+  inline void translate(float x, float y, float z)
+  { m_coordTransform.translate(x, y, z); }
+
+  inline void setRotationCenter(glm::vec3 c)
+  { m_coordTransform.setCenter(c); }
+
+  inline void setOpacity(float o)
+  { m_opacity.set(o); }
+
+  void setClipPlanes(std::vector<glm::vec4>* clipPlanes);
+
+  void setClipEnabled(bool v)
+  { m_clipEnabled = v; }
+
+  void addParameter(ZParameter& para)
+  { addParameter(&para); }
+
+  void addParameter(ZParameter* para)
+  { m_parameters.push_back(para); }
+
   // parameters of rendererbase
-  const std::vector<ZParameter*>& parameters() const { return m_parameters; }
+  const std::vector<ZParameter*>& parameters() const
+  { return m_parameters; }
+
   // only global parameters
-  const std::vector<ZParameter*>& globalParameters() const { return m_globalParas.parameters(); }
+  const std::vector<ZParameter*>& globalParameters() const
+  { return m_globalParas.parameters(); }
 
   // return scale of x,y,z coordinate
-  inline glm::mat4 coordTransform() const {return m_coordTransform.get();}
-  inline float opacity() const {return m_opacity.get();}
-  inline float sizeScale() const {return m_sizeScale.get();}
+  inline glm::mat4 coordTransform() const
+  { return m_coordTransform.get(); }
 
-  void render(Z3DEye eye, Z3DPrimitiveRenderer &renderer)
+  inline float opacity() const
+  { return m_opacity.get(); }
+
+  inline float sizeScale() const
+  { return m_sizeScale.get(); }
+
+  void render(Z3DEye eye, Z3DPrimitiveRenderer& renderer)
   { render(eye, &renderer); }
-  void render(Z3DEye eye, Z3DPrimitiveRenderer &renderer1, Z3DPrimitiveRenderer &renderer2)
+
+  void render(Z3DEye eye, Z3DPrimitiveRenderer& renderer1, Z3DPrimitiveRenderer& renderer2)
   { render(eye, &renderer1, &renderer2); }
-  void render(Z3DEye eye, Z3DPrimitiveRenderer &renderer1, Z3DPrimitiveRenderer &renderer2,
-              Z3DPrimitiveRenderer &renderer3)
+
+  void render(Z3DEye eye, Z3DPrimitiveRenderer& renderer1, Z3DPrimitiveRenderer& renderer2,
+              Z3DPrimitiveRenderer& renderer3)
   { render(eye, &renderer1, &renderer2, &renderer3); }
-  void render(Z3DEye eye, Z3DPrimitiveRenderer &renderer1, Z3DPrimitiveRenderer &renderer2,
-              Z3DPrimitiveRenderer &renderer3, Z3DPrimitiveRenderer &renderer4)
+
+  void render(Z3DEye eye, Z3DPrimitiveRenderer& renderer1, Z3DPrimitiveRenderer& renderer2,
+              Z3DPrimitiveRenderer& renderer3, Z3DPrimitiveRenderer& renderer4)
   { render(eye, &renderer1, &renderer2, &renderer3, &renderer4); }
-  void render(Z3DEye eye, Z3DPrimitiveRenderer *renderer);
-  void render(Z3DEye eye, Z3DPrimitiveRenderer *renderer1, Z3DPrimitiveRenderer *renderer2);
-  void render(Z3DEye eye, Z3DPrimitiveRenderer *renderer1, Z3DPrimitiveRenderer *renderer2,
-              Z3DPrimitiveRenderer *renderer3);
-  void render(Z3DEye eye, Z3DPrimitiveRenderer *renderer1, Z3DPrimitiveRenderer *renderer2,
-              Z3DPrimitiveRenderer *renderer3, Z3DPrimitiveRenderer *renderer4);
-  void render(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*> &renderers);
-  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer &renderer)
+
+  void render(Z3DEye eye, Z3DPrimitiveRenderer* renderer);
+
+  void render(Z3DEye eye, Z3DPrimitiveRenderer* renderer1, Z3DPrimitiveRenderer* renderer2);
+
+  void render(Z3DEye eye, Z3DPrimitiveRenderer* renderer1, Z3DPrimitiveRenderer* renderer2,
+              Z3DPrimitiveRenderer* renderer3);
+
+  void render(Z3DEye eye, Z3DPrimitiveRenderer* renderer1, Z3DPrimitiveRenderer* renderer2,
+              Z3DPrimitiveRenderer* renderer3, Z3DPrimitiveRenderer* renderer4);
+
+  void render(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers);
+
+  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer& renderer)
   { renderPicking(eye, &renderer); }
-  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer &renderer1, Z3DPrimitiveRenderer &renderer2)
+
+  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer& renderer1, Z3DPrimitiveRenderer& renderer2)
   { renderPicking(eye, &renderer1, &renderer2); }
-  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer &renderer1, Z3DPrimitiveRenderer &renderer2,
-                     Z3DPrimitiveRenderer &renderer3)
+
+  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer& renderer1, Z3DPrimitiveRenderer& renderer2,
+                     Z3DPrimitiveRenderer& renderer3)
   { renderPicking(eye, &renderer1, &renderer2, &renderer3); }
-  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer *renderer);
-  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer *renderer1, Z3DPrimitiveRenderer *renderer2);
-  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer *renderer1, Z3DPrimitiveRenderer *renderer2,
-                     Z3DPrimitiveRenderer *renderer3);
-  void renderPicking(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer *> &renderers);
 
-  inline void setShaderHookType(ShaderHookType t) { m_shaderHookType = t; }
-  inline ShaderHookType shaderHookType() const { return m_shaderHookType; }
-  inline ShaderHookParameter& shaderHookPara() { return m_shaderHookPara; }
-  inline void setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture *t) { m_shaderHookPara.dualDepthPeelingDepthBlenderTexture = t; }
-  inline void setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture *t) { m_shaderHookPara.dualDepthPeelingFrontBlenderTexture = t; }
+  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer* renderer);
 
-  inline const glm::mat4& viewportMatrix() const { return m_viewportMatrix; }
-  inline const glm::mat4& inverseViewportMatrix() const { return m_inverseViewportMatrix; }
+  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer* renderer1, Z3DPrimitiveRenderer* renderer2);
+
+  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer* renderer1, Z3DPrimitiveRenderer* renderer2,
+                     Z3DPrimitiveRenderer* renderer3);
+
+  void renderPicking(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers);
+
+  inline void setShaderHookType(ShaderHookType t)
+  { m_shaderHookType = t; }
+
+  inline ShaderHookType shaderHookType() const
+  { return m_shaderHookType; }
+
+  inline ShaderHookParameter& shaderHookPara()
+  { return m_shaderHookPara; }
+
+  inline void setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture* t)
+  { m_shaderHookPara.dualDepthPeelingDepthBlenderTexture = t; }
+
+  inline void setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture* t)
+  { m_shaderHookPara.dualDepthPeelingFrontBlenderTexture = t; }
+
+  inline const glm::mat4& viewportMatrix() const
+  { return m_viewportMatrix; }
+
+  inline const glm::mat4& inverseViewportMatrix() const
+  { return m_inverseViewportMatrix; }
 
 signals:
+
   void coordTransformChanged();
+
   void sizeScaleChanged();
 
 protected:
@@ -142,22 +241,29 @@ protected:
   void renderInstant(const std::vector<Z3DPrimitiveRenderer *> &renderers);
   void renderPickingInstant(const std::vector<Z3DPrimitiveRenderer *> &renderers);
 #endif
-  void renderUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer *> &renderers);
-  void renderPickingUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer *> &renderers);
 
-  bool needLighting(const std::vector<Z3DPrimitiveRenderer*> &renderers) const;
-  bool useDisplayList(const std::vector<Z3DPrimitiveRenderer*> &renderers) const;
+  void renderUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers);
 
-  inline bool hasClipPlanes() { return !m_clipPlanes.empty(); }
+  void renderPickingUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers);
+
+  bool needLighting(const std::vector<Z3DPrimitiveRenderer*>& renderers) const;
+
+  bool useDisplayList(const std::vector<Z3DPrimitiveRenderer*>& renderers) const;
+
+  inline bool hasClipPlanes()
+  { return !m_clipPlanes.empty(); }
+
 #ifndef _USE_CORE_PROFILE_
   void activateClipPlanesOpenGL();
   void deactivateClipPlanesOpenGL();
 #endif
+
   void activateClipPlanesGLSL();
+
   void deactivateClipPlanesGLSL();
 
   void makeViewportMatrix();
-  
+
 private:
 #ifndef _USE_CORE_PROFILE_
   void invalidateDisplayList();
@@ -165,6 +271,7 @@ private:
 #endif
 
   void compile();
+
   void makeCoordTransformNormalMatrix();
 
 protected:

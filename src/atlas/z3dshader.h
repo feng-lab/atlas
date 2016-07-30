@@ -10,27 +10,36 @@ namespace nim {
 class Z3DShader
 {
 public:
-  enum class Type {
+  enum class Type
+  {
     Vertex, Fragment, Geometry, TessellationControl, TessellationEvaluation, Compute
   };
 
   Z3DShader(Z3DShader::Type type);
+
   ~Z3DShader();
 
-  Z3DShader(const Z3DShader &) = delete;
-  Z3DShader &operator=(const Z3DShader &) = delete;
+  Z3DShader(const Z3DShader&) = delete;
 
-  Z3DShader::Type shaderType() const { return m_type; }
+  Z3DShader& operator=(const Z3DShader&) = delete;
 
-  void compileSourceCode(const char *source);
+  Z3DShader::Type shaderType() const
+  { return m_type; }
+
+  void compileSourceCode(const char* source);
+
   void compileSourceCode(const QString& source);
 
   QByteArray sourceCode() const;
 
-  bool isCompiled() const { return m_compiled; }
+  bool isCompiled() const
+  { return m_compiled; }
 
-  unsigned int shaderId() const { return m_id; }
-  Z3DContext context() const { return m_context; }
+  unsigned int shaderId() const
+  { return m_id; }
+
+  Z3DContext context() const
+  { return m_context; }
 
 private:
   Type m_type;

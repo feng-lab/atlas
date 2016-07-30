@@ -7,20 +7,24 @@ namespace nim {
 
 class Z3DEllipsoidRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   // default use display list and lighting for opengl mode
-  explicit Z3DEllipsoidRenderer(Z3DRendererBase &rendererBase);
+  explicit Z3DEllipsoidRenderer(Z3DRendererBase& rendererBase);
 
-  void setData(std::vector<glm::vec3> *centers, std::vector<glm::vec3> *axis1, std::vector<glm::vec3> *axis2,
-               std::vector<glm::vec3> *axis3, std::vector<glm::vec4> *specularAndShininessInput = NULL);
-  void setDataColors(std::vector<glm::vec4> *ellipsoidColorsInput);
-  void setDataPickingColors(std::vector<glm::vec4> *ellipsoidPickingColorsInput = NULL);
+  void setData(std::vector<glm::vec3>* centers, std::vector<glm::vec3>* axis1, std::vector<glm::vec3>* axis2,
+               std::vector<glm::vec3>* axis3, std::vector<glm::vec4>* specularAndShininessInput = nullptr);
 
-  ZBoolParameter& useDynamicMaterialPara() { return m_useDynamicMaterial; }
+  void setDataColors(std::vector<glm::vec4>* ellipsoidColorsInput);
+
+  void setDataPickingColors(std::vector<glm::vec4>* ellipsoidPickingColorsInput = nullptr);
+
+  ZBoolParameter& useDynamicMaterialPara()
+  { return m_useDynamicMaterial; }
 
 protected:
   virtual void compile() override;
+
   QString generateHeader();
 
 #ifndef _USE_CORE_PROFILE_
@@ -29,6 +33,7 @@ protected:
 #endif
 
   virtual void render(Z3DEye eye) override;
+
   virtual void renderPicking(Z3DEye eye) override;
 
   void appendDefaultColors();

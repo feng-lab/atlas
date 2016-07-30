@@ -7,23 +7,20 @@
 
 namespace nim {
 
-ZSliderEventFilter::ZSliderEventFilter(QObject *parent)
+ZSliderEventFilter::ZSliderEventFilter(QObject* parent)
   : QObject(parent)
 {
 }
 
-bool ZSliderEventFilter::eventFilter(QObject *obj, QEvent *event)
+bool ZSliderEventFilter::eventFilter(QObject* obj, QEvent* event)
 {
-  if(event->type() == QEvent::Wheel &&
-     qobject_cast<QAbstractSlider*>(obj))
-  {
-    if(qobject_cast<QAbstractSlider*>(obj)->focusPolicy() == Qt::WheelFocus)
-    {
+  if (event->type() == QEvent::Wheel &&
+      qobject_cast<QAbstractSlider*>(obj)) {
+    if (qobject_cast<QAbstractSlider*>(obj)->focusPolicy() == Qt::WheelFocus) {
       event->accept();
       return false;
     }
-    else
-    {
+    else {
       event->ignore();
       return true;
     }
@@ -31,32 +28,32 @@ bool ZSliderEventFilter::eventFilter(QObject *obj, QEvent *event)
   return QObject::eventFilter(obj, event);
 }
 
-ZSlider2::ZSlider2(QWidget *parent)
+ZSlider2::ZSlider2(QWidget* parent)
   : QSlider(Qt::Horizontal, parent)
 {
   installEventFilter(new ZSliderEventFilter(this));
   setFocusPolicy(Qt::StrongFocus);
 }
 
-ZSlider2::ZSlider2(Qt::Orientation ori, QWidget *parent)
+ZSlider2::ZSlider2(Qt::Orientation ori, QWidget* parent)
   : QSlider(ori, parent)
 {
 }
 
-void ZSlider2::focusInEvent(QFocusEvent *e)
+void ZSlider2::focusInEvent(QFocusEvent* e)
 {
   QSlider::focusInEvent(e);
   setFocusPolicy(Qt::WheelFocus);
 }
 
-void ZSlider2::focusOutEvent(QFocusEvent *e)
+void ZSlider2::focusOutEvent(QFocusEvent* e)
 {
   QSlider::focusOutEvent(e);
   setFocusPolicy(Qt::StrongFocus);
 }
 
 ZSpinBoxWithSlider::ZSpinBoxWithSlider(int value, int min, int max, int step, bool tracking,
-                                       const QString &prefix, const QString &suffix, QWidget *parent)
+                                       const QString& prefix, const QString& suffix, QWidget* parent)
   : QWidget(parent)
 {
   createWidget(value, min, max, step, tracking, prefix, suffix);
@@ -90,8 +87,8 @@ void ZSpinBoxWithSlider::setDataRange(int min, int max)
   m_spinBox->setRange(min, max);
 }
 
-void ZSpinBoxWithSlider::createWidget(int value, int min, int max, int step, bool tracking, const QString &prefix,
-                                      const QString &suffix)
+void ZSpinBoxWithSlider::createWidget(int value, int min, int max, int step, bool tracking, const QString& prefix,
+                                      const QString& suffix)
 {
   m_slider = new ZSlider2();
   m_slider->setRange(min, max);
@@ -105,7 +102,7 @@ void ZSpinBoxWithSlider::createWidget(int value, int min, int max, int step, boo
   m_spinBox->setPrefix(prefix);
   m_spinBox->setSuffix(suffix);
   QHBoxLayout* lo = new QHBoxLayout(this);
-  lo->setContentsMargins(0,0,0,0);
+  lo->setContentsMargins(0, 0, 0, 0);
   lo->addWidget(m_spinBox);
   lo->addWidget(m_slider);
   connect(m_slider, &ZSlider2::valueChanged, this, &ZSpinBoxWithSlider::valueChangedFromSlider);
@@ -113,11 +110,11 @@ void ZSpinBoxWithSlider::createWidget(int value, int min, int max, int step, boo
 }
 
 ZDoubleSpinBoxWithSlider::ZDoubleSpinBoxWithSlider(double value, double min, double max, double step,
-                                                   int decimal, bool tracking, const QString &prefix, const QString &suffix, QWidget *parent)
-  : QWidget(parent), m_value(value), m_min(min),
-    m_max(max), m_step(step), m_decimal(decimal), m_tracking(tracking)
+                                                   int decimal, bool tracking, const QString& prefix,
+                                                   const QString& suffix, QWidget* parent)
+  : QWidget(parent), m_value(value), m_min(min), m_max(max), m_step(step), m_decimal(decimal), m_tracking(tracking)
 {
-  double sliderMaxValue = (m_max-m_min)/m_step;
+  double sliderMaxValue = (m_max - m_min) / m_step;
   if (sliderMaxValue > std::numeric_limits<int>::max())
     m_sliderMaxValue = std::numeric_limits<int>::max();
   else
@@ -132,7 +129,7 @@ void ZDoubleSpinBoxWithSlider::setValue(double v)
 
 void ZDoubleSpinBoxWithSlider::valueChangedFromSlider(int v)
 {
-  m_value = static_cast<double>(v)/m_sliderMaxValue * (m_max - m_min) + m_min;
+  m_value = static_cast<double>(v) / m_sliderMaxValue * (m_max - m_min) + m_min;
   m_spinBox->blockSignals(true);
   m_spinBox->setValue(m_value);
   m_spinBox->blockSignals(false);
@@ -153,7 +150,7 @@ void ZDoubleSpinBoxWithSlider::setDataRange(double min, double max)
 {
   m_min = min;
   m_max = max;
-  double sliderMaxValue = (m_max-m_min)/m_step;
+  double sliderMaxValue = (m_max - m_min) / m_step;
   if (sliderMaxValue > std::numeric_limits<int>::max())
     m_sliderMaxValue = std::numeric_limits<int>::max();
   else
@@ -162,13 +159,13 @@ void ZDoubleSpinBoxWithSlider::setDataRange(double min, double max)
   m_spinBox->setRange(m_min, m_max);
 }
 
-void ZDoubleSpinBoxWithSlider::createWidget(const QString &prefix,
-                                            const QString &suffix)
+void ZDoubleSpinBoxWithSlider::createWidget(const QString& prefix,
+                                            const QString& suffix)
 {
   m_slider = new ZSlider2();
   m_slider->setRange(0, m_sliderMaxValue);
   m_slider->setValue(static_cast<int>((m_value - m_min) / (m_max - m_min) * m_sliderMaxValue));
-  m_slider->setSingleStep(std::max(1, static_cast<int>(m_step*m_sliderMaxValue/(m_max-m_min))));
+  m_slider->setSingleStep(std::max(1, static_cast<int>(m_step * m_sliderMaxValue / (m_max - m_min))));
   m_slider->setTracking(m_tracking);
   m_spinBox = new ZDoubleSpinBox();
   m_spinBox->setRange(m_min, m_max);
@@ -178,11 +175,12 @@ void ZDoubleSpinBoxWithSlider::createWidget(const QString &prefix,
   m_spinBox->setPrefix(prefix);
   m_spinBox->setSuffix(suffix);
   QHBoxLayout* lo = new QHBoxLayout(this);
-  lo->setContentsMargins(0,0,0,0);
+  lo->setContentsMargins(0, 0, 0, 0);
   lo->addWidget(m_spinBox);
   lo->addWidget(m_slider);
   connect(m_slider, &ZSlider2::valueChanged, this, &ZDoubleSpinBoxWithSlider::valueChangedFromSlider);
-  connect(m_spinBox, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDoubleSpinBoxWithSlider::valueChangedFromSpinBox);
+  connect(m_spinBox, qOverload<double>(&ZDoubleSpinBox::valueChanged), this,
+          &ZDoubleSpinBoxWithSlider::valueChangedFromSpinBox);
 }
 
 } // namespace nim

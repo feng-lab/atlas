@@ -10,24 +10,31 @@ class ZRegistrationCostFunction
 {
 public:
   ZRegistrationCostFunction();
-  virtual ~ZRegistrationCostFunction() {}
 
-  int numParameters() const { return m_transform ? m_transform->numParameters() : -1; }
+  virtual ~ZRegistrationCostFunction()
+  {}
 
-  void setTransform(ZImageTransform &transform);
+  int numParameters() const
+  { return m_transform ? m_transform->numParameters() : -1; }
 
-  void setImages(const ZImg &fixedImage, const ZImg &movingImage)
-    { m_fixedImg = &fixedImage; m_movingImg = &movingImage; }
+  void setTransform(ZImageTransform& transform);
+
+  void setImages(const ZImg& fixedImage, const ZImg& movingImage)
+  {
+    m_fixedImg = &fixedImage;
+    m_movingImg = &movingImage;
+  }
 
   virtual void setUseMultithreading(bool i);
+
   // given transform parameters, calc cost and gradient (if not nullptr), return true if success
-  virtual bool evaluate(const double * const parameters, double *cost, double *gradient = nullptr) const = 0;
+  virtual bool evaluate(const double* const parameters, double* cost, double* gradient = nullptr) const = 0;
 
 protected:
-  ZImageTransform *m_transform;
+  ZImageTransform* m_transform;
 
-  const ZImg *m_fixedImg;
-  const ZImg *m_movingImg;
+  const ZImg* m_fixedImg;
+  const ZImg* m_movingImg;
 
   size_t m_useMultithreading;
 };

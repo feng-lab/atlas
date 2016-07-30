@@ -5,7 +5,7 @@
 
 namespace nim {
 
-Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase &rendererBase)
+Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_backgroundShaderGrp(rendererBase)
   , m_firstColor("First Color", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f))
@@ -13,7 +13,7 @@ Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase &rendererBase)
   , m_gradientOrientation("Gradient Orientation")
   , m_mode("mode")
   , m_VAO(1)
-  , m_region(0,1,0,1)
+  , m_region(0, 1, 0, 1)
 {
   m_firstColor.setStyle("COLOR");
   m_secondColor.setStyle("COLOR");
@@ -35,15 +35,15 @@ Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase &rendererBase)
 
   if (m_hardwareSupportVAO) {
     m_VAO.bind();
-    const GLfloat vertices[] = {-1.f, 1.f, 1.0f-1e-5, //top left corner
-                                -1.f, -1.f, 1.0f-1e-5, //bottom left corner
-                                1.f, 1.f, 1.0f-1e-5, //top right corner
-                                1.f, -1.f, 1.0f-1e-5}; // bottom right rocner
+    const GLfloat vertices[] = {-1.f, 1.f, 1.0f - 1e-5, //top left corner
+                                -1.f, -1.f, 1.0f - 1e-5, //bottom left corner
+                                1.f, 1.f, 1.0f - 1e-5, //top right corner
+                                1.f, -1.f, 1.0f - 1e-5}; // bottom right rocner
     GLint attr_vertex = m_backgroundShaderGrp.get().vertexAttributeLocation();
 
     glEnableVertexAttribArray(attr_vertex);
     m_VBO.bind(GL_ARRAY_BUFFER);
-    glBufferData(GL_ARRAY_BUFFER, 3*4*sizeof(GLfloat), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, 3 * 4 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
     glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
     m_VBO.release(GL_ARRAY_BUFFER);
@@ -55,7 +55,7 @@ Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase &rendererBase)
 
 void Z3DBackgroundRenderer::setRenderingRegion(double left, double right, double bottom, double top)
 {
-  m_region = glm::vec4(left, right-left, bottom, top-bottom);
+  m_region = glm::vec4(left, right - left, bottom, top - bottom);
 }
 
 void Z3DBackgroundRenderer::compile()
@@ -130,7 +130,7 @@ void Z3DBackgroundRenderer::renderPickingUsingOpengl()
 void Z3DBackgroundRenderer::render(Z3DEye eye)
 {
   m_backgroundShaderGrp.bind();
-  Z3DShaderProgram &shader = m_backgroundShaderGrp.get();
+  Z3DShaderProgram& shader = m_backgroundShaderGrp.get();
   m_rendererBase.setGlobalShaderParameters(shader, eye);
 
   shader.setColor1Uniform(m_firstColor.get());
@@ -144,15 +144,15 @@ void Z3DBackgroundRenderer::render(Z3DEye eye)
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     m_VAO.release();
   } else {
-    const GLfloat vertices[] = {-1.f, 1.f, 1.0f-1e-5, //top left corner
-                                -1.f, -1.f, 1.0f-1e-5, //bottom left corner
-                                1.f, 1.f, 1.0f-1e-5, //top right corner
-                                1.f, -1.f, 1.0f-1e-5}; // bottom right rocner
+    const GLfloat vertices[] = {-1.f, 1.f, 1.0f - 1e-5, //top left corner
+                                -1.f, -1.f, 1.0f - 1e-5, //bottom left corner
+                                1.f, 1.f, 1.0f - 1e-5, //top right corner
+                                1.f, -1.f, 1.0f - 1e-5}; // bottom right rocner
     GLint attr_vertex = shader.vertexAttributeLocation();
 
     glEnableVertexAttribArray(attr_vertex);
     m_VBO.bind(GL_ARRAY_BUFFER);
-    glBufferData(GL_ARRAY_BUFFER, 3*4*sizeof(GLfloat), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, 3 * 4 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
     glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);

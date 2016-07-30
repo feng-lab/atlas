@@ -16,15 +16,17 @@
 #include <cassert>
 
 #ifndef _USE_QTCONCURRENT_
+
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
+
 #else
 #include <QtConcurrent/QtConcurrentMap>
 #endif
 
 namespace nim {
 
-template <typename NonInteger = double>
+template<typename NonInteger = double>
 class ZTermCriteria
 {
 public:
@@ -56,24 +58,36 @@ public:
   bool meet(size_t iter, NonInteger eps) const
   {
     switch (m_type) {
-    case Type::MaxIter:
-      return iter >= m_maxIter;
-    case Type::Eps:
-      return eps <= m_epsilon;
-    case Type::MaxIterAndEps:
-      return iter >= m_maxIter || eps < m_epsilon;
+      case Type::MaxIter:
+        return iter >= m_maxIter;
+      case Type::Eps:
+        return eps <= m_epsilon;
+      case Type::MaxIterAndEps:
+        return iter >= m_maxIter || eps < m_epsilon;
     }
     return true;
   }
 
-  inline bool willTestEPS() const { return m_type == Type::Eps || m_type == Type::MaxIterAndEps; }
-  inline bool willTestMaxIter() const { return m_type == Type::MaxIter || m_type == Type::MaxIterAndEps; }
+  inline bool willTestEPS() const
+  { return m_type == Type::Eps || m_type == Type::MaxIterAndEps; }
 
-  inline Type type() const { return m_type; }
-  inline size_t maxIter() const { return m_maxIter; }
-  inline NonInteger epsilon() const { return m_epsilon; }
-  inline void setEpsilon(NonInteger eps) { m_epsilon = eps; }
-  inline void setMaxIter(int iter) { m_maxIter = iter; }
+  inline bool willTestMaxIter() const
+  { return m_type == Type::MaxIter || m_type == Type::MaxIterAndEps; }
+
+  inline Type type() const
+  { return m_type; }
+
+  inline size_t maxIter() const
+  { return m_maxIter; }
+
+  inline NonInteger epsilon() const
+  { return m_epsilon; }
+
+  inline void setEpsilon(NonInteger eps)
+  { m_epsilon = eps; }
+
+  inline void setMaxIter(int iter)
+  { m_maxIter = iter; }
 
 private:
   Type m_type;
@@ -86,11 +100,12 @@ enum class IterAlgorithmLogLevel
   Off, Iter, Final
 };
 
-template <typename NonInteger>
+template<typename NonInteger>
 struct ZDistanceEuclidean
 {
-  Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> operator()(const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> &mat1,
-                                                                       const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> &mat2) const
+  Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>
+  operator()(const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>& mat1,
+             const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>& mat2) const
   {
     Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> result(mat1.rows(), mat2.rows());
     //for (int r=0; r<result.rows(); r++) {
@@ -98,21 +113,22 @@ struct ZDistanceEuclidean
     //    result(r,c) = (mat1.row(r) - mat2.row(c)).norm();
     //  }
     //}
-    for (int c=0; c<result.cols(); c++) {
-      result.col(c) = (mat1.col(0).array()-mat2(c,0)).abs2().matrix();
-      for (int i=1; i<mat2.cols(); i++) {
-        result.col(c) += (mat1.col(i).array()-mat2(c,i)).abs2().matrix();
+    for (int c = 0; c < result.cols(); c++) {
+      result.col(c) = (mat1.col(0).array() - mat2(c, 0)).abs2().matrix();
+      for (int i = 1; i < mat2.cols(); i++) {
+        result.col(c) += (mat1.col(i).array() - mat2(c, i)).abs2().matrix();
       }
     }
     return result.cwiseSqrt();
   }
 };
 
-template <typename Real>
+template<typename Real>
 struct ZDistanceEuclideanSquared
 {
-  Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> operator()(const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> &mat1,
-                                                                 const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> &mat2) const
+  Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>
+  operator()(const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& mat1,
+             const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& mat2) const
   {
     Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> result(mat1.rows(), mat2.rows());
     //for (int r=0; r<result.rows(); r++) {
@@ -120,84 +136,86 @@ struct ZDistanceEuclideanSquared
     //    result(r,c) = (mat1.row(r) - mat2.row(c)).squaredNorm();
     //  }
     //}
-    for (int c=0; c<result.cols(); c++) {
-      result.col(c) = (mat1.col(0).array()-mat2(c,0)).abs2().matrix();
-      for (int i=1; i<mat2.cols(); i++) {
-        result.col(c) += (mat1.col(i).array()-mat2(c,i)).abs2().matrix();
+    for (int c = 0; c < result.cols(); c++) {
+      result.col(c) = (mat1.col(0).array() - mat2(c, 0)).abs2().matrix();
+      for (int i = 1; i < mat2.cols(); i++) {
+        result.col(c) += (mat1.col(i).array() - mat2(c, i)).abs2().matrix();
       }
     }
     return result;
   }
 
-  void getCentroids(const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> &mat,
-                    const Eigen::VectorXi &labels, Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> &centroids) const
+  void getCentroids(const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& mat,
+                    const Eigen::VectorXi& labels, Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& centroids) const
   {
     centroids.setZero();
     Eigen::Matrix<Real, Eigen::Dynamic, 1> counts(centroids.rows());
     counts.setZero();
-    for (int r=0; r < mat.rows(); r++) {
+    for (int r = 0; r < mat.rows(); r++) {
       counts(labels(r))++;
       centroids.row(labels(r)) += mat.row(r);
     }
 
-    for (int c=0; c < centroids.cols(); c++) {
+    for (int c = 0; c < centroids.cols(); c++) {
       centroids.col(c) = centroids.col(c).cwiseQuotient(counts);
     }
   }
 
-  void getCentroids(const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> &mat,
-                    const Eigen::Matrix<Real, Eigen::Dynamic, 1> &weight,
-                    const Eigen::VectorXi &labels,
-                    Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> &centroids) const
+  void getCentroids(const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& mat,
+                    const Eigen::Matrix<Real, Eigen::Dynamic, 1>& weight,
+                    const Eigen::VectorXi& labels,
+                    Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& centroids) const
   {
     centroids.setZero();
     Eigen::Matrix<Real, Eigen::Dynamic, 1> counts(centroids.rows());
     counts.setZero();
-    for (int r=0; r < mat.rows(); r++) {
+    for (int r = 0; r < mat.rows(); r++) {
       counts(labels(r)) += weight(r);
-      centroids.row(labels(r)) += mat.row(r)*weight(r);
+      centroids.row(labels(r)) += mat.row(r) * weight(r);
     }
 
-    for (int c=0; c < centroids.cols(); c++) {
+    for (int c = 0; c < centroids.cols(); c++) {
       centroids.col(c) = centroids.col(c).cwiseQuotient(counts);
     }
   }
 
-  Eigen::Matrix<Real, Eigen::Dynamic, 1> pairDistance(const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> &mat1,
-                                                      const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> &mat2) const
+  Eigen::Matrix<Real, Eigen::Dynamic, 1> pairDistance(const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& mat1,
+                                                      const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& mat2) const
   {
-    assert(mat1.rows() == mat2.rows() && mat1.cols() == mat2.cols());
+    CHECK(mat1.rows() == mat2.rows() && mat1.cols() == mat2.cols());
     //return (mat1-mat2).rowwise().squaredNorm();
-    return (mat1-mat2).cwiseAbs2().rowwise().sum();
+    return (mat1 - mat2).cwiseAbs2().rowwise().sum();
   }
 };
 
-template <class T>
-bool argsort_comp(const std::pair<size_t, T>& left, const std::pair<size_t, T>& right) {
+template<class T>
+bool argsort_comp(const std::pair<size_t, T>& left, const std::pair<size_t, T>& right)
+{
   return left.second < right.second;
 }
 
-template <class RandomAccessIterator>
-std::vector<size_t> argSort(RandomAccessIterator begin, RandomAccessIterator end) {
+template<class RandomAccessIterator>
+std::vector<size_t> argSort(RandomAccessIterator begin, RandomAccessIterator end)
+{
 
   typedef typename std::iterator_traits<RandomAccessIterator>::value_type ValueType;
   typedef std::pair<size_t, ValueType> argsort_pair;
-  assert(end > begin);
-  std::vector<size_t> indices(end-begin);
+  CHECK(end > begin);
+  std::vector<size_t> indices(end - begin);
 
-  std::vector<argsort_pair> data(end-begin);
-  for(size_t i=0; i<data.size(); i++) {
+  std::vector<argsort_pair> data(end - begin);
+  for (size_t i = 0; i < data.size(); i++) {
     data[i].first = i;
-    data[i].second = *(begin+i);
+    data[i].second = *(begin + i);
   }
   std::sort(data.begin(), data.end(), argsort_comp<ValueType>);
-  for(size_t i=0; i<data.size(); i++) {
+  for (size_t i = 0; i < data.size(); i++) {
     indices[i] = data[i].first;
   }
   return indices;
 }
 
-template <class RandomAccessIterator, class RandomAccessIterator2>
+template<class RandomAccessIterator, class RandomAccessIterator2>
 typename Eigen::NumTraits<typename std::iterator_traits<RandomAccessIterator>::value_type>::NonInteger
 weightedMedian(RandomAccessIterator dataBegin, RandomAccessIterator dataEnd,
                RandomAccessIterator2 weightBegin, RandomAccessIterator2 weightEnd, bool hasZeroWeight = false)
@@ -205,55 +223,58 @@ weightedMedian(RandomAccessIterator dataBegin, RandomAccessIterator dataEnd,
   typedef typename std::iterator_traits<RandomAccessIterator>::value_type ValueType;
   typedef typename std::iterator_traits<RandomAccessIterator2>::value_type ValueType2;
   typedef typename Eigen::NumTraits<ValueType>::NonInteger ResultType;
-  assert(dataEnd > dataBegin && weightEnd-weightBegin >= dataEnd-dataBegin);
+  CHECK(dataEnd > dataBegin && weightEnd - weightBegin >= dataEnd - dataBegin);
   if (hasZeroWeight) {
     std::vector<ResultType> data;
     std::vector<ResultType> weight;
     for (RandomAccessIterator2 iter = weightBegin; iter < weightEnd; iter++) {
-      if (std::abs(*iter) >  std::numeric_limits<ValueType2>::epsilon()) {
-        data.push_back(dataBegin[iter-weightBegin]);
+      if (std::abs(*iter) > std::numeric_limits<ValueType2>::epsilon()) {
+        data.push_back(dataBegin[iter - weightBegin]);
         weight.push_back(*iter);
       }
     }
-    assert(data.size() > 0);
+    CHECK(data.size() > 0);
     ResultType sum = 0;
     std::vector<size_t> sort_order = argSort(data.begin(), data.end());
 
     size_t i;
-    for (i=0; i<data.size(); i++)
+    for (i = 0; i < data.size(); i++)
       sum += weight[sort_order[i]];
     while (sum > 0)
-      sum -= 2*weight[sort_order[--i]];
+      sum -= 2 * weight[sort_order[--i]];
 
     ResultType right = data[sort_order[i]];     // the rightmost minimum point
     ResultType left = (std::abs(sum) <= std::numeric_limits<ResultType>::epsilon() &&
-                       std::abs(weight[sort_order[i]]-weight[sort_order[i-1]]) <= std::numeric_limits<ResultType>::epsilon())
-        ? data[sort_order[i-1]] : right;
-    return (left+right)/2.0;
+                       std::abs(weight[sort_order[i]] - weight[sort_order[i - 1]]) <=
+                       std::numeric_limits<ResultType>::epsilon())
+                      ? data[sort_order[i - 1]] : right;
+    return (left + right) / 2.0;
   } else {
     ResultType sum = 0;
-    size_t n = dataEnd-dataBegin;
+    size_t n = dataEnd - dataBegin;
     std::vector<size_t> sort_order = argSort(dataBegin, dataEnd);
 
     size_t i;
-    for (i=0; i<n; i++)
+    for (i = 0; i < n; i++)
       sum += weightBegin[sort_order[i]];
     while (sum > 0)
-      sum -= 2*weightBegin[sort_order[--i]];
+      sum -= 2 * weightBegin[sort_order[--i]];
 
     ResultType right = dataBegin[sort_order[i]];     // the rightmost minimum point
     ResultType left = (std::abs(sum) <= std::numeric_limits<ResultType>::epsilon() &&
-                       std::abs(weightBegin[sort_order[i]]-weightBegin[sort_order[i-1]]) <= std::numeric_limits<ResultType>::epsilon())
-        ? dataBegin[sort_order[i-1]] : right;
-    return (left+right)/2.0;
+                       std::abs(weightBegin[sort_order[i]] - weightBegin[sort_order[i - 1]]) <=
+                       std::numeric_limits<ResultType>::epsilon())
+                      ? dataBegin[sort_order[i - 1]] : right;
+    return (left + right) / 2.0;
   }
 }
 
-template <typename NonInteger>
+template<typename NonInteger>
 struct ZDistanceManhattan
 {
-  Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> operator()(const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> &mat1,
-                                                                       const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> &mat2) const
+  Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>
+  operator()(const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>& mat1,
+             const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>& mat2) const
   {
     Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> result(mat1.rows(), mat2.rows());
     //for (int r=0; r<result.rows(); r++) {
@@ -261,18 +282,18 @@ struct ZDistanceManhattan
     //    result(r,c) = (mat1.row(r) - mat2.row(c)).template lpNorm<1>();
     //  }
     //}
-    for (int c=0; c<result.cols(); c++) {
-      result.col(c) = (mat1.col(0).array()-mat2(c,0)).abs().matrix();
-      for (int i=1; i<mat2.cols(); i++) {
-        result.col(c) += (mat1.col(i).array()-mat2(c,i)).abs().matrix();
+    for (int c = 0; c < result.cols(); c++) {
+      result.col(c) = (mat1.col(0).array() - mat2(c, 0)).abs().matrix();
+      for (int i = 1; i < mat2.cols(); i++) {
+        result.col(c) += (mat1.col(i).array() - mat2(c, i)).abs().matrix();
       }
     }
     return result;
   }
 
-  void getCentroids(const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> &mat,
-                    const Eigen::VectorXi &labels,
-                    Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> &centroids) const
+  void getCentroids(const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>& mat,
+                    const Eigen::VectorXi& labels,
+                    Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>& centroids) const
   {
     // get median of each dimension
     Eigen::VectorXi counts(centroids.rows());
@@ -280,31 +301,32 @@ struct ZDistanceManhattan
     std::vector<int> sepMatsRowIdxs;
 
     counts.setZero();
-    for (int r=0; r < labels.rows(); r++) {
+    for (int r = 0; r < labels.rows(); r++) {
       counts(labels(r))++;
     }
 
-    for (int i=0; i<counts.rows(); i++) {
-      sepMats.emplace_back(std::make_unique<Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>>(counts(i), mat.cols()));
+    for (int i = 0; i < counts.rows(); i++) {
+      sepMats.emplace_back(
+        std::make_unique<Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>>(counts(i), mat.cols()));
       sepMatsRowIdxs.push_back(0);
     }
 
-    for (int r=0; r < mat.rows(); r++) {
+    for (int r = 0; r < mat.rows(); r++) {
       sepMats[labels(r)]->row(sepMatsRowIdxs[labels(r)]++) = mat.row(r);
     }
 
-    for (size_t i=0; i<sepMats.size(); i++) {
+    for (size_t i = 0; i < sepMats.size(); i++) {
       // get median of each col
-      for (int c=0; c<sepMats[i]->cols(); c++) {
-        centroids(i,c) = medianInPlace(sepMats[i]->col(c).data(), sepMats[i]->col(c).data()+counts(i));
+      for (int c = 0; c < sepMats[i]->cols(); c++) {
+        centroids(i, c) = medianInPlace(sepMats[i]->col(c).data(), sepMats[i]->col(c).data() + counts(i));
       }
     }
   }
 
-  void getCentroids(const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> &mat,
-                    const Eigen::Matrix<NonInteger, Eigen::Dynamic, 1> &weight,
-                    const Eigen::VectorXi &labels,
-                    Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> &centroids) const
+  void getCentroids(const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>& mat,
+                    const Eigen::Matrix<NonInteger, Eigen::Dynamic, 1>& weight,
+                    const Eigen::VectorXi& labels,
+                    Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>& centroids) const
   {
     // get median of each dimension
     Eigen::VectorXi counts(centroids.rows());
@@ -313,35 +335,37 @@ struct ZDistanceManhattan
     std::vector<int> sepMatsRowIdxs;
 
     counts.setZero();
-    for (int r=0; r < labels.rows(); r++) {
+    for (int r = 0; r < labels.rows(); r++) {
       counts(labels(r))++;
     }
 
-    for (int i=0; i<counts.rows(); i++) {
-      sepMats.emplace_back(std::make_unique<Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>>(counts(i), mat.cols()));
+    for (int i = 0; i < counts.rows(); i++) {
+      sepMats.emplace_back(
+        std::make_unique<Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>>(counts(i), mat.cols()));
       sepMatsRowIdxs.push_back(0);
     }
 
-    for (int r=0; r < mat.rows(); r++) {
+    for (int r = 0; r < mat.rows(); r++) {
       sepMats[labels(r)]->row(sepMatsRowIdxs[labels(r)]++) = mat.row(r);
       sepWeights[labels(r)].push_back(weight(r));
     }
 
-    for (size_t i=0; i<sepMats.size(); i++) {
+    for (size_t i = 0; i < sepMats.size(); i++) {
       // get median of each col
-      for (int c=0; c<sepMats[i]->cols(); c++) {
-        centroids(i,c) = weightedMedian(sepMats[i]->col(c).data(), sepMats[i]->col(c).data()+counts(i),
-                                        sepWeights[i].begin(), sepWeights[i].end());
+      for (int c = 0; c < sepMats[i]->cols(); c++) {
+        centroids(i, c) = weightedMedian(sepMats[i]->col(c).data(), sepMats[i]->col(c).data() + counts(i),
+                                         sepWeights[i].begin(), sepWeights[i].end());
       }
     }
   }
 };
 
-template <typename NonInteger>
+template<typename NonInteger>
 struct ZDistanceChebychev
 {
-  Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> operator()(const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> &mat1,
-                                                                       const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> &mat2) const
+  Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>
+  operator()(const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>& mat1,
+             const Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>& mat2) const
   {
     Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> result(mat1.rows(), mat2.rows());
     //for (int r=0; r<result.rows(); r++) {
@@ -349,35 +373,39 @@ struct ZDistanceChebychev
     //    result(r,c) = (mat1.row(r) - mat2.row(c)).template lpNorm<Eigen::Infinity>();
     //  }
     //}
-    for (int c=0; c<result.cols(); c++) {
-      result.col(c) = (mat1.col(0).array()-mat2(c,0)).abs().matrix();
-      for (int i=1; i<mat2.cols(); i++) {
-        result.col(c) = result.col(c).cwiseMax((mat1.col(i).array()-mat2(c,i)).abs().matrix());
+    for (int c = 0; c < result.cols(); c++) {
+      result.col(c) = (mat1.col(0).array() - mat2(c, 0)).abs().matrix();
+      for (int i = 1; i < mat2.cols(); i++) {
+        result.col(c) = result.col(c).cwiseMax((mat1.col(i).array() - mat2(c, i)).abs().matrix());
       }
     }
     return result;
   }
 };
 
-template <class T, class WeightT, typename Distance>
+template<class T, class WeightT, typename Distance>
 class ZKMeans;
 
 #ifndef _USE_QTCONCURRENT_
+
 template<class T, class WeightT, typename Distance>
 class _ZKmeansReduce
 {
-  const ZKMeans<T,WeightT,Distance>* m_kmeans;
+  const ZKMeans<T, WeightT, Distance>* m_kmeans;
 public:
-  typename ZKMeans<T,WeightT,Distance>::InterResult m_result;
-  void operator()(const tbb::blocked_range<size_t>& range) {
-    for (size_t i=range.begin(); i != range.end(); ++i) {
-      typename ZKMeans<T,WeightT,Distance>::InterResult inter = m_kmeans->runOneAttempt();
+  typename ZKMeans<T, WeightT, Distance>::InterResult m_result;
+
+  void operator()(const tbb::blocked_range<size_t>& range)
+  {
+    for (size_t i = range.begin(); i != range.end(); ++i) {
+      typename ZKMeans<T, WeightT, Distance>::InterResult inter = m_kmeans->runOneAttempt();
       if (m_result.compactness > inter.compactness)
         m_result = inter;
     }
   }
 
-  _ZKmeansReduce(_ZKmeansReduce& x, tbb::split) : m_kmeans(x.m_kmeans) {}
+  _ZKmeansReduce(_ZKmeansReduce& x, tbb::split) : m_kmeans(x.m_kmeans)
+  {}
 
   void join(const _ZKmeansReduce& y)
   {
@@ -385,10 +413,11 @@ public:
       m_result = y.m_result;
   }
 
-  _ZKmeansReduce(const ZKMeans<T,WeightT,Distance>* kmeans)
+  _ZKmeansReduce(const ZKMeans<T, WeightT, Distance>* kmeans)
     : m_kmeans(kmeans)
   {}
 };
+
 #else
 template <class T, class WeightT, typename Distance>
 typename ZKMeans<T,WeightT,Distance>::InterResult ZKmeansRunOneAttempt(const ZKMeans<T,WeightT,Distance>* t)
@@ -405,30 +434,33 @@ void ZKmeansGetBestResult(typename ZKMeans<T,WeightT,Distance>::InterResult &res
 }
 #endif
 
-template <class T, class WeightT = float, typename Distance = ZDistanceEuclideanSquared<typename MaxFloatType<T,WeightT>::type>>
+template<class T, class WeightT = float, typename Distance = ZDistanceEuclideanSquared<typename MaxFloatType<T, WeightT>::type>>
 class ZKMeans
 {
 public:
 
-  typedef typename MaxFloatType<T,WeightT>::type ResultDataType;
+  typedef typename MaxFloatType<T, WeightT>::type ResultDataType;
   typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> MatrixXrt;  // matrix of result data type
   typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, 1> VectorXrt;  // vector of result data type
-  typedef void (ZKMeans::* initCentersFunction)(MatrixXrt &centroids) const;
+  typedef void (ZKMeans::* initCentersFunction)(MatrixXrt& centroids) const;
 
   enum class InitCentersMethod
   {
     Random, KmeansPP, Gonzales
   };
 
-  struct InterResult {
+  struct InterResult
+  {
     InterResult(int nclasses, int nData, int nDims)
-      : centroids(nclasses, nDims), initCentroids(nclasses, nDims),
-        labels(nData), compactness(std::numeric_limits<ResultDataType>::max())
+      : centroids(nclasses, nDims), initCentroids(nclasses, nDims), labels(nData), compactness(
+      std::numeric_limits<ResultDataType>::max())
     {}
+
     InterResult()
       : compactness(std::numeric_limits<ResultDataType>::max())
     {}
-    inline void swap(InterResult &other)
+
+    inline void swap(InterResult& other)
     {
       std::swap(compactness, other.compactness);
       labels.swap(other.labels);
@@ -443,49 +475,52 @@ public:
   };
 
 #ifndef _USE_QTCONCURRENT_
-  friend class _ZKmeansReduce<T,WeightT,Distance>;
+
+  friend class _ZKmeansReduce<T, WeightT, Distance>;
+
 #else
   friend InterResult ZKmeansRunOneAttempt<T,WeightT,Distance>(const ZKMeans<T,WeightT,Distance>* t);
 #endif
 
-  ZKMeans(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> &data, size_t nclasses, size_t nattempts,
-          ZTermCriteria<ResultDataType> termCriteria= ZTermCriteria<ResultDataType>(),
+  ZKMeans(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& data, size_t nclasses, size_t nattempts,
+          ZTermCriteria<ResultDataType> termCriteria = ZTermCriteria<ResultDataType>(),
           InitCentersMethod initMethod = InitCentersMethod::KmeansPP,
           IterAlgorithmLogLevel logLevel = IterAlgorithmLogLevel::Off)
-    : m_nclasses(nclasses), m_nattemps(nattempts), m_termCriteria(termCriteria), m_distanceFun(Distance()),
-      m_logLevel(logLevel), m_hasWeight(false)
+    : m_nclasses(nclasses), m_nattemps(nattempts), m_termCriteria(termCriteria), m_distanceFun(Distance()), m_logLevel(
+    logLevel), m_hasWeight(false)
   {
-    if (std::is_same<T,ResultDataType>::value) {
+    if (std::is_same<T, ResultDataType>::value) {
       // reinterpret_cast allowed (AliasedType is (possibly cv-qualified) DynamicType)
-      m_pData = reinterpret_cast<const MatrixXrt *>(&data);
+      m_pData = reinterpret_cast<const MatrixXrt*>(&data);
     } else {
       m_NonIntegerData = data.template cast<ResultDataType>();
       m_pData = &m_NonIntegerData;
     }
     checkData();
     switch (initMethod) {
-    case InitCentersMethod::Random:
-      m_initCentersFunPtr = &ZKMeans::initializeCentroidsRandom;
-      break;
-    case InitCentersMethod::KmeansPP:
-      m_initCentersFunPtr = &ZKMeans::initializeCentroidsKMeansPP;
-      break;
-    case InitCentersMethod::Gonzales:
-      m_initCentersFunPtr = &ZKMeans::initializeCentroidsGonzales;
-      break;
+      case InitCentersMethod::Random:
+        m_initCentersFunPtr = &ZKMeans::initializeCentroidsRandom;
+        break;
+      case InitCentersMethod::KmeansPP:
+        m_initCentersFunPtr = &ZKMeans::initializeCentroidsKMeansPP;
+        break;
+      case InitCentersMethod::Gonzales:
+        m_initCentersFunPtr = &ZKMeans::initializeCentroidsGonzales;
+        break;
     }
   }
 
-  ZKMeans(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> &data, const Eigen::Matrix<WeightT, Eigen::Dynamic, 1> &weight,
+  ZKMeans(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& data,
+          const Eigen::Matrix<WeightT, Eigen::Dynamic, 1>& weight,
           size_t nclasses, size_t nattempts,
-          ZTermCriteria<ResultDataType> termCriteria= ZTermCriteria<ResultDataType>(),
+          ZTermCriteria<ResultDataType> termCriteria = ZTermCriteria<ResultDataType>(),
           InitCentersMethod initMethod = InitCentersMethod::KmeansPP,
           IterAlgorithmLogLevel logLevel = IterAlgorithmLogLevel::Off)
-    : m_nclasses(nclasses), m_nattemps(nattempts), m_termCriteria(termCriteria), m_distanceFun(Distance()),
-      m_logLevel(logLevel), m_hasWeight(true)
+    : m_nclasses(nclasses), m_nattemps(nattempts), m_termCriteria(termCriteria), m_distanceFun(Distance()), m_logLevel(
+    logLevel), m_hasWeight(true)
   {
     bool hasZeroWeight = false;
-    for (int i=0; i<data.rows(); ++i) {
+    for (int i = 0; i < data.rows(); ++i) {
       if (weight(i) < std::numeric_limits<ResultDataType>::epsilon() * 1e3) {
         hasZeroWeight = true;
         break;
@@ -495,7 +530,7 @@ public:
       m_NonIntegerData = MatrixXrt(data.rows(), data.cols());
       m_NonIntegerWeight = VectorXrt(weight.rows());
       int numRows = 0;
-      for (int i=0; i<data.rows(); ++i) {
+      for (int i = 0; i < data.rows(); ++i) {
         if (weight(i) >= std::numeric_limits<ResultDataType>::epsilon() * 1e3) {
           m_NonIntegerData.row(numRows) = data.row(i).template cast<ResultDataType>();
           m_NonIntegerWeight(numRows++) = weight(i);
@@ -506,14 +541,14 @@ public:
       m_pData = &m_NonIntegerData;
       m_pWeight = &m_NonIntegerWeight;
     } else {
-      if (std::is_same<T,ResultDataType>::value) {
-        m_pData = reinterpret_cast<const MatrixXrt *>(&data);
+      if (std::is_same<T, ResultDataType>::value) {
+        m_pData = reinterpret_cast<const MatrixXrt*>(&data);
       } else {
         m_NonIntegerData = data.template cast<ResultDataType>();
         m_pData = &m_NonIntegerData;
       }
-      if (std::is_same<WeightT,ResultDataType>::value) {
-        m_pWeight = reinterpret_cast<const VectorXrt *>(&weight);
+      if (std::is_same<WeightT, ResultDataType>::value) {
+        m_pWeight = reinterpret_cast<const VectorXrt*>(&weight);
       } else {
         m_NonIntegerWeight = weight.template cast<ResultDataType>();
         m_pWeight = &m_NonIntegerWeight;
@@ -522,15 +557,15 @@ public:
 
     checkData();
     switch (initMethod) {
-    case InitCentersMethod::Random:
-      m_initCentersFunPtr = &ZKMeans::initializeCentroidsRandom;
-      break;
-    case InitCentersMethod::KmeansPP:
-      m_initCentersFunPtr = &ZKMeans::initializeCentroidsKMeansPP;
-      break;
-    case InitCentersMethod::Gonzales:
-      m_initCentersFunPtr = &ZKMeans::initializeCentroidsGonzales;
-      break;
+      case InitCentersMethod::Random:
+        m_initCentersFunPtr = &ZKMeans::initializeCentroidsRandom;
+        break;
+      case InitCentersMethod::KmeansPP:
+        m_initCentersFunPtr = &ZKMeans::initializeCentroidsKMeansPP;
+        break;
+      case InitCentersMethod::Gonzales:
+        m_initCentersFunPtr = &ZKMeans::initializeCentroidsGonzales;
+        break;
     }
   }
 
@@ -568,9 +603,9 @@ public:
 
     if (useMultithreading && m_nattemps > 1) {
 #ifndef _USE_QTCONCURRENT_
-      _ZKmeansReduce<T,WeightT,Distance> km(this);
+      _ZKmeansReduce<T, WeightT, Distance> km(this);
       tbb::parallel_reduce(tbb::blocked_range<size_t>(0, m_nattemps), km);
-      InterResult &result = km.m_result;
+      InterResult& result = km.m_result;
 #else
       QList<ZKMeans<T,WeightT,Distance>*> alllist;
       for (size_t i=0; i<m_nattemps; i++) alllist.append(this);
@@ -615,13 +650,13 @@ public:
             m_distanceFun.getCentroids(*m_pData, labels, centroids);
           }
 
-          maxCenterShift = (centroids-oldCentroids).rowwise().squaredNorm().maxCoeff();
+          maxCenterShift = (centroids - oldCentroids).rowwise().squaredNorm().maxCoeff();
         }
 
         // get labels
         compactness = 0;
         MatrixXrt allDists = m_distanceFun(*m_pData, centroids);
-        for (int r=0; r < m_pData->rows(); r++) {
+        for (int r = 0; r < m_pData->rows(); r++) {
           typename MatrixXrt::Index index;
           if (m_hasWeight)
             compactness += allDists.row(r).minCoeff(&index) * (*m_pWeight)(r);
@@ -631,7 +666,7 @@ public:
         }
 
         if (m_logLevel == IterAlgorithmLogLevel::Iter) {
-          LOG(INFO) << "KMeans attempt " << a <<  " Iter: " << iter << " Potential: " << compactness;
+          LOG(INFO) << "KMeans attempt " << a << " Iter: " << iter << " Potential: " << compactness;
           LOG(INFO) << "KMeans Centroids:\n" << centroids;
         }
       }
@@ -652,9 +687,14 @@ public:
     return bestCompactness;
   }
 
-  inline int numOfClusters() const {return m_nclasses; }
-  inline MatrixXrt centroids() const { return m_centroids; }
-  inline Eigen::VectorXi labels() const { return m_labels; }
+  inline int numOfClusters() const
+  { return m_nclasses; }
+
+  inline MatrixXrt centroids() const
+  { return m_centroids; }
+
+  inline Eigen::VectorXi labels() const
+  { return m_labels; }
 
 protected:
 
@@ -675,9 +715,9 @@ protected:
     }
 
     size_t nUniqueData = 0;
-    m_uniqueDatas.resize(m_nclasses+1, m_pData->cols());
+    m_uniqueDatas.resize(m_nclasses + 1, m_pData->cols());
     m_uniqueDatas.row(nUniqueData++) = m_pData->row(0);
-    for (int r=1; r < m_pData->rows(); r++) {
+    for (int r = 1; r < m_pData->rows(); r++) {
       MatrixXrt dist = m_distanceFun(m_uniqueDatas.topRows(nUniqueData), m_pData->row(r));
       if ((dist.array() <= Eigen::NumTraits<ResultDataType>::dummy_precision()).any()) {  // duplicate
         continue;
@@ -696,7 +736,7 @@ protected:
       // get labels
       m_uniqueLabels.resize(m_pData->rows());
       MatrixXrt allDists = m_distanceFun(*m_pData, m_uniqueDatas);
-      for (int r=0; r < m_pData->rows(); r++) {
+      for (int r = 0; r < m_pData->rows(); r++) {
         typename MatrixXrt::Index index;
         allDists.row(r).minCoeff(&index);
         m_uniqueLabels(r) = static_cast<int>(index);
@@ -724,13 +764,13 @@ protected:
           m_distanceFun.getCentroids(*m_pData, result.labels, result.centroids);
         }
 
-        maxCenterShift = (result.centroids-oldCentroids).rowwise().squaredNorm().maxCoeff();
+        maxCenterShift = (result.centroids - oldCentroids).rowwise().squaredNorm().maxCoeff();
       }
 
       // get labels
       result.compactness = 0;
       MatrixXrt allDists = m_distanceFun(*m_pData, result.centroids);
-      for (int r=0; r < m_pData->rows(); r++) {
+      for (int r = 0; r < m_pData->rows(); r++) {
         typename MatrixXrt::Index index;
         if (m_hasWeight)
           result.compactness += allDists.row(r).minCoeff(&index) * (*m_pWeight)(r);
@@ -747,11 +787,12 @@ protected:
     return result;
   }
 
-  void initializeCentroidsKMeansPP(MatrixXrt &centroids) const //Arthur & Vassilvitskii (2007) k-means++: The Advantages of Careful Seeding
+  void initializeCentroidsKMeansPP(
+    MatrixXrt& centroids) const //Arthur & Vassilvitskii (2007) k-means++: The Advantages of Careful Seeding
   {
     //int rnd = (int) ((std::rand()/(RAND_MAX+1.0)) * double(m_pData->rows()));
     std::vector<int> centerIdxs;
-    int rnd = ZRandomInstance.randInt(m_pData->rows()-1);
+    int rnd = ZRandomInstance.randInt(m_pData->rows() - 1);
     centroids.row(0) = m_pData->row(rnd);
     centerIdxs.push_back(rnd);
     VectorXrt distSq(m_pData->rows());
@@ -762,7 +803,7 @@ protected:
     ResultDataType distSqSum = distSq.sum();
 
     const int numLocalTries = 5;
-    for (size_t index=1; index < m_nclasses; index++) {
+    for (size_t index = 1; index < m_nclasses; index++) {
       ResultDataType bestNewDistSqSum = -1;
       int bestNewIndex = -1;
       for (int localTrial = 0; localTrial < numLocalTries; localTrial++) {
@@ -772,7 +813,7 @@ protected:
           ResultDataType rndd = ZRandomInstance.randReal(distSqSum);
           //draw index with probability
           int j;
-          for (j=0; j<m_pData->rows()-1; j++) {
+          for (j = 0; j < m_pData->rows() - 1; j++) {
             if (rndd <= distSq(j))
               break;
             else
@@ -784,7 +825,7 @@ protected:
             newIdx = j;
         }
         ResultDataType newDistSqSum = 0;
-        MatrixXrt dists = m_distanceFun(*m_pData, centroids.topRows(index+1));
+        MatrixXrt dists = m_distanceFun(*m_pData, centroids.topRows(index + 1));
         if (m_hasWeight) {
           newDistSqSum = dists.rowwise().minCoeff().cwiseProduct(*m_pWeight).sum();
         } else
@@ -798,7 +839,7 @@ protected:
       centroids.row(index) = m_pData->row(bestNewIndex);
       centerIdxs.push_back(bestNewIndex);
       distSqSum = bestNewDistSqSum;
-      MatrixXrt dists = m_distanceFun(*m_pData, centroids.topRows(index+1));
+      MatrixXrt dists = m_distanceFun(*m_pData, centroids.topRows(index + 1));
       distSq = dists.rowwise().minCoeff();
       if (m_hasWeight) {
         distSq.cwiseProduct(*m_pWeight);
@@ -806,14 +847,14 @@ protected:
     }
   }
 
-  void initializeCentroidsRandom(MatrixXrt &centroids) const
+  void initializeCentroidsRandom(MatrixXrt& centroids) const
   {
-    std::vector<size_t> randNumbers = ZRandomInstance.randPermutation<size_t>(m_pData->rows()-1, 0);
+    std::vector<size_t> randNumbers = ZRandomInstance.randPermutation<size_t>(m_pData->rows() - 1, 0);
 
     centroids.row(0) = m_pData->row(randNumbers[0]);
 
     size_t index = 1;
-    for (size_t i=1; i<randNumbers.size(); ++i) {
+    for (size_t i = 1; i < randNumbers.size(); ++i) {
       centroids.row(index) = m_pData->row(randNumbers[i]);
       MatrixXrt dist = m_distanceFun(centroids.topRows(index), centroids.row(index));
       if ((dist.array() <= Eigen::NumTraits<ResultDataType>::dummy_precision()).any()) {  // duplicate centroid
@@ -824,19 +865,19 @@ protected:
           break;
       }
     }
-    assert(index == m_nclasses);
+    CHECK(index == m_nclasses);
   }
 
-  void initializeCentroidsGonzales(MatrixXrt &centroids) const
+  void initializeCentroidsGonzales(MatrixXrt& centroids) const
   {
     //int rnd = (int) ((std::rand()/(RAND_MAX+1.0)) * double(m_pData->rows()));
-    int rnd = ZRandomInstance.randInt(m_pData->rows()-1);
+    int rnd = ZRandomInstance.randInt(m_pData->rows() - 1);
     centroids.row(0) = m_pData->row(rnd);
     size_t index = 1;
-    for ( ; index < m_nclasses; index++) {
+    for (; index < m_nclasses; index++) {
       int bestIndex = -1;
       ResultDataType bestVal = 0;
-      for (int j=0; j<m_pData->rows(); j++) {
+      for (int j = 0; j < m_pData->rows(); j++) {
         MatrixXrt dist = m_distanceFun(centroids.topRows(index), m_pData->row(j));
         ResultDataType mindist = dist.minCoeff();
         if (mindist > bestVal) {
@@ -844,7 +885,7 @@ protected:
           bestIndex = j;
         }
       }
-      assert(bestIndex >= 0);
+      CHECK(bestIndex >= 0);
       centroids.row(index) = m_pData->row(bestIndex);
     }
   }
@@ -855,8 +896,8 @@ private:
   Eigen::VectorXi m_labels;
   MatrixXrt m_NonIntegerData;
   VectorXrt m_NonIntegerWeight;
-  const MatrixXrt *m_pData;
-  const VectorXrt *m_pWeight;
+  const MatrixXrt* m_pData;
+  const VectorXrt* m_pWeight;
   size_t m_nclasses;
   size_t m_nattemps;
   ZTermCriteria<ResultDataType> m_termCriteria;

@@ -22,38 +22,47 @@ namespace nim {
 
 class Z3DPunctaFilter : public Z3DGeometryFilter
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit Z3DPunctaFilter(Z3DGlobalParameters &globalParas, QObject *parent = nullptr);
+  explicit Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+
   virtual ~Z3DPunctaFilter();
 
-  void setVisible(bool v) { m_visible.set(v); }
+  void setVisible(bool v)
+  { m_visible.set(v); }
 
-  void setData(ZPuncta &puncta);
-  inline void setSelectedPuncta(std::set<ZPunctum*> *list) { m_selectedPuncta = list; }
+  void setData(ZPuncta& puncta);
+
+  inline void setSelectedPuncta(std::set<ZPunctum*>* list)
+  { m_selectedPuncta = list; }
 
   virtual bool isReady(Z3DEye eye) const override;
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  inline void setColorMode(const std::string &mode)
+  inline void setColorMode(const std::string& mode)
   {
     m_colorMode.select(mode.c_str());
   }
 
   //virtual bool hasOpaque(Z3DEye eye) const override { return Z3DGeometryFilter::hasOpaque(eye) && !m_randomGlow.get(); }
   virtual void renderOpaque(Z3DEye eye) override;
+
   //virtual bool hasTransparent(Z3DEye eye) const override { return Z3DGeometryFilter::hasTransparent(eye) || m_randomGlow.get(); }
   virtual void renderTransparent(Z3DEye eye) override;
 
 signals:
+
   void punctumSelected(ZPunctum*, bool append);
 
 protected:
   void prepareColor();
+
   void adjustWidgets();
+
   void changePunctaSize();
-  void selectPuncta(QMouseEvent *e, int w, int h);
+
+  void selectPuncta(QMouseEvent* e, int w, int h);
 
   void updateData();
 
@@ -62,23 +71,26 @@ protected:
   virtual void renderPicking(Z3DEye eye) override;
 
   virtual void registerPickingObjects() override;
+
   virtual void deregisterPickingObjects() override;
 
   void prepareData();
 
   // result should has at least 6 elements
-  void punctumBound(const ZPunctum &p, std::vector<double> &result) const;
+  void punctumBound(const ZPunctum& p, std::vector<double>& result) const;
 
   // result should has at least 6 elements
-  void notTransformedPunctumBound(const ZPunctum &p, std::vector<double> &result) const;
+  void notTransformedPunctumBound(const ZPunctum& p, std::vector<double>& result) const;
 
   //virtual void updateAxisAlignedBoundBoxImpl() override;
   virtual void updateNotTransformedBoundBoxImpl() override;
+
   virtual void addSelectionLines() override;
 
 private:
   // get visible data from origPunctaList put into punctaList
   void getVisibleData();
+
   void updatePunctumVisibleState();
 
 private:
@@ -114,8 +126,8 @@ private:
 
   ZEventListenerParameter m_selectPunctumEvent;
   glm::ivec2 m_startCoord;
-  ZPunctum *m_pressedPunctum;
-  std::set<ZPunctum*> *m_selectedPuncta;   //point to all selected puncta, managed by other class
+  ZPunctum* m_pressedPunctum;
+  std::set<ZPunctum*>* m_selectedPuncta;   //point to all selected puncta, managed by other class
 
   std::vector<glm::vec4> m_pointAndRadius;
   std::vector<glm::vec4> m_specularAndShininess;

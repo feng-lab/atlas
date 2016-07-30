@@ -5,7 +5,7 @@
 
 namespace nim {
 
-ZCameraParameterKey::ZCameraParameterKey(double tm, const Z3DCameraParameter &p)
+ZCameraParameterKey::ZCameraParameterKey(double tm, const Z3DCameraParameter& p)
   : ZParameterKey(tm, p)
   , m_posTension(0.f)
   , m_posContinuity(0.f)
@@ -16,7 +16,7 @@ ZCameraParameterKey::ZCameraParameterKey(double tm, const Z3DCameraParameter &p)
 {
 }
 
-ZCameraParameterKey::ZCameraParameterKey(double tm, Z3DCameraParameter *p)
+ZCameraParameterKey::ZCameraParameterKey(double tm, Z3DCameraParameter* p)
   : ZParameterKey(tm, p)
   , m_posTension(0.f)
   , m_posContinuity(0.f)
@@ -38,7 +38,7 @@ ZCameraParameterKey::ZCameraParameterKey()
 {
 }
 
-ZCameraParameterKey::ZCameraParameterKey(const ZCameraParameterKey &key)
+ZCameraParameterKey::ZCameraParameterKey(const ZCameraParameterKey& key)
   : ZParameterKey(key)
   , m_posTension(key.posTension())
   , m_posContinuity(key.posContinuity())
@@ -50,7 +50,7 @@ ZCameraParameterKey::ZCameraParameterKey(const ZCameraParameterKey &key)
   setType(key.type());
 }
 
-bool ZCameraParameterKey::readValue(const QJsonValue &value)
+bool ZCameraParameterKey::readValue(const QJsonValue& value)
 {
   if (!ZParameterKey::readValue(value)) {
     return false;

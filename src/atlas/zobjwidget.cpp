@@ -12,7 +12,7 @@
 
 namespace nim {
 
-ZObjWidget::ZObjWidget(ZDoc *doc, ZObjModel *objModel, QItemSelectionModel *selectionModel, QWidget *parent)
+ZObjWidget::ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* selectionModel, QWidget* parent)
   : QTreeView(parent)
   , m_doc(doc)
   , m_objModel(objModel)
@@ -29,10 +29,10 @@ ZObjWidget::ZObjWidget(ZDoc *doc, ZObjModel *objModel, QItemSelectionModel *sele
   setContextMenuPolicy(Qt::CustomContextMenu);
   sortByColumn(ZObjModel::TypeColumn);
   setStyleSheet(
-        "QTreeView::indicator:unchecked {image: url(:/icons/invisible.png);}"
-        "QTreeView::indicator:checked {image: url(:/icons/visible.png);}"
-        "QTreeView::indicator:indeterminate {image: url(:/icons/eye_half-512.png);}"
-        );
+    "QTreeView::indicator:unchecked {image: url(:/icons/invisible.png);}"
+      "QTreeView::indicator:checked {image: url(:/icons/visible.png);}"
+      "QTreeView::indicator:indeterminate {image: url(:/icons/eye_half-512.png);}"
+  );
 
   connect(this, &ZObjWidget::customContextMenuRequested, this, &ZObjWidget::contextMenu);
   connect(this, &ZObjWidget::clicked, this, &ZObjWidget::indexClicked);
@@ -68,24 +68,24 @@ ZObjWidget::ZObjWidget(ZDoc *doc, ZObjModel *objModel, QItemSelectionModel *sele
   adaptColumns();
 }
 
-void ZObjWidget::contextMenu(const QPoint &pos)
+void ZObjWidget::contextMenu(const QPoint& pos)
 {
   if (m_doc->numSelectedObjs() > 0) {
     m_contextMenu->popup(mapToGlobal(pos));
   }
 }
 
-void ZObjWidget::indexClicked(const QModelIndex &index)
+void ZObjWidget::indexClicked(const QModelIndex& index)
 {
   m_objModel->clicked(m_objProxyModel->mapToSource(index));
 }
 
-void ZObjWidget::indexDoubleClicked(const QModelIndex &index)
+void ZObjWidget::indexDoubleClicked(const QModelIndex& index)
 {
   m_objModel->doubleClicked(m_objProxyModel->mapToSource(index));
 }
 
-void ZObjWidget::indexActivated(const QModelIndex &index)
+void ZObjWidget::indexActivated(const QModelIndex& index)
 {
   m_objModel->activated(m_objProxyModel->mapToSource(index));
 }
@@ -100,16 +100,16 @@ void ZObjWidget::adaptColumns()
   resizeColumnToContents(ZObjModel::LockColumn);
 }
 
-void ZObjWidget::keyPressEvent(QKeyEvent *e)
+void ZObjWidget::keyPressEvent(QKeyEvent* e)
 {
-  switch(e->key()) {
-  case Qt::Key_Delete:
-  case Qt::Key_Backspace:
-    m_doc->removeSelectedObjs();
-    break;
-  default:
-    QTreeView::keyPressEvent(e);
-    break;
+  switch (e->key()) {
+    case Qt::Key_Delete:
+    case Qt::Key_Backspace:
+      m_doc->removeSelectedObjs();
+      break;
+    default:
+      QTreeView::keyPressEvent(e);
+      break;
   }
 }
 

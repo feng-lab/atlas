@@ -4,7 +4,7 @@
 
 namespace nim {
 
-Z3DTextureGlowRenderer::Z3DTextureGlowRenderer(Z3DRendererBase &rendererBase)
+Z3DTextureGlowRenderer::Z3DTextureGlowRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_glowTextureShaderGrp(rendererBase)
   , m_glowMode("Glow Mode")
@@ -14,18 +14,20 @@ Z3DTextureGlowRenderer::Z3DTextureGlowRenderer(Z3DRendererBase &rendererBase)
   , m_VAO(1)
 {
   m_blurScale.setSingleStep(0.5);
-  m_glowMode.addOptionsWithData(qMakePair<QString,QString>("Additive", "ADDITIVE_BLENDING"),
-                                qMakePair<QString,QString>("Screen", "SCREEN_BLENDING"),
-                                qMakePair<QString,QString>("Softlight", "SOFTLIGHT_BLENDING"),
-                                qMakePair<QString,QString>("Glowmap", "GLOWMAP")
-                                );
+  m_glowMode.addOptionsWithData(qMakePair<QString, QString>("Additive", "ADDITIVE_BLENDING"),
+                                qMakePair<QString, QString>("Screen", "SCREEN_BLENDING"),
+                                qMakePair<QString, QString>("Softlight", "SOFTLIGHT_BLENDING"),
+                                qMakePair<QString, QString>("Glowmap", "GLOWMAP")
+  );
   m_glowMode.select("Screen");
   connect(&m_glowMode, &ZStringStringOptionParameter::valueChanged, this, &Z3DTextureGlowRenderer::compile);
 
   m_blurXTextureShader.bindFragDataLocation(0, "FragData0");
-  m_blurXTextureShader.loadFromSourceFile("pass.vert", "blur.frag", m_rendererBase.generateHeader() + "#define ORIENTATION_X\n");
+  m_blurXTextureShader.loadFromSourceFile("pass.vert", "blur.frag",
+                                          m_rendererBase.generateHeader() + "#define ORIENTATION_X\n");
   m_blurYTextureShader.bindFragDataLocation(0, "FragData0");
-  m_blurYTextureShader.loadFromSourceFile("pass.vert", "blur.frag", m_rendererBase.generateHeader() + "#define ORIENTATION_Y\n");
+  m_blurYTextureShader.loadFromSourceFile("pass.vert", "blur.frag",
+                                          m_rendererBase.generateHeader() + "#define ORIENTATION_Y\n");
 
   QStringList allshaders;
   allshaders << "pass.vert" << "glow_func.frag";
@@ -81,7 +83,7 @@ void Z3DTextureGlowRenderer::render(Z3DEye eye)
   m_blurYTarget.release();
 
   m_glowTextureShaderGrp.bind();
-  Z3DShaderProgram &shader = m_glowTextureShaderGrp.get();
+  Z3DShaderProgram& shader = m_glowTextureShaderGrp.get();
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   shader.bindTexture("color_texture", m_colorTexture);
   shader.bindTexture("depth_texture", m_depthTexture);

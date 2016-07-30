@@ -10,9 +10,9 @@ namespace nim {
 
 class ZVideoEncoder : public QObject
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  ZVideoEncoder(QObject *parent = nullptr);
+  ZVideoEncoder(QObject* parent = nullptr);
 
   void encode(const QDir& dir, const QString& namePrefix, int fieldWidth,
               int framesPerSecond, const QString& outputFilename);
@@ -20,18 +20,24 @@ public:
   void cancel();
 
 signals:
+
   void error(QString);
+
   void finished();
+
   void canceled();
 
 protected:
   void ffmpegError(QProcess::ProcessError error);
+
   void ffmpegFinished(int exitCode, QProcess::ExitStatus exitStatus);
+
   void logStandardError();
+
   void logStandardOutput();
 
 private:
-  QProcess *m_ffmpegProcess;
+  QProcess* m_ffmpegProcess;
 
   bool m_lock;
 };

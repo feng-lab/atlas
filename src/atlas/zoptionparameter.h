@@ -18,20 +18,32 @@ template<class T, class T2 = int>
 class ZOptionParameter : public ZSingleValueParameter<T>
 {
 public:
-  ZOptionParameter(const QString &name, QObject *parent = NULL, const QString &prefix = "",
-                   const QString &suffix = "");
-  virtual ~ZOptionParameter() {}
+  ZOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
+                   const QString& suffix = "");
 
-  inline QString prefix() const { return m_prefix; }
-  inline QString suffix() const { return m_suffix; }
+  virtual ~ZOptionParameter()
+  {}
+
+  inline QString prefix() const
+  { return m_prefix; }
+
+  inline QString suffix() const
+  { return m_suffix; }
 
   void select(const T& value);
-  void selectNext();
-  bool isSelected(const T& value) const;
-  bool isEmpty() const { return m_options.empty(); }
-  bool hasOption(const T& value) const { return m_options.contains(value); }
 
-  inline T2 associatedData() const {return m_associatedData;}
+  void selectNext();
+
+  bool isSelected(const T& value) const;
+
+  bool isEmpty() const
+  { return m_options.empty(); }
+
+  bool hasOption(const T& value) const
+  { return m_options.contains(value); }
+
+  inline T2 associatedData() const
+  { return m_associatedData; }
 
   void addOption(const T& value)
   {
@@ -142,52 +154,66 @@ public:
     addOptionsWithData(op2, op3);
   }
 
-  inline void addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3, const QPair<T, T2>& op4)
+  inline void
+  addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3, const QPair<T, T2>& op4)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4);
   }
 
-  inline void addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3, const QPair<T, T2>& op4,
-                                 const QPair<T, T2>& op5)
+  inline void
+  addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3, const QPair<T, T2>& op4,
+                     const QPair<T, T2>& op5)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4, op5);
   }
 
-  inline void addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3, const QPair<T, T2>& op4,
-                                 const QPair<T, T2>& op5, const QPair<T, T2>& op6)
+  inline void
+  addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3, const QPair<T, T2>& op4,
+                     const QPair<T, T2>& op5, const QPair<T, T2>& op6)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4, op5, op6);
   }
 
-  inline void addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3, const QPair<T, T2>& op4,
-                                 const QPair<T, T2>& op5, const QPair<T, T2>& op6, const QPair<T, T2>& op7)
+  inline void
+  addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3, const QPair<T, T2>& op4,
+                     const QPair<T, T2>& op5, const QPair<T, T2>& op6, const QPair<T, T2>& op7)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4, op5, op6, op7);
   }
 
-  inline void addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3, const QPair<T, T2>& op4,
-                                 const QPair<T, T2>& op5, const QPair<T, T2>& op6, const QPair<T, T2>& op7, const QPair<T, T2>& op8)
+  inline void
+  addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3, const QPair<T, T2>& op4,
+                     const QPair<T, T2>& op5, const QPair<T, T2>& op6, const QPair<T, T2>& op7, const QPair<T, T2>& op8)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4, op5, op6, op7, op8);
   }
 
-  virtual void setSameAs(const ZParameter &rhs) override;
-  virtual bool supportInterpolation() const override { return false; }
+  virtual void setSameAs(const ZParameter& rhs) override;
+
+  virtual bool supportInterpolation() const override
+  { return false; }
+
   virtual QJsonValue jsonValue() const override;
-  virtual void readValue(const QJsonValue &jsonValue) override;
-  virtual void forceSetValueSameAs(const ZParameter &rhs) override;
+
+  virtual void readValue(const QJsonValue& jsonValue) override;
+
+  virtual void forceSetValueSameAs(const ZParameter& rhs) override;
 
 protected:
   virtual void reservedIntSlot1(int v) override;
+
   virtual QWidget* actualCreateWidget(QWidget* parent) override;
-  virtual void beforeChange(T &value) override;
+
+  virtual void beforeChange(T& value) override;
+
   virtual void makeValid(T& value) const override;
-  QString comboBoxItemString(const T &value) const;
+
+  QString comboBoxItemString(const T& value) const;
 
 private:
   QList<T> m_options;
@@ -199,28 +225,28 @@ private:
   QString m_suffix;
 };
 
-class ZStringIntOptionParameter : public ZOptionParameter<QString,int>
+class ZStringIntOptionParameter : public ZOptionParameter<QString, int>
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  ZStringIntOptionParameter(const QString &name, QObject *parent = NULL, const QString &prefix = "",
-                            const QString &suffix = "");
+  ZStringIntOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
+                            const QString& suffix = "");
 };
 
-class ZStringStringOptionParameter : public ZOptionParameter<QString,QString>
+class ZStringStringOptionParameter : public ZOptionParameter<QString, QString>
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  ZStringStringOptionParameter(const QString &name, QObject *parent = NULL, const QString &prefix = "",
-                               const QString &suffix = "");
+  ZStringStringOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
+                               const QString& suffix = "");
 };
 
-class ZIntIntOptionParameter : public ZOptionParameter<int,int>
+class ZIntIntOptionParameter : public ZOptionParameter<int, int>
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  ZIntIntOptionParameter(const QString &name, QObject *parent = NULL, const QString &prefix = "",
-                         const QString &suffix = "");
+  ZIntIntOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
+                         const QString& suffix = "");
 };
 
 } // namespace nim

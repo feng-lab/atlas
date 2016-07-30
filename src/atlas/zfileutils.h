@@ -9,9 +9,10 @@ class ZFileUtils
 {
 public:
   ZFileUtils();
+
   ~ZFileUtils();
 
-  static void showInGraphicalShell(const QString &filePath);
+  static void showInGraphicalShell(const QString& filePath);
 };
 
 } // namespace nim

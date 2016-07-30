@@ -4,17 +4,17 @@
 
 namespace nim {
 
-ZROIView::ZROIView(ZROIDoc &doc, ZView &view)
+ZROIView::ZROIView(ZROIDoc& doc, ZView& view)
   : ZFilterView<ZROIDoc, ZROIFilter>(doc, view)
 {
   docROIsAdded(m_doc.objs());
   connect(&m_doc, &ZROIDoc::objAdded, this, &ZROIView::docROIAdded);
 }
 
-void ZROIView::docROIsAdded(const QList<size_t> &objs)
+void ZROIView::docROIsAdded(const QList<size_t>& objs)
 {
-  for (int i=0; i<objs.size(); ++i) {
-    ZROIFilter *viewControl = new ZROIFilter(m_view);
+  for (int i = 0; i < objs.size(); ++i) {
+    ZROIFilter* viewControl = new ZROIFilter(m_view);
     viewControl->setData(m_doc.roi(objs[i]));
     expandBoundBox(viewControl->boundBox());
     m_idToFilter[objs[i]].reset(viewControl);
@@ -30,7 +30,7 @@ void ZROIView::docROIsAdded(const QList<size_t> &objs)
 
 void ZROIView::docROIAdded(size_t id)
 {
-  ZROIFilter *viewControl = new ZROIFilter(m_view);
+  ZROIFilter* viewControl = new ZROIFilter(m_view);
   viewControl->setData(m_doc.roi(id));
   expandBoundBox(viewControl->boundBox());
   m_idToFilter[id].reset(viewControl);

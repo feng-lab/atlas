@@ -5,36 +5,41 @@
 
 namespace nim {
 
-template <class T, class WeightT>
+template<class T, class WeightT>
 class ZVBGMM;
 
 #ifndef _USE_QTCONCURRENT_
+
 template<class T, class WeightT>
 class _ZVBGMMReduce
 {
-  const ZVBGMM<T,WeightT>* m_vbgmm;
+  const ZVBGMM<T, WeightT>* m_vbgmm;
 public:
-  typename ZVBGMM<T,WeightT>::Params m_result;
-  void operator()(const tbb::blocked_range<size_t>& range) {
-    for (size_t i=range.begin(); i != range.end(); ++i) {
-      typename ZVBGMM<T,WeightT>::Params inter = m_vbgmm->runOneAttempt();
+  typename ZVBGMM<T, WeightT>::Params m_result;
+
+  void operator()(const tbb::blocked_range<size_t>& range)
+  {
+    for (size_t i = range.begin(); i != range.end(); ++i) {
+      typename ZVBGMM<T, WeightT>::Params inter = m_vbgmm->runOneAttempt();
       if (m_result.loglikHist < inter.loglikHist)
         m_result.swap(inter);
     }
   }
 
-  _ZVBGMMReduce(_ZVBGMMReduce& x, tbb::split) : m_vbgmm(x.m_vbgmm) {}
+  _ZVBGMMReduce(_ZVBGMMReduce& x, tbb::split) : m_vbgmm(x.m_vbgmm)
+  {}
 
   void join(const _ZVBGMMReduce& y)
   {
     if (m_result.loglikHist < y.m_result.loglikHist)
-      m_result.swap(const_cast<typename ZVBGMM<T,WeightT>::Params&>(y.m_result));  //don't need intermediate result
+      m_result.swap(const_cast<typename ZVBGMM<T, WeightT>::Params&>(y.m_result));  //don't need intermediate result
   }
 
-  _ZVBGMMReduce(const ZVBGMM<T,WeightT>* vbgmm)
+  _ZVBGMMReduce(const ZVBGMM<T, WeightT>* vbgmm)
     : m_vbgmm(vbgmm)
   {}
 };
+
 #else
 template <class T, class WeightT>
 typename ZVBGMM<T,WeightT>::Params ZVBGMMRunOneAttempt(const ZVBGMM<T,WeightT>* t)
@@ -50,23 +55,25 @@ void ZVBGMMGetBestResult(typename ZVBGMM<T,WeightT>::Params &result, const typen
 }
 #endif
 
-template <class T, class WeightT = float>
+template<class T, class WeightT = float>
 class ZVBGMM
 {
 public:
 
-  typedef typename MaxFloatType<T,WeightT>::type ResultDataType;
+  typedef typename MaxFloatType<T, WeightT>::type ResultDataType;
   typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> MatrixXrt;  // matrix of result data type
   typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, 1> VectorXrt;  // vector of result data type
   typedef Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> RowVectorXrt; // row vector of result data type
 
-  struct Params {
+  struct Params
+  {
     Params()
       : loglikHist(std::numeric_limits<ResultDataType>::lowest())
       , iter(0)
     {}
 
-    inline void swap(Params &other) {
+    inline void swap(Params& other)
+    {
       alpha.swap(other.alpha);
       beta.swap(other.beta);
       W.swap(other.W);
@@ -84,7 +91,8 @@ public:
       std::swap(iter, other.iter);
     }
 
-    void display(const QString &paraName = "") const {
+    void display(const QString& paraName = "") const
+    {
       LOG(INFO) << "VBGMM " << paraName << " alpha: " << alpha;
       LOG(INFO) << "VBGMM " << paraName << " beta: " << beta;
       LOG(INFO) << "VBGMM " << paraName << " v: " << v;
@@ -116,23 +124,24 @@ public:
   };
 
 #ifndef _USE_QTCONCURRENT_
-  friend class _ZVBGMMReduce<T,WeightT>;
+
+  friend class _ZVBGMMReduce<T, WeightT>;
+
 #else
   friend Params ZVBGMMRunOneAttempt<T,WeightT>(const ZVBGMM<T,WeightT>* t);
 #endif
 
-  ZVBGMM(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> &data,
+  ZVBGMM(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& data,
          size_t nclasses, size_t nattempts = 10,
-         const MatrixXrt &m = MatrixXrt(0,0), ResultDataType alpha0 = 0.001,
-         ZTermCriteria<ResultDataType> termCriteria = ZTermCriteria<ResultDataType>(200,1e-5),
+         const MatrixXrt& m = MatrixXrt(0, 0), ResultDataType alpha0 = 0.001,
+         ZTermCriteria<ResultDataType> termCriteria = ZTermCriteria<ResultDataType>(200, 1e-5),
          IterAlgorithmLogLevel logLevel = IterAlgorithmLogLevel::Off)
-    : m_nclasses(nclasses), m_nattemps(nattempts),
-      m_m0(m), m_alpha0(alpha0), m_termCriteria(termCriteria),
-      m_logLevel(logLevel), m_hasWeight(false), m_hasInitData(false)
+    : m_nclasses(nclasses), m_nattemps(nattempts), m_m0(m), m_alpha0(alpha0), m_termCriteria(termCriteria)
+    , m_logLevel(logLevel), m_hasWeight(false), m_hasInitData(false)
   {
-    if (std::is_same<T,ResultDataType>::value) {
+    if (std::is_same<T, ResultDataType>::value) {
       // reinterpret_cast allowed (AliasedType is (possibly cv-qualified) DynamicType)
-      m_pData = reinterpret_cast<const MatrixXrt *>(&data);
+      m_pData = reinterpret_cast<const MatrixXrt*>(&data);
     } else {
       m_NonIntegerData = data.template cast<ResultDataType>();
       m_pData = &m_NonIntegerData;
@@ -141,17 +150,17 @@ public:
       initPrior();
   }
 
-  ZVBGMM(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> &data, const Eigen::Matrix<WeightT, Eigen::Dynamic, 1> &weight,
+  ZVBGMM(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& data,
+         const Eigen::Matrix<WeightT, Eigen::Dynamic, 1>& weight,
          size_t nclasses, size_t nattempts = 10,
-         const MatrixXrt &m = MatrixXrt(0,0), ResultDataType alpha0 = 0.001,
-         ZTermCriteria<ResultDataType> termCriteria = ZTermCriteria<ResultDataType>(200,1e-5),
+         const MatrixXrt& m = MatrixXrt(0, 0), ResultDataType alpha0 = 0.001,
+         ZTermCriteria<ResultDataType> termCriteria = ZTermCriteria<ResultDataType>(200, 1e-5),
          IterAlgorithmLogLevel logLevel = IterAlgorithmLogLevel::Off)
-    : m_nclasses(nclasses), m_nattemps(nattempts),
-      m_m0(m), m_alpha0(alpha0), m_termCriteria(termCriteria),
-      m_logLevel(logLevel), m_hasWeight(true), m_hasInitData(false)
+    : m_nclasses(nclasses), m_nattemps(nattempts), m_m0(m), m_alpha0(alpha0), m_termCriteria(termCriteria),
+    m_logLevel(logLevel), m_hasWeight(true), m_hasInitData(false)
   {
     bool hasZeroWeight = false;
-    for (int i=0; i<data.rows(); ++i) {
+    for (int i = 0; i < data.rows(); ++i) {
       if (weight(i) < std::numeric_limits<ResultDataType>::epsilon() * 1e3) {
         hasZeroWeight = true;
         break;
@@ -161,7 +170,7 @@ public:
       m_NonIntegerData = MatrixXrt(data.rows(), data.cols());
       m_NonIntegerWeight = VectorXrt(weight.rows());
       int numRows = 0;
-      for (int i=0; i<data.rows(); ++i) {
+      for (int i = 0; i < data.rows(); ++i) {
         if (weight(i) >= std::numeric_limits<ResultDataType>::epsilon() * 1e3) {
           m_NonIntegerData.row(numRows) = data.row(i).template cast<ResultDataType>();
           m_NonIntegerWeight(numRows++) = weight(i);
@@ -172,14 +181,14 @@ public:
       m_pData = &m_NonIntegerData;
       m_pWeight = &m_NonIntegerWeight;
     } else {
-      if (std::is_same<T,ResultDataType>::value) {
-        m_pData = reinterpret_cast<const MatrixXrt *>(&data);
+      if (std::is_same<T, ResultDataType>::value) {
+        m_pData = reinterpret_cast<const MatrixXrt*>(&data);
       } else {
         m_NonIntegerData = data.template cast<ResultDataType>();
         m_pData = &m_NonIntegerData;
       }
-      if (std::is_same<WeightT,ResultDataType>::value) {
-        m_pWeight = reinterpret_cast<const VectorXrt *>(&weight);
+      if (std::is_same<WeightT, ResultDataType>::value) {
+        m_pWeight = reinterpret_cast<const VectorXrt*>(&weight);
       } else {
         m_NonIntegerWeight = weight.template cast<ResultDataType>();
         m_pWeight = &m_NonIntegerWeight;
@@ -195,12 +204,13 @@ public:
   }
 
   // note: only used for testing, don't call this otherwise
-  void setInitData(const VectorXrt &mixingCoefficients, const MatrixXrt &centroids, const std::vector<MatrixXrt> &covars)
+  void
+  setInitData(const VectorXrt& mixingCoefficients, const MatrixXrt& centroids, const std::vector<MatrixXrt>& covars)
   {
-    assert(mixingCoefficients.rows() == centroids.rows());
-    assert(static_cast<size_t>(centroids.rows()) == covars.size());
-    assert(centroids.cols() == m_pData->cols());
-    assert(static_cast<size_t>(centroids.rows()) == m_nclasses);
+    CHECK(mixingCoefficients.rows() == centroids.rows());
+    CHECK(static_cast<size_t>(centroids.rows()) == covars.size());
+    CHECK(centroids.cols() == m_pData->cols());
+    CHECK(static_cast<size_t>(centroids.rows()) == m_nclasses);
     m_initMixingCoefficients = mixingCoefficients;
     m_initCentroids = centroids;
     m_initCovars = covars;
@@ -216,9 +226,9 @@ public:
 
     if (useMultithreading && m_nattemps > 1) {
 #ifndef _USE_QTCONCURRENT_
-      _ZVBGMMReduce<T,WeightT> vbgmm(this);
+      _ZVBGMMReduce<T, WeightT> vbgmm(this);
       tbb::parallel_reduce(tbb::blocked_range<size_t>(0, m_nattemps), vbgmm);
-      Params &result = vbgmm.m_result;
+      Params& result = vbgmm.m_result;
 #else
       QList<ZVBGMM<T,WeightT>*> alllist;
       for (size_t i=0; i<m_nattemps; i++) alllist.append(this);
@@ -242,7 +252,7 @@ public:
 
     ResultDataType bestLogLikHist = std::numeric_limits<ResultDataType>::lowest();
     size_t finalIter = 0;
-    for (size_t i=0; i<m_nattemps; ++i) {
+    for (size_t i = 0; i < m_nattemps; ++i) {
       //m_post.display("before init");
       if (m_hasInitData)
         initPostWithInitData(m_post);
@@ -277,21 +287,22 @@ public:
           //converged if the slope of the function falls below 'threshold',
           // i.e., |f(t) - f(t-1)| / avg < threshold,
           // where avg = (|f(t)| + |f(t-1)|)/2
-          ResultDataType avg = (std::abs(loglikHist) + std::abs(oldLoglikHist) + std::numeric_limits<ResultDataType>::epsilon()) / 2;
-          ResultDataType slope = std::abs(loglikHist-oldLoglikHist) / avg;
+          ResultDataType avg =
+            (std::abs(loglikHist) + std::abs(oldLoglikHist) + std::numeric_limits<ResultDataType>::epsilon()) / 2;
+          ResultDataType slope = std::abs(loglikHist - oldLoglikHist) / avg;
           if (iter > 0 && loglikHist - oldLoglikHist < -1.) {
             LOG(WARNING) << "Objective decreased! " << loglikHist << " " << oldLoglikHist;
           }
           done = m_termCriteria.meet(iter, slope);
         } else {
-          done = m_termCriteria.meet(iter, std::abs(loglikHist-oldLoglikHist));
+          done = m_termCriteria.meet(iter, std::abs(loglikHist - oldLoglikHist));
         }
 
         if (m_logLevel == IterAlgorithmLogLevel::Iter) {
           if (m_nattemps == 1) {
             LOG(INFO) << "VBGMM Iter: " << iter << " Loglikelihood: " << loglikHist;
           } else {
-            LOG(INFO) << "VBGMM attempt " << i+1 << " Iter: " << iter << " Loglikelihood: " << loglikHist;
+            LOG(INFO) << "VBGMM attempt " << i + 1 << " Iter: " << iter << " Loglikelihood: " << loglikHist;
           }
         }
         iter++;
@@ -300,7 +311,7 @@ public:
       if (loglikHist > bestLogLikHist) {
         bestLogLikHist = loglikHist;
         composeResults(m_post);
-        finalIter = iter-1;
+        finalIter = iter - 1;
       }
     }
     if (m_logLevel == IterAlgorithmLogLevel::Final || m_logLevel == IterAlgorithmLogLevel::Iter) {
@@ -315,14 +326,22 @@ public:
     return bestLogLikHist;
   }
 
-  inline int numOfClusters() const {return m_result.m.rows(); }
-  inline MatrixXrt centroids() const { return m_result.m; }
-  inline MatrixXrt covar(size_t compIdx) const { return m_result.invW[compIdx]/(m_result.v(compIdx)-m_dimension-1); }
+  inline int numOfClusters() const
+  { return m_result.m.rows(); }
+
+  inline MatrixXrt centroids() const
+  { return m_result.m; }
+
+  inline MatrixXrt covar(size_t compIdx) const
+  { return m_result.invW[compIdx] / (m_result.v(compIdx) - m_dimension - 1); }
+
   Eigen::VectorXi labels() const
   {
     return m_resultLabels;
   }
-  inline MatrixXrt responsiblities() const { return m_resultRnk; }
+
+  inline MatrixXrt responsiblities() const
+  { return m_resultRnk; }
 
 protected:
 
@@ -344,9 +363,9 @@ protected:
     }
 
     size_t nUniqueData = 0;
-    std::set<VectorXrt,ZVectorCompare<ResultDataType>> myset;
-    std::pair<typename std::set<VectorXrt,ZVectorCompare<ResultDataType>>::iterator,bool> ret;
-    for (int r=0; r < m_pData->rows(); r++) {
+    std::set<VectorXrt, ZVectorCompare<ResultDataType>> myset;
+    std::pair<typename std::set<VectorXrt, ZVectorCompare<ResultDataType>>::iterator, bool> ret;
+    for (int r = 0; r < m_pData->rows(); r++) {
       ret = myset.insert(m_pData->row(r));
       if (ret.second != false) {
         nUniqueData++;
@@ -371,14 +390,14 @@ protected:
       //m = centre.colwise().replicate(m_nclasses);
       m_m0 = MatrixXrt::Zero(m_nclasses, m_pData->cols());
     } else {
-      assert(m_m0.cols() == m_pData->cols() && m_m0.rows() == static_cast<int>(m_nclasses));
+      CHECK(m_m0.cols() == m_pData->cols() && m_m0.rows() == static_cast<int>(m_nclasses));
     }
     if (m_hasWeight) {
       // define a vague prior
       VectorXrt alpha = VectorXrt::Ones(m_nclasses) * m_alpha0;
       VectorXrt beta = VectorXrt::Ones(m_nclasses);   // low precision for mean
       std::vector<MatrixXrt> W;
-      for (size_t i=0; i<m_nclasses; i++) {
+      for (size_t i = 0; i < m_nclasses; i++) {
         W.push_back(200 * MatrixXrt::Identity(m_dimension, m_dimension));
       }
       VectorXrt v = VectorXrt::Ones(m_nclasses) * 20;
@@ -388,7 +407,7 @@ protected:
       VectorXrt alpha = VectorXrt::Ones(m_nclasses) * m_alpha0;
       VectorXrt beta = VectorXrt::Ones(m_nclasses);   // low precision for mean
       std::vector<MatrixXrt> W;
-      for (size_t i=0; i<m_nclasses; i++) {
+      for (size_t i = 0; i < m_nclasses; i++) {
         W.push_back(200 * MatrixXrt::Identity(m_dimension, m_dimension));
       }
       VectorXrt v = VectorXrt::Ones(m_nclasses) * 20;
@@ -396,12 +415,13 @@ protected:
     }
   }
 
-  void initPostWithGMM(Params &post) const
+  void initPostWithGMM(Params& post) const
   {
     if (m_hasWeight) {
       ResultDataType numData = m_pWeight->sum();
       ZGMM<ResultDataType, ResultDataType> gmm(*m_pData, *m_pWeight, m_nclasses,
-                                               true, ZGMM<ResultDataType, ResultDataType>::CovarianceType::Full, ZTermCriteria<ResultDataType>(200,1e-5));
+                                               true, ZGMM<ResultDataType, ResultDataType>::CovarianceType::Full,
+                                               ZTermCriteria<ResultDataType>(200, 1e-5));
       gmm.setLogLevel(m_logLevel);
       gmm.runEM();
 
@@ -412,7 +432,7 @@ protected:
       if (gmm.numOfClusters() < m_nclasses) {
         Nk.conservativeResize(m_nclasses);
         xbar.conservativeResize(m_nclasses, m_dimension);
-        for (size_t i=gmm.numOfClusters(); i<m_nclasses; ++i) {
+        for (size_t i = gmm.numOfClusters(); i < m_nclasses; ++i) {
           Nk(i) = 0;
           xbar.row(i) = RowVectorXrt::Zero(m_dimension);
           S.push_back(MatrixXrt::Zero(m_dimension, m_dimension));
@@ -423,7 +443,8 @@ protected:
     } else {
       ResultDataType numData = m_pData->rows();
       ZGMM<ResultDataType, ResultDataType> gmm(*m_pData, m_nclasses,
-                                               true, ZGMM<ResultDataType, ResultDataType>::CovarianceType::Full, ZTermCriteria<ResultDataType>(200,1e-5));
+                                               true, ZGMM<ResultDataType, ResultDataType>::CovarianceType::Full,
+                                               ZTermCriteria<ResultDataType>(200, 1e-5));
       gmm.setLogLevel(m_logLevel);
       gmm.runEM();
 
@@ -438,7 +459,7 @@ protected:
       if (gmm.numOfClusters() < m_nclasses) {
         Nk.conservativeResize(m_nclasses);
         xbar.conservativeResize(m_nclasses, m_dimension);
-        for (size_t i=gmm.numOfClusters(); i<m_nclasses; ++i) {
+        for (size_t i = gmm.numOfClusters(); i < m_nclasses; ++i) {
           Nk(i) = 0;
           xbar.row(i) = RowVectorXrt::Zero(m_dimension);
           S.push_back(MatrixXrt::Zero(m_dimension, m_dimension));
@@ -449,7 +470,7 @@ protected:
     }
   }
 
-  void initPostWithInitData(Params &post) const
+  void initPostWithInitData(Params& post) const
   {
     ResultDataType numData;
     if (m_hasWeight) {
@@ -464,22 +485,23 @@ protected:
     Mstep(Nk, xbar, S, post);
   }
 
-  void Mstep(VectorXrt &Nk, MatrixXrt &xbar, std::vector<MatrixXrt> &S, Params &post) const
+  void Mstep(VectorXrt& Nk, MatrixXrt& xbar, std::vector<MatrixXrt>& S, Params& post) const
   {
     VectorXrt alpha = m_prior.alpha + Nk; // 10.58
     VectorXrt beta = m_prior.beta + Nk;  // 10.60
     MatrixXrt m = MatrixXrt::Zero(m_nclasses, m_dimension);
     VectorXrt v = VectorXrt::Zero(m_nclasses);
     std::vector<MatrixXrt> invW;
-    for (size_t k=0; k<m_nclasses; k++) {
+    for (size_t k = 0; k < m_nclasses; k++) {
       if (Nk(k) < 0.001) { // extinguished
         m.row(k) = m_prior.m.row(k);
         invW.push_back(m_prior.invW[k]);
         v(k) = m_prior.v(k);
       } else {
-        m.row(k) = (m_prior.beta(k)*m_prior.m.row(k) + Nk(k)*xbar.row(k)) / beta(k); //10.61
-        invW.push_back(m_prior.invW[k] + Nk(k)*S[k]
-                       + (m_prior.beta(k)*Nk(k) / (m_prior.beta(k)+Nk(k))) * (xbar.row(k)-m_prior.m.row(k)).transpose() * (xbar.row(k)-m_prior.m.row(k))); // 10.62
+        m.row(k) = (m_prior.beta(k) * m_prior.m.row(k) + Nk(k) * xbar.row(k)) / beta(k); //10.61
+        invW.push_back(m_prior.invW[k] + Nk(k) * S[k]
+                       + (m_prior.beta(k) * Nk(k) / (m_prior.beta(k) + Nk(k))) *
+                         (xbar.row(k) - m_prior.m.row(k)).transpose() * (xbar.row(k) - m_prior.m.row(k))); // 10.62
         v(k) = m_prior.v(k) + Nk(k); //10.63
       }
     }
@@ -487,16 +509,17 @@ protected:
     //displayParams(m_post);
   }
 
-  ResultDataType lowerBound(const VectorXrt &Nk, const MatrixXrt &xbar, const std::vector<MatrixXrt> &S, const Params &post) const  // Bishop sec 10.2.2
+  ResultDataType lowerBound(const VectorXrt& Nk, const MatrixXrt& xbar, const std::vector<MatrixXrt>& S,
+                            const Params& post) const  // Bishop sec 10.2.2
   {
     // 10.71
     VectorXrt ElogpXall = VectorXrt::Zero(m_nclasses);
-    for (size_t k=0; k<m_nclasses; k++) {
+    for (size_t k = 0; k < m_nclasses; k++) {
       RowVectorXrt xbarc = xbar.row(k) - post.m.row(k);
-      ElogpXall(k) = 0.5*Nk(k)*(post.logLambdaTilde(k) - m_dimension/post.beta(k)
-                                - (post.v(k)*S[k]*post.W[k]).trace()
-                                - post.v(k)*(((xbarc*post.W[k]).array()*xbarc.array()).sum())
-                                - m_dimension*std::log(2*M_PI));
+      ElogpXall(k) = 0.5 * Nk(k) * (post.logLambdaTilde(k) - m_dimension / post.beta(k)
+                                    - (post.v(k) * S[k] * post.W[k]).trace()
+                                    - post.v(k) * (((xbarc * post.W[k]).array() * xbarc.array()).sum())
+                                    - m_dimension * std::log(2 * M_PI));
     }
     ResultDataType ElogpX = ElogpXall.sum();
 
@@ -504,15 +527,18 @@ protected:
     ResultDataType ElogpZ = (Nk.array() * post.logPiTilde.array()).sum();
 
     // 10.73
-    ResultDataType Elogppi = m_prior.logDirConst + (post.logPiTilde*(m_alpha0-1)).sum();
+    ResultDataType Elogppi = m_prior.logDirConst + (post.logPiTilde * (m_alpha0 - 1)).sum();
 
     // 10.74
     VectorXrt ElogpmuSigmaAll = VectorXrt::Zero(m_nclasses);
-    for (size_t k=0; k<m_nclasses; k++) {
+    for (size_t k = 0; k < m_nclasses; k++) {
       RowVectorXrt mc = post.m.row(k) - m_prior.m.row(k);
-      ElogpmuSigmaAll(k) = 0.5*(m_dimension*std::log(m_prior.beta(k)/(2*M_PI)) + post.logLambdaTilde(k) - m_dimension*m_prior.beta(k)/post.beta(k)
-                                - m_prior.beta(k)*post.v(k)*((mc*post.W[k]).array()*mc.array()).sum()) + m_prior.logWishartConst(k)
-          + 0.5*(m_prior.v(k)-m_dimension-1)*post.logLambdaTilde(k) - 0.5*post.v(k)*((m_prior.invW[k]*post.W[k]).trace());
+      ElogpmuSigmaAll(k) = 0.5 * (m_dimension * std::log(m_prior.beta(k) / (2 * M_PI)) + post.logLambdaTilde(k) -
+                                  m_dimension * m_prior.beta(k) / post.beta(k)
+                                  - m_prior.beta(k) * post.v(k) * ((mc * post.W[k]).array() * mc.array()).sum()) +
+                           m_prior.logWishartConst(k)
+                           + 0.5 * (m_prior.v(k) - m_dimension - 1) * post.logLambdaTilde(k) -
+                           0.5 * post.v(k) * ((m_prior.invW[k] * post.W[k]).trace());
     }
     ResultDataType ElogpmuSigma = ElogpmuSigmaAll.sum();
 
@@ -520,42 +546,50 @@ protected:
     // 10.75//
     ResultDataType ElogqZ;
     if (m_hasWeight)
-      ElogqZ = ((post.rnk.array()*post.logrnk.array()).rowwise().sum() * (*m_pWeight).array()).sum();
+      ElogqZ = ((post.rnk.array() * post.logrnk.array()).rowwise().sum() * (*m_pWeight).array()).sum();
     else
-      ElogqZ = (post.rnk.array()*post.logrnk.array()).sum();
+      ElogqZ = (post.rnk.array() * post.logrnk.array()).sum();
 
     // 10.76
-    ResultDataType Elogqpi = (post.logPiTilde.array() * (post.alpha.array()-1)).sum() + post.logDirConst;
+    ResultDataType Elogqpi = (post.logPiTilde.array() * (post.alpha.array() - 1)).sum() + post.logDirConst;
 
     // 10.77//
-    ResultDataType ElogqmuSigma = (0.5*post.logLambdaTilde.array() + m_dimension/2. * log(post.beta.array()/(2*M_PI)) - m_dimension/2. - post.entropy.array()).sum();
+    ResultDataType ElogqmuSigma = (0.5 * post.logLambdaTilde.array() +
+                                   m_dimension / 2. * log(post.beta.array() / (2 * M_PI)) - m_dimension / 2. -
+                                   post.entropy.array()).sum();
 
     // overall sum
     // 10.70
     return ElogpX + ElogpZ + Elogppi + ElogpmuSigma - ElogqZ - Elogqpi - ElogqmuSigma;
   }
 
-  void computeEss(VectorXrt &Nk, MatrixXrt &xbar, std::vector<MatrixXrt> &S, const Params &post) const
+  void computeEss(VectorXrt& Nk, MatrixXrt& xbar, std::vector<MatrixXrt>& S, const Params& post) const
   {
     if (m_hasWeight) {
-      Nk = post.rnk.cwiseProduct((*m_pWeight)*RowVectorXrt::Ones(post.rnk.cols())).colwise().sum();
+      Nk = post.rnk.cwiseProduct((*m_pWeight) * RowVectorXrt::Ones(post.rnk.cols())).colwise().sum();
       Nk = Nk.array() + 1e-10;
       xbar = MatrixXrt::Zero(m_nclasses, m_dimension);
       S.clear();
-      for (size_t k=0; k<m_nclasses; k++) {
-        xbar.row(k) = (m_pData->array() * (post.rnk.col(k)*RowVectorXrt::Ones(m_dimension)).array() * ((*m_pWeight)*RowVectorXrt::Ones(m_dimension)).array() ).colwise().sum() / Nk(k); // 10.52
+      for (size_t k = 0; k < m_nclasses; k++) {
+        xbar.row(k) = (m_pData->array() * (post.rnk.col(k) * RowVectorXrt::Ones(m_dimension)).array() *
+                       ((*m_pWeight) * RowVectorXrt::Ones(m_dimension)).array()).colwise().sum() / Nk(k); // 10.52
         MatrixXrt XC = m_pData->rowwise() - xbar.row(k);
-        S.push_back((XC.array() * (post.rnk.col(k)*RowVectorXrt::Ones(m_dimension)).array() * ((*m_pWeight)*RowVectorXrt::Ones(m_dimension)).array() ).matrix().transpose() * XC / Nk(k)); // 10.53
+        S.push_back((XC.array() * (post.rnk.col(k) * RowVectorXrt::Ones(m_dimension)).array() *
+                     ((*m_pWeight) * RowVectorXrt::Ones(m_dimension)).array()).matrix().transpose() * XC /
+                    Nk(k)); // 10.53
       }
     } else {
       Nk = post.rnk.colwise().sum();
       Nk = Nk.array() + 1e-10;
       xbar = MatrixXrt::Zero(m_nclasses, m_dimension);
       S.clear();
-      for (size_t k=0; k<m_nclasses; k++) {
-        xbar.row(k) = (m_pData->array() * (post.rnk.col(k)*RowVectorXrt::Ones(m_dimension)).array()).colwise().sum() / Nk(k); // 10.52
+      for (size_t k = 0; k < m_nclasses; k++) {
+        xbar.row(k) = (m_pData->array() * (post.rnk.col(k) * RowVectorXrt::Ones(m_dimension)).array()).colwise().sum() /
+                      Nk(k); // 10.52
         MatrixXrt XC = m_pData->rowwise() - xbar.row(k);
-        S.push_back((XC.array() * (post.rnk.col(k)*RowVectorXrt::Ones(m_dimension)).array()).matrix().transpose() * XC / Nk(k)); // 10.53
+        S.push_back(
+          (XC.array() * (post.rnk.col(k) * RowVectorXrt::Ones(m_dimension)).array()).matrix().transpose() * XC /
+          Nk(k)); // 10.53
       }
     }
   }
@@ -563,23 +597,25 @@ protected:
   // update rnk, logrnk
   // rnk = p(z=k|X(i,:), model) soft responsibility
   // return logprob of observed data log p(X(i,:) | model)
-  VectorXrt mixGaussBayesInfer(Params &post) const
+  VectorXrt mixGaussBayesInfer(Params& post) const
   {
     MatrixXrt E(m_pData->rows(), m_nclasses);
-    for (size_t k=0; k<m_nclasses; k++) {
+    for (size_t k = 0; k < m_nclasses; k++) {
       MatrixXrt XC = m_pData->rowwise() - post.m.row(k);
-      E.col(k) = m_dimension/post.beta(k) + (post.v(k)*(((XC*post.W[k]).cwiseProduct(XC)).rowwise().sum())).array(); // 10.64
+      E.col(k) = m_dimension / post.beta(k) +
+                 (post.v(k) * (((XC * post.W[k]).cwiseProduct(XC)).rowwise().sum())).array(); // 10.64
     }
-    MatrixXrt logRho = (post.logPiTilde+0.5*post.logLambdaTilde).transpose().colwise().replicate(m_pData->rows()) - 0.5*E;
+    MatrixXrt logRho =
+      (post.logPiTilde + 0.5 * post.logLambdaTilde).transpose().colwise().replicate(m_pData->rows()) - 0.5 * E;
     VectorXrt logSumRho = ZEigenUtils::logsumexpRow(logRho);
     post.logrnk = logRho - logSumRho.rowwise().replicate(m_nclasses);
     post.rnk = exp(post.logrnk.array());
     return logSumRho;
   }
 
-  void mixGaussBayesStructure(VectorXrt &alpha, VectorXrt &beta, MatrixXrt &m, VectorXrt &v,
-                              std::vector<MatrixXrt> &W,
-                              bool isInvW, Params &out) const
+  void mixGaussBayesStructure(VectorXrt& alpha, VectorXrt& beta, MatrixXrt& m, VectorXrt& v,
+                              std::vector<MatrixXrt>& W,
+                              bool isInvW, Params& out) const
   {
     out.alpha.swap(alpha);
     out.beta.swap(beta);
@@ -588,13 +624,13 @@ protected:
     if (isInvW) {
       out.invW.swap(W);
       out.W.clear();
-      for (size_t i=0; i<m_nclasses; i++) {
+      for (size_t i = 0; i < m_nclasses; i++) {
         out.W.push_back(out.invW[i].inverse());
       }
     } else {
       out.W.swap(W);
       out.invW.clear();
-      for (size_t i=0; i<m_nclasses; i++) {
+      for (size_t i = 0; i < m_nclasses; i++) {
         out.invW.push_back(out.W[i].inverse());
       }
     }
@@ -602,20 +638,21 @@ protected:
     //LOG(INFO) << out.alpha;
     //LOG(INFO) << out.alpha.sum();
     //out.display();
-    out.logPiTilde = ZEigenUtils::matrixDigamma(out.alpha).array() -ZEigenUtils::digamma(out.alpha.sum());  //10.66
+    out.logPiTilde = ZEigenUtils::matrixDigamma(out.alpha).array() - ZEigenUtils::digamma(out.alpha.sum());  //10.66
     out.logDirConst = ZEigenUtils::gammaln(out.alpha.sum()) - ZEigenUtils::matrixGammaln(out.alpha).sum(); // B.23
     out.logLambdaTilde = VectorXrt::Zero(m_nclasses);
     out.logWishartConst = VectorXrt::Zero(m_nclasses);
     out.entropy = VectorXrt::Zero(m_nclasses);
-    for (size_t k=0; k<m_nclasses; k++) {
+    for (size_t k = 0; k < m_nclasses; k++) {
       ResultDataType logdetW = ZEigenUtils::logdet(out.W[k]);
-      VectorXrt tmp = (VectorXrt::LinSpaced(m_dimension, -static_cast<int>(m_dimension), -1).array() + out.v(k) + 1)*0.5;
+      VectorXrt tmp =
+        (VectorXrt::LinSpaced(m_dimension, -static_cast<int>(m_dimension), -1).array() + out.v(k) + 1) * 0.5;
       out.logLambdaTilde(k) = ZEigenUtils::matrixDigamma(tmp).sum()
-          + m_dimension*std::log(2.0) + logdetW; // B.81
-      out.logWishartConst(k) = -(out.v(k)/2.0)*logdetW - (out.v(k)*m_dimension/2.)*std::log(2.0)
-          - ZEigenUtils::mvtGammaln(m_dimension, out.v(k)/2.0); // B.79
-      out.entropy(k) = -out.logWishartConst(k) - (out.v(k)-m_dimension-1)/2*out.logLambdaTilde(k)
-          + out.v(k)*m_dimension/2.; // B.82
+                              + m_dimension * std::log(2.0) + logdetW; // B.81
+      out.logWishartConst(k) = -(out.v(k) / 2.0) * logdetW - (out.v(k) * m_dimension / 2.) * std::log(2.0)
+                               - ZEigenUtils::mvtGammaln(m_dimension, out.v(k) / 2.0); // B.79
+      out.entropy(k) = -out.logWishartConst(k) - (out.v(k) - m_dimension - 1) / 2 * out.logLambdaTilde(k)
+                       + out.v(k) * m_dimension / 2.; // B.82
     }
   }
 
@@ -646,14 +683,15 @@ protected:
         //converged if the slope of the function falls below 'threshold',
         // i.e., |f(t) - f(t-1)| / avg < threshold,
         // where avg = (|f(t)| + |f(t-1)|)/2
-        ResultDataType avg = (std::abs(loglikHist) + std::abs(post.loglikHist) + std::numeric_limits<ResultDataType>::epsilon()) / 2;
-        ResultDataType slope = std::abs(loglikHist-post.loglikHist) / avg;
+        ResultDataType avg =
+          (std::abs(loglikHist) + std::abs(post.loglikHist) + std::numeric_limits<ResultDataType>::epsilon()) / 2;
+        ResultDataType slope = std::abs(loglikHist - post.loglikHist) / avg;
         if (iter > 0 && loglikHist - post.loglikHist < -1.) {
           LOG(WARNING) << "Objective decreased! " << loglikHist << " " << post.loglikHist;
         }
         done = m_termCriteria.meet(iter, slope);
       } else {
-        done = m_termCriteria.meet(iter, std::abs(loglikHist-post.loglikHist));
+        done = m_termCriteria.meet(iter, std::abs(loglikHist - post.loglikHist));
       }
 
       if (m_logLevel == IterAlgorithmLogLevel::Iter) {
@@ -662,12 +700,12 @@ protected:
       iter++;
       post.loglikHist = loglikHist;
     }
-    post.iter = iter-1;
+    post.iter = iter - 1;
 
     return post;
   }
 
-  void composeResults(Params &post)   // remove extinguished components, assign labels
+  void composeResults(Params& post)   // remove extinguished components, assign labels
   {
     int idx = 0;
     m_result.alpha = VectorXrt::Zero(m_nclasses);
@@ -682,7 +720,7 @@ protected:
     m_result.logWishartConst = VectorXrt::Zero(m_nclasses);
     m_result.entropy = VectorXrt::Zero(m_nclasses);
     m_resultRnk = MatrixXrt::Zero(post.rnk.rows(), post.rnk.cols());
-    for (size_t k=0; k<m_nclasses; k++) {
+    for (size_t k = 0; k < m_nclasses; k++) {
       if (post.v(k) > m_prior.v(k)) {
         m_result.alpha(idx) = post.alpha(k);
         m_result.beta(idx) = post.beta(k);
@@ -710,7 +748,7 @@ protected:
     // assign labels
     typename RowVectorXrt::Index index;
     m_resultLabels = Eigen::VectorXi::Zero(m_pData->rows());
-    for (int i=0; i<m_resultLabels.size(); i++) {
+    for (int i = 0; i < m_resultLabels.size(); i++) {
       m_resultRnk.row(i).maxCoeff(&index);
       m_resultLabels(i) = index;
     }
@@ -738,8 +776,8 @@ private:
 
   MatrixXrt m_NonIntegerData;
   VectorXrt m_NonIntegerWeight;
-  const MatrixXrt *m_pData;
-  const VectorXrt *m_pWeight;
+  const MatrixXrt* m_pData;
+  const VectorXrt* m_pWeight;
 
   bool m_hasEnoughData;      //
 

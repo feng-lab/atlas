@@ -4,19 +4,19 @@
 
 namespace nim {
 
-Z3DSwcView::Z3DSwcView(ZSwcDoc &doc, Z3DView &view)
+Z3DSwcView::Z3DSwcView(ZSwcDoc& doc, Z3DView& view)
   : Z3DFilterView<ZSwcDoc, Z3DSwcFilter>(doc, view)
 {
   docSwcsAdded(m_doc.objs());
   connect(&m_doc, &ZSwcDoc::objAdded, this, &Z3DSwcView::docSwcAdded);
 }
 
-void Z3DSwcView::docSwcsAdded(const QList<size_t> &objs)
+void Z3DSwcView::docSwcsAdded(const QList<size_t>& objs)
 {
   try {
-    for (int i=0; i<objs.size(); ++i) {
+    for (int i = 0; i < objs.size(); ++i) {
       size_t id = objs[i];
-      Z3DSwcFilter *viewControl = new Z3DSwcFilter(globalParas(), this);
+      Z3DSwcFilter* viewControl = new Z3DSwcFilter(globalParas(), this);
       viewControl->setData(m_doc.swc(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
@@ -33,12 +33,12 @@ void Z3DSwcView::docSwcsAdded(const QList<size_t> &objs)
       networkEvaluator().updateNetwork();
       m_view.updateBoundBox();
 
-      for (int i=0; i<objs.size(); ++i) {
+      for (int i = 0; i < objs.size(); ++i) {
         emit objViewReady(objs[i]);
       }
     }
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     LOG(ERROR) << "Failed to render swc: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render swc"), e.what());
   }
@@ -47,7 +47,7 @@ void Z3DSwcView::docSwcsAdded(const QList<size_t> &objs)
 void Z3DSwcView::docSwcAdded(size_t id)
 {
   try {
-    Z3DSwcFilter *viewControl = new Z3DSwcFilter(globalParas(), this);
+    Z3DSwcFilter* viewControl = new Z3DSwcFilter(globalParas(), this);
     viewControl->setData(m_doc.swc(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
@@ -65,7 +65,7 @@ void Z3DSwcView::docSwcAdded(size_t id)
 
     emit objViewReady(id);
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     LOG(ERROR) << "Failed to render swc: " << e.what();
     QMessageBox::critical(&m_view.canvas(), tr("Failed to render swc"), e.what());
   }

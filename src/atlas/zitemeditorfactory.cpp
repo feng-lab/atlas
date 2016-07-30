@@ -8,10 +8,10 @@ ZItemEditorFactory::ZItemEditorFactory()
 {
 }
 
-QWidget *ZItemEditorFactory::createEditor(int type, QWidget *parent) const
+QWidget* ZItemEditorFactory::createEditor(int type, QWidget* parent) const
 {
   if (type == QVariant::Double) {
-    QDoubleSpinBox *sb = new QDoubleSpinBox(parent);
+    QDoubleSpinBox* sb = new QDoubleSpinBox(parent);
     sb->setFrame(false);
     sb->setDecimals(10);
     sb->setSingleStep(1e-10);

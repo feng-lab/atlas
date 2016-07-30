@@ -5,7 +5,7 @@
 
 namespace nim {
 
-ZObjView::ZObjView(ZView &view)
+ZObjView::ZObjView(ZView& view)
   : QObject(&view)
   , m_view(view)
 {
@@ -32,7 +32,7 @@ void ZObjView::resetBoundBox()
   m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = m_boundBox[7] = std::numeric_limits<int>::min();
 }
 
-void ZObjView::expandBoundBox(const std::vector<int> &boundBox)
+void ZObjView::expandBoundBox(const std::vector<int>& boundBox)
 {
   m_boundBox[0] = std::min(boundBox[0], m_boundBox[0]);
   m_boundBox[1] = std::max(boundBox[1], m_boundBox[1]);

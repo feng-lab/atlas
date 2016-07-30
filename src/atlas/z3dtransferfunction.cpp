@@ -10,8 +10,8 @@
 
 namespace nim {
 
-Z3DTransferFunction::Z3DTransferFunction(double min, double max, const glm::col4 &minColor,
-                                         const glm::col4 &maxColor, uint32_t width, QObject *parent)
+Z3DTransferFunction::Z3DTransferFunction(double min, double max, const glm::col4& minColor,
+                                         const glm::col4& maxColor, uint32_t width, QObject* parent)
   : ZColorMap(min, max, minColor, maxColor, parent)
   , m_dimensions(width, 1, 1)
   , m_textureFormat(GL_BGRA)
@@ -27,7 +27,7 @@ Z3DTransferFunction::Z3DTransferFunction(const Z3DTransferFunction& tf)
 {
 }
 
-Z3DTransferFunction::Z3DTransferFunction(Z3DTransferFunction &&tf) noexcept
+Z3DTransferFunction::Z3DTransferFunction(Z3DTransferFunction&& tf) noexcept
 {
   swap(tf);
 }
@@ -36,7 +36,7 @@ Z3DTransferFunction::~Z3DTransferFunction()
 {
 }
 
-void Z3DTransferFunction::swap(Z3DTransferFunction &other) noexcept
+void Z3DTransferFunction::swap(Z3DTransferFunction& other) noexcept
 {
   ZColorMap::swap(other);
   std::swap(m_dimensions, other.m_dimensions);
@@ -65,7 +65,7 @@ bool Z3DTransferFunction::operator!=(const Z3DTransferFunction& tf) const
 
 void Z3DTransferFunction::resetToDefault()
 {
-  reset(0., 1., glm::col4(0,0,0,0), glm::col4(255,255,255,255));
+  reset(0., 1., glm::col4(0, 0, 0, 0), glm::col4(255, 255, 255, 255));
   emit changed();
 }
 
@@ -129,7 +129,7 @@ void Z3DTransferFunction::updateTexture()
 
   std::vector<glm::col4> tfData(m_dimensions.x);
   for (size_t x = 0; x < tfData.size(); ++x)
-    tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size()-1));
+    tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size() - 1));
   m_texture->uploadImage(tfData.data());
   CHECK_GL_ERROR;
 
@@ -152,23 +152,24 @@ bool Z3DTransferFunction::isValidDomainMax(double max) const
     return false;
 }
 
-Z3DTransferFunctionParameter::Z3DTransferFunctionParameter(const QString &name, QObject *parent)
+Z3DTransferFunctionParameter::Z3DTransferFunctionParameter(const QString& name, QObject* parent)
   : ZSingleValueParameter<Z3DTransferFunction>(name, parent)
-  , m_volume(NULL)
+  , m_volume(nullptr)
 {
   connect(&m_value, &Z3DTransferFunction::changed, this, &Z3DTransferFunctionParameter::valueChanged);
 }
 
-Z3DTransferFunctionParameter::Z3DTransferFunctionParameter(const QString &name, double min, double max, const glm::col4 &minColor,
-                                                           const glm::col4 &maxColor, int width, QObject *parent)
+Z3DTransferFunctionParameter::Z3DTransferFunctionParameter(const QString& name, double min, double max,
+                                                           const glm::col4& minColor,
+                                                           const glm::col4& maxColor, int width, QObject* parent)
   : ZSingleValueParameter<Z3DTransferFunction>(name, parent)
-  , m_volume(NULL)
+  , m_volume(nullptr)
 {
   m_value = Z3DTransferFunction(min, max, minColor, maxColor, width);
   connect(&m_value, &Z3DTransferFunction::changed, this, &Z3DTransferFunctionParameter::valueChanged);
 }
 
-void Z3DTransferFunctionParameter::setVolume(Z3DVolume *volume)
+void Z3DTransferFunctionParameter::setVolume(Z3DVolume* volume)
 {
   if (m_volume != volume) {
     m_volume = volume;
@@ -185,12 +186,12 @@ void Z3DTransferFunctionParameter::setVolume(Z3DVolume *volume)
   }
 }
 
-QWidget *Z3DTransferFunctionParameter::actualCreateWidget(QWidget *parent)
+QWidget* Z3DTransferFunctionParameter::actualCreateWidget(QWidget* parent)
 {
   return new Z3DTransferFunctionWidgetWithEditorWindow(this, parent);
 }
 
-void Z3DTransferFunctionParameter::setSameAs(const ZParameter &rhs)
+void Z3DTransferFunctionParameter::setSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
   const Z3DTransferFunctionParameter* src = static_cast<const Z3DTransferFunctionParameter*>(&rhs);
@@ -217,11 +218,11 @@ QJsonValue Z3DTransferFunctionParameter::jsonValue() const
   return keyArray;
 }
 
-void Z3DTransferFunctionParameter::readValue(const QJsonValue &jsonValue)
+void Z3DTransferFunctionParameter::readValue(const QJsonValue& jsonValue)
 {
   m_value.m_keys.clear();
   QJsonArray keyArray = jsonValue.toArray();
-  for (int i=0; i<keyArray.size(); ++i) {
+  for (int i = 0; i < keyArray.size(); ++i) {
     QJsonObject keyObj = keyArray[i].toObject();
     ZColorMapKey key(0, glm::col4());
     if (keyObj.contains("intensity") &&

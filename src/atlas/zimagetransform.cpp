@@ -14,13 +14,13 @@ ZImageTransform::~ZImageTransform()
 {
 }
 
-void ZImageTransform::setParameters(const std::vector<double> &para)
+void ZImageTransform::setParameters(const std::vector<double>& para)
 {
   CHECK_GE(para.size(), numParameters()) << "Incorrect number of parameters.";
   setParameters(para.data());
 }
 
-std::vector<double> ZImageTransform::estimateParameterScales(const double *) const
+std::vector<double> ZImageTransform::estimateParameterScales(const double*) const
 {
   std::vector<double> optimizerScales(numParameters(), 1.0);
   return optimizerScales;
@@ -29,7 +29,7 @@ std::vector<double> ZImageTransform::estimateParameterScales(const double *) con
 QString ZImageTransform::paraQString() const
 {
   QString res = QString("%1").arg(m_parameters[0]);
-  for (size_t i=1; i<numParameters(); ++i) {
+  for (size_t i = 1; i < numParameters(); ++i) {
     res += QString(" %1").arg(m_parameters[i]);
   }
   return res;

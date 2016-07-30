@@ -14,30 +14,31 @@ using namespace nim;
 
 struct ScalarCostFunctor
 {
-  ScalarCostFunctor(const ZRegistrationCostFunction &costFunction,
-                    const std::vector<double> &scales)
+  ScalarCostFunctor(const ZRegistrationCostFunction& costFunction,
+                    const std::vector<double>& scales)
     : m_costFunc(costFunction)
     , m_scales(scales)
   {}
 
-  bool operator()(const double* const x, double* residuals) const {
+  bool operator()(const double* const x, double* residuals) const
+  {
     std::vector<double> parameters(m_costFunc.numParameters());
-    for (size_t i=0; i<parameters.size(); ++i)
+    for (size_t i = 0; i < parameters.size(); ++i)
       parameters[i] = x[i] * m_scales[i];
     m_costFunc.evaluate(parameters.data(), residuals);
     return true;
   }
 
 private:
-  const ZRegistrationCostFunction &m_costFunc;
+  const ZRegistrationCostFunction& m_costFunc;
   std::vector<double> m_scales;
 };
 
 class CostFunctionAdaptor : public CostFunction
 {
 public:
-  CostFunctionAdaptor(const ZRegistrationCostFunction &costFunction,
-                      const std::vector<double> &scales,
+  CostFunctionAdaptor(const ZRegistrationCostFunction& costFunction,
+                      const std::vector<double>& scales,
                       double relativeStepSize = 1e-6)
     : CostFunction()
     , m_costFunc(costFunction)
@@ -56,7 +57,7 @@ public:
   {
     std::vector<double> parameters(m_costFunc.numParameters());
     double fallbackdelta = 0.0;
-    for (size_t i=0; i<parameters.size(); ++i) {
+    for (size_t i = 0; i < parameters.size(); ++i) {
       parameters[i] = para[0][i] * m_scales[i];
       fallbackdelta += std::abs(para[0][i]) * m_relativeStepSize;
     }
@@ -66,7 +67,7 @@ public:
     if (jacobians) {
       fallbackdelta = (fallbackdelta == 0) ? m_relativeStepSize : (fallbackdelta / parameters.size());
       std::vector<double> paraPlusDelta = parameters;
-      for (size_t i=0; i<parameters.size(); ++i) {
+      for (size_t i = 0; i < parameters.size(); ++i) {
         double delta = std::abs(para[0][i]) * m_relativeStepSize;
         if (delta == 0.0)
           delta = fallbackdelta;
@@ -81,15 +82,15 @@ public:
   }
 
 private:
-  const ZRegistrationCostFunction &m_costFunc;
-  const std::vector<double> &m_scales;
+  const ZRegistrationCostFunction& m_costFunc;
+  const std::vector<double>& m_scales;
   double m_relativeStepSize;
 };
 
 class FirstOrderFunctionAdaptor : public FirstOrderFunction
 {
 public:
-  FirstOrderFunctionAdaptor(const ZRegistrationCostFunction &costFun)
+  FirstOrderFunctionAdaptor(const ZRegistrationCostFunction& costFun)
     : FirstOrderFunction()
     , m_costFun(costFun)
   {}
@@ -101,10 +102,11 @@ public:
     return m_costFun.evaluate(parameters, cost, gradient);
   }
 
-  virtual int NumParameters() const override { return m_costFun.numParameters(); }
+  virtual int NumParameters() const override
+  { return m_costFun.numParameters(); }
 
 private:
-  const ZRegistrationCostFunction &m_costFun;
+  const ZRegistrationCostFunction& m_costFun;
 };
 
 }
@@ -121,7 +123,7 @@ ZRegistrationOptimizer::ZRegistrationOptimizer()
   m_options.max_num_iterations = 100;
 }
 
-void ZRegistrationOptimizer::setCostFunction(ZRegistrationCostFunction &costFunc)
+void ZRegistrationOptimizer::setCostFunction(ZRegistrationCostFunction& costFunc)
 {
   m_costFunction = &costFunc;
 }
@@ -131,12 +133,12 @@ void ZRegistrationOptimizer::setLineSearchDirectionType(LineSearchDirectionType 
   m_options.line_search_direction_type = dirType;
 }
 
-void ZRegistrationOptimizer::setInitialParameters(const std::vector<double> &para)
+void ZRegistrationOptimizer::setInitialParameters(const std::vector<double>& para)
 {
   m_initialParameters = para;
 }
 
-void ZRegistrationOptimizer::setParameterScales(const std::vector<double> &scales)
+void ZRegistrationOptimizer::setParameterScales(const std::vector<double>& scales)
 {
   m_parameterScales = scales;
 }

@@ -20,17 +20,17 @@ ZImgRegistration::ZImgRegistration()
 {
 }
 
-void ZImgRegistration::setCostFunction(ZRegistrationCostFunction &costFunction)
+void ZImgRegistration::setCostFunction(ZRegistrationCostFunction& costFunction)
 {
   m_costFunction = &costFunction;
 }
 
-void ZImgRegistration::setInitialTransform(ZImageTransform &tfm)
+void ZImgRegistration::setInitialTransform(ZImageTransform& tfm)
 {
   m_transform = &tfm;
 }
 
-void ZImgRegistration::setOptimizer(const QString &str)
+void ZImgRegistration::setOptimizer(const QString& str)
 {
   if (str == "LBFGS") {
     m_optimizer.setLineSearchDirectionType(ceres::LBFGS);
@@ -55,9 +55,9 @@ double ZImgRegistration::run()
   m_costFunction->setTransform(*m_transform);
   m_optimizer.setCostFunction(*m_costFunction);
   m_costFunction->setUseMultithreading(m_useMultithreading);
-  m_transform->adaptParameters(0, m_numScales-1);
+  m_transform->adaptParameters(0, m_numScales - 1);
 
-  for (int i=m_numScales-1; i>=0; --i) {
+  for (int i = m_numScales - 1; i >= 0; --i) {
     double scale = std::pow(0.5, i);
     size_t sizeX = m_fixedImg->width();
     size_t sizeY = m_fixedImg->height();
@@ -181,12 +181,12 @@ double ZImgRegistration::run()
     LOG(INFO) << "  " << "MultiResolution Level: " << i;
 
     if (i < m_numScales - 1) {
-      m_transform->adaptParameters(i+1, i);
+      m_transform->adaptParameters(i + 1, i);
     }
     LOG(INFO) << "  " << "Initial Parameters: " << m_transform->paraQString();
     std::vector<double> scales = m_transform->estimateParameterScales(dims);
     QString scalesQString = QString("%1").arg(scales[0]);
-    for (size_t i=1; i<scales.size(); ++i) {
+    for (size_t i = 1; i < scales.size(); ++i) {
       scalesQString += QString(" %1").arg(scales[i]);
     }
     LOG(INFO) << "  " << "Parameter Scales: " << scalesQString;

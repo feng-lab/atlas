@@ -119,13 +119,13 @@ void decompose(const glm::mat4& m, glm::vec3& translation, glm::vec3& scale, glm
 
 namespace nim {
 
-Z3DTransformParameter::Z3DTransformParameter(const QString &name, QObject *parent)
+Z3DTransformParameter::Z3DTransformParameter(const QString& name, QObject* parent)
   : ZSingleValueParameter<glm::mat4>(name, glm::mat4(1.f), parent)
   , m_scale("Scale", glm::vec3(1.f), glm::vec3(std::numeric_limits<float>::lowest()),
             glm::vec3(std::numeric_limits<float>::max()))
   , m_translation("Translation", glm::vec3(0.f), glm::vec3(std::numeric_limits<float>::lowest()),
-             glm::vec3(std::numeric_limits<float>::max()))
-  , m_rotation("Rotation", glm::vec4(0,0,1,0), glm::vec4(std::numeric_limits<float>::lowest()),
+                  glm::vec3(std::numeric_limits<float>::max()))
+  , m_rotation("Rotation", glm::vec4(0, 0, 1, 0), glm::vec4(std::numeric_limits<float>::lowest()),
                glm::vec4(std::numeric_limits<float>::max()))
   , m_center("Rotation Center", glm::vec3(0.f), glm::vec3(std::numeric_limits<float>::lowest()),
              glm::vec3(std::numeric_limits<float>::max()))
@@ -163,13 +163,13 @@ Z3DTransformParameter::Z3DTransformParameter(const QString &name, QObject *paren
   connect(&m_center, &ZVec3Parameter::valueChanged, this, &Z3DTransformParameter::updateMatrix);
 }
 
-Z3DTransformParameter::Z3DTransformParameter(const QString &name, const glm::mat4 &value, QObject *parent)
+Z3DTransformParameter::Z3DTransformParameter(const QString& name, const glm::mat4& value, QObject* parent)
   : ZSingleValueParameter<glm::mat4>(name, value, parent)
   , m_scale("Scale", glm::vec3(1.f), glm::vec3(std::numeric_limits<float>::lowest()),
             glm::vec3(std::numeric_limits<float>::max()))
   , m_translation("Translation", glm::vec3(0.f), glm::vec3(std::numeric_limits<float>::lowest()),
-             glm::vec3(std::numeric_limits<float>::max()))
-  , m_rotation("Rotation", glm::vec4(0,0,1,0), glm::vec4(std::numeric_limits<float>::lowest()),
+                  glm::vec3(std::numeric_limits<float>::max()))
+  , m_rotation("Rotation", glm::vec4(0, 0, 1, 0), glm::vec4(std::numeric_limits<float>::lowest()),
                glm::vec4(std::numeric_limits<float>::max()))
   , m_center("Rotation Center", glm::vec3(0.f), glm::vec3(std::numeric_limits<float>::lowest()),
              glm::vec3(std::numeric_limits<float>::max()))
@@ -215,13 +215,13 @@ glm::quat Z3DTransformParameter::rotation() const
     return glm::quat();
 }
 
-void Z3DTransformParameter::rotate(const glm::vec3 &axis, float ang)
+void Z3DTransformParameter::rotate(const glm::vec3& axis, float ang)
 {
   glm::quat quat = rotation() * glm::angleAxis(ang, glm::normalize(axis));
   setRotation(glm::normalize(quat));
 }
 
-void Z3DTransformParameter::rotate(const glm::vec3 &axis, float ang, const glm::vec3 &center)
+void Z3DTransformParameter::rotate(const glm::vec3& axis, float ang, const glm::vec3& center)
 {
   glm::vec3 scale = m_scale.get();
   glm::mat4 currValue = m_value;
@@ -246,10 +246,10 @@ void Z3DTransformParameter::rotate(const glm::vec3 &axis, float ang, const glm::
   glm::quat quat = glm::normalize(glm::quat_cast(rotationMat));
   setRotation(quat);
   m_translation.set(currValue[3].xyz());
-  m_center.set(glm::vec3(0,0,0));
+  m_center.set(glm::vec3(0, 0, 0));
 }
 
-void Z3DTransformParameter::setValueSameAs(const ZParameter &rhs)
+void Z3DTransformParameter::setValueSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
   const Z3DTransformParameter& src = static_cast<const Z3DTransformParameter&>(rhs);
@@ -259,7 +259,7 @@ void Z3DTransformParameter::setValueSameAs(const ZParameter &rhs)
   m_center.set(src.m_center.get());
 }
 
-void Z3DTransformParameter::interpolate(const ZParameter &prev, double progress, ZParameter &dest)
+void Z3DTransformParameter::interpolate(const ZParameter& prev, double progress, ZParameter& dest)
 {
   CHECK(this->isSameType(prev) && this->isSameType(dest));
   const Z3DTransformParameter& prevPara = static_cast<const Z3DTransformParameter&>(prev);
@@ -297,7 +297,7 @@ void Z3DTransformParameter::showTransformMatrix()
   LOG(INFO) << "";
 }
 
-QWidget *Z3DTransformParameter::actualCreateWidget(QWidget *parent)
+QWidget* Z3DTransformParameter::actualCreateWidget(QWidget* parent)
 {
   ZWidgetsGroup transform("Transform", 1);
   transform.addChild(m_scale, 1);
@@ -305,14 +305,14 @@ QWidget *Z3DTransformParameter::actualCreateWidget(QWidget *parent)
   transform.addChild(m_translation, 1);
   transform.addChild(m_center, 1);
 
-  QPushButton *pb = new QPushButton("Show Transform Matrix");
+  QPushButton* pb = new QPushButton("Show Transform Matrix");
   connect(pb, &QPushButton::clicked, this, &Z3DTransformParameter::showTransformMatrix);
   transform.addChild(*pb, 2);
 
-  QLayout *lw = transform.createLayout(false);
+  QLayout* lw = transform.createLayout(false);
   //QWidget *widget = new QWidget();
   //widget->setLayout(lw);
-  QGroupBox *groupBox = new QGroupBox("Transform Parameters", parent);
+  QGroupBox* groupBox = new QGroupBox("Transform Parameters", parent);
   groupBox->setLayout(lw);
 
   //widget->setParent(parent);
@@ -320,12 +320,12 @@ QWidget *Z3DTransformParameter::actualCreateWidget(QWidget *parent)
   return groupBox;
 }
 
-void Z3DTransformParameter::beforeChange(glm::mat4 &value)
+void Z3DTransformParameter::beforeChange(glm::mat4& value)
 {
   updateWidget(value);
 }
 
-void Z3DTransformParameter::updateWidget(const glm::mat4 &value)
+void Z3DTransformParameter::updateWidget(const glm::mat4& value)
 {
   Q_UNUSED(value)
   m_receiveWidgetSignal = false;
@@ -345,7 +345,7 @@ void Z3DTransformParameter::updateWidget(const glm::mat4 &value)
   m_receiveWidgetSignal = true;
 }
 
-void Z3DTransformParameter::setSameAs(const ZParameter &rhs)
+void Z3DTransformParameter::setSameAs(const ZParameter& rhs)
 {
   setValueSameAs(rhs);
   ZParameter::setSameAs(rhs);
@@ -361,7 +361,7 @@ QJsonValue Z3DTransformParameter::jsonValue() const
   return obj;
 }
 
-void Z3DTransformParameter::readValue(const QJsonValue &jsonValue)
+void Z3DTransformParameter::readValue(const QJsonValue& jsonValue)
 {
   if (jsonValue.isObject()) {
     QJsonObject obj = jsonValue.toObject();

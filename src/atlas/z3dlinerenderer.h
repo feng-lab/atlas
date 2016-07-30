@@ -9,41 +9,59 @@ namespace nim {
 
 class Z3DLineRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   // default use display list but not lighing in opengl mode
-  explicit Z3DLineRenderer(Z3DRendererBase &rendererBase);
+  explicit Z3DLineRenderer(Z3DRendererBase& rendererBase);
 
   // default false, must call before setData and setDataColor and setDataPickingColors
-  void setLineStrip(bool v) { m_isLineStrip = v; }
+  void setLineStrip(bool v)
+  { m_isLineStrip = v; }
 
-  void setData(std::vector<glm::vec3> *linesInput);
-  void setLineWidth(const std::vector<float> &lineWidthArray) {
+  void setData(std::vector<glm::vec3>* linesInput);
+
+  void setLineWidth(const std::vector<float>& lineWidthArray)
+  {
     m_lineWidthArray = lineWidthArray;
   }
 
   // use vertice color
-  void setDataColors(std::vector<glm::vec4> *lineColorsInput);
-  // use 1d texture color
-  void setTexture(Z3DTexture *tex);
+  void setDataColors(std::vector<glm::vec4>* lineColorsInput);
 
-  void setDataPickingColors(std::vector<glm::vec4> *linePickingColorsInput = NULL);
+  // use 1d texture color
+  void setTexture(Z3DTexture* tex);
+
+  void setDataPickingColors(std::vector<glm::vec4>* linePickingColorsInput = nullptr);
 
   // default true since glLineWidth only support 1 pixel width line from now on
-  inline void setUseSmoothLine(bool v) { m_useSmoothLine = v; }
-  inline void setLineWidth(float v) { m_srcLineWidth = std::max(1.f, v); updateLineWidth(); }
-  inline void setEnableMultisample(bool v) { m_enableMultisample = v; updateLineWidth(); }
+  inline void setUseSmoothLine(bool v)
+  { m_useSmoothLine = v; }
+
+  inline void setLineWidth(float v)
+  {
+    m_srcLineWidth = std::max(1.f, v);
+    updateLineWidth();
+  }
+
+  inline void setEnableMultisample(bool v)
+  {
+    m_enableMultisample = v;
+    updateLineWidth();
+  }
 
   // default true, will disable screen align
   void setRoundCap(bool v);
+
   // default false, will disable round cap
   void setScreenAlign(bool v);
 
 protected:
   virtual void compile() override;
+
   QString generateHeader();
 
   virtual float lineWidth() const;
+
   virtual std::vector<glm::vec4>* lineColors();
 
 #ifndef _USE_CORE_PROFILE_
@@ -52,6 +70,7 @@ protected:
 #endif
 
   virtual void render(Z3DEye eye) override;
+
   virtual void renderPicking(Z3DEye eye) override;
 
   //void enableLineSmooth();
@@ -68,16 +87,17 @@ private:
     m_lineWidth *= qApp->devicePixelRatio();
   }
 
-  Z3DShaderGroup& currentShaderGrp() { return m_useGeomLineShader && m_useSmoothLine ? m_smoothLineShaderGrp : m_lineShaderGrp; }
+  Z3DShaderGroup& currentShaderGrp()
+  { return m_useGeomLineShader && m_useSmoothLine ? m_smoothLineShaderGrp : m_lineShaderGrp; }
 
 protected:
   Z3DShaderGroup m_lineShaderGrp;
   Z3DShaderGroup m_smoothLineShaderGrp;
   Z3DShaderGroup m_smoothLineShaderGrp1;
 
-  std::vector<glm::vec3> *m_linesPt;
-  std::vector<glm::vec4> *m_lineColorsPt;
-  std::vector<glm::vec4> *m_linePickingColorsPt;
+  std::vector<glm::vec3>* m_linesPt;
+  std::vector<glm::vec4>* m_lineColorsPt;
+  std::vector<glm::vec4>* m_linePickingColorsPt;
 
   bool m_useSmoothLine;
   float m_srcLineWidth;
@@ -85,7 +105,7 @@ protected:
   bool m_enableMultisample;
   std::vector<float> m_lineWidthArray;
 
-  Z3DTexture *m_texture;
+  Z3DTexture* m_texture;
 
 private:
   std::vector<glm::vec4> m_lineColors;
@@ -103,6 +123,7 @@ private:
   bool m_roundCap;
 
   void renderSmooth(Z3DEye eye);
+
   void renderSmoothPicking(Z3DEye eye);
 
   std::vector<glm::vec3> m_smoothLineP0s;

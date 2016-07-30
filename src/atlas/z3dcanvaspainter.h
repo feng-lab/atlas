@@ -14,30 +14,35 @@ class Z3DTexture;
 namespace nim {
 
 class Z3DCanvas;
+
 class Z3DCompositor;
 
 class Z3DCanvasPainter : public Z3DBoundedFilter
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  Z3DCanvasPainter(Z3DGlobalParameters &globalParas, QObject *parent = nullptr);
+  Z3DCanvasPainter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+
   ~Z3DCanvasPainter();
 
   virtual void invalidate(InvalidationState inv = InvalidAllResult) override;
 
   void setCanvas(Z3DCanvas* canvas);
 
-  Z3DCanvas *canvas() const;
+  Z3DCanvas* canvas() const;
 
   const Z3DTexture* imageColorTexture(Z3DEye eye) const;
+
   const Z3DTexture* imageDepthTexture(Z3DEye eye) const;
 
-  bool renderToImage(const QString &filename, Z3DScreenShotType sst);
-  bool renderToImage(const QString &filename, int width, int height, Z3DScreenShotType sst, Z3DCompositor &compositor);
+  bool renderToImage(const QString& filename, Z3DScreenShotType sst);
+
+  bool renderToImage(const QString& filename, int width, int height, Z3DScreenShotType sst, Z3DCompositor& compositor);
 
   QString renderToImageError() const;
 
-  void setLock(bool v) { m_locked = v; }
+  void setLock(bool v)
+  { m_locked = v; }
 
 protected:
   void onCanvasResized(size_t w, size_t h);
@@ -45,6 +50,7 @@ protected:
   virtual void process(Z3DEye eye) override;
 
   virtual bool isReady(Z3DEye) const override;
+
   virtual bool isValid(Z3DEye eye) const override;
 
   virtual void updateSize() override;

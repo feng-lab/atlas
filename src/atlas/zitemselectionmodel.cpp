@@ -6,7 +6,7 @@
 
 namespace nim {
 
-ZItemSelectionModel::ZItemSelectionModel(ZObjModel *model, QObject *parent)
+ZItemSelectionModel::ZItemSelectionModel(ZObjModel* model, QObject* parent)
   : QItemSelectionModel(model, parent)
   , m_model(model)
 {
@@ -18,7 +18,7 @@ size_t ZItemSelectionModel::numSelectedObjs() const
 {
   size_t num = 0;
   QModelIndexList indexes = selectedIndexes();
-  for (int i=0; i<indexes.size(); ++i) {
+  for (int i = 0; i < indexes.size(); ++i) {
     if (indexes[i].column() != ZObjModel::ShowHideNameColumn && indexes[i].column() != ZObjModel::NameColumn)
       continue;
     ++num;
@@ -30,7 +30,7 @@ QList<size_t> ZItemSelectionModel::selectedObjs() const
 {
   QList<size_t> res;
   QModelIndexList indexes = selectedIndexes();
-  for (int i=0; i<indexes.size(); ++i) {
+  for (int i = 0; i < indexes.size(); ++i) {
     if (indexes[i].column() != ZObjModel::ShowHideNameColumn && indexes[i].column() != ZObjModel::NameColumn)
       continue;
     res.push_back(m_model->indexToId(indexes[i]));
@@ -38,11 +38,11 @@ QList<size_t> ZItemSelectionModel::selectedObjs() const
   return res;
 }
 
-QList<size_t> ZItemSelectionModel::selectedObjsOfDoc(const ZObjDoc *objD) const
+QList<size_t> ZItemSelectionModel::selectedObjsOfDoc(const ZObjDoc* objD) const
 {
   QList<size_t> res;
   QModelIndexList indexes = selectedIndexes();
-  for (int i=0; i<indexes.size(); ++i) {
+  for (int i = 0; i < indexes.size(); ++i) {
     if (indexes[i].column() != ZObjModel::ShowHideNameColumn && indexes[i].column() != ZObjModel::NameColumn)
       continue;
     if (m_model->indexToDoc(indexes[i]) == objD)
@@ -54,7 +54,7 @@ QList<size_t> ZItemSelectionModel::selectedObjsOfDoc(const ZObjDoc *objD) const
 bool ZItemSelectionModel::isObjSelected(size_t id) const
 {
   QModelIndexList indexes = selectedIndexes();
-  for (int i=0; i<indexes.size(); ++i) {
+  for (int i = 0; i < indexes.size(); ++i) {
     if (indexes[i].column() != ZObjModel::ShowHideNameColumn && indexes[i].column() != ZObjModel::NameColumn)
       continue;
     if (id == m_model->indexToId(indexes[i]))
@@ -95,12 +95,13 @@ void ZItemSelectionModel::appendSelectObj(size_t id)
   }
 }
 
-void ZItemSelectionModel::convertSelectionChangedSignal(const QItemSelection &selected, const QItemSelection &deselected)
+void
+ZItemSelectionModel::convertSelectionChangedSignal(const QItemSelection& selected, const QItemSelection& deselected)
 {
-  std::map<ZObjDoc*,QList<size_t>> docSelected;
-  std::map<ZObjDoc*,QList<size_t>> docDeselected;
+  std::map<ZObjDoc*, QList<size_t>> docSelected;
+  std::map<ZObjDoc*, QList<size_t>> docDeselected;
   QModelIndexList indexes = selected.indexes();
-  for (int i=0; i<indexes.size(); ++i) {
+  for (int i = 0; i < indexes.size(); ++i) {
     if (indexes[i].column() != ZObjModel::ShowHideNameColumn && indexes[i].column() != ZObjModel::NameColumn)
       continue;
     ZObjDoc* doc = m_model->indexToDoc(indexes[i]);
@@ -109,7 +110,7 @@ void ZItemSelectionModel::convertSelectionChangedSignal(const QItemSelection &se
     docDeselected.emplace(doc, QList<size_t>());
   }
   indexes = deselected.indexes();
-  for (int i=0; i<indexes.size(); ++i) {
+  for (int i = 0; i < indexes.size(); ++i) {
     if (indexes[i].column() != ZObjModel::ShowHideNameColumn && indexes[i].column() != ZObjModel::NameColumn)
       continue;
     ZObjDoc* doc = m_model->indexToDoc(indexes[i]);
@@ -118,8 +119,8 @@ void ZItemSelectionModel::convertSelectionChangedSignal(const QItemSelection &se
     if (docSelected.find(doc) == docSelected.end())
       docSelected.emplace(doc, QList<size_t>());
   }
-  std::map<ZObjDoc*,QList<size_t>>::iterator it1 = docDeselected.begin();
-  for (std::map<ZObjDoc*,QList<size_t>>::iterator it = docSelected.begin();
+  std::map<ZObjDoc*, QList<size_t>>::iterator it1 = docDeselected.begin();
+  for (std::map<ZObjDoc*, QList<size_t>>::iterator it = docSelected.begin();
        it != docSelected.end(); ++it, ++it1) {
     it->first->sendObjSelectionChangedFromDocSignal(it->second, it1->second);
   }

@@ -12,7 +12,7 @@ template<class DocType, class FilterType>
 class ZFilterView : public ZObjView
 {
 public:
-  ZFilterView(DocType &doc, ZView &view)
+  ZFilterView(DocType& doc, ZView& view)
     : ZObjView(view)
     , m_doc(doc)
   {
@@ -31,17 +31,20 @@ public:
 
   // ZObjView interface
 public:
-  virtual const ZObjDoc& doc() const override { return m_doc; }
-  virtual bool hasObj(size_t id) const override { return m_idToFilter.find(id) != m_idToFilter.end(); }
+  virtual const ZObjDoc& doc() const override
+  { return m_doc; }
 
-  virtual void read(size_t id, const QJsonObject &json) override
+  virtual bool hasObj(size_t id) const override
+  { return m_idToFilter.find(id) != m_idToFilter.end(); }
+
+  virtual void read(size_t id, const QJsonObject& json) override
   {
     if (hasObj(id)) {
       m_idToFilter.at(id)->read(json);
     }
   }
 
-  virtual void write(size_t id, QJsonObject &json) const override
+  virtual void write(size_t id, QJsonObject& json) const override
   {
     if (hasObj(id)) {
       m_idToFilter.at(id)->write(json);
@@ -72,7 +75,7 @@ public:
     }
   }
 
-  virtual void setViewport(const QRectF &rect, double scale) override
+  virtual void setViewport(const QRectF& rect, double scale) override
   {
     for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
       try {
@@ -105,7 +108,7 @@ public:
     }
   }
 
-  virtual void mousePressed(const QPointF &scenePos) override
+  virtual void mousePressed(const QPointF& scenePos) override
   {
     for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
       try {
@@ -117,7 +120,7 @@ public:
     }
   }
 
-  virtual void mouseReleased(const QPointF &scenePos) override
+  virtual void mouseReleased(const QPointF& scenePos) override
   {
     for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
       try {
@@ -188,15 +191,15 @@ protected:
     it->second->setVisible(v);
   }
 
-  virtual void onSelectionChanged(const QList<size_t> &selected, const QList<size_t> &deselected) override
+  virtual void onSelectionChanged(const QList<size_t>& selected, const QList<size_t>& deselected) override
   {
-    for (int i=0; i<selected.size(); ++i) {
+    for (int i = 0; i < selected.size(); ++i) {
       auto it = m_idToFilter.find(selected[i]);
       if (it == m_idToFilter.end())
         return;
       it->second->setSelected(true);
     }
-    for (int i=0; i<deselected.size(); ++i) {
+    for (int i = 0; i < deselected.size(); ++i) {
       auto it = m_idToFilter.find(deselected[i]);
       if (it == m_idToFilter.end())
         return;

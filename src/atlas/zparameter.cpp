@@ -6,7 +6,7 @@
 
 namespace nim {
 
-ZParameter::ZParameter(const QString& name, QObject *parent)
+ZParameter::ZParameter(const QString& name, QObject* parent)
   : QObject(parent)
   , m_name(name)
   , m_style("DEFAULT")
@@ -20,7 +20,7 @@ ZParameter::~ZParameter()
 {
 }
 
-void ZParameter::setName(const QString &name)
+void ZParameter::setName(const QString& name)
 {
   if (name != m_name) {
     m_name = name;
@@ -33,10 +33,10 @@ QString ZParameter::type() const
   QString className = metaObject()->className();
   if (className.startsWith("nim::"))
     className.remove(0, 5);
-  return className.remove(0, 1).left(className.length()-9);
+  return className.remove(0, 1).left(className.length() - 9);
 }
 
-void ZParameter::setStyle(const QString &style)
+void ZParameter::setStyle(const QString& style)
 {
   if (m_allStyles.contains(style))
     m_style = style;
@@ -44,9 +44,9 @@ void ZParameter::setStyle(const QString &style)
     m_style = "DEFAULT";
 }
 
-QLabel *ZParameter::createNameLabel(QWidget *parent)
+QLabel* ZParameter::createNameLabel(QWidget* parent)
 {
-  QLabel *label = new QLabel(m_name, parent);
+  QLabel* label = new QLabel(m_name, parent);
   label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   if (!m_isWidgetsVisible)
     label->setVisible(m_isWidgetsVisible);
@@ -64,7 +64,7 @@ QLabel *ZParameter::createNameLabel(QWidget *parent)
   return label;
 }
 
-QWidget *ZParameter::createWidget(QWidget *parent)
+QWidget* ZParameter::createWidget(QWidget* parent)
 {
   QWidget* widget = actualCreateWidget(parent);
   if (!m_isWidgetsVisible)
@@ -88,7 +88,7 @@ QString ZParameter::jsonKey() const
   return m_name + QString(" ") + type();
 }
 
-void ZParameter::read(const QJsonObject &json)
+void ZParameter::read(const QJsonObject& json)
 {
   if (json.contains(jsonKey())) {
     readValue(json[jsonKey()]);
@@ -97,12 +97,12 @@ void ZParameter::read(const QJsonObject &json)
   }
 }
 
-void ZParameter::write(QJsonObject &json) const
+void ZParameter::write(QJsonObject& json) const
 {
   json.insert(jsonKey(), jsonValue());
 }
 
-void ZParameter::setSameAs(const ZParameter &rhs)
+void ZParameter::setSameAs(const ZParameter& rhs)
 {
   m_allStyles = rhs.m_allStyles;
   setName(rhs.m_name);
@@ -129,7 +129,7 @@ void ZParameter::setEnabled(bool s)
 
 void ZParameter::updateFromSender()
 {
-  ZParameter *para = qobject_cast<ZParameter*>(sender());
+  ZParameter* para = qobject_cast<ZParameter*>(sender());
   if (isSameType(*para)) {
     setValueSameAs(*para);
   } else {
@@ -138,12 +138,12 @@ void ZParameter::updateFromSender()
   }
 }
 
-ZBoolParameter::ZBoolParameter(const QString &name, QObject *parent)
+ZBoolParameter::ZBoolParameter(const QString& name, QObject* parent)
   : ZSingleValueParameter<bool>(name, parent)
 {
 }
 
-ZBoolParameter::ZBoolParameter(const QString &name, bool value, QObject *parent)
+ZBoolParameter::ZBoolParameter(const QString& name, bool value, QObject* parent)
   : ZSingleValueParameter<bool>(name, value, parent)
 {
 }
@@ -153,17 +153,17 @@ void ZBoolParameter::setValue(bool v)
   set(v);
 }
 
-void ZBoolParameter::beforeChange(bool &value)
+void ZBoolParameter::beforeChange(bool& value)
 {
   emit valueWillChange(value);
 }
 
-void ZBoolParameter::afterChange(bool &)
+void ZBoolParameter::afterChange(bool&)
 {
   emit boolChanged(m_value);
 }
 
-QWidget *ZBoolParameter::actualCreateWidget(QWidget *parent)
+QWidget* ZBoolParameter::actualCreateWidget(QWidget* parent)
 {
   QCheckBox* cb = new QCheckBox(parent);
   cb->setChecked(m_value);
@@ -172,7 +172,7 @@ QWidget *ZBoolParameter::actualCreateWidget(QWidget *parent)
   return cb;
 }
 
-void ZBoolParameter::setSameAs(const ZParameter &rhs)
+void ZBoolParameter::setSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
   set(static_cast<const ZBoolParameter*>(&rhs)->get());
@@ -184,7 +184,7 @@ QJsonValue ZBoolParameter::jsonValue() const
   return QJsonValue(this->m_value);
 }
 
-void ZBoolParameter::readValue(const QJsonValue &jsonValue)
+void ZBoolParameter::readValue(const QJsonValue& jsonValue)
 {
   set(jsonValue.toBool(this->m_value));
 }

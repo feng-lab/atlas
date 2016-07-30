@@ -6,7 +6,7 @@
 
 namespace nim {
 
-Z3DEllipsoidRenderer::Z3DEllipsoidRenderer(Z3DRendererBase &rendererBase)
+Z3DEllipsoidRenderer::Z3DEllipsoidRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_ellipsoidShaderGrp(rendererBase)
   , m_sphereSlicesStacks("Sphere Slices Stacks", 36, 20, 100)
@@ -30,9 +30,9 @@ Z3DEllipsoidRenderer::Z3DEllipsoidRenderer(Z3DRendererBase &rendererBase)
   CHECK_GL_ERROR;
 }
 
-void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3> *centers, std::vector<glm::vec3> *axis1,
-                                   std::vector<glm::vec3> *axis2, std::vector<glm::vec3> *axis3,
-                                   std::vector<glm::vec4> *specularAndShininessInput)
+void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3>* centers, std::vector<glm::vec3>* axis1,
+                                   std::vector<glm::vec3>* axis2, std::vector<glm::vec3>* axis3,
+                                   std::vector<glm::vec4>* specularAndShininessInput)
 {
   m_centers.clear();
   m_axis1.clear();
@@ -40,9 +40,9 @@ void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3> *centers, std::vector<
   m_axis3.clear();
   m_specularAndShininess.clear();
   m_indexs.clear();
-  int indices[6] = { 0, 1, 2, 2, 1, 3 };
+  int indices[6] = {0, 1, 2, 2, 1, 3};
   int quadIdx = 0;
-  for (size_t i=0; i<centers->size(); i++) {
+  for (size_t i = 0; i < centers->size(); i++) {
     glm::mat4 T(glm::vec4(axis1->at(i), 0.f),
                 glm::vec4(axis2->at(i), 0.f),
                 glm::vec4(axis3->at(i), 0.f),
@@ -63,15 +63,15 @@ void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3> *centers, std::vector<
     m_axis3.push_back(T[2]);
     m_axis3.push_back(T[2]);
     m_axis3.push_back(T[2]);
-    for (int k=0; k<6; k++) {
+    for (int k = 0; k < 6; k++) {
       m_indexs.push_back(indices[k] + 4 * quadIdx);
     }
     quadIdx++;
   }
-  if (specularAndShininessInput == NULL) {
+  if (!specularAndShininessInput) {
     m_useDynamicMaterial.set(false);
   } else {
-    for (size_t i=0; i<specularAndShininessInput->size(); i++) {
+    for (size_t i = 0; i < specularAndShininessInput->size(); i++) {
       m_specularAndShininess.push_back(specularAndShininessInput->at(i));
       m_specularAndShininess.push_back(specularAndShininessInput->at(i));
       m_specularAndShininess.push_back(specularAndShininessInput->at(i));
@@ -88,11 +88,11 @@ void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3> *centers, std::vector<
     m_allFlags.resize(m_centers.size());
   } else if (rightUpSize < m_centers.size()) {
     m_allFlags.resize(m_centers.size());
-    for (size_t i=rightUpSize; i<m_allFlags.size(); i+=4) {
+    for (size_t i = rightUpSize; i < m_allFlags.size(); i += 4) {
       m_allFlags[i] = cornerFlags[0];
-      m_allFlags[i+1] = cornerFlags[1];
-      m_allFlags[i+2] = cornerFlags[2];
-      m_allFlags[i+3] = cornerFlags[3];
+      m_allFlags[i + 1] = cornerFlags[1];
+      m_allFlags[i + 2] = cornerFlags[2];
+      m_allFlags[i + 3] = cornerFlags[3];
     }
   }
   invalidateOpenglRenderer();
@@ -101,10 +101,10 @@ void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3> *centers, std::vector<
   m_pickingDataChanged = true;
 }
 
-void Z3DEllipsoidRenderer::setDataColors(std::vector<glm::vec4> *ellipsoidColorsInput)
+void Z3DEllipsoidRenderer::setDataColors(std::vector<glm::vec4>* ellipsoidColorsInput)
 {
   m_ellipsoidColors.clear();
-  for (size_t i=0; i<ellipsoidColorsInput->size(); i++) {
+  for (size_t i = 0; i < ellipsoidColorsInput->size(); i++) {
     m_ellipsoidColors.push_back(ellipsoidColorsInput->at(i));
     m_ellipsoidColors.push_back(ellipsoidColorsInput->at(i));
     m_ellipsoidColors.push_back(ellipsoidColorsInput->at(i));
@@ -114,12 +114,12 @@ void Z3DEllipsoidRenderer::setDataColors(std::vector<glm::vec4> *ellipsoidColors
   m_dataChanged = true;
 }
 
-void Z3DEllipsoidRenderer::setDataPickingColors(std::vector<glm::vec4> *ellipsoidPickingColorsInput)
+void Z3DEllipsoidRenderer::setDataPickingColors(std::vector<glm::vec4>* ellipsoidPickingColorsInput)
 {
   m_ellipsoidPickingColors.clear();
-  if (ellipsoidPickingColorsInput == NULL)
+  if (!ellipsoidPickingColorsInput)
     return;
-  for (size_t i=0; i<ellipsoidPickingColorsInput->size(); i++) {
+  for (size_t i = 0; i < ellipsoidPickingColorsInput->size(); i++) {
     m_ellipsoidPickingColors.push_back(ellipsoidPickingColorsInput->at(i));
     m_ellipsoidPickingColors.push_back(ellipsoidPickingColorsInput->at(i));
     m_ellipsoidPickingColors.push_back(ellipsoidPickingColorsInput->at(i));
@@ -207,7 +207,7 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
   appendDefaultColors();
 
   m_ellipsoidShaderGrp.bind();
-  Z3DShaderProgram &shader = m_ellipsoidShaderGrp.get();
+  Z3DShaderProgram& shader = m_ellipsoidShaderGrp.get();
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   setShaderParameters(shader);
 
@@ -225,43 +225,45 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
 
       glEnableVertexAttribArray(attr_T);
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
-      glBufferData(GL_ARRAY_BUFFER, m_axis1.size()*4*sizeof(GLfloat), m_axis1.data(), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_axis1.size() * 4 * sizeof(GLfloat), m_axis1.data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_T, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-      glEnableVertexAttribArray(attr_T+1);
+      glEnableVertexAttribArray(attr_T + 1);
       m_VBOs.bind(GL_ARRAY_BUFFER, 1);
-      glBufferData(GL_ARRAY_BUFFER, m_axis2.size()*4*sizeof(GLfloat), m_axis2.data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_T+1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glBufferData(GL_ARRAY_BUFFER, m_axis2.size() * 4 * sizeof(GLfloat), m_axis2.data(), GL_STATIC_DRAW);
+      glVertexAttribPointer(attr_T + 1, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-      glEnableVertexAttribArray(attr_T+2);
+      glEnableVertexAttribArray(attr_T + 2);
       m_VBOs.bind(GL_ARRAY_BUFFER, 2);
-      glBufferData(GL_ARRAY_BUFFER, m_axis3.size()*4*sizeof(GLfloat), m_axis3.data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_T+2, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glBufferData(GL_ARRAY_BUFFER, m_axis3.size() * 4 * sizeof(GLfloat), m_axis3.data(), GL_STATIC_DRAW);
+      glVertexAttribPointer(attr_T + 2, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-      glEnableVertexAttribArray(attr_T+3);
+      glEnableVertexAttribArray(attr_T + 3);
       m_VBOs.bind(GL_ARRAY_BUFFER, 3);
-      glBufferData(GL_ARRAY_BUFFER, m_centers.size()*4*sizeof(GLfloat), m_centers.data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_T+3, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glBufferData(GL_ARRAY_BUFFER, m_centers.size() * 4 * sizeof(GLfloat), m_centers.data(), GL_STATIC_DRAW);
+      glVertexAttribPointer(attr_T + 3, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
       if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
         glEnableVertexAttribArray(attr_a_specular_shininess);
         m_VBOs.bind(GL_ARRAY_BUFFER, 6);
-        glBufferData(GL_ARRAY_BUFFER, m_specularAndShininess.size()*4*sizeof(GLfloat), m_specularAndShininess.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_specularAndShininess.size() * 4 * sizeof(GLfloat),
+                     m_specularAndShininess.data(), GL_STATIC_DRAW);
         glVertexAttribPointer(attr_a_specular_shininess, 4, GL_FLOAT, GL_FALSE, 0, 0);
       }
 
       glEnableVertexAttribArray(attr_color);
       m_VBOs.bind(GL_ARRAY_BUFFER, 7);
-      glBufferData(GL_ARRAY_BUFFER, m_ellipsoidColors.size()*4*sizeof(GLfloat), m_ellipsoidColors.data(), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_ellipsoidColors.size() * 4 * sizeof(GLfloat), m_ellipsoidColors.data(),
+                   GL_STATIC_DRAW);
       glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
       glEnableVertexAttribArray(attr_flags);
       m_VBOs.bind(GL_ARRAY_BUFFER, 4);
-      glBufferData(GL_ARRAY_BUFFER, m_allFlags.size()*sizeof(GLfloat), m_allFlags.data(), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_allFlags.size() * sizeof(GLfloat), m_allFlags.data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, 0);
 
       m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 5);
-      glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size()*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
+      glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size() * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
 
       glBindBuffer(GL_ARRAY_BUFFER, 0);
       m_VAO.release();
@@ -286,59 +288,61 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
     glEnableVertexAttribArray(attr_T);
     m_VBOs.bind(GL_ARRAY_BUFFER, 0);
     if (m_dataChanged)
-      glBufferData(GL_ARRAY_BUFFER, m_axis1.size()*4*sizeof(GLfloat), m_axis1.data(), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_axis1.size() * 4 * sizeof(GLfloat), m_axis1.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_T, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-    glEnableVertexAttribArray(attr_T+1);
+    glEnableVertexAttribArray(attr_T + 1);
     m_VBOs.bind(GL_ARRAY_BUFFER, 1);
     if (m_dataChanged)
-      glBufferData(GL_ARRAY_BUFFER, m_axis2.size()*4*sizeof(GLfloat), m_axis2.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(attr_T+1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glBufferData(GL_ARRAY_BUFFER, m_axis2.size() * 4 * sizeof(GLfloat), m_axis2.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(attr_T + 1, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-    glEnableVertexAttribArray(attr_T+2);
+    glEnableVertexAttribArray(attr_T + 2);
     m_VBOs.bind(GL_ARRAY_BUFFER, 2);
     if (m_dataChanged)
-      glBufferData(GL_ARRAY_BUFFER, m_axis3.size()*4*sizeof(GLfloat), m_axis3.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(attr_T+2, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glBufferData(GL_ARRAY_BUFFER, m_axis3.size() * 4 * sizeof(GLfloat), m_axis3.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(attr_T + 2, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-    glEnableVertexAttribArray(attr_T+3);
+    glEnableVertexAttribArray(attr_T + 3);
     m_VBOs.bind(GL_ARRAY_BUFFER, 3);
     if (m_dataChanged)
-      glBufferData(GL_ARRAY_BUFFER, m_centers.size()*4*sizeof(GLfloat), m_centers.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(attr_T+3, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glBufferData(GL_ARRAY_BUFFER, m_centers.size() * 4 * sizeof(GLfloat), m_centers.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(attr_T + 3, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
     if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
       glEnableVertexAttribArray(attr_a_specular_shininess);
       m_VBOs.bind(GL_ARRAY_BUFFER, 6);
       if (m_dataChanged)
-        glBufferData(GL_ARRAY_BUFFER, m_specularAndShininess.size()*4*sizeof(GLfloat), m_specularAndShininess.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_specularAndShininess.size() * 4 * sizeof(GLfloat),
+                     m_specularAndShininess.data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_a_specular_shininess, 4, GL_FLOAT, GL_FALSE, 0, 0);
     }
 
     glEnableVertexAttribArray(attr_color);
     m_VBOs.bind(GL_ARRAY_BUFFER, 7);
     if (m_dataChanged)
-      glBufferData(GL_ARRAY_BUFFER, m_ellipsoidColors.size()*4*sizeof(GLfloat), m_ellipsoidColors.data(), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_ellipsoidColors.size() * 4 * sizeof(GLfloat), m_ellipsoidColors.data(),
+                   GL_STATIC_DRAW);
     glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
     glEnableVertexAttribArray(attr_flags);
     m_VBOs.bind(GL_ARRAY_BUFFER, 4);
     if (m_dataChanged)
-      glBufferData(GL_ARRAY_BUFFER, m_allFlags.size()*sizeof(GLfloat), m_allFlags.data(), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_allFlags.size() * sizeof(GLfloat), m_allFlags.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, 0);
 
     m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 5);
     if (m_dataChanged)
-      glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size()*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
+      glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size() * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
 
     glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, 0);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glDisableVertexAttribArray(attr_T);
-    glDisableVertexAttribArray(attr_T+1);
-    glDisableVertexAttribArray(attr_T+2);
-    glDisableVertexAttribArray(attr_T+3);
+    glDisableVertexAttribArray(attr_T + 1);
+    glDisableVertexAttribArray(attr_T + 2);
+    glDisableVertexAttribArray(attr_T + 3);
     if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty())
       glDisableVertexAttribArray(attr_a_specular_shininess);
     glDisableVertexAttribArray(attr_color);
@@ -359,7 +363,7 @@ void Z3DEllipsoidRenderer::renderPicking(Z3DEye eye)
     return;
 
   m_ellipsoidShaderGrp.bind();
-  Z3DShaderProgram &shader = m_ellipsoidShaderGrp.get();
+  Z3DShaderProgram& shader = m_ellipsoidShaderGrp.get();
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   setPickingShaderParameters(shader);
 
@@ -374,48 +378,49 @@ void Z3DEllipsoidRenderer::renderPicking(Z3DEye eye)
       glEnableVertexAttribArray(attr_T);
       if (m_dataChanged) {
         m_pickingVBOs.bind(GL_ARRAY_BUFFER, 0);
-        glBufferData(GL_ARRAY_BUFFER, m_axis1.size()*4*sizeof(GLfloat), m_axis1.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_axis1.size() * 4 * sizeof(GLfloat), m_axis1.data(), GL_STATIC_DRAW);
       } else {
         m_VBOs.bind(GL_ARRAY_BUFFER, 0);
       }
       glVertexAttribPointer(attr_T, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-      glEnableVertexAttribArray(attr_T+1);
+      glEnableVertexAttribArray(attr_T + 1);
       if (m_dataChanged) {
         m_pickingVBOs.bind(GL_ARRAY_BUFFER, 1);
-        glBufferData(GL_ARRAY_BUFFER, m_axis2.size()*4*sizeof(GLfloat), m_axis2.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_axis2.size() * 4 * sizeof(GLfloat), m_axis2.data(), GL_STATIC_DRAW);
       } else {
         m_VBOs.bind(GL_ARRAY_BUFFER, 1);
       }
-      glVertexAttribPointer(attr_T+1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_T + 1, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-      glEnableVertexAttribArray(attr_T+2);
+      glEnableVertexAttribArray(attr_T + 2);
       if (m_dataChanged) {
         m_pickingVBOs.bind(GL_ARRAY_BUFFER, 2);
-        glBufferData(GL_ARRAY_BUFFER, m_axis3.size()*4*sizeof(GLfloat), m_axis3.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_axis3.size() * 4 * sizeof(GLfloat), m_axis3.data(), GL_STATIC_DRAW);
       } else {
         m_VBOs.bind(GL_ARRAY_BUFFER, 2);
       }
-      glVertexAttribPointer(attr_T+2, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_T + 2, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-      glEnableVertexAttribArray(attr_T+3);
+      glEnableVertexAttribArray(attr_T + 3);
       if (m_dataChanged) {
         m_pickingVBOs.bind(GL_ARRAY_BUFFER, 3);
-        glBufferData(GL_ARRAY_BUFFER, m_centers.size()*4*sizeof(GLfloat), m_centers.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_centers.size() * 4 * sizeof(GLfloat), m_centers.data(), GL_STATIC_DRAW);
       } else {
         m_VBOs.bind(GL_ARRAY_BUFFER, 3);
       }
-      glVertexAttribPointer(attr_T+3, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_T + 3, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
       glEnableVertexAttribArray(attr_color);
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 6);
-      glBufferData(GL_ARRAY_BUFFER, m_ellipsoidPickingColors.size()*4*sizeof(GLfloat), m_ellipsoidPickingColors.data(), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_ellipsoidPickingColors.size() * 4 * sizeof(GLfloat),
+                   m_ellipsoidPickingColors.data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
       glEnableVertexAttribArray(attr_flags);
       if (m_dataChanged) {
         m_pickingVBOs.bind(GL_ARRAY_BUFFER, 4);
-        glBufferData(GL_ARRAY_BUFFER, m_allFlags.size()*sizeof(GLfloat), m_allFlags.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_allFlags.size() * sizeof(GLfloat), m_allFlags.data(), GL_STATIC_DRAW);
       } else {
         m_VBOs.bind(GL_ARRAY_BUFFER, 4);
       }
@@ -423,7 +428,7 @@ void Z3DEllipsoidRenderer::renderPicking(Z3DEye eye)
 
       if (m_dataChanged) {
         m_pickingVBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 5);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size()*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size() * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
       } else {
         m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 5);
       }
@@ -448,53 +453,54 @@ void Z3DEllipsoidRenderer::renderPicking(Z3DEye eye)
     if (m_dataChanged) {
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 0);
       if (m_pickingDataChanged)
-        glBufferData(GL_ARRAY_BUFFER, m_axis1.size()*4*sizeof(GLfloat), m_axis1.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_axis1.size() * 4 * sizeof(GLfloat), m_axis1.data(), GL_STATIC_DRAW);
     } else {
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
     }
     glVertexAttribPointer(attr_T, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-    glEnableVertexAttribArray(attr_T+1);
+    glEnableVertexAttribArray(attr_T + 1);
     if (m_dataChanged) {
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 1);
       if (m_pickingDataChanged)
-        glBufferData(GL_ARRAY_BUFFER, m_axis2.size()*4*sizeof(GLfloat), m_axis2.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_axis2.size() * 4 * sizeof(GLfloat), m_axis2.data(), GL_STATIC_DRAW);
     } else {
       m_VBOs.bind(GL_ARRAY_BUFFER, 1);
     }
-    glVertexAttribPointer(attr_T+1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_T + 1, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-    glEnableVertexAttribArray(attr_T+2);
+    glEnableVertexAttribArray(attr_T + 2);
     if (m_dataChanged) {
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 2);
       if (m_pickingDataChanged)
-        glBufferData(GL_ARRAY_BUFFER, m_axis3.size()*4*sizeof(GLfloat), m_axis3.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_axis3.size() * 4 * sizeof(GLfloat), m_axis3.data(), GL_STATIC_DRAW);
     } else {
       m_VBOs.bind(GL_ARRAY_BUFFER, 2);
     }
-    glVertexAttribPointer(attr_T+2, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_T + 2, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-    glEnableVertexAttribArray(attr_T+3);
+    glEnableVertexAttribArray(attr_T + 3);
     if (m_dataChanged) {
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 3);
       if (m_pickingDataChanged)
-        glBufferData(GL_ARRAY_BUFFER, m_centers.size()*4*sizeof(GLfloat), m_centers.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_centers.size() * 4 * sizeof(GLfloat), m_centers.data(), GL_STATIC_DRAW);
     } else {
       m_VBOs.bind(GL_ARRAY_BUFFER, 3);
     }
-    glVertexAttribPointer(attr_T+3, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_T + 3, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
     glEnableVertexAttribArray(attr_color);
     m_pickingVBOs.bind(GL_ARRAY_BUFFER, 6);
     if (m_pickingDataChanged)
-      glBufferData(GL_ARRAY_BUFFER, m_ellipsoidPickingColors.size()*4*sizeof(GLfloat), m_ellipsoidPickingColors.data(), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_ellipsoidPickingColors.size() * 4 * sizeof(GLfloat),
+                   m_ellipsoidPickingColors.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
     glEnableVertexAttribArray(attr_flags);
     if (m_dataChanged) {
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 4);
       if (m_pickingDataChanged)
-        glBufferData(GL_ARRAY_BUFFER, m_allFlags.size()*sizeof(GLfloat), m_allFlags.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_allFlags.size() * sizeof(GLfloat), m_allFlags.data(), GL_STATIC_DRAW);
     } else {
       m_VBOs.bind(GL_ARRAY_BUFFER, 4);
     }
@@ -503,7 +509,7 @@ void Z3DEllipsoidRenderer::renderPicking(Z3DEye eye)
     if (m_dataChanged) {
       m_pickingVBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 5);
       if (m_pickingDataChanged)
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size()*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size() * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
     } else {
       m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 5);
     }
@@ -512,10 +518,10 @@ void Z3DEllipsoidRenderer::renderPicking(Z3DEye eye)
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glDisableVertexAttribArray(attr_T+0);
-    glDisableVertexAttribArray(attr_T+1);
-    glDisableVertexAttribArray(attr_T+2);
-    glDisableVertexAttribArray(attr_T+3);
+    glDisableVertexAttribArray(attr_T + 0);
+    glDisableVertexAttribArray(attr_T + 1);
+    glDisableVertexAttribArray(attr_T + 2);
+    glDisableVertexAttribArray(attr_T + 3);
     glDisableVertexAttribArray(attr_color);
     glDisableVertexAttribArray(attr_flags);
 
@@ -528,7 +534,7 @@ void Z3DEllipsoidRenderer::renderPicking(Z3DEye eye)
 void Z3DEllipsoidRenderer::appendDefaultColors()
 {
   if (m_ellipsoidColors.size() < m_centers.size()) {
-    for (size_t i=m_ellipsoidColors.size(); i<m_centers.size(); i++)
+    for (size_t i = m_ellipsoidColors.size(); i < m_centers.size(); i++)
       m_ellipsoidColors.emplace_back(0.f, 0.f, 0.f, 1.f);
   }
 }

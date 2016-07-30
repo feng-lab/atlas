@@ -16,10 +16,10 @@
 
 namespace nim {
 
-ZAnimationWidget::ZAnimationWidget(ZAnimation &ani, QWidget *parent)
+ZAnimationWidget::ZAnimationWidget(ZAnimation& ani, QWidget* parent)
   : QWidget(parent)
   , m_animation(ani)
-  , m_duration(new ZDoubleParameter("Duration:", m_animation.duration(), 1.0, 60*60*72, this))
+  , m_duration(new ZDoubleParameter("Duration:", m_animation.duration(), 1.0, 60 * 60 * 72, this))
   , m_currentTime(new ZDoubleParameter("Current Time:", 0.0, 0.0, ani.duration(), this))
   , m_playSpeed(new ZDoubleParameter("Speed:", 1.0, 0.01, 100, this))
   , m_isPlaying(false)
@@ -166,28 +166,28 @@ void ZAnimationWidget::repeatChanged(bool v)
   m_timeLine->setLoopCount(v ? 0 : 1);
 }
 
-void ZAnimationWidget::keyPressEvent(QKeyEvent *event)
+void ZAnimationWidget::keyPressEvent(QKeyEvent* event)
 {
   switch (event->key()) {
-  case Qt::Key_K:
-    if (event->modifiers() == Qt::ControlModifier) {
-      saveKeyFrame();
-      event->accept();
-    }
-    break;
-  case Qt::Key_Backspace:
-  case Qt::Key_Delete:
-    if (event->modifiers() == Qt::NoModifier)
-      m_timelineWidget->removeSelectedKeys();
-    break;
-  default:
-    break;
+    case Qt::Key_K:
+      if (event->modifiers() == Qt::ControlModifier) {
+        saveKeyFrame();
+        event->accept();
+      }
+      break;
+    case Qt::Key_Backspace:
+    case Qt::Key_Delete:
+      if (event->modifiers() == Qt::NoModifier)
+        m_timelineWidget->removeSelectedKeys();
+      break;
+    default:
+      break;
   }
 }
 
 void ZAnimationWidget::createWidget()
 {
-  QHBoxLayout *hlo = new QHBoxLayout;
+  QHBoxLayout* hlo = new QHBoxLayout;
 
   hlo->addWidget(m_playSpeed->createNameLabel(this));
   hlo->addWidget(m_playSpeed->createWidget(this));
@@ -237,7 +237,7 @@ void ZAnimationWidget::createWidget()
 
   m_timelineWidget = new ZTimelineWidget(m_animation, m_currentTime, this);
 
-  QVBoxLayout *vlo = new QVBoxLayout;
+  QVBoxLayout* vlo = new QVBoxLayout;
   vlo->setMargin(0);
   vlo->setSpacing(0);
   vlo->addLayout(hlo);

@@ -22,38 +22,69 @@ class Z3DShaderProgram;
 
 class Z3DImg : public QObject
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   // Z3DVolume will take ownership of the img
-  Z3DImg(const ZImgPack &imgPack, const glm::vec3& scale, QObject *parent = 0);
+  Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent = 0);
+
   ~Z3DImg();
 
-  bool is2DData() const { return m_imgPack.imgInfo().depth == 1; }
-  bool is3DData() const { return m_imgPack.imgInfo().depth > 1; }
+  bool is2DData() const
+  { return m_imgPack.imgInfo().depth == 1; }
 
-  glm::uvec3 dimensions() const { return glm::uvec3(m_imgPack.imgInfo().width, m_imgPack.imgInfo().height, m_imgPack.imgInfo().depth); }
-  size_t numChannels() const { return m_nChannels; }
-  col4 channelColor(size_t c) const { return m_imgPack.imgInfo().channelColors[c]; }
-  bool isVolumeDownsampled() const { return m_isVolumeDownsampled; }
-  const std::vector<std::unique_ptr<Z3DVolume>>& volumes() const { return m_volumes; }
+  bool is3DData() const
+  { return m_imgPack.imgInfo().depth > 1; }
 
-  static glm::uvec3 imageBlockSize() { return glm::uvec3(30, 30, 30); }
+  glm::uvec3 dimensions() const
+  { return glm::uvec3(m_imgPack.imgInfo().width, m_imgPack.imgInfo().height, m_imgPack.imgInfo().depth); }
+
+  size_t numChannels() const
+  { return m_nChannels; }
+
+  col4 channelColor(size_t c) const
+  { return m_imgPack.imgInfo().channelColors[c]; }
+
+  bool isVolumeDownsampled() const
+  { return m_isVolumeDownsampled; }
+
+  const std::vector<std::unique_ptr<Z3DVolume>>& volumes() const
+  { return m_volumes; }
+
+  static glm::uvec3 imageBlockSize()
+  { return glm::uvec3(30, 30, 30); }
 
   // Returns a string representation of the sampler type: "sampler2D" for 2D image, "sampler3D" for 3D volume
   QString samplerType() const;
 
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
-  glm::vec3 physicalLUF() const { return glm::vec3(0, 0, 0); }
-  glm::vec3 physicalRDB() const { return glm::vec3(m_imgPack.imgInfo().width-1, m_imgPack.imgInfo().height-1, m_imgPack.imgInfo().depth-1); }
-  glm::vec3 physicalLDF() const { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z); }
-  glm::vec3 physicalRDF() const { return glm::vec3(physicalRDB().x, physicalRDB().y, physicalLUF().z); }
-  glm::vec3 physicalRUF() const { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalLUF().z); }
-  glm::vec3 physicalLUB() const { return glm::vec3(physicalLUF().x, physicalLUF().y, physicalRDB().z); }
-  glm::vec3 physicalLDB() const { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalRDB().z); }
-  glm::vec3 physicalRUB() const { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalRDB().z); }
+  glm::vec3 physicalLUF() const
+  { return glm::vec3(0, 0, 0); }
+
+  glm::vec3 physicalRDB() const
+  { return glm::vec3(m_imgPack.imgInfo().width - 1, m_imgPack.imgInfo().height - 1, m_imgPack.imgInfo().depth - 1); }
+
+  glm::vec3 physicalLDF() const
+  { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z); }
+
+  glm::vec3 physicalRDF() const
+  { return glm::vec3(physicalRDB().x, physicalRDB().y, physicalLUF().z); }
+
+  glm::vec3 physicalRUF() const
+  { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalLUF().z); }
+
+  glm::vec3 physicalLUB() const
+  { return glm::vec3(physicalLUF().x, physicalLUF().y, physicalRDB().z); }
+
+  glm::vec3 physicalLDB() const
+  { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalRDB().z); }
+
+  glm::vec3 physicalRUB() const
+  { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalRDB().z); }
 
   std::vector<std::unique_ptr<Z3DVolume>> makeXSliceVolume(size_t x);
+
   std::vector<std::unique_ptr<Z3DVolume>> makeYSliceVolume(size_t y);
+
   std::vector<std::unique_ptr<Z3DVolume>> makeZSliceVolume(size_t z);
 
   // xmin, xmax, ymin, ymax, zmin, zmax
@@ -61,15 +92,23 @@ public:
 
   void setScale(const glm::vec3& scale);
 
-  size_t numLevels() const { return m_numLevels; }
-  void bindFullResBlockIDsShader(Z3DShaderProgram &shader) const;
-  void bindFullResRenderShader(Z3DShaderProgram &shader) const;
-  void bindImageCacheToFullResRenderShader(Z3DShaderProgram &shader, size_t c) const;
-  bool updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missingBlockIDs, const std::set<uint32_t>& usedBlockIDs);
+  size_t numLevels() const
+  { return m_numLevels; }
+
+  void bindFullResBlockIDsShader(Z3DShaderProgram& shader) const;
+
+  void bindFullResRenderShader(Z3DShaderProgram& shader) const;
+
+  void bindImageCacheToFullResRenderShader(Z3DShaderProgram& shader, size_t c) const;
+
+  bool
+  updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missingBlockIDs, const std::set<uint32_t>& usedBlockIDs);
+
   void uploadImageCache(size_t channel);
 
 protected:
   void readVolumes();
+
   void checkPageSystemError();
 
 protected:

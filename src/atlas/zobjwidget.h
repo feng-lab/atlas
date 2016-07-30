@@ -4,38 +4,43 @@
 #include <QTreeView>
 
 class QSortFilterProxyModel;
+
 class QItemSelectionModel;
+
 class QMenu;
 
 namespace nim {
 
 class ZDoc;
+
 class ZObjModel;
 
 class ZObjWidget : public QTreeView
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  ZObjWidget(ZDoc *doc, ZObjModel *objModel, QItemSelectionModel *selectionModel, QWidget *parent = 0);
+  ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* selectionModel, QWidget* parent = 0);
 
 protected:
-  void contextMenu(const QPoint &pos);
+  void contextMenu(const QPoint& pos);
 
-  void indexClicked(const QModelIndex &index);
-  void indexDoubleClicked(const QModelIndex &index);
-  void indexActivated(const QModelIndex &index);
+  void indexClicked(const QModelIndex& index);
+
+  void indexDoubleClicked(const QModelIndex& index);
+
+  void indexActivated(const QModelIndex& index);
 
   void adaptColumns();
 
-  virtual void keyPressEvent(QKeyEvent *e) override;
+  virtual void keyPressEvent(QKeyEvent* e) override;
 
   void createContextMenu();
 
 private:
-  ZDoc *m_doc;
-  ZObjModel *m_objModel;
-  QSortFilterProxyModel *m_objProxyModel;
-  QMenu *m_contextMenu;
+  ZDoc* m_doc;
+  ZObjModel* m_objModel;
+  QSortFilterProxyModel* m_objProxyModel;
+  QMenu* m_contextMenu;
 };
 
 } // namespace nim

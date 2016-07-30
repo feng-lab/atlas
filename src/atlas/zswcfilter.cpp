@@ -10,12 +10,12 @@
 
 namespace nim {
 
-ZSwcGraphicsItem::ZSwcGraphicsItem(ZSwc &swc, double z, QGraphicsItem *parent)
+ZSwcGraphicsItem::ZSwcGraphicsItem(ZSwc& swc, double z, QGraphicsItem* parent)
   : QGraphicsItem(parent)
   , m_swc(swc)
   , m_boundBox(8)
   , m_showSkeleton(true)
-  , m_outlineColor(255,0,0)
+  , m_outlineColor(255, 0, 0)
   , m_opacity(1)
   , m_mip(false)
   , m_z(0)
@@ -59,11 +59,11 @@ QRectF ZSwcGraphicsItem::boundingRect() const
 {
   qreal penWidth = 1;
   return QRectF(m_boundBox[0] - penWidth / 2, m_boundBox[2] - penWidth / 2,
-      m_boundBox[1] - m_boundBox[0] + penWidth,
-      m_boundBox[3] - m_boundBox[2] + penWidth);
+                m_boundBox[1] - m_boundBox[0] + penWidth,
+                m_boundBox[3] - m_boundBox[2] + penWidth);
 }
 
-void ZSwcGraphicsItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
+void ZSwcGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
   Q_UNUSED(option)
   if (m_mip) {
@@ -71,20 +71,24 @@ void ZSwcGraphicsItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
     painter->setPen(QPen(m_outlineColor, 1));
     //painter->drawLines(m_lines);
     for (ZSwc::Iterator it = m_swc.begin(); it != m_swc.end(); ++it) {
-      painter->drawEllipse(QRectF(it->x - std::max(it->radius, .5), it->y - std::max(it->radius, .5), std::max(it->radius, .5) * 2, std::max(it->radius, .5) * 2));
+      painter->drawEllipse(
+        QRectF(it->x - std::max(it->radius, .5), it->y - std::max(it->radius, .5), std::max(it->radius, .5) * 2,
+               std::max(it->radius, .5) * 2));
     }
   } else {
     //if (m_showSkeleton) {
-      //m_outlineColor.setAlpha(m_opacity * 0.5 * 255);
-      //painter->setPen(QPen(m_outlineColor));
-      //painter->drawLines(m_lines);
+    //m_outlineColor.setAlpha(m_opacity * 0.5 * 255);
+    //painter->setPen(QPen(m_outlineColor));
+    //painter->drawLines(m_lines);
     //}
     m_outlineColor.setAlpha(m_opacity * 255);
     painter->setPen(QPen(m_outlineColor, 1));
     for (ZSwc::Iterator it = m_swc.begin(); it != m_swc.end(); ++it) {
       int slice = roundTo<int>(it->z);
       if (slice == m_z) {
-        painter->drawEllipse(QRectF(it->x - std::max(it->radius, .5), it->y - std::max(it->radius, .5), std::max(it->radius, .5) * 2, std::max(it->radius, .5) * 2));
+        painter->drawEllipse(
+          QRectF(it->x - std::max(it->radius, .5), it->y - std::max(it->radius, .5), std::max(it->radius, .5) * 2,
+                 std::max(it->radius, .5) * 2));
         if (!ZSwc::isRoot(it)) {
           ZSwc::Iterator par = ZSwc::parent(it);
           painter->drawLine(QLineF(it->x, it->y, par->x, par->y));
@@ -96,9 +100,9 @@ void ZSwcGraphicsItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
   if (widget && (m_mip || m_showSkeleton)) {
     m_outlineColor.setAlpha(m_opacity * 0.5 * 255);
     double devicePixelRatio = (widget->window() && widget->window()->windowHandle()) ?
-          widget->window()->windowHandle()->devicePixelRatio() : 1.0;
-    QPixmap buffer(widget->width()*devicePixelRatio, widget->height()*devicePixelRatio);
-    buffer.fill(QColor(0,0,0,0));
+                              widget->window()->windowHandle()->devicePixelRatio() : 1.0;
+    QPixmap buffer(widget->width() * devicePixelRatio, widget->height() * devicePixelRatio);
+    buffer.fill(QColor(0, 0, 0, 0));
     QPainter pnt(&buffer);
     //pnt.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
     pnt.setTransform(painter->combinedTransform());
@@ -113,12 +117,12 @@ void ZSwcGraphicsItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
   }
 }
 
-ZSwcFilter::ZSwcFilter(ZView &view)
+ZSwcFilter::ZSwcFilter(ZView& view)
   : ZObjFilter(view)
   , m_swc(nullptr)
   , m_visible("Visible", true)
   , m_showSkeleton("Show Skeleton", true)
-  , m_outlineColor("Outline Color", glm::vec3(1,0,0), glm::vec3(0), glm::vec3(1))
+  , m_outlineColor("Outline Color", glm::vec3(1, 0, 0), glm::vec3(0), glm::vec3(1))
   , m_opacity("Opacity", 1, 0., 1.)
 {
   m_outlineColor.setStyle("COLOR");
@@ -132,7 +136,7 @@ ZSwcFilter::ZSwcFilter(ZView &view)
   addParameter(&m_opacity);
 }
 
-void ZSwcFilter::setData(ZSwc &swc)
+void ZSwcFilter::setData(ZSwc& swc)
 {
   m_swc = &swc;
   m_item.reset(new ZSwcGraphicsItem(swc));
@@ -164,7 +168,7 @@ void ZSwcFilter::setMaxZProjView(int t)
   m_item->setMaxZProjView(t);
 }
 
-const std::vector<int> &ZSwcFilter::boundBox() const
+const std::vector<int>& ZSwcFilter::boundBox() const
 {
   return m_item->boundBox();
 }

@@ -13,6 +13,7 @@
 #include "zoptionparameter.h"
 #include <QLabel>
 #include <memory>
+
 #ifdef _NEUTUBE_
 #include <zsharedpointer.h>
 #endif
@@ -26,36 +27,43 @@ namespace nim {
 
 class ZSectionsRegistrationDialog : public QDialog
 {
-  Q_OBJECT
+Q_OBJECT
 public:
 #ifdef _NEUTUBE_
   explicit ZSectionsRegistrationDialog(ZSharedPointer<ZStackDoc> doc, QWidget *parent = 0);
 #endif
-  explicit ZSectionsRegistrationDialog(QWidget *parent = 0);
-  
+
+  explicit ZSectionsRegistrationDialog(QWidget* parent = 0);
+
 signals:
 #ifdef _NEUTUBE_
   void stackDocDelivered(ZStack* stack);
 #endif
-  void resultReady(ZImg *img, QString path);
+
+  void resultReady(ZImg* img, QString path);
 
 protected:
   void registerSections();
 
   void processCanceled();
+
   void processFinished();
-  void processError(const QString &e);
+
+  void processError(const QString& e);
 
   void cancelButtonPressed();
 
-  virtual void keyPressEvent(QKeyEvent *e) override;
+  virtual void keyPressEvent(QKeyEvent* e) override;
 
 private:
   void adjustInputImageWidget();
+
   void inputImagesChanged();
 
   void init();
+
   void createIOGroupBox();
+
   void createParaGroupBox();
 
 private:
@@ -63,17 +71,17 @@ private:
   ZSharedPointer<ZStackDoc> m_doc;
 #endif
 
-  QGroupBox *m_ioGroupBox;
-  QGroupBox *m_paraGroupBox;
-  QPushButton *m_runButton;
-  QPushButton *m_exitButton;
-  QDialogButtonBox *m_buttonBox;
+  QGroupBox* m_ioGroupBox;
+  QGroupBox* m_paraGroupBox;
+  QPushButton* m_runButton;
+  QPushButton* m_exitButton;
+  QDialogButtonBox* m_buttonBox;
 
   ZBoolParameter m_useCurrentActiveImage;
-  ZSelectFileWidget *m_inputImagesFileWidget;
+  ZSelectFileWidget* m_inputImagesFileWidget;
   ZBoolParameter m_openLoadedStack;
-  ZSelectFileWidget *m_outputStackWidget;
-  ZSelectFileWidget *m_outputLogFileWidget;
+  ZSelectFileWidget* m_outputStackWidget;
+  ZSelectFileWidget* m_outputLogFileWidget;
   ZBoolParameter m_openStackAfterRegistering;
 
   ZStringIntOptionParameter m_referenceChannel;
@@ -91,7 +99,7 @@ private:
   mutable bool m_isCanceled;
   bool m_hasError;
 
-  QProgressDialog *m_progressDialog;
+  QProgressDialog* m_progressDialog;
 
   ZImg m_registeredImg;
 };

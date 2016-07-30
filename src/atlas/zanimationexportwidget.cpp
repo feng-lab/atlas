@@ -13,7 +13,7 @@
 
 namespace nim {
 
-ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget *parent)
+ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget* parent)
   : QScrollArea(parent)
   , m_group(false)
   , m_captureStereoImage("Stereo", false)
@@ -105,10 +105,10 @@ void ZAnimationExportWidget::adjustWidget()
 
 void ZAnimationExportWidget::createWidget()
 {
-  QVBoxLayout *lo = new QVBoxLayout;
+  QVBoxLayout* lo = new QVBoxLayout;
 
-  QHBoxLayout *hlo = nullptr;
-  QWidget *wg = nullptr;
+  QHBoxLayout* hlo = nullptr;
+  QWidget* wg = nullptr;
 
   if (!m_is2DAnimation) {
     hlo = new QHBoxLayout;
@@ -181,7 +181,7 @@ void ZAnimationExportWidget::createWidget()
   m_captureButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   lo->addWidget(m_captureButton, 0, Qt::AlignHCenter | Qt::AlignVCenter);
 
-  QWidget *resWgt = new QWidget(this);
+  QWidget* resWgt = new QWidget(this);
   if (m_group) {
     m_groupBox = new QGroupBox(tr("capture"), this);
     m_groupBox->setLayout(lo);

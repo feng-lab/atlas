@@ -6,10 +6,10 @@
 
 namespace nim {
 
-ZObjFilter::ZObjFilter(ZView &view)
+ZObjFilter::ZObjFilter(ZView& view)
   : QObject(nullptr)
   , m_view(view)
-  , m_offsetPara(QString("Offset"), glm::dvec4(0,0,0,0),
+  , m_offsetPara(QString("Offset"), glm::dvec4(0, 0, 0, 0),
                  glm::dvec4(std::numeric_limits<int>::min()),
                  glm::dvec4(std::numeric_limits<int>::max()))
 {
@@ -19,32 +19,32 @@ ZObjFilter::ZObjFilter(ZView &view)
   connect(&m_offsetPara, &ZDVec4Parameter::valueChanged, this, &ZObjFilter::offsetChanged);
 }
 
-void ZObjFilter::read(const QJsonObject &json)
+void ZObjFilter::read(const QJsonObject& json)
 {
-  for (int i=0; i<m_parameters.size(); ++i) {
+  for (int i = 0; i < m_parameters.size(); ++i) {
     m_parameters[i]->read(json);
   }
 }
 
-void ZObjFilter::write(QJsonObject &json) const
+void ZObjFilter::write(QJsonObject& json) const
 {
-  for (int i=0; i<m_parameters.size(); ++i) {
+  for (int i = 0; i < m_parameters.size(); ++i) {
     m_parameters[i]->write(json);
   }
 }
 
-void ZObjFilter::addParameter(ZParameter *para)
+void ZObjFilter::addParameter(ZParameter* para)
 {
   CHECK(para);
   m_parameters.push_back(para);
 }
 
-void ZObjFilter::removeParameter(ZParameter *para)
+void ZObjFilter::removeParameter(ZParameter* para)
 {
   m_parameters.removeAll(para);
 }
 
-void ZObjFilter::updateBoundBoxWithOffsetPara(std::vector<int> &boundBox) const
+void ZObjFilter::updateBoundBoxWithOffsetPara(std::vector<int>& boundBox) const
 {
   boundBox[0] += m_offsetPara.get().x;
   boundBox[1] += m_offsetPara.get().x;

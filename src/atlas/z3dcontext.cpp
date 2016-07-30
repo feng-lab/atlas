@@ -15,17 +15,17 @@ Z3DContext::~Z3DContext()
 {
 }
 
-bool Z3DContext::operator<(const Z3DContext &rhs) const
+bool Z3DContext::operator<(const Z3DContext& rhs) const
 {
   return m_context < rhs.m_context;
 }
 
-bool Z3DContext::operator==(const Z3DContext &rhs) const
+bool Z3DContext::operator==(const Z3DContext& rhs) const
 {
   return m_context == rhs.m_context;
 }
 
-bool Z3DContext::operator!=(const Z3DContext &rhs) const
+bool Z3DContext::operator!=(const Z3DContext& rhs) const
 {
   return m_context != rhs.m_context;
 }

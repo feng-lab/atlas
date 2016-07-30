@@ -4,7 +4,7 @@
 
 namespace nim {
 
-ZSpinBox::ZSpinBox(QWidget *parent)
+ZSpinBox::ZSpinBox(QWidget* parent)
   : QSpinBox(parent)
 {
   installEventFilter(new ZSpinBoxEventFilter(this));
@@ -26,19 +26,19 @@ QSize ZSpinBox::minimumSizeHint() const
   return size;
 }
 
-void ZSpinBox::focusInEvent(QFocusEvent *e)
+void ZSpinBox::focusInEvent(QFocusEvent* e)
 {
   QSpinBox::focusInEvent(e);
   setFocusPolicy(Qt::WheelFocus);
 }
 
-void ZSpinBox::focusOutEvent(QFocusEvent *e)
+void ZSpinBox::focusOutEvent(QFocusEvent* e)
 {
   QSpinBox::focusOutEvent(e);
   setFocusPolicy(Qt::StrongFocus);
 }
 
-ZDoubleSpinBox::ZDoubleSpinBox(QWidget *parent)
+ZDoubleSpinBox::ZDoubleSpinBox(QWidget* parent)
   : QDoubleSpinBox(parent)
 {
   installEventFilter(new ZSpinBoxEventFilter(this));
@@ -60,35 +60,32 @@ QSize ZDoubleSpinBox::minimumSizeHint() const
   return size;
 }
 
-void ZDoubleSpinBox::focusInEvent(QFocusEvent *e)
+void ZDoubleSpinBox::focusInEvent(QFocusEvent* e)
 {
   QDoubleSpinBox::focusInEvent(e);
   setFocusPolicy(Qt::WheelFocus);
 }
 
-void ZDoubleSpinBox::focusOutEvent(QFocusEvent *e)
+void ZDoubleSpinBox::focusOutEvent(QFocusEvent* e)
 {
   QDoubleSpinBox::focusOutEvent(e);
   setFocusPolicy(Qt::StrongFocus);
 }
 
-ZSpinBoxEventFilter::ZSpinBoxEventFilter(QObject *parent)
+ZSpinBoxEventFilter::ZSpinBoxEventFilter(QObject* parent)
   : QObject(parent)
 {
 }
 
-bool ZSpinBoxEventFilter::eventFilter(QObject *obj, QEvent *event)
+bool ZSpinBoxEventFilter::eventFilter(QObject* obj, QEvent* event)
 {
-  if(event->type() == QEvent::Wheel &&
-     qobject_cast<QAbstractSpinBox*>(obj))
-  {
-    if(qobject_cast<QAbstractSpinBox*>(obj)->focusPolicy() == Qt::WheelFocus)
-    {
+  if (event->type() == QEvent::Wheel &&
+      qobject_cast<QAbstractSpinBox*>(obj)) {
+    if (qobject_cast<QAbstractSpinBox*>(obj)->focusPolicy() == Qt::WheelFocus) {
       event->accept();
       return false;
     }
-    else
-    {
+    else {
       event->ignore();
       return true;
     }

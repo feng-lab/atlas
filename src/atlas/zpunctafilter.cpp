@@ -8,11 +8,11 @@
 
 namespace nim {
 
-ZPunctaGraphicsItem::ZPunctaGraphicsItem(ZPuncta &puncta, double z, QGraphicsItem *parent)
+ZPunctaGraphicsItem::ZPunctaGraphicsItem(ZPuncta& puncta, double z, QGraphicsItem* parent)
   : QGraphicsItem(parent)
   , m_puncta(puncta)
   , m_boundBox(8)
-  , m_outlineColor(255,0,0)
+  , m_outlineColor(255, 0, 0)
   , m_opacity(1)
   , m_mip(false)
   , m_z(0)
@@ -39,11 +39,11 @@ QRectF ZPunctaGraphicsItem::boundingRect() const
 {
   qreal penWidth = 1;
   return QRectF(m_boundBox[0] - penWidth / 2, m_boundBox[2] - penWidth / 2,
-      m_boundBox[1] - m_boundBox[0] + penWidth,
-      m_boundBox[3] - m_boundBox[2] + penWidth);
+                m_boundBox[1] - m_boundBox[0] + penWidth,
+                m_boundBox[3] - m_boundBox[2] + penWidth);
 }
 
-void ZPunctaGraphicsItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
+void ZPunctaGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
   Q_UNUSED(option)
   Q_UNUSED(widget)
@@ -57,17 +57,18 @@ void ZPunctaGraphicsItem::paint(QPainter *painter, const QStyleOptionGraphicsIte
     for (ZPuncta::iterator it = m_puncta.begin(); it != m_puncta.end(); ++it) {
       int slice = roundTo<int>(it->z());
       if (slice == m_z) {
-        painter->drawEllipse(QRectF(it->x() - it->radius(), it->y() - it->radius(), it->radius() * 2, it->radius() * 2));
+        painter->drawEllipse(
+          QRectF(it->x() - it->radius(), it->y() - it->radius(), it->radius() * 2, it->radius() * 2));
       }
     }
   }
 }
 
-ZPunctaFilter::ZPunctaFilter(ZView &view)
+ZPunctaFilter::ZPunctaFilter(ZView& view)
   : ZObjFilter(view)
   , m_puncta(nullptr)
   , m_visible("Visible", true)
-  , m_outlineColor("Outline Color", glm::vec3(1,0,1), glm::vec3(0), glm::vec3(1))
+  , m_outlineColor("Outline Color", glm::vec3(1, 0, 1), glm::vec3(0), glm::vec3(1))
   , m_opacity("Opacity", 1, 0., 1.)
 {
   m_outlineColor.setStyle("COLOR");
@@ -79,7 +80,7 @@ ZPunctaFilter::ZPunctaFilter(ZView &view)
   addParameter(&m_opacity);
 }
 
-void ZPunctaFilter::setData(ZPuncta &puncta)
+void ZPunctaFilter::setData(ZPuncta& puncta)
 {
   m_puncta = &puncta;
   m_item.reset(new ZPunctaGraphicsItem(puncta));
@@ -112,7 +113,7 @@ void ZPunctaFilter::setMaxZProjView(int t)
   m_item->setMaxZProjView(t);
 }
 
-const std::vector<int> &ZPunctaFilter::boundBox() const
+const std::vector<int>& ZPunctaFilter::boundBox() const
 {
   return m_item->boundBox();
 }

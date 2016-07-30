@@ -4,15 +4,15 @@
 namespace nim {
 
 template<class T, class T2>
-ZOptionParameter<T, T2>::ZOptionParameter(const QString &name, QObject *parent, const QString &prefix,
-                                          const QString &suffix)
+ZOptionParameter<T, T2>::ZOptionParameter(const QString& name, QObject* parent, const QString& prefix,
+                                          const QString& suffix)
   : ZSingleValueParameter<T>(name, parent), m_dataIsValid(false)
   , m_prefix(prefix), m_suffix(suffix)
 {
 }
 
 template<class T, class T2>
-void ZOptionParameter<T, T2>::select(const T &value)
+void ZOptionParameter<T, T2>::select(const T& value)
 {
   this->set(value);
 }
@@ -35,7 +35,7 @@ void ZOptionParameter<T, T2>::selectNext()
 }
 
 template<class T, class T2>
-bool ZOptionParameter<T, T2>::isSelected(const T &value) const
+bool ZOptionParameter<T, T2>::isSelected(const T& value) const
 {
 #if defined(_DEBUG_)
   if (!m_options.contains(value)) {
@@ -56,9 +56,9 @@ void ZOptionParameter<T, T2>::reservedIntSlot1(int index)
 template<class T, class T2>
 QWidget* ZOptionParameter<T, T2>::actualCreateWidget(QWidget* parent)
 {
-  ZComboBox *cb = new ZComboBox(parent);
+  ZComboBox* cb = new ZComboBox(parent);
 
-  for (int i=0; i<m_options.size(); i++) {
+  for (int i = 0; i < m_options.size(); i++) {
     cb->addItem(comboBoxItemString(m_options[i]));
   }
   if (!m_options.empty()) {
@@ -79,7 +79,7 @@ QWidget* ZOptionParameter<T, T2>::actualCreateWidget(QWidget* parent)
 }
 
 template<class T, class T2>
-void ZOptionParameter<T, T2>::makeValid(T &value) const
+void ZOptionParameter<T, T2>::makeValid(T& value) const
 {
   if (!m_options.contains(value)) {
     LOG(ERROR) << QString("Optiong value <%1> does not exist.").arg(value);
@@ -96,13 +96,13 @@ void ZOptionParameter<T, T2>::makeValid(T &value) const
 }
 
 template<class T, class T2>
-QString ZOptionParameter<T,T2>::comboBoxItemString(const T &value) const
+QString ZOptionParameter<T, T2>::comboBoxItemString(const T& value) const
 {
   return QString("%1%2%3").arg(m_prefix).arg(value).arg(m_suffix);
 }
 
 template<class T, class T2>
-void ZOptionParameter<T, T2>::beforeChange(T &value)
+void ZOptionParameter<T, T2>::beforeChange(T& value)
 {
   int index = m_options.indexOf(value);
   m_associatedData = m_associatedDatas[index];
@@ -110,16 +110,16 @@ void ZOptionParameter<T, T2>::beforeChange(T &value)
 }
 
 template<class T, class T2>
-void ZOptionParameter<T,T2>::setSameAs(const ZParameter &rhs)
+void ZOptionParameter<T, T2>::setSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
-  const ZOptionParameter<T,T2>* src = static_cast<const ZOptionParameter<T,T2>*>(&rhs);
+  const ZOptionParameter<T, T2>* src = static_cast<const ZOptionParameter<T, T2>*>(&rhs);
   m_prefix = src->m_prefix;
   m_suffix = src->m_suffix;
   m_dataIsValid = src->m_dataIsValid;
   if (m_options != src->m_options || m_associatedDatas != src->m_associatedDatas) {
     clearOptions();
-    for (int i=0; i<src->m_options.size(); ++i) {
+    for (int i = 0; i < src->m_options.size(); ++i) {
       addOptionWithData(qMakePair(src->m_options[i], src->m_associatedDatas[i]));
     }
   }
@@ -128,13 +128,13 @@ void ZOptionParameter<T,T2>::setSameAs(const ZParameter &rhs)
 }
 
 template<class T, class T2>
-QJsonValue ZOptionParameter<T,T2>::jsonValue() const
+QJsonValue ZOptionParameter<T, T2>::jsonValue() const
 {
   return QJsonValue(toQString(this->m_value));
 }
 
 template<class T, class T2>
-void ZOptionParameter<T,T2>::readValue(const QJsonValue &jsonValue)
+void ZOptionParameter<T, T2>::readValue(const QJsonValue& jsonValue)
 {
   T v;
   toVal(jsonValue.toString(toQString(this->m_value)), v);
@@ -145,10 +145,10 @@ void ZOptionParameter<T,T2>::readValue(const QJsonValue &jsonValue)
 }
 
 template<class T, class T2>
-void ZOptionParameter<T,T2>::forceSetValueSameAs(const ZParameter &rhs)
+void ZOptionParameter<T, T2>::forceSetValueSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
-  const ZOptionParameter<T,T2>* src = static_cast<const ZOptionParameter<T,T2>*>(&rhs);
+  const ZOptionParameter<T, T2>* src = static_cast<const ZOptionParameter<T, T2>*>(&rhs);
   if (hasOption(src->get())) {
     select(src->get());
   } else {
@@ -157,24 +157,32 @@ void ZOptionParameter<T,T2>::forceSetValueSameAs(const ZParameter &rhs)
   }
 }
 
-template class ZOptionParameter<QString,int>;
-template class ZOptionParameter<int,int>;
-template class ZOptionParameter<QString,QString>;
+template
+class ZOptionParameter<QString, int>;
 
-ZStringIntOptionParameter::ZStringIntOptionParameter(const QString &name, QObject *parent, const QString &prefix, const QString &suffix)
-  : ZOptionParameter<QString,int>(name, parent, prefix, suffix)
+template
+class ZOptionParameter<int, int>;
+
+template
+class ZOptionParameter<QString, QString>;
+
+ZStringIntOptionParameter::ZStringIntOptionParameter(const QString& name, QObject* parent, const QString& prefix,
+                                                     const QString& suffix)
+  : ZOptionParameter<QString, int>(name, parent, prefix, suffix)
 {
 }
 
 
-ZStringStringOptionParameter::ZStringStringOptionParameter(const QString &name, QObject *parent, const QString &prefix, const QString &suffix)
-  : ZOptionParameter<QString,QString>(name, parent, prefix, suffix)
+ZStringStringOptionParameter::ZStringStringOptionParameter(const QString& name, QObject* parent, const QString& prefix,
+                                                           const QString& suffix)
+  : ZOptionParameter<QString, QString>(name, parent, prefix, suffix)
 {
 }
 
 
-ZIntIntOptionParameter::ZIntIntOptionParameter(const QString &name, QObject *parent, const QString &prefix, const QString &suffix)
-  : ZOptionParameter<int,int>(name, parent, prefix, suffix)
+ZIntIntOptionParameter::ZIntIntOptionParameter(const QString& name, QObject* parent, const QString& prefix,
+                                               const QString& suffix)
+  : ZOptionParameter<int, int>(name, parent, prefix, suffix)
 {
 }
 

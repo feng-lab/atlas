@@ -12,7 +12,7 @@
 
 namespace nim {
 
-ZRegionAnnotationWidget::ZRegionAnnotationWidget(ZRegionAnnotation &anno, ZDoc &doc, QWidget *parent)
+ZRegionAnnotationWidget::ZRegionAnnotationWidget(ZRegionAnnotation& anno, ZDoc& doc, QWidget* parent)
   : QWidget(parent)
   , m_regionAnnotation(anno)
   , m_doc(doc)
@@ -34,7 +34,7 @@ void ZRegionAnnotationWidget::exportLabelImage()
     dialog.setAcceptMode(QFileDialog::AcceptSave);
     dialog.setFileMode(QFileDialog::AnyFile);
     dialog.setNameFilters(filters);
-    for (int i=0; i<formats.size(); ++i) {
+    for (int i = 0; i < formats.size(); ++i) {
       if (formats[i] == FileFormat::MetaImage) {
         dialog.selectNameFilter(filters[i]);
       }
@@ -54,7 +54,7 @@ void ZRegionAnnotationWidget::exportLabelImage()
       ZSystemInfoInstance.addFileToRecentFileList(fn);
       ZSystemInfoInstance.setLastOpenedImagePath(fn);
     }
-    catch (const ZException & e) {
+    catch (const ZException& e) {
       QMessageBox::critical(QApplication::activeWindow(), tr("Can not export label image"),
                             e.what());
     }
@@ -63,9 +63,9 @@ void ZRegionAnnotationWidget::exportLabelImage()
 
 void ZRegionAnnotationWidget::createWidget()
 {
-  QVBoxLayout *vlo = new QVBoxLayout;
+  QVBoxLayout* vlo = new QVBoxLayout;
 
-  QPushButton *pb = new QPushButton("Update 3D Mesh");
+  QPushButton* pb = new QPushButton("Update 3D Mesh");
   pb->setToolTip("Update 3D mesh with current region contours");
   pb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   vlo->addWidget(pb, 0, Qt::AlignLeft | Qt::AlignVCenter);
@@ -77,8 +77,8 @@ void ZRegionAnnotationWidget::createWidget()
   vlo->addWidget(pb, 0, Qt::AlignLeft | Qt::AlignVCenter);
   connect(pb, &QPushButton::clicked, this, &ZRegionAnnotationWidget::exportLabelImage);
 
-  ZRegionAnnotationTreeModel *model = new ZRegionAnnotationTreeModel(m_regionAnnotation, this);
-  ZRegionAnnotationTreeView *view = new ZRegionAnnotationTreeView(*model, m_regionAnnotation, m_doc, this);
+  ZRegionAnnotationTreeModel* model = new ZRegionAnnotationTreeModel(m_regionAnnotation, this);
+  ZRegionAnnotationTreeView* view = new ZRegionAnnotationTreeView(*model, m_regionAnnotation, m_doc, this);
   vlo->addWidget(view);
 
   setLayout(vlo);

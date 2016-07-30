@@ -6,7 +6,7 @@
 
 namespace nim {
 
-ZRegionAnnotationTreeModel::ZRegionAnnotationTreeModel(ZRegionAnnotation &anno, QObject *parent)
+ZRegionAnnotationTreeModel::ZRegionAnnotationTreeModel(ZRegionAnnotation& anno, QObject* parent)
   : QAbstractItemModel(parent)
   , m_regionAnnotation(anno)
   , m_annotationTree(m_regionAnnotation.annotationTree())
@@ -20,61 +20,61 @@ ZRegionAnnotationTreeModel::~ZRegionAnnotationTreeModel()
 {
 }
 
-QVariant ZRegionAnnotationTreeModel::data(const QModelIndex &index, int role) const
+QVariant ZRegionAnnotationTreeModel::data(const QModelIndex& index, int role) const
 {
   if (!index.isValid())
     return QVariant();
 
-  RegionNode *item = static_cast<RegionNode*>(index.internalPointer());
+  RegionNode* item = static_cast<RegionNode*>(index.internalPointer());
 
   if (role == Qt::DisplayRole) {
     switch (index.column()) {
-    case AbbreviationColumn:
-      return item->abbreviation;
-      break;
-    case IDColumn:
-      return item->id;
-      break;
-    case NameColumn:
-      return item->name;
-      break;
-    case MergeROIColumn:
-      return QString("Merge ROI to %1...").arg(item->abbreviation);
-      break;
-    case ExportROIColumn:
-      return QString("Export ROI of %1...").arg(item->abbreviation);
-      break;
-    case ExportMeshColumn:
-      return QString("Export Mesh of %1...").arg(item->abbreviation);
-      break;
-    default:
-      break;
+      case AbbreviationColumn:
+        return item->abbreviation;
+        break;
+      case IDColumn:
+        return item->id;
+        break;
+      case NameColumn:
+        return item->name;
+        break;
+      case MergeROIColumn:
+        return QString("Merge ROI to %1...").arg(item->abbreviation);
+        break;
+      case ExportROIColumn:
+        return QString("Export ROI of %1...").arg(item->abbreviation);
+        break;
+      case ExportMeshColumn:
+        return QString("Export Mesh of %1...").arg(item->abbreviation);
+        break;
+      default:
+        break;
     }
   }
 
   if (role == Qt::UserRole) {
     switch (index.column()) {
-    case AbbreviationColumn:
-    case IDColumn:
-    case NameColumn:
-    case MergeROIColumn:
-      return static_cast<qlonglong>(item->id * 10 + 1);
-      break;
-    case ExportROIColumn:
-      return static_cast<qlonglong>(item->id * 10 + 2);
-      break;
-    case ExportMeshColumn:
-      return static_cast<qlonglong>(item->id * 10 + 3);
-      break;
-    default:
-      break;
+      case AbbreviationColumn:
+      case IDColumn:
+      case NameColumn:
+      case MergeROIColumn:
+        return static_cast<qlonglong>(item->id * 10 + 1);
+        break;
+      case ExportROIColumn:
+        return static_cast<qlonglong>(item->id * 10 + 2);
+        break;
+      case ExportMeshColumn:
+        return static_cast<qlonglong>(item->id * 10 + 3);
+        break;
+      default:
+        break;
     }
   }
 
   return QVariant();
 }
 
-Qt::ItemFlags ZRegionAnnotationTreeModel::flags(const QModelIndex &index) const
+Qt::ItemFlags ZRegionAnnotationTreeModel::flags(const QModelIndex& index) const
 {
   if (!index.isValid())
     return 0;
@@ -84,7 +84,7 @@ Qt::ItemFlags ZRegionAnnotationTreeModel::flags(const QModelIndex &index) const
   return flags;
 }
 
-bool ZRegionAnnotationTreeModel::setData(const QModelIndex &index, const QVariant &value, int role)
+bool ZRegionAnnotationTreeModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
   Q_UNUSED(value)
   Q_UNUSED(role)
@@ -99,46 +99,46 @@ QVariant ZRegionAnnotationTreeModel::headerData(int section, Qt::Orientation ori
 {
   if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
     switch (section) {
-    case AbbreviationColumn:
-      return QString("Abbreviation");
-      break;
-    case IDColumn:
-      return QString("Region ID");
-      break;
-    case NameColumn:
-      return QString("Name");
-      break;
-    case MergeROIColumn:
-      return QString("Merge ROI");
-      break;
-    case ExportROIColumn:
-      return QString("Export ROI");
-      break;
-    case ExportMeshColumn:
-      return QString("Export Mesh");
-      break;
-    default:
-      break;
+      case AbbreviationColumn:
+        return QString("Abbreviation");
+        break;
+      case IDColumn:
+        return QString("Region ID");
+        break;
+      case NameColumn:
+        return QString("Name");
+        break;
+      case MergeROIColumn:
+        return QString("Merge ROI");
+        break;
+      case ExportROIColumn:
+        return QString("Export ROI");
+        break;
+      case ExportMeshColumn:
+        return QString("Export Mesh");
+        break;
+      default:
+        break;
     }
   }
 
   if (orientation == Qt::Horizontal && role == Qt::UserRole) {
     switch (section) {
-    case MergeROIColumn:
-    case ExportROIColumn:
-    case ExportMeshColumn:
-      return 1;
-      break;
-    default:
-      return 0;
-      break;
+      case MergeROIColumn:
+      case ExportROIColumn:
+      case ExportMeshColumn:
+        return 1;
+        break;
+      default:
+        return 0;
+        break;
     }
   }
 
   return QVariant();
 }
 
-QModelIndex ZRegionAnnotationTreeModel::index(int row, int column, const QModelIndex &parent) const
+QModelIndex ZRegionAnnotationTreeModel::index(int row, int column, const QModelIndex& parent) const
 {
   if (!hasIndex(row, column, parent))
     return QModelIndex();
@@ -150,7 +150,8 @@ QModelIndex ZRegionAnnotationTreeModel::index(int row, int column, const QModelI
     RegionNode* node = &(*it);
     return createIndex(row, column, node);
   } else {
-    CHECK(row < static_cast<int>(m_annotationTree.numChildren(m_nodeToIter.at(static_cast<RegionNode*>(parent.internalPointer())))));
+    CHECK(row < static_cast<int>(m_annotationTree.numChildren(
+      m_nodeToIter.at(static_cast<RegionNode*>(parent.internalPointer())))));
     auto it = m_annotationTree.beginChild(m_nodeToIter.at(static_cast<RegionNode*>(parent.internalPointer())));
     std::advance(it, row);
     RegionNode* node = &(*it);
@@ -158,7 +159,7 @@ QModelIndex ZRegionAnnotationTreeModel::index(int row, int column, const QModelI
   }
 }
 
-QModelIndex ZRegionAnnotationTreeModel::parent(const QModelIndex &index) const
+QModelIndex ZRegionAnnotationTreeModel::parent(const QModelIndex& index) const
 {
   if (!index.isValid())
     return QModelIndex();
@@ -168,7 +169,7 @@ QModelIndex ZRegionAnnotationTreeModel::parent(const QModelIndex &index) const
     return QModelIndex();
   } else {
     auto pit = m_annotationTree.parent(it);
-    RegionNode *node = &*pit;
+    RegionNode* node = &*pit;
     if (m_annotationTree.isRoot(pit)) {
       int row = 0;
       for (auto rit = m_annotationTree.beginRoot(); rit != m_annotationTree.endRoot(); ++rit, ++row) {
@@ -190,7 +191,7 @@ QModelIndex ZRegionAnnotationTreeModel::parent(const QModelIndex &index) const
   return QModelIndex();
 }
 
-int ZRegionAnnotationTreeModel::rowCount(const QModelIndex &parent) const
+int ZRegionAnnotationTreeModel::rowCount(const QModelIndex& parent) const
 {
   if (parent.column() > 0)
     return 0;
@@ -203,12 +204,12 @@ int ZRegionAnnotationTreeModel::rowCount(const QModelIndex &parent) const
   }
 }
 
-int ZRegionAnnotationTreeModel::columnCount(const QModelIndex &) const
+int ZRegionAnnotationTreeModel::columnCount(const QModelIndex&) const
 {
   return ColumnCount;
 }
 
-void ZRegionAnnotationTreeModel::clicked(const QModelIndex &idxIn)
+void ZRegionAnnotationTreeModel::clicked(const QModelIndex& idxIn)
 {
   Q_UNUSED(idxIn)
   //  if (idxIn.isValid()) {
@@ -248,11 +249,11 @@ void ZRegionAnnotationTreeModel::clicked(const QModelIndex &idxIn)
   //  }
 }
 
-void ZRegionAnnotationTreeModel::doubleClicked(const QModelIndex &)
+void ZRegionAnnotationTreeModel::doubleClicked(const QModelIndex&)
 {
 }
 
-void ZRegionAnnotationTreeModel::activated(const QModelIndex &idxIn)
+void ZRegionAnnotationTreeModel::activated(const QModelIndex& idxIn)
 {
   Q_UNUSED(idxIn)
   //  size_t id = indexToId(idxIn);

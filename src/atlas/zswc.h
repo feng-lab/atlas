@@ -56,47 +56,67 @@ public:
   static constexpr int ApicalObliqueTerminalType = 9;
   static constexpr int ApicalTuftType = 10;
 
-  ZSwc() : ZTree<SwcNode>() {}
+  ZSwc() : ZTree<SwcNode>()
+  {}
+
   // might throw ZIOException
-  explicit ZSwc(const QString &filename) { load(filename); }
+  explicit ZSwc(const QString& filename)
+  { load(filename); }
 
   ZSwc(ZSwc&&) = default;
+
   ZSwc& operator=(ZSwc&&) = default;
+
   ZSwc(const ZSwc&) = default;
+
   ZSwc& operator=(const ZSwc&) = default;
 
-  inline void swap(ZSwc &other) noexcept { ZTree<SwcNode>::swap(other); }
+  inline void swap(ZSwc& other) noexcept
+  { ZTree<SwcNode>::swap(other); }
 
   template<typename Iter>
   static QString toQString(const Iter& pos)
   {
     return isNull(pos) ? QString("(Empty Node)") :
-                         QString("id:%1, type:%2, x:%3, y:%4, z:%5, radius:%6, parentID:%7")
-                         .arg(pos->id).arg(pos->type).arg(pos->x).arg(pos->y).arg(pos->z)
-                         .arg(pos->radius).arg(parentID(pos));
+           QString("id:%1, type:%2, x:%3, y:%4, z:%5, radius:%6, parentID:%7")
+             .arg(pos->id).arg(pos->type).arg(pos->x).arg(pos->y).arg(pos->z)
+             .arg(pos->radius).arg(parentID(pos));
   }
 
   // pos must not be null
   template<typename Iter>
-  static int parentID(const Iter& pos) { return isNull(parent(pos)) ? -1 : parent(pos)->id; }
+  static int parentID(const Iter& pos)
+  { return isNull(parent(pos)) ? -1 : parent(pos)->id; }
 
   SwcTreeNode thickestNode();
-  SwcTreeNode thickestNode(const SwcTreeNode &subtree);
+
+  SwcTreeNode thickestNode(const SwcTreeNode& subtree);
 
   // set type of soma as somaType, other as otherType, set root to thickest node
   void labelSomaAndOthers(double radiusThre = 0, int somaType = SomaType, int otherType = AxonType);
+
   // before calling this, soma nodes type must be somaType and other nodes type must not be somaType
   void resortPyramidal(int basalType = BasalDendriteType, int apicalType = ApicalDendriteType, int somaType = SomaType);
+
   void resortID();
 
   // qt style read write name filter for filedialog
-  static bool canReadFile(const QString& filename) { return filename.endsWith(".swc", Qt::CaseInsensitive); }
-  static bool canWriteFile(const QString& filename) { return filename.endsWith(".swc", Qt::CaseInsensitive); }
-  static QString getQtReadNameFilter() { return QString("SWC files (*.swc)"); }
-  static QString getQtWriteNameFilter()  { return QString("SWC files (*.swc)"); }
+  static bool canReadFile(const QString& filename)
+  { return filename.endsWith(".swc", Qt::CaseInsensitive); }
+
+  static bool canWriteFile(const QString& filename)
+  { return filename.endsWith(".swc", Qt::CaseInsensitive); }
+
+  static QString getQtReadNameFilter()
+  { return QString("SWC files (*.swc)"); }
+
+  static QString getQtWriteNameFilter()
+  { return QString("SWC files (*.swc)"); }
+
   // might throw ZIOException
-  void load(const QString &filename);
-  void save(const QString &filename) const;
+  void load(const QString& filename);
+
+  void save(const QString& filename) const;
 
   //
   void addLine(const std::vector<glm::dvec3>& line, double radius);

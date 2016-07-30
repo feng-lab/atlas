@@ -13,10 +13,15 @@ public:
   ZImgFillHole();
 
   // default true
-  inline void setFullyConnected(bool v) { m_fullyConnected = v; }
+  inline void setFullyConnected(bool v)
+  { m_fullyConnected = v; }
+
   // Defaults to maximum value of InputPixelType.
-  inline void setForegroundValue(uint64_t v) { m_foregroundValue = v; }
-  inline void setNumberOfThreads(int n) { m_numThreads = n; }
+  inline void setForegroundValue(uint64_t v)
+  { m_foregroundValue = v; }
+
+  inline void setNumberOfThreads(int n)
+  { m_numThreads = n; }
 
   ZImg run(const ZImg& img);
 

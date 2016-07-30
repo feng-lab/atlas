@@ -10,31 +10,43 @@ namespace nim {
 
 class Z3DInteractionHandler : public QObject
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  Z3DInteractionHandler(const QString& name, QObject *parent = 0);
+  Z3DInteractionHandler(const QString& name, QObject* parent = 0);
 
-  void setName(const QString& name) { m_name = name; }
-  inline QString name() const { return m_name; }
+  void setName(const QString& name)
+  { m_name = name; }
+
+  inline QString name() const
+  { return m_name; }
 
   // Default to 1.0. Set it to a different value to emphasize or de-emphasize the action triggered by
   // mouse wheel motion.
-  void setMouseWheelMotionFactor(float f) { m_mouseWheelMotionFactor = f; }
-  float mouseWheelMotionFactor() const { return m_mouseWheelMotionFactor; }
+  void setMouseWheelMotionFactor(float f)
+  { m_mouseWheelMotionFactor = f; }
+
+  float mouseWheelMotionFactor() const
+  { return m_mouseWheelMotionFactor; }
 
   void setEnabled(bool enabled);
+
   void setVisible(bool state);
+
   void setSharing(bool sharing);
 
   void onEvent(QEvent* e, int w, int h);
 
 signals:
+
   void cameraMoved();
+
   void mousePressed();
+
   void mouseReleased();
 
 protected:
-  enum class State {
+  enum class State
+  {
     None,
     Rotate,
     Roll,
@@ -42,7 +54,9 @@ protected:
     Zoom,
     Shift
   };
-  void setState(State state) { m_state = state; }
+
+  void setState(State state)
+  { m_state = state; }
 
   void addEventListener(ZEventListenerParameter* eventListener)
   { m_eventListeners.emplace_back(eventListener); }
@@ -59,59 +73,94 @@ class Z3DCameraParameter;
 
 class Z3DTrackballInteractionHandler : public Z3DInteractionHandler
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  Z3DTrackballInteractionHandler(const QString& name, Z3DCameraParameter* camera, QObject *parent = 0);
+  Z3DTrackballInteractionHandler(const QString& name, Z3DCameraParameter* camera, QObject* parent = 0);
+
   virtual ~Z3DTrackballInteractionHandler();
 
-  Z3DCameraParameter* camera() const { return m_camera; }
-  void setCamera(Z3DCameraParameter* camera) { m_camera = camera; }
+  Z3DCameraParameter* camera() const
+  { return m_camera; }
+
+  void setCamera(Z3DCameraParameter* camera)
+  { m_camera = camera; }
 
   // dolly in on wheel up and out on wheel down when true (default), otherwise when false
-  void setMouseWheelUpDollyIn(bool b) { m_mouseWheelUpDollyIn = b; }
+  void setMouseWheelUpDollyIn(bool b)
+  { m_mouseWheelUpDollyIn = b; }
+
   // roll left on wheel up and right on wheel down when true (default), otherwise when false
-  void setMouseWheelUpRollLeft(bool b) { m_mouseWheelUpRollLeft = b; }
+  void setMouseWheelUpRollLeft(bool b)
+  { m_mouseWheelUpRollLeft = b; }
 
   // more sensitive (bigger motion) at bigger mouse motion factor
-  void setMouseMotionFactor(float f) { m_mouseMotionFactor = f; }
-  float mouseMotionFactor() const { return m_mouseMotionFactor; }
+  void setMouseMotionFactor(float f)
+  { m_mouseMotionFactor = f; }
+
+  float mouseMotionFactor() const
+  { return m_mouseMotionFactor; }
 
   // angle per key press
-  void setKeyPressAngle(float angle) { m_keyPressAngle = angle; }
-  float keyPressAngle() const { return m_keyPressAngle; }
+  void setKeyPressAngle(float angle)
+  { m_keyPressAngle = angle; }
+
+  float keyPressAngle() const
+  { return m_keyPressAngle; }
 
   // distance per key press in pixels
-  void setKeyPressDistance(int d) { m_keyPressDistance = d; }
-  int keyPressDistance() const { return m_keyPressDistance; }
+  void setKeyPressDistance(int d)
+  { m_keyPressDistance = d; }
 
-  void setMoveObjects(bool v) { m_moveObjects = v; }
-  bool isMovingObjects() const { return m_moveObjects; }
+  int keyPressDistance() const
+  { return m_keyPressDistance; }
+
+  void setMoveObjects(bool v)
+  { m_moveObjects = v; }
+
+  bool isMovingObjects() const
+  { return m_moveObjects; }
 
 signals:
+
   void objectsMoved(double x, double y, double z);
 
 protected:
   void rotateEvent(QMouseEvent* e, int w, int h);
-  void mouseDollyEvent(QMouseEvent *e, int w, int h);
-  void dollyEvent(QWheelEvent *e, int w, int h);
-  void shiftEvent(QMouseEvent *e, int w, int h);
-  void mouseRollEvent(QMouseEvent *e, int w, int h);
-  void wheelRollEvent(QWheelEvent *e, int w, int h);
+
+  void mouseDollyEvent(QMouseEvent* e, int w, int h);
+
+  void dollyEvent(QWheelEvent* e, int w, int h);
+
+  void shiftEvent(QMouseEvent* e, int w, int h);
+
+  void mouseRollEvent(QMouseEvent* e, int w, int h);
+
+  void wheelRollEvent(QWheelEvent* e, int w, int h);
+
   void keyRotateEvent(QKeyEvent* e, int w, int h);
+
   void keyShiftEvent(QKeyEvent* e, int w, int h);
+
   void keyDollyEvent(QKeyEvent* e, int w, int h);
+
   void keyRollEvent(QKeyEvent* e, int w, int h);
 
   void mousePressEvent(QMouseEvent* e, int w, int h);
+
   void mouseReleaseEvent(QMouseEvent* e, int w, int h);
+
   void mouseMoveEvent(QMouseEvent* e, int w, int h);
+
   void wheelEvent(QWheelEvent* e, int w, int h);
 
   // convert screen space move to world space move and move camera eye and center
   void shift(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h);
+
   // use mouse move and mouseMotionFactor to calculate angle then rotate camera
   void rotate(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h);
+
   void roll(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h);
+
   void dolly(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h, float centerDistStart);
 
 protected:
@@ -125,7 +174,7 @@ protected:
   ZEventListenerParameter* m_keyDollyEvent;
   ZEventListenerParameter* m_keyRollEvent;
 
-  Z3DCameraParameter *m_camera;
+  Z3DCameraParameter* m_camera;
   glm::ivec2 m_lastMousePosition;
   float m_lastCenterDistance;
 

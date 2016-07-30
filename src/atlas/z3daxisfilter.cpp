@@ -4,7 +4,7 @@
 
 namespace nim {
 
-Z3DAxisFilter::Z3DAxisFilter(Z3DGlobalParameters &globalParas, QObject *parent)
+Z3DAxisFilter::Z3DAxisFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   : Z3DGeometryFilter(globalParas, parent)
   , m_lineRenderer(m_rendererBase)
   , m_arrowRenderer(m_rendererBase)
@@ -69,8 +69,8 @@ std::shared_ptr<ZWidgetsGroup> Z3DAxisFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_YAxisColor, 1);
     m_widgetsGroup->addChild(m_ZAxisColor, 1);
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
-    for (size_t i=0; i<paras.size(); i++) {
-      ZParameter *para = paras[i];
+    for (size_t i = 0; i < paras.size(); i++) {
+      ZParameter* para = paras[i];
       if (para->name() == "Size Scale")
         m_widgetsGroup->addChild(*para, 1);
       else if (para->name() == "Rendering Method")
@@ -119,9 +119,9 @@ void Z3DAxisFilter::prepareData(Z3DEye eye)
   m_YEnd = rotMatrix * glm::vec3(0.f, 256.f, 0.f);
   m_ZEnd = rotMatrix * glm::vec3(0.f, 0.f, 256.f);
 
-  m_textPositions.push_back(m_XEnd*glm::vec3(0.93));
-  m_textPositions.push_back(m_YEnd*glm::vec3(0.93));
-  m_textPositions.push_back(m_ZEnd*glm::vec3(0.93));
+  m_textPositions.push_back(m_XEnd * glm::vec3(0.93));
+  m_textPositions.push_back(m_YEnd * glm::vec3(0.93));
+  m_textPositions.push_back(m_ZEnd * glm::vec3(0.93));
   QStringList texts;
   texts.push_back("X");
   texts.push_back("Y");
@@ -138,7 +138,7 @@ void Z3DAxisFilter::setupCamera()
 
   float radius = 300.f;
 
-  float distance = radius/std::sin(camera.fieldOfView()*0.5);
+  float distance = radius / std::sin(camera.fieldOfView() * 0.5);
   glm::vec3 vn(0, 0, 1);     //plane normal
   glm::vec3 position = center + vn * distance;
   camera.setCamera(position, center, glm::vec3(0.0, 1.0, 0.0));
@@ -159,20 +159,20 @@ void Z3DAxisFilter::setupCamera()
   glm::vec3 origin(0.f);
   m_lines.push_back(origin);
   m_lineColors.push_back(m_XAxisColor.get());
-  m_lines.push_back(m_XEnd*glm::vec3(0.88));
+  m_lines.push_back(m_XEnd * glm::vec3(0.88));
   m_lineColors.push_back(m_XAxisColor.get());
   m_lines.push_back(origin);
   m_lineColors.push_back(m_YAxisColor.get());
-  m_lines.push_back(m_YEnd*glm::vec3(0.88));
+  m_lines.push_back(m_YEnd * glm::vec3(0.88));
   m_lineColors.push_back(m_YAxisColor.get());
   m_lines.push_back(origin);
   m_lineColors.push_back(m_ZAxisColor.get());
-  m_lines.push_back(m_ZEnd*glm::vec3(0.88));
+  m_lines.push_back(m_ZEnd * glm::vec3(0.88));
   m_lineColors.push_back(m_ZAxisColor.get());
 
-  m_textPositions.push_back(m_XEnd*glm::vec3(0.93));
-  m_textPositions.push_back(m_YEnd*glm::vec3(0.93));
-  m_textPositions.push_back(m_ZEnd*glm::vec3(0.93));
+  m_textPositions.push_back(m_XEnd * glm::vec3(0.93));
+  m_textPositions.push_back(m_YEnd * glm::vec3(0.93));
+  m_textPositions.push_back(m_ZEnd * glm::vec3(0.93));
   m_textColors.push_back(m_XAxisColor.get());
   m_textColors.push_back(m_YAxisColor.get());
   m_textColors.push_back(m_ZAxisColor.get());
@@ -185,13 +185,13 @@ void Z3DAxisFilter::setupCamera()
   float headRadius = 10.f;
 
   m_tailPosAndTailRadius.emplace_back(origin, tailRadius);
-  m_headPosAndHeadRadius.emplace_back(m_XEnd*glm::vec3(0.88), headRadius);
+  m_headPosAndHeadRadius.emplace_back(m_XEnd * glm::vec3(0.88), headRadius);
 
   m_tailPosAndTailRadius.emplace_back(origin, tailRadius);
-  m_headPosAndHeadRadius.emplace_back(m_YEnd*glm::vec3(0.88), headRadius);
+  m_headPosAndHeadRadius.emplace_back(m_YEnd * glm::vec3(0.88), headRadius);
 
   m_tailPosAndTailRadius.emplace_back(origin, tailRadius);
-  m_headPosAndHeadRadius.emplace_back(m_ZEnd*glm::vec3(0.88), headRadius);
+  m_headPosAndHeadRadius.emplace_back(m_ZEnd * glm::vec3(0.88), headRadius);
 
   m_lineRenderer.setData(&m_lines);
   m_lineRenderer.setDataColors(&m_lineColors);

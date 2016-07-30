@@ -6,7 +6,7 @@
 
 namespace nim {
 
-Z3DImage2DRenderer::Z3DImage2DRenderer(Z3DRendererBase &rendererBase)
+Z3DImage2DRenderer::Z3DImage2DRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_VAO(1)
 {
@@ -23,16 +23,16 @@ Z3DImage2DRenderer::Z3DImage2DRenderer(Z3DRendererBase &rendererBase)
   CHECK_GL_ERROR;
 }
 
-void Z3DImage2DRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &volsIn,
-                                     const std::vector<std::unique_ptr<ZColorMapParameter>> &colormapsIn)
+void Z3DImage2DRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume>>& volsIn,
+                                     const std::vector<std::unique_ptr<ZColorMapParameter>>& colormapsIn)
 {
   CHECK(colormapsIn.size() >= volsIn.size());
-  for (size_t i=0; i<volsIn.size(); ++i) {
+  for (size_t i = 0; i < volsIn.size(); ++i) {
     CHECK(volsIn[i]->is2DData());
   }
   std::vector<Z3DVolume*> vols;
   std::vector<ZColorMapParameter*> colormaps;
-  for (size_t i=0; i<volsIn.size(); ++i) {
+  for (size_t i = 0; i < volsIn.size(); ++i) {
     vols.push_back(volsIn[i].get());
     colormaps.push_back(colormapsIn[i].get());
   }
@@ -45,13 +45,13 @@ void Z3DImage2DRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume
 
   m_volumeUniformNames.resize(m_volumes.size());
   m_colormapUniformNames.resize(m_volumes.size());
-  for (size_t i=0; i<m_volumes.size(); ++i) {
-    m_volumeUniformNames[i] = QString("volume_%1").arg(i+1);
-    m_colormapUniformNames[i] = QString("colormap_%1").arg(i+1);
+  for (size_t i = 0; i < m_volumes.size(); ++i) {
+    m_volumeUniformNames[i] = QString("volume_%1").arg(i + 1);
+    m_colormapUniformNames[i] = QString("colormap_%1").arg(i + 1);
   }
 }
 
-void Z3DImage2DRenderer::addQuad(const ZMesh &quad)
+void Z3DImage2DRenderer::addQuad(const ZMesh& quad)
 {
   if (quad.empty() ||
       (quad.numVertices() != 4 && quad.numVertices() != 6) ||
@@ -62,11 +62,11 @@ void Z3DImage2DRenderer::addQuad(const ZMesh &quad)
   m_quads.push_back(quad);
 }
 
-void Z3DImage2DRenderer::bindVolumes(Z3DShaderProgram &shader)
+void Z3DImage2DRenderer::bindVolumes(Z3DShaderProgram& shader)
 {
   size_t idx = 0;
-  for (size_t i=0; i < m_volumes.size(); ++i) {
-    Z3DVolume *volume = m_volumes[i];
+  for (size_t i = 0; i < m_volumes.size(); ++i) {
+    Z3DVolume* volume = m_volumes[i];
     if (!volume)
       continue;
 
@@ -80,7 +80,7 @@ void Z3DImage2DRenderer::bindVolumes(Z3DShaderProgram &shader)
   }
 }
 
-void Z3DImage2DRenderer::bindVolume(Z3DShaderProgram &shader, size_t idx)
+void Z3DImage2DRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx)
 {
   // volumes
   shader.bindTexture(m_volumeUniformNames[0], m_volumes[idx]->texture(), GLint(GL_NEAREST), GLint(GL_NEAREST));
@@ -93,7 +93,7 @@ void Z3DImage2DRenderer::bindVolume(Z3DShaderProgram &shader, size_t idx)
 
 bool Z3DImage2DRenderer::hasVolume() const
 {
-  for (size_t i=0; i<m_volumes.size(); ++i)
+  for (size_t i = 0; i < m_volumes.size(); ++i)
     if (m_volumes[i])
       return true;
   return false;
@@ -135,16 +135,16 @@ void Z3DImage2DRenderer::render(Z3DEye eye)
 
   if (m_volumes.size() == 1) {
     bindVolume(m_scImage2DShader, 0);
-    for (size_t i=0; i<m_quads.size(); ++i)
+    for (size_t i = 0; i < m_quads.size(); ++i)
       renderTriangleList(m_VAO, m_scImage2DShader, m_quads[i]);
   } else {
-    for (size_t j=0; j<m_volumes.size(); ++j) {
+    for (size_t j = 0; j < m_volumes.size(); ++j) {
       m_layerTarget->attachSlice(j);
       m_layerTarget->bind();
       m_layerTarget->clear();
 
       bindVolume(m_scImage2DShader, j);
-      for (size_t i=0; i<m_quads.size(); ++i)
+      for (size_t i = 0; i < m_quads.size(); ++i)
         renderTriangleList(m_VAO, m_scImage2DShader, m_quads[i]);
 
       m_layerTarget->release();

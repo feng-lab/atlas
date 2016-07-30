@@ -21,12 +21,22 @@ BOOST_GEOMETRY_REGISTER_RING(QPolygonF)
 
 // Register the QT rectangle. The macro(s) does not offer (yet) enough flexibility to do this in one line,
 // but the traits classes do their job perfectly.
-namespace boost { namespace geometry { namespace traits {
+namespace boost {
+namespace geometry {
+namespace traits {
 
-template <> struct tag<QRectF> { typedef box_tag type; };
-template <> struct point_type<QRectF> { typedef QPointF type; };
+template<>
+struct tag<QRectF>
+{
+  typedef box_tag type;
+};
+template<>
+struct point_type<QRectF>
+{
+  typedef QPointF type;
+};
 
-template <size_t C, size_t D>
+template<size_t C, size_t D>
 struct indexed_access<QRectF, C, D>
 {
   static inline double get(const QRectF& qr)
@@ -34,8 +44,9 @@ struct indexed_access<QRectF, C, D>
     return C == min_corner && D == 0 ? qr.x()
                                      : C == min_corner && D == 1 ? qr.y()
                                                                  : C == max_corner && D == 0 ? qr.x() + qr.width()
-                                                                                             : C == max_corner && D == 1 ? qr.y() + qr.height()
-                                                                                                                         : 0;
+                                                                                             : C == max_corner && D == 1
+                                                                                               ? qr.y() + qr.height()
+                                                                                               : 0;
   }
 
   static inline void set(QRectF& qr, const double& value)
@@ -46,7 +57,9 @@ struct indexed_access<QRectF, C, D>
     else if (C == max_corner && D == 1) qr.setHeight(value - qr.y());
   }
 };
-}}}
+}
+}
+}
 
 #if 0
 // ----------------------------------------------------------------------------------

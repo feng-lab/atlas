@@ -9,7 +9,7 @@
 
 namespace nim {
 
-Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase &rendererBase)
+Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_fontShaderGrp(rendererBase)
   , m_allFontNames("Font")
@@ -22,9 +22,9 @@ Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase &rendererBase)
   , m_fontOutlineColor("Font Outline Color", glm::vec4(1.f))
   , m_showFontShadow("Show Font Shadow", false)
   , m_fontShadowColor("Font Shadow Color", glm::vec4(0.f, 0.f, 0.f, 1.f))
-  , m_positionsPt(NULL)
-  , m_colorsPt(NULL)
-  , m_pickingColorsPt(NULL)
+  , m_positionsPt(nullptr)
+  , m_colorsPt(nullptr)
+  , m_pickingColorsPt(nullptr)
   , m_VAO(1)
   , m_VBOs(4)
   , m_pickingVBOs(4)
@@ -56,7 +56,7 @@ Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase &rendererBase)
   QStringList filters;
   filters << "*.png";
   QFileInfoList list = fontDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i=0; i<list.size(); i++) {
+  for (int i = 0; i < list.size(); i++) {
     QFileInfo fileInfo = list.at(i);
     QFileInfo txtFileInfo(fontDir, fileInfo.completeBaseName() + ".txt");
     if (!txtFileInfo.exists())
@@ -71,7 +71,7 @@ Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase &rendererBase)
   CHECK_GL_ERROR;
 }
 
-void Z3DFontRenderer::setData(std::vector<glm::vec3> *positions, const QStringList &texts)
+void Z3DFontRenderer::setData(std::vector<glm::vec3>* positions, const QStringList& texts)
 {
   m_positionsPt = positions;
   m_texts = texts;
@@ -81,7 +81,7 @@ void Z3DFontRenderer::setData(std::vector<glm::vec3> *positions, const QStringLi
   m_pickingDataChanged = true;
 }
 
-void Z3DFontRenderer::setDataColors(std::vector<glm::vec4> *colors)
+void Z3DFontRenderer::setDataColors(std::vector<glm::vec4>* colors)
 {
   m_colorsPt = colors;
   m_colors.clear();
@@ -89,7 +89,7 @@ void Z3DFontRenderer::setDataColors(std::vector<glm::vec4> *colors)
   m_dataChanged = true;
 }
 
-void Z3DFontRenderer::setDataPickingColors(std::vector<glm::vec4> *pickingColors)
+void Z3DFontRenderer::setDataPickingColors(std::vector<glm::vec4>* pickingColors)
 {
   m_pickingColorsPt = pickingColors;
   invalidateOpenglPickingRenderer();
@@ -109,17 +109,17 @@ void Z3DFontRenderer::compile()
   m_fontShaderGrp.rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
-std::vector<glm::vec4> *Z3DFontRenderer::getColors()
+std::vector<glm::vec4>* Z3DFontRenderer::getColors()
 {
   if (!m_colorsPt) {
     m_colors.assign(m_positionsPt->size(), glm::vec4(0.f, 0.f, 0.f, 1.f));
     return &m_colors;
   } else if (m_colorsPt->size() < m_positionsPt->size()) {
     m_colors.clear();
-    for (size_t i=0; i<m_colorsPt->size(); i++) {
+    for (size_t i = 0; i < m_colorsPt->size(); i++) {
       m_colors.push_back(m_colorsPt->at(i));
     }
-    for (size_t i=m_colorsPt->size(); i<m_positionsPt->size(); i++) {
+    for (size_t i = m_colorsPt->size(); i < m_positionsPt->size(); i++) {
       m_colors.emplace_back(0.f, 0.f, 0.f, 1.f);
     }
     return &m_colors;
@@ -131,7 +131,7 @@ std::vector<glm::vec4> *Z3DFontRenderer::getColors()
 QString Z3DFontRenderer::generateHeader()
 {
   //if (m_fontUseSoftEdge.get())
-  QString headerSource =  "#define USE_SOFTEDGE\n";
+  QString headerSource = "#define USE_SOFTEDGE\n";
   if (m_showFontOutline.get()) {
     if (m_fontOutlineMode.isSelected("Glow"))
       headerSource += "#define SHOW_GLOW\n";
@@ -159,16 +159,16 @@ void Z3DFontRenderer::render(Z3DEye eye)
 
   if (m_rendererBase.shaderHookType() == Z3DRendererBase::ShaderHookType::Normal) {
     glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
   }
 
   m_fontShaderGrp.bind();
-  Z3DShaderProgram &shader = m_fontShaderGrp.get();
+  Z3DShaderProgram& shader = m_fontShaderGrp.get();
 
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   shader.bindTexture("tex", font->texture());
   //if (m_fontUseSoftEdge.get())
-    shader.setUniform("softedge_scale", m_fontSoftEdgeScale.get());
+  shader.setUniform("softedge_scale", m_fontSoftEdgeScale.get());
   if (m_showFontOutline.get())
     shader.setUniform("outline_color", m_fontOutlineColor.get());
   if (m_showFontShadow.get())
@@ -184,21 +184,23 @@ void Z3DFontRenderer::render(Z3DEye eye)
 
       glEnableVertexAttribArray(attr_vertex);
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
-      glBufferData(GL_ARRAY_BUFFER, m_fontPositions.size()*3*sizeof(GLfloat), m_fontPositions.data(), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_fontPositions.size() * 3 * sizeof(GLfloat), m_fontPositions.data(),
+                   GL_STATIC_DRAW);
       glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
       glEnableVertexAttribArray(attr_2dTexCoord0);
       m_VBOs.bind(GL_ARRAY_BUFFER, 1);
-      glBufferData(GL_ARRAY_BUFFER, m_fontTextureCoords.size()*2*sizeof(GLfloat), m_fontTextureCoords.data(), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_fontTextureCoords.size() * 2 * sizeof(GLfloat), m_fontTextureCoords.data(),
+                   GL_STATIC_DRAW);
       glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
       glEnableVertexAttribArray(attr_color);
       m_VBOs.bind(GL_ARRAY_BUFFER, 2);
-      glBufferData(GL_ARRAY_BUFFER, m_fontColors.size()*4*sizeof(GLfloat), m_fontColors.data(), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_fontColors.size() * 4 * sizeof(GLfloat), m_fontColors.data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
       m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 3);
-      glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size()*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
+      glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size() * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
 
       glBindBuffer(GL_ARRAY_BUFFER, 0);
       m_VAO.release();
@@ -218,21 +220,22 @@ void Z3DFontRenderer::render(Z3DEye eye)
 
     glEnableVertexAttribArray(attr_vertex);
     m_VBOs.bind(GL_ARRAY_BUFFER, 0);
-    glBufferData(GL_ARRAY_BUFFER, m_fontPositions.size()*3*sizeof(GLfloat), m_fontPositions.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, m_fontPositions.size() * 3 * sizeof(GLfloat), m_fontPositions.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
     glEnableVertexAttribArray(attr_2dTexCoord0);
     m_VBOs.bind(GL_ARRAY_BUFFER, 1);
-    glBufferData(GL_ARRAY_BUFFER, m_fontTextureCoords.size()*2*sizeof(GLfloat), m_fontTextureCoords.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, m_fontTextureCoords.size() * 2 * sizeof(GLfloat), m_fontTextureCoords.data(),
+                 GL_STATIC_DRAW);
     glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
     glEnableVertexAttribArray(attr_color);
     m_VBOs.bind(GL_ARRAY_BUFFER, 2);
-    glBufferData(GL_ARRAY_BUFFER, m_fontColors.size()*4*sizeof(GLfloat), m_fontColors.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, m_fontColors.size() * 4 * sizeof(GLfloat), m_fontColors.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
     m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 3);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size()*sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size() * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
 
     glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, 0);
 
@@ -247,7 +250,7 @@ void Z3DFontRenderer::render(Z3DEye eye)
 
   if (m_rendererBase.shaderHookType() == Z3DRendererBase::ShaderHookType::Normal) {
     glDisable(GL_BLEND);
-    glBlendFunc(GL_ONE,GL_ZERO);
+    glBlendFunc(GL_ONE, GL_ZERO);
   }
 }
 
@@ -279,9 +282,9 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
   glm::vec3 upVector(viewMatrix[1][0], viewMatrix[1][1], viewMatrix[1][2]);
   Z3DSDFont* font = m_allFonts[m_allFontNames.associatedData()].get();
   float scale = m_fontSize.get() / font->maxFontHeight();
-  int indices[6] = { 0, 1, 2, 2, 1, 3 };
+  int indices[6] = {0, 1, 2, 2, 1, 3};
   int quadIdx = 0;
-  for (int strIdx=0; strIdx < m_texts.size(); strIdx++) {
+  for (int strIdx = 0; strIdx < m_texts.size(); strIdx++) {
     QString str = m_texts[strIdx];
     if (str.isEmpty())
       continue;
@@ -291,7 +294,7 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
     else
       color = m_colorsPt->at(strIdx);
     glm::vec3 loc = m_positionsPt->at(strIdx);
-    for (int charIdx=0; charIdx < str.size(); charIdx++) {
+    for (int charIdx = 0; charIdx < str.size(); charIdx++) {
       Z3DSDFont::CharInfo charInfo = font->charInfo(str[charIdx].toLatin1());
       glm::vec3 leftUp = loc + rightVector * charInfo.xoffset * scale + upVector * charInfo.yoffset * scale;
       glm::vec3 leftDown = leftUp - upVector * static_cast<float>(charInfo.height) * scale;
@@ -315,7 +318,7 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
         m_fontPickingColors.push_back(m_pickingColorsPt->at(strIdx));
         m_fontPickingColors.push_back(m_pickingColorsPt->at(strIdx));
       }
-      for (int k=0; k<6; k++) {
+      for (int k = 0; k < 6; k++) {
         m_indexs.push_back(indices[k] + 4 * quadIdx);
       }
       quadIdx++;

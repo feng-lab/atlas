@@ -26,7 +26,7 @@ ZComplexImg::~ZComplexImg()
   clear();
 }
 
-void ZComplexImg::swap(ZComplexImg &other) noexcept
+void ZComplexImg::swap(ZComplexImg& other) noexcept
 {
   m_data.swap(other.m_data);
   std::swap(m_width, other.m_width);
@@ -47,19 +47,19 @@ bool ZComplexImg::isEmpty() const
   return m_data.empty() || m_width == 0 || m_height == 0 || m_depth == 0;
 }
 
-bool ZComplexImg::isSameSize(const ZComplexImg &rhs) const
+bool ZComplexImg::isSameSize(const ZComplexImg& rhs) const
 {
   return m_width == rhs.m_width && m_height == rhs.m_height && m_depth == rhs.m_depth;
 }
 
-ZComplexImg &ZComplexImg::conj()
+ZComplexImg& ZComplexImg::conj()
 {
-  for (std::complex<double> &v : m_data)
+  for (std::complex<double>& v : m_data)
     v = std::conj(v);
   return *this;
 }
 
-ZComplexImg ZComplexImg::conj(const ZComplexImg &img)
+ZComplexImg ZComplexImg::conj(const ZComplexImg& img)
 {
   ZComplexImg res = img;
   return res.conj();
@@ -67,7 +67,7 @@ ZComplexImg ZComplexImg::conj(const ZComplexImg &img)
 
 ZComplexImg& ZComplexImg::operator+=(const std::complex<double>& rhs)
 {
-  for (std::complex<double> &v : m_data)
+  for (std::complex<double>& v : m_data)
     v += rhs;
   return *this;
 }
@@ -76,7 +76,7 @@ ZComplexImg& ZComplexImg::operator+=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
     throw ZImgException(QString("complex img addition requires same size img as input: this <1>, other <%2>")
-                        .arg(toQString()).arg(rhs.toQString()));
+                          .arg(toQString()).arg(rhs.toQString()));
   }
   std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::plus<std::complex<double>>());
   return *this;
@@ -98,7 +98,7 @@ ZComplexImg ZComplexImg::operator+(const ZComplexImg& rhs) const
 
 ZComplexImg& ZComplexImg::operator-=(const std::complex<double>& rhs)
 {
-  for (std::complex<double> &v : m_data)
+  for (std::complex<double>& v : m_data)
     v -= rhs;
   return *this;
 }
@@ -107,7 +107,7 @@ ZComplexImg& ZComplexImg::operator-=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
     throw ZImgException(QString("complex img subtraction requires same size img as input: this <1>, other <%2>")
-                        .arg(toQString()).arg(rhs.toQString()));
+                          .arg(toQString()).arg(rhs.toQString()));
   }
   std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::minus<std::complex<double>>());
   return *this;
@@ -136,7 +136,7 @@ ZComplexImg ZComplexImg::operator-() const
 
 ZComplexImg& ZComplexImg::operator*=(const std::complex<double>& rhs)
 {
-  for (std::complex<double> &v : m_data)
+  for (std::complex<double>& v : m_data)
     v *= rhs;
   return *this;
 }
@@ -145,9 +145,10 @@ ZComplexImg& ZComplexImg::operator*=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
     throw ZImgException(QString("complex img multiplies requires same size img as input: this <1>, other <%2>")
-                        .arg(toQString()).arg(rhs.toQString()));
+                          .arg(toQString()).arg(rhs.toQString()));
   }
-  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::multiplies<std::complex<double>>());
+  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(),
+                 std::multiplies<std::complex<double>>());
   return *this;
 }
 
@@ -167,7 +168,7 @@ ZComplexImg ZComplexImg::operator*(const ZComplexImg& rhs) const
 
 ZComplexImg& ZComplexImg::operator/=(const std::complex<double>& rhs)
 {
-  for (std::complex<double> &v : m_data)
+  for (std::complex<double>& v : m_data)
     v /= rhs;
   return *this;
 }
@@ -176,9 +177,10 @@ ZComplexImg& ZComplexImg::operator/=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
     throw ZImgException(QString("complex img divides requires same size img as input: this <1>, other <%2>")
-                        .arg(toQString()).arg(rhs.toQString()));
+                          .arg(toQString()).arg(rhs.toQString()));
   }
-  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::divides<std::complex<double>>());
+  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(),
+                 std::divides<std::complex<double>>());
   return *this;
 }
 

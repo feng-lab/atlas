@@ -14,13 +14,13 @@
 
 namespace nim {
 
-ZTimelineWidget::ZTimelineWidget(ZAnimation &ani, ZDoubleParameter *currentTimePara, QWidget *parent)
+ZTimelineWidget::ZTimelineWidget(ZAnimation& ani, ZDoubleParameter* currentTimePara, QWidget* parent)
   : QWidget(parent)
   , m_animation(ani)
   , m_currentTimePara(currentTimePara)
   , m_pixelsPerSecond(10)
 {
-  m_eventViewWidth = 10 + int(std::ceil((m_animation.duration()  + 10) * pixelsPerSecond()));
+  m_eventViewWidth = 10 + int(std::ceil((m_animation.duration() + 10) * pixelsPerSecond()));
   m_axis = new ZTimelineAxisView(*this);
   m_axis->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   m_axis->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -62,15 +62,15 @@ ZTimelineWidget::ZTimelineWidget(ZAnimation &ani, ZDoubleParameter *currentTimeP
   m_expandButton->setStyleSheet("border-style: none;");
   connect(m_expandButton, &QToolButton::clicked, this, &ZTimelineWidget::expandToFit);
 
-  QHBoxLayout *hlo = new QHBoxLayout;
-  hlo->addSpacing(objViewWidth()-125);
+  QHBoxLayout* hlo = new QHBoxLayout;
+  hlo->addSpacing(objViewWidth() - 125);
   hlo->addWidget(m_exportButton, 0, Qt::AlignCenter);
   hlo->addWidget(m_cleanupButton, 0, Qt::AlignCenter);
   hlo->addWidget(m_zoomInButton, 0, Qt::AlignCenter);
   hlo->addWidget(m_zoomOutButton, 0, Qt::AlignCenter);
   hlo->addWidget(m_expandButton, 0, Qt::AlignCenter);
 
-  QGridLayout *lo = new QGridLayout;
+  QGridLayout* lo = new QGridLayout;
   lo->setSpacing(0);
   lo->setMargin(0);
   lo->addLayout(hlo, 0, 0);
@@ -155,7 +155,7 @@ void ZTimelineWidget::expandToFit()
 
 void ZTimelineWidget::updateEventViewWidth()
 {
-  int wth = std::max(m_eventView->width(), 10 + int(std::ceil((m_animation.duration()  + 10) * pixelsPerSecond())));
+  int wth = std::max(m_eventView->width(), 10 + int(std::ceil((m_animation.duration() + 10) * pixelsPerSecond())));
   if (wth != m_eventViewWidth) {
     m_eventViewWidth = wth;
     emit eventViewWidthChanged();
@@ -175,7 +175,7 @@ void ZTimelineWidget::showValue(int i)
   LOG(INFO) << i;
 }
 
-void ZTimelineWidget::resizeEvent(QResizeEvent *event)
+void ZTimelineWidget::resizeEvent(QResizeEvent* event)
 {
   updateEventViewWidth();
   QWidget::resizeEvent(event);

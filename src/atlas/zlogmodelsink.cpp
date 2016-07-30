@@ -19,11 +19,13 @@ const std::deque<LogData>& logMessagesSoFar()
   return md->logMessages();
 }
 #else
-ZLogModelSink *logModelSinkInstance()
+
+ZLogModelSink* logModelSinkInstance()
 {
   static ZLogModelSink modelDestination;
   return &modelDestination;
 }
+
 #endif
 
 const char* const ZLogModelSink::Type = "window";
@@ -52,8 +54,9 @@ QString ZLogModelSink::type() const
   return QString(Type);
 }
 #else
-void ZLogModelSink::send(LogSeverity severity, const char *full_filename, const char *base_filename, int line,
-                         const tm *tm_time, const char *message, size_t prefix_len, size_t message_len)
+
+void ZLogModelSink::send(LogSeverity severity, const char* full_filename, const char* base_filename, int line,
+                         const tm* tm_time, const char* message, size_t prefix_len, size_t message_len)
 {
   addEntry(LogData(severity, full_filename, base_filename, line, tm_time, message, prefix_len, message_len));
 }
@@ -125,16 +128,16 @@ QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
     const LogData& item = m_logDatas.at(index.row());
 
     switch (index.column()) {
-    case TimeColumn:
-      return item.time.toLocalTime().toString();
-    case LevelNameColumn:
-      return levelToString(item.level);
-    case MessageColumn:
-      return item.message;
-    case FormattedMessageColumn:
-      return item.formatted;
-    default:
-      return QVariant();
+      case TimeColumn:
+        return item.time.toLocalTime().toString();
+      case LevelNameColumn:
+        return levelToString(item.level);
+      case MessageColumn:
+        return item.message;
+      case FormattedMessageColumn:
+        return item.formatted;
+      default:
+        return QVariant();
     }
 
     return QString();
@@ -145,16 +148,15 @@ QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
 
     const LogData& item = m_logDatas.at(index.row());
 
-    switch (item.level)
-    {
-    case WarningLevel:
-      return QVariant(QColor(255, 255, 128));
-    case ErrorLevel:
-      return QVariant(QColor(255, 128, 128));
-    case FatalLevel:
-      return QVariant(QColor(255, 0, 0));
-    default:
-      break;
+    switch (item.level) {
+      case WarningLevel:
+        return QVariant(QColor(255, 255, 128));
+      case ErrorLevel:
+        return QVariant(QColor(255, 128, 128));
+      case FatalLevel:
+        return QVariant(QColor(255, 0, 0));
+      default:
+        break;
     }
   }
 
@@ -165,14 +167,14 @@ QVariant ZLogModelSink::headerData(int section, Qt::Orientation orientation, int
 {
   if (role == Qt::DisplayRole && orientation == Qt::Horizontal) {
     switch (section) {
-    case TimeColumn:
-      return tr("Time");
-    case LevelNameColumn:
-      return tr("Level");
-    case MessageColumn:
-      return tr("Message");
-    default:
-      break;
+      case TimeColumn:
+        return tr("Time");
+      case LevelNameColumn:
+        return tr("Level");
+      case MessageColumn:
+        return tr("Message");
+      default:
+        break;
     }
   }
 

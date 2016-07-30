@@ -388,7 +388,7 @@ public:
   featureCovariance(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
                     bool bias = false)
   {
-    assert(x.rows() > 0);
+    CHECK(x.rows() > 0);
     typedef typename Eigen::NumTraits<T>::NonInteger ResultDataType;
     ResultDataType factor = 0;
     if (!bias && x.rows() > 1)
@@ -409,7 +409,7 @@ public:
                     bool duplicateObservation = true,
                     bool bias = false)
   {
-    assert(x.rows() > 0 && weight.rows() >= x.rows());
+    CHECK(x.rows() > 0 && weight.rows() >= x.rows());
     typedef typename MaxFloatType<T, WeightT>::type ResultDataType;
     ResultDataType factor = 0;
     // convert to result type
@@ -444,9 +444,9 @@ public:
                             double* outputShrink = nullptr,
                             double inputShrink = -1)
   {
-    assert(x.rows() > 0);
-    assert(x.cols() > 0);
-    assert(inputShrink == -1 || (inputShrink >= 0 && inputShrink <= 1));
+    CHECK(x.rows() > 0);
+    CHECK(x.cols() > 0);
+    CHECK(inputShrink == -1 || (inputShrink >= 0 && inputShrink <= 1));
     typedef typename Eigen::NumTraits<T>::NonInteger ResultDataType;
     typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> ResultMatType;
     typedef Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> ResultRowVecType;
@@ -488,9 +488,9 @@ public:
                                 double* outputShrink = nullptr,
                                 double inputShrink = -1)
   {
-    assert(x.rows() > 0);
-    assert(x.cols() > 0);
-    assert(inputShrink == -1 || (inputShrink >= 0 && inputShrink <= 1));
+    CHECK(x.rows() > 0);
+    CHECK(x.cols() > 0);
+    CHECK(inputShrink == -1 || (inputShrink >= 0 && inputShrink <= 1));
     typedef typename Eigen::NumTraits<T>::NonInteger ResultDataType;
     typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> ResultMatType;
     typedef Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> ResultRowVecType;
@@ -532,9 +532,9 @@ public:
                                       double* outputShrink = nullptr,
                                       double inputShrink = -1)
   {
-    assert(x.rows() > 0);
-    assert(x.cols() > 0);
-    assert(inputShrink == -1 || (inputShrink >= 0 && inputShrink <= 1));
+    CHECK(x.rows() > 0);
+    CHECK(x.cols() > 0);
+    CHECK(inputShrink == -1 || (inputShrink >= 0 && inputShrink <= 1));
     typedef typename Eigen::NumTraits<T>::NonInteger ResultDataType;
     typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> ResultMatType;
     typedef Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> ResultRowVecType;
@@ -587,9 +587,9 @@ public:
                             double* outputShrink = nullptr,
                             double inputShrink = -1)
   {
-    assert(x.rows() > 0);
-    assert(x.cols() > 0);
-    assert(inputShrink == -1 || (inputShrink >= 0 && inputShrink <= 1));
+    CHECK(x.rows() > 0);
+    CHECK(x.cols() > 0);
+    CHECK(inputShrink == -1 || (inputShrink >= 0 && inputShrink <= 1));
     typedef typename Eigen::NumTraits<T>::NonInteger ResultDataType;
     typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> ResultMatType;
     typedef Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> ResultRowVecType;

@@ -3,11 +3,11 @@
 
 namespace nim {
 
-ZComplexImg fft(const ZImg &img, size_t outWidth, size_t outHeight, size_t outDepth)
+ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDepth)
 {
   if (img.isEmpty() || img.numChannels() != 1 || img.numTimes() != 1) {
     throw ZImgException(QString("fft: input img dimension is not supported: <%1>")
-                        .arg(img.info().toQString()));
+                          .arg(img.info().toQString()));
   }
 
   ZComplexImg res;
@@ -22,7 +22,7 @@ ZComplexImg fft(const ZImg &img, size_t outWidth, size_t outHeight, size_t outDe
   // first copy real data to complex img
   ZImg wrapImg;
   // reinterpret_cast allowed (section "Complex numbers")
-  wrapImg.wrapData(reinterpret_cast<double*>(res.rawData()), width*2, outHeight, outDepth);
+  wrapImg.wrapData(reinterpret_cast<double*>(res.rawData()), width * 2, outHeight, outDepth);
   wrapImg.pasteImg(img);
   wrapImg.clear();   // copy data finished
 
@@ -37,7 +37,7 @@ ZComplexImg fft(const ZImg &img, size_t outWidth, size_t outHeight, size_t outDe
   return res;
 }
 
-ZImg ifft(ZComplexImg &cimg, size_t width, size_t outWidth, size_t outHeight, size_t outDepth)
+ZImg ifft(ZComplexImg& cimg, size_t width, size_t outWidth, size_t outHeight, size_t outDepth)
 {
   ZImg res;
   if (cimg.isEmpty())
@@ -51,7 +51,7 @@ ZImg ifft(ZComplexImg &cimg, size_t width, size_t outWidth, size_t outHeight, si
   fftw_destroy_plan(p);
 
   ZImg wrapImg;
-  wrapImg.wrapData(reinterpret_cast<double*>(cimg.rawData()), cimg.width()*2, cimg.height(), cimg.depth());
+  wrapImg.wrapData(reinterpret_cast<double*>(cimg.rawData()), cimg.width() * 2, cimg.height(), cimg.depth());
 
   ZImgRegion region(0, outWidth, 0, outHeight, 0, outDepth);
   res = wrapImg.crop(region);

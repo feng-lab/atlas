@@ -6,7 +6,7 @@
 
 namespace nim {
 
-Z3DCameraParameter::Z3DCameraParameter(const QString &name, QObject *parent)
+Z3DCameraParameter::Z3DCameraParameter(const QString& name, QObject* parent)
   : ZSingleValueParameter<Z3DCamera>(name, parent)
   , m_projectionType("Projection Type")
   , m_eye("Eye Position", m_value.eye(), glm::vec3(std::numeric_limits<float>::lowest()),
@@ -65,7 +65,7 @@ Z3DCameraParameter::Z3DCameraParameter(const QString &name, QObject *parent)
   connect(&m_farDist, &ZFloatParameter::valueChanged, this, &Z3DCameraParameter::updateFarDist);
 }
 
-Z3DCameraParameter::Z3DCameraParameter(const QString &name, const Z3DCamera &value, QObject *parent)
+Z3DCameraParameter::Z3DCameraParameter(const QString& name, const Z3DCamera& value, QObject* parent)
   : ZSingleValueParameter<Z3DCamera>(name, value, parent)
   , m_projectionType("Projection Type")
   , m_eye("Eye Position", m_value.eye(), glm::vec3(std::numeric_limits<float>::lowest()),
@@ -133,7 +133,7 @@ void Z3DCameraParameter::flipViewDirection()
   setEye(referenceCenter - viewVector);
 }
 
-void Z3DCameraParameter::viewportChanged(const glm::uvec2 &viewport)
+void Z3DCameraParameter::viewportChanged(const glm::uvec2& viewport)
 {
   m_value.setWindowAspectRatio(static_cast<float>(viewport.x) / viewport.y);
   emit windowsAspectRatioChanged(static_cast<float>(viewport.x) / viewport.y);
@@ -215,7 +215,7 @@ void Z3DCameraParameter::updateFarDist()
   }
 }
 
-QWidget *Z3DCameraParameter::actualCreateWidget(QWidget *parent)
+QWidget* Z3DCameraParameter::actualCreateWidget(QWidget* parent)
 {
   ZWidgetsGroup camera("Camera", 1);
   camera.addChild(m_projectionType, 1);
@@ -227,10 +227,10 @@ QWidget *Z3DCameraParameter::actualCreateWidget(QWidget *parent)
   camera.addChild(m_nearDist, 1);
   camera.addChild(m_farDist, 1);
 
-  QLayout *lw = camera.createLayout(false);
+  QLayout* lw = camera.createLayout(false);
   //QWidget *widget = new QWidget();
   //widget->setLayout(lw);
-  QGroupBox *groupBox = new QGroupBox("Camera Parameters", parent);
+  QGroupBox* groupBox = new QGroupBox("Camera Parameters", parent);
   groupBox->setLayout(lw);
 
   //widget->setParent(parent);
@@ -238,12 +238,12 @@ QWidget *Z3DCameraParameter::actualCreateWidget(QWidget *parent)
   return groupBox;
 }
 
-void Z3DCameraParameter::beforeChange(Z3DCamera &value)
+void Z3DCameraParameter::beforeChange(Z3DCamera& value)
 {
   updateWidget(value);
 }
 
-void Z3DCameraParameter::updateWidget(Z3DCamera &value)
+void Z3DCameraParameter::updateWidget(Z3DCamera& value)
 {
   m_receiveWidgetSignal = false;
   m_eye.set(value.eye());
@@ -262,7 +262,7 @@ void Z3DCameraParameter::updateWidget(Z3DCamera &value)
   m_receiveWidgetSignal = true;
 }
 
-void Z3DCameraParameter::setSameAs(const ZParameter &rhs)
+void Z3DCameraParameter::setSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
   const Z3DCameraParameter* src = static_cast<const Z3DCameraParameter*>(&rhs);
@@ -271,7 +271,7 @@ void Z3DCameraParameter::setSameAs(const ZParameter &rhs)
   ZParameter::setSameAs(rhs);
 }
 
-void Z3DCameraParameter::setValueSameAs(const ZParameter &rhs)
+void Z3DCameraParameter::setValueSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
   const Z3DCameraParameter* src = static_cast<const Z3DCameraParameter*>(&rhs);
@@ -297,7 +297,7 @@ QJsonValue Z3DCameraParameter::jsonValue() const
   return obj;
 }
 
-void Z3DCameraParameter::readValue(const QJsonValue &jsonValue)
+void Z3DCameraParameter::readValue(const QJsonValue& jsonValue)
 {
   m_receiveWidgetSignal = false;
   if (jsonValue.isObject()) {

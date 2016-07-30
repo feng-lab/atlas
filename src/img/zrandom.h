@@ -55,10 +55,10 @@ public:
   template<typename Real>
   Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> randn(int nRow, int nCol = -1, Real mean = 0, Real sigma = 1)
   {
-    assert(nRow > 0);
+    CHECK(nRow > 0);
     if (nCol == -1)
       nCol = nRow;
-    assert(nCol > 0);
+    CHECK(nCol > 0);
     Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> mat(nRow, nCol);
     for (int r = 0; r < nRow; r++)
       for (int c = 0; c < nCol; c++) {

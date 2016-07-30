@@ -16,7 +16,7 @@
 
 namespace nim {
 
-ZGraphicsView::ZGraphicsView(QGraphicsScene *scene, ZView *parent)
+ZGraphicsView::ZGraphicsView(QGraphicsScene* scene, ZView* parent)
   : QGraphicsView(scene, parent)
   , m_view(parent)
   , m_scale("Scale", 100, 7, 10000)
@@ -26,7 +26,6 @@ ZGraphicsView::ZGraphicsView(QGraphicsScene *scene, ZView *parent)
   , m_rectItem(nullptr)
   , m_polygonItem(nullptr)
   , m_splineItem(nullptr)
-
 {
   setMinimumSize(400, 400);
   setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
@@ -79,20 +78,20 @@ QRectF ZGraphicsView::getCurrrentlyVisibleRegion() const
   return QRectF(topLeft, bottomRight);
 }
 
-QWidget *ZGraphicsView::createScaleWidget(QWidget *parent)
+QWidget* ZGraphicsView::createScaleWidget(QWidget* parent)
 {
   QWidget* res = m_scale.createWidget(parent);
   res->setToolTip("Zoom");
   return res;
 }
 
-void ZGraphicsView::fitRect(const QRectF &rect)
+void ZGraphicsView::fitRect(const QRectF& rect)
 {
   fitInView(rect, Qt::KeepAspectRatio);
   setScale(transform().m11());
 }
 
-bool ZGraphicsView::renderToImage(const QString &filename, QString *err)
+bool ZGraphicsView::renderToImage(const QString& filename, QString* err)
 {
   QRect vp = viewport()->rect();
   QImage img(vp.width(), vp.height(), QImage::Format_ARGB32_Premultiplied);
@@ -110,7 +109,7 @@ bool ZGraphicsView::renderToImage(const QString &filename, QString *err)
   return true;
 }
 
-bool ZGraphicsView::renderToImage(const QString &filename, int width, int height, QString *err)
+bool ZGraphicsView::renderToImage(const QString& filename, int width, int height, QString* err)
 {
   QImage img(width, height, QImage::Format_ARGB32_Premultiplied);
   img.fill(0);
@@ -163,14 +162,14 @@ void ZGraphicsView::checkViewport()
   }
 }
 
-void ZGraphicsView::mousePressEvent(QMouseEvent *event)
+void ZGraphicsView::mousePressEvent(QMouseEvent* event)
 {
-  QGraphicsItem *item = itemAt(event->x(), event->y());
+  QGraphicsItem* item = itemAt(event->x(), event->y());
   ROIGraphicsItem* roiItem = qgraphicsitem_cast<ROIGraphicsItem*>(item);
   ROICtrlPtGraphicsItem* roiCtrlPtItem = qgraphicsitem_cast<ROICtrlPtGraphicsItem*>(item);
   bool canUpdateROI = (!roiItem && !roiCtrlPtItem)
-      || event->modifiers() == Qt::ControlModifier
-      || event->modifiers() == Qt::AltModifier;
+                      || event->modifiers() == Qt::ControlModifier
+                      || event->modifiers() == Qt::AltModifier;
 
   CHECK(!m_rectItem);
   CHECK(!m_ellipseItem);
@@ -182,37 +181,37 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
         CHECK(m_ctrlPtsItem.empty());
         m_startScenePt = scenePt;
         switch (event->modifiers()) {
-        case Qt::ControlModifier :
-          m_roiAction = ROIAction::Add;
-          break;
-        case Qt::AltModifier:
-          m_roiAction = ROIAction::Subtract;
-          break;
-        default:
-          m_roiAction = ROIAction::New;
-          break;
+          case Qt::ControlModifier :
+            m_roiAction = ROIAction::Add;
+            break;
+          case Qt::AltModifier:
+            m_roiAction = ROIAction::Subtract;
+            break;
+          default:
+            m_roiAction = ROIAction::New;
+            break;
         }
         if (m_roiAction == ROIAction::New) {
-          std::pair<int,int> sliceRange = m_view->currentSliceRange();
-          for (int i=sliceRange.first; i<sliceRange.second; ++i)
+          std::pair<int, int> sliceRange = m_view->currentSliceRange();
+          for (int i = sliceRange.first; i < sliceRange.second; ++i)
             m_view->roi().deleteSliceROI(i);
         }
-        QPolygonF startPoly = mapToScene(event->x()-5, event->y()-5, 10, 10);
+        QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
         m_startPtItem = new QGraphicsPolygonItem(startPoly);
-        m_startPtItem->setPen(QPen(QColor(0,0,0), 0));
-        m_startPtItem->setBrush(QBrush(QColor(255,255,255,128)));
+        m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
+        m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
         scene()->addItem(m_startPtItem);
         m_spline.clear();
         m_spline << m_startScenePt << m_startScenePt;  // pt and next potential pt
         m_splineItem = new QGraphicsPathItem(ZROI::splineToPainterPath(m_spline));
-        m_splineItem->setPen(QPen(QColor(255,255,0), 0));
+        m_splineItem->setPen(QPen(QColor(255, 255, 0), 0));
         scene()->addItem(m_splineItem);
       } else {
         if (m_startPtItem->contains(m_spline.last())) {  // finish here
           m_spline.last() = m_spline[0];
           if (m_spline.size() > 3) {
-            std::pair<int,int> sliceRange = m_view->currentSliceRange();
-            for (int i=sliceRange.first; i<sliceRange.second; ++i) {
+            std::pair<int, int> sliceRange = m_view->currentSliceRange();
+            for (int i = sliceRange.first; i < sliceRange.second; ++i) {
               if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
                 m_view->roi().addSpline(i, m_spline);
               else if (m_roiAction == ROIAction::Subtract)
@@ -226,11 +225,11 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
           m_ctrlPtsItem.clear();
           delete m_splineItem;
           m_splineItem = nullptr;
-        } else if (!isScenePtOverlap(m_spline.last(), m_spline[m_spline.size()-2])) {
-          QPolygonF ctrlPoly = mapToScene(event->x()-4, event->y()-4, 8, 8);
-          QGraphicsPolygonItem *ctrlPtItem = new QGraphicsPolygonItem(ctrlPoly);
-          ctrlPtItem->setPen(QPen(QColor(0,0,0), 0));
-          ctrlPtItem->setBrush(QBrush(QColor(255,255,0,128)));
+        } else if (!isScenePtOverlap(m_spline.last(), m_spline[m_spline.size() - 2])) {
+          QPolygonF ctrlPoly = mapToScene(event->x() - 4, event->y() - 4, 8, 8);
+          QGraphicsPolygonItem* ctrlPtItem = new QGraphicsPolygonItem(ctrlPoly);
+          ctrlPtItem->setPen(QPen(QColor(0, 0, 0), 0));
+          ctrlPtItem->setBrush(QBrush(QColor(255, 255, 0, 128)));
           scene()->addItem(ctrlPtItem);
           m_ctrlPtsItem.push_back(ctrlPtItem);
 
@@ -246,8 +245,8 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
           m_spline << m_spline[0];
         }
         if (m_spline.size() > 3) {
-          std::pair<int,int> sliceRange = m_view->currentSliceRange();
-          for (int i=sliceRange.first; i<sliceRange.second; ++i) {
+          std::pair<int, int> sliceRange = m_view->currentSliceRange();
+          for (int i = sliceRange.first; i < sliceRange.second; ++i) {
             if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
               m_view->roi().addSpline(i, m_spline);
             else if (m_roiAction == ROIAction::Subtract)
@@ -271,25 +270,25 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
         CHECK(m_ctrlPtsItem.empty());
         m_startScenePt = scenePt;
         switch (event->modifiers()) {
-        case Qt::ControlModifier :
-          m_roiAction = ROIAction::Add;
-          break;
-        case Qt::AltModifier:
-          m_roiAction = ROIAction::Subtract;
-          break;
-        default:
-          m_roiAction = ROIAction::New;
-          break;
+          case Qt::ControlModifier :
+            m_roiAction = ROIAction::Add;
+            break;
+          case Qt::AltModifier:
+            m_roiAction = ROIAction::Subtract;
+            break;
+          default:
+            m_roiAction = ROIAction::New;
+            break;
         }
         if (m_roiAction == ROIAction::New) {
-          std::pair<int,int> sliceRange = m_view->currentSliceRange();
-          for (int i=sliceRange.first; i<sliceRange.second; ++i)
+          std::pair<int, int> sliceRange = m_view->currentSliceRange();
+          for (int i = sliceRange.first; i < sliceRange.second; ++i)
             m_view->roi().deleteSliceROI(i);
         }
-        QPolygonF startPoly = mapToScene(event->x()-5, event->y()-5, 10, 10);
+        QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
         m_startPtItem = new QGraphicsPolygonItem(startPoly);
-        m_startPtItem->setPen(QPen(QColor(0,0,0), 0));
-        m_startPtItem->setBrush(QBrush(QColor(255,255,255,128)));
+        m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
+        m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
         scene()->addItem(m_startPtItem);
         m_polygon.clear();
         m_polygon << m_startScenePt << m_startScenePt;  // pt and next potential pt
@@ -298,14 +297,14 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
         QPainterPath path;
         path.addPolygon(m_polygon);
         m_polygonItem = new QGraphicsPathItem(path);
-        m_polygonItem->setPen(QPen(QColor(255,255,0), 0));
+        m_polygonItem->setPen(QPen(QColor(255, 255, 0), 0));
         scene()->addItem(m_polygonItem);
       } else {
         if (m_startPtItem->contains(m_polygon.last())) {  // finish here
           m_polygon.last() = m_polygon[0];
           if (m_polygon.size() > 3) {
-            std::pair<int,int> sliceRange = m_view->currentSliceRange();
-            for (int i=sliceRange.first; i<sliceRange.second; ++i) {
+            std::pair<int, int> sliceRange = m_view->currentSliceRange();
+            for (int i = sliceRange.first; i < sliceRange.second; ++i) {
               if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
                 m_view->roi().addPolygon(i, m_polygon);
               else if (m_roiAction == ROIAction::Subtract)
@@ -319,12 +318,12 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
           m_ctrlPtsItem.clear();
           delete m_polygonItem;
           m_polygonItem = nullptr;
-        } else if (!isScenePtOverlap(m_polygon.last(), m_polygon[m_polygon.size()-2])) {
+        } else if (!isScenePtOverlap(m_polygon.last(), m_polygon[m_polygon.size() - 2])) {
           if (m_polygon.size() == 2) {
             LOG(INFO) << "second: " << scenePt;
             double xdiff1 = m_polygon[0].x() - m_polygon[1].x();
             double ydiff1 = m_polygon[0].y() - m_polygon[1].y();
-            LOG(INFO) << "soma Length: " << std::sqrt(xdiff1*xdiff1 + ydiff1*ydiff1);
+            LOG(INFO) << "soma Length: " << std::sqrt(xdiff1 * xdiff1 + ydiff1 * ydiff1);
           } else if (m_polygon.size() == 3) {
             //LOG(INFO) << "third: " << scenePt;
             //            double xdiff1 = m_polygon[0].x() - m_polygon[1].x();
@@ -344,16 +343,16 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
             double ydiff2 = m_polygon[2].y() - m_polygon[1].y();
             double xdiff3 = m_polygon[2].x() - m_polygon[3].x();
             double ydiff3 = m_polygon[2].y() - m_polygon[3].y();
-            double len1 = std::sqrt(xdiff1*xdiff1 + ydiff1*ydiff1);
-            double len2 = std::sqrt(xdiff2*xdiff2 + ydiff2*ydiff2);
-            double len3 = std::sqrt(xdiff3*xdiff3 + ydiff3*ydiff3);
+            double len1 = std::sqrt(xdiff1 * xdiff1 + ydiff1 * ydiff1);
+            double len2 = std::sqrt(xdiff2 * xdiff2 + ydiff2 * ydiff2);
+            double len3 = std::sqrt(xdiff3 * xdiff3 + ydiff3 * ydiff3);
             LOG(INFO) << len1 << " " << len2 << " " << len3;
           }
 
-          QPolygonF ctrlPoly = mapToScene(event->x()-4, event->y()-4, 8, 8);
-          QGraphicsPolygonItem *ctrlPtItem = new QGraphicsPolygonItem(ctrlPoly);
-          ctrlPtItem->setPen(QPen(QColor(0,0,0), 0));
-          ctrlPtItem->setBrush(QBrush(QColor(255,255,0,128)));
+          QPolygonF ctrlPoly = mapToScene(event->x() - 4, event->y() - 4, 8, 8);
+          QGraphicsPolygonItem* ctrlPtItem = new QGraphicsPolygonItem(ctrlPoly);
+          ctrlPtItem->setPen(QPen(QColor(0, 0, 0), 0));
+          ctrlPtItem->setBrush(QBrush(QColor(255, 255, 0, 128)));
           scene()->addItem(ctrlPtItem);
           m_ctrlPtsItem.push_back(ctrlPtItem);
 
@@ -371,8 +370,8 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
           m_polygon << m_polygon[0];
         }
         if (m_polygon.size() > 3) {
-          std::pair<int,int> sliceRange = m_view->currentSliceRange();
-          for (int i=sliceRange.first; i<sliceRange.second; ++i) {
+          std::pair<int, int> sliceRange = m_view->currentSliceRange();
+          for (int i = sliceRange.first; i < sliceRange.second; ++i) {
             if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
               m_view->roi().addPolygon(i, m_polygon);
             else if (m_roiAction == ROIAction::Subtract)
@@ -393,56 +392,56 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
     CHECK(!m_startPtItem);
     m_startScenePt = scenePt;
     switch (event->modifiers()) {
-    case Qt::ControlModifier :
-      m_roiAction = ROIAction::Add;
-      break;
-    case Qt::AltModifier:
-      m_roiAction = ROIAction::Subtract;
-      break;
-    default:
-      m_roiAction = ROIAction::New;
-      break;
+      case Qt::ControlModifier :
+        m_roiAction = ROIAction::Add;
+        break;
+      case Qt::AltModifier:
+        m_roiAction = ROIAction::Subtract;
+        break;
+      default:
+        m_roiAction = ROIAction::New;
+        break;
     }
     if (m_roiAction == ROIAction::New) {
-      std::pair<int,int> sliceRange = m_view->currentSliceRange();
-      for (int i=sliceRange.first; i<sliceRange.second; ++i)
+      std::pair<int, int> sliceRange = m_view->currentSliceRange();
+      for (int i = sliceRange.first; i < sliceRange.second; ++i)
         m_view->roi().deleteSliceROI(i);
     }
-    QPolygonF startPoly = mapToScene(event->x()-5, event->y()-5, 10, 10);
+    QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
     m_startPtItem = new QGraphicsPolygonItem(startPoly);
-    m_startPtItem->setPen(QPen(QColor(0,0,0), 0));
-    m_startPtItem->setBrush(QBrush(QColor(255,255,255,128)));
+    m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
+    m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
     scene()->addItem(m_startPtItem);
-    m_rectItem = new QGraphicsRectItem(QRectF(scenePt, QSizeF(0,0)));
-    m_rectItem->setPen(QPen(QColor(255,255,0), 0));
+    m_rectItem = new QGraphicsRectItem(QRectF(scenePt, QSizeF(0, 0)));
+    m_rectItem->setPen(QPen(QColor(255, 255, 0), 0));
     scene()->addItem(m_rectItem);
   } else if (m_view->state() == ZView::State::ROIEllipse && event->button() == Qt::LeftButton && canUpdateROI) {
     QPointF scenePt = mapToScene(event->x(), event->y());
     CHECK(!m_startPtItem);
     m_startScenePt = scenePt;
     switch (event->modifiers()) {
-    case Qt::ControlModifier :
-      m_roiAction = ROIAction::Add;
-      break;
-    case Qt::AltModifier:
-      m_roiAction = ROIAction::Subtract;
-      break;
-    default:
-      m_roiAction = ROIAction::New;
-      break;
+      case Qt::ControlModifier :
+        m_roiAction = ROIAction::Add;
+        break;
+      case Qt::AltModifier:
+        m_roiAction = ROIAction::Subtract;
+        break;
+      default:
+        m_roiAction = ROIAction::New;
+        break;
     }
     if (m_roiAction == ROIAction::New) {
-      std::pair<int,int> sliceRange = m_view->currentSliceRange();
-      for (int i=sliceRange.first; i<sliceRange.second; ++i)
+      std::pair<int, int> sliceRange = m_view->currentSliceRange();
+      for (int i = sliceRange.first; i < sliceRange.second; ++i)
         m_view->roi().deleteSliceROI(i);
     }
-    QPolygonF startPoly = mapToScene(event->x()-5, event->y()-5, 10, 10);
+    QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
     m_startPtItem = new QGraphicsPolygonItem(startPoly);
-    m_startPtItem->setPen(QPen(QColor(0,0,0), 0));
-    m_startPtItem->setBrush(QBrush(QColor(255,255,255,128)));
+    m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
+    m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
     scene()->addItem(m_startPtItem);
-    m_ellipseItem = new QGraphicsEllipseItem(QRectF(m_startScenePt, QSizeF(0,0)));
-    m_ellipseItem->setPen(QPen(QColor(255,255,0), 0));
+    m_ellipseItem = new QGraphicsEllipseItem(QRectF(m_startScenePt, QSizeF(0, 0)));
+    m_ellipseItem->setPen(QPen(QColor(255, 255, 0), 0));
     scene()->addItem(m_ellipseItem);
   } else {
     QPointF scenePt = mapToScene(event->x(), event->y());
@@ -452,7 +451,7 @@ void ZGraphicsView::mousePressEvent(QMouseEvent *event)
   }
 }
 
-void ZGraphicsView::mouseMoveEvent(QMouseEvent *event)
+void ZGraphicsView::mouseMoveEvent(QMouseEvent* event)
 {
   if (m_splineItem) {
     QPointF scenePt = mapToScene(event->x(), event->y());
@@ -490,13 +489,13 @@ void ZGraphicsView::mouseMoveEvent(QMouseEvent *event)
   }
 }
 
-void ZGraphicsView::mouseReleaseEvent(QMouseEvent *event)
+void ZGraphicsView::mouseReleaseEvent(QMouseEvent* event)
 {
   if (m_rectItem) {
     QRectF rect = m_rectItem->rect();
     if (rect.width() >= 1. && rect.height() >= 1.) {
-      std::pair<int,int> sliceRange = m_view->currentSliceRange();
-      for (int i=sliceRange.first; i<sliceRange.second; ++i) {
+      std::pair<int, int> sliceRange = m_view->currentSliceRange();
+      for (int i = sliceRange.first; i < sliceRange.second; ++i) {
         if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
           m_view->roi().addRect(i, rect);
         else if (m_roiAction == ROIAction::Subtract)
@@ -510,8 +509,8 @@ void ZGraphicsView::mouseReleaseEvent(QMouseEvent *event)
   } else if (m_ellipseItem) {
     QRectF rect = m_ellipseItem->rect();
     if (rect.width() >= 1. && rect.height() >= 1.) {
-      std::pair<int,int> sliceRange = m_view->currentSliceRange();
-      for (int i=sliceRange.first; i<sliceRange.second; ++i) {
+      std::pair<int, int> sliceRange = m_view->currentSliceRange();
+      for (int i = sliceRange.first; i < sliceRange.second; ++i) {
         if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
           m_view->roi().addEllipse(i, rect);
         else if (m_roiAction == ROIAction::Subtract)
@@ -528,17 +527,17 @@ void ZGraphicsView::mouseReleaseEvent(QMouseEvent *event)
   }
 }
 
-void ZGraphicsView::dragEnterEvent(QDragEnterEvent *event)
+void ZGraphicsView::dragEnterEvent(QDragEnterEvent* event)
 {
   event->ignore();
 }
 
-void ZGraphicsView::dropEvent(QDropEvent *event)
+void ZGraphicsView::dropEvent(QDropEvent* event)
 {
   event->ignore();
 }
 
-void ZGraphicsView::wheelEvent(QWheelEvent *event)
+void ZGraphicsView::wheelEvent(QWheelEvent* event)
 {
   QGraphicsView::wheelEvent(event);
   checkViewport();

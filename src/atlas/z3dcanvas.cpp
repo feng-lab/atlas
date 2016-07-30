@@ -242,7 +242,7 @@ double Z3DCanvas::devicePixelRatio()
 #else
 
 
-Z3DCanvas::Z3DCanvas(const QString &title, int width, int height, QWidget* parent, Qt::WindowFlags f)
+Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* parent, Qt::WindowFlags f)
   : QGraphicsView(parent)
   , m_fullscreen(false)
   , m_glWidget(nullptr)
@@ -283,7 +283,8 @@ Z3DCanvas::Z3DCanvas(const QString &title, int width, int height, QWidget* paren
   connect(m_rotateZMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateZM);
 }
 
-Z3DCanvas::~Z3DCanvas() {}
+Z3DCanvas::~Z3DCanvas()
+{}
 
 QSurfaceFormat Z3DCanvas::format() const
 {
@@ -321,12 +322,12 @@ void Z3DCanvas::mousePressEvent(QMouseEvent* e)
   broadcastEvent(e, width(), height());
 }
 
-void Z3DCanvas::mouseReleaseEvent (QMouseEvent* e)
+void Z3DCanvas::mouseReleaseEvent(QMouseEvent* e)
 {
   broadcastEvent(e, width(), height());
 }
 
-void Z3DCanvas::mouseMoveEvent(QMouseEvent*  e)
+void Z3DCanvas::mouseMoveEvent(QMouseEvent* e)
 {
   broadcastEvent(e, width(), height());
 }
@@ -352,7 +353,7 @@ void Z3DCanvas::keyReleaseEvent(QKeyEvent* event)
   broadcastEvent(event, width(), height());
 }
 
-void Z3DCanvas::resizeEvent(QResizeEvent *event)
+void Z3DCanvas::resizeEvent(QResizeEvent* event)
 {
   getGLFocus();
   QGraphicsView::resizeEvent(event);
@@ -363,18 +364,18 @@ void Z3DCanvas::resizeEvent(QResizeEvent *event)
                          event->size().height() * devicePixelRatio());
 }
 
-void Z3DCanvas::paintEvent(QPaintEvent *event)
+void Z3DCanvas::paintEvent(QPaintEvent* event)
 {
   getGLFocus();
   QGraphicsView::paintEvent(event);
 }
 
-void Z3DCanvas::dragEnterEvent(QDragEnterEvent *event)
+void Z3DCanvas::dragEnterEvent(QDragEnterEvent* event)
 {
   event->ignore();
 }
 
-void Z3DCanvas::dropEvent(QDropEvent *event)
+void Z3DCanvas::dropEvent(QDropEvent* event)
 {
   event->ignore();
 }
@@ -382,7 +383,7 @@ void Z3DCanvas::dropEvent(QDropEvent *event)
 void Z3DCanvas::rotateX()
 {
   getGLFocus();
-  for (size_t i = 0 ; i < m_listeners.size() ; ++i) {
+  for (size_t i = 0; i < m_listeners.size(); ++i) {
     m_listeners[i]->rotateX();
   }
 }
@@ -390,7 +391,7 @@ void Z3DCanvas::rotateX()
 void Z3DCanvas::rotateY()
 {
   getGLFocus();
-  for (size_t i = 0 ; i < m_listeners.size() ; ++i) {
+  for (size_t i = 0; i < m_listeners.size(); ++i) {
     m_listeners[i]->rotateY();
   }
 }
@@ -398,7 +399,7 @@ void Z3DCanvas::rotateY()
 void Z3DCanvas::rotateZ()
 {
   getGLFocus();
-  for (size_t i = 0 ; i < m_listeners.size() ; ++i) {
+  for (size_t i = 0; i < m_listeners.size(); ++i) {
     m_listeners[i]->rotateZ();
   }
 }
@@ -406,7 +407,7 @@ void Z3DCanvas::rotateZ()
 void Z3DCanvas::rotateXM()
 {
   getGLFocus();
-  for (size_t i = 0 ; i < m_listeners.size() ; ++i) {
+  for (size_t i = 0; i < m_listeners.size(); ++i) {
     m_listeners[i]->rotateXM();
   }
 }
@@ -414,7 +415,7 @@ void Z3DCanvas::rotateXM()
 void Z3DCanvas::rotateYM()
 {
   getGLFocus();
-  for (size_t i = 0 ; i < m_listeners.size() ; ++i) {
+  for (size_t i = 0; i < m_listeners.size(); ++i) {
     m_listeners[i]->rotateYM();
   }
 }
@@ -422,7 +423,7 @@ void Z3DCanvas::rotateYM()
 void Z3DCanvas::rotateZM()
 {
   getGLFocus();
-  for (size_t i = 0 ; i < m_listeners.size() ; ++i) {
+  for (size_t i = 0; i < m_listeners.size(); ++i) {
     m_listeners[i]->rotateZM();
   }
 }
@@ -432,7 +433,7 @@ void Z3DCanvas::timerEvent(QTimerEvent* e)
   broadcastEvent(e, width(), height());
 }
 
-void Z3DCanvas::setNetworkEvaluator(Z3DNetworkEvaluator *n)
+void Z3DCanvas::setNetworkEvaluator(Z3DNetworkEvaluator* n)
 {
   m_3dScene->setNetworkEvaluator(n);
   if (n)
@@ -444,19 +445,19 @@ void Z3DCanvas::setFakeStereoOnce()
   m_3dScene->setFakeStereoOnce();
 }
 
-void Z3DCanvas::addEventListenerToBack(Z3DCanvasEventListener *e)
+void Z3DCanvas::addEventListenerToBack(Z3DCanvasEventListener* e)
 {
   if (e)
     m_listeners.push_back(e);
 }
 
-void Z3DCanvas::addEventListenerToFront(Z3DCanvasEventListener *e)
+void Z3DCanvas::addEventListenerToFront(Z3DCanvasEventListener* e)
 {
   if (e)
     m_listeners.push_front(e);
 }
 
-void Z3DCanvas::removeEventListener(Z3DCanvasEventListener *e)
+void Z3DCanvas::removeEventListener(Z3DCanvasEventListener* e)
 {
   std::deque<Z3DCanvasEventListener*>::iterator pos;
   pos = std::find(m_listeners.begin(), m_listeners.end(), e);
@@ -470,10 +471,10 @@ void Z3DCanvas::clearEventListeners()
   m_listeners.clear();
 }
 
-void Z3DCanvas::broadcastEvent(QEvent *e, int w, int h)
+void Z3DCanvas::broadcastEvent(QEvent* e, int w, int h)
 {
   getGLFocus();
-  for (size_t i = 0 ; i < m_listeners.size() ; ++i) {
+  for (size_t i = 0; i < m_listeners.size(); ++i) {
     m_listeners[i]->onEvent(e, w, h);
     if (e->isAccepted())
       break;
@@ -483,7 +484,7 @@ void Z3DCanvas::broadcastEvent(QEvent *e, int w, int h)
 double Z3DCanvas::devicePixelRatio()
 {
   return (window() && window()->windowHandle()) ?
-        window()->windowHandle()->devicePixelRatio() : 1.0;
+         window()->windowHandle()->devicePixelRatio() : 1.0;
 }
 
 #endif

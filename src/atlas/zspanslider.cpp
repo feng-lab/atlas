@@ -6,7 +6,7 @@
 namespace nim {
 
 ZSpanSliderWithSpinBox::ZSpanSliderWithSpinBox(int lowerValue, int upperValue, int min, int max,
-                                               int singleStep, bool tracking, QWidget *parent)
+                                               int singleStep, bool tracking, QWidget* parent)
   : QWidget(parent)
 {
   createWidget(lowerValue, upperValue, min, max, singleStep, tracking);
@@ -70,7 +70,8 @@ void ZSpanSliderWithSpinBox::valueChangedFromUpperSpinBox(int u)
   emit upperValueChanged(u);
 }
 
-void ZSpanSliderWithSpinBox::createWidget(int lowerValue, int upperValue, int min, int max, int singleStep, bool tracking)
+void
+ZSpanSliderWithSpinBox::createWidget(int lowerValue, int upperValue, int min, int max, int singleStep, bool tracking)
 {
   m_slider = new QxtSpanSlider(Qt::Horizontal);
   m_slider->setRange(min, max);
@@ -88,23 +89,26 @@ void ZSpanSliderWithSpinBox::createWidget(int lowerValue, int upperValue, int mi
   m_upperSpinBox->setValue(upperValue);
   m_upperSpinBox->setSingleStep(singleStep);
   QHBoxLayout* lo = new QHBoxLayout(this);
-  lo->setContentsMargins(0,0,0,0);
+  lo->setContentsMargins(0, 0, 0, 0);
   lo->addWidget(m_lowerSpinBox);
   lo->addWidget(m_slider);
   lo->addWidget(m_upperSpinBox);
   connect(m_slider, &QxtSpanSlider::lowerValueChanged, this, &ZSpanSliderWithSpinBox::lowerValueChangedFromSlider);
   connect(m_slider, &QxtSpanSlider::upperValueChanged, this, &ZSpanSliderWithSpinBox::upperValueChangedFromSlider);
-  connect(m_lowerSpinBox, qOverload<int>(&ZSpinBox::valueChanged), this, &ZSpanSliderWithSpinBox::valueChangedFromLowerSpinBox);
-  connect(m_upperSpinBox, qOverload<int>(&ZSpinBox::valueChanged), this, &ZSpanSliderWithSpinBox::valueChangedFromUpperSpinBox);
+  connect(m_lowerSpinBox, qOverload<int>(&ZSpinBox::valueChanged), this,
+          &ZSpanSliderWithSpinBox::valueChangedFromLowerSpinBox);
+  connect(m_upperSpinBox, qOverload<int>(&ZSpinBox::valueChanged), this,
+          &ZSpanSliderWithSpinBox::valueChangedFromUpperSpinBox);
 }
 
 
 ZDoubleSpanSliderWithSpinBox::ZDoubleSpanSliderWithSpinBox(double lowerValue, double upperValue, double min, double max,
-                                                           double singleStep, int decimal, bool tracking, QWidget *parent)
-  : QWidget(parent), m_lowerValue(lowerValue), m_upperValue(upperValue), m_min(min),
-    m_max(max), m_step(singleStep), m_decimal(decimal), m_tracking(tracking)
+                                                           double singleStep, int decimal, bool tracking,
+                                                           QWidget* parent)
+  : QWidget(parent), m_lowerValue(lowerValue), m_upperValue(upperValue), m_min(min), m_max(max), m_step(singleStep)
+  , m_decimal(decimal), m_tracking(tracking)
 {
-  double sliderMaxValue = (m_max-m_min)/m_step;
+  double sliderMaxValue = (m_max - m_min) / m_step;
   if (sliderMaxValue > std::numeric_limits<int>::max())
     m_sliderMaxValue = std::numeric_limits<int>::max();
   else
@@ -131,14 +135,14 @@ void ZDoubleSpanSliderWithSpinBox::setDataRange(double min, double max)
 {
   m_min = min;
   m_max = max;
-  double sliderMaxValue = (m_max-m_min)/m_step;
+  double sliderMaxValue = (m_max - m_min) / m_step;
   if (sliderMaxValue > std::numeric_limits<int>::max())
     m_sliderMaxValue = std::numeric_limits<int>::max();
   else
     m_sliderMaxValue = static_cast<int>(sliderMaxValue);
   m_slider->setRange(0, m_sliderMaxValue);
-  double l = m_slider->lowerValue() / static_cast<double>(m_sliderMaxValue) * (m_max-m_min) + m_min;
-  double u = m_slider->upperValue() / static_cast<double>(m_sliderMaxValue) * (m_max-m_min) + m_min;
+  double l = m_slider->lowerValue() / static_cast<double>(m_sliderMaxValue) * (m_max - m_min) + m_min;
+  double u = m_slider->upperValue() / static_cast<double>(m_sliderMaxValue) * (m_max - m_min) + m_min;
   m_lowerSpinBox->setRange(m_min, u);
   m_lowerSpinBox->setValue(l);
   m_upperSpinBox->setRange(l, m_max);
@@ -193,7 +197,7 @@ void ZDoubleSpanSliderWithSpinBox::createWidget()
   m_slider->setRange(0, m_sliderMaxValue);
   m_slider->setSpan(static_cast<int>((m_lowerValue - m_min) / (m_max - m_min) * m_sliderMaxValue),
                     static_cast<int>((m_upperValue - m_min) / (m_max - m_min) * m_sliderMaxValue));
-  m_slider->setSingleStep(std::max(1, static_cast<int>(m_step*m_sliderMaxValue/(m_max-m_min))));
+  m_slider->setSingleStep(std::max(1, static_cast<int>(m_step * m_sliderMaxValue / (m_max - m_min))));
   m_slider->setTracking(m_tracking);
   m_slider->setHandleMovementMode(QxtSpanSlider::NoCrossing);
   m_slider->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
@@ -208,14 +212,18 @@ void ZDoubleSpanSliderWithSpinBox::createWidget()
   m_upperSpinBox->setSingleStep(m_step);
   m_upperSpinBox->setDecimals(m_decimal);
   QHBoxLayout* lo = new QHBoxLayout(this);
-  lo->setContentsMargins(0,0,0,0);
+  lo->setContentsMargins(0, 0, 0, 0);
   lo->addWidget(m_lowerSpinBox);
   lo->addWidget(m_slider);
   lo->addWidget(m_upperSpinBox);
-  connect(m_slider, &QxtSpanSlider::lowerValueChanged, this, &ZDoubleSpanSliderWithSpinBox::lowerValueChangedFromSlider);
-  connect(m_slider, &QxtSpanSlider::upperValueChanged, this, &ZDoubleSpanSliderWithSpinBox::upperValueChangedFromSlider);
-  connect(m_lowerSpinBox, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDoubleSpanSliderWithSpinBox::valueChangedFromLowerSpinBox);
-  connect(m_upperSpinBox, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDoubleSpanSliderWithSpinBox::valueChangedFromUpperSpinBox);
+  connect(m_slider, &QxtSpanSlider::lowerValueChanged, this,
+          &ZDoubleSpanSliderWithSpinBox::lowerValueChangedFromSlider);
+  connect(m_slider, &QxtSpanSlider::upperValueChanged, this,
+          &ZDoubleSpanSliderWithSpinBox::upperValueChangedFromSlider);
+  connect(m_lowerSpinBox, qOverload<double>(&ZDoubleSpinBox::valueChanged), this,
+          &ZDoubleSpanSliderWithSpinBox::valueChangedFromLowerSpinBox);
+  connect(m_upperSpinBox, qOverload<double>(&ZDoubleSpinBox::valueChanged), this,
+          &ZDoubleSpanSliderWithSpinBox::valueChangedFromUpperSpinBox);
 }
 
 } // namespace nim

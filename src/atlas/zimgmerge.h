@@ -15,7 +15,8 @@ class ZImg;
 class ZImgMerge
 {
 public:
-  enum class Mode {
+  enum class Mode
+  {
     Max, Min, Mean, Median, First
   };
 
@@ -23,23 +24,27 @@ public:
 
   // don't add empty img
   // img1 has absolute location, if img already exist, update its location
-  void addImg(const ZImg &img, const ZVoxelCoordinate &loc, const QString &imgName = "");
+  void addImg(const ZImg& img, const ZVoxelCoordinate& loc, const QString& imgName = "");
+
   // img2 has relative location to img1, if pair already exist, update its offset and cost
-  void addImgPair(const ZImg &img1, const ZImg &img2, const ZVoxelCoordinate &img2Offset, double connectionCost = 0.,
-                  const QString &img1Name = "", const QString &img2Name = "");
+  void addImgPair(const ZImg& img1, const ZImg& img2, const ZVoxelCoordinate& img2Offset, double connectionCost = 0.,
+                  const QString& img1Name = "", const QString& img2Name = "");
+
   // remove img
-  void removeImg(const ZImg &img);
+  void removeImg(const ZImg& img);
+
   // remove connection between imgs, keep img
-  void removeImgConnection(const ZImg &img1, const ZImg &img2);
+  void removeImgConnection(const ZImg& img1, const ZImg& img2);
 
   // throw ZImgException if error
-  ZImg merge(Mode mode = Mode::Max, QString *summary = nullptr) const;
+  ZImg merge(Mode mode = Mode::Max, QString* summary = nullptr) const;
 
 protected:
-  void resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgs,
-                        const ZImg *refImg, double minCost, QString &summary) const;
-  void mergeImgs(ZImg &res, const std::map<const ZImg*, ZVoxelCoordinate> &imgs,
-                 Mode mode, QString &summary) const;
+  void resolveLocations(std::map<const ZImg*, ZVoxelCoordinate>& imgs,
+                        const ZImg* refImg, double minCost, QString& summary) const;
+
+  void mergeImgs(ZImg& res, const std::map<const ZImg*, ZVoxelCoordinate>& imgs,
+                 Mode mode, QString& summary) const;
 
 private:
   std::map<const ZImg*, ZVoxelCoordinate> m_imgCoords;

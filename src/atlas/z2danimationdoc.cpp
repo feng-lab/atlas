@@ -14,13 +14,13 @@
 
 namespace nim {
 
-Z2DAnimationDoc::Z2DAnimationDoc(ZDoc &doc)
+Z2DAnimationDoc::Z2DAnimationDoc(ZDoc& doc)
   : ZObjDoc(doc), m_view(nullptr)
 {
   createActions();
 }
 
-void Z2DAnimationDoc::bindView(ZView *v)
+void Z2DAnimationDoc::bindView(ZView* v)
 {
   m_view = v;
   connect(m_view, &ZView::destroyed, this, &Z2DAnimationDoc::releaseView);
@@ -29,9 +29,9 @@ void Z2DAnimationDoc::bindView(ZView *v)
   }
 }
 
-void Z2DAnimationDoc::createNewAnimation(const QString &name)
+void Z2DAnimationDoc::createNewAnimation(const QString& name)
 {
-  Z2DAnimation *animation = new Z2DAnimation(m_doc, this);
+  Z2DAnimation* animation = new Z2DAnimation(m_doc, this);
   addAnimation(animation, "", name);
   animation->addKeyFrame(0);
 }
@@ -80,12 +80,12 @@ bool Z2DAnimationDoc::saveAs(size_t id)
   return false;
 }
 
-bool Z2DAnimationDoc::canReadFile(const QString &fileName)
+bool Z2DAnimationDoc::canReadFile(const QString& fileName)
 {
   return fileName.endsWith(".animation2d", Qt::CaseInsensitive);
 }
 
-size_t Z2DAnimationDoc::loadFile(const QString &fileName, QString &errorMsg)
+size_t Z2DAnimationDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
   for (auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
     if (it->second->path == fileName)
@@ -100,13 +100,13 @@ size_t Z2DAnimationDoc::loadFile(const QString &fileName, QString &errorMsg)
     setLastOpenedObjPath(fileName);
     return id;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = e.what();
     return 0;
   }
 }
 
-size_t Z2DAnimationDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
+size_t Z2DAnimationDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
 {
   if (!jValue.isString() || jValue.toString().trimmed().isEmpty()) {
     errorMsg = QString("File path is not string or is empty");
@@ -126,13 +126,13 @@ size_t Z2DAnimationDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
     setLastOpenedObjPath(fileName);
     return id;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = e.what();
     return 0;
   }
 }
 
-QList<QAction *> Z2DAnimationDoc::loadFileActions() const
+QList<QAction*> Z2DAnimationDoc::loadFileActions() const
 {
   QList<QAction*> res;
   res.push_back(m_loadAnimationsAction);
@@ -173,7 +173,7 @@ QString Z2DAnimationDoc::objTooltip(size_t id) const
   return m_idToAnimationPacks.at(id)->tooltip();
 }
 
-QUndoStack *Z2DAnimationDoc::objUndoStack(size_t id)
+QUndoStack* Z2DAnimationDoc::objUndoStack(size_t id)
 {
   return m_idToAnimationPacks.at(id)->animation->undoStack();
 }
@@ -183,7 +183,7 @@ QJsonValue Z2DAnimationDoc::jsonValue(size_t id) const
   return QJsonValue(m_idToAnimationPacks.at(id)->path);
 }
 
-bool Z2DAnimationDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
+bool Z2DAnimationDoc::isSameObj(const QJsonValue& v1, const QJsonValue& v2) const
 {
   CHECK(v1.isString() && v2.isString());
   if (v1 == v2)
@@ -212,7 +212,7 @@ bool Z2DAnimationDoc::isAlias(size_t id) const
   return false;
 }
 
-QWidget *Z2DAnimationDoc::createObjEditWidget(size_t id)
+QWidget* Z2DAnimationDoc::createObjEditWidget(size_t id)
 {
   CHECK(m_idToAnimationPacks.find(id) != m_idToAnimationPacks.end());
 
@@ -230,7 +230,7 @@ void Z2DAnimationDoc::loadAnimation()
   if (dialog.exec()) {
     QString errorMsg;
     //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    for (int i=0; i<dialog.selectedFiles().size(); ++i) {
+    for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
         QMessageBox::critical(QApplication::activeWindow(), tr("Can not read Animation"),
                               errorMsg);
@@ -241,9 +241,9 @@ void Z2DAnimationDoc::loadAnimation()
 
 void Z2DAnimationDoc::setModified()
 {
-  Z2DAnimation *animation = qobject_cast<Z2DAnimation*>(sender());
+  Z2DAnimation* animation = qobject_cast<Z2DAnimation*>(sender());
   if (animation) {
-    for(auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
+    for (auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
       if (it->second->animation.get() == animation) {
         it->second->updateDerivedData();
         it->second->hasUnsavedChange = true;
@@ -262,7 +262,7 @@ void Z2DAnimationDoc::releaseView()
   m_view = nullptr;
 }
 
-size_t Z2DAnimationDoc::addAnimation(Z2DAnimation *animation, const QString &path, const QString &name)
+size_t Z2DAnimationDoc::addAnimation(Z2DAnimation* animation, const QString& path, const QString& name)
 {
   size_t id = m_doc.getNewObjId();
   m_idToAnimationPacks[id] = std::make_shared<AnimationPack>(animation, path, name);
@@ -279,7 +279,7 @@ size_t Z2DAnimationDoc::addAnimation(Z2DAnimation *animation, const QString &pat
   return id;
 }
 
-Z2DAnimationDoc::AnimationPack::AnimationPack(Z2DAnimation *animationIn, const QString &path, const QString &name)
+Z2DAnimationDoc::AnimationPack::AnimationPack(Z2DAnimation* animationIn, const QString& path, const QString& name)
   : animation(animationIn), path(QFileInfo(path).canonicalFilePath()), hasUnsavedChange(false), m_tmpName(name)
 {
   if (path.isEmpty()) {
@@ -295,7 +295,7 @@ void Z2DAnimationDoc::AnimationPack::updateDerivedData()
   m_tooltip = path;
 }
 
-const QString &Z2DAnimationDoc::AnimationPack::info() const
+const QString& Z2DAnimationDoc::AnimationPack::info() const
 {
   if (m_info.isEmpty()) {
     m_info = QString("%1 secs").arg(animation->duration());
@@ -310,7 +310,7 @@ void Z2DAnimationDoc::createActions()
   connect(m_loadAnimationsAction, &QAction::triggered, this, &Z2DAnimationDoc::loadAnimation);
 }
 
-bool Z2DAnimationDoc::saveAnimation(AnimationPack *pack, const QString &fileName, QString &errorMsg)
+bool Z2DAnimationDoc::saveAnimation(AnimationPack* pack, const QString& fileName, QString& errorMsg)
 {
   try {
     pack->animation->save(fileName);
@@ -322,7 +322,7 @@ bool Z2DAnimationDoc::saveAnimation(AnimationPack *pack, const QString &fileName
     setLastOpenedObjPath(fileName);
     return true;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = e.what();
     return false;
   }

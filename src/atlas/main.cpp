@@ -14,86 +14,91 @@
 #include "zexception.h"
 
 #ifdef _USE_MKL_
+
 #include "mkl_service.h"
+
 #endif
 
 #ifdef _USE_IPP_
+
 #include "ippcore.h"
 #include "ippi.h"
+
 #endif
 
 #include <QSurfaceFormat>
 
 #include <QStack>
 #include <QPointer>
+
 // thanks to Daniel Price for this workaround
 struct MacEventFilter : public QObject
 {
   QStack<QPointer<QWidget>> m_activationstack; // stack of widgets to re-active on dialog close.
 
-  explicit MacEventFilter(QObject *parent = nullptr)
+  explicit MacEventFilter(QObject* parent = nullptr)
     : QObject(parent)
   {}
 
-  virtual bool eventFilter(QObject *anObject, QEvent *anEvent)
+  virtual bool eventFilter(QObject* anObject, QEvent* anEvent)
   {
     switch (anEvent->type()) {
-    case QEvent::Show: {
-      if ((anObject->inherits("QDialog") || anObject->inherits("QDockWidget")) && qApp->activeWindow()) {
-        // Workaround for Qt bug where opened QDialogs do not re-activate previous window
-        // when accepted or rejected. We cannot rely on the parent pointers so push the previous
-        // active window onto a stack before the dialog is shown.
-        // We have to use a stack in case a dialog opens another dialog.
-        // NOTE: It's important to use QPointers so that any widgets deleted by Qt do not lead to
-        // hanging pointers in the stack.
-        m_activationstack.push(qApp->activeWindow());
-      }
-      break;
-    }
-    case QEvent::Hide: {
-      if ((anObject->inherits("QDialog") || anObject->inherits("QDockWidget")) && !m_activationstack.isEmpty()) {
-        QPointer<QWidget> widget = m_activationstack.pop();
-        if (widget) {
-          // Re-acivate widgets in the order as dialogs are closed. See Show case above.
-          widget->activateWindow();
-          widget->raise();
+      case QEvent::Show: {
+        if ((anObject->inherits("QDialog") || anObject->inherits("QDockWidget")) && qApp->activeWindow()) {
+          // Workaround for Qt bug where opened QDialogs do not re-activate previous window
+          // when accepted or rejected. We cannot rely on the parent pointers so push the previous
+          // active window onto a stack before the dialog is shown.
+          // We have to use a stack in case a dialog opens another dialog.
+          // NOTE: It's important to use QPointers so that any widgets deleted by Qt do not lead to
+          // hanging pointers in the stack.
+          m_activationstack.push(qApp->activeWindow());
         }
+        break;
       }
-      break;
-    }
-    default:
-      break;
+      case QEvent::Hide: {
+        if ((anObject->inherits("QDialog") || anObject->inherits("QDockWidget")) && !m_activationstack.isEmpty()) {
+          QPointer<QWidget> widget = m_activationstack.pop();
+          if (widget) {
+            // Re-acivate widgets in the order as dialogs are closed. See Show case above.
+            widget->activateWindow();
+            widget->raise();
+          }
+        }
+        break;
+      }
+      default:
+        break;
     }
 
     return QObject::eventFilter(anObject, anEvent);
   }
 };
 
-void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QString &msg)
+void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QString& msg)
 {
   switch (type) {
-  case QtInfoMsg:
-    LINFOF(context.file ? context.file : "QtFile",
-           context.line,
-           context.function ? context.function : "QtFunction") << msg;
-    break;
-  case QtWarningMsg:
-    LWARNF(context.file ? context.file : "QtFile",
-           context.line,
-           context.function ? context.function : "QtFunction") << msg;
-    break;
-  case QtCriticalMsg:
-    LERRORF(context.file ? context.file : "QtFile",
-            context.line,
-            context.function ? context.function : "QtFunction") << msg;
-    break;
-  case QtFatalMsg:
-    LFATALF(context.file ? context.file : "QtFile",
-            context.line,
-            context.function ? context.function : "QtFunction") << msg;
-    abort();
-  default:
-    break;
+    case QtInfoMsg:
+      LINFOF(context.file ? context.file : "QtFile",
+             context.line,
+             context.function ? context.function : "QtFunction") << msg;
+      break;
+    case QtWarningMsg:
+      LWARNF(context.file ? context.file : "QtFile",
+             context.line,
+             context.function ? context.function : "QtFunction") << msg;
+      break;
+    case QtCriticalMsg:
+      LERRORF(context.file ? context.file : "QtFile",
+              context.line,
+              context.function ? context.function : "QtFunction") << msg;
+      break;
+    case QtFatalMsg:
+      LFATALF(context.file ? context.file : "QtFile",
+              context.line,
+              context.function ? context.function : "QtFunction") << msg;
+      abort();
+    default:
+      break;
   }
 }
 
@@ -113,13 +118,13 @@ void removeOldLogs(const QDir& dir, int numberToKeep = 20)
   QFileInfoList list = ld.entryInfoList(filters,
                                         QDir::Dirs | QDir::NoSymLinks,
                                         QDir::Name);
-  for (int i=0; i < list.size() - numberToKeep; ++i) {
+  for (int i = 0; i < list.size() - numberToKeep; ++i) {
     QDir logDir(list.at(i).absoluteFilePath());
     logDir.removeRecursively();
   }
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
   QSurfaceFormat format;
 
@@ -168,7 +173,7 @@ int main(int argc, char *argv[])
   IppStatus status = ippInit();
   if (status == ippStsNonIntelCpu || status == ippStsNotSupportedCpu) {
     Ipp64u featureMask = 0;
-    IppStatus st = ippGetCpuFeatures(&featureMask, NULL);
+    IppStatus st = ippGetCpuFeatures(&featureMask, nullptr);
     if (st != ippStsNoErr) {
       if (st == ippStsNotSupportedCpu) {
         LOG(WARNING) << "IPP error: not supported cpu.";
@@ -217,15 +222,15 @@ int main(int argc, char *argv[])
   //qApp->installEventFilter(new MacEventFilter(qApp));
 
   // Our MainWindow has Qt::WA_DeleteOnClose attribute, don't delete again.
-  nim::ZMainWindow *mainWin = new nim::ZMainWindow();
+  nim::ZMainWindow* mainWin = new nim::ZMainWindow();
   mainWin->show();
   mainWin->initOpenglContext();
 
   int result;
   try {
-    result =  app.exec();
+    result = app.exec();
   }
-  catch (const nim::ZException & e) {
+  catch (const nim::ZException& e) {
     LOG(FATAL) << e.what();
   }
 

@@ -25,9 +25,10 @@ public:
 private:
   struct ShaderKey
   {
-    ShaderKey(const QString& fn, const QString& hd, const Z3DContext &ct)
+    ShaderKey(const QString& fn, const QString& hd, const Z3DContext& ct)
       : filename(fn), header(hd), context(ct)
     {}
+
     QString filename;
     QString header;
     Z3DContext context;

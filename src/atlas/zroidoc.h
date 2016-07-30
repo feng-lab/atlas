@@ -8,57 +8,88 @@ namespace nim {
 
 class ZROIDoc : public ZObjDoc
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit ZROIDoc(ZDoc &doc);
+  explicit ZROIDoc(ZDoc& doc);
 
-  inline ZROI& roi(size_t id) { return *m_idToROIPacks.at(id)->roi; }
-  inline const ZROI& roi(size_t id) const { return *m_idToROIPacks.at(id)->roi; }
+  inline ZROI& roi(size_t id)
+  { return *m_idToROIPacks.at(id)->roi; }
+
+  inline const ZROI& roi(size_t id) const
+  { return *m_idToROIPacks.at(id)->roi; }
 
   ZROI& currentROI();
 
-  void askToSave(const ZROI &roi, const QString &title = "");
+  void askToSave(const ZROI& roi, const QString& title = "");
 
   // ZObjDoc interface
 public:
   virtual bool save(size_t id) override;
+
   virtual bool saveAs(size_t id) override;
-  virtual QString typeName() const override { return "ROI"; }
-  virtual QString typePluralName() const override { return "ROI"; }
-  virtual bool canReadFile(const QString &fileName) override;
-  virtual size_t loadFile(const QString &fileName, QString &errorMsg) override;
-  virtual size_t loadFile(const QJsonValue &jValue, QString &errorMsg) override;
+
+  virtual QString typeName() const override
+  { return "ROI"; }
+
+  virtual QString typePluralName() const override
+  { return "ROI"; }
+
+  virtual bool canReadFile(const QString& fileName) override;
+
+  virtual size_t loadFile(const QString& fileName, QString& errorMsg) override;
+
+  virtual size_t loadFile(const QJsonValue& jValue, QString& errorMsg) override;
+
   virtual QList<QAction*> loadFileActions() const override;
+
   virtual QMenu* processObjMenu() const override;
+
   virtual void removeObj(size_t id) override;
+
   virtual QString objName(size_t id) const override;
+
   virtual QString objPath(size_t id) const override;
+
   virtual bool objHasUnsavedChange(size_t id) const override;
+
   virtual QString objInfo(size_t id) const override;
+
   virtual QString objTooltip(size_t id) const override;
+
   virtual QUndoStack* objUndoStack(size_t id) override;
+
   virtual QJsonValue jsonValue(size_t id) const override;
+
   virtual bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
+
   virtual size_t makeAlias(size_t id) override;
+
   virtual bool isAlias(size_t id) const override;
 
 protected:
   void loadROI();
 
   void setModified();
+
   void createMaskImage();
 
   // append another ROI into this doc
-  size_t addROI(ZROI* roi, const QString &path);
+  size_t addROI(ZROI* roi, const QString& path);
 
 private:
-  struct ROIPack { // ROI and its associated data
-    ROIPack(ZROI *roi, const QString &path);
+  struct ROIPack
+  { // ROI and its associated data
+    ROIPack(ZROI* roi, const QString& path);
 
     void updateDerivedData();
+
     const QString& info() const;
-    inline const QString& name() const { return m_name; }
-    inline const QString& tooltip() const { return m_tooltip; }
+
+    inline const QString& name() const
+    { return m_name; }
+
+    inline const QString& tooltip() const
+    { return m_tooltip; }
 
     std::unique_ptr<ZROI> roi;
     QString path;
@@ -76,16 +107,18 @@ private:
   };
 
   void createActions();
-  bool saveROI(ROIPack *pack, const QString &fileName, QString &errorMsg);
+
+  bool saveROI(ROIPack* pack, const QString& fileName, QString& errorMsg);
+
   // notify obj manager about the update
   void packInfoUpdated(ROIPack* pack);
 
 private:
   std::map<size_t, std::shared_ptr<ROIPack>> m_idToROIPacks;
 
-  QAction *m_loadROIAction;
+  QAction* m_loadROIAction;
 
-  QAction *m_createMaskImageAction;
+  QAction* m_createMaskImageAction;
 };
 
 } // namespace nim

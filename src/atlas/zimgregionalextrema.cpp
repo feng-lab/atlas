@@ -40,10 +40,10 @@ template<bool ReportProgress>
 template<typename TVoxel, template<typename> class Compare>
 void ZImgRegionalExtrema<ReportProgress>::regionalExtrema_Impl(ZImg& res, const ZImg& img, size_t conn)
 {
-  Compare<TVoxel> compare;
-  for (size_t t=0; t<img.numTimes(); ++t) {
+  Compare <TVoxel> compare;
+  for (size_t t = 0; t < img.numTimes(); ++t) {
     TVoxel extreme;
-    if (compare(1,0))
+    if (compare(1, 0))
       extreme = img.dataRangeMin<TVoxel>();
     else
       extreme = img.dataRangeMax<TVoxel>();
@@ -53,7 +53,7 @@ void ZImgRegionalExtrema<ReportProgress>::regionalExtrema_Impl(ZImg& res, const 
 
     std::stack<int64_t, std::vector<int64_t>> stk;
     ZImgNeighborhoodConstIterator<TVoxel> nit =
-        ZImgNeighborhoodConstIterator<TVoxel>(conn, img);
+      ZImgNeighborhoodConstIterator<TVoxel>(conn, img);
 
     TVoxel centerValue;
     int64_t idx;
@@ -103,12 +103,18 @@ void ZImgRegionalExtrema<ReportProgress>::regionalExtrema_Impl(ZImg& res, const 
   this->reportProgress(1.0);
 }
 
-template class ZImgRegionalExtrema<true>;
-template class ZImgRegionalExtrema<false>;
+template
+class ZImgRegionalExtrema<true>;
 
-template ZImg ZImgRegionalExtrema<true>::regionalExtrema<std::greater>(const ZImg&,size_t);
+template
+class ZImgRegionalExtrema<false>;
+
+template ZImg ZImgRegionalExtrema<true>::regionalExtrema<std::greater>(const ZImg&, size_t);
+
 template ZImg ZImgRegionalExtrema<true>::regionalExtrema<std::less>(const ZImg&, size_t);
-template ZImg ZImgRegionalExtrema<false>::regionalExtrema<std::greater>(const ZImg&,size_t);
+
+template ZImg ZImgRegionalExtrema<false>::regionalExtrema<std::greater>(const ZImg&, size_t);
+
 template ZImg ZImgRegionalExtrema<false>::regionalExtrema<std::less>(const ZImg&, size_t);
 
 } // namespace nim

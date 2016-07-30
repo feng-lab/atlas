@@ -16,7 +16,7 @@ ZFileUtils::~ZFileUtils()
 
 }
 
-void ZFileUtils::showInGraphicalShell(const QString &filePath)
+void ZFileUtils::showInGraphicalShell(const QString& filePath)
 {
   if (!QFileInfo(filePath).exists())
     return;
@@ -28,7 +28,7 @@ void ZFileUtils::showInGraphicalShell(const QString &filePath)
   args << "-e";
   args << "activate";
   args << "-e";
-  args << "select POSIX file \""+filePath+"\"";
+  args << "select POSIX file \"" + filePath + "\"";
   args << "-e";
   args << "end tell";
   QProcess::startDetached("osascript", args);

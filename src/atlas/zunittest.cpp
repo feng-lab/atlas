@@ -1,6 +1,7 @@
 #include "zunittest.h"
 
 #include <QDir>
+
 #ifdef _WIN32
 #define GET_TEST_DATA_DIR QDir("Z:\\Google Drive\\atlas_test_data")
 #else
@@ -31,7 +32,7 @@ ZUnitTest::ZUnitTest()
 int ZUnitTest::run()
 {
   char arg0[] = "atlas_test";
-  char* argv[] = { &arg0[0], nullptr };
+  char* argv[] = {&arg0[0], nullptr};
   int argc = std::extent<decltype(argv)>::value - 1;
 
   ::testing::InitGoogleTest(&argc, argv);

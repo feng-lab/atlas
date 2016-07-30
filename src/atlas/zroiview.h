@@ -10,12 +10,13 @@ namespace nim {
 
 class ZROIView : public ZFilterView<ZROIDoc, ZROIFilter>
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  ZROIView(ZROIDoc &doc, ZView &view);
+  ZROIView(ZROIDoc& doc, ZView& view);
 
 private:
-  void docROIsAdded(const QList<size_t> &objs);
+  void docROIsAdded(const QList<size_t>& objs);
+
   void docROIAdded(size_t id);
 };
 

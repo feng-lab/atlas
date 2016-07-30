@@ -75,8 +75,8 @@ private:
 
 ZLogDialog::ZLogDialog(LogSinkPtr destination, QWidget* parent)
   : QDialog(parent)
-  , mUi(NULL)
-  , mProxyModel(NULL)
+  , mUi(nullptr)
+  , mProxyModel(nullptr)
   , mIsPaused(false)
   , mHasAutoScroll(true)
 {
@@ -97,7 +97,9 @@ ZLogDialog::ZLogDialog(LogSinkPtr destination, QWidget* parent)
   connect(mUi->toolButtonCopy, SIGNAL(clicked()), SLOT(OnCopyClicked()));
   connect(mUi->comboBoxLevel, SIGNAL(currentIndexChanged(int)), SLOT(OnLevelChanged(int)));
   connect(mUi->checkBoxAutoScroll, SIGNAL(toggled(bool)), SLOT(OnAutoScrollChanged(bool)));
-  connect(mModelDestination, SIGNAL(rowsInserted(const QModelIndex&, int, int)), SLOT(ModelRowsInserted(const QModelIndex&, int, int)));
+  connect(mModelDestination, SIGNAL(rowsInserted(
+                                      const QModelIndex&, int, int)), SLOT(ModelRowsInserted(
+                                                                             const QModelIndex&, int, int)));
 
   // Install the sort / filter model
   mProxyModel = new ZLogFilterProxyModel(InfoLevel, this);
@@ -108,8 +110,10 @@ ZLogDialog::ZLogDialog(LogSinkPtr destination, QWidget* parent)
 
   mUi->tableViewMessages->setSelectionBehavior(QAbstractItemView::SelectRows);
 #if QT_VERSION >= 0x050000
-  mUi->tableViewMessages->horizontalHeader()->setSectionResizeMode(ZLogModelSink::TimeColumn, QHeaderView::ResizeToContents);
-  mUi->tableViewMessages->horizontalHeader()->setSectionResizeMode(ZLogModelSink::LevelNameColumn, QHeaderView::ResizeToContents);
+  mUi->tableViewMessages->horizontalHeader()->setSectionResizeMode(ZLogModelSink::TimeColumn,
+                                                                   QHeaderView::ResizeToContents);
+  mUi->tableViewMessages->horizontalHeader()->setSectionResizeMode(ZLogModelSink::LevelNameColumn,
+                                                                   QHeaderView::ResizeToContents);
   mUi->tableViewMessages->horizontalHeader()->setSectionResizeMode(ZLogModelSink::MessageColumn, QHeaderView::Stretch);
   mUi->tableViewMessages->verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
 #else
@@ -132,7 +136,7 @@ ZLogDialog::~ZLogDialog()
   delete mUi;
 }
 
-bool ZLogDialog::eventFilter(QObject *obj, QEvent *event)
+bool ZLogDialog::eventFilter(QObject* obj, QEvent* event)
 {
   if (obj == mUi->tableViewMessages) {
     if (event->type() == QEvent::KeyPress) {
@@ -244,7 +248,7 @@ QString ZLogDialog::getSelectionText() const
       text += mModelDestination->at(srow).formatted + "\n";
     }
   } else {
-    for (QModelIndexList::const_iterator i = rows.begin();i != rows.end();++i) {
+    for (QModelIndexList::const_iterator i = rows.begin(); i != rows.end(); ++i) {
       const int srow = mProxyModel->mapToSource(*i).row();
       text += mModelDestination->at(srow).formatted + "\n";
     }

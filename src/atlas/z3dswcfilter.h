@@ -22,23 +22,30 @@ namespace nim {
 
 class Z3DSwcFilter : public Z3DGeometryFilter
 {
-  Q_OBJECT
+Q_OBJECT
   typedef ZSwc::Iterator SwcTreeNode;
 public:
-  enum class InteractionMode {
+  enum class InteractionMode
+  {
     Select, AddSwcNode, ConnectSwcNode, SmartExtendSwcNode
   };
 
-  explicit Z3DSwcFilter(Z3DGlobalParameters &globalParas, QObject *parent = nullptr);
+  explicit Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+
   virtual ~Z3DSwcFilter();
 
-  void setVisible(bool v) { m_visible.set(v); }
+  void setVisible(bool v)
+  { m_visible.set(v); }
 
-  void setData(ZSwc &tree);
-  inline void setSelectedSwcs(std::set<ZSwc*> *list) {
+  void setData(ZSwc& tree);
+
+  inline void setSelectedSwcs(std::set<ZSwc*>* list)
+  {
     m_selectedSwcs = list;
   }
-  inline void setSelectedSwcTreeNodes(std::set<SwcTreeNode> *list) {
+
+  inline void setSelectedSwcTreeNodes(std::set<SwcTreeNode>* list)
+  {
     m_selectedSwcTreeNodes = list;
   }
 
@@ -46,68 +53,98 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  inline void setRenderingPrimitive(const std::string &mode) {
+  inline void setRenderingPrimitive(const std::string& mode)
+  {
     m_renderingPrimitive.select(mode.c_str());
   }
 
-  bool isNodeRendering() const { return m_renderingPrimitive.isSelected("Sphere"); }
+  bool isNodeRendering() const
+  { return m_renderingPrimitive.isSelected("Sphere"); }
 
-  void setInteractionMode(InteractionMode mode) { m_interactionMode = mode; }
-  inline InteractionMode interactionMode() { return m_interactionMode; }
+  void setInteractionMode(InteractionMode mode)
+  { m_interactionMode = mode; }
 
-  virtual bool hasOpaque(Z3DEye) const override { return m_rendererBase.opacity() == 1.f && !m_renderingPrimitive.isSelected("Line"); }
+  inline InteractionMode interactionMode()
+  { return m_interactionMode; }
+
+  virtual bool hasOpaque(Z3DEye) const override
+  { return m_rendererBase.opacity() == 1.f && !m_renderingPrimitive.isSelected("Line"); }
+
   virtual void renderOpaque(Z3DEye eye) override;
-  virtual bool hasTransparent(Z3DEye) const override { return m_rendererBase.opacity() < 1.f || m_renderingPrimitive.isSelected("Line"); }
+
+  virtual bool hasTransparent(Z3DEye) const override
+  { return m_rendererBase.opacity() < 1.f || m_renderingPrimitive.isSelected("Line"); }
+
   virtual void renderTransparent(Z3DEye eye) override;
 
 signals:
+
   void treeSelected(ZSwc*, bool append);
+
   void treeNodeSelected(SwcTreeNode, bool append);
+
   void connectingSwcTreeNode(SwcTreeNode);
+
   void treeNodeSelectConnection();
+
   void addNewSwcTreeNode(double x, double y, double z, double r);
+
   void extendSwcTreeNode(double x, double y, double z);
 
 protected:
   void prepareColor();
-  void adjustWidgets();
-  void selectSwc(QMouseEvent *e, int w, int h);
 
-  void setColorMode(const std::string &mode);
+  void adjustWidgets();
+
+  void selectSwc(QMouseEvent* e, int w, int h);
+
+  void setColorMode(const std::string& mode);
 
   virtual void process(Z3DEye) override;
 
   virtual void registerPickingObjects() override;
+
   virtual void deregisterPickingObjects() override;
 
   void renderPicking(Z3DEye eye) override;
+
   void prepareData();
 
   //get bounding box of swc tree in world coordinate :[xmin xmax ymin ymax zmin zmax]
-  void treeBound(ZSwc *tree, std::vector<double> &result) const;
+  void treeBound(ZSwc* tree, std::vector<double>& result) const;
+
   //get bounding box of swc tree node in world coordinate :[xmin xmax ymin ymax zmin zmax]
-  void treeNodeBound(const SwcTreeNode &tn, std::vector<double> &result) const;
-  void notTransformedTreeBound(ZSwc *tree, std::vector<double> &result) const;
+  void treeNodeBound(const SwcTreeNode& tn, std::vector<double>& result) const;
+
+  void notTransformedTreeBound(ZSwc* tree, std::vector<double>& result) const;
+
   //virtual void updateAxisAlignedBoundBoxImpl() override;
   virtual void updateNotTransformedBoundBoxImpl() override;
+
   virtual void addSelectionLines() override;
-  void notTransformedTreeNodeBound(const SwcTreeNode &tn, std::vector<double> &result) const;
+
+  void notTransformedTreeNodeBound(const SwcTreeNode& tn, std::vector<double>& result) const;
 
 private:
   void initTopologyColor();
+
   void initTypeColor();
+
   void initSubclassTypeColor();
 
   void decompseSwcTree();
-  glm::vec4 colorByType(const SwcTreeNode &n);
-  glm::vec4 colorByDirection(const SwcTreeNode &n);
+
+  glm::vec4 colorByType(const SwcTreeNode& n);
+
+  glm::vec4 colorByDirection(const SwcTreeNode& n);
 
   glm::dvec3 projectPointOnRay(
-      glm::dvec3 pt, const glm::dvec3 &v1, const glm::dvec3 &v2);
+    glm::dvec3 pt, const glm::dvec3& v1, const glm::dvec3& v2);
 
-  void addSelectionBox(const std::pair<SwcTreeNode, SwcTreeNode> &nodePair,
-                       std::vector<glm::vec3> &lines);
-  void addSelectionBox(const SwcTreeNode &tn, std::vector<glm::vec3> &lines);
+  void addSelectionBox(const std::pair<SwcTreeNode, SwcTreeNode>& nodePair,
+                       std::vector<glm::vec3>& lines);
+
+  void addSelectionBox(const SwcTreeNode& tn, std::vector<glm::vec3>& lines);
 
 private:
   Z3DLineRenderer m_lineRenderer;
@@ -133,10 +170,10 @@ private:
 
   ZEventListenerParameter m_selectSwcEvent;
   glm::ivec2 m_startCoord;
-  ZSwc *m_pressedSwc;
-  std::set<ZSwc*> *m_selectedSwcs;   //point to all selected swcs, managed by other class
-  SwcTreeNode *m_pressedSwcTreeNode;
-  std::set<SwcTreeNode> *m_selectedSwcTreeNodes;   //point to all selected swcs, managed by other class
+  ZSwc* m_pressedSwc;
+  std::set<ZSwc*>* m_selectedSwcs;   //point to all selected swcs, managed by other class
+  SwcTreeNode* m_pressedSwcTreeNode;
+  std::set<SwcTreeNode>* m_selectedSwcTreeNodes;   //point to all selected swcs, managed by other class
 
   std::vector<glm::vec4> m_baseAndBaseRadius;
   std::vector<glm::vec4> m_axisAndTopRadius;
@@ -159,8 +196,8 @@ private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_dataIsInvalid;
 
-  ZSwc *m_swcTree;
-  ZSwc *m_registeredSwcTree;
+  ZSwc* m_swcTree;
+  ZSwc* m_registeredSwcTree;
 
   InteractionMode m_interactionMode;
 };

@@ -10,11 +10,11 @@ namespace nim {
 
 class ZStyledItemDelegate : public QStyledItemDelegate
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit ZStyledItemDelegate(QObject *parent = 0);
+  explicit ZStyledItemDelegate(QObject* parent = 0);
 
-  inline QString displayText(const QVariant &value, const QLocale &locale) const
+  inline QString displayText(const QVariant& value, const QLocale& locale) const
   {
     if (value.type() == QVariant::Double) return locale.toString(value.toDouble(), 'g', 16);
     return QStyledItemDelegate::displayText(value, locale);

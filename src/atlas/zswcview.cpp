@@ -4,17 +4,17 @@
 
 namespace nim {
 
-ZSwcView::ZSwcView(ZSwcDoc &doc, ZView &view)
+ZSwcView::ZSwcView(ZSwcDoc& doc, ZView& view)
   : ZFilterView<ZSwcDoc, ZSwcFilter>(doc, view)
 {
   docSwcsAdded(m_doc.objs());
   connect(&m_doc, &ZSwcDoc::objAdded, this, &ZSwcView::docSwcAdded);
 }
 
-void ZSwcView::docSwcsAdded(const QList<size_t> &objs)
+void ZSwcView::docSwcsAdded(const QList<size_t>& objs)
 {
-  for (int i=0; i<objs.size(); ++i) {
-    ZSwcFilter *viewControl = new ZSwcFilter(m_view);
+  for (int i = 0; i < objs.size(); ++i) {
+    ZSwcFilter* viewControl = new ZSwcFilter(m_view);
     viewControl->setData(m_doc.swc(objs[i]));
     expandBoundBox(viewControl->boundBox());
     m_idToFilter[objs[i]].reset(viewControl);
@@ -30,7 +30,7 @@ void ZSwcView::docSwcsAdded(const QList<size_t> &objs)
 
 void ZSwcView::docSwcAdded(size_t id)
 {
-  ZSwcFilter *viewControl = new ZSwcFilter(m_view);
+  ZSwcFilter* viewControl = new ZSwcFilter(m_view);
   viewControl->setData(m_doc.swc(id));
   expandBoundBox(viewControl->boundBox());
   m_idToFilter[id].reset(viewControl);

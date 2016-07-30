@@ -15,22 +15,22 @@
 
 namespace nim {
 
-ZROIDoc::ZROIDoc(ZDoc &doc)
+ZROIDoc::ZROIDoc(ZDoc& doc)
   : ZObjDoc(doc)
 {
   createActions();
 }
 
-ZROI &ZROIDoc::currentROI()
+ZROI& ZROIDoc::currentROI()
 {
   if (m_idToROIPacks.empty()) {
-    ZROI *roi = new ZROI(nullptr, this);
+    ZROI* roi = new ZROI(nullptr, this);
     addROI(roi, "");
   }
   return *m_idToROIPacks.begin()->second->roi;
 }
 
-void ZROIDoc::askToSave(const ZROI &roi, const QString &title)
+void ZROIDoc::askToSave(const ZROI& roi, const QString& title)
 {
   QFileDialog dialog(QApplication::activeWindow());
   dialog.setAcceptMode(QFileDialog::AcceptSave);
@@ -49,7 +49,7 @@ void ZROIDoc::askToSave(const ZROI &roi, const QString &title)
       ZSystemInfoInstance.addFileToRecentFileList(dialog.selectedFiles().at(0));
       setLastOpenedObjPath(dialog.selectedFiles().at(0));
     }
-    catch (const ZException & e) {
+    catch (const ZException& e) {
       QMessageBox::critical(QApplication::activeWindow(), "Save ROI Error", e.what());
     }
   }
@@ -92,18 +92,19 @@ bool ZROIDoc::saveAs(size_t id)
       return true;
     } else {
       QMessageBox::critical(QApplication::activeWindow(), "Save As Error",
-                            tr("Error saving %1 as file %2: %3").arg(objName(id)).arg(dialog.selectedFiles().at(0)).arg(err));
+                            tr("Error saving %1 as file %2: %3").arg(objName(id)).arg(dialog.selectedFiles().at(0)).arg(
+                              err));
     }
   }
   return false;
 }
 
-bool ZROIDoc::canReadFile(const QString &fileName)
+bool ZROIDoc::canReadFile(const QString& fileName)
 {
   return ZROI::canReadFile(fileName);
 }
 
-size_t ZROIDoc::loadFile(const QString &fileName, QString &errorMsg)
+size_t ZROIDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
   for (auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
     if (it->second->path == fileName)
@@ -118,14 +119,14 @@ size_t ZROIDoc::loadFile(const QString &fileName, QString &errorMsg)
     setLastOpenedObjPath(fileName);
     return id;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = QString("Can not read animation from %1: %2")
-        .arg(fileName).arg(e.what());
+      .arg(fileName).arg(e.what());
     return 0;
   }
 }
 
-size_t ZROIDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
+size_t ZROIDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
 {
   if (!jValue.isString() || jValue.toString().trimmed().isEmpty()) {
     errorMsg = QString("File path is not string or is empty");
@@ -145,21 +146,21 @@ size_t ZROIDoc::loadFile(const QJsonValue &jValue, QString &errorMsg)
     setLastOpenedObjPath(fileName);
     return id;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = QString("Can not read ROI from %1: %2")
-        .arg(fileName).arg(e.what());
+      .arg(fileName).arg(e.what());
     return 0;
   }
 }
 
-QList<QAction *> ZROIDoc::loadFileActions() const
+QList<QAction*> ZROIDoc::loadFileActions() const
 {
   QList<QAction*> res;
   res.push_back(m_loadROIAction);
   return res;
 }
 
-QMenu *ZROIDoc::processObjMenu() const
+QMenu* ZROIDoc::processObjMenu() const
 {
   QMenu* res = new QMenu(typeName());
   res->addAction(m_createMaskImageAction);
@@ -200,7 +201,7 @@ QString ZROIDoc::objTooltip(size_t id) const
   return m_idToROIPacks.at(id)->tooltip();
 }
 
-QUndoStack *ZROIDoc::objUndoStack(size_t id)
+QUndoStack* ZROIDoc::objUndoStack(size_t id)
 {
   return m_idToROIPacks.at(id)->roi->undoStack();
 }
@@ -210,7 +211,7 @@ QJsonValue ZROIDoc::jsonValue(size_t id) const
   return QJsonValue(m_idToROIPacks.at(id)->path);
 }
 
-bool ZROIDoc::isSameObj(const QJsonValue &v1, const QJsonValue &v2) const
+bool ZROIDoc::isSameObj(const QJsonValue& v1, const QJsonValue& v2) const
 {
   CHECK(v1.isString() && v2.isString());
   if (v1 == v2)
@@ -249,7 +250,7 @@ void ZROIDoc::loadROI()
   if (dialog.exec()) {
     QString errorMsg;
     //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    for (int i=0; i<dialog.selectedFiles().size(); ++i) {
+    for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
         QMessageBox::critical(QApplication::activeWindow(), tr("Can not read ROI"),
                               errorMsg);
@@ -260,9 +261,9 @@ void ZROIDoc::loadROI()
 
 void ZROIDoc::setModified()
 {
-  ZROI *roi = qobject_cast<ZROI*>(sender());
+  ZROI* roi = qobject_cast<ZROI*>(sender());
   if (roi) {
-    for(auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
+    for (auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
       if (it->second->roi.get() == roi) {
         it->second->updateDerivedData();
         it->second->hasUnsavedChange = true;
@@ -306,20 +307,20 @@ void ZROIDoc::createMaskImage()
 
       int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
       img.save(dialog.selectedFiles().at(0), formats[fmtIdx], comps[fmtIdx]);
-      ZImg *tmpImg = new ZImg();
+      ZImg* tmpImg = new ZImg();
       tmpImg->swap(img);
       m_doc.imgDoc().showImg(tmpImg, dialog.selectedFiles().at(0));
 
       m_doc.imgDoc().setLastOpenedObjPath(dialog.selectedFiles().at(0));
     }
-    catch (const ZException & e) {
+    catch (const ZException& e) {
       QMessageBox::critical(QApplication::activeWindow(), "Save ROI as Mask Image",
                             tr("Error saving mask image %1: %2").arg(dialog.selectedFiles().at(0)).arg(e.what()));
     }
   }
 }
 
-size_t ZROIDoc::addROI(ZROI *roi, const QString &path)
+size_t ZROIDoc::addROI(ZROI* roi, const QString& path)
 {
   size_t id = m_doc.getNewObjId();
   m_idToROIPacks[id] = std::make_shared<ROIPack>(roi, path);
@@ -333,7 +334,7 @@ size_t ZROIDoc::addROI(ZROI *roi, const QString &path)
   return id;
 }
 
-ZROIDoc::ROIPack::ROIPack(ZROI *roi, const QString &path)
+ZROIDoc::ROIPack::ROIPack(ZROI* roi, const QString& path)
   : roi(roi), path(QFileInfo(path).canonicalFilePath()), hasUnsavedChange(false)
 {
   updateDerivedData();
@@ -351,7 +352,7 @@ void ZROIDoc::ROIPack::updateDerivedData()
   m_tooltip = path;
 }
 
-const QString &ZROIDoc::ROIPack::info() const
+const QString& ZROIDoc::ROIPack::info() const
 {
   if (m_info.isEmpty()) {
     m_info = QString("%1 slices").arg(roi->numSlices());
@@ -376,7 +377,7 @@ void ZROIDoc::createActions()
   connect(m_createMaskImageAction, &QAction::triggered, this, &ZROIDoc::createMaskImage);
 }
 
-bool ZROIDoc::saveROI(ROIPack *pack, const QString &fileName, QString &errorMsg)
+bool ZROIDoc::saveROI(ROIPack* pack, const QString& fileName, QString& errorMsg)
 {
   try {
     pack->roi->save(fileName);
@@ -388,14 +389,14 @@ bool ZROIDoc::saveROI(ROIPack *pack, const QString &fileName, QString &errorMsg)
     setLastOpenedObjPath(fileName);
     return true;
   }
-  catch (const ZException & e) {
+  catch (const ZException& e) {
     errorMsg = QString("Can not write animation to %1: %2")
-        .arg(fileName).arg(e.what());
+      .arg(fileName).arg(e.what());
     return false;
   }
 }
 
-void ZROIDoc::packInfoUpdated(ROIPack *pack)
+void ZROIDoc::packInfoUpdated(ROIPack* pack)
 {
   for (auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
     if (it->second.get() == pack)

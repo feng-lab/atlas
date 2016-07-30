@@ -11,17 +11,18 @@
 
 namespace nim {
 
-ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc &doc, QWidget *parent)
+ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc& doc, QWidget* parent)
   : QDialog(parent), m_doc(doc), m_selectedID(0)
 {
   setWindowTitle(QString("Choose %1").arg(m_doc.typeName()));
   createWidget();
   QList<size_t> objs = m_doc.objs();
 
-  for (int i=0; i<objs.size(); ++i) {
+  for (int i = 0; i < objs.size(); ++i) {
     size_t id = objs[i];
-    QTreeWidgetItem *item = new QTreeWidgetItem(m_treeWidget, QStringList()
-                                                << m_doc.objName(id) << QDir::toNativeSeparators(m_doc.objPath(id)));
+    QTreeWidgetItem* item = new QTreeWidgetItem(m_treeWidget,
+                                                QStringList() << m_doc.objName(id)
+                                                              << QDir::toNativeSeparators(m_doc.objPath(id)));
     item->setData(0, Qt::UserRole, qVariantFromValue(id));
     m_treeWidget->setItemSelected(item, i == 0);
   }
@@ -34,7 +35,7 @@ ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc &doc, QWidget *parent)
 
 void ZChooseObjDialog::createWidget()
 {
-  QVBoxLayout *lo = new QVBoxLayout(this);
+  QVBoxLayout* lo = new QVBoxLayout(this);
   m_label = new QLabel(QString("Choose one %1:").arg(m_doc.typeName()), this);
   m_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   m_treeWidget = new QTreeWidget(this);

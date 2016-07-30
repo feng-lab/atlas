@@ -19,7 +19,7 @@
 
 namespace nim {
 
-ZView::ZView(ZDoc &doc, QWidget *parent, Qt::WindowFlags f)
+ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
   : QWidget(parent, f)
   , m_doc(doc)
   , m_doNotReceiveSliceSignal(false)
@@ -55,7 +55,7 @@ ZView::ZView(ZDoc &doc, QWidget *parent, Qt::WindowFlags f)
   m_layout->addWidget(m_view);
   m_layout->addSpacing(15);
 
-  QHBoxLayout *hly = new QHBoxLayout;
+  QHBoxLayout* hly = new QHBoxLayout;
   m_imgSlice->setStyle("SPINBOXWITHSCROLLBAR");
   m_imgSliceWidget = m_imgSlice->createWidget(this);
   hly->addWidget(m_imgSlice->createNameLabel(this));
@@ -85,14 +85,14 @@ ZView::~ZView()
   qDeleteAll(m_objViews);  // objviews hold some reference to view's member, so they should die first
 }
 
-QWidget *ZView::createScaleWidget(QWidget *parent)
+QWidget* ZView::createScaleWidget(QWidget* parent)
 {
   return m_view->createScaleWidget(parent);
 }
 
-QToolButton* ZView::createROIToolButton(QWidget *parent)
+QToolButton* ZView::createROIToolButton(QWidget* parent)
 {
-  QToolButton *res = new QToolButton(parent);
+  QToolButton* res = new QToolButton(parent);
   //res->setCheckable(true);
   res->addAction(m_roiSplineAction);
   res->addAction(m_roiPolygonAction);
@@ -133,7 +133,7 @@ std::pair<int, int> ZView::currentSliceRange() const
   }
 }
 
-ZROI &ZView::roi()
+ZROI& ZView::roi()
 {
   return m_doc.roiDoc().currentROI();
 }
@@ -152,10 +152,10 @@ ZView::State ZView::state() const
     return State::Normal;
 }
 
-QWidget *ZView::captureWidget()
+QWidget* ZView::captureWidget()
 {
-  QScrollArea *res = new QScrollArea();
-  ZTakeScreenShotWidget *m_screenShotWidget = new ZTakeScreenShotWidget(true, false, nullptr);
+  QScrollArea* res = new QScrollArea();
+  ZTakeScreenShotWidget* m_screenShotWidget = new ZTakeScreenShotWidget(true, false, nullptr);
   connect(m_screenShotWidget, &ZTakeScreenShotWidget::take2DScreenShot,
           this, &ZView::takeScreenShot);
   connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeFixedSize2DScreenShot,
@@ -170,7 +170,7 @@ void ZView::updateBoundBox()
   std::vector<int> oldBound = m_boundBox;
   m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = m_boundBox[6] = std::numeric_limits<int>::max();
   m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = m_boundBox[7] = std::numeric_limits<int>::min();
-  for (int i=0; i<m_objViews.size(); ++i) {
+  for (int i = 0; i < m_objViews.size(); ++i) {
     const std::vector<int>& boundBox = m_objViews[i]->boundBox();
     m_boundBox[0] = std::min(boundBox[0], m_boundBox[0]);
     m_boundBox[1] = std::max(boundBox[1], m_boundBox[1]);
@@ -192,7 +192,7 @@ void ZView::updateBoundBox()
     m_doNotReceiveSliceSignal = false;
     return;
   }
-  QRectF sceneRect(m_boundBox[0], m_boundBox[2], m_boundBox[1]-m_boundBox[0]+1, m_boundBox[3]-m_boundBox[2]+1);
+  QRectF sceneRect(m_boundBox[0], m_boundBox[2], m_boundBox[1] - m_boundBox[0] + 1, m_boundBox[3] - m_boundBox[2] + 1);
   m_scene->setSceneRect(sceneRect);
   m_view->updateScaleFactorRange();
   int sliceBefore = m_imgSlice->get();
@@ -222,13 +222,13 @@ void ZView::setInfo(double x, double y)
   if (m_maxZProjViewAction->isChecked()) {
     info += "**Maximum Z Projection**      ";
   }
-  for (int i=0; i<m_objViews.size(); ++i) {
+  for (int i = 0; i < m_objViews.size(); ++i) {
     info += m_objViews[i]->infoOfPos(x, y);
   }
   m_label->setText(info);
 }
 
-void ZView::registerObjView(ZObjView *v)
+void ZView::registerObjView(ZObjView* v)
 {
   connect(v, &ZObjView::objViewReady, this, &ZView::objViewReady);
   m_objViews.push_back(v);
@@ -238,7 +238,7 @@ std::shared_ptr<ZWidgetsGroup> ZView::viewSettingWidgetsGroupOf(size_t id)
 {
   if (id == 1 || id == 2 || id == 3)
     return std::shared_ptr<ZWidgetsGroup>();
-  for (int i=0; i<m_objViews.size(); ++i) {
+  for (int i = 0; i < m_objViews.size(); ++i) {
     std::shared_ptr<ZWidgetsGroup> wg = m_objViews[i]->viewSettingWidgetsGroupOf(id);
     if (wg)
       return wg;
@@ -246,9 +246,9 @@ std::shared_ptr<ZWidgetsGroup> ZView::viewSettingWidgetsGroupOf(size_t id)
   return std::shared_ptr<ZWidgetsGroup>();
 }
 
-void ZView::read(size_t id, const QJsonObject &json)
+void ZView::read(size_t id, const QJsonObject& json)
 {
-  for (int i=0; i<m_objViews.size(); ++i) {
+  for (int i = 0; i < m_objViews.size(); ++i) {
     if (m_objViews[i]->hasObj(id)) {
       if (json.value("ViewObjType").toString() == m_objViews[i]->doc().typeName()) {
         m_objViews[i]->read(id, json);
@@ -261,9 +261,9 @@ void ZView::read(size_t id, const QJsonObject &json)
   }
 }
 
-void ZView::write(size_t id, QJsonObject &json) const
+void ZView::write(size_t id, QJsonObject& json) const
 {
-  for (int i=0; i<m_objViews.size(); ++i) {
+  for (int i = 0; i < m_objViews.size(); ++i) {
     if (m_objViews[i]->hasObj(id)) {
       json.insert("ViewObjType", m_objViews[i]->doc().typeName());
       json.insert("ViewVersion", QJsonValue(1.0));
@@ -273,7 +273,7 @@ void ZView::write(size_t id, QJsonObject &json) const
   }
 }
 
-void ZView::read(const QJsonObject &json)
+void ZView::read(const QJsonObject& json)
 {
   m_imgSlice->read(json);
   m_imgTime->read(json);
@@ -282,7 +282,7 @@ void ZView::read(const QJsonObject &json)
   m_mip->read(json);
 }
 
-void ZView::write(QJsonObject &json) const
+void ZView::write(QJsonObject& json) const
 {
   m_imgSlice->write(json);
   m_imgTime->write(json);
@@ -293,7 +293,7 @@ void ZView::write(QJsonObject &json) const
 
 void ZView::fitContentIntoWindow()
 {
-  QRectF sceneRect(m_boundBox[0], m_boundBox[2], m_boundBox[1]-m_boundBox[0]+1, m_boundBox[3]-m_boundBox[2]+1);
+  QRectF sceneRect(m_boundBox[0], m_boundBox[2], m_boundBox[1] - m_boundBox[0] + 1, m_boundBox[3] - m_boundBox[2] + 1);
   m_view->fitRect(sceneRect);
 }
 
@@ -303,11 +303,11 @@ void ZView::sliceChanged()
     return;
 
   if (isMaxZProjView()) {
-    for (int i=0; i<m_objViews.size(); ++i) {
+    for (int i = 0; i < m_objViews.size(); ++i) {
       m_objViews[i]->setMaxZProjView(m_imgTime->get());
     }
   } else {
-    for (int i=0; i<m_objViews.size(); ++i) {
+    for (int i = 0; i < m_objViews.size(); ++i) {
       m_objViews[i]->setNormalView(m_imgSlice->get(), m_imgTime->get());
     }
   }
@@ -320,7 +320,7 @@ void ZView::zoomIn()
 
 void ZView::zoomOut()
 {
-  m_view->setScale(1/1.1 * m_view->currentScale());
+  m_view->setScale(1 / 1.1 * m_view->currentScale());
 }
 
 void ZView::triggerNormalView(bool v)
@@ -342,7 +342,7 @@ void ZView::changeViewStyle(bool mip)
     if (!m_maxZProjViewAction->isChecked())
       m_maxZProjViewAction->setChecked(true);
 
-    for (int i=0; i<m_objViews.size(); ++i) {
+    for (int i = 0; i < m_objViews.size(); ++i) {
       m_objViews[i]->setMaxZProjView(m_imgTime->get());
     }
 
@@ -351,13 +351,13 @@ void ZView::changeViewStyle(bool mip)
     if (!m_normalViewAction->isChecked())
       m_normalViewAction->setChecked(true);
 
-    for (int i=0; i<m_objViews.size(); ++i) {
+    for (int i = 0; i < m_objViews.size(); ++i) {
       m_objViews[i]->setNormalView(m_imgSlice->get(), m_imgTime->get());
     }
 
     m_imgSlice->setEnabled(true);
   }
-  setInfo(-1,-1);
+  setInfo(-1, -1);
 }
 
 void ZView::changeViewport()
@@ -390,26 +390,27 @@ void ZView::takeScreenShot(QString filename)
 void ZView::viewportChanged()
 {
   //LOG(INFO) << m_view->getCurrrentlyVisibleRegion().intersected(m_scene->sceneRect()) << " " << m_view->currentScale();
-  for (int i=0; i<m_objViews.size(); ++i) {
-    m_objViews[i]->setViewport(m_view->getCurrrentlyVisibleRegion().intersected(m_scene->sceneRect()), m_view->currentScale());
+  for (int i = 0; i < m_objViews.size(); ++i) {
+    m_objViews[i]->setViewport(m_view->getCurrrentlyVisibleRegion().intersected(m_scene->sceneRect()),
+                               m_view->currentScale());
   }
 }
 
 void ZView::mousePressed(QPointF scenePos)
 {
-  for (int i=0; i<m_objViews.size(); ++i) {
+  for (int i = 0; i < m_objViews.size(); ++i) {
     m_objViews[i]->mousePressed(scenePos);
   }
 }
 
 void ZView::mouseReleased(QPointF scenePos)
 {
-  for (int i=0; i<m_objViews.size(); ++i) {
+  for (int i = 0; i < m_objViews.size(); ++i) {
     m_objViews[i]->mouseReleased(scenePos);
   }
 }
 
-void ZView::setViewDragMode(QAction *act)
+void ZView::setViewDragMode(QAction* act)
 {
   if (act == m_scrollHandDragAction) {
     m_view->setScrollHandDragMode();
@@ -418,52 +419,52 @@ void ZView::setViewDragMode(QAction *act)
   }
 }
 
-void ZView::keyPressEvent(QKeyEvent *event)
+void ZView::keyPressEvent(QKeyEvent* event)
 {
-  switch(event->key()) {
-  case Qt::Key_Left:
-    if (event->modifiers() == Qt::NoModifier || event->modifiers() == Qt::KeypadModifier) {
-      if (m_normalViewAction->isChecked() && m_imgSlice->get() > 0) {
-        m_imgSlice->set(m_imgSlice->get() - 1);
+  switch (event->key()) {
+    case Qt::Key_Left:
+      if (event->modifiers() == Qt::NoModifier || event->modifiers() == Qt::KeypadModifier) {
+        if (m_normalViewAction->isChecked() && m_imgSlice->get() > 0) {
+          m_imgSlice->set(m_imgSlice->get() - 1);
+        }
       }
-    }
-    break;
-  case Qt::Key_Right:
-    if (event->modifiers() == Qt::NoModifier || event->modifiers() == Qt::KeypadModifier) {
-      if (m_normalViewAction->isChecked() && m_imgSlice->get() < m_imgSlice->rangeMax())
-        m_imgSlice->set(m_imgSlice->get() + 1);
-    }
-    break;
-  case Qt::Key_M:
-    if (event->modifiers() == Qt::ControlModifier) {
-      if (m_normalViewAction->isChecked()) {
-        m_maxZProjViewAction->setChecked(true);
-      } else {
-        m_normalViewAction->setChecked(true);
+      break;
+    case Qt::Key_Right:
+      if (event->modifiers() == Qt::NoModifier || event->modifiers() == Qt::KeypadModifier) {
+        if (m_normalViewAction->isChecked() && m_imgSlice->get() < m_imgSlice->rangeMax())
+          m_imgSlice->set(m_imgSlice->get() + 1);
       }
-    }
-    break;
-  case Qt::Key_Backspace:
-  case Qt::Key_Delete:
-    if (event->modifiers() == Qt::NoModifier) {
-      for (int i=0; i<m_objViews.size(); ++i) {
-        m_objViews[i]->deleteKeyPressed();
+      break;
+    case Qt::Key_M:
+      if (event->modifiers() == Qt::ControlModifier) {
+        if (m_normalViewAction->isChecked()) {
+          m_maxZProjViewAction->setChecked(true);
+        } else {
+          m_normalViewAction->setChecked(true);
+        }
       }
-    }
-    break;
-  case Qt::Key_R:
-    if (event->modifiers() == Qt::ControlModifier) {
-      for (int i=0; i<m_objViews.size(); ++i) {
-        m_objViews[i]->rotateClockwise();
+      break;
+    case Qt::Key_Backspace:
+    case Qt::Key_Delete:
+      if (event->modifiers() == Qt::NoModifier) {
+        for (int i = 0; i < m_objViews.size(); ++i) {
+          m_objViews[i]->deleteKeyPressed();
+        }
       }
-    } else if (event->modifiers() == (Qt::ControlModifier | Qt::AltModifier)) {
-      for (int i=0; i<m_objViews.size(); ++i) {
-        m_objViews[i]->rotateCounterclockwise();
+      break;
+    case Qt::Key_R:
+      if (event->modifiers() == Qt::ControlModifier) {
+        for (int i = 0; i < m_objViews.size(); ++i) {
+          m_objViews[i]->rotateClockwise();
+        }
+      } else if (event->modifiers() == (Qt::ControlModifier | Qt::AltModifier)) {
+        for (int i = 0; i < m_objViews.size(); ++i) {
+          m_objViews[i]->rotateCounterclockwise();
+        }
       }
-    }
-    break;
-  default:
-    break;
+      break;
+    default:
+      break;
   }
 }
 

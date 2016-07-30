@@ -4,6 +4,7 @@
 #include <cassert>
 #include "zsaturateoperation.h"
 #include "zimg.h"
+#include <type_traits>
 
 namespace nim {
 
@@ -209,7 +210,6 @@ template<typename TRange>
 ZImg ZImg::convertTo(TRange minData, TRange maxData, const ZImg& targetImgType) const
 {
   IMG_RETURN_TYPED_CALL(convertTo, targetImgType, minData, maxData);
-  assert(false);
   return ZImg();
 }
 
@@ -271,8 +271,8 @@ ZImg ZImg::typedBinarized(const ForegroundPredictor& isForeground) const
 template<typename TScalar>
 ZImg& ZImg::operator+=(TScalar scalar)
 {
+  static_assert(std::is_arithmetic<TScalar>::value, "Arithmetic not possible on this type");
   if (scalar != TScalar(0)) {
-    // todo: add some static_assert here to make sure input is arithmetic
     IMG_TYPED_CALL(addScalar_Impl, (*this), scalar);
   }
   return *this;
@@ -289,8 +289,8 @@ ZImg ZImg::operator+(const TScalarOrZImg& scalarOrZImg) const
 template<typename TScalar>
 ZImg& ZImg::operator-=(TScalar scalar)
 {
+  static_assert(std::is_arithmetic<TScalar>::value, "Arithmetic not possible on this type");
   if (scalar != TScalar(0)) {
-    // todo: add some static_assert here to make sure input is arithmetic
     IMG_TYPED_CALL(subScalar_Impl, (*this), scalar);
   }
   return *this;
@@ -307,8 +307,8 @@ ZImg ZImg::operator-(const TScalarOrZImg& scalarOrZImg) const
 template<typename TScalar>
 ZImg& ZImg::operator*=(TScalar scalar)
 {
+  static_assert(std::is_arithmetic<TScalar>::value, "Arithmetic not possible on this type");
   if (scalar != TScalar(0)) {
-    // todo: add some static_assert here to make sure input is arithmetic
     IMG_TYPED_CALL(mulScalar_Impl, (*this), scalar);
   } else {
     fill(0);
@@ -327,8 +327,8 @@ ZImg ZImg::operator*(const TScalarOrZImg& scalarOrZImg) const
 template<typename TScalar>
 ZImg& ZImg::operator/=(TScalar scalar)
 {
+  static_assert(std::is_arithmetic<TScalar>::value, "Arithmetic not possible on this type");
   if (scalar != TScalar(0)) {
-    // todo: add some static_assert here to make sure input is arithmetic
     IMG_TYPED_CALL(divScalar_Impl, (*this), scalar);
   } else {
     throw ZImgException("Can not divide img by zero");

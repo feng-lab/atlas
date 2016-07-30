@@ -8,27 +8,37 @@
 #include "zoptionparameter.h"
 
 class QAction;
+
 class QColor;
+
 class QMouseEvent;
+
 class QCheckBox;
+
 class QLabel;
+
 class QLayout;
+
 class QDoubleSpinBox;
+
 class QPushButton;
 
 namespace nim {
 
 class ZClickableTransferFunctionLabel;
+
 class Z3DVolume;
+
 class Z3DTransferFunctionParameter;
+
 class Z3DTransferFunction;
 
 class Z3DTransferFunctionWidget : public QWidget
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   Z3DTransferFunctionWidget(Z3DTransferFunctionParameter* tf, bool showHistogram = true,
-                            const QString &histogramNormalizeMethod = tr("Log"), QString xAxisText = tr("Intensity"),
+                            const QString& histogramNormalizeMethod = tr("Log"), QString xAxisText = tr("Intensity"),
                             QString yAxisText = tr("Opacity"), QWidget* parent = 0);
 
   virtual void paintEvent(QPaintEvent* event) override;
@@ -37,7 +47,7 @@ public:
 
   virtual void mouseReleaseEvent(QMouseEvent* event) override;
 
-  virtual void leaveEvent(QEvent *) override;
+  virtual void leaveEvent(QEvent*) override;
 
   virtual void mouseMoveEvent(QMouseEvent* event) override;
 
@@ -45,8 +55,9 @@ public:
 
   virtual void keyReleaseEvent(QKeyEvent* event) override;
 
-  virtual bool event(QEvent *e) override;
-  bool findkey(const QPoint &pos, size_t &index, bool &isLeftPart);
+  virtual bool event(QEvent* e) override;
+
+  bool findkey(const QPoint& pos, size_t& index, bool& isLeftPart);
 
   virtual QSize minimumSizeHint() const override;
 
@@ -54,18 +65,23 @@ public:
 
   void setTransFunc(Z3DTransferFunctionParameter* tf);
 
-  void setHistogramNormalizeMethod(const QString &method);
+  void setHistogramNormalizeMethod(const QString& method);
+
   void setHistogramVisible(bool v);
-  void volumeChanged(Z3DVolume *volume);
+
+  void volumeChanged(Z3DVolume* volume);
 
 protected:
   void deleteKey();
+
   void changeCurrentColor();
+
   void changeCurrentIntensity();
+
   void changeCurrentOpacity();
 
   // Creates a new key at the given position.
-  void insertNewKey(glm::dvec2 &hit);
+  void insertNewKey(glm::dvec2& hit);
 
   // Paints all keys of the transfer function.
   void paintKeys(QPainter& paint);
@@ -85,6 +101,7 @@ protected:
   glm::dvec2 pixelToRelativeCoordinates(glm::dvec2 p);
 
   void hideKeyInfo();
+
   void showKeyInfo(QPoint pos, glm::dvec2 values);
 
   // Re-calculated the histogram
@@ -124,19 +141,25 @@ protected:
 
 class Z3DTransferFunctionEditor : public QWidget
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   Z3DTransferFunctionEditor(Z3DTransferFunctionParameter* para, QWidget* parent = 0);
+
   virtual ~Z3DTransferFunctionEditor();
 
   void createWidgets();
+
   void createConnections();
 
 protected:
   void changeHistogramNormalizeMethod();
+
   void updateFromTransferFunction();
+
   void volumeChanged();
+
   void domainMinSpinBoxChanged(double value);
+
   void domainMaxSpinBoxChanged(double value);
 
   void fitDomainToData();
@@ -164,7 +187,7 @@ protected:
   QLabel* m_dataMinNameLabel;
   QLabel* m_dataMaxNameLabel;
   QPushButton* m_fitDomainToDataButton;
-  QCheckBox *m_rescaleKeys;
+  QCheckBox* m_rescaleKeys;
 };
 
 } // namespace nim

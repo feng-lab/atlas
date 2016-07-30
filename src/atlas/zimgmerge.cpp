@@ -15,11 +15,11 @@ using namespace nim;
 
 template<typename TVoxel>
 void mergeMin_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
-                   ZImg& res, const std::vector<ZImgTile> &tiles)
+                   ZImg& res, const std::vector<ZImgTile>& tiles)
 {
   for (ZVoxelRegion::const_iterator it = region.begin(); it != region.end(); ++it) {
     TVoxel v = std::numeric_limits<TVoxel>::max();
-    for (size_t i=0; i<tiles.size(); ++i) {
+    for (size_t i = 0; i < tiles.size(); ++i) {
       if (tiles[i].contains(*it)) {
         TVoxel tmp = tiles[i].value<TVoxel>(*it);
         if (tmp < v)
@@ -33,11 +33,11 @@ void mergeMin_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
 
 template<typename TVoxel>
 void mergeMax_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
-                   ZImg& res, const std::vector<ZImgTile> &tiles)
+                   ZImg& res, const std::vector<ZImgTile>& tiles)
 {
   for (ZVoxelRegion::const_iterator it = region.begin(); it != region.end(); ++it) {
     TVoxel v = std::numeric_limits<TVoxel>::min();
-    for (size_t i=0; i<tiles.size(); ++i) {
+    for (size_t i = 0; i < tiles.size(); ++i) {
       if (tiles[i].contains(*it)) {
         TVoxel tmp = tiles[i].value<TVoxel>(*it);
         if (tmp > v)
@@ -51,11 +51,11 @@ void mergeMax_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
 
 template<typename TVoxel>
 void mergeMean_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
-                   ZImg& res, const std::vector<ZImgTile> &tiles)
+                    ZImg& res, const std::vector<ZImgTile>& tiles)
 {
   for (ZVoxelRegion::const_iterator it = region.begin(); it != region.end(); ++it) {
     std::vector<TVoxel> buf;
-    for (size_t i=0; i<tiles.size(); ++i) {
+    for (size_t i = 0; i < tiles.size(); ++i) {
       if (tiles[i].contains(*it))
         buf.push_back(tiles[i].value<TVoxel>(*it));
     }
@@ -68,11 +68,11 @@ void mergeMean_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord
 
 template<typename TVoxel>
 void mergeMedian_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
-                   ZImg& res, const std::vector<ZImgTile> &tiles)
+                      ZImg& res, const std::vector<ZImgTile>& tiles)
 {
   for (ZVoxelRegion::const_iterator it = region.begin(); it != region.end(); ++it) {
     std::vector<TVoxel> buf;
-    for (size_t i=0; i<tiles.size(); ++i) {
+    for (size_t i = 0; i < tiles.size(); ++i) {
       if (tiles[i].contains(*it))
         buf.push_back(tiles[i].value<TVoxel>(*it));
     }
@@ -85,24 +85,24 @@ void mergeMedian_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoo
 
 template<typename TVoxel>
 void merge_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord, ZImgMerge::Mode mode,
-                ZImg& res, const std::vector<ZImgTile> &tiles)
+                ZImg& res, const std::vector<ZImgTile>& tiles)
 {
   switch (mode) {
-  case ZImgMerge::Mode::Min:
-    mergeMin_Impl<TVoxel>(region, minCoord, res, tiles);
-    break;
-  case ZImgMerge::Mode::Max:
-    mergeMax_Impl<TVoxel>(region, minCoord, res, tiles);
-    break;
-  case ZImgMerge::Mode::Mean:
-    mergeMean_Impl<TVoxel>(region, minCoord, res, tiles);
-    break;
-  case ZImgMerge::Mode::Median:
-    mergeMedian_Impl<TVoxel>(region, minCoord, res, tiles);
-    break;
-  case ZImgMerge::Mode::First:
-  default:
-    break;
+    case ZImgMerge::Mode::Min:
+      mergeMin_Impl<TVoxel>(region, minCoord, res, tiles);
+      break;
+    case ZImgMerge::Mode::Max:
+      mergeMax_Impl<TVoxel>(region, minCoord, res, tiles);
+      break;
+    case ZImgMerge::Mode::Mean:
+      mergeMean_Impl<TVoxel>(region, minCoord, res, tiles);
+      break;
+    case ZImgMerge::Mode::Median:
+      mergeMedian_Impl<TVoxel>(region, minCoord, res, tiles);
+      break;
+    case ZImgMerge::Mode::First:
+    default:
+      break;
   }
 }
 
@@ -111,6 +111,7 @@ struct EdgeInfo
   EdgeInfo(double c)
     : cost(c)
   {}
+
   double cost;
 };
 
@@ -119,44 +120,53 @@ struct VertexInfo
   VertexInfo(const ZImg* im, size_t idx)
     : img(im), idx(idx)
   {}
+
   const ZImg* img;
   size_t idx;
   boost::default_color_type m_algo_color;
 };
 
 template<typename Edge>
-struct edge_in_MST {
-  edge_in_MST() {}
+struct edge_in_MST
+{
+  edge_in_MST()
+  {}
+
   edge_in_MST(const std::vector<Edge>& mstEdges)
     : m_MSTEdges(&mstEdges)
   {
   }
+
   bool operator()(const Edge& e) const
   {
-    for (size_t i=0; i<m_MSTEdges->size(); ++i) {
+    for (size_t i = 0; i < m_MSTEdges->size(); ++i) {
       if (e == m_MSTEdges->at(i)) {
         return true;
       }
     }
     return false;
   }
+
 private:
   const std::vector<Edge>* m_MSTEdges;
 };
 
 template<typename Edge>
-class dfs_edge_visitor : public boost::default_dfs_visitor {
+class dfs_edge_visitor : public boost::default_dfs_visitor
+{
 public:
-  dfs_edge_visitor(std::vector<Edge> &dfsSortedEdges)
+  dfs_edge_visitor(std::vector<Edge>& dfsSortedEdges)
     : m_dfsSortedEdges(dfsSortedEdges)
   {
     m_dfsSortedEdges.clear();
   }
+
   template<typename Graph>
   void tree_edge(Edge e, const Graph&) const
   {
     m_dfsSortedEdges.push_back(e);
   }
+
 private:
   std::vector<Edge>& m_dfsSortedEdges;
 };
@@ -169,7 +179,7 @@ ZImgMerge::ZImgMerge()
 {
 }
 
-void ZImgMerge::addImg(const ZImg &img, const ZVoxelCoordinate &loc, const QString &imgName)
+void ZImgMerge::addImg(const ZImg& img, const ZVoxelCoordinate& loc, const QString& imgName)
 {
   if (!img.isEmpty()) {
     m_imgCoords[&img] = loc;
@@ -177,8 +187,9 @@ void ZImgMerge::addImg(const ZImg &img, const ZVoxelCoordinate &loc, const QStri
   }
 }
 
-void ZImgMerge::addImgPair(const ZImg &img1, const ZImg &img2, const ZVoxelCoordinate &img2Offset, double connectionCost,
-                           const QString &img1Name, const QString &img2Name)
+void
+ZImgMerge::addImgPair(const ZImg& img1, const ZImg& img2, const ZVoxelCoordinate& img2Offset, double connectionCost,
+                      const QString& img1Name, const QString& img2Name)
 {
   if (img1.isEmpty() || img2.isEmpty())
     return;
@@ -192,7 +203,7 @@ void ZImgMerge::addImgPair(const ZImg &img1, const ZImg &img2, const ZVoxelCoord
   m_imgNames[&img2] = img2Name;
 }
 
-void ZImgMerge::removeImg(const ZImg &img)
+void ZImgMerge::removeImg(const ZImg& img)
 {
   m_imgCoords.erase(&img);
   m_imgNames.erase(&img);
@@ -206,7 +217,7 @@ void ZImgMerge::removeImg(const ZImg &img)
   }
 }
 
-void ZImgMerge::removeImgConnection(const ZImg &img1, const ZImg &img2)
+void ZImgMerge::removeImgConnection(const ZImg& img1, const ZImg& img2)
 {
   std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::iterator it = m_imgPairs.begin();
   while (it != m_imgPairs.end()) {
@@ -218,7 +229,7 @@ void ZImgMerge::removeImgConnection(const ZImg &img1, const ZImg &img2)
   }
 }
 
-ZImg ZImgMerge::merge(Mode mode, QString *summary) const
+ZImg ZImgMerge::merge(Mode mode, QString* summary) const
 {
   ZImg res;
   if (m_imgCoords.empty() && m_imgPairs.empty()) {
@@ -243,7 +254,7 @@ ZImg ZImgMerge::merge(Mode mode, QString *summary) const
     }
   }
 
-  std::map<const ZImg *, ZVoxelCoordinate> imgs;
+  std::map<const ZImg*, ZVoxelCoordinate> imgs;
   QString summ;
   resolveLocations(imgs, refImg, minCost, summ);
   mergeImgs(res, imgs, mode, summ);
@@ -256,8 +267,8 @@ ZImg ZImgMerge::merge(Mode mode, QString *summary) const
   return res;
 }
 
-void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoords,
-                                 const ZImg* refImg, double minCost, QString &summary) const
+void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate>& imgCoords,
+                                 const ZImg* refImg, double minCost, QString& summary) const
 {
   imgCoords = m_imgCoords;
 
@@ -265,7 +276,7 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
     return;
 
   typedef boost::adjacency_list<boost::listS, boost::listS,
-      boost::undirectedS, VertexInfo, EdgeInfo> GraphT;
+    boost::undirectedS, VertexInfo, EdgeInfo> GraphT;
   typedef boost::graph_traits<GraphT>::vertex_descriptor Vertex;
   typedef boost::graph_traits<GraphT>::edge_descriptor Edge;
   std::map<const ZImg*, Vertex> imgToVertexMapper;
@@ -273,25 +284,25 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
 
   size_t vIdx = 0;
   for (std::map<const ZImg*, ZVoxelCoordinate>::iterator it = imgCoords.begin();
-       it  != imgCoords.end(); ++it) {
+       it != imgCoords.end(); ++it) {
     if (imgToVertexMapper.find(it->first) == imgToVertexMapper.end()) {
       Vertex v = boost::add_vertex(VertexInfo(it->first, vIdx++), graph);
       imgToVertexMapper[it->first] = v;
     }
   }
   {
-  // use low cost to connect imgs with absolute location
-  std::map<const ZImg*, ZVoxelCoordinate>::iterator it = imgCoords.begin();
-  if (it != imgCoords.end()) {
-    std::map<const ZImg*, ZVoxelCoordinate>::iterator nextIt = it;
-    ++nextIt;
-    for (; nextIt != imgCoords.end(); ++nextIt, ++it) {
-      boost::add_edge(imgToVertexMapper[it->first],
-                      imgToVertexMapper[nextIt->first],
-                      EdgeInfo(minCost - 1e3),
-                      graph);
+    // use low cost to connect imgs with absolute location
+    std::map<const ZImg*, ZVoxelCoordinate>::iterator it = imgCoords.begin();
+    if (it != imgCoords.end()) {
+      std::map<const ZImg*, ZVoxelCoordinate>::iterator nextIt = it;
+      ++nextIt;
+      for (; nextIt != imgCoords.end(); ++nextIt, ++it) {
+        boost::add_edge(imgToVertexMapper[it->first],
+                        imgToVertexMapper[nextIt->first],
+                        EdgeInfo(minCost - 1e3),
+                        graph);
+      }
     }
-  }
   }
 
   for (std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::const_iterator it = m_imgPairs.begin();
@@ -311,7 +322,8 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
   }
 
   std::vector<int> c(boost::num_vertices(graph));
-  int num = boost::connected_components(graph, boost::make_iterator_property_map(c.begin(), boost::get(&VertexInfo::idx, graph)),
+  int num = boost::connected_components(graph, boost::make_iterator_property_map(c.begin(),
+                                                                                 boost::get(&VertexInfo::idx, graph)),
                                         boost::color_map(boost::get(&VertexInfo::m_algo_color, graph)));
   if (num != 1) {
     throw ZImgException("Merge Imgs error: imgs are not fully connected");
@@ -375,7 +387,7 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
   std::vector<Edge> tree;
   boost::kruskal_minimum_spanning_tree(graph, std::back_inserter(tree),
                                        boost::weight_map(boost::get(&EdgeInfo::cost, graph)).
-                                       vertex_index_map(boost::get(&VertexInfo::idx, graph)));
+                                         vertex_index_map(boost::get(&VertexInfo::idx, graph)));
 
   if (imgCoords.empty())
     imgCoords[refImg] = ZVoxelCoordinate();
@@ -386,12 +398,12 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
   std::vector<Edge> sortedEdges;
   dfs_edge_visitor<Edge> vis(sortedEdges);
   boost::depth_first_search(fg, boost::visitor(vis).root_vertex(imgToVertexMapper[refImg]).
-                            vertex_index_map(boost::get(&VertexInfo::idx, fg)).
-                            color_map(boost::get(&VertexInfo::m_algo_color, fg)));
+    vertex_index_map(boost::get(&VertexInfo::idx, fg)).
+    color_map(boost::get(&VertexInfo::m_algo_color, fg)));
 
-  for (size_t i=0; i<sortedEdges.size(); ++i) {
-    const ZImg * img1 = graph[boost::source(sortedEdges[i], graph)].img;
-    const ZImg * img2 = graph[boost::target(sortedEdges[i], graph)].img;
+  for (size_t i = 0; i < sortedEdges.size(); ++i) {
+    const ZImg* img1 = graph[boost::source(sortedEdges[i], graph)].img;
+    const ZImg* img2 = graph[boost::target(sortedEdges[i], graph)].img;
     bool img1HasLocation = imgCoords.find(img1) != imgCoords.end();
     bool img2HasLocation = imgCoords.find(img2) != imgCoords.end();
 
@@ -405,9 +417,9 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
         imgCoords[img2] = imgCoords[img1] - pairIt->second.first;
       }
       summary += QString("tile %1 connects to tile %2 with cost %3\n")
-          .arg(m_imgNames.at(img1))
-          .arg(m_imgNames.at(img2))
-          .arg(pairIt->second.second);
+        .arg(m_imgNames.at(img1))
+        .arg(m_imgNames.at(img2))
+        .arg(pairIt->second.second);
     } else if (!img1HasLocation && img2HasLocation) {
       std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::const_iterator pairIt;
       pairIt = m_imgPairs.find(std::make_pair(img1, img2));
@@ -418,9 +430,9 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
         imgCoords[img1] = imgCoords[img2] + pairIt->second.first;
       }
       summary += QString("tile %1 connects to tile %2 with cost %3\n")
-          .arg(m_imgNames.at(img1))
-          .arg(m_imgNames.at(img2))
-          .arg(pairIt->second.second);
+        .arg(m_imgNames.at(img1))
+        .arg(m_imgNames.at(img2))
+        .arg(pairIt->second.second);
     } else {
       CHECK(img1HasLocation && img2HasLocation);
     }
@@ -428,8 +440,8 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate> &imgCoo
 #endif
 }
 
-void ZImgMerge::mergeImgs(ZImg &res, const std::map<const ZImg*, ZVoxelCoordinate> &imgs,
-                          ZImgMerge::Mode mode, QString &summary) const
+void ZImgMerge::mergeImgs(ZImg& res, const std::map<const ZImg*, ZVoxelCoordinate>& imgs,
+                          ZImgMerge::Mode mode, QString& summary) const
 {
   std::vector<ZImgTile> tiles;
   for (std::map<const ZImg*, ZVoxelCoordinate>::const_iterator it = imgs.begin(); it != imgs.end(); ++it)
@@ -438,12 +450,12 @@ void ZImgMerge::mergeImgs(ZImg &res, const std::map<const ZImg*, ZVoxelCoordinat
   ZVoxelRegion allRegion;
   ZVoxelRegion overlapRegion;
 
-  for (size_t i=0; i<tiles.size(); ++i) {
+  for (size_t i = 0; i < tiles.size(); ++i) {
     allRegion.addBox(tiles[i].location(), tiles[i].maxCoord());
 
     ZVoxelRegion r1;
     r1.addBox(tiles[i].location(), tiles[i].maxCoord());
-    for (size_t j=i+1; j<tiles.size(); ++j) {
+    for (size_t j = i + 1; j < tiles.size(); ++j) {
       ZVoxelRegion r2;
       r2.addBox(tiles[j].location(), tiles[j].maxCoord());
       if (!r2.intersect(r1).isEmpty())
@@ -467,15 +479,15 @@ void ZImgMerge::mergeImgs(ZImg &res, const std::map<const ZImg*, ZVoxelCoordinat
 
   // to get correct meta info from tile img
   std::set<size_t> neededChannelInfo;
-  for (size_t i=0; i<res.numChannels(); ++i) {
+  for (size_t i = 0; i < res.numChannels(); ++i) {
     neededChannelInfo.insert(i);
   }
   std::set<size_t> neededTimeStamp;
-  for (size_t i=0; i<res.numTimes(); ++i) {
+  for (size_t i = 0; i < res.numTimes(); ++i) {
     neededTimeStamp.insert(i);
   }
 
-  for (size_t i=0; i<tiles.size(); ++i) {
+  for (size_t i = 0; i < tiles.size(); ++i) {
     ZVoxelCoordinate tileLoc = tiles[i].location() - minCoord;
     if (mode == Mode::Max) {
       res.pasteImgMax(tiles[i].img(), tileLoc);

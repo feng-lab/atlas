@@ -13,41 +13,50 @@
 
 namespace {
 
-struct ChangeValue {
+struct ChangeValue
+{
   ChangeValue(int64_t from, int64_t to)
     : from(from), to(to)
   {}
+
   template<typename TVoxel>
   TVoxel operator()(TVoxel current) const
   {
     return (static_cast<int64_t>(current) == from) ? static_cast<TVoxel>(to) : current;
   }
+
   int64_t from;
   int64_t to;
 };
 
-struct MarkAsIfOtherEqualsOtherWiseZero {
+struct MarkAsIfOtherEqualsOtherWiseZero
+{
   MarkAsIfOtherEqualsOtherWiseZero(int64_t as, int64_t equal)
     : as(as), equal(equal)
   {}
+
   template<typename TVoxel, typename TVoxelOther>
   TVoxel operator()(TVoxel, TVoxelOther otherVoxel) const
   {
     return (static_cast<int64_t>(otherVoxel) == equal) ? as : 0;
   }
+
   int64_t as;
   int64_t equal;
 };
 
-struct CopyAsIfOtherIsNotZero {
+struct CopyAsIfOtherIsNotZero
+{
   CopyAsIfOtherIsNotZero(int64_t as)
     : as(as)
   {}
+
   template<typename TVoxel, typename TVoxelOther>
   TVoxel operator()(TVoxel current, TVoxelOther otherVoxel) const
   {
     return (otherVoxel != 0) ? static_cast<TVoxel>(as) : current;
   }
+
   int64_t as;
 };
 
@@ -55,7 +64,7 @@ struct CopyAsIfOtherIsNotZero {
 
 namespace nim {
 
-ZRegionAnnotation::ZRegionAnnotation(QObject *parent)
+ZRegionAnnotation::ZRegionAnnotation(QObject* parent)
   : QObject(parent)
 {
   clear();
@@ -67,7 +76,7 @@ ZRegionAnnotation::ZRegionAnnotation(QObject *parent)
           this, &ZRegionAnnotation::undoStackCleanChanged);
 }
 
-ZRegionAnnotation::ZRegionAnnotation(const QString &filename, QObject *parent)
+ZRegionAnnotation::ZRegionAnnotation(const QString& filename, QObject* parent)
   : QObject(parent)
 {
   load(filename);
@@ -94,7 +103,7 @@ void ZRegionAnnotation::clear()
   updateBoundBox();
 }
 
-void ZRegionAnnotation::importLabelImage(const QString &fn, FileFormat format, bool createMesh, bool createROI)
+void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, bool createMesh, bool createROI)
 {
   ZBenchTimer bt;
   bt.start();
@@ -138,7 +147,7 @@ void ZRegionAnnotation::importLabelImage(const QString &fn, FileFormat format, b
   }
 
   std::set<int64_t> labels;
-  for (size_t i=0; i<origLabelImg.channelVoxelNumber(); ++i) {
+  for (size_t i = 0; i < origLabelImg.channelVoxelNumber(); ++i) {
     labels.insert(origLabelImg.value<int64_t>(i));
   }
   for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
@@ -170,10 +179,10 @@ void ZRegionAnnotation::importLabelImage(const QString &fn, FileFormat format, b
     // create binary image
     binaryImg.binaryOperation(labelImg, MarkAsIfOtherEqualsOtherWiseZero(1, it->id));
     if (it->id == 997) {
-      for (size_t z=0; z<binaryImg.depth(); ++z) {
+      for (size_t z = 0; z < binaryImg.depth(); ++z) {
         ZImg simg = binaryImg.createView(z, 0, 0);
         ZImg fimg = imFill.run(simg);
-        binaryImg.pasteImg(fimg, ZVoxelCoordinate(0,0,z));
+        binaryImg.pasteImg(fimg, ZVoxelCoordinate(0, 0, z));
       }
     }
     if (createMesh) {
@@ -209,7 +218,7 @@ void ZRegionAnnotation::importLabelImage(const QString &fn, FileFormat format, b
   }
   LOG(INFO) << "Finish importing label image";
 
-  bt.stopAndPrint();
+  STOP_AND_LOG(bt);
 
   if (createMesh) {
     emit allMeshChanged();
@@ -219,7 +228,7 @@ void ZRegionAnnotation::importLabelImage(const QString &fn, FileFormat format, b
   }
 }
 
-void ZRegionAnnotation::exportLabelImage(const QString &fn, FileFormat format, Compression comp) const
+void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, Compression comp) const
 {
   LOG(INFO) << "Exporting Label Image...";
   ZImgInfo info(m_width, m_height, m_depth, 1, 1, 2);
@@ -249,7 +258,7 @@ void ZRegionAnnotation::exportLabelImage(const QString &fn, FileFormat format, C
   LOG(INFO) << "Finish exporting label image";
 }
 
-void ZRegionAnnotation::mergeROIToRegion(const ZROI &roi, int64_t regionID)
+void ZRegionAnnotation::mergeROIToRegion(const ZROI& roi, int64_t regionID)
 {
   for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
     if (it->id == regionID) {
@@ -272,7 +281,7 @@ void ZRegionAnnotation::mergeROIToRegion(const ZROI &roi, int64_t regionID)
   }
 }
 
-const ZMesh *ZRegionAnnotation::meshOfRegion(int64_t regionID)
+const ZMesh* ZRegionAnnotation::meshOfRegion(int64_t regionID)
 {
   for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
     if (it->id == regionID) {
@@ -282,7 +291,7 @@ const ZMesh *ZRegionAnnotation::meshOfRegion(int64_t regionID)
   return nullptr;
 }
 
-const ZROI *ZRegionAnnotation::roiOfRegion(int64_t regionID)
+const ZROI* ZRegionAnnotation::roiOfRegion(int64_t regionID)
 {
   for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
     if (it->id == regionID) {
@@ -292,7 +301,7 @@ const ZROI *ZRegionAnnotation::roiOfRegion(int64_t regionID)
   return nullptr;
 }
 
-void ZRegionAnnotation::load(const QString &filename)
+void ZRegionAnnotation::load(const QString& filename)
 {
   clear();
 
@@ -325,8 +334,8 @@ void ZRegionAnnotation::load(const QString &filename)
     numRegionAttr.read(intType, &numRegion);
 
     std::map<int64_t, RegionNode> nodeMap;
-    for (int i=0; i<numRegion; ++i) {
-      H5::Group regionGrp = allGrp.openGroup(qUtf8Printable(QString("Region%1").arg(i+1)));
+    for (int i = 0; i < numRegion; ++i) {
+      H5::Group regionGrp = allGrp.openGroup(qUtf8Printable(QString("Region%1").arg(i + 1)));
 
       RegionNode p;
 
@@ -393,8 +402,7 @@ void ZRegionAnnotation::load(const QString &filename)
       }
     }
   }
-  catch(H5::Exception const & e)
-  {
+  catch (H5::Exception const& e) {
     throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
   }
 
@@ -402,7 +410,7 @@ void ZRegionAnnotation::load(const QString &filename)
   emit allROIChanged();
 }
 
-void ZRegionAnnotation::save(const QString &filename) const
+void ZRegionAnnotation::save(const QString& filename) const
 {
   try {
     H5::Exception::dontPrint();
@@ -431,7 +439,7 @@ void ZRegionAnnotation::save(const QString &filename) const
 
     int idx = 0;
     for (auto it = m_ontology.cbegin(); it != m_ontology.cend(); ++it) {
-      H5::Group regionGrp = allGrp.createGroup(qUtf8Printable(QString("Region%1").arg(idx+1)));
+      H5::Group regionGrp = allGrp.createGroup(qUtf8Printable(QString("Region%1").arg(idx + 1)));
       ++idx;
       const RegionNode& p = *it;
 
@@ -470,8 +478,7 @@ void ZRegionAnnotation::save(const QString &filename) const
     H5::Attribute numRegionAttr = allGrp.createAttribute("RegionNumber", intType, attrDataSpace);
     numRegionAttr.write(intType, &idx);
   }
-  catch(H5::Exception const & e)
-  {
+  catch (H5::Exception const& e) {
     QFile::remove(filename);
     throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
   }
@@ -483,7 +490,7 @@ void ZRegionAnnotation::updateMesh()
   if (dir.isValid()) {
     QString fn = QDir(dir.path()).filePath("temp_region_annotation_label_image.mhd");
     exportLabelImage(fn, FileFormat::MetaImage, Compression::AUTO);
-    ZRegionAnnotationUpdateMeshCommand *cmd = new ZRegionAnnotationUpdateMeshCommand(*this);
+    ZRegionAnnotationUpdateMeshCommand* cmd = new ZRegionAnnotationUpdateMeshCommand(*this);
     importLabelImage(fn, FileFormat::MetaImage, true, false);
     cmd->setNewOntology(m_ontology);
     m_undoStack.push(cmd);
@@ -493,11 +500,11 @@ void ZRegionAnnotation::updateMesh()
   }
 }
 
-void ZRegionAnnotation::updateMesh_Impl(const ZTree<RegionNode> &newOntology)
+void ZRegionAnnotation::updateMesh_Impl(const ZTree<RegionNode>& newOntology)
 {
   auto it = m_ontology.begin();
   auto itn = newOntology.begin();
-  for ( ; it != m_ontology.end(); ++it, ++itn) {
+  for (; it != m_ontology.end(); ++it, ++itn) {
     it->mesh = itn->mesh;
   }
   emit allMeshChanged();
@@ -510,11 +517,11 @@ void ZRegionAnnotation::updateBoundBox()
     m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = m_boundBox[7] = std::numeric_limits<int>::min();
   } else {
     m_boundBox[0] = 0;
-    m_boundBox[1] = m_width-1;
+    m_boundBox[1] = m_width - 1;
     m_boundBox[2] = 0;
-    m_boundBox[3] = m_height-1;
+    m_boundBox[3] = m_height - 1;
     m_boundBox[4] = 0;
-    m_boundBox[5] = (m_depth-1);
+    m_boundBox[5] = (m_depth - 1);
     m_boundBox[6] = 0;
     m_boundBox[7] = 0;
   }

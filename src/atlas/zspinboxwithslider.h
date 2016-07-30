@@ -8,48 +8,55 @@
 namespace nim {
 
 class ZSpinBox;
+
 class ZDoubleSpinBox;
 
 class ZSliderEventFilter : public QObject
 {
 public:
-  ZSliderEventFilter(QObject *parent = 0);
+  ZSliderEventFilter(QObject* parent = 0);
+
 protected:
-  virtual bool eventFilter(QObject *obj, QEvent *event) override;
+  virtual bool eventFilter(QObject* obj, QEvent* event) override;
 };
 
 class ZSlider2 : public QSlider
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   ZSlider2(QWidget* parent = 0);
+
   ZSlider2(Qt::Orientation ori, QWidget* parent = 0);
 
 protected:
-  virtual void focusInEvent(QFocusEvent *event) override;
-  virtual void focusOutEvent(QFocusEvent *event) override;
+  virtual void focusInEvent(QFocusEvent* event) override;
+
+  virtual void focusOutEvent(QFocusEvent* event) override;
 };
 
 class ZSpinBoxWithSlider : public QWidget
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   explicit ZSpinBoxWithSlider(int value, int min, int max, int step = 1,
-                              bool tracking = true, const QString &prefix = "",
-                              const QString &suffix = "", QWidget *parent = 0);
+                              bool tracking = true, const QString& prefix = "",
+                              const QString& suffix = "", QWidget* parent = 0);
 
   void setValue(int v);
+
   void setDataRange(int min, int max);
-  
+
 signals:
+
   void valueChanged(int);
 
 protected:
-  void createWidget(int value, int min, int max, int step, bool tracking, const QString &prefix,
-                    const QString &suffix);
-  
+  void createWidget(int value, int min, int max, int step, bool tracking, const QString& prefix,
+                    const QString& suffix);
+
 private:
   void valueChangedFromSlider(int v);
+
   void valueChangedFromSpinBox(int v);
 
   ZSlider2* m_slider;
@@ -58,24 +65,27 @@ private:
 
 class ZDoubleSpinBoxWithSlider : public QWidget
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   explicit ZDoubleSpinBoxWithSlider(double value, double min, double max, double step = .01,
-                                    int decimal = 3, bool tracking = true, const QString &prefix = "",
-                                    const QString &suffix = "", QWidget *parent = 0);
+                                    int decimal = 3, bool tracking = true, const QString& prefix = "",
+                                    const QString& suffix = "", QWidget* parent = 0);
 
   void setValue(double v);
+
   void setDataRange(double min, double max);
 
 signals:
+
   void valueChanged(double);
 
 protected:
-  void createWidget(const QString &prefix,
-                    const QString &suffix);
+  void createWidget(const QString& prefix,
+                    const QString& suffix);
 
 private:
   void valueChangedFromSlider(int v);
+
   void valueChangedFromSpinBox(double v);
 
 private:

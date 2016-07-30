@@ -9,17 +9,18 @@ class Z3DTransferFunctionEditor;
 
 class Z3DTransferFunctionWidgetWithEditorWindow : public ZClickableTransferFunctionLabel
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit Z3DTransferFunctionWidgetWithEditorWindow(Z3DTransferFunctionParameter* tf, QWidget *parent = 0);
+  explicit Z3DTransferFunctionWidgetWithEditorWindow(Z3DTransferFunctionParameter* tf, QWidget* parent = 0);
 
 protected:
   void createEditorWindow();
+
   virtual void labelClicked() override;
 
 private:
-  Z3DTransferFunctionParameter *m_transferFunction;
-  Z3DTransferFunctionEditor *m_transferFunctionEditor;
+  Z3DTransferFunctionParameter* m_transferFunction;
+  Z3DTransferFunctionEditor* m_transferFunctionEditor;
 
   std::unique_ptr<QWidget> m_editorWindow;
 };

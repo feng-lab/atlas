@@ -9,31 +9,38 @@
 namespace nim {
 
 class Z3DVolume;
+
 class Z3DImg;
 
 // render 2d slices of volume with colormap
 // use colormap of each volume to composite final image
 class Z3DVolumeSliceRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit Z3DVolumeSliceRenderer(Z3DRendererBase &rendererBase);
+  explicit Z3DVolumeSliceRenderer(Z3DRendererBase& rendererBase);
 
   void setData(const Z3DImg& img,
                const std::vector<std::unique_ptr<ZColorMapParameter>>& colormaps);
-  void setLayerTarget(Z3DRenderTarget *layerTarget) { m_layerTarget = layerTarget; }
+
+  void setLayerTarget(Z3DRenderTarget* layerTarget)
+  { m_layerTarget = layerTarget; }
 
   // a slice (quad) in 3D volume contains corner vertex and 3d texture coordinates
   // clear
-  void clearQuads() { m_quads.clear(); }
+  void clearQuads()
+  { m_quads.clear(); }
+
   // add quad
-  void addQuad(const ZMesh &quad);
+  void addQuad(const ZMesh& quad);
 
 protected:
-  void bindVolumes(Z3DShaderProgram &shader);
-  void bindVolume(Z3DShaderProgram &shader, size_t idx);
+  void bindVolumes(Z3DShaderProgram& shader);
+
+  void bindVolume(Z3DShaderProgram& shader, size_t idx);
 
   virtual void compile() override;
+
   QString generateHeader();
 
   virtual void render(Z3DEye eye) override;

@@ -10,7 +10,7 @@
 
 namespace nim {
 
-Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters &globalParas, QObject *parent)
+Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   : Z3DGeometryFilter(globalParas, parent)
   , m_lineRenderer(m_rendererBase)
   , m_arrowRenderer(m_rendererBase)
@@ -20,14 +20,14 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters &globalParas, QObject
   , m_visible("Visible", true)
   , m_lineWidth("Line Width", 2, 1, 100)
   , m_colorMode("Color Mode")
-  , m_color("Color", glm::vec4(1,1,0,1))
-  , m_colorMap("Color Map", 0.0, 1.0, QColor(255,0,0), QColor(0,0,255))
+  , m_color("Color", glm::vec4(1, 1, 0, 1))
+  , m_colorMap("Color Map", 0.0, 1.0, QColor(255, 0, 0), QColor(0, 0, 255))
   , m_timeInterval("Time Interval", .01, .01, 100)
   , m_cameraSize("Camera Size")
   , m_showCameraDirection("Show Interpolated Camera Direction", true)
   , m_cameraDirectionSize("Camera Direction Arrow Size")
-  , m_upDirectionColor("Up Direction Color", glm::vec4(0,1,0,1))
-  , m_viewDirectionColor("View Direction Color", glm::vec4(0,0,1,1))
+  , m_upDirectionColor("Up Direction Color", glm::vec4(0, 1, 0, 1))
+  , m_viewDirectionColor("View Direction Color", glm::vec4(0, 0, 1, 1))
   , m_cameraDirectionTimeInterval("Camera Direction Time Interval", .5, .1, 100)
   , m_locked(false)
 {
@@ -91,7 +91,7 @@ void Z3DAnimationFilter::process(Z3DEye)
   }
 }
 
-void Z3DAnimationFilter::setData(Z3DAnimation *animation)
+void Z3DAnimationFilter::setData(Z3DAnimation* animation)
 {
   if (m_animation) {
     m_animation->disconnect(this);
@@ -188,7 +188,7 @@ void Z3DAnimationFilter::updateNotTransformedBoundBoxImpl()
 {
   m_notTransformedBoundBox[0] = m_notTransformedBoundBox[2] = m_notTransformedBoundBox[4] = std::numeric_limits<double>::max();
   m_notTransformedBoundBox[1] = m_notTransformedBoundBox[3] = m_notTransformedBoundBox[5] = std::numeric_limits<double>::lowest();
-  for (size_t i=0; i<m_lines.size(); ++i) {
+  for (size_t i = 0; i < m_lines.size(); ++i) {
     m_notTransformedBoundBox[0] = std::min(double(m_lines[i].x), m_notTransformedBoundBox[0]);
     m_notTransformedBoundBox[1] = std::max(double(m_lines[i].x), m_notTransformedBoundBox[1]);
     m_notTransformedBoundBox[2] = std::min(double(m_lines[i].y), m_notTransformedBoundBox[2]);
@@ -213,7 +213,7 @@ void Z3DAnimationFilter::prepareColor()
   m_arrowColors.clear();
 
   if (m_colorMode.isSelected("Single Color")) {
-    for (size_t i=0; i<m_times.size(); ++i) {
+    for (size_t i = 0; i < m_times.size(); ++i) {
       m_lineColors.push_back(m_color.get());
     }
   } else if (m_colorMode.isSelected("Colormap Time")) {
@@ -221,14 +221,14 @@ void Z3DAnimationFilter::prepareColor()
       m_lineColors.push_back(m_colorMap.get().mappedFColor(0));
     } else if (m_times.size() > 1) {
       double startTime = m_times[0];
-      double endTime = m_times[m_times.size()-1];
-      for (size_t i=0; i<m_times.size(); ++i) {
-        m_lineColors.push_back(m_colorMap.get().mappedFColor( (m_times[i] - startTime) / (endTime - startTime) ));
+      double endTime = m_times[m_times.size() - 1];
+      for (size_t i = 0; i < m_times.size(); ++i) {
+        m_lineColors.push_back(m_colorMap.get().mappedFColor((m_times[i] - startTime) / (endTime - startTime)));
       }
     }
   }
 
-  for (size_t i=0; i<m_cameraDirectionTimes.size(); ++i) {
+  for (size_t i = 0; i < m_cameraDirectionTimes.size(); ++i) {
     m_arrowColors.push_back(m_viewDirectionColor.get());
     m_arrowColors.push_back(m_upDirectionColor.get());
   }
@@ -237,11 +237,11 @@ void Z3DAnimationFilter::prepareColor()
     const auto& keys = cameraParaAnimation()->keys();
     std::vector<glm::vec4> colors;
     if (m_colorMode.isSelected("Single Color")) {
-      for (size_t i=0; i<keys.size(); ++i) {
+      for (size_t i = 0; i < keys.size(); ++i) {
         colors.push_back(m_color.get());
         colors.push_back(m_color.get());
         colors.push_back(m_color.get());
-        for (int j=0; j<16; ++j)
+        for (int j = 0; j < 16; ++j)
           m_lineColors.push_back(m_color.get());
       }
     } else if (m_colorMode.isSelected("Colormap Time")) {
@@ -250,17 +250,17 @@ void Z3DAnimationFilter::prepareColor()
         colors.push_back(color);
         colors.push_back(color);
         colors.push_back(color);
-        for (int j=0; j<16; ++j)
+        for (int j = 0; j < 16; ++j)
           m_lineColors.push_back(color);
       } else if (keys.size() > 1) {
         double startTime = keys[0]->time();
-        double endTime = std::max(startTime + 0.01, keys[keys.size()-1]->time());
-        for (size_t i=0; i<keys.size(); ++i) {
-          glm::vec4 color = m_colorMap.get().mappedFColor( (keys[i]->time() - startTime) / (endTime - startTime) );
+        double endTime = std::max(startTime + 0.01, keys[keys.size() - 1]->time());
+        for (size_t i = 0; i < keys.size(); ++i) {
+          glm::vec4 color = m_colorMap.get().mappedFColor((keys[i]->time() - startTime) / (endTime - startTime));
           colors.push_back(color);
           colors.push_back(color);
           colors.push_back(color);
-          for (int j=0; j<16; ++j)
+          for (int j = 0; j < 16; ++j)
             m_lineColors.push_back(color);
         }
       }
@@ -296,28 +296,28 @@ void Z3DAnimationFilter::updateData()
 
   if (m_animation) {
     const auto& keys = cameraParaAnimation()->keys();
-    for (size_t i=0; i+1<keys.size(); ++i) {
+    for (size_t i = 0; i + 1 < keys.size(); ++i) {
       double currentKeyTime = keys[i]->time();
-      double nextKeyTime = keys[i+1]->time();
-      for (double t=currentKeyTime; t<nextKeyTime; t+=m_timeInterval.get()) {
-        if (m_times.empty() || t > m_times[m_times.size()-1] + 0.0001)  // make sure no overlap
+      double nextKeyTime = keys[i + 1]->time();
+      for (double t = currentKeyTime; t < nextKeyTime; t += m_timeInterval.get()) {
+        if (m_times.empty() || t > m_times[m_times.size() - 1] + 0.0001)  // make sure no overlap
           m_times.push_back(t);
       }
-      for (double t=currentKeyTime+m_cameraDirectionTimeInterval.get(); t<nextKeyTime;
-           t+=m_cameraDirectionTimeInterval.get()) {
+      for (double t = currentKeyTime + m_cameraDirectionTimeInterval.get(); t < nextKeyTime;
+           t += m_cameraDirectionTimeInterval.get()) {
         m_cameraDirectionTimes.push_back(t);
       }
     }
-    if (!keys.empty() && (m_times.empty() || keys[keys.size()-1]->time() > m_times[m_times.size()-1] + 0.0001))
-      m_times.push_back(keys[keys.size()-1]->time());
+    if (!keys.empty() && (m_times.empty() || keys[keys.size() - 1]->time() > m_times[m_times.size() - 1] + 0.0001))
+      m_times.push_back(keys[keys.size() - 1]->time());
 
     if (m_times.size() <= 1) {
       m_times.clear();
     } else {
       std::vector<double> times;
       times.push_back(m_times[0]);
-      size_t i=1;
-      for (; i<m_times.size()-1; ++i) {
+      size_t i = 1;
+      for (; i < m_times.size() - 1; ++i) {
         times.push_back(m_times[i]);
         times.push_back(m_times[i]);
       }
@@ -326,20 +326,21 @@ void Z3DAnimationFilter::updateData()
     }
 
     Z3DCameraParameter para("Tmp");
-    for (size_t i = 0; i<m_times.size(); ++i) {
+    for (size_t i = 0; i < m_times.size(); ++i) {
       cameraParaAnimation()->updateParaToTime(m_times[i], &para);
       m_lines.push_back(para.get().eye());
     }
 
     m_cameraDirectionSize.set(100);
     updateBoundBox();
-    double arrowSize = std::max(m_axisAlignedBoundBox[1]-m_axisAlignedBoundBox[0], m_axisAlignedBoundBox[3]-m_axisAlignedBoundBox[2]);
-    arrowSize = std::max(arrowSize, m_axisAlignedBoundBox[5]-m_axisAlignedBoundBox[4]) / 50.;
+    double arrowSize = std::max(m_axisAlignedBoundBox[1] - m_axisAlignedBoundBox[0],
+                                m_axisAlignedBoundBox[3] - m_axisAlignedBoundBox[2]);
+    arrowSize = std::max(arrowSize, m_axisAlignedBoundBox[5] - m_axisAlignedBoundBox[4]) / 50.;
     if (arrowSize < 0 || arrowSize > std::numeric_limits<float>::max())
       arrowSize = 10;
     m_cameraDirectionSize.set(arrowSize);
     m_cameraSize.set(arrowSize * 2.5);
-    for (size_t i = 0; i<m_cameraDirectionTimes.size(); ++i) {
+    for (size_t i = 0; i < m_cameraDirectionTimes.size(); ++i) {
       cameraParaAnimation()->updateParaToTime(m_cameraDirectionTimes[i], &para);
       m_tailPosAndTailRadius.emplace_back(para.get().eye(), m_cameraDirectionSize.get() / 20.f);
       m_headPosAndHeadRadius.emplace_back(para.get().eye() + m_cameraDirectionSize.get() * para.get().viewVector(),
@@ -355,7 +356,7 @@ void Z3DAnimationFilter::updateData()
     float triangleWidth = halfWidth / 2.f;
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> normals;
-    for (size_t i=0; i<keys.size(); ++i) {
+    for (size_t i = 0; i < keys.size(); ++i) {
       cameraParaAnimation()->updateParaToTime(keys[i]->time(), &para);
       glm::vec3 pt5 = para.get().eye() + m_cameraSize.get() * para.get().viewVector();
       glm::vec3 pt1 = pt5 + halfHeight * para.get().upVector() + halfWidth * para.get().strafeVector();

@@ -11,17 +11,17 @@
 
 namespace nim {
 
-ZSaveObjsDialog::ZSaveObjsDialog(const ZDoc &doc, const QList<size_t> &objs, QWidget *parent)
+ZSaveObjsDialog::ZSaveObjsDialog(const ZDoc& doc, const QList<size_t>& objs, QWidget* parent)
   : QDialog(parent), m_doc(doc)
 {
   createWidget();
 
-  foreach (size_t id, objs) {
-    ZObjDoc *odoc = m_doc.idToDoc(id);
-    QTreeWidgetItem *item = new QTreeWidgetItem(m_treeWidget, QStringList()
-                                                << odoc->objName(id) << QDir::toNativeSeparators(odoc->objPath(id)));
-    item->setData(0, Qt::UserRole, qVariantFromValue(id));
-  }
+    foreach (size_t id, objs) {
+      ZObjDoc* odoc = m_doc.idToDoc(id);
+      QTreeWidgetItem* item = new QTreeWidgetItem(m_treeWidget, QStringList()
+        << odoc->objName(id) << QDir::toNativeSeparators(odoc->objPath(id)));
+      item->setData(0, Qt::UserRole, qVariantFromValue(id));
+    }
 
   m_treeWidget->resizeColumnToContents(0);
   m_treeWidget->selectAll();
@@ -36,7 +36,7 @@ ZSaveObjsDialog::ZSaveObjsDialog(const ZDoc &doc, const QList<size_t> &objs, QWi
 
 void ZSaveObjsDialog::createWidget()
 {
-  QVBoxLayout *lo = new QVBoxLayout(this);
+  QVBoxLayout* lo = new QVBoxLayout(this);
   m_label = new QLabel("The following objects have unsaved changes:", this);
   m_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   m_treeWidget = new QTreeWidget(this);
@@ -51,7 +51,7 @@ void ZSaveObjsDialog::createWidget()
 #else
   QDialogButtonBox::ButtonRole discardButtonRole = QDialogButtonBox::DestructiveRole;
 #endif
-  QPushButton *discardButton = m_buttonBox->addButton(tr("Do not Save"), discardButtonRole);
+  QPushButton* discardButton = m_buttonBox->addButton(tr("Do not Save"), discardButtonRole);
 
   lo->addWidget(m_label);
   lo->addWidget(m_treeWidget);
@@ -69,9 +69,9 @@ void ZSaveObjsDialog::createWidget()
 void ZSaveObjsDialog::collectObjsToSave()
 {
   m_objsToSave.clear();
-  foreach (QTreeWidgetItem *item, m_treeWidget->selectedItems()) {
-    m_objsToSave.append(item->data(0, Qt::UserRole).value<size_t>());
-  }
+    foreach (QTreeWidgetItem* item, m_treeWidget->selectedItems()) {
+      m_objsToSave.append(item->data(0, Qt::UserRole).value<size_t>());
+    }
   accept();
 }
 
@@ -84,7 +84,7 @@ void ZSaveObjsDialog::discard()
 void ZSaveObjsDialog::updateSaveButton()
 {
   int count = m_treeWidget->selectedItems().count();
-  QPushButton *button = m_buttonBox->button(QDialogButtonBox::Save);
+  QPushButton* button = m_buttonBox->button(QDialogButtonBox::Save);
   if (count == m_treeWidget->topLevelItemCount()) {
     button->setEnabled(true);
     button->setText(tr("Save All"));
@@ -104,13 +104,13 @@ void ZSaveObjsDialog::adjustButtonWidths()
   if (m_treeWidget->topLevelItemCount() > 1)
     possibleTexts << tr("Save Selected");
   int maxTextWidth = 0;
-  QPushButton *saveButton = m_buttonBox->button(QDialogButtonBox::Save);
-  foreach (const QString &text, possibleTexts) {
-    saveButton->setText(text);
-    int hint = saveButton->sizeHint().width();
-    if (hint > maxTextWidth)
-      maxTextWidth = hint;
-  }
+  QPushButton* saveButton = m_buttonBox->button(QDialogButtonBox::Save);
+    foreach (const QString& text, possibleTexts) {
+      saveButton->setText(text);
+      int hint = saveButton->sizeHint().width();
+      if (hint > maxTextWidth)
+        maxTextWidth = hint;
+    }
   saveButton->setMinimumWidth(maxTextWidth);
 }
 

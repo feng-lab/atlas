@@ -24,7 +24,7 @@
 
 namespace nim {
 
-ZDoc::ZDoc(QObject *parent)
+ZDoc::ZDoc(QObject* parent)
   : QObject(parent)
   , m_nextObjId(100)
   , m_viewSettingId(0)
@@ -79,12 +79,12 @@ QList<size_t> ZDoc::selectedObjs() const
 QList<ZObjDoc*> ZDoc::objDocs()
 {
   QList<ZObjDoc*> res;
-  for (int i=0; i<m_docPacks.size(); ++i)
+  for (int i = 0; i < m_docPacks.size(); ++i)
     res.push_back(m_docPacks[i].doc);
   return res;
 }
 
-ZObjDoc *ZDoc::idToDoc(size_t id) const
+ZObjDoc* ZDoc::idToDoc(size_t id) const
 {
   return m_objModel->idToDoc(id);
 }
@@ -124,7 +124,7 @@ void ZDoc::appendSelectObj(size_t id)
   m_objSelectionModel->appendSelectObj(id);
 }
 
-size_t ZDoc::indexToId(const QModelIndex &index)
+size_t ZDoc::indexToId(const QModelIndex& index)
 {
   return m_objModel->indexToId(index);
 }
@@ -187,12 +187,12 @@ QString ZDoc::objDetailedInfo(size_t id) const
   }
 }
 
-QList<size_t> ZDoc::objsOfDoc(const ZObjDoc *objD) const
+QList<size_t> ZDoc::objsOfDoc(const ZObjDoc* objD) const
 {
   return m_objModel->objsOfDoc(objD);
 }
 
-QList<size_t> ZDoc::selectedObjsOfDoc(const ZObjDoc *objD) const
+QList<size_t> ZDoc::selectedObjsOfDoc(const ZObjDoc* objD) const
 {
   return m_objSelectionModel->selectedObjsOfDoc(objD);
 }
@@ -205,7 +205,7 @@ void ZDoc::activateEmptyUndoStack()
 QList<QAction*> ZDoc::fileActions() const
 {
   QList<QAction*> res;
-  for (int i=0; i<m_docPacks.size(); ++i) {
+  for (int i = 0; i < m_docPacks.size(); ++i) {
     res.append(m_docPacks[i].doc->loadFileActions());
     res.append(m_docPacks[i].removeAllAction);
   }
@@ -216,30 +216,30 @@ QList<QAction*> ZDoc::fileActions() const
 QList<QAction*> ZDoc::loadFileActions() const
 {
   QList<QAction*> res;
-  for (int i=0; i<m_docPacks.size(); ++i) {
+  for (int i = 0; i < m_docPacks.size(); ++i) {
     res.append(m_docPacks[i].doc->loadFileActions());
   }
   return res;
 }
 
-QList<QMenu *> ZDoc::processObjMenu() const
+QList<QMenu*> ZDoc::processObjMenu() const
 {
   QList<QMenu*> res;
-  for (int i=0; i<m_docPacks.size(); ++i) {
-    QMenu *menu = m_docPacks[i].doc->processObjMenu();
+  for (int i = 0; i < m_docPacks.size(); ++i) {
+    QMenu* menu = m_docPacks[i].doc->processObjMenu();
     if (menu)
       res.append(menu);
   }
   return res;
 }
 
-ZObjWidget *ZDoc::createObjWidget(QWidget *parent)
+ZObjWidget* ZDoc::createObjWidget(QWidget* parent)
 {
   ZObjWidget* wdt = new ZObjWidget(this, m_objModel, m_objSelectionModel, parent);
   return wdt;
 }
 
-QWidget *ZDoc::createObjEditWidget(size_t id)
+QWidget* ZDoc::createObjEditWidget(size_t id)
 {
   if (id == 0) {
     return nullptr;
@@ -253,11 +253,11 @@ void ZDoc::updateObjInfo(size_t id)
   emit objInfoChanged(id);
 }
 
-void ZDoc::registerObjDoc(ZObjDoc *objD)
+void ZDoc::registerObjDoc(ZObjDoc* objD)
 {
   DocPack docPack;
   docPack.doc = objD;
-  QAction *docRemoveAllAction = new QAction(tr("&Remove All %1").arg(objD->typePluralName()), this);
+  QAction* docRemoveAllAction = new QAction(tr("&Remove All %1").arg(objD->typePluralName()), this);
   docRemoveAllAction->setStatusTip(tr("&Remove All %1").arg(objD->typePluralName()));
   connect(docRemoveAllAction, &QAction::triggered, this, &ZDoc::removeAllObjs);
   docPack.removeAllAction = docRemoveAllAction;
@@ -274,18 +274,18 @@ void ZDoc::registerNewObj(size_t id, ZObjDoc* objD)
 
 void ZDoc::removeObj(size_t id)
 {
-  ZObjDoc *doc = m_objModel->idToDoc(id);
+  ZObjDoc* doc = m_objModel->idToDoc(id);
   if (saveOrDiscard(id)) {
     m_objModel->removeObj(id);
     doc->removeObj(id);
   }
 }
 
-void ZDoc::removeAllObjsOfDoc(ZObjDoc *doc)
+void ZDoc::removeAllObjsOfDoc(ZObjDoc* doc)
 {
   QList<size_t> objs = objsOfDoc(doc);
   if (saveOrDiscard(objs)) {
-    for (int i=0; i<objs.size(); ++i) {
+    for (int i = 0; i < objs.size(); ++i) {
       m_objModel->removeObj(objs[i]);
       doc->removeObj(objs[i]);
     }
@@ -294,7 +294,7 @@ void ZDoc::removeAllObjsOfDoc(ZObjDoc *doc)
 
 bool ZDoc::saveOrDiscard(size_t id)
 {
-  ZObjDoc *doc = m_objModel->idToDoc(id);
+  ZObjDoc* doc = m_objModel->idToDoc(id);
   if (!doc->objHasUnsavedChange(id)) {
     return true;
   }
@@ -307,30 +307,30 @@ bool ZDoc::saveOrDiscard(size_t id)
   int ret = msgBox.exec();
 
   switch (ret) {
-  case QMessageBox::Save:
-    // Save was clicked
-    if (doc->save(id)) {
+    case QMessageBox::Save:
+      // Save was clicked
+      if (doc->save(id)) {
+        return true;
+      }
+      break;
+    case QMessageBox::Discard:
+      // Don't Save was clicked
       return true;
-    }
-    break;
-  case QMessageBox::Discard:
-    // Don't Save was clicked
-    return true;
-    break;
-  case QMessageBox::Cancel:
-    // Cancel was clicked
-    break;
-  default:
-    // should never be reached
-    break;
+      break;
+    case QMessageBox::Cancel:
+      // Cancel was clicked
+      break;
+    default:
+      // should never be reached
+      break;
   }
   return false;
 }
 
-bool ZDoc::saveOrDiscard(const QList<size_t> &objs)
+bool ZDoc::saveOrDiscard(const QList<size_t>& objs)
 {
   QList<size_t> unsavedObjs;
-  for (int i=0; i<objs.size(); ++i) {
+  for (int i = 0; i < objs.size(); ++i) {
     if (m_objModel->idToDoc(objs[i])->objHasUnsavedChange(objs[i])) {
       unsavedObjs.push_back(objs[i]);
     }
@@ -341,41 +341,41 @@ bool ZDoc::saveOrDiscard(const QList<size_t> &objs)
   ZSaveObjsDialog dlg(*this, unsavedObjs, QApplication::activeWindow());
   int ret = dlg.exec();
   switch (ret) {
-  case QDialog::Accepted: {
-    //LOG(INFO) << "Save or Discard was clicked";
-    bool saveSuccess = true;
-    const QList<size_t> &sobjs = dlg.objsToSave();
-    for (int i=0; i<sobjs.size(); ++i) {
-      //LOG(INFO) << "save " << m_objModel->idToDoc(sobjs[i])->objName(sobjs[i]);
-      saveSuccess = saveSuccess && m_objModel->idToDoc(sobjs[i])->save(sobjs[i]);
+    case QDialog::Accepted: {
+      //LOG(INFO) << "Save or Discard was clicked";
+      bool saveSuccess = true;
+      const QList<size_t>& sobjs = dlg.objsToSave();
+      for (int i = 0; i < sobjs.size(); ++i) {
+        //LOG(INFO) << "save " << m_objModel->idToDoc(sobjs[i])->objName(sobjs[i]);
+        saveSuccess = saveSuccess && m_objModel->idToDoc(sobjs[i])->save(sobjs[i]);
+      }
+      return saveSuccess;
+      break;
     }
-    return saveSuccess;
-    break;
-  }
-  case QDialog::Rejected:
-    //LOG(INFO) << "Cancel was clicked";
-    break;
-  default:
-    // should never be reached
-    break;
+    case QDialog::Rejected:
+      //LOG(INFO) << "Cancel was clicked";
+      break;
+    default:
+      // should never be reached
+      break;
   }
   return false;
 }
 
-void ZDoc::loadFile(const QString &fileName)
+void ZDoc::loadFile(const QString& fileName)
 {
   QString error;
   if (!loadFile(fileName, error)) {
     QMessageBox::critical(QApplication::activeWindow(), tr("Can not read file"),
                           tr("Can not read file %1. Error: %2")
-                          .arg(fileName).arg(error));
+                            .arg(fileName).arg(error));
   }
 }
 
-void ZDoc::loadFileList(const QStringList &fileList)
+void ZDoc::loadFileList(const QStringList& fileList)
 {
   QString error;
-  for (int i=0; i<fileList.size(); ++i) {
+  for (int i = 0; i < fileList.size(); ++i) {
     QString tmpErr;
     if (!loadFile(fileList[i], tmpErr)) {
       if (!error.isEmpty())
@@ -396,12 +396,12 @@ size_t ZDoc::viewSettingId()
   return m_viewSettingId;
 }
 
-std::map<size_t, size_t> ZDoc::read(const QJsonObject &json, QString &err)
+std::map<size_t, size_t> ZDoc::read(const QJsonObject& json, QString& err)
 {
-  std::map<size_t,size_t> res;
+  std::map<size_t, size_t> res;
   if (!json.isEmpty()) {
-    for (int i=0; i<m_docPacks.size(); ++i) {
-      QList<QPair<QString,QJsonValue>> docKeyValueList;
+    for (int i = 0; i < m_docPacks.size(); ++i) {
+      QList<QPair<QString, QJsonValue>> docKeyValueList;
       for (QJsonObject::const_iterator it = json.begin(); it != json.end(); ++it) {
         if (it.key().startsWith(m_docPacks[i].doc->typeName())) {
           docKeyValueList.push_back(qMakePair(it.key(), it.value()));
@@ -419,9 +419,9 @@ std::map<size_t, size_t> ZDoc::read(const QJsonObject &json, QString &err)
   return res;
 }
 
-void ZDoc::write(QJsonObject &json, bool includeAnimation) const
+void ZDoc::write(QJsonObject& json, bool includeAnimation) const
 {
-  for (int i=0; i<m_docPacks.size(); ++i) {
+  for (int i = 0; i < m_docPacks.size(); ++i) {
     if (!includeAnimation && m_docPacks[i].doc == m_animation3DDoc)
       continue;
     if (!includeAnimation && m_docPacks[i].doc == m_animation2DDoc)
@@ -436,7 +436,7 @@ QString ZDoc::lastOpenedFilePath()
   return settings.value(QString("doc/lastOpenedPath")).toString();
 }
 
-void ZDoc::setLastOpenedFilePath(const QString &path)
+void ZDoc::setLastOpenedFilePath(const QString& path)
 {
   if (path.isEmpty())
     return;
@@ -448,7 +448,7 @@ void ZDoc::setLastOpenedFilePath(const QString &path)
 void ZDoc::hideAnimation3DView()
 {
   QList<size_t> a3ds = m_animation3DDoc->objs();
-  for (int i=0; i<a3ds.size(); ++i) {
+  for (int i = 0; i < a3ds.size(); ++i) {
     setObjVisible(a3ds[i], false);
     setObjSelected(a3ds[i], false);
   }
@@ -456,15 +456,15 @@ void ZDoc::hideAnimation3DView()
 
 void ZDoc::removeAllObjs()
 {
-  QAction *action = qobject_cast<QAction*>(sender());
+  QAction* action = qobject_cast<QAction*>(sender());
   if (!action || action == m_removeAllAction) {
-    for (int i=0; i<m_docPacks.size(); ++i) {
+    for (int i = 0; i < m_docPacks.size(); ++i) {
       removeAllObjsOfDoc(m_docPacks[i].doc);
     }
     if (!hasObj())
       m_nextObjId = 100;
   } else {
-    for (int i=0; i<m_docPacks.size(); ++i) {
+    for (int i = 0; i < m_docPacks.size(); ++i) {
       if (m_docPacks[i].removeAllAction == action) {
         removeAllObjsOfDoc(m_docPacks[i].doc);
         break;
@@ -476,7 +476,7 @@ void ZDoc::removeAllObjs()
 void ZDoc::showSelectedObjs()
 {
   QList<size_t> objs = m_objSelectionModel->selectedObjs();
-  for (int i=0; i<objs.size(); ++i) {
+  for (int i = 0; i < objs.size(); ++i) {
     setObjVisible(objs[i], true);
   }
 }
@@ -484,7 +484,7 @@ void ZDoc::showSelectedObjs()
 void ZDoc::hideSelectedObjs()
 {
   QList<size_t> objs = m_objSelectionModel->selectedObjs();
-  for (int i=0; i<objs.size(); ++i) {
+  for (int i = 0; i < objs.size(); ++i) {
     setObjVisible(objs[i], false);
   }
 }
@@ -492,8 +492,8 @@ void ZDoc::hideSelectedObjs()
 void ZDoc::makeAliasOfSelectedObjs()
 {
   QList<size_t> objs = m_objSelectionModel->selectedObjs();
-  for (int i=0; i<objs.size(); ++i) {
-    ZObjDoc *doc = idToDoc(objs[i]);
+  for (int i = 0; i < objs.size(); ++i) {
+    ZObjDoc* doc = idToDoc(objs[i]);
     doc->makeAlias(objs[i]);
   }
 }
@@ -501,7 +501,7 @@ void ZDoc::makeAliasOfSelectedObjs()
 void ZDoc::removeSelectedObjs()
 {
   QList<size_t> objs = m_objSelectionModel->selectedObjs();
-  for (int i=0; i<objs.size(); ++i) {
+  for (int i = 0; i < objs.size(); ++i) {
     removeObj(objs[i]);
   }
 }
@@ -510,7 +510,7 @@ bool ZDoc::saveSelectedObjs()
 {
   bool res = true;
   QList<size_t> objs = m_objSelectionModel->selectedObjs();
-  for (int i=0; i<objs.size(); ++i) {
+  for (int i = 0; i < objs.size(); ++i) {
     res = res && idToDoc(objs[i])->save(objs[i]);
   }
   return res;
@@ -520,7 +520,7 @@ bool ZDoc::saveSelectedObjsAs()
 {
   bool res = true;
   QList<size_t> objs = m_objSelectionModel->selectedObjs();
-  for (int i=0; i<objs.size(); ++i) {
+  for (int i = 0; i < objs.size(); ++i) {
     res = res && idToDoc(objs[i])->saveAs(objs[i]);
   }
   return res;
@@ -530,7 +530,7 @@ bool ZDoc::saveAllObjs()
 {
   bool res = true;
   QList<size_t> allObjs = objs();
-  for (int i=0; i<allObjs.size(); ++i) {
+  for (int i = 0; i < allObjs.size(); ++i) {
     res = res && idToDoc(allObjs[i])->save(allObjs[i]);
   }
   return res;
@@ -539,7 +539,7 @@ bool ZDoc::saveAllObjs()
 void ZDoc::showSelectedObjsInGraphicalShell()
 {
   QList<size_t> objs = m_objSelectionModel->selectedObjs();
-  for (int i=0; i<objs.size(); ++i) {
+  for (int i = 0; i < objs.size(); ++i) {
     idToDoc(objs[i])->showObjInGraphicalShell(objs[i]);
   }
 }
@@ -548,12 +548,12 @@ void ZDoc::copySelectedObjsPathToClipboard()
 {
   QList<size_t> objs = m_objSelectionModel->selectedObjs();
   if (!objs.isEmpty()) {
-    QString path =  idToDoc(objs[0])->objPath(objs[0]);
-    for (int i=1; i<objs.size(); ++i) {
+    QString path = idToDoc(objs[0])->objPath(objs[0]);
+    for (int i = 1; i < objs.size(); ++i) {
       path += QString("\n");
       path += idToDoc(objs[i])->objPath(objs[i]);
     }
-     QApplication::clipboard()->setText(path);
+    QApplication::clipboard()->setText(path);
   }
 }
 
@@ -603,10 +603,10 @@ void ZDoc::createActions()
   m_changeAnimationSettingAction->setStatusTip(tr("Open Animation Settings Dialog"));
 }
 
-bool ZDoc::loadFile(const QString &fileName, QString &errMsg)
+bool ZDoc::loadFile(const QString& fileName, QString& errMsg)
 {
   if (QFile::exists(fileName)) {
-    for (int i=0; i<m_docPacks.size(); ++i) {
+    for (int i = 0; i < m_docPacks.size(); ++i) {
       if (m_docPacks[i].doc->canReadFile(fileName)) {
         QString tmpErr;
         if (m_docPacks[i].doc->loadFile(fileName, tmpErr)) {

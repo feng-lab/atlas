@@ -11,34 +11,40 @@ namespace nim {
 
 class ZViewSettingWidget : public QWidget
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit ZViewSettingWidget(ZDoc *doc, ZViewSettingInterface *view, QWidget *mw = nullptr);
+  explicit ZViewSettingWidget(ZDoc* doc, ZViewSettingInterface* view, QWidget* mw = nullptr);
 
   void showDefaultWidget();
+
   void showViewSettingWidgetOfObj(size_t id);
+
   void hideViewSettingWidget();
-  void setDefaultWidget(QWidget *widget);
+
+  void setDefaultWidget(QWidget* widget);
 
 private:
   void removeViewSettingWidgetOfObj(size_t id);
+
   void updateViewSettingWidgetLabelOfObj(size_t id);
+
   void updateWidget();
 
 protected:
-  ZDoc *m_doc;
-  ZViewSettingInterface *m_view;
-  QStackedWidget *m_widget;
-  QWidget *m_defaultWidget;
+  ZDoc* m_doc;
+  ZViewSettingInterface* m_view;
+  QStackedWidget* m_widget;
+  QWidget* m_defaultWidget;
 
-  struct SubWidget {
-    SubWidget(size_t id, ZWidgetsGroup *wg, QLabel *label, QWidget *wt)
+  struct SubWidget
+  {
+    SubWidget(size_t id, ZWidgetsGroup* wg, QLabel* label, QWidget* wt)
       : id(id), widgetsGroup(wg), label(label), widget(wt)
     {}
 
     size_t id;
     ZWidgetsGroup* widgetsGroup;
-    QLabel *label;
+    QLabel* label;
     QWidget* widget;
   };
 

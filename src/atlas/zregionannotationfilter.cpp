@@ -9,7 +9,7 @@
 
 namespace nim {
 
-ZRegionAnnotationFilter::ZRegionAnnotationFilter(ZView &view)
+ZRegionAnnotationFilter::ZRegionAnnotationFilter(ZView& view)
   : ZObjFilter(view)
   , m_regionAnnotation(nullptr)
   , m_visible("Visible", true)
@@ -19,7 +19,7 @@ ZRegionAnnotationFilter::ZRegionAnnotationFilter(ZView &view)
   //addParameter(&m_visible);
 }
 
-void ZRegionAnnotationFilter::setData(ZRegionAnnotation &regionAnnotation)
+void ZRegionAnnotationFilter::setData(ZRegionAnnotation& regionAnnotation)
 {
   m_regionAnnotation = &regionAnnotation;
 
@@ -51,7 +51,7 @@ void ZRegionAnnotationFilter::setMaxZProjView(int t)
   }
 }
 
-const std::vector<int> &ZRegionAnnotationFilter::boundBox() const
+const std::vector<int>& ZRegionAnnotationFilter::boundBox() const
 {
   return m_regionAnnotation->boundBox();
 }
@@ -79,14 +79,14 @@ void ZRegionAnnotationFilter::deleteKeyPressed()
   }
 }
 
-void ZRegionAnnotationFilter::mousePressed(const QPointF &scenePos)
+void ZRegionAnnotationFilter::mousePressed(const QPointF& scenePos)
 {
   for (auto it = m_idToROIFilters.begin(); it != m_idToROIFilters.end(); ++it) {
     it->second->mousePressed(scenePos);
   }
 }
 
-void ZRegionAnnotationFilter::mouseReleased(const QPointF &scenePos)
+void ZRegionAnnotationFilter::mouseReleased(const QPointF& scenePos)
 {
   for (auto it = m_idToROIFilters.begin(); it != m_idToROIFilters.end(); ++it) {
     it->second->mouseReleased(scenePos);
@@ -114,7 +114,7 @@ void ZRegionAnnotationFilter::visibleChanged()
   }
 }
 
-void ZRegionAnnotationFilter::regionROIAdded(int64_t id, ZROI *roi)
+void ZRegionAnnotationFilter::regionROIAdded(int64_t id, ZROI* roi)
 {
   CHECK(roi);
   m_idToROIFilters.at(id)->setData(*roi);
@@ -139,18 +139,18 @@ void ZRegionAnnotationFilter::allROIChanged()
   ZTree<RegionNode>& annoTree = m_regionAnnotation->annotationTree();
   for (auto it = annoTree.begin(); it != annoTree.end(); ++it) {
     int id = it->id;
-    ZROIFilter *flt = new ZROIFilter(m_view);
+    ZROIFilter* flt = new ZROIFilter(m_view);
     if (it->roi) {
       flt->setData(*it->roi.get());
     }
     flt->setVisible(false);
-    flt->setOutlineColor(glm::vec3(it->red/255.f, it->green/255.f, it->blue/255.f));
-    flt->setRegionColor(glm::vec3(it->red/255.f, it->green/255.f, it->blue/255.f));
+    flt->setOutlineColor(glm::vec3(it->red / 255.f, it->green / 255.f, it->blue / 255.f));
+    flt->setRegionColor(glm::vec3(it->red / 255.f, it->green / 255.f, it->blue / 255.f));
     connect(&m_offsetPara, &ZDVec4Parameter::valueChanged, &flt->offsetPara(), &ZDVec4Parameter::updateFromSender);
     m_idToRegionNames[id] = QString("%1_%2").arg(it->abbreviation).arg(it->id);
     m_nameToID[m_idToRegionNames[id]] = id;
     QList<ZParameter*> paras = flt->parameters();
-    for (int i=0; i<paras.size(); ++i) {
+    for (int i = 0; i < paras.size(); ++i) {
       if (paras[i]->name() == "Offset") {
         continue;
       }

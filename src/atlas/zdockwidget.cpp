@@ -2,7 +2,7 @@
 
 namespace nim {
 
-ZDockWidget::ZDockWidget(const QString &title, QWidget *parent, Qt::WindowFlags flags)
+ZDockWidget::ZDockWidget(const QString& title, QWidget* parent, Qt::WindowFlags flags)
   : QDockWidget(title, parent, flags)
 {
 }

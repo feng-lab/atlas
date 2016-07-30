@@ -15,14 +15,17 @@ class Z3DImg;
 // transfer functions
 class Z3DVolumeRaycasterRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit Z3DVolumeRaycasterRenderer(Z3DRendererBase &rendererBase);
+  explicit Z3DVolumeRaycasterRenderer(Z3DRendererBase& rendererBase);
 
   // input vols can not be nullptr
-  void setChannels(const std::vector<std::unique_ptr<Z3DVolume>> &vols);
-  void setChannels(const Z3DImg &img);
-  void setLayerTarget(Z3DRenderTarget *layerTarget) { m_layerTarget = layerTarget; }
+  void setChannels(const std::vector<std::unique_ptr<Z3DVolume>>& vols);
+
+  void setChannels(const Z3DImg& img);
+
+  void setLayerTarget(Z3DRenderTarget* layerTarget)
+  { m_layerTarget = layerTarget; }
 
   // quad or entryexit texture should be set before rendering
 
@@ -32,15 +35,18 @@ public:
   // To render a slice in 3D volume, quad should contains corner vertex and 3d texture coordinates
   // DO NOT call this function for 3d Raycaster
   // clear
-  void clearQuads() { m_quads.clear(); }
+  void clearQuads()
+  { m_quads.clear(); }
+
   // add quad
-  void addQuad(const ZMesh &quad);
+  void addQuad(const ZMesh& quad);
+
   // For 3D Raycasting rendering, once called, 2d quads will be cleared and renderer
   // switch to 3D mode
-  void setEntryExitInfo(const Z3DTexture *entryTexCoordTexture,
-                        const Z3DTexture *entryEyeCoordTexture,
-                        const Z3DTexture *exitTexCoordTexture,
-                        const Z3DTexture *exitEyeCoordTexture);
+  void setEntryExitInfo(const Z3DTexture* entryTexCoordTexture,
+                        const Z3DTexture* entryEyeCoordTexture,
+                        const Z3DTexture* exitTexCoordTexture,
+                        const Z3DTexture* exitEyeCoordTexture);
 
   void translate(double dx, double dy, double dz);
 
@@ -49,27 +55,44 @@ public:
 
   QString compositeMode() const;
 
-  ZStringIntOptionParameter& compositingModePara() { return m_compositingMode; }
-  ZFloatParameter& samplingRatePara() { return m_samplingRate; }
-  ZFloatParameter& isoValuePara() { return m_isoValue; }
-  ZFloatParameter& localMIPThresholdPara() { return m_localMIPThreshold; }
-  const std::vector<std::unique_ptr<ZBoolParameter>>& channelVisibleParas() const { return m_channelVisibleParas; }
-  const std::vector<std::unique_ptr<Z3DTransferFunctionParameter>>& transferFuncParas() const { return m_transferFuncParas; }
-  const std::vector<std::unique_ptr<ZStringIntOptionParameter>>& texFilterModeParas() const { return m_texFilterModeParas; }
+  ZStringIntOptionParameter& compositingModePara()
+  { return m_compositingMode; }
+
+  ZFloatParameter& samplingRatePara()
+  { return m_samplingRate; }
+
+  ZFloatParameter& isoValuePara()
+  { return m_isoValue; }
+
+  ZFloatParameter& localMIPThresholdPara()
+  { return m_localMIPThreshold; }
+
+  const std::vector<std::unique_ptr<ZBoolParameter>>& channelVisibleParas() const
+  { return m_channelVisibleParas; }
+
+  const std::vector<std::unique_ptr<Z3DTransferFunctionParameter>>& transferFuncParas() const
+  { return m_transferFuncParas; }
+
+  const std::vector<std::unique_ptr<ZStringIntOptionParameter>>& texFilterModeParas() const
+  { return m_texFilterModeParas; }
 
 signals:
 
 protected slots:
+
   void adjustWidgets();
 
 protected:
-  void bindVolumesAndTransferFuncs(Z3DShaderProgram &shader);
-  void bindVolumeAndTransferFunc(Z3DShaderProgram &shader, size_t idx);
+  void bindVolumesAndTransferFuncs(Z3DShaderProgram& shader);
+
+  void bindVolumeAndTransferFunc(Z3DShaderProgram& shader, size_t idx);
 
   virtual void compile() override;
+
   QString generateHeader();
 
   virtual void render(Z3DEye eye) override;
+
   virtual void renderPicking(Z3DEye) override;
 
 //  Z3DShaderProgram m_raycasterShader;
@@ -89,7 +112,7 @@ protected:
 
   ZStringIntOptionParameter m_compositingMode;
 
-  std::vector<Z3DVolume *> m_volumes;
+  std::vector<Z3DVolume*> m_volumes;
   std::vector<QString> m_volumeUniformNames;
   std::vector<QString> m_volumeDimensionNames;
   std::vector<QString> m_transferFuncUniformNames;
@@ -105,10 +128,10 @@ private:
   bool m_is2DImage;
 
   std::vector<ZMesh> m_quads;
-  const Z3DTexture *m_entryTexCoordTexture;
-  const Z3DTexture *m_entryEyeCoordTexture;
-  const Z3DTexture *m_exitTexCoordTexture;
-  const Z3DTexture *m_exitEyeCoordTexture;
+  const Z3DTexture* m_entryTexCoordTexture;
+  const Z3DTexture* m_entryEyeCoordTexture;
+  const Z3DTexture* m_exitTexCoordTexture;
+  const Z3DTexture* m_exitEyeCoordTexture;
 
   bool m_opaque;
   double m_alpha; //only takes effect when m_opaque is true

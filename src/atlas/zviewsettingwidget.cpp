@@ -8,12 +8,12 @@
 
 namespace nim {
 
-ZViewSettingWidget::ZViewSettingWidget(ZDoc *doc, ZViewSettingInterface *view, QWidget *mw)
+ZViewSettingWidget::ZViewSettingWidget(ZDoc* doc, ZViewSettingInterface* view, QWidget* mw)
   : QWidget(mw)
   , m_doc(doc)
   , m_view(view)
 {
-  QVBoxLayout *layout = new QVBoxLayout;
+  QVBoxLayout* layout = new QVBoxLayout;
   m_widget = new QStackedWidget;
   m_defaultWidget = new QWidget(this);
   m_widget->addWidget(m_defaultWidget);
@@ -35,7 +35,7 @@ void ZViewSettingWidget::showDefaultWidget()
 
 void ZViewSettingWidget::showViewSettingWidgetOfObj(size_t id)
 {
-  for (size_t i=0; i<m_subWidgets.size(); ++i) {
+  for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       m_widget->setCurrentWidget(m_subWidgets[i].widget);
       return;
@@ -47,7 +47,7 @@ void ZViewSettingWidget::showViewSettingWidgetOfObj(size_t id)
     label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setWordWrap(true);
-    QWidget *wt = wg->createWidget(false, true, label);
+    QWidget* wt = wg->createWidget(false, true, label);
     connect(wg.get(), &ZWidgetsGroup::widgetsGroupChanged, this, &ZViewSettingWidget::updateWidget);
     m_subWidgets.emplace_back(id, wg.get(), label, wt);
     m_widget->setCurrentIndex(m_widget->addWidget(wt));
@@ -61,7 +61,7 @@ void ZViewSettingWidget::hideViewSettingWidget()
   m_widget->setCurrentWidget(m_defaultWidget);
 }
 
-void ZViewSettingWidget::setDefaultWidget(QWidget *widget)
+void ZViewSettingWidget::setDefaultWidget(QWidget* widget)
 {
   if (m_widget->currentWidget() == m_defaultWidget) {
     m_widget->setCurrentIndex(m_widget->addWidget(widget));
@@ -73,7 +73,7 @@ void ZViewSettingWidget::setDefaultWidget(QWidget *widget)
 
 void ZViewSettingWidget::removeViewSettingWidgetOfObj(size_t id)
 {
-  for (size_t i=0; i<m_subWidgets.size(); ++i) {
+  for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       if (m_widget->currentWidget() == m_subWidgets[i].widget)
         m_widget->setCurrentWidget(m_defaultWidget);
@@ -87,7 +87,7 @@ void ZViewSettingWidget::removeViewSettingWidgetOfObj(size_t id)
 
 void ZViewSettingWidget::updateViewSettingWidgetLabelOfObj(size_t id)
 {
-  for (size_t i=0; i<m_subWidgets.size(); ++i) {
+  for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       m_subWidgets[i].label->setText(m_doc->objNameWithModifiedMarkerAndID(id));
       break;
@@ -97,8 +97,8 @@ void ZViewSettingWidget::updateViewSettingWidgetLabelOfObj(size_t id)
 
 void ZViewSettingWidget::updateWidget()
 {
-  ZWidgetsGroup *wg = qobject_cast<ZWidgetsGroup*>(sender());
-  for (size_t i=0; i<m_subWidgets.size(); ++i) {
+  ZWidgetsGroup* wg = qobject_cast<ZWidgetsGroup*>(sender());
+  for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].widgetsGroup == wg) {
       bool current = false;
       if (m_widget->currentWidget() == m_subWidgets[i].widget) {

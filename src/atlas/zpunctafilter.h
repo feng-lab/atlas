@@ -17,22 +17,51 @@ namespace nim {
 class ZPunctaGraphicsItem : public QGraphicsItem
 {
 public:
-  enum { Type = UserType + 9 };
-  int type() const override { return Type; }
+  enum
+  {
+    Type = UserType + 9
+  };
 
-  ZPunctaGraphicsItem(ZPuncta &puncta, double z = 1, QGraphicsItem *parent = nullptr);
+  int type() const override
+  { return Type; }
 
-  void setOutlineColor(const QColor &c) { m_outlineColor = c; update(); }
-  void setOpacity(double v) { m_opacity = v; update(); }
-  void setNormalView(int z, int t) { m_mip = false; m_z = z; m_t = t; update(); }
-  void setMaxZProjView(int t) { m_mip = true; m_t = t; update(); }
+  ZPunctaGraphicsItem(ZPuncta& puncta, double z = 1, QGraphicsItem* parent = nullptr);
 
-  const std::vector<int>& boundBox() const { return m_boundBox; }
+  void setOutlineColor(const QColor& c)
+  {
+    m_outlineColor = c;
+    update();
+  }
+
+  void setOpacity(double v)
+  {
+    m_opacity = v;
+    update();
+  }
+
+  void setNormalView(int z, int t)
+  {
+    m_mip = false;
+    m_z = z;
+    m_t = t;
+    update();
+  }
+
+  void setMaxZProjView(int t)
+  {
+    m_mip = true;
+    m_t = t;
+    update();
+  }
+
+  const std::vector<int>& boundBox() const
+  { return m_boundBox; }
 
   // QGraphicsItem interface
 public:
   virtual QRectF boundingRect() const override;
-  virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
+
+  virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
 
 protected:
   ZPuncta& m_puncta;
@@ -46,17 +75,22 @@ protected:
 
 class ZPunctaFilter : public ZObjFilter
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  ZPunctaFilter(ZView &view);
+  ZPunctaFilter(ZView& view);
 
-  void setData(ZPuncta &puncta);
+  void setData(ZPuncta& puncta);
 
   void releaseItemsOwnership();
 
-  void setVisible(bool v) { m_visible.set(v); }
-  void setSelected(bool v) { Q_UNUSED(v) }
+  void setVisible(bool v)
+  { m_visible.set(v); }
+
+  void setSelected(bool v)
+  { Q_UNUSED(v) }
+
   void setNormalView(int z, int t) override;
+
   void setMaxZProjView(int t) override;
 
   const std::vector<int>& boundBox() const;
@@ -65,10 +99,11 @@ public:
 
 private:
   void visibleChanged();
+
   void outlineColorChanged();
 
 private:
-  ZPuncta *m_puncta;
+  ZPuncta* m_puncta;
   std::unique_ptr<ZPunctaGraphicsItem> m_item;
 
   ZBoolParameter m_visible;

@@ -30,8 +30,11 @@ public:
   ZImgNCCMatch(const ZImg& fixedImg, const ZImg& movingImg, size_t fixedT = 0, size_t movingT = 0);
 
   void setMovingImgPositionHint(PositionHint hint, double maxOverlapRate = 1.0);
+
   QString positionHintToQString() const;
+
   static void reversePositionHint(PositionHint& hint);
+
   static QString positionHintToQString(PositionHint hint, double maxOverlapRate);
 
   // NCC works for single channel, if img contains many channels, these methods control
@@ -39,59 +42,79 @@ public:
   // don't need to call this for single channel img
   // use one channel
   void useFixedImgChannel(size_t ch);
+
   void useMovingImgChannel(size_t ch);
+
   // use two channels
   void useFixedImgChannel(size_t ch1, size_t ch2);
+
   void useMovingImgChannel(size_t ch1, size_t ch2);
+
   // use three channels
   void useFixedImgChannel(size_t ch1, size_t ch2, size_t ch3);
+
   void useMovingImgChannel(size_t ch1, size_t ch2, size_t ch3);
+
   // use many channels
   void useFixedImgChannel(const std::vector<size_t>& chs);
+
   void useMovingImgChannel(const std::vector<size_t>& chs);
+
   // use all channels, this is default
   void useAllFixedImgChannels();
+
   void useAllMovingImgChannels();
 
   // optional preprocess
   // remove background for channel ch
   void enableRemoveBackgroundForFixedImgChannel(size_t ch);
+
   void enableRemoveBackgroundForMovingImgChannel(size_t ch);
+
   // don't remove background for channel ch
   void disableRemoveBackgroundForFixedImgChannel(size_t ch);
+
   void disableRemoveBackgroundForMovingImgChannel(size_t ch);
+
   //
   void enableRemoveBackgroundForAllFixedImgChannels();
+
   void enableRemoveBackgroundForAllMovingImgChannels();
+
   //  this is default behavior
   void disableRemoveBackgroundForAllFixedImgChannels();
+
   void disableRemoveBackgroundForAllMovingImgChannels();
 
   // do correlation
-  ZVoxelCoordinate computeMovingImgOffset(double *maxNCC = nullptr,
-                                          double *maxWeightedNCC = nullptr,
-                                          double *numOverlapVoxels = nullptr);
+  ZVoxelCoordinate computeMovingImgOffset(double* maxNCC = nullptr,
+                                          double* maxWeightedNCC = nullptr,
+                                          double* numOverlapVoxels = nullptr);
 
   // use coarse-to-fine method to reduce memory usage
   ZVoxelCoordinate computeMovingImgOffsetMR(size_t intvX, size_t intvY, size_t intvZ,
-                                            double *maxNCC = nullptr,
-                                            double *maxWeightedNCC = nullptr,
-                                            double *numOverlapVoxels = nullptr,
-                                            double *lowResMaxNCC = nullptr,
-                                            double *lowResMaxWeightedNCC = nullptr,
-                                            double *lowResNumOverlapVoxels = nullptr);
+                                            double* maxNCC = nullptr,
+                                            double* maxWeightedNCC = nullptr,
+                                            double* numOverlapVoxels = nullptr,
+                                            double* lowResMaxNCC = nullptr,
+                                            double* lowResMaxWeightedNCC = nullptr,
+                                            double* lowResNumOverlapVoxels = nullptr);
 
   // give a offset of moving img, get ncc of this offset
   double computeNCCOfOffset(const ZVoxelCoordinate& offset);
 
 private:
   void init();
+
   // throw if ch don't exist
   void checkFixedImgChannel(size_t ch);
+
   void checkMovingImgChannel(size_t ch);
 
-  void constructSingleChannelFixedImg(const ZImgRegion& rgn, ZImg &fixedImg);
-  void constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg &movingImg);
+  void constructSingleChannelFixedImg(const ZImgRegion& rgn, ZImg& fixedImg);
+
+  void constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg& movingImg);
+
   // only works for single channel img
   void removeBackground(ZImg& img);
 
@@ -119,19 +142,24 @@ private:
                                               double& maxWeightedNCC,
                                               double& numOverlapVoxels);
 
-  static ZImgRegion getNccImgValidRegion(const PositionHint& hint, const ZImgInfo &fixedImgInfo, const ZImgInfo &movingImgInfo);
+  static ZImgRegion
+  getNccImgValidRegion(const PositionHint& hint, const ZImgInfo& fixedImgInfo, const ZImgInfo& movingImgInfo);
 
   // ting's method, partial
   static double getRequiredNumberOfOverlapPixels(const PositionHint& hint, double minOverlapRate,
-                                                 const ZImgInfo &fixedImgInfo, const ZImgInfo &movingImgInfo);
+                                                 const ZImgInfo& fixedImgInfo, const ZImgInfo& movingImgInfo);
 
   // ting's method
-  static size_t getMaxWeightedNCCIdx(const double* NCCs, const double* overlapVoxels, double overlapVoxelThre, size_t dataLength,
-                                     double& maxNCC, double& maxWeightedNCC, double& numOverlapVoxels);
+  static size_t
+  getMaxWeightedNCCIdx(const double* NCCs, const double* overlapVoxels, double overlapVoxelThre, size_t dataLength,
+                       double& maxNCC, double& maxWeightedNCC, double& numOverlapVoxels);
 
   static std::pair<ZImgRegion, ZImgRegion> getRequiredSrcImgRegion(const PositionHint& hint,
-                                                                   const ZImg &fixedImg, const ZImg &movingImg, double overlapRate);
-  static ZVoxelCoordinate mapOffsetToSrcImg(ZVoxelCoordinate offset, const ZImgRegion &fixedRgn, const ZImgRegion &movingRgn);
+                                                                   const ZImg& fixedImg, const ZImg& movingImg,
+                                                                   double overlapRate);
+
+  static ZVoxelCoordinate
+  mapOffsetToSrcImg(ZVoxelCoordinate offset, const ZImgRegion& fixedRgn, const ZImgRegion& movingRgn);
 
   ZVoxelCoordinate computeMovingImgOffset(const PositionHint& movingImgPosHint, double maxOverlapRate,
                                           double& maxNCC,

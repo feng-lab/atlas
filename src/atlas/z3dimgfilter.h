@@ -24,27 +24,38 @@ class ZImg;
 
 class Z3DImgFilter : public Z3DBoundedFilter
 {
-  Q_OBJECT
+Q_OBJECT
+
   friend class Z3DCompositor;
+
 public:
-  explicit Z3DImgFilter(Z3DGlobalParameters &globalParas, QObject *parent = nullptr);
+  explicit Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+
   ~Z3DImgFilter();
 
-  void setVisible(bool v) { m_visible.set(v); }
+  void setVisible(bool v)
+  { m_visible.set(v); }
+
   void setOffset(double x, double y, double z);
 
-  void setData(const ZImgPack &imgPack);
+  void setData(const ZImgPack& imgPack);
 
-  virtual bool isStayOnTop() const { return m_stayOnTop.get(); }
-  virtual void setStayOnTop(bool s) { m_stayOnTop.set(s); }
+  virtual bool isStayOnTop() const
+  { return m_stayOnTop.get(); }
+
+  virtual void setStayOnTop(bool s)
+  { m_stayOnTop.set(s); }
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   bool isReady(Z3DEye eye) const override;
 
   virtual bool hasOpaque(Z3DEye eye) const override;
+
   virtual void renderOpaque(Z3DEye eye) override;
+
   virtual bool hasTransparent(Z3DEye eye) const override;
+
   virtual void renderTransparent(Z3DEye eye) override;
 
 protected:
@@ -53,7 +64,8 @@ protected:
   void changeCoordTransform();
 
   void adjustWidget();
-  void leftMouseButtonPressed(QMouseEvent *e, int w, int h);
+
+  void leftMouseButtonPressed(QMouseEvent* e, int w, int h);
 
   //  void invalidateFRVolumeZSlice();
   //  void invalidateFRVolumeYSlice();
@@ -62,23 +74,32 @@ protected:
   //  void invalidateFRVolumeYSlice2();
   //  void invalidateFRVolumeXSlice2();
 
-  virtual void setClipPlanes() override {}
+  virtual void setClipPlanes() override
+  {}
 
   void mousePressed();
+
   void mouseReleased();
 
   virtual void process(Z3DEye eye) override;
+
   bool hasSlices() const;
+
   void renderSlices(Z3DEye eye);
+
   bool hasImage() const;
+
   void renderImage(Z3DEye eye);
 
   virtual void updateNotTransformedBoundBoxImpl() override;
-  virtual void expandCutRange() override {}
+
+  virtual void expandCutRange() override
+  {}
 
 private:
   //void invalidateAllFRVolumeSlices();
   void updateBlockIDTarget();
+
   void volumeChanged();
 
 private:

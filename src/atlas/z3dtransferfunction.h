@@ -10,35 +10,44 @@
 namespace nim {
 
 class Z3DVolume;
+
 class Z3DTexture;
 
 // only support 1d transfer function now
 class Z3DTransferFunction : public ZColorMap
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  Z3DTransferFunction(double min = 0.0, double max = 1.0, const glm::col4 &minColor = glm::col4(0,0,0,0),
-                      const glm::col4 &maxColor = glm::col4(255,255,255,255),
+  Z3DTransferFunction(double min = 0.0, double max = 1.0, const glm::col4& minColor = glm::col4(0, 0, 0, 0),
+                      const glm::col4& maxColor = glm::col4(255, 255, 255, 255),
                       uint32_t width = 256,
-                      QObject *parent = 0);
+                      QObject* parent = 0);
 
 
-  Z3DTransferFunction(const Z3DTransferFunction &tf);
-  Z3DTransferFunction(Z3DTransferFunction &&tf) noexcept;
+  Z3DTransferFunction(const Z3DTransferFunction& tf);
+
+  Z3DTransferFunction(Z3DTransferFunction&& tf) noexcept;
+
   virtual ~Z3DTransferFunction();
 
   void swap(Z3DTransferFunction& other) noexcept;
 
-  Z3DTransferFunction& operator=(Z3DTransferFunction other) noexcept { swap(other); return *this; }
+  Z3DTransferFunction& operator=(Z3DTransferFunction other) noexcept
+  {
+    swap(other);
+    return *this;
+  }
 
   bool operator==(const Z3DTransferFunction& tf) const;
+
   bool operator!=(const Z3DTransferFunction& tf) const;
 
   void resetToDefault();
 
   QString samplerType() const;
 
-  inline glm::uvec3 textureDimensions() const { return m_dimensions; }
+  inline glm::uvec3 textureDimensions() const
+  { return m_dimensions; }
 
   // Returns the texture of the transfer function.
   Z3DTexture* texture();
@@ -49,6 +58,7 @@ public:
 
   // domain should be in [0.0, 1.0] range
   virtual bool isValidDomainMin(double min) const override;
+
   virtual bool isValidDomainMax(double max) const override;
 
 protected:
@@ -66,25 +76,31 @@ protected:
 
 class Z3DTransferFunctionParameter : public ZSingleValueParameter<Z3DTransferFunction>
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  Z3DTransferFunctionParameter(const QString& name, QObject *parent = NULL);
-  Z3DTransferFunctionParameter(const QString& name, double min, double max, const glm::col4 &minColor,
-                               const glm::col4 &maxColor, int width, QObject *parent = NULL);
+  Z3DTransferFunctionParameter(const QString& name, QObject* parent = nullptr);
+
+  Z3DTransferFunctionParameter(const QString& name, double min, double max, const glm::col4& minColor,
+                               const glm::col4& maxColor, int width, QObject* parent = nullptr);
 
   void setVolume(Z3DVolume* volume);
 
-  inline Z3DVolume* volume() const { return m_volume; }
+  inline Z3DVolume* volume() const
+  { return m_volume; }
 
   // ZParameter interface
 public:
-  virtual void setSameAs(const ZParameter &rhs) override;
-  virtual bool supportInterpolation() const override { return false; }
+  virtual void setSameAs(const ZParameter& rhs) override;
+
+  virtual bool supportInterpolation() const override
+  { return false; }
+
   virtual QJsonValue jsonValue() const override;
-  virtual void readValue(const QJsonValue &jsonValue) override;
+
+  virtual void readValue(const QJsonValue& jsonValue) override;
 
 protected:
-  virtual QWidget* actualCreateWidget(QWidget *parent) override;
+  virtual QWidget* actualCreateWidget(QWidget* parent) override;
 
 protected:
   Z3DVolume* m_volume;

@@ -16,7 +16,7 @@ template<typename T>
 class ZParameterMaker : public ZParameterMakerInterface
 {
 public:
-  ZParameter* create(const QString &name, QObject *parent = nullptr) const
+  ZParameter* create(const QString& name, QObject* parent = nullptr) const
   {
     return new T(name, parent);
   }
@@ -56,12 +56,12 @@ ZParameterFactory::ZParameterFactory()
   registerMaker("Font", new ZParameterMaker<ZFontParameter>());
 }
 
-bool ZParameterFactory::isTypeValid(const QString &type)
+bool ZParameterFactory::isTypeValid(const QString& type)
 {
   return m_makers.find(type) != m_makers.end();
 }
 
-ZParameter *ZParameterFactory::create(const QString &name, const QString &type, QObject *parent) const
+ZParameter* ZParameterFactory::create(const QString& name, const QString& type, QObject* parent) const
 {
   auto it = m_makers.find(type);
   if (it == m_makers.end())
@@ -69,7 +69,7 @@ ZParameter *ZParameterFactory::create(const QString &name, const QString &type, 
   return it->second->create(name, parent);
 }
 
-void ZParameterFactory::registerMaker(const QString &typeName, ZParameterMakerInterface *maker)
+void ZParameterFactory::registerMaker(const QString& typeName, ZParameterMakerInterface* maker)
 {
   if (m_makers.find(typeName) != m_makers.end()) {
     LOG(WARNING) << "Multiple makers for type " << typeName;

@@ -33,8 +33,8 @@
 
 namespace nim {
 
-void readOntology(const QJsonObject &obj, ZTree<RegionNode>::Iterator &parentIt,
-                  const QStringList& regionAbbrevs, ZTree<RegionNode> &ontology)
+void readOntology(const QJsonObject& obj, ZTree<RegionNode>::Iterator& parentIt,
+                  const QStringList& regionAbbrevs, ZTree<RegionNode>& ontology)
 {
   RegionNode node;
   QJsonArray children;
@@ -51,11 +51,11 @@ void readOntology(const QJsonObject &obj, ZTree<RegionNode>::Iterator &parentIt,
       QString colorStr = it.value().toString();
       CHECK(colorStr.size() == 6);
       bool ok;
-      node.red = colorStr.mid(0,2).toInt(&ok, 16);
+      node.red = colorStr.mid(0, 2).toInt(&ok, 16);
       CHECK(ok);
-      node.green = colorStr.mid(2,2).toInt(&ok, 16);
+      node.green = colorStr.mid(2, 2).toInt(&ok, 16);
       CHECK(ok);
-      node.blue = colorStr.mid(4,2).toInt(&ok, 16);
+      node.blue = colorStr.mid(4, 2).toInt(&ok, 16);
       CHECK(ok);
     } else if (it.key() == "children") {
       CHECK(it.value().isArray());
@@ -65,7 +65,7 @@ void readOntology(const QJsonObject &obj, ZTree<RegionNode>::Iterator &parentIt,
   if (!ontology.isNull(parentIt)) {
     ZTree<RegionNode>::Iterator currIt = ontology.appendChild(parentIt, node);
     for (QJsonArray::const_iterator it = children.constBegin(); it != children.constEnd(); ++it) {
-      assert((*it).isObject());
+      CHECK((*it).isObject());
       readOntology((*it).toObject(), currIt, regionAbbrevs, ontology);
     }
   } else {
@@ -74,13 +74,13 @@ void readOntology(const QJsonObject &obj, ZTree<RegionNode>::Iterator &parentIt,
       currIt = ontology.appendRoot(node);
     }
     for (QJsonArray::const_iterator it = children.constBegin(); it != children.constEnd(); ++it) {
-      assert((*it).isObject());
+      CHECK((*it).isObject());
       readOntology((*it).toObject(), currIt, regionAbbrevs, ontology);
     }
   }
 }
 
-void readMouseBrainAtlasOntology(ZTree<RegionNode> &ontology)
+void readMouseBrainAtlasOntology(ZTree<RegionNode>& ontology)
 {
   ontology.clear();
   QString ontologyFilename = ":/Resources/ontology/mouse_brain_atlas.json";
@@ -114,11 +114,11 @@ void readMouseBrainAtlasOntology(ZTree<RegionNode> &ontology)
       QString colorStr = it.value().toString();
       CHECK(colorStr.size() == 6);
       bool ok;
-      node.red = colorStr.mid(0,2).toInt(&ok, 16);
+      node.red = colorStr.mid(0, 2).toInt(&ok, 16);
       CHECK(ok);
-      node.green = colorStr.mid(2,2).toInt(&ok, 16);
+      node.green = colorStr.mid(2, 2).toInt(&ok, 16);
       CHECK(ok);
-      node.blue = colorStr.mid(4,2).toInt(&ok, 16);
+      node.blue = colorStr.mid(4, 2).toInt(&ok, 16);
       CHECK(ok);
     } else if (it.key() == "children") {
       CHECK(it.value().isArray());
@@ -127,12 +127,12 @@ void readMouseBrainAtlasOntology(ZTree<RegionNode> &ontology)
   }
   ZTree<RegionNode>::Iterator currIt = ontology.appendRoot(node);
   for (QJsonArray::const_iterator it = children.constBegin(); it != children.constEnd(); ++it) {
-    assert((*it).isObject());
+    CHECK((*it).isObject());
     readOntology((*it).toObject(), currIt, QStringList(), ontology);
   }
 }
 
-void readMouseBrainAtlasOntology(const QStringList &regionAbbrevs, ZTree<RegionNode> &ontology)
+void readMouseBrainAtlasOntology(const QStringList& regionAbbrevs, ZTree<RegionNode>& ontology)
 {
   ontology.clear();
   QString ontologyFilename = ":/Resources/ontology/mouse_brain_atlas.json";
@@ -166,11 +166,11 @@ void readMouseBrainAtlasOntology(const QStringList &regionAbbrevs, ZTree<RegionN
       QString colorStr = it.value().toString();
       CHECK(colorStr.size() == 6);
       bool ok;
-      node.red = colorStr.mid(0,2).toInt(&ok, 16);
+      node.red = colorStr.mid(0, 2).toInt(&ok, 16);
       CHECK(ok);
-      node.green = colorStr.mid(2,2).toInt(&ok, 16);
+      node.green = colorStr.mid(2, 2).toInt(&ok, 16);
       CHECK(ok);
-      node.blue = colorStr.mid(4,2).toInt(&ok, 16);
+      node.blue = colorStr.mid(4, 2).toInt(&ok, 16);
       CHECK(ok);
     } else if (it.key() == "children") {
       CHECK(it.value().isArray());
@@ -179,12 +179,12 @@ void readMouseBrainAtlasOntology(const QStringList &regionAbbrevs, ZTree<RegionN
   }
   ZTree<RegionNode>::Iterator nullIt;
   for (QJsonArray::const_iterator it = children.constBegin(); it != children.constEnd(); ++it) {
-    assert((*it).isObject());
+    CHECK((*it).isObject());
     readOntology((*it).toObject(), nullIt, regionAbbrevs, ontology);
   }
 }
 
-int64_t idOfRegionAbbreviation(const QString &abbreviation, const ZTree<RegionNode> &ontology)
+int64_t idOfRegionAbbreviation(const QString& abbreviation, const ZTree<RegionNode>& ontology)
 {
   for (auto it = ontology.begin(); it != ontology.end(); ++it) {
     if (it->abbreviation == abbreviation) {
@@ -195,7 +195,7 @@ int64_t idOfRegionAbbreviation(const QString &abbreviation, const ZTree<RegionNo
   return 0;
 }
 
-std::vector<int64_t> allIDsWithinRegionAbbreviation(const QString &abbreviation, const ZTree<RegionNode> &ontology)
+std::vector<int64_t> allIDsWithinRegionAbbreviation(const QString& abbreviation, const ZTree<RegionNode>& ontology)
 {
   std::vector<int64_t> res;
   for (auto it = ontology.begin(); it != ontology.end(); ++it) {
@@ -403,7 +403,7 @@ void binaryImgToMesh1(const ZImg &img, ZMesh &msh)
 }
 #endif
 
-void binaryImgToMesh(const ZImg &img, ZMesh &msh)
+void binaryImgToMesh(const ZImg& img, ZMesh& msh)
 {
   CHECK(img.isType<uint8_t>() && !img.isTimeSeries() && !img.isMultiChannelsImg());
   vtkSmartPointer<vtkImageData> vimg = vtkSmartPointer<vtkImageData>::New();
@@ -411,11 +411,11 @@ void binaryImgToMesh(const ZImg &img, ZMesh &msh)
   vimg->SetSpacing(1, 1, 1);
   vimg->SetOrigin(0, 0, 0);
   vimg->AllocateScalars(VTK_UNSIGNED_CHAR, 1);
-  memset(vimg->GetScalarPointer(), 0, (img.width()+1)*(img.height()+1)*(img.depth()+1));
+  memset(vimg->GetScalarPointer(), 0, (img.width() + 1) * (img.height() + 1) * (img.depth() + 1));
 
-  for (size_t z=0; z<img.depth(); ++z) {
-    for (size_t y=0; y<img.height(); ++y) {
-      memcpy(static_cast<uint8_t*>(vimg->GetScalarPointer(0,y,z)), img.rowData(y,z,0,0), img.rowByteNumber());
+  for (size_t z = 0; z < img.depth(); ++z) {
+    for (size_t y = 0; y < img.height(); ++y) {
+      memcpy(static_cast<uint8_t*>(vimg->GetScalarPointer(0, y, z)), img.rowData(y, z, 0, 0), img.rowByteNumber());
     }
   }
 
@@ -489,13 +489,13 @@ void binaryImgToMesh(const ZImg &img, ZMesh &msh)
   //std::vector<glm::dvec3> normals(pointsNormals->GetNumberOfTuples());
   //CHECK(vertices.size() == normals.size());
   std::vector<GLuint> indices;
-  for (vtkIdType id=0; id<points->GetNumberOfPoints(); ++id) {
+  for (vtkIdType id = 0; id < points->GetNumberOfPoints(); ++id) {
     points->GetPoint(id, &vertices[id][0]);
     //pointsNormals->GetTuple(id, &normals[id][0]);
   }
   vtkIdType npts;
-  vtkIdType *pts;
-  for (int i=0; i<outputPolydata->GetNumberOfPolys(); ++i) {
+  vtkIdType* pts;
+  for (int i = 0; i < outputPolydata->GetNumberOfPolys(); ++i) {
     int h = polys->GetNextCell(npts, pts);
     if (h == 0) {
       break;
@@ -514,12 +514,13 @@ void binaryImgToMesh(const ZImg &img, ZMesh &msh)
   msh.generateNormals();
 }
 
-struct ContourNode {
+struct ContourNode
+{
   int index;
   int parentIndex;
 };
 
-void binaryImgToROI(const ZImg &img, ZROI &roi)
+void binaryImgToROI(const ZImg& img, ZROI& roi)
 {
   CHECK(img.isType<uint8_t>() && !img.isTimeSeries() && !img.isMultiChannelsImg());
   roi.clear();
@@ -541,7 +542,7 @@ void binaryImgToROI(const ZImg &img, ZROI &roi)
       ZTree<ContourNode> contoursTree;
       std::map<int, ContourNode> nodeMap;
 
-      for (size_t i=0; i < hierarchy.size(); ++i) {
+      for (size_t i = 0; i < hierarchy.size(); ++i) {
         ContourNode node;
         node.index = i;
         node.parentIndex = hierarchy[i][3];
@@ -579,7 +580,7 @@ void binaryImgToROI(const ZImg &img, ZROI &roi)
         } else {
           size_t dst = std::max<size_t>(1, std::min<size_t>(30, contours[c].size() / 20));
           QPolygonF poly;
-          for (size_t p=0; p<contours[c].size(); p+=dst) {
+          for (size_t p = 0; p < contours[c].size(); p += dst) {
             poly.push_back(QPointF(contours[c][p].x, contours[c][p].y));
           }
           if (!poly.isClosed()) {

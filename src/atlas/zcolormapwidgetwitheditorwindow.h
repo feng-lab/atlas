@@ -6,13 +6,14 @@
 namespace nim {
 
 class ZColorMapParameter;
+
 class ZColorMapEditor;
 
 class ZColorMapWidgetWithEditorWindow : public ZClickableColorMapLabel
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit ZColorMapWidgetWithEditorWindow(ZColorMapParameter* cm, QWidget *parent = 0);
+  explicit ZColorMapWidgetWithEditorWindow(ZColorMapParameter* cm, QWidget* parent = 0);
 
 protected:
   void createEditorWindow();
@@ -20,8 +21,8 @@ protected:
   virtual void labelClicked() override;
 
 private:
-  ZColorMapParameter *m_colorMap;
-  ZColorMapEditor *m_colorMapEditor;
+  ZColorMapParameter* m_colorMap;
+  ZColorMapEditor* m_colorMapEditor;
 
   QWidget* m_editorWindow;
 };

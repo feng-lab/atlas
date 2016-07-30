@@ -9,12 +9,13 @@ namespace nim {
 
 class Z3DMeshView : public Z3DFilterView<ZMeshDoc, Z3DMeshFilter>
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  Z3DMeshView(ZMeshDoc &doc, Z3DView &view);
+  Z3DMeshView(ZMeshDoc& doc, Z3DView& view);
 
 private:
-  void docMeshesAdded(const QList<size_t> &objs);
+  void docMeshesAdded(const QList<size_t>& objs);
+
   void docMeshAdded(size_t id);
 };
 

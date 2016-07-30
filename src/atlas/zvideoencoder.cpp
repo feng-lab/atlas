@@ -5,14 +5,14 @@
 
 namespace nim {
 
-ZVideoEncoder::ZVideoEncoder(QObject *parent)
+ZVideoEncoder::ZVideoEncoder(QObject* parent)
   : QObject(parent)
   , m_lock(false)
 {
   m_ffmpegProcess = new QProcess(this);
   connect(m_ffmpegProcess, &QProcess::errorOccurred,
           this, &ZVideoEncoder::ffmpegError);
-  connect(m_ffmpegProcess, qOverload<int,QProcess::ExitStatus>(&QProcess::finished),
+  connect(m_ffmpegProcess, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
           this, &ZVideoEncoder::ffmpegFinished);
   connect(m_ffmpegProcess, &QProcess::readyReadStandardOutput,
           this, &ZVideoEncoder::logStandardOutput);
@@ -20,7 +20,8 @@ ZVideoEncoder::ZVideoEncoder(QObject *parent)
           this, &ZVideoEncoder::logStandardError);
 }
 
-void ZVideoEncoder::encode(const QDir &dir, const QString &namePrefix, int fieldWidth, int framesPerSecond, const QString &outputFilename)
+void ZVideoEncoder::encode(const QDir& dir, const QString& namePrefix, int fieldWidth, int framesPerSecond,
+                           const QString& outputFilename)
 {
   if (m_ffmpegProcess->state() != QProcess::NotRunning) {
     emit error("Encoder is already running.");
@@ -53,26 +54,26 @@ void ZVideoEncoder::ffmpegError(QProcess::ProcessError err)
 {
   QString msg;
   switch (err) {
-  case QProcess::FailedToStart:
-    msg = "Failed to Start";
-    break;
-  case QProcess::Crashed:
-    msg = "Crashed";
-    break;
-  case QProcess::Timedout:
-    msg = "Timedout";
-    break;
-  case QProcess::WriteError:
-    msg = "Write Error";
-    break;
-  case QProcess::ReadError:
-    msg = "Read Error";
-    break;
-  case QProcess::UnknownError:
-    msg = "Unknown Error";
-    break;
-  default:
-    break;
+    case QProcess::FailedToStart:
+      msg = "Failed to Start";
+      break;
+    case QProcess::Crashed:
+      msg = "Crashed";
+      break;
+    case QProcess::Timedout:
+      msg = "Timedout";
+      break;
+    case QProcess::WriteError:
+      msg = "Write Error";
+      break;
+    case QProcess::ReadError:
+      msg = "Read Error";
+      break;
+    case QProcess::UnknownError:
+      msg = "Unknown Error";
+      break;
+    default:
+      break;
   }
   emit error(msg);
 }

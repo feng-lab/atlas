@@ -13,9 +13,10 @@ class ZWidgetsGroup;
 
 class Z3DAxisFilter : public Z3DGeometryFilter
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit Z3DAxisFilter(Z3DGlobalParameters& globalParas, QObject *parent = nullptr);
+  explicit Z3DAxisFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+
   virtual ~Z3DAxisFilter();
 
   virtual bool isReady(Z3DEye eye) const override;
@@ -24,10 +25,16 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  virtual bool hasOpaque(Z3DEye) const override { return false; }
+  virtual bool hasOpaque(Z3DEye) const override
+  { return false; }
+
   virtual void renderOpaque(Z3DEye eye) override;
-  virtual bool hasTransparent(Z3DEye) const override { return true; }
-  virtual void renderTransparent(Z3DEye eye) override { renderOpaque(eye); }
+
+  virtual bool hasTransparent(Z3DEye) const override
+  { return true; }
+
+  virtual void renderTransparent(Z3DEye eye) override
+  { renderOpaque(eye); }
 
 protected:
   void prepareData(Z3DEye eye);

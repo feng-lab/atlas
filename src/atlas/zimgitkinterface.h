@@ -29,18 +29,19 @@ template<typename TVoxel>
 typename itk::Image<TVoxel, 3>::Pointer wrapZImgChannelAsITKImg(const ZImg& img, size_t c = 0, size_t t = 0)
 {
   if (!img.isType<TVoxel>()) {
-    throw ZImgException(QString("wrapZImgChannelAsITKImg wrap img <%1> to wrong type of itk img").arg(img.info().toQString()));
+    throw ZImgException(
+      QString("wrapZImgChannelAsITKImg wrap img <%1> to wrong type of itk img").arg(img.info().toQString()));
   }
   if (c >= img.numChannels() || t >= img.numTimes() || img.isEmpty()) {
     throw ZImgException(QString("wrapZImgChannelAsITKImg invalid pos of img, c:%1, t:%2, img:<%3>")
-                        .arg(c).arg(t).arg(img.info().toQString()));
+                          .arg(c).arg(t).arg(img.info().toQString()));
   }
   typedef typename itk::ImportImageFilter<TVoxel, 3> ImportFilterType;
   typename ImportFilterType::Pointer importFilter = ImportFilterType::New();
   typename ImportFilterType::SizeType size;
   typedef itk::Image<TVoxel, 3> OutputImageType;
   typedef typename OutputImageType::SpacingType SpacingType;
-  typedef typename OutputImageType::PointType   OriginType;
+  typedef typename OutputImageType::PointType OriginType;
   size[0] = img.width();
   size[1] = img.height();
   size[2] = img.depth();
@@ -60,7 +61,7 @@ typename itk::Image<TVoxel, 3>::Pointer wrapZImgChannelAsITKImg(const ZImg& img,
   spacing[1] = img.info().voxelSizeYInUm();
   spacing[2] = img.info().voxelSizeZInUm();
   importFilter->SetSpacing(spacing);
-  importFilter->SetImportPointer(const_cast<TVoxel*>(img.channelData<TVoxel>(c,t)), img.channelVoxelNumber(), false);
+  importFilter->SetImportPointer(const_cast<TVoxel*>(img.channelData<TVoxel>(c, t)), img.channelVoxelNumber(), false);
   importFilter->Update();
   return importFilter->GetOutput();
 }
@@ -72,18 +73,19 @@ template<typename TVoxel>
 typename itk::Image<TVoxel, 2>::Pointer wrapZImgPlaneAsITKImg(const ZImg& img, size_t z, size_t c = 0, size_t t = 0)
 {
   if (!img.isType<TVoxel>()) {
-    throw ZImgException(QString("wrapZImgPlaneAsITKImg wrap img <%1> to wrong type of itk img").arg(img.info().toQString()));
+    throw ZImgException(
+      QString("wrapZImgPlaneAsITKImg wrap img <%1> to wrong type of itk img").arg(img.info().toQString()));
   }
   if (z >= img.depth() || c >= img.numChannels() || t >= img.numTimes() || img.isEmpty()) {
     throw ZImgException(QString("wrapZImgPlaneAsITKImg invalid pos of img, z:%1 c:%2, t:%3, img:<%4>")
-                        .arg(z).arg(c).arg(t).arg(img.info().toQString()));
+                          .arg(z).arg(c).arg(t).arg(img.info().toQString()));
   }
   typedef typename itk::ImportImageFilter<TVoxel, 2> ImportFilterType;
   typename ImportFilterType::Pointer importFilter = ImportFilterType::New();
   typename ImportFilterType::SizeType size;
   typedef itk::Image<TVoxel, 2> OutputImageType;
   typedef typename OutputImageType::SpacingType SpacingType;
-  typedef typename OutputImageType::PointType   OriginType;
+  typedef typename OutputImageType::PointType OriginType;
   size[0] = img.width();
   size[1] = img.height();
   typename ImportFilterType::IndexType start;
@@ -100,7 +102,7 @@ typename itk::Image<TVoxel, 2>::Pointer wrapZImgPlaneAsITKImg(const ZImg& img, s
   spacing[0] = img.info().voxelSizeXInUm();
   spacing[1] = img.info().voxelSizeYInUm();
   importFilter->SetSpacing(spacing);
-  importFilter->SetImportPointer(const_cast<TVoxel*>(img.planeData<TVoxel>(z,c,t)), img.planeVoxelNumber(), false);
+  importFilter->SetImportPointer(const_cast<TVoxel*>(img.planeData<TVoxel>(z, c, t)), img.planeVoxelNumber(), false);
   importFilter->Update();
   return importFilter->GetOutput();
 }
@@ -117,9 +119,9 @@ typename itk::Image<TVoxel, 2>::Pointer wrapZImgPlaneAsITKImg(const ZImg& img, s
 // ...other stuff...
 //
 template<typename TVoxel>
-void letITKImgUseMemory(itk::Image<TVoxel,3>* itkImg, TVoxel* data, size_t width, size_t height, size_t depth)
+void letITKImgUseMemory(itk::Image<TVoxel, 3>* itkImg, TVoxel* data, size_t width, size_t height, size_t depth)
 {
-  typedef itk::Image<TVoxel,3> TITKImg;
+  typedef itk::Image<TVoxel, 3> TITKImg;
   typename TITKImg::SizeType size;
   size[0] = width;
   size[1] = height;
@@ -130,15 +132,15 @@ void letITKImgUseMemory(itk::Image<TVoxel,3>* itkImg, TVoxel* data, size_t width
   region.SetIndex(start);
   region.SetSize(size);
   itkImg->SetRegions(region);
-  itkImg->GetPixelContainer()->SetImportPointer(data, width*height*depth, false);
+  itkImg->GetPixelContainer()->SetImportPointer(data, width * height * depth, false);
   itkImg->Allocate();
 }
 
 template<typename TVoxel>
-void letITKImgUseMemory(itk::Image<TVoxel,2>* itkImg, TVoxel* data, size_t width, size_t height, size_t dummyDepth = 1)
+void letITKImgUseMemory(itk::Image<TVoxel, 2>* itkImg, TVoxel* data, size_t width, size_t height, size_t dummyDepth = 1)
 {
   Q_UNUSED(dummyDepth)
-  typedef itk::Image<TVoxel,2> TITKImg;
+  typedef itk::Image<TVoxel, 2> TITKImg;
   typename TITKImg::SizeType size;
   size[0] = width;
   size[1] = height;
@@ -148,7 +150,7 @@ void letITKImgUseMemory(itk::Image<TVoxel,2>* itkImg, TVoxel* data, size_t width
   region.SetIndex(start);
   region.SetSize(size);
   itkImg->SetRegions(region);
-  itkImg->GetPixelContainer()->SetImportPointer(data, width*height, false);
+  itkImg->GetPixelContainer()->SetImportPointer(data, width * height, false);
   itkImg->Allocate();
 }
 
@@ -163,7 +165,7 @@ ZImg convertITKImgToZImg(const itk::Image<TVoxel, 3>* image)
   info.createDefaultDescriptions();
   ZImg res(info);
   const TVoxel* array = image->GetBufferPointer();
-  memcpy(res.channelData<TVoxel>(0,0), array, res.channelByteNumber());
+  memcpy(res.channelData<TVoxel>(0, 0), array, res.channelByteNumber());
   return res;
 }
 
@@ -176,7 +178,7 @@ ZImg convertITKImgToZImg(const itk::Image<TVoxel, 2>* image)
   info.createDefaultDescriptions();
   ZImg res(info);
   const TVoxel* array = image->GetBufferPointer();
-  memcpy(res.channelData<TVoxel>(0,0), array, res.channelByteNumber());
+  memcpy(res.channelData<TVoxel>(0, 0), array, res.channelByteNumber());
   return res;
 }
 
@@ -184,14 +186,14 @@ template<typename TVoxel>
 void copyITKImgToMemory(const itk::Image<TVoxel, 3>* image, TVoxel* data)
 {
   typename itk::Image<TVoxel, 3>::SizeType size = image->GetLargestPossibleRegion().GetSize();
-  memcpy(data, image->GetBufferPointer(), size[0]*size[1]*size[2]*sizeof(TVoxel));
+  memcpy(data, image->GetBufferPointer(), size[0] * size[1] * size[2] * sizeof(TVoxel));
 }
 
 template<typename TVoxel>
 void copyITKImgToMemory(const itk::Image<TVoxel, 2>* image, TVoxel* data)
 {
   typename itk::Image<TVoxel, 2>::SizeType size = image->GetLargestPossibleRegion().GetSize();
-  memcpy(data, image->GetBufferPointer(), size[0]*size[1]*sizeof(TVoxel));
+  memcpy(data, image->GetBufferPointer(), size[0] * size[1] * sizeof(TVoxel));
 }
 
 // Macro to help use itk library

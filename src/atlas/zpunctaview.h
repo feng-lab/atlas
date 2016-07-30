@@ -10,12 +10,13 @@ namespace nim {
 
 class ZPunctaView : public ZFilterView<ZPunctaDoc, ZPunctaFilter>
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  ZPunctaView(ZPunctaDoc &doc, ZView &view);
+  ZPunctaView(ZPunctaDoc& doc, ZView& view);
 
 private:
-  void docPunctasAdded(const QList<size_t> &objs);
+  void docPunctasAdded(const QList<size_t>& objs);
+
   void docPunctaAdded(size_t id);
 };
 

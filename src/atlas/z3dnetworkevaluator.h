@@ -7,35 +7,51 @@
 #include "z3dcanvas.h"
 
 #ifndef Q_MOC_RUN
+
 #include <boost/graph/adjacency_list.hpp>
+
 #endif
 
 namespace nim {
 
 class Z3DFilter;
+
 class Z3DCanvasPainter;
+
 class Z3DOutputPortBase;
+
 class Z3DInputPortBase;
 
 class Z3DFilterWrapper
 {
 public:
-  virtual ~Z3DFilterWrapper() {}
-  virtual void beforeFilterProcess(const Z3DFilter*) {}
-  virtual void afterFilterProcess(const Z3DFilter*) {}
-  virtual void beforeNetworkProcess() {}
-  virtual void afterNetworkProcess() {}
+  virtual ~Z3DFilterWrapper()
+  {}
+
+  virtual void beforeFilterProcess(const Z3DFilter*)
+  {}
+
+  virtual void afterFilterProcess(const Z3DFilter*)
+  {}
+
+  virtual void beforeNetworkProcess()
+  {}
+
+  virtual void afterNetworkProcess()
+  {}
 };
 
 class Z3DNetworkEvaluator : public QObject
 {
-  Q_OBJECT
+Q_OBJECT
 
 public:
-  Z3DNetworkEvaluator(QObject *parent = 0);
+  Z3DNetworkEvaluator(QObject* parent = 0);
+
   ~Z3DNetworkEvaluator();
 
-  void setOpenGLContext(Z3DCanvas *context) { m_openGLContext = context; }
+  void setOpenGLContext(Z3DCanvas* context)
+  { m_openGLContext = context; }
 
   // set canvasPainter as the sink of rendering network and build network
   void setNetworkSink(Z3DCanvasPainter* canvasPainter);
@@ -55,13 +71,17 @@ protected:
 
   // Locks the evaluator. In this state, it does not perform
   // any operations, such as initializing or processing, on the filter network
-  void lock() { m_locked = true; }
-  void unlock() { m_locked = false; }
+  void lock()
+  { m_locked = true; }
 
-  inline void getGLFocus() const { if (m_openGLContext) m_openGLContext->getGLFocus(); }
+  void unlock()
+  { m_locked = false; }
 
-  // update size of all upstream filters. If input filter is NULL, update all filters
-  void sizeChangedFromFilter(Z3DFilter *rp = 0);
+  inline void getGLFocus() const
+  { if (m_openGLContext) m_openGLContext->getGLFocus(); }
+
+  // update size of all upstream filters. If input filter is nullptr, update all filters
+  void sizeChangedFromFilter(Z3DFilter* rp = 0);
 
 private:
   std::vector<Z3DFilter*> m_renderingOrder;
@@ -75,19 +95,27 @@ private:
 
   bool m_processPending;
 
-  Z3DCanvasPainter *m_canvasPainter;
+  Z3DCanvasPainter* m_canvasPainter;
 
-  struct VertexInfo {
-    VertexInfo() : filter(0) {}
-    VertexInfo(Z3DFilter* p) : filter(p) {}
-    Z3DFilter *filter;
+  struct VertexInfo
+  {
+    VertexInfo() : filter(0)
+    {}
+
+    VertexInfo(Z3DFilter* p) : filter(p)
+    {}
+
+    Z3DFilter* filter;
     //
   };
 
-  struct EdgeInfo {
-    EdgeInfo(Z3DOutputPortBase *out, Z3DInputPortBase *in) : outPort(out), inPort(in) {}
-    Z3DOutputPortBase *outPort;
-    Z3DInputPortBase *inPort;
+  struct EdgeInfo
+  {
+    EdgeInfo(Z3DOutputPortBase* out, Z3DInputPortBase* in) : outPort(out), inPort(in)
+    {}
+
+    Z3DOutputPortBase* outPort;
+    Z3DInputPortBase* inPort;
   };
 
   typedef boost::adjacency_list<boost::listS, boost::vecS, boost::bidirectionalS, VertexInfo, EdgeInfo> GraphT;
@@ -103,11 +131,14 @@ private:
 class Z3DCheckOpenGLStateFilterWrapper : public Z3DFilterWrapper
 {
 public:
-  void afterFilterProcess(const Z3DFilter *p) override;
+  void afterFilterProcess(const Z3DFilter* p) override;
+
   void beforeNetworkProcess() override;
+
 private:
-  void checkState(const Z3DFilter *p = 0);
-  void warn(const Z3DFilter *p, const QString &message);
+  void checkState(const Z3DFilter* p = 0);
+
+  void warn(const Z3DFilter* p, const QString& message);
 };
 
 // profile each filter and whole network
@@ -116,8 +147,11 @@ class Z3DProfileFilterWrapper : public Z3DFilterWrapper
   ZBenchTimer m_benchTimer;
 public:
   void beforeFilterProcess(const Z3DFilter*) override;
-  void afterFilterProcess(const Z3DFilter *p) override;
+
+  void afterFilterProcess(const Z3DFilter* p) override;
+
   void beforeNetworkProcess() override;
+
   void afterNetworkProcess() override;
 };
 

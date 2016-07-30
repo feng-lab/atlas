@@ -13,52 +13,71 @@ namespace nim {
 
 class ZObjView : public QObject
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit ZObjView(ZView &view);
+  explicit ZObjView(ZView& view);
 
-  const std::vector<int>& boundBox() const { return m_boundBox; }
+  const std::vector<int>& boundBox() const
+  { return m_boundBox; }
 
   virtual const ZObjDoc& doc() const = 0;
+
   virtual bool hasObj(size_t id) const = 0;
-  virtual void read(size_t id, const QJsonObject &json) = 0;
-  virtual void write(size_t id, QJsonObject &json) const = 0;
+
+  virtual void read(size_t id, const QJsonObject& json) = 0;
+
+  virtual void write(size_t id, QJsonObject& json) const = 0;
 
   // to show on info bar, default return empty
   virtual QString infoOfPos(double x, double y);
 
   // called to show a certain slice of certain time
   virtual void setNormalView(int slice, int time) = 0;
+
   // called to show a max z projection view of time
   virtual void setMaxZProjView(int time) = 0;
+
   // called to show a rect with scale
-  virtual void setViewport(const QRectF &rect, double scale) = 0;
+  virtual void setViewport(const QRectF& rect, double scale) = 0;
+
   // get view setting widget group of obj id, default return nullptr
   virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id);
+
   // called if delete key is pressed
   virtual void deleteKeyPressed() = 0;
+
   // called if mouse is pressed in a scene pos
-  virtual void mousePressed(const QPointF &scenePos) = 0;
-  virtual void mouseReleased(const QPointF &scenePos) = 0;
+  virtual void mousePressed(const QPointF& scenePos) = 0;
+
+  virtual void mouseReleased(const QPointF& scenePos) = 0;
+
   //
   virtual void rotateClockwise() = 0;
+
   virtual void rotateCounterclockwise() = 0;
 
 signals:
+
   void objViewReady(size_t id);
 
 protected:
   virtual void updateBoundBox() = 0;
 
   virtual void onObjRemoved(size_t id) = 0;
+
   virtual void onAllObjsRemoved() = 0;
+
   virtual void onObjVisibleChanged(size_t id, bool v) = 0;
+
   virtual void onSelectionChanged(const QList<size_t>& selected, const QList<size_t>& deselected) = 0;
+
   virtual void onObjSelectedFromView(bool append) = 0;
+
   virtual void onObjDeselectedFromView() = 0;
 
   void resetBoundBox();
-  void expandBoundBox(const std::vector<int> &boundBox);
+
+  void expandBoundBox(const std::vector<int>& boundBox);
 
 protected:
   ZView& m_view;

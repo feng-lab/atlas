@@ -17,10 +17,10 @@
 
 namespace nim {
 
-Z3DCanvasPainter::Z3DCanvasPainter(Z3DGlobalParameters &globalParas, QObject *parent)
+Z3DCanvasPainter::Z3DCanvasPainter(Z3DGlobalParameters& globalParas, QObject* parent)
   : Z3DBoundedFilter(globalParas, parent)
   , m_textureCopyRenderer(m_rendererBase, Z3DTextureCopyRenderer::OutputColorOption::DivideByAlpha)
-  , m_canvas(NULL)
+  , m_canvas(nullptr)
   , m_inport("Image", false, InvalidMonoViewResult)
   , m_leftEyeInport("LeftEyeImage", false, InvalidLeftEyeResult)
   , m_rightEyeInport("RightEyeImage", false, InvalidRightEyeResult)
@@ -41,8 +41,8 @@ void Z3DCanvasPainter::process(Z3DEye eye)
   if (!m_canvas)
     return;
 
-  Z3DRenderInputPort &currentInport = (eye == Z3DEye::Mono) ?
-        m_inport : (eye == Z3DEye::Left) ? m_leftEyeInport : m_rightEyeInport;
+  Z3DRenderInputPort& currentInport = (eye == Z3DEye::Mono) ?
+                                      m_inport : (eye == Z3DEye::Left) ? m_leftEyeInport : m_rightEyeInport;
 
   // render to image
   if (m_renderToImage) {
@@ -107,7 +107,7 @@ void Z3DCanvasPainter::invalidate(InvalidationState inv)
   }
 }
 
-void Z3DCanvasPainter::setCanvas(Z3DCanvas *canvas)
+void Z3DCanvasPainter::setCanvas(Z3DCanvas* canvas)
 {
   if (canvas == m_canvas)
     return;
@@ -130,7 +130,7 @@ Z3DCanvas* Z3DCanvasPainter::canvas() const
   return m_canvas;
 }
 
-bool Z3DCanvasPainter::renderToImage(const QString &filename, Z3DScreenShotType sst)
+bool Z3DCanvasPainter::renderToImage(const QString& filename, Z3DScreenShotType sst)
 {
   if (!m_canvas) {
     LOG(WARNING) << "no canvas assigned";
@@ -162,22 +162,23 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, Z3DScreenShotType 
         m_monoImg.infoRef().lastChannelIsAlphaChannel = true;
         m_monoImg.correctPreMultipliedColor().flip(Dimension::Y).save(filename);
         LOG(INFO) << "Saved rendering (" << m_monoImg.width() << ", " <<
-                     m_monoImg.height() << ") to file: " << filename;
+                  m_monoImg.height() << ") to file: " << filename;
       } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
         m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
         m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
         ZImg::cat(m_leftImg, m_rightImg, Dimension::X).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
         LOG(INFO) << "Saved stereo rendering (" << m_leftImg.width() << " x 2, " <<
-                     m_leftImg.height() << ") to file: " << filename;
+                  m_leftImg.height() << ") to file: " << filename;
       } else {
         m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
         m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
-        ZImg::cat(m_leftImg, m_rightImg, Dimension::X).zoom(0.5, 1).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
+        ZImg::cat(m_leftImg, m_rightImg, Dimension::X).zoom(0.5, 1).correctPreMultipliedColor().flip(Dimension::Y).save(
+          filename);
         LOG(INFO) << "Saved half sbs stereo rendering (" << m_leftImg.width() << ", " <<
-                     m_leftImg.height() << ") to file: " << filename;
+                  m_leftImg.height() << ") to file: " << filename;
       }
     }
-    catch (ZException const & e) {
+    catch (ZException const& e) {
       LOG(ERROR) << "Exception: " << e.what();
       m_renderToImageError = e.what();
     }
@@ -194,7 +195,8 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, Z3DScreenShotType 
   return (m_renderToImageError.isEmpty());
 }
 
-bool Z3DCanvasPainter::renderToImage(const QString &filename, int width, int height, Z3DScreenShotType sst, Z3DCompositor &compositor)
+bool Z3DCanvasPainter::renderToImage(const QString& filename, int width, int height, Z3DScreenShotType sst,
+                                     Z3DCompositor& compositor)
 {
   if (!m_canvas) {
     LOG(WARNING) << "no canvas assigned";
@@ -254,8 +256,8 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, int width, int hei
 
     int numCols = (width + tileInnerSize - 1) / tileInnerSize;
     int numRows = (height + tileInnerSize - 1) / tileInnerSize;
-    for (int c=0; c<numCols; ++c) {
-      for (int r=0; r<numRows; ++r) {
+    for (int c = 0; c < numCols; ++c) {
+      for (int r = 0; r < numRows; ++r) {
         m_tileStartX = c * tileInnerSize - tileBorder;
         m_tileStartY = r * tileInnerSize - tileBorder;
         double left = m_tileStartX / 1.0 / width;
@@ -292,22 +294,23 @@ bool Z3DCanvasPainter::renderToImage(const QString &filename, int width, int hei
         m_monoImg.infoRef().lastChannelIsAlphaChannel = true;
         m_monoImg.correctPreMultipliedColor().flip(Dimension::Y).save(filename);
         LOG(INFO) << "Saved rendering (" << m_monoImg.width() << ", " <<
-                     m_monoImg.height() << ") to file:" << filename;
+                  m_monoImg.height() << ") to file:" << filename;
       } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
         m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
         m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
         ZImg::cat(m_leftImg, m_rightImg, Dimension::X).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
         LOG(INFO) << "Saved stereo rendering (" << m_leftImg.width() << " x 2, " <<
-                     m_leftImg.height() << ") to file: " << filename;
+                  m_leftImg.height() << ") to file: " << filename;
       } else {
         m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
         m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
-        ZImg::cat(m_leftImg, m_rightImg, Dimension::X).zoom(0.5, 1).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
+        ZImg::cat(m_leftImg, m_rightImg, Dimension::X).zoom(0.5, 1).correctPreMultipliedColor().flip(Dimension::Y).save(
+          filename);
         LOG(INFO) << "Saved half sbs stereo rendering (" << m_leftImg.width() << ", " <<
-                     m_leftImg.height() << ") to file:" << filename;
+                  m_leftImg.height() << ") to file:" << filename;
       }
     }
-    catch (ZException const & e) {
+    catch (ZException const& e) {
       LOG(ERROR) << "Exception: " << e.what();
       m_renderToImageError = e.what();
     }
@@ -360,7 +363,8 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
       if (!leftTex) {
         throw ZGLException("not ready to capture image");
       }
-      auto colorBuffer = std::make_unique<uint8_t[]>(leftTex->bypePerPixel(dataFormat, dataType) * leftTex->numPixels());
+      auto colorBuffer = std::make_unique<uint8_t[]>(
+        leftTex->bypePerPixel(dataFormat, dataType) * leftTex->numPixels());
       leftTex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
       ZImg bufImg;
       bufImg.wrapData(colorBuffer.get(), ZImgInfo(tex->width(), tex->height(), 1, 4));
@@ -388,7 +392,7 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
       }
     }
   }
-  catch (ZException const & e) {
+  catch (ZException const& e) {
     LOG(ERROR) << "Exception: " << e.what();
     m_renderToImageError = e.what();
   }
@@ -411,7 +415,7 @@ const Z3DTexture* Z3DCanvasPainter::imageColorTexture(Z3DEye eye) const
   else if (eye == Z3DEye::Right && m_rightEyeInport.isReady())
     return m_rightEyeInport.colorTexture();
   else
-    return NULL;
+    return nullptr;
 }
 
 const Z3DTexture* Z3DCanvasPainter::imageDepthTexture(Z3DEye eye) const
@@ -423,7 +427,7 @@ const Z3DTexture* Z3DCanvasPainter::imageDepthTexture(Z3DEye eye) const
   else if (eye == Z3DEye::Right && m_rightEyeInport.isReady())
     return m_rightEyeInport.depthTexture();
   else
-    return NULL;
+    return nullptr;
 }
 
 QString Z3DCanvasPainter::renderToImageError() const

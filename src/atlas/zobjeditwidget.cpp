@@ -9,7 +9,7 @@
 
 namespace nim {
 
-ZObjEditWidget::ZObjEditWidget(ZDoc *doc, QWidget *mw)
+ZObjEditWidget::ZObjEditWidget(ZDoc* doc, QWidget* mw)
   : QTabWidget(mw)
   , m_doc(doc)
   , m_logWidget(new QPlainTextEdit(this))
@@ -29,14 +29,14 @@ ZObjEditWidget::ZObjEditWidget(ZDoc *doc, QWidget *mw)
   m_logWidget->setCenterOnScroll(true);
   m_normalFormat = m_logWidget->currentCharFormat();
   m_errorFormat = m_normalFormat;
-  m_errorFormat.setForeground(QBrush(QColor(176,0,0)));
+  m_errorFormat.setForeground(QBrush(QColor(176, 0, 0)));
   writeLogData(&logMessagesSoFar(), 0, logMessagesSoFar().size());
   receiveFutureLogMessages(this, &ZObjEditWidget::writeLogData);
 }
 
 bool ZObjEditWidget::showObjEditWidgetOfObj(size_t id)
 {
-  for (int i=0; i<m_subWidgets.size(); ++i) {
+  for (int i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       setCurrentWidget(m_subWidgets[i].widget);
       return true;
@@ -58,7 +58,7 @@ bool ZObjEditWidget::showObjEditWidgetOfObj(size_t id)
 
 void ZObjEditWidget::updateEditWidgetTitleOfObj(size_t id)
 {
-  for (int i=0; i<m_subWidgets.size(); ++i) {
+  for (int i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       setTabText(indexOf(m_subWidgets[i].widget), QString("Edit %1").arg(m_doc->objNameWithModifiedMarkerAndID(id)));
       return;
@@ -66,7 +66,7 @@ void ZObjEditWidget::updateEditWidgetTitleOfObj(size_t id)
   }
 }
 
-void ZObjEditWidget::writeLogData(const QList<LogData> *messages, int start, int end)
+void ZObjEditWidget::writeLogData(const QList<LogData>* messages, int start, int end)
 {
   if (end - start == 1) {
     if (messages->at(start).level <= InfoLevel) {
@@ -82,14 +82,14 @@ void ZObjEditWidget::writeLogData(const QList<LogData> *messages, int start, int
     QList<QStringList> textList;
     textList.push_back(QStringList());
     textList.back().push_back(messages->at(start).formatted);
-    for (int i=start+1; i<end; ++i) {
+    for (int i = start + 1; i < end; ++i) {
       if ((messages->at(i).level <= InfoLevel) != lastFormat) {
         lastFormat = !lastFormat;
         textList.push_back(QStringList());
       }
       textList.back().push_back(messages->at(i).formatted);
     }
-    for (int i=0; i<textList.size(); ++i) {
+    for (int i = 0; i < textList.size(); ++i) {
       m_logWidget->setCurrentCharFormat(firstFormat ? m_normalFormat : m_errorFormat);
       firstFormat = !firstFormat;
       m_logWidget->appendPlainText(textList[i].join("\n"));
@@ -100,7 +100,7 @@ void ZObjEditWidget::writeLogData(const QList<LogData> *messages, int start, int
 
 void ZObjEditWidget::removeObjEditWidgetOfObj(size_t id)
 {
-  for (int i=0; i<m_subWidgets.size(); ++i) {
+  for (int i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       removeTab(indexOf(m_subWidgets[i].widget));
       delete m_subWidgets[i].widget;
@@ -114,9 +114,9 @@ void ZObjEditWidget::closeTab(int index)
 {
   if (index == 0)
     return;
-  QWidget *wgt = widget(index);
+  QWidget* wgt = widget(index);
   removeTab(index);
-  for (int i=0; i<m_subWidgets.size(); ++i) {
+  for (int i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].widget == wgt) {
       delete m_subWidgets[i].widget;
       m_subWidgets.removeAt(i);

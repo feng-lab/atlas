@@ -23,9 +23,13 @@
 #include "zmainwindow.h"
 #include "zdoc.h"
 #include "zview.h"
+
 #ifdef _WITH_TESTS_
+
 #include "zunittest.h"
+
 #endif
+
 #include "zcustomcommand.h"
 #include "zviewsettingwidget.h"
 #include "z3dmainwindow.h"
@@ -51,7 +55,9 @@
 //#include "zlogdialog.h"
 
 #ifdef Q_OS_OSX
-void qt_mac_set_dock_menu(QMenu *menu);
+
+void qt_mac_set_dock_menu(QMenu* menu);
+
 #endif
 
 namespace nim {
@@ -130,7 +136,7 @@ void ZMainWindow::openEditWidget(size_t id)
 //  fftw_cleanup_threads();
 //}
 
-void ZMainWindow::closeEvent(QCloseEvent *event)
+void ZMainWindow::closeEvent(QCloseEvent* event)
 {
   // Qt 5.4 mac bug, use dock icon context menu -> quit will call this function twice and crash
   if (m_isClosed) {
@@ -155,14 +161,14 @@ void ZMainWindow::closeEvent(QCloseEvent *event)
   }
 }
 
-void ZMainWindow::dragEnterEvent(QDragEnterEvent *event)
+void ZMainWindow::dragEnterEvent(QDragEnterEvent* event)
 {
   if (event->mimeData()->hasFormat("text/uri-list")) {
     event->acceptProposedAction();
   }
 }
 
-void ZMainWindow::dropEvent(QDropEvent *event)
+void ZMainWindow::dropEvent(QDropEvent* event)
 {
   QList<QUrl> urlList = event->mimeData()->urls();
   QStringList fileList;
@@ -172,7 +178,7 @@ void ZMainWindow::dropEvent(QDropEvent *event)
     if (dirCheck.isDir()) {
       QDir dir = dirCheck.absoluteDir();
       QFileInfoList list = dir.entryInfoList(QDir::Files | QDir::NoSymLinks);
-      for (int i=0; i<list.size(); i++) {
+      for (int i = 0; i < list.size(); i++) {
         fileList.append(list.at(i).canonicalFilePath());
       }
     } else {
@@ -237,7 +243,7 @@ bool ZMainWindow::saveAs()
 
 void ZMainWindow::openRecentFile()
 {
-  QAction *action = qobject_cast<QAction*>(sender());
+  QAction* action = qobject_cast<QAction*>(sender());
   if (action) {
     QString fn = action->data().toString();
     if (fn.endsWith(".scene", Qt::CaseInsensitive)) {
@@ -252,9 +258,9 @@ void ZMainWindow::about()
 {
   QMessageBox::about(this, QString("About Atlas"),
                      QString("<p>Atlas ver. %1</p>"
-                             "<p>Atlas is developed by Linqing Feng (flq@live.com).</p>"
-                             "<p>Jinny Kim's Lab, Center for Functional Connectomics, Korea Institute of Science and Technology</p>"
-                             "<p>All rights reserved.</p>").arg(m_versionString));
+                               "<p>Atlas is developed by Linqing Feng (flq@live.com).</p>"
+                               "<p>Jinny Kim's Lab, Center for Functional Connectomics, Korea Institute of Science and Technology</p>"
+                               "<p>All rights reserved.</p>").arg(m_versionString));
 }
 
 void ZMainWindow::activateWindowIfNot()
@@ -291,10 +297,12 @@ void ZMainWindow::openLogFolder()
 }
 
 #ifdef _WITH_TESTS_
+
 void ZMainWindow::runUnitTest()
 {
   ZUnitTest::run();
 }
+
 #endif
 
 void ZMainWindow::runCustomCommand()
@@ -320,7 +328,7 @@ void ZMainWindow::open3DWindow()
       m_3dWindow->show();
       m_3dWindow->raise();
     }
-    catch (const ZException & e) {
+    catch (const ZException& e) {
       LOG(ERROR) << "Failed to open 3D window: " << e.what();
       QMessageBox::critical(this, tr("Failed to open 3D window"), e.what());
       delete m_3dWindow;
@@ -361,7 +369,8 @@ void ZMainWindow::saveScene()
     return;
   }
 
-  QString fn = QFileDialog::getSaveFileName(QApplication::activeWindow(), "Save scene to file", m_doc->lastOpenedFilePath(),
+  QString fn = QFileDialog::getSaveFileName(QApplication::activeWindow(), "Save scene to file",
+                                            m_doc->lastOpenedFilePath(),
                                             tr("Scene file (*.scene)"));
   if (!fn.isEmpty()) {
     QString err;
@@ -379,7 +388,7 @@ void ZMainWindow::saveScene()
   }
 }
 
-void ZMainWindow::loadJsonScene(const QString &fn)
+void ZMainWindow::loadJsonScene(const QString& fn)
 {
   QString err;
   if (!loadJsonSceneImpl(fn, err)) {
@@ -415,25 +424,25 @@ void ZMainWindow::init()
   m_view = new ZView(*m_doc, this);
 
   //packages
-  ZImgView *imgView = new ZImgView(m_doc->imgDoc(), *m_view);
+  ZImgView* imgView = new ZImgView(m_doc->imgDoc(), *m_view);
   m_view->registerObjView(imgView);
 
-  ZROIView *roiView = new ZROIView(m_doc->roiDoc(), *m_view);
+  ZROIView* roiView = new ZROIView(m_doc->roiDoc(), *m_view);
   m_view->registerObjView(roiView);
 
-  ZPunctaDoc *punctaDoc = new ZPunctaDoc(*m_doc);
+  ZPunctaDoc* punctaDoc = new ZPunctaDoc(*m_doc);
   m_doc->registerObjDoc(punctaDoc);
-  ZPunctaView *punctaView = new ZPunctaView(*punctaDoc, *m_view);
+  ZPunctaView* punctaView = new ZPunctaView(*punctaDoc, *m_view);
   m_view->registerObjView(punctaView);
 
-  ZSwcDoc *swcDoc = new ZSwcDoc(*m_doc);
+  ZSwcDoc* swcDoc = new ZSwcDoc(*m_doc);
   m_doc->registerObjDoc(swcDoc);
-  ZSwcView *swcView = new ZSwcView(*swcDoc, *m_view);
+  ZSwcView* swcView = new ZSwcView(*swcDoc, *m_view);
   m_view->registerObjView(swcView);
 
-  ZRegionAnnotationDoc *regionAnnotationDoc = new ZRegionAnnotationDoc(*m_doc);
+  ZRegionAnnotationDoc* regionAnnotationDoc = new ZRegionAnnotationDoc(*m_doc);
   m_doc->registerObjDoc(regionAnnotationDoc);
-  ZRegionAnnotationView *regionAnnotationView = new ZRegionAnnotationView(*regionAnnotationDoc, *m_view);
+  ZRegionAnnotationView* regionAnnotationView = new ZRegionAnnotationView(*regionAnnotationDoc, *m_view);
   m_view->registerObjView(regionAnnotationView);
 
   // UI
@@ -451,7 +460,7 @@ void ZMainWindow::init()
 
   //const QList<QAction*> &loadActList = m_doc->loadFileActions();
   //for (int i=0; i<loadActList.size(); ++i)
-    //connect(loadActList[i], &QAction::triggered, this, &ZMainWindow::activateWindowIfNot);
+  //connect(loadActList[i], &QAction::triggered, this, &ZMainWindow::activateWindowIfNot);
 }
 
 void ZMainWindow::createActions()
@@ -554,8 +563,8 @@ void ZMainWindow::createMenus()
   m_fileMenu->addAction(m_loadSceneAction);
   m_fileMenu->addAction(m_saveSceneAction);
   m_fileMenu->addSeparator();
-  const QList<QAction*> &fileActList = m_doc->fileActions();
-  for (int i=0; i<fileActList.size(); ++i)
+  const QList<QAction*>& fileActList = m_doc->fileActions();
+  for (int i = 0; i < fileActList.size(); ++i)
     m_fileMenu->addAction(fileActList[i]);
   m_separatorAction = m_fileMenu->addSeparator();
   for (int i = 0; i < m_recentFileActions.size(); ++i)
@@ -580,8 +589,8 @@ void ZMainWindow::createMenus()
   m_viewMenu->addAction(m_open3DViewAction);
   m_viewMenu->addAction(m_screenShotAction);
 
-  const QList<QMenu*> &menuList = m_doc->processObjMenu();
-  for (int i=0; i<menuList.size(); ++i) {
+  const QList<QMenu*>& menuList = m_doc->processObjMenu();
+  for (int i = 0; i < menuList.size(); ++i) {
     menuBar()->addMenu(menuList[i]);
   }
 
@@ -613,14 +622,14 @@ void ZMainWindow::createMenus()
 
 void ZMainWindow::createToolBars()
 {
-  QSize iconSize(22,22);
+  QSize iconSize(22, 22);
   m_fileToolBar = addToolBar(tr("File"));
   //m_fileToolBar->addAction(m_newAction);
   m_fileToolBar->addAction(m_openAction);
   m_fileToolBar->addAction(m_saveAction);
   //const QList<QAction*> &loadFileActList = m_doc->loadFileActions();
   //for (int i=0; i<loadFileActList.size(); ++i)
-    //m_fileToolBar->addAction(loadFileActList[i]);
+  //m_fileToolBar->addAction(loadFileActList[i]);
   m_fileToolBar->setIconSize(iconSize);
 
   m_editToolBar = addToolBar(tr("Edit"));
@@ -667,7 +676,7 @@ void ZMainWindow::createDockWindows()
   m_objectsDockWidget = new QDockWidget(tr("Objects Manager"), this);
   m_objectsDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
   m_objectsDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  ZObjWidget *objWidget = m_doc->createObjWidget(this);
+  ZObjWidget* objWidget = m_doc->createObjWidget(this);
   m_objectsDockWidget->setWidget(objWidget);
   connect(m_doc, &ZDoc::openEditWidget, this, &ZMainWindow::openEditWidget);
   addDockWidget(Qt::RightDockWidgetArea, m_objectsDockWidget);
@@ -758,17 +767,17 @@ bool ZMainWindow::maybeSave()
 //  setWindowModified(false);
 //}
 
-QString ZMainWindow::strippedName(const QString &fullFileName)
+QString ZMainWindow::strippedName(const QString& fullFileName)
 {
   return QFileInfo(fullFileName).fileName();
 }
 
-ZMainWindow *ZMainWindow::findMainWindow(const QString &)
+ZMainWindow* ZMainWindow::findMainWindow(const QString&)
 {
   return 0;
 }
 
-bool ZMainWindow::loadJsonSceneImpl(const QString &fn, QString &err)
+bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
 {
   QFile file(fn);
   if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -842,7 +851,7 @@ bool ZMainWindow::loadJsonSceneImpl(const QString &fn, QString &err)
   return true;
 }
 
-bool ZMainWindow::saveJsonSceneImpl(const QString &fn, QString &err)
+bool ZMainWindow::saveJsonSceneImpl(const QString& fn, QString& err)
 {
   QFile file(fn);
   if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -858,7 +867,7 @@ bool ZMainWindow::saveJsonSceneImpl(const QString &fn, QString &err)
   sceneObj.insert("Doc", docObj);
 
   QList<size_t> objs = m_doc->objs();
-  for (int i=0; i<objs.size(); ++i) {
+  for (int i = 0; i < objs.size(); ++i) {
     size_t id = objs[i];
     QJsonObject jObj;
 

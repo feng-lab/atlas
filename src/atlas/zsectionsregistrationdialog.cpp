@@ -6,10 +6,12 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include "zselectfilewidget.h"
+
 #ifdef _NEUTUBE_
 #include "zstack.hxx"
 #include "zstackdoc.h"
 #endif
+
 #include "zsectionsregistration.h"
 #include <QThread>
 #include "zimgstackinterface.h"
@@ -57,7 +59,7 @@ ZSectionsRegistrationDialog::ZSectionsRegistrationDialog(std::tr1::shared_ptr<ZS
 }
 #endif
 
-ZSectionsRegistrationDialog::ZSectionsRegistrationDialog(QWidget *parent)
+ZSectionsRegistrationDialog::ZSectionsRegistrationDialog(QWidget* parent)
   : QDialog(parent)
   , m_useCurrentActiveImage("Use Current Active Image", false)
   , m_openLoadedStack("Open Original Image Sequence", true)
@@ -75,7 +77,7 @@ ZSectionsRegistrationDialog::ZSectionsRegistrationDialog(QWidget *parent)
   , m_optimizer("Optimizer")
 {
   m_referenceChannel.clearOptions();
-  m_referenceChannel.addOptionWithData(qMakePair<QString,int>("Auto", 0));
+  m_referenceChannel.addOptionWithData(qMakePair<QString, int>("Auto", 0));
   m_referenceChannel.select("Auto");
   init();
 }
@@ -91,9 +93,10 @@ void ZSectionsRegistrationDialog::registerSections()
 #endif
   if (!m_useCurrentActiveImage.get()) {
     try {
-      img.load(m_inputImagesFileWidget->getSelectedMultipleOpenFiles(), Dimension::Z, 0, FileFormat::Unknown, true, m_brightBackground.get());
+      img.load(m_inputImagesFileWidget->getSelectedMultipleOpenFiles(), Dimension::Z, 0, FileFormat::Unknown, true,
+               m_brightBackground.get());
     }
-    catch (const ZException & e) {
+    catch (const ZException& e) {
       QMessageBox::critical(this, "Read Image Error", e.what());
       return;
     }
@@ -131,7 +134,7 @@ void ZSectionsRegistrationDialog::registerSections()
 
   m_isCanceled = false;
   m_hasError = false;
-  ZSectionsRegistration *worker = new ZSectionsRegistration(img, m_referenceImageIndex.get(), m_registeredImg);
+  ZSectionsRegistration* worker = new ZSectionsRegistration(img, m_referenceImageIndex.get(), m_registeredImg);
   if (refChannel >= 0)
     worker->setReferenceChannel(refChannel);
   worker->setRemoveBackground(m_removeBackground.get());
@@ -151,12 +154,13 @@ void ZSectionsRegistrationDialog::registerSections()
   m_progressDialog->setAutoReset(false);
   m_progressDialog->setAttribute(Qt::WA_DeleteOnClose);
   QObject::disconnect(m_progressDialog, &QProgressDialog::canceled, m_progressDialog, &QProgressDialog::cancel);
-  connect(worker, qOverload<int>(&ZSectionsRegistration::progressChanged), m_progressDialog, &QProgressDialog::setValue);
+  connect(worker, qOverload<int>(&ZSectionsRegistration::progressChanged), m_progressDialog,
+          &QProgressDialog::setValue);
   connect(worker, &ZSectionsRegistration::canceled, this, &ZSectionsRegistrationDialog::processCanceled);
   connect(worker, &ZSectionsRegistration::processError, this, &ZSectionsRegistrationDialog::processError);
   connect(m_progressDialog, &QProgressDialog::canceled, this, &ZSectionsRegistrationDialog::cancelButtonPressed);
 
-  QThread *thread = new QThread(this);
+  QThread* thread = new QThread(this);
   connect(thread, &QThread::started, worker, &ZSectionsRegistration::run);
   connect(worker, &ZSectionsRegistration::canceled, thread, &QThread::quit);
   connect(worker, &ZSectionsRegistration::finished, thread, &QThread::quit);
@@ -185,7 +189,7 @@ void ZSectionsRegistrationDialog::processFinished()
     try {
       m_registeredImg.save(m_outputStackWidget->getSelectedSaveFile());
     }
-    catch (const ZException & e) {
+    catch (const ZException& e) {
       QMessageBox::critical(this, "Can not save result image", e.what());
       return;
     }
@@ -200,7 +204,7 @@ void ZSectionsRegistrationDialog::processFinished()
   }
 }
 
-void ZSectionsRegistrationDialog::processError(const QString &e)
+void ZSectionsRegistrationDialog::processError(const QString& e)
 {
   m_hasError = true;
   QMessageBox::critical(this, "Error",
@@ -214,14 +218,14 @@ void ZSectionsRegistrationDialog::cancelButtonPressed()
   m_isCanceled = true;
 }
 
-void ZSectionsRegistrationDialog::keyPressEvent(QKeyEvent *e)
+void ZSectionsRegistrationDialog::keyPressEvent(QKeyEvent* e)
 {
   switch (e->key()) {
-  case Qt::Key_Return:
-  case Qt::Key_Enter:
-    break;
-  default:
-    QDialog::keyPressEvent(e);
+    case Qt::Key_Return:
+    case Qt::Key_Enter:
+      break;
+    default:
+      QDialog::keyPressEvent(e);
   }
 }
 
@@ -254,19 +258,19 @@ void ZSectionsRegistrationDialog::inputImagesChanged()
     channelNumber = info[0].numChannels;
     numFrames = info[0].depth;
   }
-  catch (const ZIOException & e) {
+  catch (const ZIOException& e) {
     QMessageBox::critical(this, "Can not parse input image", e.what());
   }
 
   m_referenceChannel.clearOptions();
-  m_referenceChannel.addOptionWithData(qMakePair<QString,int>("Auto", 0));
-  for (int i=0; i<channelNumber; ++i) {
-    m_referenceChannel.addOptionWithData(qMakePair(QString("Ch%1").arg(i+1), i+1));
+  m_referenceChannel.addOptionWithData(qMakePair<QString, int>("Auto", 0));
+  for (int i = 0; i < channelNumber; ++i) {
+    m_referenceChannel.addOptionWithData(qMakePair(QString("Ch%1").arg(i + 1), i + 1));
   }
 
   m_referenceChannel.select("Auto");
 
-  m_referenceImageIndex.setRange(0, numFrames-1);
+  m_referenceImageIndex.setRange(0, numFrames - 1);
 }
 
 void ZSectionsRegistrationDialog::init()
@@ -294,7 +298,7 @@ void ZSectionsRegistrationDialog::init()
   connect(m_exitButton, &QPushButton::clicked, this, &ZSectionsRegistrationDialog::reject);
   connect(m_runButton, &QPushButton::clicked, this, &ZSectionsRegistrationDialog::registerSections);
 
-  QVBoxLayout *mainLayout = new QVBoxLayout;
+  QVBoxLayout* mainLayout = new QVBoxLayout;
   mainLayout->addWidget(m_ioGroupBox);
   mainLayout->addWidget(m_paraGroupBox);
   mainLayout->addWidget(m_buttonBox);
@@ -307,7 +311,7 @@ void ZSectionsRegistrationDialog::createIOGroupBox()
 {
   m_ioGroupBox = new QGroupBox(tr("Inputs and Outputs"), this);
   // everything
-  QVBoxLayout *alllayout = new QVBoxLayout;
+  QVBoxLayout* alllayout = new QVBoxLayout;
 
 #ifdef _NEUTUBE_
   QHBoxLayout *hlayout;
@@ -320,8 +324,9 @@ void ZSectionsRegistrationDialog::createIOGroupBox()
     connect(&m_useCurrentActiveImage, &ZBoolParameter::valueChanged, this, &ZSectionsRegistrationDialog::adjustInputImageWidget);
   }
 #endif
-  m_inputImagesFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenMultipleFilesWithFilter, "Input Sections:",
-                                                 tr("Images (*.tif *.tiff *.raw *.lsm *.jpg *.png)"));
+  m_inputImagesFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenMultipleFilesWithFilter,
+                                                  "Input Sections:",
+                                                  tr("Images (*.tif *.tiff *.raw *.lsm *.jpg *.png)"));
   m_inputImagesFileWidget->setCompareFunc(naturalSortLessThan);
   alllayout->addWidget(m_inputImagesFileWidget);
   connect(m_inputImagesFileWidget, &ZSelectFileWidget::changed, this, &ZSectionsRegistrationDialog::inputImagesChanged);
@@ -334,7 +339,7 @@ void ZSectionsRegistrationDialog::createIOGroupBox()
   adjustInputImageWidget();
 
   m_outputStackWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Aligned Image:",
-                                                tr("Stack (*.tif *.raw)"));
+                                              tr("Stack (*.tif *.raw)"));
   alllayout->addWidget(m_outputStackWidget);
 
   m_outputLogFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Log File:",
@@ -353,9 +358,9 @@ void ZSectionsRegistrationDialog::createParaGroupBox()
 {
   m_paraGroupBox = new QGroupBox(tr("Parameters"), this);
   // everything
-  QVBoxLayout *alllayout = new QVBoxLayout;
+  QVBoxLayout* alllayout = new QVBoxLayout;
 
-  QHBoxLayout *hlayout = new QHBoxLayout;
+  QHBoxLayout* hlayout = new QHBoxLayout;
   hlayout->addWidget(m_referenceChannel.createNameLabel());
   hlayout->addWidget(m_referenceChannel.createWidget());
   //hlayout->addStretch(1);

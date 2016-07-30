@@ -22,31 +22,42 @@ namespace nim {
 
 class Z3DAnimationFilter : public Z3DGeometryFilter
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  explicit Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject *parent = nullptr);
+  explicit Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+
   virtual ~Z3DAnimationFilter();
 
-  void setVisible(bool v) { m_visible.set(v); }
+  void setVisible(bool v)
+  { m_visible.set(v); }
 
   virtual void process(Z3DEye) override;
 
-  void setData(Z3DAnimation *animation);
+  void setData(Z3DAnimation* animation);
 
   virtual bool isReady(Z3DEye eye) const override;
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  virtual bool hasOpaque(Z3DEye) const override { return false; }
+  virtual bool hasOpaque(Z3DEye) const override
+  { return false; }
+
   virtual void renderOpaque(Z3DEye eye) override;
-  virtual bool hasTransparent(Z3DEye) const override { return true; }
+
+  virtual bool hasTransparent(Z3DEye) const override
+  { return true; }
+
   virtual void renderTransparent(Z3DEye eye) override;
 
 protected:
   void prepareColor();
+
   void setClipPlanes() override;
+
   void updateData();
+
   void adjustWidgets();
+
   void updateLineWidth();
 
   virtual void renderPicking(Z3DEye eye) override;
@@ -54,13 +65,17 @@ protected:
   void prepareData();
 
   virtual void registerPickingObjects() override;
+
   virtual void deregisterPickingObjects() override;
 
   virtual void updateNotTransformedBoundBoxImpl() override;
 
 private:
-  const ZCameraParameterAnimation* cameraParaAnimation() const { return m_animation->cameraParameterAnimation(); }
-  ZCameraParameterAnimation* cameraParaAnimation() { return m_animation->cameraParameterAnimation(); }
+  const ZCameraParameterAnimation* cameraParaAnimation() const
+  { return m_animation->cameraParameterAnimation(); }
+
+  ZCameraParameterAnimation* cameraParaAnimation()
+  { return m_animation->cameraParameterAnimation(); }
 
 private:
   Z3DLineRenderer m_lineRenderer;
@@ -68,7 +83,7 @@ private:
   Z3DMeshRenderer m_triangleListRenderer;
 
   bool m_dataIsInvalid;
-  Z3DAnimation *m_animation;
+  Z3DAnimation* m_animation;
   ZBoolParameter m_visible;
   ZIntParameter m_lineWidth;
   ZStringIntOptionParameter m_colorMode;

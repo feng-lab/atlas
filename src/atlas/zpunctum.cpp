@@ -14,7 +14,7 @@ ZPunctum::ZPunctum()
   , m_z(-1)
   , m_sDevOfIntensity(0)
   , m_radius(2.0)
-  , m_color(0,255,255)
+  , m_color(0, 255, 255)
   , m_score(1.0)
 {
   updateVolSize();
@@ -29,7 +29,7 @@ ZPunctum::ZPunctum(double x, double y, double z, double r)
   , m_z(z)
   , m_sDevOfIntensity(0)
   , m_radius(r)
-  , m_color(0,255,255)
+  , m_color(0, 255, 255)
   , m_score(1.0)
 {
   updateVolSize();
@@ -78,11 +78,11 @@ void ZPunctum::updateFromVoxelsList(double conf)
     locs.rowwise() -= centroid.transpose();
     Eigen::MatrixXd cvs(locs.rows(), 2);
     cvs.col(0) = m_voxelIntensities;
-    for (int r=0; r<locs.rows(); ++r) {
-      cvs(r, 1) = std::exp(-0.5*locs.row(r)*cov*locs.row(r).transpose());
+    for (int r = 0; r < locs.rows(); ++r) {
+      cvs(r, 1) = std::exp(-0.5 * locs.row(r) * cov * locs.row(r).transpose());
     }
     Eigen::MatrixXd corrcoef = ZEigenUtils::corrcoef(cvs);
-    m_score = corrcoef(0,1);
+    m_score = corrcoef(0, 1);
   }
 }
 
@@ -125,10 +125,10 @@ QList<ZPunctum> ZPunctum::split(int num, double conf) const
   QList<ZPunctum> res;
   if (containsSignal()) {
     Eigen::MatrixXd locs = m_voxelLocations.cast<double>();
-    ZGMM<double,double> gmm(locs, m_voxelIntensities, num, true, ZGMM<double,double>::CovarianceType::Full,
-                            ZTermCriteria<double>(200,1e-5), IterAlgorithmLogLevel::Off);
+    ZGMM<double, double> gmm(locs, m_voxelIntensities, num, true, ZGMM<double, double>::CovarianceType::Full,
+                             ZTermCriteria<double>(200, 1e-5), IterAlgorithmLogLevel::Off);
     gmm.runEM();
-    for (size_t i=0; i<gmm.numOfClusters(); ++i) {
+    for (size_t i = 0; i < gmm.numOfClusters(); ++i) {
       ZPunctum p(*this);
       p.m_voxelIntensities = gmm.weight(i);
       p.m_voxelLocations = gmm.data(i).cast<int>();

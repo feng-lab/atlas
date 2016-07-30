@@ -10,7 +10,8 @@ template<bool ReportProgress = false>
 class ZImgAutoThreshold : public ZImgAlgorithm<ReportProgress>
 {
 public:
-  ZImgAutoThreshold() {}
+  ZImgAutoThreshold()
+  {}
 
   // ting's triangle auto threshold
   // threshold is calculated as img voxel type and returned as TValue because we don't know img type
@@ -29,14 +30,14 @@ public:
   TVoxel typedTriangleThre(const ZImg& imgIn, size_t c = 0, size_t t = 0);
 
   template<typename TValue>
-  TValue centroidThre(double &cent1, double &cent2, const ZImg& img, size_t c = 0, size_t t = 0)
+  TValue centroidThre(double& cent1, double& cent2, const ZImg& img, size_t c = 0, size_t t = 0)
   {
     IMG_RETURN_TYPED_CALL(typedCentroidThre, img, cent1, cent2, img, c, t);
     return 0;
   }
 
   template<typename TVoxel>
-  TVoxel typedCentroidThre(double &cent1, double &cent2, const ZImg& imgIn, size_t c = 0, size_t t = 0);
+  TVoxel typedCentroidThre(double& cent1, double& cent2, const ZImg& imgIn, size_t c = 0, size_t t = 0);
 
   template<typename TValue>
   TValue maxHistThre(const ZImg& img, size_t c = 0, size_t t = 0)
@@ -50,7 +51,7 @@ public:
 
 private:
   // assume hist is not empty
-  void histNonZeroRange(std::vector<size_t> &hist, size_t &low, size_t &high);
+  void histNonZeroRange(std::vector<size_t>& hist, size_t& low, size_t& high);
 
 };
 

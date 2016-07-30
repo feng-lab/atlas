@@ -58,7 +58,7 @@ public:
                const GenericForegroundPredictor& isForeground)
   {
     ConnComp res = createRes(img, conn, c, t);
-    ZImg bimg = img.createView(c,t).binarized(isForeground);
+    ZImg bimg = img.createView(c, t).binarized(isForeground);
 
     getConnectedComponents_Impl(bimg, res, 1);
 
@@ -78,6 +78,7 @@ public:
 
 private:
   ConnComp createRes(const ZImg& img, size_t conn, size_t c, size_t t) const;
+
   void getConnectedComponents_Impl(ZImg& markerImg, ConnComp& res, size_t label);
 };
 
