@@ -9,12 +9,12 @@ inline bool isNumber(QChar c)
   return c >= QChar('0') && c <= QChar('9');
 }
 
-int lastInteger(const QString &str)
+int lastInteger(const QString& str)
 {
   int size = str.size();
   int endNumPos = -1;
   int startNumPos = -1;
-  int index = size-1;
+  int index = size - 1;
   while (index >= 0) {
     if (isNumber(str[index])) {
       if (endNumPos == -1) {
@@ -35,7 +35,7 @@ int lastInteger(const QString &str)
     return 0;
 
   int res = str.mid(startNumPos, endNumPos - startNumPos + 1).toInt();
-  if (startNumPos > 0 && str[startNumPos-1] == QChar('-'))
+  if (startNumPos > 0 && str[startNumPos - 1] == QChar('-'))
     res = -res;
   return res;
 }
@@ -102,17 +102,17 @@ bool naturalSortLessThan(const QString& s1, const QString& s2)
   return sn1.toInt() < sn2.toInt();
 }
 
-bool lastIntegerLessThan(const QString &s1, const QString &s2)
+bool lastIntegerLessThan(const QString& s1, const QString& s2)
 {
   return lastInteger(s1) < lastInteger(s2);
 }
 
-QString replaceLastInteger(const QString &str, const QString &replacement)
+QString replaceLastInteger(const QString& str, const QString& replacement)
 {
   int size = str.size();
   int endNumPos = -1;
   int startNumPos = -1;
-  int index = size-1;
+  int index = size - 1;
   while (index >= 0) {
     if (isNumber(str[index])) {
       if (endNumPos == -1) {
@@ -132,15 +132,15 @@ QString replaceLastInteger(const QString &str, const QString &replacement)
   if (startNumPos == -1)
     return str;
 
-  if (startNumPos > 0 && str[startNumPos-1] == QChar('-'))
+  if (startNumPos > 0 && str[startNumPos - 1] == QChar('-'))
     startNumPos -= 1;
 
   QString res = str;
-  res.replace(startNumPos, endNumPos-startNumPos+1, replacement);
+  res.replace(startNumPos, endNumPos - startNumPos + 1, replacement);
   return res;
 }
 
-void removeComment(std::string &line, const std::string &commentStart, bool checkSpecialNumber)
+void removeComment(std::string& line, const std::string& commentStart, bool checkSpecialNumber)
 {
   if (commentStart == "#" && checkSpecialNumber) {
     std::vector<size_t> poses;
@@ -150,40 +150,40 @@ void removeComment(std::string &line, const std::string &commentStart, bool chec
     std::string str("1.#inf");
     size_t idx = std::string::npos;
     do {
-      idx = lineCopy.find(str, idx+1);
+      idx = lineCopy.find(str, idx + 1);
       if (idx != std::string::npos) {
-        poses.push_back(idx+2);
-        line[idx+2] = '&';
+        poses.push_back(idx + 2);
+        line[idx + 2] = '&';
       }
     } while (idx != std::string::npos);
 
     str = std::string("1.#ind");
     idx = std::string::npos;
     do {
-      idx = lineCopy.find(str, idx+1);
+      idx = lineCopy.find(str, idx + 1);
       if (idx != std::string::npos) {
-        poses.push_back(idx+2);
-        line[idx+2] = '&';
+        poses.push_back(idx + 2);
+        line[idx + 2] = '&';
       }
     } while (idx != std::string::npos);
 
     str = std::string("1.#qnan");
     idx = std::string::npos;
     do {
-      idx = lineCopy.find(str, idx+1);
+      idx = lineCopy.find(str, idx + 1);
       if (idx != std::string::npos) {
-        poses.push_back(idx+2);
-        line[idx+2] = '&';
+        poses.push_back(idx + 2);
+        line[idx + 2] = '&';
       }
     } while (idx != std::string::npos);
 
     str = std::string("1.#snan");
     idx = std::string::npos;
     do {
-      idx = lineCopy.find(str, idx+1);
+      idx = lineCopy.find(str, idx + 1);
       if (idx != std::string::npos) {
-        poses.push_back(idx+2);
-        line[idx+2] = '&';
+        poses.push_back(idx + 2);
+        line[idx + 2] = '&';
       }
     } while (idx != std::string::npos);
 
@@ -192,7 +192,7 @@ void removeComment(std::string &line, const std::string &commentStart, bool chec
       line = line.substr(0, idx);
     }
 
-    for (size_t i=0; i<poses.size(); ++i) {
+    for (size_t i = 0; i < poses.size(); ++i) {
       if (poses[i] < line.size())
         line[poses[i]] = '#';
     }
@@ -204,7 +204,7 @@ void removeComment(std::string &line, const std::string &commentStart, bool chec
   }
 }
 
-void removeComment(QString &line, const QString &commentStart, bool checkSpecialNumber)
+void removeComment(QString& line, const QString& commentStart, bool checkSpecialNumber)
 {
   if (commentStart == "#" && checkSpecialNumber) {
     std::vector<int> poses;
@@ -212,40 +212,40 @@ void removeComment(QString &line, const QString &commentStart, bool checkSpecial
     QString str("1.#inf");
     int idx = -1;
     do {
-      idx = line.indexOf(str, idx+1, Qt::CaseInsensitive);
+      idx = line.indexOf(str, idx + 1, Qt::CaseInsensitive);
       if (idx >= 0) {
-        poses.push_back(idx+2);
-        line[idx+2] = QChar('&');
+        poses.push_back(idx + 2);
+        line[idx + 2] = QChar('&');
       }
     } while (idx >= 0);
 
     str = QString("1.#ind");
     idx = -1;
     do {
-      idx = line.indexOf(str, idx+1, Qt::CaseInsensitive);
+      idx = line.indexOf(str, idx + 1, Qt::CaseInsensitive);
       if (idx >= 0) {
-        poses.push_back(idx+2);
-        line[idx+2] = QChar('&');
+        poses.push_back(idx + 2);
+        line[idx + 2] = QChar('&');
       }
     } while (idx >= 0);
 
     str = QString("1.#qnan");
     idx = -1;
     do {
-      idx = line.indexOf(str, idx+1, Qt::CaseInsensitive);
+      idx = line.indexOf(str, idx + 1, Qt::CaseInsensitive);
       if (idx >= 0) {
-        poses.push_back(idx+2);
-        line[idx+2] = QChar('&');
+        poses.push_back(idx + 2);
+        line[idx + 2] = QChar('&');
       }
     } while (idx >= 0);
 
     str = QString("1.#snan");
     idx = -1;
     do {
-      idx = line.indexOf(str, idx+1, Qt::CaseInsensitive);
+      idx = line.indexOf(str, idx + 1, Qt::CaseInsensitive);
       if (idx >= 0) {
-        poses.push_back(idx+2);
-        line[idx+2] = QChar('&');
+        poses.push_back(idx + 2);
+        line[idx + 2] = QChar('&');
       }
     } while (idx >= 0);
 
@@ -254,7 +254,7 @@ void removeComment(QString &line, const QString &commentStart, bool checkSpecial
       line.truncate(idx);
     }
 
-    for (size_t i=0; i<poses.size(); ++i) {
+    for (size_t i = 0; i < poses.size(); ++i) {
       if (poses[i] < line.size())
         line[poses[i]] = QChar('#');
     }

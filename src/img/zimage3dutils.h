@@ -7,13 +7,14 @@
 #include <numeric>
 #include "zlog.h"
 //#include "zbenchtimer.h"
+
 #ifndef _USE_QTCONCURRENT_
 #include <tbb/parallel_for.h>
 #else
 #include <QtConcurrent/QtConcurrentMap>
 #endif
-#include <QList>
 
+#include <QList>
 #include <utility>
 #include <cassert>
 #include <boost/align/aligned_allocator.hpp>
@@ -27,14 +28,14 @@ namespace nim {
 // everything is row major
 
 template<typename SignedIntegerType, typename TPixel>
-TPixel getImage3DPixelValue(const TPixel *img, size_t width, size_t height, size_t depth,
+TPixel getImage3DPixelValue(const TPixel* img, size_t width, size_t height, size_t depth,
                             SignedIntegerType x, SignedIntegerType y, SignedIntegerType z,
                             PadOption padOption = PadOption::Constant, TPixel padValue = TPixel(0))
 {
   if (x >= 0 && x < static_cast<SignedIntegerType>(width) &&
       y >= 0 && y < static_cast<SignedIntegerType>(height) &&
       z >= 0 && z < static_cast<SignedIntegerType>(depth))
-    return img[static_cast<size_t>(z)*width*height+y*width+x];
+    return img[static_cast<size_t>(z) * width * height + y * width + x];
 
   if (padOption == PadOption::Constant) {
     return padValue;
@@ -48,17 +49,17 @@ TPixel getImage3DPixelValue(const TPixel *img, size_t width, size_t height, size
     imgSize[1] = height;
     imgSize[2] = depth;
     wrapCoordToImage(coord, imgSize, 3, padOption);
-    return img[coord[2]*width*height+coord[1]*width+coord[0]];
+    return img[coord[2] * width * height + coord[1] * width + coord[0]];
   }
 }
 
 template<typename TPixel>
-TPixel getImage3DPixelValue(const TPixel *img, size_t width, size_t height, size_t depth,
+TPixel getImage3DPixelValue(const TPixel* img, size_t width, size_t height, size_t depth,
                             size_t x, size_t y, size_t z,
                             PadOption padOption = PadOption::Constant, TPixel padValue = TPixel(0))
 {
   if (x < width && y < height && z < depth)
-    return img[z*width*height+y*width+x];
+    return img[z * width * height + y * width + x];
 
   if (padOption == PadOption::Constant) {
     return padValue;
@@ -72,86 +73,92 @@ TPixel getImage3DPixelValue(const TPixel *img, size_t width, size_t height, size
     imgSize[1] = height;
     imgSize[2] = depth;
     wrapCoordToImage(coord, imgSize, 3, padOption);
-    return img[coord[2]*width*height+coord[1]*width+coord[0]];
+    return img[coord[2] * width * height + coord[1] * width + coord[0]];
   }
 }
 
 // imgOut should be preallocated and not same as img
 template<typename TPixel>
-void image3DPad(const TPixel *img, size_t width, size_t height, size_t depth,
+void image3DPad(const TPixel* img, size_t width, size_t height, size_t depth,
                 size_t leftPad, size_t rightPad, size_t upPad, size_t downPad, size_t frontPad, size_t backPad,
-                TPixel *imgOut, PadOption padOption = PadOption::Constant, TPixel padValue = TPixel(0))
+                TPixel* imgOut, PadOption padOption = PadOption::Constant, TPixel padValue = TPixel(0))
 {
   DCHECK_NE(img, imgOut);
 
-  size_t plane = width*height;
+  size_t plane = width * height;
 
   if (leftPad == 0 && rightPad == 0 && upPad == 0 && downPad == 0 && frontPad == 0 && backPad == 0) {
-    memcpy(imgOut, img, sizeof(TPixel)*plane*depth);
+    memcpy(imgOut, img, sizeof(TPixel) * plane * depth);
   } else {
-    size_t desWidth = leftPad+width+rightPad;
-    size_t desHeight = upPad+height+downPad;
-    size_t desDepth = depth+frontPad+backPad;
-    size_t desPlane = desWidth*desHeight;
+    size_t desWidth = leftPad + width + rightPad;
+    size_t desHeight = upPad + height + downPad;
+    size_t desDepth = depth + frontPad + backPad;
+    size_t desPlane = desWidth * desHeight;
 
     // copy image
-    for (size_t j=0; j<depth; ++j) {
+    for (size_t j = 0; j < depth; ++j) {
       if (leftPad == 0 && rightPad == 0) {
-        TPixel* desStart = imgOut + upPad * width + (j+frontPad) * desPlane;
-        memcpy(desStart, img + j * plane, sizeof(TPixel)*plane);
+        TPixel* desStart = imgOut + upPad * width + (j + frontPad) * desPlane;
+        memcpy(desStart, img + j * plane, sizeof(TPixel) * plane);
       } else {
-        TPixel* desStart = imgOut + upPad * desWidth + leftPad + (j+frontPad) * desPlane;
-        for (size_t i=0; i<height; ++i) {
-          memcpy(desStart, img + i*width + j * plane, sizeof(TPixel)*width);
+        TPixel* desStart = imgOut + upPad * desWidth + leftPad + (j + frontPad) * desPlane;
+        for (size_t i = 0; i < height; ++i) {
+          memcpy(desStart, img + i * width + j * plane, sizeof(TPixel) * width);
           desStart += desWidth;
         }
       }
     }
 
     // boundary
-    for (size_t k=0; k<frontPad; ++k) {
-      for (size_t j=0; j<desHeight; ++j) {
-        for (size_t i=0; i<desWidth; ++i) {
-          imgOut[k*desHeight*desWidth+j*desWidth+i] = getImage3DPixelValue(img, width, height, depth,
-                                                                           i-leftPad, j-upPad, k-frontPad,
-                                                                           padOption, padValue);
+    for (size_t k = 0; k < frontPad; ++k) {
+      for (size_t j = 0; j < desHeight; ++j) {
+        for (size_t i = 0; i < desWidth; ++i) {
+          imgOut[k * desHeight * desWidth + j * desWidth + i] = getImage3DPixelValue(img, width, height, depth,
+                                                                                     i - leftPad, j - upPad,
+                                                                                     k - frontPad,
+                                                                                     padOption, padValue);
         }
       }
     }
-    for (size_t k=frontPad+depth; k<desDepth; ++k) {
-      for (size_t j=0; j<desHeight; ++j) {
-        for (size_t i=0; i<desWidth; ++i) {
-          imgOut[k*desHeight*desWidth+j*desWidth+i] = getImage3DPixelValue(img, width, height, depth,
-                                                                           i-leftPad, j-upPad, k-frontPad,
-                                                                           padOption, padValue);
+    for (size_t k = frontPad + depth; k < desDepth; ++k) {
+      for (size_t j = 0; j < desHeight; ++j) {
+        for (size_t i = 0; i < desWidth; ++i) {
+          imgOut[k * desHeight * desWidth + j * desWidth + i] = getImage3DPixelValue(img, width, height, depth,
+                                                                                     i - leftPad, j - upPad,
+                                                                                     k - frontPad,
+                                                                                     padOption, padValue);
         }
       }
     }
-    for (size_t k=frontPad; k<frontPad+depth; ++k) {
-      for (size_t j=0; j<upPad; ++j) {
-        for (size_t i=0; i<desWidth; ++i) {
-          imgOut[k*desHeight*desWidth+j*desWidth+i] = getImage3DPixelValue(img, width, height, depth,
-                                                                           i-leftPad, j-upPad, k-frontPad,
-                                                                           padOption, padValue);
+    for (size_t k = frontPad; k < frontPad + depth; ++k) {
+      for (size_t j = 0; j < upPad; ++j) {
+        for (size_t i = 0; i < desWidth; ++i) {
+          imgOut[k * desHeight * desWidth + j * desWidth + i] = getImage3DPixelValue(img, width, height, depth,
+                                                                                     i - leftPad, j - upPad,
+                                                                                     k - frontPad,
+                                                                                     padOption, padValue);
         }
       }
-      for (size_t j=upPad+height; j<desHeight; ++j) {
-        for (size_t i=0; i<desWidth; ++i) {
-          imgOut[k*desHeight*desWidth+j*desWidth+i] = getImage3DPixelValue(img, width, height, depth,
-                                                                           i-leftPad, j-upPad, k-frontPad,
-                                                                           padOption, padValue);
+      for (size_t j = upPad + height; j < desHeight; ++j) {
+        for (size_t i = 0; i < desWidth; ++i) {
+          imgOut[k * desHeight * desWidth + j * desWidth + i] = getImage3DPixelValue(img, width, height, depth,
+                                                                                     i - leftPad, j - upPad,
+                                                                                     k - frontPad,
+                                                                                     padOption, padValue);
         }
       }
-      for (size_t j=upPad; j<upPad+height; ++j) {
-        for (size_t i=0; i<leftPad; ++i) {
-          imgOut[k*desHeight*desWidth+j*desWidth+i] = getImage3DPixelValue(img, width, height, depth,
-                                                                           i-leftPad, j-upPad, k-frontPad,
-                                                                           padOption, padValue);
+      for (size_t j = upPad; j < upPad + height; ++j) {
+        for (size_t i = 0; i < leftPad; ++i) {
+          imgOut[k * desHeight * desWidth + j * desWidth + i] = getImage3DPixelValue(img, width, height, depth,
+                                                                                     i - leftPad, j - upPad,
+                                                                                     k - frontPad,
+                                                                                     padOption, padValue);
         }
-        for (size_t i=leftPad+width; i<desWidth; ++i) {
-          imgOut[k*desHeight*desWidth+j*desWidth+i] = getImage3DPixelValue(img, width, height, depth,
-                                                                           i-leftPad, j-upPad, k-frontPad,
-                                                                           padOption, padValue);
+        for (size_t i = leftPad + width; i < desWidth; ++i) {
+          imgOut[k * desHeight * desWidth + j * desWidth + i] = getImage3DPixelValue(img, width, height, depth,
+                                                                                     i - leftPad, j - upPad,
+                                                                                     k - frontPad,
+                                                                                     padOption, padValue);
         }
       }
     }
@@ -164,8 +171,8 @@ void image3DFlip(TPixel* img, size_t width, size_t height, size_t depth, Dimensi
   if (dim == Dimension::X) {
     if (width <= 1)
       return;
-    for (size_t d=0; d<depth; ++d) {
-      for (size_t i=0; i<height; ++i) {
+    for (size_t d = 0; d < depth; ++d) {
+      for (size_t i = 0; i < height; ++i) {
         size_t j = i * width + d * width * height;
         size_t k = j + width - 1;
         while (j < k) {
@@ -179,14 +186,14 @@ void image3DFlip(TPixel* img, size_t width, size_t height, size_t depth, Dimensi
     if (height <= 1)
       return;
     std::vector<TPixel> buffer(width);
-    for (size_t d=0; d<depth; ++d) {
+    for (size_t d = 0; d < depth; ++d) {
       size_t j = 0;
       size_t k = height - 1;
       size_t size = sizeof(TPixel) * width;
       while (j < k) {
-        memcpy(buffer.data(), img+j*width+d*width*height, size);
-        memcpy(img+j*width+d*width*height, img+k*width+d*width*height, size);
-        memcpy(img+k*width+d*width*height, buffer.data(), size);
+        memcpy(buffer.data(), img + j * width + d * width * height, size);
+        memcpy(img + j * width + d * width * height, img + k * width + d * width * height, size);
+        memcpy(img + k * width + d * width * height, buffer.data(), size);
         ++j;
         --k;
       }
@@ -194,14 +201,14 @@ void image3DFlip(TPixel* img, size_t width, size_t height, size_t depth, Dimensi
   } else if (dim == Dimension::Z) {
     if (depth <= 1)
       return;
-    std::vector<TPixel> buffer(width*height);
+    std::vector<TPixel> buffer(width * height);
     size_t j = 0;
     size_t k = depth - 1;
     size_t size = sizeof(TPixel) * width * height;
     while (j < k) {
-      memcpy(buffer.data(), img+j*width*height, size);
-      memcpy(img+j*width*height, img+k*width*height, size);
-      memcpy(img+k*width*height, buffer.data(), size);
+      memcpy(buffer.data(), img + j * width * height, size);
+      memcpy(img + j * width * height, img + k * width * height, size);
+      memcpy(img + k * width * height, buffer.data(), size);
       ++j;
       --k;
     }
@@ -214,21 +221,22 @@ void image3DReflect(TPixel* img, size_t width, size_t height, size_t depth)
 {
   size_t length = width * height * depth;
   size_t j = length - 1;
-  for (size_t i=0; i<length/2; ++i, --j) {
+  for (size_t i = 0; i < length / 2; ++i, --j) {
     std::swap(img[i], img[j]);
   }
 }
 
 template<typename TPixel, typename TPixelOut = TPixel>
-struct Image3DFilterForOneBlock {
-  Image3DFilterForOneBlock(const TPixel *padImg,
+struct Image3DFilterForOneBlock
+{
+  Image3DFilterForOneBlock(const TPixel* padImg,
                            size_t padImgWidth,
                            size_t padImgHeight,
-                           const double *kernel,
+                           const double* kernel,
                            size_t kernelWidth,
                            size_t kernelHeight,
                            size_t kernelDepth,
-                           TPixelOut *imgOut,
+                           TPixelOut* imgOut,
                            size_t imgOutWidth,
                            size_t imgOutHeight)
     : padImg(padImg)
@@ -247,52 +255,54 @@ struct Image3DFilterForOneBlock {
   typedef void result_type;
 
 #ifndef _USE_QTCONCURRENT_
-  void operator()(const tbb::blocked_range<size_t> &range) const
+
+  void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    for (size_t k=range.begin(); k != range.end(); ++k) {
+    for (size_t k = range.begin(); k != range.end(); ++k) {
 #else
-  void operator()(const std::pair<size_t,size_t> &range) const
-  {
-    for (size_t k=range.first; k<range.second; ++k) {
+      void operator()(const std::pair<size_t,size_t> &range) const
+      {
+        for (size_t k=range.first; k<range.second; ++k) {
 #endif
-      for (size_t j=0; j<imgOutHeight; ++j) {
-        for (size_t i=0; i<imgOutWidth; ++i) {
+      for (size_t j = 0; j < imgOutHeight; ++j) {
+        for (size_t i = 0; i < imgOutWidth; ++i) {
           double sum = 0.0;
-          for (size_t s=0; s<kernelDepth; ++s) { // plane by plane
-            for (size_t r=0; r<kernelHeight; ++r) {  // row by row
-              const TPixel *imgStart = padImg + (j+r)*padImgWidth + i + (s+k)*padImgWidth*padImgHeight;
-              sum = std::inner_product(imgStart, imgStart+kernelWidth,
-                                       kernel+r*kernelWidth+s*kernelWidth*kernelHeight, sum);
+          for (size_t s = 0; s < kernelDepth; ++s) { // plane by plane
+            for (size_t r = 0; r < kernelHeight; ++r) {  // row by row
+              const TPixel* imgStart = padImg + (j + r) * padImgWidth + i + (s + k) * padImgWidth * padImgHeight;
+              sum = std::inner_product(imgStart, imgStart + kernelWidth,
+                                       kernel + r * kernelWidth + s * kernelWidth * kernelHeight, sum);
             }
           }
-          imgOut[j*imgOutWidth+i+k*imgOutWidth*imgOutHeight] = saturate_cast<TPixelOut>(sum);
+          imgOut[j * imgOutWidth + i + k * imgOutWidth * imgOutHeight] = saturate_cast<TPixelOut>(sum);
         }
       }
     }
   }
 
-  const TPixel *padImg;
+  const TPixel* padImg;
   size_t padImgWidth;
   size_t padImgHeight;
-  const double *kernel;
+  const double* kernel;
   size_t kernelWidth;
   size_t kernelHeight;
   size_t kernelDepth;
-  TPixelOut *imgOut;
+  TPixelOut* imgOut;
   size_t imgOutWidth;
   size_t imgOutHeight;
 };
 
 template<>
-struct Image3DFilterForOneBlock<double, double> {
-  Image3DFilterForOneBlock(const double *padImg,
+struct Image3DFilterForOneBlock<double, double>
+{
+  Image3DFilterForOneBlock(const double* padImg,
                            size_t padImgWidth,
                            size_t padImgHeight,
-                           const double *kernel,
+                           const double* kernel,
                            size_t kernelWidth,
                            size_t kernelHeight,
                            size_t kernelDepth,
-                           double *imgOut,
+                           double* imgOut,
                            size_t imgOutWidth,
                            size_t imgOutHeight)
     : padImg(padImg)
@@ -311,31 +321,34 @@ struct Image3DFilterForOneBlock<double, double> {
   typedef void result_type;
 
 #ifndef _USE_QTCONCURRENT_
-  void operator()(const tbb::blocked_range<size_t> &range) const {
+
+  void operator()(const tbb::blocked_range<size_t>& range) const
+  {
     if (kernelWidth < 8 || !(ZCpuInfoInstance.bAVX || ZCpuInfoInstance.bSSE3)) {
-      for (size_t k=range.begin(); k != range.end(); ++k) {
+      for (size_t k = range.begin(); k != range.end(); ++k) {
 #else
-  void operator()(const std::pair<size_t,size_t> &range) const {
-    if (kernelWidth < 8 || !(ZCpuInfoInstance.bAVX || ZCpuInfoInstance.bSSE3)) {
-      for (size_t k=range.first; k<range.second; ++k) {
+        void operator()(const std::pair<size_t,size_t> &range) const {
+          if (kernelWidth < 8 || !(ZCpuInfoInstance.bAVX || ZCpuInfoInstance.bSSE3)) {
+            for (size_t k=range.first; k<range.second; ++k) {
 #endif
-        for (size_t j=0; j<imgOutHeight; ++j) {
-          for (size_t i=0; i<imgOutWidth; ++i) {
+        for (size_t j = 0; j < imgOutHeight; ++j) {
+          for (size_t i = 0; i < imgOutWidth; ++i) {
             double sum = 0.0;
-            for (size_t s=0; s<kernelDepth; ++s) { // plane by plane
-              for (size_t r=0; r<kernelHeight; ++r) {  // row by row
-                const double *imgStart = padImg + (j+r)*padImgWidth + i + (s+k)*padImgWidth*padImgHeight;
-                sum = std::inner_product(imgStart, imgStart+kernelWidth,
-                                         kernel+r*kernelWidth+s*kernelWidth*kernelHeight, sum);
+            for (size_t s = 0; s < kernelDepth; ++s) { // plane by plane
+              for (size_t r = 0; r < kernelHeight; ++r) {  // row by row
+                const double* imgStart = padImg + (j + r) * padImgWidth + i + (s + k) * padImgWidth * padImgHeight;
+                sum = std::inner_product(imgStart, imgStart + kernelWidth,
+                                         kernel + r * kernelWidth + s * kernelWidth * kernelHeight, sum);
               }
             }
-            imgOut[j*imgOutWidth+i+k*imgOutWidth*imgOutHeight] = sum;
+            imgOut[j * imgOutWidth + i + k * imgOutWidth * imgOutHeight] = sum;
           }
         }
       }
     } else if (ZCpuInfoInstance.bAVX) {
 #ifndef _USE_QTCONCURRENT_
-      Image3DFilterForOneBlock_AVX(padImg, padImgWidth, padImgHeight, kernel, kernelWidth, kernelHeight, kernelDepth, imgOut,
+      Image3DFilterForOneBlock_AVX(padImg, padImgWidth, padImgHeight, kernel, kernelWidth, kernelHeight, kernelDepth,
+                                   imgOut,
                                    imgOutWidth, imgOutHeight, range.begin(), range.end());
 #else
       Image3DFilterForOneBlock_AVX(padImg, padImgWidth, padImgHeight, kernel, kernelWidth, kernelHeight, kernelDepth, imgOut,
@@ -343,7 +356,8 @@ struct Image3DFilterForOneBlock<double, double> {
 #endif
     } else if (ZCpuInfoInstance.bSSE3) {
 #ifndef _USE_QTCONCURRENT_
-      Image3DFilterForOneBlock_SSE3(padImg, padImgWidth, padImgHeight, kernel, kernelWidth, kernelHeight, kernelDepth, imgOut,
+      Image3DFilterForOneBlock_SSE3(padImg, padImgWidth, padImgHeight, kernel, kernelWidth, kernelHeight, kernelDepth,
+                                    imgOut,
                                     imgOutWidth, imgOutHeight, range.begin(), range.end());
 #else
       Image3DFilterForOneBlock_SSE3(padImg, padImgWidth, padImgHeight, kernel, kernelWidth, kernelHeight, kernelDepth, imgOut,
@@ -352,26 +366,27 @@ struct Image3DFilterForOneBlock<double, double> {
     }
   }
 
-  const double *padImg;
+  const double* padImg;
   size_t padImgWidth;
   size_t padImgHeight;
-  const double *kernel;
+  const double* kernel;
   size_t kernelWidth;
   size_t kernelHeight;
   size_t kernelDepth;
-  double *imgOut;
+  double* imgOut;
   size_t imgOutWidth;
   size_t imgOutHeight;
 };
 
 template<typename TPixel, typename TPixelOut = TPixel>
-struct Image3DRowFilterForOneBlock {
-  Image3DRowFilterForOneBlock(const TPixel *padImg,
+struct Image3DRowFilterForOneBlock
+{
+  Image3DRowFilterForOneBlock(const TPixel* padImg,
                               size_t padImgWidth,
                               size_t padImgHeight,
-                              const double *kernel,
+                              const double* kernel,
                               size_t kernelWidth,
-                              TPixelOut *imgOut,
+                              TPixelOut* imgOut,
                               size_t imgOutWidth,
                               size_t imgOutHeight)
     : padImg(padImg)
@@ -388,44 +403,46 @@ struct Image3DRowFilterForOneBlock {
   typedef void result_type;
 
 #ifndef _USE_QTCONCURRENT_
-  void operator()(const tbb::blocked_range<size_t> &range) const
+
+  void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    for (size_t k=range.begin(); k != range.end(); ++k) {
+    for (size_t k = range.begin(); k != range.end(); ++k) {
 #else
-  void operator()(const std::pair<size_t,size_t> &range) const
-  {
-    for (size_t k=range.first; k<range.second; ++k) {
+      void operator()(const std::pair<size_t,size_t> &range) const
+      {
+        for (size_t k=range.first; k<range.second; ++k) {
 #endif
-      for (size_t j=0; j<imgOutHeight; ++j) {
-        for (size_t i=0; i<imgOutWidth; ++i) {
+      for (size_t j = 0; j < imgOutHeight; ++j) {
+        for (size_t i = 0; i < imgOutWidth; ++i) {
           double sum = 0.0;
-          const TPixel *imgStart = padImg + j*padImgWidth + i + k*padImgWidth*padImgHeight;
-          sum = std::inner_product(imgStart, imgStart+kernelWidth,
+          const TPixel* imgStart = padImg + j * padImgWidth + i + k * padImgWidth * padImgHeight;
+          sum = std::inner_product(imgStart, imgStart + kernelWidth,
                                    kernel, sum);
-          imgOut[j*imgOutWidth+i+k*imgOutWidth*imgOutHeight] = saturate_cast<TPixelOut>(sum);
+          imgOut[j * imgOutWidth + i + k * imgOutWidth * imgOutHeight] = saturate_cast<TPixelOut>(sum);
         }
       }
     }
   }
 
-  const TPixel *padImg;
+  const TPixel* padImg;
   size_t padImgWidth;
   size_t padImgHeight;
-  const double *kernel;
+  const double* kernel;
   size_t kernelWidth;
-  TPixelOut *imgOut;
+  TPixelOut* imgOut;
   size_t imgOutWidth;
   size_t imgOutHeight;
 };
 
 template<>
-struct Image3DRowFilterForOneBlock<double, double> {
-  Image3DRowFilterForOneBlock(const double *padImg,
+struct Image3DRowFilterForOneBlock<double, double>
+{
+  Image3DRowFilterForOneBlock(const double* padImg,
                               size_t padImgWidth,
                               size_t padImgHeight,
-                              const double *kernel,
+                              const double* kernel,
                               size_t kernelWidth,
-                              double *imgOut,
+                              double* imgOut,
                               size_t imgOutWidth,
                               size_t imgOutHeight)
     : padImg(padImg)
@@ -442,21 +459,23 @@ struct Image3DRowFilterForOneBlock<double, double> {
   typedef void result_type;
 
 #ifndef _USE_QTCONCURRENT_
-  void operator()(const tbb::blocked_range<size_t> &range) const {
+
+  void operator()(const tbb::blocked_range<size_t>& range) const
+  {
     if (kernelWidth < 8 || !(ZCpuInfoInstance.bAVX || ZCpuInfoInstance.bSSE3)) {
-      for (size_t k=range.begin(); k != range.end(); ++k) {
+      for (size_t k = range.begin(); k != range.end(); ++k) {
 #else
-  void operator()(const std::pair<size_t,size_t> &range) const {
-    if (kernelWidth < 8 || !(ZCpuInfoInstance.bAVX || ZCpuInfoInstance.bSSE3)) {
-      for (size_t k=range.first; k<range.second; ++k) {
+        void operator()(const std::pair<size_t,size_t> &range) const {
+          if (kernelWidth < 8 || !(ZCpuInfoInstance.bAVX || ZCpuInfoInstance.bSSE3)) {
+            for (size_t k=range.first; k<range.second; ++k) {
 #endif
-        for (size_t j=0; j<imgOutHeight; ++j) {
-          for (size_t i=0; i<imgOutWidth; ++i) {
+        for (size_t j = 0; j < imgOutHeight; ++j) {
+          for (size_t i = 0; i < imgOutWidth; ++i) {
             double sum = 0.0;
-            const double *imgStart = padImg + j*padImgWidth + i + k*padImgWidth*padImgHeight;
-            sum = std::inner_product(imgStart, imgStart+kernelWidth,
+            const double* imgStart = padImg + j * padImgWidth + i + k * padImgWidth * padImgHeight;
+            sum = std::inner_product(imgStart, imgStart + kernelWidth,
                                      kernel, sum);
-            imgOut[j*imgOutWidth+i+k*imgOutWidth*imgOutHeight] = sum;
+            imgOut[j * imgOutWidth + i + k * imgOutWidth * imgOutHeight] = sum;
           }
         }
       }
@@ -479,24 +498,25 @@ struct Image3DRowFilterForOneBlock<double, double> {
     }
   }
 
-  const double *padImg;
+  const double* padImg;
   size_t padImgWidth;
   size_t padImgHeight;
-  const double *kernel;
+  const double* kernel;
   size_t kernelWidth;
-  double *imgOut;
+  double* imgOut;
   size_t imgOutWidth;
   size_t imgOutHeight;
 };
 
 template<typename TPixel, typename TPixelOut = TPixel>
-struct Image3DColFilterForOneBlock {
-  Image3DColFilterForOneBlock(const TPixel *padImg,
+struct Image3DColFilterForOneBlock
+{
+  Image3DColFilterForOneBlock(const TPixel* padImg,
                               size_t padImgWidth,
                               size_t padImgHeight,
-                              const double *kernel,
+                              const double* kernel,
                               size_t kernelHeight,
-                              TPixelOut *imgOut,
+                              TPixelOut* imgOut,
                               size_t imgOutWidth,
                               size_t imgOutHeight)
     : padImg(padImg)
@@ -513,46 +533,48 @@ struct Image3DColFilterForOneBlock {
   typedef void result_type;
 
 #ifndef _USE_QTCONCURRENT_
-  void operator()(const tbb::blocked_range<size_t> &range) const
+
+  void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    for (size_t k=range.begin(); k != range.end(); ++k) {
+    for (size_t k = range.begin(); k != range.end(); ++k) {
 #else
-  void operator()(const std::pair<size_t,size_t> &range) const
-  {
-    for (size_t k=range.first; k<range.second; ++k) {
+      void operator()(const std::pair<size_t,size_t> &range) const
+      {
+        for (size_t k=range.first; k<range.second; ++k) {
 #endif
-      for (size_t j=0; j<imgOutHeight; ++j) {
-        for (size_t i=0; i<imgOutWidth; ++i) {
+      for (size_t j = 0; j < imgOutHeight; ++j) {
+        for (size_t i = 0; i < imgOutWidth; ++i) {
           double sum = 0.0;
-          for (size_t r=0; r<kernelHeight; ++r) {  // row by row
-            sum += kernel[r] * (*(padImg + (j+r)*padImgWidth + i + k*padImgWidth*padImgHeight));
+          for (size_t r = 0; r < kernelHeight; ++r) {  // row by row
+            sum += kernel[r] * (*(padImg + (j + r) * padImgWidth + i + k * padImgWidth * padImgHeight));
           }
-          imgOut[j*imgOutWidth+i+k*imgOutWidth*imgOutHeight] = saturate_cast<TPixelOut>(sum);
+          imgOut[j * imgOutWidth + i + k * imgOutWidth * imgOutHeight] = saturate_cast<TPixelOut>(sum);
         }
       }
     }
   }
 
-  const TPixel *padImg;
+  const TPixel* padImg;
   size_t padImgWidth;
   size_t padImgHeight;
-  const double *kernel;
+  const double* kernel;
   size_t kernelHeight;
-  TPixelOut *imgOut;
+  TPixelOut* imgOut;
   size_t imgOutWidth;
   size_t imgOutHeight;
 };
 
 template<typename TPixel, typename TPixelOut = TPixel>
-struct Image3DZFilterForOneBlock {
-  Image3DZFilterForOneBlock(const TPixel *padImg,
-                              size_t padImgWidth,
-                              size_t padImgHeight,
-                              const double *kernel,
-                              size_t kernelDepth,
-                              TPixelOut *imgOut,
-                              size_t imgOutWidth,
-                              size_t imgOutHeight)
+struct Image3DZFilterForOneBlock
+{
+  Image3DZFilterForOneBlock(const TPixel* padImg,
+                            size_t padImgWidth,
+                            size_t padImgHeight,
+                            const double* kernel,
+                            size_t kernelDepth,
+                            TPixelOut* imgOut,
+                            size_t imgOutWidth,
+                            size_t imgOutHeight)
     : padImg(padImg)
     , padImgWidth(padImgWidth)
     , padImgHeight(padImgHeight)
@@ -567,40 +589,41 @@ struct Image3DZFilterForOneBlock {
   typedef void result_type;
 
 #ifndef _USE_QTCONCURRENT_
-  void operator()(const tbb::blocked_range<size_t> &range) const
+
+  void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    for (size_t k=range.begin(); k != range.end(); ++k) {
+    for (size_t k = range.begin(); k != range.end(); ++k) {
 #else
-  void operator()(const std::pair<size_t,size_t> &range) const
-  {
-    for (size_t k=range.first; k<range.second; ++k) {
+      void operator()(const std::pair<size_t,size_t> &range) const
+      {
+        for (size_t k=range.first; k<range.second; ++k) {
 #endif
-      for (size_t j=0; j<imgOutHeight; ++j) {
-        for (size_t i=0; i<imgOutWidth; ++i) {
+      for (size_t j = 0; j < imgOutHeight; ++j) {
+        for (size_t i = 0; i < imgOutWidth; ++i) {
           double sum = 0.0;
-          for (size_t p=0; p<kernelDepth; ++p) {  // plane by plane
-            sum += kernel[p] * (*(padImg + j*padImgWidth + i + (k+p)*padImgWidth*padImgHeight));
+          for (size_t p = 0; p < kernelDepth; ++p) {  // plane by plane
+            sum += kernel[p] * (*(padImg + j * padImgWidth + i + (k + p) * padImgWidth * padImgHeight));
           }
-          imgOut[j*imgOutWidth+i+k*imgOutWidth*imgOutHeight] = saturate_cast<TPixelOut>(sum);
+          imgOut[j * imgOutWidth + i + k * imgOutWidth * imgOutHeight] = saturate_cast<TPixelOut>(sum);
         }
       }
     }
   }
 
-  const TPixel *padImg;
+  const TPixel* padImg;
   size_t padImgWidth;
   size_t padImgHeight;
-  const double *kernel;
+  const double* kernel;
   size_t kernelDepth;
-  TPixelOut *imgOut;
+  TPixelOut* imgOut;
   size_t imgOutWidth;
   size_t imgOutHeight;
 };
 
 template<typename TPixel, typename TPixelOut>
-void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
-                   const double *kernel, size_t kernelWidth, size_t kernelHeight, size_t kernelDepth,
-                   TPixelOut *imgOut,
+void image3DFilter(const TPixel* img, size_t width, size_t height, size_t depth,
+                   const double* kernel, size_t kernelWidth, size_t kernelHeight, size_t kernelDepth,
+                   TPixelOut* imgOut,
                    PadOption boundaryOption = PadOption::Constant, TPixel boundaryValue = TPixel(0),
                    bool corr = true,
                    bool useMultithreading = true)
@@ -611,28 +634,29 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
   size_t downPad = (kernelHeight - 1) / 2;
   size_t frontPad = kernelDepth / 2;
   size_t backPad = (kernelDepth - 1) / 2;
-  size_t desWidth = leftPad+width+rightPad;
-  size_t desHeight = upPad+height+downPad;
-  size_t desDepth = frontPad+depth+backPad;
-  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32>> padImg(desWidth*desHeight*desDepth);
+  size_t desWidth = leftPad + width + rightPad;
+  size_t desHeight = upPad + height + downPad;
+  size_t desDepth = frontPad + depth + backPad;
+  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32>> padImg(desWidth * desHeight * desDepth);
   //ZBenchTimer bt;
   //bt.start();
   image3DPad(img, width, height, depth, leftPad, rightPad, upPad, downPad, frontPad, backPad, padImg.data(),
-      boundaryOption, boundaryValue);
+             boundaryOption, boundaryValue);
   //bt.stopAndPrint();
 
   //image3DWrite(padImg.data(), desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
 
   std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedKernel;
-  alignedKernel.insert(alignedKernel.end(), kernel, kernel + kernelWidth*kernelHeight*kernelDepth);
-  const double *adjKernel = alignedKernel.data();
+  alignedKernel.insert(alignedKernel.end(), kernel, kernel + kernelWidth * kernelHeight * kernelDepth);
+  const double* adjKernel = alignedKernel.data();
   if (!corr) {
     image3DReflect(alignedKernel.data(), kernelWidth, kernelHeight, kernelDepth);
   }
 
   // get correlation of padImg and adjKernel
-  Image3DFilterForOneBlock<TPixel,TPixelOut> functor(padImg.data(), desWidth, desHeight,
-      adjKernel, kernelWidth, kernelHeight, kernelDepth, imgOut, width, height);
+  Image3DFilterForOneBlock<TPixel, TPixelOut> functor(padImg.data(), desWidth, desHeight,
+                                                      adjKernel, kernelWidth, kernelHeight, kernelDepth, imgOut, width,
+                                                      height);
   if (!useMultithreading) {
 #ifndef _USE_QTCONCURRENT_
     functor(tbb::blocked_range<size_t>(0, depth));
@@ -658,11 +682,11 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
 }
 
 template<typename TPixel, typename TPixelOut>
-void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
-                   const double *rowkernel, size_t kernelWidth,
-                   const double *colkernel, size_t kernelHeight,
-                   const double *zkernel, size_t kernelDepth,
-                   TPixelOut *imgOut,
+void image3DFilter(const TPixel* img, size_t width, size_t height, size_t depth,
+                   const double* rowkernel, size_t kernelWidth,
+                   const double* colkernel, size_t kernelHeight,
+                   const double* zkernel, size_t kernelDepth,
+                   TPixelOut* imgOut,
                    PadOption boundaryOption = PadOption::Constant, TPixel boundaryValue = TPixel(0),
                    bool corr = true,
                    bool useMultithreading = true)
@@ -673,14 +697,14 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
   size_t downPad = (kernelHeight - 1) / 2;
   size_t frontPad = kernelDepth / 2;
   size_t backPad = (kernelDepth - 1) / 2;
-  size_t desWidth = leftPad+width+rightPad;
-  size_t desHeight = upPad+height+downPad;
-  size_t desDepth = frontPad+depth+backPad;
-  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32>> padImg(desWidth*desHeight*desDepth);
+  size_t desWidth = leftPad + width + rightPad;
+  size_t desHeight = upPad + height + downPad;
+  size_t desDepth = frontPad + depth + backPad;
+  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32>> padImg(desWidth * desHeight * desDepth);
   //ZBenchTimer bt;
   //bt.start();
   image3DPad(img, width, height, depth, leftPad, rightPad, upPad, downPad, frontPad, backPad, padImg.data(),
-      boundaryOption, boundaryValue);
+             boundaryOption, boundaryValue);
   //bt.stopAndPrint();
 
   //image3DWrite(padImg.data(), desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
@@ -691,9 +715,9 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
   alignedRowKernel.insert(alignedRowKernel.end(), rowkernel, rowkernel + kernelWidth);
   alignedColKernel.insert(alignedColKernel.end(), colkernel, colkernel + kernelHeight);
   alignedZKernel.insert(alignedZKernel.end(), zkernel, zkernel + kernelDepth);
-  const double *adjrowkernel = alignedRowKernel.data();
-  const double *adjcolkernel = alignedColKernel.data();
-  const double *adjzkernel = alignedZKernel.data();
+  const double* adjrowkernel = alignedRowKernel.data();
+  const double* adjcolkernel = alignedColKernel.data();
+  const double* adjzkernel = alignedZKernel.data();
   if (!corr) {
     image2DFlip(alignedRowKernel.data(), kernelWidth, 1, Dimension::X);
     image2DFlip(alignedColKernel.data(), kernelHeight, 1, Dimension::X);
@@ -702,9 +726,10 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
 
   // get correlation of padImg and adjKernel
   if (!useMultithreading) {
-    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg1(desWidth*height*desDepth);
-    Image3DColFilterForOneBlock<TPixel,double> colfunctor(padImg.data(), desWidth, desHeight,
-        adjcolkernel, kernelHeight, bufImg1.data(), desWidth, height);
+    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg1(desWidth * height * desDepth);
+    Image3DColFilterForOneBlock<TPixel, double> colfunctor(padImg.data(), desWidth, desHeight,
+                                                           adjcolkernel, kernelHeight, bufImg1.data(), desWidth,
+                                                           height);
 #ifndef _USE_QTCONCURRENT_
     colfunctor(tbb::blocked_range<size_t>(0, desDepth));
 #else
@@ -713,9 +738,9 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
     padImg.clear();
     padImg.shrink_to_fit();
 
-    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg2(width*height*desDepth);
-    Image3DRowFilterForOneBlock<double,double> rowfunctor(bufImg1.data(), desWidth, height,
-        adjrowkernel, kernelWidth, bufImg2.data(), width, height);
+    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg2(width * height * desDepth);
+    Image3DRowFilterForOneBlock<double, double> rowfunctor(bufImg1.data(), desWidth, height,
+                                                           adjrowkernel, kernelWidth, bufImg2.data(), width, height);
 #ifndef _USE_QTCONCURRENT_
     rowfunctor(tbb::blocked_range<size_t>(0, desDepth));
 #else
@@ -724,8 +749,8 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
     bufImg1.clear();
     bufImg1.shrink_to_fit();
 
-    Image3DZFilterForOneBlock<double,TPixelOut> zfunctor(bufImg2.data(), width, height,
-        adjzkernel, kernelDepth, imgOut, width, height);
+    Image3DZFilterForOneBlock<double, TPixelOut> zfunctor(bufImg2.data(), width, height,
+                                                          adjzkernel, kernelDepth, imgOut, width, height);
 #ifndef _USE_QTCONCURRENT_
     zfunctor(tbb::blocked_range<size_t>(0, depth));
 #else
@@ -733,23 +758,25 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
 #endif
   } else {
 #ifndef _USE_QTCONCURRENT_
-    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg1(desWidth*height*desDepth);
+    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg1(desWidth * height * desDepth);
     tbb::parallel_for(tbb::blocked_range<size_t>(0, desDepth),
-                      Image3DColFilterForOneBlock<TPixel,double>(padImg.data(), desWidth, desHeight,
-                      adjcolkernel, kernelHeight, bufImg1.data(), desWidth, height));
+                      Image3DColFilterForOneBlock<TPixel, double>(padImg.data(), desWidth, desHeight,
+                                                                  adjcolkernel, kernelHeight, bufImg1.data(), desWidth,
+                                                                  height));
     padImg.clear();
     padImg.shrink_to_fit();
 
-    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg2(width*height*desDepth);
+    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg2(width * height * desDepth);
     tbb::parallel_for(tbb::blocked_range<size_t>(0, desDepth),
-                      Image3DRowFilterForOneBlock<double,double>(bufImg1.data(), desWidth, height,
-                      adjrowkernel, kernelWidth, bufImg2.data(), width, height));
+                      Image3DRowFilterForOneBlock<double, double>(bufImg1.data(), desWidth, height,
+                                                                  adjrowkernel, kernelWidth, bufImg2.data(), width,
+                                                                  height));
     bufImg1.clear();
     bufImg1.shrink_to_fit();
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, depth),
-                      Image3DZFilterForOneBlock<double,TPixelOut>(bufImg2.data(), width, height,
-                      adjzkernel, kernelDepth, imgOut, width, height));
+                      Image3DZFilterForOneBlock<double, TPixelOut>(bufImg2.data(), width, height,
+                                                                   adjzkernel, kernelDepth, imgOut, width, height));
 #else
     size_t numThreads = QThread::idealThreadCount();
     size_t numBlock = std::min(depth, numThreads * 2);
@@ -785,9 +812,9 @@ void image3DFilter(const TPixel *img, size_t width, size_t height, size_t depth,
 
 // boundaryOption see image2DFilter
 template<typename TPixel, typename TPixelOut>
-void image3DGaussianFilter(const TPixel *img, size_t width, size_t height, size_t depth,
+void image3DGaussianFilter(const TPixel* img, size_t width, size_t height, size_t depth,
                            double kernelSigmaX, double kernelSigmaY, double kernelSigmaZ,
-                           TPixelOut *imgOut,
+                           TPixelOut* imgOut,
                            int kernelWidth = -1, int kernelHeight = -1, int kernelDepth = -1,
                            PadOption boundaryOption = PadOption::Constant, TPixel boundaryValue = TPixel(0),
                            bool useMultithreading = true)
@@ -813,8 +840,8 @@ void image3DGaussianFilter(const TPixel *img, size_t width, size_t height, size_
   //ZBenchTimer bt;
   //bt.start();
   image3DFilter(img, width, height, depth, rowkernel.data(), kWidth,
-      colkernel.data(), kHeight, zkernel.data(), kDepth,
-      imgOut, boundaryOption, boundaryValue, true, useMultithreading);
+                colkernel.data(), kHeight, zkernel.data(), kDepth,
+                imgOut, boundaryOption, boundaryValue, true, useMultithreading);
   //bt.stopAndPrint();
 #endif
 }
@@ -823,9 +850,9 @@ void image3DGaussianFilter(const TPixel *img, size_t width, size_t height, size_
 // such as double
 // boundaryOption see image2DFilter
 template<typename TPixel, typename TPixelOut>
-void image3DLoGFilter(const TPixel *img, size_t width, size_t height, size_t depth,
+void image3DLoGFilter(const TPixel* img, size_t width, size_t height, size_t depth,
                       double kernelSigmaX, double kernelSigmaY, double kernelSigmaZ,
-                      TPixelOut *imgOut,
+                      TPixelOut* imgOut,
                       int kernelWidth = -1, int kernelHeight = -1, int kernelDepth = -1,
                       PadOption boundaryOption = PadOption::Constant, TPixel boundaryValue = TPixel(0),
                       bool useMultithreading = true)
@@ -844,35 +871,36 @@ void image3DLoGFilter(const TPixel *img, size_t width, size_t height, size_t dep
   //ZBenchTimer bt;
   //bt.start();
   image3DFilter(img, width, height, depth, rowLoGkernel.data(), kWidth,
-      colGkernel.data(), kHeight, zGkernel.data(), kDepth,
-      imgOut, boundaryOption, boundaryValue, true, useMultithreading);
+                colGkernel.data(), kHeight, zGkernel.data(), kDepth,
+                imgOut, boundaryOption, boundaryValue, true, useMultithreading);
 
-  std::vector<TPixelOut> bufImg(width*height*depth);
+  std::vector<TPixelOut> bufImg(width * height * depth);
 
   image3DFilter(img, width, height, depth, rowGkernel.data(), kWidth,
-      colLoGkernel.data(), kHeight, zGkernel.data(), kDepth,
-      bufImg.data(), boundaryOption, boundaryValue, true, useMultithreading);
+                colLoGkernel.data(), kHeight, zGkernel.data(), kDepth,
+                bufImg.data(), boundaryOption, boundaryValue, true, useMultithreading);
 
-  for (size_t i=0; i<bufImg.size(); ++i)
+  for (size_t i = 0; i < bufImg.size(); ++i)
     imgOut[i] += bufImg[i];
 
   image3DFilter(img, width, height, depth, rowGkernel.data(), kWidth,
-      colGkernel.data(), kHeight, zLoGkernel.data(), kDepth,
-      bufImg.data(), boundaryOption, boundaryValue, true, useMultithreading);
+                colGkernel.data(), kHeight, zLoGkernel.data(), kDepth,
+                bufImg.data(), boundaryOption, boundaryValue, true, useMultithreading);
 
-  for (size_t i=0; i<bufImg.size(); ++i)
+  for (size_t i = 0; i < bufImg.size(); ++i)
     imgOut[i] += bufImg[i];
 
   //bt.stopAndPrint();
 }
 
 template<typename TPixel, typename TPixelOut>
-struct Resize3DForOneBlock {
-  Resize3DForOneBlock(const TPixel *img, size_t width, size_t height, size_t depth,
-                      TPixelOut *imgOut, size_t outWidth, size_t outHeight, size_t outDepth,
-                      const std::vector<double> &xWeights, const std::vector<size_t> &xIndices, size_t xKernelWidth,
-                      const std::vector<double> &yWeights, const std::vector<size_t> &yIndices, size_t yKernelWidth,
-                      const std::vector<double> &zWeights, const std::vector<size_t> &zIndices, size_t zKernelWidth)
+struct Resize3DForOneBlock
+{
+  Resize3DForOneBlock(const TPixel* img, size_t width, size_t height, size_t depth,
+                      TPixelOut* imgOut, size_t outWidth, size_t outHeight, size_t outDepth,
+                      const std::vector<double>& xWeights, const std::vector<size_t>& xIndices, size_t xKernelWidth,
+                      const std::vector<double>& yWeights, const std::vector<size_t>& yIndices, size_t yKernelWidth,
+                      const std::vector<double>& zWeights, const std::vector<size_t>& zIndices, size_t zKernelWidth)
     : m_img(img), m_width(width), m_height(height), m_depth(depth)
     , m_imgOut(imgOut), m_outWidth(outWidth), m_outHeight(outHeight), m_outDepth(outDepth)
     , m_xWeights(xWeights), m_xIndices(xIndices), m_xKernelWidth(xKernelWidth)
@@ -884,55 +912,59 @@ struct Resize3DForOneBlock {
   typedef void result_type;
 
 #ifndef _USE_QTCONCURRENT_
-  void operator()(const tbb::blocked_range<size_t> &range) const
+
+  void operator()(const tbb::blocked_range<size_t>& range) const
 #else
   void operator()(const std::pair<size_t,size_t> &range) const
 #endif
   {
     if (m_xKernelWidth == 1 && m_yKernelWidth == 1 && m_zKernelWidth == 1) {
 #ifndef _USE_QTCONCURRENT_
-      for (size_t z=range.begin(); z != range.end(); ++z) {
+      for (size_t z = range.begin(); z != range.end(); ++z) {
 #else
-      for (size_t z=range.first; z<range.second; ++z) {
+        for (size_t z=range.first; z<range.second; ++z) {
 #endif
-        for (size_t y=0; y<m_outHeight; ++y) {
-          for (size_t x=0; x<m_outWidth; ++x) {
-            m_imgOut[z*m_outWidth*m_outHeight+y*m_outWidth+x] = saturate_cast<TPixelOut>(m_img[m_zIndices[z]*m_width*m_height + m_yIndices[y]*m_width + m_xIndices[x]]);
+        for (size_t y = 0; y < m_outHeight; ++y) {
+          for (size_t x = 0; x < m_outWidth; ++x) {
+            m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] = saturate_cast<TPixelOut>(
+              m_img[m_zIndices[z] * m_width * m_height + m_yIndices[y] * m_width + m_xIndices[x]]);
           }
         }
       }
     } else {
 #ifndef _USE_QTCONCURRENT_
-      for (size_t z=range.begin(); z != range.end(); ++z) {
+      for (size_t z = range.begin(); z != range.end(); ++z) {
 #else
-      for (size_t z=range.first; z<range.second; ++z) {
+        for (size_t z=range.first; z<range.second; ++z) {
 #endif
-        for (size_t y=0; y<m_outHeight; ++y) {
-          for (size_t x=0; x<m_outWidth; ++x) {
+        for (size_t y = 0; y < m_outHeight; ++y) {
+          for (size_t x = 0; x < m_outWidth; ++x) {
             double valxyz = 0;
-            for (size_t kz=0; kz < m_zKernelWidth; ++kz) {
+            for (size_t kz = 0; kz < m_zKernelWidth; ++kz) {
               double valxy = 0;
-              for (size_t ky=0; ky < m_yKernelWidth; ++ky) {
+              for (size_t ky = 0; ky < m_yKernelWidth; ++ky) {
                 double valx = 0;
-                for (size_t kx=0; kx < m_xKernelWidth; ++kx) {
-                  valx += m_xWeights[x*m_xKernelWidth+kx] * m_img[m_zIndices[z*m_zKernelWidth+kz]*m_width*m_height + m_yIndices[y*m_yKernelWidth+ky]*m_width + m_xIndices[x*m_xKernelWidth+kx]];
+                for (size_t kx = 0; kx < m_xKernelWidth; ++kx) {
+                  valx += m_xWeights[x * m_xKernelWidth + kx] *
+                          m_img[m_zIndices[z * m_zKernelWidth + kz] * m_width * m_height +
+                                m_yIndices[y * m_yKernelWidth + ky] * m_width + m_xIndices[x * m_xKernelWidth + kx]];
                 }
-                valxy += m_yWeights[y*m_yKernelWidth+ky] * valx;
+                valxy += m_yWeights[y * m_yKernelWidth + ky] * valx;
               }
-              valxyz += m_zWeights[z*m_zKernelWidth+kz] * valxy;
+              valxyz += m_zWeights[z * m_zKernelWidth + kz] * valxy;
             }
-            m_imgOut[z*m_outWidth*m_outHeight+y*m_outWidth+x] = saturate_cast<TPixelOut>(valxyz);
+            m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] = saturate_cast<TPixelOut>(valxyz);
           }
         }
       }
     }
   }
 
-  const TPixel *m_img;
+  const TPixel* m_img;
   size_t m_width;
   size_t m_height;
   size_t m_depth;
-  TPixelOut *m_imgOut;
+  TPixelOut* m_imgOut;
   size_t m_outWidth;
   size_t m_outHeight;
   size_t m_outDepth;
@@ -952,8 +984,8 @@ struct Resize3DForOneBlock {
 // 'antialiasing' specifies whether to perform antialiasing when shrinking an image. For the 'nearest' method,
 // the parameter 'antialiasingForNearest' is used (default false); for all other methods, the default is true.
 template<typename TPixel, typename TPixelOut>
-void image3DResize(const TPixel *img, size_t width, size_t height, size_t depth,
-                   TPixelOut *imgOut, size_t outWidth, size_t outHeight, size_t outDepth,
+void image3DResize(const TPixel* img, size_t width, size_t height, size_t depth,
+                   TPixelOut* imgOut, size_t outWidth, size_t outHeight, size_t outDepth,
                    Interpolant interpolant = Interpolant::Cubic, bool antialiasing = true,
                    bool antialiasingForNearest = false,
                    bool useMultithreading = true)
@@ -967,17 +999,20 @@ void image3DResize(const TPixel *img, size_t width, size_t height, size_t depth,
   std::vector<double> zWeights;
   std::vector<size_t> zIndices;
   size_t zKernelWidth;
-  _resizeContributions(width, outWidth, interpolant, interpolant == Interpolant::Nearest ? antialiasingForNearest : antialiasing,
+  _resizeContributions(width, outWidth, interpolant,
+                       interpolant == Interpolant::Nearest ? antialiasingForNearest : antialiasing,
                        xWeights, xIndices, xKernelWidth);
-  _resizeContributions(height, outHeight, interpolant, interpolant == Interpolant::Nearest ? antialiasingForNearest : antialiasing,
+  _resizeContributions(height, outHeight, interpolant,
+                       interpolant == Interpolant::Nearest ? antialiasingForNearest : antialiasing,
                        yWeights, yIndices, yKernelWidth);
-  _resizeContributions(depth, outDepth, interpolant, interpolant == Interpolant::Nearest ? antialiasingForNearest : antialiasing,
+  _resizeContributions(depth, outDepth, interpolant,
+                       interpolant == Interpolant::Nearest ? antialiasingForNearest : antialiasing,
                        zWeights, zIndices, zKernelWidth);
 
-  Resize3DForOneBlock<TPixel,TPixelOut> func(img, width, height, depth, imgOut, outWidth, outHeight, outDepth,
-                                             xWeights, xIndices, xKernelWidth,
-                                             yWeights, yIndices, yKernelWidth,
-                                             zWeights, zIndices, zKernelWidth);
+  Resize3DForOneBlock<TPixel, TPixelOut> func(img, width, height, depth, imgOut, outWidth, outHeight, outDepth,
+                                              xWeights, xIndices, xKernelWidth,
+                                              yWeights, yIndices, yKernelWidth,
+                                              zWeights, zIndices, zKernelWidth);
   if (!useMultithreading) {
 #ifndef _USE_QTCONCURRENT_
     func(tbb::blocked_range<size_t>(0, outDepth));

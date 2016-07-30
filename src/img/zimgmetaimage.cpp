@@ -35,8 +35,9 @@ QStringList ZImgMetaImage::extensions() const
   return res;
 }
 
-void ZImgMetaImage::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                             std::vector<std::set<size_t>> *pyramidalRatios)
+void ZImgMetaImage::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                             std::vector<std::set<size_t>>* pyramidalRatios)
 {
   MetaImage metaImage;
   if (!metaImage.Read(QFile::encodeName(filename).constData(), false, nullptr)) {
@@ -49,15 +50,15 @@ void ZImgMetaImage::readInfo(const QString &filename, std::vector<ZImgInfo> &inf
   createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 }
 
-void ZImgMetaImage::readMetadata(const QString &, ZImgMetadata &, size_t )
+void ZImgMetaImage::readMetadata(const QString&, ZImgMetadata&, size_t)
 {
 }
 
-void ZImgMetaImage::readThumbnail(const QString &, ZImgThumbernail &, const ZImgRegion &, size_t )
+void ZImgMetaImage::readThumbnail(const QString&, ZImgThumbernail&, const ZImgRegion&, size_t)
 {
 }
 
-void ZImgMetaImage::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
+void ZImgMetaImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -74,7 +75,8 @@ void ZImgMetaImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
   }
 
   if (region.isEmpty() || !region.isValid(imgInfo)) {
-    throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(region.toQString()));
+    throw ZIOException(
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(region.toQString()));
   }
 
   if (region.containsWholeImg(imgInfo)) {
@@ -102,10 +104,11 @@ void ZImgMetaImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
     indexMin[1] = rgn.start.y;
     indexMin[2] = rgn.start.z;
     int indexMax[3];
-    indexMax[0] = rgn.end.x-1;
-    indexMax[1] = rgn.end.y-1;
-    indexMax[2] = rgn.end.z-1;
-    metaImage.ReadROI(indexMin, indexMax, QFile::encodeName(filename).constData(), true, tmpImg.channelData<uint8_t>(0));
+    indexMax[0] = rgn.end.x - 1;
+    indexMax[1] = rgn.end.y - 1;
+    indexMax[2] = rgn.end.z - 1;
+    metaImage.ReadROI(indexMin, indexMax, QFile::encodeName(filename).constData(), true,
+                      tmpImg.channelData<uint8_t>(0));
     if (clipInfo.numChannels > 1) {
       ZImg tpImg(clipInfo);
       CXYZtoXYZC(tmpImg, tpImg);
@@ -127,7 +130,7 @@ void ZImgMetaImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
   }
 }
 
-void ZImgMetaImage::writeImg(const QString &filename, const ZImg &img, Compression comp)
+void ZImgMetaImage::writeImg(const QString& filename, const ZImg& img, Compression comp)
 {
   CHECK(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
   if (img.numTimes() != 1) {
@@ -164,60 +167,61 @@ void ZImgMetaImage::writeImg(const QString &filename, const ZImg &img, Compressi
   }
   MET_ValueEnumType elementType = MET_CHAR;
   switch (img.voxelFormat()) {
-  case VoxelFormat::Signed:
-    switch (img.bytesPerVoxel()) {
-    case 1:
-      elementType = multipleChannel ? MET_CHAR_ARRAY : MET_CHAR;
+    case VoxelFormat::Signed:
+      switch (img.bytesPerVoxel()) {
+        case 1:
+          elementType = multipleChannel ? MET_CHAR_ARRAY : MET_CHAR;
+          break;
+        case 2:
+          elementType = multipleChannel ? MET_SHORT_ARRAY : MET_SHORT;
+          break;
+        case 4:
+          elementType = multipleChannel ? MET_INT_ARRAY : MET_INT;
+          break;
+        case 8:
+          elementType = multipleChannel ? MET_LONG_LONG_ARRAY : MET_LONG_LONG;
+          break;
+        default:
+          CHECK(false);
+          break;
+      }
       break;
-    case 2:
-      elementType = multipleChannel ? MET_SHORT_ARRAY : MET_SHORT;
+    case VoxelFormat::Unsigned:
+      switch (img.bytesPerVoxel()) {
+        case 1:
+          elementType = multipleChannel ? MET_UCHAR_ARRAY : MET_UCHAR;
+          break;
+        case 2:
+          elementType = multipleChannel ? MET_USHORT_ARRAY : MET_USHORT;
+          break;
+        case 4:
+          elementType = multipleChannel ? MET_UINT_ARRAY : MET_UINT;
+          break;
+        case 8:
+          elementType = multipleChannel ? MET_ULONG_LONG_ARRAY : MET_ULONG_LONG;
+          break;
+        default:
+          CHECK(false);
+          break;
+      }
       break;
-    case 4:
-      elementType = multipleChannel ? MET_INT_ARRAY : MET_INT;
-      break;
-    case 8:
-      elementType = multipleChannel ? MET_LONG_LONG_ARRAY : MET_LONG_LONG;
-      break;
-    default:
-      CHECK(false);
-      break;
-    }
-    break;
-  case VoxelFormat::Unsigned:
-    switch (img.bytesPerVoxel()) {
-    case 1:
-      elementType = multipleChannel ? MET_UCHAR_ARRAY : MET_UCHAR;
-      break;
-    case 2:
-      elementType = multipleChannel ? MET_USHORT_ARRAY : MET_USHORT;
-      break;
-    case 4:
-      elementType = multipleChannel ? MET_UINT_ARRAY : MET_UINT;
-      break;
-    case 8:
-      elementType = multipleChannel ? MET_ULONG_LONG_ARRAY : MET_ULONG_LONG;
-      break;
-    default:
-      CHECK(false);
-      break;
-    }
-    break;
-  case VoxelFormat::Float:
-    switch (img.bytesPerVoxel()) {
-    case 4:
-      elementType = multipleChannel ? MET_FLOAT_ARRAY : MET_FLOAT;
-      break;
-    case 8:
-      elementType = multipleChannel ? MET_DOUBLE_ARRAY : MET_DOUBLE;
-      break;
-    default:
-      CHECK(false);
-      break;
-    }
+    case VoxelFormat::Float:
+      switch (img.bytesPerVoxel()) {
+        case 4:
+          elementType = multipleChannel ? MET_FLOAT_ARRAY : MET_FLOAT;
+          break;
+        case 8:
+          elementType = multipleChannel ? MET_DOUBLE_ARRAY : MET_DOUBLE;
+          break;
+        default:
+          CHECK(false);
+          break;
+      }
   }
 
   MetaImage metaImage(nDims, dimSize, elementSpacing, elementType, img.numChannels(),
-                      multipleChannel ? const_cast<uint8_t*>(tmpImg.channelData(0)) : const_cast<uint8_t*>(img.channelData(0)));
+                      multipleChannel ? const_cast<uint8_t*>(tmpImg.channelData(0))
+                                      : const_cast<uint8_t*>(img.channelData(0)));
 
   metaImage.DistanceUnits(distanceUnitType);
   metaImage.CompressedData(comp != Compression::NONE);
@@ -227,7 +231,7 @@ void ZImgMetaImage::writeImg(const QString &filename, const ZImg &img, Compressi
   }
 }
 
-void ZImgMetaImage::writeImg(const QString &filename, const ZImgSliceProvider &imgSliceProvider, Compression comp)
+void ZImgMetaImage::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp)
 {
   CHECK(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
   if (imgSliceProvider.imgInfo().numTimes != 1) {
@@ -246,7 +250,7 @@ bool ZImgMetaImage::supportWrite() const
   return true;
 }
 
-void ZImgMetaImage::parseInfo(const MetaImage &metaImage, ZImgInfo &info)
+void ZImgMetaImage::parseInfo(const MetaImage& metaImage, ZImgInfo& info)
 {
   int ndims = metaImage.NDims();
   if (ndims == 1) {
@@ -267,76 +271,76 @@ void ZImgMetaImage::parseInfo(const MetaImage &metaImage, ZImgInfo &info)
   info.numChannels = metaImage.ElementNumberOfChannels();
   info.numTimes = 1;
   switch (metaImage.ElementType()) {
-  case MET_CHAR:
-  case MET_CHAR_ARRAY:
-    info.bytesPerVoxel = 1;
-    info.voxelFormat = VoxelFormat::Signed;
-    break;
-  case MET_UCHAR:
-  case MET_UCHAR_ARRAY:
-    info.bytesPerVoxel = 1;
-    info.voxelFormat = VoxelFormat::Unsigned;
-    break;
-  case MET_SHORT:
-  case MET_SHORT_ARRAY:
-    info.bytesPerVoxel = 2;
-    info.voxelFormat = VoxelFormat::Signed;
-    break;
-  case MET_USHORT:
-  case MET_USHORT_ARRAY:
-    info.bytesPerVoxel = 2;
-    info.voxelFormat = VoxelFormat::Unsigned;
-    break;
-  case MET_INT:
-  case MET_LONG:
-  case MET_INT_ARRAY:
-  case MET_LONG_ARRAY:
-    info.bytesPerVoxel = 4;
-    info.voxelFormat = VoxelFormat::Signed;
-    break;
-  case MET_UINT:
-  case MET_ULONG:
-  case MET_UINT_ARRAY:
-  case MET_ULONG_ARRAY:
-    info.bytesPerVoxel = 4;
-    info.voxelFormat = VoxelFormat::Unsigned;
-    break;
-  case MET_LONG_LONG:
-  case MET_LONG_LONG_ARRAY:
-    info.bytesPerVoxel = 8;
-    info.voxelFormat = VoxelFormat::Signed;
-    break;
-  case MET_ULONG_LONG:
-  case MET_ULONG_LONG_ARRAY:
-    info.bytesPerVoxel = 8;
-    info.voxelFormat = VoxelFormat::Unsigned;
-    break;
-  case MET_FLOAT:
-  case MET_FLOAT_ARRAY:
-    info.bytesPerVoxel = 4;
-    info.voxelFormat = VoxelFormat::Float;
-    break;
-  case MET_DOUBLE:
-  case MET_DOUBLE_ARRAY:
-    info.bytesPerVoxel = 8;
-    info.voxelFormat = VoxelFormat::Float;
-    break;
-  default:
-    throw ZIOException("Not supported ElementType");
-    break;
+    case MET_CHAR:
+    case MET_CHAR_ARRAY:
+      info.bytesPerVoxel = 1;
+      info.voxelFormat = VoxelFormat::Signed;
+      break;
+    case MET_UCHAR:
+    case MET_UCHAR_ARRAY:
+      info.bytesPerVoxel = 1;
+      info.voxelFormat = VoxelFormat::Unsigned;
+      break;
+    case MET_SHORT:
+    case MET_SHORT_ARRAY:
+      info.bytesPerVoxel = 2;
+      info.voxelFormat = VoxelFormat::Signed;
+      break;
+    case MET_USHORT:
+    case MET_USHORT_ARRAY:
+      info.bytesPerVoxel = 2;
+      info.voxelFormat = VoxelFormat::Unsigned;
+      break;
+    case MET_INT:
+    case MET_LONG:
+    case MET_INT_ARRAY:
+    case MET_LONG_ARRAY:
+      info.bytesPerVoxel = 4;
+      info.voxelFormat = VoxelFormat::Signed;
+      break;
+    case MET_UINT:
+    case MET_ULONG:
+    case MET_UINT_ARRAY:
+    case MET_ULONG_ARRAY:
+      info.bytesPerVoxel = 4;
+      info.voxelFormat = VoxelFormat::Unsigned;
+      break;
+    case MET_LONG_LONG:
+    case MET_LONG_LONG_ARRAY:
+      info.bytesPerVoxel = 8;
+      info.voxelFormat = VoxelFormat::Signed;
+      break;
+    case MET_ULONG_LONG:
+    case MET_ULONG_LONG_ARRAY:
+      info.bytesPerVoxel = 8;
+      info.voxelFormat = VoxelFormat::Unsigned;
+      break;
+    case MET_FLOAT:
+    case MET_FLOAT_ARRAY:
+      info.bytesPerVoxel = 4;
+      info.voxelFormat = VoxelFormat::Float;
+      break;
+    case MET_DOUBLE:
+    case MET_DOUBLE_ARRAY:
+      info.bytesPerVoxel = 8;
+      info.voxelFormat = VoxelFormat::Float;
+      break;
+    default:
+      throw ZIOException("Not supported ElementType");
+      break;
   }
 
   if (true || metaImage.ElementSizeValid()) { //todo: why?
     switch (metaImage.DistanceUnits()) {
-    case MET_DISTANCE_UNITS_CM:
-      info.voxelSizeUnit = VoxelSizeUnit::cm;
-      break;
-    case MET_DISTANCE_UNITS_MM:
-      info.voxelSizeUnit = VoxelSizeUnit::mm;
-      break;
-    default:   // todo: should we default to um ?
-      info.voxelSizeUnit = VoxelSizeUnit::um;
-      break;
+      case MET_DISTANCE_UNITS_CM:
+        info.voxelSizeUnit = VoxelSizeUnit::cm;
+        break;
+      case MET_DISTANCE_UNITS_MM:
+        info.voxelSizeUnit = VoxelSizeUnit::mm;
+        break;
+      default:   // todo: should we default to um ?
+        info.voxelSizeUnit = VoxelSizeUnit::um;
+        break;
     }
     if (ndims == 1) {
       info.voxelSizeX = metaImage.ElementSize(0);

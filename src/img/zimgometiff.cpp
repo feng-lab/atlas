@@ -12,7 +12,7 @@ ZImgOmeTiff::ZImgOmeTiff()
 {
 }
 
-void ZImgOmeTiff::readIntoInternalStructure(const QString &filename, ZTiff &tiff)
+void ZImgOmeTiff::readIntoInternalStructure(const QString& filename, ZTiff& tiff)
 {
   ZImgTiff::readIntoInternalStructure(filename, tiff);
   if (!m_imageDescription.isEmpty() && m_imageDescription.contains("<OME") && m_imageDescription.contains("<Image") &&
@@ -28,7 +28,7 @@ void ZImgOmeTiff::clearInternalState()
   m_ifdIdxPosMap.clear();
 }
 
-void ZImgOmeTiff::detectImgInfo(ZTiff &tiff)
+void ZImgOmeTiff::detectImgInfo(ZTiff& tiff)
 {
   ZImgTiff::detectImgInfo(tiff);
 
@@ -39,7 +39,7 @@ void ZImgOmeTiff::detectImgInfo(ZTiff &tiff)
       m_imgInfo[0].bytesPerVoxel != m_omeImgInfo.bytesPerVoxel ||
       m_imgInfo[0].voxelFormat != m_omeImgInfo.voxelFormat)
     throw ZIOException(QString("ome meta info <%1> doesn't match image data <%2>").
-                       arg(m_omeImgInfo.toQString()).arg(m_imgInfo[0].toQString()));
+      arg(m_omeImgInfo.toQString()).arg(m_imgInfo[0].toQString()));
 
   m_imgInfo[0].numChannels = m_omeImgInfo.numChannels;
   m_imgInfo[0].depth = m_omeImgInfo.depth;
@@ -60,7 +60,7 @@ void ZImgOmeTiff::detectImgInfo(ZTiff &tiff)
   //LOG(INFO) << m_imgInfo.toQString() << " " << m_dimensionOrder;
 }
 
-bool ZImgOmeTiff::mapIFDToImgLocation(size_t ifdIdx, int &z, int &c, int &t, int &l)
+bool ZImgOmeTiff::mapIFDToImgLocation(size_t ifdIdx, int& z, int& c, int& t, int& l)
 {
   if (m_ifdIdxPosMap.find(ifdIdx) == m_ifdIdxPosMap.end())
     return false;
@@ -90,21 +90,21 @@ QStringList ZImgOmeTiff::extensions() const
   return res;
 }
 
-void ZImgOmeTiff::writeImg(const QString &filename, const ZImg &img, Compression comp)
+void ZImgOmeTiff::writeImg(const QString& filename, const ZImg& img, Compression comp)
 {
   ZTiffWriter tiffWriter;
   int extraSample = img.info().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
-  if (img.byteNumber() > 1024_usize*1024*3600)
+  if (img.byteNumber() > 1024_usize * 1024 * 3600)
     tiffWriter.startWriting(filename, comp, extraSample, true);
   else
     tiffWriter.startWriting(filename, comp, extraSample, false);
   std::vector<ZImgMetatag> tags(1);
   makeImageDescriptionTag(img.info(), "XYZCT", tags[0]);
-  for (size_t t=0; t<img.numTimes(); ++t) {
-    for (size_t c=0; c<img.numChannels(); ++c) {
-      for (size_t z=0; z<img.depth(); ++z) {
+  for (size_t t = 0; t < img.numTimes(); ++t) {
+    for (size_t c = 0; c < img.numChannels(); ++c) {
+      for (size_t z = 0; z < img.depth(); ++z) {
         //LOG(INFO) << l << " " << t << " " << z << " " << c << " " << img.info().toQString();
-        if (t==0 && z==0 && c==0)
+        if (t == 0 && z == 0 && c == 0)
           tiffWriter.writeIFD(img, z, t, c, false, tags);
         else
           tiffWriter.writeIFD(img, z, t, c, false);
@@ -113,22 +113,22 @@ void ZImgOmeTiff::writeImg(const QString &filename, const ZImg &img, Compression
   }
 }
 
-void ZImgOmeTiff::writeImg(const QString &filename, const ZImgSliceProvider &imgSliceProvider, Compression comp)
+void ZImgOmeTiff::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp)
 {
   ZTiffWriter tiffWriter;
   int extraSample = imgSliceProvider.imgInfo().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
-  if (imgSliceProvider.imgInfo().byteNumber() > 1024_usize*1024*3600)
+  if (imgSliceProvider.imgInfo().byteNumber() > 1024_usize * 1024 * 3600)
     tiffWriter.startWriting(filename, comp, extraSample, true);
   else
     tiffWriter.startWriting(filename, comp, extraSample, false);
   std::vector<ZImgMetatag> tags(1);
   makeImageDescriptionTag(imgSliceProvider.imgInfo(), "XYCZT", tags[0]);
-  for (size_t t=0; t<imgSliceProvider.imgInfo().numTimes; ++t) {
-    for (size_t z=0; z<imgSliceProvider.imgInfo().depth; ++z) {
-      ZImg img = imgSliceProvider.slice(z,t);
-      for (size_t c=0; c<imgSliceProvider.imgInfo().numChannels; ++c) {
+  for (size_t t = 0; t < imgSliceProvider.imgInfo().numTimes; ++t) {
+    for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
+      ZImg img = imgSliceProvider.slice(z, t);
+      for (size_t c = 0; c < imgSliceProvider.imgInfo().numChannels; ++c) {
         //LOG(INFO) << l << " " << t << " " << z << " " << c << " " << img.info().toQString();
-        if (t==0 && z==0 && c==0)
+        if (t == 0 && z == 0 && c == 0)
           tiffWriter.writeIFD(img, 0, 0, c, false, tags);
         else
           tiffWriter.writeIFD(img, 0, 0, c, false);
@@ -147,7 +147,7 @@ bool ZImgOmeTiff::supportWrite() const
   return true;
 }
 
-void ZImgOmeTiff::readOmeInfo(ZTiff &tiff)
+void ZImgOmeTiff::readOmeInfo(ZTiff& tiff)
 {
   // QXmlStreamReader takes any QIODevice.
   QXmlStreamReader xml(m_imageDescription);
@@ -176,18 +176,18 @@ void ZImgOmeTiff::readOmeInfo(ZTiff &tiff)
   xml.clear();
 }
 
-void ZImgOmeTiff::makeImageDescriptionTag(const ZImgInfo &info, const QString &dimensionOrder, ZImgMetatag &tag)
+void ZImgOmeTiff::makeImageDescriptionTag(const ZImgInfo& info, const QString& dimensionOrder, ZImgMetatag& tag)
 {
   tag.setTag(270); // TIFFTAG_IMAGEDESCRIPTION
   tag.setName("ImageDescription");
   tag.setDataType(DataType::Ascii);
 
   QByteArray xml = createOmeXml(info, dimensionOrder).toUtf8();
-  tag.setCount(xml.size()+1);
+  tag.setCount(xml.size() + 1);
   memcpy(tag.dataArray<char>(), xml.constData(), tag.dataByteNumber());
 }
 
-void ZImgOmeTiff::parseOME(QXmlStreamReader &xml, ZTiff &tiff)
+void ZImgOmeTiff::parseOME(QXmlStreamReader& xml, ZTiff& tiff)
 {
   Q_ASSERT(xml.isStartElement() && xml.name() == "OME");
 
@@ -206,7 +206,7 @@ void ZImgOmeTiff::parseOME(QXmlStreamReader &xml, ZTiff &tiff)
   }
 }
 
-void ZImgOmeTiff::parsePixels(QXmlStreamReader &xml, ZTiff &tiff)
+void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
 {
   // Let's get the attributes
   QXmlStreamAttributes attributes = xml.attributes();
@@ -285,8 +285,8 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader &xml, ZTiff &tiff)
       throw ZIOException("Can not parse ome TimeIncrement");
     m_omeImgInfo.timeStamps.resize(m_omeImgInfo.numTimes);
     m_omeImgInfo.timeStamps[0] = 0;
-    for (size_t i=1; i<m_omeImgInfo.numTimes; ++i)
-      m_omeImgInfo.timeStamps[i] = ti + m_omeImgInfo.timeStamps[i-1];
+    for (size_t i = 1; i < m_omeImgInfo.numTimes; ++i)
+      m_omeImgInfo.timeStamps[i] = ti + m_omeImgInfo.timeStamps[i - 1];
   }
   m_omeImgInfo.voxelFormat = VoxelFormat::Unsigned;
   QString type;
@@ -333,7 +333,7 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader &xml, ZTiff &tiff)
   }
 }
 
-void ZImgOmeTiff::parseTiffData(QXmlStreamReader &xml, ZTiff &tiff)
+void ZImgOmeTiff::parseTiffData(QXmlStreamReader& xml, ZTiff& tiff)
 {
   // Let's get the attributes
   QXmlStreamAttributes attributes = xml.attributes();
@@ -375,7 +375,7 @@ void ZImgOmeTiff::parseTiffData(QXmlStreamReader &xml, ZTiff &tiff)
       throw ZIOException("Can not parse ome TiffData FirstC");
   }
 
-  for (size_t i=ifd; i<ifd+planeCount; ++i) {
+  for (size_t i = ifd; i < ifd + planeCount; ++i) {
     int t;
     int c;
     int l;
@@ -390,7 +390,7 @@ void ZImgOmeTiff::parseTiffData(QXmlStreamReader &xml, ZTiff &tiff)
   xml.skipCurrentElement();
 }
 
-void ZImgOmeTiff::parseChannel(QXmlStreamReader &xml)
+void ZImgOmeTiff::parseChannel(QXmlStreamReader& xml)
 {
   // Let's get the attributes
   QXmlStreamAttributes attributes = xml.attributes();
@@ -414,7 +414,7 @@ void ZImgOmeTiff::parseChannel(QXmlStreamReader &xml)
   xml.skipCurrentElement();
 }
 
-QString ZImgOmeTiff::createOmeXml(const ZImgInfo &info, const QString& dimensionOrder)
+QString ZImgOmeTiff::createOmeXml(const ZImgInfo& info, const QString& dimensionOrder)
 {
   QByteArray res;  // no " encoding="UTF-8" " if use QString
   QXmlStreamWriter xml(&res);
@@ -428,7 +428,8 @@ QString ZImgOmeTiff::createOmeXml(const ZImgInfo &info, const QString& dimension
   xml.writeAttribute("xmlns:ROI", "http://www.openmicroscopy.org/Schemas/ROI/2013-06");
   xml.writeAttribute("xmlns:OME", "http://www.openmicroscopy.org/Schemas/OME/2013-06");
   xml.writeAttribute("xmlns:BIN", "http://www.openmicroscopy.org/Schemas/BinaryFile/2013-06");
-  xml.writeAttribute("xsi:schemaLocation", "http://www.openmicroscopy.org/Schemas/OME/2013-06 http://www.openmicroscopy.org/Schemas/OME/2013-06/ome.xsd");
+  xml.writeAttribute("xsi:schemaLocation",
+                     "http://www.openmicroscopy.org/Schemas/OME/2013-06 http://www.openmicroscopy.org/Schemas/OME/2013-06/ome.xsd");
 
   xml.writeStartElement("Image");
   xml.writeAttribute("ID", "Image:0");
@@ -460,7 +461,7 @@ QString ZImgOmeTiff::createOmeXml(const ZImgInfo &info, const QString& dimension
     xml.writeAttribute("PhysicalSizeZ", QString("%1").arg(info.voxelSizeZInUm()));
   }
 
-  for (size_t i=0; i<info.numChannels; ++i) {
+  for (size_t i = 0; i < info.numChannels; ++i) {
     xml.writeStartElement("Channel");
     xml.writeAttribute("ID", QString("Channel:0:%1").arg(i));
     xml.writeAttribute("Name", info.channelNames[i]);

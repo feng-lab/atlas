@@ -13,109 +13,109 @@ FreeImage error handler
 @param fif Format / Plugin responsible for the error
 @param message Error message
 */
-void FreeImageErrorHandler(FREE_IMAGE_FORMAT fif, const char *message)
+void FreeImageErrorHandler(FREE_IMAGE_FORMAT fif, const char* message)
 {
   QString msg;
-  if(fif != FIF_UNKNOWN) {
+  if (fif != FIF_UNKNOWN) {
     msg = QString("FreeImage %1 Format: %2").arg(FreeImage_GetFormatFromFIF(fif)).arg(message);
   }
   msg = QString("FreeImage: %1").arg(message);
   LOG(WARNING) << msg;
 }
 
-ZImgInfo readInfoFromFIPImage(fipImage &fipImg)
+ZImgInfo readInfoFromFIPImage(fipImage& fipImg)
 {
   ZImgInfo info;
   switch (fipImg.getImageType()) {
-  case FIT_BITMAP:
-    info.voxelFormat = VoxelFormat::Unsigned;
-    info.bytesPerVoxel = 1;
-    switch (fipImg.getBitsPerPixel()) {
-    case 1:
-    case 4:
-    case 8:
-      if (fipImg.getColorType() == FIC_PALETTE)
-        info.numChannels = 3;
-      else
-        info.numChannels = 1;
-      break;
-    case 16:
-      info.numChannels = 3;
-      break;
-    case 24:
-      info.numChannels = 3;
-      break;
-    case 32:
-      if (fipImg.getColorType() == FIC_CMYK) {
-        info.numChannels = 3;  // to RGB
-      } else {
-        info.numChannels = 4;
-        info.lastChannelIsAlphaChannel = true;
+    case FIT_BITMAP:
+      info.voxelFormat = VoxelFormat::Unsigned;
+      info.bytesPerVoxel = 1;
+      switch (fipImg.getBitsPerPixel()) {
+        case 1:
+        case 4:
+        case 8:
+          if (fipImg.getColorType() == FIC_PALETTE)
+            info.numChannels = 3;
+          else
+            info.numChannels = 1;
+          break;
+        case 16:
+          info.numChannels = 3;
+          break;
+        case 24:
+          info.numChannels = 3;
+          break;
+        case 32:
+          if (fipImg.getColorType() == FIC_CMYK) {
+            info.numChannels = 3;  // to RGB
+          } else {
+            info.numChannels = 4;
+            info.lastChannelIsAlphaChannel = true;
+          }
+          break;
+        default:
+          throw ZIOException(QString("Not supported bitsPerPixel %1").arg(fipImg.getBitsPerPixel()));
+          break;
       }
       break;
-    default:
-      throw ZIOException(QString("Not supported bitsPerPixel %1").arg(fipImg.getBitsPerPixel()));
+    case FIT_UINT16:
+      info.bytesPerVoxel = 2;
+      info.numChannels = 1;
+      info.voxelFormat = VoxelFormat::Unsigned;
       break;
-    }
-    break;
-  case FIT_UINT16:
-    info.bytesPerVoxel = 2;
-    info.numChannels = 1;
-    info.voxelFormat = VoxelFormat::Unsigned;
-    break;
-  case FIT_INT16:
-    info.bytesPerVoxel = 2;
-    info.numChannels = 1;
-    info.voxelFormat = VoxelFormat::Signed;
-    break;
-  case FIT_UINT32:
-    info.bytesPerVoxel = 4;
-    info.numChannels = 1;
-    info.voxelFormat = VoxelFormat::Unsigned;
-    break;
-  case FIT_INT32:
-    info.bytesPerVoxel = 4;
-    info.numChannels = 1;
-    info.voxelFormat = VoxelFormat::Signed;
-    break;
-  case FIT_FLOAT:
-    info.bytesPerVoxel = 4;
-    info.numChannels = 1;
-    info.voxelFormat = VoxelFormat::Float;
-    break;
-  case FIT_DOUBLE:
-    info.bytesPerVoxel = 8;
-    info.numChannels = 1;
-    info.voxelFormat = VoxelFormat::Float;
-    break;
-  case FIT_COMPLEX:
-    throw ZIOException("Complex format image is not supported.");
-    break;
-  case FIT_RGB16:
-    info.bytesPerVoxel = 2;
-    info.numChannels = 3;
-    info.voxelFormat = VoxelFormat::Unsigned;
-    break;
-  case FIT_RGBA16:
-    info.bytesPerVoxel = 2;
-    info.numChannels = 4;
-    info.lastChannelIsAlphaChannel = true;
-    info.voxelFormat = VoxelFormat::Unsigned;
-    break;
-  case FIT_RGBF:
-    info.bytesPerVoxel = 4;
-    info.numChannels = 3;
-    info.voxelFormat = VoxelFormat::Float;
-    break;
-  case FIT_RGBAF:
-    info.bytesPerVoxel = 4;
-    info.numChannels = 4;
-    info.lastChannelIsAlphaChannel = true;
-    info.voxelFormat = VoxelFormat::Float;
-    break;
-  default:
-    throw ZIOException("Not supported format");
-    break;
+    case FIT_INT16:
+      info.bytesPerVoxel = 2;
+      info.numChannels = 1;
+      info.voxelFormat = VoxelFormat::Signed;
+      break;
+    case FIT_UINT32:
+      info.bytesPerVoxel = 4;
+      info.numChannels = 1;
+      info.voxelFormat = VoxelFormat::Unsigned;
+      break;
+    case FIT_INT32:
+      info.bytesPerVoxel = 4;
+      info.numChannels = 1;
+      info.voxelFormat = VoxelFormat::Signed;
+      break;
+    case FIT_FLOAT:
+      info.bytesPerVoxel = 4;
+      info.numChannels = 1;
+      info.voxelFormat = VoxelFormat::Float;
+      break;
+    case FIT_DOUBLE:
+      info.bytesPerVoxel = 8;
+      info.numChannels = 1;
+      info.voxelFormat = VoxelFormat::Float;
+      break;
+    case FIT_COMPLEX:
+      throw ZIOException("Complex format image is not supported.");
+      break;
+    case FIT_RGB16:
+      info.bytesPerVoxel = 2;
+      info.numChannels = 3;
+      info.voxelFormat = VoxelFormat::Unsigned;
+      break;
+    case FIT_RGBA16:
+      info.bytesPerVoxel = 2;
+      info.numChannels = 4;
+      info.lastChannelIsAlphaChannel = true;
+      info.voxelFormat = VoxelFormat::Unsigned;
+      break;
+    case FIT_RGBF:
+      info.bytesPerVoxel = 4;
+      info.numChannels = 3;
+      info.voxelFormat = VoxelFormat::Float;
+      break;
+    case FIT_RGBAF:
+      info.bytesPerVoxel = 4;
+      info.numChannels = 4;
+      info.lastChannelIsAlphaChannel = true;
+      info.voxelFormat = VoxelFormat::Float;
+      break;
+    default:
+      throw ZIOException("Not supported format");
+      break;
   }
 
   info.width = fipImg.getWidth();
@@ -130,7 +130,7 @@ ZImgInfo readInfoFromFIPImage(fipImage &fipImg)
 
 namespace nim {
 
-ZImgFreeImage &ZImgFreeImage::instance()
+ZImgFreeImage& ZImgFreeImage::instance()
 {
   static ZImgFreeImage imgFreeImage;
   return imgFreeImage;
@@ -175,11 +175,12 @@ QStringList ZImgFreeImage::extensions() const
       << "mef" << "mos" << "mrw" << "nef" << "nrw" << "orf" << "pef" << "ptx"
       << "pxn" << "qtk" << "raf" << "raw" << "rdc" << "rw2" << "rwz" << "sr2"
       << "srf" << "sti" << "x3f";
-   return res;
- }
+  return res;
+}
 
-void ZImgFreeImage::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                             std::vector<std::set<size_t>> *pyramidalRatios)
+void ZImgFreeImage::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                             std::vector<std::set<size_t>>* pyramidalRatios)
 {
 #if defined(_WIN32) || defined(_WIN64)
   FREE_IMAGE_FORMAT fmt = fipImage::identifyFIFU(filename.toStdWString().c_str());
@@ -193,8 +194,8 @@ void ZImgFreeImage::readInfo(const QString &filename, std::vector<ZImgInfo> &inf
   }*/
   fipMultiPage fipMp(true);
   bool multipage = fmt == FIF_GIF
-      && fipMp.open(QFile::encodeName(filename).constData(), false, true, FIF_LOAD_NOPIXELS | GIF_PLAYBACK)
-      && fipMp.getPageCount() > 1;
+                   && fipMp.open(QFile::encodeName(filename).constData(), false, true, FIF_LOAD_NOPIXELS | GIF_PLAYBACK)
+                   && fipMp.getPageCount() > 1;
   if (multipage) {
     fipImage fipImg;
     fipImg = fipMp.lockPage(0);
@@ -217,14 +218,15 @@ void ZImgFreeImage::readInfo(const QString &filename, std::vector<ZImgInfo> &inf
   createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 }
 
-void ZImgFreeImage::readMetadata(const QString &filename, ZImgMetadata &meta, size_t scene)
+void ZImgFreeImage::readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene)
 {
   Q_UNUSED(filename)
   Q_UNUSED(meta)
   Q_UNUSED(scene)
 }
 
-void ZImgFreeImage::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail, const ZImgRegion &region, size_t scene)
+void ZImgFreeImage::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, const ZImgRegion& region,
+                                  size_t scene)
 {
   Q_UNUSED(filename)
   Q_UNUSED(thumbnail)
@@ -232,17 +234,18 @@ void ZImgFreeImage::readThumbnail(const QString &filename, ZImgThumbernail &thum
   Q_UNUSED(scene)
 }
 
-void ZImgFreeImage::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
+void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
 {
   std::vector<ZImgInfo> infos;
   readInfo(filename, infos, nullptr, nullptr);
   if (scene >= infos.size()) {
     throw ZIOException("invalid scene");
   }
-  ZImgInfo &info = infos[0];
+  ZImgInfo& info = infos[0];
 
   if (region.isEmpty() || !region.isValid(info)) {
-    throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString()).arg(region.toQString()));
+    throw ZIOException(
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString()).arg(region.toQString()));
   }
 
   img = ZImg(info);
@@ -261,51 +264,6 @@ void ZImgFreeImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
     isBGA = fipImg.getImageType() == FIT_BITMAP;
 
     switch (fipImg.getColorType()) {
-    case FIC_CMYK:
-      LOG(INFO) << "cmyk";
-      if (!fipImg.convertTo24Bits()) {
-        throw ZIOException("convert CMYK to 24bit error");
-      }
-      break;
-    case FIC_PALETTE:
-      if (!fipImg.convertTo24Bits()) {
-        throw ZIOException("convert PALETTE image to 24bit error");
-      }
-      break;
-    case FIC_MINISBLACK:
-      if (!fipImg.convertToGrayscale()) {
-        throw ZIOException("convert MINISBLACK image to Grayscale error");
-      }
-      break;
-    case FIC_MINISWHITE:
-      if (!fipImg.convertToGrayscale()) {
-        throw ZIOException("convert MINISWHITE image to Grayscale error");
-      }
-      break;
-    default:
-      break;
-    }
-
-    uint8_t* imgBuf = img.timeData<uint8_t>(0);
-    for (size_t i=0; i<img.height(); ++i) {
-      uint8_t* scanline = fipImg.getScanLine(img.height()-i-1);
-      memcpy(imgBuf, scanline, fipImg.getLine());
-      imgBuf += fipImg.getLine();
-    }
-  } else {
-    fipMultiPage fipMp(true);
-    if (!fipMp.open(QFile::encodeName(filename).constData(), false, true, GIF_PLAYBACK)) {
-      throw ZIOException("Can not open gif");
-    }
-
-    for (size_t t=0; t<info.numTimes; ++t) {
-      fipImage fipImg;
-      fipImg = fipMp.lockPage(t);
-
-      if (t == 0)
-        isBGA = fipImg.getImageType() == FIT_BITMAP;
-
-      switch (fipImg.getColorType()) {
       case FIC_CMYK:
         LOG(INFO) << "cmyk";
         if (!fipImg.convertTo24Bits()) {
@@ -329,11 +287,56 @@ void ZImgFreeImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
         break;
       default:
         break;
+    }
+
+    uint8_t* imgBuf = img.timeData<uint8_t>(0);
+    for (size_t i = 0; i < img.height(); ++i) {
+      uint8_t* scanline = fipImg.getScanLine(img.height() - i - 1);
+      memcpy(imgBuf, scanline, fipImg.getLine());
+      imgBuf += fipImg.getLine();
+    }
+  } else {
+    fipMultiPage fipMp(true);
+    if (!fipMp.open(QFile::encodeName(filename).constData(), false, true, GIF_PLAYBACK)) {
+      throw ZIOException("Can not open gif");
+    }
+
+    for (size_t t = 0; t < info.numTimes; ++t) {
+      fipImage fipImg;
+      fipImg = fipMp.lockPage(t);
+
+      if (t == 0)
+        isBGA = fipImg.getImageType() == FIT_BITMAP;
+
+      switch (fipImg.getColorType()) {
+        case FIC_CMYK:
+          LOG(INFO) << "cmyk";
+          if (!fipImg.convertTo24Bits()) {
+            throw ZIOException("convert CMYK to 24bit error");
+          }
+          break;
+        case FIC_PALETTE:
+          if (!fipImg.convertTo24Bits()) {
+            throw ZIOException("convert PALETTE image to 24bit error");
+          }
+          break;
+        case FIC_MINISBLACK:
+          if (!fipImg.convertToGrayscale()) {
+            throw ZIOException("convert MINISBLACK image to Grayscale error");
+          }
+          break;
+        case FIC_MINISWHITE:
+          if (!fipImg.convertToGrayscale()) {
+            throw ZIOException("convert MINISWHITE image to Grayscale error");
+          }
+          break;
+        default:
+          break;
       }
 
       uint8_t* imgBuf = img.timeData<uint8_t>(t);
-      for (size_t i=0; i<img.height(); ++i) {
-        uint8_t* scanline = fipImg.getScanLine(img.height()-i-1);
+      for (size_t i = 0; i < img.height(); ++i) {
+        uint8_t* scanline = fipImg.getScanLine(img.height() - i - 1);
         memcpy(imgBuf, scanline, fipImg.getLine());
         imgBuf += fipImg.getLine();
       }
@@ -360,7 +363,7 @@ void ZImgFreeImage::readImg(const QString &filename, ZImg &img, const ZImgRegion
   }
 }
 
-void ZImgFreeImage::readInfo(uint8_t *mem, size_t size, ZImgInfo &info)
+void ZImgFreeImage::readInfo(uint8_t* mem, size_t size, ZImgInfo& info)
 {
   fipImage fipImg;
   fipMemoryIO memIO(mem, size);
@@ -370,7 +373,7 @@ void ZImgFreeImage::readInfo(uint8_t *mem, size_t size, ZImgInfo &info)
   info = readInfoFromFIPImage(fipImg);
 }
 
-void ZImgFreeImage::readImg(uint8_t *mem, size_t size, uint8_t *des, size_t desSize)
+void ZImgFreeImage::readImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
 {
   fipImage fipImg;
   fipMemoryIO memIO(mem, size);
@@ -384,34 +387,34 @@ void ZImgFreeImage::readImg(uint8_t *mem, size_t size, uint8_t *des, size_t desS
   }
 
   switch (fipImg.getColorType()) {
-  case FIC_CMYK:
-    LOG(INFO) << "cmyk";
-    if (!fipImg.convertTo24Bits()) {
-      throw ZIOException("convert CMYK to 24bit error");
-    }
-    break;
-  case FIC_PALETTE:
-    if (!fipImg.convertTo24Bits()) {
-      throw ZIOException("convert PALETTE image to 24bit error");
-    }
-    break;
-  case FIC_MINISBLACK:
-    if (!fipImg.convertToGrayscale()) {
-      throw ZIOException("convert MINISBLACK image to Grayscale error");
-    }
-    break;
-  case FIC_MINISWHITE:
-    if (!fipImg.convertToGrayscale()) {
-      throw ZIOException("convert MINISWHITE image to Grayscale error");
-    }
-    break;
-  default:
-    break;
+    case FIC_CMYK:
+      LOG(INFO) << "cmyk";
+      if (!fipImg.convertTo24Bits()) {
+        throw ZIOException("convert CMYK to 24bit error");
+      }
+      break;
+    case FIC_PALETTE:
+      if (!fipImg.convertTo24Bits()) {
+        throw ZIOException("convert PALETTE image to 24bit error");
+      }
+      break;
+    case FIC_MINISBLACK:
+      if (!fipImg.convertToGrayscale()) {
+        throw ZIOException("convert MINISBLACK image to Grayscale error");
+      }
+      break;
+    case FIC_MINISWHITE:
+      if (!fipImg.convertToGrayscale()) {
+        throw ZIOException("convert MINISWHITE image to Grayscale error");
+      }
+      break;
+    default:
+      break;
   }
 
   uint8_t* imgBuf = des;
-  for (size_t i=0; i<info.height; ++i) {
-    uint8_t* scanline = fipImg.getScanLine(info.height-i-1);
+  for (size_t i = 0; i < info.height; ++i) {
+    uint8_t* scanline = fipImg.getScanLine(info.height - i - 1);
     memcpy(imgBuf, scanline, fipImg.getLine());
     imgBuf += fipImg.getLine();
   }

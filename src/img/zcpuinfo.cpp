@@ -9,8 +9,10 @@
 #ifdef _WIN32
 #include "zwindowsheader.h"
 #elif defined(__APPLE__)
+
 #include <sys/param.h>
 #include <sys/sysctl.h>
+
 #else
 #include <unistd.h>
 #endif
@@ -78,19 +80,19 @@ inline void __cpuidex(int cpu_info[4], int info_type, int info_index)
 inline void __cpuid(int cpu_info[4], int info_type)
 {
   __asm__ volatile (
-        "cpuid \n\t"
-        : "=a"(cpu_info[0]), "=b"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
-    : "a"(info_type)
-    );
+  "cpuid \n\t"
+  : "=a"(cpu_info[0]), "=b"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
+  : "a"(info_type)
+  );
 }
 
 inline void __cpuidex(int cpu_info[4], int info_type, int info_index)
 {
   __asm__ volatile (
-        "cpuid \n\t"
-        : "=a"(cpu_info[0]), "=b"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
-    : "a"(info_type), "c"(info_index)
-    );
+  "cpuid \n\t"
+  : "=a"(cpu_info[0]), "=b"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
+  : "a"(info_type), "c"(info_index)
+  );
 }
 
 inline uint64_t _xgetbv(unsigned int index)
@@ -108,7 +110,7 @@ inline uint64_t _xgetbv(unsigned int index)
 
 namespace nim {
 
-ZCpuInfo &ZCpuInfo::instance()
+ZCpuInfo& ZCpuInfo::instance()
 {
   static ZCpuInfo cpuInfo;
   return cpuInfo;
@@ -170,7 +172,8 @@ void ZCpuInfo::logCpuInfo() const
 {
   LOG(INFO) << "CPU String: " << sCPU;
   LOG(INFO) << "CPU Brand String: " << sCPUBrand;
-  LOG(INFO) << "Stepping ID: " << nSteppingID << " Model ID: " << nModel << " Family ID: " << nFamily << " Type: " << nProcessorType
+  LOG(INFO) << "Stepping ID: " << nSteppingID << " Model ID: " << nModel << " Family ID: " << nFamily << " Type: "
+            << nProcessorType
             << " Ext.Model ID: " << nExtendedmodel << " Ext.Family ID: " << nExtendedfamily;
   LOG(INFO) << "Number of Cores: " << nPhysicalCores;
   LOG(INFO) << "Number of Threads: " << nLogicalCores;
@@ -182,32 +185,32 @@ void ZCpuInfo::logCpuInfo() const
   LOG(INFO) << "RAM: " << nPhysicalRAM;
 
   QString instructions = QString(b64Available ? "64 bit Technology" : "") +
-      QString(bXOP ? "; XOP" : "") +
-      QString(bFMA ? "; FMA" : "") +
-      QString(bFMA4 ? "; FMA4" : "") +
-      QString(b3DNow ? "; 3Dnow!" : "") +
-      QString(b3DNowExt ? "; 3Dnow ext" : "") +
-      QString(bMMX ? "; MMX" : "") +
-      QString(bMMXExtensions ? "; MMX ext" : "") +
-      QString(bSSE ? "; SSE" : "") +
-      QString(bSSE2 ? "; SSE2" : "") +
-      QString(bSSE3 ? "; SSE3" : "") +
-      QString(bSSSE3 ? "; SSSE3" : "") +
-      QString(bSSE41 ? "; SSE41" : "") +
-      QString(bSSE42 ? "; SSE42" : "") +
-      QString(bSSE4A ? "; SSE4A" : "") +
-      QString(bAVX ? "; AVX" : "") +
-      QString(bAVX2 ? "; AVX2" : "") +
-      QString(bBMI ? "; BMI" : "") +
-      QString(bMOVBE ? "; MOVBE" : "");
+                         QString(bXOP ? "; XOP" : "") +
+                         QString(bFMA ? "; FMA" : "") +
+                         QString(bFMA4 ? "; FMA4" : "") +
+                         QString(b3DNow ? "; 3Dnow!" : "") +
+                         QString(b3DNowExt ? "; 3Dnow ext" : "") +
+                         QString(bMMX ? "; MMX" : "") +
+                         QString(bMMXExtensions ? "; MMX ext" : "") +
+                         QString(bSSE ? "; SSE" : "") +
+                         QString(bSSE2 ? "; SSE2" : "") +
+                         QString(bSSE3 ? "; SSE3" : "") +
+                         QString(bSSSE3 ? "; SSSE3" : "") +
+                         QString(bSSE41 ? "; SSE41" : "") +
+                         QString(bSSE42 ? "; SSE42" : "") +
+                         QString(bSSE4A ? "; SSE4A" : "") +
+                         QString(bAVX ? "; AVX" : "") +
+                         QString(bAVX2 ? "; AVX2" : "") +
+                         QString(bBMI ? "; BMI" : "") +
+                         QString(bMOVBE ? "; MOVBE" : "");
 
   LOG(INFO) << instructions;
 
   instructions = QString(bCMPXCHG8B ? "CMPXCHG8B" : "") +
-      QString(bCMPXCHG16B ? "; CMPXCHG16B" : "") +
-      QString(bPOPCNT ? "; POPCNT" : "") +
-      QString(bLZCNT ? "; LZCNT" : "") +
-      QString(bRDTSCP ? "; RDTSCP" : "");
+                 QString(bCMPXCHG16B ? "; CMPXCHG16B" : "") +
+                 QString(bPOPCNT ? "; POPCNT" : "") +
+                 QString(bLZCNT ? "; LZCNT" : "") +
+                 QString(bRDTSCP ? "; RDTSCP" : "");
 
   LOG(INFO) << instructions;
 
@@ -231,14 +234,14 @@ void ZCpuInfo::detectCpuInfo()
   uint32_t nIds = CPUInfo[0];
 
   memcpy(CPUString, &CPUInfo[1], sizeof(int32_t));
-  memcpy(CPUString+4, &CPUInfo[3], sizeof(int32_t));
-  memcpy(CPUString+8, &CPUInfo[2], sizeof(int32_t));
+  memcpy(CPUString + 4, &CPUInfo[3], sizeof(int32_t));
+  memcpy(CPUString + 8, &CPUInfo[2], sizeof(int32_t));
   sCPU = CPUString;
 
   bool osXSAVE = false;
 
   // Get the information associated with each valid Id
-  for (uint32_t i=1; i<=nIds; ++i) {
+  for (uint32_t i = 1; i <= nIds; ++i) {
     __cpuidex(CPUInfo, i, 0);
 
     std::bitset<32> eax(CPUInfo[0]);
@@ -246,7 +249,7 @@ void ZCpuInfo::detectCpuInfo()
     std::bitset<32> ecx(CPUInfo[2]);
     std::bitset<32> edx(CPUInfo[3]);
     // Interpret CPU feature information.
-    if  (i == 1) {
+    if (i == 1) {
       bCMPXCHG8B = edx[8];
       bMMX = edx[23];
       bSSE = edx[25];
@@ -296,7 +299,7 @@ void ZCpuInfo::detectCpuInfo()
   uint32_t nExIds = CPUInfo[0];
 
   // Get the information associated with each extended ID.
-  for (uint32_t i=0x80000001; i<=nExIds; ++i) {
+  for (uint32_t i = 0x80000001; i <= nExIds; ++i) {
     __cpuid(CPUInfo, i);
 
     std::bitset<32> eax(CPUInfo[0]);
@@ -304,11 +307,11 @@ void ZCpuInfo::detectCpuInfo()
     std::bitset<32> ecx(CPUInfo[2]);
     std::bitset<32> edx(CPUInfo[3]);
 
-    if  (i == 0x80000001) {
+    if (i == 0x80000001) {
       bLZCNT = ecx[5];
       bSSE4A = ecx[6];
-      bXOP   = ecx[11];
-      bFMA4  = ecx[16];
+      bXOP = ecx[11];
+      bFMA4 = ecx[16];
 
       bMMXExtensions = edx[22];
       bRDTSCP = edx[27];
@@ -318,11 +321,11 @@ void ZCpuInfo::detectCpuInfo()
     }
 
     // Interpret CPU brand string and cache information.
-    if  (i == 0x80000002)
+    if (i == 0x80000002)
       memcpy(CPUBrandString, CPUInfo, sizeof(CPUInfo));
-    else if  (i == 0x80000003)
+    else if (i == 0x80000003)
       memcpy(CPUBrandString + 16, CPUInfo, sizeof(CPUInfo));
-    else if  (i == 0x80000004)
+    else if (i == 0x80000004)
       memcpy(CPUBrandString + 32, CPUInfo, sizeof(CPUInfo));
 
     sCPUBrand = CPUBrandString;
@@ -506,37 +509,43 @@ void ZCpuInfo::detectCoreAndThreadNumber()
   int nm[2];
   size_t len = sizeof(nPhysicalRAM);
 
-  nm[0] = CTL_HW; nm[1] = HW_MEMSIZE;
+  nm[0] = CTL_HW;
+  nm[1] = HW_MEMSIZE;
   if (sysctl(nm, 2, &nPhysicalRAM, &len, nullptr, 0) != 0)
     nPhysicalRAM = 0;
 
   int count = 0;
   len = sizeof(count);
-  nm[0] = CTL_HW; nm[1] = HW_CACHELINE;
+  nm[0] = CTL_HW;
+  nm[1] = HW_CACHELINE;
   if (sysctl(nm, 2, &count, &len, nullptr, 0) == 0) {
     nCacheLine = count;
   }
 
   count = 0;
-  nm[0] = CTL_HW; nm[1] = HW_L1ICACHESIZE;
+  nm[0] = CTL_HW;
+  nm[1] = HW_L1ICACHESIZE;
   if (sysctl(nm, 2, &count, &len, nullptr, 0) == 0) {
     nL1ICacheSize = count;
   }
 
   count = 0;
-  nm[0] = CTL_HW; nm[1] = HW_L1DCACHESIZE;
+  nm[0] = CTL_HW;
+  nm[1] = HW_L1DCACHESIZE;
   if (sysctl(nm, 2, &count, &len, nullptr, 0) == 0) {
     nL1DCacheSize = count;
   }
 
   count = 0;
-  nm[0] = CTL_HW; nm[1] = HW_L2CACHESIZE;
+  nm[0] = CTL_HW;
+  nm[1] = HW_L2CACHESIZE;
   if (sysctl(nm, 2, &count, &len, nullptr, 0) == 0) {
     nL2CacheSize = count;
   }
 
   count = 0;
-  nm[0] = CTL_HW; nm[1] = HW_L3CACHESIZE;
+  nm[0] = CTL_HW;
+  nm[1] = HW_L3CACHESIZE;
   if (sysctl(nm, 2, &count, &len, nullptr, 0) == 0) {
     nL3CacheSize = count;
   }

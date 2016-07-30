@@ -172,8 +172,8 @@ struct CZITile
                                             std::numeric_limits<int32_t>::max(),
                                             std::numeric_limits<int32_t>::max(),
                                             std::numeric_limits<int32_t>::max());
-  ZVoxelCoordinate size = ZVoxelCoordinate(1,1,1,1,1);  // all 1
-  ZVoxelCoordinate storedSize = ZVoxelCoordinate(1,1,1,1,1);  // all 1
+  ZVoxelCoordinate size = ZVoxelCoordinate(1, 1, 1, 1, 1);  // all 1
+  ZVoxelCoordinate storedSize = ZVoxelCoordinate(1, 1, 1, 1, 1);  // all 1
   int32_t pixelType; // The type of the image pixels, see PixelTypes.
   int64_t filePosition; // Seek offset of the referenced SubBlockSegment relative to the first byte of the file
   int32_t compression; // See Compression Constants
@@ -183,11 +183,12 @@ struct CZITile
 
 bool operator<(const CZITile& lhs, const CZITile& rhs);
 
-struct MixedTilesSort {
+struct MixedTilesSort
+{
   bool operator()(const CZITile& lhs, const CZITile& rhs) const
   {
     return std::tie(lhs.ratio, lhs.start.z, lhs.start.t, lhs.start.c, lhs.start.x, lhs.start.y) <
-        std::tie(rhs.ratio, rhs.start.z, rhs.start.t, rhs.start.c, rhs.start.x, rhs.start.y);
+           std::tie(rhs.ratio, rhs.start.z, rhs.start.t, rhs.start.c, rhs.start.x, rhs.start.y);
   }
 };
 
@@ -195,9 +196,11 @@ class ZImgCZISubBlock : public ZImgSubBlock
 {
 public:
   // mixed tiles has different x and y location
-  ZImgCZISubBlock(const QString &fileName, std::vector<CZITile> &tiles, bool mixedTiles = false,
+  ZImgCZISubBlock(const QString& fileName, std::vector<CZITile>& tiles, bool mixedTiles = false,
                   size_t numChannels = 0, size_t bytePerVoxel = 0, VoxelFormat vf = VoxelFormat::Unsigned);
-  virtual ~ZImgCZISubBlock() {}
+
+  virtual ~ZImgCZISubBlock()
+  {}
 
   virtual std::shared_ptr<ZImg> read() const override;
 
@@ -219,56 +222,92 @@ public:
   static ZImgZeissCZI& instance();
 
   ZImgZeissCZI();
+
   ~ZImgZeissCZI();
 
-  enum class CorrectionMode {
+  enum class CorrectionMode
+  {
     ZeroLightPreserved, IntensityRangeCorrected, Direct
   };
 
   // stack tiles to make a 3d stack
-  ZImg stackTiles(const QString &filename, size_t ch, size_t scene);
-  ZImg stackTiles(const QString &filename, size_t ch, size_t scene, const QString &inverseMaskFile, size_t maskFilePyramidalLevel = 0);
-  ZImg correctShading(const QString &filename, size_t ch, size_t scene, const ZImg &modelZ, const ZImg &modelV, CorrectionMode cm);
+  ZImg stackTiles(const QString& filename, size_t ch, size_t scene);
+
+  ZImg stackTiles(const QString& filename, size_t ch, size_t scene, const QString& inverseMaskFile,
+                  size_t maskFilePyramidalLevel = 0);
+
+  ZImg correctShading(const QString& filename, size_t ch, size_t scene, const ZImg& modelZ, const ZImg& modelV,
+                      CorrectionMode cm);
 
   // ZImgFormat interface
 public:
   virtual bool supportRead() const override;
+
   virtual bool supportWrite() const override;
+
   virtual QString shortName() const override;
+
   virtual QString fullName() const override;
+
   virtual QStringList extensions() const override;
-  virtual FileFormat format() const override { return FileFormat::ZeissCZI; }
-  virtual void readInfo(const QString &filename, std::vector<ZImgInfo> &infos,
-                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                        std::vector<std::set<size_t>> *pyramidalRatios) override;
-  virtual void readMetadata(const QString &filename, ZImgMetadata &meta, size_t scene) override;
-  virtual void readThumbnail(const QString &filename, ZImgThumbernail &thumbnail, const ZImgRegion &region, size_t scene) override;
-  virtual void readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio) override;
+
+  virtual FileFormat format() const override
+  { return FileFormat::ZeissCZI; }
+
+  virtual void readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                        std::vector<std::set<size_t>>* pyramidalRatios) override;
+
+  virtual void readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene) override;
+
+  virtual void
+  readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, const ZImgRegion& region, size_t scene) override;
+
+  virtual void
+  readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio) override;
 
 private:
   void clearInternalState();
-  int64_t checkFilename(const QString &filename);
-  void readCZIInfo(const QString &xmlString);
-  void parseMetadata(QXmlStreamReader &xml);
-  void parseChannel(QXmlStreamReader &xml);
-  void parseScene(QXmlStreamReader &xml);
-  void parseDistance(QXmlStreamReader &xml);
-  void parseDisplaySettingChannel(QXmlStreamReader &xml);
 
-  void detectInfos(std::vector<ZImgInfo> &infos, std::ifstream &inputFileStream, FileHeader &fh);
+  int64_t checkFilename(const QString& filename);
 
-  void dump(const QString &filename);
-  void dumpCZIStream(std::ifstream &inputFileStream, int64_t filesize, int64_t offset, QString &str, int indent = 0);
-  void dumpSegmentInfo(const SegmentHeader &sh, std::ifstream &inputFileStream, QString &str, int indent = 0);
-  void dumpFileHeaderSegment(std::ifstream &inputFileStream, QString &str, int indent = 0);
-  void dumpMetadataSegment(std::ifstream &inputFileStream, QString &str, int indent = 0);
-  void dumpSubBlockSegment(std::ifstream &inputFileStream, QString &str, int indent = 0);
-  void dumpDirectoryEntry(const DirectoryEntryDV &de, QString &str, int indent = 0);
-  void dumpDimensionEntry(const DimensionEntryDV1 &de, QString &str, int indent = 0);
-  void dumpSubBlockDirectory(std::ifstream &inputFileStream, QString &str, int indent = 0);
-  void dumpAttachmentSegment(std::ifstream &inputFileStream, QString &str, int indent = 0);
-  void dumpAttachmentEntry(const AttachmentEntryA1 &ae, QString &str, int indent = 0);
-  void dumpAttachmentDirectory(std::ifstream &inputFileStream, QString &str, int indent = 0);
+  void readCZIInfo(const QString& xmlString);
+
+  void parseMetadata(QXmlStreamReader& xml);
+
+  void parseChannel(QXmlStreamReader& xml);
+
+  void parseScene(QXmlStreamReader& xml);
+
+  void parseDistance(QXmlStreamReader& xml);
+
+  void parseDisplaySettingChannel(QXmlStreamReader& xml);
+
+  void detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inputFileStream, FileHeader& fh);
+
+  void dump(const QString& filename);
+
+  void dumpCZIStream(std::ifstream& inputFileStream, int64_t filesize, int64_t offset, QString& str, int indent = 0);
+
+  void dumpSegmentInfo(const SegmentHeader& sh, std::ifstream& inputFileStream, QString& str, int indent = 0);
+
+  void dumpFileHeaderSegment(std::ifstream& inputFileStream, QString& str, int indent = 0);
+
+  void dumpMetadataSegment(std::ifstream& inputFileStream, QString& str, int indent = 0);
+
+  void dumpSubBlockSegment(std::ifstream& inputFileStream, QString& str, int indent = 0);
+
+  void dumpDirectoryEntry(const DirectoryEntryDV& de, QString& str, int indent = 0);
+
+  void dumpDimensionEntry(const DimensionEntryDV1& de, QString& str, int indent = 0);
+
+  void dumpSubBlockDirectory(std::ifstream& inputFileStream, QString& str, int indent = 0);
+
+  void dumpAttachmentSegment(std::ifstream& inputFileStream, QString& str, int indent = 0);
+
+  void dumpAttachmentEntry(const AttachmentEntryA1& ae, QString& str, int indent = 0);
+
+  void dumpAttachmentDirectory(std::ifstream& inputFileStream, QString& str, int indent = 0);
 
 private:
   QString m_metadataXmlString;

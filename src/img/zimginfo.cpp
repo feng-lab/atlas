@@ -53,7 +53,7 @@ void ZImgInfo::clear()
   lastChannelIsAlphaChannel = false;
 }
 
-void ZImgInfo::swap(ZImgInfo &other) noexcept
+void ZImgInfo::swap(ZImgInfo& other) noexcept
 {
   std::swap(width, other.width);
   std::swap(height, other.height);
@@ -99,57 +99,57 @@ void ZImgInfo::swap(ZImgInfo &other) noexcept
 QString ZImgInfo::toQString() const
 {
   return QString("width: %1").arg(width) %
-      QString(", height: %1").arg(height) %
-      QString(", depth: %1").arg(depth) %
-      QString(", numChannels: %1").arg(numChannels) %
-      QString(", numTimes: %1").arg(numTimes) %
-      //QString(", numLocations: %1").arg(numLocations) %
-      QString(", bytesPerVoxel: %1").arg(bytesPerVoxel) %
-      QString(", voxelFormat: %1").arg(enumToString(voxelFormat)) %
-      QString(", voxelSizeUnit: %1").arg(enumToString(voxelSizeUnit)) %
-      QString(", voxelSizeX: %1").arg(voxelSizeX) %
-      QString(", voxelSizeY: %1").arg(voxelSizeY) %
-      QString(", voxelSizeZ: %1").arg(voxelSizeZ) %
-      (lastChannelIsAlphaChannel ? QString(", alphaChannel: %1").arg(numChannels-1) : QString("")) %
-      (validBitCount > 0 ? QString(", validBitCount: %1").arg(validBitCount) : QString(""));
+         QString(", height: %1").arg(height) %
+         QString(", depth: %1").arg(depth) %
+         QString(", numChannels: %1").arg(numChannels) %
+         QString(", numTimes: %1").arg(numTimes) %
+         //QString(", numLocations: %1").arg(numLocations) %
+         QString(", bytesPerVoxel: %1").arg(bytesPerVoxel) %
+         QString(", voxelFormat: %1").arg(enumToString(voxelFormat)) %
+         QString(", voxelSizeUnit: %1").arg(enumToString(voxelSizeUnit)) %
+         QString(", voxelSizeX: %1").arg(voxelSizeX) %
+         QString(", voxelSizeY: %1").arg(voxelSizeY) %
+         QString(", voxelSizeZ: %1").arg(voxelSizeZ) %
+         (lastChannelIsAlphaChannel ? QString(", alphaChannel: %1").arg(numChannels - 1) : QString("")) %
+         (validBitCount > 0 ? QString(", validBitCount: %1").arg(validBitCount) : QString(""));
 }
 
 QString ZImgInfo::typeAsQString() const
 {
   if (voxelFormat == VoxelFormat::Float) {
     switch (bytesPerVoxel) {
-    case 4:
-      return "float32";
-    case 8:
-      return "float64";
-    default:
-      break;
+      case 4:
+        return "float32";
+      case 8:
+        return "float64";
+      default:
+        break;
     }
   } else if (voxelFormat == VoxelFormat::Signed) {
     switch (bytesPerVoxel) {
-    case 1:
-      return "int8";
-    case 2:
-      return "int16";
-    case 4:
-      return "int32";
-    case 8:
-      return "int64";
-    default:
-      break;
+      case 1:
+        return "int8";
+      case 2:
+        return "int16";
+      case 4:
+        return "int32";
+      case 8:
+        return "int64";
+      default:
+        break;
     }
   } else {
     switch (bytesPerVoxel) {
-    case 1:
-      return "uint8";
-    case 2:
-      return "uint16";
-    case 4:
-      return "uint32";
-    case 8:
-      return "uint64";
-    default:
-      break;
+      case 1:
+        return "uint8";
+      case 2:
+        return "uint16";
+      case 4:
+        return "uint32";
+      case 8:
+        return "uint64";
+      default:
+        break;
     }
   }
   return "invalid image type";
@@ -159,12 +159,12 @@ QString ZImgInfo::displayChannelName(size_t c) const
 {
   QString res;
   if (channelNames[c].isEmpty()) {
-    res = QString("Ch%1").arg(c+1);
+    res = QString("Ch%1").arg(c + 1);
   } else {
-    res = QString("Ch%1 (%2)").arg(c+1).arg(channelNames[c]);
+    res = QString("Ch%1 (%2)").arg(c + 1).arg(channelNames[c]);
   }
 
-  if (lastChannelIsAlphaChannel && c+1 == numChannels) {
+  if (lastChannelIsAlphaChannel && c + 1 == numChannels) {
     res += QString(" (Alpha)");
   }
   return res;
@@ -179,23 +179,23 @@ void ZImgInfo::createDefaultChannelColors()
 {
   if (channelColors.size() != numChannels) {
     channelColors.resize(numChannels);
-    for (size_t i=0; i<numChannels; ++i) {
-      if (i==0) {
+    for (size_t i = 0; i < numChannels; ++i) {
+      if (i == 0) {
         if (numChannels == 1 || (numChannels == 2 && lastChannelIsAlphaChannel)) {
-          channelColors[i] = col4(255,255,255);
+          channelColors[i] = col4(255, 255, 255);
         } else {
-          channelColors[i] = col4(255,0,0);
+          channelColors[i] = col4(255, 0, 0);
         }
-      } else if (i==1) {
-        channelColors[i] = col4(0,255,0);
-      } else if (i==2) {
-        channelColors[i] = col4(0,0,255);
-      } else if (i==3) {
-        channelColors[i] = col4(255,255,0);
-      } else if (i==4) {
-        channelColors[i] = col4(255,0,255);
-      } else if (i==5) {
-        channelColors[i] = col4(0,255,255);
+      } else if (i == 1) {
+        channelColors[i] = col4(0, 255, 0);
+      } else if (i == 2) {
+        channelColors[i] = col4(0, 0, 255);
+      } else if (i == 3) {
+        channelColors[i] = col4(255, 255, 0);
+      } else if (i == 4) {
+        channelColors[i] = col4(255, 0, 255);
+      } else if (i == 5) {
+        channelColors[i] = col4(0, 255, 255);
       } else {
         channelColors[i] = col4(ZRandomInstance.randInt(255),
                                 ZRandomInstance.randInt(255),
@@ -203,7 +203,7 @@ void ZImgInfo::createDefaultChannelColors()
       }
     }
     if (lastChannelIsAlphaChannel && numChannels > 0)
-      channelColors[numChannels-1] = col4(0,0,0);
+      channelColors[numChannels - 1] = col4(0, 0, 0);
   }
 }
 
@@ -211,7 +211,7 @@ void ZImgInfo::createDefaultTimeStamps()
 {
   if (timeStamps.size() != numTimes) {
     timeStamps.resize(numTimes);
-    for (size_t i=0; i<numTimes; ++i) {
+    for (size_t i = 0; i < numTimes; ++i) {
       timeStamps[i] = i;
     }
   }
@@ -276,14 +276,23 @@ void ZImgInfo::setVoxelFormat()
 }
 
 template void ZImgInfo::setVoxelFormat<uint8_t>();
+
 template void ZImgInfo::setVoxelFormat<uint16_t>();
+
 template void ZImgInfo::setVoxelFormat<uint32_t>();
+
 template void ZImgInfo::setVoxelFormat<uint64_t>();
+
 template void ZImgInfo::setVoxelFormat<int8_t>();
+
 template void ZImgInfo::setVoxelFormat<int16_t>();
+
 template void ZImgInfo::setVoxelFormat<int32_t>();
+
 template void ZImgInfo::setVoxelFormat<int64_t>();
+
 template void ZImgInfo::setVoxelFormat<float>();
+
 template void ZImgInfo::setVoxelFormat<double>();
 
 #ifndef _MSC_VER
@@ -296,20 +305,20 @@ TValue ZImgInfo::dataRangeMin() const
 {
   if (voxelFormat == VoxelFormat::Signed) {
     switch (bytesPerVoxel) {
-    case 1:
-      return std::numeric_limits<int8_t>::min();
-      break;
-    case 2:
-      return std::numeric_limits<int16_t>::min();
-      break;
-    case 4:
-      return std::numeric_limits<int32_t>::min();
-      break;
-    case 8:
-      return std::numeric_limits<int64_t>::min();
-      break;
-    default:
-      break;
+      case 1:
+        return std::numeric_limits<int8_t>::min();
+        break;
+      case 2:
+        return std::numeric_limits<int16_t>::min();
+        break;
+      case 4:
+        return std::numeric_limits<int32_t>::min();
+        break;
+      case 8:
+        return std::numeric_limits<int64_t>::min();
+        break;
+      default:
+        break;
     }
   }
 
@@ -317,14 +326,23 @@ TValue ZImgInfo::dataRangeMin() const
 }
 
 template uint8_t ZImgInfo::dataRangeMin<uint8_t>() const;
+
 template uint16_t ZImgInfo::dataRangeMin<uint16_t>() const;
+
 template uint32_t ZImgInfo::dataRangeMin<uint32_t>() const;
+
 template uint64_t ZImgInfo::dataRangeMin<uint64_t>() const;
+
 template int8_t ZImgInfo::dataRangeMin<int8_t>() const;
+
 template int16_t ZImgInfo::dataRangeMin<int16_t>() const;
+
 template int32_t ZImgInfo::dataRangeMin<int32_t>() const;
+
 template int64_t ZImgInfo::dataRangeMin<int64_t>() const;
+
 template float ZImgInfo::dataRangeMin<float>() const;
+
 template double ZImgInfo::dataRangeMin<double>() const;
 
 template<typename TValue>
@@ -334,37 +352,37 @@ TValue ZImgInfo::dataRangeMax() const
     return static_cast<TValue>(1);
   } else if (voxelFormat == VoxelFormat::Signed) {
     switch (bytesPerVoxel) {
-    case 1:
-      return std::numeric_limits<int8_t>::max();
-      break;
-    case 2:
-      return std::numeric_limits<int16_t>::max();
-      break;
-    case 4:
-      return std::numeric_limits<int32_t>::max();
-      break;
-    case 8:
-      return std::numeric_limits<int64_t>::max();
-      break;
-    default:
-      break;
+      case 1:
+        return std::numeric_limits<int8_t>::max();
+        break;
+      case 2:
+        return std::numeric_limits<int16_t>::max();
+        break;
+      case 4:
+        return std::numeric_limits<int32_t>::max();
+        break;
+      case 8:
+        return std::numeric_limits<int64_t>::max();
+        break;
+      default:
+        break;
     }
   } else {
     switch (bytesPerVoxel) {
-    case 1:
-      return validBitCount ? ((1 << validBitCount) - 1) : std::numeric_limits<uint8_t>::max();
-      break;
-    case 2:
-      return validBitCount ? ((1 << validBitCount) - 1) : std::numeric_limits<uint16_t>::max();
-      break;
-    case 4:
-      return std::numeric_limits<uint32_t>::max();
-      break;
-    case 8:
-      return std::numeric_limits<uint64_t>::max();
-      break;
-    default:
-      break;
+      case 1:
+        return validBitCount ? ((1 << validBitCount) - 1) : std::numeric_limits<uint8_t>::max();
+        break;
+      case 2:
+        return validBitCount ? ((1 << validBitCount) - 1) : std::numeric_limits<uint16_t>::max();
+        break;
+      case 4:
+        return std::numeric_limits<uint32_t>::max();
+        break;
+      case 8:
+        return std::numeric_limits<uint64_t>::max();
+        break;
+      default:
+        break;
     }
   }
 
@@ -372,14 +390,23 @@ TValue ZImgInfo::dataRangeMax() const
 }
 
 template uint8_t ZImgInfo::dataRangeMax<uint8_t>() const;
+
 template uint16_t ZImgInfo::dataRangeMax<uint16_t>() const;
+
 template uint32_t ZImgInfo::dataRangeMax<uint32_t>() const;
+
 template uint64_t ZImgInfo::dataRangeMax<uint64_t>() const;
+
 template int8_t ZImgInfo::dataRangeMax<int8_t>() const;
+
 template int16_t ZImgInfo::dataRangeMax<int16_t>() const;
+
 template int32_t ZImgInfo::dataRangeMax<int32_t>() const;
+
 template int64_t ZImgInfo::dataRangeMax<int64_t>() const;
+
 template float ZImgInfo::dataRangeMax<float>() const;
+
 template double ZImgInfo::dataRangeMax<double>() const;
 
 #ifndef _MSC_VER

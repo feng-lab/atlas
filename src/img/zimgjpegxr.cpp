@@ -18,49 +18,49 @@ struct replaceInfAndNanWith0
 
 void reportError(ERR err)
 {
-  switch(err) {
-  case WMP_errSuccess:
-    return;
-  case WMP_errFail:
-    throw nim::ZIOException("Fail");
-  case WMP_errNotYetImplemented:
-    throw nim::ZIOException("Not yet implemented");
-  case WMP_errAbstractMethod:
-    throw nim::ZIOException("Abstract method");
-  case WMP_errOutOfMemory:
-    throw nim::ZIOException("Out of memory");
-  case WMP_errFileIO:
-    throw nim::ZIOException("File I/O error");
-  case WMP_errBufferOverflow:
-    throw nim::ZIOException("Buffer overflow");
-  case WMP_errInvalidParameter:
-    throw nim::ZIOException("Invalid parameter");
-  case WMP_errInvalidArgument:
-    throw nim::ZIOException("Invalid argument");
-  case WMP_errUnsupportedFormat:
-    throw nim::ZIOException("Unsupported format");
-  case WMP_errIncorrectCodecVersion:
-    throw nim::ZIOException("Incorrect codec version");
-  case WMP_errIndexNotFound:
-    throw nim::ZIOException("Index not found");
-  case WMP_errOutOfSequence:
-    throw nim::ZIOException("Out of sequence");
-  case WMP_errNotInitialized:
-    throw nim::ZIOException("Not Initialized");
-  case WMP_errMustBeMultipleOf16LinesUntilLastCall:
-    throw nim::ZIOException("Must be multiple of 16 lines until last call");
-  case WMP_errPlanarAlphaBandedEncRequiresTempFile:
-    throw nim::ZIOException("Planar alpha banded encoder requires temp files");
-  case WMP_errAlphaModeCannotBeTranscoded:
-    throw nim::ZIOException("Alpha mode cannot be transcoded");
-  case WMP_errIncorrectCodecSubVersion:
-    throw nim::ZIOException("Incorrect codec subversion");
-  default:
-    throw nim::ZIOException("Unknown error");
+  switch (err) {
+    case WMP_errSuccess:
+      return;
+    case WMP_errFail:
+      throw nim::ZIOException("Fail");
+    case WMP_errNotYetImplemented:
+      throw nim::ZIOException("Not yet implemented");
+    case WMP_errAbstractMethod:
+      throw nim::ZIOException("Abstract method");
+    case WMP_errOutOfMemory:
+      throw nim::ZIOException("Out of memory");
+    case WMP_errFileIO:
+      throw nim::ZIOException("File I/O error");
+    case WMP_errBufferOverflow:
+      throw nim::ZIOException("Buffer overflow");
+    case WMP_errInvalidParameter:
+      throw nim::ZIOException("Invalid parameter");
+    case WMP_errInvalidArgument:
+      throw nim::ZIOException("Invalid argument");
+    case WMP_errUnsupportedFormat:
+      throw nim::ZIOException("Unsupported format");
+    case WMP_errIncorrectCodecVersion:
+      throw nim::ZIOException("Incorrect codec version");
+    case WMP_errIndexNotFound:
+      throw nim::ZIOException("Index not found");
+    case WMP_errOutOfSequence:
+      throw nim::ZIOException("Out of sequence");
+    case WMP_errNotInitialized:
+      throw nim::ZIOException("Not Initialized");
+    case WMP_errMustBeMultipleOf16LinesUntilLastCall:
+      throw nim::ZIOException("Must be multiple of 16 lines until last call");
+    case WMP_errPlanarAlphaBandedEncRequiresTempFile:
+      throw nim::ZIOException("Planar alpha banded encoder requires temp files");
+    case WMP_errAlphaModeCannotBeTranscoded:
+      throw nim::ZIOException("Alpha mode cannot be transcoded");
+    case WMP_errIncorrectCodecSubVersion:
+      throw nim::ZIOException("Incorrect codec subversion");
+    default:
+      throw nim::ZIOException("Unknown error");
   }
 }
 
-void readInfoFromDecoder(const PKImageDecode* pDecoder, const PKPixelInfo &PI, ZImgInfo &info)
+void readInfoFromDecoder(const PKImageDecode* pDecoder, const PKPixelInfo& PI, ZImgInfo& info)
 {
   info.width = pDecoder->WMP.wmiI.cWidth;
   info.height = pDecoder->WMP.wmiI.cHeight;
@@ -78,18 +78,18 @@ void readInfoFromDecoder(const PKImageDecode* pDecoder, const PKPixelInfo &PI, Z
   info.numTimes = 1;
 
   switch (PI.bdBitDepth) {
-  case BD_8:
-    info.bytesPerVoxel = 1;
-    break;
-  case BD_16:
-    info.bytesPerVoxel = 2;
-    break;
-  case BD_32:
-  case BD_32F:
-    info.bytesPerVoxel = 4;
-    break;
-  default:
-    throw ZIOException("Not supported bit format");
+    case BD_8:
+      info.bytesPerVoxel = 1;
+      break;
+    case BD_16:
+      info.bytesPerVoxel = 2;
+      break;
+    case BD_32:
+    case BD_32F:
+      info.bytesPerVoxel = 4;
+      break;
+    default:
+      throw ZIOException("Not supported bit format");
   }
 
   if (PI.cbitUnit != info.bytesPerVoxel * info.numChannels * 8) {
@@ -101,15 +101,15 @@ void readInfoFromDecoder(const PKImageDecode* pDecoder, const PKPixelInfo &PI, Z
   }
 
   switch (PI.bdBitDepth) {
-  case BD_16F:
-  case BD_16S:
-  case BD_32F:
-  case BD_32S:
-    info.voxelFormat = VoxelFormat::Float;
-    break;
-  default:
-    info.voxelFormat = VoxelFormat::Unsigned;
-    break;
+    case BD_16F:
+    case BD_16S:
+    case BD_32F:
+    case BD_32S:
+      info.voxelFormat = VoxelFormat::Float;
+      break;
+    default:
+      info.voxelFormat = VoxelFormat::Unsigned;
+      break;
   }
 
   info.createDefaultDescriptions();
@@ -119,7 +119,7 @@ void readInfoFromDecoder(const PKImageDecode* pDecoder, const PKPixelInfo &PI, Z
 
 namespace nim {
 
-ZImgJpegXR &ZImgJpegXR::instance()
+ZImgJpegXR& ZImgJpegXR::instance()
 {
   static ZImgJpegXR imgJpegXR;
   return imgJpegXR;
@@ -160,8 +160,9 @@ QStringList ZImgJpegXR::extensions() const
   return res;
 }
 
-void ZImgJpegXR::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                          std::vector<std::set<size_t>> *pyramidalRatios)
+void ZImgJpegXR::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+                          std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                          std::vector<std::set<size_t>>* pyramidalRatios)
 {
   ERR err = WMP_errSuccess;
   PKCodecFactory* pCodecFactory = nullptr;
@@ -177,7 +178,7 @@ void ZImgJpegXR::readInfo(const QString &filename, std::vector<ZImgInfo> &infos,
   infos.resize(1);
   readInfoFromDecoder(pDecoder, PI, infos[0]);
 
-Cleanup:
+  Cleanup:
   if (pDecoder)
     pDecoder->Release(&pDecoder);
   if (pCodecFactory)
@@ -188,7 +189,7 @@ Cleanup:
   createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 }
 
-void ZImgJpegXR::readMetadata(const QString &filename, ZImgMetadata &meta, size_t scene)
+void ZImgJpegXR::readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -197,7 +198,8 @@ void ZImgJpegXR::readMetadata(const QString &filename, ZImgMetadata &meta, size_
   Q_UNUSED(meta);
 }
 
-void ZImgJpegXR::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail, const ZImgRegion &region, size_t scene)
+void
+ZImgJpegXR::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, const ZImgRegion& region, size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -207,7 +209,7 @@ void ZImgJpegXR::readThumbnail(const QString &filename, ZImgThumbernail &thumbna
   Q_UNUSED(region);
 }
 
-void ZImgJpegXR::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
+void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -230,7 +232,8 @@ void ZImgJpegXR::readImg(const QString &filename, ZImg &img, const ZImgRegion &r
   readInfoFromDecoder(pDecoder, PI, info);
 
   if (region.isEmpty() || !region.isValid(info)) {
-    throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString()).arg(region.toQString()));
+    throw ZIOException(
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString()).arg(region.toQString()));
   }
 
   if (PI.grBit & PK_pixfmtHasAlpha) {
@@ -263,7 +266,7 @@ void ZImgJpegXR::readImg(const QString &filename, ZImg &img, const ZImgRegion &r
     img.swap(imgTmp);
 
     if (PI.grBit & PK_pixfmtPreMul && info.lastChannelIsAlphaChannel) {
-      if (region.start.c < static_cast<int>(img.numChannels()-1)) { // otherwise don't need to process color channels
+      if (region.start.c < static_cast<int>(img.numChannels() - 1)) { // otherwise don't need to process color channels
         img.correctPreMultipliedColor();
       }
     }
@@ -280,7 +283,7 @@ void ZImgJpegXR::readImg(const QString &filename, ZImg &img, const ZImgRegion &r
     img.zoom(1.0 / ratio, 1.0 / ratio);
   }
 
-Cleanup:
+  Cleanup:
   if (pDecoder)
     pDecoder->Release(&pDecoder);
   if (pCodecFactory)
@@ -289,7 +292,7 @@ Cleanup:
   reportError(err);
 }
 
-void ZImgJpegXR::readInfo(uint8_t *mem, size_t size, ZImgInfo &info)
+void ZImgJpegXR::readInfo(uint8_t* mem, size_t size, ZImgInfo& info)
 {
   ERR err = WMP_errSuccess;
   PKFactory* pFactory = nullptr;
@@ -304,7 +307,7 @@ void ZImgJpegXR::readInfo(uint8_t *mem, size_t size, ZImgInfo &info)
   Call(pFactory->CreateStreamFromMemory(&pStream, mem, size));
 
   // Create decoder
-  Call(PKCodecFactory_CreateCodec(pIID, (void **)&pDecoder));
+  Call(PKCodecFactory_CreateCodec(pIID, (void**) &pDecoder));
 
   // attach stream to decoder
   Call(pDecoder->Initialize(pDecoder, pStream));
@@ -316,7 +319,7 @@ void ZImgJpegXR::readInfo(uint8_t *mem, size_t size, ZImgInfo &info)
 
   readInfoFromDecoder(pDecoder, PI, info);
 
-Cleanup:
+  Cleanup:
   if (pDecoder)
     pDecoder->Release(&pDecoder);
   if (pFactory)
@@ -325,7 +328,7 @@ Cleanup:
   reportError(err);
 }
 
-void ZImgJpegXR::readImg(uint8_t *mem, size_t size, uint8_t *des, size_t desSize)
+void ZImgJpegXR::readImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
 {
   ERR err = WMP_errSuccess;
   PKFactory* pFactory = nullptr;
@@ -342,7 +345,7 @@ void ZImgJpegXR::readImg(uint8_t *mem, size_t size, uint8_t *des, size_t desSize
   Call(pFactory->CreateStreamFromMemory(&pStream, mem, size));
 
   // Create decoder
-  Call(PKCodecFactory_CreateCodec(pIID, (void **)&pDecoder));
+  Call(PKCodecFactory_CreateCodec(pIID, (void**) &pDecoder));
 
   // attach stream to decoder
   Call(pDecoder->Initialize(pDecoder, pStream));
@@ -388,7 +391,7 @@ void ZImgJpegXR::readImg(uint8_t *mem, size_t size, uint8_t *des, size_t desSize
     }
   }
 
-Cleanup:
+  Cleanup:
   if (pDecoder)
     pDecoder->Release(&pDecoder);
   if (pFactory)

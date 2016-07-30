@@ -24,9 +24,9 @@ ZImgITKImage::ZImgITKImage()
   if (itk::ObjectFactoryBase::GetRegisteredFactories().empty()) {
     itk::NiftiImageIOFactory::RegisterOneFactory();
     itk::NrrdImageIOFactory::RegisterOneFactory();
-  #ifdef _SUPPORT_DICOM_
+#ifdef _SUPPORT_DICOM_
     itk::GDCMImageIOFactory::RegisterOneFactory();
-  #endif
+#endif
   }
 }
 
@@ -48,24 +48,24 @@ QStringList ZImgITKImage::extensions() const
 {
   QStringList res;
 
-  typedef itk::ImageIOBase                        IOBaseType;
-  typedef std::list<itk::LightObject::Pointer>    ArrayOfImageIOType;
-  typedef IOBaseType::ArrayOfExtensionsType       ArrayOfExtensionsType;
+  typedef itk::ImageIOBase IOBaseType;
+  typedef std::list<itk::LightObject::Pointer> ArrayOfImageIOType;
+  typedef IOBaseType::ArrayOfExtensionsType ArrayOfExtensionsType;
 
   ArrayOfImageIOType allobjects = itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase");
 
   ArrayOfImageIOType::iterator itr = allobjects.begin();
 
-  while( itr != allobjects.end() ) {
-    IOBaseType * io = dynamic_cast< IOBaseType * >( itr->GetPointer() );
-    if( io ) {
+  while (itr != allobjects.end()) {
+    IOBaseType* io = dynamic_cast< IOBaseType* >( itr->GetPointer());
+    if (io) {
       //LOG(INFO) << "ImageIO: " << io->GetNameOfClass();
-      const ArrayOfExtensionsType & readExtensions  = io->GetSupportedReadExtensions();
-      ArrayOfExtensionsType::const_iterator readItr  = readExtensions.begin();
+      const ArrayOfExtensionsType& readExtensions = io->GetSupportedReadExtensions();
+      ArrayOfExtensionsType::const_iterator readItr = readExtensions.begin();
 
-      while( readItr != readExtensions.end() ) {
+      while (readItr != readExtensions.end()) {
         res.push_back(readItr->c_str());
-        res.last().remove(0,1); // remove '.'
+        res.last().remove(0, 1); // remove '.'
         ++readItr;
       }
     }
@@ -78,147 +78,151 @@ QStringList ZImgITKImage::extensions() const
   return res;
 }
 
-void ZImgITKImage::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                            std::vector<std::set<size_t>> *pyramidalRatios)
+void ZImgITKImage::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+                            std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                            std::vector<std::set<size_t>>* pyramidalRatios)
 {
   try {
-  itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(), itk::ImageIOFactory::ReadMode);
+    itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
+                                                                           itk::ImageIOFactory::ReadMode);
 
-  if (imageIO.IsNull())
-    throw ZIOException("can not create reader");
+    if (imageIO.IsNull())
+      throw ZIOException("can not create reader");
 
-  imageIO->SetFileName(QFile::encodeName(filename).constData());
-  imageIO->ReadImageInformation();
+    imageIO->SetFileName(QFile::encodeName(filename).constData());
+    imageIO->ReadImageInformation();
 
-  bool isNrrd = QString(imageIO->GetNameOfClass()).contains("Nrrd");
+    bool isNrrd = QString(imageIO->GetNameOfClass()).contains("Nrrd");
 
-  infos.resize(1);
-  parseInfo(imageIO.GetPointer(), infos[0]);
+    infos.resize(1);
+    parseInfo(imageIO.GetPointer(), infos[0]);
 
-  if (isNrrd) {
-    createEmptySubBlocks(infos, subBlocks, pyramidalRatios);
-  } else {
-    createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
+    if (isNrrd) {
+      createEmptySubBlocks(infos, subBlocks, pyramidalRatios);
+    } else {
+      createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
+    }
   }
-  }
-  catch ( itk::ExceptionObject & err ) {
+  catch (itk::ExceptionObject& err) {
     throw ZIOException(err.GetDescription());
   }
 }
 
-void ZImgITKImage::readMetadata(const QString &, ZImgMetadata &, size_t )
+void ZImgITKImage::readMetadata(const QString&, ZImgMetadata&, size_t)
 {
   try {
   }
-  catch ( itk::ExceptionObject & err ) {
+  catch (itk::ExceptionObject& err) {
     throw ZIOException(err.GetDescription());
   }
 }
 
-void ZImgITKImage::readThumbnail(const QString &, ZImgThumbernail &, const ZImgRegion &, size_t )
+void ZImgITKImage::readThumbnail(const QString&, ZImgThumbernail&, const ZImgRegion&, size_t)
 {
   try {
   }
-  catch ( itk::ExceptionObject & err ) {
+  catch (itk::ExceptionObject& err) {
     throw ZIOException(err.GetDescription());
   }
 }
 
-void ZImgITKImage::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
+void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
   }
 
   try {
-  itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(), itk::ImageIOFactory::ReadMode);
+    itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
+                                                                           itk::ImageIOFactory::ReadMode);
 
-  if (imageIO.IsNull())
-    throw ZIOException("can not create reader");
+    if (imageIO.IsNull())
+      throw ZIOException("can not create reader");
 
-  imageIO->SetFileName(QFile::encodeName(filename).constData());
-  imageIO->ReadImageInformation();
+    imageIO->SetFileName(QFile::encodeName(filename).constData());
+    imageIO->ReadImageInformation();
 
-  bool isNrrd = QString(imageIO->GetNameOfClass()).contains("Nrrd");
+    bool isNrrd = QString(imageIO->GetNameOfClass()).contains("Nrrd");
 
-  ZImgInfo imgInfo;
-  parseInfo(imageIO.GetPointer(), imgInfo);
+    ZImgInfo imgInfo;
+    parseInfo(imageIO.GetPointer(), imgInfo);
 
-  if (region.isEmpty() || !region.isValid(imgInfo)) {
-    throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(region.toQString()));
-  }
+    if (region.isEmpty() || !region.isValid(imgInfo)) {
+      throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(
+        region.toQString()));
+    }
 
-  if (region.containsWholeImg(imgInfo) || isNrrd) {
-    img = ZImg(imgInfo);
-    itk::ImageIORegion ioRegion(4);
-    ioRegion.SetIndex(0, 0);
-    ioRegion.SetIndex(1, 0);
-    ioRegion.SetIndex(2, 0);
-    ioRegion.SetIndex(3, 0);
-    ioRegion.SetSize(0, img.width());
-    ioRegion.SetSize(1, img.height());
-    ioRegion.SetSize(2, img.depth());
-    ioRegion.SetSize(3, img.numTimes());
-    imageIO->SetIORegion(ioRegion);
-    if (imgInfo.numTimes > 1) {
-      std::vector<uint8_t> buf(img.byteNumber());
-      imageIO->Read(buf.data());
-      fixDimensionOrder(buf.data(), "CXYZT", img);
+    if (region.containsWholeImg(imgInfo) || isNrrd) {
+      img = ZImg(imgInfo);
+      itk::ImageIORegion ioRegion(4);
+      ioRegion.SetIndex(0, 0);
+      ioRegion.SetIndex(1, 0);
+      ioRegion.SetIndex(2, 0);
+      ioRegion.SetIndex(3, 0);
+      ioRegion.SetSize(0, img.width());
+      ioRegion.SetSize(1, img.height());
+      ioRegion.SetSize(2, img.depth());
+      ioRegion.SetSize(3, img.numTimes());
+      imageIO->SetIORegion(ioRegion);
+      if (imgInfo.numTimes > 1) {
+        std::vector<uint8_t> buf(img.byteNumber());
+        imageIO->Read(buf.data());
+        fixDimensionOrder(buf.data(), "CXYZT", img);
+      } else {
+        imageIO->Read(img.channelData(0));
+      }
+      if (imgInfo.numChannels > 1 && imgInfo.numTimes == 1) { // if numTimes > 1 then dimension order is already fixed
+        ZImg tpImg(imgInfo);
+        CXYZtoXYZC(img, tpImg);
+        img.swap(tpImg);
+      }
+
+      if (isNrrd && !region.containsWholeImg(imgInfo))
+        img = img.crop(region);
     } else {
-      imageIO->Read(img.channelData(0));
-    }
-    if (imgInfo.numChannels > 1 && imgInfo.numTimes == 1) { // if numTimes > 1 then dimension order is already fixed
-      ZImg tpImg(imgInfo);
-      CXYZtoXYZC(img, tpImg);
-      img.swap(tpImg);
-    }
+      ZImgInfo clipInfo = region.clip(imgInfo);
+      bool clipChannel = clipInfo.numChannels != imgInfo.numChannels;
+      if (clipChannel) {
+        clipInfo.numChannels = imgInfo.numChannels;
+      }
 
-    if (isNrrd && !region.containsWholeImg(imgInfo))
-      img = img.crop(region);
-  } else {
-    ZImgInfo clipInfo = region.clip(imgInfo);
-    bool clipChannel = clipInfo.numChannels != imgInfo.numChannels;
-    if (clipChannel) {
-      clipInfo.numChannels = imgInfo.numChannels;
-    }
+      ZImg tmpImg(clipInfo);
+      ZImgRegion rgn = region;
+      rgn.resolveRegionEnd(imgInfo);
+      itk::ImageIORegion ioRegion(4);
+      ioRegion.SetIndex(0, rgn.start.x);
+      ioRegion.SetIndex(1, rgn.start.y);
+      ioRegion.SetIndex(2, rgn.start.z);
+      ioRegion.SetIndex(3, rgn.start.t);
+      ioRegion.SetSize(0, rgn.end.x - rgn.start.x);
+      ioRegion.SetSize(1, rgn.end.y - rgn.start.y);
+      ioRegion.SetSize(2, rgn.end.z - rgn.start.z);
+      ioRegion.SetSize(3, rgn.end.t - rgn.start.t);
+      imageIO->SetIORegion(ioRegion);
+      if (clipInfo.numTimes > 1) {
+        std::vector<uint8_t> buf(tmpImg.byteNumber());
+        imageIO->Read(buf.data());
+        fixDimensionOrder(buf.data(), "CXYZT", tmpImg);
+      } else {
+        imageIO->Read(tmpImg.channelData(0));
+      }
+      if (clipInfo.numChannels > 1 && clipInfo.numTimes == 1) { // if numTimes > 1 then dimension order is already fixed
+        ZImg tpImg(clipInfo);
+        CXYZtoXYZC(tmpImg, tpImg);
+        tmpImg.swap(tpImg);
+      }
 
-    ZImg tmpImg(clipInfo);
-    ZImgRegion rgn = region;
-    rgn.resolveRegionEnd(imgInfo);
-    itk::ImageIORegion ioRegion(4);
-    ioRegion.SetIndex(0, rgn.start.x);
-    ioRegion.SetIndex(1, rgn.start.y);
-    ioRegion.SetIndex(2, rgn.start.z);
-    ioRegion.SetIndex(3, rgn.start.t);
-    ioRegion.SetSize(0, rgn.end.x - rgn.start.x);
-    ioRegion.SetSize(1, rgn.end.y - rgn.start.y);
-    ioRegion.SetSize(2, rgn.end.z - rgn.start.z);
-    ioRegion.SetSize(3, rgn.end.t - rgn.start.t);
-    imageIO->SetIORegion(ioRegion);
-    if (clipInfo.numTimes > 1) {
-      std::vector<uint8_t> buf(tmpImg.byteNumber());
-      imageIO->Read(buf.data());
-      fixDimensionOrder(buf.data(), "CXYZT", tmpImg);
-    } else {
-      imageIO->Read(tmpImg.channelData(0));
-    }
-    if (clipInfo.numChannels > 1 && clipInfo.numTimes == 1) { // if numTimes > 1 then dimension order is already fixed
-      ZImg tpImg(clipInfo);
-      CXYZtoXYZC(tmpImg, tpImg);
-      tmpImg.swap(tpImg);
-    }
-
-    if (clipChannel) {
-      ZImgRegion crgn;
-      crgn.start.c = rgn.start.c;
-      crgn.end.c = rgn.end.c;
-      img = tmpImg.crop(rgn);
-    } else {
-      img.swap(tmpImg);
+      if (clipChannel) {
+        ZImgRegion crgn;
+        crgn.start.c = rgn.start.c;
+        crgn.end.c = rgn.end.c;
+        img = tmpImg.crop(rgn);
+      } else {
+        img.swap(tmpImg);
+      }
     }
   }
-  }
-  catch ( itk::ExceptionObject & err ) {
+  catch (itk::ExceptionObject& err) {
     throw ZIOException(err.GetDescription());
   }
 
@@ -227,7 +231,7 @@ void ZImgITKImage::readImg(const QString &filename, ZImg &img, const ZImgRegion 
   }
 }
 
-void ZImgITKImage::writeImg(const QString &filename, const ZImg &img, Compression comp)
+void ZImgITKImage::writeImg(const QString& filename, const ZImg& img, Compression comp)
 {
   Q_UNUSED(filename)
   Q_UNUSED(img)
@@ -330,7 +334,7 @@ void ZImgITKImage::writeImg(const QString &filename, const ZImg &img, Compressio
 //  }
 }
 
-void ZImgITKImage::writeImg(const QString &filename, const ZImgSliceProvider &imgSliceProvider, Compression comp)
+void ZImgITKImage::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp)
 {
   Q_UNUSED(filename)
   Q_UNUSED(imgSliceProvider)
@@ -352,7 +356,7 @@ bool ZImgITKImage::supportWrite() const
   return false;
 }
 
-void ZImgITKImage::parseInfo(const itk::ImageIOBase *imageIO, ZImgInfo &info)
+void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info)
 {
   uint32_t ndims = imageIO->GetNumberOfDimensions();
   if (ndims == 1) {
@@ -380,49 +384,49 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase *imageIO, ZImgInfo &info)
   }
   info.numChannels = imageIO->GetNumberOfComponents();
   switch (imageIO->GetComponentType()) {
-  case itk::ImageIOBase::CHAR:
-    info.bytesPerVoxel = 1;
-    info.voxelFormat = VoxelFormat::Signed;
-    break;
-  case itk::ImageIOBase::UCHAR:
-    info.bytesPerVoxel = 1;
-    info.voxelFormat = VoxelFormat::Unsigned;
-    break;
-  case itk::ImageIOBase::SHORT:
-    info.bytesPerVoxel = 2;
-    info.voxelFormat = VoxelFormat::Signed;
-    break;
-  case itk::ImageIOBase::USHORT:
-    info.bytesPerVoxel = 2;
-    info.voxelFormat = VoxelFormat::Unsigned;
-    break;
-  case itk::ImageIOBase::INT:
-    info.bytesPerVoxel = 4;
-    info.voxelFormat = VoxelFormat::Signed;
-    break;
-  case itk::ImageIOBase::UINT:
-    info.bytesPerVoxel = 4;
-    info.voxelFormat = VoxelFormat::Unsigned;
-    break;
-  case itk::ImageIOBase::LONG:
-    info.bytesPerVoxel = 8;
-    info.voxelFormat = VoxelFormat::Signed;
-    break;
-  case itk::ImageIOBase::ULONG:
-    info.bytesPerVoxel = 8;
-    info.voxelFormat = VoxelFormat::Unsigned;
-    break;
-  case itk::ImageIOBase::FLOAT:
-    info.bytesPerVoxel = 4;
-    info.voxelFormat = VoxelFormat::Float;
-    break;
-  case itk::ImageIOBase::DOUBLE:
-    info.bytesPerVoxel = 8;
-    info.voxelFormat = VoxelFormat::Float;
-    break;
-  default:
-    throw ZIOException("Not supported ElementType");
-    break;
+    case itk::ImageIOBase::CHAR:
+      info.bytesPerVoxel = 1;
+      info.voxelFormat = VoxelFormat::Signed;
+      break;
+    case itk::ImageIOBase::UCHAR:
+      info.bytesPerVoxel = 1;
+      info.voxelFormat = VoxelFormat::Unsigned;
+      break;
+    case itk::ImageIOBase::SHORT:
+      info.bytesPerVoxel = 2;
+      info.voxelFormat = VoxelFormat::Signed;
+      break;
+    case itk::ImageIOBase::USHORT:
+      info.bytesPerVoxel = 2;
+      info.voxelFormat = VoxelFormat::Unsigned;
+      break;
+    case itk::ImageIOBase::INT:
+      info.bytesPerVoxel = 4;
+      info.voxelFormat = VoxelFormat::Signed;
+      break;
+    case itk::ImageIOBase::UINT:
+      info.bytesPerVoxel = 4;
+      info.voxelFormat = VoxelFormat::Unsigned;
+      break;
+    case itk::ImageIOBase::LONG:
+      info.bytesPerVoxel = 8;
+      info.voxelFormat = VoxelFormat::Signed;
+      break;
+    case itk::ImageIOBase::ULONG:
+      info.bytesPerVoxel = 8;
+      info.voxelFormat = VoxelFormat::Unsigned;
+      break;
+    case itk::ImageIOBase::FLOAT:
+      info.bytesPerVoxel = 4;
+      info.voxelFormat = VoxelFormat::Float;
+      break;
+    case itk::ImageIOBase::DOUBLE:
+      info.bytesPerVoxel = 8;
+      info.voxelFormat = VoxelFormat::Float;
+      break;
+    default:
+      throw ZIOException("Not supported ElementType");
+      break;
   }
 
   info.voxelSizeUnit = VoxelSizeUnit::mm;
@@ -438,7 +442,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase *imageIO, ZImgInfo &info)
   }
   info.createDefaultDescriptions();
   if (ndims == 4) {
-    for (size_t i=0; i<info.timeStamps.size(); ++i)
+    for (size_t i = 0; i < info.timeStamps.size(); ++i)
       info.timeStamps[i] *= imageIO->GetSpacing(3);
   }
 

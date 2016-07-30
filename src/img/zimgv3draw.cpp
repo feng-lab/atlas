@@ -33,8 +33,9 @@ QStringList ZImgV3DRaw::extensions() const
   return res;
 }
 
-void ZImgV3DRaw::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                          std::vector<std::set<size_t>> *pyramidalRatios)
+void ZImgV3DRaw::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+                          std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                          std::vector<std::set<size_t>>* pyramidalRatios)
 {
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
@@ -81,7 +82,7 @@ void ZImgV3DRaw::readInfo(const QString &filename, std::vector<ZImgInfo> &infos,
   createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 }
 
-void ZImgV3DRaw::readMetadata(const QString &filename, ZImgMetadata &, size_t scene)
+void ZImgV3DRaw::readMetadata(const QString& filename, ZImgMetadata&, size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -97,7 +98,7 @@ void ZImgV3DRaw::readMetadata(const QString &filename, ZImgMetadata &, size_t sc
   }
 }
 
-void ZImgV3DRaw::readThumbnail(const QString &filename, ZImgThumbernail &, const ZImgRegion &, size_t scene)
+void ZImgV3DRaw::readThumbnail(const QString& filename, ZImgThumbernail&, const ZImgRegion&, size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -113,7 +114,7 @@ void ZImgV3DRaw::readThumbnail(const QString &filename, ZImgThumbernail &, const
   }
 }
 
-void ZImgV3DRaw::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
+void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -169,7 +170,7 @@ void ZImgV3DRaw::readImg(const QString &filename, ZImg &img, const ZImgRegion &r
   }
 }
 
-void ZImgV3DRaw::writeImg(const QString &filename, const ZImg &img, Compression comp)
+void ZImgV3DRaw::writeImg(const QString& filename, const ZImg& img, Compression comp)
 {
   if (comp != Compression::AUTO && comp != Compression::NONE) {
     LOG(WARNING) << "compression is not supported for V3DRaw";
@@ -199,7 +200,7 @@ void ZImgV3DRaw::writeImg(const QString &filename, const ZImg &img, Compression 
   writeStream(outputFileStream, img.timeData<char>(0), img.timeByteNumber());
 }
 
-void ZImgV3DRaw::writeImg(const QString &filename, const ZImgSliceProvider &imgSliceProvider, Compression comp)
+void ZImgV3DRaw::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp)
 {
   if (comp != Compression::AUTO && comp != Compression::NONE) {
     LOG(WARNING) << "compression is not supported for V3DRaw";
@@ -229,8 +230,8 @@ void ZImgV3DRaw::writeImg(const QString &filename, const ZImgSliceProvider &imgS
     sz[3] = imgSliceProvider.imgInfo().numChannels;
     writeStream(outputFileStream, sz, 16);
 
-    for (size_t z=0; z<imgSliceProvider.imgInfo().depth; ++z) {
-      ZImg img = imgSliceProvider.slice(z,0);
+    for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
+      ZImg img = imgSliceProvider.slice(z, 0);
       writeStream(outputFileStream, img.timeData<char>(0), img.timeByteNumber());
     }
   }

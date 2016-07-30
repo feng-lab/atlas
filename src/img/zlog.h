@@ -8,6 +8,7 @@
 #ifndef _USE_QSLOG_
 
 #define GOOGLE_STRIP_LOG 0
+
 #include <glog/logging.h>
 #include <QString>
 #include <QDateTime>
@@ -15,6 +16,7 @@
 namespace nim {
 
 void initLogging(const char* argv0, const QString& filename);
+
 void shutdownLogging();
 
 typedef google::LogSink LogSink;
@@ -25,6 +27,7 @@ const LogSeverity WarningLevel = google::GLOG_WARNING;
 const LogSeverity ErrorLevel = google::GLOG_ERROR;
 const LogSeverity FatalLevel = google::GLOG_FATAL;
 const LogSeverity OffLevel = google::GLOG_FATAL + 1;
+
 struct LogData
 {
   LogData(LogSeverity severity, const char* full_filename,
@@ -49,15 +52,25 @@ struct LogData
   QByteArray message; // main log message
   QString formatted; // formatted log message with level, time, threadid, filename, line, and message
 };
+
 typedef std::function<void(const LogData&)> LogFunction;
 
 // might return nullptr
 LogSinkPtr createFileLogSink(const QString& filename);
+
 LogSinkPtr createFunctorLogSink(LogFunction f);
-inline void addLogSink(LogSink* sink) { if (sink) google::AddLogSink(sink); }
-inline void addLogSink(LogSinkPtr sink) { if (sink) google::AddLogSink(sink.get()); }
-inline void removeLogSink(LogSink* sink) { if (sink) google::RemoveLogSink(sink); }
-inline void removeLogSink(LogSinkPtr sink) { if (sink) google::RemoveLogSink(sink.get()); }
+
+inline void addLogSink(LogSink* sink)
+{ if (sink) google::AddLogSink(sink); }
+
+inline void addLogSink(LogSinkPtr sink)
+{ if (sink) google::AddLogSink(sink.get()); }
+
+inline void removeLogSink(LogSink* sink)
+{ if (sink) google::RemoveLogSink(sink); }
+
+inline void removeLogSink(LogSinkPtr sink)
+{ if (sink) google::RemoveLogSink(sink.get()); }
 
 QString levelToString(LogSeverity theLevel);
 
@@ -68,9 +81,14 @@ QString levelToString(LogSeverity theLevel);
 #define LERRORF(file, line, function) google::LogMessage(file, line, google::GLOG_ERROR).stream()
 #define LFATALF(file, line, function) google::LogMessage(file, line, google::GLOG_FATAL).stream()
 
-inline std::ostream& operator<<(std::ostream& s, const QByteArray& q) { return (s << q.constData()); }
-inline std::ostream& operator<<(std::ostream& s, const QString& q) { return (s << q.toUtf8().constData()); }
-inline std::ostream& operator<<(std::ostream& s, const QStringRef& q) { return (s << q.toUtf8().constData()); }
+inline std::ostream& operator<<(std::ostream& s, const QByteArray& q)
+{ return (s << q.constData()); }
+
+inline std::ostream& operator<<(std::ostream& s, const QString& q)
+{ return (s << q.toUtf8().constData()); }
+
+inline std::ostream& operator<<(std::ostream& s, const QStringRef& q)
+{ return (s << q.toUtf8().constData()); }
 
 #else
 

@@ -11,15 +11,13 @@ namespace impl {
 
 template<typename TImg, typename TVoxel>
 class img_region_iter
-    : public boost::iterator_facade<
-    img_region_iter<TImg, TVoxel>
-    , TVoxel
-    , boost::random_access_traversal_tag
-    , TVoxel&
-    , int64_t
-    >
+  : public boost::iterator_facade<
+    img_region_iter<TImg, TVoxel>, TVoxel, boost::random_access_traversal_tag, TVoxel&, int64_t
+  >
 {
-  struct enabler {};
+  struct enabler
+  {
+  };
 public:
   // empty constructor not useful
   img_region_iter()
@@ -34,8 +32,9 @@ public:
     if (m_img->isEmpty()) {
       m_endIdx = -1;
     } else if (!m_region.isValid(m_img->info())) {
-      throw ZImgException(QString("Can not construct iterator over invalid image region. Image info: '%1', region: '%2'")
-                          .arg(m_img->info().toQString()).arg(m_region.toQString()));
+      throw ZImgException(
+        QString("Can not construct iterator over invalid image region. Image info: '%1', region: '%2'")
+          .arg(m_img->info().toQString()).arg(m_region.toQString()));
     } else if (m_region.isEmpty()) {
       m_endIdx = -1;
     } else {
@@ -50,27 +49,28 @@ public:
 
     // only need first 3
     m_wrapOffsets.resize(3);
-    for (size_t i=0; i<3; ++i)
+    for (size_t i = 0; i < 3; ++i)
       m_wrapOffsets[i] = m_img->info().stride(i) * (m_img->info()[i] - m_regionInfo[i]);
   }
 
-  template <typename OtherTImg, typename OtherTVoxel>
+  template<typename OtherTImg, typename OtherTVoxel>
   img_region_iter(img_region_iter<OtherTImg, OtherTVoxel> const& other, typename std::enable_if<
-                  std::is_convertible<OtherTImg*,TImg*>::value && std::is_convertible<OtherTVoxel*,TVoxel*>::value
-                  , enabler
-                  >::type = enabler()
-      )
-    : m_img(other.m_img), m_region(other.m_region), m_regionInfo(other.m_regionInfo),
-      m_endIdx(other.m_endIdx), m_idx(other.m_idx), m_coord(other.m_coord),
-      m_centerVoxelPtr(other.m_centerVoxelPtr), m_wrapOffsets(other.m_wrapOffsets)
+    std::is_convertible<OtherTImg*, TImg*>::value && std::is_convertible<OtherTVoxel*, TVoxel*>::value, enabler
+  >::type = enabler()
+  )
+    : m_img(other.m_img), m_region(other.m_region), m_regionInfo(other.m_regionInfo), m_endIdx(other.m_endIdx), m_idx(
+    other.m_idx), m_coord(other.m_coord), m_centerVoxelPtr(other.m_centerVoxelPtr), m_wrapOffsets(other.m_wrapOffsets)
   {}
 
   // return true if before first voxel
-  __forceinline bool isBeforeBegin() const { return m_idx < 0; }
+  __forceinline bool isBeforeBegin() const
+  { return m_idx < 0; }
   // return true if at first voxel
-  __forceinline bool isAtBegin() const { return m_idx == 0; }
+  __forceinline bool isAtBegin() const
+  { return m_idx == 0; }
   // return true if past last voxel, similar to stl "== container.end()"
-  __forceinline bool isAtEnd() const { return m_idx >= m_endIdx; }
+  __forceinline bool isAtEnd() const
+  { return m_idx >= m_endIdx; }
 
   // go to first voxel
   __forceinline void goToBegin()
@@ -111,26 +111,30 @@ public:
   }
 
   // return voxel coord of this iterator
-  __forceinline ZVoxelCoordinate coord() const { return m_coord; }
+  __forceinline ZVoxelCoordinate coord() const
+  { return m_coord; }
 
   // return index of current voxel of this region
   // negative index means before the region
-  __forceinline int64_t index() const { return m_idx; }
+  __forceinline int64_t index() const
+  { return m_idx; }
 
 private:
   friend class boost::iterator_core_access;
-  template <typename, typename> friend class img_region_iter;
 
-  template <typename OtherTImg, typename OtherTVoxel>
+  template<typename, typename> friend
+  class img_region_iter;
+
+  template<typename OtherTImg, typename OtherTVoxel>
   __forceinline bool equal(img_region_iter<OtherTImg, OtherTVoxel> const& other) const
   {
     return this->m_img == other.m_img &&
-        this->m_region == other.m_region &&
-        this->m_regionInfo == other.m_regionInfo &&
-        this->m_endIdx == other.m_endIdx &&
-        this->m_idx == other.m_idx &&
-        this->m_coord == other.m_coord &&
-        this->m_wrapOffsets == other.m_wrapOffsets;
+           this->m_region == other.m_region &&
+           this->m_regionInfo == other.m_regionInfo &&
+           this->m_endIdx == other.m_endIdx &&
+           this->m_idx == other.m_idx &&
+           this->m_coord == other.m_coord &&
+           this->m_wrapOffsets == other.m_wrapOffsets;
   }
 
   __forceinline void increment()
@@ -200,7 +204,7 @@ private:
     ZVoxelCoordinate coordAdvance = ZImg::indexToCoord(n, m_regionInfo);
     ZVoxelCoordinate::value_type carry = 0;
     m_coord -= m_region.start;
-    for (size_t i=0; i<m_coord.size() - 1; ++i) {
+    for (size_t i = 0; i < m_coord.size() - 1; ++i) {
       m_coord[i] += coordAdvance[i];
       m_coord[i] += carry;
       if (m_coord[i] >= static_cast<ZVoxelCoordinate::value_type>(m_regionInfo.size(i))) {
@@ -219,14 +223,14 @@ private:
     }
   }
 
-  template <typename OtherTImg, typename OtherTVoxel>
+  template<typename OtherTImg, typename OtherTVoxel>
   __forceinline int64_t distance_to(img_region_iter<OtherTImg, OtherTVoxel> const& other) const
   {
     return other.m_idx - m_idx;
   }
 
 private:
-  TImg *m_img;
+  TImg* m_img;
   ZImgRegion m_region;
   ZImgInfo m_regionInfo;
   int64_t m_endIdx;

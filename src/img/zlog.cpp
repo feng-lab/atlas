@@ -71,7 +71,8 @@ public:
     }
   }
 
-  inline bool isValid() const { return m_file.isOpen(); }
+  inline bool isValid() const
+  { return m_file.isOpen(); }
 
   // LogSink interface
 public:
@@ -92,7 +93,9 @@ public:
   explicit FunctionLogSink(const LogFunction& f)
     : m_logFunction(f)
   {}
-  inline bool isValid() const { return m_logFunction.operator bool(); }
+
+  inline bool isValid() const
+  { return m_logFunction.operator bool(); }
 
   // LogSink interface
 public:
@@ -120,16 +123,16 @@ LogSinkPtr createFunctorLogSink(LogFunction f)
 QString levelToString(LogSeverity theLevel)
 {
   switch (theLevel) {
-  case google::GLOG_INFO:
-    return QObject::tr("Info");
-  case google::GLOG_WARNING:
-    return QObject::tr("Warning");
-  case google::GLOG_ERROR:
-    return QObject::tr("Error");
-  case google::GLOG_FATAL:
-    return QObject::tr("Fatal");
-  default:
-    return QString("Unknown");
+    case google::GLOG_INFO:
+      return QObject::tr("Info");
+    case google::GLOG_WARNING:
+      return QObject::tr("Warning");
+    case google::GLOG_ERROR:
+      return QObject::tr("Error");
+    case google::GLOG_FATAL:
+      return QObject::tr("Fatal");
+    default:
+      return QString("Unknown");
   }
 }
 

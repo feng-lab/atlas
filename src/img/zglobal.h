@@ -51,7 +51,7 @@ constexpr const char* enumToString(TEnum e) noexcept
 }
 
 // https://chromium.googlesource.com/chromium/src/+/master/base/bit_cast.h
-template <class Dest, class Source>
+template<class Dest, class Source>
 inline Dest bit_cast(const Source& source)
 {
   static_assert(sizeof(Dest) == sizeof(Source),
@@ -66,9 +66,9 @@ inline Dest bit_cast(const Source& source)
 }
 
 // effective stl, item 24, Scott Meyers
-template< typename MapType, // type of map
-          typename KeyArgType, // see below for why
-          typename ValueArgtype> // KeyArgType and ValueArgtype are type
+template<typename MapType, // type of map
+  typename KeyArgType, // see below for why
+  typename ValueArgtype> // KeyArgType and ValueArgtype are type
 typename MapType::iterator // parameters
 efficientAddOrUpdate(MapType& m, const KeyArgType& k, const ValueArgtype& v)
 {

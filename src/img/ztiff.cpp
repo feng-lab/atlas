@@ -58,256 +58,258 @@ bool hostIsLittleEndian()
   return *reinterpret_cast<char*>(&num) == 1;
 }
 
-static const struct tiftagname {
+static const struct tiftagname
+{
   uint32 tag;
   const char* name;
 } tiftagnames[] = {
-{ TIFFTAG_SUBFILETYPE, "SubfileType"},
-{ TIFFTAG_OSUBFILETYPE, "OldSubfileType"},
-{ TIFFTAG_IMAGEWIDTH, "ImageWidth"},
-{ TIFFTAG_IMAGELENGTH, "ImageLength"},
-{ TIFFTAG_BITSPERSAMPLE, "BitsPerSample"},
-{ TIFFTAG_COMPRESSION, "Compression"},
-{ TIFFTAG_PHOTOMETRIC, "PhotometricInterpretation"},
-{ TIFFTAG_THRESHHOLDING, "Threshholding"},
-{ TIFFTAG_CELLWIDTH, "CellWidth"},
-{ TIFFTAG_CELLLENGTH, "CellLength"},
-{ TIFFTAG_FILLORDER, "FillOrder"},
-{ TIFFTAG_DOCUMENTNAME, "DocumentName"},
-{ TIFFTAG_IMAGEDESCRIPTION, "ImageDescription"},
-{ TIFFTAG_MAKE, "Make"},
-{ TIFFTAG_MODEL, "Model"},
-{ TIFFTAG_STRIPOFFSETS, "StripOffsets"},
-{ TIFFTAG_ORIENTATION, "Orientation"},
-{ TIFFTAG_SAMPLESPERPIXEL, "SamplesPerPixel"},
-{ TIFFTAG_ROWSPERSTRIP, "RowsPerStrip"},
-{ TIFFTAG_STRIPBYTECOUNTS, "StripByteCounts"},
-{ TIFFTAG_MINSAMPLEVALUE, "MinSampleValue"},
-{ TIFFTAG_MAXSAMPLEVALUE, "MaxSampleValue"},
-{ TIFFTAG_XRESOLUTION, "XResolution"},
-{ TIFFTAG_YRESOLUTION, "YResolution"},
-{ TIFFTAG_PLANARCONFIG, "PlanarConfiguration"},
-{ TIFFTAG_PAGENAME, "PageName"},
-{ TIFFTAG_XPOSITION, "XPosition"},
-{ TIFFTAG_YPOSITION, "YPosition"},
-{ TIFFTAG_FREEOFFSETS, "FreeOffsets"},
-{ TIFFTAG_FREEBYTECOUNTS, "FreeByteCounts"},
-{ TIFFTAG_GRAYRESPONSEUNIT, "GrayResponseUnit"},
-{ TIFFTAG_GRAYRESPONSECURVE, "GrayResponseCurve"},
-{ TIFFTAG_RESOLUTIONUNIT, "ResolutionUnit"},
-{ TIFFTAG_PAGENUMBER, "PageNumber"},
-{ TIFFTAG_COLORRESPONSEUNIT, "ColorResponseUnit"},
-{ TIFFTAG_TRANSFERFUNCTION, "TransferFunction"},
-{ TIFFTAG_SOFTWARE, "Software"},
-{ TIFFTAG_DATETIME, "DateTime"},
-{ TIFFTAG_ARTIST, "Artist"},
-{ TIFFTAG_HOSTCOMPUTER, "HostComputer"},
-{ TIFFTAG_WHITEPOINT, "WhitePoint"},
-{ TIFFTAG_PRIMARYCHROMATICITIES, "PrimaryChromaticities"},
-{ TIFFTAG_COLORMAP, "ColorMap"},
-{ TIFFTAG_HALFTONEHINTS, "HalftoneHints"},
-{ TIFFTAG_TILEWIDTH, "TileWidth"},
-{ TIFFTAG_TILELENGTH, "TileLength"},
-{ TIFFTAG_TILEOFFSETS, "TileOffsets"},
-{ TIFFTAG_TILEBYTECOUNTS, "TileByteCounts"},
-{ TIFFTAG_SUBIFD, "SubIFD"},
-{ TIFFTAG_INKSET, "InkSet"},
-{ TIFFTAG_INKNAMES, "InkNames"},
-{ TIFFTAG_NUMBEROFINKS, "NumberOfInks"},
-{ TIFFTAG_DOTRANGE, "DotRange"},
-{ TIFFTAG_TARGETPRINTER, "TargetPrinter"},
-{ TIFFTAG_EXTRASAMPLES, "ExtraSamples"},
-{ TIFFTAG_SAMPLEFORMAT, "SampleFormat"},
-{ TIFFTAG_SMINSAMPLEVALUE, "SMinSampleValue"},
-{ TIFFTAG_SMAXSAMPLEVALUE, "SMaxSampleValue"},
-{ TIFFTAG_CLIPPATH, "ClipPath"},
-{ TIFFTAG_XCLIPPATHUNITS, "XClipPathUnits"},
-{ TIFFTAG_XCLIPPATHUNITS, "XClipPathUnits"},
-{ TIFFTAG_YCLIPPATHUNITS, "YClipPathUnits"},
-{ TIFFTAG_YCBCRCOEFFICIENTS, "YCbCrCoefficients"},
-{ TIFFTAG_YCBCRSUBSAMPLING, "YCbCrSubsampling"},
-{ TIFFTAG_YCBCRPOSITIONING, "YCbCrPositioning"},
-{ TIFFTAG_REFERENCEBLACKWHITE, "ReferenceBlackWhite"},
-{ TIFFTAG_XMLPACKET, "XMLPacket"},
+  {TIFFTAG_SUBFILETYPE,                "SubfileType"},
+  {TIFFTAG_OSUBFILETYPE,               "OldSubfileType"},
+  {TIFFTAG_IMAGEWIDTH,                 "ImageWidth"},
+  {TIFFTAG_IMAGELENGTH,                "ImageLength"},
+  {TIFFTAG_BITSPERSAMPLE,              "BitsPerSample"},
+  {TIFFTAG_COMPRESSION,                "Compression"},
+  {TIFFTAG_PHOTOMETRIC,                "PhotometricInterpretation"},
+  {TIFFTAG_THRESHHOLDING,              "Threshholding"},
+  {TIFFTAG_CELLWIDTH,                  "CellWidth"},
+  {TIFFTAG_CELLLENGTH,                 "CellLength"},
+  {TIFFTAG_FILLORDER,                  "FillOrder"},
+  {TIFFTAG_DOCUMENTNAME,               "DocumentName"},
+  {TIFFTAG_IMAGEDESCRIPTION,           "ImageDescription"},
+  {TIFFTAG_MAKE,                       "Make"},
+  {TIFFTAG_MODEL,                      "Model"},
+  {TIFFTAG_STRIPOFFSETS,               "StripOffsets"},
+  {TIFFTAG_ORIENTATION,                "Orientation"},
+  {TIFFTAG_SAMPLESPERPIXEL,            "SamplesPerPixel"},
+  {TIFFTAG_ROWSPERSTRIP,               "RowsPerStrip"},
+  {TIFFTAG_STRIPBYTECOUNTS,            "StripByteCounts"},
+  {TIFFTAG_MINSAMPLEVALUE,             "MinSampleValue"},
+  {TIFFTAG_MAXSAMPLEVALUE,             "MaxSampleValue"},
+  {TIFFTAG_XRESOLUTION,                "XResolution"},
+  {TIFFTAG_YRESOLUTION,                "YResolution"},
+  {TIFFTAG_PLANARCONFIG,               "PlanarConfiguration"},
+  {TIFFTAG_PAGENAME,                   "PageName"},
+  {TIFFTAG_XPOSITION,                  "XPosition"},
+  {TIFFTAG_YPOSITION,                  "YPosition"},
+  {TIFFTAG_FREEOFFSETS,                "FreeOffsets"},
+  {TIFFTAG_FREEBYTECOUNTS,             "FreeByteCounts"},
+  {TIFFTAG_GRAYRESPONSEUNIT,           "GrayResponseUnit"},
+  {TIFFTAG_GRAYRESPONSECURVE,          "GrayResponseCurve"},
+  {TIFFTAG_RESOLUTIONUNIT,             "ResolutionUnit"},
+  {TIFFTAG_PAGENUMBER,                 "PageNumber"},
+  {TIFFTAG_COLORRESPONSEUNIT,          "ColorResponseUnit"},
+  {TIFFTAG_TRANSFERFUNCTION,           "TransferFunction"},
+  {TIFFTAG_SOFTWARE,                   "Software"},
+  {TIFFTAG_DATETIME,                   "DateTime"},
+  {TIFFTAG_ARTIST,                     "Artist"},
+  {TIFFTAG_HOSTCOMPUTER,               "HostComputer"},
+  {TIFFTAG_WHITEPOINT,                 "WhitePoint"},
+  {TIFFTAG_PRIMARYCHROMATICITIES,      "PrimaryChromaticities"},
+  {TIFFTAG_COLORMAP,                   "ColorMap"},
+  {TIFFTAG_HALFTONEHINTS,              "HalftoneHints"},
+  {TIFFTAG_TILEWIDTH,                  "TileWidth"},
+  {TIFFTAG_TILELENGTH,                 "TileLength"},
+  {TIFFTAG_TILEOFFSETS,                "TileOffsets"},
+  {TIFFTAG_TILEBYTECOUNTS,             "TileByteCounts"},
+  {TIFFTAG_SUBIFD,                     "SubIFD"},
+  {TIFFTAG_INKSET,                     "InkSet"},
+  {TIFFTAG_INKNAMES,                   "InkNames"},
+  {TIFFTAG_NUMBEROFINKS,               "NumberOfInks"},
+  {TIFFTAG_DOTRANGE,                   "DotRange"},
+  {TIFFTAG_TARGETPRINTER,              "TargetPrinter"},
+  {TIFFTAG_EXTRASAMPLES,               "ExtraSamples"},
+  {TIFFTAG_SAMPLEFORMAT,               "SampleFormat"},
+  {TIFFTAG_SMINSAMPLEVALUE,            "SMinSampleValue"},
+  {TIFFTAG_SMAXSAMPLEVALUE,            "SMaxSampleValue"},
+  {TIFFTAG_CLIPPATH,                   "ClipPath"},
+  {TIFFTAG_XCLIPPATHUNITS,             "XClipPathUnits"},
+  {TIFFTAG_XCLIPPATHUNITS,             "XClipPathUnits"},
+  {TIFFTAG_YCLIPPATHUNITS,             "YClipPathUnits"},
+  {TIFFTAG_YCBCRCOEFFICIENTS,          "YCbCrCoefficients"},
+  {TIFFTAG_YCBCRSUBSAMPLING,           "YCbCrSubsampling"},
+  {TIFFTAG_YCBCRPOSITIONING,           "YCbCrPositioning"},
+  {TIFFTAG_REFERENCEBLACKWHITE,        "ReferenceBlackWhite"},
+  {TIFFTAG_XMLPACKET,                  "XMLPacket"},
 /* begin SGI tags */
-{ TIFFTAG_MATTEING, "Matteing"},
-{ TIFFTAG_DATATYPE, "DataType"},
-{ TIFFTAG_IMAGEDEPTH, "ImageDepth"},
-{ TIFFTAG_TILEDEPTH, "TileDepth"},
+  {TIFFTAG_MATTEING,                   "Matteing"},
+  {TIFFTAG_DATATYPE,                   "DataType"},
+  {TIFFTAG_IMAGEDEPTH,                 "ImageDepth"},
+  {TIFFTAG_TILEDEPTH,                  "TileDepth"},
 /* end SGI tags */
 /* begin Pixar tags */
-{ TIFFTAG_PIXAR_IMAGEFULLWIDTH, "ImageFullWidth"},
-{ TIFFTAG_PIXAR_IMAGEFULLLENGTH, "ImageFullLength"},
-{ TIFFTAG_PIXAR_TEXTUREFORMAT, "TextureFormat"},
-{ TIFFTAG_PIXAR_WRAPMODES, "TextureWrapModes"},
-{ TIFFTAG_PIXAR_FOVCOT, "FieldOfViewCotangent"},
-{ TIFFTAG_PIXAR_MATRIX_WORLDTOSCREEN, "MatrixWorldToScreen"},
-{ TIFFTAG_PIXAR_MATRIX_WORLDTOCAMERA, "MatrixWorldToCamera"},
-{ TIFFTAG_COPYRIGHT, "Copyright"},
+  {TIFFTAG_PIXAR_IMAGEFULLWIDTH,       "ImageFullWidth"},
+  {TIFFTAG_PIXAR_IMAGEFULLLENGTH,      "ImageFullLength"},
+  {TIFFTAG_PIXAR_TEXTUREFORMAT,        "TextureFormat"},
+  {TIFFTAG_PIXAR_WRAPMODES,            "TextureWrapModes"},
+  {TIFFTAG_PIXAR_FOVCOT,               "FieldOfViewCotangent"},
+  {TIFFTAG_PIXAR_MATRIX_WORLDTOSCREEN, "MatrixWorldToScreen"},
+  {TIFFTAG_PIXAR_MATRIX_WORLDTOCAMERA, "MatrixWorldToCamera"},
+  {TIFFTAG_COPYRIGHT,                  "Copyright"},
 /* end Pixar tags */
-{ TIFFTAG_RICHTIFFIPTC, "RichTIFFIPTC"},
-{ TIFFTAG_PHOTOSHOP, "Photoshop"},
-{ TIFFTAG_EXIFIFD, "ExifIFD" },
-{ TIFFTAG_ICCPROFILE, "ICC Profile"},
-{ TIFFTAG_GPSIFD, "GPSIFDOffset"},
-{ TIFFTAG_FAXRECVPARAMS, "FaxRecvParams"},
-{ TIFFTAG_FAXSUBADDRESS, "FaxSubAddress"},
-{ TIFFTAG_FAXRECVTIME, "FaxRecvTime"},
-{ TIFFTAG_FAXDCS, "FaxDcs"},
-{ TIFFTAG_STONITS, "StoNits"},
-{ TIFFTAG_INTEROPERABILITYIFD, "InteroperabilityIFDOffset"},
+  {TIFFTAG_RICHTIFFIPTC,               "RichTIFFIPTC"},
+  {TIFFTAG_PHOTOSHOP,                  "Photoshop"},
+  {TIFFTAG_EXIFIFD,                    "ExifIFD"},
+  {TIFFTAG_ICCPROFILE,                 "ICC Profile"},
+  {TIFFTAG_GPSIFD,                     "GPSIFDOffset"},
+  {TIFFTAG_FAXRECVPARAMS,              "FaxRecvParams"},
+  {TIFFTAG_FAXSUBADDRESS,              "FaxSubAddress"},
+  {TIFFTAG_FAXRECVTIME,                "FaxRecvTime"},
+  {TIFFTAG_FAXDCS,                     "FaxDcs"},
+  {TIFFTAG_STONITS,                    "StoNits"},
+  {TIFFTAG_INTEROPERABILITYIFD,        "InteroperabilityIFDOffset"},
 /* begin DNG tags */
-{ TIFFTAG_DNGVERSION, "DNGVersion"},
-{ TIFFTAG_DNGBACKWARDVERSION, "DNGBackwardVersion"},
-{ TIFFTAG_UNIQUECAMERAMODEL, "UniqueCameraModel"},
-{ TIFFTAG_LOCALIZEDCAMERAMODEL, "LocalizedCameraModel"},
-{ TIFFTAG_CFAPLANECOLOR, "CFAPlaneColor"},
-{ TIFFTAG_CFALAYOUT, "CFALayout"},
-{ TIFFTAG_LINEARIZATIONTABLE, "LinearizationTable"},
-{ TIFFTAG_BLACKLEVELREPEATDIM, "BlackLevelRepeatDim"},
-{ TIFFTAG_BLACKLEVEL, "BlackLevel"},
-{ TIFFTAG_BLACKLEVELDELTAH, "BlackLevelDeltaH"},
-{ TIFFTAG_BLACKLEVELDELTAV, "BlackLevelDeltaV"},
-{ TIFFTAG_WHITELEVEL, "WhiteLevel"},
-{ TIFFTAG_DEFAULTSCALE, "DefaultScale"},
-{ TIFFTAG_BESTQUALITYSCALE, "BestQualityScale"},
-{ TIFFTAG_DEFAULTCROPORIGIN, "DefaultCropOrigin"},
-{ TIFFTAG_DEFAULTCROPSIZE, "DefaultCropSize"},
-{ TIFFTAG_COLORMATRIX1, "ColorMatrix1"},
-{ TIFFTAG_COLORMATRIX2, "ColorMatrix2"},
-{ TIFFTAG_CAMERACALIBRATION1, "CameraCalibration1"},
-{ TIFFTAG_CAMERACALIBRATION2, "CameraCalibration2"},
-{ TIFFTAG_REDUCTIONMATRIX1, "ReductionMatrix1"},
-{ TIFFTAG_REDUCTIONMATRIX2, "ReductionMatrix2"},
-{ TIFFTAG_ANALOGBALANCE, "AnalogBalance"},
-{ TIFFTAG_ASSHOTNEUTRAL, "AsShotNeutral"},
-{ TIFFTAG_ASSHOTWHITEXY, "AsShotWhiteXY"},
-{ TIFFTAG_BASELINEEXPOSURE, "BaselineExposure"},
-{ TIFFTAG_BASELINENOISE, "BaselineNoise"},
-{ TIFFTAG_BASELINESHARPNESS, "BaselineSharpness"},
-{ TIFFTAG_BAYERGREENSPLIT, "BayerGreenSplit"},
-{ TIFFTAG_LINEARRESPONSELIMIT, "LinearResponseLimit"},
-{ TIFFTAG_CAMERASERIALNUMBER, "CameraSerialNumber"},
-{ TIFFTAG_LENSINFO, "LensInfo"},
-{ TIFFTAG_CHROMABLURRADIUS, "ChromaBlurRadius"},
-{ TIFFTAG_ANTIALIASSTRENGTH, "AntiAliasStrength"},
-{ TIFFTAG_SHADOWSCALE, "ShadowScale"},
-{ TIFFTAG_DNGPRIVATEDATA, "DNGPrivateData"},
-{ TIFFTAG_MAKERNOTESAFETY, "MakerNoteSafety"},
-{ TIFFTAG_CALIBRATIONILLUMINANT1, "CalibrationIlluminant1"},
-{ TIFFTAG_CALIBRATIONILLUMINANT2, "CalibrationIlluminant2"},
-{ TIFFTAG_RAWDATAUNIQUEID, "RawDataUniqueID"},
-{ TIFFTAG_ORIGINALRAWFILENAME, "OriginalRawFileName"},
-{ TIFFTAG_ORIGINALRAWFILEDATA, "OriginalRawFileData"},
-{ TIFFTAG_ACTIVEAREA, "ActiveArea"},
-{ TIFFTAG_MASKEDAREAS, "MaskedAreas"},
-{ TIFFTAG_ASSHOTICCPROFILE, "AsShotICCProfile"},
-{ TIFFTAG_ASSHOTPREPROFILEMATRIX, "AsShotPreProfileMatrix"},
-{ TIFFTAG_CURRENTICCPROFILE, "CurrentICCProfile"},
-{ TIFFTAG_CURRENTPREPROFILEMATRIX, "CurrentPreProfileMatrix"},
-{ TIFFTAG_PERSAMPLE, "PerSample"},
+  {TIFFTAG_DNGVERSION,                 "DNGVersion"},
+  {TIFFTAG_DNGBACKWARDVERSION,         "DNGBackwardVersion"},
+  {TIFFTAG_UNIQUECAMERAMODEL,          "UniqueCameraModel"},
+  {TIFFTAG_LOCALIZEDCAMERAMODEL,       "LocalizedCameraModel"},
+  {TIFFTAG_CFAPLANECOLOR,              "CFAPlaneColor"},
+  {TIFFTAG_CFALAYOUT,                  "CFALayout"},
+  {TIFFTAG_LINEARIZATIONTABLE,         "LinearizationTable"},
+  {TIFFTAG_BLACKLEVELREPEATDIM,        "BlackLevelRepeatDim"},
+  {TIFFTAG_BLACKLEVEL,                 "BlackLevel"},
+  {TIFFTAG_BLACKLEVELDELTAH,           "BlackLevelDeltaH"},
+  {TIFFTAG_BLACKLEVELDELTAV,           "BlackLevelDeltaV"},
+  {TIFFTAG_WHITELEVEL,                 "WhiteLevel"},
+  {TIFFTAG_DEFAULTSCALE,               "DefaultScale"},
+  {TIFFTAG_BESTQUALITYSCALE,           "BestQualityScale"},
+  {TIFFTAG_DEFAULTCROPORIGIN,          "DefaultCropOrigin"},
+  {TIFFTAG_DEFAULTCROPSIZE,            "DefaultCropSize"},
+  {TIFFTAG_COLORMATRIX1,               "ColorMatrix1"},
+  {TIFFTAG_COLORMATRIX2,               "ColorMatrix2"},
+  {TIFFTAG_CAMERACALIBRATION1,         "CameraCalibration1"},
+  {TIFFTAG_CAMERACALIBRATION2,         "CameraCalibration2"},
+  {TIFFTAG_REDUCTIONMATRIX1,           "ReductionMatrix1"},
+  {TIFFTAG_REDUCTIONMATRIX2,           "ReductionMatrix2"},
+  {TIFFTAG_ANALOGBALANCE,              "AnalogBalance"},
+  {TIFFTAG_ASSHOTNEUTRAL,              "AsShotNeutral"},
+  {TIFFTAG_ASSHOTWHITEXY,              "AsShotWhiteXY"},
+  {TIFFTAG_BASELINEEXPOSURE,           "BaselineExposure"},
+  {TIFFTAG_BASELINENOISE,              "BaselineNoise"},
+  {TIFFTAG_BASELINESHARPNESS,          "BaselineSharpness"},
+  {TIFFTAG_BAYERGREENSPLIT,            "BayerGreenSplit"},
+  {TIFFTAG_LINEARRESPONSELIMIT,        "LinearResponseLimit"},
+  {TIFFTAG_CAMERASERIALNUMBER,         "CameraSerialNumber"},
+  {TIFFTAG_LENSINFO,                   "LensInfo"},
+  {TIFFTAG_CHROMABLURRADIUS,           "ChromaBlurRadius"},
+  {TIFFTAG_ANTIALIASSTRENGTH,          "AntiAliasStrength"},
+  {TIFFTAG_SHADOWSCALE,                "ShadowScale"},
+  {TIFFTAG_DNGPRIVATEDATA,             "DNGPrivateData"},
+  {TIFFTAG_MAKERNOTESAFETY,            "MakerNoteSafety"},
+  {TIFFTAG_CALIBRATIONILLUMINANT1,     "CalibrationIlluminant1"},
+  {TIFFTAG_CALIBRATIONILLUMINANT2,     "CalibrationIlluminant2"},
+  {TIFFTAG_RAWDATAUNIQUEID,            "RawDataUniqueID"},
+  {TIFFTAG_ORIGINALRAWFILENAME,        "OriginalRawFileName"},
+  {TIFFTAG_ORIGINALRAWFILEDATA,        "OriginalRawFileData"},
+  {TIFFTAG_ACTIVEAREA,                 "ActiveArea"},
+  {TIFFTAG_MASKEDAREAS,                "MaskedAreas"},
+  {TIFFTAG_ASSHOTICCPROFILE,           "AsShotICCProfile"},
+  {TIFFTAG_ASSHOTPREPROFILEMATRIX,     "AsShotPreProfileMatrix"},
+  {TIFFTAG_CURRENTICCPROFILE,          "CurrentICCProfile"},
+  {TIFFTAG_CURRENTPREPROFILEMATRIX,    "CurrentPreProfileMatrix"},
+  {TIFFTAG_PERSAMPLE,                  "PerSample"},
 /* end DNG tags */
 /* begin TIFF/FX tags */
-{ TIFFTAG_INDEXED, "Indexed" },
-{ TIFFTAG_GLOBALPARAMETERSIFD, "GlobalParametersIFD"},
-{ TIFFTAG_PROFILETYPE, "ProfileType"},
-{ TIFFTAG_FAXPROFILE, "FaxProfile"},
-{ TIFFTAG_CODINGMETHODS, "CodingMethods"},
-{ TIFFTAG_VERSIONYEAR, "VersionYear"},
-{ TIFFTAG_MODENUMBER, "ModeNumber"},
-{ TIFFTAG_DECODE, "Decode"},
-{ TIFFTAG_IMAGEBASECOLOR, "ImageBaseColor"},
-{ TIFFTAG_T82OPTIONS, "T82Options"},
-{ TIFFTAG_STRIPROWCOUNTS, "StripRowCounts"},
-{ TIFFTAG_IMAGELAYER, "ImageLayer"},
+  {TIFFTAG_INDEXED,                    "Indexed"},
+  {TIFFTAG_GLOBALPARAMETERSIFD,        "GlobalParametersIFD"},
+  {TIFFTAG_PROFILETYPE,                "ProfileType"},
+  {TIFFTAG_FAXPROFILE,                 "FaxProfile"},
+  {TIFFTAG_CODINGMETHODS,              "CodingMethods"},
+  {TIFFTAG_VERSIONYEAR,                "VersionYear"},
+  {TIFFTAG_MODENUMBER,                 "ModeNumber"},
+  {TIFFTAG_DECODE,                     "Decode"},
+  {TIFFTAG_IMAGEBASECOLOR,             "ImageBaseColor"},
+  {TIFFTAG_T82OPTIONS,                 "T82Options"},
+  {TIFFTAG_STRIPROWCOUNTS,             "StripRowCounts"},
+  {TIFFTAG_IMAGELAYER,                 "ImageLayer"},
 /* end DNG tags */
 /* begin pseudo tags */
 // Carl Zeiss LSM
-{ TIFFTAG_CZ_LSMINFO, "CarlZeissLSMInfo"},
+  {TIFFTAG_CZ_LSMINFO,                 "CarlZeissLSMInfo"},
 
 // GEOTIFF
-{ TIFFTAG_GEOPIXELSCALE, "GeoPixelScale"},
-{ TIFFTAG_INTERGRAPH_MATRIX,	"Intergraph TransformationMatrix"},
-{ TIFFTAG_GEOTRANSMATRIX,	"GeoTransformationMatrix"},
-{ TIFFTAG_GEOTIEPOINTS,	"GeoTiePoints"},
-{ TIFFTAG_GEOKEYDIRECTORY, "GeoKeyDirectory"},
-{ TIFFTAG_GEODOUBLEPARAMS, "GeoDoubleParams"},
-{ TIFFTAG_GEOASCIIPARAMS, "GeoASCIIParams"},
-{ TIFFTAG_PREDICTOR, "Predictor"},
+  {TIFFTAG_GEOPIXELSCALE,              "GeoPixelScale"},
+  {TIFFTAG_INTERGRAPH_MATRIX,          "Intergraph TransformationMatrix"},
+  {TIFFTAG_GEOTRANSMATRIX,             "GeoTransformationMatrix"},
+  {TIFFTAG_GEOTIEPOINTS,               "GeoTiePoints"},
+  {TIFFTAG_GEOKEYDIRECTORY,            "GeoKeyDirectory"},
+  {TIFFTAG_GEODOUBLEPARAMS,            "GeoDoubleParams"},
+  {TIFFTAG_GEOASCIIPARAMS,             "GeoASCIIParams"},
+  {TIFFTAG_PREDICTOR,                  "Predictor"},
 
-{TIFFTAG_JPEGIFOFFSET, "JpegInterchangeFormat"},
-{TIFFTAG_JPEGIFBYTECOUNT, "JpegInterchangeFormatLength"},
-{TIFFTAG_JPEGQTABLES, "JpegQTables"},
-{TIFFTAG_JPEGDCTABLES, "JpegDcTables"},
-{TIFFTAG_JPEGACTABLES, "JpegAcTables"},
-{TIFFTAG_JPEGPROC, "JpegProc"},
-{TIFFTAG_JPEGRESTARTINTERVAL, "JpegRestartInterval"},
+  {TIFFTAG_JPEGIFOFFSET,               "JpegInterchangeFormat"},
+  {TIFFTAG_JPEGIFBYTECOUNT,            "JpegInterchangeFormatLength"},
+  {TIFFTAG_JPEGQTABLES,                "JpegQTables"},
+  {TIFFTAG_JPEGDCTABLES,               "JpegDcTables"},
+  {TIFFTAG_JPEGACTABLES,               "JpegAcTables"},
+  {TIFFTAG_JPEGPROC,                   "JpegProc"},
+  {TIFFTAG_JPEGRESTARTINTERVAL,        "JpegRestartInterval"},
 };
 
-static const struct exiftagname {
+static const struct exiftagname
+{
   uint32 tag;
   const char* name;
 } exiftagnames[] = {
-{ EXIFTAG_EXPOSURETIME, "ExposureTime"},
-{ EXIFTAG_FNUMBER, "FNumber"},
-{ EXIFTAG_EXPOSUREPROGRAM, "ExposureProgram"},
-{ EXIFTAG_SPECTRALSENSITIVITY, "SpectralSensitivity"},
-{ EXIFTAG_ISOSPEEDRATINGS, "ISOSpeedRatings"},
-{ EXIFTAG_OECF, "OptoelectricConversionFactor"},
-{ EXIFTAG_EXIFVERSION, "ExifVersion"},
-{ EXIFTAG_DATETIMEORIGINAL, "DateTimeOriginal"},
-{ EXIFTAG_DATETIMEDIGITIZED, "DateTimeDigitized"},
-{ EXIFTAG_COMPONENTSCONFIGURATION, "ComponentsConfiguration"},
-{ EXIFTAG_COMPRESSEDBITSPERPIXEL, "CompressedBitsPerPixel"},
-{ EXIFTAG_SHUTTERSPEEDVALUE, "ShutterSpeedValue"},
-{ EXIFTAG_APERTUREVALUE, "ApertureValue"},
-{ EXIFTAG_BRIGHTNESSVALUE, "BrightnessValue"},
-{ EXIFTAG_EXPOSUREBIASVALUE, "ExposureBiasValue"},
-{ EXIFTAG_MAXAPERTUREVALUE, "MaxApertureValue"},
-{ EXIFTAG_SUBJECTDISTANCE, "SubjectDistance"},
-{ EXIFTAG_METERINGMODE, "MeteringMode"},
-{ EXIFTAG_LIGHTSOURCE, "LightSource"},
-{ EXIFTAG_FLASH, "Flash"},
-{ EXIFTAG_FOCALLENGTH, "FocalLength"},
-{ EXIFTAG_SUBJECTAREA, "SubjectArea"},
-{ EXIFTAG_MAKERNOTE, "MakerNote"},
-{ EXIFTAG_USERCOMMENT, "UserComment"},
-{ EXIFTAG_SUBSECTIME, "SubSecTime"},
-{ EXIFTAG_SUBSECTIMEORIGINAL, "SubSecTimeOriginal"},
-{ EXIFTAG_SUBSECTIMEDIGITIZED, "SubSecTimeDigitized"},
-{ EXIFTAG_FLASHPIXVERSION, "FlashpixVersion"},
-{ EXIFTAG_COLORSPACE, "ColorSpace"},
-{ EXIFTAG_PIXELXDIMENSION, "PixelXDimension"},
-{ EXIFTAG_PIXELYDIMENSION, "PixelYDimension"},
-{ EXIFTAG_RELATEDSOUNDFILE, "RelatedSoundFile"},
-{ EXIFTAG_FLASHENERGY, "FlashEnergy"},
-{ EXIFTAG_SPATIALFREQUENCYRESPONSE, "SpatialFrequencyResponse"},
-{ EXIFTAG_FOCALPLANEXRESOLUTION, "FocalPlaneXResolution"},
-{ EXIFTAG_FOCALPLANEYRESOLUTION, "FocalPlaneYResolution"},
-{ EXIFTAG_FOCALPLANERESOLUTIONUNIT, "FocalPlaneResolutionUnit"},
-{ EXIFTAG_SUBJECTLOCATION, "SubjectLocation"},
-{ EXIFTAG_EXPOSUREINDEX, "ExposureIndex"},
-{ EXIFTAG_SENSINGMETHOD, "SensingMethod"},
-{ EXIFTAG_FILESOURCE, "FileSource"},
-{ EXIFTAG_SCENETYPE, "SceneType"},
-{ EXIFTAG_CFAPATTERN, "CFAPattern"},
-{ EXIFTAG_CUSTOMRENDERED, "CustomRendered"},
-{ EXIFTAG_EXPOSUREMODE, "ExposureMode"},
-{ EXIFTAG_WHITEBALANCE, "WhiteBalance"},
-{ EXIFTAG_DIGITALZOOMRATIO, "DigitalZoomRatio"},
-{ EXIFTAG_FOCALLENGTHIN35MMFILM, "FocalLengthIn35mmFilm"},
-{ EXIFTAG_SCENECAPTURETYPE, "SceneCaptureType"},
-{ EXIFTAG_GAINCONTROL, "GainControl"},
-{ EXIFTAG_CONTRAST, "Contrast"},
-{ EXIFTAG_SATURATION, "Saturation"},
-{ EXIFTAG_SHARPNESS, "Sharpness"},
-{ EXIFTAG_DEVICESETTINGDESCRIPTION, "DeviceSettingDescription"},
-{ EXIFTAG_SUBJECTDISTANCERANGE, "SubjectDistanceRange"},
-{ EXIFTAG_IMAGEUNIQUEID, "ImageUniqueID"},
-{ 1, "GPSLatitudeRef"},
-{ 2, "GPSLatitude"},
-{ 3, "GPSLongitudeRef"},
-{ 4, "GPSLongitude"},
+  {EXIFTAG_EXPOSURETIME,             "ExposureTime"},
+  {EXIFTAG_FNUMBER,                  "FNumber"},
+  {EXIFTAG_EXPOSUREPROGRAM,          "ExposureProgram"},
+  {EXIFTAG_SPECTRALSENSITIVITY,      "SpectralSensitivity"},
+  {EXIFTAG_ISOSPEEDRATINGS,          "ISOSpeedRatings"},
+  {EXIFTAG_OECF,                     "OptoelectricConversionFactor"},
+  {EXIFTAG_EXIFVERSION,              "ExifVersion"},
+  {EXIFTAG_DATETIMEORIGINAL,         "DateTimeOriginal"},
+  {EXIFTAG_DATETIMEDIGITIZED,        "DateTimeDigitized"},
+  {EXIFTAG_COMPONENTSCONFIGURATION,  "ComponentsConfiguration"},
+  {EXIFTAG_COMPRESSEDBITSPERPIXEL,   "CompressedBitsPerPixel"},
+  {EXIFTAG_SHUTTERSPEEDVALUE,        "ShutterSpeedValue"},
+  {EXIFTAG_APERTUREVALUE,            "ApertureValue"},
+  {EXIFTAG_BRIGHTNESSVALUE,          "BrightnessValue"},
+  {EXIFTAG_EXPOSUREBIASVALUE,        "ExposureBiasValue"},
+  {EXIFTAG_MAXAPERTUREVALUE,         "MaxApertureValue"},
+  {EXIFTAG_SUBJECTDISTANCE,          "SubjectDistance"},
+  {EXIFTAG_METERINGMODE,             "MeteringMode"},
+  {EXIFTAG_LIGHTSOURCE,              "LightSource"},
+  {EXIFTAG_FLASH,                    "Flash"},
+  {EXIFTAG_FOCALLENGTH,              "FocalLength"},
+  {EXIFTAG_SUBJECTAREA,              "SubjectArea"},
+  {EXIFTAG_MAKERNOTE,                "MakerNote"},
+  {EXIFTAG_USERCOMMENT,              "UserComment"},
+  {EXIFTAG_SUBSECTIME,               "SubSecTime"},
+  {EXIFTAG_SUBSECTIMEORIGINAL,       "SubSecTimeOriginal"},
+  {EXIFTAG_SUBSECTIMEDIGITIZED,      "SubSecTimeDigitized"},
+  {EXIFTAG_FLASHPIXVERSION,          "FlashpixVersion"},
+  {EXIFTAG_COLORSPACE,               "ColorSpace"},
+  {EXIFTAG_PIXELXDIMENSION,          "PixelXDimension"},
+  {EXIFTAG_PIXELYDIMENSION,          "PixelYDimension"},
+  {EXIFTAG_RELATEDSOUNDFILE,         "RelatedSoundFile"},
+  {EXIFTAG_FLASHENERGY,              "FlashEnergy"},
+  {EXIFTAG_SPATIALFREQUENCYRESPONSE, "SpatialFrequencyResponse"},
+  {EXIFTAG_FOCALPLANEXRESOLUTION,    "FocalPlaneXResolution"},
+  {EXIFTAG_FOCALPLANEYRESOLUTION,    "FocalPlaneYResolution"},
+  {EXIFTAG_FOCALPLANERESOLUTIONUNIT, "FocalPlaneResolutionUnit"},
+  {EXIFTAG_SUBJECTLOCATION,          "SubjectLocation"},
+  {EXIFTAG_EXPOSUREINDEX,            "ExposureIndex"},
+  {EXIFTAG_SENSINGMETHOD,            "SensingMethod"},
+  {EXIFTAG_FILESOURCE,               "FileSource"},
+  {EXIFTAG_SCENETYPE,                "SceneType"},
+  {EXIFTAG_CFAPATTERN,               "CFAPattern"},
+  {EXIFTAG_CUSTOMRENDERED,           "CustomRendered"},
+  {EXIFTAG_EXPOSUREMODE,             "ExposureMode"},
+  {EXIFTAG_WHITEBALANCE,             "WhiteBalance"},
+  {EXIFTAG_DIGITALZOOMRATIO,         "DigitalZoomRatio"},
+  {EXIFTAG_FOCALLENGTHIN35MMFILM,    "FocalLengthIn35mmFilm"},
+  {EXIFTAG_SCENECAPTURETYPE,         "SceneCaptureType"},
+  {EXIFTAG_GAINCONTROL,              "GainControl"},
+  {EXIFTAG_CONTRAST,                 "Contrast"},
+  {EXIFTAG_SATURATION,               "Saturation"},
+  {EXIFTAG_SHARPNESS,                "Sharpness"},
+  {EXIFTAG_DEVICESETTINGDESCRIPTION, "DeviceSettingDescription"},
+  {EXIFTAG_SUBJECTDISTANCERANGE,     "SubjectDistanceRange"},
+  {EXIFTAG_IMAGEUNIQUEID,            "ImageUniqueID"},
+  {1,                                "GPSLatitudeRef"},
+  {2,                                "GPSLatitude"},
+  {3,                                "GPSLongitudeRef"},
+  {4,                                "GPSLongitude"},
 };
 
 #ifdef _MSC_VER
@@ -324,7 +326,7 @@ void LibtiffErrorHandler(const char* module, const char* fmt, va_list ap)
   //off = snprintf(buf, 2048, "libtiff %s: ", module);
   //else
   off = snprintf(buf, 2048, "libtiff: ");
-  vsnprintf(buf+off, 2048-off, fmt, ap);
+  vsnprintf(buf + off, 2048 - off, fmt, ap);
   throw nim::ZIOException(QString(buf));
 }
 
@@ -338,7 +340,7 @@ void LibtiffErrorHandlerIgnoreColormapError(const char* module, const char* fmt,
   //off = snprintf(buf, 2048, "libtiff %s: ", module);
   //else
   off = snprintf(buf, 2048, "libtiff: ");
-  vsnprintf(buf+off, 2048-off, fmt, ap);
+  vsnprintf(buf + off, 2048 - off, fmt, ap);
   QString str(buf);
   if (str.contains("Colormap", Qt::CaseInsensitive))
     return;
@@ -627,12 +629,12 @@ uint64_t ZTiffIFD::tileByteCounts(size_t idx) const
 QString ZTiffIFD::toQString() const
 {
   QString res;
-  for (size_t i=0; i<m_entries.size(); ++i) {
+  for (size_t i = 0; i < m_entries.size(); ++i) {
     res = res % m_entries[i].toQString() % QString("\n");
   }
   if (!m_subIFDs.empty()) {
     res = res % QString("\n");
-    for (size_t i=0; i<m_subIFDs.size(); ++i) {
+    for (size_t i = 0; i < m_subIFDs.size(); ++i) {
       res = res % QString("Sub IFD %1\n").arg(i);
       res = res % m_subIFDs[i].toQString();
     }
@@ -660,9 +662,9 @@ bool ZTiffIFD::isGrayscaleColormap() const
     if (count % 3 != 0)
       return true;
     size_t colorCount = count / 3;
-    for (size_t j=0; j<colorCount; ++j) {
-      if (m_entries[i].dataAt<uint16_t>(j) != m_entries[i].dataAt<uint16_t>(j+colorCount) ||
-          m_entries[i].dataAt<uint16_t>(j) != m_entries[i].dataAt<uint16_t>(j+2*colorCount))
+    for (size_t j = 0; j < colorCount; ++j) {
+      if (m_entries[i].dataAt<uint16_t>(j) != m_entries[i].dataAt<uint16_t>(j + colorCount) ||
+          m_entries[i].dataAt<uint16_t>(j) != m_entries[i].dataAt<uint16_t>(j + 2 * colorCount))
         return false;
     }
   }
@@ -682,7 +684,7 @@ std::vector<ZImgMetatag> ZTiffIFD::extractMetadata() const
   tags.insert(TIFFTAG_COPYRIGHT);
 
   std::vector<ZImgMetatag> res;
-  for (size_t i=0; i<m_entries.size(); ++i) {
+  for (size_t i = 0; i < m_entries.size(); ++i) {
     if (tags.find(m_entries[i].tag()) != tags.end())
       res.push_back(m_entries[i]);
   }
@@ -730,7 +732,7 @@ std::string ZTiffIFD::toString() const
 
 int64_t ZTiffIFD::indexOf(uint64_t tag) const
 {
-  for (size_t i=0; i<m_entries.size(); ++i) {
+  for (size_t i = 0; i < m_entries.size(); ++i) {
     if (m_entries[i].tag() == tag) {
       return static_cast<int>(i);
     }
@@ -754,13 +756,13 @@ ZTiff::ZTiff()
 QString ZTiff::toQString() const
 {
   QString res;
-  for (size_t i=0; i<m_ifds.size(); ++i) {
+  for (size_t i = 0; i < m_ifds.size(); ++i) {
     res = res % QString("Directory %1: offset %2 (%3) next %4 (%5)\n")
-        .arg(i)
-        .arg(m_ifds[i].offset())
-        .arg(m_ifds[i].offset(), 0, 16)
-        .arg(m_ifds[i].nextIFDOffset())
-        .arg(m_ifds[i].nextIFDOffset(), 0, 16);
+      .arg(i)
+      .arg(m_ifds[i].offset())
+      .arg(m_ifds[i].offset(), 0, 16)
+      .arg(m_ifds[i].nextIFDOffset())
+      .arg(m_ifds[i].nextIFDOffset(), 0, 16);
     res = res % m_ifds[i].toQString() % QString("\n");
   }
   return res;
@@ -783,7 +785,7 @@ std::string ZTiff::toString() const
 }
 */
 
-void ZTiff::load(const QString &filename, bool tagOnly)
+void ZTiff::load(const QString& filename, bool tagOnly)
 {
   close();
 
@@ -791,7 +793,7 @@ void ZTiff::load(const QString &filename, bool tagOnly)
 
   if (m_useColormap) {
     bool allGray = true;
-    for (size_t i=0; i<m_ifds.size(); ++i) {
+    for (size_t i = 0; i < m_ifds.size(); ++i) {
       if (!m_ifds[i].isGrayscaleColormap()) {
         allGray = false;
         break;
@@ -822,7 +824,7 @@ void ZTiff::load(const QString &filename, bool tagOnly)
       m_tif.reset(TIFFOpen(QFile::encodeName(filename).constData(), "r"));
 #endif
     }
-    catch (const ZIOException & e) {
+    catch (const ZIOException& e) {
       QString err(e.what());
       if (err.contains("Colormap", Qt::CaseInsensitive)) {
         m_tif.reset();
@@ -845,7 +847,7 @@ void ZTiff::load(const QString &filename, bool tagOnly)
   }
 }
 
-void ZTiff::load(std::istream &fs, bool tagOnly)
+void ZTiff::load(std::istream& fs, bool tagOnly)
 {
   close();
 
@@ -867,7 +869,7 @@ void ZTiff::load(std::istream &fs, bool tagOnly)
     try {
       m_tif.reset(TIFFStreamOpen("MemTiff", &fs));
     }
-    catch (const ZIOException & e) {
+    catch (const ZIOException& e) {
       QString err(e.what());
       if (err.contains("Colormap", Qt::CaseInsensitive)) {
         m_tif.reset();
@@ -891,12 +893,12 @@ bool ZTiff::isLsmFile() const
   return !m_ifds.empty() && m_ifds[0].containsTag(TIFFTAG_CZ_LSMINFO);
 }
 
-const ZImgMetatag &ZTiff::lsmInfoTag() const
+const ZImgMetatag& ZTiff::lsmInfoTag() const
 {
   return m_ifds[0].tag(m_ifds[0].indexOf(TIFFTAG_CZ_LSMINFO));
 }
 
-void ZTiff::readInfoFromIFD(const ZTiffIFD &ifd, ZImgInfo &info)
+void ZTiff::readInfoFromIFD(const ZTiffIFD& ifd, ZImgInfo& info)
 {
   info.width = ifd.imageWidth();
   info.height = ifd.imageHeight();
@@ -911,14 +913,14 @@ void ZTiff::readInfoFromIFD(const ZTiffIFD &ifd, ZImgInfo &info)
     info.numChannels = ifd.samplesPerPixel();
     size_t bps = ifd.bitsPerSample(0);
     info.validBitCount = bps;
-    for (size_t j=1; j<info.numChannels; ++j)
+    for (size_t j = 1; j < info.numChannels; ++j)
       if (ifd.bitsPerSample(j) != bps)
         throw ZIOException("Different bits per sample is not supported.");
     if (bps > 64 || (bps > 8 && bps % 8 != 0))
       throw ZIOException(QString("%1 bits per sample tiff is not supported.").arg(bps));
-    info.bytesPerVoxel = std::ceil(bps*1.0/8);
+    info.bytesPerVoxel = std::ceil(bps * 1.0 / 8);
     VoxelFormat vf = ifd.voxelFormat(0);
-    for (size_t j=1; j<info.numChannels; ++j)
+    for (size_t j = 1; j < info.numChannels; ++j)
       if (ifd.voxelFormat(j) != vf)
         throw ZIOException("Different sample format is not supported.");
     info.voxelFormat = vf;
@@ -939,7 +941,7 @@ void ZTiff::readInfoFromIFD(const ZTiffIFD &ifd, ZImgInfo &info)
   info.createDefaultDescriptions();
 }
 
-void ZTiff::readImgFromIFD(size_t ifdIdx, ZImg &img)
+void ZTiff::readImgFromIFD(size_t ifdIdx, ZImg& img)
 {
   if (TIFFSetDirectory(m_tif.get(), ifdIdx) != 1)
     throw ZIOException(QString("Can not read ifd of index %1").arg(ifdIdx));
@@ -948,7 +950,7 @@ void ZTiff::readImgFromIFD(size_t ifdIdx, ZImg &img)
           m_ifds[ifdIdx].extraSample() == EXTRASAMPLE_UNSPECIFIED);
 }
 
-void ZTiff::readImgFromIFD(const ZTiffIFD &ifd, ZImg &img)
+void ZTiff::readImgFromIFD(const ZTiffIFD& ifd, ZImg& img)
 {
   if (TIFFSetSubDirectory(m_tif.get(), ifd.offset()) != 1)
     throw ZIOException(QString("Can not read ifd at offset %1").arg(ifd.offset()));
@@ -957,7 +959,7 @@ void ZTiff::readImgFromIFD(const ZTiffIFD &ifd, ZImg &img)
           ifd.extraSample() == EXTRASAMPLE_UNSPECIFIED);
 }
 
-ZImg ZTiff::readThumbnailFromIFD(const ZTiffIFD &ifd)
+ZImg ZTiff::readThumbnailFromIFD(const ZTiffIFD& ifd)
 {
   ZImg res;
 
@@ -969,7 +971,7 @@ ZImg ZTiff::readThumbnailFromIFD(const ZTiffIFD &ifd)
       res = ZImg(info);
       readImgFromIFD(ifd, res);
     }
-    catch (const ZIOException & e) {
+    catch (const ZIOException& e) {
       LOG(WARNING) << "read thumbnail from tif ifd failed: " << e.what();
       res.clear();
     }
@@ -1039,7 +1041,8 @@ struct ZTiffHeader
 
 #pragma pack(pop)
 
-void ZTiff::writeTiffHeader(uint8_t *mem, size_t width, size_t height, size_t bitsPerSample, size_t samplesPerPixel, size_t compression,
+void ZTiff::writeTiffHeader(uint8_t* mem, size_t width, size_t height, size_t bitsPerSample, size_t samplesPerPixel,
+                            size_t compression,
                             uint64_t stripOffset, uint64_t stripByteCount)
 {
   static_assert(sizeof(ZTiffHeader) == 192, "wrong tiff header size");
@@ -1055,11 +1058,11 @@ void ZTiff::writeTiffHeader(uint8_t *mem, size_t width, size_t height, size_t bi
   memcpy(mem, &header, sizeof(header));
 }
 
-uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigtiff, bool swabflag) const
+uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigtiff, bool swabflag) const
 {
   uint64_t nextdiroff = 0;
 
-  if (off == 0)			/* no more directories */
+  if (off == 0)      /* no more directories */
     return 0;
   fs.seekg(off);
 
@@ -1180,39 +1183,39 @@ uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigt
     }
     if (swabflag) {
       switch (type) {
-      case TIFF_BYTE:
-      case TIFF_ASCII:
-      case TIFF_SBYTE:
-      case TIFF_UNDEFINED:
-        break;
-      case TIFF_SHORT:
-      case TIFF_SSHORT:
-        for (size_t sc = 0; sc < count; ++sc) {
-          boost::endian::endian_reverse_inplace(field.dataAt<uint16_t>(sc));
-        }
-        break;
-      case TIFF_LONG:
-      case TIFF_SLONG:
-      case TIFF_FLOAT:
-      case TIFF_IFD:
-        for (size_t sc = 0; sc < count; ++sc) {
-          boost::endian::endian_reverse_inplace(field.dataAt<uint32_t>(sc));
-        }
-        break;
-      case TIFF_RATIONAL:
-      case TIFF_SRATIONAL:
-        for (size_t sc = 0; sc < count*2; ++sc) {
-          boost::endian::endian_reverse_inplace(field.dataAt<uint32_t>(sc));
-        }
-        break;
-      case TIFF_DOUBLE:
-      case TIFF_LONG8:
-      case TIFF_SLONG8:
-      case TIFF_IFD8:
-        for (size_t sc = 0; sc < count; ++sc) {
-          boost::endian::endian_reverse_inplace(field.dataAt<uint64_t>(sc));
-        }
-        break;
+        case TIFF_BYTE:
+        case TIFF_ASCII:
+        case TIFF_SBYTE:
+        case TIFF_UNDEFINED:
+          break;
+        case TIFF_SHORT:
+        case TIFF_SSHORT:
+          for (size_t sc = 0; sc < count; ++sc) {
+            boost::endian::endian_reverse_inplace(field.dataAt<uint16_t>(sc));
+          }
+          break;
+        case TIFF_LONG:
+        case TIFF_SLONG:
+        case TIFF_FLOAT:
+        case TIFF_IFD:
+          for (size_t sc = 0; sc < count; ++sc) {
+            boost::endian::endian_reverse_inplace(field.dataAt<uint32_t>(sc));
+          }
+          break;
+        case TIFF_RATIONAL:
+        case TIFF_SRATIONAL:
+          for (size_t sc = 0; sc < count * 2; ++sc) {
+            boost::endian::endian_reverse_inplace(field.dataAt<uint32_t>(sc));
+          }
+          break;
+        case TIFF_DOUBLE:
+        case TIFF_LONG8:
+        case TIFF_SLONG8:
+        case TIFF_IFD8:
+          for (size_t sc = 0; sc < count; ++sc) {
+            boost::endian::endian_reverse_inplace(field.dataAt<uint64_t>(sc));
+          }
+          break;
       }
     }
     ifd.addField(field);
@@ -1262,12 +1265,12 @@ uint64_t ZTiff::readIFD(std::istream &fs, ZTiffIFD &ifd, uint64_t off, bool bigt
 
 QString ZTiff::tagToName(uint32_t tag) const
 {
-  for (size_t i=0; i<std::extent<decltype(tiftagnames)>::value; ++i) {
+  for (size_t i = 0; i < std::extent<decltype(tiftagnames)>::value; ++i) {
     if (tiftagnames[i].tag == tag) {
       return tiftagnames[i].name;
     }
   }
-  for (size_t i=0; i<std::extent<decltype(exiftagnames)>::value; ++i) {
+  for (size_t i = 0; i < std::extent<decltype(exiftagnames)>::value; ++i) {
     if (exiftagnames[i].tag == tag) {
       return exiftagnames[i].name;
     }
@@ -1275,14 +1278,14 @@ QString ZTiff::tagToName(uint32_t tag) const
   return "Unknown tag";
 }
 
-void ZTiff::readIFDs(const QString &filename, std::vector<ZTiffIFD> &ifds) const
+void ZTiff::readIFDs(const QString& filename, std::vector<ZTiffIFD>& ifds) const
 {
   std::ifstream fs;
   openFileStream(fs, filename, std::ios_base::binary | std::ios_base::in);
   readIFDs(fs, ifds);
 }
 
-void ZTiff::readIFDs(std::istream &fs, std::vector<ZTiffIFD> &ifds) const
+void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds) const
 {
   std::vector<ZTiffIFD> _ifds;
   readStream(fs, &hdr, sizeof(TIFFHeaderCommon));
@@ -1291,7 +1294,7 @@ void ZTiff::readIFDs(std::istream &fs, std::vector<ZTiffIFD> &ifds) const
       && hdr.common.tiff_magic != TIFF_LITTLEENDIAN &&
       hdr.common.tiff_magic != (hostIsLittleEndian() ? MDI_LITTLEENDIAN : MDI_BIGENDIAN)) {
     throw ZIOException(QString("Not a TIFF or MDI file, bad magic number %1")
-                       .arg(hdr.common.tiff_magic, 0, 16));
+                         .arg(hdr.common.tiff_magic, 0, 16));
   }
 
   bool swabflag;
@@ -1314,7 +1317,7 @@ void ZTiff::readIFDs(std::istream &fs, std::vector<ZTiffIFD> &ifds) const
     //           42,"ClassicTIFF");
     if (diroff == 0)
       diroff = hdr.classic.tiff_diroff;
-  } else if (hdr.common.tiff_version==43) {
+  } else if (hdr.common.tiff_version == 43) {
     readStream(fs, &hdr.big.tiff_offsetsize, 12);
     if (swabflag) {
       boost::endian::endian_reverse_inplace(hdr.big.tiff_offsetsize);
@@ -1333,7 +1336,7 @@ void ZTiff::readIFDs(std::istream &fs, std::vector<ZTiffIFD> &ifds) const
     bigtiff = true;
   } else {
     throw ZIOException(QString("Not a TIFF file, bad version number %1")
-                       .arg(hdr.common.tiff_version));
+                         .arg(hdr.common.tiff_version));
   }
 
   std::set<uint64_t> visitedDiroffs;
@@ -1343,16 +1346,16 @@ void ZTiff::readIFDs(std::istream &fs, std::vector<ZTiffIFD> &ifds) const
     }
     visitedDiroffs.insert(diroff);
     _ifds.push_back(ZTiffIFD());
-    diroff = readIFD(fs, _ifds[_ifds.size()-1], diroff, bigtiff, swabflag);
+    diroff = readIFD(fs, _ifds[_ifds.size() - 1], diroff, bigtiff, swabflag);
     // workaround zeiss axio scanner exporter bug
-    if (!_ifds[_ifds.size()-1].containsTag(TIFFTAG_IMAGEWIDTH)) {
+    if (!_ifds[_ifds.size() - 1].containsTag(TIFFTAG_IMAGEWIDTH)) {
       _ifds.pop_back();
     }
   }
   _ifds.swap(ifds);
 }
 
-void ZTiff::readImg(ZImg &img, bool divideByAlpha)
+void ZTiff::readImg(ZImg& img, bool divideByAlpha)
 {
   uint16_t planarConfig;
   TIFFGetFieldDefaulted(m_tif.get(), TIFFTAG_PLANARCONFIG, &planarConfig);
@@ -1407,17 +1410,18 @@ void ZTiff::readImg(ZImg &img, bool divideByAlpha)
     if (TIFFIsTiled(m_tif.get())) {
       uint32_t tileWidth;
       uint32_t tileHeight;
-      TIFFGetField(m_tif.get(), TIFFTAG_TILEWIDTH,  &tileWidth);
+      TIFFGetField(m_tif.get(), TIFFTAG_TILEWIDTH, &tileWidth);
       TIFFGetField(m_tif.get(), TIFFTAG_TILELENGTH, &tileHeight);
       size_t numTilePerRow = (img.width() + tileWidth - 1) / tileWidth;
 
       if (separatePlane || img.numChannels() == 1) {
         uint32_t tilesPerChannel = TIFFNumberOfTiles(m_tif.get()) / img.numChannels();
 
-        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> tileBuf(tileWidth * tileHeight * img.voxelByteNumber());
+        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> tileBuf(
+          tileWidth * tileHeight * img.voxelByteNumber());
 
-        for (size_t c=0; c<img.numChannels(); ++c) {
-          for (uint32_t tile = c * tilesPerChannel; tile < (c+1) * tilesPerChannel; tile++) {
+        for (size_t c = 0; c < img.numChannels(); ++c) {
+          for (uint32_t tile = c * tilesPerChannel; tile < (c + 1) * tilesPerChannel; tile++) {
             size_t tileRow = (tile - c * tilesPerChannel) / numTilePerRow;
             size_t tileCol = (tile - c * tilesPerChannel) % numTilePerRow;
             size_t x = tileCol * tileWidth;
@@ -1427,7 +1431,8 @@ void ZTiff::readImg(ZImg &img, bool divideByAlpha)
           }
         }
       } else {
-        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> tileBuf(tileWidth * tileHeight * img.voxelByteNumber() * img.numChannels());
+        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> tileBuf(
+          tileWidth * tileHeight * img.voxelByteNumber() * img.numChannels());
 
         for (uint32_t tile = 0; tile < TIFFNumberOfTiles(m_tif.get()); tile++) {
           size_t tileRow = (tile) / numTilePerRow;
@@ -1451,15 +1456,15 @@ void ZTiff::readImg(ZImg &img, bool divideByAlpha)
         if (numRowsOfLastStrip == 0)
           numRowsOfLastStrip = numRowsPerStrip;
 
-        for (size_t c=0; c<img.numChannels(); ++c) {
+        for (size_t c = 0; c < img.numChannels(); ++c) {
           uint8_t* buf = img.channelData<uint8_t>(c);
 
           size_t off = 0;
-          for (uint32_t strip = c * stripsPerChannel; strip < (c+1) * stripsPerChannel; strip++) {
-            if (strip == (c+1) * stripsPerChannel - 1)
-              off += readStrip(strip, buf+off, img.width(), numRowsOfLastStrip, 1, invertWhiteBlack);
+          for (uint32_t strip = c * stripsPerChannel; strip < (c + 1) * stripsPerChannel; strip++) {
+            if (strip == (c + 1) * stripsPerChannel - 1)
+              off += readStrip(strip, buf + off, img.width(), numRowsOfLastStrip, 1, invertWhiteBlack);
             else
-              off += readStrip(strip, buf+off, img.width(), numRowsPerStrip, 1, invertWhiteBlack);
+              off += readStrip(strip, buf + off, img.width(), numRowsPerStrip, 1, invertWhiteBlack);
           }
           if (off != img.channelByteNumber())
             throw ZIOException(QString("read(%1):expected(%2)").arg(off).arg(img.channelByteNumber()));
@@ -1478,9 +1483,9 @@ void ZTiff::readImg(ZImg &img, bool divideByAlpha)
         size_t off = 0;
         for (uint32_t strip = 0; strip < TIFFNumberOfStrips(m_tif.get()); strip++) {
           if (strip == TIFFNumberOfStrips(m_tif.get()) - 1)
-            off += readStrip(strip, buf+off, img.width(), numRowsOfLastStrip, img.numChannels(), invertWhiteBlack);
+            off += readStrip(strip, buf + off, img.width(), numRowsOfLastStrip, img.numChannels(), invertWhiteBlack);
           else
-            off += readStrip(strip, buf+off, img.width(), numRowsPerStrip, img.numChannels(), invertWhiteBlack);
+            off += readStrip(strip, buf + off, img.width(), numRowsPerStrip, img.numChannels(), invertWhiteBlack);
         }
         if (off != img.timeByteNumber())
           throw ZIOException(QString("read(%1):expected(%2)").arg(off).arg(img.timeByteNumber()));
@@ -1499,52 +1504,52 @@ void ZTiff::readImg(ZImg &img, bool divideByAlpha)
     std::swap(img.infoRef().height, img.infoRef().width);
 
   switch (orientation) {
-  case ORIENTATION_TOPLEFT:
-    break;
-  case ORIENTATION_TOPRIGHT:
-    for (size_t i=0; i<img.numChannels(); ++i) {
-      image2DFlip(img.channelData<uint8_t>(i), img.width(), img.height(), Dimension::X);
-    }
-    break;
-  case ORIENTATION_BOTRIGHT:
-    for (size_t i=0; i<img.numChannels(); ++i) {
-      image2DReflect(img.channelData<uint8_t>(i), img.width(), img.height());
-    }
-    break;
-  case ORIENTATION_BOTLEFT:
-    for (size_t i=0; i<img.numChannels(); ++i) {
-      image2DFlip(img.channelData<uint8_t>(i), img.width(), img.height(), Dimension::Y);
-    }
-    break;
-  case ORIENTATION_LEFTTOP:
-    for (size_t i=0; i<img.numChannels(); ++i) {
-      image2DTranspose(img.channelData<uint8_t>(i), img.height(), img.width());
-    }
-    break;
-  case ORIENTATION_RIGHTTOP:
-    for (size_t i=0; i<img.numChannels(); ++i) {
-      image2DTranspose(img.channelData<uint8_t>(i), img.height(), img.width());
-      image2DFlip(img.channelData<uint8_t>(i), img.width(), img.height(), Dimension::X);
-    }
-    break;
-  case ORIENTATION_RIGHTBOT:
-    for (size_t i=0; i<img.numChannels(); ++i) {
-      image2DTranspose(img.channelData<uint8_t>(i), img.height(), img.width());
-      image2DReflect(img.channelData<uint8_t>(i), img.width(), img.height());
-    }
-    break;
-  case ORIENTATION_LEFTBOT:
-    for (size_t i=0; i<img.numChannels(); ++i) {
-      image2DTranspose(img.channelData<uint8_t>(i), img.height(), img.width());
-      image2DFlip(img.channelData<uint8_t>(i), img.width(), img.height(), Dimension::Y);
-    }
-    break;
-  default:
-    break;
+    case ORIENTATION_TOPLEFT:
+      break;
+    case ORIENTATION_TOPRIGHT:
+      for (size_t i = 0; i < img.numChannels(); ++i) {
+        image2DFlip(img.channelData<uint8_t>(i), img.width(), img.height(), Dimension::X);
+      }
+      break;
+    case ORIENTATION_BOTRIGHT:
+      for (size_t i = 0; i < img.numChannels(); ++i) {
+        image2DReflect(img.channelData<uint8_t>(i), img.width(), img.height());
+      }
+      break;
+    case ORIENTATION_BOTLEFT:
+      for (size_t i = 0; i < img.numChannels(); ++i) {
+        image2DFlip(img.channelData<uint8_t>(i), img.width(), img.height(), Dimension::Y);
+      }
+      break;
+    case ORIENTATION_LEFTTOP:
+      for (size_t i = 0; i < img.numChannels(); ++i) {
+        image2DTranspose(img.channelData<uint8_t>(i), img.height(), img.width());
+      }
+      break;
+    case ORIENTATION_RIGHTTOP:
+      for (size_t i = 0; i < img.numChannels(); ++i) {
+        image2DTranspose(img.channelData<uint8_t>(i), img.height(), img.width());
+        image2DFlip(img.channelData<uint8_t>(i), img.width(), img.height(), Dimension::X);
+      }
+      break;
+    case ORIENTATION_RIGHTBOT:
+      for (size_t i = 0; i < img.numChannels(); ++i) {
+        image2DTranspose(img.channelData<uint8_t>(i), img.height(), img.width());
+        image2DReflect(img.channelData<uint8_t>(i), img.width(), img.height());
+      }
+      break;
+    case ORIENTATION_LEFTBOT:
+      for (size_t i = 0; i < img.numChannels(); ++i) {
+        image2DTranspose(img.channelData<uint8_t>(i), img.height(), img.width());
+        image2DFlip(img.channelData<uint8_t>(i), img.width(), img.height(), Dimension::Y);
+      }
+      break;
+    default:
+      break;
   }
 }
 
-size_t ZTiff::readStrip(uint32_t strip, uint8_t *buf, size_t width, size_t height, size_t nChannel, bool invert)
+size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t height, size_t nChannel, bool invert)
 {
   uint16 bitspersample;
   TIFFGetFieldDefaulted(m_tif.get(), TIFFTAG_BITSPERSAMPLE, &bitspersample);
@@ -1552,93 +1557,93 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t *buf, size_t width, size_t heigh
     size_t read = TIFFReadEncodedStrip(m_tif.get(), strip, buf, static_cast<tmsize_t>(-1));
     if (invert) {
       switch (bitspersample / 8) {
-      case 1: {
-        uint8_t *pt = buf;
-        for (size_t i=0; i<read; ++i)
-          pt[i] = std::numeric_limits<uint8_t>::max()-pt[i];
-      }
-        break;
-      case 2: {
-        uint16_t *pt = bit_cast<uint16_t*>(buf);
-        for (size_t i=0; i<read; ++i)
-          pt[i] = std::numeric_limits<uint16_t>::max()-pt[i];
-      }
-        break;
-      case 4: {
-        uint32_t *pt = bit_cast<uint32_t*>(buf);
-        for (size_t i=0; i<read; ++i)
-          pt[i] = std::numeric_limits<uint32_t>::max()-pt[i];
-      }
-        break;
-      case 8: {
-        uint64_t *pt = bit_cast<uint64_t*>(buf);
-        for (size_t i=0; i<read; ++i)
-          pt[i] = std::numeric_limits<uint64_t>::max()-pt[i];
-      }
-        break;
-      default:
-        throw ZIOException(QString("do not support invert %1 bytes integer").arg(bitspersample/8));
+        case 1: {
+          uint8_t* pt = buf;
+          for (size_t i = 0; i < read; ++i)
+            pt[i] = std::numeric_limits<uint8_t>::max() - pt[i];
+        }
+          break;
+        case 2: {
+          uint16_t* pt = bit_cast<uint16_t*>(buf);
+          for (size_t i = 0; i < read; ++i)
+            pt[i] = std::numeric_limits<uint16_t>::max() - pt[i];
+        }
+          break;
+        case 4: {
+          uint32_t* pt = bit_cast<uint32_t*>(buf);
+          for (size_t i = 0; i < read; ++i)
+            pt[i] = std::numeric_limits<uint32_t>::max() - pt[i];
+        }
+          break;
+        case 8: {
+          uint64_t* pt = bit_cast<uint64_t*>(buf);
+          for (size_t i = 0; i < read; ++i)
+            pt[i] = std::numeric_limits<uint64_t>::max() - pt[i];
+        }
+          break;
+        default:
+          throw ZIOException(QString("do not support invert %1 bytes integer").arg(bitspersample / 8));
       }
     }
     return read;
   } else if (bitspersample == 1) {
     std::vector<uint8_t> packedBuf(TIFFStripSize(m_tif.get()));
     TIFFReadEncodedStrip(m_tif.get(), strip, packedBuf.data(), static_cast<tmsize_t>(-1));
-    uint8_t *buf8 = buf;
-    size_t bytesPerRow = (width*nChannel+7)/8;
-    if (packedBuf.size() < bytesPerRow*height) {
+    uint8_t* buf8 = buf;
+    size_t bytesPerRow = (width * nChannel + 7) / 8;
+    if (packedBuf.size() < bytesPerRow * height) {
       throw ZIOException(QString("Not enought strip data, nRows:%1, nChannel:%2, bitsPerSample:%3, strip data:%4")
-                         .arg(height).arg(nChannel).arg(bitspersample).arg(packedBuf.size()));
+                           .arg(height).arg(nChannel).arg(bitspersample).arg(packedBuf.size()));
     }
-    for (size_t r=0; r<height; ++r) {
-      for (size_t i=0; i<width*nChannel; ++i) {
-        *buf8 = invert ? ((packedBuf[r*bytesPerRow + i/8] & bitmasks1[i%8]) == 0) :
-          ((packedBuf[r*bytesPerRow + i/8] & bitmasks1[i%8]) > 0);
+    for (size_t r = 0; r < height; ++r) {
+      for (size_t i = 0; i < width * nChannel; ++i) {
+        *buf8 = invert ? ((packedBuf[r * bytesPerRow + i / 8] & bitmasks1[i % 8]) == 0) :
+                ((packedBuf[r * bytesPerRow + i / 8] & bitmasks1[i % 8]) > 0);
         buf8++;
       }
     }
-    return height*width*nChannel;
+    return height * width * nChannel;
   } else if (bitspersample == 2) {
     std::vector<uint8_t> packedBuf(TIFFStripSize(m_tif.get()));
     TIFFReadEncodedStrip(m_tif.get(), strip, packedBuf.data(), static_cast<tmsize_t>(-1));
-    uint8_t *buf8 = buf;
-    size_t bytesPerRow = (width*nChannel+3)/4;
-    if (packedBuf.size() < bytesPerRow*height) {
+    uint8_t* buf8 = buf;
+    size_t bytesPerRow = (width * nChannel + 3) / 4;
+    if (packedBuf.size() < bytesPerRow * height) {
       throw ZIOException(QString("Not enought strip data, nRows:%1, nChannel:%2, bitsPerSample:%3, strip data:%4")
-                         .arg(height).arg(nChannel).arg(bitspersample).arg(packedBuf.size()));
+                           .arg(height).arg(nChannel).arg(bitspersample).arg(packedBuf.size()));
     }
-    for (size_t r=0; r<height; ++r) {
-      for (size_t i=0; i<width*nChannel; ++i) {
-        *buf8 = invert ? (3 - ((packedBuf[r*bytesPerRow + i/4] & bitmasks2[i%4]) >> ((3-i%4)*2))) :
-          (packedBuf[r*bytesPerRow + i/4] & bitmasks2[i%4] >> ((3-i%4)*2));
+    for (size_t r = 0; r < height; ++r) {
+      for (size_t i = 0; i < width * nChannel; ++i) {
+        *buf8 = invert ? (3 - ((packedBuf[r * bytesPerRow + i / 4] & bitmasks2[i % 4]) >> ((3 - i % 4) * 2))) :
+                (packedBuf[r * bytesPerRow + i / 4] & bitmasks2[i % 4] >> ((3 - i % 4) * 2));
         buf8++;
       }
     }
-    return height*width*nChannel;
+    return height * width * nChannel;
   } else if (bitspersample == 4) {
     std::vector<uint8_t> packedBuf(TIFFStripSize(m_tif.get()));
     TIFFReadEncodedStrip(m_tif.get(), strip, packedBuf.data(), static_cast<tmsize_t>(-1));
-    uint8_t *buf8 = buf;
-    size_t bytesPerRow = (width*nChannel+1)/2;
-    if (packedBuf.size() < bytesPerRow*height) {
+    uint8_t* buf8 = buf;
+    size_t bytesPerRow = (width * nChannel + 1) / 2;
+    if (packedBuf.size() < bytesPerRow * height) {
       throw ZIOException(QString("Not enought strip data, nRows:%1, nChannel:%2, bitsPerSample:%3, strip data:%4")
-                         .arg(height).arg(nChannel).arg(bitspersample).arg(packedBuf.size()));
+                           .arg(height).arg(nChannel).arg(bitspersample).arg(packedBuf.size()));
     }
-    for (size_t r=0; r<height; ++r) {
-      for (size_t i=0; i<width*nChannel; ++i) {
-        *buf8 = invert ? (15 - ((packedBuf[r*bytesPerRow + i/2] & bitmasks4[i%2]) >> ((1-i%2)*4))) :
-          (packedBuf[r*bytesPerRow + i/2] & bitmasks4[i%2] >> ((1-i%2)*4));
+    for (size_t r = 0; r < height; ++r) {
+      for (size_t i = 0; i < width * nChannel; ++i) {
+        *buf8 = invert ? (15 - ((packedBuf[r * bytesPerRow + i / 2] & bitmasks4[i % 2]) >> ((1 - i % 2) * 4))) :
+                (packedBuf[r * bytesPerRow + i / 2] & bitmasks4[i % 2] >> ((1 - i % 2) * 4));
         buf8++;
       }
     }
-    return height*width*nChannel;
+    return height * width * nChannel;
   } else {
     throw ZIOException("should not happen");
     return 0;
   }
 }
 
-void ZTiff::readTile(uint32_t tile, uint8_t *buf, size_t tileWidth, size_t tileHeight, size_t tileChannel, bool invert)
+void ZTiff::readTile(uint32_t tile, uint8_t* buf, size_t tileWidth, size_t tileHeight, size_t tileChannel, bool invert)
 {
   uint16 bitspersample;
   TIFFGetFieldDefaulted(m_tif.get(), TIFFTAG_BITSPERSAMPLE, &bitspersample);
@@ -1646,136 +1651,138 @@ void ZTiff::readTile(uint32_t tile, uint8_t *buf, size_t tileWidth, size_t tileH
     size_t read = TIFFReadEncodedTile(m_tif.get(), tile, buf, static_cast<tmsize_t>(-1));
     if (invert) {
       switch (bitspersample / 8) {
-      case 1: {
-        uint8_t *pt = buf;
-        for (size_t i=0; i<read; ++i)
-          pt[i] = std::numeric_limits<uint8_t>::max()-pt[i];
-      }
-        break;
-      case 2: {
-        uint16_t *pt = bit_cast<uint16_t*>(buf);
-        for (size_t i=0; i<read; ++i)
-          pt[i] = std::numeric_limits<uint16_t>::max()-pt[i];
-      }
-        break;
-      case 4: {
-        uint32_t *pt = bit_cast<uint32_t*>(buf);
-        for (size_t i=0; i<read; ++i)
-          pt[i] = std::numeric_limits<uint32_t>::max()-pt[i];
-      }
-        break;
-      case 8: {
-        uint64_t *pt = bit_cast<uint64_t*>(buf);
-        for (size_t i=0; i<read; ++i)
-          pt[i] = std::numeric_limits<uint64_t>::max()-pt[i];
-      }
-        break;
-      default:
-        throw ZIOException(QString("do not support invert %1 bytes integer").arg(bitspersample/8));
+        case 1: {
+          uint8_t* pt = buf;
+          for (size_t i = 0; i < read; ++i)
+            pt[i] = std::numeric_limits<uint8_t>::max() - pt[i];
+        }
+          break;
+        case 2: {
+          uint16_t* pt = bit_cast<uint16_t*>(buf);
+          for (size_t i = 0; i < read; ++i)
+            pt[i] = std::numeric_limits<uint16_t>::max() - pt[i];
+        }
+          break;
+        case 4: {
+          uint32_t* pt = bit_cast<uint32_t*>(buf);
+          for (size_t i = 0; i < read; ++i)
+            pt[i] = std::numeric_limits<uint32_t>::max() - pt[i];
+        }
+          break;
+        case 8: {
+          uint64_t* pt = bit_cast<uint64_t*>(buf);
+          for (size_t i = 0; i < read; ++i)
+            pt[i] = std::numeric_limits<uint64_t>::max() - pt[i];
+        }
+          break;
+        default:
+          throw ZIOException(QString("do not support invert %1 bytes integer").arg(bitspersample / 8));
       }
     }
   } else if (bitspersample == 1) {
     std::vector<uint8_t> packedBuf(TIFFTileSize(m_tif.get()));
     TIFFReadEncodedTile(m_tif.get(), tile, packedBuf.data(), static_cast<tmsize_t>(-1));
-    uint8_t *buf8 = buf;
+    uint8_t* buf8 = buf;
     size_t bytesPerRow = packedBuf.size() / tileHeight;
-    for (size_t r=0; r<tileHeight; ++r) {
-      for (size_t i=0; i<tileWidth*tileChannel; ++i) {
-        *buf8 = invert ? ((packedBuf[r*bytesPerRow + i/8] & bitmasks1[i%8]) == 0) :
-          ((packedBuf[r*bytesPerRow + i/8] & bitmasks1[i%8]) > 0);
+    for (size_t r = 0; r < tileHeight; ++r) {
+      for (size_t i = 0; i < tileWidth * tileChannel; ++i) {
+        *buf8 = invert ? ((packedBuf[r * bytesPerRow + i / 8] & bitmasks1[i % 8]) == 0) :
+                ((packedBuf[r * bytesPerRow + i / 8] & bitmasks1[i % 8]) > 0);
         buf8++;
       }
     }
   } else if (bitspersample == 2) {
     std::vector<uint8_t> packedBuf(TIFFTileSize(m_tif.get()));
     TIFFReadEncodedTile(m_tif.get(), tile, packedBuf.data(), static_cast<tmsize_t>(-1));
-    uint8_t *buf8 = buf;
+    uint8_t* buf8 = buf;
     size_t bytesPerRow = packedBuf.size() / tileHeight;
-    for (size_t r=0; r<tileHeight; ++r) {
-      for (size_t i=0; i<tileWidth*tileChannel; ++i) {
-        *buf8 = invert ? (3 - ((packedBuf[r*bytesPerRow + i/4] & bitmasks2[i%4]) >> ((3-i%4)*2))) :
-          (packedBuf[r*bytesPerRow + i/4] & bitmasks2[i%4] >> ((3-i%4)*2));
+    for (size_t r = 0; r < tileHeight; ++r) {
+      for (size_t i = 0; i < tileWidth * tileChannel; ++i) {
+        *buf8 = invert ? (3 - ((packedBuf[r * bytesPerRow + i / 4] & bitmasks2[i % 4]) >> ((3 - i % 4) * 2))) :
+                (packedBuf[r * bytesPerRow + i / 4] & bitmasks2[i % 4] >> ((3 - i % 4) * 2));
         buf8++;
       }
     }
   } else if (bitspersample == 4) {
     std::vector<uint8_t> packedBuf(TIFFTileSize(m_tif.get()));
     TIFFReadEncodedTile(m_tif.get(), tile, packedBuf.data(), static_cast<tmsize_t>(-1));
-    uint8_t *buf8 = buf;
+    uint8_t* buf8 = buf;
     size_t bytesPerRow = packedBuf.size() / tileHeight;
-    for (size_t r=0; r<tileHeight; ++r) {
-      for (size_t i=0; i<tileWidth*tileChannel; ++i) {
-        *buf8 = invert ? (15 - ((packedBuf[r*bytesPerRow + i/2] & bitmasks4[i%2]) >> ((1-i%2)*4))) :
-          (packedBuf[r*bytesPerRow + i/2] & bitmasks4[i%2] >> ((1-i%2)*4));
+    for (size_t r = 0; r < tileHeight; ++r) {
+      for (size_t i = 0; i < tileWidth * tileChannel; ++i) {
+        *buf8 = invert ? (15 - ((packedBuf[r * bytesPerRow + i / 2] & bitmasks4[i % 2]) >> ((1 - i % 2) * 4))) :
+                (packedBuf[r * bytesPerRow + i / 2] & bitmasks4[i % 2] >> ((1 - i % 2) * 4));
         buf8++;
       }
     }
   }
 }
 
-void ZTiff::separateChannel(const ZImg &bufImg, ZImg &img)
+void ZTiff::separateChannel(const ZImg& bufImg, ZImg& img)
 {
-  for (size_t c=0; c<img.numChannels(); ++c) {
+  for (size_t c = 0; c < img.numChannels(); ++c) {
     switch (img.voxelByteNumber()) {
-    case 1: {
-      uint8_t *des = img.channelData<uint8_t>(c);
-      const uint8_t *src = bufImg.channelData<uint8_t>(0) + c;
-      size_t numCh = img.numChannels();
-      size_t i=0;
-      while (i++ < img.channelVoxelNumber()) {
-        *des++ = *src;
-        src += numCh;
+      case 1: {
+        uint8_t* des = img.channelData<uint8_t>(c);
+        const uint8_t* src = bufImg.channelData<uint8_t>(0) + c;
+        size_t numCh = img.numChannels();
+        size_t i = 0;
+        while (i++ < img.channelVoxelNumber()) {
+          *des++ = *src;
+          src += numCh;
+        }
       }
-    }
-      break;
-    case 2: {
-      uint16_t *des = img.channelData<uint16_t>(c);
-      const uint16_t *src = bufImg.channelData<uint16_t>(0) + c;
-      size_t numCh = img.numChannels();
-      size_t i=0;
-      while (i++ < img.channelVoxelNumber()) {
-        *des++ = *src;
-        src += numCh;
+        break;
+      case 2: {
+        uint16_t* des = img.channelData<uint16_t>(c);
+        const uint16_t* src = bufImg.channelData<uint16_t>(0) + c;
+        size_t numCh = img.numChannels();
+        size_t i = 0;
+        while (i++ < img.channelVoxelNumber()) {
+          *des++ = *src;
+          src += numCh;
+        }
       }
-    }
-      break;
-    default: {
-      uint8_t *des = img.channelData<uint8_t>(c);
-      const uint8_t *src = bufImg.channelData<uint8_t>(0) + c * img.voxelByteNumber();
-      size_t voxelByte = img.voxelByteNumber();
-      size_t srcStride = img.numChannels() * voxelByte;
-      size_t i=0;
-      while (i++ < img.channelVoxelNumber()) {
-        memcpy(des, src, voxelByte);
-        des += voxelByte;
-        src += srcStride;
+        break;
+      default: {
+        uint8_t* des = img.channelData<uint8_t>(c);
+        const uint8_t* src = bufImg.channelData<uint8_t>(0) + c * img.voxelByteNumber();
+        size_t voxelByte = img.voxelByteNumber();
+        size_t srcStride = img.numChannels() * voxelByte;
+        size_t i = 0;
+        while (i++ < img.channelVoxelNumber()) {
+          memcpy(des, src, voxelByte);
+          des += voxelByte;
+          src += srcStride;
+        }
       }
-    }
     }
   }
 }
 
-void ZTiff::copyOneChannelTileToImg(const uint8_t *tileBuf, size_t tileWidth, size_t tileHeight, size_t voxelByteNumber,
-                                    ZImg &img, size_t xStart, size_t yStart, size_t c)
+void ZTiff::copyOneChannelTileToImg(const uint8_t* tileBuf, size_t tileWidth, size_t tileHeight, size_t voxelByteNumber,
+                                    ZImg& img, size_t xStart, size_t yStart, size_t c)
 {
   size_t xEnd = std::min(xStart + tileWidth, img.width());
   size_t cpysize = (xEnd - xStart) * voxelByteNumber;
   size_t yEnd = std::min(yStart + tileHeight, img.height());
-  for (size_t y = yStart; y<yEnd; ++y) {
-    memcpy(img.data<uint8_t>(xStart, y, 0, c), tileBuf + (y-yStart)*tileWidth*voxelByteNumber, cpysize);
+  for (size_t y = yStart; y < yEnd; ++y) {
+    memcpy(img.data<uint8_t>(xStart, y, 0, c), tileBuf + (y - yStart) * tileWidth * voxelByteNumber, cpysize);
   }
 }
 
-void ZTiff::copyTileToImg(const uint8_t *tileBuf, size_t tileWidth, size_t tileHeight, size_t numChannels, size_t voxelByteNumber,
-                          ZImg &img, size_t xStart, size_t yStart)
+void ZTiff::copyTileToImg(const uint8_t* tileBuf, size_t tileWidth, size_t tileHeight, size_t numChannels,
+                          size_t voxelByteNumber,
+                          ZImg& img, size_t xStart, size_t yStart)
 {
-  for (size_t c=0; c<numChannels; ++c) {
+  for (size_t c = 0; c < numChannels; ++c) {
     size_t xEnd = std::min(xStart + tileWidth, img.width());
     size_t yEnd = std::min(yStart + tileHeight, img.height());
-    for (size_t x = xStart; x<xEnd; ++x) {
-      for (size_t y = yStart; y<yEnd; ++y) {
-        uint8_t *des = img.data<uint8_t>(x, y, 0, c);
-        const uint8_t *src = tileBuf + (y-yStart)*tileWidth*voxelByteNumber*numChannels + (x-xStart)*voxelByteNumber*numChannels + c*voxelByteNumber;
+    for (size_t x = xStart; x < xEnd; ++x) {
+      for (size_t y = yStart; y < yEnd; ++y) {
+        uint8_t* des = img.data<uint8_t>(x, y, 0, c);
+        const uint8_t* src = tileBuf + (y - yStart) * tileWidth * voxelByteNumber * numChannels +
+                             (x - xStart) * voxelByteNumber * numChannels + c * voxelByteNumber;
         memcpy(des, src, voxelByteNumber);
       }
     }
@@ -1787,7 +1794,7 @@ ZTiffWriter::ZTiffWriter()
 {
 }
 
-void ZTiffWriter::startWriting(const QString &filename, Compression comp, int extraSample, bool bigTiff)
+void ZTiffWriter::startWriting(const QString& filename, Compression comp, int extraSample, bool bigTiff)
 {
   m_tif.reset();
 
@@ -1795,7 +1802,8 @@ void ZTiffWriter::startWriting(const QString &filename, Compression comp, int ex
     comp = defaultCompression(nullptr);
   } else {
     if (!checkCompression(nullptr, comp)) {
-      LOG(WARNING) << QString("Compression %1 is not supported or not applicable, switch to default compression.").arg(enumToUnderlyingType(comp));
+      LOG(WARNING) << QString("Compression %1 is not supported or not applicable, switch to default compression.").arg(
+        enumToUnderlyingType(comp));
       comp = defaultCompression(nullptr);
     }
   }
@@ -1820,12 +1828,12 @@ void ZTiffWriter::startWriting(const QString &filename, Compression comp, int ex
     throw ZIOException(QString("Can't open ") % filename % QString(" for writing"));
 }
 
-void ZTiffWriter::writeIFD(const ZImg &img, int z, int t, int c, bool writeThumbnails,
-                           const std::vector<ZImgMetatag> &additionalTags)
+void ZTiffWriter::writeIFD(const ZImg& img, int z, int t, int c, bool writeThumbnails,
+                           const std::vector<ZImgMetatag>& additionalTags)
 {
   CHECK(m_tif);
-  for (size_t i=0; i<additionalTags.size(); ++i) {
-    const ZImgMetatag &atag = additionalTags[i];
+  for (size_t i = 0; i < additionalTags.size(); ++i) {
+    const ZImgMetatag& atag = additionalTags[i];
     if (atag.tag() > 0 && atag.tag() < 65535)
       TIFFSetField(m_tif.get(), atag.tag(), atag.dataArray());
   }
@@ -1833,7 +1841,7 @@ void ZTiffWriter::writeIFD(const ZImg &img, int z, int t, int c, bool writeThumb
   uint16_t photo = PHOTOMETRIC_MINISBLACK;
   TIFFSetField(m_tif.get(), TIFFTAG_IMAGEWIDTH, img.width());
   TIFFSetField(m_tif.get(), TIFFTAG_IMAGELENGTH, img.height());
-  TIFFSetField(m_tif.get(), TIFFTAG_BITSPERSAMPLE, img.voxelByteNumber()*8);
+  TIFFSetField(m_tif.get(), TIFFTAG_BITSPERSAMPLE, img.voxelByteNumber() * 8);
   if (c < 0) {
     TIFFSetField(m_tif.get(), TIFFTAG_SAMPLESPERPIXEL, img.numChannels());
     if (img.numChannels() > 1) {
@@ -1852,14 +1860,14 @@ void ZTiffWriter::writeIFD(const ZImg &img, int z, int t, int c, bool writeThumb
       TIFFSetField(m_tif.get(), TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL);
     }
   }
-  if (m_extraSample >=0 && m_extraSample <= 2) {
+  if (m_extraSample >= 0 && m_extraSample <= 2) {
     uint16_t extraSample = m_extraSample;
     TIFFSetField(m_tif.get(), TIFFTAG_EXTRASAMPLES, 1, &extraSample);
   }
   TIFFSetField(m_tif.get(), TIFFTAG_ROWSPERSTRIP, img.height());
   TIFFSetField(m_tif.get(), TIFFTAG_SAMPLEFORMAT, img.voxelFormat());
   std::vector<ZImg> emptyList;
-  const std::vector<ZImg> *thumbnails = &emptyList;
+  const std::vector<ZImg>* thumbnails = &emptyList;
   if (writeThumbnails) {
     thumbnails = &(img.thumbnail().planeAttachments(z, t));
     if (thumbnails->size() > 0) {
@@ -1869,10 +1877,10 @@ void ZTiffWriter::writeIFD(const ZImg &img, int z, int t, int c, bool writeThumb
   }
 
   if (c < 0) {
-    for (size_t ch=0; ch<img.numChannels(); ++ch)
-      TIFFWriteEncodedStrip(m_tif.get(), ch, const_cast<uint8_t*>(img.planeData(z,ch,t)), img.planeByteNumber());
+    for (size_t ch = 0; ch < img.numChannels(); ++ch)
+      TIFFWriteEncodedStrip(m_tif.get(), ch, const_cast<uint8_t*>(img.planeData(z, ch, t)), img.planeByteNumber());
   } else {
-    TIFFWriteEncodedStrip(m_tif.get(), 0, const_cast<uint8_t*>(img.planeData(z,c,t)), img.planeByteNumber());
+    TIFFWriteEncodedStrip(m_tif.get(), 0, const_cast<uint8_t*>(img.planeData(z, c, t)), img.planeByteNumber());
   }
 
   TIFFWriteDirectory(m_tif.get());
@@ -1881,32 +1889,32 @@ void ZTiffWriter::writeIFD(const ZImg &img, int z, int t, int c, bool writeThumb
     TIFFSetField(m_tif.get(), TIFFTAG_SUBFILETYPE, FILETYPE_REDUCEDIMAGE);
     TIFFSetField(m_tif.get(), TIFFTAG_IMAGEWIDTH, (*thumbnails)[thumb].width());
     TIFFSetField(m_tif.get(), TIFFTAG_IMAGELENGTH, (*thumbnails)[thumb].height());
-    TIFFSetField(m_tif.get(), TIFFTAG_BITSPERSAMPLE, (*thumbnails)[thumb].voxelByteNumber()*8);
+    TIFFSetField(m_tif.get(), TIFFTAG_BITSPERSAMPLE, (*thumbnails)[thumb].voxelByteNumber() * 8);
     TIFFSetField(m_tif.get(), TIFFTAG_SAMPLESPERPIXEL, (*thumbnails)[thumb].numChannels());
     TIFFSetField(m_tif.get(), TIFFTAG_COMPRESSION, m_compression);
     TIFFSetField(m_tif.get(), TIFFTAG_PHOTOMETRIC, photo);
     TIFFSetField(m_tif.get(), TIFFTAG_PLANARCONFIG, PLANARCONFIG_SEPARATE);
     TIFFSetField(m_tif.get(), TIFFTAG_ROWSPERSTRIP, (*thumbnails)[thumb].height());
     TIFFSetField(m_tif.get(), TIFFTAG_SAMPLEFORMAT, (*thumbnails)[thumb].voxelFormat());
-    for (size_t ch=0; ch<(*thumbnails)[thumb].numChannels(); ++ch)
-      TIFFWriteEncodedStrip(m_tif.get(), ch, const_cast<uint8_t*>((*thumbnails)[thumb].planeData(0,ch,0)),
+    for (size_t ch = 0; ch < (*thumbnails)[thumb].numChannels(); ++ch)
+      TIFFWriteEncodedStrip(m_tif.get(), ch, const_cast<uint8_t*>((*thumbnails)[thumb].planeData(0, ch, 0)),
                             (*thumbnails)[thumb].planeByteNumber());
     TIFFWriteDirectory(m_tif.get());
   }
 }
 
-Compression ZTiffWriter::defaultCompression(const ZImg *img)
+Compression ZTiffWriter::defaultCompression(const ZImg* img)
 {
   const Compression list[] = {
     Compression::LZW, Compression::ADOBE_DEFLATE, Compression::PACKBITS
   };
-  for (size_t i=0; i<std::extent<decltype(list)>::value; ++i)
+  for (size_t i = 0; i < std::extent<decltype(list)>::value; ++i)
     if (checkCompression(img, list[i]))
       return list[i];
   return Compression::NONE;
 }
 
-bool ZTiffWriter::checkCompression(const ZImg *, Compression comp)
+bool ZTiffWriter::checkCompression(const ZImg*, Compression comp)
 {
   if (comp == Compression::NONE)
     return true;

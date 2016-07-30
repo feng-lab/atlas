@@ -14,13 +14,16 @@ public:
   static ZCpuInfo& instance();
 
   ZCpuInfo();
-  ~ZCpuInfo() {}
+
+  ~ZCpuInfo()
+  {}
 
   // log useful cpu info
   void logCpuInfo() const;
 
 protected:
   void detectCpuInfo();
+
   void detectCoreAndThreadNumber();
 
 public:

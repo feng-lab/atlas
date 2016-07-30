@@ -4,7 +4,9 @@
 #if defined(_WIN32) || defined(_WIN64)
 #include "zwindowsheader.h"
 #elif defined(__APPLE__) && defined(__MACH__)
+
 #include <mach/mach_time.h>
+
 #else
 # include <unistd.h>
 # include <time.h>
@@ -29,7 +31,7 @@
     bt.stopAndPrint();
   */
 
-#define BENCHANDPRINT(TIMER,TRIES,REP,CODE,FUNCNAME) { \
+#define BENCHANDPRINT(TIMER, TRIES, REP, CODE, FUNCNAME) { \
   TIMER.reset(); \
   TIMER.setName(FUNCNAME); \
   for(int i=0; i<TRIES; ++i){ \
@@ -47,7 +49,7 @@ namespace nim {
 class ZBenchTimer
 {
 public:
-  ZBenchTimer(const std::string &funName = "");
+  ZBenchTimer(const std::string& funName = "");
 
   inline void reset()
   {
@@ -77,7 +79,7 @@ public:
     start();
   }
 
-  inline void resetAndStart(const std::string &newName)
+  inline void resetAndStart(const std::string& newName)
   {
     setName(newName);
     reset();
@@ -100,24 +102,31 @@ public:
   void stopAndLog();
 
   // elapsed time in seconds
-  inline double time() { return m_time; }
+  inline double time()
+  { return m_time; }
 
   // average elapsed time in seconds.
-  inline double average() { return m_average; }
+  inline double average()
+  { return m_average; }
 
   // best elapsed time in seconds
-  inline double best() { return m_best; }
+  inline double best()
+  { return m_best; }
 
   // total elapsed time in seconds.
-  inline double total() { return m_total; }
+  inline double total()
+  { return m_total; }
 
   // elapsed pause time in seconds
-  inline double pauseTime() { return m_pauseTime; }
+  inline double pauseTime()
+  { return m_pauseTime; }
 
   // total elapsed pause time in seconds.
-  inline double totalPauseTime() { return m_totalPauseTime; }
+  inline double totalPauseTime()
+  { return m_totalPauseTime; }
 
-  inline void setName(const std::string &str) { m_name = str; }
+  inline void setName(const std::string& str)
+  { m_name = str; }
 
 #if defined(_WIN32) || defined(_WIN64)
   inline LARGE_INTEGER getCpuTicks()
@@ -127,12 +136,14 @@ public:
     return queryTicks;
   }
 #elif defined(__APPLE__) && defined(__MACH__)
+
   inline uint64_t getCpuTicks()
   {
     uint64_t tm;
     tm = mach_absolute_time();
     return tm;
   }
+
 #else
   inline timespec getCpuTicks()
   {

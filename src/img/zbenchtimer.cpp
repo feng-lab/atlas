@@ -3,17 +3,17 @@
 
 namespace nim {
 
-ZBenchTimer::ZBenchTimer(const std::string &funName)
+ZBenchTimer::ZBenchTimer(const std::string& funName)
 {
 #if defined(_WIN32) || defined(_WIN64)
-    LARGE_INTEGER freq;
-    QueryPerformanceFrequency(&freq);
-    m_frequency = static_cast<double>(freq.QuadPart);
+  LARGE_INTEGER freq;
+  QueryPerformanceFrequency(&freq);
+  m_frequency = static_cast<double>(freq.QuadPart);
 #endif
-    reset();
-    if (!funName.empty()) {
-      m_name = funName.substr(funName.find_first_not_of(" \t"));
-    }
+  reset();
+  if (!funName.empty()) {
+    m_name = funName.substr(funName.find_first_not_of(" \t"));
+  }
 }
 
 void ZBenchTimer::stop()
@@ -26,13 +26,13 @@ void ZBenchTimer::stop()
     m_time += ((stop.QuadPart - m_start.QuadPart) / m_frequency);
 #elif defined(__APPLE__) && defined(__MACH__)
   uint64_t elapsed = getCpuTicks() - m_start;
-  static mach_timebase_info_data_t sTimebaseInfo = {0,0};
+  static mach_timebase_info_data_t sTimebaseInfo = {0, 0};
   if (sTimebaseInfo.denom == 0)
     (void) mach_timebase_info(&sTimebaseInfo);
   if (m_paused)
     m_pauseTime += 1e-9 * elapsed * sTimebaseInfo.numer / sTimebaseInfo.denom;
   else
-    m_time +=  1e-9 * elapsed * sTimebaseInfo.numer / sTimebaseInfo.denom;
+    m_time += 1e-9 * elapsed * sTimebaseInfo.numer / sTimebaseInfo.denom;
 #else
   timespec end = getCpuTicks();
   if ((end.tv_nsec - m_start.tv_nsec)<0) {
@@ -68,10 +68,10 @@ void ZBenchTimer::pause()
   m_time += ((stop.QuadPart - m_start.QuadPart) / m_frequency);
 #elif defined(__APPLE__) && defined(__MACH__)
   uint64_t elapsed = getCpuTicks() - m_start;
-  static mach_timebase_info_data_t sTimebaseInfo = {0,0};
+  static mach_timebase_info_data_t sTimebaseInfo = {0, 0};
   if (sTimebaseInfo.denom == 0)
     (void) mach_timebase_info(&sTimebaseInfo);
-  m_time +=  1e-9 * elapsed * sTimebaseInfo.numer / sTimebaseInfo.denom;
+  m_time += 1e-9 * elapsed * sTimebaseInfo.numer / sTimebaseInfo.denom;
 #else
   timespec end = getCpuTicks();
   if ((end.tv_nsec - m_start.tv_nsec)<0) {
@@ -98,10 +98,10 @@ void ZBenchTimer::resume()
   m_pauseTime += ((stop.QuadPart - m_start.QuadPart) / m_frequency);
 #elif defined(__APPLE__) && defined(__MACH__)
   uint64_t elapsed = getCpuTicks() - m_start;
-  static mach_timebase_info_data_t sTimebaseInfo = {0,0};
+  static mach_timebase_info_data_t sTimebaseInfo = {0, 0};
   if (sTimebaseInfo.denom == 0)
     (void) mach_timebase_info(&sTimebaseInfo);
-  m_pauseTime +=  1e-9 * elapsed * sTimebaseInfo.numer / sTimebaseInfo.denom;
+  m_pauseTime += 1e-9 * elapsed * sTimebaseInfo.numer / sTimebaseInfo.denom;
 #else
   timespec end = getCpuTicks();
   if ((end.tv_nsec - m_start.tv_nsec)<0) {

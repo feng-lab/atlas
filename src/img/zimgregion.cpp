@@ -3,14 +3,14 @@
 
 namespace nim {
 
-bool ZImgRegion::containsCoord(const nim::ZVoxelCoordinate &coord, const nim::ZImgInfo &info) const
+bool ZImgRegion::containsCoord(const nim::ZVoxelCoordinate& coord, const nim::ZImgInfo& info) const
 {
   ZImgRegion rgn = *this;
   rgn.resolveRegionEnd(info);
   return coord.allGreaterEqual(rgn.start) && coord.allLessThan(rgn.end);
 }
 
-void ZImgRegion::fitInto(const ZImgInfo &info)
+void ZImgRegion::fitInto(const ZImgInfo& info)
 {
   ZVoxelCoordinate endCoord(info.width, info.height, info.depth,
                             info.numChannels, info.numTimes);
@@ -24,7 +24,7 @@ void ZImgRegion::fitInto(const ZImgInfo &info)
   //if (end.l < 0) end.l = endCoord.l;
 }
 
-void ZImgRegion::resolveRegionEnd(const ZImgInfo &info)
+void ZImgRegion::resolveRegionEnd(const ZImgInfo& info)
 {
   if (end.x < 0) end.x = info.width;
   if (end.y < 0) end.y = info.height;
@@ -50,13 +50,13 @@ void ZImgRegion::resolveRegionEnd(const ZImgInfo &info)
 QString ZImgRegion::toQString() const
 {
   return QString("x: [%1, %2)").arg(start.x).arg(end.x) %
-      QString(", y: [%1, %2)").arg(start.y).arg(end.y) %
-      QString(", z: [%1, %2)").arg(start.z).arg(end.z) %
-      QString(", c: [%1, %2)").arg(start.c).arg(end.c) %
-      QString(", t: [%1, %2)").arg(start.t).arg(end.t);
+         QString(", y: [%1, %2)").arg(start.y).arg(end.y) %
+         QString(", z: [%1, %2)").arg(start.z).arg(end.z) %
+         QString(", c: [%1, %2)").arg(start.c).arg(end.c) %
+         QString(", t: [%1, %2)").arg(start.t).arg(end.t);
 }
 
-ZImgInfo ZImgRegion::clip(const ZImgInfo &info) const
+ZImgInfo ZImgRegion::clip(const ZImgInfo& info) const
 {
   ZImgInfo res = info;
   //  value_type rlEnd = end.l == -1 ? info.numLocations : end.l;

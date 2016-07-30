@@ -33,8 +33,9 @@ QStringList ZImgTiff::extensions() const
   return res;
 }
 
-void ZImgTiff::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                        std::vector<std::set<size_t>> *pyramidalRatios)
+void ZImgTiff::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                        std::vector<std::set<size_t>>* pyramidalRatios)
 {
   clearInternalState();
   ZTiff tiff;
@@ -49,7 +50,7 @@ void ZImgTiff::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, s
   }
 }
 
-void ZImgTiff::readMetadata(const QString &filename, ZImgMetadata &meta, size_t scene)
+void ZImgTiff::readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene)
 {
   clearInternalState();
   ZTiff tiff;
@@ -61,7 +62,8 @@ void ZImgTiff::readMetadata(const QString &filename, ZImgMetadata &meta, size_t 
   readMetadataInternal(meta, scene, tiff);
 }
 
-void ZImgTiff::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail, const ZImgRegion &region, size_t scene)
+void
+ZImgTiff::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, const ZImgRegion& region, size_t scene)
 {
   clearInternalState();
   ZTiff tiff;
@@ -73,7 +75,7 @@ void ZImgTiff::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
   readThumbnailInternal(thumbnail, region, scene, tiff);
 }
 
-void ZImgTiff::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
+void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
 {
   clearInternalState();
   ZTiff tiff;
@@ -82,7 +84,7 @@ void ZImgTiff::readImg(const QString &filename, ZImg &img, const ZImgRegion &reg
   if (scene >= m_imgInfo.size()) {
     throw ZIOException("invalid scene");
   }
-  const std::vector<ZTiffIFD> &ifds = tiff.ifds();
+  const std::vector<ZTiffIFD>& ifds = tiff.ifds();
 
   if (m_isImageJTiff && m_onlyOneIFDInImageJTiff) {
     if (!ifds[0].isNormalImage() || ifds[0].compression() != enumToUnderlyingType(Compression::NONE) ||
@@ -94,7 +96,9 @@ void ZImgTiff::readImg(const QString &filename, ZImg &img, const ZImgRegion &reg
   }
 
   if (region.isEmpty() || !region.isValid(m_imgInfo[scene])) {
-    throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'").arg(m_imgInfo[scene].toQString()).arg(region.toQString()));
+    throw ZIOException(
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(m_imgInfo[scene].toQString()).arg(
+        region.toQString()));
   }
 
   ZImgInfo imgInfo2D(m_imgInfo[scene]);
@@ -115,7 +119,7 @@ void ZImgTiff::readImg(const QString &filename, ZImg &img, const ZImgRegion &reg
   int l = 0;
   size_t ifdIdx = 0;
 
-  for (size_t i=0; i<ifds.size(); ++i) {
+  for (size_t i = 0; i < ifds.size(); ++i) {
     if (ifds[i].isNormalImage()) {
       mapIFDToImgLocation(ifdIdx, z, c, t, l);
       if ((region.zInRegion(z)) &&
@@ -123,9 +127,9 @@ void ZImgTiff::readImg(const QString &filename, ZImg &img, const ZImgRegion &reg
           (region.tInRegion(t)) &&
           (static_cast<int>(scene) == l)) {
         tiff.readImgFromIFD(i, buf2DImg);
-        int desc = c == -1 ? c : c-region.start.c;
+        int desc = c == -1 ? c : c - region.start.c;
         //LOG(INFO) << ifdIdx << " " << z << " " << c << " " << t << " " << l;
-        cpyImg(buf2DImg, region, imgTmp, z-region.start.z, desc, t-region.start.t);
+        cpyImg(buf2DImg, region, imgTmp, z - region.start.z, desc, t - region.start.t);
       }
       ifdIdx++;
     }
@@ -140,32 +144,32 @@ void ZImgTiff::readImg(const QString &filename, ZImg &img, const ZImgRegion &reg
   }
 }
 
-void ZImgTiff::writeImg(const QString &filename, const ZImg &img, Compression comp)
+void ZImgTiff::writeImg(const QString& filename, const ZImg& img, Compression comp)
 {
   ZTiffWriter tiffWriter;
   int extraSample = img.info().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
-  if (img.byteNumber() > 1024_usize*1024*3600)
+  if (img.byteNumber() > 1024_usize * 1024 * 3600)
     tiffWriter.startWriting(filename, comp, extraSample, true);
   else
     tiffWriter.startWriting(filename, comp, extraSample, false);
-  for (size_t t=0; t<img.numTimes(); ++t) {
-    for (size_t z=0; z<img.depth(); ++z) {
+  for (size_t t = 0; t < img.numTimes(); ++t) {
+    for (size_t z = 0; z < img.depth(); ++z) {
       tiffWriter.writeIFD(img, z, t, -1, true);
     }
   }
 }
 
-void ZImgTiff::writeImg(const QString &filename, const ZImgSliceProvider &imgSliceProvider, Compression comp)
+void ZImgTiff::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp)
 {
   ZTiffWriter tiffWriter;
   int extraSample = imgSliceProvider.imgInfo().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
-  if (imgSliceProvider.imgInfo().byteNumber() > 1024_usize*1024*3600)
+  if (imgSliceProvider.imgInfo().byteNumber() > 1024_usize * 1024 * 3600)
     tiffWriter.startWriting(filename, comp, extraSample, true);
   else
     tiffWriter.startWriting(filename, comp, extraSample, false);
-  for (size_t t=0; t<imgSliceProvider.imgInfo().numTimes; ++t) {
-    for (size_t z=0; z<imgSliceProvider.imgInfo().depth; ++z) {
-      tiffWriter.writeIFD(imgSliceProvider.slice(z,t), 0, 0, -1, true);
+  for (size_t t = 0; t < imgSliceProvider.imgInfo().numTimes; ++t) {
+    for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
+      tiffWriter.writeIFD(imgSliceProvider.slice(z, t), 0, 0, -1, true);
     }
   }
 }
@@ -180,7 +184,7 @@ bool ZImgTiff::supportWrite() const
   return true;
 }
 
-void ZImgTiff::readIntoInternalStructure(const QString &filename, ZTiff &tiff)
+void ZImgTiff::readIntoInternalStructure(const QString& filename, ZTiff& tiff)
 {
   tiff.load(filename);
   if (!tiff.isValid()) {
@@ -199,9 +203,9 @@ void ZImgTiff::clearInternalState()
   m_onlyOneIFDInImageJTiff = false;
 }
 
-void ZImgTiff::detectImgInfo(ZTiff &tiff)
+void ZImgTiff::detectImgInfo(ZTiff& tiff)
 {
-  const std::vector<ZTiffIFD> &ifds = tiff.ifds();
+  const std::vector<ZTiffIFD>& ifds = tiff.ifds();
   std::set<size_t> widths;
   std::set<size_t> heights;
   std::set<size_t> numChannels;
@@ -212,7 +216,7 @@ void ZImgTiff::detectImgInfo(ZTiff &tiff)
   m_imgInfo.resize(1);
   m_imgInfo[0].depth = 0;
   m_imgInfo[0].numTimes = 1;
-  for (size_t i=0; i<ifds.size(); ++i) {
+  for (size_t i = 0; i < ifds.size(); ++i) {
     if (ifds[i].isNormalImage()) {
       ZImgInfo tmpInfo;
       tiff.readInfoFromIFD(ifds[i], tmpInfo);
@@ -224,7 +228,8 @@ void ZImgTiff::detectImgInfo(ZTiff &tiff)
       voxelFormats.insert(tmpInfo.voxelFormat);
       alphaChannel.insert(tmpInfo.lastChannelIsAlphaChannel);
       validBitCounts.insert(tmpInfo.validBitCount);
-      if (widths.size() != 1 || heights.size() != 1 || numChannels.size() != 1 || bytesPerVoxels.size() != 1 || voxelFormats.size() != 1 ||
+      if (widths.size() != 1 || heights.size() != 1 || numChannels.size() != 1 || bytesPerVoxels.size() != 1 ||
+          voxelFormats.size() != 1 ||
           alphaChannel.size() != 1 || validBitCounts.size() != 1)
         throw ZIOException("Different image dimensions or formats is not supported.");
 
@@ -249,15 +254,15 @@ void ZImgTiff::detectImgInfo(ZTiff &tiff)
       size_t frames = 1;
       bool hyperstack = false;
       QStringList fields = m_imageDescription.split("\n", QString::SkipEmptyParts);
-      for (int i=0; i<fields.size(); ++i) {
+      for (int i = 0; i < fields.size(); ++i) {
         if (fields[i].startsWith("images=")) {
-          images = fields[i].remove(0,7).toInt();
+          images = fields[i].remove(0, 7).toInt();
         } else if (fields[i].startsWith("channels=")) {
-          channels = fields[i].remove(0,9).toInt();
+          channels = fields[i].remove(0, 9).toInt();
         } else if (fields[i].startsWith("slices=")) {
-          slices = fields[i].remove(0,7).toInt();
+          slices = fields[i].remove(0, 7).toInt();
         } else if (fields[i].startsWith("frames=")) {
-          frames = fields[i].remove(0,7).toInt();
+          frames = fields[i].remove(0, 7).toInt();
         } else if (fields[i].startsWith("hyperstack=true")) {
           hyperstack = true;
         }
@@ -290,9 +295,9 @@ void ZImgTiff::detectImgInfo(ZTiff &tiff)
   }
 }
 
-void ZImgTiff::readMetadataInternal(ZImgMetadata &meta, size_t scene, ZTiff &tiff)
+void ZImgTiff::readMetadataInternal(ZImgMetadata& meta, size_t scene, ZTiff& tiff)
 {
-  const std::vector<ZTiffIFD> &ifds = tiff.ifds();
+  const std::vector<ZTiffIFD>& ifds = tiff.ifds();
   int z = 0;
   int c = 0;
   int t = 0;
@@ -302,7 +307,7 @@ void ZImgTiff::readMetadataInternal(ZImgMetadata &meta, size_t scene, ZTiff &tif
     ZImgMetatag tag("metadata", m_imageDescription);
     meta.attachToTopLevel(tag);
   }
-  for (size_t i=0; i<ifds.size(); ++i) {
+  for (size_t i = 0; i < ifds.size(); ++i) {
     if (ifds[i].isNormalImage()) {
       mapIFDToImgLocation(ifdIdx, z, c, t, l);
       if (l != static_cast<int>(scene))
@@ -319,12 +324,14 @@ void ZImgTiff::readMetadataInternal(ZImgMetadata &meta, size_t scene, ZTiff &tif
   }
 }
 
-void ZImgTiff::readThumbnailInternal(ZImgThumbernail &thumbnail, const ZImgRegion &region, size_t scene, ZTiff &tiff)
+void ZImgTiff::readThumbnailInternal(ZImgThumbernail& thumbnail, const ZImgRegion& region, size_t scene, ZTiff& tiff)
 {
-  const std::vector<ZTiffIFD> &ifds = tiff.ifds();
+  const std::vector<ZTiffIFD>& ifds = tiff.ifds();
 
   if (region.isEmpty() || !region.isValid(m_imgInfo[scene])) {
-    throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'").arg(m_imgInfo[scene].toQString()).arg(region.toQString()));
+    throw ZIOException(
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(m_imgInfo[scene].toQString()).arg(
+        region.toQString()));
   }
 
   // thumbnail follows image or in subifd
@@ -333,7 +340,7 @@ void ZImgTiff::readThumbnailInternal(ZImgThumbernail &thumbnail, const ZImgRegio
   int t = 0;
   int l = 0;
   size_t ifdIdx = 0;
-  for (size_t i=0; i<ifds.size(); ++i) {
+  for (size_t i = 0; i < ifds.size(); ++i) {
     if (ifds[i].isNormalImage()) {
       mapIFDToImgLocation(ifdIdx, z, c, t, l);
       if ((region.zInRegion(z)) &&
@@ -344,26 +351,26 @@ void ZImgTiff::readThumbnailInternal(ZImgThumbernail &thumbnail, const ZImgRegio
         for (size_t sub = 0; sub < subifds.size(); ++sub) {
           ZImg thumb = tiff.readThumbnailFromIFD(subifds[sub]);
           if (!thumb.isEmpty())
-            thumbnail.attachToPlane(thumb, z-region.start.z, t-region.start.t);
+            thumbnail.attachToPlane(thumb, z - region.start.z, t - region.start.t);
         }
       }
       ifdIdx++;
     } else if (ifds[i].isReducedResolutionImage() && ifdIdx > 0) {
-      mapIFDToImgLocation(ifdIdx-1, z, c, t, l);
+      mapIFDToImgLocation(ifdIdx - 1, z, c, t, l);
       if ((region.zInRegion(z)) &&
           (region.cInRegion(c) || c == -1) &&
           (region.tInRegion(t)) &&
           (static_cast<int>(scene) == l)) {
         ZImg thumb = tiff.readThumbnailFromIFD(ifds[i]);
         if (!thumb.isEmpty()) {
-          thumbnail.attachToPlane(thumb, z-region.start.z, t-region.start.t);
+          thumbnail.attachToPlane(thumb, z - region.start.z, t - region.start.t);
         }
       }
     }
   }
 }
 
-void ZImgTiff::setDimensionOrder(const QString &order)
+void ZImgTiff::setDimensionOrder(const QString& order)
 {
   if (isDimensionOrderValid(order))
     m_dimensionOrder = order;
@@ -371,28 +378,28 @@ void ZImgTiff::setDimensionOrder(const QString &order)
     throw ZIOException(QString("Wrong dimension order: %1").arg(order));
 }
 
-bool ZImgTiff::mapIFDToImgLocation(size_t ifdIdx, int &z, int &c, int &t, int &l)
+bool ZImgTiff::mapIFDToImgLocation(size_t ifdIdx, int& z, int& c, int& t, int& l)
 {
   return IFDToLoc(ifdIdx, z, c, t, l, m_startIFDIndex, m_dimensionOrder, m_imgInfo[0], m_imgInfo.size());
 }
 
-bool ZImgTiff::isDimensionOrderValid(const QString &order)
+bool ZImgTiff::isDimensionOrderValid(const QString& order)
 {
   return (order.size() == 3 && order.contains(QChar('Z')) && order.contains(QChar('T')) &&
           order.contains(QChar('L'))) ||
-      (order.size() == 4 && order.contains(QChar('Z')) && order.contains(QChar('C')) &&
-       order.contains(QChar('T')) && order.contains(QChar('L')));
+         (order.size() == 4 && order.contains(QChar('Z')) && order.contains(QChar('C')) &&
+          order.contains(QChar('T')) && order.contains(QChar('L')));
 }
 
-bool ZImgTiff::IFDToLoc(size_t ifdIdx, int &z, int &c, int &t, int &l,
-                        size_t startIFDIndex, const QString &dimensionOrder, const ZImgInfo &imgInfo,
+bool ZImgTiff::IFDToLoc(size_t ifdIdx, int& z, int& c, int& t, int& l,
+                        size_t startIFDIndex, const QString& dimensionOrder, const ZImgInfo& imgInfo,
                         size_t numScenes,
                         int startZ, int startC, int startT, int startL)
 {
   size_t ndims = dimensionOrder.size();
   std::vector<size_t> dimSizes;
   std::vector<int> dimStarts;
-  for (size_t i=0; i<ndims; ++i) {
+  for (size_t i = 0; i < ndims; ++i) {
     if (dimensionOrder.at(i) == QChar('Z')) {
       dimSizes.push_back(imgInfo.depth);
       dimStarts.push_back(startZ);
@@ -409,35 +416,35 @@ bool ZImgTiff::IFDToLoc(size_t ifdIdx, int &z, int &c, int &t, int &l,
   }
 
   std::vector<size_t> dimStrides(ndims, 1);
-  for (size_t i=1; i<ndims; ++i)
-    dimStrides[i] = dimStrides[i-1] * dimSizes[i-1];
+  for (size_t i = 1; i < ndims; ++i)
+    dimStrides[i] = dimStrides[i - 1] * dimSizes[i - 1];
 
-  size_t maxIFDNum = dimStrides[ndims-1] * dimSizes[ndims-1];
+  size_t maxIFDNum = dimStrides[ndims - 1] * dimSizes[ndims - 1];
   if (ifdIdx < startIFDIndex || ifdIdx >= startIFDIndex + maxIFDNum)
     return false;
   ifdIdx -= startIFDIndex;
 
   std::vector<size_t> locs(ndims);
   locs[0] = ifdIdx % dimSizes[0];
-  for (size_t i=1; i<ndims; ++i) {
+  for (size_t i = 1; i < ndims; ++i) {
     locs[i] = ifdIdx % (dimStrides[i] * dimSizes[i]);
     locs[i] /= dimStrides[i];
   }
 
   // add start location to result location
-  for (size_t i=0; i<ndims; ++i) {
+  for (size_t i = 0; i < ndims; ++i) {
     locs[i] += dimStarts[i];
     if (locs[i] >= dimSizes[i]) {
       if (i < ndims - 1) {
         locs[i] %= dimSizes[i];
-        locs[i+1] += 1;
+        locs[i + 1] += 1;
       } else {
         return false;
       }
     }
   }
 
-  for (size_t i=0; i<ndims; ++i) {
+  for (size_t i = 0; i < ndims; ++i) {
     if (dimensionOrder.at(i) == QChar('Z'))
       z = locs[i];
     else if (dimensionOrder.at(i) == QChar('C'))
@@ -457,28 +464,30 @@ bool ZImgTiff::IFDToLoc(size_t ifdIdx, int &z, int &c, int &t, int &l,
   return true;
 }
 
-void ZImgTiff::cpyImg(const ZImg &img2D, const ZImgRegion &region, ZImg &img, int z, int c, int t)
+void ZImgTiff::cpyImg(const ZImg& img2D, const ZImgRegion& region, ZImg& img, int z, int c, int t)
 {
   if (c < 0) {
     size_t cEnd = region.end.c == -1 ? img2D.numChannels() : region.end.c;
     for (size_t c = region.start.c; c < cEnd; ++c) {
       if (region.containsWholeRow(img2D.info())) {
-        memcpy(img.planeData<uint8_t>(z, c-region.start.c, t), img2D.rowData<uint8_t>(region.start.y, 0, c, 0), img.planeByteNumber());
+        memcpy(img.planeData<uint8_t>(z, c - region.start.c, t), img2D.rowData<uint8_t>(region.start.y, 0, c, 0),
+               img.planeByteNumber());
       } else {
         size_t yEnd = region.end.y == -1 ? img2D.height() : region.end.y;
         for (size_t y = region.start.y; y < yEnd; ++y) {
-          memcpy(img.rowData<uint8_t>(y-region.start.y, z, c-region.start.c, t),
+          memcpy(img.rowData<uint8_t>(y - region.start.y, z, c - region.start.c, t),
                  img2D.data<uint8_t>(region.start.x, y, 0, c, 0), img.rowByteNumber());
         }
       }
     }
   } else if (region.cInRegion(c)) {
     if (region.containsWholeRow(img2D.info())) {
-      memcpy(img.planeData<uint8_t>(z, c-region.start.c, t), img2D.rowData<uint8_t>(region.start.y, 0, 0, 0), img.planeByteNumber());
+      memcpy(img.planeData<uint8_t>(z, c - region.start.c, t), img2D.rowData<uint8_t>(region.start.y, 0, 0, 0),
+             img.planeByteNumber());
     } else {
       size_t yEnd = region.end.y == -1 ? img2D.height() : region.end.y;
       for (size_t y = region.start.y; y < yEnd; ++y) {
-        memcpy(img.rowData<uint8_t>(y-region.start.y, z, c-region.start.c, t),
+        memcpy(img.rowData<uint8_t>(y - region.start.y, z, c - region.start.c, t),
                img2D.data<uint8_t>(region.start.x, y, 0, 0, 0), img.rowByteNumber());
       }
     }

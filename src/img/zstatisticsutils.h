@@ -6,9 +6,12 @@
 #include <numeric>
 #include <cassert>
 #include <QList>
+
 #ifndef _USE_QTCONCURRENT_
+
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
+
 #else
 #include <QtConcurrent/QtConcurrentMap>
 #endif
@@ -22,13 +25,16 @@ namespace nim {
 #define MULTITHREAD_THRESHOLD 1e8
 
 #ifndef _USE_QTCONCURRENT_
+
 template<typename RandomAccessIterator>
 class _MinMaxElementReduce
 {
   RandomAccessIterator m_begin;
 public:
-  std::pair<RandomAccessIterator,RandomAccessIterator> m_minmax;
-  void operator()(const tbb::blocked_range<RandomAccessIterator>& range) {
+  std::pair<RandomAccessIterator, RandomAccessIterator> m_minmax;
+
+  void operator()(const tbb::blocked_range<RandomAccessIterator>& range)
+  {
     for (RandomAccessIterator it = range.begin(); it != range.end(); ++it) {
       if (*it < *m_minmax.first)
         m_minmax.first = it;
@@ -55,6 +61,7 @@ public:
     : m_begin(begin), m_minmax(m_begin, m_begin)
   {}
 };
+
 #else
 template <typename RandomAccessIterator>
 struct MinMaxElementMap {
@@ -77,13 +84,13 @@ struct MinMaxElementMap {
 };
 #endif
 
-template <typename RandomAccessIterator>
-std::pair<RandomAccessIterator,RandomAccessIterator>
+template<typename RandomAccessIterator>
+std::pair<RandomAccessIterator, RandomAccessIterator>
 minMaxElement(RandomAccessIterator begin, RandomAccessIterator end, bool useMultithreading = true)
 {
   assert(end > begin);
 #ifndef _USE_QTCONCURRENT_
-  if (!useMultithreading || end-begin < MULTITHREAD_THRESHOLD) {
+  if (!useMultithreading || end - begin < MULTITHREAD_THRESHOLD) {
     return std::minmax_element(begin, end);
   } else {
     _MinMaxElementReduce<RandomAccessIterator> minmax(begin);
@@ -121,21 +128,28 @@ minMaxElement(RandomAccessIterator begin, RandomAccessIterator end, bool useMult
 }
 
 #ifndef _USE_QTCONCURRENT_
+
 template<typename RandomAccessIterator, typename ResultType>
 class _SumRangeReduce
 {
 public:
   ResultType m_sum;
-  void operator()(const tbb::blocked_range<RandomAccessIterator>& range) {
+
+  void operator()(const tbb::blocked_range<RandomAccessIterator>& range)
+  {
     m_sum += std::accumulate(range.begin(), range.end(), ResultType(0));
   }
 
-  _SumRangeReduce(_SumRangeReduce&, tbb::split) : m_sum(0) {}
+  _SumRangeReduce(_SumRangeReduce&, tbb::split) : m_sum(0)
+  {}
 
-  void join(const _SumRangeReduce& y) { m_sum += y.m_sum; }
+  void join(const _SumRangeReduce& y)
+  { m_sum += y.m_sum; }
 
-  _SumRangeReduce() : m_sum(0) {}
+  _SumRangeReduce() : m_sum(0)
+  {}
 };
+
 #else
 template<typename RandomAccessIterator, typename ResultType>
 struct SumRangeMap {
@@ -150,13 +164,14 @@ struct SumRangeMap {
 #endif
 
 template<typename RandomAccessIterator, typename ResultType>
-ResultType sumRange(RandomAccessIterator begin, RandomAccessIterator end, ResultType init, bool useMultithreading = true)
+ResultType
+sumRange(RandomAccessIterator begin, RandomAccessIterator end, ResultType init, bool useMultithreading = true)
 {
-  if (!useMultithreading || end-begin < MULTITHREAD_THRESHOLD)
+  if (!useMultithreading || end - begin < MULTITHREAD_THRESHOLD)
     return std::accumulate(begin, end, init);
   else {
 #ifndef _USE_QTCONCURRENT_
-    _SumRangeReduce<RandomAccessIterator, ResultType> sum;
+    _SumRangeReduce <RandomAccessIterator, ResultType> sum;
     tbb::parallel_reduce(tbb::blocked_range<RandomAccessIterator>(begin, end), sum);
     return init + sum.m_sum;
 #else
@@ -177,7 +192,7 @@ ResultType sumRange(RandomAccessIterator begin, RandomAccessIterator end, Result
   }
 }
 
-template <class RandomAccessIterator>
+template<class RandomAccessIterator>
 double mean(RandomAccessIterator begin, RandomAccessIterator end, bool useMultithreading = true)
 {
   //typedef typename std::iterator_traits<RandomAccessIterator>::value_type ValueType;
@@ -185,10 +200,11 @@ double mean(RandomAccessIterator begin, RandomAccessIterator end, bool useMultit
   typedef double ResultType;
 
   ResultType sum = sumRange(begin, end, static_cast<ResultType>(0), useMultithreading);
-  return sum / (end-begin);
+  return sum / (end - begin);
 }
 
 #ifndef _USE_QTCONCURRENT_
+
 template<typename RandomAccessIterator, typename DiffIterator, typename ResultType>
 class _StandardDeviationReduce
 {
@@ -197,11 +213,14 @@ class _StandardDeviationReduce
   ResultType m_meanV;
 public:
   ResultType m_sqSum;
-  void operator()(const tbb::blocked_range<size_t>& range) {
+
+  void operator()(const tbb::blocked_range<size_t>& range)
+  {
     ResultType meanVLocal = m_meanV;
-    std::transform(m_begin+range.begin(), m_begin+range.end(), m_diffbegin+range.begin(),
+    std::transform(m_begin + range.begin(), m_begin + range.end(), m_diffbegin + range.begin(),
                    [meanVLocal](ResultType v) { return v - meanVLocal; });
-    m_sqSum += std::inner_product(m_diffbegin+range.begin(), m_diffbegin+range.end(), m_diffbegin+range.begin(), 0.0);
+    m_sqSum += std::inner_product(m_diffbegin + range.begin(), m_diffbegin + range.end(), m_diffbegin + range.begin(),
+                                  0.0);
   }
 
   _StandardDeviationReduce(_StandardDeviationReduce& x, tbb::split)
@@ -217,6 +236,7 @@ public:
     : m_begin(begin), m_diffbegin(diffbegin), m_meanV(mean), m_sqSum(0)
   {}
 };
+
 #else
 template<typename RandomAccessIterator, typename DiffIterator, typename ResultType>
 struct StandardDeviationMap {
@@ -240,10 +260,10 @@ struct StandardDeviationMap {
 };
 #endif
 
-template <class RandomAccessIterator>
+template<class RandomAccessIterator>
 void meanAndStandardDeviation(RandomAccessIterator begin, RandomAccessIterator end,
-                              double &meanV,
-                              double &stdV,
+                              double& meanV,
+                              double& stdV,
                               bool bias = false,
                               bool useMultithreading = true)
 {
@@ -254,13 +274,15 @@ void meanAndStandardDeviation(RandomAccessIterator begin, RandomAccessIterator e
   std::vector<ResultType> diff(size);
   meanV = mean(begin, end, useMultithreading);
   ResultType sq_sum;
-  if (!useMultithreading || end-begin < MULTITHREAD_THRESHOLD) {
+  if (!useMultithreading || end - begin < MULTITHREAD_THRESHOLD) {
     std::transform(begin, end, diff.begin(),
                    [meanV](ResultType v) { return v - meanV; });
     sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
   } else {
 #ifndef _USE_QTCONCURRENT_
-    _StandardDeviationReduce<RandomAccessIterator, std::vector<ResultType>::iterator, ResultType> sqsum(begin, diff.begin(), meanV);
+    _StandardDeviationReduce <RandomAccessIterator, std::vector<ResultType>::iterator, ResultType> sqsum(begin,
+                                                                                                         diff.begin(),
+                                                                                                         meanV);
     tbb::parallel_reduce(tbb::blocked_range<size_t>(0, size), sqsum);
     sq_sum = sqsum.m_sqSum;
 #else
@@ -287,7 +309,7 @@ void meanAndStandardDeviation(RandomAccessIterator begin, RandomAccessIterator e
   }
 }
 
-template <class RandomAccessIterator>
+template<class RandomAccessIterator>
 double standardDeviation(RandomAccessIterator begin, RandomAccessIterator end, bool bias = false,
                          bool useMultithreading = true)
 {
@@ -297,7 +319,7 @@ double standardDeviation(RandomAccessIterator begin, RandomAccessIterator end, b
   return stdV;
 }
 
-template <class RandomAccessIterator>
+template<class RandomAccessIterator>
 double median(RandomAccessIterator begin, RandomAccessIterator end)
 {
   typedef typename std::iterator_traits<RandomAccessIterator>::value_type ValueType;
@@ -305,23 +327,23 @@ double median(RandomAccessIterator begin, RandomAccessIterator end)
   typedef double ResultType;
   assert(end > begin);
   size_t size = end - begin;
-  size_t middleIdx = size/2;
+  size_t middleIdx = size / 2;
 
   std::vector<ValueType> vec;
   vec.insert(vec.end(), begin, end);
   typename std::vector<ValueType>::iterator target = vec.begin() + middleIdx;
   std::nth_element(vec.begin(), target, vec.end());
 
-  if(size % 2 != 0){ //Odd number of elements
+  if (size % 2 != 0) { //Odd number of elements
     return static_cast<ResultType>(*target);
-  } else{            //Even number of elements
+  } else {            //Even number of elements
     ResultType a = *target;
-    return (a + *std::max_element(vec.begin(), target))/2.0;
+    return (a + *std::max_element(vec.begin(), target)) / 2.0;
   }
 }
 
 // will change input data
-template <class RandomAccessIterator>
+template<class RandomAccessIterator>
 double medianInPlace(RandomAccessIterator begin, RandomAccessIterator end)
 {
   //typedef typename std::iterator_traits<RandomAccessIterator>::value_type ValueType;
@@ -329,16 +351,16 @@ double medianInPlace(RandomAccessIterator begin, RandomAccessIterator end)
   typedef double ResultType;
   assert(end > begin);
   size_t size = end - begin;
-  size_t middleIdx = size/2;
+  size_t middleIdx = size / 2;
 
   RandomAccessIterator target = begin + middleIdx;
   std::nth_element(begin, target, end);
 
-  if(size % 2 != 0){ //Odd number of elements
+  if (size % 2 != 0) { //Odd number of elements
     return static_cast<ResultType>(*target);
-  } else{            //Even number of elements
+  } else {            //Even number of elements
     ResultType a = *target;
-    return (a + *std::max_element(begin, target))/2.0;
+    return (a + *std::max_element(begin, target)) / 2.0;
   }
 }
 

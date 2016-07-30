@@ -13,7 +13,8 @@ namespace nim {
 
 using namespace Eigen;
 
-MatrixXd ZEigenUtils::readMatrix(const QString &filename, const char *uSep, bool strictDelimiter, double fillValue, const std::string &commentStart)
+MatrixXd ZEigenUtils::readMatrix(const QString& filename, const char* uSep, bool strictDelimiter, double fillValue,
+                                 const std::string& commentStart)
 {
   MatrixXd mat;
   MatrixXd emptyMat;
@@ -62,8 +63,9 @@ MatrixXd ZEigenUtils::readMatrix(const QString &filename, const char *uSep, bool
   }
 }
 
-RowVectorXd ZEigenUtils::readRowVector(const std::string &iline, const char *uSep, int *nActualData,
-                                       int nReadData, bool strictDelimiter, double fillValue, const std::string &commentStart)
+RowVectorXd ZEigenUtils::readRowVector(const std::string& iline, const char* uSep, int* nActualData,
+                                       int nReadData, bool strictDelimiter, double fillValue,
+                                       const std::string& commentStart)
 {
   RowVectorXd rowVector;
   std::string line = iline.substr(0, iline.find_first_of("\n"));  //extract only one line to process
@@ -125,13 +127,13 @@ RowVectorXd ZEigenUtils::readRowVector(const std::string &iline, const char *uSe
   } else {
     sPos = line.find_first_not_of(sep);   //skip spaces
   }
-  for (int i=0; i<nReadData; i++) {
+  for (int i = 0; i < nReadData; i++) {
     if (!hasData) {
       rowVector(i) = fillValue;
       continue;
     }
     size_t ePos = line.find_first_of(sep, sPos);
-    std::string valString = line.substr(sPos, ePos-sPos);
+    std::string valString = line.substr(sPos, ePos - sPos);
     //convert valString to double
     if (strictDelimiter && valString.empty()) {
       rowVector(i) = fillValue;
@@ -162,7 +164,7 @@ RowVectorXd ZEigenUtils::readRowVector(const std::string &iline, const char *uSe
 #else
         double val = std::strtod(valString.c_str(), nullptr);
         rowVector(i) = (val == HUGE_VAL) ? std::numeric_limits<double>::infinity() :
-                                           (val == -HUGE_VAL) ? -std::numeric_limits<double>::infinity() : val;
+                       (val == -HUGE_VAL) ? -std::numeric_limits<double>::infinity() : val;
 #endif
       }
     }
@@ -172,7 +174,7 @@ RowVectorXd ZEigenUtils::readRowVector(const std::string &iline, const char *uSe
       continue;
     }
     if (strictDelimiter) {
-      sPos = ePos+1;
+      sPos = ePos + 1;
     } else {
       sPos = line.find_first_not_of(sep, ePos); //skip seps
     }
@@ -184,11 +186,11 @@ RowVectorXd ZEigenUtils::readRowVector(const std::string &iline, const char *uSe
   return rowVector;
 }
 
-MatrixXd ZEigenUtils::removeRowsContainNaNOrInF(const Eigen::MatrixXd &srcMat)
+MatrixXd ZEigenUtils::removeRowsContainNaNOrInF(const Eigen::MatrixXd& srcMat)
 {
   MatrixXd mat(srcMat.rows(), srcMat.cols());
   int idx = 0;
-  for (int i=0; i<srcMat.rows(); i++) {
+  for (int i = 0; i < srcMat.rows(); i++) {
     if (srcMat.row(i).allFinite()) {
       mat.row(idx++) = srcMat.row(i);
     }

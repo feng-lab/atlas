@@ -8,7 +8,7 @@
 namespace nim {
 
 template<typename TRange>
-std::vector<size_t> ZImg::histogram(TRange minData, TRange maxData, size_t nbins, const ZImg &mask) const
+std::vector<size_t> ZImg::histogram(TRange minData, TRange maxData, size_t nbins, const ZImg& mask) const
 {
   if (nbins == 0) {
     nbins = bytesPerVoxel() > 1 ? 65536 : 256;
@@ -22,7 +22,7 @@ std::vector<size_t> ZImg::histogram(TRange minData, TRange maxData, size_t nbins
     IMG_TYPED_CALL_2TYPE(histogramMask_Impl, (*this), mask, res, minData, maxData, mask);
   } else {
     throw ZImgException(QString("histogram mask has different size <%1> than current img <%2>")
-                        .arg(mask.info().toQString()).arg(m_info.toQString()));
+                          .arg(mask.info().toQString()).arg(m_info.toQString()));
   }
 
   return res;
@@ -53,7 +53,7 @@ std::pair<double, double> ZImg::binRange(size_t binIdx, TRange minData, TRange m
 }
 
 template<typename TPadValue>
-ZImg ZImg::cropWithPad(const ZVoxelCoordinate &startCoord, const ZVoxelCoordinate &endCoord,
+ZImg ZImg::cropWithPad(const ZVoxelCoordinate& startCoord, const ZVoxelCoordinate& endCoord,
                        PadOption padOption, TPadValue padValue) const
 {
   ZImg res;
@@ -63,7 +63,7 @@ ZImg ZImg::cropWithPad(const ZVoxelCoordinate &startCoord, const ZVoxelCoordinat
   }
   if (endCoord.anyLessThan(startCoord)) {
     throw ZImgException(QString("Try to crop pad img with invalid region <%1> to <%2>")
-                        .arg(startCoord.toQString()).arg(endCoord.toQString()));
+                          .arg(startCoord.toQString()).arg(endCoord.toQString()));
   }
   if (endCoord.anyEqual(startCoord)) {
     return res;
@@ -93,10 +93,10 @@ ZImg ZImg::cropWithPad(const ZVoxelCoordinate &startCoord, const ZVoxelCoordinat
 }
 
 template<typename TFillValue>
-ZImg &ZImg::fill(TFillValue value)
+ZImg& ZImg::fill(TFillValue value)
 {
   if (bytesPerVoxel() == 1 || value == TFillValue(0)) {
-    for (size_t t=0; t<m_info.numTimes; ++t)
+    for (size_t t = 0; t < m_info.numTimes; ++t)
       memset(timeData(t), static_cast<unsigned char>(value), timeByteNumber());
     return *this;
   }
@@ -122,48 +122,48 @@ ZImg& ZImg::normalize(TRange minData, TRange maxData)
   VoxelFormat vf = m_info.voxelFormat;
   if (vf == VoxelFormat::Float) {
     switch (bytesPerVoxel) {
-    case 4:
-      scale_Impl<float, float>(minData, maxData, this, this);
-      break;
-    case 8:
-      scale_Impl<double, double>(minData, maxData, this, this);
-      break;
-    default:
-      break;
+      case 4:
+        scale_Impl<float, float>(minData, maxData, this, this);
+        break;
+      case 8:
+        scale_Impl<double, double>(minData, maxData, this, this);
+        break;
+      default:
+        break;
     }
   } else if (vf == VoxelFormat::Signed) {
     switch (bytesPerVoxel) {
-    case 1:
-      scale_Impl<int8_t, int8_t>(minData, maxData, this, this);
-      break;
-    case 2:
-      scale_Impl<int16_t, int16_t>(minData, maxData, this, this);
-      break;
-    case 4:
-      scale_Impl<int32_t, int32_t>(minData, maxData, this, this);
-      break;
-    case 8:
-      scale_Impl<int64_t, int64_t>(minData, maxData, this, this);
-      break;
-    default:
-      break;
+      case 1:
+        scale_Impl<int8_t, int8_t>(minData, maxData, this, this);
+        break;
+      case 2:
+        scale_Impl<int16_t, int16_t>(minData, maxData, this, this);
+        break;
+      case 4:
+        scale_Impl<int32_t, int32_t>(minData, maxData, this, this);
+        break;
+      case 8:
+        scale_Impl<int64_t, int64_t>(minData, maxData, this, this);
+        break;
+      default:
+        break;
     }
   } else {
     switch (bytesPerVoxel) {
-    case 1:
-      scale_Impl<uint8_t, uint8_t>(minData, maxData, this, this);
-      break;
-    case 2:
-      scale_Impl<uint16_t, uint16_t>(minData, maxData, this, this);
-      break;
-    case 4:
-      scale_Impl<uint32_t, uint32_t>(minData, maxData, this, this);
-      break;
-    case 8:
-      scale_Impl<uint64_t, uint64_t>(minData, maxData, this, this);
-      break;
-    default:
-      break;
+      case 1:
+        scale_Impl<uint8_t, uint8_t>(minData, maxData, this, this);
+        break;
+      case 2:
+        scale_Impl<uint16_t, uint16_t>(minData, maxData, this, this);
+        break;
+      case 4:
+        scale_Impl<uint32_t, uint32_t>(minData, maxData, this, this);
+        break;
+      case 8:
+        scale_Impl<uint64_t, uint64_t>(minData, maxData, this, this);
+        break;
+      default:
+        break;
     }
   }
 
@@ -206,7 +206,7 @@ ZImg ZImg::convertTo(TRange minData, TRange maxData) const
 }
 
 template<typename TRange>
-ZImg ZImg::convertTo(TRange minData, TRange maxData, const ZImg &targetImgType) const
+ZImg ZImg::convertTo(TRange minData, TRange maxData, const ZImg& targetImgType) const
 {
   IMG_RETURN_TYPED_CALL(convertTo, targetImgType, minData, maxData);
   assert(false);
@@ -269,7 +269,7 @@ ZImg ZImg::typedBinarized(const ForegroundPredictor& isForeground) const
 }
 
 template<typename TScalar>
-ZImg &ZImg::operator+=(TScalar scalar)
+ZImg& ZImg::operator+=(TScalar scalar)
 {
   if (scalar != TScalar(0)) {
     // todo: add some static_assert here to make sure input is arithmetic
@@ -287,7 +287,7 @@ ZImg ZImg::operator+(const TScalarOrZImg& scalarOrZImg) const
 }
 
 template<typename TScalar>
-ZImg &ZImg::operator-=(TScalar scalar)
+ZImg& ZImg::operator-=(TScalar scalar)
 {
   if (scalar != TScalar(0)) {
     // todo: add some static_assert here to make sure input is arithmetic
@@ -305,7 +305,7 @@ ZImg ZImg::operator-(const TScalarOrZImg& scalarOrZImg) const
 }
 
 template<typename TScalar>
-ZImg &ZImg::operator*=(TScalar scalar)
+ZImg& ZImg::operator*=(TScalar scalar)
 {
   if (scalar != TScalar(0)) {
     // todo: add some static_assert here to make sure input is arithmetic
@@ -325,7 +325,7 @@ ZImg ZImg::operator*(const TScalarOrZImg& scalarOrZImg) const
 }
 
 template<typename TScalar>
-ZImg &ZImg::operator/=(TScalar scalar)
+ZImg& ZImg::operator/=(TScalar scalar)
 {
   if (scalar != TScalar(0)) {
     // todo: add some static_assert here to make sure input is arithmetic
@@ -365,7 +365,7 @@ ZImg& ZImg::binaryOperation(const ZImg& other, const GenericCustomBinaryOp& op)
 {
   if (!isSameSize(other)) {
     throw ZImgException(QString("img binary operation requires same size img as input: this <%1>, other <%2>")
-                        .arg(m_info.toQString()).arg(other.info().toQString()));
+                          .arg(m_info.toQString()).arg(other.info().toQString()));
   }
   IMG_TYPED_CALL_2TYPE(binaryOp_Impl, (*this), other, other, op);
   return *this;
@@ -378,7 +378,7 @@ ZImg& ZImg::typedBinaryOperation(const ZImg& other, const CustomBinaryOp& op)
     throw ZImgException("Call typedBinaryOperation with wrong type");
   if (!isSameSize(other)) {
     throw ZImgException(QString("img binary operation requires same size img as input: this <%1>, other <%2>")
-                        .arg(m_info.toQString()).arg(other.info().toQString()));
+                          .arg(m_info.toQString()).arg(other.info().toQString()));
   }
   binaryOp_Impl<TVoxel, TVoxelOther>(other, op);
   return *this;
@@ -391,12 +391,13 @@ ZVoxelCoordinate ZImg::firstMaxValueCoord(TValue& max, const ZImgRegion& region)
   ZImgRegion rgn = region;
   if (rgn.isEmpty() || !rgn.isValid(m_info)) {
     throw ZImgException(QString("Try to find max value location of img <%1> within invalid region <%2>")
-                        .arg(m_info.toQString()).arg(rgn.toQString()));
+                          .arg(m_info.toQString()).arg(rgn.toQString()));
   }
   rgn.resolveRegionEnd(m_info);
   IMG_TYPED_CALL(firstMaxValueCoord_Impl, (*this), res, max, rgn);
   return res;
 }
+
 // coord of all voxels with max img value
 template<typename TValue>
 std::vector<ZVoxelCoordinate> ZImg::maxValueCoords(TValue& max, const ZImgRegion& region) const
@@ -405,14 +406,14 @@ std::vector<ZVoxelCoordinate> ZImg::maxValueCoords(TValue& max, const ZImgRegion
   ZImgRegion rgn = region;
   if (rgn.isEmpty() || !rgn.isValid(m_info)) {
     throw ZImgException(QString("Try to find max value locations of img <%1> within invalid region <%2>")
-                        .arg(m_info.toQString()).arg(rgn.toQString()));
+                          .arg(m_info.toQString()).arg(rgn.toQString()));
   }
   rgn.resolveRegionEnd(m_info);
   IMG_TYPED_CALL(maxValueCoords_Impl, (*this), res, max, rgn);
   return res;
 }
 
-template <typename TValue>
+template<typename TValue>
 TValue ZImg::value(const ZVoxelCoordinate& coord) const
 {
   if (isEmpty()) {
@@ -423,11 +424,11 @@ TValue ZImg::value(const ZVoxelCoordinate& coord) const
     return 0;
   } else {
     throw ZImgException(QString("value: Invalid coordinate %1 of img <%2>")
-                        .arg(coord.toQString()).arg(m_info.toQString()));
+                          .arg(coord.toQString()).arg(m_info.toQString()));
   }
 }
 
-template <typename TValue>
+template<typename TValue>
 TValue ZImg::value(size_t x, size_t y, size_t z, size_t c, size_t t) const
 {
   if (isEmpty()) {
@@ -439,11 +440,11 @@ TValue ZImg::value(size_t x, size_t y, size_t z, size_t c, size_t t) const
     return 0;
   } else {
     throw ZImgException(QString("value: Invalid coordinate (%1,%2,%3,%4,%5) of img <%6>")
-                        .arg(x).arg(y).arg(z).arg(c).arg(t).arg(m_info.toQString()));
+                          .arg(x).arg(y).arg(z).arg(c).arg(t).arg(m_info.toQString()));
   }
 }
 
-template <typename TValue>
+template<typename TValue>
 TValue ZImg::value(size_t idx) const
 {
   if (isEmpty()) {
@@ -454,11 +455,11 @@ TValue ZImg::value(size_t idx) const
     return 0;
   } else {
     throw ZImgException(QString("value: Invalid voxel idx %1 of img <%2>")
-                        .arg(idx).arg(m_info.toQString()));
+                          .arg(idx).arg(m_info.toQString()));
   }
 }
 
-template <typename TValue>
+template<typename TValue>
 TValue ZImg::valueWithPad(const ZVoxelCoordinate& coord, PadOption padOption, TValue padValue) const
 {
   if (isEmpty())
@@ -467,7 +468,7 @@ TValue ZImg::valueWithPad(const ZVoxelCoordinate& coord, PadOption padOption, TV
   return 0;
 }
 
-template <typename TValue>
+template<typename TValue>
 void ZImg::setValue(TValue value, const ZVoxelCoordinate& coord)
 {
   if (isEmpty()) {
@@ -477,11 +478,11 @@ void ZImg::setValue(TValue value, const ZVoxelCoordinate& coord)
     IMG_TYPED_CALL(setValue_Impl, (*this), value, coord);
   } else {
     throw ZImgException(QString("setValue: Invalid coordinate %1 of img <%2>")
-                        .arg(coord.toQString()).arg(m_info.toQString()));
+                          .arg(coord.toQString()).arg(m_info.toQString()));
   }
 }
 
-template <typename TValue>
+template<typename TValue>
 void ZImg::setValue(TValue value, size_t x, size_t y, size_t z, size_t c, size_t t)
 {
   if (isEmpty()) {
@@ -492,11 +493,11 @@ void ZImg::setValue(TValue value, size_t x, size_t y, size_t z, size_t c, size_t
     IMG_TYPED_CALL(setValue_Impl, (*this), value, x, y, z, c, t);
   } else {
     throw ZImgException(QString("setValue: Invalid coordinate (%1,%2,%3,%4,%5) of img <%6>")
-                        .arg(x).arg(y).arg(z).arg(c).arg(t).arg(m_info.toQString()));
+                          .arg(x).arg(y).arg(z).arg(c).arg(t).arg(m_info.toQString()));
   }
 }
 
-template <typename TValue>
+template<typename TValue>
 void ZImg::setValue(TValue value, size_t idx)
 {
   if (isEmpty()) {
@@ -506,11 +507,11 @@ void ZImg::setValue(TValue value, size_t idx)
     IMG_TYPED_CALL(setValue_Impl, (*this), value, idx);
   } else {
     throw ZImgException(QString("value: Invalid voxel idx %1 of img <%2>")
-                        .arg(idx).arg(m_info.toQString()));
+                          .arg(idx).arg(m_info.toQString()));
   }
 }
 
-template <typename TValue>
+template<typename TValue>
 bool ZImg::setValueNoThrow(TValue value, const ZVoxelCoordinate& coord)
 {
   if (isCoordValid(coord)) {
@@ -520,7 +521,7 @@ bool ZImg::setValueNoThrow(TValue value, const ZVoxelCoordinate& coord)
   return false;
 }
 
-template <typename TValue>
+template<typename TValue>
 bool ZImg::setValueNoThrow(TValue value, size_t x, size_t y, size_t z, size_t c, size_t t)
 {
   if (!isEmpty() && x < m_info.width && y < m_info.height && z < m_info.depth &&
@@ -531,7 +532,7 @@ bool ZImg::setValueNoThrow(TValue value, size_t x, size_t y, size_t z, size_t c,
   return false;
 }
 
-template <typename TValue>
+template<typename TValue>
 bool ZImg::setValueNoThrow(TValue value, size_t idx)
 {
   if (!isEmpty() && idx < voxelNumber()) {
@@ -542,7 +543,7 @@ bool ZImg::setValueNoThrow(TValue value, size_t idx)
 }
 
 template<typename TVoxel, typename TDesVoxel>
-void ZImg::convert_Impl(bool normalize, const ZImg *src, ZImg *des)
+void ZImg::convert_Impl(bool normalize, const ZImg* src, ZImg* des)
 {
   TVoxel minv;
   TVoxel maxv;
@@ -557,7 +558,7 @@ void ZImg::convert_Impl(bool normalize, const ZImg *src, ZImg *des)
 }
 
 template<typename TVoxel, typename TDesVoxel>
-void ZImg::scale_Impl(TVoxel minData, TVoxel maxData, const ZImg *src, ZImg *des)
+void ZImg::scale_Impl(TVoxel minData, TVoxel maxData, const ZImg* src, ZImg* des)
 {
   TDesVoxel dataRangeMin = std::numeric_limits<TDesVoxel>::min();
   TDesVoxel dataRangeMax = std::numeric_limits<TDesVoxel>::max();
@@ -579,7 +580,7 @@ void ZImg::scale_Impl(TVoxel minData, TVoxel maxData, const ZImg *src, ZImg *des
   if (src->voxelFormat() != VoxelFormat::Float && std::is_same<TVoxel, TDesVoxel>::value &&
       dataRangeMin == TDesVoxel(minData) && dataRangeMax == TDesVoxel(maxData)) {
     if (src != des) {
-      for (size_t t=0; t<src->numTimes(); ++t) {
+      for (size_t t = 0; t < src->numTimes(); ++t) {
         memcpy(des->timeData(t), src->timeData(t), src->timeByteNumber());
       }
     }
@@ -592,22 +593,22 @@ void ZImg::scale_Impl(TVoxel minData, TVoxel maxData, const ZImg *src, ZImg *des
     buildScaleColormap(minData, maxData, dataRangeMin, dataRangeMax, colormap);
     TVoxel colormapMin = std::numeric_limits<TVoxel>::min();
 
-    for (size_t t=0; t<src->numTimes(); ++t) {
-      for (size_t c=0; c<src->numChannels(); ++c) {
-        const TVoxel* data = src->channelData<TVoxel>(c,t);
-        TDesVoxel* desData = des->channelData<TDesVoxel>(c,t);
-        for (size_t v=0; v<src->channelVoxelNumber(); ++v) {
+    for (size_t t = 0; t < src->numTimes(); ++t) {
+      for (size_t c = 0; c < src->numChannels(); ++c) {
+        const TVoxel* data = src->channelData<TVoxel>(c, t);
+        TDesVoxel* desData = des->channelData<TDesVoxel>(c, t);
+        for (size_t v = 0; v < src->channelVoxelNumber(); ++v) {
           desData[v] = colormap[data[v] - colormapMin];
         }
       }
     }
 
   } else {
-    for (size_t t=0; t<src->numTimes(); ++t) {
-      for (size_t c=0; c<src->numChannels(); ++c) {
-        const TVoxel* data = src->channelData<TVoxel>(c,t);
-        TDesVoxel* desData = des->channelData<TDesVoxel>(c,t);
-        for (size_t v=0; v<src->channelVoxelNumber(); ++v) {
+    for (size_t t = 0; t < src->numTimes(); ++t) {
+      for (size_t c = 0; c < src->numChannels(); ++c) {
+        const TVoxel* data = src->channelData<TVoxel>(c, t);
+        TDesVoxel* desData = des->channelData<TDesVoxel>(c, t);
+        for (size_t v = 0; v < src->channelVoxelNumber(); ++v) {
           if (data[v] <= minData)
             desData[v] = dataRangeMin;
           else if (data[v] >= maxData)
@@ -623,26 +624,26 @@ void ZImg::scale_Impl(TVoxel minData, TVoxel maxData, const ZImg *src, ZImg *des
 
 template<typename TVoxel, typename TDesVoxel>
 void ZImg::buildScaleColormap(TVoxel minData, TVoxel maxData, TDesVoxel desDataRangeMin, TDesVoxel desDataRangeMax,
-                              std::vector<TDesVoxel> &res)
+                              std::vector<TDesVoxel>& res)
 {
   TVoxel dataRangeMin = std::numeric_limits<TVoxel>::min();
   TVoxel dataRangeMax = std::numeric_limits<TVoxel>::max();
   res.resize(dataRangeMax - dataRangeMin + 1);
-  for (TVoxel v=dataRangeMin; v<dataRangeMax; ++v) {
+  for (TVoxel v = dataRangeMin; v < dataRangeMax; ++v) {
     if (v <= minData)
-      res[v-dataRangeMin] = desDataRangeMin;
+      res[v - dataRangeMin] = desDataRangeMin;
     else if (v >= maxData)
-      res[v-dataRangeMin] = desDataRangeMax;
+      res[v - dataRangeMin] = desDataRangeMax;
     else
-      res[v-dataRangeMin] = (v - minData) * 1.0 / (maxData - minData) * desDataRangeMax + desDataRangeMin;
+      res[v - dataRangeMin] = (v - minData) * 1.0 / (maxData - minData) * desDataRangeMax + desDataRangeMin;
   }
-  res[dataRangeMax-dataRangeMin] = desDataRangeMax;
+  res[dataRangeMax - dataRangeMin] = desDataRangeMax;
 }
 
 template<typename TVoxel, typename TScalar>
 void ZImg::addScalar_Impl(TScalar scalar)
 {
-  for (size_t t=0; t<numTimes(); ++t) {
+  for (size_t t = 0; t < numTimes(); ++t) {
     TVoxel* data = timeData<TVoxel>(t);
     saturate_add(data, scalar, timeVoxelNumber(), data);
   }
@@ -651,7 +652,7 @@ void ZImg::addScalar_Impl(TScalar scalar)
 template<typename TVoxel, typename TScalar>
 void ZImg::subScalar_Impl(TScalar scalar)
 {
-  for (size_t t=0; t<numTimes(); ++t) {
+  for (size_t t = 0; t < numTimes(); ++t) {
     TVoxel* data = timeData<TVoxel>(t);
     saturate_sub(data, scalar, timeVoxelNumber(), data);
   }
@@ -660,7 +661,7 @@ void ZImg::subScalar_Impl(TScalar scalar)
 template<typename TVoxel, typename TScalar>
 void ZImg::mulScalar_Impl(TScalar scalar)
 {
-  for (size_t t=0; t<numTimes(); ++t) {
+  for (size_t t = 0; t < numTimes(); ++t) {
     TVoxel* data = timeData<TVoxel>(t);
     saturate_mul(data, scalar, timeVoxelNumber(), data);
   }
@@ -669,7 +670,7 @@ void ZImg::mulScalar_Impl(TScalar scalar)
 template<typename TVoxel, typename TScalar>
 void ZImg::divScalar_Impl(TScalar scalar)
 {
-  for (size_t t=0; t<numTimes(); ++t) {
+  for (size_t t = 0; t < numTimes(); ++t) {
     TVoxel* data = timeData<TVoxel>(t);
     saturate_div(data, scalar, timeVoxelNumber(), data);
   }
@@ -678,9 +679,9 @@ void ZImg::divScalar_Impl(TScalar scalar)
 template<typename TVoxel, typename GenericCustomUnaryOp>
 void ZImg::unaryOp_Impl(const GenericCustomUnaryOp& op)
 {
-  for (size_t t=0; t<numTimes(); ++t) {
+  for (size_t t = 0; t < numTimes(); ++t) {
     TVoxel* data = timeData<TVoxel>(t);
-    for (size_t v=0; v<timeVoxelNumber(); ++v) {
+    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
       data[v] = op(data[v]);
     }
   }
@@ -689,10 +690,10 @@ void ZImg::unaryOp_Impl(const GenericCustomUnaryOp& op)
 template<typename TVoxel, typename TVoxelOther, typename GenericCustomBinaryOp>
 void ZImg::binaryOp_Impl(const ZImg& other, const GenericCustomBinaryOp& op)
 {
-  for (size_t t=0; t<numTimes(); ++t) {
+  for (size_t t = 0; t < numTimes(); ++t) {
     TVoxel* data = timeData<TVoxel>(t);
     const TVoxelOther* rhsData = other.timeData<TVoxelOther>(t);
-    for (size_t v=0; v<timeVoxelNumber(); ++v) {
+    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
       data[v] = op(data[v], rhsData[v]);
     }
   }
@@ -705,9 +706,9 @@ void ZImg::firstMaxValueCoord_Impl(ZVoxelCoordinate& res, TValue& max, const ZIm
   if (voxelFormat() == VoxelFormat::Float)
     maxValue = std::numeric_limits<TVoxel>::lowest();
   if (region.containsWholeTime(m_info)) {
-    for (size_t t=region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
+    for (size_t t = region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
       const TVoxel* data = timeData<TVoxel>(t);
-      for (size_t v=0; v<timeVoxelNumber(); ++v) {
+      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
         if (data[v] > maxValue) {
           maxValue = data[v];
           res = indexToCoord(v);
@@ -717,15 +718,15 @@ void ZImg::firstMaxValueCoord_Impl(ZVoxelCoordinate& res, TValue& max, const ZIm
     }
 
   } else {
-    for (size_t t=region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
-      for (size_t c=region.start.c; c < static_cast<size_t>(region.end.c); ++c) {
-        for (size_t z=region.start.z; z < static_cast<size_t>(region.end.z); ++z) {
-          for (size_t y=region.start.y; y < static_cast<size_t>(region.end.y); ++y) {
-            for (size_t x=region.start.x; x < static_cast<size_t>(region.end.x); ++x) {
-              TVoxel dat = *(data<TVoxel>(x,y,z,c,t));
+    for (size_t t = region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
+      for (size_t c = region.start.c; c < static_cast<size_t>(region.end.c); ++c) {
+        for (size_t z = region.start.z; z < static_cast<size_t>(region.end.z); ++z) {
+          for (size_t y = region.start.y; y < static_cast<size_t>(region.end.y); ++y) {
+            for (size_t x = region.start.x; x < static_cast<size_t>(region.end.x); ++x) {
+              TVoxel dat = *(data<TVoxel>(x, y, z, c, t));
               if (dat > maxValue) {
                 maxValue = dat;
-                res = ZVoxelCoordinate(x,y,z,c,t);
+                res = ZVoxelCoordinate(x, y, z, c, t);
               }
             }
           }
@@ -745,9 +746,9 @@ void ZImg::maxValueCoords_Impl(std::vector<ZVoxelCoordinate>& res, TValue& max, 
   if (voxelFormat() == VoxelFormat::Float)
     maxValue = std::numeric_limits<TVoxel>::lowest();
   if (region.containsWholeTime(m_info)) {
-    for (size_t t=region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
+    for (size_t t = region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
       const TVoxel* data = timeData<TVoxel>(t);
-      for (size_t v=0; v<timeVoxelNumber(); ++v) {
+      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
         if (data[v] > maxValue) {
           maxValue = data[v];
           res.clear();
@@ -762,18 +763,18 @@ void ZImg::maxValueCoords_Impl(std::vector<ZVoxelCoordinate>& res, TValue& max, 
       }
     }
   } else {
-    for (size_t t=region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
-      for (size_t c=region.start.c; c < static_cast<size_t>(region.end.c); ++c) {
-        for (size_t z=region.start.z; z < static_cast<size_t>(region.end.z); ++z) {
-          for (size_t y=region.start.y; y < static_cast<size_t>(region.end.y); ++y) {
-            for (size_t x=region.start.x; x < static_cast<size_t>(region.end.x); ++x) {
-              TVoxel dat = *(data<TVoxel>(x,y,z,c,t));
+    for (size_t t = region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
+      for (size_t c = region.start.c; c < static_cast<size_t>(region.end.c); ++c) {
+        for (size_t z = region.start.z; z < static_cast<size_t>(region.end.z); ++z) {
+          for (size_t y = region.start.y; y < static_cast<size_t>(region.end.y); ++y) {
+            for (size_t x = region.start.x; x < static_cast<size_t>(region.end.x); ++x) {
+              TVoxel dat = *(data<TVoxel>(x, y, z, c, t));
               if (dat > maxValue) {
                 maxValue = dat;
                 res.clear();
-                res.emplace_back(x,y,z,c,t);
+                res.emplace_back(x, y, z, c, t);
               } else if (dat == maxValue) {
-                res.emplace_back(x,y,z,c,t);
+                res.emplace_back(x, y, z, c, t);
               }
             }
           }
@@ -787,10 +788,10 @@ void ZImg::maxValueCoords_Impl(std::vector<ZVoxelCoordinate>& res, TValue& max, 
 template<typename TVoxel, typename GenericForegroundPredictor>
 void ZImg::binarized_Impl(ZImg& res, const GenericForegroundPredictor& isForeground) const
 {
-  for (size_t t=0; t<numTimes(); ++t) {
+  for (size_t t = 0; t < numTimes(); ++t) {
     const TVoxel* data = timeData<TVoxel>(t);
     uint8_t* resData = res.timeData<uint8_t>(t);
-    for (size_t v=0; v<timeVoxelNumber(); ++v) {
+    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
       if (isForeground(data[v]))
         resData[v] = 1;
     }

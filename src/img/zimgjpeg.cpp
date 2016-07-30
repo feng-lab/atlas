@@ -13,21 +13,22 @@
 
 namespace {
 
-#define	TIFFTAG_ORIENTATION		274	/* +image orientation */
-#define	    ORIENTATION_TOPLEFT		1	/* row 0 top, col 0 lhs */
-#define	    ORIENTATION_TOPRIGHT	2	/* row 0 top, col 0 rhs */
-#define	    ORIENTATION_BOTRIGHT	3	/* row 0 bottom, col 0 rhs */
-#define	    ORIENTATION_BOTLEFT		4	/* row 0 bottom, col 0 lhs */
-#define	    ORIENTATION_LEFTTOP		5	/* row 0 lhs, col 0 top */
-#define	    ORIENTATION_RIGHTTOP	6	/* row 0 rhs, col 0 top */
-#define	    ORIENTATION_RIGHTBOT	7	/* row 0 rhs, col 0 bottom */
-#define	    ORIENTATION_LEFTBOT		8	/* row 0 lhs, col 0 bottom */
-#define	TIFFTAG_JPEGIFOFFSET		513	/* !pointer to SOI marker */
+#define  TIFFTAG_ORIENTATION    274  /* +image orientation */
+#define      ORIENTATION_TOPLEFT    1  /* row 0 top, col 0 lhs */
+#define      ORIENTATION_TOPRIGHT  2  /* row 0 top, col 0 rhs */
+#define      ORIENTATION_BOTRIGHT  3  /* row 0 bottom, col 0 rhs */
+#define      ORIENTATION_BOTLEFT    4  /* row 0 bottom, col 0 lhs */
+#define      ORIENTATION_LEFTTOP    5  /* row 0 lhs, col 0 top */
+#define      ORIENTATION_RIGHTTOP  6  /* row 0 rhs, col 0 top */
+#define      ORIENTATION_RIGHTBOT  7  /* row 0 rhs, col 0 bottom */
+#define      ORIENTATION_LEFTBOT    8  /* row 0 lhs, col 0 bottom */
+#define  TIFFTAG_JPEGIFOFFSET    513  /* !pointer to SOI marker */
 
 using namespace nim;
 
-struct my_error_mgr {
-  struct jpeg_error_mgr pub;	/* "public" fields */
+struct my_error_mgr
+{
+  struct jpeg_error_mgr pub;  /* "public" fields */
 
   //jmp_buf setjmp_buffer;	/* for return to caller */
 };
@@ -67,11 +68,11 @@ void my_error_exit(j_common_ptr cinfo)
   char errbuffer[JMSG_LENGTH_MAX];
 
   /* Create the message */
-  (cinfo->err->format_message) (cinfo, errbuffer);
+  (cinfo->err->format_message)(cinfo, errbuffer);
   throw nim::ZIOException(QString("Libjpeg-turbo error: %1").arg(errbuffer));
 }
 
-void createcinfo(jpeg_decompress_struct &cinfo, my_error_mgr &jerr)
+void createcinfo(jpeg_decompress_struct& cinfo, my_error_mgr& jerr)
 {
   /* We set up the normal JPEG error routines, then override error_exit. */
   cinfo.err = jpeg_std_error(&jerr.pub);
@@ -93,11 +94,11 @@ void createcinfo(jpeg_decompress_struct &cinfo, my_error_mgr &jerr)
   jpeg_create_decompress(&cinfo);
 }
 
-void startReading(FILE *infile, jpeg_decompress_struct &cinfo)
+void startReading(FILE* infile, jpeg_decompress_struct& cinfo)
 {
   jpeg_stdio_src(&cinfo, infile);
 
-  jpeg_save_markers(&cinfo, JPEG_APP0+1, 0xFFFF);
+  jpeg_save_markers(&cinfo, JPEG_APP0 + 1, 0xFFFF);
 
   /* Step 3: read file parameters with jpeg_read_header() */
 
@@ -122,11 +123,11 @@ void startReading(FILE *infile, jpeg_decompress_struct &cinfo)
   cinfo.quantize_colors = FALSE;
 }
 
-void startReading(unsigned char *inbuffer, size_t insize, jpeg_decompress_struct &cinfo)
+void startReading(unsigned char* inbuffer, size_t insize, jpeg_decompress_struct& cinfo)
 {
   jpeg_mem_src(&cinfo, inbuffer, insize);
 
-  jpeg_save_markers(&cinfo, JPEG_APP0+1, 0xFFFF);
+  jpeg_save_markers(&cinfo, JPEG_APP0 + 1, 0xFFFF);
 
   /* Step 3: read file parameters with jpeg_read_header() */
 
@@ -151,16 +152,16 @@ void startReading(unsigned char *inbuffer, size_t insize, jpeg_decompress_struct
   cinfo.quantize_colors = FALSE;
 }
 
-uint16_t getOrientation(jpeg_decompress_struct &cinfo)
+uint16_t getOrientation(jpeg_decompress_struct& cinfo)
 {
   uint16_t orientation = ORIENTATION_TOPLEFT;
   jpeg_saved_marker_ptr marker = cinfo.marker_list;
   while (marker) {
-    if (marker->data_length > 6 && std::equal(marker->data, marker->data+6, "Exif\0\0")) {
+    if (marker->data_length > 6 && std::equal(marker->data, marker->data + 6, "Exif\0\0")) {
       typedef boost::iostreams::basic_array_source<char> Device;
       // reinterpret_cast allowed (AliasedType is char or unsigned char: this permits
       // examination of the object representation of any object as an array of unsigned char.)
-      boost::iostreams::stream<Device> exifs(reinterpret_cast<char*>(marker->data)+6, marker->data_length-6);
+      boost::iostreams::stream<Device> exifs(reinterpret_cast<char*>(marker->data) + 6, marker->data_length - 6);
       ZTiff exif;
       exif.load(exifs, true);
       if (exif.isValid()) {
@@ -175,7 +176,7 @@ uint16_t getOrientation(jpeg_decompress_struct &cinfo)
   return orientation;
 }
 
-void readInfoFromJpeg(jpeg_decompress_struct &cinfo, ZImgInfo &info)
+void readInfoFromJpeg(jpeg_decompress_struct& cinfo, ZImgInfo& info)
 {
   uint16_t orientation = getOrientation(cinfo);
 
@@ -194,7 +195,7 @@ void readInfoFromJpeg(jpeg_decompress_struct &cinfo, ZImgInfo &info)
     std::swap(info.width, info.height);
 }
 
-void readImgFromJpeg(jpeg_decompress_struct &cinfo, ZImg &img, const ZImgRegion &region, uint16_t orientation)
+void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion& region, uint16_t orientation)
 {
   /* Step 5: Start decompressor */
   (void) jpeg_start_decompress(&cinfo);
@@ -210,7 +211,8 @@ void readImgFromJpeg(jpeg_decompress_struct &cinfo, ZImg &img, const ZImgRegion 
   imgInfo.createDefaultDescriptions();
 
   if (region.isEmpty() || !region.isValid(imgInfo)) {
-    throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(region.toQString()));
+    throw ZIOException(
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(region.toQString()));
   }
 
   ZImgInfo partialImgInfo = region.clip(imgInfo);
@@ -226,7 +228,7 @@ void readImgFromJpeg(jpeg_decompress_struct &cinfo, ZImg &img, const ZImgRegion 
   /* JSAMPLEs per row in output buffer */
   /* Make a one-row-high sample array that will go away when done with image */
   JSAMPARRAY buffer = (*cinfo.mem->alloc_sarray)
-      ((j_common_ptr) &cinfo, JPOOL_IMAGE, imgInfo.rowByteNumber()*imgInfo.numChannels, cinfo.rec_outbuf_height);
+    ((j_common_ptr) &cinfo, JPOOL_IMAGE, imgInfo.rowByteNumber() * imgInfo.numChannels, cinfo.rec_outbuf_height);
 
   /* Step 6: while (scan lines remain to be read) */
   /*           jpeg_read_scanlines(...); */
@@ -242,16 +244,18 @@ void readImgFromJpeg(jpeg_decompress_struct &cinfo, ZImg &img, const ZImgRegion 
        */
     size_t lineRead = jpeg_read_scanlines(&cinfo, buffer, cinfo.rec_outbuf_height);
 
-    for (size_t y=lineStart; y<lineStart+lineRead; ++y) {
+    for (size_t y = lineStart; y < lineStart + lineRead; ++y) {
       if (region.yInRegion(y)) {
         if (imgInfo.numChannels == 1) {
-          memcpy(imgTmp.rowData<uint8_t>(y-region.start.y), &(buffer[y-lineStart][region.start.x]), imgTmp.rowByteNumber());
+          memcpy(imgTmp.rowData<uint8_t>(y - region.start.y), &(buffer[y - lineStart][region.start.x]),
+                 imgTmp.rowByteNumber());
         } else {
           size_t cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
           size_t xEnd = region.end.x == -1 ? imgInfo.width : region.end.x;
-          for (size_t c=region.start.c; c<cEnd; ++c) {
-            for (size_t x=region.start.x; x<xEnd; ++x) {
-              *imgTmp.data<uint8_t>(x-region.start.x,y-region.start.y,0,c-region.start.c) = buffer[y-lineStart][x*imgInfo.numChannels + c];
+          for (size_t c = region.start.c; c < cEnd; ++c) {
+            for (size_t x = region.start.x; x < xEnd; ++x) {
+              *imgTmp.data<uint8_t>(x - region.start.x, y - region.start.y, 0, c - region.start.c) =
+                buffer[y - lineStart][x * imgInfo.numChannels + c];
             }
           }
         }
@@ -269,48 +273,48 @@ void readImgFromJpeg(jpeg_decompress_struct &cinfo, ZImg &img, const ZImgRegion 
   }
 
   switch (orientation) {
-  case ORIENTATION_TOPLEFT:
-    break;
-  case ORIENTATION_TOPRIGHT:
-    for (size_t i=0; i<imgTmp.numChannels(); ++i) {
-      image2DFlip(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height(), Dimension::X);
-    }
-    break;
-  case ORIENTATION_BOTRIGHT:
-    for (size_t i=0; i<imgTmp.numChannels(); ++i) {
-      image2DReflect(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height());
-    }
-    break;
-  case ORIENTATION_BOTLEFT:
-    for (size_t i=0; i<imgTmp.numChannels(); ++i) {
-      image2DFlip(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height(), Dimension::Y);
-    }
-    break;
-  case ORIENTATION_LEFTTOP:
-    for (size_t i=0; i<imgTmp.numChannels(); ++i) {
-      image2DTranspose(imgTmp.channelData<uint8_t>(i), imgTmp.height(), imgTmp.width());
-    }
-    break;
-  case ORIENTATION_RIGHTTOP:
-    for (size_t i=0; i<imgTmp.numChannels(); ++i) {
-      image2DTranspose(imgTmp.channelData<uint8_t>(i), imgTmp.height(), imgTmp.width());
-      image2DFlip(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height(), Dimension::X);
-    }
-    break;
-  case ORIENTATION_RIGHTBOT:
-    for (size_t i=0; i<imgTmp.numChannels(); ++i) {
-      image2DTranspose(imgTmp.channelData<uint8_t>(i), imgTmp.height(), imgTmp.width());
-      image2DReflect(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height());
-    }
-    break;
-  case ORIENTATION_LEFTBOT:
-    for (size_t i=0; i<imgTmp.numChannels(); ++i) {
-      image2DTranspose(imgTmp.channelData<uint8_t>(i), imgTmp.height(), imgTmp.width());
-      image2DFlip(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height(), Dimension::Y);
-    }
-    break;
-  default:
-    break;
+    case ORIENTATION_TOPLEFT:
+      break;
+    case ORIENTATION_TOPRIGHT:
+      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
+        image2DFlip(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height(), Dimension::X);
+      }
+      break;
+    case ORIENTATION_BOTRIGHT:
+      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
+        image2DReflect(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height());
+      }
+      break;
+    case ORIENTATION_BOTLEFT:
+      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
+        image2DFlip(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height(), Dimension::Y);
+      }
+      break;
+    case ORIENTATION_LEFTTOP:
+      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
+        image2DTranspose(imgTmp.channelData<uint8_t>(i), imgTmp.height(), imgTmp.width());
+      }
+      break;
+    case ORIENTATION_RIGHTTOP:
+      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
+        image2DTranspose(imgTmp.channelData<uint8_t>(i), imgTmp.height(), imgTmp.width());
+        image2DFlip(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height(), Dimension::X);
+      }
+      break;
+    case ORIENTATION_RIGHTBOT:
+      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
+        image2DTranspose(imgTmp.channelData<uint8_t>(i), imgTmp.height(), imgTmp.width());
+        image2DReflect(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height());
+      }
+      break;
+    case ORIENTATION_LEFTBOT:
+      for (size_t i = 0; i < imgTmp.numChannels(); ++i) {
+        image2DTranspose(imgTmp.channelData<uint8_t>(i), imgTmp.height(), imgTmp.width());
+        image2DFlip(imgTmp.channelData<uint8_t>(i), imgTmp.width(), imgTmp.height(), Dimension::Y);
+      }
+      break;
+    default:
+      break;
   }
 
   imgTmp.swap(img);
@@ -320,7 +324,7 @@ void readImgFromJpeg(jpeg_decompress_struct &cinfo, ZImg &img, const ZImgRegion 
 
 namespace nim {
 
-ZImgJpeg &ZImgJpeg::instance()
+ZImgJpeg& ZImgJpeg::instance()
 {
   static ZImgJpeg imgJpeg;
   return imgJpeg;
@@ -351,8 +355,9 @@ QStringList ZImgJpeg::extensions() const
   return res;
 }
 
-void ZImgJpeg::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                        std::vector<std::set<size_t>> *pyramidalRatios)
+void ZImgJpeg::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                        std::vector<std::set<size_t>>* pyramidalRatios)
 {
 #ifdef _MSC_VER
   FILE *tmpf = nullptr;
@@ -386,7 +391,7 @@ void ZImgJpeg::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, s
   createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 }
 
-void ZImgJpeg::readMetadata(const QString &filename, ZImgMetadata &meta, size_t scene)
+void ZImgJpeg::readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -420,9 +425,9 @@ void ZImgJpeg::readMetadata(const QString &filename, ZImgMetadata &meta, size_t 
   // extract exif
   jpeg_saved_marker_ptr marker = cinfo.marker_list;
   while (marker) {
-    if (marker->data_length > 6 && std::equal(marker->data, marker->data+6, "Exif\0\0")) {
+    if (marker->data_length > 6 && std::equal(marker->data, marker->data + 6, "Exif\0\0")) {
       typedef boost::iostreams::basic_array_source<char> Device;
-      boost::iostreams::stream<Device> exifs(reinterpret_cast<char*>(marker->data)+6, marker->data_length-6);
+      boost::iostreams::stream<Device> exifs(reinterpret_cast<char*>(marker->data) + 6, marker->data_length - 6);
       ZTiff exif;
       try {
         exif.load(exifs, true);
@@ -430,7 +435,7 @@ void ZImgJpeg::readMetadata(const QString &filename, ZImgMetadata &meta, size_t 
           meta.attachToTopLevel(exif.ifds()[0].extractMetadata());
         }
       }
-      catch (const ZIOException & e) {
+      catch (const ZIOException& e) {
         LOG(WARNING) << "failed to read metadata from jpeg: " << e.what();
       }
       break;
@@ -441,7 +446,8 @@ void ZImgJpeg::readMetadata(const QString &filename, ZImgMetadata &meta, size_t 
   }
 }
 
-void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail, const ZImgRegion &region, size_t scene)
+void
+ZImgJpeg::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, const ZImgRegion& region, size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -475,20 +481,20 @@ void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
   // extract thumbnails
   jpeg_saved_marker_ptr marker = cinfo.marker_list;
   while (marker) {
-    if (marker->data_length > 6 && std::equal(marker->data, marker->data+6, "Exif\0\0")) {
+    if (marker->data_length > 6 && std::equal(marker->data, marker->data + 6, "Exif\0\0")) {
       typedef boost::iostreams::basic_array_source<char> Device;
-      boost::iostreams::stream<Device> exifs(reinterpret_cast<char*>(marker->data)+6, marker->data_length-6);
+      boost::iostreams::stream<Device> exifs(reinterpret_cast<char*>(marker->data) + 6, marker->data_length - 6);
       ZTiff exif;
       try {
         exif.load(exifs, true);
         if (exif.isValid()) {
-          for (size_t i=1; i<exif.ifds().size(); ++i) {
-            const ZTiffIFD &thumbIFD = exif.ifds()[i];
+          for (size_t i = 1; i < exif.ifds().size(); ++i) {
+            const ZTiffIFD& thumbIFD = exif.ifds()[i];
             int64_t idx = thumbIFD.indexOf(TIFFTAG_JPEGIFOFFSET);
             if (idx != -1) {
               // found jpeg thumbnail stream
               std::vector<uint8_t> buf;
-              const ZImgMetatag &tag = thumbIFD.tag(idx);
+              const ZImgMetatag& tag = thumbIFD.tag(idx);
               size_t off = tag.dataAt<uint32_t>(0);
               buf.assign(marker->data + 6 + off, marker->data + marker->data_length);
 
@@ -522,7 +528,7 @@ void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
           }
         }
       }
-      catch (const ZIOException & e) {
+      catch (const ZIOException& e) {
         LOG(WARNING) << "failed to read thumbnail from jpeg: " << e.what();
       }
       break;
@@ -533,7 +539,7 @@ void ZImgJpeg::readThumbnail(const QString &filename, ZImgThumbernail &thumbnail
   }
 }
 
-void ZImgJpeg::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
+void ZImgJpeg::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -584,7 +590,7 @@ bool ZImgJpeg::supportWrite() const
   return false;
 }
 
-void ZImgJpeg::readInfo(uint8_t *mem, size_t size, ZImgInfo &info)
+void ZImgJpeg::readInfo(uint8_t* mem, size_t size, ZImgInfo& info)
 {
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
@@ -602,7 +608,7 @@ void ZImgJpeg::readInfo(uint8_t *mem, size_t size, ZImgInfo &info)
   readInfoFromJpeg(cinfo, info);
 }
 
-void ZImgJpeg::readImg(uint8_t *mem, size_t size, uint8_t *des, size_t desSize)
+void ZImgJpeg::readImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
 {
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;

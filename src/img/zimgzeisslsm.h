@@ -177,26 +177,37 @@ class ZImgZeissLsm : public ZImgTiff
 {
 public:
   ZImgZeissLsm();
-  virtual ~ZImgZeissLsm() {}
+
+  virtual ~ZImgZeissLsm()
+  {}
 
   // ZImgFormat interface
 public:
   virtual QString shortName() const override;
+
   virtual QString fullName() const override;
+
   virtual QStringList extensions() const override;
-  virtual FileFormat format() const override { return FileFormat::ZeissLsm; }
+
+  virtual FileFormat format() const override
+  { return FileFormat::ZeissLsm; }
+
   virtual bool supportRead() const override;
+
   virtual bool supportWrite() const override;
 
   // ZImgTiff interface
 protected:
-  virtual void readIntoInternalStructure(const QString &filename, ZTiff &tiff) override;
+  virtual void readIntoInternalStructure(const QString& filename, ZTiff& tiff) override;
+
   virtual void clearInternalState() override;
-  virtual void detectImgInfo(ZTiff &tiff) override;
+
+  virtual void detectImgInfo(ZTiff& tiff) override;
 
 protected:
-  void readLsmInfo(const QString &filename, ZTiff &tiff);
-  void logLsmInfo(const QString &filename);
+  void readLsmInfo(const QString& filename, ZTiff& tiff);
+
+  void logLsmInfo(const QString& filename);
 
 protected:
   CZ_LsmInfo m_lsmInfo;

@@ -8,13 +8,15 @@
 namespace nim {
 
 // safe io functions, throw exceptions if error
-void openFileStream(std::ifstream &fs, const QString &filename, std::ios_base::openmode mode);
-void openFileStream(std::ofstream &fs, const QString &filename, std::ios_base::openmode mode);
+void openFileStream(std::ifstream& fs, const QString& filename, std::ios_base::openmode mode);
+
+void openFileStream(std::ofstream& fs, const QString& filename, std::ios_base::openmode mode);
 
 // mac: if count >= 2G, fs.read() will fail, this is a workaround
-void readStream_impl(std::istream &fs, char *buf, size_t count);
+void readStream_impl(std::istream& fs, char* buf, size_t count);
+
 template<typename T>
-inline void readStream(std::istream &fs, T *buf, size_t count)
+inline void readStream(std::istream& fs, T* buf, size_t count)
 {
   // reinterpret_cast allowed (AliasedType is char or unsigned char: this permits
   // examination of the object representation of any object as an array of unsigned char.)
@@ -22,9 +24,10 @@ inline void readStream(std::istream &fs, T *buf, size_t count)
 }
 
 // write seems fine
-void writeStream_impl(std::ostream &fs, const char *buf, size_t count);
+void writeStream_impl(std::ostream& fs, const char* buf, size_t count);
+
 template<typename T>
-inline void writeStream(std::ostream &fs, const T *buf, size_t count)
+inline void writeStream(std::ostream& fs, const T* buf, size_t count)
 {
   // reinterpret_cast allowed (AliasedType is char or unsigned char: this permits
   // examination of the object representation of any object as an array of unsigned char.)

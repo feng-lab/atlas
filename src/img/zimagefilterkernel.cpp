@@ -6,7 +6,7 @@
 namespace nim {
 
 template<typename TFloat>
-std::vector<TFloat> create1DGaussianKernel(TFloat sigmaX, int width, size_t *kWidth)
+std::vector<TFloat> create1DGaussianKernel(TFloat sigmaX, int width, size_t* kWidth)
 {
   if (width < 0) {
     width = std::ceil(sigmaX * 6.0);
@@ -24,28 +24,29 @@ std::vector<TFloat> create1DGaussianKernel(TFloat sigmaX, int width, size_t *kWi
 
   size_t idx = 0;
 
-  for (int i=0; i<width; ++i) {
+  for (int i = 0; i < width; ++i) {
     double distToCenterX2 = (i - centerX) * (i - centerX);
-    res[idx++] = std::exp(-distToCenterX2/sigmaX22);
-    sum += res[idx-1];
+    res[idx++] = std::exp(-distToCenterX2 / sigmaX22);
+    sum += res[idx - 1];
   }
 
 
-  for (size_t i=0; i<static_cast<size_t>(width); ++i) {
+  for (size_t i = 0; i < static_cast<size_t>(width); ++i) {
     res[i] /= sum;
   }
 
   return res;
 }
 
-template std::vector<float> create1DGaussianKernel(float,int,size_t*);
-template std::vector<double> create1DGaussianKernel(double,int,size_t*);
+template std::vector<float> create1DGaussianKernel(float, int, size_t*);
+
+template std::vector<double> create1DGaussianKernel(double, int, size_t*);
 
 
 template<typename TFloat>
 std::vector<TFloat> create2DGaussianKernel(TFloat sigmaX, TFloat sigmaY,
                                            int width, int height,
-                                           size_t *kWidth, size_t *kHeight)
+                                           size_t* kWidth, size_t* kHeight)
 {
   if (width < 0) {
     width = std::ceil(sigmaX * 6.0);
@@ -61,7 +62,7 @@ std::vector<TFloat> create2DGaussianKernel(TFloat sigmaX, TFloat sigmaY,
     *kWidth = width;
   if (kHeight)
     *kHeight = height;
-  std::vector<TFloat> res(static_cast<size_t>(width)*height);
+  std::vector<TFloat> res(static_cast<size_t>(width) * height);
   TFloat sum = 0.0;
   double sigmaX22 = 2.0 * sigmaX * sigmaX;
   double sigmaY22 = 2.0 * sigmaY * sigmaY;
@@ -69,30 +70,31 @@ std::vector<TFloat> create2DGaussianKernel(TFloat sigmaX, TFloat sigmaY,
   double centerY = (height - 1.0) / 2.0;
 
   size_t idx = 0;
-  for (int j=0; j<height; ++j) {
+  for (int j = 0; j < height; ++j) {
     double distToCenterY2 = (j - centerY) * (j - centerY);
-    for (int i=0; i<width; ++i) {
+    for (int i = 0; i < width; ++i) {
       double distToCenterX2 = (i - centerX) * (i - centerX);
-      res[idx++] = std::exp(-distToCenterX2/sigmaX22-distToCenterY2/sigmaY22);
-      sum += res[idx-1];
+      res[idx++] = std::exp(-distToCenterX2 / sigmaX22 - distToCenterY2 / sigmaY22);
+      sum += res[idx - 1];
     }
   }
 
-  for (size_t i=0; i<static_cast<size_t>(height)*width; ++i) {
+  for (size_t i = 0; i < static_cast<size_t>(height) * width; ++i) {
     res[i] /= sum;
   }
 
   return res;
 }
 
-template std::vector<float> create2DGaussianKernel(float,float,int,int,size_t*,size_t*);
-template std::vector<double> create2DGaussianKernel(double,double,int,int,size_t*,size_t*);
+template std::vector<float> create2DGaussianKernel(float, float, int, int, size_t*, size_t*);
+
+template std::vector<double> create2DGaussianKernel(double, double, int, int, size_t*, size_t*);
 
 
 template<typename TFloat>
 std::vector<TFloat> create3DGaussianKernel(TFloat sigmaX, TFloat sigmaY, TFloat sigmaZ,
                                            int width, int height, int depth,
-                                           size_t *kWidth, size_t *kHeight, size_t *kDepth)
+                                           size_t* kWidth, size_t* kHeight, size_t* kDepth)
 {
   if (width < 0) {
     width = std::ceil(sigmaX * 6.0);
@@ -115,7 +117,7 @@ std::vector<TFloat> create3DGaussianKernel(TFloat sigmaX, TFloat sigmaY, TFloat 
     *kHeight = height;
   if (kDepth)
     *kDepth = depth;
-  std::vector<TFloat> res(static_cast<size_t>(width)*height*depth);
+  std::vector<TFloat> res(static_cast<size_t>(width) * height * depth);
   TFloat sum = 0.0;
   double sigmaX22 = 2.0 * sigmaX * sigmaX;
   double sigmaY22 = 2.0 * sigmaY * sigmaY;
@@ -125,33 +127,34 @@ std::vector<TFloat> create3DGaussianKernel(TFloat sigmaX, TFloat sigmaY, TFloat 
   double centerZ = (depth - 1.0) / 2.0;
 
   size_t idx = 0;
-  for (int k=0; k<depth; ++k) {
+  for (int k = 0; k < depth; ++k) {
     double distToCenterZ2 = (k - centerZ) * (k - centerZ);
-    for (int j=0; j<height; ++j) {
+    for (int j = 0; j < height; ++j) {
       double distToCenterY2 = (j - centerY) * (j - centerY);
-      for (int i=0; i<width; ++i) {
+      for (int i = 0; i < width; ++i) {
         double distToCenterX2 = (i - centerX) * (i - centerX);
-        res[idx++] = std::exp(-distToCenterX2/sigmaX22-distToCenterY2/sigmaY22-distToCenterZ2/sigmaZ22);
-        sum += res[idx-1];
+        res[idx++] = std::exp(-distToCenterX2 / sigmaX22 - distToCenterY2 / sigmaY22 - distToCenterZ2 / sigmaZ22);
+        sum += res[idx - 1];
       }
     }
   }
 
-  for (size_t i=0; i<static_cast<size_t>(height)*width*depth; ++i) {
+  for (size_t i = 0; i < static_cast<size_t>(height) * width * depth; ++i) {
     res[i] /= sum;
   }
 
   return res;
 }
 
-template std::vector<float> create3DGaussianKernel(float,float,float,int,int,int,size_t*,size_t*,size_t*);
-template std::vector<double> create3DGaussianKernel(double,double,double,int,int,int,size_t*,size_t*,size_t*);
+template std::vector<float> create3DGaussianKernel(float, float, float, int, int, int, size_t*, size_t*, size_t*);
+
+template std::vector<double> create3DGaussianKernel(double, double, double, int, int, int, size_t*, size_t*, size_t*);
 
 
 template<typename TFloat>
 std::vector<TFloat> create1DLoGKernel(TFloat sigmaX,
                                       int width,
-                                      size_t *kWidth)
+                                      size_t* kWidth)
 {
   if (width < 0) {
     width = std::ceil(sigmaX * 6.0);
@@ -172,22 +175,23 @@ std::vector<TFloat> create1DLoGKernel(TFloat sigmaX,
   size_t idx = 0;
 
   // (1/(sqrt(2*pi)*s)) * (x.^2/s^4 - 1/s^2 ) .* exp(-x.^2/(2*s^2));
-  for (int i=0; i<width; ++i) {
+  for (int i = 0; i < width; ++i) {
     double distToCenterX2 = (i - centerX) * (i - centerX);
-    res[idx++] = 1.0/(std::sqrt(2*M_PI)*sigmaX) *
-        (distToCenterX2/sigmaX4 - 1.0/sigmaX2) * std::exp(-distToCenterX2/sigmaX22);
-    sum += res[idx-1];
+    res[idx++] = 1.0 / (std::sqrt(2 * M_PI) * sigmaX) *
+                 (distToCenterX2 / sigmaX4 - 1.0 / sigmaX2) * std::exp(-distToCenterX2 / sigmaX22);
+    sum += res[idx - 1];
   }
   double mean = sum / width;
 
-  for (size_t i=0; i<static_cast<size_t>(width); ++i) {
+  for (size_t i = 0; i < static_cast<size_t>(width); ++i) {
     res[i] -= mean;
   }
 
   return res;
 }
 
-template std::vector<float> create1DLoGKernel(float,int,size_t*);
-template std::vector<double> create1DLoGKernel(double,int,size_t*);
+template std::vector<float> create1DLoGKernel(float, int, size_t*);
+
+template std::vector<double> create1DLoGKernel(double, int, size_t*);
 
 }

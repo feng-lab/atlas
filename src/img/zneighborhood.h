@@ -11,6 +11,7 @@ class ZNeighborhood
 {
 public:
   explicit ZNeighborhood();
+
   // 2D
   // 4 4-connected neighborhood without center
   // 5 4-connected neighborhood with center
@@ -53,21 +54,44 @@ public:
   void removeCenter();
 
   // access
-  inline ZVoxelCoordinate& operator[](size_t n) { return m_offsets[n]; }
-  inline const ZVoxelCoordinate& operator[](size_t n) const { return m_offsets[n]; }
-  inline ZVoxelCoordinate& offset(size_t n) { return m_offsets[n]; }
-  inline const ZVoxelCoordinate& offset(size_t n) const { return m_offsets[n]; }
+  inline ZVoxelCoordinate& operator[](size_t n)
+  { return m_offsets[n]; }
 
-  inline const std::vector<ZVoxelCoordinate>& offsets() const { return m_offsets; }
-  inline size_t size() const { return m_offsets.size(); }
-  inline bool empty() const { return m_offsets.empty(); }
+  inline const ZVoxelCoordinate& operator[](size_t n) const
+  { return m_offsets[n]; }
 
-  inline size_t leftExtend() const { return m_leftExtend; }
-  inline size_t rightExtend() const { return m_rightExtend; }
-  inline size_t upExtend() const { return m_upExtend; }
-  inline size_t downExtend() const { return m_downExtend; }
-  inline size_t frontExtend() const { return m_frontExtend; }
-  inline size_t backExtend() const { return m_backExtend; }
+  inline ZVoxelCoordinate& offset(size_t n)
+  { return m_offsets[n]; }
+
+  inline const ZVoxelCoordinate& offset(size_t n) const
+  { return m_offsets[n]; }
+
+  inline const std::vector<ZVoxelCoordinate>& offsets() const
+  { return m_offsets; }
+
+  inline size_t size() const
+  { return m_offsets.size(); }
+
+  inline bool empty() const
+  { return m_offsets.empty(); }
+
+  inline size_t leftExtend() const
+  { return m_leftExtend; }
+
+  inline size_t rightExtend() const
+  { return m_rightExtend; }
+
+  inline size_t upExtend() const
+  { return m_upExtend; }
+
+  inline size_t downExtend() const
+  { return m_downExtend; }
+
+  inline size_t frontExtend() const
+  { return m_frontExtend; }
+
+  inline size_t backExtend() const
+  { return m_backExtend; }
 
 private:
   std::vector<ZVoxelCoordinate> m_offsets;

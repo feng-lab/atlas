@@ -12,18 +12,19 @@ namespace {
 
 using namespace nim;
 
-struct PngPack {
+struct PngPack
+{
   png_structp pngPtr = nullptr;
   png_infop infoPtr = nullptr;
   png_infop endPtr = nullptr;
 };
 
-void pngReadErrorFunction(png_structp, const char *message)
+void pngReadErrorFunction(png_structp, const char* message)
 {
   throw nim::ZIOException(QString("Libpng error: %1").arg(message));
 }
 
-void pngReadWarningFunction(png_structp, const char *message)
+void pngReadWarningFunction(png_structp, const char* message)
 {
   LOG(WARNING) << "Libpng warning: " << message;
 }
@@ -39,36 +40,36 @@ int skipIDATChunk(png_structp, png_unknown_chunkp chunk)
 }
 
 void readMetaDataFromState(png_const_structrp pngPtr, png_inforp infoPtr, png_inforp endPtr,
-                           ZImgMetadata &meta)
+                           ZImgMetadata& meta)
 {
   png_timep modTime;
   if (png_get_tIME(pngPtr, infoPtr, &modTime)) {
     meta.attachToTopLevel(ZImgMetatag("Time", QString("%1-%2-%3T%4:%5:%6")
-                                      .arg(modTime->year).arg(modTime->month).arg(modTime->day)
-                                      .arg(modTime->hour).arg(modTime->minute).arg(modTime->second)));
+      .arg(modTime->year).arg(modTime->month).arg(modTime->day)
+      .arg(modTime->hour).arg(modTime->minute).arg(modTime->second)));
   }
   if (png_get_tIME(pngPtr, endPtr, &modTime)) {
     meta.attachToTopLevel(ZImgMetatag("Time", QString("%1-%2-%3T%4:%5:%6")
-                                      .arg(modTime->year).arg(modTime->month).arg(modTime->day)
-                                      .arg(modTime->hour).arg(modTime->minute).arg(modTime->second)));
+      .arg(modTime->year).arg(modTime->month).arg(modTime->day)
+      .arg(modTime->hour).arg(modTime->minute).arg(modTime->second)));
   }
   png_textp textPtr;
   int numText;
   if (png_get_text(pngPtr, infoPtr, &textPtr, &numText)) {
-    for (int i=0; i<numText; ++i) {
+    for (int i = 0; i < numText; ++i) {
       meta.attachToTopLevel(ZImgMetatag(QString::fromUtf8(textPtr[i].key),
                                         QString::fromUtf8(textPtr[i].text)));
     }
   }
   if (png_get_text(pngPtr, endPtr, &textPtr, &numText)) {
-    for (int i=0; i<numText; ++i) {
+    for (int i = 0; i < numText; ++i) {
       meta.attachToTopLevel(ZImgMetatag(QString::fromUtf8(textPtr[i].key),
                                         QString::fromUtf8(textPtr[i].text)));
     }
   }
 }
 
-void readInfoFromBuf(png_const_structrp pngPtr, png_const_inforp infoPtr, ZImgInfo &info)
+void readInfoFromBuf(png_const_structrp pngPtr, png_const_inforp infoPtr, ZImgInfo& info)
 {
   info.width = png_get_image_width(pngPtr, infoPtr);
   info.height = png_get_image_height(pngPtr, infoPtr);
@@ -79,30 +80,30 @@ void readInfoFromBuf(png_const_structrp pngPtr, png_const_inforp infoPtr, ZImgIn
   }
   png_byte colorType = png_get_color_type(pngPtr, infoPtr);
   switch (colorType) {
-  case PNG_COLOR_TYPE_GRAY:
-    info.numChannels = 1;
-    break;
-  case PNG_COLOR_TYPE_GRAY_ALPHA:
-    info.numChannels = 2;
-    info.lastChannelIsAlphaChannel = true;
-    if (bitDepth < 8) throw ZIOException("invalid bit depth for gray alpha png");
-    break;
-  case PNG_COLOR_TYPE_RGB:
-    info.numChannels = 3;
-    if (bitDepth < 8) throw ZIOException("invalid bit depth for rgb png");
-    break;
-  case PNG_COLOR_TYPE_RGB_ALPHA:
-    info.numChannels = 4;
-    info.lastChannelIsAlphaChannel = true;
-    if (bitDepth < 8) throw ZIOException("invalid bit depth for rgba png");
-    break;
-  case PNG_COLOR_TYPE_PALETTE:
-    info.numChannels = 3;
-    if (bitDepth > 8) throw ZIOException("invalid bit depth for palette png");
-    break;
-  default:
-    throw ZIOException("not supported png colortype");
-    break;
+    case PNG_COLOR_TYPE_GRAY:
+      info.numChannels = 1;
+      break;
+    case PNG_COLOR_TYPE_GRAY_ALPHA:
+      info.numChannels = 2;
+      info.lastChannelIsAlphaChannel = true;
+      if (bitDepth < 8) throw ZIOException("invalid bit depth for gray alpha png");
+      break;
+    case PNG_COLOR_TYPE_RGB:
+      info.numChannels = 3;
+      if (bitDepth < 8) throw ZIOException("invalid bit depth for rgb png");
+      break;
+    case PNG_COLOR_TYPE_RGB_ALPHA:
+      info.numChannels = 4;
+      info.lastChannelIsAlphaChannel = true;
+      if (bitDepth < 8) throw ZIOException("invalid bit depth for rgba png");
+      break;
+    case PNG_COLOR_TYPE_PALETTE:
+      info.numChannels = 3;
+      if (bitDepth > 8) throw ZIOException("invalid bit depth for palette png");
+      break;
+    default:
+      throw ZIOException("not supported png colortype");
+      break;
   }
   if (png_get_valid(pngPtr, infoPtr, PNG_INFO_tRNS) &&
       colorType != PNG_COLOR_TYPE_GRAY_ALPHA &&
@@ -129,57 +130,58 @@ void readInfoFromBuf(png_const_structrp pngPtr, png_const_inforp infoPtr, ZImgIn
 }
 
 // convert RGBARGBA..... to RRR...GGG...BBB...AAA... and perform crop
-void separateChannel(uint8_t *bufImg, const ZImgInfo &info, const ZImgRegion &region, ZImg &img)
+void separateChannel(uint8_t* bufImg, const ZImgInfo& info, const ZImgRegion& region, ZImg& img)
 {
   if (region.containsWholeChannel(info)) {
-    for (size_t c=0; c<img.numChannels(); ++c) {
+    for (size_t c = 0; c < img.numChannels(); ++c) {
       switch (img.voxelByteNumber()) {
-      case 1: {
-        uint8_t *des = img.channelData<uint8_t>(c);
-        const uint8_t *src = bufImg + c + region.start.c;
-        size_t numCh = img.numChannels();
-        size_t i=0;
-        while (i++ < img.channelVoxelNumber()) {
-          *des++ = *src;
-          src += numCh;
+        case 1: {
+          uint8_t* des = img.channelData<uint8_t>(c);
+          const uint8_t* src = bufImg + c + region.start.c;
+          size_t numCh = img.numChannels();
+          size_t i = 0;
+          while (i++ < img.channelVoxelNumber()) {
+            *des++ = *src;
+            src += numCh;
+          }
         }
-      }
-        break;
-      case 2: {
-        uint16_t *des = img.channelData<uint16_t>(c);
-        const uint16_t *src = bit_cast<uint16_t*>(bufImg) + c + region.start.c;
-        size_t numCh = img.numChannels();
-        size_t i=0;
-        while (i++ < img.channelVoxelNumber()) {
-          *des++ = ((*src & 0xff) << 8) | ((*src & 0xff00) >> 8);
-          src += numCh;
+          break;
+        case 2: {
+          uint16_t* des = img.channelData<uint16_t>(c);
+          const uint16_t* src = bit_cast<uint16_t*>(bufImg) + c + region.start.c;
+          size_t numCh = img.numChannels();
+          size_t i = 0;
+          while (i++ < img.channelVoxelNumber()) {
+            *des++ = ((*src & 0xff) << 8) | ((*src & 0xff00) >> 8);
+            src += numCh;
+          }
         }
-      }
-        break;
-      default:
-        throw ZIOException(QString("Not support png with voxelByteNumber %1").arg(img.voxelByteNumber()));
-        break;
+          break;
+        default:
+          throw ZIOException(QString("Not support png with voxelByteNumber %1").arg(img.voxelByteNumber()));
+          break;
       }
     }
   } else {
     if (img.voxelByteNumber() == 1) {
-      for (size_t c=0; c<img.numChannels(); ++c) {
-        for (size_t y=0; y<img.height(); ++y) {
-          for (size_t x=0; x<img.width(); ++x) {
-            uint8_t *des = img.data<uint8_t>(x, y, 0, c);
-            uint8_t *src = bufImg + (y+region.start.y) * info.rowVoxelNumber() * info.numChannels +
-                (x+region.start.x) * info.numChannels + c + region.start.c;
+      for (size_t c = 0; c < img.numChannels(); ++c) {
+        for (size_t y = 0; y < img.height(); ++y) {
+          for (size_t x = 0; x < img.width(); ++x) {
+            uint8_t* des = img.data<uint8_t>(x, y, 0, c);
+            uint8_t* src = bufImg + (y + region.start.y) * info.rowVoxelNumber() * info.numChannels +
+                           (x + region.start.x) * info.numChannels + c + region.start.c;
             *des = *src;
           }
         }
       }
     } else if (img.voxelByteNumber() == 2) {
-      for (size_t c=0; c<img.numChannels(); ++c) {
-        for (size_t y=0; y<img.height(); ++y) {
-          for (size_t x=0; x<img.width(); ++x) {
-            uint16_t *des = img.data<uint16_t>(x, y, 0, c);
-            uint16_t *src = bit_cast<uint16_t*>(bufImg) + (y+region.start.y) * info.rowVoxelNumber() * info.numChannels +
-                (x+region.start.x) * info.numChannels + c + region.start.c;
+      for (size_t c = 0; c < img.numChannels(); ++c) {
+        for (size_t y = 0; y < img.height(); ++y) {
+          for (size_t x = 0; x < img.width(); ++x) {
+            uint16_t* des = img.data<uint16_t>(x, y, 0, c);
+            uint16_t* src =
+              bit_cast<uint16_t*>(bufImg) + (y + region.start.y) * info.rowVoxelNumber() * info.numChannels +
+              (x + region.start.x) * info.numChannels + c + region.start.c;
             *des = ((*src & 0xff) << 8) | ((*src & 0xff00) >> 8);
           }
         }
@@ -215,8 +217,9 @@ QStringList ZImgPng::extensions() const
   return res;
 }
 
-void ZImgPng::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> *subBlocks,
-                       std::vector<std::set<size_t>> *pyramidalRatios)
+void ZImgPng::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+                       std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                       std::vector<std::set<size_t>>* pyramidalRatios)
 {
   //ZBenchTimer bt("a");
   //bt.start();
@@ -275,7 +278,7 @@ void ZImgPng::readInfo(const QString &filename, std::vector<ZImgInfo> &infos, st
   //bt.stopAndLog();
 }
 
-void ZImgPng::readMetadata(const QString &filename, ZImgMetadata &meta, size_t scene)
+void ZImgPng::readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -324,12 +327,12 @@ void ZImgPng::readMetadata(const QString &filename, ZImgMetadata &meta, size_t s
   readMetaDataFromState(png.pngPtr, png.infoPtr, png.endPtr, meta);
 }
 
-void ZImgPng::readThumbnail(const QString &, ZImgThumbernail &, const ZImgRegion &, size_t)
+void ZImgPng::readThumbnail(const QString&, ZImgThumbernail&, const ZImgRegion&, size_t)
 {
   // png does not have standard thumbnail chunk
 }
 
-void ZImgPng::readImg(const QString &filename, ZImg &img, const ZImgRegion &region, size_t scene, size_t ratio)
+void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
 {
   //ZBenchTimer bt("b");
   //bt.start();
@@ -375,7 +378,8 @@ void ZImgPng::readImg(const QString &filename, ZImg &img, const ZImgRegion &regi
   readInfoFromBuf(png.pngPtr, png.infoPtr, info);
 
   if (region.isEmpty() || !region.isValid(info)) {
-    throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString()).arg(region.toQString()));
+    throw ZIOException(
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString()).arg(region.toQString()));
   }
 
   png_byte colorType = png_get_color_type(png.pngPtr, png.infoPtr);
@@ -393,7 +397,7 @@ void ZImgPng::readImg(const QString &filename, ZImg &img, const ZImgRegion &regi
     png_set_packing(png.pngPtr);
   }
   //if (bitDepth == 16) {     // we do it later with separateChannel
-    //png_set_swap(png.pngPtr);
+  //png_set_swap(png.pngPtr);
   //}
   png_set_interlace_handling(png.pngPtr);
   png_read_update_info(png.pngPtr, png.infoPtr);
@@ -404,7 +408,7 @@ void ZImgPng::readImg(const QString &filename, ZImg &img, const ZImgRegion &regi
   }
   std::vector<png_byte, boost::alignment::aligned_allocator<png_byte, 32>> outRaw(info.byteNumber());
   std::vector<png_bytep> rowPointers(info.height);
-  for (size_t i=0; i<rowPointers.size(); ++i) {
+  for (size_t i = 0; i < rowPointers.size(); ++i) {
     rowPointers[i] = outRaw.data() + i * rowBytes;
   }
   png_read_image(png.pngPtr, rowPointers.data());

@@ -11,9 +11,13 @@
 #include <limits>
 #include <cassert>
 #include <type_traits>
+
 #ifndef Q_MOC_RUN
+
 #include <boost/math/special_functions.hpp>
+
 #endif
+
 #include "zioutils.h"
 
 namespace nim {
@@ -40,7 +44,7 @@ inline QDebug operator<<(QDebug s, const Eigen::WithFormat<ExpressionType>& m)
 #endif
 
 template<typename Derived>
-QString matrixToQString(const Eigen::DenseBase<Derived> & m)
+QString matrixToQString(const Eigen::DenseBase<Derived>& m)
 {
   std::ostringstream oss;
   oss << m;
@@ -49,20 +53,25 @@ QString matrixToQString(const Eigen::DenseBase<Derived> & m)
 
 // from eigen doc
 template<typename Scalar>
-struct CwiseClampOp {
-  CwiseClampOp(const Scalar& inf, const Scalar& sup) : m_inf(inf), m_sup(sup) {}
-  const Scalar operator()(const Scalar& x) const { return x<m_inf ? m_inf : (x>m_sup ? m_sup : x); }
+struct CwiseClampOp
+{
+  CwiseClampOp(const Scalar& inf, const Scalar& sup) : m_inf(inf), m_sup(sup)
+  {}
+
+  const Scalar operator()(const Scalar& x) const
+  { return x < m_inf ? m_inf : (x > m_sup ? m_sup : x); }
+
   Scalar m_inf, m_sup;
 };
 
-template <typename T, bool IsInteger = Eigen::NumTraits<T>::IsInteger>
+template<typename T, bool IsInteger = Eigen::NumTraits<T>::IsInteger>
 struct ZVectorCompare
 {
-  bool operator()(const Eigen::Matrix<T , Eigen::Dynamic , 1> &v1, const Eigen::Matrix<T , Eigen::Dynamic , 1> &v2) const
+  bool operator()(const Eigen::Matrix<T, Eigen::Dynamic, 1>& v1, const Eigen::Matrix<T, Eigen::Dynamic, 1>& v2) const
   {
     if (v1.size() == v2.size()) {
-      for (int i=0; i<v1.size(); i++) {
-        if (std::abs(v1(i) - v2(i)) < Eigen::NumTraits<T>::dummy_precision() )
+      for (int i = 0; i < v1.size(); i++) {
+        if (std::abs(v1(i) - v2(i)) < Eigen::NumTraits<T>::dummy_precision())
           continue;
         else
           return v1(i) < v2(i);
@@ -74,14 +83,14 @@ struct ZVectorCompare
   }
 };
 
-template <typename T>
+template<typename T>
 struct ZVectorCompare<T, true>
 {
-  bool operator()(const Eigen::Matrix<T , Eigen::Dynamic , 1> &v1, const Eigen::Matrix<T , Eigen::Dynamic , 1> &v2) const
+  bool operator()(const Eigen::Matrix<T, Eigen::Dynamic, 1>& v1, const Eigen::Matrix<T, Eigen::Dynamic, 1>& v2) const
   {
     if (v1.size() == v2.size()) {
-      for (int i=0; i<v1.size(); i++) {
-        if (v1(i) == v2(i) )
+      for (int i = 0; i < v1.size(); i++) {
+        if (v1(i) == v2(i))
           continue;
         else
           return v1(i) < v2(i);
@@ -102,7 +111,7 @@ struct MaxFloatType
   // get larger type of two float type, use this type for all calculations
   typedef typename std::conditional<(std::numeric_limits<T1NonIntegerType>::digits10 >
                                      std::numeric_limits<T2NonIntegerType>::digits10),
-  T1NonIntegerType, T2NonIntegerType>::type type;
+    T1NonIntegerType, T2NonIntegerType>::type type;
 };
 
 class ZEigenUtils
@@ -112,9 +121,9 @@ public:
   // the result matrix size will be smaller. Number of cols are detected from statrRow
   // By default consecutive delimiters are seen as one, unless you set strictDelimiter to true.
   // Strict delimiter should be given in uSep. It **can not** be empty or space or tab.
-  static Eigen::MatrixXd readMatrix(const QString &filename, const char *uSep = "", bool strictDelimiter = false,
+  static Eigen::MatrixXd readMatrix(const QString& filename, const char* uSep = "", bool strictDelimiter = false,
                                     double fillValue = std::numeric_limits<double>::quiet_NaN(),
-                                    const std::string &commentStart = "#");
+                                    const std::string& commentStart = "#");
 
   // Read numbers in the string to a row vector. Number of data in this line will be in actualNumOfData
   // if it is not nullptr.
@@ -122,14 +131,14 @@ public:
   // the rest will be filled with fillValue. If nData is -1, vector length will be same as nActualData.
   // If strictDelimiter is used, empty data will be filled with fillValue.
   // Strict delimiter should be given in uSep. It **can not** be empty or space or tab.
-  static Eigen::RowVectorXd readRowVector(const std::string &line, const char *uSep = "", int *nActualData = nullptr,
+  static Eigen::RowVectorXd readRowVector(const std::string& line, const char* uSep = "", int* nActualData = nullptr,
                                           int nReadData = -1, bool strictDelimiter = false,
                                           double fillValue = std::numeric_limits<double>::quiet_NaN(),
-                                          const std::string &commentStart = "#");
+                                          const std::string& commentStart = "#");
 
 
   template<typename Derived>
-  static bool writeMatrix(const Eigen::DenseBase<Derived>& mat, const char *filename, const char *sep = " ",
+  static bool writeMatrix(const Eigen::DenseBase<Derived>& mat, const char* filename, const char* sep = " ",
                           int startRow = 0, int startCol = 0,
                           int endRow = -1, int endCol = -1)
   {
@@ -153,14 +162,14 @@ public:
       if (startRow == 0 && startCol == 0 && endRow == mat.rows() && endCol == mat.cols()) {
         outFile << mat.format(fmt);
       } else {
-        outFile << mat.block(startRow, endRow-startRow, startCol, endCol-startCol).format(fmt);
+        outFile << mat.block(startRow, endRow - startRow, startCol, endCol - startCol).format(fmt);
       }
     } else {
       Eigen::IOFormat fmt(Eigen::FullPrecision, Eigen::DontAlignCols, sepstr);
       if (startRow == 0 && startCol == 0 && endRow == mat.rows() && endCol == mat.cols()) {
         outFile << mat.format(fmt);
       } else {
-        outFile << mat.block(startRow, endRow-startRow, startCol, endCol-startCol).format(fmt);
+        outFile << mat.block(startRow, endRow - startRow, startCol, endCol - startCol).format(fmt);
       }
     }
 
@@ -169,44 +178,45 @@ public:
   }
 
   template<typename T>
-  static Eigen::Matrix<T, Eigen::Dynamic, 1> convertToVector(const std::vector<T> &vec)
+  static Eigen::Matrix<T, Eigen::Dynamic, 1> convertToVector(const std::vector<T>& vec)
   {
     Eigen::Matrix<T, Eigen::Dynamic, 1> result(vec.size());
-    memcpy(result.data(), vec.data(), vec.size()*sizeof(T));
+    memcpy(result.data(), vec.data(), vec.size() * sizeof(T));
     return result;
   }
 
   template<typename T>
-  static Eigen::Matrix<T, 1, Eigen::Dynamic> convertToRowVector(const std::vector<T> &vec)
+  static Eigen::Matrix<T, 1, Eigen::Dynamic> convertToRowVector(const std::vector<T>& vec)
   {
     Eigen::Matrix<T, 1, Eigen::Dynamic> result(vec.size());
-    memcpy(result.data(), vec.data(), vec.size()*sizeof(T));
+    memcpy(result.data(), vec.data(), vec.size() * sizeof(T));
     return result;
   }
 
   // similar to matlab corrcoef
   template<typename Real>
-  static Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> corrcoef(const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& x)
+  static Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>
+  corrcoef(const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& x)
   {
     typedef Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> MatrixXni;
     MatrixXni cov = featureCovariance(x);
     MatrixXni res(cov.rows(), cov.cols());
-    for (int r=0; r<cov.rows(); ++r) {
-      for (int c=r; c<cov.cols(); ++c) {
+    for (int r = 0; r < cov.rows(); ++r) {
+      for (int c = r; c < cov.cols(); ++c) {
         if (r == c) {
-          res(r,c) = 1.0;
+          res(r, c) = 1.0;
         } else {
-          res(r,c) = cov(r,c) / std::sqrt(cov(r,r)*cov(c,c));
-          if (std::abs(res(r,c)) > 1.0)
-            res(r,c) = res(r,c) / std::abs(res(r,c));
-          res(c,r) = res(r,c);
+          res(r, c) = cov(r, c) / std::sqrt(cov(r, r) * cov(c, c));
+          if (std::abs(res(r, c)) > 1.0)
+            res(r, c) = res(r, c) / std::abs(res(r, c));
+          res(c, r) = res(r, c);
         }
       }
     }
     return res;
   }
 
-  static Eigen::MatrixXd removeRowsContainNaNOrInF(const Eigen::MatrixXd &srcMat);
+  static Eigen::MatrixXd removeRowsContainNaNOrInF(const Eigen::MatrixXd& srcMat);
 
   template<typename Derived>
   inline static Derived clampMatrix(const Eigen::MatrixBase<Derived>& srcMat,
@@ -229,7 +239,7 @@ public:
   inline static Derived matrixDigamma(const Eigen::MatrixBase<Derived>& x)
   {
     return x.unaryExpr(std::pointer_to_unary_function<typename Derived::Scalar, typename Derived::Scalar>
-                       (boost::math::digamma<typename Derived::Scalar>));
+                         (boost::math::digamma<typename Derived::Scalar>));
   }
 
   template<class T>
@@ -242,7 +252,7 @@ public:
   inline static Derived matrixGammaln(const Eigen::MatrixBase<Derived>& x)
   {
     return x.unaryExpr(std::pointer_to_unary_function<typename Derived::Scalar, typename Derived::Scalar>
-                       (boost::math::lgamma<typename Derived::Scalar>));
+                         (boost::math::lgamma<typename Derived::Scalar>));
   }
 
   template<class T>
@@ -253,7 +263,8 @@ public:
 
   // Compute log(det(x)) where x is positive-definite
   template<class T>
-  inline static typename Eigen::NumTraits<T>::NonInteger logdet(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
+  inline static typename Eigen::NumTraits<T>::NonInteger
+  logdet(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
   {
     typedef Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, Eigen::Dynamic, Eigen::Dynamic> MatrixXni;
     MatrixXni floatx = x.template cast<typename Eigen::NumTraits<T>::NonInteger>();
@@ -271,31 +282,36 @@ public:
   // returns the log of multivariate gamma(n, alpha) value.
   inline static double mvtGammaln(double n, double alpha)
   {
-    Eigen::VectorXd tmp = 0.5*(Eigen::VectorXd::LinSpaced(n, -n, -1).array()+1) + alpha;
-    return ((n*(n-1))/4)*std::log(M_PI) + matrixGammaln(tmp).sum();
+    Eigen::VectorXd tmp = 0.5 * (Eigen::VectorXd::LinSpaced(n, -n, -1).array() + 1) + alpha;
+    return ((n * (n - 1)) / 4) * std::log(M_PI) + matrixGammaln(tmp).sum();
   }
 
   inline static float mvtGammaln(float n, float alpha)
   {
-    Eigen::VectorXf tmp = alpha+0.5*(Eigen::VectorXf::LinSpaced(n, -n, -1).array()+1);
-    return ((n*(n-1))/4)*std::log(M_PI) + matrixGammaln(tmp).sum();
+    Eigen::VectorXf tmp = alpha + 0.5 * (Eigen::VectorXf::LinSpaced(n, -n, -1).array() + 1);
+    return ((n * (n - 1)) / 4) * std::log(M_PI) + matrixGammaln(tmp).sum();
   }
 
   inline static long double mvtGammaln(long double n, long double alpha)
   {
-    Eigen::Matrix<long double, Eigen::Dynamic, 1> tmp = alpha+
-        0.5*(Eigen::Matrix<long double, Eigen::Dynamic, 1>::LinSpaced(n, -n, -1).array()+1);
-    return ((n*(n-1))/4)*std::log(M_PI) + matrixGammaln(tmp).sum();
+    Eigen::Matrix<long double, Eigen::Dynamic, 1> tmp = alpha +
+                                                        0.5 *
+                                                        (Eigen::Matrix<long double, Eigen::Dynamic, 1>::LinSpaced(n, -n,
+                                                                                                                  -1).array() +
+                                                         1);
+    return ((n * (n - 1)) / 4) * std::log(M_PI) + matrixGammaln(tmp).sum();
   }
 
   // return log(sum(exp(x))) along each row
   template<class T>
-  inline static Eigen::Matrix<T, Eigen::Dynamic, 1> logsumexpRow(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> &x)
+  inline static Eigen::Matrix<T, Eigen::Dynamic, 1>
+  logsumexpRow(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
   {
     Eigen::Matrix<T, Eigen::Dynamic, 1> y = x.rowwise().maxCoeff();
-    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xdiff = x - y*Eigen::Matrix<T, 1, Eigen::Dynamic>::Ones(x.cols());
+    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xdiff =
+      x - y * Eigen::Matrix<T, 1, Eigen::Dynamic>::Ones(x.cols());
     Eigen::Matrix<T, Eigen::Dynamic, 1> s = y + log(exp(xdiff.array()).rowwise().sum()).matrix();
-    for (int i=0; i<s.size(); i++) {
+    for (int i = 0; i < s.size(); i++) {
       if (s(i) == std::numeric_limits<T>::infinity()) {
         s(i) = y(i);
       }
@@ -305,12 +321,14 @@ public:
 
   // return log(sum(exp(x))) along each col
   template<class T>
-  inline static Eigen::Matrix<T, 1, Eigen::Dynamic> logsumexpCol(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> &x)
+  inline static Eigen::Matrix<T, 1, Eigen::Dynamic>
+  logsumexpCol(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
   {
     Eigen::Matrix<T, 1, Eigen::Dynamic> y = x.colwise().maxCoeff();
-    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xdiff = x - y*Eigen::Matrix<T, Eigen::Dynamic, 1>::Ones(x.rows());
+    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xdiff =
+      x - y * Eigen::Matrix<T, Eigen::Dynamic, 1>::Ones(x.rows());
     Eigen::Matrix<T, 1, Eigen::Dynamic> s = y + log(exp(xdiff.array()).colwise().sum()).matrix();
-    for (int i=0; i<s.size(); i++) {
+    for (int i = 0; i < s.size(); i++) {
       if (s(i) == std::numeric_limits<T>::infinity()) {
         s(i) = y(i);
       }
@@ -321,7 +339,7 @@ public:
   template<class T>
   inline static size_t rank(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x, double thre = -1)
   {
-    Eigen::JacobiSVD<Eigen::Matrix<T,Eigen::Dynamic,Eigen::Dynamic>> svd(x);
+    Eigen::JacobiSVD<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>> svd(x);
     if (thre > 0)
       svd.setThreshold(thre);
     return svd.rank();
@@ -329,13 +347,14 @@ public:
 
   // replicate features based on weight
   template<class T, class WeightT>
-  inline static Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> replicateFeature(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
-                                                                                  const Eigen::Matrix<WeightT, Eigen::Dynamic, 1>& weight)
+  inline static Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>
+  replicateFeature(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
+                   const Eigen::Matrix<WeightT, Eigen::Dynamic, 1>& weight)
   {
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> mat(static_cast<size_t>(weight.sum()), x.cols());
     size_t rowIdx = 0;
-    for (int i=0; i<x.rows(); i++) {
-      mat.block(rowIdx, 0, weight(i), x.cols()) = x.row(i).replicate(weight(i),1);
+    for (int i = 0; i < x.rows(); i++) {
+      mat.block(rowIdx, 0, weight(i), x.cols()) = x.row(i).replicate(weight(i), 1);
       rowIdx += weight(i);
     }
     return mat;
@@ -343,68 +362,72 @@ public:
 
   // similar to matlab mean, get mean of each column
   template<class T>
-  inline static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, 1, Eigen::Dynamic> featureMean(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
+  inline static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, 1, Eigen::Dynamic>
+  featureMean(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
   {
     return featureMeanImpl<T>::mean(x);
   }
 
   template<typename T, typename WeightT>
-  inline static Eigen::Matrix<typename MaxFloatType<T,WeightT>::type, 1, Eigen::Dynamic> featureMean(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
-                                                                                                     const Eigen::Matrix<WeightT, Eigen::Dynamic, 1>& weight)
+  inline static Eigen::Matrix<typename MaxFloatType<T, WeightT>::type, 1, Eigen::Dynamic>
+  featureMean(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
+              const Eigen::Matrix<WeightT, Eigen::Dynamic, 1>& weight)
   {
-    typedef typename MaxFloatType<T,WeightT>::type ResultDataType;
+    typedef typename MaxFloatType<T, WeightT>::type ResultDataType;
     Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> newX;
     Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> res(x.cols());
     newX = x.template cast<ResultDataType>();
-    for (int i=0; i<newX.cols(); ++i)
+    for (int i = 0; i < newX.cols(); ++i)
       res(i) = newX.col(i).dot(weight);
     return res / weight.sum();
   }
 
   // sample covariance
   template<class T>
-  static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, Eigen::Dynamic, Eigen::Dynamic> featureCovariance(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
-                                                                                                                   bool bias = false)
+  static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, Eigen::Dynamic, Eigen::Dynamic>
+  featureCovariance(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
+                    bool bias = false)
   {
     assert(x.rows() > 0);
     typedef typename Eigen::NumTraits<T>::NonInteger ResultDataType;
     ResultDataType factor = 0;
-    if (! bias && x.rows() > 1)
-      factor = 1.0/(x.rows()-1.0);
+    if (!bias && x.rows() > 1)
+      factor = 1.0 / (x.rows() - 1.0);
     else
-      factor = 1.0/x.rows();
+      factor = 1.0 / x.rows();
     // convert to result type
-    const Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> &rtX = x.template cast<ResultDataType>();
+    const Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>& rtX = x.template cast<ResultDataType>();
     Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> mean = featureMean(rtX);
     return (rtX.rowwise() - mean).transpose() * (rtX.rowwise() - mean) * factor;
   }
 
   // sample weighted covariance
   template<typename T, typename WeightT>
-  static Eigen::Matrix<typename MaxFloatType<T,WeightT>::type, Eigen::Dynamic, Eigen::Dynamic> featureCovariance(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
-                                                                                                                 const Eigen::Matrix<WeightT, Eigen::Dynamic, 1>& weight,
-                                                                                                                 bool duplicateObservation = true,
-                                                                                                                 bool bias = false)
+  static Eigen::Matrix<typename MaxFloatType<T, WeightT>::type, Eigen::Dynamic, Eigen::Dynamic>
+  featureCovariance(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
+                    const Eigen::Matrix<WeightT, Eigen::Dynamic, 1>& weight,
+                    bool duplicateObservation = true,
+                    bool bias = false)
   {
     assert(x.rows() > 0 && weight.rows() >= x.rows());
-    typedef typename MaxFloatType<T,WeightT>::type ResultDataType;
+    typedef typename MaxFloatType<T, WeightT>::type ResultDataType;
     ResultDataType factor = 0;
     // convert to result type
-    const Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> &rtX = x.template cast<ResultDataType>();
-    const Eigen::Matrix<ResultDataType, Eigen::Dynamic, 1> &rtWeight = weight.template cast<ResultDataType>();
-    if (! bias && rtWeight.sum() > 1) {
+    const Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>& rtX = x.template cast<ResultDataType>();
+    const Eigen::Matrix<ResultDataType, Eigen::Dynamic, 1>& rtWeight = weight.template cast<ResultDataType>();
+    if (!bias && rtWeight.sum() > 1) {
       if (duplicateObservation) {
         // if we treat weight as duplicated observation, then the factor should be :
         // (this estimation of covariance will be smaller than the normal one)
-        factor = 1.0/(rtWeight.sum()-1.0);
+        factor = 1.0 / (rtWeight.sum() - 1.0);
       } else {
         // http://en.wikipedia.org/wiki/Sample_covariance_matrix#Weighted_samples
         ResultDataType weightsSum = rtWeight.sum();
         ResultDataType weightsSquareSum = rtWeight.array().square().sum();
-        factor = weightsSum / (weightsSum*weightsSum - weightsSquareSum);
+        factor = weightsSum / (weightsSum * weightsSum - weightsSquareSum);
       }
     } else {
-      factor = 1.0/rtWeight.sum();
+      factor = 1.0 / rtWeight.sum();
     }
     Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> mean = featureMean(rtX, rtWeight);
     return (rtX.rowwise() - mean).transpose() * rtWeight.asDiagonal() * (rtX.rowwise() - mean) * factor;
@@ -418,7 +441,7 @@ public:
   template<class T>
   static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, Eigen::Dynamic, Eigen::Dynamic>
   featureLWShrunkCovariance(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
-                            double *outputShrink = nullptr,
+                            double* outputShrink = nullptr,
                             double inputShrink = -1)
   {
     assert(x.rows() > 0);
@@ -441,7 +464,7 @@ public:
     if (inputShrink != -1) {
       if (outputShrink)
         *outputShrink = inputShrink;
-      return inputShrink*prior + (1-inputShrink)*samplecov;
+      return inputShrink * prior + (1 - inputShrink) * samplecov;
     }
 
     ResultMatType mat = x.template cast<ResultDataType>();
@@ -451,18 +474,18 @@ public:
     ResultMatType phiMat = mat2.transpose() * mat2 / nsample - samplecov.array().square().matrix();
     ResultDataType phi = phiMat.sum();
     ResultDataType gamma = (samplecov - prior).squaredNorm();
-    ResultDataType kappa = phi/gamma;
-    ResultDataType shrinkage = std::max(0.0, std::min(1.0, kappa/nsample));
+    ResultDataType kappa = phi / gamma;
+    ResultDataType shrinkage = std::max(0.0, std::min(1.0, kappa / nsample));
     if (outputShrink)
       *outputShrink = shrinkage;
-    return shrinkage*prior + (1-shrinkage)*samplecov;
+    return shrinkage * prior + (1 - shrinkage) * samplecov;
   }
 
   // shrink from biased sample covariance to diagonal matrix
   template<class T>
   static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, Eigen::Dynamic, Eigen::Dynamic>
   featureLWDiagShrunkCovariance(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
-                                double *outputShrink = nullptr,
+                                double* outputShrink = nullptr,
                                 double inputShrink = -1)
   {
     assert(x.rows() > 0);
@@ -484,7 +507,7 @@ public:
     if (inputShrink != -1) {
       if (outputShrink)
         *outputShrink = inputShrink;
-      return inputShrink*prior + (1-inputShrink)*samplecov;
+      return inputShrink * prior + (1 - inputShrink) * samplecov;
     }
 
     ResultMatType mat = x.template cast<ResultDataType>();
@@ -495,18 +518,18 @@ public:
     ResultDataType phi = phiMat.sum();
     ResultDataType rho = phiMat.diagonal().sum();
     ResultDataType gamma = (samplecov - prior).squaredNorm();
-    ResultDataType kappa = (phi-rho)/gamma;
-    ResultDataType shrinkage = std::max(0.0, std::min(1.0, kappa/nsample));
+    ResultDataType kappa = (phi - rho) / gamma;
+    ResultDataType shrinkage = std::max(0.0, std::min(1.0, kappa / nsample));
     if (outputShrink)
       *outputShrink = shrinkage;
-    return shrinkage*prior + (1-shrinkage)*samplecov;
+    return shrinkage * prior + (1 - shrinkage) * samplecov;
   }
 
   // shrink from unbiased sample covariance to diagonal matrix  , from pmtk3
   template<class T>
   static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, Eigen::Dynamic, Eigen::Dynamic>
   featureLWDiagShrunkUnbiasCovariance(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
-                                      double *outputShrink = nullptr,
+                                      double* outputShrink = nullptr,
                                       double inputShrink = -1)
   {
     assert(x.rows() > 0);
@@ -530,25 +553,25 @@ public:
     if (inputShrink != -1) {
       if (outputShrink)
         *outputShrink = inputShrink;
-      return inputShrink*prior + (1-inputShrink)*samplecov;
+      return inputShrink * prior + (1 - inputShrink) * samplecov;
     }
 
     ResultMatType mat = x.template cast<ResultDataType>();
     ResultRowVecType matmean = featureMean(mat);
     mat.rowwise() -= matmean;
     ResultMatType varS = ResultMatType::Zero(ndim, ndim);
-    for (int i=0; i<nsample; i++) {
+    for (int i = 0; i < nsample; i++) {
       varS += (mat.row(i).transpose() * mat.row(i) - biasedcov).array().square().matrix();
     }
-    varS *= nsample/((nsample-1.0)*(nsample-1.0)*(nsample-1.0));
+    varS *= nsample / ((nsample - 1.0) * (nsample - 1.0) * (nsample - 1.0));
     ResultMatType varSup = varS.template triangularView<Eigen::StrictlyUpper>();
     ResultMatType Sup = samplecov.template triangularView<Eigen::StrictlyUpper>();
     ResultDataType num = varSup.sum();
     ResultDataType den = Sup.array().square().sum();
-    ResultDataType shrinkage = std::max(0.0, std::min(1.0, num/den));
+    ResultDataType shrinkage = std::max(0.0, std::min(1.0, num / den));
     if (outputShrink)
       *outputShrink = shrinkage;
-    return shrinkage*prior + (1-shrinkage)*samplecov;
+    return shrinkage * prior + (1 - shrinkage) * samplecov;
   }
 
   // Estimate covariance with the Oracle Approximating Shrinkage algorithm. Under the assumption that the data are
@@ -561,7 +584,7 @@ public:
   template<class T>
   static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, Eigen::Dynamic, Eigen::Dynamic>
   featureOAShrunkCovariance(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
-                            double *outputShrink = nullptr,
+                            double* outputShrink = nullptr,
                             double inputShrink = -1)
   {
     assert(x.rows() > 0);
@@ -584,7 +607,7 @@ public:
     if (inputShrink != -1) {
       if (outputShrink)
         *outputShrink = inputShrink;
-      return inputShrink*prior + (1-inputShrink)*samplecov;
+      return inputShrink * prior + (1 - inputShrink) * samplecov;
     }
 
     ResultMatType mat = x.template cast<ResultDataType>();
@@ -593,8 +616,8 @@ public:
     mat.rowwise() -= matmean;
     ResultDataType traceS = samplecov.trace();
     ResultDataType traceS2 = traceS * traceS;
-    ResultDataType traceSS = (samplecov*samplecov).trace();
-    ResultDataType shrinkage = ( traceS2+traceSS ) / ( (nsample+1.0)* (traceSS-traceS2/ndim) );
+    ResultDataType traceSS = (samplecov * samplecov).trace();
+    ResultDataType shrinkage = (traceS2 + traceSS) / ((nsample + 1.0) * (traceSS - traceS2 / ndim));
     //NonInteger mu = samplecov.trace()/ndim;
     //NonInteger alpha = samplecov.array().square().mean();
     //NonInteger num = alpha + mu*mu;
@@ -603,18 +626,19 @@ public:
     shrinkage = std::min(1.0, shrinkage);
     if (outputShrink)
       *outputShrink = shrinkage;
-    return shrinkage*prior + (1-shrinkage)*samplecov;
+    return shrinkage * prior + (1 - shrinkage) * samplecov;
   }
 
   template<class T>
-  static Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> featureUnique(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x, int *num = nullptr)
+  static Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>
+  featureUnique(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x, int* num = nullptr)
   {
     typedef Eigen::Matrix<T, 1, Eigen::Dynamic> VectorXt;
     int nUniqueData = 0;
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> uniqueMat(x.rows(), x.cols());
-    std::set<VectorXt,ZVectorCompare<T>> myset;
-    std::pair<typename std::set<VectorXt,ZVectorCompare<T>>::iterator,bool> ret;
-    for (int r=0; r < x.rows(); r++) {
+    std::set<VectorXt, ZVectorCompare<T>> myset;
+    std::pair<typename std::set<VectorXt, ZVectorCompare<T>>::iterator, bool> ret;
+    for (int r = 0; r < x.rows(); r++) {
       ret = myset.insert(x.row(r));
       if (ret.second != false) {
         uniqueMat.row(nUniqueData++) = x.row(r);
@@ -636,10 +660,12 @@ private:
       return x.colwise().mean();
     }
   };
+
   template<class T>
   struct featureMeanImpl<T, true>
   {
-    static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, 1, Eigen::Dynamic> mean(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
+    static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, 1, Eigen::Dynamic>
+    mean(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
     {
       return x.template cast<typename Eigen::NumTraits<T>::NonInteger>().colwise().mean();
     }
