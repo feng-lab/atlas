@@ -260,7 +260,6 @@ target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_
 target_compile_definitions(${LIBRARY_NAME} PUBLIC EIGEN_NO_DEBUG EIGEN_DONT_PARALLELIZE EIGEN_MPL2_ONLY)
 target_compile_definitions(${LIBRARY_NAME} PUBLIC QT_USE_QSTRINGBUILDER QT_NO_CAST_FROM_BYTEARRAY QT_NO_CAST_TO_ASCII)
 if (WIN32)
-  target_compile_definitions(${LIBRARY_NAME} PRIVATE USE_WIN32_FILEIO) # libtiff
   target_compile_definitions(${LIBRARY_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN)
 
   target_compile_options(${LIBRARY_NAME} PUBLIC /GR) # Enable Run-Time Type Information
@@ -333,37 +332,36 @@ if (Matlab_FOUND)
   message(${Matlab_LIBRARIES})
   message(${Matlab_MEX_COMPILER})
 
-  matlab_add_mex(
-    NAME correct_czi_shading_mex
-    SRC ${CMAKE_CURRENT_SOURCE_DIR}/matlab/correct_czi_shading_mex.cpp
-    LINK_TO ${LIBRARY_NAME}
-  )
-
-  matlab_add_mex(
-    NAME read_stack_info_mex
-    SRC ${CMAKE_CURRENT_SOURCE_DIR}/matlab/read_stack_info_mex.cpp
-    LINK_TO ${LIBRARY_NAME}
-  )
-
-  matlab_add_mex(
-    NAME read_stack_mex
-    SRC ${CMAKE_CURRENT_SOURCE_DIR}/matlab/read_stack_mex.cpp
-    LINK_TO ${LIBRARY_NAME}
-  )
-
-  matlab_add_mex(
-    NAME stack_czi_tiles_mex
-    SRC ${CMAKE_CURRENT_SOURCE_DIR}/matlab/stack_czi_tiles_mex.cpp
-    LINK_TO ${LIBRARY_NAME}
-  )
-
-  matlab_add_mex(
-    NAME stack_czi_tiles_with_mask_mex
-    SRC ${CMAKE_CURRENT_SOURCE_DIR}/matlab/stack_czi_tiles_with_mask_mex.cpp
-    LINK_TO ${LIBRARY_NAME}
-  )
-
   if (APPLE)
+    function(add_mex_target mexname)
+      matlab_add_mex(
+        NAME ${mexname}
+        SRC ${CMAKE_CURRENT_SOURCE_DIR}/matlab/${mexname}.cpp
+        LINK_TO ${LIBRARY_NAME}
+      )
+      add_custom_command(TARGET ${mexname}
+                         POST_BUILD
+                         COMMAND install_name_tool -change
+                         @rpath/QtCore.framework/Versions/5/QtCore
+                         @loader_path/QtCore
+                         $<TARGET_FILE:${mexname}>
+                         COMMAND install_name_tool -change
+                         /Users/feng/code/atlas/src/3rdparty/freeimage/lib/libfreeimageplus.dylib
+                         @loader_path/libfreeimageplus.dylib
+                         $<TARGET_FILE:${mexname}>
+                         COMMAND install_name_tool -change
+                         @rpath/libtbb.dylib
+                         @loader_path/libtbb.dylib
+                         $<TARGET_FILE:${mexname}>
+                         )
+    endfunction(add_mex_target)
+
+    add_mex_target(correct_czi_shading_mex)
+    add_mex_target(read_stack_info_mex)
+    add_mex_target(read_stack_mex)
+    add_mex_target(stack_czi_tiles_mex)
+    add_mex_target(stack_czi_tiles_with_mask_mex)
+
     add_custom_command(TARGET correct_czi_shading_mex
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy ${TBB_tbb_LIBRARY_RELEASE}
@@ -378,86 +376,6 @@ if (Matlab_FOUND)
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>/libfreeimageplus.dylib
                        COMMAND install_name_tool -id libtbb.dylib
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>/libtbb.dylib
-                       )
-
-    add_custom_command(TARGET correct_czi_shading_mex
-                       POST_BUILD
-                       COMMAND install_name_tool -change
-                       @rpath/QtCore.framework/Versions/5/QtCore
-                       @loader_path/QtCore
-                       $<TARGET_FILE:correct_czi_shading_mex>
-                       COMMAND install_name_tool -change
-                       /Users/feng/code/atlas/src/3rdparty/freeimage/lib/libfreeimageplus.dylib
-                       @loader_path/libfreeimageplus.dylib
-                       $<TARGET_FILE:correct_czi_shading_mex>
-                       COMMAND install_name_tool -change
-                       @rpath/libtbb.dylib
-                       @loader_path/libtbb.dylib
-                       $<TARGET_FILE:correct_czi_shading_mex>
-                       )
-
-    add_custom_command(TARGET read_stack_info_mex
-                       POST_BUILD
-                       COMMAND install_name_tool -change
-                       @rpath/QtCore.framework/Versions/5/QtCore
-                       @loader_path/QtCore
-                       $<TARGET_FILE:read_stack_info_mex>
-                       COMMAND install_name_tool -change
-                       /Users/feng/code/atlas/src/3rdparty/freeimage/lib/libfreeimageplus.dylib
-                       @loader_path/libfreeimageplus.dylib
-                       $<TARGET_FILE:read_stack_info_mex>
-                       COMMAND install_name_tool -change
-                       @rpath/libtbb.dylib
-                       @loader_path/libtbb.dylib
-                       $<TARGET_FILE:read_stack_info_mex>
-                       )
-
-    add_custom_command(TARGET read_stack_mex
-                       POST_BUILD
-                       COMMAND install_name_tool -change
-                       @rpath/QtCore.framework/Versions/5/QtCore
-                       @loader_path/QtCore
-                       $<TARGET_FILE:read_stack_mex>
-                       COMMAND install_name_tool -change
-                       /Users/feng/code/atlas/src/3rdparty/freeimage/lib/libfreeimageplus.dylib
-                       @loader_path/libfreeimageplus.dylib
-                       $<TARGET_FILE:read_stack_mex>
-                       COMMAND install_name_tool -change
-                       @rpath/libtbb.dylib
-                       @loader_path/libtbb.dylib
-                       $<TARGET_FILE:read_stack_mex>
-                       )
-
-    add_custom_command(TARGET stack_czi_tiles_mex
-                       POST_BUILD
-                       COMMAND install_name_tool -change
-                       @rpath/QtCore.framework/Versions/5/QtCore
-                       @loader_path/QtCore
-                       $<TARGET_FILE:stack_czi_tiles_mex>
-                       COMMAND install_name_tool -change
-                       /Users/feng/code/atlas/src/3rdparty/freeimage/lib/libfreeimageplus.dylib
-                       @loader_path/libfreeimageplus.dylib
-                       $<TARGET_FILE:stack_czi_tiles_mex>
-                       COMMAND install_name_tool -change
-                       @rpath/libtbb.dylib
-                       @loader_path/libtbb.dylib
-                       $<TARGET_FILE:stack_czi_tiles_mex>
-                       )
-
-    add_custom_command(TARGET stack_czi_tiles_with_mask_mex
-                       POST_BUILD
-                       COMMAND install_name_tool -change
-                       @rpath/QtCore.framework/Versions/5/QtCore
-                       @loader_path/QtCore
-                       $<TARGET_FILE:stack_czi_tiles_with_mask_mex>
-                       COMMAND install_name_tool -change
-                       /Users/feng/code/atlas/src/3rdparty/freeimage/lib/libfreeimageplus.dylib
-                       @loader_path/libfreeimageplus.dylib
-                       $<TARGET_FILE:stack_czi_tiles_with_mask_mex>
-                       COMMAND install_name_tool -change
-                       @rpath/libtbb.dylib
-                       @loader_path/libtbb.dylib
-                       $<TARGET_FILE:stack_czi_tiles_with_mask_mex>
                        )
   endif (APPLE)
 endif (Matlab_FOUND)
