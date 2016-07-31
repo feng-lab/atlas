@@ -18,12 +18,15 @@ else
 fi
 
 if [ -e "Atlas.app" ]; then
+  cp -p -R Atlas.app Atlas_bak.app
 	/Users/feng/Qt/5.7/clang_64/bin/macdeployqt Atlas.app #-verbose=3
 	if [ -e "atlas.app.new.zip" ]; then
 		rm atlas.app.new.zip
 	fi
-	zip -qr atlas.app.new.zip Atlas.app
+	zip --quiet --recurse-paths --symlinks atlas.app.new.zip Atlas.app
 	rm -r Atlas.app
+  mv Atlas_bak.app Atlas.app
+  rm -f "/Users/feng/Google Drive/jinny'lab/software/atlas.app.new.zip"
   cp -f atlas.app.new.zip "/Users/feng/Google Drive/jinny'lab/software/atlas.app.new.zip"
 else
 	echo "Atlas.app not build yet."
