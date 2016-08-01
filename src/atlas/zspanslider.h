@@ -1,8 +1,9 @@
 #ifndef ZSPANSLIDER_H
 #define ZSPANSLIDER_H
 
-#include <qxtspanslider.h>
 #include "zspinbox.h"
+
+class QxtSpanSlider;
 
 namespace nim {
 

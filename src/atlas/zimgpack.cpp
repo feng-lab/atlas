@@ -186,12 +186,12 @@ ZImgPack::ZImgPack(const QString& fileName, size_t scene, FileFormat format, siz
   if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold && !needScale) {
     m_diskCached = false;
     ZImgIOInstance.readImg(m_imgSource, m_img);
-  } else if (hasPyramidal || !needScale) {
+  } else if (info->voxelFormat != VoxelFormat::Float && (hasPyramidal || !needScale)) {
     buildFastReadIndex(*sceneSubBlock);
   } else {
     buildPyramidal();
   }
-
+  
   updateDerivedData();
 }
 
@@ -242,7 +242,7 @@ ZImgPack::ZImgPack(const QStringList& files, Dimension catDim, size_t scene, Fil
   if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold && !needScale) {
     m_diskCached = false;
     ZImgIOInstance.readImg(m_imgSource, m_img);
-  } else if (hasPyramidal || !needScale) {
+  } else if (info->voxelFormat != VoxelFormat::Float && (hasPyramidal || !needScale)) {
     buildFastReadIndex(*sceneSubBlock);
   } else {
     buildPyramidal();

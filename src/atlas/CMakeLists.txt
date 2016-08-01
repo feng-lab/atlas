@@ -138,6 +138,7 @@ find_package(Qt5Svg REQUIRED PATHS /Users/feng/Qt/5.7/clang_64 NO_DEFAULT_PATH)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ceres-solver/ceres-solver.cmake)
 
 #libqxt srcs
+add_definitions(-DBUILD_QXT -DBUILD_QXT_OBJECT)
 set(LIBQXTDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libqxt)
 set(LIBQXT_HEADERS
     ${LIBQXTDIR}/core/qxtglobal.h
@@ -154,7 +155,6 @@ set(LIBQXT_SOURCES
 source_group(libqxt FILES ${LIBQXT_HEADERS} ${LIBQXT_SOURCES})
 
 #qtcsv srcs
-add_definitions(-DBUILD_QXT -DBUILD_QXT_OBJECT)
 set(QTCSVDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/qtcsv)
 set(QTCSV_HEADERS
     ${QTCSVDIR}/include/qtcsv_global.h

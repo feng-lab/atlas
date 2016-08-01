@@ -1,7 +1,9 @@
 #include "zspanslider.h"
 #include <limits>
 #include <QBoxLayout>
+#include <qxtspanslider.h>
 #include "zlog.h"
+#include "zsaturateoperation.h"
 
 namespace nim {
 
@@ -78,7 +80,7 @@ ZSpanSliderWithSpinBox::createWidget(int lowerValue, int upperValue, int min, in
   m_slider->setSpan(lowerValue, upperValue);
   m_slider->setSingleStep(singleStep);
   m_slider->setTracking(tracking);
-  m_slider->setHandleMovementMode(QxtSpanSlider::NoCrossing);
+  m_slider->setHandleMovementMode(QxtSpanSlider::NoOverlapping);
   m_slider->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
   m_lowerSpinBox = new ZSpinBox();
   m_lowerSpinBox->setRange(min, upperValue);
@@ -108,11 +110,7 @@ ZDoubleSpanSliderWithSpinBox::ZDoubleSpanSliderWithSpinBox(double lowerValue, do
   : QWidget(parent), m_lowerValue(lowerValue), m_upperValue(upperValue), m_min(min), m_max(max), m_step(singleStep)
   , m_decimal(decimal), m_tracking(tracking)
 {
-  double sliderMaxValue = (m_max - m_min) / m_step;
-  if (sliderMaxValue > std::numeric_limits<int>::max())
-    m_sliderMaxValue = std::numeric_limits<int>::max();
-  else
-    m_sliderMaxValue = static_cast<int>(sliderMaxValue);
+  m_sliderMaxValue = 1e6; //roundTo<int>((m_max - m_min) / m_step);
   createWidget();
 }
 
@@ -135,11 +133,7 @@ void ZDoubleSpanSliderWithSpinBox::setDataRange(double min, double max)
 {
   m_min = min;
   m_max = max;
-  double sliderMaxValue = (m_max - m_min) / m_step;
-  if (sliderMaxValue > std::numeric_limits<int>::max())
-    m_sliderMaxValue = std::numeric_limits<int>::max();
-  else
-    m_sliderMaxValue = static_cast<int>(sliderMaxValue);
+  m_sliderMaxValue = 1e6; //roundTo<int>((m_max - m_min) / m_step);
   m_slider->setRange(0, m_sliderMaxValue);
   double l = m_slider->lowerValue() / static_cast<double>(m_sliderMaxValue) * (m_max - m_min) + m_min;
   double u = m_slider->upperValue() / static_cast<double>(m_sliderMaxValue) * (m_max - m_min) + m_min;
@@ -199,7 +193,7 @@ void ZDoubleSpanSliderWithSpinBox::createWidget()
                     static_cast<int>((m_upperValue - m_min) / (m_max - m_min) * m_sliderMaxValue));
   m_slider->setSingleStep(std::max(1, static_cast<int>(m_step * m_sliderMaxValue / (m_max - m_min))));
   m_slider->setTracking(m_tracking);
-  m_slider->setHandleMovementMode(QxtSpanSlider::NoCrossing);
+  m_slider->setHandleMovementMode(QxtSpanSlider::NoOverlapping);
   m_slider->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
   m_lowerSpinBox = new ZDoubleSpinBox();
   m_lowerSpinBox->setRange(m_min, m_upperValue);
