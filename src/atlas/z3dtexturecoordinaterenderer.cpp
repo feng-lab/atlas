@@ -16,7 +16,7 @@ Z3DTextureCoordinateRenderer::Z3DTextureCoordinateRenderer(Z3DRendererBase& rend
   m_renderTextureCoordinateShader.loadFromSourceFile("transform_with_3dtexture.vert",
                                                      "render_3dtexture_coordinate.frag",
                                                      m_rendererBase.generateHeader());
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DTextureCoordinateRenderer::compile()

@@ -174,7 +174,7 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
   addParameter(m_volumeRaycasterRenderer.samplingRatePara());
 
   adjustWidget();
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 
   connect(&m_visible, SIGNAL(valueChanged(bool)), this, SIGNAL(objVisibleChanged(bool)));
 
@@ -678,7 +678,7 @@ void Z3DVolumeFilter::process(Z3DEye eye)
   }
 
   renderBoundBox(eye);
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 
   currentOutport.releaseTarget();
 
@@ -691,7 +691,7 @@ void Z3DVolumeFilter::process(Z3DEye eye)
 
   glDisable(GL_DEPTH_TEST);
 
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 bool Z3DVolumeFilter::hasSlices() const
@@ -1270,7 +1270,7 @@ glm::vec3 Z3DVolumeFilter::get3DPosition(glm::ivec2 pos2D, int width, int height
   glReadPixels(pos2D.x, pos2D.y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &WindowPosZ);
   port.releaseTarget();
 
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
   glm::vec3 pos = glm::unProject(glm::vec3(pos2D.x, pos2D.y, WindowPosZ), modelview,
                                  projection, viewport);
 
@@ -1377,7 +1377,7 @@ void Z3DVolumeFilter::prepareDataForRaycaster(Z3DVolume* volume, Z3DEye eye)
   glEnable(GL_CULL_FACE);
 
   m_rendererBase.setViewport(m_exitTarget.size());
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 
   // render back texture
   GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
@@ -1391,7 +1391,7 @@ void Z3DVolumeFilter::prepareDataForRaycaster(Z3DVolume* volume, Z3DEye eye)
   m_textureAndEyeCoordinateRenderer.setTriangleList(&cube);
   m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
   m_exitTarget.release();
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 
   // render front texture
   m_entryTarget.bind();
@@ -1407,7 +1407,7 @@ void Z3DVolumeFilter::prepareDataForRaycaster(Z3DVolume* volume, Z3DEye eye)
   m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
   m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
   m_entryTarget.release();
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 
   // restore OpenGL state
   glCullFace(GL_BACK);

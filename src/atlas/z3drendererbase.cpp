@@ -155,7 +155,7 @@ void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram& shader, Z3DEye
   }
 
   shader.setClipPlanesUniform(m_clipPlanes.data(), m_clipPlanes.size());
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram* shader, Z3DEye eye)
@@ -540,7 +540,7 @@ void Z3DRendererBase::renderInstant(const std::vector<Z3DPrimitiveRenderer *> &r
   activateClipPlanesOpenGL();
   for (size_t i=0; i<renderers.size(); ++i) {
     renderers[i]->renderUsingOpengl();
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
   }
   deactivateClipPlanesOpenGL();
 
@@ -554,7 +554,7 @@ void Z3DRendererBase::renderPickingInstant(const std::vector<Z3DPrimitiveRendere
   activateClipPlanesOpenGL();
   for (size_t i=0; i<renderers.size(); ++i) {
     renderers[i]->renderPickingUsingOpengl();
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
   }
   deactivateClipPlanesOpenGL();
 
@@ -567,7 +567,7 @@ void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitive
   activateClipPlanesGLSL();
   for (size_t i = 0; i < renderers.size(); ++i) {
     renderers[i]->render(eye);
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
   }
   deactivateClipPlanesGLSL();
 }
@@ -577,7 +577,7 @@ void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, const std::vector<Z3DPr
   activateClipPlanesGLSL();
   for (size_t i = 0; i < renderers.size(); ++i) {
     renderers[i]->renderPicking(eye);
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
   }
   deactivateClipPlanesGLSL();
 }
@@ -610,7 +610,7 @@ void Z3DRendererBase::activateClipPlanesOpenGL()
   for (size_t i=0; i<m_clipPlanes.size(); ++i) {
     glClipPlane(GL_CLIP_PLANE0+i, glm::value_ptr(m_doubleClipPlanes[i]));
     glEnable(GL_CLIP_PLANE0+i);
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
   }
 }
 
@@ -620,7 +620,7 @@ void Z3DRendererBase::deactivateClipPlanesOpenGL()
     return;
   for (size_t i=0; i<m_clipPlanes.size(); ++i) {
     glDisable(GL_CLIP_PLANE0+i);
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
   }
 }
 #endif
@@ -636,7 +636,7 @@ void Z3DRendererBase::activateClipPlanesGLSL()
       glClipPlane(GL_CLIP_PLANE0 + i, glm::value_ptr(m_doubleClipPlanes[i]));
       glEnable(GL_CLIP_PLANE0 + i);
     }
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
   }
 }
 
@@ -650,7 +650,7 @@ void Z3DRendererBase::deactivateClipPlanesGLSL()
     } else {
       glDisable(GL_CLIP_PLANE0 + i);
     }
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
   }
 }
 

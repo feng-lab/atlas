@@ -74,7 +74,7 @@ void Z3DNetworkEvaluator::process(bool stereo)
   // notify filter wrappers
   for (size_t j = 0; j < m_filterWrappers.size(); ++j)
     m_filterWrappers[j]->beforeNetworkProcess();
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 
   // Iterate over filters in rendering order
   for (size_t i = 0; i < m_renderingOrder.size(); ++i) {
@@ -87,47 +87,47 @@ void Z3DNetworkEvaluator::process(bool stereo)
       // notify filter wrappers
       for (size_t j = 0; j < m_filterWrappers.size(); ++j)
         m_filterWrappers[j]->beforeFilterProcess(currentFilter);
-      CHECK_GL_ERROR;
+      CHECK_GL_ERROR
 
       {
         getGLFocus();
         currentFilter->process(eye);
         currentFilter->setValid(eye);
-        CHECK_GL_ERROR;
+        CHECK_GL_ERROR
       }
 
       // notify filter wrappers
       getGLFocus();
       for (size_t j = 0; j < m_filterWrappers.size(); ++j)
         m_filterWrappers[j]->afterFilterProcess(currentFilter);
-      CHECK_GL_ERROR;
+      CHECK_GL_ERROR
     }
 
     if (stereo && !currentFilter->isValid(Z3DEye::Right) && currentFilter->isReady(Z3DEye::Right)) {
       // notify filter wrappers
       for (size_t j = 0; j < m_filterWrappers.size(); ++j)
         m_filterWrappers[j]->beforeFilterProcess(currentFilter);
-      CHECK_GL_ERROR;
+      CHECK_GL_ERROR
 
       {
         getGLFocus();
         currentFilter->process(Z3DEye::Right);
         currentFilter->setValid(Z3DEye::Right);
-        CHECK_GL_ERROR;
+        CHECK_GL_ERROR
       }
 
       // notify filter wrappers
       getGLFocus();
       for (size_t j = 0; j < m_filterWrappers.size(); ++j)
         m_filterWrappers[j]->afterFilterProcess(currentFilter);
-      CHECK_GL_ERROR;
+      CHECK_GL_ERROR
     }
   }
 
   // notify filter wrappers
   for (size_t j = 0; j < m_filterWrappers.size(); ++j)
     m_filterWrappers[j]->afterNetworkProcess();
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 
   unlock();
 
@@ -155,7 +155,7 @@ void Z3DNetworkEvaluator::initializeNetwork()
   }
 
   unlock();
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DNetworkEvaluator::updateNetwork()
@@ -292,14 +292,15 @@ void Z3DCheckOpenGLStateFilterWrapper::checkState(const Z3DFilter* p)
     warn(p, "glLineWidth() was not set to 1.0");
   }
 
-  if (!checkGLState(GL_MATRIX_MODE, GL_MODELVIEW)) {
-    glMatrixMode(GL_MODELVIEW);
-    warn(p, "glMatrixMode was not set to GL_MODELVIEW");
-  }
-
   if (!checkGLState(GL_ACTIVE_TEXTURE, GL_TEXTURE0)) {
     glActiveTexture(GL_TEXTURE0);
     warn(p, "glActiveTexture was not set to GL_TEXTURE0");
+  }
+
+#ifndef _USE_CORE_PROFILE_
+  if (!checkGLState(GL_MATRIX_MODE, GL_MODELVIEW)) {
+    glMatrixMode(GL_MODELVIEW);
+    warn(p, "glMatrixMode was not set to GL_MODELVIEW");
   }
 
   if (!checkGLState(GL_TEXTURE_1D, false)) {
@@ -316,6 +317,7 @@ void Z3DCheckOpenGLStateFilterWrapper::checkState(const Z3DFilter* p)
     glDisable(GL_TEXTURE_3D);
     warn(p, "GL_TEXTURE_3D was enabled");
   }
+#endif
 
   GLint id;
   glGetIntegerv(GL_CURRENT_PROGRAM, &id);
@@ -324,11 +326,13 @@ void Z3DCheckOpenGLStateFilterWrapper::checkState(const Z3DFilter* p)
     warn(p, "A shader was active");
   }
 
-  // can not check this as we are drawing to QOpenglWidget's (Qt5) fbo which is not 0
-  //  if (Z3DRenderTarget::currentBoundDrawFBO() != 0) {
-  //    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  //    warn(p, "A render target was bound (releaseTarget() missing?)");
-  //  }
+   // can not check this as we are drawing to QOpenglWidget's (Qt5) fbo which is not 0
+#if 0
+  if (Z3DRenderTarget::currentBoundDrawFBO() != 0) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    warn(p, "A render target was bound (releaseTarget() missing?)");
+  }
+#endif
 
   if (!checkGLState(GL_DEPTH_FUNC, GL_LESS)) {
     glDepthFunc(GL_LESS);
@@ -341,12 +345,11 @@ void Z3DCheckOpenGLStateFilterWrapper::checkState(const Z3DFilter* p)
   }
 }
 
-void Z3DCheckOpenGLStateFilterWrapper::warn(const Z3DFilter* p, const QString& message)
+void Z3DCheckOpenGLStateFilterWrapper::warn(const Z3DFilter* p, const char* message)
 {
   if (p) {
     LOG(WARNING) << "Invalid OpenGL state after processing " << p->className() << " : " << message;
-  }
-  else {
+  } else {
     LOG(WARNING) << "Invalid OpenGL state before network processing: " << message;
   }
 }

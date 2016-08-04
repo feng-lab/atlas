@@ -72,7 +72,7 @@ void Z3DTransferFunction::resetToDefault()
 void Z3DTransferFunction::createTexture()
 {
   m_texture.reset(new Z3DTexture(GLint(GL_RGBA8), glm::uvec3(m_dimensions), m_textureFormat, m_textureDataType));
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 Z3DTexture* Z3DTransferFunction::texture()
@@ -131,7 +131,7 @@ void Z3DTransferFunction::updateTexture()
   for (size_t x = 0; x < tfData.size(); ++x)
     tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size() - 1));
   m_texture->uploadImage(tfData.data());
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 
   m_textureIsInvalid = false;
 }

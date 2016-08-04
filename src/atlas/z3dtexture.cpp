@@ -20,7 +20,7 @@ Z3DTexture::Z3DTexture(GLenum textureTarget, GLint internalFormat, const glm::uv
   glGenTextures(1, &m_id);
   setFilter();
   setWrap();
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 Z3DTexture::Z3DTexture(GLint internalFormat, const glm::uvec3& dimension, GLenum dataFormat, GLenum dataType)
@@ -41,7 +41,7 @@ Z3DTexture::Z3DTexture(GLint internalFormat, const glm::uvec3& dimension, GLenum
   glGenTextures(1, &m_id);
   setFilter();
   setWrap();
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 Z3DTexture::~Z3DTexture()
@@ -56,7 +56,7 @@ void Z3DTexture::setFilter(GLint minFilter, GLint magFilter) const
   bind();
   glTexParameteri(m_textureTarget, GL_TEXTURE_MAG_FILTER, magFilter);
   glTexParameteri(m_textureTarget, GL_TEXTURE_MIN_FILTER, minFilter);
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DTexture::setWrap(GLint wrap) const
@@ -65,14 +65,14 @@ void Z3DTexture::setWrap(GLint wrap) const
   glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_S, wrap);
   glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_T, wrap);
   glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_R, wrap);
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DTexture::generateMipmap() const
 {
   bind();
   glGenerateMipmap(m_textureTarget);
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DTexture::uploadImage(const GLvoid* data) const
@@ -101,7 +101,7 @@ void Z3DTexture::uploadImage(const GLvoid* data) const
       break;
   }
 
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DTexture::uploadSubImage(const glm::uvec3& offset, const glm::uvec3& size, const GLvoid* data) const
@@ -128,7 +128,7 @@ void Z3DTexture::uploadSubImage(const glm::uvec3& offset, const glm::uvec3& size
       break;
   }
 
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 size_t Z3DTexture::bypePerPixel(GLenum dataFormat, GLenum dataType)
@@ -330,7 +330,7 @@ void Z3DTexture::downloadTextureToBuffer(GLenum dataFormat, GLenum dataType, GLv
 {
   bind();
   glGetTexImage(m_textureTarget, 0, dataFormat, dataType, buffer);
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DTexture::saveAsColorImage(const QString& filename) const
@@ -448,7 +448,7 @@ void Z3DTextureUnitManager::activateCurrentUnit()
     LOG(ERROR) << "Exceed max number of texture units.";
   }
   glActiveTexture(currentUnitEnum());
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 GLenum Z3DTextureUnitManager::currentUnitEnum() const

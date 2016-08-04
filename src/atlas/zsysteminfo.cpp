@@ -13,7 +13,6 @@
 
 #include <glbinding/Binding.h>
 #include <glbinding/Meta.h>
-#include <glbinding/Binding.h>
 
 #if !defined(Q_OS_WIN) && !defined(Q_OS_DARWIN)
 #include <sys/utsname.h> // for uname
@@ -256,19 +255,46 @@ void ZSystemInfo::logOSInfo() const
 bool ZSystemInfo::initializeGL()
 {
   if (m_glInitialized) {
-    LOG(INFO) << "OpenGL already initialized. Skip.";
+    LOG(ERROR) << "OpenGL already initialized. Skip.";
     return false;
   }
 
   glbinding::Binding::initialize();
   Z3DGpuInfoInstance.logGpuInfo();
-#if 0
-  glbinding::setCallbackMask(glbinding::CallbackMask::After | glbinding::CallbackMask::ParametersAndReturnValue | glbinding::CallbackMask::Unresolved);
-  glbinding::setAfterCallback([](const glbinding::FunctionCall & call)
-  {
+#if defined(CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS)
+  glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After |
+                                   glbinding::CallbackMask::ParametersAndReturnValue |
+                                   glbinding::CallbackMask::Unresolved,
+                                   {"glGetError"});
+  glbinding::setAfterCallback([](const glbinding::FunctionCall& call) {
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) {
+      std::ostringstream os;
+
+      os << call.function->name() << "(";
+      for (size_t i = 0; i < call.parameters.size(); ++i) {
+        os << call.parameters[i]->asString();
+        if (i + 1 < call.parameters.size())
+          os << ", ";
+      }
+      os << ")";
+
+      if (call.returnValue) {
+        os << " -> " << call.returnValue->asString();
+      }
+
+      LOG(ERROR) << "OpenGL error: " << glbinding::Meta::getString(error) << " with " << os.str();
+    }
+  });
+#elif 0
+  glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After |
+                                   glbinding::CallbackMask::ParametersAndReturnValue |
+                                   glbinding::CallbackMask::Unresolved,
+                                   {"glGetError"});
+  glbinding::setAfterCallback([](const glbinding::FunctionCall& call) {
     std::cout << call.function->name() << "(";
 
-    for (unsigned i = 0; i < call.parameters.size(); ++i) {
+    for (size_t i = 0; i < call.parameters.size(); ++i) {
       std::cout << call.parameters[i]->asString();
       if (i < call.parameters.size() - 1)
         std::cout << ", ";
@@ -282,9 +308,9 @@ bool ZSystemInfo::initializeGL()
 
     std::cout << std::endl;
 
-    GLenum error = glbinding::Binding::GetError.directCall();
+    GLenum error = glGetError();
     if (error != GL_NO_ERROR)
-      std::cout << "gl error: " << glbinding::Meta::getString(error) << std::endl;
+      std::cout << "OpenGL error: " << glbinding::Meta::getString(error) << std::endl;
 
     std::cout.flush();
   });
@@ -332,9 +358,9 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes) const
 
   if (folder.isEmpty()) {
     folder = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
-    QDir dir(folder);
-    if (!dir.exists())
-      dir.mkpath(".");
+    QDir dir1(folder);
+    if (!dir1.exists())
+      dir1.mkpath(".");
     volumeInfo = QStorageInfo(folder);
     //LOG(INFO) << folder << " " << volumeInfo.bytesAvailable();
     if (!volumeInfo.isValid() || !volumeInfo.isReady() || volumeInfo.isReadOnly() ||

@@ -45,7 +45,7 @@ Z3DMeshRenderer::Z3DMeshRenderer(Z3DRendererBase& rendererBase)
   m_meshShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader(), "",
                        normalShaders);
   m_meshShaderGrp.addAllSupportedPostShaders();
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DMeshRenderer::setData(std::vector<ZMesh*>* meshInput)

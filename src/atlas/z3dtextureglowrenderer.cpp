@@ -33,7 +33,7 @@ Z3DTextureGlowRenderer::Z3DTextureGlowRenderer(Z3DRendererBase& rendererBase)
   allshaders << "pass.vert" << "glow_func.frag";
   m_glowTextureShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader());
   m_glowTextureShaderGrp.addAllSupportedPostShaders();
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DTextureGlowRenderer::compile()

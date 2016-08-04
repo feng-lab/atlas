@@ -36,7 +36,7 @@ Z3DImgSliceRenderer::Z3DImgSliceRenderer(Z3DRendererBase& rendererBase)
   m_image3DSliceWithColorMapShader.loadFromSourceFile("transform_with_3dtexture_and_eye_coordinate.vert",
                                                       "image3d_slice_with_colormap.frag",
                                                       m_rendererBase.generateHeader() + generateHeader());
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DImgSliceRenderer::setData(Z3DImg& img, const std::vector<std::unique_ptr<ZColorMapParameter> >& colormaps)
@@ -79,7 +79,7 @@ void Z3DImgSliceRenderer::bindVolumes(Z3DShaderProgram& shader)
     // colormap
     shader.bindTexture(m_colormapUniformNames[idx++], m_colormaps->at(i)->get().texture1D());
 
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
   }
 }
 
@@ -92,7 +92,7 @@ void Z3DImgSliceRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx)
   // colormap
   shader.bindTexture(m_colormapUniformNames[0], m_colormaps->at(idx)->get().texture1D());
 
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DImgSliceRenderer::compile()

@@ -18,7 +18,7 @@ Z3DRenderOutputPort::Z3DRenderOutputPort(const QString& name, bool allowMultiple
   , m_renderTarget(m_internalColorFormat, m_internalDepthFormat,
                    m_size, m_multisample, m_sample)
 {
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 Z3DRenderOutputPort::~Z3DRenderOutputPort()

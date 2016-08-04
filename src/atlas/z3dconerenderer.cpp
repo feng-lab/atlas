@@ -44,7 +44,7 @@ Z3DConeRenderer::Z3DConeRenderer(Z3DRendererBase& rendererBase)
     allshaders << "cone.vert" << "cone_func.frag" << "lighting2.frag";
   m_coneShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader());
   m_coneShaderGrp.addAllSupportedPostShaders();
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DConeRenderer::setData(std::vector<glm::vec4>* baseAndBaseRadius, std::vector<glm::vec4>* axisAndTopRadius)

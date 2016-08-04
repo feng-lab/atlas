@@ -272,7 +272,7 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
       glPixelStorei(GL_PACK_ALIGNMENT, 1);
       glReadPixels(e->x(), h - e->y(), 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &WindowPosZ);
       pickingManager().releaseTarget();
-      CHECK_GL_ERROR;
+      CHECK_GL_ERROR
       m_startMouseWorldPos = camera().screenToWorld(glm::vec3(e->x(), h - e->y(), WindowPosZ), viewport);
     }
     e->accept();

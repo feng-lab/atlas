@@ -66,10 +66,10 @@ void Z3DCanvasPainter::process(Z3DEye eye)
     m_textureCopyRenderer.setColorTexture(currentInport.colorTexture());
     m_textureCopyRenderer.setDepthTexture(currentInport.depthTexture());
     m_rendererBase.render(eye, m_textureCopyRenderer);
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
   } else {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
   }
 }
 

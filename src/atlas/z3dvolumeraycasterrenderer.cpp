@@ -60,7 +60,7 @@ Z3DVolumeRaycasterRenderer::Z3DVolumeRaycasterRenderer(Z3DRendererBase& renderer
   m_mergeChannelShader.bindFragDataLocation(0, "FragData0");
   m_mergeChannelShader.loadFromSourceFile("pass.vert", "image2d_array_compositor.frag",
                                           m_rendererBase.generateHeader() + generateHeader());
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 QString Z3DVolumeRaycasterRenderer::compositeMode() const
@@ -176,7 +176,7 @@ void Z3DVolumeRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram& s
     // transfer functions
     shader.bindTexture(m_transferFuncUniformNames[idx++], m_transferFuncParas[i]->get().texture());
 
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
   }
 
   shader.setLogUniformLocationError(true);
@@ -193,7 +193,7 @@ void Z3DVolumeRaycasterRenderer::bindVolumeAndTransferFunc(Z3DShaderProgram& sha
   // transfer functions
   shader.bindTexture(m_transferFuncUniformNames[0], m_transferFuncParas[idx]->get().texture());
 
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 
   shader.setLogUniformLocationError(true);
 }
@@ -397,7 +397,7 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
     m_mergeChannelShader.release();
   }
 
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DVolumeRaycasterRenderer::renderPicking(Z3DEye)

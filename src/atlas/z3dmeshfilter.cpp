@@ -102,7 +102,7 @@ void Z3DMeshFilter::process(Z3DEye eye)
     currentOutport.clearTarget();
     m_rendererBase.setViewport(currentOutport.size());
     m_rendererBase.render(eye, m_triangleListRenderer);
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
     currentOutport.releaseTarget();
 
     Z3DRenderOutputPort& currentOutport2 = (eye == Z3DEye::Mono) ?
@@ -114,7 +114,7 @@ void Z3DMeshFilter::process(Z3DEye eye)
     m_textureGlowRenderer.setColorTexture(currentOutport.colorTexture());
     m_textureGlowRenderer.setDepthTexture(currentOutport.depthTexture());
     m_rendererBase.render(eye, m_textureGlowRenderer);
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
     currentOutport2.releaseTarget();
 
     glBlendFunc(GL_ONE, GL_ZERO);

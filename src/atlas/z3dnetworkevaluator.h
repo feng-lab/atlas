@@ -138,7 +138,7 @@ public:
 private:
   void checkState(const Z3DFilter* p = 0);
 
-  void warn(const Z3DFilter* p, const QString& message);
+  void warn(const Z3DFilter* p, const char* message);
 };
 
 // profile each filter and whole network

@@ -25,7 +25,7 @@ Z3DShader::Z3DShader(Z3DShader::Type type)
   } else if (m_type == Z3DShader::Type::Compute) {
     m_id = glCreateShader(GL_COMPUTE_SHADER);
   }
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
   if (!m_id) {
     throw ZGLException("Z3DShader: Could not create shader");
   }
@@ -34,7 +34,7 @@ Z3DShader::Z3DShader(Z3DShader::Type type)
 Z3DShader::~Z3DShader()
 {
   glDeleteShader(m_id);
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DShader::compileSourceCode(const char* source)
@@ -109,7 +109,7 @@ void Z3DShader::compileSourceCode(const char* source)
         log += source;
         log += QString("\n***");
       }
-      CHECK_GL_ERROR;
+      CHECK_GL_ERROR
       throw ZGLException(log);
     }
   } else {

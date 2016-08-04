@@ -3,6 +3,7 @@
 
 #include <glbinding/ContextInfo.h>
 #include <glbinding/Version.h>
+#include <glbinding/Meta.h>
 
 namespace nim {
 
@@ -11,48 +12,18 @@ bool GLVersionGE(int majorVersion, int minorVersion)
   return glbinding::ContextInfo::version() >= glbinding::Version(majorVersion, minorVersion);
 }
 
-GLenum _CheckGLError(const char* file, int line, const char* function)
+void _CheckGLError(const char* file, int line, const char* function)
 {
   GLenum err = glGetError();
 
   if (err != GL_NO_ERROR) {
-    QString errStr;
-    switch (err) {
-      case GL_INVALID_ENUM:
-        errStr = "openGL invalid enumerant";
-        break;
-      case GL_INVALID_VALUE:
-        errStr = "openGL invalid value";
-        break;
-      case GL_INVALID_OPERATION:
-        errStr = "openGL invalid operation";
-        break;
-      case GL_INVALID_FRAMEBUFFER_OPERATION:
-        errStr = "openGL invalid framebuffer operation";
-        break;
-      case GL_STACK_OVERFLOW:
-        errStr = "openGL stack overflow";
-        break;
-      case GL_STACK_UNDERFLOW:
-        errStr = "openGL stack underflow";
-        break;
-      case GL_OUT_OF_MEMORY:
-        errStr = "openGL out of memory";
-        break;
-      default:
-        errStr = "openGL unknown error";
-        break;
-    }
-
 #ifdef _USE_QSLOG_
-    LERRORF(file, line, function) << errStr;
+    LERRORF(file, line, function) << "OpenGL error: " << glbinding::Meta::getString(err);
 #else
     Q_UNUSED(function)
-    LERRORF(file, line, "") << errStr;
+    LERRORF(file, line, "") << "OpenGL error: " << glbinding::Meta::getString(err);
 #endif
   }
-
-  return err;
 }
 
 bool checkGLState(GLenum pname, bool value)

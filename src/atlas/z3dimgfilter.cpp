@@ -60,7 +60,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_zSlice2Position("Z Slice 2 Position", 0, 0, 1)
   , m_leftMouseButtonPressEvent("Left Mouse Button Pressed", false)
 {
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
   m_baseBoundBoxRenderer.setEnableMultisample(false);
   m_textureCopyRenderer.setDiscardTransparent(true);
 
@@ -182,7 +182,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_imgRaycasterRenderer.samplingRatePara());
 
   adjustWidget();
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 
   connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DImgFilter::objVisibleChanged);
 
@@ -526,7 +526,7 @@ void Z3DImgFilter::process(Z3DEye eye)
 
   glDisable(GL_DEPTH_TEST);
 
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 bool Z3DImgFilter::hasSlices() const
@@ -790,7 +790,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     glEnable(GL_CULL_FACE);
 
     m_rendererBase.setViewport(m_exitTarget.size());
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
 
     // render back texture
     const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
@@ -804,7 +804,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     m_textureAndEyeCoordinateRenderer.setTriangleList(&cube);
     m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
     m_exitTarget.release();
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
 
     // render front texture
     m_entryTarget.bind();
@@ -820,7 +820,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
     m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
     m_entryTarget.release();
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
 
     // restore OpenGL state
     glCullFace(GL_BACK);
@@ -846,7 +846,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
   m_rendererBase.render(eye, m_imgRaycasterRenderer);
 
   renderBoundBox(eye);
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 
   currentOutport.releaseTarget();
 

@@ -20,7 +20,7 @@ Z3DImage2DRenderer::Z3DImage2DRenderer(Z3DRendererBase& rendererBase)
   m_mergeChannelShader.bindFragDataLocation(0, "FragData0");
   m_mergeChannelShader.loadFromSourceFile("pass.vert", "image2d_array_compositor.frag",
                                           m_rendererBase.generateHeader() + generateHeader());
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DImage2DRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume>>& volsIn,
@@ -76,7 +76,7 @@ void Z3DImage2DRenderer::bindVolumes(Z3DShaderProgram& shader)
     // colormap
     shader.bindTexture(m_colormapUniformNames[idx++], m_colormaps[i]->get().texture1D());
 
-    CHECK_GL_ERROR;
+    CHECK_GL_ERROR
   }
 }
 
@@ -88,7 +88,7 @@ void Z3DImage2DRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx)
   // colormap
   shader.bindTexture(m_colormapUniformNames[0], m_colormaps[idx]->get().texture1D());
 
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 bool Z3DImage2DRenderer::hasVolume() const

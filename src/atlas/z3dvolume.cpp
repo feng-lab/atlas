@@ -307,7 +307,7 @@ void Z3DVolume::generateTexture()
   m_texture.reset(new Z3DTexture(internalFormat, dimensions(), format, dataType));
   m_texture->uploadImage(m_img.channelData(0));
 
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DVolume::computeHistogramMaxValue()

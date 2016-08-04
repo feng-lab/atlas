@@ -27,7 +27,7 @@ Z3DEllipsoidRenderer::Z3DEllipsoidRenderer(Z3DRendererBase& rendererBase)
   allshaders << "ellipsoid.vert" << "ellipsoid_func.frag" << "lighting2.frag";
   m_ellipsoidShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader());
   m_ellipsoidShaderGrp.addAllSupportedPostShaders();
-  CHECK_GL_ERROR;
+  CHECK_GL_ERROR
 }
 
 void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3>* centers, std::vector<glm::vec3>* axis1,
