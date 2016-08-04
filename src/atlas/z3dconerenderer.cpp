@@ -170,7 +170,6 @@ QString Z3DConeRenderer::generateHeader()
 #ifndef _USE_CORE_PROFILE_
 void Z3DConeRenderer::renderUsingOpengl()
 {
-#ifdef _USE_GLEW_
   if (m_baseAndBaseRadius.empty())
     return;
   appendDefaultColors();
@@ -225,12 +224,10 @@ void Z3DConeRenderer::renderUsingOpengl()
     glPopMatrix();
   }
   gluDeleteQuadric(quadric);
-#endif
 }
 
 void Z3DConeRenderer::renderPickingUsingOpengl()
 {
-#ifdef _USE_GLEW_
   if (m_baseAndBaseRadius.empty())
     return;
   if (m_conePickingColors.empty() || m_conePickingColors.size() != m_baseAndBaseRadius.size())
@@ -284,7 +281,6 @@ void Z3DConeRenderer::renderPickingUsingOpengl()
     glPopMatrix();
   }
   gluDeleteQuadric(quadric);
-#endif
 }
 #endif
 

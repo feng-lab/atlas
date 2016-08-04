@@ -146,7 +146,6 @@ QString Z3DEllipsoidRenderer::generateHeader()
 #ifndef _USE_CORE_PROFILE_
 void Z3DEllipsoidRenderer::renderUsingOpengl()
 {
-#ifdef _USE_GLEW_
   if (m_centers.empty())
     return;
   appendDefaultColors();
@@ -171,12 +170,10 @@ void Z3DEllipsoidRenderer::renderUsingOpengl()
     glPopMatrix();
   }
   gluDeleteQuadric(quadric);
-#endif
 }
 
 void Z3DEllipsoidRenderer::renderPickingUsingOpengl()
 {
-#ifdef _USE_GLEW_
   if (m_centers.empty())
     return;
   if (m_ellipsoidPickingColors.empty() || m_centers.size() != m_ellipsoidPickingColors.size())
@@ -196,7 +193,6 @@ void Z3DEllipsoidRenderer::renderPickingUsingOpengl()
     glPopMatrix();
   }
   gluDeleteQuadric(quadric);
-#endif
 }
 #endif
 

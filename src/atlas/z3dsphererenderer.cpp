@@ -129,7 +129,6 @@ QString Z3DSphereRenderer::generateHeader()
 #ifndef _USE_CORE_PROFILE_
 void Z3DSphereRenderer::renderUsingOpengl()
 {
-#ifdef _USE_GLEW_
   if (m_pointAndRadius.empty())
     return;
   appendDefaultColors();
@@ -153,12 +152,10 @@ void Z3DSphereRenderer::renderUsingOpengl()
     glPopMatrix();
   }
   gluDeleteQuadric(quadric);
-#endif
 }
 
 void Z3DSphereRenderer::renderPickingUsingOpengl()
 {
-#ifdef _USE_GLEW_
   if (m_pointAndRadius.empty())
     return;
   if (m_pointPickingColors.empty() || m_pointAndRadius.size() != m_pointPickingColors.size())
@@ -177,7 +174,6 @@ void Z3DSphereRenderer::renderPickingUsingOpengl()
     glPopMatrix();
   }
   gluDeleteQuadric(quadric);
-#endif
 }
 #endif
 

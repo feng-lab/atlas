@@ -1,23 +1,14 @@
 #ifndef Z3DGL_H
 #define Z3DGL_H
 
-#ifdef _USE_GLEW_
-
-#include <GL/glew.h>
-#define GLVersionGE(a, b) GLEW_VERSION_ ## a ## _ ## b
-
-#else
-
 #include <glbinding/gl/gl.h>
-
-using namespace gl;
-
-#endif
 
 #include "zglobal.h"
 #include "zglmutils.h"
 
 namespace nim {
+
+using namespace gl;
 
 enum class Z3DEye
 {
@@ -29,11 +20,7 @@ enum class Z3DScreenShotType
   MonoView, HalfSideBySideStereoView, FullSideBySideStereoView
 };
 
-#ifndef _USE_GLEW_
-
 bool GLVersionGE(int majorVersion, int minorVersion);
-
-#endif
 
 GLenum _CheckGLError(const char* file, int line, const char* function);
 

@@ -11,13 +11,9 @@
 #include <QApplication>
 #include <QDateTime>
 
-#ifndef _USE_GLEW_
-
 #include <glbinding/Binding.h>
 #include <glbinding/Meta.h>
 #include <glbinding/Binding.h>
-
-#endif
 
 #if !defined(Q_OS_WIN) && !defined(Q_OS_DARWIN)
 #include <sys/utsname.h> // for uname
@@ -264,28 +260,6 @@ bool ZSystemInfo::initializeGL()
     return false;
   }
 
-#ifdef _USE_GLEW_
-  GLenum err = glewInit();
-  if (err != GLEW_OK) {
-    m_errorMsg = "glewInit failed, error: ";
-    m_errorMsg += reinterpret_cast<const char*>(glewGetErrorString(err));
-    LOG(ERROR) << m_errorMsg;
-    LOG(WARNING) << "3D functions will be disabled.";
-    return false;
-  } else {
-    LOG(INFO) << "GLEW version:" << (const char*)(glewGetString(GLEW_VERSION));
-    Z3DGpuInfoInstance.logGpuInfo();
-    if (Z3DGpuInfoInstance.isSupported()) {
-      m_glInitialized = true;
-      return m_glInitialized;
-    } else {
-      m_errorMsg = Z3DGpuInfoInstance.notSupportedReason();
-      LOG(ERROR) << m_errorMsg;
-      m_glInitialized = false;
-      return m_glInitialized;
-    }
-  }
-#else
   glbinding::Binding::initialize();
   Z3DGpuInfoInstance.logGpuInfo();
 #if 0
@@ -318,10 +292,10 @@ bool ZSystemInfo::initializeGL()
   glbinding::setCallbackMask(glbinding::CallbackMask::Unresolved);
 #endif
   glbinding::setUnresolvedCallback([](const glbinding::AbstractFunction& call) {
-    LOG(ERROR) << "OpengGL function " << call.name() << " can not be resolved.";
+    LOG(ERROR) << "OpenGL function " << call.name() << " can not be resolved.";
   });
   glbinding::Binding::addContextSwitchCallback([](glbinding::ContextHandle handle) {
-    LOG(INFO) << "Switching to openGL context " << handle;
+    LOG(INFO) << "Switching to OpenGL context " << handle;
   });
   if (Z3DGpuInfoInstance.isSupported()) {
     m_glInitialized = true;
@@ -332,7 +306,6 @@ bool ZSystemInfo::initializeGL()
     m_glInitialized = false;
     return m_glInitialized;
   }
-#endif
 }
 
 QString ZSystemInfo::shaderPath(const QString& filename) const

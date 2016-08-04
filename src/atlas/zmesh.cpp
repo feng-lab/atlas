@@ -33,7 +33,7 @@ nim::ZMesh vtkPolyDataToMesh(vtkPolyData* polyData)
   std::vector<glm::dvec3> vertices(points->GetNumberOfPoints());
   std::vector<glm::dvec3> normals(pointsNormals->GetNumberOfTuples());
   CHECK(vertices.size() == normals.size());
-  std::vector<GLuint> indices;
+  std::vector<gl::GLuint> indices;
   for (vtkIdType id = 0; id < points->GetNumberOfPoints(); ++id) {
     points->GetPoint(id, &vertices[id][0]);
     pointsNormals->GetTuple(id, &normals[id][0]);

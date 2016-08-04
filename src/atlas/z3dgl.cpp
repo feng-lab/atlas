@@ -1,23 +1,15 @@
 #include "z3dgl.h"
 #include "zlog.h"
 
-#ifndef _USE_GLEW_
-
 #include <glbinding/ContextInfo.h>
 #include <glbinding/Version.h>
 
-#endif
-
 namespace nim {
-
-#ifndef _USE_GLEW_
 
 bool GLVersionGE(int majorVersion, int minorVersion)
 {
   return glbinding::ContextInfo::version() >= glbinding::Version(majorVersion, minorVersion);
 }
-
-#endif
 
 GLenum _CheckGLError(const char* file, int line, const char* function)
 {

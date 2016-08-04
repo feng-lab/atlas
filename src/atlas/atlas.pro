@@ -51,7 +51,6 @@ isEqual(QT_MAJOR_VERSION,5) | greaterThan(QT_MAJOR_VERSION,5) {
 
 CONFIG += rtti exceptions
 
-CONFIG += use_glbinding
 CONFIG += use_glog
 CONFIG += with_tests
 
@@ -499,12 +498,8 @@ SOURCES += \
     zlogdialog.cpp \
     zlogmodelsink.cpp
 
-contains(CONFIG, use_glbinding) {
-    include($$PWD/../3rdparty/glbinding.pri)
-} else {
-    DEFINES += _USE_GLEW_
-    include($$PWD/../3rdparty/glew.pri)
-}
+
+include($$PWD/../3rdparty/glbinding.pri)
 
 contains(CONFIG, use_glog) {
     include($$PWD/../3rdparty/glog.pri)

@@ -6,8 +6,6 @@
 #include <ceres/problem.h>
 #include <ceres/local_parameterization.h>
 
-using namespace ceres;
-
 namespace {
 
 using namespace nim;
@@ -34,7 +32,7 @@ private:
   std::vector<double> m_scales;
 };
 
-class CostFunctionAdaptor : public CostFunction
+class CostFunctionAdaptor : public ceres::CostFunction
 {
 public:
   CostFunctionAdaptor(const ZRegistrationCostFunction& costFunction,
@@ -45,7 +43,7 @@ public:
     , m_scales(scales)
     , m_relativeStepSize(relativeStepSize)
   {
-    std::vector<int32>* parameter_block_sizes = mutable_parameter_block_sizes();
+    std::vector<int32_t>* parameter_block_sizes = mutable_parameter_block_sizes();
     parameter_block_sizes->resize(1);
     parameter_block_sizes->at(0) = m_costFunc.numParameters();
     set_num_residuals(1);
@@ -87,7 +85,7 @@ private:
   double m_relativeStepSize;
 };
 
-class FirstOrderFunctionAdaptor : public FirstOrderFunction
+class FirstOrderFunctionAdaptor : public ceres::FirstOrderFunction
 {
 public:
   FirstOrderFunctionAdaptor(const ZRegistrationCostFunction& costFun)
@@ -116,8 +114,8 @@ namespace nim {
 ZRegistrationOptimizer::ZRegistrationOptimizer()
   : m_costFunction(nullptr)
 {
-  m_options.line_search_direction_type = LBFGS;
-  m_options.line_search_type = WOLFE;
+  m_options.line_search_direction_type = ceres::LBFGS;
+  m_options.line_search_type = ceres::WOLFE;
   m_options.function_tolerance = 1e-8;
   m_options.max_lbfgs_rank = 100;
   m_options.max_num_iterations = 100;
@@ -128,7 +126,7 @@ void ZRegistrationOptimizer::setCostFunction(ZRegistrationCostFunction& costFunc
   m_costFunction = &costFunc;
 }
 
-void ZRegistrationOptimizer::setLineSearchDirectionType(LineSearchDirectionType dirType)
+void ZRegistrationOptimizer::setLineSearchDirectionType(ceres::LineSearchDirectionType dirType)
 {
   m_options.line_search_direction_type = dirType;
 }
@@ -149,8 +147,8 @@ void ZRegistrationOptimizer::minimize()
   checkParameterNumber();
 
   m_currentParameters = m_initialParameters;
-  GradientProblem problem(new FirstOrderFunctionAdaptor(*m_costFunction));
-  Solve(m_options, problem, m_currentParameters.data(), &m_summary);
+  ceres::GradientProblem problem(new FirstOrderFunctionAdaptor(*m_costFunction));
+  ceres::Solve(m_options, problem, m_currentParameters.data(), &m_summary);
 }
 
 void ZRegistrationOptimizer::checkParameterNumber() const

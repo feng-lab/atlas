@@ -8,32 +8,6 @@
 #include <map>
 #include <vector>
 
-#ifdef _USE_GLEW_
-#ifdef __APPLE__
-#ifndef glUniform1ui
-void glUniform1ui(GLint location, GLuint v0);
-#endif
-#ifndef glUniform2ui
-void glUniform2ui(GLint location, GLuint v0, GLuint v1);
-#endif
-#ifndef glUniform3ui
-void glUniform3ui(GLint location, GLuint v0, GLuint v1, GLuint v2);
-#endif
-#ifndef glUniform4ui
-void glUniform4ui(GLint location, GLuint v0, GLuint v1, GLuint v2, GLuint v3);
-#endif
-#ifndef glUniform2uiv
-void glUniform2uiv(GLint location, GLsizei count, const GLuint *value);
-#endif
-#ifndef glUniform3uiv
-void glUniform3uiv(GLint location, GLsizei count, const GLuint *value);
-#endif
-#ifndef glUniform4uiv
-void glUniform4uiv(GLint location, GLsizei count, const GLuint *value);
-#endif
-#endif
-#endif
-
 namespace nim {
 
 // throw ZGLException if error
