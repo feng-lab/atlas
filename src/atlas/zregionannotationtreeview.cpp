@@ -10,7 +10,7 @@
 #include "zroidoc.h"
 #include "zmeshdoc.h"
 #include <QMessageBox>
-#include "zapplication.h"
+#include <QApplication>
 
 namespace nim {
 

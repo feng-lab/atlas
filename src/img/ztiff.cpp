@@ -1215,6 +1215,8 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
             boost::endian::endian_reverse_inplace(field.dataAt<uint64_t>(sc));
           }
           break;
+        default:
+          break;
       }
     }
     ifd.addField(field);

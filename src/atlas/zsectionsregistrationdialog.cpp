@@ -17,7 +17,7 @@
 #include "zimgstackinterface.h"
 #include "zstringutils.h"
 #include "zlog.h"
-#include "zapplication.h"
+#include <QApplication>
 
 namespace nim {
 

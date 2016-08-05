@@ -64,4 +64,30 @@ void writeStream_impl(std::ostream& fs, const char* buf, size_t count)
   }
 }
 
+#ifdef _MSC_VER
+
+std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filename, const QString& mode)
+{
+  errno = 0;
+  std::FILE *tmpf = nullptr;
+  if (_wfopen_s(&tmpf, filename.toStdWString().c_str(), mode.toStdWString().c_str()) != 0) {
+    throw ZIOException("Can not open file");
+  }
+  return std::unique_ptr<std::FILE, decltype(&std::fclose)>(tmpf, std::fclose);
 }
+
+#else
+
+std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filename, const char* mode)
+{
+  errno = 0;
+  std::FILE* tmpf = std::fopen(QFile::encodeName(filename).constData(), mode);
+  if (!tmpf) {
+    throw ZIOException("Can not open file");
+  }
+  return std::unique_ptr<std::FILE, decltype(&std::fclose)>(tmpf, std::fclose);
+}
+
+#endif
+
+} // namespace nim

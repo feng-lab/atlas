@@ -10,7 +10,7 @@
 #include <QGroupBox>
 #include <QScrollBar>
 #include <QSettings>
-#include "zapplication.h"
+#include <QApplication>
 
 namespace nim {
 

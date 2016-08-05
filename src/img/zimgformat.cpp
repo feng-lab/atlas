@@ -24,7 +24,7 @@ std::shared_ptr<ZImg> ZImgCommonSubBlock::read() const
   rgn.end.x = m_x + m_width;
   rgn.start.y = m_y;
   rgn.end.y = m_y + m_height;
-  std::shared_ptr<ZImg> res(new ZImg());
+  std::shared_ptr<ZImg> res = std::make_shared<ZImg>();
   res->load(m_filename, rgn, m_scene, m_format);
   return res;
 }

@@ -7,7 +7,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include "zselectfilewidget.h"
-#include "zapplication.h"
+#include <QApplication>
 
 #ifdef _NEUTUBE_
 #include "zstack.hxx"

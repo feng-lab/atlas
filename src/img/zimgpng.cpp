@@ -223,18 +223,7 @@ void ZImgPng::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
 {
   //ZBenchTimer bt("a");
   //bt.start();
-#ifdef _MSC_VER
-  FILE *tmpf = nullptr;
-  if (_wfopen_s(&tmpf, filename.toStdWString().c_str(), L"rb") != 0) {
-    throw ZIOException("can't open file");
-  }
-  std::unique_ptr<FILE, decltype(&fclose)> infile(tmpf, fclose);
-#else
-  std::unique_ptr<FILE, decltype(&fclose)> infile(fopen(QFile::encodeName(filename).constData(), "rb"), fclose);
-  if (!infile) {
-    throw ZIOException("can't open file");
-  }
-#endif
+  auto infile = openFile(filename, "rb");
 
   PngPack png;
   png.pngPtr = png_create_read_struct(PNG_LIBPNG_VER_STRING, &png, pngReadErrorFunction, pngReadWarningFunction);
@@ -284,18 +273,7 @@ void ZImgPng::readMetadata(const QString& filename, ZImgMetadata& meta, size_t s
     throw ZIOException("invalid scene");
   }
 
-#ifdef _MSC_VER
-  FILE *tmpf = nullptr;
-  if (_wfopen_s(&tmpf, filename.toStdWString().c_str(), L"rb") != 0) {
-    throw ZIOException("can't open file");
-  }
-  std::unique_ptr<FILE, decltype(&fclose)> infile(tmpf, fclose);
-#else
-  std::unique_ptr<FILE, decltype(&fclose)> infile(fopen(QFile::encodeName(filename).constData(), "rb"), fclose);
-  if (!infile) {
-    throw ZIOException("can't open file");
-  }
-#endif
+  auto infile = openFile(filename, "rb");
 
   PngPack png;
   png.pngPtr = png_create_read_struct(PNG_LIBPNG_VER_STRING, &png, pngReadErrorFunction, pngReadWarningFunction);
@@ -340,18 +318,7 @@ void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& regi
     throw ZIOException("invalid scene");
   }
 
-#ifdef _MSC_VER
-  FILE *tmpf = nullptr;
-  if (_wfopen_s(&tmpf, filename.toStdWString().c_str(), L"rb") != 0) {
-    throw ZIOException("can't open file");
-  }
-  std::unique_ptr<FILE, decltype(&fclose)> infile(tmpf, fclose);
-#else
-  std::unique_ptr<FILE, decltype(&fclose)> infile(fopen(QFile::encodeName(filename).constData(), "rb"), fclose);
-  if (!infile) {
-    throw ZIOException("can't open file");
-  }
-#endif
+  auto infile = openFile(filename, "rb");
 
   PngPack png;
   png.pngPtr = png_create_read_struct(PNG_LIBPNG_VER_STRING, &png, pngReadErrorFunction, pngReadWarningFunction);

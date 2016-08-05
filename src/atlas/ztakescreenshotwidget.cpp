@@ -9,7 +9,7 @@
 #include <QGroupBox>
 #include "zselectfilewidget.h"
 #include "z3dgpuinfo.h"
-#include "zapplication.h"
+#include <QApplication>
 
 namespace nim {
 
