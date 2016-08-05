@@ -1,7 +1,6 @@
 #include "zlogmodelsink.h"
 
 #include <QColor>
-#include <cassert>
 #include <QTimer>
 
 namespace nim {

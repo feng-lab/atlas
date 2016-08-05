@@ -1,7 +1,6 @@
 #include "zlog.h"
 
 #include <QFile>
-#include <cassert>
 
 #ifndef _USE_QSLOG_
 

@@ -6,6 +6,7 @@
 #include "zobjdoc.h"
 #include "zlog.h"
 #include "zlogmodelsink.h"
+#include "zexception.h"
 
 namespace nim {
 

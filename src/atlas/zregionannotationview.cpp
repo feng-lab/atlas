@@ -1,7 +1,5 @@
 #include "zregionannotationview.h"
 
-#include <cassert>
-
 namespace nim {
 
 ZRegionAnnotationView::ZRegionAnnotationView(ZRegionAnnotationDoc& doc, ZView& view)

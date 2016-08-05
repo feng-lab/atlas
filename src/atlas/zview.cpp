@@ -375,7 +375,7 @@ void ZView::takeFixedSizeScreenShot(QString filename, int width, int height)
 {
   QString err;
   if (!m_view->renderToImage(filename, width, height, &err)) {
-    QMessageBox::critical(QApplication::activeWindow(), "Error", err);
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), err);
   }
 }
 
@@ -383,7 +383,7 @@ void ZView::takeScreenShot(QString filename)
 {
   QString err;
   if (!m_view->renderToImage(filename, &err)) {
-    QMessageBox::critical(QApplication::activeWindow(), "Error", err);
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), err);
   }
 }
 

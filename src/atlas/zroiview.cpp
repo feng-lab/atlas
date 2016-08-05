@@ -1,7 +1,5 @@
 #include "zroiview.h"
 
-#include <cassert>
-
 namespace nim {
 
 ZROIView::ZROIView(ZROIDoc& doc, ZView& view)

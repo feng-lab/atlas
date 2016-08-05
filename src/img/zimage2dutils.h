@@ -16,7 +16,6 @@
 
 #include <QList>
 #include <utility>
-#include <cassert>
 #include <boost/align/aligned_allocator.hpp>
 #include "zcpuinfo.h"
 #include "zimagesse3.h"

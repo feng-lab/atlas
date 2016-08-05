@@ -6,7 +6,6 @@
 #include "zglmutils.h"
 #include <QList>
 #include <QString>
-#include <cassert>
 
 namespace nim {
 

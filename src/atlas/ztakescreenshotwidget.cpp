@@ -9,6 +9,7 @@
 #include <QGroupBox>
 #include "zselectfilewidget.h"
 #include "z3dgpuinfo.h"
+#include "zapplication.h"
 
 namespace nim {
 
@@ -67,7 +68,7 @@ void ZTakeScreenShotWidget::captureButtonPressed()
     }
   } else {  // auto generate file name based on folder and prefix
     if (m_folderWidget->getSelectedDirectory().isEmpty()) {
-      QMessageBox::critical(this, "Output Folder do not exist", "Output Folder do not exist");
+      QMessageBox::critical(this, qApp->applicationName(), "Output Folder do not exist");
       return;
     }
     QDir dir(m_folderWidget->getSelectedDirectory());
@@ -109,7 +110,7 @@ void ZTakeScreenShotWidget::captureButtonPressed()
 void ZTakeScreenShotWidget::captureSequenceButtonPressed()
 {
   if (m_folderWidget->getSelectedDirectory().isEmpty()) {
-    QMessageBox::critical(this, "Output Folder do not exist", "Output Folder do not exist");
+    QMessageBox::critical(this, qApp->applicationName(), "Output Folder do not exist");
     return;
   }
   QDir dir(m_folderWidget->getSelectedDirectory());

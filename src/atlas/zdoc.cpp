@@ -366,7 +366,7 @@ void ZDoc::loadFile(const QString& fileName)
 {
   QString error;
   if (!loadFile(fileName, error)) {
-    QMessageBox::critical(QApplication::activeWindow(), tr("Can not read file"),
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                           tr("Can not read file %1. Error: %2")
                             .arg(fileName).arg(error));
   }
@@ -384,7 +384,7 @@ void ZDoc::loadFileList(const QStringList& fileList)
     }
   }
   if (!error.isEmpty()) {
-    QMessageBox::critical(QApplication::activeWindow(), tr("Error"), error);
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), error);
   }
 }
 

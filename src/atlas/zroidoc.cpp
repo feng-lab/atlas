@@ -6,7 +6,6 @@
 #include <QApplication>
 #include <QIcon>
 #include "zexception.h"
-#include <cassert>
 #include <set>
 #include "zlog.h"
 #include "zimg.h"
@@ -50,7 +49,8 @@ void ZROIDoc::askToSave(const ZROI& roi, const QString& title)
       setLastOpenedObjPath(dialog.selectedFiles().at(0));
     }
     catch (const ZException& e) {
-      QMessageBox::critical(QApplication::activeWindow(), "Save ROI Error", e.what());
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                            "Save ROI Error.\n" + e.what());
     }
   }
 }
@@ -67,7 +67,7 @@ bool ZROIDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     } else {
-      QMessageBox::critical(QApplication::activeWindow(), "Save Error",
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                             tr("Error saving %1 to file %2: %3").arg(objName(id)).arg(pack->path).arg(err));
       return false;
     }
@@ -91,9 +91,9 @@ bool ZROIDoc::saveAs(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     } else {
-      QMessageBox::critical(QApplication::activeWindow(), "Save As Error",
-                            tr("Error saving %1 as file %2: %3").arg(objName(id)).arg(dialog.selectedFiles().at(0)).arg(
-                              err));
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                            tr("Error saving %1 as file %2: %3").arg(objName(id)).arg(dialog.selectedFiles().at(0))
+                              .arg(err));
     }
   }
   return false;
@@ -252,8 +252,8 @@ void ZROIDoc::loadROI()
     //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(), tr("Can not read ROI"),
-                              errorMsg);
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                              "Can not read ROI.\n" + errorMsg);
       }
     }
   }
@@ -277,14 +277,14 @@ void ZROIDoc::setModified()
 void ZROIDoc::createMaskImage()
 {
   if (m_idToROIPacks.empty()) {
-    QMessageBox::information(QApplication::activeWindow(), "No ROI",
+    QMessageBox::information(QApplication::activeWindow(), qApp->applicationName(),
                              tr("No ROI"));
     return;
   }
 
   ZROI& roi = currentROI();
   if (roi.isEmpty()) {
-    QMessageBox::information(QApplication::activeWindow(), "Empty ROI",
+    QMessageBox::information(QApplication::activeWindow(), qApp->applicationName(),
                              tr("Empty ROI"));
     return;
   }
@@ -314,7 +314,7 @@ void ZROIDoc::createMaskImage()
       m_doc.imgDoc().setLastOpenedObjPath(dialog.selectedFiles().at(0));
     }
     catch (const ZException& e) {
-      QMessageBox::critical(QApplication::activeWindow(), "Save ROI as Mask Image",
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                             tr("Error saving mask image %1: %2").arg(dialog.selectedFiles().at(0)).arg(e.what()));
     }
   }

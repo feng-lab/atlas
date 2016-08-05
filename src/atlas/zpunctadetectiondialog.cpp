@@ -7,6 +7,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include "zselectfilewidget.h"
+#include "zapplication.h"
 
 #ifdef _NEUTUBE_
 #include "zstack.hxx"
@@ -77,39 +78,39 @@ void ZPunctaDetectionDialog::detect()
 #endif
     }
     catch (const ZException& e) {
-      QMessageBox::critical(this, "Read Image Error", e.what());
+      QMessageBox::critical(this, qApp->applicationName(), "Read Image Error.\n" + e.what());
       return;
     }
     // todo: select time spot
     if (!img.is3DImg() && !img.is2DImg()) {
-      QMessageBox::critical(this, "time sequence not supported",
+      QMessageBox::critical(this, qApp->applicationName(),
                             QString("Can not detect puncta from time sequence image"));
       return;
     }
   } else {
-    QMessageBox::critical(this, "No Image", "No Image to detect.");
+    QMessageBox::critical(this, qApp->applicationName(), "No Image to detect.");
     return;
   }
   if (!img.isType<uint8_t>()) {
     img = img.convertNormalizedTo<uint8_t>();
   }
   if (m_outputPunctaFileWidget->getSelectedSaveFile().isEmpty()) {
-    QMessageBox::critical(this, "No output puncta file", "Result puncta file must be specified.");
+    QMessageBox::critical(this, qApp->applicationName(), "Result puncta file must be specified.");
     return;
   }
   if (m_outputLogFileWidget->getSelectedSaveFile().isEmpty()) {
-    QMessageBox::critical(this, "No output log file", "Detection log file must be specified.");
+    QMessageBox::critical(this, qApp->applicationName(), "Detection log file must be specified.");
     return;
   }
   int punctaChannel = m_punctaChannel.get() - 1;
   int dendriteChannel = m_dendriteChannel.associatedData() - 1;
   if (punctaChannel == dendriteChannel) {
-    QMessageBox::critical(this, "Wrong Image Channels", "Puncta and tube channels are not correct.");
+    QMessageBox::critical(this, qApp->applicationName(), "Puncta and tube channels are not correct.");
     return;
   }
   if (dendriteChannel >= 0) {
     if (m_voxelSize.get().x == 0.0 || m_voxelSize.get().y == 0.0 || m_voxelSize.get().z == 0.0) {
-      QMessageBox::critical(this, "Wrong Image Resolution", "Image Resolution is not correct.");
+      QMessageBox::critical(this, qApp->applicationName(), "Image Resolution is not correct.");
       return;
     } else {
       img.infoRef().voxelSizeUnit = VoxelSizeUnit::um;
@@ -127,7 +128,7 @@ void ZPunctaDetectionDialog::detect()
     }
   }
   catch (const ZException& e) {
-    QMessageBox::critical(this, "Read Swc Error", e.what());
+    QMessageBox::critical(this, qApp->applicationName(), "Read Swc Error.\n" + e.what());
     return;
   }
 
@@ -176,14 +177,14 @@ void ZPunctaDetectionDialog::detect()
 
 void ZPunctaDetectionDialog::processCanceled()
 {
-  QMessageBox::critical(this, "Canceled",
+  QMessageBox::critical(this, qApp->applicationName(),
                         "Puncta Detection is canceled by user.");
 }
 
 void ZPunctaDetectionDialog::processFinished()
 {
   if (!m_isCanceled && !m_hasError) {
-    QMessageBox::information(this, "Finished",
+    QMessageBox::information(this, qApp->applicationName(),
                              "Puncta Detection Finished.");
   }
 }
@@ -191,7 +192,7 @@ void ZPunctaDetectionDialog::processFinished()
 void ZPunctaDetectionDialog::processError(const QString& e)
 {
   m_hasError = true;
-  QMessageBox::critical(this, "Error",
+  QMessageBox::critical(this, qApp->applicationName(),
                         QString("Error During Detection: %1").arg(e));
 }
 
@@ -258,7 +259,7 @@ void ZPunctaDetectionDialog::inputImageChanged()
     }
     catch (const ZIOException& e) {
       updateInterface(fn, 0, 0, 0, 0);
-      QMessageBox::critical(this, "Can not read input image", e.what());
+      QMessageBox::critical(this, qApp->applicationName(), "Can not read input image.\n" + e.what());
     }
   } else {
     updateInterface(fn, 0, 0, 0, 0);
@@ -277,12 +278,13 @@ void ZPunctaDetectionDialog::detectLSMResolution()
                                    info.voxelSizeYInUm(),
                                    info.voxelSizeZInUm()));
       } else {
-        QMessageBox::critical(this, "Can not detect resolution from lsm file",
-                              "file do not contains resolution information");
+        QMessageBox::critical(this, qApp->applicationName(),
+                              "File does not contain resolution information");
       }
     }
     catch (const ZException& e) {
-      QMessageBox::critical(this, "Can not detect resolution from lsm file", e.what());
+      QMessageBox::critical(this, qApp->applicationName(),
+                            "Can not detect resolution from lsm file.\n" + e.what());
     }
   }
 }

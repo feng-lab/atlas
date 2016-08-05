@@ -1,7 +1,6 @@
 #include "zobjfilter.h"
 
 #include "zparameter.h"
-#include <cassert>
 #include "zlog.h"
 
 namespace nim {

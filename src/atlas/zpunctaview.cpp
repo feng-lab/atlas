@@ -1,7 +1,5 @@
 #include "zpunctaview.h"
 
-#include <cassert>
-
 namespace nim {
 
 ZPunctaView::ZPunctaView(ZPunctaDoc& doc, ZView& view)

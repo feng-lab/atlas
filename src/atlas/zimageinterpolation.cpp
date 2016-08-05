@@ -1,5 +1,4 @@
 #include "zimageinterpolation.h"
-#include <cassert>
 #include <cmath>
 #include <algorithm>
 #include "zimage2dutils.h"

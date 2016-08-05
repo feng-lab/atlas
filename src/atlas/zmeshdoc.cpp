@@ -43,7 +43,7 @@ void ZMeshDoc::askToSave(const ZMesh& msh, const QString& title)
       setLastOpenedObjPath(dialog.selectedFiles().at(0));
     }
     catch (const ZException& e) {
-      QMessageBox::critical(QApplication::activeWindow(), "Save Mesh Error", e.what());
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Mesh Error.\n" + e.what());
     }
   }
 }
@@ -60,7 +60,7 @@ bool ZMeshDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     } else {
-      QMessageBox::critical(QApplication::activeWindow(), "Save Error", err);
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
       return false;
     }
   } else {
@@ -88,7 +88,7 @@ bool ZMeshDoc::saveAs(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     } else {
-      QMessageBox::critical(QApplication::activeWindow(), "Save As Error", err);
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
     }
   }
   return false;
@@ -240,8 +240,8 @@ void ZMeshDoc::loadMesh()
     //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(), tr("Can not read mesh"),
-                              errorMsg);
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                              "Can not read mesh.\n" + errorMsg);
       }
     }
   }

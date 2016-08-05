@@ -5,7 +5,6 @@
 #include <QSettings>
 #include <QApplication>
 #include <QIcon>
-#include <cassert>
 #include "zlog.h"
 #include "zexception.h"
 #include <set>
@@ -30,7 +29,7 @@ bool ZSwcDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     } else {
-      QMessageBox::critical(QApplication::activeWindow(), "Save Error",
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                             tr("Error saving %1 to file %2: %3").arg(objName(id)).arg(pack->path).arg(err));
       return false;
     }
@@ -54,7 +53,7 @@ bool ZSwcDoc::saveAs(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     } else {
-      QMessageBox::critical(QApplication::activeWindow(), "Save As Error", err);
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
     }
   }
   return false;
@@ -200,8 +199,8 @@ void ZSwcDoc::loadSwc()
     //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(), tr("Can not read swc"),
-                              errorMsg);
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                              "Can not read swc.\n" + errorMsg);
       }
     }
   }

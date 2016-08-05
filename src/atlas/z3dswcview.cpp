@@ -1,7 +1,5 @@
 #include "z3dswcview.h"
 
-#include <cassert>
-
 namespace nim {
 
 Z3DSwcView::Z3DSwcView(ZSwcDoc& doc, Z3DView& view)
@@ -40,7 +38,7 @@ void Z3DSwcView::docSwcsAdded(const QList<size_t>& objs)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render swc: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), tr("Failed to render swc"), e.what());
+    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(), "Failed to render swc.\n" + e.what());
   }
 }
 
@@ -67,7 +65,7 @@ void Z3DSwcView::docSwcAdded(size_t id)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render swc: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), tr("Failed to render swc"), e.what());
+    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(), "Failed to render swc.\n" + e.what());
   }
 }
 

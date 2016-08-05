@@ -7,7 +7,6 @@
 #include <QFileInfo>
 #include <QDir>
 #include <set>
-#include <cassert>
 #include "zmainwindow.h"
 #include "zlog.h"
 #include "zfileutils.h"

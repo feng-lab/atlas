@@ -7,7 +7,6 @@
 #include <QIcon>
 #include <set>
 #include "zexception.h"
-#include <cassert>
 #include "zanimationwidget.h"
 #include "zlog.h"
 #include "zview.h"
@@ -48,7 +47,7 @@ bool Z2DAnimationDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     } else {
-      QMessageBox::critical(QApplication::activeWindow(), "Save Error", err);
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
       return false;
     }
   } else {
@@ -74,7 +73,7 @@ bool Z2DAnimationDoc::saveAs(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     } else {
-      QMessageBox::critical(QApplication::activeWindow(), "Save As Error", err);
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
     }
   }
   return false;
@@ -232,8 +231,8 @@ void Z2DAnimationDoc::loadAnimation()
     //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(), tr("Can not read Animation"),
-                              errorMsg);
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                              "Can not read Animation.\n" + errorMsg);
       }
     }
   }

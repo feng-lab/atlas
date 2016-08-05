@@ -1,7 +1,6 @@
 #include "zregionannotationtreemodel.h"
 
 #include "zobjdoc.h"
-#include <cassert>
 #include "zlog.h"
 
 namespace nim {

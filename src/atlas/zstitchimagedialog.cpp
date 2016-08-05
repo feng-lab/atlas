@@ -17,22 +17,10 @@ namespace {
 
 using namespace nim;
 
-class ZStitchException
+class ZStitchException : public ZException
 {
 public:
-  explicit ZStitchException(const QString& what)
-  {
-    m_what = what;
-  }
-
-  ~ZStitchException() throw()
-  {}
-
-  QString what() const throw()
-  { return m_what; }
-
-protected:
-  QString m_what;
+  using ZException::ZException;
 };
 
 void buildConnectionFromGrid(const std::vector<std::vector<size_t>>& grid,
@@ -703,7 +691,7 @@ void ZStitchImageDialog::selectInputStacks1()
       qSort(m_inputStack1Filenames.begin(), m_inputStack1Filenames.end(), naturalSortLessThan);
       m_inputStack1FileEdit->setText(QString("%1").arg(m_inputStack1Filenames.join("\n")));
     } catch (const ZException& e) {
-      QMessageBox::critical(this, tr("Can not read image"), e.what());
+      QMessageBox::critical(this, qApp->applicationName(), "Can not read image.\n" + e.what());
       return;
     }
   }
@@ -741,7 +729,7 @@ void ZStitchImageDialog::selectInputStacks2()
       qSort(m_inputStack2Filenames.begin(), m_inputStack2Filenames.end(), naturalSortLessThan);
       m_inputStack2FileEdit->setText(QString("%1").arg(m_inputStack2Filenames.join("\n")));
     } catch (const ZException& e) {
-      QMessageBox::critical(this, tr("Can not read image"), e.what());
+      QMessageBox::critical(this, qApp->applicationName(), "Can not read image.\n" + e.what());
       return;
     }
   }
@@ -931,10 +919,10 @@ void ZStitchImageDialog::getConnFromTileImage()
         m_editTileImageButton->setEnabled(true);
       } else {
         m_tileList.clear();
-        QMessageBox::warning(this, tr("Failed"), tr("Failed to parse tile connection image."));
+        QMessageBox::warning(this, qApp->applicationName(), tr("Failed to parse tile connection image."));
       }
     } catch (const ZException& e) {
-      QMessageBox::warning(this, tr("read image failed"), e.what());
+      QMessageBox::warning(this, qApp->applicationName(), "Read image failed.\n" + e.what());
       m_tileSelectionImageFilename.clear();
     }
   }
@@ -2179,13 +2167,13 @@ void ZStitchImageDialog::stitchStacks()
 
     }
   }
-  catch (const ZException& e) {
-    m_commandOutputEdit->append(QString("<font color=red>%1</font>").arg(e.what()));
-    QMessageBox::critical(this, "error", e.what());
-  }
   catch (const ZStitchException& e) {
     m_commandOutputEdit->append(QString("<font color=red>%1</font>").arg(e.what()));
-    QMessageBox::critical(this, "error", e.what());
+    QMessageBox::critical(this, qApp->applicationName(), e.what());
+  }
+  catch (const ZException& e) {
+    m_commandOutputEdit->append(QString("<font color=red>%1</font>").arg(e.what()));
+    QMessageBox::critical(this, qApp->applicationName(), e.what());
   }
 }
 

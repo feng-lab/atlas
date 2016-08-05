@@ -4,7 +4,6 @@
 #include <QDropEvent>
 #include <QWheelEvent>
 #include <QScrollBar>
-#include <cassert>
 #include "zlog.h"
 #include <QGraphicsPolygonItem>
 #include <QGraphicsRectItem>

@@ -47,7 +47,7 @@ bool ZImgDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     } else {
-      QMessageBox::critical(QApplication::activeWindow(), "Save Error", err);
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
       return false;
     }
   } else {
@@ -76,7 +76,7 @@ bool ZImgDoc::saveAs(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     } else {
-      QMessageBox::critical(QApplication::activeWindow(), "Save As Error", err);
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
     }
   }
   return false;
@@ -311,8 +311,8 @@ void ZImgDoc::showImg(ZImg* img, const QString& path)
     setLastOpenedObjPath(path);
   }
   catch (const ZException& e) {
-    QMessageBox::critical(QApplication::activeWindow(), tr("Can not show image"),
-                          e.what());
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                          "Can not show image.\n" + e.what());
   }
 }
 
@@ -332,8 +332,8 @@ void ZImgDoc::loadImg()
     int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadImg(dialog.selectedFiles().at(i), formats[fmtIdx], errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(), tr("Can not read image"),
-                              errorMsg);
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                              "Can not read image.\n" + errorMsg);
       }
     }
   }
@@ -349,8 +349,8 @@ void ZImgDoc::importImgZSequence()
 
     QString errorMsg;
     if (!loadImg(files, Dimension::Z, FileFormat::Unknown, errorMsg)) {
-      QMessageBox::critical(QApplication::activeWindow(), tr("Can not load image sequence"),
-                            errorMsg);
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                            "Can not load image sequence.\n" + errorMsg);
     }
   }
 }
@@ -365,8 +365,8 @@ void ZImgDoc::importImgTimeSequence()
 
     QString errorMsg;
     if (!loadImg(files, Dimension::T, FileFormat::Unknown, errorMsg)) {
-      QMessageBox::critical(QApplication::activeWindow(), tr("Can not load image sequence"),
-                            errorMsg);
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                            "Can not load image sequence.\n" + errorMsg);
     }
   }
 }

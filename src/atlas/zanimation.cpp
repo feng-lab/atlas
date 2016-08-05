@@ -324,7 +324,8 @@ ZAnimation::exportFixedSize3DAnimation(const QDir& dir, const QString& fn, doubl
   CHECK(m_view);
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
-      QMessageBox::critical(QApplication::activeWindow(), "Error", QString("Can not create folder %1").arg(dir.path()));
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                            QString("Can not create folder %1").arg(dir.path()));
       return;
     }
   }
@@ -340,7 +341,7 @@ ZAnimation::exportFixedSize3DAnimation(const QDir& dir, const QString& fn, doubl
       return;
     } else {
       if (!QFile::remove(dir.filePath(fn))) {
-        QMessageBox::critical(QApplication::activeWindow(), "Error",
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                               QString("Can not replace %1").arg(dir.filePath(fn)));
         return;
       }
@@ -433,7 +434,8 @@ void ZAnimation::export3DAnimation(const QDir& dir, const QString& fn, double fr
   CHECK(m_view);
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
-      QMessageBox::critical(QApplication::activeWindow(), "Error", QString("Can not create folder %1").arg(dir.path()));
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                            QString("Can not create folder %1").arg(dir.path()));
       return;
     }
   }
@@ -449,7 +451,7 @@ void ZAnimation::export3DAnimation(const QDir& dir, const QString& fn, double fr
       return;
     } else {
       if (!QFile::remove(dir.filePath(fn))) {
-        QMessageBox::critical(QApplication::activeWindow(), "Error",
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                               QString("Can not replace %1").arg(dir.filePath(fn)));
         return;
       }
@@ -550,7 +552,8 @@ ZAnimation::exportFixedSize2DAnimation(const QDir& dir, const QString& fn, doubl
   CHECK(m_view);
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
-      QMessageBox::critical(QApplication::activeWindow(), "Error", QString("Can not create folder %1").arg(dir.path()));
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                            QString("Can not create folder %1").arg(dir.path()));
       return;
     }
   }
@@ -566,7 +569,7 @@ ZAnimation::exportFixedSize2DAnimation(const QDir& dir, const QString& fn, doubl
       return;
     } else {
       if (!QFile::remove(dir.filePath(fn))) {
-        QMessageBox::critical(QApplication::activeWindow(), "Error",
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                               QString("Can not replace %1").arg(dir.filePath(fn)));
         return;
       }
@@ -618,7 +621,7 @@ ZAnimation::exportFixedSize2DAnimation(const QDir& dir, const QString& fn, doubl
       }
     }
     if (!canvasPainter.renderToImage(filepath, width, height, &err)) {
-      QMessageBox::critical(QApplication::activeWindow(), "Error", err);
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), err);
       break;
     }
   }
@@ -694,19 +697,19 @@ void ZAnimation::tryLinkAnimationWith(size_t id)
 
 void ZAnimation::videoEncoderError(const QString& err)
 {
-  QMessageBox::critical(QApplication::activeWindow(), "Video Encoder Error",
-                        tr("Can not encode video: %1").arg(err));
+  QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                        "Video Encoder Error.\nCan not encode video: " + err);
 }
 
 void ZAnimation::videoEncoderFinished()
 {
-  QMessageBox::information(QApplication::activeWindow(), "Finish Encoding Video",
+  QMessageBox::information(QApplication::activeWindow(), qApp->applicationName(),
                            "Finish Encoding Video.");
 }
 
 void ZAnimation::videoEncoderCanceled()
 {
-  QMessageBox::warning(QApplication::activeWindow(), "Video Encoder Canceled",
+  QMessageBox::warning(QApplication::activeWindow(), qApp->applicationName(),
                        "Video Encoding was canceled.");
 }
 
@@ -991,7 +994,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
     }
 
     if (!err.isEmpty()) {
-      QMessageBox::critical(QApplication::activeWindow(), "load file error", err);
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Load File Error.\n" + err);
       LOG(WARNING) << err;
     }
 

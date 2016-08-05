@@ -6,7 +6,6 @@
 #include "zlog.h"
 #include "zeigenutils.h"
 #include <H5Cpp.h>
-#include <cassert>
 #include "zioutils.h"
 #include "zstringutils.h"
 #include <QTextStream>

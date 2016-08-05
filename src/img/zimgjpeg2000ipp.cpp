@@ -1,8 +1,5 @@
 #include "zimgjpeg2000.h"
 
-#include "QsLog.h"
-#include <cassert>
-
 #include "uic_base_stream_input.h"
 #include "uic_base_stream_output.h"
 #include "ippdefs.h"

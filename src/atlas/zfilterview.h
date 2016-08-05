@@ -58,7 +58,7 @@ public:
         it->second->setNormalView(slice, time);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), "Error", e.what());
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
       }
     }
   }
@@ -70,7 +70,7 @@ public:
         it->second->setMaxZProjView(time);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), "Error", e.what());
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
       }
     }
   }
@@ -82,7 +82,7 @@ public:
         it->second->setViewport(rect, scale);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), "Error", e.what());
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
       }
     }
   }
@@ -103,7 +103,7 @@ public:
         it->second->deleteKeyPressed();
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), "Error", e.what());
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
       }
     }
   }
@@ -115,7 +115,7 @@ public:
         it->second->mousePressed(scenePos);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), "Error", e.what());
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
       }
     }
   }
@@ -127,7 +127,7 @@ public:
         it->second->mouseReleased(scenePos);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), "Error", e.what());
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
       }
     }
   }
@@ -139,7 +139,7 @@ public:
         it->second->rotateClockwise();
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), "Error", e.what());
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
       }
     }
   }
@@ -151,7 +151,7 @@ public:
         it->second->rotateCounterclockwise();
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), "Error", e.what());
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
       }
     }
   }

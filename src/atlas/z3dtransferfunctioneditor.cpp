@@ -16,6 +16,7 @@
 #include <QPushButton>
 #include <QCheckBox>
 #include <QMessageBox>
+#include <zapplication.h>
 
 #include "z3dshaderprogram.h"
 #include "zlog.h"
@@ -903,7 +904,7 @@ void Z3DTransferFunctionEditor::domainMinSpinBoxChanged(double min)
   if (m_transferFunction->get().isValidDomainMin(min)) {
     m_transferFunction->get().setDomainMin(min, m_rescaleKeys->isChecked());
   } else {
-    QMessageBox::critical(this, "invalid transfer function range start", "invalid transfer function range start");
+    QMessageBox::critical(this, qApp->applicationName(), "invalid transfer function range start");
     m_domainMinSpinBox->setValue(m_transferFunction->get().domainMin());
   }
 }
@@ -913,7 +914,7 @@ void Z3DTransferFunctionEditor::domainMaxSpinBoxChanged(double max)
   if (m_transferFunction->get().isValidDomainMax(max)) {
     m_transferFunction->get().setDomainMax(max, m_rescaleKeys->isChecked());
   } else {
-    QMessageBox::critical(this, "invalid transfer function range end", "invalid transfer function range end");
+    QMessageBox::critical(this, qApp->applicationName(), "invalid transfer function range end");
     m_domainMaxSpinBox->setValue(m_transferFunction->get().domainMax());
   }
 }

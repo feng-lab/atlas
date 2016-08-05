@@ -2,7 +2,6 @@
 #include "zimgtile.h"
 #include "zvoxelregion.h"
 #include "zstatisticsutils.h"
-#include <cassert>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/connected_components.hpp>
 #include <boost/graph/kruskal_min_spanning_tree.hpp>

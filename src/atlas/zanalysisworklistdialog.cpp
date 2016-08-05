@@ -54,7 +54,7 @@ void ZAnalysisWorklistDialog::onOpen()
   if (!fileName.isEmpty()) {
     QString res = m_model->setSource(fileName);
     if (!res.isEmpty()) {
-      QMessageBox::critical(this, tr("Error"), res);
+      QMessageBox::critical(this, qApp->applicationName(), res);
     }
     m_filename = fileName;
     m_saveButton->setEnabled(false);
@@ -74,7 +74,7 @@ void ZAnalysisWorklistDialog::onSave()
   if (!m_filename.isEmpty()) {
     QString res = m_model->toCSV(m_filename, true);
     if (!res.isEmpty()) {
-      QMessageBox::critical(this, tr("Error"), res);
+      QMessageBox::critical(this, qApp->applicationName(), res);
     }
     m_saveButton->setEnabled(false);
     setWindowTitle(m_filename);
@@ -93,7 +93,7 @@ void ZAnalysisWorklistDialog::onSaveAs()
     m_filename = fileName;
     QString res = m_model->toCSV(m_filename, true);
     if (!res.isEmpty()) {
-      QMessageBox::critical(this, tr("Error"), res);
+      QMessageBox::critical(this, qApp->applicationName(), res);
     }
     m_saveButton->setEnabled(false);
     setWindowTitle(m_filename);
@@ -120,15 +120,15 @@ void ZAnalysisWorklistDialog::onGenerate()
         gen.generate(list[i]);
       }
       progress.setValue(list.size());
-      QMessageBox::information(this, "Analysis files generated", "Analysis files generated!");
+      QMessageBox::information(this, qApp->applicationName(), "Analysis files generated!");
     }
     catch (const ZException& e) {
       progress.setValue(list.size());
       LOG(ERROR) << "Error while generating analysis files: " << e.what();
-      QMessageBox::critical(this, "Error while generating analysis files", e.what());
+      QMessageBox::critical(this, qApp->applicationName(), "Error while generating analysis files.\n" + e.what());
     }
   } else {
-    QMessageBox::information(this, "Empty list", "No work to do.");
+    QMessageBox::information(this, qApp->applicationName(), "Empty list.\nNo work to do.");
   }
 }
 

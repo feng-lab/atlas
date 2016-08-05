@@ -17,6 +17,7 @@
 #include "zimgstackinterface.h"
 #include "zstringutils.h"
 #include "zlog.h"
+#include "zapplication.h"
 
 namespace nim {
 
@@ -97,16 +98,16 @@ void ZSectionsRegistrationDialog::registerSections()
                m_brightBackground.get());
     }
     catch (const ZException& e) {
-      QMessageBox::critical(this, "Read Image Error", e.what());
+      QMessageBox::critical(this, qApp->applicationName(), "Read Image Error.\n" + e.what());
       return;
     }
 
     if (img.is2DImg()) {
-      QMessageBox::critical(this, "only one slice", QString("Do not need align"));
+      QMessageBox::critical(this, qApp->applicationName(), QString("Only one slice.\nDo not need align"));
       return;
     } else if (!img.is3DImg()) {
       LOG(INFO) << img.info().toQString();
-      QMessageBox::critical(this, "time sequence not supported", QString("Can not align time sequence image"));
+      QMessageBox::critical(this, qApp->applicationName(), QString("Can not align time sequence image"));
       return;
     }
     if (m_openLoadedStack.get()) {
@@ -118,16 +119,16 @@ void ZSectionsRegistrationDialog::registerSections()
 #endif
     }
   } else {
-    QMessageBox::critical(this, "No Image", "No Image to Align.");
+    QMessageBox::critical(this, qApp->applicationName(), "No Image to Align.");
     return;
   }
 
   if (m_outputStackWidget->getSelectedSaveFile().isEmpty()) {
-    QMessageBox::critical(this, "No output Image file", "Result image file must be specified.");
+    QMessageBox::critical(this, qApp->applicationName(), "Result image file must be specified.");
     return;
   }
   if (m_outputLogFileWidget->getSelectedSaveFile().isEmpty()) {
-    QMessageBox::critical(this, "No output log file", "Registration log file must be specified.");
+    QMessageBox::critical(this, qApp->applicationName(), "Registration log file must be specified.");
     return;
   }
   int refChannel = m_referenceChannel.associatedData() - 1;
@@ -177,7 +178,7 @@ void ZSectionsRegistrationDialog::registerSections()
 
 void ZSectionsRegistrationDialog::processCanceled()
 {
-  QMessageBox::critical(this, "Canceled",
+  QMessageBox::critical(this, qApp->applicationName(),
                         "Sections Registration is canceled by user.");
   m_registeredImg.clear();
 }
@@ -190,7 +191,7 @@ void ZSectionsRegistrationDialog::processFinished()
       m_registeredImg.save(m_outputStackWidget->getSelectedSaveFile());
     }
     catch (const ZException& e) {
-      QMessageBox::critical(this, "Can not save result image", e.what());
+      QMessageBox::critical(this, qApp->applicationName(), "Can not save result image.\n" + e.what());
       return;
     }
     // if need open
@@ -199,7 +200,7 @@ void ZSectionsRegistrationDialog::processFinished()
     }
     m_registeredImg.clear();
     // done
-    QMessageBox::information(this, "Finished",
+    QMessageBox::information(this, qApp->applicationName(),
                              "Sections Registration Finished.");
   }
 }
@@ -207,7 +208,7 @@ void ZSectionsRegistrationDialog::processFinished()
 void ZSectionsRegistrationDialog::processError(const QString& e)
 {
   m_hasError = true;
-  QMessageBox::critical(this, "Error",
+  QMessageBox::critical(this, qApp->applicationName(),
                         QString("Error During Registration: %1").arg(e));
   m_registeredImg.clear();
 }
@@ -259,7 +260,7 @@ void ZSectionsRegistrationDialog::inputImagesChanged()
     numFrames = info[0].depth;
   }
   catch (const ZIOException& e) {
-    QMessageBox::critical(this, "Can not parse input image", e.what());
+    QMessageBox::critical(this, qApp->applicationName(), "Can not parse input image.\n" + e.what());
   }
 
   m_referenceChannel.clearOptions();

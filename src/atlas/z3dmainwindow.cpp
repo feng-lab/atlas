@@ -508,7 +508,7 @@ bool Z3DMainWindow::maybeSave()
 {
   if (false) {
     QMessageBox::StandardButton ret;
-    ret = QMessageBox::warning(this, tr(""),
+    ret = QMessageBox::warning(this, qApp->applicationName(),
                                tr("This workspace has been modified.\n"
                                     "Do you want to save your changes?"),
                                QMessageBox::Save | QMessageBox::Discard

@@ -1,7 +1,5 @@
 #include "z3dpunctaview.h"
 
-#include <cassert>
-
 namespace nim {
 
 Z3DPunctaView::Z3DPunctaView(ZPunctaDoc& doc, Z3DView& view)
@@ -40,7 +38,7 @@ void Z3DPunctaView::docPunctasAdded(const QList<size_t>& objs)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render puncta: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), tr("Failed to render puncta"), e.what());
+    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(), "Failed to render puncta.\n" + e.what());
   }
 }
 
@@ -67,7 +65,7 @@ void Z3DPunctaView::docPunctaAdded(size_t id)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render puncta: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), tr("Failed to render puncta"), e.what());
+    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(), "Failed to render puncta.\n" + e.what());
   }
 }
 

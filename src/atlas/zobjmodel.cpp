@@ -1,6 +1,5 @@
 #include "zobjmodel.h"
 #include "zobjdoc.h"
-#include <cassert>
 #include "zlog.h"
 
 namespace nim {

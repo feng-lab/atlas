@@ -1,6 +1,5 @@
 #include "zimgjpeg.h"
 #include "zlog.h"
-#include <cassert>
 #include "ztiff.h"
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>

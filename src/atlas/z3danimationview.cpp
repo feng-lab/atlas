@@ -1,7 +1,5 @@
 #include "z3danimationview.h"
 
-#include <cassert>
-
 namespace nim {
 
 Z3DAnimationView::Z3DAnimationView(Z3DAnimationDoc& doc, Z3DView& view)
@@ -35,7 +33,7 @@ void Z3DAnimationView::docAnimationsAdded(const QList<size_t>& objs)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render 3d animation: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), tr("Failed to render 3d animation"), e.what());
+    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(), "Failed to render 3d animation.\n" + e.what());
   }
 }
 
@@ -58,7 +56,7 @@ void Z3DAnimationView::docAnimationAdded(size_t id)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render 3d animation: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), tr("Failed to render 3d animation"), e.what());
+    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(), "Failed to render 3d animation.\n" + e.what());
   }
 }
 

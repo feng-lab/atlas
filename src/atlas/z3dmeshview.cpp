@@ -1,7 +1,5 @@
 #include "z3dmeshview.h"
 
-#include <cassert>
-
 namespace nim {
 
 Z3DMeshView::Z3DMeshView(ZMeshDoc& doc, Z3DView& view)
@@ -40,7 +38,7 @@ void Z3DMeshView::docMeshesAdded(const QList<size_t>& objs)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render mesh: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), tr("Failed to render mesh"), e.what());
+    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(), "Failed to render mesh.\n" + e.what());
   }
 }
 
@@ -67,7 +65,7 @@ void Z3DMeshView::docMeshAdded(size_t id)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render mesh: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), tr("Failed to render mesh"), e.what());
+    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(), "Failed to render mesh.\n" + e.what());
   }
 }
 

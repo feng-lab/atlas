@@ -1,6 +1,5 @@
 #include "zimgview.h"
 
-#include <cassert>
 #include <QMessageBox>
 #include <QApplication>
 
@@ -43,7 +42,7 @@ QString ZImgView::infoOfPos(double x, double y)
       }
     }
   } catch (const ZException& e) {
-    QMessageBox::critical(QApplication::activeWindow(), "Error", e.what());
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
   }
   return info;
 }

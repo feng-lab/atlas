@@ -1,7 +1,5 @@
 #include "z3dimgview.h"
 
-#include <cassert>
-
 namespace nim {
 
 Z3DImgView::Z3DImgView(ZImgDoc& doc, Z3DView& view)
@@ -44,7 +42,7 @@ void Z3DImgView::docImgsAdded(const QList<size_t>& objs)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render image: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), tr("Failed to render image"), e.what());
+    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(), "Failed to render image.\n" + e.what());
   }
 }
 
@@ -75,7 +73,7 @@ void Z3DImgView::docImgAdded(size_t id)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render image: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), tr("Failed to render image"), e.what());
+    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(), "Failed to render image.\n" + e.what());
   }
 }
 

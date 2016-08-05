@@ -9,7 +9,6 @@
 #include <map>
 #include <set>
 #include <limits>
-#include <cassert>
 #include <type_traits>
 
 #ifndef Q_MOC_RUN

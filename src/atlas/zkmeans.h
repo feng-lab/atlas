@@ -13,7 +13,6 @@
 #include "zbenchtimer.h"
 #include "zrandom.h"
 #include "zstatisticsutils.h"
-#include <cassert>
 
 #ifndef _USE_QTCONCURRENT_
 

@@ -10,6 +10,7 @@
 #include <QGroupBox>
 #include <QScrollBar>
 #include <QSettings>
+#include "zapplication.h"
 
 namespace nim {
 
@@ -55,7 +56,7 @@ QSize ZAnimationExportWidget::sizeHint() const
 void ZAnimationExportWidget::captureButtonPressed()
 {
   if (m_folderWidget->getSelectedDirectory().isEmpty()) {
-    QMessageBox::critical(this, "Output Folder do not exist", "Output Folder do not exist");
+    QMessageBox::critical(this, qApp->applicationName(), "Output Folder do not exist");
     return;
   }
   QDir dir(m_folderWidget->getSelectedDirectory());

@@ -1,7 +1,5 @@
 #include "zswcview.h"
 
-#include <cassert>
-
 namespace nim {
 
 ZSwcView::ZSwcView(ZSwcDoc& doc, ZView& view)

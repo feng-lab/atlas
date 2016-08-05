@@ -82,7 +82,7 @@ void ZMainWindow::initOpenglContext()
   if (!ZSystemInfoInstance.initializeGL()) {
     QString msg = ZSystemInfoInstance.errorMessage();
     msg += ". 3D functions will be disabled.";
-    QMessageBox::warning(this, "OpenGL Initialization", msg);
+    QMessageBox::warning(this, qApp->applicationName(), "OpenGL Initialization.\n" + msg);
   }
 
   ZSystemInfoInstance.setStereoSupported(m_sharedContext->format().stereo());
@@ -330,13 +330,13 @@ void ZMainWindow::open3DWindow()
     }
     catch (const ZException& e) {
       LOG(ERROR) << "Failed to open 3D window: " << e.what();
-      QMessageBox::critical(this, tr("Failed to open 3D window"), e.what());
+      QMessageBox::critical(this, qApp->applicationName(), "Failed to open 3D window.\n" + e.what());
       delete m_3dWindow;
       m_3dWindow = nullptr;
     }
   } else {
-    QMessageBox::critical(this, tr("3D functions are disabled"),
-                          ZSystemInfoInstance.errorMessage());
+    QMessageBox::critical(this, qApp->applicationName(),
+                          "3D functions are disabled.\n" + ZSystemInfoInstance.errorMessage());
   }
 }
 
@@ -352,7 +352,7 @@ void ZMainWindow::loadScene()
   if (!fn.isEmpty()) {
     QString err;
     if (!loadJsonSceneImpl(fn, err)) {
-      QMessageBox::critical(QApplication::activeWindow(), "Can not load scene",
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                             tr("Can not load scene %1: %2").arg(fn).arg(err));
     } else {
       m_doc->setLastOpenedFilePath(fn);
@@ -364,7 +364,7 @@ void ZMainWindow::loadScene()
 void ZMainWindow::saveScene()
 {
   if (!m_doc->saveAllObjs()) {
-    QMessageBox::critical(QApplication::activeWindow(), "Can not save scene",
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                           tr("Can not save scene because some objects have unsaved changes"));
     return;
   }
@@ -375,13 +375,13 @@ void ZMainWindow::saveScene()
   if (!fn.isEmpty()) {
     QString err;
     if (!saveJsonSceneImpl(fn, err)) {
-      QMessageBox::critical(QApplication::activeWindow(), "Can not save scene",
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                             tr("Can not save scene %1: %2").arg(fn).arg(err));
     } else {
       m_doc->setLastOpenedFilePath(fn);
       ZSystemInfoInstance.addFileToRecentFileList(fn);
       QMessageBox::information(QApplication::activeWindow(),
-                               "scene saved",
+                               qApp->applicationName(),
                                QString("scene saved as %1").arg(fn),
                                QMessageBox::Ok);
     }
@@ -392,11 +392,11 @@ void ZMainWindow::loadJsonScene(const QString& fn)
 {
   QString err;
   if (!loadJsonSceneImpl(fn, err)) {
-    QMessageBox::critical(QApplication::activeWindow(), "Can not load scene",
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                           tr("Can not load scene %1: %2").arg(fn).arg(err));
   } else {
     if (!err.isEmpty()) {
-      QMessageBox::critical(QApplication::activeWindow(), "Scene loaded with error",
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                             tr("Error while loading scene %1: %2").arg(fn).arg(err));
     }
     ZSystemInfoInstance.addFileToRecentFileList(fn);

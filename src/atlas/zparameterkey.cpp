@@ -3,7 +3,6 @@
 #include "zparameterfactory.h"
 #include "zparameter.h"
 #include "zparameteranimation.h"
-#include <cassert>
 #include <QJsonDocument>
 
 #include "zoptionparameter.h"

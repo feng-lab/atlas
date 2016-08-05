@@ -4,7 +4,6 @@
 #include "zlog.h"
 
 #include <QtMath>
-#include <cassert>
 
 namespace nim {
 

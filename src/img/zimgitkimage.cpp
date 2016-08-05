@@ -104,7 +104,7 @@ void ZImgITKImage::readInfo(const QString& filename, std::vector<ZImgInfo>& info
     }
   }
   catch (itk::ExceptionObject& err) {
-    throw ZIOException(err.GetDescription());
+    throw ZIOException(err.what());
   }
 }
 
@@ -113,7 +113,7 @@ void ZImgITKImage::readMetadata(const QString&, ZImgMetadata&, size_t)
   try {
   }
   catch (itk::ExceptionObject& err) {
-    throw ZIOException(err.GetDescription());
+    throw ZIOException(err.what());
   }
 }
 
@@ -122,7 +122,7 @@ void ZImgITKImage::readThumbnail(const QString&, ZImgThumbernail&, const ZImgReg
   try {
   }
   catch (itk::ExceptionObject& err) {
-    throw ZIOException(err.GetDescription());
+    throw ZIOException(err.what());
   }
 }
 
@@ -223,7 +223,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
     }
   }
   catch (itk::ExceptionObject& err) {
-    throw ZIOException(err.GetDescription());
+    throw ZIOException(err.what());
   }
 
   if (ratio > 1) {

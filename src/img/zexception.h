@@ -28,10 +28,10 @@ public:
     : m_what(what)
   {}
 
-  virtual ~ZException() throw()
+  virtual ~ZException() noexcept
   {}
 
-  inline const QString& what() const throw()
+  inline const QString& what() const noexcept
   { return m_what; }
 
 protected:
@@ -74,49 +74,19 @@ public:
 class ZImgException : public ZException
 {
 public:
-  explicit inline ZImgException(const char* what)
-    : ZException(what)
-  {}
-
-  explicit inline ZImgException(const std::string& what)
-    : ZException(what)
-  {}
-
-  explicit inline ZImgException(const QString& what)
-    : ZException(what)
-  {}
+  using ZException::ZException;
 };
 
 class ZProcessAbortException : public ZException
 {
 public:
-  explicit inline ZProcessAbortException(const char* what)
-    : ZException(what)
-  {}
-
-  explicit inline ZProcessAbortException(const std::string& what)
-    : ZException(what)
-  {}
-
-  explicit inline ZProcessAbortException(const QString& what)
-    : ZException(what)
-  {}
+  using ZException::ZException;
 };
 
 class ZGLException : public ZException
 {
 public:
-  explicit inline ZGLException(const char* what)
-    : ZException(what)
-  {}
-
-  explicit inline ZGLException(const std::string& what)
-    : ZException(what)
-  {}
-
-  explicit inline ZGLException(const QString& what)
-    : ZException(what)
-  {}
+  using ZException::ZException;
 };
 
 }

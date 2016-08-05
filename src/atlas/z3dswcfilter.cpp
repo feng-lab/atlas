@@ -567,7 +567,8 @@ void Z3DSwcFilter::prepareData()
         n2->radius < std::numeric_limits<double>::epsilon()) {
       checkRadius = false;
       QMessageBox::information(QApplication::activeWindow(),
-                               "Reset SWC Rendering Mode",
+                               qApp->applicationName(),
+                               "Reset SWC Rendering Mode.\n"
                                "SWC contains segments with zero radius. "
                                  "The geometrical primitive of SWC rendering "
                                  "will be set to 'Line' to "

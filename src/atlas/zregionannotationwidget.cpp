@@ -55,8 +55,8 @@ void ZRegionAnnotationWidget::exportLabelImage()
       ZSystemInfoInstance.setLastOpenedImagePath(fn);
     }
     catch (const ZException& e) {
-      QMessageBox::critical(QApplication::activeWindow(), tr("Can not export label image"),
-                            e.what());
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                            "Can not export label image.\n" + e.what());
     }
   }
 }

@@ -8,7 +8,6 @@
 #include <cmath>
 #include <boost/endian/conversion.hpp>
 #include <boost/align/aligned_allocator.hpp>
-#include <cassert>
 #include "zimage2dutils.h"
 #include "zioutils.h"
 #include <set>

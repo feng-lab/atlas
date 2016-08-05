@@ -1,4 +1,4 @@
-#include <QApplication>
+#include "zapplication.h"
 
 #include "zmainwindow.h"
 
@@ -12,6 +12,7 @@
 #include <fftw3.h>
 #include <QMessageBox>
 #include "zexception.h"
+#include <folly/ScopeGuard.h>
 
 #ifdef _USE_MKL_
 
@@ -96,7 +97,7 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QS
       LFATALF(context.file ? context.file : "QtFile",
               context.line,
               context.function ? context.function : "QtFunction") << msg;
-      abort();
+      break;
     default:
       break;
   }
@@ -127,7 +128,6 @@ void removeOldLogs(const QDir& dir, int numberToKeep = 20)
 int main(int argc, char* argv[])
 {
   QSurfaceFormat format;
-
 #if defined(__APPLE__) && defined(_USE_CORE_PROFILE_)
   format.setVersion(3, 2);
   format.setProfile(QSurfaceFormat::CoreProfile);
@@ -137,7 +137,7 @@ int main(int argc, char* argv[])
 
   QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
   QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings, true);
-  QApplication app(argc, argv);
+  nim::ZApplication app(argc, argv);
   app.setApplicationName("Atlas");
   app.setOrganizationDomain("atlas.com");
   app.setOrganizationName("Atlas");
@@ -145,97 +145,111 @@ int main(int argc, char* argv[])
   // init the logging mechanism
   QDir logDir = ZSystemInfoInstance.logDir();
   removeOldLogs(logDir);
-  nim::initLogging(argv[0], logDir.filePath("atlas"));
-  nim::addLogSink(nim::logModelSinkInstance());
 
+  nim::initLogging(argv[0], logDir.filePath("atlas"));
+  folly::ScopeGuard guardlogging = folly::makeGuard([]() {
+    LOG(INFO) << "--- App Log End ---";
+    nim::shutdownLogging();
+  });
+  Q_UNUSED(guardlogging)
+
+  nim::addLogSink(nim::logModelSinkInstance());
   qInstallMessageHandler(myMessageOutput);
 
-  LOG(INFO) << "--- App Log Started ---";
-  ZSystemInfoInstance.logOSInfo();
-  ZCpuInfoInstance.logCpuInfo();
-  fftw_init_threads();
-  fftw_plan_with_nthreads(ZCpuInfoInstance.nPhysicalCores);
+  try {
+    LOG(INFO) << "--- App Log Start ---";
+    ZSystemInfoInstance.logOSInfo();
+    ZCpuInfoInstance.logCpuInfo();
+
+    fftw_init_threads();
+    folly::ScopeGuard guardfftw = folly::makeGuard([]() {
+      fftw_cleanup_threads();
+    });
+    Q_UNUSED(guardfftw)
+
+    fftw_plan_with_nthreads(ZCpuInfoInstance.nPhysicalCores);
 
 #ifdef _USE_MKL_
-  // todo: check this for amd cpu
-  MKLVersion mklVer;
-  MKL_Get_Version(&mklVer);
-  LOG(INFO) << "MKL: " << mklVer.Platform << mklVer.Processor << " "
-            << mklVer.MajorVersion << " "
-            << mklVer.MinorVersion << " "
-            << mklVer.UpdateVersion << " "
-            << mklVer.Build;
-  LOG(INFO) << "";
+    // todo: check this for amd cpu
+    MKLVersion mklVer;
+    MKL_Get_Version(&mklVer);
+    LOG(INFO) << "MKL: " << mklVer.Platform << mklVer.Processor << " "
+              << mklVer.MajorVersion << " "
+              << mklVer.MinorVersion << " "
+              << mklVer.UpdateVersion << " "
+              << mklVer.Build;
+    LOG(INFO) << "";
 #endif
 
 #ifdef _USE_IPP_
-  // todo: check this for amd cpu
-  IppStatus status = ippInit();
-  if (status == ippStsNonIntelCpu || status == ippStsNotSupportedCpu) {
-    Ipp64u featureMask = 0;
-    IppStatus st = ippGetCpuFeatures(&featureMask, nullptr);
-    if (st != ippStsNoErr) {
-      if (st == ippStsNotSupportedCpu) {
-        LOG(WARNING) << "IPP error: not supported cpu.";
-        // manual set mask
-        if (ZCpuInfoInstance.bMMX)
-          featureMask |= 1;
-        if (ZCpuInfoInstance.bSSE)
-          featureMask |= 2;
-        if (ZCpuInfoInstance.bSSE2)
-          featureMask |= 4;
-        if (ZCpuInfoInstance.bSSE3)
-          featureMask |= 8;
-        if (ZCpuInfoInstance.bSSSE3)
-          featureMask |= 16;
-        if (ZCpuInfoInstance.bMOVBE)
-          featureMask |= 32;
-        if (ZCpuInfoInstance.bSSE41)
-          featureMask |= 64;
-        if (ZCpuInfoInstance.bSSE42)
-          featureMask |= 128;
-        if (ZCpuInfoInstance.bAVX)
-          featureMask |= 256;
+    // todo: check this for amd cpu
+    IppStatus status = ippInit();
+    if (status == ippStsNonIntelCpu || status == ippStsNotSupportedCpu) {
+      Ipp64u featureMask = 0;
+      IppStatus st = ippGetCpuFeatures(&featureMask, nullptr);
+      if (st != ippStsNoErr) {
+        if (st == ippStsNotSupportedCpu) {
+          LOG(WARNING) << "IPP error: not supported cpu.";
+          // manual set mask
+          if (ZCpuInfoInstance.bMMX)
+            featureMask |= 1;
+          if (ZCpuInfoInstance.bSSE)
+            featureMask |= 2;
+          if (ZCpuInfoInstance.bSSE2)
+            featureMask |= 4;
+          if (ZCpuInfoInstance.bSSE3)
+            featureMask |= 8;
+          if (ZCpuInfoInstance.bSSSE3)
+            featureMask |= 16;
+          if (ZCpuInfoInstance.bMOVBE)
+            featureMask |= 32;
+          if (ZCpuInfoInstance.bSSE41)
+            featureMask |= 64;
+          if (ZCpuInfoInstance.bSSE42)
+            featureMask |= 128;
+          if (ZCpuInfoInstance.bAVX)
+            featureMask |= 256;
+          LOG(INFO) << ippSetCpuFeatures(featureMask);
+        }
+      } else {
         LOG(INFO) << ippSetCpuFeatures(featureMask);
       }
-    } else {
-      LOG(INFO) << ippSetCpuFeatures(featureMask);
     }
-  }
 
-  // pointer to static data, no need to delete
-  const IppLibraryVersion* ippVer = ippiGetLibVersion();
-  LOG(INFO) << "IPP: " << ippVer->Name << " "
-            << ippVer->Version << " "
-            << ippVer->major << " "
-            << ippVer->minor << " "
-            << ippVer->majorBuild << " "
-            << ippVer->build;
-  LOG(INFO) << "";
+    // pointer to static data, no need to delete
+    const IppLibraryVersion* ippVer = ippiGetLibVersion();
+    LOG(INFO) << "IPP: " << ippVer->Name << " "
+              << ippVer->Version << " "
+              << ippVer->major << " "
+              << ippVer->minor << " "
+              << ippVer->majorBuild << " "
+              << ippVer->build;
+    LOG(INFO) << "";
 #endif
 
-  if (!ZCpuInfoInstance.bSSE3) {
-    QMessageBox::critical(nullptr, "CPU not supported", "This program requires CPU with SSE3 support.");
+    if (!ZCpuInfoInstance.bSSE3) {
+      QMessageBox::critical(nullptr, app.applicationName(),
+                            "CPU not supported.\nThis program requires CPU with SSE3 support. Click OK to exit.");
+      LOG(ERROR) << "CPU not supported";
+      return 1;
+    }
+
+    //qApp->installEventFilter(new MacEventFilter(qApp));
+
+    // Our MainWindow has Qt::WA_DeleteOnClose attribute, don't delete again.
+    nim::ZMainWindow* mainWin = new nim::ZMainWindow();
+    mainWin->show();
+    mainWin->initOpenglContext();
+
     return app.exec();
   }
-
-  //qApp->installEventFilter(new MacEventFilter(qApp));
-
-  // Our MainWindow has Qt::WA_DeleteOnClose attribute, don't delete again.
-  nim::ZMainWindow* mainWin = new nim::ZMainWindow();
-  mainWin->show();
-  mainWin->initOpenglContext();
-
-  int result;
-  try {
-    result = app.exec();
-  }
   catch (const nim::ZException& e) {
-    LOG(FATAL) << e.what();
+    LOG(FATAL) << "exit with " << typeid(e).name() << ": " << e.what();
   }
-
-  fftw_cleanup_threads();
-  nim::shutdownLogging();
-
-  return result;
+  catch (const std::exception& e) {
+    LOG(FATAL) << "exit with " << typeid(e).name() << ": " << e.what();
+  }
+  catch (...) {
+    LOG(FATAL) << "exit with unknown exception";
+  }
 }

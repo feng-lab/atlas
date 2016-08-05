@@ -6,7 +6,6 @@
 #include "z3dinteractionhandler.h"
 #include "zparameter.h"
 #include "zeventlistenerparameter.h"
-#include <cassert>
 #include "z3dshaderprogram.h"
 #include "z3drenderport.h"
 #include "zvertexarrayobject.h"

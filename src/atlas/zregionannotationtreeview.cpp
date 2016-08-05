@@ -10,6 +10,7 @@
 #include "zroidoc.h"
 #include "zmeshdoc.h"
 #include <QMessageBox>
+#include "zapplication.h"
 
 namespace nim {
 
@@ -106,7 +107,7 @@ void ZRegionAnnotationTreeView::buttonClickedForUserData(QVariant ud)
   //LOG(INFO) << regionID;
   if (action == 1) {
     if (!m_doc.roiDoc().hasObj()) {
-      QMessageBox::critical(this, tr("Error"), tr("No ROI to merge, try creating some ROI first"));
+      QMessageBox::critical(this, qApp->applicationName(), tr("No ROI to merge, try creating some ROI first"));
       return;
     }
     size_t objID = m_doc.roiDoc().chooseOneObjWithWidget(QString("Choose ROI to merge into region %1").arg(regionID),
@@ -118,7 +119,7 @@ void ZRegionAnnotationTreeView::buttonClickedForUserData(QVariant ud)
       m_doc.roiDoc().askToSave(*m_regionAnnotation.roiOfRegion(regionID),
                                QString("Export ROI of Region %1").arg(regionID));
     } else {
-      QMessageBox::critical(this, tr("Error"), tr("Region %1 is empty and contains no roi").arg(regionID));
+      QMessageBox::critical(this, qApp->applicationName(), tr("Region %1 is empty and contains no roi").arg(regionID));
       return;
     }
   } else if (action == 3) {
@@ -126,7 +127,7 @@ void ZRegionAnnotationTreeView::buttonClickedForUserData(QVariant ud)
       m_doc.meshDoc().askToSave(*m_regionAnnotation.meshOfRegion(regionID),
                                 QString("Export Mesh of Region %1").arg(regionID));
     } else {
-      QMessageBox::critical(this, tr("Error"), tr("Region %1 is empty or contains no mesh").arg(regionID));
+      QMessageBox::critical(this, qApp->applicationName(), tr("Region %1 is empty or contains no mesh").arg(regionID));
       return;
     }
   }
