@@ -1,6 +1,7 @@
 #include "zstringutils.h"
 
 #include <vector>
+#include <QCollator>
 
 namespace {
 
@@ -40,12 +41,22 @@ int lastInteger(const QString& str)
   return res;
 }
 
+const QCollator& myCollator()
+{
+  static QCollator collator;
+  collator.setNumericMode(true);
+  return collator;
+}
+
 }
 
 namespace nim {
 
 bool naturalSortLessThan(const QString& s1, const QString& s2)
 {
+#if 1
+  return myCollator().compare(s1, s2) < 0;
+#else
   if (s1 == "" || s2 == "") return s1 < s2;
 
   // Move to the first difference between the strings
@@ -100,6 +111,7 @@ bool naturalSortLessThan(const QString& s1, const QString& s2)
   if (sn1 != "" && sn2 == "") return false;
 
   return sn1.toInt() < sn2.toInt();
+#endif
 }
 
 bool lastIntegerLessThan(const QString& s1, const QString& s2)

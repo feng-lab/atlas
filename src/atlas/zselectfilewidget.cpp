@@ -158,9 +158,9 @@ void ZSelectFileWidget::selectFile()
       m_multipleFNames.clear();
       m_multipleFNames = tmp;
       if (m_lessThan)
-        qSort(m_multipleFNames.begin(), m_multipleFNames.end(), m_lessThan);
+        std::sort(m_multipleFNames.begin(), m_multipleFNames.end(), m_lessThan);
       else
-        qSort(m_multipleFNames.begin(), m_multipleFNames.end());
+        std::sort(m_multipleFNames.begin(), m_multipleFNames.end());
       m_textEdit->setText(QString("%1").arg(m_multipleFNames.join("\n")));
       if (m_destNames)
         *m_destNames = m_multipleFNames;

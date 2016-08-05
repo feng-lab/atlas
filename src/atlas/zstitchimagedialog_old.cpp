@@ -8,8 +8,6 @@
 
 #endif
 
-#include <QtAlgorithms>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -894,7 +892,7 @@ void ZStitchImageDialog::selectInputStacks1()
     initBgsub1ComboBox(nchannel);
     m_inputStack1Filenames.clear();
     m_inputStack1Filenames = tmp;
-    qSort(m_inputStack1Filenames.begin(), m_inputStack1Filenames.end(), numberLessThan);
+    std::sort(m_inputStack1Filenames.begin(), m_inputStack1Filenames.end(), numberLessThan);
     m_inputStack1FileEdit->setText(QString("%1").arg(m_inputStack1Filenames.join("\n")));
   }
   if (m_inputStack1Filenames.size() != 2) {
@@ -929,7 +927,7 @@ void ZStitchImageDialog::selectInputStacks2()
     initBgsub2ComboBox(nchannel);
     m_inputStack2Filenames.clear();
     m_inputStack2Filenames = tmp;
-    qSort(m_inputStack2Filenames.begin(), m_inputStack2Filenames.end(), numberLessThan);
+    std::sort(m_inputStack2Filenames.begin(), m_inputStack2Filenames.end(), numberLessThan);
     m_inputStack2FileEdit->setText(QString("%1").arg(m_inputStack2Filenames.join("\n")));
   }
   if (m_inputStack2Filenames.size() != 2) {
