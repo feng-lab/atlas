@@ -11,6 +11,8 @@
 
 namespace nim {
 
+static_assert(sizeof(boost::uuids::uuid) == 16, "wrong uuid type");
+
 #pragma pack(push, 1)
 struct SegmentHeader {
   char id[16];   // A sequence of up to 15 Ansi – characters 'A'...'Z', e.g. "ZISSUBBLOCK"
