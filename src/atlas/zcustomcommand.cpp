@@ -902,6 +902,31 @@ void testLogSpeed()
 
 void tmp()
 {
+  float v;
+  bool ok;
+  float fm;
+  QString fms;
+
+  v = std::numeric_limits<float>::max();
+  fms = QString::number(v, 'g', QLocale::FloatingPointShortest);
+  fm = fms.toFloat(&ok);
+  LOG(INFO) << fms << " " << fm << " " << ok << "  " << (fm == v) << " " << (fm == double(v));
+
+  v = 0.1;
+  fms = QString::number(v, 'g', QLocale::FloatingPointShortest);
+  fm = fms.toFloat(&ok);
+  LOG(INFO) << fms << " " << fm << " " << ok << "  " << (fm == v) << " " << (fm == double(v));
+
+  v = 0.2;
+  fms = QString::number(v, 'g', QLocale::FloatingPointShortest);
+  fm = fms.toFloat(&ok);
+  LOG(INFO) << fms << " " << fm << " " << ok << "  " << (fm == v) << " " << (fm == double(v));
+
+  v = 0.8;
+  fms = QString::number(v, 'g', QLocale::FloatingPointShortest);
+  fm = fms.toFloat(&ok);
+  LOG(INFO) << fms << " " << fm << " " << ok << "  " << (fm == v) << " " << (fm == double(v));
+
   using namespace boost::multiprecision;
 
   boost::multiprecision::int128_t res =
@@ -930,7 +955,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  testLogSpeed();
+  tmp();
   LOG(INFO) << "done";
 }
 

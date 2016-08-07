@@ -2,6 +2,7 @@
 //#include <sstream>
 #include <type_traits>
 #include "zrandom.h"
+#include <QLocale>
 
 namespace nim {
 
@@ -98,61 +99,20 @@ void ZImgInfo::swap(ZImgInfo& other) noexcept
 
 QString ZImgInfo::toQString() const
 {
-  return QString("width: %1").arg(width) %
-         QString(", height: %1").arg(height) %
-         QString(", depth: %1").arg(depth) %
-         QString(", numChannels: %1").arg(numChannels) %
-         QString(", numTimes: %1").arg(numTimes) %
-         //QString(", numLocations: %1").arg(numLocations) %
-         QString(", bytesPerVoxel: %1").arg(bytesPerVoxel) %
-         QString(", voxelFormat: %1").arg(enumToString(voxelFormat)) %
-         QString(", voxelSizeUnit: %1").arg(enumToString(voxelSizeUnit)) %
-         QString(", voxelSizeX: %1").arg(voxelSizeX) %
-         QString(", voxelSizeY: %1").arg(voxelSizeY) %
-         QString(", voxelSizeZ: %1").arg(voxelSizeZ) %
-         (lastChannelIsAlphaChannel ? QString(", alphaChannel: %1").arg(numChannels - 1) : QString("")) %
+  return "width: " + QString::number(width) +
+         ", height: " + QString::number(height) +
+         ", depth: " + QString::number(depth) +
+         ", numChannels: " + QString::number(numChannels) +
+         ", numTimes: " + QString::number(numTimes) +
+         //", numLocations: " + QString::number(numLocations) +
+         ", bytesPerVoxel: " + QString::number(bytesPerVoxel) +
+         ", voxelFormat: " + enumToString(voxelFormat) +
+         ", voxelSizeUnit: " + enumToString(voxelSizeUnit) +
+         ", voxelSizeX: " + QString::number(voxelSizeX, 'g', QLocale::FloatingPointShortest) +
+         ", voxelSizeY: " + QString::number(voxelSizeY, 'g', QLocale::FloatingPointShortest) +
+         ", voxelSizeZ: " + QString::number(voxelSizeZ, 'g', QLocale::FloatingPointShortest) +
+         (lastChannelIsAlphaChannel ? QString(", alphaChannel: %1").arg(numChannels - 1) : QString("")) +
          (validBitCount > 0 ? QString(", validBitCount: %1").arg(validBitCount) : QString(""));
-}
-
-QString ZImgInfo::typeAsQString() const
-{
-  if (voxelFormat == VoxelFormat::Float) {
-    switch (bytesPerVoxel) {
-      case 4:
-        return "float32";
-      case 8:
-        return "float64";
-      default:
-        break;
-    }
-  } else if (voxelFormat == VoxelFormat::Signed) {
-    switch (bytesPerVoxel) {
-      case 1:
-        return "int8";
-      case 2:
-        return "int16";
-      case 4:
-        return "int32";
-      case 8:
-        return "int64";
-      default:
-        break;
-    }
-  } else {
-    switch (bytesPerVoxel) {
-      case 1:
-        return "uint8";
-      case 2:
-        return "uint16";
-      case 4:
-        return "uint32";
-      case 8:
-        return "uint64";
-      default:
-        break;
-    }
-  }
-  return "invalid image type";
 }
 
 QString ZImgInfo::displayChannelName(size_t c) const
@@ -261,17 +221,15 @@ double ZImgInfo::voxelSizeZInUnit(VoxelSizeUnit unit) const
 template<typename TVoxel>
 void ZImgInfo::setVoxelFormat()
 {
+  static_assert(std::is_arithmetic<TVoxel>::value &&
+                (sizeof(TVoxel) == 1 || sizeof(TVoxel) == 2 || sizeof(TVoxel) == 4 || sizeof(TVoxel) == 8),
+                "need arithmetic type");
   validBitCount = 0;
   bytesPerVoxel = sizeof(TVoxel);
   if (std::is_integral<TVoxel>::value) {
-    if (std::is_signed<TVoxel>::value)
-      voxelFormat = VoxelFormat::Signed;
-    else
-      voxelFormat = VoxelFormat::Unsigned;
-  } else if (std::is_floating_point<TVoxel>::value) {
-    voxelFormat = VoxelFormat::Float;
+    voxelFormat = std::is_signed<TVoxel>::value ? VoxelFormat::Signed : VoxelFormat::Unsigned;
   } else {
-    throw ZImgException("set voxel format need numeric type");
+    voxelFormat = VoxelFormat::Float;
   }
 }
 

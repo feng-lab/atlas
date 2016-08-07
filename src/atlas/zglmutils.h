@@ -33,6 +33,7 @@
 #include <QRegularExpression>
 #include <QStringList>
 #include <QColor>
+#include <QLocale>
 
 namespace glm {
 typedef tvec3<unsigned char, highp> col3;
@@ -173,13 +174,48 @@ inline void toVal(const std::string& str, T& v)
 template<typename T>
 inline QString toQString(T v)
 {
-  return QString("%1").arg(v);
+  static_assert(std::is_integral<T>::value, "Integer required.");
+  return QString::number(v);
+}
+
+inline QString toQString(float v)
+{
+  return QString::number(v, 'g', QLocale::FloatingPointShortest);
+}
+
+inline QString toQString(double v)
+{
+  return QString::number(v, 'g', QLocale::FloatingPointShortest);
+}
+
+inline QString toQString(const QString& v)
+{
+  return v;
 }
 
 template<typename T, glm::precision P>
 inline QString toQString(const glm::tvec2<T, P>& v)
 {
-  return QString("[%1, %2]").arg(v[0]).arg(v[1]);
+  static_assert(std::is_integral<T>::value, "Integer required.");
+  return "[" + QString::number(v[0]) +
+         ", " + QString::number(v[1]) +
+         "]";
+}
+
+template<glm::precision P>
+inline QString toQString(const glm::tvec2<float, P>& v)
+{
+  return "[" + QString::number(v[0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[1], 'g', QLocale::FloatingPointShortest) +
+         "]";
+}
+
+template<glm::precision P>
+inline QString toQString(const glm::tvec2<double, P>& v)
+{
+  return "[" + QString::number(v[0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[1], 'g', QLocale::FloatingPointShortest) +
+         "]";
 }
 
 template<typename T, glm::precision P>
@@ -195,7 +231,29 @@ inline void toVal(const QString& str, glm::tvec2<T, P>& v)
 template<typename T, glm::precision P>
 inline QString toQString(const glm::tvec3<T, P>& v)
 {
-  return QString("[%1, %2, %3]").arg(v[0]).arg(v[1]).arg(v[2]);
+  static_assert(std::is_integral<T>::value, "Integer required.");
+  return "[" + QString::number(v[0]) +
+         ", " + QString::number(v[1]) +
+         ", " + QString::number(v[2]) +
+         "]";
+}
+
+template<glm::precision P>
+inline QString toQString(const glm::tvec3<float, P>& v)
+{
+  return "[" + QString::number(v[0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[2], 'g', QLocale::FloatingPointShortest) +
+         "]";
+}
+
+template<glm::precision P>
+inline QString toQString(const glm::tvec3<double, P>& v)
+{
+  return "[" + QString::number(v[0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[2], 'g', QLocale::FloatingPointShortest) +
+         "]";
 }
 
 template<typename T, glm::precision P>
@@ -211,7 +269,32 @@ inline void toVal(const QString& str, glm::tvec3<T, P>& v)
 template<typename T, glm::precision P>
 inline QString toQString(const glm::tvec4<T, P>& v)
 {
-  return QString("[%1, %2, %3, %4]").arg(v[0]).arg(v[1]).arg(v[2]).arg(v[3]);
+  static_assert(std::is_integral<T>::value, "Integer required.");
+  return "[" + QString::number(v[0]) +
+         ", " + QString::number(v[1]) +
+         ", " + QString::number(v[2]) +
+         ", " + QString::number(v[3]) +
+         "]";
+}
+
+template<glm::precision P>
+inline QString toQString(const glm::tvec4<float, P>& v)
+{
+  return "[" + QString::number(v[0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[2], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[3], 'g', QLocale::FloatingPointShortest) +
+         "]";
+}
+
+template<glm::precision P>
+inline QString toQString(const glm::tvec4<double, P>& v)
+{
+  return "[" + QString::number(v[0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[2], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[3], 'g', QLocale::FloatingPointShortest) +
+         "]";
 }
 
 template<typename T, glm::precision P>
@@ -226,7 +309,11 @@ inline void toVal(const QString& str, glm::tvec4<T, P>& v)
 
 inline QString toQString(const QColor& v)
 {
-  return QString("[%1, %2, %3, %4]").arg(v.red()).arg(v.green()).arg(v.blue()).arg(v.alpha());
+  return "[" + QString::number(v.red()) +
+         ", " + QString::number(v.green()) +
+         ", " + QString::number(v.blue()) +
+         ", " + QString::number(v.alpha()) +
+         "]";
 }
 
 inline void toVal(const QString& str, QColor& v)
@@ -248,13 +335,35 @@ inline void toVal(const QString& str, QColor& v)
   }
 }
 
-
 template<typename T, glm::precision P>
 inline QString toQString(const glm::tmat2x2<T, P>& m)
 {
-  return QString("[%1, %2; %3, %4]").
-    arg(m[0][0]).arg(m[1][0]).
-    arg(m[0][1]).arg(m[1][1]);
+  static_assert(std::is_integral<T>::value, "Integer required.");
+  return "[" + QString::number(m[0][0]) +
+         ", " + QString::number(m[1][0]) +
+         "; " + QString::number(m[0][1]) +
+         ", " + QString::number(m[1][1]) +
+         "]";
+}
+
+template<glm::precision P>
+inline QString toQString(const glm::tmat2x2<float, P>& m)
+{
+  return "[" + QString::number(m[0][0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][0], 'g', QLocale::FloatingPointShortest) +
+         "; " + QString::number(m[0][1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][1], 'g', QLocale::FloatingPointShortest) +
+         "]";
+}
+
+template<glm::precision P>
+inline QString toQString(const glm::tmat2x2<double, P>& m)
+{
+  return "[" + QString::number(m[0][0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][0], 'g', QLocale::FloatingPointShortest) +
+         "; " + QString::number(m[0][1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][1], 'g', QLocale::FloatingPointShortest) +
+         "]";
 }
 
 template<typename T, glm::precision P>
@@ -270,10 +379,47 @@ inline void toVal(const QString& str, glm::tmat2x2<T, P>& m)
 template<typename T, glm::precision P>
 inline QString toQString(const glm::tmat3x3<T, P>& m)
 {
-  return QString("[%1, %2, %3; %4, %5, %6; %7, %8, %9]").
-    arg(m[0][0]).arg(m[1][0]).arg(m[2][0]).
-    arg(m[0][1]).arg(m[1][1]).arg(m[2][1]).
-    arg(m[0][2]).arg(m[1][2]).arg(m[2][2]);
+  static_assert(std::is_integral<T>::value, "Integer required.");
+  return "[" + QString::number(m[0][0]) +
+         ", " + QString::number(m[1][0]) +
+         ", " + QString::number(m[2][0]) +
+         "; " + QString::number(m[0][1]) +
+         ", " + QString::number(m[1][1]) +
+         ", " + QString::number(m[2][1]) +
+         "; " + QString::number(m[0][2]) +
+         ", " + QString::number(m[1][2]) +
+         ", " + QString::number(m[2][2]) +
+         "]";
+}
+
+template<glm::precision P>
+inline QString toQString(const glm::tmat3x3<float, P>& m)
+{
+  return "[" + QString::number(m[0][0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[2][0], 'g', QLocale::FloatingPointShortest) +
+         "; " + QString::number(m[0][1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[2][1], 'g', QLocale::FloatingPointShortest) +
+         "; " + QString::number(m[0][2], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][2], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[2][2], 'g', QLocale::FloatingPointShortest) +
+         "]";
+}
+
+template<glm::precision P>
+inline QString toQString(const glm::tmat3x3<double, P>& m)
+{
+  return "[" + QString::number(m[0][0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[2][0], 'g', QLocale::FloatingPointShortest) +
+         "; " + QString::number(m[0][1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[2][1], 'g', QLocale::FloatingPointShortest) +
+         "; " + QString::number(m[0][2], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][2], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[2][2], 'g', QLocale::FloatingPointShortest) +
+         "]";
 }
 
 template<typename T, glm::precision P>
@@ -289,11 +435,68 @@ inline void toVal(const QString& str, glm::tmat3x3<T, P>& m)
 template<typename T, glm::precision P>
 inline QString toQString(const glm::tmat4x4<T, P>& m)
 {
-  return QString("[%1, %2, %3, %4; %5, %6, %7, %8; %9, %10, %11, %12; %13, %14, %15, %16]").
-    arg(m[0][0]).arg(m[1][0]).arg(m[2][0]).arg(m[3][0]).
-    arg(m[0][1]).arg(m[1][1]).arg(m[2][1]).arg(m[3][1]).
-    arg(m[0][2]).arg(m[1][2]).arg(m[2][2]).arg(m[3][2]).
-    arg(m[0][3]).arg(m[1][3]).arg(m[2][3]).arg(m[3][3]);
+  static_assert(std::is_integral<T>::value, "Integer required.");
+  return "[" + QString::number(m[0][0]) +
+         ", " + QString::number(m[1][0]) +
+         ", " + QString::number(m[2][0]) +
+         ", " + QString::number(m[3][0]) +
+         "; " + QString::number(m[0][1]) +
+         ", " + QString::number(m[1][1]) +
+         ", " + QString::number(m[2][1]) +
+         ", " + QString::number(m[3][1]) +
+         "; " + QString::number(m[0][2]) +
+         ", " + QString::number(m[1][2]) +
+         ", " + QString::number(m[2][2]) +
+         ", " + QString::number(m[3][2]) +
+         "; " + QString::number(m[0][3]) +
+         ", " + QString::number(m[1][3]) +
+         ", " + QString::number(m[2][3]) +
+         ", " + QString::number(m[3][3]) +
+         "]";
+}
+
+template<glm::precision P>
+inline QString toQString(const glm::tmat4x4<float, P>& m)
+{
+  return "[" + QString::number(m[0][0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[2][0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[3][0], 'g', QLocale::FloatingPointShortest) +
+         "; " + QString::number(m[0][1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[2][1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[3][1], 'g', QLocale::FloatingPointShortest) +
+         "; " + QString::number(m[0][2], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][2], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[2][2], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[3][2], 'g', QLocale::FloatingPointShortest) +
+         "; " + QString::number(m[0][3], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][3], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[2][3], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[3][3], 'g', QLocale::FloatingPointShortest) +
+         "]";
+}
+
+template<glm::precision P>
+inline QString toQString(const glm::tmat4x4<double, P>& m)
+{
+  return "[" + QString::number(m[0][0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[2][0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[3][0], 'g', QLocale::FloatingPointShortest) +
+         "; " + QString::number(m[0][1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[2][1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[3][1], 'g', QLocale::FloatingPointShortest) +
+         "; " + QString::number(m[0][2], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][2], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[2][2], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[3][2], 'g', QLocale::FloatingPointShortest) +
+         "; " + QString::number(m[0][3], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[1][3], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[2][3], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(m[3][3], 'g', QLocale::FloatingPointShortest) +
+         "]";
 }
 
 template<typename T, glm::precision P>
@@ -307,9 +510,34 @@ inline void toVal(const QString& str, glm::tmat4x4<T, P>& m)
 }
 
 template<typename T, glm::precision P>
-inline QString toQString(const glm::tquat<T, P>& q)
+inline QString toQString(const glm::tquat<T, P>& v)
 {
-  return QString("[%1, %2, %3, %4]").arg(q[0]).arg(q[1]).arg(q[2]).arg(q[3]);
+  static_assert(std::is_integral<T>::value, "Integer required.");
+  return "[" + QString::number(v[0]) +
+         ", " + QString::number(v[1]) +
+         ", " + QString::number(v[2]) +
+         ", " + QString::number(v[3]) +
+         "]";
+}
+
+template<glm::precision P>
+inline QString toQString(const glm::tquat<float, P>& v)
+{
+  return "[" + QString::number(v[0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[2], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[3], 'g', QLocale::FloatingPointShortest) +
+         "]";
+}
+
+template<glm::precision P>
+inline QString toQString(const glm::tquat<double, P>& v)
+{
+  return "[" + QString::number(v[0], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[1], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[2], 'g', QLocale::FloatingPointShortest) +
+         ", " + QString::number(v[3], 'g', QLocale::FloatingPointShortest) +
+         "]";
 }
 
 template<typename T, glm::precision P>
@@ -341,45 +569,6 @@ template<typename T, glm::precision P>
 inline std::ostream& operator<<(std::ostream& s, const glm::tvec4<T, P>& v)
 {
   return (s << qUtf8Printable(toQString(v)));
-}
-
-template<>
-inline std::ostream&
-operator<<<unsigned char, glm::highp>(std::ostream& s, const glm::tvec2<unsigned char, glm::highp>& v)
-{
-  return (s << glm::tvec2<int, glm::highp>(v));
-}
-
-template<>
-inline std::ostream&
-operator<<<unsigned char, glm::highp>(std::ostream& s, const glm::tvec3<unsigned char, glm::highp>& v)
-{
-  return (s << glm::tvec3<int, glm::highp>(v));
-}
-
-template<>
-inline std::ostream&
-operator<<<unsigned char, glm::highp>(std::ostream& s, const glm::tvec4<unsigned char, glm::highp>& v)
-{
-  return (s << glm::tvec4<int, glm::highp>(v));
-}
-
-template<>
-inline std::ostream& operator<<<char, glm::highp>(std::ostream& s, const glm::tvec2<char, glm::highp>& v)
-{
-  return (s << glm::tvec2<int, glm::highp>(v));
-}
-
-template<>
-inline std::ostream& operator<<<char, glm::highp>(std::ostream& s, const glm::tvec3<char, glm::highp>& v)
-{
-  return (s << glm::tvec3<int, glm::highp>(v));
-}
-
-template<>
-inline std::ostream& operator<<<char, glm::highp>(std::ostream& s, const glm::tvec4<char, glm::highp>& v)
-{
-  return (s << glm::tvec4<int, glm::highp>(v));
 }
 
 template<typename T, glm::precision P>

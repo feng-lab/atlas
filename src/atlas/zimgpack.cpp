@@ -191,7 +191,7 @@ ZImgPack::ZImgPack(const QString& fileName, size_t scene, FileFormat format, siz
   } else {
     buildPyramidal();
   }
-  
+
   updateDerivedData();
 }
 

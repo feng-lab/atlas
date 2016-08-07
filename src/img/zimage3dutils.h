@@ -172,13 +172,8 @@ void image3DFlip(TPixel* img, size_t width, size_t height, size_t depth, Dimensi
       return;
     for (size_t d = 0; d < depth; ++d) {
       for (size_t i = 0; i < height; ++i) {
-        size_t j = i * width + d * width * height;
-        size_t k = j + width - 1;
-        while (j < k) {
-          std::swap(img[j], img[k]);
-          ++j;
-          --k;
-        }
+        TPixel* start = img + i * width + d * width * height;
+        std::reverse(start, start + width);
       }
     }
   } else if (dim == Dimension::Y) {
@@ -218,11 +213,7 @@ void image3DFlip(TPixel* img, size_t width, size_t height, size_t depth, Dimensi
 template<typename TPixel>
 void image3DReflect(TPixel* img, size_t width, size_t height, size_t depth)
 {
-  size_t length = width * height * depth;
-  size_t j = length - 1;
-  for (size_t i = 0; i < length / 2; ++i, --j) {
-    std::swap(img[i], img[j]);
-  }
+  std::reverse(img, img + width * height * depth);
 }
 
 template<typename TPixel, typename TPixelOut = TPixel>

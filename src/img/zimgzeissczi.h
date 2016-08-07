@@ -2,7 +2,8 @@
 #define ZIMGZEISSCZI_H
 
 #include "zimgformat.h"
-#include <boost/uuid/uuid.hpp>
+#include <type_traits>
+#include <QUuid>
 #include <QXmlStreamReader>
 #include <array>
 #include <set>
@@ -11,7 +12,7 @@
 
 namespace nim {
 
-static_assert(sizeof(boost::uuids::uuid) == 16, "wrong uuid type");
+static_assert(sizeof(QUuid) == 16 && std::is_trivially_copyable<QUuid>::value, "wrong uuid type");
 
 #pragma pack(push, 1)
 struct SegmentHeader {
@@ -28,8 +29,8 @@ struct FileHeader {
   int32_t minor; // "0"
   int32_t reserved1;
   int32_t reserved2;
-  boost::uuids::uuid primaryFileGuid; // Unique Guid of Master file (FilePart 0)
-  boost::uuids::uuid fileGuid; // Unique Per file
+  QUuid primaryFileGuid; // Unique Guid of Master file (FilePart 0)
+  QUuid fileGuid; // Unique Per file
   int32_t filePart; // Part number in multi-file scenarios
   int64_t directoryPosition; // File position of the SubBlockDirectory Segment
   int64_t metaDataPosition; // File position of the Metadata Segment.
@@ -94,7 +95,7 @@ struct AttachmentEntryA1 {
   uint8_t reserved[10];
   int64_t filePosition; // Seek offset relative to the first byte of the file
   int32_t filePart; // Reserved;
-  boost::uuids::uuid contentGuid; // Unique Id to be used in strong, fully qualified references
+  QUuid contentGuid; // Unique Id to be used in strong, fully qualified references
   char contentFileType[8]; // Unique file type Identifier (see table below)
   char name[80]; // Null terminated (80-1) character UTF8 encoded string defining a name for this item.
                  // May be used in references instead of GUID.

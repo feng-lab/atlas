@@ -2,7 +2,6 @@
 #include <QFileInfo>
 #include <QDir>
 #include "zioutils.h"
-#include <boost/uuid/uuid_io.hpp>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
 #include <array>
@@ -1663,8 +1662,8 @@ void ZImgZeissCZI::dumpFileHeaderSegment(std::ifstream& inputFileStream, QString
   str += QString("%1FileHeaderSegment\n").arg(ind);
   str += QString("%1Major: %2\n").arg(ind).arg(fh.major);
   str += QString("%1Minor: %2\n").arg(ind).arg(fh.minor);
-  str += QString("%1PrimaryFileGuid: %2\n").arg(ind).arg(boost::uuids::to_string(fh.primaryFileGuid).c_str());
-  str += QString("%1FileGuid: %2\n").arg(ind).arg(boost::uuids::to_string(fh.fileGuid).c_str());
+  str += QString("%1PrimaryFileGuid: %2\n").arg(ind).arg(fh.primaryFileGuid.toString());
+  str += QString("%1FileGuid: %2\n").arg(ind).arg(fh.fileGuid.toString());
   str += QString("%1FilePart: %2\n").arg(ind).arg(fh.filePart);
   str += QString("%1DirectoryPosition: %2\n").arg(ind).arg(fh.directoryPosition);
   str += QString("%1MetadataPosition: %2\n").arg(ind).arg(fh.metaDataPosition);
@@ -1968,7 +1967,7 @@ void ZImgZeissCZI::dumpAttachmentEntry(const AttachmentEntryA1& ae, QString& str
   }
   str += QString("%1FilePosition: %2\n").arg(ind).arg(ae.filePosition);
   str += QString("%1FilePart: %2\n").arg(ind).arg(ae.filePart);
-  str += QString("%1ContentGuid: %2\n").arg(ind).arg(boost::uuids::to_string(ae.contentGuid).c_str());
+  str += QString("%1ContentGuid: %2\n").arg(ind).arg(ae.contentGuid.toString());
   QString contentFileType = QString::fromUtf8(ae.contentFileType, 8);
   contentFileType = contentFileType.trimmed();
   contentFileType.remove(QChar::Null);

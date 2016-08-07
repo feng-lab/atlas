@@ -23,6 +23,7 @@
 #include "zimagefilterkernel.h"
 #include "zimginterface.h"
 #include "zsaturateoperation.h"
+#include "zbenchtimer.h"
 
 namespace nim {
 
@@ -301,13 +302,8 @@ void image2DFlip(TPixel* img, size_t width, size_t height, Dimension dim)
     if (width <= 1)
       return;
     for (size_t i = 0; i < height; ++i) {
-      size_t j = i * width;
-      size_t k = j + width - 1;
-      while (j < k) {
-        std::swap(img[j], img[k]);
-        ++j;
-        --k;
-      }
+      TPixel* start = img + i * width;
+      std::reverse(start, start + width);
     }
   } else if (dim == Dimension::Y) {
     if (height <= 1)
@@ -330,21 +326,33 @@ void image2DFlip(TPixel* img, size_t width, size_t height, Dimension dim)
 template<typename TPixel>
 void image2DReflect(TPixel* img, size_t width, size_t height)
 {
-  size_t length = width * height;
-  size_t j = length - 1;
-  for (size_t i = 0; i < length / 2; ++i, --j) {
-    std::swap(img[i], img[j]);
-  }
+  std::reverse(img, img + width * height);
 }
 
 template<typename TPixel>
 void image2DTranspose(TPixel* img, size_t width, size_t height)
 {
-  std::vector<TPixel> buf(width * height);
-  for (size_t i = 0; i < height; i++)
-    for (size_t j = 0; j < width; j++)
-      buf[i + j * height] = img[j + i * width];
-  memcpy(img, buf.data(), sizeof(TPixel) * width * height);
+  if (width == height) {
+    for (size_t i = 0; i < height; i++)
+      for (size_t j = i + 1 ; j < width; j++)
+        std::swap(img[i + j * height], img[j + i * width]);
+  } else {
+    const size_t blockSize = 32;
+    std::vector<TPixel> buf(width * height);
+    for (size_t i = 0; i < height; i += blockSize) {
+      for (size_t j = 0; j < width; j += blockSize) {
+        // transpose the block beginning at [i,j]
+        size_t maxH = std::min(i + blockSize, height);
+        size_t maxW = std::min(j + blockSize, width);
+        for (size_t k = i; k < maxH; ++k) {
+          for (size_t l = j; l < maxW; ++l) {
+            buf[k + l * height] = img[l + k * width];
+          }
+        }
+      }
+    }
+    memcpy(img, buf.data(), sizeof(TPixel) * width * height);
+  }
 }
 
 template<typename TPixel, typename TPixelOut = TPixel>

@@ -1382,10 +1382,7 @@ ZImg& ZImg::flip(Dimension dim)
     }
   } else */
   if (dim == Dimension::T) { // flip times
-    size_t k = m_data.size() - 1;
-    for (size_t j = 0; j < m_data.size() / 2; ++j, --k) {
-      std::swap(m_data[j], m_data[k]);
-    }
+    std::reverse(m_data.begin(), m_data.end());
   } else if (dim == Dimension::C) { // flip channels
     if (numChannels() > 1) {
       std::vector<int8_t> buf(channelByteNumber());
@@ -2280,11 +2277,8 @@ template<typename TVoxel>
 void ZImg::reflect_Impl()
 {
   for (size_t t = 0; t < numTimes(); ++t) {
-    size_t j = timeVoxelNumber() - 1;
     TVoxel* data = timeData<TVoxel>(t);
-    for (size_t i = 0; i < timeVoxelNumber() / 2; ++i, --j) {
-      std::swap(data[i], data[j]);
-    }
+    std::reverse(data, data + timeVoxelNumber());
   }
 }
 

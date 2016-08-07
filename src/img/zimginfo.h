@@ -32,7 +32,11 @@ struct ZImgInfo
   QString toQString() const;
 
   // return img data type as string "float32", "int8" ...
-  QString typeAsQString() const;
+  QString typeAsQString() const
+  {
+    return (voxelFormat == VoxelFormat::Float ? "float" : voxelFormat == VoxelFormat::Signed ? "int" : "uint") +
+           QString::number(bytesPerVoxel * 8);
+  }
 
   // channel name for interface, prepend ch1, ch2, ...
   QString displayChannelName(size_t c) const;
