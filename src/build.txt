@@ -1,0 +1,11 @@
+OSX build:
+0. install xcode, homebrew, qt5, intel c composer (for mkl, ipp, tbb)
+1. brew install unrar p7zip git cmake
+2. put atlas_others folder to atlas/../atlas_others
+3. run "build" from 3rdparty folder
+4. use official qt5
+
+Win build:
+0. patch libtiff win32 TIFFFdOpen
+1. run "build" from 3rdparty folder
+2. use official qt5

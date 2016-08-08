@@ -11,12 +11,10 @@ then
   rm -rf $installDIR
 fi
 
-if [ -d $srcDIR ]
+if [ ! -d $srcDIR ]
 then
-  cd $srcDIR
-  git pull
-else
-  git clone git://itk.org/ITK.git $srcDIR
+  echo ERROR: src folder $srcDIR does not exist.
+  exit 1 # terminate and indicate error
 fi
 
 if [ -d $buildDIR ]

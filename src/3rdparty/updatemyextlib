@@ -1,8 +1,13 @@
 #!/bin/bash
 
-srcPackageDIR="/Users/feng/Google Drive/code/my"
-baseDIR=/Users/feng/code
 currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
+#srcPackageDIR="/Users/feng/Google Drive/code/my"
+srcPackageDIR=$currDIR/../../../atlas_others
+if [ ! -d $srcPackageDIR ]
+then
+  srcPackageDIR="/Users/feng/Google Drive/code/my"
+fi
+baseDIR=$currDIR/../../..
 
 if [[ "$OSTYPE" == "msys" ]]; then
   srcPackageDIR="/z/Google Drive/code/my"
@@ -104,4 +109,84 @@ srcArchive=$srcPackageDIR/folly-master.zip
 7z x -y -o$currDIR "$srcArchive"
 mv $currDIR/folly-master $currDIR/folly
 
+srcDIR=$baseDIR/googletest
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  echo git pull googletest
+  git pull
+else
+  git clone git@github.com:google/googletest.git $srcDIR
+fi
 cp -rf $baseDIR/googletest/googletest/ $currDIR/googletest/
+
+srcDIR=$baseDIR/glbinding
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  echo git pull glbinding
+  git pull
+else
+  git clone git@github.com:cginternals/glbinding.git $srcDIR
+fi
+
+srcDIR=$baseDIR/jxrlib
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  echo git pull jxrlib
+  git pull
+else
+  git clone https://git01.codeplex.com/jxrlib $srcDIR
+fi
+
+srcDIR=$baseDIR/assimp
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  echo git pull assimp
+  git pull
+else
+  git clone git@github.com:assimp/assimp.git $srcDIR
+fi
+
+srcDIR=$baseDIR/ITK
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  echo git pull ITK
+  git pull
+else
+  git clone git://itk.org/ITK.git $srcDIR
+fi
+
+srcDIR=$baseDIR/VTK
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  echo git pull VTK
+  git pull
+else
+  git clone https://gitlab.kitware.com/vtk/vtk.git $srcDIR
+fi
+
+srcDIR=$baseDIR/opencv
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  echo git pull opencv
+  git pull
+else
+  git clone git@github.com:Itseez/opencv.git $srcDIR
+fi
+
+srcDIR=$baseDIR/opencv_contrib
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  echo git pull opencv_contrib
+  git pull
+else
+  git clone git@github.com:Itseez/opencv_contrib.git $srcDIR
+fi
+

@@ -12,20 +12,16 @@ then
   rm -rf $installDIR
 fi
 
-if [ -d $srcDIR ]
+if [ ! -d $srcDIR ]
 then
-  cd $srcDIR
-  git pull
-else
-  git clone git@github.com:Itseez/opencv.git $srcDIR
+  echo ERROR: src folder $srcDIR does not exist.
+  exit 1 # terminate and indicate error
 fi
 
-if [ -d $srcContribDIR ]
+if [ ! -d $srcContribDIR ]
 then
-  cd $srcContribDIR
-  git pull
-else
-  git clone git@github.com:Itseez/opencv_contrib.git $srcContribDIR
+  echo ERROR: src folder $srcContribDIR does not exist.
+  exit 1 # terminate and indicate error
 fi
 
 # patch to ignore libpng warnings if we want to skip IDAT chunks, line 809

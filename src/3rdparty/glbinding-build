@@ -11,8 +11,11 @@ then
   rm -rf $installDIR
 fi
 
-cd $srcDIR
-git pull
+if [ ! -d $srcDIR ]
+then
+  echo ERROR: src folder $srcDIR does not exist.
+  exit 1 # terminate and indicate error
+fi
 
 if [ -d $buildDIR ]
 then
