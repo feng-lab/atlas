@@ -1,11 +1,10 @@
 #!/bin/bash
 
 currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
-#srcPackageDIR="/Users/feng/Google Drive/code/my"
 srcPackageDIR=$currDIR/../../../atlas_others
 if [ ! -d $srcPackageDIR ]
 then
-  srcPackageDIR="/Users/feng/Google Drive/code/my"
+  srcPackageDIR="$HOME/Google Drive/code/my"
 fi
 baseDIR=$currDIR/../../..
 
@@ -120,6 +119,26 @@ else
 fi
 cp -rf $baseDIR/googletest/googletest/ $currDIR/googletest/
 
+srcDIR=$baseDIR/glog
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  echo git pull glog
+  git pull
+else
+  git clone git@github.com:google/glog.git $srcDIR
+fi
+
+srcDIR=$baseDIR/gflags
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  echo git pull gflags
+  git pull
+else
+  git clone git@github.com:gflags/gflags.git $srcDIR
+fi
+
 srcDIR=$baseDIR/glbinding
 if [ -d $srcDIR ]
 then
@@ -140,6 +159,16 @@ else
   git clone https://git01.codeplex.com/jxrlib $srcDIR
 fi
 
+srcDIR=$baseDIR/OSPRay
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  echo git pull OSPRay
+  git pull
+else
+  git clone git@github.com:ospray/OSPRay.git $srcDIR
+fi
+
 srcDIR=$baseDIR/assimp
 if [ -d $srcDIR ]
 then
@@ -148,6 +177,16 @@ then
   git pull
 else
   git clone git@github.com:assimp/assimp.git $srcDIR
+fi
+
+srcDIR=$baseDIR/botan
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  echo git pull botan
+  git pull
+else
+  git clone git@github.com:randombit/botan.git $srcDIR
 fi
 
 srcDIR=$baseDIR/ITK

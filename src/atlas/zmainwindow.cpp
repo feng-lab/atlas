@@ -26,7 +26,7 @@
 
 #ifdef _WITH_TESTS_
 
-#include "zunittest.h"
+#include "test/zunittest.h"
 
 #endif
 

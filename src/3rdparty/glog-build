@@ -11,12 +11,10 @@ then
   rm -rf $installDIR
 fi
 
-if [ -d $srcDIR ]
+if [ ! -d $srcDIR ]
 then
-  cd $srcDIR
-  git pull
-else
-  git clone git@github.com:gflags/gflags.git $srcDIR
+  echo ERROR: src folder $srcDIR does not exist.
+  exit 1 # terminate and indicate error
 fi
 
 if [ -d $buildDIR ]
@@ -26,7 +24,13 @@ fi
 mkdir $buildDIR
 cd $buildDIR
 
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.8 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++14" $srcDIR
+OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk
+if [ ! -d $OSX_SYSROOT ]
+then
+  OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.10.sdk
+fi
+
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.8 -DCMAKE_OSX_SYSROOT=$OSX_SYSROOT -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++14" $srcDIR
 
 make -j $numCores install
 
@@ -43,12 +47,10 @@ then
   rm -rf $installDIR
 fi
 
-if [ -d $srcDIR ]
+if [ ! -d $srcDIR ]
 then
-  cd $srcDIR
-  git pull
-else
-  git clone git@github.com:google/glog.git $srcDIR
+  echo ERROR: src folder $srcDIR does not exist.
+  exit 1 # terminate and indicate error
 fi
 
 # patch
@@ -62,7 +64,7 @@ fi
 mkdir $buildDIR
 cd $buildDIR
 
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.8 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk -Dgflags_DIR:PATH=$currDIR/gflags/lib/cmake/gflags -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++14" $srcDIR
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.8 -DCMAKE_OSX_SYSROOT=$OSX_SYSROOT -Dgflags_DIR:PATH=$currDIR/gflags/lib/cmake/gflags -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++14" $srcDIR
 
 make -j $numCores install
 

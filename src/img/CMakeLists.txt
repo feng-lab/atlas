@@ -104,7 +104,7 @@ find_package(glog REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glog ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/gflags
              NO_DEFAULT_PATH)
 
-find_package(Qt5Core REQUIRED PATHS ~/Qt/5.7/clang_64 NO_DEFAULT_PATH)
+find_package(Qt5Core 5.7.0 REQUIRED PATHS ~/Qt/5.7/clang_64)
 
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})

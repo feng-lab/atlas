@@ -125,10 +125,10 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt5Core REQUIRED PATHS ~/Qt/5.7/clang_64 NO_DEFAULT_PATH)
-find_package(Qt5Widgets REQUIRED PATHS ~/Qt/5.7/clang_64 NO_DEFAULT_PATH)
-find_package(Qt5Network REQUIRED PATHS ~/Qt/5.7/clang_64 NO_DEFAULT_PATH)
-find_package(Qt5Svg REQUIRED PATHS ~/Qt/5.7/clang_64 NO_DEFAULT_PATH)
+find_package(Qt5Core 5.7.0 REQUIRED PATHS ~/Qt/5.7/clang_64)
+find_package(Qt5Widgets 5.7.0 REQUIRED PATHS ~/Qt/5.7/clang_64)
+find_package(Qt5Network 5.7.0 REQUIRED PATHS ~/Qt/5.7/clang_64)
+find_package(Qt5Svg 5.7.0 REQUIRED PATHS ~/Qt/5.7/clang_64)
 
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
@@ -233,8 +233,8 @@ if (BUILD_TESTING)
       test/zimgsigneddistancemaptest.h
       test/zimgautothresholdtest.h
       test/zimgregionalextrematest.h
-      zunittest.h
-      zunittest.cpp
+      test/zunittest.h
+      test/zunittest.cpp
       )
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/include)
 endif (BUILD_TESTING)
