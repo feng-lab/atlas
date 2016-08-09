@@ -1,5 +1,4 @@
-#ifndef Z2DANIMATIONDOC_H
-#define Z2DANIMATIONDOC_H
+#pragma once
 
 #include "zobjdoc.h"
 #include "z2danimation.h"
@@ -115,4 +114,3 @@ private:
 } // namespace nim
 
 
-#endif // Z2DANIMATIONDOC_H

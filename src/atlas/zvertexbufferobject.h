@@ -1,5 +1,4 @@
-#ifndef ZVERTEXBUFFEROBJECT_H
-#define ZVERTEXBUFFEROBJECT_H
+#pragma once
 
 #include "z3dgl.h"
 #include <vector>
@@ -28,4 +27,3 @@ private:
 
 } // namespace nim
 
-#endif // ZVERTEXBUFFEROBJECT_H

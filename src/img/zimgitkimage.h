@@ -1,5 +1,4 @@
-#ifndef ZIMGITKIMAGE_H
-#define ZIMGITKIMAGE_H
+#pragma once
 
 #include "zimgformat.h"
 
@@ -53,4 +52,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZIMGITKIMAGE_H

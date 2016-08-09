@@ -1,5 +1,4 @@
-#ifndef ZROIDOC_H
-#define ZROIDOC_H
+#pragma once
 
 #include "zobjdoc.h"
 #include "zroi.h"
@@ -123,4 +122,3 @@ private:
 
 } // namespace nim
 
-#endif // ZROIDOC_H

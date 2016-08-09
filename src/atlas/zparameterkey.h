@@ -1,5 +1,4 @@
-#ifndef ZPARAMETERKEY_H
-#define ZPARAMETERKEY_H
+#pragma once
 
 #include <QEasingCurve>
 #include <QJsonValue>
@@ -73,4 +72,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZPARAMETERKEY_H

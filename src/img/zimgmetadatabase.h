@@ -1,5 +1,4 @@
-#ifndef ZIMGMETADATABASE_H
-#define ZIMGMETADATABASE_H
+#pragma once
 
 #include <cstddef>
 #include <vector>
@@ -200,4 +199,3 @@ protected:
 
 }
 
-#endif // ZIMGMETADATABASE_H

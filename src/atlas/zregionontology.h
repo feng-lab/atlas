@@ -1,5 +1,4 @@
-#ifndef ZREGIONONTOLOGY_H
-#define ZREGIONONTOLOGY_H
+#pragma once
 
 #include <cstdint>
 #include <memory>
@@ -60,4 +59,3 @@ void binaryImgToROI(const ZImg& img, ZROI& roi);
 
 } // namespace nim
 
-#endif // ZREGIONONTOLOGY_H

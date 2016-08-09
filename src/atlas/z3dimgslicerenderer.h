@@ -1,5 +1,4 @@
-#ifndef Z3DIMGSLICERENDERER_H
-#define Z3DIMGSLICERENDERER_H
+#pragma once
 
 #include "z3dprimitiverenderer.h"
 #include "zmesh.h"
@@ -75,4 +74,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DIMGSLICERENDERER_H

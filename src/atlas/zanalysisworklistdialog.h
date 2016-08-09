@@ -1,5 +1,4 @@
-#ifndef ZANALYSISWORKLISTDIALOG_H
-#define ZANALYSISWORKLISTDIALOG_H
+#pragma once
 
 #include <QDialog>
 
@@ -46,4 +45,3 @@ private:
 } // namespace nim
 
 
-#endif // ZANALYSISWORKLISTDIALOG_H

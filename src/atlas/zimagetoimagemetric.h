@@ -1,5 +1,4 @@
-#ifndef ZIMAGETOIMAGEMETRIC_H
-#define ZIMAGETOIMAGEMETRIC_H
+#pragma once
 
 #include <cmath>
 #include "zstatisticsutils.h"
@@ -336,4 +335,3 @@ double ZImageToImageMetric::value(const TPixel1* img1, const TPixel2* img2, size
 
 } // namespace nim
 
-#endif // ZIMAGETOIMAGEMETRIC_H

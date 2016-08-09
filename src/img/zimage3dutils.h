@@ -1,5 +1,4 @@
-#ifndef ZIMAGE3DUTILS_H
-#define ZIMAGE3DUTILS_H
+#pragma once
 
 #include <cstring>
 #include <cmath>
@@ -1028,5 +1027,3 @@ void image3DResize(const TPixel* img, size_t width, size_t height, size_t depth,
 }
 
 } // namespace nim
-
-#endif // ZIMAGE3DUTILS_H

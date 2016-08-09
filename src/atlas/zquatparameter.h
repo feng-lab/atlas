@@ -1,5 +1,4 @@
-#ifndef ZQUATPARAMETER_H
-#define ZQUATPARAMETER_H
+#pragma once
 
 #include "znumericparameter.h"
 
@@ -40,4 +39,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZQUATPARAMETER_H

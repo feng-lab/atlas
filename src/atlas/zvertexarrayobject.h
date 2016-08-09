@@ -1,5 +1,4 @@
-#ifndef ZVERTEXARRAYOBJECT_H
-#define ZVERTEXARRAYOBJECT_H
+#pragma once
 
 #include <vector>
 #include "z3dgl.h"
@@ -29,4 +28,3 @@ private:
 
 } // namespace nim
 
-#endif // ZVERTEXARRAYOBJECT_H

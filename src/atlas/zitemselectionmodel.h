@@ -1,5 +1,4 @@
-#ifndef ZITEMSELECTIONMODEL_H
-#define ZITEMSELECTIONMODEL_H
+#pragma once
 
 #include <QItemSelectionModel>
 
@@ -40,4 +39,3 @@ private:
 
 } // namespace nim
 
-#endif // ZITEMSELECTIONMODEL_H

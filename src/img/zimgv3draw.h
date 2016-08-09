@@ -1,5 +1,4 @@
-#ifndef ZIMGV3DRAW_H
-#define ZIMGV3DRAW_H
+#pragma once
 
 #include "zimgformat.h"
 
@@ -46,4 +45,3 @@ public:
 
 } // namespace
 
-#endif // ZIMGV3DRAW_H

@@ -1,5 +1,4 @@
-#ifndef ZMESH_H
-#define ZMESH_H
+#pragma once
 
 #include <vector>
 #include "z3dgl.h"
@@ -308,4 +307,3 @@ private:
 
 } // namespace nim
 
-#endif // ZMESH_H

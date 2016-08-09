@@ -1,5 +1,4 @@
-#ifndef ZIMGINTERFACE_H
-#define ZIMGINTERFACE_H
+#pragma once
 
 #include "zglobal.h"
 #include "zexception.h"
@@ -207,4 +206,3 @@ enum class Dimension
 
 }
 
-#endif // ZIMGINTERFACE_H

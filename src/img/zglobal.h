@@ -1,5 +1,4 @@
-#ifndef ZGLOBAL
-#define ZGLOBAL
+#pragma once
 
 #include <cstdint>
 #include <cstddef>
@@ -95,6 +94,3 @@ constexpr int64_t operator "" _i64(unsigned long long int n) noexcept { return n
 
 
 } // namespace nim
-
-#endif // ZGLOBAL
-

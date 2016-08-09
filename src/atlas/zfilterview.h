@@ -1,5 +1,4 @@
-#ifndef ZFILTERVIEW_H
-#define ZFILTERVIEW_H
+#pragma once
 
 #include "zobjview.h"
 #include "zexception.h"
@@ -243,4 +242,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZFILTERVIEW_H

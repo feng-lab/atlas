@@ -1,5 +1,4 @@
-#ifndef Z3DMESHVIEW_H
-#define Z3DMESHVIEW_H
+#pragma once
 
 #include "z3dfilterview.h"
 #include "zmeshdoc.h"
@@ -21,4 +20,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DMESHVIEW_H

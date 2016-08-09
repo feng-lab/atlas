@@ -1,5 +1,4 @@
-#ifndef ZPUNCTAFILTER_H
-#define ZPUNCTAFILTER_H
+#pragma once
 
 #include "zobjfilter.h"
 #include <QList>
@@ -118,4 +117,3 @@ private:
 
 } // namespace nim
 
-#endif // ZPUNCTAFILTER_H

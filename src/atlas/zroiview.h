@@ -1,5 +1,4 @@
-#ifndef ZROIVIEW_H
-#define ZROIVIEW_H
+#pragma once
 
 #include <map>
 #include "zfilterview.h"
@@ -22,4 +21,3 @@ private:
 
 } // namespace nim
 
-#endif // ZROIVIEW_H

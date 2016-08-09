@@ -1,5 +1,4 @@
-#ifndef ZDOC_H
-#define ZDOC_H
+#pragma once
 
 #include <QObject>
 #include <QMap>
@@ -270,4 +269,3 @@ private:
 
 } // namespace nim
 
-#endif // ZDOC_H

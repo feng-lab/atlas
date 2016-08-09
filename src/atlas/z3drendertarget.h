@@ -1,5 +1,4 @@
-#ifndef Z3DRENDERTARGET_H
-#define Z3DRENDERTARGET_H
+#pragma once
 
 #include <map>
 #include <set>
@@ -101,4 +100,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DRENDERTARGET_H

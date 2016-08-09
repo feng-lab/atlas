@@ -1,5 +1,4 @@
-#ifndef Z3DTEXTURE_H
-#define Z3DTEXTURE_H
+#pragma once
 
 #include "z3dgl.h"
 
@@ -157,4 +156,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DTEXTURE_H

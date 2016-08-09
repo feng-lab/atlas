@@ -1,5 +1,4 @@
-#ifndef ZGLMUTILS_H
-#define ZGLMUTILS_H
+#pragma once
 
 // This file includes some commonly used headers from glm and defines some useful functions
 // for glm
@@ -653,4 +652,3 @@ inline QDebug operator<<(QDebug s, const glm::tquat<T,P>& q)
 
 //-------------------------------------------------------------------------------------------------------------------------
 
-#endif // ZGLMUTILS_H

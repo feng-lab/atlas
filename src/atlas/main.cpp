@@ -14,13 +14,13 @@
 #include "zexception.h"
 #include <folly/ScopeGuard.h>
 
-#ifdef _USE_MKL_
+#ifdef ATLAS_USE_MKL
 
 #include "mkl_service.h"
 
 #endif
 
-#ifdef _USE_IPP_
+#ifdef ATLAS_USE_IPP
 
 #include "ippcore.h"
 #include "ippi.h"
@@ -128,7 +128,7 @@ void removeOldLogs(const QDir& dir, int numberToKeep = 20)
 int main(int argc, char* argv[])
 {
   QSurfaceFormat format;
-#if defined(__APPLE__) && defined(_USE_CORE_PROFILE_)
+#if defined(__APPLE__) && defined(ATLAS_USE_CORE_PROFILE)
   format.setVersion(3, 2);
   format.setProfile(QSurfaceFormat::CoreProfile);
 #endif
@@ -169,7 +169,7 @@ int main(int argc, char* argv[])
 
     fftw_plan_with_nthreads(ZCpuInfoInstance.nPhysicalCores);
 
-#ifdef _USE_MKL_
+#ifdef ATLAS_USE_MKL
     // todo: check this for amd cpu
     MKLVersion mklVer;
     MKL_Get_Version(&mklVer);
@@ -181,7 +181,7 @@ int main(int argc, char* argv[])
     LOG(INFO) << "";
 #endif
 
-#ifdef _USE_IPP_
+#ifdef ATLAS_USE_IPP
     // todo: check this for amd cpu
     IppStatus status = ippInit();
     if (status == ippStsNonIntelCpu || status == ippStsNotSupportedCpu) {

@@ -1,5 +1,4 @@
-#ifndef ZSWCVIEW_H
-#define ZSWCVIEW_H
+#pragma once
 
 #include <map>
 #include "zfilterview.h"
@@ -22,4 +21,3 @@ private:
 
 } // namespace nim
 
-#endif // ZSWCVIEW_H

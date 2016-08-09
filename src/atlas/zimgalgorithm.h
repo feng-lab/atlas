@@ -1,5 +1,4 @@
-#ifndef ZIMGALGORITHM_H
-#define ZIMGALGORITHM_H
+#pragma once
 
 // base class for all img process, template parameter ReportProgress are used to
 // control whether progress will be reported in compile-time
@@ -155,4 +154,3 @@ public:
 
 } // namespace nim
 
-#endif // ZIMGALGORITHM_H

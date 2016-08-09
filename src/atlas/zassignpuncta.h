@@ -1,5 +1,4 @@
-#ifndef ZASSIGNPUNCTA_H
-#define ZASSIGNPUNCTA_H
+#pragma once
 
 #include <QList>
 #include <map>
@@ -94,4 +93,3 @@ private:
 
 } // namespace nim
 
-#endif // ZASSIGNPUNCTA_H

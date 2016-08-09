@@ -1,5 +1,4 @@
-#ifndef ZIMGSTACKINTERFACE_H
-#define ZIMGSTACKINTERFACE_H
+#pragma once
 
 #ifdef _NEUTUBE_
 
@@ -26,4 +25,3 @@ ZStack* readZStack(const QStringList &fileList, Dimension catDim = Dimension::Z,
 
 #endif // STACK_INTERFACE
 
-#endif // ZIMGSTACKINTERFACE_H

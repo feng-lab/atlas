@@ -1,5 +1,4 @@
-#ifndef Z2DANIMATION_H
-#define Z2DANIMATION_H
+#pragma once
 
 #include "zanimation.h"
 #include <map>
@@ -41,4 +40,3 @@ protected:
 } // namespace nim
 
 
-#endif // Z2DANIMATION_H

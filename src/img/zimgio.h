@@ -1,5 +1,4 @@
-#ifndef ZIMGIO_H
-#define ZIMGIO_H
+#pragma once
 
 #include <vector>
 #include <map>
@@ -95,4 +94,3 @@ private:
 
 } // namespace nim
 
-#endif // ZIMGIO_H

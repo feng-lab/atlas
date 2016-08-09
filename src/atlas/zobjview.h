@@ -1,5 +1,4 @@
-#ifndef ZOBJVIEW_H
-#define ZOBJVIEW_H
+#pragma once
 
 #include <QObject>
 #include <QRectF>
@@ -86,4 +85,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZOBJVIEW_H

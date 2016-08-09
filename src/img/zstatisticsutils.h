@@ -1,5 +1,4 @@
-#ifndef ZSTATISTICSUTILS_H
-#define ZSTATISTICSUTILS_H
+#pragma once
 
 #include <algorithm>
 #include <cmath>
@@ -365,5 +364,3 @@ double medianInPlace(RandomAccessIterator begin, RandomAccessIterator end)
 }
 
 } // namespace nim
-
-#endif // ZSTATISTICSUTILS_H

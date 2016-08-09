@@ -1,5 +1,4 @@
-#ifndef ZIMGNEIGHBORHOODITERATOR_H
-#define ZIMGNEIGHBORHOODITERATOR_H
+#pragma once
 
 #include "zimg.h"
 #include <boost/iterator/iterator_facade.hpp>
@@ -387,4 +386,3 @@ using ZImgNeighborhoodIterator = impl::img_neighborhood_iter<ZImg, TVoxel>;
 
 } // namespace nim
 
-#endif // ZIMGNEIGHBORHOODITERATOR_H

@@ -1,5 +1,4 @@
-#ifndef ZIMGREGIONITERATOR_H
-#define ZIMGREGIONITERATOR_H
+#pragma once
 
 #include "zimg.h"
 #include <boost/iterator/iterator_facade.hpp>
@@ -265,4 +264,3 @@ using ZImgRegionIterator = impl::img_region_iter<ZImg, TVoxel>;
 
 } // namespace nim
 
-#endif // ZIMGREGIONITERATOR_H

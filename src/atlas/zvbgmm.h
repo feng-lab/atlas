@@ -1,5 +1,4 @@
-#ifndef ZVBGMM_H
-#define ZVBGMM_H
+#pragma once
 
 #include "zgmm.h"
 
@@ -789,4 +788,3 @@ private:
 
 } // namespace nim
 
-#endif // ZVBGMM_H

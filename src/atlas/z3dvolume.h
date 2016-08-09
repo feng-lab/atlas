@@ -1,5 +1,4 @@
-#ifndef Z3DVOLUME_H
-#define Z3DVOLUME_H
+#pragma once
 
 #include "z3dgl.h"
 #include <QObject>
@@ -364,4 +363,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DVOLUME_H

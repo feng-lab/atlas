@@ -1,5 +1,4 @@
-#ifndef Z3DNETWORKEVALUATOR_H
-#define Z3DNETWORKEVALUATOR_H
+#pragma once
 
 #include <QObject>
 #include <vector>
@@ -157,4 +156,3 @@ public:
 
 } // namespace nim
 
-#endif // Z3DNETWORKEVALUATOR_H

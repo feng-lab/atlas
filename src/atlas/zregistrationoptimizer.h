@@ -1,5 +1,4 @@
-#ifndef ZREGISTRATIONOPTIMIZER_H
-#define ZREGISTRATIONOPTIMIZER_H
+#pragma once
 
 #include "zregistrationcostfunction.h"
 #include <ceres/gradient_problem_solver.h>
@@ -52,4 +51,3 @@ private:
 
 } // namespace nim
 
-#endif // ZREGISTRATIONOPTIMIZER_H

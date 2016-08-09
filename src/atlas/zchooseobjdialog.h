@@ -1,5 +1,4 @@
-#ifndef ZCHOOSEOBJDIALOG_H
-#define ZCHOOSEOBJDIALOG_H
+#pragma once
 
 #include <QDialog>
 #include <QList>
@@ -40,4 +39,3 @@ private:
 
 } // namespace nim
 
-#endif // ZCHOOSEOBJDIALOG_H

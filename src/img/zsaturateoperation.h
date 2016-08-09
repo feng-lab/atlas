@@ -1,5 +1,4 @@
-#ifndef ZSATURATEOPERATION_H
-#define ZSATURATEOPERATION_H
+#pragma once
 
 // note: these operations only works for sized type define like int32_t uint64_t
 // that means one of "long" and "long long" type is not overloaded which will cause ambiguous overloading
@@ -1260,4 +1259,3 @@ inline void saturate_div(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res
 
 }
 
-#endif // ZSATURATEOPERATION_H

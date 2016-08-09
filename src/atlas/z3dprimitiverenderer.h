@@ -1,5 +1,4 @@
-#ifndef Z3DPRIMITIVERENDERER_H
-#define Z3DPRIMITIVERENDERER_H
+#pragma once
 
 #include <QObject>
 #include "z3drendererbase.h"
@@ -87,7 +86,7 @@ protected:
 
   void setPickingShaderParameters(Z3DShaderProgram& shader);
 
-#ifndef _USE_CORE_PROFILE_
+#ifndef ATLAS_USE_CORE_PROFILE
   virtual void renderUsingOpengl() {}
   virtual void renderPickingUsingOpengl() {}
 #endif
@@ -110,4 +109,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DPRIMITIVERENDERER_H

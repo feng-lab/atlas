@@ -1,5 +1,4 @@
-#ifndef Z3DBLOCKCACHE_H
-#define Z3DBLOCKCACHE_H
+#pragma once
 
 #include <unordered_map>
 #include <list>
@@ -109,5 +108,4 @@ private:
 
 } // namespace nim
 
-#endif // Z3DBLOCKCACHE_H
 

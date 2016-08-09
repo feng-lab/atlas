@@ -1,5 +1,4 @@
-#ifndef ZANIMATIONEXPORTWIDGET_H
-#define ZANIMATIONEXPORTWIDGET_H
+#pragma once
 
 #include "z3dgl.h"
 #include <QScrollArea>
@@ -79,4 +78,3 @@ private:
 
 } // namespace nim
 
-#endif // ZANIMATIONEXPORTWIDGET_H

@@ -1,5 +1,4 @@
-#ifndef ZDOCKWIDGET_H
-#define ZDOCKWIDGET_H
+#pragma once
 
 #include <QDockWidget>
 
@@ -14,4 +13,3 @@ public:
 
 } // namespace
 
-#endif // ZDOCKWIDGET_H

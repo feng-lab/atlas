@@ -1,5 +1,4 @@
-#ifndef ZIMGINFO_H
-#define ZIMGINFO_H
+#pragma once
 
 #include <vector>
 #include "zimginterface.h"
@@ -210,4 +209,3 @@ struct ZImgInfo
 
 } // namespace
 
-#endif // ZIMGINFO_H

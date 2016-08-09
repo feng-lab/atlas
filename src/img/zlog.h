@@ -1,5 +1,4 @@
-#ifndef ZLOG_H
-#define ZLOG_H
+#pragma once
 
 #ifdef _WIN32
 #undef ERROR
@@ -350,5 +349,3 @@ void logContainer(QsLogging::Level severity, const IteratorType &begin, const It
 }
 
 #endif //_USE_QSLOG_
-
-#endif // ZLOG_H

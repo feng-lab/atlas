@@ -1,5 +1,4 @@
-#ifndef ZCOMBOBOX_H
-#define ZCOMBOBOX_H
+#pragma once
 
 #include <QComboBox>
 
@@ -38,4 +37,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZCOMBOBOX_H

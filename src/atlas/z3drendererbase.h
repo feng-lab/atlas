@@ -1,5 +1,4 @@
-#ifndef Z3DRENDERERBASE_H
-#define Z3DRENDERERBASE_H
+#pragma once
 
 #include <QObject>
 #include <vector>
@@ -234,7 +233,7 @@ signals:
 
 protected:
 
-#ifndef _USE_CORE_PROFILE_
+#ifndef ATLAS_USE_CORE_PROFILE
   void generateDisplayList(const std::vector<Z3DPrimitiveRenderer *> &renderers);
   void generatePickingDisplayList(const std::vector<Z3DPrimitiveRenderer *> &renderers);
 
@@ -253,7 +252,7 @@ protected:
   inline bool hasClipPlanes()
   { return !m_clipPlanes.empty(); }
 
-#ifndef _USE_CORE_PROFILE_
+#ifndef ATLAS_USE_CORE_PROFILE
   void activateClipPlanesOpenGL();
   void deactivateClipPlanesOpenGL();
 #endif
@@ -265,7 +264,7 @@ protected:
   void makeViewportMatrix();
 
 private:
-#ifndef _USE_CORE_PROFILE_
+#ifndef ATLAS_USE_CORE_PROFILE
   void invalidateDisplayList();
   void invalidatePickingDisplayList();
 #endif
@@ -277,7 +276,7 @@ private:
 protected:
   Z3DGlobalParameters& m_globalParas;
 
-#ifndef _USE_CORE_PROFILE_
+#ifndef ATLAS_USE_CORE_PROFILE
   // display list generated from the geometry.
   GLuint m_displayList;
   GLuint m_pickingDisplayList;
@@ -319,4 +318,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DRENDERERBASE_H

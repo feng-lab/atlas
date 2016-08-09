@@ -1,5 +1,4 @@
-#ifndef ZTIMELINEOBJVIEW_H
-#define ZTIMELINEOBJVIEW_H
+#pragma once
 
 #include <QGraphicsView>
 #include <QGraphicsItemGroup>
@@ -32,4 +31,3 @@ private:
 
 } // namespace nim
 
-#endif // ZTIMELINEOBJVIEW_H

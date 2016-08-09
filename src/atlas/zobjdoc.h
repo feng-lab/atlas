@@ -1,5 +1,4 @@
-#ifndef ZOBJDOC_H
-#define ZOBJDOC_H
+#pragma once
 
 #include "zdoc.h"
 #include <QObject>
@@ -148,4 +147,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZOBJDOC_H

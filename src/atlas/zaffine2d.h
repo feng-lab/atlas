@@ -1,5 +1,4 @@
-#ifndef ZAFFINE2D_H
-#define ZAFFINE2D_H
+#pragma once
 
 #include "zeigenutils.h"
 
@@ -96,4 +95,3 @@ private:
 
 } // namespace nim
 
-#endif // ZAFFINE2D_H

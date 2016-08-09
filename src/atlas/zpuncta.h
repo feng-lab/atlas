@@ -1,5 +1,4 @@
-#ifndef ZPUNCTA_H
-#define ZPUNCTA_H
+#pragma once
 
 #include <QLinkedList>
 #include "zpunctum.h"
@@ -58,4 +57,3 @@ public:
 
 } // namespace nim
 
-#endif // ZPUNCTA_H

@@ -1,5 +1,4 @@
-#ifndef ZSAVEOBJSDIALOG_H
-#define ZSAVEOBJSDIALOG_H
+#pragma once
 
 #include <QDialog>
 #include <QList>
@@ -46,4 +45,3 @@ private:
 
 } // namespace nim
 
-#endif // ZSAVEOBJSDIALOG_H

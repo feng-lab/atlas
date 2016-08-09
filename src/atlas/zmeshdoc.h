@@ -1,5 +1,4 @@
-#ifndef ZMESHDOC_H
-#define ZMESHDOC_H
+#pragma once
 
 #include "zobjdoc.h"
 #include "zmesh.h"
@@ -113,4 +112,3 @@ private:
 
 } // namespace nim
 
-#endif // ZMESHDOC_H

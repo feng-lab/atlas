@@ -1,5 +1,4 @@
-#ifndef ZIMGOMETIFF_H
-#define ZIMGOMETIFF_H
+#pragma once
 
 #include "zimgtiff.h"
 #include <map>
@@ -81,4 +80,3 @@ protected:
 
 }  // namespace
 
-#endif // ZIMGOMETIFF_H

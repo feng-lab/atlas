@@ -1,5 +1,4 @@
-#ifndef ZREGISTRATIONNUMERICDIFFCOSTFUNCTION_H
-#define ZREGISTRATIONNUMERICDIFFCOSTFUNCTION_H
+#pragma once
 
 #include "zregistrationcostfunction.h"
 #include "zimagetoimagemetric.h"
@@ -31,4 +30,3 @@ private:
 
 } // namespace nim
 
-#endif // ZREGISTRATIONNUMERICDIFFCOSTFUNCTION_H

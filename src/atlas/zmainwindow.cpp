@@ -24,7 +24,7 @@
 #include "zdoc.h"
 #include "zview.h"
 
-#ifdef _WITH_TESTS_
+#ifdef ATLAS_WITH_TESTS
 
 #include "test/zunittest.h"
 
@@ -53,12 +53,6 @@
 #include "zregionannotationview.h"
 
 //#include "zlogdialog.h"
-
-#ifdef Q_OS_OSX
-
-void qt_mac_set_dock_menu(QMenu* menu);
-
-#endif
 
 namespace nim {
 
@@ -296,7 +290,7 @@ void ZMainWindow::openLogFolder()
   QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfoInstance.logDir().absolutePath()));
 }
 
-#ifdef _WITH_TESTS_
+#ifdef ATLAS_WITH_TESTS
 
 void ZMainWindow::runUnitTest()
 {
@@ -538,7 +532,7 @@ void ZMainWindow::createActions()
   m_openLogFolderAction->setStatusTip(tr("Open Log Folder"));
   connect(m_openLogFolderAction, &QAction::triggered, this, &ZMainWindow::openLogFolder);
 
-#ifdef _WITH_TESTS_
+#ifdef ATLAS_WITH_TESTS
   m_testAction = new QAction(QIcon(":/icons/test-512.png"), tr("&UnitTest"), this);
   m_testAction->setStatusTip(tr("Run Unit Test"));
   connect(m_testAction, &QAction::triggered, this, &ZMainWindow::runUnitTest);
@@ -608,7 +602,7 @@ void ZMainWindow::createMenus()
   m_helpMenu->addSeparator();
   m_helpMenu->addAction(m_viewLogAction);
   m_helpMenu->addAction(m_openLogFolderAction);
-#ifdef _WITH_TESTS_
+#ifdef ATLAS_WITH_TESTS
   m_helpMenu->addAction(m_testAction);
 #endif
   m_helpMenu->addAction(m_runCustomCommandAction);
@@ -616,7 +610,7 @@ void ZMainWindow::createMenus()
   m_dockMenu = new QMenu(this);
   m_dockMenu->addAction(m_openNewInstanceAction);
 #ifdef Q_OS_OSX
-  qt_mac_set_dock_menu(m_dockMenu);
+  m_dockMenu->setAsDockMenu();
 #endif
 }
 
@@ -659,7 +653,7 @@ void ZMainWindow::createToolBars()
 
   //m_helpToolBar = addToolBar(tr("Help"));
   //m_helpToolBar->addAction(m_openLogFolderAction);
-  //#ifdef _WITH_TESTS_
+  //#ifdef ATLAS_WITH_TESTS
   //  m_helpToolBar->addAction(m_testAction);
   //#endif
   //  m_helpToolBar->addAction(m_runCustomCommandAction);

@@ -1,5 +1,4 @@
-#ifndef ZSWCFILTER_H
-#define ZSWCFILTER_H
+#pragma once
 
 #include "zobjfilter.h"
 #include <QList>
@@ -128,4 +127,3 @@ private:
 
 } // namespace nim
 
-#endif // ZSWCFILTER_H

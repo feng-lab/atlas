@@ -1,5 +1,4 @@
-#ifndef ZIMGDOC_H
-#define ZIMGDOC_H
+#pragma once
 
 #include "zobjdoc.h"
 #include "zimgpack.h"
@@ -124,4 +123,3 @@ private:
 
 } // namespace nim
 
-#endif // ZIMGDOC_H

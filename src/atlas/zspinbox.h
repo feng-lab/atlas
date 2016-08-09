@@ -1,5 +1,4 @@
-#ifndef ZSPINBOX_H
-#define ZSPINBOX_H
+#pragma once
 
 #include <QSpinBox>
 
@@ -51,4 +50,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZSPINBOX_H

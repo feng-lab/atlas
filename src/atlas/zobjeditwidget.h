@@ -1,5 +1,4 @@
-#ifndef ZOBJEDITWIDGET_H
-#define ZOBJEDITWIDGET_H
+#pragma once
 
 #include <QStackedWidget>
 #include <QPlainTextEdit>
@@ -50,4 +49,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZOBJEDITWIDGET_H

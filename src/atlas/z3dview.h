@@ -1,5 +1,4 @@
-#ifndef Z3DVIEW_H
-#define Z3DVIEW_H
+#pragma once
 
 #include <QObject>
 #include <QAction>
@@ -140,4 +139,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DVIEW_H

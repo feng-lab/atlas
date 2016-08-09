@@ -1,5 +1,4 @@
-#ifndef Z3DIMGVIEW_H
-#define Z3DIMGVIEW_H
+#pragma once
 
 #include "z3dfilterview.h"
 #include "zimgdoc.h"
@@ -21,4 +20,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DIMGVIEW_H

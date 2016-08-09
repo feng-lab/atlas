@@ -1,5 +1,4 @@
-#ifndef ZTIMELINEWIDGET_H
-#define ZTIMELINEWIDGET_H
+#pragma once
 
 #include <QWidget>
 #include <cmath>
@@ -100,4 +99,3 @@ private:
 
 } // namespace nim
 
-#endif // ZTIMELINEWIDGET_H

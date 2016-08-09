@@ -1,5 +1,4 @@
-#ifndef ZIMAGEINTERPOLATION_H
-#define ZIMAGEINTERPOLATION_H
+#pragma once
 
 #include "zimginterface.h"
 
@@ -93,4 +92,3 @@ private:
 
 } // namespace nim
 
-#endif // ZIMAGEINTERPOLATION_H

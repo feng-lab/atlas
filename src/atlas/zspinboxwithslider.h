@@ -1,5 +1,4 @@
-#ifndef ZSPINBOXWITHSLIDER_H
-#define ZSPINBOXWITHSLIDER_H
+#pragma once
 
 #include <QWidget>
 #include <QSlider>
@@ -102,4 +101,3 @@ private:
 
 } // namespace nim
 
-#endif // ZSPINBOXWITHSLIDER_H

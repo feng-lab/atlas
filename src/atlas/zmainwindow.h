@@ -1,5 +1,4 @@
-#ifndef ZMAINWINDOW_H
-#define ZMAINWINDOW_H
+#pragma once
 
 #include <QMainWindow>
 
@@ -68,7 +67,7 @@ private:
 
   void openLogFolder();
 
-#ifdef _WITH_TESTS_
+#ifdef ATLAS_WITH_TESTS
 
   void runUnitTest();
 
@@ -146,7 +145,7 @@ private:
 
   QAction* m_viewLogAction;
   QAction* m_openLogFolderAction;
-#ifdef _WITH_TESTS_
+#ifdef ATLAS_WITH_TESTS
   QAction* m_testAction;
 #endif
   QAction* m_runCustomCommandAction;
@@ -182,4 +181,3 @@ private:
 
 } // namespace nim
 
-#endif

@@ -1,5 +1,4 @@
-#ifndef Z3DPUNCTAVIEW_H
-#define Z3DPUNCTAVIEW_H
+#pragma once
 
 #include "z3dfilterview.h"
 #include "zpunctadoc.h"
@@ -21,4 +20,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DPUNCTAVIEW_H

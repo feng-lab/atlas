@@ -1,5 +1,4 @@
-#ifndef ZANALYSISWORKLISTMODEL_H
-#define ZANALYSISWORKLISTMODEL_H
+#pragma once
 
 #include "zgenerateanalysistextfile.h"
 #include <QAbstractTableModel>
@@ -62,4 +61,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZANALYSISWORKLISTMODEL_H

@@ -1,5 +1,4 @@
-#ifndef ZIMGFREEIMAGE_H
-#define ZIMGFREEIMAGE_H
+#pragma once
 
 #include "zimgformat.h"
 
@@ -48,4 +47,3 @@ public:
 
 } // namespace nim
 
-#endif // ZIMGFREEIMAGE_H

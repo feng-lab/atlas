@@ -1,5 +1,4 @@
-#ifndef ZIMGVOXELCOLORMAP
-#define ZIMGVOXELCOLORMAP
+#pragma once
 
 #include <QImage>
 
@@ -101,5 +100,4 @@ public:
 
 } // namespace nim
 
-#endif // ZIMGVOXELCOLORMAP
 

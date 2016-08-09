@@ -1,5 +1,4 @@
-#ifndef Z3DMAINWINDOW_H
-#define Z3DMAINWINDOW_H
+#pragma once
 
 #include <QMainWindow>
 
@@ -156,4 +155,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DMAINWINDOW_H

@@ -1,5 +1,4 @@
-#ifndef Z3DANIMATIONDOC_H
-#define Z3DANIMATIONDOC_H
+#pragma once
 
 #include "zobjdoc.h"
 #include "z3danimation.h"
@@ -117,4 +116,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DANIMATIONDOC_H

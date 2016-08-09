@@ -1,5 +1,4 @@
-#ifndef ZMESHUTILS_H
-#define ZMESHUTILS_H
+#pragma once
 
 #include "zmesh.h"
 
@@ -660,4 +659,3 @@ private:
 
 } // namespace nim
 
-#endif // ZMESHUTILS_H

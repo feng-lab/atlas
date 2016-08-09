@@ -1,5 +1,4 @@
-#ifndef ZCPUINFO_H
-#define ZCPUINFO_H
+#pragma once
 
 #include <QString>
 #include <cstdint>
@@ -79,5 +78,3 @@ public:
 };
 
 } // namespace nim
-
-#endif // ZCPUINFO_H

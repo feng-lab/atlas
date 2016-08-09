@@ -1,5 +1,4 @@
-#ifndef ZPUNCTADETECTION_H
-#define ZPUNCTADETECTION_H
+#pragma once
 
 #include <QList>
 #include "zimgprocess.h"
@@ -183,4 +182,3 @@ private:
 
 } // namespace nim
 
-#endif // ZPUNCTADETECTION_H

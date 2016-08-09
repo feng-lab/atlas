@@ -1,5 +1,4 @@
-#ifndef ZIMGJPEG_H
-#define ZIMGJPEG_H
+#pragma once
 
 #include "zimgformat.h"
 
@@ -50,4 +49,3 @@ public:
 
 } // namespace nim
 
-#endif // ZIMGJPEG_H

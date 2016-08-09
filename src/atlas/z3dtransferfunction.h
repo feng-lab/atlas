@@ -1,5 +1,4 @@
-#ifndef Z3DTRANSFERFUNCTION_H
-#define Z3DTRANSFERFUNCTION_H
+#pragma once
 
 #include "z3dgl.h"
 #include <QObject>
@@ -108,4 +107,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DTRANSFERFUNCTION_H

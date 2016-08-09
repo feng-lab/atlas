@@ -1,5 +1,4 @@
-#ifndef Z3DANIMATIONFILTER_H
-#define Z3DANIMATIONFILTER_H
+#pragma once
 
 #include <QObject>
 #include "z3dgeometryfilter.h"
@@ -113,4 +112,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DANIMATIONFILTER_H

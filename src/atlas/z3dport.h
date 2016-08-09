@@ -1,5 +1,4 @@
-#ifndef Z3DPORT_H
-#define Z3DPORT_H
+#pragma once
 
 #include "zlog.h"
 #include "z3dfilter.h"
@@ -326,4 +325,3 @@ protected:
 } // namespace nim
 
 
-#endif // Z3DPORT_H

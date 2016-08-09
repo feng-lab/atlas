@@ -1,5 +1,4 @@
-#ifndef ZROI_H
-#define ZROI_H
+#pragma once
 
 #include <QObject>
 #include <QPointF>
@@ -441,4 +440,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZROI_H

@@ -1,5 +1,4 @@
-#ifndef ZIMGPROCESS_H
-#define ZIMGPROCESS_H
+#pragma once
 
 #include "zimgalgorithm.h"
 
@@ -34,4 +33,3 @@ private:
 
 } // namespace nim
 
-#endif // ZIMGPROCESS_H

@@ -1,5 +1,4 @@
-#ifndef ZREGIONANNOTATIONFILTER_H
-#define ZREGIONANNOTATIONFILTER_H
+#pragma once
 
 #include "zobjfilter.h"
 #include "zregionannotation.h"
@@ -62,4 +61,3 @@ private:
 
 } // namespace nim
 
-#endif // ZREGIONANNOTATIONFILTER_H

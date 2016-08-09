@@ -1,5 +1,4 @@
-#ifndef ZCOMPLEXIMG_H
-#define ZCOMPLEXIMG_H
+#pragma once
 
 #include <complex>
 #include <vector>
@@ -103,4 +102,3 @@ private:
 
 } // namespace nim
 
-#endif // ZCOMPLEXIMG_H

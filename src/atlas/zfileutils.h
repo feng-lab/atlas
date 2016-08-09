@@ -1,5 +1,4 @@
-#ifndef ZFILEUTILS_H
-#define ZFILEUTILS_H
+#pragma once
 
 #include <QString>
 
@@ -17,4 +16,3 @@ public:
 
 } // namespace nim
 
-#endif // ZFILEUTILS_H

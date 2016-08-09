@@ -1,5 +1,4 @@
-#ifndef Z3DVOLUMERAYCASTERRENDERER_H
-#define Z3DVOLUMERAYCASTERRENDERER_H
+#pragma once
 
 #include "z3dprimitiverenderer.h"
 #include "z3dtransferfunction.h"
@@ -140,4 +139,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DVOLUMERAYCASTERRENDERER_H

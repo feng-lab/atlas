@@ -1,5 +1,4 @@
-#ifndef Z3DREGIONANNOTATIONVIEW_H
-#define Z3DREGIONANNOTATIONVIEW_H
+#pragma once
 
 #include "z3dfilterview.h"
 #include "zregionannotationdoc.h"
@@ -22,4 +21,3 @@ private:
 } // namespace nim
 
 
-#endif // Z3DREGIONANNOTATIONDOC_H

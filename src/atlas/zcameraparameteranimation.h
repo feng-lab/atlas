@@ -1,5 +1,4 @@
-#ifndef ZCAMERAPARAMETERANIMATION_H
-#define ZCAMERAPARAMETERANIMATION_H
+#pragma once
 
 #include "zparameteranimation.h"
 #include "z3dcameraparameter.h"
@@ -137,4 +136,3 @@ protected:
 
 } // namespace
 
-#endif // ZCAMERAPARAMETERANIMATION_H

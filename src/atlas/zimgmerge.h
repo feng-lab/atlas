@@ -1,5 +1,4 @@
-#ifndef ZIMGMERGE_H
-#define ZIMGMERGE_H
+#pragma once
 
 #include <QString>
 #include <map>
@@ -54,4 +53,3 @@ private:
 
 } // namespace nim
 
-#endif // ZIMGMERGE_H

@@ -1,5 +1,4 @@
-#ifndef ZREGIONANNOTATIONTREEMODEL_H
-#define ZREGIONANNOTATIONTREEMODEL_H
+#pragma once
 
 #include <QAbstractItemModel>
 #include <QModelIndex>
@@ -55,4 +54,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZREGIONANNOTATIONTREEMODEL_H

@@ -1,5 +1,4 @@
-#ifndef ZIMGNCCMATCH_H
-#define ZIMGNCCMATCH_H
+#pragma once
 
 #include "zimg.h"
 #include "zvoxelcoordinate.h"
@@ -194,4 +193,3 @@ Q_DECLARE_OPERATORS_FOR_FLAGS(ZImgNCCMatch::PositionHint)
 
 } // namespace nim
 
-#endif // ZIMGNCCMATCH_H

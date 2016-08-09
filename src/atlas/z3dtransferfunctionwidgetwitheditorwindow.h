@@ -1,5 +1,4 @@
-#ifndef Z3DTRANSFERFUNCTIONWIDGETWITHEDITORWINDOW_H
-#define Z3DTRANSFERFUNCTIONWIDGETWITHEDITORWINDOW_H
+#pragma once
 
 #include "zclickablelabel.h"
 
@@ -27,4 +26,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DTRANSFERFUNCTIONWIDGETWITHEDITORWINDOW_H

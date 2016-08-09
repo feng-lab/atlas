@@ -1,5 +1,4 @@
-#ifndef ZSPANSLIDER_H
-#define ZSPANSLIDER_H
+#pragma once
 
 #include "zspinbox.h"
 
@@ -91,4 +90,3 @@ private:
 
 } // namespace nim
 
-#endif // ZSPANSLIDER_H

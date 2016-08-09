@@ -1,5 +1,4 @@
-#ifndef ZEIGENUTILS_H
-#define ZEIGENUTILS_H
+#pragma once
 
 #include <cmath>
 #include <Eigen/Dense>
@@ -672,5 +671,3 @@ private:
 };
 
 } // namespace nim
-
-#endif // ZEIGENUTILS_H

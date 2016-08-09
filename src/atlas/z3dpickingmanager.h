@@ -1,5 +1,4 @@
-#ifndef Z3DPICKINGMANAGER_H
-#define Z3DPICKINGMANAGER_H
+#pragma once
 
 #include "zglmutils.h"
 #include <cstdint>
@@ -68,4 +67,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DPICKINGMANAGER_H

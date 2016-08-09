@@ -1,5 +1,4 @@
-#ifndef ZOBJDETAILEDINFOWIDGET_H
-#define ZOBJDETAILEDINFOWIDGET_H
+#pragma once
 
 #include <QWidget>
 #include <QStackedWidget>
@@ -50,4 +49,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZOBJDETAILEDINFOWIDGET_H

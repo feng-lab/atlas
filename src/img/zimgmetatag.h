@@ -1,5 +1,4 @@
-#ifndef ZIMGMETATAG_H
-#define ZIMGMETATAG_H
+#pragma once
 
 #include <vector>
 #include "zimginterface.h"
@@ -105,4 +104,3 @@ private:
 
 } // namespace
 
-#endif // ZIMGMETATAG_H

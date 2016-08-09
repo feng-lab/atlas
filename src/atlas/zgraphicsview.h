@@ -1,5 +1,4 @@
-#ifndef ZGRAPHICSVIEW_H
-#define ZGRAPHICSVIEW_H
+#pragma once
 
 #include <QGraphicsView>
 #include "zview.h"
@@ -89,4 +88,3 @@ private:
 
 } // namespace nim
 
-#endif // ZGRAPHICSVIEW_H

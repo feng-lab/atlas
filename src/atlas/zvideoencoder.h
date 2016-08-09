@@ -1,5 +1,4 @@
-#ifndef ZVIDEOENCODER_H
-#define ZVIDEOENCODER_H
+#pragma once
 
 #include <QObject>
 #include <QString>
@@ -44,4 +43,3 @@ private:
 
 } // namespace nim
 
-#endif // ZVIDEOENCODER_H

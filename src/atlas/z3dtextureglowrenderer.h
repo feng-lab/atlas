@@ -1,5 +1,4 @@
-#ifndef Z3DTEXTUREGLOWRENDERER_H
-#define Z3DTEXTUREGLOWRENDERER_H
+#pragma once
 
 #include "z3dprimitiverenderer.h"
 #include "z3dshaderprogram.h"
@@ -59,4 +58,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DTEXTUREGLOWRENDERER_H

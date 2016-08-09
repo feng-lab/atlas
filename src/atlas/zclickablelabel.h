@@ -1,5 +1,4 @@
-#ifndef ZCLICKABLELABEL_H
-#define ZCLICKABLELABEL_H
+#pragma once
 
 #include <QLabel>
 
@@ -103,4 +102,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZCLICKABLELABEL_H

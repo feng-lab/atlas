@@ -1,5 +1,4 @@
-#ifndef Z3DSHADER_H
-#define Z3DSHADER_H
+#pragma once
 
 #include <QString>
 #include "z3dcontext.h"
@@ -50,4 +49,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DSHADER_H

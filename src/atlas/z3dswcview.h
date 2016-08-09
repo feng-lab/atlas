@@ -1,5 +1,4 @@
-#ifndef Z3DSWCVIEW_H
-#define Z3DSWCVIEW_H
+#pragma once
 
 #include "z3dfilterview.h"
 #include "zswcdoc.h"
@@ -21,4 +20,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DSWCVIEW_H

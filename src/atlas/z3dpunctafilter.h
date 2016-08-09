@@ -1,5 +1,4 @@
-#ifndef Z3DPUNCTAFILTER1_H
-#define Z3DPUNCTAFILTER1_H
+#pragma once
 
 #include <QObject>
 #include "z3dgeometryfilter.h"
@@ -149,4 +148,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DPUNCTAFILTER1_H

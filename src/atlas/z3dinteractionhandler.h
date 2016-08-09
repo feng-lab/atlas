@@ -1,5 +1,4 @@
-#ifndef Z3DINTERACTIONHANDLER_H
-#define Z3DINTERACTIONHANDLER_H
+#pragma once
 
 #include "zeventlistenerparameter.h"
 #include "zglmutils.h"
@@ -194,4 +193,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DINTERACTIONHANDLER_H

@@ -1,5 +1,4 @@
-#ifndef Z3DTRANSFORMPARAMETER_H
-#define Z3DTRANSFORMPARAMETER_H
+#pragma once
 
 #include "zparameter.h"
 #include "zglmutils.h"
@@ -95,4 +94,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DTRANSFORMPARAMETER_H

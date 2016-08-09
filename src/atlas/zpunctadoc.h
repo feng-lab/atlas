@@ -1,5 +1,4 @@
-#ifndef ZPUNCTADOC_H
-#define ZPUNCTADOC_H
+#pragma once
 
 #include "zobjdoc.h"
 #include "zpuncta.h"
@@ -114,4 +113,3 @@ private:
 
 } // namespace nim
 
-#endif // ZPUNCTADOC_H

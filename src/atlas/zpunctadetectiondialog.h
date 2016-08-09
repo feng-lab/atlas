@@ -1,5 +1,4 @@
-#ifndef ZPUNCTADETECTIONDIALOG_H
-#define ZPUNCTADETECTIONDIALOG_H
+#pragma once
 
 #include <QDialog>
 #include <QGroupBox>
@@ -112,4 +111,3 @@ private:
 
 } // namespace nim
 
-#endif // ZPUNCTADETECTIONDIALOG_H

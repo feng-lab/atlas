@@ -1,5 +1,4 @@
-#ifndef ZSELECTFILEWIDGET_H
-#define ZSELECTFILEWIDGET_H
+#pragma once
 
 #include <QWidget>
 #include <QBoxLayout>
@@ -90,4 +89,3 @@ private:
 
 } // namespace nim
 
-#endif // ZSELECTFILEWIDGET_H

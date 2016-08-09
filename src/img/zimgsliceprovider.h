@@ -1,5 +1,4 @@
-#ifndef ZIMGSLICEPROVIDER
-#define ZIMGSLICEPROVIDER
+#pragma once
 
 #include "zimg.h"
 
@@ -18,5 +17,4 @@ public:
 
 } // namespace nim
 
-#endif // ZIMGSLICEPROVIDER
 

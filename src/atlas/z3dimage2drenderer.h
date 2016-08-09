@@ -1,5 +1,4 @@
-#ifndef Z3DIMAGE2DRENDERER_H
-#define Z3DIMAGE2DRENDERER_H
+#pragma once
 
 #include "z3dprimitiverenderer.h"
 #include "zmesh.h"
@@ -64,4 +63,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DIMAGE2DRENDERER_H

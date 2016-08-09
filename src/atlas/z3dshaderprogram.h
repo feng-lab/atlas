@@ -1,5 +1,4 @@
-#ifndef Z3DSHADERPROGRAM_H
-#define Z3DSHADERPROGRAM_H
+#pragma once
 
 #include "z3dtexture.h"
 #include "zglmutils.h"
@@ -626,4 +625,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DSHADERPROGRAM_H

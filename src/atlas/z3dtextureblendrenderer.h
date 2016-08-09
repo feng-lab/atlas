@@ -1,5 +1,4 @@
-#ifndef Z3DTEXTUREBLENDRENDERER_H
-#define Z3DTEXTUREBLENDRENDERER_H
+#pragma once
 
 #include "z3dprimitiverenderer.h"
 #include "z3dshaderprogram.h"
@@ -51,4 +50,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DTEXTUREBLENDRENDERER_H

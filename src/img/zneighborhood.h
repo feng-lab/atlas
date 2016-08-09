@@ -1,5 +1,4 @@
-#ifndef ZNEIGHBORHOOD_H
-#define ZNEIGHBORHOOD_H
+#pragma once
 
 #include "zvoxelcoordinate.h"
 #include <vector>
@@ -105,4 +104,3 @@ private:
 
 } // namespace nim
 
-#endif // ZNEIGHBORHOOD_H

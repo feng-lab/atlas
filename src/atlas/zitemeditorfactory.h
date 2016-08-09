@@ -1,5 +1,4 @@
-#ifndef ZITEMEDITORFACTORY_H
-#define ZITEMEDITORFACTORY_H
+#pragma once
 
 #include <QItemEditorFactory>
 
@@ -16,4 +15,3 @@ public:
 
 } // namespace nim
 
-#endif // ZITEMEDITORFACTORY_H

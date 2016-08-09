@@ -1,5 +1,4 @@
-#ifndef ZIMGREGISTRATION_H
-#define ZIMGREGISTRATION_H
+#pragma once
 
 #include "zimg.h"
 #include "zregistrationoptimizer.h"
@@ -60,4 +59,3 @@ private:
 
 } // namespace nim
 
-#endif // ZIMGREGISTRATION_H

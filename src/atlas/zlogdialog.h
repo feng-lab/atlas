@@ -23,8 +23,7 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 // OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef ZLOGDIALOG_H
-#define ZLOGDIALOG_H
+#pragma once
 
 #include "zlog.h"
 #include "zlogmodelsink.h"
@@ -84,4 +83,3 @@ private:
 
 }
 
-#endif // ZLOGDIALOG_H

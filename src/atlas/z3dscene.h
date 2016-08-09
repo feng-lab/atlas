@@ -1,5 +1,4 @@
-#ifndef Z3DSCENE_H
-#define Z3DSCENE_H
+#pragma once
 
 #include <QGraphicsScene>
 
@@ -31,4 +30,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DSCENE_H

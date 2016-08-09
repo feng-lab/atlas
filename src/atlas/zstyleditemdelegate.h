@@ -1,5 +1,4 @@
-#ifndef ZSTYLEDITEMDELEGATE_H
-#define ZSTYLEDITEMDELEGATE_H
+#pragma once
 
 #include <QStyledItemDelegate>
 #include "zitemeditorfactory.h"
@@ -43,4 +42,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZSTYLEDITEMDELEGATE_H

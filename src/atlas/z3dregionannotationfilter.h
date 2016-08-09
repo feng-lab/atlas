@@ -1,5 +1,4 @@
-#ifndef Z3DREGIONANNOTATIONFILTER_H
-#define Z3DREGIONANNOTATIONFILTER_H
+#pragma once
 
 
 #include "z3dmeshfilter.h"
@@ -77,4 +76,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DREGIONANNOTATIONFILTER_H

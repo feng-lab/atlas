@@ -1,5 +1,4 @@
-#ifndef ZSWC_H
-#define ZSWC_H
+#pragma once
 
 #include <QString>
 #include "ztree.hpp"
@@ -124,4 +123,3 @@ public:
 
 } // namespace nim
 
-#endif // ZSWC_H

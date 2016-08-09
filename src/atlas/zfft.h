@@ -1,5 +1,4 @@
-#ifndef ZFFT_H
-#define ZFFT_H
+#pragma once
 
 #include "zcompleximg.h"
 #include "zimg.h"
@@ -19,4 +18,3 @@ ZImg ifft(ZComplexImg& cimg, size_t width, size_t outWidth, size_t outHeight, si
 
 } // namespace nim
 
-#endif // ZFFT_H

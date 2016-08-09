@@ -1,5 +1,4 @@
-#ifndef ZIMG_HXX
-#define ZIMG_HXX
+#pragma once
 
 #include "zsaturateoperation.h"
 #include "zimg.h"
@@ -798,5 +797,3 @@ void ZImg::binarized_Impl(ZImg& res, const GenericForegroundPredictor& isForegro
 }
 
 } // namespace nim
-
-#endif // ZIMG_HXX

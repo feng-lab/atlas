@@ -1,5 +1,4 @@
-#ifndef Z3DLINEWITHFIXEDWIDTHCOLORRENDERER_H
-#define Z3DLINEWITHFIXEDWIDTHCOLORRENDERER_H
+#pragma once
 
 #include "z3dlinerenderer.h"
 
@@ -33,4 +32,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DLINEWITHFIXEDWIDTHCOLORRENDERER_H

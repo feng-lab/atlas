@@ -1,5 +1,4 @@
-#ifndef Z3DCAMERA_H
-#define Z3DCAMERA_H
+#pragma once
 
 #include "z3dgl.h"
 #include "zglmutils.h"
@@ -341,4 +340,3 @@ private:
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(nim::Z3DCamera::ResetCameraOptions)
 
-#endif // Z3DCAMERA_H

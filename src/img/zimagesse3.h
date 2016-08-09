@@ -1,5 +1,4 @@
-#ifndef ZIMAGESSE3_H
-#define ZIMAGESSE3_H
+#pragma once
 
 #include <cstddef>
 
@@ -51,4 +50,3 @@ void Image3DRowFilterForOneBlock_SSE3(const double* padImg,
 
 }
 
-#endif // ZIMAGESSE3_H

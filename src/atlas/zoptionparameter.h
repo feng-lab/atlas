@@ -1,5 +1,4 @@
-#ifndef ZOPTIONPARAMETER_H
-#define ZOPTIONPARAMETER_H
+#pragma once
 
 #include "zparameter.h"
 #include "zcombobox.h"
@@ -250,4 +249,3 @@ public:
 
 } // namespace nim
 
-#endif // ZOPTIONPARAMETER_H

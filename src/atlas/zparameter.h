@@ -1,5 +1,4 @@
-#ifndef ZPARAMETER_H
-#define ZPARAMETER_H
+#pragma once
 
 // Base class for all parameters that algorithms or renderers need.
 // A parameter can emit changed() signal while changed. And it has
@@ -287,4 +286,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZPARAMETER_H

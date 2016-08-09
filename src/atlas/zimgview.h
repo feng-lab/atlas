@@ -1,5 +1,4 @@
-#ifndef ZIMGVIEW_H
-#define ZIMGVIEW_H
+#pragma once
 
 #include <map>
 #include "zfilterview.h"
@@ -28,4 +27,3 @@ private:
 
 } // namespace nim
 
-#endif // ZIMGVIEW_H

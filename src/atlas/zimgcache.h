@@ -1,5 +1,4 @@
-#ifndef ZIMGCACHE_H
-#define ZIMGCACHE_H
+#pragma once
 
 #include <mutex>
 #include <QCache>
@@ -35,4 +34,3 @@ private:
 
 } // namespace
 
-#endif // ZIMGCACHE_H

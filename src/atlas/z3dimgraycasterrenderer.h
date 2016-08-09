@@ -1,5 +1,4 @@
-#ifndef Z3DIMGRAYCASTERRENDERER_H
-#define Z3DIMGRAYCASTERRENDERER_H
+#pragma once
 
 #include "z3dprimitiverenderer.h"
 #include "z3dtransferfunction.h"
@@ -146,4 +145,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DIMGRAYCASTERRENDERER_H

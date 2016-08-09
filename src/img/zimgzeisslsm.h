@@ -1,5 +1,4 @@
-#ifndef ZIMGZEISSLSM_H
-#define ZIMGZEISSLSM_H
+#pragma once
 
 #include "zimgtiff.h"
 #include <map>
@@ -222,4 +221,3 @@ protected:
 
 } // namespace
 
-#endif // ZIMGZEISSLSM_H

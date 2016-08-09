@@ -1,5 +1,4 @@
-#ifndef ZIMGFILTER_H
-#define ZIMGFILTER_H
+#pragma once
 
 #include "zobjfilter.h"
 #include <QList>
@@ -107,4 +106,3 @@ private:
 
 } // namespace nim
 
-#endif // ZIMGFILTER_H

@@ -1,5 +1,4 @@
-#ifndef ZTREE_HPP
-#define ZTREE_HPP
+#pragma once
 
 #include "zlog.h"
 #include <boost/iterator/iterator_facade.hpp>
@@ -1173,5 +1172,3 @@ protected:
 };
 
 }  // namespace nim
-
-#endif // ZTREE_HPP

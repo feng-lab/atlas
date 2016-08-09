@@ -1,5 +1,4 @@
-#ifndef Z3DCONTEXT_H
-#define Z3DCONTEXT_H
+#pragma once
 
 class QOpenGLContextGroup;
 
@@ -28,4 +27,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DCONTEXT_H

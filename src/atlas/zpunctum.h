@@ -1,5 +1,4 @@
-#ifndef ZPUNCTUM_H
-#define ZPUNCTUM_H
+#pragma once
 
 #include <QString>
 #include "zeigenutils.h"
@@ -294,4 +293,3 @@ ZPunctum ZPunctum::merge(InputIterator first, InputIterator last, double conf)
 
 } // namespace nim
 
-#endif // ZPUNCTUM_H

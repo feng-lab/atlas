@@ -1,5 +1,4 @@
-#ifndef ZREGIONANNOTATIONDOC_H
-#define ZREGIONANNOTATIONDOC_H
+#pragma once
 
 #include "zobjdoc.h"
 #include "zregionannotation.h"
@@ -121,4 +120,3 @@ private:
 
 } // namespace nim
 
-#endif // ZREGIONANNOTATIONDOC_H

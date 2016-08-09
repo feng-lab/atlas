@@ -1,5 +1,4 @@
-#ifndef ZSECTIONSREGISTRATION_H
-#define ZSECTIONSREGISTRATION_H
+#pragma once
 
 #include "zimgprocess.h"
 #include <map>
@@ -120,4 +119,3 @@ private:
 
 } // namespace nim
 
-#endif // ZSECTIONSREGISTRATION_H

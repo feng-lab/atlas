@@ -1,5 +1,4 @@
-#ifndef Z3DTRANSFERFUNCTIONEDITOR_H
-#define Z3DTRANSFERFUNCTIONEDITOR_H
+#pragma once
 
 #include "zglmutils.h"
 #include <QWidget>
@@ -192,4 +191,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DTRANSFERFUNCTIONEDITOR_H

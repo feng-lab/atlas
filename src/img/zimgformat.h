@@ -1,5 +1,4 @@
-#ifndef ZIMGFORMAT_H
-#define ZIMGFORMAT_H
+#pragma once
 
 #include <QStringList>
 #include "zimginfo.h"
@@ -110,4 +109,3 @@ protected:
 
 } // namespace
 
-#endif // ZIMGFORMAT_H

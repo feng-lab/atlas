@@ -1,5 +1,4 @@
-#ifndef ZSTITCHIMAGEDIALOG_H
-#define ZSTITCHIMAGEDIALOG_H
+#pragma once
 
 #include <QDialog>
 #include <QList>
@@ -277,4 +276,3 @@ private:
 
 } // namespace nim
 
-#endif // ZSTITCHIMAGEDIALOG_H

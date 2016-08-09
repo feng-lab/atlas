@@ -1,5 +1,4 @@
-#ifndef ZBOOSTGEOMETRYADAPTOR_H
-#define ZBOOSTGEOMETRYADAPTOR_H
+#pragma once
 
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/point_xy.hpp>
@@ -102,4 +101,3 @@ struct access<nim::ZVoxelCoordinate, I>
 }}}
 #endif
 
-#endif // ZBOOSTGEOMETRYADAPTOR_H

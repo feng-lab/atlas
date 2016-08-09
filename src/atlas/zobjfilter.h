@@ -1,5 +1,4 @@
-#ifndef ZOBJFILTER_H
-#define ZOBJFILTER_H
+#pragma once
 
 #include <QObject>
 #include <QList>
@@ -86,4 +85,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZOBJFILTER_H

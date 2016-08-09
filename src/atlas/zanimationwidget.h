@@ -1,5 +1,4 @@
-#ifndef ZANIMATIONWIDGET_H
-#define ZANIMATIONWIDGET_H
+#pragma once
 
 #include <QWidget>
 #include "zanimation.h"
@@ -75,4 +74,3 @@ private:
 
 } // namespace nim
 
-#endif // ZANIMATIONWIDGET_H

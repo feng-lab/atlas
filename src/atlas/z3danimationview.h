@@ -1,5 +1,4 @@
-#ifndef Z3DANIMATIONVIEW_H
-#define Z3DANIMATIONVIEW_H
+#pragma once
 
 #include "z3dfilterview.h"
 #include "z3danimationdoc.h"
@@ -21,4 +20,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DANIMATIONVIEW_H

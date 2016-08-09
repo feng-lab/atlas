@@ -1,5 +1,4 @@
-#ifndef ZGENERATEANALYSISTEXTFILE_H
-#define ZGENERATEANALYSISTEXTFILE_H
+#pragma once
 
 #include "zimginterface.h"
 #include <map>
@@ -191,4 +190,3 @@ private:
 
 } // namespace nim
 
-#endif // ZGENERATEANALYSISTEXTFILE_H

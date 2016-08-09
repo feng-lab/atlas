@@ -1,5 +1,4 @@
-#ifndef ZSHAREITEMSELECTIONMODEL_H
-#define ZSHAREITEMSELECTIONMODEL_H
+#pragma once
 
 #include <QItemSelectionModel>
 
@@ -42,4 +41,3 @@ private:
 
 } // namespace nim
 
-#endif // ZSHAREITEMSELECTIONMODEL_H

@@ -1,5 +1,4 @@
-#ifndef ZIMGPNG_H
-#define ZIMGPNG_H
+#pragma once
 
 #include "zimgformat.h"
 
@@ -40,4 +39,3 @@ public:
 
 } // namespace
 
-#endif // ZIMGPNG_H

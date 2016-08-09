@@ -1,5 +1,4 @@
-#ifndef Z3DGL_H
-#define Z3DGL_H
+#pragma once
 
 #include <glbinding/gl/gl.h>
 
@@ -43,4 +42,3 @@ bool checkGLState(GLenum pname, const glm::vec4 value);
 
 } // namespace nim
 
-#endif  //Z3DGL_H

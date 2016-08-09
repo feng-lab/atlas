@@ -1,5 +1,4 @@
-#ifndef ZTIFF_H
-#define ZTIFF_H
+#pragma once
 
 #include <vector>
 #include <cstdint>
@@ -289,4 +288,3 @@ private:
 
 } // namespace
 
-#endif // ZTIFF_H

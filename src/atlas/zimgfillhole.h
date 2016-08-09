@@ -1,5 +1,4 @@
-#ifndef ZIMGFILLHOLE_H
-#define ZIMGFILLHOLE_H
+#pragma once
 
 #include "zimg.h"
 #include "zimgalgorithm.h"
@@ -36,4 +35,3 @@ private:
 };
 
 } // namespace nim
-#endif // ZIMGFILLHOLE_H

@@ -1,5 +1,4 @@
-#ifndef ZREGIONANNOTATION_H
-#define ZREGIONANNOTATION_H
+#pragma once
 
 #include "zglobal.h"
 #include <map>
@@ -137,4 +136,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZREGIONANNOTATION_H

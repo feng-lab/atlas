@@ -1,5 +1,4 @@
-#ifndef ZFONTPARAMETER_H
-#define ZFONTPARAMETER_H
+#pragma once
 
 #include <QObject>
 #include <QFont>
@@ -40,4 +39,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZFONTPARAMETER_H

@@ -1,5 +1,4 @@
-#ifndef ZSTRINGPARAMETER_H
-#define ZSTRINGPARAMETER_H
+#pragma once
 
 #include "zparameter.h"
 
@@ -40,4 +39,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZSTRINGPARAMETER_H

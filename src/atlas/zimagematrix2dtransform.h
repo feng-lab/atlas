@@ -1,5 +1,4 @@
-#ifndef ZIMAGEMATRIX2DTRANSFORM_H
-#define ZIMAGEMATRIX2DTRANSFORM_H
+#pragma once
 
 #include "zimagetransform.h"
 #include "zaffine2d.h"
@@ -180,4 +179,3 @@ void image2DResize_Old(const TPixel* img, size_t width, size_t height,
 
 } // namespace nim
 
-#endif // ZIMAGEMATRIX2DTRANSFORM_H

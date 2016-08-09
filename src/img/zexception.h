@@ -1,5 +1,4 @@
-#ifndef ZEXCEPTION_H
-#define ZEXCEPTION_H
+#pragma once
 
 #include <string>
 #include <QString>
@@ -90,5 +89,3 @@ public:
 };
 
 }
-
-#endif // ZEXCEPTION_H

@@ -1,5 +1,4 @@
-#ifndef Z3DBACKGROUNDRENDERER_H
-#define Z3DBACKGROUNDRENDERER_H
+#pragma once
 
 #include "z3dprimitiverenderer.h"
 
@@ -32,7 +31,7 @@ protected:
 
   QString generateHeader();
 
-#ifndef _USE_CORE_PROFILE_
+#ifndef ATLAS_USE_CORE_PROFILE
   virtual void renderUsingOpengl() override;
   virtual void renderPickingUsingOpengl() override;
 #endif
@@ -57,4 +56,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DBACKGROUNDRENDERER_H

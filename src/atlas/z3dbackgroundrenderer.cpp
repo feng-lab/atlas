@@ -81,7 +81,7 @@ QString Z3DBackgroundRenderer::generateHeader()
   return headerSource;
 }
 
-#ifndef _USE_CORE_PROFILE_
+#ifndef ATLAS_USE_CORE_PROFILE
 void Z3DBackgroundRenderer::renderUsingOpengl()
 {
   glMatrixMode(GL_PROJECTION);

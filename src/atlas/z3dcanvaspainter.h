@@ -1,5 +1,4 @@
-#ifndef Z3DCANVASPAINTER_H
-#define Z3DCANVASPAINTER_H
+#pragma once
 
 #include "z3dboundedfilter.h"
 #include "znumericparameter.h"
@@ -83,4 +82,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DCANVASPAINTER_H

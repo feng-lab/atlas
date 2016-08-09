@@ -1,5 +1,4 @@
-#ifndef ZSTITCHIMAGEDIALOG_H
-#define ZSTITCHIMAGEDIALOG_H
+#pragma once
 
 #include <QDialog>
 #include <QList>
@@ -297,4 +296,3 @@ private:
 
 };
 
-#endif // ZSTITCHIMAGEDIALOG_H

@@ -1,5 +1,4 @@
-#ifndef Z3DVOLUMEFILTER_H
-#define Z3DVOLUMEFILTER_H
+#pragma once
 
 #include "z3dboundedfilter.h"
 
@@ -232,4 +231,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DVOLUMEFILTER_H

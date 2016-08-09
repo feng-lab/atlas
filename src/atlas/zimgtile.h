@@ -1,5 +1,4 @@
-#ifndef ZIMGTILE_H
-#define ZIMGTILE_H
+#pragma once
 
 #include "zimg.h"
 #include "zbbox.h"
@@ -53,4 +52,3 @@ private:
 } // namespace nim
 
 
-#endif // ZIMGTILE_H

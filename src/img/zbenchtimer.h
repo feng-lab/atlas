@@ -1,5 +1,4 @@
-#ifndef ZBENCHTIMER_H
-#define ZBENCHTIMER_H
+#pragma once
 
 #if defined(_WIN32) || defined(_WIN64)
 #include "zwindowsheader.h"
@@ -176,5 +175,3 @@ QDebug operator<<(QDebug s, const ZBenchTimer& m);
 #endif
 
 } // namespace nim
-
-#endif // ZBENCHTIMER_H

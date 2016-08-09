@@ -1,5 +1,4 @@
-#ifndef ZOBJMODEL_H
-#define ZOBJMODEL_H
+#pragma once
 
 #include <QAbstractItemModel>
 #include <QModelIndex>
@@ -134,4 +133,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZOBJMODEL_H

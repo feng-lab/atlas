@@ -10,9 +10,9 @@
 #include <itkNrrdImageIOFactory.h>
 #include <itkImageIOFactory.h>
 
-//#define _SUPPORT_DICOM_
+//#define ATLAS_SUPPORT_DICOM
 
-#ifdef _SUPPORT_DICOM_
+#ifdef ATLAS_SUPPORT_DICOM
 #include <itkGDCMImageIOFactory.h>
 #endif
 
@@ -24,7 +24,7 @@ ZImgITKImage::ZImgITKImage()
   if (itk::ObjectFactoryBase::GetRegisteredFactories().empty()) {
     itk::NiftiImageIOFactory::RegisterOneFactory();
     itk::NrrdImageIOFactory::RegisterOneFactory();
-#ifdef _SUPPORT_DICOM_
+#ifdef ATLAS_SUPPORT_DICOM
     itk::GDCMImageIOFactory::RegisterOneFactory();
 #endif
   }
@@ -71,7 +71,7 @@ QStringList ZImgITKImage::extensions() const
     }
     ++itr;
   }
-#ifdef _SUPPORT_DICOM_
+#ifdef ATLAS_SUPPORT_DICOM
   res.push_back("dcm");
 #endif
 

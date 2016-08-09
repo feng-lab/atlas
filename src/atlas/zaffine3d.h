@@ -1,5 +1,4 @@
-#ifndef ZAFFINE3D_H
-#define ZAFFINE3D_H
+#pragma once
 
 #include "zeigenutils.h"
 
@@ -142,4 +141,3 @@ private:
 
 } // namespace nim
 
-#endif // ZAFFINE3D_H

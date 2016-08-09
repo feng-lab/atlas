@@ -1,5 +1,4 @@
-#ifndef ZGMM_H
-#define ZGMM_H
+#pragma once
 
 #include "zkmeans.h"
 
@@ -793,4 +792,3 @@ private:
 
 } // namespace nim
 
-#endif // ZGMM_H

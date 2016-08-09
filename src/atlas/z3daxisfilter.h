@@ -1,5 +1,4 @@
-#ifndef Z3DAXISFILTER_H
-#define Z3DAXISFILTER_H
+#pragma once
 
 #include <QObject>
 #include "z3dgeometryfilter.h"
@@ -69,4 +68,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DAXISFILTER_H

@@ -1,5 +1,4 @@
-#ifndef ZIMGTIFF_H
-#define ZIMGTIFF_H
+#pragma once
 
 #include "zimgformat.h"
 #include <vector>
@@ -102,4 +101,3 @@ private:
 
 } // namespace
 
-#endif // ZIMGTIFF_H

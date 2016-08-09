@@ -1,5 +1,4 @@
-#ifndef Z3DCAMERACONTROLWIDGET_H
-#define Z3DCAMERACONTROLWIDGET_H
+#pragma once
 
 #include <QWidget>
 #include "z3dcameraparameter.h"
@@ -38,4 +37,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DCAMERACONTROLWIDGET_H

@@ -1,5 +1,4 @@
-#ifndef ZSTRINGUTILS_H
-#define ZSTRINGUTILS_H
+#pragma once
 
 #include <QString>
 
@@ -18,4 +17,3 @@ void removeComment(QString& line, const QString& commentStart = "#", bool checkS
 
 } // namespace nim
 
-#endif // ZSTRINGUTILS_H

@@ -1,5 +1,4 @@
-#ifndef ZIMGNCC_H
-#define ZIMGNCC_H
+#pragma once
 
 #include "zimg.h"
 
@@ -40,4 +39,3 @@ void cropOverlapSubImg(const ZImg& fixedImgIn, const ZImg& movingImgIn, const ZV
 
 } // namespace nim
 
-#endif // ZIMGNCC_H

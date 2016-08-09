@@ -1,5 +1,4 @@
-#ifndef Z3DLINERENDERER_H
-#define Z3DLINERENDERER_H
+#pragma once
 
 #include "z3dprimitiverenderer.h"
 #include "z3dgpuinfo.h"
@@ -64,7 +63,7 @@ protected:
 
   virtual std::vector<glm::vec4>* lineColors();
 
-#ifndef _USE_CORE_PROFILE_
+#ifndef ATLAS_USE_CORE_PROFILE
   virtual void renderUsingOpengl() override;
   virtual void renderPickingUsingOpengl() override;
 #endif
@@ -144,4 +143,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DLINERENDERER_H

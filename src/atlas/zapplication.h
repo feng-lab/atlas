@@ -2,8 +2,7 @@
 // Created by Linqing Feng on 8/5/16.
 //
 
-#ifndef ATLAS_ZAPPLICATION_H
-#define ATLAS_ZAPPLICATION_H
+#pragma once
 
 #include <QApplication>
 
@@ -20,4 +19,3 @@ public:
 
 } // namespace nim
 
-#endif //ATLAS_ZAPPLICATION_H

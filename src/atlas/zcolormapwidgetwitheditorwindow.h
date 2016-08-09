@@ -1,5 +1,4 @@
-#ifndef ZCOLORMAPWIDGETWITHEDITORWINDOW_H
-#define ZCOLORMAPWIDGETWITHEDITORWINDOW_H
+#pragma once
 
 #include "zclickablelabel.h"
 
@@ -29,4 +28,3 @@ private:
 
 } // namespace nim
 
-#endif // ZCOLORMAPWIDGETWITHEDITORWINDOW_H

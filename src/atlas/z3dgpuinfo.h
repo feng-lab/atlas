@@ -1,5 +1,4 @@
-#ifndef Z3DGPUINFO_H
-#define Z3DGPUINFO_H
+#pragma once
 
 #include <QString>
 #include <cstdint>
@@ -271,4 +270,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DGPUINFO_H

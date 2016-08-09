@@ -1,5 +1,4 @@
-#ifndef ZSYSTEMINFO_H
-#define ZSYSTEMINFO_H
+#pragma once
 
 #include <QString>
 #include <QDir>
@@ -81,4 +80,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZSYSTEMINFO_H

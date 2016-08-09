@@ -1,5 +1,4 @@
-#ifndef ZIMGAUTOTHRESHOLD_H
-#define ZIMGAUTOTHRESHOLD_H
+#pragma once
 
 #include "zimgalgorithm.h"
 #include "zimg.h"
@@ -57,4 +56,3 @@ private:
 
 } // namespace nim
 
-#endif // ZIMGAUTOTHRESHOLD_H

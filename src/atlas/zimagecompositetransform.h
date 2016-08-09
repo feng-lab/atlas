@@ -1,5 +1,4 @@
-#ifndef ZIMAGECOMPOSITETRANSFORM_H
-#define ZIMAGECOMPOSITETRANSFORM_H
+#pragma once
 
 #include "zimagetransform.h"
 #include <deque>
@@ -46,4 +45,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZIMAGECOMPOSITETRANSFORM_H

@@ -1,5 +1,4 @@
-#ifndef Z3DSHADERMANAGER_H
-#define Z3DSHADERMANAGER_H
+#pragma once
 
 #include <map>
 #include <QString>
@@ -41,4 +40,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DSHADERMANAGER_H

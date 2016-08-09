@@ -1,5 +1,4 @@
-#ifndef ZTIMELINEEVENTSCENE_H
-#define ZTIMELINEEVENTSCENE_H
+#pragma once
 
 #include <QGraphicsScene>
 #include <QPixmap>
@@ -123,4 +122,3 @@ private:
 } // namespace nim
 
 
-#endif // ZTIMELINEEVENTSCENE_H

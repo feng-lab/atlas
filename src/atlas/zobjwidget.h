@@ -1,5 +1,4 @@
-#ifndef ZOBJWIDGET_H
-#define ZOBJWIDGET_H
+#pragma once
 
 #include <QTreeView>
 
@@ -45,4 +44,3 @@ private:
 
 } // namespace nim
 
-#endif // ZOBJWIDGET_H

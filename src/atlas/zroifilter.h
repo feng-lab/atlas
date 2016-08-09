@@ -1,5 +1,4 @@
-#ifndef ZROIFILTER_H
-#define ZROIFILTER_H
+#pragma once
 
 #include "zobjfilter.h"
 #include <QList>
@@ -172,4 +171,3 @@ private:
 
 } // namespace nim
 
-#endif // ZROIFILTER_H

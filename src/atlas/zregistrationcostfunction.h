@@ -1,5 +1,4 @@
-#ifndef ZREGISTRATIONCOSTFUNCTION_H
-#define ZREGISTRATIONCOSTFUNCTION_H
+#pragma once
 
 #include "zimagetransform.h"
 #include "zimg.h"
@@ -41,4 +40,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZREGISTRATIONCOSTFUNCTION_H

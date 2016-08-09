@@ -1,5 +1,4 @@
-#ifndef ZTIMELINEEVENTVIEW_H
-#define ZTIMELINEEVENTVIEW_H
+#pragma once
 
 #include <QGraphicsView>
 #include "ztimelinewidget.h"
@@ -25,4 +24,3 @@ private:
 } // namespace nim
 
 
-#endif // ZTIMELINEEVENTVIEW_H

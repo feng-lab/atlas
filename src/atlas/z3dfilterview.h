@@ -1,5 +1,4 @@
-#ifndef Z3DFILTERVIEW_H
-#define Z3DFILTERVIEW_H
+#pragma once
 
 #include "z3dobjview.h"
 
@@ -166,4 +165,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DFILTERVIEW_H

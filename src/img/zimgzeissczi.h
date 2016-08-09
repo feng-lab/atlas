@@ -1,5 +1,4 @@
-#ifndef ZIMGZEISSCZI_H
-#define ZIMGZEISSCZI_H
+#pragma once
 
 #include "zimgformat.h"
 #include <type_traits>
@@ -339,4 +338,3 @@ private:
 
 } // namespace
 
-#endif // ZIMGZEISSCZI_H

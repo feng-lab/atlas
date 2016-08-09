@@ -1,5 +1,4 @@
-#ifndef ZANIMATION_H
-#define ZANIMATION_H
+#pragma once
 
 #include <QObject>
 #include <map>
@@ -205,4 +204,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZANIMATION_H

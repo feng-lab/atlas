@@ -1,5 +1,4 @@
-#ifndef Z3DMESHRENDERER_H
-#define Z3DMESHRENDERER_H
+#pragma once
 
 #include "z3dprimitiverenderer.h"
 #include "zmesh.h"
@@ -47,7 +46,7 @@ protected:
 
   QString generateHeader();
 
-#ifndef _USE_CORE_PROFILE_
+#ifndef ATLAS_USE_CORE_PROFILE
   virtual void renderUsingOpengl() override;
   virtual void renderPickingUsingOpengl() override;
 #endif
@@ -103,4 +102,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DMESHRENDERER_H

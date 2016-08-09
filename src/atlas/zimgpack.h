@@ -1,5 +1,4 @@
-#ifndef ZIMGPACK_H
-#define ZIMGPACK_H
+#pragma once
 
 #include "zimg.h"
 #include <tuple>
@@ -279,4 +278,3 @@ private:
 
 } // namespace
 
-#endif // ZIMGPACK_H

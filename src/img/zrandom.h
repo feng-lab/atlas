@@ -1,5 +1,4 @@
-#ifndef ZRANDOM_H
-#define ZRANDOM_H
+#pragma once
 
 #include <random>
 #include <algorithm>
@@ -99,5 +98,3 @@ private:
 };
 
 } // namespace nim
-
-#endif // ZRANDOM_H

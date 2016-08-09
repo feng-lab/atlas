@@ -57,7 +57,7 @@ CONFIG += with_tests
 DEFINES *= QT_USE_QSTRINGBUILDER
 DEFINES += QT_NO_CAST_FROM_BYTEARRAY
 DEFINES += QT_NO_CAST_TO_ASCII
-DEFINES += _USE_CORE_PROFILE_
+DEFINES += ATLAS_USE_CORE_PROFILE
 
 FORMS   += LogDialog.ui
 RESOURCES += LogDialog.qrc
@@ -509,7 +509,7 @@ contains(CONFIG, use_glog) {
 }
 
 contains(CONFIG, with_tests) {
-    DEFINES += _WITH_TESTS_
+    DEFINES += ATLAS_WITH_TESTS
     include($$PWD/../3rdparty/googletest.pri)
 
     HEADERS += \
@@ -542,7 +542,7 @@ macx {
     SOURCES += $$PWD/../3rdparty/sys/VideoMemoryMac.cpp
 
 exists(/opt/intel/mkl/include) {
-    DEFINES += _USE_MKL_
+    DEFINES += ATLAS_USE_MKL
     MKLPath = /opt/intel/mkl
     INCLUDEPATH += $$MKLPath/include $$MKLPath/include/fftw
     LIBS += $$MKLPath/lib/libmkl_intel_lp64.a $$MKLPath/lib/libmkl_intel_thread.a $$MKLPath/lib/libmkl_core.a \
@@ -557,7 +557,7 @@ exists(/opt/intel/mkl/include) {
 }
 
 exists(/opt/intel/ipp/include) {
-    DEFINES += _USE_IPP_
+    DEFINES += ATLAS_USE_IPP
     IPPPath = /opt/intel/ipp
     INCLUDEPATH += $$IPPPath/include
     LIBS += $$IPPPath/lib/libippi.a $$IPPPath/lib/libippcore.a $$IPPPath/lib/libippvm.a $$IPPPath/lib/libipps.a $$IPPPath/lib/libippcv.a $$IPPPath/lib/libippcc.a \
@@ -648,12 +648,12 @@ win32 {
         3rdparty/sys/VidMemViaDDraw.cpp \
         3rdparty/sys/VidMemViaDxDiag.cpp
 
-    DEFINES += _USE_MKL_
+    DEFINES += ATLAS_USE_MKL
     MKLPath = "C:\Program Files (x86)\Intel\Composer XE\mkl"
     INCLUDEPATH += $$MKLPath\include $$MKLPath\include\fftw
     LIBS += $$MKLPath\lib\intel64\mkl_intel_lp64.lib $$MKLPath\lib\intel64\mkl_intel_thread.lib $$MKLPath\lib\intel64\mkl_core.lib
 
-    DEFINES += _USE_IPP_
+    DEFINES += ATLAS_USE_IPP
     IPPPath = "C:\Program Files (x86)\Intel\Composer XE\ipp"
     INCLUDEPATH += $$IPPPath\include
     LIBS += -L$$IPPPath\lib\intel64 ippimt.lib ippcoremt.lib ippvmmt.lib ippsmt.lib ippcvmt.lib ippccmt.lib

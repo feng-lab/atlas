@@ -1,5 +1,4 @@
-#ifndef ZREGIONANNOTATIONTREEVIEW_H
-#define ZREGIONANNOTATIONTREEVIEW_H
+#pragma once
 
 #include <QTreeView>
 #include "zregionannotationtreemodel.h"
@@ -45,4 +44,3 @@ private:
 
 } // namespace nim
 
-#endif // ZREGIONANNOTATIONTREEVIEW_H

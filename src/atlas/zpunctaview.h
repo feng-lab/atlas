@@ -1,5 +1,4 @@
-#ifndef ZPUNCTAVIEW_H
-#define ZPUNCTAVIEW_H
+#pragma once
 
 #include <map>
 #include "zfilterview.h"
@@ -22,4 +21,3 @@ private:
 
 } // namespace nim
 
-#endif // ZPUNCTAVIEW_H

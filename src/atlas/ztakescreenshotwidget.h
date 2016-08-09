@@ -1,5 +1,4 @@
-#ifndef ZTAKESCREENSHOTWIDGET_H
-#define ZTAKESCREENSHOTWIDGET_H
+#pragma once
 
 #include "z3dgl.h"
 #include <QWidget>
@@ -98,4 +97,3 @@ private:
 
 } // namespace nim
 
-#endif // ZTAKESCREENSHOTWIDGET_H

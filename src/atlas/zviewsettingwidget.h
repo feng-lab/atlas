@@ -1,5 +1,4 @@
-#ifndef ZVIEWSETTINGWIDGET_H
-#define ZVIEWSETTINGWIDGET_H
+#pragma once
 
 #include <QWidget>
 #include <QStackedWidget>
@@ -53,4 +52,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZVIEWSETTINGWIDGET_H

@@ -1,5 +1,4 @@
-#ifndef ZIMGMETAIMAGE_H
-#define ZIMGMETAIMAGE_H
+#pragma once
 
 #include "zimgformat.h"
 
@@ -51,4 +50,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZIMGMETAIMAGE_H

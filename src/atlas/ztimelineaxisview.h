@@ -1,5 +1,4 @@
-#ifndef ZTIMELINEAXISVIEW_H
-#define ZTIMELINEAXISVIEW_H
+#pragma once
 
 #include <QGraphicsView>
 #include <QGraphicsScene>
@@ -44,4 +43,3 @@ private:
 };
 
 } // namespace nim
-#endif // ZTIMELINEAXISVIEW_H

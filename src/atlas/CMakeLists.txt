@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.5.2)
 project(Atlas)
+set(ATLAS_VERSION 0.7.0)
 
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 14)
@@ -216,7 +217,7 @@ set(RESOURCES
 
 option(BUILD_TESTING "Enable tests" ON)
 if (BUILD_TESTING)
-  add_definitions(-D_WITH_TESTS_)
+  add_definitions(-DATLAS_WITH_TESTS)
   set(TESTS
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc
       test/zimggraphtest.h
@@ -701,7 +702,7 @@ target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
 target_compile_definitions(${APP_NAME} PUBLIC EIGEN_NO_DEBUG EIGEN_DONT_PARALLELIZE EIGEN_MPL2_ONLY)
 target_compile_definitions(${APP_NAME} PUBLIC EIGEN_USE_BLAS EIGEN_USE_LAPACKE_STRICT EIGEN_USE_MKL_VML)
 target_compile_definitions(${APP_NAME} PUBLIC QT_USE_QSTRINGBUILDER QT_NO_CAST_FROM_BYTEARRAY QT_NO_CAST_TO_ASCII)
-target_compile_definitions(${APP_NAME} PUBLIC _USE_CORE_PROFILE_ _USE_MKL_ _USE_IPP_)
+target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_CORE_PROFILE ATLAS_USE_MKL ATLAS_USE_IPP)
 if (WIN32)
   target_compile_definitions(${APP_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN)
 
@@ -750,8 +751,8 @@ if (APPLE)
   set_target_properties(${APP_NAME} PROPERTIES
                         OUTPUT_NAME "${APP_NAME}"
                         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Info.plist.in"
-                        MACOSX_BUNDLE_SHORT_VERSION_STRING "${CMAKE_BUNDLE_VERSION}"
-                        # TBD: MACOSX_BUNDLE_BUNDLE_VERSION "${CMAKE_BUNDLE_VERSION}"
+                        MACOSX_BUNDLE_SHORT_VERSION_STRING "${ATLAS_VERSION}"
+                        # TBD: MACOSX_BUNDLE_BUNDLE_VERSION "${ATLAS_VERSION}"
                         MACOSX_BUNDLE_COPYRIGHT "${copyright_line}"
                         MACOSX_BUNDLE_GUI_IDENTIFIER "org.atlas.Atlas"
                         )

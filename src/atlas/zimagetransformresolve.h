@@ -1,5 +1,4 @@
-#ifndef ZIMAGETRANSFORMRESOLVE_H
-#define ZIMAGETRANSFORMRESOLVE_H
+#pragma once
 
 #include <QString>
 #include <map>
@@ -32,4 +31,3 @@ private:
 
 } // namespace nim
 
-#endif // ZIMAGETRANSFORMRESOLVE_H

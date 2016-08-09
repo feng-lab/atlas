@@ -1,5 +1,4 @@
-#ifndef Z3DTEXTUREANDEYECOORDINATERENDERER_H
-#define Z3DTEXTUREANDEYECOORDINATERENDERER_H
+#pragma once
 
 
 #include "z3dprimitiverenderer.h"
@@ -43,4 +42,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DTEXTUREANDEYECOORDINATERENDERER_H

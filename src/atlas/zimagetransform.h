@@ -1,5 +1,4 @@
-#ifndef ZIMAGETRANSFORM_H
-#define ZIMAGETRANSFORM_H
+#pragma once
 
 #include <vector>
 
@@ -285,4 +284,3 @@ void ZImageTransform::transformImage(const TPixel* Iin, size_t width, size_t hei
 
 } // namespace nim
 
-#endif // ZIMAGETRANSFORM_H

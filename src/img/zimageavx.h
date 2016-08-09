@@ -1,5 +1,4 @@
-#ifndef ZIMAGEAVX_H
-#define ZIMAGEAVX_H
+#pragma once
 
 #include <cstddef>
 
@@ -50,5 +49,3 @@ void Image3DRowFilterForOneBlock_AVX(const double* padImg,
                                      size_t rangeEnd);
 
 }
-
-#endif // ZIMAGEAVX_H

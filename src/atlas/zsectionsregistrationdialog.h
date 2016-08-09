@@ -1,5 +1,4 @@
-#ifndef ZSECTIONSREGISTRATIONDIALOG_H
-#define ZSECTIONSREGISTRATIONDIALOG_H
+#pragma once
 
 #include <QDialog>
 #include <QGroupBox>
@@ -106,4 +105,3 @@ private:
 
 } // namespace nim
 
-#endif // ZSECTIONSREGISTRATIONDIALOG_H

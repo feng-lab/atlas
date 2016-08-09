@@ -1,5 +1,4 @@
-#ifndef ZLOADIMAGESEQUENCEDIALOG_H
-#define ZLOADIMAGESEQUENCEDIALOG_H
+#pragma once
 
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -25,4 +24,3 @@ private:
 
 } // namespace nim
 
-#endif // ZLOADIMAGESEQUENCEDIALOG_H

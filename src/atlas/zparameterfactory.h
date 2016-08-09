@@ -1,5 +1,4 @@
-#ifndef ZPARAMETERFACTORY_H
-#define ZPARAMETERFACTORY_H
+#pragma once
 
 #include <QString>
 #include <QObject>
@@ -39,4 +38,3 @@ private:
 
 } // namespace nim
 
-#endif // ZPARAMETERFACTORY_H

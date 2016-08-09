@@ -1,5 +1,4 @@
-#ifndef Z3DIMG_H
-#define Z3DIMG_H
+#pragma once
 
 #include "z3dgl.h"
 #include <QObject>
@@ -154,4 +153,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DIMG_H

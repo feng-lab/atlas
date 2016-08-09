@@ -1,5 +1,4 @@
-#ifndef ZSWCDOC_H
-#define ZSWCDOC_H
+#pragma once
 
 #include "zobjdoc.h"
 #include "zswc.h"
@@ -105,4 +104,3 @@ private:
 
 } // namespace nim
 
-#endif // ZSWCDOC_H

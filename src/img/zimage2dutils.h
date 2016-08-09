@@ -1,5 +1,4 @@
-#ifndef ZIMAGE2DUTILS_H
-#define ZIMAGE2DUTILS_H
+#pragma once
 
 #include <cstring>
 #include <cmath>
@@ -1003,5 +1002,3 @@ void image2DResize(const TPixel* img, size_t width, size_t height,
 }
 
 } // namespace nim
-
-#endif // ZIMAGE2DUTILS_H

@@ -1,5 +1,4 @@
-#ifndef ZCUSTOMCOMMAND_H
-#define ZCUSTOMCOMMAND_H
+#pragma once
 
 namespace nim {
 
@@ -13,4 +12,3 @@ public:
 
 } // namespace nim
 
-#endif // ZCUSTOMCOMMAND_H

@@ -1,5 +1,4 @@
-#ifndef ZNUMERICPARAMETER_H
-#define ZNUMERICPARAMETER_H
+#pragma once
 
 #include "zparameter.h"
 #include <limits>
@@ -802,4 +801,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZNUMERICPARAMETER_H

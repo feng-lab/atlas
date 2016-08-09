@@ -1,5 +1,4 @@
-#ifndef Z3DARROWRENDERER_H
-#define Z3DARROWRENDERER_H
+#pragma once
 
 #include "z3dconerenderer.h"
 
@@ -37,4 +36,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DARROWRENDERER_H

@@ -1,5 +1,4 @@
-#ifndef ZIOUTILS_H
-#define ZIOUTILS_H
+#pragma once
 
 #include <iostream>
 #include <fstream>
@@ -46,4 +45,3 @@ std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filen
 
 }
 
-#endif // ZIOUTILS_H

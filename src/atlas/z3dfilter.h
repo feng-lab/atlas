@@ -1,5 +1,4 @@
-#ifndef Z3DFILTER_H
-#define Z3DFILTER_H
+#pragma once
 
 #include <QObject>
 #include <vector>
@@ -226,4 +225,3 @@ Q_DECLARE_OPERATORS_FOR_FLAGS(Z3DFilter::InvalidationState)
 
 } // namespace nim
 
-#endif // Z3DFILTER_H

@@ -23,8 +23,7 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 // OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef ZLOGMODELSINK_H
-#define ZLOGMODELSINK_H
+#pragma once
 
 #include "zlog.h"
 
@@ -127,4 +126,3 @@ receiveFutureLogMessages(const typename QtPrivate::FunctionPointer<Func1>::Objec
 
 } // namespace nim
 
-#endif // ZLOGMODELSINK_H

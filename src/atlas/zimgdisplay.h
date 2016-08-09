@@ -1,5 +1,4 @@
-#ifndef ZIMGDISPLAY_H
-#define ZIMGDISPLAY_H
+#pragma once
 
 #include "zimg.h"
 #include "zimgvoxelcolormap.h"
@@ -127,4 +126,3 @@ private:
 
 } // namespace nim
 
-#endif // ZIMGDISPLAY_H

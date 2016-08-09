@@ -1,5 +1,4 @@
-#ifndef Z3DOBJVIEW_H
-#define Z3DOBJVIEW_H
+#pragma once
 
 #include <QObject>
 #include "z3dview.h"
@@ -82,4 +81,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DOBJVIEW_H

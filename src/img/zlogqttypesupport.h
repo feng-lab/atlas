@@ -1,5 +1,4 @@
-#ifndef ZLOGQTTYPESUPPORT_H
-#define ZLOGQTTYPESUPPORT_H
+#pragma once
 
 #include <iosfwd>
 #include <QDebug>
@@ -121,4 +120,3 @@ inline std::ostream& operator<<(std::ostream& s, const QFlags<T>& flags)
 } // namespace nim
 
 
-#endif // ZLOGQTTYPESUPPORT_H

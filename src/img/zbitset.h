@@ -1,5 +1,4 @@
-#ifndef ZBITSET_H
-#define ZBITSET_H
+#pragma once
 
 #include <bitset>
 
@@ -20,5 +19,3 @@ size_t bitsetRangeToValue(const std::bitset<N>& bitSet, size_t startBit, size_t 
 }
 
 }
-
-#endif // ZBITSET_H

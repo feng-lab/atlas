@@ -1,5 +1,4 @@
-#ifndef ZVOXELREGION_H
-#define ZVOXELREGION_H
+#pragma once
 
 #include "zvoxelcoordinate.h"
 #include "zbbox.h"
@@ -192,4 +191,3 @@ QDebug operator<<(QDebug s, const ZVoxelRegion& m);
 } // namespace nim
 
 
-#endif // ZVOXELREGION_H

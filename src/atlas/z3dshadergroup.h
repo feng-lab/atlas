@@ -1,5 +1,4 @@
-#ifndef Z3DSHADERGROUP_H
-#define Z3DSHADERGROUP_H
+#pragma once
 
 #include <map>
 #include "z3drendererbase.h"
@@ -62,4 +61,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DSHADERGROUP_H

@@ -1,5 +1,4 @@
-#ifndef Z3DGEOMETRYFILTER_H
-#define Z3DGEOMETRYFILTER_H
+#pragma once
 
 #include "z3dboundedfilter.h"
 #include "z3drendererbase.h"
@@ -72,4 +71,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DGEOMETRYFILTER_H

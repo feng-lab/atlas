@@ -1,5 +1,4 @@
-#ifndef ZPARAMETERANIMATION_H
-#define ZPARAMETERANIMATION_H
+#pragma once
 
 #include <QObject>
 #include <QColor>
@@ -100,4 +99,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZPARAMETERANIMATION_H

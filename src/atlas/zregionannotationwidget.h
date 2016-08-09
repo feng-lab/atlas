@@ -1,5 +1,4 @@
-#ifndef ZREGIONANNOTATIONWIDGET_H
-#define ZREGIONANNOTATIONWIDGET_H
+#pragma once
 
 #include <QWidget>
 #include "zregionannotation.h"
@@ -26,4 +25,3 @@ private:
 
 } // namespace nim
 
-#endif // ZREGIONANNOTATIONWIDGET_H

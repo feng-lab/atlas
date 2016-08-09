@@ -1,5 +1,4 @@
-#ifndef ZMESHIO_H
-#define ZMESHIO_H
+#pragma once
 
 #include <QStringList>
 #include "z3dgl.h"
@@ -45,4 +44,3 @@ private:
 
 } // namespace nim
 
-#endif // ZMESHIO_H

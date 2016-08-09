@@ -1,5 +1,4 @@
-#ifndef ZCOLORMAP_H
-#define ZCOLORMAP_H
+#pragma once
 
 #include "zglmutils.h"
 #include <vector>
@@ -522,4 +521,3 @@ ZColorMapParameter::ZColorMapParameter(const QString& name, const ForwardIterato
 
 } // namespace nim
 
-#endif // ZCOLORMAP_H

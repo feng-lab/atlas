@@ -1,5 +1,4 @@
-#ifndef ZVIEW_H
-#define ZVIEW_H
+#pragma once
 
 #include <QWidget>
 #include <QAction>
@@ -225,4 +224,3 @@ private:
 
 } // namespace nim
 
-#endif // ZVIEW_H

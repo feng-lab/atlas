@@ -1,5 +1,4 @@
-#ifndef ZPUNCTAIO_H
-#define ZPUNCTAIO_H
+#pragma once
 
 #include <QStringList>
 
@@ -54,4 +53,3 @@ private:
 
 } // namespace nim
 
-#endif // ZPUNCTAIO_H

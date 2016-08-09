@@ -1,5 +1,4 @@
-#ifndef Z3DCANVAS_H
-#define Z3DCANVAS_H
+#pragma once
 
 #include "zglmutils.h"
 #include <QGraphicsView>
@@ -224,4 +223,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DCANVAS_H

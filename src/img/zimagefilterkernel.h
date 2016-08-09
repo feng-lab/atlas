@@ -1,5 +1,4 @@
-#ifndef ZIMAGEFILTERKERNEL_H
-#define ZIMAGEFILTERKERNEL_H
+#pragma once
 
 #include <vector>
 
@@ -39,5 +38,3 @@ std::vector<TFloat> create1DLoGKernel(TFloat sigmaX,
                                       size_t* kWidth = nullptr);
 
 } // namespace nim
-
-#endif // ZIMAGEFILTERKERNEL_H

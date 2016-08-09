@@ -1,5 +1,4 @@
-#ifndef ZSPINBOXWITHSCROLLBAR_H
-#define ZSPINBOXWITHSCROLLBAR_H
+#pragma once
 
 #include <QWidget>
 
@@ -44,4 +43,3 @@ private:
 
 } // namespace nim
 
-#endif // ZSPINBOXWITHSCROLLBAR_H

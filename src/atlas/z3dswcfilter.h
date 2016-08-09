@@ -1,5 +1,4 @@
-#ifndef Z3DSWCFILTER_H
-#define Z3DSWCFILTER_H
+#pragma once
 
 #include <QObject>
 #include "z3dgeometryfilter.h"
@@ -204,4 +203,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DSWCFILTER_H

@@ -1,5 +1,4 @@
-#ifndef ZIMGJPEGXR_H
-#define ZIMGJPEGXR_H
+#pragma once
 
 #include "zimgformat.h"
 
@@ -50,4 +49,3 @@ public:
 
 } // namespace
 
-#endif // ZIMGJPEGXR_H

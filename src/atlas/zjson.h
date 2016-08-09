@@ -1,5 +1,4 @@
-#ifndef ZJSON_H
-#define ZJSON_H
+#pragma once
 
 #include <QJsonDocument>
 #include <QJsonValue>
@@ -13,4 +12,3 @@ void modifyJsonValue(QJsonDocument& doc, const QString& path, const QJsonValue& 
 
 } // namespace nim
 
-#endif // ZJSON_H

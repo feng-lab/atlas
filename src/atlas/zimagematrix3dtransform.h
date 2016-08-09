@@ -1,5 +1,4 @@
-#ifndef ZIMAGEMATRIX3DTRANSFORM_H
-#define ZIMAGEMATRIX3DTRANSFORM_H
+#pragma once
 
 #include "zimagetransform.h"
 #include "zaffine3d.h"
@@ -156,4 +155,3 @@ void image3DResize_Old(const TPixel* img, size_t width, size_t height, size_t de
 
 } // namespace nim
 
-#endif // ZIMAGEMATRIX3DTRANSFORM_H

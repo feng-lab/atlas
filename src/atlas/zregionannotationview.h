@@ -1,5 +1,4 @@
-#ifndef ZREGIONANNOTATIONVIEW_H
-#define ZREGIONANNOTATIONVIEW_H
+#pragma once
 
 #include <map>
 #include "zfilterview.h"
@@ -22,4 +21,3 @@ private:
 
 } // namespace nim
 
-#endif // ZREGIONANNOTATIONVIEW_H

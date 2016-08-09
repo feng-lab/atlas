@@ -1,5 +1,4 @@
-#ifndef ZEVENTLISTENERPARAMETER_H
-#define ZEVENTLISTENERPARAMETER_H
+#pragma once
 
 #include "zparameter.h"
 #include <QList>
@@ -92,4 +91,3 @@ private:
 
 } // namespace nim
 
-#endif // ZEVENTLISTENERPARAMETER_H

@@ -1,5 +1,4 @@
-#ifndef ZVIEWSETTINGINTERFACE_H
-#define ZVIEWSETTINGINTERFACE_H
+#pragma once
 
 #include "zwidgetsgroup.h"
 
@@ -13,4 +12,3 @@ public:
 
 } // namespace nim
 
-#endif // ZVIEWSETTINGINTERFACE_H

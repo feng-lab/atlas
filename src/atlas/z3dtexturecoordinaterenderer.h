@@ -1,5 +1,4 @@
-#ifndef Z3DTEXTURECOORDINATERENDERER_H
-#define Z3DTEXTURECOORDINATERENDERER_H
+#pragma once
 
 #include "z3dprimitiverenderer.h"
 #include "z3dshaderprogram.h"
@@ -42,4 +41,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DTEXTURECOORDINATERENDERER_H

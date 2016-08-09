@@ -1,5 +1,4 @@
-#ifndef Z3DIMGFILTER_H
-#define Z3DIMGFILTER_H
+#pragma once
 
 #include "z3dboundedfilter.h"
 
@@ -165,4 +164,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DIMGFILTER_H

@@ -1,5 +1,4 @@
-#ifndef ZBBOX_H
-#define ZBBOX_H
+#pragma once
 
 #include <limits>
 #include <iostream>
@@ -237,5 +236,3 @@ template<typename T> inline QDebug operator<<(QDebug s, const ZBBox<T>& box)
 #endif
 
 } // namespace nim
-
-#endif // ZBBOX_H

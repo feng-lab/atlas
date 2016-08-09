@@ -1,5 +1,4 @@
-#ifndef Z3DGLOBALPARAMETERS_H
-#define Z3DGLOBALPARAMETERS_H
+#pragma once
 
 #include "znumericparameter.h"
 #include "z3dcameraparameter.h"
@@ -119,4 +118,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DGLOBALPARAMETERS_H

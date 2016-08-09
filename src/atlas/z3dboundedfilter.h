@@ -1,5 +1,4 @@
-#ifndef Z3DBOUNDEDFILTER_H
-#define Z3DBOUNDEDFILTER_H
+#pragma once
 
 #include "z3dfilter.h"
 #include "z3dtransferfunction.h"
@@ -283,4 +282,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DBOUNDEDFILTER_H

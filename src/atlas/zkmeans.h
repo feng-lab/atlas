@@ -1,5 +1,4 @@
-#ifndef ZKMEANS_H
-#define ZKMEANS_H
+#pragma once
 
 #include "zeigenutils.h"
 #include <limits>
@@ -912,4 +911,3 @@ private:
 
 } // namespace nim
 
-#endif // ZKMEANS_H

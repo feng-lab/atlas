@@ -1,5 +1,4 @@
-#ifndef ZACTIONGROUP_H
-#define ZACTIONGROUP_H
+#pragma once
 
 #include <QObject>
 #include <QAction>
@@ -65,4 +64,3 @@ private:
 
 } // namespace nim
 
-#endif // ZACTIONGROUP_H

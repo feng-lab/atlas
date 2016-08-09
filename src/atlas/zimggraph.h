@@ -1,5 +1,4 @@
-#ifndef ZIMGGRAPH_H
-#define ZIMGGRAPH_H
+#pragma once
 
 #include "zimgneighborhooditerator.h"
 #include "zimgneighborhoodwithptriterator.h"
@@ -177,4 +176,3 @@ public:
 
 } // namespace nim
 
-#endif // ZIMGGRAPH_H

@@ -1,5 +1,4 @@
-#ifndef Z3DCOMPOSITOR_H
-#define Z3DCOMPOSITOR_H
+#pragma once
 
 #include "z3drenderport.h"
 #include "z3dboundedfilter.h"
@@ -142,4 +141,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DCOMPOSITOR_H

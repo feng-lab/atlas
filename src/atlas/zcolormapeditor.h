@@ -1,5 +1,4 @@
-#ifndef ZCOLORMAPEDITOR_H
-#define ZCOLORMAPEDITOR_H
+#pragma once
 
 #include <QWidget>
 
@@ -110,4 +109,3 @@ private:
 
 } // namespace nim
 
-#endif // ZCOLORMAPEDITOR_H

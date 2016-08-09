@@ -1,5 +1,4 @@
-#ifndef ZIMG_H
-#define ZIMG_H
+#pragma once
 
 #include <cstdint>
 #include <vector>
@@ -1468,5 +1467,3 @@ void image3DWrite(const TPixel* data, size_t width, size_t height, size_t depth,
 }  // namespace
 
 #include "zimg.hxx"
-
-#endif // ZIMG_H

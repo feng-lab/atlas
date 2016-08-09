@@ -1,5 +1,4 @@
-#ifndef ZIMGNEIGHBORHOODWITHCOORDITERATOR_H
-#define ZIMGNEIGHBORHOODWITHCOORDITERATOR_H
+#pragma once
 
 #include "zimg.h"
 #include <boost/iterator/iterator_facade.hpp>
@@ -352,4 +351,3 @@ using ZImgNeighborhoodWithCoordIterator = impl::img_neighborhood_with_coord_iter
 
 } // namespace nim
 
-#endif // ZIMGNEIGHBORHOODWITHCOORDITERATOR_H

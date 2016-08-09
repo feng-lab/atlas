@@ -1,5 +1,4 @@
-#ifndef ZFONTWIDGET_H
-#define ZFONTWIDGET_H
+#pragma once
 
 #include <QWidget>
 #include <QFont>
@@ -37,4 +36,3 @@ private:
 
 } // namespace nim
 
-#endif // ZFONTWIDGET_H

@@ -1,5 +1,4 @@
-#ifndef ZIMGITKINTERFACE_H
-#define ZIMGITKINTERFACE_H
+#pragma once
 
 #include "zimg.h"
 #include <itkImage.h>
@@ -411,4 +410,3 @@ void copyITKImgToMemory(const itk::Image<TVoxel, 2>* image, TVoxel* data)
 
 } // namespace nim
 
-#endif // ZIMGITKINTERFACE_H

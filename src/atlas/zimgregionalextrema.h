@@ -1,5 +1,4 @@
-#ifndef ZIMGREGIONALEXTREMA_H
-#define ZIMGREGIONALEXTREMA_H
+#pragma once
 
 #include "zimgalgorithm.h"
 #include "zimg.h"
@@ -42,4 +41,3 @@ private:
 
 } // namespace nim
 
-#endif // ZIMGREGIONALEXTREMA_H

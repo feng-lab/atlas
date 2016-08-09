@@ -1,5 +1,4 @@
-#ifndef ZCAMERAPARAMETER_H
-#define ZCAMERAPARAMETER_H
+#pragma once
 
 #include "zparameter.h"
 #include "znumericparameter.h"
@@ -235,4 +234,3 @@ private:
 
 } // namespace nim
 
-#endif // ZCAMERAPARAMETER_H

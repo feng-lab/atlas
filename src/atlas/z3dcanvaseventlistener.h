@@ -1,5 +1,4 @@
-#ifndef Z3DCANVASEVENTLISTENER_H
-#define Z3DCANVASEVENTLISTENER_H
+#pragma once
 
 #include <QEvent>
 
@@ -37,4 +36,3 @@ public:
 
 } // namespace nim
 
-#endif // Z3DCANVASEVENTLISTENER_H

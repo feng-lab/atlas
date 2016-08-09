@@ -1,5 +1,4 @@
-#ifndef ZCAMERAPARAMETERKEY_H
-#define ZCAMERAPARAMETERKEY_H
+#pragma once
 
 #include "zparameterkey.h"
 #include "z3dcameraparameter.h"
@@ -80,4 +79,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZCAMERAPARAMETERKEY_H

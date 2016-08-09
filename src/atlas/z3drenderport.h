@@ -1,5 +1,4 @@
-#ifndef Z3DRENDERPORT_H
-#define Z3DRENDERPORT_H
+#pragma once
 
 #include "z3dport.h"
 #include "z3dtexture.h"
@@ -115,4 +114,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DRENDERPORT_H

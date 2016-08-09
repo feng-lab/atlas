@@ -1,5 +1,4 @@
-#ifndef ZIMGJPEG2000_H
-#define ZIMGJPEG2000_H
+#pragma once
 
 #include "zimgformat.h"
 
@@ -29,4 +28,3 @@ protected:
 
 } // namespace
 
-#endif // ZIMGJPEG2000_H

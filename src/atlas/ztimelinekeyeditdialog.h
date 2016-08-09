@@ -1,5 +1,4 @@
-#ifndef ZTIMELINEKEYEDITDIALOG_H
-#define ZTIMELINEKEYEDITDIALOG_H
+#pragma once
 
 #include <QDialog>
 #include <QVBoxLayout>
@@ -50,4 +49,3 @@ protected:
 
 } // namespace nim
 
-#endif // ZTIMELINEKEYEDITDIALOG_H

@@ -1,5 +1,4 @@
-#ifndef Z3DSDFONT_H
-#define Z3DSDFONT_H
+#pragma once
 
 #include <QString>
 #include <QImage>
@@ -78,4 +77,3 @@ private:
 
 } // namespace nim
 
-#endif // Z3DSDFONT_H

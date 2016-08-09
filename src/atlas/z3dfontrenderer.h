@@ -1,5 +1,4 @@
-#ifndef Z3DFONTRENDERER_H
-#define Z3DFONTRENDERER_H
+#pragma once
 
 #include "z3dprimitiverenderer.h"
 #include "zfontparameter.h"
@@ -97,4 +96,3 @@ protected:
 
 } // namespace nim
 
-#endif // Z3DFONTRENDERER_H

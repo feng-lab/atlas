@@ -1,5 +1,4 @@
-#ifndef ZVOXELCOORDINATE_H
-#define ZVOXELCOORDINATE_H
+#pragma once
 
 #include <sstream>
 
@@ -403,4 +402,3 @@ inline QDebug operator<<(QDebug s, const ZVoxelCoordinate& c)
 
 } // namespace nim
 
-#endif // ZVOXELCOORDINATE_H

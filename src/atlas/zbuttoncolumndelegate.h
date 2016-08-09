@@ -1,5 +1,4 @@
-#ifndef ZBUTTONCOLUMNDELEGATE_H
-#define ZBUTTONCOLUMNDELEGATE_H
+#pragma once
 
 #include <QStyledItemDelegate>
 #include <QWidget>
@@ -47,4 +46,3 @@ private:
 
 } // namespace nim
 
-#endif // ZBUTTONCOLUMNDELEGATE_H

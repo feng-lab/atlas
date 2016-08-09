@@ -1,5 +1,4 @@
-#ifndef ZIMGCONNECTEDCOMPONENTS_H
-#define ZIMGCONNECTEDCOMPONENTS_H
+#pragma once
 
 #include "zimgalgorithm.h"
 #include "zimg.h"
@@ -84,4 +83,3 @@ private:
 
 } // namespace nim
 
-#endif // ZIMGCONNECTEDCOMPONENTS_H

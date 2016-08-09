@@ -1,5 +1,4 @@
-#ifndef ZIMGREGION_H
-#define ZIMGREGION_H
+#pragma once
 
 #include <QString>
 #include "zimginfo.h"
@@ -169,4 +168,3 @@ struct ZImgRegion
 
 }
 
-#endif // ZIMGREGION_H

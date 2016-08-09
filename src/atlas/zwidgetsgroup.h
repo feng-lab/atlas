@@ -1,5 +1,4 @@
-#ifndef ZWIDGETSGROUP_H
-#define ZWIDGETSGROUP_H
+#pragma once
 
 #include <QObject>
 #include <QLayout>
@@ -104,4 +103,3 @@ private:
 
 } // namespace nim
 
-#endif // ZWIDGETSGROUP_H

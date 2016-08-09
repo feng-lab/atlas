@@ -1,5 +1,4 @@
-#ifndef ZIMGSIGNEDDISTANCEMAP_H
-#define ZIMGSIGNEDDISTANCEMAP_H
+#pragma once
 
 #include "zimg.h"
 #include "zimgalgorithm.h"
@@ -38,4 +37,3 @@ private:
 
 } // namespace nim
 
-#endif // ZIMGSIGNEDDISTANCEMAP_H
