@@ -845,8 +845,8 @@ void benchSaturateMul()
   bt5.start();
   bt5.pause();
   for (int j = 0; j < 1e8; ++j) {
-    int64_t a = ZRandomInstance.randIntType<int64_t>(INT64_MAX, INT64_MIN) * 1000;
-    int64_t b = ZRandomInstance.randIntType<int64_t>(INT64_MAX, INT64_MIN) * 1000;
+    int64_t a = ZRandom::instance().randIntType<int64_t>(INT64_MAX, INT64_MIN) * 1000;
+    int64_t b = ZRandom::instance().randIntType<int64_t>(INT64_MAX, INT64_MIN) * 1000;
     int32_t a32 = static_cast<int32_t>(a);
     int32_t b32 = static_cast<int32_t>(b);
     int32_t a16 = static_cast<int16_t>(a);

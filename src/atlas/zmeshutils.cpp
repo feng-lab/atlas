@@ -581,8 +581,8 @@ int PointInPolygon(glm::dvec3 x, const std::vector<glm::dvec3>& pts, const doubl
     //
     bool rayOK;
     for (rayOK = false; rayOK == false;) {
-      ray[comps[0]] = ZRandomInstance.randDouble(rayMag, -rayMag);
-      ray[comps[1]] = ZRandomInstance.randDouble(rayMag, -rayMag);
+      ray[comps[0]] = nim::ZRandom::instance().randDouble(rayMag, -rayMag);
+      ray[comps[1]] = nim::ZRandom::instance().randDouble(rayMag, -rayMag);
       ray[maxComp] = -(normal[comps[0]] * ray[comps[0]] +
                        normal[comps[1]] * ray[comps[1]]) / normal[maxComp];
       if ((mag = glm::length(ray)) > rayMag * VTK_TOL) {

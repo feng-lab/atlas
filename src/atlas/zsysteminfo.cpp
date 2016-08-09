@@ -260,8 +260,8 @@ bool ZSystemInfo::initializeGL()
   }
 
   glbinding::Binding::initialize();
-  Z3DGpuInfoInstance.logGpuInfo();
-#if defined(CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS)
+  Z3DGpuInfo::instance().logGpuInfo();
+#if defined(ATLAS_CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS)
   glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After |
                                    glbinding::CallbackMask::ParametersAndReturnValue |
                                    glbinding::CallbackMask::Unresolved,
@@ -323,11 +323,11 @@ bool ZSystemInfo::initializeGL()
   glbinding::Binding::addContextSwitchCallback([](glbinding::ContextHandle handle) {
     LOG(INFO) << "Switching to OpenGL context " << handle;
   });
-  if (Z3DGpuInfoInstance.isSupported()) {
+  if (Z3DGpuInfo::instance().isSupported()) {
     m_glInitialized = true;
     return m_glInitialized;
   } else {
-    m_errorMsg = Z3DGpuInfoInstance.notSupportedReason();
+    m_errorMsg = Z3DGpuInfo::instance().notSupportedReason();
     LOG(ERROR) << m_errorMsg;
     m_glInitialized = false;
     return m_glInitialized;

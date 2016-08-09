@@ -15,10 +15,6 @@
 #include <limits>
 #include <sstream>
 
-#ifdef _USE_QSLOG_
-#include <QDebug>
-#endif
-
 namespace nim {
 
 /* usage:
@@ -168,10 +164,5 @@ protected:
 };
 
 std::ostream& operator<<(std::ostream& s, const ZBenchTimer& m);
-
-#ifdef _USE_QSLOG_
-// qDebug output
-QDebug operator<<(QDebug s, const ZBenchTimer& m);
-#endif
 
 } // namespace nim

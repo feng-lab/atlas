@@ -18,9 +18,6 @@ namespace nim {
 #define __align(...)        __attribute__((aligned(__VA_ARGS__)))
 #endif
 
-#define DECLARE_SWAP(TYPE) \
-  inline void swap(TYPE &value1, TYPE &value2) { value1.swap(value2); }
-
 template<typename TEnum>
 constexpr typename std::underlying_type<TEnum>::type enumToUnderlyingType(TEnum e) noexcept
 {

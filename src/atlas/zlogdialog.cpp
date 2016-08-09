@@ -80,13 +80,8 @@ ZLogDialog::ZLogDialog(LogSinkPtr destination, QWidget* parent)
   , mIsPaused(false)
   , mHasAutoScroll(true)
 {
-#ifdef _USE_QSLOG_
-  mModelDestination = dynamic_cast<ZLogModelSink*>(destination.data());
-  Q_ASSERT_X(mModelDestination, "Window", "log window needs a destination of type ModelDestination");
-#else
   mModelDestination = dynamic_cast<ZLogModelSink*>(destination.get());
-  Q_ASSERT_X(mModelDestination, "Window", "log window needs a destination of type ModelDestination");
-#endif
+  CHECK(mModelDestination) << "log window needs a destination of type ModelDestination";
 
   mUi = new Ui::LogWindow();
   mUi->setupUi(this);

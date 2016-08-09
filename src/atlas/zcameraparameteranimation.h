@@ -17,9 +17,9 @@ class ZCameraParameterAnimation : public ZParameterAnimation
 Q_OBJECT
 public:
   ZCameraParameterAnimation(const QString& name,
-                            const QColor& color = QColor(ZRandomInstance.randInt(255),
-                                                         ZRandomInstance.randInt(255),
-                                                         ZRandomInstance.randInt(255)),
+                            const QColor& color = QColor(ZRandom::instance().randInt(255),
+                                                         ZRandom::instance().randInt(255),
+                                                         ZRandom::instance().randInt(255)),
                             QObject* parent = 0);
 
   ~ZCameraParameterAnimation();

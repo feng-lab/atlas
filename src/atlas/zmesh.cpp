@@ -132,32 +132,32 @@ void ZMesh::swap(ZMesh& rhs) noexcept
 
 bool ZMesh::canReadFile(const QString& filename)
 {
-  return ZMeshIOInstance.canReadFile(filename);
+  return ZMeshIO::instance().canReadFile(filename);
 }
 
 bool ZMesh::canWriteFile(const QString& filename)
 {
-  return ZMeshIOInstance.canWriteFile(filename);
+  return ZMeshIO::instance().canWriteFile(filename);
 }
 
 const QString& ZMesh::getQtReadNameFilter()
 {
-  return ZMeshIOInstance.getQtReadNameFilter();
+  return ZMeshIO::instance().getQtReadNameFilter();
 }
 
 void ZMesh::getQtWriteNameFilter(QStringList& filters, QList<std::string>& formats)
 {
-  ZMeshIOInstance.getQtWriteNameFilter(filters, formats);
+  ZMeshIO::instance().getQtWriteNameFilter(filters, formats);
 }
 
 void ZMesh::load(const QString& filename)
 {
-  ZMeshIOInstance.load(filename, *this);
+  ZMeshIO::instance().load(filename, *this);
 }
 
 void ZMesh::save(const QString& filename, const std::string& format) const
 {
-  ZMeshIOInstance.save(*this, filename, format);
+  ZMeshIO::instance().save(*this, filename, format);
 }
 
 void ZMesh::load(H5::Group& allGrp)

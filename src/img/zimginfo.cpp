@@ -157,9 +157,9 @@ void ZImgInfo::createDefaultChannelColors()
       } else if (i == 5) {
         channelColors[i] = col4(0, 255, 255);
       } else {
-        channelColors[i] = col4(ZRandomInstance.randInt(255),
-                                ZRandomInstance.randInt(255),
-                                ZRandomInstance.randInt(255));
+        channelColors[i] = col4(ZRandom::instance().randInt(255),
+                                ZRandom::instance().randInt(255),
+                                ZRandom::instance().randInt(255));
       }
     }
     if (lastChannelIsAlphaChannel && numChannels > 0)

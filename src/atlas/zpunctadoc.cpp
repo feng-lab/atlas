@@ -77,7 +77,7 @@ size_t ZPunctaDoc::loadFile(const QString& fileName, QString& errorMsg)
   try {
     ZPuncta puncta(fileName);
     size_t id = addPuncta(puncta, fileName);
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
@@ -101,7 +101,7 @@ size_t ZPunctaDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
   try {
     ZPuncta puncta(fileName);
     size_t id = addPuncta(puncta, fileName);
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
@@ -291,7 +291,7 @@ bool ZPunctaDoc::savePuncta(PunctaPack* pack, const QString& fileName, QString& 
     pack->hasUnsavedChange = false;
     pack->updateDerivedData();
 
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return true;
   }

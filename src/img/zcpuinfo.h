@@ -5,8 +5,6 @@
 
 namespace nim {
 
-#define ZCpuInfoInstance nim::ZCpuInfo::instance()
-
 class ZCpuInfo
 {
 public:

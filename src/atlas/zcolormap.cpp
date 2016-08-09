@@ -863,7 +863,7 @@ Z3DTexture* ZColorMap::texture1D()
 
 void ZColorMap::create1DTexture(size_t width)
 {
-  size_t maxTexSize = Z3DGpuInfoInstance.maxTextureSize();
+  size_t maxTexSize = Z3DGpuInfo::instance().maxTextureSize();
   if (maxTexSize < width)
     width = maxTexSize;
   m_texture.reset(new Z3DTexture(GLint(GL_RGBA8), glm::uvec3(width, 1, 1), GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV));

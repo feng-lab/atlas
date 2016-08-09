@@ -106,7 +106,7 @@ ZParameterAnimation* ZParameterAnimation::create(const QString& key, const QJson
   QString name = key.left(spaceIdx);
   QString type = key.mid(spaceIdx + 1);
   QColor color(0, 0, 0, 255);
-  if (!ZParameterFactoryInstance.isTypeValid(type)) {
+  if (!ZParameterFactory::instance().isTypeValid(type)) {
     LOG(WARNING) << "Invalid Animation Parameter " << key;
     return nullptr;
   }

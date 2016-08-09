@@ -59,18 +59,10 @@ public:
 
   LogData at(size_t index);
 
-#ifdef _USE_QSLOG_
-  // Destination overrides
-  virtual void write(const LogData& message) override;
-  virtual bool isValid() override;
-  virtual QString type() const override;
-#else
   // LogSink interface
 public:
   virtual void send(LogSeverity severity, const char* full_filename, const char* base_filename, int line,
                     const tm* tm_time, const char* message, size_t prefix_len, size_t message_len) override;
-
-#endif
 
   // QAbstractTableModel overrides
   virtual int columnCount(const QModelIndex& parent = QModelIndex()) const override;
@@ -99,17 +91,6 @@ private:
   int m_unsendLogDataStart = 0;
 };
 
-#ifdef _USE_QSLOG_
-LogSinkPtr logModelSinkInstance();
-const std::deque<LogData>& logMessagesSoFar();
-template <typename Func1>
-inline QMetaObject::Connection receiveFutureLogMessages(const typename QtPrivate::FunctionPointer<Func1>::Object *receiver, Func1 slot)
-{
-  return QObject::connect(dynamic_cast<ZLogModelSink*>(logModelSinkInstance().data()), &ZLogModelSink::logDataReady,
-                          receiver, slot, Qt::QueuedConnection);
-}
-#else
-
 ZLogModelSink* logModelSinkInstance();
 
 inline const QList<LogData>& logMessagesSoFar()
@@ -121,8 +102,6 @@ receiveFutureLogMessages(const typename QtPrivate::FunctionPointer<Func1>::Objec
 {
   return QObject::connect(logModelSinkInstance(), &ZLogModelSink::logDataReady, receiver, slot, Qt::QueuedConnection);
 }
-
-#endif
 
 } // namespace nim
 

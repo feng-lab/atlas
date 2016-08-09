@@ -32,6 +32,8 @@
 #include <QStack>
 #include <QPointer>
 
+using namespace nim;
+
 // thanks to Daniel Price for this workaround
 struct MacEventFilter : public QObject
 {
@@ -79,24 +81,16 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QS
 {
   switch (type) {
     case QtInfoMsg:
-      LINFOF(context.file ? context.file : "QtFile",
-             context.line,
-             context.function ? context.function : "QtFunction") << msg;
+      LINFOF(context.file ? context.file : "QtFile", context.line) << msg;
       break;
     case QtWarningMsg:
-      LWARNF(context.file ? context.file : "QtFile",
-             context.line,
-             context.function ? context.function : "QtFunction") << msg;
+      LWARNF(context.file ? context.file : "QtFile", context.line) << msg;
       break;
     case QtCriticalMsg:
-      LERRORF(context.file ? context.file : "QtFile",
-              context.line,
-              context.function ? context.function : "QtFunction") << msg;
+      LERRORF(context.file ? context.file : "QtFile", context.line) << msg;
       break;
     case QtFatalMsg:
-      LFATALF(context.file ? context.file : "QtFile",
-              context.line,
-              context.function ? context.function : "QtFunction") << msg;
+      LFATALF(context.file ? context.file : "QtFile", context.line) << msg;
       break;
     default:
       break;
@@ -143,7 +137,7 @@ int main(int argc, char* argv[])
   app.setOrganizationName("Atlas");
 
   // init the logging mechanism
-  QDir logDir = ZSystemInfoInstance.logDir();
+  QDir logDir = nim::ZSystemInfo::instance().logDir();
   removeOldLogs(logDir);
 
   nim::initLogging(argv[0], logDir.filePath("atlas"));
@@ -158,8 +152,8 @@ int main(int argc, char* argv[])
 
   try {
     LOG(INFO) << "--- App Log Start ---";
-    ZSystemInfoInstance.logOSInfo();
-    ZCpuInfoInstance.logCpuInfo();
+    nim::ZSystemInfo::instance().logOSInfo();
+    nim::ZCpuInfo::instance().logCpuInfo();
 
     fftw_init_threads();
     folly::ScopeGuard guardfftw = folly::makeGuard([]() {
@@ -167,7 +161,7 @@ int main(int argc, char* argv[])
     });
     Q_UNUSED(guardfftw)
 
-    fftw_plan_with_nthreads(ZCpuInfoInstance.nPhysicalCores);
+    fftw_plan_with_nthreads(nim::ZCpuInfo::instance().nPhysicalCores);
 
 #ifdef ATLAS_USE_MKL
     // todo: check this for amd cpu
@@ -191,23 +185,23 @@ int main(int argc, char* argv[])
         if (st == ippStsNotSupportedCpu) {
           LOG(WARNING) << "IPP error: not supported cpu.";
           // manual set mask
-          if (ZCpuInfoInstance.bMMX)
+          if (nim::ZCpuInfo::instance().bMMX)
             featureMask |= 1;
-          if (ZCpuInfoInstance.bSSE)
+          if (nim::ZCpuInfo::instance().bSSE)
             featureMask |= 2;
-          if (ZCpuInfoInstance.bSSE2)
+          if (nim::ZCpuInfo::instance().bSSE2)
             featureMask |= 4;
-          if (ZCpuInfoInstance.bSSE3)
+          if (nim::ZCpuInfo::instance().bSSE3)
             featureMask |= 8;
-          if (ZCpuInfoInstance.bSSSE3)
+          if (nim::ZCpuInfo::instance().bSSSE3)
             featureMask |= 16;
-          if (ZCpuInfoInstance.bMOVBE)
+          if (nim::ZCpuInfo::instance().bMOVBE)
             featureMask |= 32;
-          if (ZCpuInfoInstance.bSSE41)
+          if (nim::ZCpuInfo::instance().bSSE41)
             featureMask |= 64;
-          if (ZCpuInfoInstance.bSSE42)
+          if (nim::ZCpuInfo::instance().bSSE42)
             featureMask |= 128;
-          if (ZCpuInfoInstance.bAVX)
+          if (nim::ZCpuInfo::instance().bAVX)
             featureMask |= 256;
           LOG(INFO) << ippSetCpuFeatures(featureMask);
         }
@@ -227,7 +221,7 @@ int main(int argc, char* argv[])
     LOG(INFO) << "";
 #endif
 
-    if (!ZCpuInfoInstance.bSSE3) {
+    if (!nim::ZCpuInfo::instance().bSSE3) {
       QMessageBox::critical(nullptr, app.applicationName(),
                             "CPU not supported.\nThis program requires CPU with SSE3 support. Click OK to exit.");
       LOG(ERROR) << "CPU not supported";

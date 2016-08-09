@@ -24,7 +24,7 @@ Z3DShader& Z3DShaderManager::shader(const QString& fn, const QString& header, co
   ShaderKey key(fn, header, context);
   auto lb = m_shaders.lower_bound(key);
   if (lb == m_shaders.end() || m_shaders.key_comp()(key, lb->first)) {
-    QString filename = ZSystemInfoInstance.shaderPath(fn);
+    QString filename = ZSystemInfo::instance().shaderPath(fn);
     Z3DShader::Type type;
     if (filename.endsWith(".vert", Qt::CaseInsensitive)) {
       type = Z3DShader::Type::Vertex;

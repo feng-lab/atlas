@@ -5,27 +5,11 @@
 
 namespace nim {
 
-#ifdef _USE_QSLOG_
-LogSinkPtr logModelSinkInstance()
-{
-  static LogSinkPtr modelDestination(new ZLogModelSink());
-  return modelDestination;
-}
-const std::deque<LogData>& logMessagesSoFar()
-{
-  ZLogModelSink *md = dynamic_cast<ZLogModelSink*>(logModelSinkInstance().data());
-  CHECK(md);
-  return md->logMessages();
-}
-#else
-
 ZLogModelSink* logModelSinkInstance()
 {
   static ZLogModelSink modelDestination;
   return &modelDestination;
 }
-
-#endif
 
 const char* const ZLogModelSink::Type = "window";
 
@@ -37,30 +21,11 @@ ZLogModelSink::ZLogModelSink(int max_items)
   connect(m_timer, &QTimer::timeout, this, &ZLogModelSink::sendLogData);
 }
 
-#ifdef _USE_QSLOG_
-void ZLogModelSink::write(const LogData& message)
-{
-  addEntry(message);
-}
-
-bool ZLogModelSink::isValid()
-{
-  return true;
-}
-
-QString ZLogModelSink::type() const
-{
-  return QString(Type);
-}
-#else
-
 void ZLogModelSink::send(LogSeverity severity, const char* full_filename, const char* base_filename, int line,
                          const tm* tm_time, const char* message, size_t prefix_len, size_t message_len)
 {
   addEntry(LogData(severity, full_filename, base_filename, line, tm_time, message, prefix_len, message_len));
 }
-
-#endif
 
 void ZLogModelSink::addEntry(const LogData& message)
 {

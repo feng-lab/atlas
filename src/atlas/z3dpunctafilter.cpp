@@ -18,9 +18,9 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   , m_sphereRenderer(m_rendererBase)
   , m_visible("Visible", true)
   , m_colorMode("Color Mode")
-  , m_singleColorForAllPuncta("Puncta Color", glm::vec4(ZRandomInstance.randReal<float>(),
-                                                        ZRandomInstance.randReal<float>(),
-                                                        ZRandomInstance.randReal<float>(),
+  , m_singleColorForAllPuncta("Puncta Color", glm::vec4(ZRandom::instance().randReal<float>(),
+                                                        ZRandom::instance().randReal<float>(),
+                                                        ZRandom::instance().randReal<float>(),
                                                         1.f))
   , m_colorMapScore("Score Color Map", -1., 1., QColor(255, 255, 0), QColor(0, 0, 255))
   , m_colorMapMeanIntensity("Mean Intensity Color Map", 0., 1., QColor(255, 0, 0), QColor(0, 0, 0))
@@ -439,8 +439,10 @@ void Z3DPunctaFilter::prepareColor()
     }
   } else if (m_colorMode.isSelected("Random Color")) {
     for (size_t i = 0; i < m_punctaList.size(); i++) {
-      glm::vec4 color(ZRandomInstance.randReal<float>(), ZRandomInstance.randReal<float>(),
-                      ZRandomInstance.randReal<float>(), 1.0f);
+      glm::vec4 color(ZRandom::instance().randReal<float>(),
+                      ZRandom::instance().randReal<float>(),
+                      ZRandom::instance().randReal<float>(),
+                      1.0f);
       m_pointColors.push_back(color);
     }
   } else if (m_colorMode.isSelected("Single Color")) {

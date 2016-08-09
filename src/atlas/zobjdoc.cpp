@@ -148,12 +148,12 @@ void ZObjDoc::write(QJsonObject& json) const
 
 QString ZObjDoc::lastOpenedObjPath()
 {
-  return ZSystemInfoInstance.lastOpenedObjPath(typeName());
+  return ZSystemInfo::instance().lastOpenedObjPath(typeName());
 }
 
 void ZObjDoc::setLastOpenedObjPath(const QString& path)
 {
-  ZSystemInfoInstance.setLastOpenedObjPath(typeName(), path);
+  ZSystemInfo::instance().setLastOpenedObjPath(typeName(), path);
 }
 
 QString ZObjDoc::strippedName(const QString& fullFileName)

@@ -39,7 +39,7 @@ void ZRegionAnnotationWidget::exportLabelImage()
         dialog.selectNameFilter(filters[i]);
       }
     }
-    dialog.setDirectory(ZSystemInfoInstance.lastOpenedObjPath("RegionAnnotation"));
+    dialog.setDirectory(ZSystemInfo::instance().lastOpenedObjPath("RegionAnnotation"));
     dialog.setWindowTitle(tr("Export Region Annotation As Label Image"));
     if (dialog.exec()) {
       fmtIdx = filters.indexOf(dialog.selectedNameFilter());
@@ -51,8 +51,8 @@ void ZRegionAnnotationWidget::exportLabelImage()
   if (fmtIdx >= 0 && !fn.isEmpty()) {
     try {
       m_regionAnnotation.exportLabelImage(fn, formats[fmtIdx], comps[fmtIdx]);
-      ZSystemInfoInstance.addFileToRecentFileList(fn);
-      ZSystemInfoInstance.setLastOpenedImagePath(fn);
+      ZSystemInfo::instance().addFileToRecentFileList(fn);
+      ZSystemInfo::instance().setLastOpenedImagePath(fn);
     }
     catch (const ZException& e) {
       QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),

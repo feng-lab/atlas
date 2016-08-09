@@ -205,10 +205,10 @@ void Z3DShaderProgram::loadFromSourceFile(const QString& vertFilename, const QSt
                                           const QString& fragFilename, const QString& header, const QString& geomHeader)
 {
   removeAllShaders();
-  addShader(Z3DShaderManagerInstance.shader(vertFilename, header, m_context));
-  addShader(Z3DShaderManagerInstance.shader(fragFilename, header, m_context));
+  addShader(Z3DShaderManager::instance().shader(vertFilename, header, m_context));
+  addShader(Z3DShaderManager::instance().shader(fragFilename, header, m_context));
   if (!geomFilename.isEmpty()) {
-    addShader(Z3DShaderManagerInstance.shader(geomFilename, geomHeader, m_context));
+    addShader(Z3DShaderManager::instance().shader(geomFilename, geomHeader, m_context));
   }
   link();
   m_shaderFiles.clear();
@@ -229,9 +229,9 @@ void Z3DShaderProgram::loadFromSourceFile(const QStringList& shaderFilenames, co
     if (shaderFilenames[i].isEmpty())
       continue;
     if (shaderFilenames[i].endsWith(".geom", Qt::CaseInsensitive)) {
-      addShader(Z3DShaderManagerInstance.shader(shaderFilenames[i], geomHeader, m_context));
+      addShader(Z3DShaderManager::instance().shader(shaderFilenames[i], geomHeader, m_context));
     } else {
-      addShader(Z3DShaderManagerInstance.shader(shaderFilenames[i], header, m_context));
+      addShader(Z3DShaderManager::instance().shader(shaderFilenames[i], header, m_context));
     }
   }
   link();

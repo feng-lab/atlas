@@ -260,16 +260,16 @@ float Z3DLineRenderer::lineWidth() const
     if (m_useSmoothLine)
       return std::max(1.f, m_lineWidth * m_rendererBase.sizeScale());
     else
-      return std::min(Z3DGpuInfoInstance.maxAliasedLineWidth(),
+      return std::min(Z3DGpuInfo::instance().maxAliasedLineWidth(),
                       std::max(m_rendererBase.sizeScale() * m_lineWidth,
-                               Z3DGpuInfoInstance.minAliasedLineWidth()));
+                               Z3DGpuInfo::instance().minAliasedLineWidth()));
   } else {
     if (m_useSmoothLine)
       return m_lineWidth;
     else
-      return std::min(Z3DGpuInfoInstance.maxAliasedLineWidth(),
+      return std::min(Z3DGpuInfo::instance().maxAliasedLineWidth(),
                       std::max(m_lineWidth,
-                               Z3DGpuInfoInstance.minAliasedLineWidth()));
+                               Z3DGpuInfo::instance().minAliasedLineWidth()));
   }
 }
 

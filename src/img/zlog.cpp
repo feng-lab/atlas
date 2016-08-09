@@ -2,8 +2,6 @@
 
 #include <QFile>
 
-#ifndef _USE_QSLOG_
-
 namespace nim {
 
 void initLogging(const char* argv0, const QString& filename)
@@ -136,72 +134,3 @@ QString levelToString(LogSeverity theLevel)
 }
 
 } // namespace nim
-
-#else
-
-namespace nim {
-
-void initLogging(const char*, const QString &filename)
-{
-  QsLogging::Logger& logger = QsLogging::Logger::instance();
-  QsLogging::DestinationPtr fileDestination(
-        QsLogging::DestinationFactory::MakeFileDestination(filename + "_log.txt", QsLogging::EnableLogRotation,
-                                                           QsLogging::MaxSizeBytes(1e9), QsLogging::MaxOldLogCount(20)));
-  QsLogging::DestinationPtr debugOutputDestination(
-        QsLogging::DestinationFactory::MakeDebugOutputDestination());
-  logger.addDestination(debugOutputDestination);
-  logger.addDestination(fileDestination);
-#if defined _DEBUG_
-  logger.setLoggingLevel(QsLogging::DebugLevel);
-#else
-  logger.setLoggingLevel(QsLogging::InfoLevel);
-#endif
-}
-
-LogSinkPtr createFileLogSink(const QString &filename)
-{
-  QsLogging::DestinationPtr fileDestination;
-  if (!filename.isEmpty()) {
-    fileDestination = QsLogging::DestinationFactory::MakeFileDestination(filename);
-  }
-  return fileDestination->isValid() ? fileDestination : QsLogging::DestinationPtr();
-}
-
-LogSinkPtr createFunctorLogSink(QsLogging::Destination::LogFunction f)
-{
-  return QsLogging::DestinationFactory::MakeFunctorDestination(f);
-}
-
-void addLogSink(LogSinkPtr sink)
-{
-  if (sink->isValid())
-    QsLogging::Logger::instance().addDestination(sink);
-}
-
-void removeLogSink(const LogSinkPtr &sink)
-{
-  if (sink->isValid())
-    QsLogging::Logger::instance().removeDestination(sink);
-}
-
-QString levelToString(LogSeverity theLevel)
-{
-  return LocalizedLevelName(theLevel);
-}
-
-} // namespace nim
-
-// support std string
-QDebug operator<<(QDebug s, const std::string& m)
-{
-  s.nospace() << m.c_str();
-  return s.space();
-}
-
-QDebug operator<<(QDebug s, const std::basic_string<wchar_t>& m)
-{
-  s.nospace() << QString::fromStdWString(m);
-  return s.space();
-}
-
-#endif

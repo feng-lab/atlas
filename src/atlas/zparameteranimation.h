@@ -13,9 +13,9 @@ class ZParameterAnimation : public QObject
 Q_OBJECT
 public:
   ZParameterAnimation(const QString& name, const QString& type,
-                      const QColor& color = QColor(ZRandomInstance.randInt(255),
-                                                   ZRandomInstance.randInt(255),
-                                                   ZRandomInstance.randInt(255)),
+                      const QColor& color = QColor(ZRandom::instance().randInt(255),
+                                                   ZRandom::instance().randInt(255),
+                                                   ZRandom::instance().randInt(255)),
                       QObject* parent = 0);
 
   virtual ~ZParameterAnimation();

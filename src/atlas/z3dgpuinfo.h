@@ -9,8 +9,6 @@
 // If isSupported() return false, other functions (except gl*Version functions
 // which will still be correct.) will return uninitialized values.
 
-#define Z3DGpuInfoInstance nim::Z3DGpuInfo::instance()
-
 namespace nim {
 
 class Z3DGpuInfo

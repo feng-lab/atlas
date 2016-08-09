@@ -12,17 +12,12 @@ bool GLVersionGE(int majorVersion, int minorVersion)
   return glbinding::ContextInfo::version() >= glbinding::Version(majorVersion, minorVersion);
 }
 
-void _CheckGLError(const char* file, int line, const char* function)
+void _CheckGLError(const char* file, int line)
 {
   GLenum err = glGetError();
 
   if (err != GL_NO_ERROR) {
-#ifdef _USE_QSLOG_
-    LERRORF(file, line, function) << "OpenGL error: " << glbinding::Meta::getString(err);
-#else
-    Q_UNUSED(function)
-    LERRORF(file, line, "") << "OpenGL error: " << glbinding::Meta::getString(err);
-#endif
+    LERRORF(file, line) << "OpenGL error: " << glbinding::Meta::getString(err);
   }
 }
 

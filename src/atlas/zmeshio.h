@@ -8,8 +8,6 @@ namespace nim {
 
 class ZMesh;
 
-#define ZMeshIOInstance nim::ZMeshIO::instance()
-
 class ZMeshIO
 {
 public:

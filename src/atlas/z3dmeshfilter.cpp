@@ -19,9 +19,9 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_triangleListRenderer(m_rendererBase)
   , m_visible("Visible", true)
   , m_colorMode("Color Mode")
-  , m_singleColorForAllMesh("Mesh Color", glm::vec4(ZRandomInstance.randReal<float>(),
-                                                    ZRandomInstance.randReal<float>(),
-                                                    ZRandomInstance.randReal<float>(),
+  , m_singleColorForAllMesh("Mesh Color", glm::vec4(ZRandom::instance().randReal<float>(),
+                                                    ZRandom::instance().randReal<float>(),
+                                                    ZRandom::instance().randReal<float>(),
                                                     1.f))
   , m_textureGlowRenderer(m_rendererBase)
   , m_glow("Glow", false)

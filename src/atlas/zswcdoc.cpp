@@ -73,7 +73,7 @@ size_t ZSwcDoc::loadFile(const QString& fileName, QString& errorMsg)
   try {
     ZSwc tree(fileName);
     size_t id = addSwc(tree, fileName);
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
 
     return id;
@@ -98,7 +98,7 @@ size_t ZSwcDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
   try {
     ZSwc tree(fileName);
     size_t id = addSwc(tree, fileName);
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
@@ -258,7 +258,7 @@ bool ZSwcDoc::saveSwc(SwcPack* pack, const QString& fileName, QString& errorMsg)
     pack->hasUnsavedChange = false;
     pack->updateDerivedData();
 
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return true;
   }

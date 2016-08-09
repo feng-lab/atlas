@@ -171,9 +171,9 @@ void Z3DMainWindow::viewLog()
   //logDialog.exec();
   QStringList filters;
   filters << "atlas*_log.txt";
-  QFileInfoList list = ZSystemInfoInstance.logDir().entryInfoList(filters,
-                                                                  QDir::Files | QDir::NoSymLinks,
-                                                                  QDir::Name);  // sorted by modification time
+  QFileInfoList list = ZSystemInfo::instance().logDir().entryInfoList(filters,
+                                                                      QDir::Files | QDir::NoSymLinks,
+                                                                      QDir::Name);  // sorted by modification time
   if (!list.isEmpty()) {
     QDesktopServices::openUrl(QUrl::fromLocalFile(list.last().absoluteFilePath()));
   }
@@ -181,7 +181,7 @@ void Z3DMainWindow::viewLog()
 
 void Z3DMainWindow::openLogFolder()
 {
-  QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfoInstance.logDir().absolutePath()));
+  QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfo::instance().logDir().absolutePath()));
 }
 
 void Z3DMainWindow::changeBackground()

@@ -8,8 +8,6 @@ namespace nim {
 
 class Z3DShader;
 
-#define Z3DShaderManagerInstance nim::Z3DShaderManager::instance()
-
 // throw ZGLException if compile error
 class Z3DShaderManager
 {

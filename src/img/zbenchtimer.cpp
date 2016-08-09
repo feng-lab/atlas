@@ -134,18 +134,4 @@ std::ostream& operator<<(std::ostream& s, const ZBenchTimer& m)
   return s;
 }
 
-#ifdef _USE_QSLOG_
-// qDebug output
-QDebug operator<<(QDebug s, const ZBenchTimer& m)
-{
-  std::ostringstream oss;
-  oss << m;
-  std::string outstr = oss.str();
-  // remove newline at last
-  outstr.erase(outstr.end()-1);
-  s.nospace() << outstr.c_str();
-  return s.space();
-}
-#endif
-
 } // namespace nim

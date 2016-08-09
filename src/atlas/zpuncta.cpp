@@ -11,32 +11,32 @@ ZPuncta::ZPuncta(const QString& filename)
 
 bool ZPuncta::canReadFile(const QString& filename)
 {
-  return ZPunctaIOInstance.canReadFile(filename);
+  return ZPunctaIO::instance().canReadFile(filename);
 }
 
 bool ZPuncta::canWriteFile(const QString& filename)
 {
-  return ZPunctaIOInstance.canWriteFile(filename);
+  return ZPunctaIO::instance().canWriteFile(filename);
 }
 
 const QString& ZPuncta::getQtReadNameFilter()
 {
-  return ZPunctaIOInstance.getQtReadNameFilter();
+  return ZPunctaIO::instance().getQtReadNameFilter();
 }
 
 void ZPuncta::getQtWriteNameFilter(QStringList& filters, QStringList& formats)
 {
-  ZPunctaIOInstance.getQtWriteNameFilter(filters, formats);
+  ZPunctaIO::instance().getQtWriteNameFilter(filters, formats);
 }
 
 void ZPuncta::load(const QString& filename)
 {
-  ZPunctaIOInstance.load(filename, *this);
+  ZPunctaIO::instance().load(filename, *this);
 }
 
 void ZPuncta::save(const QString& filename, const QString& format) const
 {
-  ZPunctaIOInstance.save(*this, filename, format);
+  ZPunctaIO::instance().save(*this, filename, format);
 }
 
 } // namespace nim

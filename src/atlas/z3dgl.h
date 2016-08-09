@@ -8,7 +8,7 @@
 namespace nim {
 
 using namespace gl;
-#define CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
+#define ATLAS_CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
 
 enum class Z3DEye
 {
@@ -22,12 +22,12 @@ enum class Z3DScreenShotType
 
 bool GLVersionGE(int majorVersion, int minorVersion);
 
-void _CheckGLError(const char* file, int line, const char* function);
+void _CheckGLError(const char* file, int line);
 
-#ifdef CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
+#ifdef ATLAS_CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
 #define CHECK_GL_ERROR
 #else
-#define CHECK_GL_ERROR _CheckGLError(__FILE__, __LINE__, __PRETTY_FUNCTION__);
+#define CHECK_GL_ERROR _CheckGLError(__FILE__, __LINE__);
 #endif
 
 bool checkGLState(GLenum pname, bool value);

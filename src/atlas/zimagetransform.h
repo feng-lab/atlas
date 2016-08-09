@@ -83,10 +83,6 @@ protected:
 
 std::ostream& operator<<(std::ostream& s, const ZImageTransform& tfm);
 
-#ifdef _USE_QSLOG_
-QDebug operator<<(QDebug s, const ZImageTransform& tfm);
-#endif
-
 template<typename TPixel, typename TPixelOut>
 struct AffineTransform3DForOneBlock
 {

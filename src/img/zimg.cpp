@@ -199,52 +199,52 @@ void ZImg::swap(ZImg& other) noexcept
 
 void ZImg::getQtReadNameFilter(QStringList& filters, QList<FileFormat>& formats)
 {
-  ZImgIOInstance.getQtReadNameFilter(filters, formats);
+  ZImgIO::instance().getQtReadNameFilter(filters, formats);
 }
 
 void ZImg::getQtWriteNameFilter(QStringList& filters, QList<FileFormat>& formats, QList<Compression>& comps)
 {
-  ZImgIOInstance.getQtWriteNameFilter(filters, formats, comps);
+  ZImgIO::instance().getQtWriteNameFilter(filters, formats, comps);
 }
 
 bool ZImg::fileExtensionReadSupported(const QString& filename)
 {
-  return ZImgIOInstance.fileExtensionReadSupported(filename);
+  return ZImgIO::instance().fileExtensionReadSupported(filename);
 }
 
 bool ZImg::fileExtensionWriteSupported(const QString& filename)
 {
-  return ZImgIOInstance.fileExtensionWriteSupported(filename);
+  return ZImgIO::instance().fileExtensionWriteSupported(filename);
 }
 
 void ZImg::load(const QString& filename, size_t scene, FileFormat format)
 {
   clear();
-  ZImgIOInstance.readImg(filename, *this, ZImgRegion(), scene, 1, format);
+  ZImgIO::instance().readImg(filename, *this, ZImgRegion(), scene, 1, format);
 }
 
 void ZImg::load(const QString& filename, ZImgRegion region, size_t scene, FileFormat format)
 {
   clear();
-  ZImgIOInstance.readImg(filename, *this, region, scene, 1, format);
+  ZImgIO::instance().readImg(filename, *this, region, scene, 1, format);
 }
 
 void ZImg::load(const ZImgSource& imgSource)
 {
   clear();
-  ZImgIOInstance.readImg(imgSource, *this);
+  ZImgIO::instance().readImg(imgSource, *this);
 }
 
 void ZImg::save(const QString& filename, FileFormat format, Compression comp) const
 {
-  ZImgIOInstance.writeImg(filename, *this, format, comp);
+  ZImgIO::instance().writeImg(filename, *this, format, comp);
 }
 
 void ZImg::load(const QStringList& fileList, Dimension catDim, size_t scene, FileFormat format,
                 bool expandXY, bool expandWithMaxValue)
 {
   clear();
-  ZImgIOInstance.readImg(fileList, catDim, *this, scene, format, expandXY, expandWithMaxValue);
+  ZImgIO::instance().readImg(fileList, catDim, *this, scene, format, expandXY, expandWithMaxValue);
 }
 
 void
@@ -252,7 +252,7 @@ ZImg::load(const QStringList& fileList, Dimension catDim, const ZImgRegion& regi
            bool expandXY, bool expandWithMaxValue)
 {
   clear();
-  ZImgIOInstance.readImg(fileList, catDim, region, *this, scene, format, expandXY, expandWithMaxValue);
+  ZImgIO::instance().readImg(fileList, catDim, region, *this, scene, format, expandXY, expandWithMaxValue);
 }
 
 std::vector<ZImgInfo>
@@ -260,7 +260,7 @@ ZImg::readImgInfo(const QString& filename, std::vector<std::vector<std::shared_p
                   FileFormat format)
 {
   std::vector<ZImgInfo> res;
-  ZImgIOInstance.readInfo(filename, res, subBlocks, nullptr, format);
+  ZImgIO::instance().readInfo(filename, res, subBlocks, nullptr, format);
   return res;
 }
 
@@ -269,7 +269,7 @@ std::vector<ZImgInfo> ZImg::readImgInfo(const QStringList& fileList, Dimension c
                                         FileFormat format, bool expandXY)
 {
   std::vector<ZImgInfo> res;
-  ZImgIOInstance.readInfo(fileList, catDim, res, subBlocks, format, expandXY);
+  ZImgIO::instance().readInfo(fileList, catDim, res, subBlocks, format, expandXY);
   return res;
 }
 
@@ -762,7 +762,7 @@ void ZImg::fillRandom_Impl()
   for (size_t t = 0; t < numTimes(); ++t) {
     TVoxel* data = timeData<TVoxel>(t);
     for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      data[v] = dist(ZRandomInstance.engine());
+      data[v] = dist(ZRandom::instance().engine());
     }
   }
 }
@@ -774,7 +774,7 @@ void ZImg::fillRandom_Impl<uint8_t>()
   for (size_t t = 0; t < numTimes(); ++t) {
     uint8_t* data = timeData<uint8_t>(t);
     for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      data[v] = dist(ZRandomInstance.engine());
+      data[v] = dist(ZRandom::instance().engine());
     }
   }
 }
@@ -786,7 +786,7 @@ void ZImg::fillRandom_Impl<int8_t>()
   for (size_t t = 0; t < numTimes(); ++t) {
     int8_t* data = timeData<int8_t>(t);
     for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      data[v] = dist(ZRandomInstance.engine());
+      data[v] = dist(ZRandom::instance().engine());
     }
   }
 }
@@ -798,7 +798,7 @@ void ZImg::fillRandom_Impl<float>()
   for (size_t t = 0; t < numTimes(); ++t) {
     float* data = timeData<float>(t);
     for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      data[v] = dist(ZRandomInstance.engine());
+      data[v] = dist(ZRandom::instance().engine());
     }
   }
 }
@@ -810,7 +810,7 @@ void ZImg::fillRandom_Impl<double>()
   for (size_t t = 0; t < numTimes(); ++t) {
     double* data = timeData<double>(t);
     for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      data[v] = dist(ZRandomInstance.engine());
+      data[v] = dist(ZRandom::instance().engine());
     }
   }
 }

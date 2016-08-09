@@ -74,7 +74,7 @@ size_t ZRegionAnnotationDoc::loadFile(const QString& fileName, QString& errorMsg
   try {
     ZRegionAnnotation* regionAnnotation = new ZRegionAnnotation(fileName);
     size_t id = addRegionAnnotation(regionAnnotation, fileName);
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
@@ -98,7 +98,7 @@ size_t ZRegionAnnotationDoc::loadFile(const QJsonValue& jValue, QString& errorMs
   try {
     ZRegionAnnotation* regionAnnotation = new ZRegionAnnotation(fileName);
     size_t id = addRegionAnnotation(regionAnnotation, fileName);
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
@@ -257,8 +257,8 @@ void ZRegionAnnotationDoc::importLabelImage()
       regionAnnotation->importLabelImage(fn, formats[fmtIdx]);
 
       addRegionAnnotation(regionAnnotation, QFileInfo(fn).baseName() + "_anno", true);
-      ZSystemInfoInstance.addFileToRecentFileList(fn);
-      ZSystemInfoInstance.setLastOpenedImagePath(fn);
+      ZSystemInfo::instance().addFileToRecentFileList(fn);
+      ZSystemInfo::instance().setLastOpenedImagePath(fn);
     }
     catch (const ZException& e) {
       QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
@@ -316,8 +316,8 @@ void ZRegionAnnotationDoc::exportLabelImage()
     try {
       m_idToRegionAnnotationPacks.begin()->second->regionAnnotation->exportLabelImage(fn, formats[fmtIdx],
                                                                                       comps[fmtIdx]);
-      ZSystemInfoInstance.addFileToRecentFileList(fn);
-      ZSystemInfoInstance.setLastOpenedImagePath(fn);
+      ZSystemInfo::instance().addFileToRecentFileList(fn);
+      ZSystemInfo::instance().setLastOpenedImagePath(fn);
     }
     catch (const ZException& e) {
       QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
@@ -429,7 +429,7 @@ bool ZRegionAnnotationDoc::saveRegionAnnotation(RegionAnnotationPack* pack, cons
     pack->hasUnsavedChange = false;
     pack->updateDerivedData();
 
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return true;
   }

@@ -52,7 +52,7 @@ Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase& rendererBase)
   m_fontShaderGrp.addAllSupportedPostShaders();
 
   // search for available fonts
-  QDir fontDir(ZSystemInfoInstance.fontPath());
+  QDir fontDir(ZSystemInfo::instance().fontPath());
   QStringList filters;
   filters << "*.png";
   QFileInfoList list = fontDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);

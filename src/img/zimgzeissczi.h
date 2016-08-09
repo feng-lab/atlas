@@ -216,8 +216,6 @@ protected:
   VoxelFormat m_voxelFormat;
 };
 
-#define ZImgZeissCZIInstance nim::ZImgZeissCZI::instance()
-
 class ZImgZeissCZI : public ZImgFormat
 {
 public:

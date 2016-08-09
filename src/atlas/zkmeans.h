@@ -790,7 +790,7 @@ protected:
   {
     //int rnd = (int) ((std::rand()/(RAND_MAX+1.0)) * double(m_pData->rows()));
     std::vector<int> centerIdxs;
-    int rnd = ZRandomInstance.randInt(m_pData->rows() - 1);
+    int rnd = ZRandom::instance().randInt(m_pData->rows() - 1);
     centroids.row(0) = m_pData->row(rnd);
     centerIdxs.push_back(rnd);
     VectorXrt distSq(m_pData->rows());
@@ -808,7 +808,7 @@ protected:
         //NonInteger rndd = ((std::rand()/(RAND_MAX+1.0)) * distSqSum);
         int newIdx = -1;
         while (newIdx == -1) {
-          ResultDataType rndd = ZRandomInstance.randReal(distSqSum);
+          ResultDataType rndd = ZRandom::instance().randReal(distSqSum);
           //draw index with probability
           int j;
           for (j = 0; j < m_pData->rows() - 1; j++) {
@@ -847,7 +847,7 @@ protected:
 
   void initializeCentroidsRandom(MatrixXrt& centroids) const
   {
-    std::vector<size_t> randNumbers = ZRandomInstance.randPermutation<size_t>(m_pData->rows() - 1, 0);
+    std::vector<size_t> randNumbers = ZRandom::instance().randPermutation<size_t>(m_pData->rows() - 1, 0);
 
     centroids.row(0) = m_pData->row(randNumbers[0]);
 
@@ -869,7 +869,7 @@ protected:
   void initializeCentroidsGonzales(MatrixXrt& centroids) const
   {
     //int rnd = (int) ((std::rand()/(RAND_MAX+1.0)) * double(m_pData->rows()));
-    int rnd = ZRandomInstance.randInt(m_pData->rows() - 1);
+    int rnd = ZRandom::instance().randInt(m_pData->rows() - 1);
     centroids.row(0) = m_pData->row(rnd);
     size_t index = 1;
     for (; index < m_nclasses; index++) {

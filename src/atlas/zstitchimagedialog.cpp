@@ -671,10 +671,10 @@ void ZStitchImageDialog::selectInputStacks1()
   QStringList tmp;
   tmp = QFileDialog::getOpenFileNames(
     this, tr("select all input stacks"),
-    ZSystemInfoInstance.lastOpenedImagePath(),
+    ZSystemInfo::instance().lastOpenedImagePath(),
     tr("Image Files (*.lsm *.tif *.raw)"));
   if (tmp.count()) {
-    ZSystemInfoInstance.setLastOpenedImagePath(tmp[0]);
+    ZSystemInfo::instance().setLastOpenedImagePath(tmp[0]);
     try {
       // test image
       ZImgInfo info = ZImg::readImgInfo(tmp[0]).at(0);
@@ -709,10 +709,10 @@ void ZStitchImageDialog::selectInputStacks2()
   QStringList tmp;
   tmp = QFileDialog::getOpenFileNames(
     this, tr("select all input stacks"),
-    ZSystemInfoInstance.lastOpenedImagePath(),
+    ZSystemInfo::instance().lastOpenedImagePath(),
     tr("Image Files (*.lsm *.tif *.raw)"));
   if (tmp.count()) {
-    ZSystemInfoInstance.setLastOpenedImagePath(tmp[0]);
+    ZSystemInfo::instance().setLastOpenedImagePath(tmp[0]);
     try {
       // test image
       ZImgInfo info = ZImg::readImgInfo(tmp[0]).at(0);
@@ -893,10 +893,10 @@ void ZStitchImageDialog::getConnFromTileImage()
 {
   QString tmpName = QFileDialog::getOpenFileName(this,
                                                  tr("tile selection image file"),
-                                                 ZSystemInfoInstance.lastOpenedImagePath(),
+                                                 ZSystemInfo::instance().lastOpenedImagePath(),
                                                  tr("Tile Select Image (*.lsm *.tif)"));
   if (!tmpName.isEmpty()) {
-    ZSystemInfoInstance.setLastOpenedImagePath(tmpName);
+    ZSystemInfo::instance().setLastOpenedImagePath(tmpName);
     m_tileSelectionImageFilename = tmpName;
     m_tileList.clear();
     try {
@@ -1547,10 +1547,10 @@ void ZStitchImageDialog::selectConnFile()
 {
   QString connFileName = QFileDialog::getOpenFileName(this,
                                                       tr("specify conn txt file"),
-                                                      ZSystemInfoInstance.lastOpenedImagePath(),
+                                                      ZSystemInfo::instance().lastOpenedImagePath(),
                                                       tr("Conn File (*.txt)"));
   if (!connFileName.isEmpty()) {
-    ZSystemInfoInstance.setLastOpenedImagePath(connFileName);
+    ZSystemInfo::instance().setLastOpenedImagePath(connFileName);
     m_connFileEdit->setText(connFileName);
   }
 }
@@ -1559,10 +1559,10 @@ void ZStitchImageDialog::selectOutputFile()
 {
   QString outputFileName = QFileDialog::getSaveFileName(this,
                                                         tr("specify output file"),
-                                                        ZSystemInfoInstance.lastOpenedImagePath(),
+                                                        ZSystemInfo::instance().lastOpenedImagePath(),
                                                         tr("Output Image (*.tif *.v3draw)"));
   if (!outputFileName.isEmpty()) {
-    ZSystemInfoInstance.setLastOpenedImagePath(outputFileName);
+    ZSystemInfo::instance().setLastOpenedImagePath(outputFileName);
     m_outputFileEdit->setText(outputFileName);
   }
 }

@@ -25,10 +25,6 @@
 #include <sstream>
 #include <tuple>
 
-#ifdef _USE_QSLOG_
-#include <QDebug>
-#endif
-
 #include <QRegularExpression>
 #include <QStringList>
 #include <QColor>
@@ -593,60 +589,6 @@ inline std::ostream& operator<<(std::ostream& s, const glm::tquat<T, P>& q)
 {
   return (s << qUtf8Printable(toQString(q)));
 }
-
-#ifdef _USE_QSLOG_
-//-------------------------------------------------------------------------------------------------------------------------
-// qDebug print
-
-template<typename T, glm::precision P>
-inline QDebug operator<<(QDebug s, const glm::tvec2<T,P>& v)
-{
-  s.nospace() << qUtf8Printable(toQString(v));
-  return s.space();
-}
-
-template<typename T, glm::precision P>
-inline QDebug operator<<(QDebug s, const glm::tvec3<T,P>& v)
-{
-  s.nospace() << qUtf8Printable(toQString(v));
-  return s.space();
-}
-
-template<typename T, glm::precision P>
-inline QDebug operator<<(QDebug s, const glm::tvec4<T,P>& v)
-{
-  s.nospace() << qUtf8Printable(toQString(v));
-  return s.space();
-}
-
-template<typename T, glm::precision P>
-inline QDebug operator<<(QDebug s, const glm::tmat2x2<T,P>& m)
-{
-  s.nospace() << qUtf8Printable(toQString(m));
-  return s.space();
-}
-
-template<typename T, glm::precision P>
-inline QDebug operator<<(QDebug s, const glm::tmat3x3<T,P>& m)
-{
-  s.nospace() << qUtf8Printable(toQString(m));
-  return s.space();
-}
-
-template<typename T, glm::precision P>
-inline QDebug operator<<(QDebug s, const glm::tmat4x4<T,P>& m)
-{
-  s.nospace() << qUtf8Printable(toQString(m));
-  return s.space();
-}
-
-template<typename T, glm::precision P>
-inline QDebug operator<<(QDebug s, const glm::tquat<T,P>& q)
-{
-  s.nospace() << qUtf8Printable(toQString(q));
-  return s.space();
-}
-#endif
 
 } // namespace nim
 

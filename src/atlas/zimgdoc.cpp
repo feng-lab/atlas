@@ -307,7 +307,7 @@ void ZImgDoc::showImg(ZImg* img, const QString& path)
 
   try {
     addImgPack(new ZImgPack(*img, path));
-    ZSystemInfoInstance.addFileToRecentFileList(path);
+    ZSystemInfo::instance().addFileToRecentFileList(path);
     setLastOpenedObjPath(path);
   }
   catch (const ZException& e) {
@@ -429,7 +429,7 @@ size_t ZImgDoc::loadImg(const QString& fileName, size_t scene, FileFormat format
 
     size_t id = addImgPack(new ZImgPack(fileName, scene, format, numScene, info, subBlock));
 
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
@@ -472,7 +472,7 @@ size_t ZImgDoc::loadImg(const QStringList& files, Dimension catDim, size_t scene
 
     size_t id = addImgPack(new ZImgPack(files, catDim, scene, format, numScene, info, subBlock));
 
-    ZSystemInfoInstance.addFileToRecentFileList(files[0]);
+    ZSystemInfo::instance().addFileToRecentFileList(files[0]);
     setLastOpenedObjPath(files[0]);
     return id;
   }
@@ -522,7 +522,7 @@ bool ZImgDoc::saveImg(ZImgPack* pack, QString fileName, FileFormat format, Compr
   try {
     pack->save(fileName, format, comp);
 
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return true;
   }

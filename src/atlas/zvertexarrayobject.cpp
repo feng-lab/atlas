@@ -14,7 +14,7 @@
 namespace nim {
 
 ZVertexArrayObject::ZVertexArrayObject(GLsizei n)
-  : m_hardwareSupportVAO(Z3DGpuInfoInstance.isVAOSupported())
+  : m_hardwareSupportVAO(Z3DGpuInfo::instance().isVAOSupported())
   , m_arrays(std::max(GLsizei(0), n), 0)
 {
   if (m_hardwareSupportVAO)

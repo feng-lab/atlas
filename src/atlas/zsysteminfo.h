@@ -3,8 +3,6 @@
 #include <QString>
 #include <QDir>
 
-#define ZSystemInfoInstance nim::ZSystemInfo::instance()
-
 namespace nim {
 
 class ZSystemInfo

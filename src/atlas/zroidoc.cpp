@@ -45,7 +45,7 @@ void ZROIDoc::askToSave(const ZROI& roi, const QString& title)
     try {
       roi.save(dialog.selectedFiles().at(0));
 
-      ZSystemInfoInstance.addFileToRecentFileList(dialog.selectedFiles().at(0));
+      ZSystemInfo::instance().addFileToRecentFileList(dialog.selectedFiles().at(0));
       setLastOpenedObjPath(dialog.selectedFiles().at(0));
     }
     catch (const ZException& e) {
@@ -115,7 +115,7 @@ size_t ZROIDoc::loadFile(const QString& fileName, QString& errorMsg)
     auto roi = std::make_unique<ZROI>();
     roi->load(fileName);
     id = addROI(roi.release(), fileName);
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
@@ -142,7 +142,7 @@ size_t ZROIDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
     auto roi = std::make_unique<ZROI>();
     roi->load(fileName);
     id = addROI(roi.release(), fileName);
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
@@ -385,7 +385,7 @@ bool ZROIDoc::saveROI(ROIPack* pack, const QString& fileName, QString& errorMsg)
     pack->hasUnsavedChange = false;
     pack->updateDerivedData();
 
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return true;
   }

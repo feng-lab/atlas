@@ -4,8 +4,6 @@
 
 namespace nim {
 
-#define ZImgJpegInstance nim::ZImgJpeg::instance()
-
 class ZImgJpeg : public ZImgFormat
 {
 public:

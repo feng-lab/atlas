@@ -158,7 +158,7 @@ ZImgPack::ZImgPack(const QString& fileName, size_t scene, FileFormat format, siz
   } else {
     std::vector<ZImgInfo> infos;
     std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-    ZImgIOInstance.readInfo(m_imgSource.filenames[0], infos, &subBlocks, nullptr, m_imgSource.format);
+    ZImgIO::instance().readInfo(m_imgSource.filenames[0], infos, &subBlocks, nullptr, m_imgSource.format);
     if (scene >= infos.size()) {
       throw ZIOException("invalid scene");
     }
@@ -182,10 +182,10 @@ ZImgPack::ZImgPack(const QString& fileName, size_t scene, FileFormat format, siz
     }
   }
 
-  bool needScale = Z3DGpuInfoInstance.needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height, m_imgInfo.depth);
+  bool needScale = Z3DGpuInfo::instance().needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height, m_imgInfo.depth);
   if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold && !needScale) {
     m_diskCached = false;
-    ZImgIOInstance.readImg(m_imgSource, m_img);
+    ZImgIO::instance().readImg(m_imgSource, m_img);
   } else if (info->voxelFormat != VoxelFormat::Float && (hasPyramidal || !needScale)) {
     buildFastReadIndex(*sceneSubBlock);
   } else {
@@ -214,7 +214,7 @@ ZImgPack::ZImgPack(const QStringList& files, Dimension catDim, size_t scene, Fil
   } else {
     std::vector<ZImgInfo> infos;
     std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-    ZImgIOInstance.readInfo(m_imgSource.filenames, m_imgSource.catDim, infos, &subBlocks, m_imgSource.format);
+    ZImgIO::instance().readInfo(m_imgSource.filenames, m_imgSource.catDim, infos, &subBlocks, m_imgSource.format);
     if (scene >= infos.size()) {
       throw ZIOException("invalid scene");
     }
@@ -238,10 +238,10 @@ ZImgPack::ZImgPack(const QStringList& files, Dimension catDim, size_t scene, Fil
     }
   }
 
-  bool needScale = Z3DGpuInfoInstance.needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height, m_imgInfo.depth);
+  bool needScale = Z3DGpuInfo::instance().needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height, m_imgInfo.depth);
   if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold && !needScale) {
     m_diskCached = false;
-    ZImgIOInstance.readImg(m_imgSource, m_img);
+    ZImgIO::instance().readImg(m_imgSource, m_img);
   } else if (info->voxelFormat != VoxelFormat::Float && (hasPyramidal || !needScale)) {
     buildFastReadIndex(*sceneSubBlock);
   } else {
@@ -254,7 +254,7 @@ ZImgPack::ZImgPack(const QStringList& files, Dimension catDim, size_t scene, Fil
 ZImgPack::~ZImgPack()
 {
   for (size_t i = 0; i < m_allTiles.size(); ++i) {
-    ZImgCacheInstance.remove(boost::hash_value(HashKeyType(this, i)));
+    ZImgCache::instance().remove(boost::hash_value(HashKeyType(this, i)));
   }
 }
 
@@ -310,7 +310,7 @@ void ZImgPack::setChannelColor(size_t c, col4 col)
 void ZImgPack::save(QString fileName, FileFormat format, Compression comp)
 {
   if (m_diskCached) {
-    ZImgIOInstance.writeImg(fileName, *this, format, comp);
+    ZImgIO::instance().writeImg(fileName, *this, format, comp);
   } else {
     m_img.save(fileName, format, comp);
     m_diskCached = true;
@@ -320,11 +320,11 @@ void ZImgPack::save(QString fileName, FileFormat format, Compression comp)
   m_hasUnsavedChange = false;
 
   for (size_t i = 0; i < m_allTiles.size(); ++i) {
-    ZImgCacheInstance.remove(boost::hash_value(HashKeyType(this, i)));
+    ZImgCache::instance().remove(boost::hash_value(HashKeyType(this, i)));
   }
   std::vector<ZImgInfo> infos;
   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-  ZImgIOInstance.readInfo(m_imgSource.filenames[0], infos, &subBlocks, nullptr, m_imgSource.format);
+  ZImgIO::instance().readInfo(m_imgSource.filenames[0], infos, &subBlocks, nullptr, m_imgSource.format);
   CHECK(!infos.empty() && !subBlocks.empty());
   m_imgInfo = infos[0];
   m_numScenes = infos.size();
@@ -408,7 +408,7 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>>& imgs, std
     tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
     for (size_t i = 0; i < queryResult.size(); ++i) {
       const ZImgSubBlock& tile = *m_allTiles[queryResult[i].second].get();
-      std::shared_ptr<ZImg>* imgPtr = ZImgCacheInstance.getOrRead(
+      std::shared_ptr<ZImg>* imgPtr = ZImgCache::instance().getOrRead(
         boost::hash_value(HashKeyType(this, queryResult[i].second)), tile);
       imgs.push_back(*imgPtr);
       locs.push_back(QPoint(tile.x, tile.y));
@@ -423,7 +423,7 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>>& imgs, std
       const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
       QRectF tileRect(tile.x, tile.y, tile.width, tile.height);
       if (tileRect.intersects(viewport)) {
-        std::shared_ptr<ZImg> *imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(HashKeyType(this, tileIndice[i])), tile);
+        std::shared_ptr<ZImg> *imgPtr = ZImgCache::instance().getOrRead(boost::hash_value(HashKeyType(this, tileIndice[i])), tile);
         imgs.push_back(*imgPtr);
         locs.push_back(QPoint(tile.x, tile.y));
         scales.push_back(readRatio);
@@ -447,7 +447,7 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
         CHECK(tile.x >= 0 && tile.y >= 0);
         if (static_cast<int64_t>(x) >= tile.x && static_cast<int64_t>(x) < tile.x + tile.width &&
             static_cast<int64_t>(y) >= tile.y && static_cast<int64_t>(y) < tile.y + tile.height) {
-          std::shared_ptr<ZImg>* imgPtr = ZImgCacheInstance.getOrRead(
+          std::shared_ptr<ZImg>* imgPtr = ZImgCache::instance().getOrRead(
             boost::hash_value(HashKeyType(this, tileIndice[i])), tile);
           return (*imgPtr)->value<double>(x - tile.x, y - tile.y, 0, c, 0);
         }
@@ -483,7 +483,7 @@ double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, 
           if (ix >= tile.x && ix < tile.x + tile.width && iy >= tile.y && iy < tile.y + tile.height) {
             if (ratio == 1)
               hasTile = true;
-            std::shared_ptr<ZImg>* imgPtr = ZImgCacheInstance.object(
+            std::shared_ptr<ZImg>* imgPtr = ZImgCache::instance().object(
               boost::hash_value(HashKeyType(this, tileIndice[i])));
             if (imgPtr) {
               return (*imgPtr)->value<double>((ix - tile.x) / (1.0 * ratio), (iy - tile.y) / (1.0 * ratio), 0, c, 0);
@@ -546,7 +546,7 @@ ZImg ZImgPack::crop(const ZImgRegion& region) const
             continue;
           }
 
-          std::shared_ptr<ZImg>* imgPtr = ZImgCacheInstance.getOrRead(
+          std::shared_ptr<ZImg>* imgPtr = ZImgCache::instance().getOrRead(
             boost::hash_value(HashKeyType(this, tileIndice[i])), tile);
           res.pasteImg(*imgPtr->get(), start);
         }
@@ -627,7 +627,7 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
                                  zIdx,
                                  -ZVoxelCoordinate::value_type(sc),
                                  0);
-          std::shared_ptr<ZImg>* imgPtr = ZImgCacheInstance.getOrRead(
+          std::shared_ptr<ZImg>* imgPtr = ZImgCache::instance().getOrRead(
             boost::hash_value(HashKeyType(this, queryResult[i].second)), tile);
           if ((*imgPtr)->isSameType(res)) {
             if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
@@ -693,8 +693,8 @@ void ZImgPack::createSliceTiles(ZImg* img, size_t z, size_t t, bool mip)
     } else {
       m_allTiles.emplace_back(new ZImgPackSubBlock(m_imgSource, 1, t, z, 0, 0, img->width(), img->height()));
     }
-    ZImgCacheInstance.insert(boost::hash_value(HashKeyType(this, m_allTiles.size() - 1)),
-                             new std::shared_ptr<ZImg>(img), std::max<size_t>(1, img->byteNumber() / 1024 / 1024));
+    ZImgCache::instance().insert(boost::hash_value(HashKeyType(this, m_allTiles.size() - 1)),
+                                 new std::shared_ptr<ZImg>(img), std::max<size_t>(1, img->byteNumber() / 1024 / 1024));
     return;
   }
 
@@ -712,9 +712,9 @@ void ZImgPack::createSliceTiles(ZImg* img, size_t z, size_t t, bool mip)
         } else {
           m_allTiles.emplace_back(new ZImgPackSubBlock(simg, ratio, t, z, 0, 0, width, height));
         }
-        ZImgCacheInstance.insert(boost::hash_value(HashKeyType(this, m_allTiles.size() - 1)),
-                                 new std::shared_ptr<ZImg>(simg),
-                                 std::max<size_t>(1, simg->byteNumber() / 1024 / 1024));
+        ZImgCache::instance().insert(boost::hash_value(HashKeyType(this, m_allTiles.size() - 1)),
+                                     new std::shared_ptr<ZImg>(simg),
+                                     std::max<size_t>(1, simg->byteNumber() / 1024 / 1024));
         break;
       } else {
         std::shared_ptr<ZImg> simg(new ZImg(*img));
@@ -723,9 +723,9 @@ void ZImgPack::createSliceTiles(ZImg* img, size_t z, size_t t, bool mip)
         } else {
           m_allTiles.emplace_back(new ZImgPackSubBlock(simg, ratio, t, z, 0, 0, width, height));
         }
-        ZImgCacheInstance.insert(boost::hash_value(HashKeyType(this, m_allTiles.size() - 1)),
-                                 new std::shared_ptr<ZImg>(simg),
-                                 std::max<size_t>(1, simg->byteNumber() / 1024 / 1024));
+        ZImgCache::instance().insert(boost::hash_value(HashKeyType(this, m_allTiles.size() - 1)),
+                                     new std::shared_ptr<ZImg>(simg),
+                                     std::max<size_t>(1, simg->byteNumber() / 1024 / 1024));
 
         img->zoom(0.5, 0.5);
         ratio *= 2;
@@ -751,9 +751,9 @@ void ZImgPack::createSliceTiles(ZImg* img, size_t z, size_t t, bool mip)
           } else {
             m_allTiles.emplace_back(new ZImgPackSubBlock(cropped, ratio, t, z, startX, startY, width, height));
           }
-          ZImgCacheInstance.insert(boost::hash_value(HashKeyType(this, m_allTiles.size() - 1)),
-                                   new std::shared_ptr<ZImg>(cropped),
-                                   std::max<size_t>(1, cropped->byteNumber() / 1024 / 1024));
+          ZImgCache::instance().insert(boost::hash_value(HashKeyType(this, m_allTiles.size() - 1)),
+                                       new std::shared_ptr<ZImg>(cropped),
+                                       std::max<size_t>(1, cropped->byteNumber() / 1024 / 1024));
         }
       }
 
@@ -812,7 +812,7 @@ void ZImgPack::buildPyramidal(ZImg& img)
 
 void ZImgPack::buildPyramidal()
 {
-  if (m_imgInfo.byteNumber() <= ZCpuInfoInstance.nPhysicalRAM / 2) {
+  if (m_imgInfo.byteNumber() <= ZCpuInfo::instance().nPhysicalRAM / 2) {
     ZImg tImg;
     tImg.load(m_imgSource.filenames, m_imgSource.catDim, ZImgRegion(), m_imgSource.scene, m_imgSource.format);
     buildPyramidal(tImg);
@@ -929,7 +929,7 @@ ZImg ZImgPack::assembleImg(size_t ratio) const
           const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
           ZVoxelCoordinate start(tile.x / double(ratio), tile.y / double(ratio), z, 0, t);
 
-          std::shared_ptr<ZImg>* imgPtr = ZImgCacheInstance.getOrRead(
+          std::shared_ptr<ZImg>* imgPtr = ZImgCache::instance().getOrRead(
             boost::hash_value(HashKeyType(this, tileIndice[i])), tile);
           res.pasteImg(*imgPtr->get(), start);
         }
@@ -961,8 +961,9 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t) const
         const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
         ZVoxelCoordinate start(tile.x / double(ratio), tile.y / double(ratio), z, 0, 0);
 
-        std::shared_ptr<ZImg>* imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(HashKeyType(this, tileIndice[i])),
-                                                                    tile);
+        std::shared_ptr<ZImg>* imgPtr = ZImgCache::instance().getOrRead(
+          boost::hash_value(HashKeyType(this, tileIndice[i])),
+          tile);
         res.pasteImg(*imgPtr->get(), start);
       }
     }
@@ -989,8 +990,9 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t, size_t z) const
       const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
       ZVoxelCoordinate start(tile.x / double(ratio), tile.y / double(ratio), 0, 0, 0);
 
-      std::shared_ptr<ZImg>* imgPtr = ZImgCacheInstance.getOrRead(boost::hash_value(HashKeyType(this, tileIndice[i])),
-                                                                  tile);
+      std::shared_ptr<ZImg>* imgPtr = ZImgCache::instance().getOrRead(
+        boost::hash_value(HashKeyType(this, tileIndice[i])),
+        tile);
       res.pasteImg(*imgPtr->get(), start);
     }
   }

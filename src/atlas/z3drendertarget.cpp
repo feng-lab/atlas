@@ -189,10 +189,10 @@ bool Z3DRenderTarget::resize(glm::uvec2 newsize)
     LOG(WARNING) << "invalid size: " << newsize;
     return false;
   }
-  if (newsize.x > static_cast<uint32_t>(Z3DGpuInfoInstance.maxTextureSize()) ||
-      newsize.y > static_cast<uint32_t>(Z3DGpuInfoInstance.maxTextureSize())) {
+  if (newsize.x > static_cast<uint32_t>(Z3DGpuInfo::instance().maxTextureSize()) ||
+      newsize.y > static_cast<uint32_t>(Z3DGpuInfo::instance().maxTextureSize())) {
     LOG(WARNING) << "size " << newsize << " exceeds texture size limit: "
-                 << Z3DGpuInfoInstance.maxTextureSize();
+                 << Z3DGpuInfo::instance().maxTextureSize();
     return false;
   }
 

@@ -4,8 +4,6 @@
 
 namespace nim {
 
-#define ZImgFreeImageInstance nim::ZImgFreeImage::instance()
-
 class ZImgFreeImage : public ZImgFormat
 {
 public:

@@ -5,15 +5,9 @@
 #include <QTabWidget>
 #include "zdoc.h"
 
-#ifdef _USE_QSLOG_
-#include "zlog.h"
-#endif
-
 namespace nim {
 
-#ifndef _USE_QSLOG_
 struct LogData;
-#endif
 
 class ZObjEditWidget : public QTabWidget
 {

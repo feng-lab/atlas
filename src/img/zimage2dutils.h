@@ -432,7 +432,7 @@ struct Image2DFilterForOneBlock<double, double>
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (kernelWidth < 8 || !(ZCpuInfoInstance.bAVX || ZCpuInfoInstance.bSSE3)) {
+    if (kernelWidth < 8 || !(ZCpuInfo::instance().bAVX || ZCpuInfo::instance().bSSE3)) {
       for (size_t j = range.begin(); j != range.end(); ++j) {
 #else
         void operator()(const std::pair<size_t,size_t> &range) const {
@@ -449,7 +449,7 @@ struct Image2DFilterForOneBlock<double, double>
           imgOut[j * imgOutWidth + i] = sum;
         }
       }
-    } else if (ZCpuInfoInstance.bAVX) {
+    } else if (ZCpuInfo::instance().bAVX) {
 #ifndef _USE_QTCONCURRENT_
       Image2DFilterForOneBlock_AVX(padImg, padImgWidth, kernel, kernelWidth, kernelHeight,
                                    imgOut, imgOutWidth, range.begin(), range.end());
@@ -457,7 +457,7 @@ struct Image2DFilterForOneBlock<double, double>
       Image2DFilterForOneBlock_AVX(padImg, padImgWidth, kernel, kernelWidth, kernelHeight,
                                    imgOut, imgOutWidth, range.first, range.second);
 #endif
-    } else if (ZCpuInfoInstance.bSSE3) {
+    } else if (ZCpuInfo::instance().bSSE3) {
 #ifndef _USE_QTCONCURRENT_
       Image2DFilterForOneBlock_SSE3(padImg, padImgWidth, kernel, kernelWidth, kernelHeight,
                                     imgOut, imgOutWidth, range.begin(), range.end());
@@ -548,7 +548,7 @@ struct Image2DRowFilterForOneBlock<double, double>
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (kernelWidth < 8 || !(ZCpuInfoInstance.bAVX || ZCpuInfoInstance.bSSE3)) {
+    if (kernelWidth < 8 || !(ZCpuInfo::instance().bAVX || ZCpuInfo::instance().bSSE3)) {
       for (size_t j = range.begin(); j != range.end(); ++j) {
 #else
         void operator()(const std::pair<size_t,size_t> &range) const {
@@ -563,7 +563,7 @@ struct Image2DRowFilterForOneBlock<double, double>
           imgOut[j * imgOutWidth + i] = sum;
         }
       }
-    } else if (ZCpuInfoInstance.bAVX) {
+    } else if (ZCpuInfo::instance().bAVX) {
 #ifndef _USE_QTCONCURRENT_
       Image2DRowFilterForOneBlock_AVX(padImg, padImgWidth, kernel, kernelWidth, imgOut, imgOutWidth,
                                       range.begin(), range.end());
@@ -571,7 +571,7 @@ struct Image2DRowFilterForOneBlock<double, double>
       Image2DRowFilterForOneBlock_AVX(padImg, padImgWidth, kernel, kernelWidth, imgOut, imgOutWidth,
                                       range.first ,range.second);
 #endif
-    } else if (ZCpuInfoInstance.bSSE3) {
+    } else if (ZCpuInfo::instance().bSSE3) {
 #ifndef _USE_QTCONCURRENT_
       Image2DRowFilterForOneBlock_SSE3(padImg, padImgWidth, kernel, kernelWidth, imgOut, imgOutWidth,
                                        range.begin(), range.end());

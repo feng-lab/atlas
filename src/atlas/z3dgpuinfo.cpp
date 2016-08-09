@@ -267,18 +267,18 @@ void Z3DGpuInfo::logGpuInfo() const
 
 bool Z3DGpuInfo::isWeightedAverageSupported() const
 {
-  return Z3DGpuInfoInstance.isTextureRGSupported() && Z3DGpuInfoInstance.isTextureRectangleSupported() &&
-         Z3DGpuInfoInstance.isTextureFloatSupported() &&
-         Z3DGpuInfoInstance.isColorBufferFloatSupported() &&
-         Z3DGpuInfoInstance.maxColorAttachments() >= 2;
+  return Z3DGpuInfo::instance().isTextureRGSupported() && Z3DGpuInfo::instance().isTextureRectangleSupported() &&
+         Z3DGpuInfo::instance().isTextureFloatSupported() &&
+         Z3DGpuInfo::instance().isColorBufferFloatSupported() &&
+         Z3DGpuInfo::instance().maxColorAttachments() >= 2;
 }
 
 bool Z3DGpuInfo::isDualDepthPeelingSupported() const
 {
-  return Z3DGpuInfoInstance.isTextureRGSupported() && Z3DGpuInfoInstance.isTextureRectangleSupported() &&
-         Z3DGpuInfoInstance.isTextureFloatSupported() &&
-         Z3DGpuInfoInstance.isColorBufferFloatSupported() &&
-         Z3DGpuInfoInstance.maxColorAttachments() >= 8;
+  return Z3DGpuInfo::instance().isTextureRGSupported() && Z3DGpuInfo::instance().isTextureRectangleSupported() &&
+         Z3DGpuInfo::instance().isTextureFloatSupported() &&
+         Z3DGpuInfo::instance().isColorBufferFloatSupported() &&
+         Z3DGpuInfo::instance().maxColorAttachments() >= 8;
 }
 
 bool Z3DGpuInfo::isLinkedListSupported() const

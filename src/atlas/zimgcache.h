@@ -6,8 +6,6 @@
 
 namespace nim {
 
-#define ZImgCacheInstance nim::ZImgCache::instance()
-
 class ZImgCache : private QCache<size_t, std::shared_ptr<ZImg>>
 {
 public:

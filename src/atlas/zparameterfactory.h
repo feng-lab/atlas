@@ -7,8 +7,6 @@
 
 namespace nim {
 
-#define ZParameterFactoryInstance nim::ZParameterFactory::instance()
-
 class ZParameterMakerInterface
 {
 public:

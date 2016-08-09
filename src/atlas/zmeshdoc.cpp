@@ -39,7 +39,7 @@ void ZMeshDoc::askToSave(const ZMesh& msh, const QString& title)
     try {
       msh.save(dialog.selectedFiles().at(0), formats[fmtIdx]);
 
-      ZSystemInfoInstance.addFileToRecentFileList(dialog.selectedFiles().at(0));
+      ZSystemInfo::instance().addFileToRecentFileList(dialog.selectedFiles().at(0));
       setLastOpenedObjPath(dialog.selectedFiles().at(0));
     }
     catch (const ZException& e) {
@@ -108,7 +108,7 @@ size_t ZMeshDoc::loadFile(const QString& fileName, QString& errorMsg)
   try {
     ZMesh mesh(fileName);
     size_t id = addMesh(mesh, fileName);
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
@@ -132,7 +132,7 @@ size_t ZMeshDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
   try {
     ZMesh mesh(fileName);
     size_t id = addMesh(mesh, fileName);
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
@@ -325,7 +325,7 @@ bool ZMeshDoc::saveMesh(MeshPack* pack, const QString& fileName, QString& errorM
     pack->hasUnsavedChange = false;
     pack->updateDerivedData();
 
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return true;
   }

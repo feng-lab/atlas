@@ -12,8 +12,6 @@ class ZImgFormat;
 
 class ZImgSliceProvider;
 
-#define ZImgIOInstance nim::ZImgIO::instance()
-
 class ZImgIO
 {
 public:

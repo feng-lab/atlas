@@ -35,8 +35,8 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimatio
   addWidget(m_type.createNameLabel(this), m_type.createWidget(this), lo);
 
   if (m_paraAnimation.boundParameter()->type().contains("Span")) {
-    m_para = ZParameterFactoryInstance.create(m_paraAnimation.boundParameter()->name(),
-                                              m_paraAnimation.boundParameter()->type(), this);
+    m_para = ZParameterFactory::instance().create(m_paraAnimation.boundParameter()->name(),
+                                                  m_paraAnimation.boundParameter()->type(), this);
     m_para->setSameAs(*m_paraAnimation.boundParameter());
     connect(m_para, &ZParameter::valueChanged, m_paraAnimation.boundParameter(), &ZParameter::updateFromSender);
     m_para->setStyle("SPINBOX");

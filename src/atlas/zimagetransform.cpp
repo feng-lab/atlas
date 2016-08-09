@@ -40,12 +40,4 @@ std::ostream& operator<<(std::ostream& s, const ZImageTransform& tfm)
   return (s << qUtf8Printable(tfm.toQString()));
 }
 
-#ifdef _USE_QSLOG_
-QDebug operator<<(QDebug s, const ZImageTransform& tfm)
-{
-  s.nospace() << tfm.toQString();
-  return s.space();
-}
-#endif
-
 } // namespace nim

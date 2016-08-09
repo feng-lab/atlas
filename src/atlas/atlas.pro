@@ -504,7 +504,7 @@ include($$PWD/../3rdparty/glbinding.pri)
 contains(CONFIG, use_glog) {
     include($$PWD/../3rdparty/glog.pri)
 } else {
-    DEFINES += _USE_QSLOG_
+    DEFINES += ATLAS_USE_QSLOG
     include($$PWD/../3rdparty/QsLog/QsLogGUI.pri)
 }
 

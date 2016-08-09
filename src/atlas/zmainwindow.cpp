@@ -73,13 +73,13 @@ void ZMainWindow::initOpenglContext()
   m_sharedContext->show();
 
   // initialize OpenGL
-  if (!ZSystemInfoInstance.initializeGL()) {
-    QString msg = ZSystemInfoInstance.errorMessage();
+  if (!ZSystemInfo::instance().initializeGL()) {
+    QString msg = ZSystemInfo::instance().errorMessage();
     msg += ". 3D functions will be disabled.";
     QMessageBox::warning(this, qApp->applicationName(), "OpenGL Initialization.\n" + msg);
   }
 
-  ZSystemInfoInstance.setStereoSupported(m_sharedContext->format().stereo());
+  ZSystemInfo::instance().setStereoSupported(m_sharedContext->format().stereo());
   m_sharedContext->hide();
 }
 
@@ -277,7 +277,7 @@ void ZMainWindow::viewLog()
   //logDialog.exec();
   QStringList filters;
   filters << "atlas*_log.txt";
-  QFileInfoList list = ZSystemInfoInstance.logDir().entryInfoList(filters,
+  QFileInfoList list = ZSystemInfo::instance().logDir().entryInfoList(filters,
                                                                   QDir::Files | QDir::NoSymLinks,
                                                                   QDir::Name);  // sorted by modification time
   if (!list.isEmpty()) {
@@ -287,7 +287,7 @@ void ZMainWindow::viewLog()
 
 void ZMainWindow::openLogFolder()
 {
-  QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfoInstance.logDir().absolutePath()));
+  QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfo::instance().logDir().absolutePath()));
 }
 
 #ifdef ATLAS_WITH_TESTS
@@ -306,7 +306,7 @@ void ZMainWindow::runCustomCommand()
 
 void ZMainWindow::open3DWindow()
 {
-  if (ZSystemInfoInstance.is3DSupported()) {
+  if (ZSystemInfo::instance().is3DSupported()) {
     try {
       if (!m_3dWindow) {
         m_3dWindow = new Z3DMainWindow(m_doc, *this, false);
@@ -330,7 +330,7 @@ void ZMainWindow::open3DWindow()
     }
   } else {
     QMessageBox::critical(this, qApp->applicationName(),
-                          "3D functions are disabled.\n" + ZSystemInfoInstance.errorMessage());
+                          "3D functions are disabled.\n" + ZSystemInfo::instance().errorMessage());
   }
 }
 
@@ -350,7 +350,7 @@ void ZMainWindow::loadScene()
                             tr("Can not load scene %1: %2").arg(fn).arg(err));
     } else {
       m_doc->setLastOpenedFilePath(fn);
-      ZSystemInfoInstance.addFileToRecentFileList(fn);
+      ZSystemInfo::instance().addFileToRecentFileList(fn);
     }
   }
 }
@@ -373,7 +373,7 @@ void ZMainWindow::saveScene()
                             tr("Can not save scene %1: %2").arg(fn).arg(err));
     } else {
       m_doc->setLastOpenedFilePath(fn);
-      ZSystemInfoInstance.addFileToRecentFileList(fn);
+      ZSystemInfo::instance().addFileToRecentFileList(fn);
       QMessageBox::information(QApplication::activeWindow(),
                                qApp->applicationName(),
                                QString("scene saved as %1").arg(fn),
@@ -393,7 +393,7 @@ void ZMainWindow::loadJsonScene(const QString& fn)
       QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                             tr("Error while loading scene %1: %2").arg(fn).arg(err));
     }
-    ZSystemInfoInstance.addFileToRecentFileList(fn);
+    ZSystemInfo::instance().addFileToRecentFileList(fn);
   }
 }
 
@@ -493,7 +493,7 @@ void ZMainWindow::createActions()
   m_closeAction->setStatusTip(tr("Close this window"));
   connect(m_closeAction, &QAction::triggered, this, &ZMainWindow::close);
 
-  for (int i = 0; i < ZSystemInfoInstance.maxNumRecentFiles(); ++i) {
+  for (int i = 0; i < ZSystemInfo::instance().maxNumRecentFiles(); ++i) {
     m_recentFileActions.push_back(new QAction(this));
     m_recentFileActions[i]->setVisible(false);
     connect(m_recentFileActions[i], &QAction::triggered, this, &ZMainWindow::openRecentFile);

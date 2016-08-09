@@ -165,8 +165,8 @@ void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram* shader, Z3DEye
 
 QString Z3DRendererBase::generateHeader() const
 {
-  QString glslVer = QString("%1%2").arg(Z3DGpuInfoInstance.glslMajorVersion()).arg(
-    Z3DGpuInfoInstance.glslMinorVersion());
+  QString glslVer = QString("%1%2").arg(Z3DGpuInfo::instance().glslMajorVersion()).arg(
+    Z3DGpuInfo::instance().glslMinorVersion());
   if (glslVer.length() < 3)
     glslVer += "0";
 
@@ -198,8 +198,8 @@ QString Z3DRendererBase::generateHeader() const
 
 QString Z3DRendererBase::generateGeomHeader() const
 {
-  QString glslVer = QString("%1%2").arg(Z3DGpuInfoInstance.glslMajorVersion()).arg(
-    Z3DGpuInfoInstance.glslMinorVersion());
+  QString glslVer = QString("%1%2").arg(Z3DGpuInfo::instance().glslMajorVersion()).arg(
+    Z3DGpuInfo::instance().glslMinorVersion());
   if (glslVer.length() < 3)
     glslVer += "0";
 

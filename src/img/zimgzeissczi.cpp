@@ -161,14 +161,14 @@ ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
     }
       break;
     case 1:  // Jpeg
-      ZImgJpegInstance.readInfo(fileBuf.data(), sb.dataSize, info);
+      ZImgJpeg::instance().readInfo(fileBuf.data(), sb.dataSize, info);
       res = ZImg(info);
-      ZImgJpegInstance.readImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
+      ZImgJpeg::instance().readImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
       break;
     case 4:  // JpegXR
-      ZImgJpegXRInstance.readInfo(fileBuf.data(), sb.dataSize, info);
+      ZImgJpegXR::instance().readInfo(fileBuf.data(), sb.dataSize, info);
       res = ZImg(info);
-      ZImgJpegXRInstance.readImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
+      ZImgJpegXR::instance().readImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
       break;
     default:
       try {
@@ -177,9 +177,9 @@ ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
           ZImgFormat::fixDimensionOrder(fileBuf.data(), dimensionOrder, res,
                                         pixelTypeIsBGR(sb.directoryEntry.pixelType));
         } else {
-          ZImgFreeImageInstance.readInfo(fileBuf.data(), sb.dataSize, info);
+          ZImgFreeImage::instance().readInfo(fileBuf.data(), sb.dataSize, info);
           res = ZImg(info);
-          ZImgFreeImageInstance.readImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
+          ZImgFreeImage::instance().readImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
         }
       } catch (const ZException&) {
         throw ZIOException(QString("not supported compression type %1").arg(sb.directoryEntry.compression));

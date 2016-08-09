@@ -6,8 +6,7 @@
 #include <type_traits>
 #include "zeigenutils.h"
 
-#define ZRandomInstance nim::ZRandom::instance()
-// always use ZRandomInstance or instance() to get the static instance of ZRandom, one engine is enough
+// use instance() to get the static instance of ZRandom, one engine is enough
 
 namespace nim {
 

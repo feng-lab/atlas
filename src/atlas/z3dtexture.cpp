@@ -423,7 +423,7 @@ void Z3DTexture::getType()
 }
 
 Z3DTextureUnitManager::Z3DTextureUnitManager()
-  : m_maxTextureUnits(Z3DGpuInfoInstance.maxCombinedTextureImageUnits())
+  : m_maxTextureUnits(Z3DGpuInfo::instance().maxCombinedTextureImageUnits())
   , m_currentUnitNumber(-1)
 {
 }

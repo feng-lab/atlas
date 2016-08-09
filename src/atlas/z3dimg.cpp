@@ -47,13 +47,13 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent)
     m_pageTableBlockSize = glm::uvec3(32, 32, 32);
     m_imageBlockSize = imageBlockSize();
     m_imageBlockReadSize = glm::ivec3(510, 510, 30);
-    if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 4096) {
+    if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 4096) {
       m_imageCacheNumBlocks = glm::uvec3(32, 32, 32); // 1G
       m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 2); // 256*256*64*4*4   64MB
-    } else if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 2048) {
+    } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 2048) {
       m_imageCacheNumBlocks = glm::uvec3(32, 32, 16);
       m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 1); // 256*256*32*4*4   32MB
-    } else if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 1024) {
+    } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 1024) {
       m_imageCacheNumBlocks = glm::uvec3(32, 32, 8);
       m_pageTableCacheNumBlocks = glm::uvec3(4, 4, 2); // 128*128*64*4*4   16MB
     } else {
@@ -95,7 +95,7 @@ QString Z3DImg::samplerType() const
 std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeXSliceVolume(size_t x)
 {
   std::vector<std::unique_ptr<Z3DVolume>> res;
-  size_t maxTextureSize = Z3DGpuInfoInstance.maxTextureSize();
+  size_t maxTextureSize = Z3DGpuInfo::instance().maxTextureSize();
   for (size_t c = 0; c < m_nChannels; ++c) {
     ZImg croped = m_imgPack.crop(ZImgRegion(x, x + 1, 0, -1, 0, -1, c, c + 1, 0, 1));
     croped.infoRef().width = m_imgPack.imgInfo().height;
@@ -121,7 +121,7 @@ std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeXSliceVolume(size_t x)
 std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeYSliceVolume(size_t y)
 {
   std::vector<std::unique_ptr<Z3DVolume>> res;
-  size_t maxTextureSize = Z3DGpuInfoInstance.maxTextureSize();
+  size_t maxTextureSize = Z3DGpuInfo::instance().maxTextureSize();
   for (size_t c = 0; c < m_nChannels; ++c) {
     ZImg croped = m_imgPack.crop(ZImgRegion(0, -1, y, y + 1, 0, -1, c, c + 1, 0, 1));
     croped.infoRef().height = m_imgPack.imgInfo().depth;
@@ -146,7 +146,7 @@ std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeYSliceVolume(size_t y)
 std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeZSliceVolume(size_t z)
 {
   std::vector<std::unique_ptr<Z3DVolume>> res;
-  size_t maxTextureSize = Z3DGpuInfoInstance.maxTextureSize();
+  size_t maxTextureSize = Z3DGpuInfo::instance().maxTextureSize();
   for (size_t c = 0; c < m_nChannels; ++c) {
     ZImg croped = m_imgPack.crop(ZImgRegion(0, -1, 0, -1, z, z + 1, c, c + 1, 0, 1));
     if (croped.width() > maxTextureSize || croped.height() > maxTextureSize) {
@@ -281,9 +281,9 @@ void Z3DImg::setScale(const glm::vec3& scale)
     }
     m_pageDirectorySize = glm::max(m_pageDirectorySize,
                                    m_pageDirectoryBases[l] + glm::ivec3(m_pageDirectoryDimensions[l]));
-    if (m_pageDirectorySize.x > Z3DGpuInfoInstance.max3DTextureSize() ||
-        m_pageDirectorySize.y > Z3DGpuInfoInstance.max3DTextureSize() ||
-        m_pageDirectorySize.z > Z3DGpuInfoInstance.max3DTextureSize()) {
+    if (m_pageDirectorySize.x > Z3DGpuInfo::instance().max3DTextureSize() ||
+        m_pageDirectorySize.y > Z3DGpuInfo::instance().max3DTextureSize() ||
+        m_pageDirectorySize.z > Z3DGpuInfo::instance().max3DTextureSize()) {
       throw ZGLException(QString("Image (%1) is not supported").arg(info.toQString()));
     }
     LOG(INFO) << l << " "
@@ -553,7 +553,7 @@ void Z3DImg::readVolumes()
   // see https://www.opengl.org/wiki/Shader#Resource_limitations
   size_t maxPossibleChannels = std::min(20, (Z3DGpuInfoInstance.maxTextureImageUnits() - 4) / 2);
 #else
-  size_t maxPossibleChannels = Z3DGpuInfoInstance.maxArrayTextureLayers();
+  size_t maxPossibleChannels = Z3DGpuInfo::instance().maxArrayTextureLayers();
 #endif
   if (m_nChannels > maxPossibleChannels) {
     QMessageBox::warning(QApplication::activeWindow(), qApp->applicationName(),
@@ -565,7 +565,7 @@ void Z3DImg::readVolumes()
   double widthScale = 1.0;
   double heightScale = 1.0;
   double depthScale = 1.0;
-  Z3DGpuInfoInstance.getDataScaleForTexture(info.width, info.height, info.depth, widthScale, heightScale, depthScale);
+  Z3DGpuInfo::instance().getDataScaleForTexture(info.width, info.height, info.depth, widthScale, heightScale, depthScale);
 
   if (widthScale != 1.0 || heightScale != 1.0 || depthScale != 1.0) {
     m_isVolumeDownsampled = true;

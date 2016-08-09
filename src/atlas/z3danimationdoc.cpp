@@ -95,7 +95,7 @@ size_t Z3DAnimationDoc::loadFile(const QString& fileName, QString& errorMsg)
     auto animation = std::make_unique<Z3DAnimation>(m_doc);
     animation->load(fileName);
     id = addAnimation(animation.release(), fileName);
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
@@ -121,7 +121,7 @@ size_t Z3DAnimationDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
     auto animation = std::make_unique<Z3DAnimation>(m_doc);
     animation->load(fileName);
     id = addAnimation(animation.release(), fileName);
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
   }
@@ -317,7 +317,7 @@ bool Z3DAnimationDoc::saveAnimation(AnimationPack* pack, const QString& fileName
     pack->hasUnsavedChange = false;
     pack->updateDerivedData();
 
-    ZSystemInfoInstance.addFileToRecentFileList(fileName);
+    ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return true;
   }

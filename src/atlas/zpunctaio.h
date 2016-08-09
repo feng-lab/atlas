@@ -6,8 +6,6 @@ namespace nim {
 
 class ZPuncta;
 
-#define ZPunctaIOInstance nim::ZPunctaIO::instance()
-
 class ZPunctaIO
 {
 public:
