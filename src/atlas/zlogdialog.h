@@ -28,7 +28,6 @@
 #include "zlog.h"
 #include "zlogmodelsink.h"
 #include <QDialog>
-#include <QSharedPointer>
 
 class QModelIndex;
 

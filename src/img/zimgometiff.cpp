@@ -189,7 +189,7 @@ void ZImgOmeTiff::makeImageDescriptionTag(const ZImgInfo& info, const QString& d
 
 void ZImgOmeTiff::parseOME(QXmlStreamReader& xml, ZTiff& tiff)
 {
-  Q_ASSERT(xml.isStartElement() && xml.name() == "OME");
+  CHECK(xml.isStartElement() && xml.name() == "OME");
 
   while (xml.readNextStartElement()) {
     if (xml.name() == "Image") {

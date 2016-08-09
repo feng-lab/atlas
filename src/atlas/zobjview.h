@@ -2,7 +2,6 @@
 
 #include <QObject>
 #include <QRectF>
-#include <QPointer>
 #include "zgraphicsscene.h"
 #include "zview.h"
 #include "zwidgetsgroup.h"

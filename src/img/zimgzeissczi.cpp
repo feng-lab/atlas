@@ -892,7 +892,7 @@ void ZImgZeissCZI::readCZIInfo(const QString& xmlString)
 
 void ZImgZeissCZI::parseMetadata(QXmlStreamReader& xml)
 {
-  Q_ASSERT(xml.isStartElement() && xml.name() == "Metadata");
+  CHECK(xml.isStartElement() && xml.name() == "Metadata");
 
   while (xml.readNextStartElement()) {
     if (xml.name() == "Information") {

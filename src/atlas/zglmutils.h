@@ -47,7 +47,7 @@ tvec3<T, P> applyMatrix(const tmat4x4<T, P>& mat, const tvec3<T, P>& vec)
 template<typename T, precision P>
 void getOrthogonalVectors(const tvec3<T, P>& vec, tvec3<T, P>& e1, tvec3<T, P>& e2)
 {
-  GLM_STATIC_ASSERT(std::numeric_limits<T>::is_iec559, "'getOrthogonalVectors' only accept floating-point inputs");
+  static_assert(std::numeric_limits<T>::is_iec559, "'getOrthogonalVectors' only accept floating-point inputs");
   T eps = std::numeric_limits<T>::epsilon() * 1e2;
 
   e1 = cross(vec, tvec3<T, P>(T(1), T(0), T(0)));
