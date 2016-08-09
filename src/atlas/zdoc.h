@@ -42,7 +42,7 @@ class ZDoc : public QObject
 {
 Q_OBJECT
 public:
-  typedef QList<size_t>::const_iterator ConstObjIdIterator;
+  using ConstObjIdIterator = QList<size_t>::const_iterator;
 
   explicit ZDoc(QObject* parent = 0);
 

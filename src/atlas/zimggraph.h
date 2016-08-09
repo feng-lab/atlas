@@ -111,11 +111,11 @@ private:
     double weight;
   };
 
-  typedef boost::adjacency_list<boost::vecS, boost::vecS,
+  using GraphT = boost::adjacency_list<boost::vecS, boost::vecS,
     boost::undirectedS, boost::no_property, EdgeInfo,
-    boost::no_property, boost::vecS> GraphT;
-  typedef boost::graph_traits<GraphT>::vertex_descriptor Vertex;
-  typedef boost::graph_traits<GraphT>::edge_descriptor Edge;
+    boost::no_property, boost::vecS>;
+  using Vertex = boost::graph_traits<GraphT>::vertex_descriptor;
+  using Edge = boost::graph_traits<GraphT>::edge_descriptor;
 
   GraphT m_graph;
   double m_lowestWeight;

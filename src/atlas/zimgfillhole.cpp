@@ -31,7 +31,7 @@ template<bool ReportProgress>
 template<typename TITKImg>
 void ZImgFillHole<ReportProgress>::run_Impl(TITKImg* itkimg, ZImg& res, size_t c, size_t t)
 {
-  typedef itk::BinaryFillholeImageFilter<TITKImg> BinaryFillHoleFilterType;
+  using BinaryFillHoleFilterType = itk::BinaryFillholeImageFilter<TITKImg>;
   typename BinaryFillHoleFilterType::Pointer bfhFilter = BinaryFillHoleFilterType::New();
   bfhFilter->SetInput(itkimg);
   bfhFilter->SetFullyConnected(m_fullyConnected);

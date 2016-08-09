@@ -147,7 +147,7 @@ ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
       ZTiff::writeTiffHeader(fileBuf.data(), info.width, info.height * info.depth * info.numTimes * info.numChannels,
                              info.bytesPerVoxel * 8, 1, 5, 192, sb.dataSize);
 
-      typedef boost::iostreams::basic_array_source<char> Device;
+      using Device = boost::iostreams::basic_array_source<char>;
       // reinterpret_cast allowed (AliasedType is the (possibly cv-qualified) signed or unsigned variant of DynamicType)
       boost::iostreams::stream<Device> istr(reinterpret_cast<char*>(fileBuf.data()), fileBuf.size());
       ZTiff tif;

@@ -7,8 +7,6 @@ namespace nim {
 template<class T, class WeightT>
 class ZVBGMM;
 
-#ifndef _USE_QTCONCURRENT_
-
 template<class T, class WeightT>
 class _ZVBGMMReduce
 {
@@ -39,30 +37,15 @@ public:
   {}
 };
 
-#else
-template <class T, class WeightT>
-typename ZVBGMM<T,WeightT>::Params ZVBGMMRunOneAttempt(const ZVBGMM<T,WeightT>* t)
-{
-  return t->runOneAttempt();
-}
-
-template <class T, class WeightT>
-void ZVBGMMGetBestResult(typename ZVBGMM<T,WeightT>::Params &result, const typename ZVBGMM<T,WeightT>::Params& inter)
-{
-  if (result.loglikHist < inter.loglikHist)
-    result.swap(const_cast<typename ZVBGMM<T,WeightT>::Params&>(inter));  //don't need intermediate result
-}
-#endif
-
 template<class T, class WeightT = float>
 class ZVBGMM
 {
 public:
 
-  typedef typename MaxFloatType<T, WeightT>::type ResultDataType;
-  typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> MatrixXrt;  // matrix of result data type
-  typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, 1> VectorXrt;  // vector of result data type
-  typedef Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> RowVectorXrt; // row vector of result data type
+  using ResultDataType = typename MaxFloatType<T, WeightT>::type;
+  using MatrixXrt = Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>;  // matrix of result data type
+  using VectorXrt = Eigen::Matrix<ResultDataType, Eigen::Dynamic, 1>;  // vector of result data type
+  using RowVectorXrt = Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic>; // row vector of result data type
 
   struct Params
   {
@@ -122,13 +105,7 @@ public:
     size_t iter;
   };
 
-#ifndef _USE_QTCONCURRENT_
-
   friend class _ZVBGMMReduce<T, WeightT>;
-
-#else
-  friend Params ZVBGMMRunOneAttempt<T,WeightT>(const ZVBGMM<T,WeightT>* t);
-#endif
 
   ZVBGMM(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& data,
          size_t nclasses, size_t nattempts = 10,
@@ -224,17 +201,10 @@ public:
     }
 
     if (useMultithreading && m_nattemps > 1) {
-#ifndef _USE_QTCONCURRENT_
       _ZVBGMMReduce<T, WeightT> vbgmm(this);
       tbb::parallel_reduce(tbb::blocked_range<size_t>(0, m_nattemps), vbgmm);
       Params& result = vbgmm.m_result;
-#else
-      QList<ZVBGMM<T,WeightT>*> alllist;
-      for (size_t i=0; i<m_nattemps; i++) alllist.append(this);
-      Params result = QtConcurrent::blockingMappedReduced(alllist,
-                                                          ZVBGMMRunOneAttempt<T,WeightT>,
-                                                          ZVBGMMGetBestResult<T,WeightT>);
-#endif
+
       composeResults(result);
 
       if (m_logLevel == IterAlgorithmLogLevel::Final || m_logLevel == IterAlgorithmLogLevel::Iter) {

@@ -11,7 +11,7 @@ namespace nim {
 // end == -1 means to the end of that dimension
 struct ZImgRegion
 {
-  typedef ZVoxelCoordinate::value_type value_type;
+  using value_type = ZVoxelCoordinate::value_type;
 
   ZImgRegion()
     : start(0, 0, 0, 0, 0)

@@ -15,9 +15,9 @@ void initLogging(const char* argv0, const QString& filename);
 
 void shutdownLogging();
 
-typedef google::LogSink LogSink;
-typedef std::shared_ptr<google::LogSink> LogSinkPtr;
-typedef google::LogSeverity LogSeverity;
+using LogSink = google::LogSink;
+using LogSinkPtr = std::shared_ptr<google::LogSink>;
+using LogSeverity = google::LogSeverity;
 const LogSeverity InfoLevel = google::GLOG_INFO;
 const LogSeverity WarningLevel = google::GLOG_WARNING;
 const LogSeverity ErrorLevel = google::GLOG_ERROR;
@@ -49,7 +49,7 @@ struct LogData
   QString formatted; // formatted log message with level, time, threadid, filename, line, and message
 };
 
-typedef std::function<void(const LogData&)> LogFunction;
+using LogFunction = std::function<void(const LogData&)>;
 
 // might return nullptr
 LogSinkPtr createFileLogSink(const QString& filename);

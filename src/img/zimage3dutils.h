@@ -6,13 +6,7 @@
 #include <numeric>
 #include "zlog.h"
 //#include "zbenchtimer.h"
-
-#ifndef _USE_QTCONCURRENT_
 #include <tbb/parallel_for.h>
-#else
-#include <QtConcurrent/QtConcurrentMap>
-#endif
-
 #include <QList>
 #include <utility>
 #include <boost/align/aligned_allocator.hpp>
@@ -241,18 +235,9 @@ struct Image3DFilterForOneBlock
   {
   }
 
-  typedef void result_type;
-
-#ifndef _USE_QTCONCURRENT_
-
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     for (size_t k = range.begin(); k != range.end(); ++k) {
-#else
-      void operator()(const std::pair<size_t,size_t> &range) const
-      {
-        for (size_t k=range.first; k<range.second; ++k) {
-#endif
       for (size_t j = 0; j < imgOutHeight; ++j) {
         for (size_t i = 0; i < imgOutWidth; ++i) {
           double sum = 0.0;
@@ -307,19 +292,10 @@ struct Image3DFilterForOneBlock<double, double>
   {
   }
 
-  typedef void result_type;
-
-#ifndef _USE_QTCONCURRENT_
-
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     if (kernelWidth < 8 || !(ZCpuInfo::instance().bAVX || ZCpuInfo::instance().bSSE3)) {
       for (size_t k = range.begin(); k != range.end(); ++k) {
-#else
-        void operator()(const std::pair<size_t,size_t> &range) const {
-          if (kernelWidth < 8 || !(ZCpuInfoInstance.bAVX || ZCpuInfoInstance.bSSE3)) {
-            for (size_t k=range.first; k<range.second; ++k) {
-#endif
         for (size_t j = 0; j < imgOutHeight; ++j) {
           for (size_t i = 0; i < imgOutWidth; ++i) {
             double sum = 0.0;
@@ -335,23 +311,13 @@ struct Image3DFilterForOneBlock<double, double>
         }
       }
     } else if (ZCpuInfo::instance().bAVX) {
-#ifndef _USE_QTCONCURRENT_
       Image3DFilterForOneBlock_AVX(padImg, padImgWidth, padImgHeight, kernel, kernelWidth, kernelHeight, kernelDepth,
                                    imgOut,
                                    imgOutWidth, imgOutHeight, range.begin(), range.end());
-#else
-      Image3DFilterForOneBlock_AVX(padImg, padImgWidth, padImgHeight, kernel, kernelWidth, kernelHeight, kernelDepth, imgOut,
-                                   imgOutWidth, imgOutHeight, range.first, range.second);
-#endif
     } else if (ZCpuInfo::instance().bSSE3) {
-#ifndef _USE_QTCONCURRENT_
       Image3DFilterForOneBlock_SSE3(padImg, padImgWidth, padImgHeight, kernel, kernelWidth, kernelHeight, kernelDepth,
                                     imgOut,
                                     imgOutWidth, imgOutHeight, range.begin(), range.end());
-#else
-      Image3DFilterForOneBlock_SSE3(padImg, padImgWidth, padImgHeight, kernel, kernelWidth, kernelHeight, kernelDepth, imgOut,
-                                    imgOutWidth, imgOutHeight, range.first, range.second);
-#endif
     }
   }
 
@@ -389,18 +355,9 @@ struct Image3DRowFilterForOneBlock
   {
   }
 
-  typedef void result_type;
-
-#ifndef _USE_QTCONCURRENT_
-
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     for (size_t k = range.begin(); k != range.end(); ++k) {
-#else
-      void operator()(const std::pair<size_t,size_t> &range) const
-      {
-        for (size_t k=range.first; k<range.second; ++k) {
-#endif
       for (size_t j = 0; j < imgOutHeight; ++j) {
         for (size_t i = 0; i < imgOutWidth; ++i) {
           double sum = 0.0;
@@ -445,19 +402,10 @@ struct Image3DRowFilterForOneBlock<double, double>
   {
   }
 
-  typedef void result_type;
-
-#ifndef _USE_QTCONCURRENT_
-
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     if (kernelWidth < 8 || !(ZCpuInfo::instance().bAVX || ZCpuInfo::instance().bSSE3)) {
       for (size_t k = range.begin(); k != range.end(); ++k) {
-#else
-        void operator()(const std::pair<size_t,size_t> &range) const {
-          if (kernelWidth < 8 || !(ZCpuInfoInstance.bAVX || ZCpuInfoInstance.bSSE3)) {
-            for (size_t k=range.first; k<range.second; ++k) {
-#endif
         for (size_t j = 0; j < imgOutHeight; ++j) {
           for (size_t i = 0; i < imgOutWidth; ++i) {
             double sum = 0.0;
@@ -469,21 +417,11 @@ struct Image3DRowFilterForOneBlock<double, double>
         }
       }
     } else if (ZCpuInfo::instance().bAVX) {
-#ifndef _USE_QTCONCURRENT_
       Image3DRowFilterForOneBlock_AVX(padImg, padImgWidth, padImgHeight, kernel, kernelWidth,
                                       imgOut, imgOutWidth, imgOutHeight, range.begin(), range.end());
-#else
-      Image3DRowFilterForOneBlock_AVX(padImg, padImgWidth, padImgHeight, kernel, kernelWidth,
-                                      imgOut, imgOutWidth, imgOutHeight, range.first, range.second);
-#endif
     } else if (ZCpuInfo::instance().bSSE3) {
-#ifndef _USE_QTCONCURRENT_
       Image3DRowFilterForOneBlock_SSE3(padImg, padImgWidth, padImgHeight, kernel, kernelWidth,
                                        imgOut, imgOutWidth, imgOutHeight, range.begin(), range.end());
-#else
-      Image3DRowFilterForOneBlock_SSE3(padImg, padImgWidth, padImgHeight, kernel, kernelWidth,
-                                       imgOut, imgOutWidth, imgOutHeight, range.first, range.second);
-#endif
     }
   }
 
@@ -519,18 +457,9 @@ struct Image3DColFilterForOneBlock
   {
   }
 
-  typedef void result_type;
-
-#ifndef _USE_QTCONCURRENT_
-
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     for (size_t k = range.begin(); k != range.end(); ++k) {
-#else
-      void operator()(const std::pair<size_t,size_t> &range) const
-      {
-        for (size_t k=range.first; k<range.second; ++k) {
-#endif
       for (size_t j = 0; j < imgOutHeight; ++j) {
         for (size_t i = 0; i < imgOutWidth; ++i) {
           double sum = 0.0;
@@ -575,18 +504,9 @@ struct Image3DZFilterForOneBlock
   {
   }
 
-  typedef void result_type;
-
-#ifndef _USE_QTCONCURRENT_
-
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     for (size_t k = range.begin(); k != range.end(); ++k) {
-#else
-      void operator()(const std::pair<size_t,size_t> &range) const
-      {
-        for (size_t k=range.first; k<range.second; ++k) {
-#endif
       for (size_t j = 0; j < imgOutHeight; ++j) {
         for (size_t i = 0; i < imgOutWidth; ++i) {
           double sum = 0.0;
@@ -647,26 +567,9 @@ void image3DFilter(const TPixel* img, size_t width, size_t height, size_t depth,
                                                       adjKernel, kernelWidth, kernelHeight, kernelDepth, imgOut, width,
                                                       height);
   if (!useMultithreading) {
-#ifndef _USE_QTCONCURRENT_
     functor(tbb::blocked_range<size_t>(0, depth));
-#else
-    functor(std::make_pair(0, depth));
-#endif
   } else {
-#ifndef _USE_QTCONCURRENT_
     tbb::parallel_for(tbb::blocked_range<size_t>(0, depth), functor);
-#else
-    size_t numThreads = QThread::idealThreadCount();
-    size_t numBlock = std::min(depth, numThreads * 2);
-    size_t zPerBlock = depth / numBlock;
-    QList<std::pair<size_t,size_t>> allRange;
-    for (size_t i=0; i<numBlock; ++i) {
-      allRange.push_back(std::make_pair(i*zPerBlock,
-                                        (i==numBlock-1) ? depth : (i+1)*zPerBlock));
-    }
-
-    QtConcurrent::blockingMap(allRange, functor);
-#endif
   }
 }
 
@@ -719,34 +622,21 @@ void image3DFilter(const TPixel* img, size_t width, size_t height, size_t depth,
     Image3DColFilterForOneBlock<TPixel, double> colfunctor(padImg.data(), desWidth, desHeight,
                                                            adjcolkernel, kernelHeight, bufImg1.data(), desWidth,
                                                            height);
-#ifndef _USE_QTCONCURRENT_
     colfunctor(tbb::blocked_range<size_t>(0, desDepth));
-#else
-    colfunctor(std::make_pair(0, desDepth));
-#endif
     padImg.clear();
     padImg.shrink_to_fit();
 
     std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg2(width * height * desDepth);
     Image3DRowFilterForOneBlock<double, double> rowfunctor(bufImg1.data(), desWidth, height,
                                                            adjrowkernel, kernelWidth, bufImg2.data(), width, height);
-#ifndef _USE_QTCONCURRENT_
     rowfunctor(tbb::blocked_range<size_t>(0, desDepth));
-#else
-    rowfunctor(std::make_pair(0, desDepth));
-#endif
     bufImg1.clear();
     bufImg1.shrink_to_fit();
 
     Image3DZFilterForOneBlock<double, TPixelOut> zfunctor(bufImg2.data(), width, height,
                                                           adjzkernel, kernelDepth, imgOut, width, height);
-#ifndef _USE_QTCONCURRENT_
     zfunctor(tbb::blocked_range<size_t>(0, depth));
-#else
-    zfunctor(std::make_pair(0, depth));
-#endif
   } else {
-#ifndef _USE_QTCONCURRENT_
     std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg1(desWidth * height * desDepth);
     tbb::parallel_for(tbb::blocked_range<size_t>(0, desDepth),
                       Image3DColFilterForOneBlock<TPixel, double>(padImg.data(), desWidth, desHeight,
@@ -766,36 +656,6 @@ void image3DFilter(const TPixel* img, size_t width, size_t height, size_t depth,
     tbb::parallel_for(tbb::blocked_range<size_t>(0, depth),
                       Image3DZFilterForOneBlock<double, TPixelOut>(bufImg2.data(), width, height,
                                                                    adjzkernel, kernelDepth, imgOut, width, height));
-#else
-    size_t numThreads = QThread::idealThreadCount();
-    size_t numBlock = std::min(depth, numThreads * 2);
-    size_t zPerBlock = depth / numBlock;
-    QList<std::pair<size_t,size_t>> allRange;
-    for (size_t i=0; i<numBlock; ++i) {
-      allRange.push_back(std::make_pair(i*zPerBlock,
-                                        (i==numBlock-1) ? depth : (i+1)*zPerBlock));
-    }
-
-    allRange[allRange.size()-1].second = desDepth;
-    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg1(desWidth*height*desDepth);
-    QtConcurrent::blockingMap(allRange,
-                              Image3DColFilterForOneBlock<TPixel,double>(padImg.data(), desWidth, desHeight,
-                              adjcolkernel, kernelHeight, bufImg1.data(), desWidth, height));
-    padImg.clear();
-    padImg.shrink_to_fit();
-
-    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg2(width*height*desDepth);
-    QtConcurrent::blockingMap(allRange,
-                              Image3DRowFilterForOneBlock<double,double>(bufImg1.data(), desWidth, height,
-                              adjrowkernel, kernelWidth, bufImg2.data(), width, height));
-    bufImg1.clear();
-    bufImg1.shrink_to_fit();
-
-    allRange[allRange.size()-1].second = depth;
-    QtConcurrent::blockingMap(allRange,
-                              Image3DZFilterForOneBlock<double,TPixelOut>(bufImg2.data(), width, height,
-                              adjzkernel, kernelDepth, imgOut, width, height));
-#endif
   }
 }
 
@@ -898,21 +758,10 @@ struct Resize3DForOneBlock
   {
   }
 
-  typedef void result_type;
-
-#ifndef _USE_QTCONCURRENT_
-
   void operator()(const tbb::blocked_range<size_t>& range) const
-#else
-  void operator()(const std::pair<size_t,size_t> &range) const
-#endif
   {
     if (m_xKernelWidth == 1 && m_yKernelWidth == 1 && m_zKernelWidth == 1) {
-#ifndef _USE_QTCONCURRENT_
       for (size_t z = range.begin(); z != range.end(); ++z) {
-#else
-        for (size_t z=range.first; z<range.second; ++z) {
-#endif
         for (size_t y = 0; y < m_outHeight; ++y) {
           for (size_t x = 0; x < m_outWidth; ++x) {
             m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] = saturate_cast<TPixelOut>(
@@ -921,11 +770,7 @@ struct Resize3DForOneBlock
         }
       }
     } else {
-#ifndef _USE_QTCONCURRENT_
       for (size_t z = range.begin(); z != range.end(); ++z) {
-#else
-        for (size_t z=range.first; z<range.second; ++z) {
-#endif
         for (size_t y = 0; y < m_outHeight; ++y) {
           for (size_t x = 0; x < m_outWidth; ++x) {
             double valxyz = 0;
@@ -1003,26 +848,9 @@ void image3DResize(const TPixel* img, size_t width, size_t height, size_t depth,
                                               yWeights, yIndices, yKernelWidth,
                                               zWeights, zIndices, zKernelWidth);
   if (!useMultithreading) {
-#ifndef _USE_QTCONCURRENT_
     func(tbb::blocked_range<size_t>(0, outDepth));
-#else
-    func(std::pair<size_t,size_t>(0, outDepth));
-#endif
   } else {
-#ifndef _USE_QTCONCURRENT_
     tbb::parallel_for(tbb::blocked_range<size_t>(0, outDepth), func);
-#else
-    size_t numThreads = QThread::idealThreadCount();
-    size_t numBlock = std::min(outDepth, numThreads * 2);
-    size_t pagesPerBlock = outDepth / numBlock;
-    QList<std::pair<size_t,size_t>> allRange;
-    for (size_t i=0; i<numBlock; ++i) {
-      allRange.push_back(std::make_pair(i*pagesPerBlock,
-                                        (i==numBlock-1) ? outDepth : ((i+1)*pagesPerBlock)));
-    }
-
-    QtConcurrent::blockingMap(allRange, func);
-#endif
   }
 }
 

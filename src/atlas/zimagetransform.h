@@ -1,15 +1,7 @@
 #pragma once
 
 #include <vector>
-
-#ifndef _USE_QTCONCURRENT_
-
 #include <tbb/parallel_for.h>
-
-#else
-#include <QtConcurrent/QtConcurrentMap>
-#endif
-
 #include "zimageinterpolation.h"
 #include "zsaturateoperation.h"
 #include "zstatisticsutils.h"
@@ -96,24 +88,13 @@ struct AffineTransform3DForOneBlock
   {
   }
 
-  typedef void result_type;
-
-#ifndef _USE_QTCONCURRENT_
-
   void operator()(const tbb::blocked_range<int>& range) const
-#else
-  void operator()(const std::pair<int,int> &range) const
-#endif
   {
     size_t outWidth = m_xend - m_xstart;
     size_t outHeight = m_yend - m_ystart;
 
     double outCoords[3];
-#ifndef _USE_QTCONCURRENT_
     for (int z = range.begin(); z != range.end(); ++z) {
-#else
-      for (int z=range.first; z<range.second; ++z) {
-#endif
       for (int y = m_ystart; y < m_yend; ++y) {
         for (int x = m_xstart; x < m_xend; ++x) {
           outCoords[0] = x;
@@ -162,27 +143,9 @@ void ZImageTransform::transformImage(const TPixel* Iin, size_t width, size_t hei
                                                        this->m_imageInterpolation,
                                                        Iout, xstart, xend, ystart, yend, zstart);
   if (!this->m_useMultithreading) {
-#ifndef _USE_QTCONCURRENT_
     func(tbb::blocked_range<int>(zstart, zend));
-#else
-    func(std::make_pair(zstart, zend));
-#endif
   } else {
-#ifndef _USE_QTCONCURRENT_
     tbb::parallel_for(tbb::blocked_range<int>(zstart, zend), func);
-#else
-    int outDepth = zend - zstart;
-    int numThreads = QThread::idealThreadCount();
-    int numBlock = std::min(outDepth, numThreads * 2);
-    int zPerBlock = outDepth / numBlock;
-    QList<std::pair<int,int>> allRange;
-    for (int i=0; i<numBlock; ++i) {
-      allRange.push_back(std::make_pair(i*zPerBlock + zstart,
-                                        (i==numBlock-1) ? zend : ((i+1)*zPerBlock + zstart)));
-    }
-
-    QtConcurrent::blockingMap(allRange, func);
-#endif
   }
 }
 
@@ -199,23 +162,12 @@ struct AffineTransform2DForOneBlock
   {
   }
 
-  typedef void result_type;
-
-#ifndef _USE_QTCONCURRENT_
-
   void operator()(const tbb::blocked_range<int>& range) const
-#else
-  void operator()(const std::pair<int,int> &range) const
-#endif
   {
     size_t outWidth = m_xend - m_xstart;
 
     double outCoords[2];
-#ifndef _USE_QTCONCURRENT_
     for (int y = range.begin(); y != range.end(); ++y) {
-#else
-      for (int y=range.first; y<range.second; ++y) {
-#endif
       for (int x = m_xstart; x < m_xend; ++x) {
         outCoords[0] = x;
         outCoords[1] = y;
@@ -254,27 +206,9 @@ void ZImageTransform::transformImage(const TPixel* Iin, size_t width, size_t hei
                                                        this->m_imageInterpolation,
                                                        Iout, xstart, xend, ystart);
   if (!this->m_useMultithreading) {
-#ifndef _USE_QTCONCURRENT_
     func(tbb::blocked_range<int>(ystart, yend));
-#else
-    func(std::make_pair(ystart, yend));
-#endif
   } else {
-#ifndef _USE_QTCONCURRENT_
     tbb::parallel_for(tbb::blocked_range<int>(ystart, yend), func);
-#else
-    int outHeight = yend - ystart;
-    int numThreads = QThread::idealThreadCount();
-    int numBlock = std::min(outHeight, numThreads * 2);
-    int rowsPerBlock = outHeight / numBlock;
-    QList<std::pair<int,int>> allRange;
-    for (int i=0; i<numBlock; ++i) {
-      allRange.push_back(std::make_pair(i*rowsPerBlock + ystart,
-                                        (i==numBlock-1) ? yend : ((i+1)*rowsPerBlock) + ystart));
-    }
-
-    QtConcurrent::blockingMap(allRange, func);
-#endif
   }
 }
 

@@ -2,18 +2,9 @@
 
 #include <cmath>
 #include "zstatisticsutils.h"
-
-#ifndef _USE_QTCONCURRENT_
-
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
-
-#else
-#include <QtConcurrent/QtConcurrentMap>
-#endif
-
 #include <QList>
-
 #include <utility>
 #include "zbenchtimer.h"
 #include "zimage2dutils.h"
@@ -100,13 +91,9 @@ struct EvaluateMetricForOneBlock
                             double mean1 = 0, double std1 = 0, double mean2 = 0, double std2 = 0)
     : m_img1(img1), m_img2(img2), m_size(size), m_type(type)
     , m_mean1(mean1), m_mean2(mean2), m_std1(std1), m_std2(std2)
-#ifndef _USE_QTCONCURRENT_
     , m_metric(0)
-#endif
   {
   }
-
-#ifndef _USE_QTCONCURRENT_
 
   void operator()(const tbb::blocked_range<size_t>& range)
   {
@@ -136,30 +123,6 @@ struct EvaluateMetricForOneBlock
     m_metric += y.m_metric;
   }
 
-#else
-  typedef double result_type;
-
-  double operator()(const std::pair<size_t,size_t> &range) const {
-    double value = 0;
-    if (m_type == ZImageToImageMetric::MeanDifferences) {
-      for (size_t i=range.first; i<range.second; ++i)
-        value += (m_img1[i] * 1.0 - m_img2[i]) / m_size;
-    } else if (m_type == ZImageToImageMetric::MeanSquaredDifferences) {
-      for (size_t i=range.first; i<range.second; ++i)
-        value += (m_img1[i] * 1.0 - m_img2[i]) * (m_img1[i] * 1.0 - m_img2[i]) / m_size;
-    } else if (m_type == ZImageToImageMetric::LogAbsoluteDifferences) {
-      for (size_t i=range.first; i<range.second; ++i)
-        value += std::log(std::abs(m_img1[i] * 1.0 - m_img2[i]) + 1.0) / m_size;
-    } else if (m_type == ZImageToImageMetric::NormalizedCrossCorrelation) {
-      double scale = 1. / (m_size * m_std1 * m_std2);
-      for (size_t i=range.first; i<range.second; ++i)
-        value += -(m_img1[i]-m_mean1)*(m_img2[i]-m_mean2) * scale;
-    }
-
-    return value;
-  }
-#endif
-
   const TPixel1* m_img1;
   const TPixel2* m_img2;
   double m_size;
@@ -168,9 +131,7 @@ struct EvaluateMetricForOneBlock
   double m_mean2;
   double m_std1;
   double m_std2;
-#ifndef _USE_QTCONCURRENT_
   double m_metric;
-#endif
 };
 
 //template<typename TPixel1, typename TPixel2>
@@ -186,7 +147,7 @@ struct EvaluateMetricForOneBlock
 //  {
 //  }
 
-//  typedef std::vector<std::vector<double>> result_type;
+//  using result_type = std::vector<std::vector<double>>;
 
 //  std::vector<std::vector<double>> operator()(const std::pair<size_t,size_t> &range) const {
 //    std::vector<std::vector<double>> res(3);
@@ -241,62 +202,6 @@ double ZImageToImageMetric::value(const TPixel1* img1, const TPixel2* img2, size
 {
   size_t size = width * height * depth;
 
-  //  if (m_type == NormalizedMutualInformation) {
-  //    double Imin, Imax;
-  //    getHistogramRange<TPixel>(Imin, Imax);
-  //    BuildImageHistogramForOneBlock<TPixel> func(img1, img2, size, Imin, Imax, m_nbins);
-  //    std::vector<std::vector<double>> hists;
-  //    if (m_numThreads == 1) {
-  //      hists = func(std::make_pair((size_t)0, size));
-  //    } else {
-  //      size_t numBlock = std::min(size, (size_t)m_numThreads*2);
-  //      size_t pixelPerBlock = size / numBlock;
-  //      QList<std::pair<size_t,size_t>> allRange;
-  //      for (size_t i=0; i<numBlock; ++i) {
-  //        allRange.push_back(std::make_pair(i*pixelPerBlock,
-  //                                          (i==numBlock-1) ? size : (i+1)*pixelPerBlock));
-  //      }
-  //      if (m_numThreads != (size_t)QThread::idealThreadCount())
-  //        QThreadPool::globalInstance()->setMaxThreadCount(m_numThreads);
-  //      QList<std::vector<std::vector<double>>> values = QtConcurrent::blockingMapped(allRange, func);
-  //      if (m_numThreads != (size_t)QThread::idealThreadCount())
-  //        QThreadPool::globalInstance()->setMaxThreadCount(QThread::idealThreadCount());
-  //      hists = values[0];
-  //      for (int i=1; i<values.size(); ++i) {
-  //        for (size_t j=0; j<m_nbins; ++j) {
-  //          hists[0][j] += values[i][0][j];
-  //          hists[1][j] += values[i][1][j];
-  //        }
-  //        for (size_t j=0; j<m_nbins*m_nbins; ++j) {
-  //          hists[2][j] += values[i][2][j];
-  //        }
-  //      }
-  //    }
-  //    //logContainer(INFO, hists[0], m_nbins, "1");
-  //    //logContainer(INFO, hists[1], m_nbins, "2");
-  //    //logContainer(INFO, hists[2], m_nbins, "3");
-  //    image2DGaussianFilter(&hists[0][0], m_nbins, 1, 1.0, 1.0, &hists[0][0], -1, 1, PadOption::Replicate);
-  //    image2DGaussianFilter(&hists[1][0], m_nbins, 1, 1.0, 1.0, &hists[1][0], -1, 1, PadOption::Replicate);
-  //    image2DGaussianFilter(&hists[2][0], m_nbins, m_nbins, 1.0, 1.0, &hists[2][0], -1, -1, PadOption::Replicate);
-  //    //logContainer(INFO, hists[0], m_nbins, "1");
-  //    //logContainer(INFO, hists[1], m_nbins, "2");
-  //    //logContainer(INFO, hists[2], m_nbins, "3");
-  //    double eps = std::numeric_limits<double>::epsilon() * 1e3;
-  //    double HA = 0.0;
-  //    double HB = 0.0;
-  //    double HAB = 0.0;
-  //    for (size_t i=0; i<m_nbins; ++i) {
-  //      HA += -hists[0][i] * std::log(hists[0][i] + eps);
-  //      HB += -hists[1][i] * std::log(hists[1][i] + eps);
-  //    }
-  //    for (size_t i=0; i<m_nbins*m_nbins; ++i) {
-  //      HAB += -hists[2][i] * std::log(hists[2][i] + eps);
-  //    }
-  //    if( HAB == 0)
-  //      HAB = eps;
-  //    return -(HA + HB) / HAB;
-  //  }
-
   double mean1 = 0, mean2 = 0, std1 = 0, std2 = 0;
   if (m_type == Type::NormalizedCrossCorrelation) {
     meanAndStandardDeviation(img1, img1 + size, mean1, std1, true);
@@ -308,28 +213,11 @@ double ZImageToImageMetric::value(const TPixel1* img1, const TPixel2* img2, size
   EvaluateMetricForOneBlock<TPixel1, TPixel2> func(img1, img2, size, m_type, mean1, std1, mean2, std2);
 
   if (!m_useMultithreading) {
-#ifndef _USE_QTCONCURRENT_
     func(tbb::blocked_range<size_t>(0, size));
     return func.m_metric;
-#else
-    return func(std::pair<size_t,size_t>(0, size));
-#endif
   } else {
-#ifndef _USE_QTCONCURRENT_
     tbb::parallel_reduce(tbb::blocked_range<size_t>(0, size), func);
     return func.m_metric;
-#else
-    size_t numThreads = QThread::idealThreadCount();
-    size_t numBlock = std::min(size, numThreads*2);
-    size_t pixelPerBlock = size / numBlock;
-    QList<std::pair<size_t,size_t>> allRange;
-    for (size_t i=0; i<numBlock; ++i) {
-      allRange.push_back(std::make_pair(i*pixelPerBlock,
-                                        (i==numBlock-1) ? size : (i+1)*pixelPerBlock));
-    }
-    QList<double> values = QtConcurrent::blockingMapped(allRange, func);
-    return std::accumulate(values.begin(), values.end(), 0.0);
-#endif
   }
 }
 

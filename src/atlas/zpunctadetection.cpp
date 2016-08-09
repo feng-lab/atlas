@@ -38,9 +38,9 @@ bool vectorIsEmpty(const std::vector<int>& i)
   return i.empty();
 }
 
-typedef boost::geometry::model::d2::point_xy<double> point_2d;
-typedef boost::geometry::model::polygon<point_2d> polygon_2d;
-typedef boost::geometry::model::box<point_2d> box_2d;
+using point_2d = boost::geometry::model::d2::point_xy<double>;
+using polygon_2d = boost::geometry::model::polygon<point_2d>;
+using box_2d = boost::geometry::model::box<point_2d>;
 
 polygon_2d errorEllipseToPolygon(Eigen::RowVectorXd m, Eigen::MatrixXd cov, double k)
 {
@@ -502,31 +502,31 @@ MatrixXi ZPunctaDetection::detectSomaPuncta(const Image3DType *preprocessedImage
 
   Uint8Image3DType::Pointer somaArea = constructBinaryITKImage(somaVoxels, m_img, borderWidth, &minLoc, &size);
 
-  typedef itk::SizeValueType LabelType;
-  typedef itk::LabelMap<itk::LabelObject<LabelType, 3>> LabelMapType;
-  typedef itk::Image<LabelType, 3>  LabelImageType;
+  using LabelType = itk::SizeValueType;
+  using LabelMapType = itk::LabelMap<itk::LabelObject<LabelType, 3>>;
+  using LabelImageType = itk::Image<LabelType, 3>;
 
   typename Image3DType::Pointer somaPunctaImage = cropITKImage(preprocessedImage, minLoc, size);
 
   //writeITKImage(somaPunctaImage.GetPointer(), "/Users/feng/Downloads/test_itk.tif");
   //writeITKImage(somaArea.GetPointer(), "/Users/feng/Downloads/test_itk2.tif");
 
-  typedef itk::MaskImageFilter<Uint8Image3DType, Image3DType> MaskFilterType;
+  using MaskFilterType = itk::MaskImageFilter<Uint8Image3DType, Image3DType>;
   typename MaskFilterType::Pointer maskFilter = MaskFilterType::New();
   maskFilter->SetInput(somaArea);
   maskFilter->SetMaskImage(somaPunctaImage);
   maskFilter->SetNumberOfThreads(m_numThreads);
   registerOperation(maskFilter.GetPointer(), .25);
 
-  typedef itk::FlatStructuringElement<3> StructuringElementType;
+  using StructuringElementType = itk::FlatStructuringElement<3>;
   StructuringElementType::RadiusType openElementRadius;
   openElementRadius[0] = std::floor(.22 / m_voxelSizeX);
   openElementRadius[1] = std::floor(.22 / m_voxelSizeY);
   openElementRadius[2] = std::floor(.52 / m_voxelSizeZ);
   StructuringElementType openStructuringElement = StructuringElementType::Box(openElementRadius);
 
-  typedef itk::BinaryMorphologicalOpeningImageFilter<Uint8Image3DType, Uint8Image3DType, StructuringElementType>
-      BinaryMorphologicalOpeningImageFilterType;
+  using BinaryMorphologicalOpeningImageFilterType =
+      itk::BinaryMorphologicalOpeningImageFilter<Uint8Image3DType, Uint8Image3DType, StructuringElementType>;
   BinaryMorphologicalOpeningImageFilterType::Pointer openFilter
       = BinaryMorphologicalOpeningImageFilterType::New();
   openFilter->SetKernel(openStructuringElement);
@@ -534,8 +534,7 @@ MatrixXi ZPunctaDetection::detectSomaPuncta(const Image3DType *preprocessedImage
   openFilter->SetNumberOfThreads(m_numThreads);
   registerOperation(openFilter.GetPointer(), .25);
 
-  typedef itk::BinaryImageToLabelMapFilter<Uint8Image3DType, LabelMapType>
-      BinaryImageToLabelMapFilterType;
+  using BinaryImageToLabelMapFilterType = itk::BinaryImageToLabelMapFilter<Uint8Image3DType, LabelMapType>;
   BinaryImageToLabelMapFilterType::Pointer binaryImageToLabelMapFilter
       = BinaryImageToLabelMapFilterType::New();
   binaryImageToLabelMapFilter->SetInput(openFilter->GetOutput());
@@ -628,12 +627,11 @@ QString ZPunctaDetection::getFilteredSomaPunctaFilename()
 void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& big)
 {
   size_t numThreads = m_useMultithreading ? QThread::idealThreadCount() : 1;
-  typedef itk::Image<uint8_t, 3> Image3DType;
-  typedef itk::Image<bool, 3> BinaryImage3DType;
+  using Image3DType = itk::Image<uint8_t, 3>;
+  using BinaryImage3DType = itk::Image<bool, 3>;
   Image3DType::Pointer image = wrapZImgChannelAsITKImg<uint8_t>(m_img, m_dendriteChannel, m_t);
 
-  typedef itk::BinaryThresholdImageFilter<Image3DType, BinaryImage3DType>
-    BinaryThresholdImageFilterType;
+  using BinaryThresholdImageFilterType = itk::BinaryThresholdImageFilter<Image3DType, BinaryImage3DType>;
   BinaryThresholdImageFilterType::Pointer thresholdFilter
     = BinaryThresholdImageFilterType::New();
   thresholdFilter->SetInput(image);
@@ -644,7 +642,7 @@ void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& b
   double tubeRadiusX = std::floor(m_maxDendriteTubeRadius / m_img.voxelSizeXInUm());
   double tubeRadiusY = std::floor(m_maxDendriteTubeRadius / m_img.voxelSizeYInUm());
 
-  typedef itk::Neighborhood<bool, 2> StructuringElement2DType;
+  using StructuringElement2DType = itk::Neighborhood<bool, 2>;
   StructuringElement2DType::SizeType radius;
   radius[0] = tubeRadiusX;
   radius[1] = tubeRadiusY;
@@ -661,16 +659,15 @@ void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& b
     }
   }
 
-  typedef itk::Image<bool, 2> BinaryImage2DType;
-  typedef itk::BinaryMorphologicalOpeningImageFilter<BinaryImage2DType, BinaryImage2DType, StructuringElement2DType>
-    BinaryMorphologicalOpeningImageFilterType;
+  using BinaryImage2DType = itk::Image<bool, 2>;
+  using BinaryMorphologicalOpeningImageFilterType
+    = itk::BinaryMorphologicalOpeningImageFilter<BinaryImage2DType, BinaryImage2DType, StructuringElement2DType>;
   BinaryMorphologicalOpeningImageFilterType::Pointer openFilter
     = BinaryMorphologicalOpeningImageFilterType::New();
   openFilter->SetKernel(structuringElement);
   openFilter->SetNumberOfThreads(numThreads);
 
-  typedef itk::SliceBySliceImageFilter<BinaryImage3DType, BinaryImage3DType>
-    SliceBySliceImageFilterType;
+  using SliceBySliceImageFilterType = itk::SliceBySliceImageFilter<BinaryImage3DType, BinaryImage3DType>;
   SliceBySliceImageFilterType::Pointer sliceBySliceImageFilter
     = SliceBySliceImageFilterType::New();
   sliceBySliceImageFilter->SetFilter(openFilter);
@@ -678,15 +675,15 @@ void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& b
   sliceBySliceImageFilter->SetNumberOfThreads(numThreads);
   registerSubOperation(sliceBySliceImageFilter.GetPointer(), .45 * .5);
 
-  typedef itk::FlatStructuringElement<3> StructuringElementType;
+  using StructuringElementType = itk::FlatStructuringElement<3>;
   StructuringElementType::RadiusType dlElementRadius;
   dlElementRadius[0] = std::max(1., std::floor(.32 / m_img.voxelSizeXInUm()));
   dlElementRadius[1] = std::max(1., std::floor(.32 / m_img.voxelSizeYInUm()));
   dlElementRadius[2] = std::max(1., std::floor(1.2 / m_img.voxelSizeZInUm()));
   StructuringElementType dlStructuringElement = StructuringElementType::Box(dlElementRadius);
 
-  typedef itk::BinaryDilateImageFilter<BinaryImage3DType, BinaryImage3DType, StructuringElementType>
-    BinaryDilateImageFilterType;
+  using BinaryDilateImageFilterType
+    = itk::BinaryDilateImageFilter<BinaryImage3DType, BinaryImage3DType, StructuringElementType>;
   BinaryDilateImageFilterType::Pointer dilateFilter
     = BinaryDilateImageFilterType::New();
   dilateFilter->SetInput(sliceBySliceImageFilter->GetOutput());
@@ -695,7 +692,7 @@ void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& b
   registerSubOperation(dilateFilter.GetPointer(), .45 * .3);
 
   dilateFilter->Update();
-  typedef itk::ImageRegionConstIterator<BinaryImage3DType> ConstIteratorType;
+  using ConstIteratorType = itk::ImageRegionConstIterator<BinaryImage3DType>;
   std::vector<int> coords;
 
   ConstIteratorType maskIt(dilateFilter->GetOutput(), dilateFilter->GetOutput()->GetLargestPossibleRegion());

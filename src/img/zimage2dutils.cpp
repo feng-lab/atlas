@@ -139,7 +139,7 @@ void _resizeContributions(size_t inLength, size_t outLength, Interpolant interpo
   double invScale = 1.0 / scale;
   ArrayXd inCoord(outLength);
   ArrayXXd indices(outLength, static_cast<size_t>(std::ceil(kernelWidth) + 2));
-  typedef std::ptrdiff_t Index;
+  using Index = std::ptrdiff_t;
   for (Index i = 0; i < inCoord.size(); ++i) {
     inCoord(i) = i * invScale - 0.5 * (1 - invScale);
     indices(i, 0) = std::floor(inCoord(i) - 0.5 * kernelWidth);

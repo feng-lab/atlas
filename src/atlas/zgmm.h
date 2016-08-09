@@ -9,10 +9,10 @@ class ZGMM
 {
 public:
 
-  typedef typename MaxFloatType<T, WeightT>::type ResultDataType;
-  typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> MatrixXrt;  // matrix of result data type
-  typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, 1> VectorXrt;  // vector of result data type
-  typedef Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> RowVectorXrt; // row vector of result data type
+  using ResultDataType = typename MaxFloatType<T, WeightT>::type;
+  using MatrixXrt = Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>;  // matrix of result data type
+  using VectorXrt = Eigen::Matrix<ResultDataType, Eigen::Dynamic, 1>;  // vector of result data type
+  using RowVectorXrt = Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic>; // row vector of result data type
 
   enum class CovarianceType
   {

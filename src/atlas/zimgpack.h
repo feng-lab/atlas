@@ -257,15 +257,15 @@ private:
 
   std::vector<std::shared_ptr<ZImgSubBlock>> m_allTiles;
   std::map<size_t, QSize> m_ratioToSize;
-  typedef std::tuple<size_t, size_t, int> RTZType;
+  using RTZType = std::tuple<size_t, size_t, int>;
   std::map<RTZType, std::vector<size_t>> m_rtzToTileIndice;
-  typedef bg::model::point<int64_t, 2, bg::cs::cartesian> TileCornerType;
-  typedef bg::model::box<TileCornerType> TileBoxType;
-  typedef std::pair<TileBoxType, size_t> RTreeValueType;
-  typedef bgi::rtree<RTreeValueType, bgi::quadratic<16>> RTreeType;
-  typedef std::map<RTZType, std::unique_ptr<RTreeType>> RTZToTileBoxRTreeType;
+  using TileCornerType = bg::model::point<int64_t, 2, bg::cs::cartesian>;
+  using TileBoxType = bg::model::box<TileCornerType>;
+  using RTreeValueType = std::pair<TileBoxType, size_t>;
+  using RTreeType = bgi::rtree<RTreeValueType, bgi::quadratic<16>>;
+  using RTZToTileBoxRTreeType = std::map<RTZType, std::unique_ptr<RTreeType>>;
   RTZToTileBoxRTreeType m_rtzToTileBoxRTree;
-  typedef std::tuple<const ZImgPack*, size_t> HashKeyType;
+  using HashKeyType = std::tuple<const ZImgPack*, size_t>;
 
   double m_minIntensity;
   double m_maxIntensity;

@@ -4,21 +4,6 @@
 #include <itkImage.h>
 #include <itkImportImageFilter.h>
 
-// On mac system,
-// qglobal.h force min mac version to 1040 which breaks ITK
-// To make ITK work, change itkLightObject.h:
-// (force use volatile int64_t since MAC_OS_X_VERSION_MIN_REQUIRED used
-// while building ITK would be the currently build-on mac version which
-// is larger than 1050)
-
-//#elif defined( __GLIBCPP__ ) || defined( __GLIBCXX__ )
-//  //typedef _Atomic_word InternalReferenceCountType;
-//  typedef volatile int64_t InternalReferenceCountType;
-//#else
-
-// see http://www.itk.org/pipermail/insight-users/2011-October/042755.html
-// see https://bugreports.qt-project.org/browse/QTBUG-22154
-
 namespace nim {
 
 // ZImg channel to 3d itk image
@@ -35,12 +20,12 @@ typename itk::Image<TVoxel, 3>::Pointer wrapZImgChannelAsITKImg(const ZImg& img,
     throw ZImgException(QString("wrapZImgChannelAsITKImg invalid pos of img, c:%1, t:%2, img:<%3>")
                           .arg(c).arg(t).arg(img.info().toQString()));
   }
-  typedef typename itk::ImportImageFilter<TVoxel, 3> ImportFilterType;
+  using ImportFilterType = typename itk::ImportImageFilter<TVoxel, 3>;
   typename ImportFilterType::Pointer importFilter = ImportFilterType::New();
   typename ImportFilterType::SizeType size;
-  typedef itk::Image<TVoxel, 3> OutputImageType;
-  typedef typename OutputImageType::SpacingType SpacingType;
-  typedef typename OutputImageType::PointType OriginType;
+  using OutputImageType = itk::Image<TVoxel, 3>;
+  using SpacingType = typename OutputImageType::SpacingType;
+  using OriginType = typename OutputImageType::PointType;
   size[0] = img.width();
   size[1] = img.height();
   size[2] = img.depth();
@@ -79,12 +64,12 @@ typename itk::Image<TVoxel, 2>::Pointer wrapZImgPlaneAsITKImg(const ZImg& img, s
     throw ZImgException(QString("wrapZImgPlaneAsITKImg invalid pos of img, z:%1 c:%2, t:%3, img:<%4>")
                           .arg(z).arg(c).arg(t).arg(img.info().toQString()));
   }
-  typedef typename itk::ImportImageFilter<TVoxel, 2> ImportFilterType;
+  using ImportFilterType = typename itk::ImportImageFilter<TVoxel, 2>;
   typename ImportFilterType::Pointer importFilter = ImportFilterType::New();
   typename ImportFilterType::SizeType size;
-  typedef itk::Image<TVoxel, 2> OutputImageType;
-  typedef typename OutputImageType::SpacingType SpacingType;
-  typedef typename OutputImageType::PointType OriginType;
+  using OutputImageType = itk::Image<TVoxel, 2>;
+  using SpacingType = typename OutputImageType::SpacingType;
+  using OriginType = typename OutputImageType::PointType;
   size[0] = img.width();
   size[1] = img.height();
   typename ImportFilterType::IndexType start;
@@ -120,7 +105,7 @@ typename itk::Image<TVoxel, 2>::Pointer wrapZImgPlaneAsITKImg(const ZImg& img, s
 template<typename TVoxel>
 void letITKImgUseMemory(itk::Image<TVoxel, 3>* itkImg, TVoxel* data, size_t width, size_t height, size_t depth)
 {
-  typedef itk::Image<TVoxel, 3> TITKImg;
+  using TITKImg = itk::Image<TVoxel, 3>;
   typename TITKImg::SizeType size;
   size[0] = width;
   size[1] = height;
@@ -139,7 +124,7 @@ template<typename TVoxel>
 void letITKImgUseMemory(itk::Image<TVoxel, 2>* itkImg, TVoxel* data, size_t width, size_t height, size_t dummyDepth = 1)
 {
   Q_UNUSED(dummyDepth)
-  typedef itk::Image<TVoxel, 2> TITKImg;
+  using TITKImg = itk::Image<TVoxel, 2>;
   typename TITKImg::SizeType size;
   size[0] = width;
   size[1] = height;

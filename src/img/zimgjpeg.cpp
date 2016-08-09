@@ -158,7 +158,7 @@ uint16_t getOrientation(jpeg_decompress_struct& cinfo)
   jpeg_saved_marker_ptr marker = cinfo.marker_list;
   while (marker) {
     if (marker->data_length > 6 && std::equal(marker->data, marker->data + 6, "Exif\0\0")) {
-      typedef boost::iostreams::basic_array_source<char> Device;
+      using Device = boost::iostreams::basic_array_source<char>;
       // reinterpret_cast allowed (AliasedType is char or unsigned char: this permits
       // examination of the object representation of any object as an array of unsigned char.)
       boost::iostreams::stream<Device> exifs(reinterpret_cast<char*>(marker->data) + 6, marker->data_length - 6);
@@ -404,7 +404,7 @@ void ZImgJpeg::readMetadata(const QString& filename, ZImgMetadata& meta, size_t 
   jpeg_saved_marker_ptr marker = cinfo.marker_list;
   while (marker) {
     if (marker->data_length > 6 && std::equal(marker->data, marker->data + 6, "Exif\0\0")) {
-      typedef boost::iostreams::basic_array_source<char> Device;
+      using Device = boost::iostreams::basic_array_source<char>;
       boost::iostreams::stream<Device> exifs(reinterpret_cast<char*>(marker->data) + 6, marker->data_length - 6);
       ZTiff exif;
       try {
@@ -449,7 +449,7 @@ ZImgJpeg::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, con
   jpeg_saved_marker_ptr marker = cinfo.marker_list;
   while (marker) {
     if (marker->data_length > 6 && std::equal(marker->data, marker->data + 6, "Exif\0\0")) {
-      typedef boost::iostreams::basic_array_source<char> Device;
+      using Device = boost::iostreams::basic_array_source<char>;
       boost::iostreams::stream<Device> exifs(reinterpret_cast<char*>(marker->data) + 6, marker->data_length - 6);
       ZTiff exif;
       try {

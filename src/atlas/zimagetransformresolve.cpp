@@ -112,10 +112,9 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
 
   QString summ;
 
-  typedef boost::adjacency_list<boost::listS, boost::listS,
-    boost::undirectedS, VertexInfo, EdgeInfo> GraphT;
-  typedef boost::graph_traits<GraphT>::vertex_descriptor Vertex;
-  typedef boost::graph_traits<GraphT>::edge_descriptor Edge;
+  using GraphT = boost::adjacency_list<boost::listS, boost::listS, boost::undirectedS, VertexInfo, EdgeInfo>;
+  using Vertex = boost::graph_traits<GraphT>::vertex_descriptor;
+  using Edge = boost::graph_traits<GraphT>::edge_descriptor;
   std::map<size_t, Vertex> idxToVertexMapper;
   GraphT graph;
 

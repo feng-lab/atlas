@@ -12,15 +12,8 @@
 #include "zbenchtimer.h"
 #include "zrandom.h"
 #include "zstatisticsutils.h"
-
-#ifndef _USE_QTCONCURRENT_
-
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
-
-#else
-#include <QtConcurrent/QtConcurrentMap>
-#endif
 
 namespace nim {
 
@@ -196,8 +189,8 @@ template<class RandomAccessIterator>
 std::vector<size_t> argSort(RandomAccessIterator begin, RandomAccessIterator end)
 {
 
-  typedef typename std::iterator_traits<RandomAccessIterator>::value_type ValueType;
-  typedef std::pair<size_t, ValueType> argsort_pair;
+  using ValueType = typename std::iterator_traits<RandomAccessIterator>::value_type;
+  using argsort_pair = std::pair<size_t, ValueType>;
   CHECK(end > begin);
   std::vector<size_t> indices(end - begin);
 
@@ -218,9 +211,9 @@ typename Eigen::NumTraits<typename std::iterator_traits<RandomAccessIterator>::v
 weightedMedian(RandomAccessIterator dataBegin, RandomAccessIterator dataEnd,
                RandomAccessIterator2 weightBegin, RandomAccessIterator2 weightEnd, bool hasZeroWeight = false)
 {
-  typedef typename std::iterator_traits<RandomAccessIterator>::value_type ValueType;
-  typedef typename std::iterator_traits<RandomAccessIterator2>::value_type ValueType2;
-  typedef typename Eigen::NumTraits<ValueType>::NonInteger ResultType;
+  using ValueType = typename std::iterator_traits<RandomAccessIterator>::value_type;
+  using ValueType2 = typename std::iterator_traits<RandomAccessIterator2>::value_type;
+  using ResultType = typename Eigen::NumTraits<ValueType>::NonInteger;
   CHECK(dataEnd > dataBegin && weightEnd - weightBegin >= dataEnd - dataBegin);
   if (hasZeroWeight) {
     std::vector<ResultType> data;
@@ -384,8 +377,6 @@ struct ZDistanceChebychev
 template<class T, class WeightT, typename Distance>
 class ZKMeans;
 
-#ifndef _USE_QTCONCURRENT_
-
 template<class T, class WeightT, typename Distance>
 class _ZKmeansReduce
 {
@@ -416,31 +407,15 @@ public:
   {}
 };
 
-#else
-template <class T, class WeightT, typename Distance>
-typename ZKMeans<T,WeightT,Distance>::InterResult ZKmeansRunOneAttempt(const ZKMeans<T,WeightT,Distance>* t)
-{
-  return t->runOneAttempt();
-}
-
-template <class T, class WeightT, typename Distance>
-void ZKmeansGetBestResult(typename ZKMeans<T,WeightT,Distance>::InterResult &result, const typename ZKMeans<T,WeightT,Distance>::InterResult& inter)
-{
-  if (result.compactness > inter.compactness)
-    //result.swap(const_cast<typename ZKMeans<T,WeightT,Distance>::InterResult&>(inter));  //don't need intermediate result
-    result = inter;
-}
-#endif
-
 template<class T, class WeightT = float, typename Distance = ZDistanceEuclideanSquared<typename MaxFloatType<T, WeightT>::type>>
 class ZKMeans
 {
 public:
 
-  typedef typename MaxFloatType<T, WeightT>::type ResultDataType;
-  typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> MatrixXrt;  // matrix of result data type
-  typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, 1> VectorXrt;  // vector of result data type
-  typedef void (ZKMeans::* initCentersFunction)(MatrixXrt& centroids) const;
+  using ResultDataType = typename MaxFloatType<T, WeightT>::type;
+  using MatrixXrt = Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>;  // matrix of result data type
+  using VectorXrt = Eigen::Matrix<ResultDataType, Eigen::Dynamic, 1>;  // vector of result data type
+  using initCentersFunction = void (ZKMeans::*)(MatrixXrt& centroids) const;
 
   enum class InitCentersMethod
   {
@@ -472,20 +447,14 @@ public:
     ResultDataType compactness;
   };
 
-#ifndef _USE_QTCONCURRENT_
-
   friend class _ZKmeansReduce<T, WeightT, Distance>;
-
-#else
-  friend InterResult ZKmeansRunOneAttempt<T,WeightT,Distance>(const ZKMeans<T,WeightT,Distance>* t);
-#endif
 
   ZKMeans(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& data, size_t nclasses, size_t nattempts,
           ZTermCriteria<ResultDataType> termCriteria = ZTermCriteria<ResultDataType>(),
           InitCentersMethod initMethod = InitCentersMethod::KmeansPP,
           IterAlgorithmLogLevel logLevel = IterAlgorithmLogLevel::Off)
-    : m_nclasses(nclasses), m_nattemps(nattempts), m_termCriteria(termCriteria), m_distanceFun(Distance()), m_logLevel(
-    logLevel), m_hasWeight(false)
+    : m_nclasses(nclasses), m_nattemps(nattempts), m_termCriteria(termCriteria), m_distanceFun(Distance())
+    , m_logLevel(logLevel), m_hasWeight(false)
   {
     if (std::is_same<T, ResultDataType>::value) {
       // reinterpret_cast allowed (AliasedType is (possibly cv-qualified) DynamicType)
@@ -600,17 +569,10 @@ public:
     }
 
     if (useMultithreading && m_nattemps > 1) {
-#ifndef _USE_QTCONCURRENT_
       _ZKmeansReduce<T, WeightT, Distance> km(this);
       tbb::parallel_reduce(tbb::blocked_range<size_t>(0, m_nattemps), km);
       InterResult& result = km.m_result;
-#else
-      QList<ZKMeans<T,WeightT,Distance>*> alllist;
-      for (size_t i=0; i<m_nattemps; i++) alllist.append(this);
-      InterResult result = QtConcurrent::blockingMappedReduced(alllist,
-                                                               ZKmeansRunOneAttempt<T,WeightT,Distance>,
-                                                               ZKmeansGetBestResult<T,WeightT,Distance>);
-#endif
+
       m_centroids.swap(result.centroids);
       m_initCentroids.swap(result.initCentroids);
       m_labels.swap(result.labels);

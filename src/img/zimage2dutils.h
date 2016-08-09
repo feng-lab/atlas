@@ -6,13 +6,7 @@
 #include <numeric>
 #include "zlog.h"
 //#include "zbenchtimer.h"
-
-#ifndef _USE_QTCONCURRENT_
 #include <tbb/parallel_for.h>
-#else
-#include <QtConcurrent/QtConcurrentMap>
-#endif
-
 #include <QList>
 #include <utility>
 #include <boost/align/aligned_allocator.hpp>
@@ -374,17 +368,9 @@ struct Image2DFilterForOneBlock
   {
   }
 
-  typedef void result_type;
-
-#ifndef _USE_QTCONCURRENT_
-
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     for (size_t j = range.begin(); j != range.end(); ++j) {
-#else
-      void operator()(const std::pair<size_t,size_t> &range) const {
-        for (size_t j=range.first; j<range.second; ++j) {
-#endif
       for (size_t i = 0; i < imgOutWidth; ++i) {
         double sum = 0.0;
         for (size_t r = 0; r < kernelHeight; ++r) {  // row by row
@@ -426,19 +412,10 @@ struct Image2DFilterForOneBlock<double, double>
   {
   }
 
-  typedef void result_type;
-
-#ifndef _USE_QTCONCURRENT_
-
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     if (kernelWidth < 8 || !(ZCpuInfo::instance().bAVX || ZCpuInfo::instance().bSSE3)) {
       for (size_t j = range.begin(); j != range.end(); ++j) {
-#else
-        void operator()(const std::pair<size_t,size_t> &range) const {
-          if (kernelWidth < 8 || !(ZCpuInfoInstance.bAVX || ZCpuInfoInstance.bSSE3)) {
-            for (size_t j=range.first; j<range.second; ++j) {
-#endif
         for (size_t i = 0; i < imgOutWidth; ++i) {
           double sum = 0.0;
           for (size_t r = 0; r < kernelHeight; ++r) {  // row by row
@@ -450,21 +427,11 @@ struct Image2DFilterForOneBlock<double, double>
         }
       }
     } else if (ZCpuInfo::instance().bAVX) {
-#ifndef _USE_QTCONCURRENT_
       Image2DFilterForOneBlock_AVX(padImg, padImgWidth, kernel, kernelWidth, kernelHeight,
                                    imgOut, imgOutWidth, range.begin(), range.end());
-#else
-      Image2DFilterForOneBlock_AVX(padImg, padImgWidth, kernel, kernelWidth, kernelHeight,
-                                   imgOut, imgOutWidth, range.first, range.second);
-#endif
     } else if (ZCpuInfo::instance().bSSE3) {
-#ifndef _USE_QTCONCURRENT_
       Image2DFilterForOneBlock_SSE3(padImg, padImgWidth, kernel, kernelWidth, kernelHeight,
                                     imgOut, imgOutWidth, range.begin(), range.end());
-#else
-      Image2DFilterForOneBlock_SSE3(padImg, padImgWidth, kernel, kernelWidth, kernelHeight,
-                                    imgOut, imgOutWidth, range.first, range.second);
-#endif
     }
   }
 
@@ -495,17 +462,9 @@ struct Image2DRowFilterForOneBlock
   {
   }
 
-  typedef void result_type;
-
-#ifndef _USE_QTCONCURRENT_
-
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     for (size_t j = range.begin(); j != range.end(); ++j) {
-#else
-      void operator()(const std::pair<size_t,size_t> &range) const {
-        for (size_t j=range.first; j<range.second; ++j) {
-#endif
       for (size_t i = 0; i < imgOutWidth; ++i) {
         double sum = 0.0;
         const TPixel* imgStart = padImg + j * padImgWidth + i;
@@ -542,19 +501,10 @@ struct Image2DRowFilterForOneBlock<double, double>
   {
   }
 
-  typedef void result_type;
-
-#ifndef _USE_QTCONCURRENT_
-
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     if (kernelWidth < 8 || !(ZCpuInfo::instance().bAVX || ZCpuInfo::instance().bSSE3)) {
       for (size_t j = range.begin(); j != range.end(); ++j) {
-#else
-        void operator()(const std::pair<size_t,size_t> &range) const {
-          if (kernelWidth < 8 || !(ZCpuInfoInstance.bAVX || ZCpuInfoInstance.bSSE3)) {
-            for (size_t j=range.first; j<range.second; ++j) {
-#endif
         for (size_t i = 0; i < imgOutWidth; ++i) {
           double sum = 0.0;
           const double* imgStart = padImg + j * padImgWidth + i;
@@ -564,21 +514,11 @@ struct Image2DRowFilterForOneBlock<double, double>
         }
       }
     } else if (ZCpuInfo::instance().bAVX) {
-#ifndef _USE_QTCONCURRENT_
       Image2DRowFilterForOneBlock_AVX(padImg, padImgWidth, kernel, kernelWidth, imgOut, imgOutWidth,
                                       range.begin(), range.end());
-#else
-      Image2DRowFilterForOneBlock_AVX(padImg, padImgWidth, kernel, kernelWidth, imgOut, imgOutWidth,
-                                      range.first ,range.second);
-#endif
     } else if (ZCpuInfo::instance().bSSE3) {
-#ifndef _USE_QTCONCURRENT_
       Image2DRowFilterForOneBlock_SSE3(padImg, padImgWidth, kernel, kernelWidth, imgOut, imgOutWidth,
                                        range.begin(), range.end());
-#else
-      Image2DRowFilterForOneBlock_SSE3(padImg, padImgWidth, kernel, kernelWidth, imgOut, imgOutWidth,
-                                       range.first ,range.second);
-#endif
     }
   }
 
@@ -608,17 +548,9 @@ struct Image2DColFilterForOneBlock
   {
   }
 
-  typedef void result_type;
-
-#ifndef _USE_QTCONCURRENT_
-
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     for (size_t j = range.begin(); j != range.end(); ++j) {
-#else
-      void operator()(const std::pair<size_t,size_t> &range) const {
-        for (size_t j=range.first; j<range.second; ++j) {
-#endif
       for (size_t i = 0; i < imgOutWidth; ++i) {
         double sum = 0.0;
         for (size_t r = 0; r < kernelHeight; ++r) {  // row by row
@@ -679,59 +611,20 @@ void image2DFilter(const TPixel* img, size_t width, size_t height,
 
     // get correlation of padImg and adjKernel
     if (!useMultithreading) {
-#ifndef _USE_QTCONCURRENT_
       rowfunctor(tbb::blocked_range<size_t>(0, desHeight));
       colfunctor(tbb::blocked_range<size_t>(0, height));
-#else
-      rowfunctor(std::make_pair(0, desHeight));
-      colfunctor(std::make_pair(0, height));
-#endif
     } else {
-#ifndef _USE_QTCONCURRENT_
       tbb::parallel_for(tbb::blocked_range<size_t>(0, desHeight), rowfunctor);
       tbb::parallel_for(tbb::blocked_range<size_t>(0, height), colfunctor);
-#else
-      size_t numThreads = QThread::idealThreadCount();
-      size_t numBlock = std::min(height, numThreads * 2);
-      size_t rowsPerBlock = height / numBlock;
-      QList<std::pair<size_t,size_t>> allRange;
-      for (size_t i=0; i<numBlock; ++i) {
-        allRange.push_back(std::make_pair(i*rowsPerBlock,
-                                          (i==numBlock-1) ? height : (i+1)*rowsPerBlock));
-      }
-
-      allRange[allRange.size()-1].second = desHeight;
-      QtConcurrent::blockingMap(allRange, rowfunctor);
-
-      allRange[allRange.size()-1].second = height;
-      QtConcurrent::blockingMap(allRange, colfunctor);
-#endif
     }
   } else {
     // get correlation of padImg and adjKernel
     Image2DFilterForOneBlock<TPixel, TPixelOut> functor(padImg.data(), desWidth,
                                                         alignedKernel.data(), kernelWidth, kernelHeight, imgOut, width);
     if (!useMultithreading) {
-#ifndef _USE_QTCONCURRENT_
       functor(tbb::blocked_range<size_t>(0, height));
-#else
-      functor(std::make_pair(0, height));
-#endif
     } else {
-#ifndef _USE_QTCONCURRENT_
       tbb::parallel_for(tbb::blocked_range<size_t>(0, height), functor);
-#else
-      size_t numThreads = QThread::idealThreadCount();
-      size_t numBlock = std::min(height, numThreads * 2);
-      size_t rowsPerBlock = height / numBlock;
-      QList<std::pair<size_t,size_t>> allRange;
-      for (size_t i=0; i<numBlock; ++i) {
-        allRange.push_back(std::make_pair(i*rowsPerBlock,
-                                          (i==numBlock-1) ? height : (i+1)*rowsPerBlock));
-      }
-
-      QtConcurrent::blockingMap(allRange, functor);
-#endif
     }
   }
 }
@@ -778,33 +671,11 @@ void image2DFilter(const TPixel* img, size_t width, size_t height,
 
   // get correlation of padImg and adjKernel
   if (!useMultithreading) {
-#ifndef _USE_QTCONCURRENT_
     rowfunctor(tbb::blocked_range<size_t>(0, desHeight));
     colfunctor(tbb::blocked_range<size_t>(0, height));
-#else
-    rowfunctor(std::make_pair(0, desHeight));
-    colfunctor(std::make_pair(0, height));
-#endif
   } else {
-#ifndef _USE_QTCONCURRENT_
     tbb::parallel_for(tbb::blocked_range<size_t>(0, desHeight), rowfunctor);
     tbb::parallel_for(tbb::blocked_range<size_t>(0, height), colfunctor);
-#else
-    size_t numThreads = QThread::idealThreadCount();
-    size_t numBlock = std::min(height, numThreads * 2);
-    size_t rowsPerBlock = height / numBlock;
-    QList<std::pair<size_t,size_t>> allRange;
-    for (size_t i=0; i<numBlock; ++i) {
-      allRange.push_back(std::make_pair(i*rowsPerBlock,
-                                        (i==numBlock-1) ? height : (i+1)*rowsPerBlock));
-    }
-
-    allRange[allRange.size()-1].second = desHeight;
-    QtConcurrent::blockingMap(allRange, rowfunctor);
-
-    allRange[allRange.size()-1].second = height;
-    QtConcurrent::blockingMap(allRange, colfunctor);
-#endif
   }
 }
 
@@ -896,31 +767,16 @@ struct Resize2DForOneBlock
   {
   }
 
-  typedef void result_type;
-
-#ifndef _USE_QTCONCURRENT_
-
   void operator()(const tbb::blocked_range<size_t>& range) const
-#else
-  void operator()(const std::pair<size_t,size_t> &range) const
-#endif
   {
     if (m_xKernelWidth == 1 && m_yKernelWidth == 1) {
-#ifndef _USE_QTCONCURRENT_
       for (size_t y = range.begin(); y != range.end(); ++y) {
-#else
-        for (size_t y=range.first; y<range.second; ++y) {
-#endif
         for (size_t x = 0; x < m_outWidth; ++x) {
           m_imgOut[y * m_outWidth + x] = saturate_cast<TPixelOut>(m_img[m_yIndices[y] * m_width + m_xIndices[x]]);
         }
       }
     } else {
-#ifndef _USE_QTCONCURRENT_
       for (size_t y = range.begin(); y != range.end(); ++y) {
-#else
-        for (size_t y=range.first; y<range.second; ++y) {
-#endif
         for (size_t x = 0; x < m_outWidth; ++x) {
           double valxy = 0;
           for (size_t ky = 0; ky < m_yKernelWidth; ++ky) {
@@ -978,26 +834,9 @@ void image2DResize(const TPixel* img, size_t width, size_t height,
   Resize2DForOneBlock<TPixel, TPixelOut> func(img, width, height, imgOut, outWidth, outHeight,
                                               xWeights, xIndices, xKernelWidth, yWeights, yIndices, yKernelWidth);
   if (!useMultithreading) {
-#ifndef _USE_QTCONCURRENT_
     func(tbb::blocked_range<size_t>(0, outHeight));
-#else
-    func(std::pair<size_t,size_t>(0, outHeight));
-#endif
   } else {
-#ifndef _USE_QTCONCURRENT_
     tbb::parallel_for(tbb::blocked_range<size_t>(0, outHeight), func);
-#else
-    size_t numThreads = QThread::idealThreadCount();
-    size_t numBlock = std::min(outHeight, numThreads * 2);
-    size_t rowsPerBlock = outHeight / numBlock;
-    QList<std::pair<size_t,size_t>> allRange;
-    for (size_t i=0; i<numBlock; ++i) {
-      allRange.push_back(std::make_pair(i*rowsPerBlock,
-                                        (i==numBlock-1) ? outHeight : ((i+1)*rowsPerBlock)));
-    }
-
-    QtConcurrent::blockingMap(allRange, func);
-#endif
   }
 }
 

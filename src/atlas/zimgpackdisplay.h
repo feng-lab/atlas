@@ -4,13 +4,7 @@
 #include "zimgvoxelcolormap.h"
 #include <map>
 #include <QImage>
-
-#ifndef _USE_QTCONCURRENT_
-
 #include <tbb/blocked_range.h>
-
-#endif
-
 
 namespace nim {
 
@@ -76,8 +70,6 @@ private:
   //                            const std::vector<size_t>& channels,
   //                            const std::vector<ZImgVoxelColormap<TVoxel>>& colormaps) const;
 
-#ifndef _USE_QTCONCURRENT_
-
   template<typename TVoxel>
   void setQImageDataBlockCM(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,
                             const std::vector<size_t>* channels,
@@ -88,18 +80,6 @@ private:
                                      const std::vector<size_t>* channels,
                                      const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const;
 
-#else
-  template<typename TVoxel>
-  void setQImageDataBlockCM(const ZImg *img, QImage *qim, std::pair<size_t,size_t> rowRange,
-                            const std::vector<size_t>* channels,
-                            const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const;
-
-  template<typename TVoxel>
-  void setQImageDataBlockCMMultAlpha(const ZImg *img, QImage *qim, std::pair<size_t,size_t> rowRange,
-                                     const std::vector<size_t>* channels,
-                                     const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const;
-#endif
-
   template<typename TVoxel>
   void setQImageDataCM(const ZImg& img, QImage& qim) const;
 
@@ -107,17 +87,9 @@ private:
   //  void setQImageDataBlock(QImage &qim, size_t startLine, size_t endLine,
   //                            const std::vector<size_t>& channels) const;
 
-#ifndef _USE_QTCONCURRENT_
-
   template<typename TVoxel>
   void setQImageDataBlock(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,
                           const std::vector<size_t>* channels) const;
-
-#else
-  template<typename TVoxel>
-  void setQImageDataBlock(const ZImg *img, QImage *qim, std::pair<size_t, size_t> rowRange,
-                            const std::vector<size_t>* channels) const;
-#endif
 
   template<typename TVoxel>
   void setQImageData(const ZImg& img, QImage& qim) const;

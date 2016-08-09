@@ -184,7 +184,7 @@ exists(/opt/intel/tbb/include) {
     INCLUDEPATH += $$TBBPath/include
     LIBS += $$TBBPath/lib/libtbb.dylib
 } else {
-    DEFINES += _USE_QTCONCURRENT_
+    DEFINES += ATLAS_USE_QTCONCURRENT
     QT += concurrent
 }
 

@@ -138,7 +138,7 @@ class ZROI : public QObject
 {
 Q_OBJECT
 public:
-  typedef std::map<int, ZSliceROI>::const_iterator const_iterator;
+  using const_iterator = std::map<int, ZSliceROI>::const_iterator;
 
   explicit ZROI(QUndoStack* undoStack = nullptr, QObject* parent = nullptr);
 

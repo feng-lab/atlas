@@ -8,7 +8,7 @@
 #include "zimgmetatag.h"
 
 struct tiff;
-typedef struct tiff TIFF;
+using TIFF = struct tiff;
 
 namespace nim {
 

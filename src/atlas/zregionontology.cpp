@@ -219,12 +219,12 @@ void cgalMeshToVerticesIndices(const C2t3 &c2t3, std::vector<glm::vec3> &vertice
   indices.clear();
   using CGAL::Surface_mesher::number_of_facets_on_surface;
 
-  typedef typename C2t3::Triangulation Tr;
-  typedef typename Tr::Finite_facets_iterator Finite_facets_iterator;
-  typedef typename Tr::Finite_vertices_iterator Finite_vertices_iterator;
-  typedef typename Tr::Facet Facet;
-  typedef typename Tr::Edge Edge;
-  typedef typename Tr::Vertex_handle Vertex_handle;
+  using Tr = typename C2t3::Triangulation;
+  using Finite_facets_iterator = typename Tr::Finite_facets_iterator;
+  using Finite_vertices_iterator = typename Tr::Finite_vertices_iterator;
+  using Facet = typename Tr::Facet;
+  using Edge = typename Tr::Edge;
+  using Vertex_handle = typename Tr::Vertex_handle;
 
   // Header.
   const Tr& tr = c2t3.triangulation();
@@ -351,12 +351,12 @@ void binaryImgToMesh1(const ZImg &img, ZMesh &msh)
   memcpy(image3.data(), img.channelData(0), img.channelByteNumber());
 
   // default triangulation for Surface_mesher
-  typedef CGAL::Surface_mesh_default_triangulation_3 Tr;
+  using Tr = CGAL::Surface_mesh_default_triangulation_3;
   // c2t3
-  typedef CGAL::Complex_2_in_triangulation_3<Tr> C2t3;
-  typedef Tr::Geom_traits GT;
-  typedef CGAL::Gray_level_image_3<GT::FT, GT::Point_3> Gray_level_image;
-  typedef CGAL::Implicit_surface_3<GT, Gray_level_image> Surface_3;
+  using C2t3 = CGAL::Complex_2_in_triangulation_3<Tr>;
+  using GT = Tr::Geom_traits;
+  using Gray_level_image = CGAL::Gray_level_image_3<GT::FT, GT::Point_3>;
+  using Surface_3 = CGAL::Implicit_surface_3<GT, Gray_level_image>;
 
   std::vector<glm::vec3> allVertices;
   std::vector<GLuint> allIndices;

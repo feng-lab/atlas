@@ -12,8 +12,8 @@ template<typename KeyType>
 class Z3DBlockCache
 {
 public:
-  typedef typename std::pair<KeyType, glm::ivec3> KeyValuePairType;
-  typedef typename std::list<KeyValuePairType>::iterator ListIteratorType;
+  using KeyValuePairType = typename std::pair<KeyType, glm::ivec3>;
+  using ListIteratorType = typename std::list<KeyValuePairType>::iterator;
 
   Z3DBlockCache(const glm::uvec3& blockSize, const glm::uvec3& numBlocks, const KeyType& invalidKey)
     : m_numValidItems(0)

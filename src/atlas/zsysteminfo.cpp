@@ -22,8 +22,8 @@
 #include "zwindowsheader.h"
 #include <string>
 #include <sstream>
-typedef void (WINAPI *PGNSI)(LPSYSTEM_INFO);
-typedef BOOL (WINAPI *PGPI)(DWORD, DWORD, DWORD, DWORD, PDWORD);
+using PGNSI = void (WINAPI *)(LPSYSTEM_INFO);
+using PGPI = BOOL (WINAPI *)(DWORD, DWORD, DWORD, DWORD, PDWORD);
 //#define PRODUCT_PROFESSIONAL	0x00000030   //defined by winnt.h of mingw
 #define VER_SUITE_WH_SERVER	0x00008000
 #endif

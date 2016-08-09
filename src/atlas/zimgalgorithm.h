@@ -73,8 +73,8 @@ private:
   inline double clamp(double progress, double min = 0.0, double max = 1.0)
   { return std::max(min, std::min(progress, max)); }
 
-  typedef itk::MemberCommand<ZImgAlgorithmBaseWithProgressReporter> CommandType;
-  typedef CommandType::Pointer CommandPointer;
+  using CommandType = itk::MemberCommand<ZImgAlgorithmBaseWithProgressReporter>;
+  using CommandPointer = CommandType::Pointer;
 
   // call back function for ITK
   void processITKEvent(itk::Object* caller, const itk::EventObject& event);

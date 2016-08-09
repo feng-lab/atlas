@@ -41,8 +41,8 @@ struct SwcNode
 class ZSwc : public ZTree<SwcNode>
 {
 public:
-  typedef ZSwc::Iterator SwcTreeNode;
-  typedef ZSwc::ConstIterator ConstSwcTreeNode;
+  using SwcTreeNode = ZSwc::Iterator;
+  using ConstSwcTreeNode = ZSwc::ConstIterator;
 
   static constexpr int SomaType = 1;
   static constexpr int AxonType = 2;

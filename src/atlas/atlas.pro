@@ -572,7 +572,7 @@ exists(/opt/intel/tbb/include) {
     TBB.path = Contents/Frameworks
     QMAKE_BUNDLE_DATA += TBB
 } else {
-    DEFINES += _USE_QTCONCURRENT_
+    DEFINES += ATLAS_USE_QTCONCURRENT
     QT += concurrent
 }
 

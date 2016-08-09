@@ -1,12 +1,6 @@
 #include "zrandom.h"
 
-#ifndef _USE_QTCONCURRENT_
-
 #include <tbb/enumerable_thread_specific.h>
-
-#else
-#include <QThreadStorage>
-#endif
 
 #if defined(_WIN32) || defined(_WIN64)
 
@@ -35,15 +29,8 @@ ZRandom::ZRandom()
 
 ZRandom& ZRandom::instance()
 {
-#ifndef _USE_QTCONCURRENT_
   static tbb::enumerable_thread_specific<ZRandom> globalZRandom;
   return globalZRandom.local();
-#else
-  // should be thread local,
-  // use qt or use boost thread_specific_ptr or wait for c++11 thread_local keyword
-  static QThreadStorage<ZRandom> globalZRandom;
-  return globalZRandom.localData();
-#endif
 }
 
 } // namespace nim

@@ -31,8 +31,8 @@
 #include <QLocale>
 
 namespace glm {
-typedef tvec3<unsigned char, highp> col3;
-typedef tvec4<unsigned char, highp> col4;
+using col3 = tvec3<unsigned char, highp>;
+using col4 = tvec4<unsigned char, highp>;
 
 // apply transform matrix
 template<typename T, precision P>

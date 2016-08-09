@@ -40,8 +40,8 @@ struct ZAnalysisTextFileInput
 
 class ZGenerateAnalysisTextFile
 {
-  typedef ZSwc::Iterator SwcTreeNode;
-  typedef ZSwc::ConstIterator ConstSwcTreeNode;
+  using SwcTreeNode = ZSwc::Iterator;
+  using ConstSwcTreeNode = ZSwc::ConstIterator;
 public:
   ZGenerateAnalysisTextFile();
 

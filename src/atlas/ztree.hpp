@@ -19,7 +19,7 @@ namespace impl {
 template<typename T>
 struct TreeNode
 {
-  typedef T ValueType;
+  using ValueType = T;
 
   TreeNode()
     : parent(nullptr), firstChild(nullptr), lastChild(nullptr), prevSibling(nullptr), nextSibling(nullptr)
@@ -45,8 +45,8 @@ class BaseIterator
   class Iterator;
 
 public:
-  typedef TNode NodeType;
-  typedef typename TNode::ValueType ValueType;
+  using NodeType = TNode;
+  using ValueType = typename TNode::ValueType;
   NodeType* node;
   NodeType* parent;
 
@@ -66,8 +66,8 @@ class BaseIterator<TNode, true>
   class Iterator;
 
 public:
-  typedef TNode NodeType;
-  typedef const typename TNode::ValueType ValueType;
+  using NodeType = TNode;
+  using ValueType = const typename TNode::ValueType;
   NodeType* node;
   NodeType* parent;
 
@@ -83,7 +83,7 @@ template<typename TNode>
 class PreOrderIterator : public BaseIterator<TNode>
 {
 public:
-  typedef typename BaseIterator<TNode>::NodeType NodeType;
+  using NodeType = typename BaseIterator<TNode>::NodeType;
 protected:
   void init(NodeType* n, NodeType* p)
   {
@@ -135,7 +135,7 @@ template<typename TNode>
 class PostOrderIterator : public BaseIterator<TNode>
 {
 public:
-  typedef typename BaseIterator<TNode>::NodeType NodeType;
+  using NodeType = typename BaseIterator<TNode>::NodeType;
 protected:
   void init(NodeType* n, NodeType* p)
   {
@@ -180,7 +180,7 @@ template<typename TNode>
 class BreadthFirstIterator : public BaseIterator<TNode>
 {
 public:
-  typedef typename BaseIterator<TNode>::NodeType NodeType;
+  using NodeType = typename BaseIterator<TNode>::NodeType;
 protected:
   void init(NodeType* n, NodeType* p)
   {
@@ -248,7 +248,7 @@ template<typename TNode>
 class ChildIterator : public BaseIterator<TNode>
 {
 public:
-  typedef typename BaseIterator<TNode>::NodeType NodeType;
+  using NodeType = typename BaseIterator<TNode>::NodeType;
 protected:
   void init(NodeType* n, NodeType* p)
   {
@@ -276,7 +276,7 @@ template<typename TNode>
 class AncestorIterator : public BaseIterator<TNode>
 {
 public:
-  typedef typename BaseIterator<TNode>::NodeType NodeType;
+  using NodeType = typename BaseIterator<TNode>::NodeType;
 protected:
   void init(NodeType* n, NodeType* p)
   {
@@ -308,7 +308,7 @@ template<typename TNode>
 class LeafIterator : public BaseIterator<TNode>
 {
 public:
-  typedef typename BaseIterator<TNode>::NodeType NodeType;
+  using NodeType = typename BaseIterator<TNode>::NodeType;
 protected:
   void init(NodeType* n, NodeType* p)
   {
@@ -400,25 +400,25 @@ protected:
 template<typename T>
 class ZTree
 {
-  typedef impl::TreeNode<T> TreeNode;
+  using TreeNode = impl::TreeNode<T>;
 public:
-  typedef T ValueType;
-  typedef impl::Iterator<impl::PreOrderIterator<TreeNode>> PreOrderIterator;
-  typedef impl::Iterator<impl::PreOrderIterator<const TreeNode>> ConstPreOrderIterator;
-  typedef impl::Iterator<impl::PostOrderIterator<TreeNode>> PostOrderIterator;
-  typedef impl::Iterator<impl::PostOrderIterator<const TreeNode>> ConstPostOrderIterator;
-  typedef impl::Iterator<impl::BreadthFirstIterator<TreeNode>> BreadthFirstIterator;
-  typedef impl::Iterator<impl::BreadthFirstIterator<const TreeNode>> ConstBreadthFirstIterator;
-  typedef impl::Iterator<impl::ChildIterator<TreeNode>> ChildIterator;
-  typedef impl::Iterator<impl::ChildIterator<const TreeNode>> ConstChildIterator;
-  typedef impl::Iterator<impl::AncestorIterator<TreeNode>> AncestorIterator;
-  typedef impl::Iterator<impl::AncestorIterator<const TreeNode>> ConstAncestorIterator;
-  typedef impl::Iterator<impl::LeafIterator<TreeNode>> LeafIterator;
-  typedef impl::Iterator<impl::LeafIterator<const TreeNode>> ConstLeafIterator;
-  typedef PreOrderIterator Iterator;
-  typedef ConstPreOrderIterator ConstIterator;
-  typedef ChildIterator RootIterator;
-  typedef ConstChildIterator ConstRootIterator;
+  using ValueType = T;
+  using PreOrderIterator = impl::Iterator<impl::PreOrderIterator<TreeNode>>;
+  using ConstPreOrderIterator = impl::Iterator<impl::PreOrderIterator<const TreeNode>>;
+  using PostOrderIterator = impl::Iterator<impl::PostOrderIterator<TreeNode>>;
+  using ConstPostOrderIterator = impl::Iterator<impl::PostOrderIterator<const TreeNode>>;
+  using BreadthFirstIterator = impl::Iterator<impl::BreadthFirstIterator<TreeNode>>;
+  using ConstBreadthFirstIterator = impl::Iterator<impl::BreadthFirstIterator<const TreeNode>>;
+  using ChildIterator = impl::Iterator<impl::ChildIterator<TreeNode>>;
+  using ConstChildIterator = impl::Iterator<impl::ChildIterator<const TreeNode>>;
+  using AncestorIterator = impl::Iterator<impl::AncestorIterator<TreeNode>>;
+  using ConstAncestorIterator = impl::Iterator<impl::AncestorIterator<const TreeNode>>;
+  using LeafIterator = impl::Iterator<impl::LeafIterator<TreeNode>>;
+  using ConstLeafIterator = impl::Iterator<impl::LeafIterator<const TreeNode>>;
+  using Iterator = PreOrderIterator;
+  using ConstIterator = ConstPreOrderIterator;
+  using RootIterator = ChildIterator;
+  using ConstRootIterator = ConstChildIterator;
 
   ZTree()
   { init(); }

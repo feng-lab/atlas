@@ -45,7 +45,7 @@ public:
 private:
   const ZImg* m_img;
 
-  typedef ZBBox<ZVoxelCoordinate> BoxType;
+  using BoxType = ZBBox<ZVoxelCoordinate>;
   BoxType m_box;
 };
 

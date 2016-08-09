@@ -12,7 +12,7 @@ class ZImg;
 
 class ZAssignPuncta : public ZImgProcess
 {
-  typedef ZSwc::Iterator SwcTreeNode;
+  using SwcTreeNode = ZSwc::Iterator;
 public:
   ZAssignPuncta(const ZImg& img, size_t dendriteChannel, size_t t = 0);
 

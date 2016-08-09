@@ -27,12 +27,12 @@ namespace traits {
 template<>
 struct tag<QRectF>
 {
-  typedef box_tag type;
+  using type = box_tag;
 };
 template<>
 struct point_type<QRectF>
 {
-  typedef QPointF type;
+  using type = QPointF;
 };
 
 template<size_t C, size_t D>
@@ -67,17 +67,17 @@ namespace boost { namespace geometry { namespace traits {
 
 template<> struct tag<nim::ZVoxelCoordinate>
 {
-  typedef point_tag type;
+  using type = point_tag;
 };
 
 template<> struct coordinate_type< nim::ZVoxelCoordinate >
 {
-  typedef nim::CoordinateType type;
+  using type = nim::CoordinateType;
 };
 
 template<> struct coordinate_system< nim::ZVoxelCoordinate >
 {
-  typedef cs::cartesian type;
+  using type = cs::cartesian;
 };
 
 template<> struct dimension< nim::ZVoxelCoordinate > : boost::mpl::int_<6>

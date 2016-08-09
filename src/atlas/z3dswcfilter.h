@@ -22,7 +22,7 @@ namespace nim {
 class Z3DSwcFilter : public Z3DGeometryFilter
 {
 Q_OBJECT
-  typedef ZSwc::Iterator SwcTreeNode;
+  using SwcTreeNode = ZSwc::Iterator;
 public:
   enum class InteractionMode
   {

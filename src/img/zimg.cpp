@@ -823,7 +823,7 @@ ZImg& ZImg::fillRandom()
 
 ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start)
 {
-  typedef ZVoxelCoordinate::value_type TCoordinate;
+  using TCoordinate = ZVoxelCoordinate::value_type;
 
   if (isEmpty() || img.isEmpty()) {
     LOG(WARNING) << "Trying to paste empty img, abort";
@@ -883,7 +883,7 @@ ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start)
 
 ZImg& ZImg::pasteImgMax(const ZImg& img, const ZVoxelCoordinate& start)
 {
-  typedef ZVoxelCoordinate::value_type TCoordinate;
+  using TCoordinate = ZVoxelCoordinate::value_type;
 
   if (isEmpty() || img.isEmpty()) {
     LOG(WARNING) << "Trying to paste empty img, abort";
@@ -1715,7 +1715,7 @@ template void ZImg::fill_Impl<double>(double);
 template<typename TVoxel, typename TVoxelImg>
 void ZImg::pasteImg_Impl(const ZImg& img, const ZVoxelCoordinate& start)
 {
-  typedef ZVoxelCoordinate::value_type TCoordinate;
+  using TCoordinate = ZVoxelCoordinate::value_type;
   size_t desX = std::max(start.x, TCoordinate(0));
   size_t srcX = desX - start.x;
   size_t desXEnd = std::min(start.x + static_cast<TCoordinate>(img.width()), static_cast<TCoordinate>(width()));
@@ -1752,7 +1752,7 @@ void ZImg::pasteImg_Impl(const ZImg& img, const ZVoxelCoordinate& start)
 template<typename TVoxel, typename TVoxelImg>
 void ZImg::pasteImgMax_Impl(const ZImg& img, const ZVoxelCoordinate& start)
 {
-  typedef ZVoxelCoordinate::value_type TCoordinate;
+  using TCoordinate = ZVoxelCoordinate::value_type;
   size_t desX = std::max(start.x, TCoordinate(0));
   size_t srcX = desX - start.x;
   size_t desXEnd = std::min(start.x + static_cast<TCoordinate>(img.width()), static_cast<TCoordinate>(width()));

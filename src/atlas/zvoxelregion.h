@@ -114,8 +114,8 @@ private:
 class ZVoxelRegion
 {
 public:
-  //typedef impl::voxel_iter<ZVoxelRegion> iterator;
-  typedef impl::voxel_iter<ZVoxelRegion const> const_iterator;
+  //using iterator = impl::voxel_iter<ZVoxelRegion>;
+  using const_iterator = impl::voxel_iter<ZVoxelRegion const>;
 
   ZVoxelRegion();
 
@@ -147,7 +147,7 @@ public:
   static ZVoxelRegion intersect(const ZVoxelRegion& r1, const ZVoxelRegion& r2);
 
 protected:
-  typedef ZBBox<ZVoxelCoordinate> BoxType;
+  using BoxType = ZBBox<ZVoxelCoordinate>;
 
   inline void addBox(const BoxType& box)
   {

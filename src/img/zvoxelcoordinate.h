@@ -12,7 +12,7 @@ namespace nim {
 
 struct ZVoxelCoordinate
 {
-  typedef int value_type;
+  using value_type = int;
 
   enum class Init
   {

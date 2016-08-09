@@ -83,12 +83,12 @@ struct ZVectorCompare<T, true>
 template<typename T1, typename T2>
 struct MaxFloatType
 {
-  typedef typename Eigen::NumTraits<T1>::NonInteger T1NonIntegerType;
-  typedef typename Eigen::NumTraits<T2>::NonInteger T2NonIntegerType;
+  using T1NonIntegerType = typename Eigen::NumTraits<T1>::NonInteger;
+  using T2NonIntegerType = typename Eigen::NumTraits<T2>::NonInteger;
   // get larger type of two float type, use this type for all calculations
-  typedef typename std::conditional<(std::numeric_limits<T1NonIntegerType>::digits10 >
-                                     std::numeric_limits<T2NonIntegerType>::digits10),
-    T1NonIntegerType, T2NonIntegerType>::type type;
+  using type = typename std::conditional<(std::numeric_limits<T1NonIntegerType>::digits10 >
+                                          std::numeric_limits<T2NonIntegerType>::digits10),
+    T1NonIntegerType, T2NonIntegerType>::type;
 };
 
 class ZEigenUtils
@@ -175,7 +175,7 @@ public:
   static Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>
   corrcoef(const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& x)
   {
-    typedef Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> MatrixXni;
+    using MatrixXni = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
     MatrixXni cov = featureCovariance(x);
     MatrixXni res(cov.rows(), cov.cols());
     for (int r = 0; r < cov.rows(); ++r) {
@@ -243,7 +243,7 @@ public:
   inline static typename Eigen::NumTraits<T>::NonInteger
   logdet(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
   {
-    typedef Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, Eigen::Dynamic, Eigen::Dynamic> MatrixXni;
+    using MatrixXni = Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, Eigen::Dynamic, Eigen::Dynamic>;
     MatrixXni floatx = x.template cast<typename Eigen::NumTraits<T>::NonInteger>();
     Eigen::LLT<MatrixXni> chol;
     chol.compute(floatx);
@@ -350,7 +350,7 @@ public:
   featureMean(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
               const Eigen::Matrix<WeightT, Eigen::Dynamic, 1>& weight)
   {
-    typedef typename MaxFloatType<T, WeightT>::type ResultDataType;
+    using ResultDataType = typename MaxFloatType<T, WeightT>::type;
     Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> newX;
     Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> res(x.cols());
     newX = x.template cast<ResultDataType>();
@@ -366,7 +366,7 @@ public:
                     bool bias = false)
   {
     CHECK(x.rows() > 0);
-    typedef typename Eigen::NumTraits<T>::NonInteger ResultDataType;
+    using ResultDataType = typename Eigen::NumTraits<T>::NonInteger;
     ResultDataType factor = 0;
     if (!bias && x.rows() > 1)
       factor = 1.0 / (x.rows() - 1.0);
@@ -387,7 +387,7 @@ public:
                     bool bias = false)
   {
     CHECK(x.rows() > 0 && weight.rows() >= x.rows());
-    typedef typename MaxFloatType<T, WeightT>::type ResultDataType;
+    using ResultDataType = typename MaxFloatType<T, WeightT>::type;
     ResultDataType factor = 0;
     // convert to result type
     const Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>& rtX = x.template cast<ResultDataType>();
@@ -424,9 +424,9 @@ public:
     CHECK(x.rows() > 0);
     CHECK(x.cols() > 0);
     CHECK(inputShrink == -1 || (inputShrink >= 0 && inputShrink <= 1));
-    typedef typename Eigen::NumTraits<T>::NonInteger ResultDataType;
-    typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> ResultMatType;
-    typedef Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> ResultRowVecType;
+    using ResultDataType = typename Eigen::NumTraits<T>::NonInteger;
+    using ResultMatType = Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>;
+    using ResultRowVecType = Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic>;
     int nsample = x.rows();
     int ndim = x.cols();
     ResultMatType samplecov = featureCovariance(x, true);
@@ -468,9 +468,9 @@ public:
     CHECK(x.rows() > 0);
     CHECK(x.cols() > 0);
     CHECK(inputShrink == -1 || (inputShrink >= 0 && inputShrink <= 1));
-    typedef typename Eigen::NumTraits<T>::NonInteger ResultDataType;
-    typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> ResultMatType;
-    typedef Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> ResultRowVecType;
+    using ResultDataType = typename Eigen::NumTraits<T>::NonInteger;
+    using ResultMatType = Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>;
+    using ResultRowVecType = Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic>;
     int nsample = x.rows();
     ResultMatType samplecov = featureCovariance(x, true);
     ResultMatType prior = samplecov.diagonal().asDiagonal();
@@ -512,9 +512,9 @@ public:
     CHECK(x.rows() > 0);
     CHECK(x.cols() > 0);
     CHECK(inputShrink == -1 || (inputShrink >= 0 && inputShrink <= 1));
-    typedef typename Eigen::NumTraits<T>::NonInteger ResultDataType;
-    typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> ResultMatType;
-    typedef Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> ResultRowVecType;
+    using ResultDataType = typename Eigen::NumTraits<T>::NonInteger;
+    using ResultMatType = Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>;
+    using ResultRowVecType = Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic>;
     int nsample = x.rows();
     int ndim = x.cols();
     ResultMatType samplecov = featureCovariance(x);
@@ -567,9 +567,9 @@ public:
     CHECK(x.rows() > 0);
     CHECK(x.cols() > 0);
     CHECK(inputShrink == -1 || (inputShrink >= 0 && inputShrink <= 1));
-    typedef typename Eigen::NumTraits<T>::NonInteger ResultDataType;
-    typedef Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> ResultMatType;
-    typedef Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> ResultRowVecType;
+    using ResultDataType = typename Eigen::NumTraits<T>::NonInteger;
+    using ResultMatType = Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>;
+    using ResultRowVecType = Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic>;
     int nsample = x.rows();
     int ndim = x.cols();
     ResultMatType samplecov = featureCovariance(x, true);
@@ -610,7 +610,7 @@ public:
   static Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>
   featureUnique(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x, int* num = nullptr)
   {
-    typedef Eigen::Matrix<T, 1, Eigen::Dynamic> VectorXt;
+    using VectorXt = Eigen::Matrix<T, 1, Eigen::Dynamic>;
     int nUniqueData = 0;
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> uniqueMat(x.rows(), x.cols());
     std::set<VectorXt, ZVectorCompare<T>> myset;

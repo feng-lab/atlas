@@ -348,7 +348,7 @@ protected:
   friend class Z3DTransferFunctionParameter;
 
   std::vector<std::pair<ZColorMapKey, bool>> m_keys;
-  typedef std::vector<std::pair<ZColorMapKey, bool>>::iterator KeyIterType;
+  using KeyIterType = std::vector<std::pair<ZColorMapKey, bool>>::iterator;
   bool m_hasDataRange;
   double m_dataMin;
   double m_dataMax;

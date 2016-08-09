@@ -22,13 +22,6 @@ using namespace nim;
 
 namespace {
 
-typedef enum
-{
-  J2K_32 = 0,
-  J2K_16 = 1
-
-} J2KPRECISION;
-
 bool IsJP2(BaseStreamInput& in)
 {
   unsigned char buf[4];

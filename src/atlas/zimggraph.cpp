@@ -10,7 +10,7 @@ template<class Graph>
 class distance_heuristic : public boost::astar_heuristic<Graph, double>
 {
 public:
-  typedef typename boost::graph_traits<Graph>::vertex_descriptor Vertex;
+  using Vertex = typename boost::graph_traits<Graph>::vertex_descriptor;
 
   distance_heuristic(const ZImgRegion& region, const ZImgInfo& regionInfo,
                      const std::vector<Vertex>& goals, double weight, bool useVoxelSize, const ZNeighborhood& nb)
@@ -216,9 +216,9 @@ std::tuple<double, size_t> ZImgGraph::shortestPath(size_t startIdx, const std::v
     }
   }
 
-  typedef std::unordered_map<Vertex, Vertex> PredMap;
+  using PredMap = std::unordered_map<Vertex, Vertex>;
   PredMap predecessor;
-  typedef std::unordered_map<Vertex, double> DistMap;
+  using DistMap = std::unordered_map<Vertex, double>;
   DistMap distance;
   try {
     if (resPath) {

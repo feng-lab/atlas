@@ -1192,7 +1192,7 @@ ZMesh ZMesh::merge(const std::vector<ZMesh>& meshes)
 
 void ZMesh::createSwcMesh(const ZSwc& tree, double zScale, int rootType, ZMesh& rootMesh, ZMesh& branchMesh)
 {
-  typedef ZSwc::ConstIterator SwcTreeNode;
+  using SwcTreeNode = ZSwc::ConstIterator;
   std::map<SwcTreeNode, size_t> nodeToBranchId;
   std::vector<std::vector<SwcTreeNode>> allBranches;
   std::vector<std::vector<SwcTreeNode>> rootBranches;

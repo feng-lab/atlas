@@ -528,7 +528,7 @@ ZImg ZImgPack::crop(const ZImgRegion& region) const
   // create destination
   res = ZImg(resInfo);
   // start copy data
-  typedef ZVoxelCoordinate::value_type TCoordinate;
+  using TCoordinate = ZVoxelCoordinate::value_type;
 
   for (TCoordinate t = rgn.tStart(); t < rgn.tEnd(); ++t) {
     for (TCoordinate z = rgn.zStart(); z < rgn.zEnd(); ++z) {

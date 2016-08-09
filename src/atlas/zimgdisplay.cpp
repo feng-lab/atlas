@@ -1,13 +1,5 @@
 #include "zimgdisplay.h"
-
-#ifndef _USE_QTCONCURRENT_
-
 #include <tbb/parallel_for.h>
-
-#else
-#include <QtConcurrentRun>
-#endif
-
 #include "zlog.h"
 #include <functional>
 
@@ -133,26 +125,15 @@ ZQImagePack ZImgDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) const
 }
 
 template<typename TVoxel>
-#ifndef _USE_QTCONCURRENT_
 void ZImgDisplay::setQImageDataBlockCM(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,
-#else
-  void ZImgDisplay::setQImageDataBlockCM(const ZImg *img, QImage *qim, std::pair<size_t, size_t> rowRange,
-#endif
                                        const std::vector<size_t>* channels,
                                        const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const
 {
   std::vector<const TVoxel*> imgDatas(channels->size());
-#ifndef _USE_QTCONCURRENT_
   for (size_t c = 0; c < channels->size(); ++c) {
     imgDatas[c] = img->rowData<TVoxel>(rowRange.begin(), m_z, (*channels)[c], m_t);
   }
   for (size_t i = rowRange.begin(); i != rowRange.end(); ++i) {
-#else
-    for (size_t c=0; c<channels->size(); ++c) {
-      imgDatas[c] = img->rowData<TVoxel>(rowRange.first, m_z, (*channels)[c], m_t);
-    }
-    for (size_t i=rowRange.first; i<rowRange.second; ++i) {
-#endif
     QRgb* qimData = bit_cast<QRgb*>(qim->scanLine(i));
 
     for (int j = 0; j < qim->width(); ++j) {
@@ -167,27 +148,16 @@ void ZImgDisplay::setQImageDataBlockCM(const ZImg* img, QImage* qim, const tbb::
 }
 
 template<typename TVoxel>
-#ifndef _USE_QTCONCURRENT_
 void
 ZImgDisplay::setQImageDataBlockCMMultAlpha(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,
-#else
-  void ZImgDisplay::setQImageDataBlockCMMultAlpha(const ZImg *img, QImage *qim, std::pair<size_t, size_t> rowRange,
-#endif
                                            const std::vector<size_t>* channels,
                                            const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const
 {
   std::vector<const TVoxel*> imgDatas(channels->size());
-#ifndef _USE_QTCONCURRENT_
   for (size_t c = 0; c < channels->size(); ++c) {
     imgDatas[c] = img->rowData<TVoxel>(rowRange.begin(), m_z, (*channels)[c], m_t);
   }
   for (size_t i = rowRange.begin(); i != rowRange.end(); ++i) {
-#else
-    for (size_t c=0; c<channels->size(); ++c) {
-      imgDatas[c] = img->rowData<TVoxel>(rowRange.first, m_z, (*channels)[c], m_t);
-    }
-    for (size_t i=rowRange.first; i<rowRange.second; ++i) {
-#endif
     QRgb* qimData = bit_cast<QRgb*>(qim->scanLine(i));
 
     for (int j = 0; j < qim->width(); ++j) {
@@ -271,7 +241,6 @@ void ZImgDisplay::setQImageDataCM(const ZImg& img, QImage& qim) const
   //setQImageDataBlockCM<TVoxel>(qim, 0, m_img.height(), channels, colormaps);
   //return;
 
-#ifndef _USE_QTCONCURRENT_
   if (alphaChannelIdx < 0) {
     tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),
                       [&](const tbb::blocked_range<size_t>& range) {
@@ -283,34 +252,10 @@ void ZImgDisplay::setQImageDataCM(const ZImg& img, QImage& qim) const
                         setQImageDataBlockCMMultAlpha<TVoxel>(&img, &qim, range, &channels, &colormaps);
                       });
   }
-#else
-  size_t numBlock = std::min<size_t>(img.height(), 32);
-  size_t blockHeight = img.height() / numBlock;
-  std::vector<QFuture<void>> res(numBlock);
-  for (size_t i=0; i<numBlock; ++i) {
-    size_t startLine = i * blockHeight;
-    size_t endLine = (i+1) * blockHeight;
-    if (i == numBlock - 1)
-      endLine = img.height();
-    if (alphaChannelIdx < 0) {
-      res[i] = QtConcurrent::run(this, &ZImgDisplay::setQImageDataBlockCM<TVoxel>, &img, &qim,
-                                 std::make_pair(startLine, endLine), &channels, &colormaps);
-    } else {
-      res[i] = QtConcurrent::run(this, &ZImgDisplay::setQImageDataBlockCMMultAlpha<TVoxel>, &img, &qim,
-                                 std::make_pair(startLine, endLine), &channels, &colormaps);
-    }
-  }
-  for (size_t i=0; i<numBlock; ++i)
-    res[i].waitForFinished();
-#endif
 }
 
 template<typename TVoxel>
-#ifndef _USE_QTCONCURRENT_
 void ZImgDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,
-#else
-  void ZImgDisplay::setQImageDataBlock(const ZImg *img, QImage *qim, std::pair<size_t, size_t> rowRange,
-#endif
                                      const std::vector<size_t>* channels) const
 {
   std::vector<const TVoxel*> imgDatas(channels->size());
@@ -320,11 +265,7 @@ void ZImgDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb::bl
   int alphaChannelIdx = -1;
   for (size_t c = 0; c < channels->size(); ++c) {
     size_t ch = channels->at(c);
-#ifndef _USE_QTCONCURRENT_
     imgDatas[c] = img->rowData<TVoxel>(rowRange.begin(), m_z, ch, m_t);
-#else
-    imgDatas[c] = img->rowData<TVoxel>(rowRange.first, m_z, ch, m_t);
-#endif
     chMinValue[c] = m_channels.at(ch).first;
     chMaxValue[c] = m_channels.at(ch).second;
     chCol[c] = m_img.channelColor(ch);
@@ -333,11 +274,7 @@ void ZImgDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb::bl
       alphaChannelIdx = c;
   }
   if (alphaChannelIdx < 0) {
-#ifndef _USE_QTCONCURRENT_
     for (size_t i = rowRange.begin(); i != rowRange.end(); ++i) {
-#else
-      for (size_t i=rowRange.first; i<rowRange.second; ++i) {
-#endif
       QRgb* qimData = bit_cast<QRgb*>(qim->scanLine(i));
 
       for (int j = 0; j < qim->width(); ++j) {
@@ -353,11 +290,7 @@ void ZImgDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb::bl
     }
   } else {
     if (channels->size() == 1) {
-#ifndef _USE_QTCONCURRENT_
       for (size_t i = rowRange.begin(); i != rowRange.end(); ++i) {
-#else
-        for (size_t i=rowRange.first; i<rowRange.second; ++i) {
-#endif
         QRgb* qimData = bit_cast<QRgb*>(qim->scanLine(i));
 
         for (int j = 0; j < qim->width(); ++j) {
@@ -370,11 +303,8 @@ void ZImgDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb::bl
       for (size_t c = 0; c < channels->size() - 1; ++c) {
         chCol[c].a = 255;
       }
-#ifndef _USE_QTCONCURRENT_
+
       for (size_t i = rowRange.begin(); i != rowRange.end(); ++i) {
-#else
-        for (size_t i=rowRange.first; i<rowRange.second; ++i) {
-#endif
         QRgb* qimData = bit_cast<QRgb*>(qim->scanLine(i));
 
         for (int j = 0; j < qim->width(); ++j) {
@@ -411,26 +341,10 @@ void ZImgDisplay::setQImageData(const ZImg& img, QImage& qim) const
     channels[idx++] = it->first;
   }
 
-#ifndef _USE_QTCONCURRENT_
   tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),
                     [&](const tbb::blocked_range<size_t>& range) {
                       setQImageDataBlock<TVoxel>(&img, &qim, range, &channels);
                     });
-#else
-  size_t numBlock = std::min<size_t>(img.height(), 32);
-  size_t blockHeight = img.height() / numBlock;
-  std::vector<QFuture<void>> res(numBlock);
-  for (size_t i=0; i<numBlock; ++i) {
-    size_t startLine = i * blockHeight;
-    size_t endLine = (i+1) * blockHeight;
-    if (i == numBlock - 1)
-      endLine = img.height();
-    res[i] = QtConcurrent::run(this, &ZImgDisplay::setQImageDataBlock<TVoxel>, &img, &qim,
-                               std::make_pair(startLine, endLine), &channels);
-  }
-  for (size_t i=0; i<numBlock; ++i)
-    res[i].waitForFinished();
-#endif
 }
 
 void ZImgDisplay::fillQImage(const ZImg& img, QImage& qim) const

@@ -27,10 +27,7 @@ namespace {
 
 #include <intrin.h>
 
-typedef BOOL (WINAPI *LPFN_GLPI)(
-    PSYSTEM_LOGICAL_PROCESSOR_INFORMATION,
-    PDWORD);
-
+using LPFN_GLPI = BOOL (WINAPI *)(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD);
 
 // Helper function to count set bits in the processor mask.
 DWORD CountSetBits(ULONG_PTR bitMask)
