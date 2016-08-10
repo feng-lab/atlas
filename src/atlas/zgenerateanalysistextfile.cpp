@@ -590,22 +590,23 @@ void ZGenerateAnalysisTextFile::removeSmallLeafBranch(ZSwc& tree, int numNodeThr
     ++tnnext;
     double branchLength = 0;
     int nNodes = 0;
-    SwcTreeNode nodeBeforeBranchNode = tn;
-    for (ZSwc::AncestorIterator tmptn = tree.beginAncestor(tn, true);
-         tmptn != tree.endAncestor(tn) && !ZSwc::isBranchNode(tmptn); ++tmptn) {
+    SwcTreeNode nodeBeforeBranchNode;
+    ZSwc::AncestorIterator lasttn = tn;
+    for (ZSwc::AncestorIterator tmptn = tree.beginAncestor(tn); tmptn != tree.endAncestor(tn); ++tmptn) {
       nNodes++;
-      ZSwc::AncestorIterator parent = ZSwc::parent(tmptn);
       glm::dvec3 bot(tmptn->x, tmptn->y, tmptn->z);
-      glm::dvec3 top(parent->x, parent->y, parent->z);
+      glm::dvec3 top(lasttn->x, lasttn->y, lasttn->z);
       glm::dvec3 res(m_input.voxelSizeX, m_input.voxelSizeY, m_input.voxelSizeZ);
       bot *= res;
       top *= res;
       branchLength += glm::length(bot - top);
-      if (ZSwc::isBranchNode(parent)) {
-        nodeBeforeBranchNode = tmptn;
+      if (ZSwc::isBranchNode(tmptn)) {
+        nodeBeforeBranchNode = lasttn;
+        break;
       }
+      lasttn = tmptn;
     }
-    if (nNodes < numNodeThre && branchLength < lengthThre) {
+    if (nNodes < numNodeThre && branchLength < lengthThre && !ZSwc::isNull(nodeBeforeBranchNode)) {
       tree.eraseSubtree(nodeBeforeBranchNode);
     }
     tn = tnnext;
