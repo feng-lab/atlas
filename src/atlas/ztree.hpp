@@ -184,63 +184,64 @@ public:
 protected:
   void init(NodeType* n, NodeType* p)
   {
-    startNode = n ? n : p;
-    this->node = n;
+    // case 1: p is nullptr, n is either tail or first root of tree
+    // case 2: p is a node, n is either nullptr (mean end) or same as p
+    CHECK(n || p);
+    if (p) {
+      if (n) CHECK(n == p);
+      startNode = p;
+    } else {
+      CHECK(!n->parent);
+      CHECK(!n->nextSibling || (n->prevSibling && !n->prevSibling->prevSibling));
+      startNode = n;
+      while (startNode->prevSibling->prevSibling)
+        startNode = startNode->prevSibling;      // startNode is first root (next sibling of m_head, can be m_tail)
+    }
+
+    this->node = this->isTail(n) ? nullptr : n;
     this->parent = p;
-    if (this->node) {
-      if (this->isTail(this->node)) {
-        //CHECK(!this->parent);
-        this->node = nullptr;
-        return;
-      }
+
+    if (!this->isTail(startNode)) {
+      deque.push_back(startNode);
       if (!this->parent) {
-        deque.push_back(this->node);
-        n = n->nextSibling;
+        n = startNode->nextSibling;
         while (n && !this->isTail(n)) {
           deque.push_back(n);
           n = n->nextSibling;
         }
-      } else {
-        //CHECK(this->node == this->parent);
-        deque.push_back(this->node);
       }
     }
   }
 
   void increment()
   {
-    CHECK(this->node);
-    NodeType* n = this->node->firstChild;
-    while (n) {
-      deque.push_back(n);
-      n = n->nextSibling;
+    if (!deque.empty() && this->node) {
+      prevDeque.push_back(deque.front());
+      deque.pop_front();
+      NodeType* n = this->node->firstChild;
+      while (n) {
+        deque.push_back(n);
+        n = n->nextSibling;
+      }
+      this->node = deque.empty() ? nullptr : deque.front();
     }
-    deque.pop_front();
-    this->node = deque.empty() ? nullptr : deque.front();
   }
 
   void decrement()
   {
-    CHECK(startNode && this->node != startNode);
-    std::deque<NodeType*> tmpDeque;
-    tmpDeque.push_back(startNode);
-    while (!tmpDeque.empty()) {
-      NodeType* curNode = tmpDeque.front();
-      NodeType* n = curNode->firstChild;
-      while (n) {
-        tmpDeque.push_back(n);
-        n = n->nextSibling;
+    if (!prevDeque.empty()) {
+      NodeType* n = prevDeque.back();
+      while (!deque.empty() && deque.back()->parent == n) {
+        deque.pop_back();
       }
-      tmpDeque.pop_front();
-      NodeType* nextNode = tmpDeque.empty() ? nullptr : tmpDeque.front();
-      if (nextNode == this->node) {
-        this->node = curNode;
-        break;
-      }
+      deque.push_front(n);
+      prevDeque.pop_back();
+      this->node = deque.front();
     }
   }
 
   std::deque<NodeType*> deque;
+  std::deque<NodeType*> prevDeque;
   NodeType* startNode;
 };
 
@@ -331,8 +332,10 @@ protected:
         if (this->node->parent == nullptr) // tail
           return;
         this->node = this->node->parent;
-        if (this->node == this->parent)
+        if (this->node == this->parent) {
+          this->node = nullptr;
           return;
+        }
       }
       this->node = this->node->nextSibling;
       while (this->node->firstChild)
@@ -562,7 +565,7 @@ public:
   ConstPostOrderIterator beginPost(const Iter& root) const
   {
     CHECK(root.node && root.node != m_head && root.node != m_tail);
-    TreeNode* n = root.node;
+    const TreeNode* n = root.node;
     while (n->firstChild)
       n = n->firstChild;
     return ConstPostOrderIterator(n, root.node);
@@ -593,7 +596,7 @@ public:
   { return BreadthFirstIterator(m_head->nextSibling); }
 
   BreadthFirstIterator endBreadthFirst()
-  { return BreadthFirstIterator(); }
+  { return BreadthFirstIterator(m_tail); }
 
   template<typename Iter>
   BreadthFirstIterator beginBreadthFirst(const Iter& root)
@@ -613,7 +616,7 @@ public:
   { return ConstBreadthFirstIterator(m_head->nextSibling); }
 
   ConstBreadthFirstIterator endBreadthFirst() const
-  { return ConstBreadthFirstIterator(); }
+  { return ConstBreadthFirstIterator(m_tail); }
 
   template<typename Iter>
   ConstBreadthFirstIterator beginBreadthFirst(const Iter& root) const
@@ -781,7 +784,7 @@ public:
   ConstLeafIterator beginLeaf(const Iter& root) const
   {
     CHECK(root.node && root.node != m_head && root.node != m_tail);
-    TreeNode* n = root.node;
+    const TreeNode* n = root.node;
     while (n->firstChild)
       n = n->firstChild;
     return ConstLeafIterator(n, root.node);

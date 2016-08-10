@@ -220,6 +220,8 @@ if (BUILD_TESTING)
   add_definitions(-DATLAS_WITH_TESTS)
   set(TESTS
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc
+      test/zunittest.h
+      test/zunittest.cpp
       test/zimggraphtest.h
       test/zimagetoimagemetrictest.h
       test/zimageutilstest.h
@@ -234,9 +236,7 @@ if (BUILD_TESTING)
       test/zimgsigneddistancemaptest.h
       test/zimgautothresholdtest.h
       test/zimgregionalextrematest.h
-      test/zunittest.h
-      test/zunittest.cpp
-      )
+      test/ztreetest.h)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/include)
 endif (BUILD_TESTING)
 
