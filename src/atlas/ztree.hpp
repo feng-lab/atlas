@@ -11,8 +11,9 @@
 
 namespace nim {
 
-// if Iterator's root node is not nullptr (iterator through subtree), then it can only decrement correctly if root node
-// and tree structure is not changed
+// all Iterators are standard-conforming BidirectionalIterator
+// Iterator can be constructed from different type of Iterator and will behave correctly
+// see ztreetest.h (IteratorInteraction test) for usage
 
 namespace impl {
 
@@ -93,7 +94,8 @@ protected:
 
   void increment()
   {
-    CHECK(this->node);
+    // assume this->node or this->parent
+    CHECK(this->node && !this->isTail(this->node)); // crash on purpose if we are increasing past-the-end
     if (this->node->firstChild) {
       this->node = this->node->firstChild;
     } else {
@@ -114,6 +116,7 @@ protected:
 
   void decrement()
   {
+    // assume this->node or this->parent
     if (this->node) {
       if (this->node->prevSibling) {
         this->node = this->node->prevSibling;
@@ -123,7 +126,6 @@ protected:
         this->node = this->node->parent;
       }
     } else {
-      CHECK(this->parent);
       this->node = this->parent;
       while (this->node->lastChild)
         this->node = this->node->lastChild;
@@ -145,7 +147,8 @@ protected:
 
   void increment()
   {
-    CHECK(this->node);
+    // assume this->node or this->parent
+    CHECK(this->node && !this->isTail(this->node)); // crash on purpose if we are increasing past-the-end
     if (this->node == this->parent) {
       this->node = nullptr;
     } else {
@@ -161,6 +164,7 @@ protected:
 
   void decrement()
   {
+    // assume this->node or this->parent
     if (this->node) {
       if (this->node->lastChild) {
         this->node = this->node->lastChild;
@@ -170,7 +174,6 @@ protected:
         this->node = this->node->prevSibling;
       }
     } else {
-      CHECK(this->parent);
       this->node = this->parent;
     }
   }
@@ -184,32 +187,53 @@ public:
 protected:
   void init(NodeType* n, NodeType* p)
   {
-    // case 1: p is nullptr, n is either tail or first root of tree
-    // case 2: p is a node, n is either nullptr (mean end) or same as p
-    CHECK(n || p);
-    NodeType* startNode;
-    if (p) {
-      if (n) CHECK(n == p);
-      startNode = p;
-      this->node = n;
-    } else {
-      CHECK(!n->parent);
-      CHECK(!n->nextSibling || (n->prevSibling && !n->prevSibling->prevSibling));
-      startNode = n;
-      this->node = this->isTail(n) ? nullptr : n;
-      while (startNode->prevSibling->prevSibling)
-        startNode = startNode->prevSibling;      // startNode is first root (next sibling of m_head, can be m_tail)
-    }
-
+    this->node = n;
     this->parent = p;
+    if (!n && !p)  // default constructed
+      return;
+
+    NodeType* startNode;
+    if (p) { // start node is p (must be valid), current node is n, end node is nullptr
+      startNode = p;
+      endNode = nullptr;
+    } else { // p is nullptr, start node is first root of tree, current node is n, end node is m_tail
+      // use n to find start node
+      startNode = n;
+      while (startNode->parent) {
+        startNode = startNode->parent;
+      }
+      CHECK(startNode->prevSibling);
+      while (startNode->prevSibling->prevSibling)
+        startNode = startNode->prevSibling;
+      // find m_tail as end node
+      endNode = startNode;
+      while (!this->isTail(endNode))
+        endNode = endNode->nextSibling;
+    }
 
     if (!this->isTail(startNode)) {
       deque.push_back(startNode);
-      if (!this->parent) {
-        startNode = startNode->nextSibling;
-        while (startNode && !this->isTail(startNode)) {
-          deque.push_back(startNode);
-          startNode = startNode->nextSibling;
+      if (endNode) {
+        n = startNode->nextSibling;
+        while (n && n != endNode) {
+          deque.push_back(n);
+          n = n->nextSibling;
+        }
+      }
+
+      // if current node is equal to end node, usually it is just for equality comparison,
+      //  so we do nothing and let decrement() takes care of the rare decrement case.
+      // if current node is not equal to start node, we need to walk the tree to current node
+      if (this->node != endNode && this->node != startNode) {
+        while (deque.front() != this->node) {
+          n = deque.front()->firstChild;
+          while (n) {
+            deque.push_back(n);
+            n = n->nextSibling;
+          }
+          prevDeque.push_back(deque.front());
+          deque.pop_front();
+          CHECK(!deque.empty());
         }
       }
     }
@@ -217,52 +241,48 @@ protected:
 
   void increment()
   {
-    if (!deque.empty() && this->node) {
-      CHECK(this->node == deque.front());
-      prevDeque.push_back(deque.front());
-      deque.pop_front();
-      NodeType* n = this->node->firstChild;
-      while (n) {
-        deque.push_back(n);
-        n = n->nextSibling;
-      }
-      this->node = deque.empty() ? nullptr : deque.front();
+    // assume this->node or this->parent
+    CHECK(this->node != endNode && !deque.empty()); // crash on purpose if we are increasing past-the-end
+    CHECK(this->node == deque.front());
+    NodeType* n = this->node->firstChild;
+    while (n) {
+      deque.push_back(n);
+      n = n->nextSibling;
     }
+    prevDeque.push_back(deque.front());
+    deque.pop_front();
+    this->node = deque.empty() ? endNode : deque.front();
   }
 
   void decrement()
   {
-    if (!this->node) {
-      if (prevDeque.empty()) {
-        if (deque.empty()) {
-          return;
-        } else { // decrement from endBreadthFirst iterator, we do a forward transverse from start
-          while (!deque.empty()) {
-            NodeType* n = deque.front()->firstChild;
-            while (n) {
-              deque.push_back(n);
-              n = n->nextSibling;
-            }
-            prevDeque.push_back(deque.front());
-            deque.pop_front();
-          }
+    // assume this->node or this->parent
+    if (this->node == endNode && prevDeque.empty() && !deque.empty()) {
+      // decrement from endBreadthFirst() iterator, we do a forward transverse from start
+      while (!deque.empty()) {
+        NodeType* n = deque.front()->firstChild;
+        while (n) {
+          deque.push_back(n);
+          n = n->nextSibling;
         }
+        prevDeque.push_back(deque.front());
+        deque.pop_front();
       }
     }
 
-    if (!prevDeque.empty()) {
-      NodeType* n = prevDeque.back();
-      while (!deque.empty() && deque.back()->parent == n) {
-        deque.pop_back();
-      }
-      deque.push_front(n);
-      prevDeque.pop_back();
-      this->node = deque.front();
+    CHECK(!prevDeque.empty());
+    NodeType* n = prevDeque.back();
+    while (!deque.empty() && deque.back()->parent == n) {
+      deque.pop_back();
     }
+    deque.push_front(n);
+    prevDeque.pop_back();
+    this->node = deque.front();
   }
 
   std::deque<NodeType*> deque;
   std::deque<NodeType*> prevDeque;
+  NodeType* endNode = nullptr;
 };
 
 template<typename TNode>
@@ -279,12 +299,14 @@ protected:
 
   void increment()
   {
-    if (this->node)
-      this->node = this->node->nextSibling;
+    // assume this->node or this->parent
+    CHECK(this->node && !this->isTail(this->node)); // crash on purpose if we are increasing past-the-end
+    this->node = this->node->nextSibling;
   }
 
   void decrement()
   {
+    // assume this->node or this->parent
     if (this->node) {
       this->node = this->node->prevSibling;
     } else {
@@ -303,26 +325,25 @@ protected:
   {
     this->node = n;
     this->parent = p;
-    startNode = n ? n : p;
   }
 
   void increment()
   {
-    if (this->node) {
-      this->node = this->node->parent;
-    }
+    // assume this->parent
+    CHECK(this->node); // crash on purpose if we are increasing past-the-end
+    this->node = this->node->parent;
   }
 
   void decrement()
   {
-    CHECK(startNode && this->node != startNode);
-    NodeType* n = startNode;
+    // assume this->parent
+    CHECK(this->parent->parent != this->node);  // crash on purpose if we are decreasing begin iterator
+    NodeType* n = this->parent->parent;
     while (n && n->parent != this->node)
       n = n->parent;
     this->node = n;
+    CHECK(this->node);
   }
-
-  NodeType* startNode;
 };
 
 template<typename TNode>
@@ -339,7 +360,8 @@ protected:
 
   void increment()
   {
-    CHECK(this->node);
+    // assume this->node or this->parent
+    CHECK(this->node && !this->isTail(this->node)); // crash on purpose if we are increasing past-the-end
     if (this->node->firstChild) {
       while (this->node->firstChild)
         this->node = this->node->firstChild;
@@ -365,6 +387,7 @@ protected:
 
   void decrement()
   {
+    // assume this->node or this->parent
     if (this->node) {
       while (this->node->prevSibling == nullptr) {
         if (this->node->parent == nullptr) // head
@@ -377,7 +400,6 @@ protected:
       while (this->node->lastChild)
         this->node = this->node->lastChild;
     } else {
-      CHECK(this->parent);
       this->node = this->parent;
       while (this->node->lastChild)
         this->node = this->node->lastChild;

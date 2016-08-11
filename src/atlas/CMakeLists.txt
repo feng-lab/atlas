@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5.2)
+cmake_minimum_required(VERSION 3.6.1)
 project(Atlas)
 set(ATLAS_VERSION 0.7.0)
 
