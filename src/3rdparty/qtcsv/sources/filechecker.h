@@ -11,15 +11,9 @@ namespace QtCSV
     // - filePath - string with absolute path to csv-file
     // @output:
     // - bool - True if file is OK, else False
-    inline bool CheckFile(const QString& filePath)
+    inline bool CheckFile(const QString&)
     {
-        QFileInfo fileInfo(filePath);
-        if ( fileInfo.isAbsolute() && "csv" == fileInfo.completeSuffix() )
-        {
-            return true;
-        }
-
-        return false;
+        return true;
     }
 }
 
