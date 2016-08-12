@@ -517,8 +517,6 @@ public:
   virtual ~ZTree()
   {
     clear();
-    delete m_head;
-    delete m_tail;
   }
 
   ZTree<T>& operator=(ZTree rhs)
@@ -537,7 +535,7 @@ public:
   { return Iterator(m_head->nextSibling); }
 
   Iterator end()
-  { return Iterator(m_tail); }
+  { return Iterator(m_tail.get()); }
 
   ReverseIterator rbegin()
   { return make_reverse_iterator(end()); }
@@ -548,14 +546,14 @@ public:
   template<typename Iter>
   Iterator begin(const Iter& root)
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     return Iterator(root.node, root.node);
   }
 
   template<typename Iter>
   Iterator end(const Iter& root)
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     return Iterator(nullptr, root.node);
   }
 
@@ -571,7 +569,7 @@ public:
   { return ConstIterator(m_head->nextSibling); }
 
   ConstIterator end() const
-  { return ConstIterator(m_tail); }
+  { return ConstIterator(m_tail.get()); }
 
   ConstReverseIterator rbegin() const
   { return make_reverse_iterator(end()); }
@@ -582,14 +580,14 @@ public:
   template<typename Iter>
   ConstIterator begin(const Iter& root) const
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     return ConstIterator(root.node, root.node);
   }
 
   template<typename Iter>
   ConstIterator end(const Iter& root) const
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     return ConstIterator(nullptr, root.node);
   }
 
@@ -632,7 +630,7 @@ public:
   PostOrderIterator beginPost()
   {
     TreeNode* n = m_head->nextSibling;
-    if (n != m_tail) {
+    if (n != m_tail.get()) {
       while (n->firstChild)
         n = n->firstChild;
     }
@@ -640,7 +638,7 @@ public:
   }
 
   PostOrderIterator endPost()
-  { return PostOrderIterator(m_tail); }
+  { return PostOrderIterator(m_tail.get()); }
 
   ReversePostOrderIterator rbeginPost()
   { return make_reverse_iterator(endPost()); }
@@ -651,7 +649,7 @@ public:
   template<typename Iter>
   PostOrderIterator beginPost(const Iter& root)
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     TreeNode* n = root.node;
     while (n->firstChild)
       n = n->firstChild;
@@ -661,7 +659,7 @@ public:
   template<typename Iter>
   PostOrderIterator endPost(const Iter& root)
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     return PostOrderIterator(nullptr, root.node);
   }
 
@@ -676,7 +674,7 @@ public:
   ConstPostOrderIterator beginPost() const
   {
     TreeNode* n = m_head->nextSibling;
-    if (n != m_tail) {
+    if (n != m_tail.get()) {
       while (n->firstChild)
         n = n->firstChild;
     }
@@ -684,7 +682,7 @@ public:
   }
 
   ConstPostOrderIterator endPost() const
-  { return ConstPostOrderIterator(m_tail); }
+  { return ConstPostOrderIterator(m_tail.get()); }
 
   ConstReversePostOrderIterator rbeginPost() const
   { return make_reverse_iterator(endPost()); }
@@ -695,7 +693,7 @@ public:
   template<typename Iter>
   ConstPostOrderIterator beginPost(const Iter& root) const
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     const TreeNode* n = root.node;
     while (n->firstChild)
       n = n->firstChild;
@@ -705,7 +703,7 @@ public:
   template<typename Iter>
   ConstPostOrderIterator endPost(const Iter& root) const
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     return ConstPostOrderIterator(nullptr, root.node);
   }
 
@@ -749,7 +747,7 @@ public:
   { return BreadthFirstIterator(m_head->nextSibling); }
 
   BreadthFirstIterator endBreadthFirst()
-  { return BreadthFirstIterator(m_tail); }
+  { return BreadthFirstIterator(m_tail.get()); }
 
   ReverseBreadthFirstIterator rbeginBreadthFirst()
   { return make_reverse_iterator(endBreadthFirst()); }
@@ -760,14 +758,14 @@ public:
   template<typename Iter>
   BreadthFirstIterator beginBreadthFirst(const Iter& root)
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     return BreadthFirstIterator(root.node, root.node);
   }
 
   template<typename Iter>
   BreadthFirstIterator endBreadthFirst(const Iter& root)
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     return BreadthFirstIterator(nullptr, root.node);
   }
 
@@ -783,7 +781,7 @@ public:
   { return ConstBreadthFirstIterator(m_head->nextSibling); }
 
   ConstBreadthFirstIterator endBreadthFirst() const
-  { return ConstBreadthFirstIterator(m_tail); }
+  { return ConstBreadthFirstIterator(m_tail.get()); }
 
   ConstReverseBreadthFirstIterator rbeginBreadthFirst() const
   { return make_reverse_iterator(endBreadthFirst()); }
@@ -794,14 +792,14 @@ public:
   template<typename Iter>
   ConstBreadthFirstIterator beginBreadthFirst(const Iter& root) const
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     return ConstBreadthFirstIterator(root.node, root.node);
   }
 
   template<typename Iter>
   ConstBreadthFirstIterator endBreadthFirst(const Iter& root) const
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     return ConstBreadthFirstIterator(nullptr, root.node);
   }
 
@@ -845,7 +843,7 @@ public:
   { return RootIterator(m_head->nextSibling); }
 
   RootIterator endRoot()
-  { return RootIterator(m_tail); }
+  { return RootIterator(m_tail.get()); }
 
   ReverseRootIterator rbeginRoot()
   { return make_reverse_iterator(endRoot()); }
@@ -857,7 +855,7 @@ public:
   { return ConstRootIterator(m_head->nextSibling); }
 
   ConstRootIterator endRoot() const
-  { return ConstRootIterator(m_tail); }
+  { return ConstRootIterator(m_tail.get()); }
 
   ConstReverseRootIterator rbeginRoot() const
   { return make_reverse_iterator(endRoot()); }
@@ -880,14 +878,14 @@ public:
   template<typename Iter>
   ChildIterator beginChild(const Iter& parent)
   {
-    CHECK(parent.node && parent.node != m_head && parent.node != m_tail);
+    CHECK(isValid(parent));
     return ChildIterator(parent.node->firstChild, parent.node);
   }
 
   template<typename Iter>
   ChildIterator endChild(const Iter& parent)
   {
-    CHECK(parent.node && parent.node != m_head && parent.node != m_tail);
+    CHECK(isValid(parent));
     return ChildIterator(nullptr, parent.node);
   }
 
@@ -902,14 +900,14 @@ public:
   template<typename Iter>
   ConstChildIterator beginChild(const Iter& parent) const
   {
-    CHECK(parent.node && parent.node != m_head && parent.node != m_tail);
+    CHECK(isValid(parent));
     return ConstChildIterator(parent.node->firstChild, parent.node);
   }
 
   template<typename Iter>
   ConstChildIterator endChild(const Iter& parent) const
   {
-    CHECK(parent.node && parent.node != m_head && parent.node != m_tail);
+    CHECK(isValid(parent));
     return ConstChildIterator(nullptr, parent.node);
   }
 
@@ -940,14 +938,14 @@ public:
   template<typename Iter>
   AncestorIterator beginAncestor(const Iter& child)
   {
-    CHECK(child.node && child.node != m_head && child.node != m_tail);
+    CHECK(isValid(child));
     return AncestorIterator(child.node->parent, child.node);
   }
 
   template<typename Iter>
   AncestorIterator endAncestor(const Iter& child)
   {
-    CHECK(child.node && child.node != m_head && child.node != m_tail);
+    CHECK(isValid(child));
     return AncestorIterator(nullptr, child.node);
   }
 
@@ -962,14 +960,14 @@ public:
   template<typename Iter>
   ConstAncestorIterator beginAncestor(const Iter& child) const
   {
-    CHECK(child.node && child.node != m_head && child.node != m_tail);
+    CHECK(isValid(child));
     return ConstAncestorIterator(child.node->parent, child.node);
   }
 
   template<typename Iter>
   ConstAncestorIterator endAncestor(const Iter& child) const
   {
-    CHECK(child.node && child.node != m_head && child.node != m_tail);
+    CHECK(isValid(child));
     return ConstAncestorIterator(nullptr, child.node);
   }
 
@@ -1000,7 +998,7 @@ public:
   LeafIterator beginLeaf()
   {
     TreeNode* n = m_head->nextSibling;
-    if (n != m_tail) {
+    if (n != m_tail.get()) {
       while (n->firstChild)
         n = n->firstChild;
     }
@@ -1008,7 +1006,7 @@ public:
   }
 
   LeafIterator endLeaf()
-  { return LeafIterator(m_tail); }
+  { return LeafIterator(m_tail.get()); }
 
   ReverseLeafIterator rbeginLeaf()
   { return make_reverse_iterator(endLeaf()); }
@@ -1019,7 +1017,7 @@ public:
   template<typename Iter>
   LeafIterator beginLeaf(const Iter& root)
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     TreeNode* n = root.node;
     while (n->firstChild)
       n = n->firstChild;
@@ -1029,7 +1027,7 @@ public:
   template<typename Iter>
   LeafIterator endLeaf(const Iter& root)
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     return LeafIterator(nullptr, root.node);
   }
 
@@ -1044,7 +1042,7 @@ public:
   ConstLeafIterator beginLeaf() const
   {
     TreeNode* n = m_head->nextSibling;
-    if (n != m_tail) {
+    if (n != m_tail.get()) {
       while (n->firstChild)
         n = n->firstChild;
     }
@@ -1052,7 +1050,7 @@ public:
   }
 
   ConstLeafIterator endLeaf() const
-  { return ConstLeafIterator(m_tail); }
+  { return ConstLeafIterator(m_tail.get()); }
 
   ConstReverseLeafIterator rbeginLeaf() const
   { return make_reverse_iterator(endLeaf()); }
@@ -1063,7 +1061,7 @@ public:
   template<typename Iter>
   ConstLeafIterator beginLeaf(const Iter& root) const
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     const TreeNode* n = root.node;
     while (n->firstChild)
       n = n->firstChild;
@@ -1073,7 +1071,7 @@ public:
   template<typename Iter>
   ConstLeafIterator endLeaf(const Iter& root) const
   {
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(root));
     return ConstLeafIterator(nullptr, root.node);
   }
 
@@ -1140,7 +1138,7 @@ public:
   { return size(parent) - 1; }
 
   bool empty() const
-  { return m_head->nextSibling == m_tail; }
+  { return m_head->nextSibling == m_tail.get(); }
 
   template<typename Iter>
   static bool isRoot(const Iter& pos)
@@ -1216,7 +1214,7 @@ public:
   {
     TreeNode* node = new TreeNode(v);
     node->prevSibling = m_tail->prevSibling;
-    node->nextSibling = m_tail;
+    node->nextSibling = m_tail.get();
     m_tail->prevSibling->nextSibling = node;
     m_tail->prevSibling = node;
     return Iterator(node);
@@ -1235,7 +1233,7 @@ public:
   template<typename Iter>
   Iter appendChild(Iter parent, const T& v)
   {
-    CHECK(parent.node && parent.node != m_head && parent.node != m_tail);
+    CHECK(isValid(parent));
     TreeNode* node = new TreeNode(v);
     node->parent = parent.node;
     if (parent.node->lastChild) {
@@ -1253,8 +1251,7 @@ public:
   template<typename Iter>
   void appendChild(Iter parent, Iter child)
   {
-    CHECK(parent.node && parent.node != m_head && parent.node != m_tail);
-    CHECK(child.node && child.node != m_head && child.node != m_tail);
+    CHECK(isValid(parent) && isValid(child));
     if (parent == this->parent(child))
       return;
     detachParent(child);
@@ -1273,7 +1270,7 @@ public:
   template<typename Iter>
   Iter prependChild(Iter parent, const T& v)
   {
-    CHECK(parent.node && parent.node != m_head && parent.node != m_tail);
+    CHECK(isValid(parent));
     TreeNode* node = new TreeNode(v);
     node->parent = parent.node;
     if (parent.node->firstChild) {
@@ -1291,8 +1288,7 @@ public:
   template<typename Iter>
   void prependChild(Iter parent, Iter child)
   {
-    CHECK(parent.node && parent.node != m_head && parent.node != m_tail);
-    CHECK(child.node && child.node != m_head && child.node != m_tail);
+    CHECK(isValid(parent) && isValid(child));
     if (parent == this->parent(child))
       return;
     if (!isRoot(child))
@@ -1312,7 +1308,7 @@ public:
   template<typename IterTo, typename IterFrom>
   void copy(IterTo to, const IterFrom& from)
   {
-    CHECK(to.node && to.node != m_head && to.node != m_tail && from.node);
+    CHECK(isValid(to) && isValid(from));
     eraseChildren(to);
     to.node->data = from.node->data;
     // pre order copy
@@ -1345,7 +1341,7 @@ public:
   template<typename Iter>
   void flatten(Iter pos)
   {
-    CHECK(pos.node && pos.node != m_head && pos.node != m_tail);
+    CHECK(isValid(pos));
     if (!pos.node->firstChild)
       return;
     TreeNode* child = pos.node->firstChild;
@@ -1369,7 +1365,7 @@ public:
   template<typename Iter>
   void setAsRoot(Iter pos)
   {
-    CHECK(pos.node && pos.node != m_head && pos.node != m_tail);
+    CHECK(isValid(pos));
     if (isRoot(pos))
       return;
     std::vector<AncestorIterator> chain;
@@ -1408,11 +1404,11 @@ public:
 protected:
   void init()
   {
-    m_head = new TreeNode();
-    m_tail = new TreeNode();
+    m_head = std::make_unique<TreeNode>();
+    m_tail = std::make_unique<TreeNode>();
 
-    m_head->nextSibling = m_tail;
-    m_tail->prevSibling = m_head;
+    m_head->nextSibling = m_tail.get();
+    m_tail->prevSibling = m_head.get();
   }
 
   void deepCopy(const ZTree<T>& rhs)
@@ -1453,8 +1449,7 @@ protected:
   template<typename Iter>
   void reverseChildRoot(Iter child, Iter root)
   {
-    CHECK(child.node && child.node != m_head && child.node != m_tail);
-    CHECK(root.node && root.node != m_head && root.node != m_tail);
+    CHECK(isValid(child) && isValid(root));
     CHECK(root == this->parent(child) && isRoot(root));
     detachParent(child);
     // move child to root's position, isolate root
@@ -1468,13 +1463,19 @@ protected:
     appendChild(child, root);
   }
 
+  template<typename Iter>
+  inline bool isValid(Iter it) const
+  {
+    return it.node && it.node != m_head.get() && it.node != m_tail.get();
+  }
+
 protected:
   // head --- root1 --- root2 --- root3 --- ... --- tail
   //          / | \     / | \     / |
   //         nodes...  nodes...  nodes...
   //
-  TreeNode* m_head;
-  TreeNode* m_tail;
+  std::unique_ptr<TreeNode> m_head;
+  std::unique_ptr<TreeNode> m_tail;
 };
 
 }  // namespace nim

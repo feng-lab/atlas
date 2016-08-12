@@ -791,7 +791,7 @@ public:
   bool operator==(const ZImg& other) const;
 
   // perform custom voxel-wise unary operator
-  // GenericCustomUnaryOp is a non-template functor that accepts current voxel as argument and return the new voxel value
+  // GenericCustomUnaryOp is a generic lambda or non-template functor that accepts current voxel as argument and return the new voxel value
   // the non-template functor might have a templated operator() to process all possible voxel types
   // a typical prototype of unary function looks like:
   //
@@ -816,7 +816,7 @@ public:
   ZImg& typedUnaryOperation(const CustomUnaryOp& op);
 
   // perform a custom voxel-wise operator <op> of *this and other
-  // GenericBinaryFunctor is a non-template functor that accepts current voxel from *this as first argument
+  // GenericBinaryFunctor is a generic lambda or non-template functor that accepts current voxel from *this as first argument
   // and another voxel from same position of other as second argument and return the new value of current voxel
   // the non-template functor might have a templated operator() to process all possible voxel types
   // the functor should not modify the second parameter (if take by reference)
@@ -1466,4 +1466,4 @@ void image3DWrite(const TPixel* data, size_t width, size_t height, size_t depth,
 
 }  // namespace
 
-#include "zimg.hxx"
+#include "zimg.inl"

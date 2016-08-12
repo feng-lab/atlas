@@ -26,7 +26,7 @@ ZSwc::SwcTreeNode ZSwc::thickestNode()
 
 ZSwc::SwcTreeNode ZSwc::thickestNode(const ZSwc::SwcTreeNode& subtree)
 {
-  CHECK(subtree.node && subtree.node != m_head && subtree.node != m_tail);
+  CHECK(isValid(subtree));
   SwcTreeNode thickestNode;
   double maxRadius = std::numeric_limits<double>::lowest();
   for (SwcTreeNode tn = begin(subtree); tn != end(subtree); ++tn) {

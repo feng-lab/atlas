@@ -174,7 +174,7 @@ set(IMG_SOURCES
     zimagefilterkernel.h
     zimagesse3.h
     zimg.h
-    zimg.hxx
+    zimg.inl
     zimgformat.h
     zimgfreeimage.h
     zimginfo.h
@@ -213,9 +213,7 @@ set(IMG_SOURCES
     zbenchtimer.cpp
     zcpuinfo.cpp
     zeigenutils.cpp
-    zexception.cpp
     zimage2dutils.cpp
-    zimage3dutils.cpp
     zimagefilterkernel.cpp
     zimg.cpp
     zimgformat.cpp
