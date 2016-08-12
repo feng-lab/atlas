@@ -13,7 +13,7 @@ namespace nim {
 
 // all Iterators are standard-conforming BidirectionalIterator
 // Iterator can be constructed from different type of Iterator and will behave correctly
-// see ztreetest.h (IteratorInteraction test) for usage
+// see ztreetest.h for usage
 
 namespace impl {
 
@@ -446,38 +446,41 @@ template<typename T>
 class ZTree
 {
   using TreeNode = impl::TreeNode<T>;
+
+  template<class Iterator>
+  using reverse_iterator = boost::reverse_iterator<Iterator>;
 public:
   using ValueType = T;
 
   using PreOrderIterator = impl::Iterator<impl::PreOrderIterator<TreeNode>>;
   using ConstPreOrderIterator = impl::Iterator<impl::PreOrderIterator<const TreeNode>>;
-  using ReversePreOrderIterator = boost::reverse_iterator<PreOrderIterator>;
-  using ConstReversePreOrderIterator = boost::reverse_iterator<ConstPreOrderIterator>;
+  using ReversePreOrderIterator = reverse_iterator<PreOrderIterator>;
+  using ConstReversePreOrderIterator = reverse_iterator<ConstPreOrderIterator>;
 
   using PostOrderIterator = impl::Iterator<impl::PostOrderIterator<TreeNode>>;
   using ConstPostOrderIterator = impl::Iterator<impl::PostOrderIterator<const TreeNode>>;
-  using ReversePostOrderIterator = boost::reverse_iterator<PostOrderIterator>;
-  using ConstReversePostOrderIterator = boost::reverse_iterator<ConstPostOrderIterator>;
+  using ReversePostOrderIterator = reverse_iterator<PostOrderIterator>;
+  using ConstReversePostOrderIterator = reverse_iterator<ConstPostOrderIterator>;
 
   using BreadthFirstIterator = impl::Iterator<impl::BreadthFirstIterator<TreeNode>>;
   using ConstBreadthFirstIterator = impl::Iterator<impl::BreadthFirstIterator<const TreeNode>>;
-  using ReverseBreadthFirstIterator = boost::reverse_iterator<BreadthFirstIterator>;
-  using ConstReverseBreadthFirstIterator = boost::reverse_iterator<ConstBreadthFirstIterator>;
+  using ReverseBreadthFirstIterator = reverse_iterator<BreadthFirstIterator>;
+  using ConstReverseBreadthFirstIterator = reverse_iterator<ConstBreadthFirstIterator>;
 
   using ChildIterator = impl::Iterator<impl::ChildIterator<TreeNode>>;
   using ConstChildIterator = impl::Iterator<impl::ChildIterator<const TreeNode>>;
-  using ReverseChildIterator = boost::reverse_iterator<ChildIterator>;
-  using ConstReverseChildIterator = boost::reverse_iterator<ConstChildIterator>;
+  using ReverseChildIterator = reverse_iterator<ChildIterator>;
+  using ConstReverseChildIterator = reverse_iterator<ConstChildIterator>;
 
   using AncestorIterator = impl::Iterator<impl::AncestorIterator<TreeNode>>;
   using ConstAncestorIterator = impl::Iterator<impl::AncestorIterator<const TreeNode>>;
-  using ReverseAncestorIterator = boost::reverse_iterator<AncestorIterator>;
-  using ConstReverseAncestorIterator = boost::reverse_iterator<ConstAncestorIterator>;
+  using ReverseAncestorIterator = reverse_iterator<AncestorIterator>;
+  using ConstReverseAncestorIterator = reverse_iterator<ConstAncestorIterator>;
 
   using LeafIterator = impl::Iterator<impl::LeafIterator<TreeNode>>;
   using ConstLeafIterator = impl::Iterator<impl::LeafIterator<const TreeNode>>;
-  using ReverseLeafIterator = boost::reverse_iterator<LeafIterator>;
-  using ConstReverseLeafIterator = boost::reverse_iterator<ConstLeafIterator>;
+  using ReverseLeafIterator = reverse_iterator<LeafIterator>;
+  using ConstReverseLeafIterator = reverse_iterator<ConstLeafIterator>;
 
   using Iterator = PreOrderIterator;
   using ConstIterator = ConstPreOrderIterator;
@@ -537,10 +540,10 @@ public:
   { return Iterator(m_tail); }
 
   ReverseIterator rbegin()
-  { return boost::make_reverse_iterator(end()); }
+  { return make_reverse_iterator(end()); }
 
   ReverseIterator rend()
-  { return boost::make_reverse_iterator(begin()); }
+  { return make_reverse_iterator(begin()); }
 
   template<typename Iter>
   Iterator begin(const Iter& root)
@@ -558,11 +561,11 @@ public:
 
   template<typename Iter>
   ReverseIterator rbegin(const Iter& root)
-  { return boost::make_reverse_iterator(end(root)); }
+  { return make_reverse_iterator(end(root)); }
 
   template<typename Iter>
   ReverseIterator rend(const Iter& root)
-  { return boost::make_reverse_iterator(begin(root)); }
+  { return make_reverse_iterator(begin(root)); }
 
   ConstIterator begin() const
   { return ConstIterator(m_head->nextSibling); }
@@ -571,10 +574,10 @@ public:
   { return ConstIterator(m_tail); }
 
   ConstReverseIterator rbegin() const
-  { return boost::make_reverse_iterator(end()); }
+  { return make_reverse_iterator(end()); }
 
   ConstReverseIterator rend() const
-  { return boost::make_reverse_iterator(begin()); }
+  { return make_reverse_iterator(begin()); }
 
   template<typename Iter>
   ConstIterator begin(const Iter& root) const
@@ -592,11 +595,11 @@ public:
 
   template<typename Iter>
   ConstReverseIterator rbegin(const Iter& root) const
-  { return boost::make_reverse_iterator(end(root)); }
+  { return make_reverse_iterator(end(root)); }
 
   template<typename Iter>
   ConstReverseIterator rend(const Iter& root) const
-  { return boost::make_reverse_iterator(begin(root)); }
+  { return make_reverse_iterator(begin(root)); }
 
   ConstIterator cbegin() const
   { return begin(); }
@@ -605,10 +608,10 @@ public:
   { return end(); }
 
   ConstReverseIterator crbegin() const
-  { return boost::make_reverse_iterator(cend()); }
+  { return make_reverse_iterator(cend()); }
 
   ConstReverseIterator crend() const
-  { return boost::make_reverse_iterator(cbegin()); }
+  { return make_reverse_iterator(cbegin()); }
 
   template<typename Iter>
   ConstIterator cbegin(const Iter& root) const
@@ -620,11 +623,11 @@ public:
 
   template<typename Iter>
   ConstReverseIterator crbegin(const Iter& root) const
-  { return boost::make_reverse_iterator(cend(root)); }
+  { return make_reverse_iterator(cend(root)); }
 
   template<typename Iter>
   ConstReverseIterator crend(const Iter& root) const
-  { return boost::make_reverse_iterator(cbegin(root)); }
+  { return make_reverse_iterator(cbegin(root)); }
 
   PostOrderIterator beginPost()
   {
@@ -640,10 +643,10 @@ public:
   { return PostOrderIterator(m_tail); }
 
   ReversePostOrderIterator rbeginPost()
-  { return boost::make_reverse_iterator(endPost()); }
+  { return make_reverse_iterator(endPost()); }
 
   ReversePostOrderIterator rendPost()
-  { return boost::make_reverse_iterator(beginPost()); }
+  { return make_reverse_iterator(beginPost()); }
 
   template<typename Iter>
   PostOrderIterator beginPost(const Iter& root)
@@ -664,11 +667,11 @@ public:
 
   template<typename Iter>
   ReversePostOrderIterator rbeginPost(const Iter& root)
-  { return boost::make_reverse_iterator(endPost(root)); }
+  { return make_reverse_iterator(endPost(root)); }
 
   template<typename Iter>
   ReversePostOrderIterator rendPost(const Iter& root)
-  { return boost::make_reverse_iterator(beginPost(root)); }
+  { return make_reverse_iterator(beginPost(root)); }
 
   ConstPostOrderIterator beginPost() const
   {
@@ -684,10 +687,10 @@ public:
   { return ConstPostOrderIterator(m_tail); }
 
   ConstReversePostOrderIterator rbeginPost() const
-  { return boost::make_reverse_iterator(endPost()); }
+  { return make_reverse_iterator(endPost()); }
 
   ConstReversePostOrderIterator rendPost() const
-  { return boost::make_reverse_iterator(beginPost()); }
+  { return make_reverse_iterator(beginPost()); }
 
   template<typename Iter>
   ConstPostOrderIterator beginPost(const Iter& root) const
@@ -708,11 +711,11 @@ public:
 
   template<typename Iter>
   ConstReversePostOrderIterator rbeginPost(const Iter& root) const
-  { return boost::make_reverse_iterator(endPost(root)); }
+  { return make_reverse_iterator(endPost(root)); }
 
   template<typename Iter>
   ConstReversePostOrderIterator rendPost(const Iter& root) const
-  { return boost::make_reverse_iterator(beginPost(root)); }
+  { return make_reverse_iterator(beginPost(root)); }
 
   ConstPostOrderIterator cbeginPost() const
   { return beginPost(); }
@@ -721,10 +724,10 @@ public:
   { return endPost(); }
 
   ConstReversePostOrderIterator crbeginPost() const
-  { return boost::make_reverse_iterator(cendPost()); }
+  { return make_reverse_iterator(cendPost()); }
 
   ConstReversePostOrderIterator crendPost() const
-  { return boost::make_reverse_iterator(cbeginPost()); }
+  { return make_reverse_iterator(cbeginPost()); }
 
   template<typename Iter>
   ConstPostOrderIterator cbeginPost(const Iter& root) const
@@ -736,11 +739,11 @@ public:
 
   template<typename Iter>
   ConstReversePostOrderIterator crbeginPost(const Iter& root) const
-  { return boost::make_reverse_iterator(cendPost(root)); }
+  { return make_reverse_iterator(cendPost(root)); }
 
   template<typename Iter>
   ConstReversePostOrderIterator crendPost(const Iter& root) const
-  { return boost::make_reverse_iterator(cbeginPost(root)); }
+  { return make_reverse_iterator(cbeginPost(root)); }
 
   BreadthFirstIterator beginBreadthFirst()
   { return BreadthFirstIterator(m_head->nextSibling); }
@@ -749,10 +752,10 @@ public:
   { return BreadthFirstIterator(m_tail); }
 
   ReverseBreadthFirstIterator rbeginBreadthFirst()
-  { return boost::make_reverse_iterator(endBreadthFirst()); }
+  { return make_reverse_iterator(endBreadthFirst()); }
 
   ReverseBreadthFirstIterator rendBreadthFirst()
-  { return boost::make_reverse_iterator(beginBreadthFirst()); }
+  { return make_reverse_iterator(beginBreadthFirst()); }
 
   template<typename Iter>
   BreadthFirstIterator beginBreadthFirst(const Iter& root)
@@ -770,11 +773,11 @@ public:
 
   template<typename Iter>
   ReverseBreadthFirstIterator rbeginBreadthFirst(const Iter& root)
-  { return boost::make_reverse_iterator(endBreadthFirst(root)); }
+  { return make_reverse_iterator(endBreadthFirst(root)); }
 
   template<typename Iter>
   ReverseBreadthFirstIterator rendBreadthFirst(const Iter& root)
-  { return boost::make_reverse_iterator(beginBreadthFirst(root)); }
+  { return make_reverse_iterator(beginBreadthFirst(root)); }
 
   ConstBreadthFirstIterator beginBreadthFirst() const
   { return ConstBreadthFirstIterator(m_head->nextSibling); }
@@ -783,10 +786,10 @@ public:
   { return ConstBreadthFirstIterator(m_tail); }
 
   ConstReverseBreadthFirstIterator rbeginBreadthFirst() const
-  { return boost::make_reverse_iterator(endBreadthFirst()); }
+  { return make_reverse_iterator(endBreadthFirst()); }
 
   ConstReverseBreadthFirstIterator rendBreadthFirst() const
-  { return boost::make_reverse_iterator(beginBreadthFirst()); }
+  { return make_reverse_iterator(beginBreadthFirst()); }
 
   template<typename Iter>
   ConstBreadthFirstIterator beginBreadthFirst(const Iter& root) const
@@ -804,11 +807,11 @@ public:
 
   template<typename Iter>
   ConstReverseBreadthFirstIterator rbeginBreadthFirst(const Iter& root) const
-  { return boost::make_reverse_iterator(endBreadthFirst(root)); }
+  { return make_reverse_iterator(endBreadthFirst(root)); }
 
   template<typename Iter>
   ConstReverseBreadthFirstIterator rendBreadthFirst(const Iter& root) const
-  { return boost::make_reverse_iterator(beginBreadthFirst(root)); }
+  { return make_reverse_iterator(beginBreadthFirst(root)); }
 
   ConstBreadthFirstIterator cbeginBreadthFirst() const
   { return beginBreadthFirst(); }
@@ -817,10 +820,10 @@ public:
   { return endBreadthFirst(); }
 
   ConstReverseBreadthFirstIterator crbeginBreadthFirst() const
-  { return boost::make_reverse_iterator(cendBreadthFirst()); }
+  { return make_reverse_iterator(cendBreadthFirst()); }
 
   ConstReverseBreadthFirstIterator crendBreadthFirst() const
-  { return boost::make_reverse_iterator(cbeginBreadthFirst()); }
+  { return make_reverse_iterator(cbeginBreadthFirst()); }
 
   template<typename Iter>
   ConstBreadthFirstIterator cbeginBreadthFirst(const Iter& root) const
@@ -832,11 +835,11 @@ public:
 
   template<typename Iter>
   ConstReverseBreadthFirstIterator crbeginBreadthFirst(const Iter& root) const
-  { return boost::make_reverse_iterator(cendBreadthFirst(root)); }
+  { return make_reverse_iterator(cendBreadthFirst(root)); }
 
   template<typename Iter>
   ConstReverseBreadthFirstIterator crendBreadthFirst(const Iter& root) const
-  { return boost::make_reverse_iterator(cbeginBreadthFirst(root)); }
+  { return make_reverse_iterator(cbeginBreadthFirst(root)); }
 
   RootIterator beginRoot()
   { return RootIterator(m_head->nextSibling); }
@@ -845,10 +848,10 @@ public:
   { return RootIterator(m_tail); }
 
   ReverseRootIterator rbeginRoot()
-  { return boost::make_reverse_iterator(endRoot()); }
+  { return make_reverse_iterator(endRoot()); }
 
   ReverseRootIterator rendRoot()
-  { return boost::make_reverse_iterator(beginRoot()); }
+  { return make_reverse_iterator(beginRoot()); }
 
   ConstRootIterator beginRoot() const
   { return ConstRootIterator(m_head->nextSibling); }
@@ -857,10 +860,10 @@ public:
   { return ConstRootIterator(m_tail); }
 
   ConstReverseRootIterator rbeginRoot() const
-  { return boost::make_reverse_iterator(endRoot()); }
+  { return make_reverse_iterator(endRoot()); }
 
   ConstReverseRootIterator rendRoot() const
-  { return boost::make_reverse_iterator(beginRoot()); }
+  { return make_reverse_iterator(beginRoot()); }
 
   ConstRootIterator cbeginRoot() const
   { return beginRoot(); }
@@ -869,10 +872,10 @@ public:
   { return endRoot(); }
 
   ConstReverseRootIterator crbeginRoot() const
-  { return boost::make_reverse_iterator(cendRoot()); }
+  { return make_reverse_iterator(cendRoot()); }
 
   ConstReverseRootIterator crendRoot() const
-  { return boost::make_reverse_iterator(cbeginRoot()); }
+  { return make_reverse_iterator(cbeginRoot()); }
 
   template<typename Iter>
   ChildIterator beginChild(const Iter& parent)
@@ -890,11 +893,11 @@ public:
 
   template<typename Iter>
   ReverseChildIterator rbeginChild(const Iter& parent)
-  { return boost::make_reverse_iterator(endChild(parent)); }
+  { return make_reverse_iterator(endChild(parent)); }
 
   template<typename Iter>
   ReverseChildIterator rendChild(const Iter& parent)
-  { return boost::make_reverse_iterator(beginChild(parent)); }
+  { return make_reverse_iterator(beginChild(parent)); }
 
   template<typename Iter>
   ConstChildIterator beginChild(const Iter& parent) const
@@ -912,11 +915,11 @@ public:
 
   template<typename Iter>
   ConstReverseChildIterator rbeginChild(const Iter& parent) const
-  { return boost::make_reverse_iterator(endChild(parent)); }
+  { return make_reverse_iterator(endChild(parent)); }
 
   template<typename Iter>
   ConstReverseChildIterator rendChild(const Iter& parent) const
-  { return boost::make_reverse_iterator(beginChild(parent)); }
+  { return make_reverse_iterator(beginChild(parent)); }
 
   template<typename Iter>
   ConstChildIterator cbeginChild(const Iter& parent) const
@@ -928,11 +931,11 @@ public:
 
   template<typename Iter>
   ConstReverseChildIterator crbeginChild(const Iter& parent) const
-  { return boost::make_reverse_iterator(cendChild(parent)); }
+  { return make_reverse_iterator(cendChild(parent)); }
 
   template<typename Iter>
   ConstReverseChildIterator crendChild(const Iter& parent) const
-  { return boost::make_reverse_iterator(cbeginChild(parent)); }
+  { return make_reverse_iterator(cbeginChild(parent)); }
 
   template<typename Iter>
   AncestorIterator beginAncestor(const Iter& child)
@@ -950,11 +953,11 @@ public:
 
   template<typename Iter>
   ReverseAncestorIterator rbeginAncestor(const Iter& child)
-  { return boost::make_reverse_iterator(endAncestor(child)); }
+  { return make_reverse_iterator(endAncestor(child)); }
 
   template<typename Iter>
   ReverseAncestorIterator rendAncestor(const Iter& child)
-  { return boost::make_reverse_iterator(beginAncestor(child)); }
+  { return make_reverse_iterator(beginAncestor(child)); }
 
   template<typename Iter>
   ConstAncestorIterator beginAncestor(const Iter& child) const
@@ -972,11 +975,11 @@ public:
 
   template<typename Iter>
   ConstReverseAncestorIterator rbeginAncestor(const Iter& child) const
-  { return boost::make_reverse_iterator(endAncestor(child)); }
+  { return make_reverse_iterator(endAncestor(child)); }
 
   template<typename Iter>
   ConstReverseAncestorIterator rendAncestor(const Iter& child) const
-  { return boost::make_reverse_iterator(beginAncestor(child)); }
+  { return make_reverse_iterator(beginAncestor(child)); }
 
   template<typename Iter>
   ConstAncestorIterator cbeginAncestor(const Iter& child) const
@@ -988,11 +991,11 @@ public:
 
   template<typename Iter>
   ConstReverseAncestorIterator crbeginAncestor(const Iter& child) const
-  { return boost::make_reverse_iterator(cendAncestor(child)); }
+  { return make_reverse_iterator(cendAncestor(child)); }
 
   template<typename Iter>
   ConstReverseAncestorIterator crendAncestor(const Iter& child) const
-  { return boost::make_reverse_iterator(cbeginAncestor(child)); }
+  { return make_reverse_iterator(cbeginAncestor(child)); }
 
   LeafIterator beginLeaf()
   {
@@ -1008,10 +1011,10 @@ public:
   { return LeafIterator(m_tail); }
 
   ReverseLeafIterator rbeginLeaf()
-  { return boost::make_reverse_iterator(endLeaf()); }
+  { return make_reverse_iterator(endLeaf()); }
 
   ReverseLeafIterator rendLeaf()
-  { return boost::make_reverse_iterator(beginLeaf()); }
+  { return make_reverse_iterator(beginLeaf()); }
 
   template<typename Iter>
   LeafIterator beginLeaf(const Iter& root)
@@ -1032,11 +1035,11 @@ public:
 
   template<typename Iter>
   ReverseLeafIterator rbeginLeaf(const Iter& root)
-  { return boost::make_reverse_iterator(endLeaf(root)); }
+  { return make_reverse_iterator(endLeaf(root)); }
 
   template<typename Iter>
   ReverseLeafIterator rendLeaf(const Iter& root)
-  { return boost::make_reverse_iterator(beginLeaf(root)); }
+  { return make_reverse_iterator(beginLeaf(root)); }
 
   ConstLeafIterator beginLeaf() const
   {
@@ -1052,10 +1055,10 @@ public:
   { return ConstLeafIterator(m_tail); }
 
   ConstReverseLeafIterator rbeginLeaf() const
-  { return boost::make_reverse_iterator(endLeaf()); }
+  { return make_reverse_iterator(endLeaf()); }
 
   ConstReverseLeafIterator rendLeaf() const
-  { return boost::make_reverse_iterator(beginLeaf()); }
+  { return make_reverse_iterator(beginLeaf()); }
 
   template<typename Iter>
   ConstLeafIterator beginLeaf(const Iter& root) const
@@ -1076,11 +1079,11 @@ public:
 
   template<typename Iter>
   ConstReverseLeafIterator rbeginLeaf(const Iter& root) const
-  { return boost::make_reverse_iterator(endLeaf(root)); }
+  { return make_reverse_iterator(endLeaf(root)); }
 
   template<typename Iter>
   ConstReverseLeafIterator rendLeaf(const Iter& root) const
-  { return boost::make_reverse_iterator(beginLeaf(root)); }
+  { return make_reverse_iterator(beginLeaf(root)); }
 
   ConstLeafIterator cbeginLeaf() const
   { return beginLeaf(); }
@@ -1089,10 +1092,10 @@ public:
   { return endLeaf(); }
 
   ConstReverseLeafIterator crbeginLeaf() const
-  { return boost::make_reverse_iterator(cendLeaf()); }
+  { return make_reverse_iterator(cendLeaf()); }
 
   ConstReverseLeafIterator crendLeaf() const
-  { return boost::make_reverse_iterator(cbeginLeaf()); }
+  { return make_reverse_iterator(cbeginLeaf()); }
 
   template<typename Iter>
   ConstLeafIterator cbeginLeaf(const Iter& root) const
@@ -1104,11 +1107,11 @@ public:
 
   template<typename Iter>
   ConstReverseLeafIterator crbeginLeaf(const Iter& root) const
-  { return boost::make_reverse_iterator(cendLeaf(root)); }
+  { return make_reverse_iterator(cendLeaf(root)); }
 
   template<typename Iter>
   ConstReverseLeafIterator crendLeaf(const Iter& root) const
-  { return boost::make_reverse_iterator(cbeginLeaf(root)); }
+  { return make_reverse_iterator(cbeginLeaf(root)); }
 
   size_t size() const
   { return std::distance(begin(), end()); }

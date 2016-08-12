@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstring>
 #include <type_traits>
+#include <iterator>
 
 namespace nim {
 
@@ -88,6 +89,22 @@ constexpr uint32_t operator "" _u32(unsigned long long int n) noexcept { return 
 constexpr int32_t operator "" _i32(unsigned long long int n) noexcept { return n; }
 constexpr uint64_t operator "" _u64(unsigned long long int n) noexcept { return n; }
 constexpr int64_t operator "" _i64(unsigned long long int n) noexcept { return n; }
+
+//http://stackoverflow.com/questions/8542591/c11-reverse-range-based-for-loop
+template<typename T>
+struct reversion_wrapper
+{
+  T& iterable;
+};
+
+template<typename T>
+inline auto begin(reversion_wrapper<T> w) { return std::rbegin(w.iterable); }
+
+template<typename T>
+inline auto end(reversion_wrapper<T> w) { return std::rend(w.iterable); }
+
+template<typename T>
+inline reversion_wrapper<T> make_reverse(T&& iterable) { return {iterable}; }
 
 
 } // namespace nim

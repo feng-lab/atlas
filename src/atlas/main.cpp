@@ -80,6 +80,9 @@ struct MacEventFilter : public QObject
 void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QString& msg)
 {
   switch (type) {
+    case QtDebugMsg:
+      LWARNF(context.file ? context.file : "QtFile", context.line) << msg;
+      break;
     case QtInfoMsg:
       LINFOF(context.file ? context.file : "QtFile", context.line) << msg;
       break;
