@@ -1,7 +1,7 @@
 #include "z3dboundedfilter.h"
 
 #include <Mathematics/GteDistLineRay.h>
-#include <QtMath>  // for M_PI
+#include <boost/math/constants/constants.hpp>
 #include "zlog.h"
 
 namespace nim {
@@ -182,42 +182,42 @@ void Z3DBoundedFilter::rotateX()
 {
   if (!m_isSelected || !m_transformEnabled)
     return;
-  m_rendererBase.coordTransformPara().rotate(glm::vec3(1, 0, 0), 2 * M_PI / 360., m_center);
+  m_rendererBase.coordTransformPara().rotate(glm::vec3(1, 0, 0), boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::rotateY()
 {
   if (!m_isSelected || !m_transformEnabled)
     return;
-  m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 1, 0), 2 * M_PI / 360., m_center);
+  m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 1, 0), boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::rotateZ()
 {
   if (!m_isSelected || !m_transformEnabled)
     return;
-  m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 0, 1), 2 * M_PI / 360., m_center);
+  m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 0, 1), boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::rotateXM()
 {
   if (!m_isSelected || !m_transformEnabled)
     return;
-  m_rendererBase.coordTransformPara().rotate(glm::vec3(1, 0, 0), -2 * M_PI / 360., m_center);
+  m_rendererBase.coordTransformPara().rotate(glm::vec3(1, 0, 0), -boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::rotateYM()
 {
   if (!m_isSelected || !m_transformEnabled)
     return;
-  m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 1, 0), -2 * M_PI / 360., m_center);
+  m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 1, 0), -boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::rotateZM()
 {
   if (!m_isSelected || !m_transformEnabled)
     return;
-  m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 0, 1), -2 * M_PI / 360., m_center);
+  m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 0, 1), -boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::updateBoundBox()

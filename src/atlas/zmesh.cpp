@@ -20,6 +20,7 @@
 #include "zswc.h"
 #include "zlog.h"
 #include <map>
+#include <boost/math/constants/constants.hpp>
 
 namespace {
 
@@ -1074,7 +1075,8 @@ ZMesh ZMesh::createConeMesh(glm::vec3 base, float baseRadius, glm::vec3 top, flo
   std::vector<glm::vec3> normals;
   std::vector<GLuint> triangles;
 
-  float theta = 2.f * M_PI / numberOfSides;
+  using namespace boost::math::float_constants;
+  float theta = two_pi / numberOfSides;
 
   if (baseRadius == 0) {
     vertices.push_back(base);

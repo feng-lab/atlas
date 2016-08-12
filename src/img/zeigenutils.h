@@ -13,6 +13,7 @@
 #ifndef Q_MOC_RUN
 
 #include <boost/math/special_functions.hpp>
+#include <boost/math/constants/constants.hpp>
 
 #endif
 
@@ -257,26 +258,13 @@ public:
   }
 
   // returns the log of multivariate gamma(n, alpha) value.
-  inline static double mvtGammaln(double n, double alpha)
+  template<class Real>
+  inline static Real mvtGammaln(Real n, Real alpha)
   {
-    Eigen::VectorXd tmp = 0.5 * (Eigen::VectorXd::LinSpaced(n, -n, -1).array() + 1) + alpha;
-    return ((n * (n - 1)) / 4) * std::log(M_PI) + matrixGammaln(tmp).sum();
-  }
-
-  inline static float mvtGammaln(float n, float alpha)
-  {
-    Eigen::VectorXf tmp = alpha + 0.5 * (Eigen::VectorXf::LinSpaced(n, -n, -1).array() + 1);
-    return ((n * (n - 1)) / 4) * std::log(M_PI) + matrixGammaln(tmp).sum();
-  }
-
-  inline static long double mvtGammaln(long double n, long double alpha)
-  {
-    Eigen::Matrix<long double, Eigen::Dynamic, 1> tmp = alpha +
-                                                        0.5 *
-                                                        (Eigen::Matrix<long double, Eigen::Dynamic, 1>::LinSpaced(n, -n,
-                                                                                                                  -1).array() +
-                                                         1);
-    return ((n * (n - 1)) / 4) * std::log(M_PI) + matrixGammaln(tmp).sum();
+    using namespace boost::math::constants;
+    Eigen::Matrix<Real, Eigen::Dynamic, 1> tmp =
+      alpha + 0.5 * (Eigen::Matrix<Real, Eigen::Dynamic, 1>::LinSpaced(n, -n, -1).array() + 1);
+    return ((n * (n - 1)) / 4) * std::log(pi<Real>()) + matrixGammaln(tmp).sum();
   }
 
   // return log(sum(exp(x))) along each row

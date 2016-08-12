@@ -8,6 +8,7 @@
 #include "zgraphicsview.h"
 #include <QGraphicsSceneContextMenuEvent>
 #include <QToolTip>
+#include <boost/math/constants/constants.hpp>
 
 namespace nim {
 
@@ -394,8 +395,9 @@ void ZROIFilter::rotateClockwise()
       }
     }
   }
+  using namespace boost::math::double_constants;
   if (!controlPoints.empty())
-    m_ROI->rotateROIControlPoints(controlPoints, 5. / 180. * M_PI);
+    m_ROI->rotateROIControlPoints(controlPoints, 5. * degree);
 }
 
 void ZROIFilter::rotateCounterclockwise()
@@ -408,8 +410,9 @@ void ZROIFilter::rotateCounterclockwise()
       }
     }
   }
+  using namespace boost::math::double_constants;
   if (!controlPoints.empty())
-    m_ROI->rotateROIControlPoints(controlPoints, -5. / 180. * M_PI);
+    m_ROI->rotateROIControlPoints(controlPoints, -5. * degree);
 }
 
 void ZROIFilter::offsetChanged()

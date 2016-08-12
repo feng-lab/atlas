@@ -1,7 +1,7 @@
 #include "zimagefilterkernel.h"
 
-#include <QtMath>  //for M_PI
 #include <cmath>
+#include <boost/math/constants/constants.hpp>
 
 namespace nim {
 
@@ -177,7 +177,7 @@ std::vector<TFloat> create1DLoGKernel(TFloat sigmaX,
   // (1/(sqrt(2*pi)*s)) * (x.^2/s^4 - 1/s^2 ) .* exp(-x.^2/(2*s^2));
   for (int i = 0; i < width; ++i) {
     double distToCenterX2 = (i - centerX) * (i - centerX);
-    res[idx++] = 1.0 / (std::sqrt(2 * M_PI) * sigmaX) *
+    res[idx++] = 1.0 / (std::sqrt(boost::math::double_constants::two_pi) * sigmaX) *
                  (distToCenterX2 / sigmaX4 - 1.0 / sigmaX2) * std::exp(-distToCenterX2 / sigmaX22);
     sum += res[idx - 1];
   }

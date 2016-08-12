@@ -379,7 +379,8 @@ void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta) const
           }
         }
       }
-      punctum.setRadius(std::pow(0.75 / M_PI * punctum.volSize(), 1.0 / 3));
+      using namespace boost::math::double_constants;
+      punctum.setRadius(std::pow(three_quarters_pi * punctum.volSize(), 1.0 / 3));
       puncta.push_back(punctum);
     } else if (!line.isEmpty()) {
       throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));

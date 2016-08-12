@@ -508,6 +508,7 @@ protected:
   //  component subspace.
   MatrixXrt activations()
   {
+    using namespace boost::math::double_constants;
     if (!m_hasEnoughData)
       return MatrixXrt();
 
@@ -521,12 +522,12 @@ protected:
         }
         // calculate width factors
         MatrixXrt wi2 = VectorXrt::Ones(m_pData->rows()) * (covars * 2);
-        MatrixXrt normal = (wi2 * M_PI).array().pow(m_dimension / 2.0);
+        MatrixXrt normal = (wi2 * pi).array().pow(m_dimension / 2.0);
         a = exp(-n2.array() / wi2.array()) / normal.array();
         break;
       }
       case CovarianceType::Diag: {
-        ResultDataType normal = std::pow(2 * M_PI, m_dimension / 2.0);
+        ResultDataType normal = std::pow(two_pi, m_dimension / 2.0);
         for (size_t j = 0; j < m_nclasses; j++) {
           ResultDataType s = m_covars[j].diagonal().cwiseSqrt().prod();
           MatrixXrt diffs = m_pData->rowwise() - m_centroids.row(j);
@@ -537,7 +538,7 @@ protected:
         break;
       }
       case CovarianceType::Full: {
-        ResultDataType normal = std::pow(2 * M_PI, m_dimension / 2.0);
+        ResultDataType normal = std::pow(two_pi, m_dimension / 2.0);
         for (size_t j = 0; j < m_nclasses; j++) {
           MatrixXrt diffs = m_pData->rowwise() - m_centroids.row(j);
           Eigen::LLT<MatrixXrt> chol;

@@ -1,5 +1,4 @@
 #include "z3dgl.h"
-#include <QtMath>
 #include "z3drendererbase.h"
 
 #include "z3dprimitiverenderer.h"
@@ -143,15 +142,16 @@ void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram& shader, Z3DEye
     shader.setFogColorTopUniform(m_globalParas.fogTopColor.get());
     shader.setFogColorBottomUniform(m_globalParas.fogBottomColor.get());
   }
+  // #define M_LOG2E     1.44269504088896340735992468100189214   /* log2(e)        */
   if (m_globalParas.fogMode.isSelected("Linear")) {
     shader.setFogEndUniform(static_cast<GLfloat>((m_globalParas.fogRange.get().y)));
     shader.setFogScaleUniform(
       static_cast<GLfloat>(1.f / (m_globalParas.fogRange.get().y - m_globalParas.fogRange.get().x)));
   } else if (m_globalParas.fogMode.isSelected("Exponential")) {
-    shader.setFogDensityLog2eUniform(m_globalParas.fogDensity.get() * static_cast<float>(M_LOG2E));
+    shader.setFogDensityLog2eUniform(m_globalParas.fogDensity.get() * 1.44269504088896340735992468100189214f);
   } else if (m_globalParas.fogMode.isSelected("Squared Exponential")) {
     shader.setFogDensityDensityLog2eUniform(
-      m_globalParas.fogDensity.get() * m_globalParas.fogDensity.get() * static_cast<float>(M_LOG2E));
+      m_globalParas.fogDensity.get() * m_globalParas.fogDensity.get() * 1.44269504088896340735992468100189214f);
   }
 
   shader.setClipPlanesUniform(m_clipPlanes.data(), m_clipPlanes.size());

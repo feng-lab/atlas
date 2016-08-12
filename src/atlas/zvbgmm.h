@@ -481,6 +481,7 @@ protected:
   ResultDataType lowerBound(const VectorXrt& Nk, const MatrixXrt& xbar, const std::vector<MatrixXrt>& S,
                             const Params& post) const  // Bishop sec 10.2.2
   {
+    using namespace boost::math::double_constants;
     // 10.71
     VectorXrt ElogpXall = VectorXrt::Zero(m_nclasses);
     for (size_t k = 0; k < m_nclasses; k++) {
@@ -488,7 +489,7 @@ protected:
       ElogpXall(k) = 0.5 * Nk(k) * (post.logLambdaTilde(k) - m_dimension / post.beta(k)
                                     - (post.v(k) * S[k] * post.W[k]).trace()
                                     - post.v(k) * (((xbarc * post.W[k]).array() * xbarc.array()).sum())
-                                    - m_dimension * std::log(2 * M_PI));
+                                    - m_dimension * std::log(two_pi));
     }
     ResultDataType ElogpX = ElogpXall.sum();
 
@@ -502,7 +503,7 @@ protected:
     VectorXrt ElogpmuSigmaAll = VectorXrt::Zero(m_nclasses);
     for (size_t k = 0; k < m_nclasses; k++) {
       RowVectorXrt mc = post.m.row(k) - m_prior.m.row(k);
-      ElogpmuSigmaAll(k) = 0.5 * (m_dimension * std::log(m_prior.beta(k) / (2 * M_PI)) + post.logLambdaTilde(k) -
+      ElogpmuSigmaAll(k) = 0.5 * (m_dimension * std::log(m_prior.beta(k) / two_pi) + post.logLambdaTilde(k) -
                                   m_dimension * m_prior.beta(k) / post.beta(k)
                                   - m_prior.beta(k) * post.v(k) * ((mc * post.W[k]).array() * mc.array()).sum()) +
                            m_prior.logWishartConst(k)
@@ -524,7 +525,7 @@ protected:
 
     // 10.77//
     ResultDataType ElogqmuSigma = (0.5 * post.logLambdaTilde.array() +
-                                   m_dimension / 2. * log(post.beta.array() / (2 * M_PI)) - m_dimension / 2. -
+                                   m_dimension / 2. * log(post.beta.array() / two_pi) - m_dimension / 2. -
                                    post.entropy.array()).sum();
 
     // overall sum
@@ -619,7 +620,7 @@ protected:
       out.logLambdaTilde(k) = ZEigenUtils::matrixDigamma(tmp).sum()
                               + m_dimension * std::log(2.0) + logdetW; // B.81
       out.logWishartConst(k) = -(out.v(k) / 2.0) * logdetW - (out.v(k) * m_dimension / 2.) * std::log(2.0)
-                               - ZEigenUtils::mvtGammaln(m_dimension, out.v(k) / 2.0); // B.79
+                               - ZEigenUtils::mvtGammaln<double>(m_dimension, out.v(k) / 2.0); // B.79
       out.entropy(k) = -out.logWishartConst(k) - (out.v(k) - m_dimension - 1) / 2 * out.logLambdaTilde(k)
                        + out.v(k) * m_dimension / 2.; // B.82
     }

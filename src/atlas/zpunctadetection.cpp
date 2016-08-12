@@ -46,7 +46,8 @@ polygon_2d errorEllipseToPolygon(Eigen::RowVectorXd m, Eigen::MatrixXd cov, doub
 {
   polygon_2d poly;
   const int n = 100;  // number of points around half ellipse
-  double step = M_PI / n;
+  using namespace boost::math::double_constants;
+  double step = pi / n;
   double coor[n * 2 + 1][2];
   double p = 0;  // angles around a circle
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(cov.topLeftCorner<2, 2>(), Eigen::ComputeEigenvectors);

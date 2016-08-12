@@ -306,6 +306,7 @@ bool Z3DView::takeScreenShot(QString filename, Z3DScreenShotType sst)
 bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, glm::vec3 axis,
                                             bool clockWise, int numFrame, int width, int height, Z3DScreenShotType sst)
 {
+  using namespace boost::math::double_constants;
   QString title = "Capturing Images...";
   if (sst == Z3DScreenShotType::HalfSideBySideStereoView)
     title = "Capturing Half Side-By-Side Stereo Images...";
@@ -314,7 +315,7 @@ bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& name
   QProgressDialog progress(title, "Cancel", 0, numFrame, m_mainWin);
   progress.setWindowModality(Qt::WindowModal);
   progress.show();
-  double rAngle = M_PI * 2. / numFrame;
+  double rAngle = two_pi / numFrame;
   bool res = true;
   for (int i = 0; i < numFrame; i++) {
     progress.setValue(i);
@@ -341,6 +342,7 @@ bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& name
 bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, glm::vec3 axis,
                                    bool clockWise, int numFrame, Z3DScreenShotType sst)
 {
+  using namespace boost::math::double_constants;
   QString title = "Capturing Images...";
   if (sst == Z3DScreenShotType::HalfSideBySideStereoView)
     title = "Capturing Half Side-By-Side Stereo Images...";
@@ -349,7 +351,7 @@ bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, g
   QProgressDialog progress(title, "Cancel", 0, numFrame, m_mainWin);
   progress.setWindowModality(Qt::WindowModal);
   progress.show();
-  double rAngle = M_PI * 2. / numFrame;
+  double rAngle = two_pi / numFrame;
   bool res = true;
   for (int i = 0; i < numFrame; i++) {
     progress.setValue(i);

@@ -6,13 +6,14 @@ void getAffineParameterScales(double width, double height, double* scaleRotation
                               double* scaleScaleX = nullptr, double* scaleScaleY = nullptr,
                               double* scaleShearXY = nullptr, double* scaleShearYX = nullptr)
 {
+  using namespace boost::math::double_constants;
   double dt = 1;
   double axy = std::atan(height / width);
-  double bxy = M_PI / 2 - axy;
+  double bxy = half_pi - axy;
   double Kxy = std::pow(width, 3) * (std::sin(axy) / std::pow(std::cos(axy), 2) +
-                                     std::log(std::abs(std::tan((M_PI / 4) + (axy / 2))))) +
+                                     std::log(std::abs(std::tan((pi / 4) + (axy / 2))))) +
                std::pow(height, 3) * (std::sin(bxy) / std::pow(std::cos(bxy), 2)
-                                      + std::log(std::abs(std::tan((M_PI / 2) - (axy / 2)))));
+                                      + std::log(std::abs(std::tan((half_pi) - (axy / 2)))));
   if (scaleRotation)
     *scaleRotation = std::abs(2 * std::asin((6 * dt * width * height) / Kxy));
   if (scaleScaleX)

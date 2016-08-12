@@ -2,8 +2,7 @@
 
 #include "z3dcameraparameter.h"
 #include "zlog.h"
-
-#include <QtMath>
+#include <boost/math/constants/constants.hpp>
 
 namespace nim {
 
@@ -400,8 +399,8 @@ void Z3DTrackballInteractionHandler::rotate(glm::ivec2 mouseStart, glm::ivec2 mo
 {
   glm::ivec2 dPos = mouseEnd - mouseStart;
 
-  double delta_elevation = -0.2 * M_PI / h;
-  double delta_azimuth = -0.2 * M_PI / w;
+  double delta_elevation = -0.2 * boost::math::double_constants::pi / h;
+  double delta_azimuth = -0.2 * boost::math::double_constants::pi / w;
 
   double rxf = dPos.x * delta_azimuth * m_mouseMotionFactor;
   double ryf = dPos.y * delta_elevation * m_mouseMotionFactor;

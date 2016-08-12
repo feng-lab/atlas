@@ -29,14 +29,16 @@ __forceinline double cubic_kernel(double x)
 
 __forceinline double lanczos2_kernel(double x)
 {
-  return (std::abs(x) < 2) * (std::sin(M_PI * x) * std::sin(M_PI * x / 2) + std::numeric_limits<double>::epsilon()) /
-         ((M_PI * M_PI * x * x / 2) + std::numeric_limits<double>::epsilon());
+  using namespace boost::math::double_constants;
+  return (std::abs(x) < 2) * (std::sin(pi * x) * std::sin(pi * x / 2) + std::numeric_limits<double>::epsilon()) /
+         ((pi * pi * x * x / 2) + std::numeric_limits<double>::epsilon());
 }
 
 __forceinline double lanczos3_kernel(double x)
 {
-  return (std::abs(x) < 3) * (std::sin(M_PI * x) * std::sin(M_PI * x / 3) + std::numeric_limits<double>::epsilon()) /
-         ((M_PI * M_PI * x * x / 3) + std::numeric_limits<double>::epsilon());
+  using namespace boost::math::double_constants;
+  return (std::abs(x) < 3) * (std::sin(pi * x) * std::sin(pi * x / 3) + std::numeric_limits<double>::epsilon()) /
+         ((pi * pi * x * x / 3) + std::numeric_limits<double>::epsilon());
 }
 
 }
