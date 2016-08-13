@@ -216,8 +216,7 @@ public:
   template<typename Derived>
   inline static Derived matrixDigamma(const Eigen::MatrixBase<Derived>& x)
   {
-    return x.unaryExpr(std::pointer_to_unary_function<typename Derived::Scalar, typename Derived::Scalar>
-                         (boost::math::digamma<typename Derived::Scalar>));
+    return x.unaryExpr([](typename Derived::Scalar v) { return boost::math::digamma(v); });
   }
 
   template<class T>
@@ -229,8 +228,7 @@ public:
   template<typename Derived>
   inline static Derived matrixGammaln(const Eigen::MatrixBase<Derived>& x)
   {
-    return x.unaryExpr(std::pointer_to_unary_function<typename Derived::Scalar, typename Derived::Scalar>
-                         (boost::math::lgamma<typename Derived::Scalar>));
+    return x.unaryExpr([](typename Derived::Scalar v) { return boost::math::lgamma(v); });
   }
 
   template<class T>
