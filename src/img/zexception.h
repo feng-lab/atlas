@@ -27,8 +27,7 @@ public:
     : m_what(what)
   {}
 
-  virtual ~ZException() noexcept
-  {}
+  virtual ~ZException() noexcept;
 
   inline const QString& what() const noexcept
   { return m_what; }

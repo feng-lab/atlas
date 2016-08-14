@@ -929,9 +929,9 @@ inline void saturate_add<uint8_t, const uint8_t>(const uint8_t *x, const uint8_t
   size_t i;
   // process 16 elements per iteration
   for (i = 0; i < count - 15; i += 16) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    __m128i r = _mm_loadu_si128((const __m128i*)(y+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_adds_epu8(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    __m128i r = _mm_loadu_si128(reinterpret_cast<const __m128i*>(y + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epu8(l, r));
   }
 
   // clean up any remaining elements
@@ -947,8 +947,8 @@ inline void saturate_add<uint8_t, uint8_t>(const uint8_t *x, uint8_t y, size_t c
   size_t i;
   // process 16 elements per iteration
   for (i = 0; i < count - 15; i += 16) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_adds_epu8(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x+i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res+i), _mm_adds_epu8(l, r));
   }
 
   // clean up any remaining elements
@@ -963,9 +963,9 @@ inline void saturate_add<int8_t, const int8_t>(const int8_t *x, const int8_t *y,
   size_t i;
   // process 16 elements per iteration
   for (i = 0; i < count - 15; i += 16) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    __m128i r = _mm_loadu_si128((const __m128i*)(y+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_adds_epi8(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x+i));
+    __m128i r = _mm_loadu_si128(reinterpret_cast<const __m128i*>(y+i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res+i), _mm_adds_epi8(l, r));
   }
 
   // clean up any remaining elements
@@ -981,8 +981,8 @@ inline void saturate_add<int8_t, int8_t>(const int8_t *x, int8_t y, size_t count
   size_t i;
   // process 16 elements per iteration
   for (i = 0; i < count - 15; i += 16) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_adds_epi8(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x+i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res+i), _mm_adds_epi8(l, r));
   }
 
   // clean up any remaining elements
@@ -992,69 +992,69 @@ inline void saturate_add<int8_t, int8_t>(const int8_t *x, int8_t y, size_t count
 }
 
 template<>
-inline void saturate_add<uint16_t, const uint16_t>(const uint16_t *x, const uint16_t *y, size_t count, uint16_t *res)
+inline void saturate_add<uint16_t, const uint16_t>(const uint16_t* x, const uint16_t* y, size_t count, uint16_t* res)
 {
   size_t i;
   // process 8 elements per iteration
   for (i = 0; i < count - 7; i += 8) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    __m128i r = _mm_loadu_si128((const __m128i*)(y+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_adds_epu16(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    __m128i r = _mm_loadu_si128(reinterpret_cast<const __m128i*>(y + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epu16(l, r));
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y[i]);
   }
 }
 
 template<>
-inline void saturate_add<uint16_t, uint16_t>(const uint16_t *x, uint16_t y, size_t count, uint16_t *res)
+inline void saturate_add<uint16_t, uint16_t>(const uint16_t* x, uint16_t y, size_t count, uint16_t* res)
 {
   __m128i r = _mm_set1_epi16(y);
   size_t i;
   // process 16 elements per iteration
   for (i = 0; i < count - 7; i += 8) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_adds_epu16(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epu16(l, r));
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y);
   }
 }
 
 template<>
-inline void saturate_add<int16_t, const int16_t>(const int16_t *x, const int16_t *y, size_t count, int16_t *res)
+inline void saturate_add<int16_t, const int16_t>(const int16_t* x, const int16_t* y, size_t count, int16_t* res)
 {
   size_t i;
   // process 8 elements per iteration
   for (i = 0; i < count - 7; i += 8) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    __m128i r = _mm_loadu_si128((const __m128i*)(y+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_adds_epi16(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    __m128i r = _mm_loadu_si128(reinterpret_cast<const __m128i*>(y + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epi16(l, r));
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y[i]);
   }
 }
 
 template<>
-inline void saturate_add<int16_t, int16_t>(const int16_t *x, int16_t y, size_t count, int16_t *res)
+inline void saturate_add<int16_t, int16_t>(const int16_t* x, int16_t y, size_t count, int16_t* res)
 {
   __m128i r = _mm_set1_epi16(y);
   size_t i;
   // process 16 elements per iteration
   for (i = 0; i < count - 7; i += 8) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_adds_epi16(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epi16(l, r));
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y);
   }
 }
@@ -1064,7 +1064,7 @@ inline void saturate_add<int16_t, int16_t>(const int16_t *x, int16_t y, size_t c
 template<typename TVoxel1, typename TVoxel2>
 inline void saturate_sub(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
 {
-  for (size_t i=0; i<count; ++i) {
+  for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_sub(x[i], y[i]);
   }
 }
@@ -1072,143 +1072,143 @@ inline void saturate_sub(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* re
 template<typename TVoxel1, typename TVoxel2>
 inline void saturate_sub(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res)
 {
-  for (size_t i=0; i<count; ++i) {
+  for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_sub(x[i], y);
   }
 }
 
 template<>
-inline void saturate_sub<uint8_t, const uint8_t>(const uint8_t *x, const uint8_t *y, size_t count, uint8_t *res)
+inline void saturate_sub<uint8_t, const uint8_t>(const uint8_t* x, const uint8_t* y, size_t count, uint8_t* res)
 {
   size_t i;
   // process 16 elements per iteration
   for (i = 0; i < count - 15; i += 16) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    __m128i r = _mm_loadu_si128((const __m128i*)(y+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_subs_epu8(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    __m128i r = _mm_loadu_si128(reinterpret_cast<const __m128i*>(y + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epu8(l, r));
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y[i]);
   }
 }
 
 template<>
-inline void saturate_sub<uint8_t, uint8_t>(const uint8_t *x, uint8_t y, size_t count, uint8_t *res)
+inline void saturate_sub<uint8_t, uint8_t>(const uint8_t* x, uint8_t y, size_t count, uint8_t* res)
 {
   __m128i r = _mm_set1_epi8(y);
   size_t i;
   // process 16 elements per iteration
   for (i = 0; i < count - 15; i += 16) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_subs_epu8(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epu8(l, r));
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y);
   }
 }
 
 template<>
-inline void saturate_sub<int8_t, const int8_t>(const int8_t *x, const int8_t *y, size_t count, int8_t *res)
+inline void saturate_sub<int8_t, const int8_t>(const int8_t* x, const int8_t* y, size_t count, int8_t* res)
 {
   size_t i;
   // process 16 elements per iteration
   for (i = 0; i < count - 15; i += 16) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    __m128i r = _mm_loadu_si128((const __m128i*)(y+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_subs_epi8(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    __m128i r = _mm_loadu_si128(reinterpret_cast<const __m128i*>(y + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epi8(l, r));
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y[i]);
   }
 }
 
 template<>
-inline void saturate_sub<int8_t, int8_t>(const int8_t *x, int8_t y, size_t count, int8_t *res)
+inline void saturate_sub<int8_t, int8_t>(const int8_t* x, int8_t y, size_t count, int8_t* res)
 {
   __m128i r = _mm_set1_epi8(y);
   size_t i;
   // process 16 elements per iteration
   for (i = 0; i < count - 15; i += 16) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_subs_epi8(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epi8(l, r));
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y);
   }
 }
 
 template<>
-inline void saturate_sub<uint16_t, const uint16_t>(const uint16_t *x, const uint16_t *y, size_t count, uint16_t *res)
+inline void saturate_sub<uint16_t, const uint16_t>(const uint16_t* x, const uint16_t* y, size_t count, uint16_t* res)
 {
   size_t i;
   // process 8 elements per iteration
   for (i = 0; i < count - 7; i += 8) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    __m128i r = _mm_loadu_si128((const __m128i*)(y+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_subs_epu16(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    __m128i r = _mm_loadu_si128(reinterpret_cast<const __m128i*>(y + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epu16(l, r));
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y[i]);
   }
 }
 
 template<>
-inline void saturate_sub<uint16_t, uint16_t>(const uint16_t *x, uint16_t y, size_t count, uint16_t *res)
+inline void saturate_sub<uint16_t, uint16_t>(const uint16_t* x, uint16_t y, size_t count, uint16_t* res)
 {
   __m128i r = _mm_set1_epi16(y);
   size_t i;
   // process 16 elements per iteration
   for (i = 0; i < count - 7; i += 8) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_subs_epu16(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epu16(l, r));
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y);
   }
 }
 
 template<>
-inline void saturate_sub<int16_t, const int16_t>(const int16_t *x, const int16_t *y, size_t count, int16_t *res)
+inline void saturate_sub<int16_t, const int16_t>(const int16_t* x, const int16_t* y, size_t count, int16_t* res)
 {
   size_t i;
   // process 8 elements per iteration
   for (i = 0; i < count - 7; i += 8) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    __m128i r = _mm_loadu_si128((const __m128i*)(y+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_subs_epi16(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    __m128i r = _mm_loadu_si128(reinterpret_cast<const __m128i*>(y + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epi16(l, r));
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y[i]);
   }
 }
 
 template<>
-inline void saturate_sub<int16_t, int16_t>(const int16_t *x, int16_t y, size_t count, int16_t *res)
+inline void saturate_sub<int16_t, int16_t>(const int16_t* x, int16_t y, size_t count, int16_t* res)
 {
   __m128i r = _mm_set1_epi16(y);
   size_t i;
   // process 16 elements per iteration
   for (i = 0; i < count - 7; i += 8) {
-    __m128i l = _mm_loadu_si128((const __m128i*)(x+i));
-    _mm_storeu_si128((__m128i*)(res+i), _mm_subs_epi16(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epi16(l, r));
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y);
   }
 }
@@ -1218,7 +1218,7 @@ inline void saturate_sub<int16_t, int16_t>(const int16_t *x, int16_t y, size_t c
 template<typename TVoxel1, typename TVoxel2>
 inline void saturate_mul(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
 {
-  for (size_t i=0; i<count; ++i) {
+  for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_mul(x[i], y[i]);
   }
 }
@@ -1226,7 +1226,7 @@ inline void saturate_mul(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* re
 template<typename TVoxel1, typename TVoxel2>
 inline void saturate_mul(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res)
 {
-  for (size_t i=0; i<count; ++i) {
+  for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_mul(x[i], y);
   }
 }
@@ -1236,7 +1236,7 @@ inline void saturate_mul(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res
 template<typename TVoxel1, typename TVoxel2>
 inline void saturate_div(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
 {
-  for (size_t i=0; i<count; ++i) {
+  for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_div(x[i], y[i]);
   }
 }
@@ -1244,7 +1244,7 @@ inline void saturate_div(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* re
 template<typename TVoxel1, typename TVoxel2>
 inline void saturate_div_secure(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
 {
-  for (size_t i=0; i<count; ++i) {
+  for (size_t i = 0; i < count; ++i) {
     res[i] = y[i] == TVoxel2(0) ? TVoxel1(0) : saturate_div(x[i], y[i]);
   }
 }
@@ -1252,7 +1252,7 @@ inline void saturate_div_secure(const TVoxel1* x, TVoxel2* y, size_t count, TVox
 template<typename TVoxel1, typename TVoxel2>
 inline void saturate_div(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res)
 {
-  for (size_t i=0; i<count; ++i) {
+  for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_div(x[i], y);
   }
 }

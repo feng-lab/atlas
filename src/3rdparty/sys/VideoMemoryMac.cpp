@@ -13,9 +13,9 @@ uint64_t getDedicatedVideoMemoryMB()
   CGLRendererInfoObj rend;
   // Using a -1/0xFFFFFFFF display mask enables us to find all renderers,
   // including those GPUs that are not attached to monitors, aka. offline renderers.
-  const GLint displayMask = 0xFFFFFFFF;
+  const GLuint displayMask = 0xFFFFFFFF;
 
-  CGLQueryRendererInfo((GLuint)displayMask, &rend, &nrend);
+  CGLQueryRendererInfo(displayMask, &rend, &nrend);
 
   for (i = 0; i < nrend; i++) {
     GLint thisRendererID;

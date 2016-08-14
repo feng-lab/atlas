@@ -715,7 +715,7 @@ if (WIN32)
   target_compile_options(${APP_NAME} PUBLIC /wd4305) # 'identifier' : truncation from 'type1' to 'type2'
   target_compile_options(${APP_NAME} PUBLIC /wd4819) # The file contains a character that cannot be represented in the current code page (number). Save the file in Unicode format to prevent data loss.
   target_compile_options(${APP_NAME} PUBLIC /utf-8)  # https://blogs.msdn.microsoft.com/vcblog/2016/02/22/new-options-for-managing-character-sets-in-the-microsoft-cc-compiler/
-  target_compile_options($(LIBRARY_NAME) PUBLIC /analyze) # The C/C++ Code Analysis tool provides information to developers about possible defects in their C/C++ source code
+  target_compile_options($(APP_NAME) PUBLIC /analyze) # The C/C++ Code Analysis tool provides information to developers about possible defects in their C/C++ source code
 
   target_link_libraries(${APP_NAME} PUBLIC /LTCG) # Link-time Code Generation
 
@@ -728,6 +728,7 @@ else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -frtti)
   target_compile_options(${APP_NAME} PUBLIC -fexceptions)
   target_compile_options(${APP_NAME} PUBLIC -Wall -Wextra)
+  target_compile_options(${APP_NAME} PUBLIC -Wbool-conversion -Wundefined-reinterpret-cast)
   target_compile_options(${APP_NAME} PUBLIC -Wshadow) #Warn whenever a local variable or type declaration shadows another variable, parameter, type, class member (in C++), or instance variable (in Objective-C) or whenever a built-in function is shadowed. Note that in C++, the compiler warns if a local variable shadows an explicit typedef, but not if it shadows a struct/class/enum.
   target_compile_options(${APP_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
 

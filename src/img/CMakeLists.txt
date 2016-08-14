@@ -243,7 +243,7 @@ set(IMG_SOURCES
     zimagesse3.cpp
     zimageavx.cpp
     zimgjpegxr.cpp
-    )
+    zexception.cpp)
 
 # our target
 set(LIBRARY_NAME img)
@@ -292,6 +292,7 @@ else (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC -frtti)
   target_compile_options(${LIBRARY_NAME} PUBLIC -fexceptions)
   target_compile_options(${LIBRARY_NAME} PUBLIC -Wall -Wextra)
+  target_compile_options(${LIBRARY_NAME} PUBLIC -Wbool-conversion -Wundefined-reinterpret-cast)
   target_compile_options(${LIBRARY_NAME} PUBLIC -Wshadow) #Warn whenever a local variable or type declaration shadows another variable, parameter, type, class member (in C++), or instance variable (in Objective-C) or whenever a built-in function is shadowed. Note that in C++, the compiler warns if a local variable shadows an explicit typedef, but not if it shadows a struct/class/enum.
   target_compile_options(${LIBRARY_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
 

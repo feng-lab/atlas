@@ -62,6 +62,18 @@ inline Dest bit_cast(const Source& source)
   return dest;
 }
 
+template<typename Type>
+inline bool is_aligned(Type* ptr)
+{
+  return (reinterpret_cast<uintptr_t>(ptr) & (alignof(Type) - 1)) == 0;
+}
+
+template<typename Type>
+inline bool is_aligned(Type* ptr, size_t a)
+{
+  return (reinterpret_cast<uintptr_t>(ptr) & (a - 1)) == 0;
+}
+
 // effective stl, item 24, Scott Meyers
 template<typename MapType, // type of map
   typename KeyArgType, // see below for why

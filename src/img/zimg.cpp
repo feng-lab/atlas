@@ -128,6 +128,10 @@ QString ZImgSource::toQString() const
   return res;
 }
 
+ZImgSubBlock::~ZImgSubBlock()
+{
+}
+
 //-----------------------------------------------------------------------------------
 
 ZImg::ZImg()

@@ -78,8 +78,7 @@ public:
     : ratio(ratio_), t(t_), z(z_), x(x_), y(y_), width(width_), height(height_)
   {}
 
-  virtual ~ZImgSubBlock()
-  {}
+  virtual ~ZImgSubBlock();
 
   // subclass read should depend its own members rather than member of this class
   virtual std::shared_ptr<ZImg> read() const = 0;

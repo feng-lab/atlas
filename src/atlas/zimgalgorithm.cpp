@@ -27,7 +27,7 @@ void ZImgAlgorithmBaseWithProgressReporter::setProgressReportInterval(double int
 void ZImgAlgorithmBaseWithProgressReporter::subOperationProgressChanged(double p, void* sender)
 {
   if (false && m_cancelFlag && *m_cancelFlag) {
-    std::set<itk::ProcessObject*>::iterator it = m_itkOperations.find((itk::ProcessObject*) sender);
+    std::set<itk::ProcessObject*>::iterator it = m_itkOperations.find(static_cast<itk::ProcessObject*>(sender));
     if (it != m_itkOperations.end()) {
       (*it)->AbortGenerateDataOn();
     } else {
