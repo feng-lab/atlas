@@ -14,9 +14,9 @@ void modifyJsonValue(QJsonObject& obj, const QString& path, const QJsonValue& ne
     subValue = newValue;
   }
   else {
-    QJsonObject obj = subValue.toObject();
-    modifyJsonValue(obj, subPath, newValue);
-    subValue = obj;
+    QJsonObject lobj = subValue.toObject();
+    modifyJsonValue(lobj, subPath, newValue);
+    subValue = lobj;
   }
 
   obj[propertyName] = subValue;

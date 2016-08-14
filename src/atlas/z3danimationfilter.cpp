@@ -7,6 +7,7 @@
 #include "z3dcameraparameter.h"
 #include "z3dgpuinfo.h"
 #include <QFileInfo>
+#include <boost/math/constants/constants.hpp>
 
 namespace nim {
 

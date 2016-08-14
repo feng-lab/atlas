@@ -55,8 +55,8 @@ protected:
   ValueType& dereference() const
   { return node->data; }
 
-  bool isTail(const NodeType* node)
-  { return !node->parent && !node->nextSibling; }
+  bool isTail(const NodeType* node_)
+  { return !node_->parent && !node_->nextSibling; }
 };
 
 template<typename TNode>
@@ -76,8 +76,8 @@ protected:
   ValueType& dereference() const
   { return node->data; }
 
-  bool isTail(const NodeType* node)
-  { return !node->parent && !node->nextSibling; }
+  bool isTail(const NodeType* node_)
+  { return !node_->parent && !node_->nextSibling; }
 };
 
 template<typename TNode>

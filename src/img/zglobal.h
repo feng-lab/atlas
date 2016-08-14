@@ -5,6 +5,8 @@
 #include <cstring>
 #include <type_traits>
 #include <iterator>
+#include <memory>
+#include "zexception.h"
 
 namespace nim {
 

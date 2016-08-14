@@ -116,8 +116,8 @@ struct EdgeInfo
 
 struct VertexInfo
 {
-  VertexInfo(const ZImg* im, size_t idx)
-    : img(im), idx(idx)
+  VertexInfo(const ZImg* im, size_t idx_)
+    : img(im), idx(idx_)
   {}
 
   const ZImg* img;

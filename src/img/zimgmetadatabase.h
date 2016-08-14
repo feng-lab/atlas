@@ -17,8 +17,8 @@ class ZImgMetadataBase
 protected:
   struct _AttachPoint
   {
-    _AttachPoint(int z, int c, int t)
-      : z(z), c(c), t(t)
+    _AttachPoint(int z_, int c_, int t_)
+      : z(z_), c(c_), t(t_)
     {}
 
     int z;

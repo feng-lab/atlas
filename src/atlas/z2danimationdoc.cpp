@@ -278,8 +278,8 @@ size_t Z2DAnimationDoc::addAnimation(Z2DAnimation* animation, const QString& pat
   return id;
 }
 
-Z2DAnimationDoc::AnimationPack::AnimationPack(Z2DAnimation* animationIn, const QString& path, const QString& name)
-  : animation(animationIn), path(QFileInfo(path).canonicalFilePath()), hasUnsavedChange(false), m_tmpName(name)
+Z2DAnimationDoc::AnimationPack::AnimationPack(Z2DAnimation* animation_, const QString& path_, const QString& name)
+  : animation(animation_), path(QFileInfo(path_).canonicalFilePath()), hasUnsavedChange(false), m_tmpName(name)
 {
   if (path.isEmpty()) {
     hasUnsavedChange = true;

@@ -728,13 +728,15 @@ else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -frtti)
   target_compile_options(${APP_NAME} PUBLIC -fexceptions)
   target_compile_options(${APP_NAME} PUBLIC -Wall -Wextra)
+  target_compile_options(${APP_NAME} PUBLIC -Wshadow) #Warn whenever a local variable or type declaration shadows another variable, parameter, type, class member (in C++), or instance variable (in Objective-C) or whenever a built-in function is shadowed. Note that in C++, the compiler warns if a local variable shadows an explicit typedef, but not if it shadows a struct/class/enum.
   target_compile_options(${APP_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
 
   target_link_libraries(${APP_NAME} PUBLIC -stdlib=libc++ "-rpath @executable_path/../Frameworks")
 
   # for some files
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
-                              "-Wno-unused-parameter -Wno-sign-compare -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
+                              "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
+  set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
   set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc
                               PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest)
 

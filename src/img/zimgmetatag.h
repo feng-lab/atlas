@@ -2,7 +2,6 @@
 
 #include <vector>
 #include "zimginterface.h"
-#include "zimginfo.h"
 #include <boost/align/aligned_allocator.hpp>
 
 namespace nim {

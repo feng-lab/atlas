@@ -2,7 +2,6 @@
 
 #include "zsaturateoperation.h"
 #include "zimg.h"
-#include <type_traits>
 
 namespace nim {
 

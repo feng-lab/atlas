@@ -1,4 +1,5 @@
 #include "zimg.h"
+
 #include "zimgio.h"
 #include "zlog.h"
 #include "zimage3dutils.h"
@@ -6,7 +7,6 @@
 #include <algorithm>
 #include "zrandom.h"
 #include <QTextStream>
-#include <type_traits>
 #include "zbenchtimer.h"
 #include <QFileInfo>
 
@@ -82,8 +82,8 @@ ZImgSource::ZImgSource()
 {
 }
 
-ZImgSource::ZImgSource(const QString& fn, const ZImgRegion& rgn, size_t scene, FileFormat format)
-  : region(rgn), scene(scene), format(format)
+ZImgSource::ZImgSource(const QString& fn, const ZImgRegion& rgn, size_t scene_, FileFormat format_)
+  : region(rgn), scene(scene_), format(format_)
 {
   QFileInfo fi(fn);
   if (fi.exists()) {
@@ -94,10 +94,11 @@ ZImgSource::ZImgSource(const QString& fn, const ZImgRegion& rgn, size_t scene, F
   }
 }
 
-ZImgSource::ZImgSource(const QStringList& fns, Dimension catDim, const ZImgRegion& rgn, size_t scene, FileFormat format,
-                       bool expandXY, bool expandWithMaxValue)
-  : catDim(catDim), region(rgn), scene(scene), format(format), expandXY(expandXY)
-  , expandWithMaxValue(expandWithMaxValue)
+ZImgSource::ZImgSource(const QStringList& fns, Dimension catDim_,
+                       const ZImgRegion& rgn, size_t scene_, FileFormat format_,
+                       bool expandXY_, bool expandWithMaxValue_)
+  : catDim(catDim_), region(rgn), scene(scene_), format(format_), expandXY(expandXY_)
+  , expandWithMaxValue(expandWithMaxValue_)
 {
   for (int i = 0; i < fns.size(); ++i) {
     QFileInfo fi(fns[i]);
@@ -473,8 +474,8 @@ ZImg ZImg::createView(int c, int t)
   ZImg res;
   res.m_info = rgn.clip(m_info);
   res.m_data.resize(res.numTimes());
-  for (size_t t = 0; t < res.numTimes(); ++t)
-    res.m_data[t] = channelData<uint8_t>(rgn.start.c, t + rgn.start.t);
+  for (size_t lt = 0; lt < res.numTimes(); ++lt)
+    res.m_data[lt] = channelData<uint8_t>(rgn.start.c, lt + rgn.start.t);
   res.m_ownData = false;
   return res;
 }
@@ -497,8 +498,8 @@ const ZImg ZImg::createView(int c, int t) const
   ZImg res;
   res.m_info = rgn.clip(m_info);
   res.m_data.resize(res.numTimes());
-  for (size_t t = 0; t < res.numTimes(); ++t)
-    res.m_data[t] = &(m_data[t + rgn.start.t][0]) + rgn.start.c * m_info.channelByteNumber();
+  for (size_t lt = 0; lt < res.numTimes(); ++lt)
+    res.m_data[lt] = &(m_data[lt + rgn.start.t][0]) + rgn.start.c * m_info.channelByteNumber();
   res.m_ownData = false;
   return res;
 }
@@ -519,8 +520,8 @@ ZImg ZImg::createView(size_t z, size_t c, size_t t)
   ZImg res;
   res.m_info = rgn.clip(m_info);
   res.m_data.resize(res.numTimes());
-  for (size_t t = 0; t < res.numTimes(); ++t)
-    res.m_data[t] = planeData<uint8_t>(rgn.start.z, rgn.start.c, t + rgn.start.t);
+  for (size_t lt = 0; lt < res.numTimes(); ++lt)
+    res.m_data[lt] = planeData<uint8_t>(rgn.start.z, rgn.start.c, lt + rgn.start.t);
   res.m_ownData = false;
   return res;
 }
@@ -541,8 +542,8 @@ const ZImg ZImg::createView(size_t z, size_t c, size_t t) const
   ZImg res;
   res.m_info = rgn.clip(m_info);
   res.m_data.resize(res.numTimes());
-  for (size_t t = 0; t < res.numTimes(); ++t)
-    res.m_data[t] = &(m_data[t + rgn.start.t][0]) +
+  for (size_t lt = 0; lt < res.numTimes(); ++lt)
+    res.m_data[lt] = &(m_data[lt + rgn.start.t][0]) +
                     rgn.start.c * m_info.channelByteNumber() + rgn.start.z * m_info.planeByteNumber();
   res.m_ownData = false;
   return res;
@@ -759,10 +760,11 @@ template<typename TVoxel>
 void ZImg::fillRandom_Impl()
 {
   std::uniform_int_distribution<TVoxel> dist(dataRangeMin<TVoxel>(), dataRangeMax<TVoxel>());
+  auto& eng = ZRandom::instance().engine();
   for (size_t t = 0; t < numTimes(); ++t) {
     TVoxel* data = timeData<TVoxel>(t);
     for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      data[v] = dist(ZRandom::instance().engine());
+      data[v] = dist(eng);
     }
   }
 }
@@ -771,10 +773,11 @@ template<>
 void ZImg::fillRandom_Impl<uint8_t>()
 {
   std::uniform_int_distribution<uint32_t> dist(dataRangeMin<uint32_t>(), dataRangeMax<uint32_t>());
+  auto& eng = ZRandom::instance().engine();
   for (size_t t = 0; t < numTimes(); ++t) {
     uint8_t* data = timeData<uint8_t>(t);
     for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      data[v] = dist(ZRandom::instance().engine());
+      data[v] = dist(eng);
     }
   }
 }
@@ -783,10 +786,11 @@ template<>
 void ZImg::fillRandom_Impl<int8_t>()
 {
   std::uniform_int_distribution<int32_t> dist(dataRangeMin<int32_t>(), dataRangeMax<int32_t>());
+  auto& eng = ZRandom::instance().engine();
   for (size_t t = 0; t < numTimes(); ++t) {
     int8_t* data = timeData<int8_t>(t);
     for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      data[v] = dist(ZRandom::instance().engine());
+      data[v] = dist(eng);
     }
   }
 }
@@ -795,10 +799,11 @@ template<>
 void ZImg::fillRandom_Impl<float>()
 {
   std::uniform_real_distribution<float> dist(dataRangeMin<float>(), dataRangeMax<float>());
+  auto& eng = ZRandom::instance().engine();
   for (size_t t = 0; t < numTimes(); ++t) {
     float* data = timeData<float>(t);
     for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      data[v] = dist(ZRandom::instance().engine());
+      data[v] = dist(eng);
     }
   }
 }
@@ -807,10 +812,11 @@ template<>
 void ZImg::fillRandom_Impl<double>()
 {
   std::uniform_real_distribution<double> dist(dataRangeMin<double>(), dataRangeMax<double>());
+  auto& eng = ZRandom::instance().engine();
   for (size_t t = 0; t < numTimes(); ++t) {
     double* data = timeData<double>(t);
     for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      data[v] = dist(ZRandom::instance().engine());
+      data[v] = dist(eng);
     }
   }
 }

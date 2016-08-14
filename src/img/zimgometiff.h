@@ -67,8 +67,8 @@ protected:
       , t(std::numeric_limits<size_t>::max())
     {}
 
-    IFDPos(size_t z, size_t c, size_t t)
-      : z(z), c(c), t(t)
+    IFDPos(size_t z_, size_t c_, size_t t_)
+      : z(z_), c(c_), t(t_)
     {}
 
     size_t z, c, t;

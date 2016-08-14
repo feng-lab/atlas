@@ -358,38 +358,38 @@ struct Image2DFilterForOneBlock
                            size_t kernelHeight,
                            TPixelOut* imgOut,
                            size_t imgOutWidth)
-    : padImg(padImg)
-    , padImgWidth(padImgWidth)
-    , kernel(kernel)
-    , kernelWidth(kernelWidth)
-    , kernelHeight(kernelHeight)
-    , imgOut(imgOut)
-    , imgOutWidth(imgOutWidth)
+    : m_padImg(padImg)
+    , m_padImgWidth(padImgWidth)
+    , m_kernel(kernel)
+    , m_kernelWidth(kernelWidth)
+    , m_kernelHeight(kernelHeight)
+    , m_imgOut(imgOut)
+    , m_imgOutWidth(imgOutWidth)
   {
   }
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     for (size_t j = range.begin(); j != range.end(); ++j) {
-      for (size_t i = 0; i < imgOutWidth; ++i) {
+      for (size_t i = 0; i < m_imgOutWidth; ++i) {
         double sum = 0.0;
-        for (size_t r = 0; r < kernelHeight; ++r) {  // row by row
-          const TPixel* imgStart = padImg + (j + r) * padImgWidth + i;
-          sum = std::inner_product(imgStart, imgStart + kernelWidth,
-                                   kernel + r * kernelWidth, sum);
+        for (size_t r = 0; r < m_kernelHeight; ++r) {  // row by row
+          const TPixel* imgStart = m_padImg + (j + r) * m_padImgWidth + i;
+          sum = std::inner_product(imgStart, imgStart + m_kernelWidth,
+                                   m_kernel + r * m_kernelWidth, sum);
         }
-        imgOut[j * imgOutWidth + i] = saturate_cast<TPixelOut>(sum);
+        m_imgOut[j * m_imgOutWidth + i] = saturate_cast<TPixelOut>(sum);
       }
     }
   }
 
-  const TPixel* padImg;
-  size_t padImgWidth;
-  const double* kernel;
-  size_t kernelWidth;
-  size_t kernelHeight;
-  TPixelOut* imgOut;
-  size_t imgOutWidth;
+  const TPixel* m_padImg;
+  size_t m_padImgWidth;
+  const double* m_kernel;
+  size_t m_kernelWidth;
+  size_t m_kernelHeight;
+  TPixelOut* m_imgOut;
+  size_t m_imgOutWidth;
 };
 
 template<>
@@ -402,46 +402,46 @@ struct Image2DFilterForOneBlock<double, double>
                            size_t kernelHeight,
                            double* imgOut,
                            size_t imgOutWidth)
-    : padImg(padImg)
-    , padImgWidth(padImgWidth)
-    , kernel(kernel)
-    , kernelWidth(kernelWidth)
-    , kernelHeight(kernelHeight)
-    , imgOut(imgOut)
-    , imgOutWidth(imgOutWidth)
+    : m_padImg(padImg)
+    , m_padImgWidth(padImgWidth)
+    , m_kernel(kernel)
+    , m_kernelWidth(kernelWidth)
+    , m_kernelHeight(kernelHeight)
+    , m_imgOut(imgOut)
+    , m_imgOutWidth(imgOutWidth)
   {
   }
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (kernelWidth < 8 || !(ZCpuInfo::instance().bAVX || ZCpuInfo::instance().bSSE3)) {
+    if (m_kernelWidth < 8 || !(ZCpuInfo::instance().bAVX || ZCpuInfo::instance().bSSE3)) {
       for (size_t j = range.begin(); j != range.end(); ++j) {
-        for (size_t i = 0; i < imgOutWidth; ++i) {
+        for (size_t i = 0; i < m_imgOutWidth; ++i) {
           double sum = 0.0;
-          for (size_t r = 0; r < kernelHeight; ++r) {  // row by row
-            const double* imgStart = padImg + (j + r) * padImgWidth + i;
-            sum = std::inner_product(imgStart, imgStart + kernelWidth,
-                                     kernel + r * kernelWidth, sum);
+          for (size_t r = 0; r < m_kernelHeight; ++r) {  // row by row
+            const double* imgStart = m_padImg + (j + r) * m_padImgWidth + i;
+            sum = std::inner_product(imgStart, imgStart + m_kernelWidth,
+                                     m_kernel + r * m_kernelWidth, sum);
           }
-          imgOut[j * imgOutWidth + i] = sum;
+          m_imgOut[j * m_imgOutWidth + i] = sum;
         }
       }
     } else if (ZCpuInfo::instance().bAVX) {
-      Image2DFilterForOneBlock_AVX(padImg, padImgWidth, kernel, kernelWidth, kernelHeight,
-                                   imgOut, imgOutWidth, range.begin(), range.end());
+      Image2DFilterForOneBlock_AVX(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_kernelHeight,
+                                   m_imgOut, m_imgOutWidth, range.begin(), range.end());
     } else if (ZCpuInfo::instance().bSSE3) {
-      Image2DFilterForOneBlock_SSE3(padImg, padImgWidth, kernel, kernelWidth, kernelHeight,
-                                    imgOut, imgOutWidth, range.begin(), range.end());
+      Image2DFilterForOneBlock_SSE3(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_kernelHeight,
+                                    m_imgOut, m_imgOutWidth, range.begin(), range.end());
     }
   }
 
-  const double* padImg;
-  size_t padImgWidth;
-  const double* kernel;
-  size_t kernelWidth;
-  size_t kernelHeight;
-  double* imgOut;
-  size_t imgOutWidth;
+  const double* m_padImg;
+  size_t m_padImgWidth;
+  const double* m_kernel;
+  size_t m_kernelWidth;
+  size_t m_kernelHeight;
+  double* m_imgOut;
+  size_t m_imgOutWidth;
 };
 
 template<typename TPixel, typename TPixelOut = TPixel>
@@ -453,34 +453,34 @@ struct Image2DRowFilterForOneBlock
                               size_t kernelWidth,
                               TPixelOut* imgOut,
                               size_t imgOutWidth)
-    : padImg(padImg)
-    , padImgWidth(padImgWidth)
-    , kernel(kernel)
-    , kernelWidth(kernelWidth)
-    , imgOut(imgOut)
-    , imgOutWidth(imgOutWidth)
+    : m_padImg(padImg)
+    , m_padImgWidth(padImgWidth)
+    , m_kernel(kernel)
+    , m_kernelWidth(kernelWidth)
+    , m_imgOut(imgOut)
+    , m_imgOutWidth(imgOutWidth)
   {
   }
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     for (size_t j = range.begin(); j != range.end(); ++j) {
-      for (size_t i = 0; i < imgOutWidth; ++i) {
+      for (size_t i = 0; i < m_imgOutWidth; ++i) {
         double sum = 0.0;
-        const TPixel* imgStart = padImg + j * padImgWidth + i;
-        sum = std::inner_product(imgStart, imgStart + kernelWidth,
-                                 kernel, sum);
-        imgOut[j * imgOutWidth + i] = saturate_cast<TPixelOut>(sum);
+        const TPixel* imgStart = m_padImg + j * m_padImgWidth + i;
+        sum = std::inner_product(imgStart, imgStart + m_kernelWidth,
+                                 m_kernel, sum);
+        m_imgOut[j * m_imgOutWidth + i] = saturate_cast<TPixelOut>(sum);
       }
     }
   }
 
-  const TPixel* padImg;
-  size_t padImgWidth;
-  const double* kernel;
-  size_t kernelWidth;
-  TPixelOut* imgOut;
-  size_t imgOutWidth;
+  const TPixel* m_padImg;
+  size_t m_padImgWidth;
+  const double* m_kernel;
+  size_t m_kernelWidth;
+  TPixelOut* m_imgOut;
+  size_t m_imgOutWidth;
 };
 
 template<>
@@ -492,42 +492,42 @@ struct Image2DRowFilterForOneBlock<double, double>
                               size_t kernelWidth,
                               double* imgOut,
                               size_t imgOutWidth)
-    : padImg(padImg)
-    , padImgWidth(padImgWidth)
-    , kernel(kernel)
-    , kernelWidth(kernelWidth)
-    , imgOut(imgOut)
-    , imgOutWidth(imgOutWidth)
+    : m_padImg(padImg)
+    , m_padImgWidth(padImgWidth)
+    , m_kernel(kernel)
+    , m_kernelWidth(kernelWidth)
+    , m_imgOut(imgOut)
+    , m_imgOutWidth(imgOutWidth)
   {
   }
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (kernelWidth < 8 || !(ZCpuInfo::instance().bAVX || ZCpuInfo::instance().bSSE3)) {
+    if (m_kernelWidth < 8 || !(ZCpuInfo::instance().bAVX || ZCpuInfo::instance().bSSE3)) {
       for (size_t j = range.begin(); j != range.end(); ++j) {
-        for (size_t i = 0; i < imgOutWidth; ++i) {
+        for (size_t i = 0; i < m_imgOutWidth; ++i) {
           double sum = 0.0;
-          const double* imgStart = padImg + j * padImgWidth + i;
-          sum = std::inner_product(imgStart, imgStart + kernelWidth,
-                                   kernel, sum);
-          imgOut[j * imgOutWidth + i] = sum;
+          const double* imgStart = m_padImg + j * m_padImgWidth + i;
+          sum = std::inner_product(imgStart, imgStart + m_kernelWidth,
+                                   m_kernel, sum);
+          m_imgOut[j * m_imgOutWidth + i] = sum;
         }
       }
     } else if (ZCpuInfo::instance().bAVX) {
-      Image2DRowFilterForOneBlock_AVX(padImg, padImgWidth, kernel, kernelWidth, imgOut, imgOutWidth,
+      Image2DRowFilterForOneBlock_AVX(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_imgOut, m_imgOutWidth,
                                       range.begin(), range.end());
     } else if (ZCpuInfo::instance().bSSE3) {
-      Image2DRowFilterForOneBlock_SSE3(padImg, padImgWidth, kernel, kernelWidth, imgOut, imgOutWidth,
+      Image2DRowFilterForOneBlock_SSE3(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_imgOut, m_imgOutWidth,
                                        range.begin(), range.end());
     }
   }
 
-  const double* padImg;
-  size_t padImgWidth;
-  const double* kernel;
-  size_t kernelWidth;
-  double* imgOut;
-  size_t imgOutWidth;
+  const double* m_padImg;
+  size_t m_padImgWidth;
+  const double* m_kernel;
+  size_t m_kernelWidth;
+  double* m_imgOut;
+  size_t m_imgOutWidth;
 };
 
 template<typename TPixel, typename TPixelOut = TPixel>
@@ -539,34 +539,34 @@ struct Image2DColFilterForOneBlock
                               size_t kernelHeight,
                               TPixelOut* imgOut,
                               size_t imgOutWidth)
-    : padImg(padImg)
-    , padImgWidth(padImgWidth)
-    , kernel(kernel)
-    , kernelHeight(kernelHeight)
-    , imgOut(imgOut)
-    , imgOutWidth(imgOutWidth)
+    : m_padImg(padImg)
+    , m_padImgWidth(padImgWidth)
+    , m_kernel(kernel)
+    , m_kernelHeight(kernelHeight)
+    , m_imgOut(imgOut)
+    , m_imgOutWidth(imgOutWidth)
   {
   }
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     for (size_t j = range.begin(); j != range.end(); ++j) {
-      for (size_t i = 0; i < imgOutWidth; ++i) {
+      for (size_t i = 0; i < m_imgOutWidth; ++i) {
         double sum = 0.0;
-        for (size_t r = 0; r < kernelHeight; ++r) {  // row by row
-          sum += kernel[r] * (*(padImg + (j + r) * padImgWidth + i));
+        for (size_t r = 0; r < m_kernelHeight; ++r) {  // row by row
+          sum += m_kernel[r] * (*(m_padImg + (j + r) * m_padImgWidth + i));
         }
-        imgOut[j * imgOutWidth + i] = saturate_cast<TPixelOut>(sum);
+        m_imgOut[j * m_imgOutWidth + i] = saturate_cast<TPixelOut>(sum);
       }
     }
   }
 
-  const TPixel* padImg;
-  size_t padImgWidth;
-  const double* kernel;
-  size_t kernelHeight;
-  TPixelOut* imgOut;
-  size_t imgOutWidth;
+  const TPixel* m_padImg;
+  size_t m_padImgWidth;
+  const double* m_kernel;
+  size_t m_kernelHeight;
+  TPixelOut* m_imgOut;
+  size_t m_imgOutWidth;
 };
 
 template<typename TPixel, typename TPixelOut>

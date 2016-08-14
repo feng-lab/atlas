@@ -580,8 +580,8 @@ int PointInPolygon(glm::dvec3 x, const std::vector<glm::dvec3>& pts, const doubl
     //
     bool rayOK;
     for (rayOK = false; rayOK == false;) {
-      ray[comps[0]] = nim::ZRandom::instance().randDouble(rayMag, -rayMag);
-      ray[comps[1]] = nim::ZRandom::instance().randDouble(rayMag, -rayMag);
+      ray[comps[0]] = nim::ZRandom::instance().randReal(rayMag, -rayMag);
+      ray[comps[1]] = nim::ZRandom::instance().randReal(rayMag, -rayMag);
       ray[maxComp] = -(normal[comps[0]] * ray[comps[0]] +
                        normal[comps[1]] * ray[comps[1]]) / normal[maxComp];
       if ((mag = glm::length(ray)) > rayMag * VTK_TOL) {
@@ -745,7 +745,7 @@ double vtkCCSPolygonBounds(
   bounds[4] = bounds[5] = p[2];
 
   for (size_t j = 1; j < n; j++) {
-    glm::dvec3 p = vertices[poly[j]];
+    p = vertices[poly[j]];
     if (p[0] < bounds[0]) { bounds[0] = p[0]; };
     if (p[0] > bounds[1]) { bounds[1] = p[0]; };
     if (p[1] < bounds[2]) { bounds[2] = p[1]; };

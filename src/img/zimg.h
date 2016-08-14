@@ -1,14 +1,10 @@
 #pragma once
 
-#include <cstdint>
-#include <vector>
 #include <QStringList>
-#include <memory>
 #include "zimginfo.h"
 #include "zimgregion.h"
 #include "zimgmetatag.h"
 #include "zimgmetadatabase.h"
-#include "zimginterface.h"
 
 namespace nim {
 
@@ -77,9 +73,9 @@ struct ZImgSource
 class ZImgSubBlock
 {
 public:
-  ZImgSubBlock(size_t ratio, size_t t, int64_t z,
-               int64_t x, int64_t y, int64_t width, int64_t height)
-    : ratio(ratio), t(t), z(z), x(x), y(y), width(width), height(height)
+  ZImgSubBlock(size_t ratio_, size_t t_, int64_t z_,
+               int64_t x_, int64_t y_, int64_t width_, int64_t height_)
+    : ratio(ratio_), t(t_), z(z_), x(x_), y(y_), width(width_), height(height_)
   {}
 
   virtual ~ZImgSubBlock()

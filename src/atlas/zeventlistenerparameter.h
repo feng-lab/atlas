@@ -58,8 +58,9 @@ signals:
 protected:
   struct MouseEvent
   {
-    MouseEvent(const QString& actionName, Qt::MouseButtons buttons, Qt::KeyboardModifiers modifiers, QEvent::Type type)
-      : actionName(actionName), buttons(buttons), modifiers(modifiers), type(type)
+    MouseEvent(const QString& actionName_, Qt::MouseButtons buttons_,
+               Qt::KeyboardModifiers modifiers_, QEvent::Type type_)
+      : actionName(actionName_), buttons(buttons_), modifiers(modifiers_), type(type_)
     {}
 
     QString actionName;
@@ -70,9 +71,9 @@ protected:
 
   struct KeyEvent
   {
-    KeyEvent(const QString& actionName, Qt::Key key, Qt::KeyboardModifiers modifiers,
-             QEvent::Type type = QEvent::KeyPress)
-      : actionName(actionName), key(key), modifiers(modifiers), type(type)
+    KeyEvent(const QString& actionName_, Qt::Key key_, Qt::KeyboardModifiers modifiers_,
+             QEvent::Type type_ = QEvent::KeyPress)
+      : actionName(actionName_), key(key_), modifiers(modifiers_), type(type_)
     {}
 
     QString actionName;

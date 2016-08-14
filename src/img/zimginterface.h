@@ -1,7 +1,6 @@
 #pragma once
 
 #include "zglobal.h"
-#include "zexception.h"
 
 namespace nim {
 
@@ -68,13 +67,13 @@ struct col4
     : r(0), g(0), b(0), a(255)
   {}
 
-  col4(uint8_t const& r, uint8_t const& g, uint8_t const& b, uint8_t const& a = 255_u8)
-    : r(r), g(g), b(b), a(a)
+  col4(uint8_t const& r_, uint8_t const& g_, uint8_t const& b_, uint8_t const& a_ = 255_u8)
+    : r(r_), g(g_), b(b_), a(a_)
   {}
 
   template<typename A, typename B, typename C, typename D>
-  col4(A const& r, B const& g, C const& b, D const& a = D(255))
-    : r(r), g(g), b(b), a(a)
+  col4(A const& r_, B const& g_, C const& b_, D const& a_ = D(255))
+    : r(r_), g(g_), b(b_), a(a_)
   {}
 
   bool operator==(const col4& c) const
@@ -123,8 +122,8 @@ struct Location
     : x(0), y(0), z(0)
   {}
 
-  Location(double x, double y, double z)
-    : x(x), y(y), z(z)
+  Location(double x_, double y_, double z_)
+    : x(x_), y(y_), z(z_)
   {}
 
   bool operator==(const Location& l) const

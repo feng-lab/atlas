@@ -97,7 +97,8 @@ void buildConnectionFromGrid(const std::vector<std::vector<size_t>>& grid,
 
 namespace nim {
 
-ZTile::ZTile(int index, QPoint topleft, QPoint bottomright) : index(index)
+ZTile::ZTile(int index_, QPoint topleft, QPoint bottomright)
+  : index(index_)
 {
   region = QRect(topleft, bottomright);
   bIsSelected = true;

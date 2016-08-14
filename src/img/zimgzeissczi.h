@@ -1,11 +1,9 @@
 #pragma once
 
 #include "zimgformat.h"
-#include <type_traits>
 #include <QUuid>
 #include <QXmlStreamReader>
 #include <array>
-#include <set>
 
 //todo : support multiple files czi
 

@@ -5,7 +5,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_OSX_DEPLOYMENT_TARGET 10.8)
 
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 if (NOT CMAKE_DEBUG_POSTFIX)
   set(CMAKE_DEBUG_POSTFIX d)
@@ -292,6 +292,7 @@ else (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC -frtti)
   target_compile_options(${LIBRARY_NAME} PUBLIC -fexceptions)
   target_compile_options(${LIBRARY_NAME} PUBLIC -Wall -Wextra)
+  target_compile_options(${LIBRARY_NAME} PUBLIC -Wshadow) #Warn whenever a local variable or type declaration shadows another variable, parameter, type, class member (in C++), or instance variable (in Objective-C) or whenever a built-in function is shadowed. Note that in C++, the compiler warns if a local variable shadows an explicit typedef, but not if it shadows a struct/class/enum.
   target_compile_options(${LIBRARY_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
 
   target_link_libraries(${LIBRARY_NAME} PUBLIC -stdlib=libc++)
@@ -300,7 +301,7 @@ else (WIN32)
   set_source_files_properties(zimagesse3.cpp PROPERTIES COMPILE_FLAGS -msse3)
   set_source_files_properties(zimageavx.cpp PROPERTIES COMPILE_FLAGS -mavx)
 
-  set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS -Wno-unused-parameter)
+  set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-shadow")
   set_source_files_properties(ztiff.cpp PROPERTIES COMPILE_FLAGS -I${TIFFDIR})
   set_source_files_properties(${TIFFDIR}/tif_ojpeg.c
                               PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -I${JPEGTURBO_INCLUDE_DIRS}")

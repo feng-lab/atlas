@@ -798,30 +798,30 @@ void ZAnimation::buildDisplayPacks()
       for (size_t i = 0; i < paraAnimationList.size(); ++i) {
         if (paraAnimationList[i]->numKeys() > 1 || m_objList[j]->isShowAll ||
             paraAnimationList[i]->name() == "Visible") {
-          ZAnimationDisplayPack pack;
-          pack.name = paraAnimationList[i]->name();
-          pack.id = m_objList[j]->uniqueId;
-          pack.boundId = m_objList[j]->boundId;
-          pack.row = row++;
-          pack.type = ZAnimationDisplayPack::Type::ObjectPara;
-          pack.expanded = false;
-          pack.showAll = false;
-          pack.paraAnimation = paraAnimationList[i].get();
-          pack.objInfo = objInfo;
-          m_displayPacks.push_back(pack);
+          ZAnimationDisplayPack pack1;
+          pack1.name = paraAnimationList[i]->name();
+          pack1.id = m_objList[j]->uniqueId;
+          pack1.boundId = m_objList[j]->boundId;
+          pack1.row = row++;
+          pack1.type = ZAnimationDisplayPack::Type::ObjectPara;
+          pack1.expanded = false;
+          pack1.showAll = false;
+          pack1.paraAnimation = paraAnimationList[i].get();
+          pack1.objInfo = objInfo;
+          m_displayPacks.push_back(pack1);
         }
       }
-      ZAnimationDisplayPack pack;
-      pack.name = m_objList[j]->isShowAll ? QString("Hide ...") : QString("Show All ...");
-      pack.id = m_objList[j]->uniqueId;
-      pack.boundId = m_objList[j]->boundId;
-      pack.row = row++;
-      pack.type = ZAnimationDisplayPack::Type::ShowAll;
-      pack.expanded = false;
-      pack.showAll = false;
-      pack.paraAnimation = nullptr;
-      pack.objInfo = objInfo;
-      m_displayPacks.push_back(pack);
+      ZAnimationDisplayPack pack2;
+      pack2.name = m_objList[j]->isShowAll ? QString("Hide ...") : QString("Show All ...");
+      pack2.id = m_objList[j]->uniqueId;
+      pack2.boundId = m_objList[j]->boundId;
+      pack2.row = row++;
+      pack2.type = ZAnimationDisplayPack::Type::ShowAll;
+      pack2.expanded = false;
+      pack2.showAll = false;
+      pack2.paraAnimation = nullptr;
+      pack2.objInfo = objInfo;
+      m_displayPacks.push_back(pack2);
     }
   }
 }

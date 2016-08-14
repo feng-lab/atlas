@@ -1,5 +1,5 @@
 #include "zioutils.h"
-#include "zexception.h"
+
 #include "zglobal.h"
 #include <vector>
 #include <QFile>

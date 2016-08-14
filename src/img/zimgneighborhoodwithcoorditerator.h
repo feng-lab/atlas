@@ -2,7 +2,6 @@
 
 #include "zimg.h"
 #include <boost/iterator/iterator_facade.hpp>
-#include <type_traits>
 #include "zneighborhood.h"
 
 namespace nim {

@@ -18,8 +18,8 @@ struct EdgeInfo
 
 struct VertexInfo
 {
-  VertexInfo(size_t imgidx, size_t idx)
-    : img(imgidx), idx(idx)
+  VertexInfo(size_t imgidx, size_t idx_)
+    : img(imgidx), idx(idx_)
   {}
 
   size_t img;

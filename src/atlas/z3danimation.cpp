@@ -1,14 +1,8 @@
 #include "z3danimation.h"
 
-#include "zwidgetsgroup.h"
 #include "zcameraparameteranimation.h"
-#include "znumericparameter.h"
 #include "z3dview.h"
 #include "zdoc.h"
-#include "zexception.h"
-#include <QApplication>
-#include <QMessageBox>
-#include "zobjdoc.h"
 
 namespace nim {
 

@@ -255,8 +255,8 @@ void transfromMesh()
     ZMesh msh(fileInfo.absoluteFilePath());
 
     std::vector<glm::vec3> vertices = msh.vertices();
-    for (size_t i = 0; i < vertices.size(); ++i) {
-      vertices[i] = glm::applyMatrix(mat, vertices[i]);
+    for (size_t j = 0; j < vertices.size(); ++j) {
+      vertices[j] = glm::applyMatrix(mat, vertices[j]);
     }
     msh.setVertices(vertices);
     msh.generateNormals();
@@ -281,8 +281,8 @@ void transfromMesh2()
     ZMesh msh(fileInfo.absoluteFilePath());
 
     std::vector<glm::vec3> vertices = msh.vertices();
-    for (size_t i = 0; i < vertices.size(); ++i) {
-      vertices[i] = glm::applyMatrix(mat, vertices[i]);
+    for (size_t j = 0; j < vertices.size(); ++j) {
+      vertices[j] = glm::applyMatrix(mat, vertices[j]);
     }
     msh.setVertices(vertices);
     msh.generateNormals();
@@ -845,8 +845,8 @@ void benchSaturateMul()
   bt5.start();
   bt5.pause();
   for (int j = 0; j < 1e8; ++j) {
-    int64_t a = ZRandom::instance().randIntType<int64_t>(INT64_MAX, INT64_MIN) * 1000;
-    int64_t b = ZRandom::instance().randIntType<int64_t>(INT64_MAX, INT64_MIN) * 1000;
+    int64_t a = ZRandom::instance().randInt<int64_t>(INT64_MAX, INT64_MIN) * 1000;
+    int64_t b = ZRandom::instance().randInt<int64_t>(INT64_MAX, INT64_MIN) * 1000;
     int32_t a32 = static_cast<int32_t>(a);
     int32_t b32 = static_cast<int32_t>(b);
     int32_t a16 = static_cast<int16_t>(a);

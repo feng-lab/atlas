@@ -1,7 +1,6 @@
 #pragma once
 
 #include "zimgformat.h"
-#include <vector>
 
 namespace nim {
 

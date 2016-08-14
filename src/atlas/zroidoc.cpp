@@ -334,8 +334,8 @@ size_t ZROIDoc::addROI(ZROI* roi, const QString& path)
   return id;
 }
 
-ZROIDoc::ROIPack::ROIPack(ZROI* roi, const QString& path)
-  : roi(roi), path(QFileInfo(path).canonicalFilePath()), hasUnsavedChange(false)
+ZROIDoc::ROIPack::ROIPack(ZROI* roi_, const QString& path_)
+  : roi(roi_), path(QFileInfo(path_).canonicalFilePath()), hasUnsavedChange(false)
 {
   updateDerivedData();
   if (path.isEmpty()) {

@@ -18,6 +18,7 @@
 #endif
 
 #include "zioutils.h"
+#include "zrandom.h"
 
 namespace nim {
 
@@ -48,7 +49,7 @@ struct ZVectorCompare
   bool operator()(const Eigen::Matrix<T, Eigen::Dynamic, 1>& v1, const Eigen::Matrix<T, Eigen::Dynamic, 1>& v2) const
   {
     if (v1.size() == v2.size()) {
-      for (int i = 0; i < v1.size(); i++) {
+      for (Eigen::Index i = 0; i < v1.size(); i++) {
         if (std::abs(v1(i) - v2(i)) < Eigen::NumTraits<T>::dummy_precision())
           continue;
         else
@@ -67,7 +68,7 @@ struct ZVectorCompare<T, true>
   bool operator()(const Eigen::Matrix<T, Eigen::Dynamic, 1>& v1, const Eigen::Matrix<T, Eigen::Dynamic, 1>& v2) const
   {
     if (v1.size() == v2.size()) {
-      for (int i = 0; i < v1.size(); i++) {
+      for (Eigen::Index i = 0; i < v1.size(); i++) {
         if (v1(i) == v2(i))
           continue;
         else
@@ -155,6 +156,36 @@ public:
     return true;
   }
 
+  // similar to matlab randn, if nCol == -1, nCol = nRow
+  template<typename Real>
+  Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> randn(Eigen::Index nRow, Eigen::Index nCol = -1,
+                                                            Real mean = 0, Real sigma = 1)
+  {
+    CHECK(nRow > 0);
+    if (nCol == -1)
+      nCol = nRow;
+    CHECK(nCol > 0);
+    std::normal_distribution<Real> dist(mean, sigma);
+    auto& eng = ZRandom::instance().engine();
+    Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> mat(nRow, nCol);
+    for (Eigen::Index r = 0; r < nRow; r++) {
+      for (Eigen::Index c = 0; c < nCol; c++) {
+        mat(r, c) = dist(eng);
+      }
+    }
+    return mat;
+  }
+
+  template<typename Real>
+  Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> randPositiveDefiniteMatrix(Eigen::Index dim)
+  {
+    Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> tmp = randn<Real>(dim);
+    Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> Mat = tmp * tmp.transpose();
+    while (!ZEigenUtils::matrixIsPositiveDefinite(Mat, 1e-5))
+      Mat += Eigen::Matrix<Real, Eigen::Dynamic, 1>::Constant(dim, 0.001).asDiagonal();
+    return Mat;
+  }
+
   template<typename T>
   static Eigen::Matrix<T, Eigen::Dynamic, 1> convertToVector(const std::vector<T>& vec)
   {
@@ -179,8 +210,8 @@ public:
     using MatrixXni = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
     MatrixXni cov = featureCovariance(x);
     MatrixXni res(cov.rows(), cov.cols());
-    for (int r = 0; r < cov.rows(); ++r) {
-      for (int c = r; c < cov.cols(); ++c) {
+    for (Eigen::Index r = 0; r < cov.rows(); ++r) {
+      for (Eigen::Index c = r; c < cov.cols(); ++c) {
         if (r == c) {
           res(r, c) = 1.0;
         } else {
@@ -274,7 +305,7 @@ public:
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xdiff =
       x - y * Eigen::Matrix<T, 1, Eigen::Dynamic>::Ones(x.cols());
     Eigen::Matrix<T, Eigen::Dynamic, 1> s = y + log(exp(xdiff.array()).rowwise().sum()).matrix();
-    for (int i = 0; i < s.size(); i++) {
+    for (Eigen::Index i = 0; i < s.size(); i++) {
       if (s(i) == std::numeric_limits<T>::infinity()) {
         s(i) = y(i);
       }
@@ -291,7 +322,7 @@ public:
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xdiff =
       x - y * Eigen::Matrix<T, Eigen::Dynamic, 1>::Ones(x.rows());
     Eigen::Matrix<T, 1, Eigen::Dynamic> s = y + log(exp(xdiff.array()).colwise().sum()).matrix();
-    for (int i = 0; i < s.size(); i++) {
+    for (Eigen::Index i = 0; i < s.size(); i++) {
       if (s(i) == std::numeric_limits<T>::infinity()) {
         s(i) = y(i);
       }
@@ -316,7 +347,7 @@ public:
   {
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> mat(static_cast<size_t>(weight.sum()), x.cols());
     size_t rowIdx = 0;
-    for (int i = 0; i < x.rows(); i++) {
+    for (Eigen::Index i = 0; i < x.rows(); i++) {
       mat.block(rowIdx, 0, weight(i), x.cols()) = x.row(i).replicate(weight(i), 1);
       rowIdx += weight(i);
     }
@@ -340,7 +371,7 @@ public:
     Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> newX;
     Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> res(x.cols());
     newX = x.template cast<ResultDataType>();
-    for (int i = 0; i < newX.cols(); ++i)
+    for (Eigen::Index i = 0; i < newX.cols(); ++i)
       res(i) = newX.col(i).dot(weight);
     return res / weight.sum();
   }
@@ -413,8 +444,8 @@ public:
     using ResultDataType = typename Eigen::NumTraits<T>::NonInteger;
     using ResultMatType = Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>;
     using ResultRowVecType = Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic>;
-    int nsample = x.rows();
-    int ndim = x.cols();
+    Eigen::Index nsample = x.rows();
+    Eigen::Index ndim = x.cols();
     ResultMatType samplecov = featureCovariance(x, true);
     ResultMatType prior = ResultMatType::Identity(ndim, ndim) * (samplecov.trace() / ndim);
 
@@ -457,7 +488,7 @@ public:
     using ResultDataType = typename Eigen::NumTraits<T>::NonInteger;
     using ResultMatType = Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>;
     using ResultRowVecType = Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic>;
-    int nsample = x.rows();
+    Eigen::Index nsample = x.rows();
     ResultMatType samplecov = featureCovariance(x, true);
     ResultMatType prior = samplecov.diagonal().asDiagonal();
 
@@ -501,8 +532,8 @@ public:
     using ResultDataType = typename Eigen::NumTraits<T>::NonInteger;
     using ResultMatType = Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>;
     using ResultRowVecType = Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic>;
-    int nsample = x.rows();
-    int ndim = x.cols();
+    Eigen::Index nsample = x.rows();
+    Eigen::Index ndim = x.cols();
     ResultMatType samplecov = featureCovariance(x);
     ResultMatType biasedcov = featureCovariance(x, true);
     ResultMatType prior = samplecov.diagonal().asDiagonal();
@@ -523,7 +554,7 @@ public:
     ResultRowVecType matmean = featureMean(mat);
     mat.rowwise() -= matmean;
     ResultMatType varS = ResultMatType::Zero(ndim, ndim);
-    for (int i = 0; i < nsample; i++) {
+    for (Eigen::Index i = 0; i < nsample; i++) {
       varS += (mat.row(i).transpose() * mat.row(i) - biasedcov).array().square().matrix();
     }
     varS *= nsample / ((nsample - 1.0) * (nsample - 1.0) * (nsample - 1.0));
@@ -556,8 +587,8 @@ public:
     using ResultDataType = typename Eigen::NumTraits<T>::NonInteger;
     using ResultMatType = Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>;
     using ResultRowVecType = Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic>;
-    int nsample = x.rows();
-    int ndim = x.cols();
+    Eigen::Index nsample = x.rows();
+    Eigen::Index ndim = x.cols();
     ResultMatType samplecov = featureCovariance(x, true);
     ResultMatType prior = ResultMatType::Identity(ndim, ndim) * (samplecov.trace() / ndim);
 
@@ -594,14 +625,14 @@ public:
 
   template<class T>
   static Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>
-  featureUnique(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x, int* num = nullptr)
+  featureUnique(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x, Eigen::Index* num = nullptr)
   {
     using VectorXt = Eigen::Matrix<T, 1, Eigen::Dynamic>;
-    int nUniqueData = 0;
+    Eigen::Index nUniqueData = 0;
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> uniqueMat(x.rows(), x.cols());
     std::set<VectorXt, ZVectorCompare<T>> myset;
     std::pair<typename std::set<VectorXt, ZVectorCompare<T>>::iterator, bool> ret;
-    for (int r = 0; r < x.rows(); r++) {
+    for (Eigen::Index r = 0; r < x.rows(); r++) {
       ret = myset.insert(x.row(r));
       if (ret.second != false) {
         uniqueMat.row(nUniqueData++) = x.row(r);

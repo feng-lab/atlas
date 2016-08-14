@@ -191,7 +191,7 @@ void Z3DNetworkEvaluator::buildNetwork()
         Z3DFilter* outFilter = connected[j]->filter();
         if (m_filterToVertexMapper.find(outFilter) == m_filterToVertexMapper.end()) {
           filterQueue.push(outFilter);
-          Vertex v = boost::add_vertex(VertexInfo(outFilter), m_filterGraph);
+          v = boost::add_vertex(VertexInfo(outFilter), m_filterGraph);
           m_filterToVertexMapper[outFilter] = v;
         }
         boost::add_edge(m_filterToVertexMapper[outFilter],

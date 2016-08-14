@@ -257,8 +257,8 @@ size_t ZMeshDoc::addMesh(ZMesh& mesh, const QString& path)
   return id;
 }
 
-ZMeshDoc::MeshPack::MeshPack(ZMesh& imesh, const QString& path)
-  : path(QFileInfo(path).canonicalFilePath()), hasUnsavedChange(false)
+ZMeshDoc::MeshPack::MeshPack(ZMesh& imesh, const QString& path_)
+  : path(QFileInfo(path_).canonicalFilePath()), hasUnsavedChange(false)
 {
   mesh.swap(imesh);
   meshList.push_back(&mesh);

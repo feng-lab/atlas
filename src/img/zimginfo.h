@@ -2,7 +2,6 @@
 
 #include <vector>
 #include "zimginterface.h"
-#include <QString>
 
 namespace nim {
 

@@ -37,8 +37,8 @@ protected:
 
   struct SubWidget
   {
-    SubWidget(size_t id, ZWidgetsGroup* wg, QLabel* label, QWidget* wt)
-      : id(id), widgetsGroup(wg), label(label), widget(wt)
+    SubWidget(size_t id_, ZWidgetsGroup* wg, QLabel* label_, QWidget* wt)
+      : id(id_), widgetsGroup(wg), label(label_), widget(wt)
     {}
 
     size_t id;

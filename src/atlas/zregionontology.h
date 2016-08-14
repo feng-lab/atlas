@@ -12,10 +12,10 @@ namespace nim {
 
 struct RegionNode
 {
-  RegionNode(int64_t id = -1, int64_t parentID = -1, int red = 0, int green = 0, int blue = 0,
-             QString name = "", QString abbreviation = "")
-    : id(id), parentID(parentID), red(red), green(green), blue(blue)
-    , name(name), abbreviation(abbreviation)
+  RegionNode(int64_t id_ = -1, int64_t parentID_ = -1, int red_ = 0, int green_ = 0, int blue_ = 0,
+             QString name_ = "", QString abbreviation_ = "")
+    : id(id_), parentID(parentID_), red(red_), green(green_), blue(blue_)
+    , name(name_), abbreviation(abbreviation_)
   {}
 
   int64_t id;

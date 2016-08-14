@@ -52,13 +52,13 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
     m_smoothLineShaderGrp.setGeometryInputType(GL_LINES);
     m_smoothLineShaderGrp.setGeometryOutputType(GL_TRIANGLE_STRIP);
     m_smoothLineShaderGrp.setGeometryOutputVertexCount(4);
-    QStringList allshaders;
+    allshaders.clear();
     allshaders << "wideline.vert" << "wideline.geom" << "wideline_func.frag";
     m_smoothLineShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader(),
                                m_rendererBase.generateGeomHeader() + generateHeader());
     m_smoothLineShaderGrp.addAllSupportedPostShaders();
   } else {
-    QStringList allshaders;
+    allshaders.clear();
     allshaders << "wideline1.vert" << "wideline_func1.frag";
     m_smoothLineShaderGrp1.init(allshaders, m_rendererBase.generateHeader() + generateHeader());
     m_smoothLineShaderGrp1.addAllSupportedPostShaders();

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <QString>
 #include "zimginfo.h"
 #include "zvoxelcoordinate.h"
 

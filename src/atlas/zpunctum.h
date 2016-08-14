@@ -254,7 +254,7 @@ ZPunctum ZPunctum::merge(InputIterator first, InputIterator last, double conf)
   }
   ZPunctum res(*(*first));
   if (hasSignal) {
-    InputIterator it = first;
+    it = first;
     ++it;
     for (; it != last; ++it) {
       res.m_voxelIntensities.conservativeResize(res.m_voxelIntensities.size() + (*it).m_voxelIntensities.size());
@@ -267,7 +267,7 @@ ZPunctum ZPunctum::merge(InputIterator first, InputIterator last, double conf)
   } else {
     res.m_voxelLocations = Eigen::MatrixXi();
     res.m_voxelIntensities = Eigen::VectorXd();
-    InputIterator it = first;
+    it = first;
     ++it;
     res.m_x *= res.m_volSize;
     res.m_y *= res.m_volSize;

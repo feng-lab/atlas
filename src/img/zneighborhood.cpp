@@ -1,5 +1,4 @@
 #include "zneighborhood.h"
-#include "zexception.h"
 
 namespace nim {
 

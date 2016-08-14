@@ -1114,7 +1114,8 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
   }
   fs.clear();
 
-  for (char* dp = dirmemvector.data(), n = dircount; n > 0; n--) {
+  char* dp = dirmemvector.data();
+  for (n = dircount; n > 0; n--) {
     ZImgMetatag field;
 
     uint16_t tag;

@@ -1,10 +1,5 @@
 #include "zeigenutils.h"
 
-#include <Eigen/Dense>
-#include <limits>
-#include <iostream>
-#include <fstream>
-#include "zbenchtimer.h"
 #include "zexception.h"
 #include "zstringutils.h"
 #include <QFile>
@@ -189,8 +184,8 @@ RowVectorXd ZEigenUtils::readRowVector(const std::string& iline, const char* uSe
 MatrixXd ZEigenUtils::removeRowsContainNaNOrInF(const Eigen::MatrixXd& srcMat)
 {
   MatrixXd mat(srcMat.rows(), srcMat.cols());
-  int idx = 0;
-  for (int i = 0; i < srcMat.rows(); i++) {
+  Eigen::Index idx = 0;
+  for (Eigen::Index i = 0; i < srcMat.rows(); i++) {
     if (srcMat.row(i).allFinite()) {
       mat.row(idx++) = srcMat.row(i);
     }

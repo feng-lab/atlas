@@ -27,13 +27,13 @@ const LogSeverity OffLevel = google::GLOG_FATAL + 1;
 struct LogData
 {
   LogData(LogSeverity severity, const char* full_filename,
-          const char* base_filename, int line,
+          const char* base_filename, int line_,
           const ::tm* tm_time,
           const char* msg, size_t prefix_len, size_t message_len)
     : level(severity)
     , fullFilename(full_filename)
     , baseFilename(base_filename)
-    , line(line)
+    , line(line_)
     , time(QDate(tm_time->tm_year + 1900, tm_time->tm_mon + 1, tm_time->tm_mday),
            QTime(tm_time->tm_hour, tm_time->tm_min, tm_time->tm_sec))
     , message(msg + prefix_len, message_len - prefix_len)

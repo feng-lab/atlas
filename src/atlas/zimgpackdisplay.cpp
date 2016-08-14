@@ -98,10 +98,6 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
     m_imgPack.retrieveCoveredImgs(imgs, locs, scales, m_z, m_t, m_viewport, m_scale, m_mip);
 
     for (size_t i = 0; i < imgs.size(); ++i) {
-      QImage res(imgs[i]->width(), imgs[i]->height(), QImage::Format_ARGB32_Premultiplied);
-      fillQImage(*imgs[i], res);
-      resV.addImage(res, locs[i], scales[i]);
-
       if (imgs[i]->width() <= tileWidth && imgs[i]->height() <= tileHeight) {
         QImage res(imgs[i]->width(), imgs[i]->height(), QImage::Format_ARGB32_Premultiplied);
         fillQImage(*imgs[i], res);

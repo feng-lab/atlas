@@ -83,11 +83,11 @@ Eigen::MatrixXd meanShiftGaussianCenters(const nim::ZVBGMM<T, double>& vbgmm, co
   boost::math::chi_squared dist(dimension);
   double k = std::sqrt(boost::math::quantile(dist, 0.9));
 
-  for (int i = 0; i < vbgmm.numOfClusters(); ++i) {
+  for (size_t i = 0; i < vbgmm.numOfClusters(); ++i) {
     Eigen::Vector3i m;
     for (int d = 0; d < dimension; ++d)
       m[d] = nim::roundTo<int>(res(i, d));
-    Eigen::MatrixXd cov = vbgmm.covar(static_cast<size_t>(i));
+    Eigen::MatrixXd cov = vbgmm.covar(i);
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(cov, Eigen::EigenvaluesOnly);
     double radius = std::sqrt(es.eigenvalues()(dimension - 2)); // short axis or middle axis
     if (radius < 1)
@@ -106,17 +106,17 @@ Eigen::MatrixXd meanShiftGaussianCenters(const nim::ZVBGMM<T, double>& vbgmm, co
         std::vector<double> x_shifts;
         std::vector<double> y_shifts;
         std::vector<double> z_shifts;
-        for (int z = -w; z <= w; ++z)
+        for (int lz = -w; lz <= w; ++lz)  // local z
           for (int y = -w; y <= w; ++y)
             for (int x = -w; x <= w; ++x) {
-              if (x * x + y * y + z * z <= w * w &&
+              if (x * x + y * y + lz * lz <= w * w &&
                   m.x() + x >= 0 && m.x() + x < static_cast<int>(img.width()) &&
                   m.y() + y >= 0 && m.y() + y < static_cast<int>(img.height()) &&
-                  m.z() + z >= 0 && m.z() + z < static_cast<int>(img.depth())) {
-                values.push_back(img.value<double>(m.x() + x, m.y() + y, m.z() + z));
+                  m.z() + lz >= 0 && m.z() + lz < static_cast<int>(img.depth())) {
+                values.push_back(img.value<double>(m.x() + x, m.y() + y, m.z() + lz));
                 x_shifts.push_back(x);
                 y_shifts.push_back(y);
-                z_shifts.push_back(z);
+                z_shifts.push_back(lz);
               }
             }
         double value_sum = std::accumulate(values.begin(), values.end(), 0);
@@ -1017,14 +1017,14 @@ ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs, const Eigen::Vect
   std::vector<int> group1;
   group1.push_back(0);
   modelGroups.push_back(group1);
-  for (int i = 1; i < vbgmm.numOfClusters(); ++i) {
-    int currentModel = i;
+  for (size_t i = 1; i < vbgmm.numOfClusters(); ++i) {
+    size_t currentModel = i;
     int currentModelGroup = -1;
     for (size_t g = 0; g < modelGroups.size(); ++g) {
       bool overlap = false;
       std::vector<int>& testGroup = modelGroups[g];
-      for (size_t m = 0; !overlap && m < testGroup.size(); ++m) {
-        int testModel = testGroup[m];
+      for (size_t t = 0; !overlap && t < testGroup.size(); ++t) {
+        int testModel = testGroup[t];
 
         //        LOG(INFO) << currentModel << " " << testModel << " " << getOverlapRateOfTwoErrorEllipse(centroids.row(currentModel), vbgmm.covar(currentModel),
         //                                                                                centroids.row(testModel), vbgmm.covar(testModel),
@@ -1034,7 +1034,7 @@ ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs, const Eigen::Vect
                                             centroids.row(testModel), vbgmm.covar(testModel),
                                             confOverlapArea) >= overlapRateThreshold) {
           if (currentModelGroup == -1) {
-            currentModelGroup = g;
+            currentModelGroup = static_cast<int>(g);
             testGroup.push_back(currentModel);
           } else {  // currentmodel overlap with two group, merge these two group
             modelGroups[currentModelGroup].insert(modelGroups[currentModelGroup].end(),
@@ -1062,7 +1062,7 @@ ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs, const Eigen::Vect
     Eigen::MatrixXi vbVoxelLocs(voxelIntens.size(), 3);
     Eigen::VectorXd vbVoxelIntens(voxelIntens.size());
     size_t numVoxel = 0;
-    for (int l = 0; l < labels.rows(); ++l) {
+    for (Eigen::Index l = 0; l < labels.rows(); ++l) {
       if (std::find(modelGroups[g].begin(), modelGroups[g].end(), labels(l)) != modelGroups[g].end()) {
         vbVoxelLocs.row(numVoxel) = voxelLocs.row(l) + minLoc;
         vbVoxelIntens(numVoxel++) = voxelIntens(l);

@@ -186,8 +186,8 @@ double ZImgRegistration::run()
     LOG(INFO) << "  " << "Initial Parameters: " << m_transform->paraQString();
     std::vector<double> scales = m_transform->estimateParameterScales(dims);
     QString scalesQString = QString("%1").arg(scales[0]);
-    for (size_t i = 1; i < scales.size(); ++i) {
-      scalesQString += QString(" %1").arg(scales[i]);
+    for (size_t j = 1; j < scales.size(); ++j) {
+      scalesQString += QString(" %1").arg(scales[j]);
     }
     LOG(INFO) << "  " << "Parameter Scales: " << scalesQString;
 

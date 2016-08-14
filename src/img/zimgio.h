@@ -1,8 +1,6 @@
 #pragma once
 
-#include <vector>
 #include <map>
-#include <QString>
 #include "zimg.h"
 #include <set>
 

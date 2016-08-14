@@ -468,15 +468,15 @@ void ZImgTiff::cpyImg(const ZImg& img2D, const ZImgRegion& region, ZImg& img, in
 {
   if (c < 0) {
     size_t cEnd = region.end.c == -1 ? img2D.numChannels() : region.end.c;
-    for (size_t c = region.start.c; c < cEnd; ++c) {
+    for (size_t lc = region.start.c; lc < cEnd; ++lc) {
       if (region.containsWholeRow(img2D.info())) {
-        memcpy(img.planeData<uint8_t>(z, c - region.start.c, t), img2D.rowData<uint8_t>(region.start.y, 0, c, 0),
+        memcpy(img.planeData<uint8_t>(z, lc - region.start.c, t), img2D.rowData<uint8_t>(region.start.y, 0, lc, 0),
                img.planeByteNumber());
       } else {
         size_t yEnd = region.end.y == -1 ? img2D.height() : region.end.y;
         for (size_t y = region.start.y; y < yEnd; ++y) {
-          memcpy(img.rowData<uint8_t>(y - region.start.y, z, c - region.start.c, t),
-                 img2D.data<uint8_t>(region.start.x, y, 0, c, 0), img.rowByteNumber());
+          memcpy(img.rowData<uint8_t>(y - region.start.y, z, lc - region.start.c, t),
+                 img2D.data<uint8_t>(region.start.x, y, 0, lc, 0), img.rowByteNumber());
         }
       }
     }

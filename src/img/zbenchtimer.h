@@ -12,8 +12,6 @@
 #endif
 
 #include <iostream>
-#include <limits>
-#include <sstream>
 
 namespace nim {
 

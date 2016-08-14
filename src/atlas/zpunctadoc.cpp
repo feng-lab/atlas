@@ -242,8 +242,8 @@ size_t ZPunctaDoc::addPuncta(ZPuncta& puncta, const QString& path)
   return id;
 }
 
-ZPunctaDoc::PunctaPack::PunctaPack(ZPuncta& punctaIn, const QString& path)
-  : path(QFileInfo(path).canonicalFilePath()), hasUnsavedChange(false)
+ZPunctaDoc::PunctaPack::PunctaPack(ZPuncta& punctaIn, const QString& path_)
+  : path(QFileInfo(path_).canonicalFilePath()), hasUnsavedChange(false)
 {
   puncta.swap(punctaIn);
   updateDerivedData();

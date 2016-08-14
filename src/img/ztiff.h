@@ -1,9 +1,6 @@
 #pragma once
 
-#include <vector>
-#include <cstdint>
 #include <iostream>
-#include <memory>
 #include "zimginterface.h"
 #include "zimgmetatag.h"
 

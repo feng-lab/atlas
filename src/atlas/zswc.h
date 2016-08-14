@@ -10,9 +10,9 @@ namespace nim {
 // http://research.mssm.edu/cnic/swc.html
 struct SwcNode
 {
-  SwcNode(int id = -1, int type = -1, double x = 0, double y = 0, double z = 0,
-          double radius = -1, int parentID = -2)
-    : id(id), type(type), x(x), y(y), z(z), radius(radius), parentID(parentID), label(-1)
+  SwcNode(int id_ = -1, int type_ = -1, double x_ = 0, double y_ = 0, double z_ = 0,
+          double radius_ = -1, int parentID_ = -2)
+    : id(id_), type(type_), x(x_), y(y_), z(z_), radius(radius_), parentID(parentID_), label(-1)
   {}
 
   int id;

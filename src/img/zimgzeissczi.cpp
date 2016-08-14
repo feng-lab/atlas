@@ -364,9 +364,9 @@ ZImg ZImgZeissCZI::stackTiles(const QString& filename, size_t ch, size_t scene, 
       int endY = std::min(inverseMask.height() * 1.0, startY + std::ceil(it->size.y * scale));
       bool pass = true;
       ZImgRegion region(startX, endX, startY, endY);
-      for (ZImgRegionIterator<uint8_t> it = ZImgRegionIterator<uint8_t>(inverseMask, region);
-           !it.isAtEnd(); it += 1) {
-        if (*it > 0) {
+      for (ZImgRegionIterator<uint8_t> rit = ZImgRegionIterator<uint8_t>(inverseMask, region);
+           !rit.isAtEnd(); rit += 1) {
+        if (*rit > 0) {
           pass = false;
           break;
         }
@@ -1553,8 +1553,8 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
         if (m_channelValidBitCount.size() == 1 || m_channelValidBitCount.size() == info.numChannels) {
           // set 12bit flag if all channels are 12 bit
           info.validBitCount = m_channelValidBitCount[0];
-          for (size_t idx = 1; idx < m_channelValidBitCount.size(); ++idx)
-            info.validBitCount = std::max(info.validBitCount, m_channelValidBitCount[idx]);
+          for (size_t iidx = 1; iidx < m_channelValidBitCount.size(); ++iidx)
+            info.validBitCount = std::max(info.validBitCount, m_channelValidBitCount[iidx]);
         } else if (m_channelValidBitCount.size() > info.numChannels &&
                    info.numChannels == 1) { // channels are separated to different scenes
           CHECK(m_shouldSeparateChannelsToDifferentScenes);

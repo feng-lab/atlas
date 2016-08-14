@@ -22,15 +22,15 @@ enum class ROIType
 
 struct ZROIShapeOperation
 {
-  ZROIShapeOperation(bool isAdd, ROIType type, const QRectF& rect)
-    : isAdd(isAdd), type(type)
+  ZROIShapeOperation(bool isAdd_, ROIType type_, const QRectF& rect)
+    : isAdd(isAdd_), type(type_)
   {
     poly.push_back(rect.topLeft());
     poly.push_back(rect.bottomRight());
   }
 
-  ZROIShapeOperation(bool isAdd, ROIType type, const QPolygonF& poly)
-    : isAdd(isAdd), type(type), poly(poly)
+  ZROIShapeOperation(bool isAdd_, ROIType type_, const QPolygonF& poly_)
+    : isAdd(isAdd_), type(type_), poly(poly_)
   {
     CHECK(poly.isClosed());
   }
@@ -122,8 +122,8 @@ struct ZROIControlPoint
     Any
   };
 
-  ZROIControlPoint(int slice, size_t shapeOperationIndex, Pos pos, size_t pointIndex = 0)
-    : slice(slice), shapeOperationIndex(shapeOperationIndex), pos(pos), pointIndex(pointIndex)
+  ZROIControlPoint(int slice_, size_t shapeOperationIndex_, Pos pos_, size_t pointIndex_ = 0)
+    : slice(slice_), shapeOperationIndex(shapeOperationIndex_), pos(pos_), pointIndex(pointIndex_)
   {}
 
   int slice;

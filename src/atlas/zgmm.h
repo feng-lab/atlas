@@ -54,7 +54,7 @@ public:
     , m_logLevel(logLevel), m_hasWeight(true), m_labelsNeedUpdate(false), m_hasInitData(false)
   {
     bool hasZeroWeight = false;
-    for (int i = 0; i < data.rows(); ++i) {
+    for (Eigen::Index i = 0; i < data.rows(); ++i) {
       if (weight(i) < std::numeric_limits<ResultDataType>::epsilon() * 1e3) {
         hasZeroWeight = true;
         break;
@@ -63,8 +63,8 @@ public:
     if (hasZeroWeight) {
       m_NonIntegerData = MatrixXrt(data.rows(), data.cols());
       m_NonIntegerWeight = VectorXrt(weight.rows());
-      int numRows = 0;
-      for (int i = 0; i < data.rows(); ++i) {
+      Eigen::Index numRows = 0;
+      for (Eigen::Index i = 0; i < data.rows(); ++i) {
         if (weight(i) >= std::numeric_limits<ResultDataType>::epsilon() * 1e3) {
           m_NonIntegerData.row(numRows) = data.row(i).template cast<ResultDataType>();
           m_NonIntegerWeight(numRows++) = weight(i);
@@ -143,10 +143,10 @@ public:
     size_t iter;
     for (iter = 0; !m_termCriteria.meet(iter, likelihoodChange); iter++) {
       // remove empty components
-      int ncls = m_nclasses;
-      for (int j = 0; j < ncls; ++j) {
+      size_t ncls = m_nclasses;
+      for (size_t j = 0; j < ncls; ++j) {
         if (m_priors(j) < std::numeric_limits<ResultDataType>::epsilon()) {
-          for (int k = j + 1; k < ncls; ++k) {
+          for (size_t k = j + 1; k < ncls; ++k) {
             m_covars[k - 1] = m_covars[k];
             m_priors(k - 1) = m_priors(k);
             m_centroids.row(k - 1) = m_centroids.row(k);
@@ -157,8 +157,8 @@ public:
           --ncls;
         }
       }
-      if (m_nclasses != static_cast<size_t>(ncls)) {
-        m_nclasses = static_cast<size_t>(ncls);
+      if (m_nclasses != ncls) {
+        m_nclasses = ncls;
         m_covars.resize(m_nclasses);
         m_priors.conservativeResize(m_nclasses);
         m_centroids.conservativeResize(m_nclasses, Eigen::NoChange);
@@ -369,8 +369,8 @@ public:
   Eigen::VectorXi labels()
   {
     if (m_labelsNeedUpdate) {
-      typename RowVectorXrt::Index index;
-      for (int i = 0; i < m_labels.size(); i++) {
+      Eigen::Index index;
+      for (Eigen::Index i = 0; i < m_labels.size(); i++) {
         m_responsibilities.row(i).maxCoeff(&index);
         m_labels(i) = index;
       }
@@ -387,8 +387,8 @@ public:
   {
     MatrixXrt res = *m_pData;
     Eigen::VectorXi label = labels();
-    int num = 0;
-    for (int i = 0; i < label.size(); ++i) {
+    Eigen::Index num = 0;
+    for (Eigen::Index i = 0; i < label.size(); ++i) {
       if (label(i) == static_cast<int>(compIdx))
         res.row(num++) = m_pData->row(i);
     }
@@ -401,8 +401,8 @@ public:
   {
     VectorXrt res = *m_pWeight;
     Eigen::VectorXi label = labels();
-    int num = 0;
-    for (int i = 0; i < label.size(); ++i) {
+    Eigen::Index num = 0;
+    for (Eigen::Index i = 0; i < label.size(); ++i) {
       if (label(i) == static_cast<int>(compIdx))
         res(num++) = (*m_pWeight)(i);
     }
@@ -417,8 +417,8 @@ protected:
     // get labels
     MatrixXrt allDists = m_dist2(*m_pData, m_centroids);
     m_labels.resize(m_pData->rows());
-    for (int r = 0; r < m_pData->rows(); r++) {
-      typename MatrixXrt::Index index;
+    for (Eigen::Index r = 0; r < m_pData->rows(); r++) {
+      Eigen::Index index;
       allDists.row(r).minCoeff(&index);
       m_labels(r) = static_cast<int>(index);
     }
@@ -468,7 +468,7 @@ protected:
     size_t nUniqueData = 0;
     m_uniqueDatas.resize(m_nclasses + 1, m_pData->cols());
     m_uniqueDatas.row(nUniqueData++) = m_pData->row(0);
-    for (int r = 1; r < m_pData->rows(); r++) {
+    for (Eigen::Index r = 1; r < m_pData->rows(); r++) {
       MatrixXrt dist = m_dist2(m_uniqueDatas.topRows(nUniqueData), m_pData->row(r));
       if ((dist.array() <= Eigen::NumTraits<ResultDataType>::dummy_precision()).any()) {  // duplicate
         continue;
@@ -490,8 +490,8 @@ protected:
       // get labels
       m_uniqueLabels.resize(m_pData->rows());
       MatrixXrt allDists = m_dist2(*m_pData, m_uniqueDatas);
-      for (int r = 0; r < m_pData->rows(); r++) {
-        typename MatrixXrt::Index index;
+      for (Eigen::Index r = 0; r < m_pData->rows(); r++) {
+        Eigen::Index index;
         allDists.row(r).minCoeff(&index);
         m_uniqueLabels(r) = static_cast<int>(index);
       }
@@ -567,7 +567,7 @@ protected:
 
     m_responsibilities = a.cwiseProduct(VectorXrt::Ones(m_pData->rows()) * m_priors);
     VectorXrt s = m_responsibilities.rowwise().sum();
-    for (int i = 0; i < s.size(); i++) {
+    for (Eigen::Index i = 0; i < s.size(); i++) {
       if (s(i) == 0) {
         LOG(WARNING) << "Some zero posterior probabilities";
         s(i) = 1;
@@ -589,7 +589,7 @@ protected:
   {
     if (m_hasWeight) {
       VectorXrt clusterSizes = VectorXrt::Zero(m_nclasses);
-      for (int i = 0; i < m_labels.rows(); i++) {
+      for (Eigen::Index i = 0; i < m_labels.rows(); i++) {
         clusterSizes(m_labels(i)) += (*m_pWeight)(i);
       }
       for (size_t i = 0; i < m_nclasses; i++) {
@@ -598,7 +598,7 @@ protected:
       Eigen::VectorXi counts(m_nclasses);
       std::vector<std::unique_ptr<MatrixXrt>> sepMats;
       std::vector<std::unique_ptr<VectorXrt>> sepWeights;
-      std::vector<int> sepMatsRowIdxs;
+      std::vector<Eigen::Index> sepMatsRowIdxs;
       switch (m_covarType) {
         case CovarianceType::Spherical:
           if (m_nclasses > 1) {
@@ -619,17 +619,17 @@ protected:
         case CovarianceType::Diag:
           // Pick out data points belonging to this centre
           counts.setZero();
-          for (int r = 0; r < m_labels.rows(); r++) {
+          for (Eigen::Index r = 0; r < m_labels.rows(); r++) {
             counts(m_labels(r))++;
           }
 
-          for (int i = 0; i < counts.rows(); i++) {
+          for (Eigen::Index i = 0; i < counts.rows(); i++) {
             sepMats.emplace_back(std::make_unique<MatrixXrt>(counts(i), m_dimension));
             sepWeights.emplace_back(std::make_unique<VectorXrt>(counts(i)));
             sepMatsRowIdxs.push_back(0);
           }
 
-          for (int r = 0; r < m_pData->rows(); r++) {
+          for (Eigen::Index r = 0; r < m_pData->rows(); r++) {
             sepMats[m_labels(r)]->row(sepMatsRowIdxs[m_labels(r)]++) = m_pData->row(r);
             sepWeights[m_labels(r)]->row(sepMatsRowIdxs[m_labels(r)] - 1) = (*m_pWeight).row(r);
           }
@@ -648,17 +648,17 @@ protected:
         case CovarianceType::Full:
           // Pick out data points belonging to this centre
           counts.setZero();
-          for (int r = 0; r < m_labels.rows(); r++) {
+          for (Eigen::Index r = 0; r < m_labels.rows(); r++) {
             counts(m_labels(r))++;
           }
 
-          for (int i = 0; i < counts.rows(); i++) {
+          for (Eigen::Index i = 0; i < counts.rows(); i++) {
             sepMats.emplace_back(std::make_unique<MatrixXrt>(counts(i), m_dimension));
             sepWeights.emplace_back(std::make_unique<VectorXrt>(counts(i)));
             sepMatsRowIdxs.push_back(0);
           }
 
-          for (int r = 0; r < m_pData->rows(); r++) {
+          for (Eigen::Index r = 0; r < m_pData->rows(); r++) {
             sepMats[m_labels(r)]->row(sepMatsRowIdxs[m_labels(r)]++) = m_pData->row(r);
             sepWeights[m_labels(r)]->row(sepMatsRowIdxs[m_labels(r)] - 1) = m_pWeight->row(r);
           }
@@ -676,7 +676,7 @@ protected:
       }
     } else {
       VectorXrt clusterSizes = VectorXrt::Zero(m_nclasses);
-      for (int i = 0; i < m_labels.rows(); i++) {
+      for (Eigen::Index i = 0; i < m_labels.rows(); i++) {
         clusterSizes(m_labels(i)) += 1;
       }
       for (size_t i = 0; i < m_nclasses; i++) {
@@ -705,16 +705,16 @@ protected:
         case CovarianceType::Diag:
           // Pick out data points belonging to this centre
           counts.setZero();
-          for (int r = 0; r < m_labels.rows(); r++) {
+          for (Eigen::Index r = 0; r < m_labels.rows(); r++) {
             counts(m_labels(r))++;
           }
 
-          for (int i = 0; i < counts.rows(); i++) {
+          for (Eigen::Index i = 0; i < counts.rows(); i++) {
             sepMats.emplace_back(std::make_unique<MatrixXrt>(counts(i), m_dimension));
             sepMatsRowIdxs.push_back(0);
           }
 
-          for (int r = 0; r < m_pData->rows(); r++) {
+          for (Eigen::Index r = 0; r < m_pData->rows(); r++) {
             sepMats[m_labels(r)]->row(sepMatsRowIdxs[m_labels(r)]++) = m_pData->row(r);
           }
 
@@ -732,16 +732,16 @@ protected:
         case CovarianceType::Full:
           // Pick out data points belonging to this centre
           counts.setZero();
-          for (int r = 0; r < m_labels.rows(); r++) {
+          for (Eigen::Index r = 0; r < m_labels.rows(); r++) {
             counts(m_labels(r))++;
           }
 
-          for (int i = 0; i < counts.rows(); i++) {
+          for (Eigen::Index i = 0; i < counts.rows(); i++) {
             sepMats.emplace_back(std::make_unique<MatrixXrt>(counts(i), m_dimension));
             sepMatsRowIdxs.push_back(0);
           }
 
-          for (int r = 0; r < m_pData->rows(); r++) {
+          for (Eigen::Index r = 0; r < m_pData->rows(); r++) {
             sepMats[m_labels(r)]->row(sepMatsRowIdxs[m_labels(r)]++) = m_pData->row(r);
           }
 

@@ -558,14 +558,11 @@ Qt::CheckState ZObjModel::getModelIndexCheckState(const QModelIndex& index) cons
 
 bool ZObjModel::needCheckbox(const QModelIndex& index) const
 {
-  if (static_cast<ObjItem*>(index.internalPointer()) == m_rootItem.get()) {
-    return false;
-  }
-  return true;
+  return index.internalPointer() != m_rootItem.get();
 }
 
-ZObjModel::ObjItem::ObjItem(size_t id, ZObjDoc* doc, ObjItem* parent)
-  : parent(parent), id(id), doc(doc), locked(false), show(true)
+ZObjModel::ObjItem::ObjItem(size_t id_, ZObjDoc* doc_, ObjItem* parent_)
+  : parent(parent_), id(id_), doc(doc_), locked(false), show(true)
 {
   checkState = Qt::Checked;
 }

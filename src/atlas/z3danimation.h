@@ -1,7 +1,6 @@
 #pragma once
 
 #include "zanimation.h"
-#include <map>
 
 namespace nim {
 

@@ -1,16 +1,9 @@
 #include "z2danimation.h"
 
-#include "zwidgetsgroup.h"
 #include "znumericparameter.h"
-#include "zparameteranimation.h"
 #include "zview.h"
 #include "zdoc.h"
-#include "zexception.h"
 #include <QApplication>
-#include <QMessageBox>
-#include <QFile>
-#include <QFileInfo>
-#include "zobjdoc.h"
 
 namespace nim {
 

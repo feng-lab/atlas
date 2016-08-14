@@ -2,7 +2,6 @@
 
 #include <sstream>
 #include <tuple>
-#include <QString>
 #include "zglobal.h"
 
 namespace nim {

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <QStringList>
-#include "zimginfo.h"
 #include "zimg.h"
 #include <fstream>
 #include <set>

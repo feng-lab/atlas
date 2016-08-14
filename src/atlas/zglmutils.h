@@ -71,7 +71,8 @@ class Vec2Compare
 {
   bool less;
 public:
-  Vec2Compare(bool less = true) : less(less)
+  Vec2Compare(bool less_ = true)
+    : less(less_)
   {}
 
   bool operator()(const glm::tvec2<T, P>& lhs, const glm::tvec2<T, P>& rhs) const
@@ -89,7 +90,8 @@ class Vec3Compare
 {
   bool less;
 public:
-  Vec3Compare(bool less = true) : less(less)
+  Vec3Compare(bool less_ = true)
+    : less(less_)
   {}
 
   bool operator()(const glm::tvec3<T, P>& lhs, const glm::tvec3<T, P>& rhs) const
@@ -107,7 +109,8 @@ class Vec4Compare
 {
   bool less;
 public:
-  Vec4Compare(bool less = true) : less(less)
+  Vec4Compare(bool less_ = true)
+    : less(less_)
   {}
 
   bool operator()(const glm::tvec4<T, P>& lhs, const glm::tvec4<T, P>& rhs) const

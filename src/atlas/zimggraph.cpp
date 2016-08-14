@@ -96,7 +96,7 @@ private:
 template<class Vertex>
 struct found_goal
 {
-  found_goal(Vertex v) : v(v)
+  found_goal(Vertex v_) : v(v_)
   {}
 
   Vertex v;

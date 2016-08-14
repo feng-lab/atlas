@@ -15,8 +15,8 @@ namespace {
 
 struct ChangeValue
 {
-  ChangeValue(int64_t from, int64_t to)
-    : from(from), to(to)
+  ChangeValue(int64_t from_, int64_t to_)
+    : from(from_), to(to_)
   {}
 
   template<typename TVoxel>
@@ -31,8 +31,8 @@ struct ChangeValue
 
 struct MarkAsIfOtherEqualsOtherWiseZero
 {
-  MarkAsIfOtherEqualsOtherWiseZero(int64_t as, int64_t equal)
-    : as(as), equal(equal)
+  MarkAsIfOtherEqualsOtherWiseZero(int64_t as_, int64_t equal_)
+    : as(as_), equal(equal_)
   {}
 
   template<typename TVoxel, typename TVoxelOther>
@@ -47,8 +47,8 @@ struct MarkAsIfOtherEqualsOtherWiseZero
 
 struct CopyAsIfOtherIsNotZero
 {
-  CopyAsIfOtherIsNotZero(int64_t as)
-    : as(as)
+  CopyAsIfOtherIsNotZero(int64_t as_)
+    : as(as_)
   {}
 
   template<typename TVoxel, typename TVoxelOther>

@@ -136,7 +136,7 @@ public:
     m_logLevel(logLevel), m_hasWeight(true), m_hasInitData(false)
   {
     bool hasZeroWeight = false;
-    for (int i = 0; i < data.rows(); ++i) {
+    for (Eigen::Index i = 0; i < data.rows(); ++i) {
       if (weight(i) < std::numeric_limits<ResultDataType>::epsilon() * 1e3) {
         hasZeroWeight = true;
         break;
@@ -145,8 +145,8 @@ public:
     if (hasZeroWeight) {
       m_NonIntegerData = MatrixXrt(data.rows(), data.cols());
       m_NonIntegerWeight = VectorXrt(weight.rows());
-      int numRows = 0;
-      for (int i = 0; i < data.rows(); ++i) {
+      Eigen::Index numRows = 0;
+      for (Eigen::Index i = 0; i < data.rows(); ++i) {
         if (weight(i) >= std::numeric_limits<ResultDataType>::epsilon() * 1e3) {
           m_NonIntegerData.row(numRows) = data.row(i).template cast<ResultDataType>();
           m_NonIntegerWeight(numRows++) = weight(i);
@@ -295,7 +295,7 @@ public:
     return bestLogLikHist;
   }
 
-  inline int numOfClusters() const
+  inline size_t numOfClusters() const
   { return m_result.m.rows(); }
 
   inline MatrixXrt centroids() const
@@ -334,7 +334,7 @@ protected:
     size_t nUniqueData = 0;
     std::set<VectorXrt, ZVectorCompare<ResultDataType>> myset;
     std::pair<typename std::set<VectorXrt, ZVectorCompare<ResultDataType>>::iterator, bool> ret;
-    for (int r = 0; r < m_pData->rows(); r++) {
+    for (Eigen::Index r = 0; r < m_pData->rows(); r++) {
       ret = myset.insert(m_pData->row(r));
       if (ret.second != false) {
         nUniqueData++;
@@ -677,7 +677,7 @@ protected:
 
   void composeResults(Params& post)   // remove extinguished components, assign labels
   {
-    int idx = 0;
+    Eigen::Index idx = 0;
     m_result.alpha = VectorXrt::Zero(m_nclasses);
     m_result.beta = VectorXrt::Zero(m_nclasses);
     m_result.W.clear();
@@ -716,9 +716,9 @@ protected:
     m_result.entropy.conservativeResize(idx);
     m_resultRnk.conservativeResize(Eigen::NoChange, idx);
     // assign labels
-    typename RowVectorXrt::Index index;
+    Eigen::Index index;
     m_resultLabels = Eigen::VectorXi::Zero(m_pData->rows());
-    for (int i = 0; i < m_resultLabels.size(); i++) {
+    for (Eigen::Index i = 0; i < m_resultLabels.size(); i++) {
       m_resultRnk.row(i).maxCoeff(&index);
       m_resultLabels(i) = index;
     }

@@ -11,10 +11,11 @@ class Z3DSDFont
 public:
   struct CharInfo
   {
-    CharInfo(int id = 0, int x = 0, int y = 0, int width = 0, int height = 0, float xoffset = 0.f, float yoffset = 0.f,
-             float xadvance = 0.f, int page = 0, int chnl = 0, int texWidth = 1, int texHeight = 1)
-      : id(id), x(x), y(y), width(width), height(height), xoffset(xoffset), yoffset(yoffset)
-      , xadvance(xadvance), page(page), chnl(chnl)
+    CharInfo(int id_ = 0, int x_ = 0, int y_ = 0, int width_ = 0, int height_ = 0,
+             float xoffset_ = 0.f, float yoffset_ = 0.f,
+             float xadvance_ = 0.f, int page_ = 0, int chnl_ = 0, int texWidth = 1, int texHeight = 1)
+      : id(id_), x(x_), y(y_), width(width_), height(height_), xoffset(xoffset_), yoffset(yoffset_)
+      , xadvance(xadvance_), page(page_), chnl(chnl_)
     {
       sMin = static_cast<float>(x) / static_cast<float>(texWidth);
       tMin = static_cast<float>(y + height) / static_cast<float>(texHeight);
