@@ -16,15 +16,6 @@
 
 namespace nim {
 
-// result has same sign as y
-inline int64_t modulo(int64_t x, int64_t y)
-{
-  int64_t res = x % y;
-  if (res * y < 0)
-    res += y;
-  return res;
-}
-
 // T must be integer type and Float must be float type
 template<typename T, typename Float>
 inline T roundTo(Float x)

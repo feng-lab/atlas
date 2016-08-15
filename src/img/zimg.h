@@ -1028,14 +1028,24 @@ private:
   template<typename TVoxel, typename TVoxelRhs>
   void secureDivImg_Impl(const ZImg& rhs);
 
-  template<typename TVoxel>
+  template<typename TVoxel,
+    typename std::enable_if_t<std::is_integral<std::remove_reference_t<TVoxel>>::value, int> = 0>
+  void histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData) const;
+
+  template<typename TVoxel,
+    typename std::enable_if_t<std::is_floating_point<std::remove_reference_t<TVoxel>>::value, int> = 0>
   void histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData) const;
 
   template<typename TVoxel>
   inline void histogram_Impl(std::vector<size_t>& res) const
   { histogram_Impl(res, dataRangeMin<TVoxel>(), dataRangeMax<TVoxel>()); }
 
-  template<typename TVoxel, typename TMaskVoxel>
+  template<typename TVoxel, typename TMaskVoxel,
+    typename std::enable_if_t<std::is_integral<std::remove_reference_t<TVoxel>>::value, int> = 0>
+  void histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData, const ZImg& mask) const;
+
+  template<typename TVoxel, typename TMaskVoxel,
+    typename std::enable_if_t<std::is_floating_point<std::remove_reference_t<TVoxel>>::value, int> = 0>
   void histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData, const ZImg& mask) const;
 
   template<typename TVoxel, typename TMaskVoxel>

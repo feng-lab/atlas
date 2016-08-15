@@ -234,7 +234,7 @@ std::shared_ptr<ZImg> ZImgCZISubBlock::read() const
     if (m_tiles.empty()) {
       throw ZIOException("empty czi sub block");
     }
-    std::shared_ptr<ZImg> res = std::make_shared<ZImg>();
+    auto res = std::make_shared<ZImg>();
     std::ifstream inputFileStream;
     openFileStream(inputFileStream, m_filename, std::ios_base::in | std::ios_base::binary);
     if (m_mixedTiles) {
