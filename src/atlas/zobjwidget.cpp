@@ -29,8 +29,8 @@ ZObjWidget::ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* sele
   setContextMenuPolicy(Qt::CustomContextMenu);
   sortByColumn(ZObjModel::TypeColumn);
   setStyleSheet(
-    "QTreeView::indicator:unchecked {image: url(:/icons/invisible.png);}"
-      "QTreeView::indicator:checked {image: url(:/icons/visible.png);}"
+    "QTreeView::indicator:unchecked {image: url(:/icons/eye_close-512.png);}"
+      "QTreeView::indicator:checked {image: url(:/icons/eye_open-512.png);}"
       "QTreeView::indicator:indeterminate {image: url(:/icons/eye_half-512.png);}"
   );
 
