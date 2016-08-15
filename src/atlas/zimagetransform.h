@@ -16,6 +16,14 @@ public:
 
   virtual ~ZImageTransform();
 
+  ZImageTransform(ZImageTransform&&) = default;
+
+  ZImageTransform& operator=(ZImageTransform&&) = default;
+
+  ZImageTransform(const ZImageTransform&) = default;
+
+  ZImageTransform& operator=(const ZImageTransform&) = default;
+
   virtual size_t numParameters() const = 0;
 
   void setParameters(const std::vector<double>& para);

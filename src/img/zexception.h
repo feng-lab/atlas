@@ -27,6 +27,14 @@ public:
     : m_what(what)
   {}
 
+  ZException(ZException&&) = default;
+
+  ZException& operator=(ZException&&) = default;
+
+  ZException(const ZException&) = default;
+
+  ZException& operator=(const ZException&) = default;
+
   virtual ~ZException() noexcept;
 
   inline const QString& what() const noexcept

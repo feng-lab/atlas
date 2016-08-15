@@ -36,7 +36,7 @@ inline T roundTo(Float x)
   else if (x >= std::numeric_limits<T>::max())
     return std::numeric_limits<T>::max();
   else
-    return std::round(x);
+    return static_cast<T>(std::round(x));
 }
 
 /////////////// saturate_cast (modified from opencv, add (u)int32_t and (u)int64_t suppport) ///////////////////
@@ -910,7 +910,7 @@ inline double saturate_div(double x, double y) { return x/y; }
 template<typename TVoxel1, typename TVoxel2>
 inline void saturate_add(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
 {
-  for (size_t i=0; i<count; ++i) {
+  for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_add(x[i], y[i]);
   }
 }
@@ -918,13 +918,13 @@ inline void saturate_add(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* re
 template<typename TVoxel1, typename TVoxel2>
 inline void saturate_add(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res)
 {
-  for (size_t i=0; i<count; ++i) {
+  for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_add(x[i], y);
   }
 }
 
 template<>
-inline void saturate_add<uint8_t, const uint8_t>(const uint8_t *x, const uint8_t *y, size_t count, uint8_t *res)
+inline void saturate_add<uint8_t, const uint8_t>(const uint8_t* x, const uint8_t* y, size_t count, uint8_t* res)
 {
   size_t i;
   // process 16 elements per iteration
@@ -935,58 +935,58 @@ inline void saturate_add<uint8_t, const uint8_t>(const uint8_t *x, const uint8_t
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y[i]);
   }
 }
 
 template<>
-inline void saturate_add<uint8_t, uint8_t>(const uint8_t *x, uint8_t y, size_t count, uint8_t *res)
+inline void saturate_add<uint8_t, uint8_t>(const uint8_t* x, uint8_t y, size_t count, uint8_t* res)
 {
   __m128i r = _mm_set1_epi8(y);
   size_t i;
   // process 16 elements per iteration
   for (i = 0; i < count - 15; i += 16) {
-    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x+i));
-    _mm_storeu_si128(reinterpret_cast<__m128i*>(res+i), _mm_adds_epu8(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epu8(l, r));
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y);
   }
 }
 
 template<>
-inline void saturate_add<int8_t, const int8_t>(const int8_t *x, const int8_t *y, size_t count, int8_t *res)
+inline void saturate_add<int8_t, const int8_t>(const int8_t* x, const int8_t* y, size_t count, int8_t* res)
 {
   size_t i;
   // process 16 elements per iteration
   for (i = 0; i < count - 15; i += 16) {
-    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x+i));
-    __m128i r = _mm_loadu_si128(reinterpret_cast<const __m128i*>(y+i));
-    _mm_storeu_si128(reinterpret_cast<__m128i*>(res+i), _mm_adds_epi8(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    __m128i r = _mm_loadu_si128(reinterpret_cast<const __m128i*>(y + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epi8(l, r));
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y[i]);
   }
 }
 
 template<>
-inline void saturate_add<int8_t, int8_t>(const int8_t *x, int8_t y, size_t count, int8_t *res)
+inline void saturate_add<int8_t, int8_t>(const int8_t* x, int8_t y, size_t count, int8_t* res)
 {
   __m128i r = _mm_set1_epi8(y);
   size_t i;
   // process 16 elements per iteration
   for (i = 0; i < count - 15; i += 16) {
-    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x+i));
-    _mm_storeu_si128(reinterpret_cast<__m128i*>(res+i), _mm_adds_epi8(l, r));
+    __m128i l = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x + i));
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epi8(l, r));
   }
 
   // clean up any remaining elements
-  for ( ; i < count; ++i) {
+  for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y);
   }
 }
@@ -1257,5 +1257,5 @@ inline void saturate_div(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res
   }
 }
 
-}
+} // namespace nim
 

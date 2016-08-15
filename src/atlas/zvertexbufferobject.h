@@ -12,6 +12,14 @@ public:
 
   ~ZVertexBufferObject();
 
+  ZVertexBufferObject(ZVertexBufferObject&&) = default;
+
+  ZVertexBufferObject& operator=(ZVertexBufferObject&&) = default;
+
+  ZVertexBufferObject(const ZVertexBufferObject&) = default;
+
+  ZVertexBufferObject& operator=(const ZVertexBufferObject&) = default;
+
   void bind(GLenum target, size_t idx = 0);
 
   void release(GLenum target);

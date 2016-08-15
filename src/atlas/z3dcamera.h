@@ -37,8 +37,6 @@ public:
 
   Z3DCamera();
 
-  virtual ~Z3DCamera();
-
   const glm::vec3& eye() const
   { return m_eye; }
 

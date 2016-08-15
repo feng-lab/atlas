@@ -91,16 +91,16 @@ efficientAddOrUpdate(MapType& m, const KeyArgType& k, const ValueArgtype& v)
 }
 
 // literal
-constexpr size_t operator "" _usize(unsigned long long int n) noexcept { return n; }
-constexpr ptrdiff_t operator "" _isize(unsigned long long int n) noexcept { return n; }
-constexpr uint8_t operator "" _u8(unsigned long long int n) noexcept { return n; }
-constexpr int8_t operator "" _i8(unsigned long long int n) noexcept { return n; }
-constexpr uint16_t operator "" _u16(unsigned long long int n) noexcept { return n; }
-constexpr int16_t operator "" _i16(unsigned long long int n) noexcept { return n; }
-constexpr uint32_t operator "" _u32(unsigned long long int n) noexcept { return n; }
-constexpr int32_t operator "" _i32(unsigned long long int n) noexcept { return n; }
-constexpr uint64_t operator "" _u64(unsigned long long int n) noexcept { return n; }
-constexpr int64_t operator "" _i64(unsigned long long int n) noexcept { return n; }
+constexpr size_t operator "" _usize(unsigned long long int n) noexcept { return static_cast<size_t>(n); }
+constexpr ptrdiff_t operator "" _isize(unsigned long long int n) noexcept { return static_cast<ptrdiff_t>(n); }
+constexpr uint8_t operator "" _u8(unsigned long long int n) noexcept { return static_cast<uint8_t>(n); }
+constexpr int8_t operator "" _i8(unsigned long long int n) noexcept { return static_cast<int8_t>(n); }
+constexpr uint16_t operator "" _u16(unsigned long long int n) noexcept { return static_cast<uint16_t>(n); }
+constexpr int16_t operator "" _i16(unsigned long long int n) noexcept { return static_cast<int16_t>(n); }
+constexpr uint32_t operator "" _u32(unsigned long long int n) noexcept { return static_cast<uint32_t>(n); }
+constexpr int32_t operator "" _i32(unsigned long long int n) noexcept { return static_cast<int32_t>(n); }
+constexpr uint64_t operator "" _u64(unsigned long long int n) noexcept { return static_cast<uint64_t>(n); }
+constexpr int64_t operator "" _i64(unsigned long long int n) noexcept { return static_cast<int64_t>(n); }
 
 //http://stackoverflow.com/questions/8542591/c11-reverse-range-based-for-loop
 template<typename T>

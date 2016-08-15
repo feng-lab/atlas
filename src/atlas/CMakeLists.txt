@@ -686,12 +686,11 @@ add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
                ${TESTS})
 
 target_include_directories(${APP_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(${APP_NAME} PUBLIC ${TBB_INCLUDE_DIRS})
+target_include_directories(${APP_NAME} SYSTEM PUBLIC ${TBB_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${MKL_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${IPP_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${WILDMAGIC_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${HDF5_INCLUDE_DIR})
-target_include_directories(${APP_NAME} PUBLIC ${ASSIMP_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${CERESSOLVER_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${QTCSVDIR})
 target_include_directories(${APP_NAME} PUBLIC ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
@@ -724,12 +723,14 @@ if (WIN32)
                               "/wd4100 /I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}") # 'identifier' : unreferenced formal parameter)
   set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc
                               PROPERTIES COMPILE_FLAGS /I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest)
+  set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS /I${ASSIMP_INCLUDE_DIRS})
 else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -frtti)
   target_compile_options(${APP_NAME} PUBLIC -fexceptions)
   target_compile_options(${APP_NAME} PUBLIC -Wall -Wextra)
-  target_compile_options(${APP_NAME} PUBLIC -Wbool-conversion -Wundefined-reinterpret-cast)
-  target_compile_options(${APP_NAME} PUBLIC -Wshadow) #Warn whenever a local variable or type declaration shadows another variable, parameter, type, class member (in C++), or instance variable (in Objective-C) or whenever a built-in function is shadowed. Note that in C++, the compiler warns if a local variable shadows an explicit typedef, but not if it shadows a struct/class/enum.
+  target_compile_options(${APP_NAME} PUBLIC -Wbool-conversion -Wconstant-conversion -Wenum-conversion)
+  target_compile_options(${APP_NAME} PUBLIC -Wc++14-compat-pedantic -Waddress -Waddress-of-temporary -Wdeprecated)
+  target_compile_options(${APP_NAME} PUBLIC -Wshadow)
   target_compile_options(${APP_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
 
   target_link_libraries(${APP_NAME} PUBLIC -stdlib=libc++ "-rpath @executable_path/../Frameworks")
@@ -739,7 +740,10 @@ else (WIN32)
                               "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
   set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
   set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc
-                              PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest)
+                              PROPERTIES COMPILE_FLAGS
+                              "-I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest -Wno-deprecated")
+  set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS "-isystem ${ASSIMP_INCLUDE_DIRS}")
+  set_source_files_properties(test/zunittest.cpp PROPERTIES COMPILE_FLAGS "-Wno-deprecated")
 
   set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
   set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../../ffmpeg PROPERTIES MACOSX_PACKAGE_LOCATION Resources)

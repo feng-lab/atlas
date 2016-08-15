@@ -12,6 +12,14 @@ public:
 
   ~ZVertexArrayObject();
 
+  ZVertexArrayObject(ZVertexArrayObject&&) = default;
+
+  ZVertexArrayObject& operator=(ZVertexArrayObject&&) = default;
+
+  ZVertexArrayObject(const ZVertexArrayObject&) = default;
+
+  ZVertexArrayObject& operator=(const ZVertexArrayObject&) = default;
+
   void bind(size_t idx = 0) const;
 
   void release() const;

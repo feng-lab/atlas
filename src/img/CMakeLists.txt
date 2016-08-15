@@ -250,7 +250,7 @@ set(LIBRARY_NAME img)
 add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${IMG_SOURCES})
 
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(${LIBRARY_NAME} PUBLIC ${TBB_INCLUDE_DIRS})
+target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${TBB_INCLUDE_DIRS})
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/eigen)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/boost)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glm)
@@ -292,9 +292,11 @@ else (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC -frtti)
   target_compile_options(${LIBRARY_NAME} PUBLIC -fexceptions)
   target_compile_options(${LIBRARY_NAME} PUBLIC -Wall -Wextra)
-  target_compile_options(${LIBRARY_NAME} PUBLIC -Wbool-conversion -Wundefined-reinterpret-cast)
-  target_compile_options(${LIBRARY_NAME} PUBLIC -Wshadow) #Warn whenever a local variable or type declaration shadows another variable, parameter, type, class member (in C++), or instance variable (in Objective-C) or whenever a built-in function is shadowed. Note that in C++, the compiler warns if a local variable shadows an explicit typedef, but not if it shadows a struct/class/enum.
+  target_compile_options(${LIBRARY_NAME} PUBLIC -Wbool-conversion -Wconstant-conversion -Wenum-conversion)
+  target_compile_options(${LIBRARY_NAME} PUBLIC -Wc++14-compat-pedantic -Waddress -Waddress-of-temporary -Wdeprecated)
+  target_compile_options(${LIBRARY_NAME} PUBLIC -Wshadow)
   target_compile_options(${LIBRARY_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
+  target_compile_options(${LIBRARY_NAME} PRIVATE -Wundefined-reinterpret-cast)
 
   target_link_libraries(${LIBRARY_NAME} PUBLIC -stdlib=libc++)
 

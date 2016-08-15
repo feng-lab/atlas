@@ -4,49 +4,27 @@
 namespace nim {
 
 ZBenchTimer::ZBenchTimer(const std::string& funName)
+  : m_name(funName)
 {
-#if defined(_WIN32) || defined(_WIN64)
-  LARGE_INTEGER freq;
-  QueryPerformanceFrequency(&freq);
-  m_frequency = static_cast<double>(freq.QuadPart);
-#endif
   reset();
-  if (!funName.empty()) {
-    m_name = funName.substr(funName.find_first_not_of(" \t"));
-  }
+}
+
+void ZBenchTimer::start()
+{
+  m_time = 0.0;
+  m_pauseTime = 0.0;
+  m_paused = false;
+  m_start = std::chrono::high_resolution_clock::now();
 }
 
 void ZBenchTimer::stop()
 {
-#if defined(_WIN64) || defined(_WIN32)
-  LARGE_INTEGER stop = getCpuTicks();
+  double elapsed = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_start).count();
   if (m_paused)
-    m_pauseTime += ((stop.QuadPart - m_start.QuadPart) / m_frequency);
+    m_pauseTime += elapsed;
   else
-    m_time += ((stop.QuadPart - m_start.QuadPart) / m_frequency);
-#elif defined(__APPLE__) && defined(__MACH__)
-  uint64_t elapsed = getCpuTicks() - m_start;
-  static mach_timebase_info_data_t sTimebaseInfo = {0, 0};
-  if (sTimebaseInfo.denom == 0)
-    (void) mach_timebase_info(&sTimebaseInfo);
-  if (m_paused)
-    m_pauseTime += 1e-9 * elapsed * sTimebaseInfo.numer / sTimebaseInfo.denom;
-  else
-    m_time += 1e-9 * elapsed * sTimebaseInfo.numer / sTimebaseInfo.denom;
-#else
-  timespec end = getCpuTicks();
-  if ((end.tv_nsec - m_start.tv_nsec)<0) {
-    end.tv_sec = end.tv_sec - m_start.tv_sec - 1;
-    end.tv_nsec = 1000000000 + end.tv_nsec - m_start.tv_nsec;
-  } else {
-    end.tv_sec -= m_start.tv_sec;
-    end.tv_nsec -= m_start.tv_nsec;
-  }
-  if (m_paused)
-    m_pauseTime += double(end.tv_sec) + 1e-9 * double(end.tv_nsec);
-  else
-    m_time += double(end.tv_sec) + 1e-9 * double(end.tv_nsec);
-#endif
+    m_time += elapsed;
+
   m_paused = false;
 
   m_best = std::min(m_best, m_time);
@@ -63,29 +41,9 @@ void ZBenchTimer::pause()
   if (m_paused)
     return;
 
-#if defined(_WIN64) || defined(_WIN32)
-  LARGE_INTEGER stop = getCpuTicks();
-  m_time += ((stop.QuadPart - m_start.QuadPart) / m_frequency);
-#elif defined(__APPLE__) && defined(__MACH__)
-  uint64_t elapsed = getCpuTicks() - m_start;
-  static mach_timebase_info_data_t sTimebaseInfo = {0, 0};
-  if (sTimebaseInfo.denom == 0)
-    (void) mach_timebase_info(&sTimebaseInfo);
-  m_time += 1e-9 * elapsed * sTimebaseInfo.numer / sTimebaseInfo.denom;
-#else
-  timespec end = getCpuTicks();
-  if ((end.tv_nsec - m_start.tv_nsec)<0) {
-    end.tv_sec = end.tv_sec - m_start.tv_sec - 1;
-    end.tv_nsec = 1000000000 + end.tv_nsec - m_start.tv_nsec;
-  } else {
-    end.tv_sec -= m_start.tv_sec;
-    end.tv_nsec -= m_start.tv_nsec;
-  }
-  m_time += double(end.tv_sec) + 1e-9 * double(end.tv_nsec);
-#endif
-
+  m_time += std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_start).count();
   m_paused = true;
-  m_start = getCpuTicks();
+  m_start = std::chrono::high_resolution_clock::now();
 }
 
 void ZBenchTimer::resume()
@@ -93,29 +51,9 @@ void ZBenchTimer::resume()
   if (!m_paused)
     return;
 
-#if defined(_WIN64) || defined(_WIN32)
-  LARGE_INTEGER stop = getCpuTicks();
-  m_pauseTime += ((stop.QuadPart - m_start.QuadPart) / m_frequency);
-#elif defined(__APPLE__) && defined(__MACH__)
-  uint64_t elapsed = getCpuTicks() - m_start;
-  static mach_timebase_info_data_t sTimebaseInfo = {0, 0};
-  if (sTimebaseInfo.denom == 0)
-    (void) mach_timebase_info(&sTimebaseInfo);
-  m_pauseTime += 1e-9 * elapsed * sTimebaseInfo.numer / sTimebaseInfo.denom;
-#else
-  timespec end = getCpuTicks();
-  if ((end.tv_nsec - m_start.tv_nsec)<0) {
-    end.tv_sec = end.tv_sec - m_start.tv_sec - 1;
-    end.tv_nsec = 1000000000 + end.tv_nsec - m_start.tv_nsec;
-  } else {
-    end.tv_sec -= m_start.tv_sec;
-    end.tv_nsec -= m_start.tv_nsec;
-  }
-  m_pauseTime += double(end.tv_sec) + 1e-9 * double(end.tv_nsec);
-#endif
-
+  m_pauseTime += std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_start).count();
   m_paused = false;
-  m_start = getCpuTicks();
+  m_start = std::chrono::high_resolution_clock::now();
 }
 
 std::ostream& operator<<(std::ostream& s, const ZBenchTimer& m)

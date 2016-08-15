@@ -21,10 +21,6 @@ Z3DCamera::Z3DCamera()
   updateFrustum();
 }
 
-Z3DCamera::~Z3DCamera()
-{
-}
-
 void Z3DCamera::setCamera(const glm::vec3& eye, const glm::vec3& center, const glm::vec3& upVector)
 {
   m_eye = eye;

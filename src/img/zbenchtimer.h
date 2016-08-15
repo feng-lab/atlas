@@ -1,16 +1,6 @@
 #pragma once
 
-#if defined(_WIN32) || defined(_WIN64)
-#include "zwindowsheader.h"
-#elif defined(__APPLE__) && defined(__MACH__)
-
-#include <mach/mach_time.h>
-
-#else
-# include <unistd.h>
-# include <time.h>
-#endif
-
+#include <chrono>
 #include <iostream>
 
 namespace nim {
@@ -63,20 +53,14 @@ public:
     m_averagePauseTime = 0;
   }
 
-  inline void start()
-  {
-    m_time = 0.0;
-    m_pauseTime = 0.0;
-    m_paused = false;
-    m_start = getCpuTicks();
-  }
-
   inline void resetAndStart(const std::string& newName)
   {
     setName(newName);
     reset();
     start();
   }
+
+  void start();
 
   void stop();
 
@@ -111,42 +95,11 @@ public:
   inline void setName(const std::string& str)
   { m_name = str; }
 
-#if defined(_WIN32) || defined(_WIN64)
-  inline LARGE_INTEGER getCpuTicks()
-  {
-    LARGE_INTEGER queryTicks;
-    QueryPerformanceCounter(&queryTicks);
-    return queryTicks;
-  }
-#elif defined(__APPLE__) && defined(__MACH__)
-
-  inline uint64_t getCpuTicks()
-  {
-    uint64_t tm;
-    tm = mach_absolute_time();
-    return tm;
-  }
-
-#else
-  inline timespec getCpuTicks()
-  {
-    timespec ts;
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
-    return ts;
-  }
-#endif
 
 protected:
   friend std::ostream& operator<<(std::ostream& s, const ZBenchTimer& m);
 
-#if defined(_WIN32) || defined(_WIN64)
-  double m_frequency;
-  LARGE_INTEGER m_start;
-#elif defined(__APPLE__) && defined(__MACH__)
-  uint64_t m_start;
-#else
-  timespec m_start;
-#endif
+  std::chrono::time_point<std::chrono::high_resolution_clock> m_start;
   double m_time;
   double m_best;
   double m_worst;

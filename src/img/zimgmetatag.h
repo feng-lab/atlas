@@ -14,8 +14,6 @@ class ZImgMetatag
 public:
   ZImgMetatag();
 
-  ZImgMetatag(const ZImgMetatag& other);
-
   // convenient function to create a name-value pair meta data
   // value will be stored as utf-8 string with datatype DataType::Ascii
   ZImgMetatag(const QString& name, const QString& value);

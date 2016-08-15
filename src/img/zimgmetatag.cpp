@@ -7,15 +7,6 @@ ZImgMetatag::ZImgMetatag()
 {
 }
 
-ZImgMetatag::ZImgMetatag(const ZImgMetatag& other)
-{
-  m_data = other.m_data;
-  m_name = other.m_name;
-  m_tag = other.m_tag;
-  m_dataType = other.m_dataType;
-  m_count = other.m_count;
-}
-
 ZImgMetatag::ZImgMetatag(const QString& name, const QString& value)
   : m_name(name), m_tag(0), m_dataType(DataType::Ascii)
 {
