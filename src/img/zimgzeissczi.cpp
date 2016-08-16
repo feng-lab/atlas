@@ -30,6 +30,7 @@ inline bool pixelTypeIsBGR(int32_t pixelType)
 
 ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
 {
+  ZImg res;
   SegmentHeader sh;
   inputFileStream.seekg(tile.filePosition);
   readStream(inputFileStream, &sh, sizeof(SegmentHeader));
@@ -47,144 +48,145 @@ ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
 
   inputFileStream.seekg(directoryEntriesSize + fill + sb.metaDataSize, std::ios_base::cur);
 
-  std::vector<uint8_t> fileBuf(192 + sb.dataSize);
-  if (sb.directoryEntry.compression == 2) {
-    readStream(inputFileStream, fileBuf.data() + 192, sb.dataSize); // wrap a tif header and use tif decoder
-  } else {
-    readStream(inputFileStream, fileBuf.data(), sb.dataSize);
-  }
+  if (sb.dataSize > 0) {
+    std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> fileBuf(192 + sb.dataSize);
+    if (sb.directoryEntry.compression == 2) {
+      readStream(inputFileStream, fileBuf.data() + 192, sb.dataSize); // wrap a tif header and use tif decoder
+    } else {
+      readStream(inputFileStream, fileBuf.data(), sb.dataSize);
+    }
 
-  ZImgInfo info;
-  QString dimensionOrder = tile.dimensionOrder;
-  if (sb.directoryEntry.compression != 1 &&
-      sb.directoryEntry.compression != 4) {
+    ZImgInfo info;
+    QString dimensionOrder = tile.dimensionOrder;
+    if (sb.directoryEntry.compression != 1 &&
+        sb.directoryEntry.compression != 4) {
 
-    info.width = tile.storedSize.x;
-    info.height = tile.storedSize.y;
-    info.depth = tile.storedSize.z;
-    info.numChannels = tile.storedSize.c;
-    info.numTimes = tile.storedSize.t;
+      info.width = tile.storedSize.x;
+      info.height = tile.storedSize.y;
+      info.depth = tile.storedSize.z;
+      info.numChannels = tile.storedSize.c;
+      info.numTimes = tile.storedSize.t;
 
-    switch (sb.directoryEntry.pixelType) {
-      case 0:
-        info.bytesPerVoxel = 1;
-        info.voxelFormat = VoxelFormat::Unsigned;
+      switch (sb.directoryEntry.pixelType) {
+        case 0:
+          info.bytesPerVoxel = 1;
+          info.voxelFormat = VoxelFormat::Unsigned;
+          break;
+        case 1:
+          info.bytesPerVoxel = 2;
+          info.voxelFormat = VoxelFormat::Unsigned;
+          break;
+        case 2:
+          info.bytesPerVoxel = 4;
+          info.voxelFormat = VoxelFormat::Float;
+          break;
+        case 3:
+          CHECK(info.numChannels == 1);
+          dimensionOrder.remove('C');
+          dimensionOrder.push_front('C');
+          info.numChannels = 3;
+          info.bytesPerVoxel = 1;
+          info.voxelFormat = VoxelFormat::Unsigned;
+          break;
+        case 4:
+          CHECK(info.numChannels == 1);
+          dimensionOrder.remove('C');
+          dimensionOrder.push_front('C');
+          info.numChannels = 3;
+          info.bytesPerVoxel = 2;
+          info.voxelFormat = VoxelFormat::Unsigned;
+          break;
+        case 8:
+          CHECK(info.numChannels == 1);
+          dimensionOrder.remove('C');
+          dimensionOrder.push_front('C');
+          info.numChannels = 3;
+          info.bytesPerVoxel = 4;
+          info.voxelFormat = VoxelFormat::Float;
+          break;
+        case 9:
+          CHECK(info.numChannels == 1);
+          dimensionOrder.remove('C');
+          dimensionOrder.push_front('C');
+          info.numChannels = 4;
+          info.lastChannelIsAlphaChannel = true;
+          info.bytesPerVoxel = 1;
+          info.voxelFormat = VoxelFormat::Unsigned;
+          break;
+        case 10:
+          throw ZIOException("complex gray64 image not supported");
+          break;
+        case 11:
+          throw ZIOException("complex bgr192 image not supported");
+          break;
+        case 12:
+          info.bytesPerVoxel = 4;
+          info.voxelFormat = VoxelFormat::Unsigned;
+          break;
+        case 13:
+          info.bytesPerVoxel = 8;
+          info.voxelFormat = VoxelFormat::Float;
+          break;
+        default:
+          throw ZIOException("Wrong Pixel Type");
+          break;
+      }
+      info.createDefaultDescriptions();
+    }
+
+    switch (sb.directoryEntry.compression) {
+      case 0:  // Uncompressed
+        if (static_cast<int64_t>(info.byteNumber()) != sb.dataSize) {
+          throw ZIOException("stored size and tile info don't match");
+        }
+        res = ZImg(info);
+        ZImgFormat::fixDimensionOrder(fileBuf.data(), dimensionOrder, res, pixelTypeIsBGR(sb.directoryEntry.pixelType));
         break;
-      case 1:
-        info.bytesPerVoxel = 2;
-        info.voxelFormat = VoxelFormat::Unsigned;
+      case 2:  // LZW
+      {
+        res = ZImg(info);
+        ZTiff::writeTiffHeader(fileBuf.data(), info.width, info.height * info.depth * info.numTimes * info.numChannels,
+                               info.bytesPerVoxel * 8, 1, 5, 192, sb.dataSize);
+
+        using Device = boost::iostreams::basic_array_source<char>;
+        // reinterpret_cast allowed (AliasedType is the (possibly cv-qualified) signed or unsigned variant of DynamicType)
+        boost::iostreams::stream<Device> istr(reinterpret_cast<char*>(fileBuf.data()), fileBuf.size());
+        ZTiff tif;
+        tif.load(istr);
+        info.height *= info.numTimes;
+        info.numTimes = 1;
+        ZImg img(info);
+        tif.readImgFromIFD(0, img);
+        ZImgFormat::fixDimensionOrder(img.timeData<uint8_t>(0), dimensionOrder, res,
+                                      pixelTypeIsBGR(sb.directoryEntry.pixelType));
+      }
         break;
-      case 2:
-        info.bytesPerVoxel = 4;
-        info.voxelFormat = VoxelFormat::Float;
+      case 1:  // Jpeg
+        ZImgJpeg::instance().readInfo(fileBuf.data(), sb.dataSize, info);
+        res = ZImg(info);
+        ZImgJpeg::instance().readImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
         break;
-      case 3:
-        CHECK(info.numChannels == 1);
-        dimensionOrder.remove('C');
-        dimensionOrder.push_front('C');
-        info.numChannels = 3;
-        info.bytesPerVoxel = 1;
-        info.voxelFormat = VoxelFormat::Unsigned;
-        break;
-      case 4:
-        CHECK(info.numChannels == 1);
-        dimensionOrder.remove('C');
-        dimensionOrder.push_front('C');
-        info.numChannels = 3;
-        info.bytesPerVoxel = 2;
-        info.voxelFormat = VoxelFormat::Unsigned;
-        break;
-      case 8:
-        CHECK(info.numChannels == 1);
-        dimensionOrder.remove('C');
-        dimensionOrder.push_front('C');
-        info.numChannels = 3;
-        info.bytesPerVoxel = 4;
-        info.voxelFormat = VoxelFormat::Float;
-        break;
-      case 9:
-        CHECK(info.numChannels == 1);
-        dimensionOrder.remove('C');
-        dimensionOrder.push_front('C');
-        info.numChannels = 4;
-        info.lastChannelIsAlphaChannel = true;
-        info.bytesPerVoxel = 1;
-        info.voxelFormat = VoxelFormat::Unsigned;
-        break;
-      case 10:
-        throw ZIOException("complex gray64 image not supported");
-        break;
-      case 11:
-        throw ZIOException("complex bgr192 image not supported");
-        break;
-      case 12:
-        info.bytesPerVoxel = 4;
-        info.voxelFormat = VoxelFormat::Unsigned;
-        break;
-      case 13:
-        info.bytesPerVoxel = 8;
-        info.voxelFormat = VoxelFormat::Float;
+      case 4:  // JpegXR
+        ZImgJpegXR::instance().readInfo(fileBuf.data(), sb.dataSize, info);
+        res = ZImg(info);
+        ZImgJpegXR::instance().readImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
         break;
       default:
-        throw ZIOException("Wrong Pixel Type");
+        try {
+          if (static_cast<int64_t>(info.byteNumber()) == sb.dataSize) {
+            res = ZImg(info);
+            ZImgFormat::fixDimensionOrder(fileBuf.data(), dimensionOrder, res,
+                                          pixelTypeIsBGR(sb.directoryEntry.pixelType));
+          } else {
+            ZImgFreeImage::instance().readInfo(fileBuf.data(), sb.dataSize, info);
+            res = ZImg(info);
+            ZImgFreeImage::instance().readImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
+          }
+        } catch (const ZException&) {
+          throw ZIOException(QString("not supported compression type %1").arg(sb.directoryEntry.compression));
+        }
         break;
     }
-    info.createDefaultDescriptions();
-  }
-
-  ZImg res;
-  switch (sb.directoryEntry.compression) {
-    case 0:  // Uncompressed
-      if (static_cast<int64_t>(info.byteNumber()) != sb.dataSize) {
-        throw ZIOException("stored size and tile info don't match");
-      }
-      res = ZImg(info);
-      ZImgFormat::fixDimensionOrder(fileBuf.data(), dimensionOrder, res, pixelTypeIsBGR(sb.directoryEntry.pixelType));
-      break;
-    case 2:  // LZW
-    {
-      res = ZImg(info);
-      ZTiff::writeTiffHeader(fileBuf.data(), info.width, info.height * info.depth * info.numTimes * info.numChannels,
-                             info.bytesPerVoxel * 8, 1, 5, 192, sb.dataSize);
-
-      using Device = boost::iostreams::basic_array_source<char>;
-      // reinterpret_cast allowed (AliasedType is the (possibly cv-qualified) signed or unsigned variant of DynamicType)
-      boost::iostreams::stream<Device> istr(reinterpret_cast<char*>(fileBuf.data()), fileBuf.size());
-      ZTiff tif;
-      tif.load(istr);
-      info.height *= info.numTimes;
-      info.numTimes = 1;
-      ZImg img(info);
-      tif.readImgFromIFD(0, img);
-      ZImgFormat::fixDimensionOrder(img.timeData<uint8_t>(0), dimensionOrder, res,
-                                    pixelTypeIsBGR(sb.directoryEntry.pixelType));
-    }
-      break;
-    case 1:  // Jpeg
-      ZImgJpeg::instance().readInfo(fileBuf.data(), sb.dataSize, info);
-      res = ZImg(info);
-      ZImgJpeg::instance().readImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
-      break;
-    case 4:  // JpegXR
-      ZImgJpegXR::instance().readInfo(fileBuf.data(), sb.dataSize, info);
-      res = ZImg(info);
-      ZImgJpegXR::instance().readImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
-      break;
-    default:
-      try {
-        if (static_cast<int64_t>(info.byteNumber()) == sb.dataSize) {
-          res = ZImg(info);
-          ZImgFormat::fixDimensionOrder(fileBuf.data(), dimensionOrder, res,
-                                        pixelTypeIsBGR(sb.directoryEntry.pixelType));
-        } else {
-          ZImgFreeImage::instance().readInfo(fileBuf.data(), sb.dataSize, info);
-          res = ZImg(info);
-          ZImgFreeImage::instance().readImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
-        }
-      } catch (const ZException&) {
-        throw ZIOException(QString("not supported compression type %1").arg(sb.directoryEntry.compression));
-      }
-      break;
   }
 
   return res;

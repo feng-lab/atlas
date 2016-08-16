@@ -35,34 +35,21 @@ private:
   TVoxel m_min;
 };
 
-template<typename FloatType>
-col4 scaleDownColorRGB(const col4& c, FloatType scale)
+template<typename Real>
+col4 scaleDownColorRGB(const col4& c, Real scale)
 {
-  scale *= static_cast<FloatType>(c.a) / 255.;
-  if (scale <= FloatType(0))
-    return col4(0, 0, 0, c.a);
-  else if (scale >= FloatType(1))
-    return c;
-
-  uint8_t r = static_cast<uint8_t>(scale * c.r + FloatType(0.5));
-  uint8_t g = static_cast<uint8_t>(scale * c.g + FloatType(0.5));
-  uint8_t b = static_cast<uint8_t>(scale * c.b + FloatType(0.5));
-  return col4(r, g, b, c.a);
-}
-
-template<typename FloatType>
-col4 scaleDownColorRGBA(const col4& c, FloatType scale)
-{
-  if (scale <= FloatType(0))
-    return col4(0, 0, 0, 0);
-  else if (scale >= FloatType(1))
-    return c;
-
-  uint8_t r = static_cast<uint8_t>(scale * c.r + FloatType(0.5));
-  uint8_t g = static_cast<uint8_t>(scale * c.g + FloatType(0.5));
-  uint8_t b = static_cast<uint8_t>(scale * c.b + FloatType(0.5));
-  uint8_t a = static_cast<uint8_t>(scale * c.a + FloatType(0.5));
-  return col4(r, g, b, a);
+  col4 res;
+  if (scale <= Real(0)) {
+    res = col4(0, 0, 0, c.a);
+  } else if (scale >= Real(1)) {
+    res = c;
+  } else {
+    res = col4(static_cast<uint8_t>(scale * c.r + Real(0.5)),
+               static_cast<uint8_t>(scale * c.g + Real(0.5)),
+               static_cast<uint8_t>(scale * c.b + Real(0.5)),
+               c.a);
+  }
+  return res;
 }
 
 // several tiles of qimage represent one big 2d image

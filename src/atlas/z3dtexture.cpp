@@ -359,10 +359,10 @@ void Z3DTexture::saveAsDepthImage(const QString& filename) const
   try {
     GLenum dataFormat = GL_DEPTH_COMPONENT;
     GLenum dataType = GL_UNSIGNED_INT;
-    auto depthBuffer = std::make_unique<uint32_t[]>(numPixels());
-    downloadTextureToBuffer(dataFormat, dataType, depthBuffer.get());
+    std::vector<uint32_t, boost::alignment::aligned_allocator<uint32_t, 32>> depthBuffer(numPixels());
+    downloadTextureToBuffer(dataFormat, dataType, depthBuffer.data());
     nim::ZImg img;
-    img.wrapData(depthBuffer.get(), width(), height(), 1);
+    img.wrapData(depthBuffer.data(), width(), height(), 1);
     img.flip(nim::Dimension::Y);
     img.save(filename);
   }

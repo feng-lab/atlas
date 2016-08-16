@@ -1566,19 +1566,19 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t heigh
         }
           break;
         case 2: {
-          uint16_t* pt = bit_cast<uint16_t*>(buf);
+          uint16_t* pt = reinterpret_cast<uint16_t*>(buf);
           for (size_t i = 0; i < read; ++i)
             pt[i] = std::numeric_limits<uint16_t>::max() - pt[i];
         }
           break;
         case 4: {
-          uint32_t* pt = bit_cast<uint32_t*>(buf);
+          uint32_t* pt = reinterpret_cast<uint32_t*>(buf);
           for (size_t i = 0; i < read; ++i)
             pt[i] = std::numeric_limits<uint32_t>::max() - pt[i];
         }
           break;
         case 8: {
-          uint64_t* pt = bit_cast<uint64_t*>(buf);
+          uint64_t* pt = reinterpret_cast<uint64_t*>(buf);
           for (size_t i = 0; i < read; ++i)
             pt[i] = std::numeric_limits<uint64_t>::max() - pt[i];
         }
@@ -1660,19 +1660,19 @@ void ZTiff::readTile(uint32_t tile, uint8_t* buf, size_t tileWidth, size_t tileH
         }
           break;
         case 2: {
-          uint16_t* pt = bit_cast<uint16_t*>(buf);
+          uint16_t* pt = reinterpret_cast<uint16_t*>(buf);
           for (size_t i = 0; i < read; ++i)
             pt[i] = std::numeric_limits<uint16_t>::max() - pt[i];
         }
           break;
         case 4: {
-          uint32_t* pt = bit_cast<uint32_t*>(buf);
+          uint32_t* pt = reinterpret_cast<uint32_t*>(buf);
           for (size_t i = 0; i < read; ++i)
             pt[i] = std::numeric_limits<uint32_t>::max() - pt[i];
         }
           break;
         case 8: {
-          uint64_t* pt = bit_cast<uint64_t*>(buf);
+          uint64_t* pt = reinterpret_cast<uint64_t*>(buf);
           for (size_t i = 0; i < read; ++i)
             pt[i] = std::numeric_limits<uint64_t>::max() - pt[i];
         }

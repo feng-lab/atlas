@@ -37,7 +37,7 @@ void ZImgPackDisplay::showChannel(size_t ch, double minData, double maxData)
       maxData = minData + 1.;
   }
 
-  if (ch < m_imgPack.imgInfo().numChannels) {
+  if (ch < imgInfo().numChannels) {
     m_channels[ch] = std::make_pair(minData, maxData);
   }
 }
@@ -61,7 +61,7 @@ void ZImgPackDisplay::showAllChannels(double minData, double maxData)
       maxData = minData + 1.;
   }
 
-  for (size_t i = 0; i < m_imgPack.imgInfo().numChannels; ++i) {
+  for (size_t i = 0; i < imgInfo().numChannels; ++i) {
     showChannel(i, minData, maxData);
   }
 }
@@ -137,7 +137,7 @@ void ZImgPackDisplay::setQImageDataBlockCM(const ZImg* img, QImage* qim, const t
     imgDatas[c] = img->rowData<TVoxel>(rowRange.begin(), 0, (*channels)[c], 0);
   }
   for (size_t i = rowRange.begin(); i != rowRange.end(); ++i) {
-    QRgb* qimData = bit_cast<QRgb*>(qim->scanLine(i));
+    QRgb* qimData = reinterpret_cast<QRgb*>(qim->scanLine(i));
 
     for (int j = 0; j < qim->width(); ++j) {
       col4 col = colormaps->at(0).color(*(imgDatas[0])++);
@@ -161,18 +161,20 @@ ZImgPackDisplay::setQImageDataBlockCMMultAlpha(const ZImg* img, QImage* qim, con
     imgDatas[c] = img->rowData<TVoxel>(rowRange.begin(), 0, (*channels)[c], 0);
   }
   for (size_t i = rowRange.begin(); i != rowRange.end(); ++i) {
-    QRgb* qimData = bit_cast<QRgb*>(qim->scanLine(i));
+    QRgb* qimData = reinterpret_cast<QRgb*>(qim->scanLine(i));
 
     for (int j = 0; j < qim->width(); ++j) {
       col4 col = colormaps->at(0).color(*(imgDatas[0])++);
-      for (size_t c = 1; c < channels->size(); ++c) {
+      size_t c = 1;
+      for (; c < channels->size() - 1; ++c) {
         col.max(colormaps->at(c).color(*(imgDatas[c])++));
       }
-      float a = col.a / 255.f;
-      qimData[j] = qRgba(static_cast<uint8_t>(col.r * a + .5f),
-                         static_cast<uint8_t>(col.g * a + .5f),
-                         static_cast<uint8_t>(col.b * a + .5f),
-                         col.a);
+      // multiply alpha channel (which contains global alpha)
+      float a = colormaps->at(c).color(*(imgDatas[c])++).a / 255.f;
+      qimData[j] = qRgba(static_cast<int>(col.r * a + .5f), // not correct for some edge cases but faster than std::round
+                         static_cast<int>(col.g * a + .5f),
+                         static_cast<int>(col.b * a + .5f),
+                         static_cast<int>(col.a * a + .5f));
     }
   }
 }
@@ -189,62 +191,56 @@ void ZImgPackDisplay::setQImageDataCM(const ZImg& img, QImage& qim) const
   int alphaChannelIdx = -1;
   for (std::map<size_t, std::pair<double, double>>::const_iterator it = m_channels.begin();
        it != m_channels.end(); ++it) {
-    if (m_imgPack.imgInfo().isAlphaChannel(it->first)) {
+    if (imgInfo().isAlphaChannel(it->first)) {
       alphaChannelIdx = idx;
       break;
     }
     idx++;
   }
   idx = 0;
-  if (alphaChannelIdx < 0) {
-    for (std::map<size_t, std::pair<double, double>>::const_iterator it = m_channels.begin();
-         it != m_channels.end(); ++it) {
-      size_t ch = it->first;
-      double minValue = it->second.first;
-      double maxValue = it->second.second;
-      channels[idx] = ch;
-      colormaps[idx].setRange(minimum, maximum);
-      col4 maxCol(m_imgPack.imgInfo().channelColors[ch]);
-      maxCol.a = roundTo<uint8_t>(m_alpha * 255);
-      for (TVoxel v = minimum; v < maximum; ++v) {
-        double coef = (v - minValue) / (maxValue - minValue);
-        colormaps[idx].color(v) = scaleDownColorRGB(maxCol, coef);
+  for (std::map<size_t, std::pair<double, double>>::const_iterator it = m_channels.begin();
+       it != m_channels.end(); ++it) {
+    size_t ch = it->first;
+    double minValue = it->second.first;
+    double maxValue = it->second.second;
+    channels[idx] = ch;
+    colormaps[idx].setRange(minimum, maximum);
+    if (imgInfo().isAlphaChannel(ch)) {
+      double da;
+      TVoxel v = minimum;
+      for (; v < maximum; ++v) {
+        da = (v - minValue) / (maxValue - minValue);
+        da = da < 0.0 ? 0.0 : da > 1.0 ? 1.0 : da;
+        colormaps[idx].color(v) = col4(static_cast<uint8_t>(m_alpha * da * 255 + 0.5));
       }
-      colormaps[idx].color(maximum) = scaleDownColorRGB(maxCol, (maximum - minValue) / (maxValue - minValue));
-      idx++;
-    }
-  } else {
-    for (std::map<size_t, std::pair<double, double>>::const_iterator it = m_channels.begin();
-         it != m_channels.end(); ++it) {
-      size_t ch = it->first;
-      double minValue = it->second.first;
-      double maxValue = it->second.second;
-      channels[idx] = ch;
-      colormaps[idx].setRange(minimum, maximum);
-      if (m_imgPack.imgInfo().isAlphaChannel(ch)) {
-        col4 maxCol(0, 0, 0, roundTo<uint8_t>(m_alpha * 255));
-        for (TVoxel v = minimum; v < maximum; ++v) {
-          double coef = (v - minValue) / (maxValue - minValue);
-          colormaps[idx].color(v) = scaleDownColorRGBA(maxCol, coef);
+      da = (v - minValue) / (maxValue - minValue);
+      da = da < 0.0 ? 0.0 : da > 1.0 ? 1.0 : da;
+      colormaps[idx].color(v) = col4(static_cast<uint8_t>(m_alpha * da * 255 + 0.5));
+    } else {
+      col4 maxCol(imgInfo().channelColors[ch]);
+      if (alphaChannelIdx < 0) {  // no alpha channel, encode global alpha into colormap
+        maxCol.r = static_cast<uint8_t>(m_alpha * maxCol.r + 0.5);
+        maxCol.g = static_cast<uint8_t>(m_alpha * maxCol.g + 0.5);
+        maxCol.b = static_cast<uint8_t>(m_alpha * maxCol.b + 0.5);
+        maxCol.a = static_cast<uint8_t>(m_alpha * 255 + 0.5);
+        TVoxel v = minimum;
+        for (; v < maximum; ++v) {
+          colormaps[idx].color(v) = scaleDownColorRGB(maxCol, (v - minValue) / (maxValue - minValue));
         }
-        colormaps[idx].color(maximum) = scaleDownColorRGBA(maxCol, (maximum - minValue) / (maxValue - minValue));
-      } else {
-        col4 maxCol(m_imgPack.imgInfo().channelColors[ch]);
-        maxCol.a = 0;
-        for (TVoxel v = minimum; v < maximum; ++v) {
-          double coef = (v - minValue) / (maxValue - minValue);
-          colormaps[idx].color(v) = scaleDownColorRGBA(maxCol, coef);
+        colormaps[idx].color(v) = scaleDownColorRGB(maxCol, (v - minValue) / (maxValue - minValue));
+      } else {  // has alpha channel, skip global alpha as it is already encoded in alpha channel's colormap
+        maxCol.a = 255;
+        TVoxel v = minimum;
+        for (; v < maximum; ++v) {
+          colormaps[idx].color(v) = scaleDownColorRGB(maxCol, (v - minValue) / (maxValue - minValue));
         }
-        colormaps[idx].color(maximum) = scaleDownColorRGBA(maxCol, (maximum - minValue) / (maxValue - minValue));
+        colormaps[idx].color(v) = scaleDownColorRGB(maxCol, (v - minValue) / (maxValue - minValue));
       }
-      idx++;
     }
+    idx++;
   }
 
-  //setQImageDataBlockCM<TVoxel>(qim, 0, m_img.height(), channels, colormaps);
-  //return;
-
-  if (alphaChannelIdx < 0) {
+  if (alphaChannelIdx < 0 || m_channels.size() == 1) {  // no alpha channel or only alpha channel
     tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),
                       [&](const tbb::blocked_range<size_t>& range) {
                         setQImageDataBlockCM<TVoxel>(&img, &qim, range, &channels, &colormaps);
@@ -271,14 +267,17 @@ void ZImgPackDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb
     imgDatas[c] = img->rowData<TVoxel>(rowRange.begin(), 0, ch, 0);
     chMinValue[c] = m_channels.at(ch).first;
     chMaxValue[c] = m_channels.at(ch).second;
-    chCol[c] = m_imgPack.imgInfo().channelColors[ch];
-    chCol[c].a = roundTo<uint8_t>(m_alpha * 255);
-    if (m_imgPack.imgInfo().isAlphaChannel(ch))
+    chCol[c] = imgInfo().channelColors[ch];
+    chCol[c].r = static_cast<uint8_t>(m_alpha * chCol[c].r + 0.5);
+    chCol[c].g = static_cast<uint8_t>(m_alpha * chCol[c].g + 0.5);
+    chCol[c].b = static_cast<uint8_t>(m_alpha * chCol[c].b + 0.5);
+    chCol[c].a = static_cast<uint8_t>(m_alpha * 255 + 0.5);
+    if (imgInfo().isAlphaChannel(ch))
       alphaChannelIdx = c;
   }
   if (alphaChannelIdx < 0) {
     for (size_t i = rowRange.begin(); i != rowRange.end(); ++i) {
-      QRgb* qimData = bit_cast<QRgb*>(qim->scanLine(i));
+      QRgb* qimData = reinterpret_cast<QRgb*>(qim->scanLine(i));
 
       for (int j = 0; j < qim->width(); ++j) {
         TVoxel v = *(imgDatas[0])++;
@@ -294,20 +293,18 @@ void ZImgPackDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb
   } else {
     if (channels->size() == 1) {
       for (size_t i = rowRange.begin(); i != rowRange.end(); ++i) {
-        QRgb* qimData = bit_cast<QRgb*>(qim->scanLine(i));
+        QRgb* qimData = reinterpret_cast<QRgb*>(qim->scanLine(i));
 
         for (int j = 0; j < qim->width(); ++j) {
-          TVoxel v = *(imgDatas[0])++;
-          int a = roundTo<uint8_t>(m_alpha * (v - chMinValue[0]) / (chMaxValue[0] - chMinValue[0]) * 255);
-          qimData[j] = qRgba(0, 0, 0, a);
+          double da = (*(imgDatas[0])++ - chMinValue[0]) / (chMaxValue[0] - chMinValue[0]);
+          da = da < 0.0 ? 0.0 : da > 1.0 ? 1.0 : da;
+          int v = static_cast<int>(m_alpha * da * 255 + 0.5);
+          qimData[j] = qRgba(v, v, v, v);
         }
       }
     } else {
-      for (size_t c = 0; c < channels->size() - 1; ++c) {
-        chCol[c].a = 255;
-      }
       for (size_t i = rowRange.begin(); i != rowRange.end(); ++i) {
-        QRgb* qimData = bit_cast<QRgb*>(qim->scanLine(i));
+        QRgb* qimData = reinterpret_cast<QRgb*>(qim->scanLine(i));
 
         for (int j = 0; j < qim->width(); ++j) {
           size_t c = 0;
@@ -317,16 +314,13 @@ void ZImgPackDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb
             v = *(imgDatas[c])++;
             col.max(scaleDownColorRGB(chCol[c], (v - chMinValue[c]) / (chMaxValue[c] - chMinValue[c])));
           }
-          v = *(imgDatas[c])++;
-          double a = m_alpha * (v - chMinValue[c]) / (chMaxValue[c] - chMinValue[c]);
-          if (a < 0) {
-            a = 0;
-          } else if (a > 1) {
-            a = 1;
-          }
-
-          qimData[j] = qRgba(roundTo<uint8_t>(col.r * a), roundTo<uint8_t>(col.g * a),
-                             roundTo<uint8_t>(col.b * a), roundTo<uint8_t>(a * 255));
+          // multiply alpha channel
+          double a = (*(imgDatas[c])++ - chMinValue[c]) / (chMaxValue[c] - chMinValue[c]);
+          a = a < 0.0 ? 0.0 : a > 1.0 ? 1.0 : a;
+          qimData[j] = qRgba(static_cast<int>(col.r * a + .5), // not correct for some edge cases but faster than std::round
+                             static_cast<int>(col.g * a + .5),
+                             static_cast<int>(col.b * a + .5),
+                             static_cast<int>(col.a * a + .5));
         }
       }
     }

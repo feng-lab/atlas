@@ -148,7 +148,7 @@ void separateChannel(uint8_t* bufImg, const ZImgInfo& info, const ZImgRegion& re
           break;
         case 2: {
           uint16_t* des = img.channelData<uint16_t>(c);
-          const uint16_t* src = bit_cast<uint16_t*>(bufImg) + c + region.start.c;
+          const uint16_t* src = reinterpret_cast<uint16_t*>(bufImg) + c + region.start.c;
           size_t numCh = img.numChannels();
           size_t i = 0;
           while (i++ < img.channelVoxelNumber()) {
@@ -180,7 +180,7 @@ void separateChannel(uint8_t* bufImg, const ZImgInfo& info, const ZImgRegion& re
           for (size_t x = 0; x < img.width(); ++x) {
             uint16_t* des = img.data<uint16_t>(x, y, 0, c);
             uint16_t* src =
-              bit_cast<uint16_t*>(bufImg) + (y + region.start.y) * info.rowVoxelNumber() * info.numChannels +
+              reinterpret_cast<uint16_t*>(bufImg) + (y + region.start.y) * info.rowVoxelNumber() * info.numChannels +
               (x + region.start.x) * info.numChannels + c + region.start.c;
             *des = ((*src & 0xff) << 8) | ((*src & 0xff00) >> 8);
           }

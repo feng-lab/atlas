@@ -345,10 +345,11 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
 
     if (eye == Z3DEye::Mono) {
       // get color buffer content
-      auto colorBuffer = std::make_unique<uint8_t[]>(tex->bypePerPixel(dataFormat, dataType) * tex->numPixels());
-      tex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
+      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> colorBuffer(
+        tex->bypePerPixel(dataFormat, dataType) * tex->numPixels());
+      tex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.data());
       ZImg bufImg;
-      bufImg.wrapData(colorBuffer.get(), ZImgInfo(tex->width(), tex->height(), 1, 4));
+      bufImg.wrapData(colorBuffer.data(), ZImgInfo(tex->width(), tex->height(), 1, 4));
       if (m_tiledRendering) {
         CHECK(!m_monoImg.isEmpty());
         ZImg tmpImg = ZImg(bufImg.info());
@@ -363,11 +364,11 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
       if (!leftTex) {
         throw ZGLException("not ready to capture image");
       }
-      auto colorBuffer = std::make_unique<uint8_t[]>(
+      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> colorBuffer(
         leftTex->bypePerPixel(dataFormat, dataType) * leftTex->numPixels());
-      leftTex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
+      leftTex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.data());
       ZImg bufImg;
-      bufImg.wrapData(colorBuffer.get(), ZImgInfo(tex->width(), tex->height(), 1, 4));
+      bufImg.wrapData(colorBuffer.data(), ZImgInfo(tex->width(), tex->height(), 1, 4));
       ZImg tmpImg;
       if (m_tiledRendering) {
         CHECK(!m_leftImg.isEmpty());
@@ -380,8 +381,8 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
       }
 
 
-      tex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
-      bufImg.wrapData(colorBuffer.get(), ZImgInfo(tex->width(), tex->height(), 1, 4));
+      tex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.data());
+      bufImg.wrapData(colorBuffer.data(), ZImgInfo(tex->width(), tex->height(), 1, 4));
       if (m_tiledRendering) {
         CHECK(!m_rightImg.isEmpty());
         ZImgFormat::CXYZtoXYZC(bufImg, tmpImg, true);

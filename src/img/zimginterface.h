@@ -67,12 +67,17 @@ struct col4
     : r(0), g(0), b(0), a(255)
   {}
 
-  col4(uint8_t const& r_, uint8_t const& g_, uint8_t const& b_, uint8_t const& a_ = 255_u8)
+  template<typename A>
+  col4(A v)
+    : r(v), g(v), b(v), a(v)
+  {}
+
+  col4(uint8_t r_, uint8_t g_, uint8_t b_, uint8_t a_ = 255_u8)
     : r(r_), g(g_), b(b_), a(a_)
   {}
 
   template<typename A, typename B, typename C, typename D>
-  col4(A const& r_, B const& g_, C const& b_, D const& a_ = D(255))
+  col4(A r_, B g_, C b_, D a_ = D(255))
     : r(r_), g(g_), b(b_), a(a_)
   {}
 

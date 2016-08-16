@@ -65,10 +65,8 @@ public:
   ZQImagePack toQImagePack(size_t tileWidth = 4096, size_t tileHeight = 4096) const;
 
 private:
-  //  template<typename TVoxel>
-  //  void setQImageDataBlockCM(QImage &qim, size_t startLine, size_t endLine,
-  //                            const std::vector<size_t>& channels,
-  //                            const std::vector<ZImgVoxelColormap<TVoxel>>& colormaps) const;
+  inline const ZImgInfo& imgInfo() const
+  { return m_imgPack.imgInfo(); }
 
   template<typename TVoxel>
   void setQImageDataBlockCM(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,
@@ -82,10 +80,6 @@ private:
 
   template<typename TVoxel>
   void setQImageDataCM(const ZImg& img, QImage& qim) const;
-
-  //  template<typename TVoxel>
-  //  void setQImageDataBlock(QImage &qim, size_t startLine, size_t endLine,
-  //                            const std::vector<size_t>& channels) const;
 
   template<typename TVoxel>
   void setQImageDataBlock(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,

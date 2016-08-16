@@ -877,6 +877,50 @@ void benchSaturateMul()
   STOP_AND_LOG(bt5);
 }
 
+void benchRound()
+{
+  ZBenchTimer bt1("wrong");
+  ZBenchTimer bt2("correct");
+
+  bt1.start();
+  bt1.pause();
+  bt2.start();
+  bt2.pause();
+  for (int j = 0; j < 1e8; ++j) {
+    float a = ZRandom::instance().randReal<float>(255);
+    bt2.resume();
+    uint8_t d = static_cast<uint8_t>(std::round(a));
+    bt2.pause();
+    bt1.resume();
+    uint8_t c = static_cast<uint8_t>(a + 0.5f);
+    bt1.pause();
+    if (c != d) {
+      LOG(INFO) << c << " " << d;
+    }
+  }
+  STOP_AND_LOG(bt1);
+  STOP_AND_LOG(bt2);
+
+  bt1.resetAndStart("wrong");
+  bt1.pause();
+  bt2.resetAndStart("correct");
+  bt2.pause();
+  for (int j = 0; j < 1e8; ++j) {
+    double a = ZRandom::instance().randReal<double>(255);
+    bt2.resume();
+    uint8_t d = static_cast<uint8_t>(std::round(a));
+    bt2.pause();
+    bt1.resume();
+    uint8_t c = static_cast<uint8_t>(a + 0.5);
+    bt1.pause();
+    if (c != d) {
+      LOG(INFO) << c << " " << d;
+    }
+  }
+  STOP_AND_LOG(bt1);
+  STOP_AND_LOG(bt2);
+}
+
 QString GetRandomString()
 {
   const QString possibleCharacters("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
@@ -902,6 +946,9 @@ void testLogSpeed()
 
 void tmp()
 {
+  ZBenchTimer bt;
+
+
   float v;
   bool ok;
   float fm;
@@ -955,7 +1002,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  tmp();
+  benchRound();
   LOG(INFO) << "done";
 }
 

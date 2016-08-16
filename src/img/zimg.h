@@ -184,6 +184,7 @@ public:
   // wrap exist raw data as ZImg, ZImg will **not** free the memory after using
   // only accept non-const data pointer (link error if input is const)
   // previous data of current img will be cleared
+  // note: use with caution as the input data might not meet the alignment requirement of some operations
   template<typename TVoxel>
   void wrapData(TVoxel* data, size_t width, size_t height, size_t depth = 1,
                 size_t numChannels = 1, size_t numTimes = 1);
@@ -362,27 +363,27 @@ public:
 
   template<typename T = uint8_t>
   inline T* timeData(size_t t)
-  { return bit_cast<T*>(&(m_data[t][0])); }
+  { return reinterpret_cast<T*>(&(m_data[t][0])); }
 
   template<typename T = uint8_t>
   inline T* channelData(size_t c, size_t t = 0)
-  { return bit_cast<T*>(&(m_data[t][0]) + c * m_info.channelByteNumber()); }
+  { return reinterpret_cast<T*>(&(m_data[t][0]) + c * m_info.channelByteNumber()); }
 
   template<typename T = uint8_t>
   inline T* planeData(size_t z, size_t c = 0, size_t t = 0)
-  { return bit_cast<T*>(&(m_data[t][0]) + c * m_info.channelByteNumber() + z * m_info.planeByteNumber()); }
+  { return reinterpret_cast<T*>(&(m_data[t][0]) + c * m_info.channelByteNumber() + z * m_info.planeByteNumber()); }
 
   template<typename T = uint8_t>
   inline T* rowData(size_t y, size_t z = 0, size_t c = 0, size_t t = 0)
   {
-    return bit_cast<T*>(
+    return reinterpret_cast<T*>(
       &(m_data[t][0]) + c * m_info.channelByteNumber() + z * m_info.planeByteNumber() + y * m_info.rowByteNumber());
   }
 
   template<typename T = uint8_t>
   inline T* data(size_t x, size_t y, size_t z = 0, size_t c = 0, size_t t = 0)
   {
-    return bit_cast<T*>(
+    return reinterpret_cast<T*>(
       &(m_data[t][0]) + c * m_info.channelByteNumber() + z * m_info.planeByteNumber() + y * m_info.rowByteNumber()
       + x * m_info.voxelByteNumber());
   }
@@ -390,7 +391,7 @@ public:
   template<typename T = uint8_t>
   inline T* data(const ZVoxelCoordinate& coord)
   {
-    return bit_cast<T*>(
+    return reinterpret_cast<T*>(
       &(m_data[coord.t][0]) + coord.c * m_info.channelByteNumber() + coord.z * m_info.planeByteNumber() +
       coord.y * m_info.rowByteNumber() + coord.x * m_info.voxelByteNumber());
   }
@@ -402,32 +403,32 @@ public:
     //idx -= l * m_info.locationVoxelNumber();
     size_t t = idx / m_info.timeVoxelNumber();
     idx -= t * m_info.timeVoxelNumber();
-    return bit_cast<T*>(&(m_data[t][0]) + idx * m_info.voxelByteNumber());
+    return reinterpret_cast<T*>(&(m_data[t][0]) + idx * m_info.voxelByteNumber());
   }
 
   template<typename T = uint8_t>
   inline const T* timeData(size_t t) const
-  { return bit_cast<T*>(&(m_data[t][0])); }
+  { return reinterpret_cast<T*>(&(m_data[t][0])); }
 
   template<typename T = uint8_t>
   inline const T* channelData(size_t c, size_t t = 0) const
-  { return bit_cast<T*>(&(m_data[t][0]) + c * m_info.channelByteNumber()); }
+  { return reinterpret_cast<T*>(&(m_data[t][0]) + c * m_info.channelByteNumber()); }
 
   template<typename T = uint8_t>
   inline const T* planeData(size_t z, size_t c = 0, size_t t = 0) const
-  { return bit_cast<T*>(&(m_data[t][0]) + c * m_info.channelByteNumber() + z * m_info.planeByteNumber()); }
+  { return reinterpret_cast<T*>(&(m_data[t][0]) + c * m_info.channelByteNumber() + z * m_info.planeByteNumber()); }
 
   template<typename T = uint8_t>
   inline const T* rowData(size_t y, size_t z = 0, size_t c = 0, size_t t = 0) const
   {
-    return bit_cast<T*>(
+    return reinterpret_cast<T*>(
       &(m_data[t][0]) + c * m_info.channelByteNumber() + z * m_info.planeByteNumber() + y * m_info.rowByteNumber());
   }
 
   template<typename T = uint8_t>
   inline const T* data(size_t x, size_t y, size_t z = 0, size_t c = 0, size_t t = 0) const
   {
-    return bit_cast<T*>(
+    return reinterpret_cast<T*>(
       &(m_data[t][0]) + c * m_info.channelByteNumber() + z * m_info.planeByteNumber() + y * m_info.rowByteNumber()
       + x * m_info.voxelByteNumber());
   }
@@ -435,7 +436,7 @@ public:
   template<typename T = uint8_t>
   inline const T* data(const ZVoxelCoordinate& coord) const
   {
-    return bit_cast<T*>(
+    return reinterpret_cast<T*>(
       &(m_data[coord.t][0]) + coord.c * m_info.channelByteNumber() + coord.z * m_info.planeByteNumber() +
       coord.y * m_info.rowByteNumber() + coord.x * m_info.voxelByteNumber());
   }
@@ -447,7 +448,7 @@ public:
     //idx -= l * m_info.locationVoxelNumber();
     size_t t = idx / m_info.timeVoxelNumber();
     idx -= t * m_info.timeVoxelNumber();
-    return bit_cast<T*>(&(m_data[t][0]) + idx * m_info.voxelByteNumber());
+    return reinterpret_cast<T*>(&(m_data[t][0]) + idx * m_info.voxelByteNumber());
   }
 
   // return out bound voxel value based on boundary condition (padOption)
