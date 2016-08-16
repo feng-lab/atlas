@@ -100,6 +100,16 @@ else (WIN32)
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/wildmagic/lib/libGTEngine.a)
 endif (WIN32)
 
+set(BENCHMARK_INCLUDE_DIRS ${BENCHMARK_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/benchmark/include)
+if (WIN32)
+  set(BENCHMARK_LIBRARIES ${BENCHMARK_LIBRARIES}
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/benchmark/lib/benchmark.lib)
+else (WIN32)
+  set(BENCHMARK_LIBRARIES ${BENCHMARK_LIBRARIES}
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/benchmark/lib/libbenchmark.a)
+endif (WIN32)
+
 find_package(HDF5 REQUIRED COMPONENTS C CXX static
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/share NO_DEFAULT_PATH)
 message(${HDF5_INCLUDE_DIR})
@@ -219,6 +229,8 @@ option(BUILD_TESTING "Enable tests" ON)
 if (BUILD_TESTING)
   add_definitions(-DATLAS_WITH_TESTS)
   set(TESTS
+      test/zrunbenchmark.cpp
+      test/zrunbenchmark.h
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc
       test/zunittest.h
       test/zunittest.cpp
@@ -238,6 +250,7 @@ if (BUILD_TESTING)
       test/zimgregionalextrematest.h
       test/ztreetest.h)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/include)
+  include_directories(${BENCHMARK_INCLUDE_DIRS})
 endif (BUILD_TESTING)
 
 set(SOURCES
@@ -752,6 +765,9 @@ endif (WIN32)
 target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding hdf5_cpp-static hdf5-static
                       img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${WILDMAGIC_LIBRARIES}
                       ${ASSIMP_LIBRARIES} ${MKL_LIBRARIES} ${IPP_LIBRARIES} ${TBB_LIBRARIES})
+if (BUILD_TESTING)
+  target_link_libraries(${APP_NAME} PUBLIC ${BENCHMARK_LIBRARIES})
+endif (BUILD_TESTING)
 
 if (APPLE)
   set(copyright_line "Copyright 2011-2016 Linqing Feng @ JinnyLab")

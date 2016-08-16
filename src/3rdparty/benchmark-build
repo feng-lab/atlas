@@ -1,0 +1,38 @@
+#!/bin/bash
+
+currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
+srcDIR=$currDIR/../../../benchmark
+buildDIR=$srcDIR/../__benchmark-build
+installDIR=$currDIR/benchmark
+numCores=$( sysctl -n hw.logicalcpu )
+
+if [ -d $installDIR ]
+then
+  rm -rf $installDIR
+fi
+
+if [ ! -d $srcDIR ]
+then
+  echo ERROR: src folder $srcDIR does not exist.
+  exit 1 # terminate and indicate error
+fi
+
+if [ -d $buildDIR ]
+then
+  rm -rf $buildDIR
+fi
+mkdir $buildDIR
+cd $buildDIR
+
+OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk
+if [ ! -d $OSX_SYSROOT ]
+then
+  OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.10.sdk
+fi
+
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.8 -DCMAKE_OSX_SYSROOT=$OSX_SYSROOT -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++14" $srcDIR
+
+make -j $numCores install
+
+cd $currDIR
+rm -rf $buildDIR

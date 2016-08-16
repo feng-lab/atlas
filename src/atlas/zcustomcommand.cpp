@@ -16,7 +16,6 @@
 #include "zregionontology.h"
 #include <include/reader.h>
 #include <zjson.h>
-#include <boost/multiprecision/cpp_int.hpp>
 #include "zbenchtimer.h"
 #include "zrandom.h"
 
@@ -787,140 +786,6 @@ void moveObjectToCorrectLocation()
   }
 }
 
-inline int64_t saturate_mul_1(int64_t x, int64_t y)
-{
-  static_assert(-std::numeric_limits<int64_t>::max() > std::numeric_limits<int64_t>::min(),
-                "integer representation is not two's complement");
-  if (x == 0 || y == 0) {
-    return 0;
-  } else if (x > 0 && y < 0) {
-    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX) + 1,
-                                          saturate_mul(static_cast<uint64_t>(x), static_cast<uint64_t>(-y))));
-  } else if (x < 0 && y > 0) {
-    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX) + 1,
-                                          saturate_mul(static_cast<uint64_t>(-x), static_cast<uint64_t>(y))));
-  } else if (x > 0) {
-    return std::min<uint64_t>(INT64_MAX, saturate_mul(static_cast<uint64_t>(x), static_cast<uint64_t>(y)));
-  } else {
-    return std::min<uint64_t>(INT64_MAX, saturate_mul(static_cast<uint64_t>(-x), static_cast<uint64_t>(-y)));
-  }
-}
-
-inline int64_t saturate_mul_2(int64_t x, int64_t y)
-{
-  using namespace boost::multiprecision;
-
-  int128_t res = static_cast<int128_t>(x) * static_cast<int128_t>(y);
-  return res < static_cast<int128_t>(INT64_MIN) ? INT64_MIN :
-         res > static_cast<int128_t>(INT64_MAX) ? INT64_MAX :
-         static_cast<int64_t>(res);
-}
-
-inline int64_t saturate_mul_3(int64_t x, int64_t y)
-{
-  using namespace boost::multiprecision;
-
-  int128_t res = static_cast<int128_t>(x) * static_cast<int128_t>(y);
-  if (static_cast<int64_t>(res >> 64) != (static_cast<int64_t>(res) >> 63))
-    res = (static_cast<uint64_t>(x ^ y) >> 63) + INT64_MAX;
-  return static_cast<int64_t>(res);
-}
-
-void benchSaturateMul()
-{
-  ZBenchTimer bt1("my");
-  ZBenchTimer bt2("boost");
-  ZBenchTimer bt3("boost2");
-  ZBenchTimer bt4("my32");
-  ZBenchTimer bt5("my16");
-
-  bt1.start();
-  bt1.pause();
-  bt2.start();
-  bt2.pause();
-  bt3.start();
-  bt3.pause();
-  bt4.start();
-  bt4.pause();
-  bt5.start();
-  bt5.pause();
-  for (int j = 0; j < 1e8; ++j) {
-    int64_t a = ZRandom::instance().randInt<int64_t>(INT64_MAX, INT64_MIN) * 1000;
-    int64_t b = ZRandom::instance().randInt<int64_t>(INT64_MAX, INT64_MIN) * 1000;
-    int32_t a32 = static_cast<int32_t>(a);
-    int32_t b32 = static_cast<int32_t>(b);
-    int32_t a16 = static_cast<int16_t>(a);
-    int32_t b16 = static_cast<int16_t>(b);
-    bt1.resume();
-    int64_t c = saturate_mul_1(a, b);
-    bt1.pause();
-    bt2.resume();
-    int64_t d = saturate_mul_2(a, b);
-    bt2.pause();
-    bt3.resume();
-    int64_t e = saturate_mul_3(a, b);
-    bt3.pause();
-    bt4.resume();
-    int32_t f = saturate_mul(a32, b32);
-    bt4.pause();
-    bt5.resume();
-    int16_t g = saturate_mul(a16, b16);
-    bt5.pause();
-    if (c != d || d > e) {
-      LOG(INFO) << c << " " << d << " " << e << " " << a << " " << b << " " << f << " " << g;
-    }
-  }
-  STOP_AND_LOG(bt1);
-  STOP_AND_LOG(bt2);
-  STOP_AND_LOG(bt3);
-  STOP_AND_LOG(bt4);
-  STOP_AND_LOG(bt5);
-}
-
-void benchRound()
-{
-  ZBenchTimer bt1("wrong");
-  ZBenchTimer bt2("correct");
-
-  bt1.start();
-  bt1.pause();
-  bt2.start();
-  bt2.pause();
-  for (int j = 0; j < 1e8; ++j) {
-    float a = ZRandom::instance().randReal<float>(255);
-    bt2.resume();
-    uint8_t d = static_cast<uint8_t>(std::round(a));
-    bt2.pause();
-    bt1.resume();
-    uint8_t c = static_cast<uint8_t>(a + 0.5f);
-    bt1.pause();
-    if (c != d) {
-      LOG(INFO) << c << " " << d;
-    }
-  }
-  STOP_AND_LOG(bt1);
-  STOP_AND_LOG(bt2);
-
-  bt1.resetAndStart("wrong");
-  bt1.pause();
-  bt2.resetAndStart("correct");
-  bt2.pause();
-  for (int j = 0; j < 1e8; ++j) {
-    double a = ZRandom::instance().randReal<double>(255);
-    bt2.resume();
-    uint8_t d = static_cast<uint8_t>(std::round(a));
-    bt2.pause();
-    bt1.resume();
-    uint8_t c = static_cast<uint8_t>(a + 0.5);
-    bt1.pause();
-    if (c != d) {
-      LOG(INFO) << c << " " << d;
-    }
-  }
-  STOP_AND_LOG(bt1);
-  STOP_AND_LOG(bt2);
-}
-
 QString GetRandomString()
 {
   const QString possibleCharacters("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
@@ -937,18 +802,18 @@ QString GetRandomString()
 
 void testLogSpeed()
 {
+  ZBenchTimer bt;
   QStringList logList;
   for (int i = 0; i < 1000000; ++i)
     logList << GetRandomString();
+  bt.start();
   for (int i = 0; i < logList.size(); ++i)
     LOG(INFO) << logList.at(i);
+  STOP_AND_LOG(bt);
 }
 
 void tmp()
 {
-  ZBenchTimer bt;
-
-
   float v;
   bool ok;
   float fm;
@@ -974,21 +839,21 @@ void tmp()
   fm = fms.toFloat(&ok);
   LOG(INFO) << fms << " " << fm << " " << ok << "  " << (fm == v) << " " << (fm == double(v));
 
-  using namespace boost::multiprecision;
-
-  boost::multiprecision::int128_t res =
-    static_cast<boost::multiprecision::int128_t>(INT64_MIN) * static_cast<boost::multiprecision::int128_t>(1);
-  int64_t r = res < static_cast<boost::multiprecision::int128_t>(INT64_MIN) ? INT64_MIN :
-              res > static_cast<boost::multiprecision::int128_t>(INT64_MAX) ? INT64_MAX :
-              static_cast<int64_t>(res);
-  std::cout << res << std::endl;
-
-  std::cout << r << " "
-            << (res < static_cast<boost::multiprecision::int128_t>(INT64_MIN)) << " "
-            << INT64_MIN << " "
-            << (res > static_cast<boost::multiprecision::int128_t>(INT64_MAX)) << " "
-            << static_cast<int64_t>(res) << " "
-            << res << std::endl;
+//  using namespace boost::multiprecision;
+//
+//  boost::multiprecision::int128_t res =
+//    static_cast<boost::multiprecision::int128_t>(INT64_MIN) * static_cast<boost::multiprecision::int128_t>(1);
+//  int64_t r = res < static_cast<boost::multiprecision::int128_t>(INT64_MIN) ? INT64_MIN :
+//              res > static_cast<boost::multiprecision::int128_t>(INT64_MAX) ? INT64_MAX :
+//              static_cast<int64_t>(res);
+//  std::cout << res << std::endl;
+//
+//  std::cout << r << " "
+//            << (res < static_cast<boost::multiprecision::int128_t>(INT64_MIN)) << " "
+//            << INT64_MIN << " "
+//            << (res > static_cast<boost::multiprecision::int128_t>(INT64_MAX)) << " "
+//            << static_cast<int64_t>(res) << " "
+//            << res << std::endl;
 }
 
 
@@ -1002,7 +867,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  benchRound();
+  tmp();
   LOG(INFO) << "done";
 }
 

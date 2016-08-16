@@ -26,6 +26,7 @@
 
 #ifdef ATLAS_WITH_TESTS
 
+#include "test/zrunbenchmark.h"
 #include "test/zunittest.h"
 
 #endif
@@ -292,6 +293,11 @@ void ZMainWindow::openLogFolder()
 
 #ifdef ATLAS_WITH_TESTS
 
+void ZMainWindow::runBenchmark()
+{
+  ZRunBenchmark::run();
+}
+
 void ZMainWindow::runUnitTest()
 {
   ZUnitTest::run();
@@ -533,6 +539,10 @@ void ZMainWindow::createActions()
   connect(m_openLogFolderAction, &QAction::triggered, this, &ZMainWindow::openLogFolder);
 
 #ifdef ATLAS_WITH_TESTS
+  m_runBenchmarkAction = new QAction(QIcon(":/icons/run_command-512.png"), tr("&Run Benchmark"), this);
+  m_runBenchmarkAction->setStatusTip(tr("Run Benchmark"));
+  connect(m_runBenchmarkAction, &QAction::triggered, this, &ZMainWindow::runBenchmark);
+
   m_testAction = new QAction(QIcon(":/icons/test-512.png"), tr("&UnitTest"), this);
   m_testAction->setStatusTip(tr("Run Unit Test"));
   connect(m_testAction, &QAction::triggered, this, &ZMainWindow::runUnitTest);
@@ -603,6 +613,7 @@ void ZMainWindow::createMenus()
   m_helpMenu->addAction(m_viewLogAction);
   m_helpMenu->addAction(m_openLogFolderAction);
 #ifdef ATLAS_WITH_TESTS
+  m_helpMenu->addAction(m_runBenchmarkAction);
   m_helpMenu->addAction(m_testAction);
 #endif
   m_helpMenu->addAction(m_runCustomCommandAction);

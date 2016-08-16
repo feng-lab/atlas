@@ -119,6 +119,16 @@ else
 fi
 cp -rf $baseDIR/googletest/googletest/ $currDIR/googletest/
 
+srcDIR=$baseDIR/benchmark
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  echo git pull benchmark
+  git pull
+else
+  git clone git@github.com:google/benchmark.git $srcDIR
+fi
+
 srcDIR=$baseDIR/glog
 if [ -d $srcDIR ]
 then

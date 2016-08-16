@@ -69,6 +69,8 @@ private:
 
 #ifdef ATLAS_WITH_TESTS
 
+  void runBenchmark();
+
   void runUnitTest();
 
 #endif
@@ -146,6 +148,7 @@ private:
   QAction* m_viewLogAction;
   QAction* m_openLogFolderAction;
 #ifdef ATLAS_WITH_TESTS
+  QAction* m_runBenchmarkAction;
   QAction* m_testAction;
 #endif
   QAction* m_runCustomCommandAction;
