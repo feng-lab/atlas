@@ -4,6 +4,11 @@
 
 namespace nim {
 
+QString randomString(int minLength, int maxLength);
+
+inline QString randomString(int size)
+{ return randomString(size, size); }
+
 bool naturalSortLessThan(const QString& s1, const QString& s2);
 
 bool lastIntegerLessThan(const QString& s1, const QString& s2);

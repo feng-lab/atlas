@@ -2,6 +2,8 @@
 
 #include <vector>
 #include <QCollator>
+#include "zlog.h"
+#include "zrandom.h"
 
 namespace {
 
@@ -51,6 +53,26 @@ const QCollator& myCollator()
 }
 
 namespace nim {
+
+QString randomString(int minLength, int maxLength)
+{
+  static const QString possibleCharacters(
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789;',./<>?L:\"`~!@#$%^&*()");
+  QString res;
+  minLength = std::max(0, minLength);
+  if (maxLength >= minLength) {
+    int length = ZRandom::instance().randInt<int>(maxLength, minLength);
+    if (length > 0) {
+      res.resize(length);
+      std::uniform_int_distribution<int> dist(0, possibleCharacters.size() - 1);
+      for (int i = 0; i < length; ++i) {
+        res[i] = possibleCharacters.at(dist(ZRandom::instance().engine()));
+      }
+    }
+  }
+
+  return res;
+}
 
 bool naturalSortLessThan(const QString& s1, const QString& s2)
 {

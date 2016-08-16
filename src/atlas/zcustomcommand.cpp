@@ -18,6 +18,7 @@
 #include <zjson.h>
 #include "zbenchtimer.h"
 #include "zrandom.h"
+#include "zstringutils.h"
 
 namespace nim {
 
@@ -786,26 +787,12 @@ void moveObjectToCorrectLocation()
   }
 }
 
-QString GetRandomString()
-{
-  const QString possibleCharacters("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
-  const int randomStringLength = 100; // assuming you want random strings of 12 characters
-
-  QString randomString;
-  for (int i = 0; i < randomStringLength; ++i) {
-    int index = qrand() % possibleCharacters.length();
-    QChar nextChar = possibleCharacters.at(index);
-    randomString.append(nextChar);
-  }
-  return randomString;
-}
-
 void testLogSpeed()
 {
   ZBenchTimer bt;
   QStringList logList;
-  for (int i = 0; i < 1000000; ++i)
-    logList << GetRandomString();
+  for (int i = 0; i < 1000; ++i)
+    logList << randomString(10, 100);
   bt.start();
   for (int i = 0; i < logList.size(); ++i)
     LOG(INFO) << logList.at(i);
@@ -867,7 +854,7 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  tmp();
+  testLogSpeed();
   LOG(INFO) << "done";
 }
 
