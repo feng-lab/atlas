@@ -12,9 +12,6 @@ public:
 
   ZCpuInfo();
 
-  ~ZCpuInfo()
-  {}
-
   // log useful cpu info
   void logCpuInfo() const;
 
@@ -24,55 +21,116 @@ protected:
   void detectCoreAndThreadNumber();
 
 public:
-  QString sCPU;
-  QString sCPUBrand;
+  QString vendor;
+  QString brand;
 
-  int nPhysicalCores;
-  int nLogicalCores;
+  int nPhysicalCores = 1;
+  int nLogicalCores = 1;
 
-  uint64_t nCacheLine;
-  uint64_t nL1ICacheSize;
-  uint64_t nL1DCacheSize;
-  uint64_t nL2CacheSize;
-  uint64_t nL3CacheSize;
-  uint64_t nPhysicalRAM;
+  uint64_t nCacheLine = 0;
+  uint64_t nL1ICacheSize = 0;
+  uint64_t nL1DCacheSize = 0;
+  uint64_t nL2CacheSize = 0;
+  uint64_t nL3CacheSize = 0;
+  uint64_t nPhysicalRAM = 0;
 
-  bool b64Available;
-  bool bXOP;
-  bool bFMA;
-  bool bFMA4;
-  bool b3DNow;
-  bool b3DNowExt;
-  bool bMMX;
-  bool bMMXExtensions;
-  bool bSSE;
-  bool bSSE2;
-  bool bSSE3;
-  bool bSSSE3;
-  bool bSSE41;
-  bool bSSE42;
-  bool bSSE4A;
-  bool bAVX;
-  bool bAVX2;
-  bool bBMI;
-  bool bMOVBE;
+  bool bXOP = false;
+  bool bFMA = false;
+  bool bFMA4 = false;
+  bool b3DNow = false;
+  bool b3DNowExt = false;
+  bool bMMX = false;
+  bool bMMXExtensions = false;
+  bool bSSE = false;
+  bool bSSE2 = false;
+  bool bSSE3 = false;
+  bool bSSSE3 = false;
+  bool bSSE41 = false;
+  bool bSSE42 = false;
+  bool bSSE4A = false;
+  bool bAVX = false;
+  bool bAVX2 = false;
+  bool bBMI = false;
+  bool bMOVBE = false;
 
-  bool bCMPXCHG8B;
-  bool bCMPXCHG16B;
-  bool bPOPCNT;
-  bool bLZCNT;
-  bool bRDTSCP;
+  bool bCMPXCHG16B = false;
+  bool bPOPCNT = false;
+  bool bLZCNT = false;
+  bool bABM = false;  // for AMD
+  bool bRDTSCP = false;
 
-  bool bHTT;
+  bool bAESNI = false;
+  bool bPCLMULQDQ = false;
+  bool bRDRAND = false;
+  bool bF16C = false;
+  bool bRDSEED = false;
+  bool bADX = false;
+  bool bPREFTEHCHW = false;
+  bool bSHA = false;
 
-  int nSteppingID;
-  int nModel;
-  int nFamily;
-  int nProcessorType;
-  int nExtendedmodel;
-  int nExtendedfamily;
-  int nMaxLogicalProcessors;
-  int nAPICPhysicalID;
+  bool bDTES64 = false;
+  bool bMONITOR = false;
+  bool bDSCPL = false;
+  bool bVMX = false;
+  bool bSMX = false;
+  bool bEIST = false;
+  bool bTM2 = false;
+  bool bCNXTID = false;
+  bool bSDBG = false;
+  bool bxTPRUpdateControl = false;
+  bool bPDCM = false;
+  bool bPCID = false;
+  bool bDCA = false;
+  bool bx2APIC = false;
+  bool bTSCDeadline = false;
+  bool bXSAVE = false;
+  bool bOSXSAVE = false;
+
+  bool bFPU = false;
+  bool bVME = false;
+  bool bDE = false;
+  bool bPSE = false;
+  bool bTSC = false;
+  bool bMSR = false;
+  bool bPAE = false;
+  bool bMCE = false;
+  bool bCMPXCHG8B = false;
+  bool bAPIC = false;
+  bool bSEP = false;
+  bool bMTRR = false;
+  bool bPGE = false;
+  bool bMCA = false;
+  bool bCMOV = false;
+  bool bPAT = false;
+  bool bPSE36 = false;
+  bool bPSN = false;
+  bool bCLFSH = false;
+  bool bDS = false;
+  bool bACPI = false;
+  bool bFXSR = false;
+  bool bSS = false;
+  bool bHTT = false;
+  bool bTM = false;
+  bool bPBE = false;
+
+  bool bAVX512F = false;
+  bool bAVX512DQ = false;
+  bool bAVX512PF = false;
+  bool bAVX512ER = false;
+  bool bAVX512CD = false;
+  bool bAVX512BW = false;
+  bool bAVX512VL = false;
+
+  bool bPREFTEHCHWT1 = false;
+
+  int nSteppingID = 0;
+  int nModel = 0;
+  int nFamily = 0;
+  int nProcessorType = 0;
+  int nExtendedmodel = 0;
+  int nExtendedfamily = 0;
+  int nMaxLogicalProcessors = 1;
+  int nAPICPhysicalID = 0;
 };
 
 } // namespace nim

@@ -355,11 +355,18 @@ public:
   }
 
   // similar to matlab mean, get mean of each column
-  template<class T>
+  template<class T, typename std::enable_if_t<std::is_integral<std::remove_reference_t<T>>::value, int> = 0>
   inline static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, 1, Eigen::Dynamic>
   featureMean(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
   {
-    return featureMeanImpl<T>::mean(x);
+    return x.template cast<typename Eigen::NumTraits<T>::NonInteger>().colwise().mean();
+  }
+
+  template<class T, typename std::enable_if_t<std::is_floating_point<std::remove_reference_t<T>>::value, int> = 0>
+  inline static Eigen::Matrix<T, 1, Eigen::Dynamic>
+  featureMean(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
+  {
+    return x.colwise().mean();
   }
 
   template<typename T, typename WeightT>
@@ -643,27 +650,6 @@ public:
     uniqueMat.conservativeResize(nUniqueData, Eigen::NoChange);
     return uniqueMat;
   }
-
-
-private:
-  template<class T, bool IsInteger = Eigen::NumTraits<T>::IsInteger>
-  struct featureMeanImpl
-  {
-    static Eigen::Matrix<T, 1, Eigen::Dynamic> mean(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
-    {
-      return x.colwise().mean();
-    }
-  };
-
-  template<class T>
-  struct featureMeanImpl<T, true>
-  {
-    static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, 1, Eigen::Dynamic>
-    mean(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
-    {
-      return x.template cast<typename Eigen::NumTraits<T>::NonInteger>().colwise().mean();
-    }
-  };
 };
 
 } // namespace nim

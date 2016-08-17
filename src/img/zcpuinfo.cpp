@@ -4,28 +4,29 @@
 #include "zlog.h"
 #include <QProcess>
 #include <QThread>
-#include <algorithm>
+#include <array>
 
 #ifdef _WIN32
 #include "zwindowsheader.h"
+#include <intrin.h>
 #elif defined(__APPLE__)
-
 #include <sys/param.h>
 #include <sys/sysctl.h>
-
+#include <cpuid.h>
 #else
+#include <cpuid.h>
 #include <unistd.h>
 #endif
 
-// http://stackoverflow.com/questions/6121792/how-to-check-if-a-cpu-supports-the-sse3-instruction-set
-// http://msdn.microsoft.com/en-us/library/hskdteyh%28v=vs.90%29.aspx
-// @Mysticial
+// http://stackoverflow.com/questions/6121792/how-to-check-if-a-cpu-supports-the-sse3-instruction-set @Mysticial
+// https://msdn.microsoft.com/en-us/library/hskdteyh(v=vs.140).aspx
 
 namespace {
 
-#if defined(_MSC_VER)
+#ifdef _WIN32
 
-#include <intrin.h>
+#define cpuid __cpuid
+#define cpuidex __cpuidex
 
 using LPFN_GLPI = BOOL (WINAPI *)(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD);
 
@@ -48,58 +49,22 @@ DWORD CountSetBits(ULONG_PTR bitMask)
 
 #else
 
-#if defined(__pic__) && defined(__i386__)
-
-inline void __cpuid(int cpu_info[4], int info_type)
+inline void cpuid(int cpu_info[4], int info_type)
 {
-  __asm__ volatile (
-        "mov %%ebx, %%edi\n"
-        "cpuid\n"
-        "xchg %%edi, %%ebx\n"
-        : "=a"(cpu_info[0]), "=D"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
-    : "a"(info_type)
-    );
+  __cpuid(info_type, cpu_info[0], cpu_info[1], cpu_info[2], cpu_info[3]);
 }
 
-inline void __cpuidex(int cpu_info[4], int info_type, int info_index)
+inline void cpuidex(int cpu_info[4], int info_type, int info_index)
 {
-  __asm__ volatile (
-        "mov %%ebx, %%edi\n"
-        "cpuid\n"
-        "xchg %%edi, %%ebx\n"
-        : "=a"(cpu_info[0]), "=D"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
-    : "a"(info_type), "c"(info_index)
-    );
-}
-
-#else
-
-inline void __cpuid(int cpu_info[4], int info_type)
-{
-  __asm__ volatile (
-  "cpuid \n\t"
-  : "=a"(cpu_info[0]), "=b"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
-  : "a"(info_type)
-  );
-}
-
-inline void __cpuidex(int cpu_info[4], int info_type, int info_index)
-{
-  __asm__ volatile (
-  "cpuid \n\t"
-  : "=a"(cpu_info[0]), "=b"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
-  : "a"(info_type), "c"(info_index)
-  );
+  __cpuid_count(info_type, info_index, cpu_info[0], cpu_info[1], cpu_info[2], cpu_info[3]);
 }
 
 inline uint64_t _xgetbv(unsigned int index)
 {
-  unsigned int eax, edx;
+  uint32_t eax, edx;
   __asm__ __volatile__ ("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index));
   return (static_cast<uint64_t>(edx) << 32) | eax;
 }
-
-#endif
 
 #endif
 
@@ -115,60 +80,13 @@ ZCpuInfo& ZCpuInfo::instance()
 
 ZCpuInfo::ZCpuInfo()
 {
-  nPhysicalCores = 1;
-  nLogicalCores = 1;
-
-  nCacheLine = 0;
-  nL1ICacheSize = 0;
-  nL1DCacheSize = 0;
-  nL2CacheSize = 0;
-  nL3CacheSize = 0;
-  nPhysicalRAM = 0;
-
-  b64Available = false;
-  bXOP = false;
-  bFMA = false;
-  bFMA4 = false;
-  b3DNowExt = false;
-  b3DNow = false;
-  bMMX = false;
-  bMMXExtensions = false;
-  bSSE = false;
-  bSSE2 = false;
-  bSSE3 = false;
-  bSSSE3 = false;
-  bSSE41 = false;
-  bSSE42 = false;
-  bSSE4A = false;
-  bAVX = false;
-  bAVX2 = false;
-  bBMI = false;
-  bMOVBE = false;
-
-  bCMPXCHG8B = false;
-  bCMPXCHG16B = false;
-  bPOPCNT = false;
-  bLZCNT = false;
-  bRDTSCP = false;
-
-  bHTT = false;
-
-  nSteppingID = 0;
-  nModel = 0;
-  nFamily = 0;
-  nProcessorType = 0;
-  nExtendedmodel = 0;
-  nExtendedfamily = 0;
-  nMaxLogicalProcessors = 0;
-  nAPICPhysicalID = 0;
-
   detectCpuInfo();
 }
 
 void ZCpuInfo::logCpuInfo() const
 {
-  LOG(INFO) << "CPU String: " << sCPU;
-  LOG(INFO) << "CPU Brand String: " << sCPUBrand;
+  LOG(INFO) << "CPU Vendor: " << vendor;
+  LOG(INFO) << "CPU Brand: " << brand;
   LOG(INFO) << "Stepping ID: " << nSteppingID << " Model ID: " << nModel << " Family ID: " << nFamily << " Type: "
             << nProcessorType
             << " Ext.Model ID: " << nExtendedmodel << " Ext.Family ID: " << nExtendedfamily;
@@ -181,33 +99,38 @@ void ZCpuInfo::logCpuInfo() const
   LOG(INFO) << "L3Cache: " << nL3CacheSize;
   LOG(INFO) << "RAM: " << nPhysicalRAM;
 
-  QString instructions = QString(b64Available ? "64 bit Technology" : "") +
-                         QString(bXOP ? "; XOP" : "") +
-                         QString(bFMA ? "; FMA" : "") +
-                         QString(bFMA4 ? "; FMA4" : "") +
-                         QString(b3DNow ? "; 3Dnow!" : "") +
-                         QString(b3DNowExt ? "; 3Dnow ext" : "") +
-                         QString(bMMX ? "; MMX" : "") +
-                         QString(bMMXExtensions ? "; MMX ext" : "") +
-                         QString(bSSE ? "; SSE" : "") +
-                         QString(bSSE2 ? "; SSE2" : "") +
-                         QString(bSSE3 ? "; SSE3" : "") +
-                         QString(bSSSE3 ? "; SSSE3" : "") +
-                         QString(bSSE41 ? "; SSE41" : "") +
-                         QString(bSSE42 ? "; SSE42" : "") +
-                         QString(bSSE4A ? "; SSE4A" : "") +
-                         QString(bAVX ? "; AVX" : "") +
-                         QString(bAVX2 ? "; AVX2" : "") +
-                         QString(bBMI ? "; BMI" : "") +
-                         QString(bMOVBE ? "; MOVBE" : "");
+  QString instructions = QString(bXOP ? "XOP " : "") +
+                         QString(bFMA ? "FMA " : "") +
+                         QString(bFMA4 ? "FMA4 " : "") +
+                         QString(b3DNow ? "3Dnow! " : "") +
+                         QString(b3DNowExt ? "3Dnow ext " : "") +
+                         QString(bMMX ? "MMX " : "") +
+                         QString(bMMXExtensions ? "MMX ext " : "") +
+                         QString(bSSE ? "SSE " : "") +
+                         QString(bSSE2 ? "SSE2 " : "") +
+                         QString(bSSE3 ? "SSE3 " : "") +
+                         QString(bSSSE3 ? "SSSE3 " : "") +
+                         QString(bSSE41 ? "SSE41 " : "") +
+                         QString(bSSE42 ? "SSE42 " : "") +
+                         QString(bSSE4A ? "SSE4A " : "") +
+                         QString(bAVX ? "AVX " : "") +
+                         QString(bAVX2 ? "AVX2 " : "") +
+                         QString(bBMI ? "BMI " : "") +
+                         QString(bAVX512F ? "AVX512F " : "") +
+                         QString(bAVX512DQ ? "AVX512DQ " : "") +
+                         QString(bAVX512PF ? "AVX512PF " : "") +
+                         QString(bAVX512ER ? "AVX512ER " : "") +
+                         QString(bAVX512CD ? "AVX512CD " : "") +
+                         QString(bAVX512BW ? "AVX512BW " : "") +
+                         QString(bAVX512VL ? "AVX512VL " : "");
 
   LOG(INFO) << instructions;
 
-  instructions = QString(bCMPXCHG8B ? "CMPXCHG8B" : "") +
-                 QString(bCMPXCHG16B ? "; CMPXCHG16B" : "") +
-                 QString(bPOPCNT ? "; POPCNT" : "") +
-                 QString(bLZCNT ? "; LZCNT" : "") +
-                 QString(bRDTSCP ? "; RDTSCP" : "");
+  instructions = QString(bCMPXCHG8B ? "CMPXCHG8B " : "") +
+                 QString(bCMPXCHG16B ? "CMPXCHG16B " : "") +
+                 QString(bPOPCNT ? "POPCNT " : "") +
+                 QString(bLZCNT ? "LZCNT " : "") +
+                 QString(bRDTSCP ? "RDTSCP " : "");
 
   LOG(INFO) << instructions;
 
@@ -216,117 +139,208 @@ void ZCpuInfo::logCpuInfo() const
 
 void ZCpuInfo::detectCpuInfo()
 {
-  char CPUString[0x20];
-  memset(CPUString, 0, sizeof(CPUString));
-  char CPUBrandString[0x40];
-  memset(CPUBrandString, 0, sizeof(CPUBrandString));
-  int32_t CPUInfo[4] = {-1};
+  std::array<int, 4> cpui;
+  uint32_t nIds = 0;
+  uint32_t nExIds = 0;
+  bool isIntel = false;
+  bool isAMD = false;
+  std::bitset<32> f_1_EAX = 0;
+  std::bitset<32> f_1_EBX = 0;
+  std::bitset<32> f_1_ECX = 0;
+  std::bitset<32> f_1_EDX = 0;
+  std::bitset<32> f_7_EBX = 0;
+  std::bitset<32> f_7_ECX = 0;
+  std::bitset<32> f_81_ECX = 0;
+  std::bitset<32> f_81_EDX = 0;
+  std::vector<std::array<int, 4>> data;
+  std::vector<std::array<int, 4>> extdata;
 
-  // __cpuid with an InfoType argument of 0 returns the number of
-  // valid Ids in CPUInfo[0] and the CPU identification string in
-  // the other three array elements. The CPU identification string is
-  // not in linear order. The code below arranges the information
-  // in a human readable form.
-  __cpuid(CPUInfo, 0);
-  uint32_t nIds = CPUInfo[0];
+  // Calling __cpuid with 0x0 as the function_id argument
+  // gets the number of the highest valid function ID.
+  cpuid(cpui.data(), 0);
+  nIds = cpui[0];
 
-  memcpy(CPUString, &CPUInfo[1], sizeof(int32_t));
-  memcpy(CPUString + 4, &CPUInfo[3], sizeof(int32_t));
-  memcpy(CPUString + 8, &CPUInfo[2], sizeof(int32_t));
-  sCPU = CPUString;
-
-  bool osXSAVE = false;
-
-  // Get the information associated with each valid Id
-  for (uint32_t i = 1; i <= nIds; ++i) {
-    __cpuidex(CPUInfo, i, 0);
-
-    std::bitset<32> eax(CPUInfo[0]);
-    std::bitset<32> ebx(CPUInfo[1]);
-    std::bitset<32> ecx(CPUInfo[2]);
-    std::bitset<32> edx(CPUInfo[3]);
-    // Interpret CPU feature information.
-    if (i == 1) {
-      bCMPXCHG8B = edx[8];
-      bMMX = edx[23];
-      bSSE = edx[25];
-      bSSE2 = edx[26];
-      bHTT = edx[28];
-
-      bSSE3 = ecx[0];
-      bSSSE3 = ecx[9];
-      bFMA = ecx[12];
-      bCMPXCHG16B = ecx[13];
-      bSSE41 = ecx[19];
-      bSSE42 = ecx[20];
-      bMOVBE = ecx[22];
-      bPOPCNT = ecx[23];
-      osXSAVE = ecx[27];
-      bAVX = ecx[28];
-
-      nSteppingID = bitsetRangeToValue(eax, 0, 4);
-      nModel = bitsetRangeToValue(eax, 4, 8);
-      nFamily = bitsetRangeToValue(eax, 8, 12);
-      nProcessorType = bitsetRangeToValue(eax, 12, 14);
-      nExtendedmodel = bitsetRangeToValue(eax, 16, 20);
-      nExtendedfamily = bitsetRangeToValue(eax, 20, 28);
-
-      nMaxLogicalProcessors = bHTT ? bitsetRangeToValue(ebx, 16, 24) : 1;
-      nAPICPhysicalID = bitsetRangeToValue(ebx, 24, 32);
-    }
-
-    if (i == 7) {
-      bAVX2 = ebx[5];
-      bBMI = ebx[3] && ebx[8];
-    }
+  for (uint32_t i = 0; i <= nIds; ++i) {
+    cpuidex(cpui.data(), i, 0);
+    data.push_back(cpui);
   }
 
-  bool hasYMM = false;
-  if (osXSAVE) {
+  // Capture vendor string
+  char vendorStr[0x20];
+  memset(vendorStr, 0, sizeof(vendorStr));
+  memcpy(vendorStr, &data[0][1], sizeof(int32_t));
+  memcpy(vendorStr + 4, &data[0][3], sizeof(int32_t));
+  memcpy(vendorStr + 8, &data[0][2], sizeof(int32_t));
+  vendor = vendorStr;
+  if (vendor == "GenuineIntel") {
+    isIntel = true;
+  } else if (vendor == "AuthenticAMD") {
+    isAMD = true;
+  }
+
+  // load bitset with flags for function 0x00000001
+  if (nIds >= 1) {
+    f_1_EAX = data[1][0];
+    f_1_EBX = data[1][1];
+    f_1_ECX = data[1][2];
+    f_1_EDX = data[1][3];
+  }
+
+  // load bitset with flags for function 0x00000007
+  if (nIds >= 7) {
+    f_7_EBX = data[7][1];
+    f_7_ECX = data[7][2];
+  }
+
+  // Calling __cpuid with 0x80000000 as the function_id argument
+  // gets the number of the highest valid extended ID.
+  cpuid(cpui.data(), 0x80000000);
+  nExIds = cpui[0];
+
+  char brandStr[0x40];
+  memset(brandStr, 0, sizeof(brandStr));
+
+  for (uint32_t i = 0x80000000; i <= nExIds; ++i) {
+    cpuidex(cpui.data(), i, 0);
+    extdata.push_back(cpui);
+  }
+
+  // load bitset with flags for function 0x80000001
+  if (nExIds >= 0x80000001) {
+    f_81_ECX = extdata[1][2];
+    f_81_EDX = extdata[1][3];
+  }
+
+  // Interpret CPU brand string if reported
+  if (nExIds >= 0x80000004) {
+    memcpy(brandStr, extdata[2].data(), sizeof(cpui));
+    memcpy(brandStr + 16, extdata[3].data(), sizeof(cpui));
+    memcpy(brandStr + 32, extdata[4].data(), sizeof(cpui));
+    brand = brandStr;
+  }
+
+  // Interpret CPU feature information.
+  bSSE3 = f_1_ECX[0];
+  bPCLMULQDQ = f_1_ECX[1];
+  bDTES64 = f_1_ECX[2];
+  bMONITOR = f_1_ECX[3];
+  bDSCPL = f_1_ECX[4];
+  bVMX = f_1_ECX[5];
+  bSMX = f_1_ECX[6];
+  bEIST = f_1_ECX[7];
+  bTM2 = f_1_ECX[8];
+  bSSSE3 = f_1_ECX[9];
+  bCNXTID = f_1_ECX[10];
+  bSDBG = f_1_ECX[11];
+  bFMA = f_1_ECX[12];
+  bCMPXCHG16B = f_1_ECX[13];
+  bxTPRUpdateControl = f_1_ECX[14];
+  bPDCM = f_1_ECX[15];
+  bPCID = f_1_ECX[17];
+  bDCA = f_1_ECX[18];
+  bSSE41 = f_1_ECX[19];
+  bSSE42 = f_1_ECX[20];
+  bx2APIC = f_1_ECX[21];
+  bMOVBE = f_1_ECX[22];
+  bPOPCNT = f_1_ECX[23];
+  bTSCDeadline = f_1_ECX[24];
+  bAESNI = f_1_ECX[25];
+  bXSAVE = f_1_ECX[26];
+  bOSXSAVE = f_1_ECX[27];
+  bAVX = f_1_ECX[28];
+  bF16C = f_1_ECX[29];
+  bRDRAND = f_1_ECX[30];
+
+  bFPU = f_1_EDX[0];
+  bVME = f_1_EDX[1];
+  bDE = f_1_EDX[2];
+  bPSE = f_1_EDX[3];
+  bTSC = f_1_EDX[4];
+  bMSR = f_1_EDX[5];
+  bPAE = f_1_EDX[6];
+  bMCE = f_1_EDX[7];
+  bCMPXCHG8B = f_1_EDX[8];
+  bAPIC = f_1_EDX[9];
+  bSEP = f_1_EDX[11];
+  bMTRR = f_1_EDX[12];
+  bPGE = f_1_EDX[13];
+  bMCA = f_1_EDX[14];
+  bCMOV = f_1_EDX[15];
+  bPAT = f_1_EDX[16];
+  bPSE36 = f_1_EDX[17];
+  bPSN = f_1_EDX[18];
+  bCLFSH = f_1_EDX[19];
+  bDS = f_1_EDX[21];
+  bACPI = f_1_EDX[22];
+  bMMX = f_1_EDX[23];
+  bFXSR = f_1_EDX[24];
+  bSSE = f_1_EDX[25];
+  bSSE2 = f_1_EDX[26];
+  bSS = f_1_EDX[27];
+  bHTT = f_1_EDX[28];
+  bTM = f_1_EDX[29];
+  bPBE = f_1_EDX[31];
+
+  nSteppingID = bitsetRangeToValue(f_1_EAX, 0, 4);
+  nModel = bitsetRangeToValue(f_1_EAX, 4, 8);
+  nFamily = bitsetRangeToValue(f_1_EAX, 8, 12);
+  nProcessorType = bitsetRangeToValue(f_1_EAX, 12, 14);
+  nExtendedmodel = bitsetRangeToValue(f_1_EAX, 16, 20);
+  nExtendedfamily = bitsetRangeToValue(f_1_EAX, 20, 28);
+
+  nMaxLogicalProcessors = bHTT ? bitsetRangeToValue(f_1_EBX, 16, 24) : 1;
+  nAPICPhysicalID = bitsetRangeToValue(f_1_EBX, 24, 32);
+
+  bAVX2 = f_7_EBX[5];
+  bBMI = f_7_EBX[3] && f_7_EBX[8];
+  bAVX512F = f_7_EBX[16];
+  bAVX512DQ = f_7_EBX[17];
+  bRDSEED = f_7_EBX[18];
+  bADX = f_7_EBX[19];
+  bAVX512PF = f_7_EBX[26];
+  bAVX512ER = f_7_EBX[27];
+  bAVX512CD = f_7_EBX[28];
+  bSHA = f_7_EBX[29];
+  bAVX512BW = f_7_EBX[30];
+  bAVX512VL = f_7_EBX[31];
+
+  bPREFTEHCHWT1 = f_7_ECX[0];
+
+  bool hasXYMM = false;
+  bool hasZMM = false;
+  if (bOSXSAVE) {
     uint64_t xcrFeatureMask = _xgetbv(0);
-    hasYMM = (xcrFeatureMask & 0x6) == 6;
+    std::bitset<64> xcr0(xcrFeatureMask);
+    hasXYMM = xcr0[1] && xcr0[2];
+    hasZMM = xcr0[5] && xcr0[6] && xcr0[7];
   }
-  bAVX = bAVX && hasYMM;
-  bAVX2 = bAVX2 && hasYMM;
-  bFMA = bFMA && hasYMM;
+  bAVX = bAVX && hasXYMM;
 
-  // Calling __cpuid with 0x80000000 as the InfoType argument
-  // gets the number of valid extended IDs.
-  __cpuid(CPUInfo, 0x80000000);
-  uint32_t nExIds = CPUInfo[0];
+  bAESNI = bAESNI && bAVX;
+  bPCLMULQDQ = bPCLMULQDQ && bAVX;
+  bF16C = bF16C && bAVX;
+  bFMA = bFMA && bAVX;
+  bAVX2 = bAVX2 && bAVX;
 
-  // Get the information associated with each extended ID.
-  for (uint32_t i = 0x80000001; i <= nExIds; ++i) {
-    __cpuid(CPUInfo, i);
+  bAVX512F = bAVX512F && hasXYMM && hasZMM;
+  bAVX512DQ = bAVX512DQ && bAVX512F;
+  bAVX512PF = bAVX512PF && bAVX512F;
+  bAVX512ER = bAVX512ER && bAVX512F;
+  bAVX512CD = bAVX512CD && bAVX512F;
+  bAVX512BW = bAVX512BW && bAVX512F;
+  bAVX512VL = bAVX512VL && bAVX512F;
 
-    std::bitset<32> eax(CPUInfo[0]);
-    //std::bitset<32> ebx(CPUInfo[1]);
-    std::bitset<32> ecx(CPUInfo[2]);
-    std::bitset<32> edx(CPUInfo[3]);
+  bLZCNT = f_81_ECX[5] && isIntel;
+  bABM = f_81_ECX[5] && isAMD;
+  bSSE4A = f_81_ECX[6] && isAMD;
+  bPREFTEHCHW = f_81_ECX[8];
+  bXOP = f_81_ECX[11] && isAMD;
+  bFMA4 = f_81_ECX[16] && isAMD;
 
-    if (i == 0x80000001) {
-      bLZCNT = ecx[5];
-      bSSE4A = ecx[6];
-      bXOP = ecx[11];
-      bFMA4 = ecx[16];
-
-      bMMXExtensions = edx[22];
-      bRDTSCP = edx[27];
-      b64Available = edx[29];
-      b3DNowExt = edx[30];
-      b3DNow = edx[31];
-    }
-
-    // Interpret CPU brand string and cache information.
-    if (i == 0x80000002)
-      memcpy(CPUBrandString, CPUInfo, sizeof(CPUInfo));
-    else if (i == 0x80000003)
-      memcpy(CPUBrandString + 16, CPUInfo, sizeof(CPUInfo));
-    else if (i == 0x80000004)
-      memcpy(CPUBrandString + 32, CPUInfo, sizeof(CPUInfo));
-
-    sCPUBrand = CPUBrandString;
-  }
+  bMMXExtensions = f_81_EDX[22] && isAMD;
+  bRDTSCP = f_81_EDX[27] && isIntel;
+  b3DNowExt = f_81_EDX[30] && isAMD;
+  b3DNow = f_81_EDX[31] && isAMD;
 
   detectCoreAndThreadNumber();
 }
@@ -511,7 +525,7 @@ void ZCpuInfo::detectCoreAndThreadNumber()
   if (sysctl(nm, 2, &nPhysicalRAM, &len, nullptr, 0) != 0)
     nPhysicalRAM = 0;
 
-  int count = 0;
+  uint32_t count = 0;
   len = sizeof(count);
   nm[0] = CTL_HW;
   nm[1] = HW_CACHELINE;

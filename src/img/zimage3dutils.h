@@ -294,7 +294,7 @@ struct Image3DFilterForOneBlock<double, double>
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (m_kernelWidth < 8 || !(ZCpuInfo::instance().bAVX || ZCpuInfo::instance().bSSE3)) {
+    if (m_kernelWidth < 8) {
       for (size_t k = range.begin(); k != range.end(); ++k) {
         for (size_t j = 0; j < m_imgOutHeight; ++j) {
           for (size_t i = 0; i < m_imgOutWidth; ++i) {
@@ -314,7 +314,7 @@ struct Image3DFilterForOneBlock<double, double>
       Image3DFilterForOneBlock_AVX(m_padImg, m_padImgWidth, m_padImgHeight,
                                    m_kernel, m_kernelWidth, m_kernelHeight, m_kernelDepth,
                                    m_imgOut, m_imgOutWidth, m_imgOutHeight, range.begin(), range.end());
-    } else if (ZCpuInfo::instance().bSSE3) {
+    } else {
       Image3DFilterForOneBlock_SSE3(m_padImg, m_padImgWidth, m_padImgHeight,
                                     m_kernel, m_kernelWidth, m_kernelHeight, m_kernelDepth,
                                     m_imgOut, m_imgOutWidth, m_imgOutHeight, range.begin(), range.end());
@@ -404,7 +404,7 @@ struct Image3DRowFilterForOneBlock<double, double>
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (m_kernelWidth < 8 || !(ZCpuInfo::instance().bAVX || ZCpuInfo::instance().bSSE3)) {
+    if (m_kernelWidth < 8) {
       for (size_t k = range.begin(); k != range.end(); ++k) {
         for (size_t j = 0; j < m_imgOutHeight; ++j) {
           for (size_t i = 0; i < m_imgOutWidth; ++i) {
@@ -419,7 +419,7 @@ struct Image3DRowFilterForOneBlock<double, double>
     } else if (ZCpuInfo::instance().bAVX) {
       Image3DRowFilterForOneBlock_AVX(m_padImg, m_padImgWidth, m_padImgHeight, m_kernel, m_kernelWidth,
                                       m_imgOut, m_imgOutWidth, m_imgOutHeight, range.begin(), range.end());
-    } else if (ZCpuInfo::instance().bSSE3) {
+    } else {
       Image3DRowFilterForOneBlock_SSE3(m_padImg, m_padImgWidth, m_padImgHeight, m_kernel, m_kernelWidth,
                                        m_imgOut, m_imgOutWidth, m_imgOutHeight, range.begin(), range.end());
     }

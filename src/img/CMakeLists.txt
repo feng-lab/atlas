@@ -301,7 +301,6 @@ else (WIN32)
   target_link_libraries(${LIBRARY_NAME} PUBLIC -stdlib=libc++)
 
   # for some files
-  set_source_files_properties(zimagesse3.cpp PROPERTIES COMPILE_FLAGS -msse3)
   set_source_files_properties(zimageavx.cpp PROPERTIES COMPILE_FLAGS -mavx)
 
   set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-shadow")

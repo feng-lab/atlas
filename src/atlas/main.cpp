@@ -189,23 +189,57 @@ int main(int argc, char* argv[])
           LOG(WARNING) << "IPP error: not supported cpu.";
           // manual set mask
           if (nim::ZCpuInfo::instance().bMMX)
-            featureMask |= 1;
+            featureMask |= ippCPUID_MMX;
           if (nim::ZCpuInfo::instance().bSSE)
-            featureMask |= 2;
+            featureMask |= ippCPUID_SSE;
           if (nim::ZCpuInfo::instance().bSSE2)
-            featureMask |= 4;
+            featureMask |= ippCPUID_SSE2;
           if (nim::ZCpuInfo::instance().bSSE3)
-            featureMask |= 8;
+            featureMask |= ippCPUID_SSE3;
           if (nim::ZCpuInfo::instance().bSSSE3)
-            featureMask |= 16;
+            featureMask |= ippCPUID_SSSE3;
           if (nim::ZCpuInfo::instance().bMOVBE)
-            featureMask |= 32;
+            featureMask |= ippCPUID_MOVBE;
           if (nim::ZCpuInfo::instance().bSSE41)
-            featureMask |= 64;
+            featureMask |= ippCPUID_SSE41;
           if (nim::ZCpuInfo::instance().bSSE42)
-            featureMask |= 128;
-          if (nim::ZCpuInfo::instance().bAVX)
-            featureMask |= 256;
+            featureMask |= ippCPUID_SSE42;
+          if (nim::ZCpuInfo::instance().bAVX) {
+            featureMask |= ippCPUID_AVX;
+            featureMask |= ippAVX_ENABLEDBYOS;
+          }
+          if (nim::ZCpuInfo::instance().bAESNI)
+            featureMask |= ippCPUID_AES;
+          if (nim::ZCpuInfo::instance().bPCLMULQDQ)
+            featureMask |= ippCPUID_CLMUL;
+          if (nim::ZCpuInfo::instance().bRDRAND)
+            featureMask |= ippCPUID_RDRAND;
+          if (nim::ZCpuInfo::instance().bF16C)
+            featureMask |= ippCPUID_F16C;
+          if (nim::ZCpuInfo::instance().bAVX2)
+            featureMask |= ippCPUID_AVX2;
+          if (nim::ZCpuInfo::instance().bADX)
+            featureMask |= ippCPUID_ADCOX;
+          if (nim::ZCpuInfo::instance().bRDSEED)
+            featureMask |= ippCPUID_RDSEED;
+          if (nim::ZCpuInfo::instance().bPREFTEHCHW)
+            featureMask |= ippCPUID_PREFETCHW;
+          if (nim::ZCpuInfo::instance().bSHA)
+            featureMask |= ippCPUID_SHA;
+          if (nim::ZCpuInfo::instance().bAVX512F)
+            featureMask |= ippCPUID_AVX512F;
+          if (nim::ZCpuInfo::instance().bAVX512CD)
+            featureMask |= ippCPUID_AVX512CD;
+          if (nim::ZCpuInfo::instance().bAVX512ER)
+            featureMask |= ippCPUID_AVX512ER;
+          if (nim::ZCpuInfo::instance().bAVX512PF)
+            featureMask |= ippCPUID_AVX512PF;
+          if (nim::ZCpuInfo::instance().bAVX512BW)
+            featureMask |= ippCPUID_AVX512BW;
+          if (nim::ZCpuInfo::instance().bAVX512DQ)
+            featureMask |= ippCPUID_AVX512DQ;
+          if (nim::ZCpuInfo::instance().bAVX512VL)
+            featureMask |= ippCPUID_AVX512VL;
           LOG(INFO) << ippSetCpuFeatures(featureMask);
         }
       } else {
