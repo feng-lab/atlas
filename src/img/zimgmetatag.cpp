@@ -20,7 +20,7 @@ QString ZImgMetatag::toQString() const
   QString res = m_name;
   if (m_tag != 0)
     res = res % QString(" (tag:%1)").arg(m_tag);
-  res = res % QString(" %2 %3<").arg(enumToString(m_dataType)).arg(m_count);
+  res = res % QString(" %1 %2<").arg(enumToString(m_dataType)).arg(m_count);
   QString sep;
   uint64_t ct = m_count;
 

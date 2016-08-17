@@ -139,7 +139,7 @@ void ZCpuInfo::logCpuInfo() const
 
 void ZCpuInfo::detectCpuInfo()
 {
-  std::array<int, 4> cpui;
+  std::array<int, 4> cpui{{0, 0, 0, 0}};
   uint32_t nIds = 0;
   uint32_t nExIds = 0;
   bool isIntel = false;
@@ -171,7 +171,7 @@ void ZCpuInfo::detectCpuInfo()
   memcpy(vendorStr, &data[0][1], sizeof(int32_t));
   memcpy(vendorStr + 4, &data[0][3], sizeof(int32_t));
   memcpy(vendorStr + 8, &data[0][2], sizeof(int32_t));
-  vendor = vendorStr;
+  vendor = QString(vendorStr);
   if (vendor == "GenuineIntel") {
     isIntel = true;
   } else if (vendor == "AuthenticAMD") {
@@ -197,9 +197,6 @@ void ZCpuInfo::detectCpuInfo()
   cpuid(cpui.data(), 0x80000000);
   nExIds = cpui[0];
 
-  char brandStr[0x40];
-  memset(brandStr, 0, sizeof(brandStr));
-
   for (uint32_t i = 0x80000000; i <= nExIds; ++i) {
     cpuidex(cpui.data(), i, 0);
     extdata.push_back(cpui);
@@ -212,11 +209,13 @@ void ZCpuInfo::detectCpuInfo()
   }
 
   // Interpret CPU brand string if reported
+  char brandStr[0x40];
+  memset(brandStr, 0, sizeof(brandStr));
   if (nExIds >= 0x80000004) {
     memcpy(brandStr, extdata[2].data(), sizeof(cpui));
     memcpy(brandStr + 16, extdata[3].data(), sizeof(cpui));
     memcpy(brandStr + 32, extdata[4].data(), sizeof(cpui));
-    brand = brandStr;
+    brand = QString(brandStr);
   }
 
   // Interpret CPU feature information.

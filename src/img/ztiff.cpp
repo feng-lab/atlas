@@ -454,7 +454,7 @@ QString ZTiffIFD::imageDescriptionAsQString() const
 {
   int64_t i = indexOf(TIFFTAG_IMAGEDESCRIPTION);
   if (i != -1)
-    return QString(m_entries[i].dataArray<char>());
+    return QString::fromUtf8(m_entries[i].dataArray<char>(), m_entries[i].count() - 1);
   else
     return QString();
 }
@@ -696,39 +696,6 @@ std::vector<ZImgMetatag> ZTiffIFD::extractMetadata() const
   return res;
 }
 
-/*
-std::string ZTiffIFD::toString() const
-{
-  std::ostringstream res;
-  for (size_t i=0; i<m_entries.size(); ++i) {
-    res << m_entries[i].toString() << std::endl;
-  }
-  if (!m_subIFDs.empty()) {
-    res << std::endl;
-    for (size_t i=0; i<m_subIFDs.size(); ++i) {
-      res << "Sub IFD " << i << std::endl;
-      res << m_subIFDs[i].toString();
-    }
-  }
-  if (!m_exifIFD.empty()) {
-    res << std::endl;
-    res << "Exif IFD" << std::endl;
-    res << m_exifIFD[0].toString();
-  }
-  if (!m_gpsIFD.empty()) {
-    res << std::endl;
-    res << "GPS IFD" << std::endl;
-    res << m_gpsIFD[0].toString();
-  }
-  if (!m_interoperabilityIFD.empty()) {
-    res << std::endl;
-    res << "Interoperability IFD" << std::endl;
-    res << m_interoperabilityIFD[0].toString();
-  }
-  return res.str();
-}
-*/
-
 int64_t ZTiffIFD::indexOf(uint64_t tag) const
 {
   for (size_t i = 0; i < m_entries.size(); ++i) {
@@ -767,28 +734,12 @@ QString ZTiff::toQString() const
   return res;
 }
 
-/*
-std::string ZTiff::toString() const
-{
-  std::ostringstream res;
-  for (size_t i=0; i<m_ifds.size(); ++i) {
-    res << "Directory " << i
-        << ": offset " << m_ifds[i].offset()
-        << " (" << std::hex << m_ifds[i].offset() << std::dec << ")"
-        << " next " << m_ifds[i].nextIFDOffset()
-        << " (" << std::hex << m_ifds[i].nextIFDOffset() << std::dec << ")"
-        << std::endl;
-    res << m_ifds[i].toString() << std::endl;
-  }
-  return res.str();
-}
-*/
-
 void ZTiff::load(const QString& filename, bool tagOnly)
 {
   close();
 
   readIFDs(filename, m_ifds);
+  //LOG(INFO) << toQString();
 
   if (m_useColormap) {
     bool allGray = true;
@@ -980,6 +931,7 @@ ZImg ZTiff::readThumbnailFromIFD(const ZTiffIFD& ifd)
 }
 
 #pragma pack(push, 1)
+
 struct ZTiffHeader
 {
   TIFFHeaderBig header = {TIFF_LITTLEENDIAN, 43, 8, 0, 16};
@@ -1267,14 +1219,14 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
 
 QString ZTiff::tagToName(uint32_t tag) const
 {
-  for (size_t i = 0; i < std::extent<decltype(tiftagnames)>::value; ++i) {
-    if (tiftagnames[i].tag == tag) {
-      return tiftagnames[i].name;
+  for (const auto& tagName : tiftagnames) {
+    if (tagName.tag == tag) {
+      return tagName.name;
     }
   }
-  for (size_t i = 0; i < std::extent<decltype(exiftagnames)>::value; ++i) {
-    if (exiftagnames[i].tag == tag) {
-      return exiftagnames[i].name;
+  for (const auto& tagName : exiftagnames) {
+    if (tagName.tag == tag) {
+      return tagName.name;
     }
   }
   return "Unknown tag";
@@ -1910,9 +1862,10 @@ Compression ZTiffWriter::defaultCompression(const ZImg* img)
   const Compression list[] = {
     Compression::LZW, Compression::ADOBE_DEFLATE, Compression::PACKBITS
   };
-  for (size_t i = 0; i < std::extent<decltype(list)>::value; ++i)
-    if (checkCompression(img, list[i]))
-      return list[i];
+  for (auto comp : list) {
+    if (checkCompression(img, comp))
+      return comp;
+  }
   return Compression::NONE;
 }
 
