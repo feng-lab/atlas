@@ -20,11 +20,11 @@ Z3DSDFont::Z3DSDFont(const QString& imageFileName, const QString& txtFileName)
 Z3DSDFont::CharInfo Z3DSDFont::charInfo(int id) const
 {
   CharInfo space;
-  for (int i = 0; i < m_charInfos.size(); i++) {
-    if (m_charInfos[i].id == id)
-      return m_charInfos[i];
-    else if (m_charInfos[i].id == 32)
-      space = m_charInfos[i];
+  for (const auto& info : m_charInfos) {
+    if (info.id == id)
+      return info;
+    else if (info.id == 32)
+      space = info;
   }
   return space;
 }
@@ -99,7 +99,7 @@ void Z3DSDFont::parseFontFile()
         line = line.trimmed();
         int tokenIndex = -1;
         QString value;
-        for (int i = 0; i < tokens.size(); i++) {
+        for (int i = 0; i < tokens.size(); ++i) {
           if (line.startsWith(tokens[i])) {
             if (line.indexOf(' ') == -1) {
               value = line.mid(tokens[i].size());

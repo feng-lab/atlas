@@ -35,7 +35,7 @@ void Z3DLineWithFixedWidthColorRenderer::setLineColors()
   m_lineColorsPrivate.clear();
   if (!m_linesPt)
     return;
-  for (size_t i = 0; i < m_linesPt->size(); i++) {
+  for (size_t i = 0; i < m_linesPt->size(); ++i) {
     m_lineColorsPrivate.push_back(m_lineColor.get());
   }
   setDataColors(&m_lineColorsPrivate);

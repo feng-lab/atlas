@@ -56,8 +56,7 @@ Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase& rendererBase)
   QStringList filters;
   filters << "*.png";
   QFileInfoList list = fontDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); i++) {
-    QFileInfo fileInfo = list.at(i);
+  for (const auto& fileInfo : list) {
     QFileInfo txtFileInfo(fontDir, fileInfo.completeBaseName() + ".txt");
     if (!txtFileInfo.exists())
       continue;
@@ -116,10 +115,10 @@ std::vector<glm::vec4>* Z3DFontRenderer::getColors()
     return &m_colors;
   } else if (m_colorsPt->size() < m_positionsPt->size()) {
     m_colors.clear();
-    for (size_t i = 0; i < m_colorsPt->size(); i++) {
-      m_colors.push_back(m_colorsPt->at(i));
+    for (const auto& color : *m_colorsPt) {
+      m_colors.push_back(color);
     }
-    for (size_t i = m_colorsPt->size(); i < m_positionsPt->size(); i++) {
+    for (size_t i = m_colorsPt->size(); i < m_positionsPt->size(); ++i) {
       m_colors.emplace_back(0.f, 0.f, 0.f, 1.f);
     }
     return &m_colors;
@@ -318,7 +317,7 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
         m_fontPickingColors.push_back(m_pickingColorsPt->at(strIdx));
         m_fontPickingColors.push_back(m_pickingColorsPt->at(strIdx));
       }
-      for (int k = 0; k < 6; k++) {
+      for (int k = 0; k < 6; ++k) {
         m_indexs.push_back(indices[k] + 4 * quadIdx);
       }
       quadIdx++;

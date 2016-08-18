@@ -94,7 +94,7 @@ aiNode* createNodes(const ZMesh& mesh, aiNode* pParent, aiScene* pScene, std::ve
   pNode->mName = "meshName";
   appendChildToParentNode(pParent, pNode);
 
-  for (unsigned int i = 0; i < 1; i++) {
+  for (unsigned int i = 0; i < 1; ++i) {
     std::unique_ptr<aiMesh> pMesh(createAIMesh(mesh));
     if (pMesh->mNumVertices > 0) {
       MeshArray.push_back(pMesh.release());
@@ -107,7 +107,7 @@ aiNode* createNodes(const ZMesh& mesh, aiNode* pParent, aiScene* pScene, std::ve
     pNode->mMeshes = new unsigned int[meshSizeDiff];
     pNode->mNumMeshes = static_cast<unsigned int>( meshSizeDiff );
     size_t index = 0;
-    for (size_t i = oldMeshSize; i < MeshArray.size(); i++) {
+    for (size_t i = oldMeshSize; i < MeshArray.size(); ++i) {
       pNode->mMeshes[index] = pScene->mNumMeshes;
       pScene->mNumMeshes++;
       index++;
@@ -315,7 +315,7 @@ void ZMeshIO::readAllenAtlasMesh(const QString& filename, std::vector<glm::vec3>
 
   //read points
   // 3 floats for normals followed by 3 floats for coordinates per point
-  for (uint32_t i = 0; i < numPoints; i++) {
+  for (uint32_t i = 0; i < numPoints; ++i) {
     readStream(inputFileStream, &normals[i][0], 3 * 4);
     readStream(inputFileStream, &vertices[i][0], 3 * 4);
   }
@@ -325,7 +325,7 @@ void ZMeshIO::readAllenAtlasMesh(const QString& filename, std::vector<glm::vec3>
   std::vector<std::vector<uint32_t>> allStrips;
 
   // read triangle strips
-  for (uint32_t i = 0; i < numTriangleStrips; i++) {
+  for (uint32_t i = 0; i < numTriangleStrips; ++i) {
     //read number of points in the strip
     uint32_t numPointsInStrip = 0;
     readStream(inputFileStream, &numPointsInStrip, 2);
@@ -339,14 +339,14 @@ void ZMeshIO::readAllenAtlasMesh(const QString& filename, std::vector<glm::vec3>
   inputFileStream.close();
 
   size_t numTriangles = 0;
-  for (uint32_t i = 0; i < numTriangleStrips; i++) {
+  for (uint32_t i = 0; i < numTriangleStrips; ++i) {
     numTriangles += allStrips[i].size() - 2;
   }
   indices.resize(numTriangles * 3);
 
   size_t triIdx = 0;
-  for (uint32_t i = 0; i < numTriangleStrips; i++) {
-    for (size_t j = 0; j < allStrips[i].size() - 2; j++) {
+  for (uint32_t i = 0; i < numTriangleStrips; ++i) {
+    for (size_t j = 0; j < allStrips[i].size() - 2; ++j) {
       //Indicies in the triStripIndices are like: ABCDEFG
       //We need to change them to be ABC CBD CDE EDF EFG(note swapping of ordering)
       if (j % 2 == 0) {

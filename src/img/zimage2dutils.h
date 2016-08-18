@@ -326,8 +326,8 @@ template<typename TPixel>
 void image2DTranspose(TPixel* img, size_t width, size_t height)
 {
   if (width == height) {
-    for (size_t i = 0; i < height; i++)
-      for (size_t j = i + 1 ; j < width; j++)
+    for (size_t i = 0; i < height; ++i)
+      for (size_t j = i + 1 ; j < width; ++j)
         std::swap(img[i + j * height], img[j + i * width]);
   } else {
     const size_t blockSize = 32;

@@ -297,7 +297,7 @@ void Z3DVolumeFilter::exitZoomInView()
     return;
 
   // copy transform matrix from sub volume, in case it is changed
-  for (size_t i = 0; i < m_volumes.size(); i++) {
+  for (size_t i = 0; i < m_volumes.size(); ++i) {
     m_volumes[i]->setPhysicalToWorldMatrix(m_zoomInVolumes[i]->physicalToWorldMatrix());
   }
   m_zoomInVolumes.clear();
@@ -366,7 +366,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DVolumeFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_rendererBase.coordTransformPara(), 1);
 
     const std::vector<ZParameter*>& paras = parameters();
-    for (size_t i = 0; i < paras.size(); i++) {
+    for (size_t i = 0; i < paras.size(); ++i) {
       ZParameter* para = paras[i];
       if (para->name().contains("Slice") && !para->name().endsWith("2") && !para->name().endsWith("2 Position"))
         m_widgetsGroup->addChild(*para, 11);
@@ -491,10 +491,10 @@ void Z3DVolumeFilter::changeCoordTransform()
 {
   if (m_volumes.empty())
     return;
-  for (size_t i = 0; i < m_volumes.size(); i++) {
+  for (size_t i = 0; i < m_volumes.size(); ++i) {
     m_volumes[i]->setPhysicalToWorldMatrix(m_rendererBase.coordTransform());
   }
-  for (size_t i = 0; i < m_zoomInVolumes.size(); i++) {
+  for (size_t i = 0; i < m_zoomInVolumes.size(); ++i) {
     m_zoomInVolumes[i]->setPhysicalToWorldMatrix(m_rendererBase.coordTransform());
   }
   invalidateAllFRVolumeSlices();
@@ -1109,7 +1109,7 @@ void Z3DVolumeFilter::readVolumes()
 
     m_volumes.emplace_back(vh);
   } else {
-    for (size_t i = 0; i < m_nChannels; i++) {
+    for (size_t i = 0; i < m_nChannels; ++i) {
       ZImg cImg = img.crop(ZImgRegion(0, -1, 0, -1, 0, -1, i, i + 1));
       Z3DVolume* vh = new Z3DVolume(cImg,
                                     glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale),
@@ -1120,7 +1120,7 @@ void Z3DVolumeFilter::readVolumes()
     } //for each cannel
   }
 
-  for (size_t i = 0; i < m_nChannels; i++) {
+  for (size_t i = 0; i < m_nChannels; ++i) {
     m_volumes[i]->setVolColor(glm::vec3(m_imgPack->imgInfo().channelColors[i].r / 255.,
                                         m_imgPack->imgInfo().channelColors[i].g / 255.,
                                         m_imgPack->imgInfo().channelColors[i].b / 255.));
@@ -1146,7 +1146,7 @@ void Z3DVolumeFilter::readSubVolumes(int left, int right, int up, int down, int 
 
   glm::vec3 downsampleSpacing = glm::vec3(1.f, 1.f, 1.f);
   glm::vec3 offset = glm::vec3(left, right, front) + m_volumes[0]->offset();
-  for (size_t i = 0; i < m_nChannels; i++) {
+  for (size_t i = 0; i < m_nChannels; ++i) {
     ZImg img = m_imgPack->crop(ZImgRegion(left, right + 1, up, down + 1, front, back + 1,
                                           i, i + 1, 0, 1));
     if (!img.isType<uint8_t>())
@@ -1162,7 +1162,7 @@ void Z3DVolumeFilter::readSubVolumes(int left, int right, int up, int down, int 
     m_zoomInVolumes.emplace_back(vh);
   }
 
-  for (size_t i = 0; i < m_nChannels; i++) {
+  for (size_t i = 0; i < m_nChannels; ++i) {
     m_zoomInVolumes[i]->setVolColor(glm::vec3(m_imgPack->imgInfo().channelColors[i].r / 255.,
                                               m_imgPack->imgInfo().channelColors[i].g / 255.,
                                               m_imgPack->imgInfo().channelColors[i].b / 255.));

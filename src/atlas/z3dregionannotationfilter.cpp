@@ -51,8 +51,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DRegionAnnotationFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_stayOnTop, 1);
 
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
-    for (size_t i = 0; i < paras.size(); i++) {
-      ZParameter* para = paras[i];
+    for (auto para : paras) {
       if (para->name() == "Coord Transform")
         m_widgetsGroup->addChild(*para, 2);
     }

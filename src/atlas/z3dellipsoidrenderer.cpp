@@ -42,7 +42,7 @@ void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3>* centers, std::vector<
   m_indexs.clear();
   int indices[6] = {0, 1, 2, 2, 1, 3};
   int quadIdx = 0;
-  for (size_t i = 0; i < centers->size(); i++) {
+  for (size_t i = 0; i < centers->size(); ++i) {
     glm::mat4 T(glm::vec4(axis1->at(i), 0.f),
                 glm::vec4(axis2->at(i), 0.f),
                 glm::vec4(axis3->at(i), 0.f),
@@ -63,7 +63,7 @@ void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3>* centers, std::vector<
     m_axis3.push_back(T[2]);
     m_axis3.push_back(T[2]);
     m_axis3.push_back(T[2]);
-    for (int k = 0; k < 6; k++) {
+    for (int k = 0; k < 6; ++k) {
       m_indexs.push_back(indices[k] + 4 * quadIdx);
     }
     quadIdx++;
@@ -71,11 +71,11 @@ void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3>* centers, std::vector<
   if (!specularAndShininessInput) {
     m_useDynamicMaterial.set(false);
   } else {
-    for (size_t i = 0; i < specularAndShininessInput->size(); i++) {
-      m_specularAndShininess.push_back(specularAndShininessInput->at(i));
-      m_specularAndShininess.push_back(specularAndShininessInput->at(i));
-      m_specularAndShininess.push_back(specularAndShininessInput->at(i));
-      m_specularAndShininess.push_back(specularAndShininessInput->at(i));
+    for (auto ss : *specularAndShininessInput) {
+      m_specularAndShininess.push_back(ss);
+      m_specularAndShininess.push_back(ss);
+      m_specularAndShininess.push_back(ss);
+      m_specularAndShininess.push_back(ss);
     }
   }
   size_t rightUpSize = m_allFlags.size();
@@ -104,11 +104,11 @@ void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3>* centers, std::vector<
 void Z3DEllipsoidRenderer::setDataColors(std::vector<glm::vec4>* ellipsoidColorsInput)
 {
   m_ellipsoidColors.clear();
-  for (size_t i = 0; i < ellipsoidColorsInput->size(); i++) {
-    m_ellipsoidColors.push_back(ellipsoidColorsInput->at(i));
-    m_ellipsoidColors.push_back(ellipsoidColorsInput->at(i));
-    m_ellipsoidColors.push_back(ellipsoidColorsInput->at(i));
-    m_ellipsoidColors.push_back(ellipsoidColorsInput->at(i));
+  for (auto color : *ellipsoidColorsInput) {
+    m_ellipsoidColors.push_back(color);
+    m_ellipsoidColors.push_back(color);
+    m_ellipsoidColors.push_back(color);
+    m_ellipsoidColors.push_back(color);
   }
   invalidateOpenglRenderer();
   m_dataChanged = true;
@@ -119,11 +119,11 @@ void Z3DEllipsoidRenderer::setDataPickingColors(std::vector<glm::vec4>* ellipsoi
   m_ellipsoidPickingColors.clear();
   if (!ellipsoidPickingColorsInput)
     return;
-  for (size_t i = 0; i < ellipsoidPickingColorsInput->size(); i++) {
-    m_ellipsoidPickingColors.push_back(ellipsoidPickingColorsInput->at(i));
-    m_ellipsoidPickingColors.push_back(ellipsoidPickingColorsInput->at(i));
-    m_ellipsoidPickingColors.push_back(ellipsoidPickingColorsInput->at(i));
-    m_ellipsoidPickingColors.push_back(ellipsoidPickingColorsInput->at(i));
+  for (auto color : *ellipsoidPickingColorsInput) {
+    m_ellipsoidPickingColors.push_back(color);
+    m_ellipsoidPickingColors.push_back(color);
+    m_ellipsoidPickingColors.push_back(color);
+    m_ellipsoidPickingColors.push_back(color);
   }
   invalidateOpenglPickingRenderer();
   m_pickingDataChanged = true;
@@ -530,7 +530,7 @@ void Z3DEllipsoidRenderer::renderPicking(Z3DEye eye)
 void Z3DEllipsoidRenderer::appendDefaultColors()
 {
   if (m_ellipsoidColors.size() < m_centers.size()) {
-    for (size_t i = m_ellipsoidColors.size(); i < m_centers.size(); i++)
+    for (size_t i = m_ellipsoidColors.size(); i < m_centers.size(); ++i)
       m_ellipsoidColors.emplace_back(0.f, 0.f, 0.f, 1.f);
   }
 }

@@ -69,20 +69,6 @@ int numDigits(int32_t x)
   return 1;
 }
 
-//// partial-specialization optimization for 8-bit numbers
-//template <>
-//int numDigits(char n)
-//{
-//  // if you have the time, replace this with a static initialization to avoid
-//  // the initial overhead & unnecessary branch
-//  static char x[256] = {0};
-//  if (x[0] == 0) {
-//    for (char c = 1; c != 0; c++)
-//      x[static_cast<int>(c)] = numDigits((int32_t)c);
-//    x[0] = 1;
-//  }
-//  return x[static_cast<int>(n)];
-//}
 }
 
 namespace nim {
@@ -369,7 +355,7 @@ ZAnimation::exportFixedSize3DAnimation(const QDir& dir, const QString& fn, doubl
   double timeIncrement = m_duration / numFrame;
   bool checkOverwrite = true;
   QString namePrefix = QFileInfo(fn).completeBaseName();
-  for (int i = 0; i < numFrame; i++) {
+  for (int i = 0; i < numFrame; ++i) {
     progress->setValue(i);
     if (progress->wasCanceled())
       break;
@@ -486,7 +472,7 @@ void ZAnimation::export3DAnimation(const QDir& dir, const QString& fn, double fr
   double timeIncrement = m_duration / numFrame;
   bool checkOverwrite = true;
   QString namePrefix = QFileInfo(fn).completeBaseName();
-  for (int i = 0; i < numFrame; i++) {
+  for (int i = 0; i < numFrame; ++i) {
     progress->setValue(i);
     if (progress->wasCanceled())
       break;
@@ -594,7 +580,7 @@ ZAnimation::exportFixedSize2DAnimation(const QDir& dir, const QString& fn, doubl
   bool checkOverwrite = true;
   QString namePrefix = QFileInfo(fn).completeBaseName();
   QString err;
-  for (int i = 0; i < numFrame; i++) {
+  for (int i = 0; i < numFrame; ++i) {
     progress->setValue(i);
     if (progress->wasCanceled())
       break;

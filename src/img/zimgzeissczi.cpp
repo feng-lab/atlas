@@ -217,10 +217,10 @@ ZImgCZISubBlock::ZImgCZISubBlock(const QString& fileName, std::vector<CZITile>& 
   if (m_mixedTiles) {
     int32_t endx = std::numeric_limits<int32_t>::min();
     int32_t endy = std::numeric_limits<int32_t>::min();
-    for (size_t i = 0; i < m_tiles.size(); ++i) {
-      m_mixedTilesStart = min(m_mixedTilesStart, m_tiles[i].start);
-      endx = std::max(endx, m_tiles[i].start.x + m_tiles[i].size.x);
-      endy = std::max(endy, m_tiles[i].start.y + m_tiles[i].size.y);
+    for (const auto& tile : m_tiles) {
+      m_mixedTilesStart = min(m_mixedTilesStart, tile.start);
+      endx = std::max(endx, tile.start.x + tile.size.x);
+      endy = std::max(endy, tile.start.y + tile.size.y);
     }
     m_mixedTilesStart.c = 0;
     x = m_mixedTilesStart.x;
@@ -243,9 +243,9 @@ std::shared_ptr<ZImg> ZImgCZISubBlock::read() const
       double scale = 1.0 / ratio;
       *res = ZImg(ZImgInfo(std::ceil(width * scale), std::ceil(height * scale), 1, m_numChannels, 1, m_bytePerVoxel,
                            m_voxelFormat));
-      for (size_t i = 0; i < m_tiles.size(); ++i) {
-        ZImg img = readCZITile(inputFileStream, m_tiles[i]);
-        ZVoxelCoordinate tileStart = m_tiles[i].start - m_mixedTilesStart;
+      for (const auto& tile : m_tiles) {
+        ZImg img = readCZITile(inputFileStream, tile);
+        ZVoxelCoordinate tileStart = tile.start - m_mixedTilesStart;
         tileStart.x *= scale;
         tileStart.y *= scale;
         res->pasteImg(img, tileStart);

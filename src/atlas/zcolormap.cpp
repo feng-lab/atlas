@@ -347,7 +347,7 @@ bool ZColorMap::setDomainMin(double min, bool rescaleKeys)
       double scale = distToMax / prevDistToMax;
       double dmax = domainMax();
       std::vector<std::pair<ZColorMapKey, bool>> newKeys;
-      for (size_t i = 0; i < m_keys.size(); i++) {
+      for (size_t i = 0; i < m_keys.size(); ++i) {
         double inten = keyIntensity(i);
         double newInten = dmax - (dmax - inten) * scale;
         if (isKeySplit(i))
@@ -360,7 +360,7 @@ bool ZColorMap::setDomainMin(double min, bool rescaleKeys)
       glm::col4 col = mappedColor(min);
       size_t startIdx = m_keys.size();
       size_t endIdx = 0;
-      for (size_t i = 0; i < m_keys.size(); i++) {
+      for (size_t i = 0; i < m_keys.size(); ++i) {
         if (keyIntensity(i) <= min) {
           startIdx = std::min(startIdx, i);
           endIdx = std::max(endIdx, i);
@@ -391,7 +391,7 @@ bool ZColorMap::setDomainMax(double max, bool rescaleKeys)
       double scale = distToMin / prevDistToMin;
       double dmin = domainMin();
       std::vector<std::pair<ZColorMapKey, bool>> newKeys;
-      for (size_t i = 0; i < m_keys.size(); i++) {
+      for (size_t i = 0; i < m_keys.size(); ++i) {
         double inten = keyIntensity(i);
         double newInten = dmin + (inten - dmin) * scale;
         if (isKeySplit(i))
@@ -404,7 +404,7 @@ bool ZColorMap::setDomainMax(double max, bool rescaleKeys)
       glm::col4 col = mappedColor(max);
       size_t startIdx = m_keys.size();
       size_t endIdx = 0;
-      for (int i = static_cast<int>(m_keys.size()) - 1; i >= 0; i--) {
+      for (int i = static_cast<int>(m_keys.size()) - 1; i >= 0; --i) {
         if (keyIntensity(i) >= max) {
           startIdx = std::min(startIdx, static_cast<size_t>(i));
           endIdx = std::max(endIdx, static_cast<size_t>(i));
@@ -647,7 +647,7 @@ void ZColorMap::setKeySelected(size_t index, bool v)
 void ZColorMap::deselectAllKeys()
 {
   bool change = false;
-  for (size_t i = 0; i < m_keys.size(); i++) {
+  for (size_t i = 0; i < m_keys.size(); ++i) {
     if (m_keys[i].second) {
       change = true;
       m_keys[i].second = false;
@@ -660,7 +660,7 @@ void ZColorMap::deselectAllKeys()
 std::vector<size_t> ZColorMap::selectedKeyIndexes() const
 {
   std::vector<size_t> all;
-  for (size_t i = 0; i < m_keys.size(); i++) {
+  for (size_t i = 0; i < m_keys.size(); ++i) {
     if (m_keys[i].second)
       all.push_back(i);
   }
@@ -717,7 +717,7 @@ bool ZColorMap::setKeys(const std::vector<ZColorMapKey>& keys)
     return false;
   blockSignals(true);
   clearKeys();
-  for (size_t i = 0; i < keys.size(); i++)
+  for (size_t i = 0; i < keys.size(); ++i)
     addKey(keys[i]);
   blockSignals(false);
   emit changed();

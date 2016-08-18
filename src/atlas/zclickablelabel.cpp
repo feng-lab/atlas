@@ -217,7 +217,7 @@ void ZClickableTransferFunctionLabel::paintEvent(QPaintEvent* /*e*/)
   QColor color2(255, 255, 255);
   qreal width = contentsRect().width() / 20.;
   qreal height = contentsRect().height() / 4.;
-  for (int i = 0; i < 20; i++) {
+  for (int i = 0; i < 20; ++i) {
     if (i % 2 == 0) {
       painter.fillRect(QRectF(contentsRect().left() + i * width, contentsRect().top(), width, height), color2);
       painter.fillRect(

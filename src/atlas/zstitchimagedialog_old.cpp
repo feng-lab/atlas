@@ -121,7 +121,7 @@ void ZTileImageWidget::paintEvent(QPaintEvent*)
     if (m_tileimages.size() == m_pTiles->size()) {
 
 
-      for (int i = 0; i < m_pTiles->size(); i++) {
+      for (int i = 0; i < m_pTiles->size(); ++i) {
         //        QRect rect = QRect(m_pTiles->at(i).region.topLeft() * m_scaleFactor,
         //                           m_pTiles->at(i).region.bottomRight() * m_scaleFactor);
         QPoint tl = m_pTiles->at(i).region.topLeft() * m_scaleFactor;
@@ -141,7 +141,7 @@ void ZTileImageWidget::paintEvent(QPaintEvent*)
         //painter.drawText(rect, str);
       }
     } else {
-      for (int i = 0; i < m_pTiles->size(); i++) {
+      for (int i = 0; i < m_pTiles->size(); ++i) {
         QRect rect = QRect(m_pTiles->at(i).region.topLeft() * m_scaleFactor,
                            m_pTiles->at(i).region.bottomRight() * m_scaleFactor);
         if (m_pTiles->at(i).bIsSelected) {
@@ -172,7 +172,7 @@ void ZTileImageWidget::mouseReleaseEvent(QMouseEvent* event)
 {
   m_rubberBand->hide();
   QRect selRegion = QRect(m_origin / m_scaleFactor, event->pos() / m_scaleFactor).normalized();
-  for (int i = 0; i < m_pTiles->size(); i++) {
+  for (int i = 0; i < m_pTiles->size(); ++i) {
     if (m_pTiles->at(i).region.intersects(selRegion)) {
       if ((*m_pTiles)[i].bIsSelected) {
         (*m_pTiles)[i].bIsSelected = false;
@@ -186,7 +186,7 @@ void ZTileImageWidget::mouseReleaseEvent(QMouseEvent* event)
 
 void ZTileImageWidget::clearAllSelected()
 {
-  for (int i = 0; i < m_pTiles->size(); i++) {
+  for (int i = 0; i < m_pTiles->size(); ++i) {
     (*m_pTiles)[i].bIsSelected = false;
   }
   update();
@@ -194,7 +194,7 @@ void ZTileImageWidget::clearAllSelected()
 
 void ZTileImageWidget::selectAll()
 {
-  for (int i = 0; i < m_pTiles->size(); i++) {
+  for (int i = 0; i < m_pTiles->size(); ++i) {
     (*m_pTiles)[i].bIsSelected = true;
   }
   update();
@@ -1065,15 +1065,15 @@ void ZStitchImageDialog::editConnFromTileImage()
     if (dia.exec() == QDialog::Accepted) {
       m_tileList = tmpList;
       m_nSel = 0;
-      for (int i = 0; i < m_tileList.size(); i++) {
+      for (int i = 0; i < m_tileList.size(); ++i) {
         if (m_tileList[i].bIsSelected)
           m_nSel++;
       }
       QString str = QString("%1 images selected to stitch:").arg(m_nSel);
       m_connEdit->setText(str);
-      for (int i = 0; i < m_tileMatrix.size(); i++) {
+      for (int i = 0; i < m_tileMatrix.size(); ++i) {
         str = QString("  ");
-        for (int j = 0; j < m_tileMatrix[0].size(); j++) {
+        for (int j = 0; j < m_tileMatrix[0].size(); ++j) {
           if (m_tileMatrix[i][j] > 0 && m_tileList[m_tileMatrix[i][j] - 1].bIsSelected) {
             str += QString("%1\t").arg(m_tileMatrix[i][j]);
           } else {
@@ -1177,7 +1177,7 @@ void ZStitchImageDialog::initChannel1ComboBox(int nchannel)
   while (m_channel1ComboBox->count() > 2) {
     m_channel1ComboBox->removeItem(2);
   }
-  for (int i = 0; i < nchannel; i++) {
+  for (int i = 0; i < nchannel; ++i) {
     m_channel1ComboBox->addItem(QString("Ch%1").arg(i + 1));
   }
 }
@@ -1188,7 +1188,7 @@ void ZStitchImageDialog::initBgsub1ComboBox(int nchannel)
   while (m_bgsub1ComboBox->count() > 4) {
     m_bgsub1ComboBox->removeItem(4);
   }
-  for (int i = 0; i < nchannel; i++) {
+  for (int i = 0; i < nchannel; ++i) {
     m_bgsub1ComboBox->addItem(QString("Ch%1").arg(i + 1));
   }
 }
@@ -1199,7 +1199,7 @@ void ZStitchImageDialog::initChannel2ComboBox(int nchannel)
   while (m_channel2ComboBox->count() > 2) {
     m_channel2ComboBox->removeItem(2);
   }
-  for (int i = 0; i < nchannel; i++) {
+  for (int i = 0; i < nchannel; ++i) {
     m_channel2ComboBox->addItem(QString("Ch%1").arg(i + 1));
   }
 }
@@ -1210,7 +1210,7 @@ void ZStitchImageDialog::initBgsub2ComboBox(int nchannel)
   while (m_bgsub2ComboBox->count() > 4) {
     m_bgsub2ComboBox->removeItem(4);
   }
-  for (int i = 0; i < nchannel; i++) {
+  for (int i = 0; i < nchannel; ++i) {
     m_bgsub2ComboBox->addItem(QString("Ch%1").arg(i + 1));
   }
 }
@@ -1300,7 +1300,7 @@ void ZStitchImageDialog::stitchStacks2()
       m_commandOutputEdit->append("<font color=red>Can not split this image 2. Abort.</font>");
       QApplication::processEvents();
       Kill_Mc_Stack(stack);
-      for (int i = 0; i < nstack; i++) {
+      for (int i = 0; i < nstack; ++i) {
         free(filepath1[i]);
       }
       free(filepath1);
@@ -1308,7 +1308,7 @@ void ZStitchImageDialog::stitchStacks2()
     } else {
       filepath2 = splitstack(stack, input2ba.data(), nstack);
       if (filepath2 == nullptr) {
-        for (int i = 0; i < nstack; i++) {
+        for (int i = 0; i < nstack; ++i) {
           free(filepath1[i]);
         }
         free(filepath1);
@@ -1317,13 +1317,13 @@ void ZStitchImageDialog::stitchStacks2()
       }
     }
     Kill_Mc_Stack(stack);
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       if (m_tileList[i].bIsSelected) {
         inputStack1Filenames.push_back(filepath1[i]);
         inputStack2Filenames.push_back(filepath2[i]);
       }
     }
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       free(filepath1[i]);
       free(filepath2[i]);
     }
@@ -1353,7 +1353,7 @@ void ZStitchImageDialog::stitchStacks2()
         nstack = m_nSel;
 
         if (m_inputStack1Filenames.size() == m_tileList.size()) {
-          for (int i = 0; i < m_inputStack1Filenames.size(); i++) {
+          for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
             if (m_tileList[i].bIsSelected) {
               inputStack1Filenames.push_back(m_inputStack1Filenames[i]);
             }
@@ -1390,7 +1390,7 @@ void ZStitchImageDialog::stitchStacks2()
         }
 
         if (m_inputStack2Filenames.size() == m_tileList.size()) {
-          for (int i = 0; i < m_inputStack2Filenames.size(); i++) {
+          for (int i = 0; i < m_inputStack2Filenames.size(); ++i) {
             if (m_tileList[i].bIsSelected) {
               inputStack2Filenames.push_back(m_inputStack2Filenames[i]);
             }
@@ -1452,7 +1452,7 @@ void ZStitchImageDialog::stitchStacks2()
         m_commandOutputEdit->append("<font color=red>Invalid layout. Abort.</font>");
         QApplication::processEvents();
         Kill_Mc_Stack(stack);
-        for (int i = 0; i < nstack; i++) {
+        for (int i = 0; i < nstack; ++i) {
           free(filepath1[i]);
         }
         free(filepath1);
@@ -1460,7 +1460,7 @@ void ZStitchImageDialog::stitchStacks2()
       } else {
         filepath2 = splitstack(stack, input2ba.data(), nstack);
         if (filepath2 == nullptr) {
-          for (int i = 0; i < nstack; i++) {
+          for (int i = 0; i < nstack; ++i) {
             free(filepath1[i]);
           }
           free(filepath1);
@@ -1495,7 +1495,7 @@ void ZStitchImageDialog::stitchStacks2()
   QList<QByteArray> filepath1List;
   if (filepath1 == nullptr) {
     filepath1 = (char**) malloc(sizeof(char*) * nstack);
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       filepath1List.push_front(inputStack1Filenames[i].toLocal8Bit());
       filepath1[i] = filepath1List[0].data();
     }
@@ -1504,7 +1504,7 @@ void ZStitchImageDialog::stitchStacks2()
   QList<QByteArray> filepath2List;
   if (filepath2 == nullptr) {
     filepath2 = (char**) malloc(sizeof(char*) * nstack);
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       filepath2List.push_front(inputStack2Filenames[i].toLocal8Bit());
       filepath2[i] = filepath2List[0].data();
     }
@@ -1513,9 +1513,9 @@ void ZStitchImageDialog::stitchStacks2()
   //first get conn and all_config (position relationship)
   int*** all_config;
   GUARDED_MALLOC_ARRAY(all_config, nstack, int * *);
-  for (int i = 0; i < nstack; i++) {
+  for (int i = 0; i < nstack; ++i) {
     GUARDED_MALLOC_ARRAY(all_config[i], nstack, int * );
-    for (int j = 0; j < nstack; j++) {
+    for (int j = 0; j < nstack; ++j) {
       all_config[i][j] = nullptr;
     }
   }
@@ -1542,23 +1542,23 @@ void ZStitchImageDialog::stitchStacks2()
     //QVector<QVector<int> > conn(m_nSel, QVector<int>(m_nSel, 0));
     int i;
     MALLOC_2D_ARRAY(conn, nstack, nstack, int, i);
-    for (int i = 0; i < nstack; i++) {
-      for (int j = 0; j < nstack; j++) {
+    for (int i = 0; i < nstack; ++i) {
+      for (int j = 0; j < nstack; ++j) {
         conn[i][j] = 0;
       }
     }
     QVector<QVector<int> > tileMatrix(m_tileMatrix.size(), QVector<int>(m_tileMatrix[0].size(), 0));
 
     int index = 1;
-    for (int i = 0; i < m_tileMatrix.size(); i++) {
-      for (int j = 0; j < m_tileMatrix[0].size(); j++) {
+    for (int i = 0; i < m_tileMatrix.size(); ++i) {
+      for (int j = 0; j < m_tileMatrix[0].size(); ++j) {
         if (m_tileMatrix[i][j] > 0 && m_tileList[m_tileMatrix[i][j] - 1].bIsSelected) {
           tileMatrix[i][j] = index++;
         }
       }
     }
-    for (int i = 0; i < tileMatrix.size(); i++) {
-      for (int j = 0; j < tileMatrix[0].size(); j++) {
+    for (int i = 0; i < tileMatrix.size(); ++i) {
+      for (int j = 0; j < tileMatrix[0].size(); ++j) {
         if (tileMatrix[i][j] > 0) {
           bool connected = false;
           if (j + 1 < tileMatrix[0].size() && tileMatrix[i][j + 1] > 0) { //right
@@ -1662,12 +1662,12 @@ void ZStitchImageDialog::stitchStacks2()
               FREE_2D_ARRAY(conn, nstack);
               conn = nullptr;
             }
-            for (int i = 0; i < nstack; i++) {
-              for (int j = 0; j < nstack; j++) {
+            for (int i = 0; i < nstack; ++i) {
+              for (int j = 0; j < nstack; ++j) {
                 free(all_config[i][j]);
               }
             }
-            for (int i = 0; i < nstack; i++) {
+            for (int i = 0; i < nstack; ++i) {
               free(all_config[i]);
             }
             free(all_config);
@@ -1689,7 +1689,7 @@ void ZStitchImageDialog::stitchStacks2()
     if (conn == nullptr) {
       m_commandOutputEdit->append(
         QString("<font color=red>Failed to load connection file: %1. Abort.</font>").arg(m_connFileEdit->text()));
-      for (int i = 0; i < nstack; i++) {
+      for (int i = 0; i < nstack; ++i) {
         free(all_config[i]);
       }
       free(all_config);
@@ -1706,8 +1706,8 @@ void ZStitchImageDialog::stitchStacks2()
   } else if (m_useLayoutRadioButton->isChecked()) {
     int i;
     MALLOC_2D_ARRAY(conn, nstack, nstack, int, i);
-    for (int i = 0; i < nstack; i++) {
-      for (int j = 0; j < nstack; j++) {
+    for (int i = 0; i < nstack; ++i) {
+      for (int j = 0; j < nstack; ++j) {
         conn[i][j] = 0;
       }
     }
@@ -1718,19 +1718,19 @@ void ZStitchImageDialog::stitchStacks2()
     int is_in_bound[4];
     //Stack_Neighbor_Offset(4, row, col, neighbor);
     Stack_Neighbor_Offset(4, col, row, neighbor);
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       //int nbound = Stack_Neighbor_Bound_Test_I(4, row, col, 1, i,
       //                                         is_in_bound);
       int nbound = Stack_Neighbor_Bound_Test_I(4, col, row, 1, i, is_in_bound);
       if (nbound == 4) {
-        for (int j = 0; j < 4; j++) {
+        for (int j = 0; j < 4; ++j) {
           int nbr = i + neighbor[j];
           if (nbr > i) {
             conn[i][nbr] = 1;
           }
         }
       } else {
-        for (int j = 0; j < 4; j++) {
+        for (int j = 0; j < 4; ++j) {
           int nbr = i + neighbor[j];
           if (nbr > i) {
             if (is_in_bound[j]) {
@@ -1743,12 +1743,12 @@ void ZStitchImageDialog::stitchStacks2()
   }
 
   final_offset = (int**) malloc(sizeof(int*) * nstack * 2);
-  for (int i = 0; i < nstack * 2; i++) {
+  for (int i = 0; i < nstack * 2; ++i) {
     final_offset[i] = iarray_calloc(3);
   }
 
   stackSizes = (int**) malloc(sizeof(int*) * nstack * 2);
-  for (int i = 0; i < nstack * 2; i++) {
+  for (int i = 0; i < nstack * 2; ++i) {
     stackSizes[i] = (int*) malloc(3 * sizeof(int));
   }
 
@@ -1768,7 +1768,7 @@ void ZStitchImageDialog::stitchStacks2()
 
   int** pairs;
   pairs = (int**) malloc(sizeof(int*) * npair);
-  for (int i = 0; i < npair; i++) {
+  for (int i = 0; i < npair; ++i) {
     pairs[i] = (int*) malloc(2 * sizeof(int));
   }
 
@@ -1786,7 +1786,7 @@ void ZStitchImageDialog::stitchStacks2()
   int bgsub2Index = m_bgsub2ComboBox->currentIndex();
 
   m_commandOutputEdit->append("Load stacks ...");
-  for (int i = 0; i < nstack * 2; i++) {
+  for (int i = 0; i < nstack * 2; ++i) {
     m_commandOutputEdit->append(QString("Stack %1 ...").arg(i));
     if (i < nstack) {
       stack1 = readStack(filepath1[i], bgsub1Index, channel1Index);
@@ -1842,8 +1842,8 @@ void ZStitchImageDialog::stitchStacks2()
 #endif
 
   /* rough estimation */
-  for (int i = 0; i < nstack - 1; i++) {
-    for (int j = i + 1; j < nstack; j++) {
+  for (int i = 0; i < nstack - 1; ++i) {
+    for (int j = i + 1; j < nstack; ++j) {
       if ((conn == nullptr) || (conn[i][j] == 1)) {
         max_corr[idx] = Align_Stack_MR_D(downstacks[i], downstacks[j], intv,
                                          -1, all_config[i][j], offset[idx],
@@ -1867,8 +1867,8 @@ void ZStitchImageDialog::stitchStacks2()
   Kill_Stack(downstacks[nstack - 1]);
 
   /* rough estimation */
-  for (int i = nstack; i < 2 * nstack - 1; i++) {
-    for (int j = i + 1; j < 2 * nstack; j++) {
+  for (int i = nstack; i < 2 * nstack - 1; ++i) {
+    for (int j = i + 1; j < 2 * nstack; ++j) {
       if ((conn == nullptr) || (conn[i - nstack][j - nstack] == 1)) {
         max_corr[idx] = Align_Stack_MR_D(downstacks[i], downstacks[j], intv,
                                          -1, all_config[i - nstack][j - nstack], offset[idx],
@@ -1896,7 +1896,7 @@ void ZStitchImageDialog::stitchStacks2()
   int stack1kind;
   int stack2kind;
   // rough estimate inter stack corr
-  for (int i = 0; i < nstack; i++) {
+  for (int i = 0; i < nstack; ++i) {
     stack1 = Read_Sc_Stack(filepath1[i], m_commonChannel1SpinBox->value() - 1);
     stack2 = Read_Sc_Stack(filepath2[i], m_commonChannel2SpinBox->value() - 1);
     stack1kind = stack1->kind;
@@ -1955,22 +1955,22 @@ void ZStitchImageDialog::stitchStacks2()
 
   int* permidx;
   permidx = (int*) malloc(sizeof(int) * npair);
-  for (int i = 0; i < npair; i++) {
+  for (int i = 0; i < npair; ++i) {
     permidx[i] = i;
   }
   int* labels;
   labels = (int*) malloc(sizeof(int) * nstack * 2);
-  for (int i = 0; i < nstack * 2; i++) {
+  for (int i = 0; i < nstack * 2; ++i) {
     labels[i] = 0;
   }
   int** selpairs;
   selpairs = (int**) malloc(sizeof(int*) * (2 * nstack - 1));
-  for (int i = 0; i < 2 * nstack - 1; i++)
+  for (int i = 0; i < 2 * nstack - 1; ++i)
     selpairs[i] = (int*) malloc(sizeof(int) * 2);
 
   int** seloffset;
   seloffset = (int**) malloc(sizeof(int*) * (2 * nstack - 1));
-  for (int i = 0; i < 2 * nstack - 1; i++)
+  for (int i = 0; i < 2 * nstack - 1; ++i)
     seloffset[i] = (int*) malloc(sizeof(int) * 3);
 
   darray_qsort(max_corr, permidx, npair);
@@ -2046,7 +2046,7 @@ void ZStitchImageDialog::stitchStacks2()
       idx++;
       i = 0;
     }
-    i++;
+    ++i;
     qDebug() << "hasfw: " << i;
   }
   FREE_2D_ARRAY(pairs, npair);
@@ -2068,18 +2068,18 @@ void ZStitchImageDialog::stitchStacks2()
     FREE_2D_ARRAY(conn, nstack);
     conn = nullptr;
   }
-  for (int i = 0; i < nstack; i++) {
-    for (int j = 0; j < nstack; j++) {
+  for (int i = 0; i < nstack; ++i) {
+    for (int j = 0; j < nstack; ++j) {
       free(all_config[i][j]);
     }
   }
-  for (int i = 0; i < nstack; i++) {
+  for (int i = 0; i < nstack; ++i) {
     free(all_config[i]);
   }
   free(all_config);
   all_config = nullptr;
 
-  for (int i = 0; i < 2 * nstack; i++) {
+  for (int i = 0; i < 2 * nstack; ++i) {
     if (i < nstack) {
       m_commandOutputEdit->append(filepath1[i]);
     } else {
@@ -2096,13 +2096,13 @@ void ZStitchImageDialog::stitchStacks2()
   Mc_Stack* new_stack = nullptr;
 
   //????????????????????????????????????????
-  //  for (int i = 0; i < nstack; i++) {
+  //  for (int i = 0; i < nstack; ++i) {
   //    if (m_dsCheckBox->isChecked()) {
   //      int ds[3];
   //      ds[0] = m_dsXSpinBox->value();
   //      ds[1] = m_dsYSpinBox->value();
   //      ds[2] = m_dsZSpinBox->value();
-  //      for (int j = 0; j < 3; j++) {
+  //      for (int j = 0; j < 3; ++j) {
   //        if (final_offset[i][j] < 0) {
   //          final_offset[i][j]--;
   //        }
@@ -2117,7 +2117,7 @@ void ZStitchImageDialog::stitchStacks2()
   //  if (large_stack == false) {
   //    Mc_Stack **stacks = (Mc_Stack **) malloc(sizeof(Mc_Stack*) * nstack);
 
-  //    for (int i = 0; i < nstack; i++) {
+  //    for (int i = 0; i < nstack; ++i) {
   //      stacks[i] = Read_Mc_Stack(filepath1[i], -1);
   //      if (m_dsCheckBox->isChecked()) {
   //        Mc_Stack_Downsample_Mean(stacks[i], m_dsXSpinBox->value() - 1, m_dsYSpinBox->value() - 1,
@@ -2129,7 +2129,7 @@ void ZStitchImageDialog::stitchStacks2()
   //    new_stack = Mc_Stack_Merge(stacks, nstack, final_offset,
   //                               merge_mode);
 
-  //    for (int i = 0; i< nstack; i++) {
+  //    for (int i = 0; i< nstack; ++i) {
   //      Kill_Mc_Stack(stacks[i]);
   //    }
   //    free(stacks);
@@ -2156,20 +2156,20 @@ void ZStitchImageDialog::stitchStacks2()
   int corner2[3];
   MALLOC_2D_ARRAY(start, 3, nstack * 2, int, i);
   MALLOC_2D_ARRAY(end, 3, nstack * 2, int, i);
-  for (i = 0; i < nstack * 2; i++) {
-    for (int j = 0; j < 3; j++) {
+  for (i = 0; i < nstack * 2; ++i) {
+    for (int j = 0; j < 3; ++j) {
       start[j][i] = final_offset[i][j];
     }
   }
-  for (i = 0; i < nstack * 2; i++) {
+  for (i = 0; i < nstack * 2; ++i) {
     end[0][i] = start[0][i] + stackSizes[i][0] - 1;
     end[1][i] = start[1][i] + stackSizes[i][1] - 1;
     end[2][i] = start[2][i] + stackSizes[i][2] - 1;
   }
-  for (i = 0; i < 3; i++) {
+  for (i = 0; i < 3; ++i) {
     corner1[i] = iarray_min(start[i], nstack * 2, nullptr);
   }
-  for (i = 0; i < 3; i++) {
+  for (i = 0; i < 3; ++i) {
     corner2[i] = iarray_max(end[i], nstack * 2, nullptr);
   }
   FREE_2D_ARRAY(start, 3);
@@ -2186,7 +2186,7 @@ void ZStitchImageDialog::stitchStacks2()
     ch3 = Mc_Stack_Channel(new_stack, 2);
     if (m_outputCh3ImageComboBox->currentIndex() == 1) {
       int channel = m_outputCh3ImageChannelSpinBox->value() - 1;
-      for (int i = 0; i < nstack; i++) {
+      for (int i = 0; i < nstack; ++i) {
         stacks[i] = Read_Sc_Stack(filepath1[i], channel);
         if (m_dsCheckBox->isChecked()) {
           Downsample_Stack_Mean(stacks[i], m_dsXSpinBox->value() - 1, m_dsYSpinBox->value() - 1,
@@ -2194,12 +2194,12 @@ void ZStitchImageDialog::stitchStacks2()
         }
       }
       Stack_Merge_M_FC(stacks, nstack, final_offset, merge_mode, &ch3, corner1, corner2);
-      for (int i = 0; i < nstack; i++) {
+      for (int i = 0; i < nstack; ++i) {
         Kill_Stack(stacks[i]);
       }
     } else if (m_outputCh3ImageComboBox->currentIndex() == 2) {
       int channel = m_outputCh3ImageChannelSpinBox->value() - 1;
-      for (int i = 0; i < nstack; i++) {
+      for (int i = 0; i < nstack; ++i) {
         stacks[i] = Read_Sc_Stack(filepath2[i], channel);
         if (m_dsCheckBox->isChecked()) {
           Downsample_Stack_Mean(stacks[i], m_dsXSpinBox->value() - 1, m_dsYSpinBox->value() - 1,
@@ -2210,7 +2210,7 @@ void ZStitchImageDialog::stitchStacks2()
         }
       }
       Stack_Merge_M_FC(stacks, nstack, final_offset + nstack, merge_mode, &ch3, corner1, corner2);
-      for (int i = 0; i < nstack; i++) {
+      for (int i = 0; i < nstack; ++i) {
         Kill_Stack(stacks[i]);
       }
     }
@@ -2219,7 +2219,7 @@ void ZStitchImageDialog::stitchStacks2()
   ch2 = Mc_Stack_Channel(new_stack, 1);
   if (m_outputCh2ImageComboBox->currentIndex() == 1) {
     int channel = m_outputCh2ImageChannelSpinBox->value() - 1;
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       stacks[i] = Read_Sc_Stack(filepath1[i], channel);
       if (m_dsCheckBox->isChecked()) {
         Downsample_Stack_Mean(stacks[i], m_dsXSpinBox->value() - 1, m_dsYSpinBox->value() - 1,
@@ -2227,12 +2227,12 @@ void ZStitchImageDialog::stitchStacks2()
       }
     }
     Stack_Merge_M_FC(stacks, nstack, final_offset, merge_mode, &ch2, corner1, corner2);
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       Kill_Stack(stacks[i]);
     }
   } else if (m_outputCh2ImageComboBox->currentIndex() == 2) {
     int channel = m_outputCh2ImageChannelSpinBox->value() - 1;
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       stacks[i] = Read_Sc_Stack(filepath2[i], channel);
       if (m_dsCheckBox->isChecked()) {
         Downsample_Stack_Mean(stacks[i], m_dsXSpinBox->value() - 1, m_dsYSpinBox->value() - 1,
@@ -2243,7 +2243,7 @@ void ZStitchImageDialog::stitchStacks2()
       }
     }
     Stack_Merge_M_FC(stacks, nstack, final_offset + nstack, merge_mode, &ch2, corner1, corner2);
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       Kill_Stack(stacks[i]);
     }
   }
@@ -2251,7 +2251,7 @@ void ZStitchImageDialog::stitchStacks2()
   ch1 = Mc_Stack_Channel(new_stack, 0);
   if (m_outputCh1ImageComboBox->currentIndex() == 1) {
     int channel = m_outputCh1ImageChannelSpinBox->value() - 1;
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       stacks[i] = Read_Sc_Stack(filepath1[i], channel);
       if (m_dsCheckBox->isChecked()) {
         Downsample_Stack_Mean(stacks[i], m_dsXSpinBox->value() - 1, m_dsYSpinBox->value() - 1,
@@ -2259,12 +2259,12 @@ void ZStitchImageDialog::stitchStacks2()
       }
     }
     Stack_Merge_M_FC(stacks, nstack, final_offset, merge_mode, &ch1, corner1, corner2);
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       Kill_Stack(stacks[i]);
     }
   } else if (m_outputCh1ImageComboBox->currentIndex() == 2) {
     int channel = m_outputCh1ImageChannelSpinBox->value() - 1;
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       stacks[i] = Read_Sc_Stack(filepath2[i], channel);
       if (m_dsCheckBox->isChecked()) {
         Downsample_Stack_Mean(stacks[i], m_dsXSpinBox->value() - 1, m_dsYSpinBox->value() - 1,
@@ -2275,7 +2275,7 @@ void ZStitchImageDialog::stitchStacks2()
       }
     }
     Stack_Merge_M_FC(stacks, nstack, final_offset + nstack, merge_mode, &ch1, corner1, corner2);
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       Kill_Stack(stacks[i]);
     }
   }
@@ -2298,7 +2298,7 @@ void ZStitchImageDialog::stitchStacks2()
     QImage image(*m_tileImage);
 
     QPainter painter(&image);
-    for (int i = 0; i < m_tileList.size(); i++) {
+    for (int i = 0; i < m_tileList.size(); ++i) {
       QRect rect = QRect(m_tileList.at(i).region.topLeft(),
                          m_tileList.at(i).region.bottomRight());
       if (m_tileList.at(i).bIsSelected) {
@@ -2319,7 +2319,7 @@ void ZStitchImageDialog::stitchStacks2()
   // cleanup
   if (m_useLayoutRadioButton->isChecked() && m_inputStack1Filenames.size() == 1 &&
       m_layout1SpinBox->value() * m_layout2SpinBox->value() != 1) {
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       free(filepath1[i]);
       free(filepath2[i]);
     }
@@ -2334,7 +2334,7 @@ void ZStitchImageDialog::stitchStacks2()
     filepath2 = nullptr;
   }
   FREE_2D_ARRAY(final_offset, nstack * 2);
-  for (int i = 0; i < 2 * nstack; i++) {
+  for (int i = 0; i < 2 * nstack; ++i) {
     free(stackSizes[i]);
   }
   free(stackSizes);
@@ -2459,7 +2459,7 @@ void ZStitchImageDialog::hasTwoInputStackSetCheckBoxChanged(int state)
     m_outputCh1ImageComboBox->show();
     m_outputCh2ImageComboBox->show();
     m_outputCh3ImageComboBox->show();
-    for (int i = 0; i < m_labelsForTwoInputs.size(); i++) {
+    for (int i = 0; i < m_labelsForTwoInputs.size(); ++i) {
       m_labelsForTwoInputs[i]->show();
     }
   } else {
@@ -2480,7 +2480,7 @@ void ZStitchImageDialog::hasTwoInputStackSetCheckBoxChanged(int state)
     m_outputCh1ImageComboBox->hide();
     m_outputCh2ImageComboBox->hide();
     m_outputCh3ImageComboBox->hide();
-    for (int i = 0; i < m_labelsForTwoInputs.size(); i++) {
+    for (int i = 0; i < m_labelsForTwoInputs.size(); ++i) {
       m_labelsForTwoInputs[i]->hide();
     }
   }
@@ -2608,12 +2608,12 @@ void ZStitchImageDialog::stitchStacks()
       }
     }
     Kill_Mc_Stack(stack);
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       if (m_tileList[i].bIsSelected) {
         inputStackFilenames.push_back(filepath[i]);
       }
     }
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       free(filepath[i]);
     }
     free(filepath);
@@ -2638,7 +2638,7 @@ void ZStitchImageDialog::stitchStacks()
         nstack = m_nSel;
 
         if (m_inputStack1Filenames.size() == m_tileList.size()) {
-          for (int i = 0; i < m_inputStack1Filenames.size(); i++) {
+          for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
             if (m_tileList[i].bIsSelected) {
               inputStackFilenames.push_back(m_inputStack1Filenames[i]);
             }
@@ -2731,7 +2731,7 @@ void ZStitchImageDialog::stitchStacks()
   QList<QByteArray> filepathList;
   if (filepath == nullptr) {
     filepath = (char**) malloc(sizeof(char*) * nstack);
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       filepathList.push_front(inputStackFilenames[i].toLocal8Bit());
       filepath[i] = filepathList[0].data();
     }
@@ -2741,9 +2741,9 @@ void ZStitchImageDialog::stitchStacks()
   //first get conn and all_config (position relationship)
   int*** all_config;
   GUARDED_MALLOC_ARRAY(all_config, nstack, int * *);
-  for (int i = 0; i < nstack; i++) {
+  for (int i = 0; i < nstack; ++i) {
     GUARDED_MALLOC_ARRAY(all_config[i], nstack, int * );
-    for (int j = 0; j < nstack; j++) {
+    for (int j = 0; j < nstack; ++j) {
       all_config[i][j] = nullptr;
     }
   }
@@ -2767,23 +2767,23 @@ void ZStitchImageDialog::stitchStacks()
     //QVector<QVector<int> > conn(m_nSel, QVector<int>(m_nSel, 0));
     int i;
     MALLOC_2D_ARRAY(conn, nstack, nstack, int, i);
-    for (int i = 0; i < nstack; i++) {
-      for (int j = 0; j < nstack; j++) {
+    for (int i = 0; i < nstack; ++i) {
+      for (int j = 0; j < nstack; ++j) {
         conn[i][j] = 0;
       }
     }
     QVector<QVector<int> > tileMatrix(m_tileMatrix.size(), QVector<int>(m_tileMatrix[0].size(), 0));
 
     int index = 1;
-    for (int i = 0; i < m_tileMatrix.size(); i++) {
-      for (int j = 0; j < m_tileMatrix[0].size(); j++) {
+    for (int i = 0; i < m_tileMatrix.size(); ++i) {
+      for (int j = 0; j < m_tileMatrix[0].size(); ++j) {
         if (m_tileMatrix[i][j] > 0 && m_tileList[m_tileMatrix[i][j] - 1].bIsSelected) {
           tileMatrix[i][j] = index++;
         }
       }
     }
-    for (int i = 0; i < tileMatrix.size(); i++) {
-      for (int j = 0; j < tileMatrix[0].size(); j++) {
+    for (int i = 0; i < tileMatrix.size(); ++i) {
+      for (int j = 0; j < tileMatrix[0].size(); ++j) {
         if (tileMatrix[i][j] > 0) {
           bool connected = false;
           if (j + 1 < tileMatrix[0].size() && tileMatrix[i][j + 1] > 0) { //right
@@ -2885,12 +2885,12 @@ void ZStitchImageDialog::stitchStacks()
               FREE_2D_ARRAY(conn, nstack);
               conn = nullptr;
             }
-            for (int i = 0; i < nstack; i++) {
-              for (int j = 0; j < nstack; j++) {
+            for (int i = 0; i < nstack; ++i) {
+              for (int j = 0; j < nstack; ++j) {
                 free(all_config[i][j]);
               }
             }
-            for (int i = 0; i < nstack; i++) {
+            for (int i = 0; i < nstack; ++i) {
               free(all_config[i]);
             }
             free(all_config);
@@ -2911,7 +2911,7 @@ void ZStitchImageDialog::stitchStacks()
     if (conn == nullptr) {
       m_commandOutputEdit->append(
         QString("<font color=red>Failed to load connection file: %1. Abort.</font>").arg(m_connFileEdit->text()));
-      for (int i = 0; i < nstack; i++) {
+      for (int i = 0; i < nstack; ++i) {
         free(all_config[i]);
       }
       free(all_config);
@@ -2926,8 +2926,8 @@ void ZStitchImageDialog::stitchStacks()
   } else if (m_useLayoutRadioButton->isChecked()) {
     int i;
     MALLOC_2D_ARRAY(conn, nstack, nstack, int, i);
-    for (int i = 0; i < nstack; i++) {
-      for (int j = 0; j < nstack; j++) {
+    for (int i = 0; i < nstack; ++i) {
+      for (int j = 0; j < nstack; ++j) {
         conn[i][j] = 0;
       }
     }
@@ -2938,19 +2938,19 @@ void ZStitchImageDialog::stitchStacks()
     int is_in_bound[4];
     //Stack_Neighbor_Offset(4, row, col, neighbor);
     Stack_Neighbor_Offset(4, col, row, neighbor);
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       //int nbound = Stack_Neighbor_Bound_Test_I(4, row, col, 1, i,
       //                                         is_in_bound);
       int nbound = Stack_Neighbor_Bound_Test_I(4, col, row, 1, i, is_in_bound);
       if (nbound == 4) {
-        for (int j = 0; j < 4; j++) {
+        for (int j = 0; j < 4; ++j) {
           int nbr = i + neighbor[j];
           if (nbr > i) {
             conn[i][nbr] = 1;
           }
         }
       } else {
-        for (int j = 0; j < 4; j++) {
+        for (int j = 0; j < 4; ++j) {
           int nbr = i + neighbor[j];
           if (nbr > i) {
             if (is_in_bound[j]) {
@@ -2963,12 +2963,12 @@ void ZStitchImageDialog::stitchStacks()
   }
 
   int** stackSizes = (int**) malloc(sizeof(int*) * nstack);
-  for (int i = 0; i < nstack; i++) {
+  for (int i = 0; i < nstack; ++i) {
     stackSizes[i] = (int*) malloc(3 * sizeof(int));
   }
 
   final_offset = (int**) malloc(sizeof(int*) * nstack);
-  for (int i = 0; i < nstack; i++) {
+  for (int i = 0; i < nstack; ++i) {
     final_offset[i] = iarray_calloc(3);
   }
 
@@ -2977,7 +2977,7 @@ void ZStitchImageDialog::stitchStacks()
     if (conn == nullptr) {
       m_commandOutputEdit->append(
         "<font color=red>Position information incomplete for image concatenate, Abort.</font>");
-      for (int i = 0; i < nstack; i++) {
+      for (int i = 0; i < nstack; ++i) {
         free(all_config[i]);
       }
       free(all_config);
@@ -2989,13 +2989,13 @@ void ZStitchImageDialog::stitchStacks()
     int stackwidth = stackSizes[0][0];
     int stackheight = stackSizes[0][1];
     int stackdepth = stackSizes[0][2];
-    for (int i = 1; i < nstack; i++) {
+    for (int i = 1; i < nstack; ++i) {
       Stack_Size_F(filepath[i], stackSizes[i]);
       if (!std::equal(stackSizes[0], stackSizes[0] + 3, stackSizes[i])) {
         m_commandOutputEdit->append(
           "<font color=red>For image concatenate, all the stack size must be same. Abort.</font>");
 
-        for (int j = 0; j < nstack; j++) {
+        for (int j = 0; j < nstack; ++j) {
           free(all_config[j]);
         }
         free(all_config);
@@ -3004,13 +3004,13 @@ void ZStitchImageDialog::stitchStacks()
     }
 
     int* labels = new int[nstack];
-    for (int i = 0; i < nstack; i++)
+    for (int i = 0; i < nstack; ++i)
       labels[i] = 0;
     labels[0] = 1;
     int nfinished = 1;
     while (nfinished != nstack) {
-      for (int i = 0; i < nstack - 1; i++) {
-        for (int j = i + 1; j < nstack; j++) {
+      for (int i = 0; i < nstack - 1; ++i) {
+        for (int j = i + 1; j < nstack; ++j) {
           if (labels[i] == 1 && labels[j] == 0 && conn[i][j] == 1) {
             if (all_config[i][j] == nullptr) {
               m_commandOutputEdit->append(
@@ -3052,7 +3052,7 @@ void ZStitchImageDialog::stitchStacks()
 
     int** pairs;
     pairs = (int**) malloc(sizeof(int*) * npair);
-    for (int i = 0; i < npair; i++) {
+    for (int i = 0; i < npair; ++i) {
       pairs[i] = (int*) malloc(2 * sizeof(int));
     }
 
@@ -3080,7 +3080,7 @@ void ZStitchImageDialog::stitchStacks()
     int bgsubIndex = m_bgsub1ComboBox->currentIndex();
 
     m_commandOutputEdit->append("Load stacks ...");
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       m_commandOutputEdit->append(QString("Stack %1 ...").arg(i));
 
       stack1 = readStack(filepath[i], bgsubIndex, channelIndex);
@@ -3131,8 +3131,8 @@ void ZStitchImageDialog::stitchStacks()
 #endif
 
     /* rough estimation */
-    for (int i = 0; i < nstack - 1; i++) {
-      for (int j = i + 1; j < nstack; j++) {
+    for (int i = 0; i < nstack - 1; ++i) {
+      for (int j = i + 1; j < nstack; ++j) {
         if ((conn == nullptr) || (conn[i][j] == 1)) {
           max_corr[idx] = Align_Stack_MR_D(downstacks[i], downstacks[j], intv,
                                            -1, all_config[i][j], offset[idx],
@@ -3162,22 +3162,22 @@ void ZStitchImageDialog::stitchStacks()
 
     int* permidx;
     permidx = (int*) malloc(sizeof(int) * npair);
-    for (int i = 0; i < npair; i++) {
+    for (int i = 0; i < npair; ++i) {
       permidx[i] = i;
     }
     int* labels;
     labels = (int*) malloc(sizeof(int) * nstack);
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       labels[i] = 0;
     }
     int** selpairs;
     selpairs = (int**) malloc(sizeof(int*) * (nstack - 1));
-    for (int i = 0; i < nstack - 1; i++)
+    for (int i = 0; i < nstack - 1; ++i)
       selpairs[i] = (int*) malloc(sizeof(int) * 2);
 
     int** seloffset;
     seloffset = (int**) malloc(sizeof(int*) * (nstack - 1));
-    for (int i = 0; i < nstack - 1; i++)
+    for (int i = 0; i < nstack - 1; ++i)
       seloffset[i] = (int*) malloc(sizeof(int) * 3);
 
     darray_qsort(max_corr, permidx, npair);
@@ -3245,7 +3245,7 @@ void ZStitchImageDialog::stitchStacks()
         idx++;
         i = 0;
       }
-      i++;
+      ++i;
       qDebug() << "hasfw: " << i;
     }
     FREE_2D_ARRAY(pairs, npair);
@@ -3267,19 +3267,19 @@ void ZStitchImageDialog::stitchStacks()
     FREE_2D_ARRAY(conn, nstack);
     conn = nullptr;
   }
-  for (int i = 0; i < nstack; i++) {
-    for (int j = 0; j < nstack; j++) {
+  for (int i = 0; i < nstack; ++i) {
+    for (int j = 0; j < nstack; ++j) {
       free(all_config[i][j]);
     }
   }
-  for (int i = 0; i < nstack; i++) {
+  for (int i = 0; i < nstack; ++i) {
     free(all_config[i]);
   }
   free(all_config);
   all_config = nullptr;
 
 
-  for (int i = 0; i < nstack; i++) {
+  for (int i = 0; i < nstack; ++i) {
     m_commandOutputEdit->append(filepath[i]);
     m_commandOutputEdit->append(QString("(%1,%2,%3) (%4,%5,%6)").
         arg(final_offset[i][0]).arg(final_offset[i][1]).arg(final_offset[i][2])
@@ -3288,7 +3288,7 @@ void ZStitchImageDialog::stitchStacks()
 
   if (fhasext(outputba.data(), "txt")) {
     FILE* fp = GUARDED_FOPEN(outputba.data(), "w");
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       fprintf(fp, "%s ", filepath[i]);
       fprintf(fp, "(%d,%d,%d) (%d,%d,%d)\n",
               final_offset[i][0], final_offset[i][1], final_offset[i][2],
@@ -3302,13 +3302,13 @@ void ZStitchImageDialog::stitchStacks()
     Mc_Stack* new_stack = nullptr;
 
 //    //????????????????????????????
-//    for (int i = 0; i < nstack; i++) {
+//    for (int i = 0; i < nstack; ++i) {
 //      if (m_dsCheckBox->isChecked()) {
 //        int ds[3];
 //        ds[0] = m_dsXSpinBox->value();
 //        ds[1] = m_dsYSpinBox->value();
 //        ds[2] = m_dsZSpinBox->value();
-//        for (int j = 0; j < 3; j++) {
+//        for (int j = 0; j < 3; ++j) {
 //          if (final_offset[i][j] < 0) {
 //            final_offset[i][j]--;
 //          }
@@ -3323,7 +3323,7 @@ void ZStitchImageDialog::stitchStacks()
     if (large_stack == false) {
       Mc_Stack** stacks = (Mc_Stack**) malloc(sizeof(Mc_Stack * ) * nstack);
 
-      for (int i = 0; i < nstack; i++) {
+      for (int i = 0; i < nstack; ++i) {
         stacks[i] = Read_Mc_Stack(filepath[i], -1);
         if (m_dsCheckBox->isChecked()) {
           Mc_Stack_Downsample_Mean(stacks[i], m_dsXSpinBox->value() - 1, m_dsYSpinBox->value() - 1,
@@ -3335,7 +3335,7 @@ void ZStitchImageDialog::stitchStacks()
       new_stack = Mc_Stack_Merge(stacks, nstack, final_offset,
                                  merge_mode);
 
-      for (int i = 0; i < nstack; i++) {
+      for (int i = 0; i < nstack; ++i) {
         Kill_Mc_Stack(stacks[i]);
       }
       free(stacks);
@@ -3371,7 +3371,7 @@ void ZStitchImageDialog::stitchStacks()
       QImage image(*m_tileImage);
 
       QPainter painter(&image);
-      for (int i = 0; i < m_tileList.size(); i++) {
+      for (int i = 0; i < m_tileList.size(); ++i) {
         QRect rect = QRect(m_tileList.at(i).region.topLeft(),
                            m_tileList.at(i).region.bottomRight());
         if (m_tileList.at(i).bIsSelected) {
@@ -3392,7 +3392,7 @@ void ZStitchImageDialog::stitchStacks()
   // cleanup
   if (m_useLayoutRadioButton->isChecked() && m_inputStack1Filenames.size() == 1 &&
       m_layout1SpinBox->value() * m_layout2SpinBox->value() != 1) {
-    for (int i = 0; i < nstack; i++) {
+    for (int i = 0; i < nstack; ++i) {
       free(filepath[i]);
     }
     free(filepath);
@@ -3402,7 +3402,7 @@ void ZStitchImageDialog::stitchStacks()
     filepath = nullptr;
   }
   FREE_2D_ARRAY(final_offset, nstack);
-  for (int i = 0; i < nstack; i++) {
+  for (int i = 0; i < nstack; ++i) {
     free(stackSizes[i]);
   }
   free(stackSizes);
@@ -3443,10 +3443,10 @@ char** ZStitchImageDialog::splitstack(Mc_Stack* stack, const char* filepath, int
   uint8_t* array = stack->array;
   char filename[100];
   fname(filepath, filename);
-  for (k = 0; k < nstack; k++) {
+  for (k = 0; k < nstack; ++k) {
     int offset = 0;
     int offset2 = 0;
-    for (i = 0; i < stack->nchannel; i++) {
+    for (i = 0; i < stack->nchannel; ++i) {
       memcpy(tmpstack->array + offset2, array + offset, channel_size2);
       offset += channel_size;
       offset2 += channel_size2;
@@ -3492,7 +3492,7 @@ Stack* ZStitchImageDialog::readStack(char* filepath, int bgsubIndex, int channel
     }
 
     int mask[zstack->channelNumber()];
-    for (int i = 0; i < zstack->channelNumber(); i++) {
+    for (int i = 0; i < zstack->channelNumber(); ++i) {
       if (bgsubIndex == 1) {  // remove background for all channels
         mask[i] = 1;
       } else {
@@ -3505,7 +3505,7 @@ Stack* ZStitchImageDialog::readStack(char* filepath, int bgsubIndex, int channel
     }
 
     if ((bgsubIndex == 1) || (bgsubIndex > 3)) {
-      for (int i = 0; i < zstack->channelNumber(); i++) {
+      for (int i = 0; i < zstack->channelNumber(); ++i) {
         if (mask[i] == 1) {
           Stack* channel = zstack->c_stack(i);
           Pixel_Range* pr = Stack_Range(channel, 0);
@@ -3556,7 +3556,7 @@ int ZStitchImageDialog::load_align(const char* filepath, char*** stack_file, int
         int n;
         (*offset)[i] = String_To_Integer_Array(strsplit(line, '(', 1), nullptr,
                                                &n);
-        i++;
+        ++i;
       }
     }
   }
@@ -3585,8 +3585,8 @@ int** ZStitchImageDialog::load_conn(char* filepath, int*** config)
   int** conn;
   int i, j;
   MALLOC_2D_ARRAY(conn, ntile, ntile, int, i);
-  for (i = 0; i < ntile; i++) {
-    for (j = 0; j < ntile; j++) {
+  for (i = 0; i < ntile; ++i) {
+    for (j = 0; j < ntile; ++j) {
       conn[i][j] = 0;
     }
   }

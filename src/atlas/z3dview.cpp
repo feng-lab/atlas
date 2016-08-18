@@ -76,20 +76,6 @@ int numDigits(int32_t x)
   return 1;
 }
 
-//// partial-specialization optimization for 8-bit numbers
-//template <>
-//int numDigits(char n)
-//{
-//  // if you have the time, replace this with a static initialization to avoid
-//  // the initial overhead & unnecessary branch
-//  static char x[256] = {0};
-//  if (x[0] == 0) {
-//    for (char c = 1; c != 0; c++)
-//      x[static_cast<int>(c)] = numDigits((int32_t)c);
-//    x[0] = 1;
-//  }
-//  return x[static_cast<int>(n)];
-//}
 }
 
 namespace nim {
@@ -317,7 +303,7 @@ bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& name
   progress.show();
   double rAngle = two_pi / numFrame;
   bool res = true;
-  for (int i = 0; i < numFrame; i++) {
+  for (int i = 0; i < numFrame; ++i) {
     progress.setValue(i);
     if (progress.wasCanceled())
       break;
@@ -353,7 +339,7 @@ bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, g
   progress.show();
   double rAngle = two_pi / numFrame;
   bool res = true;
-  for (int i = 0; i < numFrame; i++) {
+  for (int i = 0; i < numFrame; ++i) {
     progress.setValue(i);
     if (progress.wasCanceled())
       break;

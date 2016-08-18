@@ -41,12 +41,12 @@ void Z3DSphereRenderer::setData(std::vector<glm::vec4>* pointAndRadiusInput,
   m_indexs.clear();
   int indices[6] = {0, 1, 2, 2, 1, 3};
   int quadIdx = 0;
-  for (size_t i = 0; i < pointAndRadiusInput->size(); i++) {
-    m_pointAndRadius.push_back(pointAndRadiusInput->at(i));
-    m_pointAndRadius.push_back(pointAndRadiusInput->at(i));
-    m_pointAndRadius.push_back(pointAndRadiusInput->at(i));
-    m_pointAndRadius.push_back(pointAndRadiusInput->at(i));
-    for (int k = 0; k < 6; k++) {
+  for (auto pr : *pointAndRadiusInput) {
+    m_pointAndRadius.push_back(pr);
+    m_pointAndRadius.push_back(pr);
+    m_pointAndRadius.push_back(pr);
+    m_pointAndRadius.push_back(pr);
+    for (int k = 0; k < 6; ++k) {
       m_indexs.push_back(indices[k] + 4 * quadIdx);
     }
     quadIdx++;
@@ -54,11 +54,11 @@ void Z3DSphereRenderer::setData(std::vector<glm::vec4>* pointAndRadiusInput,
   if (!specularAndShininessInput) {
     m_useDynamicMaterial.set(false);
   } else {
-    for (size_t i = 0; i < specularAndShininessInput->size(); i++) {
-      m_specularAndShininess.push_back(specularAndShininessInput->at(i));
-      m_specularAndShininess.push_back(specularAndShininessInput->at(i));
-      m_specularAndShininess.push_back(specularAndShininessInput->at(i));
-      m_specularAndShininess.push_back(specularAndShininessInput->at(i));
+    for (auto ss : *specularAndShininessInput) {
+      m_specularAndShininess.push_back(ss);
+      m_specularAndShininess.push_back(ss);
+      m_specularAndShininess.push_back(ss);
+      m_specularAndShininess.push_back(ss);
     }
   }
   size_t rightUpSize = m_allFlags.size();
@@ -87,11 +87,11 @@ void Z3DSphereRenderer::setData(std::vector<glm::vec4>* pointAndRadiusInput,
 void Z3DSphereRenderer::setDataColors(std::vector<glm::vec4>* pointColorsInput)
 {
   m_pointColors.clear();
-  for (size_t i = 0; i < pointColorsInput->size(); i++) {
-    m_pointColors.push_back(pointColorsInput->at(i));
-    m_pointColors.push_back(pointColorsInput->at(i));
-    m_pointColors.push_back(pointColorsInput->at(i));
-    m_pointColors.push_back(pointColorsInput->at(i));
+  for (auto color : *pointColorsInput) {
+    m_pointColors.push_back(color);
+    m_pointColors.push_back(color);
+    m_pointColors.push_back(color);
+    m_pointColors.push_back(color);
   }
   invalidateOpenglRenderer();
   m_dataChanged = true;
@@ -102,11 +102,11 @@ void Z3DSphereRenderer::setDataPickingColors(std::vector<glm::vec4>* pointPickin
   m_pointPickingColors.clear();
   if (!pointPickingColorsInput)
     return;
-  for (size_t i = 0; i < pointPickingColorsInput->size(); i++) {
-    m_pointPickingColors.push_back(pointPickingColorsInput->at(i));
-    m_pointPickingColors.push_back(pointPickingColorsInput->at(i));
-    m_pointPickingColors.push_back(pointPickingColorsInput->at(i));
-    m_pointPickingColors.push_back(pointPickingColorsInput->at(i));
+  for (auto color : *pointPickingColorsInput) {
+    m_pointPickingColors.push_back(color);
+    m_pointPickingColors.push_back(color);
+    m_pointPickingColors.push_back(color);
+    m_pointPickingColors.push_back(color);
   }
   invalidateOpenglPickingRenderer();
   m_pickingDataChanged = true;
@@ -498,7 +498,7 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
 void Z3DSphereRenderer::appendDefaultColors()
 {
   if (m_pointColors.size() < m_pointAndRadius.size()) {
-    for (size_t i = m_pointColors.size(); i < m_pointAndRadius.size(); i++)
+    for (size_t i = m_pointColors.size(); i < m_pointAndRadius.size(); ++i)
       m_pointColors.emplace_back(0.f, 0.f, 0.f, 1.f);
   }
 }

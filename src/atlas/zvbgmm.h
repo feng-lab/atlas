@@ -334,7 +334,7 @@ protected:
     size_t nUniqueData = 0;
     std::set<VectorXrt, ZVectorCompare<ResultDataType>> myset;
     std::pair<typename std::set<VectorXrt, ZVectorCompare<ResultDataType>>::iterator, bool> ret;
-    for (Eigen::Index r = 0; r < m_pData->rows(); r++) {
+    for (Eigen::Index r = 0; r < m_pData->rows(); ++r) {
       ret = myset.insert(m_pData->row(r));
       if (ret.second != false) {
         nUniqueData++;
@@ -366,7 +366,7 @@ protected:
       VectorXrt alpha = VectorXrt::Ones(m_nclasses) * m_alpha0;
       VectorXrt beta = VectorXrt::Ones(m_nclasses);   // low precision for mean
       std::vector<MatrixXrt> W;
-      for (size_t i = 0; i < m_nclasses; i++) {
+      for (size_t i = 0; i < m_nclasses; ++i) {
         W.push_back(200 * MatrixXrt::Identity(m_dimension, m_dimension));
       }
       VectorXrt v = VectorXrt::Ones(m_nclasses) * 20;
@@ -376,7 +376,7 @@ protected:
       VectorXrt alpha = VectorXrt::Ones(m_nclasses) * m_alpha0;
       VectorXrt beta = VectorXrt::Ones(m_nclasses);   // low precision for mean
       std::vector<MatrixXrt> W;
-      for (size_t i = 0; i < m_nclasses; i++) {
+      for (size_t i = 0; i < m_nclasses; ++i) {
         W.push_back(200 * MatrixXrt::Identity(m_dimension, m_dimension));
       }
       VectorXrt v = VectorXrt::Ones(m_nclasses) * 20;
@@ -461,7 +461,7 @@ protected:
     MatrixXrt m = MatrixXrt::Zero(m_nclasses, m_dimension);
     VectorXrt v = VectorXrt::Zero(m_nclasses);
     std::vector<MatrixXrt> invW;
-    for (size_t k = 0; k < m_nclasses; k++) {
+    for (size_t k = 0; k < m_nclasses; ++k) {
       if (Nk(k) < 0.001) { // extinguished
         m.row(k) = m_prior.m.row(k);
         invW.push_back(m_prior.invW[k]);
@@ -484,7 +484,7 @@ protected:
     using namespace boost::math::double_constants;
     // 10.71
     VectorXrt ElogpXall = VectorXrt::Zero(m_nclasses);
-    for (size_t k = 0; k < m_nclasses; k++) {
+    for (size_t k = 0; k < m_nclasses; ++k) {
       RowVectorXrt xbarc = xbar.row(k) - post.m.row(k);
       ElogpXall(k) = 0.5 * Nk(k) * (post.logLambdaTilde(k) - m_dimension / post.beta(k)
                                     - (post.v(k) * S[k] * post.W[k]).trace()
@@ -501,7 +501,7 @@ protected:
 
     // 10.74
     VectorXrt ElogpmuSigmaAll = VectorXrt::Zero(m_nclasses);
-    for (size_t k = 0; k < m_nclasses; k++) {
+    for (size_t k = 0; k < m_nclasses; ++k) {
       RowVectorXrt mc = post.m.row(k) - m_prior.m.row(k);
       ElogpmuSigmaAll(k) = 0.5 * (m_dimension * std::log(m_prior.beta(k) / two_pi) + post.logLambdaTilde(k) -
                                   m_dimension * m_prior.beta(k) / post.beta(k)
@@ -540,7 +540,7 @@ protected:
       Nk = Nk.array() + 1e-10;
       xbar = MatrixXrt::Zero(m_nclasses, m_dimension);
       S.clear();
-      for (size_t k = 0; k < m_nclasses; k++) {
+      for (size_t k = 0; k < m_nclasses; ++k) {
         xbar.row(k) = (m_pData->array() * (post.rnk.col(k) * RowVectorXrt::Ones(m_dimension)).array() *
                        ((*m_pWeight) * RowVectorXrt::Ones(m_dimension)).array()).colwise().sum() / Nk(k); // 10.52
         MatrixXrt XC = m_pData->rowwise() - xbar.row(k);
@@ -553,7 +553,7 @@ protected:
       Nk = Nk.array() + 1e-10;
       xbar = MatrixXrt::Zero(m_nclasses, m_dimension);
       S.clear();
-      for (size_t k = 0; k < m_nclasses; k++) {
+      for (size_t k = 0; k < m_nclasses; ++k) {
         xbar.row(k) = (m_pData->array() * (post.rnk.col(k) * RowVectorXrt::Ones(m_dimension)).array()).colwise().sum() /
                       Nk(k); // 10.52
         MatrixXrt XC = m_pData->rowwise() - xbar.row(k);
@@ -570,7 +570,7 @@ protected:
   VectorXrt mixGaussBayesInfer(Params& post) const
   {
     MatrixXrt E(m_pData->rows(), m_nclasses);
-    for (size_t k = 0; k < m_nclasses; k++) {
+    for (size_t k = 0; k < m_nclasses; ++k) {
       MatrixXrt XC = m_pData->rowwise() - post.m.row(k);
       E.col(k) = m_dimension / post.beta(k) +
                  (post.v(k) * (((XC * post.W[k]).cwiseProduct(XC)).rowwise().sum())).array(); // 10.64
@@ -594,13 +594,13 @@ protected:
     if (isInvW) {
       out.invW.swap(W);
       out.W.clear();
-      for (size_t i = 0; i < m_nclasses; i++) {
+      for (size_t i = 0; i < m_nclasses; ++i) {
         out.W.push_back(out.invW[i].inverse());
       }
     } else {
       out.W.swap(W);
       out.invW.clear();
-      for (size_t i = 0; i < m_nclasses; i++) {
+      for (size_t i = 0; i < m_nclasses; ++i) {
         out.invW.push_back(out.W[i].inverse());
       }
     }
@@ -613,7 +613,7 @@ protected:
     out.logLambdaTilde = VectorXrt::Zero(m_nclasses);
     out.logWishartConst = VectorXrt::Zero(m_nclasses);
     out.entropy = VectorXrt::Zero(m_nclasses);
-    for (size_t k = 0; k < m_nclasses; k++) {
+    for (size_t k = 0; k < m_nclasses; ++k) {
       ResultDataType logdetW = ZEigenUtils::logdet(out.W[k]);
       VectorXrt tmp =
         (VectorXrt::LinSpaced(m_dimension, -static_cast<int>(m_dimension), -1).array() + out.v(k) + 1) * 0.5;
@@ -690,7 +690,7 @@ protected:
     m_result.logWishartConst = VectorXrt::Zero(m_nclasses);
     m_result.entropy = VectorXrt::Zero(m_nclasses);
     m_resultRnk = MatrixXrt::Zero(post.rnk.rows(), post.rnk.cols());
-    for (size_t k = 0; k < m_nclasses; k++) {
+    for (size_t k = 0; k < m_nclasses; ++k) {
       if (post.v(k) > m_prior.v(k)) {
         m_result.alpha(idx) = post.alpha(k);
         m_result.beta(idx) = post.beta(k);
@@ -718,7 +718,7 @@ protected:
     // assign labels
     Eigen::Index index;
     m_resultLabels = Eigen::VectorXi::Zero(m_pData->rows());
-    for (Eigen::Index i = 0; i < m_resultLabels.size(); i++) {
+    for (Eigen::Index i = 0; i < m_resultLabels.size(); ++i) {
       m_resultRnk.row(i).maxCoeff(&index);
       m_resultLabels(i) = index;
     }

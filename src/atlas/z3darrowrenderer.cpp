@@ -18,7 +18,7 @@ void Z3DArrowRenderer::setArrowData(std::vector<glm::vec4>* tailPosAndTailRadius
   m_arrowConeBaseAndBaseRadius.clear();
   m_arrowConeAxisAndTopRadius.clear();
 
-  for (size_t i = 0; i < tailPosAndTailRadius->size(); i++) {
+  for (size_t i = 0; i < tailPosAndTailRadius->size(); ++i) {
     glm::vec3 tail = tailPosAndTailRadius->at(i).xyz();
     glm::vec3 head = headPosAndHeadRadius->at(i).xyz();
     glm::vec3 cutPos = glm::mix(head, tail, headLengthProportion);
@@ -38,7 +38,7 @@ void Z3DArrowRenderer::setFixedHeadLengthArrowData(std::vector<glm::vec4>* tailP
   m_arrowConeBaseAndBaseRadius.clear();
   m_arrowConeAxisAndTopRadius.clear();
 
-  for (size_t i = 0; i < tailPosAndTailRadius->size(); i++) {
+  for (size_t i = 0; i < tailPosAndTailRadius->size(); ++i) {
     glm::vec3 tail = tailPosAndTailRadius->at(i).xyz();
     glm::vec3 head = headPosAndHeadRadius->at(i).xyz();
     float totalLength = glm::length(head - tail);

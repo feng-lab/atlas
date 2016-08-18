@@ -161,8 +161,8 @@ protected:
     if (box.empty()) {
       return true;
     } else {
-      for (size_t i = 0; i < m_boxes.size(); ++i)
-        if (m_boxes[i].contains(box))
+      for (const auto& mbox : m_boxes)
+        if (mbox.contains(box))
           return true;
     }
     return false;

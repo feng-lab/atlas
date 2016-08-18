@@ -75,7 +75,7 @@ void decompose(const glm::mat4& m, glm::vec3& translation, glm::vec3& scale, glm
     nextRotation = (rotation + currInvTranspose) * .5f;
 
     norm = 0.0;
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 3; ++i) {
       float n = static_cast<float>(
             std::abs(rotation[0][i] - nextRotation[0][i]) +
           std::abs(rotation[1][i] - nextRotation[1][i]) +

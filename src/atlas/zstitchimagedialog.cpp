@@ -25,8 +25,8 @@ public:
 void buildConnectionFromGrid(const std::vector<std::vector<size_t>>& grid,
                              std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>& conn)
 {
-  for (size_t i = 0; i < grid.size(); i++) {
-    for (size_t j = 0; j < grid[i].size(); j++) {
+  for (size_t i = 0; i < grid.size(); ++i) {
+    for (size_t j = 0; j < grid[i].size(); ++j) {
       if (grid[i][j] > 0) {
         bool connected = false;
         if (j + 1 < grid[0].size() && grid[i][j + 1] > 0) { //right
@@ -154,7 +154,7 @@ void ZTileImageWidget::paintEvent(QPaintEvent*)
     if (m_tileimages.size() == m_pTiles->size()) {
 
 
-      for (int i = 0; i < m_pTiles->size(); i++) {
+      for (int i = 0; i < m_pTiles->size(); ++i) {
         //        QRect rect = QRect(m_pTiles->at(i).region.topLeft() * m_scaleFactor,
         //                           m_pTiles->at(i).region.bottomRight() * m_scaleFactor);
         QPoint tl = m_pTiles->at(i).region.topLeft() * m_scaleFactor;
@@ -174,7 +174,7 @@ void ZTileImageWidget::paintEvent(QPaintEvent*)
         //painter.drawText(rect, str);
       }
     } else {
-      for (int i = 0; i < m_pTiles->size(); i++) {
+      for (int i = 0; i < m_pTiles->size(); ++i) {
         QRect rect = QRect(m_pTiles->at(i).region.topLeft() * m_scaleFactor,
                            m_pTiles->at(i).region.bottomRight() * m_scaleFactor);
         if (m_pTiles->at(i).bIsSelected) {
@@ -205,7 +205,7 @@ void ZTileImageWidget::mouseReleaseEvent(QMouseEvent* event)
 {
   m_rubberBand->hide();
   QRect selRegion = QRect(m_origin / m_scaleFactor, event->pos() / m_scaleFactor).normalized();
-  for (int i = 0; i < m_pTiles->size(); i++) {
+  for (int i = 0; i < m_pTiles->size(); ++i) {
     if (m_pTiles->at(i).region.intersects(selRegion)) {
       if ((*m_pTiles)[i].bIsSelected) {
         (*m_pTiles)[i].bIsSelected = false;
@@ -219,7 +219,7 @@ void ZTileImageWidget::mouseReleaseEvent(QMouseEvent* event)
 
 void ZTileImageWidget::clearAllSelected()
 {
-  for (int i = 0; i < m_pTiles->size(); i++) {
+  for (int i = 0; i < m_pTiles->size(); ++i) {
     (*m_pTiles)[i].bIsSelected = false;
   }
   update();
@@ -227,7 +227,7 @@ void ZTileImageWidget::clearAllSelected()
 
 void ZTileImageWidget::selectAll()
 {
-  for (int i = 0; i < m_pTiles->size(); i++) {
+  for (int i = 0; i < m_pTiles->size(); ++i) {
     (*m_pTiles)[i].bIsSelected = true;
   }
   update();
@@ -869,15 +869,15 @@ void ZStitchImageDialog::editConnFromTileImage()
     if (dia.exec() == QDialog::Accepted) {
       m_tileList = tmpList;
       m_nSel = 0;
-      for (int i = 0; i < m_tileList.size(); i++) {
+      for (int i = 0; i < m_tileList.size(); ++i) {
         if (m_tileList[i].bIsSelected)
           m_nSel++;
       }
       QString str = QString("%1 images selected to stitch:").arg(m_nSel);
       m_connEdit->setText(str);
-      for (int i = 0; i < m_tileMatrix.size(); i++) {
+      for (int i = 0; i < m_tileMatrix.size(); ++i) {
         str = QString("  ");
-        for (int j = 0; j < m_tileMatrix[0].size(); j++) {
+        for (int j = 0; j < m_tileMatrix[0].size(); ++j) {
           if (m_tileMatrix[i][j] > 0 && m_tileList[m_tileMatrix[i][j] - 1].bIsSelected) {
             str += QString("%1\t").arg(m_tileMatrix[i][j]);
           } else {
@@ -975,7 +975,7 @@ void ZStitchImageDialog::initChannel1ComboBox(int nchannel)
   while (m_channel1ComboBox->count() > 2) {
     m_channel1ComboBox->removeItem(2);
   }
-  for (int i = 0; i < nchannel; i++) {
+  for (int i = 0; i < nchannel; ++i) {
     m_channel1ComboBox->addItem(QString("Ch%1").arg(i + 1));
   }
 }
@@ -986,7 +986,7 @@ void ZStitchImageDialog::initBgsub1ComboBox(int nchannel)
   while (m_bgsub1ComboBox->count() > 2) {
     m_bgsub1ComboBox->removeItem(2);
   }
-  for (int i = 0; i < nchannel; i++) {
+  for (int i = 0; i < nchannel; ++i) {
     m_bgsub1ComboBox->addItem(QString("Ch%1").arg(i + 1));
   }
 }
@@ -997,7 +997,7 @@ void ZStitchImageDialog::initChannel2ComboBox(int nchannel)
   while (m_channel2ComboBox->count() > 2) {
     m_channel2ComboBox->removeItem(2);
   }
-  for (int i = 0; i < nchannel; i++) {
+  for (int i = 0; i < nchannel; ++i) {
     m_channel2ComboBox->addItem(QString("Ch%1").arg(i + 1));
   }
 }
@@ -1008,7 +1008,7 @@ void ZStitchImageDialog::initBgsub2ComboBox(int nchannel)
   while (m_bgsub2ComboBox->count() > 2) {
     m_bgsub2ComboBox->removeItem(2);
   }
-  for (int i = 0; i < nchannel; i++) {
+  for (int i = 0; i < nchannel; ++i) {
     m_bgsub2ComboBox->addItem(QString("Ch%1").arg(i + 1));
   }
 }
@@ -1095,13 +1095,13 @@ void ZStitchImageDialog::stitchStacks2()
       throw ZStitchException(QString("Can not split image %1. Abort.").arg(m_inputStack2Filenames[0]));
 
     if (stack1File1Infos.size() == nstack) {
-      for (size_t i = 0; i < nstack; i++) {
+      for (size_t i = 0; i < nstack; ++i) {
         if (m_tileList[i].bIsSelected) {
           inputStack1Sources.push_back(ZImgSource(m_inputStack1Filenames[0], ZImgRegion(), i));
         }
       }
     } else {
-      for (size_t i = 0; i < nstack; i++) {
+      for (size_t i = 0; i < nstack; ++i) {
         if (m_tileList[i].bIsSelected) {
           ZImgRegion rgn;
           rgn.start.t = i;
@@ -1111,13 +1111,13 @@ void ZStitchImageDialog::stitchStacks2()
       }
     }
     if (stack2File1Infos.size() == nstack) {
-      for (size_t i = 0; i < nstack; i++) {
+      for (size_t i = 0; i < nstack; ++i) {
         if (m_tileList[i].bIsSelected) {
           inputStack2Sources.push_back(ZImgSource(m_inputStack2Filenames[0], ZImgRegion(), i));
         }
       }
     } else {
-      for (size_t i = 0; i < nstack; i++) {
+      for (size_t i = 0; i < nstack; ++i) {
         if (m_tileList[i].bIsSelected) {
           ZImgRegion rgn;
           rgn.start.t = i;
@@ -1129,7 +1129,7 @@ void ZStitchImageDialog::stitchStacks2()
     nstack = m_nSel;
   } else if (m_inputStack1Filenames.size() == 1 || m_useLayoutRadioButton->isChecked()) {
     nstack = m_inputStack1Filenames.size();
-    for (int i = 0; i < m_inputStack1Filenames.size(); i++) {
+    for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
       inputStack1Sources.push_back(m_inputStack1Filenames[i]);
       inputStack2Sources.push_back(m_inputStack2Filenames[i]);
     }
@@ -1148,14 +1148,14 @@ void ZStitchImageDialog::stitchStacks2()
         nstack = m_nSel;
 
         if (m_inputStack1Filenames.size() == m_tileList.size()) {
-          for (int i = 0; i < m_inputStack1Filenames.size(); i++) {
+          for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
             if (m_tileList[i].bIsSelected) {
               inputStack1Sources.push_back(m_inputStack1Filenames[i]);
               inputStack2Sources.push_back(m_inputStack2Filenames[i]);
             }
           }
         } else {
-          for (int i = 0; i < m_inputStack1Filenames.size(); i++) {
+          for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
             inputStack1Sources.push_back(m_inputStack1Filenames[i]);
             inputStack2Sources.push_back(m_inputStack2Filenames[i]);
           }
@@ -1164,7 +1164,7 @@ void ZStitchImageDialog::stitchStacks2()
         m_commandOutputEdit->setText(QString("<font color=red>No Tile Image, switching to blind stitching.</font>"));
         QApplication::processEvents();
         nstack = m_inputStack1Filenames.size();
-        for (int i = 0; i < m_inputStack1Filenames.size(); i++) {
+        for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
           inputStack1Sources.push_back(m_inputStack1Filenames[i]);
           inputStack2Sources.push_back(m_inputStack2Filenames[i]);
         }
@@ -1174,7 +1174,7 @@ void ZStitchImageDialog::stitchStacks2()
 
     } else {
       nstack = m_inputStack1Filenames.size();
-      for (int i = 0; i < m_inputStack1Filenames.size(); i++) {
+      for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
         inputStack1Sources.push_back(m_inputStack1Filenames[i]);
         inputStack2Sources.push_back(m_inputStack2Filenames[i]);
       }
@@ -1196,13 +1196,13 @@ void ZStitchImageDialog::stitchStacks2()
       if (stack2File1Infos.size() != nstack && stack2File1Infos[0].numTimes != nstack)
         throw ZStitchException("Invalid layout. Abort.");
       if (stack1File1Infos.size() == nstack) {
-        for (size_t i = 0; i < nstack; i++) {
+        for (size_t i = 0; i < nstack; ++i) {
           if (m_tileList[i].bIsSelected) {
             inputStack1Sources.push_back(ZImgSource(m_inputStack1Filenames[0], ZImgRegion(), i));
           }
         }
       } else {
-        for (size_t i = 0; i < nstack; i++) {
+        for (size_t i = 0; i < nstack; ++i) {
           if (m_tileList[i].bIsSelected) {
             ZImgRegion rgn;
             rgn.start.t = i;
@@ -1212,13 +1212,13 @@ void ZStitchImageDialog::stitchStacks2()
         }
       }
       if (stack2File1Infos.size() == nstack) {
-        for (size_t i = 0; i < nstack; i++) {
+        for (size_t i = 0; i < nstack; ++i) {
           if (m_tileList[i].bIsSelected) {
             inputStack2Sources.push_back(ZImgSource(m_inputStack2Filenames[0], ZImgRegion(), i));
           }
         }
       } else {
-        for (size_t i = 0; i < nstack; i++) {
+        for (size_t i = 0; i < nstack; ++i) {
           if (m_tileList[i].bIsSelected) {
             ZImgRegion rgn;
             rgn.start.t = i;
@@ -1261,8 +1261,8 @@ void ZStitchImageDialog::stitchStacks2()
     std::vector<std::vector<size_t>> tileMatrix(m_tileMatrix.size(), std::vector<size_t>(m_tileMatrix[0].size(), 0));
 
     int index = 1;
-    for (size_t i = 0; i < tileMatrix.size(); i++) {
-      for (size_t j = 0; j < tileMatrix[i].size(); j++) {
+    for (size_t i = 0; i < tileMatrix.size(); ++i) {
+      for (size_t j = 0; j < tileMatrix[i].size(); ++j) {
         if (m_tileMatrix[i][j] > 0 && m_tileList[m_tileMatrix[i][j] - 1].bIsSelected) {
           tileMatrix[i][j] = index++;
         }
@@ -1284,7 +1284,7 @@ void ZStitchImageDialog::stitchStacks2()
     //    conn = load_conn(connba.data(), all_config);
     //    if (!conn) {
     //      m_commandOutputEdit->append(QString("<font color=red>Failed to load connection file: %1. Abort.</font>").arg(m_connFileEdit->text()));
-    //      for (int i=0; i<nstack; i++) {
+    //      for (int i=0; i<nstack; ++i) {
     //        free(all_config[i]);
     //      }
     //      free(all_config);
@@ -1304,8 +1304,8 @@ void ZStitchImageDialog::stitchStacks2()
     std::vector<std::vector<size_t>> tileMatrix(row, std::vector<size_t>(col, 0));
 
     int index = 1;
-    for (size_t i = 0; i < tileMatrix.size(); i++) {
-      for (size_t j = 0; j < tileMatrix[i].size(); j++) {
+    for (size_t i = 0; i < tileMatrix.size(); ++i) {
+      for (size_t j = 0; j < tileMatrix[i].size(); ++j) {
         tileMatrix[i][j] = index++;
       }
     }
@@ -1516,7 +1516,7 @@ void ZStitchImageDialog::stitchStacks2()
     QImage image(m_tileImage);
 
     QPainter painter(&image);
-    for (int i = 0; i < m_tileList.size(); i++) {
+    for (int i = 0; i < m_tileList.size(); ++i) {
       QRect rect = QRect(m_tileList.at(i).region.topLeft(),
                          m_tileList.at(i).region.bottomRight());
       if (m_tileList.at(i).bIsSelected) {
@@ -1635,7 +1635,7 @@ void ZStitchImageDialog::hasTwoInputStackSetCheckBoxChanged(int state)
     //    m_outputCh1ImageComboBox->show();
     //    m_outputCh2ImageComboBox->show();
     //    m_outputCh3ImageComboBox->show();
-    for (int i = 0; i < m_labelsForTwoInputs.size(); i++) {
+    for (int i = 0; i < m_labelsForTwoInputs.size(); ++i) {
       m_labelsForTwoInputs[i]->show();
     }
   } else {
@@ -1656,7 +1656,7 @@ void ZStitchImageDialog::hasTwoInputStackSetCheckBoxChanged(int state)
     //    m_outputCh1ImageComboBox->hide();
     //    m_outputCh2ImageComboBox->hide();
     //    m_outputCh3ImageComboBox->hide();
-    for (int i = 0; i < m_labelsForTwoInputs.size(); i++) {
+    for (int i = 0; i < m_labelsForTwoInputs.size(); ++i) {
       m_labelsForTwoInputs[i]->hide();
     }
   }
@@ -1781,13 +1781,13 @@ void ZStitchImageDialog::stitchStacks()
         throw ZStitchException("Can not split this image. Abort.");
 
       if (stack1File1Infos.size() == nstack) {
-        for (size_t i = 0; i < nstack; i++) {
+        for (size_t i = 0; i < nstack; ++i) {
           if (m_tileList[i].bIsSelected) {
             inputStackSources.push_back(ZImgSource(m_inputStack1Filenames[0], ZImgRegion(), i));
           }
         }
       } else {
-        for (size_t i = 0; i < nstack; i++) {
+        for (size_t i = 0; i < nstack; ++i) {
           if (m_tileList[i].bIsSelected) {
             ZImgRegion rgn;
             rgn.start.t = i;
@@ -1799,7 +1799,7 @@ void ZStitchImageDialog::stitchStacks()
       nstack = m_nSel;
     } else if (m_inputStack1Filenames.size() == 1 || m_useLayoutRadioButton->isChecked()) {
       nstack = m_inputStack1Filenames.size();
-      for (int i = 0; i < m_inputStack1Filenames.size(); i++) {
+      for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
         inputStackSources.push_back(m_inputStack1Filenames[i]);
       }
     } else {
@@ -1817,13 +1817,13 @@ void ZStitchImageDialog::stitchStacks()
           nstack = m_nSel;
 
           if (m_inputStack1Filenames.size() == m_tileList.size()) {
-            for (int i = 0; i < m_inputStack1Filenames.size(); i++) {
+            for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
               if (m_tileList[i].bIsSelected) {
                 inputStackSources.push_back(m_inputStack1Filenames[i]);
               }
             }
           } else {
-            for (int i = 0; i < m_inputStack1Filenames.size(); i++) {
+            for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
               inputStackSources.push_back(m_inputStack1Filenames[i]);
             }
           }
@@ -1831,7 +1831,7 @@ void ZStitchImageDialog::stitchStacks()
           m_commandOutputEdit->setText(QString("<font color=red>No Tile Image, switching to blind stitching.</font>"));
           QApplication::processEvents();
           nstack = m_inputStack1Filenames.size();
-          for (int i = 0; i < m_inputStack1Filenames.size(); i++) {
+          for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
             inputStackSources.push_back(m_inputStack1Filenames[i]);
           }
           m_useFullConnectionRadioButton->click();
@@ -1840,7 +1840,7 @@ void ZStitchImageDialog::stitchStacks()
 
       } else {
         nstack = m_inputStack1Filenames.size();
-        for (int i = 0; i < m_inputStack1Filenames.size(); i++) {
+        for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
           inputStackSources.push_back(m_inputStack1Filenames[i]);
         }
       }
@@ -1859,13 +1859,13 @@ void ZStitchImageDialog::stitchStacks()
         if (stack1File1Infos.size() != nstack && stack1File1Infos[0].numTimes != nstack)
           throw ZStitchException("Invalid layout. Abort.");
         if (stack1File1Infos.size() == nstack) {
-          for (size_t i = 0; i < nstack; i++) {
+          for (size_t i = 0; i < nstack; ++i) {
             if (m_tileList[i].bIsSelected) {
               inputStackSources.push_back(ZImgSource(m_inputStack1Filenames[0], ZImgRegion(), i));
             }
           }
         } else {
-          for (size_t i = 0; i < nstack; i++) {
+          for (size_t i = 0; i < nstack; ++i) {
             if (m_tileList[i].bIsSelected) {
               ZImgRegion rgn;
               rgn.start.t = i;
@@ -1927,8 +1927,8 @@ void ZStitchImageDialog::stitchStacks()
       std::vector<std::vector<size_t>> tileMatrix(m_tileMatrix.size(), std::vector<size_t>(m_tileMatrix[0].size(), 0));
 
       int index = 1;
-      for (size_t i = 0; i < tileMatrix.size(); i++) {
-        for (size_t j = 0; j < tileMatrix[i].size(); j++) {
+      for (size_t i = 0; i < tileMatrix.size(); ++i) {
+        for (size_t j = 0; j < tileMatrix[i].size(); ++j) {
           if (m_tileMatrix[i][j] > 0 && m_tileList[m_tileMatrix[i][j] - 1].bIsSelected) {
             tileMatrix[i][j] = index++;
           }
@@ -1947,7 +1947,7 @@ void ZStitchImageDialog::stitchStacks()
       //    conn = load_conn(connba.data(), all_config);
       //    if (!conn) {
       //      m_commandOutputEdit->append(QString("<font color=red>Failed to load connection file: %1. Abort.</font>").arg(m_connFileEdit->text()));
-      //      for (int i=0; i<nstack; i++) {
+      //      for (int i=0; i<nstack; ++i) {
       //        free(all_config[i]);
       //      }
       //      free(all_config);
@@ -1967,8 +1967,8 @@ void ZStitchImageDialog::stitchStacks()
       std::vector<std::vector<size_t>> tileMatrix(row, std::vector<size_t>(col, 0));
 
       int index = 1;
-      for (size_t i = 0; i < tileMatrix.size(); i++) {
-        for (size_t j = 0; j < tileMatrix[i].size(); j++) {
+      for (size_t i = 0; i < tileMatrix.size(); ++i) {
+        for (size_t j = 0; j < tileMatrix[i].size(); ++j) {
           tileMatrix[i][j] = index++;
         }
       }
@@ -2149,7 +2149,7 @@ void ZStitchImageDialog::stitchStacks()
       QImage image(m_tileImage);
 
       QPainter painter(&image);
-      for (int i = 0; i < m_tileList.size(); i++) {
+      for (int i = 0; i < m_tileList.size(); ++i) {
         QRect rect = QRect(m_tileList.at(i).region.topLeft(),
                            m_tileList.at(i).region.bottomRight());
         if (m_tileList.at(i).bIsSelected) {

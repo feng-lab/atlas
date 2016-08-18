@@ -148,9 +148,9 @@ void Z3DNetworkEvaluator::initializeNetwork()
 
   // update size
   sizeChangedFromFilter();
-  for (size_t i = 0; i < m_reverseSortedFilters.size(); i++) {
-    QObject::disconnect(m_reverseSortedFilters[i], &Z3DFilter::requestUpstreamSizeChange, 0, 0);
-    connect(m_reverseSortedFilters[i], &Z3DFilter::requestUpstreamSizeChange,
+  for (auto filter : m_reverseSortedFilters) {
+    QObject::disconnect(filter, &Z3DFilter::requestUpstreamSizeChange, 0, 0);
+    connect(filter, &Z3DFilter::requestUpstreamSizeChange,
             this, &Z3DNetworkEvaluator::sizeChangedFromFilter);
   }
 
@@ -213,7 +213,7 @@ void Z3DNetworkEvaluator::buildNetwork()
   }
 
   LOG(INFO) << "Rendering Order: ";
-  for (size_t i = 0; i < m_renderingOrder.size(); i++) {
+  for (size_t i = 0; i < m_renderingOrder.size(); ++i) {
     LOG(INFO) << "  " << i << ": " << m_renderingOrder[i]->className();
   }
   LOG(INFO) << "";
@@ -227,17 +227,17 @@ void Z3DNetworkEvaluator::sizeChangedFromFilter(Z3DFilter* rp)
 {
   if (rp) {
     bool started = false;
-    for (size_t i = 0; i < m_reverseSortedFilters.size(); i++) {
+    for (auto filter : m_reverseSortedFilters) {
       if (started)
-        m_reverseSortedFilters[i]->updateSize();
+        filter->updateSize();
       else {
-        if (rp == m_reverseSortedFilters[i])
+        if (rp == filter)
           started = true;
       }
     }
   } else {
-    for (size_t i = 0; i < m_reverseSortedFilters.size(); i++) {
-      m_reverseSortedFilters[i]->updateSize();
+    for (auto filter : m_reverseSortedFilters) {
+      filter->updateSize();
     }
   }
 }

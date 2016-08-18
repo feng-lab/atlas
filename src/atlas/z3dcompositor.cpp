@@ -166,8 +166,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DCompositor::axisWidgetsGroup()
     m_axisWidgetsGroup->addChild(m_YAxisColor, 1);
     m_axisWidgetsGroup->addChild(m_ZAxisColor, 1);
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
-    for (size_t i = 0; i < paras.size(); i++) {
-      ZParameter* para = paras[i];
+    for (auto para : paras) {
       if (para->name() == "Size Scale")
         m_axisWidgetsGroup->addChild(*para, 1);
       else if (para->name() == "Rendering Method")
@@ -654,8 +653,7 @@ void Z3DCompositor::process(Z3DEye eye)
   } else if (showHandleFilters.empty() && !filters.empty()) {
     pickingManager().bindTarget();
     pickingManager().clearTarget();
-    for (size_t i = 0; i < filters.size(); i++) {
-      Z3DGeometryFilter* geomFilter = filters.at(i);
+    for (auto geomFilter : filters) {
       if (geomFilter->isReady(eye)) {
         geomFilter->setViewport(pickingManager().renderTarget().size());
         geomFilter->renderPicking(eye);
@@ -673,8 +671,7 @@ void Z3DCompositor::process(Z3DEye eye)
     m_tempPort5.releaseTarget();
     m_tempPort4.bindTarget();
     m_tempPort4.clearTarget();
-    for (size_t i = 0; i < filters.size(); i++) {
-      Z3DGeometryFilter* geomFilter = filters.at(i);
+    for (auto geomFilter : filters) {
       if (geomFilter->isReady(eye)) {
         geomFilter->setViewport(m_tempPort4.size());
         geomFilter->renderPicking(eye);
@@ -717,15 +714,13 @@ void Z3DCompositor::renderGeomsBlendDelayed(const std::vector<Z3DBoundedFilter*>
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   CHECK_GL_ERROR
 
-  for (size_t i = 0; i < opaqueFilters.size(); i++) {
-    Z3DBoundedFilter* filter = opaqueFilters.at(i);
+  for (auto filter : opaqueFilters) {
     filter->setViewport(port.size());
     filter->renderOpaque(eye);
     CHECK_GL_ERROR
   }
 
-  for (size_t i = 0; i < transparentFilters.size(); i++) {
-    Z3DBoundedFilter* filter = transparentFilters.at(i);
+  for (auto filter : transparentFilters) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     filter->setViewport(port.size());
@@ -747,15 +742,13 @@ void Z3DCompositor::renderGeomsBlendNoDepthMask(const std::vector<Z3DBoundedFilt
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   CHECK_GL_ERROR
 
-  for (size_t i = 0; i < opaqueFilters.size(); i++) {
-    Z3DBoundedFilter* filter = opaqueFilters.at(i);
+  for (auto filter : opaqueFilters) {
     filter->setViewport(port.size());
     filter->renderOpaque(eye);
     CHECK_GL_ERROR
   }
 
-  for (size_t i = 0; i < transparentFilters.size(); i++) {
-    Z3DBoundedFilter* filter = transparentFilters.at(i);
+  for (auto filter : transparentFilters) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     glDepthMask(GL_FALSE);
@@ -829,8 +822,7 @@ void Z3DCompositor::renderOpaqueFilters(const std::vector<Z3DBoundedFilter*>& fi
   port.bindTarget();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   CHECK_GL_ERROR
-  for (size_t i = 0; i < filters.size(); i++) {
-    Z3DBoundedFilter* filter = filters.at(i);
+  for (auto filter : filters) {
     filter->setViewport(port.size());
     filter->renderOpaque(eye);
     CHECK_GL_ERROR
@@ -905,8 +897,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   glClear(GL_COLOR_BUFFER_BIT);
   glBlendEquation(GL_MAX);
 
-  for (size_t i = 0; i < filters.size(); i++) {
-    Z3DBoundedFilter* filter = filters.at(i);
+  for (auto filter : filters) {
     filter->setViewport(m_ddpRT->size());
     filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
     filter->renderTransparent(eye);
@@ -945,8 +936,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
     glDrawBuffers(3, &g_drawBuffers[bufId + 0]);
     glBlendEquation(GL_MAX);
 
-    for (size_t i = 0; i < filters.size(); i++) {
-      Z3DBoundedFilter* filter = filters.at(i);
+    for (auto filter : filters) {
       filter->setViewport(m_ddpRT->size());
       filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
       filter->setShaderHookParaDDPDepthBlenderTexture(g_dualDepthTexId[prevId]);
@@ -1004,8 +994,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   glBlendFunc(GL_ONE, GL_ZERO);
   glDisable(GL_BLEND);
 
-  for (size_t i = 0; i < filters.size(); i++) {
-    Z3DBoundedFilter* filter = filters.at(i);
+  for (auto filter : filters) {
     filter->setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
   }
   CHECK_GL_ERROR
@@ -1043,7 +1032,7 @@ bool Z3DCompositor::createDDPRenderTarget(glm::uvec2 size)
   Z3DTexture* g_depthTex;
 
 #ifdef USE_RECT_TEX
-  for (int i = 0; i < 2; i++)
+  for (int i = 0; i < 2; ++i)
   {
     g_dualDepthTexId[i] = new Z3DTexture(glm::ivec3(size, 1), GL_TEXTURE_RECTANGLE,
                                          GL_RG, GL_RG32F, GL_FLOAT,
@@ -1071,7 +1060,7 @@ bool Z3DCompositor::createDDPRenderTarget(glm::uvec2 size)
                               GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE);
   g_depthTex->uploadTexture();
 #else
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 2; ++i) {
     g_dualDepthTexId[i] = new Z3DTexture(GLint(GL_RG32F), glm::uvec3(size, 1), GL_RG, GL_FLOAT);
     g_dualDepthTexId[i]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
     g_dualDepthTexId[i]->uploadImage();
@@ -1153,8 +1142,7 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
   glBlendFunc(GL_ONE, GL_ONE);
   glEnable(GL_BLEND);
 
-  for (size_t i = 0; i < filters.size(); i++) {
-    Z3DBoundedFilter* filter = filters.at(i);
+  for (auto filter : filters) {
     filter->setViewport(m_waRT->size());
     filter->setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
     filter->renderTransparent(eye);
@@ -1173,8 +1161,7 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
   glBlendFunc(GL_ONE, GL_ZERO);
   glDisable(GL_BLEND);
 
-  for (size_t i = 0; i < filters.size(); i++) {
-    Z3DBoundedFilter* filter = filters.at(i);
+  for (auto filter : filters) {
     filter->setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
   }
   CHECK_GL_ERROR

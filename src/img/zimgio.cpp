@@ -58,12 +58,12 @@ void ZImgIO::readInfo(const QString& filename, std::vector<ZImgInfo>& res,
     if (readers.empty()) {
       error = QString("File %1 is not supported.").arg(filename);
     } else {
-      for (size_t i = 0; i < readers.size(); ++i) {
+      for (auto reader : readers) {
         try {
           std::vector<ZImgInfo> tmpInfo;
           if (subBlocks)
             subBlocks->clear();
-          readers[i]->readInfo(filename, tmpInfo, subBlocks, pyramidalRatios);
+          reader->readInfo(filename, tmpInfo, subBlocks, pyramidalRatios);
           if (!tmpInfo.empty()) {
             tmpInfo.swap(res);
             return;
@@ -73,7 +73,7 @@ void ZImgIO::readInfo(const QString& filename, std::vector<ZImgInfo>& res,
         }
         catch (const ZIOException& e) {
           error += QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename).arg(
-            readers[i]->fullName()).arg(e.what());
+            reader->fullName()).arg(e.what());
         }
       }
     }
@@ -202,16 +202,16 @@ void ZImgIO::readMetadata(const QString& filename, ZImgMetadata& meta, size_t sc
     if (readers.empty()) {
       error = QString("File %1 is not supported.").arg(filename);
     } else {
-      for (size_t i = 0; i < readers.size(); ++i) {
+      for (auto reader : readers) {
         try {
           ZImgMetadata tmpMeta;
-          readers[i]->readMetadata(filename, tmpMeta, scene);
+          reader->readMetadata(filename, tmpMeta, scene);
           tmpMeta.swap(meta);
           return;
         }
         catch (const ZIOException& e) {
           error += QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename).arg(
-            readers[i]->fullName()).arg(e.what());
+            reader->fullName()).arg(e.what());
         }
       }
     }
@@ -244,16 +244,16 @@ void ZImgIO::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, 
     if (readers.empty()) {
       error = QString("File %1 is not supported.").arg(filename);
     } else {
-      for (size_t i = 0; i < readers.size(); ++i) {
+      for (auto reader : readers) {
         try {
           ZImgThumbernail tmpThumbnail;
-          readers[i]->readThumbnail(filename, tmpThumbnail, region, scene);
+          reader->readThumbnail(filename, tmpThumbnail, region, scene);
           tmpThumbnail.swap(thumbnail);
           return;
         }
         catch (const ZIOException& e) {
           error += QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename).arg(
-            readers[i]->fullName()).arg(e.what());
+            reader->fullName()).arg(e.what());
         }
       }
     }
@@ -286,16 +286,16 @@ void ZImgIO::readImg(const QString& filename, ZImg& img, const ZImgRegion& regio
     if (readers.empty()) {
       error = QString("File %1 is not supported.").arg(filename);
     } else {
-      for (size_t i = 0; i < readers.size(); ++i) {
+      for (auto reader : readers) {
         try {
           ZImg tmpImg;
-          readers[i]->readImg(filename, tmpImg, region, scene, ratio);
+          reader->readImg(filename, tmpImg, region, scene, ratio);
           tmpImg.swap(img);
           return;
         }
         catch (const ZIOException& e) {
           error += QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename).arg(
-            readers[i]->fullName()).arg(e.what());
+            reader->fullName()).arg(e.what());
         }
       }
     }
@@ -505,13 +505,13 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
     if (writers.empty()) {
       error = QString("Write file %1 is not supported.").arg(filename);
     } else {
-      for (size_t i = 0; i < writers.size(); ++i) {
+      for (auto writer : writers) {
         try {
-          writers[i]->writeImg(filename, img, comp);
+          writer->writeImg(filename, img, comp);
           return;
         }
         catch (const ZIOException& e) {
-          error += QString("Try write %1 as '%2' format, failed: %3 ").arg(filename).arg(writers[i]->fullName()).arg(
+          error += QString("Try write %1 as '%2' format, failed: %3 ").arg(filename).arg(writer->fullName()).arg(
             e.what());
         }
       }
@@ -544,13 +544,13 @@ void ZImgIO::writeImg(const QString& filename, const ZImgSliceProvider& img, Fil
     if (writers.empty()) {
       error = QString("Write file %1 is not supported.").arg(filename);
     } else {
-      for (size_t i = 0; i < writers.size(); ++i) {
+      for (auto writer : writers) {
         try {
-          writers[i]->writeImg(filename, img, comp);
+          writer->writeImg(filename, img, comp);
           return;
         }
         catch (const ZIOException& e) {
-          error += QString("\nTry write %1 as '%2' format, failed: %3 ").arg(filename).arg(writers[i]->fullName()).arg(
+          error += QString("\nTry write %1 as '%2' format, failed: %3 ").arg(filename).arg(writer->fullName()).arg(
             e.what());
         }
       }

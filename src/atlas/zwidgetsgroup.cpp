@@ -71,10 +71,10 @@ std::vector<ZParameter*> ZWidgetsGroup::getParameterList()
     if (!m_isSorted) {
       sortChildGroups();
     }
-    for (size_t i = 0; i < m_childGroups.size(); ++i) {
-      std::vector<ZParameter*> tmpRes = m_childGroups[i]->getParameterList();
-      for (size_t j = 0; j < tmpRes.size(); ++j) {
-        res.push_back(tmpRes[j]);
+    for (const auto& childGroup : m_childGroups) {
+      std::vector<ZParameter*> tmpRes = childGroup->getParameterList();
+      for (auto pp : tmpRes) {
+        res.push_back(pp);
       }
     }
   }
@@ -104,8 +104,8 @@ void ZWidgetsGroup::addChild(std::shared_ptr<ZWidgetsGroup> child, bool atEnd)
 
 void ZWidgetsGroup::removeAllChildren()
 {
-  for (size_t i = 0; i < m_childGroups.size(); i++) {
-    m_childGroups[i]->disconnect(this);
+  for (const auto& childGroup : m_childGroups) {
+    childGroup->disconnect(this);
   }
   m_childGroups.clear();
 }
@@ -196,7 +196,7 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
       if (createBasic) {
         size_t i;
         for (i = 0; i < m_childGroups.size() &&
-                    m_childGroups[i]->m_visibleLevel <= m_cutOffbetweenBasicAndAdvancedLevel; i++) {
+                    m_childGroups[i]->m_visibleLevel <= m_cutOffbetweenBasicAndAdvancedLevel; ++i) {
           QLayout* lw = m_childGroups[i]->createLayout(true);
           if (m_childGroups[i]->isGroup()) {
             QGroupBox* groupBox = new QGroupBox(m_childGroups[i]->getGroupName());
@@ -214,40 +214,40 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
       } else {
         if (m_useToolBoxStyle) {
           QToolBox* toolBox = new QToolBox();
-          for (size_t i = 0; i < m_childGroups.size(); i++) {
+          for (auto& childGroup : m_childGroups) {
             if (m_useToolBoxStyle) {
-              if (m_childGroups[i]->isGroup()) {
-                QWidget* wg = m_childGroups[i]->createWidget(false, false);
-                toolBox->addItem(wg, m_childGroups[i]->getGroupName());
+              if (childGroup->isGroup()) {
+                QWidget* wg = childGroup->createWidget(false, false);
+                toolBox->addItem(wg, childGroup->getGroupName());
                 // fully expand page, no scroll bar
                 dynamic_cast<QScrollArea*>(wg->parentWidget()->parentWidget())->setSizePolicy(
                   QSizePolicy::Preferred, QSizePolicy::Fixed);
               } else {
-                QLayout* lw = m_childGroups[i]->createLayout(false);
+                QLayout* lw = childGroup->createLayout(false);
                 vbl->addLayout(lw);
               }
             } else {
-              if (m_childGroups[i]->isGroup()) {
-                QGroupBox* groupBox = new QGroupBox(m_childGroups[i]->getGroupName());
-                QLayout* lw = m_childGroups[i]->createLayout(false);
+              if (childGroup->isGroup()) {
+                QGroupBox* groupBox = new QGroupBox(childGroup->getGroupName());
+                QLayout* lw = childGroup->createLayout(false);
                 groupBox->setLayout(lw);
                 vbl->addWidget(groupBox);
               } else {
-                QLayout* lw = m_childGroups[i]->createLayout(false);
+                QLayout* lw = childGroup->createLayout(false);
                 vbl->addLayout(lw);
               }
             }
           }
           vbl->addWidget(toolBox);
         } else {
-          for (size_t i = 0; i < m_childGroups.size(); i++) {
-            if (m_childGroups[i]->isGroup()) {
-              QGroupBox* groupBox = new QGroupBox(m_childGroups[i]->getGroupName());
-              QLayout* lw = m_childGroups[i]->createLayout(false);
+          for (auto& childGroup : m_childGroups) {
+            if (childGroup->isGroup()) {
+              QGroupBox* groupBox = new QGroupBox(childGroup->getGroupName());
+              QLayout* lw = childGroup->createLayout(false);
               groupBox->setLayout(lw);
               vbl->addWidget(groupBox);
             } else {
-              QLayout* lw = m_childGroups[i]->createLayout(false);
+              QLayout* lw = childGroup->createLayout(false);
               vbl->addLayout(lw);
             }
           }

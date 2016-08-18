@@ -595,7 +595,7 @@ void Z3DImg::readVolumes()
 
     m_volumes.emplace_back(vh);
   } else {
-    for (size_t i = 0; i < m_nChannels; i++) {
+    for (size_t i = 0; i < m_nChannels; ++i) {
       ZImg cImg = img.crop(ZImgRegion(0, -1, 0, -1, 0, -1, i, i + 1));
       Z3DVolume* vh = new Z3DVolume(cImg,
                                     glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale),
@@ -605,7 +605,7 @@ void Z3DImg::readVolumes()
     } //for each cannel
   }
 
-  for (size_t i = 0; i < m_nChannels; i++) {
+  for (size_t i = 0; i < m_nChannels; ++i) {
     m_volumes[i]->setVolColor(glm::vec3(info.channelColors[i].r / 255.,
                                         info.channelColors[i].g / 255.,
                                         info.channelColors[i].b / 255.));

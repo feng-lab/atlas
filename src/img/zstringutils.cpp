@@ -84,7 +84,7 @@ bool naturalSortLessThan(const QString& s1, const QString& s2)
   // Move to the first difference between the strings
   int startIndex = -1;
   int length = s1.length() > s2.length() ? s2.length() : s1.length();
-  for (int i = 0; i < length; i++) {
+  for (int i = 0; i < length; ++i) {
     QChar c1 = s1[i];
     QChar c2 = s2[i];
     if (c1 != c2) {
@@ -103,7 +103,7 @@ bool naturalSortLessThan(const QString& s1, const QString& s2)
   bool done2 = false;
   length = s1.length() < s2.length() ? s2.length() : s1.length();
 
-  for (int i = startIndex; i < length; i++) {
+  for (int i = startIndex; i < length; ++i) {
     if (!done1 && i < s1.length()) {
       if (isNumber(s1[i])) {
         sn1 += QString(s1[i]);

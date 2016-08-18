@@ -282,7 +282,7 @@ ZMeshUtils::vertexLineSquaredDistance(const glm::tvec3<Real, glm::highp>& x, con
   p1p2 = p1 - p2;
 
   if ((den = glm::length(p1p2)) != 0.0) {
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 3; ++i) {
       p1p2[i] /= den;
     }
   }

@@ -29,7 +29,7 @@ void zoomPVRawImages()
   QStringList filters;
   filters << "*.raw";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); i++) {
+  for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder + fileInfo.completeBaseName() + "_ds.tif";
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0, -1, 0, -1, 0, -1, 2, 3));
@@ -45,7 +45,7 @@ void zoomRefBrainSlices()
   QStringList filters;
   filters << "*.ome.tiff";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); i++) {
+  for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder + fileInfo.fileName();
     ZImg img(fileInfo.absoluteFilePath());
@@ -61,7 +61,7 @@ void zoomRefBrainSlices2()
   QStringList filters;
   filters << "*.ome.tiff";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); i++) {
+  for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder + fileInfo.fileName();
     ZImg img(fileInfo.absoluteFilePath());
@@ -151,7 +151,7 @@ void convertImages()
   QStringList filters;
   filters << "*.tif";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); i++) {
+  for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder + fileInfo.baseName() + ".v3draw";
     ZImg img(fileInfo.absoluteFilePath());
@@ -182,7 +182,7 @@ void extractNeuronChannel()
   list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
   dir = QDir("/Volumes/lq/image/1201_devCA3_CA1/35143_02");
   list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
-  for (int i = 0; i < list.size(); i++) {
+  for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0, -1, 0, -1, 0, -1, 1, 2));
@@ -204,7 +204,7 @@ void convertImagesFormat()
   QStringList filters;
   filters << "*.v3draw";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); i++) {
+  for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
@@ -227,7 +227,7 @@ void resizeInjectionCoreImgs()
   QStringList filters;
   filters << "*.czi";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); i++) {
+  for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     QString fileName = fileInfo.fileName();
     size_t scene = fileName.at(fileName.size() - 5).toLatin1() - '1';
@@ -250,7 +250,7 @@ void transfromMesh()
   glm::mat4 mat;
   nim::toVal(QString("[1.03, 0, 0, 0; 0, 6.13928e-08, 1.03, 0; 0, -1.03, 6.13928e-08, 0; 0, 0, 0, 1]"), mat);
 
-  for (int i = 0; i < list.size(); i++) {
+  for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     ZMesh msh(fileInfo.absoluteFilePath());
 
@@ -276,7 +276,7 @@ void transfromMesh2()
   glm::mat4 mat;
   nim::toVal(QString("[5.96047e-09, 0, -0.1, 490.6; 0, 0.1, 0, -355.6; 0.1, 0, 5.96047e-09, -513.4; 0, 0, 0, 1]"), mat);
 
-  for (int i = 0; i < list.size(); i++) {
+  for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     ZMesh msh(fileInfo.absoluteFilePath());
 
@@ -316,7 +316,7 @@ void stnTrajectory()
     }
   }
 
-  for (int i = 0; i < list.size(); i++) {
+  for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     QStringList tokens = fileInfo.fileName().split("_");
     for (auto it = tokens.begin(); it != tokens.end(); ++it) {
@@ -569,7 +569,7 @@ void calcSwcVolume()
   ZMesh branchMesh;
   filters << "*c.swc";
   LOG(INFO) << "NameOfCell, SomaSurfaceArea, SomaVolume, NeuriteSurfaceArea, NeuriteVolume";
-  for (int i = 0; i < dirlist.size(); i++) {
+  for (int i = 0; i < dirlist.size(); ++i) {
     QFileInfo dirInfo = dirlist.at(i);
     QDir subDir(dirInfo.absoluteFilePath());
     QFileInfoList list = subDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
@@ -597,7 +597,7 @@ void changeImgCompressionType()
   QStringList filters;
   filters << "*.tif";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); i++) {
+  for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
@@ -613,7 +613,7 @@ void makeSWCPyramidal()
   QStringList filters;
   filters << "*c.swc";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); i++) {
+  for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZSwc tree(fileInfo.absoluteFilePath());
@@ -633,7 +633,7 @@ void makeAxonChannelImages()
   QStringList filters;
   filters << "*.raw";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); i++) {
+  for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
     QString outname1 = outFolder.absoluteFilePath(fileInfo.baseName() + "_rb.tif");
@@ -655,7 +655,7 @@ void makeAxonChannelImages()
   axonChannel = 0;
 
   list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); i++) {
+  for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
     QString outname1 = outFolder.absoluteFilePath(fileInfo.baseName() + "_rb.tif");
@@ -677,7 +677,7 @@ void makeAxonChannelImages()
   axonChannel = 2;
 
   list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); i++) {
+  for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
     QString outname1 = outFolder.absoluteFilePath(fileInfo.baseName() + "_rb.tif");

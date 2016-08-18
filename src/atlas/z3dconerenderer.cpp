@@ -56,7 +56,7 @@ void Z3DConeRenderer::setData(std::vector<glm::vec4>* baseAndBaseRadius, std::ve
   if (m_useConeShader2) {
     int indices[6] = {0, 1, 2, 2, 1, 3};
     int quadIdx = 0;
-    for (size_t i = 0; i < baseAndBaseRadius->size(); i++) {
+    for (size_t i = 0; i < baseAndBaseRadius->size(); ++i) {
       m_baseAndBaseRadius.push_back(baseAndBaseRadius->at(i));
       m_baseAndBaseRadius.push_back(baseAndBaseRadius->at(i));
       m_baseAndBaseRadius.push_back(baseAndBaseRadius->at(i));
@@ -65,7 +65,7 @@ void Z3DConeRenderer::setData(std::vector<glm::vec4>* baseAndBaseRadius, std::ve
       m_axisAndTopRadius.push_back(axisAndTopRadius->at(i));
       m_axisAndTopRadius.push_back(axisAndTopRadius->at(i));
       m_axisAndTopRadius.push_back(axisAndTopRadius->at(i));
-      for (int k = 0; k < 6; k++) {
+      for (int k = 0; k < 6; ++k) {
         m_indexs.push_back(indices[k] + 4 * quadIdx);
       }
       quadIdx++;
@@ -94,13 +94,13 @@ void Z3DConeRenderer::setData(std::vector<glm::vec4>* baseAndBaseRadius, std::ve
     int upIdx[8] = {0, 0, 1, 1, 0, 0, 1, 1};
     int outIdx[8] = {0, 0, 0, 0, 1, 1, 1, 1};
     int coneIdx = 0;
-    for (size_t i = 0; i < baseAndBaseRadius->size(); i++) {
-      for (int k = 0; k < 8; k++) {
+    for (size_t i = 0; i < baseAndBaseRadius->size(); ++i) {
+      for (int k = 0; k < 8; ++k) {
         m_baseAndBaseRadius.push_back(baseAndBaseRadius->at(i));
         m_axisAndTopRadius.push_back(axisAndTopRadius->at(i));
         m_allFlags.push_back(rightIdx[k] << 8 | upIdx[k] << 4 | outIdx[k]);
       }
-      for (int k = 0; k < 36; k++) {
+      for (int k = 0; k < 36; ++k) {
         m_indexs.push_back(indices[k] + 8 * coneIdx);
       }
       coneIdx++;
@@ -119,9 +119,9 @@ void Z3DConeRenderer::setDataColors(std::vector<glm::vec4>* coneColors)
   m_coneTopColors.clear();
   m_sameColorForBaseAndTop = true;
   int dup = m_useConeShader2 ? 4 : 8;
-  for (size_t i = 0; i < coneColors->size(); i++) {
-    for (int k = 0; k < dup; k++)
-      m_coneBaseColors.push_back(coneColors->at(i));
+  for (auto color : *coneColors) {
+    for (int k = 0; k < dup; ++k)
+      m_coneBaseColors.push_back(color);
   }
   invalidateOpenglRenderer();
   m_dataChanged = true;
@@ -133,10 +133,10 @@ void Z3DConeRenderer::setDataColors(std::vector<glm::vec4>* coneBaseColors, std:
   m_coneTopColors.clear();
   m_sameColorForBaseAndTop = false;
   int dup = m_useConeShader2 ? 4 : 8;
-  for (size_t i = 0; i < coneBaseColors->size(); i++) {
-    for (int k = 0; k < dup; k++) {
-      m_coneBaseColors.push_back(coneBaseColors->at(i));
-      m_coneTopColors.push_back(coneTopColors->at(i));
+  for (size_t i = 0; i < coneBaseColors->size(); ++i) {
+    for (int k = 0; k < dup; ++k) {
+      m_coneBaseColors.push_back((*coneBaseColors)[i]);
+      m_coneTopColors.push_back((*coneTopColors)[i]);
     }
   }
   invalidateOpenglRenderer();
@@ -149,9 +149,9 @@ void Z3DConeRenderer::setDataPickingColors(std::vector<glm::vec4>* conePickingCo
   if (!conePickingColors)
     return;
   int dup = m_useConeShader2 ? 4 : 8;
-  for (size_t i = 0; i < conePickingColors->size(); i++) {
-    for (int k = 0; k < dup; k++)
-      m_conePickingColors.push_back(conePickingColors->at(i));
+  for (auto color : *conePickingColors) {
+    for (int k = 0; k < dup; ++k)
+      m_conePickingColors.push_back(color);
   }
   invalidateOpenglPickingRenderer();
   m_pickingDataChanged = true;
@@ -579,10 +579,10 @@ void Z3DConeRenderer::appendDefaultColors()
 {
   if (m_coneBaseColors.size() < m_baseAndBaseRadius.size()) {
     if (m_sameColorForBaseAndTop) {
-      for (size_t i = m_coneBaseColors.size(); i < m_baseAndBaseRadius.size(); i++)
+      for (size_t i = m_coneBaseColors.size(); i < m_baseAndBaseRadius.size(); ++i)
         m_coneBaseColors.emplace_back(0.f, 0.f, 0.f, 1.f);
     } else {
-      for (size_t i = m_coneBaseColors.size(); i < m_baseAndBaseRadius.size(); i++) {
+      for (size_t i = m_coneBaseColors.size(); i < m_baseAndBaseRadius.size(); ++i) {
         m_coneBaseColors.emplace_back(0.f, 0.f, 0.f, 1.f);
         m_coneTopColors.emplace_back(0.f, 0.f, 0.f, 1.f);
       }

@@ -117,7 +117,7 @@ void Z3DPunctaFilter::process(Z3DEye eye)
   //    m_specularAndShininessNormal.clear();
   //    m_pointColorsNormal.clear();
 
-  //    for (size_t i=0; i<m_punctaList.size(); i++) {
+  //    for (size_t i=0; i<m_punctaList.size(); ++i) {
   //      if (ZRandomInstance.randReal<float>() < m_glowPercentage.get()) {
   //        m_pointAndRadiusGlow.push_back(m_pointAndRadius[i]);
   //        m_specularAndShininessGlow.push_back(m_specularAndShininess[i]);
@@ -203,8 +203,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DPunctaFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_sphereRenderer.useDynamicMaterialPara(), 7);
 
     const std::vector<ZParameter*>& paras = m_rendererBase.parameters();
-    for (size_t i = 0; i < paras.size(); i++) {
-      ZParameter* para = paras[i];
+    for (auto para : paras) {
       if (para->name() == "Coord Transform")
         m_widgetsGroup->addChild(*para, 2);
       else if (para->name() == "Size Scale")
@@ -278,13 +277,13 @@ void Z3DPunctaFilter::renderPicking(Z3DEye eye)
 void Z3DPunctaFilter::registerPickingObjects()
 {
   if (!m_pickingObjectsRegistered) {
-    for (size_t i = 0; i < m_punctaList.size(); i++) {
-      pickingManager().registerObject(m_punctaList[i]);
+    for (auto punctum : m_punctaList) {
+      pickingManager().registerObject(punctum);
     }
     m_registeredPunctaList = m_punctaList;
     m_pointPickingColors.clear();
-    for (size_t i = 0; i < m_punctaList.size(); i++) {
-      glm::col4 pickingColor = pickingManager().colorOfObject(m_punctaList[i]);
+    for (auto punctum : m_punctaList) {
+      glm::col4 pickingColor = pickingManager().colorOfObject(punctum);
       glm::vec4 fPickingColor(pickingColor[0] / 255.f, pickingColor[1] / 255.f, pickingColor[2] / 255.f,
                               pickingColor[3] / 255.f);
       m_pointPickingColors.push_back(fPickingColor);
@@ -298,8 +297,8 @@ void Z3DPunctaFilter::registerPickingObjects()
 void Z3DPunctaFilter::deregisterPickingObjects()
 {
   if (m_pickingObjectsRegistered) {
-    for (size_t i = 0; i < m_registeredPunctaList.size(); i++) {
-      pickingManager().deregisterObject(m_registeredPunctaList[i]);
+    for (auto punctum : m_registeredPunctaList) {
+      pickingManager().deregisterObject(punctum);
     }
     m_registeredPunctaList.clear();
   }
@@ -317,16 +316,16 @@ void Z3DPunctaFilter::prepareData()
   // convert puncta to format that glsl can use
   m_specularAndShininess.clear();
   m_pointAndRadius.clear();
-  for (size_t i = 0; i < m_punctaList.size(); i++) {
+  for (auto punctum : m_punctaList) {
     if (m_useSameSizeForAllPuncta.get())
-      m_pointAndRadius.emplace_back(m_punctaList[i]->x(), m_punctaList[i]->y(), m_punctaList[i]->z(), 2.f);
+      m_pointAndRadius.emplace_back(punctum->x(), punctum->y(), punctum->z(), 2.f);
     else
-      m_pointAndRadius.emplace_back(m_punctaList[i]->x(), m_punctaList[i]->y(), m_punctaList[i]->z(),
-                                    m_punctaList[i]->radius());
-    m_specularAndShininess.emplace_back(m_punctaList[i]->maxIntensity() / 255.f,
-                                        m_punctaList[i]->maxIntensity() / 255.f,
-                                        m_punctaList[i]->maxIntensity() / 255.f,
-                                        m_punctaList[i]->maxIntensity() / 2.f);
+      m_pointAndRadius.emplace_back(punctum->x(), punctum->y(), punctum->z(),
+                                    punctum->radius());
+    m_specularAndShininess.emplace_back(punctum->maxIntensity() / 255.f,
+                                        punctum->maxIntensity() / 255.f,
+                                        punctum->maxIntensity() / 255.f,
+                                        punctum->maxIntensity() / 2.f);
   }
 
   initializeCutRange();
@@ -432,13 +431,13 @@ void Z3DPunctaFilter::prepareColor()
   m_pointColors.clear();
 
   if (m_colorMode.isSelected("Original Point Color")) {
-    for (size_t i = 0; i < m_punctaList.size(); i++) {
-      glm::vec4 color(m_punctaList[i]->color().redF(), m_punctaList[i]->color().greenF(),
-                      m_punctaList[i]->color().blueF(), m_punctaList[i]->color().alphaF());
+    for (auto punctum : m_punctaList) {
+      glm::vec4 color(punctum->color().redF(), punctum->color().greenF(),
+                      punctum->color().blueF(), punctum->color().alphaF());
       m_pointColors.push_back(color);
     }
   } else if (m_colorMode.isSelected("Random Color")) {
-    for (size_t i = 0; i < m_punctaList.size(); i++) {
+    for (size_t i = 0; i < m_punctaList.size(); ++i) {
       glm::vec4 color(ZRandom::instance().randReal<float>(),
                       ZRandom::instance().randReal<float>(),
                       ZRandom::instance().randReal<float>(),
@@ -446,20 +445,20 @@ void Z3DPunctaFilter::prepareColor()
       m_pointColors.push_back(color);
     }
   } else if (m_colorMode.isSelected("Single Color")) {
-    for (size_t i = 0; i < m_punctaList.size(); i++) {
+    for (size_t i = 0; i < m_punctaList.size(); ++i) {
       m_pointColors.push_back(m_singleColorForAllPuncta.get());
     }
   } else if (m_colorMode.isSelected("Colormap Score")) {
-    for (size_t i = 0; i < m_punctaList.size(); i++) {
-      m_pointColors.push_back(m_colorMapScore.get().mappedFColor(m_punctaList[i]->score()));
+    for (auto punctum : m_punctaList) {
+      m_pointColors.push_back(m_colorMapScore.get().mappedFColor(punctum->score()));
     }
   } else if (m_colorMode.isSelected("Colormap Mean Intensity")) {
-    for (size_t i = 0; i < m_punctaList.size(); i++) {
-      m_pointColors.push_back(m_colorMapMeanIntensity.get().mappedFColor(m_punctaList[i]->meanIntensity()));
+    for (auto punctum : m_punctaList) {
+      m_pointColors.push_back(m_colorMapMeanIntensity.get().mappedFColor(punctum->meanIntensity()));
     }
   } else if (m_colorMode.isSelected("Colormap Max Intensity")) {
-    for (size_t i = 0; i < m_punctaList.size(); i++) {
-      m_pointColors.push_back(m_colorMapMaxIntensity.get().mappedFColor(m_punctaList[i]->maxIntensity()));
+    for (auto punctum : m_punctaList) {
+      m_pointColors.push_back(m_colorMapMaxIntensity.get().mappedFColor(punctum->maxIntensity()));
     }
   }
 
@@ -558,7 +557,7 @@ void Z3DPunctaFilter::updatePunctumVisibleState()
 
 void Z3DPunctaFilter::changePunctaSize()
 {
-  for (size_t i = 0; i < m_pointAndRadius.size(); i++) {
+  for (size_t i = 0; i < m_pointAndRadius.size(); ++i) {
     if (m_useSameSizeForAllPuncta.get())
       m_pointAndRadius.at(i).w = 2.f;
     else

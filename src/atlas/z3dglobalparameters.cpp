@@ -178,7 +178,7 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   m_lightSpotDirectionArray.resize(lightPositions.size());
   updateLightsArray();
 
-  for (size_t i = 0; i < lightPositions.size(); i++) {
+  for (size_t i = 0; i < lightPositions.size(); ++i) {
     lightAmbients[i]->setStyle("COLOR");
     lightDiffuses[i]->setStyle("COLOR");
     lightSpeculars[i]->setStyle("COLOR");
@@ -261,7 +261,7 @@ void Z3DGlobalParameters::getGLFocus()
 
 void Z3DGlobalParameters::updateLightsArray()
 {
-  for (size_t i = 0; i < lightPositions.size(); i++) {
+  for (size_t i = 0; i < lightPositions.size(); ++i) {
     m_lightPositionArray[i] = lightPositions[i]->get();
     m_lightAmbientArray[i] = lightAmbients[i]->get();
     m_lightDiffuseArray[i] = lightDiffuses[i]->get();

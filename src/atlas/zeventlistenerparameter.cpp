@@ -40,7 +40,7 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
   if (QMouseEvent* mouseEvent = dynamic_cast<QMouseEvent*>(e)) {
     bool accept = false;
     //LOG(INFO) << mouseEvent->modifiers() << " " << mouseEvent->button() << " " << mouseEvent->buttons();
-    for (int i = 0; i < m_mouseEvents.size(); i++) {
+    for (int i = 0; i < m_mouseEvents.size(); ++i) {
       accept = true;
       accept &= (mouseEvent->modifiers() == m_mouseEvents[i].modifiers);
       accept &= (mouseEvent->type() == m_mouseEvents[i].type);
@@ -60,7 +60,7 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
     }
   } else if (QWheelEvent* wheelEvent = dynamic_cast<QWheelEvent*>(e)) {
     bool accept = false;
-    for (int i = 0; i < m_mouseEvents.size(); i++) {
+    for (int i = 0; i < m_mouseEvents.size(); ++i) {
       accept = true;
       accept &= (wheelEvent->modifiers() == m_mouseEvents[i].modifiers);
       accept &= (wheelEvent->type() == m_mouseEvents[i].type);
@@ -77,7 +77,7 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
     }
   } else if (QKeyEvent* keyEvent = dynamic_cast<QKeyEvent*>(e)) {
     bool accept = false;
-    for (int i = 0; i < m_keyEvents.size(); i++) {
+    for (int i = 0; i < m_keyEvents.size(); ++i) {
       accept = true;
       accept &= (keyEvent->modifiers() == m_keyEvents[i].modifiers);
       accept &= (keyEvent->type() == m_keyEvents[i].type);

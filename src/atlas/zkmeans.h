@@ -100,9 +100,9 @@ struct ZDistanceEuclidean
   {
     Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> result(mat1.rows(), mat2.rows());
 
-    for (Eigen::Index c = 0; c < result.cols(); c++) {
+    for (Eigen::Index c = 0; c < result.cols(); ++c) {
       result.col(c) = (mat1.col(0).array() - mat2(c, 0)).abs2().matrix();
-      for (Eigen::Index i = 1; i < mat2.cols(); i++) {
+      for (Eigen::Index i = 1; i < mat2.cols(); ++i) {
         result.col(c) += (mat1.col(i).array() - mat2(c, i)).abs2().matrix();
       }
     }
@@ -119,9 +119,9 @@ struct ZDistanceEuclideanSquared
   {
     Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> result(mat1.rows(), mat2.rows());
 
-    for (Eigen::Index c = 0; c < result.cols(); c++) {
+    for (Eigen::Index c = 0; c < result.cols(); ++c) {
       result.col(c) = (mat1.col(0).array() - mat2(c, 0)).abs2().matrix();
-      for (Eigen::Index i = 1; i < mat2.cols(); i++) {
+      for (Eigen::Index i = 1; i < mat2.cols(); ++i) {
         result.col(c) += (mat1.col(i).array() - mat2(c, i)).abs2().matrix();
       }
     }
@@ -134,12 +134,12 @@ struct ZDistanceEuclideanSquared
     centroids.setZero();
     Eigen::Matrix<Real, Eigen::Dynamic, 1> counts(centroids.rows());
     counts.setZero();
-    for (Eigen::Index r = 0; r < mat.rows(); r++) {
+    for (Eigen::Index r = 0; r < mat.rows(); ++r) {
       counts(labels(r))++;
       centroids.row(labels(r)) += mat.row(r);
     }
 
-    for (Eigen::Index c = 0; c < centroids.cols(); c++) {
+    for (Eigen::Index c = 0; c < centroids.cols(); ++c) {
       centroids.col(c) = centroids.col(c).cwiseQuotient(counts);
     }
   }
@@ -152,12 +152,12 @@ struct ZDistanceEuclideanSquared
     centroids.setZero();
     Eigen::Matrix<Real, Eigen::Dynamic, 1> counts(centroids.rows());
     counts.setZero();
-    for (Eigen::Index r = 0; r < mat.rows(); r++) {
+    for (Eigen::Index r = 0; r < mat.rows(); ++r) {
       counts(labels(r)) += weight(r);
       centroids.row(labels(r)) += mat.row(r) * weight(r);
     }
 
-    for (Eigen::Index c = 0; c < centroids.cols(); c++) {
+    for (Eigen::Index c = 0; c < centroids.cols(); ++c) {
       centroids.col(c) = centroids.col(c).cwiseQuotient(counts);
     }
   }
@@ -187,12 +187,12 @@ std::vector<size_t> argSort(RandomAccessIterator begin, RandomAccessIterator end
   std::vector<size_t> indices(end - begin);
 
   std::vector<argsort_pair> data(end - begin);
-  for (size_t i = 0; i < data.size(); i++) {
+  for (size_t i = 0; i < data.size(); ++i) {
     data[i].first = i;
     data[i].second = *(begin + i);
   }
   std::sort(data.begin(), data.end(), argsort_comp<ValueType>);
-  for (size_t i = 0; i < data.size(); i++) {
+  for (size_t i = 0; i < data.size(); ++i) {
     indices[i] = data[i].first;
   }
   return indices;
@@ -210,7 +210,7 @@ weightedMedian(RandomAccessIterator dataBegin, RandomAccessIterator dataEnd,
   if (hasZeroWeight) {
     std::vector<ResultType> data;
     std::vector<ResultType> weight;
-    for (RandomAccessIterator2 iter = weightBegin; iter < weightEnd; iter++) {
+    for (RandomAccessIterator2 iter = weightBegin; iter != weightEnd; ++iter) {
       if (std::abs(*iter) > std::numeric_limits<ValueType2>::epsilon()) {
         data.push_back(dataBegin[iter - weightBegin]);
         weight.push_back(*iter);
@@ -221,7 +221,7 @@ weightedMedian(RandomAccessIterator dataBegin, RandomAccessIterator dataEnd,
     std::vector<size_t> sort_order = argSort(data.begin(), data.end());
 
     size_t i;
-    for (i = 0; i < data.size(); i++)
+    for (i = 0; i < data.size(); ++i)
       sum += weight[sort_order[i]];
     while (sum > 0)
       sum -= 2 * weight[sort_order[--i]];
@@ -238,7 +238,7 @@ weightedMedian(RandomAccessIterator dataBegin, RandomAccessIterator dataEnd,
     std::vector<size_t> sort_order = argSort(dataBegin, dataEnd);
 
     size_t i;
-    for (i = 0; i < n; i++)
+    for (i = 0; i < n; ++i)
       sum += weightBegin[sort_order[i]];
     while (sum > 0)
       sum -= 2 * weightBegin[sort_order[--i]];
@@ -261,9 +261,9 @@ struct ZDistanceManhattan
   {
     Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> result(mat1.rows(), mat2.rows());
 
-    for (Eigen::Index c = 0; c < result.cols(); c++) {
+    for (Eigen::Index c = 0; c < result.cols(); ++c) {
       result.col(c) = (mat1.col(0).array() - mat2(c, 0)).abs().matrix();
-      for (Eigen::Index i = 1; i < mat2.cols(); i++) {
+      for (Eigen::Index i = 1; i < mat2.cols(); ++i) {
         result.col(c) += (mat1.col(i).array() - mat2(c, i)).abs().matrix();
       }
     }
@@ -280,23 +280,23 @@ struct ZDistanceManhattan
     std::vector<int> sepMatsRowIdxs;
 
     counts.setZero();
-    for (Eigen::Index r = 0; r < labels.rows(); r++) {
+    for (Eigen::Index r = 0; r < labels.rows(); ++r) {
       counts(labels(r))++;
     }
 
-    for (Eigen::Index i = 0; i < counts.rows(); i++) {
+    for (Eigen::Index i = 0; i < counts.rows(); ++i) {
       sepMats.emplace_back(
         std::make_unique<Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>>(counts(i), mat.cols()));
       sepMatsRowIdxs.push_back(0);
     }
 
-    for (Eigen::Index r = 0; r < mat.rows(); r++) {
+    for (Eigen::Index r = 0; r < mat.rows(); ++r) {
       sepMats[labels(r)]->row(sepMatsRowIdxs[labels(r)]++) = mat.row(r);
     }
 
-    for (size_t i = 0; i < sepMats.size(); i++) {
+    for (size_t i = 0; i < sepMats.size(); ++i) {
       // get median of each col
-      for (Eigen::Index c = 0; c < sepMats[i]->cols(); c++) {
+      for (Eigen::Index c = 0; c < sepMats[i]->cols(); ++c) {
         centroids(i, c) = medianInPlace(sepMats[i]->col(c).data(), sepMats[i]->col(c).data() + counts(i));
       }
     }
@@ -314,24 +314,24 @@ struct ZDistanceManhattan
     std::vector<int> sepMatsRowIdxs;
 
     counts.setZero();
-    for (Eigen::Index r = 0; r < labels.rows(); r++) {
+    for (Eigen::Index r = 0; r < labels.rows(); ++r) {
       counts(labels(r))++;
     }
 
-    for (Eigen::Index i = 0; i < counts.rows(); i++) {
+    for (Eigen::Index i = 0; i < counts.rows(); ++i) {
       sepMats.emplace_back(
         std::make_unique<Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic>>(counts(i), mat.cols()));
       sepMatsRowIdxs.push_back(0);
     }
 
-    for (Eigen::Index r = 0; r < mat.rows(); r++) {
+    for (Eigen::Index r = 0; r < mat.rows(); ++r) {
       sepMats[labels(r)]->row(sepMatsRowIdxs[labels(r)]++) = mat.row(r);
       sepWeights[labels(r)].push_back(weight(r));
     }
 
-    for (size_t i = 0; i < sepMats.size(); i++) {
+    for (size_t i = 0; i < sepMats.size(); ++i) {
       // get median of each col
-      for (Eigen::Index c = 0; c < sepMats[i]->cols(); c++) {
+      for (Eigen::Index c = 0; c < sepMats[i]->cols(); ++c) {
         centroids(i, c) = weightedMedian(sepMats[i]->col(c).data(), sepMats[i]->col(c).data() + counts(i),
                                          sepWeights[i].begin(), sepWeights[i].end());
       }
@@ -348,9 +348,9 @@ struct ZDistanceChebychev
   {
     Eigen::Matrix<NonInteger, Eigen::Dynamic, Eigen::Dynamic> result(mat1.rows(), mat2.rows());
 
-    for (Eigen::Index c = 0; c < result.cols(); c++) {
+    for (Eigen::Index c = 0; c < result.cols(); ++c) {
       result.col(c) = (mat1.col(0).array() - mat2(c, 0)).abs().matrix();
-      for (Eigen::Index i = 1; i < mat2.cols(); i++) {
+      for (Eigen::Index i = 1; i < mat2.cols(); ++i) {
         result.col(c) = result.col(c).cwiseMax((mat1.col(i).array() - mat2(c, i)).abs().matrix());
       }
     }
@@ -577,10 +577,10 @@ public:
     m_centroids.resize(m_nclasses, m_pData->cols());
     m_labels.resize(m_pData->rows());
 
-    for (size_t a = 0; a < m_nattemps; a++) {
+    for (size_t a = 0; a < m_nattemps; ++a) {
       ResultDataType maxCenterShift = std::numeric_limits<ResultDataType>::max();
       ResultDataType compactness = 0;
-      for (size_t iter = 0; !m_termCriteria.meet(iter, maxCenterShift); iter++) {
+      for (size_t iter = 0; !m_termCriteria.meet(iter, maxCenterShift); ++iter) {
         if (iter == 0) {
           (this->*m_initCentersFunPtr)(initCentroids);
           centroids = initCentroids;
@@ -600,7 +600,7 @@ public:
         // get labels
         compactness = 0;
         MatrixXrt allDists = m_distanceFun(*m_pData, centroids);
-        for (Eigen::Index r = 0; r < m_pData->rows(); r++) {
+        for (Eigen::Index r = 0; r < m_pData->rows(); ++r) {
           Eigen::Index index;
           if (m_hasWeight)
             compactness += allDists.row(r).minCoeff(&index) * (*m_pWeight)(r);
@@ -661,7 +661,7 @@ protected:
     size_t nUniqueData = 0;
     m_uniqueDatas.resize(m_nclasses + 1, m_pData->cols());
     m_uniqueDatas.row(nUniqueData++) = m_pData->row(0);
-    for (Eigen::Index r = 1; r < m_pData->rows(); r++) {
+    for (Eigen::Index r = 1; r < m_pData->rows(); ++r) {
       MatrixXrt dist = m_distanceFun(m_uniqueDatas.topRows(nUniqueData), m_pData->row(r));
       if ((dist.array() <= Eigen::NumTraits<ResultDataType>::dummy_precision()).any()) {  // duplicate
         continue;
@@ -680,7 +680,7 @@ protected:
       // get labels
       m_uniqueLabels.resize(m_pData->rows());
       MatrixXrt allDists = m_distanceFun(*m_pData, m_uniqueDatas);
-      for (Eigen::Index r = 0; r < m_pData->rows(); r++) {
+      for (Eigen::Index r = 0; r < m_pData->rows(); ++r) {
         Eigen::Index index;
         allDists.row(r).minCoeff(&index);
         m_uniqueLabels(r) = static_cast<int>(index);
@@ -714,7 +714,7 @@ protected:
       // get labels
       result.compactness = 0;
       MatrixXrt allDists = m_distanceFun(*m_pData, result.centroids);
-      for (Eigen::Index r = 0; r < m_pData->rows(); r++) {
+      for (Eigen::Index r = 0; r < m_pData->rows(); ++r) {
         Eigen::Index index;
         if (m_hasWeight)
           result.compactness += allDists.row(r).minCoeff(&index) * (*m_pWeight)(r);
@@ -746,16 +746,16 @@ protected:
     ResultDataType distSqSum = distSq.sum();
 
     const int numLocalTries = 5;
-    for (size_t index = 1; index < m_nclasses; index++) {
+    for (size_t index = 1; index < m_nclasses; ++index) {
       ResultDataType bestNewDistSqSum = -1;
       Eigen::Index bestNewIndex = -1;
-      for (int localTrial = 0; localTrial < numLocalTries; localTrial++) {
+      for (int localTrial = 0; localTrial < numLocalTries; ++localTrial) {
         Eigen::Index newIdx = -1;
         while (newIdx == -1) {
           ResultDataType rndd = ZRandom::instance().randReal(distSqSum);
           //draw index with probability
           Eigen::Index j;
-          for (j = 0; j < m_pData->rows() - 1; j++) {
+          for (j = 0; j < m_pData->rows() - 1; ++j) {
             if (rndd <= distSq(j))
               break;
             else
@@ -815,10 +815,10 @@ protected:
     Eigen::Index rnd = ZRandom::instance().randInt(m_pData->rows() - 1);
     centroids.row(0) = m_pData->row(rnd);
     size_t index = 1;
-    for (; index < m_nclasses; index++) {
+    for (; index < m_nclasses; ++index) {
       Eigen::Index bestIndex = -1;
       ResultDataType bestVal = 0;
-      for (Eigen::Index j = 0; j < m_pData->rows(); j++) {
+      for (Eigen::Index j = 0; j < m_pData->rows(); ++j) {
         MatrixXrt dist = m_distanceFun(centroids.topRows(index), m_pData->row(j));
         ResultDataType mindist = dist.minCoeff();
         if (mindist > bestVal) {

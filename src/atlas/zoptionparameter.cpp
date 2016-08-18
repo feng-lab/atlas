@@ -58,7 +58,7 @@ QWidget* ZOptionParameter<T, T2>::actualCreateWidget(QWidget* parent)
 {
   ZComboBox* cb = new ZComboBox(parent);
 
-  for (int i = 0; i < m_options.size(); i++) {
+  for (int i = 0; i < m_options.size(); ++i) {
     cb->addItem(comboBoxItemString(m_options[i]));
   }
   if (!m_options.empty()) {

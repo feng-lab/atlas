@@ -197,7 +197,7 @@ float ZCameraParameterAnimation::Poly::Length(float fU)
   // Need to transform domain [0,u] to [-1,1]. If 0 <= x <= u
   // and -1 <= t <= 1, then x = u*(t+1)/2.
   float fResult = 0.0f;
-  for (int i = 0; i < 5; i++)
+  for (int i = 0; i < 5; ++i)
     fResult += ms_afModCoeff[i] * Speed(fU * ms_afModRoot[i]);
   fResult *= fU;
   return fResult;
@@ -239,7 +239,7 @@ glm::quat ZCameraParameterAnimation::SplineRange::rotation(float fTime) const
   float fU;
   if (startTime() < fTime) {
     if (fTime < endTime()) {
-      for (i = 0; i < rotSpline.size(); i++) {
+      for (i = 0; i < rotSpline.size(); ++i) {
         if (fTime < rotSpline[i].m_fTMax)
           break;
       }
@@ -383,7 +383,7 @@ void ZCameraParameterAnimation::SplineRange::buildPosSpline()
   }
   // compute arc lengths of polynomials and total length of spline
   posSplineLengths.resize(posSpline.size() + 1, 0.f);
-  for (int i = 0; i < posSpline.size(); i++) {
+  for (int i = 0; i < posSpline.size(); ++i) {
     // length of current polynomial
     float fPolyLength = posSpline[i].Length(1.0f);
     // total length of curve between poly[0] and poly[i+1]
@@ -401,7 +401,7 @@ void ZCameraParameterAnimation::SplineRange::buildRotSpline()
   // Consecutive quaterions should form an acute angle. Changing sign on
   // a quaternion does not change the rotation it represents.
   int i;
-  for (i = 1; i < keys.size(); i++) {
+  for (i = 1; i < keys.size(); ++i) {
     if (glm::dot(keys[i]->rot(), keys[i - 1]->rot()) < 0.0f)
       keys[i]->rot() = -keys[i]->rot();
   }
@@ -498,7 +498,7 @@ void ZCameraParameterAnimation::SplineRange::invertIntegral(float fS, int& riI, 
   // use Newton's method to invert the arc length integral
   const float fTolerance = 1e-06f;
   const int iMax = 32;
-  for (int i = 0; i < iMax; i++) {
+  for (int i = 0; i < iMax; ++i) {
     float fDiff = posSpline[riI].Length(rfU) - fDist;
     if (std::abs(fDiff) <= fTolerance)
       break;

@@ -487,7 +487,7 @@ void ZCpuInfo::detectCoreAndThreadNumber()
       break;
     }
     byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
-    ptr++;
+    ++ptr;
   }
 
   LOG(INFO) << "Number of NUMA nodes: " << numaNodeCount;

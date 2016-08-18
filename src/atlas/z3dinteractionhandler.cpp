@@ -16,20 +16,20 @@ Z3DInteractionHandler::Z3DInteractionHandler(const QString& name, QObject* paren
 
 void Z3DInteractionHandler::setEnabled(bool enabled)
 {
-  for (size_t i = 0; i < m_eventListeners.size(); i++)
-    m_eventListeners[i]->setEnabled(enabled);
+  for (const auto& l : m_eventListeners)
+    l->setEnabled(enabled);
 }
 
 void Z3DInteractionHandler::setVisible(bool state)
 {
-  for (size_t i = 0; i < m_eventListeners.size(); i++)
-    m_eventListeners[i]->setVisible(state);
+  for (const auto& l : m_eventListeners)
+    l->setVisible(state);
 }
 
 void Z3DInteractionHandler::setSharing(bool sharing)
 {
-  for (size_t i = 0; i < m_eventListeners.size(); i++)
-    m_eventListeners[i]->setSharing(sharing);
+  for (const auto& l : m_eventListeners)
+    l->setSharing(sharing);
 }
 
 void Z3DInteractionHandler::onEvent(QEvent* e, int w, int h)

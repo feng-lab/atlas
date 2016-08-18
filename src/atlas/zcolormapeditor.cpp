@@ -59,7 +59,7 @@ void ZColorMapWidget::mousePressEvent(QMouseEvent* e)
       if (e->modifiers() & Qt::ControlModifier) {
         m_colorMap->get().setKeySelected(index, true);
       } else {
-        for (size_t i = 1; i < m_colorMap->get().numKeys() - 1; i++) {
+        for (size_t i = 1; i < m_colorMap->get().numKeys() - 1; ++i) {
           if (index == i)
             m_colorMap->get().setKeySelected(i, true);
           else
@@ -71,7 +71,7 @@ void ZColorMapWidget::mousePressEvent(QMouseEvent* e)
     m_isDragging = true;
   } else {
     if (!(e->modifiers() & Qt::ControlModifier))
-      for (size_t i = 0; i < m_colorMap->get().numKeys(); i++) {
+      for (size_t i = 0; i < m_colorMap->get().numKeys(); ++i) {
         m_colorMap->get().setKeySelected(i, false);
       }
   }
@@ -89,7 +89,7 @@ void ZColorMapWidget::mouseMoveEvent(QMouseEvent* e)
   if (dist < 0) {
     // need to check from index 0 since selected key might be inserted before first key
     // during move, but it is impossible to go after last key because the clamp below
-    for (size_t i = 0; i < m_colorMap->get().numKeys() - 1; i++) {
+    for (size_t i = 0; i < m_colorMap->get().numKeys() - 1; ++i) {
       //LOG(INFO) << m_colorMap->get().isKeySelected(i) << " " << m_colorMap->get().key(i).intensity() << " " << m_colorMap->get().domainMin();
       if (m_colorMap->get().isKeySelected(i)) {
         if (m_colorMap->get().key(i).intensity() == m_colorMap->get().domainMin())
@@ -99,7 +99,7 @@ void ZColorMapWidget::mouseMoveEvent(QMouseEvent* e)
       }
     }
   } else {
-    for (int i = int(m_colorMap->get().numKeys()) - 2; i >= 0; i--) {
+    for (int i = int(m_colorMap->get().numKeys()) - 2; i >= 0; --i) {
       //LOG(INFO) << m_colorMap->get().isKeySelected(i) << " " << m_colorMap->get().key(i).intensity() << " " << m_colorMap->get().domainMax();
       if (m_colorMap->get().isKeySelected(i)) {
         if (m_colorMap->get().key(i).intensity() == m_colorMap->get().domainMax())
@@ -301,7 +301,7 @@ void ZColorMapWidget::paintEvent(QPaintEvent*)
           << QPoint(0, 0);
   polygon.translate(0, contentsRect().bottom() - 1.5);
   double prevPos = -m_sliderWidth;
-  for (size_t i = 0; i < m_colorMap->get().numKeys(); i++) {
+  for (size_t i = 0; i < m_colorMap->get().numKeys(); ++i) {
     ZColorMapKey key = m_colorMap->get().key(i);
     double x = intensityToScreenXPosition(m_colorMap->get().key(i).intensity());
     polygon.translate(x - polygon[4].x(), 0);
@@ -358,7 +358,7 @@ ZColorMapWidget::FindKeyResult ZColorMapWidget::findkey(const QPoint& pos, size_
   bool hit = false;
   bool left = true;
   size_t minIndex = 0;
-  for (size_t i = 1; i < m_colorMap->get().numKeys() - 1; i++) {
+  for (size_t i = 1; i < m_colorMap->get().numKeys() - 1; ++i) {
     double dist = intensityToScreenXPosition(m_colorMap->get().key(i).intensity()) - pos.x();
     if (std::abs(dist) < m_sliderWidth / 2 && std::abs(dist) < minDist) {
       hit = true;

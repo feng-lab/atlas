@@ -122,7 +122,7 @@ RowVectorXd ZEigenUtils::readRowVector(const std::string& iline, const char* uSe
   } else {
     sPos = line.find_first_not_of(sep);   //skip spaces
   }
-  for (int i = 0; i < nReadData; i++) {
+  for (int i = 0; i < nReadData; ++i) {
     if (!hasData) {
       rowVector(i) = fillValue;
       continue;
@@ -185,7 +185,7 @@ MatrixXd ZEigenUtils::removeRowsContainNaNOrInF(const Eigen::MatrixXd& srcMat)
 {
   MatrixXd mat(srcMat.rows(), srcMat.cols());
   Eigen::Index idx = 0;
-  for (Eigen::Index i = 0; i < srcMat.rows(); i++) {
+  for (Eigen::Index i = 0; i < srcMat.rows(); ++i) {
     if (srcMat.row(i).allFinite()) {
       mat.row(idx++) = srcMat.row(i);
     }

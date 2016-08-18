@@ -69,7 +69,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DAxisFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_YAxisColor, 1);
     m_widgetsGroup->addChild(m_ZAxisColor, 1);
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
-    for (size_t i = 0; i < paras.size(); i++) {
+    for (size_t i = 0; i < paras.size(); ++i) {
       ZParameter* para = paras[i];
       if (para->name() == "Size Scale")
         m_widgetsGroup->addChild(*para, 1);

@@ -72,7 +72,7 @@ Z3DRendererBase::Z3DRendererBase(Z3DGlobalParameters& globalParas, QObject* pare
   connect(&m_materialShininess, &ZFloatParameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
   connect(&m_materialSpecular, &ZVec4Parameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
 
-  for (size_t i=0; i<m_globalParas.lightPositions.size(); i++) {
+  for (size_t i=0; i<m_globalParas.lightPositions.size(); ++i) {
     connect(m_globalParas.lightPositions[i], &ZVec4Parameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
     connect(m_globalParas.lightAmbients[i], &ZVec4Parameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
     connect(m_globalParas.lightDiffuses[i], &ZVec4Parameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);

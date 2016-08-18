@@ -25,9 +25,9 @@ Z3DFilter::~Z3DFilter()
 
 ZParameter* Z3DFilter::parameter(const QString& name) const
 {
-  for (size_t i = 0; i < m_parameters.size(); i++) {
-    if (m_parameters[i]->name() == name)
-      return m_parameters[i];
+  for (auto para : m_parameters) {
+    if (para->name() == name)
+      return para;
   }
   return nullptr;
 }
@@ -51,9 +51,9 @@ void Z3DFilter::invalidate(InvalidationState inv)
 
 Z3DInputPortBase* Z3DFilter::inputPort(const QString& name) const
 {
-  for (size_t i = 0; i < m_inputPorts.size(); i++) {
-    if (m_inputPorts[i]->name() == name)
-      return m_inputPorts[i];
+  for (auto port : m_inputPorts) {
+    if (port->name() == name)
+      return port;
   }
 
   return nullptr;
@@ -61,9 +61,9 @@ Z3DInputPortBase* Z3DFilter::inputPort(const QString& name) const
 
 Z3DOutputPortBase* Z3DFilter::outputPort(const QString& name) const
 {
-  for (size_t i = 0; i < m_outputPorts.size(); i++) {
-    if (m_outputPorts[i]->name() == name)
-      return m_outputPorts[i];
+  for (auto port : m_outputPorts) {
+    if (port->name() == name)
+      return port;
   }
 
   return nullptr;
@@ -317,26 +317,26 @@ void Z3DFilter::updateSize()
 {
   // 1. update outport size
   glm::uvec2 maxOutportSize(0, 0);
-  for (size_t i = 0; i < m_outputPorts.size(); ++i) {
-    glm::uvec2 outportSize = m_outputPorts[i]->expectedSize();
-    if (outportSize.x > 0 && outportSize != m_outputPorts[i]->size()) {
-      m_outputPorts[i]->resize(outportSize);
+  for (auto port : m_outputPorts) {
+    glm::uvec2 outportSize = port->expectedSize();
+    if (outportSize.x > 0 && outportSize != port->size()) {
+      port->resize(outportSize);
     }
 
-    maxOutportSize = glm::max(maxOutportSize, m_outputPorts[i]->size());
+    maxOutportSize = glm::max(maxOutportSize, port->size());
   }
 
   // 2. update private ports
-  for (size_t i = 0; i < m_privateRenderPorts.size(); ++i) {
-    m_privateRenderPorts[i]->resize(maxOutportSize);
+  for (auto port : m_privateRenderPorts) {
+    port->resize(maxOutportSize);
   }
-  for (size_t i = 0; i < m_privateRenderTargets.size(); ++i) {
-    m_privateRenderTargets[i]->resize(maxOutportSize);
+  for (auto target : m_privateRenderTargets) {
+    target->resize(maxOutportSize);
   }
 
   // 3. update inport expected size
-  for (size_t i = 0; i < m_inputPorts.size(); i++) {
-    m_inputPorts[i]->setExpectedSize(maxOutportSize);
+  for (auto port : m_inputPorts) {
+    port->setExpectedSize(maxOutportSize);
   }
 
   invalidate();

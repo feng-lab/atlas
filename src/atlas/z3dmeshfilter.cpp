@@ -141,8 +141,8 @@ void Z3DMeshFilter::setData(QList<ZMesh*>* meshList)
 {
   m_origMeshList.clear();
   if (meshList) {
-    for (int i = 0; i < meshList->size(); i++)
-      m_origMeshList.push_back(meshList->at(i));
+    for (auto mesh : *meshList)
+      m_origMeshList.push_back(mesh);
     LOG(INFO) << className() << " read " << m_origMeshList.size() << " meshes.";
   }
   getVisibleData();
@@ -182,8 +182,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_triangleListRenderer.wireframeColorPara(), 1);
 
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
-    for (size_t i = 0; i < paras.size(); i++) {
-      ZParameter* para = paras[i];
+    for (auto para : paras) {
       if (para->name() == "Coord Transform") {
         m_widgetsGroup->addChild(*para, 2);
         //        QPushButton *pb = new QPushButton("Apply Transform");
@@ -230,8 +229,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroupForAnnotationFilter()
     m_widgetsGroup->addChild(m_triangleListRenderer.wireframeColorPara(), 1);
 
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
-    for (size_t i = 0; i < paras.size(); i++) {
-      ZParameter* para = paras[i];
+    for (auto para : paras) {
       if (para->name().contains("Opacity") || para->name().contains("Material"))
         m_widgetsGroup->addChild(*para, 5);
     }
@@ -294,13 +292,13 @@ void Z3DMeshFilter::prepareData()
 void Z3DMeshFilter::registerPickingObjects()
 {
   if (!m_pickingObjectsRegistered) {
-    for (size_t i = 0; i < m_meshList.size(); i++) {
-      pickingManager().registerObject(m_meshList[i]);
+    for (auto mesh : m_meshList) {
+      pickingManager().registerObject(mesh);
     }
     m_registeredMeshList = m_meshList;
     m_meshPickingColors.clear();
-    for (size_t i = 0; i < m_meshList.size(); i++) {
-      glm::col4 pickingColor = pickingManager().colorOfObject(m_meshList[i]);
+    for (auto mesh : m_meshList) {
+      glm::col4 pickingColor = pickingManager().colorOfObject(mesh);
       glm::vec4 fPickingColor(pickingColor[0] / 255.f, pickingColor[1] / 255.f, pickingColor[2] / 255.f,
                               pickingColor[3] / 255.f);
       m_meshPickingColors.push_back(fPickingColor);
@@ -314,8 +312,8 @@ void Z3DMeshFilter::registerPickingObjects()
 void Z3DMeshFilter::deregisterPickingObjects()
 {
   if (m_pickingObjectsRegistered) {
-    for (size_t i = 0; i < m_registeredMeshList.size(); i++) {
-      pickingManager().deregisterObject(m_registeredMeshList[i]);
+    for (auto mesh : m_registeredMeshList) {
+      pickingManager().deregisterObject(mesh);
     }
     m_registeredMeshList.clear();
   }
@@ -385,7 +383,7 @@ void Z3DMeshFilter::prepareColor()
   m_meshColors.clear();
 
   if (m_colorMode.isSelected("Single Color")) {
-    for (size_t i = 0; i < m_meshList.size(); i++) {
+    for (size_t i = 0; i < m_meshList.size(); ++i) {
       m_meshColors.push_back(m_singleColorForAllMesh.get());
     }
   }

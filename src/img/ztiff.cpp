@@ -628,8 +628,8 @@ uint64_t ZTiffIFD::tileByteCounts(size_t idx) const
 QString ZTiffIFD::toQString() const
 {
   QString res;
-  for (size_t i = 0; i < m_entries.size(); ++i) {
-    res = res % m_entries[i].toQString() % QString("\n");
+  for (const auto& entry : m_entries) {
+    res = res % entry.toQString() % QString("\n");
   }
   if (!m_subIFDs.empty()) {
     res = res % QString("\n");
@@ -683,9 +683,9 @@ std::vector<ZImgMetatag> ZTiffIFD::extractMetadata() const
   tags.insert(TIFFTAG_COPYRIGHT);
 
   std::vector<ZImgMetatag> res;
-  for (size_t i = 0; i < m_entries.size(); ++i) {
-    if (tags.find(m_entries[i].tag()) != tags.end())
-      res.push_back(m_entries[i]);
+  for (const auto& entry : m_entries) {
+    if (tags.find(entry.tag()) != tags.end())
+      res.push_back(entry);
   }
   if (hasExifIFD()) {
     res.insert(res.end(), exifIFD()->m_entries.begin(), exifIFD()->m_entries.end());
@@ -1786,8 +1786,7 @@ void ZTiffWriter::writeIFD(const ZImg& img, int z, int t, int c, bool writeThumb
                            const std::vector<ZImgMetatag>& additionalTags)
 {
   CHECK(m_tif);
-  for (size_t i = 0; i < additionalTags.size(); ++i) {
-    const ZImgMetatag& atag = additionalTags[i];
+  for (const auto& atag : additionalTags) {
     if (atag.tag() > 0 && atag.tag() < 65535)
       TIFFSetField(m_tif.get(), atag.tag(), atag.dataArray());
   }

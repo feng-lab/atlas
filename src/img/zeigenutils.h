@@ -49,7 +49,7 @@ struct ZVectorCompare
   bool operator()(const Eigen::Matrix<T, Eigen::Dynamic, 1>& v1, const Eigen::Matrix<T, Eigen::Dynamic, 1>& v2) const
   {
     if (v1.size() == v2.size()) {
-      for (Eigen::Index i = 0; i < v1.size(); i++) {
+      for (Eigen::Index i = 0; i < v1.size(); ++i) {
         if (std::abs(v1(i) - v2(i)) < Eigen::NumTraits<T>::dummy_precision())
           continue;
         else
@@ -68,7 +68,7 @@ struct ZVectorCompare<T, true>
   bool operator()(const Eigen::Matrix<T, Eigen::Dynamic, 1>& v1, const Eigen::Matrix<T, Eigen::Dynamic, 1>& v2) const
   {
     if (v1.size() == v2.size()) {
-      for (Eigen::Index i = 0; i < v1.size(); i++) {
+      for (Eigen::Index i = 0; i < v1.size(); ++i) {
         if (v1(i) == v2(i))
           continue;
         else
@@ -168,8 +168,8 @@ public:
     std::normal_distribution<Real> dist(mean, sigma);
     auto& eng = ZRandom::instance().engine();
     Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> mat(nRow, nCol);
-    for (Eigen::Index r = 0; r < nRow; r++) {
-      for (Eigen::Index c = 0; c < nCol; c++) {
+    for (Eigen::Index r = 0; r < nRow; ++r) {
+      for (Eigen::Index c = 0; c < nCol; ++c) {
         mat(r, c) = dist(eng);
       }
     }
@@ -305,7 +305,7 @@ public:
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xdiff =
       x - y * Eigen::Matrix<T, 1, Eigen::Dynamic>::Ones(x.cols());
     Eigen::Matrix<T, Eigen::Dynamic, 1> s = y + log(exp(xdiff.array()).rowwise().sum()).matrix();
-    for (Eigen::Index i = 0; i < s.size(); i++) {
+    for (Eigen::Index i = 0; i < s.size(); ++i) {
       if (s(i) == std::numeric_limits<T>::infinity()) {
         s(i) = y(i);
       }
@@ -322,7 +322,7 @@ public:
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xdiff =
       x - y * Eigen::Matrix<T, Eigen::Dynamic, 1>::Ones(x.rows());
     Eigen::Matrix<T, 1, Eigen::Dynamic> s = y + log(exp(xdiff.array()).colwise().sum()).matrix();
-    for (Eigen::Index i = 0; i < s.size(); i++) {
+    for (Eigen::Index i = 0; i < s.size(); ++i) {
       if (s(i) == std::numeric_limits<T>::infinity()) {
         s(i) = y(i);
       }
@@ -347,7 +347,7 @@ public:
   {
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> mat(static_cast<size_t>(weight.sum()), x.cols());
     size_t rowIdx = 0;
-    for (Eigen::Index i = 0; i < x.rows(); i++) {
+    for (Eigen::Index i = 0; i < x.rows(); ++i) {
       mat.block(rowIdx, 0, weight(i), x.cols()) = x.row(i).replicate(weight(i), 1);
       rowIdx += weight(i);
     }
@@ -561,7 +561,7 @@ public:
     ResultRowVecType matmean = featureMean(mat);
     mat.rowwise() -= matmean;
     ResultMatType varS = ResultMatType::Zero(ndim, ndim);
-    for (Eigen::Index i = 0; i < nsample; i++) {
+    for (Eigen::Index i = 0; i < nsample; ++i) {
       varS += (mat.row(i).transpose() * mat.row(i) - biasedcov).array().square().matrix();
     }
     varS *= nsample / ((nsample - 1.0) * (nsample - 1.0) * (nsample - 1.0));
@@ -639,7 +639,7 @@ public:
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> uniqueMat(x.rows(), x.cols());
     std::set<VectorXt, ZVectorCompare<T>> myset;
     std::pair<typename std::set<VectorXt, ZVectorCompare<T>>::iterator, bool> ret;
-    for (Eigen::Index r = 0; r < x.rows(); r++) {
+    for (Eigen::Index r = 0; r < x.rows(); ++r) {
       ret = myset.insert(x.row(r));
       if (ret.second != false) {
         uniqueMat.row(nUniqueData++) = x.row(r);

@@ -48,8 +48,9 @@ QString ZImgMetadata::toQString() const
     if (!it->second.empty()) {
       res = res % QString("Attach Point: z: %1, c: %2, t: %3\n").arg(it->first.z)
         .arg(it->first.c).arg(it->first.t);
-      for (size_t i = 0; i < it->second.size(); ++i)
-        res = res % "  " % it->second[i].toQString() % "\n";
+      for (const auto& tag : it->second) {
+        res = res % "  " % tag.toQString() % "\n";
+      }
     }
   }
 
@@ -70,8 +71,9 @@ QString ZImgThumbernail::toQString() const
     if (!it->second.empty()) {
       res = res % QString("Attach Point: z: %1, c: %2, t: %3, Number of Thumbnails: %4\n").arg(it->first.z)
         .arg(it->first.c).arg(it->first.t).arg(it->second.size());
-      for (size_t i = 0; i < it->second.size(); ++i)
-        res = res % "  thumb <" % it->second[i].info().toQString() % ">\n";
+      for (const auto& img : it->second) {
+        res = res % "  thumb <" % img.info().toQString() % ">\n";
+      }
     }
   }
 
@@ -1395,7 +1397,7 @@ ZImg& ZImg::flip(Dimension dim)
     std::reverse(m_data.begin(), m_data.end());
   } else if (dim == Dimension::C) { // flip channels
     if (numChannels() > 1) {
-      std::vector<int8_t> buf(channelByteNumber());
+      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> buf(channelByteNumber());
       for (size_t t = 0; t < numTimes(); ++t) {
         size_t j = numChannels() - 1;
         for (size_t i = 0; i < numChannels() / 2; ++i, --j) {
@@ -1618,9 +1620,7 @@ void ZImg::clearData()
   }
 
   for (size_t i = 0; i < m_data.size(); ++i) {
-    //for (size_t j=0; j<m_data[i].size(); ++j) {
     boost::alignment::aligned_free(m_data[i]);
-    //}
   }
   m_data.clear();
 }

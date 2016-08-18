@@ -129,9 +129,9 @@ void Z3DCamera::resetCameraNearFarPlane(const std::vector<double>& bound)
   range[1] = 1e-18;
 
   // Find the closest / farthest bounding box vertex
-  for (int k = 0; k < 2; k++) {
-    for (int j = 0; j < 2; j++) {
-      for (int i = 0; i < 2; i++) {
+  for (int k = 0; k < 2; ++k) {
+    for (int j = 0; j < 2; ++j) {
+      for (int i = 0; i < 2; ++i) {
         double dist = a * bound[i] + b * bound[2 + j] + c * bound[4 + k] + d;
         range[0] = (dist < range[0]) ? (dist) : (range[0]);
         range[1] = (dist > range[1]) ? (dist) : (range[1]);

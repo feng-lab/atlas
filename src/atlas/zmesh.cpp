@@ -334,24 +334,22 @@ QString ZMesh::typeAsString() const
 std::vector<glm::dvec3> ZMesh::doubleVertices() const
 {
   std::vector<glm::dvec3> result;
-  for (size_t i = 0; i < m_vertices.size(); i++)
-    result.emplace_back(m_vertices[i].x, m_vertices[i].y, m_vertices[i].z);
+  for (auto v : m_vertices)
+    result.emplace_back(v.x, v.y, v.z);
   return result;
 }
 
 void ZMesh::setVertices(const std::vector<glm::dvec3>& vertices)
 {
-  for (size_t i = 0; i < vertices.size(); i++) {
-    glm::vec3 vert = glm::vec3(vertices[i]);
-    m_vertices.push_back(vert);
+  for (const auto& v : vertices) {
+    m_vertices.push_back(glm::vec3(v));
   }
 }
 
 void ZMesh::setNormals(const std::vector<glm::dvec3>& normals)
 {
-  for (size_t i = 0; i < normals.size(); i++) {
-    glm::vec3 normal = glm::vec3(normals[i]);
-    m_normals.push_back(normal);
+  for (const auto& n : normals) {
+    m_normals.push_back(glm::vec3(n));
   }
 }
 
@@ -366,10 +364,10 @@ void ZMesh::interpolate(const ZMesh& ref)
     m_3DTextureCoordinates.clear();
   if (!ref.m_colors.empty())
     m_colors.clear();
-  for (size_t i = 0; i < m_vertices.size(); i++) {
+  for (size_t i = 0; i < m_vertices.size(); ++i) {
     bool match = false;
     // first check all ref vertices
-    for (size_t j = 0; !match && j < ref.m_vertices.size(); j++) {
+    for (size_t j = 0; !match && j < ref.m_vertices.size(); ++j) {
       if (glm::length(ref.m_vertices[j] - m_vertices[i]) <= 1e-6) {
         match = true;
         if (!ref.m_1DTextureCoordinates.empty())
@@ -383,7 +381,7 @@ void ZMesh::interpolate(const ZMesh& ref)
       }
     }
     // no vertice match, interpolate
-    for (size_t j = 0; !match && j < triIdxs.size(); j++) {
+    for (size_t j = 0; !match && j < triIdxs.size(); ++j) {
       glm::uvec3 triIdx = triIdxs[j];
       double s, t;
       if (ZMeshUtils::vertexTriangleSquaredDistance(glm::dvec3(m_vertices[i]), glm::dvec3(ref.m_vertices[triIdx[0]]),

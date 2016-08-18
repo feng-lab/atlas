@@ -122,11 +122,11 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   m_handleEvent.setEnabled(m_isSelected);
 
   const std::vector<ZParameter*>& globalParas = m_rendererBase.globalParameters();
-  for (size_t i = 0; i < globalParas.size(); i++) {
+  for (size_t i = 0; i < globalParas.size(); ++i) {
     connect(globalParas[i], &ZParameter::valueChanged, this, &Z3DBoundedFilter::invalidateResult);
   }
   const std::vector<ZParameter*>& paras = m_rendererBase.parameters();
-  for (size_t i = 0; i < paras.size(); i++) {
+  for (size_t i = 0; i < paras.size(); ++i) {
     addParameter(*paras[i]);
   }
 }

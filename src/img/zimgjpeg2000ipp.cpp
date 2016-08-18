@@ -215,9 +215,9 @@ void ZImgJpeg2000::readImg(const QString &filename, ZImg &img, const ZImgRegion 
         int32_t *src = imagePn.Buffer().DataPtr()[c].p32s;
         uint16_t *pDst = res.channelData<uint16_t>(c);
 
-        for(int i = 0; i < size.height; i++) {
+        for(int i = 0; i < size.height; ++i) {
           int32_t *pSrc = (int32_t*)((uint8_t*)src + i*dataOrderPn.LineStep()[c]);
-          for(int j = 0; j < size.width; j++)
+          for(int j = 0; j < size.width; ++j)
             *pDst++ = saturate_cast<uint16_t>(*pSrc++);
         }
       } else { // J2K_16 == j2kArithmetic
@@ -296,7 +296,7 @@ void ZImgJpeg2000::writeImg(const QString &filename, const ZImg &img, Compressio
   dataOrder.SetDataType(T32s);
   dataOrder.ReAlloc(Plane, img.numChannels());
 
-  for (size_t i = 0; i < img.numChannels(); i++) {
+  for (size_t i = 0; i < img.numChannels(); ++i) {
     dataOrder.PixelStep()[i] = NOfBytes(dataOrder.DataType());
     dataOrder.LineStep() [i] = geometry.RefGridRect().Width() * du;
   }
@@ -308,7 +308,7 @@ void ZImgJpeg2000::writeImg(const QString &filename, const ZImg &img, Compressio
   imagePn.ColorSpec().SetColorSpecMethod(Enumerated);
   imagePn.ColorSpec().SetComponentToColorMap(Direct);
 
-  for (size_t i = 0; i < img.numChannels(); i++) {
+  for (size_t i = 0; i < img.numChannels(); ++i) {
     if(img.bytesPerVoxel() <= 1) {
       imagePn.ColorSpec().DataRange()[i].SetAsRange8u(255);
     } else {

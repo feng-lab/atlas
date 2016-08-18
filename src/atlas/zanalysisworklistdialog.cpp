@@ -111,7 +111,7 @@ void ZAnalysisWorklistDialog::onGenerate()
     progress.setWindowModality(Qt::WindowModal);
     progress.show();
     try {
-      for (int i = 0; i < list.size(); i++) {
+      for (int i = 0; i < list.size(); ++i) {
         progress.setValue(i);
         if (progress.wasCanceled())
           break;

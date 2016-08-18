@@ -325,7 +325,7 @@ Z3DVolumeHistogramThread::Z3DVolumeHistogramThread(Z3DVolume* volume, QObject* p
 void Z3DVolumeHistogramThread::run()
 {
   m_histogram.assign(static_cast<size_t>(m_volume->maxValue() + 1), 0);
-  for (size_t i = 0; i < m_volume->numVoxels(); i++) {
+  for (size_t i = 0; i < m_volume->numVoxels(); ++i) {
     m_histogram[static_cast<size_t>(m_volume->value(i))]++;
   }
 }

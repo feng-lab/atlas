@@ -86,8 +86,8 @@ void Z3DMainWindow::dropEvent(QDropEvent* event)
     if (dirCheck.isDir()) {
       QDir dir = dirCheck.absoluteDir();
       QFileInfoList list = dir.entryInfoList(QDir::Files | QDir::NoSymLinks);
-      for (int i = 0; i < list.size(); i++) {
-        fileList.append(list.at(i).canonicalFilePath());
+      for (const auto& fi : list) {
+        fileList.append(fi.canonicalFilePath());
       }
     } else {
       fileList.append(dirCheck.canonicalFilePath());

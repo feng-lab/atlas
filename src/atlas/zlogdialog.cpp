@@ -119,7 +119,7 @@ ZLogDialog::ZLogDialog(LogSinkPtr destination, QWidget* parent)
 #endif
 
   // Initialize log level selection
-  for (int l = InfoLevel; l < OffLevel; l++) {
+  for (int l = InfoLevel; l < OffLevel; ++l) {
     const QString ln = levelToString(static_cast<LogSeverity>(l));
     mUi->comboBoxLevel->addItem(ln, l);
   }
@@ -238,7 +238,7 @@ QString ZLogDialog::getSelectionText() const
   QString text;
 
   if (rows.count() == 0) {
-    for (int i = 0; i < mProxyModel->rowCount(); i++) {
+    for (int i = 0; i < mProxyModel->rowCount(); ++i) {
       const int srow = mProxyModel->mapToSource(mProxyModel->index(i, 0)).row();
       text += mModelDestination->at(srow).formatted + "\n";
     }

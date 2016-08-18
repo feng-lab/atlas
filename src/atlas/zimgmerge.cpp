@@ -377,7 +377,7 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate>& imgCoo
         }
         tree.erase(it++);
       } else {
-        it++;
+        ++it;
       }
     }
   }

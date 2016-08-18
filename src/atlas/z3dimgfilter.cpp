@@ -366,8 +366,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_rendererBase.coordTransformPara(), 1);
 
     const std::vector<ZParameter*>& paras = parameters();
-    for (size_t i = 0; i < paras.size(); i++) {
-      ZParameter* para = paras[i];
+    for (auto para : paras) {
       if (para->name().contains("Slice") && !para->name().endsWith("2") && !para->name().endsWith("2 Position"))
         m_widgetsGroup->addChild(*para, 11);
       else if (para->name().contains("Slice"))

@@ -99,7 +99,7 @@ int64_t* vtkCCSEdgeLocator::InsertUniqueEdge(
 
   int i = 1;
   while (node->next != 0) {
-    i++;
+    ++i;
     node = node->next;
 
     if (node->ptId0 == i0 && node->ptId1 == i1) {
@@ -327,7 +327,7 @@ void vtkCCSInsertTriangle(
     // Find out which edge has the most extra points
     int64_t maxPoints = 0;
     int currSide = 0;
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 3; ++i) {
       if (edgeLocs[i] >= 0) {
         int64_t npts = originalEdges[edgeLocs[i]].size();
         int64_t* pts = originalEdges[edgeLocs[i]].data();
@@ -368,7 +368,7 @@ void vtkCCSInsertTriangle(
           n -= nextNeeded;
         }
 
-        for (int k = m; k < n; k++) {
+        for (int k = m; k < n; ++k) {
           polys.push_back(glm::i64vec3(edgePts[side][k], edgePts[side][k + 1], tailPtIds[side]));
         }
       }
@@ -382,7 +382,7 @@ glm::dvec3 ComputePolygonNormal(const std::vector<int64_t>& poly, const std::vec
   if (poly.empty())
     return normal;
   glm::dvec3 anchor = vertices[poly[0]];
-  for (size_t i = 1; i < poly.size() - 1; i++) {
+  for (size_t i = 1; i < poly.size() - 1; ++i) {
     glm::dvec3 v1 = vertices[poly[i]] - anchor;
     glm::dvec3 v2 = vertices[poly[i + 1]] - anchor;
     normal += glm::cross(v1, v2);
@@ -514,7 +514,7 @@ int PointInPolygon(glm::dvec3 x, const std::vector<glm::dvec3>& pts, const doubl
   //  normal of the face.  The length of the ray is a function of the
   //  size of the face bounding box.
   //
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; ++i) {
     ray[i] = (bounds[2 * i + 1] - bounds[2 * i]) * 1.1 +
              std::abs((bounds[2 * i + 1] + bounds[2 * i]) / 2.0 - x[i]);
   }
@@ -591,14 +591,14 @@ int PointInPolygon(glm::dvec3 x, const std::vector<glm::dvec3>& pts, const doubl
 
     //  The ray must be appropriately sized.
     //
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 3; ++i) {
       xray[i] = x[i] + (rayMag / mag) * ray[i];
     }
 
     //  The ray may now be fired against all the edges
     //
     size_t i;
-    for (numInts = 0, testResult = VTK_POLYGON_CERTAIN, i = 0; i < pts.size(); i++) {
+    for (numInts = 0, testResult = VTK_POLYGON_CERTAIN, i = 0; i < pts.size(); ++i) {
       glm::dvec3 x1 = pts[i];
       glm::dvec3 x2 = pts[(i + 1) % pts.size()];
 
@@ -744,7 +744,7 @@ double vtkCCSPolygonBounds(
   bounds[2] = bounds[3] = p[1];
   bounds[4] = bounds[5] = p[2];
 
-  for (size_t j = 1; j < n; j++) {
+  for (size_t j = 1; j < n; ++j) {
     p = vertices[poly[j]];
     if (p[0] < bounds[0]) { bounds[0] = p[0]; };
     if (p[0] > bounds[1]) { bounds[1] = p[0]; };
@@ -787,7 +787,7 @@ bool TriangulatePolygon2(const std::vector<int64_t>& poly, const std::vector<glm
   // vertices with smallest angle are to be removed first).
   //
   std::priority_queue<std::pair<double, size_t>, std::vector<std::pair<double, size_t>>, MeasureIDComparison> VertexQueue;
-  for (size_t i = 0; i < poly.size(); i++) {
+  for (size_t i = 0; i < poly.size(); ++i) {
     //concave (negative measure) vertices are not elgible for removal
     double measure = ComputePolygonTriangleMeasure(i, normal, poly, vertices);
     if (measure > 0.0) {
@@ -823,7 +823,7 @@ bool TriangulatePolygon2(const std::vector<int64_t>& poly, const std::vector<glm
       // rebuild VertexQueue
       while (!VertexQueue.empty())
         VertexQueue.pop();
-      for (size_t i = 0; i < polyCopy.size(); i++) {
+      for (size_t i = 0; i < polyCopy.size(); ++i) {
         //concave (negative measure) vertices are not elgible for removal
         double measure = ComputePolygonTriangleMeasure(i, normal, polyCopy, vertices);
         if (measure > 0.0) {
@@ -848,7 +848,7 @@ bool TriangulatePolygon2(const std::vector<int64_t>& poly, const std::vector<glm
         // rebuild VertexQueue
         while (!VertexQueue.empty())
           VertexQueue.pop();
-        for (size_t i = 0; i < polyCopy.size(); i++) {
+        for (size_t i = 0; i < polyCopy.size(); ++i) {
           //concave (negative measure) vertices are not elgible for removal
           double measure = ComputePolygonTriangleMeasure(i, normal, polyCopy, vertices);
           if (measure > 0.0) {
@@ -904,9 +904,9 @@ bool vtkCCSTriangulate(
 
     for (size_t k = 0; k < tris.size(); k += 3) {
       size_t trids[3];
-      for (size_t i = 0; i < 3; i++) {
+      for (size_t i = 0; i < 3; ++i) {
         size_t id = tris[k + i];
-        for (size_t m = 0; m < poly.size(); m++) {
+        for (size_t m = 0; m < poly.size(); ++m) {
           if (static_cast<size_t>(poly[m]) == id) {
             trids[i] = m;
             break;
@@ -1065,7 +1065,7 @@ void vtkCCSJoinLooseEnds(
     double dMin = std::numeric_limits<double>::max();
     size_t iMin = 0;
 
-    for (size_t i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; ++i) {
       std::vector<int64_t>& poly2 = polys[incompletePolys[i]];
       int64_t pt2 = poly2[0];
       p2 = vertices[pt2];
@@ -1093,10 +1093,10 @@ void vtkCCSJoinLooseEnds(
       // the edge is not on the hull of the pointset.
       int badPoint = 0;
       size_t m = polys.size();
-      for (size_t j = 0; j < m && !badPoint; j++) {
+      for (size_t j = 0; j < m && !badPoint; ++j) {
         vtkCCSPoly& poly = polys[j];
         size_t npts = poly.size();
-        for (size_t k = 0; k < npts; k++) {
+        for (size_t k = 0; k < npts; ++k) {
           int64_t ptId = poly[k];
           if (ptId != pt1 && ptId != pt2) {
             glm::dvec3 p = vertices[ptId];
@@ -1218,7 +1218,7 @@ int vtkCCSSplitAtPinchPoints(
 {
   int splitCount = 0;
 
-  for (size_t i = 0; i < polys.size(); i++) {
+  for (size_t i = 0; i < polys.size(); ++i) {
     std::vector<int64_t>& poly = polys[i];
     size_t n = poly.size();
 
@@ -1303,7 +1303,7 @@ int vtkCCSSplitAtPinchPoints(
       std::vector<int64_t> newEdges2(n - m + unique);
 
       // The current poly, which is now intersection-free
-      for (size_t l = 0; l < m + unique; l++) {
+      for (size_t l = 0; l < m + unique; ++l) {
         newPoly1[l] = oldPoly[l + idx1];
         newEdges1[l] = oldEdges[l + idx1];
       }
@@ -1312,14 +1312,14 @@ int vtkCCSSplitAtPinchPoints(
       }
 
       // The poly that is split off, which might have more intersections
-      for (size_t j = 0; j < idx1 + unique; j++) {
+      for (size_t j = 0; j < idx1 + unique; ++j) {
         newPoly2[j] = oldPoly[j];
         newEdges2[j] = oldEdges[j];
       }
       if (unique) {
         newEdges2[idx1] = -1;
       }
-      for (size_t k = idx2; k < n; k++) {
+      for (size_t k = idx2; k < n; ++k) {
         newPoly2[k - m + unique] = oldPoly[k];
         newEdges2[k - m + unique] = oldEdges[k];
       }
@@ -1401,7 +1401,7 @@ void vtkCCSFindTrueEdges(
     double l2;
     glm::dvec3 p2, v2;
 
-    for (size_t j = 0; j < n; j++) {
+    for (size_t j = 0; j < n; ++j) {
       size_t k = j + 1;
       if (k >= n) { k -= n; }
 
@@ -1617,7 +1617,7 @@ void vtkCCSPrepareForPolyInPoly(
   }
 
   // Pull out the points
-  for (size_t k = 0; k < n; k++) {
+  for (size_t k = 0; k < n; ++k) {
     //double *p = &pp[3*k];
     //vertices->GetPoint(outerPoly[k], p);
     pp.push_back(vertices[outerPoly[k]]);
@@ -1662,7 +1662,7 @@ void vtkCCSMakeHoleyPolys(
   double tol2;
 
   // Go through all polys
-  for (size_t i = 0; i < numNewPolys; i++) {
+  for (size_t i = 0; i < numNewPolys; ++i) {
     size_t n = newPolys[i].size();
 
     if (n < 3) { continue; }
@@ -1677,13 +1677,13 @@ void vtkCCSMakeHoleyPolys(
     vtkCCSPrepareForPolyInPoly(newPolys[i], vertices, pp, bounds, tol2);
 
     // Look for polygons inside of this one
-    for (size_t j = 0; j < numNewPolys; j++) {
+    for (size_t j = 0; j < numNewPolys; ++j) {
       size_t m = newPolys[j].size();
       if (j == i || m < 3) { continue; }
 
       // Make sure polygon i is not in polygon j
       int isInteriorPoly = 0;
-      for (size_t k = 1; k < polyGroups[j].size(); k++) {
+      for (size_t k = 1; k < polyGroups[j].size(); ++k) {
         if (polyGroups[j][k] == i) {
           isInteriorPoly = 1;
           break;
@@ -1702,7 +1702,7 @@ void vtkCCSMakeHoleyPolys(
     }
   }
 
-  for (size_t j = 0; j < numNewPolys; j++) {
+  for (size_t j = 0; j < numNewPolys; ++j) {
     // Remove the groups for reversed polys
     if (polyReversed.get(j)) {
       polyGroups[j].clear();
@@ -1712,7 +1712,7 @@ void vtkCCSMakeHoleyPolys(
     else if (polyGroups[j].size() > 1) {
       // Convert the group into a bit array, to make manipulation easier
       innerPolys.clear();
-      for (size_t k = 1; k < polyGroups[j].size(); k++) {
+      for (size_t k = 1; k < polyGroups[j].size(); ++k) {
         innerPolys.set(polyGroups[j][k], 1);
       }
 
@@ -1808,7 +1808,7 @@ int vtkCCSCheckCut(
   pc[2] = glmpc[2];
   pc[3] = -glm::dot(glmpc, p1);
 
-  for (size_t i = 0; i < polyGroup.size(); i++) {
+  for (size_t i = 0; i < polyGroup.size(); ++i) {
     const vtkCCSPoly& poly = polys[polyGroup[i]];
     size_t n = poly.size();
 
@@ -1817,7 +1817,7 @@ int vtkCCSCheckCut(
     double v1 = pc[0] * q1[0] + pc[1] * q1[1] + pc[2] * q1[2] + pc[3];
     int c1 = (v1 > 0);
 
-    for (size_t j = 0; j < n; j++) {
+    for (size_t j = 0; j < n; ++j) {
       int64_t qtId2 = poly[j];
       glm::dvec3 q2 = vertices[qtId2];
       double v2 = pc[0] * q2[0] + pc[1] * q2[1] + pc[2] * q2[2] + pc[3];
@@ -1968,7 +1968,7 @@ void vtkCCSFindSharpestVerts(
 
   l1 = std::sqrt(glm::dot(v1, v1));
 
-  for (size_t j = 0; j < n; j++) {
+  for (size_t j = 0; j < n; ++j) {
     size_t k = j + 1;
     if (k == n) { k = 0; }
 
@@ -2028,7 +2028,7 @@ int vtkCCSFindCuts(
 
     size_t count = (exhaustive ? innerSize : 3);
 
-    for (size_t i = 0; i < count && !foundCut; i++) {
+    for (size_t i = 0; i < count && !foundCut; ++i) {
       // Semi-randomize the search order
       size_t j = (i >> 1) + (i & 1) * ((innerSize + 1) >> 1);
       // Start at the best first point
@@ -2205,7 +2205,7 @@ int vtkCCSCutHoleyPolys(
       std::vector<std::pair<size_t, size_t>>
         innerBySize(polyGroup.size());
 
-      for (size_t i = 1; i < polyGroup.size(); i++) {
+      for (size_t i = 1; i < polyGroup.size(); ++i) {
         innerBySize[i].first = polys[polyGroup[i]].size();
         innerBySize[i].second = i;
       }
@@ -2218,7 +2218,7 @@ int vtkCCSCutHoleyPolys(
       int madeCut = 0;
       size_t inner = 0;
       for (int exhaustive = 0; exhaustive < 2 && !madeCut; exhaustive++) {
-        for (size_t j = 1; j < polyGroup.size(); j++) {
+        for (size_t j = 1; j < polyGroup.size(); ++j) {
           inner = innerBySize[j].second;
           innerPolyId = polyGroup[inner];
 
@@ -2240,7 +2240,7 @@ int vtkCCSCutHoleyPolys(
       }
       else {
         // Remove all failed inner polys from the group
-        for (size_t k = 1; k < polyGroup.size(); k++) {
+        for (size_t k = 1; k < polyGroup.size(); ++k) {
           innerPolyId = polyGroup[k];
           polyGroups[innerPolyId].push_back(innerPolyId);
         }
@@ -2344,7 +2344,7 @@ void MakePolysFromContours(
 
   size_t numNewPolys = newPolys.size();
   std::vector<std::vector<size_t>> polyGroups(numNewPolys);
-  for (size_t i = 0; i < numNewPolys; i++) {
+  for (size_t i = 0; i < numNewPolys; ++i) {
     polyGroups[i].push_back(i);
   }
 
@@ -2439,7 +2439,7 @@ void ClipAndContourPolys(
     // To store the ids of the contour line
     glm::i64vec2 linePts(0, 0);
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 3; ++i) {
       // Save previous point info
       int64_t i0 = i1;
       double v0 = v1;
@@ -2508,12 +2508,12 @@ ZMesh ZMeshUtils::clipClosedSurface(const ZMesh& mesh, std::vector<glm::vec4> cl
   std::vector<glm::uvec3> tris = mesh.triangleIndices();
   std::vector<glm::i64vec3> inputTriangles;
   vtkCCSEdgeLocator* edgeLocator = vtkCCSEdgeLocator::New();
-  for (size_t i = 0; i < tris.size(); i++)
+  for (size_t i = 0; i < tris.size(); ++i)
     inputTriangles.push_back(glm::i64vec3(tris[i]));
 
   bool clipped = false;
 
-  for (size_t i = 0; i < clipPlanes.size(); i++) {
+  for (size_t i = 0; i < clipPlanes.size(); ++i) {
     std::vector<glm::i64vec3> outputTriangles;
     glm::dvec4 plane = glm::dvec4(clipPlanes[i]);
     std::vector<double> vertexDists;
@@ -2539,7 +2539,7 @@ ZMesh ZMeshUtils::clipClosedSurface(const ZMesh& mesh, std::vector<glm::vec4> cl
     ZMesh result(GL_TRIANGLES);
     result.setVertices(vertices);
     std::vector<GLuint> indexes;
-    for (size_t i = 0; i < inputTriangles.size(); i++) {
+    for (size_t i = 0; i < inputTriangles.size(); ++i) {
       indexes.push_back(inputTriangles[i].x);
       indexes.push_back(inputTriangles[i].y);
       indexes.push_back(inputTriangles[i].z);
