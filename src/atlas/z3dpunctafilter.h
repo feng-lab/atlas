@@ -75,10 +75,10 @@ protected:
 
   void prepareData();
 
-  // result should has at least 6 elements
+  // result should have at least 6 elements
   void punctumBound(const ZPunctum& p, std::vector<double>& result) const;
 
-  // result should has at least 6 elements
+  // result should have at least 6 elements
   void notTransformedPunctumBound(const ZPunctum& p, std::vector<double>& result) const;
 
   //virtual void updateAxisAlignedBoundBoxImpl() override;

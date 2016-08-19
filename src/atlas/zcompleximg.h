@@ -58,7 +58,7 @@ public:
 
   static ZComplexImg conj(const ZComplexImg& img);
 
-  // for operator between img, input should has same size, otherwise ZImgException will be thrown
+  // for operator between img, input should have same size, otherwise ZImgException will be thrown
   ZComplexImg& operator+=(const std::complex<double>& rhs);
 
   ZComplexImg& operator+=(const ZComplexImg& rhs);

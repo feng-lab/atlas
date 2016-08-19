@@ -1,7 +1,7 @@
 #include "zimgnccmatch.h"
 
 #include "zlog.h"
-#include <algorithm>
+#include <array>
 #include "zimgncc.h"
 #include "zimgautothreshold.h"
 #include <QStringList>
@@ -281,7 +281,7 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffset(double* maxNCC, double* ma
   }
   ZVoxelCoordinate res;
   if (m_movingImgPosHint == PositionHint::None && m_maxOverlapRate < 1) {
-    std::vector<PositionHint> hints{PositionHint::Left, PositionHint::Right, PositionHint::Up, PositionHint::Down};
+    std::array<PositionHint, 4> hints{{PositionHint::Left, PositionHint::Right, PositionHint::Up, PositionHint::Down}};
     double wncc = std::numeric_limits<double>::lowest();
     for (PositionHint hint : hints) {
       double tmpMaxNCC;
@@ -321,7 +321,7 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(size_t intvX, size_t int
   }
   ZVoxelCoordinate res;
   if (m_movingImgPosHint == PositionHint::None && m_maxOverlapRate < 1) {
-    std::vector<PositionHint> hints{PositionHint::Left, PositionHint::Right, PositionHint::Up, PositionHint::Down};
+    std::array<PositionHint, 4> hints{{PositionHint::Left, PositionHint::Right, PositionHint::Up, PositionHint::Down}};
     double wncc = std::numeric_limits<double>::lowest();
     for (PositionHint hint : hints) {
       double tmpMaxNCC;

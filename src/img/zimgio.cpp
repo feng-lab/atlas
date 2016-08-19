@@ -142,36 +142,36 @@ void ZImgIO::readInfo(const QStringList& fileList, Dimension catDim, std::vector
             .arg(i).arg(tmpInfo[s].toQString()).arg(res[s].toQString()));
       }
       // check whether dimension size match
-      for (size_t d = 0; d < res[s].numDimensions(); ++d) {
+      for (auto dim : res[s].dimensions()) {
         if (expandXY) {
-          if (d != enumToType<size_t>(Dimension::X) && d != enumToType<size_t>(Dimension::Y) &&
-              d != enumToType<size_t>(catDim) && res[s].size(d) != tmpInfo[s].size(d)) {
+          if (dim != Dimension::X && dim != Dimension::Y && dim != catDim &&
+              res[s].size(dim) != tmpInfo[s].size(dim)) {
             throw ZIOException(
               QString("Read sequence failed: image dimension don't match, can not cat Img %1 <%2> to Img 0 <%3>")
                 .arg(i).arg(tmpInfo[s].toQString()).arg(res[s].toQString()));
           }
         } else {
-          if (d != enumToType<size_t>(catDim) && res[s].size(d) != tmpInfo[s].size(d)) {
+          if (dim != catDim && res[s].size(dim) != tmpInfo[s].size(dim)) {
             throw ZIOException(
               QString("Read sequence failed: image dimension don't match, can not cat Img %1 <%2> to Img 0 <%3>")
                 .arg(i).arg(tmpInfo[s].toQString()).arg(res[s].toQString()));
           }
         }
-        if (d == enumToType<size_t>(catDim)) {
+        if (dim == catDim) {
           if (subBlocks) {
             for (size_t tsidx = 0; tsidx < tmpSubBlocks[s].size(); ++tsidx) {
               switch (catDim) {
                 case Dimension::X:
-                  tmpSubBlocks[s][tsidx]->x += res[s].size(d);
+                  tmpSubBlocks[s][tsidx]->x += res[s].size(dim);
                   break;
                 case Dimension::Y:
-                  tmpSubBlocks[s][tsidx]->y += res[s].size(d);
+                  tmpSubBlocks[s][tsidx]->y += res[s].size(dim);
                   break;
                 case Dimension::Z:
-                  tmpSubBlocks[s][tsidx]->z += res[s].size(d);
+                  tmpSubBlocks[s][tsidx]->z += res[s].size(dim);
                   break;
                 case Dimension::T:
-                  tmpSubBlocks[s][tsidx]->t += res[s].size(d);
+                  tmpSubBlocks[s][tsidx]->t += res[s].size(dim);
                   break;
                 default:
                   CHECK(false);
@@ -180,7 +180,7 @@ void ZImgIO::readInfo(const QStringList& fileList, Dimension catDim, std::vector
               subBlocks->at(s).push_back(tmpSubBlocks[s][tsidx]);
             }
           }
-          res[s].setSize(catDim, res[s].size(d) + tmpInfo[s].size(d));
+          res[s].setSize(catDim, res[s].size(dim) + tmpInfo[s].size(dim));
         }
       }
       // get final width and height

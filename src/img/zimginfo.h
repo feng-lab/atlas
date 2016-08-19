@@ -64,8 +64,11 @@ struct ZImgInfo
   inline bool isSameType(const ZImgInfo& other) const
   { return voxelFormat == other.voxelFormat && bytesPerVoxel == other.bytesPerVoxel; }
 
-  inline static size_t numDimensions()
+  static constexpr size_t numDimensions()
   { return 5; }
+
+  static constexpr std::array<Dimension, 5> dimensions()
+  { return {{Dimension::X, Dimension::Y, Dimension::Z, Dimension::C, Dimension::T}}; };
 
   // access
   inline void setSize(Dimension dim, size_t size)
@@ -74,10 +77,10 @@ struct ZImgInfo
     if (dim >= Dimension::C) createDefaultDescriptions();
   }
 
-  // sz should has at least numDimensions() elements
+  // sz should have at least numDimensions() elements
   inline void setSize(size_t* sz)
   {
-    memcpy(&width, sz, sizeof(size_t) * 6);
+    memcpy(&width, sz, sizeof(size_t) * numDimensions());
     createDefaultDescriptions();
   }
 

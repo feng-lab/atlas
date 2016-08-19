@@ -11,7 +11,7 @@ namespace nim {
 class Z3DPickingManager
 {
 public:
-  // input render target should has color internal format as GL_RGBA8
+  // input render target should have color internal format as GL_RGBA8
   Z3DPickingManager();
 
   // must call

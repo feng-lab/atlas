@@ -744,7 +744,7 @@ public:
   template<typename TScalar>
   ZImg& operator+=(TScalar scalar);
 
-  // add img, input should has same size, otherwise throw ZImgException
+  // add img, input should have same size, otherwise throw ZImgException
   ZImg& operator+=(const ZImg& rhs);
 
   template<typename TScalarOrZImg>
@@ -753,7 +753,7 @@ public:
   template<typename TScalar>
   ZImg& operator-=(TScalar scalar);
 
-  // sub img, input should has same size, otherwise throw ZImgException
+  // sub img, input should have same size, otherwise throw ZImgException
   ZImg& operator-=(const ZImg& rhs);
 
   template<typename TScalarOrZImg>
@@ -762,7 +762,7 @@ public:
   template<typename TScalar>
   ZImg& operator*=(TScalar scalar);
 
-  // multiply img, input should has same size, otherwise throw ZImgException
+  // multiply img, input should have same size, otherwise throw ZImgException
   ZImg& operator*=(const ZImg& rhs);
 
   template<typename TScalarOrZImg>
@@ -772,14 +772,14 @@ public:
   // throw ZImgException if scalar is zero and not float
   ZImg& operator/=(TScalar scalar);
 
-  // divide img, input should has same size, otherwise throw ZImgException
+  // divide img, input should have same size, otherwise throw ZImgException
   // might got hardware exception if rhs contains zero and both img is not float type
   ZImg& operator/=(const ZImg& rhs);
 
   template<typename TScalarOrZImg>
   ZImg operator/(const TScalarOrZImg& scalarOrZImg) const;
 
-  // divide img, input should has same size, otherwise throw ZImgException
+  // divide img, input should have same size, otherwise throw ZImgException
   // result voxel is 0 if rhs voxel is 0
   ZImg& secureDivideBy(const ZImg& rhs);
 
