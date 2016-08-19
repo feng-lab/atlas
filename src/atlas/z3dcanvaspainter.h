@@ -24,7 +24,7 @@ public:
 
   ~Z3DCanvasPainter();
 
-  virtual void invalidate(InvalidationState inv = InvalidAllResult) override;
+  virtual void invalidate(State inv = State::AllResultInvalid) override;
 
   void setCanvas(Z3DCanvas* canvas);
 

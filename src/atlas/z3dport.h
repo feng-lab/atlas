@@ -11,7 +11,7 @@ class Z3DPort
 {
 public:
   Z3DPort(const QString& name, bool allowMultipleConnections = false,
-          Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult);
+          Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid);
 
   virtual ~Z3DPort();
 
@@ -33,7 +33,7 @@ protected:
   bool m_allowMultipleConnections;
 
   // how changes from this port affect its filter
-  Z3DFilter::InvalidationState m_invalidationState;
+  Z3DFilter::State m_invalidationState;
 };
 
 class Z3DOutputPortBase;
@@ -42,11 +42,11 @@ class Z3DInputPortBase : public Z3DPort
 {
 public:
   Z3DInputPortBase(const QString& name, bool allowMultipleConnections = false,
-                   Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult);
+                   Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid);
 
   virtual ~Z3DInputPortBase();
 
-  // invalidate filter with the given InvalidationState and set hasChanged=true.
+  // invalidate filter with the given State and set hasChanged=true.
   void invalidate();
 
   // has the data in this port changed since the last process() call?
@@ -96,7 +96,7 @@ class Z3DOutputPortBase : public Z3DPort
 {
 public:
   Z3DOutputPortBase(const QString& name, bool allowMultipleConnections = true,
-                    Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult);
+                    Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid);
 
   virtual ~Z3DOutputPortBase();
 
@@ -155,7 +155,7 @@ class Z3DOutputPort : public Z3DOutputPortBase
 {
 public:
   Z3DOutputPort(const QString& name, bool allowMultipleConnections = true,
-                Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult)
+                Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid)
     : Z3DOutputPortBase(name, allowMultipleConnections, invalidationState)
     , m_portData(0)
   {}
@@ -209,7 +209,7 @@ class Z3DInputPort : public Z3DInputPortBase
 {
 public:
   Z3DInputPort(const QString& name, bool allowMultipleConnections = true,
-               Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult)
+               Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid)
     : Z3DInputPortBase(name, allowMultipleConnections, invalidationState)
   {}
 
@@ -262,7 +262,7 @@ class Z3DFilterInputPort : public Z3DInputPortBase
 {
 public:
   Z3DFilterInputPort(const QString& name, bool allowMultipleConnections = true,
-                     Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult)
+                     Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid)
     : Z3DInputPortBase(name, allowMultipleConnections, invalidationState)
   {
   }
@@ -294,7 +294,7 @@ class Z3DFilterOutputPort : public Z3DOutputPortBase
 {
 public:
   Z3DFilterOutputPort(const QString& name, bool allowMultipleConnections = false,
-                      Z3DFilter::InvalidationState invalidationState = Z3DFilter::InvalidAllResult)
+                      Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid)
     : Z3DOutputPortBase(name, allowMultipleConnections, invalidationState)
   {
   }

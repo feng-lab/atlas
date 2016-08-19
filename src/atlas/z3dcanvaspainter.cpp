@@ -21,9 +21,9 @@ Z3DCanvasPainter::Z3DCanvasPainter(Z3DGlobalParameters& globalParas, QObject* pa
   : Z3DBoundedFilter(globalParas, parent)
   , m_textureCopyRenderer(m_rendererBase, Z3DTextureCopyRenderer::OutputColorOption::DivideByAlpha)
   , m_canvas(nullptr)
-  , m_inport("Image", false, InvalidMonoViewResult)
-  , m_leftEyeInport("LeftEyeImage", false, InvalidLeftEyeResult)
-  , m_rightEyeInport("RightEyeImage", false, InvalidRightEyeResult)
+  , m_inport("Image", false, State::MonoViewResultInvalid)
+  , m_leftEyeInport("LeftEyeImage", false, State::LeftEyeResultInvalid)
+  , m_rightEyeInport("RightEyeImage", false, State::RightEyeResultInvalid)
   , m_renderToImage(false)
 {
   addPort(m_inport);
@@ -95,11 +95,11 @@ void Z3DCanvasPainter::onCanvasResized(size_t w, size_t h)
   emit requestUpstreamSizeChange(this);
 }
 
-void Z3DCanvasPainter::invalidate(InvalidationState inv)
+void Z3DCanvasPainter::invalidate(State inv)
 {
   if (!m_locked) {
     m_locked = true;
-    m_invalidationState |= inv;
+    m_state |= inv;
     if (m_canvas) {
       m_canvas->updateAll();
     }

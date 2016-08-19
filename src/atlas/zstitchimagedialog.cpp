@@ -33,14 +33,14 @@ void buildConnectionFromGrid(const std::vector<std::vector<size_t>>& grid,
           size_t idx1 = grid[i][j] - 1;
           size_t idx2 = grid[i][j + 1] - 1;
           std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
-          conn[stackPair] = ZImgNCCMatch::Right;
+          conn[stackPair] = ZImgNCCMatch::PositionHint::Right;
           connected = true;
         }
         if (i + 1 < grid.size() && grid[i + 1][j] > 0) { //down
           size_t idx1 = grid[i][j] - 1;
           size_t idx2 = grid[i + 1][j] - 1;
           std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
-          conn[stackPair] = ZImgNCCMatch::Down;
+          conn[stackPair] = ZImgNCCMatch::PositionHint::Down;
           connected = true;
         }
         if (i + 1 < grid.size() && j + 1 < grid[0].size() && grid[i + 1][j + 1] > 0
@@ -48,7 +48,7 @@ void buildConnectionFromGrid(const std::vector<std::vector<size_t>>& grid,
           size_t idx1 = grid[i][j] - 1;
           size_t idx2 = grid[i + 1][j + 1] - 1;
           std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
-          conn[stackPair] = ZImgNCCMatch::Down | ZImgNCCMatch::Right;
+          conn[stackPair] = ZImgNCCMatch::PositionHint::Down | ZImgNCCMatch::PositionHint::Right;
           connected = true;
         }
         if (i + 1 < grid.size() && j >= 1 && grid[i + 1][j - 1] > 0
@@ -56,7 +56,7 @@ void buildConnectionFromGrid(const std::vector<std::vector<size_t>>& grid,
           size_t idx1 = grid[i][j] - 1;
           size_t idx2 = grid[i + 1][j - 1] - 1;
           std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
-          conn[stackPair] = ZImgNCCMatch::Down | ZImgNCCMatch::Left;
+          conn[stackPair] = ZImgNCCMatch::PositionHint::Down | ZImgNCCMatch::PositionHint::Left;
           connected = true;
         }
         if (connected == false) {  // test if this image is connected
@@ -1238,21 +1238,21 @@ void ZStitchImageDialog::stitchStacks2()
   if (m_useConfigRadioButton->isChecked()) {
     if (nstack == 2) {
       std::pair<size_t, size_t> stackPair = std::pair<size_t, size_t>(0, 1);
-      conn[stackPair] = ZImgNCCMatch::None;
+      conn[stackPair] = ZImgNCCMatch::PositionHint::None;
       if (m_configDim1ComboBox->currentIndex() == 0)
-        conn[stackPair] |= ZImgNCCMatch::Left;
+        conn[stackPair] |= ZImgNCCMatch::PositionHint::Left;
       else if (m_configDim1ComboBox->currentIndex() == 2)
-        conn[stackPair] |= ZImgNCCMatch::Right;
+        conn[stackPair] |= ZImgNCCMatch::PositionHint::Right;
 
       if (m_configDim2ComboBox->currentIndex() == 0)
-        conn[stackPair] |= ZImgNCCMatch::Up;
+        conn[stackPair] |= ZImgNCCMatch::PositionHint::Up;
       else if (m_configDim2ComboBox->currentIndex() == 2)
-        conn[stackPair] |= ZImgNCCMatch::Down;
+        conn[stackPair] |= ZImgNCCMatch::PositionHint::Down;
 
       if (m_configDim3ComboBox->currentIndex() == 0)
-        conn[stackPair] |= ZImgNCCMatch::Front;
+        conn[stackPair] |= ZImgNCCMatch::PositionHint::Front;
       else if (m_configDim3ComboBox->currentIndex() == 2)
-        conn[stackPair] |= ZImgNCCMatch::Back;
+        conn[stackPair] |= ZImgNCCMatch::PositionHint::Back;
     }
   }
     /*generate connection file from tile_selection.lsm file*/
@@ -1353,7 +1353,7 @@ void ZStitchImageDialog::stitchStacks2()
         imgNCCMatch.enableRemoveBackgroundForMovingImgChannel(m_bgsub2ComboBox->currentIndex() - 2);
       }
       // fully overlap, no position hint
-      imgNCCMatch.setMovingImgPositionHint(ZImgNCCMatch::None, 1.0);
+      imgNCCMatch.setMovingImgPositionHint(ZImgNCCMatch::PositionHint::None, 1.0);
 
       double maxNCC;
       ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(intv[0], intv[1], intv[2], &maxNCC);
@@ -1401,7 +1401,7 @@ void ZStitchImageDialog::stitchStacks2()
         }
 
         std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>::iterator it = conn.find(std::make_pair(f, m));
-        ZImgNCCMatch::PositionHint hint = ZImgNCCMatch::None;
+        ZImgNCCMatch::PositionHint hint = ZImgNCCMatch::PositionHint::None;
         if (it != conn.end()) {
           hint = it->second;
         } else {
@@ -1435,7 +1435,7 @@ void ZStitchImageDialog::stitchStacks2()
         }
 
         std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>::iterator it = conn.find(std::make_pair(f, m));
-        ZImgNCCMatch::PositionHint hint = ZImgNCCMatch::None;
+        ZImgNCCMatch::PositionHint hint = ZImgNCCMatch::PositionHint::None;
         if (it != conn.end())
           hint = it->second;
         else {
@@ -1904,21 +1904,21 @@ void ZStitchImageDialog::stitchStacks()
     if (m_useConfigRadioButton->isChecked()) {
       if (nstack == 2) {
         std::pair<size_t, size_t> stackPair = std::pair<size_t, size_t>(0, 1);
-        conn[stackPair] = ZImgNCCMatch::None;
+        conn[stackPair] = ZImgNCCMatch::PositionHint::None;
         if (m_configDim1ComboBox->currentIndex() == 0)
-          conn[stackPair] |= ZImgNCCMatch::Left;
+          conn[stackPair] |= ZImgNCCMatch::PositionHint::Left;
         else if (m_configDim1ComboBox->currentIndex() == 2)
-          conn[stackPair] |= ZImgNCCMatch::Right;
+          conn[stackPair] |= ZImgNCCMatch::PositionHint::Right;
 
         if (m_configDim2ComboBox->currentIndex() == 0)
-          conn[stackPair] |= ZImgNCCMatch::Up;
+          conn[stackPair] |= ZImgNCCMatch::PositionHint::Up;
         else if (m_configDim2ComboBox->currentIndex() == 2)
-          conn[stackPair] |= ZImgNCCMatch::Down;
+          conn[stackPair] |= ZImgNCCMatch::PositionHint::Down;
 
         if (m_configDim3ComboBox->currentIndex() == 0)
-          conn[stackPair] |= ZImgNCCMatch::Front;
+          conn[stackPair] |= ZImgNCCMatch::PositionHint::Front;
         else if (m_configDim3ComboBox->currentIndex() == 2)
-          conn[stackPair] |= ZImgNCCMatch::Back;
+          conn[stackPair] |= ZImgNCCMatch::PositionHint::Back;
       }
     }
       /*generate connection file from tile_selection.lsm file*/
@@ -2009,25 +2009,25 @@ void ZStitchImageDialog::stitchStacks()
       for (std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>::iterator it = conn.begin();
            it != conn.end(); ++it) {
         ZImgNCCMatch::PositionHint posHint = it->second;
-        if (posHint == ZImgNCCMatch::None) {
+        if (posHint == ZImgNCCMatch::PositionHint::None) {
           throw ZStitchException("Position information incomplete for image concatenate, Abort.");
         }
         const ZImg& fixedImg = imgs[it->first.first];
         const ZImg& movingImg = imgs[it->first.second];
         ZVoxelCoordinate movingImgOffset;
-        if (posHint.testFlag(ZImgNCCMatch::Left)) {
+        if (has_flag(posHint, ZImgNCCMatch::PositionHint::Left)) {
           movingImgOffset.x = -static_cast<ZVoxelCoordinate::value_type>(movingImg.width());
-        } else if (posHint.testFlag(ZImgNCCMatch::Right)) {
+        } else if (has_flag(posHint, ZImgNCCMatch::PositionHint::Right)) {
           movingImgOffset.x = fixedImg.width();
         }
-        if (posHint.testFlag(ZImgNCCMatch::Up)) {
+        if (has_flag(posHint, ZImgNCCMatch::PositionHint::Up)) {
           movingImgOffset.y = -static_cast<ZVoxelCoordinate::value_type>(movingImg.height());
-        } else if (posHint.testFlag(ZImgNCCMatch::Down)) {
+        } else if (has_flag(posHint, ZImgNCCMatch::PositionHint::Down)) {
           movingImgOffset.y = fixedImg.height();
         }
-        if (posHint.testFlag(ZImgNCCMatch::Front)) {
+        if (has_flag(posHint, ZImgNCCMatch::PositionHint::Front)) {
           movingImgOffset.z = -static_cast<ZVoxelCoordinate::value_type>(movingImg.depth());
-        } else if (posHint.testFlag(ZImgNCCMatch::Back)) {
+        } else if (has_flag(posHint, ZImgNCCMatch::PositionHint::Back)) {
           movingImgOffset.z = fixedImg.depth();
         }
         imgMerge.addImgPair(fixedImg, movingImg, movingImgOffset, 0,
@@ -2091,7 +2091,7 @@ void ZStitchImageDialog::stitchStacks()
 
           std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>::iterator it = conn.find(
             std::make_pair(f, m));
-          ZImgNCCMatch::PositionHint hint = ZImgNCCMatch::None;
+          ZImgNCCMatch::PositionHint hint = ZImgNCCMatch::PositionHint::None;
           if (it != conn.end())
             hint = it->second;
           else {

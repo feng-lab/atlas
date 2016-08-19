@@ -78,14 +78,14 @@ public:
   void flipViewDirection();
 
   inline void resetCamera(const std::vector<double>& bound,
-                          Z3DCamera::ResetCameraOptions options = Z3DCamera::ResetAll)
+                          Z3DCamera::ResetOption options = Z3DCamera::ResetOption::ResetAll)
   {
     m_value.resetCamera(bound, options);
     updatePara();
   }
 
   inline void resetCamera(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax,
-                          Z3DCamera::ResetCameraOptions options = Z3DCamera::ResetAll)
+                          Z3DCamera::ResetOption options = Z3DCamera::ResetOption::ResetAll)
   {
     m_value.resetCamera(xmin, xmax, ymin, ymax, zmin, zmax, options);
     updatePara();

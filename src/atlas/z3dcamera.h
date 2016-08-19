@@ -3,7 +3,7 @@
 #include "z3dgl.h"
 #include "zglmutils.h"
 #include <map>
-#include <QFlags>
+#include "zflags.h"
 #include <vector>
 
 namespace nim {
@@ -27,13 +27,12 @@ public:
     Perspective, Orthographic
   };
 
-  enum ___ResetCameraOption
+  enum class ResetOption
   {
-    ResetAll = 0x00,
-    PreserveCenterDistance = 0x01,
-    PreserveViewVector = 0x02
+    ResetAll = 0,
+    PreserveCenterDistance = 1,
+    PreserveViewVector = 1 << 1
   };
-  Q_DECLARE_FLAGS(ResetCameraOptions, ___ResetCameraOption)
 
   Z3DCamera();
 
@@ -157,10 +156,10 @@ public:
   // will be preserved based on the PreserveViewVector flag. By default it is not preserved and will be
   // reset to (0,0,1) (upVector will then be set to (0,-1,0)).
   // Result depends on current field of view and aspect ratio.
-  void resetCamera(const std::vector<double>& bound, ResetCameraOptions options = ResetAll);
+  void resetCamera(const std::vector<double>& bound, ResetOption options = ResetOption::ResetAll);
 
   void resetCamera(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax,
-                   ResetCameraOptions options = ResetAll);
+                   ResetOption options = ResetOption::ResetAll);
 
   // Reset the camera near far plane based on the bounding box (see resetCamera).
   // This ensures that nothing is clipped by the near far planes
@@ -334,7 +333,7 @@ private:
   glm::mat4 m_projectionViewMatrices[3];
 };
 
-} // namespace nim
+DECLARE_OPERATORS_FOR_ENUM(Z3DCamera::ResetOption)
 
-Q_DECLARE_OPERATORS_FOR_FLAGS(nim::Z3DCamera::ResetCameraOptions)
+} // namespace nim
 

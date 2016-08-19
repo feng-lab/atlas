@@ -3,7 +3,7 @@
 
 namespace nim {
 
-Z3DPort::Z3DPort(const QString& name, bool allowMultipleConnections, Z3DFilter::InvalidationState invalidationState)
+Z3DPort::Z3DPort(const QString& name, bool allowMultipleConnections, Z3DFilter::State invalidationState)
   : m_name(name)
   , m_filter(nullptr)
   , m_allowMultipleConnections(allowMultipleConnections)
@@ -21,7 +21,7 @@ void Z3DPort::setFilter(Z3DFilter* p)
 }
 
 Z3DInputPortBase::Z3DInputPortBase(const QString& name, bool allowMultipleConnections,
-                                   Z3DFilter::InvalidationState invalidationState)
+                                   Z3DFilter::State invalidationState)
   : Z3DPort(name, allowMultipleConnections, invalidationState)
   , m_expectedSize(0)
 {
@@ -69,7 +69,7 @@ void Z3DInputPortBase::disconnectAll()
 
 
 Z3DOutputPortBase::Z3DOutputPortBase(const QString& name, bool allowMultipleConnections,
-                                     Z3DFilter::InvalidationState invalidationState)
+                                     Z3DFilter::State invalidationState)
   : Z3DPort(name, allowMultipleConnections, invalidationState)
   , m_size(32, 32)
 {

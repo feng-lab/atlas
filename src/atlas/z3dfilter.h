@@ -7,6 +7,7 @@
 #include "z3dcanvaseventlistener.h"
 #include <QJsonObject>
 #include "z3dgl.h"
+#include "zflags.h"
 
 class QString;
 
@@ -41,16 +42,15 @@ Q_OBJECT
 public:
   // specifies the invalidation status of the filter.
   // The networkEvaluator use this value to mark filters that has to be executed
-  enum ___InvalidationState
+  enum class State
   {
-    Valid = 0x00,
-    InvalidMonoViewResult = 0x01,
-    InvalidLeftEyeResult = 0x02,
-    InvalidRightEyeResult = 0x04,
-    InvalidStereoResult = InvalidLeftEyeResult | InvalidRightEyeResult,
-    InvalidAllResult = InvalidMonoViewResult | InvalidStereoResult
+    Valid = 0,
+    MonoViewResultInvalid = 1,
+    LeftEyeResultInvalid = 1 << 1,
+    RightEyeResultInvalid = 1 << 2,
+    StereoResultInvalid = LeftEyeResultInvalid | RightEyeResultInvalid,
+    AllResultInvalid = MonoViewResultInvalid | StereoResultInvalid
   };
-  Q_DECLARE_FLAGS(InvalidationState, ___InvalidationState)
 
   Z3DFilter(QObject* parent = nullptr);
 
@@ -79,7 +79,7 @@ public:
   template<class T>
   std::vector<T*> parametersOfType() const;
 
-  virtual void invalidate(InvalidationState inv = InvalidAllResult);
+  virtual void invalidate(State inv = State::AllResultInvalid);
 
   // returns the port with the given name, or nullptr if such a port does not exist.
   Z3DInputPortBase* inputPort(const QString& name) const;
@@ -109,7 +109,7 @@ public:
   void write(QJsonObject& json) const;
 
   inline void invalidateResult()
-  { invalidate(InvalidAllResult); }
+  { invalidate(State::AllResultInvalid); }
 
 signals:
 
@@ -147,7 +147,7 @@ protected:
 
   void removePort(Z3DOutputPortBase& port);
 
-  void addParameter(ZParameter& para, InvalidationState inv = InvalidAllResult);
+  void addParameter(ZParameter& para, State inv = State::AllResultInvalid);
 
   void removeParameter(ZParameter& para);
 
@@ -186,7 +186,7 @@ protected:
   std::map<QString, Z3DInputPortBase*> m_inputPortMap;
   std::map<QString, Z3DOutputPortBase*> m_outputPortMap;
 
-  InvalidationState m_invalidationState;
+  State m_state;
   std::set<void*> m_interactionModeSources;
 
   QString m_name;
@@ -221,7 +221,7 @@ std::vector<T*> Z3DFilter::parametersOfType() const
   return result;
 }
 
-Q_DECLARE_OPERATORS_FOR_FLAGS(Z3DFilter::InvalidationState)
+DECLARE_OPERATORS_FOR_ENUM(Z3DFilter::State)
 
 } // namespace nim
 

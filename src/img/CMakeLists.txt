@@ -243,7 +243,8 @@ set(IMG_SOURCES
     zimagesse3.cpp
     zimageavx.cpp
     zimgjpegxr.cpp
-    zexception.cpp)
+    zexception.cpp
+    zflags.h)
 
 # our target
 set(LIBRARY_NAME img)

@@ -14,7 +14,7 @@ namespace nim {
 
 Z3DFilter::Z3DFilter(QObject* parent)
   : QObject(parent)
-  , m_invalidationState(InvalidAllResult)
+  , m_state(State::AllResultInvalid)
   , m_invalidationVisited(false)
 {
 }
@@ -32,11 +32,11 @@ ZParameter* Z3DFilter::parameter(const QString& name) const
   return nullptr;
 }
 
-void Z3DFilter::invalidate(InvalidationState inv)
+void Z3DFilter::invalidate(State inv)
 {
-  m_invalidationState |= inv;
+  set_flag(m_state, inv);
 
-  if (inv == Z3DFilter::Valid)
+  if (inv == State::Valid)
     return;
 
   if (!m_invalidationVisited) {
@@ -112,11 +112,11 @@ void Z3DFilter::write(QJsonObject& json) const
 void Z3DFilter::setValid(Z3DEye eye)
 {
   if (eye == Z3DEye::Mono)
-    m_invalidationState &= ~InvalidMonoViewResult;
+    reset_flag(m_state, State::MonoViewResultInvalid);
   else if (eye == Z3DEye::Left)
-    m_invalidationState &= ~InvalidLeftEyeResult;
+    reset_flag(m_state, State::LeftEyeResultInvalid);
   else
-    m_invalidationState &= ~InvalidRightEyeResult;
+    reset_flag(m_state, State::RightEyeResultInvalid);
 
   for (size_t i = 0; i < m_inputPorts.size(); ++i)
     m_inputPorts[i]->setValid();
@@ -125,11 +125,11 @@ void Z3DFilter::setValid(Z3DEye eye)
 bool Z3DFilter::isValid(Z3DEye eye) const
 {
   if (eye == Z3DEye::Mono)
-    return !m_invalidationState.testFlag(InvalidMonoViewResult);
+    return !has_flag(m_state, State::MonoViewResultInvalid);
   else if (eye == Z3DEye::Left)
-    return !m_invalidationState.testFlag(InvalidLeftEyeResult);
+    return !has_flag(m_state, State::LeftEyeResultInvalid);
   else
-    return !m_invalidationState.testFlag(InvalidRightEyeResult);
+    return !has_flag(m_state, State::RightEyeResultInvalid);
 }
 
 bool Z3DFilter::isReady(Z3DEye) const
@@ -199,14 +199,14 @@ void Z3DFilter::removePort(Z3DOutputPortBase& port)
   }
 }
 
-void Z3DFilter::addParameter(ZParameter& para, InvalidationState inv)
+void Z3DFilter::addParameter(ZParameter& para, State inv)
 {
   if (m_parameterNames.find(para.name()) != m_parameterNames.end()) {
     LOG(FATAL) << "Duplicated para name " << para.name();
   }
   m_parameters.push_back(&para);
   m_parameterNames.insert(para.name());
-  if (inv != Valid) {
+  if (inv != State::Valid) {
     connect(&para, &ZParameter::valueChanged, this, &Z3DFilter::invalidateResult);
   }
 }

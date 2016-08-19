@@ -242,7 +242,7 @@ void Z3DView::zoomOut()
 
 void Z3DView::resetCamera()
 {
-  camera().resetCamera(m_boundBox, Z3DCamera::ResetAll);
+  camera().resetCamera(m_boundBox, Z3DCamera::ResetOption::ResetAll);
 }
 
 void Z3DView::resetCameraClippingRange()

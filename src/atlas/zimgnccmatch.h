@@ -3,7 +3,7 @@
 #include "zimg.h"
 #include "zvoxelcoordinate.h"
 #include <set>
-#include <QFlags>
+#include "zflags.h"
 
 namespace nim {
 
@@ -14,17 +14,16 @@ class ZImgNCCMatch
 {
 public:
   // Conflicting combinations of flags have undefined meanings.
-  enum ___PositionHint
+  enum class PositionHint
   {
-    None = 0x00, // no hint, any position can be possible
-    Left = 0x01,  // img is in left side, only overlap with left part of another img
-    Right = 0x02, // img is in right side, only overlap with right part of another img
-    Up = 0x04,
-    Down = 0x08,
-    Front = 0x10,
-    Back = 0x20
+    None = 0, // no hint, any position can be possible
+    Left = 1,  // img is in left side, only overlap with left part of another img
+    Right = 1 << 1, // img is in right side, only overlap with right part of another img
+    Up = 1 << 2,
+    Down = 1 << 3,
+    Front = 1 << 4,
+    Back = 1 << 5
   };
-  Q_DECLARE_FLAGS(PositionHint, ___PositionHint)
 
   ZImgNCCMatch(const ZImg& fixedImg, const ZImg& movingImg, size_t fixedT = 0, size_t movingT = 0);
 
@@ -189,7 +188,7 @@ private:
   std::set<size_t> m_movingImgChannelsToRemoveBackground;
 };
 
-Q_DECLARE_OPERATORS_FOR_FLAGS(ZImgNCCMatch::PositionHint)
+DECLARE_OPERATORS_FOR_ENUM(ZImgNCCMatch::PositionHint)
 
 } // namespace nim
 

@@ -46,7 +46,7 @@ protected:
   virtual void setValid(Z3DEye eye) override
   {
     Z3DBoundedFilter::setValid(eye);
-    m_invalidationState = Valid;
+    m_state = State::Valid;
   }
 
   // functions for picking, use these two function and m_pickingObjectsRegistered to control picking
