@@ -51,15 +51,15 @@ ZImgNCCMatch::ZImgNCCMatch(const ZImg& fixedImg, const ZImg& movingImg,
 void ZImgNCCMatch::setMovingImgPositionHint(PositionHint hint, double maxOverlapRate)
 {
   // make it correct
-  if (has_flag(hint, PositionHint::Left) && has_flag(hint, PositionHint::Right)) {
+  if (is_flag_set(hint, PositionHint::Left) && is_flag_set(hint, PositionHint::Right)) {
     flip_flag(hint, PositionHint::Left);
     flip_flag(hint, PositionHint::Right);
   }
-  if (has_flag(hint, PositionHint::Up) && has_flag(hint, PositionHint::Down)) {
+  if (is_flag_set(hint, PositionHint::Up) && is_flag_set(hint, PositionHint::Down)) {
     flip_flag(hint, PositionHint::Up);
     flip_flag(hint, PositionHint::Down);
   }
-  if (has_flag(hint, PositionHint::Front) && has_flag(hint, PositionHint::Back)) {
+  if (is_flag_set(hint, PositionHint::Front) && is_flag_set(hint, PositionHint::Back)) {
     flip_flag(hint, PositionHint::Front);
     flip_flag(hint, PositionHint::Back);
   }
@@ -76,37 +76,37 @@ QString ZImgNCCMatch::positionHintToQString() const
 void ZImgNCCMatch::reversePositionHint(PositionHint& hint)
 {
   // make it correct
-  if (has_flag(hint, PositionHint::Left) && has_flag(hint, PositionHint::Right)) {
+  if (is_flag_set(hint, PositionHint::Left) && is_flag_set(hint, PositionHint::Right)) {
     flip_flag(hint, PositionHint::Left);
     flip_flag(hint, PositionHint::Right);
   }
-  if (has_flag(hint, PositionHint::Up) && has_flag(hint, PositionHint::Down)) {
+  if (is_flag_set(hint, PositionHint::Up) && is_flag_set(hint, PositionHint::Down)) {
     flip_flag(hint, PositionHint::Up);
     flip_flag(hint, PositionHint::Down);
   }
-  if (has_flag(hint, PositionHint::Front) && has_flag(hint, PositionHint::Back)) {
+  if (is_flag_set(hint, PositionHint::Front) && is_flag_set(hint, PositionHint::Back)) {
     flip_flag(hint, PositionHint::Front);
     flip_flag(hint, PositionHint::Back);
   }
   // reverse
-  if (has_flag(hint, PositionHint::Left)) {
+  if (is_flag_set(hint, PositionHint::Left)) {
     flip_flag(hint, PositionHint::Left);
     set_flag(hint, PositionHint::Right);
-  } else if (has_flag(hint, PositionHint::Right)) {
+  } else if (is_flag_set(hint, PositionHint::Right)) {
     flip_flag(hint, PositionHint::Right);
     set_flag(hint, PositionHint::Left);
   }
-  if (has_flag(hint, PositionHint::Up)) {
+  if (is_flag_set(hint, PositionHint::Up)) {
     flip_flag(hint, PositionHint::Up);
     set_flag(hint, PositionHint::Down);
-  } else if (has_flag(hint, PositionHint::Down)) {
+  } else if (is_flag_set(hint, PositionHint::Down)) {
     flip_flag(hint, PositionHint::Down);
     set_flag(hint, PositionHint::Up);
   }
-  if (has_flag(hint, PositionHint::Front)) {
+  if (is_flag_set(hint, PositionHint::Front)) {
     flip_flag(hint, PositionHint::Front);
     set_flag(hint, PositionHint::Back);
-  } else if (has_flag(hint, PositionHint::Back)) {
+  } else if (is_flag_set(hint, PositionHint::Back)) {
     flip_flag(hint, PositionHint::Back);
     set_flag(hint, PositionHint::Front);
   }
@@ -115,19 +115,19 @@ void ZImgNCCMatch::reversePositionHint(PositionHint& hint)
 QString ZImgNCCMatch::positionHintToQString(PositionHint hint, double maxOverlapRate)
 {
   QStringList hintList;
-  if (has_flag(hint, PositionHint::Left)) {
+  if (is_flag_set(hint, PositionHint::Left)) {
     hintList << "Left";
-  } else if (has_flag(hint, PositionHint::Right)) {
+  } else if (is_flag_set(hint, PositionHint::Right)) {
     hintList << "Right";
   }
-  if (has_flag(hint, PositionHint::Up)) {
+  if (is_flag_set(hint, PositionHint::Up)) {
     hintList << "Up";
-  } else if (has_flag(hint, PositionHint::Down)) {
+  } else if (is_flag_set(hint, PositionHint::Down)) {
     hintList << "Down";
   }
-  if (has_flag(hint, PositionHint::Front)) {
+  if (is_flag_set(hint, PositionHint::Front)) {
     hintList << "Front";
-  } else if (has_flag(hint, PositionHint::Back)) {
+  } else if (is_flag_set(hint, PositionHint::Back)) {
     hintList << "Back";
   }
   QString res;
@@ -631,19 +631,19 @@ ZImgRegion ZImgNCCMatch::getNccImgValidRegion(const PositionHint& hint, const ZI
                                               const ZImgInfo& movingImgInfo)
 {
   ZImgRegion rgn;
-  if (has_flag(hint, PositionHint::Left)) {
+  if (is_flag_set(hint, PositionHint::Left)) {
     rgn.end.x = fixedImgInfo.width;
-  } else if (has_flag(hint, PositionHint::Right)) {
+  } else if (is_flag_set(hint, PositionHint::Right)) {
     rgn.start.x = movingImgInfo.width - 1;
   }
-  if (has_flag(hint, PositionHint::Up)) {
+  if (is_flag_set(hint, PositionHint::Up)) {
     rgn.end.y = fixedImgInfo.height;
-  } else if (has_flag(hint, PositionHint::Down)) {
+  } else if (is_flag_set(hint, PositionHint::Down)) {
     rgn.start.y = movingImgInfo.height - 1;
   }
-  if (has_flag(hint, PositionHint::Front)) {
+  if (is_flag_set(hint, PositionHint::Front)) {
     rgn.end.z = fixedImgInfo.depth;
-  } else if (has_flag(hint, PositionHint::Back)) {
+  } else if (is_flag_set(hint, PositionHint::Back)) {
     rgn.start.z = movingImgInfo.depth - 1;
   }
   return rgn;
@@ -654,13 +654,13 @@ double ZImgNCCMatch::getRequiredNumberOfOverlapPixels(const PositionHint& hint, 
 {
   double res = std::min(fixedImgInfo.channelVoxelNumber(), movingImgInfo.channelVoxelNumber()) * minOverlapRate;
   double l = 0;
-  if (has_flag(hint, PositionHint::Left) || has_flag(hint, PositionHint::Right)) {
+  if (is_flag_set(hint, PositionHint::Left) || is_flag_set(hint, PositionHint::Right)) {
     l += 1;
   }
-  if (has_flag(hint, PositionHint::Up) ||has_flag(hint, PositionHint::Down)) {
+  if (is_flag_set(hint, PositionHint::Up) || is_flag_set(hint, PositionHint::Down)) {
     l += 1;
   }
-  if (has_flag(hint, PositionHint::Front) || has_flag(hint, PositionHint::Back)) {
+  if (is_flag_set(hint, PositionHint::Front) || is_flag_set(hint, PositionHint::Back)) {
     l += 1;
   }
   if (l == 2) {
@@ -703,34 +703,34 @@ ZImgNCCMatch::getRequiredSrcImgRegion(const PositionHint& hint, const ZImg& fixe
   ZImgRegion fixedRgn;
   ZImgRegion movingRgn;
 
-  if (has_flag(hint, PositionHint::Left)) {
+  if (is_flag_set(hint, PositionHint::Left)) {
     size_t maxNumOverlapPixelsX = std::ceil(std::min(fixedImg.width(), movingImg.width()) * overlapRate);
     fixedRgn.end.x = std::min(maxNumOverlapPixelsX, fixedImg.width());
     CHECK(movingImg.width() >= maxNumOverlapPixelsX);
     movingRgn.start.x = movingImg.width() - maxNumOverlapPixelsX;
-  } else if (has_flag(hint, PositionHint::Right)) {
+  } else if (is_flag_set(hint, PositionHint::Right)) {
     size_t maxNumOverlapPixelsX = std::ceil(std::min(fixedImg.width(), movingImg.width()) * overlapRate);
     movingRgn.end.x = std::min(maxNumOverlapPixelsX, movingImg.width());
     CHECK(fixedImg.width() >= maxNumOverlapPixelsX);
     fixedRgn.start.x = fixedImg.width() - maxNumOverlapPixelsX;
   }
-  if (has_flag(hint, PositionHint::Up)) {
+  if (is_flag_set(hint, PositionHint::Up)) {
     size_t maxNumOverlapPixelsY = std::ceil(std::min(fixedImg.height(), movingImg.height()) * overlapRate);
     fixedRgn.end.y = std::min(maxNumOverlapPixelsY, fixedImg.height());
     CHECK(movingImg.height() >= maxNumOverlapPixelsY);
     movingRgn.start.y = movingImg.height() - maxNumOverlapPixelsY;
-  } else if (has_flag(hint, PositionHint::Down)) {
+  } else if (is_flag_set(hint, PositionHint::Down)) {
     size_t maxNumOverlapPixelsY = std::ceil(std::min(fixedImg.height(), movingImg.height()) * overlapRate);
     movingRgn.end.y = std::min(maxNumOverlapPixelsY, movingImg.height());
     CHECK(fixedImg.height() >= maxNumOverlapPixelsY);
     fixedRgn.start.y = fixedImg.height() - maxNumOverlapPixelsY;
   }
-  if (has_flag(hint, PositionHint::Front)) {
+  if (is_flag_set(hint, PositionHint::Front)) {
     size_t maxNumOverlapPixelsZ = std::ceil(std::min(fixedImg.depth(), movingImg.depth()) * overlapRate);
     fixedRgn.end.z = std::min(maxNumOverlapPixelsZ, fixedImg.depth());
     CHECK(movingImg.depth() >= maxNumOverlapPixelsZ);
     movingRgn.start.z = movingImg.depth() - maxNumOverlapPixelsZ;
-  } else if (has_flag(hint, PositionHint::Back)) {
+  } else if (is_flag_set(hint, PositionHint::Back)) {
     size_t maxNumOverlapPixelsZ = std::ceil(std::min(fixedImg.depth(), movingImg.depth()) * overlapRate);
     movingRgn.end.z = std::min(maxNumOverlapPixelsZ, movingImg.depth());
     CHECK(fixedImg.depth() >= maxNumOverlapPixelsZ);

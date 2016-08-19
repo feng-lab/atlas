@@ -60,7 +60,7 @@ void Z3DCamera::resetCamera(const std::vector<double>& bound, ResetOption option
   center[1] = (bound[2] + bound[3]) / 2.0;
   center[2] = (bound[4] + bound[5]) / 2.0;
 
-  if (!has_flag(options, ResetOption::PreserveCenterDistance)) {
+  if (!is_flag_set(options, ResetOption::PreserveCenterDistance)) {
     float w1 = bound[1] - bound[0];
     float w2 = bound[3] - bound[2];
     float w3 = bound[5] - bound[4];
@@ -93,7 +93,7 @@ void Z3DCamera::resetCamera(const std::vector<double>& bound, ResetOption option
     //m_centerDist = radius/std::sin(angle*0.5);
     m_centerDist = radius / std::sin(angle * 0.5) + (bound[5] - bound[4]) / 2.0;
   }
-  if (!has_flag(options, ResetOption::PreserveViewVector)) {
+  if (!is_flag_set(options, ResetOption::PreserveViewVector)) {
     m_viewVector = glm::vec3(0.f, 0.f, 1.f);
     m_upVector = glm::vec3(0.f, -1.f, 0.f);
   }

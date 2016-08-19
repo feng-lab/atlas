@@ -53,7 +53,7 @@ ___DECLARE_ENUM_BINARY_OPERATOR(^)
 namespace nim {
 
 template<typename Enum, std::enable_if_t<is_flags<Enum>::value, int> = 0>
-constexpr bool has_flag(Enum value, Enum flag) noexcept
+constexpr bool is_flag_set(Enum value, Enum flag) noexcept
 {
   using underlyingT = typename std::underlying_type<Enum>::type;
   return (static_cast<underlyingT>(value) & static_cast<underlyingT>(flag)) != 0;

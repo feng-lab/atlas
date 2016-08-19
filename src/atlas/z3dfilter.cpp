@@ -42,8 +42,8 @@ void Z3DFilter::invalidate(State inv)
   if (!m_invalidationVisited) {
     m_invalidationVisited = true;
 
-    for (size_t i = 0; i < m_outputPorts.size(); ++i)
-      m_outputPorts[i]->invalidate();
+    for (auto port : m_outputPorts)
+      port->invalidate();
 
     m_invalidationVisited = false;
   }
@@ -86,26 +86,26 @@ void Z3DFilter::onEvent(QEvent* e, int w, int h)
 
 void Z3DFilter::disconnectAllPorts()
 {
-  for (size_t i = 0; i < m_inputPorts.size(); ++i) {
-    m_inputPorts[i]->disconnectAll();
+  for (auto port : m_inputPorts) {
+    port->disconnectAll();
   }
 
-  for (size_t i = 0; i < m_outputPorts.size(); ++i) {
-    m_outputPorts[i]->disconnectAll();
+  for (auto port : m_outputPorts) {
+    port->disconnectAll();
   }
 }
 
 void Z3DFilter::read(const QJsonObject& json)
 {
-  for (size_t i = 0; i < m_parameters.size(); ++i) {
-    m_parameters[i]->read(json);
+  for (auto para : m_parameters) {
+    para->read(json);
   }
 }
 
 void Z3DFilter::write(QJsonObject& json) const
 {
-  for (size_t i = 0; i < m_parameters.size(); ++i) {
-    m_parameters[i]->write(json);
+  for (auto para : m_parameters) {
+    para->write(json);
   }
 }
 
@@ -118,28 +118,28 @@ void Z3DFilter::setValid(Z3DEye eye)
   else
     reset_flag(m_state, State::RightEyeResultInvalid);
 
-  for (size_t i = 0; i < m_inputPorts.size(); ++i)
-    m_inputPorts[i]->setValid();
+  for (auto port : m_inputPorts)
+    port->setValid();
 }
 
 bool Z3DFilter::isValid(Z3DEye eye) const
 {
   if (eye == Z3DEye::Mono)
-    return !has_flag(m_state, State::MonoViewResultInvalid);
+    return !is_flag_set(m_state, State::MonoViewResultInvalid);
   else if (eye == Z3DEye::Left)
-    return !has_flag(m_state, State::LeftEyeResultInvalid);
+    return !is_flag_set(m_state, State::LeftEyeResultInvalid);
   else
-    return !has_flag(m_state, State::RightEyeResultInvalid);
+    return !is_flag_set(m_state, State::RightEyeResultInvalid);
 }
 
 bool Z3DFilter::isReady(Z3DEye) const
 {
-  for (size_t i = 0; i < m_inputPorts.size(); ++i)
-    if (!m_inputPorts[i]->isReady())
+  for (auto port : m_inputPorts)
+    if (!port->isReady())
       return false;
 
-  for (size_t i = 0; i < m_outputPorts.size(); ++i)
-    if (!m_outputPorts[i]->isReady())
+  for (auto port : m_outputPorts)
+    if (!port->isReady())
       return false;
 
   return true;

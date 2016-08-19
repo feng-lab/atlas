@@ -2015,19 +2015,19 @@ void ZStitchImageDialog::stitchStacks()
         const ZImg& fixedImg = imgs[it->first.first];
         const ZImg& movingImg = imgs[it->first.second];
         ZVoxelCoordinate movingImgOffset;
-        if (has_flag(posHint, ZImgNCCMatch::PositionHint::Left)) {
+        if (is_flag_set(posHint, ZImgNCCMatch::PositionHint::Left)) {
           movingImgOffset.x = -static_cast<ZVoxelCoordinate::value_type>(movingImg.width());
-        } else if (has_flag(posHint, ZImgNCCMatch::PositionHint::Right)) {
+        } else if (is_flag_set(posHint, ZImgNCCMatch::PositionHint::Right)) {
           movingImgOffset.x = fixedImg.width();
         }
-        if (has_flag(posHint, ZImgNCCMatch::PositionHint::Up)) {
+        if (is_flag_set(posHint, ZImgNCCMatch::PositionHint::Up)) {
           movingImgOffset.y = -static_cast<ZVoxelCoordinate::value_type>(movingImg.height());
-        } else if (has_flag(posHint, ZImgNCCMatch::PositionHint::Down)) {
+        } else if (is_flag_set(posHint, ZImgNCCMatch::PositionHint::Down)) {
           movingImgOffset.y = fixedImg.height();
         }
-        if (has_flag(posHint, ZImgNCCMatch::PositionHint::Front)) {
+        if (is_flag_set(posHint, ZImgNCCMatch::PositionHint::Front)) {
           movingImgOffset.z = -static_cast<ZVoxelCoordinate::value_type>(movingImg.depth());
-        } else if (has_flag(posHint, ZImgNCCMatch::PositionHint::Back)) {
+        } else if (is_flag_set(posHint, ZImgNCCMatch::PositionHint::Back)) {
           movingImgOffset.z = fixedImg.depth();
         }
         imgMerge.addImgPair(fixedImg, movingImg, movingImgOffset, 0,
