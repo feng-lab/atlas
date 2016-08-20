@@ -133,8 +133,6 @@ void ZCpuInfo::logCpuInfo() const
                  QString(bRDTSCP ? "RDTSCP " : "");
 
   LOG(INFO) << instructions;
-
-  LOG(INFO) << "";
 }
 
 void ZCpuInfo::detectCpuInfo()

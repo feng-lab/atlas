@@ -171,11 +171,10 @@ int main(int argc, char* argv[])
     MKLVersion mklVer;
     MKL_Get_Version(&mklVer);
     LOG(INFO) << "MKL: " << mklVer.Platform << mklVer.Processor << " "
-              << mklVer.MajorVersion << " "
-              << mklVer.MinorVersion << " "
-              << mklVer.UpdateVersion << " "
+              << mklVer.MajorVersion << "."
+              << mklVer.MinorVersion << "."
+              << mklVer.UpdateVersion << ".b"
               << mklVer.Build;
-    LOG(INFO) << "";
 #endif
 
 #ifdef ATLAS_USE_IPP
@@ -249,13 +248,12 @@ int main(int argc, char* argv[])
 
     // pointer to static data, no need to delete
     const IppLibraryVersion* ippVer = ippiGetLibVersion();
-    LOG(INFO) << "IPP: " << ippVer->Name << " "
-              << ippVer->Version << " "
-              << ippVer->major << " "
-              << ippVer->minor << " "
-              << ippVer->majorBuild << " "
-              << ippVer->build;
-    LOG(INFO) << "";
+    LOG(INFO) << "IPP: " << ippVer->Name << " " << ippVer->Version;
+//              << " "
+//              << ippVer->major << "."
+//              << ippVer->minor << "."
+//              << ippVer->majorBuild << ".b"
+//              << ippVer->build;
 #endif
 
     if (!nim::ZCpuInfo::instance().bSSE3) {
