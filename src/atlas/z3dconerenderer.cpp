@@ -57,14 +57,14 @@ void Z3DConeRenderer::setData(std::vector<glm::vec4>* baseAndBaseRadius, std::ve
     int indices[6] = {0, 1, 2, 2, 1, 3};
     int quadIdx = 0;
     for (size_t i = 0; i < baseAndBaseRadius->size(); ++i) {
-      m_baseAndBaseRadius.push_back(baseAndBaseRadius->at(i));
-      m_baseAndBaseRadius.push_back(baseAndBaseRadius->at(i));
-      m_baseAndBaseRadius.push_back(baseAndBaseRadius->at(i));
-      m_baseAndBaseRadius.push_back(baseAndBaseRadius->at(i));
-      m_axisAndTopRadius.push_back(axisAndTopRadius->at(i));
-      m_axisAndTopRadius.push_back(axisAndTopRadius->at(i));
-      m_axisAndTopRadius.push_back(axisAndTopRadius->at(i));
-      m_axisAndTopRadius.push_back(axisAndTopRadius->at(i));
+      m_baseAndBaseRadius.push_back((*baseAndBaseRadius)[i]);
+      m_baseAndBaseRadius.push_back((*baseAndBaseRadius)[i]);
+      m_baseAndBaseRadius.push_back((*baseAndBaseRadius)[i]);
+      m_baseAndBaseRadius.push_back((*baseAndBaseRadius)[i]);
+      m_axisAndTopRadius.push_back((*axisAndTopRadius)[i]);
+      m_axisAndTopRadius.push_back((*axisAndTopRadius)[i]);
+      m_axisAndTopRadius.push_back((*axisAndTopRadius)[i]);
+      m_axisAndTopRadius.push_back((*axisAndTopRadius)[i]);
       for (int k = 0; k < 6; ++k) {
         m_indexs.push_back(indices[k] + 4 * quadIdx);
       }
@@ -96,8 +96,8 @@ void Z3DConeRenderer::setData(std::vector<glm::vec4>* baseAndBaseRadius, std::ve
     int coneIdx = 0;
     for (size_t i = 0; i < baseAndBaseRadius->size(); ++i) {
       for (int k = 0; k < 8; ++k) {
-        m_baseAndBaseRadius.push_back(baseAndBaseRadius->at(i));
-        m_axisAndTopRadius.push_back(axisAndTopRadius->at(i));
+        m_baseAndBaseRadius.push_back((*baseAndBaseRadius)[i]);
+        m_axisAndTopRadius.push_back((*axisAndTopRadius)[i]);
         m_allFlags.push_back(rightIdx[k] << 8 | upIdx[k] << 4 | outIdx[k]);
       }
       for (int k = 0; k < 36; ++k) {

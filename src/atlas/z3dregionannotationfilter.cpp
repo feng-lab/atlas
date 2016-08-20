@@ -214,12 +214,12 @@ void Z3DRegionAnnotationFilter::deregisterPickingObjects()
 
 void Z3DRegionAnnotationFilter::updateNotTransformedBoundBoxImpl()
 {
-  m_notTransformedBoundBox[0] = m_regionAnnotation->boundBox().at(0);
-  m_notTransformedBoundBox[1] = m_regionAnnotation->boundBox().at(1);
-  m_notTransformedBoundBox[2] = m_regionAnnotation->boundBox().at(2);
-  m_notTransformedBoundBox[3] = m_regionAnnotation->boundBox().at(3);
-  m_notTransformedBoundBox[4] = m_regionAnnotation->boundBox().at(4);
-  m_notTransformedBoundBox[5] = m_regionAnnotation->boundBox().at(5);
+  m_notTransformedBoundBox[0] = m_regionAnnotation->boundBox()[0];
+  m_notTransformedBoundBox[1] = m_regionAnnotation->boundBox()[1];
+  m_notTransformedBoundBox[2] = m_regionAnnotation->boundBox()[2];
+  m_notTransformedBoundBox[3] = m_regionAnnotation->boundBox()[3];
+  m_notTransformedBoundBox[4] = m_regionAnnotation->boundBox()[4];
+  m_notTransformedBoundBox[5] = m_regionAnnotation->boundBox()[5];
 }
 
 } // namespace nim

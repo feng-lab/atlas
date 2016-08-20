@@ -585,7 +585,7 @@ void Z3DVolumeFilter::invalidateFRVolumeXSlice2()
 void Z3DVolumeFilter::updateCubeSerieSlices()
 {
   m_cubeSerieSlices.clear();
-  Z3DVolume* volume = getVolumes().at(0).get();
+  Z3DVolume* volume = getVolumes()[0].get();
 
   glm::vec3 coordLuf = volume->physicalLUF();
   glm::vec3 coordRdb = volume->physicalRDB();
@@ -651,7 +651,7 @@ void Z3DVolumeFilter::process(Z3DEye eye)
 {
   glEnable(GL_DEPTH_TEST);
 
-  Z3DVolume* volume = getVolumes().at(0).get();
+  Z3DVolume* volume = getVolumes()[0].get();
   if (volume->is1DData())
     return;
 
@@ -710,7 +710,7 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
   currentOutport.clearTarget();
   m_rendererBase.setViewport(currentOutport.size());
 
-  Z3DVolume* volume = getVolumes().at(0).get();
+  Z3DVolume* volume = getVolumes()[0].get();
   glm::uvec3 volDim = volume->originalDimensions();
   glm::vec3 coordLuf = volume->physicalLUF();
   glm::vec3 coordRdb = volume->physicalRDB();
@@ -1185,7 +1185,7 @@ glm::vec3 Z3DVolumeFilter::getFirstHit3DPosition(int x, int y, int width, int he
       height /= m_interactionDownsample.get();
     }
     glm::vec3 fpos3D = get3DPosition(pos2D, width, height, port);
-    glm::vec3 res = glm::round(glm::applyMatrix(getVolumes().at(0)->worldToPhysicalMatrix(), fpos3D));
+    glm::vec3 res = glm::round(glm::applyMatrix(getVolumes()[0]->worldToPhysicalMatrix(), fpos3D));
     if (res.x >= 0 && res.x < m_imgPack->imgInfo().width &&
         res.y >= 0 && res.y < m_imgPack->imgInfo().height &&
         res.z >= 0 && res.z < m_imgPack->imgInfo().depth) {
@@ -1210,7 +1210,7 @@ glm::vec3 Z3DVolumeFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, i
       height /= m_interactionDownsample.get();
     }
     glm::vec3 fpos3D = get3DPosition(pos2D, width, height, port);
-    glm::vec3 res = glm::round(glm::applyMatrix(getVolumes().at(0)->worldToPhysicalMatrix(), fpos3D));
+    glm::vec3 res = glm::round(glm::applyMatrix(getVolumes()[0]->worldToPhysicalMatrix(), fpos3D));
     if (res.x >= 0 && res.x < m_imgPack->imgInfo().width &&
         res.y >= 0 && res.y < m_imgPack->imgInfo().height &&
         res.z >= 0 && res.z < m_imgPack->imgInfo().depth) {
@@ -1219,7 +1219,7 @@ glm::vec3 Z3DVolumeFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, i
 
     if (success) {
       fpos3D = get3DPosition(pos2D, 1.0, width, height);
-      des = glm::round(glm::applyMatrix(getVolumes().at(0)->worldToPhysicalMatrix(), fpos3D));
+      des = glm::round(glm::applyMatrix(getVolumes()[0]->worldToPhysicalMatrix(), fpos3D));
       //LWARN() << "start" << res << "to" << des;
       if (glm::length(des - res) <= 1.f) {  // res is last pixel along current ray direction
         return res;
@@ -1427,7 +1427,7 @@ void Z3DVolumeFilter::invalidateAllFRVolumeSlices()
 
 void Z3DVolumeFilter::volumeChanged()
 {
-  Z3DVolume* volume = getVolumes().at(0).get();
+  Z3DVolume* volume = getVolumes()[0].get();
   bool is2DImage = (volume->is2DData());
   glm::uvec3 volDim = volume->originalDimensions();
   m_xCut.setRange(-1, volDim.x);

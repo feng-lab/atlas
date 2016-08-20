@@ -155,8 +155,6 @@ void ZTileImageWidget::paintEvent(QPaintEvent*)
 
 
       for (int i = 0; i < m_pTiles->size(); ++i) {
-        //        QRect rect = QRect(m_pTiles->at(i).region.topLeft() * m_scaleFactor,
-        //                           m_pTiles->at(i).region.bottomRight() * m_scaleFactor);
         QPoint tl = m_pTiles->at(i).region.topLeft() * m_scaleFactor;
         QPoint br = m_pTiles->at(i).region.bottomRight() * m_scaleFactor;
         painter.drawImage(QRectF(tl.x(), tl.y(), br.x() - tl.x() + m_scaleFactor, br.y() - tl.y() + m_scaleFactor),

@@ -112,7 +112,7 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg& img)
       connect(m_channelVisibleParas[i].get(), &ZBoolParameter::valueChanged, this, &Z3DImgRaycasterRenderer::compile);
       m_transferFuncParas.emplace_back(
         std::make_unique<Z3DTransferFunctionParameter>(QString("Transfer Function %1").arg(i + 1)));
-      //m_transferFuncParas[i]->setVolume(m_img->volumes().at(i).get());
+      //m_transferFuncParas[i]->setVolume(m_img->volumes()[i].get());
       m_texFilterModeParas.emplace_back(
         std::make_unique<ZStringIntOptionParameter>(QString("Texture Filtering %1").arg(i + 1)));
       m_texFilterModeParas[i]->addOptionsWithData(qMakePair(QString("Nearest"), static_cast<int>(GL_NEAREST)),
@@ -170,10 +170,10 @@ void Z3DImgRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram& shad
       continue;
 
     // volumes
-    shader.bindTexture(m_volumeUniformNames[idx], m_img->volumes().at(i)->texture(),
+    shader.bindTexture(m_volumeUniformNames[idx], m_img->volumes()[i]->texture(),
                        m_texFilterModeParas[i]->associatedData(),
                        m_texFilterModeParas[i]->associatedData());
-    shader.setUniform(m_volumeDimensionNames[idx], glm::vec3(m_img->volumes().at(i)->dimensions()));
+    shader.setUniform(m_volumeDimensionNames[idx], glm::vec3(m_img->volumes()[i]->dimensions()));
 
     // transfer functions
     shader.bindTexture(m_transferFuncUniformNames[idx++], m_transferFuncParas[i]->get().texture());
@@ -188,10 +188,10 @@ void Z3DImgRaycasterRenderer::bindVolumeAndTransferFunc(Z3DShaderProgram& shader
 {
   shader.setLogUniformLocationError(false);
 
-  shader.bindTexture(m_volumeUniformNames[0], m_img->volumes().at(idx)->texture(),
+  shader.bindTexture(m_volumeUniformNames[0], m_img->volumes()[idx]->texture(),
                      m_texFilterModeParas[idx]->associatedData(),
                      m_texFilterModeParas[idx]->associatedData());
-  shader.setUniform(m_volumeDimensionNames[0], glm::vec3(m_img->volumes().at(idx)->dimensions()));
+  shader.setUniform(m_volumeDimensionNames[0], glm::vec3(m_img->volumes()[idx]->dimensions()));
 
   // transfer functions
   shader.bindTexture(m_transferFuncUniformNames[0], m_transferFuncParas[idx]->get().texture());

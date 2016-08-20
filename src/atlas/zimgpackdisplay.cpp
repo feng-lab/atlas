@@ -140,9 +140,9 @@ void ZImgPackDisplay::setQImageDataBlockCM(const ZImg* img, QImage* qim, const t
     QRgb* qimData = reinterpret_cast<QRgb*>(qim->scanLine(i));
 
     for (int j = 0; j < qim->width(); ++j) {
-      col4 col = colormaps->at(0).color(*(imgDatas[0])++);
+      col4 col = (*colormaps)[0].color(*(imgDatas[0])++);
       for (size_t c = 1; c < channels->size(); ++c) {
-        col.max(colormaps->at(c).color(*(imgDatas[c])++));
+        col.max((*colormaps)[c].color(*(imgDatas[c])++));
       }
 
       qimData[j] = qRgba(col.r, col.g, col.b, col.a);
@@ -164,13 +164,13 @@ ZImgPackDisplay::setQImageDataBlockCMMultAlpha(const ZImg* img, QImage* qim, con
     QRgb* qimData = reinterpret_cast<QRgb*>(qim->scanLine(i));
 
     for (int j = 0; j < qim->width(); ++j) {
-      col4 col = colormaps->at(0).color(*(imgDatas[0])++);
+      col4 col = (*colormaps)[0].color(*(imgDatas[0])++);
       size_t c = 1;
       for (; c < channels->size() - 1; ++c) {
-        col.max(colormaps->at(c).color(*(imgDatas[c])++));
+        col.max((*colormaps)[c].color(*(imgDatas[c])++));
       }
       // multiply alpha channel (which contains global alpha)
-      float a = colormaps->at(c).color(*(imgDatas[c])++).a / 255.f;
+      float a = (*colormaps)[c].color(*(imgDatas[c])++).a / 255.f;
       qimData[j] = qRgba(static_cast<int>(col.r * a + .5f), // not correct for some edge cases but faster than std::round
                          static_cast<int>(col.g * a + .5f),
                          static_cast<int>(col.b * a + .5f),
@@ -263,7 +263,7 @@ void ZImgPackDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb
   std::vector<col4> chCol(channels->size());
   int alphaChannelIdx = -1;
   for (size_t c = 0; c < channels->size(); ++c) {
-    size_t ch = channels->at(c);
+    size_t ch = (*channels)[c];
     imgDatas[c] = img->rowData<TVoxel>(rowRange.begin(), 0, ch, 0);
     chMinValue[c] = m_channels.at(ch).first;
     chMaxValue[c] = m_channels.at(ch).second;

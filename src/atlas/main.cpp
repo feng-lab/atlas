@@ -249,11 +249,6 @@ int main(int argc, char* argv[])
     // pointer to static data, no need to delete
     const IppLibraryVersion* ippVer = ippiGetLibVersion();
     LOG(INFO) << "IPP: " << ippVer->Name << " " << ippVer->Version;
-//              << " "
-//              << ippVer->major << "."
-//              << ippVer->minor << "."
-//              << ippVer->majorBuild << ".b"
-//              << ippVer->build;
 #endif
 
     if (!nim::ZCpuInfo::instance().bSSE3) {

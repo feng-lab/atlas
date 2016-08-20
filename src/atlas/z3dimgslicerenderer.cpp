@@ -73,11 +73,11 @@ void Z3DImgSliceRenderer::bindVolumes(Z3DShaderProgram& shader)
   size_t idx = 0;
   for (size_t i = 0; i < m_img->numChannels(); ++i) {
     // volumes
-    shader.bindTexture(m_volumeUniformNames[idx], m_img->volumes().at(i)->texture(),
+    shader.bindTexture(m_volumeUniformNames[idx], m_img->volumes()[i]->texture(),
                        GLint(GL_NEAREST), GLint(GL_NEAREST));
 
     // colormap
-    shader.bindTexture(m_colormapUniformNames[idx++], m_colormaps->at(i)->get().texture1D());
+    shader.bindTexture(m_colormapUniformNames[idx++], (*m_colormaps)[i]->get().texture1D());
 
     CHECK_GL_ERROR
   }
@@ -86,11 +86,11 @@ void Z3DImgSliceRenderer::bindVolumes(Z3DShaderProgram& shader)
 void Z3DImgSliceRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx)
 {
   // volumes
-  shader.bindTexture(m_volumeUniformNames[0], m_img->volumes().at(idx)->texture(),
+  shader.bindTexture(m_volumeUniformNames[0], m_img->volumes()[idx]->texture(),
                      GLint(GL_NEAREST), GLint(GL_NEAREST));
 
   // colormap
-  shader.bindTexture(m_colormapUniformNames[0], m_colormaps->at(idx)->get().texture1D());
+  shader.bindTexture(m_colormapUniformNames[0], (*m_colormaps)[idx]->get().texture1D());
 
   CHECK_GL_ERROR
 }
@@ -227,7 +227,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
     if (m_img->numChannels() == 1) {
       m_img->uploadImageCache(0);
       m_img->bindImageCacheToFullResRenderShader(m_image3DSliceWithColorMapShader, 0);
-      m_image3DSliceWithColorMapShader.bindTexture("colormap", m_colormaps->at(0)->get().texture1D());
+      m_image3DSliceWithColorMapShader.bindTexture("colormap", (*m_colormaps)[0]->get().texture1D());
       for (size_t q = 0; q < m_quads.size(); ++q)
         renderTriangleList(m_VAO, m_image3DSliceWithColorMapShader, m_quads[q]);
     } else {
@@ -243,7 +243,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
 
         m_img->uploadImageCache(i);
         m_img->bindImageCacheToFullResRenderShader(m_image3DSliceWithColorMapShader, i);
-        m_image3DSliceWithColorMapShader.bindTexture("colormap", m_colormaps->at(i)->get().texture1D());
+        m_image3DSliceWithColorMapShader.bindTexture("colormap", (*m_colormaps)[i]->get().texture1D());
         for (size_t q = 0; q < m_quads.size(); ++q)
           renderTriangleList(m_VAO, m_image3DSliceWithColorMapShader, m_quads[q]);
 

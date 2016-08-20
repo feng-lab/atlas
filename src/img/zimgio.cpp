@@ -177,7 +177,7 @@ void ZImgIO::readInfo(const QStringList& fileList, Dimension catDim, std::vector
                   CHECK(false);
                   break;
               }
-              subBlocks->at(s).push_back(tmpSubBlocks[s][tsidx]);
+              (*subBlocks)[s].push_back(tmpSubBlocks[s][tsidx]);
             }
           }
           res[s].setSize(catDim, res[s].size(dim) + tmpInfo[s].size(dim));

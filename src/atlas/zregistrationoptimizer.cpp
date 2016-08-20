@@ -45,7 +45,7 @@ public:
   {
     std::vector<int32_t>* parameter_block_sizes = mutable_parameter_block_sizes();
     parameter_block_sizes->resize(1);
-    parameter_block_sizes->at(0) = m_costFunc.numParameters();
+    (*parameter_block_sizes)[0] = m_costFunc.numParameters();
     set_num_residuals(1);
   }
 

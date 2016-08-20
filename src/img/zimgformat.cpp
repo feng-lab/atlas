@@ -468,7 +468,7 @@ void ZImgFormat::createDefaultSubBlocks(const QString& filename,
 {
   if (pyramidalRatios) {
     pyramidalRatios->resize(1);
-    pyramidalRatios->at(0).insert(1);
+    (*pyramidalRatios)[0].insert(1);
   }
   if (!subBlocks)
     return;
@@ -476,7 +476,7 @@ void ZImgFormat::createDefaultSubBlocks(const QString& filename,
   for (size_t s = 0; s < infos.size(); ++s) {
     for (size_t t = 0; t < infos[s].numTimes; ++t) {
       for (size_t z = 0; z < infos[s].depth; ++z) {
-        subBlocks->at(s).emplace_back(std::make_shared<ZImgCommonSubBlock>(filename, format(), s, 1, t, z,
+        (*subBlocks)[s].emplace_back(std::make_shared<ZImgCommonSubBlock>(filename, format(), s, 1, t, z,
                                                                            0, 0, infos[s].width, infos[s].height));
       }
     }
@@ -489,7 +489,7 @@ void ZImgFormat::createEmptySubBlocks(const std::vector<ZImgInfo>& infos,
 {
   if (pyramidalRatios) {
     pyramidalRatios->resize(1);
-    pyramidalRatios->at(0).insert(1);
+    (*pyramidalRatios)[0].insert(1);
   }
   if (!subBlocks)
     return;

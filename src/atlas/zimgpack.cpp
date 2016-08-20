@@ -176,7 +176,7 @@ ZImgPack::ZImgPack(const QString& fileName, size_t scene, FileFormat format, siz
 
   bool hasPyramidal = false;
   for (size_t i = 0; i < sceneSubBlock->size(); ++i) {
-    if (sceneSubBlock->at(i)->ratio > 1) {
+    if ((*sceneSubBlock)[i]->ratio > 1) {
       hasPyramidal = true;
       break;
     }
@@ -232,7 +232,7 @@ ZImgPack::ZImgPack(const QStringList& files, Dimension catDim, size_t scene, Fil
 
   bool hasPyramidal = false;
   for (size_t i = 0; i < sceneSubBlock->size(); ++i) {
-    if (sceneSubBlock->at(i)->ratio > 1) {
+    if ((*sceneSubBlock)[i]->ratio > 1) {
       hasPyramidal = true;
       break;
     }

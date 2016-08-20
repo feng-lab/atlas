@@ -241,7 +241,7 @@ void Z3DRendererBase::setClipPlanes(std::vector<glm::vec4>* clipPlanes)
   if (clipPlanes) {
     glm::mat4 itCoordTrans = glm::inverse(glm::transpose(m_coordTransform.get()));
     for (size_t i = 0; i < clipPlanes->size(); ++i) {
-      m_clipPlanes.push_back(itCoordTrans * clipPlanes->at(i));
+      m_clipPlanes.push_back(itCoordTrans * (*clipPlanes)[i]);
     }
   }
   size_t nNewClipPlanes = m_clipPlanes.size();

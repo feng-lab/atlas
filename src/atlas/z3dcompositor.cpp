@@ -210,8 +210,7 @@ void Z3DCompositor::process(Z3DEye eye)
   std::vector<Z3DBoundedFilter*> normalTransparentFilters;
   std::vector<Z3DBoundedFilter*> selectedFilters;
   std::vector<Z3DBoundedFilter*> showHandleFilters;
-  for (size_t i = 0; i < vFilters.size(); ++i) {
-    Z3DImgFilter* vFilter = vFilters.at(i);
+  for (auto vFilter : vFilters) {
     if (vFilter->isReady(eye) && vFilter->hasOpaque(eye)) {
       normalOpaqueFilters.push_back(vFilter);
     }
@@ -222,8 +221,7 @@ void Z3DCompositor::process(Z3DEye eye)
     }
   }
   //if (m_renderGeometries.get()) {
-  for (size_t i = 0; i < filters.size(); ++i) {
-    Z3DGeometryFilter* geomFilter = filters.at(i);
+  for (auto geomFilter : filters) {
     if (geomFilter->isReady(eye) && (geomFilter->opacity() > 0.0)) {
       if (geomFilter->hasOpaque(eye)) {
         if (geomFilter->isStayOnTop())
@@ -502,8 +500,7 @@ void Z3DCompositor::process(Z3DEye eye)
       }
     }
   } else { // OIT
-    for (size_t i = 0; i < vFilters.size(); ++i) {
-      Z3DImgFilter* vFilter = vFilters.at(i);
+    for (auto vFilter : vFilters) {
       if (vFilter->isReady(eye) && vFilter->hasTransparent(eye)) {
         normalTransparentFilters.push_back(vFilter);
       }

@@ -114,8 +114,8 @@ void Z3DMeshRenderer::prepareMesh()
   }
   m_splitCount.resize(m_meshPt->size());
   size_t numTriThre = 1000000;
-  for (size_t i = 0; i < m_meshPt->size(); ++i) {
-    if (m_meshPt->at(i)->numTriangles() > numTriThre) {
+  for (auto mesh : *m_meshPt) {
+    if (mesh->numTriangles() > numTriThre) {
       m_meshNeedSplit = true;
       break;
     }
@@ -123,11 +123,11 @@ void Z3DMeshRenderer::prepareMesh()
   if (m_meshNeedSplit) {
     LOG(INFO) << "Number of meshes before spliting " << m_meshPt->size();
     for (size_t i = 0; i < m_meshPt->size(); ++i) {
-      if (m_meshPt->at(i)->numTriangles() <= numTriThre) {
-        m_splitMeshes.push_back(*(m_meshPt->at(i)));
+      if ((*m_meshPt)[i]->numTriangles() <= numTriThre) {
+        m_splitMeshes.push_back(*((*m_meshPt)[i]));
         m_splitCount[i] = 1;
       } else {
-        std::vector<ZMesh> res = m_meshPt->at(i)->split(numTriThre);
+        std::vector<ZMesh> res = (*m_meshPt)[i]->split(numTriThre);
         m_splitCount[i] = res.size();
         if (i == 0) {
           m_splitMeshes.swap(res);
@@ -158,7 +158,7 @@ void Z3DMeshRenderer::prepareMeshColor()
   if (m_meshNeedSplit) {
     for (size_t i = 0; i < m_splitCount.size(); ++i) {
       for (size_t j = 0; j < m_splitCount[i]; ++j)
-        m_splitMeshesColors.push_back(m_origMeshColorsPt->at(i));
+        m_splitMeshesColors.push_back((*m_origMeshColorsPt)[i]);
     }
     m_meshColorsPt = &m_splitMeshesColors;
   }
@@ -174,7 +174,7 @@ void Z3DMeshRenderer::prepareMeshPickingColor()
   if (m_meshNeedSplit) {
     for (size_t i = 0; i < m_splitCount.size(); ++i) {
       for (size_t j = 0; j < m_splitCount[i]; ++j)
-        m_splitMeshesPickingColors.push_back(m_origMeshPickingColorsPt->at(i));
+        m_splitMeshesPickingColors.push_back((*m_origMeshPickingColorsPt)[i]);
     }
     m_meshPickingColorsPt = &m_splitMeshesPickingColors;
   }
@@ -190,25 +190,25 @@ void Z3DMeshRenderer::renderUsingOpengl()
     prepareMeshColor();
 
   for (size_t i=0; i<m_meshPt->size(); ++i) {
-    if (m_colorSource.isSelected("MeshColor") && m_meshPt->at(i)->numColors() < m_meshPt->at(i)->numVertices())
+    if (m_colorSource.isSelected("MeshColor") && (*m_meshPt)[i]->numColors() < (*m_meshPt)[i]->numVertices())
       return;
     if (m_colorSource.isSelected("Mesh1DTexture") &&
-        (m_meshPt->at(i)->num1DTextureCoordinates() < m_meshPt->at(i)->numVertices() ||
+        ((*m_meshPt)[i]->num1DTextureCoordinates() < (*m_meshPt)[i]->numVertices() ||
          !m_texture || m_texture->textureTarget() != GL_TEXTURE_1D))
       return;
     if (m_colorSource.isSelected("Mesh2DTexture") &&
-        (m_meshPt->at(i)->num2DTextureCoordinates() < m_meshPt->at(i)->numVertices() ||
+        ((*m_meshPt)[i]->num2DTextureCoordinates() < (*m_meshPt)[i]->numVertices() ||
          !m_texture || m_texture->textureTarget() != GL_TEXTURE_2D))
       return;
     if (m_colorSource.isSelected("Mesh3DTexture") &&
-        (m_meshPt->at(i)->num3DTextureCoordinates() < m_meshPt->at(i)->numVertices() ||
+        ((*m_meshPt)[i]->num3DTextureCoordinates() < (*m_meshPt)[i]->numVertices() ||
          !m_texture || m_texture->textureTarget() != GL_TEXTURE_3D))
       return;
     if (m_colorSource.isSelected("CustomColor") &&
         (!m_meshColorsPt || m_meshColorsPt->size() < m_meshPt->size()))
       return;
-    if (m_meshPt->at(i)->numNormals() != m_meshPt->at(i)->numVertices())
-      m_meshPt->at(i)->generateNormals();
+    if ((*m_meshPt)[i]->numNormals() != (*m_meshPt)[i]->numVertices())
+      (*m_meshPt)[i]->generateNormals();
   }
 
   glMatrixMode(GL_MODELVIEW);
@@ -222,14 +222,14 @@ void Z3DMeshRenderer::renderUsingOpengl()
   }
 
   for (size_t i=0; i<m_meshPt->size(); ++i) {
-    const std::vector<glm::vec3>& vertices = m_meshPt->at(i)->vertices();
-    const std::vector<glm::vec3>& normals = m_meshPt->at(i)->normals();
-    const std::vector<glm::vec4>& colors = m_meshPt->at(i)->colors();
-    const std::vector<float>& texture1DCoords = m_meshPt->at(i)->textureCoordinates1D();
-    const std::vector<glm::vec2>& texture2DCoords = m_meshPt->at(i)->textureCoordinates2D();
-    const std::vector<glm::vec3>& texture3DCoords = m_meshPt->at(i)->textureCoordinates3D();
-    const std::vector<GLuint>& triangleIndexes = m_meshPt->at(i)->indices();
-    GLenum type = m_meshPt->at(i)->type();
+    const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
+    const std::vector<glm::vec3>& normals = (*m_meshPt)[i]->normals();
+    const std::vector<glm::vec4>& colors = (*m_meshPt)[i]->colors();
+    const std::vector<float>& texture1DCoords = (*m_meshPt)[i]->textureCoordinates1D();
+    const std::vector<glm::vec2>& texture2DCoords = (*m_meshPt)[i]->textureCoordinates2D();
+    const std::vector<glm::vec3>& texture3DCoords = (*m_meshPt)[i]->textureCoordinates3D();
+    const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
+    GLenum type = (*m_meshPt)[i]->type();
 
     GLuint bufObjects[4];
     glGenBuffers(4, bufObjects);
@@ -245,8 +245,8 @@ void Z3DMeshRenderer::renderUsingOpengl()
       glBufferData(GL_ARRAY_BUFFER, colors.size()*4*sizeof(GLfloat), colors.data(), GL_STATIC_DRAW);
       glColorPointer(4, GL_FLOAT, 0, 0);
     } else if (m_colorSource.isSelected("CustomColor")) {
-      glColor4f(m_meshColorsPt->at(i).r, m_meshColorsPt->at(i).g, m_meshColorsPt->at(i).b,
-                m_meshColorsPt->at(i).a * opacity());
+      glColor4f((*m_meshColorsPt)[i].r, (*m_meshColorsPt)[i].g, (*m_meshColorsPt)[i].b,
+                (*m_meshColorsPt)[i].a * opacity());
     } else if (m_colorSource.isSelected("Mesh1DTexture")) {
       glClientActiveTexture(GL_TEXTURE0);
       glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -318,10 +318,10 @@ void Z3DMeshRenderer::renderPickingUsingOpengl()
   glMultMatrixf(&coordTransform()[0][0]);   // not sure, todo check
 
   for (size_t i=0; i<m_meshPt->size(); ++i) {
-    const std::vector<glm::vec3>& vertices = m_meshPt->at(i)->vertices();
-    //const std::vector<glm::vec3>& normals = m_meshPt->at(i)->normals();
-    const std::vector<GLuint>& triangleIndexes = m_meshPt->at(i)->indices();
-    GLenum type = m_meshPt->at(i)->type();
+    const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
+    //const std::vector<glm::vec3>& normals = (*m_meshPt)[i]->normals();
+    const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
+    GLenum type = (*m_meshPt)[i]->type();
 
     GLuint bufObjects[3];
     glGenBuffers(3, bufObjects);
@@ -331,8 +331,8 @@ void Z3DMeshRenderer::renderPickingUsingOpengl()
     glBufferData(GL_ARRAY_BUFFER, vertices.size()*3*sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
     glVertexPointer(3, GL_FLOAT, 0, 0);
 
-    glColor4f(m_meshPickingColorsPt->at(i).r, m_meshPickingColorsPt->at(i).g,
-              m_meshPickingColorsPt->at(i).b, m_meshPickingColorsPt->at(i).a);
+    glColor4f((*m_meshPickingColorsPt)[i].r, (*m_meshPickingColorsPt)[i].g,
+              (*m_meshPickingColorsPt)[i].b, (*m_meshPickingColorsPt)[i].a);
 
     //glEnableClientState(GL_NORMAL_ARRAY);
     //glBindBuffer(GL_ARRAY_BUFFER, bufObjects[1]);
@@ -367,26 +367,26 @@ void Z3DMeshRenderer::render(Z3DEye eye)
   if (m_colorSource.isSelected("CustomColor") && !m_meshColorReady)
     prepareMeshColor();
 
-  for (size_t i = 0; i < m_meshPt->size(); ++i) {
-    if (m_colorSource.isSelected("MeshColor") && m_meshPt->at(i)->numColors() < m_meshPt->at(i)->numVertices())
+  for (auto mesh : *m_meshPt) {
+    if (m_colorSource.isSelected("MeshColor") && mesh->numColors() < mesh->numVertices())
       return;
     if (m_colorSource.isSelected("Mesh1DTexture") &&
-        (m_meshPt->at(i)->num1DTextureCoordinates() < m_meshPt->at(i)->numVertices() ||
+        (mesh->num1DTextureCoordinates() < mesh->numVertices() ||
           !m_texture || m_texture->textureTarget() != GL_TEXTURE_1D))
       return;
     if (m_colorSource.isSelected("Mesh2DTexture") &&
-        (m_meshPt->at(i)->num2DTextureCoordinates() < m_meshPt->at(i)->numVertices() ||
+        (mesh->num2DTextureCoordinates() < mesh->numVertices() ||
           !m_texture || m_texture->textureTarget() != GL_TEXTURE_2D))
       return;
     if (m_colorSource.isSelected("Mesh3DTexture") &&
-        (m_meshPt->at(i)->num3DTextureCoordinates() < m_meshPt->at(i)->numVertices() ||
+        (mesh->num3DTextureCoordinates() < mesh->numVertices() ||
           !m_texture || m_texture->textureTarget() != GL_TEXTURE_3D))
       return;
     if (m_colorSource.isSelected("CustomColor") &&
         (!m_meshColorsPt || m_meshColorsPt->size() < m_meshPt->size()))
       return;
-    if (m_meshPt->at(i)->numNormals() != m_meshPt->at(i)->numVertices())
-      m_meshPt->at(i)->generateNormals();
+    if (mesh->numNormals() != mesh->numVertices())
+      mesh->generateNormals();
   }
 
   m_meshShaderGrp.bind();
@@ -419,13 +419,13 @@ void Z3DMeshRenderer::render(Z3DEye eye)
       for (size_t i = 0; i < m_meshPt->size(); ++i) {
         m_VAOs.bind(i);
 
-        const std::vector<glm::vec3>& vertices = m_meshPt->at(i)->vertices();
-        const std::vector<float>& textureCoordinates1D = m_meshPt->at(i)->textureCoordinates1D();
-        const std::vector<glm::vec2>& textureCoordinates2D = m_meshPt->at(i)->textureCoordinates2D();
-        const std::vector<glm::vec3>& textureCoordinates3D = m_meshPt->at(i)->textureCoordinates3D();
-        const std::vector<glm::vec3>& normals = m_meshPt->at(i)->normals();
-        const std::vector<glm::vec4>& colors = m_meshPt->at(i)->colors();
-        const std::vector<GLuint>& triangleIndexes = m_meshPt->at(i)->indices();
+        const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
+        const std::vector<float>& textureCoordinates1D = (*m_meshPt)[i]->textureCoordinates1D();
+        const std::vector<glm::vec2>& textureCoordinates2D = (*m_meshPt)[i]->textureCoordinates2D();
+        const std::vector<glm::vec3>& textureCoordinates3D = (*m_meshPt)[i]->textureCoordinates3D();
+        const std::vector<glm::vec3>& normals = (*m_meshPt)[i]->normals();
+        const std::vector<glm::vec4>& colors = (*m_meshPt)[i]->colors();
+        const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
 
         int bufIdx = 0;
         glEnableVertexAttribArray(attr_vertex);
@@ -489,12 +489,12 @@ void Z3DMeshRenderer::render(Z3DEye eye)
       for (size_t i = 0; i < m_meshPt->size(); ++i) {
         if (m_colorSource.isSelected("CustomColor")) {
           shader.setUseCustomColorUniform(true);
-          shader.setCustomColorUniform(m_meshColorsPt->at(i));
+          shader.setCustomColorUniform((*m_meshColorsPt)[i]);
         }
 
-        GLenum type = m_meshPt->at(i)->type();
-        const std::vector<glm::vec3>& vertices = m_meshPt->at(i)->vertices();
-        const std::vector<GLuint>& triangleIndexes = m_meshPt->at(i)->indices();
+        GLenum type = (*m_meshPt)[i]->type();
+        const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
+        const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
         m_VAOs.bind(i);
         if (triangleIndexes.empty()) {
           glDrawArrays(type, 0, vertices.size());
@@ -516,9 +516,9 @@ void Z3DMeshRenderer::render(Z3DEye eye)
         shader.setUseCustomColorUniform(true);
         shader.setCustomColorUniform(m_wireframeColor.get());
 
-        GLenum type = m_meshPt->at(i)->type();
-        const std::vector<glm::vec3>& vertices = m_meshPt->at(i)->vertices();
-        const std::vector<GLuint>& triangleIndexes = m_meshPt->at(i)->indices();
+        GLenum type = (*m_meshPt)[i]->type();
+        const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
+        const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
         m_VAOs.bind(i);
         if (triangleIndexes.empty()) {
           glDrawArrays(type, 0, vertices.size());
@@ -536,9 +536,9 @@ void Z3DMeshRenderer::render(Z3DEye eye)
     //    for (size_t i=0; i<m_meshPt->size(); ++i) {
     //      shader.setUniformValue("lighting_enabled", m_needLighting);
     //      if (m_colorSource.isSelected("CustomColor"))
-    //        renderTriangleList(shader, *(m_meshPt->at(i)), m_meshColorsPt->at(i));
+    //        renderTriangleList(shader, *((*m_meshPt)[i]), (*m_meshColorsPt)[i]);
     //      else
-    //        renderTriangleList(shader, *(m_meshPt->at(i)));
+    //        renderTriangleList(shader, *((*m_meshPt)[i]));
     //    }
     if (m_dataChanged) {
       m_VBOs.resize(m_meshPt->size());
@@ -550,17 +550,17 @@ void Z3DMeshRenderer::render(Z3DEye eye)
     for (size_t i = 0; i < m_meshPt->size(); ++i) {
       if (m_colorSource.isSelected("CustomColor")) {
         shader.setUseCustomColorUniform(true);
-        shader.setCustomColorUniform(m_meshColorsPt->at(i));
+        shader.setCustomColorUniform((*m_meshColorsPt)[i]);
       }
 
-      const std::vector<glm::vec3>& vertices = m_meshPt->at(i)->vertices();
-      const std::vector<float>& textureCoordinates1D = m_meshPt->at(i)->textureCoordinates1D();
-      const std::vector<glm::vec2>& textureCoordinates2D = m_meshPt->at(i)->textureCoordinates2D();
-      const std::vector<glm::vec3>& textureCoordinates3D = m_meshPt->at(i)->textureCoordinates3D();
-      const std::vector<glm::vec3>& normals = m_meshPt->at(i)->normals();
-      const std::vector<glm::vec4>& colors = m_meshPt->at(i)->colors();
-      const std::vector<GLuint>& triangleIndexes = m_meshPt->at(i)->indices();
-      GLenum type = m_meshPt->at(i)->type();
+      const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
+      const std::vector<float>& textureCoordinates1D = (*m_meshPt)[i]->textureCoordinates1D();
+      const std::vector<glm::vec2>& textureCoordinates2D = (*m_meshPt)[i]->textureCoordinates2D();
+      const std::vector<glm::vec3>& textureCoordinates3D = (*m_meshPt)[i]->textureCoordinates3D();
+      const std::vector<glm::vec3>& normals = (*m_meshPt)[i]->normals();
+      const std::vector<glm::vec4>& colors = (*m_meshPt)[i]->colors();
+      const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
+      GLenum type = (*m_meshPt)[i]->type();
 
       int bufIdx = 0;
       glEnableVertexAttribArray(attr_vertex);
@@ -702,9 +702,9 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
       for (size_t i = 0; i < m_meshPt->size(); ++i) {
         m_pickingVAOs.bind(i);
 
-        const std::vector<glm::vec3>& vertices = m_meshPt->at(i)->vertices();
-        const std::vector<glm::vec3>& normals = m_meshPt->at(i)->normals();
-        const std::vector<GLuint>& triangleIndexes = m_meshPt->at(i)->indices();
+        const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
+        const std::vector<glm::vec3>& normals = (*m_meshPt)[i]->normals();
+        const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
 
         int bufIdx = 0;
         glEnableVertexAttribArray(attr_vertex);
@@ -755,11 +755,11 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
     }
 
     for (size_t i = 0; i < m_meshPt->size(); ++i) {
-      shader.setCustomColorUniform(m_meshPickingColorsPt->at(i));
+      shader.setCustomColorUniform((*m_meshPickingColorsPt)[i]);
 
-      GLenum type = m_meshPt->at(i)->type();
-      const std::vector<glm::vec3>& vertices = m_meshPt->at(i)->vertices();
-      const std::vector<GLuint>& triangleIndexes = m_meshPt->at(i)->indices();
+      GLenum type = (*m_meshPt)[i]->type();
+      const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
+      const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
 
       m_pickingVAOs.bind(i);
       if (triangleIndexes.empty()) {
@@ -778,7 +778,7 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
 
   } else {
     //for (size_t i=0; i<m_meshPt->size(); ++i) {
-    //renderTriangleList(shader, *(m_meshPt->at(i)), m_meshPickingColorsPt->at(i));
+    //renderTriangleList(shader, *((*m_meshPt)[i]), (*m_meshPickingColorsPt)[i]);
     //}
     if (m_pickingDataChanged) {
       m_pickingVBOs.resize(m_meshPt->size());
@@ -797,12 +797,12 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
     }
 
     for (size_t i = 0; i < m_meshPt->size(); ++i) {
-      shader.setCustomColorUniform(m_meshPickingColorsPt->at(i));
+      shader.setCustomColorUniform((*m_meshPickingColorsPt)[i]);
 
-      const std::vector<glm::vec3>& vertices = m_meshPt->at(i)->vertices();
-      const std::vector<glm::vec3>& normals = m_meshPt->at(i)->normals();
-      const std::vector<GLuint>& triangleIndexes = m_meshPt->at(i)->indices();
-      GLenum type = m_meshPt->at(i)->type();
+      const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
+      const std::vector<glm::vec3>& normals = (*m_meshPt)[i]->normals();
+      const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
+      GLenum type = (*m_meshPt)[i]->type();
 
       int bufIdx = 0;
       glEnableVertexAttribArray(attr_vertex);

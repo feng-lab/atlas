@@ -43,10 +43,10 @@ void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3>* centers, std::vector<
   int indices[6] = {0, 1, 2, 2, 1, 3};
   int quadIdx = 0;
   for (size_t i = 0; i < centers->size(); ++i) {
-    glm::mat4 T(glm::vec4(axis1->at(i), 0.f),
-                glm::vec4(axis2->at(i), 0.f),
-                glm::vec4(axis3->at(i), 0.f),
-                glm::vec4(centers->at(i), 1.f));
+    glm::mat4 T(glm::vec4((*axis1)[i], 0.f),
+                glm::vec4((*axis2)[i], 0.f),
+                glm::vec4((*axis3)[i], 0.f),
+                glm::vec4((*centers)[i], 1.f));
     m_centers.push_back(T[3]);
     m_centers.push_back(T[3]);
     m_centers.push_back(T[3]);

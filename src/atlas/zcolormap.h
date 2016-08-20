@@ -266,7 +266,7 @@ public:
   { return m_keys.size(); }
 
   inline ZColorMapKey& key(size_t index)
-  { return m_keys.at(index).first; }
+  { return m_keys[index].first; }
 
   inline bool hasDataRange() const
   { return m_hasDataRange; }

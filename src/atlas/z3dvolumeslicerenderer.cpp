@@ -60,11 +60,11 @@ void Z3DVolumeSliceRenderer::bindVolumes(Z3DShaderProgram& shader)
   size_t idx = 0;
   for (size_t i = 0; i < m_img->numChannels(); ++i) {
     // volumes
-    shader.bindTexture(m_volumeUniformNames[idx], m_img->volumes().at(i)->texture(),
+    shader.bindTexture(m_volumeUniformNames[idx], m_img->volumes()[i]->texture(),
                        GLint(GL_NEAREST), GLint(GL_NEAREST));
 
     // colormap
-    shader.bindTexture(m_colormapUniformNames[idx++], m_colormaps->at(i)->get().texture1D());
+    shader.bindTexture(m_colormapUniformNames[idx++], (*m_colormaps)[i]->get().texture1D());
 
     CHECK_GL_ERROR
   }
@@ -73,11 +73,11 @@ void Z3DVolumeSliceRenderer::bindVolumes(Z3DShaderProgram& shader)
 void Z3DVolumeSliceRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx)
 {
   // volumes
-  shader.bindTexture(m_volumeUniformNames[0], m_img->volumes().at(idx)->texture(),
+  shader.bindTexture(m_volumeUniformNames[0], m_img->volumes()[idx]->texture(),
                      GLint(GL_NEAREST), GLint(GL_NEAREST));
 
   // colormap
-  shader.bindTexture(m_colormapUniformNames[0], m_colormaps->at(idx)->get().texture1D());
+  shader.bindTexture(m_colormapUniformNames[0], (*m_colormaps)[idx]->get().texture1D());
 
   CHECK_GL_ERROR
 }

@@ -559,9 +559,9 @@ void Z3DPunctaFilter::changePunctaSize()
 {
   for (size_t i = 0; i < m_pointAndRadius.size(); ++i) {
     if (m_useSameSizeForAllPuncta.get())
-      m_pointAndRadius.at(i).w = 2.f;
+      m_pointAndRadius[i].w = 2.f;
     else
-      m_pointAndRadius.at(i).w = m_punctaList[i]->radius();
+      m_pointAndRadius[i].w = m_punctaList[i]->radius();
   }
   m_sphereRenderer.setData(&m_pointAndRadius, &m_specularAndShininess);
   updateBoundBox();

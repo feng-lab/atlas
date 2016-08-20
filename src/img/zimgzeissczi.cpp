@@ -532,10 +532,10 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
             if (tiles.size() > infos[s].numChannels) {
               throw ZIOException("invalid tiles: too many channels");
             } else if (tiles.size() == infos[s].numChannels) {
-              subBlocks->at(s).emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles));
+              (*subBlocks)[s].emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles));
             } else if (!tiles.empty()) {
               hasMissingTiles = true;
-              subBlocks->at(s).emplace_back(
+              (*subBlocks)[s].emplace_back(
                 std::make_shared<ZImgCZISubBlock>(filename, tiles, true, infos[s].numChannels, infos[s].bytesPerVoxel,
                                                   infos[s].voxelFormat));
             }
@@ -549,7 +549,7 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
           tiles.push_back(tile);
         }
         if (!tiles.empty()) {
-          subBlocks->at(s).emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles));
+          (*subBlocks)[s].emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles));
           tiles.clear();
         }
 
@@ -581,7 +581,7 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
           if (currnetRatio < 1_usize || tile.ratio != currnetRatio || tile.start.x != currentX || tile.start.y != currentY ||
               tile.start.z != currentZ || tile.start.t != currentT) {
             if (tiles.size() == infos[s].numChannels) {
-              subBlocks->at(s).emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles));
+              (*subBlocks)[s].emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles));
             } else if (!tiles.empty()) {
               hasMixedTiles = true;
 
@@ -593,7 +593,7 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
               //              }
 
               if(mixAllTilesIfNecessary) {
-                subBlocks->at(s).clear();
+                (*subBlocks)[s].clear();
                 break;
               } else {
                 allMixedTiles.insert(tiles.begin(), tiles.end());
@@ -609,7 +609,7 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
           tiles.push_back(tile);
         }
         if (!tiles.empty() && (!mixAllTilesIfNecessary || !hasMixedTiles)) {
-          subBlocks->at(s).emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles));
+          (*subBlocks)[s].emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles));
           tiles.clear();
         }
 
@@ -628,8 +628,8 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
             const CZITile &tile = *it;
             if (currnetRatio < 1_usize || tile.ratio != currnetRatio || tile.start.z != currentZ || tile.start.t != currentT) {
               if (!tiles.empty()) {
-                subBlocks->at(s).emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles, true, infos[s].numChannels, infos[s].bytesPerVoxel,
-                                                                                infos[s].voxelFormat));
+                (*subBlocks)[s].emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles, true, infos[s].numChannels, infos[s].bytesPerVoxel,
+                                                                               infos[s].voxelFormat));
                 tiles.clear();
               }
               currnetRatio = tile.ratio;
@@ -639,8 +639,8 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
             tiles.push_back(tile);
           }
           if (!tiles.empty()) {
-            subBlocks->at(s).emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles, true, infos[s].numChannels, infos[s].bytesPerVoxel,
-                                                                            infos[s].voxelFormat));
+            (*subBlocks)[s].emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles, true, infos[s].numChannels, infos[s].bytesPerVoxel,
+                                                                           infos[s].voxelFormat));
           }
         }
 #endif
@@ -651,7 +651,7 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
       for (size_t s = 0; s < infos.size(); ++s) {
         for (auto it = m_sceneTiles[s].cbegin(); it != m_sceneTiles[s].cend(); ++it) {
           CHECK(it->ratio >= 1);
-          pyramidalRatios->at(s).insert(it->ratio);
+          (*pyramidalRatios)[s].insert(it->ratio);
         }
       }
     }

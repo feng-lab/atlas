@@ -291,8 +291,8 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
     if (!m_colorsPt || static_cast<size_t>(strIdx) >= m_colorsPt->size())
       color = glm::vec4(0.f, 0.f, 0.f, 1.f);
     else
-      color = m_colorsPt->at(strIdx);
-    glm::vec3 loc = m_positionsPt->at(strIdx);
+      color = (*m_colorsPt)[strIdx];
+    glm::vec3 loc = (*m_positionsPt)[strIdx];
     for (int charIdx = 0; charIdx < str.size(); charIdx++) {
       Z3DSDFont::CharInfo charInfo = font->charInfo(str[charIdx].toLatin1());
       glm::vec3 leftUp = loc + rightVector * charInfo.xoffset * scale + upVector * charInfo.yoffset * scale;
@@ -312,10 +312,10 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
       m_fontColors.push_back(color);
       m_fontColors.push_back(color);
       if (m_pickingColorsPt && m_pickingColorsPt->size() == m_positionsPt->size()) {
-        m_fontPickingColors.push_back(m_pickingColorsPt->at(strIdx));
-        m_fontPickingColors.push_back(m_pickingColorsPt->at(strIdx));
-        m_fontPickingColors.push_back(m_pickingColorsPt->at(strIdx));
-        m_fontPickingColors.push_back(m_pickingColorsPt->at(strIdx));
+        m_fontPickingColors.push_back((*m_pickingColorsPt)[strIdx]);
+        m_fontPickingColors.push_back((*m_pickingColorsPt)[strIdx]);
+        m_fontPickingColors.push_back((*m_pickingColorsPt)[strIdx]);
+        m_fontPickingColors.push_back((*m_pickingColorsPt)[strIdx]);
       }
       for (int k = 0; k < 6; ++k) {
         m_indexs.push_back(indices[k] + 4 * quadIdx);

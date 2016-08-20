@@ -139,7 +139,7 @@ struct edge_in_MST
   bool operator()(const Edge& e) const
   {
     for (size_t i = 0; i < m_MSTEdges->size(); ++i) {
-      if (e == m_MSTEdges->at(i)) {
+      if (e == (*m_MSTEdges)[i]) {
         return true;
       }
     }

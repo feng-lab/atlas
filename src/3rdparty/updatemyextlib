@@ -72,7 +72,7 @@ else
   srcArchive=$srcPackageDIR/ispc-v1.9.1-osx.tar.gz
   tar -zxf "$srcArchive" -C $baseDIR
 
-  srcArchive=$srcPackageDIR/ffmpeg-3.1.1.7z
+  srcArchive=$srcPackageDIR/ffmpeg-3.1.2.7z
   7z x -y -o$baseDIR/atlas "$srcArchive"
 fi
 
@@ -88,9 +88,12 @@ if [ -d $currDIR/eigen ]
 then
   rm -rf $currDIR/eigen
 fi
-srcArchive=$srcPackageDIR/eigen-eigen-dfb0ec8e0d86.tar.bz2
-tar -jxf "$srcArchive" -C $currDIR
-mv $currDIR/eigen-eigen-dfb0ec8e0d86 $currDIR/eigen
+#srcArchive=$srcPackageDIR/eigen-eigen-dfb0ec8e0d86.tar.bz2
+#tar -jxf "$srcArchive" -C $currDIR
+#mv $currDIR/eigen-eigen-dfb0ec8e0d86 $currDIR/eigen
+srcArchive=$srcPackageDIR/eigen-eigen-cd5824eb9fb2.zip
+7z x -y -o$currDIR "$srcArchive"
+mv $currDIR/eigen-eigen-cd5824eb9fb2 $currDIR/eigen
 
 if [ -d $currDIR/glm ]
 then

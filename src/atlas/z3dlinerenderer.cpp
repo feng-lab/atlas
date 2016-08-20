@@ -79,14 +79,14 @@ void Z3DLineRenderer::setData(std::vector<glm::vec3>* linesInput)
       int quadIdx = 0;
       if (m_isLineStrip) {
         for (size_t i = 1; i < linesInput->size(); ++i) {
-          m_smoothLineP0s.push_back(linesInput->at(i - 1));
-          m_smoothLineP0s.push_back(linesInput->at(i - 1));
-          m_smoothLineP0s.push_back(linesInput->at(i - 1));
-          m_smoothLineP0s.push_back(linesInput->at(i - 1));
-          m_smoothLineP1s.push_back(linesInput->at(i));
-          m_smoothLineP1s.push_back(linesInput->at(i));
-          m_smoothLineP1s.push_back(linesInput->at(i));
-          m_smoothLineP1s.push_back(linesInput->at(i));
+          m_smoothLineP0s.push_back((*linesInput)[i - 1]);
+          m_smoothLineP0s.push_back((*linesInput)[i - 1]);
+          m_smoothLineP0s.push_back((*linesInput)[i - 1]);
+          m_smoothLineP0s.push_back((*linesInput)[i - 1]);
+          m_smoothLineP1s.push_back((*linesInput)[i]);
+          m_smoothLineP1s.push_back((*linesInput)[i]);
+          m_smoothLineP1s.push_back((*linesInput)[i]);
+          m_smoothLineP1s.push_back((*linesInput)[i]);
           for (int k = 0; k < 6; ++k) {
             m_indexs.push_back(indices[k] + 4 * quadIdx);
           }
@@ -94,14 +94,14 @@ void Z3DLineRenderer::setData(std::vector<glm::vec3>* linesInput)
         }
       } else {
         for (size_t i = 0; i + 1 < linesInput->size(); i += 2) {
-          m_smoothLineP0s.push_back(linesInput->at(i));
-          m_smoothLineP0s.push_back(linesInput->at(i));
-          m_smoothLineP0s.push_back(linesInput->at(i));
-          m_smoothLineP0s.push_back(linesInput->at(i));
-          m_smoothLineP1s.push_back(linesInput->at(i + 1));
-          m_smoothLineP1s.push_back(linesInput->at(i + 1));
-          m_smoothLineP1s.push_back(linesInput->at(i + 1));
-          m_smoothLineP1s.push_back(linesInput->at(i + 1));
+          m_smoothLineP0s.push_back((*linesInput)[i]);
+          m_smoothLineP0s.push_back((*linesInput)[i]);
+          m_smoothLineP0s.push_back((*linesInput)[i]);
+          m_smoothLineP0s.push_back((*linesInput)[i]);
+          m_smoothLineP1s.push_back((*linesInput)[i + 1]);
+          m_smoothLineP1s.push_back((*linesInput)[i + 1]);
+          m_smoothLineP1s.push_back((*linesInput)[i + 1]);
+          m_smoothLineP1s.push_back((*linesInput)[i + 1]);
           for (int k = 0; k < 6; ++k) {
             m_indexs.push_back(indices[k] + 4 * quadIdx);
           }
@@ -280,8 +280,8 @@ std::vector<glm::vec4>* Z3DLineRenderer::lineColors()
     return &m_lineColors;
   } else if (m_lineColorsPt->size() < m_linesPt->size()) {
     m_lineColors.clear();
-    for (size_t i = 0; i < m_lineColorsPt->size(); ++i) {
-      m_lineColors.push_back(m_lineColorsPt->at(i));
+    for (auto& color : *m_lineColorsPt) {
+      m_lineColors.push_back(color);
     }
     for (size_t i = m_lineColorsPt->size(); i < m_linesPt->size(); ++i) {
       m_lineColors.emplace_back(0.f, 0.f, 0.f, 1.f);
@@ -300,9 +300,9 @@ void Z3DLineRenderer::renderUsingOpengl()
 
   std::vector<glm::vec4> * colors = lineColors();
 
-  if (colors->at(0).a != opacity()) {
+  if ((*colors)[0].a != opacity()) {
     for (size_t i=0; i<colors->size(); ++i)
-      colors->at(i).a = opacity();
+      (*colors)[i].a = opacity();
   }
 
   glLineWidth(lineWidth());
