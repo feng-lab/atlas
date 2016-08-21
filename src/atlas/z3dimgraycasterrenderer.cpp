@@ -397,8 +397,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           usedBlockIDs.insert(ccSet.begin(), ccSet.end());
           ccSet.clear();
         }
-        missingBlockIDs.erase(0);
-        usedBlockIDs.erase(0);
+        missingBlockIDs.erase(0_u32);
+        usedBlockIDs.erase(0_u32);
 
         m_image3DSliceWithTransferfunBlockIDsShader.release();
         //glFinish();

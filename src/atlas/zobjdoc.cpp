@@ -83,25 +83,21 @@ std::map<size_t, size_t> ZObjDoc::read(const QList<QPair<QString, QJsonValue>>& 
   }
 
   while (!idToJsonValue.empty()) {
-    std::set<size_t> ids;
     std::map<size_t, QJsonValue>::iterator it = idToJsonValue.begin();
     QJsonValue jv = it->second;
+    std::set<size_t> ids; // collect all ids that are pointing to jv
     ids.insert(it->first);
-    std::map<size_t, QJsonValue>::iterator itToErase = it;
-    ++it;
-    idToJsonValue.erase(itToErase);
+    it = idToJsonValue.erase(it);
     while (it != idToJsonValue.end()) {
       if (it->second == jv) {
         ids.insert(it->first);
-        itToErase = it;
-        ++it;
-        idToJsonValue.erase(itToErase);
+        it = idToJsonValue.erase(it);
       } else {
         ++it;
       }
     }
 
-    // check existing objects with same path
+    // check existing objects that are pointing to jv
     std::set<size_t> existingIds;
     for (int i = 0; i < allObjs.size(); ++i) {
       if (isSameObj(jv, jsonValue(allObjs[i]))) {

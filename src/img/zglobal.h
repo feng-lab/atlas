@@ -42,7 +42,7 @@ constexpr const char* enumToString(TEnum e) noexcept
 
 // https://chromium.googlesource.com/chromium/src/+/master/base/bit_cast.h
 template<class Dest, class Source>
-inline Dest bit_cast(const Source& source)
+__forceinline Dest bit_cast(const Source& source)
 {
   static_assert(sizeof(Dest) == sizeof(Source),
                 "bit_cast requires source and destination to be the same size");
@@ -69,10 +69,9 @@ inline bool is_aligned(Type* ptr, size_t a)
 
 // effective stl, item 24, Scott Meyers
 template<typename MapType, // type of map
-  typename KeyArgType, // see below for why
-  typename ValueArgtype> // KeyArgType and ValueArgtype are type
-typename MapType::iterator // parameters
-efficientAddOrUpdate(MapType& m, const KeyArgType& k, const ValueArgtype& v)
+  typename KeyArgType,
+  typename ValueArgtype>
+__forceinline typename MapType::iterator efficientAddOrUpdate(MapType& m, const KeyArgType& k, const ValueArgtype& v)
 {
   typename MapType::iterator lb = m.lower_bound(k); // find where k is or should be
   if (lb != m.end() && !(m.key_comp()(k, lb->first))) { // if Ib points to a pair whose key is equiv to k...

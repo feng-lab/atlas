@@ -209,7 +209,7 @@ void ZImgMerge::removeImg(const ZImg& img)
   std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::iterator it = m_imgPairs.begin();
   while (it != m_imgPairs.end()) {
     if (it->first.first == &img || it->first.second == &img) {
-      m_imgPairs.erase(it++);
+      it = m_imgPairs.erase(it);
     } else {
       ++it;
     }
@@ -221,7 +221,7 @@ void ZImgMerge::removeImgConnection(const ZImg& img1, const ZImg& img2)
   std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::iterator it = m_imgPairs.begin();
   while (it != m_imgPairs.end()) {
     if (it->first == std::make_pair(&img1, &img2) || it->first == std::make_pair(&img2, &img1)) {
-      m_imgPairs.erase(it++);
+      it = m_imgPairs.erase(it);
     } else {
       ++it;
     }
@@ -327,61 +327,6 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate>& imgCoo
     throw ZImgException("Merge Imgs error: imgs are not fully connected");
   }
 
-#if 0
-  std::list<Edge> tree;
-  boost::kruskal_minimum_spanning_tree(graph, std::back_inserter(tree),
-                                       boost::weight_map(boost::get(&EdgeInfo::cost, graph)).
-                                       vertex_index_map(boost::get(&VertexInfo::idx, graph)));
-
-  if (imgCoords.empty())
-    imgCoords[refImg] = ZVoxelCoordinate();
-
-  //  for (std::list<Edge>::iterator it = tree.begin(); it != tree.end(); ++it) {
-  //    LOG(INFO) << graph[boost::source(*it, graph)].idx << " " << graph[boost::target(*it, graph)].idx << " " << graph[*it].cost;
-  //  }
-
-  while (!tree.empty()) {
-    std::list<Edge>::iterator it = tree.begin();
-    while (it != tree.end()) {
-      const ZImg * img1 = graph[boost::source(*it, graph)].img;
-      const ZImg * img2 = graph[boost::target(*it, graph)].img;
-      bool img1HasLocation = imgCoords.find(img1) != imgCoords.end();
-      bool img2HasLocation = imgCoords.find(img2) != imgCoords.end();
-
-      if (img1HasLocation && img2HasLocation) {
-        tree.erase(it++);
-      } else if (img1HasLocation && !img2HasLocation) {
-        summary += QString("tile %1 connects to tile %2\n")
-            .arg(m_imgNames.at(img1))
-            .arg(m_imgNames.at(img2));
-        std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::const_iterator pairIt;
-        pairIt = m_imgPairs.find(std::make_pair(img1, img2));
-        if (pairIt != m_imgPairs.end())
-          imgCoords[img2] = imgCoords[img1] + pairIt->second.first;
-        else {
-          pairIt = m_imgPairs.find(std::make_pair(img2, img1));  // must exist
-          imgCoords[img2] = imgCoords[img1] - pairIt->second.first;
-        }
-        tree.erase(it++);
-      } else if (!img1HasLocation && img2HasLocation) {
-        summary += QString("tile %1 connects to tile %2\n")
-            .arg(m_imgNames.at(img1))
-            .arg(m_imgNames.at(img2));
-        std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::const_iterator pairIt;
-        pairIt = m_imgPairs.find(std::make_pair(img1, img2));
-        if (pairIt != m_imgPairs.end())
-          imgCoords[img1] = imgCoords[img2] - pairIt->second.first;
-        else {
-          pairIt = m_imgPairs.find(std::make_pair(img2, img1));  // must exist
-          imgCoords[img1] = imgCoords[img2] + pairIt->second.first;
-        }
-        tree.erase(it++);
-      } else {
-        ++it;
-      }
-    }
-  }
-#else
   std::vector<Edge> tree;
   boost::kruskal_minimum_spanning_tree(graph, std::back_inserter(tree),
                                        boost::weight_map(boost::get(&EdgeInfo::cost, graph)).
@@ -435,7 +380,6 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate>& imgCoo
       CHECK(img1HasLocation && img2HasLocation);
     }
   }
-#endif
 }
 
 void ZImgMerge::mergeImgs(ZImg& res, const std::map<const ZImg*, ZVoxelCoordinate>& imgs,
@@ -501,7 +445,7 @@ void ZImgMerge::mergeImgs(ZImg& res, const std::map<const ZImg*, ZVoxelCoordinat
         if (*it >= tileStartC && *it < tileEndC) {
           res.infoRef().channelColors[*it] = tiles[i].img().info().channelColors[*it - tileStartC];
           res.infoRef().channelNames[*it] = tiles[i].img().info().channelNames[*it - tileStartC];
-          neededChannelInfo.erase(it++);
+          it = neededChannelInfo.erase(it);
         } else {
           ++it;
         }
@@ -513,7 +457,7 @@ void ZImgMerge::mergeImgs(ZImg& res, const std::map<const ZImg*, ZVoxelCoordinat
       for (std::set<size_t>::iterator it = neededTimeStamp.begin(); it != neededTimeStamp.end();) {
         if (*it >= tileStartT && *it < tileEndT) {
           res.infoRef().timeStamps[*it] = tiles[i].img().info().timeStamps[*it - tileStartT];
-          neededTimeStamp.erase(it++);
+          it = neededTimeStamp.erase(it);
         } else {
           ++it;
         }

@@ -22,22 +22,6 @@ private:
   size_t m_label;
 };
 
-struct ContainerSizeLessThan
-{
-  ContainerSizeLessThan(size_t thre)
-    : m_thre(thre)
-  {}
-
-  template<typename Container>
-  inline bool operator()(const Container& c) const
-  {
-    return c.size() < m_thre;
-  }
-
-private:
-  size_t m_thre;
-};
-
 }
 
 ConnComp::ConnComp()
@@ -60,7 +44,10 @@ void ConnComp::removeSmallObject(size_t sizeThre, bool includeThre)
   }
   if (includeThre)
     sizeThre++;
-  voxelIdxList.erase(std::remove_if(voxelIdxList.begin(), voxelIdxList.end(), impl::ContainerSizeLessThan(sizeThre)),
+  voxelIdxList.erase(std::remove_if(voxelIdxList.begin(), voxelIdxList.end(),
+                                    [sizeThre](const std::vector<size_t>& v) {
+                                      return v.size() < sizeThre;
+                                    }),
                      voxelIdxList.end());
 }
 

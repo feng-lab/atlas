@@ -151,7 +151,6 @@ void ZSwc::load(const QString& filename)
     }
 
     std::map<int, Iterator> itMap;
-    std::map<int, SwcNode>::iterator tmp;
     while (!nodeMap.empty()) {
       std::map<int, SwcNode>::iterator it = nodeMap.begin();
       while (it != nodeMap.end()) {
@@ -159,14 +158,10 @@ void ZSwc::load(const QString& filename)
         std::map<int, Iterator>::const_iterator nodeIt = itMap.find(parentID);
         if (nodeIt != itMap.end()) {
           itMap[it->first] = appendChild(nodeIt->second, it->second);
-          tmp = it;
-          ++it;
-          nodeMap.erase(tmp);
+          it = nodeMap.erase(it);
         } else if (nodeMap.find(parentID) == nodeMap.end()) {
           itMap[it->first] = appendRoot(it->second);
-          tmp = it;
-          ++it;
-          nodeMap.erase(tmp);
+          it = nodeMap.erase(it);
         } else {
           ++it;
         }

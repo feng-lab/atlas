@@ -550,7 +550,6 @@ void binaryImgToROI(const ZImg& img, ZROI& roi)
       }
 
       std::map<int, ZTree<ContourNode>::Iterator> itMap;
-      std::map<int, ContourNode>::iterator tmp;
       while (!nodeMap.empty()) {
         std::map<int, ContourNode>::iterator it = nodeMap.begin();
         while (it != nodeMap.end()) {
@@ -558,14 +557,10 @@ void binaryImgToROI(const ZImg& img, ZROI& roi)
           std::map<int, ZTree<ContourNode>::Iterator>::const_iterator nodeIt = itMap.find(parentID);
           if (nodeIt != itMap.end()) {
             itMap[it->first] = contoursTree.appendChild(nodeIt->second, it->second);
-            tmp = it;
-            ++it;
-            nodeMap.erase(tmp);
+            it = nodeMap.erase(it);
           } else if (nodeMap.find(parentID) == nodeMap.end()) {
             itMap[it->first] = contoursTree.appendRoot(it->second);
-            tmp = it;
-            ++it;
-            nodeMap.erase(tmp);
+            it = nodeMap.erase(it);
           } else {
             ++it;
           }

@@ -380,7 +380,6 @@ void ZRegionAnnotation::load(const QString& filename)
     }
 
     std::map<int64_t, ZTree<RegionNode>::Iterator> itMap;
-    std::map<int64_t, RegionNode>::iterator tmp;
     while (!nodeMap.empty()) {
       std::map<int64_t, RegionNode>::iterator it = nodeMap.begin();
       while (it != nodeMap.end()) {
@@ -388,14 +387,10 @@ void ZRegionAnnotation::load(const QString& filename)
         std::map<int64_t, ZTree<RegionNode>::Iterator>::const_iterator nodeIt = itMap.find(parentID);
         if (nodeIt != itMap.end()) {
           itMap[it->first] = m_ontology.appendChild(nodeIt->second, it->second);
-          tmp = it;
-          ++it;
-          nodeMap.erase(tmp);
+          it = nodeMap.erase(it);
         } else if (nodeMap.find(parentID) == nodeMap.end()) {
           itMap[it->first] = m_ontology.appendRoot(it->second);
-          tmp = it;
-          ++it;
-          nodeMap.erase(tmp);
+          it = nodeMap.erase(it);
         } else {
           ++it;
         }

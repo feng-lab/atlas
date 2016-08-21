@@ -33,11 +33,6 @@
 
 namespace {
 
-bool vectorIsEmpty(const std::vector<int>& i)
-{
-  return i.empty();
-}
-
 using point_2d = boost::geometry::model::d2::point_xy<double>;
 using polygon_2d = boost::geometry::model::polygon<point_2d>;
 using box_2d = boost::geometry::model::box<point_2d>;
@@ -1046,7 +1041,11 @@ ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs, const Eigen::Vect
       }
     }
     // remove empty group
-    modelGroups.erase(std::remove_if(modelGroups.begin(), modelGroups.end(), vectorIsEmpty), modelGroups.end());
+    modelGroups.erase(std::remove_if(modelGroups.begin(), modelGroups.end(),
+                                     [](const std::vector<int>& v) {
+                                       return v.empty();
+                                     }),
+                      modelGroups.end());
     // create new group
     if (currentModelGroup == -1) {
       std::vector<int> newGroup;

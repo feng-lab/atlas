@@ -36,7 +36,9 @@ void ZParameterAnimation::deleteKey(ZParameterKey* key)
   key->setParaAnimation(nullptr);
   emit keyAboutToDelete(key);
   m_keys.erase(std::remove_if(m_keys.begin(), m_keys.end(),
-                              [=](const auto& ckey) { return ckey.get() == key; }),
+                              [key](const std::unique_ptr<ZParameterKey>& ckey) {
+                                return ckey.get() == key;
+                              }),
                m_keys.end());
   emit keysChanged();
 }
@@ -199,23 +201,20 @@ void ZParameterAnimation::removeRedundantKeys()
   if (m_keys.size() < 2)
     return;
 
-  auto result = m_keys.begin();
-  ++result;
-  auto first = result;
-  int prevDist = 1;
-  while (first != m_keys.end()) {
-    auto prev = first - prevDist;
-    auto next = first + 1;
-    if ((*first)->value().jsonValue() != (*prev)->value().jsonValue() ||
-        (next != m_keys.end() && (*first)->value().jsonValue() != (*next)->value().jsonValue())) {
-      *result = std::move(*first);
-      ++result;
-    } else {
-      ++prevDist;
+  auto it = m_keys.begin();
+  auto result = it;  // pointer to last non-redundant key
+  ++it;
+  while (it != m_keys.end()) {
+    auto next = it + 1;
+    if ((*it)->value().jsonValue() != (*result)->value().jsonValue() ||   // not equal to prev
+        (next != m_keys.end() && (*it)->value().jsonValue() != (*next)->value().jsonValue())) { // or not equal to next
+      ++result;  // make space for new valid it
+      if (it != result)
+        *result = std::move(*it);   // keep it and advance result
     }
-    ++first;
+    ++it;
   }
-  m_keys.erase(result, m_keys.end());
+  m_keys.erase(result + 1, m_keys.end());
 }
 
 } // namespace nim

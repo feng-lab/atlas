@@ -799,25 +799,14 @@ void ZColorMap::addKeyAtFraction(double fraction, double alpha, bool select)
   addKey(ZColorMapKey(intensity, col), select);
 }
 
-namespace {
-
-bool KeyIntensityEqual(const std::pair<ZColorMapKey, bool>& key1,
-                       const std::pair<ZColorMapKey, bool>& key2)
-{
-  return key1.first.intensity() == key2.first.intensity();
-}
-
-bool KeyIsSelected(const std::pair<ZColorMapKey, bool>& key)
-{
-  return key.second;
-}
-
-}
-
 bool ZColorMap::removeDuplicatedKeys()
 {
   size_t sizeBefore = m_keys.size();
-  m_keys.erase(std::unique(m_keys.begin(), m_keys.end(), KeyIntensityEqual), m_keys.end());
+  m_keys.erase(std::unique(m_keys.begin(), m_keys.end(),
+                           [](const std::pair<ZColorMapKey, bool>& key1, const std::pair<ZColorMapKey, bool>& key2) {
+                             return key1.first.intensity() == key2.first.intensity();
+                           }),
+               m_keys.end());
   if (m_keys.size() != sizeBefore)
     emit changed();
   return m_keys.size() != sizeBefore;
@@ -826,7 +815,11 @@ bool ZColorMap::removeDuplicatedKeys()
 bool ZColorMap::removeSelectedKeys()
 {
   size_t sizeBefore = m_keys.size();
-  m_keys.erase(std::remove_if(m_keys.begin(), m_keys.end(), KeyIsSelected), m_keys.end());
+  m_keys.erase(std::remove_if(m_keys.begin(), m_keys.end(),
+                              [](const std::pair<ZColorMapKey, bool>& key) {
+                                return key.second;
+                              }),
+               m_keys.end());
   if (m_keys.size() != sizeBefore)
     emit changed();
   return m_keys.size() != sizeBefore;
