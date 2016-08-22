@@ -7,6 +7,7 @@
 #include "zlog.h"
 #include "zlogmodelsink.h"
 #include "zexception.h"
+#include <iostream>
 
 namespace nim {
 
@@ -31,8 +32,10 @@ ZObjEditWidget::ZObjEditWidget(ZDoc* doc, QWidget* mw)
   m_normalFormat = m_logWidget->currentCharFormat();
   m_errorFormat = m_normalFormat;
   m_errorFormat.setForeground(QBrush(QColor(176, 0, 0)));
-  writeLogData(&logMessagesSoFar(), 0, logMessagesSoFar().size());
-  receiveFutureLogMessages(this, &ZObjEditWidget::writeLogData);
+  auto lms = ZLogModelSink::logMessagesSoFar();
+  if (std::get<2>(lms) > std::get<1>(lms))
+    writeLogData(&std::get<0>(lms), std::get<1>(lms), std::get<2>(lms));
+  ZLogModelSink::receiveFutureLogMessages(this, &ZObjEditWidget::writeLogData);
 }
 
 bool ZObjEditWidget::showObjEditWidgetOfObj(size_t id)

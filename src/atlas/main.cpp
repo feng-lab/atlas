@@ -150,7 +150,7 @@ int main(int argc, char* argv[])
   });
   Q_UNUSED(guardlogging)
 
-  nim::addLogSink(nim::logModelSinkInstance());
+  nim::addLogSink(&nim::ZLogModelSink::instance());
   qInstallMessageHandler(myMessageOutput);
 
   try {

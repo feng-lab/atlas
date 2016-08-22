@@ -2,13 +2,14 @@
 
 #include <QColor>
 #include <QTimer>
+#include <iostream>
 
 namespace nim {
 
-ZLogModelSink* logModelSinkInstance()
+ZLogModelSink& ZLogModelSink::instance()
 {
   static ZLogModelSink modelDestination;
-  return &modelDestination;
+  return modelDestination;
 }
 
 const char* const ZLogModelSink::Type = "window";
@@ -149,7 +150,9 @@ void ZLogModelSink::sendLogData()
 {
   int start = m_unsendLogDataStart;
   m_unsendLogDataStart = m_logDatas.size();
-  emit logDataReady(&m_logDatas, start, m_unsendLogDataStart);
+  if (m_unsendLogDataStart > start) {
+    emit logDataReady(&m_logDatas, start, m_unsendLogDataStart);
+  }
 }
 
 } // namespace nim
