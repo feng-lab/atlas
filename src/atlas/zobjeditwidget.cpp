@@ -33,8 +33,7 @@ ZObjEditWidget::ZObjEditWidget(ZDoc* doc, QWidget* mw)
   m_errorFormat = m_normalFormat;
   m_errorFormat.setForeground(QBrush(QColor(176, 0, 0)));
   auto lms = ZLogModelSink::logMessagesSoFar();
-  if (std::get<2>(lms) > std::get<1>(lms))
-    writeLogData(&std::get<0>(lms), std::get<1>(lms), std::get<2>(lms));
+  writeLogData(&std::get<0>(lms), std::get<1>(lms), std::get<2>(lms));
   ZLogModelSink::receiveFutureLogMessages(this, &ZObjEditWidget::writeLogData);
 }
 
@@ -72,33 +71,35 @@ void ZObjEditWidget::updateEditWidgetTitleOfObj(size_t id)
 
 void ZObjEditWidget::writeLogData(const QList<LogData>* messages, int start, int end)
 {
-  if (end - start == 1) {
-    if (messages->at(start).level <= InfoLevel) {
-      m_logWidget->appendPlainText(messages->at(start).formatted);
+  if (end > start) {
+    if (end - start == 1) {
+      if (messages->at(start).level <= InfoLevel) {
+        m_logWidget->appendPlainText(messages->at(start).formatted);
+      } else {
+        m_logWidget->setCurrentCharFormat(m_errorFormat);
+        m_logWidget->appendPlainText(messages->at(start).formatted);
+        m_logWidget->setCurrentCharFormat(m_normalFormat);
+      }
     } else {
-      m_logWidget->setCurrentCharFormat(m_errorFormat);
-      m_logWidget->appendPlainText(messages->at(start).formatted);
+      bool firstFormat = messages->at(start).level <= InfoLevel;
+      bool lastFormat = firstFormat;
+      QList<QStringList> textList;
+      textList.push_back(QStringList());
+      textList.back().push_back(messages->at(start).formatted);
+      for (int i = start + 1; i < end; ++i) {
+        if ((messages->at(i).level <= InfoLevel) != lastFormat) {
+          lastFormat = !lastFormat;
+          textList.push_back(QStringList());
+        }
+        textList.back().push_back(messages->at(i).formatted);
+      }
+      for (int i = 0; i < textList.size(); ++i) {
+        m_logWidget->setCurrentCharFormat(firstFormat ? m_normalFormat : m_errorFormat);
+        firstFormat = !firstFormat;
+        m_logWidget->appendPlainText(textList[i].join("\n"));
+      }
       m_logWidget->setCurrentCharFormat(m_normalFormat);
     }
-  } else {
-    bool firstFormat = messages->at(start).level <= InfoLevel;
-    bool lastFormat = firstFormat;
-    QList<QStringList> textList;
-    textList.push_back(QStringList());
-    textList.back().push_back(messages->at(start).formatted);
-    for (int i = start + 1; i < end; ++i) {
-      if ((messages->at(i).level <= InfoLevel) != lastFormat) {
-        lastFormat = !lastFormat;
-        textList.push_back(QStringList());
-      }
-      textList.back().push_back(messages->at(i).formatted);
-    }
-    for (int i = 0; i < textList.size(); ++i) {
-      m_logWidget->setCurrentCharFormat(firstFormat ? m_normalFormat : m_errorFormat);
-      firstFormat = !firstFormat;
-      m_logWidget->appendPlainText(textList[i].join("\n"));
-    }
-    m_logWidget->setCurrentCharFormat(m_normalFormat);
   }
 }
 

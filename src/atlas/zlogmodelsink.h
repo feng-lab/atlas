@@ -82,7 +82,7 @@ public:
 
   virtual QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
-  // return the list and [start, end)
+  // return the list and valid range [start, end)
   static inline std::tuple<const QList<LogData>&, int, int> logMessagesSoFar()
   {
     return std::make_tuple(std::cref(ZLogModelSink::instance().m_logDatas),
