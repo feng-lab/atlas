@@ -1,6 +1,6 @@
 #pragma once
 
-#include <mutex>
+#include <QMutexLocker>
 #include <QCache>
 #include "zimgpack.h"
 
@@ -27,7 +27,7 @@ public:
   std::shared_ptr<ZImg>* getOrRead(size_t key, const ZImgSubBlock& imgBlock);
 
 private:
-  std::mutex m_mutex;
+  QMutex m_mutex;
 };
 
 } // namespace

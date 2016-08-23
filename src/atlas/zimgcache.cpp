@@ -1,6 +1,5 @@
 #include "zimgcache.h"
 
-#include <mutex>
 #include "zcpuinfo.h"
 
 namespace nim {
@@ -24,25 +23,25 @@ ZImgCache::~ZImgCache()
 
 std::shared_ptr<ZImg>* ZImgCache::get(size_t key)
 {
-  std::lock_guard<std::mutex> lock(m_mutex);
+  QMutexLocker lock(&m_mutex);
   return QCache<size_t, std::shared_ptr<ZImg>>::object(key);
 }
 
 bool ZImgCache::insert(size_t key, std::shared_ptr<ZImg>* object, int cost)
 {
-  std::lock_guard<std::mutex> lock(m_mutex);
+  QMutexLocker lock(&m_mutex);
   return QCache<size_t, std::shared_ptr<ZImg>>::insert(key, object, cost);
 }
 
 bool ZImgCache::remove(size_t key)
 {
-  std::lock_guard<std::mutex> lock(m_mutex);
+  QMutexLocker lock(&m_mutex);
   return QCache<size_t, std::shared_ptr<ZImg>>::remove(key);
 }
 
 std::shared_ptr<ZImg>* ZImgCache::getOrRead(size_t key, const ZImgSubBlock& imgBlock)
 {
-  std::lock_guard<std::mutex> lock(m_mutex);
+  QMutexLocker lock(&m_mutex);
   std::shared_ptr<ZImg>* res = ZImgCache::instance().object(key);
   if (!res) {
     res = new std::shared_ptr<ZImg>(imgBlock.read());
