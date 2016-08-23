@@ -4,7 +4,7 @@
 
 #include "zlog.h"
 #include <iostream>
-#include "zlogmodelsink.h"
+#include "zlogcache.h"
 #include <QDir>
 #include <QFileInfo>
 #include "zcpuinfo.h"
@@ -150,7 +150,7 @@ int main(int argc, char* argv[])
   });
   Q_UNUSED(guardlogging)
 
-  nim::addLogSink(&nim::ZLogModelSink::instance());
+  nim::addLogSink(&nim::ZLogCache::instance());
   qInstallMessageHandler(myMessageOutput);
 
   try {

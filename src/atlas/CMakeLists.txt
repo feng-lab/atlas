@@ -686,7 +686,10 @@ set(SOURCES
     zjson.cpp
     zlogdialog.cpp
     zlogmodelsink.cpp
-    zapplication.cpp zapplication.h)
+    zapplication.cpp
+    zapplication.h
+    zlogcache.cpp
+    zlogcache.h)
 
 # our target
 set(APP_NAME Atlas)

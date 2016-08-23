@@ -1,31 +1,14 @@
 #include "zlogmodelsink.h"
 
 #include <QColor>
-#include <QTimer>
-#include <iostream>
 
 namespace nim {
-
-ZLogModelSink& ZLogModelSink::instance()
-{
-  static ZLogModelSink modelDestination;
-  return modelDestination;
-}
 
 const char* const ZLogModelSink::Type = "window";
 
 ZLogModelSink::ZLogModelSink(int max_items)
   : m_maxItems(max_items)
-  , m_timer(new QTimer(this))
 {
-  m_timer->setSingleShot(true);
-  connect(m_timer, &QTimer::timeout, this, &ZLogModelSink::sendLogData);
-}
-
-void ZLogModelSink::send(LogSeverity severity, const char* full_filename, const char* base_filename, int line,
-                         const tm* tm_time, const char* message, size_t prefix_len, size_t message_len)
-{
-  addEntry(LogData(severity, full_filename, base_filename, line, tm_time, message, prefix_len, message_len));
 }
 
 void ZLogModelSink::addEntry(const LogData& message)
@@ -37,9 +20,6 @@ void ZLogModelSink::addEntry(const LogData& message)
     m_logDatas.push_back(message);
   }
   endInsertRows();
-  if (!m_timer->isActive()) {
-    m_timer->start(200);
-  }
 
   if (m_maxItems < std::numeric_limits<int>::max() && m_logDatas.size() > m_maxItems) {
     {
@@ -144,15 +124,6 @@ QVariant ZLogModelSink::headerData(int section, Qt::Orientation orientation, int
   }
 
   return QVariant();
-}
-
-void ZLogModelSink::sendLogData()
-{
-  int start = m_unsendLogDataStart;
-  m_unsendLogDataStart = m_logDatas.size();
-  if (m_unsendLogDataStart > start) {
-    emit logDataReady(&m_logDatas, start, m_unsendLogDataStart);
-  }
 }
 
 } // namespace nim

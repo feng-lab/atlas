@@ -33,22 +33,12 @@
 #include <limits>
 #include <QList>
 
-class QTimer;
-
 namespace nim {
 
-class ZLogModelSink : public QAbstractTableModel, public LogSink
+class ZLogModelSink : public QAbstractTableModel
 {
 Q_OBJECT
 public:
-  static ZLogModelSink& instance();
-
-  // delete copy and move constructors and assign operators
-  ZLogModelSink(const ZLogModelSink&) = delete;             // Copy construct
-  ZLogModelSink(ZLogModelSink&&) = delete;                  // Move construct
-  ZLogModelSink& operator=(const ZLogModelSink&) = delete;  // Copy assign
-  ZLogModelSink& operator=(ZLogModelSink&&) = delete;      // Move assign
-
   static const char* const Type;
 
   enum Column
@@ -59,20 +49,15 @@ public:
     FormattedMessageColumn = 100
   };
 
+  explicit ZLogModelSink(int max_items = std::numeric_limits<int>::max());
+
   void addEntry(const LogData& message);
 
   void clear();
 
   LogData at(size_t index);
 
-protected:
-  explicit ZLogModelSink(int max_items = std::numeric_limits<int>::max());
-
 public:
-  // LogSink interface
-  virtual void send(LogSeverity severity, const char* full_filename, const char* base_filename, int line,
-                    const tm* tm_time, const char* message, size_t prefix_len, size_t message_len) override;
-
   // QAbstractTableModel overrides
   virtual int columnCount(const QModelIndex& parent = QModelIndex()) const override;
 
@@ -82,34 +67,10 @@ public:
 
   virtual QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
-  // return the list and valid range [start, end)
-  static inline std::tuple<const QList<LogData>&, int, int> logMessagesSoFar()
-  {
-    return std::make_tuple(std::cref(ZLogModelSink::instance().m_logDatas),
-                           0, ZLogModelSink::instance().m_unsendLogDataStart);
-  }
-
-  template<typename Func1>
-  static inline QMetaObject::Connection
-  receiveFutureLogMessages(const typename QtPrivate::FunctionPointer<Func1>::Object* receiver, Func1 slot)
-  {
-    return QObject::connect(&ZLogModelSink::instance(), &ZLogModelSink::logDataReady,
-                            receiver, slot,
-                            Qt::QueuedConnection);
-  }
-
-private:
-  void sendLogData();
-
-signals:
-  void logDataReady(const QList<LogData>* messages, int start, int end);
-
 private:
   QList<LogData> m_logDatas;
   mutable QReadWriteLock m_messagesLock;
   int m_maxItems;
-  QTimer* m_timer;
-  int m_unsendLogDataStart = 0;
 };
 
 } // namespace nim
