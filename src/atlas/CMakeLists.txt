@@ -778,8 +778,11 @@ if (APPLE)
   set_target_properties(${APP_NAME} PROPERTIES
                         OUTPUT_NAME "${APP_NAME}"
                         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Info.plist.in"
+                        MACOSX_BUNDLE_INFO_STRING "${APP_NAME}"
+                        MACOSX_BUNDLE_LONG_VERSION_STRING "${ATLAS_VERSION}"
                         MACOSX_BUNDLE_SHORT_VERSION_STRING "${ATLAS_VERSION}"
-                        # TBD: MACOSX_BUNDLE_BUNDLE_VERSION "${ATLAS_VERSION}"
+                        MACOSX_BUNDLE_BUNDLE_NAME "${APP_NAME}"
+                        MACOSX_BUNDLE_BUNDLE_VERSION "${ATLAS_VERSION}"
                         MACOSX_BUNDLE_COPYRIGHT "${copyright_line}"
                         MACOSX_BUNDLE_GUI_IDENTIFIER "org.atlas.Atlas"
                         )
