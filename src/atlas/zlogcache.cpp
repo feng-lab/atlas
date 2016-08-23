@@ -17,7 +17,7 @@ ZLogCache& ZLogCache::instance()
 void ZLogCache::send(LogSeverity severity, const char* full_filename, const char* base_filename,
                      int line, const tm* tm_time, const char* message, size_t prefix_len, size_t message_len)
 {
-  QWriteLocker lock(&m_messagesLock);
+  QMutexLocker lock(&m_mutex);
   if (m_logDatas.size() == m_maxNumItems) {
     m_logDatas.pop_front();
     --m_unsendLogDataStart;
@@ -38,7 +38,7 @@ ZLogCache::ZLogCache(int maxNumItems)
 
 void ZLogCache::sendLogData()
 {
-  QReadLocker lock(&m_messagesLock);
+  QMutexLocker lock(&m_mutex);
   int start = m_unsendLogDataStart;
   m_unsendLogDataStart = m_logDatas.size();
   if (m_unsendLogDataStart > start) {

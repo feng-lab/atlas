@@ -7,7 +7,7 @@
 #include "zlog.h"
 
 #include <QObject>
-#include <QReadWriteLock>
+#include <QMutexLocker>
 
 #include <limits>
 #include <QList>
@@ -38,7 +38,7 @@ public:
   receiveLogMessages(typename QtPrivate::FunctionPointer<Func1>::Object* receiver, Func1 slot) const
   {
     CHECK(this->thread() == receiver->thread()) << "receiver must be in main gui thread";
-    QReadLocker lock(&m_messagesLock);
+    QMutexLocker lock(&m_mutex);
     if (m_unsendLogDataStart > 0)
       (receiver->*slot)(&m_logDatas, 0, m_unsendLogDataStart);
     return QObject::connect(this, &ZLogCache::logDataReady, receiver, slot, Qt::DirectConnection);
@@ -56,7 +56,7 @@ private:
 
 private:
   QList<LogData> m_logDatas;
-  mutable QReadWriteLock m_messagesLock;
+  mutable QMutex m_mutex;
   int m_maxNumItems;
   QTimer* m_timer;
   int m_unsendLogDataStart = 0;

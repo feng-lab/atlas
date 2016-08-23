@@ -791,7 +791,7 @@ void testLogSpeed()
 {
   ZBenchTimer bt;
   QStringList logList;
-  for (int i = 0; i < 1000; ++i)
+  for (int i = 0; i < 500000; ++i)
     logList << randomString(10, 100);
   bt.start();
   for (int i = 0; i < logList.size(); ++i)
