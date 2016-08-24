@@ -125,6 +125,7 @@ void ZTimelineKeyEditDialog::reject()
 
 void ZTimelineKeyEditDialog::raiseAndActivate()
 {
+  showNormal();
   raise();
   activateWindow();
 }

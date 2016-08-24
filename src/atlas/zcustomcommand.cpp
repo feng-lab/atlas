@@ -695,7 +695,9 @@ void makeAxonChannelImages()
   }
 }
 
-void moveObjectToCorrectLocation(const QString& fn, const QString& resfn, const QString& metadatafn, int mode)
+void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
+                                 const QString& metadatafn, const QString& swcFolder,
+                                 int mode)
 {
   QFile file(fn);
   if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -734,7 +736,7 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn, const 
 
     glm::dvec3 swcLoc(-Medial_Lateral, Deep_Superficial, -Anterior_Posterior);
     glm::dvec3 swcRootImageLoc = (swcLoc - refSwcLocInBrain) * imagePixelPerUm * 1000. + refSwcRootImageLoc;
-    ZSwc swc(QString("/Users/feng/Documents/PV/PVSWC/%1.swc").arg(cellName));
+    ZSwc swc(QString("%1/%2.swc").arg(swcFolder).arg(cellName));
     ZSwc::SwcTreeNode rootn = swc.thickestNode();
     glm::dvec3 rootLoc(rootn->x, rootn->y, rootn->z * swcPixelPerUmxy / swcPixelPerUmz);
 
@@ -851,14 +853,16 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  moveObjectToCorrectLocation("/Users/feng/Documents/PV/contra.scene",
-                              "/Users/feng/Documents/PV/contra_in_ca1.scene",
-                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
+  moveObjectToCorrectLocation("/Users/feng/Documents/PY/pyr.scene",
+                              "/Users/feng/Documents/PY/pyr_in_ca1.scene",
+                              "/Users/feng/code/mgrasp-analysis/py_neuron_metadata.csv",
+                              "/Users/feng/Documents/PY/PySWC",
                               1);
-  moveObjectToCorrectLocation("/Users/feng/Documents/PV/ipsi.scene",
-                              "/Users/feng/Documents/PV/ipsi_in_ca1.scene",
-                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
-                              1);
+  moveObjectToCorrectLocation("/Users/feng/Documents/PY/pyr.scene",
+                              "/Users/feng/Documents/PY/pyr_center_overlap.scene",
+                              "/Users/feng/code/mgrasp-analysis/py_neuron_metadata.csv",
+                              "/Users/feng/Documents/PY/PySWC",
+                              2);
   LOG(INFO) << "done";
 }
 

@@ -17,16 +17,16 @@ ZColorMapWidgetWithEditorWindow::ZColorMapWidgetWithEditorWindow(ZColorMapParame
 void ZColorMapWidgetWithEditorWindow::createEditorWindow()
 {
   if (m_editorWindow) {
-    if (!m_editorWindow->isVisible()) {
-      m_editorWindow->show();
-    }
+    m_editorWindow->showNormal();
     m_editorWindow->raise();
+    m_editorWindow->activateWindow();
   } else {
     QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
 
     m_editorWindow = new ZColorMapEditor(m_colorMap);
-    m_editorWindow->show();
+    m_editorWindow->showNormal();
     m_editorWindow->raise();
+    m_editorWindow->activateWindow();
 
     QApplication::restoreOverrideCursor();
   }

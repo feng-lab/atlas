@@ -127,8 +127,9 @@ void ParameterKeysItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent*)
     if (!m_editDialog)
       m_editDialog.reset(new ZTimelineKeyEditDialog(m_paraAnimation, m_paraKey, &m_timeline));
     m_editDialog->setInitialValue();
-    m_editDialog->show();
+    m_editDialog->showNormal();
     m_editDialog->raise();
+    m_editDialog->activateWindow();
   }
 }
 

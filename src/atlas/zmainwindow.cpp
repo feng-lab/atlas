@@ -155,11 +155,6 @@ void ZMainWindow::loadUrls(const QList<QUrl>& urlList)
     m_doc->loadFileList(fileList);
 }
 
-//void ZMainWindow::appAboutToQuit()
-//{
-//  fftw_cleanup_threads();
-//}
-
 void ZMainWindow::closeEvent(QCloseEvent* event)
 {
   // Qt 5.4 mac bug, use dock icon context menu -> quit will call this function twice and crash
@@ -197,37 +192,8 @@ void ZMainWindow::dropEvent(QDropEvent* event)
   loadUrls(event->mimeData()->urls());
 }
 
-//void ZMainWindow::newWindow()
-//{
-//  ZMainWindow *other = new ZMainWindow();
-//  other->move(x() + 40, y() + 40);
-//  other->show();
-//}
-
 void ZMainWindow::open()
 {
-  /*
-  QString fileName = QFileDialog::getOpenFileName(this, tr("Open Workspace"),
-                                                  "/");
-  if (!fileName.isEmpty()) {
-    ZMainWindow *existing = findMainWindow(fileName);
-    if (existing) {
-      existing->show();
-      existing->raise();
-      existing->activateWindow();
-      return;
-    }
-
-    if (false) {   // if is empty todo
-      loadWorkspace(fileName);
-    } else {
-      ZMainWindow *other = new ZMainWindow();
-      other->move(x() + 40, y() + 40);
-      other->show();
-      other->loadWorkspace(fileName);
-    }
-  }
-  */
 }
 
 bool ZMainWindow::save()
@@ -329,8 +295,10 @@ void ZMainWindow::open3DWindow()
         m_doc->animation3DDoc().bindView(m_3dWindow->view());
       }
 
-      m_3dWindow->show();
+      m_3dWindow->showNormal();
       m_3dWindow->raise();
+      m_3dWindow->activateWindow();
+      //m_3dWindow->setWindowState(Qt::WindowActive);
     }
     catch (const ZException& e) {
       LOG(ERROR) << "Failed to open 3D window: " << e.what();

@@ -108,28 +108,6 @@ void Z3DMainWindow::dropEvent(QDropEvent* event)
 
 void Z3DMainWindow::open()
 {
-  /*
-  QString fileName = QFileDialog::getOpenFileName(this, tr("Open Workspace"),
-                                                  "/");
-  if (!fileName.isEmpty()) {
-    Z3DMainWindow *existing = findMainWindow(fileName);
-    if (existing) {
-      existing->show();
-      existing->raise();
-      existing->activateWindow();
-      return;
-    }
-
-    if (false) {   // if is empty todo
-      loadWorkspace(fileName);
-    } else {
-      Z3DMainWindow *other = new Z3DMainWindow();
-      other->move(x() + 40, y() + 40);
-      other->show();
-      other->loadWorkspace(fileName);
-    }
-  }
-  */
 }
 
 bool Z3DMainWindow::save()
