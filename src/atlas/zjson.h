@@ -1,8 +1,8 @@
 #pragma once
 
 #include <QJsonDocument>
-#include <QJsonValue>
 #include <QJsonObject>
+#include <QJsonArray>
 
 namespace nim {
 

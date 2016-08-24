@@ -2,7 +2,6 @@
 
 #include "zlog.h"
 #include "zglmutils.h"
-#include <QJsonArray>
 #include "zparameterfactory.h"
 #include "zcameraparameteranimation.h"
 #include "zcameraparameterkey.h"

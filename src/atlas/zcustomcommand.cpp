@@ -15,7 +15,7 @@
 #include <tbb/task_scheduler_init.h>
 #include "zregionontology.h"
 #include <include/reader.h>
-#include <zjson.h>
+#include "zjson.h"
 #include "zbenchtimer.h"
 #include "zrandom.h"
 #include "zstringutils.h"
@@ -695,10 +695,8 @@ void makeAxonChannelImages()
   }
 }
 
-void moveObjectToCorrectLocation()
+void moveObjectToCorrectLocation(const QString& fn, const QString& resfn, const QString& metadatafn, int mode)
 {
-  QString fn = "/Users/feng/Documents/PV/contra.scene";
-  QString resfn = "/Users/feng/Documents/PV/contra_res.scene";
   QFile file(fn);
   if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
     return;
@@ -720,7 +718,7 @@ void moveObjectToCorrectLocation()
 
   QDir::setCurrent(QFileInfo(fn).absolutePath());
 
-  QList<QStringList> metaData = QtCSV::Reader::readToList("/Users/feng/Documents/PV/contra_neuron_metadata.csv");
+  QList<QStringList> metaData = QtCSV::Reader::readToList(metadatafn);
   std::map<QString, glm::dvec3> cellNameToLocations;
   glm::dvec3 imagescale = glm::dvec3(71, 71, 71);
   double imagePixelPerUm = 0.136;
@@ -731,21 +729,22 @@ void moveObjectToCorrectLocation()
   for (int metaIdx = 1; metaIdx < metaData.size(); ++metaIdx) {
     QString cellName = metaData[metaIdx][0];
     double Anterior_Posterior = metaData[metaIdx][1].toDouble();
-    //double ML_pt = metaData[metaIdx][2].toDouble();
-    //double DV_pt = metaData[metaIdx][3].toDouble();
-    //double DV_dura_pt = metaData[metaIdx][4].toDouble();
-    double Medial_Lateral = metaData[metaIdx][5].toDouble();
-    double Deep_Superficial = metaData[metaIdx][6].toDouble();
+    double Medial_Lateral = metaData[metaIdx][2].toDouble();
+    double Deep_Superficial = metaData[metaIdx][3].toDouble();
 
     glm::dvec3 swcLoc(-Medial_Lateral, Deep_Superficial, -Anterior_Posterior);
     glm::dvec3 swcRootImageLoc = (swcLoc - refSwcLocInBrain) * imagePixelPerUm * 1000. + refSwcRootImageLoc;
-    ZSwc swc(QString("/Users/feng/Documents/PV/contra/%1.swc").arg(cellName));
+    ZSwc swc(QString("/Users/feng/Documents/PV/PVSWC/%1.swc").arg(cellName));
     ZSwc::SwcTreeNode rootn = swc.thickestNode();
     glm::dvec3 rootLoc(rootn->x, rootn->y, rootn->z * swcPixelPerUmxy / swcPixelPerUmz);
 
-    glm::dvec3 rootTrans = swcRootImageLoc - rootLoc * imagePixelPerUm / swcPixelPerUmxy;
-    rootTrans = rootTrans * imagescale;
-    cellNameToLocations[cellName] = rootTrans;
+    if (mode == 1) {
+      glm::dvec3 rootTrans = swcRootImageLoc - rootLoc * imagePixelPerUm / swcPixelPerUmxy;
+      rootTrans = rootTrans * imagescale;
+      cellNameToLocations[cellName] = rootTrans;
+    } else if (mode == 2) {
+      cellNameToLocations[cellName] = -rootLoc;
+    }
   }
 
   QJsonObject docObject = sceneObj["Doc"].toObject();
@@ -769,8 +768,6 @@ void moveObjectToCorrectLocation()
 
     modifyJsonValue(sceneObj, IDString + ".View3D.Coord Transform 3DTransform.Scale Vec3", scaleString);
     modifyJsonValue(sceneObj, IDString + ".View3D.Coord Transform 3DTransform.Translation Vec3", locString);
-    //    LOG(INFO) << IDString << scaleString << locString << sceneObj[IDString].toObject()["View3D"].toObject()["Coord Transform 3DTransform"].toObject()["Scale Vec3"].toString()
-    //        << sceneObj[IDString].toObject()["View3D"].toObject()["Coord Transform 3DTransform"].toObject()["Translation Vec3"].toString();
   }
 
   QFile resfile(resfn);
@@ -854,7 +851,14 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  testLogSpeed();
+  moveObjectToCorrectLocation("/Users/feng/Documents/PV/contra.scene",
+                              "/Users/feng/Documents/PV/contra_in_ca1.scene",
+                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
+                              1);
+  moveObjectToCorrectLocation("/Users/feng/Documents/PV/ipsi.scene",
+                              "/Users/feng/Documents/PV/ipsi_in_ca1.scene",
+                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
+                              1);
   LOG(INFO) << "done";
 }
 

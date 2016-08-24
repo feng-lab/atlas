@@ -2,12 +2,12 @@
 
 #include <QObject>
 #include <map>
-#include <QJsonValue>
 #include <QUndoStack>
 #include "zviewsettinginterface.h"
 #include <QDir>
 #include "z3dgl.h"
 #include "zparameteranimation.h"
+#include "zjson.h"
 
 namespace nim {
 

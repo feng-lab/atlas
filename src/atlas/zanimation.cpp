@@ -5,8 +5,6 @@
 #include <QLabel>
 #include "zparameteranimation.h"
 #include "zobjdoc.h"
-#include <QJsonObject>
-#include <QJsonDocument>
 #include <QFile>
 #include <QFileInfo>
 #include "zexception.h"

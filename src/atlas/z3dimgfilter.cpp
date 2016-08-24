@@ -7,6 +7,8 @@
 #include "zlog.h"
 #include "zbenchtimer.h"
 #include "zmeshutils.h"
+#include <QMessageBox>
+#include <QApplication>
 
 namespace nim {
 
@@ -221,106 +223,113 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     removeParameter(*m_parameters[m_numParas]);
   }
 
-  m_3dImg.reset(new Z3DImg(imgPack, m_rendererBase.coordTransformPara().scale()));
+  try {
+    m_3dImg.reset(new Z3DImg(imgPack, m_rendererBase.coordTransformPara().scale()));
 
-  updateBlockIDTarget();
+    updateBlockIDTarget();
 
-  if (m_3dImg->numChannels() > m_layerColorTexture.depth()) {
-    m_layerColorTexture.setDimension(
-      glm::uvec3(m_layerColorTexture.width(), m_layerColorTexture.height(), m_3dImg->numChannels()));
-    m_layerColorTexture.uploadImage();
-    m_layerDepthTexture.setDimension(
-      glm::uvec3(m_layerDepthTexture.width(), m_layerDepthTexture.height(), m_3dImg->numChannels()));
-    m_layerDepthTexture.uploadImage();
-    m_layerTarget.attachTextureToFBO(&m_layerColorTexture, GL_COLOR_ATTACHMENT0, false);
-    m_layerTarget.attachTextureToFBO(&m_layerDepthTexture, GL_DEPTH_ATTACHMENT, false);
-    m_layerTarget.isFBOComplete();
-  }
-  m_isVolumeDownsampled.set(m_3dImg->isVolumeDownsampled());
+    if (m_3dImg->numChannels() > m_layerColorTexture.depth()) {
+      m_layerColorTexture.setDimension(
+        glm::uvec3(m_layerColorTexture.width(), m_layerColorTexture.height(), m_3dImg->numChannels()));
+      m_layerColorTexture.uploadImage();
+      m_layerDepthTexture.setDimension(
+        glm::uvec3(m_layerDepthTexture.width(), m_layerDepthTexture.height(), m_3dImg->numChannels()));
+      m_layerDepthTexture.uploadImage();
+      m_layerTarget.attachTextureToFBO(&m_layerColorTexture, GL_COLOR_ATTACHMENT0, false);
+      m_layerTarget.attachTextureToFBO(&m_layerDepthTexture, GL_DEPTH_ATTACHMENT, false);
+      m_layerTarget.isFBOComplete();
+    }
+    m_isVolumeDownsampled.set(m_3dImg->isVolumeDownsampled());
 
-  m_sliceColormaps.clear();
-  for (size_t c = 0; c < m_3dImg->numChannels(); ++c) {
-    m_sliceColormaps.emplace_back(
-      std::make_unique<ZColorMapParameter>(QString("Slice Channel %1 Colormap").arg(c + 1)));
-    m_sliceColormaps[c]->get().create1DTexture(256);
-    m_sliceColormaps[c]->get().reset(0.0, 1.0, QColor(0, 0, 0), QColor(m_3dImg->channelColor(c).r,
-                                                                       m_3dImg->channelColor(c).g,
-                                                                       m_3dImg->channelColor(c).b));
-  }
+    m_sliceColormaps.clear();
+    for (size_t c = 0; c < m_3dImg->numChannels(); ++c) {
+      m_sliceColormaps.emplace_back(
+        std::make_unique<ZColorMapParameter>(QString("Slice Channel %1 Colormap").arg(c + 1)));
+      m_sliceColormaps[c]->get().create1DTexture(256);
+      m_sliceColormaps[c]->get().reset(0.0, 1.0, QColor(0, 0, 0), QColor(m_3dImg->channelColor(c).r,
+                                                                         m_3dImg->channelColor(c).g,
+                                                                         m_3dImg->channelColor(c).b));
+    }
 
-  bool is2DImage = m_3dImg->is2DData();
-  glm::uvec3 volDim = m_3dImg->dimensions();
-  m_xCut.setRange(-1, volDim.x);
-  m_xCut.set(m_xCut.range());
-  m_yCut.setRange(-1, volDim.y);
-  m_yCut.set(m_yCut.range());
-  m_zCut.setRange(-1, volDim.z);
-  m_zCut.set(m_zCut.range());
+    bool is2DImage = m_3dImg->is2DData();
+    glm::uvec3 volDim = m_3dImg->dimensions();
+    m_xCut.setRange(-1, volDim.x);
+    m_xCut.set(m_xCut.range());
+    m_yCut.setRange(-1, volDim.y);
+    m_yCut.set(m_yCut.range());
+    m_zCut.setRange(-1, volDim.z);
+    m_zCut.set(m_zCut.range());
 
-  m_rendererBase.setRotationCenter(glm::vec3(volDim.x - 1, volDim.y - 1, volDim.z - 1) / 2.f);
+    m_rendererBase.setRotationCenter(glm::vec3(volDim.x - 1, volDim.y - 1, volDim.z - 1) / 2.f);
 
-  m_zSlicePosition.setRange(0, volDim.z - 1);
-  m_ySlicePosition.setRange(0, volDim.y - 1);
-  m_xSlicePosition.setRange(0, volDim.x - 1);
-  m_zSlice2Position.setRange(0, volDim.z - 1);
-  m_ySlice2Position.setRange(0, volDim.y - 1);
-  m_xSlice2Position.setRange(0, volDim.x - 1);
-  //invalidateAllFRVolumeSlices();
-  //m_useFRVolumeSlice.set(!is2DImage);
-  //m_useFRVolumeSlice.setVisible(!is2DImage);
-  m_showXSlice.set(false);
-  m_showYSlice.set(false);
-  m_showZSlice.set(false);
-  m_showXSlice2.set(false);
-  m_showYSlice2.set(false);
-  m_showZSlice2.set(false);
-  m_showXSlice.setVisible(!is2DImage);
-  m_showYSlice.setVisible(!is2DImage);
-  m_showZSlice.setVisible(!is2DImage);
-  m_showXSlice2.setVisible(!is2DImage);
-  m_showYSlice2.setVisible(!is2DImage);
-  m_showZSlice2.setVisible(!is2DImage);
+    m_zSlicePosition.setRange(0, volDim.z - 1);
+    m_ySlicePosition.setRange(0, volDim.y - 1);
+    m_xSlicePosition.setRange(0, volDim.x - 1);
+    m_zSlice2Position.setRange(0, volDim.z - 1);
+    m_ySlice2Position.setRange(0, volDim.y - 1);
+    m_xSlice2Position.setRange(0, volDim.x - 1);
+    //invalidateAllFRVolumeSlices();
+    //m_useFRVolumeSlice.set(!is2DImage);
+    //m_useFRVolumeSlice.setVisible(!is2DImage);
+    m_showXSlice.set(false);
+    m_showYSlice.set(false);
+    m_showZSlice.set(false);
+    m_showXSlice2.set(false);
+    m_showYSlice2.set(false);
+    m_showZSlice2.set(false);
+    m_showXSlice.setVisible(!is2DImage);
+    m_showYSlice.setVisible(!is2DImage);
+    m_showZSlice.setVisible(!is2DImage);
+    m_showXSlice2.setVisible(!is2DImage);
+    m_showYSlice2.setVisible(!is2DImage);
+    m_showZSlice2.setVisible(!is2DImage);
 
-  m_imgRaycasterRenderer.setData(*m_3dImg.get());
-  if (!is2DImage) {
-    m_imgSliceRenderer.setData(*m_3dImg.get(), m_sliceColormaps);
-  }
+    m_imgRaycasterRenderer.setData(*m_3dImg.get());
+    if (!is2DImage) {
+      m_imgSliceRenderer.setData(*m_3dImg.get(), m_sliceColormaps);
+    }
 
-  updateBoundBox();
+    updateBoundBox();
 
-  for (auto it = m_imgRaycasterRenderer.channelVisibleParas().begin();
-       it != m_imgRaycasterRenderer.channelVisibleParas().end(); ++it) {
-    addParameter(*it->get());
-  }
-  for (auto it = m_imgRaycasterRenderer.transferFuncParas().begin();
-       it != m_imgRaycasterRenderer.transferFuncParas().end(); ++it) {
-    addParameter(*it->get());
-  }
-  for (auto it = m_imgRaycasterRenderer.texFilterModeParas().begin();
-       it != m_imgRaycasterRenderer.texFilterModeParas().end(); ++it) {
-    addParameter(*it->get());
-  }
-  for (auto it = m_sliceColormaps.begin(); it != m_sliceColormaps.end(); ++it) {
-    addParameter(*it->get());
-  }
-
-  if (m_widgetsGroup) {
     for (auto it = m_imgRaycasterRenderer.channelVisibleParas().begin();
          it != m_imgRaycasterRenderer.channelVisibleParas().end(); ++it) {
-      m_widgetsGroup->addChild(*it->get(), 2);
+      addParameter(*it->get());
     }
     for (auto it = m_imgRaycasterRenderer.transferFuncParas().begin();
          it != m_imgRaycasterRenderer.transferFuncParas().end(); ++it) {
-      m_widgetsGroup->addChild(*it->get(), 3);
+      addParameter(*it->get());
     }
     for (auto it = m_imgRaycasterRenderer.texFilterModeParas().begin();
          it != m_imgRaycasterRenderer.texFilterModeParas().end(); ++it) {
-      m_widgetsGroup->addChild(*it->get(), 15);
+      addParameter(*it->get());
     }
     for (auto it = m_sliceColormaps.begin(); it != m_sliceColormaps.end(); ++it) {
-      m_widgetsGroup->addChild(*it->get(), 11);
+      addParameter(*it->get());
     }
-    m_widgetsGroup->emitWidgetsGroupChangedSignal();
+
+    if (m_widgetsGroup) {
+      for (auto it = m_imgRaycasterRenderer.channelVisibleParas().begin();
+           it != m_imgRaycasterRenderer.channelVisibleParas().end(); ++it) {
+        m_widgetsGroup->addChild(*it->get(), 2);
+      }
+      for (auto it = m_imgRaycasterRenderer.transferFuncParas().begin();
+           it != m_imgRaycasterRenderer.transferFuncParas().end(); ++it) {
+        m_widgetsGroup->addChild(*it->get(), 3);
+      }
+      for (auto it = m_imgRaycasterRenderer.texFilterModeParas().begin();
+           it != m_imgRaycasterRenderer.texFilterModeParas().end(); ++it) {
+        m_widgetsGroup->addChild(*it->get(), 15);
+      }
+      for (auto it = m_sliceColormaps.begin(); it != m_sliceColormaps.end(); ++it) {
+        m_widgetsGroup->addChild(*it->get(), 11);
+      }
+      m_widgetsGroup->emitWidgetsGroupChangedSignal();
+    }
+  }
+  catch (const ZException& e) {
+    m_3dImg.reset();
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                          QString("import 3d img error: %1").arg(e.what()));
   }
 
   invalidateResult();

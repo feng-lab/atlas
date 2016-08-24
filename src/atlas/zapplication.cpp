@@ -5,6 +5,7 @@
 #include "zapplication.h"
 #include "zexception.h"
 #include <QMessageBox>
+#include <QFileOpenEvent>
 #include "zlog.h"
 
 namespace nim {
@@ -33,6 +34,18 @@ bool ZApplication::notify(QObject* object, QEvent* event)
   }
 
   return false;
+}
+
+bool ZApplication::event(QEvent* event)
+{
+  if (event->type() == QEvent::FileOpen) {
+    QFileOpenEvent* openEvent = static_cast<QFileOpenEvent*>(event);
+    LOG(INFO) << "Open file: " << openEvent->file();
+    QList<QUrl> list;
+    list << openEvent->url();
+    emit fileOpenRequest(list);
+  }
+  return QApplication::event(event);
 }
 
 } // namespace nim

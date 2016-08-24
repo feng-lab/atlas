@@ -262,6 +262,7 @@ int main(int argc, char* argv[])
 
     // Our MainWindow has Qt::WA_DeleteOnClose attribute, don't delete again.
     nim::ZMainWindow* mainWin = new nim::ZMainWindow();
+    QObject::connect(&app, &nim::ZApplication::fileOpenRequest, mainWin, &nim::ZMainWindow::loadUrls);
     mainWin->show();
     mainWin->initOpenglContext();
 

@@ -8,7 +8,6 @@
 #include "zloadimagesequencedialog.h"
 #include "zstitchimagedialog.h"
 #include <set>
-#include <QJsonArray>
 #include "zsectionsregistrationdialog.h"
 #include "zlog.h"
 

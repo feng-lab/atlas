@@ -4,7 +4,6 @@
 #include <QAction>
 #include "zviewsettinginterface.h"
 #include <QDir>
-#include <QJsonObject>
 #include "z3dglobalparameters.h"
 
 class QMainWindow;

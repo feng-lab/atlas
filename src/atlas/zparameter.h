@@ -10,8 +10,7 @@
 #include <QStringList>
 #include <set>
 #include "zlog.h"
-#include <QJsonObject>
-#include <QJsonValue>
+#include "zjson.h"
 
 class QWidget;
 

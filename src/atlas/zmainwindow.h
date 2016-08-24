@@ -38,6 +38,8 @@ public:
 
   void openEditWidget(size_t id);
 
+  void loadUrls(const QList<QUrl>& urlList);
+
 protected:
   //void appAboutToQuit();
 

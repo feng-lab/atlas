@@ -9,18 +9,67 @@
 		<dict>
 			<key>CFBundleTypeExtensions</key>
 			<array>
-				<string>trace</string>
+				<string>nimp</string>
+				<string>NIMP</string>
 			</array>
 			<key>CFBundleTypeIconFile</key>
 			<string>app.icns</string>
 			<key>CFBundleTypeName</key>
-			<string>Trace Project</string>
+			<string>Atlas Puncta</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
-			<key>LSTypeIsPackage</key>
-			<true/>
-		    <key>LSIsAppleDefaultForType</key>
-			<true/>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>swc</string>
+				<string>SWC</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>app.icns</string>
+			<key>CFBundleTypeName</key>
+			<string>SWC</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>scene</string>
+				<string>SCENE</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>app.icns</string>
+			<key>CFBundleTypeName</key>
+			<string>Atlas Scene</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>animation2d</string>
+				<string>ANIMATION2D</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>app.icns</string>
+			<key>CFBundleTypeName</key>
+			<string>Atlas 2D Animation</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>animation3d</string>
+				<string>ANIMATION3D</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>app.icns</string>
+			<key>CFBundleTypeName</key>
+			<string>Atlas 3D Animation</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
 		</dict>
 	</array>
 	<key>CFBundleExecutable</key>

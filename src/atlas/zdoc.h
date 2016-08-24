@@ -4,7 +4,6 @@
 #include <QMap>
 #include <QList>
 #include <QSet>
-#include <QJsonObject>
 #include <QUndoGroup>
 #include <deque>
 

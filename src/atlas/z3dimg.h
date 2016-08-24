@@ -18,7 +18,7 @@ class Z3DShaderProgram;
 //                     in which (0,0,0) is LeftUpFront Corner (LUF)
 //                         and dim-1 is RightDownBack Corner (RDB)
 // 2. Texture Coordinate:  [0.0, 1.0] x [0.0, 1.0] x [0.0, 1.0]
-
+// might throw exception
 class Z3DImg : public QObject
 {
 Q_OBJECT

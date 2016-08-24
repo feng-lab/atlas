@@ -3,6 +3,8 @@
 #include "zlog.h"
 #include <functional>
 #include "zimgdisplay.h"
+#include <QApplication>
+#include <QMessageBox>
 
 namespace nim {
 
@@ -91,35 +93,41 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
     if (m_channels.empty())
       return resV;
 
-    std::vector<std::shared_ptr<ZImg>> imgs;
-    std::vector<QPoint> locs;
-    std::vector<double> scales;
+    try {
+      std::vector<std::shared_ptr<ZImg>> imgs;
+      std::vector<QPoint> locs;
+      std::vector<double> scales;
 
-    m_imgPack.retrieveCoveredImgs(imgs, locs, scales, m_z, m_t, m_viewport, m_scale, m_mip);
+      m_imgPack.retrieveCoveredImgs(imgs, locs, scales, m_z, m_t, m_viewport, m_scale, m_mip);
 
-    for (size_t i = 0; i < imgs.size(); ++i) {
-      if (imgs[i]->width() <= tileWidth && imgs[i]->height() <= tileHeight) {
-        QImage res(imgs[i]->width(), imgs[i]->height(), QImage::Format_ARGB32_Premultiplied);
-        fillQImage(*imgs[i], res);
-        resV.addImage(res, locs[i], scales[i]);
-      } else {
-        size_t lastCol = imgs[i]->width() % tileWidth;
-        size_t lastRow = imgs[i]->height() % tileHeight;
-        size_t numX = imgs[i]->width() / tileWidth + (lastCol > 0);
-        size_t numY = imgs[i]->height() / tileHeight + (lastRow > 0);
-        for (size_t x = 0; x < numX; ++x) {
-          for (size_t y = 0; y < numY; ++y) {
-            size_t startX = x * tileWidth;
-            size_t endX = std::min(imgs[i]->width(), startX + tileWidth + 1);
-            size_t startY = y * tileHeight;
-            size_t endY = std::min(imgs[i]->height(), startY + tileHeight + 1);
-            ZImg croped = imgs[i]->crop(ZImgRegion(startX, endX, startY, endY));
-            QImage res(croped.width(), croped.height(), QImage::Format_ARGB32_Premultiplied);
-            fillQImage(croped, res);
-            resV.addImage(res, locs[i] + QPoint(startX, startY), scales[i]);
+      for (size_t i = 0; i < imgs.size(); ++i) {
+        if (imgs[i]->width() <= tileWidth && imgs[i]->height() <= tileHeight) {
+          QImage res(imgs[i]->width(), imgs[i]->height(), QImage::Format_ARGB32_Premultiplied);
+          fillQImage(*imgs[i], res);
+          resV.addImage(res, locs[i], scales[i]);
+        } else {
+          size_t lastCol = imgs[i]->width() % tileWidth;
+          size_t lastRow = imgs[i]->height() % tileHeight;
+          size_t numX = imgs[i]->width() / tileWidth + (lastCol > 0);
+          size_t numY = imgs[i]->height() / tileHeight + (lastRow > 0);
+          for (size_t x = 0; x < numX; ++x) {
+            for (size_t y = 0; y < numY; ++y) {
+              size_t startX = x * tileWidth;
+              size_t endX = std::min(imgs[i]->width(), startX + tileWidth + 1);
+              size_t startY = y * tileHeight;
+              size_t endY = std::min(imgs[i]->height(), startY + tileHeight + 1);
+              ZImg croped = imgs[i]->crop(ZImgRegion(startX, endX, startY, endY));
+              QImage res(croped.width(), croped.height(), QImage::Format_ARGB32_Premultiplied);
+              fillQImage(croped, res);
+              resV.addImage(res, locs[i] + QPoint(startX, startY), scales[i]);
+            }
           }
         }
       }
+    }
+    catch (const ZException& e) {
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                            QString("img error: %1").arg(e.what()));
     }
 
     return resV;

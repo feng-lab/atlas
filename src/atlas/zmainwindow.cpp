@@ -8,7 +8,6 @@
 #include <QToolBar>
 #include <QMenu>
 #include <QModelIndex>
-#include <QJsonDocument>
 #include <QSettings>
 #include <QApplication>
 #include <QDockWidget>
@@ -52,6 +51,7 @@
 #include "zroiview.h"
 #include "zregionannotationdoc.h"
 #include "zregionannotationview.h"
+#include "zjson.h"
 
 //#include "zlogdialog.h"
 
@@ -126,6 +126,35 @@ void ZMainWindow::openEditWidget(size_t id)
   }
 }
 
+void ZMainWindow::loadUrls(const QList<QUrl>& urlList)
+{
+  QStringList fileList;
+  for (QList<QUrl>::const_iterator iter = urlList.begin(); iter != urlList.end(); ++iter) {
+    // load files inside if is folder
+    QFileInfo dirCheck(iter->toLocalFile());
+    if (dirCheck.isDir()) {
+      QDir dir = dirCheck.absoluteDir();
+      QFileInfoList list = dir.entryInfoList(QDir::Files | QDir::NoSymLinks);
+      for (const auto& fi : list) {
+        fileList.append(fi.canonicalFilePath());
+      }
+    } else {
+      fileList.append(dirCheck.canonicalFilePath());
+    }
+  }
+  QStringList::iterator it = fileList.begin();
+  while (it != fileList.end()) {
+    if (it->endsWith(".scene", Qt::CaseInsensitive)) {
+      loadJsonScene(*it);
+      it = fileList.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  if (!fileList.isEmpty())
+    m_doc->loadFileList(fileList);
+}
+
 //void ZMainWindow::appAboutToQuit()
 //{
 //  fftw_cleanup_threads();
@@ -165,32 +194,7 @@ void ZMainWindow::dragEnterEvent(QDragEnterEvent* event)
 
 void ZMainWindow::dropEvent(QDropEvent* event)
 {
-  QList<QUrl> urlList = event->mimeData()->urls();
-  QStringList fileList;
-  for (QList<QUrl>::const_iterator iter = urlList.begin(); iter != urlList.end(); ++iter) {
-    // load files inside if is folder
-    QFileInfo dirCheck(iter->toLocalFile());
-    if (dirCheck.isDir()) {
-      QDir dir = dirCheck.absoluteDir();
-      QFileInfoList list = dir.entryInfoList(QDir::Files | QDir::NoSymLinks);
-      for (const auto& fi : list) {
-        fileList.append(fi.canonicalFilePath());
-      }
-    } else {
-      fileList.append(dirCheck.canonicalFilePath());
-    }
-  }
-  QStringList::iterator it = fileList.begin();
-  while (it != fileList.end()) {
-    if (it->endsWith(".scene", Qt::CaseInsensitive)) {
-      loadJsonScene(*it);
-      it = fileList.erase(it);
-    } else {
-      ++it;
-    }
-  }
-  if (!fileList.isEmpty())
-    m_doc->loadFileList(fileList);
+  loadUrls(event->mimeData()->urls());
 }
 
 //void ZMainWindow::newWindow()

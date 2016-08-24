@@ -2,7 +2,6 @@
 
 #include <QObject>
 #include <QList>
-#include <QJsonObject>
 #include "zview.h"
 #include "znumericparameter.h"
 

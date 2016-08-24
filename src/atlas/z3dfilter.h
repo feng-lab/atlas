@@ -5,7 +5,6 @@
 #include <map>
 #include <set>
 #include "z3dcanvaseventlistener.h"
-#include <QJsonObject>
 #include "z3dgl.h"
 #include "zflags.h"
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <QEasingCurve>
-#include <QJsonValue>
+#include "zjson.h"
 
 namespace nim {
 

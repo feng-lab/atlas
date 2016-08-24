@@ -3,7 +3,6 @@
 #include <QWidget>
 #include <QAction>
 #include "zviewsettinginterface.h"
-#include <QJsonObject>
 
 class QVBoxLayout;
 

@@ -7,6 +7,7 @@
 #include <QAction>
 #include <QUndoStack>
 #include "zsysteminfo.h"
+#include "zjson.h"
 
 namespace nim {
 

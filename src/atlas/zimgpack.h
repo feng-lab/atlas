@@ -51,6 +51,7 @@ protected:
   std::shared_ptr<ZImg> m_img;
 };
 
+// might throw Exception
 class ZImgPack : public ZImgSliceProvider
 {
 public:
