@@ -51,6 +51,9 @@
 #include "zroiview.h"
 #include "zregionannotationdoc.h"
 #include "zregionannotationview.h"
+#include "zsvgdoc.h"
+#include "zsvgview.h"
+
 #include "zjson.h"
 
 //#include "zlogdialog.h"
@@ -416,6 +419,11 @@ void ZMainWindow::init()
   m_doc->registerObjDoc(regionAnnotationDoc);
   ZRegionAnnotationView* regionAnnotationView = new ZRegionAnnotationView(*regionAnnotationDoc, *m_view);
   m_view->registerObjView(regionAnnotationView);
+
+  ZSvgDoc* svgDoc = new ZSvgDoc(*m_doc);
+  m_doc->registerObjDoc(svgDoc);
+  ZSvgView* svgView = new ZSvgView(*svgDoc, *m_view);
+  m_view->registerObjView(svgView);
 
   // UI
   setCentralWidget(m_view);

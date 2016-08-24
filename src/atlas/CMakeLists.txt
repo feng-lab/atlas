@@ -689,7 +689,13 @@ set(SOURCES
     zapplication.cpp
     zapplication.h
     zlogcache.cpp
-    zlogcache.h)
+    zlogcache.h
+    zsvgdoc.cpp
+    zsvgdoc.h
+    zsvgfilter.cpp
+    zsvgfilter.h
+    zsvgview.cpp
+    zsvgview.h)
 
 # our target
 set(APP_NAME Atlas)
