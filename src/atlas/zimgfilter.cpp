@@ -99,10 +99,10 @@ void ZImgFilter::setData(ZImgPack& pack)
   }
   for (size_t c = 0; c < m_imgPack->imgInfo().numChannels; ++c) {
     m_display->showChannel(c, getLowerChannelRange(c), getUpperChannelRange(c));
-    m_display->setAlpha(m_opacity.get());
+    //m_display->setAlpha(m_opacity.get());
     if (m_maxZProjDisplay) {
       m_maxZProjDisplay->showChannel(c, getLowerChannelRange(c), getUpperChannelRange(c));
-      m_maxZProjDisplay->setAlpha(m_opacity.get());
+      //m_maxZProjDisplay->setAlpha(m_opacity.get());
     }
 
     addParameter(m_channelVisibleParas[c].get());
@@ -334,15 +334,18 @@ void ZImgFilter::channelColorChanged()
 
 void ZImgFilter::opacityChanged()
 {
-  m_display->setAlpha(m_opacity.get());
-  if (m_maxZProjDisplay)
-    m_maxZProjDisplay->setAlpha(m_opacity.get());
-  m_displayValid = false;
-  if (!m_isVisible) {
-    destroyImgItems(); // will create new one next time
-  } else {
-    updateImgItems();
+  for (auto& item : m_imgItems) {
+    item->setOpacity(m_opacity.get());
   }
+//  m_display->setAlpha(m_opacity.get());
+//  if (m_maxZProjDisplay)
+//    m_maxZProjDisplay->setAlpha(m_opacity.get());
+//  m_displayValid = false;
+//  if (!m_isVisible) {
+//    destroyImgItems(); // will create new one next time
+//  } else {
+//    updateImgItems();
+//  }
 }
 
 void ZImgFilter::visibleChanged()
@@ -401,8 +404,8 @@ void ZImgFilter::updateImgItems()
     //LOG(INFO) << "0";
     // pixmap is same, we only need to show it
     if (!m_imgItems[0]->isVisible()) {
-      for (size_t i = 0; i < m_imgItems.size(); ++i) {
-        m_imgItems[i]->setVisible(true);
+      for (auto& item : m_imgItems) {
+        item->setVisible(true);
       }
     }
   } else {
@@ -418,6 +421,7 @@ void ZImgFilter::updateImgItems()
       m_imgItems.emplace_back(std::make_unique<QGraphicsPixmapItem>(QPixmap::fromImage(qImagePack.image(i))));
       m_imgItems[i]->setScale(qImagePack.scale(i));
       m_imgItems[i]->setPos(QPointF(qImagePack.location(i)) + QPointF(m_offsetPara.get().x, m_offsetPara.get().y));
+      m_imgItems[i]->setOpacity(m_opacity.get());
       m_imgItems[i]->setVisible(m_isVisible);
       m_view.scene().addItem(m_imgItems[i].get());
     }

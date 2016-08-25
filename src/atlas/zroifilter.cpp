@@ -202,7 +202,7 @@ ZROIFilter::ZROIFilter(ZView& view)
   connect(&m_showControlPoints, &ZBoolParameter::valueChanged, this, &ZROIFilter::showControlPointsChanged);
   connect(&m_outlineColor, &ZVec3Parameter::valueChanged, this, &ZROIFilter::outlineColorChanged);
   connect(&m_regionColor, &ZVec3Parameter::valueChanged, this, &ZROIFilter::regionColorChanged);
-  connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZROIFilter::regionColorChanged);
+  connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZROIFilter::opacityChanged);
   addParameter(&m_visible);
   addParameter(&m_showControlPoints);
   addParameter(&m_outlineColor);
@@ -224,11 +224,13 @@ void ZROIFilter::setData(ZROI& roi)
       ROIGraphicsItem* roiItem = new ROIGraphicsItem(*m_ROI, i);
       roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
                                   m_outlineColor.get().y * 255,
-                                  m_outlineColor.get().z * 255), 0));
+                                  m_outlineColor.get().z * 255),
+                           0));
       roiItem->setBrush(QColor(m_regionColor.get().x * 255,
                                m_regionColor.get().y * 255,
                                m_regionColor.get().z * 255,
                                m_opacity.get() * 255));
+      //roiItem->setOpacity(m_opacity.get());
       roiItem->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
       roiItem->setVisible((realZ() == i || m_view.isMaxZProjView()) && m_visible.get());
       m_view.scene().addItem(roiItem);
@@ -484,20 +486,34 @@ void ZROIFilter::showControlPointsChanged()
 
 void ZROIFilter::outlineColorChanged()
 {
-  for (auto it = m_sliceToROIItem.begin(); it != m_sliceToROIItem.end(); ++it) {
-    it->second->setPen(QPen(QColor(m_outlineColor.get().x * 255,
-                                   m_outlineColor.get().y * 255,
-                                   m_outlineColor.get().z * 255), 0));
+  for (auto& kv : m_sliceToROIItem) {
+    kv.second->setPen(QPen(QColor(m_outlineColor.get().x * 255,
+                                  m_outlineColor.get().y * 255,
+                                  m_outlineColor.get().z * 255),
+                           0));
   }
 }
 
 void ZROIFilter::regionColorChanged()
 {
-  for (auto it = m_sliceToROIItem.begin(); it != m_sliceToROIItem.end(); ++it) {
-    it->second->setBrush(QColor(m_regionColor.get().x * 255,
-                                m_regionColor.get().y * 255,
-                                m_regionColor.get().z * 255,
-                                m_opacity.get() * 255));
+  for (auto& kv : m_sliceToROIItem) {
+    kv.second->setBrush(QColor(m_regionColor.get().x * 255,
+                               m_regionColor.get().y * 255,
+                               m_regionColor.get().z * 255,
+                               m_opacity.get() * 255));
+  }
+}
+
+void ZROIFilter::opacityChanged()
+{
+//  for (auto& kv : m_sliceToROIItem) {
+//    kv.second->setOpacity(m_opacity.get());
+//  }
+  for (auto& kv : m_sliceToROIItem) {
+    kv.second->setBrush(QColor(m_regionColor.get().x * 255,
+                               m_regionColor.get().y * 255,
+                               m_regionColor.get().z * 255,
+                               m_opacity.get() * 255));
   }
 }
 
@@ -507,11 +523,13 @@ void ZROIFilter::onRoiChanged(int slice)
     ROIGraphicsItem* roiItem = new ROIGraphicsItem(*m_ROI, slice);
     roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
                                 m_outlineColor.get().y * 255,
-                                m_outlineColor.get().z * 255), 0));
+                                m_outlineColor.get().z * 255),
+                         0));
     roiItem->setBrush(QColor(m_regionColor.get().x * 255,
                              m_regionColor.get().y * 255,
                              m_regionColor.get().z * 255,
                              m_opacity.get() * 255));
+    //roiItem->setOpacity(m_opacity.get());
     roiItem->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
     roiItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get());
     m_view.scene().addItem(roiItem);

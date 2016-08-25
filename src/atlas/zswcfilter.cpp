@@ -129,7 +129,7 @@ ZSwcFilter::ZSwcFilter(ZView& view)
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZSwcFilter::visibleChanged);
   connect(&m_showSkeleton, &ZBoolParameter::valueChanged, this, &ZSwcFilter::showSkeletonChanged);
   connect(&m_outlineColor, &ZVec3Parameter::valueChanged, this, &ZSwcFilter::outlineColorChanged);
-  connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZSwcFilter::outlineColorChanged);
+  connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZSwcFilter::opacityChanged);
   addParameter(&m_visible);
   addParameter(&m_showSkeleton);
   addParameter(&m_outlineColor);
@@ -200,6 +200,11 @@ void ZSwcFilter::outlineColorChanged()
   m_item->setOutlineColor(QColor(m_outlineColor.get().x * 255,
                                  m_outlineColor.get().y * 255,
                                  m_outlineColor.get().z * 255));
+}
+
+void ZSwcFilter::opacityChanged()
+{
+  m_item->setOpacity(m_opacity.get());
 }
 
 } // namespace nim

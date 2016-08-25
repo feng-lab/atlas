@@ -74,7 +74,7 @@ ZPunctaFilter::ZPunctaFilter(ZView& view)
   m_outlineColor.setStyle("COLOR");
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZPunctaFilter::visibleChanged);
   connect(&m_outlineColor, &ZVec3Parameter::valueChanged, this, &ZPunctaFilter::outlineColorChanged);
-  connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZPunctaFilter::outlineColorChanged);
+  connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZPunctaFilter::opacityChanged);
   addParameter(&m_visible);
   addParameter(&m_outlineColor);
   addParameter(&m_opacity);
@@ -139,6 +139,11 @@ void ZPunctaFilter::outlineColorChanged()
   m_item->setOutlineColor(QColor(m_outlineColor.get().x * 255,
                                  m_outlineColor.get().y * 255,
                                  m_outlineColor.get().z * 255));
+}
+
+void ZPunctaFilter::opacityChanged()
+{
+  m_item->setOpacity(m_opacity.get());
 }
 
 } // namespace nim

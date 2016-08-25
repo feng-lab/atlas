@@ -145,6 +145,8 @@ private:
 
   void regionColorChanged();
 
+  void opacityChanged();
+
   void onRoiChanged(int slice);
 
   void onRoiMoved(int slice);

@@ -39,11 +39,11 @@ public:
     update();
   }
 
-  void setOpacity(double v)
-  {
-    m_opacity = v;
-    update();
-  }
+//  void setOpacity(double v)
+//  {
+//    m_opacity = v;
+//    update();
+//  }
 
   void setNormalView(int z, int t)
   {
@@ -111,6 +111,8 @@ private:
   void showSkeletonChanged();
 
   void outlineColorChanged();
+
+  void opacityChanged();
 
 private:
   ZSwc* m_swc;

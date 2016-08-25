@@ -32,11 +32,11 @@ public:
     update();
   }
 
-  void setOpacity(double v)
-  {
-    m_opacity = v;
-    update();
-  }
+//  void setOpacity(double v)
+//  {
+//    m_opacity = v;
+//    update();
+//  }
 
   void setNormalView(int z, int t)
   {
@@ -100,6 +100,8 @@ private:
   void visibleChanged();
 
   void outlineColorChanged();
+
+  void opacityChanged();
 
 private:
   ZPuncta* m_puncta;
