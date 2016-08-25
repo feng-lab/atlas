@@ -770,6 +770,7 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
 
     modifyJsonValue(sceneObj, IDString + ".View3D.Coord Transform 3DTransform.Scale Vec3", scaleString);
     modifyJsonValue(sceneObj, IDString + ".View3D.Coord Transform 3DTransform.Translation Vec3", locString);
+    modifyJsonValue(sceneObj, IDString + ".View2D.Offset DVec4", toQString(glm::dvec4(loc, 0)));
   }
 
   QFile resfile(resfn);
@@ -853,16 +854,36 @@ ZCustomCommand::ZCustomCommand()
 
 void ZCustomCommand::run()
 {
-  moveObjectToCorrectLocation("/Users/feng/Documents/PY/pyr.scene",
-                              "/Users/feng/Documents/PY/pyr_in_ca1.scene",
-                              "/Users/feng/code/mgrasp-analysis/py_neuron_metadata.csv",
-                              "/Users/feng/Documents/PY/PySWC",
-                              1);
+  moveObjectToCorrectLocation("/Users/feng/Documents/PV/contra.scene",
+                              "/Users/feng/Documents/PV/contra_center_overlap.scene",
+                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
+                              "/Users/feng/Documents/PV/PVSWC",
+                              2);
+  moveObjectToCorrectLocation("/Users/feng/Documents/PV/ipsi.scene",
+                              "/Users/feng/Documents/PV/ipsi_center_overlap.scene",
+                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
+                              "/Users/feng/Documents/PV/PVSWC",
+                              2);
   moveObjectToCorrectLocation("/Users/feng/Documents/PY/pyr.scene",
                               "/Users/feng/Documents/PY/pyr_center_overlap.scene",
                               "/Users/feng/code/mgrasp-analysis/py_neuron_metadata.csv",
                               "/Users/feng/Documents/PY/PySWC",
                               2);
+  moveObjectToCorrectLocation("/Users/feng/Documents/PV/contra.scene",
+                              "/Users/feng/Documents/PV/contra_in_ca1.scene",
+                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
+                              "/Users/feng/Documents/PV/PVSWC",
+                              1);
+  moveObjectToCorrectLocation("/Users/feng/Documents/PV/ipsi.scene",
+                              "/Users/feng/Documents/PV/ipsi_in_ca1.scene",
+                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
+                              "/Users/feng/Documents/PV/PVSWC",
+                              1);
+  moveObjectToCorrectLocation("/Users/feng/Documents/PY/pyr.scene",
+                              "/Users/feng/Documents/PY/pyr_in_ca1.scene",
+                              "/Users/feng/code/mgrasp-analysis/py_neuron_metadata.csv",
+                              "/Users/feng/Documents/PY/PySWC",
+                              1);
   LOG(INFO) << "done";
 }
 

@@ -47,17 +47,21 @@ public:
 
   void setNormalView(int z, int t)
   {
-    m_mip = false;
-    m_z = z;
-    m_t = t;
-    update();
+    if (m_mip || m_z != z || m_t != t) {
+      m_mip = false;
+      m_z = z;
+      m_t = t;
+      update();
+    }
   }
 
   void setMaxZProjView(int t)
   {
-    m_mip = true;
-    m_t = t;
-    update();
+    if (!m_mip || m_t != t) {
+      m_mip = true;
+      m_t = t;
+      update();
+    }
   }
 
   const std::vector<int>& boundBox() const
@@ -101,9 +105,12 @@ public:
 
   void setMaxZProjView(int t) override;
 
-  const std::vector<int>& boundBox() const;
+  std::vector<int> boundBox() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
+
+protected:
+  virtual void offsetChanged() override;
 
 private:
   void visibleChanged();

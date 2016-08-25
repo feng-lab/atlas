@@ -322,7 +322,8 @@ void ZMainWindow::detach3DWindow()
 
 void ZMainWindow::loadScene()
 {
-  QString fn = QFileDialog::getOpenFileName(QApplication::activeWindow(), "Load scene", m_doc->lastOpenedFilePath(),
+  QString fn = QFileDialog::getOpenFileName(QApplication::activeWindow(), "Load scene",
+                                            m_doc->lastOpenedFilePath(),
                                             tr("Scene file (*.scene)"));
   if (!fn.isEmpty()) {
     QString err;

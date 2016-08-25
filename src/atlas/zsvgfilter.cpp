@@ -33,7 +33,9 @@ void ZSvgFilter::setData(QSvgRenderer& svg)
   m_item->setSharedRenderer(&svg);
   m_item->setOpacity(m_opacity.get());
   m_item->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
-  m_item->setVisible((realZ() == 0 || m_view.isMaxZProjView()) && m_visible.get());
+  m_item->setVisible((realZ() == 0 || m_view.isMaxZProjView()) && realT() == 0 && m_visible.get());
+  //if (svg.animated())
+    //connect(m_item->renderer(), &QSvgRenderer::repaintNeeded, [this](){ m_item->update(); });
   m_view.scene().addItem(m_item.get());
 }
 
@@ -44,14 +46,12 @@ void ZSvgFilter::releaseItemsOwnership()
 
 void ZSvgFilter::setNormalView(int z, int t)
 {
-  Q_UNUSED(t)
-  m_item->setVisible(realZ(z) == 0 && m_visible.get());
+  m_item->setVisible(realZ(z) == 0 && realT(t) == 0 && m_visible.get());
 }
 
 void ZSvgFilter::setMaxZProjView(int t)
 {
-  Q_UNUSED(t)
-  m_item->setVisible(m_visible.get());
+  m_item->setVisible(realT(t) == 0 && m_visible.get());
 }
 
 std::vector<int> ZSvgFilter::boundBox() const
@@ -80,12 +80,13 @@ std::shared_ptr<ZWidgetsGroup> ZSvgFilter::viewSettingWidgetsGroup()
 void ZSvgFilter::offsetChanged()
 {
   m_item->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
+  m_item->setVisible((realZ() == 0 || m_view.isMaxZProjView()) && realT() == 0 && m_visible.get());
   ZObjFilter::offsetChanged();
 }
 
 void ZSvgFilter::visibleChanged()
 {
-  m_item->setVisible((realZ() == 0 || m_view.isMaxZProjView()) && m_visible.get());
+  m_item->setVisible((realZ() == 0 || m_view.isMaxZProjView()) && realT() == 0 && m_visible.get());
 }
 
 void ZSvgFilter::opacityChanged()

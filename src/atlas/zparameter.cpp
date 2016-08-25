@@ -93,7 +93,7 @@ void ZParameter::read(const QJsonObject& json)
   if (json.contains(jsonKey())) {
     readValue(json[jsonKey()]);
   } else {
-    LOG(WARNING) << "Parameter " << jsonKey() << " not found, abort reading.";
+    LOG(WARNING) << "Parameter <" << jsonKey() << "> not found.";
   }
 }
 

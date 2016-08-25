@@ -65,6 +65,8 @@ QRectF ZSwcGraphicsItem::boundingRect() const
 
 void ZSwcGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
+  if (m_t != 0)
+    return;
   Q_UNUSED(option)
   if (m_mip) {
     m_outlineColor.setAlpha(m_opacity * 255);
@@ -133,6 +135,7 @@ ZSwcFilter::ZSwcFilter(ZView& view)
   addParameter(&m_visible);
   addParameter(&m_showSkeleton);
   addParameter(&m_outlineColor);
+  addParameter(&m_offsetPara);
   addParameter(&m_opacity);
 }
 
@@ -145,10 +148,11 @@ void ZSwcFilter::setData(ZSwc& swc)
                                  m_outlineColor.get().y * 255,
                                  m_outlineColor.get().z * 255));
   m_item->setOpacity(m_opacity.get());
+  m_item->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
   if (m_view.isMaxZProjView()) {
-    m_item->setMaxZProjView(m_view.currentTime());
+    m_item->setMaxZProjView(realT());
   } else {
-    m_item->setNormalView(m_view.currentSlice(), m_view.currentTime());
+    m_item->setNormalView(realZ(), realT());
   }
   m_view.scene().addItem(m_item.get());
 }
@@ -160,17 +164,19 @@ void ZSwcFilter::releaseItemsOwnership()
 
 void ZSwcFilter::setNormalView(int z, int t)
 {
-  m_item->setNormalView(z, t);
+  m_item->setNormalView(realZ(z), realT(t));
 }
 
 void ZSwcFilter::setMaxZProjView(int t)
 {
-  m_item->setMaxZProjView(t);
+  m_item->setMaxZProjView(realT(t));
 }
 
-const std::vector<int>& ZSwcFilter::boundBox() const
+std::vector<int> ZSwcFilter::boundBox() const
 {
-  return m_item->boundBox();
+  std::vector<int> res = m_item->boundBox();
+  updateBoundBoxWithOffsetPara(res);
+  return res;
 }
 
 std::shared_ptr<ZWidgetsGroup> ZSwcFilter::viewSettingWidgetsGroup()
@@ -180,9 +186,21 @@ std::shared_ptr<ZWidgetsGroup> ZSwcFilter::viewSettingWidgetsGroup()
     m_widgetsGroup->addChild(m_visible, 1);
     m_widgetsGroup->addChild(m_showSkeleton, 1);
     m_widgetsGroup->addChild(m_outlineColor, 1);
+    m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
   }
   return m_widgetsGroup;
+}
+
+void ZSwcFilter::offsetChanged()
+{
+  m_item->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
+  if (m_view.isMaxZProjView()) {
+    m_item->setMaxZProjView(realT());
+  } else {
+    m_item->setNormalView(realZ(), realT());
+  }
+  ZObjFilter::offsetChanged();
 }
 
 void ZSwcFilter::visibleChanged()
