@@ -15,8 +15,7 @@ ZSliderEventFilter::ZSliderEventFilter(QObject* parent)
 bool ZSliderEventFilter::eventFilter(QObject* obj, QEvent* event)
 {
   if (event->type() == QEvent::Wheel) {
-    auto qas = qobject_cast<QAbstractSlider*>(obj);
-    if (qas) {
+    if (auto qas = qobject_cast<QAbstractSlider*>(obj)) {
       if (qas->focusPolicy() == Qt::WheelFocus) {
         event->accept();
         return false;

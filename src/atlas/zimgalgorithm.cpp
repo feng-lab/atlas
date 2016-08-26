@@ -95,15 +95,16 @@ void ZImgAlgorithmBaseWithProgressReporter::sendProgressSignal()
 
 void ZImgAlgorithmBaseWithProgressReporter::processITKEvent(itk::Object* caller, const itk::EventObject& event)
 {
-  if (dynamic_cast<const itk::ProgressEvent*>(&event)) {
-    itk::ProcessObject* process = dynamic_cast<itk::ProcessObject*>(caller);
-    if (m_cancelFlag && *m_cancelFlag) {
-      if (process->GetAbortGenerateData() == false) {
-        process->AbortGenerateDataOn();
-        LOG(INFO) << "abort itk 1";
+  if (itk::ProgressEvent().CheckEvent(&event)) {
+    if (auto process = dynamic_cast<itk::ProcessObject*>(caller)) {
+      if (m_cancelFlag && *m_cancelFlag) {
+        if (process->GetAbortGenerateData() == false) {
+          process->AbortGenerateDataOn();
+          LOG(INFO) << "abort itk 1";
+        }
+      } else {
+        subOperationProgressChanged(clamp(process->GetProgress()), process);
       }
-    } else {
-      subOperationProgressChanged(clamp(process->GetProgress()), process);
     }
   }
 }
@@ -111,15 +112,16 @@ void ZImgAlgorithmBaseWithProgressReporter::processITKEvent(itk::Object* caller,
 void
 ZImgAlgorithmBaseWithProgressReporter::constProcessITKEvent(const itk::Object* caller, const itk::EventObject& event)
 {
-  if (dynamic_cast<const itk::ProgressEvent*>(&event)) {
-    itk::ProcessObject* process = const_cast<itk::ProcessObject*>(dynamic_cast<const itk::ProcessObject*>(caller));
-    if (m_cancelFlag && *m_cancelFlag) {
-      if (process->GetAbortGenerateData() == false) {
-        process->AbortGenerateDataOn();
-        LOG(INFO) << "abort itk 2";
+  if (itk::ProgressEvent().CheckEvent(&event)) {
+    if (auto process = const_cast<itk::ProcessObject*>(dynamic_cast<const itk::ProcessObject*>(caller))) {
+      if (m_cancelFlag && *m_cancelFlag) {
+        if (process->GetAbortGenerateData() == false) {
+          process->AbortGenerateDataOn();
+          LOG(INFO) << "abort itk 2";
+        }
+      } else {
+        subOperationProgressChanged(clamp(process->GetProgress()), process);
       }
-    } else {
-      subOperationProgressChanged(clamp(process->GetProgress()), process);
     }
   }
 }

@@ -48,28 +48,14 @@ QStringList ZImgITKImage::extensions() const
 {
   QStringList res;
 
-  using IOBaseType = itk::ImageIOBase;
-  using ArrayOfImageIOType = std::list<itk::LightObject::Pointer>;
-  using ArrayOfExtensionsType = IOBaseType::ArrayOfExtensionsType;
-
-  ArrayOfImageIOType allobjects = itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase");
-
-  ArrayOfImageIOType::iterator itr = allobjects.begin();
-
-  while (itr != allobjects.end()) {
-    IOBaseType* io = dynamic_cast< IOBaseType* >( itr->GetPointer());
-    if (io) {
+  for (const auto& pt : itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase")) {
+    if (auto io = dynamic_cast<const itk::ImageIOBase*>(pt.GetPointer())) {
       //LOG(INFO) << "ImageIO: " << io->GetNameOfClass();
-      const ArrayOfExtensionsType& readExtensions = io->GetSupportedReadExtensions();
-      ArrayOfExtensionsType::const_iterator readItr = readExtensions.begin();
-
-      while (readItr != readExtensions.end()) {
-        res.push_back(readItr->c_str());
+      for (const auto& ext : io->GetSupportedReadExtensions()) {
+        res.push_back(ext.c_str());
         res.last().remove(0, 1); // remove '.'
-        ++readItr;
       }
     }
-    ++itr;
   }
 #ifdef ATLAS_SUPPORT_DICOM
   res.push_back("dcm");

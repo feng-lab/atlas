@@ -97,23 +97,24 @@ void ZViewSettingWidget::updateViewSettingWidgetLabelOfObj(size_t id)
 
 void ZViewSettingWidget::updateWidget()
 {
-  ZWidgetsGroup* wg = qobject_cast<ZWidgetsGroup*>(sender());
-  for (size_t i = 0; i < m_subWidgets.size(); ++i) {
-    if (m_subWidgets[i].widgetsGroup == wg) {
-      bool current = false;
-      if (m_widget->currentWidget() == m_subWidgets[i].widget) {
-        current = true;
-        m_widget->setCurrentWidget(m_defaultWidget);
-      }
-      m_widget->removeWidget(m_subWidgets[i].widget);
-      delete m_subWidgets[i].widget;
+  if (ZWidgetsGroup* wg = qobject_cast<ZWidgetsGroup*>(sender())) {
+    for (size_t i = 0; i < m_subWidgets.size(); ++i) {
+      if (m_subWidgets[i].widgetsGroup == wg) {
+        bool current = false;
+        if (m_widget->currentWidget() == m_subWidgets[i].widget) {
+          current = true;
+          m_widget->setCurrentWidget(m_defaultWidget);
+        }
+        m_widget->removeWidget(m_subWidgets[i].widget);
+        delete m_subWidgets[i].widget;
 
-      m_subWidgets[i].label = new QLabel(m_doc->objNameWithModifiedMarkerAndID(m_subWidgets[i].id));
-      m_subWidgets[i].label->setTextInteractionFlags(Qt::TextSelectableByMouse);
-      m_subWidgets[i].label->setWordWrap(true);
-      m_subWidgets[i].widget = wg->createWidget(false, true, m_subWidgets[i].label);
-      if (current) {
-        m_widget->setCurrentIndex(m_widget->addWidget(m_subWidgets[i].widget));
+        m_subWidgets[i].label = new QLabel(m_doc->objNameWithModifiedMarkerAndID(m_subWidgets[i].id));
+        m_subWidgets[i].label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        m_subWidgets[i].label->setWordWrap(true);
+        m_subWidgets[i].widget = wg->createWidget(false, true, m_subWidgets[i].label);
+        if (current) {
+          m_widget->setCurrentIndex(m_widget->addWidget(m_subWidgets[i].widget));
+        }
       }
     }
   }

@@ -454,8 +454,7 @@ void ZSystemInfo::addFileToRecentFileList(const QString& fileName) const
 void ZSystemInfo::updateRecentFiles() const
 {
   for (auto widget : QApplication::topLevelWidgets()) {
-    ZMainWindow* mainWin = qobject_cast<ZMainWindow*>(widget);
-    if (mainWin)
+    if (ZMainWindow* mainWin = qobject_cast<ZMainWindow*>(widget))
       mainWin->updateRecentFileActions();
   }
 }

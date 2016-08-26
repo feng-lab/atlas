@@ -136,13 +136,13 @@ QWidget* ZWidgetsGroup::createWidget(bool createBasic, bool scroll, QLabel* labe
 {
   QLayout* lw = createLayout(createBasic);
   // if is boxLayout, add strech to fill the space
-  QBoxLayout* blo = qobject_cast<QBoxLayout*>(lw);
-  if (blo)
+  if (QBoxLayout* blo = qobject_cast<QBoxLayout*>(lw)) {
     blo->addStretch();
-  //
-  if (blo && label) {
-    blo->insertWidget(0, label);
-    blo->insertSpacing(1, 20);
+    //
+    if (label) {
+      blo->insertWidget(0, label);
+      blo->insertSpacing(1, 20);
+    }
   }
   QWidget* widget = new QWidget();
   widget->setLayout(lw);
@@ -171,8 +171,7 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
     }
     case Type::Parameter: {
       QHBoxLayout* hbl = new QHBoxLayout;
-      if (qobject_cast<Z3DCameraParameter*>(m_parameter)
-          || qobject_cast<Z3DTransformParameter*>(m_parameter)) {
+      if (qobject_cast<Z3DCameraParameter*>(m_parameter) || qobject_cast<Z3DTransformParameter*>(m_parameter)) {
         QWidget* wg = m_parameter->createWidget();
         hbl->addWidget(wg);
         return hbl;

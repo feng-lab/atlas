@@ -40,14 +40,14 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
   if (QMouseEvent* mouseEvent = dynamic_cast<QMouseEvent*>(e)) {
     bool accept = false;
     //LOG(INFO) << mouseEvent->modifiers() << " " << mouseEvent->button() << " " << mouseEvent->buttons();
-    for (int i = 0; i < m_mouseEvents.size(); ++i) {
+    for (const auto& me : m_mouseEvents) {
       accept = true;
-      accept &= (mouseEvent->modifiers() == m_mouseEvents[i].modifiers);
-      accept &= (mouseEvent->type() == m_mouseEvents[i].type);
+      accept &= (mouseEvent->modifiers() == me.modifiers);
+      accept &= (mouseEvent->type() == me.type);
       if (mouseEvent->type() == QEvent::MouseMove)
-        accept &= ((mouseEvent->buttons() == m_mouseEvents[i].buttons));
+        accept &= ((mouseEvent->buttons() == me.buttons));
       else
-        accept &= ((mouseEvent->button() == m_mouseEvents[i].buttons));
+        accept &= ((mouseEvent->button() == me.buttons));
       if (accept)
         break;
     }
@@ -60,11 +60,11 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
     }
   } else if (QWheelEvent* wheelEvent = dynamic_cast<QWheelEvent*>(e)) {
     bool accept = false;
-    for (int i = 0; i < m_mouseEvents.size(); ++i) {
+    for (const auto& me : m_mouseEvents) {
       accept = true;
-      accept &= (wheelEvent->modifiers() == m_mouseEvents[i].modifiers);
-      accept &= (wheelEvent->type() == m_mouseEvents[i].type);
-      accept &= ((wheelEvent->buttons() == m_mouseEvents[i].buttons));
+      accept &= (wheelEvent->modifiers() == me.modifiers);
+      accept &= (wheelEvent->type() == me.type);
+      accept &= ((wheelEvent->buttons() == me.buttons));
       if (accept)
         break;
     }
@@ -77,11 +77,11 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
     }
   } else if (QKeyEvent* keyEvent = dynamic_cast<QKeyEvent*>(e)) {
     bool accept = false;
-    for (int i = 0; i < m_keyEvents.size(); ++i) {
+    for (const auto& ke : m_keyEvents) {
       accept = true;
-      accept &= (keyEvent->modifiers() == m_keyEvents[i].modifiers);
-      accept &= (keyEvent->type() == m_keyEvents[i].type);
-      accept &= (keyEvent->key() == m_keyEvents[i].key);
+      accept &= (keyEvent->modifiers() == ke.modifiers);
+      accept &= (keyEvent->type() == ke.type);
+      accept &= (keyEvent->key() == ke.key);
       if (accept)
         break;
     }

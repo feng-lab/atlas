@@ -114,8 +114,7 @@ protected:
 
   virtual void onObjSelectedFromView(bool append) override
   {
-    FilterType* filter = qobject_cast<FilterType*>(sender());
-    if (filter) {
+    if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
       for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
         if (it->second.get() == filter) {
           if (append)
@@ -131,8 +130,7 @@ protected:
 
   virtual void onObjDeselectedFromView() override
   {
-    FilterType* filter = qobject_cast<FilterType*>(sender());
-    if (filter) {
+    if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
       for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
         if (it->second.get() == filter) {
           m_doc.doc().deselectObj(it->first);
@@ -145,8 +143,7 @@ protected:
 
   virtual void onObjVisibleChangedFromView(bool v) override
   {
-    FilterType* filter = qobject_cast<FilterType*>(sender());
-    if (filter) {
+    if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
       for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
         if (it->second.get() == filter) {
           if (m_doc.doc().isObjVisible(it->first) != v) {

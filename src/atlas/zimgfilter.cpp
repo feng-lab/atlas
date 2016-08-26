@@ -255,8 +255,7 @@ void ZImgFilter::channelVisibleChanged()
   }
   m_isVisible = m_hasVisibleChannel && m_visible.get() && m_sliceValid;
 
-  ZBoolParameter* para = qobject_cast<ZBoolParameter*>(sender());
-  if (para) {
+  if (ZBoolParameter* para = qobject_cast<ZBoolParameter*>(sender())) {
     // find which channel send the signal
     size_t c = 0;
     for (; c < m_channelVisibleParas.size(); ++c) {
@@ -285,8 +284,7 @@ void ZImgFilter::channelVisibleChanged()
 
 void ZImgFilter::channelRangeChanged()
 {
-  ZDoubleSpanParameter* para = qobject_cast<ZDoubleSpanParameter*>(sender());
-  if (para) {
+  if (ZDoubleSpanParameter* para = qobject_cast<ZDoubleSpanParameter*>(sender())) {
     // find which channel send the signal
     size_t c = 0;
     for (; c < m_doubleChannelRangeParas.size(); ++c) {
@@ -309,8 +307,7 @@ void ZImgFilter::channelRangeChanged()
 
 void ZImgFilter::channelColorChanged()
 {
-  ZVec3Parameter* para = qobject_cast<ZVec3Parameter*>(sender());
-  if (para) {
+  if (ZVec3Parameter* para = qobject_cast<ZVec3Parameter*>(sender())) {
     // find which channel send the signal
     size_t c = 0;
     for (; c < m_channelColorParas.size(); ++c) {

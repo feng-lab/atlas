@@ -261,8 +261,7 @@ void ZROIDoc::loadROI()
 
 void ZROIDoc::setModified()
 {
-  ZROI* roi = qobject_cast<ZROI*>(sender());
-  if (roi) {
+  if (ZROI* roi = qobject_cast<ZROI*>(sender())) {
     for (auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
       if (it->second->roi.get() == roi) {
         it->second->updateDerivedData();

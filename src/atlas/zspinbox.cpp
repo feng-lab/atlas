@@ -80,8 +80,7 @@ ZSpinBoxEventFilter::ZSpinBoxEventFilter(QObject* parent)
 bool ZSpinBoxEventFilter::eventFilter(QObject* obj, QEvent* event)
 {
   if (event->type() == QEvent::Wheel) {
-    auto qasb = qobject_cast<QAbstractSpinBox*>(obj);
-    if (qasb) {
+    if (auto qasb = qobject_cast<QAbstractSpinBox*>(obj)) {
       if (qasb->focusPolicy() == Qt::WheelFocus) {
         event->accept();
         return false;

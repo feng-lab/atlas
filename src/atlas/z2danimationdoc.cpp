@@ -240,8 +240,7 @@ void Z2DAnimationDoc::loadAnimation()
 
 void Z2DAnimationDoc::setModified()
 {
-  Z2DAnimation* animation = qobject_cast<Z2DAnimation*>(sender());
-  if (animation) {
+  if (Z2DAnimation* animation = qobject_cast<Z2DAnimation*>(sender())) {
     for (auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
       if (it->second->animation.get() == animation) {
         it->second->updateDerivedData();

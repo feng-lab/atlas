@@ -210,8 +210,7 @@ bool ZMainWindow::saveAs()
 
 void ZMainWindow::openRecentFile()
 {
-  QAction* action = qobject_cast<QAction*>(sender());
-  if (action) {
+  if (QAction* action = qobject_cast<QAction*>(sender())) {
     QString fn = action->data().toString();
     if (fn.endsWith(".scene", Qt::CaseInsensitive)) {
       loadJsonScene(fn);

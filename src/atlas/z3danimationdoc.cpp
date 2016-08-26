@@ -240,8 +240,7 @@ void Z3DAnimationDoc::loadAnimation()
 
 void Z3DAnimationDoc::setModified()
 {
-  Z3DAnimation* animation = qobject_cast<Z3DAnimation*>(sender());
-  if (animation) {
+  if (Z3DAnimation* animation = qobject_cast<Z3DAnimation*>(sender())) {
     for (auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
       if (it->second->animation.get() == animation) {
         it->second->updateDerivedData();

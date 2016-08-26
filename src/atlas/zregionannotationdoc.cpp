@@ -328,8 +328,7 @@ void ZRegionAnnotationDoc::exportLabelImage()
 
 void ZRegionAnnotationDoc::setModified()
 {
-  ZRegionAnnotation* ra = qobject_cast<ZRegionAnnotation*>(sender());
-  if (ra) {
+  if (ZRegionAnnotation* ra = qobject_cast<ZRegionAnnotation*>(sender())) {
     for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
       if (it->second->regionAnnotation == ra && !it->second->hasUnsavedChange) {
         it->second->updateDerivedData();
@@ -343,8 +342,7 @@ void ZRegionAnnotationDoc::setModified()
 
 void ZRegionAnnotationDoc::setModified(bool clean)
 {
-  ZRegionAnnotation* ra = qobject_cast<ZRegionAnnotation*>(sender());
-  if (ra) {
+  if (ZRegionAnnotation* ra = qobject_cast<ZRegionAnnotation*>(sender())) {
     for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
       if (it->second->regionAnnotation == ra) {
         if (clean && it->second->path.endsWith(ZRegionAnnotation::fileExtension(), Qt::CaseInsensitive)) {

@@ -54,8 +54,7 @@ ZComboBoxEventFilter::ZComboBoxEventFilter(QObject* parent)
 bool ZComboBoxEventFilter::eventFilter(QObject* obj, QEvent* event)
 {
   if (event->type() == QEvent::Wheel) {
-    auto qcb = qobject_cast<QComboBox*>(obj);
-    if (qcb) {
+    if (auto qcb = qobject_cast<QComboBox*>(obj)) {
       if (qcb->focusPolicy() == Qt::WheelFocus) {
         event->accept();
         return false;
