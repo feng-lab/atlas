@@ -14,15 +14,16 @@ ZSliderEventFilter::ZSliderEventFilter(QObject* parent)
 
 bool ZSliderEventFilter::eventFilter(QObject* obj, QEvent* event)
 {
-  if (event->type() == QEvent::Wheel &&
-      qobject_cast<QAbstractSlider*>(obj)) {
-    if (qobject_cast<QAbstractSlider*>(obj)->focusPolicy() == Qt::WheelFocus) {
-      event->accept();
-      return false;
-    }
-    else {
-      event->ignore();
-      return true;
+  if (event->type() == QEvent::Wheel) {
+    auto qas = qobject_cast<QAbstractSlider*>(obj);
+    if (qas) {
+      if (qas->focusPolicy() == Qt::WheelFocus) {
+        event->accept();
+        return false;
+      } else {
+        event->ignore();
+        return true;
+      }
     }
   }
   return QObject::eventFilter(obj, event);

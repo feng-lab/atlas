@@ -453,11 +453,11 @@ void ZSystemInfo::addFileToRecentFileList(const QString& fileName) const
 
 void ZSystemInfo::updateRecentFiles() const
 {
-    foreach (QWidget* widget, QApplication::topLevelWidgets()) {
-      ZMainWindow* mainWin = qobject_cast<ZMainWindow*>(widget);
-      if (mainWin)
-        mainWin->updateRecentFileActions();
-    }
+  for (auto widget : QApplication::topLevelWidgets()) {
+    ZMainWindow* mainWin = qobject_cast<ZMainWindow*>(widget);
+    if (mainWin)
+      mainWin->updateRecentFileActions();
+  }
 }
 
 void ZSystemInfo::detectOS()

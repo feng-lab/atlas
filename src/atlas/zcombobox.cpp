@@ -4,8 +4,8 @@
 
 namespace nim {
 
-ZComboBox::ZComboBox(QWidget* parent) :
-  QComboBox(parent)
+ZComboBox::ZComboBox(QWidget* parent)
+  : QComboBox(parent)
 {
   installEventFilter(new ZComboBoxEventFilter(this));
   setFocusPolicy(Qt::StrongFocus);
@@ -53,15 +53,16 @@ ZComboBoxEventFilter::ZComboBoxEventFilter(QObject* parent)
 
 bool ZComboBoxEventFilter::eventFilter(QObject* obj, QEvent* event)
 {
-  if (event->type() == QEvent::Wheel &&
-      qobject_cast<QComboBox*>(obj)) {
-    if (qobject_cast<QComboBox*>(obj)->focusPolicy() == Qt::WheelFocus) {
-      event->accept();
-      return false;
-    }
-    else {
-      event->ignore();
-      return true;
+  if (event->type() == QEvent::Wheel) {
+    auto qcb = qobject_cast<QComboBox*>(obj);
+    if (qcb) {
+      if (qcb->focusPolicy() == Qt::WheelFocus) {
+        event->accept();
+        return false;
+      } else {
+        event->ignore();
+        return true;
+      }
     }
   }
   return QObject::eventFilter(obj, event);

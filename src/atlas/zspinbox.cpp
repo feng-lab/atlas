@@ -79,15 +79,16 @@ ZSpinBoxEventFilter::ZSpinBoxEventFilter(QObject* parent)
 
 bool ZSpinBoxEventFilter::eventFilter(QObject* obj, QEvent* event)
 {
-  if (event->type() == QEvent::Wheel &&
-      qobject_cast<QAbstractSpinBox*>(obj)) {
-    if (qobject_cast<QAbstractSpinBox*>(obj)->focusPolicy() == Qt::WheelFocus) {
-      event->accept();
-      return false;
-    }
-    else {
-      event->ignore();
-      return true;
+  if (event->type() == QEvent::Wheel) {
+    auto qasb = qobject_cast<QAbstractSpinBox*>(obj);
+    if (qasb) {
+      if (qasb->focusPolicy() == Qt::WheelFocus) {
+        event->accept();
+        return false;
+      } else {
+        event->ignore();
+        return true;
+      }
     }
   }
   return QObject::eventFilter(obj, event);

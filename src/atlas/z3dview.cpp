@@ -388,36 +388,29 @@ void Z3DView::init()
   m_networkEvaluator->initializeNetwork();
 
   //packages
-  QList<ZObjDoc*> objDocs = m_doc->objDocs();
-  for (int i = 0; i < objDocs.size(); ++i) {
-    if (objDocs[i]->typeName() == "Image") {
-      ZImgDoc* imgDoc = qobject_cast<ZImgDoc*>(objDocs[i]);
+  for (auto objDoc : m_doc->objDocs()) {
+    if (ZImgDoc* imgDoc = qobject_cast<ZImgDoc*>(objDoc)) {
       Z3DImgView* imgView = new Z3DImgView(*imgDoc, *this);
       connect(imgView, &Z3DImgView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(imgView);
-    } else if (objDocs[i]->typeName() == "Puncta") {
-      ZPunctaDoc* punctaDoc = qobject_cast<ZPunctaDoc*>(objDocs[i]);
+    } else if (ZPunctaDoc* punctaDoc = qobject_cast<ZPunctaDoc*>(objDoc)) {
       Z3DPunctaView* punctaView = new Z3DPunctaView(*punctaDoc, *this);
       connect(punctaView, &Z3DPunctaView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(punctaView);
-    } else if (objDocs[i]->typeName() == "Swc") {
-      ZSwcDoc* swcDoc = qobject_cast<ZSwcDoc*>(objDocs[i]);
+    } else if (ZSwcDoc* swcDoc = qobject_cast<ZSwcDoc*>(objDoc)) {
       Z3DSwcView* swcView = new Z3DSwcView(*swcDoc, *this);
       connect(swcView, &Z3DSwcView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(swcView);
-    } else if (objDocs[i]->typeName() == "Mesh") {
-      ZMeshDoc* meshDoc = qobject_cast<ZMeshDoc*>(objDocs[i]);
+    } else if (ZMeshDoc* meshDoc = qobject_cast<ZMeshDoc*>(objDoc)) {
       Z3DMeshView* meshView = new Z3DMeshView(*meshDoc, *this);
       connect(meshView, &Z3DMeshView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(meshView);
-    } else if (objDocs[i]->typeName() == "Animation3D") {
-      Z3DAnimationDoc* aniDoc = qobject_cast<Z3DAnimationDoc*>(objDocs[i]);
+    } else if (Z3DAnimationDoc* aniDoc = qobject_cast<Z3DAnimationDoc*>(objDoc)) {
       Z3DAnimationView* aniView = new Z3DAnimationView(*aniDoc, *this);
       connect(aniView, &Z3DAnimationView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(aniView);
-    } else if (objDocs[i]->typeName() == "RegionAnnotation") {
-      ZRegionAnnotationDoc* aniDoc = qobject_cast<ZRegionAnnotationDoc*>(objDocs[i]);
-      Z3DRegionAnnotationView* aniView = new Z3DRegionAnnotationView(*aniDoc, *this);
+    } else if (ZRegionAnnotationDoc* raDoc = qobject_cast<ZRegionAnnotationDoc*>(objDoc)) {
+      Z3DRegionAnnotationView* aniView = new Z3DRegionAnnotationView(*raDoc, *this);
       connect(aniView, &Z3DRegionAnnotationView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(aniView);
     }
