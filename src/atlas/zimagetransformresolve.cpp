@@ -187,7 +187,7 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
       std::map<std::pair<size_t, size_t>, std::pair<const ZImageTransform*, double>>::const_iterator pairIt;
       pairIt = m_idxPairs.find(std::make_pair(img1, img2));
       res[img2] = std::unique_ptr<ZImageCompositeTransform>(
-        dynamic_cast<ZImageCompositeTransform*>(res[img1]->clone()));
+        static_cast<ZImageCompositeTransform*>(res[img1]->clone()));
       if (pairIt != m_idxPairs.end()) {
         res[img2]->addTransform(*pairIt->second.first);
       } else {
@@ -199,7 +199,7 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
       std::map<std::pair<size_t, size_t>, std::pair<const ZImageTransform*, double>>::const_iterator pairIt;
       pairIt = m_idxPairs.find(std::make_pair(img1, img2));
       res[img1] = std::unique_ptr<ZImageCompositeTransform>(
-        dynamic_cast<ZImageCompositeTransform*>(res[img2]->clone()));
+        static_cast<ZImageCompositeTransform*>(res[img2]->clone()));
       if (pairIt != m_idxPairs.end())
         res[img1]->addTransform(pairIt->second.first->makeInverseTransform());
       else {

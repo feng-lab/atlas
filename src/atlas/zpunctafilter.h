@@ -8,6 +8,7 @@
 #include <map>
 #include "znumericparameter.h"
 #include "zpuncta.h"
+#include "zgraphicsitemtype.h"
 
 class ZWidgetsGroup;
 
@@ -18,7 +19,7 @@ class ZPunctaGraphicsItem : public QGraphicsItem
 public:
   enum
   {
-    Type = UserType + 9
+    Type = GraphicsItemType::ZPunctaGraphicsItem
   };
 
   int type() const override

@@ -695,7 +695,8 @@ set(SOURCES
     zsvgfilter.cpp
     zsvgfilter.h
     zsvgview.cpp
-    zsvgview.h)
+    zsvgview.h
+    zgraphicsitemtype.h)
 
 # our target
 set(APP_NAME Atlas)

@@ -196,15 +196,15 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
             m_view->roi().deleteSliceROI(i);
         }
         QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
-        m_startPtItem = new QGraphicsPolygonItem(startPoly);
+        m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
         m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
         m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
-        scene()->addItem(m_startPtItem);
+        scene()->addItem(m_startPtItem.get());
         m_spline.clear();
         m_spline << m_startScenePt << m_startScenePt;  // pt and next potential pt
-        m_splineItem = new QGraphicsPathItem(ZROI::splineToPainterPath(m_spline));
+        m_splineItem = std::make_unique<QGraphicsPathItem>(ZROI::splineToPainterPath(m_spline));
         m_splineItem->setPen(QPen(QColor(255, 255, 0), 0));
-        scene()->addItem(m_splineItem);
+        scene()->addItem(m_splineItem.get());
       } else {
         if (m_startPtItem->contains(m_spline.last())) {  // finish here
           m_spline.last() = m_spline[0];
@@ -217,20 +217,16 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
                 m_view->roi().subtractSpline(i, m_spline);
             }
           }
-          delete m_startPtItem;
-          m_startPtItem = nullptr;
-          for (auto ctrlItem : m_ctrlPtsItem)
-            delete ctrlItem;
+          m_startPtItem.reset();
           m_ctrlPtsItem.clear();
-          delete m_splineItem;
-          m_splineItem = nullptr;
+          m_splineItem.reset();
         } else if (!isScenePtOverlap(m_spline.last(), m_spline[m_spline.size() - 2])) {
           QPolygonF ctrlPoly = mapToScene(event->x() - 4, event->y() - 4, 8, 8);
-          QGraphicsPolygonItem* ctrlPtItem = new QGraphicsPolygonItem(ctrlPoly);
+          auto ctrlPtItem = std::make_unique<QGraphicsPolygonItem>(ctrlPoly);
           ctrlPtItem->setPen(QPen(QColor(0, 0, 0), 0));
           ctrlPtItem->setBrush(QBrush(QColor(255, 255, 0, 128)));
-          scene()->addItem(ctrlPtItem);
-          m_ctrlPtsItem.push_back(ctrlPtItem);
+          scene()->addItem(ctrlPtItem.get());
+          m_ctrlPtsItem.push_back(std::move(ctrlPtItem));
 
           m_spline << scenePt;   // add next potential pt
           m_splineItem->setPath(ZROI::splineToPainterPath(m_spline));
@@ -252,13 +248,9 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
               m_view->roi().subtractSpline(i, m_spline);
           }
         }
-        delete m_startPtItem;
-        m_startPtItem = nullptr;
-        for (auto ctrlItem : m_ctrlPtsItem)
-          delete ctrlItem;
+        m_startPtItem.reset();
         m_ctrlPtsItem.clear();
-        delete m_splineItem;
-        m_splineItem = nullptr;
+        m_splineItem.reset();
       }
     }
   } else if ((m_polygonItem || m_view->state() == ZView::State::ROIPolygon) && canUpdateROI) {
@@ -285,19 +277,19 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
             m_view->roi().deleteSliceROI(i);
         }
         QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
-        m_startPtItem = new QGraphicsPolygonItem(startPoly);
+        m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
         m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
         m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
-        scene()->addItem(m_startPtItem);
+        scene()->addItem(m_startPtItem.get());
         m_polygon.clear();
         m_polygon << m_startScenePt << m_startScenePt;  // pt and next potential pt
         LOG(INFO) << "";
         LOG(INFO) << "first: " << m_startScenePt;
         QPainterPath path;
         path.addPolygon(m_polygon);
-        m_polygonItem = new QGraphicsPathItem(path);
+        m_polygonItem = std::make_unique<QGraphicsPathItem>(path);
         m_polygonItem->setPen(QPen(QColor(255, 255, 0), 0));
-        scene()->addItem(m_polygonItem);
+        scene()->addItem(m_polygonItem.get());
       } else {
         if (m_startPtItem->contains(m_polygon.last())) {  // finish here
           m_polygon.last() = m_polygon[0];
@@ -310,13 +302,9 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
                 m_view->roi().subtractPolygon(i, m_polygon);
             }
           }
-          delete m_startPtItem;
-          m_startPtItem = nullptr;
-          for (auto ctrlItem : m_ctrlPtsItem)
-            delete ctrlItem;
+          m_startPtItem.reset();
           m_ctrlPtsItem.clear();
-          delete m_polygonItem;
-          m_polygonItem = nullptr;
+          m_polygonItem.reset();
         } else if (!isScenePtOverlap(m_polygon.last(), m_polygon[m_polygon.size() - 2])) {
           if (m_polygon.size() == 2) {
             LOG(INFO) << "second: " << scenePt;
@@ -349,11 +337,11 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
           }
 
           QPolygonF ctrlPoly = mapToScene(event->x() - 4, event->y() - 4, 8, 8);
-          QGraphicsPolygonItem* ctrlPtItem = new QGraphicsPolygonItem(ctrlPoly);
+          auto ctrlPtItem = std::make_unique<QGraphicsPolygonItem>(ctrlPoly);
           ctrlPtItem->setPen(QPen(QColor(0, 0, 0), 0));
           ctrlPtItem->setBrush(QBrush(QColor(255, 255, 0, 128)));
-          scene()->addItem(ctrlPtItem);
-          m_ctrlPtsItem.push_back(ctrlPtItem);
+          scene()->addItem(ctrlPtItem.get());
+          m_ctrlPtsItem.push_back(std::move(ctrlPtItem));
 
           m_polygon << scenePt;   // add next potential pt
           QPainterPath path;
@@ -377,13 +365,9 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
               m_view->roi().subtractPolygon(i, m_polygon);
           }
         }
-        delete m_startPtItem;
-        m_startPtItem = nullptr;
-        for (auto ctrlItem : m_ctrlPtsItem)
-          delete ctrlItem;
+        m_startPtItem.reset();
         m_ctrlPtsItem.clear();
-        delete m_polygonItem;
-        m_polygonItem = nullptr;
+        m_polygonItem.reset();
       }
     }
   } else if (m_view->state() == ZView::State::ROIRect && event->button() == Qt::LeftButton && canUpdateROI) {
@@ -407,13 +391,13 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
         m_view->roi().deleteSliceROI(i);
     }
     QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
-    m_startPtItem = new QGraphicsPolygonItem(startPoly);
+    m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
     m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
     m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
-    scene()->addItem(m_startPtItem);
-    m_rectItem = new QGraphicsRectItem(QRectF(scenePt, QSizeF(0, 0)));
+    scene()->addItem(m_startPtItem.get());
+    m_rectItem = std::make_unique<QGraphicsRectItem>(QRectF(scenePt, QSizeF(0, 0)));
     m_rectItem->setPen(QPen(QColor(255, 255, 0), 0));
-    scene()->addItem(m_rectItem);
+    scene()->addItem(m_rectItem.get());
   } else if (m_view->state() == ZView::State::ROIEllipse && event->button() == Qt::LeftButton && canUpdateROI) {
     QPointF scenePt = mapToScene(event->x(), event->y());
     CHECK(!m_startPtItem);
@@ -435,13 +419,13 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
         m_view->roi().deleteSliceROI(i);
     }
     QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
-    m_startPtItem = new QGraphicsPolygonItem(startPoly);
+    m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
     m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
     m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
-    scene()->addItem(m_startPtItem);
-    m_ellipseItem = new QGraphicsEllipseItem(QRectF(m_startScenePt, QSizeF(0, 0)));
+    scene()->addItem(m_startPtItem.get());
+    m_ellipseItem = std::make_unique<QGraphicsEllipseItem>(QRectF(m_startScenePt, QSizeF(0, 0)));
     m_ellipseItem->setPen(QPen(QColor(255, 255, 0), 0));
-    scene()->addItem(m_ellipseItem);
+    scene()->addItem(m_ellipseItem.get());
   } else {
     QPointF scenePt = mapToScene(event->x(), event->y());
     LOG(INFO) << scenePt.x() << " " << scenePt.y() << " " << m_view->currentSlice();
@@ -501,10 +485,8 @@ void ZGraphicsView::mouseReleaseEvent(QMouseEvent* event)
           m_view->roi().subtractRect(i, rect);
       }
     }
-    delete m_startPtItem;
-    m_startPtItem = nullptr;
-    delete m_rectItem;
-    m_rectItem = nullptr;
+    m_startPtItem.reset();
+    m_rectItem.reset();
   } else if (m_ellipseItem) {
     QRectF rect = m_ellipseItem->rect();
     if (rect.width() >= 1. && rect.height() >= 1.) {
@@ -516,10 +498,8 @@ void ZGraphicsView::mouseReleaseEvent(QMouseEvent* event)
           m_view->roi().subtractEllipse(i, rect);
       }
     }
-    delete m_startPtItem;
-    m_startPtItem = nullptr;
-    delete m_ellipseItem;
-    m_ellipseItem = nullptr;
+    m_startPtItem.reset();
+    m_ellipseItem.reset();
   } else {
     QGraphicsView::mouseReleaseEvent(event);
     //viewport()->setCursor(Qt::ArrowCursor);

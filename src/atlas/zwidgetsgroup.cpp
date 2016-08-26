@@ -136,7 +136,7 @@ QWidget* ZWidgetsGroup::createWidget(bool createBasic, bool scroll, QLabel* labe
 {
   QLayout* lw = createLayout(createBasic);
   // if is boxLayout, add strech to fill the space
-  QBoxLayout* blo = dynamic_cast<QBoxLayout*>(lw);
+  QBoxLayout* blo = qobject_cast<QBoxLayout*>(lw);
   if (blo)
     blo->addStretch();
   //
@@ -171,8 +171,8 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
     }
     case Type::Parameter: {
       QHBoxLayout* hbl = new QHBoxLayout;
-      if (dynamic_cast<Z3DCameraParameter*>(m_parameter)
-          || dynamic_cast<Z3DTransformParameter*>(m_parameter)) {
+      if (qobject_cast<Z3DCameraParameter*>(m_parameter)
+          || qobject_cast<Z3DTransformParameter*>(m_parameter)) {
         QWidget* wg = m_parameter->createWidget();
         hbl->addWidget(wg);
         return hbl;
@@ -220,7 +220,7 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
                 QWidget* wg = childGroup->createWidget(false, false);
                 toolBox->addItem(wg, childGroup->getGroupName());
                 // fully expand page, no scroll bar
-                dynamic_cast<QScrollArea*>(wg->parentWidget()->parentWidget())->setSizePolicy(
+                qobject_cast<QScrollArea*>(wg->parentWidget()->parentWidget())->setSizePolicy(
                   QSizePolicy::Preferred, QSizePolicy::Fixed);
               } else {
                 QLayout* lw = childGroup->createLayout(false);

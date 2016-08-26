@@ -22,7 +22,7 @@ Q_OBJECT
 public:
   static ZLogCache& instance();
 
-  // delete copy and move constructors and assign operators
+  // remove copy and move constructors and assign operators
   ZLogCache(const ZLogCache&) = delete;             // Copy construct
   ZLogCache(ZLogCache&&) = delete;                  // Move construct
   ZLogCache& operator=(const ZLogCache&) = delete;  // Copy assign

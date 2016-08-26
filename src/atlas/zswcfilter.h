@@ -9,6 +9,7 @@
 #include <map>
 #include "znumericparameter.h"
 #include "zswcdoc.h"
+#include "zgraphicsitemtype.h"
 
 class ZWidgetsGroup;
 
@@ -19,7 +20,7 @@ class ZSwcGraphicsItem : public QGraphicsItem
 public:
   enum
   {
-    Type = UserType + 7
+    Type = GraphicsItemType::ZSwcGraphicsItem
   };
 
   int type() const override

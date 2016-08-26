@@ -37,18 +37,10 @@ void EventBoundRectItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
   if (time < 0)
     time = 0;
   QMenu menu;
-  //QAction *addKeyAction = menu.addAction("Add Key...");
+
   QAction* addKeyHereAction = menu.addAction("Add Key Here");
   QAction* selectedAction = menu.exec(event->screenPos());
-  /*if (selectedAction == addKeyAction) {
-    ZParameterKey *key = m_displayPack.paraAnimation->createKey(time);
-    ZTimelineKeyEditDialog dlg(*m_displayPack.paraAnimation, *key, &m_timeline);
-    if (dlg.exec() == QDialog::Accepted) {
-      m_displayPack.paraAnimation->addKey(key);
-    } else {
-      delete key;
-    }
-  } else */
+
   if (selectedAction == addKeyHereAction) {
     m_displayPack.paraAnimation->addKey(m_displayPack.paraAnimation->createKey(time));
   }
@@ -284,7 +276,7 @@ void ZTimelineEventScene::updateItems()
 void ZTimelineEventScene::removeSelectedKeys()
 {
   QList<QGraphicsItem*> items = selectedItems();
-  // make sure key delete only once
+  // make sure that the selected keys are deleted only once
   std::map<ZParameterKey*, ZParameterAnimation*> keyAniMap;
   for (int i = 0; i < items.size(); ++i) {
     ParameterKeysItem* item = qgraphicsitem_cast<ParameterKeysItem*>(items[i]);

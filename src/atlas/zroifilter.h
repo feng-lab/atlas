@@ -10,6 +10,7 @@
 #include "znumericparameter.h"
 #include <vector>
 #include "zroi.h"
+#include "zgraphicsitemtype.h"
 
 class ZWidgetsGroup;
 
@@ -20,7 +21,7 @@ class ROIGraphicsItem : public QGraphicsPathItem
 public:
   enum
   {
-    Type = UserType + 5
+    Type = GraphicsItemType::ROIGraphicsItem
   };
 
   int type() const override
@@ -52,7 +53,7 @@ class ROICtrlPtGraphicsItem : public QGraphicsRectItem
 public:
   enum
   {
-    Type = UserType + 6
+    Type = GraphicsItemType::ROICtrlPtGraphicsItem
   };
 
   int type() const override

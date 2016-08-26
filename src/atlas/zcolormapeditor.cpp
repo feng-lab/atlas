@@ -252,7 +252,7 @@ bool ZColorMapWidget::event(QEvent* e)
 {
   if (e->type() == QEvent::ToolTip) {
     size_t index;
-    QHelpEvent* helpEvent = dynamic_cast<QHelpEvent*>(e);
+    QHelpEvent* helpEvent = static_cast<QHelpEvent*>(e);
     QRect tipRect;
     QString tipText;
     if (findkey(helpEvent->pos(), index, true) != ZColorMapWidget::NONE) {

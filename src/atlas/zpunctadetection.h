@@ -102,7 +102,7 @@ private:
   template<typename Image3DType>
   Eigen::MatrixXi detectSomaPuncta(const Image3DType* preprocessedImage);
 
-  // delete all detected punctum
+  // remove all detected punctum
   void cleanup();
 
   QString getPunctaOutputFilename(const QString& swcPath);

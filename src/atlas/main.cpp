@@ -215,7 +215,7 @@ int main(int argc, char* argv[])
       return 1;
     }
 
-    // Our MainWindow has Qt::WA_DeleteOnClose attribute, don't delete again.
+    // ZMainWindow has Qt::WA_DeleteOnClose attribute
     nim::ZMainWindow* mainWin = new nim::ZMainWindow();
     QObject::connect(&app, &nim::ZApplication::fileOpenRequest, mainWin, &nim::ZMainWindow::loadUrls);
     mainWin->show();

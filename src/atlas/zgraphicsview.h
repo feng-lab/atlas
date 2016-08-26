@@ -76,14 +76,14 @@ private:
 
   ROIAction m_roiAction;
   QPointF m_startScenePt;
-  QGraphicsPolygonItem* m_startPtItem;
-  std::vector<QGraphicsPolygonItem*> m_ctrlPtsItem;
-  QGraphicsEllipseItem* m_ellipseItem;
-  QGraphicsRectItem* m_rectItem;
+  std::unique_ptr<QGraphicsPolygonItem> m_startPtItem;
+  std::vector<std::unique_ptr<QGraphicsPolygonItem>> m_ctrlPtsItem;
+  std::unique_ptr<QGraphicsEllipseItem> m_ellipseItem;
+  std::unique_ptr<QGraphicsRectItem> m_rectItem;
   QPolygonF m_polygon;
-  QGraphicsPathItem* m_polygonItem;
+  std::unique_ptr<QGraphicsPathItem> m_polygonItem;
   QPolygonF m_spline;
-  QGraphicsPathItem* m_splineItem;
+  std::unique_ptr<QGraphicsPathItem> m_splineItem;
 };
 
 } // namespace nim

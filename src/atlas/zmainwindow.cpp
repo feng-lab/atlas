@@ -62,7 +62,6 @@ namespace nim {
 
 ZMainWindow::ZMainWindow()
   : QMainWindow()
-  , m_3dWindow(nullptr)
   , m_isClosed(false)
   , m_versionString(__DATE__)
 {
@@ -125,7 +124,9 @@ void ZMainWindow::openEditWidget(size_t id)
     if (!m_3dWindow) {
       open3DWindow();
     }
-    m_3dWindow->openEditWidget(id);
+    if (m_3dWindow) {
+      m_3dWindow->openEditWidget(id);
+    }
   }
 }
 
@@ -160,23 +161,21 @@ void ZMainWindow::loadUrls(const QList<QUrl>& urlList)
 
 void ZMainWindow::closeEvent(QCloseEvent* event)
 {
-  // Qt 5.4 mac bug, use dock icon context menu -> quit will call this function twice and crash
+  // Qt mac bug, use dock icon context menu -> quit will call this function twice and crash
   if (m_isClosed) {
     event->accept();
     return;
   }
 
-  if (m_3dWindow) {
-    delete m_3dWindow;
-    m_3dWindow = nullptr;
-  }
+  delete m_3dWindow.data();
+  m_3dWindow.clear();
 
   if (maybeSave()) {
     writeSettings();
     event->accept();
     // otherwise it is very slow to close the application
-    delete m_view;
-    delete m_doc;
+    m_view.reset();
+    m_doc.reset();
     m_isClosed = true;
   } else {
     event->ignore();
@@ -288,12 +287,11 @@ void ZMainWindow::open3DWindow()
   if (ZSystemInfo::instance().is3DSupported()) {
     try {
       if (!m_3dWindow) {
-        m_3dWindow = new Z3DMainWindow(m_doc, *this, false);
+        m_3dWindow = new Z3DMainWindow(m_doc.get(), *this, false);
         m_3dWindow->setWindowTitle(QString("3D View  %1").arg(windowTitle()));
         connect(m_3dWindow, &Z3DMainWindow::loadScene, this, &ZMainWindow::loadScene);
         connect(m_3dWindow, &Z3DMainWindow::saveScene, this, &ZMainWindow::saveScene);
         connect(m_3dWindow, &Z3DMainWindow::loadJsonScene, this, &ZMainWindow::loadJsonScene);
-        connect(m_3dWindow, &Z3DMainWindow::destroyed, this, &ZMainWindow::detach3DWindow);
         QApplication::processEvents();
         m_doc->animation3DDoc().bindView(m_3dWindow->view());
       }
@@ -306,18 +304,13 @@ void ZMainWindow::open3DWindow()
     catch (const ZException& e) {
       LOG(ERROR) << "Failed to open 3D window: " << e.what();
       QMessageBox::critical(this, qApp->applicationName(), "Failed to open 3D window.\n" + e.what());
-      delete m_3dWindow;
-      m_3dWindow = nullptr;
+      delete m_3dWindow.data();
+      m_3dWindow.clear();
     }
   } else {
     QMessageBox::critical(this, qApp->applicationName(),
                           "3D functions are disabled.\n" + ZSystemInfo::instance().errorMessage());
   }
-}
-
-void ZMainWindow::detach3DWindow()
-{
-  m_3dWindow = nullptr;
 }
 
 void ZMainWindow::loadScene()
@@ -396,8 +389,8 @@ void ZMainWindow::init()
   setAttribute(Qt::WA_DeleteOnClose);
   setAcceptDrops(true);
 
-  m_doc = new ZDoc(this);
-  m_view = new ZView(*m_doc, this);
+  m_doc = std::make_unique<ZDoc>(this);
+  m_view = std::make_unique<ZView>(*m_doc, this);
 
   //packages
   ZImgView* imgView = new ZImgView(m_doc->imgDoc(), *m_view);
@@ -427,9 +420,9 @@ void ZMainWindow::init()
   m_view->registerObjView(svgView);
 
   // UI
-  setCentralWidget(m_view);
+  setCentralWidget(m_view.get());
 
-  m_doc->animation2DDoc().bindView(m_view);
+  m_doc->animation2DDoc().bindView(m_view.get());
 
   createActions();
   createMenus();
@@ -664,14 +657,14 @@ void ZMainWindow::createDockWindows()
   m_objectsDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
   ZObjWidget* objWidget = m_doc->createObjWidget(this);
   m_objectsDockWidget->setWidget(objWidget);
-  connect(m_doc, &ZDoc::openEditWidget, this, &ZMainWindow::openEditWidget);
+  connect(m_doc.get(), &ZDoc::openEditWidget, this, &ZMainWindow::openEditWidget);
   addDockWidget(Qt::RightDockWidgetArea, m_objectsDockWidget);
   m_windowMenu->addAction(m_objectsDockWidget->toggleViewAction());
 
   m_viewSettingDockWidget = new QDockWidget(tr("Object View Setting"), this);
   m_viewSettingDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
   m_viewSettingDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  m_viewSettingDockWidget->setWidget(new ZViewSettingWidget(m_doc, m_view, this));
+  m_viewSettingDockWidget->setWidget(new ZViewSettingWidget(m_doc.get(), m_view.get(), this));
   addDockWidget(Qt::RightDockWidgetArea, m_viewSettingDockWidget);
   m_windowMenu->addAction(m_viewSettingDockWidget->toggleViewAction());
 
@@ -680,7 +673,7 @@ void ZMainWindow::createDockWindows()
                                               QDockWidget::DockWidgetMovable |
                                               QDockWidget::DockWidgetFloatable);
   m_objectDetailedInfoDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  m_objectDetailedInfoDockWidget->setWidget(new ZObjDetailedInfoWidget(m_doc, this));
+  m_objectDetailedInfoDockWidget->setWidget(new ZObjDetailedInfoWidget(m_doc.get(), this));
   addDockWidget(Qt::RightDockWidgetArea, m_objectDetailedInfoDockWidget);
   m_windowMenu->addAction(m_objectDetailedInfoDockWidget->toggleViewAction());
   m_objectDetailedInfoDockWidget->setVisible(false);
@@ -698,7 +691,7 @@ void ZMainWindow::createDockWindows()
   m_editObjDockWidget = new QDockWidget(tr("Edit and Output"), this);
   m_editObjDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
   m_editObjDockWidget->setAllowedAreas(Qt::BottomDockWidgetArea);
-  m_objEditWidget = new ZObjEditWidget(m_doc, this);
+  m_objEditWidget = new ZObjEditWidget(m_doc.get(), this);
   m_editObjDockWidget->setWidget(m_objEditWidget);
   addDockWidget(Qt::BottomDockWidgetArea, m_editObjDockWidget);
   m_windowMenu->addAction(m_editObjDockWidget->toggleViewAction());
@@ -807,7 +800,9 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
     if (it.key() == "View2DGeneral") {
       m_view->read(it.value().toObject());
     } else if (it.key() == "View3DGeneral") {
-      m_3dWindow->view()->read(it.value().toObject());
+      if (m_3dWindow) {
+        m_3dWindow->view()->read(it.value().toObject());
+      }
     } else if (it.key() != "Doc" && it.key() != "Version") {
       bool ok;
       size_t objectId = it.key().toLongLong(&ok);
@@ -823,7 +818,9 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
               open3DWindow();
               QApplication::processEvents();
             }
-            m_3dWindow->view()->read(id, viewObj["View3D"].toObject());
+            if (m_3dWindow) {
+              m_3dWindow->view()->read(id, viewObj["View3D"].toObject());
+            }
           }
         }
       } else {

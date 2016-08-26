@@ -59,7 +59,7 @@ void Z3DNetworkEvaluator::process(bool stereo)
   lock();
 
 //  for (size_t i = 0; i < m_renderingOrder.size(); ++i) {
-//    Z3DMeshFilter* meshFilter = dynamic_cast<Z3DMeshFilter*>(m_renderingOrder[i]);
+//    Z3DMeshFilter* meshFilter = qobject_cast<Z3DMeshFilter*>(m_renderingOrder[i]);
 //    if (meshFilter && !meshFilter->isFixed()) {
 //      if (ZRandomInstance.randReal<float>() < 0.001f) {
 //        meshFilter->setVisible(true);

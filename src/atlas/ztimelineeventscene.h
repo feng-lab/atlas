@@ -9,6 +9,7 @@
 #include <QTextOption>
 #include "ztimelinewidget.h"
 #include "zparameterkey.h"
+#include "zgraphicsitemtype.h"
 
 namespace nim {
 
@@ -36,7 +37,7 @@ class ParameterKeysItem : public QGraphicsRectItem
 public:
   enum
   {
-    Type = UserType + 4
+    Type = GraphicsItemType::ParameterKeysItem
   };
 
   int type() const override

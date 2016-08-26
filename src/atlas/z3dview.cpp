@@ -367,9 +367,6 @@ void Z3DView::init()
 
   // filters
   m_compositor.reset(new Z3DCompositor(m_globalParas));
-  //ZStringIntOptionParameter* transparentMethod = dynamic_cast<ZStringIntOptionParameter*>(m_compositor->getParameter("Transparency"));
-  //if (Z3DGpuInfoInstance.isWeightedAverageSupported())
-  //transparentMethod->select("Weighted Average");
 
   m_canvasPainter.reset(new Z3DCanvasPainter(m_globalParas));
   m_canvasPainter->setCanvas(m_canvas);

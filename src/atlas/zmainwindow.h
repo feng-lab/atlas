@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QPointer>
 
 class QAction;
 
@@ -80,8 +81,6 @@ private:
   void runCustomCommand();
 
   void open3DWindow();
-
-  void detach3DWindow();
 
   void loadScene();
 
@@ -171,13 +170,13 @@ private:
   ZObjEditWidget* m_objEditWidget;
 
   //
-  ZDoc* m_doc;
-  ZView* m_view;
+  std::unique_ptr<ZDoc> m_doc;
+  std::unique_ptr<ZView> m_view;
 
   //
   Z3DCanvas* m_sharedContext;
 
-  Z3DMainWindow* m_3dWindow;
+  QPointer<Z3DMainWindow> m_3dWindow;
 
   bool m_isClosed;
 

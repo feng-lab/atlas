@@ -41,7 +41,7 @@ public:
   // get view setting widget group of obj id, default return nullptr
   virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id);
 
-  // called if delete key is pressed
+  // called if Delete key is pressed
   virtual void deleteKeyPressed() = 0;
 
   // called if mouse is pressed in a scene pos
