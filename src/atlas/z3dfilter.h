@@ -74,10 +74,6 @@ public:
   // returns first parameter with the given name. return nullptr if not found
   ZParameter* parameter(const QString& name) const;
 
-  // returns all parameters matching the specified type T, including subtypes.
-  template<class T>
-  std::vector<T*> parametersOfType() const;
-
   virtual void invalidate(State inv = State::AllResultInvalid);
 
   // returns the port with the given name, or nullptr if such a port does not exist.

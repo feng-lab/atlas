@@ -382,25 +382,18 @@ void Z3DVolumeFilter::enterInteractionMode()
 {
   glm::uvec2 expectedSize = m_outport.expectedSize();
   if (m_interactionDownsample.get() != 1) {
-    const std::vector<Z3DOutputPortBase*> outports = outputPorts();
-    for (size_t i = 0; i < outports.size(); ++i) {
-      Z3DRenderOutputPort* rp = dynamic_cast<Z3DRenderOutputPort*>(outports[i]);
-      if (rp)
-        rp->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
+    for (auto port : outputPorts()) {
+      port->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
+    }
+    for (auto port : m_privateRenderPorts) {
+      port->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
+    }
+    for (auto target : m_privateRenderTargets) {
+      target->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
     }
 
-    for (size_t i = 0; i < m_privateRenderPorts.size(); ++i) {
-      m_privateRenderPorts[i]->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
-    }
-    for (size_t i = 0; i < m_privateRenderTargets.size(); ++i) {
-      m_privateRenderTargets[i]->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
-    }
-
-    const std::vector<Z3DInputPortBase*> inports = inputPorts();
-    for (size_t i = 0; i < inports.size(); ++i) {
-      Z3DRenderInputPort* rp = dynamic_cast<Z3DRenderInputPort*>(inports[i]);
-      if (rp)
-        rp->setExpectedSize(expectedSize / uint32_t(m_interactionDownsample.get()));
+    for (auto port : inputPorts()) {
+      port->setExpectedSize(expectedSize / uint32_t(m_interactionDownsample.get()));
     }
     emit requestUpstreamSizeChange(this);
 
@@ -414,25 +407,18 @@ void Z3DVolumeFilter::exitInteractionMode()
 {
   glm::uvec2 expectedSize = m_outport.expectedSize();
   if (m_interactionDownsample.get() != 1) {
-    const std::vector<Z3DOutputPortBase*> outports = outputPorts();
-    for (size_t i = 0; i < outports.size(); ++i) {
-      Z3DRenderOutputPort* rp = dynamic_cast<Z3DRenderOutputPort*>(outports[i]);
-      if (rp)
-        rp->resize(expectedSize);
+    for (auto port : outputPorts()) {
+      port->resize(expectedSize);
+    }
+    for (auto port : m_privateRenderPorts) {
+      port->resize(expectedSize);
+    }
+    for (auto target : m_privateRenderTargets) {
+      target->resize(expectedSize);
     }
 
-    for (size_t i = 0; i < m_privateRenderPorts.size(); ++i) {
-      m_privateRenderPorts[i]->resize(expectedSize);
-    }
-    for (size_t i = 0; i < m_privateRenderTargets.size(); ++i) {
-      m_privateRenderTargets[i]->resize(expectedSize);
-    }
-
-    const std::vector<Z3DInputPortBase*> inports = inputPorts();
-    for (size_t i = 0; i < inports.size(); ++i) {
-      Z3DRenderInputPort* rp = dynamic_cast<Z3DRenderInputPort*>(inports[i]);
-      if (rp)
-        rp->setExpectedSize(expectedSize);
+    for (auto port : inputPorts()) {
+      port->setExpectedSize(expectedSize);
     }
     emit requestUpstreamSizeChange(this);
 

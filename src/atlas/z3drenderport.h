@@ -10,8 +10,7 @@ namespace nim {
 class Z3DRenderOutputPort : public Z3DOutputPortBase
 {
 public:
-  Z3DRenderOutputPort(const QString& name, bool allowMultipleConnections = true,
-                      Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid,
+  Z3DRenderOutputPort(const QString& name, Z3DFilter* filter,
                       GLint internalColorFormat = GLint(GL_RGBA16),
                       GLint internalDepthFormat = GLint(GL_DEPTH_COMPONENT24));
 
@@ -89,7 +88,8 @@ private:
 class Z3DRenderInputPort : public Z3DInputPortBase
 {
 public:
-  Z3DRenderInputPort(const QString& name, bool allowMultipleConnections = false,
+  Z3DRenderInputPort(const QString& name, bool allowMultipleConnections,
+                     Z3DFilter* filter,
                      Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid);
 
   virtual ~Z3DRenderInputPort();

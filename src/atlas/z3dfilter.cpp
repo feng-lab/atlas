@@ -147,29 +147,24 @@ bool Z3DFilter::isReady(Z3DEye) const
 
 void Z3DFilter::addPort(Z3DInputPortBase& port)
 {
-  port.setFilter(this);
-
   m_inputPorts.push_back(&port);
 
   std::map<QString, Z3DInputPortBase*>::const_iterator it = m_inputPortMap.find(port.name());
   if (it == m_inputPortMap.end())
     m_inputPortMap.emplace(port.name(), &port);
   else {
-    LOG(ERROR) << className() << " port " << port.name() << " has already been inserted!";
-    CHECK(false);
+    LOG(FATAL) << className() << " port " << port.name() << " has already been inserted!";
   }
 }
 
 void Z3DFilter::addPort(Z3DOutputPortBase& port)
 {
-  port.setFilter(this);
   m_outputPorts.push_back(&port);
   std::map<QString, Z3DOutputPortBase*>::const_iterator it = m_outputPortMap.find(port.name());
   if (it == m_outputPortMap.end())
     m_outputPortMap.emplace(port.name(), &port);
   else {
-    LOG(ERROR) << className() << " port " << port.name() << " has already been inserted!";
-    CHECK(false);
+    LOG(FATAL) << className() << " port " << port.name() << " has already been inserted!";
   }
 }
 
@@ -181,8 +176,7 @@ void Z3DFilter::removePort(Z3DInputPortBase& port)
   if (inIt != m_inputPortMap.end())
     m_inputPortMap.erase(inIt);
   else {
-    LOG(ERROR) << className() << " port " << port.name() << " was not found!";
-    CHECK(false);
+    LOG(FATAL) << className() << " port " << port.name() << " was not found!";
   }
 }
 
@@ -194,8 +188,7 @@ void Z3DFilter::removePort(Z3DOutputPortBase& port)
   if (outIt != m_outputPortMap.end())
     m_outputPortMap.erase(outIt);
   else {
-    LOG(ERROR) << className() << " port " << port.name() << " was not found!";
-    CHECK(false);
+    LOG(FATAL) << className() << " port " << port.name() << " was not found!";
   }
 }
 
@@ -261,15 +254,13 @@ void Z3DFilter::toggleInteractionMode(bool interactionMode, void* source)
 
 void Z3DFilter::addPrivateRenderPort(Z3DRenderOutputPort& port)
 {
-  port.setFilter(this);
   m_privateRenderPorts.push_back(&port);
 
   std::map<QString, Z3DOutputPortBase*>::const_iterator it = m_outputPortMap.find(port.name());
   if (it == m_outputPortMap.end())
     m_outputPortMap.emplace(port.name(), &port);
   else {
-    LOG(ERROR) << className() << " port " << port.name() << " has already been inserted!";
-    CHECK(false);
+    LOG(FATAL) << className() << " port " << port.name() << " has already been inserted!";
   }
 }
 

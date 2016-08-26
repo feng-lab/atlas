@@ -7,16 +7,16 @@
 
 namespace nim {
 
-class Z3DPort
+class Z3DOutputPortBase;
+
+class Z3DInputPortBase
 {
 public:
-  Z3DPort(const QString& name, bool allowMultipleConnections = false,
-          Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid);
+  Z3DInputPortBase(const QString& name, bool allowMultipleConnections,
+                   Z3DFilter* filter,
+                   Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid);
 
-  virtual ~Z3DPort();
-
-  bool allowMultipleConnections() const
-  { return m_allowMultipleConnections; }
+  virtual ~Z3DInputPortBase();
 
   // return the filter this port belongs to.
   Z3DFilter* filter() const
@@ -24,27 +24,6 @@ public:
 
   QString name() const
   { return m_name; }
-
-  virtual void setFilter(Z3DFilter* p);
-
-protected:
-  QString m_name;
-  Z3DFilter* m_filter;
-  bool m_allowMultipleConnections;
-
-  // how changes from this port affect its filter
-  Z3DFilter::State m_invalidationState;
-};
-
-class Z3DOutputPortBase;
-
-class Z3DInputPortBase : public Z3DPort
-{
-public:
-  Z3DInputPortBase(const QString& name, bool allowMultipleConnections = false,
-                   Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid);
-
-  virtual ~Z3DInputPortBase();
 
   // invalidate filter with the given State and set hasChanged=true.
   void invalidate();
@@ -86,19 +65,32 @@ public:
 protected:
   friend class Z3DOutputPortBase;
 
+  QString m_name;
+  bool m_allowMultipleConnections;
+  Z3DFilter* m_filter;
+
+  // how changes from this port affect its filter
+  Z3DFilter::State m_invalidationState;
+
   std::vector<Z3DOutputPortBase*> m_connectedOutputPorts;
   bool m_hasChanged;
 
   glm::uvec2 m_expectedSize;
 };
 
-class Z3DOutputPortBase : public Z3DPort
+class Z3DOutputPortBase
 {
 public:
-  Z3DOutputPortBase(const QString& name, bool allowMultipleConnections = true,
-                    Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid);
+  Z3DOutputPortBase(const QString& name, Z3DFilter* filter);
 
   virtual ~Z3DOutputPortBase();
+
+  // return the filter this port belongs to.
+  Z3DFilter* filter() const
+  { return m_filter; }
+
+  QString name() const
+  { return m_name; }
 
   const std::vector<Z3DInputPortBase*> connected() const
   { return m_connectedInputPorts; }
@@ -142,128 +134,22 @@ public:
   { m_size = newsize; }
 
 protected:
+  QString m_name;
+  Z3DFilter* m_filter;
+
   std::vector<Z3DInputPortBase*> m_connectedInputPorts;
 
   glm::uvec2 m_size;
 };
 
-template<class T>
-class Z3DInputPort;
-
-template<typename T>
-class Z3DOutputPort : public Z3DOutputPortBase
-{
-public:
-  Z3DOutputPort(const QString& name, bool allowMultipleConnections = true,
-                Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid)
-    : Z3DOutputPortBase(name, allowMultipleConnections, invalidationState)
-    , m_portData(0)
-  {}
-
-  virtual ~Z3DOutputPort()
-  {
-  }
-
-  virtual bool canConnectTo(const Z3DInputPortBase* inport) const override
-  {
-    if (dynamic_cast<const Z3DInputPort<T>*>(inport))
-      return Z3DOutputPortBase::canConnectTo(inport);
-    else
-      return false;
-  }
-
-  void setData(T* data)
-  {
-    // is it possible that the new allocated data has the same address as the old one???
-    if (data != m_portData) {
-      m_portData = data;
-      invalidate();
-    }
-  }
-
-  // return the data stored in this port
-  T* data() const
-  {
-    return m_portData;
-  }
-
-  virtual bool hasValidData() const override
-  { return m_portData != nullptr; }
-
-  std::vector<const Z3DInputPort<T>*> connected() const
-  {
-    std::vector<const Z3DInputPort<T>*> ports;
-    for (size_t i = 0; i < m_connectedInputPorts.size(); ++i) {
-      Z3DInputPort<T>* p = static_cast<Z3DInputPort<T>*>(m_connectedInputPorts[i]);
-      ports.push_back(p);
-    }
-    return ports;
-  }
-
-protected:
-  T* m_portData;
-};
-
-template<typename T>
-class Z3DInputPort : public Z3DInputPortBase
-{
-public:
-  Z3DInputPort(const QString& name, bool allowMultipleConnections = true,
-               Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid)
-    : Z3DInputPortBase(name, allowMultipleConnections, invalidationState)
-  {}
-
-  virtual ~Z3DInputPort()
-  {}
-
-
-  // return first valid data stored in the connected outports
-  T* firstValidData() const
-  {
-    for (size_t i = 0; i < m_connectedOutputPorts.size(); ++i) {
-      Z3DOutputPort<T>* p = static_cast< Z3DOutputPort<T>* >(m_connectedOutputPorts[i]);
-      if (p->hasValidData())
-        return p->data();
-    }
-    return nullptr;
-  }
-
-  // return all valid data stored in the connected outports
-  std::vector<T*> allValidData() const
-  {
-    std::vector<T*> allData;
-
-    for (size_t i = 0; i < m_connectedOutputPorts.size(); ++i) {
-      Z3DOutputPort<T>* p = static_cast<Z3DOutputPort<T>*>(m_connectedOutputPorts[i]);
-      if (p->hasValidData())
-        allData.push_back(p->data());
-    }
-
-    return allData;
-  }
-
-  std::vector<const Z3DOutputPort<T>*> connected() const
-  {
-    std::vector<const Z3DOutputPort<T>*> ports;
-    for (size_t i = 0; i < m_connectedOutputPorts.size(); ++i) {
-      Z3DOutputPort<T>* p = static_cast<Z3DOutputPort<T>*>(m_connectedOutputPorts[i]);
-      ports.push_back(p);
-    }
-    return ports;
-  }
-
-  virtual bool isReady() const override
-  { return firstValidData() != nullptr; }
-};
-
-
 template<typename T>
 class Z3DFilterInputPort : public Z3DInputPortBase
 {
 public:
-  Z3DFilterInputPort(const QString& name, bool allowMultipleConnections = true,
+  Z3DFilterInputPort(const QString& name, bool allowMultipleConnections,
+                     Z3DFilter* filter,
                      Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid)
-    : Z3DInputPortBase(name, allowMultipleConnections, invalidationState)
+    : Z3DInputPortBase(name, allowMultipleConnections, filter, invalidationState)
   {
   }
 
@@ -293,9 +179,8 @@ template<typename T>
 class Z3DFilterOutputPort : public Z3DOutputPortBase
 {
 public:
-  Z3DFilterOutputPort(const QString& name, bool allowMultipleConnections = false,
-                      Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid)
-    : Z3DOutputPortBase(name, allowMultipleConnections, invalidationState)
+  Z3DFilterOutputPort(const QString& name, Z3DFilter* filter)
+    : Z3DOutputPortBase(name, filter)
   {
   }
 
@@ -310,16 +195,6 @@ public:
   // data is filter itself, so it is always valid
   virtual bool hasValidData() const override
   { return true; }
-
-protected:
-  virtual void setFilter(Z3DFilter* p) override
-  {
-    Z3DOutputPortBase::setFilter(p);
-    T* tp = dynamic_cast<T*>(p);
-    if (!tp) {
-      LOG(ERROR) << "Port " << name() << " attached to filter of wrong type " << p->className();
-    }
-  }
 };
 
 } // namespace nim

@@ -21,9 +21,9 @@ Z3DCanvasPainter::Z3DCanvasPainter(Z3DGlobalParameters& globalParas, QObject* pa
   : Z3DBoundedFilter(globalParas, parent)
   , m_textureCopyRenderer(m_rendererBase, Z3DTextureCopyRenderer::OutputColorOption::DivideByAlpha)
   , m_canvas(nullptr)
-  , m_inport("Image", false, State::MonoViewResultInvalid)
-  , m_leftEyeInport("LeftEyeImage", false, State::LeftEyeResultInvalid)
-  , m_rightEyeInport("RightEyeImage", false, State::RightEyeResultInvalid)
+  , m_inport("Image", false, this, State::MonoViewResultInvalid)
+  , m_leftEyeInport("LeftEyeImage", false, this, State::LeftEyeResultInvalid)
+  , m_rightEyeInport("RightEyeImage", false, this, State::RightEyeResultInvalid)
   , m_renderToImage(false)
 {
   addPort(m_inport);

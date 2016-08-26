@@ -3,28 +3,15 @@
 
 namespace nim {
 
-Z3DPort::Z3DPort(const QString& name, bool allowMultipleConnections, Z3DFilter::State invalidationState)
-  : m_name(name)
-  , m_filter(nullptr)
-  , m_allowMultipleConnections(allowMultipleConnections)
-  , m_invalidationState(invalidationState)
-{
-}
-
-Z3DPort::~Z3DPort()
-{
-}
-
-void Z3DPort::setFilter(Z3DFilter* p)
-{
-  m_filter = p;
-}
-
-Z3DInputPortBase::Z3DInputPortBase(const QString& name, bool allowMultipleConnections,
+Z3DInputPortBase::Z3DInputPortBase(const QString& name, bool allowMultipleConnections, Z3DFilter* filter,
                                    Z3DFilter::State invalidationState)
-  : Z3DPort(name, allowMultipleConnections, invalidationState)
+  : m_name(name)
+  , m_allowMultipleConnections(allowMultipleConnections)
+  , m_filter(filter)
+  , m_invalidationState(invalidationState)
   , m_expectedSize(0)
 {
+  CHECK(filter);
 }
 
 Z3DInputPortBase::~Z3DInputPortBase()
@@ -67,12 +54,12 @@ void Z3DInputPortBase::disconnectAll()
   }
 }
 
-
-Z3DOutputPortBase::Z3DOutputPortBase(const QString& name, bool allowMultipleConnections,
-                                     Z3DFilter::State invalidationState)
-  : Z3DPort(name, allowMultipleConnections, invalidationState)
+Z3DOutputPortBase::Z3DOutputPortBase(const QString& name, Z3DFilter* filter)
+  : m_name(name)
+  , m_filter(filter)
   , m_size(32, 32)
 {
+  CHECK(filter);
 }
 
 Z3DOutputPortBase::~Z3DOutputPortBase()
@@ -88,7 +75,7 @@ bool Z3DOutputPortBase::canConnectTo(const Z3DInputPortBase* inport) const
   if (isConnectedTo(inport))
     return false;
 
-  if ((inport->allowMultipleConnections() == false) && inport->isConnected())
+  if (!inport->m_allowMultipleConnections && inport->isConnected())
     return false;
 
   if (filter() == inport->filter())
@@ -116,8 +103,11 @@ bool Z3DOutputPortBase::connect(Z3DInputPortBase* inport)
     inport->m_connectedOutputPorts.push_back(this);
     inport->invalidate();
     return true;
+  } else {
+    LOG(ERROR) << "Inport " << inport->name() << " of " << inport->filter()->className()
+               << " can not be connected to outport " << m_name << " of " << m_filter->className();
+    return false;
   }
-  return false;
 }
 
 void Z3DOutputPortBase::disconnect(Z3DInputPortBase* inport)

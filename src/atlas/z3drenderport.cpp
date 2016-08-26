@@ -6,10 +6,9 @@
 
 namespace nim {
 
-Z3DRenderOutputPort::Z3DRenderOutputPort(const QString& name, bool allowMultipleConnections,
-                                         Z3DFilter::State invalidationState, GLint internalColorFormat,
-                                         GLint internalDepthFormat)
-  : Z3DOutputPortBase(name, allowMultipleConnections, invalidationState)
+Z3DRenderOutputPort::Z3DRenderOutputPort(const QString& name, Z3DFilter* filter,
+                                         GLint internalColorFormat, GLint internalDepthFormat)
+  : Z3DOutputPortBase(name, filter)
   , m_resultIsValid(false)
   , m_internalColorFormat(internalColorFormat)
   , m_internalDepthFormat(internalDepthFormat)
@@ -81,8 +80,9 @@ bool Z3DRenderOutputPort::canConnectTo(const Z3DInputPortBase* inport) const
 //-----------------------------------------------------------------------------------
 
 Z3DRenderInputPort::Z3DRenderInputPort(const QString& name, bool allowMultipleConnections,
+                                       Z3DFilter* filter,
                                        Z3DFilter::State invalidationState)
-  : Z3DInputPortBase(name, allowMultipleConnections, invalidationState)
+  : Z3DInputPortBase(name, allowMultipleConnections, filter, invalidationState)
 {
 }
 
@@ -94,8 +94,7 @@ size_t Z3DRenderInputPort::numValidInputs() const
 {
   size_t res = 0;
   for (size_t i = 0; i < m_connectedOutputPorts.size(); ++i) {
-    const Z3DRenderOutputPort* p = dynamic_cast<const Z3DRenderOutputPort*>(m_connectedOutputPorts[i]);
-    CHECK(p);
+    const Z3DRenderOutputPort* p = static_cast<const Z3DRenderOutputPort*>(m_connectedOutputPorts[i]);
     if (p->hasValidData())
       ++res;
   }
@@ -132,8 +131,7 @@ const Z3DRenderTarget* Z3DRenderInputPort::renderTarget(size_t idx) const
     return nullptr;
   size_t res = 0;
   for (size_t i = 0; i < m_connectedOutputPorts.size(); ++i) {
-    const Z3DRenderOutputPort* p = dynamic_cast<const Z3DRenderOutputPort*>(m_connectedOutputPorts[i]);
-    CHECK(p);
+    const Z3DRenderOutputPort* p = static_cast<const Z3DRenderOutputPort*>(m_connectedOutputPorts[i]);
     if (p->hasValidData())
       ++res;
     if (idx == res - 1)
