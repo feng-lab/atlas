@@ -706,7 +706,8 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
 
   QByteArray saveData = file.readAll();
 
-  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData));
+  QJsonParseError jsonError;
+  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
   if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
     return;
   }

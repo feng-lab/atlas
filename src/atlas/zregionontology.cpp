@@ -88,9 +88,10 @@ void readMouseBrainAtlasOntology(ZTree<RegionNode>& ontology)
   }
 
   QByteArray saveData = file.readAll();
-  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData));
+  QJsonParseError jsonError;
+  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
   if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
-    throw ZIOException(QObject::tr("File format is incorrect"));
+    throw ZIOException(QString("Incorrect file format <%1>").arg(jsonError.errorString()));
   }
   QJsonObject loadObj = loadDoc.object();
   if (!loadObj.contains("msg") || !loadObj["msg"].isArray() || !loadObj["msg"].toArray().first().isObject()) {
@@ -140,9 +141,10 @@ void readMouseBrainAtlasOntology(const QStringList& regionAbbrevs, ZTree<RegionN
   }
 
   QByteArray saveData = file.readAll();
-  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData));
+  QJsonParseError jsonError;
+  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
   if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
-    throw ZIOException(QObject::tr("File format is incorrect"));
+    throw ZIOException(QString("Incorrect file format <%1>").arg(jsonError.errorString()));
   }
   QJsonObject loadObj = loadDoc.object();
   if (!loadObj.contains("msg") || !loadObj["msg"].isArray() || !loadObj["msg"].toArray().first().isObject()) {

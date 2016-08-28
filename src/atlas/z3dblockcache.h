@@ -39,7 +39,7 @@ public:
   glm::ivec3 insert(const KeyType& key, KeyType& erasedKey)
   {
     auto last = m_cacheItemsList.end();
-    last--;
+    --last;
     if (m_numValidItems == m_size) {
       m_cacheItemsMap.erase(last->first);
     } else {

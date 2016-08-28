@@ -35,7 +35,7 @@ public:
   ZImgPackSubBlock(std::shared_ptr<ZImg>& img, size_t ratio, size_t t, size_t z,
                    int64_t x, int64_t y, size_t width, size_t height);
 
-  ZImgPackSubBlock(std::shared_ptr<ZImg>& img, size_t ratio, size_t t, size_t sliceStart, size_t sliceEnd,
+  ZImgPackSubBlock(const std::shared_ptr<ZImg>& img, size_t ratio, size_t t, size_t sliceStart, size_t sliceEnd,
                    int64_t x, int64_t y, size_t width, size_t height);
 
   virtual ~ZImgPackSubBlock()
@@ -55,6 +55,8 @@ protected:
 class ZImgPack : public ZImgSliceProvider
 {
 public:
+  using HashKeyType = std::tuple<const ZImgPack*, size_t>;
+
   enum class MinMaxState
   {
     Invalid, Partial, Complete
@@ -266,7 +268,6 @@ private:
   using RTreeType = bgi::rtree<RTreeValueType, bgi::quadratic<16>>;
   using RTZToTileBoxRTreeType = std::map<RTZType, std::unique_ptr<RTreeType>>;
   RTZToTileBoxRTreeType m_rtzToTileBoxRTree;
-  using HashKeyType = std::tuple<const ZImgPack*, size_t>;
 
   double m_minIntensity;
   double m_maxIntensity;

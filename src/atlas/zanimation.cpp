@@ -862,9 +862,10 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
 
     QByteArray saveData = file.readAll();
 
-    QJsonDocument loadDoc(QJsonDocument::fromJson(saveData));
+    QJsonParseError jsonError;
+    QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
     if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
-      throw ZIOException(tr("File format is incorrect"));
+      throw ZIOException(QString("Incorrect file format <%1>").arg(jsonError.errorString()));
     }
 
     QJsonObject loadObj = loadDoc.object();
