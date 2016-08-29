@@ -23,7 +23,7 @@ public:
   // thread-safe functions:
 
   // do nothing if object is too big
-  void insert(const KeyType& key, const ValueType& object, size_t cost = 1)
+  void insert(const KeyType& key, ValueType&& object, size_t cost = 1)
   {
     QMutexLocker lock(&m_lock);
     // same as remove(key)
@@ -46,7 +46,7 @@ public:
       m_cacheItemsList.pop_back();
     }
 
-    m_cacheItemsList.emplace_front(key, object, cost);
+    m_cacheItemsList.emplace_front(key, std::move(object), cost);
     m_cacheItemsMap[key] = m_cacheItemsList.begin();
     m_totalCost += cost;
   }
@@ -92,9 +92,9 @@ public:
 
   ZImgCache();
 
-  inline void insert(const ZImgPack::HashKeyType& key, const std::shared_ptr<ZImg>& object)
+  inline void insert(const ZImgPack::HashKeyType& key, std::shared_ptr<ZImg>&& object)
   {
-    ZSharedCache<ZImgPack::HashKeyType, ZImg>::insert(key, object,
+    ZSharedCache<ZImgPack::HashKeyType, ZImg>::insert(key, std::move(object),
                                                       std::max<size_t>(1, object->byteNumber() / 1024 / 1024));
   }
 
@@ -104,7 +104,7 @@ public:
     std::shared_ptr<ZImg> res = get(key);
     if (!res) {
       res = imgBlock.read();
-      insert(key, res);
+      insert(key, std::shared_ptr<ZImg>(res));
     }
     return res;
   }

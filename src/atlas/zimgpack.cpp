@@ -719,7 +719,7 @@ void ZImgPack::createSliceTiles(ZImg* img, size_t z, size_t t, bool mip)
         } else {
           m_allTiles.emplace_back(new ZImgPackSubBlock(simg, ratio, t, z, 0, 0, width, height));
         }
-        ZImgCache::instance().insert(HashKeyType(this, m_allTiles.size() - 1), simg);
+        ZImgCache::instance().insert(HashKeyType(this, m_allTiles.size() - 1), std::move(simg));
         break;
       } else {
         std::shared_ptr<ZImg> simg(new ZImg(*img));
@@ -728,7 +728,7 @@ void ZImgPack::createSliceTiles(ZImg* img, size_t z, size_t t, bool mip)
         } else {
           m_allTiles.emplace_back(new ZImgPackSubBlock(simg, ratio, t, z, 0, 0, width, height));
         }
-        ZImgCache::instance().insert(HashKeyType(this, m_allTiles.size() - 1), simg);
+        ZImgCache::instance().insert(HashKeyType(this, m_allTiles.size() - 1), std::move(simg));
 
         img->zoom(0.5, 0.5);
         ratio *= 2;
@@ -753,7 +753,7 @@ void ZImgPack::createSliceTiles(ZImg* img, size_t z, size_t t, bool mip)
           } else {
             m_allTiles.emplace_back(new ZImgPackSubBlock(cropped, ratio, t, z, startX, startY, width, height));
           }
-          ZImgCache::instance().insert(HashKeyType(this, m_allTiles.size() - 1), cropped);
+          ZImgCache::instance().insert(HashKeyType(this, m_allTiles.size() - 1), std::move(cropped));
         }
       }
 
