@@ -428,29 +428,29 @@ void ZImg::allocate()
       ZImgInfo info = m_info;
       m_info.clear();
       throw ZImgException(QString("Can not allocate memory for img <%1>").arg(info.toQString()));
+    } else {
+      memset(m_data[t], 0, timeByteNumber());
     }
   }
 
-  int64_t defaultValue = 0;
   if (m_info.voxelFormat == VoxelFormat::Signed) {
     switch (m_info.bytesPerVoxel) {
       case 1:
-        defaultValue = std::numeric_limits<int8_t>::min();
+        fill(std::numeric_limits<int8_t>::min());
         break;
       case 2:
-        defaultValue = std::numeric_limits<int16_t>::min();
+        fill(std::numeric_limits<int16_t>::min());
         break;
       case 4:
-        defaultValue = std::numeric_limits<int32_t>::min();
+        fill(std::numeric_limits<int32_t>::min());
         break;
       case 8:
-        defaultValue = std::numeric_limits<int64_t>::min();
+        fill(std::numeric_limits<int64_t>::min());
         break;
       default:
         break;
     }
   }
-  fill(defaultValue);
 }
 
 QString ZImg::toQString() const
@@ -863,26 +863,45 @@ ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start)
     size_t rowByteNumber = (desXEnd - desX) * m_info.bytesPerVoxel;
 
     for (TCoordinate desT = std::max(start.t, TCoordinate(0));
-         desT <
-         std::min(start.t + static_cast<TCoordinate>(img.numTimes()), static_cast<TCoordinate>(numTimes())); ++desT) {
+         desT < std::min(start.t + static_cast<TCoordinate>(img.numTimes()),
+                         static_cast<TCoordinate>(numTimes()));
+         ++desT) {
       size_t srcT = desT - start.t;
       for (TCoordinate desC = std::max(start.c, TCoordinate(0));
            desC < std::min(start.c + static_cast<TCoordinate>(img.numChannels()),
-                           static_cast<TCoordinate>(numChannels())); ++desC) {
+                           static_cast<TCoordinate>(numChannels()));
+           ++desC) {
         size_t srcC = desC - start.c;
         for (TCoordinate desZ = std::max(start.z, TCoordinate(0));
-             desZ <
-             std::min(start.z + static_cast<TCoordinate>(img.depth()), static_cast<TCoordinate>(depth())); ++desZ) {
+             desZ < std::min(start.z + static_cast<TCoordinate>(img.depth()),
+                             static_cast<TCoordinate>(depth()));
+             ++desZ) {
           size_t srcZ = desZ - start.z;
+#if 1
           for (TCoordinate desY = std::max(start.y, TCoordinate(0));
-               desY <
-               std::min(start.y + static_cast<TCoordinate>(img.height()), static_cast<TCoordinate>(height())); ++desY) {
+               desY < std::min(start.y + static_cast<TCoordinate>(img.height()),
+                               static_cast<TCoordinate>(height()));
+               ++desY) {
             size_t srcY = desY - start.y;
 
             memcpy(data(desX, desY, desZ, desC, desT),
                    img.data(srcX, srcY, srcZ, srcC, srcT),
                    rowByteNumber);
           }
+#else
+          tbb::parallel_for(tbb::blocked_range<TCoordinate>(std::max(start.y, TCoordinate(0)),
+                                                            std::min(start.y + static_cast<TCoordinate>(img.height()),
+                                                                     static_cast<TCoordinate>(height()))),
+                            [&](const tbb::blocked_range<TCoordinate>& r) {
+                              for (TCoordinate desY = r.begin(); desY != r.end(); ++desY) {
+                                size_t srcY = desY - start.y;
+                                memcpy(data(desX, desY, desZ, desC, desT),
+                                       img.data(srcX, srcY, srcZ, srcC, srcT),
+                                       rowByteNumber);
+                              }
+                            }
+          );
+#endif
         }
       }
     }
@@ -1732,20 +1751,24 @@ void ZImg::pasteImg_Impl(const ZImg& img, const ZVoxelCoordinate& start)
   size_t rowVoxelNumber = desXEnd - desX;
 
   for (TCoordinate desT = std::max(start.t, TCoordinate(0));
-       desT <
-       std::min(start.t + static_cast<TCoordinate>(img.numTimes()), static_cast<TCoordinate>(numTimes())); ++desT) {
+       desT < std::min(start.t + static_cast<TCoordinate>(img.numTimes()),
+                       static_cast<TCoordinate>(numTimes()));
+       ++desT) {
     size_t srcT = desT - start.t;
     for (TCoordinate desC = std::max(start.c, TCoordinate(0));
          desC < std::min(start.c + static_cast<TCoordinate>(img.numChannels()),
-                         static_cast<TCoordinate>(numChannels())); ++desC) {
+                         static_cast<TCoordinate>(numChannels()));
+         ++desC) {
       size_t srcC = desC - start.c;
       for (TCoordinate desZ = std::max(start.z, TCoordinate(0));
-           desZ <
-           std::min(start.z + static_cast<TCoordinate>(img.depth()), static_cast<TCoordinate>(depth())); ++desZ) {
+           desZ < std::min(start.z + static_cast<TCoordinate>(img.depth()),
+                           static_cast<TCoordinate>(depth()));
+           ++desZ) {
         size_t srcZ = desZ - start.z;
         for (TCoordinate desY = std::max(start.y, TCoordinate(0));
-             desY <
-             std::min(start.y + static_cast<TCoordinate>(img.height()), static_cast<TCoordinate>(height())); ++desY) {
+             desY < std::min(start.y + static_cast<TCoordinate>(img.height()),
+                             static_cast<TCoordinate>(height()));
+             ++desY) {
           size_t srcY = desY - start.y;
 
           TVoxel* desData = data<TVoxel>(desX, desY, desZ, desC, desT);

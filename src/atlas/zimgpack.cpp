@@ -612,6 +612,8 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
                                         (sy + static_cast<int64_t>(res.height())) * static_cast<int64_t>(xyRatio) - 1));
     int64_t zEnd = std::min(static_cast<int64_t>(m_imgInfo.depth),
                             (sz + static_cast<int64_t>(res.depth())) * static_cast<int64_t>(zRatio));
+
+#if 1
     size_t zIdx = 0;
     for (int64_t z = sz * static_cast<int64_t>(zRatio); z < zEnd; z += static_cast<int64_t>(zRatio), ++zIdx) {
       if (z < 0)
@@ -621,13 +623,49 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
       if (tiit != m_rtzToTileBoxRTree.end()) {
         std::vector<RTreeValueType> queryResult;
         tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, queryResult.size()),
-                          [&](const tbb::blocked_range<size_t>& r) {
-                            for (size_t i = r.begin(); i != r.end(); ++i) {
+        for (size_t i = 0; i < queryResult.size(); ++i) {
+          const ZImgSubBlock& tile = *m_allTiles[queryResult[i].second].get();
+          ZVoxelCoordinate start(tile.x / static_cast<int64_t>(xyRatio) - sx,
+                                 tile.y / static_cast<int64_t>(xyRatio) - sy,
+                                 zIdx,
+                                 -ZVoxelCoordinate::value_type(sc),
+                                 0);
+          std::shared_ptr<ZImg> imgPtr =
+            ZImgCache::instance().getOrRead(HashKeyType(this, queryResult[i].second), tile);
+          if (imgPtr->isSameType(res)) {
+            if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
+              ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
+              res.pasteImg(tmp, start);
+            } else {
+              res.pasteImg(*imgPtr, start);
+            }
+          } else {
+            ZImg tmp = imgPtr->convertTo(m_minIntensity, m_maxIntensity, res);
+            res.pasteImg(tmp, start);
+          }
+        }
+      }
+    }
+#else
+    std::vector<int> allZ;
+    for (int64_t z = sz * static_cast<int64_t>(zRatio); z < zEnd; z += static_cast<int64_t>(zRatio)) {
+      allZ.push_back(z);
+    }
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, allZ.size()),
+                      [&](const tbb::blocked_range<size_t>& r) {
+                        for (size_t zi = r.begin(); zi != r.end(); ++zi) {
+                          if (allZ[zi] < 0)
+                            continue;
+                          auto tiit = m_rtzToTileBoxRTree.find(std::make_tuple(xyRatio, t, allZ[zi]));
+                          if (tiit != m_rtzToTileBoxRTree.end()) {
+                            std::vector<RTreeValueType> queryResult;
+                            tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
+                            for (size_t i = 0; i < queryResult.size(); ++i) {
                               const ZImgSubBlock& tile = *m_allTiles[queryResult[i].second].get();
                               ZVoxelCoordinate start(tile.x / static_cast<int64_t>(xyRatio) - sx,
                                                      tile.y / static_cast<int64_t>(xyRatio) - sy,
-                                                     zIdx,
+                                                     zi,
                                                      -ZVoxelCoordinate::value_type(sc),
                                                      0);
                               std::shared_ptr<ZImg> imgPtr = ZImgCache::instance().getOrRead(
@@ -647,9 +685,10 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
                               }
                             }
                           }
-        );
-      }
-    }
+                        }
+                      }
+    );
+#endif
   } else {
     ZImgInfo info = res.info();
     info.width = std::round(info.width * xyRatio * 1.0 / readRatio);
@@ -925,13 +964,18 @@ ZImg ZImgPack::assembleImg(size_t ratio) const
       auto tiit = m_rtzToTileIndice.find(std::make_tuple(ratio, t, int(z)));
       if (tiit != m_rtzToTileIndice.end()) {
         const std::vector<size_t>& tileIndice = tiit->second;
-        for (size_t i = 0; i < tileIndice.size(); ++i) {
-          const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
-          ZVoxelCoordinate start(tile.x / double(ratio), tile.y / double(ratio), z, 0, t);
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, tileIndice.size()),
+                          [&](const tbb::blocked_range<size_t>& r) {
+                            for (size_t i = r.begin(); i != r.end(); ++i) {
+                              const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
+                              ZVoxelCoordinate start(tile.x / double(ratio), tile.y / double(ratio), z, 0, t);
 
-          std::shared_ptr<ZImg> imgPtr = ZImgCache::instance().getOrRead(HashKeyType(this, tileIndice[i]), tile);
-          res.pasteImg(*imgPtr, start);
-        }
+                              std::shared_ptr<ZImg> imgPtr =
+                                ZImgCache::instance().getOrRead(HashKeyType(this, tileIndice[i]), tile);
+                              res.pasteImg(*imgPtr, start);
+                            }
+                          }
+        );
       }
     }
   }
@@ -956,13 +1000,18 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t) const
     auto tiit = m_rtzToTileIndice.find(std::make_tuple(ratio, t, int(z)));
     if (tiit != m_rtzToTileIndice.end()) {
       const std::vector<size_t>& tileIndice = tiit->second;
-      for (size_t i = 0; i < tileIndice.size(); ++i) {
-        const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
-        ZVoxelCoordinate start(tile.x / double(ratio), tile.y / double(ratio), z, 0, 0);
+      tbb::parallel_for(tbb::blocked_range<size_t>(0, tileIndice.size()),
+                        [&](const tbb::blocked_range<size_t>& r) {
+                          for (size_t i = r.begin(); i != r.end(); ++i) {
+                            const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
+                            ZVoxelCoordinate start(tile.x / double(ratio), tile.y / double(ratio), z, 0, 0);
 
-        std::shared_ptr<ZImg> imgPtr = ZImgCache::instance().getOrRead(HashKeyType(this, tileIndice[i]), tile);
-        res.pasteImg(*imgPtr, start);
-      }
+                            std::shared_ptr<ZImg> imgPtr =
+                              ZImgCache::instance().getOrRead(HashKeyType(this, tileIndice[i]), tile);
+                            res.pasteImg(*imgPtr, start);
+                          }
+                        }
+      );
     }
   }
   //LOG(INFO) << "end assemble level " << level;
@@ -983,13 +1032,18 @@ ZImg ZImgPack::assembleImg(size_t ratio, size_t t, size_t z) const
   auto tiit = m_rtzToTileIndice.find(std::make_tuple(ratio, t, int(z)));
   if (tiit != m_rtzToTileIndice.end()) {
     const std::vector<size_t>& tileIndice = tiit->second;
-    for (size_t i = 0; i < tileIndice.size(); ++i) {
-      const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
-      ZVoxelCoordinate start(tile.x / double(ratio), tile.y / double(ratio), 0, 0, 0);
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, tileIndice.size()),
+                      [&](const tbb::blocked_range<size_t>& r) {
+                        for (size_t i = r.begin(); i != r.end(); ++i) {
+                          const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
+                          ZVoxelCoordinate start(tile.x / double(ratio), tile.y / double(ratio), 0, 0, 0);
 
-      std::shared_ptr<ZImg> imgPtr = ZImgCache::instance().getOrRead(HashKeyType(this, tileIndice[i]), tile);
-      res.pasteImg(*imgPtr, start);
-    }
+                          std::shared_ptr<ZImg> imgPtr =
+                            ZImgCache::instance().getOrRead(HashKeyType(this, tileIndice[i]), tile);
+                          res.pasteImg(*imgPtr, start);
+                        }
+                      }
+    );
   }
   return res;
 }

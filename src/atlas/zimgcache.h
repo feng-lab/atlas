@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QMutexLocker>
+#include <QReadWriteLock>
 #include <unordered_map>
 #include <list>
 #include <boost/functional/hash.hpp>
@@ -25,7 +25,7 @@ public:
   // do nothing if object is too big
   void insert(const KeyType& key, ValueType&& object, size_t cost = 1)
   {
-    QMutexLocker lock(&m_lock);
+    QWriteLocker lock(&m_lock);
     // same as remove(key)
     auto it = m_cacheItemsMap.find(key);
     if (it != m_cacheItemsMap.end()) {
@@ -53,7 +53,7 @@ public:
 
   void remove(const KeyType& key)
   {
-    QMutexLocker lock(&m_lock);
+    QWriteLocker lock(&m_lock);
     auto it = m_cacheItemsMap.find(key);
     if (it != m_cacheItemsMap.end()) {
       auto listIt = it->second;
@@ -66,10 +66,10 @@ public:
   // might return empty ptr
   ValueType get(const KeyType& key)
   {
-    QMutexLocker lock(&m_lock);
+    QReadLocker lock(&m_lock);
     auto it = m_cacheItemsMap.find(key);
     if (it != m_cacheItemsMap.end()) {
-      m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, it->second);
+      //m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, it->second);
       return std::get<1>(*(it->second));
     } else {
       return ValueType();
@@ -82,7 +82,7 @@ private:
   std::unordered_map<KeyType, ListIteratorType, boost::hash<KeyType>> m_cacheItemsMap;
   size_t m_maxCost;
   size_t m_totalCost = 0;
-  mutable QMutex m_lock;
+  mutable QReadWriteLock m_lock;
 };
 
 class ZImgCache : public ZSharedCache<ZImgPack::HashKeyType, ZImg>

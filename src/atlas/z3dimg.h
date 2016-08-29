@@ -100,8 +100,8 @@ public:
 
   void bindImageCacheToFullResRenderShader(Z3DShaderProgram& shader, size_t c) const;
 
-  bool
-  updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missingBlockIDs, const std::set<uint32_t>& usedBlockIDs);
+  bool updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missingBlockIDs,
+                                          const std::set<uint32_t>& usedBlockIDs);
 
   void uploadImageCache(size_t channel);
 
@@ -148,7 +148,7 @@ private:
   size_t m_nChannels = 0;
   bool m_isVolumeDownsampled;
 
-  std::vector<std::map<glm::uvec3, glm::ivec4, Vec3Compare<uint32_t, glm::highp>>> m_channelPendingUpdates;  // block cache pos to block image pos
+  std::vector<std::vector<std::pair<glm::uvec3, glm::ivec4>>> m_channelPendingUpdates;  // block cache pos and block image pos
 };
 
 } // namespace nim
