@@ -221,8 +221,8 @@ bool ZMeshDoc::isAlias(size_t id) const
   CHECK(m_idToMeshPacks.find(id) != m_idToMeshPacks.end());
 
   auto& pack = m_idToMeshPacks.at(id);
-  for (auto it = m_idToMeshPacks.cbegin(); it != m_idToMeshPacks.cend(); ++it) {
-    if (it->first != id && it->second == pack)
+  for (const auto& idPack : m_idToMeshPacks) {
+    if (idPack.first != id && idPack.second == pack)
       return true;
   }
   return false;

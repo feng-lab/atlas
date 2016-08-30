@@ -534,13 +534,14 @@ void Z3DImg::uploadImageCache(size_t channel)
 #if 0
   ZImg img(ZImgInfo(m_imageBlockSize.x + 2, m_imageBlockSize.y + 2, m_imageBlockSize.z + 2, 1));
   if (m_imageBlockReadSize == glm::ivec3(m_imageBlockSize)) {
-    for (auto it = m_channelPendingUpdates[channel].cbegin(); it != m_channelPendingUpdates[channel].cend(); ++it) {
+    for (const auto& cachePosImagePos : m_channelPendingUpdates[channel]) {
       bt2.resume();
-      const glm::ivec4& blockImagePos = it->second;
+      const glm::ivec4& blockImagePos = cachePosImagePos.second;
       m_imgPack.readRegionToImg(m_levelScales[blockImagePos.x].x, m_levelScales[blockImagePos.x].z,
                                 blockImagePos.y - 1, blockImagePos.z - 1, blockImagePos.w - 1, channel, 0, img);
       bt2.pause();
-      m_imageCacheTextures[channel]->uploadSubImage(it->first, m_imageBlockSize + 2_u32, img.channelData(0));
+      m_imageCacheTextures[channel]->uploadSubImage(cachePosImagePos.first,
+                                                    m_imageBlockSize + 2_u32, img.channelData(0));
       img.fill(0);
     }
   } else {
@@ -548,22 +549,28 @@ void Z3DImg::uploadImageCache(size_t channel)
     ZImg bigImg(ZImgInfo(m_imageBlockReadSize.x + 2, m_imageBlockReadSize.y + 2, m_imageBlockReadSize.z + 2, 1));
     std::map<glm::ivec4, std::vector<std::pair<glm::ivec4, glm::uvec3>>, Vec4Compare<int, glm::highp>> bigToSmall;
     glm::ivec4 tmp(1, m_imageBlockReadSize.x, m_imageBlockReadSize.y, m_imageBlockReadSize.z);
-    for (auto it = m_channelPendingUpdates[channel].cbegin(); it != m_channelPendingUpdates[channel].cend(); ++it) {
-      bigToSmall[it->second / tmp * tmp].push_back(std::make_pair(it->second, it->first));
+    for (const auto& cachePosImagePos : m_channelPendingUpdates[channel]) {
+      bigToSmall[cachePosImagePos.second / tmp * tmp].push_back(std::make_pair(cachePosImagePos.second,
+                                                                               cachePosImagePos.first));
     }
     bt2.pause();
-    for (auto it = bigToSmall.begin(); it != bigToSmall.end(); ++it) {
+    for (const auto& bigImgImagePosCachePos : bigToSmall) {
       // read from it->first level x y z
       bt2.resume();
-      m_imgPack.readRegionToImg(m_levelScales[it->first.x].x, m_levelScales[it->first.x].z,
-                                it->first.y - 1, it->first.z - 1, it->first.w - 1, channel, 0, bigImg);
+      m_imgPack.readRegionToImg(m_levelScales[bigImgImagePosCachePos.first.x].x,
+                                m_levelScales[bigImgImagePosCachePos.first.x].z,
+                                bigImgImagePosCachePos.first.y - 1,
+                                bigImgImagePosCachePos.first.z - 1,
+                                bigImgImagePosCachePos.first.w - 1,
+                                channel, 0, bigImg);
       bt2.pause();
-      for (size_t i = 0; i < it->second.size(); ++i) {
+      for (const auto& imagePosCachePos : bigImgImagePosCachePos.second) {
         bt2.resume();
-        glm::ivec3 startCoord = it->first.yzw() - it->second[i].first.yzw();
+        glm::ivec3 startCoord = bigImgImagePosCachePos.first.yzw() - imagePosCachePos.first.yzw();
         img.pasteImg(bigImg, ZVoxelCoordinate(startCoord.x, startCoord.y, startCoord.z));
         bt2.pause();
-        m_imageCacheTextures[channel]->uploadSubImage(it->second[i].second, m_imageBlockSize + 2_u32,
+        m_imageCacheTextures[channel]->uploadSubImage(imagePosCachePos.second,
+                                                      m_imageBlockSize + 2_u32,
                                                       img.channelData(0));
       }
       bigImg.fill(0);

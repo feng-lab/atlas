@@ -82,8 +82,8 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
     display.setSlice(m_z);
     display.setTime(m_t);
     display.setAlpha(m_alpha);
-    for (auto it = m_channels.cbegin(); it != m_channels.cend(); ++it) {
-      display.showChannel(it->first, it->second.first, it->second.second);
+    for (const auto& chRange : m_channels) {
+      display.showChannel(chRange.first, chRange.second.first, chRange.second.second);
     }
     return display.toQImagePack(tileWidth, tileHeight);
 

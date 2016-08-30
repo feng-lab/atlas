@@ -116,9 +116,7 @@ QString ZAnalysisWorklistModel::setSource(const QString& filename, QTextCodec* c
   }
 
   size_t row = 0;
-  for (QList<ZAnalysisTextFileInput>::iterator it = m_inputs.begin();
-       it != m_inputs.end(); ++it) {
-    ZAnalysisTextFileInput& input = *it;
+  for (auto& input : m_inputs) {
     m_rowToInput[row++] = &input;
   }
   m_rowCount += m_inputs.size();

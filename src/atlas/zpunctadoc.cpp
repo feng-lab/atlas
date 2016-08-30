@@ -193,8 +193,8 @@ bool ZPunctaDoc::isAlias(size_t id) const
   CHECK(m_idToPunctaPacks.find(id) != m_idToPunctaPacks.end());
 
   auto& pack = m_idToPunctaPacks.at(id);
-  for (auto it = m_idToPunctaPacks.cbegin(); it != m_idToPunctaPacks.cend(); ++it) {
-    if (it->first != id && it->second == pack)
+  for (const auto& idPack : m_idToPunctaPacks) {
+    if (idPack.first != id && idPack.second == pack)
       return true;
   }
   return false;

@@ -285,8 +285,8 @@ bool ZImgDoc::isAlias(size_t id) const
   CHECK(m_idToImgPacks.find(id) != m_idToImgPacks.end());
 
   auto& pack = m_idToImgPacks.at(id);
-  for (auto it = m_idToImgPacks.cbegin(); it != m_idToImgPacks.cend(); ++it) {
-    if (it->first != id && it->second == pack)
+  for (const auto& idPack : m_idToImgPacks) {
+    if (idPack.first != id && idPack.second == pack)
       return true;
   }
   return false;
@@ -296,10 +296,10 @@ void ZImgDoc::showImg(ZImg* img, const QString& path)
 {
   QStringList files;
   files.push_back(QFileInfo(path).canonicalFilePath());
-  for (auto it = m_idToImgPacks.cbegin(); it != m_idToImgPacks.cend(); ++it) {
-    if (it->second->paths() == files) {
+  for (const auto& idPack : m_idToImgPacks) {
+    if (idPack.second->paths() == files) {
       //it->second->setImg(*img);
-      sendChangedSignal(it->first);
+      sendChangedSignal(idPack.first);
       return;
     }
   }
@@ -421,9 +421,9 @@ size_t ZImgDoc::loadImg(const QString& fileName, size_t scene, FileFormat format
 {
   try {
     ZImgSource imgSource(fileName, ZImgRegion(), scene, format);
-    for (auto it = m_idToImgPacks.cbegin(); it != m_idToImgPacks.cend(); ++it) {
-      if (it->second->imgSource() == imgSource)
-        return it->first;
+    for (const auto& idPack : m_idToImgPacks) {
+      if (idPack.second->imgSource() == imgSource)
+        return idPack.first;
     }
 
     size_t id = addImgPack(new ZImgPack(fileName, scene, format, numScene, info, subBlock));
@@ -464,9 +464,9 @@ size_t ZImgDoc::loadImg(const QStringList& files, Dimension catDim, size_t scene
 {
   try {
     ZImgSource imgSource(files, catDim, ZImgRegion(), scene, format);
-    for (auto it = m_idToImgPacks.cbegin(); it != m_idToImgPacks.cend(); ++it) {
-      if (it->second->imgSource() == imgSource)
-        return it->first;
+    for (const auto& idPack : m_idToImgPacks) {
+      if (idPack.second->imgSource() == imgSource)
+        return idPack.first;
     }
 
     size_t id = addImgPack(new ZImgPack(files, catDim, scene, format, numScene, info, subBlock));
@@ -487,8 +487,8 @@ void ZImgDoc::sendChangedSignal(size_t id)
   CHECK(m_idToImgPacks.find(id) != m_idToImgPacks.end());
 
   auto& pack = m_idToImgPacks.at(id);
-  for (auto it = m_idToImgPacks.cbegin(); it != m_idToImgPacks.cend(); ++it) {
-    if (it->second == pack)
+  for (const auto& idPack : m_idToImgPacks) {
+    if (idPack.second == pack)
       emit imgChanged(id);
   }
 }
@@ -533,9 +533,9 @@ bool ZImgDoc::saveImg(ZImgPack* pack, QString fileName, FileFormat format, Compr
 
 void ZImgDoc::packInfoUpdated(ZImgPack* pack)
 {
-  for (auto it = m_idToImgPacks.cbegin(); it != m_idToImgPacks.cend(); ++it) {
-    if (it->second.get() == pack)
-      m_doc.updateObjInfo(it->first);
+  for (const auto& idPack : m_idToImgPacks) {
+    if (idPack.second.get() == pack)
+      m_doc.updateObjInfo(idPack.first);
   }
 }
 

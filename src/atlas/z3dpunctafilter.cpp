@@ -357,11 +357,11 @@ void Z3DPunctaFilter::updateData()
   double maxMeanInten = std::numeric_limits<double>::lowest();
   double minMaxInten = std::numeric_limits<double>::max();
   double maxMaxInten = std::numeric_limits<double>::lowest();
-  for (ZPuncta::const_iterator it = m_origPuncta->begin(); it != m_origPuncta->end(); ++it) {
-    minMeanInten = std::min(minMeanInten, it->meanIntensity());
-    maxMeanInten = std::max(maxMeanInten, it->meanIntensity());
-    minMaxInten = std::min(minMaxInten, it->maxIntensity());
-    maxMaxInten = std::max(maxMaxInten, it->maxIntensity());
+  for (const auto& p : *m_origPuncta) {
+    minMeanInten = std::min(minMeanInten, p.meanIntensity());
+    maxMeanInten = std::max(maxMeanInten, p.meanIntensity());
+    minMaxInten = std::min(minMaxInten, p.maxIntensity());
+    maxMaxInten = std::max(maxMaxInten, p.maxIntensity());
   }
   //todo: set correct range for colormap
 
@@ -406,8 +406,8 @@ void Z3DPunctaFilter::updateNotTransformedBoundBoxImpl()
   m_notTransformedBoundBox[0] = m_notTransformedBoundBox[2] = m_notTransformedBoundBox[4] = std::numeric_limits<double>::max();
   m_notTransformedBoundBox[1] = m_notTransformedBoundBox[3] = m_notTransformedBoundBox[5] = std::numeric_limits<double>::lowest();
   std::vector<double> boundBox(6);
-  for (ZPuncta::const_iterator it = m_origPuncta->begin(); it != m_origPuncta->end(); ++it) {
-    notTransformedPunctumBound(*it, boundBox);
+  for (const auto& p : *m_origPuncta) {
+    notTransformedPunctumBound(p, boundBox);
     m_notTransformedBoundBox[0] = std::min(boundBox[0], m_notTransformedBoundBox[0]);
     m_notTransformedBoundBox[1] = std::max(boundBox[1], m_notTransformedBoundBox[1]);
     m_notTransformedBoundBox[2] = std::min(boundBox[2], m_notTransformedBoundBox[2]);
@@ -420,8 +420,8 @@ void Z3DPunctaFilter::updateNotTransformedBoundBoxImpl()
 void Z3DPunctaFilter::addSelectionLines()
 {
   std::vector<double> boundBox(6);
-  for (ZPuncta::const_iterator it = m_origPuncta->begin(); it != m_origPuncta->end(); ++it) {
-    punctumBound(*it, boundBox);
+  for (const auto& p : *m_origPuncta) {
+    punctumBound(p, boundBox);
     appendBoundboxLines(boundBox, m_selectionLines);
   }
 }
@@ -542,9 +542,9 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int, int h)
 void Z3DPunctaFilter::getVisibleData()
 {
   m_punctaList.clear();
-  for (ZPuncta::iterator it = m_origPuncta->begin(); it != m_origPuncta->end(); ++it) {
+  for (auto& p : *m_origPuncta) {
     //if (m_origPuncta[i]->isVisible())
-    m_punctaList.push_back(&(*it));
+    m_punctaList.push_back(&p);
   }
 }
 

@@ -204,8 +204,8 @@ bool Z2DAnimationDoc::isAlias(size_t id) const
   CHECK(m_idToAnimationPacks.find(id) != m_idToAnimationPacks.end());
 
   auto& pack = m_idToAnimationPacks.at(id);
-  for (auto it = m_idToAnimationPacks.cbegin(); it != m_idToAnimationPacks.cend(); ++it) {
-    if (it->first != id && it->second == pack)
+  for (const auto& idPack : m_idToAnimationPacks) {
+    if (idPack.first != id && idPack.second == pack)
       return true;
   }
   return false;

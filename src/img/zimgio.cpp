@@ -578,15 +578,15 @@ void ZImgIO::getQtReadNameFilter(QStringList& filters, QList<FileFormat>& format
 
   QString all = "Images";
   QStringList lst;
-  for (auto it = m_ioFormats.cbegin(); it != m_ioFormats.cend(); ++it) {
-    if (it->second->supportRead()) {
-      QString filter = QString("*.") + it->second->extensions().join(" *.");
+  for (const auto& fmt : m_ioFormats) {
+    if (fmt.second->supportRead()) {
+      QString filter = QString("*.") + fmt.second->extensions().join(" *.");
       lst.push_back(filter);
 
-      filter = it->second->fullName() + QString(" (*.") +
-               it->second->extensions().join(" *.") + QString(")");
+      filter = fmt.second->fullName() + QString(" (*.") +
+               fmt.second->extensions().join(" *.") + QString(")");
       filters.push_back(filter);
-      formats.push_back(it->first);
+      formats.push_back(fmt.first);
     }
   }
   all += " (";
@@ -601,28 +601,28 @@ void ZImgIO::getQtWriteNameFilter(QStringList& filters, QList<FileFormat>& forma
   filters.clear();
   formats.clear();
   comps.clear();
-  for (auto it = m_ioFormats.cbegin(); it != m_ioFormats.cend(); ++it) {
-    if (it->second->supportWrite()) {
-      QString filter = it->second->fullName() + QString(" (*.") +
-                       it->second->extensions().join(" *.") + QString(")");
-      if (it->first == FileFormat::OmeTiff || it->first == FileFormat::Tiff) {
+  for (const auto& fmt : m_ioFormats) {
+    if (fmt.second->supportWrite()) {
+      QString filter = fmt.second->fullName() + QString(" (*.") +
+                       fmt.second->extensions().join(" *.") + QString(")");
+      if (fmt.first == FileFormat::OmeTiff || fmt.first == FileFormat::Tiff) {
         QString flt = QString("LZW Compressed ") + filter;  // todo: use custom dialog and set compression as option
         filters.push_back(flt);
-        formats.push_back(it->first);
+        formats.push_back(fmt.first);
         comps.push_back(Compression::LZW);
         flt = QString("ADOBE DEFLATE Compressed ") + filter;
         filters.push_back(flt);
-        formats.push_back(it->first);
+        formats.push_back(fmt.first);
         comps.push_back(Compression::ADOBE_DEFLATE);
       }
-      if (it->first == FileFormat::MetaImage) {
+      if (fmt.first == FileFormat::MetaImage) {
         QString flt = QString("Compressed ") + filter;  // todo: use custom dialog and set compression as option
         filters.push_back(flt);
-        formats.push_back(it->first);
+        formats.push_back(fmt.first);
         comps.push_back(Compression::AUTO);
       }
       filters.push_back(filter);
-      formats.push_back(it->first);
+      formats.push_back(fmt.first);
       comps.push_back(Compression::NONE);
     }
   }
@@ -630,8 +630,8 @@ void ZImgIO::getQtWriteNameFilter(QStringList& filters, QList<FileFormat>& forma
 
 bool ZImgIO::fileExtensionReadSupported(const QString& filename) const
 {
-  for (auto it = m_ioFormats.cbegin(); it != m_ioFormats.cend(); ++it) {
-    if (it->second->canRead(filename))
+  for (const auto& fmt : m_ioFormats) {
+    if (fmt.second->canRead(filename))
       return true;
   }
   return false;
@@ -639,8 +639,8 @@ bool ZImgIO::fileExtensionReadSupported(const QString& filename) const
 
 bool ZImgIO::fileExtensionWriteSupported(const QString& filename) const
 {
-  for (auto it = m_ioFormats.cbegin(); it != m_ioFormats.cend(); ++it) {
-    if (it->second->canWrite(filename))
+  for (const auto& fmt : m_ioFormats) {
+    if (fmt.second->canWrite(filename))
       return true;
   }
   return false;
@@ -649,9 +649,9 @@ bool ZImgIO::fileExtensionWriteSupported(const QString& filename) const
 std::vector<ZImgFormat*> ZImgIO::getSupportedReader(const QString& filename) const
 {
   std::vector<ZImgFormat*> res;
-  for (auto it = m_ioFormats.cbegin(); it != m_ioFormats.cend(); ++it) {
-    if (it->second->canRead(filename))
-      res.push_back(it->second.get());
+  for (const auto& fmt : m_ioFormats) {
+    if (fmt.second->canRead(filename))
+      res.push_back(fmt.second.get());
   }
   return res;
 }
@@ -659,9 +659,9 @@ std::vector<ZImgFormat*> ZImgIO::getSupportedReader(const QString& filename) con
 std::vector<ZImgFormat*> ZImgIO::getSupportedWriter(const QString& filename) const
 {
   std::vector<ZImgFormat*> res;
-  for (auto it = m_ioFormats.cbegin(); it != m_ioFormats.cend(); ++it) {
-    if (it->second->canWrite(filename))
-      res.push_back(it->second.get());
+  for (const auto& fmt : m_ioFormats) {
+    if (fmt.second->canWrite(filename))
+      res.push_back(fmt.second.get());
   }
   return res;
 }

@@ -112,8 +112,11 @@ void ZSectionsRegistration::doWork()
   ZImageTransformResolve tfmResolve;
   auto notfm = std::make_unique<ZImageAffine2DTransform>();
   tfmResolve.addFixedImage(m_fixedSliceIndex, notfm.get());
-  for (auto it = idxPairs.cbegin(); it != idxPairs.cend(); ++it) {
-    tfmResolve.addImagePair(it->first.first, it->first.second, it->second.first.get(), it->second.second);
+  for (const auto& fixedMovingTfmCost : idxPairs) {
+    tfmResolve.addImagePair(fixedMovingTfmCost.first.first,
+                            fixedMovingTfmCost.first.second,
+                            fixedMovingTfmCost.second.first.get(),
+                            fixedMovingTfmCost.second.second);
   }
   std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> tfmmap = tfmResolve.resolve();
 
