@@ -18,7 +18,7 @@ public:
 
   ZParameterKey(double tm, ZParameter* p);
 
-  ZParameterKey(const QString& type);
+  explicit ZParameterKey(const QString& type);
 
   ZParameterKey(const ZParameterKey& key);
 

@@ -121,7 +121,7 @@ class ZIntParameter : public ZNumericParameter<int>
 {
 Q_OBJECT
 public:
-  ZIntParameter(const QString& name, QObject* parent = nullptr);
+  explicit ZIntParameter(const QString& name, QObject* parent = nullptr);
 
   ZIntParameter(const QString& name, int value, int min, int max, QObject* parent = nullptr);
 
@@ -149,7 +149,7 @@ class ZDoubleParameter : public ZNumericParameter<double>
 {
 Q_OBJECT
 public:
-  ZDoubleParameter(const QString& name, QObject* parent = nullptr);
+  explicit ZDoubleParameter(const QString& name, QObject* parent = nullptr);
 
   ZDoubleParameter(const QString& name, double value, double min, double max, QObject* parent = nullptr);
 
@@ -177,7 +177,7 @@ class ZFloatParameter : public ZNumericParameter<float>
 {
 Q_OBJECT
 public:
-  ZFloatParameter(const QString& name, QObject* parent = nullptr);
+  explicit ZFloatParameter(const QString& name, QObject* parent = nullptr);
 
   ZFloatParameter(const QString& name, float value, float min, float max, QObject* parent = nullptr);
 
@@ -330,7 +330,7 @@ class ZVec2Parameter : public ZNumericVectorParameter<glm::vec2>
 {
 Q_OBJECT
 public:
-  ZVec2Parameter(const QString& name, QObject* parent = nullptr);
+  explicit ZVec2Parameter(const QString& name, QObject* parent = nullptr);
 
   ZVec2Parameter(const QString& name, glm::vec2 value, glm::vec2 min = glm::vec2(0.f),
                  glm::vec2 max = glm::vec2(1.f), QObject* parent = nullptr);
@@ -355,7 +355,7 @@ class ZVec3Parameter : public ZNumericVectorParameter<glm::vec3>
 {
 Q_OBJECT
 public:
-  ZVec3Parameter(const QString& name, QObject* parent = nullptr);
+  explicit ZVec3Parameter(const QString& name, QObject* parent = nullptr);
 
   ZVec3Parameter(const QString& name, glm::vec3 value, glm::vec3 min = glm::vec3(0.f),
                  glm::vec3 max = glm::vec3(1.f), QObject* parent = nullptr);
@@ -384,7 +384,7 @@ class ZVec4Parameter : public ZNumericVectorParameter<glm::vec4>
 {
 Q_OBJECT
 public:
-  ZVec4Parameter(const QString& name, QObject* parent = nullptr);
+  explicit ZVec4Parameter(const QString& name, QObject* parent = nullptr);
 
   ZVec4Parameter(const QString& name, glm::vec4 value, glm::vec4 min = glm::vec4(0.f),
                  glm::vec4 max = glm::vec4(1.f), QObject* parent = nullptr);
@@ -417,7 +417,7 @@ class ZDVec2Parameter : public ZNumericVectorParameter<glm::dvec2>
 {
 Q_OBJECT
 public:
-  ZDVec2Parameter(const QString& name, QObject* parent = nullptr);
+  explicit ZDVec2Parameter(const QString& name, QObject* parent = nullptr);
 
   ZDVec2Parameter(const QString& name, glm::dvec2 value, glm::dvec2 min = glm::dvec2(0.f),
                   glm::dvec2 max = glm::dvec2(1.f), QObject* parent = nullptr);
@@ -442,7 +442,7 @@ class ZDVec3Parameter : public ZNumericVectorParameter<glm::dvec3>
 {
 Q_OBJECT
 public:
-  ZDVec3Parameter(const QString& name, QObject* parent = nullptr);
+  explicit ZDVec3Parameter(const QString& name, QObject* parent = nullptr);
 
   ZDVec3Parameter(const QString& name, glm::dvec3 value, glm::dvec3 min = glm::dvec3(0.f),
                   glm::dvec3 max = glm::dvec3(1.f), QObject* parent = nullptr);
@@ -471,7 +471,7 @@ class ZDVec4Parameter : public ZNumericVectorParameter<glm::dvec4>
 {
 Q_OBJECT
 public:
-  ZDVec4Parameter(const QString& name, QObject* parent = nullptr);
+  explicit ZDVec4Parameter(const QString& name, QObject* parent = nullptr);
 
   ZDVec4Parameter(const QString& name, glm::dvec4 value, glm::dvec4 min = glm::dvec4(0.f),
                   glm::dvec4 max = glm::dvec4(1.f), QObject* parent = nullptr);
@@ -504,7 +504,7 @@ class ZIVec2Parameter : public ZNumericVectorParameter<glm::ivec2>
 {
 Q_OBJECT
 public:
-  ZIVec2Parameter(const QString& name, QObject* parent = nullptr);
+  explicit ZIVec2Parameter(const QString& name, QObject* parent = nullptr);
 
   ZIVec2Parameter(const QString& name, glm::ivec2 value, glm::ivec2 min,
                   glm::ivec2 max, QObject* parent = nullptr);
@@ -529,7 +529,7 @@ class ZIVec3Parameter : public ZNumericVectorParameter<glm::ivec3>
 {
 Q_OBJECT
 public:
-  ZIVec3Parameter(const QString& name, QObject* parent = nullptr);
+  explicit ZIVec3Parameter(const QString& name, QObject* parent = nullptr);
 
   ZIVec3Parameter(const QString& name, glm::ivec3 value, glm::ivec3 min,
                   glm::ivec3 max, QObject* parent = nullptr);
@@ -716,7 +716,7 @@ class ZIntSpanParameter : public ZNumericSpanParameter<glm::ivec2>
 {
 Q_OBJECT
 public:
-  ZIntSpanParameter(const QString& name, QObject* parent = nullptr);
+  explicit ZIntSpanParameter(const QString& name, QObject* parent = nullptr);
 
   ZIntSpanParameter(const QString& name, glm::ivec2 value, int min,
                     int max, QObject* parent = nullptr);
@@ -745,7 +745,7 @@ class ZFloatSpanParameter : public ZNumericSpanParameter<glm::vec2>
 {
 Q_OBJECT
 public:
-  ZFloatSpanParameter(const QString& name, QObject* parent = nullptr);
+  explicit ZFloatSpanParameter(const QString& name, QObject* parent = nullptr);
 
   ZFloatSpanParameter(const QString& name, glm::vec2 value, float min,
                       float max, QObject* parent = nullptr);
@@ -774,7 +774,7 @@ class ZDoubleSpanParameter : public ZNumericSpanParameter<glm::dvec2>
 {
 Q_OBJECT
 public:
-  ZDoubleSpanParameter(const QString& name, QObject* parent = nullptr);
+  explicit ZDoubleSpanParameter(const QString& name, QObject* parent = nullptr);
 
   ZDoubleSpanParameter(const QString& name, glm::dvec2 value, double min,
                        double max, QObject* parent = nullptr);

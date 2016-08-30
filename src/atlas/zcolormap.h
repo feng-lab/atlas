@@ -107,25 +107,25 @@ public:
   template<class ForwardIterator>
   ZColorMap(const ForwardIterator first, const ForwardIterator last,
             const glm::col4& minColor = glm::col4(0, 0, 0, 255),
-            const glm::col4& maxColor = glm::col4(255, 255, 255, 255), QObject* parent = 0);
+            const glm::col4& maxColor = glm::col4(255, 255, 255, 255), QObject* parent = nullptr);
 
-  ZColorMap(double min = 0.0, double max = 255.0, const glm::col4& minColor = glm::col4(0, 0, 0, 255),
-            const glm::col4& maxColor = glm::col4(255, 255, 255, 255), QObject* parent = 0);
+  explicit ZColorMap(double min = 0.0, double max = 255.0, const glm::col4& minColor = glm::col4(0, 0, 0, 255),
+                     const glm::col4& maxColor = glm::col4(255, 255, 255, 255), QObject* parent = nullptr);
 
   template<class ForwardIterator>
   ZColorMap(const ForwardIterator first, const ForwardIterator last,
             const glm::vec4& minColor = glm::vec4(0.f, 0.f, 0.f, 1.f),
-            const glm::vec4& maxColor = glm::vec4(1.f, 1.f, 1.f, 1.f), QObject* parent = 0);
+            const glm::vec4& maxColor = glm::vec4(1.f, 1.f, 1.f, 1.f), QObject* parent = nullptr);
 
   ZColorMap(double min, double max, const glm::vec4& minColor = glm::vec4(0.f, 0.f, 0.f, 1.f),
-            const glm::vec4& maxColor = glm::vec4(1.f, 1.f, 1.f, 1.f), QObject* parent = 0);
+            const glm::vec4& maxColor = glm::vec4(1.f, 1.f, 1.f, 1.f), QObject* parent = nullptr);
 
   template<class ForwardIterator>
   ZColorMap(const ForwardIterator first, const ForwardIterator last, const QColor& minColor = QColor(0, 0, 0, 255),
-            const QColor& maxColor = QColor(255, 255, 255, 255), QObject* parent = 0);
+            const QColor& maxColor = QColor(255, 255, 255, 255), QObject* parent = nullptr);
 
   ZColorMap(double min, double max, const QColor& minColor, const QColor& maxColor = QColor(0, 0, 0, 255),
-            QObject* parent = 0);
+            QObject* parent = nullptr);
 
   ZColorMap(const ZColorMap& cm);
 
@@ -447,7 +447,7 @@ class ZColorMapParameter : public ZSingleValueParameter<ZColorMap>
 {
 Q_OBJECT
 public:
-  ZColorMapParameter(const QString& name, QObject* parent = nullptr);
+  explicit ZColorMapParameter(const QString& name, QObject* parent = nullptr);
 
   ZColorMapParameter(const QString& name, const ZColorMap& cm, QObject* parent = nullptr);
 

@@ -11,9 +11,7 @@ namespace nim {
 class ZImgDisplay
 {
 public:
-  ZImgDisplay(const ZImg& img);
-
-  ~ZImgDisplay();
+  explicit ZImgDisplay(const ZImg& img);
 
   // default, hide all channels
   // default go to first slice and set alpha to 1

@@ -11,7 +11,7 @@ class Z3DTransformParameter : public ZSingleValueParameter<glm::mat4>
 {
 Q_OBJECT
 public:
-  Z3DTransformParameter(const QString& name, QObject* parent = nullptr);
+  explicit Z3DTransformParameter(const QString& name, QObject* parent = nullptr);
 
   Z3DTransformParameter(const QString& name, const glm::mat4& value, QObject* parent = nullptr);
 

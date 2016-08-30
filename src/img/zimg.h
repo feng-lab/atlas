@@ -31,8 +31,8 @@ struct ZImgSource
 {
   ZImgSource();
 
-  ZImgSource(const QString& fn, const ZImgRegion& rgn = ZImgRegion(), size_t scene = 0,
-             FileFormat format = FileFormat::Unknown);
+  explicit ZImgSource(const QString& fn, const ZImgRegion& rgn = ZImgRegion(), size_t scene = 0,
+                      FileFormat format = FileFormat::Unknown);
 
   ZImgSource(const QStringList& fns, Dimension catDim, const ZImgRegion& rgn = ZImgRegion(), size_t scene = 0,
              FileFormat format = FileFormat::Unknown,
@@ -1470,6 +1470,6 @@ void image3DWrite(const TPixel* data, size_t width, size_t height, size_t depth,
 }
 
 
-}  // namespace
+}  // namespace nim
 
 #include "zimg.inl"

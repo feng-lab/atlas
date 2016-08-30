@@ -46,13 +46,13 @@ public:
   Z3DContext context() const
   { return m_context; }
 
-  void setGeometryInputType(GLenum)
+  void setGeometryInputType(GLenum /*unused*/)
   {}
 
-  void setGeometryOutputType(GLenum)
+  void setGeometryOutputType(GLenum /*unused*/)
   {}
 
-  void setGeometryOutputVertexCount(int)
+  void setGeometryOutputVertexCount(int /*unused*/)
   {}
 
   void bindFragDataLocation(GLuint colorNumber, const QString& name);

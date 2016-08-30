@@ -8,7 +8,7 @@ namespace nim {
 class ZVertexBufferObject
 {
 public:
-  ZVertexBufferObject(GLsizei n = 1);
+  explicit ZVertexBufferObject(GLsizei n = 1);
 
   ~ZVertexBufferObject();
 

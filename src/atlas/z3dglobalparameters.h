@@ -2,8 +2,8 @@
 
 #include "znumericparameter.h"
 #include "z3dcameraparameter.h"
-#include "zoptionparameter.h"
 #include "z3dpickingmanager.h"
+#include "zoptionparameter.h"
 #include "z3dinteractionhandler.h"
 #include <vector>
 

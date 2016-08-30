@@ -89,7 +89,7 @@ protected:
 
   virtual void render(Z3DEye eye) override;
 
-  virtual void renderPicking(Z3DEye) override;
+  virtual void renderPicking(Z3DEye /*unused*/) override;
 
 private:
   // this function is used to get proper default

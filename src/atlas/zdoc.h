@@ -43,7 +43,7 @@ Q_OBJECT
 public:
   using ConstObjIdIterator = QList<size_t>::const_iterator;
 
-  explicit ZDoc(QObject* parent = 0);
+  explicit ZDoc(QObject* parent = nullptr);
 
   bool hasObj() const;
 

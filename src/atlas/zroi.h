@@ -315,7 +315,7 @@ protected:
 class ZROICommand : public QUndoCommand
 {
 public:
-  ZROICommand(ZROI& roi)
+  explicit ZROICommand(ZROI& roi)
     : QUndoCommand(), m_roi(roi), m_oldSliceROIs(m_roi.m_sliceROIs)
   {}
 
@@ -403,7 +403,7 @@ protected:
 class ZROISliceMoveSelectedControlPointsCommand : public ZROICommand
 {
 public:
-  ZROISliceMoveSelectedControlPointsCommand(ZROI& roi)
+  explicit ZROISliceMoveSelectedControlPointsCommand(ZROI& roi)
     : ZROICommand(roi), m_firstRun(true)
   {
     setText("Move Selected Control Points");

@@ -9,7 +9,7 @@ namespace nim {
 class ZComboBoxEventFilter : public QObject
 {
 public:
-  ZComboBoxEventFilter(QObject* parent = 0);
+  explicit ZComboBoxEventFilter(QObject* parent = nullptr);
 
 protected:
   virtual bool eventFilter(QObject* obj, QEvent* event) override;
@@ -19,7 +19,7 @@ class ZComboBox : public QComboBox
 {
 Q_OBJECT
 public:
-  explicit ZComboBox(QWidget* parent = 0);
+  explicit ZComboBox(QWidget* parent = nullptr);
 
   virtual QSize sizeHint() const override;
 

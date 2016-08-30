@@ -1,10 +1,10 @@
 #pragma once
 
 #include <QObject>
-#include <vector>
+#include "z3dcanvaseventlistener.h"
 #include <map>
 #include <set>
-#include "z3dcanvaseventlistener.h"
+#include <vector>
 #include "z3dgl.h"
 #include "zflags.h"
 
@@ -51,7 +51,7 @@ public:
     AllResultInvalid = MonoViewResultInvalid | StereoResultInvalid
   };
 
-  Z3DFilter(QObject* parent = nullptr);
+  explicit Z3DFilter(QObject* parent = nullptr);
 
   virtual ~Z3DFilter();
 

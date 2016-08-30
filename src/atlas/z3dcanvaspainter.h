@@ -20,7 +20,7 @@ class Z3DCanvasPainter : public Z3DBoundedFilter
 {
 Q_OBJECT
 public:
-  Z3DCanvasPainter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+  explicit Z3DCanvasPainter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
   ~Z3DCanvasPainter();
 
@@ -48,7 +48,7 @@ protected:
 
   virtual void process(Z3DEye eye) override;
 
-  virtual bool isReady(Z3DEye) const override;
+  virtual bool isReady(Z3DEye /*eye*/) const override;
 
   virtual bool isValid(Z3DEye eye) const override;
 

@@ -24,7 +24,7 @@ struct ZVoxelCoordinate
     : x(0), y(0), z(0), c(0), t(0)
   {}
 
-  inline ZVoxelCoordinate(Init init)
+  inline explicit ZVoxelCoordinate(Init init)
   {
     switch (init) {
       case Init::Minimum:

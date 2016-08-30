@@ -37,7 +37,7 @@ namespace nim {
 class ZBenchTimer
 {
 public:
-  ZBenchTimer(const std::string& funName = "");
+  explicit ZBenchTimer(const std::string& funName = "");
 
   inline void reset()
   {

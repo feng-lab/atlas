@@ -82,7 +82,7 @@ protected:
   {
     SplineRange();
 
-    SplineRange(QList<ZCameraParameterKey*>& kys);
+    explicit SplineRange(QList<ZCameraParameterKey*>& kys);
 
     glm::quat rotation(float fTime) const;
 
@@ -134,5 +134,5 @@ protected:
   ZStringIntOptionParameter m_interpolationMethod;
 };
 
-} // namespace
+}  // namespace nim
 

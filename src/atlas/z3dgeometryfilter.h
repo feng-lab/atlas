@@ -1,10 +1,9 @@
 #pragma once
 
 #include "z3dboundedfilter.h"
-#include "z3drendererbase.h"
-#include "z3dport.h"
 #include "z3dpickingmanager.h"
-
+#include "z3dport.h"
+#include "z3drendererbase.h"
 namespace nim {
 
 class Z3DGeometryFilter : public Z3DBoundedFilter
@@ -12,9 +11,9 @@ class Z3DGeometryFilter : public Z3DBoundedFilter
   friend class Z3DCompositor;
 
 public:
-  Z3DGeometryFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+  explicit Z3DGeometryFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  virtual void renderPicking(Z3DEye)
+  virtual void renderPicking(Z3DEye /*unused*/)
   {}
 
   bool isStayOnTop() const
@@ -39,7 +38,7 @@ public:
   { m_rendererBase.setSizeScale(s); }
 
 protected:
-  virtual void process(Z3DEye) override
+  virtual void process(Z3DEye /*eye*/) override
   {}
 
   // once processed, should be valid for both stereo view and mono view

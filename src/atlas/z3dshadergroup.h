@@ -9,7 +9,7 @@ namespace nim {
 class Z3DShaderGroup
 {
 public:
-  Z3DShaderGroup(Z3DRendererBase& rendererBase);
+  explicit Z3DShaderGroup(Z3DRendererBase& rendererBase);
 
   void init(const QStringList& shaderFiles, const QString& header, const QString& geomHeader = "",
             const QStringList& normalShaderFiles = QStringList());

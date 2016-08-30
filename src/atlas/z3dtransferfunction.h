@@ -17,10 +17,10 @@ class Z3DTransferFunction : public ZColorMap
 {
 Q_OBJECT
 public:
-  Z3DTransferFunction(double min = 0.0, double max = 1.0, const glm::col4& minColor = glm::col4(0, 0, 0, 0),
-                      const glm::col4& maxColor = glm::col4(255, 255, 255, 255),
-                      uint32_t width = 256,
-                      QObject* parent = 0);
+  explicit Z3DTransferFunction(double min = 0.0, double max = 1.0, const glm::col4& minColor = glm::col4(0, 0, 0, 0),
+                               const glm::col4& maxColor = glm::col4(255, 255, 255, 255),
+                               uint32_t width = 256,
+                               QObject* parent = nullptr);
 
 
   Z3DTransferFunction(const Z3DTransferFunction& tf);
@@ -77,7 +77,7 @@ class Z3DTransferFunctionParameter : public ZSingleValueParameter<Z3DTransferFun
 {
 Q_OBJECT
 public:
-  Z3DTransferFunctionParameter(const QString& name, QObject* parent = nullptr);
+  explicit Z3DTransferFunctionParameter(const QString& name, QObject* parent = nullptr);
 
   Z3DTransferFunctionParameter(const QString& name, double min, double max, const glm::col4& minColor,
                                const glm::col4& maxColor, int width, QObject* parent = nullptr);

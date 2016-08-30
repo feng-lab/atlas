@@ -16,7 +16,7 @@ public:
                       const QColor& color = QColor(ZRandom::instance().randInt(255),
                                                    ZRandom::instance().randInt(255),
                                                    ZRandom::instance().randInt(255)),
-                      QObject* parent = 0);
+                      QObject* parent = nullptr);
 
   virtual ~ZParameterAnimation();
 

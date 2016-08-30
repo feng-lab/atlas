@@ -24,7 +24,7 @@ class ZParameter : public QObject
 {
 Q_OBJECT
 public:
-  explicit ZParameter(const QString& name, QObject* parent = 0);
+  explicit ZParameter(const QString& name, QObject* parent = nullptr);
 
   virtual ~ZParameter();
 
@@ -113,16 +113,16 @@ signals:
 
 protected:
   // some templated subclass might need this
-  virtual void reservedIntSlot1(int)
+  virtual void reservedIntSlot1(int /*unused*/)
   {}
 
-  virtual void reservedIntSlot2(int)
+  virtual void reservedIntSlot2(int /*unused*/)
   {}
 
-  virtual void reservedStringSlot1(QString)
+  virtual void reservedStringSlot1(QString /*unused*/)
   {}
 
-  virtual void reservedStringSlot2(QString)
+  virtual void reservedStringSlot2(QString /*unused*/)
   {}
 
   virtual void reservedSlot1()
@@ -154,7 +154,7 @@ class ZSingleValueParameter : public ZParameter
 public:
   ZSingleValueParameter(const QString& name, const T& value, QObject* parent = nullptr);
 
-  ZSingleValueParameter(const QString& name, QObject* parent = nullptr);
+  explicit ZSingleValueParameter(const QString& name, QObject* parent = nullptr);
 
   virtual ~ZSingleValueParameter();
 
@@ -209,8 +209,7 @@ ZSingleValueParameter<T>::ZSingleValueParameter(const QString& name, QObject* pa
 {}
 
 template<class T>
-ZSingleValueParameter<T>::~ZSingleValueParameter()
-{}
+ZSingleValueParameter<T>::~ZSingleValueParameter() = default;
 
 template<class T>
 void ZSingleValueParameter<T>::set(const T& valueIn)
@@ -252,7 +251,7 @@ class ZBoolParameter : public ZSingleValueParameter<bool>
 {
 Q_OBJECT
 public:
-  ZBoolParameter(const QString& name, QObject* parent = nullptr);
+  explicit ZBoolParameter(const QString& name, QObject* parent = nullptr);
 
   ZBoolParameter(const QString& name, bool value, QObject* parent = nullptr);
 

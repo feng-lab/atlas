@@ -24,7 +24,7 @@ class Z3DImg : public QObject
 Q_OBJECT
 public:
   // Z3DVolume will take ownership of the img
-  Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent = 0);
+  Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent = nullptr);
 
   ~Z3DImg();
 

@@ -14,7 +14,7 @@ public:
     Vertex, Fragment, Geometry, TessellationControl, TessellationEvaluation, Compute
   };
 
-  Z3DShader(Z3DShader::Type type);
+  explicit Z3DShader(Z3DShader::Type type);
 
   ~Z3DShader();
 

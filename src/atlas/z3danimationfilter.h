@@ -3,19 +3,19 @@
 #include <QObject>
 #include "z3dgeometryfilter.h"
 #include "zoptionparameter.h"
-#include <map>
 #include <QString>
+#include <map>
 #include <QPoint>
-#include <vector>
-#include "zwidgetsgroup.h"
-#include "znumericparameter.h"
 #include "z3danimation.h"
 #include "zcameraparameteranimation.h"
+#include "znumericparameter.h"
+#include "zwidgetsgroup.h"
+#include <vector>
+#include "z3darrowrenderer.h"
+#include "z3dlinerenderer.h"
+#include "z3dmeshrenderer.h"
 #include "zcolormap.h"
 #include "zmesh.h"
-#include "z3dlinerenderer.h"
-#include "z3darrowrenderer.h"
-#include "z3dmeshrenderer.h"
 
 namespace nim {
 
@@ -30,7 +30,7 @@ public:
   void setVisible(bool v)
   { m_visible.set(v); }
 
-  virtual void process(Z3DEye) override;
+  virtual void process(Z3DEye /*unused*/) override;
 
   void setData(Z3DAnimation* animation);
 
@@ -38,12 +38,12 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  virtual bool hasOpaque(Z3DEye) const override
+  virtual bool hasOpaque(Z3DEye /*unused*/) const override
   { return false; }
 
   virtual void renderOpaque(Z3DEye eye) override;
 
-  virtual bool hasTransparent(Z3DEye) const override
+  virtual bool hasTransparent(Z3DEye /*unused*/) const override
   { return true; }
 
   virtual void renderTransparent(Z3DEye eye) override;

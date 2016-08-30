@@ -2,6 +2,7 @@
 #include <tbb/parallel_for.h>
 #include "zlog.h"
 #include <functional>
+#include <utility>
 
 namespace nim {
 
@@ -10,10 +11,6 @@ ZImgDisplay::ZImgDisplay(const ZImg& img)
 {
   CHECK(!m_img.isEmpty());
   reset();
-}
-
-ZImgDisplay::~ZImgDisplay()
-{
 }
 
 void ZImgDisplay::reset()
@@ -102,8 +99,8 @@ ZQImagePack ZImgDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) const
     m_t = 0;
     size_t lastCol = m_img.width() % tileWidth;
     size_t lastRow = m_img.height() % tileHeight;
-    size_t numX = m_img.width() / tileWidth + (lastCol > 0);
-    size_t numY = m_img.height() / tileHeight + (lastRow > 0);
+    size_t numX = m_img.width() / tileWidth + static_cast<size_t>(lastCol > 0);
+    size_t numY = m_img.height() / tileHeight + static_cast<size_t>(lastRow > 0);
     for (size_t x = 0; x < numX; ++x) {
       for (size_t y = 0; y < numY; ++y) {
         size_t startX = x * tileWidth;

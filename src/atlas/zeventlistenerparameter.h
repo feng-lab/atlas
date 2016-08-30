@@ -11,7 +11,7 @@ class ZEventListenerParameter : public ZParameter
 {
 Q_OBJECT
 public:
-  ZEventListenerParameter(const QString& name, bool sharing = false, QObject* parent = nullptr);
+  explicit ZEventListenerParameter(const QString& name, bool sharing = false, QObject* parent = nullptr);
 
   inline void setSharing(bool s)
   { if (m_sharing != s) { m_sharing = s; emit valueChanged(); }}
@@ -37,7 +37,7 @@ public:
 public:
   virtual void setSameAs(const ZParameter& rhs) override;
 
-  virtual void setValueSameAs(const ZParameter&) override;
+  virtual void setValueSameAs(const ZParameter& /*rhs*/) override;
 
   virtual void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override;
 

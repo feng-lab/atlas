@@ -209,5 +209,5 @@ struct ZImgInfo
 
 #pragma pack(pop)
 
-} // namespace
+}  // namespace nim
 

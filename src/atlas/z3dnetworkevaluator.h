@@ -25,12 +25,12 @@ class Z3DFilterWrapper
 {
 public:
   virtual ~Z3DFilterWrapper()
+  = default;
+
+  virtual void beforeFilterProcess(const Z3DFilter* /*unused*/)
   {}
 
-  virtual void beforeFilterProcess(const Z3DFilter*)
-  {}
-
-  virtual void afterFilterProcess(const Z3DFilter*)
+  virtual void afterFilterProcess(const Z3DFilter* /*unused*/)
   {}
 
   virtual void beforeNetworkProcess()
@@ -45,7 +45,7 @@ class Z3DNetworkEvaluator : public QObject
 Q_OBJECT
 
 public:
-  Z3DNetworkEvaluator(QObject* parent = 0);
+  explicit Z3DNetworkEvaluator(QObject* parent = nullptr);
 
   ~Z3DNetworkEvaluator();
 
@@ -80,7 +80,7 @@ protected:
   { if (m_openGLContext) m_openGLContext->getGLFocus(); }
 
   // update size of all upstream filters. If input filter is nullptr, update all filters
-  void sizeChangedFromFilter(Z3DFilter* rp = 0);
+  void sizeChangedFromFilter(Z3DFilter* rp = nullptr);
 
 private:
   std::vector<Z3DFilter*> m_renderingOrder;
@@ -98,10 +98,10 @@ private:
 
   struct VertexInfo
   {
-    VertexInfo() : filter(0)
+    VertexInfo() : filter(nullptr)
     {}
 
-    VertexInfo(Z3DFilter* p) : filter(p)
+    explicit VertexInfo(Z3DFilter* p) : filter(p)
     {}
 
     Z3DFilter* filter;
@@ -135,7 +135,7 @@ public:
   void beforeNetworkProcess() override;
 
 private:
-  void checkState(const Z3DFilter* p = 0);
+  void checkState(const Z3DFilter* p = nullptr);
 
   void warn(const Z3DFilter* p, const char* message);
 };
@@ -145,7 +145,7 @@ class Z3DProfileFilterWrapper : public Z3DFilterWrapper
 {
   ZBenchTimer m_benchTimer;
 public:
-  void beforeFilterProcess(const Z3DFilter*) override;
+  void beforeFilterProcess(const Z3DFilter* /*unused*/) override;
 
   void afterFilterProcess(const Z3DFilter* p) override;
 

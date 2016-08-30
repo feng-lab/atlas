@@ -99,5 +99,5 @@ private:
   std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> m_data;
 };
 
-} // namespace
+}  // namespace nim
 

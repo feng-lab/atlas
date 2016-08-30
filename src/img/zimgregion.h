@@ -165,5 +165,4 @@ struct ZImgRegion
   ZVoxelCoordinate end;
 };
 
-}
-
+} // namespace nim

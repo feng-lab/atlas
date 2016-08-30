@@ -38,8 +38,7 @@ public:
   ZImgPackSubBlock(const std::shared_ptr<ZImg>& img, size_t ratio, size_t t, size_t sliceStart, size_t sliceEnd,
                    int64_t x, int64_t y, size_t width, size_t height);
 
-  virtual ~ZImgPackSubBlock()
-  {}
+  virtual ~ZImgPackSubBlock() = default;
 
   virtual std::shared_ptr<ZImg> read() const override;
 
@@ -278,5 +277,5 @@ private:
   mutable ZImg m_maximumProjectedAlongZImg;
 };
 
-} // namespace
+}  // namespace nim
 

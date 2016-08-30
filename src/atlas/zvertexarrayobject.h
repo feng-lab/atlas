@@ -8,7 +8,7 @@ namespace nim {
 class ZVertexArrayObject
 {
 public:
-  ZVertexArrayObject(GLsizei n = 1);
+  explicit ZVertexArrayObject(GLsizei n = 1);
 
   ~ZVertexArrayObject();
 

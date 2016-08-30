@@ -7,8 +7,8 @@
 class QOpenGLWidget;
 
 #include <QInputEvent>
-#include <deque>
 #include <QShortcut>
+#include <deque>
 
 namespace nim {
 

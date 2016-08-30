@@ -18,6 +18,7 @@
 #include "z3dcanvaspainter.h"
 #include "zgraphicsview.h"
 #include <QProgressDialog>
+#include <utility>
 #include "zvideoencoder.h"
 
 namespace {
@@ -67,7 +68,7 @@ int numDigits(int32_t x)
   return 1;
 }
 
-}
+}  // namespace
 
 namespace nim {
 

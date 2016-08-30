@@ -10,7 +10,7 @@ class ZFontParameter : public ZSingleValueParameter<QFont>
 {
 Q_OBJECT
 public:
-  ZFontParameter(const QString& name, QObject* parent = nullptr);
+  explicit ZFontParameter(const QString& name, QObject* parent = nullptr);
 
   ZFontParameter(const QString& name, const QFont& font, QObject* parent = nullptr);
 

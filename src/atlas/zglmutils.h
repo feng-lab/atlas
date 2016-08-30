@@ -62,7 +62,7 @@ inline quat mix(const quat& q1, const quat& q2, double p)
   return mix(q1, q2, float(p));
 }
 
-}
+} // namespace glm
 
 namespace nim {
 
@@ -71,7 +71,7 @@ class Vec2Compare
 {
   bool less;
 public:
-  Vec2Compare(bool less_ = true)
+  explicit Vec2Compare(bool less_ = true)
     : less(less_)
   {}
 
@@ -90,7 +90,7 @@ class Vec3Compare
 {
   bool less;
 public:
-  Vec3Compare(bool less_ = true)
+  explicit Vec3Compare(bool less_ = true)
     : less(less_)
   {}
 
@@ -109,7 +109,7 @@ class Vec4Compare
 {
   bool less;
 public:
-  Vec4Compare(bool less_ = true)
+  explicit Vec4Compare(bool less_ = true)
     : less(less_)
   {}
 

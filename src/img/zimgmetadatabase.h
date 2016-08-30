@@ -34,11 +34,9 @@ protected:
   };
 
 public:
-  ZImgMetadataBase()
-  {}
+  ZImgMetadataBase() = default;
 
-  virtual ~ZImgMetadataBase()
-  {}
+  virtual ~ZImgMetadataBase() = default;
 
   ZImgMetadataBase(ZImgMetadataBase&&) = default;
 
@@ -197,5 +195,5 @@ protected:
   std::vector<T> m_empty;
 };
 
-}
+}  // namespace nim
 

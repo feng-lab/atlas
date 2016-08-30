@@ -4,14 +4,14 @@
 #include "z3dboundedfilter.h"
 #include "z3dgeometryfilter.h"
 #include "z3dimgfilter.h"
-#include "z3dpickingmanager.h"
-#include "z3dcameraparameter.h"
 #include "z3dbackgroundrenderer.h"
-#include "z3dtexturecopyrenderer.h"
+#include "z3dcameraparameter.h"
+#include "z3dpickingmanager.h"
 #include "z3dtextureblendrenderer.h"
-#include "zwidgetsgroup.h"
-#include "z3dinteractionhandler.h"
+#include "z3dtexturecopyrenderer.h"
 #include "z3dfontrenderer.h"
+#include "z3dinteractionhandler.h"
+#include "zwidgetsgroup.h"
 #include "z3dshaderprogram.h"
 
 namespace nim {
@@ -20,7 +20,7 @@ class Z3DCompositor : public Z3DBoundedFilter
 {
 Q_OBJECT
 public:
-  Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+  explicit Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
   virtual bool isReady(Z3DEye eye) const override;
 

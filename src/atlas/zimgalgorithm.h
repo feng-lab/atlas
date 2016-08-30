@@ -105,30 +105,28 @@ protected:
 class ZImgAlgorithmBase
 {
 public:
-  ZImgAlgorithmBase()
-  {}
+  ZImgAlgorithmBase() = default;
 
 protected:
-  ~ZImgAlgorithmBase()
+  ~ZImgAlgorithmBase() = default;
+
+  inline void setCancelFlag(bool* /*unused*/)
   {}
 
-  inline void setCancelFlag(bool*)
+  inline void setProgressReportInterval(double /*unused*/)
   {}
 
-  inline void setProgressReportInterval(double)
+  inline void setTotalSubOperationWeight(double /*unused*/)
   {}
 
-  inline void setTotalSubOperationWeight(double)
-  {}
-
-  inline void reportProgress(double)
+  inline void reportProgress(double /*unused*/)
   {}
 
   // will change the progress interval of internal operation
-  inline void registerSubOperation(void*, double)
+  inline void registerSubOperation(void* /*unused*/, double /*unused*/)
   {}
 
-  inline void registerSubOperation(itk::ProcessObject*, double)
+  inline void registerSubOperation(itk::ProcessObject* /*unused*/, double /*unused*/)
   {}
 
   inline void clearRegisteredSubOperations()
@@ -139,8 +137,7 @@ template<bool ReportProgress = false>
 class ZImgAlgorithm : public ZImgAlgorithmBase
 {
 public:
-  ZImgAlgorithm()
-  {}
+  ZImgAlgorithm() = default;
 };
 
 template<>

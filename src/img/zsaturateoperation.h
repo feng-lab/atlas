@@ -22,7 +22,7 @@ inline T roundTo(Float x)
 {
   if (std::isnan(x))
     return 0;
-  else if (x <= std::numeric_limits<T>::min())
+  if (x <= std::numeric_limits<T>::min())
     return std::numeric_limits<T>::min();
   else if (x >= std::numeric_limits<T>::max())
     return std::numeric_limits<T>::max();

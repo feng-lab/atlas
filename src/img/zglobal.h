@@ -77,9 +77,8 @@ __forceinline typename MapType::iterator efficientAddOrUpdate(MapType& m, const 
   if (lb != m.end() && !(m.key_comp()(k, lb->first))) { // if Ib points to a pair whose key is equiv to k...
     lb->second = v; // update the pair's value
     return lb; // and return an iterator to that pair
-  } else {
-    return m.emplace_hint(lb, k, v); // add pair(k, v) to m and return an iterator to the new map element
   }
+  return m.emplace_hint(lb, k, v); // add pair(k, v) to m and return an iterator to the new map element
 }
 
 // literal

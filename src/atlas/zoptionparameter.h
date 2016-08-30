@@ -16,11 +16,10 @@ template<class T, class T2 = int>
 class ZOptionParameter : public ZSingleValueParameter<T>
 {
 public:
-  ZOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
-                   const QString& suffix = "");
+  explicit ZOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
+                            const QString& suffix = "");
 
-  virtual ~ZOptionParameter()
-  {}
+  virtual ~ZOptionParameter() = default;
 
   inline QString prefix() const
   { return m_prefix; }
@@ -227,24 +226,24 @@ class ZStringIntOptionParameter : public ZOptionParameter<QString, int>
 {
 Q_OBJECT
 public:
-  ZStringIntOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
-                            const QString& suffix = "");
+  explicit ZStringIntOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
+                                     const QString& suffix = "");
 };
 
 class ZStringStringOptionParameter : public ZOptionParameter<QString, QString>
 {
 Q_OBJECT
 public:
-  ZStringStringOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
-                               const QString& suffix = "");
+  explicit ZStringStringOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
+                                        const QString& suffix = "");
 };
 
 class ZIntIntOptionParameter : public ZOptionParameter<int, int>
 {
 Q_OBJECT
 public:
-  ZIntIntOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
-                         const QString& suffix = "");
+  explicit ZIntIntOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
+                                  const QString& suffix = "");
 };
 
 } // namespace nim

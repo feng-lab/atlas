@@ -11,7 +11,7 @@ class Z3DInteractionHandler : public QObject
 {
 Q_OBJECT
 public:
-  Z3DInteractionHandler(const QString& name, QObject* parent = 0);
+  explicit Z3DInteractionHandler(const QString& name, QObject* parent = nullptr);
 
   void setName(const QString& name)
   { m_name = name; }
@@ -74,7 +74,7 @@ class Z3DTrackballInteractionHandler : public Z3DInteractionHandler
 {
 Q_OBJECT
 public:
-  Z3DTrackballInteractionHandler(const QString& name, Z3DCameraParameter* camera, QObject* parent = 0);
+  Z3DTrackballInteractionHandler(const QString& name, Z3DCameraParameter* camera, QObject* parent = nullptr);
 
   virtual ~Z3DTrackballInteractionHandler();
 

@@ -91,7 +91,7 @@ class ZROIFilter : public ZObjFilter
 {
 Q_OBJECT
 public:
-  ZROIFilter(ZView& view);
+  explicit ZROIFilter(ZView& view);
 
   void setData(ZROI& roi);
 

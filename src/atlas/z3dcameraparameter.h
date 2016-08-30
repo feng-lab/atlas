@@ -1,8 +1,8 @@
 #pragma once
 
-#include "zparameter.h"
 #include "znumericparameter.h"
 #include "zoptionparameter.h"
+#include "zparameter.h"
 #include "z3dcamera.h"
 
 namespace nim {

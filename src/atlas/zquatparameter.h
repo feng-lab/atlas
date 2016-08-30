@@ -8,7 +8,7 @@ class ZQuatParameter : public ZNumericVectorParameter<glm::quat>
 {
 Q_OBJECT
 public:
-  ZQuatParameter(const QString& name, QObject* parent = nullptr);
+  explicit ZQuatParameter(const QString& name, QObject* parent = nullptr);
 
   ZQuatParameter(const QString& name, glm::quat value, QObject* parent = nullptr);
 

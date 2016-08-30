@@ -16,7 +16,7 @@ class Z3DTexture;
 class Z3DVolumeHistogramThread : public QThread
 {
 public:
-  Z3DVolumeHistogramThread(Z3DVolume* volume, QObject* parent = 0);
+  explicit Z3DVolumeHistogramThread(Z3DVolume* volume, QObject* parent = nullptr);
 
   void run();
 
@@ -48,11 +48,11 @@ class Z3DVolume : public QObject
 Q_OBJECT
 public:
   // Z3DVolume will take ownership of the img
-  Z3DVolume(ZImg& img,
-            const glm::vec3& spacing = glm::vec3(1.f),
-            const glm::vec3& offset = glm::vec3(0.f),
-            const glm::mat4& transformation = glm::mat4(1.0),
-            QObject* parent = 0);
+  explicit Z3DVolume(ZImg& img,
+                     const glm::vec3& spacing = glm::vec3(1.f),
+                     const glm::vec3& offset = glm::vec3(0.f),
+                     const glm::mat4& transformation = glm::mat4(1.0),
+                     QObject* parent = nullptr);
 
   virtual ~Z3DVolume();
 

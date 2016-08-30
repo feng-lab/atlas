@@ -26,9 +26,6 @@ public:
 
   Z3DGpuInfo();
 
-  ~Z3DGpuInfo()
-  {}
-
   bool isSupported() const
   { return m_isSupported; }
 

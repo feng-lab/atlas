@@ -1,9 +1,9 @@
 #pragma once
 
 #include "z3dgl.h"
+#include "zflags.h"
 #include "zglmutils.h"
 #include <map>
-#include "zflags.h"
 #include <vector>
 
 namespace nim {

@@ -11,7 +11,7 @@ class ZVideoEncoder : public QObject
 {
 Q_OBJECT
 public:
-  ZVideoEncoder(QObject* parent = nullptr);
+  explicit ZVideoEncoder(QObject* parent = nullptr);
 
   void encode(const QDir& dir, const QString& namePrefix, int fieldWidth,
               int framesPerSecond, const QString& outputFilename);

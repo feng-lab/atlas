@@ -1079,8 +1079,8 @@ void ZStitchImageDialog::stitchStacks2()
   }
 
   size_t nstack;
-  QList<ZImgSource> inputStack1Sources;
-  QList<ZImgSource> inputStack2Sources;
+  std::vector<ZImgSource> inputStack1Sources;
+  std::vector<ZImgSource> inputStack2Sources;
 
   if (m_inputStack1Filenames.size() == 1 && m_useTileImageRadioButton->isChecked() && m_tileList.size() > 1) {
     // split input into m_tileList.size() tiles
@@ -1128,8 +1128,8 @@ void ZStitchImageDialog::stitchStacks2()
   } else if (m_inputStack1Filenames.size() == 1 || m_useLayoutRadioButton->isChecked()) {
     nstack = m_inputStack1Filenames.size();
     for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
-      inputStack1Sources.push_back(m_inputStack1Filenames[i]);
-      inputStack2Sources.push_back(m_inputStack2Filenames[i]);
+      inputStack1Sources.emplace_back(m_inputStack1Filenames[i]);
+      inputStack2Sources.emplace_back(m_inputStack2Filenames[i]);
     }
   } else {
     if (m_useTileImageRadioButton->isChecked()) {
@@ -1148,14 +1148,14 @@ void ZStitchImageDialog::stitchStacks2()
         if (m_inputStack1Filenames.size() == m_tileList.size()) {
           for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
             if (m_tileList[i].bIsSelected) {
-              inputStack1Sources.push_back(m_inputStack1Filenames[i]);
-              inputStack2Sources.push_back(m_inputStack2Filenames[i]);
+              inputStack1Sources.emplace_back(m_inputStack1Filenames[i]);
+              inputStack2Sources.emplace_back(m_inputStack2Filenames[i]);
             }
           }
         } else {
           for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
-            inputStack1Sources.push_back(m_inputStack1Filenames[i]);
-            inputStack2Sources.push_back(m_inputStack2Filenames[i]);
+            inputStack1Sources.emplace_back(m_inputStack1Filenames[i]);
+            inputStack2Sources.emplace_back(m_inputStack2Filenames[i]);
           }
         }
       } else {
@@ -1163,8 +1163,8 @@ void ZStitchImageDialog::stitchStacks2()
         QApplication::processEvents();
         nstack = m_inputStack1Filenames.size();
         for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
-          inputStack1Sources.push_back(m_inputStack1Filenames[i]);
-          inputStack2Sources.push_back(m_inputStack2Filenames[i]);
+          inputStack1Sources.emplace_back(m_inputStack1Filenames[i]);
+          inputStack2Sources.emplace_back(m_inputStack2Filenames[i]);
         }
         m_useFullConnectionRadioButton->click();
         QApplication::processEvents();
@@ -1173,8 +1173,8 @@ void ZStitchImageDialog::stitchStacks2()
     } else {
       nstack = m_inputStack1Filenames.size();
       for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
-        inputStack1Sources.push_back(m_inputStack1Filenames[i]);
-        inputStack2Sources.push_back(m_inputStack2Filenames[i]);
+        inputStack1Sources.emplace_back(m_inputStack1Filenames[i]);
+        inputStack2Sources.emplace_back(m_inputStack2Filenames[i]);
       }
     }
   }
@@ -1268,10 +1268,10 @@ void ZStitchImageDialog::stitchStacks2()
     }
     buildConnectionFromGrid(tileMatrix, conn);
 
-    for (int i = 0; i < inputStack1Sources.size(); ++i) {
+    for (size_t i = 0; i < inputStack1Sources.size(); ++i) {
       m_commandOutputEdit->append(inputStack1Sources[i].toQString());
     }
-    for (int i = 0; i < inputStack2Sources.size(); ++i) {
+    for (size_t i = 0; i < inputStack2Sources.size(); ++i) {
       m_commandOutputEdit->append(inputStack2Sources[i].toQString());
     }
     QApplication::processEvents();
@@ -1768,7 +1768,7 @@ void ZStitchImageDialog::stitchStacks()
     }
 
     size_t nstack;
-    QList<ZImgSource> inputStackSources;
+    std::vector<ZImgSource> inputStackSources;
 
     if (m_inputStack1Filenames.size() == 1 && m_useTileImageRadioButton->isChecked() && m_tileList.size() > 1) {
       // split input into m_tileList.size() tiles
@@ -1798,7 +1798,7 @@ void ZStitchImageDialog::stitchStacks()
     } else if (m_inputStack1Filenames.size() == 1 || m_useLayoutRadioButton->isChecked()) {
       nstack = m_inputStack1Filenames.size();
       for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
-        inputStackSources.push_back(m_inputStack1Filenames[i]);
+        inputStackSources.emplace_back(m_inputStack1Filenames[i]);
       }
     } else {
       if (m_useTileImageRadioButton->isChecked()) {
@@ -1817,12 +1817,12 @@ void ZStitchImageDialog::stitchStacks()
           if (m_inputStack1Filenames.size() == m_tileList.size()) {
             for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
               if (m_tileList[i].bIsSelected) {
-                inputStackSources.push_back(m_inputStack1Filenames[i]);
+                inputStackSources.emplace_back(m_inputStack1Filenames[i]);
               }
             }
           } else {
             for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
-              inputStackSources.push_back(m_inputStack1Filenames[i]);
+              inputStackSources.emplace_back(m_inputStack1Filenames[i]);
             }
           }
         } else {
@@ -1830,7 +1830,7 @@ void ZStitchImageDialog::stitchStacks()
           QApplication::processEvents();
           nstack = m_inputStack1Filenames.size();
           for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
-            inputStackSources.push_back(m_inputStack1Filenames[i]);
+            inputStackSources.emplace_back(m_inputStack1Filenames[i]);
           }
           m_useFullConnectionRadioButton->click();
           QApplication::processEvents();
@@ -1839,7 +1839,7 @@ void ZStitchImageDialog::stitchStacks()
       } else {
         nstack = m_inputStack1Filenames.size();
         for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
-          inputStackSources.push_back(m_inputStack1Filenames[i]);
+          inputStackSources.emplace_back(m_inputStack1Filenames[i]);
         }
       }
     }
@@ -1934,7 +1934,7 @@ void ZStitchImageDialog::stitchStacks()
       }
       buildConnectionFromGrid(tileMatrix, conn);
 
-      for (int i = 0; i < inputStackSources.size(); ++i) {
+      for (size_t i = 0; i < inputStackSources.size(); ++i) {
         m_commandOutputEdit->append(inputStackSources[i].toQString());
       }
       QApplication::processEvents();

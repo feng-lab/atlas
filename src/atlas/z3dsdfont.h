@@ -11,9 +11,9 @@ class Z3DSDFont
 public:
   struct CharInfo
   {
-    CharInfo(int id_ = 0, int x_ = 0, int y_ = 0, int width_ = 0, int height_ = 0,
-             float xoffset_ = 0.f, float yoffset_ = 0.f,
-             float xadvance_ = 0.f, int page_ = 0, int chnl_ = 0, int texWidth = 1, int texHeight = 1)
+    explicit CharInfo(int id_ = 0, int x_ = 0, int y_ = 0, int width_ = 0, int height_ = 0,
+                      float xoffset_ = 0.f, float yoffset_ = 0.f,
+                      float xadvance_ = 0.f, int page_ = 0, int chnl_ = 0, int texWidth = 1, int texHeight = 1)
       : id(id_), x(x_), y(y_), width(width_), height(height_), xoffset(xoffset_), yoffset(yoffset_)
       , xadvance(xadvance_), page(page_), chnl(chnl_)
     {
