@@ -392,31 +392,25 @@ void ZMainWindow::init()
   m_view = std::make_unique<ZView>(*m_doc, this);
 
   //packages
-  ZImgView* imgView = new ZImgView(m_doc->imgDoc(), *m_view);
-  m_view->registerObjView(imgView);
+  m_view->registerObjView(std::make_unique<ZImgView>(m_doc->imgDoc(), *m_view));
 
-  ZROIView* roiView = new ZROIView(m_doc->roiDoc(), *m_view);
-  m_view->registerObjView(roiView);
+  m_view->registerObjView(std::make_unique<ZROIView>(m_doc->roiDoc(), *m_view));
 
   ZPunctaDoc* punctaDoc = new ZPunctaDoc(*m_doc);
   m_doc->registerObjDoc(punctaDoc);
-  ZPunctaView* punctaView = new ZPunctaView(*punctaDoc, *m_view);
-  m_view->registerObjView(punctaView);
+  m_view->registerObjView(std::make_unique<ZPunctaView>(*punctaDoc, *m_view));
 
   ZSwcDoc* swcDoc = new ZSwcDoc(*m_doc);
   m_doc->registerObjDoc(swcDoc);
-  ZSwcView* swcView = new ZSwcView(*swcDoc, *m_view);
-  m_view->registerObjView(swcView);
+  m_view->registerObjView(std::make_unique<ZSwcView>(*swcDoc, *m_view));
 
   ZRegionAnnotationDoc* regionAnnotationDoc = new ZRegionAnnotationDoc(*m_doc);
   m_doc->registerObjDoc(regionAnnotationDoc);
-  ZRegionAnnotationView* regionAnnotationView = new ZRegionAnnotationView(*regionAnnotationDoc, *m_view);
-  m_view->registerObjView(regionAnnotationView);
+  m_view->registerObjView(std::make_unique<ZRegionAnnotationView>(*regionAnnotationDoc, *m_view));
 
   ZSvgDoc* svgDoc = new ZSvgDoc(*m_doc);
   m_doc->registerObjDoc(svgDoc);
-  ZSvgView* svgView = new ZSvgView(*svgDoc, *m_view);
-  m_view->registerObjView(svgView);
+  m_view->registerObjView(std::make_unique<ZSvgView>(*svgDoc, *m_view));
 
   // UI
   setCentralWidget(m_view.get());

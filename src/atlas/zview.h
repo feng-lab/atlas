@@ -128,7 +128,7 @@ public:
   // will show on label
   void setInfo(double x, double y);
 
-  void registerObjView(ZObjView* v);
+  void registerObjView(std::unique_ptr<ZObjView>&& v);
 
   virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override;
 
@@ -216,7 +216,7 @@ private:
   bool m_doNotReceiveSliceSignal;
   std::vector<int> m_boundBox;
 
-  QList<ZObjView*> m_objViews;
+  std::vector<std::unique_ptr<ZObjView>> m_objViews;
 
   size_t m_numObjsBefore;
 };

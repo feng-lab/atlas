@@ -16,12 +16,12 @@ ZSaveObjsDialog::ZSaveObjsDialog(const ZDoc& doc, const QList<size_t>& objs, QWi
 {
   createWidget();
 
-    foreach (size_t id, objs) {
-      ZObjDoc* odoc = m_doc.idToDoc(id);
-      QTreeWidgetItem* item = new QTreeWidgetItem(m_treeWidget, QStringList()
-        << odoc->objName(id) << QDir::toNativeSeparators(odoc->objPath(id)));
-      item->setData(0, Qt::UserRole, qVariantFromValue(id));
-    }
+  for (auto id : objs) {
+    ZObjDoc* odoc = m_doc.idToDoc(id);
+    QTreeWidgetItem* item = new QTreeWidgetItem(m_treeWidget, QStringList()
+      << odoc->objName(id) << QDir::toNativeSeparators(odoc->objPath(id)));
+    item->setData(0, Qt::UserRole, qVariantFromValue(id));
+  }
 
   m_treeWidget->resizeColumnToContents(0);
   m_treeWidget->selectAll();
@@ -69,9 +69,9 @@ void ZSaveObjsDialog::createWidget()
 void ZSaveObjsDialog::collectObjsToSave()
 {
   m_objsToSave.clear();
-    foreach (QTreeWidgetItem* item, m_treeWidget->selectedItems()) {
-      m_objsToSave.append(item->data(0, Qt::UserRole).value<size_t>());
-    }
+  for (auto item : m_treeWidget->selectedItems()) {
+    m_objsToSave.append(item->data(0, Qt::UserRole).value<size_t>());
+  }
   accept();
 }
 
@@ -105,12 +105,12 @@ void ZSaveObjsDialog::adjustButtonWidths()
     possibleTexts << tr("Save Selected");
   int maxTextWidth = 0;
   QPushButton* saveButton = m_buttonBox->button(QDialogButtonBox::Save);
-    foreach (const QString& text, possibleTexts) {
-      saveButton->setText(text);
-      int hint = saveButton->sizeHint().width();
-      if (hint > maxTextWidth)
-        maxTextWidth = hint;
-    }
+  for (const QString& text : possibleTexts) {
+    saveButton->setText(text);
+    int hint = saveButton->sizeHint().width();
+    if (hint > maxTextWidth)
+      maxTextWidth = hint;
+  }
   saveButton->setMinimumWidth(maxTextWidth);
 }
 

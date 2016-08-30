@@ -516,7 +516,6 @@ void Z3DImg::uploadImageCache(size_t channel)
   tbb::parallel_for(tbb::blocked_range<size_t>(0, imgs.size()),
                     [&](const tbb::blocked_range<size_t>& r) {
                       for (size_t i = r.begin(); i != r.end(); ++i) {
-                        //const auto& blockPos = m_channelPendingUpdates[channel][i].first;
                         const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
                         imgs[i] = ZImg(ZImgInfo(m_imageBlockSize.x + 2, m_imageBlockSize.y + 2, m_imageBlockSize.z + 2,
                                                 1));
@@ -527,7 +526,7 @@ void Z3DImg::uploadImageCache(size_t channel)
                     }
   );
   bt2.pause();
-  for (size_t i=0; i<imgs.size(); ++i) {
+  for (size_t i = 0; i < imgs.size(); ++i) {
     m_imageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][i].first,
                                                   m_imageBlockSize + 2_u32, imgs[i].channelData(0));
   }
