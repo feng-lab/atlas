@@ -20,8 +20,6 @@ public:
 
   explicit ZRegionAnnotationTreeModel(ZRegionAnnotation& anno, QObject* parent = nullptr);
 
-  ~ZRegionAnnotationTreeModel();
-
   QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
 
   Qt::ItemFlags flags(const QModelIndex& index) const;

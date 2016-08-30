@@ -72,10 +72,10 @@ void ZSwcGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* 
     m_outlineColor.setAlpha(m_opacity * 255);
     painter->setPen(QPen(m_outlineColor, 1));
     //painter->drawLines(m_lines);
-    for (ZSwc::Iterator it = m_swc.begin(); it != m_swc.end(); ++it) {
+    for (const auto& node : m_swc) {
       painter->drawEllipse(
-        QRectF(it->x - std::max(it->radius, .5), it->y - std::max(it->radius, .5), std::max(it->radius, .5) * 2,
-               std::max(it->radius, .5) * 2));
+        QRectF(node.x - std::max(node.radius, .5), node.y - std::max(node.radius, .5), std::max(node.radius, .5) * 2,
+               std::max(node.radius, .5) * 2));
     }
   } else {
     //if (m_showSkeleton) {

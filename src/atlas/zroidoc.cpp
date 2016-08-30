@@ -106,9 +106,9 @@ bool ZROIDoc::canReadFile(const QString& fileName)
 
 size_t ZROIDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
-  for (auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
-    if (it->second->path == fileName)
-      return it->first;
+  for (const auto& idPack : m_idToROIPacks) {
+    if (idPack.second->path == fileName)
+      return idPack.first;
   }
   size_t id;
   try {
@@ -132,9 +132,9 @@ size_t ZROIDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
     errorMsg = QString("File path is not string or is empty");
     return 0;
   }
-  for (auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
-    if (isSameObj(jValue, jsonValue(it->first)))
-      return it->first;
+  for (const auto& idPack : m_idToROIPacks) {
+    if (isSameObj(jValue, jsonValue(idPack.first)))
+      return idPack.first;
   }
   size_t id;
   QString fileName = jValue.toString();
@@ -233,8 +233,8 @@ bool ZROIDoc::isAlias(size_t id) const
   CHECK(m_idToROIPacks.find(id) != m_idToROIPacks.end());
 
   auto& pack = m_idToROIPacks.at(id);
-  for (auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
-    if (it->first != id && it->second == pack)
+  for (const auto& idPack : m_idToROIPacks) {
+    if (idPack.first != id && idPack.second == pack)
       return true;
   }
   return false;
@@ -262,11 +262,11 @@ void ZROIDoc::loadROI()
 void ZROIDoc::setModified()
 {
   if (ZROI* roi = qobject_cast<ZROI*>(sender())) {
-    for (auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
-      if (it->second->roi.get() == roi) {
-        it->second->updateDerivedData();
-        it->second->hasUnsavedChange = true;
-        m_doc.updateObjInfo(it->first);
+    for (auto& idPack : m_idToROIPacks) {
+      if (idPack.second->roi.get() == roi) {
+        idPack.second->updateDerivedData();
+        idPack.second->hasUnsavedChange = true;
+        m_doc.updateObjInfo(idPack.first);
         return;
       }
     }
@@ -397,9 +397,9 @@ bool ZROIDoc::saveROI(ROIPack* pack, const QString& fileName, QString& errorMsg)
 
 void ZROIDoc::packInfoUpdated(ROIPack* pack)
 {
-  for (auto it = m_idToROIPacks.begin(); it != m_idToROIPacks.end(); ++it) {
-    if (it->second.get() == pack)
-      m_doc.updateObjInfo(it->first);
+  for (const auto& idPack : m_idToROIPacks) {
+    if (idPack.second.get() == pack)
+      m_doc.updateObjInfo(idPack.first);
   }
 }
 

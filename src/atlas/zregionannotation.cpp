@@ -283,9 +283,9 @@ void ZRegionAnnotation::mergeROIToRegion(const ZROI& roi, int64_t regionID)
 
 const ZMesh* ZRegionAnnotation::meshOfRegion(int64_t regionID)
 {
-  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
-    if (it->id == regionID) {
-      return it->mesh.get();
+  for (const auto& node : m_ontology) {
+    if (node.id == regionID) {
+      return node.mesh.get();
     }
   }
   return nullptr;
@@ -293,9 +293,9 @@ const ZMesh* ZRegionAnnotation::meshOfRegion(int64_t regionID)
 
 const ZROI* ZRegionAnnotation::roiOfRegion(int64_t regionID)
 {
-  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
-    if (it->id == regionID) {
-      return it->roi.get();
+  for (const auto& node : m_ontology) {
+    if (node.id == regionID) {
+      return node.roi.get();
     }
   }
   return nullptr;

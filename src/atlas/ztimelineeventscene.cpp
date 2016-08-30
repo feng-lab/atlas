@@ -284,9 +284,8 @@ void ZTimelineEventScene::removeSelectedKeys()
       keyAniMap[&item->paraKey()] = &item->paraAnimation();
     }
   }
-  for (std::map<ZParameterKey*, ZParameterAnimation*>::iterator it = keyAniMap.begin();
-       it != keyAniMap.end(); ++it) {
-    it->second->deleteKey(it->first);
+  for (const auto& keyAni : keyAniMap) {
+    keyAni.second->deleteKey(keyAni.first);
   }
 }
 
@@ -295,25 +294,21 @@ void ZTimelineEventScene::resizeRects()
   QRectF rect = sceneRect();
   rect.setWidth(m_timeline.eventViewWidth() - m_view->verticalScrollBar()->width());
   setSceneRect(rect);
-  for (std::map<EventBoundRectItem*, const ZAnimationDisplayPack*>::iterator it = m_itemToDisplayPack.begin();
-       it != m_itemToDisplayPack.end(); ++it) {
-    it->first->setRect(-1, 0, m_timeline.eventViewWidth() + 2, m_timeline.rowHeight());
+  for (const auto& itemDisplayPack : m_itemToDisplayPack) {
+    itemDisplayPack.first->setRect(-1, 0, m_timeline.eventViewWidth() + 2, m_timeline.rowHeight());
   }
 }
 
 void ZTimelineEventScene::moveKeys()
 {
-  for (std::map<ZParameterKey*, ParameterKeysItem*>::iterator it = m_globalParaKeyToItem.begin();
-       it != m_globalParaKeyToItem.end(); ++it) {
-    it->second->updateValue();
+  for (const auto& keyItem : m_globalParaKeyToItem) {
+    keyItem.second->updateValue();
   }
-  for (std::map<ZParameterKey*, ParameterKeysItem*>::iterator it = m_ObjKeyToItem.begin();
-       it != m_ObjKeyToItem.end(); ++it) {
-    it->second->updateValue();
+  for (const auto& keyItem : m_ObjKeyToItem) {
+    keyItem.second->updateValue();
   }
-  for (std::map<ZParameterKey*, ParameterKeysItem*>::iterator it = m_ObjParaKeyToItem.begin();
-       it != m_ObjParaKeyToItem.end(); ++it) {
-    it->second->updateValue();
+  for (const auto& keyItem : m_ObjParaKeyToItem) {
+    keyItem.second->updateValue();
   }
 }
 

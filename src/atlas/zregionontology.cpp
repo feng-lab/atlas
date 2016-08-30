@@ -186,9 +186,9 @@ void readMouseBrainAtlasOntology(const QStringList& regionAbbrevs, ZTree<RegionN
 
 int64_t idOfRegionAbbreviation(const QString& abbreviation, const ZTree<RegionNode>& ontology)
 {
-  for (auto it = ontology.begin(); it != ontology.end(); ++it) {
-    if (it->abbreviation == abbreviation) {
-      return it->id;
+  for (const auto& node : ontology) {
+    if (node.abbreviation == abbreviation) {
+      return node.id;
     }
   }
   throw ZException(QString("can not find region %1").arg(abbreviation));
@@ -198,9 +198,9 @@ int64_t idOfRegionAbbreviation(const QString& abbreviation, const ZTree<RegionNo
 std::vector<int64_t> allIDsWithinRegionAbbreviation(const QString& abbreviation, const ZTree<RegionNode>& ontology)
 {
   std::vector<int64_t> res;
-  for (auto it = ontology.begin(); it != ontology.end(); ++it) {
+  for (auto it = ontology.cbegin(); it != ontology.cend(); ++it) {
     if (it->abbreviation == abbreviation) {
-      for (auto ait = ontology.begin(it); ait != ontology.end(it); ++ait) {
+      for (auto ait = ontology.cbegin(it); ait != ontology.cend(it); ++ait) {
         res.push_back(ait->id);
       }
     }

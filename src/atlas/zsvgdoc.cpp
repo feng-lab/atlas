@@ -40,9 +40,9 @@ bool ZSvgDoc::canReadFile(const QString& fileName)
 
 size_t ZSvgDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
-  for (auto it = m_idToSvgPacks.begin(); it != m_idToSvgPacks.end(); ++it) {
-    if (it->second->path == fileName)
-      return it->first;
+  for (const auto& idPack : m_idToSvgPacks) {
+    if (idPack.second->path == fileName)
+      return idPack.first;
   }
   auto svg = std::make_unique<QSvgRenderer>(fileName);
   if (svg->isValid()) {
@@ -63,9 +63,9 @@ size_t ZSvgDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
     errorMsg = QString("File path is not string or is empty");
     return 0;
   }
-  for (auto it = m_idToSvgPacks.begin(); it != m_idToSvgPacks.end(); ++it) {
-    if (isSameObj(jValue, jsonValue(it->first)))
-      return it->first;
+  for (const auto& idPack : m_idToSvgPacks) {
+    if (isSameObj(jValue, jsonValue(idPack.first)))
+      return idPack.first;
   }
   QString fileName = jValue.toString();
   auto svg = std::make_unique<QSvgRenderer>(fileName);
@@ -153,8 +153,8 @@ size_t ZSvgDoc::makeAlias(size_t id)
 bool ZSvgDoc::isAlias(size_t id) const
 {
   auto& pack = m_idToSvgPacks.at(id);
-  for (auto it = m_idToSvgPacks.begin(); it != m_idToSvgPacks.end(); ++it) {
-    if (it->first != id && it->second == pack)
+  for (const auto& idPack : m_idToSvgPacks) {
+    if (idPack.first != id && idPack.second == pack)
       return true;
   }
   return false;
@@ -222,9 +222,9 @@ void ZSvgDoc::createActions()
 
 void ZSvgDoc::packInfoUpdated(SvgPack* pack)
 {
-  for (auto it = m_idToSvgPacks.begin(); it != m_idToSvgPacks.end(); ++it) {
-    if (it->second.get() == pack)
-      m_doc.updateObjInfo(it->first);
+  for (const auto& idPack : m_idToSvgPacks) {
+    if (idPack.second.get() == pack)
+      m_doc.updateObjInfo(idPack.first);
   }
 }
 

@@ -23,8 +23,8 @@ public:
 
   ~ZFilterView()
   {
-    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
-      it->second->releaseItemsOwnership();  // destroy view means mainwindow is closing, this will speed up the closing process
+    for (const auto& idFilter : m_idToFilter) {
+      idFilter.second->releaseItemsOwnership();  // destroy view means mainwindow is closing, this will speed up the closing process
     }
   }
 
@@ -52,9 +52,9 @@ public:
 
   virtual void setNormalView(int slice, int time) override
   {
-    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
+    for (const auto& idFilter : m_idToFilter) {
       try {
-        it->second->setNormalView(slice, time);
+        idFilter.second->setNormalView(slice, time);
       }
       catch (const ZException& e) {
         QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
@@ -64,9 +64,9 @@ public:
 
   virtual void setMaxZProjView(int time) override
   {
-    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
+    for (const auto& idFilter : m_idToFilter) {
       try {
-        it->second->setMaxZProjView(time);
+        idFilter.second->setMaxZProjView(time);
       }
       catch (const ZException& e) {
         QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
@@ -76,9 +76,9 @@ public:
 
   virtual void setViewport(const QRectF& rect, double scale) override
   {
-    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
+    for (const auto& idFilter : m_idToFilter) {
       try {
-        it->second->setViewport(rect, scale);
+        idFilter.second->setViewport(rect, scale);
       }
       catch (const ZException& e) {
         QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
@@ -97,9 +97,9 @@ public:
 
   virtual void deleteKeyPressed() override
   {
-    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
+    for (const auto& idFilter : m_idToFilter) {
       try {
-        it->second->deleteKeyPressed();
+        idFilter.second->deleteKeyPressed();
       }
       catch (const ZException& e) {
         QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
@@ -109,9 +109,9 @@ public:
 
   virtual void mousePressed(const QPointF& scenePos) override
   {
-    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
+    for (const auto& idFilter : m_idToFilter) {
       try {
-        it->second->mousePressed(scenePos);
+        idFilter.second->mousePressed(scenePos);
       }
       catch (const ZException& e) {
         QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
@@ -121,9 +121,9 @@ public:
 
   virtual void mouseReleased(const QPointF& scenePos) override
   {
-    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
+    for (const auto& idFilter : m_idToFilter) {
       try {
-        it->second->mouseReleased(scenePos);
+        idFilter.second->mouseReleased(scenePos);
       }
       catch (const ZException& e) {
         QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
@@ -133,9 +133,9 @@ public:
 
   virtual void rotateClockwise() override
   {
-    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
+    for (const auto& idFilter : m_idToFilter) {
       try {
-        it->second->rotateClockwise();
+        idFilter.second->rotateClockwise();
       }
       catch (const ZException& e) {
         QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
@@ -145,9 +145,9 @@ public:
 
   virtual void rotateCounterclockwise() override
   {
-    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
+    for (const auto& idFilter : m_idToFilter) {
       try {
-        it->second->rotateCounterclockwise();
+        idFilter.second->rotateCounterclockwise();
       }
       catch (const ZException& e) {
         QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
@@ -159,8 +159,8 @@ protected:
   virtual void updateBoundBox() override
   {
     resetBoundBox();
-    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
-      expandBoundBox(it->second->boundBox());
+    for (const auto& idFilter : m_idToFilter) {
+      expandBoundBox(idFilter.second->boundBox());
     }
     m_view.updateBoundBox();
   }
@@ -192,14 +192,14 @@ protected:
 
   virtual void onSelectionChanged(const QList<size_t>& selected, const QList<size_t>& deselected) override
   {
-    for (int i = 0; i < selected.size(); ++i) {
-      auto it = m_idToFilter.find(selected[i]);
+    for (auto id : selected) {
+      auto it = m_idToFilter.find(id);
       if (it == m_idToFilter.end())
         return;
       it->second->setSelected(true);
     }
-    for (int i = 0; i < deselected.size(); ++i) {
-      auto it = m_idToFilter.find(deselected[i]);
+    for (auto id : deselected) {
+      auto it = m_idToFilter.find(id);
       if (it == m_idToFilter.end())
         return;
       it->second->setSelected(false);
@@ -209,12 +209,12 @@ protected:
   virtual void onObjSelectedFromView(bool append) override
   {
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
-      for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
-        if (it->second.get() == filter) {
+      for (const auto& idFilter : m_idToFilter) {
+        if (idFilter.second.get() == filter) {
           if (append)
-            m_doc.doc().appendSelectObj(it->first);
+            m_doc.doc().appendSelectObj(idFilter.first);
           else
-            m_doc.doc().clearAndSelectObj(it->first);
+            m_doc.doc().clearAndSelectObj(idFilter.first);
           return;
         }
       }
@@ -224,9 +224,9 @@ protected:
   virtual void onObjDeselectedFromView() override
   {
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
-      for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
-        if (it->second.get() == filter) {
-          m_doc.doc().deselectObj(it->first);
+      for (const auto& idFilter : m_idToFilter) {
+        if (idFilter.second.get() == filter) {
+          m_doc.doc().deselectObj(idFilter.first);
           return;
         }
       }

@@ -183,20 +183,18 @@ void ZImgDisplay::setQImageDataCM(const ZImg& img, QImage& qim) const
   TVoxel maximum = std::numeric_limits<TVoxel>::max();
   size_t idx = 0;
   int alphaChannelIdx = -1;
-  for (std::map<size_t, std::pair<double, double>>::const_iterator it = m_channels.begin();
-       it != m_channels.end(); ++it) {
-    if (imgInfo().isAlphaChannel(it->first)) {
+  for (const auto& chRange : m_channels) {
+    if (imgInfo().isAlphaChannel(chRange.first)) {
       alphaChannelIdx = idx;
       break;
     }
     idx++;
   }
   idx = 0;
-  for (std::map<size_t, std::pair<double, double>>::const_iterator it = m_channels.begin();
-       it != m_channels.end(); ++it) {
-    size_t ch = it->first;
-    double minValue = it->second.first;
-    double maxValue = it->second.second;
+  for (const auto& chRange : m_channels) {
+    size_t ch = chRange.first;
+    double minValue = chRange.second.first;
+    double maxValue = chRange.second.second;
     channels[idx] = ch;
     colormaps[idx].setRange(minimum, maximum);
     if (imgInfo().isAlphaChannel(ch)) {
@@ -326,9 +324,8 @@ void ZImgDisplay::setQImageData(const ZImg& img, QImage& qim) const
 {
   std::vector<size_t> channels(m_channels.size());
   size_t idx = 0;
-  for (std::map<size_t, std::pair<double, double>>::const_iterator it = m_channels.begin();
-       it != m_channels.end(); ++it) {
-    channels[idx++] = it->first;
+  for (const auto& chRange : m_channels) {
+    channels[idx++] = chRange.first;
   }
 
   tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),

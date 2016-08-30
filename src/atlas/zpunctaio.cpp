@@ -236,10 +236,9 @@ void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename) co
     ver.write(intType, &punctaVer);
 
     int idx = 0;
-    for (ZPuncta::const_iterator it = puncta.begin(); it != puncta.end(); ++it) {
+    for (const auto& p : puncta) {
       H5::Group punctumGrp = allGrp.createGroup(qUtf8Printable(QString("Punctum%1").arg(idx + 1)));
       ++idx;
-      const ZPunctum& p = *it;
 
       if (!p.name().isEmpty()) {
         H5::Attribute name = punctumGrp.createAttribute("Name", strType, attrDataSpace);
@@ -402,13 +401,13 @@ void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file) cons
   if (out.status() != QTextStream::Ok) {
     throw ZIOException("Error while writing file.");
   }
-  for (ZPuncta::const_iterator it = puncta.begin(); it != puncta.end(); ++it) {
-    out << QString("%1,,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12,%13,%14,%15,%16,%17\n").arg(idx + 1).arg(it->name()).arg(
-        it->comment())
-      .arg(it->z()).arg(it->x()).arg(it->y()).arg(it->maxIntensity()).arg(it->meanIntensity()).arg(
-        it->sDevOfIntensity())
-      .arg(it->volSize()).arg(it->mass()).arg(it->property1()).arg(it->property2()).arg(it->property3())
-      .arg(it->color().red()).arg(it->color().green()).arg(it->color().blue());
+  for (const auto& pun : puncta) {
+    out << QString("%1,,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12,%13,%14,%15,%16,%17\n").arg(idx + 1).arg(pun.name())
+      .arg(pun.comment())
+      .arg(pun.z()).arg(pun.x()).arg(pun.y()).arg(pun.maxIntensity()).arg(pun.meanIntensity())
+      .arg(pun.sDevOfIntensity())
+      .arg(pun.volSize()).arg(pun.mass()).arg(pun.property1()).arg(pun.property2()).arg(pun.property3())
+      .arg(pun.color().red()).arg(pun.color().green()).arg(pun.color().blue());
     ++idx;
     if (out.status() != QTextStream::Ok) {
       throw ZIOException("Error while writing file.");
@@ -508,8 +507,8 @@ void ZPunctaIO::writeMatFile(const ZPuncta& puncta, const QString& file) const
   if (out.status() != QTextStream::Ok) {
     throw ZIOException("Error while writing file.");
   }
-  for (ZPuncta::const_iterator it = puncta.begin(); it != puncta.end(); ++it) {
-    out << QString("%1 %2 %3 %4\n").arg(it->x()).arg(it->y()).arg(it->z()).arg(it->radius());
+  for (const auto& pun : puncta) {
+    out << QString("%1 %2 %3 %4\n").arg(pun.x()).arg(pun.y()).arg(pun.z()).arg(pun.radius());
     if (out.status() != QTextStream::Ok) {
       throw ZIOException("Error while writing file.");
     }

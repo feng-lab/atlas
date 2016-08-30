@@ -436,9 +436,9 @@ void Z3DMeshFilter::selectMesh(QMouseEvent* e, int, int h)
     }
 
     // Check if any point was selected...
-    for (std::vector<ZMesh*>::iterator it = m_meshList.begin(); it != m_meshList.end(); ++it)
-      if (*it == obj) {
-        m_pressedMesh = *it;
+    for (auto m : m_meshList)
+      if (m == obj) {
+        m_pressedMesh = m;
         break;
       }
     return;

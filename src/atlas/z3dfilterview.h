@@ -53,9 +53,9 @@ protected:
   virtual void updateBoundBox() override
   {
     resetBoundBox();
-    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
-      if (m_doc.isObjVisible(it->first) || m_doc.isObjSelected(it->first))
-        expandBoundBox(it->second->axisAlignedBoundBox());
+    for (const auto& idFilter : m_idToFilter) {
+      if (m_doc.isObjVisible(idFilter.first) || m_doc.isObjSelected(idFilter.first))
+        expandBoundBox(idFilter.second->axisAlignedBoundBox());
     }
     m_view.updateBoundBox();
   }
@@ -77,9 +77,8 @@ protected:
   {
     if (m_idToFilter.empty())
       return;
-    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
-      FilterType* viewControl = it->second.get();
-      canvas().removeEventListener(viewControl);
+    for (const auto& idFilter : m_idToFilter) {
+      canvas().removeEventListener(idFilter.second.get());
     }
     m_idToFilter.clear();
     networkEvaluator().updateNetwork();
@@ -97,14 +96,14 @@ protected:
 
   virtual void onSelectionChanged(const QList<size_t>& selected, const QList<size_t>& deselected) override
   {
-    for (int i = 0; i < selected.size(); ++i) {
-      auto it = m_idToFilter.find(selected[i]);
+    for (auto id : selected) {
+      auto it = m_idToFilter.find(id);
       if (it == m_idToFilter.end())
         return;
       it->second->setSelected(true);
     }
-    for (int i = 0; i < deselected.size(); ++i) {
-      auto it = m_idToFilter.find(deselected[i]);
+    for (auto id : deselected) {
+      auto it = m_idToFilter.find(id);
       if (it == m_idToFilter.end())
         return;
       it->second->setSelected(false);
@@ -115,12 +114,12 @@ protected:
   virtual void onObjSelectedFromView(bool append) override
   {
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
-      for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
-        if (it->second.get() == filter) {
+      for (const auto& idFilter : m_idToFilter) {
+        if (idFilter.second.get() == filter) {
           if (append)
-            m_doc.doc().appendSelectObj(it->first);
+            m_doc.doc().appendSelectObj(idFilter.first);
           else
-            m_doc.doc().clearAndSelectObj(it->first);
+            m_doc.doc().clearAndSelectObj(idFilter.first);
           updateBoundBox();
           return;
         }
@@ -131,9 +130,9 @@ protected:
   virtual void onObjDeselectedFromView() override
   {
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
-      for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
-        if (it->second.get() == filter) {
-          m_doc.doc().deselectObj(it->first);
+      for (const auto& idFilter : m_idToFilter) {
+        if (idFilter.second.get() == filter) {
+          m_doc.doc().deselectObj(idFilter.first);
           updateBoundBox();
           return;
         }
@@ -144,10 +143,10 @@ protected:
   virtual void onObjVisibleChangedFromView(bool v) override
   {
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
-      for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
-        if (it->second.get() == filter) {
-          if (m_doc.doc().isObjVisible(it->first) != v) {
-            m_doc.doc().setObjVisible(it->first, v);
+      for (const auto& idFilter : m_idToFilter) {
+        if (idFilter.second.get() == filter) {
+          if (m_doc.doc().isObjVisible(idFilter.first) != v) {
+            m_doc.doc().setObjVisible(idFilter.first, v);
           }
           return;
         }

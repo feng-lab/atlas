@@ -20,15 +20,15 @@ ZObjFilter::ZObjFilter(ZView& view)
 
 void ZObjFilter::read(const QJsonObject& json)
 {
-  for (int i = 0; i < m_parameters.size(); ++i) {
-    m_parameters[i]->read(json);
+  for (auto para : m_parameters) {
+    para->read(json);
   }
 }
 
 void ZObjFilter::write(QJsonObject& json) const
 {
-  for (int i = 0; i < m_parameters.size(); ++i) {
-    m_parameters[i]->write(json);
+  for (auto para : m_parameters) {
+    para->write(json);
   }
 }
 

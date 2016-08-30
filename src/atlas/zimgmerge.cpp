@@ -236,19 +236,19 @@ ZImg ZImgMerge::merge(Mode mode, QString* summary) const
   }
 
   const ZImg* refImg = nullptr;
-  for (std::map<const ZImg*, ZVoxelCoordinate>::const_iterator it = m_imgCoords.begin();
-       it != m_imgCoords.end(); ++it) {
-    if (!refImg) refImg = it->first;
-    else if (!it->first->isSameType(*refImg)) {
+  for (const auto& imgCoord : m_imgCoords) {
+    if (!refImg) {
+      refImg = imgCoord.first;
+    } else if (!imgCoord.first->isSameType(*refImg)) {
       throw ZImgException("Merge Imgs error: imgs are not same type");
     }
   }
   double minCost = std::numeric_limits<double>::max();
-  for (std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::const_iterator it = m_imgPairs.begin();
-       it != m_imgPairs.end(); ++it) {
-    minCost = std::min(minCost, it->second.second);
-    if (!refImg) refImg = it->first.first;
-    else if (!it->first.first->isSameType(*refImg)) {
+  for (const auto& imgimgOffsetCost : m_imgPairs) {
+    minCost = std::min(minCost, imgimgOffsetCost.second.second);
+    if (!refImg) {
+      refImg = imgimgOffsetCost.first.first;
+    } else if (!imgimgOffsetCost.first.first->isSameType(*refImg)) {
       throw ZImgException("Merge Imgs error: imgs are not same type");
     }
   }
@@ -281,11 +281,10 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate>& imgCoo
   GraphT graph;
 
   size_t vIdx = 0;
-  for (std::map<const ZImg*, ZVoxelCoordinate>::iterator it = imgCoords.begin();
-       it != imgCoords.end(); ++it) {
-    if (imgToVertexMapper.find(it->first) == imgToVertexMapper.end()) {
-      Vertex v = boost::add_vertex(VertexInfo(it->first, vIdx++), graph);
-      imgToVertexMapper[it->first] = v;
+  for (const auto& imgCoord : imgCoords) {
+    if (imgToVertexMapper.find(imgCoord.first) == imgToVertexMapper.end()) {
+      Vertex v = boost::add_vertex(VertexInfo(imgCoord.first, vIdx++), graph);
+      imgToVertexMapper[imgCoord.first] = v;
     }
   }
   {
@@ -303,19 +302,18 @@ void ZImgMerge::resolveLocations(std::map<const ZImg*, ZVoxelCoordinate>& imgCoo
     }
   }
 
-  for (std::map<std::pair<const ZImg*, const ZImg*>, std::pair<ZVoxelCoordinate, double>>::const_iterator it = m_imgPairs.begin();
-       it != m_imgPairs.end(); ++it) {
-    if (imgToVertexMapper.find(it->first.first) == imgToVertexMapper.end()) {
-      Vertex v = boost::add_vertex(VertexInfo(it->first.first, vIdx++), graph);
-      imgToVertexMapper[it->first.first] = v;
+  for (const auto& imgimgOffsetCost : m_imgPairs) {
+    if (imgToVertexMapper.find(imgimgOffsetCost.first.first) == imgToVertexMapper.end()) {
+      Vertex v = boost::add_vertex(VertexInfo(imgimgOffsetCost.first.first, vIdx++), graph);
+      imgToVertexMapper[imgimgOffsetCost.first.first] = v;
     }
-    if (imgToVertexMapper.find(it->first.second) == imgToVertexMapper.end()) {
-      Vertex v = boost::add_vertex(VertexInfo(it->first.second, vIdx++), graph);
-      imgToVertexMapper[it->first.second] = v;
+    if (imgToVertexMapper.find(imgimgOffsetCost.first.second) == imgToVertexMapper.end()) {
+      Vertex v = boost::add_vertex(VertexInfo(imgimgOffsetCost.first.second, vIdx++), graph);
+      imgToVertexMapper[imgimgOffsetCost.first.second] = v;
     }
-    boost::add_edge(imgToVertexMapper[it->first.first],
-                    imgToVertexMapper[it->first.second],
-                    EdgeInfo(it->second.second),
+    boost::add_edge(imgToVertexMapper[imgimgOffsetCost.first.first],
+                    imgToVertexMapper[imgimgOffsetCost.first.second],
+                    EdgeInfo(imgimgOffsetCost.second.second),
                     graph);
   }
 
@@ -386,8 +384,8 @@ void ZImgMerge::mergeImgs(ZImg& res, const std::map<const ZImg*, ZVoxelCoordinat
                           ZImgMerge::Mode mode, QString& summary) const
 {
   std::vector<ZImgTile> tiles;
-  for (std::map<const ZImg*, ZVoxelCoordinate>::const_iterator it = imgs.begin(); it != imgs.end(); ++it)
-    tiles.emplace_back(it->first, it->second);
+  for (const auto& imgCoord : imgs)
+    tiles.emplace_back(imgCoord.first, imgCoord.second);
 
   ZVoxelRegion allRegion;
   ZVoxelRegion overlapRegion;

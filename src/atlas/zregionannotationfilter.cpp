@@ -32,22 +32,22 @@ void ZRegionAnnotationFilter::setData(ZRegionAnnotation& regionAnnotation)
 
 void ZRegionAnnotationFilter::releaseItemsOwnership()
 {
-  for (auto it = m_idToROIFilters.begin(); it != m_idToROIFilters.end(); ++it) {
-    it->second->releaseItemsOwnership();
+  for (auto& idFilter : m_idToROIFilters) {
+    idFilter.second->releaseItemsOwnership();
   }
 }
 
 void ZRegionAnnotationFilter::setNormalView(int z, int t)
 {
-  for (auto it = m_idToROIFilters.begin(); it != m_idToROIFilters.end(); ++it) {
-    it->second->setNormalView(z, t);
+  for (auto& idFilter : m_idToROIFilters) {
+    idFilter.second->setNormalView(z, t);
   }
 }
 
 void ZRegionAnnotationFilter::setMaxZProjView(int t)
 {
-  for (auto it = m_idToROIFilters.begin(); it != m_idToROIFilters.end(); ++it) {
-    it->second->setMaxZProjView(t);
+  for (auto& idFilter : m_idToROIFilters) {
+    idFilter.second->setMaxZProjView(t);
   }
 }
 
@@ -61,9 +61,9 @@ std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup(
   if (!m_widgetsGroup) {
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("", 1);
     m_widgetsGroup->addChild(m_visible, 1);
-    for (auto it = m_nameToID.begin(); it != m_nameToID.end(); ++it) {
-      std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[it->second]->viewSettingWidgetsGroupForAnnotationFilter();
-      wg->setGroupName(it->first);
+    for (const auto& nameID : m_nameToID) {
+      std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[nameID.second]->viewSettingWidgetsGroupForAnnotationFilter();
+      wg->setGroupName(nameID.first);
       m_widgetsGroup->addChild(wg);
     }
     m_widgetsGroup->addChild(m_offsetPara, 2);
@@ -74,43 +74,43 @@ std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup(
 
 void ZRegionAnnotationFilter::deleteKeyPressed()
 {
-  for (auto it = m_idToROIFilters.begin(); it != m_idToROIFilters.end(); ++it) {
-    it->second->deleteKeyPressed();
+  for (auto& idFilter : m_idToROIFilters) {
+    idFilter.second->deleteKeyPressed();
   }
 }
 
 void ZRegionAnnotationFilter::mousePressed(const QPointF& scenePos)
 {
-  for (auto it = m_idToROIFilters.begin(); it != m_idToROIFilters.end(); ++it) {
-    it->second->mousePressed(scenePos);
+  for (auto& idFilter : m_idToROIFilters) {
+    idFilter.second->mousePressed(scenePos);
   }
 }
 
 void ZRegionAnnotationFilter::mouseReleased(const QPointF& scenePos)
 {
-  for (auto it = m_idToROIFilters.begin(); it != m_idToROIFilters.end(); ++it) {
-    it->second->mouseReleased(scenePos);
+  for (auto& idFilter : m_idToROIFilters) {
+    idFilter.second->mouseReleased(scenePos);
   }
 }
 
 void ZRegionAnnotationFilter::rotateClockwise()
 {
-  for (auto it = m_idToROIFilters.begin(); it != m_idToROIFilters.end(); ++it) {
-    it->second->rotateClockwise();
+  for (auto& idFilter : m_idToROIFilters) {
+    idFilter.second->rotateClockwise();
   }
 }
 
 void ZRegionAnnotationFilter::rotateCounterclockwise()
 {
-  for (auto it = m_idToROIFilters.begin(); it != m_idToROIFilters.end(); ++it) {
-    it->second->rotateCounterclockwise();
+  for (auto& idFilter : m_idToROIFilters) {
+    idFilter.second->rotateCounterclockwise();
   }
 }
 
 void ZRegionAnnotationFilter::visibleChanged()
 {
-  for (auto it = m_idToROIFilters.begin(); it != m_idToROIFilters.end(); ++it) {
-    it->second->setVisible(m_visible.get());
+  for (auto& idFilter : m_idToROIFilters) {
+    idFilter.second->setVisible(m_visible.get());
   }
 }
 
@@ -123,8 +123,8 @@ void ZRegionAnnotationFilter::regionROIAdded(int64_t id, ZROI* roi)
 void ZRegionAnnotationFilter::allROIChanged()
 {
   if (m_widgetsGroup) {
-    for (auto it = m_nameToID.begin(); it != m_nameToID.end(); ++it) {
-      m_widgetsGroup->removeChild(m_idToROIFilters[it->second]->viewSettingWidgetsGroupForAnnotationFilter());
+    for (const auto& nameID : m_nameToID) {
+      m_widgetsGroup->removeChild(m_idToROIFilters[nameID.second]->viewSettingWidgetsGroupForAnnotationFilter());
     }
   }
 
@@ -136,34 +136,32 @@ void ZRegionAnnotationFilter::allROIChanged()
   //addParameter(&m_visible);
   addParameter(&m_offsetPara);
 
-  ZTree<RegionNode>& annoTree = m_regionAnnotation->annotationTree();
-  for (auto it = annoTree.begin(); it != annoTree.end(); ++it) {
-    int id = it->id;
+  for (auto& node : m_regionAnnotation->annotationTree()) {
+    int id = node.id;
     ZROIFilter* flt = new ZROIFilter(m_view);
-    if (it->roi) {
-      flt->setData(*it->roi.get());
+    if (node.roi) {
+      flt->setData(*(node.roi));
     }
     flt->setVisible(false);
-    flt->setOutlineColor(glm::vec3(it->red / 255.f, it->green / 255.f, it->blue / 255.f));
-    flt->setRegionColor(glm::vec3(it->red / 255.f, it->green / 255.f, it->blue / 255.f));
+    flt->setOutlineColor(glm::vec3(node.red / 255.f, node.green / 255.f, node.blue / 255.f));
+    flt->setRegionColor(glm::vec3(node.red / 255.f, node.green / 255.f, node.blue / 255.f));
     connect(&m_offsetPara, &ZDVec4Parameter::valueChanged, &flt->offsetPara(), &ZDVec4Parameter::updateFromSender);
-    m_idToRegionNames[id] = QString("%1_%2").arg(it->abbreviation).arg(it->id);
+    m_idToRegionNames[id] = QString("%1_%2").arg(node.abbreviation).arg(node.id);
     m_nameToID[m_idToRegionNames[id]] = id;
-    QList<ZParameter*> paras = flt->parameters();
-    for (int i = 0; i < paras.size(); ++i) {
-      if (paras[i]->name() == "Offset") {
+    for (auto para : flt->parameters()) {
+      if (para->name() == "Offset") {
         continue;
       }
-      paras[i]->setName(QString("%1 %2").arg(m_idToRegionNames[id]).arg(paras[i]->name()));
-      addParameter(paras[i]);
+      para->setName(QString("%1 %2").arg(m_idToRegionNames[id]).arg(para->name()));
+      addParameter(para);
     }
     m_idToROIFilters[id] = std::unique_ptr<ZROIFilter>(flt);
   }
 
   if (m_widgetsGroup) {
-    for (auto it = m_nameToID.begin(); it != m_nameToID.end(); ++it) {
-      std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[it->second]->viewSettingWidgetsGroupForAnnotationFilter();
-      wg->setGroupName(it->first);
+    for (const auto& nameID : m_nameToID) {
+      std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[nameID.second]->viewSettingWidgetsGroupForAnnotationFilter();
+      wg->setGroupName(nameID.first);
       m_widgetsGroup->addChild(wg);
     }
     m_widgetsGroup->emitWidgetsGroupChangedSignal();

@@ -101,9 +101,9 @@ bool ZMeshDoc::canReadFile(const QString& fileName)
 
 size_t ZMeshDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
-  for (auto it = m_idToMeshPacks.begin(); it != m_idToMeshPacks.end(); ++it) {
-    if (it->second->path == fileName)
-      return it->first;
+  for (const auto& idPack : m_idToMeshPacks) {
+    if (idPack.second->path == fileName)
+      return idPack.first;
   }
   try {
     ZMesh mesh(fileName);
@@ -124,9 +124,9 @@ size_t ZMeshDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
     errorMsg = QString("File path is not string or is empty");
     return 0;
   }
-  for (auto it = m_idToMeshPacks.begin(); it != m_idToMeshPacks.end(); ++it) {
-    if (isSameObj(jValue, jsonValue(it->first)))
-      return it->first;
+  for (const auto& idPack : m_idToMeshPacks) {
+    if (isSameObj(jValue, jsonValue(idPack.first)))
+      return idPack.first;
   }
   QString fileName = jValue.toString();
   try {
@@ -337,9 +337,9 @@ bool ZMeshDoc::saveMesh(MeshPack* pack, const QString& fileName, QString& errorM
 
 void ZMeshDoc::packInfoUpdated(MeshPack* pack)
 {
-  for (auto it = m_idToMeshPacks.begin(); it != m_idToMeshPacks.end(); ++it) {
-    if (it->second.get() == pack)
-      m_doc.updateObjInfo(it->first);
+  for (const auto& idPack : m_idToMeshPacks) {
+    if (idPack.second.get() == pack)
+      m_doc.updateObjInfo(idPack.first);
   }
 }
 

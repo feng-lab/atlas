@@ -15,10 +15,6 @@ ZRegionAnnotationTreeModel::ZRegionAnnotationTreeModel(ZRegionAnnotation& anno, 
   }
 }
 
-ZRegionAnnotationTreeModel::~ZRegionAnnotationTreeModel()
-{
-}
-
 QVariant ZRegionAnnotationTreeModel::data(const QModelIndex& index, int role) const
 {
   if (!index.isValid())

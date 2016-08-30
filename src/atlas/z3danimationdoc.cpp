@@ -23,8 +23,8 @@ void Z3DAnimationDoc::bindView(Z3DView* v)
 {
   m_view = v;
   connect(m_view, &Z3DView::destroyed, this, &Z3DAnimationDoc::releaseView);
-  for (auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
-    it->second->animation->bindView(m_view);
+  for (auto& idPack : m_idToAnimationPacks) {
+    idPack.second->animation->bindView(m_view);
   }
 }
 
@@ -86,9 +86,9 @@ bool Z3DAnimationDoc::canReadFile(const QString& fileName)
 
 size_t Z3DAnimationDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
-  for (auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
-    if (it->second->path == fileName)
-      return it->first;
+  for (const auto& idPack : m_idToAnimationPacks) {
+    if (idPack.second->path == fileName)
+      return idPack.first;
   }
   size_t id;
   try {
@@ -111,9 +111,9 @@ size_t Z3DAnimationDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
     errorMsg = QString("File path is not string or is empty");
     return 0;
   }
-  for (auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
-    if (isSameObj(jValue, jsonValue(it->first)))
-      return it->first;
+  for (const auto& idPack : m_idToAnimationPacks) {
+    if (isSameObj(jValue, jsonValue(idPack.first)))
+      return idPack.first;
   }
   size_t id;
   QString fileName = jValue.toString();
@@ -241,11 +241,11 @@ void Z3DAnimationDoc::loadAnimation()
 void Z3DAnimationDoc::setModified()
 {
   if (Z3DAnimation* animation = qobject_cast<Z3DAnimation*>(sender())) {
-    for (auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
-      if (it->second->animation.get() == animation) {
-        it->second->updateDerivedData();
-        it->second->hasUnsavedChange = true;
-        m_doc.updateObjInfo(it->first);
+    for (auto& idPack : m_idToAnimationPacks) {
+      if (idPack.second->animation.get() == animation) {
+        idPack.second->updateDerivedData();
+        idPack.second->hasUnsavedChange = true;
+        m_doc.updateObjInfo(idPack.first);
         return;
       }
     }
@@ -254,8 +254,8 @@ void Z3DAnimationDoc::setModified()
 
 void Z3DAnimationDoc::releaseView()
 {
-  for (auto it = m_idToAnimationPacks.begin(); it != m_idToAnimationPacks.end(); ++it) {
-    it->second->animation->releaseView();
+  for (auto& idPack : m_idToAnimationPacks) {
+    idPack.second->animation->releaseView();
   }
   m_view = nullptr;
 }

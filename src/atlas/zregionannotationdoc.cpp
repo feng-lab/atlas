@@ -67,9 +67,9 @@ bool ZRegionAnnotationDoc::canReadFile(const QString& fileName)
 
 size_t ZRegionAnnotationDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
-  for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
-    if (it->second->path == fileName)
-      return it->first;
+  for (const auto& idPack : m_idToRegionAnnotationPacks) {
+    if (idPack.second->path == fileName)
+      return idPack.first;
   }
   try {
     ZRegionAnnotation* regionAnnotation = new ZRegionAnnotation(fileName);
@@ -90,9 +90,9 @@ size_t ZRegionAnnotationDoc::loadFile(const QJsonValue& jValue, QString& errorMs
     errorMsg = QString("File path is not string or is empty");
     return 0;
   }
-  for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
-    if (isSameObj(jValue, jsonValue(it->first)))
-      return it->first;
+  for (const auto& idPack : m_idToRegionAnnotationPacks) {
+    if (isSameObj(jValue, jsonValue(idPack.first)))
+      return idPack.first;
   }
   QString fileName = jValue.toString();
   try {
@@ -196,8 +196,8 @@ bool ZRegionAnnotationDoc::isAlias(size_t id) const
   CHECK(m_idToRegionAnnotationPacks.find(id) != m_idToRegionAnnotationPacks.end());
 
   auto& pack = m_idToRegionAnnotationPacks.at(id);
-  for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
-    if (it->first != id && it->second == pack)
+  for (const auto& idPack : m_idToRegionAnnotationPacks) {
+    if (idPack.first != id && idPack.second == pack)
       return true;
   }
   return false;
@@ -329,11 +329,13 @@ void ZRegionAnnotationDoc::exportLabelImage()
 void ZRegionAnnotationDoc::setModified()
 {
   if (ZRegionAnnotation* ra = qobject_cast<ZRegionAnnotation*>(sender())) {
-    for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
-      if (it->second->regionAnnotation == ra && !it->second->hasUnsavedChange) {
-        it->second->updateDerivedData();
-        it->second->hasUnsavedChange = true;
-        m_doc.updateObjInfo(it->first);
+    for (auto& idPack : m_idToRegionAnnotationPacks) {
+      if (idPack.second->regionAnnotation == ra) {
+        if (!idPack.second->hasUnsavedChange) {
+          idPack.second->updateDerivedData();
+          idPack.second->hasUnsavedChange = true;
+          m_doc.updateObjInfo(idPack.first);
+        }
         return;
       }
     }
@@ -343,16 +345,16 @@ void ZRegionAnnotationDoc::setModified()
 void ZRegionAnnotationDoc::setModified(bool clean)
 {
   if (ZRegionAnnotation* ra = qobject_cast<ZRegionAnnotation*>(sender())) {
-    for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
-      if (it->second->regionAnnotation == ra) {
-        if (clean && it->second->path.endsWith(ZRegionAnnotation::fileExtension(), Qt::CaseInsensitive)) {
-          it->second->updateDerivedData();
-          it->second->hasUnsavedChange = false;
-          m_doc.updateObjInfo(it->first);
-        } else if (!it->second->hasUnsavedChange) {
-          it->second->updateDerivedData();
-          it->second->hasUnsavedChange = true;
-          m_doc.updateObjInfo(it->first);
+    for (auto& idPack : m_idToRegionAnnotationPacks) {
+      if (idPack.second->regionAnnotation == ra) {
+        if (clean && idPack.second->path.endsWith(ZRegionAnnotation::fileExtension(), Qt::CaseInsensitive)) {
+          idPack.second->updateDerivedData();
+          idPack.second->hasUnsavedChange = false;
+          m_doc.updateObjInfo(idPack.first);
+        } else if (!idPack.second->hasUnsavedChange) {
+          idPack.second->updateDerivedData();
+          idPack.second->hasUnsavedChange = true;
+          m_doc.updateObjInfo(idPack.first);
         }
         return;
       }
@@ -439,9 +441,9 @@ bool ZRegionAnnotationDoc::saveRegionAnnotation(RegionAnnotationPack* pack, cons
 
 void ZRegionAnnotationDoc::packInfoUpdated(RegionAnnotationPack* pack)
 {
-  for (auto it = m_idToRegionAnnotationPacks.begin(); it != m_idToRegionAnnotationPacks.end(); ++it) {
-    if (it->second.get() == pack)
-      m_doc.updateObjInfo(it->first);
+  for (const auto& idPack : m_idToRegionAnnotationPacks) {
+    if (idPack.second.get() == pack)
+      m_doc.updateObjInfo(idPack.first);
   }
 }
 

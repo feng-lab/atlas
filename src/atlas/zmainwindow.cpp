@@ -133,9 +133,9 @@ void ZMainWindow::openEditWidget(size_t id)
 void ZMainWindow::loadUrls(const QList<QUrl>& urlList)
 {
   QStringList fileList;
-  for (QList<QUrl>::const_iterator iter = urlList.begin(); iter != urlList.end(); ++iter) {
+  for (const auto& url : urlList) {
     // load files inside if is folder
-    QFileInfo dirCheck(iter->toLocalFile());
+    QFileInfo dirCheck(url.toLocalFile());
     if (dirCheck.isDir()) {
       QDir dir = dirCheck.absoluteDir();
       QFileInfoList list = dir.entryInfoList(QDir::Files | QDir::NoSymLinks);

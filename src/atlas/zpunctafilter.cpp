@@ -22,12 +22,12 @@ ZPunctaGraphicsItem::ZPunctaGraphicsItem(ZPuncta& puncta, double z, QGraphicsIte
 
   m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = m_boundBox[6] = std::numeric_limits<int>::max();
   m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = m_boundBox[7] = std::numeric_limits<int>::min();
-  for (ZPuncta::iterator it = m_puncta.begin(); it != m_puncta.end(); ++it) {
-    int slice = roundTo<int>(it->z());
-    m_boundBox[0] = std::min(roundTo<int>(it->x() - it->radius()), m_boundBox[0]);
-    m_boundBox[1] = std::max(roundTo<int>(it->x() + it->radius()), m_boundBox[1]);
-    m_boundBox[2] = std::min(roundTo<int>(it->y() - it->radius()), m_boundBox[2]);
-    m_boundBox[3] = std::max(roundTo<int>(it->y() + it->radius()), m_boundBox[3]);
+  for (const auto& p : m_puncta) {
+    int slice = roundTo<int>(p.z());
+    m_boundBox[0] = std::min(roundTo<int>(p.x() - p.radius()), m_boundBox[0]);
+    m_boundBox[1] = std::max(roundTo<int>(p.x() + p.radius()), m_boundBox[1]);
+    m_boundBox[2] = std::min(roundTo<int>(p.y() - p.radius()), m_boundBox[2]);
+    m_boundBox[3] = std::max(roundTo<int>(p.y() + p.radius()), m_boundBox[3]);
     m_boundBox[4] = std::min(slice, m_boundBox[4]);
     m_boundBox[5] = std::max(slice, m_boundBox[5]);
     m_boundBox[6] = std::min(0, m_boundBox[6]);
@@ -52,15 +52,14 @@ void ZPunctaGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsIte
   m_outlineColor.setAlpha(m_opacity * 255);
   painter->setPen(QPen(m_outlineColor, 1));
   if (m_mip) {
-    for (ZPuncta::iterator it = m_puncta.begin(); it != m_puncta.end(); ++it) {
-      painter->drawEllipse(QRectF(it->x() - it->radius(), it->y() - it->radius(), it->radius() * 2, it->radius() * 2));
+    for (const auto& p : m_puncta) {
+      painter->drawEllipse(QRectF(p.x() - p.radius(), p.y() - p.radius(), p.radius() * 2, p.radius() * 2));
     }
   } else {
-    for (ZPuncta::iterator it = m_puncta.begin(); it != m_puncta.end(); ++it) {
-      int slice = roundTo<int>(it->z());
+    for (const auto& p : m_puncta) {
+      int slice = roundTo<int>(p.z());
       if (slice == m_z) {
-        painter->drawEllipse(
-          QRectF(it->x() - it->radius(), it->y() - it->radius(), it->radius() * 2, it->radius() * 2));
+        painter->drawEllipse(QRectF(p.x() - p.radius(), p.y() - p.radius(), p.radius() * 2, p.radius() * 2));
       }
     }
   }

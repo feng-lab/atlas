@@ -43,12 +43,11 @@ QString ZImgMetadata::toQString() const
 {
   QString res;
 
-  for (std::map<_AttachPoint, std::vector<ZImgMetatag>>::const_iterator it = m_data.begin();
-       it != m_data.end(); ++it) {
-    if (!it->second.empty()) {
-      res = res % QString("Attach Point: z: %1, c: %2, t: %3\n").arg(it->first.z)
-        .arg(it->first.c).arg(it->first.t);
-      for (const auto& tag : it->second) {
+  for (const auto& attachPointTags : m_data) {
+    if (!attachPointTags.second.empty()) {
+      res = res % QString("Attach Point: z: %1, c: %2, t: %3\n").arg(attachPointTags.first.z)
+        .arg(attachPointTags.first.c).arg(attachPointTags.first.t);
+      for (const auto& tag : attachPointTags.second) {
         res = res % "  " % tag.toQString() % "\n";
       }
     }
@@ -66,12 +65,11 @@ QString ZImgThumbernail::toQString() const
 {
   QString res;
 
-  for (std::map<_AttachPoint, std::vector<ZImg>>::const_iterator it = m_data.begin();
-       it != m_data.end(); ++it) {
-    if (!it->second.empty()) {
-      res = res % QString("Attach Point: z: %1, c: %2, t: %3, Number of Thumbnails: %4\n").arg(it->first.z)
-        .arg(it->first.c).arg(it->first.t).arg(it->second.size());
-      for (const auto& img : it->second) {
+  for (const auto& attachPointsImgs : m_data) {
+    if (!attachPointsImgs.second.empty()) {
+      res = res % QString("Attach Point: z: %1, c: %2, t: %3, Number of Thumbnails: %4\n").arg(attachPointsImgs.first.z)
+        .arg(attachPointsImgs.first.c).arg(attachPointsImgs.first.t).arg(attachPointsImgs.second.size());
+      for (const auto& img : attachPointsImgs.second) {
         res = res % "  thumb <" % img.info().toQString() % ">\n";
       }
     }

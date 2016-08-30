@@ -1493,11 +1493,11 @@ void ZStitchImageDialog::stitchStacks2()
       }
     }
   }
-  for (std::map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>>::iterator it = offsets.begin();
-       it != offsets.end(); ++it) {
-    size_t f = it->first.first;
-    size_t m = it->first.second;
-    imgMerge.addImgPair(imgs[f], imgs[m], it->second.first, -(it->second.second),
+  for (const auto& fixedMovingOffsetCost : offsets) {
+    size_t f = fixedMovingOffsetCost.first.first;
+    size_t m = fixedMovingOffsetCost.first.second;
+    imgMerge.addImgPair(imgs[f], imgs[m], fixedMovingOffsetCost.second.first,
+                        -(fixedMovingOffsetCost.second.second),
                         QString::number(f + 1), QString::number(m + 1));
   }
 
@@ -2004,14 +2004,13 @@ void ZStitchImageDialog::stitchStacks()
       }
 
       ZImgMerge imgMerge;
-      for (std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>::iterator it = conn.begin();
-           it != conn.end(); ++it) {
-        ZImgNCCMatch::PositionHint posHint = it->second;
+      for (const auto& fixedMovingPosHint : conn) {
+        ZImgNCCMatch::PositionHint posHint = fixedMovingPosHint.second;
         if (posHint == ZImgNCCMatch::PositionHint::None) {
           throw ZStitchException("Position information incomplete for image concatenate, Abort.");
         }
-        const ZImg& fixedImg = imgs[it->first.first];
-        const ZImg& movingImg = imgs[it->first.second];
+        const ZImg& fixedImg = imgs[fixedMovingPosHint.first.first];
+        const ZImg& movingImg = imgs[fixedMovingPosHint.first.second];
         ZVoxelCoordinate movingImgOffset;
         if (is_flag_set(posHint, ZImgNCCMatch::PositionHint::Left)) {
           movingImgOffset.x = -static_cast<ZVoxelCoordinate::value_type>(movingImg.width());
@@ -2029,7 +2028,8 @@ void ZStitchImageDialog::stitchStacks()
           movingImgOffset.z = fixedImg.depth();
         }
         imgMerge.addImgPair(fixedImg, movingImg, movingImgOffset, 0,
-                            QString::number(it->first.first + 1), QString::number(it->first.second + 1));
+                            QString::number(fixedMovingPosHint.first.first + 1),
+                            QString::number(fixedMovingPosHint.first.second + 1));
       }
 
       QString summary;
@@ -2125,11 +2125,11 @@ void ZStitchImageDialog::stitchStacks()
                                   ZImg::CombineMode::Mean);
         }
       }
-      for (std::map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>>::iterator it = offsets.begin();
-           it != offsets.end(); ++it) {
-        size_t f = it->first.first;
-        size_t m = it->first.second;
-        imgMerge.addImgPair(imgs[f], imgs[m], it->second.first, -(it->second.second),
+      for (const auto& fixedMovingOffsetCost : offsets) {
+        size_t f = fixedMovingOffsetCost.first.first;
+        size_t m = fixedMovingOffsetCost.first.second;
+        imgMerge.addImgPair(imgs[f], imgs[m], fixedMovingOffsetCost.second.first,
+                            -(fixedMovingOffsetCost.second.second),
                             QString::number(f + 1), QString::number(m + 1));
       }
 

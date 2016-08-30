@@ -203,20 +203,17 @@ void Z3DImgFilter::setOffset(double x, double y, double z)
 void Z3DImgFilter::setData(const ZImgPack& imgPack)
 {
   if (m_widgetsGroup) {
-    for (auto it = m_imgRaycasterRenderer.channelVisibleParas().begin();
-         it != m_imgRaycasterRenderer.channelVisibleParas().end(); ++it) {
-      m_widgetsGroup->removeChild(*it->get());
+    for (auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
+      m_widgetsGroup->removeChild(*para);
     }
-    for (auto it = m_imgRaycasterRenderer.transferFuncParas().begin();
-         it != m_imgRaycasterRenderer.transferFuncParas().end(); ++it) {
-      m_widgetsGroup->removeChild(*it->get());
+    for (auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
+      m_widgetsGroup->removeChild(*para);
     }
-    for (auto it = m_imgRaycasterRenderer.texFilterModeParas().begin();
-         it != m_imgRaycasterRenderer.texFilterModeParas().end(); ++it) {
-      m_widgetsGroup->removeChild(*it->get());
+    for (auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
+      m_widgetsGroup->removeChild(*para);
     }
-    for (auto it = m_sliceColormaps.begin(); it != m_sliceColormaps.end(); ++it) {
-      m_widgetsGroup->removeChild(*it->get());
+    for (auto& cm : m_sliceColormaps) {
+      m_widgetsGroup->removeChild(*cm);
     }
   }
   while (m_numParas < m_parameters.size()) {
@@ -291,37 +288,31 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
 
     updateBoundBox();
 
-    for (auto it = m_imgRaycasterRenderer.channelVisibleParas().begin();
-         it != m_imgRaycasterRenderer.channelVisibleParas().end(); ++it) {
-      addParameter(*it->get());
+    for (auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
+      addParameter(*para);
     }
-    for (auto it = m_imgRaycasterRenderer.transferFuncParas().begin();
-         it != m_imgRaycasterRenderer.transferFuncParas().end(); ++it) {
-      addParameter(*it->get());
+    for (auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
+      addParameter(*para);
     }
-    for (auto it = m_imgRaycasterRenderer.texFilterModeParas().begin();
-         it != m_imgRaycasterRenderer.texFilterModeParas().end(); ++it) {
-      addParameter(*it->get());
+    for (auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
+      addParameter(*para);
     }
-    for (auto it = m_sliceColormaps.begin(); it != m_sliceColormaps.end(); ++it) {
-      addParameter(*it->get());
+    for (auto& cm : m_sliceColormaps) {
+      addParameter(*cm);
     }
 
     if (m_widgetsGroup) {
-      for (auto it = m_imgRaycasterRenderer.channelVisibleParas().begin();
-           it != m_imgRaycasterRenderer.channelVisibleParas().end(); ++it) {
-        m_widgetsGroup->addChild(*it->get(), 2);
+      for (auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
+        m_widgetsGroup->addChild(*para, 2);
       }
-      for (auto it = m_imgRaycasterRenderer.transferFuncParas().begin();
-           it != m_imgRaycasterRenderer.transferFuncParas().end(); ++it) {
-        m_widgetsGroup->addChild(*it->get(), 3);
+      for (auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
+        m_widgetsGroup->addChild(*para, 3);
       }
-      for (auto it = m_imgRaycasterRenderer.texFilterModeParas().begin();
-           it != m_imgRaycasterRenderer.texFilterModeParas().end(); ++it) {
-        m_widgetsGroup->addChild(*it->get(), 15);
+      for (auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
+        m_widgetsGroup->addChild(*para, 15);
       }
-      for (auto it = m_sliceColormaps.begin(); it != m_sliceColormaps.end(); ++it) {
-        m_widgetsGroup->addChild(*it->get(), 11);
+      for (auto& cm : m_sliceColormaps) {
+        m_widgetsGroup->addChild(*cm, 11);
       }
       m_widgetsGroup->emitWidgetsGroupChangedSignal();
     }
@@ -344,21 +335,18 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_stayOnTop, 1);
     m_widgetsGroup->addChild(m_isVolumeDownsampled, 2);
 
-    for (auto it = m_imgRaycasterRenderer.channelVisibleParas().begin();
-         it != m_imgRaycasterRenderer.channelVisibleParas().end(); ++it) {
-      m_widgetsGroup->addChild(*it->get(), 2);
+    for (auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
+      m_widgetsGroup->addChild(*para, 2);
     }
-    for (auto it = m_imgRaycasterRenderer.transferFuncParas().begin();
-         it != m_imgRaycasterRenderer.transferFuncParas().end(); ++it) {
-      m_widgetsGroup->addChild(*it->get(), 3);
+    for (auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
+      m_widgetsGroup->addChild(*para, 3);
     }
     m_widgetsGroup->addChild(m_imgRaycasterRenderer.compositingModePara(), 4);
     m_widgetsGroup->addChild(m_imgRaycasterRenderer.isoValuePara(), 4);
     m_widgetsGroup->addChild(m_imgRaycasterRenderer.localMIPThresholdPara(), 4);
     m_widgetsGroup->addChild(m_imgRaycasterRenderer.samplingRatePara(), 15);
-    for (auto it = m_imgRaycasterRenderer.texFilterModeParas().begin();
-         it != m_imgRaycasterRenderer.texFilterModeParas().end(); ++it) {
-      m_widgetsGroup->addChild(*it->get(), 15);
+    for (auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
+      m_widgetsGroup->addChild(*para, 15);
     }
 
     m_widgetsGroup->addChild(m_xCut, 12);

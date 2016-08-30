@@ -12,8 +12,7 @@ Z3DAnimationView::Z3DAnimationView(Z3DAnimationDoc& doc, Z3DView& view)
 void Z3DAnimationView::docAnimationsAdded(const QList<size_t>& objs)
 {
   try {
-    for (int i = 0; i < objs.size(); ++i) {
-      size_t id = objs[i];
+    for (auto id : objs) {
       Z3DAnimationFilter* viewControl = new Z3DAnimationFilter(globalParas(), this);
       viewControl->setData(&m_doc.animation(id));
       viewControl->setSelected(m_doc.isObjSelected(id));

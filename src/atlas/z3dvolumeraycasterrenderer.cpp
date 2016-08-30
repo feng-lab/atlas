@@ -427,10 +427,9 @@ void Z3DVolumeRaycasterRenderer::resetTransferFunctions()
 
 void Z3DVolumeRaycasterRenderer::translate(double dx, double dy, double dz)
 {
-  for (std::vector<Z3DVolume*>::iterator iter = m_volumes.begin();
-       iter != m_volumes.end(); ++iter) {
-    if (*iter != nullptr) {
-      (*iter)->translate(dx, dy, dz);
+  for (auto vol : m_volumes) {
+    if (vol) {
+      vol->translate(dx, dy, dz);
     }
   }
 }

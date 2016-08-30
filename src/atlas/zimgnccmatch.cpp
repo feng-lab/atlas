@@ -421,9 +421,7 @@ void ZImgNCCMatch::constructSingleChannelFixedImg(const ZImgRegion& rgn, ZImg& f
     } else if (m_fixedImgChannelsToUse.size() > 1) {
       std::vector<ZImg> imgs(m_fixedImgChannelsToUse.size());
       size_t idx = 0;
-      for (std::set<size_t>::iterator it = m_fixedImgChannelsToUse.begin();
-           it != m_fixedImgChannelsToUse.end(); ++it) {
-        size_t ch = *it;
+      for (auto ch : m_fixedImgChannelsToUse) {
         if (m_fixedImgChannelsToRemoveBackground.find(ch) == m_fixedImgChannelsToRemoveBackground.end()) {
           imgs[idx] = m_fixedImg.createView(ch, m_fixedT); // virtual img
         } else {
@@ -449,9 +447,7 @@ void ZImgNCCMatch::constructSingleChannelFixedImg(const ZImgRegion& rgn, ZImg& f
     } else if (m_fixedImgChannelsToUse.size() > 1) {
       std::vector<ZImg> imgs(m_fixedImgChannelsToUse.size());
       size_t idx = 0;
-      for (std::set<size_t>::iterator it = m_fixedImgChannelsToUse.begin();
-           it != m_fixedImgChannelsToUse.end(); ++it) {
-        size_t ch = *it;
+      for (auto ch : m_fixedImgChannelsToUse) {
         ZImgRegion tmpRgn = rgn;
         tmpRgn.start.c = ch;
         tmpRgn.end.c = ch + 1;
@@ -485,9 +481,7 @@ void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg& 
     } else if (m_movingImgChannelsToUse.size() > 1) {
       std::vector<ZImg> imgs(m_movingImgChannelsToUse.size());
       size_t idx = 0;
-      for (std::set<size_t>::iterator it = m_movingImgChannelsToUse.begin();
-           it != m_movingImgChannelsToUse.end(); ++it) {
-        size_t ch = *it;
+      for (auto ch : m_movingImgChannelsToUse) {
         if (m_movingImgChannelsToRemoveBackground.find(ch) == m_movingImgChannelsToRemoveBackground.end()) {
           imgs[idx] = m_movingImg.createView(ch, m_movingT); // virtual img
         } else {
@@ -513,9 +507,7 @@ void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg& 
     } else if (m_movingImgChannelsToUse.size() > 1) {
       std::vector<ZImg> imgs(m_movingImgChannelsToUse.size());
       size_t idx = 0;
-      for (std::set<size_t>::iterator it = m_movingImgChannelsToUse.begin();
-           it != m_movingImgChannelsToUse.end(); ++it) {
-        size_t ch = *it;
+      for (auto ch : m_movingImgChannelsToUse) {
         ZImgRegion tmpRgn = rgn;
         tmpRgn.start.c = ch;
         tmpRgn.end.c = ch + 1;

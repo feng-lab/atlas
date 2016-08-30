@@ -66,9 +66,9 @@ bool ZSwcDoc::canReadFile(const QString& fileName)
 
 size_t ZSwcDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
-  for (auto it = m_idToSwcPacks.begin(); it != m_idToSwcPacks.end(); ++it) {
-    if (it->second->path == fileName)
-      return it->first;
+  for (const auto& idPack : m_idToSwcPacks) {
+    if (idPack.second->path == fileName)
+      return idPack.first;
   }
   try {
     ZSwc tree(fileName);
@@ -90,9 +90,9 @@ size_t ZSwcDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
     errorMsg = QString("File path is not string or is empty");
     return 0;
   }
-  for (auto it = m_idToSwcPacks.begin(); it != m_idToSwcPacks.end(); ++it) {
-    if (isSameObj(jValue, jsonValue(it->first)))
-      return it->first;
+  for (const auto& idPack : m_idToSwcPacks) {
+    if (isSameObj(jValue, jsonValue(idPack.first)))
+      return idPack.first;
   }
   QString fileName = jValue.toString();
   try {
@@ -180,8 +180,8 @@ size_t ZSwcDoc::makeAlias(size_t id)
 bool ZSwcDoc::isAlias(size_t id) const
 {
   auto& pack = m_idToSwcPacks.at(id);
-  for (auto it = m_idToSwcPacks.begin(); it != m_idToSwcPacks.end(); ++it) {
-    if (it->first != id && it->second == pack)
+  for (const auto& idPack : m_idToSwcPacks) {
+    if (idPack.first != id && idPack.second == pack)
       return true;
   }
   return false;
@@ -270,9 +270,9 @@ bool ZSwcDoc::saveSwc(SwcPack* pack, const QString& fileName, QString& errorMsg)
 
 void ZSwcDoc::packInfoUpdated(SwcPack* pack)
 {
-  for (auto it = m_idToSwcPacks.begin(); it != m_idToSwcPacks.end(); ++it) {
-    if (it->second.get() == pack)
-      m_doc.updateObjInfo(it->first);
+  for (const auto& idPack : m_idToSwcPacks) {
+    if (idPack.second.get() == pack)
+      m_doc.updateObjInfo(idPack.first);
   }
 }
 

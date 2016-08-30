@@ -17,11 +17,11 @@ QString ZImgView::infoOfPos(double x, double y)
 {
   QString info;
   try {
-    for (auto it = m_idToFilter.begin(); it != m_idToFilter.end(); ++it) {
-      ZImgFilter* viewControl = it->second.get();
+    for (const auto& idFilter : m_idToFilter) {
+      const ZImgFilter* viewControl = idFilter.second.get();
       if (!viewControl->isVisible())
         continue;
-      size_t id = it->first;
+      size_t id = idFilter.first;
       const ZImgPack& imgPack = m_doc.imgPack(id);
       int lx = x - imgPack.offsetX();
       int ly = y - imgPack.offsetY();

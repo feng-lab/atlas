@@ -248,13 +248,13 @@ void ZROIFilter::setData(ZROI& roi)
 
 void ZROIFilter::releaseItemsOwnership()
 {
-  for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
-    for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
-      it1->release();
+  for (auto& sliceItems : m_sliceToCtrlPtItems) {
+    for (auto& item : sliceItems.second) {
+      item.release();
     }
   }
-  for (auto it = m_sliceToROIItem.begin(); it != m_sliceToROIItem.end(); ++it) {
-    it->second.release();
+  for (auto& sliceItem : m_sliceToROIItem) {
+    sliceItem.second.release();
   }
 }
 
@@ -264,13 +264,13 @@ void ZROIFilter::setNormalView(int z, int t)
   if (!m_visible.get())
     return;
   int rz = realZ(z);
-  for (auto it = m_sliceToROIItem.begin(); it != m_sliceToROIItem.end(); ++it) {
-    it->second->setVisible(it->first == int(rz));
+  for (auto& sliceItem : m_sliceToROIItem) {
+    sliceItem.second->setVisible(sliceItem.first == int(rz));
   }
   if (m_showControlPoints.get()) {
-    for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
-      for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
-        (*it1)->setVisible(it->first == int(rz));
+    for (auto& sliceItems : m_sliceToCtrlPtItems) {
+      for (auto& item : sliceItems.second) {
+        item->setVisible(sliceItems.first == int(rz));
       }
     }
   }
@@ -281,13 +281,13 @@ void ZROIFilter::setMaxZProjView(int t)
   Q_UNUSED(t)
   if (!m_visible.get())
     return;
-  for (auto it = m_sliceToROIItem.begin(); it != m_sliceToROIItem.end(); ++it) {
-    it->second->setVisible(true);
+  for (auto& sliceItem : m_sliceToROIItem) {
+    sliceItem.second->setVisible(true);
   }
   if (m_showControlPoints.get()) {
-    for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
-      for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
-        (*it1)->setVisible(true);
+    for (auto& sliceItems : m_sliceToCtrlPtItems) {
+      for (auto& item : sliceItems.second) {
+        item->setVisible(true);
       }
     }
   }
@@ -330,9 +330,9 @@ std::shared_ptr<ZWidgetsGroup> ZROIFilter::viewSettingWidgetsGroupForAnnotationF
 void ZROIFilter::deleteKeyPressed()
 {
   std::vector<int> slices;
-  for (auto it = m_sliceToROIItem.begin(); it != m_sliceToROIItem.end(); ++it) {
-    if (it->second->isSelected()) {
-      slices.push_back(it->first);
+  for (const auto& sliceItem : m_sliceToROIItem) {
+    if (sliceItem.second->isSelected()) {
+      slices.push_back(sliceItem.first);
     }
   }
   for (size_t i = 0; i < slices.size(); ++i) {
@@ -340,10 +340,10 @@ void ZROIFilter::deleteKeyPressed()
   }
 
   std::vector<ZROIControlPoint> controlPoints;
-  for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
-    for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
-      if ((*it1)->isSelected()) {
-        controlPoints.push_back((*it1)->controlPoint());
+  for (const auto& sliceItems : m_sliceToCtrlPtItems) {
+    for (const auto& item : sliceItems.second) {
+      if (item->isSelected()) {
+        controlPoints.push_back(item->controlPoint());
       }
     }
   }
@@ -355,9 +355,9 @@ void ZROIFilter::mousePressed(const QPointF&)
 {
   m_hasSelectedItems = false;
   if (m_view.isMaxZProjView()) {
-    for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
-      for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
-        if ((*it1)->isSelected()) {
+    for (const auto& sliceItems : m_sliceToCtrlPtItems) {
+      for (const auto& item : sliceItems.second) {
+        if (item->isSelected()) {
           m_hasSelectedItems = true;
           break;
         }
@@ -366,9 +366,8 @@ void ZROIFilter::mousePressed(const QPointF&)
         break;
     }
   } else if (m_sliceToCtrlPtItems.find(realZ()) != m_sliceToCtrlPtItems.end()) {
-    for (auto it1 = m_sliceToCtrlPtItems.at(realZ()).begin();
-         it1 != m_sliceToCtrlPtItems.at(realZ()).end(); ++it1) {
-      if ((*it1)->isSelected()) {
+    for (const auto& item : m_sliceToCtrlPtItems.at(realZ())) {
+      if (item->isSelected()) {
         m_hasSelectedItems = true;
         break;
       }
@@ -390,10 +389,10 @@ void ZROIFilter::mouseReleased(const QPointF&)
 void ZROIFilter::rotateClockwise()
 {
   std::vector<ZROIControlPoint> controlPoints;
-  for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
-    for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
-      if ((*it1)->isSelected()) {
-        controlPoints.push_back((*it1)->controlPoint());
+  for (const auto& sliceItems : m_sliceToCtrlPtItems) {
+    for (const auto& item : sliceItems.second) {
+      if (item->isSelected()) {
+        controlPoints.push_back(item->controlPoint());
       }
     }
   }
@@ -405,10 +404,10 @@ void ZROIFilter::rotateClockwise()
 void ZROIFilter::rotateCounterclockwise()
 {
   std::vector<ZROIControlPoint> controlPoints;
-  for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
-    for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
-      if ((*it1)->isSelected()) {
-        controlPoints.push_back((*it1)->controlPoint());
+  for (const auto& sliceItems : m_sliceToCtrlPtItems) {
+    for (const auto& item : sliceItems.second) {
+      if (item->isSelected()) {
+        controlPoints.push_back(item->controlPoint());
       }
     }
   }
@@ -419,13 +418,13 @@ void ZROIFilter::rotateCounterclockwise()
 
 void ZROIFilter::offsetChanged()
 {
-  for (auto it = m_sliceToROIItem.begin(); it != m_sliceToROIItem.end(); ++it) {
-    it->second->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
+  for (auto& sliceItem : m_sliceToROIItem) {
+    sliceItem.second->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
   }
   if (m_showControlPoints.get()) {
-    for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
-      for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
-        (*it1)->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
+    for (auto& sliceItems : m_sliceToCtrlPtItems) {
+      for (auto& item : sliceItems.second) {
+        item->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
       }
     }
   }
@@ -435,7 +434,7 @@ std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> ZROIFilter::createCtrlPtItem
 {
   std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> items;
   std::vector<ZROIControlPoint> controlPoints = m_ROI->sliceControlPoints(slice);
-  for (auto controlPoint : controlPoints) {
+  for (const auto& controlPoint : controlPoints) {
     ROICtrlPtGraphicsItem* rectItem = new ROICtrlPtGraphicsItem(*m_ROI, controlPoint,
                                                                 m_view.graphicsView().currentScale());
     rectItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get() && m_showControlPoints.get());
@@ -456,12 +455,12 @@ void ZROIFilter::visibleChanged()
       setNormalView(m_view.currentSlice(), m_view.currentTime());
     }
   } else {
-    for (auto it = m_sliceToROIItem.begin(); it != m_sliceToROIItem.end(); ++it) {
-      it->second->setVisible(false);
+    for (auto& sliceItem : m_sliceToROIItem) {
+      sliceItem.second->setVisible(false);
     }
-    for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
-      for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
-        (*it1)->setVisible(false);
+    for (auto& sliceItems : m_sliceToCtrlPtItems) {
+      for (auto& item : sliceItems.second) {
+        item->setVisible(false);
       }
     }
   }
@@ -476,9 +475,9 @@ void ZROIFilter::showControlPointsChanged()
       setNormalView(m_view.currentSlice(), m_view.currentTime());
     }
   } else {
-    for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
-      for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
-        (*it1)->setVisible(false);
+    for (auto& sliceItems : m_sliceToCtrlPtItems) {
+      for (auto& item : sliceItems.second) {
+        item->setVisible(false);
       }
     }
   }
@@ -546,8 +545,8 @@ void ZROIFilter::onRoiChanged(int slice)
 void ZROIFilter::onRoiMoved(int slice)
 {
   m_sliceToROIItem.at(slice)->updateValue();
-  for (auto it1 = m_sliceToCtrlPtItems.at(slice).begin(); it1 != m_sliceToCtrlPtItems.at(slice).end(); ++it1) {
-    (*it1)->updateValue();
+  for (auto& item : m_sliceToCtrlPtItems.at(slice)) {
+    item->updateValue();
   }
 }
 
@@ -559,9 +558,9 @@ void ZROIFilter::onRoiDeleted(int slice)
 
 void ZROIFilter::viewScaleChanged(double s)
 {
-  for (auto it = m_sliceToCtrlPtItems.begin(); it != m_sliceToCtrlPtItems.end(); ++it) {
-    for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1) {
-      (*it1)->setViewScale(s);
+  for (auto& sliceItems : m_sliceToCtrlPtItems) {
+    for (auto& item : sliceItems.second) {
+      item->setViewScale(s);
     }
   }
 }

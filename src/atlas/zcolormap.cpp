@@ -931,13 +931,12 @@ void ZColorMapParameter::setSameAs(const ZParameter& rhs)
 QJsonValue ZColorMapParameter::jsonValue() const
 {
   QJsonArray keyArray;
-  for (std::vector<std::pair<ZColorMapKey, bool>>::const_iterator it = m_value.m_keys.begin();
-       it != m_value.m_keys.end(); ++it) {
+  for (const auto& k : m_value.m_keys) {
     QJsonObject key;
-    key.insert("intensity", toQString(it->first.m_intensity));
-    key.insert("colorL", toQString(it->first.m_colorL));
-    key.insert("colorR", toQString(it->first.m_colorR));
-    key.insert("split", it->first.m_split);
+    key.insert("intensity", toQString(k.first.m_intensity));
+    key.insert("colorL", toQString(k.first.m_colorL));
+    key.insert("colorR", toQString(k.first.m_colorR));
+    key.insert("split", k.first.m_split);
     keyArray.append(key);
   }
   return keyArray;

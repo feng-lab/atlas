@@ -16,10 +16,9 @@ void ZImgAlgorithmBaseWithProgressReporter::setProgressReportInterval(double int
 {
   if (interval != m_reportInterval) {
     m_reportInterval = interval;
-    for (std::map<void*, WeightProgress>::iterator it = m_subOperationsWeightProgress.begin();
-         it != m_subOperationsWeightProgress.end(); ++it) {
-      ZImgAlgorithmBaseWithProgressReporter* sub = static_cast<ZImgAlgorithmBaseWithProgressReporter*>(it->first);
-      sub->setProgressReportInterval(m_reportInterval / it->second.weight);
+    for (const auto& soWP : m_subOperationsWeightProgress) {
+      ZImgAlgorithmBaseWithProgressReporter* sub = static_cast<ZImgAlgorithmBaseWithProgressReporter*>(soWP.first);
+      sub->setProgressReportInterval(m_reportInterval / soWP.second.weight);
     }
   }
 }
@@ -81,9 +80,8 @@ void ZImgAlgorithmBaseWithProgressReporter::clearRegisteredSubOperations()
 void ZImgAlgorithmBaseWithProgressReporter::sendProgressSignal()
 {
   double currentProgress = m_weight * m_progress;
-  for (std::map<void*, WeightProgress>::iterator it = m_subOperationsWeightProgress.begin();
-       it != m_subOperationsWeightProgress.end(); ++it) {
-    currentProgress += it->second.weight * it->second.progress;
+  for (const auto& soWP : m_subOperationsWeightProgress) {
+    currentProgress += soWP.second.weight * soWP.second.progress;
   }
   if (m_parent) {
     m_parent->subOperationProgressChanged(currentProgress, this);

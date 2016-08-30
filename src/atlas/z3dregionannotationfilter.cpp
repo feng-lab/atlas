@@ -26,8 +26,8 @@ void Z3DRegionAnnotationFilter::process(Z3DEye eye)
 {
   initializeCutRange();
   initializeRotationCenter();
-  for (auto it = m_idToMeshFilters.begin(); it != m_idToMeshFilters.end(); ++it) {
-    it->second->process(eye);
+  for (auto& idFilter : m_idToMeshFilters) {
+    idFilter.second->process(eye);
   }
 }
 
@@ -63,9 +63,9 @@ std::shared_ptr<ZWidgetsGroup> Z3DRegionAnnotationFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_manipulatorSize, 7);
 
 
-    for (auto it = m_nameToID.begin(); it != m_nameToID.end(); ++it) {
-      std::shared_ptr<ZWidgetsGroup> wg = m_idToMeshFilters[it->second]->widgetsGroupForAnnotationFilter();
-      wg->setGroupName(it->first);
+    for (const auto& nameID : m_nameToID) {
+      std::shared_ptr<ZWidgetsGroup> wg = m_idToMeshFilters[nameID.second]->widgetsGroupForAnnotationFilter();
+      wg->setGroupName(nameID.first);
       m_widgetsGroup->addChild(wg);
     }
   }
@@ -75,18 +75,18 @@ std::shared_ptr<ZWidgetsGroup> Z3DRegionAnnotationFilter::widgetsGroup()
 
 void Z3DRegionAnnotationFilter::renderOpaque(Z3DEye eye)
 {
-  for (auto it = m_idToMeshFilters.begin(); it != m_idToMeshFilters.end(); ++it) {
-    if (it->second->isVisible() && it->second->opacity() == 1.f)
-      it->second->renderTransparent(eye);
+  for (auto& idFilter : m_idToMeshFilters) {
+    if (idFilter.second->isVisible() && idFilter.second->opacity() == 1.f)
+      idFilter.second->renderOpaque(eye);
   }
   renderBoundBox(eye);
 }
 
 void Z3DRegionAnnotationFilter::renderTransparent(Z3DEye eye)
 {
-  for (auto it = m_idToMeshFilters.begin(); it != m_idToMeshFilters.end(); ++it) {
-    if (it->second->isVisible() && it->second->opacity() < 1.f)
-      it->second->renderTransparent(eye);
+  for (auto& idFilter : m_idToMeshFilters) {
+    if (idFilter.second->isVisible() && idFilter.second->opacity() < 1.f)
+      idFilter.second->renderTransparent(eye);
   }
   renderBoundBox(eye);
 }
@@ -94,52 +94,52 @@ void Z3DRegionAnnotationFilter::renderTransparent(Z3DEye eye)
 void Z3DRegionAnnotationFilter::setViewport(glm::uvec2 viewport)
 {
   Z3DGeometryFilter::setViewport(viewport);
-  for (auto it = m_idToMeshFilters.begin(); it != m_idToMeshFilters.end(); ++it) {
-    it->second->setViewport(viewport);
+  for (auto& idFilter : m_idToMeshFilters) {
+    idFilter.second->setViewport(viewport);
   }
 }
 
 void Z3DRegionAnnotationFilter::setViewport(glm::uvec4 viewport)
 {
   Z3DGeometryFilter::setViewport(viewport);
-  for (auto it = m_idToMeshFilters.begin(); it != m_idToMeshFilters.end(); ++it) {
-    it->second->setViewport(viewport);
+  for (auto& idFilter : m_idToMeshFilters) {
+    idFilter.second->setViewport(viewport);
   }
 }
 
 void Z3DRegionAnnotationFilter::setShaderHookType(Z3DRendererBase::ShaderHookType t)
 {
-  for (auto it = m_idToMeshFilters.begin(); it != m_idToMeshFilters.end(); ++it) {
-    it->second->setShaderHookType(t);
+  for (auto& idFilter : m_idToMeshFilters) {
+    idFilter.second->setShaderHookType(t);
   }
 }
 
 void Z3DRegionAnnotationFilter::setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture* t)
 {
-  for (auto it = m_idToMeshFilters.begin(); it != m_idToMeshFilters.end(); ++it) {
-    it->second->setShaderHookParaDDPDepthBlenderTexture(t);
+  for (auto& idFilter : m_idToMeshFilters) {
+    idFilter.second->setShaderHookParaDDPDepthBlenderTexture(t);
   }
 }
 
 void Z3DRegionAnnotationFilter::setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture* t)
 {
-  for (auto it = m_idToMeshFilters.begin(); it != m_idToMeshFilters.end(); ++it) {
-    it->second->setShaderHookParaDDPFrontBlenderTexture(t);
+  for (auto& idFilter : m_idToMeshFilters) {
+    idFilter.second->setShaderHookParaDDPFrontBlenderTexture(t);
   }
 }
 
 void Z3DRegionAnnotationFilter::visibleChanged(bool v)
 {
-  for (auto it = m_idToMeshFilters.begin(); it != m_idToMeshFilters.end(); ++it) {
-    it->second->setVisible(v);
+  for (auto& idFilter : m_idToMeshFilters) {
+    idFilter.second->setVisible(v);
   }
 }
 
 void Z3DRegionAnnotationFilter::allMeshChanged()
 {
   if (m_widgetsGroup) {
-    for (auto it = m_nameToID.begin(); it != m_nameToID.end(); ++it) {
-      m_widgetsGroup->removeChild(m_idToMeshFilters[it->second]->widgetsGroupForAnnotationFilter());
+    for (const auto& nameID : m_nameToID) {
+      m_widgetsGroup->removeChild(m_idToMeshFilters[nameID.second]->widgetsGroupForAnnotationFilter());
     }
   }
 
@@ -150,19 +150,18 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
   m_idToRegionNames.clear();
   m_nameToID.clear();
 
-  const ZTree<RegionNode>& annoTree = m_regionAnnotation->annotationTree();
-  for (auto it = annoTree.begin(); it != annoTree.end(); ++it) {
-    int id = it->id;
+  for (const auto& node : m_regionAnnotation->annotationTree()) {
+    int id = node.id;
     Z3DMeshFilter* flt = new Z3DMeshFilter(m_rendererBase.globalParas());
-    if (it->mesh) {
+    if (node.mesh) {
       QList<ZMesh*> meshList;
-      meshList.push_back(it->mesh.get());
+      meshList.push_back(node.mesh.get());
       flt->setData(&meshList);
     }
     flt->setVisible(false);
-    flt->setMeshColor(glm::vec4(it->red / 255.f, it->green / 255.f, it->blue / 255.f, 1.f));
+    flt->setMeshColor(glm::vec4(node.red / 255.f, node.green / 255.f, node.blue / 255.f, 1.f));
     flt->setOpacity(0.5);
-    m_idToRegionNames[id] = QString("%1_%2").arg(it->abbreviation).arg(it->id);
+    m_idToRegionNames[id] = QString("%1_%2").arg(node.abbreviation).arg(node.id);
     m_nameToID[m_idToRegionNames[id]] = id;
     std::vector<ZParameter*> paras = flt->parameters();
     for (size_t i = 0; i < paras.size(); ++i) {
@@ -191,9 +190,9 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
   updateBoundBox();
 
   if (m_widgetsGroup) {
-    for (auto it = m_nameToID.begin(); it != m_nameToID.end(); ++it) {
-      std::shared_ptr<ZWidgetsGroup> wg = m_idToMeshFilters[it->second]->widgetsGroupForAnnotationFilter();
-      wg->setGroupName(it->first);
+    for (const auto& nameID : m_nameToID) {
+      std::shared_ptr<ZWidgetsGroup> wg = m_idToMeshFilters[nameID.second]->widgetsGroupForAnnotationFilter();
+      wg->setGroupName(nameID.first);
       m_widgetsGroup->addChild(wg);
     }
     m_widgetsGroup->emitWidgetsGroupChangedSignal();

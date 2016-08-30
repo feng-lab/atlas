@@ -408,10 +408,8 @@ std::map<size_t, size_t> ZDoc::read(const QJsonObject& json, QString& err)
         }
       }
       if (!docKeyValueList.empty()) {
-        std::map<size_t, size_t> idmap = m_docPacks[i].doc->read(docKeyValueList, err);
-        for (std::map<size_t, size_t>::iterator it = idmap.begin();
-             it != idmap.end(); ++it) {
-          res[it->first] = it->second;
+        for (const auto& idid : m_docPacks[i].doc->read(docKeyValueList, err)) {
+          res[idid.first] = idid.second;
         }
       }
     }

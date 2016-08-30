@@ -70,9 +70,9 @@ bool ZPunctaDoc::canReadFile(const QString& fileName)
 
 size_t ZPunctaDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
-  for (auto it = m_idToPunctaPacks.begin(); it != m_idToPunctaPacks.end(); ++it) {
-    if (it->second->path == fileName)
-      return it->first;
+  for (const auto& idPack : m_idToPunctaPacks) {
+    if (idPack.second->path == fileName)
+      return idPack.first;
   }
   try {
     ZPuncta puncta(fileName);
@@ -93,9 +93,9 @@ size_t ZPunctaDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
     errorMsg = QString("File path is not string or is empty");
     return 0;
   }
-  for (auto it = m_idToPunctaPacks.begin(); it != m_idToPunctaPacks.end(); ++it) {
-    if (isSameObj(jValue, jsonValue(it->first)))
-      return it->first;
+  for (const auto& idPack : m_idToPunctaPacks) {
+    if (isSameObj(jValue, jsonValue(idPack.first)))
+      return idPack.first;
   }
   QString fileName = jValue.toString();
   try {
@@ -303,9 +303,9 @@ bool ZPunctaDoc::savePuncta(PunctaPack* pack, const QString& fileName, QString& 
 
 void ZPunctaDoc::packInfoUpdated(PunctaPack* pack)
 {
-  for (auto it = m_idToPunctaPacks.begin(); it != m_idToPunctaPacks.end(); ++it) {
-    if (it->second.get() == pack)
-      m_doc.updateObjInfo(it->first);
+  for (const auto& idPack : m_idToPunctaPacks) {
+    if (idPack.second.get() == pack)
+      m_doc.updateObjInfo(idPack.first);
   }
 }
 

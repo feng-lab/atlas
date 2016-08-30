@@ -112,24 +112,28 @@ void ZWidgetsGroup::removeAllChildren()
 
 void ZWidgetsGroup::removeChild(const ZParameter& para)
 {
-  for (auto it = m_childGroups.begin(); it != m_childGroups.end(); ++it) {
-    if ((*it)->m_type == Type::Parameter && (*it)->m_parameter == &para) {
-      (*it)->disconnect(this);
-      m_childGroups.erase(it);
-      break;
-    }
-  }
+  m_childGroups.erase(std::remove_if(m_childGroups.begin(), m_childGroups.end(),
+                                     [&para, this](const std::shared_ptr<ZWidgetsGroup>& child) {
+                                       if (child->m_type == Type::Parameter && child->m_parameter == &para) {
+                                         child->disconnect(this);
+                                         return true;
+                                       }
+                                       return false;
+                                     }),
+                      m_childGroups.end());
 }
 
-void ZWidgetsGroup::removeChild(const std::shared_ptr<ZWidgetsGroup>& child)
+void ZWidgetsGroup::removeChild(const std::shared_ptr<ZWidgetsGroup>& childIn)
 {
-  for (auto it = m_childGroups.begin(); it != m_childGroups.end(); ++it) {
-    if ((*it)->m_type == Type::Group && (*it) == child) {
-      (*it)->disconnect(this);
-      m_childGroups.erase(it);
-      break;
-    }
-  }
+  m_childGroups.erase(std::remove_if(m_childGroups.begin(), m_childGroups.end(),
+                                     [&childIn, this](const std::shared_ptr<ZWidgetsGroup>& child) {
+                                       if (child->m_type == Type::Group && child == childIn) {
+                                         child->disconnect(this);
+                                         return true;
+                                       }
+                                       return false;
+                                     }),
+                      m_childGroups.end());
 }
 
 QWidget* ZWidgetsGroup::createWidget(bool createBasic, bool scroll, QLabel* label)

@@ -184,9 +184,9 @@ void ZSliceROI::subtractSpline(const QPolygonF& spline)
 
 void ZSliceROI::rotateCtrlPoints(const std::map<size_t, std::set<size_t> >& shapeOpIndexToPointIndices, double angle)
 {
-  for (auto it = shapeOpIndexToPointIndices.begin(); it != shapeOpIndexToPointIndices.end(); ++it) {
-    const std::set<size_t>& pointIndices = it->second;
-    ZROIShapeOperation& shapeOp = m_shapeOperations[it->first];
+  for (const auto& shapeOpIndexPointIndices : shapeOpIndexToPointIndices) {
+    const std::set<size_t>& pointIndices = shapeOpIndexPointIndices.second;
+    ZROIShapeOperation& shapeOp = m_shapeOperations[shapeOpIndexPointIndices.first];
     QPolygonF& poly = shapeOp.poly;
     if (poly.size() > 3 && (shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline)) {
       QPointF center = poly[0];
@@ -195,8 +195,7 @@ void ZSliceROI::rotateCtrlPoints(const std::map<size_t, std::set<size_t> >& shap
       }
       center /= poly.size();
 
-      for (auto iit = pointIndices.begin(); iit != pointIndices.end(); ++iit) {
-        size_t idx = *iit;
+      for (auto idx : pointIndices) {
         QPointF startPt = poly[idx] - center;
         glm::dvec2 rPt = glm::rotate(glm::dvec2(startPt.x(), startPt.y()), angle);
         QPointF resPt = QPointF(rPt.x, rPt.y) + center;
@@ -214,9 +213,9 @@ void ZSliceROI::rotateCtrlPoints(const std::map<size_t, std::set<size_t> >& shap
 void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::set<size_t>>& shapeOpIndexToPointIndices)
 {
   size_t shapeOpIndexSubtract = 0;
-  for (auto it = shapeOpIndexToPointIndices.begin(); it != shapeOpIndexToPointIndices.end(); ++it) {
-    size_t i = it->first - shapeOpIndexSubtract;
-    const std::set<size_t>& pointIndices = it->second;
+  for (const auto& shapeOpIndexPointIndices : shapeOpIndexToPointIndices) {
+    size_t i = shapeOpIndexPointIndices.first - shapeOpIndexSubtract;
+    const std::set<size_t>& pointIndices = shapeOpIndexPointIndices.second;
     ZROIShapeOperation& shapeOp = m_shapeOperations[i];
 
     bool deleteAll = shapeOp.type == ROIType::Rect ||
@@ -228,8 +227,8 @@ void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::set<size_t>>& shape
       ++shapeOpIndexSubtract;
     } else {
       size_t pointIndexSubtract = 0;
-      for (auto iit = pointIndices.begin(); iit != pointIndices.end(); ++iit) {
-        size_t idx = *iit - pointIndexSubtract;
+      for (auto pointIndex : pointIndices) {
+        size_t idx = pointIndex - pointIndexSubtract;
         ++pointIndexSubtract;
         if ((idx == 0 || idx == static_cast<size_t>(shapeOp.poly.size() - 1))) {
           m_shapeOperations[i].poly.removeFirst();
@@ -556,8 +555,8 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
 
 void ZROI::clear()
 {
-  for (auto it = m_sliceROIs.begin(); it != m_sliceROIs.end(); ++it) {
-    emit roiDeleted(it->first);
+  for (const auto& sliceROI : m_sliceROIs) {
+    emit roiDeleted(sliceROI.first);
   }
   m_sliceROIs.clear();
   resetBoundBox();
@@ -578,12 +577,11 @@ void ZROI::mergeWith(const ZROI& other)
 std::set<int> ZROI::mergeWith_Impl(const std::map<int, ZSliceROI>& sliceROIs)
 {
   std::set<int> changedSlices;
-  for (auto it = sliceROIs.begin(); it != sliceROIs.end(); ++it) {
-    if (!it->second.isEmpty()) {
-      //LOG(INFO) << getOrCreateSliceROI(it->first).isEmpty();
-      changedSlices.insert(it->first);
-      m_sliceROIs[it->first].mergeWith(it->second);
-      onSliceROIUpdated(it->first);
+  for (const auto& sliceROI : sliceROIs) {
+    if (!sliceROI.second.isEmpty()) {
+      changedSlices.insert(sliceROI.first);
+      m_sliceROIs[sliceROI.first].mergeWith(sliceROI.second);
+      onSliceROIUpdated(sliceROI.first);
     }
   }
   return changedSlices;
@@ -644,17 +642,16 @@ std::set<int> ZROI::rotateROIControlPoints_Impl(const std::vector<ZROIControlPoi
 {
   std::set<int> slices;
   std::map<int, std::map<size_t, std::set<size_t>>> sliceToShapeOpIndexToPointIndices;
-  for (auto controlPoint : controlPoints) {
+  for (const auto& controlPoint : controlPoints) {
     sliceToShapeOpIndexToPointIndices[controlPoint.slice][controlPoint.shapeOperationIndex].insert(
       controlPoint.pointIndex);
     slices.insert(controlPoint.slice);
   }
-  for (auto it = sliceToShapeOpIndexToPointIndices.begin();
-       it != sliceToShapeOpIndexToPointIndices.end(); ++it) {
-    auto sit = m_sliceROIs.find(it->first);
+  for (const auto& sliceOthers : sliceToShapeOpIndexToPointIndices) {
+    auto sit = m_sliceROIs.find(sliceOthers.first);
     if (sit != m_sliceROIs.end()) {
-      sit->second.rotateCtrlPoints(it->second, angle);
-      onSliceROIMoved(it->first);
+      sit->second.rotateCtrlPoints(sliceOthers.second, angle);
+      onSliceROIMoved(sliceOthers.first);
     }
   }
   return slices;
@@ -670,17 +667,16 @@ std::set<int> ZROI::deleteROIControlPoints_Impl(const std::vector<ZROIControlPoi
 {
   std::set<int> slices;
   std::map<int, std::map<size_t, std::set<size_t>>> sliceToShapeOpIndexToPointIndices;
-  for (auto controlPoint : controlPoints) {
+  for (const auto& controlPoint : controlPoints) {
     sliceToShapeOpIndexToPointIndices[controlPoint.slice][controlPoint.shapeOperationIndex].insert(
       controlPoint.pointIndex);
     slices.insert(controlPoint.slice);
   }
-  for (auto it = sliceToShapeOpIndexToPointIndices.begin();
-       it != sliceToShapeOpIndexToPointIndices.end(); ++it) {
-    auto sit = m_sliceROIs.find(it->first);
+  for (const auto& sliceOthers : sliceToShapeOpIndexToPointIndices) {
+    auto sit = m_sliceROIs.find(sliceOthers.first);
     if (sit != m_sliceROIs.end()) {
-      sit->second.deleteCtrlPoints(it->second);
-      onSliceROIUpdated(it->first);
+      sit->second.deleteCtrlPoints(sliceOthers.second);
+      onSliceROIUpdated(sliceOthers.first);
     }
   }
   return slices;
@@ -843,23 +839,15 @@ void ZROI::endMoveSelectedControlPointsCommand()
 
 void ZROI::changeSliceROIs(const std::map<int, ZSliceROI>& sliceROIs, const std::set<int>& changedSlices)
 {
-  for (auto it = changedSlices.begin(); it != changedSlices.end(); ++it) {
-    if (m_sliceROIs.find(*it) != m_sliceROIs.end()) {
-      emit roiDeleted(*it);
+  for (auto slice : changedSlices) {
+    if (m_sliceROIs.find(slice) != m_sliceROIs.end()) {
+      emit roiDeleted(slice);
     }
-    if (sliceROIs.find(*it) != sliceROIs.end()) {
-      m_sliceROIs[*it] = sliceROIs.at(*it);
-      emit roiChanged(*it);
+    if (sliceROIs.find(slice) != sliceROIs.end()) {
+      m_sliceROIs[slice] = sliceROIs.at(slice);
+      emit roiChanged(slice);
     }
   }
-  //  for (auto it = m_sliceROIs.begin(); it != m_sliceROIs.end(); ++it) {
-  //    emit roiDeleted(it->first);
-  //  }
-  //  m_sliceROIs = sliceROIs;
-  //  resetBoundBox();
-  //  for (auto it = m_sliceROIs.begin(); it != m_sliceROIs.end(); ++it) {
-  //    emit roiChanged(it->first);
-  //  }
 }
 
 void ZROI::load(const QString& filename)
@@ -970,14 +958,14 @@ void ZROI::resetBoundBox()
 {
   m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = m_boundBox[6] = std::numeric_limits<int>::max();
   m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = m_boundBox[7] = std::numeric_limits<int>::min();
-  for (auto it = m_sliceROIs.begin(); it != m_sliceROIs.end(); ++it) {
-    QRectF rect = it->second.paintPath().boundingRect();
+  for (const auto& sliceROI : m_sliceROIs) {
+    QRectF rect = sliceROI.second.paintPath().boundingRect();
     m_boundBox[0] = std::min(roundTo<int>(rect.left()), m_boundBox[0]);
     m_boundBox[1] = std::max(roundTo<int>(rect.right() - 1), m_boundBox[1]);
     m_boundBox[2] = std::min(roundTo<int>(rect.top()), m_boundBox[2]);
     m_boundBox[3] = std::max(roundTo<int>(rect.bottom() - 1), m_boundBox[3]);
-    m_boundBox[4] = std::min(it->first, m_boundBox[4]);
-    m_boundBox[5] = std::max(it->first, m_boundBox[5]);
+    m_boundBox[4] = std::min(sliceROI.first, m_boundBox[4]);
+    m_boundBox[5] = std::max(sliceROI.first, m_boundBox[5]);
     m_boundBox[6] = std::min(0, m_boundBox[6]);
     m_boundBox[7] = std::max(0, m_boundBox[7]);
   }

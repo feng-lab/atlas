@@ -476,8 +476,8 @@ double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, 
     int64_t ix = x;
     int64_t iy = y;
 
-    for (auto it = m_ratioToSize.begin(); it != m_ratioToSize.end(); ++it) {
-      size_t ratio = it->first;
+    for (const auto& ratioSize : m_ratioToSize) {
+      size_t ratio = ratioSize.first;
       auto tiit = m_rtzToTileIndice.find(std::make_tuple(ratio, t, mip ? -1 : int(z)));
       if (tiit != m_rtzToTileIndice.end()) {
         const std::vector<size_t>& tileIndice = tiit->second;
@@ -571,11 +571,11 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
   }
 
   size_t ratio = 1;
-  for (auto it = m_ratioToSize.begin(); it != m_ratioToSize.end(); ++it) {
-    if (it->second.width() < int(width) || it->second.height() < int(height)) {
+  for (const auto& ratioSize : m_ratioToSize) {
+    if (ratioSize.second.width() < int(width) || ratioSize.second.height() < int(height)) {
       break;
     }
-    ratio = it->first;
+    ratio = ratioSize.first;
   }
 
   if (m_imgInfo.width == width && m_imgInfo.height == height && m_imgInfo.depth == depth) {
@@ -935,16 +935,17 @@ void ZImgPack::createTileIndexStructure()
     }
     m_rtzToTileIndice[std::tie(tile.ratio, tile.t, tile.z)].push_back(i);
   }
-  for (auto it = m_rtzToTileIndice.begin(); it != m_rtzToTileIndice.end(); ++it) {
-    std::vector<RTreeValueType> values(it->second.size());
-    for (size_t i = 0; i < it->second.size(); ++i) {
-      const ZImgSubBlock& tile = *m_allTiles[it->second[i]].get();
+  for (const auto& rtzTileIndices : m_rtzToTileIndice) {
+    std::vector<RTreeValueType> values(rtzTileIndices.second.size());
+    for (size_t i = 0; i < rtzTileIndices.second.size(); ++i) {
+      const ZImgSubBlock& tile = *m_allTiles[rtzTileIndices.second[i]].get();
       values[i] = std::make_pair(TileBoxType(TileCornerType(tile.x, tile.y),
                                              TileCornerType(tile.x + tile.width - 1,
                                                             tile.y + tile.height - 1)),
-                                 it->second[i]);
+                                 rtzTileIndices.second[i]);
     }
-    m_rtzToTileBoxRTree.emplace_hint(m_rtzToTileBoxRTree.end(), it->first, std::make_unique<RTreeType>(values));
+    m_rtzToTileBoxRTree.emplace_hint(m_rtzToTileBoxRTree.end(), rtzTileIndices.first,
+                                     std::make_unique<RTreeType>(values));
   }
 }
 
@@ -1106,11 +1107,11 @@ size_t ZImgPack::ratioForScale(double scale) const
 size_t ZImgPack::readRatioOf(size_t needRatio) const
 {
   size_t readRatio = 1;
-  for (auto it = m_ratioToSize.begin(); it != m_ratioToSize.end(); ++it) {
-    if (it->first > needRatio) {
+  for (const auto& ratioSize : m_ratioToSize) {
+    if (ratioSize.first > needRatio) {
       break;
     }
-    readRatio = it->first;
+    readRatio = ratioSize.first;
   }
   return readRatio;
 }

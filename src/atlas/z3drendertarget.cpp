@@ -199,11 +199,10 @@ bool Z3DRenderTarget::resize(glm::uvec2 newsize)
   m_size = newsize;
 
   glActiveTexture(GL_TEXTURE0);
-  for (std::map<GLenum, Z3DTexture*>::iterator it = m_attachments.begin();
-       it != m_attachments.end(); ++it) {
-    if (it->second) {
-      it->second->setDimension(glm::uvec3(m_size.x, m_size.y, it->second->depth()));
-      it->second->uploadImage();
+  for (auto& enumAttach : m_attachments) {
+    if (enumAttach.second) {
+      enumAttach.second->setDimension(glm::uvec3(m_size.x, m_size.y, enumAttach.second->depth()));
+      enumAttach.second->uploadImage();
     }
   }
   isFBOComplete();
@@ -350,11 +349,11 @@ void Z3DRenderTarget::detach(GLenum attachment)
 void Z3DRenderTarget::attachSlice(size_t zSlice)
 {
   bind();
-  for (auto it = m_attachments.begin(); it != m_attachments.end(); ++it) {
-    Z3DTexture* texture = it->second;
+  for (const auto& enumAttach : m_attachments) {
+    Z3DTexture* texture = enumAttach.second;
     CHECK(texture->textureTarget() == GL_TEXTURE_2D_ARRAY || texture->textureTarget() == GL_TEXTURE_3D);
     CHECK(zSlice < texture->depth());
-    glFramebufferTextureLayer(GL_DRAW_FRAMEBUFFER, it->first, texture->id(), 0, zSlice);
+    glFramebufferTextureLayer(GL_DRAW_FRAMEBUFFER, enumAttach.first, texture->id(), 0, zSlice);
   }
   isFBOComplete();
   CHECK_GL_ERROR
