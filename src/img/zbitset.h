@@ -18,4 +18,4 @@ size_t bitsetRangeToValue(const std::bitset<N>& bitSet, size_t startBit, size_t 
   return res;
 }
 
-}
+}  // namespace nim

@@ -17,7 +17,7 @@ class ZSaveObjsDialog : public QDialog
 {
 Q_OBJECT
 public:
-  explicit ZSaveObjsDialog(const ZDoc& doc, const QList<size_t>& objs, QWidget* parent = 0);
+  explicit ZSaveObjsDialog(const ZDoc& doc, const QList<size_t>& objs, QWidget* parent = nullptr);
 
   const QList<size_t>& objsToSave() const
   { return m_objsToSave; }

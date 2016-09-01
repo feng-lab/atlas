@@ -1,11 +1,12 @@
 #include "z3dtransferfunction.h"
+
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 #include "z3dtransferfunctionwidgetwitheditorwindow.h"
 #include "z3dvolume.h"
 #include "z3dtexture.h"
-#include <QLabel>
 #include "zlog.h"
+#include <QLabel>
 
 namespace nim {
 
@@ -86,10 +87,10 @@ QString Z3DTransferFunction::samplerType() const
 {
   if (m_dimensions.z > 1)
     return "sampler3D";
-  else if (m_dimensions.y > 1)
+  if (m_dimensions.y > 1)
     return "sampler2D";
-  else
-    return "sampler1D";
+
+  return "sampler1D";
 }
 
 void Z3DTransferFunction::resize(uint32_t width)
@@ -105,10 +106,11 @@ void Z3DTransferFunction::resize(uint32_t width)
 void Z3DTransferFunction::fitDimensions(uint32_t& width, uint32_t& height, uint32_t& depth) const
 {
   uint32_t maxTexSize;
-  if (depth == 1)
+  if (depth == 1) {
     maxTexSize = static_cast<uint32_t>(Z3DGpuInfo::instance().maxTextureSize());
-  else
+  } else {
     maxTexSize = static_cast<uint32_t>(Z3DGpuInfo::instance().max3DTextureSize());
+  }
 
   if (maxTexSize < width)
     width = maxTexSize;
@@ -137,18 +139,12 @@ void Z3DTransferFunction::updateTexture()
 
 bool Z3DTransferFunction::isValidDomainMin(double min) const
 {
-  if (min < domainMax() && min >= 0.0 && min < 1.0)
-    return true;
-  else
-    return false;
+  return min < domainMax() && min >= 0.0 && min < 1.0;
 }
 
 bool Z3DTransferFunction::isValidDomainMax(double max) const
 {
-  if (max > domainMin() && max > 0.0 && max <= 1.0)
-    return true;
-  else
-    return false;
+  return max > domainMin() && max > 0.0 && max <= 1.0;
 }
 
 Z3DTransferFunctionParameter::Z3DTransferFunctionParameter(const QString& name, QObject* parent)
@@ -220,8 +216,8 @@ void Z3DTransferFunctionParameter::readValue(const QJsonValue& jsonValue)
 {
   m_value.m_keys.clear();
   QJsonArray keyArray = jsonValue.toArray();
-  for (int i = 0; i < keyArray.size(); ++i) {
-    QJsonObject keyObj = keyArray[i].toObject();
+  for (const auto & i : keyArray) {
+    QJsonObject keyObj = i.toObject();
     ZColorMapKey key(0, glm::col4());
     if (keyObj.contains("intensity") &&
         keyObj.contains("colorL") &&

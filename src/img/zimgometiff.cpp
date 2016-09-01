@@ -1,9 +1,10 @@
 #include "zimgometiff.h"
+
 #include "ztiff.h"
-#include <QXmlStreamReader>
-#include <QXmlStreamWriter>
 #include "zlog.h"
 #include "zimgsliceprovider.h"
+#include <QXmlStreamReader>
+#include <QXmlStreamWriter>
 
 namespace nim {
 
@@ -16,10 +17,11 @@ void ZImgOmeTiff::readIntoInternalStructure(const QString& filename, ZTiff& tiff
 {
   ZImgTiff::readIntoInternalStructure(filename, tiff);
   if (!m_imageDescription.isEmpty() && m_imageDescription.contains("<OME") && m_imageDescription.contains("<Image") &&
-      m_imageDescription.contains("<Pixels"))
+      m_imageDescription.contains("<Pixels")) {
     readOmeInfo(tiff);
-  else
+  } else {
     throw ZIOException("Not OME Tiff file");
+  }
 }
 
 void ZImgOmeTiff::clearInternalState()
@@ -94,10 +96,11 @@ void ZImgOmeTiff::writeImg(const QString& filename, const ZImg& img, Compression
 {
   ZTiffWriter tiffWriter;
   int extraSample = img.info().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
-  if (img.byteNumber() > 1024_usize * 1024 * 3600)
+  if (img.byteNumber() > 1024_usize * 1024 * 3600) {
     tiffWriter.startWriting(filename, comp, extraSample, true);
-  else
+  } else {
     tiffWriter.startWriting(filename, comp, extraSample, false);
+  }
   std::vector<ZImgMetatag> tags(1);
   makeImageDescriptionTag(img.info(), "XYZCT", tags[0]);
   for (size_t t = 0; t < img.numTimes(); ++t) {
@@ -117,10 +120,11 @@ void ZImgOmeTiff::writeImg(const QString& filename, const ZImgSliceProvider& img
 {
   ZTiffWriter tiffWriter;
   int extraSample = imgSliceProvider.imgInfo().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
-  if (imgSliceProvider.imgInfo().byteNumber() > 1024_usize * 1024 * 3600)
+  if (imgSliceProvider.imgInfo().byteNumber() > 1024_usize * 1024 * 3600) {
     tiffWriter.startWriting(filename, comp, extraSample, true);
-  else
+  } else {
     tiffWriter.startWriting(filename, comp, extraSample, false);
+  }
   std::vector<ZImgMetatag> tags(1);
   makeImageDescriptionTag(imgSliceProvider.imgInfo(), "XYCZT", tags[0]);
   for (size_t t = 0; t < imgSliceProvider.imgInfo().numTimes; ++t) {
@@ -439,12 +443,13 @@ QString ZImgOmeTiff::createOmeXml(const ZImgInfo& info, const QString& dimension
   xml.writeAttribute("ID", "Pixels:0");
   xml.writeAttribute("DimensionOrder", dimensionOrder);
   if (info.voxelFormat == VoxelFormat::Float) {
-    if (info.bytesPerVoxel == 4)
+    if (info.bytesPerVoxel == 4) {
       xml.writeAttribute("Type", "float");
-    else if (info.bytesPerVoxel == 8)
+    } else if (info.bytesPerVoxel == 8) {
       xml.writeAttribute("Type", "double");
-    else
+    } else {
       throw ZIOException(QString("%1 bytes float pixel?").arg(info.bytesPerVoxel));
+    }
   } else if (info.voxelFormat == VoxelFormat::Signed) {
     xml.writeAttribute("Type", QString("int%1").arg(info.bytesPerVoxel * 8));
   } else {
@@ -483,4 +488,4 @@ QString ZImgOmeTiff::createOmeXml(const ZImgInfo& info, const QString& dimension
   return res;
 }
 
-}  // namespace
+} // namespace nim

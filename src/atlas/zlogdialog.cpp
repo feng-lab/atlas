@@ -8,8 +8,8 @@
 #include <QKeyEvent>
 #include <QFileDialog>
 #include <QtGlobal>
-#include <cstddef>
 #include <QTextStream>
+#include <cstddef>
 
 namespace nim {
 
@@ -29,7 +29,7 @@ static const QIcon& playIcon()
 class ZLogFilterProxyModel : public QSortFilterProxyModel
 {
 public:
-  ZLogFilterProxyModel(LogSeverity level, QObject* parent = 0)
+  explicit ZLogFilterProxyModel(LogSeverity level, QObject* parent = nullptr)
     : QSortFilterProxyModel(parent)
     , mLevel(level)
     , mLastVisibleRow(0)
@@ -143,9 +143,8 @@ bool ZLogDialog::eventFilter(QObject* obj, QEvent* event)
     }
 
     return false;
-  } else {
-    return QDialog::eventFilter(obj, event);
   }
+  return QDialog::eventFilter(obj, event);
 }
 
 void ZLogDialog::OnPauseClicked()

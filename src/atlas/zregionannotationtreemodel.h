@@ -1,11 +1,11 @@
 #pragma once
 
+#include "zregionannotation.h"
 #include <QAbstractItemModel>
 #include <QModelIndex>
 #include <QVariant>
 #include <QIcon>
 #include <map>
-#include "zregionannotation.h"
 
 namespace nim {
 
@@ -38,11 +38,11 @@ public:
 
   int columnCount(const QModelIndex& parent = QModelIndex()) const;
 
-  void clicked(const QModelIndex& index);
+  void clicked(const QModelIndex& idxIn);
 
   void doubleClicked(const QModelIndex& index);
 
-  void activated(const QModelIndex& index);
+  void activated(const QModelIndex& idxIn);
 
 protected:
   ZRegionAnnotation& m_regionAnnotation;

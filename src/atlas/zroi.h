@@ -1,14 +1,14 @@
 #pragma once
 
+#include "zimg.h"
+#include "zimgsigneddistancemap.h"
+#include "zlog.h"
+#include <H5Cpp.h>
 #include <QObject>
 #include <QPointF>
 #include <QPainterPath>
 #include <QUndoStack>
 #include <map>
-#include "zimg.h"
-#include "zimgsigneddistancemap.h"
-#include <H5Cpp.h>
-#include "zlog.h"
 
 namespace nim {
 
@@ -93,9 +93,9 @@ public:
   const QPainterPath& paintPath() const
   { return m_roi; }
 
-  void load(H5::Group& grp);
+  void load(H5::Group& sliceGrp);
 
-  void save(H5::Group& grp) const;
+  void save(H5::Group& sliceGrp) const;
 
   bool hasPolyOrSpline() const;
 
@@ -280,9 +280,9 @@ public:
 
   void save(const QString& filename) const;
 
-  void load(H5::Group& grp);
+  void load(H5::Group& allGrp);
 
-  void save(H5::Group& grp) const;
+  void save(H5::Group& allGrp) const;
 
 signals:
 

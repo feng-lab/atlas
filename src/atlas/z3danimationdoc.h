@@ -76,7 +76,7 @@ protected:
 private:
   struct AnimationPack
   { // animation and its associated data
-    AnimationPack(Z3DAnimation* animation, const QString& path, const QString& name = "");
+    AnimationPack(Z3DAnimation* animation_, const QString& path_, const QString& name = "");
 
     void updateDerivedData();
 

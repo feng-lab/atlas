@@ -1,9 +1,8 @@
 #include "z3dpunctafilter.h"
 
-#include <iostream>
-
 #include "zpuncta.h"
 #include "zrandom.h"
+#include <iostream>
 
 namespace nim {
 
@@ -482,7 +481,7 @@ void Z3DPunctaFilter::adjustWidgets()
   //  m_textureGlowRenderer.blurStrengthPara().setVisible(m_randomGlow.get());
 }
 
-void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int, int h)
+void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*unused*/, int h)
 {
   Q_UNUSED(h)
   if (m_punctaList.empty())

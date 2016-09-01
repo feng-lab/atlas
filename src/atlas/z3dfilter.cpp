@@ -4,9 +4,9 @@
 #include "zsysteminfo.h"
 #include "z3dport.h"
 #include "z3dinteractionhandler.h"
-#include "zparameter.h"
-#include "zeventlistenerparameter.h"
 #include "z3dshaderprogram.h"
+#include "zeventlistenerparameter.h"
+#include "zparameter.h"
 #include "z3drenderport.h"
 #include "zvertexarrayobject.h"
 
@@ -132,7 +132,7 @@ bool Z3DFilter::isValid(Z3DEye eye) const
     return !is_flag_set(m_state, State::RightEyeResultInvalid);
 }
 
-bool Z3DFilter::isReady(Z3DEye) const
+bool Z3DFilter::isReady(Z3DEye /*unused*/) const
 {
   for (auto port : m_inputPorts)
     if (!port->isReady())
@@ -290,7 +290,7 @@ void Z3DFilter::renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderP
   glEnableVertexAttribArray(attr_vertex);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[0]);
   glBufferData(GL_ARRAY_BUFFER, 3 * 4 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
-  glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
+  glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
   glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 

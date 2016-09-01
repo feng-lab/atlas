@@ -1,10 +1,9 @@
 #pragma once
 
+#include "zglobal.h"
+#include <boost/align/aligned_allocator.hpp>
 #include <complex>
 #include <vector>
-#include <boost/align/aligned_allocator.hpp>
-#include <QString>
-#include "zglobal.h"
 
 namespace nim {
 

@@ -10,7 +10,7 @@ class Z3DScene : public QGraphicsScene
 {
 Q_OBJECT
 public:
-  explicit Z3DScene(int width, int height, bool stereo, QObject* parent = 0);
+  explicit Z3DScene(int width, int height, bool stereo, QObject* parent = nullptr);
 
   ~Z3DScene();
 

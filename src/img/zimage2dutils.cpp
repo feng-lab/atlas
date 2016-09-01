@@ -1,4 +1,5 @@
 #include "zimage2dutils.h"
+
 #include "zeigenutils.h"
 
 using namespace Eigen;
@@ -8,12 +9,12 @@ namespace
 
 __forceinline double nearest_kernel(double x)
 {
-  return (-0.5 <= x) && (x < 0.5);
+  return static_cast<double>((-0.5 <= x) && (x < 0.5));
 }
 
 __forceinline double linear_kernel(double x)
 {
-  return (x + 1) * ((-1 <= x) && (x < 0)) + (1 - x) * ((0 <= x) && (x <= 1));
+  return (x + 1) * static_cast<double>((-1 <= x) && (x < 0)) + (1 - x) * static_cast<double>((0 <= x) && (x <= 1));
 }
 
 __forceinline double cubic_kernel(double x)
@@ -22,9 +23,9 @@ __forceinline double cubic_kernel(double x)
   double absx2 = absx * absx;
   double absx3 = absx2 * absx;
 
-  return (1.5 * absx3 - 2.5 * absx2 + 1) * (absx <= 1) +
+  return (1.5 * absx3 - 2.5 * absx2 + 1) * static_cast<double>(absx <= 1) +
          (-0.5 * absx3 + 2.5 * absx2 - 4 * absx + 2) *
-         ((1 < absx) && (absx <= 2));
+         static_cast<double>((1 < absx) && (absx <= 2));
 }
 
 __forceinline double lanczos2_kernel(double x)
@@ -41,7 +42,7 @@ __forceinline double lanczos3_kernel(double x)
          ((pi * pi * x * x / 3) + std::numeric_limits<double>::epsilon());
 }
 
-}
+}  // namespace
 
 namespace nim
 {
@@ -66,9 +67,10 @@ bool seperate2DKernel(const double* kernel, size_t width, size_t height,
     //LOG(INFO) << s;
     double tol = std::numeric_limits<double>::epsilon() * s(0) * std::max(width, height);
     int rank = 1;
-    for (int i = 1; i < s.size(); ++i)
+    for (int i = 1; i < s.size(); ++i) {
       if (s(i) > tol)
         ++rank;
+    }
     if (rank == 1) {
       //LOG(INFO) << "rank " << rank;
       //LOG(INFO) << svd.matrixU();
@@ -79,9 +81,8 @@ bool seperate2DKernel(const double* kernel, size_t width, size_t height,
       //      show.insert(show.end(),rowKernel, rowKernel+width);
       //      logContainer(INFO, show, width);
       return true;
-    } else {
-      return false;
     }
+    return false;
   }
   return false;
 }

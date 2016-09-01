@@ -1,16 +1,15 @@
 #include "zsectionsregistration.h"
 
 #include "zimg.h"
-#include <numeric>
-#include <algorithm>
 #include "zstatisticsutils.h"
-
 #include "zregistrationnumericdiffcostfunction.h"
 #include "zimage2dutils.h"
 #include "zimgregistration.h"
 #include "zimagematrix2dtransform.h"
-#include <memory>
 #include "zimagetransformresolve.h"
+#include <algorithm>
+#include <memory>
+#include <numeric>
 #include <utility>
 
 namespace nim {
@@ -247,35 +246,36 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
   //  image2DWrite(filteredMovingImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/fmim.tif");
 
   ZImageToImageMetric metric;
-  if (m_metric == "Mean Differences")
+  if (m_metric == "Mean Differences") {
     metric.setType(ZImageToImageMetric::Type::MeanDifferences);
-  else if (m_metric == "Mean Squared Differences")
+  } else if (m_metric == "Mean Squared Differences") {
     metric.setType(ZImageToImageMetric::Type::MeanSquaredDifferences);
-  else if (m_metric == "Log Absolute Differences")
+  } else if (m_metric == "Log Absolute Differences") {
     metric.setType(ZImageToImageMetric::Type::LogAbsoluteDifferences);
-  else if (m_metric == "Normalized Cross-Correlation")
+  } else if (m_metric == "Normalized Cross-Correlation") {
     metric.setType(ZImageToImageMetric::Type::NormalizedCrossCorrelation);
-  else if (m_metric == "Normalized Mutual Information")
+  } else if (m_metric == "Normalized Mutual Information") {
     metric.setType(ZImageToImageMetric::Type::NormalizedMutualInformation);
-  else
+  } else {
     LOG(FATAL) << "impossible transform type selection";
+  }
 
   if (m_transform == "YTranslation") {
-    ZImageYTranslation2DTransform* tfm = new ZImageYTranslation2DTransform();
+    auto tfm = new ZImageYTranslation2DTransform();
     transform = tfm;
   } else if (m_transform == "Translation") {
-    ZImageTranslation2DTransform* tfm = new ZImageTranslation2DTransform();
+    auto tfm = new ZImageTranslation2DTransform();
     transform = tfm;
   } else if (m_transform == "Rigid") {
-    ZImageRigid2DTransform* tfm = new ZImageRigid2DTransform();
+    auto tfm = new ZImageRigid2DTransform();
     tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
     transform = tfm;
   } else if (m_transform == "Similarity") {
-    ZImageSimilarity2DTransform* tfm = new ZImageSimilarity2DTransform();
+    auto tfm = new ZImageSimilarity2DTransform();
     tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
     transform = tfm;
   } else if (m_transform == "Affine") {
-    ZImageAffine2DTransform* tfm = new ZImageAffine2DTransform();
+    auto tfm = new ZImageAffine2DTransform();
     tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
     transform = tfm;
   } else {
@@ -439,36 +439,37 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
   //  image2DWrite(filteredMovingImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/fmim.tif");
 
   ZImageToImageMetric metric;
-  if (m_metric == "Mean Differences")
+  if (m_metric == "Mean Differences") {
     metric.setType(ZImageToImageMetric::Type::MeanDifferences);
-  else if (m_metric == "Mean Squared Differences")
+  } else if (m_metric == "Mean Squared Differences") {
     metric.setType(ZImageToImageMetric::Type::MeanSquaredDifferences);
-  else if (m_metric == "Log Absolute Differences")
+  } else if (m_metric == "Log Absolute Differences") {
     metric.setType(ZImageToImageMetric::Type::LogAbsoluteDifferences);
-  else if (m_metric == "Normalized Cross-Correlation")
+  } else if (m_metric == "Normalized Cross-Correlation") {
     metric.setType(ZImageToImageMetric::Type::NormalizedCrossCorrelation);
-  else if (m_metric == "Normalized Mutual Information")
+  } else if (m_metric == "Normalized Mutual Information") {
     metric.setType(ZImageToImageMetric::Type::NormalizedMutualInformation);
-  else
+  } else {
     LOG(FATAL) << "impossible transform type selection";
+  }
 
   std::unique_ptr<ZImageTransform> transform;
   if (m_transform == "YTranslation") {
-    ZImageYTranslation2DTransform* tfm = new ZImageYTranslation2DTransform();
+    auto tfm = new ZImageYTranslation2DTransform();
     transform.reset(tfm);
   } else if (m_transform == "Translation") {
-    ZImageTranslation2DTransform* tfm = new ZImageTranslation2DTransform();
+    auto tfm = new ZImageTranslation2DTransform();
     transform.reset(tfm);
   } else if (m_transform == "Rigid") {
-    ZImageRigid2DTransform* tfm = new ZImageRigid2DTransform();
+    auto tfm = new ZImageRigid2DTransform();
     tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
     transform.reset(tfm);
   } else if (m_transform == "Similarity") {
-    ZImageSimilarity2DTransform* tfm = new ZImageSimilarity2DTransform();
+    auto tfm = new ZImageSimilarity2DTransform();
     tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
     transform.reset(tfm);
   } else if (m_transform == "Affine") {
-    ZImageAffine2DTransform* tfm = new ZImageAffine2DTransform();
+    auto tfm = new ZImageAffine2DTransform();
     tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
     transform.reset(tfm);
   } else {
@@ -498,21 +499,21 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
     image2DFlip(filteredMovingImageData.data(), m_img.width(), m_img.height(), Dimension::X);
     std::unique_ptr<ZImageTransform> flipTransform;
     if (m_transform == "YTranslation") {
-      ZImageYTranslation2DTransform* tfm = new ZImageYTranslation2DTransform();
+      auto tfm = new ZImageYTranslation2DTransform();
       flipTransform.reset(tfm);
     } else if (m_transform == "Translation") {
-      ZImageTranslation2DTransform* tfm = new ZImageTranslation2DTransform();
+      auto tfm = new ZImageTranslation2DTransform();
       flipTransform.reset(tfm);
     } else if (m_transform == "Rigid") {
-      ZImageRigid2DTransform* tfm = new ZImageRigid2DTransform();
+      auto tfm = new ZImageRigid2DTransform();
       tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
       flipTransform.reset(tfm);
     } else if (m_transform == "Similarity") {
-      ZImageSimilarity2DTransform* tfm = new ZImageSimilarity2DTransform();
+      auto tfm = new ZImageSimilarity2DTransform();
       tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
       flipTransform.reset(tfm);
     } else if (m_transform == "Affine") {
-      ZImageAffine2DTransform* tfm = new ZImageAffine2DTransform();
+      auto tfm = new ZImageAffine2DTransform();
       tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
       flipTransform.reset(tfm);
     } else {

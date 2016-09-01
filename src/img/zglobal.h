@@ -1,13 +1,13 @@
 #pragma once
 
-#include <cstdint>
+#include "zexception.h"
+#include <array>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
-#include <type_traits>
 #include <iterator>
 #include <memory>
-#include <array>
-#include "zexception.h"
+#include <type_traits>
 
 namespace nim {
 

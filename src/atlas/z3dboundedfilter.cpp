@@ -1,8 +1,8 @@
 #include "z3dboundedfilter.h"
 
+#include "zlog.h"
 #include <Mathematics/GteDistLineRay.h>
 #include <boost/math/constants/constants.hpp>
-#include "zlog.h"
 
 namespace nim {
 
@@ -654,16 +654,16 @@ int Z3DBoundedFilter::selectedHandle(const void* obj)
 {
   if (!obj)
     return 0;
-  else if (obj == &m_handleCenterRenderer)
+  if (obj == &m_handleCenterRenderer)
     return 1;
-  else if (obj == &m_handleArrowRenderer)
+  if (obj == &m_handleArrowRenderer)
     return 2;
-  else if (obj == &m_handleArrowTailPosAndTailRadius)
+  if (obj == &m_handleArrowTailPosAndTailRadius)
     return 3;
-  else if (obj == &m_handleArrowheadPosAndHeadRadius)
+  if (obj == &m_handleArrowheadPosAndHeadRadius)
     return 4;
-  else
-    return 0;
+
+  return 0;
 }
 
 void Z3DBoundedFilter::updateSelectedHandle(int handleIdx)

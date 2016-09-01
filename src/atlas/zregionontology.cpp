@@ -1,11 +1,8 @@
 #include "zregionontology.h"
 
-#include <QFile>
-#include <QObject>
 #include "zexception.h"
-#include "zlog.h"
 #include "zjson.h"
-
+#include "zlog.h"
 //#include <CGAL/Surface_mesh_default_triangulation_3.h>
 //#include <CGAL/Surface_mesh_default_criteria_3.h>
 //#include <CGAL/Complex_2_in_triangulation_3.h>
@@ -13,21 +10,21 @@
 //#include <CGAL/Gray_level_image_3.h>
 //#include <CGAL/Implicit_surface_3.h>
 //#include <CGAL/exceptions.h>
-
 #include <opencv2/imgproc.hpp>
-
 #include <vtkDiscreteMarchingCubes.h>
 #include <vtkWindowedSincPolyDataFilter.h>
 #include <vtkMaskFields.h>
 #include <vtkThreshold.h>
 #include <vtkGeometryFilter.h>
-#include <vtkSmartPointer.h>
 #include <vtkImageData.h>
+#include <vtkSmartPointer.h>
 #include <vtkPointData.h>
 #include <vtkUnstructuredGrid.h>
 #include <vtkCellArray.h>
 #include <vtkQuadricDecimation.h>
 #include <vtkPolyDataNormals.h>
+#include <QFile>
+#include <QObject>
 
 namespace nim {
 

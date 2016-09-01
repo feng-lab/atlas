@@ -1,6 +1,5 @@
 #include "zselectfilewidget.h"
 
-#include <QtGui>
 #include <QtWidgets>
 
 namespace nim {
@@ -41,23 +40,23 @@ QString ZSelectFileWidget::getSelectedOpenFile()
 {
   if (m_fileMode == FileMode::OpenSingleFile)
     return m_lineEdit->text();
-  else
-    return QString();
+
+  return QString();
 }
 
 QString ZSelectFileWidget::getSelectedSaveFile()
 {
   if (m_fileMode == FileMode::SaveFile)
     return m_lineEdit->text();
-  else
-    return QString();
+
+  return QString();
 }
 
 QStringList ZSelectFileWidget::getSelectedMultipleOpenFiles()
 {
-  if (m_fileMode == FileMode::OpenMultipleFiles)
+  if (m_fileMode == FileMode::OpenMultipleFiles) {
     return m_multipleFNames;
-  else if (m_fileMode == FileMode::OpenMultipleFilesWithFilter) {
+  } else if (m_fileMode == FileMode::OpenMultipleFilesWithFilter) {
 #if 1
     QString regPattern = QRegularExpression::escape(m_filterLineEdit->text());
     regPattern.replace(QLatin1String("\\["), QLatin1String("["));
@@ -78,8 +77,8 @@ QString ZSelectFileWidget::getSelectedDirectory()
 {
   if (m_fileMode == FileMode::Directory)
     return m_lineEdit->text();
-  else
-    return QString();
+
+  return QString();
 }
 
 void ZSelectFileWidget::setFile(const QString& fn)
@@ -112,7 +111,7 @@ void ZSelectFileWidget::createWidget(QBoxLayout::Direction direction)
     m_layout->addWidget(m_selectPushButton);
     m_layout->addWidget(m_textEdit);
   } else if (m_fileMode == FileMode::OpenMultipleFilesWithFilter) {
-    QBoxLayout* lo = new QBoxLayout(direction);
+    auto lo = new QBoxLayout(direction);
     lo->setContentsMargins(0, 0, 0, 0);
     m_layout = new QBoxLayout(QBoxLayout::TopToBottom, this);
     m_layout->setContentsMargins(0, 0, 0, 0);

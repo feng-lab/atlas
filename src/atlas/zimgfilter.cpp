@@ -1,13 +1,13 @@
 #include "zimgfilter.h"
 
-#include <QGraphicsPixmapItem>
 #include "zimg.h"
 #include "zimgdoc.h"
 #include "zimgview.h"
 #include "zimgpackdisplay.h"
+#include "zlog.h"
 #include "znumericparameter.h"
 #include "zwidgetsgroup.h"
-#include "zlog.h"
+#include <QGraphicsPixmapItem>
 
 namespace nim {
 
@@ -109,10 +109,11 @@ void ZImgFilter::setData(ZImgPack& pack)
     addParameter(m_channelColorParas[c].get());
     addParameter(m_doubleChannelRangeParas[c].get());
   }
-  if (m_view.isMaxZProjView())
+  if (m_view.isMaxZProjView()) {
     setMaxZProjView(m_view.currentTime());
-  else
+  } else {
     setNormalView(m_view.currentSlice(), m_view.currentTime());
+  }
 
   updateViewSettingWidgetsGroup();
 }
@@ -222,10 +223,11 @@ void ZImgFilter::offsetChanged()
   m_imgPack->setOffsetT(m_offsetPara.get().w);
   ZObjFilter::offsetChanged();
   m_displayValid = false;
-  if (m_view.isMaxZProjView())
+  if (m_view.isMaxZProjView()) {
     setMaxZProjView(m_view.currentTime());
-  else
+  } else {
     setNormalView(m_view.currentSlice(), m_view.currentTime());
+  }
 }
 
 void ZImgFilter::updateViewSettingWidgetsGroup()
@@ -349,10 +351,11 @@ void ZImgFilter::visibleChanged()
 {
   bool isVisibleBefore = m_isVisible;
   m_isVisible = m_hasVisibleChannel && m_visible.get() && m_sliceValid;
-  if (m_isVisible && !isVisibleBefore)
+  if (m_isVisible && !isVisibleBefore) {
     updateImgItems();
-  else if (!m_isVisible && isVisibleBefore)
+  } else if (!m_isVisible && isVisibleBefore) {
     hideImgItems();
+  }
 }
 
 ZImgPackDisplay* ZImgFilter::getDisplay() const

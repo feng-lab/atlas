@@ -1,16 +1,15 @@
 #pragma once
 
 #include "zobjfilter.h"
-#include <QList>
-#include <vector>
 #include "zparameter.h"
-#include <QGraphicsRectItem>
-#include <QGraphicsPathItem>
-#include <map>
 #include "znumericparameter.h"
-#include <vector>
 #include "zroi.h"
 #include "zgraphicsitemtype.h"
+#include <QGraphicsRectItem>
+#include <QGraphicsPathItem>
+#include <QList>
+#include <map>
+#include <vector>
 
 class ZWidgetsGroup;
 

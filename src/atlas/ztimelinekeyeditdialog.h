@@ -1,15 +1,15 @@
 #pragma once
 
+#include "zparameteranimation.h"
+#include "zparameterkey.h"
+#include "znumericparameter.h"
+#include "zoptionparameter.h"
 #include <QDialog>
 #include <QVBoxLayout>
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
-#include "zparameteranimation.h"
-#include "zparameterkey.h"
-#include "znumericparameter.h"
-#include "zoptionparameter.h"
 
 namespace nim {
 

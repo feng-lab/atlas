@@ -3,10 +3,11 @@
 //
 
 #include "zapplication.h"
+
 #include "zexception.h"
+#include "zlog.h"
 #include <QMessageBox>
 #include <QFileOpenEvent>
-#include "zlog.h"
 
 namespace nim {
 

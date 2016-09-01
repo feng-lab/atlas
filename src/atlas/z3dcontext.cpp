@@ -1,7 +1,7 @@
 #include "z3dcontext.h"
 
-#include <QOpenGLContext>
 #include "zlog.h"
+#include <QOpenGLContext>
 
 namespace nim {
 
@@ -11,9 +11,7 @@ Z3DContext::Z3DContext()
   CHECK(m_context);
 }
 
-Z3DContext::~Z3DContext()
-{
-}
+Z3DContext::~Z3DContext() = default;
 
 bool Z3DContext::operator<(const Z3DContext& rhs) const
 {

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "ztimelinewidget.h"
+#include "zparameterkey.h"
+#include "zgraphicsitemtype.h"
 #include <QGraphicsScene>
 #include <QPixmap>
 #include <QGraphicsTextItem>
@@ -7,9 +10,6 @@
 #include <QGraphicsRectItem>
 #include <QGraphicsPathItem>
 #include <QTextOption>
-#include "ztimelinewidget.h"
-#include "zparameterkey.h"
-#include "zgraphicsitemtype.h"
 
 namespace nim {
 
@@ -76,7 +76,7 @@ private:
 class CurrentTimeLineItem : public QGraphicsLineItem
 {
 public:
-  CurrentTimeLineItem(ZTimelineWidget& timeline, QGraphicsItem* parent = nullptr);
+  explicit CurrentTimeLineItem(ZTimelineWidget& timeline, QGraphicsItem* parent = nullptr);
 
 protected:
   virtual QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;

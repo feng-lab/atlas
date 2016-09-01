@@ -1,7 +1,6 @@
 #pragma once
 
-#include <QString>
-#include <cstdint>
+#include "zglobal.h"
 
 // This class provides information about the GPU
 // If the openGL version is too low or certain critical extensions are not supported,

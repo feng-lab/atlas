@@ -1,10 +1,10 @@
 #pragma once
 
-#include <QObject>
-#include <QAction>
+#include "z3dglobalparameters.h"
 #include "zviewsettinginterface.h"
 #include <QDir>
-#include "z3dglobalparameters.h"
+#include <QObject>
+#include <QAction>
 
 class QMainWindow;
 

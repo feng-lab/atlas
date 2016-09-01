@@ -1,10 +1,10 @@
 #pragma once
 
-#include <string>
 #include <QString>
-#include <stdexcept>
-#include <cstring>
 #include <cerrno>
+#include <cstring>
+#include <stdexcept>
+#include <string>
 
 // all exceptions are defined here
 // always catch ZException unless you can make sure of the possible exception type
@@ -95,4 +95,4 @@ public:
   using ZException::ZException;
 };
 
-}
+} // namespace nim

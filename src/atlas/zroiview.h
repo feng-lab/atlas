@@ -1,9 +1,9 @@
 #pragma once
 
-#include <map>
 #include "zfilterview.h"
 #include "zroidoc.h"
 #include "zroifilter.h"
+#include <map>
 
 namespace nim {
 

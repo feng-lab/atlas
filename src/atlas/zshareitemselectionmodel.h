@@ -11,7 +11,7 @@ class ZShareItemSelectionModel : public QItemSelectionModel
 Q_OBJECT
 public:
   explicit ZShareItemSelectionModel(QAbstractItemModel* model,
-                                    QItemSelectionModel* srcSelectionModel, QObject* parent = 0);
+                                    QItemSelectionModel* srcSelectionModel, QObject* parent = nullptr);
 
   // QItemSelectionModel interface
 public:
@@ -22,7 +22,7 @@ public:
 private:
   void srcSelectionChanged(const QItemSelection& selected, const QItemSelection& deselected);
 
-  void srcCurrentChanged(const QModelIndex& current, const QModelIndex& previous);
+  void srcCurrentChanged(const QModelIndex& srcCurrent, const QModelIndex& previous);
 
   void thisCurrentChanged(const QModelIndex& current, const QModelIndex& previous);
 

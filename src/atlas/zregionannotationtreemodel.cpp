@@ -162,27 +162,26 @@ QModelIndex ZRegionAnnotationTreeModel::parent(const QModelIndex& index) const
   auto it = m_nodeToIter.at(static_cast<RegionNode*>(index.internalPointer()));
   if (m_annotationTree.isRoot(it)) {
     return QModelIndex();
-  } else {
-    auto pit = m_annotationTree.parent(it);
-    RegionNode* node = &*pit;
-    if (m_annotationTree.isRoot(pit)) {
-      int row = 0;
-      for (auto rit = m_annotationTree.beginRoot(); rit != m_annotationTree.endRoot(); ++rit, ++row) {
-        if (&*rit == node) {
-          return createIndex(row, 0, node);
-        }
+  }
+
+  auto pit = m_annotationTree.parent(it);
+  RegionNode* node = &*pit;
+  if (m_annotationTree.isRoot(pit)) {
+    int row = 0;
+    for (auto rit = m_annotationTree.beginRoot(); rit != m_annotationTree.endRoot(); ++rit, ++row) {
+      if (&*rit == node) {
+        return createIndex(row, 0, node);
       }
-    } else {
-      int row = 0;
-      auto ppit = m_annotationTree.parent(pit);
-      for (auto rit = m_annotationTree.beginChild(ppit); rit != m_annotationTree.endChild(ppit); ++rit, ++row) {
-        if (&*rit == node) {
-          return createIndex(row, 0, node);
-        }
+    }
+  } else {
+    int row = 0;
+    auto ppit = m_annotationTree.parent(pit);
+    for (auto rit = m_annotationTree.beginChild(ppit); rit != m_annotationTree.endChild(ppit); ++rit, ++row) {
+      if (&*rit == node) {
+        return createIndex(row, 0, node);
       }
     }
   }
-
   return QModelIndex();
 }
 
@@ -199,7 +198,7 @@ int ZRegionAnnotationTreeModel::rowCount(const QModelIndex& parent) const
   }
 }
 
-int ZRegionAnnotationTreeModel::columnCount(const QModelIndex&) const
+int ZRegionAnnotationTreeModel::columnCount(const QModelIndex& /*parent*/) const
 {
   return ColumnCount;
 }
@@ -244,7 +243,7 @@ void ZRegionAnnotationTreeModel::clicked(const QModelIndex& idxIn)
   //  }
 }
 
-void ZRegionAnnotationTreeModel::doubleClicked(const QModelIndex&)
+void ZRegionAnnotationTreeModel::doubleClicked(const QModelIndex& /*unused*/)
 {
 }
 

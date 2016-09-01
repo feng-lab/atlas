@@ -4,6 +4,7 @@
 #include "z3dpickingmanager.h"
 #include "z3dport.h"
 #include "z3drendererbase.h"
+
 namespace nim {
 
 class Z3DGeometryFilter : public Z3DBoundedFilter
@@ -11,7 +12,7 @@ class Z3DGeometryFilter : public Z3DBoundedFilter
   friend class Z3DCompositor;
 
 public:
-  explicit Z3DGeometryFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+  explicit Z3DGeometryFilter(Z3DGlobalParameters& globalPara, QObject* parent = nullptr);
 
   virtual void renderPicking(Z3DEye /*unused*/)
   {}

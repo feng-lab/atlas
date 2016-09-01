@@ -1,14 +1,14 @@
 #include "zobjwidget.h"
 
-#include <QSortFilterProxyModel>
-#include <QKeyEvent>
-#include <QHeaderView>
-#include <QMenu>
 #include "zdoc.h"
 #include "zshareitemselectionmodel.h"
 #include "zobjmodel.h"
 #include "zstyleditemdelegate.h"
 #include "zlog.h"
+#include <QSortFilterProxyModel>
+#include <QKeyEvent>
+#include <QHeaderView>
+#include <QMenu>
 
 namespace nim {
 

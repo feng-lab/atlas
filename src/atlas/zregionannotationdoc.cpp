@@ -1,15 +1,15 @@
 #include "zregionannotationdoc.h"
 
+#include "zimgdoc.h"
+#include "zregionannotationwidget.h"
+#include "zlog.h"
+#include "zsysteminfo.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
 #include <QIcon>
-#include "zimgdoc.h"
 #include <set>
-#include "zregionannotationwidget.h"
-#include "zsysteminfo.h"
-#include "zlog.h"
 
 namespace nim {
 
@@ -30,13 +30,11 @@ bool ZRegionAnnotationDoc::save(size_t id)
     if (saveRegionAnnotation(pack.get(), pack->path, err)) {
       m_doc.updateObjInfo(id);
       return true;
-    } else {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
-      return false;
     }
-  } else {
-    return saveAs(id);
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
+    return false;
   }
+  return saveAs(id);
 }
 
 bool ZRegionAnnotationDoc::saveAs(size_t id)
@@ -53,9 +51,8 @@ bool ZRegionAnnotationDoc::saveAs(size_t id)
     if (saveRegionAnnotation(pack.get(), dialog.selectedFiles().at(0), err)) {
       m_doc.updateObjInfo(id);
       return true;
-    } else {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
     }
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
   }
   return false;
 }
@@ -72,7 +69,7 @@ size_t ZRegionAnnotationDoc::loadFile(const QString& fileName, QString& errorMsg
       return idPack.first;
   }
   try {
-    ZRegionAnnotation* regionAnnotation = new ZRegionAnnotation(fileName);
+    auto regionAnnotation = new ZRegionAnnotation(fileName);
     size_t id = addRegionAnnotation(regionAnnotation, fileName);
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
@@ -96,7 +93,7 @@ size_t ZRegionAnnotationDoc::loadFile(const QJsonValue& jValue, QString& errorMs
   }
   QString fileName = jValue.toString();
   try {
-    ZRegionAnnotation* regionAnnotation = new ZRegionAnnotation(fileName);
+    auto regionAnnotation = new ZRegionAnnotation(fileName);
     size_t id = addRegionAnnotation(regionAnnotation, fileName);
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
@@ -253,7 +250,7 @@ void ZRegionAnnotationDoc::importLabelImage()
   QApplication::processEvents();
   if (fmtIdx >= 0 && !fn.isEmpty()) {
     try {
-      ZRegionAnnotation* regionAnnotation = new ZRegionAnnotation();
+      auto regionAnnotation = new ZRegionAnnotation();
       regionAnnotation->importLabelImage(fn, formats[fmtIdx]);
 
       addRegionAnnotation(regionAnnotation, QFileInfo(fn).baseName() + "_anno", true);
@@ -278,7 +275,8 @@ void ZRegionAnnotationDoc::exportLabelImage()
     QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                           tr("No RegionAnnotation to Export"));
     return;
-  } else if (m_idToRegionAnnotationPacks.size() > 1) {
+  }
+  if (m_idToRegionAnnotationPacks.size() > 1) {
     QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                           tr("Two many RegionAnnotations, don't know which one to export. "
                                "Right now this function only works when there is only one regionannotation object"));
@@ -386,9 +384,7 @@ ZRegionAnnotationDoc::RegionAnnotationPack::RegionAnnotationPack(ZRegionAnnotati
   updateDerivedData();
 }
 
-ZRegionAnnotationDoc::RegionAnnotationPack::~RegionAnnotationPack()
-{
-}
+ZRegionAnnotationDoc::RegionAnnotationPack::~RegionAnnotationPack() = default;
 
 void ZRegionAnnotationDoc::RegionAnnotationPack::updateDerivedData()
 {

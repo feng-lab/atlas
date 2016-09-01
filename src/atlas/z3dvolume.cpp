@@ -1,10 +1,11 @@
 #include "z3dvolume.h"
-#include <algorithm>
-#include <QString>
-#include "zlog.h"
+
 #include "z3dshaderprogram.h"
 #include "z3dgpuinfo.h"
 #include "z3dtexture.h"
+#include "zlog.h"
+#include <QString>
+#include <algorithm>
 
 namespace nim {
 
@@ -54,26 +55,26 @@ QString Z3DVolume::samplerType() const
 {
   if (m_dimensions.z > 1)
     return "sampler3D";
-  else if (m_dimensions.y > 1 && m_dimensions.x > 1)
+  if (m_dimensions.y > 1 && m_dimensions.x > 1)
     return "sampler2D";
-  else
-    return "sampler1D";
+
+  return "sampler1D";
 }
 
 double Z3DVolume::floatMinValue() const
 {
   if (bitsStored() <= 16)
     return m_minValue / ((1 << bitsStored()) - 1);
-  else
-    return minValue();   // already float image
+
+  return minValue();   // already float image
 }
 
 double Z3DVolume::floatMaxValue() const
 {
   if (bitsStored() <= 16)
     return m_maxValue / ((1 << bitsStored()) - 1);
-  else
-    return maxValue();   // already float image
+
+  return maxValue();   // already float image
 }
 
 double Z3DVolume::value(int x, int y, int z) const
@@ -99,10 +100,8 @@ size_t Z3DVolume::histogramBinCount() const
 {
   if (m_img.isType<uint8_t>()) {
     return 256;
-  } else {
-    return m_histogram.size();
   }
-  return 0;
+  return m_histogram.size();
 }
 
 size_t Z3DVolume::histogramValue(size_t index) const

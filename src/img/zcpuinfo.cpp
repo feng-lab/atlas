@@ -68,7 +68,7 @@ inline uint64_t _xgetbv(unsigned int index)
 
 #endif
 
-}
+} // namespace
 
 namespace nim {
 

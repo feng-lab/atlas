@@ -1,8 +1,7 @@
 #pragma once
 
-#include "zlog.h"
 #include "z3dfilter.h"
-
+#include "zlog.h"
 #include <vector>
 
 namespace nim {
@@ -186,10 +185,11 @@ public:
 
   virtual bool canConnectTo(const Z3DInputPortBase* inport) const override
   {
-    if (dynamic_cast<const Z3DFilterInputPort<T>*>(inport))
+    if (dynamic_cast<const Z3DFilterInputPort<T>*>(inport)) {
       return Z3DOutputPortBase::canConnectTo(inport);
-    else
+    } else {
       return false;
+    }
   }
 
   // data is filter itself, so it is always valid

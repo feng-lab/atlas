@@ -1,10 +1,10 @@
 #pragma once
 
-#include <QObject>
-#include <QColor>
 #include "zrandom.h"
 #include "zparameterkey.h"
 #include "zparameter.h"
+#include <QObject>
+#include <QColor>
 
 namespace nim {
 
@@ -48,7 +48,7 @@ public:
 
   void deleteKey(ZParameterKey* key);
 
-  void addKey(ZParameterKey* key, bool keepRedundant = true);
+  void addKey(ZParameterKey* keyIn, bool keepRedundant = true);
 
   const std::vector<std::unique_ptr<ZParameterKey>>& keys() const
   { return m_keys; }

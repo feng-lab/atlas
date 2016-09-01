@@ -1,24 +1,22 @@
 #include "zpunctadetectiondialog.h"
 
+#ifdef _NEUTUBE_
+#include "zstack.hxx"
+#include "zstackdoc.h"
+#endif
+#include "zpunctadetection.h"
+#include "zimg.h"
+#include "zselectfilewidget.h"
+#include "zimgstackinterface.h"
+#include "zswc.h"
 #include <QVBoxLayout>
 #include <QGridLayout>
 #include <QFileInfo>
 #include <QKeyEvent>
 #include <QFileDialog>
 #include <QMessageBox>
-#include "zselectfilewidget.h"
 #include <QApplication>
-
-#ifdef _NEUTUBE_
-#include "zstack.hxx"
-#include "zstackdoc.h"
-#endif
-
-#include "zpunctadetection.h"
 #include <QThread>
-#include "zimg.h"
-#include "zimgstackinterface.h"
-#include "zswc.h"
 
 namespace nim {
 
@@ -66,7 +64,7 @@ void ZPunctaDetectionDialog::detect()
     try {
       img.load(m_inputImageFileWidget->getSelectedOpenFile());
 #ifndef _NEUTUBE_
-      ZImg* imgToSend = new ZImg();   // will leak memory if no one receive the signal
+      auto imgToSend = new ZImg();   // will leak memory if no one receive the signal
       imgToSend->swap(img);
       img = imgToSend->createView();
       emit srcImgReady(imgToSend, m_inputImageFileWidget->getSelectedOpenFile());
@@ -112,12 +110,11 @@ void ZPunctaDetectionDialog::detect()
     if (m_voxelSize.get().x == 0.0 || m_voxelSize.get().y == 0.0 || m_voxelSize.get().z == 0.0) {
       QMessageBox::critical(this, qApp->applicationName(), "Image Resolution is not correct.");
       return;
-    } else {
-      img.infoRef().voxelSizeUnit = VoxelSizeUnit::um;
-      img.infoRef().voxelSizeX = m_voxelSize.get().x;
-      img.infoRef().voxelSizeY = m_voxelSize.get().y;
-      img.infoRef().voxelSizeZ = m_voxelSize.get().z;
     }
+    img.infoRef().voxelSizeUnit = VoxelSizeUnit::um;
+    img.infoRef().voxelSizeX = m_voxelSize.get().x;
+    img.infoRef().voxelSizeY = m_voxelSize.get().y;
+    img.infoRef().voxelSizeZ = m_voxelSize.get().z;
   }
 
   QStringList swcFiles = m_inputSwcFilesWidget->getSelectedMultipleOpenFiles();
@@ -135,7 +132,7 @@ void ZPunctaDetectionDialog::detect()
   m_isCanceled = false;
   m_hasError = false;
 
-  ZPunctaDetection* worker = new ZPunctaDetection(img, punctaChannel);
+  auto worker = new ZPunctaDetection(img, punctaChannel);
   worker->setAmbiguousFactor(m_ambiguousFactor.get());
   if (dendriteChannel >= 0)
     worker->setDendriteChannel(dendriteChannel);
@@ -346,7 +343,7 @@ void ZPunctaDetectionDialog::init()
   connect(&m_dendriteChannel, &ZStringIntOptionParameter::valueChanged, this,
           &ZPunctaDetectionDialog::dendriteChannelChanged);
 
-  QVBoxLayout* mainLayout = new QVBoxLayout;
+  auto mainLayout = new QVBoxLayout;
   mainLayout->addWidget(m_ioGroupBox);
   mainLayout->addWidget(m_paraGroupBox);
   mainLayout->addWidget(m_buttonBox);
@@ -359,7 +356,7 @@ void ZPunctaDetectionDialog::createIOGroupBox()
 {
   m_ioGroupBox = new QGroupBox(tr("Inputs and Outputs"), this);
   // everything
-  QVBoxLayout* alllayout = new QVBoxLayout;
+  auto alllayout = new QVBoxLayout;
 
 #ifdef _NEUTUBE_
   QHBoxLayout *hlayout;
@@ -404,7 +401,7 @@ void ZPunctaDetectionDialog::createParaGroupBox()
 {
   m_paraGroupBox = new QGroupBox(tr("Parameters"), this);
   // everything
-  QVBoxLayout* alllayout = new QVBoxLayout;
+  auto alllayout = new QVBoxLayout;
 
   m_voxelSize.setSingleStep(1e-6);
   m_voxelSize.setDecimal(6);
@@ -416,7 +413,7 @@ void ZPunctaDetectionDialog::createParaGroupBox()
   name.push_back("z");
   m_voxelSize.setNameForEachValue(name);
 
-  QHBoxLayout* hlayout = new QHBoxLayout;
+  auto hlayout = new QHBoxLayout;
   hlayout->addWidget(m_voxelSize.createNameLabel());
   hlayout->addWidget(m_voxelSize.createWidget(), 0, Qt::AlignLeft);
   m_detectResolutionButton = new QPushButton(tr("Detect From File"), this);
@@ -454,7 +451,7 @@ void ZPunctaDetectionDialog::createParaGroupBox()
   //hlayout->addWidget(m_ambiguousFactor.createWidget());
   //alllayout->addLayout(hlayout);
 #else
-  QGridLayout* glayout = new QGridLayout;
+  auto glayout = new QGridLayout;
   glayout->addWidget(m_punctaChannel.createNameLabel(), 0, 0);
   glayout->addWidget(m_punctaChannel.createWidget(), 0, 1);
 

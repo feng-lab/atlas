@@ -1,12 +1,13 @@
 #include "zimgmerge.h"
+
 #include "zimgtile.h"
 #include "zvoxelregion.h"
 #include "zstatisticsutils.h"
+#include "zlog.h"
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/connected_components.hpp>
 #include <boost/graph/kruskal_min_spanning_tree.hpp>
 #include <boost/graph/filtered_graph.hpp>
-#include "zlog.h"
 
 namespace {
 
@@ -107,7 +108,7 @@ void merge_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord, ZI
 
 struct EdgeInfo
 {
-  EdgeInfo(double c)
+  explicit EdgeInfo(double c)
     : cost(c)
   {}
 
@@ -128,8 +129,7 @@ struct VertexInfo
 template<typename Edge>
 struct edge_in_MST
 {
-  edge_in_MST()
-  {}
+  edge_in_MST() = default;
 
   edge_in_MST(const std::vector<Edge>& mstEdges)
     : m_MSTEdges(&mstEdges)
@@ -154,14 +154,14 @@ template<typename Edge>
 class dfs_edge_visitor : public boost::default_dfs_visitor
 {
 public:
-  dfs_edge_visitor(std::vector<Edge>& dfsSortedEdges)
+  explicit dfs_edge_visitor(std::vector<Edge>& dfsSortedEdges)
     : m_dfsSortedEdges(dfsSortedEdges)
   {
     m_dfsSortedEdges.clear();
   }
 
   template<typename Graph>
-  void tree_edge(Edge e, const Graph&) const
+  void tree_edge(Edge e, const Graph& /*unused*/) const
   {
     m_dfsSortedEdges.push_back(e);
   }
@@ -170,13 +170,11 @@ private:
   std::vector<Edge>& m_dfsSortedEdges;
 };
 
-}
+} // namespace
 
 namespace nim {
 
-ZImgMerge::ZImgMerge()
-{
-}
+ZImgMerge::ZImgMerge() = default;
 
 void ZImgMerge::addImg(const ZImg& img, const ZVoxelCoordinate& loc, const QString& imgName)
 {
@@ -472,4 +470,4 @@ void ZImgMerge::mergeImgs(ZImg& res, const std::map<const ZImg*, ZVoxelCoordinat
   }
 }
 
-} // namespace nims
+} // namespace nim

@@ -1,21 +1,22 @@
 #pragma once
 
-#include <cstdint>
-#include <memory>
-#include <QString>
-#include <QStringList>
 #include "ztree.hpp"
 #include "zroi.h"
 #include "zmesh.h"
+#include <QString>
+#include <QStringList>
+#include <cstdint>
+#include <memory>
+#include <utility>
 
 namespace nim {
 
 struct RegionNode
 {
-  RegionNode(int64_t id_ = -1, int64_t parentID_ = -1, int red_ = 0, int green_ = 0, int blue_ = 0,
-             QString name_ = "", QString abbreviation_ = "")
+  explicit RegionNode(int64_t id_ = -1, int64_t parentID_ = -1, int red_ = 0, int green_ = 0, int blue_ = 0,
+                      QString name_ = "", QString abbreviation_ = "")
     : id(id_), parentID(parentID_), red(red_), green(green_), blue(blue_)
-    , name(name_), abbreviation(abbreviation_)
+    , name(std::move(name_)), abbreviation(std::move(abbreviation_))
   {}
 
   int64_t id;

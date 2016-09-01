@@ -1,7 +1,7 @@
 #pragma once
 
-#include "zvoxelcoordinate.h"
 #include "zbbox.h"
+#include "zvoxelcoordinate.h"
 #include <boost/iterator/iterator_facade.hpp>
 #include <type_traits>
 #include <vector>
@@ -82,9 +82,9 @@ private:
                 if (++m_voxel[5] > m_region->m_boxes[m_boxIdx].maxCorner()[5]) {
                   m_boxIdx++;
                   // goto min corner of next box
-                  if (m_boxIdx == m_region->m_boxes.size())
+                  if (m_boxIdx == m_region->m_boxes.size()) {
                     m_voxel.set(0, 0, 0, 0, 0);
-                  else {
+                  } else {
                     m_voxel = m_region->m_boxes[m_boxIdx].minCorner();
                   }
                 }
@@ -160,11 +160,11 @@ protected:
   {
     if (box.empty()) {
       return true;
-    } else {
-      for (const auto& mbox : m_boxes)
-        if (mbox.contains(box))
-          return true;
     }
+    for (const auto& mbox : m_boxes)
+      if (mbox.contains(box))
+        return true;
+
     return false;
   }
 

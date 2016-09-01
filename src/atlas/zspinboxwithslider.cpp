@@ -1,9 +1,10 @@
 #include "zspinboxwithslider.h"
-#include <limits>
-#include <QHBoxLayout>
+
 #include "zspinbox.h"
-#include <QEvent>
 #include "zlog.h"
+#include <QHBoxLayout>
+#include <QEvent>
+#include <limits>
 
 namespace nim {
 
@@ -19,10 +20,9 @@ bool ZSliderEventFilter::eventFilter(QObject* obj, QEvent* event)
       if (qas->focusPolicy() == Qt::WheelFocus) {
         event->accept();
         return false;
-      } else {
-        event->ignore();
-        return true;
       }
+      event->ignore();
+      return true;
     }
   }
   return QObject::eventFilter(obj, event);

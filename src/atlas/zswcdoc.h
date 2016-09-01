@@ -64,7 +64,7 @@ protected:
 private:
   struct SwcPack
   { // swc and its associated data
-    SwcPack(ZSwc& tree, const QString& path);
+    SwcPack(ZSwc& tree, const QString& path_);
 
     ~SwcPack();
 

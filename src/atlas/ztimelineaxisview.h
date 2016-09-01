@@ -1,16 +1,16 @@
 #pragma once
 
+#include "ztimelinewidget.h"
 #include <QGraphicsView>
 #include <QGraphicsScene>
 #include <QGraphicsPathItem>
-#include "ztimelinewidget.h"
 
 namespace nim {
 
 class CurrentTimeItem : public QGraphicsPathItem
 {
 public:
-  CurrentTimeItem(ZTimelineWidget& timeline, QGraphicsItem* parent = nullptr);
+  explicit CurrentTimeItem(ZTimelineWidget& timeline, QGraphicsItem* parent = nullptr);
 
 protected:
   virtual QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;

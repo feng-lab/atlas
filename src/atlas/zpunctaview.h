@@ -1,9 +1,9 @@
 #pragma once
 
-#include <map>
 #include "zfilterview.h"
 #include "zpunctadoc.h"
 #include "zpunctafilter.h"
+#include <map>
 
 namespace nim {
 

@@ -1,8 +1,8 @@
 #pragma once
 
+#include "z3dtexture.h"
 #include <QString>
 #include <QImage>
-#include "z3dtexture.h"
 
 namespace nim {
 

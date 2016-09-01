@@ -1,6 +1,6 @@
-#include "z3dgl.h"
 #include "z3dscene.h"
 
+#include "z3dgl.h"
 #include "z3dnetworkevaluator.h"
 
 namespace nim {
@@ -17,7 +17,7 @@ Z3DScene::~Z3DScene()
 {
 }
 
-void Z3DScene::drawBackground(QPainter* /*painter*/, const QRectF&)
+void Z3DScene::drawBackground(QPainter* /*painter*/, const QRectF& /*rect*/)
 {
   if (!m_networkEvaluator) {
     return;

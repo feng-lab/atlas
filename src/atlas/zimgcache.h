@@ -1,10 +1,10 @@
 #pragma once
 
-#include <QReadWriteLock>
-#include <unordered_map>
-#include <list>
-#include <boost/functional/hash.hpp>
 #include "zimgpack.h"
+#include <QReadWriteLock>
+#include <boost/functional/hash.hpp>
+#include <list>
+#include <unordered_map>
 
 namespace nim {
 
@@ -16,7 +16,7 @@ public:
   using KeyValueType = typename std::tuple<KeyType, ValueType, size_t>;
   using ListIteratorType = typename std::list<KeyValueType>::iterator;
 
-  ZSharedCache(size_t maxCost)
+  explicit ZSharedCache(size_t maxCost)
     : m_maxCost(maxCost)
   {}
 
@@ -110,5 +110,5 @@ public:
   }
 };
 
-} // namespace
+}  // namespace nim
 

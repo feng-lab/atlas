@@ -1,7 +1,7 @@
 #include "zfontparameter.h"
 
-#include "zlog.h"
 #include "zfontwidget.h"
+#include "zlog.h"
 
 namespace nim {
 

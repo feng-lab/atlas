@@ -1,8 +1,8 @@
 #pragma once
 
-#include <QGraphicsView>
-#include "ztimelinewidget.h"
 #include "ztimelineeventscene.h"
+#include "ztimelinewidget.h"
+#include <QGraphicsView>
 
 namespace nim {
 

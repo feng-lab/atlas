@@ -7,7 +7,7 @@ namespace nim {
 class ZImageInterpolation
 {
 public:
-  ZImageInterpolation(Interpolant interp, PadOption padOption = PadOption::Constant, double fillValue = 0.0);
+  explicit ZImageInterpolation(Interpolant interp, PadOption padOption = PadOption::Constant, double fillValue = 0.0);
 
 #if 0
   //  'bound'

@@ -68,7 +68,7 @@ protected:
 private:
   struct SvgPack
   { // svg and its associated data
-    SvgPack(std::unique_ptr<QSvgRenderer> svg, const QString& path);
+    explicit SvgPack(std::unique_ptr<QSvgRenderer> svg, const QString& path);
 
     ~SvgPack();
 

@@ -18,7 +18,7 @@ class ZObjWidget : public QTreeView
 {
 Q_OBJECT
 public:
-  ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* selectionModel, QWidget* parent = 0);
+  ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* selectionModel, QWidget* parent = nullptr);
 
 protected:
   void contextMenu(const QPoint& pos);

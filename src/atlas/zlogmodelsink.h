@@ -26,12 +26,10 @@
 #pragma once
 
 #include "zlog.h"
-
 #include <QAbstractTableModel>
 #include <QReadWriteLock>
-
-#include <limits>
 #include <QList>
+#include <limits>
 
 namespace nim {
 

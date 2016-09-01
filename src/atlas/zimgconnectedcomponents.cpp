@@ -1,4 +1,5 @@
 #include "zimgconnectedcomponents.h"
+
 #include "zimgneighborhooditerator.h"
 #include <stack>
 
@@ -8,7 +9,7 @@ namespace impl {
 
 struct EqualToLabel
 {
-  EqualToLabel(size_t label)
+  explicit EqualToLabel(size_t label)
     : m_label(label)
   {}
 
@@ -22,7 +23,7 @@ private:
   size_t m_label;
 };
 
-}
+}  // namespace impl
 
 ConnComp::ConnComp()
 { clear(); }
@@ -64,13 +65,14 @@ size_t ConnComp::labelImgBytesPerVoxel() const
 {
   if (voxelIdxList.size() <= UINT8_MAX) {
     return 1;
-  } else if (voxelIdxList.size() <= UINT16_MAX) {
-    return 2;
-  } else if (voxelIdxList.size() <= UINT32_MAX) {
-    return 3;
-  } else {
-    return 4;
   }
+  if (voxelIdxList.size() <= UINT16_MAX) {
+    return 2;
+  }
+  if (voxelIdxList.size() <= UINT32_MAX) {
+    return 3;
+  }
+  return 4;
 }
 
 // return a label img with smallest possible voxel type, use labelImgBytesPerVoxel to get type
@@ -125,8 +127,7 @@ template ZImg ConnComp::createTypedLabelImg<float>() const;
 template ZImg ConnComp::createTypedLabelImg<double>() const;
 
 template<bool ReportProgress>
-ZImgConnectedComponents<ReportProgress>::ZImgConnectedComponents()
-{}
+ZImgConnectedComponents<ReportProgress>::ZImgConnectedComponents() = default;
 
 template<bool ReportProgress>
 ConnComp ZImgConnectedComponents<ReportProgress>::run(const ZImg& img, size_t conn, size_t c, size_t t)
@@ -148,9 +149,8 @@ ZImgConnectedComponents<ReportProgress>::runLabel(const ZImg& img, size_t conn, 
     ZImg bimg = img.extractChannel(c, t);
     getConnectedComponents_Impl(bimg, res, label);
     return res;
-  } else {
-    return run(img, conn, c, t, impl::EqualToLabel(label));
   }
+  return run(img, conn, c, t, impl::EqualToLabel(label));
 }
 
 template<bool ReportProgress>
@@ -162,9 +162,8 @@ ZImgConnectedComponents<ReportProgress>::runLabelModifyInput(ZImg& img, size_t c
     ZImg bimg = img.createView(c, t);
     getConnectedComponents_Impl(bimg, res, label);
     return res;
-  } else {
-    return run(img, conn, c, t, impl::EqualToLabel(label));
   }
+  return run(img, conn, c, t, impl::EqualToLabel(label));
 }
 
 template<bool ReportProgress>
@@ -176,10 +175,11 @@ ConnComp ZImgConnectedComponents<ReportProgress>::createRes(const ZImg& img, siz
     throw ZImgException(QString("invalid conn input: %1").arg(conn));
   }
   if (img.is2DImg() && conn != 4 && conn != 8) {
-    if (conn == 6)
+    if (conn == 6) {
       conn = 4;
-    else
+    } else {
       conn = 8;
+    }
   }
 
   ConnComp res;
@@ -201,7 +201,7 @@ void ZImgConnectedComponents<ReportProgress>::getConnectedComponents_Impl(ZImg& 
   size_t conn = res.connectivity;
   size_t voxelNumber = markerImg.voxelNumber();
   ZImgNeighborhoodConstIterator<uint8_t> nit =
-    ZImgNeighborhoodConstIterator<uint8_t>(conn, markerImg);
+    ZImgNeighborhoodConstIterator<uint8_t>(ZNeighborhood(conn), markerImg);
   uint8_t* marker = markerImg.timeData<uint8_t>(0);
 
   std::vector<size_t> idxList;

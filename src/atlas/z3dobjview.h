@@ -1,12 +1,12 @@
 #pragma once
 
-#include <QObject>
 #include "z3dview.h"
 #include "zwidgetsgroup.h"
 #include "z3dnetworkevaluator.h"
 #include "z3dcompositor.h"
 #include "zobjdoc.h"
 #include "zexception.h"
+#include <QObject>
 #include <QMessageBox>
 
 namespace nim {

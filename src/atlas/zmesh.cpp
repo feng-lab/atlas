@@ -2,9 +2,10 @@
 
 #include "zmeshio.h"
 #include "zmeshutils.h"
-#include "zexception.h"
 #include "zbbox.h"
-
+#include "zexception.h"
+#include "zswc.h"
+#include "zlog.h"
 #include <vtkPolyData.h>
 #include <vtkPointData.h>
 #include <vtkSmartPointer.h>
@@ -16,11 +17,8 @@
 #include <vtkTriangleFilter.h>
 #include <vtkCleanPolyData.h>
 #include <vtkAppendPolyData.h>
-
-#include "zswc.h"
-#include "zlog.h"
-#include <map>
 #include <boost/math/constants/constants.hpp>
+#include <map>
 
 namespace {
 
@@ -100,7 +98,7 @@ vtkSmartPointer<vtkPolyData> meshToVtkPolyData(const nim::ZMesh& mesh)
   return polyData;
 }
 
-}
+} // namespace
 
 namespace nim {
 
@@ -114,9 +112,7 @@ ZMesh::ZMesh(const QString& filename)
   load(filename);
 }
 
-ZMesh::~ZMesh()
-{
-}
+ZMesh::~ZMesh() = default;
 
 void ZMesh::swap(ZMesh& rhs) noexcept
 {
@@ -321,14 +317,19 @@ std::vector<double> ZMesh::boundBox(const glm::mat4& transform) const
 
 QString ZMesh::typeAsString() const
 {
-  if (m_type == GL_TRIANGLES)
+  if (m_type == GL_TRIANGLES) {
     return "GL_TRIANGLES";
-  else if (m_type == GL_TRIANGLE_STRIP)
+  }
+
+  if (m_type == GL_TRIANGLE_STRIP) {
     return "GL_TRIANGLE_STRIP";
-  else if (m_type == GL_TRIANGLE_FAN)
+  }
+
+  if (m_type == GL_TRIANGLE_FAN) {
     return "GL_TRIANGLE_FAN";
-  else
-    return "WrongType";
+  }
+
+  return "WrongType";
 }
 
 std::vector<glm::dvec3> ZMesh::doubleVertices() const
@@ -449,10 +450,10 @@ size_t ZMesh::numTriangles() const
     n = m_indices.size();
   if (m_type == GL_TRIANGLES)
     return n / 3;
-  else if (m_type == GL_TRIANGLE_STRIP || m_type == GL_TRIANGLE_FAN)
+  if (m_type == GL_TRIANGLE_STRIP || m_type == GL_TRIANGLE_FAN)
     return n - 2;
-  else
-    return 0;
+
+  return 0;
 }
 
 std::vector<glm::vec3> ZMesh::triangleVertices(size_t index) const

@@ -1,9 +1,9 @@
 #include "zstringutils.h"
 
-#include <vector>
-#include <QCollator>
 #include "zlog.h"
 #include "zrandom.h"
+#include <QCollator>
+#include <vector>
 
 namespace {
 
@@ -50,7 +50,7 @@ const QCollator& myCollator()
   return collator;
 }
 
-}
+} // namespace
 
 namespace nim {
 

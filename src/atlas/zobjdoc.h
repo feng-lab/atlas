@@ -1,13 +1,13 @@
 #pragma once
 
 #include "zdoc.h"
+#include "zjson.h"
+#include "zsysteminfo.h"
 #include <QObject>
 #include <QString>
 #include <QMenu>
 #include <QAction>
 #include <QUndoStack>
-#include "zsysteminfo.h"
-#include "zjson.h"
 
 namespace nim {
 

@@ -1,36 +1,30 @@
 #include "zapplication.h"
-
 #include "zmainwindow.h"
-
-#include "zlog.h"
-#include <iostream>
-#include "zlogcache.h"
-#include <QDir>
-#include <QFileInfo>
-#include "zcpuinfo.h"
 #include "zsysteminfo.h"
-#include <fftw3.h>
-#include <QMessageBox>
+#include "zlog.h"
 #include "zexception.h"
-#include <folly/ScopeGuard.h>
+#include "zlogcache.h"
+#include "zcpuinfo.h"
+
+#include <fftw3.h>
 
 #ifdef ATLAS_USE_MKL
-
 #include "mkl_service.h"
-
 #endif
 
 #ifdef ATLAS_USE_IPP
-
 #include "ippcore.h"
 #include "ippi.h"
-
 #endif
 
 #include <QSurfaceFormat>
-
 #include <QStack>
 #include <QPointer>
+#include <QMessageBox>
+#include <QDir>
+#include <QFileInfo>
+#include <folly/ScopeGuard.h>
+#include <iostream>
 
 using namespace nim;
 
@@ -216,7 +210,7 @@ int main(int argc, char* argv[])
     }
 
     // ZMainWindow has Qt::WA_DeleteOnClose attribute
-    nim::ZMainWindow* mainWin = new nim::ZMainWindow();
+    auto mainWin = new nim::ZMainWindow();
     QObject::connect(&app, &nim::ZApplication::fileOpenRequest, mainWin, &nim::ZMainWindow::loadUrls);
     mainWin->show();
     mainWin->initOpenglContext();

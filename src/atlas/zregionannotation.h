@@ -1,10 +1,10 @@
 #pragma once
 
 #include "zglobal.h"
-#include <map>
+#include "zregionontology.h"
 #include <QObject>
 #include <QUndoStack>
-#include "zregionontology.h"
+#include <map>
 
 namespace nim {
 
@@ -13,7 +13,7 @@ class ZRegionAnnotation : public QObject
 Q_OBJECT
 public:
   // might throw ZIOException
-  ZRegionAnnotation(QObject* parent = nullptr);
+  explicit ZRegionAnnotation(QObject* parent = nullptr);
 
   explicit ZRegionAnnotation(const QString& filename, QObject* parent = nullptr);
 
@@ -115,7 +115,7 @@ private:
 class ZRegionAnnotationUpdateMeshCommand : public QUndoCommand
 {
 public:
-  ZRegionAnnotationUpdateMeshCommand(ZRegionAnnotation& ra)
+  explicit ZRegionAnnotationUpdateMeshCommand(ZRegionAnnotation& ra)
     : QUndoCommand(), m_regionAnnotation(ra), m_oldOntology(m_regionAnnotation.m_ontology), m_firstRun(true)
   {}
 

@@ -7,4 +7,4 @@ ZDockWidget::ZDockWidget(const QString& title, QWidget* parent, Qt::WindowFlags 
 {
 }
 
-} // namespace
+} // namespace nim

@@ -1,14 +1,14 @@
 #pragma once
 
-#include "zregistrationcostfunction.h"
 #include "zimagetoimagemetric.h"
+#include "zregistrationcostfunction.h"
 
 namespace nim {
 
 class ZRegistrationNumericDiffCostFunction : public ZRegistrationCostFunction
 {
 public:
-  ZRegistrationNumericDiffCostFunction(double relativeStepSize = 1e-6);
+  explicit ZRegistrationNumericDiffCostFunction(double relativeStepSize = 1e-6);
 
   void setRelativeStepSize(double v)
   { m_relativeStepSize = v; }

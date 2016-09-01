@@ -2,9 +2,10 @@
 
 #include "zlog.h"
 #include "zglmutils.h"
+#include "zlog.h"
 #include "zparameterfactory.h"
 #include "zcameraparameteranimation.h"
-#include "zcameraparameterkey.h"
+#include "zglobal.h"
 
 namespace nim {
 
@@ -120,7 +121,7 @@ ZParameterAnimation* ZParameterAnimation::create(const QString& key, const QJson
     toVal(obj.value("color").toString(), color);
   }
   if (type == "3DCamera") {
-    ZCameraParameterAnimation* res = new ZCameraParameterAnimation(name, color, parent);
+    auto res = new ZCameraParameterAnimation(name, color, parent);
     if (obj.contains("keys")) {
       QJsonArray keyArray = obj.value("keys").toArray();
       for (int i = 0; i < keyArray.size(); ++i) {
@@ -132,7 +133,7 @@ ZParameterAnimation* ZParameterAnimation::create(const QString& key, const QJson
     }
     return res;
   } else {
-    ZParameterAnimation* res = new ZParameterAnimation(name, type, color, parent);
+    auto res = new ZParameterAnimation(name, type, color, parent);
     if (obj.contains("keys")) {
       QJsonArray keyArray = obj.value("keys").toArray();
       for (int i = 0; i < keyArray.size(); ++i) {

@@ -1,8 +1,8 @@
 #include "zimginfo.h"
-//#include <sstream>
-#include <type_traits>
+
 #include "zrandom.h"
 #include <QLocale>
+#include <type_traits>
 
 namespace nim {
 
@@ -308,7 +308,9 @@ TValue ZImgInfo::dataRangeMax() const
 {
   if (voxelFormat == VoxelFormat::Float) {
     return static_cast<TValue>(1);
-  } else if (voxelFormat == VoxelFormat::Signed) {
+  }
+
+  if (voxelFormat == VoxelFormat::Signed) {
     switch (bytesPerVoxel) {
       case 1:
         return std::numeric_limits<int8_t>::max();
@@ -371,4 +373,4 @@ template double ZImgInfo::dataRangeMax<double>() const;
 #pragma clang diagnostic pop
 #endif
 
-} // namespace
+} // namespace nim

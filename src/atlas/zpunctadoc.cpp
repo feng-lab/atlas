@@ -1,13 +1,13 @@
 #include "zpunctadoc.h"
 
+#include "zpunctadetectiondialog.h"
+#include "zimgdoc.h"
+#include "zanalysisworklistdialog.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
 #include <QIcon>
-#include "zpunctadetectiondialog.h"
-#include "zimgdoc.h"
-#include "zanalysisworklistdialog.h"
 
 namespace nim {
 
@@ -28,13 +28,11 @@ bool ZPunctaDoc::save(size_t id)
     if (savePuncta(pack.get(), pack->path, err)) {
       m_doc.updateObjInfo(id);
       return true;
-    } else {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
-      return false;
     }
-  } else {
-    return saveAs(id);
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
+    return false;
   }
+  return saveAs(id);
 }
 
 bool ZPunctaDoc::saveAs(size_t id)
@@ -56,9 +54,8 @@ bool ZPunctaDoc::saveAs(size_t id)
     if (savePuncta(pack.get(), dialog.selectedFiles().at(0), err, formats[fmtIdx])) {
       m_doc.updateObjInfo(id);
       return true;
-    } else {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
     }
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
   }
   return false;
 }

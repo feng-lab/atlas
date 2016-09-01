@@ -1,25 +1,25 @@
 #include "zanimation.h"
 
+#include "zvideoencoder.h"
 #include "zdoc.h"
-#include <QHBoxLayout>
-#include <QLabel>
-#include "zparameteranimation.h"
 #include "zobjdoc.h"
-#include <QFile>
-#include <QFileInfo>
+#include "zparameteranimation.h"
 #include "zexception.h"
-#include <QMessageBox>
-#include <QApplication>
-#include <QSettings>
-#include <QDir>
 #include "zview.h"
 #include "z3dview.h"
 #include "z3dcanvas.h"
 #include "z3dcanvaspainter.h"
 #include "zgraphicsview.h"
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QFile>
+#include <QFileInfo>
+#include <QMessageBox>
+#include <QApplication>
+#include <QSettings>
+#include <QDir>
 #include <QProgressDialog>
 #include <utility>
-#include "zvideoencoder.h"
 
 namespace {
 // generic solution
@@ -324,12 +324,11 @@ ZAnimation::exportFixedSize3DAnimation(const QDir& dir, const QString& fn, doubl
 
     if (ret == QMessageBox::Cancel) {
       return;
-    } else {
-      if (!QFile::remove(dir.filePath(fn))) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-                              QString("Can not replace %1").arg(dir.filePath(fn)));
-        return;
-      }
+    }
+    if (!QFile::remove(dir.filePath(fn))) {
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                            QString("Can not replace %1").arg(dir.filePath(fn)));
+      return;
     }
   }
   if (width % 2 == 1) {
@@ -341,10 +340,11 @@ ZAnimation::exportFixedSize3DAnimation(const QDir& dir, const QString& fn, doubl
   m_doc.hideAnimation3DView();
   int numFrame = std::ceil(m_duration * framePerSecond);
   QString title = "Exporting 3D Animation As Images...";
-  if (sst == Z3DScreenShotType::HalfSideBySideStereoView)
+  if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
     title = "Exporting 3D Animation As Half Side-By-Side Stereo Images...";
-  else if (sst == Z3DScreenShotType::FullSideBySideStereoView)
+  } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
     title = "Exporting 3D Animation As Full Side-By-Side Stereo Images...";
+  }
   QProgressDialog* progress = new QProgressDialog(title, "Cancel", 0, numFrame, QApplication::activeWindow());
   progress->setWindowModality(Qt::WindowModal);
   progress->setAttribute(Qt::WA_DeleteOnClose);
@@ -434,12 +434,11 @@ void ZAnimation::export3DAnimation(const QDir& dir, const QString& fn, double fr
 
     if (ret == QMessageBox::Cancel) {
       return;
-    } else {
-      if (!QFile::remove(dir.filePath(fn))) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-                              QString("Can not replace %1").arg(dir.filePath(fn)));
-        return;
-      }
+    }
+    if (!QFile::remove(dir.filePath(fn))) {
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                            QString("Can not replace %1").arg(dir.filePath(fn)));
+      return;
     }
   }
   m_doc.hideAnimation3DView();
@@ -459,10 +458,11 @@ void ZAnimation::export3DAnimation(const QDir& dir, const QString& fn, double fr
   }
   int numFrame = std::ceil(m_duration * framePerSecond);
   QString title = "Exporting 3D Animation As Images...";
-  if (sst == Z3DScreenShotType::HalfSideBySideStereoView)
+  if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
     title = "Exporting 3D Animation As Half Side-By-Side Stereo Images...";
-  else if (sst == Z3DScreenShotType::FullSideBySideStereoView)
+  } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
     title = "Exporting 3D Animation As Full Side-By-Side Stereo Images...";
+  }
   QProgressDialog* progress = new QProgressDialog(title, "Cancel", 0, numFrame, QApplication::activeWindow());
   progress->setWindowModality(Qt::WindowModal);
   progress->show();
@@ -552,12 +552,11 @@ ZAnimation::exportFixedSize2DAnimation(const QDir& dir, const QString& fn, doubl
 
     if (ret == QMessageBox::Cancel) {
       return;
-    } else {
-      if (!QFile::remove(dir.filePath(fn))) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-                              QString("Can not replace %1").arg(dir.filePath(fn)));
-        return;
-      }
+    }
+    if (!QFile::remove(dir.filePath(fn))) {
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                            QString("Can not replace %1").arg(dir.filePath(fn)));
+      return;
     }
   }
   if (width % 2 == 1) {

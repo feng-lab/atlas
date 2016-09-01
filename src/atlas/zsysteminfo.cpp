@@ -1,19 +1,18 @@
-#include "z3dgl.h"
 #include "zsysteminfo.h"
 
+#include "z3dgl.h"
 #include "zlog.h"
 #include "z3dgpuinfo.h"
+#include "zmainwindow.h"
+#include "z3dmainwindow.h"
+#include <glbinding/Binding.h>
+#include <glbinding/Meta.h>
 #include <QStandardPaths>
 #include <QStorageInfo>
 #include <QSettings>
-#include "zmainwindow.h"
-#include "z3dmainwindow.h"
 #include <QApplication>
 #include <QDateTime>
 #include <chrono>
-
-#include <glbinding/Binding.h>
-#include <glbinding/Meta.h>
 
 #if !defined(Q_OS_WIN) && !defined(Q_OS_DARWIN)
 #include <sys/utsname.h> // for uname
@@ -236,9 +235,7 @@ ZSystemInfo::ZSystemInfo()
   m_fontPath = ":/Resources/fonts";
 }
 
-ZSystemInfo::~ZSystemInfo()
-{
-}
+ZSystemInfo::~ZSystemInfo() = default;
 
 void ZSystemInfo::logOSInfo() const
 {
@@ -343,12 +340,11 @@ bool ZSystemInfo::initializeGL()
   if (Z3DGpuInfo::instance().isSupported()) {
     m_glInitialized = true;
     return m_glInitialized;
-  } else {
-    m_errorMsg = Z3DGpuInfo::instance().notSupportedReason();
-    LOG(ERROR) << m_errorMsg;
-    m_glInitialized = false;
-    return m_glInitialized;
   }
+  m_errorMsg = Z3DGpuInfo::instance().notSupportedReason();
+  LOG(ERROR) << m_errorMsg;
+  m_glInitialized = false;
+  return m_glInitialized;
 }
 
 QString ZSystemInfo::shaderPath(const QString& filename) const
@@ -400,10 +396,9 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes) const
 
   if (!folder.isEmpty() && QDir(folder).mkpath(".atlasImgCache")) {
     return QDir(folder).filePath(".atlasImgCache");
-  } else {
-    folder.clear();
-    return folder;
   }
+  folder.clear();
+  return folder;
 }
 
 QDir ZSystemInfo::logDir() const
@@ -552,8 +547,8 @@ QDir ZSystemInfo::createLogDir() const
     dir.remove(logFolderName);
   if (dir.mkpath(logFolderName))
     return QDir(dir.absoluteFilePath(logFolderName));
-  else
-    return dir;
+
+  return dir;
 }
 
 } // namespace nim

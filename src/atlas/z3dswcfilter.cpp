@@ -1,11 +1,10 @@
 #include "z3dswcfilter.h"
 
-#include <iostream>
-
 #include "zrandom.h"
 #include "zlog.h"
 #include <QMessageBox>
 #include <QApplication>
+#include <iostream>
 
 namespace nim {
 
@@ -116,7 +115,7 @@ Z3DSwcFilter::~Z3DSwcFilter()
 {
 }
 
-void Z3DSwcFilter::process(Z3DEye)
+void Z3DSwcFilter::process(Z3DEye /*unused*/)
 {
   if (m_dataIsInvalid) {
     prepareData();

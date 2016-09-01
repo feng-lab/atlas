@@ -49,7 +49,7 @@ void Z3DAnimation::addGlobalKey(double time)
 {
   // camera
   Z3DCameraParameter& camera = static_cast<Z3DView*>(m_view)->camera();
-  ZCameraParameterKey* ckey = new ZCameraParameterKey(time, camera);
+  auto ckey = new ZCameraParameterKey(time, camera);
   m_cameraParameterAnimation->addKey(ckey);
 }
 

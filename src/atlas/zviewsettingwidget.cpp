@@ -1,10 +1,10 @@
 #include "zviewsettingwidget.h"
 
+#include "zlog.h"
+#include "zobjdoc.h"
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QScrollArea>
-#include "zlog.h"
-#include "zobjdoc.h"
 
 namespace nim {
 
@@ -13,7 +13,7 @@ ZViewSettingWidget::ZViewSettingWidget(ZDoc* doc, ZViewSettingInterface* view, Q
   , m_doc(doc)
   , m_view(view)
 {
-  QVBoxLayout* layout = new QVBoxLayout;
+  auto layout = new QVBoxLayout;
   m_widget = new QStackedWidget;
   m_defaultWidget = new QWidget(this);
   m_widget->addWidget(m_defaultWidget);

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "zobjdoc.h"
 #include "z2danimation.h"
+#include "zobjdoc.h"
 
 namespace nim {
 
@@ -72,7 +72,7 @@ protected:
 private:
   struct AnimationPack
   { // animation and its associated data
-    AnimationPack(Z2DAnimation* animation, const QString& path, const QString& name = "");
+    AnimationPack(Z2DAnimation* animation_, const QString& path_, const QString& name = "");
 
     void updateDerivedData();
 

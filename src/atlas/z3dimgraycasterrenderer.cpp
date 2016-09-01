@@ -3,11 +3,11 @@
 #include "z3dtexture.h"
 #include "z3dvolume.h"
 #include "z3dimg.h"
+#include "zbenchtimer.h"
+#include "zlog.h"
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
 #include <QApplication>
-#include "zbenchtimer.h"
-#include "zlog.h"
 
 namespace nim {
 
@@ -762,7 +762,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
   CHECK_GL_ERROR
 }
 
-void Z3DImgRaycasterRenderer::renderPicking(Z3DEye)
+void Z3DImgRaycasterRenderer::renderPicking(Z3DEye /*unused*/)
 {
 }
 

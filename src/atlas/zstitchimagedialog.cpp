@@ -1,8 +1,5 @@
 #include "zstitchimagedialog.h"
 
-#include <QtGui>
-#include <QtWidgets>
-
 #include "zimg.h"
 #include "zimgio.h"
 #include "zimgdisplay.h"
@@ -11,6 +8,7 @@
 #include "zstringutils.h"
 #include "zsysteminfo.h"
 #include "zlog.h"
+#include <QtWidgets>
 
 namespace {
 
@@ -59,7 +57,7 @@ void buildConnectionFromGrid(const std::vector<std::vector<size_t>>& grid,
           conn[stackPair] = ZImgNCCMatch::PositionHint::Down | ZImgNCCMatch::PositionHint::Left;
           connected = true;
         }
-        if (connected == false) {  // test if this image is connected
+        if (!connected) {  // test if this image is connected
           if (i >= 1 && j >= 1 && grid[i - 1][j - 1] > 0) {  // up-left
             size_t idx1 = grid[i][j] - 1;
             size_t idx2 = grid[i - 1][j - 1] - 1;
@@ -85,7 +83,7 @@ void buildConnectionFromGrid(const std::vector<std::vector<size_t>>& grid,
               connected = true;
           }
         }
-        if (connected == false) {
+        if (!connected) {
           throw ZStitchException(QString("Can not stitch because images are not connected. Abort."));
         }
       }
@@ -93,7 +91,7 @@ void buildConnectionFromGrid(const std::vector<std::vector<size_t>>& grid,
   }
 }
 
-}
+}  // namespace
 
 namespace nim {
 
@@ -129,9 +127,8 @@ QSize ZTileImageWidget::sizeHint() const
 {
   if (!m_image) {
     return minimumSizeHint();
-  } else {
-    return m_image->size();
   }
+  return m_image->size();
 }
 
 void ZTileImageWidget::init(QImage* image, QList<ZTile>* pTiles)
@@ -142,7 +139,7 @@ void ZTileImageWidget::init(QImage* image, QList<ZTile>* pTiles)
   update();
 }
 
-void ZTileImageWidget::paintEvent(QPaintEvent*)
+void ZTileImageWidget::paintEvent(QPaintEvent* /*event*/)
 {
   if (m_image) {
     QPainter painter(this);
@@ -278,7 +275,7 @@ ZStitchImageDialog::ZStitchImageDialog(QWidget* parent) :
   m_tabWidget->addTab(createIOWidget(), "Inputs and Outputs");
   m_tabWidget->addTab(createConnWidget(), "Connection info");
   m_tabWidget->addTab(createCommandOutputWidget(), "Stitch process output");
-  QVBoxLayout* mainLayout = new QVBoxLayout;
+  auto mainLayout = new QVBoxLayout;
   //mainLayout->addWidget(m_ioGroupBox);
   //mainLayout->addWidget(m_connGroupBox);
   //mainLayout->addWidget(m_commandOutputGroupBox);
@@ -297,17 +294,17 @@ ZStitchImageDialog::~ZStitchImageDialog()
 QLayout* ZStitchImageDialog::createIOLayout()
 {
   // everything
-  QVBoxLayout* alllayout = new QVBoxLayout;
-  QHBoxLayout* allinputlayout = new QHBoxLayout;
+  auto alllayout = new QVBoxLayout;
+  auto allinputlayout = new QHBoxLayout;
   //input1
-  QVBoxLayout* input1vlayout = new QVBoxLayout;
+  auto input1vlayout = new QVBoxLayout;
   m_inputStack1FileEdit = new QTextEdit(this);
   m_inputStack1FileEdit->setReadOnly(true);
   m_selectInputStacks1Button = new QPushButton(tr("select input stacks 1:"), this);
   connect(m_selectInputStacks1Button, &QPushButton::clicked, this, &ZStitchImageDialog::selectInputStacks1);
   input1vlayout->addWidget(m_selectInputStacks1Button);
   input1vlayout->addWidget(m_inputStack1FileEdit);
-  QHBoxLayout* tmphlayout = new QHBoxLayout;
+  auto tmphlayout = new QHBoxLayout;
   QLabel* pl = new QLabel(tr("Use channel: "), this);
   pl->setToolTip(tr("channel used for stitch"));
   m_channel1ComboBox = new QComboBox(this);
@@ -341,7 +338,7 @@ QLayout* ZStitchImageDialog::createIOLayout()
   tmphlayout->addWidget(m_mergeMode1ComboBox);
   input1vlayout->addLayout(tmphlayout);
   //input 2
-  QVBoxLayout* input2vlayout = new QVBoxLayout;
+  auto input2vlayout = new QVBoxLayout;
   m_inputStack2FileEdit = new QTextEdit(this);
   m_inputStack2FileEdit->setReadOnly(true);
   m_selectInputStacks2Button = new QPushButton(tr("select input stacks 2:"), this);
@@ -389,7 +386,7 @@ QLayout* ZStitchImageDialog::createIOLayout()
   allinputlayout->addLayout(input2vlayout);
   alllayout->addLayout(allinputlayout);
   // parameters
-  QGridLayout* layout = new QGridLayout;
+  auto layout = new QGridLayout;
   int row = 0;
 
   pl = new QLabel(tr("Common Channel: "), this);
@@ -517,8 +514,8 @@ QLayout* ZStitchImageDialog::createIOLayout()
 
 QLayout* ZStitchImageDialog::createConnLayout()
 {
-  QVBoxLayout* layout = new QVBoxLayout;
-  QHBoxLayout* hlayout = new QHBoxLayout;
+  auto layout = new QVBoxLayout;
+  auto hlayout = new QHBoxLayout;
 
   hlayout->addWidget(new QLabel("Max Overlap Rate: "));
   m_overlapRateSpinBox = new QSpinBox();
@@ -612,7 +609,7 @@ QLayout* ZStitchImageDialog::createConnLayout()
 
 QLayout* ZStitchImageDialog::createCommandOutputLayout()
 {
-  QVBoxLayout* layout = new QVBoxLayout;
+  auto layout = new QVBoxLayout;
 
   m_commandOutputEdit = new QTextEdit(this);
   layout->addWidget(m_commandOutputEdit);
@@ -795,12 +792,11 @@ bool ZStitchImageDialog::getTileMatrix(ZImg& img, QVector<QVector<int>>& tileMat
         if (value > thre2) {
           if (currentrow + 1 > tileMatrix.size() || currentcol + 1 > tileMatrix[currentrow].size()) {
             return false;
-          } else {
-            tileMatrix[currentrow][currentcol] = tileindex++;
-            QPoint qp(w, h);
-            ZTile tile(tileindex - 1, qp, qp);
-            tileList.push_back(tile);
           }
+          tileMatrix[currentrow][currentcol] = tileindex++;
+          QPoint qp(w, h);
+          ZTile tile(tileindex - 1, qp, qp);
+          tileList.push_back(tile);
         }
         currentcol++;
         if (currentcol >= numTilePerRow) {
@@ -811,18 +807,13 @@ bool ZStitchImageDialog::getTileMatrix(ZImg& img, QVector<QVector<int>>& tileMat
       if (value > thre2 && value > post && value > down) {
         if (tileindex2 > tileList.size()) {
           return false;
-        } else {
-          tileList[tileindex2 - 1].region.setBottomRight(QPoint(w, h));
-          tileindex2++;
         }
+        tileList[tileindex2 - 1].region.setBottomRight(QPoint(w, h));
+        tileindex2++;
       }
     }
   }
-  if (tileindex != tileindex2) {
-    return false;
-  } else {
-    return true;
-  }
+  return tileindex == tileindex2;
 }
 
 void ZStitchImageDialog::editConnFromTileImage()
@@ -834,8 +825,8 @@ void ZStitchImageDialog::editConnFromTileImage()
     m_tileImageWidget = new ZTileImageWidget(this, &m_tileImage, &tmpList, m_inputStack1Filenames);
     m_scrollArea->setWidget(m_tileImageWidget);
     m_scrollArea->ensureWidgetVisible(m_tileImageWidget);
-    QVBoxLayout* vlayout = new QVBoxLayout;
-    QHBoxLayout* hlayout = new QHBoxLayout;
+    auto vlayout = new QVBoxLayout;
+    auto hlayout = new QHBoxLayout;
     QPushButton* zoomInButton = new QPushButton(tr("zoom in"), this);
     connect(zoomInButton, &QPushButton::clicked, this, &ZStitchImageDialog::zoomInTileImageWidget);
     hlayout->addWidget(zoomInButton);
@@ -1566,27 +1557,27 @@ void ZStitchImageDialog::selectOutputFile()
   }
 }
 
-void ZStitchImageDialog::d8Changed(int)
+void ZStitchImageDialog::d8Changed(int /*unused*/)
 {
 
 }
 
-void ZStitchImageDialog::configDim1Changed(int)
+void ZStitchImageDialog::configDim1Changed(int /*unused*/)
 {
 
 }
 
-void ZStitchImageDialog::configDim2Changed(int)
+void ZStitchImageDialog::configDim2Changed(int /*unused*/)
 {
 
 }
 
-void ZStitchImageDialog::configDim3Changed(int)
+void ZStitchImageDialog::configDim3Changed(int /*unused*/)
 {
 
 }
 
-void ZStitchImageDialog::fixCheckBoxChanged(int)
+void ZStitchImageDialog::fixCheckBoxChanged(int /*unused*/)
 {
 
 }

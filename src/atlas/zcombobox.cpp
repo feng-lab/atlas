@@ -1,6 +1,7 @@
 #include "zcombobox.h"
-#include <QEvent>
+
 #include "zlog.h"
+#include <QEvent>
 
 namespace nim {
 
@@ -36,12 +37,12 @@ void ZComboBox::removeItemSlot(const QString& text)
   removeItem(findText(text));
 }
 
-void ZComboBox::focusInEvent(QFocusEvent*)
+void ZComboBox::focusInEvent(QFocusEvent* /*e*/)
 {
   setFocusPolicy(Qt::WheelFocus);
 }
 
-void ZComboBox::focusOutEvent(QFocusEvent*)
+void ZComboBox::focusOutEvent(QFocusEvent* /*e*/)
 {
   setFocusPolicy(Qt::StrongFocus);
 }
@@ -58,10 +59,9 @@ bool ZComboBoxEventFilter::eventFilter(QObject* obj, QEvent* event)
       if (qcb->focusPolicy() == Qt::WheelFocus) {
         event->accept();
         return false;
-      } else {
-        event->ignore();
-        return true;
       }
+      event->ignore();
+      return true;
     }
   }
   return QObject::eventFilter(obj, event);

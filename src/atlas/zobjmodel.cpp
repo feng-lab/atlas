@@ -1,4 +1,5 @@
 #include "zobjmodel.h"
+
 #include "zobjdoc.h"
 #include "zlog.h"
 
@@ -187,10 +188,11 @@ QModelIndex ZObjModel::index(int row, int column, const QModelIndex& parent) con
 
   ObjItem* parentItem;
 
-  if (!parent.isValid())
+  if (!parent.isValid()) {
     parentItem = m_rootItem.get();
-  else
+  } else {
     parentItem = static_cast<ObjItem*>(parent.internalPointer());
+  }
 
   auto& childItem = parentItem->children[row];
   if (childItem)
@@ -228,7 +230,7 @@ int ZObjModel::rowCount(const QModelIndex& parent) const
   }
 }
 
-int ZObjModel::columnCount(const QModelIndex&) const
+int ZObjModel::columnCount(const QModelIndex& /*parent*/) const
 {
 #ifdef CONFIG_OLD
   return ColumnCount - 4;
@@ -471,7 +473,7 @@ void ZObjModel::clicked(const QModelIndex& idxIn)
   }
 }
 
-void ZObjModel::doubleClicked(const QModelIndex&)
+void ZObjModel::doubleClicked(const QModelIndex& /*unused*/)
 {
 }
 

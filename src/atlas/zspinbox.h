@@ -9,7 +9,7 @@ namespace nim {
 class ZSpinBoxEventFilter : public QObject
 {
 public:
-  ZSpinBoxEventFilter(QObject* parent = 0);
+  explicit ZSpinBoxEventFilter(QObject* parent = nullptr);
 
 protected:
   virtual bool eventFilter(QObject* obj, QEvent* event) override;
@@ -19,7 +19,7 @@ class ZSpinBox : public QSpinBox
 {
 Q_OBJECT
 public:
-  ZSpinBox(QWidget* parent = 0);
+  explicit ZSpinBox(QWidget* parent = nullptr);
 
   virtual QSize sizeHint() const override;
 
@@ -36,7 +36,7 @@ class ZDoubleSpinBox : public QDoubleSpinBox
 {
 Q_OBJECT
 public:
-  ZDoubleSpinBox(QWidget* parent = 0);
+  explicit ZDoubleSpinBox(QWidget* parent = nullptr);
 
   virtual QSize sizeHint() const override;
 

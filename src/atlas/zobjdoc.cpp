@@ -1,17 +1,17 @@
 #include "zobjdoc.h"
 
 #include "zdoc.h"
+#include "zmainwindow.h"
+#include "zlog.h"
+#include "zfileutils.h"
+#include "zchooseobjdialog.h"
+#include "zsysteminfo.h"
 #include <QSettings>
 #include <QMessageBox>
 #include <QApplication>
 #include <QFileInfo>
 #include <QDir>
 #include <set>
-#include "zmainwindow.h"
-#include "zlog.h"
-#include "zfileutils.h"
-#include "zsysteminfo.h"
-#include "zchooseobjdialog.h"
 
 namespace nim {
 
@@ -44,16 +44,16 @@ QString ZObjDoc::objNameWithModifiedMarker(size_t id) const
 {
   if (objHasUnsavedChange(id))
     return QString("%1*").arg(objName(id));
-  else
-    return objName(id);
+
+  return objName(id);
 }
 
 QString ZObjDoc::objNameWithModifiedMarkerAndID(size_t id) const
 {
   if (objHasUnsavedChange(id))
     return QString("%1* (id: %2)").arg(objName(id)).arg(id);
-  else
-    return QString("%1 (id: %2)").arg(objName(id)).arg(id);
+
+  return QString("%1 (id: %2)").arg(objName(id)).arg(id);
 }
 
 std::map<size_t, size_t> ZObjDoc::read(const QList<QPair<QString, QJsonValue>>& docKeyValueList, QString& err)

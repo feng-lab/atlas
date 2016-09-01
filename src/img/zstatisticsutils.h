@@ -1,17 +1,15 @@
 #pragma once
 
-#include <algorithm>
-#include <cmath>
-#include <numeric>
 #include "zlog.h"
 #include <QList>
-
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
-
 #include <vector>
 #include <utility>
 #include <functional>
+#include <algorithm>
+#include <cmath>
+#include <numeric>
 
 namespace nim {
 
@@ -34,7 +32,7 @@ public:
     }
   }
 
-  _MinMaxElementReduce(_MinMaxElementReduce& x, tbb::split)
+  _MinMaxElementReduce(_MinMaxElementReduce& x, tbb::split /*unused*/)
     : m_begin(x.m_begin), m_minmax(m_begin, m_begin)
   {}
 
@@ -48,7 +46,7 @@ public:
     }
   }
 
-  _MinMaxElementReduce(RandomAccessIterator begin)
+  explicit _MinMaxElementReduce(RandomAccessIterator begin)
     : m_begin(begin), m_minmax(m_begin, m_begin)
   {}
 };
@@ -78,7 +76,7 @@ public:
     m_sum += std::accumulate(range.begin(), range.end(), ResultType(0));
   }
 
-  _SumRangeReduce(_SumRangeReduce&, tbb::split) : m_sum(0)
+  _SumRangeReduce(_SumRangeReduce& /*unused*/, tbb::split /*unused*/) : m_sum(0)
   {}
 
   void join(const _SumRangeReduce& y)
@@ -92,9 +90,9 @@ template<typename RandomAccessIterator, typename ResultType>
 ResultType
 sumRange(RandomAccessIterator begin, RandomAccessIterator end, ResultType init, bool useMultithreading = true)
 {
-  if (!useMultithreading || end - begin < MULTITHREAD_THRESHOLD)
+  if (!useMultithreading || end - begin < MULTITHREAD_THRESHOLD) {
     return std::accumulate(begin, end, init);
-  else {
+  } else {
     _SumRangeReduce <RandomAccessIterator, ResultType> sum;
     tbb::parallel_reduce(tbb::blocked_range<RandomAccessIterator>(begin, end), sum);
     return init + sum.m_sum;
@@ -128,7 +126,7 @@ public:
                                   0.0);
   }
 
-  _StandardDeviationReduce(_StandardDeviationReduce& x, tbb::split)
+  _StandardDeviationReduce(_StandardDeviationReduce& x, tbb::split /*unused*/)
     : m_begin(x.m_begin), m_diffbegin(x.m_diffbegin), m_meanV(x.m_meanV), m_sqSum(0)
   {}
 
@@ -220,10 +218,9 @@ double medianInPlace(RandomAccessIterator begin, RandomAccessIterator end)
 
   if (size % 2 != 0) { //Odd number of elements
     return static_cast<ResultType>(*target);
-  } else {            //Even number of elements
-    ResultType a = *target;
-    return (a + *std::max_element(begin, target)) / 2.0;
-  }
+  }            //Even number of elements
+  ResultType a = *target;
+  return (a + *std::max_element(begin, target)) / 2.0;
 }
 
 } // namespace nim

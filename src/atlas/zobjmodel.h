@@ -85,11 +85,11 @@ public:
 
   ZObjDoc* indexToDoc(const QModelIndex& index);
 
-  void clicked(const QModelIndex& index);
+  void clicked(const QModelIndex& idxIn);
 
   void doubleClicked(const QModelIndex& index);
 
-  void activated(const QModelIndex& index);
+  void activated(const QModelIndex& idxIn);
 
 protected:
   void updateChildCheckState(const QModelIndex& parent, Qt::CheckState cs);
@@ -108,7 +108,7 @@ protected:
 
   struct ObjItem
   {
-    ObjItem(size_t id, ZObjDoc* doc, ObjItem* parent);
+    ObjItem(size_t id_, ZObjDoc* doc_, ObjItem* parent_);
 
     int row() const;
 

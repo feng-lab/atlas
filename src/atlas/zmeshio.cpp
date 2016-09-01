@@ -3,14 +3,14 @@
 #include "zmesh.h"
 #include "zioutils.h"
 #include "zexception.h"
+#include "zlog.h"
 #include <assimp/Importer.hpp>
 #include <assimp/Exporter.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <assimp/material.h>
-#include "zlog.h"
-#include <memory>
 #include <QFile>
+#include <memory>
 
 namespace {
 
@@ -21,14 +21,14 @@ void createMaterials(aiScene* pScene)
   pScene->mNumMaterials = 1;
   pScene->mMaterials = new aiMaterial* [pScene->mNumMaterials];
   for (unsigned int matIndex = 0; matIndex < pScene->mNumMaterials; matIndex++) {
-    aiMaterial* mat = new aiMaterial;
+    auto mat = new aiMaterial;
     pScene->mMaterials[matIndex] = mat;
   }
 }
 
 aiMesh* createAIMesh(const ZMesh& mesh)
 {
-  aiMesh* pMesh = new aiMesh;
+  auto pMesh = new aiMesh;
   pMesh->mMaterialIndex = 0;
   pMesh->mNumFaces = mesh.numTriangles();
   pMesh->mPrimitiveTypes = aiPrimitiveType_TRIANGLE;
@@ -89,7 +89,7 @@ aiNode* createNodes(const ZMesh& mesh, aiNode* pParent, aiScene* pScene, std::ve
 {
   // Store older mesh size to be able to computes mesh offsets for new mesh instances
   const size_t oldMeshSize = MeshArray.size();
-  aiNode* pNode = new aiNode;
+  auto pNode = new aiNode;
 
   pNode->mName = "meshName";
   appendChildToParentNode(pParent, pNode);
@@ -117,7 +117,7 @@ aiNode* createNodes(const ZMesh& mesh, aiNode* pParent, aiScene* pScene, std::ve
   return pNode;
 }
 
-}
+}  // namespace
 
 namespace nim {
 

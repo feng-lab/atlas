@@ -1,11 +1,10 @@
 #include "zanalysisworklistdialog.h"
 
-#include <QtGui>
-#include <QtWidgets>
-#include <QTableView>
 #include "zlog.h"
 #include "zanalysisworklistmodel.h"
 #include "zstyleditemdelegate.h"
+#include <QtWidgets>
+#include <QTableView>
 
 namespace nim {
 
@@ -142,8 +141,8 @@ void ZAnalysisWorklistDialog::dataModified()
 
 void ZAnalysisWorklistDialog::createWidget()
 {
-  QVBoxLayout* vlayout = new QVBoxLayout;
-  QHBoxLayout* hlayout = new QHBoxLayout;
+  auto vlayout = new QVBoxLayout;
+  auto hlayout = new QHBoxLayout;
   QPushButton* newButton = new QPushButton(tr("new"), this);
   connect(newButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::onNew);
   hlayout->addWidget(newButton);

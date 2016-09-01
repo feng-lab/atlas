@@ -1,5 +1,9 @@
 #include "ztimelineobjscene.h"
 
+#include "zanimation.h"
+#include "zbenchtimer.h"
+#include "zlog.h"
+#include "zparameteranimation.h"
 #include <QGraphicsRectItem>
 #include <QGraphicsTextItem>
 #include <QGraphicsPixmapItem>
@@ -7,10 +11,6 @@
 #include <QTextDocument>
 #include <QPainter>
 #include <QColorDialog>
-#include "zlog.h"
-#include "zanimation.h"
-#include "zbenchtimer.h"
-#include "zparameteranimation.h"
 #include <QMenu>
 #include <QGraphicsSceneContextMenuEvent>
 
@@ -61,7 +61,7 @@ ExpandArrowPixmapItem::ExpandArrowPixmapItem(const ZAnimationDisplayPack& pack, 
   setShapeMode(QGraphicsPixmapItem::BoundingRectShape);
 }
 
-void ExpandArrowPixmapItem::mousePressEvent(QGraphicsSceneMouseEvent*)
+void ExpandArrowPixmapItem::mousePressEvent(QGraphicsSceneMouseEvent* /*event*/)
 {
   m_timeline.animation().toogleExpanded(m_displayPack.id);
 }
@@ -75,14 +75,14 @@ ObjBoundRectItem::ObjBoundRectItem(const ZAnimationDisplayPack& pack, ZTimelineW
   setToolTip(m_displayPack.objInfo);
 }
 
-void ObjBoundRectItem::mousePressEvent(QGraphicsSceneMouseEvent*)
+void ObjBoundRectItem::mousePressEvent(QGraphicsSceneMouseEvent* /*event*/)
 {
   if (m_displayPack.type == ZAnimationDisplayPack::Type::ShowAll) {
     m_timeline.animation().toogleShowAll(m_displayPack.id);
   }
 }
 
-void ObjBoundRectItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent*)
+void ObjBoundRectItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* /*event*/)
 {
   if (m_displayPack.type == ZAnimationDisplayPack::Type::Object) {
     m_timeline.animation().toogleExpanded(m_displayPack.id);
@@ -111,7 +111,7 @@ ParameterAnimationColorItem::ParameterAnimationColorItem(const ZAnimationDisplay
   setRect(5, 5, m_timeline.rowHeight() - 10, m_timeline.rowHeight() - 10);
 }
 
-void ParameterAnimationColorItem::mousePressEvent(QGraphicsSceneMouseEvent*)
+void ParameterAnimationColorItem::mousePressEvent(QGraphicsSceneMouseEvent* /*event*/)
 {
   QColor newColor = QColorDialog::getColor(m_displayPack.paraAnimation->color(), &m_timeline,
                                            "New Color");
@@ -146,7 +146,7 @@ void ZTimelineObjScene::updateItems()
   for (size_t dpi = 0; dpi < dps.size(); ++dpi) {
     const ZAnimationDisplayPack& pack = dps[dpi];
     if (pack.type == ZAnimationDisplayPack::Type::GlobalPara) {
-      ObjBoundRectItem* rect = new ObjBoundRectItem(pack, m_timeline);
+      auto rect = new ObjBoundRectItem(pack, m_timeline);
       rect->setRect(0, 0, m_timeline.objViewWidth(), m_timeline.rowHeight());
       rect->setPen(QPen(QColor(133, 133, 133)));
       rect->setBrush(QBrush(QColor(227, 227, 227)));
@@ -156,7 +156,7 @@ void ZTimelineObjScene::updateItems()
       addItem(rect);
       m_itemToDisplayPack[rect] = &pack;
     } else if (pack.type == ZAnimationDisplayPack::Type::Object) {
-      ObjBoundRectItem* rect = new ObjBoundRectItem(pack, m_timeline);
+      auto rect = new ObjBoundRectItem(pack, m_timeline);
       rect->setRect(0, 0, m_timeline.objViewWidth(), m_timeline.rowHeight());
       rect->setPen(QPen(QColor(133, 133, 133)));
       rect->setBrush(QBrush(QColor(220, 220, 220)));
@@ -172,7 +172,7 @@ void ZTimelineObjScene::updateItems()
       addItem(rect);
       m_itemToDisplayPack[rect] = &pack;
     } else if (pack.type == ZAnimationDisplayPack::Type::ObjectPara) {
-      ObjBoundRectItem* rect = new ObjBoundRectItem(pack, m_timeline);
+      auto rect = new ObjBoundRectItem(pack, m_timeline);
       rect->setRect(0, 0, m_timeline.objViewWidth(), m_timeline.rowHeight());
       rect->setPen(QPen(QColor(200, 200, 200)));
       rect->setBrush(QBrush(QColor(235, 235, 235)));
@@ -182,7 +182,7 @@ void ZTimelineObjScene::updateItems()
       addItem(rect);
       m_itemToDisplayPack[rect] = &pack;
     } else if (pack.type == ZAnimationDisplayPack::Type::ShowAll) {
-      ObjBoundRectItem* rect = new ObjBoundRectItem(pack, m_timeline);
+      auto rect = new ObjBoundRectItem(pack, m_timeline);
       rect->setRect(0, 0, m_timeline.objViewWidth(), m_timeline.rowHeight());
       rect->setPen(QPen(QColor(200, 200, 200)));
       rect->setBrush(QBrush(QColor(235, 235, 235)));

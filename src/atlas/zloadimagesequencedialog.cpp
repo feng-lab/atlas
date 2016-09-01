@@ -1,5 +1,8 @@
 #include "zloadimagesequencedialog.h"
 
+#include "zselectfilewidget.h"
+#include "zimg.h"
+#include "zstringutils.h"
 #include <QVBoxLayout>
 #include <QFileInfo>
 #include <QKeyEvent>
@@ -7,9 +10,6 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QProgressDialog>
-#include "zselectfilewidget.h"
-#include "zimg.h"
-#include "zstringutils.h"
 
 namespace nim {
 
@@ -28,7 +28,7 @@ ZLoadImageSequenceDialog::ZLoadImageSequenceDialog(const QString& title, const Q
   connect(m_buttonBox, &QDialogButtonBox::accepted, this, &ZLoadImageSequenceDialog::accept);
   connect(m_buttonBox, &QDialogButtonBox::rejected, this, &ZLoadImageSequenceDialog::reject);
 
-  QVBoxLayout* mainLayout = new QVBoxLayout;
+  auto mainLayout = new QVBoxLayout;
   mainLayout->addWidget(m_inputImagesFileWidget);
   mainLayout->addWidget(m_buttonBox);
   setLayout(mainLayout);

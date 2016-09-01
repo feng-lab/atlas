@@ -18,9 +18,9 @@ public:
 
   void bindView(Z3DView* v);
 
-  void load(const QString& filename);
+  void load(const QString& fn);
 
-  void save(const QString& filename);
+  void save(const QString& fn);
 
   const ZCameraParameterAnimation* cameraParameterAnimation() const
   { return m_cameraParameterAnimation; }

@@ -1,21 +1,19 @@
 #pragma once
 
-#include <QObject>
 #include "z3dgeometryfilter.h"
 #include "zoptionparameter.h"
-#include <map>
-#include <QString>
-#include <vector>
-#include <utility>
-
 #include "zswc.h"
 #include "zcolormap.h"
 #include "zwidgetsgroup.h"
-
 #include "z3dlinerenderer.h"
 #include "z3dconerenderer.h"
 #include "z3dsphererenderer.h"
 #include "zeventlistenerparameter.h"
+#include <QObject>
+#include <QString>
+#include <map>
+#include <utility>
+#include <vector>
 
 namespace nim {
 
@@ -66,12 +64,12 @@ public:
   inline InteractionMode interactionMode()
   { return m_interactionMode; }
 
-  virtual bool hasOpaque(Z3DEye) const override
+  virtual bool hasOpaque(Z3DEye /*unused*/) const override
   { return m_rendererBase.opacity() == 1.f && !m_renderingPrimitive.isSelected("Line"); }
 
   virtual void renderOpaque(Z3DEye eye) override;
 
-  virtual bool hasTransparent(Z3DEye) const override
+  virtual bool hasTransparent(Z3DEye /*unused*/) const override
   { return m_rendererBase.opacity() < 1.f || m_renderingPrimitive.isSelected("Line"); }
 
   virtual void renderTransparent(Z3DEye eye) override;
@@ -99,7 +97,7 @@ protected:
 
   void setColorMode(const std::string& mode);
 
-  virtual void process(Z3DEye) override;
+  virtual void process(Z3DEye /*unused*/) override;
 
   virtual void registerPickingObjects() override;
 

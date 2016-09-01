@@ -33,7 +33,7 @@ class QModelIndex;
 
 namespace Ui {
 class LogWindow;
-}
+} // namespace Ui
 
 namespace nim {
 
@@ -44,7 +44,7 @@ class ZLogDialog : public QDialog
 Q_OBJECT
 
 public:
-  explicit ZLogDialog(LogSinkPtr destination, QWidget* parent = 0);
+  explicit ZLogDialog(LogSinkPtr destination, QWidget* parent = nullptr);
 
   virtual ~ZLogDialog();
 
@@ -80,5 +80,5 @@ private:
   bool mHasAutoScroll;
 };
 
-}
+}  // namespace nim
 

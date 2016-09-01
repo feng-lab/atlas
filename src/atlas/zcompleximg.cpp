@@ -1,8 +1,9 @@
 #include "zcompleximg.h"
+
 #include "zimginterface.h"
+#include "zlog.h"
 #include <algorithm>
 #include <functional>
-#include "zlog.h"
 
 namespace nim {
 

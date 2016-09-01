@@ -78,5 +78,5 @@ protected:
   std::map<size_t, IFDPos> m_ifdIdxPosMap;
 };
 
-}  // namespace
+}  // namespace nim
 

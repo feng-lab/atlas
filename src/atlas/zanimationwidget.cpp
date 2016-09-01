@@ -1,6 +1,8 @@
 #include "zanimationwidget.h"
 
 #include "znumericparameter.h"
+#include "ztimelinewidget.h"
+#include "zanimationexportwidget.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QToolButton>
@@ -11,8 +13,6 @@
 #include <QTimeLine>
 #include <QApplication>
 #include <QKeyEvent>
-#include "ztimelinewidget.h"
-#include "zanimationexportwidget.h"
 
 namespace nim {
 
@@ -187,7 +187,7 @@ void ZAnimationWidget::keyPressEvent(QKeyEvent* event)
 
 void ZAnimationWidget::createWidget()
 {
-  QHBoxLayout* hlo = new QHBoxLayout;
+  auto hlo = new QHBoxLayout;
 
   hlo->addWidget(m_playSpeed->createNameLabel(this));
   hlo->addWidget(m_playSpeed->createWidget(this));
@@ -237,7 +237,7 @@ void ZAnimationWidget::createWidget()
 
   m_timelineWidget = new ZTimelineWidget(m_animation, m_currentTime, this);
 
-  QVBoxLayout* vlo = new QVBoxLayout;
+  auto vlo = new QVBoxLayout;
   vlo->setMargin(0);
   vlo->setSpacing(0);
   vlo->addLayout(hlo);

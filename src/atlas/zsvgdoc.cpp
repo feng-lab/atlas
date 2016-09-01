@@ -4,13 +4,13 @@
 
 #include "zsvgdoc.h"
 
+#include "zlog.h"
+#include "zexception.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
 #include <QIcon>
-#include "zlog.h"
-#include "zexception.h"
 #include <set>
 
 namespace nim {
@@ -51,10 +51,9 @@ size_t ZSvgDoc::loadFile(const QString& fileName, QString& errorMsg)
     setLastOpenedObjPath(fileName);
 
     return id;
-  } else {
-    errorMsg = QString("invalid svg: %1").arg(fileName);
-    return 0;
   }
+  errorMsg = QString("invalid svg: %1").arg(fileName);
+  return 0;
 }
 
 size_t ZSvgDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
@@ -75,10 +74,9 @@ size_t ZSvgDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
     setLastOpenedObjPath(fileName);
 
     return id;
-  } else {
-    errorMsg = QString("invalid svg: %1").arg(fileName);
-    return 0;
   }
+  errorMsg = QString("invalid svg: %1").arg(fileName);
+  return 0;
 }
 
 QList<QAction*> ZSvgDoc::loadFileActions() const

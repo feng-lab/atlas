@@ -1,9 +1,9 @@
 #pragma once
 
-#include <QList>
 #include "zimgprocess.h"
 #include "zeigenutils.h"
 #include "zpuncta.h"
+#include <QList>
 
 namespace nim {
 

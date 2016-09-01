@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zbenchtimer.h"
 #include "zimg.h"
 #include "zimgalgorithm.h"
 

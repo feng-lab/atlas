@@ -1,7 +1,7 @@
 #pragma once
 
-#include <map>
 #include "zimg.h"
+#include <map>
 #include <set>
 
 namespace nim {

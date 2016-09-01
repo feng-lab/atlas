@@ -1,6 +1,7 @@
 #include "z3dcamera.h"
-#include <cmath>
+
 #include "zlog.h"
+#include <cmath>
 
 namespace nim {
 

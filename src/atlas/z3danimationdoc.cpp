@@ -1,15 +1,15 @@
 #include "z3danimationdoc.h"
 
+#include "zanimationwidget.h"
+#include "z3dview.h"
+#include "zexception.h"
+#include "zlog.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
 #include <QIcon>
 #include <set>
-#include "zexception.h"
-#include "zanimationwidget.h"
-#include "z3dview.h"
-#include "zlog.h"
 
 namespace nim {
 
@@ -46,13 +46,11 @@ bool Z3DAnimationDoc::save(size_t id)
     if (saveAnimation(pack.get(), pack->path, err)) {
       m_doc.updateObjInfo(id);
       return true;
-    } else {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
-      return false;
     }
-  } else {
-    return saveAs(id);
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
+    return false;
   }
+  return saveAs(id);
 }
 
 bool Z3DAnimationDoc::saveAs(size_t id)
@@ -72,9 +70,8 @@ bool Z3DAnimationDoc::saveAs(size_t id)
     if (saveAnimation(pack.get(), dialog.selectedFiles().at(0), err)) {
       m_doc.updateObjInfo(id);
       return true;
-    } else {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
     }
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
   }
   return false;
 }
@@ -194,7 +191,7 @@ bool Z3DAnimationDoc::isSameObj(const QJsonValue& v1, const QJsonValue& v2) cons
   return QFileInfo(f1).canonicalFilePath() == QFileInfo(f2).canonicalFilePath();
 }
 
-size_t Z3DAnimationDoc::makeAlias(size_t)
+size_t Z3DAnimationDoc::makeAlias(size_t /*id*/)
 {
   return 0;
 }

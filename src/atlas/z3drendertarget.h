@@ -1,8 +1,8 @@
 #pragma once
 
+#include "z3dgl.h"
 #include <map>
 #include <set>
-#include "z3dgl.h"
 
 namespace nim {
 
@@ -12,11 +12,13 @@ class Z3DRenderTarget
 {
 public:
   // create one color and one depth attachment
-  Z3DRenderTarget(GLint internalColorFormat = GLint(GL_RGBA16), GLint internalDepthFormat = GLint(GL_DEPTH_COMPONENT24),
-                  glm::uvec2 size = glm::uvec2(32, 32), bool multisample = false, int sample = 4);
+  explicit Z3DRenderTarget(GLint internalColorFormat = GLint(GL_RGBA16),
+                           GLint internalDepthFormat = GLint(GL_DEPTH_COMPONENT24),
+                           glm::uvec2 size = glm::uvec2(32, 32),
+                           bool multisample = false, int sample = 4);
 
   // empty fbo with no attachment
-  Z3DRenderTarget(glm::uvec2 size);
+  explicit Z3DRenderTarget(glm::uvec2 size);
 
   virtual ~Z3DRenderTarget();
 

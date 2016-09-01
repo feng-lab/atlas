@@ -1,12 +1,11 @@
 #pragma once
 
 #include "zglmutils.h"
-#include <vector>
+#include "zglobal.h"
+#include "zparameter.h"
 #include <QColor>
 #include <limits>
-#include "zparameter.h"
-#include <cstdint>
-#include "zglobal.h"
+#include <vector>
 
 namespace nim {
 

@@ -6,13 +6,12 @@
 // There should be no overhead because compiler should optimize
 // all those empty functions call out
 
+#include "zexception.h"
+#include <itkCommand.h>
+#include <itkProcessObject.h>
 #include <QObject>
 #include <map>
 #include <set>
-#include "zexception.h"
-
-#include <itkCommand.h>
-#include <itkProcessObject.h>
 
 #undef _WIN32_WINNT
 

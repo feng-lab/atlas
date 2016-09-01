@@ -78,7 +78,7 @@ protected:
 private:
   struct RegionAnnotationPack
   { // RegionAnnotation and its associated data
-    RegionAnnotationPack(ZRegionAnnotation* regionAnnotation, const QString& path, bool unsaved = false);
+    RegionAnnotationPack(ZRegionAnnotation* regionAnnotationIn, const QString& pathIn, bool unsaved = false);
 
     ~RegionAnnotationPack();
 

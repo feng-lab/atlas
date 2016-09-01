@@ -1,8 +1,8 @@
 #pragma once
 
-#include <iosfwd>
 #include <QDebug>
 #include <QPoint>
+#include <iosfwd>
 #include <type_traits>
 
 namespace nim {

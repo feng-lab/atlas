@@ -1,8 +1,8 @@
 #pragma once
 
 #include "z3dfilterview.h"
-#include "zimgdoc.h"
 #include "z3dimgfilter.h"
+#include "zimgdoc.h"
 
 namespace nim {
 

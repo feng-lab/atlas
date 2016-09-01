@@ -1,7 +1,7 @@
 #pragma once
 
-#include "zimgalgorithm.h"
 #include "zimg.h"
+#include "zimgalgorithm.h"
 
 namespace nim {
 
@@ -9,8 +9,7 @@ template<bool ReportProgress = false>
 class ZImgAutoThreshold : public ZImgAlgorithm<ReportProgress>
 {
 public:
-  ZImgAutoThreshold()
-  {}
+  ZImgAutoThreshold() = default;
 
   // ting's triangle auto threshold
   // threshold is calculated as img voxel type and returned as TValue because we don't know img type

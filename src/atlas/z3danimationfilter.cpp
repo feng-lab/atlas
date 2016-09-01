@@ -1,11 +1,11 @@
 #include "z3danimationfilter.h"
 
-#include "zmesh.h"
-#include "zrandom.h"
-#include "zeventlistenerparameter.h"
-#include "zcameraparameteranimation.h"
 #include "z3dcameraparameter.h"
 #include "z3dgpuinfo.h"
+#include "zcameraparameteranimation.h"
+#include "zeventlistenerparameter.h"
+#include "zmesh.h"
+#include "zrandom.h"
 #include <QFileInfo>
 #include <boost/math/constants/constants.hpp>
 
@@ -85,7 +85,7 @@ Z3DAnimationFilter::~Z3DAnimationFilter()
 {
 }
 
-void Z3DAnimationFilter::process(Z3DEye)
+void Z3DAnimationFilter::process(Z3DEye /*unused*/)
 {
   if (m_dataIsInvalid) {
     prepareData();

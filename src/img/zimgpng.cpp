@@ -1,12 +1,11 @@
 #include "zimgpng.h"
-#include <png.h>
+
+#include "zlog.h"
 #include "zioutils.h"
-#include <memory>
-#include <QFile>
 #include "zbenchtimer.h"
+#include <png.h>
 #include <folly/ScopeGuard.h>
 #include <boost/align/aligned_allocator.hpp>
-#include "zlog.h"
 
 namespace {
 
@@ -19,24 +18,23 @@ struct PngPack
   png_infop endPtr = nullptr;
 };
 
-void pngReadErrorFunction(png_structp, const char* message)
+void pngReadErrorFunction(png_structp /*unused*/, const char* message)
 {
   throw nim::ZIOException(QString("Libpng error: %1").arg(message));
 }
 
-void pngReadWarningFunction(png_structp, const char* message)
+void pngReadWarningFunction(png_structp /*unused*/, const char* message)
 {
   LOG(WARNING) << "Libpng warning: " << message;
 }
 
-int skipIDATChunk(png_structp, png_unknown_chunkp chunk)
+int skipIDATChunk(png_structp /*unused*/, png_unknown_chunkp chunk)
 {
   //LOG(INFO) << reinterpret_cast<const char*>(chunk->name);
   if (chunk->name[0] == 'I' && chunk->name[1] == 'D' && chunk->name[2] == 'A' && chunk->name[3] == 'T') {
     return 1;
-  } else {
-    return 0;
   }
+  return 0;
 }
 
 void readMetaDataFromState(png_const_structrp pngPtr, png_inforp infoPtr, png_inforp endPtr,
@@ -192,7 +190,7 @@ void separateChannel(uint8_t* bufImg, const ZImgInfo& info, const ZImgRegion& re
   }
 }
 
-}
+} // namespace
 
 namespace nim {
 
@@ -305,7 +303,8 @@ void ZImgPng::readMetadata(const QString& filename, ZImgMetadata& meta, size_t s
   readMetaDataFromState(png.pngPtr, png.infoPtr, png.endPtr, meta);
 }
 
-void ZImgPng::readThumbnail(const QString&, ZImgThumbernail&, const ZImgRegion&, size_t)
+void ZImgPng::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thumbnail*/,
+                            const ZImgRegion& /*region*/, size_t /*scene*/)
 {
   // png does not have standard thumbnail chunk
 }

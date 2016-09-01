@@ -1,7 +1,6 @@
 #include "zcustomcommand.h"
 
 #include "zimg.h"
-#include <QDir>
 #include "zglmutils.h"
 #include "zimagematrix3dtransform.h"
 #include "zimgregistration.h"
@@ -9,16 +8,17 @@
 #include "zswc.h"
 #include "zimgio.h"
 #include "zmesh.h"
-#include <itkMath.h>
 #include "zimgautothreshold.h"
 #include "zimggraph.h"
-#include <tbb/task_scheduler_init.h>
 #include "zregionontology.h"
-#include <include/reader.h>
 #include "zjson.h"
 #include "zbenchtimer.h"
 #include "zrandom.h"
 #include "zstringutils.h"
+#include <include/reader.h>
+#include <itkMath.h>
+#include <QDir>
+#include <tbb/task_scheduler_init.h>
 
 namespace nim {
 
@@ -845,13 +845,11 @@ void tmp()
 }
 
 
-}
+}  // namespace nim
 
 namespace nim {
 
-ZCustomCommand::ZCustomCommand()
-{
-}
+ZCustomCommand::ZCustomCommand() = default;
 
 void ZCustomCommand::run()
 {

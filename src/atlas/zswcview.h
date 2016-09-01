@@ -1,9 +1,9 @@
 #pragma once
 
-#include <map>
 #include "zfilterview.h"
 #include "zswcdoc.h"
 #include "zswcfilter.h"
+#include <map>
 
 namespace nim {
 

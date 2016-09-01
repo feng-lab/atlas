@@ -1,4 +1,5 @@
 #include "z3dtransferfunctionwidgetwitheditorwindow.h"
+
 #include "z3dtransferfunction.h"
 #include "z3dtransferfunctioneditor.h"
 #include <QApplication>

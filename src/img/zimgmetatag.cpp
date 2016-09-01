@@ -209,4 +209,4 @@ std::string ZImgMetatag::toString() const
 }
 */
 
-} // namespace
+} // namespace nim

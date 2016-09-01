@@ -1,9 +1,9 @@
 #include "zspanslider.h"
-#include <limits>
-#include <QBoxLayout>
-#include <qxtspanslider.h>
+
 #include "zlog.h"
 #include "zsaturateoperation.h"
+#include <qxtspanslider.h>
+#include <QBoxLayout>
 
 namespace nim {
 

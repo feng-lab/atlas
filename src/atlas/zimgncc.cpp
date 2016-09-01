@@ -1,17 +1,18 @@
 #include "zimgncc.h"
+
 #include "zlog.h"
-#include <algorithm>
 #include "zfft.h"
 #include "zimagetoimagemetric.h"
+#include <algorithm>
 
 namespace {
 
 size_t factorizeNumber(size_t n)
 {
   size_t ifac[3] = {2, 3, 5};
-  for (int i = 0; i < 3; ++i) {
-    while (n % ifac[i] == 0)
-      n = n / ifac[i];
+  for (auto i : ifac) {
+    while (n % i == 0)
+      n = n / i;
   }
   return n;
 }
@@ -34,8 +35,8 @@ inline double secureDivideSqrt(double v1, double v2)
   v2 = std::sqrt(v2);
   if (v2 > 1e-8) {
     return v1 / v2;
-  } else
-    return 0.0;
+  }
+  return 0.0;
 }
 
 inline double secureDivideSqrt2(double v1, double v2)
@@ -121,7 +122,7 @@ void checkInputImgs(const ZImg& fixedImg, const ZImg& movingImg, const QString& 
   }
 }
 
-}
+} // namespace
 
 namespace nim {
 

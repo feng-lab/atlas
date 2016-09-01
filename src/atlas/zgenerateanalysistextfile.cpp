@@ -1,13 +1,14 @@
 #include "zgenerateanalysistextfile.h"
-#include <QFile>
-#include <QFileInfo>
-#include <QDir>
+
 #include "zimg.h"
 #include "zimggraph.h"
 #include "zimgautothreshold.h"
 #include "zglmutils.h"
 #include "zioutils.h"
 #include <include/reader.h>
+#include <QFile>
+#include <QFileInfo>
+#include <QDir>
 
 namespace nim {
 

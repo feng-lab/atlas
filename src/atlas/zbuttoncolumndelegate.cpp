@@ -1,10 +1,10 @@
 #include "zbuttoncolumndelegate.h"
 
+#include "zlog.h"
 #include <QPainter>
 #include <QPushButton>
 #include <QStylePainter>
 #include <QAbstractItemView>
-#include "zlog.h"
 
 namespace nim {
 
@@ -29,7 +29,7 @@ QWidget*
 ZButtonColumnDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    QPushButton* btn = new QPushButton(parent);
+    auto btn = new QPushButton(parent);
     btn->setText(index.data().toString());
     connect(btn, &QPushButton::clicked, this, &ZButtonColumnDelegate::buttonClicked);
     return btn;
@@ -79,7 +79,7 @@ void ZButtonColumnDelegate::paint(QPainter* painter, const QStyleOptionViewItem&
 }
 
 void ZButtonColumnDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option,
-                                                 const QModelIndex&) const
+                                                 const QModelIndex& /*index*/) const
 {
   editor->setGeometry(option.rect);
 }
@@ -91,9 +91,8 @@ QSize ZButtonColumnDelegate::sizeHint(const QStyleOptionViewItem& option, const 
     QSize res = m_button->grab().size();
     res.setWidth(res.width() * 2);
     return res;
-  } else {
-    return QStyledItemDelegate::sizeHint(option, index);
   }
+  return QStyledItemDelegate::sizeHint(option, index);
 }
 
 void ZButtonColumnDelegate::cellEntered(const QModelIndex& index)

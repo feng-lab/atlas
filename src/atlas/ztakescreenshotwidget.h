@@ -1,12 +1,12 @@
 #pragma once
 
 #include "z3dgl.h"
+#include "znumericparameter.h"
+#include "zoptionparameter.h"
+#include "zstringparameter.h"
 #include <QWidget>
 #include <QScrollArea>
 #include <QDir>
-#include "zoptionparameter.h"
-#include "znumericparameter.h"
-#include "zstringparameter.h"
 
 class QPushButton;
 
@@ -22,7 +22,7 @@ class ZTakeScreenShotWidget : public QScrollArea
 {
 Q_OBJECT
 public:
-  explicit ZTakeScreenShotWidget(bool is2D = false, bool group = false, QWidget* parent = 0);
+  explicit ZTakeScreenShotWidget(bool is2D = false, bool group = false, QWidget* parent = nullptr);
 
   // In stereo rendering mode, we can only capture stereo image.
   // In normal rendering mode or if stereo is not supported by graphic card,

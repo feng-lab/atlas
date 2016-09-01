@@ -1,4 +1,5 @@
 #include "zregistrationnumericdiffcostfunction.h"
+
 #include <vector>
 
 namespace nim {

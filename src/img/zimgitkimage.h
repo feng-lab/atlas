@@ -4,7 +4,7 @@
 
 namespace itk {
 class ImageIOBase;
-}
+} // namespace itk
 
 namespace nim {
 

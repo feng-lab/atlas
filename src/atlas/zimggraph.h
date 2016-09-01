@@ -10,7 +10,7 @@ namespace nim {
 class ZImgGraph
 {
 public:
-  ZImgGraph(const ZImg& img, const ZImgRegion& rgn = ZImgRegion());
+  explicit ZImgGraph(const ZImg& img, const ZImgRegion& rgn = ZImgRegion());
 
   // default is 8-conn for 2d and 26-conn for 3d
   void setConnectivity(size_t n);
@@ -104,7 +104,7 @@ private:
 
   struct EdgeInfo
   {
-    EdgeInfo(double w)
+    explicit EdgeInfo(double w)
       : weight(w)
     {}
 
@@ -160,12 +160,11 @@ public:
     {
       if (v1 < m_thre || v2 < m_thre) {
         return 1000;
-      } else {
-        return dist *
-               (1.0 / (1.0 + std::exp((v1 - m_thre) / m_scale))
-                + 1.0 / (1.0 + std::exp((v2 - m_thre) / m_scale))
-                + 0.00001);
       }
+      return dist *
+        (1.0 / (1.0 + std::exp((v1 - m_thre) / m_scale))
+         + 1.0 / (1.0 + std::exp((v2 - m_thre) / m_scale))
+         + 0.00001);
     }
 
   private:

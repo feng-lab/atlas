@@ -83,7 +83,7 @@ QString ZImageCompositeTransform::toQString() const
 
 ZImageTransform* ZImageCompositeTransform::clone() const
 {
-  ZImageCompositeTransform* res = new ZImageCompositeTransform();
+  auto res = new ZImageCompositeTransform();
   for (auto it = m_tfms.cbegin(); it != m_tfms.cend(); ++it) {
     res->addTransform(*it->get());
   }
@@ -92,7 +92,7 @@ ZImageTransform* ZImageCompositeTransform::clone() const
 
 ZImageTransform* ZImageCompositeTransform::makeInverseTransform() const
 {
-  ZImageCompositeTransform* res = new ZImageCompositeTransform();
+  auto res = new ZImageCompositeTransform();
   for (auto it = m_tfms.crbegin(); it != m_tfms.crend(); ++it) {
     res->addTransform((*it)->makeInverseTransform());
   }

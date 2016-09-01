@@ -1,4 +1,5 @@
 #include "z3dport.h"
+
 #include "zlog.h"
 
 namespace nim {
@@ -103,11 +104,10 @@ bool Z3DOutputPortBase::connect(Z3DInputPortBase* inport)
     inport->m_connectedOutputPorts.push_back(this);
     inport->invalidate();
     return true;
-  } else {
-    LOG(ERROR) << "Inport " << inport->name() << " of " << inport->filter()->className()
-               << " can not be connected to outport " << m_name << " of " << m_filter->className();
-    return false;
   }
+  LOG(ERROR) << "Inport " << inport->name() << " of " << inport->filter()->className()
+             << " can not be connected to outport " << m_name << " of " << m_filter->className();
+  return false;
 }
 
 void Z3DOutputPortBase::disconnect(Z3DInputPortBase* inport)

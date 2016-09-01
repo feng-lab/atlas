@@ -11,7 +11,7 @@ class ZSpanSliderWithSpinBox : public QWidget
 Q_OBJECT
 public:
   explicit ZSpanSliderWithSpinBox(int lowerValue, int upperValue, int min, int max, int singleStep = 1,
-                                  bool tracking = true, QWidget* parent = 0);
+                                  bool tracking = true, QWidget* parent = nullptr);
 
   void setLowerValue(int lower);
 
@@ -49,7 +49,7 @@ Q_OBJECT
 public:
   explicit ZDoubleSpanSliderWithSpinBox(double lowerValue, double upperValue, double min, double max,
                                         double singleStep = .01,
-                                        int decimal = 3, bool tracking = true, QWidget* parent = 0);
+                                        int decimal = 3, bool tracking = true, QWidget* parent = nullptr);
 
   void setLowerValue(double lower);
 

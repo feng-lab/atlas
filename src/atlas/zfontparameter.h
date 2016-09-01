@@ -1,8 +1,8 @@
 #pragma once
 
+#include "zparameter.h"
 #include <QObject>
 #include <QFont>
-#include "zparameter.h"
 
 namespace nim {
 

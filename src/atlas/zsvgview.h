@@ -4,10 +4,10 @@
 
 #pragma once
 
-#include <map>
 #include "zfilterview.h"
 #include "zsvgdoc.h"
 #include "zsvgfilter.h"
+#include <map>
 
 namespace nim {
 

@@ -1,10 +1,10 @@
 #pragma once
 
-#include <QList>
-#include <map>
 #include "zimgprocess.h"
 #include "zpuncta.h"
 #include "zswc.h"
+#include <QList>
+#include <map>
 
 namespace nim {
 

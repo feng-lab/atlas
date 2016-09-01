@@ -3,12 +3,11 @@
 #include "zglmutils.h"
 #include <QGraphicsView>
 #include <QSurfaceFormat>
-
-class QOpenGLWidget;
-
 #include <QInputEvent>
 #include <QShortcut>
 #include <deque>
+
+class QOpenGLWidget;
 
 namespace nim {
 

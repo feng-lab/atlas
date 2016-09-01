@@ -1,8 +1,8 @@
 #pragma once
 
-#include <QGraphicsView>
-#include "zview.h"
 #include "znumericparameter.h"
+#include "zview.h"
+#include <QGraphicsView>
 
 namespace nim {
 

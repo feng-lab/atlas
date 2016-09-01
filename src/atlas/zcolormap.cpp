@@ -1,12 +1,12 @@
 #include "zcolormap.h"
-#include <limits>
-#include <algorithm>
-#include <QWidget>
-#include "zlog.h"
+
 #include "z3dtexture.h"
 #include "z3dgpuinfo.h"
-
+#include "zlog.h"
 #include "zcolormapwidgetwitheditorwindow.h"
+#include <QWidget>
+#include <algorithm>
+#include <limits>
 
 namespace nim {
 
@@ -320,18 +320,12 @@ double ZColorMap::domainMax() const
 
 bool ZColorMap::isValidDomainMin(double min) const
 {
-  if ((!m_hasDataRange && min < domainMax()) || (m_hasDataRange && min <= m_dataMin))
-    return true;
-  else
-    return false;
+  return (!m_hasDataRange && min < domainMax()) || (m_hasDataRange && min <= m_dataMin);
 }
 
 bool ZColorMap::isValidDomainMax(double max) const
 {
-  if ((!m_hasDataRange && max > domainMin()) || (m_hasDataRange && max >= m_dataMax))
-    return true;
-  else
-    return false;
+  return (!m_hasDataRange && max > domainMin()) || (m_hasDataRange && max >= m_dataMax);
 }
 
 bool ZColorMap::setDomainMin(double min, bool rescaleKeys)
@@ -374,8 +368,8 @@ bool ZColorMap::setDomainMin(double min, bool rescaleKeys)
     blockSignals(false);
     emit changed();
     return true;
-  } else
-    return false;
+  }
+  return false;
 }
 
 bool ZColorMap::setDomainMax(double max, bool rescaleKeys)
@@ -418,8 +412,8 @@ bool ZColorMap::setDomainMax(double max, bool rescaleKeys)
     blockSignals(false);
     emit changed();
     return true;
-  } else
-    return false;
+  }
+  return false;
 }
 
 void ZColorMap::setDomain(double min, double max, bool rescaleKeys)
@@ -946,8 +940,8 @@ void ZColorMapParameter::readValue(const QJsonValue& jsonValue)
 {
   m_value.m_keys.clear();
   QJsonArray keyArray = jsonValue.toArray();
-  for (int i = 0; i < keyArray.size(); ++i) {
-    QJsonObject keyObj = keyArray[i].toObject();
+  for (const auto & i : keyArray) {
+    QJsonObject keyObj = i.toObject();
     ZColorMapKey key(0, glm::col4());
     if (keyObj.contains("intensity") &&
         keyObj.contains("colorL") &&

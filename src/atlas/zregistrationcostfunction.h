@@ -10,8 +10,7 @@ class ZRegistrationCostFunction
 public:
   ZRegistrationCostFunction();
 
-  virtual ~ZRegistrationCostFunction()
-  {}
+  virtual ~ZRegistrationCostFunction() = default;
 
   int numParameters() const
   { return m_transform ? m_transform->numParameters() : -1; }

@@ -1,5 +1,6 @@
-#include "z3dgl.h"
 #include "z3dconerenderer.h"
+
+#include "z3dgl.h"
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 
@@ -38,10 +39,11 @@ Z3DConeRenderer::Z3DConeRenderer(Z3DRendererBase& rendererBase)
   connect(&m_cylinderSubdivisionAlongZ, &ZIntParameter::valueChanged, this, &Z3DConeRenderer::invalidateOpenglRenderer);
 
   QStringList allshaders;
-  if (m_useConeShader2)
+  if (m_useConeShader2) {
     allshaders << "cone_2.vert" << "cone_func_2.frag" << "lighting2.frag";
-  else
+  } else {
     allshaders << "cone.vert" << "cone_func.frag" << "lighting2.frag";
+  }
   m_coneShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader());
   m_coneShaderGrp.addAllSupportedPostShaders();
   CHECK_GL_ERROR

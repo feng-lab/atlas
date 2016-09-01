@@ -1,13 +1,13 @@
 #include "zchooseobjdialog.h"
 
+#include "zobjdoc.h"
+#include "zdoc.h"
 #include <QPushButton>
 #include <QLabel>
 #include <QDialogButtonBox>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 #include <QDir>
-#include "zobjdoc.h"
-#include "zdoc.h"
 
 namespace nim {
 

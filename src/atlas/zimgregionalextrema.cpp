@@ -1,4 +1,5 @@
 #include "zimgregionalextrema.h"
+
 #include "zimgneighborhooditerator.h"
 #include <stack>
 
@@ -14,10 +15,11 @@ ZImg ZImgRegionalExtrema<ReportProgress>::regionalExtrema(const ZImg& img, size_
     throw ZImgException(QString("invalid conn input: %1").arg(conn));
   }
   if (img.is2DImg() && conn != 4 && conn != 8) {
-    if (conn == 6)
+    if (conn == 6) {
       conn = 4;
-    else
+    } else {
       conn = 8;
+    }
   }
 
   ZImg res;
@@ -43,17 +45,18 @@ void ZImgRegionalExtrema<ReportProgress>::regionalExtrema_Impl(ZImg& res, const 
   Compare <TVoxel> compare;
   for (size_t t = 0; t < img.numTimes(); ++t) {
     TVoxel extreme;
-    if (compare(1, 0))
+    if (compare(1, 0)) {
       extreme = img.dataRangeMin<TVoxel>();
-    else
+    } else {
       extreme = img.dataRangeMax<TVoxel>();
+    }
     uint8_t* out = res.timeData<uint8_t>(t);
     const TVoxel* data = img.timeData<TVoxel>(t);
     double voxelNumber = img.timeVoxelNumber();
 
     std::stack<int64_t, std::vector<int64_t>> stk;
     ZImgNeighborhoodConstIterator<TVoxel> nit =
-      ZImgNeighborhoodConstIterator<TVoxel>(conn, img);
+      ZImgNeighborhoodConstIterator<TVoxel>(ZNeighborhood(conn), img);
 
     TVoxel centerValue;
     int64_t idx;

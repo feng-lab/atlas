@@ -1,6 +1,7 @@
 #include "zimagetransform.h"
-#include <sstream>
+
 #include "zlog.h"
+#include <sstream>
 
 namespace nim {
 
@@ -10,9 +11,7 @@ ZImageTransform::ZImageTransform()
 {
 }
 
-ZImageTransform::~ZImageTransform()
-{
-}
+ZImageTransform::~ZImageTransform() = default;
 
 void ZImageTransform::setParameters(const std::vector<double>& para)
 {

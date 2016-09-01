@@ -1,12 +1,12 @@
 #include "z3dcanvas.h"
 
 #include "z3dnetworkevaluator.h"
-#include <algorithm>
 #include "z3dcanvaseventlistener.h"
 #include "z3dscene.h"
 #include "zlog.h"
 #include <QWindow>
 #include <QOpenGLWidget>
+#include <algorithm>
 
 namespace nim {
 

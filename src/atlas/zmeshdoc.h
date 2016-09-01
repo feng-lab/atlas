@@ -1,7 +1,7 @@
 #pragma once
 
-#include "zobjdoc.h"
 #include "zmesh.h"
+#include "zobjdoc.h"
 
 namespace nim {
 
@@ -68,7 +68,7 @@ protected:
 private:
   struct MeshPack
   { // mesh and its associated data
-    MeshPack(ZMesh& mesh, const QString& path);
+    MeshPack(ZMesh& imesh, const QString& path_);
 
     ~MeshPack();
 

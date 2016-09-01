@@ -2,8 +2,8 @@
 
 #include "zimgitkinterface.h"
 #include <itkBinaryFillholeImageFilter.h>
-#include <type_traits>
 #include <QThread>
+#include <type_traits>
 
 namespace nim {
 

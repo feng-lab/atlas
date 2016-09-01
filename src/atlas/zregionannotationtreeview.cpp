@@ -1,16 +1,16 @@
 #include "zregionannotationtreeview.h"
 
-#include <QSortFilterProxyModel>
-#include <QKeyEvent>
-#include <QHeaderView>
-#include <QMenu>
 #include "zstyleditemdelegate.h"
-#include "zlog.h"
 #include "zbuttoncolumndelegate.h"
+#include "zlog.h"
 #include "zroidoc.h"
 #include "zmeshdoc.h"
 #include <QMessageBox>
 #include <QApplication>
+#include <QSortFilterProxyModel>
+#include <QKeyEvent>
+#include <QHeaderView>
+#include <QMenu>
 
 namespace nim {
 

@@ -2,7 +2,6 @@
 
 #include <QWidget>
 #include <QSlider>
-#include <Qt>
 
 namespace nim {
 
@@ -13,7 +12,7 @@ class ZDoubleSpinBox;
 class ZSliderEventFilter : public QObject
 {
 public:
-  ZSliderEventFilter(QObject* parent = 0);
+  explicit ZSliderEventFilter(QObject* parent = nullptr);
 
 protected:
   virtual bool eventFilter(QObject* obj, QEvent* event) override;
@@ -23,14 +22,14 @@ class ZSlider2 : public QSlider
 {
 Q_OBJECT
 public:
-  ZSlider2(QWidget* parent = 0);
+  explicit ZSlider2(QWidget* parent = nullptr);
 
-  ZSlider2(Qt::Orientation ori, QWidget* parent = 0);
+  explicit ZSlider2(Qt::Orientation ori, QWidget* parent = nullptr);
 
 protected:
-  virtual void focusInEvent(QFocusEvent* event) override;
+  virtual void focusInEvent(QFocusEvent* e) override;
 
-  virtual void focusOutEvent(QFocusEvent* event) override;
+  virtual void focusOutEvent(QFocusEvent* e) override;
 };
 
 class ZSpinBoxWithSlider : public QWidget
@@ -39,7 +38,7 @@ Q_OBJECT
 public:
   explicit ZSpinBoxWithSlider(int value, int min, int max, int step = 1,
                               bool tracking = true, const QString& prefix = "",
-                              const QString& suffix = "", QWidget* parent = 0);
+                              const QString& suffix = "", QWidget* parent = nullptr);
 
   void setValue(int v);
 
@@ -68,7 +67,7 @@ Q_OBJECT
 public:
   explicit ZDoubleSpinBoxWithSlider(double value, double min, double max, double step = .01,
                                     int decimal = 3, bool tracking = true, const QString& prefix = "",
-                                    const QString& suffix = "", QWidget* parent = 0);
+                                    const QString& suffix = "", QWidget* parent = nullptr);
 
   void setValue(double v);
 

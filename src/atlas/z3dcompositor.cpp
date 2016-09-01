@@ -1,10 +1,9 @@
-#include "z3dgl.h"
 #include "z3dcompositor.h"
 
-#include "z3dtexture.h"
+#include "z3dgl.h"
 #include "z3dgpuinfo.h"
 #include "z3drendertarget.h"
-
+#include "z3dtexture.h"
 #include "zbenchtimer.h"
 
 namespace nim {
@@ -134,10 +133,11 @@ bool Z3DCompositor::isReady(Z3DEye eye) const
 {
   if (eye == Z3DEye::Mono && m_outport.isReady())
     return true;
-  else if (eye == Z3DEye::Left && m_leftEyeOutport.isReady())
+  if (eye == Z3DEye::Left && m_leftEyeOutport.isReady())
     return true;
-  else if (eye == Z3DEye::Right && m_rightEyeOutport.isReady())
+  if (eye == Z3DEye::Right && m_rightEyeOutport.isReady())
     return true;
+
   return false;
 }
 

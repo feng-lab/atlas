@@ -1,8 +1,8 @@
 #pragma once
 
-#include <iostream>
-#include <fstream>
 #include <QString>
+#include <fstream>
+#include <iostream>
 
 namespace nim {
 
@@ -43,5 +43,5 @@ std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filen
 
 #endif
 
-}
+} // namespace nim
 

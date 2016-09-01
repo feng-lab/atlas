@@ -1,13 +1,13 @@
 #include "zmeshdoc.h"
 
+#include "zexception.h"
+#include "zlog.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
 #include <QIcon>
 #include <set>
-#include "zexception.h"
-#include "zlog.h"
 
 namespace nim {
 
@@ -59,13 +59,11 @@ bool ZMeshDoc::save(size_t id)
     if (saveMesh(pack.get(), pack->path, err)) {
       m_doc.updateObjInfo(id);
       return true;
-    } else {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
-      return false;
     }
-  } else {
-    return saveAs(id);
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
+    return false;
   }
+  return saveAs(id);
 }
 
 bool ZMeshDoc::saveAs(size_t id)
@@ -87,9 +85,8 @@ bool ZMeshDoc::saveAs(size_t id)
     if (saveMesh(pack.get(), dialog.selectedFiles().at(0), err, formats[fmtIdx])) {
       m_doc.updateObjInfo(id);
       return true;
-    } else {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
     }
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
   }
   return false;
 }

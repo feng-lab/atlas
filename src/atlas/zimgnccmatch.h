@@ -2,8 +2,8 @@
 
 #include "zimg.h"
 #include "zvoxelcoordinate.h"
-#include <set>
 #include "zflags.h"
+#include <set>
 
 namespace nim {
 

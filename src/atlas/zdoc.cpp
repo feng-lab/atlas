@@ -1,14 +1,5 @@
 #include "zdoc.h"
 
-#include <QUndoGroup>
-#include <QAction>
-#include <QMessageBox>
-#include <QApplication>
-#include <QFile>
-#include <QSettings>
-#include <QInputDialog>
-#include <QDir>
-#include <QMenu>
 #include "zobjdoc.h"
 #include "zobjmodel.h"
 #include "zitemselectionmodel.h"
@@ -20,6 +11,15 @@
 #include "z3danimationdoc.h"
 #include "zroidoc.h"
 #include "zmeshdoc.h"
+#include <QUndoGroup>
+#include <QAction>
+#include <QMessageBox>
+#include <QApplication>
+#include <QFile>
+#include <QSettings>
+#include <QInputDialog>
+#include <QDir>
+#include <QMenu>
 #include <QClipboard>
 
 namespace nim {
@@ -133,58 +133,63 @@ QString ZDoc::objName(size_t id) const
 {
   if (id >= 100) {
     return idToDoc(id)->objName(id);
-  } else if (id == 1) {
-    return QString("Background");
-  } else if (id == 2) {
-    return QString("Axis");
-  } else if (id == 3) {
-    return QString("Lighting");
-  } else {
-    CHECK(false);
-    return "";
   }
+  if (id == 1) {
+    return QString("Background");
+  }
+  if (id == 2) {
+    return QString("Axis");
+  }
+  if (id == 3) {
+    return QString("Lighting");
+  }
+  CHECK(false);
+  return "";
 }
 
 QString ZDoc::objNameWithModifiedMarker(size_t id) const
 {
   if (id >= 100) {
     return idToDoc(id)->objNameWithModifiedMarker(id);
-  } else if (id == 1) {
-    return QString("Background");
-  } else if (id == 2) {
-    return QString("Axis");
-  } else if (id == 3) {
-    return QString("Lighting");
-  } else {
-    CHECK(false);
-    return "";
   }
+  if (id == 1) {
+    return QString("Background");
+  }
+  if (id == 2) {
+    return QString("Axis");
+  }
+  if (id == 3) {
+    return QString("Lighting");
+  }
+  CHECK(false);
+  return "";
 }
 
 QString ZDoc::objNameWithModifiedMarkerAndID(size_t id) const
 {
   if (id >= 100) {
     return idToDoc(id)->objNameWithModifiedMarkerAndID(id);
-  } else if (id == 1) {
-    return QString("Background");
-  } else if (id == 2) {
-    return QString("Axis");
-  } else if (id == 3) {
-    return QString("Lighting");
-  } else {
-    CHECK(false);
-    return "";
   }
+  if (id == 1) {
+    return QString("Background");
+  }
+  if (id == 2) {
+    return QString("Axis");
+  }
+  if (id == 3) {
+    return QString("Lighting");
+  }
+  CHECK(false);
+  return "";
 }
 
 QString ZDoc::objDetailedInfo(size_t id) const
 {
   if (id >= 100) {
     return idToDoc(id)->objDetailedInfo(id);
-  } else {
-    CHECK(false);
-    return "";
   }
+  CHECK(false);
+  return "";
 }
 
 QList<size_t> ZDoc::objsOfDoc(const ZObjDoc* objD) const
@@ -378,8 +383,9 @@ void ZDoc::loadFileList(const QStringList& fileList)
   for (int i = 0; i < fileList.size(); ++i) {
     QString tmpErr;
     if (!loadFile(fileList[i], tmpErr)) {
-      if (!error.isEmpty())
+      if (!error.isEmpty()) {
         error += "\n\n";
+      }
       error += QString("Can not read file %1. Error: %2").arg(fileList[i]).arg(tmpErr);
     }
   }
@@ -610,9 +616,8 @@ bool ZDoc::loadFile(const QString& fileName, QString& errMsg)
         if (m_docPacks[i].doc->loadFile(fileName, tmpErr)) {
           errMsg.clear();
           return true;
-        } else {
-          errMsg += QString("\nRead As %1, failed: %2 ").arg(m_docPacks[i].doc->typeName()).arg(tmpErr);
         }
+        errMsg += QString("\nRead As %1, failed: %2 ").arg(m_docPacks[i].doc->typeName()).arg(tmpErr);
       }
     }
     if (errMsg.isEmpty()) {

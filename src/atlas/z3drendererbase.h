@@ -1,13 +1,13 @@
 #pragma once
 
-#include <QObject>
-#include <vector>
-#include <set>
+#include "z3dtransformparameter.h"
 #include "znumericparameter.h"
 #include "zoptionparameter.h"
-#include "z3dtransformparameter.h"
 #include "z3dcamera.h"
 #include "z3dglobalparameters.h"
+#include <QObject>
+#include <set>
+#include <vector>
 
 namespace nim {
 

@@ -1,7 +1,7 @@
 #include "zstringparameter.h"
-#include <QtGui>
-#include <QtWidgets>
+
 #include "zlog.h"
+#include <QtWidgets>
 
 namespace nim {
 
@@ -22,14 +22,14 @@ void ZStringParameter::setContent(QString str)
 
 QWidget* ZStringParameter::actualCreateWidget(QWidget* parent)
 {
-  QLineEdit* le = new QLineEdit(parent);
+  auto le = new QLineEdit(parent);
   le->setText(m_value);
   connect(le, &QLineEdit::textChanged, this, &ZStringParameter::setContent);
   connect(this, &ZStringParameter::stringChanged, le, &QLineEdit::setText);
   return le;
 }
 
-void ZStringParameter::afterChange(QString&)
+void ZStringParameter::afterChange(QString& /*unused*/)
 {
   emit stringChanged(m_value);
 }

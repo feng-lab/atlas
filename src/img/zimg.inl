@@ -1,7 +1,7 @@
 #pragma once
 
-#include "zsaturateoperation.h"
 #include "zimg.h"
+#include "zsaturateoperation.h"
 
 namespace nim {
 

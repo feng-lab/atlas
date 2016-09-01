@@ -1,15 +1,15 @@
 #pragma once
 
 #include "zobjfilter.h"
-#include <QList>
-#include <vector>
 #include "zparameter.h"
-#include <QGraphicsEllipseItem>
-#include <QGraphicsLineItem>
-#include <map>
 #include "znumericparameter.h"
 #include "zswcdoc.h"
 #include "zgraphicsitemtype.h"
+#include <QGraphicsEllipseItem>
+#include <QGraphicsLineItem>
+#include <QList>
+#include <map>
+#include <vector>
 
 class ZWidgetsGroup;
 
@@ -26,7 +26,7 @@ public:
   int type() const override
   { return Type; }
 
-  ZSwcGraphicsItem(ZSwc& swc, double z = 1, QGraphicsItem* parent = nullptr);
+  explicit ZSwcGraphicsItem(ZSwc& swc, double z = 1, QGraphicsItem* parent = nullptr);
 
   void setShowSkeleton(bool v)
   {
@@ -90,7 +90,7 @@ class ZSwcFilter : public ZObjFilter
 {
 Q_OBJECT
 public:
-  ZSwcFilter(ZView& view);
+  explicit ZSwcFilter(ZView& view);
 
   void setData(ZSwc& swc);
 

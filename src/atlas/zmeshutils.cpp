@@ -1,8 +1,8 @@
 #include "zmeshutils.h"
 
+#include "zrandom.h"
 #include <limits>
 #include <queue>
-#include "zrandom.h"
 
 namespace {
 
@@ -16,7 +16,7 @@ class vtkCCSEdgeLocatorNode
 {
 public:
   vtkCCSEdgeLocatorNode() :
-    ptId0(-1), ptId1(-1), edgeId(-1), next(0)
+    ptId0(-1), ptId1(-1), edgeId(-1), next(nullptr)
   {}
 
   ~vtkCCSEdgeLocatorNode()
@@ -25,7 +25,7 @@ public:
     while (ptr) {
       vtkCCSEdgeLocatorNode* tmp = ptr;
       ptr = ptr->next;
-      tmp->next = 0;
+      tmp->next = nullptr;
       delete tmp;
     }
   }
@@ -94,17 +94,17 @@ int64_t* vtkCCSEdgeLocator::InsertUniqueEdge(
   // Search through the list for i0 and i1
   if (node->ptId0 == i0 && node->ptId1 == i1) {
     edgeId = node->edgeId;
-    return 0;
+    return nullptr;
   }
 
   int i = 1;
-  while (node->next != 0) {
+  while (node->next != nullptr) {
     ++i;
     node = node->next;
 
     if (node->ptId0 == i0 && node->ptId1 == i1) {
       edgeId = node->edgeId;
-      return 0;
+      return nullptr;
     }
   }
 
@@ -2498,7 +2498,7 @@ void ClipAndContourPolys(
   }
 }
 
-} // empty namespace
+} // namespace
 
 namespace nim {
 

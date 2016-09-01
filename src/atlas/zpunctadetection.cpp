@@ -1,19 +1,9 @@
 #include "zpunctadetection.h"
+
 #include "zimg.h"
 #include "zeigenutils.h"
 #include "zvbgmm.h"
-#include <boost/math/distributions/chi_squared.hpp>
-#include <boost/geometry/geometry.hpp>
-#include <boost/geometry/geometries/point_xy.hpp>
-#include <boost/geometry/geometries/polygon.hpp>
-#include <boost/geometry/geometries/adapted/c_array.hpp>
-#include <boost/geometry/multi/geometries/multi_polygon.hpp>
-#include <limits>
-#include <algorithm>
-#include <QThread>
 #include "zassignpuncta.h"
-#include <QFileInfo>
-#include <QFile>
 #include "zimgautothreshold.h"
 #include "zimgitkinterface.h"
 #include "zimage2dutils.h"
@@ -21,7 +11,6 @@
 #include "zimgconnectedcomponents.h"
 #include "zimgregionalextrema.h"
 #include "zimgneighborhooditerator.h"
-
 #include <itkImage.h>
 #include <itkImageRegionIterator.h>
 #include <itkSliceBySliceImageFilter.h>
@@ -30,6 +19,17 @@
 #include <itkBinaryDilateImageFilter.h>
 #include <itkBinaryMorphologicalOpeningImageFilter.h>
 #include <itkBinaryThresholdImageFilter.h>
+#include <QThread>
+#include <QFileInfo>
+#include <QFile>
+#include <boost/math/distributions/chi_squared.hpp>
+#include <boost/geometry/geometry.hpp>
+#include <boost/geometry/geometries/point_xy.hpp>
+#include <boost/geometry/geometries/adapted/c_array.hpp>
+#include <boost/geometry/geometries/polygon.hpp>
+#include <boost/geometry/multi/geometries/multi_polygon.hpp>
+#include <algorithm>
+#include <limits>
 
 namespace {
 
@@ -816,7 +816,7 @@ std::vector<Eigen::MatrixXi> ZPunctaDetection::watershedSplit(const ZImg& imgIn)
           // separate touched regions, set barrier voxels to 0
           while (!currentLevelVoxels.empty()) {
             std::list<size_t>::iterator lit;
-            ZImgNeighborhoodConstIterator<uint32_t> nit(26, labelImg);
+            ZImgNeighborhoodConstIterator<uint32_t> nit(ZNeighborhood(26), labelImg);
             for (lit = currentLevelVoxels.begin(); lit != currentLevelVoxels.end();) {
               nit.goToIndex(*lit);
               std::set<uint32_t> neighborLabels;
@@ -853,7 +853,7 @@ std::vector<Eigen::MatrixXi> ZPunctaDetection::watershedSplit(const ZImg& imgIn)
   }
 
   uint32_t* labelData = labelImg.channelData<uint32_t>(0, 0);
-  ZImgNeighborhoodConstIterator<uint32_t> nit(26, labelImg);
+  ZImgNeighborhoodConstIterator<uint32_t> nit(ZNeighborhood(26), labelImg);
   for (size_t i = 0; i < m_barrierVoxels.size(); ++i) {
     nit.goToIndex(m_barrierVoxels[i]);
     CHECK(*nit == 0);

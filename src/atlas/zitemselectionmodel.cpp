@@ -1,8 +1,8 @@
 #include "zitemselectionmodel.h"
 
 #include "zobjmodel.h"
-#include <QSet>
 #include "zobjdoc.h"
+#include <QSet>
 
 namespace nim {
 

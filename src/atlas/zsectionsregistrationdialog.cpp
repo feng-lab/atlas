@@ -1,23 +1,21 @@
 #include "zsectionsregistrationdialog.h"
 
+#include "zselectfilewidget.h"
+#ifdef _NEUTUBE_
+#include "zstack.hxx"
+#include "zstackdoc.h"
+#endif
+#include "zsectionsregistration.h"
+#include "zimgstackinterface.h"
+#include "zstringutils.h"
+#include "zlog.h"
+#include <QApplication>
 #include <QVBoxLayout>
 #include <QFileInfo>
 #include <QKeyEvent>
 #include <QFileDialog>
 #include <QMessageBox>
-#include "zselectfilewidget.h"
-
-#ifdef _NEUTUBE_
-#include "zstack.hxx"
-#include "zstackdoc.h"
-#endif
-
-#include "zsectionsregistration.h"
 #include <QThread>
-#include "zimgstackinterface.h"
-#include "zstringutils.h"
-#include "zlog.h"
-#include <QApplication>
 
 namespace nim {
 
@@ -105,7 +103,8 @@ void ZSectionsRegistrationDialog::registerSections()
     if (img.is2DImg()) {
       QMessageBox::critical(this, qApp->applicationName(), QString("Only one slice.\nDo not need align"));
       return;
-    } else if (!img.is3DImg()) {
+    }
+    if (!img.is3DImg()) {
       LOG(INFO) << img.info().toQString();
       QMessageBox::critical(this, qApp->applicationName(), QString("Can not align time sequence image"));
       return;
@@ -299,7 +298,7 @@ void ZSectionsRegistrationDialog::init()
   connect(m_exitButton, &QPushButton::clicked, this, &ZSectionsRegistrationDialog::reject);
   connect(m_runButton, &QPushButton::clicked, this, &ZSectionsRegistrationDialog::registerSections);
 
-  QVBoxLayout* mainLayout = new QVBoxLayout;
+  auto mainLayout = new QVBoxLayout;
   mainLayout->addWidget(m_ioGroupBox);
   mainLayout->addWidget(m_paraGroupBox);
   mainLayout->addWidget(m_buttonBox);
@@ -312,7 +311,7 @@ void ZSectionsRegistrationDialog::createIOGroupBox()
 {
   m_ioGroupBox = new QGroupBox(tr("Inputs and Outputs"), this);
   // everything
-  QVBoxLayout* alllayout = new QVBoxLayout;
+  auto alllayout = new QVBoxLayout;
 
 #ifdef _NEUTUBE_
   QHBoxLayout *hlayout;
@@ -359,9 +358,9 @@ void ZSectionsRegistrationDialog::createParaGroupBox()
 {
   m_paraGroupBox = new QGroupBox(tr("Parameters"), this);
   // everything
-  QVBoxLayout* alllayout = new QVBoxLayout;
+  auto alllayout = new QVBoxLayout;
 
-  QHBoxLayout* hlayout = new QHBoxLayout;
+  auto hlayout = new QHBoxLayout;
   hlayout->addWidget(m_referenceChannel.createNameLabel());
   hlayout->addWidget(m_referenceChannel.createWidget());
   //hlayout->addStretch(1);

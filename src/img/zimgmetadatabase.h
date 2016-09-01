@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cstddef>
-#include <vector>
 #include <map>
+#include <vector>
 
 namespace nim {
 

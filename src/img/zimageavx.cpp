@@ -1,4 +1,5 @@
 #include "zimageavx.h"
+
 #include <immintrin.h>
 
 namespace nim {
@@ -166,4 +167,4 @@ Image3DRowFilterForOneBlock_AVX(const double* padImg, size_t padImgWidth, size_t
   }
 }
 
-}
+}  // namespace nim

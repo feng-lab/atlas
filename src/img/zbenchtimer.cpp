@@ -1,4 +1,5 @@
 #include "zbenchtimer.h"
+
 #include "zlog.h"
 
 namespace nim {
@@ -20,10 +21,11 @@ void ZBenchTimer::start()
 void ZBenchTimer::stop()
 {
   double elapsed = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_start).count();
-  if (m_paused)
+  if (m_paused) {
     m_pauseTime += elapsed;
-  else
+  } else {
     m_time += elapsed;
+  }
 
   m_paused = false;
 

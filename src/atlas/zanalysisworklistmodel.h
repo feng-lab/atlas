@@ -9,8 +9,8 @@
 #include <QStringList>
 #include <QModelIndex>
 #include <QMimeData>
-#include <map>
 #include <QTextCodec>
+#include <map>
 
 namespace nim {
 
@@ -18,9 +18,9 @@ class ZAnalysisWorklistModel : public QAbstractTableModel
 {
 Q_OBJECT
 public:
-  explicit ZAnalysisWorklistModel(QObject* parent = 0);
+  explicit ZAnalysisWorklistModel(QObject* parent = nullptr);
 
-  explicit ZAnalysisWorklistModel(const QString& filename, QObject* parent = 0);
+  explicit ZAnalysisWorklistModel(const QString& filename, QObject* parent = nullptr);
 
   ~ZAnalysisWorklistModel();
 

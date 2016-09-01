@@ -20,4 +20,4 @@ ZImg ZImgSliceProvider::allSlices(size_t t) const
 }
 
 
-} // namespace
+} // namespace nim

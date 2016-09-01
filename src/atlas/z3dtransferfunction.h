@@ -1,10 +1,10 @@
 #pragma once
 
 #include "z3dgl.h"
-#include <QObject>
-#include <vector>
 #include "zcolormap.h"
 #include "zparameter.h"
+#include <QObject>
+#include <vector>
 
 namespace nim {
 

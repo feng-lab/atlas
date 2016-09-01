@@ -73,8 +73,9 @@ public:
 
   // LogSink interface
 public:
-  virtual void send(LogSeverity, const char*, const char*, int,
-                    const ::tm*, const char* message, size_t, size_t message_len) override
+  virtual void send(LogSeverity /*severity*/, const char* /*full_filename*/, const char* /*base_filename*/,
+                    int /*line*/, const ::tm* /*tm_time*/, const char* message,
+                    size_t /*prefix_len*/, size_t message_len) override
   {
     if (isValid()) {
       m_file.write(message, message_len + 1);  // glog: after message_len is '\n'

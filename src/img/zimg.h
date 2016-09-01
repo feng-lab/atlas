@@ -1,10 +1,10 @@
 #pragma once
 
-#include <QStringList>
 #include "zimginfo.h"
 #include "zimgregion.h"
-#include "zimgmetatag.h"
 #include "zimgmetadatabase.h"
+#include "zimgmetatag.h"
+#include <QStringList>
 
 namespace nim {
 
@@ -31,26 +31,24 @@ struct ZImgSource
 {
   ZImgSource();
 
-  explicit ZImgSource(const QString& fn, const ZImgRegion& rgn = ZImgRegion(), size_t scene = 0,
-                      FileFormat format = FileFormat::Unknown);
+  explicit ZImgSource(const QString& fn, const ZImgRegion& rgn = ZImgRegion(), size_t scene_ = 0,
+                      FileFormat format_ = FileFormat::Unknown);
 
-  ZImgSource(const QStringList& fns, Dimension catDim, const ZImgRegion& rgn = ZImgRegion(), size_t scene = 0,
-             FileFormat format = FileFormat::Unknown,
-             bool expandXY = false, bool expandWithMaxValue = false);
+  ZImgSource(const QStringList& fns, Dimension catDim_, const ZImgRegion& rgn = ZImgRegion(), size_t scene_ = 0,
+             FileFormat format_ = FileFormat::Unknown,
+             bool expandXY_ = false, bool expandWithMaxValue_ = false);
 
   inline bool operator==(const ZImgSource& other) const
   {
     if (filenames == other.filenames) {
       if (filenames.size() == 1) {
         return region == other.region && scene == other.scene;
-      } else {
-        return catDim == other.catDim && region == other.region &&
-               scene == other.scene && expandXY == other.expandXY &&
-               expandWithMaxValue == other.expandWithMaxValue;
       }
-    } else {
-      return false;
+      return catDim == other.catDim && region == other.region &&
+             scene == other.scene && expandXY == other.expandXY &&
+             expandWithMaxValue == other.expandWithMaxValue;
     }
+    return false;
   }
 
   inline bool operator!=(const ZImgSource& other) const
@@ -459,11 +457,10 @@ public:
   {
     if (padOption == PadOption::Constant) {
       return padValue;
-    } else {
-      ZVoxelCoordinate coordCopy = coord;
-      wrapCoord(coordCopy, padOption);
-      return *(data<T>(coordCopy));
     }
+    ZVoxelCoordinate coordCopy = coord;
+    wrapCoord(coordCopy, padOption);
+    return *(data<T>(coordCopy));
   }
 
   template<typename T>
@@ -472,11 +469,10 @@ public:
   {
     if (padOption == PadOption::Constant) {
       return padValue;
-    } else {
-      ZVoxelCoordinate coordCopy(x, y, z, c, t);
-      wrapCoord(coordCopy, padOption);
-      return *(data<T>(coordCopy));
     }
+    ZVoxelCoordinate coordCopy(x, y, z, c, t);
+    wrapCoord(coordCopy, padOption);
+    return *(data<T>(coordCopy));
   }
 
   // output img as values row by row, for debug
@@ -634,7 +630,7 @@ public:
   ZImg __warn_unused_result castTo() const;
 
   // overload, cast voxel to format, throw if combination is not supported (like 3-byte float..)
-  ZImg __warn_unused_result castTo(VoxelFormat vf, size_t bytesPerVoxel);
+  ZImg __warn_unused_result castTo(VoxelFormat vf, size_t bytePerVoxel);
 
   // make img of new type, map current data type range to target img data type range, return new img
   // note: float img data type range is [0.0 1.0]
@@ -1000,7 +996,7 @@ private:
   blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, size_t blockDepth, CombineMode mode) const;
 
   template<typename TVoxel, typename TValue>
-  void computeMinMax_Impl(TValue& min, TValue& max) const;
+  void computeMinMax_Impl(TValue& minV, TValue& maxV) const;
 
   template<typename TVoxel, typename TScalar>
   void addScalar_Impl(TScalar scalar);

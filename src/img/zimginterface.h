@@ -68,7 +68,7 @@ struct col4
   {}
 
   template<typename A>
-  col4(A v)
+  explicit col4(A v)
     : r(v), g(v), b(v), a(v)
   {}
 

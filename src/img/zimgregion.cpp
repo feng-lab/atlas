@@ -1,5 +1,4 @@
 #include "zimgregion.h"
-//#include <sstream>
 
 namespace nim {
 

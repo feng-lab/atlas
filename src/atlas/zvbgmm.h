@@ -23,7 +23,8 @@ public:
     }
   }
 
-  _ZVBGMMReduce(_ZVBGMMReduce& x, tbb::split) : m_vbgmm(x.m_vbgmm)
+  _ZVBGMMReduce(_ZVBGMMReduce& x, tbb::split /*unused*/)
+    : m_vbgmm(x.m_vbgmm)
   {}
 
   void join(const _ZVBGMMReduce& y)
@@ -32,7 +33,7 @@ public:
       m_result.swap(const_cast<typename ZVBGMM<T, WeightT>::Params&>(y.m_result));  //don't need intermediate result
   }
 
-  _ZVBGMMReduce(const ZVBGMM<T, WeightT>* vbgmm)
+  explicit _ZVBGMMReduce(const ZVBGMM<T, WeightT>* vbgmm)
     : m_vbgmm(vbgmm)
   {}
 };
@@ -223,10 +224,11 @@ public:
     size_t finalIter = 0;
     for (size_t i = 0; i < m_nattemps; ++i) {
       //m_post.display("before init");
-      if (m_hasInitData)
+      if (m_hasInitData) {
         initPostWithInitData(m_post);
-      else
+      } else {
         initPostWithGMM(m_post);
+      }
       size_t iter = 0;
       bool done = false;
       ResultDataType oldLoglikHist = std::numeric_limits<ResultDataType>::infinity();
@@ -629,10 +631,11 @@ protected:
   Params runOneAttempt() const
   {
     Params post;
-    if (m_hasInitData)
+    if (m_hasInitData) {
       initPostWithInitData(post);
-    else
+    } else {
       initPostWithGMM(post);
+    }
     size_t iter = 0;
     bool done = false;
     ResultDataType loglikHist;

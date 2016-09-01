@@ -1,12 +1,12 @@
 #pragma once
 
-#include <QObject>
+#include "z3dgl.h"
 #include "z3dcanvaseventlistener.h"
+#include "zflags.h"
+#include <QObject>
 #include <map>
 #include <set>
 #include <vector>
-#include "z3dgl.h"
-#include "zflags.h"
 
 class QString;
 
@@ -160,7 +160,7 @@ protected:
 
   bool isInInteractionMode() const;
 
-  void toggleInteractionMode(bool isInInteractionMode, void* source);
+  void toggleInteractionMode(bool interactionMode, void* source);
 
   void addPrivateRenderPort(Z3DRenderOutputPort& port);
 

@@ -1,10 +1,10 @@
 #include "zquatparameter.h"
 
+#include "zspinbox.h"
+#include "zspinboxwithslider.h"
 #include <QGroupBox>
 #include <QBoxLayout>
-#include "zspinbox.h"
 #include <QLabel>
-#include "zspinboxwithslider.h"
 
 namespace nim {
 
@@ -81,7 +81,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
 
   if (m_style == "SPINBOX") {
     {
-      ZDoubleSpinBox* sb1 = new ZDoubleSpinBox();
+      auto sb1 = new ZDoubleSpinBox();
       sb1->setRange(m_min[0], m_max[0]);
       sb1->setValue(m_value[0]);
       sb1->setSingleStep(m_step);
@@ -100,7 +100,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb1);
           lo->addLayout(hlo);
@@ -108,7 +108,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBox* sb2 = new ZDoubleSpinBox();
+      auto sb2 = new ZDoubleSpinBox();
       sb2->setRange(m_min[1], m_max[1]);
       sb2->setValue(m_value[1]);
       sb2->setSingleStep(m_step);
@@ -127,7 +127,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb2);
           lo->addLayout(hlo);
@@ -135,7 +135,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBox* sb3 = new ZDoubleSpinBox();
+      auto sb3 = new ZDoubleSpinBox();
       sb3->setRange(m_min[2], m_max[2]);
       sb3->setValue(m_value[2]);
       sb3->setSingleStep(m_step);
@@ -154,7 +154,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb3);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb3);
           lo->addLayout(hlo);
@@ -162,7 +162,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBox* sb4 = new ZDoubleSpinBox();
+      auto sb4 = new ZDoubleSpinBox();
       sb4->setRange(m_min[3], m_max[3]);
       sb4->setValue(m_value[3]);
       sb4->setSingleStep(m_step);
@@ -181,7 +181,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb4);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb4);
           lo->addLayout(hlo);
@@ -204,7 +204,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws1);
           lo->addLayout(hlo);
@@ -226,7 +226,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws2);
           lo->addLayout(hlo);
@@ -248,7 +248,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws3);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws3);
           lo->addLayout(hlo);
@@ -270,7 +270,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws4);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws4);
           lo->addLayout(hlo);

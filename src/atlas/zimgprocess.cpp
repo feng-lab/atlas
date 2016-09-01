@@ -1,4 +1,5 @@
 #include "zimgprocess.h"
+
 #include "zlog.h"
 #include <QThread>
 #include <folly/ScopeGuard.h>

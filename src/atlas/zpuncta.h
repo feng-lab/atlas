@@ -1,9 +1,9 @@
 #pragma once
 
-#include <QLinkedList>
 #include "zpunctum.h"
 #include "zglmutils.h"
 #include "zglobal.h"
+#include <QLinkedList>
 
 namespace nim {
 
@@ -14,8 +14,7 @@ class ZPuncta : public QLinkedList<ZPunctum>
   friend class ZPunctaIO;
 
 public:
-  inline ZPuncta()
-  {}
+  inline ZPuncta() = default;
 
   inline explicit ZPuncta(const ZPunctum& i)
   { append(i); }

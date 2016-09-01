@@ -1,11 +1,11 @@
 #pragma once
 
-#include <vector>
-#include <tbb/parallel_for.h>
 #include "zimageinterpolation.h"
 #include "zsaturateoperation.h"
 #include "zstatisticsutils.h"
+#include <tbb/parallel_for.h>
 #include <utility>
+#include <vector>
 
 namespace nim {
 

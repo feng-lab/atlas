@@ -1,8 +1,8 @@
 #include "zimgjpegxr.h"
 
 #include <JXRGlue.h>
-#include <cmath>
 #include <QFile>
+#include <cmath>
 
 namespace {
 
@@ -115,7 +115,7 @@ void readInfoFromDecoder(const PKImageDecode* pDecoder, const PKPixelInfo& PI, Z
   info.createDefaultDescriptions();
 }
 
-}
+} // namespace
 
 namespace nim {
 
@@ -129,9 +129,7 @@ ZImgJpegXR::ZImgJpegXR()
 {
 }
 
-ZImgJpegXR::~ZImgJpegXR()
-{
-}
+ZImgJpegXR::~ZImgJpegXR() = default;
 
 bool ZImgJpegXR::supportRead() const
 {
@@ -400,4 +398,4 @@ void ZImgJpegXR::readImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize
   reportError(err);
 }
 
-} // namespace
+} // namespace nim

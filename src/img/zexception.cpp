@@ -5,8 +5,6 @@
 
 namespace nim {
 
-ZException::~ZException() noexcept
-{
-}
+ZException::~ZException() noexcept = default;
 
 } // namespace nim

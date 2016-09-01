@@ -1,12 +1,12 @@
 #pragma once
 
 #include "zobjfilter.h"
+#include "zimgpackdisplay.h"
+#include "znumericparameter.h"
+#include "zparameter.h"
+#include <QGraphicsPixmapItem>
 #include <QList>
 #include <vector>
-#include <QGraphicsPixmapItem>
-#include "zimgpackdisplay.h"
-#include "zparameter.h"
-#include "znumericparameter.h"
 
 class ZWidgetsGroup;
 
@@ -18,7 +18,7 @@ class ZImgFilter : public ZObjFilter
 {
 Q_OBJECT
 public:
-  ZImgFilter(ZView& view);
+  explicit ZImgFilter(ZView& view);
 
   void setData(ZImgPack& pack);
 

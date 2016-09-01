@@ -1,19 +1,20 @@
 #include "zimgzeissczi.h"
-#include <QFileInfo>
-#include <QDir>
-#include "zioutils.h"
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
-#include <array>
-#include <tuple>
-#include "zbbox.h"
+
 #include "zimgjpegxr.h"
 #include "zimgjpeg.h"
 #include "zimgfreeimage.h"
 #include "ztiff.h"
 #include "zstatisticsutils.h"
 #include "zimgregioniterator.h"
+#include "zbbox.h"
+#include "zioutils.h"
 #include "zlog.h"
+#include <QFileInfo>
+#include <QDir>
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+#include <array>
+#include <tuple>
 
 //#define DUMP_CZI_INFO
 #define NO_MIXED_TILE
@@ -192,7 +193,7 @@ ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
   return res;
 }
 
-}
+}  // namespace
 
 namespace nim {
 
@@ -278,10 +279,7 @@ ZImgZeissCZI::ZImgZeissCZI()
 
 }
 
-ZImgZeissCZI::~ZImgZeissCZI()
-{
-
-}
+ZImgZeissCZI::~ZImgZeissCZI() = default;
 
 ZImg ZImgZeissCZI::stackTiles(const QString& filename, size_t ch, size_t scene)
 {
@@ -1986,4 +1984,4 @@ void ZImgZeissCZI::dumpAttachmentDirectory(std::ifstream& inputFileStream, QStri
   str += "\n";
 }
 
-} // namespace
+} // namespace nim

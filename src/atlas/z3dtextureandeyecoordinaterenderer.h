@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "z3dprimitiverenderer.h"
 #include "z3dshaderprogram.h"
 

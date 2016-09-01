@@ -10,7 +10,7 @@ class ZRegionAnnotationFilter : public ZObjFilter
 {
 Q_OBJECT
 public:
-  ZRegionAnnotationFilter(ZView& view);
+  explicit ZRegionAnnotationFilter(ZView& view);
 
   void setData(ZRegionAnnotation& regionAnnotation);
 

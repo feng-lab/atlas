@@ -1,14 +1,14 @@
 #include "zregionannotationwidget.h"
 
+#include "zimg.h"
+#include "zsysteminfo.h"
+#include "zregionannotationtreemodel.h"
+#include "zregionannotationtreeview.h"
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QFileDialog>
 #include <QApplication>
 #include <QMessageBox>
-#include "zimg.h"
-#include "zsysteminfo.h"
-#include "zregionannotationtreemodel.h"
-#include "zregionannotationtreeview.h"
 
 namespace nim {
 
@@ -63,7 +63,7 @@ void ZRegionAnnotationWidget::exportLabelImage()
 
 void ZRegionAnnotationWidget::createWidget()
 {
-  QVBoxLayout* vlo = new QVBoxLayout;
+  auto vlo = new QVBoxLayout;
 
   QPushButton* pb = new QPushButton("Update 3D Mesh");
   pb->setToolTip("Update 3D mesh with current region contours");

@@ -1,21 +1,20 @@
 #pragma once
 
-#include <QObject>
 #include "z3dgeometryfilter.h"
 #include "zoptionparameter.h"
-#include <QString>
-#include <map>
-#include <QPoint>
 #include "z3danimation.h"
 #include "zcameraparameteranimation.h"
 #include "znumericparameter.h"
 #include "zwidgetsgroup.h"
-#include <vector>
 #include "z3darrowrenderer.h"
 #include "z3dlinerenderer.h"
 #include "z3dmeshrenderer.h"
 #include "zcolormap.h"
 #include "zmesh.h"
+#include <QString>
+#include <QPoint>
+#include <map>
+#include <vector>
 
 namespace nim {
 

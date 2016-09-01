@@ -1,12 +1,12 @@
 #pragma once
 
+#include "ztimelinewidget.h"
 #include <QGraphicsScene>
 #include <QPixmap>
 #include <QGraphicsTextItem>
 #include <QGraphicsPixmapItem>
 #include <QGraphicsRectItem>
 #include <QTextOption>
-#include "ztimelinewidget.h"
 
 namespace nim {
 

@@ -1,9 +1,8 @@
 #pragma once
 
-#include <glbinding/gl/gl.h>
-
-#include "zglobal.h"
 #include "zglmutils.h"
+#include "zglobal.h"
+#include <glbinding/gl/gl.h>
 
 namespace nim {
 

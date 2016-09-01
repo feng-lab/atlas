@@ -1,4 +1,5 @@
 #include "zimggraph.h"
+
 #include <boost/graph/dijkstra_shortest_paths.hpp>
 #include <boost/graph/astar_search.hpp>
 #include <unordered_map>
@@ -96,7 +97,7 @@ private:
 template<class Vertex>
 struct found_goal
 {
-  found_goal(Vertex v_) : v(v_)
+  explicit found_goal(Vertex v_) : v(v_)
   {}
 
   Vertex v;
@@ -107,11 +108,11 @@ template<class Vertex>
 class astar_goal_visitor : public boost::default_astar_visitor
 {
 public:
-  astar_goal_visitor(const std::vector<Vertex>& goals) : m_goals(goals)
+  explicit astar_goal_visitor(const std::vector<Vertex>& goals) : m_goals(goals)
   {}
 
   template<class Graph>
-  void examine_vertex(Vertex u, Graph&)
+  void examine_vertex(Vertex u, Graph& /*unused*/)
   {
     for (Vertex gv : m_goals) {
       if (gv == u)

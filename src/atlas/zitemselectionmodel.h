@@ -12,7 +12,7 @@ class ZItemSelectionModel : public QItemSelectionModel
 {
 Q_OBJECT
 public:
-  explicit ZItemSelectionModel(ZObjModel* model, QObject* parent = 0);
+  explicit ZItemSelectionModel(ZObjModel* model, QObject* parent = nullptr);
 
   size_t numSelectedObjs() const;
 

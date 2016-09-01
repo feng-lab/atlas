@@ -188,9 +188,8 @@ public:
             LOG(INFO) << "GMM Final Negative Loglikelihood: " << e;
           }
           return e;
-        } else {
-          eold = e;
         }
+        eold = e;
       }
 
       if (m_hasWeight) {    //substitute responsibilities with responsibilities.*weight

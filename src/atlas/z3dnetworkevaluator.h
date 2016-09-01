@@ -1,15 +1,12 @@
 #pragma once
 
-#include <QObject>
-#include <vector>
-#include "zbenchtimer.h"
 #include "z3dcanvas.h"
-
+#include "zbenchtimer.h"
+#include <QObject>
 #ifndef Q_MOC_RUN
-
 #include <boost/graph/adjacency_list.hpp>
-
 #endif
+#include <vector>
 
 namespace nim {
 

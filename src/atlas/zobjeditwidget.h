@@ -1,9 +1,9 @@
 #pragma once
 
+#include "zdoc.h"
 #include <QStackedWidget>
 #include <QPlainTextEdit>
 #include <QTabWidget>
-#include "zdoc.h"
 
 namespace nim {
 

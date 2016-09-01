@@ -1,19 +1,17 @@
-#include "z3dgl.h"
 #include "z3dcanvaspainter.h"
 
+#include "z3dgl.h"
 #include "z3dcanvas.h"
-#include "z3dtexture.h"
-#include "zlog.h"
+#include "z3dcompositor.h"
 #include "z3dgpuinfo.h"
+#include "z3dtexture.h"
 #include "zexception.h"
-
+#include "zimgformat.h"
+#include "zlog.h"
 #include <QImage>
 #include <QImageWriter>
 #include <QPainter>
 #include <memory>
-#include "zimgformat.h"
-
-#include "z3dcompositor.h"
 
 namespace nim {
 
@@ -73,12 +71,12 @@ void Z3DCanvasPainter::process(Z3DEye eye)
   }
 }
 
-bool Z3DCanvasPainter::isReady(Z3DEye) const
+bool Z3DCanvasPainter::isReady(Z3DEye /*eye*/) const
 {
   return true;
 }
 
-bool Z3DCanvasPainter::isValid(Z3DEye) const
+bool Z3DCanvasPainter::isValid(Z3DEye /*eye*/) const
 {
   return false;
 }

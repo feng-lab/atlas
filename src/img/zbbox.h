@@ -1,7 +1,7 @@
 #pragma once
 
-#include <limits>
 #include <iostream>
+#include <limits>
 
 namespace nim {
 
@@ -56,9 +56,10 @@ public:
   //
   inline bool empty() const
   {
-    for (size_t i = 0; i < m_minCorner.length(); ++i)
+    for (size_t i = 0; i < m_minCorner.length(); ++i) {
       if (m_minCorner[i] > m_maxCorner[i])
         return true;
+    }
     return false;
   }
 
@@ -120,17 +121,19 @@ public:
   //
   inline bool contains(const ZBBox& other) const
   {
-    for (size_t i = 0; i < m_minCorner.length(); ++i)
+    for (size_t i = 0; i < m_minCorner.length(); ++i) {
       if (other.m_minCorner[i] < m_minCorner[i] || other.m_maxCorner[i] > m_maxCorner[i])
         return false;
+    }
     return true;
   }
 
   inline bool contains(const Point& other) const
   {
-    for (size_t i = 0; i < m_minCorner.length(); ++i)
+    for (size_t i = 0; i < m_minCorner.length(); ++i) {
       if (other[i] < m_minCorner[i] || other[i] > m_maxCorner[i])
         return false;
+    }
     return true;
   }
 
@@ -141,18 +144,20 @@ public:
   inline bool disjoint(const ZBBox& other) const
   {
     const Point sz = min(other.m_maxCorner, m_maxCorner) - max(other.m_minCorner, m_minCorner);
-    for (size_t i = 0; i < sz.length(); ++i)
+    for (size_t i = 0; i < sz.length(); ++i) {
       if (sz[i] < 0)
         return true;
+    }
     return false;
   }
 
   inline bool disjoint(const Point& other) const
   {
     const Point sz = min(other, m_maxCorner) - max(other, m_minCorner);
-    for (size_t i = 0; i < sz.length(); ++i)
+    for (size_t i = 0; i < sz.length(); ++i) {
       if (sz[i] < 0)
         return true;
+    }
     return false;
   }
 

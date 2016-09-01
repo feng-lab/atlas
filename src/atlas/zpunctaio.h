@@ -27,9 +27,9 @@ public:
   void save(const ZPuncta& puncta, const QString& filename, QString format) const;
 
 private:
-  void readNimpFile(const QString& file, ZPuncta& puncta) const;
+  void readNimpFile(const QString& filename, ZPuncta& puncta) const;
 
-  void writeNimpFile(const ZPuncta& puncta, const QString& file) const;
+  void writeNimpFile(const ZPuncta& puncta, const QString& filename) const;
 
   void readV3DApoFile(const QString& file, ZPuncta& puncta) const;
 

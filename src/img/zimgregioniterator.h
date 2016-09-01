@@ -18,8 +18,7 @@ class img_region_iter
   };
 public:
   // empty constructor not useful
-  img_region_iter()
-  {}
+  img_region_iter() = default;
 
   explicit img_region_iter(TImg& img, const ZImgRegion& region = ZImgRegion())
     : m_img(&img), m_region(region), m_idx(0), m_centerVoxelPtr(nullptr)

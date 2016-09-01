@@ -1,6 +1,16 @@
-#include "z3dgl.h"
 #include "z3dmainwindow.h"
 
+#include "z3dgl.h"
+#include "zdoc.h"
+#include "z3dview.h"
+#include "zviewsettingwidget.h"
+#include "zobjdetailedinfowidget.h"
+#include "z3dcanvas.h"
+#include "zobjwidget.h"
+#include "zobjeditwidget.h"
+#include "zobjdoc.h"
+#include "zmainwindow.h"
+#include "zsysteminfo.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QAction>
@@ -14,19 +24,6 @@
 #include <QStatusBar>
 #include <QApplication>
 #include <QDesktopServices>
-
-#include "zdoc.h"
-#include "z3dview.h"
-#include "zviewsettingwidget.h"
-#include "zobjdetailedinfowidget.h"
-#include "z3dcanvas.h"
-#include "zobjwidget.h"
-#include "zobjeditwidget.h"
-#include "zobjdoc.h"
-#include "zmainwindow.h"
-#include "zsysteminfo.h"
-
-//#include "zlogdialog.h"
 
 namespace nim {
 
@@ -45,10 +42,11 @@ Z3DMainWindow::Z3DMainWindow(ZDoc* doc, ZMainWindow& win2d, bool stereoView, QWi
 void Z3DMainWindow::openEditWidget(size_t id)
 {
   ZObjDoc* doc = m_doc->idToDoc(id);
-  if (doc->objUndoStack(id))
+  if (doc->objUndoStack(id)) {
     doc->objUndoStack(id)->setActive();
-  else
+  } else {
     m_doc->activateEmptyUndoStack();
+  }
   if (!doc->typeName().contains("2D", Qt::CaseInsensitive)) {
     if (m_objEditWidget->showObjEditWidgetOfObj(id)) {
       m_editObjDockWidget->setVisible(true);
@@ -530,9 +528,9 @@ QString Z3DMainWindow::strippedName(const QString& fullFileName)
   return QFileInfo(fullFileName).fileName();
 }
 
-Z3DMainWindow* Z3DMainWindow::findMainWindow(const QString&)
+Z3DMainWindow* Z3DMainWindow::findMainWindow(const QString& /*unused*/)
 {
-  return 0;
+  return nullptr;
 }
 
 } // namespace nim

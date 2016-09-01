@@ -1,9 +1,9 @@
 #pragma once
 
+#include "zparameter.h"
 #include <QString>
 #include <QObject>
 #include <map>
-#include "zparameter.h"
 
 namespace nim {
 
@@ -12,8 +12,7 @@ class ZParameterMakerInterface
 public:
   virtual ZParameter* create(const QString& name, QObject* parent = nullptr) const = 0;
 
-  virtual ~ZParameterMakerInterface()
-  {}
+  virtual ~ZParameterMakerInterface() = default;
 };
 
 class ZParameterFactory

@@ -7,7 +7,7 @@
 
 namespace nim {
 
-double getNCCOfOffset(const ZImg& fixedImg, const ZImg& movingImg, const ZVoxelCoordinate& offset);
+double getNCCOfOffset(const ZImg& fixedImgIn, const ZImg& movingImgIn, const ZVoxelCoordinate& offset);
 
 // first two paras are input, last two are output
 // output are double img

@@ -1,9 +1,9 @@
-#include "z3dgl.h"
 #include "z3dgpuinfo.h"
 
+#include "z3dgl.h"
+#include "zlog.h"
 #include <QStringList>
 #include <QProcess>
-#include "zlog.h"
 
 uint64_t getDedicatedVideoMemoryMB();
 
@@ -25,30 +25,27 @@ int Z3DGpuInfo::glslMajorVersion() const
 {
   if (isSupported()) {
     return m_glslMajorVersion;
-  } else {
-    LOG(FATAL) << "Current GPU card not supported. This function call should not happen.";
-    return -1;
   }
+  LOG(FATAL) << "Current GPU card not supported. This function call should not happen.";
+  return -1;
 }
 
 int Z3DGpuInfo::glslMinorVersion() const
 {
   if (isSupported()) {
     return m_glslMinorVersion;
-  } else {
-    LOG(FATAL) << "Current GPU card not supported. This function call should not happen.";
-    return -1;
   }
+  LOG(FATAL) << "Current GPU card not supported. This function call should not happen.";
+  return -1;
 }
 
 int Z3DGpuInfo::glslReleaseVersion() const
 {
   if (isSupported()) {
     return m_glslReleaseVersion;
-  } else {
-    LOG(FATAL) << "Current GPU card not supported. This function call should not happen.";
-    return -1;
   }
+  LOG(FATAL) << "Current GPU card not supported. This function call should not happen.";
+  return -1;
 }
 
 Z3DGpuInfo::GpuVendor Z3DGpuInfo::gpuVendor() const
@@ -203,10 +200,11 @@ QStringList Z3DGpuInfo::gpuInfo() const
   QProcess dispInfo;
   dispInfo.start("system_profiler", QStringList() << "SPDisplaysDataType");
 
-  if (dispInfo.waitForFinished(-1))
+  if (dispInfo.waitForFinished(-1)) {
     info << dispInfo.readAllStandardOutput();
-  else
+  } else {
     info << dispInfo.readAllStandardError();
+  }
 #endif
 
   info << QString("OpenGL Vendor:                 %1").arg(m_glVendorString);
@@ -317,11 +315,13 @@ void Z3DGpuInfo::detectGpuInfo()
       m_isSupported = false;
       m_notSupportedReason = "Frame Buffer Object (FBO) is not supported by current openGL context.";
       return;
-    } else if (!isNonPowerOfTwoTextureSupported()) { // not necessary, NPOT texture is supported since opengl 2.0
+    }
+    if (!isNonPowerOfTwoTextureSupported()) { // not necessary, NPOT texture is supported since opengl 2.0
       m_isSupported = false;
       m_notSupportedReason = "Non power of two texture is not supported by current openGL context.";
       return;
-    } else if (gpuVendor() == GpuVendor::AMD && isNonPowerOfTwoTextureSupported() &&
+    }
+    if (gpuVendor() == GpuVendor::AMD && isNonPowerOfTwoTextureSupported() &&
                (m_glRendererString.contains("RADEON X", Qt::CaseInsensitive) ||
                 m_glRendererString.contains("RADEON 9",
                                             Qt::CaseInsensitive))) { //from http://www.opengl.org/wiki/NPOT_Texture
@@ -329,36 +329,33 @@ void Z3DGpuInfo::detectGpuInfo()
       m_notSupportedReason = "The R300 and R400-based cards (Radeon 9500+ and X500+) are incapable of generic NPOT usage. You can use NPOTs, "
         "but only if the texture has no mipmaps.";
       return;
-    } else if (gpuVendor() == GpuVendor::NVIDIA && isNonPowerOfTwoTextureSupported() &&
+    }
+    if (gpuVendor() == GpuVendor::NVIDIA && isNonPowerOfTwoTextureSupported() &&
                m_glRendererString.contains("GeForce FX",
                                            Qt::CaseInsensitive)) { //from http://www.opengl.org/wiki/NPOT_Texture
       m_isSupported = false;
       m_notSupportedReason = "NV30-based cards (GeForce FX of any kind) are incapable of NPOTs at all, despite implementing OpenGL 2.0 "
         "(which requires NPOT). It will do software rendering if you try to use it. ";
       return;
-    } else {
-      m_isSupported = true;
     }
+    m_isSupported = true;
 
     // Prevent segfault
     const char* glslVS = reinterpret_cast<const char*>(glGetString(GL_SHADING_LANGUAGE_VERSION));
-    if (glslVS)
-      m_glslVersionString = QString(glslVS);
-    else
-      m_glslVersionString = "";
+    m_glslVersionString = glslVS ? QString(glslVS) : "";
 
     if (!parseVersionString(m_glVersionString, m_glMajorVersion, m_glMinorVersion, m_glReleaseVersion)) {
       LOG(ERROR) << "Malformed OpenGL version string: " << m_glVersionString;
     }
 
     // GPU Vendor
-    if (m_glVendorString.contains("NVIDIA", Qt::CaseInsensitive))
+    if (m_glVendorString.contains("NVIDIA", Qt::CaseInsensitive)) {
       m_gpuVendor = GpuVendor::NVIDIA;
-    else if (m_glVendorString.contains("ATI", Qt::CaseInsensitive))
+    } else if (m_glVendorString.contains("ATI", Qt::CaseInsensitive)) {
       m_gpuVendor = GpuVendor::AMD;
-    else if (m_glVendorString.contains("INTEL", Qt::CaseInsensitive))
+    } else if (m_glVendorString.contains("INTEL", Qt::CaseInsensitive)) {
       m_gpuVendor = GpuVendor::INTEL;
-    else {
+    } else {
       m_gpuVendor = GpuVendor::UNKNOWN;
     }
 
@@ -397,10 +394,11 @@ void Z3DGpuInfo::detectGpuInfo()
       glGetIntegerv(GL_MAX_TEXTURE_COORDS, &m_maxTextureCoords);
     }
 
-    if (isTextureFilterAnisotropicSupported())
+    if (isTextureFilterAnisotropicSupported()) {
       glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &m_maxTextureAnisotropy);
-    else
+    } else {
       m_maxTextureAnisotropy = 1.0;
+    }
 
     glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS_EXT, &m_maxColorAttachments);
     glGetIntegerv(GL_MAX_DRAW_BUFFERS, &m_maxDrawBuffer);

@@ -1,10 +1,9 @@
 #pragma once
 
-#include <vector>
 #include "z3dgl.h"
-#include "zglobal.h"
-#include <H5Cpp.h>
 #include "zlog.h"
+#include <H5Cpp.h>
+#include <vector>
 
 namespace nim {
 
@@ -74,9 +73,9 @@ public:
 
   void save(const QString& filename, const std::string& format = "") const;
 
-  void load(H5::Group& grp);
+  void load(H5::Group& allGrp);
 
-  void save(H5::Group& grp) const;
+  void save(H5::Group& allGrp) const;
 
   std::vector<double> boundBox() const;
 
@@ -273,7 +272,7 @@ public:
 
   static ZMesh merge(const std::vector<ZMesh>& meshes);
 
-  static void createSwcMesh(const ZSwc& swc, double zScale, int rootType, ZMesh& rootMesh, ZMesh& branchMesh);
+  static void createSwcMesh(const ZSwc& tree, double zScale, int rootType, ZMesh& rootMesh, ZMesh& branchMesh);
 
 private:
   enum class BooleanOperationType

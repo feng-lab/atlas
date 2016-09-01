@@ -1,8 +1,8 @@
 #pragma once
 
+#include "zvoxelcoordinate.h"
 #include <QString>
 #include <map>
-#include "zvoxelcoordinate.h"
 
 namespace nim {
 

@@ -1,8 +1,8 @@
 #include "zimgfreeimage.h"
 
+#include "zlog.h"
 #include <FreeImagePlus.h>
 #include <QFile>
-#include "zlog.h"
 
 namespace {
 
@@ -34,10 +34,11 @@ ZImgInfo readInfoFromFIPImage(fipImage& fipImg)
         case 1:
         case 4:
         case 8:
-          if (fipImg.getColorType() == FIC_PALETTE)
+          if (fipImg.getColorType() == FIC_PALETTE) {
             info.numChannels = 3;
-          else
+          } else {
             info.numChannels = 1;
+          }
           break;
         case 16:
           info.numChannels = 3;
@@ -126,7 +127,7 @@ ZImgInfo readInfoFromFIPImage(fipImage& fipImg)
   return info;
 }
 
-}
+} // namespace
 
 namespace nim {
 
@@ -350,10 +351,11 @@ void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
     ZImg imgTmp(info);
     CXYZtoXYZC(img, imgTmp, isBGA);
 
-    if (region.containsWholeImg(imgTmp.info()))
+    if (region.containsWholeImg(imgTmp.info())) {
       img.swap(imgTmp);
-    else
+    } else {
       img = imgTmp.crop(region);
+    }
   } else if (!region.containsWholeImg(img.info())) {
     img = img.crop(region);
   }

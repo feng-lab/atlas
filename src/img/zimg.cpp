@@ -4,11 +4,11 @@
 #include "zlog.h"
 #include "zimage3dutils.h"
 #include "zstatisticsutils.h"
-#include <algorithm>
 #include "zrandom.h"
-#include <QTextStream>
 #include "zbenchtimer.h"
+#include <QTextStream>
 #include <QFileInfo>
+#include <algorithm>
 
 namespace {
 
@@ -30,14 +30,13 @@ struct MaxOp
   }
 };
 
-}
+} // namespace
 
 namespace nim {
 
 ZImgMetadata::ZImgMetadata()
   : ZImgMetadataBase<ZImgMetatag>()
-{
-}
+{}
 
 QString ZImgMetadata::toQString() const
 {
@@ -58,8 +57,7 @@ QString ZImgMetadata::toQString() const
 
 ZImgThumbernail::ZImgThumbernail()
   : ZImgMetadataBase<ZImg>()
-{
-}
+{};
 
 QString ZImgThumbernail::toQString() const
 {
@@ -128,10 +126,7 @@ QString ZImgSource::toQString() const
   return res;
 }
 
-ZImgSubBlock::~ZImgSubBlock()
-{
-}
-
+ZImgSubBlock::~ZImgSubBlock() = default;
 //-----------------------------------------------------------------------------------
 
 ZImg::ZImg()
@@ -1653,10 +1648,11 @@ void ZImg::checkConnInput(size_t& conn) const
     throw ZImgException(QString("invalid conn input: %1").arg(conn));
   }
   if (is2DImg() && conn != 4 && conn != 8) {
-    if (conn == 6)
+    if (conn == 6) {
       conn = 4;
-    else
+    } else {
       conn = 8;
+    }
   }
 }
 

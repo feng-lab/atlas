@@ -18,7 +18,7 @@ class ZColorMapWidget : public QWidget
 {
 Q_OBJECT
 public:
-  explicit ZColorMapWidget(ZColorMapParameter* colorMap, QWidget* parent = 0);
+  explicit ZColorMapWidget(ZColorMapParameter* colorMap, QWidget* parent = nullptr);
 
   void editLColor(size_t index);
 
@@ -41,9 +41,9 @@ protected:
 
   virtual bool event(QEvent* e) override;
 
-  virtual void paintEvent(QPaintEvent*) override;
+  virtual void paintEvent(QPaintEvent* /*event*/) override;
 
-  virtual void resizeEvent(QResizeEvent*) override;
+  virtual void resizeEvent(QResizeEvent* /*event*/) override;
 
   virtual QSize sizeHint() const override;
 
@@ -78,7 +78,7 @@ class ZColorMapEditor : public QWidget
 {
 Q_OBJECT
 public:
-  explicit ZColorMapEditor(ZColorMapParameter* colorMap, QWidget* parent = 0);
+  explicit ZColorMapEditor(ZColorMapParameter* colorMap, QWidget* parent = nullptr);
 
 protected:
   void updateFromColorMap();

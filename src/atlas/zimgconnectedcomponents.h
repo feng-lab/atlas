@@ -1,7 +1,7 @@
 #pragma once
 
-#include "zimgalgorithm.h"
 #include "zimg.h"
+#include "zimgalgorithm.h"
 
 namespace nim {
 

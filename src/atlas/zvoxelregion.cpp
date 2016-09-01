@@ -2,9 +2,7 @@
 
 namespace nim {
 
-ZVoxelRegion::ZVoxelRegion()
-{
-}
+ZVoxelRegion::ZVoxelRegion() = default;
 
 void ZVoxelRegion::getBoundBox(ZVoxelCoordinate& minCoord, ZVoxelCoordinate& maxCoord) const
 {
@@ -19,9 +17,10 @@ void ZVoxelRegion::getBoundBox(ZVoxelCoordinate& minCoord, ZVoxelCoordinate& max
 
 bool ZVoxelRegion::containsVoxel(const ZVoxelCoordinate& v)
 {
-  for (size_t i = 0; i < m_boxes.size(); ++i)
+  for (size_t i = 0; i < m_boxes.size(); ++i) {
     if (m_boxes[i].contains(v))
       return true;
+  }
   return false;
 }
 
@@ -43,10 +42,11 @@ ZVoxelRegion& ZVoxelRegion::intersect(const ZVoxelRegion& other)
 {
   std::vector<BoxType> currentBoxes;
   currentBoxes.swap(m_boxes);
-  for (size_t i = 0; i < other.m_boxes.size(); ++i)
+  for (size_t i = 0; i < other.m_boxes.size(); ++i) {
     for (size_t j = 0; j < currentBoxes.size(); ++j) {
       addBox(nim::intersect(other.m_boxes[i], currentBoxes[j]));
     }
+  }
   return *this;
 }
 

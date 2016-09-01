@@ -88,7 +88,7 @@ private:
 class FirstOrderFunctionAdaptor : public ceres::FirstOrderFunction
 {
 public:
-  FirstOrderFunctionAdaptor(const ZRegistrationCostFunction& costFun)
+  explicit FirstOrderFunctionAdaptor(const ZRegistrationCostFunction& costFun)
     : FirstOrderFunction()
     , m_costFun(costFun)
   {}
@@ -107,7 +107,7 @@ private:
   const ZRegistrationCostFunction& m_costFun;
 };
 
-}
+}  // namespace
 
 namespace nim {
 

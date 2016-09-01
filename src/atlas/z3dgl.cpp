@@ -1,6 +1,6 @@
 #include "z3dgl.h"
-#include "zlog.h"
 
+#include "zlog.h"
 #include <glbinding/ContextInfo.h>
 #include <glbinding/Version.h>
 #include <glbinding/Meta.h>

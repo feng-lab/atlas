@@ -5,12 +5,10 @@
 #pragma once
 
 #include "zlog.h"
-
 #include <QObject>
 #include <QMutexLocker>
-
-#include <limits>
 #include <QList>
+#include <limits>
 
 class QTimer;
 

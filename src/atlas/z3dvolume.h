@@ -1,8 +1,8 @@
 #pragma once
 
 #include "z3dgl.h"
-#include <QObject>
 #include "zimg.h"
+#include <QObject>
 #include <QThread>
 
 namespace nim {

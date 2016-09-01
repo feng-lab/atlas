@@ -93,9 +93,10 @@ void Z3DImage2DRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx)
 
 bool Z3DImage2DRenderer::hasVolume() const
 {
-  for (size_t i = 0; i < m_volumes.size(); ++i)
+  for (size_t i = 0; i < m_volumes.size(); ++i) {
     if (m_volumes[i])
       return true;
+  }
   return false;
 }
 

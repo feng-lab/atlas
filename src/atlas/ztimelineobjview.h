@@ -1,9 +1,9 @@
 #pragma once
 
+#include "ztimelinewidget.h"
 #include <QGraphicsView>
 #include <QGraphicsItemGroup>
 #include <QMouseEvent>
-#include "ztimelinewidget.h"
 
 namespace nim {
 

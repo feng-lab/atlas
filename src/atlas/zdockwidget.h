@@ -11,5 +11,5 @@ public:
   explicit ZDockWidget(const QString& title, QWidget* parent = nullptr, Qt::WindowFlags flags = nullptr);
 };
 
-} // namespace
+} // namespace nim
 

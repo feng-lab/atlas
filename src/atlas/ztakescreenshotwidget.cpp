@@ -1,4 +1,7 @@
 #include "ztakescreenshotwidget.h"
+
+#include "zselectfilewidget.h"
+#include "z3dgpuinfo.h"
 #include <QStandardPaths>
 #include <QDateTime>
 #include <QPushButton>
@@ -7,8 +10,6 @@
 #include <QMessageBox>
 #include <QLabel>
 #include <QGroupBox>
-#include "zselectfilewidget.h"
-#include "z3dgpuinfo.h"
 #include <QApplication>
 
 namespace nim {
@@ -194,7 +195,7 @@ void ZTakeScreenShotWidget::adjustWidget()
 
 void ZTakeScreenShotWidget::createWidget()
 {
-  QVBoxLayout* lo = new QVBoxLayout;
+  auto lo = new QVBoxLayout;
 
   QHBoxLayout* hlo = nullptr;
   QWidget* wg = nullptr;
@@ -357,7 +358,7 @@ void ZTakeScreenShotWidget::createWidget()
 
   m_useAutoName->click();
 
-  QWidget* widget = new QWidget();
+  auto widget = new QWidget();
   if (m_group) {
     m_groupBox = new QGroupBox(tr("capture"), this);
     m_groupBox->setLayout(lo);

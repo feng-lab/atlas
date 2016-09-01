@@ -1,16 +1,16 @@
 #include "ztimelinewidget.h"
 
+#include "ztimelineeventview.h"
+#include "ztimelineobjview.h"
+#include "ztimelineaxisview.h"
+#include "zlog.h"
+#include "znumericparameter.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QGridLayout>
 #include <QScrollBar>
-#include "ztimelineeventview.h"
-#include "ztimelineobjview.h"
-#include "ztimelineaxisview.h"
 #include <QToolBar>
 #include <QAction>
-#include "zlog.h"
-#include "znumericparameter.h"
 
 namespace nim {
 
@@ -62,7 +62,7 @@ ZTimelineWidget::ZTimelineWidget(ZAnimation& ani, ZDoubleParameter* currentTimeP
   m_expandButton->setStyleSheet("border-style: none;");
   connect(m_expandButton, &QToolButton::clicked, this, &ZTimelineWidget::expandToFit);
 
-  QHBoxLayout* hlo = new QHBoxLayout;
+  auto hlo = new QHBoxLayout;
   hlo->addSpacing(objViewWidth() - 125);
   hlo->addWidget(m_exportButton, 0, Qt::AlignCenter);
   hlo->addWidget(m_cleanupButton, 0, Qt::AlignCenter);
@@ -70,7 +70,7 @@ ZTimelineWidget::ZTimelineWidget(ZAnimation& ani, ZDoubleParameter* currentTimeP
   hlo->addWidget(m_zoomOutButton, 0, Qt::AlignCenter);
   hlo->addWidget(m_expandButton, 0, Qt::AlignCenter);
 
-  QGridLayout* lo = new QGridLayout;
+  auto lo = new QGridLayout;
   lo->setSpacing(0);
   lo->setMargin(0);
   lo->addLayout(hlo, 0, 0);

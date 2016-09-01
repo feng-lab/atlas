@@ -1,15 +1,14 @@
 #include "zimgjpeg.h"
+
 #include "zlog.h"
 #include "ztiff.h"
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
-#include <jpeglib.h>
-//#include <setjmp.h>
+#include "zioutils.h"
 #include "zimage2dutils.h"
-#include <memory>
+#include <jpeglib.h>
 #include <QFile>
 #include <folly/ScopeGuard.h>
-#include "zioutils.h"
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
 
 namespace {
 
@@ -228,7 +227,8 @@ void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion&
   /* JSAMPLEs per row in output buffer */
   /* Make a one-row-high sample array that will go away when done with image */
   JSAMPARRAY buffer = (*cinfo.mem->alloc_sarray)
-    ((j_common_ptr) &cinfo, JPOOL_IMAGE, imgInfo.rowByteNumber() * imgInfo.numChannels, cinfo.rec_outbuf_height);
+    (reinterpret_cast<j_common_ptr>(&cinfo), JPOOL_IMAGE,
+     imgInfo.rowByteNumber() * imgInfo.numChannels, cinfo.rec_outbuf_height);
 
   /* Step 6: while (scan lines remain to be read) */
   /*           jpeg_read_scanlines(...); */
@@ -320,7 +320,7 @@ void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion&
   imgTmp.swap(img);
 }
 
-}
+} // namespace
 
 namespace nim {
 
@@ -334,9 +334,7 @@ ZImgJpeg::ZImgJpeg()
 {
 }
 
-ZImgJpeg::~ZImgJpeg()
-{
-}
+ZImgJpeg::~ZImgJpeg() = default;
 
 QString ZImgJpeg::shortName() const
 {
@@ -589,4 +587,4 @@ void ZImgJpeg::readImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
   memcpy(des, img.channelData<uint8_t>(0), img.byteNumber());
 }
 
-} // namespace
+}  // namespace nim

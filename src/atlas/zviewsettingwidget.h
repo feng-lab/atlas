@@ -1,10 +1,10 @@
 #pragma once
 
+#include "zdoc.h"
+#include "zviewsettinginterface.h"
 #include <QWidget>
 #include <QStackedWidget>
 #include <QLabel>
-#include "zviewsettinginterface.h"
-#include "zdoc.h"
 
 namespace nim {
 

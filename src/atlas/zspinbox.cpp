@@ -1,6 +1,7 @@
 #include "zspinbox.h"
-#include <QEvent>
+
 #include "zlog.h"
+#include <QEvent>
 
 namespace nim {
 
@@ -84,10 +85,9 @@ bool ZSpinBoxEventFilter::eventFilter(QObject* obj, QEvent* event)
       if (qasb->focusPolicy() == Qt::WheelFocus) {
         event->accept();
         return false;
-      } else {
-        event->ignore();
-        return true;
       }
+      event->ignore();
+      return true;
     }
   }
   return QObject::eventFilter(obj, event);

@@ -52,7 +52,7 @@ class ZImg;
 class ZTile
 {
 public:
-  ZTile(int index, QPoint topleft, QPoint bottomright);
+  ZTile(int index_, QPoint topleft, QPoint bottomright);
 
   bool bIsSelected;
   int index;
@@ -105,7 +105,7 @@ class ZStitchImageDialog : public QDialog
 {
 Q_OBJECT
 public:
-  explicit ZStitchImageDialog(QWidget* parent = 0);
+  explicit ZStitchImageDialog(QWidget* parent = nullptr);
 
   virtual ~ZStitchImageDialog();
 

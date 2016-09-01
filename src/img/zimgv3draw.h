@@ -43,5 +43,5 @@ public:
   virtual bool supportWrite() const override;
 };
 
-} // namespace
+} // namespace nim
 

@@ -1,8 +1,8 @@
 #pragma once
 
+#include "zviewsettinginterface.h"
 #include <QWidget>
 #include <QAction>
-#include "zviewsettinginterface.h"
 
 class QVBoxLayout;
 

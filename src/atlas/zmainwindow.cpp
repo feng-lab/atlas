@@ -1,6 +1,35 @@
+#include "zmainwindow.h"
+
 #include "z3dcanvas.h"
 #include "zsysteminfo.h"
-
+#include "zdoc.h"
+#include "zview.h"
+#ifdef ATLAS_WITH_TESTS
+#include "test/zrunbenchmark.h"
+#include "test/zunittest.h"
+#endif
+#include "zcustomcommand.h"
+#include "zviewsettingwidget.h"
+#include "z3dmainwindow.h"
+#include "z3dview.h"
+#include "zobjwidget.h"
+#include "zobjeditwidget.h"
+#include "zobjdetailedinfowidget.h"
+#include "zimgdoc.h"
+#include "zimgview.h"
+#include "zpunctadoc.h"
+#include "zpunctaview.h"
+#include "zswcdoc.h"
+#include "zswcview.h"
+#include "zmeshdoc.h"
+#include "z2danimationdoc.h"
+#include "z3danimationdoc.h"
+#include "zroiview.h"
+#include "zregionannotationdoc.h"
+#include "zregionannotationview.h"
+#include "zsvgdoc.h"
+#include "zsvgview.h"
+#include "zjson.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QAction>
@@ -18,45 +47,6 @@
 #include <QStatusBar>
 #include <QDesktopServices>
 #include <QProcess>
-
-#include "zmainwindow.h"
-#include "zdoc.h"
-#include "zview.h"
-
-#ifdef ATLAS_WITH_TESTS
-
-#include "test/zrunbenchmark.h"
-#include "test/zunittest.h"
-
-#endif
-
-#include "zcustomcommand.h"
-#include "zviewsettingwidget.h"
-#include "z3dmainwindow.h"
-#include "z3dview.h"
-#include "zobjwidget.h"
-#include "zobjeditwidget.h"
-#include "zobjdetailedinfowidget.h"
-
-#include "zimgdoc.h"
-#include "zimgview.h"
-#include "zpunctadoc.h"
-#include "zpunctaview.h"
-#include "zswcdoc.h"
-#include "zswcview.h"
-#include "zmeshdoc.h"
-//#include "zmeshview.h"
-#include "z2danimationdoc.h"
-#include "z3danimationdoc.h"
-#include "zroiview.h"
-#include "zregionannotationdoc.h"
-#include "zregionannotationview.h"
-#include "zsvgdoc.h"
-#include "zsvgview.h"
-
-#include "zjson.h"
-
-//#include "zlogdialog.h"
 
 namespace nim {
 
@@ -111,10 +101,11 @@ void ZMainWindow::updateRecentFileActions()
 void ZMainWindow::openEditWidget(size_t id)
 {
   ZObjDoc* doc = m_doc->idToDoc(id);
-  if (doc->objUndoStack(id))
+  if (doc->objUndoStack(id)) {
     doc->objUndoStack(id)->setActive();
-  else
+  } else {
     m_doc->activateEmptyUndoStack();
+  }
   if (!doc->typeName().contains("3D", Qt::CaseInsensitive)) {
     if (m_objEditWidget->showObjEditWidgetOfObj(id)) {
       m_editObjDockWidget->setVisible(true);
@@ -744,9 +735,9 @@ QString ZMainWindow::strippedName(const QString& fullFileName)
   return QFileInfo(fullFileName).fileName();
 }
 
-ZMainWindow* ZMainWindow::findMainWindow(const QString&)
+ZMainWindow* ZMainWindow::findMainWindow(const QString& /*unused*/)
 {
-  return 0;
+  return nullptr;
 }
 
 bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)

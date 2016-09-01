@@ -1,16 +1,16 @@
 #include "zroidoc.h"
 
+#include "zexception.h"
+#include "zimg.h"
+#include "zimgdoc.h"
+#include "zimgsigneddistancemap.h"
+#include "zlog.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
 #include <QIcon>
-#include "zexception.h"
 #include <set>
-#include "zlog.h"
-#include "zimg.h"
-#include "zimgdoc.h"
-#include "zimgsigneddistancemap.h"
 
 namespace nim {
 
@@ -66,14 +66,12 @@ bool ZROIDoc::save(size_t id)
     if (saveROI(pack.get(), pack->path, err)) {
       m_doc.updateObjInfo(id);
       return true;
-    } else {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-                            tr("Error saving %1 to file %2: %3").arg(objName(id)).arg(pack->path).arg(err));
-      return false;
     }
-  } else {
-    return saveAs(id);
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                          tr("Error saving %1 to file %2: %3").arg(objName(id)).arg(pack->path).arg(err));
+    return false;
   }
+  return saveAs(id);
 }
 
 bool ZROIDoc::saveAs(size_t id)
@@ -90,11 +88,9 @@ bool ZROIDoc::saveAs(size_t id)
     if (saveROI(pack.get(), dialog.selectedFiles().at(0), err)) {
       m_doc.updateObjInfo(id);
       return true;
-    } else {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-                            tr("Error saving %1 as file %2: %3").arg(objName(id)).arg(dialog.selectedFiles().at(0))
-                              .arg(err));
     }
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                          tr("Error saving %1 as file %2: %3").arg(objName(id)).arg(dialog.selectedFiles().at(0)).arg(err));
   }
   return false;
 }
@@ -223,7 +219,7 @@ bool ZROIDoc::isSameObj(const QJsonValue& v1, const QJsonValue& v2) const
   return QFileInfo(f1).canonicalFilePath() == QFileInfo(f2).canonicalFilePath();
 }
 
-size_t ZROIDoc::makeAlias(size_t)
+size_t ZROIDoc::makeAlias(size_t /*id*/)
 {
   return 0;
 }
@@ -306,7 +302,7 @@ void ZROIDoc::createMaskImage()
 
       int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
       img.save(dialog.selectedFiles().at(0), formats[fmtIdx], comps[fmtIdx]);
-      ZImg* tmpImg = new ZImg();
+      auto tmpImg = new ZImg();
       tmpImg->swap(img);
       m_doc.imgDoc().showImg(tmpImg, dialog.selectedFiles().at(0));
 

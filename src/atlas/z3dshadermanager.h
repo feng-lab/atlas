@@ -1,8 +1,8 @@
 #pragma once
 
-#include <map>
-#include <QString>
 #include "z3dcontext.h"
+#include <QString>
+#include <map>
 
 namespace nim {
 
@@ -17,7 +17,7 @@ public:
   Z3DShaderManager();
 
   // return reference because it is always valid
-  Z3DShader& shader(const QString& filename, const QString& header, const Z3DContext& context);
+  Z3DShader& shader(const QString& fn, const QString& header, const Z3DContext& context);
 
 private:
   struct ShaderKey

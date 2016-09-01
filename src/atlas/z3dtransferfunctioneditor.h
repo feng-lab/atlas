@@ -1,10 +1,9 @@
 #pragma once
 
 #include "zglmutils.h"
+#include "zoptionparameter.h"
 #include <QWidget>
 #include <QMenu>
-#include "zparameter.h"
-#include "zoptionparameter.h"
 
 class QAction;
 
@@ -36,9 +35,11 @@ class Z3DTransferFunctionWidget : public QWidget
 {
 Q_OBJECT
 public:
-  Z3DTransferFunctionWidget(Z3DTransferFunctionParameter* tf, bool showHistogram = true,
-                            const QString& histogramNormalizeMethod = tr("Log"), QString xAxisText = tr("Intensity"),
-                            QString yAxisText = tr("Opacity"), QWidget* parent = 0);
+  explicit Z3DTransferFunctionWidget(Z3DTransferFunctionParameter* tf, bool showHistogram = true,
+                                     const QString& histogramNormalizeMethod = tr("Log"),
+                                     QString xAxisText = tr("Intensity"),
+                                     QString yAxisText = tr("Opacity"),
+                                     QWidget* parent = nullptr);
 
   virtual void paintEvent(QPaintEvent* event) override;
 
@@ -46,7 +47,7 @@ public:
 
   virtual void mouseReleaseEvent(QMouseEvent* event) override;
 
-  virtual void leaveEvent(QEvent*) override;
+  virtual void leaveEvent(QEvent* /*event*/) override;
 
   virtual void mouseMoveEvent(QMouseEvent* event) override;
 
@@ -142,7 +143,7 @@ class Z3DTransferFunctionEditor : public QWidget
 {
 Q_OBJECT
 public:
-  Z3DTransferFunctionEditor(Z3DTransferFunctionParameter* para, QWidget* parent = 0);
+  explicit Z3DTransferFunctionEditor(Z3DTransferFunctionParameter* para, QWidget* parent = nullptr);
 
   virtual ~Z3DTransferFunctionEditor();
 
@@ -157,9 +158,9 @@ protected:
 
   void volumeChanged();
 
-  void domainMinSpinBoxChanged(double value);
+  void domainMinSpinBoxChanged(double min);
 
-  void domainMaxSpinBoxChanged(double value);
+  void domainMaxSpinBoxChanged(double max);
 
   void fitDomainToData();
 

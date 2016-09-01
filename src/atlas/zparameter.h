@@ -6,11 +6,11 @@
 // generation. The changed() signal can be used to change algorithm
 // or renderer behavior dynamicly.
 
+#include "zjson.h"
+#include "zlog.h"
 #include <QObject>
 #include <QStringList>
 #include <set>
-#include "zlog.h"
-#include "zjson.h"
 
 class QWidget;
 

@@ -23,7 +23,7 @@ public:
   // 19 18-connected neighborhood with center
   // 26 26-connected neighborhood without center
   // 27 26-connected neighborhood with center
-  ZNeighborhood(size_t nb);
+  explicit ZNeighborhood(size_t nb);
 
   // symmetrical box neighborhood, with or without center
   ZNeighborhood(size_t xRadius, size_t yRadius, size_t zRadius, bool includeCenter);

@@ -7,15 +7,10 @@
 #include "z3dcameraparameter.h"
 #include "z3dinteractionhandler.h"
 #include "z3dnetworkevaluator.h"
-#include "zwidgetsgroup.h"
 #include "zsysteminfo.h"
-#include <QMessageBox>
-#include <QProgressDialog>
-#include <QMainWindow>
-#include <QScrollArea>
+#include "zwidgetsgroup.h"
 #include "ztakescreenshotwidget.h"
 #include "z3dgpuinfo.h"
-
 #include "zimgdoc.h"
 #include "z3dimgview.h"
 #include "zpunctadoc.h"
@@ -28,6 +23,10 @@
 #include "z3danimationview.h"
 #include "z3dregionannotationview.h"
 #include "z3dmainwindow.h"
+#include <QMessageBox>
+#include <QProgressDialog>
+#include <QMainWindow>
+#include <QScrollArea>
 
 namespace {
 // generic solution
@@ -76,7 +75,7 @@ int numDigits(int32_t x)
   return 1;
 }
 
-}
+}  // namespace
 
 namespace nim {
 
@@ -126,8 +125,8 @@ QWidget* Z3DView::globalParasWidget()
 
 QWidget* Z3DView::captureWidget()
 {
-  QScrollArea* res = new QScrollArea();
-  ZTakeScreenShotWidget* m_screenShotWidget = new ZTakeScreenShotWidget(false, false, nullptr);
+  auto res = new QScrollArea();
+  auto m_screenShotWidget = new ZTakeScreenShotWidget(false, false, nullptr);
   m_screenShotWidget->setCaptureStereoImage(m_isStereoView);
   connect(m_screenShotWidget, &ZTakeScreenShotWidget::take3DScreenShot,
           this, &Z3DView::takeScreenShot);
@@ -294,10 +293,11 @@ bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& name
 {
   using namespace boost::math::double_constants;
   QString title = "Capturing Images...";
-  if (sst == Z3DScreenShotType::HalfSideBySideStereoView)
+  if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
     title = "Capturing Half Side-By-Side Stereo Images...";
-  else if (sst == Z3DScreenShotType::FullSideBySideStereoView)
+  } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
     title = "Capturing Full Side-By-Side Stereo Images...";
+  }
   QProgressDialog progress(title, "Cancel", 0, numFrame, m_mainWin);
   progress.setWindowModality(Qt::WindowModal);
   progress.show();
@@ -330,10 +330,11 @@ bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, g
 {
   using namespace boost::math::double_constants;
   QString title = "Capturing Images...";
-  if (sst == Z3DScreenShotType::HalfSideBySideStereoView)
+  if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
     title = "Capturing Half Side-By-Side Stereo Images...";
-  else if (sst == Z3DScreenShotType::FullSideBySideStereoView)
+  } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
     title = "Capturing Full Side-By-Side Stereo Images...";
+  }
   QProgressDialog progress(title, "Cancel", 0, numFrame, m_mainWin);
   progress.setWindowModality(Qt::WindowModal);
   progress.show();

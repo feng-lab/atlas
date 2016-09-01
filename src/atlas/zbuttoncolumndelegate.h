@@ -10,7 +10,7 @@ class ZButtonColumnDelegate : public QStyledItemDelegate
 {
 Q_OBJECT
 public:
-  explicit ZButtonColumnDelegate(QObject* parent = 0);
+  explicit ZButtonColumnDelegate(QObject* parent = nullptr);
 
   ~ZButtonColumnDelegate();
 

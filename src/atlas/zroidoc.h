@@ -78,7 +78,7 @@ protected:
 private:
   struct ROIPack
   { // ROI and its associated data
-    ROIPack(ZROI* roi, const QString& path);
+    ROIPack(ZROI* roi_, const QString& path_);
 
     void updateDerivedData();
 

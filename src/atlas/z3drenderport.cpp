@@ -1,8 +1,8 @@
-#include "z3dgl.h"
 #include "z3drenderport.h"
-#include "z3drendertarget.h"
 
+#include "z3dgl.h"
 #include "z3dgpuinfo.h"
+#include "z3drendertarget.h"
 
 namespace nim {
 
@@ -62,10 +62,11 @@ void Z3DRenderOutputPort::chagneDepthFormat(GLint internalDepthFormat)
 
 bool Z3DRenderOutputPort::canConnectTo(const Z3DInputPortBase* inport) const
 {
-  if (dynamic_cast<const Z3DRenderInputPort*>(inport))
+  if (dynamic_cast<const Z3DRenderInputPort*>(inport)) {
     return Z3DOutputPortBase::canConnectTo(inport);
-  else
+  } else {
     return false;
+  }
 }
 
 //void Z3DRenderOutputPort::setMultisample(bool multisample, int nsample)
@@ -113,16 +114,16 @@ const Z3DTexture* Z3DRenderInputPort::colorTexture(size_t idx) const
 {
   if (renderTarget(idx))
     return renderTarget(idx)->attachment(GL_COLOR_ATTACHMENT0);
-  else
-    return nullptr;
+
+  return nullptr;
 }
 
 const Z3DTexture* Z3DRenderInputPort::depthTexture(size_t idx) const
 {
   if (renderTarget(idx))
     return renderTarget(idx)->attachment(GL_DEPTH_ATTACHMENT);
-  else
-    return nullptr;
+
+  return nullptr;
 }
 
 const Z3DRenderTarget* Z3DRenderInputPort::renderTarget(size_t idx) const

@@ -6,18 +6,14 @@
 #include "zimgtiff.h"
 #include "zimgzeisslsm.h"
 #include "zimgzeissczi.h"
-
 #ifndef _NEUTUBE_
-
 #include "zimgjpeg.h"
 #include "zimgjpegxr.h"
 #include "zimgpng.h"
 #include "zimgfreeimage.h"
 #include "zimgmetaimage.h"
 #include "zimgitkimage.h"
-
 #endif
-
 #include "zlog.h"
 
 namespace nim {
@@ -666,4 +662,4 @@ std::vector<ZImgFormat*> ZImgIO::getSupportedWriter(const QString& filename) con
   return res;
 }
 
-} // namespace
+} // namespace nim

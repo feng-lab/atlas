@@ -98,5 +98,5 @@ private:
   bool m_onlyOneIFDInImageJTiff;
 };
 
-} // namespace
+} // namespace nim
 

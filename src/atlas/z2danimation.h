@@ -16,9 +16,9 @@ public:
 
   void bindView(ZView* v);
 
-  void load(const QString& filename);
+  void load(const QString& fn);
 
-  void save(const QString& filename);
+  void save(const QString& fn);
 
   virtual bool is2DAnimation() const override
   { return true; }

@@ -48,4 +48,4 @@ void Image3DRowFilterForOneBlock_AVX(const double* padImg,
                                      size_t rangeStart,
                                      size_t rangeEnd);
 
-}
+} // namespace nim

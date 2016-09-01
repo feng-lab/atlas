@@ -31,7 +31,7 @@ public:
   explicit ZSelectFileWidget(FileMode mode, const QString& guiname = QString(),
                              const QString& filter = QString(),
                              QBoxLayout::Direction direction = QBoxLayout::LeftToRight,
-                             const QString& startDir = QString(), QWidget* parent = 0);
+                             const QString& startDir = QString(), QWidget* parent = nullptr);
 
   // This variable will be changed with the widget or you can use the get* function
   void setDestination(QString* name);

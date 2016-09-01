@@ -1,17 +1,17 @@
 #include "zgraphicsview.h"
 
+#include "zlog.h"
+#include "zroi.h"
+#include "zroifilter.h"
+#include "zlogqttypesupport.h"
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QWheelEvent>
 #include <QScrollBar>
-#include "zlog.h"
 #include <QGraphicsPolygonItem>
 #include <QGraphicsRectItem>
 #include <QGraphicsEllipseItem>
-#include "zroi.h"
-#include "zroifilter.h"
 #include <QImageWriter>
-#include "zlogqttypesupport.h"
 
 namespace nim {
 
@@ -479,10 +479,11 @@ void ZGraphicsView::mouseReleaseEvent(QMouseEvent* event)
     if (rect.width() >= 1. && rect.height() >= 1.) {
       std::pair<int, int> sliceRange = m_view->currentSliceRange();
       for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-        if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
+        if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New) {
           m_view->roi().addRect(i, rect);
-        else if (m_roiAction == ROIAction::Subtract)
+        } else if (m_roiAction == ROIAction::Subtract) {
           m_view->roi().subtractRect(i, rect);
+        }
       }
     }
     m_startPtItem.reset();
@@ -492,10 +493,11 @@ void ZGraphicsView::mouseReleaseEvent(QMouseEvent* event)
     if (rect.width() >= 1. && rect.height() >= 1.) {
       std::pair<int, int> sliceRange = m_view->currentSliceRange();
       for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-        if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
+        if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New) {
           m_view->roi().addEllipse(i, rect);
-        else if (m_roiAction == ROIAction::Subtract)
+        } else if (m_roiAction == ROIAction::Subtract) {
           m_view->roi().subtractEllipse(i, rect);
+        }
       }
     }
     m_startPtItem.reset();

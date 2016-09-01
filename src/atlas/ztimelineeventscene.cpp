@@ -1,22 +1,22 @@
 #include "ztimelineeventscene.h"
 
-#include <QGraphicsRectItem>
-#include <QGraphicsTextItem>
-#include <QGraphicsPixmapItem>
-#include <QTextOption>
-#include <QTextDocument>
-#include <QPainter>
-#include "zlog.h"
-#include <cmath>
+#include "ztimelinekeyeditdialog.h"
 #include "zanimation.h"
 #include "zbenchtimer.h"
+#include "zlog.h"
 #include "ztimelineeventview.h"
 #include "zparameteranimation.h"
 #include <QScrollBar>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QGraphicsSceneContextMenuEvent>
-#include "ztimelinekeyeditdialog.h"
+#include <QGraphicsRectItem>
+#include <QGraphicsTextItem>
+#include <QGraphicsPixmapItem>
+#include <QTextOption>
+#include <QTextDocument>
+#include <QPainter>
+#include <cmath>
 
 namespace nim {
 
@@ -83,7 +83,7 @@ QVariant ParameterKeysItem::itemChange(QGraphicsItem::GraphicsItemChange change,
   return QGraphicsRectItem::itemChange(change, value);
 }
 
-void ParameterKeysItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*)
+void ParameterKeysItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* /*option*/, QWidget* /*widget*/)
 {
   painter->setRenderHint(QPainter::Antialiasing);
   QPen pen(m_paraAnimation.color());
@@ -107,13 +107,13 @@ void ParameterKeysItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
   event->accept();
 }
 
-void ParameterKeysItem::hoverEnterEvent(QGraphicsSceneHoverEvent*)
+void ParameterKeysItem::hoverEnterEvent(QGraphicsSceneHoverEvent* /*event*/)
 {
   setToolTip(
     QString("Parameter:%1\n%2Object:%3").arg(m_paraAnimation.name()).arg(m_paraKey.info()).arg(m_displayPack.objInfo));
 }
 
-void ParameterKeysItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent*)
+void ParameterKeysItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* /*event*/)
 {
   if (m_paraAnimation.boundParameter()) {
     if (!m_editDialog)
@@ -214,7 +214,7 @@ void ZTimelineEventScene::updateItems()
   for (size_t dpi = 0; dpi < dps.size(); ++dpi) {
     const ZAnimationDisplayPack& pack = dps[dpi];
     if (pack.type == ZAnimationDisplayPack::Type::GlobalPara) {
-      EventBoundRectItem* rect = new EventBoundRectItem(pack, m_timeline);
+      auto rect = new EventBoundRectItem(pack, m_timeline);
       rect->setRect(-1, 0, m_timeline.eventViewWidth() + 2, m_timeline.rowHeight());
       rect->setPen(QPen(QColor(133, 133, 133)));
       rect->setBrush(QBrush(QColor(235 + 20, 235 + 20, 235 + 20)));
@@ -229,7 +229,7 @@ void ZTimelineEventScene::updateItems()
       addItem(rect);
       m_itemToDisplayPack[rect] = &pack;
     } else if (pack.type == ZAnimationDisplayPack::Type::Object) {
-      EventBoundRectItem* rect = new EventBoundRectItem(pack, m_timeline);
+      auto rect = new EventBoundRectItem(pack, m_timeline);
       rect->setRect(-1, 0, m_timeline.eventViewWidth() + 2, m_timeline.rowHeight());
       rect->setPen(QPen(QColor(133, 133, 133)));
       rect->setBrush(QBrush(QColor(220 + 20, 220 + 20, 220 + 20)));
@@ -248,7 +248,7 @@ void ZTimelineEventScene::updateItems()
       addItem(rect);
       m_itemToDisplayPack[rect] = &pack;
     } else if (pack.type == ZAnimationDisplayPack::Type::ObjectPara) {
-      EventBoundRectItem* rect = new EventBoundRectItem(pack, m_timeline);
+      auto rect = new EventBoundRectItem(pack, m_timeline);
       rect->setRect(-1, 0, m_timeline.eventViewWidth() + 2, m_timeline.rowHeight());
       rect->setPen(QPen(QColor(200, 200, 200)));
       rect->setBrush(QBrush(QColor(235 + 20, 235 + 20, 235 + 20)));

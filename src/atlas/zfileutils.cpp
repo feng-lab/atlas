@@ -6,15 +6,9 @@
 
 namespace nim {
 
-ZFileUtils::ZFileUtils()
-{
+ZFileUtils::ZFileUtils() = default;
 
-}
-
-ZFileUtils::~ZFileUtils()
-{
-
-}
+ZFileUtils::~ZFileUtils() = default;
 
 void ZFileUtils::showInGraphicalShell(const QString& filePath)
 {

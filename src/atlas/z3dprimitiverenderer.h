@@ -1,10 +1,10 @@
 #pragma once
 
-#include <QObject>
 #include "z3drendererbase.h"
 #include "z3dshadergroup.h"
 #include "zvertexarrayobject.h"
 #include "zvertexbufferobject.h"
+#include <QObject>
 
 namespace nim {
 

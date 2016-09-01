@@ -1,6 +1,6 @@
-#include "z3dgl.h"
 #include "z3dpickingmanager.h"
 
+#include "z3dgl.h"
 #include "z3dtexture.h"
 #include "zlog.h"
 #include <QApplication>

@@ -16,7 +16,7 @@ Q_OBJECT
 public:
   explicit ZSpinBoxWithScrollBar(int value, int min, int max, int step = 1,
                                  bool tracking = true, const QString& prefix = "",
-                                 const QString& suffix = "", QWidget* parent = 0);
+                                 const QString& suffix = "", QWidget* parent = nullptr);
 
   void setValue(int v);
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <QWidget>
 #include "z3dcameraparameter.h"
+#include <QWidget>
 
 class QSpinBox;
 
@@ -11,7 +11,7 @@ class Z3DCameraControlWidget : public QWidget
 {
 Q_OBJECT
 public:
-  explicit Z3DCameraControlWidget(Z3DCameraParameter& camera, QWidget* parent = 0);
+  explicit Z3DCameraControlWidget(Z3DCameraParameter& camera, QWidget* parent = nullptr);
 
 private:
   void roll();

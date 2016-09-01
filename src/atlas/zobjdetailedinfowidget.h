@@ -1,9 +1,9 @@
 #pragma once
 
+#include "zdoc.h"
 #include <QWidget>
 #include <QStackedWidget>
 #include <QLabel>
-#include "zdoc.h"
 
 namespace nim {
 

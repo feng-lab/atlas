@@ -1,9 +1,10 @@
 #include "z3dtransformparameter.h"
+
+#include "zwidgetsgroup.h"
+#include "zlog.h"
 #include <QWidget>
 #include <QGroupBox>
 #include <QPushButton>
-#include "zwidgetsgroup.h"
-#include "zlog.h"
 
 namespace {
 
@@ -115,7 +116,7 @@ void decompose(const glm::mat4& m, glm::vec3& translation, glm::vec3& scale, glm
 }
 #endif
 
-}
+}  // namespace
 
 namespace nim {
 

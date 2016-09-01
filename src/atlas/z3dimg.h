@@ -1,12 +1,12 @@
 #pragma once
 
 #include "z3dgl.h"
-#include <QObject>
 #include "zimgpack.h"
-#include <QThread>
 #include "z3dblockcache.h"
 #include "z3dtexture.h"
 #include "z3dvolume.h"
+#include <QObject>
+#include <QThread>
 #include <set>
 
 namespace nim {

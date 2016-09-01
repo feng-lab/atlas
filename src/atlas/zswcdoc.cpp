@@ -1,12 +1,12 @@
 #include "zswcdoc.h"
 
+#include "zexception.h"
+#include "zlog.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
 #include <QIcon>
-#include "zlog.h"
-#include "zexception.h"
 #include <set>
 
 namespace nim {
@@ -28,14 +28,12 @@ bool ZSwcDoc::save(size_t id)
     if (saveSwc(pack.get(), pack->path, err)) {
       m_doc.updateObjInfo(id);
       return true;
-    } else {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-                            tr("Error saving %1 to file %2: %3").arg(objName(id)).arg(pack->path).arg(err));
-      return false;
     }
-  } else {
-    return saveAs(id);
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                          tr("Error saving %1 to file %2: %3").arg(objName(id)).arg(pack->path).arg(err));
+    return false;
   }
+  return saveAs(id);
 }
 
 bool ZSwcDoc::saveAs(size_t id)
@@ -52,9 +50,8 @@ bool ZSwcDoc::saveAs(size_t id)
     if (saveSwc(pack.get(), dialog.selectedFiles().at(0), err)) {
       m_doc.updateObjInfo(id);
       return true;
-    } else {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
     }
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
   }
   return false;
 }

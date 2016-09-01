@@ -1,9 +1,9 @@
 #pragma once
 
-#include <QWidget>
-#include <cmath>
-#include <QToolButton>
 #include "zanimation.h"
+#include <QWidget>
+#include <QToolButton>
+#include <cmath>
 
 namespace nim {
 

@@ -12,7 +12,7 @@ class ZColorMapWidgetWithEditorWindow : public ZClickableColorMapLabel
 {
 Q_OBJECT
 public:
-  explicit ZColorMapWidgetWithEditorWindow(ZColorMapParameter* cm, QWidget* parent = 0);
+  explicit ZColorMapWidgetWithEditorWindow(ZColorMapParameter* cm, QWidget* parent = nullptr);
 
 protected:
   void createEditorWindow();

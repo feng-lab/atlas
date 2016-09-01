@@ -1,9 +1,9 @@
 #include "z3dsdfont.h"
 
+#include "zlog.h"
 #include <QFile>
 #include <QTextStream>
 #include <QStringList>
-#include "zlog.h"
 
 namespace nim {
 

@@ -1,8 +1,6 @@
 #pragma once
 
-#include <QString>
 #include "ztree.hpp"
-#include "zglobal.h"
 #include "zglmutils.h"
 
 namespace nim {
@@ -10,8 +8,8 @@ namespace nim {
 // http://research.mssm.edu/cnic/swc.html
 struct SwcNode
 {
-  SwcNode(int id_ = -1, int type_ = -1, double x_ = 0, double y_ = 0, double z_ = 0,
-          double radius_ = -1, int parentID_ = -2)
+  explicit SwcNode(int id_ = -1, int type_ = -1, double x_ = 0, double y_ = 0, double z_ = 0,
+                   double radius_ = -1, int parentID_ = -2)
     : id(id_), type(type_), x(x_), y(y_), z(z_), radius(radius_), parentID(parentID_), label(-1)
   {}
 
@@ -55,7 +53,8 @@ public:
   static constexpr int ApicalObliqueTerminalType = 9;
   static constexpr int ApicalTuftType = 10;
 
-  ZSwc() : ZTree<SwcNode>()
+  ZSwc()
+    : ZTree<SwcNode>()
   {}
 
   // might throw ZIOException

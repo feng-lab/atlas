@@ -111,7 +111,7 @@ ZImageTransform* ZImageMatrix3DTransform::clone() const
 
 ZImageTransform* ZImageMatrix3DTransform::makeInverseTransform() const
 {
-  ZImageMatrix3DTransform* res = new ZImageMatrix3DTransform(*this);
+  auto res = new ZImageMatrix3DTransform(*this);
   res->m_tform.invert();
   return res;
 }
@@ -168,7 +168,7 @@ ZImageTransform* ZImageTranslation3DTransform::clone() const
 
 ZImageTransform* ZImageTranslation3DTransform::makeInverseTransform() const
 {
-  ZImageTranslation3DTransform* res = new ZImageTranslation3DTransform(*this);
+  auto res = new ZImageTranslation3DTransform(*this);
   res->m_tform.invert();
   return res;
 }
@@ -216,7 +216,7 @@ ZImageTransform* ZImageRigid3DTransform::clone() const
 
 ZImageTransform* ZImageRigid3DTransform::makeInverseTransform() const
 {
-  ZImageRigid3DTransform* res = new ZImageRigid3DTransform(*this);
+  auto res = new ZImageRigid3DTransform(*this);
   res->m_tform.invert();
   return res;
 }
@@ -266,7 +266,7 @@ ZImageTransform* ZImageSimilarity3DTransform::clone() const
 
 ZImageTransform* ZImageSimilarity3DTransform::makeInverseTransform() const
 {
-  ZImageSimilarity3DTransform* res = new ZImageSimilarity3DTransform(*this);
+  auto res = new ZImageSimilarity3DTransform(*this);
   res->m_tform.invert();
   return res;
 }
@@ -319,7 +319,7 @@ ZImageTransform* ZImageAffine3DTransform::clone() const
 
 ZImageTransform* ZImageAffine3DTransform::makeInverseTransform() const
 {
-  ZImageAffine3DTransform* res = new ZImageAffine3DTransform(*this);
+  auto res = new ZImageAffine3DTransform(*this);
   res->m_tform.invert();
   return res;
 }

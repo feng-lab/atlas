@@ -1,8 +1,8 @@
 #pragma once
 
-#include "zparameter.h"
 #include "zglmutils.h"
 #include "znumericparameter.h"
+#include "zparameter.h"
 #include "zquatparameter.h"
 
 namespace nim {

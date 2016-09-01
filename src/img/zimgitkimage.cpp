@@ -1,20 +1,18 @@
 #include "zimgitkimage.h"
 
-#include <QFile>
-#include <QStringList>
-#include <QFileInfo>
-#include <QDir>
 #include "zimgsliceprovider.h"
 #include <itkImageIOBase.h>
 #include <itkNiftiImageIOFactory.h>
 #include <itkNrrdImageIOFactory.h>
 #include <itkImageIOFactory.h>
-
 //#define ATLAS_SUPPORT_DICOM
-
 #ifdef ATLAS_SUPPORT_DICOM
 #include <itkGDCMImageIOFactory.h>
 #endif
+#include <QFile>
+#include <QStringList>
+#include <QFileInfo>
+#include <QDir>
 
 namespace nim {
 
@@ -30,9 +28,7 @@ ZImgITKImage::ZImgITKImage()
   }
 }
 
-ZImgITKImage::~ZImgITKImage()
-{
-}
+ZImgITKImage::~ZImgITKImage() = default;
 
 QString ZImgITKImage::shortName() const
 {
@@ -94,7 +90,7 @@ void ZImgITKImage::readInfo(const QString& filename, std::vector<ZImgInfo>& info
   }
 }
 
-void ZImgITKImage::readMetadata(const QString&, ZImgMetadata&, size_t)
+void ZImgITKImage::readMetadata(const QString& /*filename*/, ZImgMetadata& /*meta*/, size_t /*scene*/)
 {
   try {
   }
@@ -103,7 +99,8 @@ void ZImgITKImage::readMetadata(const QString&, ZImgMetadata&, size_t)
   }
 }
 
-void ZImgITKImage::readThumbnail(const QString&, ZImgThumbernail&, const ZImgRegion&, size_t)
+void ZImgITKImage::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thumbnail*/,
+                                 const ZImgRegion& /*region*/, size_t /*scene*/)
 {
   try {
   }
@@ -437,5 +434,5 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info)
   }
 }
 
-} // namespace
+}  // namespace nim
 

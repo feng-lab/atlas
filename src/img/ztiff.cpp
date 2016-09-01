@@ -1,17 +1,17 @@
 #include "ztiff.h"
-#include <sstream>
-#include <tiffio.h>
-#include <tiffio.hxx>
-//#include "zxtiffio.h"
+
 #include "zimgformat.h"
 #include "zlog.h"
-#include <cmath>
-#include <boost/endian/conversion.hpp>
-#include <boost/align/aligned_allocator.hpp>
 #include "zimage2dutils.h"
 #include "zioutils.h"
-#include <set>
+#include <tiffio.h>
+#include <tiffio.hxx>
 #include <QFile>
+#include <boost/endian/conversion.hpp>
+#include <boost/align/aligned_allocator.hpp>
+#include <cmath>
+#include <set>
+#include <sstream>
 
 namespace {
 
@@ -358,7 +358,7 @@ const uint8_t bitmasks4[] = {
   0xF0, 0x0F
 };
 
-}
+}  // namespace
 
 namespace nim {
 
@@ -392,26 +392,26 @@ VoxelFormat ZTiffIFD::voxelFormat(size_t sample) const
     }
     VoxelFormat vf = static_cast<VoxelFormat>(vfn);
     return vf;
-  } else
-    return VoxelFormat::Unsigned;
+  }
+  return VoxelFormat::Unsigned;
 }
 
 size_t ZTiffIFD::samplesPerPixel() const
 {
   int64_t i = indexOf(TIFFTAG_SAMPLESPERPIXEL);
-  if (i != -1)
+  if (i != -1) {
     return m_entries[i].dataAt<uint16_t>(0);
-  else
-    return 1;
+  }
+  return 1;
 }
 
 size_t ZTiffIFD::bitsPerSample(size_t sample) const
 {
   int64_t i = indexOf(TIFFTAG_BITSPERSAMPLE);
-  if (i != -1)
+  if (i != -1) {
     return m_entries[i].dataAt<uint16_t>(sample);
-  else
-    return 1;
+  }
+  return 1;
 }
 
 size_t ZTiffIFD::imageWidth() const
@@ -445,8 +445,8 @@ uint16_t ZTiffIFD::photometricInterpretation() const
   int64_t i = indexOf(TIFFTAG_PHOTOMETRIC);
   if (i != -1)
     return m_entries[i].dataAt<uint16_t>(0);
-  else
-    throw ZIOException("TIFFTAG_PHOTOMETRIC is required field of tiff.");
+
+  throw ZIOException("TIFFTAG_PHOTOMETRIC is required field of tiff.");
   return 0;
 }
 
@@ -455,8 +455,8 @@ QString ZTiffIFD::imageDescriptionAsQString() const
   int64_t i = indexOf(TIFFTAG_IMAGEDESCRIPTION);
   if (i != -1)
     return QString::fromUtf8(m_entries[i].dataArray<char>(), m_entries[i].count() - 1);
-  else
-    return QString();
+
+  return QString();
 }
 
 uint16_t ZTiffIFD::orientation() const
@@ -464,8 +464,8 @@ uint16_t ZTiffIFD::orientation() const
   int64_t i = indexOf(TIFFTAG_ORIENTATION);
   if (i != -1)
     return m_entries[i].dataAt<uint16_t>(0);
-  else
-    return 1;
+
+  return 1;
 }
 
 uint16_t ZTiffIFD::compression() const
@@ -473,8 +473,8 @@ uint16_t ZTiffIFD::compression() const
   int64_t i = indexOf(TIFFTAG_COMPRESSION);
   if (i != -1)
     return m_entries[i].dataAt<uint16_t>(0);
-  else
-    return 1;
+
+  return 1;
 }
 
 uint16_t ZTiffIFD::planarConfiguration() const
@@ -482,8 +482,8 @@ uint16_t ZTiffIFD::planarConfiguration() const
   int64_t i = indexOf(TIFFTAG_PLANARCONFIG);
   if (i != -1)
     return m_entries[i].dataAt<uint16_t>(0);
-  else
-    return 1;
+
+  return 1;
 }
 
 int ZTiffIFD::extraSample() const
@@ -760,7 +760,7 @@ void ZTiff::load(const QString& filename, bool tagOnly)
   }
 
   if (!tagOnly) {
-    TIFFSetWarningHandler(0);
+    TIFFSetWarningHandler(nullptr);
     if (m_useColormap) {
       TIFFSetErrorHandler(LibtiffErrorHandler);
     } else {
@@ -863,16 +863,19 @@ void ZTiff::readInfoFromIFD(const ZTiffIFD& ifd, ZImgInfo& info)
     info.numChannels = ifd.samplesPerPixel();
     size_t bps = ifd.bitsPerSample(0);
     info.validBitCount = bps;
-    for (size_t j = 1; j < info.numChannels; ++j)
+    for (size_t j = 1; j < info.numChannels; ++j) {
       if (ifd.bitsPerSample(j) != bps)
         throw ZIOException("Different bits per sample is not supported.");
+    }
     if (bps > 64 || (bps > 8 && bps % 8 != 0))
       throw ZIOException(QString("%1 bits per sample tiff is not supported.").arg(bps));
+
     info.bytesPerVoxel = std::ceil(bps * 1.0 / 8);
     VoxelFormat vf = ifd.voxelFormat(0);
-    for (size_t j = 1; j < info.numChannels; ++j)
+    for (size_t j = 1; j < info.numChannels; ++j) {
       if (ifd.voxelFormat(j) != vf)
         throw ZIOException("Different sample format is not supported.");
+    }
     info.voxelFormat = vf;
 
     if (ifd.extraSample() >= 0) {
@@ -1415,10 +1418,11 @@ void ZTiff::readImg(ZImg& img, bool divideByAlpha)
 
           size_t off = 0;
           for (uint32_t strip = c * stripsPerChannel; strip < (c + 1) * stripsPerChannel; strip++) {
-            if (strip == (c + 1) * stripsPerChannel - 1)
+            if (strip == (c + 1) * stripsPerChannel - 1) {
               off += readStrip(strip, buf + off, img.width(), numRowsOfLastStrip, 1, invertWhiteBlack);
-            else
+            } else {
               off += readStrip(strip, buf + off, img.width(), numRowsPerStrip, 1, invertWhiteBlack);
+            }
           }
           if (off != img.channelByteNumber())
             throw ZIOException(QString("read(%1):expected(%2)").arg(off).arg(img.channelByteNumber()));
@@ -1540,7 +1544,9 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t heigh
       }
     }
     return read;
-  } else if (bitspersample == 1) {
+  }
+
+  if (bitspersample == 1) {
     std::vector<uint8_t> packedBuf(TIFFStripSize(m_tif.get()));
     TIFFReadEncodedStrip(m_tif.get(), strip, packedBuf.data(), static_cast<tmsize_t>(-1));
     uint8_t* buf8 = buf;
@@ -1557,7 +1563,8 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t heigh
       }
     }
     return height * width * nChannel;
-  } else if (bitspersample == 2) {
+  }
+  if (bitspersample == 2) {
     std::vector<uint8_t> packedBuf(TIFFStripSize(m_tif.get()));
     TIFFReadEncodedStrip(m_tif.get(), strip, packedBuf.data(), static_cast<tmsize_t>(-1));
     uint8_t* buf8 = buf;
@@ -1574,7 +1581,8 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t heigh
       }
     }
     return height * width * nChannel;
-  } else if (bitspersample == 4) {
+  }
+  if (bitspersample == 4) {
     std::vector<uint8_t> packedBuf(TIFFStripSize(m_tif.get()));
     TIFFReadEncodedStrip(m_tif.get(), strip, packedBuf.data(), static_cast<tmsize_t>(-1));
     uint8_t* buf8 = buf;
@@ -1591,10 +1599,9 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t heigh
       }
     }
     return height * width * nChannel;
-  } else {
-    throw ZIOException("should not happen");
-    return 0;
   }
+  throw ZIOException("should not happen");
+  return 0;
 }
 
 void ZTiff::readTile(uint32_t tile, uint8_t* buf, size_t tileWidth, size_t tileHeight, size_t tileChannel, bool invert)
@@ -1745,8 +1752,7 @@ void ZTiff::copyTileToImg(const uint8_t* tileBuf, size_t tileWidth, size_t tileH
 
 ZTiffWriter::ZTiffWriter()
   : m_tif(nullptr, TIFFClose)
-{
-}
+{}
 
 void ZTiffWriter::startWriting(const QString& filename, Compression comp, int extraSample, bool bigTiff)
 {
@@ -1765,7 +1771,7 @@ void ZTiffWriter::startWriting(const QString& filename, Compression comp, int ex
   m_compression = comp;
   m_extraSample = extraSample;
 
-  TIFFSetWarningHandler(0);
+  TIFFSetWarningHandler(nullptr);
   TIFFSetErrorHandler(LibtiffErrorHandler);
 #if defined(_WIN32) || defined(_WIN64)
   if (bigTiff)
@@ -1868,7 +1874,7 @@ Compression ZTiffWriter::defaultCompression(const ZImg* img)
   return Compression::NONE;
 }
 
-bool ZTiffWriter::checkCompression(const ZImg*, Compression comp)
+bool ZTiffWriter::checkCompression(const ZImg* /*unused*/, Compression comp)
 {
   if (comp == Compression::NONE)
     return true;
@@ -1885,4 +1891,4 @@ bool ZTiffWriter::checkCompression(const ZImg*, Compression comp)
   return true;
 }
 
-} // namespace
+} // namespace nim

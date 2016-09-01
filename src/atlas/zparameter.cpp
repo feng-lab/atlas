@@ -1,8 +1,9 @@
 #include "zparameter.h"
+
+#include "zlog.h"
 #include <QWidget>
 #include <QLabel>
 #include <QCheckBox>
-#include "zlog.h"
 
 namespace nim {
 
@@ -46,7 +47,7 @@ void ZParameter::setStyle(const QString& style)
 
 QLabel* ZParameter::createNameLabel(QWidget* parent)
 {
-  QLabel* label = new QLabel(m_name, parent);
+  auto label = new QLabel(m_name, parent);
   label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   if (!m_isWidgetsVisible)
     label->setVisible(m_isWidgetsVisible);
@@ -158,14 +159,14 @@ void ZBoolParameter::beforeChange(bool& value)
   emit valueWillChange(value);
 }
 
-void ZBoolParameter::afterChange(bool&)
+void ZBoolParameter::afterChange(bool& /*unused*/)
 {
   emit boolChanged(m_value);
 }
 
 QWidget* ZBoolParameter::actualCreateWidget(QWidget* parent)
 {
-  QCheckBox* cb = new QCheckBox(parent);
+  auto cb = new QCheckBox(parent);
   cb->setChecked(m_value);
   connect(cb, &QCheckBox::toggled, this, &ZBoolParameter::setValue);
   connect(this, &ZBoolParameter::valueWillChange, cb, &QCheckBox::setChecked);

@@ -1,6 +1,7 @@
 #include "zeventlistenerparameter.h"
-#include <QLabel>
+
 #include "zlog.h"
+#include <QLabel>
 
 namespace nim {
 
@@ -97,7 +98,7 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
 
 QWidget* ZEventListenerParameter::actualCreateWidget(QWidget* parent)
 {
-  // TODO
+  // todo: interface?
   return new QLabel("Place holder", parent);
 }
 
@@ -127,7 +128,7 @@ QJsonValue ZEventListenerParameter::jsonValue() const
   return QJsonValue(QString(""));
 }
 
-void ZEventListenerParameter::readValue(const QJsonValue&)
+void ZEventListenerParameter::readValue(const QJsonValue& /*value*/)
 {
 }
 

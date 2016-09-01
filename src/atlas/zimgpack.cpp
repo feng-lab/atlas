@@ -1,17 +1,17 @@
 #include "zimgpack.h"
 
-#include <QFileInfo>
-#include <cmath>
-#include <QPoint>
-#include <QDir>
 #include "zimgcache.h"
 #include "zsysteminfo.h"
 #include "zcpuinfo.h"
 #include "zimgio.h"
-#include <boost/function_output_iterator.hpp>
 #include "z3dgpuinfo.h"
 #include "zlog.h"
+#include <QFileInfo>
+#include <QPoint>
+#include <QDir>
 #include <tbb/parallel_for.h>
+#include <boost/function_output_iterator.hpp>
+#include <cmath>
 
 namespace {
 
@@ -24,7 +24,7 @@ struct MaxOp
   }
 };
 
-}
+}  // namespace
 
 namespace nim {
 
@@ -457,14 +457,12 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
       }
     }
     return 0;
-  } else {
-    if (mip) {
-      CHECK(!m_maximumProjectedAlongZImg.isEmpty());
-      return m_maximumProjectedAlongZImg.value<double>(x, y, 0, c, t);
-    } else {
-      return m_img.value<double>(x, y, z, c, t);
-    }
   }
+  if (mip) {
+    CHECK(!m_maximumProjectedAlongZImg.isEmpty());
+    return m_maximumProjectedAlongZImg.value<double>(x, y, 0, c, t);
+  }
+  return m_img.value<double>(x, y, z, c, t);
 }
 
 double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, bool mip) const
@@ -496,14 +494,12 @@ double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, 
     }
 
     return hasTile ? value(x, y, z, c, t, mip) : 0;
-  } else {
-    if (mip) {
-      CHECK(!m_maximumProjectedAlongZImg.isEmpty());
-      return m_maximumProjectedAlongZImg.value<double>(x, y, 0, c, t);
-    } else {
-      return m_img.value<double>(x, y, z, c, t);
-    }
   }
+  if (mip) {
+    CHECK(!m_maximumProjectedAlongZImg.isEmpty());
+    return m_maximumProjectedAlongZImg.value<double>(x, y, 0, c, t);
+  }
+  return m_img.value<double>(x, y, z, c, t);
 }
 
 ZImg ZImgPack::crop(const ZImgRegion& region) const
@@ -812,28 +808,28 @@ void ZImgPack::buildPyramidal(ZImg& img)
   if (m_imgInfo.depth == 1) {
     for (size_t t = 0; t < m_imgInfo.numTimes; ++t) {
       if (m_imgInfo.numTimes == 1) {
-        ZImg* tImg = new ZImg();
+        auto tImg = new ZImg();
         tImg->swap(img);
         createSliceTiles(tImg, 0, 0);
       } else {
         ZImgRegion rgn;
         rgn.start.t = t;
         rgn.end.t = t + 1;
-        ZImg* tImg = new ZImg();
+        auto tImg = new ZImg();
         img.crop(rgn).swap(*tImg);
         createSliceTiles(tImg, 0, t);
       }
     }
   } else {
     for (size_t t = 0; t < m_imgInfo.numTimes; ++t) {
-      ZImg* mipImg = new ZImg();
+      auto mipImg = new ZImg();
       for (size_t z = 0; z < m_imgInfo.depth; ++z) {
         ZImgRegion rgn;
         rgn.start.z = z;
         rgn.end.z = z + 1;
         rgn.start.t = t;
         rgn.end.t = t + 1;
-        ZImg* tImg = new ZImg();
+        auto tImg = new ZImg();
         img.crop(rgn).swap(*tImg);
         if (z == 0) {
           *mipImg = *tImg;
@@ -868,7 +864,7 @@ void ZImgPack::buildPyramidal()
       ZImgRegion rgn;
       rgn.start.t = t;
       rgn.end.t = t + 1;
-      ZImg* tImg = new ZImg();
+      auto tImg = new ZImg();
       tImg->load(m_imgSource.filenames, m_imgSource.catDim, rgn, m_imgSource.scene, m_imgSource.format);
       tImg->computeMinMax(minV, maxV);
       m_minIntensity = std::min(m_minIntensity, minV);
@@ -877,14 +873,14 @@ void ZImgPack::buildPyramidal()
     }
   } else {
     for (size_t t = 0; t < m_imgInfo.numTimes; ++t) {
-      ZImg* mipImg = new ZImg();
+      auto mipImg = new ZImg();
       for (size_t z = 0; z < m_imgInfo.depth; ++z) {
         ZImgRegion rgn;
         rgn.start.z = z;
         rgn.end.z = z + 1;
         rgn.start.t = t;
         rgn.end.t = t + 1;
-        ZImg* tImg = new ZImg();
+        auto tImg = new ZImg();
         tImg->load(m_imgSource.filenames, m_imgSource.catDim, rgn, m_imgSource.scene, m_imgSource.format);
         tImg->computeMinMax(minV, maxV);
         m_minIntensity = std::min(m_minIntensity, minV);
@@ -1116,4 +1112,4 @@ size_t ZImgPack::readRatioOf(size_t needRatio) const
   return readRatio;
 }
 
-} // namespace
+} // namespace nim

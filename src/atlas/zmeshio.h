@@ -1,7 +1,7 @@
 #pragma once
 
-#include <QStringList>
 #include "z3dgl.h"
+#include <QStringList>
 #include <vector>
 
 namespace nim {

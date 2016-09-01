@@ -1,12 +1,13 @@
 #include "znumericparameter.h"
+
 #include "zspinboxwithslider.h"
 #include "zspinboxwithscrollbar.h"
 #include "zspinbox.h"
 #include "zclickablelabel.h"
+#include "zspanslider.h"
 #include <QBoxLayout>
 #include <QGroupBox>
 #include <QLabel>
-#include "zspanslider.h"
 
 namespace nim {
 
@@ -42,7 +43,7 @@ void ZIntParameter::afterChange(int& value)
 QWidget* ZIntParameter::actualCreateWidget(QWidget* parent)
 {
   if (m_style == "SPINBOX") {
-    ZSpinBox* sb = new ZSpinBox(parent);
+    auto sb = new ZSpinBox(parent);
     sb->setRange(m_min, m_max);
     sb->setValue(m_value);
     sb->setSingleStep(m_step);
@@ -105,7 +106,7 @@ void ZDoubleParameter::afterChange(double& value)
 QWidget* ZDoubleParameter::actualCreateWidget(QWidget* parent)
 {
   if (m_style == "SPINBOX") {
-    ZDoubleSpinBox* sb = new ZDoubleSpinBox(parent);
+    auto sb = new ZDoubleSpinBox(parent);
     sb->setRange(m_min, m_max);
     sb->setValue(m_value);
     sb->setSingleStep(m_step);
@@ -161,7 +162,7 @@ void ZFloatParameter::afterChange(float& value)
 QWidget* ZFloatParameter::actualCreateWidget(QWidget* parent)
 {
   if (m_style == "SPINBOX") {
-    ZDoubleSpinBox* sb = new ZDoubleSpinBox(parent);
+    auto sb = new ZDoubleSpinBox(parent);
     sb->setRange(m_min, m_max);
     sb->setValue(m_value);
     sb->setSingleStep(m_step);
@@ -235,7 +236,7 @@ QWidget* ZVec2Parameter::actualCreateWidget(QWidget* parent)
 
   if (m_style == "SPINBOX") {
     {
-      ZDoubleSpinBox* sb1 = new ZDoubleSpinBox();
+      auto sb1 = new ZDoubleSpinBox();
       sb1->setRange(m_min[0], m_max[0]);
       sb1->setValue(m_value[0]);
       sb1->setSingleStep(m_step);
@@ -254,7 +255,7 @@ QWidget* ZVec2Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb1);
           lo->addLayout(hlo);
@@ -262,7 +263,7 @@ QWidget* ZVec2Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBox* sb2 = new ZDoubleSpinBox();
+      auto sb2 = new ZDoubleSpinBox();
       sb2->setRange(m_min[1], m_max[1]);
       sb2->setValue(m_value[1]);
       sb2->setSingleStep(m_step);
@@ -281,7 +282,7 @@ QWidget* ZVec2Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb2);
           lo->addLayout(hlo);
@@ -304,7 +305,7 @@ QWidget* ZVec2Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws1);
           lo->addLayout(hlo);
@@ -326,7 +327,7 @@ QWidget* ZVec2Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws2);
           lo->addLayout(hlo);
@@ -400,7 +401,7 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
 
   if (m_style == "SPINBOX") {
     {
-      ZDoubleSpinBox* sb1 = new ZDoubleSpinBox();
+      auto sb1 = new ZDoubleSpinBox();
       sb1->setRange(m_min[0], m_max[0]);
       sb1->setValue(m_value[0]);
       sb1->setSingleStep(m_step);
@@ -419,7 +420,7 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb1);
           lo->addLayout(hlo);
@@ -427,7 +428,7 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBox* sb2 = new ZDoubleSpinBox();
+      auto sb2 = new ZDoubleSpinBox();
       sb2->setRange(m_min[1], m_max[1]);
       sb2->setValue(m_value[1]);
       sb2->setSingleStep(m_step);
@@ -446,7 +447,7 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb2);
           lo->addLayout(hlo);
@@ -454,7 +455,7 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBox* sb3 = new ZDoubleSpinBox();
+      auto sb3 = new ZDoubleSpinBox();
       sb3->setRange(m_min[2], m_max[2]);
       sb3->setValue(m_value[2]);
       sb3->setSingleStep(m_step);
@@ -473,7 +474,7 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb3);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb3);
           lo->addLayout(hlo);
@@ -496,7 +497,7 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws1);
           lo->addLayout(hlo);
@@ -518,7 +519,7 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws2);
           lo->addLayout(hlo);
@@ -540,7 +541,7 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws3);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws3);
           lo->addLayout(hlo);
@@ -621,7 +622,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
 
   if (m_style == "SPINBOX") {
     {
-      ZDoubleSpinBox* sb1 = new ZDoubleSpinBox();
+      auto sb1 = new ZDoubleSpinBox();
       sb1->setRange(m_min[0], m_max[0]);
       sb1->setValue(m_value[0]);
       sb1->setSingleStep(m_step);
@@ -640,7 +641,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb1);
           lo->addLayout(hlo);
@@ -648,7 +649,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBox* sb2 = new ZDoubleSpinBox();
+      auto sb2 = new ZDoubleSpinBox();
       sb2->setRange(m_min[1], m_max[1]);
       sb2->setValue(m_value[1]);
       sb2->setSingleStep(m_step);
@@ -667,7 +668,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb2);
           lo->addLayout(hlo);
@@ -675,7 +676,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBox* sb3 = new ZDoubleSpinBox();
+      auto sb3 = new ZDoubleSpinBox();
       sb3->setRange(m_min[2], m_max[2]);
       sb3->setValue(m_value[2]);
       sb3->setSingleStep(m_step);
@@ -694,7 +695,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb3);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb3);
           lo->addLayout(hlo);
@@ -702,7 +703,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBox* sb4 = new ZDoubleSpinBox();
+      auto sb4 = new ZDoubleSpinBox();
       sb4->setRange(m_min[3], m_max[3]);
       sb4->setValue(m_value[3]);
       sb4->setSingleStep(m_step);
@@ -721,7 +722,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb4);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb4);
           lo->addLayout(hlo);
@@ -744,7 +745,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws1);
           lo->addLayout(hlo);
@@ -766,7 +767,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws2);
           lo->addLayout(hlo);
@@ -788,7 +789,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws3);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws3);
           lo->addLayout(hlo);
@@ -810,7 +811,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws4);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws4);
           lo->addLayout(hlo);
@@ -872,7 +873,7 @@ QWidget* ZDVec2Parameter::actualCreateWidget(QWidget* parent)
 
   if (m_style == "SPINBOX") {
     {
-      ZDoubleSpinBox* sb1 = new ZDoubleSpinBox();
+      auto sb1 = new ZDoubleSpinBox();
       sb1->setRange(m_min[0], m_max[0]);
       sb1->setValue(m_value[0]);
       sb1->setSingleStep(m_step);
@@ -891,7 +892,7 @@ QWidget* ZDVec2Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb1);
           lo->addLayout(hlo);
@@ -899,7 +900,7 @@ QWidget* ZDVec2Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBox* sb2 = new ZDoubleSpinBox();
+      auto sb2 = new ZDoubleSpinBox();
       sb2->setRange(m_min[1], m_max[1]);
       sb2->setValue(m_value[1]);
       sb2->setSingleStep(m_step);
@@ -918,7 +919,7 @@ QWidget* ZDVec2Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb2);
           lo->addLayout(hlo);
@@ -941,7 +942,7 @@ QWidget* ZDVec2Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws1);
           lo->addLayout(hlo);
@@ -963,7 +964,7 @@ QWidget* ZDVec2Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws2);
           lo->addLayout(hlo);
@@ -1037,7 +1038,7 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
 
   if (m_style == "SPINBOX") {
     {
-      ZDoubleSpinBox* sb1 = new ZDoubleSpinBox();
+      auto sb1 = new ZDoubleSpinBox();
       sb1->setRange(m_min[0], m_max[0]);
       sb1->setValue(m_value[0]);
       sb1->setSingleStep(m_step);
@@ -1056,7 +1057,7 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb1);
           lo->addLayout(hlo);
@@ -1064,7 +1065,7 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBox* sb2 = new ZDoubleSpinBox();
+      auto sb2 = new ZDoubleSpinBox();
       sb2->setRange(m_min[1], m_max[1]);
       sb2->setValue(m_value[1]);
       sb2->setSingleStep(m_step);
@@ -1083,7 +1084,7 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb2);
           lo->addLayout(hlo);
@@ -1091,7 +1092,7 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBox* sb3 = new ZDoubleSpinBox();
+      auto sb3 = new ZDoubleSpinBox();
       sb3->setRange(m_min[2], m_max[2]);
       sb3->setValue(m_value[2]);
       sb3->setSingleStep(m_step);
@@ -1110,7 +1111,7 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb3);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb3);
           lo->addLayout(hlo);
@@ -1133,7 +1134,7 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws1);
           lo->addLayout(hlo);
@@ -1155,7 +1156,7 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws2);
           lo->addLayout(hlo);
@@ -1177,7 +1178,7 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws3);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws3);
           lo->addLayout(hlo);
@@ -1258,7 +1259,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
 
   if (m_style == "SPINBOX") {
     {
-      ZDoubleSpinBox* sb1 = new ZDoubleSpinBox();
+      auto sb1 = new ZDoubleSpinBox();
       sb1->setRange(m_min[0], m_max[0]);
       sb1->setValue(m_value[0]);
       sb1->setSingleStep(m_step);
@@ -1277,7 +1278,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb1);
           lo->addLayout(hlo);
@@ -1285,7 +1286,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBox* sb2 = new ZDoubleSpinBox();
+      auto sb2 = new ZDoubleSpinBox();
       sb2->setRange(m_min[1], m_max[1]);
       sb2->setValue(m_value[1]);
       sb2->setSingleStep(m_step);
@@ -1304,7 +1305,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb2);
           lo->addLayout(hlo);
@@ -1312,7 +1313,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBox* sb3 = new ZDoubleSpinBox();
+      auto sb3 = new ZDoubleSpinBox();
       sb3->setRange(m_min[2], m_max[2]);
       sb3->setValue(m_value[2]);
       sb3->setSingleStep(m_step);
@@ -1331,7 +1332,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb3);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb3);
           lo->addLayout(hlo);
@@ -1339,7 +1340,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBox* sb4 = new ZDoubleSpinBox();
+      auto sb4 = new ZDoubleSpinBox();
       sb4->setRange(m_min[3], m_max[3]);
       sb4->setValue(m_value[3]);
       sb4->setSingleStep(m_step);
@@ -1358,7 +1359,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb4);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb4);
           lo->addLayout(hlo);
@@ -1381,7 +1382,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws1);
           lo->addLayout(hlo);
@@ -1403,7 +1404,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws2);
           lo->addLayout(hlo);
@@ -1425,7 +1426,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws3);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws3);
           lo->addLayout(hlo);
@@ -1447,7 +1448,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws4);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws4);
           lo->addLayout(hlo);
@@ -1508,7 +1509,7 @@ QWidget* ZIVec2Parameter::actualCreateWidget(QWidget* parent)
 
   if (m_style == "SPINBOX") {
     {
-      ZSpinBox* sb1 = new ZSpinBox();
+      auto sb1 = new ZSpinBox();
       sb1->setRange(m_min[0], m_max[0]);
       sb1->setValue(m_value[0]);
       sb1->setSingleStep(m_step);
@@ -1526,7 +1527,7 @@ QWidget* ZIVec2Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb1);
           lo->addLayout(hlo);
@@ -1534,7 +1535,7 @@ QWidget* ZIVec2Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZSpinBox* sb2 = new ZSpinBox();
+      auto sb2 = new ZSpinBox();
       sb2->setRange(m_min[1], m_max[1]);
       sb2->setValue(m_value[1]);
       sb2->setSingleStep(m_step);
@@ -1552,7 +1553,7 @@ QWidget* ZIVec2Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb2);
           lo->addLayout(hlo);
@@ -1575,7 +1576,7 @@ QWidget* ZIVec2Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws1);
           lo->addLayout(hlo);
@@ -1597,7 +1598,7 @@ QWidget* ZIVec2Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws2);
           lo->addLayout(hlo);
@@ -1665,7 +1666,7 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
 
   if (m_style == "SPINBOX") {
     {
-      ZSpinBox* sb1 = new ZSpinBox();
+      auto sb1 = new ZSpinBox();
       sb1->setRange(m_min[0], m_max[0]);
       sb1->setValue(m_value[0]);
       sb1->setSingleStep(m_step);
@@ -1683,7 +1684,7 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb1);
           lo->addLayout(hlo);
@@ -1691,7 +1692,7 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZSpinBox* sb2 = new ZSpinBox();
+      auto sb2 = new ZSpinBox();
       sb2->setRange(m_min[1], m_max[1]);
       sb2->setValue(m_value[1]);
       sb2->setSingleStep(m_step);
@@ -1709,7 +1710,7 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb2);
           lo->addLayout(hlo);
@@ -1717,7 +1718,7 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZSpinBox* sb3 = new ZSpinBox();
+      auto sb3 = new ZSpinBox();
       sb3->setRange(m_min[2], m_max[2]);
       sb3->setValue(m_value[2]);
       sb3->setSingleStep(m_step);
@@ -1735,7 +1736,7 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sb3);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sb3);
           lo->addLayout(hlo);
@@ -1758,7 +1759,7 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws1);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws1);
           lo->addLayout(hlo);
@@ -1780,7 +1781,7 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws2);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws2);
           lo->addLayout(hlo);
@@ -1802,7 +1803,7 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
           lo->addWidget(lb);
           lo->addWidget(sbws3);
         } else {
-          QHBoxLayout* hlo = new QHBoxLayout();
+          auto hlo = new QHBoxLayout();
           hlo->addWidget(lb);
           hlo->addWidget(sbws3);
           lo->addLayout(hlo);
@@ -1864,7 +1865,7 @@ QWidget* ZIntSpanParameter::actualCreateWidget(QWidget* parent)
     else
       lo = new QVBoxLayout();
 
-    ZSpinBox* sb1 = new ZSpinBox();
+    auto sb1 = new ZSpinBox();
     sb1->setRange(m_min, m_value[1]);
     sb1->setValue(m_value[0]);
     sb1->setSingleStep(m_step);
@@ -1882,13 +1883,13 @@ QWidget* ZIntSpanParameter::actualCreateWidget(QWidget* parent)
         lo->addWidget(lb);
         lo->addWidget(sb1);
       } else {
-        QHBoxLayout* hlo = new QHBoxLayout();
+        auto hlo = new QHBoxLayout();
         hlo->addWidget(lb);
         hlo->addWidget(sb1);
         lo->addLayout(hlo);
       }
     }
-    ZSpinBox* sb2 = new ZSpinBox();
+    auto sb2 = new ZSpinBox();
     sb2->setRange(m_value[0], m_max);
     sb2->setValue(m_value[1]);
     sb2->setSingleStep(m_step);
@@ -1906,7 +1907,7 @@ QWidget* ZIntSpanParameter::actualCreateWidget(QWidget* parent)
         lo->addWidget(lb);
         lo->addWidget(sb2);
       } else {
-        QHBoxLayout* hlo = new QHBoxLayout();
+        auto hlo = new QHBoxLayout();
         hlo->addWidget(lb);
         hlo->addWidget(sb2);
         lo->addLayout(hlo);
@@ -1981,7 +1982,7 @@ QWidget* ZFloatSpanParameter::actualCreateWidget(QWidget* parent)
     else
       lo = new QVBoxLayout();
 
-    ZDoubleSpinBox* sb1 = new ZDoubleSpinBox();
+    auto sb1 = new ZDoubleSpinBox();
     sb1->setRange(m_min, m_value[1]);
     sb1->setValue(m_value[0]);
     sb1->setSingleStep(m_step);
@@ -2000,13 +2001,13 @@ QWidget* ZFloatSpanParameter::actualCreateWidget(QWidget* parent)
         lo->addWidget(lb);
         lo->addWidget(sb1);
       } else {
-        QHBoxLayout* hlo = new QHBoxLayout();
+        auto hlo = new QHBoxLayout();
         hlo->addWidget(lb);
         hlo->addWidget(sb1);
         lo->addLayout(hlo);
       }
     }
-    ZDoubleSpinBox* sb2 = new ZDoubleSpinBox();
+    auto sb2 = new ZDoubleSpinBox();
     sb2->setRange(m_value[0], m_max);
     sb2->setValue(m_value[1]);
     sb2->setSingleStep(m_step);
@@ -2025,7 +2026,7 @@ QWidget* ZFloatSpanParameter::actualCreateWidget(QWidget* parent)
         lo->addWidget(lb);
         lo->addWidget(sb2);
       } else {
-        QHBoxLayout* hlo = new QHBoxLayout();
+        auto hlo = new QHBoxLayout();
         hlo->addWidget(lb);
         hlo->addWidget(sb2);
         lo->addLayout(hlo);

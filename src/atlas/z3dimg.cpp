@@ -1,16 +1,17 @@
 #include "z3dimg.h"
-#include <algorithm>
-#include <QString>
-#include "zlog.h"
+
 #include "z3dshaderprogram.h"
 #include "z3dgpuinfo.h"
 #include "z3dtexture.h"
 #include "zkmeans.h"
+#include "zbenchtimer.h"
 #include "zexception.h"
+#include "zlog.h"
 #include <QApplication>
 #include <QMessageBox>
-#include "zbenchtimer.h"
+#include <QString>
 #include <tbb/parallel_for.h>
+#include <algorithm>
 
 namespace nim {
 
@@ -87,10 +88,11 @@ Z3DImg::~Z3DImg()
 
 QString Z3DImg::samplerType() const
 {
-  if (is3DData())
+  if (is3DData()) {
     return "sampler3D";
-  else
-    return "sampler2D";
+  }
+
+  return "sampler2D";
 }
 
 std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeXSliceVolume(size_t x)

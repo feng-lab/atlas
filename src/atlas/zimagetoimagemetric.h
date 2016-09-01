@@ -1,14 +1,14 @@
 #pragma once
 
-#include <cmath>
-#include "zstatisticsutils.h"
-#include <tbb/parallel_reduce.h>
-#include <tbb/blocked_range.h>
-#include <QList>
-#include <utility>
 #include "zbenchtimer.h"
 #include "zimage2dutils.h"
+#include "zstatisticsutils.h"
+#include <QList>
+#include <tbb/parallel_reduce.h>
+#include <tbb/blocked_range.h>
+#include <cmath>
 #include <type_traits>
+#include <utility>
 
 namespace nim {
 
@@ -113,7 +113,7 @@ struct EvaluateMetricForOneBlock
     }
   }
 
-  EvaluateMetricForOneBlock(EvaluateMetricForOneBlock& x, tbb::split)
+  EvaluateMetricForOneBlock(EvaluateMetricForOneBlock& x, tbb::split /*unused*/)
     : m_img1(x.m_img1), m_img2(x.m_img2), m_size(x.m_size), m_type(x.m_type)
     , m_mean1(x.m_mean1), m_mean2(x.m_mean2), m_std1(x.m_std1), m_std2(x.m_std2), m_metric(0)
   {}
@@ -215,10 +215,9 @@ double ZImageToImageMetric::value(const TPixel1* img1, const TPixel2* img2, size
   if (!m_useMultithreading) {
     func(tbb::blocked_range<size_t>(0, size));
     return func.m_metric;
-  } else {
-    tbb::parallel_reduce(tbb::blocked_range<size_t>(0, size), func);
-    return func.m_metric;
   }
+  tbb::parallel_reduce(tbb::blocked_range<size_t>(0, size), func);
+  return func.m_metric;
 }
 
 } // namespace nim

@@ -1,11 +1,11 @@
 #include "z3dshadermanager.h"
 
 #include "zsysteminfo.h"
-#include <QFile>
 #include "zexception.h"
 #include "zlog.h"
 #include "z3dshader.h"
 #include <QTextStream>
+#include <QFile>
 
 namespace nim {
 
@@ -15,9 +15,7 @@ Z3DShaderManager& Z3DShaderManager::instance()
   return sm;
 }
 
-Z3DShaderManager::Z3DShaderManager()
-{
-}
+Z3DShaderManager::Z3DShaderManager() = default;
 
 Z3DShader& Z3DShaderManager::shader(const QString& fn, const QString& header, const Z3DContext& context)
 {
@@ -52,9 +50,8 @@ Z3DShader& Z3DShaderManager::shader(const QString& fn, const QString& header, co
     Z3DShader* res = shdr.get();
     m_shaders.emplace_hint(lb, key, std::move(shdr));
     return *res;
-  } else {
-    return *(lb->second);
   }
+  return *(lb->second);
 }
 
 bool Z3DShaderManager::ShaderKey::operator<(const Z3DShaderManager::ShaderKey& rhs) const

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <vector>
 #include "zimginterface.h"
 #include <boost/align/aligned_allocator.hpp>
+#include <vector>
 
 namespace nim {
 

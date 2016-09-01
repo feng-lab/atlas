@@ -1,14 +1,14 @@
 #pragma once
 
 #include "zimg.h"
-#include <tuple>
-#include <QRectF>
 #include "zimgsliceprovider.h"
-#include <boost/geometry.hpp>
-#include <boost/geometry/geometries/point.hpp>
-#include <boost/geometry/geometries/box.hpp>
-#include <boost/geometry/index/rtree.hpp>
 #include "zlog.h"
+#include <QRectF>
+#include <boost/geometry.hpp>
+#include <boost/geometry/geometries/box.hpp>
+#include <boost/geometry/geometries/point.hpp>
+#include <boost/geometry/index/rtree.hpp>
+#include <tuple>
 
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;

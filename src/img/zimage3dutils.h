@@ -1,19 +1,18 @@
 #pragma once
 
-#include <cstring>
-#include <cmath>
-#include <algorithm>
-#include <numeric>
-#include "zlog.h"
-//#include "zbenchtimer.h"
-#include <tbb/parallel_for.h>
-#include <QList>
-#include <utility>
-#include <boost/align/aligned_allocator.hpp>
 #include "zcpuinfo.h"
+#include "zlog.h"
 #include "zimagesse3.h"
 #include "zimageavx.h"
 #include "zimage2dutils.h"
+#include <QList>
+#include <tbb/parallel_for.h>
+#include <boost/align/aligned_allocator.hpp>
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <numeric>
+#include <utility>
 
 namespace nim {
 
@@ -31,18 +30,18 @@ TPixel getImage3DPixelValue(const TPixel* img, size_t width, size_t height, size
 
   if (padOption == PadOption::Constant) {
     return padValue;
-  } else {
-    SignedIntegerType coord[3];
-    coord[0] = x;
-    coord[1] = y;
-    coord[2] = z;
-    size_t imgSize[3];
-    imgSize[0] = width;
-    imgSize[1] = height;
-    imgSize[2] = depth;
-    wrapCoordToImage(coord, imgSize, 3, padOption);
-    return img[coord[2] * width * height + coord[1] * width + coord[0]];
   }
+
+  SignedIntegerType coord[3];
+  coord[0] = x;
+  coord[1] = y;
+  coord[2] = z;
+  size_t imgSize[3];
+  imgSize[0] = width;
+  imgSize[1] = height;
+  imgSize[2] = depth;
+  wrapCoordToImage(coord, imgSize, 3, padOption);
+  return img[coord[2] * width * height + coord[1] * width + coord[0]];
 }
 
 template<typename TPixel>
@@ -55,18 +54,18 @@ TPixel getImage3DPixelValue(const TPixel* img, size_t width, size_t height, size
 
   if (padOption == PadOption::Constant) {
     return padValue;
-  } else {
-    size_t coord[3];
-    coord[0] = x;
-    coord[1] = y;
-    coord[2] = z;
-    size_t imgSize[3];
-    imgSize[0] = width;
-    imgSize[1] = height;
-    imgSize[2] = depth;
-    wrapCoordToImage(coord, imgSize, 3, padOption);
-    return img[coord[2] * width * height + coord[1] * width + coord[0]];
   }
+
+  size_t coord[3];
+  coord[0] = x;
+  coord[1] = y;
+  coord[2] = z;
+  size_t imgSize[3];
+  imgSize[0] = width;
+  imgSize[1] = height;
+  imgSize[2] = depth;
+  wrapCoordToImage(coord, imgSize, 3, padOption);
+  return img[coord[2] * width * height + coord[1] * width + coord[0]];
 }
 
 // imgOut should be preallocated and not same as img

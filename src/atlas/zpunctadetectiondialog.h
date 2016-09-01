@@ -1,21 +1,15 @@
 #pragma once
 
+#include "znumericparameter.h"
+#include "zselectfilewidget.h"
+#include "zoptionparameter.h"
 #include <QDialog>
 #include <QGroupBox>
 #include <QDialogButtonBox>
 #include <QPushButton>
 #include <QThread>
 #include <QProgressDialog>
-#include "znumericparameter.h"
-#include "zselectfilewidget.h"
-#include "zoptionparameter.h"
 #include <QLabel>
-#include <memory>
-
-#ifdef _NEUTUBE_
-#include <zsharedpointer.h>
-#endif
-
 #ifdef _NEUTUBE_
 class ZStackDoc;
 class ZStack;
@@ -33,7 +27,7 @@ public:
   explicit ZPunctaDetectionDialog(ZSharedPointer<ZStackDoc> doc, QWidget *parent = 0);
 #endif
 
-  explicit ZPunctaDetectionDialog(QWidget* parent = 0);
+  explicit ZPunctaDetectionDialog(QWidget* parent = nullptr);
 
 signals:
 #ifdef _NEUTUBE_

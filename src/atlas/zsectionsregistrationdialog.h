@@ -1,15 +1,15 @@
 #pragma once
 
+#include "zimg.h"
+#include "znumericparameter.h"
+#include "zselectfilewidget.h"
+#include "zoptionparameter.h"
 #include <QDialog>
 #include <QGroupBox>
 #include <QDialogButtonBox>
 #include <QPushButton>
 #include <QThread>
 #include <QProgressDialog>
-#include "zimg.h"
-#include "znumericparameter.h"
-#include "zselectfilewidget.h"
-#include "zoptionparameter.h"
 #include <QLabel>
 #include <memory>
 
@@ -32,7 +32,7 @@ public:
   explicit ZSectionsRegistrationDialog(ZSharedPointer<ZStackDoc> doc, QWidget *parent = 0);
 #endif
 
-  explicit ZSectionsRegistrationDialog(QWidget* parent = 0);
+  explicit ZSectionsRegistrationDialog(QWidget* parent = nullptr);
 
 signals:
 #ifdef _NEUTUBE_

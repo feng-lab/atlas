@@ -1,11 +1,12 @@
 #include "zimgmetaimage.h"
+
+#include "zimgsliceprovider.h"
+#include "zlog.h"
+#include <metaImage.h>
 #include <QFile>
 #include <QStringList>
 #include <QFileInfo>
 #include <QDir>
-#include <metaImage.h>
-#include "zimgsliceprovider.h"
-#include "zlog.h"
 
 namespace nim {
 
@@ -14,9 +15,7 @@ ZImgMetaImage::ZImgMetaImage()
 {
 }
 
-ZImgMetaImage::~ZImgMetaImage()
-{
-}
+ZImgMetaImage::~ZImgMetaImage() = default;
 
 QString ZImgMetaImage::shortName() const
 {
@@ -50,11 +49,12 @@ void ZImgMetaImage::readInfo(const QString& filename, std::vector<ZImgInfo>& inf
   createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 }
 
-void ZImgMetaImage::readMetadata(const QString&, ZImgMetadata&, size_t)
+void ZImgMetaImage::readMetadata(const QString& /*filename*/, ZImgMetadata& /*meta*/, size_t /*scene*/)
 {
 }
 
-void ZImgMetaImage::readThumbnail(const QString&, ZImgThumbernail&, const ZImgRegion&, size_t)
+void ZImgMetaImage::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thumbnail*/,
+                                  const ZImgRegion& /*region*/, size_t /*scene*/)
 {
 }
 
@@ -356,5 +356,5 @@ void ZImgMetaImage::parseInfo(const MetaImage& metaImage, ZImgInfo& info)
   info.createDefaultDescriptions();
 }
 
-} // namespace
+} // namespace nim
 

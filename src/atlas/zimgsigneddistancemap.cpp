@@ -1,8 +1,9 @@
 #include "zimgsigneddistancemap.h"
+
 #include "zimgitkinterface.h"
+#include <QThread>
 #include <itkSignedMaurerDistanceMapImageFilter.h>
 #include <type_traits>
-#include <QThread>
 
 namespace nim {
 

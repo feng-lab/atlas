@@ -1,7 +1,7 @@
 #include "zimagefilterkernel.h"
 
-#include <cmath>
 #include <boost/math/constants/constants.hpp>
+#include <cmath>
 
 namespace nim {
 
@@ -194,4 +194,4 @@ template std::vector<float> create1DLoGKernel(float, int, size_t*);
 
 template std::vector<double> create1DLoGKernel(double, int, size_t*);
 
-}
+}  // namespace nim

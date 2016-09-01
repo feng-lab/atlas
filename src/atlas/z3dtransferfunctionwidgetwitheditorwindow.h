@@ -10,7 +10,7 @@ class Z3DTransferFunctionWidgetWithEditorWindow : public ZClickableTransferFunct
 {
 Q_OBJECT
 public:
-  explicit Z3DTransferFunctionWidgetWithEditorWindow(Z3DTransferFunctionParameter* tf, QWidget* parent = 0);
+  explicit Z3DTransferFunctionWidgetWithEditorWindow(Z3DTransferFunctionParameter* tf, QWidget* parent = nullptr);
 
 protected:
   void createEditorWindow();

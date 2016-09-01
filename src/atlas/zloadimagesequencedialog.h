@@ -11,7 +11,7 @@ class ZLoadImageSequenceDialog : public QDialog
 {
 Q_OBJECT
 public:
-  explicit ZLoadImageSequenceDialog(const QString& title, const QString& startDir, QWidget* parent = 0);
+  explicit ZLoadImageSequenceDialog(const QString& title, const QString& startDir, QWidget* parent = nullptr);
 
   QStringList getSelectedFiles();
 

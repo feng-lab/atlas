@@ -1,9 +1,9 @@
 #pragma once
 
-#include <map>
 #include "zfilterview.h"
 #include "zregionAnnotationdoc.h"
 #include "zregionAnnotationfilter.h"
+#include <map>
 
 namespace nim {
 

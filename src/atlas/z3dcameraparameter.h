@@ -1,9 +1,9 @@
 #pragma once
 
+#include "z3dcamera.h"
 #include "znumericparameter.h"
 #include "zoptionparameter.h"
 #include "zparameter.h"
-#include "z3dcamera.h"
 
 namespace nim {
 
@@ -11,7 +11,7 @@ class Z3DCameraParameter : public ZSingleValueParameter<Z3DCamera>
 {
 Q_OBJECT
 public:
-  Z3DCameraParameter(const QString& name, QObject* parent = nullptr);
+  explicit Z3DCameraParameter(const QString& name, QObject* parent = nullptr);
 
   Z3DCameraParameter(const QString& name, const Z3DCamera& value, QObject* parent = nullptr);
 

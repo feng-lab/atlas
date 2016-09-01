@@ -27,7 +27,7 @@ signals:
   void canceled();
 
 protected:
-  void ffmpegError(QProcess::ProcessError error);
+  void ffmpegError(QProcess::ProcessError err);
 
   void ffmpegFinished(int exitCode, QProcess::ExitStatus exitStatus);
 

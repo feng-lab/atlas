@@ -1,9 +1,9 @@
 #pragma once
 
+#include "zneighborhood.h"
 #include "zimg.h"
 #include <boost/iterator/iterator_facade.hpp>
 #include <type_traits>
-#include "zneighborhood.h"
 
 namespace nim {
 
@@ -20,8 +20,7 @@ class img_neighborhood_iter
   };
 public:
   // empty constructor not useful
-  img_neighborhood_iter()
-  {}
+  img_neighborhood_iter() = default;
 
   explicit img_neighborhood_iter(const ZNeighborhood& nb, TImg& img, const ZImgRegion& region = ZImgRegion(),
                                  PadOption padOption = PadOption::Constant, TVoxel padValue = TVoxel(0))

@@ -1,22 +1,21 @@
 #pragma once
 
-#include <cstring>
-#include <cmath>
-#include <algorithm>
-#include <numeric>
-#include "zlog.h"
-//#include "zbenchtimer.h"
-#include <tbb/parallel_for.h>
-#include <QList>
-#include <utility>
-#include <boost/align/aligned_allocator.hpp>
 #include "zcpuinfo.h"
+#include "zlog.h"
 #include "zimagesse3.h"
 #include "zimageavx.h"
-#include "zimagefilterkernel.h"
+#include "zlog.h"
+#include "zbenchtimer.h"
 #include "zimginterface.h"
 #include "zsaturateoperation.h"
-#include "zbenchtimer.h"
+#include "zimagefilterkernel.h"
+#include <QList>
+#include <tbb/parallel_for.h>
+#include <boost/align/aligned_allocator.hpp>
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <numeric>
 
 namespace nim {
 
@@ -35,10 +34,11 @@ void wrapCoordToImage(SignedIntegerType* coord, const size_t* imgSize, size_t nu
       if (coord[i] < 0) {
         coord[i] = -coord[i] - 1;
       }
-      if ((coord[i] / imgSize[i]) % 2 == 0)
+      if ((coord[i] / imgSize[i]) % 2 == 0) {
         coord[i] = coord[i] % imgSize[i];
-      else
+      } else {
         coord[i] = imgSize[i] - 1 - coord[i] % imgSize[i];
+      }
     }
   } else if (padOption == PadOption::Replicate) {
     for (size_t i = 0; i < numDimensions; ++i) {
@@ -50,10 +50,11 @@ void wrapCoordToImage(SignedIntegerType* coord, const size_t* imgSize, size_t nu
     }
   } else if (padOption == PadOption::Circular) {
     for (size_t i = 0; i < numDimensions; ++i) {
-      if (coord[i] >= 0)
+      if (coord[i] >= 0) {
         coord[i] = coord[i] % imgSize[i];
-      else
+      } else {
         coord[i] += ((-coord[i] - 1) / imgSize[i] + 1) * imgSize[i];
+      }
     }
   }
 }
@@ -72,16 +73,16 @@ TPixel getImage2DPixelValue(const TPixel* img, size_t width, size_t height,
 
   if (padOption == PadOption::Constant) {
     return padValue;
-  } else {
-    SignedIntegerType coord[2];
-    coord[0] = x;
-    coord[1] = y;
-    size_t imgSize[2];
-    imgSize[0] = width;
-    imgSize[1] = height;
-    wrapCoordToImage(coord, imgSize, 2, padOption);
-    return img[coord[1] * width + coord[0]];
   }
+
+  SignedIntegerType coord[2];
+  coord[0] = x;
+  coord[1] = y;
+  size_t imgSize[2];
+  imgSize[0] = width;
+  imgSize[1] = height;
+  wrapCoordToImage(coord, imgSize, 2, padOption);
+  return img[coord[1] * width + coord[0]];
 }
 
 // imgOut should be preallocated and not same as img
@@ -105,71 +106,80 @@ void image2DPad(const TPixel* img, size_t width, size_t height,
       // corner
       for (size_t j = 0; j < upPad; ++j) {
         size_t refY = upPad - j - 1;
-        if ((refY / height) % 2 == 1)
+        if ((refY / height) % 2 == 1) {
           refY = height - 1 - refY % height;
-        else
+        } else {
           refY = refY % height;
+        }
         for (size_t i = 0; i < leftPad; ++i) {
           size_t refX = leftPad - i - 1;
-          if ((refX / width) % 2 == 1)
+          if ((refX / width) % 2 == 1) {
             refX = width - 1 - refX % width;
-          else
+          } else {
             refX = refX % width;
+          }
           imgOut[j * desWidth + i] = img[refY * width + refX];
         }
       }
       for (size_t j = 0; j < upPad; ++j) {
         size_t refY = upPad - j - 1;
-        if ((refY / height) % 2 == 1)
+        if ((refY / height) % 2 == 1) {
           refY = height - 1 - refY % height;
-        else
+        } else {
           refY = refY % height;
+        }
         for (size_t i = desWidth - rightPad; i < desWidth; ++i) {
           size_t refX = width - (i - desWidth + rightPad) - 1;
-          if ((refX / width) % 2 == 1)
+          if ((refX / width) % 2 == 1) {
             refX = width - 1 - refX % width;
-          else
+          } else {
             refX = refX % width;
+          }
           imgOut[j * desWidth + i] = img[refY * width + refX];
         }
       }
       for (size_t j = desHeight - downPad; j < desHeight; ++j) {
         size_t refY = height - (j - desHeight + downPad) - 1;
-        if ((refY / height) % 2 == 1)
+        if ((refY / height) % 2 == 1) {
           refY = height - 1 - refY % height;
-        else
+        } else {
           refY = refY % height;
+        }
         for (size_t i = 0; i < leftPad; ++i) {
           size_t refX = leftPad - i - 1;
-          if ((refX / width) % 2 == 1)
+          if ((refX / width) % 2 == 1) {
             refX = width - 1 - refX % width;
-          else
+          } else {
             refX = refX % width;
+          }
           imgOut[j * desWidth + i] = img[refY * width + refX];
         }
       }
       for (size_t j = desHeight - downPad; j < desHeight; ++j) {
         size_t refY = height - (j - desHeight + downPad) - 1;
-        if ((refY / height) % 2 == 1)
+        if ((refY / height) % 2 == 1) {
           refY = height - 1 - refY % height;
-        else
+        } else {
           refY = refY % height;
+        }
         for (size_t i = desWidth - rightPad; i < desWidth; ++i) {
           size_t refX = width - (i - desWidth + rightPad) - 1;
-          if ((refX / width) % 2 == 1)
+          if ((refX / width) % 2 == 1) {
             refX = width - 1 - refX % width;
-          else
+          } else {
             refX = refX % width;
+          }
           imgOut[j * desWidth + i] = img[refY * width + refX];
         }
       }
       // left
       for (size_t i = 0; i < leftPad; ++i) {
         size_t refX = leftPad - i - 1;
-        if ((refX / width) % 2 == 1)
+        if ((refX / width) % 2 == 1) {
           refX = width - 1 - refX % width;
-        else
+        } else {
           refX = refX % width;
+        }
         for (size_t j = 0; j < height; ++j) {
           imgOut[(j + upPad) * desWidth + i] = img[j * width + refX];
         }
@@ -177,10 +187,11 @@ void image2DPad(const TPixel* img, size_t width, size_t height,
       // right
       for (size_t i = desWidth - rightPad; i < desWidth; ++i) {
         size_t refX = width - (i - desWidth + rightPad) - 1;
-        if ((refX / width) % 2 == 1)
+        if ((refX / width) % 2 == 1) {
           refX = width - 1 - refX % width;
-        else
+        } else {
           refX = refX % width;
+        }
         for (size_t j = 0; j < height; ++j) {
           imgOut[(j + upPad) * desWidth + i] = img[j * width + refX];
         }
@@ -188,10 +199,11 @@ void image2DPad(const TPixel* img, size_t width, size_t height,
       // up
       for (size_t j = 0; j < upPad; ++j) {
         size_t refY = upPad - j - 1;
-        if ((refY / height) % 2 == 1)
+        if ((refY / height) % 2 == 1) {
           refY = height - 1 - refY % height;
-        else
+        } else {
           refY = refY % height;
+        }
         memcpy(imgOut + j * desWidth + leftPad,
                img + refY * width,
                sizeof(TPixel) * width);
@@ -199,10 +211,11 @@ void image2DPad(const TPixel* img, size_t width, size_t height,
       // down
       for (size_t j = desHeight - downPad; j < desHeight; ++j) {
         size_t refY = height - (j - desHeight + downPad) - 1;
-        if ((refY / height) % 2 == 1)
+        if ((refY / height) % 2 == 1) {
           refY = height - 1 - refY % height;
-        else
+        } else {
           refY = refY % height;
+        }
         memcpy(imgOut + j * desWidth + leftPad,
                img + refY * width,
                sizeof(TPixel) * width);
@@ -326,9 +339,10 @@ template<typename TPixel>
 void image2DTranspose(TPixel* img, size_t width, size_t height)
 {
   if (width == height) {
-    for (size_t i = 0; i < height; ++i)
-      for (size_t j = i + 1 ; j < width; ++j)
+    for (size_t i = 0; i < height; ++i) {
+      for (size_t j = i + 1; j < width; ++j)
         std::swap(img[i + j * height], img[j + i * width]);
+    }
   } else {
     const size_t blockSize = 32;
     std::vector<TPixel> buf(width * height);

@@ -1,15 +1,16 @@
 #include "zimagetransformresolve.h"
+
+#include "zlog.h"
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/connected_components.hpp>
 #include <boost/graph/kruskal_min_spanning_tree.hpp>
 #include <boost/graph/filtered_graph.hpp>
-#include "zlog.h"
 
 namespace {
 
 struct EdgeInfo
 {
-  EdgeInfo(double c)
+  explicit EdgeInfo(double c)
     : cost(c)
   {}
 
@@ -30,8 +31,7 @@ struct VertexInfo
 template<typename Edge>
 struct edge_in_MST
 {
-  edge_in_MST()
-  {}
+  edge_in_MST() = default;
 
   edge_in_MST(const std::vector<Edge>& mstEdges)
     : m_MSTEdges(&mstEdges)
@@ -56,14 +56,14 @@ template<typename Edge>
 class dfs_edge_visitor : public boost::default_dfs_visitor
 {
 public:
-  dfs_edge_visitor(std::vector<Edge>& dfsSortedEdges)
+  explicit dfs_edge_visitor(std::vector<Edge>& dfsSortedEdges)
     : m_dfsSortedEdges(dfsSortedEdges)
   {
     m_dfsSortedEdges.clear();
   }
 
   template<typename Graph>
-  void tree_edge(Edge e, const Graph&) const
+  void tree_edge(Edge e, const Graph& /*unused*/) const
   {
     m_dfsSortedEdges.push_back(e);
   }
@@ -72,13 +72,11 @@ private:
   std::vector<Edge>& m_dfsSortedEdges;
 };
 
-}
+}  // namespace
 
 namespace nim {
 
-ZImageTransformResolve::ZImageTransformResolve()
-{
-}
+ZImageTransformResolve::ZImageTransformResolve() = default;
 
 void ZImageTransformResolve::addFixedImage(size_t idx, const ZImageTransform* tfm)
 {
@@ -220,4 +218,4 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
   return res;
 }
 
-} // namespace nims
+} // namespace nim

@@ -1,4 +1,5 @@
 #include "zimgzeisslsm.h"
+
 #include "ztiff.h"
 #include "zlog.h"
 #include "zioutils.h"
@@ -73,10 +74,11 @@ void ZImgZeissLsm::detectImgInfo(ZTiff& tiff)
       arg(m_lsmImgInfo.toQString()).arg(m_imgInfo[0].toQString()));
 
   size_t numLocations = 0;
-  if (m_numScenes > 0)
+  if (m_numScenes > 0) {
     numLocations = m_numScenes;
-  else
+  } else {
     numLocations = m_imgInfo[0].depth / (m_lsmImgInfo.depth * m_lsmImgInfo.numTimes);
+  }
   if (numLocations == 0) {
     throw ZIOException("invalid number of scenes in lsm file");
   }
@@ -106,10 +108,11 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
   memcpy(&m_lsmInfo, lsmInfoTag.dataArray(), lsmInfoTag.dataByteNumber());
 
   if (m_lsmInfo.u16ScanType == 3 || m_lsmInfo.u16ScanType == 5 ||
-      m_lsmInfo.u16ScanType == 7 || m_lsmInfo.u16ScanType == 9)
+      m_lsmInfo.u16ScanType == 7 || m_lsmInfo.u16ScanType == 9) {
     setDimensionOrder("TZL");
-  else
+  } else {
     setDimensionOrder("ZTL");
+  }
 
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
@@ -181,9 +184,10 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
   if (m_lsmInfo.s32DataType == 0) {
     if (m_channelDataTypes.size() < m_lsmImgInfo.numChannels)
       throw ZIOException("lsm channel data type is not complete");
-    for (size_t i = 1; i < m_lsmImgInfo.numChannels; ++i)
+    for (size_t i = 1; i < m_lsmImgInfo.numChannels; ++i) {
       if (m_channelDataTypes[i] != m_channelDataTypes[0])
         throw ZIOException("lsm different channel data type is not supported");
+    }
     switch (m_channelDataTypes[0]) {
       case 1:
         m_lsmImgInfo.voxelFormat = VoxelFormat::Unsigned;
@@ -350,4 +354,4 @@ void ZImgZeissLsm::logLsmInfo(const QString& filename)
 }
 
 
-} // namespace
+} // namespace nim

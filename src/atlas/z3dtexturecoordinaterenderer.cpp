@@ -1,6 +1,6 @@
-#include "z3dgl.h"
 #include "z3dtexturecoordinaterenderer.h"
 
+#include "z3dgl.h"
 #include "zmesh.h"
 
 namespace nim {
@@ -47,12 +47,12 @@ void Z3DTextureCoordinateRenderer::render(Z3DEye eye)
       glEnableVertexAttribArray(attr_vertex);
       m_VBOs.bind(GL_ARRAY_BUFFER, bufIdx++);
       glBufferData(GL_ARRAY_BUFFER, vertices.size() * 3 * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_3dTexCoord0);
       m_VBOs.bind(GL_ARRAY_BUFFER, bufIdx++);
       glBufferData(GL_ARRAY_BUFFER, texCoords.size() * 3 * sizeof(GLfloat), texCoords.data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_3dTexCoord0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_3dTexCoord0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       if (!triangleIndexes.empty()) {
         m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
@@ -82,12 +82,12 @@ void Z3DTextureCoordinateRenderer::render(Z3DEye eye)
     glEnableVertexAttribArray(attr_vertex);
     m_VBOs.bind(GL_ARRAY_BUFFER, bufIdx++);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * 3 * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glEnableVertexAttribArray(attr_3dTexCoord0);
     m_VBOs.bind(GL_ARRAY_BUFFER, bufIdx++);
     glBufferData(GL_ARRAY_BUFFER, texCoords.size() * 3 * sizeof(GLfloat), texCoords.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(attr_3dTexCoord0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_3dTexCoord0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     if (triangleIndexes.empty()) {
       glDrawArrays(m_mesh->type(), 0, vertices.size());
@@ -108,7 +108,7 @@ void Z3DTextureCoordinateRenderer::render(Z3DEye eye)
   m_renderTextureCoordinateShader.release();
 }
 
-void Z3DTextureCoordinateRenderer::renderPicking(Z3DEye)
+void Z3DTextureCoordinateRenderer::renderPicking(Z3DEye /*unused*/)
 {
 }
 

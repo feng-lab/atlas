@@ -1,12 +1,12 @@
 #include "zanalysisworklistmodel.h"
 
-#include <QFile>
-#include <QTextStream>
 #include "zlog.h"
-#include <QUrl>
 #include <include/reader.h>
 #include <include/variantdata.h>
 #include <include/writer.h>
+#include <QUrl>
+#include <QFile>
+#include <QTextStream>
 
 namespace nim {
 
@@ -157,9 +157,8 @@ QString ZAnalysisWorklistModel::toCSV(const QString filename, bool withHeader, Q
   if (!QtCSV::Writer::write(filename, vd, separator, QString(""), QtCSV::Writer::REWRITE, QStringList(), QStringList(),
                             codec)) {
     return QString("Can not write csv to file (%1).").arg(filename);
-  } else {
-    return QString();
   }
+  return QString();
 }
 
 int ZAnalysisWorklistModel::rowCount(const QModelIndex& parent) const

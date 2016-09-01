@@ -1,14 +1,14 @@
 #pragma once
 
 #include "zobjfilter.h"
-#include <QList>
-#include <vector>
 #include "zparameter.h"
-#include <QGraphicsEllipseItem>
-#include <map>
 #include "znumericparameter.h"
 #include "zpuncta.h"
 #include "zgraphicsitemtype.h"
+#include <QList>
+#include <QGraphicsEllipseItem>
+#include <map>
+#include <vector>
 
 class ZWidgetsGroup;
 
@@ -25,7 +25,7 @@ public:
   int type() const override
   { return Type; }
 
-  ZPunctaGraphicsItem(ZPuncta& puncta, double z = 1, QGraphicsItem* parent = nullptr);
+  explicit ZPunctaGraphicsItem(ZPuncta& puncta, double z = 1, QGraphicsItem* parent = nullptr);
 
   void setOutlineColor(const QColor& c)
   {
@@ -81,7 +81,7 @@ class ZPunctaFilter : public ZObjFilter
 {
 Q_OBJECT
 public:
-  ZPunctaFilter(ZView& view);
+  explicit ZPunctaFilter(ZView& view);
 
   void setData(ZPuncta& puncta);
 

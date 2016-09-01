@@ -1,9 +1,9 @@
 #pragma once
 
+#include "zimagecompositetransform.h"
+#include "zimagetransform.h"
 #include <QString>
 #include <map>
-#include "zimagetransform.h"
-#include "zimagecompositetransform.h"
 
 namespace nim {
 

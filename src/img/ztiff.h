@@ -1,8 +1,8 @@
 #pragma once
 
-#include <iostream>
 #include "zimginterface.h"
 #include "zimgmetatag.h"
+#include <iostream>
 
 struct tiff;
 using TIFF = struct tiff;
@@ -283,5 +283,5 @@ private:
   int m_extraSample;
 };
 
-} // namespace
+} // namespace nim
 

@@ -1,10 +1,10 @@
 #include "zregionannotationfilter.h"
 
+#include "zgraphicsview.h"
 #include "znumericparameter.h"
 #include "zwidgetsgroup.h"
-#include "zgraphicsview.h"
-#include "zsaturateoperation.h"
 #include "zgraphicsscene.h"
+#include "zsaturateoperation.h"
 #include "zlog.h"
 
 namespace nim {

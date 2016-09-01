@@ -1,9 +1,9 @@
 #pragma once
 
-#include <QString>
 #include "zeigenutils.h"
-#include <cmath>
 #include <QColor>
+#include <QString>
+#include <cmath>
 
 namespace nim {
 

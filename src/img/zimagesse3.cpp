@@ -1,4 +1,5 @@
 #include "zimagesse3.h"
+
 #include <immintrin.h>
 
 namespace nim {
@@ -181,4 +182,4 @@ void Image3DRowFilterForOneBlock_SSE3(const double* padImg, size_t padImgWidth, 
   }
 }
 
-}
+}  // namespace nim

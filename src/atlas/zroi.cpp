@@ -1,11 +1,11 @@
 #include "zroi.h"
 
-#include "zlog.h"
-#include <cmath>
-#include <Mathematics/GteNaturalSplineCurve.h>
-#include "zsaturateoperation.h"
-#include <QFile>
 #include "zglmutils.h"
+#include "zlog.h"
+#include "zsaturateoperation.h"
+#include <Mathematics/GteNaturalSplineCurve.h>
+#include <QFile>
+#include <cmath>
 
 namespace {
 
@@ -71,7 +71,7 @@ QPainterPath splineToQPainterPath(const QPolygonF& spline, bool showLastSeg = tr
   return res;
 }
 
-}
+} // namespace
 
 namespace nim {
 

@@ -1,6 +1,6 @@
-#include "z3dgl.h"
 #include "z3dsphererenderer.h"
 
+#include "z3dgl.h"
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 

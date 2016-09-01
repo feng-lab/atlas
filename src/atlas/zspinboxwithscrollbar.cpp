@@ -1,9 +1,9 @@
 #include "zspinboxwithscrollbar.h"
 
+#include "zspinbox.h"
 #include <QHBoxLayout>
 #include <QScrollBar>
 #include <QLabel>
-#include "zspinbox.h"
 
 namespace nim {
 

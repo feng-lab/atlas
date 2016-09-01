@@ -1,15 +1,15 @@
 #include "zregionannotation.h"
 
+#include "zexception.h"
+#include "zioutils.h"
+#include "zimgconnectedcomponents.h"
+#include "zlog.h"
+#include "zimgfillhole.h"
+#include "zimgsigneddistancemap.h"
+#include "zbenchtimer.h"
 #include <QStandardPaths>
 #include <QFile>
 #include <QTemporaryDir>
-#include "zexception.h"
-#include "zioutils.h"
-#include "zlog.h"
-#include "zimgconnectedcomponents.h"
-#include "zimgsigneddistancemap.h"
-#include "zimgfillhole.h"
-#include "zbenchtimer.h"
 
 namespace {
 
@@ -36,7 +36,7 @@ struct MarkAsIfOtherEqualsOtherWiseZero
   {}
 
   template<typename TVoxel, typename TVoxelOther>
-  TVoxel operator()(TVoxel, TVoxelOther otherVoxel) const
+  TVoxel operator()(TVoxel /*unused*/, TVoxelOther otherVoxel) const
   {
     return (static_cast<int64_t>(otherVoxel) == equal) ? as : 0;
   }
@@ -47,7 +47,7 @@ struct MarkAsIfOtherEqualsOtherWiseZero
 
 struct CopyAsIfOtherIsNotZero
 {
-  CopyAsIfOtherIsNotZero(int64_t as_)
+  explicit CopyAsIfOtherIsNotZero(int64_t as_)
     : as(as_)
   {}
 
@@ -60,7 +60,7 @@ struct CopyAsIfOtherIsNotZero
   int64_t as;
 };
 
-}
+} // namespace
 
 namespace nim {
 
@@ -485,7 +485,7 @@ void ZRegionAnnotation::updateMesh()
   if (dir.isValid()) {
     QString fn = QDir(dir.path()).filePath("temp_region_annotation_label_image.mhd");
     exportLabelImage(fn, FileFormat::MetaImage, Compression::AUTO);
-    ZRegionAnnotationUpdateMeshCommand* cmd = new ZRegionAnnotationUpdateMeshCommand(*this);
+    auto cmd = new ZRegionAnnotationUpdateMeshCommand(*this);
     importLabelImage(fn, FileFormat::MetaImage, true, false);
     cmd->setNewOntology(m_ontology);
     m_undoStack.push(cmd);

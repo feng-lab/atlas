@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "z3dmeshfilter.h"
 #include "zregionannotation.h"
 
@@ -29,10 +28,10 @@ public:
 
   virtual void renderTransparent(Z3DEye eye) override;
 
-  virtual bool hasOpaque(Z3DEye) const override
+  virtual bool hasOpaque(Z3DEye /*unused*/) const override
   { return true; }
 
-  virtual bool hasTransparent(Z3DEye) const override
+  virtual bool hasTransparent(Z3DEye /*unused*/) const override
   { return true; }
 
   virtual void setViewport(glm::uvec2 viewport) override;

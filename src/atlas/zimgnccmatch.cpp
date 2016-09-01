@@ -1,10 +1,10 @@
 #include "zimgnccmatch.h"
 
 #include "zlog.h"
-#include <array>
 #include "zimgncc.h"
 #include "zimgautothreshold.h"
 #include <QStringList>
+#include <array>
 
 namespace {
 
@@ -20,7 +20,7 @@ void removeBG(ZImg& img)
 // ting's method
 struct WeightNCCTing
 {
-  WeightNCCTing(double overlapThre)
+  explicit WeightNCCTing(double overlapThre)
     : m_overlapThre(overlapThre)
   {}
 
@@ -34,7 +34,7 @@ private:
   double m_overlapThre;
 };
 
-}
+}  // namespace
 
 namespace nim {
 

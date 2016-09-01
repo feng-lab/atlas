@@ -1,6 +1,6 @@
-#include "z3dgl.h"
 #include "z3drendererbase.h"
 
+#include "z3dgl.h"
 #include "z3dprimitiverenderer.h"
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
@@ -167,8 +167,9 @@ QString Z3DRendererBase::generateHeader() const
 {
   QString glslVer = QString("%1%2").arg(Z3DGpuInfo::instance().glslMajorVersion()).arg(
     Z3DGpuInfo::instance().glslMinorVersion());
-  if (glslVer.length() < 3)
+  if (glslVer.length() < 3) {
     glslVer += "0";
+  }
 
   QString header = QString("#version %1\n").arg(glslVer);
 
@@ -200,8 +201,9 @@ QString Z3DRendererBase::generateGeomHeader() const
 {
   QString glslVer = QString("%1%2").arg(Z3DGpuInfo::instance().glslMajorVersion()).arg(
     Z3DGpuInfo::instance().glslMinorVersion());
-  if (glslVer.length() < 3)
+  if (glslVer.length() < 3) {
     glslVer += "0";
+  }
 
   QString header = QString("#version %1\n").arg(glslVer);
 

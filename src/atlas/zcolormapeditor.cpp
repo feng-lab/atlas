@@ -1,8 +1,8 @@
 #include "zcolormapeditor.h"
+
 #include "zcolormap.h"
-#include <QtGui>
-#include <QtWidgets>
 #include "zlog.h"
+#include <QtWidgets>
 
 namespace nim {
 
@@ -162,10 +162,12 @@ void ZColorMapWidget::mouseDoubleClickEvent(QMouseEvent* e)
   if (findkey(e->pos(), index, true) == ZColorMapWidget::LEFT) {
     editLColor(index);
     return;
-  } else if (findkey(e->pos(), index, true) == ZColorMapWidget::RIGHT) {
+  }
+  if (findkey(e->pos(), index, true) == ZColorMapWidget::RIGHT) {
     editRColor(index);
     return;
-  } else if (contentsRect().contains(e->pos())) {
+  }
+  if (contentsRect().contains(e->pos())) {
     double i = screenXPositionToIntensity(e->pos().x());
     m_colorMap->get().addKeyAtIntensity(i);
     m_colorMap->get().removeDuplicatedKeys();
@@ -197,9 +199,9 @@ void ZColorMapWidget::contextMenuEvent(QContextMenuEvent* e)
     }
     removeAction = contextMenu.addAction("Delete");
     QAction* action = contextMenu.exec(e->globalPos());
-    if (action == editLColorAction)
+    if (action == editLColorAction) {
       editLColor(index);
-    else if (action == editIntensityAction) {
+    } else if (action == editIntensityAction) {
       bool ok;
       double newI = QInputDialog::getDouble(this, QString("Key %1").arg(index + 1), "Intensity:",
                                             m_colorMap->get().key(index).intensity(),
@@ -212,10 +214,11 @@ void ZColorMapWidget::contextMenuEvent(QContextMenuEvent* e)
       m_colorMap->get().removeKey(index);
     }
     if (isSplit) {
-      if (action == editRColorAction)
+      if (action == editRColorAction) {
         editRColor(index);
-      else if (action == mergeAction)
+      } else if (action == mergeAction) {
         m_colorMap->get().setKeySplit(index, false);
+      }
     } else {
       if (action == splitAction)
         m_colorMap->get().setKeySplit(index, true);
@@ -277,7 +280,7 @@ bool ZColorMapWidget::event(QEvent* e)
   return QWidget::event(e);
 }
 
-void ZColorMapWidget::paintEvent(QPaintEvent*)
+void ZColorMapWidget::paintEvent(QPaintEvent* /*event*/)
 {
   QPainter painter(this);
   //
@@ -339,7 +342,7 @@ void ZColorMapWidget::paintEvent(QPaintEvent*)
 
 }
 
-void ZColorMapWidget::resizeEvent(QResizeEvent*)
+void ZColorMapWidget::resizeEvent(QResizeEvent* /*event*/)
 {
   updateIntensityScreenWidth();
 }
@@ -383,12 +386,9 @@ ZColorMapWidget::FindKeyResult ZColorMapWidget::findkey(const QPoint& pos, size_
   }
   if (hit) {
     index = minIndex;
-    if (left)
-      return ZColorMapWidget::LEFT;
-    else
-      return ZColorMapWidget::RIGHT;
-  } else
-    return ZColorMapWidget::NONE;
+    return left ? ZColorMapWidget::LEFT : ZColorMapWidget::RIGHT;
+  }
+  return ZColorMapWidget::NONE;
 }
 
 double ZColorMapWidget::intensityToScreenXPosition(double intensity) const
@@ -470,8 +470,8 @@ void ZColorMapEditor::fitDomainToDataRange()
 
 void ZColorMapEditor::createWidget()
 {
-  QVBoxLayout* vlo = new QVBoxLayout;
-  QHBoxLayout* hlo = new QHBoxLayout;
+  auto vlo = new QVBoxLayout;
+  auto hlo = new QHBoxLayout;
   m_colorMapWidget = new ZColorMapWidget(m_colorMap, this);
   vlo->addWidget(m_colorMapWidget);
   m_dataMinNameLabel = new QLabel("Data Min: ", this);

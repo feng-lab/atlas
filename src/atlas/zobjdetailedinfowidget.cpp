@@ -1,11 +1,11 @@
 #include "zobjdetailedinfowidget.h"
 
-#include <QVBoxLayout>
-#include <QLabel>
-#include <QScrollArea>
 #include "zwidgetsgroup.h"
 #include "zlog.h"
 #include "zobjdoc.h"
+#include <QVBoxLayout>
+#include <QLabel>
+#include <QScrollArea>
 
 namespace nim {
 
@@ -13,7 +13,7 @@ ZObjDetailedInfoWidget::ZObjDetailedInfoWidget(ZDoc* doc, QWidget* mw)
   : QWidget(mw)
   , m_doc(doc)
 {
-  QVBoxLayout* layout = new QVBoxLayout;
+  auto layout = new QVBoxLayout;
   m_widget = new QStackedWidget;
   m_defaultWidget = new QWidget(this);
   m_widget->addWidget(m_defaultWidget);
@@ -44,7 +44,7 @@ void ZObjDetailedInfoWidget::showWidgetOfObj(size_t id)
   QString info = m_doc->objDetailedInfo(id);
   if (!info.isEmpty()) {
     ZWidgetsGroup wg("Info", 1);
-    QLabel* infoLabel = new QLabel(info);
+    auto infoLabel = new QLabel(info);
     infoLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     infoLabel->setWordWrap(true);
     wg.addChild(*infoLabel, 1);

@@ -1,4 +1,5 @@
 #include "zimgalgorithm.h"
+
 #include "zlog.h"
 
 namespace nim {
@@ -96,7 +97,7 @@ void ZImgAlgorithmBaseWithProgressReporter::processITKEvent(itk::Object* caller,
   if (itk::ProgressEvent().CheckEvent(&event)) {
     if (auto process = dynamic_cast<itk::ProcessObject*>(caller)) {
       if (m_cancelFlag && *m_cancelFlag) {
-        if (process->GetAbortGenerateData() == false) {
+        if (!process->GetAbortGenerateData()) {
           process->AbortGenerateDataOn();
           LOG(INFO) << "abort itk 1";
         }
@@ -113,7 +114,7 @@ ZImgAlgorithmBaseWithProgressReporter::constProcessITKEvent(const itk::Object* c
   if (itk::ProgressEvent().CheckEvent(&event)) {
     if (auto process = const_cast<itk::ProcessObject*>(dynamic_cast<const itk::ProcessObject*>(caller))) {
       if (m_cancelFlag && *m_cancelFlag) {
-        if (process->GetAbortGenerateData() == false) {
+        if (!process->GetAbortGenerateData()) {
           process->AbortGenerateDataOn();
           LOG(INFO) << "abort itk 2";
         }

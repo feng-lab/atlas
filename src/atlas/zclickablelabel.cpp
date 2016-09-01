@@ -1,5 +1,6 @@
-#include "zglmutils.h"
 #include "zclickablelabel.h"
+
+#include "zglmutils.h"
 #include "zcolormap.h"
 #include "z3dtransferfunction.h"
 #include "znumericparameter.h"
@@ -28,11 +29,12 @@ bool ZClickableLabel::event(QEvent* event)
     QHelpEvent* helpEvent = static_cast<QHelpEvent*>(event);
     QRect tipRect;
     QString tipText;
-    if (getTip(helpEvent->pos(), &tipRect, &tipText))
+    if (getTip(helpEvent->pos(), &tipRect, &tipText)) {
       QToolTip::showText(
         helpEvent->globalPos(), tipText, this, tipRect);
-    else
+    } else {
       QToolTip::hideText();
+    }
   }
   return QWidget::event(event);
 }
@@ -45,38 +47,38 @@ void ZClickableLabel::labelClicked()
 ZClickableColorLabel::ZClickableColorLabel(ZVec4Parameter* color, QWidget* parent, Qt::WindowFlags f)
   : ZClickableLabel(parent, f)
   , m_vec4Color(color)
-  , m_vec3Color(0)
-  , m_dvec4Color(0)
-  , m_dvec3Color(0)
+  , m_vec3Color(nullptr)
+  , m_dvec4Color(nullptr)
+  , m_dvec3Color(nullptr)
 {
   connect(m_vec4Color, &ZVec4Parameter::valueChanged, this, qOverload<>(&ZClickableColorLabel::update));
 }
 
 ZClickableColorLabel::ZClickableColorLabel(ZVec3Parameter* color, QWidget* parent, Qt::WindowFlags f)
   : ZClickableLabel(parent, f)
-  , m_vec4Color(0)
+  , m_vec4Color(nullptr)
   , m_vec3Color(color)
-  , m_dvec4Color(0)
-  , m_dvec3Color(0)
+  , m_dvec4Color(nullptr)
+  , m_dvec3Color(nullptr)
 {
   connect(m_vec3Color, &ZVec3Parameter::valueChanged, this, qOverload<>(&ZClickableColorLabel::update));
 }
 
 ZClickableColorLabel::ZClickableColorLabel(ZDVec4Parameter* color, QWidget* parent, Qt::WindowFlags f)
   : ZClickableLabel(parent, f)
-  , m_vec4Color(0)
-  , m_vec3Color(0)
+  , m_vec4Color(nullptr)
+  , m_vec3Color(nullptr)
   , m_dvec4Color(color)
-  , m_dvec3Color(0)
+  , m_dvec3Color(nullptr)
 {
   connect(m_dvec4Color, &ZDVec4Parameter::valueChanged, this, qOverload<>(&ZClickableColorLabel::update));
 }
 
 ZClickableColorLabel::ZClickableColorLabel(ZDVec3Parameter* color, QWidget* parent, Qt::WindowFlags f)
   : ZClickableLabel(parent, f)
-  , m_vec4Color(0)
-  , m_vec3Color(0)
-  , m_dvec4Color(0)
+  , m_vec4Color(nullptr)
+  , m_vec3Color(nullptr)
+  , m_dvec4Color(nullptr)
   , m_dvec3Color(color)
 {
   connect(m_dvec3Color, &ZDVec3Parameter::valueChanged, this, qOverload<>(&ZClickableColorLabel::update));

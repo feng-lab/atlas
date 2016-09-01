@@ -3,9 +3,9 @@
 #include "zroi.h"
 #include "zroidoc.h"
 #include "zroiview.h"
+#include "zgraphicsview.h"
 #include "znumericparameter.h"
 #include "zwidgetsgroup.h"
-#include "zgraphicsview.h"
 #include <QGraphicsSceneContextMenuEvent>
 #include <QToolTip>
 #include <boost/math/constants/constants.hpp>
@@ -221,7 +221,7 @@ void ZROIFilter::setData(ZROI& roi)
   if (!m_ROI->isEmpty()) {
     for (auto it = m_ROI->cbegin(); it != m_ROI->cend(); ++it) {
       int i = it->first;
-      ROIGraphicsItem* roiItem = new ROIGraphicsItem(*m_ROI, i);
+      auto roiItem = new ROIGraphicsItem(*m_ROI, i);
       roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
                                   m_outlineColor.get().y * 255,
                                   m_outlineColor.get().z * 255),
@@ -351,7 +351,7 @@ void ZROIFilter::deleteKeyPressed()
     m_ROI->deleteROIControlPoints(controlPoints);
 }
 
-void ZROIFilter::mousePressed(const QPointF&)
+void ZROIFilter::mousePressed(const QPointF& /*scenePos*/)
 {
   m_hasSelectedItems = false;
   if (m_view.isMaxZProjView()) {
@@ -378,7 +378,7 @@ void ZROIFilter::mousePressed(const QPointF&)
   }
 }
 
-void ZROIFilter::mouseReleased(const QPointF&)
+void ZROIFilter::mouseReleased(const QPointF& /*scenePos*/)
 {
   if (m_hasSelectedItems) {
     m_ROI->endMoveSelectedControlPointsCommand();
@@ -519,7 +519,7 @@ void ZROIFilter::opacityChanged()
 void ZROIFilter::onRoiChanged(int slice)
 {
   if (m_sliceToROIItem.find(slice) == m_sliceToROIItem.end()) {
-    ROIGraphicsItem* roiItem = new ROIGraphicsItem(*m_ROI, slice);
+    auto roiItem = new ROIGraphicsItem(*m_ROI, slice);
     roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
                                 m_outlineColor.get().y * 255,
                                 m_outlineColor.get().z * 255),

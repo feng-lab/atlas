@@ -45,5 +45,5 @@ public:
   void readImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize);
 };
 
-} // namespace
+} // namespace nim
 

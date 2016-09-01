@@ -1,5 +1,6 @@
-#include "z3dgl.h"
 #include "z3dbackgroundrenderer.h"
+
+#include "z3dgl.h"
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 
@@ -44,7 +45,7 @@ Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase& rendererBase)
     glEnableVertexAttribArray(attr_vertex);
     m_VBO.bind(GL_ARRAY_BUFFER);
     glBufferData(GL_ARRAY_BUFFER, 3 * 4 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     m_VBO.release(GL_ARRAY_BUFFER);
 
@@ -153,7 +154,7 @@ void Z3DBackgroundRenderer::render(Z3DEye eye)
     glEnableVertexAttribArray(attr_vertex);
     m_VBO.bind(GL_ARRAY_BUFFER);
     glBufferData(GL_ARRAY_BUFFER, 3 * 4 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
@@ -165,7 +166,7 @@ void Z3DBackgroundRenderer::render(Z3DEye eye)
   m_backgroundShaderGrp.release();
 }
 
-void Z3DBackgroundRenderer::renderPicking(Z3DEye)
+void Z3DBackgroundRenderer::renderPicking(Z3DEye /*unused*/)
 {
   // do nothing
 }

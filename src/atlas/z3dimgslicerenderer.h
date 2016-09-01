@@ -1,9 +1,9 @@
 #pragma once
 
 #include "z3dprimitiverenderer.h"
-#include "zmesh.h"
-#include "zcolormap.h"
 #include "z3dshaderprogram.h"
+#include "zcolormap.h"
+#include "zmesh.h"
 
 namespace nim {
 

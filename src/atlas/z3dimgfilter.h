@@ -1,13 +1,11 @@
 #pragma once
 
 #include "z3dboundedfilter.h"
-
 #include "z3dcameraparameter.h"
 #include "znumericparameter.h"
 #include "z3dimg.h"
 #include "z3dtransformparameter.h"
 #include "zwidgetsgroup.h"
-#include <vector>
 #include "z3dimgraycasterrenderer.h"
 #include "z3dimgslicerenderer.h"
 #include "z3dtextureandeyecoordinaterenderer.h"
@@ -16,6 +14,7 @@
 #include "z3dtexturecopyrenderer.h"
 #include "zimgpack.h"
 #include "z3drenderport.h"
+#include <vector>
 
 namespace nim {
 

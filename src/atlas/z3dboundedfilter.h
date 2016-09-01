@@ -15,7 +15,7 @@ class Z3DBoundedFilter : public Z3DFilter
 {
 Q_OBJECT
 public:
-  explicit Z3DBoundedFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+  explicit Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* parent = nullptr);
 
   void setSelected(bool v);
 

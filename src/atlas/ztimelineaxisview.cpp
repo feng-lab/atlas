@@ -1,13 +1,13 @@
 #include "ztimelineaxisview.h"
 
+#include "zlog.h"
+#include "zsaturateoperation.h"
 #include <QGraphicsItem>
 #include <QGraphicsEllipseItem>
 #include <QGraphicsTextItem>
 #include <QGraphicsRectItem>
 #include <QGraphicsLineItem>
 #include <QScrollBar>
-#include "zlog.h"
-#include "zsaturateoperation.h"
 
 namespace nim {
 
@@ -68,7 +68,7 @@ void ZTimelineAxisView::updateAxisScene()
   m_scene->clear();
 
   m_scene->setSceneRect(0, 0, m_timeline.eventViewWidth(), m_timeline.rowHeight());
-  QGraphicsRectItem* rect = new QGraphicsRectItem(nullptr);
+  auto rect = new QGraphicsRectItem(nullptr);
   rect->setRect(-1, -1, m_timeline.eventViewWidth() + 2, m_timeline.rowHeight() + 2);
   rect->setPen(QPen(QColor(200, 200, 200)));
   rect->setBrush(QBrush(QColor(235 + 20, 235 + 20, 235 + 20)));
@@ -101,7 +101,7 @@ void ZTimelineAxisView::updateAxisScene()
     double x = m_timeline.timeToX(time);
     uint64_t count = roundTo<uint64_t>(time / tickTimeSpan);
     if (count % 10 == 0) { // big tick
-      QGraphicsLineItem* line = new QGraphicsLineItem();
+      auto line = new QGraphicsLineItem();
       line->setLine(x, m_timeline.rowHeight() * 0.2, x, m_timeline.rowHeight());
       line->setPen(QPen(QColor(100, 100, 100)));
       QGraphicsTextItem* text = new QGraphicsTextItem(timeToString(time));
@@ -113,7 +113,7 @@ void ZTimelineAxisView::updateAxisScene()
       m_scene->addItem(line);
       m_scene->addItem(text);
     } else if (count % 5 == 0) { // middle tick
-      QGraphicsLineItem* line = new QGraphicsLineItem();
+      auto line = new QGraphicsLineItem();
       line->setLine(x, m_timeline.rowHeight() * 0.5, x, m_timeline.rowHeight());
       line->setPen(QPen(QColor(150, 150, 150)));
       QGraphicsTextItem* text = new QGraphicsTextItem(timeToString(time));
@@ -125,7 +125,7 @@ void ZTimelineAxisView::updateAxisScene()
       m_scene->addItem(line);
       m_scene->addItem(text);
     } else { // small tick
-      QGraphicsLineItem* line = new QGraphicsLineItem();
+      auto line = new QGraphicsLineItem();
       line->setLine(x, m_timeline.rowHeight() * 0.7, x, m_timeline.rowHeight());
       line->setPen(QPen(QColor(180, 180, 180)));
       m_scene->addItem(line);
@@ -154,11 +154,11 @@ QString ZTimelineAxisView::timeToString(double time) const
   tm -= miniter * 60000;
   if (hour > 0) {
     return QString("%1h%2m%3s").arg(hour).arg(miniter).arg(tm / 1000.);
-  } else if (miniter > 0) {
-    return QString("%1m%2s").arg(miniter).arg(tm / 1000.);
-  } else {
-    return QString("%1s").arg(tm / 1000.);
   }
+  if (miniter > 0) {
+    return QString("%1m%2s").arg(miniter).arg(tm / 1000.);
+  }
+  return QString("%1s").arg(tm / 1000.);
 }
 
 void ZTimelineAxisView::moveCurrentTime()

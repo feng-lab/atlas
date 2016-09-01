@@ -1,11 +1,11 @@
 #pragma once
 
 #include "zimginterface.h"
-#include <map>
-#include <vector>
-#include <QDir>
 #include "zpuncta.h"
 #include "zswc.h"
+#include <QDir>
+#include <map>
+#include <vector>
 
 namespace nim {
 

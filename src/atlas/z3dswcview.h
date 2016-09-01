@@ -1,8 +1,8 @@
 #pragma once
 
 #include "z3dfilterview.h"
-#include "zswcdoc.h"
 #include "z3dswcfilter.h"
+#include "zswcdoc.h"
 
 namespace nim {
 

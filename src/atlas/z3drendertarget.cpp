@@ -4,9 +4,9 @@
 #include "zlog.h"
 #include "zbenchtimer.h"
 #include "z3dgpuinfo.h"
+#include "zimg.h"
 #include <QImage>
 #include <QImageWriter>
-#include "zimg.h"
 
 namespace nim {
 

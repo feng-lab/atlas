@@ -5,13 +5,13 @@
 #pragma once
 
 #include "zobjfilter.h"
-#include <QList>
-#include <vector>
 #include "zparameter.h"
-#include <map>
 #include "znumericparameter.h"
 #include "zsvgdoc.h"
 #include <QGraphicsSvgItem>
+#include <QList>
+#include <map>
+#include <vector>
 
 class ZWidgetsGroup;
 
@@ -21,7 +21,7 @@ class ZSvgFilter : public ZObjFilter
 {
 Q_OBJECT
 public:
-  ZSvgFilter(ZView& view);
+  explicit ZSvgFilter(ZView& view);
 
   void setData(QSvgRenderer& svg);
 

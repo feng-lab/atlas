@@ -1,9 +1,9 @@
 #include "zioutils.h"
 
 #include "zglobal.h"
-#include <vector>
 #include <QFile>
 #include <QTextStream>
+#include <vector>
 
 namespace nim {
 

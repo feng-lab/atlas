@@ -70,7 +70,7 @@ protected:
 private:
   struct PunctaPack
   { // puncta and its associated data
-    PunctaPack(ZPuncta& puncta, const QString& path);
+    PunctaPack(ZPuncta& punctaIn, const QString& path_);
 
     ~PunctaPack();
 

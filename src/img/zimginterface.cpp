@@ -87,4 +87,4 @@ double unitSizeInMeter(VoxelSizeUnit vsu)
   }
 }
 
-}
+}  // namespace nim

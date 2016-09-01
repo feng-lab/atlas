@@ -1,24 +1,18 @@
 #pragma once
 
-#include <cmath>
-#include <Eigen/Dense>
-#include <fstream>
-#include <sstream>
-#include "zlog.h"
-#include <map>
-#include <set>
-#include <limits>
-#include <type_traits>
-
-#ifndef Q_MOC_RUN
-
-#include <boost/math/special_functions.hpp>
-#include <boost/math/constants/constants.hpp>
-
-#endif
-
 #include "zioutils.h"
 #include "zrandom.h"
+#include "zlog.h"
+#include <Eigen/Dense>
+#ifndef Q_MOC_RUN
+#include <boost/math/special_functions.hpp>
+#include <boost/math/constants/constants.hpp>
+#endif
+#include <cmath>
+#include <limits>
+#include <map>
+#include <set>
+#include <type_traits>
 
 namespace nim {
 
@@ -56,9 +50,8 @@ struct ZVectorCompare
           return v1(i) < v2(i);
       }
       return false;   //equal
-    } else {
-      return v1.size() < v2.size();
     }
+    return v1.size() < v2.size();
   }
 };
 
@@ -75,9 +68,8 @@ struct ZVectorCompare<T, true>
           return v1(i) < v2(i);
       }
       return false;   //equal
-    } else {
-      return v1.size() < v2.size();
     }
+    return v1.size() < v2.size();
   }
 };
 

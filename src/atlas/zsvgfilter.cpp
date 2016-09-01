@@ -4,13 +4,12 @@
 
 #include "zsvgfilter.h"
 
-#include "znumericparameter.h"
-#include "zwidgetsgroup.h"
 #include "zgraphicsview.h"
+#include "znumericparameter.h"
 #include "zsaturateoperation.h"
 #include "zgraphicsscene.h"
+#include "zwidgetsgroup.h"
 #include "zlogqttypesupport.h"
-
 #include <QWindow>
 
 namespace nim {

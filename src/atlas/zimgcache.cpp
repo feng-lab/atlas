@@ -15,4 +15,4 @@ ZImgCache::ZImgCache()
 {
 }
 
-} // namespace
+} // namespace nim

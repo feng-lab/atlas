@@ -17,7 +17,7 @@ class ZChooseObjDialog : public QDialog
 {
 Q_OBJECT
 public:
-  explicit ZChooseObjDialog(const ZObjDoc& doc, QWidget* parent = 0);
+  explicit ZChooseObjDialog(const ZObjDoc& doc, QWidget* parent = nullptr);
 
   size_t selectedID() const
   { return m_selectedID; }

@@ -1,9 +1,9 @@
 #pragma once
 
+#include "znumericparameter.h"
+#include "zview.h"
 #include <QObject>
 #include <QList>
-#include "zview.h"
-#include "znumericparameter.h"
 
 namespace nim {
 

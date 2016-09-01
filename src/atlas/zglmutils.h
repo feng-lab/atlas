@@ -18,17 +18,15 @@
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/vector_angle.hpp>
-#include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/hash.hpp>
-
-#include <iostream>
-#include <sstream>
-#include <tuple>
-
+#include <glm/gtx/rotate_vector.hpp>
 #include <QRegularExpression>
 #include <QStringList>
 #include <QColor>
 #include <QLocale>
+#include <iostream>
+#include <sstream>
+#include <tuple>
 
 namespace glm {
 using col3 = tvec3<unsigned char, highp>;

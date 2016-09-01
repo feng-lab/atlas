@@ -4,6 +4,11 @@
 #include "zgraphicsscene.h"
 #include "zgraphicsview.h"
 #include "zobjview.h"
+#include "zactiongroup.h"
+#include "znumericparameter.h"
+#include "zroidoc.h"
+#include "ztakescreenshotwidget.h"
+#include "zlog.h"
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QKeyEvent>
@@ -11,11 +16,6 @@
 #include <QToolButton>
 #include <QMessageBox>
 #include <QApplication>
-#include "znumericparameter.h"
-#include "zactiongroup.h"
-#include "zroidoc.h"
-#include "ztakescreenshotwidget.h"
-#include "zlog.h"
 
 namespace nim {
 
@@ -55,7 +55,7 @@ ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
   m_layout->addWidget(m_view);
   m_layout->addSpacing(15);
 
-  QHBoxLayout* hly = new QHBoxLayout;
+  auto hly = new QHBoxLayout;
   m_imgSlice->setStyle("SPINBOXWITHSCROLLBAR");
   m_imgSliceWidget = m_imgSlice->createWidget(this);
   hly->addWidget(m_imgSlice->createNameLabel(this));
@@ -92,7 +92,7 @@ QWidget* ZView::createScaleWidget(QWidget* parent)
 
 QToolButton* ZView::createROIToolButton(QWidget* parent)
 {
-  QToolButton* res = new QToolButton(parent);
+  auto res = new QToolButton(parent);
   //res->setCheckable(true);
   res->addAction(m_roiSplineAction);
   res->addAction(m_roiPolygonAction);
@@ -142,20 +142,20 @@ ZView::State ZView::state() const
 {
   if (m_roiEllipseAction->isChecked())
     return State::ROIEllipse;
-  else if (m_roiRectangleAction->isChecked())
+  if (m_roiRectangleAction->isChecked())
     return State::ROIRect;
-  else if (m_roiPolygonAction->isChecked())
+  if (m_roiPolygonAction->isChecked())
     return State::ROIPolygon;
-  else if (m_roiSplineAction->isChecked())
+  if (m_roiSplineAction->isChecked())
     return State::ROISpline;
-  else
-    return State::Normal;
+
+  return State::Normal;
 }
 
 QWidget* ZView::captureWidget()
 {
-  QScrollArea* res = new QScrollArea();
-  ZTakeScreenShotWidget* m_screenShotWidget = new ZTakeScreenShotWidget(true, false, nullptr);
+  auto res = new QScrollArea();
+  auto m_screenShotWidget = new ZTakeScreenShotWidget(true, false, nullptr);
   connect(m_screenShotWidget, &ZTakeScreenShotWidget::take2DScreenShot,
           this, &ZView::takeScreenShot);
   connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeFixedSize2DScreenShot,

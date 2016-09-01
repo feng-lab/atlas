@@ -5,14 +5,14 @@
 // if it happens you have to convert the ambiguous type (e.g. size_t can be long or long long) into one of
 // the sized type to make the overload work
 
-#include <cstdint>
-#include <numeric>
-#include <cmath>
-#include <limits>
-#include <immintrin.h>
 #if 0
 #include <boost/multiprecision/cpp_int.hpp>
 #endif
+#include <cmath>
+#include <cstdint>
+#include <limits>
+#include <numeric>
+#include <immintrin.h>
 
 namespace nim {
 
@@ -209,23 +209,21 @@ inline int64_t saturate_add(int64_t x, int64_t y)
 
 inline uint64_t saturate_add(uint64_t x, int64_t y)
 {
-  if (y <= 0)
+  if (y <= 0) {
     return x > static_cast<uint64_t>(-y) ? x - static_cast<uint64_t>(-y) : 0;
-  else
-    return saturate_add(x, static_cast<uint64_t>(y));
+  }
+  return saturate_add(x, static_cast<uint64_t>(y));
 }
 
 inline int64_t saturate_add(int64_t x, uint64_t y)
 {
   if (static_cast<uint64_t>(INT64_MAX - x) <= y) {
     return INT64_MAX;
-  } else {
-    if (y > INT64_MAX) { // x must less than zero
-      return y - static_cast<uint64_t>(-x);
-    } else {
-      return x + static_cast<int64_t>(y);
-    }
   }
+  if (y > INT64_MAX) { // x must less than zero
+    return y - static_cast<uint64_t>(-x);
+  }
+  return x + static_cast<int64_t>(y);
 }
 
 
@@ -293,22 +291,19 @@ inline uint64_t saturate_sub(uint64_t x, int64_t y)
 {
   if (y < 0) {
     return saturate_add(x, static_cast<uint64_t>(-y));
-  } else {
-    return x > static_cast<uint64_t>(y) ? (x -  static_cast<uint64_t>(y)) : 0;
   }
+  return x > static_cast<uint64_t>(y) ? (x -  static_cast<uint64_t>(y)) : 0;
 }
 
 inline int64_t saturate_sub(int64_t x, uint64_t y)
 {
   if (static_cast<uint64_t>(x - INT64_MIN) <= y) {
     return INT64_MIN;
-  } else {
-    if (y > INT64_MAX) { // x must large than zero
-      return static_cast<uint64_t>(x) - y;
-    } else {
-      return x - static_cast<int64_t>(y);
-    }
   }
+  if (y > INT64_MAX) { // x must large than zero
+    return static_cast<uint64_t>(x) - y;
+  }
+  return x - static_cast<int64_t>(y);
 }
 
 
@@ -332,12 +327,13 @@ inline uint32_t saturate_mul(uint32_t x, uint32_t y)
 
 inline uint64_t saturate_mul(uint64_t x, uint64_t y)
 {
-  if (x == 0 || y == 0)
+  if (x == 0 || y == 0) {
     return 0;
-  else if (UINT64_MAX / x < y)
+  }
+  if (UINT64_MAX / x < y) {
     return UINT64_MAX;
-  else
-    return x * y;
+  }
+  return x * y;
 }
 
 inline int8_t saturate_mul(int8_t x, int8_t y)
@@ -388,7 +384,8 @@ inline int64_t saturate_mul(int64_t x, int64_t y)
                 "integer representation is not two's complement");
   if (x == 0 || y == 0) {
     return 0;
-  } else if (x > 0 && y < 0) {
+  }
+  if (x > 0 && y < 0) {
     return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX)+1, saturate_mul(static_cast<uint64_t>(x), static_cast<uint64_t>(-y))));
   } else if (x < 0 && y > 0) {
     return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX)+1, saturate_mul(static_cast<uint64_t>(-x), static_cast<uint64_t>(y))));
@@ -484,13 +481,13 @@ inline uint64_t saturate_div(uint64_t x, int64_t y)
 
 inline int64_t saturate_div(int64_t x, uint64_t y)
 {
-  if (y == 0)
+  if (y == 0) {
     return x > 0 ? INT64_MAX : x < 0 ? INT64_MIN : 0;
+  }
   if (x >= 0) {
     return static_cast<uint64_t>(x) / y;
-  } else {
-    return -static_cast<int64_t>(static_cast<uint64_t>(-x) / y);
   }
+  return -static_cast<int64_t>(static_cast<uint64_t>(-x) / y);
 }
 
 

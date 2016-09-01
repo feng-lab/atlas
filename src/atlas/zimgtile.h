@@ -12,7 +12,7 @@ namespace nim {
 class ZImgTile
 {
 public:
-  ZImgTile(const ZImg* img, const ZVoxelCoordinate& loc = ZVoxelCoordinate())
+  explicit ZImgTile(const ZImg* img, const ZVoxelCoordinate& loc = ZVoxelCoordinate())
     : m_img(img)
   {
     setLocation(loc);

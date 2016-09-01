@@ -177,8 +177,7 @@ class ZImgZeissLsm : public ZImgTiff
 public:
   ZImgZeissLsm();
 
-  virtual ~ZImgZeissLsm()
-  {}
+  virtual ~ZImgZeissLsm() = default;
 
   // ZImgFormat interface
 public:
@@ -219,5 +218,5 @@ protected:
   size_t m_numScenes;
 };
 
-} // namespace
+} // namespace nim
 

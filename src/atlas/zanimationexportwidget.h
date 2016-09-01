@@ -1,11 +1,11 @@
 #pragma once
 
 #include "z3dgl.h"
-#include <QScrollArea>
-#include <QDir>
 #include "zoptionparameter.h"
 #include "znumericparameter.h"
 #include "zstringparameter.h"
+#include <QScrollArea>
+#include <QDir>
 
 class QPushButton;
 

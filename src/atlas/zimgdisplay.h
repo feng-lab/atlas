@@ -2,9 +2,9 @@
 
 #include "zimg.h"
 #include "zimgvoxelcolormap.h"
-#include <map>
 #include <QImage>
 #include <tbb/blocked_range.h>
+#include <map>
 
 namespace nim {
 

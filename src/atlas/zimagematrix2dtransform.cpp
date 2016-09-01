@@ -26,7 +26,7 @@ void getAffineParameterScales(double width, double height, double* scaleRotation
     *scaleShearYX = 4 * dt / width;
 }
 
-} // empty namespace
+} // namespace
 
 namespace nim {
 
@@ -121,7 +121,7 @@ ZImageTransform* ZImageMatrix2DTransform::clone() const
 
 ZImageTransform* ZImageMatrix2DTransform::makeInverseTransform() const
 {
-  ZImageMatrix2DTransform* res = new ZImageMatrix2DTransform(*this);
+  auto res = new ZImageMatrix2DTransform(*this);
   res->m_tform.invert();
   return res;
 }
@@ -173,7 +173,7 @@ ZImageTransform* ZImageYTranslation2DTransform::clone() const
 
 ZImageTransform* ZImageYTranslation2DTransform::makeInverseTransform() const
 {
-  ZImageYTranslation2DTransform* res = new ZImageYTranslation2DTransform(*this);
+  auto res = new ZImageYTranslation2DTransform(*this);
   res->m_tform.invert();
   return res;
 }
@@ -227,7 +227,7 @@ ZImageTransform* ZImageTranslation2DTransform::clone() const
 
 ZImageTransform* ZImageTranslation2DTransform::makeInverseTransform() const
 {
-  ZImageTranslation2DTransform* res = new ZImageTranslation2DTransform(*this);
+  auto res = new ZImageTranslation2DTransform(*this);
   res->m_tform.invert();
   return res;
 }
@@ -280,7 +280,7 @@ ZImageTransform* ZImageRigid2DTransform::clone() const
 
 ZImageTransform* ZImageRigid2DTransform::makeInverseTransform() const
 {
-  ZImageRigid2DTransform* res = new ZImageRigid2DTransform(*this);
+  auto res = new ZImageRigid2DTransform(*this);
   res->m_tform.invert();
   return res;
 }
@@ -335,7 +335,7 @@ ZImageTransform* ZImageSimilarity2DTransform::clone() const
 
 ZImageTransform* ZImageSimilarity2DTransform::makeInverseTransform() const
 {
-  ZImageSimilarity2DTransform* res = new ZImageSimilarity2DTransform(*this);
+  auto res = new ZImageSimilarity2DTransform(*this);
   res->m_tform.invert();
   return res;
 }
@@ -393,7 +393,7 @@ ZImageTransform* ZImageAffine2DTransform::clone() const
 
 ZImageTransform* ZImageAffine2DTransform::makeInverseTransform() const
 {
-  ZImageAffine2DTransform* res = new ZImageAffine2DTransform(*this);
+  auto res = new ZImageAffine2DTransform(*this);
   res->m_tform.invert();
   return res;
 }

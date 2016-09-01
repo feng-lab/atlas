@@ -1,8 +1,8 @@
 #include "zpunctum.h"
 
-#include <boost/math/distributions/chi_squared.hpp>
-#include "zrandom.h"
 #include "zgmm.h"
+#include "zrandom.h"
+#include <boost/math/distributions/chi_squared.hpp>
 
 namespace nim {
 

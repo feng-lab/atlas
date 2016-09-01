@@ -1,9 +1,9 @@
 #include "zcolormapwidgetwitheditorwindow.h"
-#include <QtGui>
-#include <QtWidgets>
+
 #include "zcolormap.h"
 #include "zcolormapeditor.h"
 #include "zlog.h"
+#include <QtWidgets>
 
 namespace nim {
 

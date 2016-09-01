@@ -1,10 +1,9 @@
 #pragma once
 
-#include <QObject>
 #include "z3dgeometryfilter.h"
-#include "z3dlinerenderer.h"
 #include "z3darrowrenderer.h"
 #include "z3dfontrenderer.h"
+#include "z3dlinerenderer.h"
 
 namespace nim {
 
@@ -24,12 +23,12 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  virtual bool hasOpaque(Z3DEye) const override
+  virtual bool hasOpaque(Z3DEye /*unused*/) const override
   { return false; }
 
   virtual void renderOpaque(Z3DEye eye) override;
 
-  virtual bool hasTransparent(Z3DEye) const override
+  virtual bool hasTransparent(Z3DEye /*unused*/) const override
   { return true; }
 
   virtual void renderTransparent(Z3DEye eye) override

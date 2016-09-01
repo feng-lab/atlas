@@ -1,9 +1,10 @@
 #include "z3dtexture.h"
+
 #include "zlog.h"
 #include "z3dgpuinfo.h"
+#include "zimg.h"
 #include <QImage>
 #include <QImageWriter>
-#include "zimg.h"
 
 namespace nim {
 
@@ -428,9 +429,7 @@ Z3DTextureUnitManager::Z3DTextureUnitManager()
 {
 }
 
-Z3DTextureUnitManager::~Z3DTextureUnitManager()
-{
-}
+Z3DTextureUnitManager::~Z3DTextureUnitManager() = default;
 
 void Z3DTextureUnitManager::nextAvailableUnit()
 {

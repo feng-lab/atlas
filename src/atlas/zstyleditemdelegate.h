@@ -1,7 +1,7 @@
 #pragma once
 
-#include <QStyledItemDelegate>
 #include "zitemeditorfactory.h"
+#include <QStyledItemDelegate>
 
 class QPushButton;
 
@@ -11,7 +11,7 @@ class ZStyledItemDelegate : public QStyledItemDelegate
 {
 Q_OBJECT
 public:
-  explicit ZStyledItemDelegate(QObject* parent = 0);
+  explicit ZStyledItemDelegate(QObject* parent = nullptr);
 
   inline QString displayText(const QVariant& value, const QLocale& locale) const
   {

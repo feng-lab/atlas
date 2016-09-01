@@ -29,14 +29,10 @@ std::shared_ptr<ZImg> ZImgCommonSubBlock::read() const
   return res;
 }
 
-ZImgFormat::ZImgFormat()
-{
-}
+ZImgFormat::ZImgFormat() = default;
 
 
-ZImgFormat::~ZImgFormat()
-{
-}
+ZImgFormat::~ZImgFormat() = default;
 
 bool ZImgFormat::canRead(const QString& filename) const
 {
@@ -116,12 +112,13 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
     for (int c = region.start.c; c < cEnd; ++c) {
       for (int z = region.start.z; z < zEnd; ++z) {
         size_t offset = 0;
-        if ((dimensionOrder == "ZCTL" || dimensionOrder == "ZTL"))
+        if ((dimensionOrder == "ZCTL" || dimensionOrder == "ZTL")) {
           offset = dataOffset + c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
                    region.start.y * imgInfo.rowByteNumber();
-        else // "CZTL"
+        } else { // "CZTL"
           offset = dataOffset + (c + imgInfo.numChannels * z) * imgInfo.planeByteNumber() +
                    region.start.y * imgInfo.rowByteNumber();
+        }
         inputFileStream.seekg(offset, std::ios_base::beg);
         readStream(inputFileStream, res.planeData<char>(z - region.start.z, c - region.start.c, 0),
                    res.planeByteNumber());
@@ -136,12 +133,13 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
       for (int z = region.start.z; z < zEnd; ++z) {
         for (int y = region.start.y; y < yEnd; ++y) {
           size_t offset = 0;
-          if ((dimensionOrder == "ZCTL" || dimensionOrder == "ZTL"))
+          if ((dimensionOrder == "ZCTL" || dimensionOrder == "ZTL")) {
             offset = dataOffset + c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
                      y * imgInfo.rowByteNumber() + region.start.x * imgInfo.voxelByteNumber();
-          else // "CZTL"
+          } else { // "CZTL"
             offset = dataOffset + (c + imgInfo.numChannels * z) * imgInfo.planeByteNumber() +
                      y * imgInfo.rowByteNumber() + region.start.x * imgInfo.voxelByteNumber();
+          }
           inputFileStream.seekg(offset, std::ios_base::beg);
           readStream(inputFileStream, res.rowData<char>(y - region.start.y, z - region.start.z, c - region.start.c, 0),
                      res.rowByteNumber());
@@ -171,15 +169,17 @@ void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool A
     for (size_t c = 0; c < img.numChannels(); ++c) {
       size_t srcC = c;
       if (BGRtoRGB) {
-        if (srcC == 0)
+        if (srcC == 0) {
           srcC = 2;
-        else if (srcC == 2)
+        } else if (srcC == 2) {
           srcC = 0;
+        }
       } else if (ARGBtoRGBA) {
-        if (srcC == 0)
+        if (srcC == 0) {
           srcC = 3;
-        else
+        } else {
           srcC -= 1;
+        }
       }
 
       switch (img.voxelByteNumber()) {
@@ -313,10 +313,11 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
       for (size_t t = 0; t < img.numTimes(); ++t) {
         for (size_t c = 0; c < img.numChannels(); ++c) {
           size_t srcC = c;
-          if (c == 0)
+          if (c == 0) {
             srcC = 2;
-          else if (c == 2)
+          } else if (c == 2) {
             srcC = 0;
+          }
           memcpy(img.channelData<uint8_t>(c, t),
                  buf + t * img.timeByteNumber() + srcC * img.channelByteNumber(),
                  img.channelByteNumber());
@@ -377,10 +378,11 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
             desLocs[srcDimIdxToDesDimIdx[3]] = i3;
             size_t desC = desLocs[3];
             if (BGRtoRGB) {
-              if (desC == 0)
+              if (desC == 0) {
                 desC = 2;
-              else if (desC == 2)
+              } else if (desC == 2) {
                 desC = 0;
+              }
             }
             uint8_t* desLoc = img.channelData<uint8_t>(desC, desLocs[4]);
             memcpy(desLoc, srcLoc, srcStride);
@@ -396,10 +398,11 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
               desLocs[srcDimIdxToDesDimIdx[2]] = i2;
               size_t desC = desLocs[3];
               if (BGRtoRGB) {
-                if (desC == 0)
+                if (desC == 0) {
                   desC = 2;
-                else if (desC == 2)
+                } else if (desC == 2) {
                   desC = 0;
+                }
               }
               uint8_t* desLoc = img.planeData<uint8_t>(desLocs[2], desC, desLocs[4]);
               memcpy(desLoc, srcLoc, srcStride);
@@ -419,10 +422,11 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
               desLocs[srcDimIdxToDesDimIdx[1]] = i1;
               size_t desC = desLocs[3];
               if (BGRtoRGB) {
-                if (desC == 0)
+                if (desC == 0) {
                   desC = 2;
-                else if (desC == 2)
+                } else if (desC == 2) {
                   desC = 0;
+                }
               }
               uint8_t* desLoc = img.rowData<uint8_t>(desLocs[1], desLocs[2], desC, desLocs[4]);
               memcpy(desLoc, srcLoc, srcStride);
@@ -445,10 +449,11 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
               desLocs[srcDimIdxToDesDimIdx[0]] = i0;
               size_t desC = desLocs[3];
               if (BGRtoRGB) {
-                if (desC == 0)
+                if (desC == 0) {
                   desC = 2;
-                else if (desC == 2)
+                } else if (desC == 2) {
                   desC = 0;
+                }
               }
               uint8_t* desLoc = img.data<uint8_t>(desLocs[0], desLocs[1], desLocs[2], desC, desLocs[4]);
               memcpy(desLoc, srcLoc, srcStride);
@@ -477,7 +482,7 @@ void ZImgFormat::createDefaultSubBlocks(const QString& filename,
     for (size_t t = 0; t < infos[s].numTimes; ++t) {
       for (size_t z = 0; z < infos[s].depth; ++z) {
         (*subBlocks)[s].emplace_back(std::make_shared<ZImgCommonSubBlock>(filename, format(), s, 1, t, z,
-                                                                           0, 0, infos[s].width, infos[s].height));
+                                                                          0, 0, infos[s].width, infos[s].height));
       }
     }
   }
@@ -496,4 +501,4 @@ void ZImgFormat::createEmptySubBlocks(const std::vector<ZImgInfo>& infos,
   subBlocks->resize(infos.size());
 }
 
-} // namespace
+} // namespace nim

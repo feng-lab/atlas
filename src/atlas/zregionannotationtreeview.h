@@ -1,8 +1,8 @@
 #pragma once
 
-#include <QTreeView>
-#include "zregionannotationtreemodel.h"
 #include "zdoc.h"
+#include "zregionannotationtreemodel.h"
+#include <QTreeView>
 
 class QSortFilterProxyModel;
 

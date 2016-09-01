@@ -1,6 +1,5 @@
 #include "zimgv3draw.h"
-#include <fstream>
-#include <iostream>
+
 #include "zioutils.h"
 #include "zimgsliceprovider.h"
 #include "zlog.h"
@@ -12,9 +11,7 @@ ZImgV3DRaw::ZImgV3DRaw()
 {
 }
 
-ZImgV3DRaw::~ZImgV3DRaw()
-{
-}
+ZImgV3DRaw::~ZImgV3DRaw() = default;
 
 QString ZImgV3DRaw::shortName() const
 {
@@ -82,7 +79,7 @@ void ZImgV3DRaw::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
   createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 }
 
-void ZImgV3DRaw::readMetadata(const QString& filename, ZImgMetadata&, size_t scene)
+void ZImgV3DRaw::readMetadata(const QString& filename, ZImgMetadata& /*meta*/, size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -98,7 +95,8 @@ void ZImgV3DRaw::readMetadata(const QString& filename, ZImgMetadata&, size_t sce
   }
 }
 
-void ZImgV3DRaw::readThumbnail(const QString& filename, ZImgThumbernail&, const ZImgRegion&, size_t scene)
+void ZImgV3DRaw::readThumbnail(const QString& filename, ZImgThumbernail& /*thumbnail*/,
+                               const ZImgRegion& /*region*/, size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -157,10 +155,11 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   imgInfo.numChannels = sz[3];
   imgInfo.numTimes = 1;
   imgInfo.bytesPerVoxel = dataType;
-  if (dataType == 4 || dataType == 8)
+  if (dataType == 4 || dataType == 8) {
     imgInfo.voxelFormat = VoxelFormat::Float;
-  else
+  } else {
     imgInfo.voxelFormat = VoxelFormat::Unsigned;
+  }
   imgInfo.createDefaultDescriptions();
 
   img = readRawImg(filename, imgInfo, "ZCTL", dataOffset, region);
@@ -247,4 +246,4 @@ bool ZImgV3DRaw::supportWrite() const
   return true;
 }
 
-} // namespace
+} // namespace nim

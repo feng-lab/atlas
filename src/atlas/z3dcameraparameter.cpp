@@ -1,8 +1,9 @@
 #include "z3dcameraparameter.h"
-#include <QWidget>
-#include <QGroupBox>
+
 #include "zwidgetsgroup.h"
 #include "zlog.h"
+#include <QWidget>
+#include <QGroupBox>
 
 namespace nim {
 

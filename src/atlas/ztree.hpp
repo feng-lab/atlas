@@ -1,13 +1,11 @@
 #pragma once
 
+#include "zglobal.h"
 #include "zlog.h"
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/reverse_iterator.hpp>
-#include <type_traits>
-#include <memory>
 #include <deque>
 #include <vector>
-#include "zglobal.h"
 
 namespace nim {
 
@@ -26,7 +24,7 @@ struct TreeNode
     : parent(nullptr), firstChild(nullptr), lastChild(nullptr), prevSibling(nullptr), nextSibling(nullptr)
   {}
 
-  TreeNode(const T& d)
+  explicit TreeNode(const T& d)
     : parent(nullptr), firstChild(nullptr), lastChild(nullptr), prevSibling(nullptr), nextSibling(nullptr), data(d)
   {}
 
@@ -496,7 +494,7 @@ public:
   { init(); }
 
   template<typename Iter>
-  ZTree(const Iter& it)
+  explicit ZTree(const Iter& it)
   {
     init();
     copy(appendRoot(*it), it);
@@ -1212,7 +1210,7 @@ public:
 
   Iterator appendRoot(const T& v)
   {
-    TreeNode* node = new TreeNode(v);
+    auto node = new TreeNode(v);
     node->prevSibling = m_tail->prevSibling;
     node->nextSibling = m_tail.get();
     m_tail->prevSibling->nextSibling = node;
@@ -1222,7 +1220,7 @@ public:
 
   Iterator prependRoot(const T& v)
   {
-    TreeNode* node = new TreeNode(v);
+    auto node = new TreeNode(v);
     node->prevSibling = m_head;
     node->nextSibling = m_head->nextSibling;
     m_head->nextSibling->prevSibling = node;
@@ -1234,7 +1232,7 @@ public:
   Iter appendChild(Iter parent, const T& v)
   {
     CHECK(isValid(parent));
-    TreeNode* node = new TreeNode(v);
+    auto node = new TreeNode(v);
     node->parent = parent.node;
     if (parent.node->lastChild) {
       parent.node->lastChild->nextSibling = node;
@@ -1271,7 +1269,7 @@ public:
   Iter prependChild(Iter parent, const T& v)
   {
     CHECK(isValid(parent));
-    TreeNode* node = new TreeNode(v);
+    auto node = new TreeNode(v);
     node->parent = parent.node;
     if (parent.node->firstChild) {
       parent.node->firstChild->prevSibling = node;

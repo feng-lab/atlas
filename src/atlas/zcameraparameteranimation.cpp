@@ -516,4 +516,4 @@ void ZCameraParameterAnimation::SplineRange::swap(ZCameraParameterAnimation::Spl
   rotSpline.swap(rhs.rotSpline);
 }
 
-} // namespace
+} // namespace nim

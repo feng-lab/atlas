@@ -1,7 +1,7 @@
 #include "z3dtexturecopyrenderer.h"
 
-#include "z3dtexture.h"
 #include "z3dshaderprogram.h"
+#include "z3dtexture.h"
 
 namespace nim {
 
@@ -29,10 +29,11 @@ void Z3DTextureCopyRenderer::compile()
 QString Z3DTextureCopyRenderer::generateHeader() const
 {
   QString headerSource;
-  if (m_mode == OutputColorOption::MultiplyAlpha)
+  if (m_mode == OutputColorOption::MultiplyAlpha) {
     headerSource += "#define Multiply_Alpha\n";
-  else if (m_mode == OutputColorOption::DivideByAlpha)
+  } else if (m_mode == OutputColorOption::DivideByAlpha) {
     headerSource += "#define Divide_By_Alpha\n";
+  }
   return headerSource;
 }
 

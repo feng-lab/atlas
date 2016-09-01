@@ -1,16 +1,17 @@
-#include "z3dgl.h"
 #include "z3dnetworkevaluator.h"
-#include <set>
-#include <queue>
-#include <algorithm>
-#include <boost/graph/topological_sort.hpp>
+
+#include "z3dgl.h"
 #include "z3dcanvaspainter.h"
 #include "z3dfilter.h"
-#include "zlog.h"
-#include "z3dtexture.h"
-#include "z3drendertarget.h"
 #include "z3dmeshfilter.h"
+#include "z3drendertarget.h"
+#include "z3dtexture.h"
+#include "zlog.h"
 #include "zrandom.h"
+#include <boost/graph/topological_sort.hpp>
+#include <algorithm>
+#include <queue>
+#include <set>
 
 //#define PROFILE3DRENDERERS
 
@@ -355,7 +356,7 @@ void Z3DCheckOpenGLStateFilterWrapper::warn(const Z3DFilter* p, const char* mess
 }
 
 
-void Z3DProfileFilterWrapper::beforeFilterProcess(const Z3DFilter*)
+void Z3DProfileFilterWrapper::beforeFilterProcess(const Z3DFilter* /*unused*/)
 {
   m_benchTimer.start();
 }

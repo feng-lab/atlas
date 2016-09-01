@@ -1,9 +1,10 @@
 #include "zimgtiff.h"
-#include "ztiff.h"
-#include <set>
-#include <cmath>
+
 #include "zlog.h"
 #include "zimgsliceprovider.h"
+#include "ztiff.h"
+#include <cmath>
+#include <set>
 
 namespace nim {
 
@@ -12,9 +13,7 @@ ZImgTiff::ZImgTiff()
 {
 }
 
-ZImgTiff::~ZImgTiff()
-{
-}
+ZImgTiff::~ZImgTiff() = default;
 
 QString ZImgTiff::shortName() const
 {
@@ -280,10 +279,11 @@ void ZImgTiff::detectImgInfo(ZTiff& tiff)
       m_imgInfo[0].numTimes = frames;
 
       if (channels > 1) {
-        if (hyperstack)
+        if (hyperstack) {
           m_dimensionOrder = "CZTL";
-        else
+        } else {
           m_dimensionOrder = "ZCTL";
+        }
       } else {
         m_dimensionOrder = "ZTL";
       }
@@ -372,10 +372,11 @@ void ZImgTiff::readThumbnailInternal(ZImgThumbernail& thumbnail, const ZImgRegio
 
 void ZImgTiff::setDimensionOrder(const QString& order)
 {
-  if (isDimensionOrderValid(order))
+  if (isDimensionOrderValid(order)) {
     m_dimensionOrder = order;
-  else
+  } else {
     throw ZIOException(QString("Wrong dimension order: %1").arg(order));
+  }
 }
 
 bool ZImgTiff::mapIFDToImgLocation(size_t ifdIdx, int& z, int& c, int& t, int& l)
@@ -494,6 +495,4 @@ void ZImgTiff::cpyImg(const ZImg& img2D, const ZImgRegion& region, ZImg& img, in
   }
 }
 
-} // namespace
-
-
+} // namespace nim

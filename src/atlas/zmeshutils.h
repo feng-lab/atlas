@@ -67,8 +67,8 @@ ZMeshUtils::vertexPlaneDistance(const glm::tvec3<Real, glm::highp>& vertex, cons
   double distance = glm::dot(plane.xyz(), vertex) - plane.w;
   if (std::abs(distance) <= epsilon)
     return 0;
-  else
-    return distance;
+
+  return distance;
 }
 
 template<typename Real>

@@ -1,19 +1,17 @@
 #pragma once
 
 #include "zeigenutils.h"
-#include <limits>
-#include <cstdlib>
-#include <ctime>
-#include <vector>
-#include <cstdlib>
-#include <iostream>
-#include <set>
-#include <algorithm>
 #include "zbenchtimer.h"
 #include "zrandom.h"
 #include "zstatisticsutils.h"
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
+#include <limits>
+#include <vector>
+#include <cstdlib>
+#include <iostream>
+#include <set>
+#include <algorithm>
 
 namespace nim {
 
@@ -30,11 +28,11 @@ public:
     : m_type(Type::MaxIterAndEps), m_maxIter(200), m_epsilon(1e-5)
   {}
 
-  ZTermCriteria(size_t maxIter)
+  explicit ZTermCriteria(size_t maxIter)
     : m_type(Type::MaxIter), m_maxIter(maxIter), m_epsilon(1e-5)
   {}
 
-  ZTermCriteria(NonInteger epsilon)
+  explicit ZTermCriteria(NonInteger epsilon)
     : m_type(Type::Eps), m_maxIter(200), m_epsilon(epsilon)
   {}
 
@@ -377,7 +375,7 @@ public:
     }
   }
 
-  _ZKmeansReduce(_ZKmeansReduce& x, tbb::split) : m_kmeans(x.m_kmeans)
+  _ZKmeansReduce(_ZKmeansReduce& x, tbb::split /*unused*/) : m_kmeans(x.m_kmeans)
   {}
 
   void join(const _ZKmeansReduce& y)
@@ -386,7 +384,7 @@ public:
       m_result = y.m_result;
   }
 
-  _ZKmeansReduce(const ZKMeans<T, WeightT, Distance>* kmeans)
+  explicit _ZKmeansReduce(const ZKMeans<T, WeightT, Distance>* kmeans)
     : m_kmeans(kmeans)
   {}
 };

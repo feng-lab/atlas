@@ -1,11 +1,11 @@
 #include "zanimationexportwidget.h"
 
 #include "z3dgpuinfo.h"
+#include "zselectfilewidget.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QMessageBox>
 #include <QPushButton>
-#include "zselectfilewidget.h"
 #include <QLabel>
 #include <QGroupBox>
 #include <QScrollBar>
@@ -106,7 +106,7 @@ void ZAnimationExportWidget::adjustWidget()
 
 void ZAnimationExportWidget::createWidget()
 {
-  QVBoxLayout* lo = new QVBoxLayout;
+  auto lo = new QVBoxLayout;
 
   QHBoxLayout* hlo = nullptr;
   QWidget* wg = nullptr;

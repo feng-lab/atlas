@@ -14,7 +14,7 @@ class ZAnalysisWorklistDialog : public QDialog
 {
 Q_OBJECT
 public:
-  explicit ZAnalysisWorklistDialog(QWidget* parent = 0);
+  explicit ZAnalysisWorklistDialog(QWidget* parent = nullptr);
 
   virtual ~ZAnalysisWorklistDialog();
 

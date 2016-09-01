@@ -1,11 +1,11 @@
 #include "z3dimgfilter.h"
 
 #include "z3dgpuinfo.h"
-#include "zimg.h"
-#include "zeventlistenerparameter.h"
-#include "zmesh.h"
-#include "zlog.h"
 #include "zbenchtimer.h"
+#include "zeventlistenerparameter.h"
+#include "zimg.h"
+#include "zlog.h"
+#include "zmesh.h"
 #include "zmeshutils.h"
 #include <QMessageBox>
 #include <QApplication>
@@ -379,7 +379,7 @@ bool Z3DImgFilter::isReady(Z3DEye eye) const
   return Z3DBoundedFilter::isReady(eye) && m_visible.get() && m_3dImg;
 }
 
-bool Z3DImgFilter::hasOpaque(Z3DEye) const
+bool Z3DImgFilter::hasOpaque(Z3DEye /*unused*/) const
 {
   return hasSlices();
 }

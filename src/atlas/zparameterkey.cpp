@@ -3,7 +3,6 @@
 #include "zparameterfactory.h"
 #include "zparameter.h"
 #include "zparameteranimation.h"
-
 #include "zoptionparameter.h"
 
 namespace {

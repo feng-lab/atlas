@@ -1,12 +1,12 @@
 #include "zobjeditwidget.h"
 
-#include <QTabBar>
-#include <QApplication>
-#include <QScrollBar>
 #include "zobjdoc.h"
 #include "zlog.h"
 #include "zlogcache.h"
 #include "zexception.h"
+#include <QTabBar>
+#include <QApplication>
+#include <QScrollBar>
 #include <iostream>
 
 namespace nim {
@@ -51,9 +51,8 @@ bool ZObjEditWidget::showObjEditWidgetOfObj(size_t id)
     m_subWidgets.push_back(sw);
     setCurrentIndex(addTab(sw.widget, QString("Edit %1").arg(m_doc->objNameWithModifiedMarkerAndID(id))));
     return true;
-  } else {
-    setCurrentWidget(m_logWidget);
   }
+  setCurrentWidget(m_logWidget);
   return false;
 }
 

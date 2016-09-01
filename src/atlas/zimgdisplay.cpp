@@ -1,6 +1,7 @@
 #include "zimgdisplay.h"
-#include <tbb/parallel_for.h>
+
 #include "zlog.h"
+#include <tbb/parallel_for.h>
 #include <functional>
 #include <utility>
 

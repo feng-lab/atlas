@@ -1,4 +1,5 @@
 #include "zimgautothreshold.h"
+
 #include "zimgconnectedcomponents.h"
 #include "zimgregionalextrema.h"
 #include "zbenchtimer.h"

@@ -3,7 +3,8 @@
 #include "z3dtransferfunction.h"
 #include "zclickablelabel.h"
 #include "z3dvolume.h"
-
+#include "z3dshaderprogram.h"
+#include "zlog.h"
 #include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
@@ -16,12 +17,9 @@
 #include <QPushButton>
 #include <QCheckBox>
 #include <QMessageBox>
-#include <zapplication.h>
-
-#include "z3dshaderprogram.h"
-#include "zlog.h"
-
-#include <math.h>
+#include <QApplication>
+#include <cmath>
+#include <utility>
 
 namespace nim {
 
@@ -30,8 +28,8 @@ Z3DTransferFunctionWidget::Z3DTransferFunctionWidget(Z3DTransferFunctionParamete
                                                      QString xAxisText, QString yAxisText, QWidget* parent)
   : QWidget(parent)
   , m_transferFunction(tf)
-  , m_xAxisText(xAxisText)
-  , m_yAxisText(yAxisText)
+  , m_xAxisText(std::move(xAxisText))
+  , m_yAxisText(std::move(yAxisText))
   , m_showHistogram(showHistogram)
   , m_histogramNormalizeMethod(histogramNormalizeMethod)
   , m_volume(tf->volume())
@@ -135,10 +133,11 @@ void Z3DTransferFunctionWidget::paintEvent(QPaintEvent* event)
           if (x == histogramWidth - 1)
             expos -= 0.5 * barWidth;
           double value;
-          if (m_histogramNormalizeMethod == "Log")
+          if (m_histogramNormalizeMethod == "Log") {
             value = m_volume->logNormalizedHistogramValue(x);
-          else
+          } else {
             value = m_volume->normalizedHistogramValue(x);
+          }
           glm::dvec2 p1 = relativeToPixelCoordinates(
             glm::dvec2(sxpos, value * (m_yRange[1] - m_yRange[0]) + m_yRange[0]));
           glm::dvec2 p2 = relativeToPixelCoordinates(glm::dvec2(expos, m_yRange[0]));
@@ -287,10 +286,11 @@ void Z3DTransferFunctionWidget::mousePressEvent(QMouseEvent* event)
   glm::dvec2 hit = pixelToRelativeCoordinates(sHit);
 
   if (event->button() == Qt::RightButton) {
-    if (!selectedKey)
+    if (!selectedKey) {
       showNoKeyContextMenu(event);
-    else
+    } else {
       showKeyContextMenu(event, selectedKeyIndex);
+    }
     return;
   }
 
@@ -358,7 +358,7 @@ void Z3DTransferFunctionWidget::mouseReleaseEvent(QMouseEvent* event)
   }
 }
 
-void Z3DTransferFunctionWidget::leaveEvent(QEvent*)
+void Z3DTransferFunctionWidget::leaveEvent(QEvent* /*event*/)
 {
   m_dragging = false;
   hideKeyInfo();
@@ -484,10 +484,7 @@ bool Z3DTransferFunctionWidget::findkey(const QPoint& pos, size_t& index, bool& 
       }
     }
   }
-  if (selectedKeyIndex != -1)
-    return true;
-  else
-    return false;
+  return selectedKeyIndex != -1;
 }
 
 void Z3DTransferFunctionWidget::setHistogramNormalizeMethod(const QString& method)
@@ -535,7 +532,7 @@ void Z3DTransferFunctionWidget::changeCurrentColor()
   else
     oldColor = m_transferFunction->get().keyQColorL(selectedIdx);
 
-  QColor newColor = QColorDialog::getColor(oldColor, 0);
+  QColor newColor = QColorDialog::getColor(oldColor, nullptr);
   if (newColor.isValid() && oldColor != newColor) {
     if (m_transferFunction->get().isKeySplit(selectedIdx) && !m_selectedLeftPart) {
       newColor.setAlpha(m_transferFunction->get().keyAlphaR(selectedIdx));
@@ -752,11 +749,11 @@ QLayout* Z3DTransferFunctionEditor::createMappingLayout()
                                                            m_showHistogram.get(), m_histogramNormalizeMethod.get());
   m_transferFunctionWidget->setMinimumWidth(140);
 
-  QWidget* additionalSpace = new QWidget();
+  auto additionalSpace = new QWidget();
   additionalSpace->setMinimumHeight(2);
 
   //histogram
-  QHBoxLayout* hboxHist = new QHBoxLayout();
+  auto hboxHist = new QHBoxLayout();
   hboxHist->addWidget(m_showHistogram.createNameLabel());
   hboxHist->addWidget(m_showHistogram.createWidget());
   hboxHist->addStretch();
@@ -764,7 +761,7 @@ QLayout* Z3DTransferFunctionEditor::createMappingLayout()
   hboxHist->addWidget(m_histogramNormalizeMethod.createWidget());
 
   //data bounds
-  QHBoxLayout* hboxData = new QHBoxLayout();
+  auto hboxData = new QHBoxLayout();
   m_dataMinNameLabel = new QLabel("Data Min: ", this);
   m_dataMinNameLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
   m_dataMaxNameLabel = new QLabel("Data Max: ", this);
@@ -783,7 +780,7 @@ QLayout* Z3DTransferFunctionEditor::createMappingLayout()
   hboxData->addSpacing(21);
 
   //domain settings:
-  QHBoxLayout* hboxDomain = new QHBoxLayout();
+  auto hboxDomain = new QHBoxLayout();
   m_domainMinSpinBox = new QDoubleSpinBox();
   m_domainMaxSpinBox = new QDoubleSpinBox();
   m_domainMaxSpinBox->setRange(0.001, 1.0);
@@ -821,7 +818,7 @@ QLayout* Z3DTransferFunctionEditor::createMappingLayout()
   m_transferFunctionTexture = new ZClickableTransferFunctionLabel(m_transferFunction);
 
   // put widgets in layout
-  QVBoxLayout* vBox = new QVBoxLayout();
+  auto vBox = new QVBoxLayout();
   vBox->setMargin(0);
   vBox->setSpacing(1);
   vBox->addStretch();

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <vector>
 #include "zimginterface.h"
+#include <vector>
 
 namespace nim {
 

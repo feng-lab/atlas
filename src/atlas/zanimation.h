@@ -1,13 +1,13 @@
 #pragma once
 
-#include <QObject>
-#include <map>
-#include <QUndoStack>
-#include "zviewsettinginterface.h"
-#include <QDir>
 #include "z3dgl.h"
 #include "zparameteranimation.h"
+#include "zviewsettinginterface.h"
 #include "zjson.h"
+#include <QObject>
+#include <QDir>
+#include <QUndoStack>
+#include <map>
 
 namespace nim {
 

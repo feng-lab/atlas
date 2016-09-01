@@ -1,11 +1,11 @@
 #pragma once
 
-#include <QObject>
-#include <QRectF>
 #include "zgraphicsscene.h"
 #include "zview.h"
 #include "zwidgetsgroup.h"
 #include "zobjdoc.h"
+#include <QObject>
+#include <QRectF>
 
 namespace nim {
 

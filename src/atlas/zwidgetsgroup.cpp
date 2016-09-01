@@ -1,8 +1,8 @@
 #include "zwidgetsgroup.h"
+
 #include "z3dcameraparameter.h"
 #include "z3dtransformparameter.h"
 #include "zparameter.h"
-
 #include <QGroupBox>
 #include <QVBoxLayout>
 #include <QScrollArea>
@@ -18,7 +18,7 @@ bool widgetGroupPtVisibleLevelLessThan(const std::shared_ptr<nim::ZWidgetsGroup>
   return s1->visibleLevel() < s2->visibleLevel();
 }
 
-}
+} // namespace
 
 namespace nim {
 

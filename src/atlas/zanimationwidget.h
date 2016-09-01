@@ -1,7 +1,7 @@
 #pragma once
 
-#include <QWidget>
 #include "zanimation.h"
+#include <QWidget>
 
 class QToolButton;
 
@@ -23,7 +23,7 @@ class ZAnimationWidget : public QWidget
 {
 Q_OBJECT
 public:
-  explicit ZAnimationWidget(ZAnimation& ani, QWidget* parent = 0);
+  explicit ZAnimationWidget(ZAnimation& ani, QWidget* parent = nullptr);
 
 protected:
   void onDurationChanged(double d);

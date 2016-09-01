@@ -1,13 +1,13 @@
 #include "zswc.h"
 
+#include "zlog.h"
+#include "zstringutils.h"
 #include "zioutils.h"
+#include "zexception.h"
 #include <QFile>
 #include <QTextStream>
 #include <QStringList>
-#include "zexception.h"
 #include <map>
-#include "zlog.h"
-#include "zstringutils.h"
 
 namespace nim {
 

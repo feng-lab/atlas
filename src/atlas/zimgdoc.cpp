@@ -1,15 +1,15 @@
 #include "zimgdoc.h"
 
+#include "zloadimagesequencedialog.h"
+#include "zstitchimagedialog.h"
+#include "zsectionsregistrationdialog.h"
+#include "zlog.h"
 #include <QApplication>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
 #include <cmath>
-#include "zloadimagesequencedialog.h"
-#include "zstitchimagedialog.h"
 #include <set>
-#include "zsectionsregistrationdialog.h"
-#include "zlog.h"
 
 namespace nim {
 
@@ -45,13 +45,11 @@ bool ZImgDoc::save(size_t id)
     if (saveImg(pack.get(), pack->paths()[0], FileFormat::Unknown, Compression::AUTO, err)) {
       m_doc.updateObjInfo(id);
       return true;
-    } else {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
-      return false;
     }
-  } else {
-    return saveAs(id);
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
+    return false;
   }
+  return saveAs(id);
 }
 
 bool ZImgDoc::saveAs(size_t id)
@@ -74,9 +72,8 @@ bool ZImgDoc::saveAs(size_t id)
     if (saveImg(pack.get(), dialog.selectedFiles().at(0), formats[fmtIdx], comps[fmtIdx], err)) {
       m_doc.updateObjInfo(id);
       return true;
-    } else {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
     }
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
   }
   return false;
 }
@@ -113,25 +110,23 @@ size_t ZImgDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
     if (!obj["CatDimension"].isString()) {
       errorMsg = QString("Invalid CatDimension Key");
       return 0;
+    }
+    QString txt = obj["CatDimension"].toString();
+    if (txt == enumToString(Dimension::Z)) {
+      catDim = Dimension::Z;
+    } else if (txt == enumToString(Dimension::T)) {
+      catDim = Dimension::T;
     } else {
-      QString txt = obj["CatDimension"].toString();
-      if (txt == enumToString(Dimension::Z)) {
-        catDim = Dimension::Z;
-      } else if (txt == enumToString(Dimension::T)) {
-        catDim = Dimension::T;
-      } else {
-        errorMsg = QString("Wrong CatDimension String %1").arg(txt);
-        return 0;
-      }
+      errorMsg = QString("Wrong CatDimension String %1").arg(txt);
+      return 0;
     }
   }
   if (obj.contains("TileIndex")) {
     if (!obj["TileIndex"].isDouble()) {
       errorMsg = QString("Invalid TileIndex Key");
       return 0;
-    } else {
-      tileIdx = obj.value("TileIndex").toInt(-1);
     }
+    tileIdx = obj.value("TileIndex").toInt(-1);
   }
   if (paths.size() > 1) {
     return loadImg(paths, catDim, tileIdx, FileFormat::Unknown, errorMsg);

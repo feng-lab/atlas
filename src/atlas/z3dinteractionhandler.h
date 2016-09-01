@@ -2,7 +2,6 @@
 
 #include "zeventlistenerparameter.h"
 #include "zglmutils.h"
-
 #include <QObject>
 
 namespace nim {

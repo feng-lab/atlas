@@ -1,8 +1,9 @@
 #include "zimageinterpolation.h"
-#include <cmath>
-#include <algorithm>
+
 #include "zimage2dutils.h"
 #include "zimage3dutils.h"
+#include <algorithm>
+#include <cmath>
 
 namespace nim {
 
@@ -45,15 +46,14 @@ double ZImageInterpolation::nCubicInterpolate(int n, double* p, double coordinat
   CHECK(n > 0);
   if (n == 1) {
     return cubicInterpolate(p, *coordinates);
-  } else {
-    double arr[4];
-    int skip = 1 << (n - 1) * 2;
-    arr[0] = nCubicInterpolate(n - 1, p, coordinates + 1);
-    arr[1] = nCubicInterpolate(n - 1, p + skip, coordinates + 1);
-    arr[2] = nCubicInterpolate(n - 1, p + 2 * skip, coordinates + 1);
-    arr[3] = nCubicInterpolate(n - 1, p + 3 * skip, coordinates + 1);
-    return cubicInterpolate(arr, *coordinates);
   }
+  double arr[4];
+  int skip = 1 << (n - 1) * 2;
+  arr[0] = nCubicInterpolate(n - 1, p, coordinates + 1);
+  arr[1] = nCubicInterpolate(n - 1, p + skip, coordinates + 1);
+  arr[2] = nCubicInterpolate(n - 1, p + 2 * skip, coordinates + 1);
+  arr[3] = nCubicInterpolate(n - 1, p + 3 * skip, coordinates + 1);
+  return cubicInterpolate(arr, *coordinates);
 }
 
 template<typename TPixel>

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "zparameter.h"
 #include "zcombobox.h"
 #include "zglmutils.h"
+#include "zparameter.h"
 #include <QList>
 #include <QString>
 
@@ -73,9 +73,9 @@ public:
     m_associatedDatas.removeAt(idx);
     emit this->reservedStringSignal2(comboBoxItemString(value));
     int index = m_options.indexOf(this->m_value);
-    if (index != -1)
+    if (index != -1) {
       emit this->reservedIntSignal1(index);
-    else {
+    } else {
       emit this->reservedIntSignal1(0);
       this->set(m_options[0]);
     }
