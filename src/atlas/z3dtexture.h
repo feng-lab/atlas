@@ -21,7 +21,7 @@ public:
   void setFilter(GLint minFilter = GLint(GL_LINEAR), GLint magFilter = GLint(GL_LINEAR)) const;
 
   // default is GL_CLAMP_TO_EDGE
-  // note: openGL default is GL_REPEAT !!
+  // note: openGL default is GL_REPEAT
   void setWrap(GLint wrap = GLint(GL_CLAMP_TO_EDGE)) const;
 
   //

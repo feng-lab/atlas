@@ -116,16 +116,8 @@ template<> inline uint64_t saturate_cast<uint64_t>(float v) { return roundTo<uin
 template<> inline uint64_t saturate_cast<uint64_t>(double v) { return roundTo<uint64_t>(v); }
 template<> inline uint64_t saturate_cast<uint64_t>(long double v) { return roundTo<uint64_t>(v); }
 
-template<> inline float saturate_cast<float>(double v)
-{
-  if (v >= std::numeric_limits<float>::max())
-    return std::numeric_limits<float>::max();
-  else if (v <= std::numeric_limits<float>::lowest())
-    return std::numeric_limits<float>::lowest();
-  else
-    return v;
-}
-template<> inline float saturate_cast<float>(long double v)
+template<>
+inline float saturate_cast<float>(double v)
 {
   if (v >= std::numeric_limits<float>::max())
     return std::numeric_limits<float>::max();
@@ -135,7 +127,19 @@ template<> inline float saturate_cast<float>(long double v)
     return v;
 }
 
-template<> inline double saturate_cast<double>(long double v)
+template<>
+inline float saturate_cast<float>(long double v)
+{
+  if (v >= std::numeric_limits<float>::max())
+    return std::numeric_limits<float>::max();
+  else if (v <= std::numeric_limits<float>::lowest())
+    return std::numeric_limits<float>::lowest();
+  else
+    return v;
+}
+
+template<>
+inline double saturate_cast<double>(long double v)
 {
   if (v >= std::numeric_limits<double>::max())
     return std::numeric_limits<double>::max();
@@ -173,7 +177,7 @@ inline uint64_t saturate_add(uint64_t x, uint64_t y)
 
 inline int8_t saturate_add(int8_t x, int8_t y)
 {
-  int8_t res =  (x < 0) ? INT8_MIN : INT8_MAX;
+  int8_t res = (x < 0) ? INT8_MIN : INT8_MAX;
   int8_t comp = res - x;
   if ((x < 0) == (y > comp))
     res = x + y;
@@ -182,7 +186,7 @@ inline int8_t saturate_add(int8_t x, int8_t y)
 
 inline int16_t saturate_add(int16_t x, int16_t y)
 {
-  int16_t res =  (x < 0) ? INT16_MIN : INT16_MAX;
+  int16_t res = (x < 0) ? INT16_MIN : INT16_MAX;
   int16_t comp = res - x;
   if ((x < 0) == (y > comp))
     res = x + y;
@@ -191,7 +195,7 @@ inline int16_t saturate_add(int16_t x, int16_t y)
 
 inline int32_t saturate_add(int32_t x, int32_t y)
 {
-  int32_t res =  (x < 0) ? INT32_MIN : INT32_MAX;
+  int32_t res = (x < 0) ? INT32_MIN : INT32_MAX;
   int32_t comp = res - x;
   if ((x < 0) == (y > comp))
     res = x + y;
@@ -200,7 +204,7 @@ inline int32_t saturate_add(int32_t x, int32_t y)
 
 inline int64_t saturate_add(int64_t x, int64_t y)
 {
-  int64_t res =  (x < 0) ? INT64_MIN : INT64_MAX;
+  int64_t res = (x < 0) ? INT64_MIN : INT64_MAX;
   int64_t comp = res - x;
   if ((x < 0) == (y > comp))
     res = x + y;
@@ -253,7 +257,7 @@ inline uint64_t saturate_sub(uint64_t x, uint64_t y)
 
 inline int8_t saturate_sub(int8_t x, int8_t y)
 {
-  int8_t res =  (x < 0) ? INT8_MIN : INT8_MAX;
+  int8_t res = (x < 0) ? INT8_MIN : INT8_MAX;
   int8_t comp = res - x; // comp can not be INT8_MIN so it is safe to negate it
   if ((x < 0) == (y < -comp))
     res = x - y;
@@ -262,7 +266,7 @@ inline int8_t saturate_sub(int8_t x, int8_t y)
 
 inline int16_t saturate_sub(int16_t x, int16_t y)
 {
-  int16_t res =  (x < 0) ? INT16_MIN : INT16_MAX;
+  int16_t res = (x < 0) ? INT16_MIN : INT16_MAX;
   int16_t comp = res - x;
   if ((x < 0) == (y < -comp))
     res = x - y;
@@ -271,7 +275,7 @@ inline int16_t saturate_sub(int16_t x, int16_t y)
 
 inline int32_t saturate_sub(int32_t x, int32_t y)
 {
-  int32_t res =  (x < 0) ? INT32_MIN : INT32_MAX;
+  int32_t res = (x < 0) ? INT32_MIN : INT32_MAX;
   int32_t comp = res - x;
   if ((x < 0) == (y < -comp))
     res = x - y;
@@ -280,7 +284,7 @@ inline int32_t saturate_sub(int32_t x, int32_t y)
 
 inline int64_t saturate_sub(int64_t x, int64_t y)
 {
-  int64_t res =  (x < 0) ? INT64_MIN : INT64_MAX;
+  int64_t res = (x < 0) ? INT64_MIN : INT64_MAX;
   int64_t comp = res - x;
   if ((x < 0) == (y < -comp))
     res = x - y;
@@ -292,7 +296,7 @@ inline uint64_t saturate_sub(uint64_t x, int64_t y)
   if (y < 0) {
     return saturate_add(x, static_cast<uint64_t>(-y));
   }
-  return x > static_cast<uint64_t>(y) ? (x -  static_cast<uint64_t>(y)) : 0;
+  return x > static_cast<uint64_t>(y) ? (x - static_cast<uint64_t>(y)) : 0;
 }
 
 inline int64_t saturate_sub(int64_t x, uint64_t y)
@@ -310,19 +314,19 @@ inline int64_t saturate_sub(int64_t x, uint64_t y)
 inline uint8_t saturate_mul(uint8_t x, uint8_t y)
 {
   uint32_t res = static_cast<uint32_t>(x) * static_cast<uint32_t>(y);
-  return (-!!(res >> 8)) | static_cast<uint8_t>(res);
+  return (-(res >> 8 != 0)) | static_cast<uint8_t>(res);
 }
 
 inline uint16_t saturate_mul(uint16_t x, uint16_t y)
 {
   uint32_t res = static_cast<uint32_t>(x) * static_cast<uint32_t>(y);
-  return (-!!(res >> 16)) | static_cast<uint16_t>(res);
+  return (-(res >> 16 != 0)) | static_cast<uint16_t>(res);
 }
 
 inline uint32_t saturate_mul(uint32_t x, uint32_t y)
 {
   uint64_t res = static_cast<uint64_t>(x) * static_cast<uint64_t>(y);
-  return (-!!(res >> 32)) | static_cast<uint32_t>(res);
+  return (-(res >> 32 != 0)) | static_cast<uint32_t>(res);
 }
 
 inline uint64_t saturate_mul(uint64_t x, uint64_t y)
@@ -339,8 +343,8 @@ inline uint64_t saturate_mul(uint64_t x, uint64_t y)
 inline int8_t saturate_mul(int8_t x, int8_t y)
 {
   // for this to work, compiler need to do arithmetic right shift
-  static_assert((static_cast<int16_t>(-1) >> 1) == static_cast<int16_t>(-1), "Arithmetic shift unsupported.");
-  static_assert((static_cast<int8_t>(-1) >> 1) == static_cast<int8_t>(-1), "Arithmetic shift unsupported.");
+  static_assert((static_cast<int16_t>(-1) >> 1) == static_cast<int16_t>(-1), "need arithmetic right shift.");
+  static_assert((static_cast<int8_t>(-1) >> 1) == static_cast<int8_t>(-1), "need arithmetic right shift.");
 
   int16_t res = static_cast<int16_t>(x) * static_cast<int16_t>(y);
   if (static_cast<int8_t>(res >> 8) != (static_cast<int8_t>(res) >> 7))
@@ -350,8 +354,8 @@ inline int8_t saturate_mul(int8_t x, int8_t y)
 
 inline int16_t saturate_mul(int16_t x, int16_t y)
 {
-  static_assert((static_cast<int16_t>(-1) >> 1) == static_cast<int16_t>(-1), "arithmetic shift unsupported.");
-  static_assert((static_cast<int32_t>(-1) >> 1) == static_cast<int32_t>(-1), "arithmetic shift unsupported.");
+  static_assert((static_cast<int16_t>(-1) >> 1) == static_cast<int16_t>(-1), "need arithmetic right shift.");
+  static_assert((static_cast<int32_t>(-1) >> 1) == static_cast<int32_t>(-1), "need arithmetic right shift.");
 
   int32_t res = static_cast<int32_t>(x) * static_cast<int32_t>(y);
   if (static_cast<int16_t>(res >> 16) != (static_cast<int16_t>(res) >> 15))
@@ -361,8 +365,8 @@ inline int16_t saturate_mul(int16_t x, int16_t y)
 
 inline int32_t saturate_mul(int32_t x, int32_t y)
 {
-  static_assert((static_cast<int64_t>(-1) >> 1) == static_cast<int64_t>(-1), "arithmetic shift unsupported.");
-  static_assert((static_cast<int32_t>(-1) >> 1) == static_cast<int32_t>(-1), "arithmetic shift unsupported.");
+  static_assert((static_cast<int64_t>(-1) >> 1) == static_cast<int64_t>(-1), "need arithmetic right shift.");
+  static_assert((static_cast<int32_t>(-1) >> 1) == static_cast<int32_t>(-1), "need arithmetic right shift.");
 
   int64_t res = static_cast<int64_t>(x) * static_cast<int64_t>(y);
   if (static_cast<int32_t>(res >> 32) != (static_cast<int32_t>(res) >> 31))
@@ -386,9 +390,11 @@ inline int64_t saturate_mul(int64_t x, int64_t y)
     return 0;
   }
   if (x > 0 && y < 0) {
-    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX)+1, saturate_mul(static_cast<uint64_t>(x), static_cast<uint64_t>(-y))));
+    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX) + 1,
+                                          saturate_mul(static_cast<uint64_t>(x), static_cast<uint64_t>(-y))));
   } else if (x < 0 && y > 0) {
-    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX)+1, saturate_mul(static_cast<uint64_t>(-x), static_cast<uint64_t>(y))));
+    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX) + 1,
+                                          saturate_mul(static_cast<uint64_t>(-x), static_cast<uint64_t>(y))));
   } else if (x > 0) {
     return std::min<uint64_t>(INT64_MAX, saturate_mul(static_cast<uint64_t>(x), static_cast<uint64_t>(y)));
   } else {
@@ -407,7 +413,8 @@ inline int64_t saturate_mul(int64_t x, uint64_t y)
   if (x >= 0) {
     return std::min<uint64_t>(INT64_MAX, saturate_mul(static_cast<uint64_t>(x), y));
   } else {
-    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX)+1, saturate_mul(static_cast<uint64_t>(-x), y)));
+    return -static_cast<int64_t>(std::min(static_cast<uint64_t>(INT64_MAX) + 1,
+                                          saturate_mul(static_cast<uint64_t>(-x), y)));
   }
 }
 
