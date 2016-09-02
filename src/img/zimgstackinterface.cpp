@@ -76,18 +76,6 @@ ZStack *readZStack(const std::string &filename, ZStack *data, QString *error)
   try {
     ZImg img(QString::fromLocal8Bit(filename.c_str()));
 
-    //    QDir dir("/Users/feng/Documents/image/CA3Py_CA1PV_os/");
-    //    QString outFolder("/Users/feng/Documents/image/CA3Py_CA1PV_os/");
-    //    QStringList filters;
-    //    filters << "*.nimp";
-    //    QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-    //    int nSuc = 0;
-    //    for (int i=0; i<list.size(); i++) {
-    //      QFileInfo fileInfo = list.at(i);
-    //      QString outname = outFolder + fileInfo.completeBaseName() + ".apo";
-    //    }
-    //    std::cout << "convert " << list.size() << " files, " << list.size()-nSuc << " failed." << std::endl;
-
     // workaround QImage limit
     if (img.width() * img.height() * 4 >= 1024_usize*1024*1024*2) {
       double scale =  (1024.0*1024*1024*2) / ((double)img.width() * img.height() * 4);

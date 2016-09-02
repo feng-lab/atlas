@@ -214,10 +214,16 @@ public:
 
   static QPainterPath splineToPainterPath(const QPolygonF& spline, bool makeCloseIfNot = false);
 
-  const_iterator cbegin() const
+  const_iterator begin() const noexcept
+  { return m_sliceROIs.begin(); }
+
+  const_iterator end() const noexcept
+  { return m_sliceROIs.end(); }
+
+  const_iterator cbegin() const noexcept
   { return m_sliceROIs.cbegin(); }
 
-  const_iterator cend() const
+  const_iterator cend() const noexcept
   { return m_sliceROIs.cend(); }
 
   size_t numSlices() const

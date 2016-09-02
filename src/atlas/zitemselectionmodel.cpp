@@ -2,7 +2,6 @@
 
 #include "zobjmodel.h"
 #include "zobjdoc.h"
-#include <QSet>
 
 namespace nim {
 

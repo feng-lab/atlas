@@ -1,11 +1,8 @@
 #pragma once
 
 #include <QObject>
-#include <QMap>
 #include <QList>
-#include <QSet>
 #include <QUndoGroup>
-#include <deque>
 
 class QUndoStack;
 

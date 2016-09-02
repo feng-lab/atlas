@@ -517,7 +517,7 @@ public:
     clear();
   }
 
-  ZTree<T>& operator=(ZTree rhs)
+  ZTree<T>& operator=(ZTree rhs) noexcept
   {
     swap(rhs);
     return *this;
@@ -529,103 +529,103 @@ public:
     std::swap(m_tail, rhs.m_tail);
   }
 
-  Iterator begin()
+  Iterator begin() noexcept
   { return Iterator(m_head->nextSibling); }
 
-  Iterator end()
+  Iterator end() noexcept
   { return Iterator(m_tail.get()); }
 
-  ReverseIterator rbegin()
+  ReverseIterator rbegin() noexcept
   { return make_reverse_iterator(end()); }
 
-  ReverseIterator rend()
+  ReverseIterator rend() noexcept
   { return make_reverse_iterator(begin()); }
 
   template<typename Iter>
-  Iterator begin(const Iter& root)
+  Iterator begin(const Iter& root) noexcept
   {
     CHECK(isValid(root));
     return Iterator(root.node, root.node);
   }
 
   template<typename Iter>
-  Iterator end(const Iter& root)
+  Iterator end(const Iter& root) noexcept
   {
     CHECK(isValid(root));
     return Iterator(nullptr, root.node);
   }
 
   template<typename Iter>
-  ReverseIterator rbegin(const Iter& root)
+  ReverseIterator rbegin(const Iter& root) noexcept
   { return make_reverse_iterator(end(root)); }
 
   template<typename Iter>
-  ReverseIterator rend(const Iter& root)
+  ReverseIterator rend(const Iter& root) noexcept
   { return make_reverse_iterator(begin(root)); }
 
-  ConstIterator begin() const
+  ConstIterator begin() const noexcept
   { return ConstIterator(m_head->nextSibling); }
 
-  ConstIterator end() const
+  ConstIterator end() const noexcept
   { return ConstIterator(m_tail.get()); }
 
-  ConstReverseIterator rbegin() const
+  ConstReverseIterator rbegin() const noexcept
   { return make_reverse_iterator(end()); }
 
-  ConstReverseIterator rend() const
+  ConstReverseIterator rend() const noexcept
   { return make_reverse_iterator(begin()); }
 
   template<typename Iter>
-  ConstIterator begin(const Iter& root) const
+  ConstIterator begin(const Iter& root) const noexcept
   {
     CHECK(isValid(root));
     return ConstIterator(root.node, root.node);
   }
 
   template<typename Iter>
-  ConstIterator end(const Iter& root) const
+  ConstIterator end(const Iter& root) const noexcept
   {
     CHECK(isValid(root));
     return ConstIterator(nullptr, root.node);
   }
 
   template<typename Iter>
-  ConstReverseIterator rbegin(const Iter& root) const
+  ConstReverseIterator rbegin(const Iter& root) const noexcept
   { return make_reverse_iterator(end(root)); }
 
   template<typename Iter>
-  ConstReverseIterator rend(const Iter& root) const
+  ConstReverseIterator rend(const Iter& root) const noexcept
   { return make_reverse_iterator(begin(root)); }
 
-  ConstIterator cbegin() const
+  ConstIterator cbegin() const noexcept
   { return begin(); }
 
-  ConstIterator cend() const
+  ConstIterator cend() const noexcept
   { return end(); }
 
-  ConstReverseIterator crbegin() const
+  ConstReverseIterator crbegin() const noexcept
   { return make_reverse_iterator(cend()); }
 
-  ConstReverseIterator crend() const
+  ConstReverseIterator crend() const noexcept
   { return make_reverse_iterator(cbegin()); }
 
   template<typename Iter>
-  ConstIterator cbegin(const Iter& root) const
+  ConstIterator cbegin(const Iter& root) const noexcept
   { return begin(root); }
 
   template<typename Iter>
-  ConstIterator cend(const Iter& root) const
+  ConstIterator cend(const Iter& root) const noexcept
   { return end(root); }
 
   template<typename Iter>
-  ConstReverseIterator crbegin(const Iter& root) const
+  ConstReverseIterator crbegin(const Iter& root) const noexcept
   { return make_reverse_iterator(cend(root)); }
 
   template<typename Iter>
-  ConstReverseIterator crend(const Iter& root) const
+  ConstReverseIterator crend(const Iter& root) const noexcept
   { return make_reverse_iterator(cbegin(root)); }
 
-  PostOrderIterator beginPost()
+  PostOrderIterator beginPost() noexcept
   {
     TreeNode* n = m_head->nextSibling;
     if (n != m_tail.get()) {
@@ -635,17 +635,17 @@ public:
     return PostOrderIterator(n);
   }
 
-  PostOrderIterator endPost()
+  PostOrderIterator endPost() noexcept
   { return PostOrderIterator(m_tail.get()); }
 
-  ReversePostOrderIterator rbeginPost()
+  ReversePostOrderIterator rbeginPost() noexcept
   { return make_reverse_iterator(endPost()); }
 
-  ReversePostOrderIterator rendPost()
+  ReversePostOrderIterator rendPost() noexcept
   { return make_reverse_iterator(beginPost()); }
 
   template<typename Iter>
-  PostOrderIterator beginPost(const Iter& root)
+  PostOrderIterator beginPost(const Iter& root) noexcept
   {
     CHECK(isValid(root));
     TreeNode* n = root.node;
@@ -655,21 +655,21 @@ public:
   }
 
   template<typename Iter>
-  PostOrderIterator endPost(const Iter& root)
+  PostOrderIterator endPost(const Iter& root) noexcept
   {
     CHECK(isValid(root));
     return PostOrderIterator(nullptr, root.node);
   }
 
   template<typename Iter>
-  ReversePostOrderIterator rbeginPost(const Iter& root)
+  ReversePostOrderIterator rbeginPost(const Iter& root) noexcept
   { return make_reverse_iterator(endPost(root)); }
 
   template<typename Iter>
-  ReversePostOrderIterator rendPost(const Iter& root)
+  ReversePostOrderIterator rendPost(const Iter& root) noexcept
   { return make_reverse_iterator(beginPost(root)); }
 
-  ConstPostOrderIterator beginPost() const
+  ConstPostOrderIterator beginPost() const noexcept
   {
     TreeNode* n = m_head->nextSibling;
     if (n != m_tail.get()) {
@@ -679,17 +679,17 @@ public:
     return ConstPostOrderIterator(n);
   }
 
-  ConstPostOrderIterator endPost() const
+  ConstPostOrderIterator endPost() const noexcept
   { return ConstPostOrderIterator(m_tail.get()); }
 
-  ConstReversePostOrderIterator rbeginPost() const
+  ConstReversePostOrderIterator rbeginPost() const noexcept
   { return make_reverse_iterator(endPost()); }
 
-  ConstReversePostOrderIterator rendPost() const
+  ConstReversePostOrderIterator rendPost() const noexcept
   { return make_reverse_iterator(beginPost()); }
 
   template<typename Iter>
-  ConstPostOrderIterator beginPost(const Iter& root) const
+  ConstPostOrderIterator beginPost(const Iter& root) const noexcept
   {
     CHECK(isValid(root));
     const TreeNode* n = root.node;
@@ -699,301 +699,301 @@ public:
   }
 
   template<typename Iter>
-  ConstPostOrderIterator endPost(const Iter& root) const
+  ConstPostOrderIterator endPost(const Iter& root) const noexcept
   {
     CHECK(isValid(root));
     return ConstPostOrderIterator(nullptr, root.node);
   }
 
   template<typename Iter>
-  ConstReversePostOrderIterator rbeginPost(const Iter& root) const
+  ConstReversePostOrderIterator rbeginPost(const Iter& root) const noexcept
   { return make_reverse_iterator(endPost(root)); }
 
   template<typename Iter>
-  ConstReversePostOrderIterator rendPost(const Iter& root) const
+  ConstReversePostOrderIterator rendPost(const Iter& root) const noexcept
   { return make_reverse_iterator(beginPost(root)); }
 
-  ConstPostOrderIterator cbeginPost() const
+  ConstPostOrderIterator cbeginPost() const noexcept
   { return beginPost(); }
 
-  ConstPostOrderIterator cendPost() const
+  ConstPostOrderIterator cendPost() const noexcept
   { return endPost(); }
 
-  ConstReversePostOrderIterator crbeginPost() const
+  ConstReversePostOrderIterator crbeginPost() const noexcept
   { return make_reverse_iterator(cendPost()); }
 
-  ConstReversePostOrderIterator crendPost() const
+  ConstReversePostOrderIterator crendPost() const noexcept
   { return make_reverse_iterator(cbeginPost()); }
 
   template<typename Iter>
-  ConstPostOrderIterator cbeginPost(const Iter& root) const
+  ConstPostOrderIterator cbeginPost(const Iter& root) const noexcept
   { return beginPost(root); }
 
   template<typename Iter>
-  ConstPostOrderIterator cendPost(const Iter& root) const
+  ConstPostOrderIterator cendPost(const Iter& root) const noexcept
   { return endPost(root); }
 
   template<typename Iter>
-  ConstReversePostOrderIterator crbeginPost(const Iter& root) const
+  ConstReversePostOrderIterator crbeginPost(const Iter& root) const noexcept
   { return make_reverse_iterator(cendPost(root)); }
 
   template<typename Iter>
-  ConstReversePostOrderIterator crendPost(const Iter& root) const
+  ConstReversePostOrderIterator crendPost(const Iter& root) const noexcept
   { return make_reverse_iterator(cbeginPost(root)); }
 
-  BreadthFirstIterator beginBreadthFirst()
+  BreadthFirstIterator beginBreadthFirst() noexcept
   { return BreadthFirstIterator(m_head->nextSibling); }
 
-  BreadthFirstIterator endBreadthFirst()
+  BreadthFirstIterator endBreadthFirst() noexcept
   { return BreadthFirstIterator(m_tail.get()); }
 
-  ReverseBreadthFirstIterator rbeginBreadthFirst()
+  ReverseBreadthFirstIterator rbeginBreadthFirst() noexcept
   { return make_reverse_iterator(endBreadthFirst()); }
 
-  ReverseBreadthFirstIterator rendBreadthFirst()
+  ReverseBreadthFirstIterator rendBreadthFirst() noexcept
   { return make_reverse_iterator(beginBreadthFirst()); }
 
   template<typename Iter>
-  BreadthFirstIterator beginBreadthFirst(const Iter& root)
+  BreadthFirstIterator beginBreadthFirst(const Iter& root) noexcept
   {
     CHECK(isValid(root));
     return BreadthFirstIterator(root.node, root.node);
   }
 
   template<typename Iter>
-  BreadthFirstIterator endBreadthFirst(const Iter& root)
+  BreadthFirstIterator endBreadthFirst(const Iter& root) noexcept
   {
     CHECK(isValid(root));
     return BreadthFirstIterator(nullptr, root.node);
   }
 
   template<typename Iter>
-  ReverseBreadthFirstIterator rbeginBreadthFirst(const Iter& root)
+  ReverseBreadthFirstIterator rbeginBreadthFirst(const Iter& root) noexcept
   { return make_reverse_iterator(endBreadthFirst(root)); }
 
   template<typename Iter>
-  ReverseBreadthFirstIterator rendBreadthFirst(const Iter& root)
+  ReverseBreadthFirstIterator rendBreadthFirst(const Iter& root) noexcept
   { return make_reverse_iterator(beginBreadthFirst(root)); }
 
-  ConstBreadthFirstIterator beginBreadthFirst() const
+  ConstBreadthFirstIterator beginBreadthFirst() const noexcept
   { return ConstBreadthFirstIterator(m_head->nextSibling); }
 
-  ConstBreadthFirstIterator endBreadthFirst() const
+  ConstBreadthFirstIterator endBreadthFirst() const noexcept
   { return ConstBreadthFirstIterator(m_tail.get()); }
 
-  ConstReverseBreadthFirstIterator rbeginBreadthFirst() const
+  ConstReverseBreadthFirstIterator rbeginBreadthFirst() const noexcept
   { return make_reverse_iterator(endBreadthFirst()); }
 
-  ConstReverseBreadthFirstIterator rendBreadthFirst() const
+  ConstReverseBreadthFirstIterator rendBreadthFirst() const noexcept
   { return make_reverse_iterator(beginBreadthFirst()); }
 
   template<typename Iter>
-  ConstBreadthFirstIterator beginBreadthFirst(const Iter& root) const
+  ConstBreadthFirstIterator beginBreadthFirst(const Iter& root) const noexcept
   {
     CHECK(isValid(root));
     return ConstBreadthFirstIterator(root.node, root.node);
   }
 
   template<typename Iter>
-  ConstBreadthFirstIterator endBreadthFirst(const Iter& root) const
+  ConstBreadthFirstIterator endBreadthFirst(const Iter& root) const noexcept
   {
     CHECK(isValid(root));
     return ConstBreadthFirstIterator(nullptr, root.node);
   }
 
   template<typename Iter>
-  ConstReverseBreadthFirstIterator rbeginBreadthFirst(const Iter& root) const
+  ConstReverseBreadthFirstIterator rbeginBreadthFirst(const Iter& root) const noexcept
   { return make_reverse_iterator(endBreadthFirst(root)); }
 
   template<typename Iter>
-  ConstReverseBreadthFirstIterator rendBreadthFirst(const Iter& root) const
+  ConstReverseBreadthFirstIterator rendBreadthFirst(const Iter& root) const noexcept
   { return make_reverse_iterator(beginBreadthFirst(root)); }
 
-  ConstBreadthFirstIterator cbeginBreadthFirst() const
+  ConstBreadthFirstIterator cbeginBreadthFirst() const noexcept
   { return beginBreadthFirst(); }
 
-  ConstBreadthFirstIterator cendBreadthFirst() const
+  ConstBreadthFirstIterator cendBreadthFirst() const noexcept
   { return endBreadthFirst(); }
 
-  ConstReverseBreadthFirstIterator crbeginBreadthFirst() const
+  ConstReverseBreadthFirstIterator crbeginBreadthFirst() const noexcept
   { return make_reverse_iterator(cendBreadthFirst()); }
 
-  ConstReverseBreadthFirstIterator crendBreadthFirst() const
+  ConstReverseBreadthFirstIterator crendBreadthFirst() const noexcept
   { return make_reverse_iterator(cbeginBreadthFirst()); }
 
   template<typename Iter>
-  ConstBreadthFirstIterator cbeginBreadthFirst(const Iter& root) const
+  ConstBreadthFirstIterator cbeginBreadthFirst(const Iter& root) const noexcept
   { return beginBreadthFirst(root); }
 
   template<typename Iter>
-  ConstBreadthFirstIterator cendBreadthFirst(const Iter& root) const
+  ConstBreadthFirstIterator cendBreadthFirst(const Iter& root) const noexcept
   { return endBreadthFirst(root); }
 
   template<typename Iter>
-  ConstReverseBreadthFirstIterator crbeginBreadthFirst(const Iter& root) const
+  ConstReverseBreadthFirstIterator crbeginBreadthFirst(const Iter& root) const noexcept
   { return make_reverse_iterator(cendBreadthFirst(root)); }
 
   template<typename Iter>
-  ConstReverseBreadthFirstIterator crendBreadthFirst(const Iter& root) const
+  ConstReverseBreadthFirstIterator crendBreadthFirst(const Iter& root) const noexcept
   { return make_reverse_iterator(cbeginBreadthFirst(root)); }
 
-  RootIterator beginRoot()
+  RootIterator beginRoot() noexcept
   { return RootIterator(m_head->nextSibling); }
 
-  RootIterator endRoot()
+  RootIterator endRoot() noexcept
   { return RootIterator(m_tail.get()); }
 
-  ReverseRootIterator rbeginRoot()
+  ReverseRootIterator rbeginRoot() noexcept
   { return make_reverse_iterator(endRoot()); }
 
-  ReverseRootIterator rendRoot()
+  ReverseRootIterator rendRoot() noexcept
   { return make_reverse_iterator(beginRoot()); }
 
-  ConstRootIterator beginRoot() const
+  ConstRootIterator beginRoot() const noexcept
   { return ConstRootIterator(m_head->nextSibling); }
 
-  ConstRootIterator endRoot() const
+  ConstRootIterator endRoot() const noexcept
   { return ConstRootIterator(m_tail.get()); }
 
-  ConstReverseRootIterator rbeginRoot() const
+  ConstReverseRootIterator rbeginRoot() const noexcept
   { return make_reverse_iterator(endRoot()); }
 
-  ConstReverseRootIterator rendRoot() const
+  ConstReverseRootIterator rendRoot() const noexcept
   { return make_reverse_iterator(beginRoot()); }
 
-  ConstRootIterator cbeginRoot() const
+  ConstRootIterator cbeginRoot() const noexcept
   { return beginRoot(); }
 
-  ConstRootIterator cendRoot() const
+  ConstRootIterator cendRoot() const noexcept
   { return endRoot(); }
 
-  ConstReverseRootIterator crbeginRoot() const
+  ConstReverseRootIterator crbeginRoot() const noexcept
   { return make_reverse_iterator(cendRoot()); }
 
-  ConstReverseRootIterator crendRoot() const
+  ConstReverseRootIterator crendRoot() const noexcept
   { return make_reverse_iterator(cbeginRoot()); }
 
   template<typename Iter>
-  ChildIterator beginChild(const Iter& parent)
+  ChildIterator beginChild(const Iter& parent) noexcept
   {
     CHECK(isValid(parent));
     return ChildIterator(parent.node->firstChild, parent.node);
   }
 
   template<typename Iter>
-  ChildIterator endChild(const Iter& parent)
+  ChildIterator endChild(const Iter& parent) noexcept
   {
     CHECK(isValid(parent));
     return ChildIterator(nullptr, parent.node);
   }
 
   template<typename Iter>
-  ReverseChildIterator rbeginChild(const Iter& parent)
+  ReverseChildIterator rbeginChild(const Iter& parent) noexcept
   { return make_reverse_iterator(endChild(parent)); }
 
   template<typename Iter>
-  ReverseChildIterator rendChild(const Iter& parent)
+  ReverseChildIterator rendChild(const Iter& parent) noexcept
   { return make_reverse_iterator(beginChild(parent)); }
 
   template<typename Iter>
-  ConstChildIterator beginChild(const Iter& parent) const
+  ConstChildIterator beginChild(const Iter& parent) const noexcept
   {
     CHECK(isValid(parent));
     return ConstChildIterator(parent.node->firstChild, parent.node);
   }
 
   template<typename Iter>
-  ConstChildIterator endChild(const Iter& parent) const
+  ConstChildIterator endChild(const Iter& parent) const noexcept
   {
     CHECK(isValid(parent));
     return ConstChildIterator(nullptr, parent.node);
   }
 
   template<typename Iter>
-  ConstReverseChildIterator rbeginChild(const Iter& parent) const
+  ConstReverseChildIterator rbeginChild(const Iter& parent) const noexcept
   { return make_reverse_iterator(endChild(parent)); }
 
   template<typename Iter>
-  ConstReverseChildIterator rendChild(const Iter& parent) const
+  ConstReverseChildIterator rendChild(const Iter& parent) const noexcept
   { return make_reverse_iterator(beginChild(parent)); }
 
   template<typename Iter>
-  ConstChildIterator cbeginChild(const Iter& parent) const
+  ConstChildIterator cbeginChild(const Iter& parent) const noexcept
   { return beginChild(parent); }
 
   template<typename Iter>
-  ConstChildIterator cendChild(const Iter& parent) const
+  ConstChildIterator cendChild(const Iter& parent) const noexcept
   { return endChild(parent); }
 
   template<typename Iter>
-  ConstReverseChildIterator crbeginChild(const Iter& parent) const
+  ConstReverseChildIterator crbeginChild(const Iter& parent) const noexcept
   { return make_reverse_iterator(cendChild(parent)); }
 
   template<typename Iter>
-  ConstReverseChildIterator crendChild(const Iter& parent) const
+  ConstReverseChildIterator crendChild(const Iter& parent) const noexcept
   { return make_reverse_iterator(cbeginChild(parent)); }
 
   template<typename Iter>
-  AncestorIterator beginAncestor(const Iter& child)
+  AncestorIterator beginAncestor(const Iter& child) noexcept
   {
     CHECK(isValid(child));
     return AncestorIterator(child.node->parent, child.node);
   }
 
   template<typename Iter>
-  AncestorIterator endAncestor(const Iter& child)
+  AncestorIterator endAncestor(const Iter& child) noexcept
   {
     CHECK(isValid(child));
     return AncestorIterator(nullptr, child.node);
   }
 
   template<typename Iter>
-  ReverseAncestorIterator rbeginAncestor(const Iter& child)
+  ReverseAncestorIterator rbeginAncestor(const Iter& child) noexcept
   { return make_reverse_iterator(endAncestor(child)); }
 
   template<typename Iter>
-  ReverseAncestorIterator rendAncestor(const Iter& child)
+  ReverseAncestorIterator rendAncestor(const Iter& child) noexcept
   { return make_reverse_iterator(beginAncestor(child)); }
 
   template<typename Iter>
-  ConstAncestorIterator beginAncestor(const Iter& child) const
+  ConstAncestorIterator beginAncestor(const Iter& child) const noexcept
   {
     CHECK(isValid(child));
     return ConstAncestorIterator(child.node->parent, child.node);
   }
 
   template<typename Iter>
-  ConstAncestorIterator endAncestor(const Iter& child) const
+  ConstAncestorIterator endAncestor(const Iter& child) const noexcept
   {
     CHECK(isValid(child));
     return ConstAncestorIterator(nullptr, child.node);
   }
 
   template<typename Iter>
-  ConstReverseAncestorIterator rbeginAncestor(const Iter& child) const
+  ConstReverseAncestorIterator rbeginAncestor(const Iter& child) const noexcept
   { return make_reverse_iterator(endAncestor(child)); }
 
   template<typename Iter>
-  ConstReverseAncestorIterator rendAncestor(const Iter& child) const
+  ConstReverseAncestorIterator rendAncestor(const Iter& child) const noexcept
   { return make_reverse_iterator(beginAncestor(child)); }
 
   template<typename Iter>
-  ConstAncestorIterator cbeginAncestor(const Iter& child) const
+  ConstAncestorIterator cbeginAncestor(const Iter& child) const noexcept
   { return beginAncestor(child); }
 
   template<typename Iter>
-  ConstAncestorIterator cendAncestor(const Iter& child) const
+  ConstAncestorIterator cendAncestor(const Iter& child) const noexcept
   { return endAncestor(child); }
 
   template<typename Iter>
-  ConstReverseAncestorIterator crbeginAncestor(const Iter& child) const
+  ConstReverseAncestorIterator crbeginAncestor(const Iter& child) const noexcept
   { return make_reverse_iterator(cendAncestor(child)); }
 
   template<typename Iter>
-  ConstReverseAncestorIterator crendAncestor(const Iter& child) const
+  ConstReverseAncestorIterator crendAncestor(const Iter& child) const noexcept
   { return make_reverse_iterator(cbeginAncestor(child)); }
 
-  LeafIterator beginLeaf()
+  LeafIterator beginLeaf() noexcept
   {
     TreeNode* n = m_head->nextSibling;
     if (n != m_tail.get()) {
@@ -1003,17 +1003,17 @@ public:
     return LeafIterator(n);
   }
 
-  LeafIterator endLeaf()
+  LeafIterator endLeaf() noexcept
   { return LeafIterator(m_tail.get()); }
 
-  ReverseLeafIterator rbeginLeaf()
+  ReverseLeafIterator rbeginLeaf() noexcept
   { return make_reverse_iterator(endLeaf()); }
 
-  ReverseLeafIterator rendLeaf()
+  ReverseLeafIterator rendLeaf() noexcept
   { return make_reverse_iterator(beginLeaf()); }
 
   template<typename Iter>
-  LeafIterator beginLeaf(const Iter& root)
+  LeafIterator beginLeaf(const Iter& root) noexcept
   {
     CHECK(isValid(root));
     TreeNode* n = root.node;
@@ -1023,21 +1023,21 @@ public:
   }
 
   template<typename Iter>
-  LeafIterator endLeaf(const Iter& root)
+  LeafIterator endLeaf(const Iter& root) noexcept
   {
     CHECK(isValid(root));
     return LeafIterator(nullptr, root.node);
   }
 
   template<typename Iter>
-  ReverseLeafIterator rbeginLeaf(const Iter& root)
+  ReverseLeafIterator rbeginLeaf(const Iter& root) noexcept
   { return make_reverse_iterator(endLeaf(root)); }
 
   template<typename Iter>
-  ReverseLeafIterator rendLeaf(const Iter& root)
+  ReverseLeafIterator rendLeaf(const Iter& root) noexcept
   { return make_reverse_iterator(beginLeaf(root)); }
 
-  ConstLeafIterator beginLeaf() const
+  ConstLeafIterator beginLeaf() const noexcept
   {
     TreeNode* n = m_head->nextSibling;
     if (n != m_tail.get()) {
@@ -1047,17 +1047,17 @@ public:
     return ConstLeafIterator(n);
   }
 
-  ConstLeafIterator endLeaf() const
+  ConstLeafIterator endLeaf() const noexcept
   { return ConstLeafIterator(m_tail.get()); }
 
-  ConstReverseLeafIterator rbeginLeaf() const
+  ConstReverseLeafIterator rbeginLeaf() const noexcept
   { return make_reverse_iterator(endLeaf()); }
 
-  ConstReverseLeafIterator rendLeaf() const
+  ConstReverseLeafIterator rendLeaf() const noexcept
   { return make_reverse_iterator(beginLeaf()); }
 
   template<typename Iter>
-  ConstLeafIterator beginLeaf(const Iter& root) const
+  ConstLeafIterator beginLeaf(const Iter& root) const noexcept
   {
     CHECK(isValid(root));
     const TreeNode* n = root.node;
@@ -1067,46 +1067,46 @@ public:
   }
 
   template<typename Iter>
-  ConstLeafIterator endLeaf(const Iter& root) const
+  ConstLeafIterator endLeaf(const Iter& root) const noexcept
   {
     CHECK(isValid(root));
     return ConstLeafIterator(nullptr, root.node);
   }
 
   template<typename Iter>
-  ConstReverseLeafIterator rbeginLeaf(const Iter& root) const
+  ConstReverseLeafIterator rbeginLeaf(const Iter& root) const noexcept
   { return make_reverse_iterator(endLeaf(root)); }
 
   template<typename Iter>
-  ConstReverseLeafIterator rendLeaf(const Iter& root) const
+  ConstReverseLeafIterator rendLeaf(const Iter& root) const noexcept
   { return make_reverse_iterator(beginLeaf(root)); }
 
-  ConstLeafIterator cbeginLeaf() const
+  ConstLeafIterator cbeginLeaf() const noexcept
   { return beginLeaf(); }
 
-  ConstLeafIterator cendLeaf() const
+  ConstLeafIterator cendLeaf() const noexcept
   { return endLeaf(); }
 
-  ConstReverseLeafIterator crbeginLeaf() const
+  ConstReverseLeafIterator crbeginLeaf() const noexcept
   { return make_reverse_iterator(cendLeaf()); }
 
-  ConstReverseLeafIterator crendLeaf() const
+  ConstReverseLeafIterator crendLeaf() const noexcept
   { return make_reverse_iterator(cbeginLeaf()); }
 
   template<typename Iter>
-  ConstLeafIterator cbeginLeaf(const Iter& root) const
+  ConstLeafIterator cbeginLeaf(const Iter& root) const noexcept
   { return beginLeaf(root); }
 
   template<typename Iter>
-  ConstLeafIterator cendLeaf(const Iter& root) const
+  ConstLeafIterator cendLeaf(const Iter& root) const noexcept
   { return endLeaf(root); }
 
   template<typename Iter>
-  ConstReverseLeafIterator crbeginLeaf(const Iter& root) const
+  ConstReverseLeafIterator crbeginLeaf(const Iter& root) const noexcept
   { return make_reverse_iterator(cendLeaf(root)); }
 
   template<typename Iter>
-  ConstReverseLeafIterator crendLeaf(const Iter& root) const
+  ConstReverseLeafIterator crendLeaf(const Iter& root) const noexcept
   { return make_reverse_iterator(cbeginLeaf(root)); }
 
   size_t size() const

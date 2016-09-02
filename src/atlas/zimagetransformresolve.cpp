@@ -95,17 +95,17 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
 {
   CHECK(!m_idxTransforms.empty());
   std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> res;
-  for (auto it = m_idxTransforms.cbegin(); it != m_idxTransforms.cend(); ++it) {
-    res[it->first] = std::make_unique<ZImageCompositeTransform>();
-    res[it->first]->addTransform(*it->second);
+  for (const auto& idxTfm : m_idxTransforms) {
+    res[idxTfm.first] = std::make_unique<ZImageCompositeTransform>();
+    res[idxTfm.first]->addTransform(*idxTfm.second);
   }
   if (m_idxPairs.empty())
     return res;
 
   size_t refIdx = m_idxTransforms.cbegin()->first;
   double minCost = std::numeric_limits<double>::max();
-  for (auto it = m_idxPairs.cbegin(); it != m_idxPairs.cend(); ++it) {
-    minCost = std::min(minCost, it->second.second);
+  for (const auto& imgImgTfmCost : m_idxPairs) {
+    minCost = std::min(minCost, imgImgTfmCost.second.second);
   }
 
   QString summ;
@@ -117,10 +117,10 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
   GraphT graph;
 
   size_t vIdx = 0;
-  for (auto it = m_idxTransforms.cbegin(); it != m_idxTransforms.cend(); ++it) {
-    if (idxToVertexMapper.find(it->first) == idxToVertexMapper.end()) {
-      Vertex v = boost::add_vertex(VertexInfo(it->first, vIdx++), graph);
-      idxToVertexMapper[it->first] = v;
+  for (const auto& idxTfm : m_idxTransforms) {
+    if (idxToVertexMapper.find(idxTfm.first) == idxToVertexMapper.end()) {
+      Vertex v = boost::add_vertex(VertexInfo(idxTfm.first, vIdx++), graph);
+      idxToVertexMapper[idxTfm.first] = v;
     }
   }
   {
@@ -138,18 +138,18 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
     }
   }
 
-  for (auto it = m_idxPairs.begin(); it != m_idxPairs.end(); ++it) {
-    if (idxToVertexMapper.find(it->first.first) == idxToVertexMapper.end()) {
-      Vertex v = boost::add_vertex(VertexInfo(it->first.first, vIdx++), graph);
-      idxToVertexMapper[it->first.first] = v;
+  for (const auto& imgImgTfmCost : m_idxPairs) {
+    if (idxToVertexMapper.find(imgImgTfmCost.first.first) == idxToVertexMapper.end()) {
+      Vertex v = boost::add_vertex(VertexInfo(imgImgTfmCost.first.first, vIdx++), graph);
+      idxToVertexMapper[imgImgTfmCost.first.first] = v;
     }
-    if (idxToVertexMapper.find(it->first.second) == idxToVertexMapper.end()) {
-      Vertex v = boost::add_vertex(VertexInfo(it->first.second, vIdx++), graph);
-      idxToVertexMapper[it->first.second] = v;
+    if (idxToVertexMapper.find(imgImgTfmCost.first.second) == idxToVertexMapper.end()) {
+      Vertex v = boost::add_vertex(VertexInfo(imgImgTfmCost.first.second, vIdx++), graph);
+      idxToVertexMapper[imgImgTfmCost.first.second] = v;
     }
-    boost::add_edge(idxToVertexMapper[it->first.first],
-                    idxToVertexMapper[it->first.second],
-                    EdgeInfo(it->second.second),
+    boost::add_edge(idxToVertexMapper[imgImgTfmCost.first.first],
+                    idxToVertexMapper[imgImgTfmCost.first.second],
+                    EdgeInfo(imgImgTfmCost.second.second),
                     graph);
   }
 

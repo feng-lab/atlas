@@ -61,15 +61,15 @@ void ZBenchTimer::resume()
 std::ostream& operator<<(std::ostream& s, const ZBenchTimer& m)
 {
   if (m.m_rep == 1) {
-    s << "Function " << m.m_name << " took " << m.m_time << " seconds." << std::endl;
+    s << "Function " << m.m_name << " took " << m.m_time << " seconds.\n";
     if (m.m_pauseTime > 0)
-      s << "Function " << m.m_name << " pause " << m.m_pauseTime << " seconds." << std::endl;
+      s << "Function " << m.m_name << " pause " << m.m_pauseTime << " seconds.\n";
   } else if (m.m_rep > 1) {
     s << "Function " << m.m_name << " took on average " << m.m_average << " seconds.";
     s << " (out of " << m.m_rep << " repeats. best: " << m.m_best << "  worst: ";
-    s << m.m_worst << ")" << std::endl;
+    s << m.m_worst << ")\n";
     if (m.m_averagePauseTime > 0)
-      s << "Function " << m.m_name << " pause on average " << m.m_averagePauseTime << " seconds." << std::endl;
+      s << "Function " << m.m_name << " pause on average " << m.m_averagePauseTime << " seconds.\n";
   }
   return s;
 }

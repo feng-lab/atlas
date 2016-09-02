@@ -219,8 +219,8 @@ void ZROIFilter::setData(ZROI& roi)
   m_sliceToROIItem.clear();
   m_sliceToCtrlPtItems.clear();
   if (!m_ROI->isEmpty()) {
-    for (auto it = m_ROI->cbegin(); it != m_ROI->cend(); ++it) {
-      int i = it->first;
+    for (const auto& sliceROI : *m_ROI) {
+      int i = sliceROI.first;
       auto roiItem = new ROIGraphicsItem(*m_ROI, i);
       roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
                                   m_outlineColor.get().y * 255,

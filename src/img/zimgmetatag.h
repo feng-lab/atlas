@@ -18,7 +18,15 @@ public:
   // value will be stored as utf-8 string with datatype DataType::Ascii
   ZImgMetatag(const QString& name, const QString& value);
 
-  void swap(ZImgMetatag& other)
+  ZImgMetatag(ZImgMetatag&&) = default;
+
+  ZImgMetatag& operator=(ZImgMetatag&&) = default;
+
+  ZImgMetatag(const ZImgMetatag&) = default;
+
+  ZImgMetatag& operator=(const ZImgMetatag&) = default;
+
+  void swap(ZImgMetatag& other) noexcept
   {
     m_name.swap(other.m_name);
     std::swap(m_tag, other.m_tag);

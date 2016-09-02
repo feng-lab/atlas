@@ -22,7 +22,7 @@ public:
 
   ZPunctum& operator=(const ZPunctum&) = default;
 
-  void swap(ZPunctum& rhs)
+  void swap(ZPunctum& rhs) noexcept
   {
     m_name.swap(rhs.m_name);
     m_comment.swap(rhs.m_comment);

@@ -382,8 +382,10 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missin
   glm::ivec4 erasedKey;
   int numAvailablePageCacheBlock = int(m_pageTableCacheManager->size()) - int(usedPageTableKeys.size());
   CHECK(numAvailablePageCacheBlock >= 0);
-  for (auto it = missingBlockIDs.begin(); it != missingBlockIDs.end() && count < numBlocksToRead; ++it) {
-    uint32_t blockID = *it;
+  for (auto blockID : missingBlockIDs) {
+    if (count >= numBlocksToRead)
+      break;
+
     while (level + 1 < m_numLevels && blockID >= m_posToBlockIDs[level + 1].w) {
       ++level;
     }

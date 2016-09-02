@@ -22,8 +22,8 @@ void ZImageCompositeTransform::addTransform(ZImageTransform* tfm)
 size_t ZImageCompositeTransform::numParameters() const
 {
   size_t res = 0;
-  for (auto it = m_tfms.cbegin(); it != m_tfms.cend(); ++it) {
-    res += (*it)->numParameters();
+  for (const auto& tfm : m_tfms) {
+    res += tfm->numParameters();
   }
   return res;
 }
@@ -32,16 +32,16 @@ void ZImageCompositeTransform::setParameters(const double* para)
 {
   m_parameters = std::vector<double>(para, para + numParameters());
   size_t idx = 0;
-  for (auto it = m_tfms.begin(); it != m_tfms.end(); ++it) {
-    (*it)->setParameters(&m_parameters[idx]);
-    idx += (*it)->numParameters();
+  for (const auto& tfm : m_tfms) {
+    tfm->setParameters(&m_parameters[idx]);
+    idx += tfm->numParameters();
   }
 }
 
 bool ZImageCompositeTransform::is2DTransform() const
 {
-  for (auto it = m_tfms.cbegin(); it != m_tfms.cend(); ++it) {
-    if (!(*it)->is2DTransform())
+  for (const auto& tfm : m_tfms) {
+    if (!tfm->is2DTransform())
       return false;
   }
   return true;
@@ -49,16 +49,16 @@ bool ZImageCompositeTransform::is2DTransform() const
 
 void ZImageCompositeTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 {
-  for (auto it = m_tfms.begin(); it != m_tfms.end(); ++it) {
-    (*it)->adaptParameters(fromLevel, toLevel);
+  for (const auto& tfm : m_tfms) {
+    tfm->adaptParameters(fromLevel, toLevel);
   }
 }
 
 std::vector<double> ZImageCompositeTransform::estimateParameterScales(const double* dims) const
 {
   std::vector<double> res;
-  for (auto it = m_tfms.cbegin(); it != m_tfms.cend(); ++it) {
-    std::vector<double> tmpres = (*it)->estimateParameterScales(dims);
+  for (const auto& tfm : m_tfms) {
+    std::vector<double> tmpres = tfm->estimateParameterScales(dims);
     res.insert(res.end(), tmpres.begin(), tmpres.end());
   }
   return res;
@@ -66,8 +66,8 @@ std::vector<double> ZImageCompositeTransform::estimateParameterScales(const doub
 
 void ZImageCompositeTransform::transformPoint(double* inoutCoords) const
 {
-  for (auto it = m_tfms.crbegin(); it != m_tfms.crend(); ++it) {
-    (*it)->transformPoint(inoutCoords);
+  for (const auto& tfm : make_reverse(m_tfms)) {
+    tfm->transformPoint(inoutCoords);
   }
 }
 
@@ -75,8 +75,8 @@ QString ZImageCompositeTransform::toQString() const
 {
   QString res;
   size_t idx = 1;
-  for (auto it = m_tfms.begin(); it != m_tfms.end(); ++it) {
-    res += QString("Transform %1: %2\n").arg(idx++).arg((*it)->toQString());
+  for (const auto& tfm : m_tfms) {
+    res += QString("Transform %1: %2\n").arg(idx++).arg(tfm->toQString());
   }
   return res;
 }
@@ -84,8 +84,8 @@ QString ZImageCompositeTransform::toQString() const
 ZImageTransform* ZImageCompositeTransform::clone() const
 {
   auto res = new ZImageCompositeTransform();
-  for (auto it = m_tfms.cbegin(); it != m_tfms.cend(); ++it) {
-    res->addTransform(*it->get());
+  for (const auto& tfm : m_tfms) {
+    res->addTransform(*tfm);
   }
   return res;
 }
@@ -93,8 +93,8 @@ ZImageTransform* ZImageCompositeTransform::clone() const
 ZImageTransform* ZImageCompositeTransform::makeInverseTransform() const
 {
   auto res = new ZImageCompositeTransform();
-  for (auto it = m_tfms.crbegin(); it != m_tfms.crend(); ++it) {
-    res->addTransform((*it)->makeInverseTransform());
+  for (const auto& tfm : make_reverse(m_tfms)) {
+    res->addTransform(tfm->makeInverseTransform());
   }
   return res;
 }
@@ -102,8 +102,8 @@ ZImageTransform* ZImageCompositeTransform::makeInverseTransform() const
 void ZImageCompositeTransform::constructParameters()
 {
   m_parameters.clear();
-  for (auto it = m_tfms.cbegin(); it != m_tfms.cend(); ++it) {
-    const std::vector<double>& tmpres = (*it)->parameters();
+  for (const auto& tfm : m_tfms) {
+    const std::vector<double>& tmpres = tfm->parameters();
     m_parameters.insert(m_parameters.end(), tmpres.begin(), tmpres.end());
   }
 }

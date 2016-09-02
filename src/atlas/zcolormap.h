@@ -140,7 +140,6 @@ public:
     return *this;
   }
 
-
   void reset(double min = 0.0, double max = 255.0, const glm::col4& minColor = glm::col4(0, 0, 0, 255),
              const glm::col4& maxColor = glm::col4(255, 255, 255, 255));
 

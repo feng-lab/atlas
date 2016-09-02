@@ -320,11 +320,11 @@ bool ZSystemInfo::initializeGL()
       std::cout << " -> " << call.returnValue->asString();
     }
 
-    std::cout << std::endl;
+    std::cout << "\n";
 
     GLenum error = glGetError();
     if (error != GL_NO_ERROR)
-      std::cout << "OpenGL error: " << glbinding::Meta::getString(error) << std::endl;
+      std::cout << "OpenGL error: " << glbinding::Meta::getString(error) << "\n";
 
     std::cout.flush();
   });

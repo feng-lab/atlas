@@ -456,14 +456,13 @@ void ZPunctaDetection::detectImpl(ZImg& img, int thre, ZPuncta& resList, ZPuncta
   LOG(INFO) << "";
   LOG(INFO) << "Detected " << resList.size() << " Puncta.";
 
-  ZPuncta::iterator pIt = resList.begin();
-  while (pIt != resList.end()) {
-    if (pIt->volSize() <= 5.0 && pIt->maxIntensity() < thre + .1 * saturatedIntensity) {
-      filteredList.push_back(*pIt);
-      pIt = resList.erase(pIt);
-    } else
-      ++pIt;
-  }
+  resList.remove_if([&](const ZPunctum& p) {
+    if (p.volSize() <= 5.0 && p.maxIntensity() < (thre + .1 * saturatedIntensity)) {
+      filteredList.push_back(p);
+      return true;
+    }
+    return false;
+  });
   LOG(INFO) << "Number of Puncta After Filtering: " << resList.size();
   reportProgress(baseWeight + weight * 1.0);
 }

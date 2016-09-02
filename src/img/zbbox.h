@@ -20,26 +20,19 @@ public:
 
   inline explicit ZBBox(const Point& minmaxCorner)
     : m_minCorner(minmaxCorner), m_maxCorner(minmaxCorner)
-  {
-  }
+  {}
 
   inline ZBBox(const Point& minCorner, const Point& maxCorner)
     : m_minCorner(minCorner), m_maxCorner(maxCorner)
-  {
-  }
+  {}
 
-  inline ZBBox(const ZBBox& other)
-  {
-    m_minCorner = other.m_minCorner;
-    m_maxCorner = other.m_maxCorner;
-  }
+  ZBBox(ZBBox&&) = default;
 
-  inline ZBBox& operator=(const ZBBox& other)
-  {
-    m_minCorner = other.m_minCorner;
-    m_maxCorner = other.m_maxCorner;
-    return *this;
-  }
+  ZBBox& operator=(ZBBox&&) = default;
+
+  ZBBox(const ZBBox&) = default;
+
+  ZBBox& operator=(const ZBBox&) = default;
 
   inline Point const& minCorner() const
   { return m_minCorner; }

@@ -60,7 +60,7 @@ ZVoxelRegion ZVoxelRegion::intersect(const ZVoxelRegion& r1, const ZVoxelRegion&
 std::ostream& operator<<(std::ostream& s, const ZVoxelRegion& m)
 {
   for (size_t i = 0; i < m.m_boxes.size(); ++i) {
-    s << "Box " << i << ": " << m << std::endl;
+    s << "Box " << i << ": " << m << "\n";
   }
   return s;
 }

@@ -64,7 +64,7 @@ public:
   }
 
   // might return empty ptr
-  ValueType get(const KeyType& key)
+  ValueType get(const KeyType& key) const
   {
     QReadLocker lock(&m_lock);
     auto it = m_cacheItemsMap.find(key);

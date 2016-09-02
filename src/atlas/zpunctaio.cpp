@@ -200,7 +200,7 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta) const
         p.setVoxelLocations(voxelLocations);
       }
 
-      puncta.push_back(p);
+      puncta.push_back(std::move(p));
     }
   }
   catch (H5::Exception const& e) {
@@ -380,7 +380,7 @@ void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta) const
       }
       using namespace boost::math::double_constants;
       punctum.setRadius(std::pow(three_quarters_pi * punctum.volSize(), 1.0 / 3));
-      puncta.push_back(punctum);
+      puncta.push_back(std::move(punctum));
     } else if (!line.isEmpty()) {
       throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
     }
@@ -469,7 +469,7 @@ void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta) const
           throw ZIOException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
         }
       }
-      puncta.push_back(punctum);
+      puncta.push_back(std::move(punctum));
     } else if (!line.isEmpty()) {
       throw ZIOException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
     }
@@ -482,13 +482,11 @@ void ZPunctaIO::readMatFile(const QString& file, ZPuncta& puncta) const
   mat = ZEigenUtils::removeRowsContainNaNOrInF(mat);
   if (mat.rows() > 0 && mat.cols() == 3) {
     for (int i = 0; i < mat.rows(); ++i) {
-      ZPunctum punctum(mat(i, 0), mat(i, 1), mat(i, 2), 2);
-      puncta.push_back(punctum);
+      puncta.emplace_back(mat(i, 0), mat(i, 1), mat(i, 2), 2);
     }
   } else if (mat.rows() > 0 && mat.cols() == 4) {
     for (int i = 0; i < mat.rows(); ++i) {
-      ZPunctum punctum(mat(i, 0), mat(i, 1), mat(i, 2), mat(i, 3));
-      puncta.push_back(punctum);
+      puncta.emplace_back(mat(i, 0), mat(i, 1), mat(i, 2), mat(i, 3));
     }
   } else {
     throw ZIOException("file is not nx3 or nx4 matrix");

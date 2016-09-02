@@ -17,16 +17,16 @@ template<typename TVoxel>
 void mergeMin_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
                    ZImg& res, const std::vector<ZImgTile>& tiles)
 {
-  for (ZVoxelRegion::const_iterator it = region.begin(); it != region.end(); ++it) {
+  for (const auto& coord : region) {
     TVoxel v = std::numeric_limits<TVoxel>::max();
     for (size_t i = 0; i < tiles.size(); ++i) {
-      if (tiles[i].contains(*it)) {
-        TVoxel tmp = tiles[i].value<TVoxel>(*it);
+      if (tiles[i].contains(coord)) {
+        TVoxel tmp = tiles[i].value<TVoxel>(coord);
         if (tmp < v)
           v = tmp;
       }
     }
-    ZVoxelCoordinate locInRes = *it - minCoord;
+    ZVoxelCoordinate locInRes = coord - minCoord;
     *res.data<TVoxel>(locInRes) = v;
   }
 }
@@ -35,16 +35,16 @@ template<typename TVoxel>
 void mergeMax_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
                    ZImg& res, const std::vector<ZImgTile>& tiles)
 {
-  for (ZVoxelRegion::const_iterator it = region.begin(); it != region.end(); ++it) {
+  for (const auto& coord : region) {
     TVoxel v = std::numeric_limits<TVoxel>::min();
     for (size_t i = 0; i < tiles.size(); ++i) {
-      if (tiles[i].contains(*it)) {
-        TVoxel tmp = tiles[i].value<TVoxel>(*it);
+      if (tiles[i].contains(coord)) {
+        TVoxel tmp = tiles[i].value<TVoxel>(coord);
         if (tmp > v)
           v = tmp;
       }
     }
-    ZVoxelCoordinate locInRes = *it - minCoord;
+    ZVoxelCoordinate locInRes = coord - minCoord;
     *res.data<TVoxel>(locInRes) = v;
   }
 }
@@ -53,15 +53,15 @@ template<typename TVoxel>
 void mergeMean_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
                     ZImg& res, const std::vector<ZImgTile>& tiles)
 {
-  for (ZVoxelRegion::const_iterator it = region.begin(); it != region.end(); ++it) {
+  for (const auto& coord : region) {
     std::vector<TVoxel> buf;
     for (size_t i = 0; i < tiles.size(); ++i) {
-      if (tiles[i].contains(*it))
-        buf.push_back(tiles[i].value<TVoxel>(*it));
+      if (tiles[i].contains(coord))
+        buf.push_back(tiles[i].value<TVoxel>(coord));
     }
     CHECK(buf.size() > 1);
 
-    ZVoxelCoordinate locInRes = *it - minCoord;
+    ZVoxelCoordinate locInRes = coord - minCoord;
     *res.data<TVoxel>(locInRes) = static_cast<TVoxel>(mean(buf.begin(), buf.end()));;
   }
 }
@@ -70,15 +70,15 @@ template<typename TVoxel>
 void mergeMedian_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
                       ZImg& res, const std::vector<ZImgTile>& tiles)
 {
-  for (ZVoxelRegion::const_iterator it = region.begin(); it != region.end(); ++it) {
+  for (const auto& coord : region) {
     std::vector<TVoxel> buf;
     for (size_t i = 0; i < tiles.size(); ++i) {
-      if (tiles[i].contains(*it))
-        buf.push_back(tiles[i].value<TVoxel>(*it));
+      if (tiles[i].contains(coord))
+        buf.push_back(tiles[i].value<TVoxel>(coord));
     }
     CHECK(buf.size() > 1);
 
-    ZVoxelCoordinate locInRes = *it - minCoord;
+    ZVoxelCoordinate locInRes = coord - minCoord;
     *res.data<TVoxel>(locInRes) = static_cast<TVoxel>(medianInPlace(buf.begin(), buf.end()));;
   }
 }

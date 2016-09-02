@@ -1,7 +1,7 @@
 #pragma once
 
-#include <random>
 #include <algorithm>
+#include <random>
 #include <vector>
 
 // use instance() to get the static instance of ZRandom, one engine is enough

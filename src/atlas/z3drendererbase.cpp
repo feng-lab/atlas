@@ -706,9 +706,8 @@ void Z3DRendererBase::invalidatePickingDisplayList()
 
 void Z3DRendererBase::compile()
 {
-  for (m_renderersIt = m_renderers.begin(); m_renderersIt != m_renderers.end();
-       ++m_renderersIt) {
-    (*m_renderersIt)->compile();
+  for (auto renderer : m_renderers) {
+    renderer->compile();
   }
 }
 

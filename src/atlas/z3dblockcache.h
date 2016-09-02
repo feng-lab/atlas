@@ -74,7 +74,7 @@ public:
     }
   }
 
-  const glm::ivec3& get(const KeyType& key)
+  const glm::ivec3& get(const KeyType& key) const
   {
     auto it = m_cacheItemsMap.find(key);
     return it->second->second;

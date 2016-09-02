@@ -70,12 +70,12 @@ void ZAssignPuncta::doWork()
   } else {
     throw ZImgException(QString("Wrong dendrite channel: %1. Abort.").arg(m_dendriteChannel));
   }
-  for (auto it = m_swcTreeToPuncta.begin(); it != m_swcTreeToPuncta.end(); ++it) {
-    it->first->labelSomaAndOthers(3.0 / m_img.voxelSizeXInUm()); // soma radius at least 3um
-    it->second.clear();
+  for (auto& treePuncta : m_swcTreeToPuncta) {
+    treePuncta.first->labelSomaAndOthers(3.0 / m_img.voxelSizeXInUm()); // soma radius at least 3um
+    treePuncta.second.clear();
   }
-  for (auto it = m_swcTreeToSomaPuncta.begin(); it != m_swcTreeToSomaPuncta.end(); ++it) {
-    it->second.clear();
+  for (auto& treePuncta : m_swcTreeToSomaPuncta) {
+    treePuncta.second.clear();
   }
   m_ambiguousPuncta.clear();
 
@@ -112,43 +112,42 @@ ZPuncta ZAssignPuncta::getSomaPunctaOfTree(ZSwc* tree) const
 
 void ZAssignPuncta::separatePuncta()
 {
-  if (m_puncta.isEmpty())
+  if (m_puncta.empty())
     reportProgress(1.0);
   std::map<SwcTreeNode, ZSwc*> nodeToTree;
-  std::map<ZSwc*, ZPuncta>::const_iterator it;
   double punctaSize = m_puncta.size();
   size_t idx = 1;
-  for (ZPuncta::const_iterator pit = m_puncta.begin(); pit != m_puncta.end(); ++pit) {
+  for (const auto& p : m_puncta) {
     LOG(INFO) << "Start Puncta " << idx;
     nodeToTree.clear();
     std::vector<SwcTreeNode> nodes;
     size_t numTreeInRange = 0;
-    for (it = m_swcTreeToPuncta.begin(); it != m_swcTreeToPuncta.end(); ++it) {
-      std::vector<SwcTreeNode> tmpNodes = nodesNearbyPuncta(*pit, it->first);
+    for (const auto& treePuncta : m_swcTreeToPuncta) {
+      std::vector<SwcTreeNode> tmpNodes = nodesNearbyPuncta(p, treePuncta.first);
       if (!tmpNodes.empty()) {
         ++numTreeInRange;
         for (size_t tmpNodesIdx = 0; tmpNodesIdx < tmpNodes.size(); ++tmpNodesIdx) {
-          nodeToTree[tmpNodes[tmpNodesIdx]] = it->first;
+          nodeToTree[tmpNodes[tmpNodesIdx]] = treePuncta.first;
           nodes.push_back(tmpNodes[tmpNodesIdx]);
         }
       }
     }
 
     if (numTreeInRange == 1) {
-      m_swcTreeToPuncta[nodeToTree.begin()->second].push_back(*pit);
+      m_swcTreeToPuncta[nodeToTree.begin()->second].push_back(p);
     } else if (numTreeInRange > 1) {
       bool isAmbiguous = false;
-      SwcTreeNode tn = intensityWeightedNearestNode(pit->x(), pit->y(), pit->z(),
+      SwcTreeNode tn = intensityWeightedNearestNode(p.x(), p.y(), p.z(),
                                                     nodes, isAmbiguous);
-      if (nearestNode(pit->x(), pit->y(), pit->z(), nodes) != tn) {
+      if (nearestNode(p.x(), p.y(), p.z(), nodes) != tn) {
         LOG(WARNING) << "Check Punctum: "
-                     << pit->x() << " " << pit->y() << " " << pit->z() << " " << pit->radius() << " "
-                     << pit->maxIntensity() << " " << pit->meanIntensity();
+                     << p.x() << " " << p.y() << " " << p.z() << " " << p.radius() << " "
+                     << p.maxIntensity() << " " << p.meanIntensity();
       }
       if (isAmbiguous) {
-        m_ambiguousPuncta.push_back(*pit);
+        m_ambiguousPuncta.push_back(p);
       } else {
-        m_swcTreeToPuncta[nodeToTree[tn]].push_back(*pit);
+        m_swcTreeToPuncta[nodeToTree[tn]].push_back(p);
       }
     }
     reportProgress(0.25 + 0.75 * idx / punctaSize);
@@ -158,24 +157,23 @@ void ZAssignPuncta::separatePuncta()
 
 void ZAssignPuncta::separateSomaPuncta()
 {
-  if (m_somaPuncta.isEmpty())
+  if (m_somaPuncta.empty())
     reportProgress(.25);
-  std::map<ZSwc*, ZPuncta>::const_iterator it;
   double punctaSize = m_somaPuncta.size();
   size_t idx = 1;
-  for (ZPuncta::const_iterator pit = m_somaPuncta.begin(); pit != m_somaPuncta.end(); ++pit) {
+  for (const auto& p : m_somaPuncta) {
     LOG(INFO) << "Start Soma Puncta " << idx;
     double min_dist = std::numeric_limits<double>::max();
     ZSwc* tree = nullptr;
-    for (it = m_swcTreeToSomaPuncta.begin(); it != m_swcTreeToSomaPuncta.end(); ++it) {
-      double dist = punctaSomaDist(*pit, it->first);
+    for (const auto& treePuncta : m_swcTreeToSomaPuncta) {
+      double dist = punctaSomaDist(p, treePuncta.first);
       if (dist < min_dist) {
         min_dist = dist;
-        tree = it->first;
+        tree = treePuncta.first;
       }
     }
     if (tree) {
-      m_swcTreeToSomaPuncta[tree].push_back(*pit);
+      m_swcTreeToSomaPuncta[tree].push_back(p);
     }
     reportProgress(.25 * idx / punctaSize);
     idx++;

@@ -530,11 +530,10 @@ void ZGenerateAnalysisTextFile::mergeSoma(ZSwc& tree,
   }
 
   size_t bestCount = 0;
-  for (std::map<size_t, size_t>::const_iterator it = layerCount.begin();
-       it != layerCount.end(); ++it) {
-    if (it->second > bestCount) {
-      nodeToLayer[somaNode] = it->first;
-      bestCount = it->second;
+  for (const auto& lc : layerCount) {
+    if (lc.second > bestCount) {
+      nodeToLayer[somaNode] = lc.first;
+      bestCount = lc.second;
     }
   }
 
@@ -858,14 +857,12 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
   ZPuncta punctaList(m_input.somaPunctaFilename);
   std::ofstream somaPunctaStream;
   openFileStream(somaPunctaStream, somaPunctaFilename, std::ios_base::out | std::ios_base::trunc);
-  somaPunctaStream << "# puncta id, x, y, z, volsize, meanIntensity, maxIntensity" << std::endl;
+  somaPunctaStream << "# puncta id, x, y, z, volsize, meanIntensity, maxIntensity\n";
 
   size_t idx = 0;
-  for (ZPuncta::const_iterator it = punctaList.begin(); it != punctaList.end(); ++it) {
-    somaPunctaStream << idx++ << " " << it->x() << " " << it->y() << " "
-                     << it->z() << " "
-                     << it->volSize() << " " << it->meanIntensity() << " "
-                     << it->maxIntensity() << std::endl;
+  for (const auto& p : punctaList) {
+    somaPunctaStream << idx++ << " " << p.x() << " " << p.y() << " " << p.z() << " "
+                     << p.volSize() << " " << p.meanIntensity() << " " << p.maxIntensity() << "\n";
   }
   somaPunctaStream.close();
 
@@ -884,39 +881,39 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
   std::map<const ZPunctum*, double> punctumDistToBranchStart;
   std::map<const ZPunctum*, double> punctumDistToSoma;
   std::map<const ZPunctum*, double> punctumDistToSegmentStart;
-  for (ZPuncta::const_iterator it = punctaList.begin(); it != punctaList.end(); ++it) {
-    ConstSwcTreeNode tn = getNodeSegOfPunctum(tree, *it, branches.size(), nodeToBranchId);
-    punctumToNode[&(*it)] = tn;
+  for (const auto& p : punctaList) {
+    ConstSwcTreeNode tn = getNodeSegOfPunctum(tree, p, branches.size(), nodeToBranchId);
+    punctumToNode[&p] = tn;
     if (ZSwc::isNull(tn))
       continue;
 
-    nodeToPuncta[tn].push_back(&(*it));
+    nodeToPuncta[tn].push_back(&p);
 
     size_t branchId = nodeToBranchId[tn];
     bool firstSeg = branchId != nodeToBranchId[ZSwc::parent(tn)];
 
     double frac;
-    punctaFrustumConeDist(*it, ZSwc::parent(tn), tn, &frac);
+    punctaFrustumConeDist(p, ZSwc::parent(tn), tn, &frac);
     if (frac < 0) {
-      punctumDistToBranchStart[&(*it)] = firstSeg ? 0 : nodeDistToBranchStart[ZSwc::parent(tn)];
-      punctumDistToSoma[&(*it)] = nodeDistToSoma[ZSwc::parent(tn)];
-      punctumDistToSegmentStart[&(*it)] = 0;
+      punctumDistToBranchStart[&p] = firstSeg ? 0 : nodeDistToBranchStart[ZSwc::parent(tn)];
+      punctumDistToSoma[&p] = nodeDistToSoma[ZSwc::parent(tn)];
+      punctumDistToSegmentStart[&p] = 0;
     } else if (frac > 1) {
-      punctumDistToBranchStart[&(*it)] = nodeDistToBranchStart[tn];
-      punctumDistToSoma[&(*it)] = nodeDistToSoma[tn];
-      punctumDistToSegmentStart[&(*it)] = nodeDistToParent[tn];
+      punctumDistToBranchStart[&p] = nodeDistToBranchStart[tn];
+      punctumDistToSoma[&p] = nodeDistToSoma[tn];
+      punctumDistToSegmentStart[&p] = nodeDistToParent[tn];
     } else {
-      punctumDistToBranchStart[&(*it)] =
+      punctumDistToBranchStart[&p] =
         (firstSeg ? 0 : nodeDistToBranchStart[ZSwc::parent(tn)]) + frac * nodeDistToParent[tn];
-      punctumDistToSoma[&(*it)] = nodeDistToSoma[ZSwc::parent(tn)] + frac * nodeDistToParent[tn];
-      punctumDistToSegmentStart[&(*it)] = frac * nodeDistToParent[tn];
+      punctumDistToSoma[&p] = nodeDistToSoma[ZSwc::parent(tn)] + frac * nodeDistToParent[tn];
+      punctumDistToSegmentStart[&p] = frac * nodeDistToParent[tn];
     }
   }
 
   std::ofstream branchStream;
   openFileStream(branchStream, branchFilename, std::ios_base::out | std::ios_base::trunc);
-  branchStream << "# branch id, type, x, y, z, radius, blueness, layer, topological type, distToBranchStart, distToSoma"
-               << std::endl;
+  branchStream << "# branch id, type, x, y, z, radius, blueness, layer, topological type, "
+    "distToBranchStart, distToSoma\n";
 
   for (size_t i = 0; i < branches.size(); ++i) {
     Branch& branch = branches[i];
@@ -929,29 +926,28 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
                    << nodeToLayer.at(tn) << " "
                    << nodeTopologyType.at(tn) << " "
                    << nodeDistToBranchStart.at(tn) << " "
-                   << nodeDistToSoma.at(tn) << std::endl;
+                   << nodeDistToSoma.at(tn) << "\n";
     }
   }
   branchStream.close();
 
   std::ofstream punctaStream;
   openFileStream(punctaStream, punctaFilename, std::ios_base::out | std::ios_base::trunc);
-  punctaStream
-    << "# puncta id, x, y, z, branch id, offset, volsize, meanIntensity, maxIntensity, distToBranchStart, distToSoma"
-    << std::endl;
+  punctaStream << "# puncta id, x, y, z, branch id, offset, volsize, meanIntensity, maxIntensity, "
+    "distToBranchStart, distToSoma\n";
 
   idx = 0;
-  for (ZPuncta::const_iterator it = punctaList.begin(); it != punctaList.end(); ++it) {
-    if (ZSwc::isNull(punctumToNode[&(*it)]))
+  for (const auto& p : punctaList) {
+    if (ZSwc::isNull(punctumToNode[&p]))
       continue;
-    size_t branchId = nodeToBranchId[punctumToNode[&(*it)]];
-    double offset = punctumDistToBranchStart[&(*it)] / branches[branchId - 1].length;
-    punctaStream << idx++ << " " << it->x() << " " << it->y() << " "
-                 << it->z() << " " << branchId << " " << offset << " "
-                 << it->volSize() << " " << it->meanIntensity() << " "
-                 << it->maxIntensity() << " "
-                 << punctumDistToBranchStart[&(*it)] << " "
-                 << punctumDistToSoma[&(*it)] << std::endl;
+    size_t branchId = nodeToBranchId[punctumToNode[&p]];
+    double offset = punctumDistToBranchStart[&p] / branches[branchId - 1].length;
+    punctaStream << idx++ << " " << p.x() << " " << p.y() << " "
+                 << p.z() << " " << branchId << " " << offset << " "
+                 << p.volSize() << " " << p.meanIntensity() << " "
+                 << p.maxIntensity() << " "
+                 << punctumDistToBranchStart[&p] << " "
+                 << punctumDistToSoma[&p] << "\n";
   }
   punctaStream.close();
 
@@ -978,22 +974,20 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
 
     std::ofstream outSwcTxtStream;
     openFileStream(outSwcTxtStream, outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
-    outSwcTxtStream
-      << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, distToBranchStart, distToSoma"
-      << std::endl;
+    outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, "
+      "distToBranchStart, distToSoma\n";
 
     std::ofstream outPunctaTxtStream;
     openFileStream(outPunctaTxtStream, outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
-    outPunctaTxtStream
-      << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, distToBranchStart, distToSoma"
-      << std::endl;
+    outPunctaTxtStream << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, "
+      "distToBranchStart, distToSoma\n";
 
     ZPuncta tmpPunc;
     for (size_t j = 0; j < branch.nodes.size(); ++j) {
       const ConstSwcTreeNode& tn = branch.nodes[j];
       outSwcStream << tn->id << " " << tn->type << " " << tn->x << " "
                    << tn->y << " " << tn->z << " " << tn->radius << " "
-                   << ZSwc::parentID(tn) << std::endl;
+                   << ZSwc::parentID(tn) << "\n";
       if (j == 0) {
         outSwcTxtStream << 0 << " ";
       } else if (j == branch.nodes.size() - 1) {
@@ -1008,7 +1002,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
                       << nodeToLayer.at(tn) << " "
                       << nodeTopologyType.at(tn) << " "
                       << nodeDistToBranchStart.at(tn) << " "
-                      << nodeDistToSoma.at(tn) << std::endl;
+                      << nodeDistToSoma.at(tn) << "\n";
 
       if (j > 0) {
         std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
@@ -1021,7 +1015,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
                              << punctum->volSize() << " " << punctum->meanIntensity() << " "
                              << punctum->maxIntensity() << " "
                              << punctumDistToBranchStart[punctum] << " "
-                             << punctumDistToSoma[punctum] << std::endl;
+                             << punctumDistToSoma[punctum] << "\n";
         }
       }
     }
@@ -1076,15 +1070,13 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
 
       std::ofstream outSwcTxtStream;
       openFileStream(outSwcTxtStream, outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
-      outSwcTxtStream
-        << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, distToBranchStart, distToSoma"
-        << std::endl;
+      outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, "
+        "distToBranchStart, distToSoma\n";
 
       std::ofstream outPunctaTxtStream;
       openFileStream(outPunctaTxtStream, outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
-      outPunctaTxtStream
-        << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, distToBranchStart, distToSoma"
-        << std::endl;
+      outPunctaTxtStream << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, "
+        "distToBranchStart, distToSoma\n";
 
       int nodeIdx = -1;
       ZPuncta tmpPunc;
@@ -1100,7 +1092,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
           const ConstSwcTreeNode& btn = branch.nodes[j];
           outSwcStream << btn->id << " " << btn->type << " " << btn->x << " "
                        << btn->y << " " << btn->z << " " << btn->radius << " "
-                       << ZSwc::parentID(btn) << std::endl;
+                       << ZSwc::parentID(btn) << "\n";
           if (i == 0 && j == 0) {
             outSwcTxtStream << 0 << " ";
           } else if (i == branchIdList.size() - 1 && j == branch.nodes.size() - 1) {
@@ -1115,7 +1107,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
                           << nodeToLayer.at(btn) << " "
                           << nodeTopologyType.at(btn) << " "
                           << nodeDistToBranchStart.at(btn) << " "
-                          << nodeDistToSoma.at(btn) << std::endl;
+                          << nodeDistToSoma.at(btn) << "\n";
 
           // don't need to skip i == 0 and j == 0 case because btn will be soma and there
           // should be no puncta for soma
@@ -1129,7 +1121,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
                                << punctum->volSize() << " " << punctum->meanIntensity() << " "
                                << punctum->maxIntensity() << " "
                                << punctumDistToSoma[punctum] << " "
-                               << punctumDistToSoma[punctum] << std::endl;
+                               << punctumDistToSoma[punctum] << "\n";
           }
         }
       }
@@ -1237,15 +1229,13 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
 
       std::ofstream outSwcTxtStream;
       openFileStream(outSwcTxtStream, outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
-      outSwcTxtStream
-        << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, distToBranchStart, distToSoma"
-        << std::endl;
+      outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, "
+        "distToBranchStart, distToSoma\n";
 
       std::ofstream outPunctaTxtStream;
       openFileStream(outPunctaTxtStream, outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
-      outPunctaTxtStream
-        << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, distToBranchStart, distToSoma"
-        << std::endl;
+      outPunctaTxtStream << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, "
+        "distToBranchStart, distToSoma\n";
 
       double segmentStartToBranchStartLength = 0.0;
       ZPuncta tmpPunc;
@@ -1253,7 +1243,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
         const ConstSwcTreeNode& tn = branch.nodes[j];
         outSwcStream << tn->id << " " << tn->type << " " << tn->x << " "
                      << tn->y << " " << tn->z << " " << tn->radius << " "
-                     << ZSwc::parentID(tn) << std::endl;
+                     << ZSwc::parentID(tn) << "\n";
         if (j == 0) {
           outSwcTxtStream << 0 << " ";
         } else if (j == branch.nodes.size() - 1) {
@@ -1268,7 +1258,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
                         << nodeToLayer.at(tn) << " "
                         << nodeTopologyType.at(tn) << " "
                         << nodeDistToBranchStart.at(tn) << " "
-                        << nodeDistToSoma.at(tn) << std::endl;
+                        << nodeDistToSoma.at(tn) << "\n";
 
         if (j > 0) {
           std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
@@ -1282,7 +1272,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
                                << punctum->volSize() << " " << punctum->meanIntensity() << " "
                                << punctum->maxIntensity() << " "
                                << punctumDistToMTTBranchStart << " "
-                               << punctumDistToSoma[punctum] << std::endl;
+                               << punctumDistToSoma[punctum] << "\n";
           }
 
           segmentStartToBranchStartLength += nodeDistToParent[tn];
@@ -1333,22 +1323,20 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
 
         std::ofstream outSwcTxtStream;
         openFileStream(outSwcTxtStream, outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
-        outSwcTxtStream
-          << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, distToBranchStart, distToSoma"
-          << std::endl;
+        outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, "
+          "distToBranchStart, distToSoma\n";
 
         std::ofstream outPunctaTxtStream;
         openFileStream(outPunctaTxtStream, outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
-        outPunctaTxtStream
-          << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, distToBranchStart, distToSoma"
-          << std::endl;
+        outPunctaTxtStream << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, "
+          "distToBranchStart, distToSoma\n";
 
         ZPuncta tmpPunc;
         for (size_t j = 0; j < branch.nodes.size(); ++j) {
           const ConstSwcTreeNode& tn = branch.nodes[j];
           outSwcStream << tn->id << " " << tn->type << " " << tn->x << " "
                        << tn->y << " " << tn->z << " " << tn->radius << " "
-                       << ZSwc::parentID(tn) << std::endl;
+                       << ZSwc::parentID(tn) << "\n";
           if (j == 0) {
             outSwcTxtStream << 0 << " ";
           } else if (j == branch.nodes.size() - 1) {
@@ -1363,7 +1351,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
                           << nodeToLayer.at(tn) << " "
                           << nodeTopologyType.at(tn) << " "
                           << nodeDistToBranchStart.at(tn) << " "
-                          << nodeDistToSoma.at(tn) << std::endl;
+                          << nodeDistToSoma.at(tn) << "\n";
 
           if (j > 0) {
             std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
@@ -1376,7 +1364,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
                                  << punctum->volSize() << " " << punctum->meanIntensity() << " "
                                  << punctum->maxIntensity() << " "
                                  << punctumDistToBranchStart[punctum] << " "
-                                 << punctumDistToSoma[punctum] << std::endl;
+                                 << punctumDistToSoma[punctum] << "\n";
             }
           }
         }

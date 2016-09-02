@@ -738,8 +738,7 @@ void ZStitchImageDialog::selectInputStacks2()
   }
 }
 
-bool ZStitchImageDialog::getTileMatrix(ZImg& img, QVector<QVector<int>>& tileMatrix,
-                                       QList<ZTile>& tileList)
+bool ZStitchImageDialog::getTileMatrix(ZImg& img, std::vector<std::vector<int>>& tileMatrix, QList<ZTile>& tileList)
 {
   double minvalue;
   double maxvalue;
@@ -747,8 +746,8 @@ bool ZStitchImageDialog::getTileMatrix(ZImg& img, QVector<QVector<int>>& tileMat
   double midvalue = (minvalue + maxvalue) / 2;
   double thre1 = (minvalue + midvalue) / 2;
   double thre2 = (midvalue + maxvalue) / 2;
-  int numTilePerRow = 0;
-  int numTilePerCol = 0;
+  size_t numTilePerRow = 0;
+  size_t numTilePerCol = 0;
   tileMatrix.clear();
   tileList.clear();
   for (size_t h = 0; h < img.height(); h++) {
@@ -776,11 +775,11 @@ bool ZStitchImageDialog::getTileMatrix(ZImg& img, QVector<QVector<int>>& tileMat
   if (numTilePerRow == 0 || numTilePerCol == 0) {
     return false;
   }
-  tileMatrix = QVector<QVector<int>>(numTilePerCol, QVector<int>(numTilePerRow, 0));
+  tileMatrix = std::vector<std::vector<int>>(numTilePerCol, std::vector<int>(numTilePerRow, 0));
   int tileindex = 1;
   int tileindex2 = 1;
-  int currentrow = 0;
-  int currentcol = 0;
+  size_t currentrow = 0;
+  size_t currentcol = 0;
   for (size_t h = 1; h < img.height() - 1; h++) {
     for (size_t w = 1; w < img.width() - 1; w++) {
       int value = img.value<int>(w, h, 0);
@@ -864,9 +863,9 @@ void ZStitchImageDialog::editConnFromTileImage()
       }
       QString str = QString("%1 images selected to stitch:").arg(m_nSel);
       m_connEdit->setText(str);
-      for (int i = 0; i < m_tileMatrix.size(); ++i) {
+      for (size_t i = 0; i < m_tileMatrix.size(); ++i) {
         str = QString("  ");
-        for (int j = 0; j < m_tileMatrix[0].size(); ++j) {
+        for (size_t j = 0; j < m_tileMatrix[0].size(); ++j) {
           if (m_tileMatrix[i][j] > 0 && m_tileList[m_tileMatrix[i][j] - 1].bIsSelected) {
             str += QString("%1\t").arg(m_tileMatrix[i][j]);
           } else {

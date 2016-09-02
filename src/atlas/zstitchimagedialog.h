@@ -2,7 +2,7 @@
 
 #include <QDialog>
 #include <QList>
-#include <QVector>
+#include <vector>
 
 QT_BEGIN_NAMESPACE
 class QCheckBox;
@@ -177,8 +177,7 @@ private:
 
   QWidget* createCommandOutputWidget();
 
-  bool getTileMatrix(ZImg& img, QVector<QVector<int>>& tileMatrix,
-                     QList<ZTile>& tileList);
+  bool getTileMatrix(ZImg& img, std::vector<std::vector<int>>& tileMatrix, QList<ZTile>& tileList);
 
   void initChannel1ComboBox(int nchannel);
 
@@ -193,7 +192,7 @@ private:
   void stitchStacks2(); //stitch two stack sets with common channel, merge channel into output
 
 private:
-  QVector<QVector<int>> m_tileMatrix;
+  std::vector<std::vector<int>> m_tileMatrix;
   QList<ZTile> m_tileList;
   int m_nSel;
 

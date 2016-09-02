@@ -479,13 +479,12 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
     std::vector<size_t> srcSlices;
     ZImgSignedDistanceMap<> distMap;
     distMap.setInsideIsPositive(false);
-    for (ZROI::const_iterator it = cbegin(); it != cend(); ++it) {
-      if (it->first < 0)
+    for (const auto& sliceROI : m_sliceROIs) {
+      if (sliceROI.first < 0)
         continue;
-      size_t slice = it->first;
+      size_t slice = sliceROI.first;
       //LOG(INFO) << slice;
-      const ZSliceROI& sliceROI = it->second;
-      const QPainterPath& path = sliceROI.paintPath();
+      const QPainterPath& path = sliceROI.second.paintPath();
       QRectF pathRect = path.boundingRect();
       size_t minX = std::max(static_cast<int>(std::floor(pathRect.left())),
                              std::max(0, bBox[0]));
@@ -933,17 +932,17 @@ void ZROI::save(H5::Group& allGrp) const
     ver.write(intType, &roiVer);
 
     int idx = 0;
-    for (auto it = m_sliceROIs.cbegin(); it != m_sliceROIs.cend(); ++it) {
-      if (it->second.isEmpty())
+    for (const auto& sliceROI : m_sliceROIs) {
+      if (sliceROI.second.isEmpty())
         continue;
 
       H5::Group sliceGrp = allGrp.createGroup(qUtf8Printable(QString("Slice%1").arg(idx + 1)));
       ++idx;
 
       H5::Attribute sliceAttr = sliceGrp.createAttribute("Slice", intType, attrDataSpace);
-      sliceAttr.write(intType, &it->first);
+      sliceAttr.write(intType, &sliceROI.first);
 
-      it->second.save(sliceGrp);
+      sliceROI.second.save(sliceGrp);
     }
 
     H5::Attribute numSliceAttr = allGrp.createAttribute("SliceNumber", intType, attrDataSpace);
