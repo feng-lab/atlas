@@ -51,7 +51,7 @@ void ZRegionAnnotationFilter::setMaxZProjView(int t)
   }
 }
 
-const std::vector<int>& ZRegionAnnotationFilter::boundBox() const
+const std::array<int, 8>& ZRegionAnnotationFilter::boundBox() const
 {
   return m_regionAnnotation->boundBox();
 }

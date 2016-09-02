@@ -54,7 +54,7 @@ void Z3DCamera::setTileFrustum(double left, double right, double bottom, double 
   makeProjectionMatrices();
 }
 
-void Z3DCamera::resetCamera(const std::vector<double>& bound, ResetOption options)
+void Z3DCamera::resetCamera(const std::array<double, 6>& bound, ResetOption options)
 {
   glm::vec3 center;
   center[0] = (bound[0] + bound[1]) / 2.0;
@@ -107,7 +107,7 @@ void Z3DCamera::resetCamera(const std::vector<double>& bound, ResetOption option
 void Z3DCamera::resetCamera(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax,
                             ResetOption options)
 {
-  std::vector<double> bound(6);
+  std::array<double, 6> bound;
   bound[0] = xmin;
   bound[1] = xmax;
   bound[2] = ymin;
@@ -117,7 +117,7 @@ void Z3DCamera::resetCamera(double xmin, double xmax, double ymin, double ymax, 
   resetCamera(bound, options);
 }
 
-void Z3DCamera::resetCameraNearFarPlane(const std::vector<double>& bound)
+void Z3DCamera::resetCameraNearFarPlane(const std::array<double, 6>& bound)
 {
   double a = m_viewVector[0];
   double b = m_viewVector[1];
@@ -170,7 +170,7 @@ void Z3DCamera::resetCameraNearFarPlane(const std::vector<double>& bound)
 
 void Z3DCamera::resetCameraNearFarPlane(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax)
 {
-  std::vector<double> bound(6);
+  std::array<double, 6> bound;
   bound[0] = xmin;
   bound[1] = xmax;
   bound[2] = ymin;

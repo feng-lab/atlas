@@ -442,7 +442,6 @@ bool ZSliceROI::hasPolyOrSpline() const
 
 ZROI::ZROI(QUndoStack* undoStack, QObject* parent)
   : QObject(parent)
-  , m_boundBox(8)
   , m_undoStack(undoStack)
   , m_moveSelectedControlPointsCommand(nullptr)
 {
@@ -455,7 +454,7 @@ ZROI::ZROI(QUndoStack* undoStack, QObject* parent)
 ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpolation) const
 {
   ZImg img;
-  const std::vector<int>& bBox = boundBox();
+  const std::array<int, 8>& bBox = boundBox();
   if (bBox[5] == bBox[4]) {
     img = ZImg(ZImgInfo(bBox[1] + 3, bBox[3] + 3, 1));
     const ZSliceROI& sliceROI = cbegin()->second;

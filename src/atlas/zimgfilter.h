@@ -39,7 +39,7 @@ public:
   inline bool isVisible() const
   { return m_isVisible; }
 
-  std::vector<int> boundBox() const;
+  std::array<int, 8> boundBox() const;
 
   // location within img, can be out of img range
   int imgSlice() const;

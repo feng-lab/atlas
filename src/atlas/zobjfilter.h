@@ -58,7 +58,7 @@ protected:
 
   void removeParameter(ZParameter* para);
 
-  void updateBoundBoxWithOffsetPara(std::vector<int>& boundBox) const;
+  void updateBoundBoxWithOffsetPara(std::array<int, 8>& boundBox) const;
 
   int realZ() const
   { return m_view.currentSlice() - int(m_offsetPara.get().z); }

@@ -11,7 +11,6 @@ namespace nim {
 ZPunctaGraphicsItem::ZPunctaGraphicsItem(ZPuncta& puncta, double z, QGraphicsItem* parent)
   : QGraphicsItem(parent)
   , m_puncta(puncta)
-  , m_boundBox(8)
   , m_outlineColor(255, 0, 0)
   , m_opacity(1)
   , m_mip(false)
@@ -116,9 +115,9 @@ void ZPunctaFilter::setMaxZProjView(int t)
   m_item->setMaxZProjView(realT(t));
 }
 
-std::vector<int> ZPunctaFilter::boundBox() const
+std::array<int, 8> ZPunctaFilter::boundBox() const
 {
-  std::vector<int> res = m_item->boundBox();
+  std::array<int, 8> res = m_item->boundBox();
   updateBoundBoxWithOffsetPara(res);
   return res;
 }

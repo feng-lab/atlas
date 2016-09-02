@@ -156,14 +156,14 @@ public:
   // will be preserved based on the PreserveViewVector flag. By default it is not preserved and will be
   // reset to (0,0,1) (upVector will then be set to (0,-1,0)).
   // Result depends on current field of view and aspect ratio.
-  void resetCamera(const std::vector<double>& bound, ResetOption options = ResetOption::ResetAll);
+  void resetCamera(const std::array<double, 6>& bound, ResetOption options = ResetOption::ResetAll);
 
   void resetCamera(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax,
                    ResetOption options = ResetOption::ResetAll);
 
   // Reset the camera near far plane based on the bounding box (see resetCamera).
   // This ensures that nothing is clipped by the near far planes
-  void resetCameraNearFarPlane(const std::vector<double>& bound);
+  void resetCameraNearFarPlane(const std::array<double, 6>& bound);
 
   void resetCameraNearFarPlane(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax);
 

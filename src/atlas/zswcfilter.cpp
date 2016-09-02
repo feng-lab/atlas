@@ -12,7 +12,6 @@ namespace nim {
 ZSwcGraphicsItem::ZSwcGraphicsItem(ZSwc& swc, double z, QGraphicsItem* parent)
   : QGraphicsItem(parent)
   , m_swc(swc)
-  , m_boundBox(8)
   , m_showSkeleton(true)
   , m_outlineColor(255, 0, 0)
   , m_opacity(1)
@@ -171,9 +170,9 @@ void ZSwcFilter::setMaxZProjView(int t)
   m_item->setMaxZProjView(realT(t));
 }
 
-std::vector<int> ZSwcFilter::boundBox() const
+std::array<int, 8> ZSwcFilter::boundBox() const
 {
-  std::vector<int> res = m_item->boundBox();
+  std::array<int, 8> res = m_item->boundBox();
   updateBoundBoxWithOffsetPara(res);
   return res;
 }

@@ -58,10 +58,10 @@ public:
   inline Z3DRendererBase::ShaderHookParameter& shaderHookPara()
   { return m_rendererBase.shaderHookPara(); }
 
-  const std::vector<double>& axisAlignedBoundBox() const
+  const std::array<double, 6>& axisAlignedBoundBox() const
   { return m_axisAlignedBoundBox; }
 
-  const std::vector<double>& notTransformedBoundBox() const
+  const std::array<double, 6>& notTransformedBoundBox() const
   { return m_notTransformedBoundBox; }
 
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
@@ -171,7 +171,7 @@ protected:
 
   void renderBoundBox(Z3DEye eye);
 
-  void appendBoundboxLines(const std::vector<double>& bound, std::vector<glm::vec3>& lines);
+  void appendBoundboxLines(const std::array<double, 6>& bound, std::vector<glm::vec3>& lines);
 
   // output v1 is start point of ray, v2 is a point on the ray, v2-v1 is normalized
   // x and y are input screen point, width and height are input screen dimension
@@ -241,9 +241,9 @@ protected:
   ZFloatParameter m_manipulatorSize;
   ZEventListenerParameter m_handleEvent;
 
-  std::vector<double> m_axisAlignedBoundBox;
+  std::array<double, 6> m_axisAlignedBoundBox;
   glm::vec3 m_center;
-  std::vector<double> m_notTransformedBoundBox;
+  std::array<double, 6> m_notTransformedBoundBox;
 
   std::vector<glm::vec3> m_normalBoundBoxLines;
   std::vector<glm::vec3> m_axisAlignedBoundBoxLines;
@@ -267,7 +267,7 @@ protected:
   bool m_isSelected;
 
 private:
-  std::vector<double> m_selectionBoundBox;
+  std::array<double, 6> m_selectionBoundBox;
 
   glm::ivec2 m_lastMousePosition;
   glm::vec3 m_startMouseWorldPos;

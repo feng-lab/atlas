@@ -25,8 +25,6 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   , m_selectionLineColor("Selection Line Color", glm::vec4(1.f, 1.f, 0.f, 1.f))
   , m_manipulatorSize("Manipulator Size", 150, 50, 1e5)
   , m_handleEvent("handle", false)
-  , m_axisAlignedBoundBox(6)
-  , m_notTransformedBoundBox(6)
   , m_handleCenterAndRadius(1)
   , m_handleArrowTailPosAndTailRadius(3)
   , m_handleArrowheadPosAndHeadRadius(3)
@@ -322,7 +320,7 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
 void Z3DBoundedFilter::initializeCutRange()
 {
   m_canUpdateClipPlane = false;
-  const std::vector<double>& bound = notTransformedBoundBox();
+  const std::array<double, 6>& bound = notTransformedBoundBox();
   m_xCut.setRange(std::floor(bound[0]) - 1, std::ceil(bound[1]) + 1);
   m_xCut.set(m_xCut.range());
   m_yCut.setRange(std::floor(bound[2]) - 1, std::ceil(bound[3]) + 1);
@@ -335,7 +333,7 @@ void Z3DBoundedFilter::initializeCutRange()
 
 void Z3DBoundedFilter::initializeRotationCenter()
 {
-  const std::vector<double>& bound = notTransformedBoundBox();
+  const std::array<double, 6>& bound = notTransformedBoundBox();
   m_rendererBase.setRotationCenter(
     glm::vec3((bound[0] + bound[1]) / 2.0, (bound[2] + bound[3]) / 2.0, (bound[4] + bound[5]) / 2.0));
 }
@@ -349,7 +347,7 @@ void Z3DBoundedFilter::renderBoundBox(Z3DEye eye)
   }
 }
 
-void Z3DBoundedFilter::appendBoundboxLines(const std::vector<double>& bound, std::vector<glm::vec3>& lines)
+void Z3DBoundedFilter::appendBoundboxLines(const std::array<double, 6>& bound, std::vector<glm::vec3>& lines)
 {
   float xmin = bound[0];
   float xmax = bound[1];
@@ -462,7 +460,7 @@ void Z3DBoundedFilter::updateAxisAlignedBoundBoxImpl()
 void Z3DBoundedFilter::expandCutRange()
 {
   m_canUpdateClipPlane = false;
-  const std::vector<double>& bound = notTransformedBoundBox();
+  const std::array<double, 6>& bound = notTransformedBoundBox();
   bool noLowXCut = m_xCut.lowerValue() == m_xCut.minimum();
   bool noHighXCut = m_xCut.upperValue() == m_xCut.maximum();
   bool noLowYCut = m_yCut.lowerValue() == m_yCut.minimum();

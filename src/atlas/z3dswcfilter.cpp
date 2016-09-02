@@ -609,11 +609,11 @@ void Z3DSwcFilter::prepareData()
   m_dataIsInvalid = false;
 }
 
-void Z3DSwcFilter::treeBound(ZSwc* tree, std::vector<double>& res) const
+void Z3DSwcFilter::treeBound(ZSwc* tree, std::array<double, 6>& res) const
 {
   res[0] = res[2] = res[4] = std::numeric_limits<double>::max();
   res[1] = res[3] = res[5] = std::numeric_limits<double>::lowest();
-  std::vector<double> nodeBound(6);
+  std::array<double, 6> nodeBound;
   for (ZSwc::Iterator tn = tree->begin(); tn != tree->end(); ++tn) {
     treeNodeBound(tn, nodeBound);
     res[0] = std::min(res[0], nodeBound[0]);
@@ -625,7 +625,7 @@ void Z3DSwcFilter::treeBound(ZSwc* tree, std::vector<double>& res) const
   }
 }
 
-void Z3DSwcFilter::treeNodeBound(const SwcTreeNode& tn, std::vector<double>& result) const
+void Z3DSwcFilter::treeNodeBound(const SwcTreeNode& tn, std::array<double, 6>& result) const
 {
   glm::vec3 cent = glm::applyMatrix(coordTransform(), glm::vec3(tn->x, tn->y, tn->z));
   result[0] = cent.x - std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale());
@@ -636,7 +636,7 @@ void Z3DSwcFilter::treeNodeBound(const SwcTreeNode& tn, std::vector<double>& res
   result[5] = cent.z + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale());
 }
 
-void Z3DSwcFilter::notTransformedTreeBound(ZSwc* tree, std::vector<double>& res) const
+void Z3DSwcFilter::notTransformedTreeBound(ZSwc* tree, std::array<double, 6>& res) const
 {
   res[0] = res[2] = res[4] = std::numeric_limits<double>::max();
   res[1] = res[3] = res[5] = std::numeric_limits<double>::lowest();

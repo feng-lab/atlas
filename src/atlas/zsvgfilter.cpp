@@ -53,10 +53,11 @@ void ZSvgFilter::setMaxZProjView(int t)
   m_item->setVisible(realT(t) == 0 && m_visible.get());
 }
 
-std::vector<int> ZSvgFilter::boundBox() const
+std::array<int, 8> ZSvgFilter::boundBox() const
 {
   QRectF bound = m_item->boundingRect();
-  std::vector<int> res(8, 0);
+  std::array<int, 8> res;
+  res.fill(0);
   res[0] = std::floor(bound.left());
   res[1] = std::ceil(bound.right());
   res[2] = std::floor(bound.top());

@@ -23,7 +23,6 @@ ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
   : QWidget(parent, f)
   , m_doc(doc)
   , m_doNotReceiveSliceSignal(false)
-  , m_boundBox(8)
   , m_numObjsBefore(m_doc.numObjs())
 {
   m_imgSlice = new ZIntParameter("slice", 0, 0, 0, this);
@@ -167,11 +166,11 @@ QWidget* ZView::captureWidget()
 void ZView::updateBoundBox()
 {
   m_doNotReceiveSliceSignal = true;
-  std::vector<int> oldBound = m_boundBox;
+  std::array<int, 8> oldBound = m_boundBox;
   m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = m_boundBox[6] = std::numeric_limits<int>::max();
   m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = m_boundBox[7] = std::numeric_limits<int>::min();
   for (const auto& view : m_objViews) {
-    const std::vector<int>& boundBox = view->boundBox();
+    const std::array<int, 8>& boundBox = view->boundBox();
     m_boundBox[0] = std::min(boundBox[0], m_boundBox[0]);
     m_boundBox[1] = std::max(boundBox[1], m_boundBox[1]);
     m_boundBox[2] = std::min(boundBox[2], m_boundBox[2]);

@@ -336,7 +336,7 @@ void Z3DPunctaFilter::prepareData()
   m_dataIsInvalid = false;
 }
 
-void Z3DPunctaFilter::punctumBound(const ZPunctum& p, std::vector<double>& result) const
+void Z3DPunctaFilter::punctumBound(const ZPunctum& p, std::array<double, 6>& result) const
 {
   double radius = p.radius() * m_rendererBase.sizeScale();
   if (m_useSameSizeForAllPuncta.get())
@@ -371,7 +371,7 @@ void Z3DPunctaFilter::updateData()
   updateBoundBox();
 }
 
-void Z3DPunctaFilter::notTransformedPunctumBound(const ZPunctum& p, std::vector<double>& result) const
+void Z3DPunctaFilter::notTransformedPunctumBound(const ZPunctum& p, std::array<double, 6>& result) const
 {
   double radius = p.radius() * m_rendererBase.sizeScale();
   if (m_useSameSizeForAllPuncta.get())
@@ -404,7 +404,7 @@ void Z3DPunctaFilter::updateNotTransformedBoundBoxImpl()
 {
   m_notTransformedBoundBox[0] = m_notTransformedBoundBox[2] = m_notTransformedBoundBox[4] = std::numeric_limits<double>::max();
   m_notTransformedBoundBox[1] = m_notTransformedBoundBox[3] = m_notTransformedBoundBox[5] = std::numeric_limits<double>::lowest();
-  std::vector<double> boundBox(6);
+  std::array<double, 6> boundBox;
   for (const auto& p : *m_origPuncta) {
     notTransformedPunctumBound(p, boundBox);
     m_notTransformedBoundBox[0] = std::min(boundBox[0], m_notTransformedBoundBox[0]);
@@ -418,7 +418,7 @@ void Z3DPunctaFilter::updateNotTransformedBoundBoxImpl()
 
 void Z3DPunctaFilter::addSelectionLines()
 {
-  std::vector<double> boundBox(6);
+  std::array<double, 6> boundBox;
   for (const auto& p : *m_origPuncta) {
     punctumBound(p, boundBox);
     appendBoundboxLines(boundBox, m_selectionLines);

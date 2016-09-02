@@ -65,7 +65,7 @@ public:
     }
   }
 
-  const std::vector<int>& boundBox() const
+  const std::array<int, 8>& boundBox() const
   { return m_boundBox; }
 
   // QGraphicsItem interface
@@ -76,7 +76,7 @@ public:
 
 protected:
   ZSwc& m_swc;
-  std::vector<int> m_boundBox;
+  std::array<int, 8> m_boundBox;
   bool m_showSkeleton;
   QColor m_outlineColor;
   double m_opacity;
@@ -106,7 +106,7 @@ public:
 
   void setMaxZProjView(int t) override;
 
-  std::vector<int> boundBox() const;
+  std::array<int, 8> boundBox() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 

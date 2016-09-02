@@ -3,6 +3,7 @@
 #include "zviewsettinginterface.h"
 #include <QWidget>
 #include <QAction>
+#include <array>
 
 class QVBoxLayout;
 
@@ -214,7 +215,7 @@ private:
   QAction* m_roiLineAction;
 
   bool m_doNotReceiveSliceSignal;
-  std::vector<int> m_boundBox;
+  std::array<int, 8> m_boundBox;
 
   std::vector<std::unique_ptr<ZObjView>> m_objViews;
 

@@ -19,12 +19,11 @@ std::shared_ptr<ZWidgetsGroup> Z3DObjView::viewSettingWidgetsGroupOf(size_t id)
 
 void Z3DObjView::resetBoundBox()
 {
-  m_boundBox.resize(6);
   m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = std::numeric_limits<double>::max();
   m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = std::numeric_limits<double>::lowest();
 }
 
-void Z3DObjView::expandBoundBox(const std::vector<double>& boundBox)
+void Z3DObjView::expandBoundBox(const std::array<double, 6>& boundBox)
 {
   m_boundBox[0] = std::min(boundBox[0], m_boundBox[0]);
   m_boundBox[1] = std::max(boundBox[1], m_boundBox[1]);

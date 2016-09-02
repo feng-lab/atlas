@@ -173,9 +173,9 @@ void ZImgFilter::setViewport(const QRectF& rect, double scale)
   }
 }
 
-std::vector<int> ZImgFilter::boundBox() const
+std::array<int, 8> ZImgFilter::boundBox() const
 {
-  std::vector<int> res(8);
+  std::array<int, 8> res;
   res[0] = 0;
   res[1] = int(m_imgPack->imgInfo().width) - 1;
   res[2] = 0;

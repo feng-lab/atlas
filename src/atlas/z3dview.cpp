@@ -84,7 +84,6 @@ Z3DView::Z3DView(ZDoc* doc, bool stereo, Z3DMainWindow* parent)
   , m_doc(doc)
   , m_isStereoView(stereo)
   , m_mainWin(parent)
-  , m_boundBox(6)
   , m_numObjsBefore(m_doc->numObjs())
   , m_lock(false)
 {
@@ -155,7 +154,7 @@ void Z3DView::updateBoundBox()
   m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = std::numeric_limits<double>::max();
   m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = std::numeric_limits<double>::lowest();
   for (int i = 0; i < m_3dObjViews.size(); ++i) {
-    std::vector<double> boundBox = m_3dObjViews[i]->boundBox();
+    const std::array<double, 6>& boundBox = m_3dObjViews[i]->boundBox();
     m_boundBox[0] = std::min(boundBox[0], m_boundBox[0]);
     m_boundBox[1] = std::max(boundBox[1], m_boundBox[1]);
     m_boundBox[2] = std::min(boundBox[2], m_boundBox[2]);

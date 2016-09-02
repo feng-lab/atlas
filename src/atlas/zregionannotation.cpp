@@ -98,8 +98,7 @@ void ZRegionAnnotation::clear()
   m_voxelSizeX = 1;
   m_voxelSizeX = 1;
   m_ontology.clear();
-  m_boundBox.clear();
-  m_boundBox.resize(8);
+  m_boundBox.fill(0);
   updateBoundBox();
 }
 

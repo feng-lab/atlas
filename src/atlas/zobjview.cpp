@@ -27,12 +27,11 @@ std::shared_ptr<ZWidgetsGroup> ZObjView::viewSettingWidgetsGroupOf(size_t id)
 
 void ZObjView::resetBoundBox()
 {
-  m_boundBox.resize(8);
   m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = m_boundBox[6] = std::numeric_limits<int>::max();
   m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = m_boundBox[7] = std::numeric_limits<int>::min();
 }
 
-void ZObjView::expandBoundBox(const std::vector<int>& boundBox)
+void ZObjView::expandBoundBox(const std::array<int, 8>& boundBox)
 {
   m_boundBox[0] = std::min(boundBox[0], m_boundBox[0]);
   m_boundBox[1] = std::max(boundBox[1], m_boundBox[1]);

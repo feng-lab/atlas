@@ -112,7 +112,7 @@ public:
   void setRegionColor(glm::vec3 col)
   { m_regionColor.set(col); }
 
-  std::vector<int> boundBox() const;
+  std::array<int, 8> boundBox() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 

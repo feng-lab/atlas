@@ -108,12 +108,12 @@ protected:
   void prepareData();
 
   //get bounding box of swc tree in world coordinate :[xmin xmax ymin ymax zmin zmax]
-  void treeBound(ZSwc* tree, std::vector<double>& result) const;
+  void treeBound(ZSwc* tree, std::array<double, 6>& result) const;
 
   //get bounding box of swc tree node in world coordinate :[xmin xmax ymin ymax zmin zmax]
-  void treeNodeBound(const SwcTreeNode& tn, std::vector<double>& result) const;
+  void treeNodeBound(const SwcTreeNode& tn, std::array<double, 6>& result) const;
 
-  void notTransformedTreeBound(ZSwc* tree, std::vector<double>& result) const;
+  void notTransformedTreeBound(ZSwc* tree, std::array<double, 6>& result) const;
 
   //virtual void updateAxisAlignedBoundBoxImpl() override;
   virtual void updateNotTransformedBoundBoxImpl() override;

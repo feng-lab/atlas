@@ -17,7 +17,7 @@ Q_OBJECT
 public:
   explicit Z3DObjView(Z3DView& view);
 
-  std::vector<double> boundBox() const
+  const std::array<double, 6>& boundBox() const
   { return m_boundBox; }
 
   virtual const ZObjDoc& doc() const = 0;
@@ -72,11 +72,11 @@ protected:
 
   void resetBoundBox();
 
-  void expandBoundBox(const std::vector<double>& boundBox);
+  void expandBoundBox(const std::array<double, 6>& boundBox);
 
 protected:
   Z3DView& m_view;
-  std::vector<double> m_boundBox;
+  std::array<double, 6> m_boundBox;
 };
 
 } // namespace nim

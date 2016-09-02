@@ -144,7 +144,7 @@ public:
 
   ZImg toMaskImg(int outWidth = 0, int outHeight = 0, int outDepth = -1, bool doInterpolation = true) const;
 
-  const std::vector<int>& boundBox() const
+  const std::array<int, 8>& boundBox() const
   { return m_boundBox; }
 
   QUndoStack* undoStack()
@@ -311,7 +311,7 @@ protected:
   friend class ZROICommand;
 
   std::map<int, ZSliceROI> m_sliceROIs;
-  std::vector<int> m_boundBox;
+  std::array<int, 8> m_boundBox;
 
   QUndoStack* m_undoStack;
   ZROISliceMoveSelectedControlPointsCommand* m_moveSelectedControlPointsCommand;

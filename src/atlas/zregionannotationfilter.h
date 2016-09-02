@@ -26,7 +26,7 @@ public:
 
   void setMaxZProjView(int t) override;
 
-  const std::vector<int>& boundBox() const;
+  const std::array<int, 8>& boundBox() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 

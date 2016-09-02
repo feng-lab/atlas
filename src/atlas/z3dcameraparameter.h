@@ -77,7 +77,7 @@ public:
 
   void flipViewDirection();
 
-  inline void resetCamera(const std::vector<double>& bound,
+  inline void resetCamera(const std::array<double, 6>& bound,
                           Z3DCamera::ResetOption options = Z3DCamera::ResetOption::ResetAll)
   {
     m_value.resetCamera(bound, options);
@@ -91,7 +91,7 @@ public:
     updatePara();
   }
 
-  inline void resetCameraNearFarPlane(const std::vector<double>& bound)
+  inline void resetCameraNearFarPlane(const std::array<double, 6>& bound)
   {
     m_value.resetCameraNearFarPlane(bound);
     updatePara();

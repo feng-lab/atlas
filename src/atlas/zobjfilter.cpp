@@ -43,7 +43,7 @@ void ZObjFilter::removeParameter(ZParameter* para)
   m_parameters.removeAll(para);
 }
 
-void ZObjFilter::updateBoundBoxWithOffsetPara(std::vector<int>& boundBox) const
+void ZObjFilter::updateBoundBoxWithOffsetPara(std::array<int, 8>& boundBox) const
 {
   boundBox[0] += m_offsetPara.get().x;
   boundBox[1] += m_offsetPara.get().x;
