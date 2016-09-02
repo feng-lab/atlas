@@ -169,11 +169,11 @@ std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeZSliceVolume(size_t z)
   return res;
 }
 
-std::vector<double> Z3DImg::physicalBoundBox() const
+std::array<double, 6> Z3DImg::physicalBoundBox() const
 {
   glm::vec3 luf = physicalLUF();
   glm::vec3 rdb = physicalRDB();
-  std::vector<double> res(6);
+  std::array<double, 6> res;
   res[0] = luf.x;
   res[1] = rdb.x;
   res[2] = luf.y;

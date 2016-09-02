@@ -120,7 +120,7 @@ protected:
 
   virtual void addSelectionLines() override;
 
-  void notTransformedTreeNodeBound(const SwcTreeNode& tn, std::vector<double>& result) const;
+  void notTransformedTreeNodeBound(const SwcTreeNode& tn, std::array<double, 6>& result) const;
 
 private:
   void initTopologyColor();

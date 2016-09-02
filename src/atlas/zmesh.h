@@ -77,9 +77,9 @@ public:
 
   void save(H5::Group& allGrp) const;
 
-  std::vector<double> boundBox() const;
+  std::array<double, 6> boundBox() const;
 
-  std::vector<double> boundBox(const glm::mat4& transform) const;
+  std::array<double, 6> boundBox(const glm::mat4& transform) const;
 
   GLenum type() const
   { return m_type; }

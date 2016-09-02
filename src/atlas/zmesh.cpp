@@ -282,9 +282,9 @@ void ZMesh::save(H5::Group& allGrp) const
   }
 }
 
-std::vector<double> ZMesh::boundBox() const
+std::array<double, 6> ZMesh::boundBox() const
 {
-  std::vector<double> result(6);
+  std::array<double, 6> result;
   result[0] = result[2] = result[4] = std::numeric_limits<double>::max();
   result[1] = result[3] = result[5] = std::numeric_limits<double>::lowest();
   for (size_t i = 0; i < m_vertices.size(); ++i) {
@@ -298,9 +298,9 @@ std::vector<double> ZMesh::boundBox() const
   return result;
 }
 
-std::vector<double> ZMesh::boundBox(const glm::mat4& transform) const
+std::array<double, 6> ZMesh::boundBox(const glm::mat4& transform) const
 {
-  std::vector<double> result(6);
+  std::array<double, 6> result;
   result[0] = result[2] = result[4] = std::numeric_limits<double>::max();
   result[1] = result[3] = result[5] = std::numeric_limits<double>::lowest();
   for (size_t i = 0; i < m_vertices.size(); ++i) {

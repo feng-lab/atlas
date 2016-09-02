@@ -87,7 +87,7 @@ public:
   std::vector<std::unique_ptr<Z3DVolume>> makeZSliceVolume(size_t z);
 
   // xmin, xmax, ymin, ymax, zmin, zmax
-  std::vector<double> physicalBoundBox() const;
+  std::array<double, 6> physicalBoundBox() const;
 
   void setScale(const glm::vec3& scale);
 

@@ -384,22 +384,6 @@ void Z3DPunctaFilter::notTransformedPunctumBound(const ZPunctum& p, std::array<d
   result[5] = p.z() + radius;
 }
 
-//void Z3DPunctaFilter::updateAxisAlignedBoundBoxImpl()
-//{
-//  m_axisAlignedBoundBox[0] = m_axisAlignedBoundBox[2] = m_axisAlignedBoundBox[4] = std::numeric_limits<double>::max();
-//  m_axisAlignedBoundBox[1] = m_axisAlignedBoundBox[3] = m_axisAlignedBoundBox[5] = std::numeric_limits<double>::lowest();
-//  std::vector<double> boundBox(6);
-//  for (size_t i=0; i<m_origPunctaList.size(); ++i) {
-//    getPunctumBound(m_origPunctaList[i], boundBox);
-//    m_axisAlignedBoundBox[0] = std::min(boundBox[0], m_axisAlignedBoundBox[0]);
-//    m_axisAlignedBoundBox[1] = std::max(boundBox[1], m_axisAlignedBoundBox[1]);
-//    m_axisAlignedBoundBox[2] = std::min(boundBox[2], m_axisAlignedBoundBox[2]);
-//    m_axisAlignedBoundBox[3] = std::max(boundBox[3], m_axisAlignedBoundBox[3]);
-//    m_axisAlignedBoundBox[4] = std::min(boundBox[4], m_axisAlignedBoundBox[4]);
-//    m_axisAlignedBoundBox[5] = std::max(boundBox[5], m_axisAlignedBoundBox[5]);
-//  }
-//}
-
 void Z3DPunctaFilter::updateNotTransformedBoundBoxImpl()
 {
   m_notTransformedBoundBox[0] = m_notTransformedBoundBox[2] = m_notTransformedBoundBox[4] = std::numeric_limits<double>::max();

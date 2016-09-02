@@ -148,11 +148,11 @@ Z3DTexture* Z3DVolume::texture()
   return m_texture.get();
 }
 
-std::vector<double> Z3DVolume::physicalBoundBox() const
+std::array<double, 6> Z3DVolume::physicalBoundBox() const
 {
   glm::vec3 luf = physicalLUF();
   glm::vec3 rdb = physicalRDB();
-  std::vector<double> res(6);
+  std::array<double, 6> res;
   res[0] = luf.x;
   res[1] = rdb.x;
   res[2] = luf.y;
@@ -162,10 +162,10 @@ std::vector<double> Z3DVolume::physicalBoundBox() const
   return res;
 }
 
-std::vector<double> Z3DVolume::worldBoundBox() const
+std::array<double, 6> Z3DVolume::worldBoundBox() const
 {
   if (m_hasTransformMatrix) {
-    std::vector<double> res(6);
+    std::array<double, 6> res;
     glm::vec3 minCoord = glm::min(worldLUF(), worldRDB());
     glm::vec3 maxCoord = glm::max(worldLUF(), worldRDB());
 

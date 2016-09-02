@@ -170,7 +170,7 @@ public:
   { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalRDB().z); }
 
   // xmin, xmax, ymin, ymax, zmin, zmax
-  std::vector<double> physicalBoundBox() const;
+  std::array<double, 6> physicalBoundBox() const;
 
   // bound voxels in world coordinate
   glm::vec3 worldLUF() const
@@ -198,7 +198,7 @@ public:
   { return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalRUB()) : physicalRUB(); }
 
   // xmin, xmax, ymin, ymax, zmin, zmax
-  std::vector<double> worldBoundBox() const;
+  std::array<double, 6> worldBoundBox() const;
 
   // corners of parent volume
   glm::vec3 parentVolPhysicalLUF() const

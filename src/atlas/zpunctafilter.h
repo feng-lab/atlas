@@ -122,7 +122,7 @@ private:
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
 
-  std::vector<int> m_boundBox;
+  std::array<int, 8> m_boundBox;
 };
 
 } // namespace nim
