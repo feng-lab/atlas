@@ -16,18 +16,17 @@
 
 namespace nim {
 
-// T must be integer type and Float must be float type
 template<typename T, typename Float>
 inline T roundTo(Float x)
 {
+  static_assert(std::is_integral<T>::value &&  std::is_floating_point<Float>::value,
+                "T must be integer type and Float must be float type");
   if (std::isnan(x))
     return 0;
-  if (x <= std::numeric_limits<T>::min())
-    return std::numeric_limits<T>::min();
-  else if (x >= std::numeric_limits<T>::max())
-    return std::numeric_limits<T>::max();
-  else
-    return static_cast<T>(std::round(x));
+
+  return x <= std::numeric_limits<T>::lowest() ? std::numeric_limits<T>::lowest()
+                                            : x >= std::numeric_limits<T>::max() ? std::numeric_limits<T>::max()
+                                                                                 : static_cast<T>(std::round(x));
 }
 
 /////////////// saturate_cast (modified from opencv, add (u)int32_t and (u)int64_t suppport) ///////////////////
@@ -119,34 +118,28 @@ template<> inline uint64_t saturate_cast<uint64_t>(long double v) { return round
 template<>
 inline float saturate_cast<float>(double v)
 {
-  if (v >= std::numeric_limits<float>::max())
-    return std::numeric_limits<float>::max();
-  else if (v <= std::numeric_limits<float>::lowest())
-    return std::numeric_limits<float>::lowest();
-  else
-    return v;
+  return v >= std::numeric_limits<float>::max() ? std::numeric_limits<float>::max()
+                                                : v <= std::numeric_limits<float>::lowest()
+                                                  ? std::numeric_limits<float>::lowest()
+                                                  : static_cast<float>(v);
 }
 
 template<>
 inline float saturate_cast<float>(long double v)
 {
-  if (v >= std::numeric_limits<float>::max())
-    return std::numeric_limits<float>::max();
-  else if (v <= std::numeric_limits<float>::lowest())
-    return std::numeric_limits<float>::lowest();
-  else
-    return v;
+  return v >= std::numeric_limits<float>::max() ? std::numeric_limits<float>::max()
+                                                : v <= std::numeric_limits<float>::lowest()
+                                                  ? std::numeric_limits<float>::lowest()
+                                                  : static_cast<float>(v);
 }
 
 template<>
 inline double saturate_cast<double>(long double v)
 {
-  if (v >= std::numeric_limits<double>::max())
-    return std::numeric_limits<double>::max();
-  else if (v <= std::numeric_limits<double>::lowest())
-    return std::numeric_limits<double>::lowest();
-  else
-    return v;
+  return v >= std::numeric_limits<double>::max() ? std::numeric_limits<double>::max()
+                                                 : v <= std::numeric_limits<double>::lowest()
+                                                   ? std::numeric_limits<double>::lowest()
+                                                   : static_cast<double>(v);
 }
 
 // saturate arithmetics
@@ -214,7 +207,7 @@ inline int64_t saturate_add(int64_t x, int64_t y)
 inline uint64_t saturate_add(uint64_t x, int64_t y)
 {
   if (y <= 0) {
-    return x > static_cast<uint64_t>(-y) ? x - static_cast<uint64_t>(-y) : 0;
+    return x > static_cast<uint64_t>(-y) ? (x - static_cast<uint64_t>(-y)) : 0;
   }
   return saturate_add(x, static_cast<uint64_t>(y));
 }
@@ -224,7 +217,7 @@ inline int64_t saturate_add(int64_t x, uint64_t y)
   if (static_cast<uint64_t>(INT64_MAX - x) <= y) {
     return INT64_MAX;
   }
-  if (y > INT64_MAX) { // x must less than zero
+  if (y > INT64_MAX) { // x less than zero
     return y - static_cast<uint64_t>(-x);
   }
   return x + static_cast<int64_t>(y);
@@ -304,7 +297,7 @@ inline int64_t saturate_sub(int64_t x, uint64_t y)
   if (static_cast<uint64_t>(x - INT64_MIN) <= y) {
     return INT64_MIN;
   }
-  if (y > INT64_MAX) { // x must large than zero
+  if (y > INT64_MAX) { // x large than zero
     return static_cast<uint64_t>(x) - y;
   }
   return x - static_cast<int64_t>(y);
