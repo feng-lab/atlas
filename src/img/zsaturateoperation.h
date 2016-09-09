@@ -5,7 +5,7 @@
 // if it happens you have to convert the ambiguous type (e.g. size_t can be long or long long) into one of
 // the sized type to make the overload work
 
-#if 0
+#ifndef __GNUG__ // not clang or gcc
 #include <boost/multiprecision/cpp_int.hpp>
 #endif
 #include <cmath>
@@ -338,6 +338,11 @@ inline uint64_t saturate_mul(uint64_t x, uint64_t y)
 #else
 inline uint64_t saturate_mul(uint64_t x, uint64_t y)
 {
+#if 1
+  boost::multiprecision::uint128_t res =
+    static_cast<boost::multiprecision::uint128_t>(x) * static_cast<boost::multiprecision::uint128_t>(y);
+  return (-((res >> 64) != 0)) | static_cast<uint64_t>(res);
+#else
   if (x == 0 || y == 0) {
     return 0;
   }
@@ -345,6 +350,7 @@ inline uint64_t saturate_mul(uint64_t x, uint64_t y)
     return UINT64_MAX;
   }
   return x * y;
+#endif
 }
 #endif // __GNUG__
 
@@ -396,13 +402,12 @@ inline int64_t saturate_mul(int64_t x, int64_t y)
 #else
 inline int64_t saturate_mul(int64_t x, int64_t y)
 {
-#if 0
-  using namespace boost::multiprecision;
-
-  int128_t res = static_cast<int128_t>(x) * static_cast<int128_t>(y);
-  return res < static_cast<int128_t>(INT64_MIN) ? INT64_MIN :
-                                                  res > static_cast<int128_t>(INT64_MAX) ? INT64_MAX :
-                                                                                           static_cast<int64_t>(res);
+#if 1
+  boost::multiprecision::int128_t res =
+    static_cast<boost::multiprecision::int128_t>(x) * static_cast<boost::multiprecision::int128_t>(y);
+  return res <= static_cast<boost::multiprecision::int128_t>(INT64_MIN) ?
+         INT64_MIN : res >= static_cast<boost::multiprecision::int128_t>(INT64_MAX) ?
+                     INT64_MAX : static_cast<int64_t>(res);
 #else
   static_assert(-std::numeric_limits<int64_t>::max() > std::numeric_limits<int64_t>::min(),
                 "integer representation is not two's complement");
