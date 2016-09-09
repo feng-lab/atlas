@@ -329,6 +329,13 @@ inline uint32_t saturate_mul(uint32_t x, uint32_t y)
   return (-(res >> 32 != 0)) | static_cast<uint32_t>(res);
 }
 
+#ifdef __GNUG__ // clang or gcc
+inline uint64_t saturate_mul(uint64_t x, uint64_t y)
+{
+  __uint128_t res = static_cast<__uint128_t>(x) * static_cast<__uint128_t>(y);
+  return (-(res >> 64 != 0)) | static_cast<uint64_t>(res);
+}
+#else
 inline uint64_t saturate_mul(uint64_t x, uint64_t y)
 {
   if (x == 0 || y == 0) {
@@ -339,6 +346,7 @@ inline uint64_t saturate_mul(uint64_t x, uint64_t y)
   }
   return x * y;
 }
+#endif // __GNUG__
 
 inline int8_t saturate_mul(int8_t x, int8_t y)
 {
@@ -374,6 +382,18 @@ inline int32_t saturate_mul(int32_t x, int32_t y)
   return res;
 }
 
+#ifdef __GNUG__ // clang or gcc
+inline int64_t saturate_mul(int64_t x, int64_t y)
+{
+  static_assert((static_cast<__int128_t>(-1) >> 1) == static_cast<__int128_t>(-1), "need arithmetic right shift.");
+  static_assert((static_cast<int64_t>(-1) >> 1) == static_cast<int64_t>(-1), "need arithmetic right shift.");
+
+  __int128_t res = static_cast<__int128_t>(x) * static_cast<__int128_t>(y);
+  if (static_cast<int64_t>(res >> 64) != (static_cast<int64_t>(res) >> 63))
+    res = (static_cast<uint64_t>(x ^ y) >> 63) + INT64_MAX;
+  return res;
+}
+#else
 inline int64_t saturate_mul(int64_t x, int64_t y)
 {
 #if 0
@@ -402,6 +422,7 @@ inline int64_t saturate_mul(int64_t x, int64_t y)
   }
 #endif
 }
+#endif // __GNUG__
 
 inline uint64_t saturate_mul(uint64_t x, int64_t y)
 {
