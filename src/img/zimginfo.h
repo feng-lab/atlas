@@ -9,7 +9,8 @@ namespace nim {
 
 struct ZImgInfo
 {
-  ZImgInfo();
+  ZImgInfo()
+  { clear(); }
 
   ZImgInfo(size_t w, size_t h, size_t d = 1,
            size_t c = 1, size_t t = 1,

@@ -9,6 +9,14 @@ class ZImageInterpolation
 public:
   explicit ZImageInterpolation(Interpolant interp, PadOption padOption = PadOption::Constant, double fillValue = 0.0);
 
+  ZImageInterpolation(ZImageInterpolation&&) = default;
+
+  ZImageInterpolation& operator=(ZImageInterpolation&&) = default;
+
+  ZImageInterpolation(const ZImageInterpolation&) = default;
+
+  ZImageInterpolation& operator=(const ZImageInterpolation&) = default;
+
 #if 0
   //  'bound'
   //  Assigns values from the fill value array to points that map outside the array and repeats border

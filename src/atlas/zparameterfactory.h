@@ -10,8 +10,6 @@ namespace nim {
 class ZParameterMakerInterface
 {
 public:
-  ZParameterMakerInterface() = default;
-
   virtual ~ZParameterMakerInterface() = default;
 
   virtual ZParameter* create(const QString& name, QObject* parent = nullptr) const = 0;

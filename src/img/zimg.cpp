@@ -34,10 +34,6 @@ struct MaxOp
 
 namespace nim {
 
-ZImgMetadata::ZImgMetadata()
-  : ZImgMetadataBase<ZImgMetatag>()
-{}
-
 QString ZImgMetadata::toQString() const
 {
   QString res;
@@ -55,10 +51,6 @@ QString ZImgMetadata::toQString() const
   return res;
 }
 
-ZImgThumbernail::ZImgThumbernail()
-  : ZImgMetadataBase<ZImg>()
-{};
-
 QString ZImgThumbernail::toQString() const
 {
   QString res;
@@ -74,10 +66,6 @@ QString ZImgThumbernail::toQString() const
   }
 
   return res;
-}
-
-ZImgSource::ZImgSource()
-{
 }
 
 ZImgSource::ZImgSource(const QString& fn, const ZImgRegion& rgn, size_t scene_, FileFormat format_)

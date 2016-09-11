@@ -104,7 +104,6 @@ protected:
 class ZImgAlgorithmBase
 {
 public:
-  ZImgAlgorithmBase() = default;
 
 protected:
   virtual ~ZImgAlgorithmBase() = default;
@@ -135,15 +134,11 @@ protected:
 template<bool ReportProgress = false>
 class ZImgAlgorithm : public ZImgAlgorithmBase
 {
-public:
-  ZImgAlgorithm() = default;
 };
 
 template<>
 class ZImgAlgorithm<true> : public ZImgAlgorithmBaseWithProgressReporter
 {
-public:
-  ZImgAlgorithm() = default;
 };
 
 } // namespace nim

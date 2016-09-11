@@ -6,11 +6,6 @@
 
 namespace nim {
 
-ZImgInfo::ZImgInfo()
-{
-  clear();
-}
-
 ZImgInfo::ZImgInfo(size_t w, size_t h, size_t d,
                    size_t c, size_t t,
                    size_t bytePerVox, VoxelFormat vf)

@@ -21,8 +21,6 @@ class Z3DInputPortBase;
 class Z3DFilterWrapper
 {
 public:
-  Z3DFilterWrapper() = default;
-
   virtual ~Z3DFilterWrapper() = default;
 
   virtual void beforeFilterProcess(const Z3DFilter* /*unused*/)

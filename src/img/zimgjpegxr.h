@@ -9,8 +9,6 @@ class ZImgJpegXR : public ZImgFormat
 public:
   static ZImgJpegXR& instance();
 
-  ZImgJpegXR() = default;
-
   // ZImgFormat interface
 public:
   virtual bool supportRead() const override;

@@ -17,7 +17,7 @@ public:
   using reverse_iterator = container_type::reverse_iterator;
   using const_reverse_iterator = container_type::const_reverse_iterator;
 
-  inline ZPuncta() = default;
+  ZPuncta() = default;
 
   // might throw ZIOException
   explicit ZPuncta(const QString& filename);

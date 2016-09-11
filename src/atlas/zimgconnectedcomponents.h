@@ -42,8 +42,6 @@ template<bool ReportProgress = false>
 class ZImgConnectedComponents : public ZImgAlgorithm<ReportProgress>
 {
 public:
-  ZImgConnectedComponents() = default;
-
   // input can be any type of img, all > 0 voxel are foreground
   // conn can be 4, 8 (2D) or 6, 18, 26 (3D)
   // if conn == 0, uses a default connectivity of 8 for two dimensions, 26 for three dimensions

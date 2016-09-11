@@ -7,7 +7,6 @@ namespace nim {
 class ZImgV3DRaw : public ZImgFormat
 {
 public:
-  ZImgV3DRaw() = default;
 
   // ZImgFormat interface
 public:

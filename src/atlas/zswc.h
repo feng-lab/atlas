@@ -53,9 +53,7 @@ public:
   static constexpr int ApicalObliqueTerminalType = 9;
   static constexpr int ApicalTuftType = 10;
 
-  ZSwc()
-    : ZTree<SwcNode>()
-  {}
+  ZSwc() = default;
 
   // might throw ZIOException
   explicit ZSwc(const QString& filename)

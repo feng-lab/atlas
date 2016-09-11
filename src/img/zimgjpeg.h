@@ -9,8 +9,6 @@ class ZImgJpeg : public ZImgFormat
 public:
   static ZImgJpeg& instance();
 
-  ZImgJpeg() = default;
-
   // ZImgFormat interface
 public:
   virtual QString shortName() const override;

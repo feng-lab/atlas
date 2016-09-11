@@ -18,7 +18,6 @@ public:
 
   ~ZComplexImg();
 
-
   ZComplexImg(ZComplexImg&&) = default;
 
   ZComplexImg& operator=(ZComplexImg&&) = default;

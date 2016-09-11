@@ -9,7 +9,6 @@ namespace nim {
 class ZImgMetaImage : public ZImgFormat
 {
 public:
-  ZImgMetaImage() = default;
 
   // ZImgFormat interface
 public:

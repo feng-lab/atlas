@@ -33,8 +33,6 @@ class ZImgSliceProvider;
 class ZImgFormat
 {
 public:
-  ZImgFormat();
-
   virtual ~ZImgFormat();
 
   // whether read or write is supported

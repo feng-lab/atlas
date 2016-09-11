@@ -10,7 +10,7 @@ class ZBBox
 {
 public:
   // inverse box
-  inline ZBBox()
+  ZBBox()
   {
     for (size_t i = 0; i < m_minCorner.length(); ++i) {
       m_minCorner[i] = std::numeric_limits<typename Point::value_type>::max();
@@ -18,11 +18,11 @@ public:
     }
   }
 
-  inline explicit ZBBox(const Point& minmaxCorner)
+  explicit ZBBox(const Point& minmaxCorner)
     : m_minCorner(minmaxCorner), m_maxCorner(minmaxCorner)
   {}
 
-  inline ZBBox(const Point& minCorner, const Point& maxCorner)
+  ZBBox(const Point& minCorner, const Point& maxCorner)
     : m_minCorner(minCorner), m_maxCorner(maxCorner)
   {}
 

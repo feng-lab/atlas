@@ -7,8 +7,6 @@ namespace nim {
 class ZFileUtils
 {
 public:
-  ZFileUtils() = default;
-
   static void showInGraphicalShell(const QString& filePath);
 };
 

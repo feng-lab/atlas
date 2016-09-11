@@ -219,8 +219,6 @@ class ZImgZeissCZI : public ZImgFormat
 public:
   static ZImgZeissCZI& instance();
 
-  ZImgZeissCZI() = default;
-
   enum class CorrectionMode
   {
     ZeroLightPreserved, IntensityRangeCorrected, Direct

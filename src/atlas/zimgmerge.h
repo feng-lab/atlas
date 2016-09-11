@@ -19,8 +19,6 @@ public:
     Max, Min, Mean, Median, First
   };
 
-  ZImgMerge() = default;
-
   // don't add empty img
   // img1 has absolute location, if img already exist, update its location
   void addImg(const ZImg& img, const ZVoxelCoordinate& loc, const QString& imgName = "");

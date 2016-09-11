@@ -9,8 +9,6 @@ template<bool ReportProgress = false>
 class ZImgAutoThreshold : public ZImgAlgorithm<ReportProgress>
 {
 public:
-  ZImgAutoThreshold() = default;
-
   // ting's triangle auto threshold
   // threshold is calculated as img voxel type and returned as TValue because we don't know img type
   // throw ZImgException for empty img and wrong channel or location

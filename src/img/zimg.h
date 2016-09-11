@@ -11,8 +11,6 @@ namespace nim {
 class ZImgMetadata : public ZImgMetadataBase<ZImgMetatag>
 {
 public:
-  ZImgMetadata();
-
   QString toQString() const;
 };
 
@@ -21,15 +19,13 @@ class ZImg;
 class ZImgThumbernail : public ZImgMetadataBase<ZImg>
 {
 public:
-  ZImgThumbernail();
-
   QString toQString() const;
 };
 
 // throw ZIOException if file does not exist
 struct ZImgSource
 {
-  ZImgSource();
+  ZImgSource() = default;
 
   explicit ZImgSource(const QString& fn, const ZImgRegion& rgn = ZImgRegion(), size_t scene_ = 0,
                       FileFormat format_ = FileFormat::Unknown);
