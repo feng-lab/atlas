@@ -66,8 +66,6 @@ private:
   { // swc and its associated data
     SwcPack(ZSwc& tree, const QString& path_);
 
-    ~SwcPack();
-
     void updateDerivedData();
 
     const QString& info() const;

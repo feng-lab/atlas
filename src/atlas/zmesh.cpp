@@ -112,8 +112,6 @@ ZMesh::ZMesh(const QString& filename)
   load(filename);
 }
 
-ZMesh::~ZMesh() = default;
-
 void ZMesh::swap(ZMesh& rhs) noexcept
 {
   std::swap(m_type, rhs.m_type);
@@ -802,7 +800,8 @@ ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3>& coordLlfs, cons
   return cubes;
 }
 
-ZMesh ZMesh::createCube(glm::vec3 coordLlf, glm::vec3 coordUrb, glm::vec3 texLlf, glm::vec3 texUrb)
+ZMesh ZMesh::createCube(const glm::vec3& coordLlf, const glm::vec3& coordUrb,
+                        const glm::vec3& texLlf, const glm::vec3& texUrb)
 {
   ZMesh cube(GL_TRIANGLE_STRIP);
   std::vector<glm::vec3> vertices;
@@ -834,8 +833,8 @@ ZMesh ZMesh::createCube(glm::vec3 coordLlf, glm::vec3 coordUrb, glm::vec3 texLlf
 }
 
 ZMesh ZMesh::createCubeSlice(float coordIn3rdDim, float texCoordIn3rdDim, int alongDim,
-                             glm::vec2 coordlow, glm::vec2 coordhigh,
-                             glm::vec2 texlow, glm::vec2 texhigh)
+                             const glm::vec2& coordlow, const glm::vec2& coordhigh,
+                             const glm::vec2& texlow, const glm::vec2& texhigh)
 {
   ZMesh quad(GL_TRIANGLE_STRIP);
   std::vector<glm::vec3> vertices;
@@ -875,8 +874,8 @@ ZMesh ZMesh::createCubeSlice(float coordIn3rdDim, float texCoordIn3rdDim, int al
 }
 
 ZMesh ZMesh::createCubeSliceWith2DTexture(float coordIn3rdDim, int alongDim,
-                                          glm::vec2 coordlow, glm::vec2 coordhigh,
-                                          glm::vec2 texlow, glm::vec2 texhigh)
+                                          const glm::vec2& coordlow, const glm::vec2& coordhigh,
+                                          const glm::vec2& texlow, const glm::vec2& texhigh)
 {
   ZMesh quad(GL_TRIANGLE_STRIP);
   std::vector<glm::vec3> vertices;
@@ -907,8 +906,8 @@ ZMesh ZMesh::createCubeSliceWith2DTexture(float coordIn3rdDim, int alongDim,
   return quad;
 }
 
-ZMesh ZMesh::createImageSlice(float coordIn3rdDim, glm::vec2 coordlow,
-                              glm::vec2 coordhigh, glm::vec2 texlow, glm::vec2 texhigh)
+ZMesh ZMesh::createImageSlice(float coordIn3rdDim, const glm::vec2& coordlow,
+                              const glm::vec2& coordhigh, const glm::vec2& texlow, const glm::vec2& texhigh)
 {
   ZMesh quad(GL_TRIANGLE_STRIP);
   std::vector<glm::vec3> vertices;
@@ -928,8 +927,8 @@ ZMesh ZMesh::createImageSlice(float coordIn3rdDim, glm::vec2 coordlow,
   return quad;
 }
 
-ZMesh ZMesh::createCubeSerieSlices(int numSlices, int alongDim, glm::vec3 coordfirst,
-                                   glm::vec3 coordlast, glm::vec3 texfirst, glm::vec3 texlast)
+ZMesh ZMesh::createCubeSerieSlices(int numSlices, int alongDim, const glm::vec3& coordfirst,
+                                   const glm::vec3& coordlast, const glm::vec3& texfirst, const glm::vec3& texlast)
 {
   ZMesh quad(GL_TRIANGLES);
   std::vector<glm::vec3> vertices;
@@ -1307,7 +1306,7 @@ void ZMesh::createSwcMesh(const ZSwc& tree, double zScale, int rootType, ZMesh& 
 //  return res;
 }
 
-void ZMesh::appendTriangle(const ZMesh& mesh, glm::uvec3 triangle)
+void ZMesh::appendTriangle(const ZMesh& mesh, const glm::uvec3& triangle)
 {
   if (!m_indices.empty() || m_type != GL_TRIANGLES)
     return;

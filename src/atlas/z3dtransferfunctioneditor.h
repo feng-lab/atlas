@@ -95,14 +95,14 @@ protected:
   void showNoKeyContextMenu(QMouseEvent* event);
 
   // Relative coordinates to Pixel coordinates
-  glm::dvec2 relativeToPixelCoordinates(glm::dvec2 r);
+  glm::dvec2 relativeToPixelCoordinates(const glm::dvec2& r);
 
   // Pixel coordinates to Relative coordinates
-  glm::dvec2 pixelToRelativeCoordinates(glm::dvec2 p);
+  glm::dvec2 pixelToRelativeCoordinates(const glm::dvec2& p);
 
   void hideKeyInfo();
 
-  void showKeyInfo(QPoint pos, glm::dvec2 values);
+  void showKeyInfo(QPoint pos, const glm::dvec2& values);
 
   // Re-calculated the histogram
   void updateHistogram();
@@ -144,8 +144,6 @@ class Z3DTransferFunctionEditor : public QWidget
 Q_OBJECT
 public:
   explicit Z3DTransferFunctionEditor(Z3DTransferFunctionParameter* para, QWidget* parent = nullptr);
-
-  virtual ~Z3DTransferFunctionEditor();
 
   void createWidgets();
 

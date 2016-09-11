@@ -283,9 +283,6 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   connect(m_rotateZMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateZM);
 }
 
-Z3DCanvas::~Z3DCanvas()
-{}
-
 QSurfaceFormat Z3DCanvas::format() const
 {
   return m_glWidget->format();

@@ -14,7 +14,7 @@ class Z3DShaderManager
 public:
   static Z3DShaderManager& instance();
 
-  Z3DShaderManager();
+  Z3DShaderManager() = default;
 
   // return reference because it is always valid
   Z3DShader& shader(const QString& fn, const QString& header, const Z3DContext& context);

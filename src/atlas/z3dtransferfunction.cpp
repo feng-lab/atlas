@@ -32,10 +32,6 @@ Z3DTransferFunction::Z3DTransferFunction(Z3DTransferFunction&& tf) noexcept
   swap(tf);
 }
 
-Z3DTransferFunction::~Z3DTransferFunction()
-{
-}
-
 void Z3DTransferFunction::swap(Z3DTransferFunction& other) noexcept
 {
   ZColorMap::swap(other);

@@ -220,10 +220,6 @@ ZSwcDoc::SwcPack::SwcPack(ZSwc& tree, const QString& path_)
   updateDerivedData();
 }
 
-ZSwcDoc::SwcPack::~SwcPack()
-{
-}
-
 void ZSwcDoc::SwcPack::updateDerivedData()
 {
   m_info.clear();

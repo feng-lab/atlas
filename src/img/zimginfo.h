@@ -11,8 +11,8 @@ struct ZImgInfo
 {
   ZImgInfo();
 
-  ZImgInfo(size_t width, size_t height, size_t depth = 1,
-           size_t numChannels = 1, size_t numTimes = 1,
+  ZImgInfo(size_t w, size_t h, size_t d = 1,
+           size_t c = 1, size_t t = 1,
            size_t bytePerVox = 1, VoxelFormat vf = VoxelFormat::Unsigned);
 
   void clear();

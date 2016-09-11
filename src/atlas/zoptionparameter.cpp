@@ -57,16 +57,16 @@ void ZOptionParameter<T, T2>::reservedIntSlot1(int index)
 template<class T, class T2>
 QWidget* ZOptionParameter<T, T2>::actualCreateWidget(QWidget* parent)
 {
-  ZComboBox* cb = new ZComboBox(parent);
+  auto cb = new ZComboBox(parent);
 
   for (int i = 0; i < m_options.size(); ++i) {
     cb->addItem(comboBoxItemString(m_options[i]));
   }
   if (!m_options.empty()) {
     int index = m_options.indexOf(this->m_value);
-    if (index != -1)
+    if (index != -1) {
       cb->setCurrentIndex(index);
-    else {
+    } else {
       cb->setCurrentIndex(0);
       this->set(m_options[0]);
     }

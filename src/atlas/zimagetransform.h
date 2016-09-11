@@ -14,7 +14,7 @@ class ZImageTransform
 public:
   ZImageTransform();
 
-  virtual ~ZImageTransform();
+  virtual ~ZImageTransform() = default;
 
   ZImageTransform(ZImageTransform&&) = default;
 

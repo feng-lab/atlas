@@ -37,10 +37,6 @@ ZCameraParameterAnimation::ZCameraParameterAnimation(const QString& name, const 
   connect(this, &ZCameraParameterAnimation::keyChanged, this, &ZCameraParameterAnimation::buildSpline);
 }
 
-ZCameraParameterAnimation::~ZCameraParameterAnimation()
-{
-}
-
 ZParameterKey* ZCameraParameterAnimation::createKey(double secs) const
 {
   CHECK(secs >= 0);

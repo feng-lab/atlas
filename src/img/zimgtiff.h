@@ -11,8 +11,6 @@ class ZImgTiff : public ZImgFormat
 public:
   ZImgTiff();
 
-  virtual ~ZImgTiff();
-
   // ZImgFormat interface
 public:
   virtual QString shortName() const override;

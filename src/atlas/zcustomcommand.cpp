@@ -849,8 +849,6 @@ void tmp()
 
 namespace nim {
 
-ZCustomCommand::ZCustomCommand() = default;
-
 void ZCustomCommand::run()
 {
   moveObjectToCorrectLocation("/Users/feng/Documents/PV/contra.scene",

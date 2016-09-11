@@ -19,8 +19,6 @@ public:
   explicit ZOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
                             const QString& suffix = "");
 
-  virtual ~ZOptionParameter() = default;
-
   inline QString prefix() const
   { return m_prefix; }
 

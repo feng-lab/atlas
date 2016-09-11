@@ -55,7 +55,7 @@ public:
 
   void disconnectAll();
 
-  void setExpectedSize(glm::uvec2 size)
+  void setExpectedSize(const glm::uvec2& size)
   { m_expectedSize = size; }
 
   glm::uvec2 expectedSize() const

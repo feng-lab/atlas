@@ -19,8 +19,6 @@ Q_OBJECT
 public:
   Z3DGlobalParameters();
 
-  ~Z3DGlobalParameters();
-
   const std::vector<ZParameter*>& parameters() const
   { return m_parameters; }
 

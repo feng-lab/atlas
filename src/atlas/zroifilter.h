@@ -106,10 +106,10 @@ public:
 
   void setMaxZProjView(int t) override;
 
-  void setOutlineColor(glm::vec3 col)
+  void setOutlineColor(const glm::vec3& col)
   { m_outlineColor.set(col); }
 
-  void setRegionColor(glm::vec3 col)
+  void setRegionColor(const glm::vec3& col)
   { m_regionColor.set(col); }
 
   std::array<int, 8> boundBox() const;

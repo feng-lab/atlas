@@ -127,9 +127,6 @@ template ZImg ConnComp::createTypedLabelImg<float>() const;
 template ZImg ConnComp::createTypedLabelImg<double>() const;
 
 template<bool ReportProgress>
-ZImgConnectedComponents<ReportProgress>::ZImgConnectedComponents() = default;
-
-template<bool ReportProgress>
 ConnComp ZImgConnectedComponents<ReportProgress>::run(const ZImg& img, size_t conn, size_t c, size_t t)
 {
   ConnComp res = createRes(img, conn, c, t);

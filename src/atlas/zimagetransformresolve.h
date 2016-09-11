@@ -13,7 +13,7 @@ namespace nim {
 class ZImageTransformResolve
 {
 public:
-  ZImageTransformResolve();
+  ZImageTransformResolve() = default;
 
   // idx has absolute transform, if idx already exist, update its location
   void addFixedImage(size_t idx, const ZImageTransform* tfm);

@@ -48,7 +48,7 @@ public:
 
   GpuVendor gpuVendor() const;
 
-  bool isExtensionSupported(QString extension) const;
+  bool isExtensionSupported(const QString& extension) const;
 
   QString glVersionString() const;
 

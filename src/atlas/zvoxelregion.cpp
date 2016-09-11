@@ -2,8 +2,6 @@
 
 namespace nim {
 
-ZVoxelRegion::ZVoxelRegion() = default;
-
 void ZVoxelRegion::getBoundBox(ZVoxelCoordinate& minCoord, ZVoxelCoordinate& maxCoord) const
 {
   BoxType box;

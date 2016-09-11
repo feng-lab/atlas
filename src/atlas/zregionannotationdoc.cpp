@@ -384,8 +384,6 @@ ZRegionAnnotationDoc::RegionAnnotationPack::RegionAnnotationPack(ZRegionAnnotati
   updateDerivedData();
 }
 
-ZRegionAnnotationDoc::RegionAnnotationPack::~RegionAnnotationPack() = default;
-
 void ZRegionAnnotationDoc::RegionAnnotationPack::updateDerivedData()
 {
   m_info.clear();

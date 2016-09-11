@@ -97,7 +97,7 @@ void ZRegionAnnotationTreeView::adaptColumns()
   resizeColumnToContents(ZRegionAnnotationTreeModel::ExportMeshColumn);
 }
 
-void ZRegionAnnotationTreeView::buttonClickedForUserData(QVariant ud)
+void ZRegionAnnotationTreeView::buttonClickedForUserData(const QVariant& ud)
 {
   bool ok;
   int64_t regionID = ud.toLongLong(&ok);

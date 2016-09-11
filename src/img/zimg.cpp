@@ -1829,7 +1829,9 @@ ZImg ZImg::combine_Impl(const std::vector<const ZImg*>& imgs, CombineMode mode)
       }
     }
     return res;
-  } else if (mode == CombineMode::Max) {
+  }
+
+  if (mode == CombineMode::Max) {
     ZImg res(*imgs[0]);
     for (size_t i = 1; i < imgs.size(); ++i) {
       const ZImg* img = imgs[i];
@@ -1842,7 +1844,9 @@ ZImg ZImg::combine_Impl(const std::vector<const ZImg*>& imgs, CombineMode mode)
       }
     }
     return res;
-  } else if (mode == CombineMode::Mean) {
+  }
+
+  if (mode == CombineMode::Mean) {
     ZImg res(imgs[0]->info());
     std::vector<TVoxel> buf(imgs.size());
 
@@ -1857,7 +1861,9 @@ ZImg ZImg::combine_Impl(const std::vector<const ZImg*>& imgs, CombineMode mode)
       }
     }
     return res;
-  } else if (mode == CombineMode::Median) {
+  }
+
+  if (mode == CombineMode::Median) {
     ZImg res(imgs[0]->info());
     std::vector<TVoxel> buf(imgs.size());
 
@@ -1873,6 +1879,7 @@ ZImg ZImg::combine_Impl(const std::vector<const ZImg*>& imgs, CombineMode mode)
     }
     return res;
   }
+
   return ZImg();
 }
 

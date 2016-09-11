@@ -12,8 +12,6 @@ public:
 
   ZSystemInfo();
 
-  ~ZSystemInfo();
-
   void logOSInfo() const;
 
   bool is3DSupported() const

@@ -53,8 +53,6 @@ public:
 
   explicit Z3DFilter(QObject* parent = nullptr);
 
-  virtual ~Z3DFilter();
-
   QString className() const
   { return metaObject()->className(); }
 

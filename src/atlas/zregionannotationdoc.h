@@ -80,8 +80,6 @@ private:
   { // RegionAnnotation and its associated data
     RegionAnnotationPack(ZRegionAnnotation* regionAnnotationIn, const QString& pathIn, bool unsaved = false);
 
-    ~RegionAnnotationPack();
-
     void updateDerivedData();
 
     const QString& info() const;

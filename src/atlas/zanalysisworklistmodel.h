@@ -22,11 +22,9 @@ public:
 
   explicit ZAnalysisWorklistModel(const QString& filename, QObject* parent = nullptr);
 
-  ~ZAnalysisWorklistModel();
-
   QString setSource(const QString& filename, QTextCodec* codec = QTextCodec::codecForName("UTF-8"));
 
-  QString toCSV(const QString filename, bool withHeader = true, QChar separator = ',',
+  QString toCSV(const QString& filename, bool withHeader = true, QChar separator = ',',
                 QTextCodec* codec = QTextCodec::codecForName("UTF-8")) const;
 
   int rowCount(const QModelIndex& parent = QModelIndex()) const;

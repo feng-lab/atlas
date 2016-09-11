@@ -39,7 +39,7 @@ public:
   const glm::vec3& eye() const
   { return m_eye; }
 
-  void setEye(glm::vec3 eye)
+  void setEye(const glm::vec3& eye)
   {
     m_eye = eye;
     updateCamera();
@@ -48,7 +48,7 @@ public:
   const glm::vec3& center() const
   { return m_center; }
 
-  void setCenter(glm::vec3 center)
+  void setCenter(const glm::vec3& center)
   {
     m_center = center;
     updateCamera();
@@ -58,7 +58,7 @@ public:
   const glm::vec3& upVector() const
   { return m_upVector; }
 
-  void setUpVector(glm::vec3 upVector)
+  void setUpVector(const glm::vec3& upVector)
   {
     m_upVector = glm::normalize(upVector);
     updateCamera();

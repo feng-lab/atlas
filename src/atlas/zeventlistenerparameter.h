@@ -23,10 +23,11 @@ public:
   // An OR-combinations of buttons means all buttons should be pressed at the time
   // An OR-combinations of modifiers means all modifiers should be pressed at the time
   void
-  listenTo(const QString& actionName, Qt::MouseButtons buttons, Qt::KeyboardModifiers modifiers, QEvent::Type type);
+  listenTo(const QString& actionName, const Qt::MouseButtons& buttons, const Qt::KeyboardModifiers& modifiers,
+           QEvent::Type type);
 
   //
-  void listenTo(const QString& actionName, Qt::Key key, Qt::KeyboardModifiers modifiers,
+  void listenTo(const QString& actionName, Qt::Key key, const Qt::KeyboardModifiers& modifiers,
                 QEvent::Type type = QEvent::KeyPress);
 
   void clearAll();

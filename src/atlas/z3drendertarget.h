@@ -46,16 +46,16 @@ public:
   { return m_attachments.at(attachment); }
 
   //Get the color at position pos. This method will bind the RenderTarget!
-  glm::vec4 floatColorAtPos(glm::ivec2 pos);
+  glm::vec4 floatColorAtPos(const glm::ivec2& pos);
 
-  glm::col4 colorAtPos(glm::ivec2 pos);
+  glm::col4 colorAtPos(const glm::ivec2& pos);
 
-  GLfloat depthAtPos(glm::ivec2 pos);
+  GLfloat depthAtPos(const glm::ivec2& pos);
 
   glm::uvec2 size() const
   { return m_size; }
 
-  bool resize(glm::uvec2 newsize);
+  bool resize(const glm::uvec2& newsize);
 
   void changeColorAttachmentFormat(GLint internalColorFormat, GLenum attachment = GL_COLOR_ATTACHMENT0);
 

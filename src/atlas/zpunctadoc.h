@@ -72,8 +72,6 @@ private:
   { // puncta and its associated data
     PunctaPack(ZPuncta& punctaIn, const QString& path_);
 
-    ~PunctaPack();
-
     void updateDerivedData();
 
     const QString& info() const;

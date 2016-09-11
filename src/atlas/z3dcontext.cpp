@@ -11,8 +11,6 @@ Z3DContext::Z3DContext()
   CHECK(m_context);
 }
 
-Z3DContext::~Z3DContext() = default;
-
 bool Z3DContext::operator<(const Z3DContext& rhs) const
 {
   return m_context < rhs.m_context;

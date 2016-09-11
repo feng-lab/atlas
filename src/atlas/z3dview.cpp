@@ -252,7 +252,7 @@ void Z3DView::resetCameraClippingRange()
   m_lock = false;
 }
 
-bool Z3DView::takeFixedSizeScreenShot(QString filename, int width, int height, Z3DScreenShotType sst)
+bool Z3DView::takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst)
 {
   bool res = true;
   m_lock = true;
@@ -264,7 +264,7 @@ bool Z3DView::takeFixedSizeScreenShot(QString filename, int width, int height, Z
   return res;
 }
 
-bool Z3DView::takeScreenShot(QString filename, Z3DScreenShotType sst)
+bool Z3DView::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
 {
   int h = m_canvas->height();
   if (h % 2 == 1) {
@@ -287,7 +287,7 @@ bool Z3DView::takeScreenShot(QString filename, Z3DScreenShotType sst)
   return res;
 }
 
-bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, glm::vec3 axis,
+bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
                                             bool clockWise, int numFrame, int width, int height, Z3DScreenShotType sst)
 {
   using namespace boost::math::double_constants;
@@ -324,7 +324,7 @@ bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& name
   return res;
 }
 
-bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, glm::vec3 axis,
+bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
                                    bool clockWise, int numFrame, Z3DScreenShotType sst)
 {
   using namespace boost::math::double_constants;

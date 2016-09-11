@@ -57,7 +57,7 @@ namespace nim {
 QString randomString(int minLength, int maxLength)
 {
   static const QString possibleCharacters(
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789;',./<>?L:\"`~!@#$%^&*()");
+    R"(ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789`~!@#$%^&*()-_=+[{]}\|;:'",<.>/? )");
   QString res;
   minLength = std::max(0, minLength);
   if (maxLength >= minLength) {

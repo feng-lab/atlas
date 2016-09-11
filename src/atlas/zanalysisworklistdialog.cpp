@@ -16,10 +16,6 @@ ZAnalysisWorklistDialog::ZAnalysisWorklistDialog(QWidget* parent)
   createWidget();
 }
 
-ZAnalysisWorklistDialog::~ZAnalysisWorklistDialog()
-{
-}
-
 void ZAnalysisWorklistDialog::reject()
 {
   if (!m_saveButton->isEnabled() || m_model->worklist().empty()) {

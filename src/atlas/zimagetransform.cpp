@@ -11,8 +11,6 @@ ZImageTransform::ZImageTransform()
 {
 }
 
-ZImageTransform::~ZImageTransform() = default;
-
 void ZImageTransform::setParameters(const std::vector<double>& para)
 {
   CHECK_GE(para.size(), numParameters()) << "Incorrect number of parameters.";

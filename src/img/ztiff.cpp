@@ -57,7 +57,7 @@ bool hostIsLittleEndian()
   return *reinterpret_cast<char*>(&num) == 1;
 }
 
-static const struct tiftagname
+const struct tiftagname
 {
   uint32 tag;
   const char* name;
@@ -244,7 +244,7 @@ static const struct tiftagname
   {TIFFTAG_JPEGRESTARTINTERVAL,        "JpegRestartInterval"},
 };
 
-static const struct exiftagname
+const struct exiftagname
 {
   uint32 tag;
   const char* name;
@@ -775,7 +775,7 @@ void ZTiff::load(const QString& filename, bool tagOnly)
 #endif
     }
     catch (const ZIOException& e) {
-      QString err(e.what());
+      const QString& err(e.what());
       if (err.contains("Colormap", Qt::CaseInsensitive)) {
         m_tif.reset();
         LOG(WARNING) << "Disable colormap because of error " << err;
@@ -809,7 +809,7 @@ void ZTiff::load(std::istream& fs, bool tagOnly)
     fs.clear();
     fs.seekg(0);
 
-    TIFFSetWarningHandler(0);
+    TIFFSetWarningHandler(nullptr);
     if (m_useColormap) {
       TIFFSetErrorHandler(LibtiffErrorHandler);
     } else {
@@ -820,7 +820,7 @@ void ZTiff::load(std::istream& fs, bool tagOnly)
       m_tif.reset(TIFFStreamOpen("MemTiff", &fs));
     }
     catch (const ZIOException& e) {
-      QString err(e.what());
+      const QString& err(e.what());
       if (err.contains("Colormap", Qt::CaseInsensitive)) {
         m_tif.reset();
         LOG(WARNING) << "Disable colormap because of error " << err;

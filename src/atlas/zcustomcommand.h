@@ -5,7 +5,7 @@ namespace nim {
 class ZCustomCommand
 {
 public:
-  ZCustomCommand();
+  ZCustomCommand() = default;
 
   static void run();
 };

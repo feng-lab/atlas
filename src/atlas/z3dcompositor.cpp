@@ -1019,7 +1019,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   CHECK_GL_ERROR
 }
 
-bool Z3DCompositor::createDDPRenderTarget(glm::uvec2 size)
+bool Z3DCompositor::createDDPRenderTarget(const glm::uvec2& size)
 {
   m_ddpRT.reset(new Z3DRenderTarget(size));
   Z3DTexture* g_dualDepthTexId[2];
@@ -1185,7 +1185,7 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
   CHECK_GL_ERROR
 }
 
-bool Z3DCompositor::createWARenderTarget(glm::uvec2 size)
+bool Z3DCompositor::createWARenderTarget(const glm::uvec2& size)
 {
   m_waRT.reset(new Z3DRenderTarget(size));
   Z3DTexture* g_accumulationTexId[2];

@@ -24,8 +24,6 @@ Q_OBJECT
 public:
   explicit Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  virtual ~Z3DAnimationFilter();
-
   void setVisible(bool v)
   { m_visible.set(v); }
 

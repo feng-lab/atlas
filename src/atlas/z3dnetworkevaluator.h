@@ -21,8 +21,9 @@ class Z3DInputPortBase;
 class Z3DFilterWrapper
 {
 public:
-  virtual ~Z3DFilterWrapper()
-  = default;
+  Z3DFilterWrapper() = default;
+
+  virtual ~Z3DFilterWrapper() = default;
 
   virtual void beforeFilterProcess(const Z3DFilter* /*unused*/)
   {}
@@ -43,8 +44,6 @@ Q_OBJECT
 
 public:
   explicit Z3DNetworkEvaluator(QObject* parent = nullptr);
-
-  ~Z3DNetworkEvaluator();
 
   void setOpenGLContext(Z3DCanvas* context)
   { m_openGLContext = context; }

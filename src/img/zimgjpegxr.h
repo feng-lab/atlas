@@ -9,9 +9,7 @@ class ZImgJpegXR : public ZImgFormat
 public:
   static ZImgJpegXR& instance();
 
-  ZImgJpegXR();
-
-  ~ZImgJpegXR();
+  ZImgJpegXR() = default;
 
   // ZImgFormat interface
 public:

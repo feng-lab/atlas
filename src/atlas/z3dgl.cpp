@@ -49,7 +49,7 @@ bool checkGLState(GLenum pname, GLfloat value)
   return (f == value);
 }
 
-bool checkGLState(GLenum pname, const glm::vec4 value)
+bool checkGLState(GLenum pname, const glm::vec4& value)
 {
   glm::vec4 v;
   glGetFloatv(pname, &v[0]);

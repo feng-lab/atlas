@@ -53,9 +53,8 @@ MatrixXd ZEigenUtils::readMatrix(const QString& filename, const char* uSep, bool
   if (notEmptyLineIdx > 0) {
     mat.conservativeResize(notEmptyLineIdx, Eigen::NoChange);
     return mat;
-  } else {
-    return emptyMat;
   }
+  return emptyMat;
 }
 
 RowVectorXd ZEigenUtils::readRowVector(const std::string& iline, const char* uSep, int* nActualData,

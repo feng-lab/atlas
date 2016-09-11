@@ -14,8 +14,6 @@ public:
   ZImgCommonSubBlock(const QString& fileName, FileFormat format, size_t scene, size_t ratio,
                      size_t t, size_t z, size_t x, size_t y, size_t width, size_t height);
 
-  virtual ~ZImgCommonSubBlock() = default;
-
   virtual std::shared_ptr<ZImg> read() const override;
 
 protected:

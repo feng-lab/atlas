@@ -15,7 +15,7 @@ ZStringParameter::ZStringParameter(const QString& name, const QString& str, QObj
 {
 }
 
-void ZStringParameter::setContent(QString str)
+void ZStringParameter::setContent(const QString& str)
 {
   set(str);
 }

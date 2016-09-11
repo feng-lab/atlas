@@ -98,10 +98,6 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DPunctaFilter::objVisibleChanged);
 }
 
-Z3DPunctaFilter::~Z3DPunctaFilter()
-{
-}
-
 void Z3DPunctaFilter::process(Z3DEye eye)
 {
   Q_UNUSED(eye)

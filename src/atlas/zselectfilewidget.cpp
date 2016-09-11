@@ -59,10 +59,10 @@ QStringList ZSelectFileWidget::getSelectedMultipleOpenFiles()
   } else if (m_fileMode == FileMode::OpenMultipleFilesWithFilter) {
 #if 1
     QString regPattern = QRegularExpression::escape(m_filterLineEdit->text());
-    regPattern.replace(QLatin1String("\\["), QLatin1String("["));
-    regPattern.replace(QLatin1String("\\]"), QLatin1String("]"));
-    regPattern.replace(QLatin1String("\\?"), QLatin1String("."));
-    regPattern.replace(QLatin1String("\\*"), QLatin1String(".*"));
+    regPattern.replace(QLatin1String(R"(\[)"), QLatin1String("["));
+    regPattern.replace(QLatin1String(R"(\])"), QLatin1String("]"));
+    regPattern.replace(QLatin1String(R"(\?)"), QLatin1String("."));
+    regPattern.replace(QLatin1String(R"(\*)"), QLatin1String(".*"));
     QRegularExpression regExp(regPattern, QRegularExpression::CaseInsensitiveOption);
 #else
     QRegExp regExp(m_filterLineEdit->text(), Qt::CaseInsensitive, QRegExp::Wildcard);

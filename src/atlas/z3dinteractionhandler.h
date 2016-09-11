@@ -75,8 +75,6 @@ Q_OBJECT
 public:
   Z3DTrackballInteractionHandler(const QString& name, Z3DCameraParameter* camera, QObject* parent = nullptr);
 
-  virtual ~Z3DTrackballInteractionHandler();
-
   Z3DCameraParameter* camera() const
   { return m_camera; }
 
@@ -152,14 +150,14 @@ protected:
   void wheelEvent(QWheelEvent* e, int w, int h);
 
   // convert screen space move to world space move and move camera eye and center
-  void shift(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h);
+  void shift(const glm::ivec2& mouseStart, const glm::ivec2& mouseEnd, int w, int h);
 
   // use mouse move and mouseMotionFactor to calculate angle then rotate camera
-  void rotate(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h);
+  void rotate(const glm::ivec2& mouseStart, const glm::ivec2& mouseEnd, int w, int h);
 
-  void roll(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h);
+  void roll(const glm::ivec2& mouseStart, const glm::ivec2& mouseEnd, int w, int h);
 
-  void dolly(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h, float centerDistStart);
+  void dolly(const glm::ivec2& mouseStart, const glm::ivec2& mouseEnd, int w, int h, float centerDistStart);
 
 protected:
   ZEventListenerParameter* m_rotateEvent;

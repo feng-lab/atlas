@@ -26,8 +26,6 @@ Q_OBJECT
 public:
   explicit ZParameter(const QString& name, QObject* parent = nullptr);
 
-  virtual ~ZParameter();
-
   inline QString name() const
   { return m_name; }
 
@@ -156,8 +154,6 @@ public:
 
   explicit ZSingleValueParameter(const QString& name, QObject* parent = nullptr);
 
-  virtual ~ZSingleValueParameter();
-
   void set(const T& valueIn);
 
   inline const T& get() const
@@ -207,9 +203,6 @@ template<class T>
 ZSingleValueParameter<T>::ZSingleValueParameter(const QString& name, QObject* parent)
   : ZParameter(name, parent), m_locked(false)
 {}
-
-template<class T>
-ZSingleValueParameter<T>::~ZSingleValueParameter() = default;
 
 template<class T>
 void ZSingleValueParameter<T>::set(const T& valueIn)

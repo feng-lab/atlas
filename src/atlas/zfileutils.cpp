@@ -6,10 +6,6 @@
 
 namespace nim {
 
-ZFileUtils::ZFileUtils() = default;
-
-ZFileUtils::~ZFileUtils() = default;
-
 void ZFileUtils::showInGraphicalShell(const QString& filePath)
 {
   if (!QFileInfo(filePath).exists())
@@ -18,7 +14,7 @@ void ZFileUtils::showInGraphicalShell(const QString& filePath)
 #ifdef Q_OS_MAC
   QStringList args;
   args << "-e";
-  args << "tell application \"Finder\"";
+  args << R"(tell application "Finder")";
   args << "-e";
   args << "activate";
   args << "-e";

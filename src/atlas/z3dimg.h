@@ -26,8 +26,6 @@ public:
   // Z3DVolume will take ownership of the img
   Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent = nullptr);
 
-  ~Z3DImg();
-
   bool is2DData() const
   { return m_imgPack.imgInfo().depth == 1; }
 

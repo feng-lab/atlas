@@ -62,15 +62,16 @@ glm::col4 Z3DPickingManager::colorOfObject(const void* obj)
     return glm::col4(0, 0, 0, 0);
 }
 
-const void* Z3DPickingManager::objectOfColor(glm::col4 col)
+const void* Z3DPickingManager::objectOfColor(const glm::col4& col)
 {
   if (col.a == 0)
     return nullptr;
 
-  if (isRegistered(col))
+  if (isRegistered(col)) {
     return m_colorToObject[col];
-  else
+  } else {
     return nullptr;
+  }
 }
 
 const void* Z3DPickingManager::objectAtWidgetPos(glm::ivec2 pos)

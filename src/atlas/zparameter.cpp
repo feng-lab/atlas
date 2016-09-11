@@ -17,10 +17,6 @@ ZParameter::ZParameter(const QString& name, QObject* parent)
   addStyle("DEFAULT");
 }
 
-ZParameter::~ZParameter()
-{
-}
-
 void ZParameter::setName(const QString& name)
 {
   if (name != m_name) {

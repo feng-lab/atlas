@@ -135,10 +135,6 @@ Z3DTrackballInteractionHandler::Z3DTrackballInteractionHandler(const QString& na
   addEventListener(m_keyRollEvent);
 }
 
-Z3DTrackballInteractionHandler::~Z3DTrackballInteractionHandler()
-{
-}
-
 void Z3DTrackballInteractionHandler::rotateEvent(QMouseEvent* e, int w, int h)
 {
   if (e->type() == QEvent::MouseButtonPress) {
@@ -381,7 +377,7 @@ void Z3DTrackballInteractionHandler::wheelEvent(QWheelEvent* e, int /*unused*/, 
 #endif
 }
 
-void Z3DTrackballInteractionHandler::shift(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h)
+void Z3DTrackballInteractionHandler::shift(const glm::ivec2& mouseStart, const glm::ivec2& mouseEnd, int w, int h)
 {
   glm::ivec4 viewport(0, 0, w, h);
   float centerDepth = m_camera->get().worldToScreen(m_camera->get().center(), viewport).z;
@@ -396,7 +392,7 @@ void Z3DTrackballInteractionHandler::shift(glm::ivec2 mouseStart, glm::ivec2 mou
   }
 }
 
-void Z3DTrackballInteractionHandler::rotate(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h)
+void Z3DTrackballInteractionHandler::rotate(const glm::ivec2& mouseStart, const glm::ivec2& mouseEnd, int w, int h)
 {
   glm::ivec2 dPos = mouseEnd - mouseStart;
 
@@ -410,7 +406,7 @@ void Z3DTrackballInteractionHandler::rotate(glm::ivec2 mouseStart, glm::ivec2 mo
   m_camera->elevation(ryf);
 }
 
-void Z3DTrackballInteractionHandler::roll(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int w, int h)
+void Z3DTrackballInteractionHandler::roll(const glm::ivec2& mouseStart, const glm::ivec2& mouseEnd, int w, int h)
 {
   glm::dvec2 center(w / 2., h / 2.);
   double newAngle = std::atan2(mouseEnd.y - center.y, mouseEnd.x - center.x);
@@ -420,7 +416,8 @@ void Z3DTrackballInteractionHandler::roll(glm::ivec2 mouseStart, glm::ivec2 mous
 }
 
 void
-Z3DTrackballInteractionHandler::dolly(glm::ivec2 mouseStart, glm::ivec2 mouseEnd, int /*unused*/, int h, float centerDistStart)
+Z3DTrackballInteractionHandler::dolly(const glm::ivec2& mouseStart, const glm::ivec2& mouseEnd,
+                                      int /*unused*/, int h, float centerDistStart)
 {
   glm::ivec2 dPos = mouseEnd - mouseStart;
 
@@ -428,7 +425,8 @@ Z3DTrackballInteractionHandler::dolly(glm::ivec2 mouseStart, glm::ivec2 mouseEnd
   float factor = dPos.y * deltaFactor;
 
   m_camera->dollyToCenterDistance(std::pow(1.1f, factor) * centerDistStart);
-  //LOG(INFO) << centerDistStart << std::pow(1.1f, factor) * centerDistStart << factor << dPos << deltaFactor << mouseStart << mouseEnd;
+  //LOG(INFO) << centerDistStart << std::pow(1.1f, factor) * centerDistStart << factor
+  // << dPos << deltaFactor << mouseStart << mouseEnd;
 }
 
 } // namespace nim

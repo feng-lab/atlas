@@ -85,9 +85,9 @@ public:
 
   void write(QJsonObject& json) const;
 
-  bool takeFixedSizeScreenShot(QString filename, int width, int height, Z3DScreenShotType sst);
+  bool takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst);
 
-  bool takeScreenShot(QString filename, Z3DScreenShotType sst);
+  bool takeScreenShot(const QString& filename, Z3DScreenShotType sst);
 
 signals:
 
@@ -101,11 +101,11 @@ private:
   void resetCamera();  // set up camera based on visible objects in scene, original position
   void resetCameraClippingRange(); // Reset the camera clipping range to include this entire bounding box
 
-  bool takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, glm::vec3 axis,
+  bool takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
                                      bool clockWise, int numFrame, int width, int height,
                                      Z3DScreenShotType sst);
 
-  bool takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, glm::vec3 axis,
+  bool takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
                             bool clockWise, int numFrame, Z3DScreenShotType sst);
 
   void init();

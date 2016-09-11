@@ -16,7 +16,7 @@ ZGenerateAnalysisTextFile::ZGenerateAnalysisTextFile()
 {
 }
 
-void ZGenerateAnalysisTextFile::generate(const ZAnalysisTextFileInput input)
+void ZGenerateAnalysisTextFile::generate(const ZAnalysisTextFileInput& input)
 {
   m_input = input;
   generate();
@@ -449,11 +449,11 @@ double ZGenerateAnalysisTextFile::pointFrustumConeDist(double x, double y, doubl
   double dotbptb = glm::dot(bot - pt, top - bot);
   double frac = -dotbptb / normtb;
   if (fracOut) *fracOut = frac;
-  if (frac < 0)
+  if (frac < 0) {
     dist = std::sqrt(normbp) - start->radius * m_input.voxelSizeX;
-  else if (frac > 1)
+  } else if (frac > 1) {
     dist = std::sqrt(normtp) - end->radius * m_input.voxelSizeX;
-  else {
+  } else {
     double radius = m_input.voxelSizeX * ((1 - frac) * start->radius + frac * end->radius);
     dist = std::sqrt(normbp - dotbptb * dotbptb / normtb) - radius;
   }

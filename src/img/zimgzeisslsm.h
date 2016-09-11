@@ -175,9 +175,7 @@ struct CZ_ScanInformation {
 class ZImgZeissLsm : public ZImgTiff
 {
 public:
-  ZImgZeissLsm();
-
-  virtual ~ZImgZeissLsm() = default;
+  ZImgZeissLsm() = default;
 
   // ZImgFormat interface
 public:

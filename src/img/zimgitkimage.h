@@ -13,8 +13,6 @@ class ZImgITKImage : public ZImgFormat
 public:
   ZImgITKImage();
 
-  ~ZImgITKImage();
-
   // ZImgFormat interface
 public:
   virtual QString shortName() const override;

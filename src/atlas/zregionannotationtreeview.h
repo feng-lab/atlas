@@ -28,7 +28,7 @@ protected:
 
   void adaptColumns();
 
-  void buttonClickedForUserData(QVariant ud);
+  void buttonClickedForUserData(const QVariant& ud);
 
   virtual void keyPressEvent(QKeyEvent* e) override;
 

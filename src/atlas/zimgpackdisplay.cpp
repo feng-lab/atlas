@@ -15,8 +15,6 @@ ZImgPackDisplay::ZImgPackDisplay(const ZImgPack& imgPack, bool mip)
   reset();
 }
 
-ZImgPackDisplay::~ZImgPackDisplay() = default;
-
 void ZImgPackDisplay::reset()
 {
   m_z = 0;

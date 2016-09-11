@@ -242,10 +242,6 @@ ZColorMap::ZColorMap(ZColorMap&& other) noexcept
   swap(other);
 }
 
-ZColorMap::~ZColorMap()
-{
-}
-
 void ZColorMap::swap(ZColorMap& other) noexcept
 {
   m_keys.swap(other.m_keys);
@@ -443,7 +439,7 @@ void ZColorMap::setDomain(double min, double max, bool rescaleKeys)
   }
 }
 
-void ZColorMap::setDomain(glm::dvec2 domain, bool rescaleKeys)
+void ZColorMap::setDomain(const glm::dvec2& domain, bool rescaleKeys)
 {
   setDomain(domain.x, domain.y, rescaleKeys);
 }

@@ -231,10 +231,6 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   }
 }
 
-Z3DGlobalParameters::~Z3DGlobalParameters()
-{
-}
-
 void Z3DGlobalParameters::read(const QJsonObject& json)
 {
   for (size_t i = 0; i < m_parameters.size(); ++i) {

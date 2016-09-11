@@ -57,7 +57,7 @@ protected:
   void renderInportToImage(Z3DEye eye);
 
 private:
-  void setOutputSize(glm::uvec2 size);
+  void setOutputSize(const glm::uvec2& size);
 
 private:
   Z3DTextureCopyRenderer m_textureCopyRenderer;

@@ -109,8 +109,6 @@ Q_OBJECT
 public:
   Z3DCanvas(const QString& title, int width, int height, QWidget* parent = nullptr, Qt::WindowFlags f = 0);
 
-  virtual ~Z3DCanvas();
-
   QSurfaceFormat format() const;
 
   void setNetworkEvaluator(Z3DNetworkEvaluator* n);

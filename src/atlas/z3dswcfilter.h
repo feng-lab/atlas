@@ -29,8 +29,6 @@ public:
 
   explicit Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  virtual ~Z3DSwcFilter();
-
   void setVisible(bool v)
   { m_visible.set(v); }
 
@@ -136,7 +134,7 @@ private:
   glm::vec4 colorByDirection(const SwcTreeNode& n);
 
   glm::dvec3 projectPointOnRay(
-    glm::dvec3 pt, const glm::dvec3& v1, const glm::dvec3& v2);
+    const glm::dvec3& pt, const glm::dvec3& v1, const glm::dvec3& v2);
 
   void addSelectionBox(const std::pair<SwcTreeNode, SwcTreeNode>& nodePair,
                        std::vector<glm::vec3>& lines);

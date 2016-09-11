@@ -12,14 +12,15 @@ ZEventListenerParameter::ZEventListenerParameter(const QString& name, bool shari
 }
 
 void
-ZEventListenerParameter::listenTo(const QString& actionName, Qt::MouseButtons buttons, Qt::KeyboardModifiers modifiers,
+ZEventListenerParameter::listenTo(const QString& actionName, const Qt::MouseButtons& buttons,
+                                  const Qt::KeyboardModifiers& modifiers,
                                   QEvent::Type type)
 {
   m_mouseEvents.push_back(MouseEvent(actionName, buttons, modifiers, type));
   emit valueChanged();
 }
 
-void ZEventListenerParameter::listenTo(const QString& actionName, Qt::Key key, Qt::KeyboardModifiers modifiers,
+void ZEventListenerParameter::listenTo(const QString& actionName, Qt::Key key, const Qt::KeyboardModifiers& modifiers,
                                        QEvent::Type type)
 {
   m_keyEvents.push_back(KeyEvent(actionName, key, modifiers, type));

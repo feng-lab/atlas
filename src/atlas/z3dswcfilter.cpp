@@ -111,10 +111,6 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DSwcFilter::objVisibleChanged);
 }
 
-Z3DSwcFilter::~Z3DSwcFilter()
-{
-}
-
 void Z3DSwcFilter::process(Z3DEye /*unused*/)
 {
   if (m_dataIsInvalid) {
@@ -861,7 +857,7 @@ glm::vec4 Z3DSwcFilter::colorByType(const SwcTreeNode& n)
   }
 }
 
-glm::dvec3 Z3DSwcFilter::projectPointOnRay(glm::dvec3 pt, const glm::dvec3& v1, const glm::dvec3& v2)
+glm::dvec3 Z3DSwcFilter::projectPointOnRay(const glm::dvec3& pt, const glm::dvec3& v1, const glm::dvec3& v2)
 {
   return v1 + glm::dot(pt - v1, v2 - v1) * (v2 - v1);
 }

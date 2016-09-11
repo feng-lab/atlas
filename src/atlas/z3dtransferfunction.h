@@ -27,8 +27,6 @@ public:
 
   Z3DTransferFunction(Z3DTransferFunction&& tf) noexcept;
 
-  virtual ~Z3DTransferFunction();
-
   void swap(Z3DTransferFunction& other) noexcept;
 
   Z3DTransferFunction& operator=(Z3DTransferFunction other) noexcept

@@ -132,8 +132,6 @@ class Z3DTextureUnitManager
 public:
   Z3DTextureUnitManager();
 
-  ~Z3DTextureUnitManager();
-
   void nextAvailableUnit();
 
   void activateCurrentUnit();

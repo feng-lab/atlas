@@ -117,7 +117,7 @@ public:
   //using iterator = impl::voxel_iter<ZVoxelRegion>;
   using const_iterator = impl::voxel_iter<ZVoxelRegion const>;
 
-  ZVoxelRegion();
+  ZVoxelRegion() = default;
 
   inline void addBox(const ZVoxelCoordinate& minCoord, const ZVoxelCoordinate& maxCoord)
   { addBox(BoxType(minCoord, maxCoord)); }

@@ -14,8 +14,6 @@ public:
                       GLint internalColorFormat = GLint(GL_RGBA16),
                       GLint internalDepthFormat = GLint(GL_DEPTH_COMPONENT24));
 
-  virtual ~Z3DRenderOutputPort();
-
   virtual void invalidate() override;
 
   void bindTarget()
@@ -91,8 +89,6 @@ public:
   Z3DRenderInputPort(const QString& name, bool allowMultipleConnections,
                      Z3DFilter* filter,
                      Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid);
-
-  virtual ~Z3DRenderInputPort();
 
   virtual bool isReady() const override
   { return numValidInputs() > 0; }

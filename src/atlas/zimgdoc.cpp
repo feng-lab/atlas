@@ -511,7 +511,7 @@ void ZImgDoc::createActions()
   connect(m_alignSectionsAction, &QAction::triggered, this, &ZImgDoc::alignSections);
 }
 
-bool ZImgDoc::saveImg(ZImgPack* pack, QString fileName, FileFormat format, Compression comp, QString& errorMsg)
+bool ZImgDoc::saveImg(ZImgPack* pack, const QString& fileName, FileFormat format, Compression comp, QString& errorMsg)
 {
   try {
     pack->save(fileName, format, comp);

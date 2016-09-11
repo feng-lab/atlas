@@ -23,15 +23,13 @@ Q_OBJECT
 public:
   explicit Z3DMeshFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  virtual ~Z3DMeshFilter();
-
   void setVisible(bool v)
   { m_visible.set(v); }
 
   bool isVisible() const
   { return m_visible.get(); }
 
-  void setMeshColor(glm::vec4 col)
+  void setMeshColor(const glm::vec4& col)
   { m_singleColorForAllMesh.set(col); }
 
   bool isFixed() const

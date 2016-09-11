@@ -43,7 +43,7 @@ public:
   inline QColor color() const
   { return m_color; }
 
-  inline void setColor(QColor c)
+  inline void setColor(const QColor& c)
   { if (m_color != c) { m_color = c; emit colorChanged(this); }}
 
   void deleteKey(ZParameterKey* key);

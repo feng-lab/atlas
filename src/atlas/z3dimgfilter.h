@@ -29,8 +29,6 @@ Q_OBJECT
 public:
   explicit Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  ~Z3DImgFilter();
-
   void setVisible(bool v)
   { m_visible.set(v); }
 

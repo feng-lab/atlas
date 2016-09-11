@@ -80,10 +80,6 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DMeshFilter::objVisibleChanged);
 }
 
-Z3DMeshFilter::~Z3DMeshFilter()
-{
-}
-
 void Z3DMeshFilter::process(Z3DEye eye)
 {
   if (m_dataIsInvalid) {

@@ -22,8 +22,6 @@ public:
                                                                   ZRandom::instance().randInt(255)),
                                      QObject* parent = nullptr);
 
-  ~ZCameraParameterAnimation();
-
   ZStringIntOptionParameter& interpolationMethodPara()
   { return m_interpolationMethod; }
 

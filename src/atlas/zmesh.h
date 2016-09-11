@@ -47,8 +47,6 @@ public:
   // might throw ZIOException
   explicit ZMesh(const QString& filename);
 
-  virtual ~ZMesh();
-
   ZMesh(ZMesh&&) = default;
 
   ZMesh& operator=(ZMesh&&) = default;
@@ -200,10 +198,10 @@ public:
 
   // a cube with six surfaces
   static ZMesh createCube(
-    glm::vec3 coordLlf = glm::vec3(0.f, 0.f, 0.f),
-    glm::vec3 coordUrb = glm::vec3(1.f, 1.f, 1.f),
-    glm::vec3 texLlf = glm::vec3(0.f, 0.f, 0.f),
-    glm::vec3 texUrb = glm::vec3(1.f, 1.f, 1.f));
+    const glm::vec3& coordLlf = glm::vec3(0.f, 0.f, 0.f),
+    const glm::vec3& coordUrb = glm::vec3(1.f, 1.f, 1.f),
+    const glm::vec3& texLlf = glm::vec3(0.f, 0.f, 0.f),
+    const glm::vec3& texUrb = glm::vec3(1.f, 1.f, 1.f));
 
   // one slice from a cube, it is a x slice if alongDim == 0, a y slice if alongDim == 1,
   // a z slice if alongDim == 2
@@ -211,28 +209,28 @@ public:
     float coordIn3rdDim,
     float texCoordIn3rdDim,
     int alongDim = 2,     // 0, 1, or 2
-    glm::vec2 coordlow = glm::vec2(0.f, 0.f),
-    glm::vec2 coordhigh = glm::vec2(1.f, 1.f),
-    glm::vec2 texlow = glm::vec2(0.f, 0.f),
-    glm::vec2 texhigh = glm::vec2(1.f, 1.f));
+    const glm::vec2& coordlow = glm::vec2(0.f, 0.f),
+    const glm::vec2& coordhigh = glm::vec2(1.f, 1.f),
+    const glm::vec2& texlow = glm::vec2(0.f, 0.f),
+    const glm::vec2& texhigh = glm::vec2(1.f, 1.f));
 
   // one slice from a cube, it is a x slice if alongDim == 0, a y slice if alongDim == 1,
   // a z slice if alongDim == 2
   static ZMesh createCubeSliceWith2DTexture(
     float coordIn3rdDim,
     int alongDim = 2,     // 0, 1, or 2
-    glm::vec2 coordlow = glm::vec2(0.f, 0.f),
-    glm::vec2 coordhigh = glm::vec2(1.f, 1.f),
-    glm::vec2 texlow = glm::vec2(0.f, 0.f),
-    glm::vec2 texhigh = glm::vec2(1.f, 1.f));
+    const glm::vec2& coordlow = glm::vec2(0.f, 0.f),
+    const glm::vec2& coordhigh = glm::vec2(1.f, 1.f),
+    const glm::vec2& texlow = glm::vec2(0.f, 0.f),
+    const glm::vec2& texhigh = glm::vec2(1.f, 1.f));
 
   // a 2d image quad with 2d texture coordinates
   static ZMesh createImageSlice(
     float coordIn3rdDim,
-    glm::vec2 coordlow = glm::vec2(0.f, 0.f),
-    glm::vec2 coordhigh = glm::vec2(1.f, 1.f),
-    glm::vec2 texlow = glm::vec2(0.f, 0.f),
-    glm::vec2 texhigh = glm::vec2(1.f, 1.f));
+    const glm::vec2& coordlow = glm::vec2(0.f, 0.f),
+    const glm::vec2& coordhigh = glm::vec2(1.f, 1.f),
+    const glm::vec2& texlow = glm::vec2(0.f, 0.f),
+    const glm::vec2& texhigh = glm::vec2(1.f, 1.f));
 
   // create a serie of slices from a cube, slices are cut along a specified dimension
   // if number of slices if 1, first slice will be returned (use first coordinate)
@@ -244,10 +242,10 @@ public:
   static ZMesh createCubeSerieSlices(
     int numSlices,
     int alongDim = 2,     // 0, 1, or 2
-    glm::vec3 coordfirst = glm::vec3(0.f, 0.f, 0.f),
-    glm::vec3 coordlast = glm::vec3(1.f, 1.f, 1.f),
-    glm::vec3 texfirst = glm::vec3(0.f, 0.f, 0.f),
-    glm::vec3 texlast = glm::vec3(1.f, 1.f, 1.f));
+    const glm::vec3& coordfirst = glm::vec3(0.f, 0.f, 0.f),
+    const glm::vec3& coordlast = glm::vec3(1.f, 1.f, 1.f),
+    const glm::vec3& texfirst = glm::vec3(0.f, 0.f, 0.f),
+    const glm::vec3& texlast = glm::vec3(1.f, 1.f, 1.f));
 
   static ZMesh createSphereMesh(const glm::vec3& center, float radius,
                                 int thetaResolution = 32, int phiResolution = 32,
@@ -280,7 +278,7 @@ private:
     Union, Intersection, Difference
   };
 
-  void appendTriangle(const ZMesh& mesh, glm::uvec3 triangle);
+  void appendTriangle(const ZMesh& mesh, const glm::uvec3& triangle);
 
   double signedVolumeOfTriangle(const glm::vec3& v1,
                                 const glm::vec3& v2,

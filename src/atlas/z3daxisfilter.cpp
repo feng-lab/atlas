@@ -44,10 +44,6 @@ Z3DAxisFilter::Z3DAxisFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   setupCamera();
 }
 
-Z3DAxisFilter::~Z3DAxisFilter()
-{
-}
-
 bool Z3DAxisFilter::isReady(Z3DEye eye) const
 {
   return Z3DGeometryFilter::isReady(eye) && m_showAxis.get();

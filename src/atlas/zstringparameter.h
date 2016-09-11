@@ -30,7 +30,7 @@ signals:
   void stringChanged(QString str);
 
 protected:
-  void setContent(QString str);
+  void setContent(const QString& str);
 
   virtual QWidget* actualCreateWidget(QWidget* parent) override;
 

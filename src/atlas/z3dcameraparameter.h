@@ -152,25 +152,25 @@ public:
     updatePara();
   }
 
-  inline void rotate(float angle, glm::vec3 axis, glm::vec3 point)
+  inline void rotate(float angle, const glm::vec3& axis, const glm::vec3& point)
   {
     m_value.rotate(angle, axis, point);
     updatePara();
   }
 
-  inline void rotate(glm::quat quat, glm::vec3 point)
+  inline void rotate(const glm::quat& quat, const glm::vec3& point)
   {
     m_value.rotate(quat, point);
     updatePara();
   }
 
-  inline void rotate(float angle, glm::vec3 axis)
+  inline void rotate(float angle, const glm::vec3& axis)
   {
     m_value.rotate(angle, axis);
     updatePara();
   }
 
-  inline void rotate(glm::quat quat)
+  inline void rotate(const glm::quat& quat)
   {
     m_value.rotate(quat);
     updatePara();

@@ -92,10 +92,11 @@ void wrapCoordToImage<size_t>(size_t* coord, const size_t* imgSize, size_t numDi
 {
   if (padOption == PadOption::Symmetric) {
     for (size_t i = 0; i < numDimensions; ++i) {
-      if ((coord[i] / imgSize[i]) % 2 == 0)
+      if ((coord[i] / imgSize[i]) % 2 == 0) {
         coord[i] = coord[i] % imgSize[i];
-      else
+      } else {
         coord[i] = imgSize[i] - 1 - coord[i] % imgSize[i];
+      }
     }
   } else if (padOption == PadOption::Replicate) {
     for (size_t i = 0; i < numDimensions; ++i) {

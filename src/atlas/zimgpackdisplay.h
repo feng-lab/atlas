@@ -13,8 +13,6 @@ class ZImgPackDisplay
 public:
   ZImgPackDisplay(const ZImgPack& imgPack, bool mip);
 
-  ~ZImgPackDisplay();
-
   // default, hide all channels
   // default go to first slice and set alpha and scale to 1
   void reset();

@@ -667,7 +667,7 @@ void Z3DTransferFunctionWidget::paintKeys(QPainter& paint)
   }
 }
 
-glm::dvec2 Z3DTransferFunctionWidget::relativeToPixelCoordinates(glm::dvec2 r)
+glm::dvec2 Z3DTransferFunctionWidget::relativeToPixelCoordinates(const glm::dvec2& r)
 {
   double px =
     (r.x - m_xRange[0]) / (m_xRange[1] - m_xRange[0]) * (static_cast<double>(width()) - 2 * m_padding) + m_padding;
@@ -677,7 +677,7 @@ glm::dvec2 Z3DTransferFunctionWidget::relativeToPixelCoordinates(glm::dvec2 r)
   return glm::dvec2(px, py);
 }
 
-glm::dvec2 Z3DTransferFunctionWidget::pixelToRelativeCoordinates(glm::dvec2 p)
+glm::dvec2 Z3DTransferFunctionWidget::pixelToRelativeCoordinates(const glm::dvec2& p)
 {
   double rx =
     (p.x - m_padding) / (static_cast<double>(width()) - 2 * m_padding) * (m_xRange[1] - m_xRange[0]) + m_xRange[0];
@@ -702,7 +702,7 @@ void Z3DTransferFunctionWidget::hideKeyInfo()
   QToolTip::hideText();
 }
 
-void Z3DTransferFunctionWidget::showKeyInfo(QPoint pos, glm::dvec2 values)
+void Z3DTransferFunctionWidget::showKeyInfo(QPoint pos, const glm::dvec2& values)
 {
   QToolTip::showText(mapToGlobal(pos), QString("Intensity: %1 \nOpacity: %2").arg(values.x).arg(values.y));
 }
@@ -737,10 +737,6 @@ Z3DTransferFunctionEditor::Z3DTransferFunctionEditor(Z3DTransferFunctionParamete
   createWidgets();
   updateFromTransferFunction();
   createConnections();
-}
-
-Z3DTransferFunctionEditor::~Z3DTransferFunctionEditor()
-{
 }
 
 QLayout* Z3DTransferFunctionEditor::createMappingLayout()

@@ -58,12 +58,12 @@ private:
   void renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& filters,
                             Z3DRenderOutputPort& port, Z3DEye eye, Z3DTexture* depthTexture = nullptr);
 
-  bool createDDPRenderTarget(glm::uvec2 size);
+  bool createDDPRenderTarget(const glm::uvec2& size);
 
   void renderTransparentWA(const std::vector<Z3DBoundedFilter*>& filters,
                            Z3DRenderOutputPort& port, Z3DEye eye, Z3DTexture* depthTexture = nullptr);
 
-  bool createWARenderTarget(glm::uvec2 size);
+  bool createWARenderTarget(const glm::uvec2& size);
 
   // if image inport has more than 1 image, blend use tempport3 and tempport4,
   // send output to colorTex and depthTex

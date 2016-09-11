@@ -429,8 +429,6 @@ Z3DTextureUnitManager::Z3DTextureUnitManager()
 {
 }
 
-Z3DTextureUnitManager::~Z3DTextureUnitManager() = default;
-
 void Z3DTextureUnitManager::nextAvailableUnit()
 {
   ++m_currentUnitNumber;

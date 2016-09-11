@@ -19,10 +19,6 @@ Z3DFilter::Z3DFilter(QObject* parent)
 {
 }
 
-Z3DFilter::~Z3DFilter()
-{
-}
-
 ZParameter* Z3DFilter::parameter(const QString& name) const
 {
   for (auto para : m_parameters) {

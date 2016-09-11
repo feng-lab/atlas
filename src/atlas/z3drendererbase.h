@@ -73,7 +73,7 @@ public:
   inline ZStringIntOptionParameter& transparencyMethodPara()
   { return m_globalParas.transparencyMethod; }
 
-  inline void setViewport(glm::uvec4 viewport)
+  inline void setViewport(const glm::uvec4& viewport)
   {
     if (m_viewport != viewport) {
       m_viewport = viewport;
@@ -81,7 +81,7 @@ public:
     }
   }
 
-  inline void setViewport(glm::uvec2 viewport)
+  inline void setViewport(const glm::uvec2& viewport)
   {
     if (m_viewport.zw() != viewport) {
       m_viewport = glm::ivec4(0, 0, viewport);
@@ -124,7 +124,7 @@ public:
   inline void translate(float x, float y, float z)
   { m_coordTransform.translate(x, y, z); }
 
-  inline void setRotationCenter(glm::vec3 c)
+  inline void setRotationCenter(const glm::vec3& c)
   { m_coordTransform.setCenter(c); }
 
   inline void setOpacity(float o)

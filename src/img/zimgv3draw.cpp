@@ -6,13 +6,6 @@
 
 namespace nim {
 
-ZImgV3DRaw::ZImgV3DRaw()
-  : ZImgFormat()
-{
-}
-
-ZImgV3DRaw::~ZImgV3DRaw() = default;
-
 QString ZImgV3DRaw::shortName() const
 {
   return "Vaa3d raw";

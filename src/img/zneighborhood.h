@@ -32,7 +32,7 @@ public:
   ZNeighborhood(size_t left, size_t right, size_t up, size_t down, size_t front, size_t back, bool includeCenter);
 
   // arbitrary
-  ZNeighborhood(const std::vector<ZVoxelCoordinate>& offsets);
+  explicit ZNeighborhood(const std::vector<ZVoxelCoordinate>& offsets);
 
   // same as constructor, function version
 

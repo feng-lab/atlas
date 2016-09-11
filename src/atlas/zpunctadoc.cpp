@@ -246,10 +246,6 @@ ZPunctaDoc::PunctaPack::PunctaPack(ZPuncta& punctaIn, const QString& path_)
   updateDerivedData();
 }
 
-ZPunctaDoc::PunctaPack::~PunctaPack()
-{
-}
-
 void ZPunctaDoc::PunctaPack::updateDerivedData()
 {
   m_info.clear();

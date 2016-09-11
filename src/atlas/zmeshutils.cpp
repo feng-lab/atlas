@@ -887,7 +887,7 @@ bool vtkCCSTriangulate(
     return true;
   }
     // If the poly is a triangle, then pass it
-  else if (n == 3) {
+  if (n == 3) {
     size_t trids[3];
     trids[0] = 0;
     trids[1] = 1;

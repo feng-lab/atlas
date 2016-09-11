@@ -7,10 +7,6 @@ Z3DArrowRenderer::Z3DArrowRenderer(Z3DRendererBase& rendererBase) :
 {
 }
 
-Z3DArrowRenderer::~Z3DArrowRenderer()
-{
-}
-
 void Z3DArrowRenderer::setArrowData(std::vector<glm::vec4>* tailPosAndTailRadius,
                                     std::vector<glm::vec4>* headPosAndHeadRadius,
                                     float headLengthProportion)

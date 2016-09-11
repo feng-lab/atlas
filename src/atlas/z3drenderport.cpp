@@ -20,10 +20,6 @@ Z3DRenderOutputPort::Z3DRenderOutputPort(const QString& name, Z3DFilter* filter,
   CHECK_GL_ERROR
 }
 
-Z3DRenderOutputPort::~Z3DRenderOutputPort()
-{
-}
-
 void Z3DRenderOutputPort::invalidate()
 {
   m_resultIsValid = false;
@@ -84,10 +80,6 @@ Z3DRenderInputPort::Z3DRenderInputPort(const QString& name, bool allowMultipleCo
                                        Z3DFilter* filter,
                                        Z3DFilter::State invalidationState)
   : Z3DInputPortBase(name, allowMultipleConnections, filter, invalidationState)
-{
-}
-
-Z3DRenderInputPort::~Z3DRenderInputPort()
 {
 }
 

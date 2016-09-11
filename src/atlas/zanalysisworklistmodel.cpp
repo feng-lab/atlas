@@ -22,10 +22,6 @@ ZAnalysisWorklistModel::ZAnalysisWorklistModel(const QString& filename, QObject*
   setSource(filename);
 }
 
-ZAnalysisWorklistModel::~ZAnalysisWorklistModel()
-{
-}
-
 QString ZAnalysisWorklistModel::setSource(const QString& filename, QTextCodec* codec)
 {
   QStringList res;
@@ -126,7 +122,7 @@ QString ZAnalysisWorklistModel::setSource(const QString& filename, QTextCodec* c
   return res.join("\n");
 }
 
-QString ZAnalysisWorklistModel::toCSV(const QString filename, bool withHeader, QChar separator, QTextCodec* codec) const
+QString ZAnalysisWorklistModel::toCSV(const QString& filename, bool withHeader, QChar separator, QTextCodec* codec) const
 {
   QtCSV::VariantData vd;
   if (withHeader) {

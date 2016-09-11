@@ -12,8 +12,6 @@ Q_OBJECT
 public:
   explicit ZButtonColumnDelegate(QObject* parent = nullptr);
 
-  ~ZButtonColumnDelegate();
-
   virtual QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option,
                                 const QModelIndex& index) const override;
 

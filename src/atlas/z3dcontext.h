@@ -9,8 +9,6 @@ class Z3DContext
 public:
   Z3DContext();
 
-  ~Z3DContext();
-
   Z3DContext(const Z3DContext&) = default;
 
   Z3DContext& operator=(const Z3DContext&) = default;

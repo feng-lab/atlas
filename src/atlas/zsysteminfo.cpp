@@ -235,8 +235,6 @@ ZSystemInfo::ZSystemInfo()
   m_fontPath = ":/Resources/fonts";
 }
 
-ZSystemInfo::~ZSystemInfo() = default;
-
 void ZSystemInfo::logOSInfo() const
 {
   //LOG(INFO) << "OS: " << m_osString;

@@ -9,9 +9,7 @@ class ZImgJpeg : public ZImgFormat
 public:
   static ZImgJpeg& instance();
 
-  ZImgJpeg();
-
-  ~ZImgJpeg();
+  ZImgJpeg() = default;
 
   // ZImgFormat interface
 public:

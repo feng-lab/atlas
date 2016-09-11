@@ -217,7 +217,7 @@ inline QString toQString(const glm::tvec2<double, P>& v)
 template<typename T, glm::precision P>
 inline void toVal(const QString& str, glm::tvec2<T, P>& v)
 {
-  QRegularExpression rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
   for (int i = 0; i < std::min(2, numList.size()); ++i) {
     toVal(numList[i], v[i]);
@@ -255,7 +255,7 @@ inline QString toQString(const glm::tvec3<double, P>& v)
 template<typename T, glm::precision P>
 inline void toVal(const QString& str, glm::tvec3<T, P>& v)
 {
-  QRegularExpression rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
   for (int i = 0; i < std::min(3, numList.size()); ++i) {
     toVal(numList[i], v[i]);
@@ -296,7 +296,7 @@ inline QString toQString(const glm::tvec4<double, P>& v)
 template<typename T, glm::precision P>
 inline void toVal(const QString& str, glm::tvec4<T, P>& v)
 {
-  QRegularExpression rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
   for (int i = 0; i < std::min(4, numList.size()); ++i) {
     toVal(numList[i], v[i]);
@@ -314,7 +314,7 @@ inline QString toQString(const QColor& v)
 
 inline void toVal(const QString& str, QColor& v)
 {
-  QRegularExpression rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
   for (int i = 0; i < std::min(4, numList.size()); ++i) {
     int c;
@@ -365,7 +365,7 @@ inline QString toQString(const glm::tmat2x2<double, P>& m)
 template<typename T, glm::precision P>
 inline void toVal(const QString& str, glm::tmat2x2<T, P>& m)
 {
-  QRegularExpression rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
   for (int i = 0; i < std::min(4, numList.size()); ++i) {
     toVal(numList[i], m[i % 2][i / 2]);
@@ -421,7 +421,7 @@ inline QString toQString(const glm::tmat3x3<double, P>& m)
 template<typename T, glm::precision P>
 inline void toVal(const QString& str, glm::tmat3x3<T, P>& m)
 {
-  QRegularExpression rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
   for (int i = 0; i < std::min(9, numList.size()); ++i) {
     toVal(numList[i], m[i % 3][i / 3]);
@@ -498,7 +498,7 @@ inline QString toQString(const glm::tmat4x4<double, P>& m)
 template<typename T, glm::precision P>
 inline void toVal(const QString& str, glm::tmat4x4<T, P>& m)
 {
-  QRegularExpression rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
   for (int i = 0; i < std::min(16, numList.size()); ++i) {
     toVal(numList[i], m[i % 4][i / 4]);
@@ -539,7 +539,7 @@ inline QString toQString(const glm::tquat<double, P>& v)
 template<typename T, glm::precision P>
 inline void toVal(const QString& str, glm::tquat<T, P>& q)
 {
-  QRegularExpression rx("(\\ |\\,|\\[|\\]|\\;)"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
   for (int i = 0; i < std::min(4, numList.size()); ++i) {
     toVal(numList[i], q[i]);

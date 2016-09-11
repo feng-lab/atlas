@@ -37,7 +37,7 @@ bool checkGLState(GLenum pname, GLenum value);
 
 bool checkGLState(GLenum pname, GLfloat value);
 
-bool checkGLState(GLenum pname, const glm::vec4 value);
+bool checkGLState(GLenum pname, const glm::vec4& value);
 
 } // namespace nim
 

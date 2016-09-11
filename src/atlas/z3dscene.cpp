@@ -13,10 +13,6 @@ Z3DScene::Z3DScene(int width, int height, bool stereo, QObject* parent)
 {
 }
 
-Z3DScene::~Z3DScene()
-{
-}
-
 void Z3DScene::drawBackground(QPainter* /*painter*/, const QRectF& /*rect*/)
 {
   if (!m_networkEvaluator) {

@@ -31,7 +31,6 @@ std::shared_ptr<ZImg> ZImgCommonSubBlock::read() const
 
 ZImgFormat::ZImgFormat() = default;
 
-
 ZImgFormat::~ZImgFormat() = default;
 
 bool ZImgFormat::canRead(const QString& filename) const

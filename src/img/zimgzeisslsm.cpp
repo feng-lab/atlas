@@ -6,11 +6,6 @@
 
 namespace nim {
 
-ZImgZeissLsm::ZImgZeissLsm()
-  : ZImgTiff()
-{
-}
-
 QString ZImgZeissLsm::shortName() const
 {
   return "Lsm";

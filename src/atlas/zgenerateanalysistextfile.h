@@ -47,7 +47,7 @@ public:
 
   // -----  first way to call ---------
 
-  void generate(const ZAnalysisTextFileInput input);
+  void generate(const ZAnalysisTextFileInput& input);
 
   // -----  second way to call ---------
 

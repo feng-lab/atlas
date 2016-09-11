@@ -274,13 +274,6 @@ ZImgZeissCZI& ZImgZeissCZI::instance()
   return imgCzi;
 }
 
-ZImgZeissCZI::ZImgZeissCZI()
-{
-
-}
-
-ZImgZeissCZI::~ZImgZeissCZI() = default;
-
 ZImg ZImgZeissCZI::stackTiles(const QString& filename, size_t ch, size_t scene)
 {
   clearInternalState();

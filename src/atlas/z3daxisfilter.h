@@ -15,8 +15,6 @@ Q_OBJECT
 public:
   explicit Z3DAxisFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  virtual ~Z3DAxisFilter();
-
   virtual bool isReady(Z3DEye eye) const override;
 
   void setVisible(bool visible);

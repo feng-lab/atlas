@@ -82,10 +82,6 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent)
   }
 }
 
-Z3DImg::~Z3DImg()
-{
-}
-
 QString Z3DImg::samplerType() const
 {
   if (is3DData()) {

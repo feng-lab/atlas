@@ -170,7 +170,6 @@ uint16_t getOrientation(jpeg_decompress_struct& cinfo)
     }
 
     marker = marker->next;
-    continue;
   }
   return orientation;
 }
@@ -330,12 +329,6 @@ ZImgJpeg& ZImgJpeg::instance()
   return imgJpeg;
 }
 
-ZImgJpeg::ZImgJpeg()
-{
-}
-
-ZImgJpeg::~ZImgJpeg() = default;
-
 QString ZImgJpeg::shortName() const
 {
   return "Jpeg";
@@ -418,7 +411,6 @@ void ZImgJpeg::readMetadata(const QString& filename, ZImgMetadata& meta, size_t 
     }
 
     marker = marker->next;
-    continue;
   }
 }
 
@@ -500,7 +492,6 @@ ZImgJpeg::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, con
     }
 
     marker = marker->next;
-    continue;
   }
 }
 

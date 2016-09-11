@@ -10,8 +10,6 @@ Q_OBJECT
 public:
   explicit Z3DArrowRenderer(Z3DRendererBase& rendererBase);
 
-  virtual ~Z3DArrowRenderer();
-
   // head length is in proportion to whole length
   void setArrowData(std::vector<glm::vec4>* tailPosAndTailRadius, std::vector<glm::vec4>* headPosAndHeadRadius,
                     float headLengthProportion = 0.1);

@@ -10,13 +10,6 @@
 
 namespace nim {
 
-ZImgMetaImage::ZImgMetaImage()
-  : ZImgFormat()
-{
-}
-
-ZImgMetaImage::~ZImgMetaImage() = default;
-
 QString ZImgMetaImage::shortName() const
 {
   return "MetaImage";

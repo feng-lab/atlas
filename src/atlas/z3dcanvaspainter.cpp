@@ -397,7 +397,7 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
   }
 }
 
-void Z3DCanvasPainter::setOutputSize(glm::uvec2 size)
+void Z3DCanvasPainter::setOutputSize(const glm::uvec2& size)
 {
   m_inport.setExpectedSize(size);
   m_leftEyeInport.setExpectedSize(size);

@@ -131,7 +131,7 @@ struct edge_in_MST
 {
   edge_in_MST() = default;
 
-  edge_in_MST(const std::vector<Edge>& mstEdges)
+  explicit edge_in_MST(const std::vector<Edge>& mstEdges)
     : m_MSTEdges(&mstEdges)
   {
   }
@@ -173,8 +173,6 @@ private:
 } // namespace
 
 namespace nim {
-
-ZImgMerge::ZImgMerge() = default;
 
 void ZImgMerge::addImg(const ZImg& img, const ZVoxelCoordinate& loc, const QString& imgName)
 {

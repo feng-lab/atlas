@@ -28,8 +28,6 @@ ZImgITKImage::ZImgITKImage()
   }
 }
 
-ZImgITKImage::~ZImgITKImage() = default;
-
 QString ZImgITKImage::shortName() const
 {
   return "ITKImage";

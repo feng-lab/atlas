@@ -53,7 +53,7 @@ Z3DGpuInfo::GpuVendor Z3DGpuInfo::gpuVendor() const
   return m_gpuVendor;
 }
 
-bool Z3DGpuInfo::isExtensionSupported(QString extension) const
+bool Z3DGpuInfo::isExtensionSupported(const QString& extension) const
 {
   return m_glExtensionsString.contains(extension, Qt::CaseInsensitive);
 }

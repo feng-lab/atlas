@@ -18,10 +18,6 @@ Z3DRegionAnnotationFilter::Z3DRegionAnnotationFilter(Z3DGlobalParameters& global
   m_numParas = m_parameters.size();
 }
 
-Z3DRegionAnnotationFilter::~Z3DRegionAnnotationFilter()
-{
-}
-
 void Z3DRegionAnnotationFilter::process(Z3DEye eye)
 {
   initializeCutRange();

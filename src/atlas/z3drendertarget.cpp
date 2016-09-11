@@ -150,7 +150,7 @@ GLuint Z3DRenderTarget::handle() const
   return m_fboID;
 }
 
-glm::vec4 Z3DRenderTarget::floatColorAtPos(glm::ivec2 pos)
+glm::vec4 Z3DRenderTarget::floatColorAtPos(const glm::ivec2& pos)
 {
   bind();
   glPixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -160,7 +160,7 @@ glm::vec4 Z3DRenderTarget::floatColorAtPos(glm::ivec2 pos)
   return pixel;
 }
 
-glm::col4 Z3DRenderTarget::colorAtPos(glm::ivec2 pos)
+glm::col4 Z3DRenderTarget::colorAtPos(const glm::ivec2& pos)
 {
   bind();
   glPixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -171,7 +171,7 @@ glm::col4 Z3DRenderTarget::colorAtPos(glm::ivec2 pos)
   return pixel;
 }
 
-GLfloat Z3DRenderTarget::depthAtPos(glm::ivec2 pos)
+GLfloat Z3DRenderTarget::depthAtPos(const glm::ivec2& pos)
 {
   bind();
   GLfloat res;
@@ -181,7 +181,7 @@ GLfloat Z3DRenderTarget::depthAtPos(glm::ivec2 pos)
   return res;
 }
 
-bool Z3DRenderTarget::resize(glm::uvec2 newsize)
+bool Z3DRenderTarget::resize(const glm::uvec2& newsize)
 {
   if (newsize == m_size)
     return false;

@@ -125,12 +125,6 @@ ZImgJpegXR& ZImgJpegXR::instance()
   return imgJpegXR;
 }
 
-ZImgJpegXR::ZImgJpegXR()
-{
-}
-
-ZImgJpegXR::~ZImgJpegXR() = default;
-
 bool ZImgJpegXR::supportRead() const
 {
   return true;

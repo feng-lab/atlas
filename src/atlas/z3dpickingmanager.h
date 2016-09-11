@@ -30,7 +30,7 @@ public:
   glm::vec4 fColorOfObject(const void* obj)
   { return glm::vec4(glm::vec4(colorOfObject(obj)) / 255.f); }
 
-  const void* objectOfColor(glm::col4 col);
+  const void* objectOfColor(const glm::col4& col);
 
   const void* objectAtWidgetPos(glm::ivec2 pos);
 
@@ -52,7 +52,7 @@ public:
   bool isRegistered(const void* obj)
   { return m_objectToColor.find(obj) != m_objectToColor.end(); }
 
-  bool isRegistered(glm::col4 col)
+  bool isRegistered(const glm::col4& col)
   { return m_colorToObject.find(col) != m_colorToObject.end(); }
 
 private:

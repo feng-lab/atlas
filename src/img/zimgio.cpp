@@ -84,9 +84,8 @@ void ZImgIO::readInfo(const QString& filename, std::vector<ZImgInfo>& res,
       if (!tmpInfo.empty()) {
         tmpInfo.swap(res);
         return;
-      } else {
-        throw ZIOException("empty image");
       }
+      throw ZIOException("empty image");
     }
     catch (const ZIOException& e) {
       error = QString("Try read file %1 as '%2' format, failed: %3").arg(filename).arg(
@@ -104,7 +103,8 @@ void ZImgIO::readInfo(const QStringList& fileList, Dimension catDim, std::vector
   if (fileList.size() == 1) {
     readInfo(fileList[0], res, subBlocks, nullptr, format);
     return;
-  } else if (fileList.empty()) {
+  }
+  if (fileList.empty()) {
     throw ZIOException("Read sequence failed: empty file list");
   }
 

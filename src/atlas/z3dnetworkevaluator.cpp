@@ -32,10 +32,6 @@ Z3DNetworkEvaluator::Z3DNetworkEvaluator(QObject* parent)
 #endif
 }
 
-Z3DNetworkEvaluator::~Z3DNetworkEvaluator()
-{
-}
-
 void Z3DNetworkEvaluator::setNetworkSink(Z3DCanvasPainter* canvasPainter)
 {
   if (m_canvasPainter == canvasPainter)

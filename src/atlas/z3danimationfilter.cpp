@@ -81,10 +81,6 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject
   connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DAnimationFilter::objVisibleChanged);
 }
 
-Z3DAnimationFilter::~Z3DAnimationFilter()
-{
-}
-
 void Z3DAnimationFilter::process(Z3DEye /*unused*/)
 {
   if (m_dataIsInvalid) {

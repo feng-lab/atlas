@@ -15,8 +15,6 @@ Z3DShaderManager& Z3DShaderManager::instance()
   return sm;
 }
 
-Z3DShaderManager::Z3DShaderManager() = default;
-
 Z3DShader& Z3DShaderManager::shader(const QString& fn, const QString& header, const Z3DContext& context)
 {
   ShaderKey key(fn, header, context);

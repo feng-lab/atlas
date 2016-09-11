@@ -20,11 +20,6 @@ ZButtonColumnDelegate::ZButtonColumnDelegate(QObject* parent)
   }
 }
 
-ZButtonColumnDelegate::~ZButtonColumnDelegate()
-{
-
-}
-
 QWidget*
 ZButtonColumnDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
