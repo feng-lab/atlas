@@ -29,11 +29,11 @@ fi
 srcArchive=$srcPackageDIR/libjpeg-turbo-1.5.0.tar.gz
 tar -zxf "$srcArchive" -C $baseDIR
 
-if [ -d $baseDIR/libpng-1.6.24 ]
+if [ -d $baseDIR/libpng-1.6.25 ]
 then
-  rm -rf $baseDIR/libpng-1.6.24
+  rm -rf $baseDIR/libpng-1.6.25
 fi
-srcArchive=$srcPackageDIR/libpng-1.6.24.tar.gz
+srcArchive=$srcPackageDIR/libpng-1.6.25.tar.gz
 tar -zxf "$srcArchive" -C $baseDIR
 
 if [ -d $baseDIR/hdf5-1.10.0-patch1 ]
@@ -72,7 +72,7 @@ else
   srcArchive=$srcPackageDIR/ispc-v1.9.1-osx.tar.gz
   tar -zxf "$srcArchive" -C $baseDIR
 
-  srcArchive=$srcPackageDIR/ffmpeg-3.1.2.7z
+  srcArchive=$srcPackageDIR/ffmpeg-3.1.3.7z
   7z x -y -o$baseDIR/atlas "$srcArchive"
 fi
 

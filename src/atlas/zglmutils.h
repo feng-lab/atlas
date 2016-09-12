@@ -8,8 +8,8 @@
 #define GLM_FORCE_SIZE_T_LENGTH
 #define GLM_FORCE_NO_CTOR_INIT
 #define GLM_FORCE_EXPLICIT_CTOR
-//#define GLM_MESSAGES
-#define GLM_SWIZZLE
+//#define GLM_FORCE_MESSAGES
+#define GLM_FORCE_SWIZZLE
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>

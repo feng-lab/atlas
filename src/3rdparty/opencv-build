@@ -48,7 +48,7 @@ make -j $numCores install
 mv -f $srcDIR/cmake/OpenCVCompilerOptions.cmake.bak $srcDIR/cmake/OpenCVCompilerOptions.cmake
 
 # patch cmake module
-$currDIR/massedit.py -w -e "re.sub(r';libtbb.dylib;ippcore;ipps;ippi;ippcc;ippcv;ippvm;/opt/intel/compilers_and_libraries_2016.3.170/mac/compiler/lib/libirc.dylib;/opt/intel/compilers_and_libraries_2016.3.170/mac/compiler/lib/libimf.dylib;/opt/intel/compilers_and_libraries_2016.3.170/mac/compiler/lib/libsvml.dylib', r'', line)" $installDIR/share/OpenCV/OpenCVModules-release.cmake
+$currDIR/massedit.py -w -e "re.sub(r';libtbb.dylib;ippcore;ipps;ippi;ippcc;ippcv;ippvm;/opt/intel/compilers_and_libraries_2017.0.102/mac/compiler/lib/libirc.dylib;/opt/intel/compilers_and_libraries_2017.0.102/mac/compiler/lib/libimf.dylib;/opt/intel/compilers_and_libraries_2017.0.102/mac/compiler/lib/libsvml.dylib', r'', line)" $installDIR/share/OpenCV/OpenCVModules-release.cmake
 
 cd $currDIR
 rm -rf $buildDIR
