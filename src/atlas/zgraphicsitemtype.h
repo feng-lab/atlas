@@ -1,7 +1,3 @@
-//
-// Created by Linqing Feng on 8/26/16.
-//
-
 #pragma once
 
 #include <QGraphicsItem>

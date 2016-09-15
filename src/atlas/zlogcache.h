@@ -1,7 +1,3 @@
-//
-// Created by Linqing Feng on 8/23/16.
-//
-
 #pragma once
 
 #include "zlog.h"

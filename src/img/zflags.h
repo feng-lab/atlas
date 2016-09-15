@@ -1,7 +1,3 @@
-//
-// Created by Linqing Feng on 8/19/16.
-//
-
 #pragma once
 
 #include <type_traits>

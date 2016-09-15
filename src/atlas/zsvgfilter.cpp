@@ -1,7 +1,3 @@
-//
-// Created by Linqing Feng on 8/24/16.
-//
-
 #include "zsvgfilter.h"
 
 #include "zgraphicsview.h"

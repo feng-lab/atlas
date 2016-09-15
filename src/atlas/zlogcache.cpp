@@ -1,7 +1,3 @@
-//
-// Created by Linqing Feng on 8/23/16.
-//
-
 #include "zlogcache.h"
 
 #include <QTimer>

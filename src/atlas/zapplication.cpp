@@ -1,7 +1,3 @@
-//
-// Created by Linqing Feng on 8/5/16.
-//
-
 #include "zapplication.h"
 
 #include "zexception.h"

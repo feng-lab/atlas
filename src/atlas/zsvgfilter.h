@@ -1,7 +1,3 @@
-//
-// Created by Linqing Feng on 8/24/16.
-//
-
 #pragma once
 
 #include "zobjfilter.h"
