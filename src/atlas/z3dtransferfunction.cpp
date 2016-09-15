@@ -65,13 +65,7 @@ void Z3DTransferFunction::resetToDefault()
   emit changed();
 }
 
-void Z3DTransferFunction::createTexture()
-{
-  m_texture.reset(new Z3DTexture(GLint(GL_RGBA8), glm::uvec3(m_dimensions), m_textureFormat, m_textureDataType));
-  CHECK_GL_ERROR
-}
-
-Z3DTexture* Z3DTransferFunction::texture()
+Z3DTexture* Z3DTransferFunction::texture() const
 {
   if (m_textureIsInvalid)
     updateTexture();
@@ -118,7 +112,7 @@ void Z3DTransferFunction::fitDimensions(uint32_t& width, uint32_t& height, uint3
     depth = maxTexSize;
 }
 
-void Z3DTransferFunction::updateTexture()
+void Z3DTransferFunction::updateTexture() const
 {
   if (!m_texture || (m_texture->dimension() != glm::uvec3(m_dimensions)))
     createTexture();
@@ -131,6 +125,12 @@ void Z3DTransferFunction::updateTexture()
   CHECK_GL_ERROR
 
   m_textureIsInvalid = false;
+}
+
+void Z3DTransferFunction::createTexture() const
+{
+  m_texture.reset(new Z3DTexture(GLint(GL_RGBA8), glm::uvec3(m_dimensions), m_textureFormat, m_textureDataType));
+  CHECK_GL_ERROR
 }
 
 bool Z3DTransferFunction::isValidDomainMin(double min) const

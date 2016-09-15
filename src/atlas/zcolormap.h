@@ -316,9 +316,9 @@ public:
   inline bool isEmpty() const
   { return m_keys.empty(); }
 
-  Z3DTexture* texture1D();
+  Z3DTexture* texture1D() const;
 
-  void create1DTexture(size_t width = 256);
+  void create1DTexture(size_t width = 256) const;
 
 signals:
 
@@ -328,7 +328,7 @@ protected:
   void invalidateTexture()
   { m_textureIsInvalid = true; }
 
-  void update1DTexture();
+  void update1DTexture() const;
 
   inline void clearKeys()
   { m_keys.clear(); }
@@ -336,8 +336,8 @@ protected:
   virtual bool equalTo(const ZColorMap& cm) const;
 
 protected:
-  std::unique_ptr<Z3DTexture> m_texture;
-  bool m_textureIsInvalid = true;
+  mutable std::unique_ptr<Z3DTexture> m_texture;
+  mutable bool m_textureIsInvalid = true;
 
   friend class ZColorMapParameter;
 

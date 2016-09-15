@@ -47,11 +47,9 @@ public:
   { return m_dimensions; }
 
   // Returns the texture of the transfer function.
-  Z3DTexture* texture();
+  Z3DTexture* texture() const;
 
   void resize(uint32_t width);
-
-  void updateTexture();
 
   // domain should be in [0.0, 1.0] range
   virtual bool isValidDomainMin(double min) const override;
@@ -59,7 +57,9 @@ public:
   virtual bool isValidDomainMax(double max) const override;
 
 protected:
-  void createTexture();
+  void updateTexture() const;
+
+  void createTexture() const;
 
 private:
   // Adapts the given width and height of transfer function to graphics board capabilities.

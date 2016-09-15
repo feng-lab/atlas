@@ -97,7 +97,7 @@ private:
 
   //QThread *m_thread;
 
-  mutable bool m_isCanceled;
+  std::atomic<bool> m_isCanceled;
   bool m_hasError;
 
   QProgressDialog* m_progressDialog;

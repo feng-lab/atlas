@@ -238,7 +238,6 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     for (size_t c = 0; c < m_3dImg->numChannels(); ++c) {
       m_sliceColormaps.emplace_back(
         std::make_unique<ZColorMapParameter>(QString("Slice Channel %1 Colormap").arg(c + 1)));
-      m_sliceColormaps[c]->get().create1DTexture(256);
       m_sliceColormaps[c]->get().reset(0.0, 1.0, QColor(0, 0, 0), QColor(m_3dImg->channelColor(c).r,
                                                                          m_3dImg->channelColor(c).g,
                                                                          m_3dImg->channelColor(c).b));

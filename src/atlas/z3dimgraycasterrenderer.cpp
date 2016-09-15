@@ -160,7 +160,7 @@ void Z3DImgRaycasterRenderer::adjustWidgets()
                                  m_compositingMode.isSelected("Local MIP Opaque"));
 }
 
-void Z3DImgRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram& shader)
+void Z3DImgRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram& shader) const
 {
   shader.setLogUniformLocationError(false);
 
@@ -184,7 +184,7 @@ void Z3DImgRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram& shad
   shader.setLogUniformLocationError(true);
 }
 
-void Z3DImgRaycasterRenderer::bindVolumeAndTransferFunc(Z3DShaderProgram& shader, size_t idx)
+void Z3DImgRaycasterRenderer::bindVolumeAndTransferFunc(Z3DShaderProgram& shader, size_t idx) const
 {
   shader.setLogUniformLocationError(false);
 

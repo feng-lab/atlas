@@ -55,7 +55,7 @@ void Z3DVolumeSliceRenderer::addQuad(const ZMesh& quad)
   m_quads.push_back(quad);
 }
 
-void Z3DVolumeSliceRenderer::bindVolumes(Z3DShaderProgram& shader)
+void Z3DVolumeSliceRenderer::bindVolumes(Z3DShaderProgram& shader) const
 {
   size_t idx = 0;
   for (size_t i = 0; i < m_img->numChannels(); ++i) {
@@ -70,7 +70,7 @@ void Z3DVolumeSliceRenderer::bindVolumes(Z3DShaderProgram& shader)
   }
 }
 
-void Z3DVolumeSliceRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx)
+void Z3DVolumeSliceRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx) const
 {
   // volumes
   shader.bindTexture(m_volumeUniformNames[0], m_img->volumes()[idx]->texture(),

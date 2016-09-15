@@ -95,7 +95,7 @@ private:
   ZStringIntOptionParameter m_transform;
   ZStringIntOptionParameter m_optimizer;
 
-  mutable bool m_isCanceled;
+  std::atomic<bool> m_isCanceled;
   bool m_hasError;
 
   QProgressDialog* m_progressDialog;

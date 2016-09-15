@@ -138,7 +138,7 @@ public:
 
   double logNormalizedHistogramValue(double fraction) const;
 
-  Z3DTexture* texture();
+  Z3DTexture* texture() const;
 
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
 
@@ -334,7 +334,7 @@ signals:
 protected:
   void setHistogram();
 
-  void generateTexture();
+  void generateTexture() const;
 
 private:
   void computeHistogramMaxValue();
@@ -352,7 +352,7 @@ protected:
   glm::mat4 m_transformationMatrix;
   std::vector<size_t> m_histogram;
   double m_histogramMaxValue;
-  std::unique_ptr<Z3DTexture> m_texture;
+  mutable std::unique_ptr<Z3DTexture> m_texture;
 
   glm::vec3 m_volColor;
 

@@ -81,9 +81,9 @@ public:
 protected:
   void adjustWidgets();
 
-  void bindVolumesAndTransferFuncs(Z3DShaderProgram& shader);
+  void bindVolumesAndTransferFuncs(Z3DShaderProgram& shader) const;
 
-  void bindVolumeAndTransferFunc(Z3DShaderProgram& shader, size_t idx);
+  void bindVolumeAndTransferFunc(Z3DShaderProgram& shader, size_t idx) const;
 
   QString generateHeader();
 

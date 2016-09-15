@@ -832,7 +832,7 @@ void ZColorMap::removeKey(size_t index)
   emit changed();
 }
 
-Z3DTexture* ZColorMap::texture1D()
+Z3DTexture* ZColorMap::texture1D() const
 {
   if (!m_texture)
     create1DTexture(256);
@@ -843,7 +843,7 @@ Z3DTexture* ZColorMap::texture1D()
   return m_texture.get();
 }
 
-void ZColorMap::create1DTexture(size_t width)
+void ZColorMap::create1DTexture(size_t width) const
 {
   size_t maxTexSize = Z3DGpuInfo::instance().maxTextureSize();
   if (maxTexSize < width)
@@ -852,7 +852,7 @@ void ZColorMap::create1DTexture(size_t width)
   CHECK_GL_ERROR
 }
 
-void ZColorMap::update1DTexture()
+void ZColorMap::update1DTexture() const
 {
   if (!m_texture)
     return;

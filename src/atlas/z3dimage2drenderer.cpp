@@ -62,7 +62,7 @@ void Z3DImage2DRenderer::addQuad(const ZMesh& quad)
   m_quads.push_back(quad);
 }
 
-void Z3DImage2DRenderer::bindVolumes(Z3DShaderProgram& shader)
+void Z3DImage2DRenderer::bindVolumes(Z3DShaderProgram& shader) const
 {
   size_t idx = 0;
   for (size_t i = 0; i < m_volumes.size(); ++i) {
@@ -80,7 +80,7 @@ void Z3DImage2DRenderer::bindVolumes(Z3DShaderProgram& shader)
   }
 }
 
-void Z3DImage2DRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx)
+void Z3DImage2DRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx) const
 {
   // volumes
   shader.bindTexture(m_volumeUniformNames[0], m_volumes[idx]->texture(), GLint(GL_NEAREST), GLint(GL_NEAREST));

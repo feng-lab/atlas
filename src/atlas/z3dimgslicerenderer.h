@@ -42,9 +42,9 @@ public:
   virtual void compile() override;
 
 protected:
-  void bindVolumes(Z3DShaderProgram& shader);
+  void bindVolumes(Z3DShaderProgram& shader) const;
 
-  void bindVolume(Z3DShaderProgram& shader, size_t idx);
+  void bindVolume(Z3DShaderProgram& shader, size_t idx) const;
 
   QString generateHeader();
 

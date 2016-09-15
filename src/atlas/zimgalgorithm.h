@@ -25,7 +25,7 @@ public:
 
   // if flag is set to true, current algorithm will abort and throw a ZProcessAbortException
   // or itk::ProcessAborted
-  inline void setCancelFlag(bool* flag)
+  inline void setCancelFlag(std::atomic<bool>* flag)
   { m_cancelFlag = flag; }
 
   // default report 1 percent change
@@ -97,7 +97,7 @@ protected:
   double m_weight;
   double m_progress;
   double m_reportInterval;
-  bool* m_cancelFlag;
+  std::atomic<bool>* m_cancelFlag;
   ZImgAlgorithmBaseWithProgressReporter* m_parent;
 };
 

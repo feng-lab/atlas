@@ -140,7 +140,7 @@ double Z3DVolume::logNormalizedHistogramValue(double fraction) const
   return logNormalizedHistogramValue(index);
 }
 
-Z3DTexture* Z3DVolume::texture()
+Z3DTexture* Z3DVolume::texture() const
 {
   if (!m_texture) {
     generateTexture();
@@ -272,7 +272,7 @@ void Z3DVolume::setHistogram()
   emit histogramFinished();
 }
 
-void Z3DVolume::generateTexture()
+void Z3DVolume::generateTexture() const
 {
   if (dimensions().x == 0 || dimensions().y == 0 || dimensions().z == 0) {
     QString message = QString(
