@@ -8,6 +8,7 @@
 #include "zstringutils.h"
 #include "zsysteminfo.h"
 #include "zlog.h"
+#include <include/reader.h>
 #include <QtWidgets>
 
 namespace {
@@ -86,6 +87,56 @@ void buildConnectionFromGrid(const std::vector<std::vector<size_t>>& grid,
         if (!connected) {
           throw ZStitchException(QString("Can not stitch because images are not connected. Abort."));
         }
+      }
+    }
+  }
+}
+
+void buildConnectionFromTextFile(const QString& filename,
+                                 std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>& conn)
+{
+  if (!QFile::exists(filename)) {
+    throw ZStitchException(QString("file %1 doesn't exist").arg(filename));
+  }
+
+  QStringList header;
+  header << "# img1" << "img2" << "position";
+
+  QList<QStringList> allLines = QtCSV::Reader::readToList(filename);
+  if (allLines.empty()) {
+    throw ZStitchException(QString("Can not parse file (%1) or file is empty").arg(filename));
+  }
+
+  for (const auto& list: allLines) {
+    if (list.empty() || list.at(0).startsWith("#")) {
+      continue;
+    }
+    if (list.size() < header.size()) {
+      throw ZStitchException(
+        QString("Wrong number of items in line (%1), expected format: <%2>").arg(list.join(',')).arg(header.join(',')));
+    }
+    bool ok = false;
+    int idx1 = list[0].toInt(&ok);
+    if (!ok || idx1 <= 0)
+      throw ZStitchException(
+        QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+    int idx2 = list[1].toInt(&ok);
+    if (!ok || idx2 <= 0)
+      throw ZStitchException(
+        QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+    auto stackPair = std::make_pair<size_t, size_t>(idx1 - 1, idx2 - 1);
+    conn[stackPair] = ZImgNCCMatch::PositionHint::None;
+    for (int i = 2; i < list.size(); ++i) {
+      QString pos = list[i].trimmed();
+      if (pos.compare("Down", Qt::CaseInsensitive) == 0) {
+        conn[stackPair] = conn[stackPair] | ZImgNCCMatch::PositionHint::Down;
+      } else if (pos.compare("Right", Qt::CaseInsensitive) == 0) {
+        conn[stackPair] = conn[stackPair] | ZImgNCCMatch::PositionHint::Right;
+      } else if (pos.compare("Back", Qt::CaseInsensitive) == 0) {
+        conn[stackPair] = conn[stackPair] | ZImgNCCMatch::PositionHint::Back;
+      } else {
+        throw ZStitchException(
+          QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
       }
     }
   }
@@ -468,7 +519,8 @@ QLayout* ZStitchImageDialog::createIOLayout()
 
   pl = new QLabel(tr("interval: "), this);
   pl->setToolTip(tr(
-    "Use the interval to downsample stack while stitching (more memory efficient). Note that this interval will be applied to original stack, not downsampled one."));
+    "Use the interval to downsample stack while stitching (more memory efficient). Note that this interval will be "
+      "applied to original stack, not downsampled one."));
   layout->addWidget(pl, row, 0);
   m_intvXSpinBox = new QSpinBox(this);
   m_intvXSpinBox->setRange(0, 10);
@@ -1267,20 +1319,7 @@ void ZStitchImageDialog::stitchStacks2()
     QApplication::processEvents();
 
   } else if (m_useConnFileRadioButton->isChecked()) {
-    //    m_commandOutputEdit->append("Loading connection file...");
-    //    QByteArray connba = m_connFileEdit->text().toUtf8();
-    //    conn = load_conn(connba.data(), all_config);
-    //    if (!conn) {
-    //      m_commandOutputEdit->append(QString("<font color=red>Failed to load connection file: %1. Abort.</font>").arg(m_connFileEdit->text()));
-    //      for (int i=0; i<nstack; ++i) {
-    //        free(all_config[i]);
-    //      }
-    //      free(all_config);
-    //      all_config = nullptr;
-    //      free(filepath);
-    //      filepath = nullptr;
-    //      return;
-    //    }
+    buildConnectionFromTextFile(m_connFileEdit->text(), conn);
   } else if (m_useFullConnectionRadioButton->isChecked()) {
     m_commandOutputEdit->append("<font color=red>Blind Stitching...</font>");
     QApplication::processEvents();
@@ -1930,20 +1969,7 @@ void ZStitchImageDialog::stitchStacks()
       QApplication::processEvents();
 
     } else if (m_useConnFileRadioButton->isChecked()) {
-      //    m_commandOutputEdit->append("Loading connection file...");
-      //    QByteArray connba = m_connFileEdit->text().toUtf8();
-      //    conn = load_conn(connba.data(), all_config);
-      //    if (!conn) {
-      //      m_commandOutputEdit->append(QString("<font color=red>Failed to load connection file: %1. Abort.</font>").arg(m_connFileEdit->text()));
-      //      for (int i=0; i<nstack; ++i) {
-      //        free(all_config[i]);
-      //      }
-      //      free(all_config);
-      //      all_config = nullptr;
-      //      free(filepath);
-      //      filepath = nullptr;
-      //      return;
-      //    }
+      buildConnectionFromTextFile(m_connFileEdit->text(), conn);
     } else if (m_useFullConnectionRadioButton->isChecked()) {
       m_commandOutputEdit->append("<font color=red>Blind Stitching...</font>");
       QApplication::processEvents();
