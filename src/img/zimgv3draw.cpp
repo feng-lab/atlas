@@ -156,6 +156,10 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   imgInfo.createDefaultDescriptions();
 
   img = readRawImg(filename, imgInfo, "ZCTL", dataOffset, region);
+  if ((hostIsLittleEndian() && (endian == 'B' || endian == 'b')) ||
+      (!hostIsLittleEndian() && (endian == 'L' || endian == 'l'))) {
+    img.reverseEndianness();
+  }
 
   if (ratio > 1) {
     img.zoom(1.0 / ratio, 1.0 / ratio);

@@ -89,6 +89,9 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
       throw ZIOException("Wrong ImageJ Tiff file");
     }
     img = readRawImg(filename, m_imgInfo[scene], m_dimensionOrder, ifds[0].stripOffsets(0), region);
+    if (!tiff.isNativeEndianness()) {
+      img.reverseEndianness();
+    }
     return;
   }
 

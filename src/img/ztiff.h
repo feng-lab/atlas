@@ -194,6 +194,9 @@ public:
 
   bool isLsmFile() const;
 
+  bool isNativeEndianness() const
+  { return m_isNativeEndianness; }
+
   // crash if file is not lsm
   const ZImgMetatag& lsmInfoTag() const;
 
@@ -222,9 +225,9 @@ protected:
 
   QString tagToName(uint32_t tag) const;
 
-  void readIFDs(const QString& filename, std::vector<ZTiffIFD>& ifds) const;
+  void readIFDs(const QString& filename, std::vector<ZTiffIFD>& ifds, bool& reverseEndianness) const;
 
-  void readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds) const;
+  void readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds, bool& reverseEndianness) const;
 
   // read img from current ifd
   void readImg(ZImg& img, bool divideByAlpha);
@@ -249,7 +252,8 @@ protected:
 private:
   std::vector<ZTiffIFD> m_ifds;
   std::unique_ptr<TIFF, void (*)(TIFF*)> m_tif;
-  bool m_useColormap;
+  bool m_useColormap = true;
+  bool m_isNativeEndianness = false;
 };
 
 class ZTiffWriter

@@ -51,12 +51,6 @@ union
   TIFFHeaderCommon common;
 } hdr;
 
-bool hostIsLittleEndian()
-{
-  int num = 1;
-  return *reinterpret_cast<char*>(&num) == 1;
-}
-
 const struct tiftagname
 {
   uint32 tag;
@@ -715,7 +709,7 @@ uint32_t ZTiffIFD::subfileTypeData() const
 }
 
 ZTiff::ZTiff()
-  : m_tif(nullptr, TIFFClose), m_useColormap(true)
+  : m_tif(nullptr, TIFFClose)
 {
 }
 
@@ -738,7 +732,7 @@ void ZTiff::load(const QString& filename, bool tagOnly)
 {
   close();
 
-  readIFDs(filename, m_ifds);
+  readIFDs(filename, m_ifds, m_isNativeEndianness);
   //LOG(INFO) << toQString();
 
   if (m_useColormap) {
@@ -801,7 +795,7 @@ void ZTiff::load(std::istream& fs, bool tagOnly)
 {
   close();
 
-  readIFDs(fs, m_ifds);
+  readIFDs(fs, m_ifds, m_isNativeEndianness);
 
   if (!tagOnly) {
     if (fs.fail())
@@ -1235,14 +1229,14 @@ QString ZTiff::tagToName(uint32_t tag) const
   return "Unknown tag";
 }
 
-void ZTiff::readIFDs(const QString& filename, std::vector<ZTiffIFD>& ifds) const
+void ZTiff::readIFDs(const QString& filename, std::vector<ZTiffIFD>& ifds, bool& isNativeEndianness) const
 {
   std::ifstream fs;
   openFileStream(fs, filename, std::ios_base::binary | std::ios_base::in);
-  readIFDs(fs, ifds);
+  readIFDs(fs, ifds, isNativeEndianness);
 }
 
-void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds) const
+void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds, bool& isNativeEndianness) const
 {
   std::vector<ZTiffIFD> _ifds;
   readStream(fs, &hdr, sizeof(TIFFHeaderCommon));
@@ -1255,10 +1249,12 @@ void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds) const
   }
 
   bool swabflag;
-  if (hdr.common.tiff_magic == TIFF_BIGENDIAN || hdr.common.tiff_magic == MDI_BIGENDIAN)
+  if (hdr.common.tiff_magic == TIFF_BIGENDIAN || hdr.common.tiff_magic == MDI_BIGENDIAN) {
     swabflag = hostIsLittleEndian();
-  else
+  } else {
     swabflag = !hostIsLittleEndian();
+  }
+  isNativeEndianness = !swabflag;
   if (swabflag)
     boost::endian::endian_reverse_inplace(hdr.common.tiff_version);
 

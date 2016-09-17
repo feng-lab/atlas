@@ -67,6 +67,12 @@ inline bool is_aligned(Type* ptr, size_t a)
   return (reinterpret_cast<uintptr_t>(ptr) & (a - 1)) == 0;
 }
 
+inline bool hostIsLittleEndian()
+{
+  int32_t num = 1;
+  return *reinterpret_cast<char*>(&num) == 1;
+}
+
 // effective stl, item 24, Scott Meyers
 template<typename MapType, // type of map
   typename KeyArgType,

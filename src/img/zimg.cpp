@@ -8,6 +8,7 @@
 #include "zbenchtimer.h"
 #include <QTextStream>
 #include <QFileInfo>
+#include <boost/endian/conversion.hpp>
 #include <algorithm>
 
 namespace {
@@ -430,6 +431,38 @@ void ZImg::allocate()
         break;
       default:
         break;
+    }
+  }
+}
+
+void ZImg::reverseEndianness()
+{
+  if (m_info.bytesPerVoxel == 1)
+    return;
+
+  if (m_info.bytesPerVoxel == 2) {
+    for (size_t t = 0; t < numTimes(); ++t) {
+      uint16_t* data = timeData<uint16_t>(t);
+      size_t count = timeVoxelNumber();
+      for (size_t v = 0; v < count; ++v) {
+        boost::endian::endian_reverse_inplace(data[v]);
+      }
+    }
+  } else if (m_info.bytesPerVoxel == 4) {
+    for (size_t t = 0; t < numTimes(); ++t) {
+      uint32_t* data = timeData<uint32_t>(t);
+      size_t count = timeVoxelNumber();
+      for (size_t v = 0; v < count; ++v) {
+        boost::endian::endian_reverse_inplace(data[v]);
+      }
+    }
+  } else if (m_info.bytesPerVoxel == 8) {
+    for (size_t t = 0; t < numTimes(); ++t) {
+      uint64_t* data = timeData<uint64_t>(t);
+      size_t count = timeVoxelNumber();
+      for (size_t v = 0; v < count; ++v) {
+        boost::endian::endian_reverse_inplace(data[v]);
+      }
     }
   }
 }

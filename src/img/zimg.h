@@ -471,6 +471,9 @@ public:
     return *(data<T>(coordCopy));
   }
 
+  // reverse endianness of img data
+  void reverseEndianness();
+
   // output img as values row by row, for debug
   QString toQString() const;
 
