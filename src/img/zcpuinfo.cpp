@@ -28,20 +28,19 @@ namespace {
 #define cpuid __cpuid
 #define cpuidex __cpuidex
 
-using LPFN_GLPI = BOOL (WINAPI *)(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD);
+using LPFN_GLPI = BOOL (WINAPI*)(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD);
 
 // Helper function to count set bits in the processor mask.
 DWORD CountSetBits(ULONG_PTR bitMask)
 {
-  DWORD LSHIFT = sizeof(ULONG_PTR)*8 - 1;
+  DWORD LSHIFT = sizeof(ULONG_PTR) * 8 - 1;
   DWORD bitSetCount = 0;
-  ULONG_PTR bitTest = (ULONG_PTR)1 << LSHIFT;
+  ULONG_PTR bitTest = (ULONG_PTR) 1 << LSHIFT;
   DWORD i;
 
-  for (i = 0; i <= LSHIFT; ++i)
-  {
-    bitSetCount += ((bitMask & bitTest)?1:0);
-    bitTest/=2;
+  for (i = 0; i <= LSHIFT; ++i) {
+    bitSetCount += ((bitMask & bitTest) ? 1 : 0);
+    bitTest /= 2;
   }
 
   return bitSetCount;
@@ -374,102 +373,84 @@ void ZCpuInfo::detectCoreAndThreadNumber()
   DWORD byteOffset = 0;
   PCACHE_DESCRIPTOR Cache;
 
-  glpi = (LPFN_GLPI) GetProcAddress(
-        GetModuleHandle(TEXT("kernel32")),
-        "GetLogicalProcessorInformation");
-  if (!glpi)
-  {
+  glpi = (LPFN_GLPI) GetProcAddress(GetModuleHandle(TEXT("kernel32")),
+                                    "GetLogicalProcessorInformation");
+  if (!glpi) {
     LOG(ERROR) << "GetLogicalProcessorInformation is not supported.";
     return;
   }
 
-  while (!done)
-  {
+  while (!done) {
     DWORD rc = glpi(buffer, &returnLength);
 
-    if (FALSE == rc)
-    {
-      if (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
-      {
+    if (FALSE == rc) {
+      if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
         if (buffer)
           free(buffer);
 
-        buffer = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION)malloc(
-              returnLength);
+        buffer = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION) malloc(returnLength);
 
-        if (!buffer)
-        {
+        if (!buffer) {
           LOG(ERROR) << "Allocation PSYSTEM_LOGICAL_PROCESSOR_INFORMATION failure";
           return;
         }
-      }
-      else
-      {
+      } else {
         LOG(ERROR) << "Error " << GetLastError();
         return;
       }
-    }
-    else
-    {
+    } else {
       done = TRUE;
     }
   }
 
   ptr = buffer;
 
-  while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength)
-  {
-    switch (ptr->Relationship)
-    {
-    case RelationNumaNode:
-      // Non-NUMA systems report a single record of this type.
-      numaNodeCount++;
-      break;
+  while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength) {
+    switch (ptr->Relationship) {
+      case RelationNumaNode:
+        // Non-NUMA systems report a single record of this type.
+        numaNodeCount++;
+        break;
 
-    case RelationProcessorCore:
-      processorCoreCount++;
+      case RelationProcessorCore:
+        processorCoreCount++;
 
-      // A hyperthreaded core supplies more than one logical processor.
-      logicalProcessorCount += CountSetBits(ptr->ProcessorMask);
-      break;
+        // A hyperthreaded core supplies more than one logical processor.
+        logicalProcessorCount += CountSetBits(ptr->ProcessorMask);
+        break;
 
-    case RelationCache:
-      // Cache data is in ptr->Cache, one CACHE_DESCRIPTOR structure for each cache.
-      Cache = &ptr->Cache;
-      nCacheLine = Cache->LineSize;
-      if (Cache->Level == 1)
-      {
-        processorL1CacheCount++;
-        if (Cache->Type == CacheInstruction) {
-          nL1ICacheSize = std::max(nL1ICacheSize, static_cast<uint64_t>(Cache->Size));
-        } else if (Cache->Type == CacheData) {
-          nL1DCacheSize = std::max(nL1DCacheSize, static_cast<uint64_t>(Cache->Size));
+      case RelationCache:
+        // Cache data is in ptr->Cache, one CACHE_DESCRIPTOR structure for each cache.
+        Cache = &ptr->Cache;
+        nCacheLine = Cache->LineSize;
+        if (Cache->Level == 1) {
+          processorL1CacheCount++;
+          if (Cache->Type == CacheInstruction) {
+            nL1ICacheSize = std::max(nL1ICacheSize, static_cast<uint64_t>(Cache->Size));
+          } else if (Cache->Type == CacheData) {
+            nL1DCacheSize = std::max(nL1DCacheSize, static_cast<uint64_t>(Cache->Size));
+          }
+        } else if (Cache->Level == 2) {
+          processorL2CacheCount++;
+          if (Cache->Type == CacheUnified) {
+            nL2CacheSize = std::max(nL2CacheSize, static_cast<uint64_t>(Cache->Size));
+          }
+        } else if (Cache->Level == 3) {
+          processorL3CacheCount++;
+          if (Cache->Type == CacheUnified) {
+            nL3CacheSize = std::max(nL3CacheSize, static_cast<uint64_t>(Cache->Size));
+          }
         }
-      }
-      else if (Cache->Level == 2)
-      {
-        processorL2CacheCount++;
-        if (Cache->Type == CacheUnified) {
-          nL2CacheSize = std::max(nL2CacheSize, static_cast<uint64_t>(Cache->Size));
-        }
-      }
-      else if (Cache->Level == 3)
-      {
-        processorL3CacheCount++;
-        if (Cache->Type == CacheUnified) {
-          nL3CacheSize = std::max(nL3CacheSize, static_cast<uint64_t>(Cache->Size));
-        }
-      }
-      break;
+        break;
 
-    case RelationProcessorPackage:
-      // Logical processors share a physical package.
-      processorPackageCount++;
-      break;
+      case RelationProcessorPackage:
+        // Logical processors share a physical package.
+        processorPackageCount++;
+        break;
 
-    default:
-      LOG(ERROR) << "Unsupported LOGICAL_PROCESSOR_RELATIONSHIP value.";
-      break;
+      default:
+        LOG(ERROR) << "Unsupported LOGICAL_PROCESSOR_RELATIONSHIP value.";
+        break;
     }
     byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
     ++ptr;
