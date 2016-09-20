@@ -15,21 +15,9 @@
 namespace nim {
 
 ZSectionsRegistration::ZSectionsRegistration(const ZImg& img, int fixedSliceIndex, ZImg& registeredImg)
-  : ZImgProcess()
-  , m_img(img)
+  : m_img(img)
   , m_fixedSliceIndex(fixedSliceIndex)
   , m_registeredImg(registeredImg)
-  , m_referenceChannel(-1)
-  , m_removeBackground(true)
-  , m_removeHighForeground(true)
-  , m_allowFlip(false)
-  , m_brightBackground(false)
-  , m_useMultithreading(true)
-  , m_numScales(1)
-  , m_numNeighbors(1)
-  , m_metric("Log Absolute Differences")
-  , m_transform("Rigid")
-  , m_optimizer("LBFGS")
 {
 }
 

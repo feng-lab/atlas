@@ -2,13 +2,8 @@
 
 namespace nim {
 
-ZImgMetatag::ZImgMetatag()
-  : m_tag(0), m_dataType(DataType::Byte), m_count(0)
-{
-}
-
 ZImgMetatag::ZImgMetatag(const QString& name, const QString& value)
-  : m_name(name), m_tag(0), m_dataType(DataType::Ascii)
+  : m_name(name), m_dataType(DataType::Ascii)
 {
   QByteArray utf8array = value.toUtf8();
   setCount(utf8array.size() + 1);

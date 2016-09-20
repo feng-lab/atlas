@@ -540,7 +540,7 @@ protected:
   void storeAttributeLocations();
 
 protected:
-  bool m_logUniformLocationError;
+  bool m_logUniformLocationError = true;
   // srcs read from file, withour header
   QStringList m_vertSrcs;
   QStringList m_geomSrcs;
@@ -616,8 +616,8 @@ protected:
   const Attribute* m_TAttribute;
 
 private:
-  bool m_linked;
-  unsigned int m_id;
+  bool m_linked = false;
+  GLuint m_id = 0;
   std::vector<Z3DShader*> m_shaders;
   std::vector<std::unique_ptr<Z3DShader>> m_anonShaders;
   Z3DContext m_context;

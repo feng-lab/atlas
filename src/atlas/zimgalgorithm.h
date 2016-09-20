@@ -7,6 +7,7 @@
 // all those empty functions call out
 
 #include "zexception.h"
+#include "zcpuinfo.h"
 #include <itkCommand.h>
 #include <itkProcessObject.h>
 #include <QObject>
@@ -85,6 +86,9 @@ private:
   inline void setParent(ZImgAlgorithmBaseWithProgressReporter* p)
   { m_parent = p; }
 
+  inline void setNumberOfThreads(uint32_t n)
+  { m_numThreads = n; }
+
 protected:
   struct WeightProgress
   {
@@ -94,11 +98,13 @@ protected:
 
   std::map<void*, WeightProgress> m_subOperationsWeightProgress;
   std::set<itk::ProcessObject*> m_itkOperations;
-  double m_weight;
-  double m_progress;
-  double m_reportInterval;
-  std::atomic<bool>* m_cancelFlag;
-  ZImgAlgorithmBaseWithProgressReporter* m_parent;
+  double m_weight = 1;
+  double m_progress = 0;
+  double m_reportInterval = 0.01;
+  std::atomic<bool>* m_cancelFlag = nullptr;
+  ZImgAlgorithmBaseWithProgressReporter* m_parent = nullptr;
+
+  uint32_t m_numThreads = ZCpuInfo::instance().nLogicalCores;
 };
 
 class ZImgAlgorithmBase
@@ -129,6 +135,12 @@ protected:
 
   inline void clearRegisteredSubOperations()
   {}
+
+  inline void setNumberOfThreads(uint32_t n)
+  { m_numThreads = n; }
+
+protected:
+  uint32_t m_numThreads = ZCpuInfo::instance().nLogicalCores;
 };
 
 template<bool ReportProgress = false>

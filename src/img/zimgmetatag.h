@@ -12,7 +12,7 @@ class ZTiff;
 class ZImgMetatag
 {
 public:
-  ZImgMetatag();
+  ZImgMetatag() = default;
 
   // convenient function to create a name-value pair meta data
   // value will be stored as utf-8 string with datatype DataType::Ascii
@@ -101,9 +101,9 @@ private:
 
 private:
   QString m_name;
-  uint32_t m_tag;
-  DataType m_dataType;
-  uint64_t m_count;
+  uint32_t m_tag = 0;
+  DataType m_dataType = DataType::Byte;
+  uint64_t m_count = 0;
   std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> m_data;
 };
 

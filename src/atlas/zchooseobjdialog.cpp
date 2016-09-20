@@ -12,7 +12,7 @@
 namespace nim {
 
 ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc& doc, QWidget* parent)
-  : QDialog(parent), m_doc(doc), m_selectedID(0)
+  : QDialog(parent), m_doc(doc)
 {
   setWindowTitle(QString("Choose %1").arg(m_doc.typeName()));
   createWidget();

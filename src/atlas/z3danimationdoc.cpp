@@ -14,7 +14,7 @@
 namespace nim {
 
 Z3DAnimationDoc::Z3DAnimationDoc(ZDoc& doc)
-  : ZObjDoc(doc), m_view(nullptr)
+  : ZObjDoc(doc)
 {
   createActions();
 }
@@ -275,7 +275,7 @@ size_t Z3DAnimationDoc::addAnimation(Z3DAnimation* animation, const QString& pat
 }
 
 Z3DAnimationDoc::AnimationPack::AnimationPack(Z3DAnimation* animation_, const QString& path_, const QString& name)
-  : animation(animation_), path(QFileInfo(path_).canonicalFilePath()), hasUnsavedChange(false), m_tmpName(name)
+  : animation(animation_), path(QFileInfo(path_).canonicalFilePath()), m_tmpName(name)
 {
   if (path.isEmpty()) {
     hasUnsavedChange = true;

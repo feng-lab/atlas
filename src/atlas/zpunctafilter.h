@@ -70,11 +70,11 @@ public:
 protected:
   ZPuncta& m_puncta;
   std::array<int, 8> m_boundBox;
-  QColor m_outlineColor;
-  double m_opacity;
-  bool m_mip;
-  int m_z;
-  int m_t;
+  QColor m_outlineColor{255, 0, 0};
+  double m_opacity = 1;
+  bool m_mip = false;
+  int m_z = 0;
+  int m_t = 0;
 };
 
 class ZPunctaFilter : public ZObjFilter
@@ -112,7 +112,7 @@ private:
   void opacityChanged();
 
 private:
-  ZPuncta* m_puncta;
+  ZPuncta* m_puncta = nullptr;
   std::unique_ptr<ZPunctaGraphicsItem> m_item;
 
   ZBoolParameter m_visible;

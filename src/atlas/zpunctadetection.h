@@ -16,8 +16,6 @@ class ZPunctaDetection : public ZImgProcess
 public:
   ZPunctaDetection(const ZImg& img, size_t punctaChannel, size_t t = 0);
 
-  ~ZPunctaDetection();
-
   // if set, result will be saved to these files
   void setResultPunctaFilename(const QString& fn)
   { m_detectedPunctaFileName = fn; }
@@ -152,22 +150,22 @@ private:
   size_t m_t;
 
   // parameters
-  int m_punctaThreshold;
-  int m_splitSizeThreshold;
-  double m_confRadius;
-  double m_confOverlapArea;
-  double m_overlapRateThreshold;
-  int m_seedSizeThreshold;
-  bool m_useMultithreading;
+  int m_punctaThreshold = -1;
+  int m_splitSizeThreshold = 20;
+  double m_confRadius = 0.95;
+  double m_confOverlapArea = 0.8;
+  double m_overlapRateThreshold = 0.8;
+  int m_seedSizeThreshold = 6;
+  bool m_useMultithreading = true;
 
   // parameters for soma detection
-  int m_dendriteChannel;
-  double m_maxDendriteTubeRadius;  // in um
-  double m_dendriteThreshold;
+  int m_dendriteChannel = -1;
+  double m_maxDendriteTubeRadius = 2.6;  // in um
+  double m_dendriteThreshold = 100;
 
   // parameters for assign puncta to swc tree
-  double m_maxDistToBranch; // in um
-  double m_ambiguousFactor;
+  double m_maxDistToBranch = 2.5; // in um
+  double m_ambiguousFactor = 1.0;
 
   ZPuncta m_detectedSomaPuncta;
   ZPuncta m_detectedPuncta;

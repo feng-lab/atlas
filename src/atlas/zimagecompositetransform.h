@@ -9,8 +9,6 @@ namespace nim {
 class ZImageCompositeTransform : public ZImageTransform
 {
 public:
-  ZImageCompositeTransform();
-
   void addTransform(const ZImageTransform& tfm);
 
   // take ownership

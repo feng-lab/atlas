@@ -31,9 +31,6 @@ void getAffineParameterScales(double width, double height, double* scaleRotation
 namespace nim {
 
 ZImageMatrix2DTransform::ZImageMatrix2DTransform()
-  : ZImageTransform()
-  , m_centerX(0)
-  , m_centerY(0)
 {
   std::vector<double>(6, 0).swap(m_parameters);
   m_parameters[0] = 1;
@@ -129,7 +126,6 @@ ZImageTransform* ZImageMatrix2DTransform::makeInverseTransform() const
 ///////////////////////
 
 ZImageYTranslation2DTransform::ZImageYTranslation2DTransform()
-  : ZImageMatrix2DTransform()
 {
   std::vector<double>(1, 0).swap(m_parameters);
 }
@@ -181,7 +177,6 @@ ZImageTransform* ZImageYTranslation2DTransform::makeInverseTransform() const
 ///////////////////////
 
 ZImageTranslation2DTransform::ZImageTranslation2DTransform()
-  : ZImageMatrix2DTransform()
 {
   std::vector<double>(2, 0).swap(m_parameters);
 }
@@ -235,7 +230,6 @@ ZImageTransform* ZImageTranslation2DTransform::makeInverseTransform() const
 /////////////////////////
 
 ZImageRigid2DTransform::ZImageRigid2DTransform()
-  : ZImageMatrix2DTransform()
 {
   std::vector<double>(3, 0).swap(m_parameters);
 }
@@ -288,7 +282,6 @@ ZImageTransform* ZImageRigid2DTransform::makeInverseTransform() const
 /////////////////////////
 
 ZImageSimilarity2DTransform::ZImageSimilarity2DTransform()
-  : ZImageMatrix2DTransform()
 {
   std::vector<double>(4, 0).swap(m_parameters);
   m_parameters[3] = 1;
@@ -343,7 +336,6 @@ ZImageTransform* ZImageSimilarity2DTransform::makeInverseTransform() const
 /////////////////////////
 
 ZImageAffine2DTransform::ZImageAffine2DTransform()
-  : ZImageMatrix2DTransform()
 {
   std::vector<double>(7, 0).swap(m_parameters);
   m_parameters[3] = 1;

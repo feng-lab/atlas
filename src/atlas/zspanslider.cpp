@@ -110,7 +110,7 @@ ZDoubleSpanSliderWithSpinBox::ZDoubleSpanSliderWithSpinBox(double lowerValue, do
   : QWidget(parent), m_lowerValue(lowerValue), m_upperValue(upperValue), m_min(min), m_max(max), m_step(singleStep)
   , m_decimal(decimal), m_tracking(tracking)
 {
-  m_sliderMaxValue = 1e6; //roundTo<int>((m_max - m_min) / m_step);
+  m_sliderMaxValue = 1000000; //roundTo<int>((m_max - m_min) / m_step);
   createWidget();
 }
 

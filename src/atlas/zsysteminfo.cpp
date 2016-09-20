@@ -223,8 +223,6 @@ ZSystemInfo& ZSystemInfo::instance()
 }
 
 ZSystemInfo::ZSystemInfo()
-  : m_glInitialized(false)
-  , m_stereoViewSupported(false)
 {
   detectOS();
 

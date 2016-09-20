@@ -47,38 +47,26 @@ void ZClickableLabel::labelClicked()
 ZClickableColorLabel::ZClickableColorLabel(ZVec4Parameter* color, QWidget* parent, Qt::WindowFlags f)
   : ZClickableLabel(parent, f)
   , m_vec4Color(color)
-  , m_vec3Color(nullptr)
-  , m_dvec4Color(nullptr)
-  , m_dvec3Color(nullptr)
 {
   connect(m_vec4Color, &ZVec4Parameter::valueChanged, this, qOverload<>(&ZClickableColorLabel::update));
 }
 
 ZClickableColorLabel::ZClickableColorLabel(ZVec3Parameter* color, QWidget* parent, Qt::WindowFlags f)
   : ZClickableLabel(parent, f)
-  , m_vec4Color(nullptr)
   , m_vec3Color(color)
-  , m_dvec4Color(nullptr)
-  , m_dvec3Color(nullptr)
 {
   connect(m_vec3Color, &ZVec3Parameter::valueChanged, this, qOverload<>(&ZClickableColorLabel::update));
 }
 
 ZClickableColorLabel::ZClickableColorLabel(ZDVec4Parameter* color, QWidget* parent, Qt::WindowFlags f)
   : ZClickableLabel(parent, f)
-  , m_vec4Color(nullptr)
-  , m_vec3Color(nullptr)
   , m_dvec4Color(color)
-  , m_dvec3Color(nullptr)
 {
   connect(m_dvec4Color, &ZDVec4Parameter::valueChanged, this, qOverload<>(&ZClickableColorLabel::update));
 }
 
 ZClickableColorLabel::ZClickableColorLabel(ZDVec3Parameter* color, QWidget* parent, Qt::WindowFlags f)
   : ZClickableLabel(parent, f)
-  , m_vec4Color(nullptr)
-  , m_vec3Color(nullptr)
-  , m_dvec4Color(nullptr)
   , m_dvec3Color(color)
 {
   connect(m_dvec3Color, &ZDVec3Parameter::valueChanged, this, qOverload<>(&ZClickableColorLabel::update));

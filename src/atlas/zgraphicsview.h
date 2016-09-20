@@ -74,7 +74,7 @@ private:
   ZView* m_view;
   ZDoubleParameter m_scale;
 
-  ROIAction m_roiAction;
+  ROIAction m_roiAction = ROIAction::New;
   QPointF m_startScenePt;
   std::unique_ptr<QGraphicsPolygonItem> m_startPtItem;
   std::vector<std::unique_ptr<QGraphicsPolygonItem>> m_ctrlPtsItem;

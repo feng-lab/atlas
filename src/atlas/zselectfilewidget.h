@@ -70,10 +70,10 @@ private:
   QString m_filter;
   QString m_lastFName;
 
-  QString* m_destName;
-  QStringList* m_destNames;
+  QString* m_destName = NULL;
+  QStringList* m_destNames = nullptr;
 
-  bool (* m_lessThan)(const QString&, const QString&);
+  bool (* m_lessThan)(const QString&, const QString&) = nullptr;
 
   QStringList m_multipleFNames;
 

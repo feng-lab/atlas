@@ -12,7 +12,7 @@ namespace nim {
 class ZImageTransform
 {
 public:
-  ZImageTransform();
+  ZImageTransform() = default;
 
   virtual ~ZImageTransform() = default;
 
@@ -75,8 +75,8 @@ public:
   virtual ZImageTransform* makeInverseTransform() const = 0;
 
 protected:
-  ZImageInterpolation m_imageInterpolation;
-  bool m_useMultithreading;
+  ZImageInterpolation m_imageInterpolation{Interpolant::Cubic, PadOption::Constant, 0.0};
+  bool m_useMultithreading = true;
 
   std::vector<double> m_parameters;
 };

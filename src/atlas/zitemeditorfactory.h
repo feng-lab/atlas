@@ -7,7 +7,6 @@ namespace nim {
 class ZItemEditorFactory : public QItemEditorFactory
 {
 public:
-  explicit ZItemEditorFactory();
 
   virtual QWidget* createEditor(int type, QWidget* parent) const override;
 

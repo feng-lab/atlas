@@ -53,10 +53,10 @@ protected:
 
   virtual QSize minimumSizeHint() const override;
 
-  ZVec4Parameter* m_vec4Color;
-  ZVec3Parameter* m_vec3Color;
-  ZDVec4Parameter* m_dvec4Color;
-  ZDVec3Parameter* m_dvec3Color;
+  ZVec4Parameter* m_vec4Color = nullptr;
+  ZVec3Parameter* m_vec3Color = nullptr;
+  ZDVec4Parameter* m_dvec4Color = nullptr;
+  ZDVec3Parameter* m_dvec3Color = nullptr;
 
   virtual bool getTip(const QPoint& p, QRect* r, QString* s) override;
 

@@ -8,7 +8,6 @@
 #include <QGroupBox>
 #include <QDialogButtonBox>
 #include <QPushButton>
-#include <QThread>
 #include <QProgressDialog>
 #include <QLabel>
 #include <memory>

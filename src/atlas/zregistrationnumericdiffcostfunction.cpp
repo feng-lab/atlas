@@ -5,9 +5,7 @@
 namespace nim {
 
 ZRegistrationNumericDiffCostFunction::ZRegistrationNumericDiffCostFunction(double relativeStepSize)
-  : ZRegistrationCostFunction()
-  , m_metric(nullptr)
-  , m_relativeStepSize(relativeStepSize)
+  : m_relativeStepSize(relativeStepSize)
 {
 }
 
@@ -24,8 +22,8 @@ void ZRegistrationNumericDiffCostFunction::setUseMultithreading(bool i)
     m_metric->setUseMultithreading(i);
 }
 
-bool
-ZRegistrationNumericDiffCostFunction::evaluate(const double* const parameters, double* cost, double* gradient) const
+bool ZRegistrationNumericDiffCostFunction::evaluate(const double* const parameters,
+                                                    double* cost, double* gradient) const
 {
   if (!m_metric || !m_transform) {
     LOG(FATAL) << "Metric or Transform is not set";

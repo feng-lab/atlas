@@ -98,9 +98,9 @@ private:
   ZImgRegion m_region;
   ZImgInfo m_regionInfo;
   ZNeighborhood m_neighborhood;
-  bool m_useVoxelSize;
+  bool m_useVoxelSize = true;
   std::vector<double> m_dists; // dists for each neighbor
-  bool m_graphIsValid;
+  bool m_graphIsValid = false;
 
   struct EdgeInfo
   {

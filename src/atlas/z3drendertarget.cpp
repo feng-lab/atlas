@@ -12,12 +12,8 @@ namespace nim {
 
 Z3DRenderTarget::Z3DRenderTarget(GLint internalColorFormat, GLint internalDepthFormat, glm::uvec2 size,
                                  bool multisample, int sample)
-  : m_previousViewport(0)
-  , m_previousDrawFBOID(0)
-  , m_previousReadFBOID(0)
-  , m_multisample(multisample)
+  : m_multisample(multisample)
   , m_samples(sample)
-  , m_maxSamples(0)
   , m_size(size)
 {
   generateId();
@@ -28,12 +24,7 @@ Z3DRenderTarget::Z3DRenderTarget(GLint internalColorFormat, GLint internalDepthF
 }
 
 Z3DRenderTarget::Z3DRenderTarget(glm::uvec2 size)
-  : m_previousDrawFBOID(0)
-  , m_previousReadFBOID(0)
-  , m_multisample(false)
-  , m_samples(4)
-  , m_maxSamples(0)
-  , m_size(size)
+  : m_size(size)
 {
   generateId();
 }
@@ -424,10 +415,6 @@ void Z3DRenderTarget::saveAsDepthImage(const QString& filename)
 
 void Z3DRenderTarget::generateId()
 {
-  m_fboID = 0;
-  m_multisampleFBOID = 0;
-  m_colorBufferID = 0;
-  m_depthBufferID = 0;
   glGenFramebuffers(1, &m_fboID);
   //  if (m_samples < 2)
   //    m_multisample = false;

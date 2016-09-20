@@ -156,7 +156,7 @@ private:
   void viewScaleChanged(double s);
 
 private:
-  ZROI* m_ROI;
+  ZROI* m_ROI = nullptr;
   std::map<int, std::unique_ptr<ROIGraphicsItem>> m_sliceToROIItem;
   std::map<int, std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>>> m_sliceToCtrlPtItems;
 
@@ -168,7 +168,7 @@ private:
   bool m_sliceValid;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
-  bool m_hasSelectedItems;
+  bool m_hasSelectedItems = false;
 };
 
 } // namespace nim

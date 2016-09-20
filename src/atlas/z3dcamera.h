@@ -301,17 +301,17 @@ protected:
   void makeProjectionMatrices();
 
 private:
-  glm::vec3 m_eye;
-  glm::vec3 m_center;
-  glm::vec3 m_upVector;  // normalized
-  ProjectionType m_projectionType;
-  float m_fieldOfView;
-  float m_aspectRatio;
-  float m_nearDist;
-  float m_farDist;
-  float m_windowAspectRatio;
+  glm::vec3 m_eye{0.f, 0.f, 0.f};
+  glm::vec3 m_center{0.f, 0.f, -1.f};
+  glm::vec3 m_upVector{0.f, 1.f, 0.f};  // normalized
+  ProjectionType m_projectionType = ProjectionType::Perspective;
+  float m_fieldOfView = glm::radians(45.f);
+  float m_aspectRatio = 1.f;
+  float m_nearDist = .1f;
+  float m_farDist = 50.f;
+  float m_windowAspectRatio = 1.f;
   float m_eyeSeparation;  // dist from left eye to right eye
-  float m_eyeSeparationAngle;  // angle between two eyes to focus point
+  float m_eyeSeparationAngle = glm::radians(8.f);  // angle between two eyes to focus point
   float m_focusDistance;
 
   // derived camera variables

@@ -344,6 +344,14 @@ void ZCpuInfo::detectCpuInfo()
 
 void ZCpuInfo::detectCoreAndThreadNumber()
 {
+  nPhysicalCores = QThread::idealThreadCount();
+  if (nPhysicalCores <= 0) {
+    nPhysicalCores = 1;
+    nLogicalCores = 1;
+  } else {
+    nLogicalCores = nPhysicalCores;
+  }
+
 #ifdef _WIN32
   MEMORYSTATUSEX memInfo;
   memInfo.dwLength = sizeof(MEMORYSTATUSEX);
@@ -372,13 +380,6 @@ void ZCpuInfo::detectCoreAndThreadNumber()
   if (!glpi)
   {
     LOG(ERROR) << "GetLogicalProcessorInformation is not supported.";
-    nPhysicalCores = QThread::idealThreadCount();
-    if (nPhysicalCores < 0) {
-      nPhysicalCores = 1;
-      nLogicalCores = 1;
-    } else {
-      nLogicalCores = nPhysicalCores;
-    }
     return;
   }
 
@@ -399,26 +400,12 @@ void ZCpuInfo::detectCoreAndThreadNumber()
         if (!buffer)
         {
           LOG(ERROR) << "Allocation PSYSTEM_LOGICAL_PROCESSOR_INFORMATION failure";
-          nPhysicalCores = QThread::idealThreadCount();
-          if (nPhysicalCores < 0) {
-            nPhysicalCores = 1;
-            nLogicalCores = 1;
-          } else {
-            nLogicalCores = nPhysicalCores;
-          }
           return;
         }
       }
       else
       {
         LOG(ERROR) << "Error " << GetLastError();
-        nPhysicalCores = QThread::idealThreadCount();
-        if (nPhysicalCores < 0) {
-          nPhysicalCores = 1;
-          nLogicalCores = 1;
-        } else {
-          nLogicalCores = nPhysicalCores;
-        }
         return;
       }
     }
@@ -495,23 +482,13 @@ void ZCpuInfo::detectCoreAndThreadNumber()
 
   free(buffer);
 #elif defined(__APPLE__)
-  size_t oldlenp = sizeof(nPhysicalCores);
-  if (sysctlbyname("hw.physicalcpu_max", &nPhysicalCores, &oldlenp, nullptr, 0) != 0) {
-    nPhysicalCores = QThread::idealThreadCount();
-    if (nPhysicalCores < 0) {
-      nPhysicalCores = 1;
-      nLogicalCores = 1;
-    } else {
-      nLogicalCores = nPhysicalCores;
-    }
-  } else {
-    oldlenp = sizeof(nLogicalCores);
-    if (sysctlbyname("hw.logicalcpu_max", &nLogicalCores, &oldlenp, nullptr, 0) != 0) {
-      nLogicalCores = QThread::idealThreadCount();
-      if (nLogicalCores < 0) {
-        nLogicalCores = 1;
-      }
-    }
+  int tmpNumCores;
+  size_t oldlenp = sizeof(tmpNumCores);
+  if (sysctlbyname("hw.physicalcpu_max", &tmpNumCores, &oldlenp, nullptr, 0) == 0) {
+    nPhysicalCores = tmpNumCores;
+  }
+  if (sysctlbyname("hw.logicalcpu_max", &tmpNumCores, &oldlenp, nullptr, 0) == 0) {
+    nLogicalCores = tmpNumCores;
   }
 
   int nm[2];
@@ -556,14 +533,6 @@ void ZCpuInfo::detectCoreAndThreadNumber()
   nm[1] = HW_L3CACHESIZE;
   if (sysctl(nm, 2, &count, &len, nullptr, 0) == 0) {
     nL3CacheSize = count;
-  }
-#else
-  nPhysicalCores = QThread::idealThreadCount();
-  if (nPhysicalCores < 0) {
-    nPhysicalCores = 1;
-    nLogicalCores = 1;
-  } else {
-    nLogicalCores = nPhysicalCores;
   }
 #endif
 }

@@ -10,7 +10,6 @@ namespace nim {
 class ZImgOmeTiff : public ZImgTiff
 {
 public:
-  ZImgOmeTiff();
 
   // ZImgFormat interface
 public:

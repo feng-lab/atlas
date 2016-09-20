@@ -90,15 +90,15 @@ private:
 private:
   Type m_type;
   QString m_groupName;
-  QWidget* m_widget;
-  ZParameter* m_parameter;
+  QWidget* m_widget = nullptr;
+  ZParameter* m_parameter = nullptr;
   int m_visibleLevel;
-  bool m_isSorted;
-  int m_cutOffbetweenBasicAndAdvancedLevel;
+  bool m_isSorted = false;
+  int m_cutOffbetweenBasicAndAdvancedLevel = 1;
   std::vector<std::shared_ptr<ZWidgetsGroup>> m_childGroups;
-  bool m_isVisible;
+  bool m_isVisible = true;
 
-  bool m_useToolBoxStyle;
+  bool m_useToolBoxStyle = false;
 };
 
 } // namespace nim

@@ -19,7 +19,6 @@
 #include <itkBinaryDilateImageFilter.h>
 #include <itkBinaryMorphologicalOpeningImageFilter.h>
 #include <itkBinaryThresholdImageFilter.h>
-#include <QThread>
 #include <QFileInfo>
 #include <QFile>
 #include <boost/math/distributions/chi_squared.hpp>
@@ -165,31 +164,13 @@ Eigen::MatrixXd meanShiftGaussianCenters(const nim::ZVBGMM<T, double>& vbgmm, co
 namespace nim {
 
 ZPunctaDetection::ZPunctaDetection(const ZImg& img, size_t punctaChannel, size_t t)
-  : ZImgProcess()
-  , m_img(img)
+  : m_img(img)
   , m_punctaChannel(punctaChannel)
   , m_t(t)
-  , m_punctaThreshold(-1)
-  , m_splitSizeThreshold(20)
-  , m_confRadius(0.95)
-  , m_confOverlapArea(0.8)
-  , m_overlapRateThreshold(0.8)
-  , m_seedSizeThreshold(6)
-  , m_dendriteChannel(-1)
-  , m_maxDendriteTubeRadius(2.6)
-  , m_dendriteThreshold(100)
-  , m_maxDistToBranch(2.5)
-  , m_ambiguousFactor(1.0)
 {
   if (!m_img.isType<uint8_t>()) {
     throw ZImgException("puncta detecion only support uint8_t img");
   }
-  m_useMultithreading = true;
-}
-
-ZPunctaDetection::~ZPunctaDetection()
-{
-  cleanup();
 }
 
 void ZPunctaDetection::doWork()
@@ -621,7 +602,7 @@ QString ZPunctaDetection::getFilteredSomaPunctaFilename()
 
 void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& big)
 {
-  size_t numThreads = m_useMultithreading ? QThread::idealThreadCount() : 1;
+  size_t numThreads = m_useMultithreading ? ZCpuInfo::instance().nLogicalCores : 1;
   using Image3DType = itk::Image<uint8_t, 3>;
   using BinaryImage3DType = itk::Image<bool, 3>;
   Image3DType::Pointer image = wrapZImgChannelAsITKImg<uint8_t>(m_img, m_dendriteChannel, m_t);

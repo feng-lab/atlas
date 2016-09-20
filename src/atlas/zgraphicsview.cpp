@@ -19,12 +19,6 @@ ZGraphicsView::ZGraphicsView(QGraphicsScene* scene, ZView* parent)
   : QGraphicsView(scene, parent)
   , m_view(parent)
   , m_scale("Scale", 100, 7, 10000)
-  , m_roiAction(ROIAction::New)
-  , m_startPtItem(nullptr)
-  , m_ellipseItem(nullptr)
-  , m_rectItem(nullptr)
-  , m_polygonItem(nullptr)
-  , m_splineItem(nullptr)
 {
   setMinimumSize(400, 400);
   setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);

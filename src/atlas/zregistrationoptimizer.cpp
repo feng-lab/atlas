@@ -112,7 +112,6 @@ private:
 namespace nim {
 
 ZRegistrationOptimizer::ZRegistrationOptimizer()
-  : m_costFunction(nullptr)
 {
   m_options.line_search_direction_type = ceres::LBFGS;
   m_options.line_search_type = ceres::WOLFE;

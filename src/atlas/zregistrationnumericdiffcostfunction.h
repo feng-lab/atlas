@@ -24,7 +24,7 @@ private:
   void evaluate_Impl(const double* const parameters, double* value) const;
 
 private:
-  ZImageToImageMetric* m_metric;
+  ZImageToImageMetric* m_metric = nullptr;
   double m_relativeStepSize;
 };
 

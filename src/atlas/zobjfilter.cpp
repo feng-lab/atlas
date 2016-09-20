@@ -6,8 +6,7 @@
 namespace nim {
 
 ZObjFilter::ZObjFilter(ZView& view)
-  : QObject(nullptr)
-  , m_view(view)
+  : m_view(view)
   , m_offsetPara(QString("Offset"), glm::dvec4(0, 0, 0, 0),
                  glm::dvec4(std::numeric_limits<int>::min()),
                  glm::dvec4(std::numeric_limits<int>::max()))

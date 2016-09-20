@@ -7,34 +7,16 @@ namespace nim {
 
 ZCameraParameterKey::ZCameraParameterKey(double tm, const Z3DCameraParameter& p)
   : ZParameterKey(tm, p)
-  , m_posTension(0.f)
-  , m_posContinuity(0.f)
-  , m_posBias(0.f)
-  , m_rotTension(0.f)
-  , m_rotContinuity(0.f)
-  , m_rotBias(0.f)
 {
 }
 
 ZCameraParameterKey::ZCameraParameterKey(double tm, Z3DCameraParameter* p)
   : ZParameterKey(tm, p)
-  , m_posTension(0.f)
-  , m_posContinuity(0.f)
-  , m_posBias(0.f)
-  , m_rotTension(0.f)
-  , m_rotContinuity(0.f)
-  , m_rotBias(0.f)
 {
 }
 
 ZCameraParameterKey::ZCameraParameterKey()
   : ZParameterKey("3DCamera")
-  , m_posTension(0.f)
-  , m_posContinuity(0.f)
-  , m_posBias(0.f)
-  , m_rotTension(0.f)
-  , m_rotContinuity(0.f)
-  , m_rotBias(0.f)
 {
 }
 

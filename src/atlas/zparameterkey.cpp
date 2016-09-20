@@ -18,7 +18,6 @@ namespace nim {
 
 ZParameterKey::ZParameterKey(double tm, const ZParameter& p)
   : m_time(std::max(tm, 0.0))
-  , m_paraAnimation(nullptr)
 {
   m_value.reset(ZParameterFactory::instance().create(p.name(), p.type()));
   m_value->forceSetValueSameAs(p);
@@ -27,7 +26,6 @@ ZParameterKey::ZParameterKey(double tm, const ZParameter& p)
 
 ZParameterKey::ZParameterKey(double tm, ZParameter* p)
   : m_time(std::max(tm, 0.0))
-  , m_paraAnimation(nullptr)
 {
   CHECK(p);
   m_value.reset(p);
@@ -36,7 +34,6 @@ ZParameterKey::ZParameterKey(double tm, ZParameter* p)
 
 ZParameterKey::ZParameterKey(const QString& type)
   : m_time(0)
-  , m_paraAnimation(nullptr)
 {
   m_value.reset(ZParameterFactory::instance().create("", type));
   CHECK(m_value);
@@ -45,16 +42,11 @@ ZParameterKey::ZParameterKey(const QString& type)
 
 ZParameterKey::ZParameterKey(const ZParameterKey& key)
   : m_time(std::max(0., key.time()))
-  , m_paraAnimation(nullptr)
 {
   m_value.reset(ZParameterFactory::instance().create(key.value().name(), key.value().type()));
   m_value->setSameAs(key.value());
   setDefaultType();
   setType(key.type());
-}
-
-ZParameterKey::~ZParameterKey()
-{
 }
 
 void ZParameterKey::setTime(double t)

@@ -10,9 +10,6 @@ namespace nim {
 ZParameter::ZParameter(const QString& name, QObject* parent)
   : QObject(parent)
   , m_name(name)
-  , m_style("DEFAULT")
-  , m_isWidgetsEnabled(true)
-  , m_isWidgetsVisible(true)
 {
   addStyle("DEFAULT");
 }

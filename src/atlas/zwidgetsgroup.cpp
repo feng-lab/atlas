@@ -23,42 +23,25 @@ bool widgetGroupPtVisibleLevelLessThan(const std::shared_ptr<nim::ZWidgetsGroup>
 namespace nim {
 
 ZWidgetsGroup::ZWidgetsGroup(QWidget& widget, int visibleLevel)
-  : QObject()
-  , m_type(Type::Widget)
+  : m_type(Type::Widget)
   , m_groupName("This is not a group")
   , m_widget(&widget)
-  , m_parameter(nullptr)
   , m_visibleLevel(visibleLevel)
-  , m_isSorted(true)
-  , m_isVisible(true)
-  , m_useToolBoxStyle(false)
 {
 }
 
 ZWidgetsGroup::ZWidgetsGroup(const QString& groupName, int visibleLevel)
-  : QObject()
-  , m_type(Type::Group)
+  : m_type(Type::Group)
   , m_groupName(groupName)
-  , m_widget(nullptr)
-  , m_parameter(nullptr)
   , m_visibleLevel(visibleLevel)
-  , m_isSorted(false)
-  , m_cutOffbetweenBasicAndAdvancedLevel(1)
-  , m_isVisible(true)
-  , m_useToolBoxStyle(false)
 {
 }
 
 ZWidgetsGroup::ZWidgetsGroup(ZParameter& parameter, int visibleLevel)
-  : QObject()
-  , m_type(Type::Parameter)
+  : m_type(Type::Parameter)
   , m_groupName("This is not a group")
-  , m_widget(nullptr)
   , m_parameter(&parameter)
   , m_visibleLevel(visibleLevel)
-  , m_isSorted(true)
-  , m_isVisible(true)
-  , m_useToolBoxStyle(false)
 {
 }
 

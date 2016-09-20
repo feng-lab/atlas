@@ -2,51 +2,6 @@
 
 namespace nim {
 
-ZAffine3D::ZAffine3D()
-  : m_matrix(Eigen::Matrix4d::Identity())
-  , m_inverseMatrix(Eigen::Matrix4d::Identity())
-  , m_translationX(0)
-  , m_translationY(0)
-  , m_translationZ(0)
-  , m_scaleX(1)
-  , m_scaleY(1)
-  , m_scaleZ(1)
-  , m_rotateAngleXY(0)
-  , m_rotateAngleXZ(0)
-  , m_rotateAngleYZ(0)
-  , m_shearXY(0)
-  , m_shearXZ(0)
-  , m_shearYX(0)
-  , m_shearYZ(0)
-  , m_shearZX(0)
-  , m_shearZY(0)
-{
-}
-
-ZAffine3D::ZAffine3D(double m11, double m12, double m13, double m14,
-                     double m21, double m22, double m23, double m24,
-                     double m31, double m32, double m33, double m34)
-  : m_matrix(Eigen::Matrix4d::Identity())
-  , m_inverseMatrix(Eigen::Matrix4d::Identity())
-  , m_translationX(0)
-  , m_translationY(0)
-  , m_translationZ(0)
-  , m_scaleX(1)
-  , m_scaleY(1)
-  , m_scaleZ(1)
-  , m_rotateAngleXY(0)
-  , m_rotateAngleXZ(0)
-  , m_rotateAngleYZ(0)
-  , m_shearXY(0)
-  , m_shearXZ(0)
-  , m_shearYX(0)
-  , m_shearYZ(0)
-  , m_shearZX(0)
-  , m_shearZY(0)
-{
-  setMatrix(m11, m12, m13, m14, m21, m22, m23, m24, m31, m32, m33, m34);
-}
-
 void ZAffine3D::makeMatrix()
 {
   Eigen::Matrix4d matTrans;

@@ -6,17 +6,6 @@
 namespace nim {
 
 Z3DCamera::Z3DCamera()
-  : m_eye(0.f, 0.f, 0.f)
-  , m_center(0.f, 0.f, -1.f)
-  , m_upVector(0.f, 1.f, 0.f)
-  //, m_projectionType(Orthographic)
-  , m_projectionType(ProjectionType::Perspective)
-  , m_fieldOfView(glm::radians(45.f))
-  , m_aspectRatio(1.f)
-  , m_nearDist(.1f)
-  , m_farDist(50.f)
-  , m_windowAspectRatio(1.f)
-  , m_eyeSeparationAngle(glm::radians(8.f))
 {
   updateCamera();
   updateFrustum();

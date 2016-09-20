@@ -24,7 +24,7 @@ then
   exit 1 # terminate and indicate error
 fi
 
-# patch to ignore libpng warnings if we want to skip IDAT chunks, line 809
+# patch
 $currDIR/massedit.py -w -e "re.sub(r'stdc\+\+', r'', line)" $srcDIR/cmake/OpenCVCompilerOptions.cmake
 
 if [ -d $buildDIR ]

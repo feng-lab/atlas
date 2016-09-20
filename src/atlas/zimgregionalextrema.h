@@ -10,6 +10,7 @@ template<bool ReportProgress = false>
 class ZImgRegionalExtrema : public ZImgAlgorithm<ReportProgress>
 {
 public:
+
   // regional min max
   // finds the regional maxima, returns 8-bit unsigned image mask that identifies the locations of the regional maxima.
   // In mask, pixels that are set to 1 identify regional maxima; all other pixels are set to 0.

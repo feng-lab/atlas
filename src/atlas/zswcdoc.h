@@ -78,7 +78,7 @@ private:
 
     ZSwc swc;
     QString path;
-    bool hasUnsavedChange;
+    bool hasUnsavedChange = false;
 
     // derived data
   private:

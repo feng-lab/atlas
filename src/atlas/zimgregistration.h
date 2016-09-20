@@ -11,7 +11,6 @@ namespace nim {
 class ZImgRegistration
 {
 public:
-  ZImgRegistration();
 
   const ZImg& fixedImg() const
   { return *m_fixedImg; }
@@ -46,15 +45,15 @@ public:
   double run();
 
 private:
-  const ZImg* m_fixedImg;
-  const ZImg* m_movingImg;
+  const ZImg* m_fixedImg = nullptr;
+  const ZImg* m_movingImg = nullptr;
 
   ZRegistrationOptimizer m_optimizer;
-  ZRegistrationCostFunction* m_costFunction;
-  ZImageTransform* m_transform;
+  ZRegistrationCostFunction* m_costFunction = nullptr;
+  ZImageTransform* m_transform = nullptr;
 
-  int m_useMultithreading;
-  int m_numScales;
+  int m_useMultithreading = true;
+  int m_numScales = 1;
 };
 
 } // namespace nim

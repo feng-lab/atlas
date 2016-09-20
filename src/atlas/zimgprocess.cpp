@@ -6,11 +6,6 @@
 
 namespace nim {
 
-ZImgProcess::ZImgProcess()
-  : ZImgAlgorithmBaseWithProgressReporter()
-{
-}
-
 void ZImgProcess::run()
 {
   LogSinkPtr fileDestination = createFileLogSink(m_logFile);

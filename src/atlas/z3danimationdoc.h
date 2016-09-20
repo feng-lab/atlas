@@ -90,7 +90,7 @@ private:
 
     std::unique_ptr<Z3DAnimation> animation;
     QString path;
-    bool hasUnsavedChange;
+    bool hasUnsavedChange = false;
 
   protected:
     QString m_tmpName;
@@ -111,7 +111,7 @@ private:
 
   QAction* m_loadAnimationsAction;
 
-  Z3DView* m_view;
+  Z3DView* m_view = nullptr;
 };
 
 } // namespace nim

@@ -10,7 +10,7 @@ namespace nim {
 class ZPunctum
 {
 public:
-  ZPunctum();
+  ZPunctum() = default;
 
   ZPunctum(double x, double y, double z, double r);
 
@@ -220,20 +220,20 @@ public:
 private:
   QString m_name;
   QString m_comment;
-  double m_maxIntensity;
-  double m_meanIntensity;
-  double m_x;
-  double m_y;
-  double m_z;
-  double m_sDevOfIntensity;
-  double m_volSize;
-  double m_mass;
-  double m_radius;   //radius
+  double m_maxIntensity = 255;
+  double m_meanIntensity = 255;
+  double m_x = -1;
+  double m_y = -1;
+  double m_z = -1;
+  double m_sDevOfIntensity = 0;
+  double m_volSize = 33.5103216382911;
+  double m_mass = 8545.13201776424;
+  double m_radius = 2.0;   //radius
   QString m_property1;
   QString m_property2;
   QString m_property3;
-  QColor m_color;
-  double m_score;  // detection score [-1.0 1.0]
+  QColor m_color{0, 255, 255};
+  double m_score = 1.0;  // detection score [-1.0 1.0]
 
   // info of voxels belong to this punctum
   Eigen::MatrixXi m_voxelLocations;   // n x 3 matrix

@@ -117,9 +117,9 @@ protected:
 
     size_t id;
     ZObjDoc* doc;
-    Qt::CheckState checkState;
-    bool locked;
-    bool show;
+    Qt::CheckState checkState = Qt::Checked;
+    bool locked = false;
+    bool show = true;
   };
 
   QIcon m_settingIcon;

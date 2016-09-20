@@ -443,7 +443,6 @@ bool ZSliceROI::hasPolyOrSpline() const
 ZROI::ZROI(QUndoStack* undoStack, QObject* parent)
   : QObject(parent)
   , m_undoStack(undoStack)
-  , m_moveSelectedControlPointsCommand(nullptr)
 {
   resetBoundBox();
   if (!m_undoStack) {

@@ -22,7 +22,7 @@ public:
 
   ZParameterKey(const ZParameterKey& key);
 
-  virtual ~ZParameterKey();
+  virtual ~ZParameterKey() = default;
 
   double time() const
   { return m_time; }
@@ -67,7 +67,7 @@ protected:
   ZStringIntOptionParameter* m_type;
 
   QEasingCurve m_curve;
-  ZParameterAnimation* m_paraAnimation;
+  ZParameterAnimation* m_paraAnimation = nullptr;
 };
 
 } // namespace nim

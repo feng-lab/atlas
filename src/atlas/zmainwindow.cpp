@@ -51,9 +51,7 @@
 namespace nim {
 
 ZMainWindow::ZMainWindow()
-  : QMainWindow()
-  , m_isClosed(false)
-  , m_versionString(__DATE__)
+  : m_versionString(__DATE__)
 {
   init();
   setWindowTitle(QString("Atlas ver. %1").arg(m_versionString));

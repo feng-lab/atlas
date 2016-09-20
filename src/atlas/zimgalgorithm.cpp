@@ -5,8 +5,6 @@
 namespace nim {
 
 ZImgAlgorithmBaseWithProgressReporter::ZImgAlgorithmBaseWithProgressReporter()
-  : QObject(nullptr), m_weight(1.0), m_progress(0.0), m_reportInterval(.01), m_cancelFlag(nullptr)
-  , m_parent(nullptr)
 {
   m_CallbackCommand = CommandType::New();
   m_CallbackCommand->SetCallbackFunction(this, &ZImgAlgorithmBaseWithProgressReporter::processITKEvent);

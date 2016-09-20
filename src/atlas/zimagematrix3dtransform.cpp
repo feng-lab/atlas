@@ -3,10 +3,6 @@
 namespace nim {
 
 ZImageMatrix3DTransform::ZImageMatrix3DTransform()
-  : ZImageTransform()
-  , m_centerX(0)
-  , m_centerY(0)
-  , m_centerZ(0)
 {
   std::vector<double>(12, 0).swap(m_parameters);
   m_parameters[0] = 1;
@@ -119,7 +115,6 @@ ZImageTransform* ZImageMatrix3DTransform::makeInverseTransform() const
 ///////////////////////
 
 ZImageTranslation3DTransform::ZImageTranslation3DTransform()
-  : ZImageMatrix3DTransform()
 {
   std::vector<double>(3, 0).swap(m_parameters);
 }
@@ -176,7 +171,6 @@ ZImageTransform* ZImageTranslation3DTransform::makeInverseTransform() const
 /////////////////////////
 
 ZImageRigid3DTransform::ZImageRigid3DTransform()
-  : ZImageMatrix3DTransform()
 {
   std::vector<double>(6, 0).swap(m_parameters);
 }
@@ -224,7 +218,6 @@ ZImageTransform* ZImageRigid3DTransform::makeInverseTransform() const
 /////////////////////////
 
 ZImageSimilarity3DTransform::ZImageSimilarity3DTransform()
-  : ZImageMatrix3DTransform()
 {
   std::vector<double>(7, 0).swap(m_parameters);
   m_parameters[6] = 1;
@@ -274,7 +267,6 @@ ZImageTransform* ZImageSimilarity3DTransform::makeInverseTransform() const
 /////////////////////////
 
 ZImageAffine3DTransform::ZImageAffine3DTransform()
-  : ZImageMatrix3DTransform()
 {
   std::vector<double>(15, 0).swap(m_parameters);
   m_parameters[6] = 1;

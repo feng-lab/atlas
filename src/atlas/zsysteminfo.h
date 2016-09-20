@@ -69,9 +69,9 @@ protected:
   QString m_fontPath;
   QString m_shaderPath;
 
-  bool m_glInitialized;
+  bool m_glInitialized = false;
 
-  bool m_stereoViewSupported;
+  bool m_stereoViewSupported = false;
 };
 
 } // namespace nim

@@ -2,11 +2,6 @@
 
 namespace nim {
 
-ZNeighborhood::ZNeighborhood()
-  : m_leftExtend(0), m_rightExtend(0), m_upExtend(0), m_downExtend(0), m_frontExtend(0), m_backExtend(0)
-{
-}
-
 ZNeighborhood::ZNeighborhood(size_t nb)
 {
   set(nb);

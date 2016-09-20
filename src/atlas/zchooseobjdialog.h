@@ -30,7 +30,7 @@ private:
 
 private:
   const ZObjDoc& m_doc;
-  size_t m_selectedID;
+  size_t m_selectedID = 0;
 
   QLabel* m_label;
   QTreeWidget* m_treeWidget;

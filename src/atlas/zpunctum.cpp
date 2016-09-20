@@ -6,31 +6,11 @@
 
 namespace nim {
 
-ZPunctum::ZPunctum()
-  : m_maxIntensity(255)
-  , m_meanIntensity(255)
-  , m_x(-1)
-  , m_y(-1)
-  , m_z(-1)
-  , m_sDevOfIntensity(0)
-  , m_radius(2.0)
-  , m_color(0, 255, 255)
-  , m_score(1.0)
-{
-  updateVolSize();
-  updateMass();
-}
-
 ZPunctum::ZPunctum(double x, double y, double z, double r)
-  : m_maxIntensity(255)
-  , m_meanIntensity(255)
-  , m_x(x)
+  : m_x(x)
   , m_y(y)
   , m_z(z)
-  , m_sDevOfIntensity(0)
   , m_radius(r)
-  , m_color(0, 255, 255)
-  , m_score(1.0)
 {
   updateVolSize();
   updateMass();

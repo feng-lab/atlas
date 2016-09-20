@@ -8,8 +8,7 @@
 namespace nim {
 
 Z3DGlobalParameters::Z3DGlobalParameters()
-  : QObject()
-  , geometriesMultisampleMode("Multisample Anti-Aliasing")
+  : geometriesMultisampleMode("Multisample Anti-Aliasing")
   , transparencyMethod("Transparency")
   , lightCount("Light Count", 5, 1, 5)
   , sceneAmbient("Scene Ambient", glm::vec4(0.2f, 0.2f, 0.2f, 1.f))

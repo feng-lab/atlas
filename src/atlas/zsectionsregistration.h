@@ -98,23 +98,23 @@ private:
 
   ZImg& m_registeredImg;
 
-  int m_referenceChannel;
+  int m_referenceChannel = -1;
 
-  bool m_removeBackground;
-  bool m_removeHighForeground;
-  bool m_allowFlip;
-  bool m_brightBackground;
-  bool m_useMultithreading;
-  int m_numScales;
-  int m_numNeighbors;
+  bool m_removeBackground = true;
+  bool m_removeHighForeground = true;
+  bool m_allowFlip = false;
+  bool m_brightBackground = false;
+  bool m_useMultithreading = true;
+  int m_numScales = 1;
+  int m_numNeighbors = 1;
 
   std::vector<SectionInfo> m_sectionInfos;
   double m_minValue;
   double m_maxValue;
 
-  QString m_metric;
-  QString m_transform;
-  QString m_optimizer;
+  QString m_metric{"Log Absolute Differences"};
+  QString m_transform{"Rigid"};
+  QString m_optimizer{"LBFGS"};
 };
 
 } // namespace nim

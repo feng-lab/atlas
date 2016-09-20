@@ -38,7 +38,7 @@ protected:
 private:
   QProcess* m_ffmpegProcess;
 
-  bool m_lock;
+  bool m_lock = false;
 };
 
 } // namespace nim

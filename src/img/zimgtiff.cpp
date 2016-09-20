@@ -8,11 +8,6 @@
 
 namespace nim {
 
-ZImgTiff::ZImgTiff()
-  : ZImgFormat(), m_dimensionOrder("ZTL"), m_startIFDIndex(0), m_isImageJTiff(false), m_onlyOneIFDInImageJTiff(false)
-{
-}
-
 QString ZImgTiff::shortName() const
 {
   return "Tiff";
@@ -248,7 +243,6 @@ void ZImgTiff::detectImgInfo(ZTiff& tiff)
     m_imgInfo[0].validBitCount = *validBitCounts.begin();
 
     if (m_imageDescription.startsWith("ImageJ=") && m_imageDescription.contains("images=")) {
-      LOG(INFO) << "ImageJ Tiff: " << m_imageDescription;
       m_isImageJTiff = true;
       size_t images = 0;
       size_t channels = 1;

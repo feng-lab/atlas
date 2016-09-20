@@ -87,7 +87,7 @@ private:
     ZMesh mesh;
     QList<ZMesh*> meshList;
     QString path;
-    bool hasUnsavedChange;
+    bool hasUnsavedChange = false;
 
     // derived data
   private:

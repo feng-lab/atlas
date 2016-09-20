@@ -194,10 +194,6 @@ void separateChannel(uint8_t* bufImg, const ZImgInfo& info, const ZImgRegion& re
 
 namespace nim {
 
-ZImgPng::ZImgPng()
-{
-}
-
 QString ZImgPng::shortName() const
 {
   return "Png";

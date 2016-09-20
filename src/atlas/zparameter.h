@@ -137,12 +137,12 @@ protected:
 
 protected:
   QString m_name;
-  QString m_style;
+  QString m_style{"DEFAULT"};
   QStringList m_allStyles;
 
   //std::set<QWidget*> m_widgets;
-  bool m_isWidgetsEnabled;
-  bool m_isWidgetsVisible;
+  bool m_isWidgetsEnabled = true;
+  bool m_isWidgetsVisible = true;
 };
 
 // parameter contains a single value
@@ -188,7 +188,7 @@ protected:
 
 protected:
   T m_value;
-  bool m_locked;
+  bool m_locked = false;
 };
 
 //---------------------------------------------------------------------------
@@ -196,12 +196,12 @@ protected:
 template<class T>
 ZSingleValueParameter<T>::ZSingleValueParameter(const QString& name, const T& value, QObject* parent)
   : ZParameter(name, parent)
-  , m_value(value), m_locked(false)
+  , m_value(value)
 {}
 
 template<class T>
 ZSingleValueParameter<T>::ZSingleValueParameter(const QString& name, QObject* parent)
-  : ZParameter(name, parent), m_locked(false)
+  : ZParameter(name, parent)
 {}
 
 template<class T>

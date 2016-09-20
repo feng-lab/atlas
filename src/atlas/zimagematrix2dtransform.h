@@ -48,8 +48,8 @@ public:
 
 protected:
   ZAffine2D m_tform;
-  double m_centerX;
-  double m_centerY;
+  double m_centerX = 0;
+  double m_centerY = 0;
 };
 
 class ZImageYTranslation2DTransform : public ZImageMatrix2DTransform

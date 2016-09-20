@@ -2,11 +2,6 @@
 
 namespace nim {
 
-ZImageCompositeTransform::ZImageCompositeTransform()
-  : ZImageTransform()
-{
-}
-
 void ZImageCompositeTransform::addTransform(const ZImageTransform& tfm)
 {
   m_tfms.emplace_back(tfm.clone());

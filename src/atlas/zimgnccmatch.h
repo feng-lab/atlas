@@ -179,8 +179,8 @@ private:
   const ZImg& m_movingImg;
   size_t m_fixedT;
   size_t m_movingT;
-  PositionHint m_movingImgPosHint;
-  double m_maxOverlapRate;  // 0 to 1, default 1
+  PositionHint m_movingImgPosHint = PositionHint::None;
+  double m_maxOverlapRate = 1.0;  // 0 to 1
 
   std::set<size_t> m_fixedImgChannelsToUse;
   std::set<size_t> m_movingImgChannelsToUse;

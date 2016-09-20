@@ -9,7 +9,7 @@ namespace nim {
 class ZNeighborhood
 {
 public:
-  explicit ZNeighborhood();
+  ZNeighborhood() = default;
 
   // 2D
   // 4 4-connected neighborhood without center
@@ -94,12 +94,12 @@ public:
 
 private:
   std::vector<ZVoxelCoordinate> m_offsets;
-  size_t m_leftExtend;
-  size_t m_rightExtend;
-  size_t m_upExtend;
-  size_t m_downExtend;
-  size_t m_frontExtend;
-  size_t m_backExtend;
+  size_t m_leftExtend = 0;
+  size_t m_rightExtend = 0;
+  size_t m_upExtend = 0;
+  size_t m_downExtend = 0;
+  size_t m_frontExtend = 0;
+  size_t m_backExtend = 0;
 };
 
 } // namespace nim

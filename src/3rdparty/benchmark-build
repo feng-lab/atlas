@@ -17,6 +17,9 @@ then
   exit 1 # terminate and indicate error
 fi
 
+# patch to build with xcode 8
+$currDIR/massedit.py -w -e "re.sub(r'CLOCK_PROCESS_CPUTIME_ID', 'XXX_CLOCK_PROCESS_CPUTIME_ID', line)" -e "re.sub(r'CLOCK_THREAD_CPUTIME_ID', 'XXX_CLOCK_THREAD_CPUTIME_ID', line)" $srcDIR/src/timers.cc
+
 if [ -d $buildDIR ]
 then
   rm -rf $buildDIR
@@ -37,6 +40,9 @@ fi
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$installDIR -DCMAKE_OSX_DEPLOYMENT_TARGET=10.8 -DBENCHMARK_USE_LIBCXX:BOOL="1" -DCMAKE_OSX_SYSROOT=$OSX_SYSROOT -DCMAKE_CXX_FLAGS:STRING="${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++14" $srcDIR
 
 make -j $numCores install
+
+# unpatch
+mv -f $srcDIR/src/timers.cc.bak $srcDIR/src/timers.cc
 
 cd $currDIR
 rm -rf $buildDIR

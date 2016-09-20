@@ -10,16 +10,6 @@
 
 namespace nim {
 
-ZImgRegistration::ZImgRegistration()
-  : m_fixedImg(nullptr)
-  , m_movingImg(nullptr)
-  , m_costFunction(nullptr)
-  , m_transform(nullptr)
-  , m_useMultithreading(true)
-  , m_numScales(1)
-{
-}
-
 void ZImgRegistration::setCostFunction(ZRegistrationCostFunction& costFunction)
 {
   m_costFunction = &costFunction;

@@ -11,11 +11,6 @@ namespace nim {
 ZPunctaGraphicsItem::ZPunctaGraphicsItem(ZPuncta& puncta, double z, QGraphicsItem* parent)
   : QGraphicsItem(parent)
   , m_puncta(puncta)
-  , m_outlineColor(255, 0, 0)
-  , m_opacity(1)
-  , m_mip(false)
-  , m_z(0)
-  , m_t(0)
 {
   setZValue(z);
 
@@ -66,7 +61,6 @@ void ZPunctaGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsIte
 
 ZPunctaFilter::ZPunctaFilter(ZView& view)
   : ZObjFilter(view)
-  , m_puncta(nullptr)
   , m_visible("Visible", true)
   , m_outlineColor("Outline Color", glm::vec3(1, 0, 1), glm::vec3(0), glm::vec3(1))
   , m_opacity("Opacity", 1, 0., 1.)

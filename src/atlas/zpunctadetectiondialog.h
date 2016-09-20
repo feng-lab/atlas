@@ -7,7 +7,6 @@
 #include <QGroupBox>
 #include <QDialogButtonBox>
 #include <QPushButton>
-#include <QThread>
 #include <QProgressDialog>
 #include <QLabel>
 #ifdef _NEUTUBE_
@@ -94,8 +93,6 @@ private:
   ZStringIntOptionParameter m_dendriteChannel;
   ZIntParameter m_tubeThreshold;
   ZDoubleParameter m_ambiguousFactor;
-
-  //QThread *m_thread;
 
   std::atomic<bool> m_isCanceled;
   bool m_hasError;

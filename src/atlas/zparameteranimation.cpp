@@ -10,7 +10,7 @@
 namespace nim {
 
 ZParameterAnimation::ZParameterAnimation(const QString& name, const QString& type, const QColor& color, QObject* parent)
-  : QObject(parent), m_name(name), m_type(type), m_color(color), m_boundPara(nullptr)
+  : QObject(parent), m_name(name), m_type(type), m_color(color)
 {
 }
 

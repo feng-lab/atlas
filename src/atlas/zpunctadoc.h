@@ -84,7 +84,7 @@ private:
 
     ZPuncta puncta;
     QString path;
-    bool hasUnsavedChange;
+    bool hasUnsavedChange = false;
 
     // derived data
   private:

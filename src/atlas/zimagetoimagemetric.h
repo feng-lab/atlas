@@ -24,8 +24,6 @@ public:
     NormalizedMutualInformation
   };
 
-  ZImageToImageMetric();
-
   void setType(Type type)
   { m_type = type; }
 
@@ -72,11 +70,11 @@ protected:
 //  }
 
 private:
-  Type m_type;
-  size_t m_nbins;
-  double m_Imin;
-  double m_Imax;
-  bool m_useMultithreading;
+  Type m_type = Type::LogAbsoluteDifferences;
+  size_t m_nbins = 128;
+  double m_Imin = 0;
+  double m_Imax = -2;
+  bool m_useMultithreading = true;
 };
 
 // template

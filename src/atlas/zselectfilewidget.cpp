@@ -12,9 +12,6 @@ ZSelectFileWidget::ZSelectFileWidget(FileMode mode, const QString& guiname, cons
   , m_guiName(guiname)
   , m_filter(filter)
   , m_lastFName(startDir)
-  , m_destName(nullptr)
-  , m_destNames(nullptr)
-  , m_lessThan(nullptr)
 {
   createWidget(direction);
 }

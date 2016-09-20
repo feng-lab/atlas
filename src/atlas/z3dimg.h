@@ -6,7 +6,6 @@
 #include "z3dtexture.h"
 #include "z3dvolume.h"
 #include <QObject>
-#include <QThread>
 #include <set>
 
 namespace nim {

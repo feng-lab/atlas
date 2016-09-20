@@ -7,9 +7,10 @@ namespace nim {
 class ZAffine2D
 {
 public:
-  ZAffine2D();
+  ZAffine2D() = default;
 
-  ZAffine2D(double m11, double m12, double m13, double m21, double m22, double m23);
+  ZAffine2D(double m11, double m12, double m13, double m21, double m22, double m23)
+  { setMatrix(m11, m12, m13, m21, m22, m23); }
 
   // must call makeMatrix to update, shear -> scale -> rotate -> translate
   void setTranslation(double x, double y)
@@ -81,16 +82,16 @@ protected:
   Eigen::Matrix3d getInverseTransformMatrix() const;
 
 private:
-  Eigen::Matrix3d m_matrix;
-  Eigen::Matrix3d m_inverseMatrix;
+  Eigen::Matrix3d m_matrix = Eigen::Matrix3d::Identity();
+  Eigen::Matrix3d m_inverseMatrix = Eigen::Matrix3d::Identity();
 
-  double m_translationX;
-  double m_translationY;
-  double m_scaleX;
-  double m_scaleY;
-  double m_rotateAngle;
-  double m_shearXY;
-  double m_shearYX;
+  double m_translationX = 0;
+  double m_translationY = 0;
+  double m_scaleX = 1;
+  double m_scaleY = 1;
+  double m_rotateAngle = 0;
+  double m_shearXY = 0;
+  double m_shearYX = 0;
 };
 
 } // namespace nim

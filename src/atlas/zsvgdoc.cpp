@@ -183,7 +183,7 @@ size_t ZSvgDoc::addSvg(std::unique_ptr<QSvgRenderer> svg, const QString& path)
 }
 
 ZSvgDoc::SvgPack::SvgPack(std::unique_ptr<QSvgRenderer> svg_, const QString& path_)
-  : svg(std::move(svg_)), path(QFileInfo(path_).canonicalFilePath()), hasUnsavedChange(false)
+  : svg(std::move(svg_)), path(QFileInfo(path_).canonicalFilePath())
 {
   updateDerivedData();
 }

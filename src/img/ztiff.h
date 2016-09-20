@@ -16,9 +16,6 @@ struct ZImgInfo;
 class ZTiffIFD
 {
 public:
-  ZTiffIFD()
-    : m_offset(0), m_nextIFDOffset(0)
-  {}
 
   bool isNormalImage() const
   { return !isReducedResolutionImage() && !isTransparencyMask(); }
@@ -149,8 +146,8 @@ protected:
 
 private:
   std::vector<ZImgMetatag> m_entries;
-  uint64_t m_offset;
-  uint64_t m_nextIFDOffset;
+  uint64_t m_offset = 0;
+  uint64_t m_nextIFDOffset = 0;
   std::vector<ZTiffIFD> m_subIFDs;
   std::vector<ZTiffIFD> m_exifIFD;  // should contains 0 or 1 IFD
   std::vector<ZTiffIFD> m_gpsIFD;   // should contains 0 or 1 IFD

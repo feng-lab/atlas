@@ -9,8 +9,7 @@
 namespace nim {
 
 ZAssignPuncta::ZAssignPuncta(const ZImg& img, size_t dendriteChannel, size_t t)
-  : ZImgProcess()
-  , m_img(img)
+  : m_img(img)
   , m_dendriteChannel(dendriteChannel)
   , m_t(t)
   , m_maxDistToBranch(2.5)

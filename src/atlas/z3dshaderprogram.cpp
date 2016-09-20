@@ -10,10 +10,6 @@
 namespace nim {
 
 Z3DShaderProgram::Z3DShaderProgram()
-  : m_logUniformLocationError(true)
-  , m_linked(false)
-  , m_id(0)
-  , m_context()
 {
   m_id = glCreateProgram();
   if (!m_id) {

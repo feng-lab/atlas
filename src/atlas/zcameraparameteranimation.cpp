@@ -204,15 +204,8 @@ glm::quat ZCameraParameterAnimation::SquadPoly::Q(float fU) const
   return glm::squad(m_kP, m_kQ, m_kA, m_kB, fU);
 }
 
-ZCameraParameterAnimation::SplineRange::SplineRange()
-  : posSplineTotalLength(0)
-  , m_hasSpline(false)
-{
-}
-
 ZCameraParameterAnimation::SplineRange::SplineRange(QList<ZCameraParameterKey*>& kys)
-  : posSplineTotalLength(0)
-  , m_hasSpline(kys.size() >= 2)
+  : m_hasSpline(kys.size() >= 2)
 {
   keys.swap(kys);
   if (m_hasSpline) {

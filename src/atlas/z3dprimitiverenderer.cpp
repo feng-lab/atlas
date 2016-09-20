@@ -8,8 +8,7 @@
 namespace nim {
 
 Z3DPrimitiveRenderer::Z3DPrimitiveRenderer(Z3DRendererBase& rendererBase)
-  : QObject()
-  , m_rendererBase(rendererBase)
+  : m_rendererBase(rendererBase)
   , m_needLighting(true)
   , m_useDisplayList(false)
   , m_followCoordTransform(true)

@@ -314,7 +314,7 @@ protected:
   std::array<int, 8> m_boundBox;
 
   QUndoStack* m_undoStack;
-  ZROISliceMoveSelectedControlPointsCommand* m_moveSelectedControlPointsCommand;
+  ZROISliceMoveSelectedControlPointsCommand* m_moveSelectedControlPointsCommand = nullptr;
   std::set<int> m_changedSlices;
 };
 

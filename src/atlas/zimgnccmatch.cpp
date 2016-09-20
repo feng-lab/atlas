@@ -42,8 +42,6 @@ ZImgNCCMatch::ZImgNCCMatch(const ZImg& fixedImg, const ZImg& movingImg,
                            size_t fixedT, size_t movingT)
   : m_fixedImg(fixedImg), m_movingImg(movingImg)
   , m_fixedT(fixedT), m_movingT(movingT)
-  , m_movingImgPosHint(PositionHint::None)
-  , m_maxOverlapRate(1.)
 {
   init();
 }

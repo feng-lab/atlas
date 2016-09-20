@@ -50,9 +50,9 @@ public:
 
 protected:
   ZAffine3D m_tform;
-  double m_centerX;
-  double m_centerY;
-  double m_centerZ;
+  double m_centerX = 0;
+  double m_centerY = 0;
+  double m_centerZ = 0;
 };
 
 class ZImageTranslation3DTransform : public ZImageMatrix3DTransform

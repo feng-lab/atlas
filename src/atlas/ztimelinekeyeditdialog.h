@@ -44,7 +44,7 @@ protected:
   ZFloatParameter m_posContinuity;
   ZFloatParameter m_posBias;
 
-  ZParameter* m_para;
+  ZParameter* m_para = nullptr;
 };
 
 } // namespace nim

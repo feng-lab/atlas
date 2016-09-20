@@ -78,7 +78,7 @@ protected:
 
   struct SplineRange
   {
-    SplineRange();
+    SplineRange() = default;
 
     explicit SplineRange(QList<ZCameraParameterKey*>& kys);
 
@@ -121,9 +121,9 @@ protected:
     QList<ZCameraParameterKey*> keys;
     QList<Poly> posSpline;
     std::vector<float> posSplineLengths;
-    float posSplineTotalLength;
+    float posSplineTotalLength = 0;
     QList<SquadPoly> rotSpline;
-    bool m_hasSpline;
+    bool m_hasSpline = false;
     std::unique_ptr<ZCameraParameterKey> firstKey;
     std::unique_ptr<ZCameraParameterKey> lastKey;
   };

@@ -4,11 +4,6 @@
 
 namespace nim {
 
-ZItemEditorFactory::ZItemEditorFactory()
-  : QItemEditorFactory()
-{
-}
-
 QWidget* ZItemEditorFactory::createEditor(int type, QWidget* parent) const
 {
   if (type == QVariant::Double) {

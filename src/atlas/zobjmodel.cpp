@@ -564,9 +564,8 @@ bool ZObjModel::needCheckbox(const QModelIndex& index) const
 }
 
 ZObjModel::ObjItem::ObjItem(size_t id_, ZObjDoc* doc_, ObjItem* parent_)
-  : parent(parent_), id(id_), doc(doc_), locked(false), show(true)
+  : parent(parent_), id(id_), doc(doc_)
 {
-  checkState = Qt::Checked;
 }
 
 int ZObjModel::ObjItem::row() const

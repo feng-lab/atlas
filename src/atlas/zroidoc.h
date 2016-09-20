@@ -92,7 +92,7 @@ private:
 
     std::unique_ptr<ZROI> roi;
     QString path;
-    bool hasUnsavedChange;
+    bool hasUnsavedChange = false;
 
   private:
     QString generateUniqueName();

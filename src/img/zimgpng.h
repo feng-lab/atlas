@@ -7,7 +7,6 @@ namespace nim {
 class ZImgPng : public ZImgFormat
 {
 public:
-  ZImgPng();
 
   // ZImgFormat interface
 public:

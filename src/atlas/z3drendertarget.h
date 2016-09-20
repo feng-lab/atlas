@@ -82,20 +82,22 @@ protected:
   void generateId();
 
 protected:
-  GLuint m_fboID, m_multisampleFBOID;
-  GLuint m_colorBufferID, m_depthBufferID;
+  GLuint m_fboID = 0;
+  GLuint m_multisampleFBOID = 0;
+  GLuint m_colorBufferID = 0;
+  GLuint m_depthBufferID = 0;
 
   glm::ivec4 m_previousViewport;
-  GLuint m_previousDrawFBOID;
-  GLuint m_previousReadFBOID;
+  GLuint m_previousDrawFBOID = 0;
+  GLuint m_previousReadFBOID = 0;
 
   std::map<GLenum, Z3DTexture*> m_attachments;
   // textures created by this rendertarget
   std::set<std::unique_ptr<Z3DTexture>> m_ownTextures;
 
-  bool m_multisample;
-  int m_samples;
-  int m_maxSamples;
+  bool m_multisample = false;
+  int m_samples = 0;
+  int m_maxSamples = 0;
 
   glm::uvec2 m_size;
 };

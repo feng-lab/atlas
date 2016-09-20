@@ -80,7 +80,7 @@ private:
 
     std::unique_ptr<QSvgRenderer> svg;
     QString path;
-    bool hasUnsavedChange;
+    bool hasUnsavedChange = false;
 
     // derived data
   private:

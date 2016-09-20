@@ -5,12 +5,6 @@
 
 namespace nim {
 
-ZImageTransform::ZImageTransform()
-  : m_imageInterpolation(Interpolant::Cubic, PadOption::Constant, 0.0)
-  , m_useMultithreading(true)
-{
-}
-
 void ZImageTransform::setParameters(const std::vector<double>& para)
 {
   CHECK_GE(para.size(), numParameters()) << "Incorrect number of parameters.";

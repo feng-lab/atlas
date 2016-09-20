@@ -8,8 +8,6 @@ namespace nim {
 class ZRegistrationCostFunction
 {
 public:
-  ZRegistrationCostFunction();
-
   virtual ~ZRegistrationCostFunction() = default;
 
   int numParameters() const
@@ -29,12 +27,12 @@ public:
   virtual bool evaluate(const double* const parameters, double* cost, double* gradient = nullptr) const = 0;
 
 protected:
-  ZImageTransform* m_transform;
+  ZImageTransform* m_transform = nullptr;
 
-  const ZImg* m_fixedImg;
-  const ZImg* m_movingImg;
+  const ZImg* m_fixedImg = nullptr;
+  const ZImg* m_movingImg = nullptr;
 
-  size_t m_useMultithreading;
+  bool m_useMultithreading = true;
 };
 
 } // namespace nim

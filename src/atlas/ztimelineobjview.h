@@ -26,7 +26,7 @@ protected:
 
 private:
   ZTimelineWidget& m_parent;
-  bool m_scrollEnabled;
+  bool m_scrollEnabled = true;
 };
 
 } // namespace nim

@@ -7,7 +7,7 @@ namespace nim {
 template<class T, class T2>
 ZOptionParameter<T, T2>::ZOptionParameter(const QString& name, QObject* parent, const QString& prefix,
                                           const QString& suffix)
-  : ZSingleValueParameter<T>(name, parent), m_dataIsValid(false)
+  : ZSingleValueParameter<T>(name, parent)
   , m_prefix(prefix), m_suffix(suffix)
 {
 }

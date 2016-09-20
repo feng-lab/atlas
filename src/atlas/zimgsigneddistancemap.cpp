@@ -1,16 +1,9 @@
 #include "zimgsigneddistancemap.h"
 
 #include "zimgitkinterface.h"
-#include <QThread>
 #include <itkSignedMaurerDistanceMapImageFilter.h>
-#include <type_traits>
 
 namespace nim {
-
-template<bool ReportProgress>
-ZImgSignedDistanceMap<ReportProgress>::ZImgSignedDistanceMap()
-  : m_insideIsPositive(false), m_useSquaredDistance(false), m_numThreads(QThread::idealThreadCount())
-{}
 
 template<bool ReportProgress>
 template<typename TVoxelOut>
@@ -51,7 +44,7 @@ void ZImgSignedDistanceMap<ReportProgress>::run_Impl(TITKImg* itkimg, bool useVo
   dmFilter->SetInsideIsPositive(m_insideIsPositive);
   dmFilter->SetSquaredDistance(m_useSquaredDistance);
   dmFilter->SetUseImageSpacing(useVoxelSize);
-  dmFilter->SetNumberOfThreads(m_numThreads);
+  dmFilter->SetNumberOfThreads(this->m_numThreads);
   dmFilter->Update();
   copyITKImgToMemory(dmFilter->GetOutput(), res.channelData<TVoxelOut>(c, t));
 }

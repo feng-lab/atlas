@@ -22,7 +22,6 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimatio
   , m_posTension("Tension", 0, -1, 1)
   , m_posContinuity("Continuity", 0, -1, 1)
   , m_posBias("Bias", 0, -1, 1)
-  , m_para(nullptr)
 {
   setModal(false);
 

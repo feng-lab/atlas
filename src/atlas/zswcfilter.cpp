@@ -12,12 +12,6 @@ namespace nim {
 ZSwcGraphicsItem::ZSwcGraphicsItem(ZSwc& swc, double z, QGraphicsItem* parent)
   : QGraphicsItem(parent)
   , m_swc(swc)
-  , m_showSkeleton(true)
-  , m_outlineColor(255, 0, 0)
-  , m_opacity(1)
-  , m_mip(false)
-  , m_z(0)
-  , m_t(0)
 {
   setZValue(z);
 
@@ -119,7 +113,6 @@ void ZSwcGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* 
 
 ZSwcFilter::ZSwcFilter(ZView& view)
   : ZObjFilter(view)
-  , m_swc(nullptr)
   , m_visible("Visible", true)
   , m_showSkeleton("Show Skeleton", true)
   , m_outlineColor("Outline Color", glm::vec3(1, 0, 0), glm::vec3(0), glm::vec3(1))

@@ -188,13 +188,11 @@ QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange cha
 
 ZROIFilter::ZROIFilter(ZView& view)
   : ZObjFilter(view)
-  , m_ROI(nullptr)
   , m_visible("Visible", true)
   , m_showControlPoints("Show Control Points", true)
   , m_outlineColor("Outline Color", glm::vec3(1, 1, 0), glm::vec3(0), glm::vec3(1))
   , m_regionColor("Region Color", glm::vec3(.2, .2, .2), glm::vec3(0), glm::vec3(1))
   , m_opacity("Opacity", .5, 0., 1.)
-  , m_hasSelectedItems(false)
 {
   m_outlineColor.setStyle("COLOR");
   m_regionColor.setStyle("COLOR");

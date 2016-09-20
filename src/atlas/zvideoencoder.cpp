@@ -7,7 +7,6 @@ namespace nim {
 
 ZVideoEncoder::ZVideoEncoder(QObject* parent)
   : QObject(parent)
-  , m_lock(false)
 {
   m_ffmpegProcess = new QProcess(this);
   connect(m_ffmpegProcess, &QProcess::errorOccurred,

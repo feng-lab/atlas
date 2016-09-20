@@ -125,7 +125,7 @@ private:
 };
 
 ZImgGraph::ZImgGraph(const ZImg& img, const ZImgRegion& rgn)
-  : m_img(img), m_region(rgn), m_useVoxelSize(true), m_graphIsValid(false)
+  : m_img(img), m_region(rgn)
 {
   if (!rgn.isValid(m_img.info())) {
     throw ZImgException(QString("Can not build graph with invalid region <%1> of img <%2>")

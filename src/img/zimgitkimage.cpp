@@ -17,7 +17,6 @@
 namespace nim {
 
 ZImgITKImage::ZImgITKImage()
-  : ZImgFormat()
 {
   if (itk::ObjectFactoryBase::GetRegisteredFactories().empty()) {
     itk::NiftiImageIOFactory::RegisterOneFactory();

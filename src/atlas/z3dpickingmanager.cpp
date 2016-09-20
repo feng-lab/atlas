@@ -10,12 +10,6 @@
 
 namespace nim {
 
-Z3DPickingManager::Z3DPickingManager()
-  : m_renderTarget(nullptr)
-  , m_currentColor(0, 0, 0, 128)
-{
-}
-
 void Z3DPickingManager::setRenderTarget(Z3DRenderTarget& rt)
 {
   CHECK(rt.attachment(GL_COLOR_ATTACHMENT0)->internalFormat() == GL_RGBA8);

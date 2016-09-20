@@ -69,12 +69,12 @@ public:
   virtual QJsonValue jsonValue() const override;
 
 protected:
-  float m_posTension;
-  float m_posContinuity;
-  float m_posBias;
-  float m_rotTension;
-  float m_rotContinuity;
-  float m_rotBias;
+  float m_posTension = 0;
+  float m_posContinuity = 0;
+  float m_posBias = 0;
+  float m_rotTension = 0;
+  float m_rotContinuity = 0;
+  float m_rotBias = 0;
 };
 
 } // namespace nim

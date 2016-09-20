@@ -214,7 +214,7 @@ size_t ZSwcDoc::addSwc(ZSwc& tree, const QString& path)
 }
 
 ZSwcDoc::SwcPack::SwcPack(ZSwc& tree, const QString& path_)
-  : path(QFileInfo(path_).canonicalFilePath()), hasUnsavedChange(false)
+  : path(QFileInfo(path_).canonicalFilePath())
 {
   swc.swap(tree);
   updateDerivedData();

@@ -9,7 +9,6 @@ class ZTiff;
 class ZImgTiff : public ZImgFormat
 {
 public:
-  ZImgTiff();
 
   // ZImgFormat interface
 public:
@@ -87,13 +86,13 @@ private:
 
 protected:
   std::vector<ZImgInfo> m_imgInfo;
-  QString m_dimensionOrder;
-  size_t m_startIFDIndex;
+  QString m_dimensionOrder = "ZTL";
+  size_t m_startIFDIndex = 0;
   QString m_imageDescription;
 
 private:
-  bool m_isImageJTiff;
-  bool m_onlyOneIFDInImageJTiff;
+  bool m_isImageJTiff = false;
+  bool m_onlyOneIFDInImageJTiff = false;
 };
 
 } // namespace nim

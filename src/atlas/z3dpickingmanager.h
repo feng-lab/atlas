@@ -12,8 +12,6 @@ class Z3DPickingManager
 {
 public:
   // input render target should have color internal format as GL_RGBA8
-  Z3DPickingManager();
-
   // must call
   void setRenderTarget(Z3DRenderTarget& rt);
 
@@ -61,8 +59,8 @@ private:
 private:
   std::map<glm::col4, const void*, Col4Compare> m_colorToObject;
   std::map<const void*, glm::col4> m_objectToColor;
-  Z3DRenderTarget* m_renderTarget;
-  glm::col4 m_currentColor;
+  Z3DRenderTarget* m_renderTarget = nullptr;
+  glm::col4 m_currentColor{0, 0, 0, 128};
 };
 
 } // namespace nim

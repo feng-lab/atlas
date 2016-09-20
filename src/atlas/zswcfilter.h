@@ -77,12 +77,12 @@ public:
 protected:
   ZSwc& m_swc;
   std::array<int, 8> m_boundBox;
-  bool m_showSkeleton;
-  QColor m_outlineColor;
-  double m_opacity;
-  bool m_mip;
-  int m_z;
-  int m_t;
+  bool m_showSkeleton = true;
+  QColor m_outlineColor{255, 0, 0};
+  double m_opacity = 1;
+  bool m_mip = false;
+  int m_z = 0;
+  int m_t = 0;
   QVector<QLineF> m_lines;
 };
 
@@ -123,7 +123,7 @@ private:
   void opacityChanged();
 
 private:
-  ZSwc* m_swc;
+  ZSwc* m_swc = nullptr;
   std::unique_ptr<ZSwcGraphicsItem> m_item;
 
   ZBoolParameter m_visible;

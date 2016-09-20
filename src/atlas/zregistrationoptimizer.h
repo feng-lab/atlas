@@ -40,7 +40,7 @@ protected:
   void checkParameterNumber() const;
 
 private:
-  ZRegistrationCostFunction* m_costFunction;
+  ZRegistrationCostFunction* m_costFunction = nullptr;
   ceres::GradientProblemSolver::Options m_options;
   ceres::GradientProblemSolver::Summary m_summary;
 

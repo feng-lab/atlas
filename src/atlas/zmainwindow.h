@@ -178,7 +178,7 @@ private:
 
   QPointer<Z3DMainWindow> m_3dWindow;
 
-  bool m_isClosed;
+  bool m_isClosed = false;
 
   QString m_versionString;
 };

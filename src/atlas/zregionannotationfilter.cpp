@@ -11,7 +11,6 @@ namespace nim {
 
 ZRegionAnnotationFilter::ZRegionAnnotationFilter(ZView& view)
   : ZObjFilter(view)
-  , m_regionAnnotation(nullptr)
   , m_visible("Visible", true)
   , m_view(view)
 {

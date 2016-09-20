@@ -94,7 +94,7 @@ protected:
   QString m_type;
   QColor m_color;
   std::vector<std::unique_ptr<ZParameterKey>> m_keys;
-  ZParameter* m_boundPara;
+  ZParameter* m_boundPara = nullptr;
 };
 
 } // namespace nim

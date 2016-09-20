@@ -2,33 +2,6 @@
 
 namespace nim {
 
-ZAffine2D::ZAffine2D()
-  : m_matrix(Eigen::Matrix3d::Identity())
-  , m_inverseMatrix(Eigen::Matrix3d::Identity())
-  , m_translationX(0)
-  , m_translationY(0)
-  , m_scaleX(1)
-  , m_scaleY(1)
-  , m_rotateAngle(0)
-  , m_shearXY(0)
-  , m_shearYX(0)
-{
-}
-
-ZAffine2D::ZAffine2D(double m11, double m12, double m13, double m21, double m22, double m23)
-  : m_matrix(Eigen::Matrix3d::Identity())
-  , m_inverseMatrix(Eigen::Matrix3d::Identity())
-  , m_translationX(0)
-  , m_translationY(0)
-  , m_scaleX(1)
-  , m_scaleY(1)
-  , m_rotateAngle(0)
-  , m_shearXY(0)
-  , m_shearYX(0)
-{
-  setMatrix(m11, m12, m13, m21, m22, m23);
-}
-
 void ZAffine2D::makeMatrix()
 {
   Eigen::Matrix3d matTrans;

@@ -8,11 +8,6 @@
 
 namespace nim {
 
-ZImgOmeTiff::ZImgOmeTiff()
-  : ZImgTiff()
-{
-}
-
 void ZImgOmeTiff::readIntoInternalStructure(const QString& filename, ZTiff& tiff)
 {
   ZImgTiff::readIntoInternalStructure(filename, tiff);

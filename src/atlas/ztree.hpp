@@ -20,19 +20,17 @@ struct TreeNode
 {
   using ValueType = T;
 
-  TreeNode()
-    : parent(nullptr), firstChild(nullptr), lastChild(nullptr), prevSibling(nullptr), nextSibling(nullptr)
-  {}
+  TreeNode() = default;
 
   explicit TreeNode(const T& d)
-    : parent(nullptr), firstChild(nullptr), lastChild(nullptr), prevSibling(nullptr), nextSibling(nullptr), data(d)
+    : data(d)
   {}
 
-  TreeNode<T>* parent;
-  TreeNode<T>* firstChild;
-  TreeNode<T>* lastChild;
-  TreeNode<T>* prevSibling;
-  TreeNode<T>* nextSibling;
+  TreeNode<T>* parent = nullptr;
+  TreeNode<T>* firstChild = nullptr;
+  TreeNode<T>* lastChild = nullptr;
+  TreeNode<T>* prevSibling = nullptr;
+  TreeNode<T>* nextSibling = nullptr;
   T data;
 };
 

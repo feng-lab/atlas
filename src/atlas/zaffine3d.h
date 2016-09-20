@@ -7,11 +7,14 @@ namespace nim {
 class ZAffine3D
 {
 public:
-  ZAffine3D();
+  ZAffine3D() = default;
 
   ZAffine3D(double m11, double m12, double m13, double m14,
             double m21, double m22, double m23, double m24,
-            double m31, double m32, double m33, double m34);
+            double m31, double m32, double m33, double m34)
+  {
+    setMatrix(m11, m12, m13, m14, m21, m22, m23, m24, m31, m32, m33, m34);
+  }
 
   // must call makeMatrix to update, shear -> scale -> rotate -> translate
   void setTranslation(double x, double y, double z)
@@ -119,24 +122,24 @@ protected:
   Eigen::Matrix4d getInverseTransformMatrix() const;
 
 private:
-  Eigen::Matrix4d m_matrix;
-  Eigen::Matrix4d m_inverseMatrix;
+  Eigen::Matrix4d m_matrix = Eigen::Matrix4d::Identity();
+  Eigen::Matrix4d m_inverseMatrix = Eigen::Matrix4d::Identity();
 
-  double m_translationX;
-  double m_translationY;
-  double m_translationZ;
-  double m_scaleX;
-  double m_scaleY;
-  double m_scaleZ;
-  double m_rotateAngleXY;
-  double m_rotateAngleXZ;
-  double m_rotateAngleYZ;
-  double m_shearXY;
-  double m_shearXZ;
-  double m_shearYX;
-  double m_shearYZ;
-  double m_shearZX;
-  double m_shearZY;
+  double m_translationX = 0;
+  double m_translationY = 0;
+  double m_translationZ = 0;
+  double m_scaleX = 1;
+  double m_scaleY = 1;
+  double m_scaleZ = 1;
+  double m_rotateAngleXY = 0;
+  double m_rotateAngleXZ = 0;
+  double m_rotateAngleYZ = 0;
+  double m_shearXY = 0;
+  double m_shearXZ = 0;
+  double m_shearYX = 0;
+  double m_shearYZ = 0;
+  double m_shearZX = 0;
+  double m_shearZY = 0;
 };
 
 } // namespace nim

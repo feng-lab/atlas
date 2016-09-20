@@ -203,7 +203,7 @@ protected:
   void detectDedicatedVideoMemory();
 
 private:
-  bool m_isSupported;   //whether current graphic card is supported
+  bool m_isSupported = false;   //whether current graphic card is supported
   QString m_notSupportedReason;  // Reason why current gpu card are not supported
 
   int m_glMajorVersion;

@@ -16,7 +16,6 @@ Z3DGpuInfo& Z3DGpuInfo::instance()
 }
 
 Z3DGpuInfo::Z3DGpuInfo()
-  : m_isSupported(false)
 {
   detectGpuInfo();
 }

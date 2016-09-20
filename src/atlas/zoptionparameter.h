@@ -215,7 +215,7 @@ private:
   T2 m_associatedData;
   QList<T2> m_associatedDatas;
 
-  bool m_dataIsValid;
+  bool m_dataIsValid = false;
   QString m_prefix;
   QString m_suffix;
 };

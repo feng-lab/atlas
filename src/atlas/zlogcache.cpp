@@ -23,8 +23,7 @@ void ZLogCache::send(LogSeverity severity, const char* full_filename, const char
 }
 
 ZLogCache::ZLogCache(int maxNumItems)
-  : QObject(nullptr)
-  , m_maxNumItems(maxNumItems)
+  : m_maxNumItems(maxNumItems)
   , m_timer(new QTimer(this))
 {
   connect(m_timer, &QTimer::timeout, this, &ZLogCache::sendLogData);

@@ -8,7 +8,6 @@ class ZImgProcess : public ZImgAlgorithmBaseWithProgressReporter
 {
 Q_OBJECT
 public:
-  ZImgProcess();
 
   // log output
   void setLogFile(const QString& logFile)

@@ -12,7 +12,6 @@ namespace nim {
 ZTimelineObjView::ZTimelineObjView(ZTimelineWidget& parent)
   : QGraphicsView(&parent)
   , m_parent(parent)
-  , m_scrollEnabled(true)
 {
   setAlignment(Qt::AlignLeft | Qt::AlignTop);
   setScene(new ZTimelineObjScene(m_parent, this));

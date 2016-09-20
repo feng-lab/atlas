@@ -11,7 +11,7 @@ class ZComplexImg
 {
 public:
   // create a empty img
-  ZComplexImg();
+  ZComplexImg() = default;
 
   // create a img and allocate space
   ZComplexImg(size_t width, size_t height, size_t depth);
@@ -93,9 +93,9 @@ public:
 
 private:
   std::vector<std::complex<double>, boost::alignment::aligned_allocator<std::complex<double>, 32>> m_data;
-  size_t m_width;
-  size_t m_height;
-  size_t m_depth;
+  size_t m_width = 0;
+  size_t m_height = 0;
+  size_t m_depth = 0;
 };
 
 } // namespace nim

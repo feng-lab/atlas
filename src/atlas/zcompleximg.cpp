@@ -7,13 +7,6 @@
 
 namespace nim {
 
-ZComplexImg::ZComplexImg()
-  : m_width(0)
-  , m_height(0)
-  , m_depth(0)
-{
-}
-
 ZComplexImg::ZComplexImg(size_t width, size_t height, size_t depth)
   : m_data(width * height * depth)
   , m_width(width)
