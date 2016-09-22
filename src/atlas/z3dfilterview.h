@@ -147,6 +147,7 @@ protected:
         if (idFilter.second.get() == filter) {
           if (m_doc.doc().isObjVisible(idFilter.first) != v) {
             m_doc.doc().setObjVisible(idFilter.first, v);
+            updateBoundBox();
           }
           return;
         }

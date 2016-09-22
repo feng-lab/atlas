@@ -696,7 +696,8 @@ void makeAxonChannelImages()
 }
 
 void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
-                                 const QString& metadatafn, const QString& swcFolder,
+                                 const QStringList& metaFiles,
+                                 const QStringList& swcFolders,
                                  int mode)
 {
   QFile file(fn);
@@ -721,7 +722,14 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
 
   QDir::setCurrent(QFileInfo(fn).absolutePath());
 
-  QList<QStringList> metaData = QtCSV::Reader::readToList(metadatafn);
+  QList<QStringList> metaData = QtCSV::Reader::readToList(metaFiles[0]);
+  metaData.removeFirst();
+  for (int i = 1; i < metaFiles.size(); ++i) {
+    QList<QStringList> tmp = QtCSV::Reader::readToList(metaFiles[i]);
+    tmp.removeFirst();
+    metaData += tmp;
+  }
+
   std::map<QString, glm::dvec3> cellNameToLocations;
   glm::dvec3 imagescale = glm::dvec3(71, 71, 71);
   double imagePixelPerUm = 0.136;
@@ -729,7 +737,7 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
   double swcPixelPerUmz = 2.0;
   glm::dvec3 refSwcLocInBrain = glm::dvec3(-2.25, 1.27, 2.5);   //in mm
   glm::dvec3 refSwcRootImageLoc = glm::dvec3(373, 291, 202);   //roughly get from image
-  for (int metaIdx = 1; metaIdx < metaData.size(); ++metaIdx) {
+  for (int metaIdx = 0; metaIdx < metaData.size(); ++metaIdx) {
     QString cellName = metaData[metaIdx][0];
     double Anterior_Posterior = metaData[metaIdx][1].toDouble();
     double Medial_Lateral = metaData[metaIdx][2].toDouble();
@@ -737,6 +745,13 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
 
     glm::dvec3 swcLoc(-Medial_Lateral, Deep_Superficial, -Anterior_Posterior);
     glm::dvec3 swcRootImageLoc = (swcLoc - refSwcLocInBrain) * imagePixelPerUm * 1000. + refSwcRootImageLoc;
+    QString swcFolder;
+    for (int i = 0; i < swcFolders.size(); ++i) {
+      if (QFile::exists(QString("%1/%2.swc").arg(swcFolders[i]).arg(cellName))) {
+        swcFolder = swcFolders[i];
+        break;
+      }
+    }
     ZSwc swc(QString("%1/%2.swc").arg(swcFolder).arg(cellName));
     ZSwc::SwcTreeNode rootn = swc.thickestNode();
     glm::dvec3 rootLoc(rootn->x, rootn->y, rootn->z * swcPixelPerUmxy / swcPixelPerUmz);
@@ -757,13 +772,30 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
     QFileInfo docPath(it.value().toString());
     QString filename = docPath.completeBaseName();
     if (typeAndID[0] == "Swc") {
-      filename.chop(6);
+      if (filename.endsWith("layer"))
+        filename.chop(6);
+      else
+        LOG(FATAL) << "..";
+      modifyJsonValue(sceneObj, IDString + ".View3D.Color Mode StringIntOption", QJsonValue("Single Color"));
+      if (filename.startsWith("Py"))
+        modifyJsonValue(sceneObj, IDString + ".View3D.Color Vec4", QJsonValue(toQString(glm::vec4(1, 0, 0, 1))));
+      else if (filename.startsWith("PV169") || filename.startsWith("PV40") || filename.startsWith("PV41") ||
+               filename.startsWith("PV42")) {
+        modifyJsonValue(sceneObj, IDString + ".View3D.Color Vec4", QJsonValue(toQString(glm::vec4(0, 1, 1, 1))));
+      } else {
+        modifyJsonValue(sceneObj, IDString + ".View3D.Color Vec4", QJsonValue(toQString(glm::vec4(0, 0, 1, 1))));
+      }
     } else if (typeAndID[0] == "Puncta") {
-      filename.chop(8);
+      if (filename.endsWith("puncta"))
+        filename.chop(7);
+      else if (filename.endsWith("neurite"))
+        filename.chop(8);
+      else
+        LOG(FATAL) << "..";
       modifyJsonValue(sceneObj, IDString + ".View3D.Use Same Size Bool", QJsonValue(true));
       modifyJsonValue(sceneObj, IDString + ".View3D.Size Scale Float", QJsonValue("4"));
       modifyJsonValue(sceneObj, IDString + ".View3D.Color Mode StringIntOption", QJsonValue("Single Color"));
-      modifyJsonValue(sceneObj, IDString + ".View3D.Puncta Color Vec4", QJsonValue(toQString(glm::vec4(1, 1, 0, 1))));
+      modifyJsonValue(sceneObj, IDString + ".View3D.Puncta Color Vec4", QJsonValue(toQString(glm::vec4(0, 1, 0, 1))));
     }
     glm::dvec3 loc = cellNameToLocations.at(filename);
     QString locString = toQString(loc);
@@ -851,35 +883,46 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  moveObjectToCorrectLocation("/Users/feng/Documents/PV/contra.scene",
-                              "/Users/feng/Documents/PV/contra_center_overlap.scene",
-                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
-                              "/Users/feng/Documents/PV/PVSWC",
-                              2);
-  moveObjectToCorrectLocation("/Users/feng/Documents/PV/ipsi.scene",
-                              "/Users/feng/Documents/PV/ipsi_center_overlap.scene",
-                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
-                              "/Users/feng/Documents/PV/PVSWC",
-                              2);
-  moveObjectToCorrectLocation("/Users/feng/Documents/PY/pyr.scene",
-                              "/Users/feng/Documents/PY/pyr_center_overlap.scene",
-                              "/Users/feng/code/mgrasp-analysis/py_neuron_metadata.csv",
-                              "/Users/feng/Documents/PY/PySWC",
-                              2);
-  moveObjectToCorrectLocation("/Users/feng/Documents/PV/contra.scene",
-                              "/Users/feng/Documents/PV/contra_in_ca1.scene",
-                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
-                              "/Users/feng/Documents/PV/PVSWC",
-                              1);
-  moveObjectToCorrectLocation("/Users/feng/Documents/PV/ipsi.scene",
-                              "/Users/feng/Documents/PV/ipsi_in_ca1.scene",
-                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
-                              "/Users/feng/Documents/PV/PVSWC",
-                              1);
-  moveObjectToCorrectLocation("/Users/feng/Documents/PY/pyr.scene",
-                              "/Users/feng/Documents/PY/pyr_in_ca1.scene",
-                              "/Users/feng/code/mgrasp-analysis/py_neuron_metadata.csv",
-                              "/Users/feng/Documents/PY/PySWC",
+//  moveObjectToCorrectLocation("/Users/feng/Documents/PV/contra.scene",
+//                              "/Users/feng/Documents/PV/contra_center_overlap.scene",
+//                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
+//                              "/Users/feng/Documents/PV/PVSWC",
+//                              2);
+//  moveObjectToCorrectLocation("/Users/feng/Documents/PV/ipsi.scene",
+//                              "/Users/feng/Documents/PV/ipsi_center_overlap.scene",
+//                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
+//                              "/Users/feng/Documents/PV/PVSWC",
+//                              2);
+//  moveObjectToCorrectLocation("/Users/feng/Documents/PY/pyr.scene",
+//                              "/Users/feng/Documents/PY/pyr_center_overlap.scene",
+//                              "/Users/feng/code/mgrasp-analysis/py_neuron_metadata.csv",
+//                              "/Users/feng/Documents/PY/PySWC",
+//                              2);
+//  moveObjectToCorrectLocation("/Users/feng/Documents/PV/contra.scene",
+//                              "/Users/feng/Documents/PV/contra_in_ca1.scene",
+//                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
+//                              "/Users/feng/Documents/PV/PVSWC",
+//                              1);
+//  moveObjectToCorrectLocation("/Users/feng/Documents/PV/ipsi.scene",
+//                              "/Users/feng/Documents/PV/ipsi_in_ca1.scene",
+//                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
+//                              "/Users/feng/Documents/PV/PVSWC",
+//                              1);
+//  moveObjectToCorrectLocation("/Users/feng/Documents/PY/pyr.scene",
+//                              "/Users/feng/Documents/PY/pyr_in_ca1.scene",
+//                              "/Users/feng/code/mgrasp-analysis/py_neuron_metadata.csv",
+//                              "/Users/feng/Documents/PY/PySWC",
+//                              1);
+  QStringList metaFiles;
+  metaFiles << "/Users/feng/code/mgrasp-analysis/py_neuron_metadata.csv"
+            << "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv";
+  QStringList swcFolders;
+  swcFolders << "/Users/feng/Documents/PV/PVSWC"
+             << "/Users/feng/Documents/PY/PySWC";
+  moveObjectToCorrectLocation("/Users/feng/Downloads/all.scene",
+                              "/Users/feng/Downloads/all_in_ca1.scene",
+                              metaFiles,
+                              swcFolders,
                               1);
   LOG(INFO) << "done";
 }

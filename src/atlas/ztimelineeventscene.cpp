@@ -68,16 +68,18 @@ ParameterKeysItem::ParameterKeysItem(ZParameterKey& paraKey, ZParameterAnimation
 
 void ParameterKeysItem::updateValue()
 {
-  setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
-  setPos(m_timeline.timeToX(m_paraKey.time()), 0);
-  setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
+  if (!m_updateValueLock) {
+    setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
+    setPos(m_timeline.timeToX(m_paraKey.time()), 0);
+    setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
+  }
 }
 
 QVariant ParameterKeysItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
 {
   if (change == ItemPositionChange) {
-    double time = m_timeline.xToTime(value.toPointF().x());
-    m_paraKey.setTime(time);
+    m_paraKey.setTime(m_timeline.xToTime(value.toPointF().x()));
+    m_itemMoved = true;
     return QPointF(m_timeline.timeToX(m_paraKey.time()), 0);
   }
   return QGraphicsRectItem::itemChange(change, value);
@@ -122,6 +124,23 @@ void ParameterKeysItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* /*event*
     m_editDialog->showNormal();
     m_editDialog->raise();
     m_editDialog->activateWindow();
+  }
+}
+
+void ParameterKeysItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
+{
+  m_itemMoved = false;
+  m_itemOldTime = m_paraKey.time();
+  QGraphicsRectItem::mousePressEvent(event);
+}
+
+void ParameterKeysItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
+{
+  QGraphicsRectItem::mouseReleaseEvent(event);
+  if (m_itemMoved && m_itemOldTime != m_paraKey.time()) {
+    m_updateValueLock = true;
+    m_paraAnimation.emitKeyChangedSignal(&m_paraKey);
+    m_updateValueLock = false;
   }
 }
 

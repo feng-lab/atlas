@@ -50,12 +50,12 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimatio
                                                            std::numeric_limits<double>::max());
     }
     addWidget(m_para->createNameLabel(this), m_para->createWidget(this), lo);
-    connect(m_para, &ZParameter::valueChanged, this, &ZTimelineKeyEditDialog::raiseAndActivate);
+    //connect(m_para, &ZParameter::valueChanged, this, &ZTimelineKeyEditDialog::raiseAndActivate);
   } else {
     addWidget(m_paraAnimation.boundParameter()->createNameLabel(this),
               m_paraAnimation.boundParameter()->createWidget(this), lo);
-    connect(m_paraAnimation.boundParameter(), &ZParameter::valueChanged, this,
-            &ZTimelineKeyEditDialog::raiseAndActivate);
+    //connect(m_paraAnimation.boundParameter(), &ZParameter::valueChanged, this,
+    //        &ZTimelineKeyEditDialog::raiseAndActivate);
   }
 
   if (m_paraAnimation.type() == "3DCamera") {

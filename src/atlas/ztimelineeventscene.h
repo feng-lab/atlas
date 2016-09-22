@@ -65,12 +65,20 @@ protected:
 
   virtual void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
 
+  virtual void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
+
+  virtual void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
+
 private:
   ZParameterKey& m_paraKey;
   ZParameterAnimation& m_paraAnimation;
   const ZAnimationDisplayPack& m_displayPack;
   ZTimelineWidget& m_timeline;
   std::unique_ptr<ZTimelineKeyEditDialog> m_editDialog;
+
+  bool m_updateValueLock = false;
+  bool m_itemMoved = false;
+  double m_itemOldTime = 0.0;
 };
 
 class CurrentTimeLineItem : public QGraphicsLineItem

@@ -463,22 +463,22 @@ void ZCpuInfo::detectCoreAndThreadNumber()
 
   free(buffer);
 #elif defined(__APPLE__)
-  int tmpNumCores;
-  size_t oldlenp = sizeof(tmpNumCores);
-  if (sysctlbyname("hw.physicalcpu_max", &tmpNumCores, &oldlenp, nullptr, 0) == 0) {
+  int32_t tmpNumCores;
+  size_t len = sizeof(tmpNumCores);
+  if (sysctlbyname("hw.physicalcpu_max", &tmpNumCores, &len, nullptr, 0) == 0) {
     nPhysicalCores = tmpNumCores;
   }
-  if (sysctlbyname("hw.logicalcpu_max", &tmpNumCores, &oldlenp, nullptr, 0) == 0) {
+  if (sysctlbyname("hw.logicalcpu_max", &tmpNumCores, &len, nullptr, 0) == 0) {
     nLogicalCores = tmpNumCores;
   }
 
   int nm[2];
-  size_t len = sizeof(nPhysicalRAM);
-
+  len = sizeof(nPhysicalRAM);
   nm[0] = CTL_HW;
   nm[1] = HW_MEMSIZE;
-  if (sysctl(nm, 2, &nPhysicalRAM, &len, nullptr, 0) != 0)
+  if (sysctl(nm, 2, &nPhysicalRAM, &len, nullptr, 0) != 0) {
     nPhysicalRAM = 0;
+  }
 
   uint32_t count = 0;
   len = sizeof(count);

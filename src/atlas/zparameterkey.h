@@ -55,9 +55,6 @@ public:
 
   QString info() const;
 
-  void setParaAnimation(ZParameterAnimation* paraAnimation)
-  { m_paraAnimation = paraAnimation; }
-
 protected:
   void setDefaultType();
 
@@ -67,7 +64,6 @@ protected:
   ZStringIntOptionParameter* m_type;
 
   QEasingCurve m_curve;
-  ZParameterAnimation* m_paraAnimation = nullptr;
 };
 
 } // namespace nim

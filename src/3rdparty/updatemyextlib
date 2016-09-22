@@ -22,11 +22,11 @@ fi
 srcArchive=$srcPackageDIR/freeimage-FreeImage.tar.gz
 tar -zxf "$srcArchive" -C $baseDIR
 
-if [ -d $baseDIR/libjpeg-turbo-1.5.0 ]
+if [ -d $baseDIR/libjpeg-turbo-1.5.1 ]
 then
-  rm -rf $baseDIR/libjpeg-turbo-1.5.0
+  rm -rf $baseDIR/libjpeg-turbo-1.5.1
 fi
-srcArchive=$srcPackageDIR/libjpeg-turbo-1.5.0.tar.gz
+srcArchive=$srcPackageDIR/libjpeg-turbo-1.5.1.tar.gz
 tar -zxf "$srcArchive" -C $baseDIR
 
 if [ -d $baseDIR/libpng-1.6.25 ]

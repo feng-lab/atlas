@@ -51,13 +51,7 @@ ZParameterKey::ZParameterKey(const ZParameterKey& key)
 
 void ZParameterKey::setTime(double t)
 {
-  if (t < 0)
-    t = 0;
-  if (m_time == t)
-    return;
   m_time = t;
-  if (m_paraAnimation)
-    m_paraAnimation->emitKeyChangedSignal(this);
 }
 
 void ZParameterKey::setValue(const ZParameter& v)
@@ -66,8 +60,6 @@ void ZParameterKey::setValue(const ZParameter& v)
     m_value->forceSetValueSameAs(v);
   else
     m_value->setValueSameAs(v);
-  if (m_paraAnimation)
-    m_paraAnimation->emitKeyChangedSignal(this);
 }
 
 QString ZParameterKey::type() const
@@ -82,8 +74,6 @@ void ZParameterKey::setType(const QString& t)
 
   m_type->select(t);
   updateEasingCurve();
-  if (m_paraAnimation)
-    m_paraAnimation->emitKeyChangedSignal(this);
 }
 
 void ZParameterKey::updateEasingCurve()

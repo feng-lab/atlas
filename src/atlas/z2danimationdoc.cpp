@@ -240,9 +240,11 @@ void Z2DAnimationDoc::setModified()
   if (Z2DAnimation* animation = qobject_cast<Z2DAnimation*>(sender())) {
     for (auto& idPack : m_idToAnimationPacks) {
       if (idPack.second->animation.get() == animation) {
-        idPack.second->updateDerivedData();
-        idPack.second->hasUnsavedChange = true;
-        m_doc.updateObjInfo(idPack.first);
+        if (!idPack.second->hasUnsavedChange) {
+          idPack.second->updateDerivedData();
+          idPack.second->hasUnsavedChange = true;
+          m_doc.updateObjInfo(idPack.first);
+        }
         return;
       }
     }
@@ -271,6 +273,7 @@ size_t Z2DAnimationDoc::addAnimation(Z2DAnimation* animation, const QString& pat
   connect(animation, &Z2DAnimation::objChanged, this, &Z2DAnimationDoc::setModified);
   connect(animation, &Z2DAnimation::keyChanged, this, &Z2DAnimationDoc::setModified);
   connect(animation, &Z2DAnimation::colorChanged, this, &Z2DAnimationDoc::setModified);
+  connect(animation, &Z2DAnimation::keyAboutToDelete, this, &Z2DAnimationDoc::setModified);
   return id;
 }
 
