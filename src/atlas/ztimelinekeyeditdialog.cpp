@@ -82,10 +82,19 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimatio
 
 void ZTimelineKeyEditDialog::setInitialValue()
 {
+  m_time.set(m_paraKey.time());
+  m_type.setSameAs(*m_paraKey.typePara());
   if (m_paraAnimation.boundParameter()->type().contains("Span")) {
     m_para->setValueSameAs(m_paraKey.value());
   } else {
     m_paraAnimation.boundParameter()->setValueSameAs(m_paraKey.value());
+  }
+  if (m_paraAnimation.type() == "3DCamera") {
+    ZCameraParameterKey* cpk = static_cast<ZCameraParameterKey*>(&m_paraKey);
+
+    m_posTension.set(cpk->posTension());
+    m_posContinuity.set(cpk->posContinuity());
+    m_posBias.set(cpk->posBias());
   }
 }
 
