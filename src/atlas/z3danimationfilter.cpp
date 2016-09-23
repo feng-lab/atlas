@@ -219,8 +219,8 @@ void Z3DAnimationFilter::prepareColor()
     } else if (m_times.size() > 1) {
       double startTime = m_times[0];
       double endTime = m_times[m_times.size() - 1];
-      for (size_t i = 0; i < m_times.size(); ++i) {
-        m_lineColors.push_back(m_colorMap.get().mappedFColor((m_times[i] - startTime) / (endTime - startTime)));
+      for (auto time : m_times) {
+        m_lineColors.push_back(m_colorMap.get().mappedFColor((time - startTime) / (endTime - startTime)));
       }
     }
   }
@@ -252,8 +252,8 @@ void Z3DAnimationFilter::prepareColor()
       } else if (keys.size() > 1) {
         double startTime = keys[0]->time();
         double endTime = std::max(startTime + 0.01, keys[keys.size() - 1]->time());
-        for (size_t i = 0; i < keys.size(); ++i) {
-          glm::vec4 color = m_colorMap.get().mappedFColor((keys[i]->time() - startTime) / (endTime - startTime));
+        for (const auto& key : keys) {
+          glm::vec4 color = m_colorMap.get().mappedFColor((key->time() - startTime) / (endTime - startTime));
           colors.push_back(color);
           colors.push_back(color);
           colors.push_back(color);
@@ -323,8 +323,8 @@ void Z3DAnimationFilter::updateData()
     }
 
     Z3DCameraParameter para("Tmp");
-    for (size_t i = 0; i < m_times.size(); ++i) {
-      cameraParaAnimation()->updateParaToTime(m_times[i], &para);
+    for (auto time : m_times) {
+      cameraParaAnimation()->updateParaToTime(time, &para);
       m_lines.push_back(para.get().eye());
     }
 
@@ -337,8 +337,8 @@ void Z3DAnimationFilter::updateData()
       arrowSize = 10;
     m_cameraDirectionSize.set(arrowSize);
     m_cameraSize.set(arrowSize * 2.5);
-    for (size_t i = 0; i < m_cameraDirectionTimes.size(); ++i) {
-      cameraParaAnimation()->updateParaToTime(m_cameraDirectionTimes[i], &para);
+    for (auto time : m_cameraDirectionTimes) {
+      cameraParaAnimation()->updateParaToTime(time, &para);
       m_tailPosAndTailRadius.emplace_back(para.get().eye(), m_cameraDirectionSize.get() / 20.f);
       m_headPosAndHeadRadius.emplace_back(para.get().eye() + m_cameraDirectionSize.get() * para.get().viewVector(),
                                           m_cameraDirectionSize.get() / 10.f);
@@ -354,8 +354,8 @@ void Z3DAnimationFilter::updateData()
     float triangleWidth = halfWidth / 2.f;
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> normals;
-    for (size_t i = 0; i < keys.size(); ++i) {
-      cameraParaAnimation()->updateParaToTime(keys[i]->time(), &para);
+    for (const auto& key : keys) {
+      cameraParaAnimation()->updateParaToTime(key->time(), &para);
       glm::vec3 pt5 = para.get().eye() + m_cameraSize.get() * para.get().viewVector();
       glm::vec3 pt1 = pt5 + halfHeight * para.get().upVector() + halfWidth * para.get().strafeVector();
       glm::vec3 pt2 = pt5 - halfHeight * para.get().upVector() + halfWidth * para.get().strafeVector();

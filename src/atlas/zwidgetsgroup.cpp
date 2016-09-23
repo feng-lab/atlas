@@ -200,7 +200,7 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
       } else {
         if (m_useToolBoxStyle) {
           QToolBox* toolBox = new QToolBox();
-          for (auto& childGroup : m_childGroups) {
+          for (const auto& childGroup : m_childGroups) {
             if (m_useToolBoxStyle) {
               if (childGroup->isGroup()) {
                 QWidget* wg = childGroup->createWidget(false, false);
@@ -226,7 +226,7 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
           }
           vbl->addWidget(toolBox);
         } else {
-          for (auto& childGroup : m_childGroups) {
+          for (const auto& childGroup : m_childGroups) {
             if (childGroup->isGroup()) {
               QGroupBox* groupBox = new QGroupBox(childGroup->getGroupName());
               QLayout* lw = childGroup->createLayout(false);

@@ -333,7 +333,7 @@ void ZImgFilter::channelColorChanged()
 
 void ZImgFilter::opacityChanged()
 {
-  for (auto& item : m_imgItems) {
+  for (const auto& item : m_imgItems) {
     item->setOpacity(m_opacity.get());
   }
 //  m_display->setAlpha(m_opacity.get());
@@ -404,7 +404,7 @@ void ZImgFilter::updateImgItems()
     //LOG(INFO) << "0";
     // pixmap is same, we only need to show it
     if (!m_imgItems[0]->isVisible()) {
-      for (auto& item : m_imgItems) {
+      for (const auto& item : m_imgItems) {
         item->setVisible(true);
       }
     }

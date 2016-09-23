@@ -73,6 +73,12 @@ inline bool hostIsLittleEndian()
   return *reinterpret_cast<char*>(&num) == 1;
 }
 
+template<typename Container>
+inline void clearAndDeallocate(Container& c)
+{
+  Container().swap(c);
+}
+
 // effective stl, item 24, Scott Meyers
 template<typename MapType, // type of map
   typename KeyArgType,

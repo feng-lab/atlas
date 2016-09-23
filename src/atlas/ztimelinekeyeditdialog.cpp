@@ -30,7 +30,7 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimatio
   m_time.set(m_paraKey.time());
   m_time.setStyle("SPINBOX");
   addWidget(m_time.createNameLabel(this), m_time.createWidget(this), lo);
-  m_type.setSameAs(*m_paraKey.typePara());
+  m_type.setSameAs(m_paraKey.typePara());
   addWidget(m_type.createNameLabel(this), m_type.createWidget(this), lo);
 
   if (m_paraAnimation.boundParameter()->type().contains("Span")) {
@@ -83,7 +83,7 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimatio
 void ZTimelineKeyEditDialog::setInitialValue()
 {
   m_time.set(m_paraKey.time());
-  m_type.setSameAs(*m_paraKey.typePara());
+  m_type.setSameAs(m_paraKey.typePara());
   if (m_paraAnimation.boundParameter()->type().contains("Span")) {
     m_para->setValueSameAs(m_paraKey.value());
   } else {

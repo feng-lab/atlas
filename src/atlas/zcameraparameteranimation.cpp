@@ -233,13 +233,11 @@ glm::quat ZCameraParameterAnimation::SplineRange::rotation(float fTime) const
           break;
       }
       fU = (fTime - rotSpline[i].m_fTMin) * rotSpline[i].m_fTInvRange;
-    }
-    else {
+    } else {
       i = rotSpline.size() - 1;
       fU = 1.0f;
     }
-  }
-  else {
+  } else {
     i = 0;
     fU = 0.0f;
   }
@@ -447,13 +445,11 @@ void ZCameraParameterAnimation::SplineRange::doPolyLookup(float fTime, int& riI,
           break;
       }
       rfU = (fTime - posSpline[riI].m_fTMin) * posSpline[riI].m_fTInvRange;
-    }
-    else {
+    } else {
       riI = posSpline.size() - 1;
       rfU = 1.0f;
     }
-  }
-  else {
+  } else {
     riI = 0;
     rfU = 0.0f;
   }

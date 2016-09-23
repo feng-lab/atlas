@@ -622,15 +622,13 @@ void image3DFilter(const TPixel* img, size_t width, size_t height, size_t depth,
                                                            adjcolkernel, kernelHeight, bufImg1.data(), desWidth,
                                                            height);
     colfunctor(tbb::blocked_range<size_t>(0, desDepth));
-    padImg.clear();
-    padImg.shrink_to_fit();
+    clearAndDeallocate(padImg);
 
     std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg2(width * height * desDepth);
     Image3DRowFilterForOneBlock<double, double> rowfunctor(bufImg1.data(), desWidth, height,
                                                            adjrowkernel, kernelWidth, bufImg2.data(), width, height);
     rowfunctor(tbb::blocked_range<size_t>(0, desDepth));
-    bufImg1.clear();
-    bufImg1.shrink_to_fit();
+    clearAndDeallocate(bufImg1);
 
     Image3DZFilterForOneBlock<double, TPixelOut> zfunctor(bufImg2.data(), width, height,
                                                           adjzkernel, kernelDepth, imgOut, width, height);
@@ -641,16 +639,14 @@ void image3DFilter(const TPixel* img, size_t width, size_t height, size_t depth,
                       Image3DColFilterForOneBlock<TPixel, double>(padImg.data(), desWidth, desHeight,
                                                                   adjcolkernel, kernelHeight, bufImg1.data(), desWidth,
                                                                   height));
-    padImg.clear();
-    padImg.shrink_to_fit();
+    clearAndDeallocate(padImg);
 
     std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg2(width * height * desDepth);
     tbb::parallel_for(tbb::blocked_range<size_t>(0, desDepth),
                       Image3DRowFilterForOneBlock<double, double>(bufImg1.data(), desWidth, height,
                                                                   adjrowkernel, kernelWidth, bufImg2.data(), width,
                                                                   height));
-    bufImg1.clear();
-    bufImg1.shrink_to_fit();
+    clearAndDeallocate(bufImg1);
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, depth),
                       Image3DZFilterForOneBlock<double, TPixelOut>(bufImg2.data(), width, height,

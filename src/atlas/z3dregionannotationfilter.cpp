@@ -22,7 +22,7 @@ void Z3DRegionAnnotationFilter::process(Z3DEye eye)
 {
   initializeCutRange();
   initializeRotationCenter();
-  for (auto& idFilter : m_idToMeshFilters) {
+  for (const auto& idFilter : m_idToMeshFilters) {
     idFilter.second->process(eye);
   }
 }
@@ -71,7 +71,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DRegionAnnotationFilter::widgetsGroup()
 
 void Z3DRegionAnnotationFilter::renderOpaque(Z3DEye eye)
 {
-  for (auto& idFilter : m_idToMeshFilters) {
+  for (const auto& idFilter : m_idToMeshFilters) {
     if (idFilter.second->isVisible() && idFilter.second->opacity() == 1.f)
       idFilter.second->renderOpaque(eye);
   }
@@ -80,7 +80,7 @@ void Z3DRegionAnnotationFilter::renderOpaque(Z3DEye eye)
 
 void Z3DRegionAnnotationFilter::renderTransparent(Z3DEye eye)
 {
-  for (auto& idFilter : m_idToMeshFilters) {
+  for (const auto& idFilter : m_idToMeshFilters) {
     if (idFilter.second->isVisible() && idFilter.second->opacity() < 1.f)
       idFilter.second->renderTransparent(eye);
   }
@@ -90,7 +90,7 @@ void Z3DRegionAnnotationFilter::renderTransparent(Z3DEye eye)
 void Z3DRegionAnnotationFilter::setViewport(glm::uvec2 viewport)
 {
   Z3DGeometryFilter::setViewport(viewport);
-  for (auto& idFilter : m_idToMeshFilters) {
+  for (const auto& idFilter : m_idToMeshFilters) {
     idFilter.second->setViewport(viewport);
   }
 }
@@ -98,35 +98,35 @@ void Z3DRegionAnnotationFilter::setViewport(glm::uvec2 viewport)
 void Z3DRegionAnnotationFilter::setViewport(glm::uvec4 viewport)
 {
   Z3DGeometryFilter::setViewport(viewport);
-  for (auto& idFilter : m_idToMeshFilters) {
+  for (const auto& idFilter : m_idToMeshFilters) {
     idFilter.second->setViewport(viewport);
   }
 }
 
 void Z3DRegionAnnotationFilter::setShaderHookType(Z3DRendererBase::ShaderHookType t)
 {
-  for (auto& idFilter : m_idToMeshFilters) {
+  for (const auto& idFilter : m_idToMeshFilters) {
     idFilter.second->setShaderHookType(t);
   }
 }
 
 void Z3DRegionAnnotationFilter::setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture* t)
 {
-  for (auto& idFilter : m_idToMeshFilters) {
+  for (const auto& idFilter : m_idToMeshFilters) {
     idFilter.second->setShaderHookParaDDPDepthBlenderTexture(t);
   }
 }
 
 void Z3DRegionAnnotationFilter::setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture* t)
 {
-  for (auto& idFilter : m_idToMeshFilters) {
+  for (const auto& idFilter : m_idToMeshFilters) {
     idFilter.second->setShaderHookParaDDPFrontBlenderTexture(t);
   }
 }
 
 void Z3DRegionAnnotationFilter::visibleChanged(bool v)
 {
-  for (auto& idFilter : m_idToMeshFilters) {
+  for (const auto& idFilter : m_idToMeshFilters) {
     idFilter.second->setVisible(v);
   }
 }

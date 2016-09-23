@@ -23,7 +23,7 @@ void Z3DAnimationDoc::bindView(Z3DView* v)
 {
   m_view = v;
   connect(m_view, &Z3DView::destroyed, this, &Z3DAnimationDoc::releaseView);
-  for (auto& idPack : m_idToAnimationPacks) {
+  for (const auto& idPack : m_idToAnimationPacks) {
     idPack.second->animation->bindView(m_view);
   }
 }
@@ -238,7 +238,7 @@ void Z3DAnimationDoc::loadAnimation()
 void Z3DAnimationDoc::setModified()
 {
   if (Z3DAnimation* animation = qobject_cast<Z3DAnimation*>(sender())) {
-    for (auto& idPack : m_idToAnimationPacks) {
+    for (const auto& idPack : m_idToAnimationPacks) {
       if (idPack.second->animation.get() == animation) {
         if (!idPack.second->hasUnsavedChange) {
           idPack.second->updateDerivedData();
@@ -253,7 +253,7 @@ void Z3DAnimationDoc::setModified()
 
 void Z3DAnimationDoc::releaseView()
 {
-  for (auto& idPack : m_idToAnimationPacks) {
+  for (const auto& idPack : m_idToAnimationPacks) {
     idPack.second->animation->releaseView();
   }
   m_view = nullptr;

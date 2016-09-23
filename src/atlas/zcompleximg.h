@@ -16,8 +16,6 @@ public:
   // create a img and allocate space
   ZComplexImg(size_t width, size_t height, size_t depth);
 
-  ~ZComplexImg();
-
   ZComplexImg(ZComplexImg&&) = default;
 
   ZComplexImg& operator=(ZComplexImg&&) = default;

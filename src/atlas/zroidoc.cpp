@@ -258,7 +258,7 @@ void ZROIDoc::loadROI()
 void ZROIDoc::setModified()
 {
   if (ZROI* roi = qobject_cast<ZROI*>(sender())) {
-    for (auto& idPack : m_idToROIPacks) {
+    for (const auto& idPack : m_idToROIPacks) {
       if (idPack.second->roi.get() == roi) {
         idPack.second->updateDerivedData();
         idPack.second->hasUnsavedChange = true;

@@ -190,7 +190,7 @@ bool Z3DRenderTarget::resize(const glm::uvec2& newsize)
   m_size = newsize;
 
   glActiveTexture(GL_TEXTURE0);
-  for (auto& enumAttach : m_attachments) {
+  for (const auto& enumAttach : m_attachments) {
     if (enumAttach.second) {
       enumAttach.second->setDimension(glm::uvec3(m_size.x, m_size.y, enumAttach.second->depth()));
       enumAttach.second->uploadImage();

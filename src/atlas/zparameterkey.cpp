@@ -49,11 +49,6 @@ ZParameterKey::ZParameterKey(const ZParameterKey& key)
   setType(key.type());
 }
 
-void ZParameterKey::setTime(double t)
-{
-  m_time = t;
-}
-
 void ZParameterKey::setValue(const ZParameter& v)
 {
   if (m_value->type().endsWith("Option"))
@@ -85,7 +80,7 @@ void ZParameterKey::updateEasingCurve()
   }
 }
 
-double ZParameterKey::timeToProgress(const ZParameterKey& prev, double time)
+double ZParameterKey::timeToProgress(const ZParameterKey& prev, double time) const
 {
   return m_curve.valueForProgress((time - prev.time()) / (m_time - prev.time()));
 }
@@ -146,7 +141,7 @@ QString ZParameterKey::info() const
 
 void ZParameterKey::setDefaultType()
 {
-  m_type = new ZStringIntOptionParameter("Type");
+  m_type = std::make_unique<ZStringIntOptionParameter>("Type");
   if (!m_value->supportInterpolation()) {
     m_type->addOptionWithData(qMakePair<QString, int>("Switch", QEasingCurve::Custom));
     setType("Switch");

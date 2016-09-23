@@ -281,7 +281,7 @@ std::vector<glm::vec4>* Z3DLineRenderer::lineColors()
     return &m_lineColors;
   } else if (m_lineColorsPt->size() < m_linesPt->size()) {
     m_lineColors.clear();
-    for (auto& color : *m_lineColorsPt) {
+    for (const auto& color : *m_lineColorsPt) {
       m_lineColors.push_back(color);
     }
     for (size_t i = m_lineColorsPt->size(); i < m_linesPt->size(); ++i) {

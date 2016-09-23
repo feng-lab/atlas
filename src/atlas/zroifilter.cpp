@@ -262,12 +262,12 @@ void ZROIFilter::setNormalView(int z, int t)
   if (!m_visible.get())
     return;
   int rz = realZ(z);
-  for (auto& sliceItem : m_sliceToROIItem) {
+  for (const auto& sliceItem : m_sliceToROIItem) {
     sliceItem.second->setVisible(sliceItem.first == int(rz));
   }
   if (m_showControlPoints.get()) {
-    for (auto& sliceItems : m_sliceToCtrlPtItems) {
-      for (auto& item : sliceItems.second) {
+    for (const auto& sliceItems : m_sliceToCtrlPtItems) {
+      for (const auto& item : sliceItems.second) {
         item->setVisible(sliceItems.first == int(rz));
       }
     }
@@ -279,12 +279,12 @@ void ZROIFilter::setMaxZProjView(int t)
   Q_UNUSED(t)
   if (!m_visible.get())
     return;
-  for (auto& sliceItem : m_sliceToROIItem) {
+  for (const auto& sliceItem : m_sliceToROIItem) {
     sliceItem.second->setVisible(true);
   }
   if (m_showControlPoints.get()) {
-    for (auto& sliceItems : m_sliceToCtrlPtItems) {
-      for (auto& item : sliceItems.second) {
+    for (const auto& sliceItems : m_sliceToCtrlPtItems) {
+      for (const auto& item : sliceItems.second) {
         item->setVisible(true);
       }
     }
@@ -416,12 +416,12 @@ void ZROIFilter::rotateCounterclockwise()
 
 void ZROIFilter::offsetChanged()
 {
-  for (auto& sliceItem : m_sliceToROIItem) {
+  for (const auto& sliceItem : m_sliceToROIItem) {
     sliceItem.second->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
   }
   if (m_showControlPoints.get()) {
-    for (auto& sliceItems : m_sliceToCtrlPtItems) {
-      for (auto& item : sliceItems.second) {
+    for (const auto& sliceItems : m_sliceToCtrlPtItems) {
+      for (const auto& item : sliceItems.second) {
         item->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
       }
     }
@@ -453,11 +453,11 @@ void ZROIFilter::visibleChanged()
       setNormalView(m_view.currentSlice(), m_view.currentTime());
     }
   } else {
-    for (auto& sliceItem : m_sliceToROIItem) {
+    for (const auto& sliceItem : m_sliceToROIItem) {
       sliceItem.second->setVisible(false);
     }
-    for (auto& sliceItems : m_sliceToCtrlPtItems) {
-      for (auto& item : sliceItems.second) {
+    for (const auto& sliceItems : m_sliceToCtrlPtItems) {
+      for (const auto& item : sliceItems.second) {
         item->setVisible(false);
       }
     }
@@ -473,8 +473,8 @@ void ZROIFilter::showControlPointsChanged()
       setNormalView(m_view.currentSlice(), m_view.currentTime());
     }
   } else {
-    for (auto& sliceItems : m_sliceToCtrlPtItems) {
-      for (auto& item : sliceItems.second) {
+    for (const auto& sliceItems : m_sliceToCtrlPtItems) {
+      for (const auto& item : sliceItems.second) {
         item->setVisible(false);
       }
     }
@@ -483,7 +483,7 @@ void ZROIFilter::showControlPointsChanged()
 
 void ZROIFilter::outlineColorChanged()
 {
-  for (auto& kv : m_sliceToROIItem) {
+  for (const auto& kv : m_sliceToROIItem) {
     kv.second->setPen(QPen(QColor(m_outlineColor.get().x * 255,
                                   m_outlineColor.get().y * 255,
                                   m_outlineColor.get().z * 255),
@@ -493,7 +493,7 @@ void ZROIFilter::outlineColorChanged()
 
 void ZROIFilter::regionColorChanged()
 {
-  for (auto& kv : m_sliceToROIItem) {
+  for (const auto& kv : m_sliceToROIItem) {
     kv.second->setBrush(QColor(m_regionColor.get().x * 255,
                                m_regionColor.get().y * 255,
                                m_regionColor.get().z * 255,
@@ -503,10 +503,10 @@ void ZROIFilter::regionColorChanged()
 
 void ZROIFilter::opacityChanged()
 {
-//  for (auto& kv : m_sliceToROIItem) {
+//  for (const auto& kv : m_sliceToROIItem) {
 //    kv.second->setOpacity(m_opacity.get());
 //  }
-  for (auto& kv : m_sliceToROIItem) {
+  for (const auto& kv : m_sliceToROIItem) {
     kv.second->setBrush(QColor(m_regionColor.get().x * 255,
                                m_regionColor.get().y * 255,
                                m_regionColor.get().z * 255,
@@ -543,7 +543,7 @@ void ZROIFilter::onRoiChanged(int slice)
 void ZROIFilter::onRoiMoved(int slice)
 {
   m_sliceToROIItem.at(slice)->updateValue();
-  for (auto& item : m_sliceToCtrlPtItems.at(slice)) {
+  for (const auto& item : m_sliceToCtrlPtItems.at(slice)) {
     item->updateValue();
   }
 }
@@ -556,8 +556,8 @@ void ZROIFilter::onRoiDeleted(int slice)
 
 void ZROIFilter::viewScaleChanged(double s)
 {
-  for (auto& sliceItems : m_sliceToCtrlPtItems) {
-    for (auto& item : sliceItems.second) {
+  for (const auto& sliceItems : m_sliceToCtrlPtItems) {
+    for (const auto& item : sliceItems.second) {
       item->setViewScale(s);
     }
   }

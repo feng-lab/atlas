@@ -129,7 +129,7 @@ void Z3DSwcFilter::initTopologyColor()
     std::make_unique<ZVec4Parameter>("Leaf Color", glm::vec4(255 / 255.f, 255 / 255.f, 0 / 255.f, 1.f)));
   m_colorsForDifferentTopology.emplace_back(
     std::make_unique<ZVec4Parameter>("Other", glm::vec4(255 / 255.f, 0 / 255.f, 0 / 255.f, 1.f)));
-  for (auto& color : m_colorsForDifferentTopology) {
+  for (const auto& color : m_colorsForDifferentTopology) {
     color->setStyle("COLOR");
     connect(color.get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
   }
@@ -219,7 +219,7 @@ void Z3DSwcFilter::initTypeColor()
   m_colorsForDifferentType.emplace_back(
     std::make_unique<ZVec4Parameter>(name, glm::vec4(0xcc / 255.f, 0xcc / 255.f, 0xcc / 255.f, 1.f)));
 
-  for (auto& color : m_colorsForDifferentType) {
+  for (const auto& color : m_colorsForDifferentType) {
     color->setStyle("COLOR");
     connect(color.get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
   }
@@ -259,7 +259,7 @@ void Z3DSwcFilter::initSubclassTypeColor()
   name = QString("Other Undefined class Color");
   m_colorsForSubclassType.emplace_back(
     std::make_unique<ZVec4Parameter>(name, glm::vec4(0xcc / 255.f, 0xcc / 255.f, 0xcc / 255.f, 1.f)));
-  for (auto& color : m_colorsForSubclassType) {
+  for (const auto& color : m_colorsForSubclassType) {
     color->setStyle("COLOR");
     connect(color.get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
   }
@@ -342,13 +342,13 @@ std::shared_ptr<ZWidgetsGroup> Z3DSwcFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_colorMode, 1);
     m_widgetsGroup->addChild(m_swcTreeColor, 1);
 
-    for (auto& color : m_colorsForDifferentType) {
+    for (const auto& color : m_colorsForDifferentType) {
       m_widgetsGroup->addChild(*color, 1);
     }
-    for (auto& color : m_colorsForSubclassType) {
+    for (const auto& color : m_colorsForSubclassType) {
       m_widgetsGroup->addChild(*color, 1);
     }
-    for (auto& color : m_colorsForDifferentTopology) {
+    for (const auto& color : m_colorsForDifferentTopology) {
       m_widgetsGroup->addChild(*color, 1);
     }
     m_widgetsGroup->addChild(m_colorMapBranchType, 1);
@@ -783,10 +783,10 @@ void Z3DSwcFilter::adjustWidgets()
     m_colorsForDifferentType[i]->setVisible(m_allNodeType.find(i) != m_allNodeType.end() &&
                                               m_colorMode.isSelected("Branch Type"));
   }
-  for (auto& color : m_colorsForSubclassType) {
+  for (const auto& color : m_colorsForSubclassType) {
     color->setVisible(m_colorMode.isSelected("Subclass"));
   }
-  for (auto& color : m_colorsForDifferentTopology) {
+  for (const auto& color : m_colorsForDifferentTopology) {
     color->setVisible(m_colorMode.isSelected("Topology"));
   }
   m_colorMapBranchType.setVisible(m_colorMode.isSelected("Colormap Branch Type"));

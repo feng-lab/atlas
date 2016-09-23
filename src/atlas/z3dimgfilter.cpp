@@ -199,16 +199,16 @@ void Z3DImgFilter::setOffset(double x, double y, double z)
 void Z3DImgFilter::setData(const ZImgPack& imgPack)
 {
   if (m_widgetsGroup) {
-    for (auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
+    for (const auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
       m_widgetsGroup->removeChild(*para);
     }
-    for (auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
+    for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
       m_widgetsGroup->removeChild(*para);
     }
-    for (auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
+    for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
       m_widgetsGroup->removeChild(*para);
     }
-    for (auto& cm : m_sliceColormaps) {
+    for (const auto& cm : m_sliceColormaps) {
       m_widgetsGroup->removeChild(*cm);
     }
   }
@@ -283,30 +283,30 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
 
     updateBoundBox();
 
-    for (auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
+    for (const auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
       addParameter(*para);
     }
-    for (auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
+    for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
       addParameter(*para);
     }
-    for (auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
+    for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
       addParameter(*para);
     }
-    for (auto& cm : m_sliceColormaps) {
+    for (const auto& cm : m_sliceColormaps) {
       addParameter(*cm);
     }
 
     if (m_widgetsGroup) {
-      for (auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
+      for (const auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
         m_widgetsGroup->addChild(*para, 2);
       }
-      for (auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
+      for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
         m_widgetsGroup->addChild(*para, 3);
       }
-      for (auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
+      for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
         m_widgetsGroup->addChild(*para, 15);
       }
-      for (auto& cm : m_sliceColormaps) {
+      for (const auto& cm : m_sliceColormaps) {
         m_widgetsGroup->addChild(*cm, 11);
       }
       m_widgetsGroup->emitWidgetsGroupChangedSignal();
@@ -330,17 +330,17 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_stayOnTop, 1);
     m_widgetsGroup->addChild(m_isVolumeDownsampled, 2);
 
-    for (auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
+    for (const auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
       m_widgetsGroup->addChild(*para, 2);
     }
-    for (auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
+    for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
       m_widgetsGroup->addChild(*para, 3);
     }
     m_widgetsGroup->addChild(m_imgRaycasterRenderer.compositingModePara(), 4);
     m_widgetsGroup->addChild(m_imgRaycasterRenderer.isoValuePara(), 4);
     m_widgetsGroup->addChild(m_imgRaycasterRenderer.localMIPThresholdPara(), 4);
     m_widgetsGroup->addChild(m_imgRaycasterRenderer.samplingRatePara(), 15);
-    for (auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
+    for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
       m_widgetsGroup->addChild(*para, 15);
     }
 

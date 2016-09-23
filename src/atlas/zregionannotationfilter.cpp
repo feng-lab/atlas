@@ -31,21 +31,21 @@ void ZRegionAnnotationFilter::setData(ZRegionAnnotation& regionAnnotation)
 
 void ZRegionAnnotationFilter::releaseItemsOwnership()
 {
-  for (auto& idFilter : m_idToROIFilters) {
+  for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->releaseItemsOwnership();
   }
 }
 
 void ZRegionAnnotationFilter::setNormalView(int z, int t)
 {
-  for (auto& idFilter : m_idToROIFilters) {
+  for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->setNormalView(z, t);
   }
 }
 
 void ZRegionAnnotationFilter::setMaxZProjView(int t)
 {
-  for (auto& idFilter : m_idToROIFilters) {
+  for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->setMaxZProjView(t);
   }
 }
@@ -73,42 +73,42 @@ std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup(
 
 void ZRegionAnnotationFilter::deleteKeyPressed()
 {
-  for (auto& idFilter : m_idToROIFilters) {
+  for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->deleteKeyPressed();
   }
 }
 
 void ZRegionAnnotationFilter::mousePressed(const QPointF& scenePos)
 {
-  for (auto& idFilter : m_idToROIFilters) {
+  for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->mousePressed(scenePos);
   }
 }
 
 void ZRegionAnnotationFilter::mouseReleased(const QPointF& scenePos)
 {
-  for (auto& idFilter : m_idToROIFilters) {
+  for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->mouseReleased(scenePos);
   }
 }
 
 void ZRegionAnnotationFilter::rotateClockwise()
 {
-  for (auto& idFilter : m_idToROIFilters) {
+  for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->rotateClockwise();
   }
 }
 
 void ZRegionAnnotationFilter::rotateCounterclockwise()
 {
-  for (auto& idFilter : m_idToROIFilters) {
+  for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->rotateCounterclockwise();
   }
 }
 
 void ZRegionAnnotationFilter::visibleChanged()
 {
-  for (auto& idFilter : m_idToROIFilters) {
+  for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->setVisible(m_visible.get());
   }
 }
@@ -135,7 +135,7 @@ void ZRegionAnnotationFilter::allROIChanged()
   //addParameter(&m_visible);
   addParameter(&m_offsetPara);
 
-  for (auto& node : m_regionAnnotation->annotationTree()) {
+  for (const auto& node : m_regionAnnotation->annotationTree()) {
     int id = node.id;
     ZROIFilter* flt = new ZROIFilter(m_view);
     if (node.roi) {

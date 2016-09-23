@@ -210,9 +210,8 @@ void ZTimelineEventScene::updateKey(ZParameterKey* paraKey)
 
 void ZTimelineEventScene::updateParameterAnimation(ZParameterAnimation* pa)
 {
-  const auto& keys = pa->keys();
-  for (size_t i = 0; i < keys.size(); ++i) {
-    updateKey(keys[i].get());
+  for (const auto& key : pa->keys()) {
+    updateKey(key.get());
   }
 }
 
@@ -230,8 +229,7 @@ void ZTimelineEventScene::updateItems()
   m_ObjKeyToItem.clear();
   m_ObjParaKeyToItem.clear();
 
-  for (size_t dpi = 0; dpi < dps.size(); ++dpi) {
-    const ZAnimationDisplayPack& pack = dps[dpi];
+  for (const auto& pack : dps) {
     if (pack.type == ZAnimationDisplayPack::Type::GlobalPara) {
       auto rect = new EventBoundRectItem(pack, m_timeline);
       rect->setRect(-1, 0, m_timeline.eventViewWidth() + 2, m_timeline.rowHeight());
@@ -239,10 +237,8 @@ void ZTimelineEventScene::updateItems()
       rect->setBrush(QBrush(QColor(235 + 20, 235 + 20, 235 + 20)));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
 
-      const auto& keys = pack.paraAnimation->keys();
-      for (size_t i = 0; i < keys.size(); ++i) {
-        m_globalParaKeyToItem[keys[i].get()] = new ParameterKeysItem(*keys[i], *pack.paraAnimation, pack, m_timeline,
-                                                                     rect);
+      for (const auto& key : pack.paraAnimation->keys()) {
+        m_globalParaKeyToItem[key.get()] = new ParameterKeysItem(*key, *pack.paraAnimation, pack, m_timeline, rect);
       }
 
       addItem(rect);
@@ -254,13 +250,10 @@ void ZTimelineEventScene::updateItems()
       rect->setBrush(QBrush(QColor(220 + 20, 220 + 20, 220 + 20)));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
 
-      const auto& paraAnimationList = m_timeline.animation().paraAnimationList(pack.id);
-      for (size_t j = 0; j < paraAnimationList.size(); ++j) {
-        ZParameterAnimation* paraAnimation = paraAnimationList[j].get();
-        const auto& keys = paraAnimation->keys();
-        for (size_t i = 0; i < keys.size(); ++i) {
-          ParameterKeysItem* ki = new ParameterKeysItem(*keys[i], *paraAnimation, pack, m_timeline, rect);
-          m_ObjKeyToItem[keys[i].get()] = ki;
+      for (const auto& pa : m_timeline.animation().paraAnimationList(pack.id)) {
+        for (const auto& key : pa->keys()) {
+          ParameterKeysItem* ki = new ParameterKeysItem(*key, *pa, pack, m_timeline, rect);
+          m_ObjKeyToItem[key.get()] = ki;
         }
       }
 
@@ -273,10 +266,8 @@ void ZTimelineEventScene::updateItems()
       rect->setBrush(QBrush(QColor(235 + 20, 235 + 20, 235 + 20)));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
 
-      const auto& keys = pack.paraAnimation->keys();
-      for (size_t i = 0; i < keys.size(); ++i) {
-        m_ObjParaKeyToItem[keys[i].get()] = new ParameterKeysItem(*keys[i], *pack.paraAnimation, pack, m_timeline,
-                                                                  rect);
+      for (const auto& key : pack.paraAnimation->keys()) {
+        m_ObjParaKeyToItem[key.get()] = new ParameterKeysItem(*key, *pack.paraAnimation, pack, m_timeline, rect);
       }
 
       addItem(rect);
@@ -294,11 +285,10 @@ void ZTimelineEventScene::updateItems()
 
 void ZTimelineEventScene::removeSelectedKeys()
 {
-  QList<QGraphicsItem*> items = selectedItems();
   // make sure that the selected keys are deleted only once
   std::map<ZParameterKey*, ZParameterAnimation*> keyAniMap;
-  for (int i = 0; i < items.size(); ++i) {
-    ParameterKeysItem* item = qgraphicsitem_cast<ParameterKeysItem*>(items[i]);
+  for (auto itm : selectedItems()) {
+    ParameterKeysItem* item = qgraphicsitem_cast<ParameterKeysItem*>(itm);
     if (item) {
       keyAniMap[&item->paraKey()] = &item->paraAnimation();
     }

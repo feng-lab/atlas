@@ -27,7 +27,8 @@ public:
   double time() const
   { return m_time; }
 
-  void setTime(double t);
+  void setTime(double t)
+  { m_time = t; }
 
   ZParameter& value() const
   { return *m_value; }
@@ -40,11 +41,11 @@ public:
 
   void updateEasingCurve();
 
-  ZStringIntOptionParameter* typePara()
-  { return m_type; }
+  const ZStringIntOptionParameter& typePara() const
+  { return *m_type; }
 
   // convert time to progress between prev key and current key
-  double timeToProgress(const ZParameterKey& prev, double time);
+  double timeToProgress(const ZParameterKey& prev, double time) const;
 
   // interpolate value of time and put result to dest
   virtual void interpolate(const ZParameterKey& prev, double time, ZParameter& dest) const;
@@ -61,7 +62,7 @@ protected:
 protected:
   double m_time;
   std::unique_ptr<ZParameter> m_value;
-  ZStringIntOptionParameter* m_type;
+  std::unique_ptr<ZStringIntOptionParameter> m_type;
 
   QEasingCurve m_curve;
 };
