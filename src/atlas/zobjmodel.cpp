@@ -242,8 +242,8 @@ int ZObjModel::columnCount(const QModelIndex& /*parent*/) const
 size_t ZObjModel::numObjs() const
 {
   int num = 0;
-  for (size_t i = 0; i < m_rootItem->children.size(); ++i) {
-    num += std::max<size_t>(m_rootItem->children[i]->children.size(), 1);
+  for (const auto& c : m_rootItem->children) {
+    num += std::max<size_t>(c->children.size(), 1);
   }
   return num;
 }
@@ -251,12 +251,12 @@ size_t ZObjModel::numObjs() const
 QList<size_t> ZObjModel::objs() const
 {
   QList<size_t> res;
-  for (size_t i = 0; i < m_rootItem->children.size(); ++i) {
-    if (m_rootItem->children[i]->children.empty()) {
-      res.push_back(m_rootItem->children[i]->id);
+  for (const auto& c : m_rootItem->children) {
+    if (c->children.empty()) {
+      res.push_back(c->id);
     } else {
-      for (size_t j = 0; j < m_rootItem->children[i]->children.size(); ++j) {
-        res.push_back(m_rootItem->children[i]->children[j]->id);
+      for (const auto& cc : c->children) {
+        res.push_back(cc->id);
       }
     }
   }
@@ -266,14 +266,14 @@ QList<size_t> ZObjModel::objs() const
 QList<size_t> ZObjModel::objsOfDoc(const ZObjDoc* doc) const
 {
   QList<size_t> res;
-  for (size_t i = 0; i < m_rootItem->children.size(); ++i) {
-    if (m_rootItem->children[i]->doc != doc)
+  for (const auto& c : m_rootItem->children) {
+    if (c->doc != doc)
       continue;
-    if (m_rootItem->children[i]->children.empty()) {
-      res.push_back(m_rootItem->children[i]->id);
+    if (c->children.empty()) {
+      res.push_back(c->id);
     } else {
-      for (size_t j = 0; j < m_rootItem->children[i]->children.size(); ++j) {
-        res.push_back(m_rootItem->children[i]->children[j]->id);
+      for (const auto& cc : c->children) {
+        res.push_back(cc->id);
       }
     }
   }
@@ -282,16 +282,14 @@ QList<size_t> ZObjModel::objsOfDoc(const ZObjDoc* doc) const
 
 bool ZObjModel::isObjVisible(size_t id) const
 {
-  for (size_t i = 0; i < m_rootItem->children.size(); ++i) {
-    if (m_rootItem->children[i]->children.empty()) {
-      if (m_rootItem->children[i]->id == id)
-        //return m_rootItem->children[i]->checkState == Qt::Checked;
-        return m_rootItem->children[i]->show;
+  for (const auto& c : m_rootItem->children) {
+    if (c->children.empty()) {
+      if (c->id == id)
+        return c->show;
     } else {
-      for (size_t j = 0; j < m_rootItem->children[i]->children.size(); ++j) {
-        if (m_rootItem->children[i]->children[j]->id == id)
-          //return m_rootItem->children[i]->children[j]->checkState == Qt::Checked;
-          return m_rootItem->children[i]->children[j]->show;
+      for (const auto& cc : c->children) {
+        if (cc->id == id)
+          return cc->show;
       }
     }
   }
@@ -313,14 +311,14 @@ void ZObjModel::setObjVisible(size_t id, bool v)
 
 ZObjDoc* ZObjModel::idToDoc(size_t id) const
 {
-  for (size_t i = 0; i < m_rootItem->children.size(); ++i) {
-    if (m_rootItem->children[i]->children.empty()) {
-      if (m_rootItem->children[i]->id == id)
-        return m_rootItem->children[i]->doc;
+  for (const auto& c : m_rootItem->children) {
+    if (c->children.empty()) {
+      if (c->id == id)
+        return c->doc;
     } else {
-      for (size_t j = 0; j < m_rootItem->children[i]->children.size(); ++j) {
-        if (m_rootItem->children[i]->children[j]->id == id)
-          return m_rootItem->children[i]->children[j]->doc;
+      for (const auto& cc : c->children) {
+        if (cc->id == id)
+          return cc->doc;
       }
     }
   }
