@@ -149,8 +149,7 @@ public:
                      Z3DFilter* filter,
                      Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid)
     : Z3DInputPortBase(name, allowMultipleConnections, filter, invalidationState)
-  {
-  }
+  {}
 
   std::vector<T*> connectedFilters() const
   {
@@ -180,8 +179,7 @@ class Z3DFilterOutputPort : public Z3DOutputPortBase
 public:
   Z3DFilterOutputPort(const QString& name, Z3DFilter* filter)
     : Z3DOutputPortBase(name, filter)
-  {
-  }
+  {}
 
   virtual bool canConnectTo(const Z3DInputPortBase* inport) const override
   {

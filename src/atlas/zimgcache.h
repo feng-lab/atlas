@@ -20,6 +20,14 @@ public:
     : m_maxCost(maxCost)
   {}
 
+  ZSharedCache(ZSharedCache&&) = delete;
+
+  ZSharedCache& operator=(ZSharedCache&&) = delete;
+
+  ZSharedCache(const ZSharedCache&) = delete;
+
+  ZSharedCache& operator=(const ZSharedCache&) = delete;
+
   // thread-safe functions:
 
   // do nothing if object is too big
@@ -75,6 +83,9 @@ public:
       return ValueType();
     }
   }
+
+protected:
+  ~ZSharedCache() = default;
 
 private:
   // first item is latest item
