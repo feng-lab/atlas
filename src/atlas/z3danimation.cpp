@@ -48,9 +48,8 @@ void Z3DAnimation::bindGlobalParameters()
 void Z3DAnimation::addGlobalKey(double time)
 {
   // camera
-  Z3DCameraParameter& camera = static_cast<Z3DView*>(m_view)->camera();
-  auto ckey = new ZCameraParameterKey(time, camera);
-  m_cameraParameterAnimation->addKey(ckey);
+  m_cameraParameterAnimation->addKey(
+    std::make_unique<ZCameraParameterKey>(time, static_cast<Z3DView*>(m_view)->camera()));
 }
 
 } // namespace nim

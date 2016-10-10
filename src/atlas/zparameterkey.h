@@ -22,7 +22,7 @@ public:
 
   ZParameterKey(const ZParameterKey& key);
 
-  virtual ~ZParameterKey() = default;
+  virtual ~ZParameterKey();
 
   double time() const
   { return m_time; }

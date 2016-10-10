@@ -48,7 +48,7 @@ public:
 
   void deleteKey(ZParameterKey* key);
 
-  void addKey(ZParameterKey* keyIn, bool keepRedundant = true);
+  void addKey(std::unique_ptr<ZParameterKey> key, bool keepRedundant = true);
 
   const std::vector<std::unique_ptr<ZParameterKey>>& keys() const
   { return m_keys; }
@@ -67,7 +67,7 @@ public:
   void write(QJsonObject& json) const;
 
   // create a new key based on current view
-  virtual ZParameterKey* createKey(double secs) const;
+  virtual std::unique_ptr<ZParameterKey> createKey(double secs) const;
 
   void setCurrentTime(double secs);
 

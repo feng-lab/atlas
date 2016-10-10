@@ -49,6 +49,8 @@ ZParameterKey::ZParameterKey(const ZParameterKey& key)
   setType(key.type());
 }
 
+ZParameterKey::~ZParameterKey() = default;
+
 void ZParameterKey::setValue(const ZParameter& v)
 {
   if (m_value->type().endsWith("Option"))

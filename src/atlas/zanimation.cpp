@@ -151,12 +151,11 @@ void ZAnimation::addKeyFrame(double time)
     auto& paraAnimationList = aniObj->objParaAnimations;
 
     for (size_t i = 0; i < paraList.size(); ++i) {
-      ZParameterKey* key = new ZParameterKey(time, *paraList[i]);
       bool found = false;
       for (size_t j = 0; j < paraAnimationList.size(); ++j) {
         if (paraList[i] == paraAnimationList[j]->boundParameter()) {
           found = true;
-          paraAnimationList[j]->addKey(key, false);
+          paraAnimationList[j]->addKey(std::make_unique<ZParameterKey>(time, *paraList[i]), false);
           if (j != i) {
             std::swap(paraAnimationList[i], paraAnimationList[j]);
             sorted = true;
@@ -169,7 +168,7 @@ void ZAnimation::addKeyFrame(double time)
         auto paraAnimation = std::make_unique<ZParameterAnimation>(paraList[i]->name(), paraList[i]->type());
         paraAnimation->setParent(this);
         paraAnimation->bindParameter(*paraList[i]);
-        paraAnimation->addKey(key, false);
+        paraAnimation->addKey(std::make_unique<ZParameterKey>(time, *paraList[i]), false);
         paraAnimationList.insert(paraAnimationList.begin() + i, std::move(paraAnimation));
       }
     }

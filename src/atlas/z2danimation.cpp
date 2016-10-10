@@ -60,18 +60,10 @@ void Z2DAnimation::bindGlobalParameters()
 void Z2DAnimation::addGlobalKey(double time)
 {
   // global settings
-  ZIntParameter& slicePara = static_cast<ZView*>(m_view)->slicePara();
-  ZParameterKey* skey = new ZParameterKey(time, slicePara);
-  m_sliceAnimation->addKey(skey);
-  ZIntParameter& timePara = static_cast<ZView*>(m_view)->timePara();
-  ZParameterKey* tkey = new ZParameterKey(time, timePara);
-  m_timeAnimation->addKey(tkey);
-  ZBoolParameter& mipPara = static_cast<ZView*>(m_view)->mipPara();
-  ZParameterKey* mkey = new ZParameterKey(time, mipPara);
-  m_mipAnimation->addKey(mkey);
-  ZDVec4Parameter& viewportPara = static_cast<ZView*>(m_view)->viewportPara();
-  ZParameterKey* vkey = new ZParameterKey(time, viewportPara);
-  m_viewportAnimation->addKey(vkey);
+  m_sliceAnimation->addKey(std::make_unique<ZParameterKey>(time, static_cast<ZView*>(m_view)->slicePara()));
+  m_timeAnimation->addKey(std::make_unique<ZParameterKey>(time, static_cast<ZView*>(m_view)->timePara()));
+  m_mipAnimation->addKey(std::make_unique<ZParameterKey>(time, static_cast<ZView*>(m_view)->mipPara()));
+  m_viewportAnimation->addKey(std::make_unique<ZParameterKey>(time, static_cast<ZView*>(m_view)->viewportPara()));
 }
 
 } // namespace nim

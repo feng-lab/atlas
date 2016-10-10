@@ -41,9 +41,8 @@ void ZParameterAnimation::deleteKey(ZParameterKey* key)
                m_keys.end());
 }
 
-void ZParameterAnimation::addKey(ZParameterKey* keyIn, bool keepRedundant)
+void ZParameterAnimation::addKey(std::unique_ptr<ZParameterKey> key, bool keepRedundant)
 {
-  std::unique_ptr<ZParameterKey> key(keyIn);
   CHECK(key);
   CHECK(key->time() >= 0.0);
   CHECK(key->value().type() == m_type);
@@ -123,7 +122,7 @@ ZParameterAnimation* ZParameterAnimation::create(const QString& key, const QJson
       for (int i = 0; i < keyArray.size(); ++i) {
         auto cpkey = std::make_unique<ZCameraParameterKey>();
         if (cpkey->readValue(keyArray.at(i))) {
-          res->addKey(cpkey.release());
+          res->addKey(std::unique_ptr<ZParameterKey>(std::move(cpkey)));
         }
       }
     }
@@ -135,7 +134,7 @@ ZParameterAnimation* ZParameterAnimation::create(const QString& key, const QJson
       for (int i = 0; i < keyArray.size(); ++i) {
         auto cpkey = std::make_unique<ZParameterKey>(type);
         if (cpkey->readValue(keyArray.at(i))) {
-          res->addKey(cpkey.release());
+          res->addKey(std::move(cpkey));
         }
       }
     }
@@ -157,12 +156,12 @@ void ZParameterAnimation::write(QJsonObject& json) const
   json.insert(jsonKey(), obj);
 }
 
-ZParameterKey* ZParameterAnimation::createKey(double secs) const
+std::unique_ptr<ZParameterKey> ZParameterAnimation::createKey(double secs) const
 {
   CHECK(secs >= 0);
   CHECK(m_boundPara);
 
-  return new ZParameterKey(secs, *m_boundPara);
+  return std::make_unique<ZParameterKey>(secs, *m_boundPara);
 }
 
 void ZParameterAnimation::setCurrentTime(double secs)

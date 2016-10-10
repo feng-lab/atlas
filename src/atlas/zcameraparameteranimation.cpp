@@ -37,12 +37,12 @@ ZCameraParameterAnimation::ZCameraParameterAnimation(const QString& name, const 
   connect(this, &ZCameraParameterAnimation::keyChanged, this, &ZCameraParameterAnimation::buildSpline);
 }
 
-ZParameterKey* ZCameraParameterAnimation::createKey(double secs) const
+std::unique_ptr<ZParameterKey> ZCameraParameterAnimation::createKey(double secs) const
 {
   CHECK(secs >= 0);
   CHECK(m_boundPara);
 
-  return new ZCameraParameterKey(secs, *static_cast<Z3DCameraParameter*>(m_boundPara));
+  return std::make_unique<ZCameraParameterKey>(secs, *static_cast<Z3DCameraParameter*>(m_boundPara));
 }
 
 void ZCameraParameterAnimation::updateParaToTime(double secs, ZParameter* para) const
