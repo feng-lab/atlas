@@ -103,14 +103,6 @@ srcArchive=$srcPackageDIR/glm-master.zip
 7z x -y -o$currDIR "$srcArchive"
 mv $currDIR/glm-master $currDIR/glm
 
-if [ -d $currDIR/folly ]
-then
-  rm -rf $currDIR/folly
-fi
-srcArchive=$srcPackageDIR/folly-master.zip
-7z x -y -o$currDIR "$srcArchive"
-mv $currDIR/folly-master $currDIR/folly
-
 srcDIR=$baseDIR/googletest
 if [ -d $srcDIR ]
 then
@@ -121,6 +113,18 @@ else
   git clone git@github.com:google/googletest.git $srcDIR
 fi
 cp -rf $baseDIR/googletest/googletest/ $currDIR/googletest/
+
+srcDIR=$baseDIR/folly
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  echo git pull folly
+  git pull
+else
+  git clone git@github.com:facebook/folly.git $srcDIR
+fi
+cd $srcDIR
+git checkout-index --prefix=$srcDIR/ -a
 
 srcDIR=$baseDIR/benchmark
 if [ -d $srcDIR ]
