@@ -136,10 +136,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt5Core 5.7.0 REQUIRED PATHS ~/Qt/5.7/clang_64)
-find_package(Qt5Widgets 5.7.0 REQUIRED PATHS ~/Qt/5.7/clang_64)
-find_package(Qt5Network 5.7.0 REQUIRED PATHS ~/Qt/5.7/clang_64)
-find_package(Qt5Svg 5.7.0 REQUIRED PATHS ~/Qt/5.7/clang_64)
+find_package(Qt5 5.7.0 REQUIRED COMPONENTS Core Widgets Network Svg
+             PATHS ~/Qt/5.7/clang_64)
 
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
