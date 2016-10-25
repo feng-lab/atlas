@@ -29,11 +29,11 @@ fi
 srcArchive=$srcPackageDIR/libjpeg-turbo-1.5.1.tar.gz
 tar -zxf "$srcArchive" -C $baseDIR
 
-if [ -d $baseDIR/libpng-1.6.25 ]
+if [ -d $baseDIR/libpng-1.6.26 ]
 then
-  rm -rf $baseDIR/libpng-1.6.25
+  rm -rf $baseDIR/libpng-1.6.26
 fi
-srcArchive=$srcPackageDIR/libpng-1.6.25.tar.gz
+srcArchive=$srcPackageDIR/libpng-1.6.26.tar.gz
 tar -zxf "$srcArchive" -C $baseDIR
 
 if [ -d $baseDIR/hdf5-1.10.0-patch1 ]
@@ -72,7 +72,7 @@ else
   srcArchive=$srcPackageDIR/ispc-v1.9.1-osx.tar.gz
   tar -zxf "$srcArchive" -C $baseDIR
 
-  srcArchive=$srcPackageDIR/ffmpeg-3.1.4.7z
+  srcArchive=$srcPackageDIR/ffmpeg-3.1.5.7z
   7z x -y -o$baseDIR/atlas "$srcArchive"
 fi
 
@@ -91,17 +91,36 @@ fi
 #srcArchive=$srcPackageDIR/eigen-eigen-dfb0ec8e0d86.tar.bz2
 #tar -jxf "$srcArchive" -C $currDIR
 #mv $currDIR/eigen-eigen-dfb0ec8e0d86 $currDIR/eigen
-srcArchive=$srcPackageDIR/eigen-eigen-1a24287c6c13.zip
+srcArchive=$srcPackageDIR/eigen-eigen-3c986dbcba0c.zip
 7z x -y -o$currDIR "$srcArchive"
-mv $currDIR/eigen-eigen-1a24287c6c13 $currDIR/eigen
+mv $currDIR/eigen-eigen-3c986dbcba0c $currDIR/eigen
 
 if [ -d $currDIR/glm ]
 then
   rm -rf $currDIR/glm
 fi
-srcArchive=$srcPackageDIR/glm-master.zip
-7z x -y -o$currDIR "$srcArchive"
-mv $currDIR/glm-master $currDIR/glm
+srcDIR=$baseDIR/glm
+if [ -d $srcDIR ]
+then
+  cd $srcDIR
+  echo git pull glm
+  git pull
+else
+  git clone git@github.com:g-truc/glm.git $srcDIR
+fi
+# # option 2:
+# cd $srcDIR
+# git checkout-index --prefix=$currDIR/glm/ -a
+# # option 3: use some tag
+# git clone --shared --branch <tag> <repository> <destination>
+# rm -rf <destination>/.git
+# # option 4:
+# cp -rf $srcDIR/ $currDIR/glm/
+# rm -rf $currDIR/glm/.git
+git clone --shared --no-checkout $srcDIR $currDIR/glm
+cd $currDIR/glm
+git checkout master
+rm -rf .git
 
 if [ -d $currDIR/googletest ]
 then
@@ -116,7 +135,7 @@ then
 else
   git clone git@github.com:google/googletest.git $srcDIR
 fi
-cp -rf $baseDIR/googletest/googletest/ $currDIR/googletest/
+cp -rf $srcDIR/googletest/ $currDIR/googletest/
 
 if [ -d $currDIR/folly ]
 then
@@ -131,8 +150,10 @@ then
 else
   git clone git@github.com:facebook/folly.git $srcDIR
 fi
-cd $srcDIR
-git checkout-index --prefix=$currDIR/folly/ -a
+git clone --shared --no-checkout $srcDIR $currDIR/folly
+cd $currDIR/folly
+git checkout master
+rm -rf .git
 
 srcDIR=$baseDIR/benchmark
 if [ -d $srcDIR ]
