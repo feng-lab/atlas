@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo ERROR: use build.py
+exit 1 # terminate and indicate error
+
 currDIR="$( cd -P "$( dirname "$0" )" && pwd )"
 srcPackageDIR=$currDIR/../../../atlas_others
 if [ ! -d $srcPackageDIR ]
