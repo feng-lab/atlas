@@ -8,7 +8,7 @@ import subprocess
 import difflib
 
 if sys.version_info[0] < 3 or sys.version_info[1] < 5:
-    sys.stderr.write("Error: need python 3.5 or higher\n")
+    sys.stderr.write('Error: need python 3.5 or higher\n')
     sys.exit(1)
 
 
@@ -54,6 +54,35 @@ def create_build_dir(src_dir: str):
 
 def get_bak_file_name(orig_file: str):
     return orig_file + '.bak'
+
+
+def get_vcvars_environment():
+    """
+    Returns a dictionary containing the environment variables set up by vcvarsall.bat amd64
+    """
+
+    comntools_var_names = ['VS140COMNTOOLS']
+
+    vscomntools = None
+    for var_name in comntools_var_names:
+        vscomntools = os.getenv(var_name)
+        if vscomntools is not None:
+            break
+
+    if vscomntools is None:
+        sys.stderr.write('Could not find COMNTOOLS environment variable\n')
+        sys.exit(1)
+
+    vcvars = os.path.join(vscomntools, '..', '..', 'VC', 'vcvarsall.bat')
+    python = sys.executable
+    process = subprocess.Popen(
+        '("{0}" amd64>nul)&&"{1}" -c "import os; print repr(os.environ)"'.format(vcvars, python),
+        stdout=subprocess.PIPE, shell=True)
+    stdout, _ = process.communicate()
+    exitcode = process.wait()
+    if exitcode != 0:
+        raise Exception("Got error code {0} from subprocess.".format(exitcode))
+    return eval(stdout.strip())
 
 
 def get_cmake_cmd_common_part(install_dir: str):
