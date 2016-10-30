@@ -90,14 +90,14 @@ include(${VTK_USE_FILE})
 message("${VTK_INCLUDE_DIRS}")
 message("${VTK_LIBRARIES}")
 
-set(WILDMAGIC_INCLUDE_DIRS ${WILDMAGIC_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/wildmagic/include)
+set(GEOMETRICTOOLS_INCLUDE_DIRS ${GEOMETRICTOOLS_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/include)
 if (WIN32)
-  set(WILDMAGIC_LIBRARIES ${WILDMAGIC_LIBRARIES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/wildmagic/lib/GTEngine.lib)
+  set(GEOMETRICTOOLS_LIBRARIES ${GEOMETRICTOOLS_LIBRARIES}
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/lib/GTEngine.lib)
 else (WIN32)
-  set(WILDMAGIC_LIBRARIES ${WILDMAGIC_LIBRARIES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/wildmagic/lib/libGTEngine.a)
+  set(GEOMETRICTOOLS_LIBRARIES ${GEOMETRICTOOLS_LIBRARIES}
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/lib/libGTEngine.a)
 endif (WIN32)
 
 set(BENCHMARK_INCLUDE_DIRS ${BENCHMARK_INCLUDE_DIRS}
@@ -710,7 +710,7 @@ target_include_directories(${APP_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(${APP_NAME} SYSTEM PUBLIC ${TBB_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${MKL_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${IPP_INCLUDE_DIRS})
-target_include_directories(${APP_NAME} PUBLIC ${WILDMAGIC_INCLUDE_DIRS})
+target_include_directories(${APP_NAME} PUBLIC ${GEOMETRICTOOLS_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${HDF5_INCLUDE_DIR})
 target_include_directories(${APP_NAME} PUBLIC ${CERESSOLVER_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${QTCSVDIR})
@@ -771,7 +771,7 @@ else (WIN32)
 endif (WIN32)
 
 target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding hdf5_cpp-static hdf5-static
-                      img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${WILDMAGIC_LIBRARIES}
+                      img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${GEOMETRICTOOLS_LIBRARIES}
                       ${ASSIMP_LIBRARIES} ${MKL_LIBRARIES} ${IPP_LIBRARIES} ${TBB_LIBRARIES})
 if (BUILD_TESTING)
   target_link_libraries(${APP_NAME} PUBLIC ${BENCHMARK_LIBRARIES})

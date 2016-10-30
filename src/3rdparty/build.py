@@ -1,3 +1,5 @@
+#!/Users/feng/miniconda3/bin/python3
+
 import os
 import sys
 import shutil
@@ -6,6 +8,7 @@ import zipfile
 from pathlib import Path
 import subprocess
 import difflib
+
 
 if sys.version_info[0] < 3 or sys.version_info[1] < 5:
     sys.stderr.write('Error: need python 3.5 or higher\n')
@@ -70,18 +73,18 @@ def get_vcvars_environment():
             break
 
     if vscomntools is None:
-        sys.stderr.write('Could not find COMNTOOLS environment variable\n')
-        sys.exit(1)
+        raise OSError('could not find COMNTOOLS environment variable')
 
     vcvars = os.path.join(vscomntools, '..', '..', 'VC', 'vcvarsall.bat')
     python = sys.executable
     process = subprocess.Popen(
-        '("{0}" amd64>nul)&&"{1}" -c "import os; print repr(os.environ)"'.format(vcvars, python),
+        '("{}" amd64>nul)&&"{1}" -c "import os; print repr(os.environ)"'.format(vcvars, python),
         stdout=subprocess.PIPE, shell=True)
     stdout, _ = process.communicate()
     exitcode = process.wait()
     if exitcode != 0:
-        raise Exception("Got error code {0} from subprocess.".format(exitcode))
+        raise Exception("Got error code {} from subprocess.".format(exitcode))
+
     return eval(stdout.strip())
 
 
@@ -110,17 +113,19 @@ def get_cmake_cmd_common_part(install_dir: str):
 
 
 def build_gflags(src_dir: str, install_dir: str, curr_dir: str):
+    del curr_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
-    cmakecmd = get_cmake_cmd_common_part(install_dir)
-    cmakecmd.extend([src_dir])
-    subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
-    subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                   cwd=build_dir, shell=shell, check=True)
-
-    shutil.rmtree(build_dir, ignore_errors=False)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend([src_dir])
+        subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
+        subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                       cwd=build_dir, shell=shell, check=True)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_glog(src_dir: str, install_dir: str, curr_dir: str):
@@ -133,7 +138,7 @@ def build_glog(src_dir: str, install_dir: str, curr_dir: str):
                        cwd=src_dir, shell=shell, check=True)
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
-        cmakecmd.extend(['-Dgflags_DIR:PATH={0}/gflags/lib/cmake/gflags'.format(curr_dir),
+        cmakecmd.extend(['-Dgflags_DIR:PATH={}/gflags/lib/cmake/gflags'.format(curr_dir),
                          src_dir])
         subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
         subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
@@ -141,40 +146,43 @@ def build_glog(src_dir: str, install_dir: str, curr_dir: str):
     finally:
         subprocess.run(['git', 'reset', '--hard', 'HEAD'],
                        cwd=src_dir, shell=shell, check=True)
-
-    shutil.rmtree(build_dir, ignore_errors=False)
+        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_benchmark(src_dir: str, install_dir: str, curr_dir: str):
+    del curr_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
-    cmakecmd = get_cmake_cmd_common_part(install_dir)
-    cmakecmd.extend(['-DBENCHMARK_USE_LIBCXX:BOOL=ON',
-                    src_dir])
-    subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
-    subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                   cwd=build_dir, shell=shell, check=True)
-
-    shutil.rmtree(build_dir, ignore_errors=False)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DBENCHMARK_USE_LIBCXX:BOOL=ON',
+                        src_dir])
+        subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
+        subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                       cwd=build_dir, shell=shell, check=True)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_glbinding(src_dir: str, install_dir: str, curr_dir: str):
+    del curr_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
-    cmakecmd = get_cmake_cmd_common_part(install_dir)
-    cmakecmd.extend(['-DOPTION_BUILD_GPU_TESTS:BOOL=OFF',
-                     '-DBUILD_SHARED_LIBS:BOOL=OFF',
-                     '-DOPTION_BUILD_TESTS:BOOL=OFF',
-                    src_dir])
-    subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
-    subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                   cwd=build_dir, shell=shell, check=True)
-
-    shutil.rmtree(build_dir, ignore_errors=False)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DOPTION_BUILD_GPU_TESTS:BOOL=OFF',
+                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DOPTION_BUILD_TESTS:BOOL=OFF',
+                        src_dir])
+        subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
+        subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                       cwd=build_dir, shell=shell, check=True)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_libjpeg(src_dir: str, install_dir: str, curr_dir: str):
@@ -182,19 +190,21 @@ def build_libjpeg(src_dir: str, install_dir: str, curr_dir: str):
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
-    subprocess.run(['sh', src_dir + '/configure', '--host', 'x86_64-apple-darwin', 'NASM=' + curr_dir + '/nasm',
-                    '--enable-static', '--disable-shared', 'CFLAGS=-mmacosx-version-min=10.8 -O3',
-                    'LDFLAGS=-mmacosx-version-min=10.8'],
-                   cwd=build_dir, shell=shell, check=True)
-    subprocess.run(['make', '-j' + str(os.cpu_count())],
-                   cwd=build_dir, shell=shell, check=True)
-    subprocess.run(['make', 'install', 'prefix=' + install_dir, 'libdir=' + install_dir + '/lib'],
-                   cwd=build_dir, shell=shell, check=True)
-
-    shutil.rmtree(build_dir, ignore_errors=False)
+    try:
+        subprocess.run(['sh', src_dir + '/configure', '--host', 'x86_64-apple-darwin', 'NASM=' + curr_dir + '/nasm',
+                        '--enable-static', '--disable-shared', 'CFLAGS=-mmacosx-version-min=10.8 -O3',
+                        'LDFLAGS=-mmacosx-version-min=10.8'],
+                       cwd=build_dir, shell=shell, check=True)
+        subprocess.run(['make', '-j' + str(os.cpu_count())],
+                       cwd=build_dir, shell=shell, check=True)
+        subprocess.run(['make', 'install', 'prefix=' + install_dir, 'libdir=' + install_dir + '/lib'],
+                       cwd=build_dir, shell=shell, check=True)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_libpng(src_dir: str, install_dir: str, curr_dir: str):
+    del curr_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
@@ -223,11 +233,11 @@ def build_libpng(src_dir: str, install_dir: str, curr_dir: str):
                        cwd=build_dir, shell=shell, check=True)
     finally:
         os.replace(bak_file, orig_file)
-
-    shutil.rmtree(build_dir, ignore_errors=False)
+        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_jxrlib(src_dir: str, install_dir: str, curr_dir: str):
+    del curr_dir
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
@@ -256,6 +266,7 @@ def build_jxrlib(src_dir: str, install_dir: str, curr_dir: str):
 
 
 def build_geometrictools(src_dir: str, install_dir: str, curr_dir: str):
+    del curr_dir
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
@@ -286,7 +297,31 @@ def build_geometrictools(src_dir: str, install_dir: str, curr_dir: str):
         os.replace(bak_file, orig_file)
 
 
+def build_ospray(src_dir: str, install_dir: str, curr_dir: str):
+    del curr_dir
+    build_dir = create_build_dir(src_dir)
+    shutil.rmtree(install_dir, ignore_errors=True)
+    shell = sys.platform.startswith('win')
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DTBB_ROOT:PATH=/opt/intel/tbb',
+                         '-DOSPRAY_BUILD_ISA:STRING=ALL',
+                         '-DOSPRAY_MODULE_TACHYON:BOOL=ON',
+                         '-DOSPRAY_APPS_QTVIEWER:BOOL=OFF',
+                         '-DOSPRAY_MODULE_SEISMIC:BOOL=OFF',
+                         '-DOSPRAY_APPS_VOLUMEVIEWER:BOOL=OFF',
+                         '-DOSPRAY_APPS_MODELVIEWER:BOOL=OFF',
+                        src_dir])
+        subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
+        subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                       cwd=build_dir, shell=shell, check=True)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
 def build_assimp(src_dir: str, install_dir: str, curr_dir: str):
+    del curr_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
@@ -315,27 +350,28 @@ def build_assimp(src_dir: str, install_dir: str, curr_dir: str):
                        cwd=build_dir, shell=shell, check=True)
     finally:
         os.replace(bak_file, orig_file)
-
-    shutil.rmtree(build_dir, ignore_errors=False)
+        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_hdf5(src_dir: str, install_dir: str, curr_dir: str):
+    del curr_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
-    cmakecmd = get_cmake_cmd_common_part(install_dir)
-    cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
-                     '-DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=OFF',
-                     '-DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON',
-                     '-DHDF5_ENABLE_THREADSAFE:BOOL=OFF',
-                     '-DHDF5_BUILD_EXAMPLES:BOOL=OFF',
-                    src_dir])
-    subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
-    subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                   cwd=build_dir, shell=shell, check=True)
-
-    shutil.rmtree(build_dir, ignore_errors=False)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
+                         '-DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=OFF',
+                         '-DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON',
+                         '-DHDF5_ENABLE_THREADSAFE:BOOL=OFF',
+                         '-DHDF5_BUILD_EXAMPLES:BOOL=OFF',
+                        src_dir])
+        subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
+        subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                       cwd=build_dir, shell=shell, check=True)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_freeimage(src_dir: str, install_dir: str, curr_dir: str):
@@ -405,48 +441,70 @@ def build_freeimage(src_dir: str, install_dir: str, curr_dir: str):
         os.replace(bak_file_2, orig_file_2)
 
 
+def build_botan(src_dir: str, install_dir: str, curr_dir: str):
+    del curr_dir
+    shutil.rmtree(install_dir, ignore_errors=True)
+    shell = sys.platform.startswith('win')
+
+    try:
+        python = sys.executable
+        subprocess.run([python, src_dir + '/configure.py', '--cc=clang',
+                        '--cc-abi-flags=-mmacosx-version-min=10.8 -stdlib=libc++ -std=c++14',
+                        '--prefix=' + install_dir],
+                       cwd=src_dir, shell=shell, check=True)
+        subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                       cwd=src_dir, shell=shell, check=True)
+    finally:
+        shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)
+        os.remove(os.path.join(src_dir, 'Makefile'))
+
+
 def build_itk(src_dir: str, install_dir: str, curr_dir: str):
+    del curr_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
-    cmakecmd = get_cmake_cmd_common_part(install_dir)
-    cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
-                     '-DBUILD_TESTING:BOOL=OFF',
-                     '-DITK_USE_64BITS_IDS:BOOL=ON',
-                     '-DITK_LEGACY_REMOVE:BOOL=ON',
-                     '-DITK_USE_GPU:BOOL=ON',
-                     '-DITK_DOXYGEN_HTML:BOOL=OFF',
-                     '-DITK_USE_STRICT_CONCEPT_CHECKING:BOOL=ON',
-                     '-DModule_ITKReview:BOOL=ON',
-                     '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
-                     '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
-                    src_dir])
-    subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
-    subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                   cwd=build_dir, shell=shell, check=True)
-
-    shutil.rmtree(build_dir, ignore_errors=False)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
+                         '-DBUILD_TESTING:BOOL=OFF',
+                         '-DITK_USE_64BITS_IDS:BOOL=ON',
+                         '-DITK_LEGACY_REMOVE:BOOL=ON',
+                         '-DITK_USE_GPU:BOOL=ON',
+                         '-DITK_DOXYGEN_HTML:BOOL=OFF',
+                         '-DITK_USE_STRICT_CONCEPT_CHECKING:BOOL=ON',
+                         '-DModule_ITKReview:BOOL=ON',
+                         '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
+                         '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
+                        src_dir])
+        subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
+        subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                       cwd=build_dir, shell=shell, check=True)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_vtk(src_dir: str, install_dir: str, curr_dir: str):
+    del curr_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
-    cmakecmd = get_cmake_cmd_common_part(install_dir)
-    cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
-                     '-DBUILD_TESTING:BOOL=OFF',
-                     '-DBUILD_SHARED_LIBS:BOOL=OFF',
-                     '-DVTK_USE_SYSTEM_ZLIB:BOOL=ON',
-                     '-DVTK_LEGACY_REMOVE:BOOL=ON',
-                     '-DVTK_USE_SYSTEM_LIBXML2:BOOL=ON',
-                    src_dir])
-    subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
-    subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                   cwd=build_dir, shell=shell, check=True)
-
-    shutil.rmtree(build_dir, ignore_errors=False)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
+                         '-DBUILD_TESTING:BOOL=OFF',
+                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DVTK_USE_SYSTEM_ZLIB:BOOL=ON',
+                         '-DVTK_LEGACY_REMOVE:BOOL=ON',
+                         '-DVTK_USE_SYSTEM_LIBXML2:BOOL=ON',
+                        src_dir])
+        subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
+        subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                       cwd=build_dir, shell=shell, check=True)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, curr_dir: str):
@@ -537,13 +595,11 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, curr_dir:
         print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
     finally:
         os.replace(bak_file, orig_file)
-
-    shutil.rmtree(build_dir, ignore_errors=False)
+        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_libs(libs: dict, update_src: bool):
     curr_dir = os.path.abspath(os.path.dirname(__file__))
-    print('currDIR:', curr_dir)
 
     src_package_dir = os.path.normpath(os.path.join(curr_dir, '..', '..', '..', 'atlas_others'))
     if sys.platform.startswith('win'):
@@ -552,10 +608,12 @@ def build_libs(libs: dict, update_src: bool):
     else:
         if not os.path.exists(src_package_dir):
             src_package_dir = os.path.join(os.path.expanduser('~/'), 'Google Drive', 'code', 'my')
-
     assert os.path.exists(src_package_dir)
+
     base_dir = os.path.normpath(os.path.join(curr_dir, '..', '..', '..'))
     assert os.path.exists(base_dir)
+
+    print('currDIR:', curr_dir)
     print('srcPackageDIR:', src_package_dir)
     print('baseDIR:', base_dir)
 
@@ -650,11 +708,12 @@ def build_libs(libs: dict, update_src: bool):
             unpack_file_to_folder(os.path.join(src_package_dir, 'GeometricTools', 'GeometricToolsEngine3p3.zip'),
                                   base_dir)
         build_geometrictools(os.path.join(base_dir, 'GeometricTools', 'GTEngine'),
-                             os.path.join(curr_dir, 'wildmagic'), curr_dir)
+                             os.path.join(curr_dir, 'geometrictools'), curr_dir)
 
     if libs['ospray']:
         if update_src:
             update_or_clone_git_repository(os.path.join(base_dir, 'OSPRay'), 'git@github.com:ospray/OSPRay.git')
+        build_ospray(os.path.join(base_dir, 'OSPRay'), os.path.join(curr_dir, 'ospray'), curr_dir)
 
     if libs['assimp']:
         if update_src:
@@ -678,6 +737,7 @@ def build_libs(libs: dict, update_src: bool):
     if libs['botan']:
         if update_src:
             update_or_clone_git_repository(os.path.join(base_dir, 'botan'), 'git@github.com:randombit/botan.git')
+        build_botan(os.path.join(base_dir, 'botan'), os.path.join(curr_dir, 'botan'), curr_dir)
 
     if libs['itk']:
         if update_src:
@@ -699,50 +759,55 @@ def build_libs(libs: dict, update_src: bool):
                      os.path.join(curr_dir, 'opencv'), curr_dir)
 
 
-if __name__ == "__main__":
-    alllibs = {'all': False,
-               'zlib': False,
-               'glog': False,
-               'benchmark': False,
-               'glbinding': False,
-               'libjpeg': False,
-               'libpng': False,
-               'jxrlib': False,
-               'geometrictools': False,
-               'assimp': False,
-               'hdf5': False,
-               'freeimage': False,
-               'itk': False,
-               'vtk': False,
-               'opencv': False,
-               'boost': False,
-               'eigen': False,
-               'glm': False,
-               'googletest': False,
-               'folly': False,
-               'ffmpeg': False,
-               'botan': False,
-               'ospray': False
-               }
-    no_update_src = False
+def parse_inputs(argv: list):
+    libs = {'all': False,
+            'zlib': False,
+            'glog': False,
+            'benchmark': False,
+            'glbinding': False,
+            'libjpeg': False,
+            'libpng': False,
+            'jxrlib': False,
+            'geometrictools': False,
+            'assimp': False,
+            'hdf5': False,
+            'freeimage': False,
+            'itk': False,
+            'vtk': False,
+            'opencv': False,
+            'boost': False,
+            'eigen': False,
+            'glm': False,
+            'googletest': False,
+            'folly': False,
+            'ffmpeg': False,
+            'botan': False,
+            'ospray': False
+            }
+    update_src = True
 
-    if len(sys.argv) == 1:
-        usage = '~/miniconda3/bin/python3 build.py [noupdatesrc]'
-        for lib in alllibs:
+    print('current interpreter: ' + sys.executable)
+    if len(argv) == 1:
+        usage = 'usage: python3 build.py [noupdatesrc]'
+        for lib in libs:
             usage += ' [' + lib + ']'
         print(usage)
-    else:
-        for lib in sys.argv[1:]:
-            if lib.lower() in alllibs:
-                alllibs[lib.lower()] = True
-            elif lib.lower() == 'noupdatesrc':
-                no_update_src = True
-            else:
-                sys.stderr.write("Error: wrong lib name: " + lib + '\n')
-                sys.exit(1)
+        sys.exit(0)
 
-    if alllibs['all']:
-        for lib in alllibs:
-            alllibs[lib] = True
+    for lib in argv[1:]:
+        if lib.lower() in libs:
+            libs[lib.lower()] = True
+        elif lib.lower() == 'noupdatesrc':
+            update_src = False
+        else:
+            raise SyntaxError("wrong lib name: " + lib)
 
-    build_libs(alllibs, not no_update_src)
+    if libs['all']:
+        for lib in libs:
+            libs[lib] = True
+
+    return libs, update_src
+
+
+if __name__ == "__main__":
+    build_libs(*parse_inputs(sys.argv))
