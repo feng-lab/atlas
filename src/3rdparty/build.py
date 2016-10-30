@@ -805,6 +805,8 @@ def parse_inputs(argv: list):
     if libs['all']:
         for lib in libs:
             libs[lib] = True
+        libs['ospray'] = False
+        libs['botan'] = False
 
     return libs, update_src
 
