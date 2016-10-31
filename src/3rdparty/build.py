@@ -306,12 +306,14 @@ def build_ospray(src_dir: str, install_dir: str, curr_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DTBB_ROOT:PATH=/opt/intel/tbb',
-                         '-DOSPRAY_BUILD_ISA:STRING=ALL',
-                         '-DOSPRAY_MODULE_TACHYON:BOOL=ON',
+                         '-DOSPRAY_USE_EXTERNAL_EMBREE:BOOL=ON',
+                         '-DOSPRAY_USE_EMBREE_STREAMS:BOOL=ON',
+                         '-DOSPRAY_USE_HIGH_QUALITY_BVH:BOOL=ON',
+                         '-Dembree_DIR:PATH=' + src_dir + '/../embree-2.12.0.x86_64.macosx/lib/cmake/embree-2.12.0',
+                         '-DISPC_EXECUTABLE:FILEPATH=' + src_dir + '/../ispc-v1.9.1-osx/ispc',
+                         '-DOSPRAY_APPS_GLUTVIEWER:BOOL=OFF',
                          '-DOSPRAY_APPS_QTVIEWER:BOOL=OFF',
-                         '-DOSPRAY_MODULE_SEISMIC:BOOL=OFF',
                          '-DOSPRAY_APPS_VOLUMEVIEWER:BOOL=OFF',
-                         '-DOSPRAY_APPS_MODELVIEWER:BOOL=OFF',
                         src_dir])
         subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
         subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
@@ -448,11 +450,13 @@ def build_botan(src_dir: str, install_dir: str, curr_dir: str):
 
     try:
         python = sys.executable
-        subprocess.run([python, src_dir + '/configure.py', '--cc=clang',
-                        '--cc-abi-flags=-mmacosx-version-min=10.8 -stdlib=libc++ -std=c++14',
+        subprocess.run([python, src_dir + '/configure.py', '--cc=clang', '--with-zlib',
+                        '--cc-abi-flags=-mmacosx-version-min=10.8',
                         '--prefix=' + install_dir],
                        cwd=src_dir, shell=shell, check=True)
         subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                       cwd=src_dir, shell=shell, check=True)
+        subprocess.run(['make', 'clean'],
                        cwd=src_dir, shell=shell, check=True)
     finally:
         shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)
@@ -623,6 +627,10 @@ def build_libs(libs: dict, update_src: bool):
                 shutil.rmtree(os.path.join(base_dir, 'ispc-v1.9.1-windows-vs2015'), ignore_errors=True)
                 unpack_file_to_folder(os.path.join(src_package_dir, 'ispc-v1.9.1-windows-vs2015.zip'),
                                       base_dir)
+                shutil.rmtree(os.path.join(base_dir, 'embree-2.12.0.x64.windows'), ignore_errors=True)
+                unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.12.0.x64.windows.zip'),
+                                      base_dir)
+
 
         if libs['zlib']:
             if update_src:
@@ -634,6 +642,9 @@ def build_libs(libs: dict, update_src: bool):
             if update_src:
                 shutil.rmtree(os.path.join(base_dir, 'ispc-v1.9.1-osx'), ignore_errors=True)
                 unpack_file_to_folder(os.path.join(src_package_dir, 'ispc-v1.9.1-osx.tar.gz'),
+                                      base_dir)
+                shutil.rmtree(os.path.join(base_dir, 'embree-2.12.0.x86_64.macosx'), ignore_errors=True)
+                unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.12.0.x86_64.macosx.tar.gz'),
                                       base_dir)
 
         if libs['ffmpeg']:
@@ -710,11 +721,6 @@ def build_libs(libs: dict, update_src: bool):
         build_geometrictools(os.path.join(base_dir, 'GeometricTools', 'GTEngine'),
                              os.path.join(curr_dir, 'geometrictools'), curr_dir)
 
-    if libs['ospray']:
-        if update_src:
-            update_or_clone_git_repository(os.path.join(base_dir, 'OSPRay'), 'git@github.com:ospray/OSPRay.git')
-        build_ospray(os.path.join(base_dir, 'OSPRay'), os.path.join(curr_dir, 'ospray'), curr_dir)
-
     if libs['assimp']:
         if update_src:
             update_or_clone_git_repository(os.path.join(base_dir, 'assimp'), 'git@github.com:assimp/assimp.git')
@@ -734,11 +740,6 @@ def build_libs(libs: dict, update_src: bool):
                                   base_dir)
         build_freeimage(os.path.join(base_dir, 'FreeImage'), os.path.join(curr_dir, 'freeimage'), curr_dir)
 
-    if libs['botan']:
-        if update_src:
-            update_or_clone_git_repository(os.path.join(base_dir, 'botan'), 'git@github.com:randombit/botan.git')
-        build_botan(os.path.join(base_dir, 'botan'), os.path.join(curr_dir, 'botan'), curr_dir)
-
     if libs['itk']:
         if update_src:
             update_or_clone_git_repository(os.path.join(base_dir, 'ITK'), 'git://itk.org/ITK.git')
@@ -757,6 +758,16 @@ def build_libs(libs: dict, update_src: bool):
                                            'git@github.com:Itseez/opencv_contrib.git')
         build_opencv(os.path.join(base_dir, 'opencv'), os.path.join(base_dir, 'opencv_contrib'),
                      os.path.join(curr_dir, 'opencv'), curr_dir)
+
+    if libs['botan']:
+        if update_src:
+            update_or_clone_git_repository(os.path.join(base_dir, 'botan'), 'git@github.com:randombit/botan.git')
+        build_botan(os.path.join(base_dir, 'botan'), os.path.join(curr_dir, 'botan'), curr_dir)
+
+    if libs['ospray']:
+        if update_src:
+            update_or_clone_git_repository(os.path.join(base_dir, 'OSPRay'), 'git@github.com:ospray/OSPRay.git')
+        build_ospray(os.path.join(base_dir, 'OSPRay'), os.path.join(curr_dir, 'ospray'), curr_dir)
 
 
 def parse_inputs(argv: list):
@@ -805,8 +816,6 @@ def parse_inputs(argv: list):
     if libs['all']:
         for lib in libs:
             libs[lib] = True
-        libs['ospray'] = False
-        libs['botan'] = False
 
     return libs, update_src
 

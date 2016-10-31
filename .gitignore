@@ -38,6 +38,7 @@
 /src/3rdparty/jxrlib/
 /src/3rdparty/opencv/
 /src/3rdparty/ospray/
+/src/3rdparty/botan/
 /src/3rdparty/boost/
 /src/3rdparty/eigen/
 /src/3rdparty/glm/
