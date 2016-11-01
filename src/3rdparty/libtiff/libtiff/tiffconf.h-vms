@@ -1,49 +1,34 @@
-/* $Id$ */
-
-/*
- * Windows CE platform tiffconf.wince.h
- * Created by Mateusz Loskot (mateusz@loskot.net)
- *
- * NOTE: Requires WCELIBCEX library with wceex_* functions,
- * It's an extension to C library on Windows CE platform.
- * For example, HAVE_STDIO_H definition indicates there are
- * following files available:
- * stdio.h - from Windows CE / Windows Mobile SDK 
- * wce_stdio.h - from WCELIBCEX library
- */
-
-
 /*
   Configuration defines for installed libtiff.
   This file maintained for backward compatibility. Do not use definitions
   from this file in your programs.
 */
 
-#ifndef _WIN32_WCE
-# error This version of tif_config.h header is dedicated for Windows CE platform!
-#endif
-
-
 #ifndef _TIFFCONF_
 #define _TIFFCONF_
 
 /* Define to 1 if the system has the type `int16'. */
-/* #undef HAVE_INT16 */
+//#define HAVE_INT16 
 
 /* Define to 1 if the system has the type `int32'. */
-/* #undef HAVE_INT32 */
+//#define  HAVE_INT32 
 
 /* Define to 1 if the system has the type `int8'. */
-/* #undef HAVE_INT8 */
+//#define HAVE_INT8 
 
 /* The size of a `int', as computed by sizeof. */
 #define SIZEOF_INT 4
+
+/* The size of a `long', as computed by sizeof. */
+#define SIZEOF_LONG 4
 
 /* Compatibility stuff. */
 
 /* Define as 0 or 1 according to the floating point format suported by the
    machine */
 #define HAVE_IEEEFP 1
+
+#define HAVE_GETOPT 1
 
 /* Set the native cpu bit order (FILLORDER_LSB2MSB or FILLORDER_MSB2LSB) */
 #define HOST_FILLORDER FILLORDER_LSB2MSB
@@ -56,7 +41,7 @@
 #define CCITT_SUPPORT 1
 
 /* Support JPEG compression (requires IJG JPEG library) */
-/* #undef JPEG_SUPPORT */
+#define JPEG_SUPPORT 
 
 /* Support LogLuv high dynamic range encoding */
 #define LOGLUV_SUPPORT 1
@@ -112,10 +97,3 @@
 #define IPTC_SUPPORT
 
 #endif /* _TIFFCONF_ */
-/*
- * Local Variables:
- * mode: c
- * c-basic-offset: 8
- * fill-column: 78
- * End:
- */

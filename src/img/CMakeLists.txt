@@ -304,7 +304,7 @@ else (WIN32)
   # for some files
   set_source_files_properties(zimageavx.cpp PROPERTIES COMPILE_FLAGS -mavx)
 
-  set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-shadow")
+  set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS -Wno-unused-parameter)
   set_source_files_properties(ztiff.cpp PROPERTIES COMPILE_FLAGS -I${TIFFDIR})
   set_source_files_properties(${TIFFDIR}/tif_ojpeg.c
                               PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -I${JPEGTURBO_INCLUDE_DIRS}")

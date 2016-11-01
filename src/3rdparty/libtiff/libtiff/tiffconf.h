@@ -140,7 +140,7 @@
 #define TIFF_INT32_T signed int
 
 /* Signed 64-bit type */
-#define TIFF_INT64_T signed long long
+#define TIFF_INT64_T signed long
 
 /* Signed 8-bit type */
 #define TIFF_INT8_T signed char
