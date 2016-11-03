@@ -590,9 +590,9 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, curr_dir:
             to_lines = []
             for line in from_lines:
                 line = line.replace(r';libtbb.dylib;ippcore;ipps;ippi;ippcc;ippcv;ippvm;'
-                                    r'/opt/intel/compilers_and_libraries_2017.0.102/mac/compiler/lib/libirc.dylib;'
-                                    r'/opt/intel/compilers_and_libraries_2017.0.102/mac/compiler/lib/libimf.dylib;'
-                                    r'/opt/intel/compilers_and_libraries_2017.0.102/mac/compiler/lib/libsvml.dylib',
+                                    r'/opt/intel/compilers_and_libraries_2017.1.126/mac/compiler/lib/libirc.dylib;'
+                                    r'/opt/intel/compilers_and_libraries_2017.1.126/mac/compiler/lib/libimf.dylib;'
+                                    r'/opt/intel/compilers_and_libraries_2017.1.126/mac/compiler/lib/libsvml.dylib',
                                     r'')
                 f.write(line)
                 to_lines.append(line)
