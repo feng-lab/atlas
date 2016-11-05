@@ -538,16 +538,16 @@ protected:
   void computeEss(VectorXrt& Nk, MatrixXrt& xbar, std::vector<MatrixXrt>& S, const Params& post) const
   {
     if (m_hasWeight) {
-      Nk = post.rnk.cwiseProduct((*m_pWeight) * RowVectorXrt::Ones(post.rnk.cols())).colwise().sum();
+      Nk = post.rnk.cwiseProduct(m_pWeight->rowwise().replicate(post.rnk.cols())).colwise().sum();
       Nk = Nk.array() + 1e-10;
       xbar = MatrixXrt::Zero(m_nclasses, m_dimension);
       S.clear();
       for (size_t k = 0; k < m_nclasses; ++k) {
-        xbar.row(k) = (m_pData->array() * (post.rnk.col(k) * RowVectorXrt::Ones(m_dimension)).array() *
-                       ((*m_pWeight) * RowVectorXrt::Ones(m_dimension)).array()).colwise().sum() / Nk(k); // 10.52
+        xbar.row(k) = (m_pData->array() * (post.rnk.col(k).rowwise().replicate(m_dimension)).array() *
+                       (m_pWeight->rowwise().replicate(m_dimension)).array()).colwise().sum() / Nk(k); // 10.52
         MatrixXrt XC = m_pData->rowwise() - xbar.row(k);
-        S.push_back((XC.array() * (post.rnk.col(k) * RowVectorXrt::Ones(m_dimension)).array() *
-                     ((*m_pWeight) * RowVectorXrt::Ones(m_dimension)).array()).matrix().transpose() * XC /
+        S.push_back((XC.array() * (post.rnk.col(k).rowwise().replicate(m_dimension)).array() *
+                     (m_pWeight->rowwise().replicate(m_dimension)).array()).matrix().transpose() * XC /
                     Nk(k)); // 10.53
       }
     } else {
@@ -556,11 +556,11 @@ protected:
       xbar = MatrixXrt::Zero(m_nclasses, m_dimension);
       S.clear();
       for (size_t k = 0; k < m_nclasses; ++k) {
-        xbar.row(k) = (m_pData->array() * (post.rnk.col(k) * RowVectorXrt::Ones(m_dimension)).array()).colwise().sum() /
+        xbar.row(k) = (m_pData->array() * (post.rnk.col(k).rowwise().replicate(m_dimension)).array()).colwise().sum() /
                       Nk(k); // 10.52
         MatrixXrt XC = m_pData->rowwise() - xbar.row(k);
         S.push_back(
-          (XC.array() * (post.rnk.col(k) * RowVectorXrt::Ones(m_dimension)).array()).matrix().transpose() * XC /
+          (XC.array() * (post.rnk.col(k).rowwise().replicate(m_dimension)).array()).matrix().transpose() * XC /
           Nk(k)); // 10.53
       }
     }

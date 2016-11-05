@@ -195,13 +195,13 @@ public:
       if (m_hasWeight) {    //substitute responsibilities with responsibilities.*weight
         // Adjust the new estimates for the parameters
         RowVectorXrt new_pr = (m_responsibilities.cwiseProduct(
-          (*m_pWeight) * RowVectorXrt::Ones(m_nclasses))).colwise().sum();
+          m_pWeight->rowwise().replicate(m_nclasses))).colwise().sum();
         MatrixXrt new_c =
-          m_responsibilities.cwiseProduct((*m_pWeight) * RowVectorXrt::Ones(m_nclasses)).transpose() * (*m_pData);
+          m_responsibilities.cwiseProduct(m_pWeight->rowwise().replicate(m_nclasses)).transpose() * (*m_pData);
 
         // Now move new estimates to old parameter vectors
         m_priors = new_pr / (m_pWeight->sum());
-        m_centroids = new_c.array() / (new_pr.transpose() * RowVectorXrt::Ones(m_dimension)).array();
+        m_centroids = new_c.array() / (new_pr.transpose().rowwise().replicate(m_dimension)).array();
 
         switch (m_covarType) {
           case CovarianceType::Spherical: {
@@ -228,7 +228,7 @@ public:
               diffs = diffs.array().square();
               VectorXrt colj = m_responsibilities.col(j).cwiseProduct(*m_pWeight);
               RowVectorXrt covar =
-                diffs.cwiseProduct(colj * RowVectorXrt::Ones(m_dimension)).colwise().sum() / new_pr(j);
+                diffs.cwiseProduct(colj.rowwise().replicate(m_dimension)).colwise().sum() / new_pr(j);
               if (m_checkCovars && covar.minCoeff() < min_covar) {
                 // don't change covar
               } else {
@@ -242,7 +242,7 @@ public:
             for (size_t j = 0; j < m_nclasses; ++j) {
               MatrixXrt diffs = m_pData->rowwise() - m_centroids.row(j);
               VectorXrt colj = m_responsibilities.col(j).cwiseProduct(*m_pWeight);
-              diffs = diffs.cwiseProduct(colj.cwiseSqrt() * RowVectorXrt::Ones(m_dimension));
+              diffs = diffs.cwiseProduct(colj.cwiseSqrt().rowwise().replicate(m_dimension));
               MatrixXrt covar = (diffs.transpose() * diffs) / new_pr(j);
               if (m_checkCovars && ZEigenUtils::rank(covar) < m_dimension) {
                 // don't change covar
@@ -267,7 +267,7 @@ public:
 
         // Now move new estimates to old parameter vectors
         m_priors = new_pr / m_pData->rows();
-        m_centroids = new_c.array() / (new_pr.transpose() * RowVectorXrt::Ones(m_dimension)).array();
+        m_centroids = new_c.array() / (new_pr.transpose().rowwise().replicate(m_dimension)).array();
 
         switch (m_covarType) {
           case CovarianceType::Spherical: {
@@ -292,7 +292,7 @@ public:
               MatrixXrt diffs = m_pData->rowwise() - m_centroids.row(j);
               diffs = diffs.array().square();
               RowVectorXrt covar =
-                diffs.cwiseProduct(m_responsibilities.col(j) * RowVectorXrt::Ones(m_dimension)).colwise().sum() /
+                diffs.cwiseProduct(m_responsibilities.col(j).rowwise().replicate(m_dimension)).colwise().sum() /
                 new_pr(j);
               if (m_checkCovars && covar.minCoeff() < min_covar) {
                 // don't change covar
@@ -307,7 +307,7 @@ public:
             for (size_t j = 0; j < m_nclasses; ++j) {
               MatrixXrt diffs = m_pData->rowwise() - m_centroids.row(j);
               VectorXrt colj = m_responsibilities.col(j);
-              diffs = diffs.cwiseProduct(colj.cwiseSqrt() * RowVectorXrt::Ones(m_dimension));
+              diffs = diffs.cwiseProduct(colj.cwiseSqrt().rowwise().replicate(m_dimension));
               MatrixXrt covar = (diffs.transpose() * diffs) / new_pr(j);
               if (m_checkCovars && ZEigenUtils::rank(covar) < m_dimension) {
                 // don't change covar
@@ -573,7 +573,7 @@ protected:
         m_responsibilities.row(i) = RowVectorXrt::Ones(m_nclasses) / m_nclasses;
       }
     }
-    m_responsibilities = m_responsibilities.cwiseQuotient(s * RowVectorXrt::Ones(m_nclasses));
+    m_responsibilities = m_responsibilities.cwiseQuotient(s.rowwise().replicate(m_nclasses));
     m_labelsNeedUpdate = true;
   }
 
