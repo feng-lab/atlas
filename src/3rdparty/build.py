@@ -611,7 +611,7 @@ def build_libs(libs: dict, update_src: bool):
             src_package_dir = os.path.join('z:', os.sep, 'Google Drive', 'code', 'my')
     else:
         if not os.path.exists(src_package_dir):
-            src_package_dir = os.path.join(os.path.expanduser('~/'), 'Google Drive', 'code', 'my')
+            src_package_dir = os.path.join(os.path.expanduser('~'), 'Google Drive', 'code', 'my')
     assert os.path.exists(src_package_dir)
 
     base_dir = os.path.normpath(os.path.join(curr_dir, '..', '..', '..'))
