@@ -270,22 +270,7 @@ def build_geometrictools(src_dir: str, install_dir: str, curr_dir: str):
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
-    orig_file = os.path.join(src_dir, 'Include', 'GTEngine.h')
-    bak_file = get_bak_file_name(orig_file)
     try:
-        os.rename(orig_file, bak_file)
-        with open(bak_file, mode='r', encoding='utf-8') as f:
-            from_lines = f.readlines()
-        with open(orig_file, mode='w', encoding='utf-8') as f:
-            to_lines = []
-            for line in from_lines:
-                line = line.replace(r'#include <GTGraphics.h>', r'')
-                line = line.replace(r'#include <GTPhysics.h>', r'')
-                line = line.replace(r'#include <GTApplications.h>', r'')
-                f.write(line)
-                to_lines.append(line)
-        print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
-
         subprocess.run(['xcodebuild', '-project', 'GTEngine.xcodeproj', '-configuration', 'Default',
                         '-target', 'Release Static', 'build', '-arch', 'x86_64',
                         'MACOSX_DEPLOYMENT_TARGET=10.8', 'CLANG_CXX_LANGUAGE_STANDARD=c++14'],
@@ -294,7 +279,6 @@ def build_geometrictools(src_dir: str, install_dir: str, curr_dir: str):
         shutil.copytree(os.path.join(src_dir, 'Include'), os.path.join(install_dir, 'include'))
     finally:
         shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)
-        os.replace(bak_file, orig_file)
 
 
 def build_ospray(src_dir: str, install_dir: str, curr_dir: str):
@@ -658,9 +642,9 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['eigen']:
         shutil.rmtree(os.path.join(curr_dir, 'eigen'), ignore_errors=True)
-        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-42149289d067.zip'),
+        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-13ee053f74af.zip'),
                               curr_dir)
-        os.rename(os.path.join(curr_dir, 'eigen-eigen-42149289d067'), os.path.join(curr_dir, 'eigen'))
+        os.rename(os.path.join(curr_dir, 'eigen-eigen-13ee053f74af'), os.path.join(curr_dir, 'eigen'))
 
     if libs['glm']:
         update_or_clone_git_repository(os.path.join(base_dir, 'glm'), 'git@github.com:g-truc/glm.git')
@@ -715,7 +699,7 @@ def build_libs(libs: dict, update_src: bool):
     if libs['geometrictools']:
         if update_src:
             shutil.rmtree(os.path.join(base_dir, 'GeometricTools'), ignore_errors=True)
-            unpack_file_to_folder(os.path.join(src_package_dir, 'GeometricTools', 'GeometricToolsEngine3p3.zip'),
+            unpack_file_to_folder(os.path.join(src_package_dir, 'GeometricTools', 'GeometricToolsEngine3p4.zip'),
                                   base_dir)
         build_geometrictools(os.path.join(base_dir, 'GeometricTools', 'GTEngine'),
                              os.path.join(curr_dir, 'geometrictools'), curr_dir)
