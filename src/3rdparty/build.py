@@ -38,13 +38,15 @@ def update_or_clone_git_repository(repository_folder: str, repository_url: str):
         subprocess.run(['git', 'clone', repository_url, repository_folder], shell=shell, check=True)
 
 
-def export_git_repository(repository_folder: str, target_folder: str, tag: str=''):
+def export_git_repository(repository_folder: str, target_folder: str, branch: str='', tag: str=''):
     shell = sys.platform.startswith('win')
-    if not tag:
-        tag = 'master'
+    if not branch:
+        branch = 'master'
     shutil.rmtree(target_folder, ignore_errors=True)
-    subprocess.run(['git', 'clone', '--shared', '--branch', tag, repository_folder, target_folder],
+    subprocess.run(['git', 'clone', '--shared', '--branch', branch, repository_folder, target_folder],
                    shell=shell, check=True)
+    if tag:
+        subprocess.run(['git', 'checkout', tag], cwd=target_folder, shell=shell, check=True)
     shutil.rmtree(os.path.join(target_folder, '.git'), ignore_errors=False)
 
 
@@ -611,8 +613,8 @@ def build_libs(libs: dict, update_src: bool):
                 shutil.rmtree(os.path.join(base_dir, 'ispc-v1.9.1-windows-vs2015'), ignore_errors=True)
                 unpack_file_to_folder(os.path.join(src_package_dir, 'ispc-v1.9.1-windows-vs2015.zip'),
                                       base_dir)
-                shutil.rmtree(os.path.join(base_dir, 'embree-2.12.0.x64.windows'), ignore_errors=True)
-                unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.12.0.x64.windows.zip'),
+                shutil.rmtree(os.path.join(base_dir, 'embree-2.13.0.x64.windows'), ignore_errors=True)
+                unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.13.0.x64.windows.zip'),
                                       base_dir)
 
         if libs['zlib']:
@@ -626,13 +628,13 @@ def build_libs(libs: dict, update_src: bool):
                 shutil.rmtree(os.path.join(base_dir, 'ispc-v1.9.1-osx'), ignore_errors=True)
                 unpack_file_to_folder(os.path.join(src_package_dir, 'ispc-v1.9.1-osx.tar.gz'),
                                       base_dir)
-                shutil.rmtree(os.path.join(base_dir, 'embree-2.12.0.x86_64.macosx'), ignore_errors=True)
-                unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.12.0.x86_64.macosx.tar.gz'),
+                shutil.rmtree(os.path.join(base_dir, 'embree-2.13.0.x86_64.macosx'), ignore_errors=True)
+                unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.13.0.x86_64.macosx.tar.gz'),
                                       base_dir)
 
         if libs['ffmpeg']:
             unpack_file_to_folder(os.path.join(src_package_dir, 'ffmpeg-3.2.7z'),
-                                  os.path.join(base_dir, 'atlas'))
+                                  curr_dir)
 
     if libs['boost']:
         shutil.rmtree(os.path.join(curr_dir, 'boost'), ignore_errors=True)
@@ -642,9 +644,9 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['eigen']:
         shutil.rmtree(os.path.join(curr_dir, 'eigen'), ignore_errors=True)
-        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-13ee053f74af.zip'),
+        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-7f9319d63946.zip'),
                               curr_dir)
-        os.rename(os.path.join(curr_dir, 'eigen-eigen-13ee053f74af'), os.path.join(curr_dir, 'eigen'))
+        os.rename(os.path.join(curr_dir, 'eigen-eigen-7f9319d63946'), os.path.join(curr_dir, 'eigen'))
 
     if libs['glm']:
         update_or_clone_git_repository(os.path.join(base_dir, 'glm'), 'git@github.com:g-truc/glm.git')
@@ -657,7 +659,7 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['folly']:
         update_or_clone_git_repository(os.path.join(base_dir, 'folly'), 'git@github.com:facebook/folly.git')
-        export_git_repository(os.path.join(base_dir, 'folly'), os.path.join(curr_dir, 'folly'))
+        export_git_repository(os.path.join(base_dir, 'folly'), os.path.join(curr_dir, 'folly'), tag='aebb140')
 
     if libs['glog']:
         if update_src:

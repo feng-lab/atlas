@@ -210,7 +210,7 @@ endif ()
 if (APPLE)
   set(ASSETS
       ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns
-      ${CMAKE_CURRENT_SOURCE_DIR}/../../ffmpeg)
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ffmpeg)
   set(MACOSX_BUNDLE_ICON_FILE app.icns)
 endif ()
 
@@ -767,7 +767,7 @@ else (WIN32)
   set_source_files_properties(test/zunittest.cpp PROPERTIES COMPILE_FLAGS "-Wno-deprecated")
 
   set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../../ffmpeg PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ffmpeg PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 endif (WIN32)
 
 target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding hdf5_cpp-static hdf5-static

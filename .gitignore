@@ -65,6 +65,7 @@ gui-build-Desktop*-*/
 build-gui-Desktop-*/
 build-gui-Desktop*-*/
 build-atlas*/
+cmake-build-*/
 build-img-Desktop-*/
 build-img-Desktop*-*/
 CMakeFiles/

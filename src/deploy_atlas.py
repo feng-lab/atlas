@@ -20,7 +20,7 @@ def deploy_atlas():
 
     curr_dir = os.path.abspath(os.path.dirname(__file__))
 
-    binary_dir = os.path.normpath(os.path.join(curr_dir, '..', 'build-atlas'))
+    binary_dir = os.path.normpath(os.path.join(curr_dir, 'cmake-build-release', 'atlas'))
     assert os.path.exists(binary_dir)
 
     target_dir = os.path.join(os.path.expanduser('~'), 'Google Drive', "jinny'lab", 'software')
