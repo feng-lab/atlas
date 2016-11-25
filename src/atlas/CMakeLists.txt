@@ -225,30 +225,7 @@ set(RESOURCES
 
 option(BUILD_TESTING "Enable tests" ON)
 if (BUILD_TESTING)
-  add_definitions(-DATLAS_WITH_TESTS)
-  set(TESTS
-      test/zrunbenchmark.cpp
-      test/zrunbenchmark.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc
-      test/zunittest.h
-      test/zunittest.cpp
-      test/zimggraphtest.h
-      test/zimagetoimagemetrictest.h
-      test/zimageutilstest.h
-      test/zimageaffinetransformtest.h
-      test/zimgncctest.h
-      test/zfilereadtest.h
-      test/zimgiteratortest.h
-      test/zsaturateoperationtest.h
-      test/zclustertest.h
-      test/zimgtest.h
-      test/zimgconnectedcomponentstest.h
-      test/zimgsigneddistancemaptest.h
-      test/zimgautothresholdtest.h
-      test/zimgregionalextrematest.h
-      test/ztreetest.h)
-  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/include)
-  include_directories(${BENCHMARK_INCLUDE_DIRS})
+  include(${CMAKE_CURRENT_SOURCE_DIR}/../../test/test.cmake)
 endif (BUILD_TESTING)
 
 set(SOURCES
@@ -742,8 +719,6 @@ if (WIN32)
   # for some files
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
                               "/wd4100 /I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}") # 'identifier' : unreferenced formal parameter)
-  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc
-                              PROPERTIES COMPILE_FLAGS /I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest)
   set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS /I${ASSIMP_INCLUDE_DIRS})
 else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -frtti)
@@ -760,11 +735,7 @@ else (WIN32)
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
                               "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
   set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
-  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest/src/gtest-all.cc
-                              PROPERTIES COMPILE_FLAGS
-                              "-I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/googletest -Wno-deprecated")
   set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS "-isystem ${ASSIMP_INCLUDE_DIRS}")
-  set_source_files_properties(test/zunittest.cpp PROPERTIES COMPILE_FLAGS "-Wno-deprecated")
 
   set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
   set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ffmpeg PROPERTIES MACOSX_PACKAGE_LOCATION Resources)

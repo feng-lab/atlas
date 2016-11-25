@@ -5,8 +5,8 @@
 #include "zdoc.h"
 #include "zview.h"
 #ifdef ATLAS_WITH_TESTS
-#include "test/zrunbenchmark.h"
-#include "test/zunittest.h"
+#include "../../test/zrunbenchmark.h"
+#include "../../test/zunittest.h"
 #endif
 #include "zcustomcommand.h"
 #include "zviewsettingwidget.h"
