@@ -1,12 +1,13 @@
 ## Installation
 ### macOS:
-1. install xcode, homebrew, qt5, intel c composer (for mkl, ipp, tbb)
-2. brew install unrar p7zip git cmake
-3. current code repository folder should be named "atlas" and make sure "atlas_others" folder and "atlas" folder are in same directory
-4. (setup SSH credential for github), run "build_ext_libs.py all" from util folder
-5. build CMakeLists.txt
+* install xcode, homebrew, qt5, intel c composer (for mkl, ipp, tbb) and python3
+* brew install unrar p7zip git cmake
 
 ### Windows:
-1. patch libtiff win32 TIFFFdOpen
-2. run "build_ext_libs.py all" from util folder
-3. build CMakeLists.txt
+* install visual studio, qt5, intel c composer (for mkl, ipp, tbb) and python3, 7z, git and cmake
+* patch libtiff win32 TIFFFdOpen
+
+### All:
+* code repository folder should be named as "atlas"; "atlas_others" folder and "atlas" folder should be in same directory
+* (setup SSH credential for github), run "util/build_ext_libs.py all" to build external libraries
+* build CMakeLists.txt

@@ -92,7 +92,7 @@ def write_project_file(out_folder: str, header_files: list, internal_header_file
         f.write(FOOT)
 
 
-def make_qt_optimization_project(ceres_folder: str, out_folder: str):
+def make_cmake_ceres_solver_project(ceres_folder: str, out_folder: str):
     """
     rip ceres for neuTube
     """
@@ -147,7 +147,7 @@ def make_qt_optimization_project(ceres_folder: str, out_folder: str):
 
 if __name__ == "__main__":
     if len(sys.argv) > 2:
-        make_qt_optimization_project(sys.argv[1], sys.argv[2])
+        make_cmake_ceres_solver_project(sys.argv[1], sys.argv[2])
     else:
-        make_qt_optimization_project(common_dirs.base_dir() + '/ceres-solver',
-                                     common_dirs.base_dir() + '/ceres-solver-my')
+        make_cmake_ceres_solver_project(common_dirs.base_dir() + '/ceres-solver',
+                                        common_dirs.ext_dir() + '/ceres-solver')

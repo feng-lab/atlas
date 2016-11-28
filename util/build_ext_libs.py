@@ -48,7 +48,7 @@ def export_git_repository(repository_folder: str, target_folder: str, branch: st
 
 
 def create_build_dir(src_dir: str):
-    build_dir = os.path.join(src_dir, '..', '__' + Path(src_dir).name + '-build')
+    build_dir = os.path.normpath(os.path.join(src_dir, '..', '__' + Path(src_dir).name + '-build'))
     shutil.rmtree(build_dir, ignore_errors=True)
     os.makedirs(build_dir, exist_ok=False)
     return build_dir
@@ -74,7 +74,7 @@ def get_vcvars_environment():
     if vscomntools is None:
         raise OSError('could not find COMNTOOLS environment variable')
 
-    vcvars = os.path.join(vscomntools, '..', '..', 'VC', 'vcvarsall.bat')
+    vcvars = os.path.normpath(os.path.join(vscomntools, '..', '..', 'VC', 'vcvarsall.bat'))
     python = sys.executable
     process = subprocess.Popen(
         '("{}" amd64>nul)&&"{1}" -c "import os; print repr(os.environ)"'.format(vcvars, python),

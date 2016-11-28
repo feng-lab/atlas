@@ -19,7 +19,8 @@ set(TESTS
     ${CMAKE_CURRENT_LIST_DIR}/zimgsigneddistancemaptest.h
     ${CMAKE_CURRENT_LIST_DIR}/zimgautothresholdtest.h
     ${CMAKE_CURRENT_LIST_DIR}/zimgregionalextrematest.h
-    ${CMAKE_CURRENT_LIST_DIR}/ztreetest.h)
+    ${CMAKE_CURRENT_LIST_DIR}/ztreetest.h
+    )
 include_directories(${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest/include)
 include_directories(${BENCHMARK_INCLUDE_DIRS})
 

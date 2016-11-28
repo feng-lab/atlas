@@ -6,38 +6,44 @@ def curr_dir():
     return os.path.abspath(os.path.dirname(__file__))
 
 
+def repository_dir():
+    res = os.path.normpath(os.path.join(curr_dir(), '..'))
+    assert os.path.exists(res)
+    return res
+
+
 def base_dir():
-    res = os.path.normpath(os.path.join(curr_dir(), '..', '..'))
+    res = os.path.normpath(os.path.join(repository_dir(), '..'))
     assert os.path.exists(res)
     return res
 
 
 def src_dir():
-    res = os.path.normpath(os.path.join(curr_dir(), '..', 'src'))
+    res = os.path.join(repository_dir(), 'src')
     assert os.path.exists(res)
     return res
 
 
 def ext_dir():
-    res = os.path.normpath(os.path.join(src_dir(), '3rdparty'))
+    res = os.path.join(src_dir(), '3rdparty')
     assert os.path.exists(res)
     return res
 
 
 def atlas_dir():
-    res = os.path.normpath(os.path.join(src_dir(), 'atlas'))
+    res = os.path.join(src_dir(), 'atlas')
     assert os.path.exists(res)
     return res
 
 
 def img_dir():
-    res = os.path.normpath(os.path.join(src_dir(), 'img'))
+    res = os.path.join(src_dir(), 'img')
     assert os.path.exists(res)
     return res
 
 
 def src_package_dir():
-    res = os.path.normpath(os.path.join(base_dir(), 'atlas_others'))
+    res = os.path.join(base_dir(), 'atlas_others')
     if not os.path.exists(res):
         if sys.platform.startswith('win'):
             res = os.path.join('z:', os.sep, 'Google Drive', 'code', 'my')
@@ -48,7 +54,7 @@ def src_package_dir():
 
 
 def binary_dir():
-    res = os.path.normpath(os.path.join(curr_dir(), '..', 'cmake-build-release', 'src', 'atlas'))
+    res = os.path.join(repository_dir(), 'cmake-build-release', 'src', 'atlas')
     assert os.path.exists(res)
     return res
 
