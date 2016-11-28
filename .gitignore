@@ -49,6 +49,7 @@
 /src/3rdparty/benchmark/
 ffmpeg
 .idea/
+__pycache__/
 
 # binary file
 obj/

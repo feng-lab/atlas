@@ -9,10 +9,7 @@ from pathlib import Path
 import subprocess
 import difflib
 
-
-if sys.version_info[0] < 3 or sys.version_info[1] < 5:
-    sys.stderr.write('Error: need python 3.5 or higher\n')
-    sys.exit(1)
+import common_dirs
 
 
 def unpack_file_to_folder(file: str, folder: str):
@@ -114,8 +111,8 @@ def get_cmake_cmd_common_part(install_dir: str):
                 ]
 
 
-def build_gflags(src_dir: str, install_dir: str, curr_dir: str):
-    del curr_dir
+def build_gflags(src_dir: str, install_dir: str, ext_dir: str):
+    del ext_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
@@ -130,17 +127,17 @@ def build_gflags(src_dir: str, install_dir: str, curr_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_glog(src_dir: str, install_dir: str, curr_dir: str):
+def build_glog(src_dir: str, install_dir: str, ext_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
     try:
-        subprocess.run(['git', 'apply', os.path.join(curr_dir, 'glog_patch.txt')],
+        subprocess.run(['git', 'apply', os.path.join(ext_dir, 'glog_patch.txt')],
                        cwd=src_dir, shell=shell, check=True)
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
-        cmakecmd.extend(['-Dgflags_DIR:PATH={}/gflags/lib/cmake/gflags'.format(curr_dir),
+        cmakecmd.extend(['-Dgflags_DIR:PATH={}/gflags/lib/cmake/gflags'.format(ext_dir),
                          src_dir])
         subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
         subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
@@ -151,8 +148,8 @@ def build_glog(src_dir: str, install_dir: str, curr_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_benchmark(src_dir: str, install_dir: str, curr_dir: str):
-    del curr_dir
+def build_benchmark(src_dir: str, install_dir: str, ext_dir: str):
+    del ext_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
@@ -168,8 +165,8 @@ def build_benchmark(src_dir: str, install_dir: str, curr_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_glbinding(src_dir: str, install_dir: str, curr_dir: str):
-    del curr_dir
+def build_glbinding(src_dir: str, install_dir: str, ext_dir: str):
+    del ext_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
@@ -187,13 +184,13 @@ def build_glbinding(src_dir: str, install_dir: str, curr_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_libjpeg(src_dir: str, install_dir: str, curr_dir: str):
+def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
     try:
-        subprocess.run(['sh', src_dir + '/configure', '--host', 'x86_64-apple-darwin', 'NASM=' + curr_dir + '/nasm',
+        subprocess.run(['sh', src_dir + '/configure', '--host', 'x86_64-apple-darwin', 'NASM=' + ext_dir + '/nasm',
                         '--enable-static', '--disable-shared', 'CFLAGS=-mmacosx-version-min=10.8 -O3',
                         'LDFLAGS=-mmacosx-version-min=10.8'],
                        cwd=build_dir, shell=shell, check=True)
@@ -205,8 +202,8 @@ def build_libjpeg(src_dir: str, install_dir: str, curr_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_libpng(src_dir: str, install_dir: str, curr_dir: str):
-    del curr_dir
+def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
+    del ext_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
@@ -238,8 +235,8 @@ def build_libpng(src_dir: str, install_dir: str, curr_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_jxrlib(src_dir: str, install_dir: str, curr_dir: str):
-    del curr_dir
+def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
+    del ext_dir
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
@@ -267,8 +264,8 @@ def build_jxrlib(src_dir: str, install_dir: str, curr_dir: str):
         os.replace(bak_file, orig_file)
 
 
-def build_geometrictools(src_dir: str, install_dir: str, curr_dir: str):
-    del curr_dir
+def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
+    del ext_dir
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
@@ -283,8 +280,8 @@ def build_geometrictools(src_dir: str, install_dir: str, curr_dir: str):
         shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)
 
 
-def build_ospray(src_dir: str, install_dir: str, curr_dir: str):
-    del curr_dir
+def build_ospray(src_dir: str, install_dir: str, ext_dir: str, ispc_dir: str, embree_dir: str):
+    del ext_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
@@ -295,8 +292,8 @@ def build_ospray(src_dir: str, install_dir: str, curr_dir: str):
                          '-DOSPRAY_USE_EXTERNAL_EMBREE:BOOL=ON',
                          '-DOSPRAY_USE_EMBREE_STREAMS:BOOL=ON',
                          '-DOSPRAY_USE_HIGH_QUALITY_BVH:BOOL=ON',
-                         '-Dembree_DIR:PATH=' + src_dir + '/../embree-2.12.0.x86_64.macosx/lib/cmake/embree-2.12.0',
-                         '-DISPC_EXECUTABLE:FILEPATH=' + src_dir + '/../ispc-v1.9.1-osx/ispc',
+                         '-Dembree_DIR:PATH=' + embree_dir,
+                         '-DISPC_EXECUTABLE:FILEPATH=' + ispc_dir + '/ispc',
                          '-DOSPRAY_APPS_GLUTVIEWER:BOOL=OFF',
                          '-DOSPRAY_APPS_QTVIEWER:BOOL=OFF',
                          '-DOSPRAY_APPS_VOLUMEVIEWER:BOOL=OFF',
@@ -308,8 +305,8 @@ def build_ospray(src_dir: str, install_dir: str, curr_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_assimp(src_dir: str, install_dir: str, curr_dir: str):
-    del curr_dir
+def build_assimp(src_dir: str, install_dir: str, ext_dir: str):
+    del ext_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
@@ -341,8 +338,8 @@ def build_assimp(src_dir: str, install_dir: str, curr_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_hdf5(src_dir: str, install_dir: str, curr_dir: str):
-    del curr_dir
+def build_hdf5(src_dir: str, install_dir: str, ext_dir: str):
+    del ext_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
@@ -362,7 +359,7 @@ def build_hdf5(src_dir: str, install_dir: str, curr_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_freeimage(src_dir: str, install_dir: str, curr_dir: str):
+def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
@@ -399,8 +396,8 @@ def build_freeimage(src_dir: str, install_dir: str, curr_dir: str):
                 to_lines.append(line)
         print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
 
-        shutil.copy2(os.path.join(curr_dir, 'freeimage-makefiles', 'Makefile_gnu'), src_dir)
-        shutil.copy2(os.path.join(curr_dir, 'freeimage-makefiles', 'Makefile_fip'), src_dir)
+        shutil.copy2(os.path.join(ext_dir, 'freeimage-makefiles', 'Makefile_gnu'), src_dir)
+        shutil.copy2(os.path.join(ext_dir, 'freeimage-makefiles', 'Makefile_fip'), src_dir)
         subprocess.run(['make', '-f', 'Makefile_gnu', '-j' + str(os.cpu_count())],
                        cwd=src_dir, shell=shell, check=True)
         subprocess.run(['make', '-f', 'Makefile_gnu', '-j' + str(os.cpu_count()), 'install', 'PREFIX=' + install_dir],
@@ -429,8 +426,8 @@ def build_freeimage(src_dir: str, install_dir: str, curr_dir: str):
         os.replace(bak_file_2, orig_file_2)
 
 
-def build_botan(src_dir: str, install_dir: str, curr_dir: str):
-    del curr_dir
+def build_botan(src_dir: str, install_dir: str, ext_dir: str):
+    del ext_dir
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
 
@@ -449,8 +446,8 @@ def build_botan(src_dir: str, install_dir: str, curr_dir: str):
         os.remove(os.path.join(src_dir, 'Makefile'))
 
 
-def build_itk(src_dir: str, install_dir: str, curr_dir: str):
-    del curr_dir
+def build_itk(src_dir: str, install_dir: str, ext_dir: str):
+    del ext_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
@@ -475,8 +472,8 @@ def build_itk(src_dir: str, install_dir: str, curr_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_vtk(src_dir: str, install_dir: str, curr_dir: str):
-    del curr_dir
+def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
+    del ext_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
@@ -497,7 +494,7 @@ def build_vtk(src_dir: str, install_dir: str, curr_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, curr_dir: str):
+def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
     shell = sys.platform.startswith('win')
@@ -525,7 +522,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, curr_dir:
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DBUILD_opencv_python2:BOOL=OFF',
                          '-DBUILD_opencv_videostab:BOOL=ON',
-                         '-DEIGEN_INCLUDE_PATH:PATH=' + curr_dir + '/eigen',
+                         '-DEIGEN_INCLUDE_PATH:PATH=' + ext_dir + '/eigen',
                          '-DBUILD_opencv_world:BOOL=OFF',
                          '-DWITH_TBB:BOOL=ON',
                          '-DWITH_VTK:BOOL=OFF',
@@ -589,33 +586,26 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, curr_dir:
 
 
 def build_libs(libs: dict, update_src: bool):
-    curr_dir = os.path.abspath(os.path.dirname(__file__))
-
-    src_package_dir = os.path.normpath(os.path.join(curr_dir, '..', '..', '..', 'atlas_others'))
-    if sys.platform.startswith('win'):
-        if not os.path.exists(src_package_dir):
-            src_package_dir = os.path.join('z:', os.sep, 'Google Drive', 'code', 'my')
-    else:
-        if not os.path.exists(src_package_dir):
-            src_package_dir = os.path.join(os.path.expanduser('~'), 'Google Drive', 'code', 'my')
-    assert os.path.exists(src_package_dir)
-
-    base_dir = os.path.normpath(os.path.join(curr_dir, '..', '..', '..'))
-    assert os.path.exists(base_dir)
-
-    print('currDIR:', curr_dir)
+    ext_dir = common_dirs.ext_dir()
+    src_package_dir = common_dirs.src_package_dir()
+    base_dir = common_dirs.base_dir()
+    print('extDIR:', ext_dir)
     print('srcPackageDIR:', src_package_dir)
     print('baseDIR:', base_dir)
 
+    ispc_dir = ''
+    embree_dir = ''
     if sys.platform.startswith('win32'):
         if libs['ospray']:
             if update_src:
                 shutil.rmtree(os.path.join(base_dir, 'ispc-v1.9.1-windows-vs2015'), ignore_errors=True)
                 unpack_file_to_folder(os.path.join(src_package_dir, 'ispc-v1.9.1-windows-vs2015.zip'),
                                       base_dir)
+                ispc_dir = os.path.join(base_dir, 'ispc-v1.9.1-windows-vs2015')
                 shutil.rmtree(os.path.join(base_dir, 'embree-2.13.0.x64.windows'), ignore_errors=True)
                 unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.13.0.x64.windows.zip'),
                                       base_dir)
+                embree_dir = os.path.join(base_dir, 'embree-2.13.0.x64.windows', 'lib', 'cmake', 'embree-2.13.0')
 
         if libs['zlib']:
             if update_src:
@@ -628,75 +618,77 @@ def build_libs(libs: dict, update_src: bool):
                 shutil.rmtree(os.path.join(base_dir, 'ispc-v1.9.1-osx'), ignore_errors=True)
                 unpack_file_to_folder(os.path.join(src_package_dir, 'ispc-v1.9.1-osx.tar.gz'),
                                       base_dir)
+                ispc_dir = os.path.join(base_dir, 'ispc-v1.9.1-osx')
                 shutil.rmtree(os.path.join(base_dir, 'embree-2.13.0.x86_64.macosx'), ignore_errors=True)
                 unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.13.0.x86_64.macosx.tar.gz'),
                                       base_dir)
+                embree_dir = os.path.join(base_dir, 'embree-2.13.0.x86_64.macosx', 'lib', 'cmake', 'embree-2.13.0')
 
         if libs['ffmpeg']:
-            unpack_file_to_folder(os.path.join(src_package_dir, 'ffmpeg-3.2.7z'),
-                                  curr_dir)
+            unpack_file_to_folder(os.path.join(src_package_dir, 'ffmpeg-3.2.1.7z'),
+                                  ext_dir)
 
     if libs['boost']:
-        shutil.rmtree(os.path.join(curr_dir, 'boost'), ignore_errors=True)
+        shutil.rmtree(os.path.join(ext_dir, 'boost'), ignore_errors=True)
         unpack_file_to_folder(os.path.join(src_package_dir, 'boost_1_62_0.tar.bz2'),
-                              curr_dir)
-        os.rename(os.path.join(curr_dir, 'boost_1_62_0'), os.path.join(curr_dir, 'boost'))
+                              ext_dir)
+        os.rename(os.path.join(ext_dir, 'boost_1_62_0'), os.path.join(ext_dir, 'boost'))
 
     if libs['eigen']:
-        shutil.rmtree(os.path.join(curr_dir, 'eigen'), ignore_errors=True)
-        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-7f9319d63946.zip'),
-                              curr_dir)
-        os.rename(os.path.join(curr_dir, 'eigen-eigen-7f9319d63946'), os.path.join(curr_dir, 'eigen'))
+        shutil.rmtree(os.path.join(ext_dir, 'eigen'), ignore_errors=True)
+        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-c2b73097b199.zip'),
+                              ext_dir)
+        os.rename(os.path.join(ext_dir, 'eigen-eigen-c2b73097b199'), os.path.join(ext_dir, 'eigen'))
 
     if libs['glm']:
         update_or_clone_git_repository(os.path.join(base_dir, 'glm'), 'git@github.com:g-truc/glm.git')
-        export_git_repository(os.path.join(base_dir, 'glm'), os.path.join(curr_dir, 'glm'))
+        export_git_repository(os.path.join(base_dir, 'glm'), os.path.join(ext_dir, 'glm'))
 
     if libs['googletest']:
         update_or_clone_git_repository(os.path.join(base_dir, 'googletest'), 'git@github.com:google/googletest.git')
-        shutil.rmtree(os.path.join(curr_dir, 'googletest'), ignore_errors=True)
-        shutil.copytree(os.path.join(base_dir, 'googletest', 'googletest'), os.path.join(curr_dir, 'googletest'))
+        shutil.rmtree(os.path.join(ext_dir, 'googletest'), ignore_errors=True)
+        shutil.copytree(os.path.join(base_dir, 'googletest', 'googletest'), os.path.join(ext_dir, 'googletest'))
 
     if libs['folly']:
         update_or_clone_git_repository(os.path.join(base_dir, 'folly'), 'git@github.com:facebook/folly.git')
-        export_git_repository(os.path.join(base_dir, 'folly'), os.path.join(curr_dir, 'folly'), tag='aebb140')
+        export_git_repository(os.path.join(base_dir, 'folly'), os.path.join(ext_dir, 'folly'), tag='aebb140')
 
     if libs['glog']:
         if update_src:
             update_or_clone_git_repository(os.path.join(base_dir, 'gflags'), 'git@github.com:gflags/gflags.git')
             update_or_clone_git_repository(os.path.join(base_dir, 'glog'), 'git@github.com:google/glog.git')
-        build_gflags(os.path.join(base_dir, 'gflags'), os.path.join(curr_dir, 'gflags'), curr_dir)
-        build_glog(os.path.join(base_dir, 'glog'), os.path.join(curr_dir, 'glog'), curr_dir)
+        build_gflags(os.path.join(base_dir, 'gflags'), os.path.join(ext_dir, 'gflags'), ext_dir)
+        build_glog(os.path.join(base_dir, 'glog'), os.path.join(ext_dir, 'glog'), ext_dir)
 
     if libs['benchmark']:
         if update_src:
             update_or_clone_git_repository(os.path.join(base_dir, 'benchmark'), 'git@github.com:google/benchmark.git')
-        build_benchmark(os.path.join(base_dir, 'benchmark'), os.path.join(curr_dir, 'benchmark'), curr_dir)
+        build_benchmark(os.path.join(base_dir, 'benchmark'), os.path.join(ext_dir, 'benchmark'), ext_dir)
 
     if libs['glbinding']:
         if update_src:
             update_or_clone_git_repository(os.path.join(base_dir, 'glbinding'),
                                            'git@github.com:cginternals/glbinding.git')
-        build_glbinding(os.path.join(base_dir, 'glbinding'), os.path.join(curr_dir, 'glbinding'), curr_dir)
+        build_glbinding(os.path.join(base_dir, 'glbinding'), os.path.join(ext_dir, 'glbinding'), ext_dir)
 
     if libs['libjpeg']:
         if update_src:
             shutil.rmtree(os.path.join(base_dir, 'libjpeg-turbo-1.5.1'), ignore_errors=True)
             unpack_file_to_folder(os.path.join(src_package_dir, 'libjpeg-turbo-1.5.1.tar.gz'),
                                   base_dir)
-        build_libjpeg(os.path.join(base_dir, 'libjpeg-turbo-1.5.1'), os.path.join(curr_dir, 'libjpeg-turbo'), curr_dir)
+        build_libjpeg(os.path.join(base_dir, 'libjpeg-turbo-1.5.1'), os.path.join(ext_dir, 'libjpeg-turbo'), ext_dir)
 
     if libs['libpng']:
         if update_src:
             shutil.rmtree(os.path.join(base_dir, 'libpng-1.6.26'), ignore_errors=True)
             unpack_file_to_folder(os.path.join(src_package_dir, 'libpng-1.6.26.tar.gz'),
                                   base_dir)
-        build_libpng(os.path.join(base_dir, 'libpng-1.6.26'), os.path.join(curr_dir, 'libpng'), curr_dir)
+        build_libpng(os.path.join(base_dir, 'libpng-1.6.26'), os.path.join(ext_dir, 'libpng'), ext_dir)
 
     if libs['jxrlib']:
         if update_src:
             update_or_clone_git_repository(os.path.join(base_dir, 'jxrlib'), 'https://git01.codeplex.com/jxrlib')
-        build_jxrlib(os.path.join(base_dir, 'jxrlib'), os.path.join(curr_dir, 'jxrlib'), curr_dir)
+        build_jxrlib(os.path.join(base_dir, 'jxrlib'), os.path.join(ext_dir, 'jxrlib'), ext_dir)
 
     if libs['geometrictools']:
         if update_src:
@@ -704,36 +696,36 @@ def build_libs(libs: dict, update_src: bool):
             unpack_file_to_folder(os.path.join(src_package_dir, 'GeometricTools', 'GeometricToolsEngine3p4.zip'),
                                   base_dir)
         build_geometrictools(os.path.join(base_dir, 'GeometricTools', 'GTEngine'),
-                             os.path.join(curr_dir, 'geometrictools'), curr_dir)
+                             os.path.join(ext_dir, 'geometrictools'), ext_dir)
 
     if libs['assimp']:
         if update_src:
             update_or_clone_git_repository(os.path.join(base_dir, 'assimp'), 'git@github.com:assimp/assimp.git')
-        build_assimp(os.path.join(base_dir, 'assimp'), os.path.join(curr_dir, 'assimp'), curr_dir)
+        build_assimp(os.path.join(base_dir, 'assimp'), os.path.join(ext_dir, 'assimp'), ext_dir)
 
     if libs['hdf5']:
         if update_src:
             shutil.rmtree(os.path.join(base_dir, 'hdf5-1.10.0-patch1'), ignore_errors=True)
             unpack_file_to_folder(os.path.join(src_package_dir, 'hdf5-1.10.0-patch1.tar.bz2'),
                                   base_dir)
-        build_hdf5(os.path.join(base_dir, 'hdf5-1.10.0-patch1'), os.path.join(curr_dir, 'hdf5'), curr_dir)
+        build_hdf5(os.path.join(base_dir, 'hdf5-1.10.0-patch1'), os.path.join(ext_dir, 'hdf5'), ext_dir)
 
     if libs['freeimage']:
         if update_src:
             shutil.rmtree(os.path.join(base_dir, 'FreeImage'), ignore_errors=True)
             unpack_file_to_folder(os.path.join(src_package_dir, 'freeimage-FreeImage.tar.gz'),
                                   base_dir)
-        build_freeimage(os.path.join(base_dir, 'FreeImage'), os.path.join(curr_dir, 'freeimage'), curr_dir)
+        build_freeimage(os.path.join(base_dir, 'FreeImage'), os.path.join(ext_dir, 'freeimage'), ext_dir)
 
     if libs['itk']:
         if update_src:
             update_or_clone_git_repository(os.path.join(base_dir, 'ITK'), 'git://itk.org/ITK.git')
-        build_itk(os.path.join(base_dir, 'ITK'), os.path.join(curr_dir, 'itk'), curr_dir)
+        build_itk(os.path.join(base_dir, 'ITK'), os.path.join(ext_dir, 'itk'), ext_dir)
 
     if libs['vtk']:
         if update_src:
             update_or_clone_git_repository(os.path.join(base_dir, 'VTK'), 'https://gitlab.kitware.com/vtk/vtk.git')
-        build_vtk(os.path.join(base_dir, 'VTK'), os.path.join(curr_dir, 'vtk'), curr_dir)
+        build_vtk(os.path.join(base_dir, 'VTK'), os.path.join(ext_dir, 'vtk'), ext_dir)
 
     if libs['opencv']:
         if update_src:
@@ -742,17 +734,18 @@ def build_libs(libs: dict, update_src: bool):
             update_or_clone_git_repository(os.path.join(base_dir, 'opencv_contrib'),
                                            'git@github.com:Itseez/opencv_contrib.git')
         build_opencv(os.path.join(base_dir, 'opencv'), os.path.join(base_dir, 'opencv_contrib'),
-                     os.path.join(curr_dir, 'opencv'), curr_dir)
+                     os.path.join(ext_dir, 'opencv'), ext_dir)
 
     if libs['botan']:
         if update_src:
             update_or_clone_git_repository(os.path.join(base_dir, 'botan'), 'git@github.com:randombit/botan.git')
-        build_botan(os.path.join(base_dir, 'botan'), os.path.join(curr_dir, 'botan'), curr_dir)
+        build_botan(os.path.join(base_dir, 'botan'), os.path.join(ext_dir, 'botan'), ext_dir)
 
     if libs['ospray']:
         if update_src:
             update_or_clone_git_repository(os.path.join(base_dir, 'OSPRay'), 'git@github.com:ospray/OSPRay.git')
-        build_ospray(os.path.join(base_dir, 'OSPRay'), os.path.join(curr_dir, 'ospray'), curr_dir)
+        build_ospray(os.path.join(base_dir, 'OSPRay'), os.path.join(ext_dir, 'ospray'), ext_dir,
+                     ispc_dir=ispc_dir, embree_dir=embree_dir)
 
 
 def parse_inputs(argv: list):
