@@ -776,7 +776,7 @@ def parse_inputs(argv: list):
 
     print('current interpreter: ' + sys.executable)
     if len(argv) == 1:
-        usage = 'usage: python3 build.py [noupdatesrc] [all or components...] [except] [components...]\n' \
+        usage = 'usage: python3 build_ext_libs.py [noupdatesrc] [all or components...] [except] [components...]\n' \
                 'valid components:'
         for lib in libs:
             usage += ' [' + lib + ']'
