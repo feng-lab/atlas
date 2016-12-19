@@ -702,7 +702,7 @@ gtTileContig(TIFFRGBAImage* img, uint32* raster, uint32 w, uint32 h)
 	    this_toskew = toskew;
 	}
 
-        y += (flip & FLIP_VERTICALLY ? -(int32) nrow : (int32) nrow);
+        y += ((flip & FLIP_VERTICALLY) ? -(int32) nrow : (int32) nrow);
     }
     _TIFFfree(buf);
 
@@ -871,7 +871,7 @@ gtTileSeparate(TIFFRGBAImage* img, uint32* raster, uint32 w, uint32 h)
 			this_toskew = toskew;
 		}
 
-		y += (flip & FLIP_VERTICALLY ?-(int32) nrow : (int32) nrow);
+		y += ((flip & FLIP_VERTICALLY) ?-(int32) nrow : (int32) nrow);
 	}
 
 	if (flip & FLIP_HORIZONTALLY) {
@@ -962,7 +962,7 @@ gtStripContig(TIFFRGBAImage* img, uint32* raster, uint32 w, uint32 h)
 		pos = ((row + img->row_offset) % rowsperstrip) * scanline + \
 			((tmsize_t) img->col_offset * img->samplesperpixel);
 		(*put)(img, raster+y*w, 0, y, w, nrow, fromskew, toskew, buf + pos);
-		y += (flip & FLIP_VERTICALLY ? -(int32) nrow : (int32) nrow);
+		y += ((flip & FLIP_VERTICALLY) ? -(int32) nrow : (int32) nrow);
 	}
 
 	if (flip & FLIP_HORIZONTALLY) {
@@ -1097,7 +1097,7 @@ gtStripSeparate(TIFFRGBAImage* img, uint32* raster, uint32 w, uint32 h)
 			((tmsize_t) img->col_offset * img->samplesperpixel);
 		(*put)(img, raster+y*w, 0, y, w, nrow, fromskew, toskew, p0 + pos, p1 + pos,
 		    p2 + pos, (alpha?(pa+pos):NULL));
-		y += (flip & FLIP_VERTICALLY ? -(int32) nrow : (int32) nrow);
+		y += ((flip & FLIP_VERTICALLY) ? -(int32) nrow : (int32) nrow);
 	}
 
 	if (flip & FLIP_HORIZONTALLY) {
@@ -2816,6 +2816,13 @@ int
 TIFFReadRGBAStrip(TIFF* tif, uint32 row, uint32 * raster )
 
 {
+    return TIFFReadRGBAStripExt(tif, row, raster, 0 );
+}
+
+int
+TIFFReadRGBAStripExt(TIFF* tif, uint32 row, uint32 * raster, int stop_on_error)
+
+{
     char 	emsg[1024] = "";
     TIFFRGBAImage img;
     int 	ok;
@@ -2836,7 +2843,7 @@ TIFFReadRGBAStrip(TIFF* tif, uint32 row, uint32 * raster )
 		return (0);
     }
 
-    if (TIFFRGBAImageOK(tif, emsg) && TIFFRGBAImageBegin(&img, tif, 0, emsg)) {
+    if (TIFFRGBAImageOK(tif, emsg) && TIFFRGBAImageBegin(&img, tif, stop_on_error, emsg)) {
 
         img.row_offset = row;
         img.col_offset = 0;
@@ -2866,6 +2873,13 @@ TIFFReadRGBAStrip(TIFF* tif, uint32 row, uint32 * raster )
 int
 TIFFReadRGBATile(TIFF* tif, uint32 col, uint32 row, uint32 * raster)
 
+{
+    return TIFFReadRGBATileExt(tif, col, row, raster, 0 );
+}
+
+
+int
+TIFFReadRGBATileExt(TIFF* tif, uint32 col, uint32 row, uint32 * raster, int stop_on_error )
 {
     char 	emsg[1024] = "";
     TIFFRGBAImage img;
@@ -2901,7 +2915,7 @@ TIFFReadRGBATile(TIFF* tif, uint32 col, uint32 row, uint32 * raster)
      */
     
     if (!TIFFRGBAImageOK(tif, emsg) 
-	|| !TIFFRGBAImageBegin(&img, tif, 0, emsg)) {
+	|| !TIFFRGBAImageBegin(&img, tif, stop_on_error, emsg)) {
 	    TIFFErrorExt(tif->tif_clientdata, TIFFFileName(tif), "%s", emsg);
 	    return( 0 );
     }

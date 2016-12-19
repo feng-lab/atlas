@@ -8,6 +8,7 @@ import zipfile
 from pathlib import Path
 import subprocess
 import difflib
+import json
 
 import common_dirs
 
@@ -75,16 +76,26 @@ def get_vcvars_environment():
         raise OSError('could not find COMNTOOLS environment variable')
 
     vcvars = os.path.normpath(os.path.join(vscomntools, '..', '..', 'VC', 'vcvarsall.bat'))
+    return get_enviroment_from_shell_script(vcvars, 'amd64')
+
+
+def get_enviroment_from_shell_script(script: str, para: str=''):
     python = sys.executable
-    process = subprocess.Popen(
-        '("{}" amd64>nul)&&"{1}" -c "import os; print repr(os.environ)"'.format(vcvars, python),
-        stdout=subprocess.PIPE, shell=True)
+    if sys.platform.startswith('win32'):
+        process = subprocess.Popen(
+            '("{}" {} >nul) && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
+                script, para, python),
+            stdout=subprocess.PIPE, shell=True, universal_newlines=True)
+    else:
+        process = subprocess.Popen(
+            'source "{}" {} > /dev/null && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
+                script, para, python),
+            stdout=subprocess.PIPE, shell=True, universal_newlines=True)
     stdout, _ = process.communicate()
     exitcode = process.wait()
     if exitcode != 0:
         raise Exception("Got error code {} from subprocess.".format(exitcode))
-
-    return eval(stdout.strip())
+    return json.loads(stdout.strip())
 
 
 def get_cmake_cmd_common_part(install_dir: str):
@@ -514,6 +525,13 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                 to_lines.append(line)
         print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
 
+        env = {}
+        if sys.platform.startswith('win32'):
+            sys.exit(2)
+        else:
+            env = get_enviroment_from_shell_script('/opt/intel/tbb/bin/tbbvars.sh')
+        print('TBBROOT:', env['TBBROOT'])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DIPPROOT=/opt/intel/ipp',
                          '-DBUILD_WITH_DYNAMIC_IPP:BOOL=OFF',
@@ -522,6 +540,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DBUILD_opencv_python2:BOOL=OFF',
                          '-DBUILD_opencv_videostab:BOOL=ON',
+                         '-DBUILD_opencv_hdf:BOOL=OFF',
                          '-DEIGEN_INCLUDE_PATH:PATH=' + ext_dir + '/eigen',
                          '-DBUILD_opencv_world:BOOL=OFF',
                          '-DWITH_TBB:BOOL=ON',
@@ -560,9 +579,9 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                          '-DBUILD_opencv_apps:BOOL=OFF',
                          '-DBUILD_opencv_matlab:BOOL=OFF',
                         src_dir])
-        subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
+        subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True, env=env)
         subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                       cwd=build_dir, shell=shell, check=True)
+                       cwd=build_dir, shell=shell, check=True, env=env)
 
         orig_file_2 = os.path.join(install_dir, 'share', 'OpenCV', 'OpenCVModules-release.cmake')
         bak_file_2 = get_bak_file_name(orig_file_2)
@@ -572,7 +591,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
         with open(orig_file_2, mode='w', encoding='utf-8') as f:
             to_lines = []
             for line in from_lines:
-                line = line.replace(r';libtbb.dylib;ippcore;ipps;ippi;ippcc;ippcv;ippvm;'
+                line = line.replace(r';tbb;ippcore;ipps;ippi;ippcc;ippcv;ippvm;'
                                     r'/opt/intel/compilers_and_libraries_2017.1.126/mac/compiler/lib/libirc.dylib;'
                                     r'/opt/intel/compilers_and_libraries_2017.1.126/mac/compiler/lib/libimf.dylib;'
                                     r'/opt/intel/compilers_and_libraries_2017.1.126/mac/compiler/lib/libsvml.dylib',
@@ -585,6 +604,10 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
+def remove_path_contains(path: str):
+    os.environ['PATH'] = os.pathsep.join([x for x in os.environ['PATH'].split(os.pathsep) if path not in x])
+
+
 def build_libs(libs: dict, update_src: bool):
     ext_dir = common_dirs.ext_dir()
     src_package_dir = common_dirs.src_package_dir()
@@ -593,52 +616,32 @@ def build_libs(libs: dict, update_src: bool):
     print('srcPackageDIR:', src_package_dir)
     print('baseDIR:', base_dir)
 
-    ispc_dir = ''
-    embree_dir = ''
-    if sys.platform.startswith('win32'):
-        if libs['ospray']:
-            if update_src:
-                shutil.rmtree(os.path.join(base_dir, 'ispc-v1.9.1-windows-vs2015'), ignore_errors=True)
-                unpack_file_to_folder(os.path.join(src_package_dir, 'ispc-v1.9.1-windows-vs2015.zip'),
-                                      base_dir)
-                ispc_dir = os.path.join(base_dir, 'ispc-v1.9.1-windows-vs2015')
-                shutil.rmtree(os.path.join(base_dir, 'embree-2.13.0.x64.windows'), ignore_errors=True)
-                unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.13.0.x64.windows.zip'),
-                                      base_dir)
-                embree_dir = os.path.join(base_dir, 'embree-2.13.0.x64.windows', 'lib', 'cmake', 'embree-2.13.0')
+    remove_path_contains('miniconda')
+    remove_path_contains('anaconda')
+    print('PATH:', os.environ['PATH'])
 
+    if sys.platform.startswith('win32'):
         if libs['zlib']:
             if update_src:
                 shutil.rmtree(os.path.join(base_dir, 'zlib-1.2.8'), ignore_errors=True)
                 unpack_file_to_folder(os.path.join(src_package_dir, 'zlib128.zip'),
                                       base_dir)
     else:
-        if libs['ospray']:
-            if update_src:
-                shutil.rmtree(os.path.join(base_dir, 'ispc-v1.9.1-osx'), ignore_errors=True)
-                unpack_file_to_folder(os.path.join(src_package_dir, 'ispc-v1.9.1-osx.tar.gz'),
-                                      base_dir)
-                ispc_dir = os.path.join(base_dir, 'ispc-v1.9.1-osx')
-                shutil.rmtree(os.path.join(base_dir, 'embree-2.13.0.x86_64.macosx'), ignore_errors=True)
-                unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.13.0.x86_64.macosx.tar.gz'),
-                                      base_dir)
-                embree_dir = os.path.join(base_dir, 'embree-2.13.0.x86_64.macosx', 'lib', 'cmake', 'embree-2.13.0')
-
         if libs['ffmpeg']:
-            unpack_file_to_folder(os.path.join(src_package_dir, 'ffmpeg-3.2.1.7z'),
+            unpack_file_to_folder(os.path.join(src_package_dir, 'ffmpeg-3.2.2.7z'),
                                   ext_dir)
 
     if libs['boost']:
         shutil.rmtree(os.path.join(ext_dir, 'boost'), ignore_errors=True)
-        unpack_file_to_folder(os.path.join(src_package_dir, 'boost_1_62_0.tar.bz2'),
+        unpack_file_to_folder(os.path.join(src_package_dir, 'boost_1_63_0.tar.bz2'),
                               ext_dir)
-        os.rename(os.path.join(ext_dir, 'boost_1_62_0'), os.path.join(ext_dir, 'boost'))
+        os.rename(os.path.join(ext_dir, 'boost_1_63_0'), os.path.join(ext_dir, 'boost'))
 
     if libs['eigen']:
         shutil.rmtree(os.path.join(ext_dir, 'eigen'), ignore_errors=True)
-        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-c2b73097b199.zip'),
+        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-d7f257380d20.zip'),
                               ext_dir)
-        os.rename(os.path.join(ext_dir, 'eigen-eigen-c2b73097b199'), os.path.join(ext_dir, 'eigen'))
+        os.rename(os.path.join(ext_dir, 'eigen-eigen-d7f257380d20'), os.path.join(ext_dir, 'eigen'))
 
     if libs['glm']:
         update_or_clone_git_repository(os.path.join(base_dir, 'glm'), 'git@github.com:g-truc/glm.git')
@@ -693,7 +696,7 @@ def build_libs(libs: dict, update_src: bool):
     if libs['geometrictools']:
         if update_src:
             shutil.rmtree(os.path.join(base_dir, 'GeometricTools'), ignore_errors=True)
-            unpack_file_to_folder(os.path.join(src_package_dir, 'GeometricTools', 'GeometricToolsEngine3p4.zip'),
+            unpack_file_to_folder(os.path.join(src_package_dir, 'GeometricToolsEngine3p5.zip'),
                                   base_dir)
         build_geometrictools(os.path.join(base_dir, 'GeometricTools', 'GTEngine'),
                              os.path.join(ext_dir, 'geometrictools'), ext_dir)
@@ -741,6 +744,31 @@ def build_libs(libs: dict, update_src: bool):
             update_or_clone_git_repository(os.path.join(base_dir, 'botan'), 'git@github.com:randombit/botan.git')
         build_botan(os.path.join(base_dir, 'botan'), os.path.join(ext_dir, 'botan'), ext_dir)
 
+    ispc_dir = ''
+    embree_dir = ''
+    if sys.platform.startswith('win32'):
+        if libs['ospray']:
+            if update_src:
+                shutil.rmtree(os.path.join(base_dir, 'ispc-v1.9.1-windows-vs2015'), ignore_errors=True)
+                unpack_file_to_folder(os.path.join(src_package_dir, 'ispc-v1.9.1-windows-vs2015.zip'),
+                                      base_dir)
+                ispc_dir = os.path.join(base_dir, 'ispc-v1.9.1-windows-vs2015')
+                shutil.rmtree(os.path.join(base_dir, 'embree-2.13.0.x64.windows'), ignore_errors=True)
+                unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.13.0.x64.windows.zip'),
+                                      base_dir)
+                embree_dir = os.path.join(base_dir, 'embree-2.13.0.x64.windows', 'lib', 'cmake', 'embree-2.13.0')
+    else:
+        if libs['ospray']:
+            if update_src:
+                shutil.rmtree(os.path.join(base_dir, 'ispc-v1.9.1-osx'), ignore_errors=True)
+                unpack_file_to_folder(os.path.join(src_package_dir, 'ispc-v1.9.1-osx.tar.gz'),
+                                      base_dir)
+                ispc_dir = os.path.join(base_dir, 'ispc-v1.9.1-osx')
+                shutil.rmtree(os.path.join(base_dir, 'embree-2.13.0.x86_64.macosx'), ignore_errors=True)
+                unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.13.0.x86_64.macosx.tar.gz'),
+                                      base_dir)
+                embree_dir = os.path.join(base_dir, 'embree-2.13.0.x86_64.macosx', 'lib', 'cmake', 'embree-2.13.0')
+
     if libs['ospray']:
         if update_src:
             update_or_clone_git_repository(os.path.join(base_dir, 'OSPRay'), 'git@github.com:ospray/OSPRay.git')
@@ -750,6 +778,12 @@ def build_libs(libs: dict, update_src: bool):
 
 def parse_inputs(argv: list):
     libs = {'zlib': False,
+            'ffmpeg': False,
+            'boost': False,
+            'eigen': False,
+            'glm': False,
+            'googletest': False,
+            'folly': False,
             'glog': False,
             'benchmark': False,
             'glbinding': False,
@@ -763,12 +797,6 @@ def parse_inputs(argv: list):
             'itk': False,
             'vtk': False,
             'opencv': False,
-            'boost': False,
-            'eigen': False,
-            'glm': False,
-            'googletest': False,
-            'folly': False,
-            'ffmpeg': False,
             'botan': False,
             'ospray': False
             }

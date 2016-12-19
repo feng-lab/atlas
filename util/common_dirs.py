@@ -46,9 +46,9 @@ def src_package_dir():
     res = os.path.join(base_dir(), 'atlas_others')
     if not os.path.exists(res):
         if sys.platform.startswith('win'):
-            res = os.path.join('z:', os.sep, 'Google Drive', 'code', 'my')
+            res = os.path.join('z:', os.sep, 'Google Drive', 'code', 'my', 'atlas_others')
         else:
-            res = os.path.join(os.path.expanduser('~'), 'Google Drive', 'code', 'my')
+            res = os.path.join(os.path.expanduser('~'), 'Google Drive', 'code', 'my', 'atlas_others')
     assert os.path.exists(res)
     return res
 
