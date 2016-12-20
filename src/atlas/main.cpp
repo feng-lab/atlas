@@ -5,16 +5,17 @@
 #include "zexception.h"
 #include "zlogcache.h"
 #include "zcpuinfo.h"
+#include "../version/version.h"
 
 #include <fftw3.h>
 
 #ifdef ATLAS_USE_MKL
-#include "mkl_service.h"
+#include <mkl_service.h>
 #endif
 
 #ifdef ATLAS_USE_IPP
-#include "ippcore.h"
-#include "ippi.h"
+#include <ippcore.h>
+#include <ippi.h>
 #endif
 
 #include <QSurfaceFormat>
@@ -24,6 +25,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <folly/ScopeGuard.h>
+#include <gflags/gflags.h>
 #include <iostream>
 
 using namespace nim;
@@ -75,6 +77,12 @@ void removeOldLogs(const QDir& dir, int numberToKeep = 20)
 
 int main(int argc, char* argv[])
 {
+  std::string usage("Atlas is a brain map platform.  Usage:\n");
+  usage += std::string(argv[0]) + "";
+  gflags::SetUsageMessage(usage);
+  gflags::SetVersionString(GIT_VERSION);
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+
   QSurfaceFormat format;
 #if defined(__APPLE__) && defined(ATLAS_USE_CORE_PROFILE)
   format.setVersion(3, 2);
@@ -210,7 +218,7 @@ int main(int argc, char* argv[])
     }
 
     // ZMainWindow has Qt::WA_DeleteOnClose attribute
-    auto mainWin = new nim::ZMainWindow();
+    auto mainWin = new nim::ZMainWindow(GIT_VERSION);
     QObject::connect(&app, &nim::ZApplication::fileOpenRequest, mainWin, &nim::ZMainWindow::loadUrls);
     mainWin->show();
     mainWin->initOpenglContext();

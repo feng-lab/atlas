@@ -50,6 +50,7 @@
 ffmpeg
 .idea/
 __pycache__/
+/src/version/version.h
 
 # binary file
 obj/

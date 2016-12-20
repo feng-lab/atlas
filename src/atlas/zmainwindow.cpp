@@ -50,11 +50,11 @@
 
 namespace nim {
 
-ZMainWindow::ZMainWindow()
-  : m_versionString(__DATE__)
+ZMainWindow::ZMainWindow(const QString& versionStr)
+  : m_versionString(versionStr)
 {
   init();
-  setWindowTitle(QString("Atlas ver. %1").arg(m_versionString));
+  setWindowTitle(QString("Atlas version %1").arg(m_versionString));
   //setCurrentFile("");
 }
 
@@ -212,7 +212,7 @@ void ZMainWindow::openRecentFile()
 void ZMainWindow::about()
 {
   QMessageBox::about(this, QString("About Atlas"),
-                     QString("<p>Atlas ver. %1</p>"
+                     QString("<p>Atlas version %1</p>"
                                "<p>Atlas is developed by Linqing Feng (flq@live.com).</p>"
                                "<p>Jinny Kim's Lab, Center for Functional Connectomics, Korea Institute of Science and Technology</p>"
                                "<p>All rights reserved.</p>").arg(m_versionString));

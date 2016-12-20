@@ -801,6 +801,7 @@ def parse_inputs(argv: list):
             'ospray': False
             }
     update_src = True
+    libs_reverse_depends = {'eigen': ['opencv']}
 
     print('current interpreter: ' + sys.executable)
     if len(argv) == 1:
@@ -824,6 +825,11 @@ def parse_inputs(argv: list):
             update_src = False
         else:
             raise SyntaxError("wrong lib name: " + lib)
+
+    for lib, rev_dep in libs_reverse_depends.items():
+        if libs[lib.lower()]:
+            for dlib in rev_dep:
+                libs[dlib.lower()] = True
 
     return libs, update_src
 
