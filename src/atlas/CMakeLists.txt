@@ -684,7 +684,6 @@ add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
                ${TESTS})
 
 target_include_directories(${APP_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(${APP_NAME} SYSTEM PUBLIC ${TBB_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${MKL_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${IPP_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${GEOMETRICTOOLS_INCLUDE_DIRS})
@@ -743,7 +742,7 @@ endif (WIN32)
 
 target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding hdf5_cpp-static hdf5-static
                       img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${GEOMETRICTOOLS_LIBRARIES}
-                      ${ASSIMP_LIBRARIES} ${MKL_LIBRARIES} ${IPP_LIBRARIES} ${TBB_LIBRARIES})
+                      ${ASSIMP_LIBRARIES} ${MKL_LIBRARIES} ${IPP_LIBRARIES})
 if (BUILD_TESTING)
   target_link_libraries(${APP_NAME} PUBLIC ${BENCHMARK_LIBRARIES})
 endif (BUILD_TESTING)

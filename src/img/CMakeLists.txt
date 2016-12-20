@@ -35,7 +35,6 @@ endif (NOT CMAKE_BUILD_TYPE)
 # main stuff
 
 find_package(TBB REQUIRED)
-message(${TBB_INCLUDE_DIRS})
 message("${TBB_tbb_LIBRARY_RELEASE}")
 
 find_package(ITK REQUIRED COMPONENTS ITKIOMeta ITKIONIFTI ITKIONRRD ITKIOGDCM ITKBinaryMathematicalMorphology
@@ -46,7 +45,7 @@ include(${ITK_USE_FILE})
 message("${ITK_INCLUDE_DIRS}")
 message("${ITK_LIBRARIES}")
 
-#find_package(JPEG REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty NO_DEFAULT_PATH)
+#find_package(libjpeg REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libjpeg-turbo NO_DEFAULT_PATH)
 set(JPEGTURBO_INCLUDE_DIRS ${JPEGTURBO_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libjpeg-turbo/include)
 if (WIN32)
@@ -57,16 +56,18 @@ else (WIN32)
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libjpeg-turbo/lib/libjpeg.a)
 endif (WIN32)
 
-#find_package(libpng16 REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libpng NO_DEFAULT_PATH)
+# libpng16.cmake does not provide include dir, so we have to create it, note PNG_INCLUDE_DIRS will only used by 1 file
+include(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libpng/lib/libpng/libpng16.cmake)
 set(PNG_INCLUDE_DIRS ${PNG_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libpng/include)
-if (WIN32)
-  set(PNG_LIBRARIES ${PNG_LIBRARIES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libpng/lib/png-static.lib)
-else (WIN32)
-  set(PNG_LIBRARIES ${PNG_LIBRARIES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libpng/lib/libpng.a)
-endif (WIN32)
+#if (WIN32)
+#  set(PNG_LIBRARIES ${PNG_LIBRARIES}
+#      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libpng/lib/png-static.lib)
+#else (WIN32)
+#  set(PNG_LIBRARIES ${PNG_LIBRARIES}
+#      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libpng/lib/libpng.a)
+#endif (WIN32)
+#find_package(libpng16 REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libpng/lib/libpng NO_DEFAULT_PATH)
 
 set(JPEGXR_INCLUDE_DIRS ${JPEGXR_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/jxrlib/include/libjxr/common
@@ -251,7 +252,6 @@ set(LIBRARY_NAME img)
 add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${IMG_SOURCES})
 
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${TBB_INCLUDE_DIRS})
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/eigen)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/boost)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glm)
@@ -321,8 +321,8 @@ else (WIN32)
   set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS -I${FREEIMAGE_INCLUDE_DIRS})
 endif (WIN32)
 
-target_link_libraries(${LIBRARY_NAME} PUBLIC ${TBB_tbb_LIBRARY_RELEASE} ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
-                      ${PNG_LIBRARIES} ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} glog::glog Qt5::Core)
+target_link_libraries(${LIBRARY_NAME} PUBLIC tbb ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
+                      png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} glog::glog Qt5::Core)
 
 
 # mex file
