@@ -10,6 +10,7 @@ import subprocess
 import difflib
 import json
 import distutils.dir_util
+import glob
 
 import common_dirs
 
@@ -34,7 +35,7 @@ def unpack_file_to_folder(file: str, folder: str):
 def update_or_clone_git_repository(repository_folder: str, repository_url: str):
     if os.path.exists(repository_folder):
         print('git', 'pull', Path(repository_folder).name)
-        subprocess.run(['git', 'pull'], cwd=repository_folder, shell=False, check=True)
+        subprocess.run(['git', 'pull'], cwd=repository_folder, shell=False, check=False)
     else:
         subprocess.run(['git', 'clone', repository_url, repository_folder], shell=False, check=True)
 
@@ -65,7 +66,15 @@ def remove_path_contains(path: str, env=os.environ):
     env['PATH'] = os.pathsep.join([x for x in env['PATH'].split(os.pathsep) if path.lower() not in x.lower()])
 
 
-def get_vcvars_environment():
+def glob_copy(files: str, dst: str):
+    if not os.path.exists(dst):
+        os.makedirs(dst)
+    assert os.path.isdir(dst)
+    for file in glob.glob(files):
+        shutil.copy2(file, dst)
+
+
+def get_vcvars_environment(remove_conda_from_path: bool=True):
     """
     Returns a dictionary containing the environment variables set up by vcvarsall.bat amd64
     """
@@ -82,29 +91,31 @@ def get_vcvars_environment():
         raise OSError('could not find COMNTOOLS environment variable')
 
     vcvars = os.path.normpath(os.path.join(vscomntools, '..', '..', 'VC', 'vcvarsall.bat'))
-    env = get_enviroment_from_shell_script(vcvars, 'amd64')
-    remove_path_contains('miniconda', env)
-    remove_path_contains('anaconda', env)
-    return env
+    return get_enviroment_from_shell_script(vcvars, 'amd64', remove_conda_from_path=remove_conda_from_path)
 
 
-def get_enviroment_from_shell_script(script: str, para: str=''):
+def get_enviroment_from_shell_script(script: str, para: str='', start_env=os.environ,
+                                     remove_conda_from_path: bool=True):
     python = sys.executable
     if sys.platform.startswith('win32'):
         process = subprocess.Popen(
             '"{}" {} >nul && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
                 script, para, python),
-            stdout=subprocess.PIPE, shell=False, universal_newlines=True)
+            stdout=subprocess.PIPE, shell=False, universal_newlines=True, env=start_env)
     else:
         process = subprocess.Popen(
             'source "{}" {} > /dev/null && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
                 script, para, python),
-            stdout=subprocess.PIPE, shell=True, universal_newlines=True)
+            stdout=subprocess.PIPE, shell=True, universal_newlines=True, env=start_env)
     stdout, _ = process.communicate()
     exitcode = process.wait()
     if exitcode != 0:
         raise Exception("Got error code {} from subprocess.".format(exitcode))
-    return json.loads(stdout.strip())
+    env = json.loads(stdout.strip())
+    if remove_conda_from_path:
+        remove_path_contains('miniconda', env)
+        remove_path_contains('anaconda', env)
+    return env
 
 
 def get_cmake_cmd_common_part(install_dir: str):
@@ -364,32 +375,60 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
 
 
 def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
-    del ext_dir
     shutil.rmtree(install_dir, ignore_errors=True)
-    shell = sys.platform.startswith('win')
 
     orig_file = os.path.join(src_dir, 'Makefile')
     bak_file = get_bak_file_name(orig_file)
     try:
-        os.rename(orig_file, bak_file)
-        with open(bak_file, mode='r', encoding='utf-8') as f:
-            from_lines = f.readlines()
-        with open(orig_file, mode='w', encoding='utf-8') as f:
-            to_lines = []
-            for line in from_lines:
-                line = line.replace(r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
-                                    r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O',
-                                    r'CFLAGS=-mmacosx-version-min=10.8 -I. -Icommon/include -I$(DIR_SYS) '
-                                    r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3')
-                f.write(line)
-                to_lines.append(line)
-        print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+        if sys.platform.startswith('win'):
+            env = get_vcvars_environment()
+            subprocess.run(['MSBuild', 'JXR_vc14.sln', '/target:JXRDecApp', '/property:Platform=x64',
+                            '/property:ForceImportBeforeCppTargets=' + ext_dir + '\\runtime_md.props',
+                            '/property:Configuration=Release', '/maxcpucount'],
+                           cwd=os.path.join(src_dir, 'jxrencoderdecoder'), shell=True, check=True, env=env)
+            glob_copy(os.path.join(src_dir, 'common', 'include', '*.h'),
+                      os.path.join(install_dir, 'include', 'libjxr', 'common'))
+            glob_copy(os.path.join(src_dir, 'image', 'x86', '*.h'),
+                      os.path.join(install_dir, 'include', 'libjxr', 'image', 'x86'))
+            glob_copy(os.path.join(src_dir, 'image', 'sys', '*.h'),
+                      os.path.join(install_dir, 'include', 'libjxr', 'image'))
+            glob_copy(os.path.join(src_dir, 'image', 'encode', '*.h'),
+                      os.path.join(install_dir, 'include', 'libjxr', 'image'))
+            glob_copy(os.path.join(src_dir, 'image', 'decode', '*.h'),
+                      os.path.join(install_dir, 'include', 'libjxr', 'image'))
+            glob_copy(os.path.join(src_dir, 'jxrgluelib', '*.h'),
+                      os.path.join(install_dir, 'include', 'libjxr', 'glue'))
 
-        subprocess.run(['make', '-j' + str(os.cpu_count()), 'install', 'DIR_INSTALL=' + install_dir],
-                       cwd=src_dir, shell=shell, check=True)
+            glob_copy(os.path.join(src_dir, 'jxrgluelib', 'Release', 'JXRGlueLib', 'x64', '*.lib'),
+                      os.path.join(install_dir, 'lib'))
+            glob_copy(os.path.join(src_dir, 'image', 'vc14projects', 'Release', 'JXRCommonLib', 'x64', '*.lib'),
+                      os.path.join(install_dir, 'lib'))
+            glob_copy(os.path.join(src_dir, 'image', 'vc14projects', 'Release', 'JXRDecodeLib', 'x64', '*.lib'),
+                      os.path.join(install_dir, 'lib'))
+            glob_copy(os.path.join(src_dir, 'image', 'vc14projects', 'Release', 'JXREncodeLib', 'x64', '*.lib'),
+                      os.path.join(install_dir, 'lib'))
+        else:
+            os.rename(orig_file, bak_file)
+            with open(bak_file, mode='r', encoding='utf-8') as f:
+                from_lines = f.readlines()
+            with open(orig_file, mode='w', encoding='utf-8') as f:
+                to_lines = []
+                for line in from_lines:
+                    line = line.replace(r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
+                                        r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O',
+                                        r'CFLAGS=-mmacosx-version-min=10.8 -I. -Icommon/include -I$(DIR_SYS) '
+                                        r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3')
+                    f.write(line)
+                    to_lines.append(line)
+            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+
+            subprocess.run(['make', '-j' + str(os.cpu_count()), 'install', 'DIR_INSTALL=' + install_dir],
+                           cwd=src_dir, shell=False, check=True)
     finally:
-        shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)
-        os.replace(bak_file, orig_file)
+        if not sys.platform.startswith('win'):
+            shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)
+        if not sys.platform.startswith('win'):
+            os.replace(bak_file, orig_file)
 
 
 def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
@@ -402,13 +441,12 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['MSBuild', 'GTEngine.v14.vcxproj', '/property:Platform=x64',
                             '/property:Configuration=Release', '/maxcpucount'],
                            cwd=src_dir, shell=True, check=True, env=env)
-            os.makedirs(os.path.join(install_dir, 'lib'))
-            shutil.copy2(os.path.join(src_dir, '_Output', 'v140', 'x64', 'Release', 'GTEngine.v14.lib'),
-                         os.path.join(install_dir, 'lib'))
-            shutil.copy2(os.path.join(src_dir, '_Output', 'v140', 'x64', 'Release', 'GTEngine.v14.pch'),
-                         os.path.join(install_dir, 'lib'))
-            shutil.copy2(os.path.join(src_dir, '_Output', 'v140', 'x64', 'Release', 'GTEngine.v14.pdb'),
-                         os.path.join(install_dir, 'lib'))
+            glob_copy(os.path.join(src_dir, '_Output', 'v140', 'x64', 'Release', 'GTEngine.v14.lib'),
+                      os.path.join(install_dir, 'lib'))
+            glob_copy(os.path.join(src_dir, '_Output', 'v140', 'x64', 'Release', 'GTEngine.v14.pch'),
+                      os.path.join(install_dir, 'lib'))
+            glob_copy(os.path.join(src_dir, '_Output', 'v140', 'x64', 'Release', 'GTEngine.v14.pdb'),
+                      os.path.join(install_dir, 'lib'))
         else:
             subprocess.run(['xcodebuild', '-project', 'GTEngine.xcodeproj', '-configuration', 'Default',
                             '-target', 'Release Static', 'build', '-arch', 'x86_64',
@@ -426,23 +464,41 @@ def build_ospray(src_dir: str, install_dir: str, ext_dir: str, ispc_dir: str, em
     del ext_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
-    shell = sys.platform.startswith('win')
 
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
-        cmakecmd.extend(['-DTBB_ROOT:PATH=/opt/intel/tbb',
-                         '-DOSPRAY_USE_EXTERNAL_EMBREE:BOOL=ON',
-                         '-DOSPRAY_USE_EMBREE_STREAMS:BOOL=ON',
-                         '-DOSPRAY_USE_HIGH_QUALITY_BVH:BOOL=ON',
-                         '-Dembree_DIR:PATH=' + embree_dir,
-                         '-DISPC_EXECUTABLE:FILEPATH=' + ispc_dir + '/ispc',
-                         '-DOSPRAY_APPS_GLUTVIEWER:BOOL=OFF',
-                         '-DOSPRAY_APPS_QTVIEWER:BOOL=OFF',
-                         '-DOSPRAY_APPS_VOLUMEVIEWER:BOOL=OFF',
-                        src_dir])
-        subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
-        subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                       cwd=build_dir, shell=shell, check=True)
+
+        if sys.platform.startswith('win'):
+            cmakecmd.extend(['-DTBB_ROOT:PATH=' + os.environ['ICPP_COMPILER17'] + 'tbb',
+                             '-DOSPRAY_USE_EXTERNAL_EMBREE:BOOL=ON',
+                             '-DOSPRAY_USE_EMBREE_STREAMS:BOOL=ON',
+                             '-DOSPRAY_USE_HIGH_QUALITY_BVH:BOOL=ON',
+                             '-Dembree_DIR:PATH=' + embree_dir,
+                             '-DISPC_EXECUTABLE:FILEPATH=' + ispc_dir + '\\ispc.exe',
+                             '-DOSPRAY_APPS_GLUTVIEWER:BOOL=OFF',
+                             '-DOSPRAY_APPS_QTVIEWER:BOOL=OFF',
+                             '-DOSPRAY_APPS_VOLUMEVIEWER:BOOL=OFF',
+                             src_dir])
+            env = get_vcvars_environment()
+            subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
+                           cwd=build_dir, shell=True, check=True, env=env)
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+                           cwd=build_dir, shell=True, check=True, env=env)
+        else:
+            cmakecmd.extend(['-DTBB_ROOT:PATH=/opt/intel/tbb',
+                             '-DOSPRAY_USE_EXTERNAL_EMBREE:BOOL=ON',
+                             '-DOSPRAY_USE_EMBREE_STREAMS:BOOL=ON',
+                             '-DOSPRAY_USE_HIGH_QUALITY_BVH:BOOL=ON',
+                             '-Dembree_DIR:PATH=' + embree_dir,
+                             '-DISPC_EXECUTABLE:FILEPATH=' + ispc_dir + '/ispc',
+                             '-DOSPRAY_APPS_GLUTVIEWER:BOOL=OFF',
+                             '-DOSPRAY_APPS_QTVIEWER:BOOL=OFF',
+                             '-DOSPRAY_APPS_VOLUMEVIEWER:BOOL=OFF',
+                            src_dir])
+            subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
+            subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                           cwd=build_dir, shell=False, check=True)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
@@ -530,7 +586,6 @@ def build_hdf5(src_dir: str, install_dir: str, ext_dir: str):
 
 def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
     shutil.rmtree(install_dir, ignore_errors=True)
-    shell = sys.platform.startswith('win')
 
     orig_file = os.path.join(src_dir, 'Source', 'LibRawLite', 'internal', 'dcraw_common.cpp')
     bak_file = get_bak_file_name(orig_file)
@@ -582,28 +637,28 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
             shutil.copy2(os.path.join(ext_dir, 'freeimage-makefiles', 'Makefile_gnu'), src_dir)
             shutil.copy2(os.path.join(ext_dir, 'freeimage-makefiles', 'Makefile_fip'), src_dir)
             subprocess.run(['make', '-f', 'Makefile_gnu', '-j' + str(os.cpu_count())],
-                           cwd=src_dir, shell=shell, check=True)
+                           cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-f', 'Makefile_gnu', '-j' + str(os.cpu_count()), 'install',
                             'PREFIX=' + install_dir],
-                           cwd=src_dir, shell=shell, check=True)
+                           cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-f', 'Makefile_gnu', 'clean'],
-                           cwd=src_dir, shell=shell, check=True)
+                           cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-f', 'Makefile_fip', '-j' + str(os.cpu_count())],
-                           cwd=src_dir, shell=shell, check=True)
+                           cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-f', 'Makefile_fip', '-j' + str(os.cpu_count()), 'install',
                             'PREFIX=' + install_dir],
-                           cwd=src_dir, shell=shell, check=True)
+                           cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-f', 'Makefile_fip', 'clean'],
-                           cwd=src_dir, shell=shell, check=True)
+                           cwd=src_dir, shell=False, check=True)
 
             subprocess.run(['install_name_tool', '-id',
                             install_dir + '/lib/libfreeimage.dylib',
                             install_dir + '/lib/libfreeimage.dylib'],
-                           shell=shell, check=True)
+                           shell=False, check=True)
             subprocess.run(['install_name_tool', '-id',
                             install_dir + '/lib/libfreeimageplus.dylib',
                             install_dir + '/lib/libfreeimageplus.dylib'],
-                           shell=shell, check=True)
+                           shell=False, check=True)
     finally:
         os.replace(bak_file, orig_file)
         os.replace(bak_file_2, orig_file_2)
@@ -615,67 +670,115 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
 def build_botan(src_dir: str, install_dir: str, ext_dir: str):
     del ext_dir
     shutil.rmtree(install_dir, ignore_errors=True)
-    shell = sys.platform.startswith('win')
 
     try:
         python = sys.executable
-        subprocess.run([python, src_dir + '/configure.py', '--cc=clang', '--with-zlib',
-                        '--cc-abi-flags=-mmacosx-version-min=10.8',
-                        '--prefix=' + install_dir],
-                       cwd=src_dir, shell=shell, check=True)
-        subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                       cwd=src_dir, shell=shell, check=True)
-        subprocess.run(['make', 'clean'],
-                       cwd=src_dir, shell=shell, check=True)
+
+        if sys.platform.startswith('win'):
+            env = get_vcvars_environment()
+            subprocess.run([python, src_dir + '/configure.py', '--cc=msvc',
+                            '--prefix=' + install_dir],
+                           cwd=src_dir, shell=False, check=True, env=env)
+            subprocess.run(['nmake'],
+                           cwd=src_dir, shell=True, check=True, env=env)
+            subprocess.run(['botan-test'],
+                           cwd=src_dir, shell=True, check=True, env=env)
+            subprocess.run(['nmake', 'install'],
+                           cwd=src_dir, shell=False, check=True, env=env)   # todo: install not working
+        else:
+            subprocess.run([python, src_dir + '/configure.py', '--cc=clang', '--with-zlib',
+                            '--cc-abi-flags=-mmacosx-version-min=10.8',
+                            '--prefix=' + install_dir],
+                           cwd=src_dir, shell=False, check=True)
+            subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                           cwd=src_dir, shell=False, check=True)
+            subprocess.run(['make', 'clean'],
+                           cwd=src_dir, shell=False, check=True)
     finally:
         shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)
         os.remove(os.path.join(src_dir, 'Makefile'))
 
 
 def build_itk(src_dir: str, install_dir: str, ext_dir: str):
-    del ext_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
-    shell = sys.platform.startswith('win')
 
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
-        cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
-                         '-DBUILD_TESTING:BOOL=OFF',
-                         '-DITK_USE_64BITS_IDS:BOOL=ON',
-                         '-DITK_LEGACY_REMOVE:BOOL=ON',
-                         '-DITK_USE_GPU:BOOL=ON',
-                         '-DITK_DOXYGEN_HTML:BOOL=OFF',
-                         '-DITK_USE_STRICT_CONCEPT_CHECKING:BOOL=ON',
-                         '-DModule_ITKReview:BOOL=ON',
-                         '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
-                         '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
-                        src_dir])
-        subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
-        subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                       cwd=build_dir, shell=shell, check=True)
+
+        if sys.platform.startswith('win'):
+            cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
+                             '-DBUILD_TESTING:BOOL=OFF',
+                             '-DITK_USE_64BITS_IDS:BOOL=ON',
+                             '-DITK_LEGACY_REMOVE:BOOL=ON',
+                             '-DITK_USE_GPU:BOOL=OFF',
+                             '-DITK_DOXYGEN_HTML:BOOL=OFF',
+                             '-DITK_USE_STRICT_CONCEPT_CHECKING:BOOL=ON',
+                             '-DModule_ITKReview:BOOL=ON',
+                             '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
+                             '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
+                             '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
+                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '\\zlib\\lib\\zlibstatic.lib',
+                             src_dir])
+            env = get_vcvars_environment()
+            subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
+                           cwd=build_dir, shell=True, check=True, env=env)
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+                           cwd=build_dir, shell=True, check=True, env=env)
+        else:
+            cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
+                             '-DBUILD_TESTING:BOOL=OFF',
+                             '-DITK_USE_64BITS_IDS:BOOL=ON',
+                             '-DITK_LEGACY_REMOVE:BOOL=ON',
+                             '-DITK_USE_GPU:BOOL=OFF',
+                             '-DITK_DOXYGEN_HTML:BOOL=OFF',
+                             '-DITK_USE_STRICT_CONCEPT_CHECKING:BOOL=ON',
+                             '-DModule_ITKReview:BOOL=ON',
+                             '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
+                             '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
+                            src_dir])
+            subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
+            subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                           cwd=build_dir, shell=False, check=True)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
-    del ext_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
-    shell = sys.platform.startswith('win')
 
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
-        cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
-                         '-DBUILD_TESTING:BOOL=OFF',
-                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
-                         '-DVTK_USE_SYSTEM_ZLIB:BOOL=ON',
-                         '-DVTK_LEGACY_REMOVE:BOOL=ON',
-                         '-DVTK_USE_SYSTEM_LIBXML2:BOOL=ON',
-                        src_dir])
-        subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True)
-        subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                       cwd=build_dir, shell=shell, check=True)
+
+        if sys.platform.startswith('win'):
+            cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
+                             '-DBUILD_TESTING:BOOL=OFF',
+                             '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                             '-DVTK_USE_SYSTEM_ZLIB:BOOL=ON',
+                             '-DVTK_LEGACY_REMOVE:BOOL=ON',
+                             '-DVTK_USE_SYSTEM_LIBXML2:BOOL=OFF',
+                             '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
+                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '\\zlib\\lib\\zlibstatic.lib',
+                             src_dir])
+            env = get_vcvars_environment()
+            subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
+                           cwd=build_dir, shell=True, check=True, env=env)
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+                           cwd=build_dir, shell=True, check=True, env=env)
+        else:
+            cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
+                             '-DBUILD_TESTING:BOOL=OFF',
+                             '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                             '-DVTK_USE_SYSTEM_ZLIB:BOOL=ON',
+                             '-DVTK_LEGACY_REMOVE:BOOL=ON',
+                             '-DVTK_USE_SYSTEM_LIBXML2:BOOL=ON',
+                            src_dir])
+            subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
+            subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                           cwd=build_dir, shell=False, check=True)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
@@ -683,7 +786,6 @@ def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
-    shell = sys.platform.startswith('win')
 
     orig_file = os.path.join(src_dir, 'cmake', 'OpenCVCompilerOptions.cmake')
     bak_file = get_bak_file_name(orig_file)
@@ -702,78 +804,142 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
 
         if sys.platform.startswith('win32'):
             env = get_enviroment_from_shell_script(os.environ['ICPP_COMPILER17'] + 'tbb\\bin\\tbbvars.bat',
-                                                   'intel64 vs2015')
+                                                   para='intel64 vs2015',
+                                                   start_env=get_vcvars_environment())
+            print('TBBROOT:', env['TBBROOT'])
+
+            cmakecmd = get_cmake_cmd_common_part(install_dir)
+            cmakecmd.extend(['-DIPPROOT=' + os.environ['ICPP_COMPILER17'] + 'ipp',
+                             '-DBUILD_WITH_DYNAMIC_IPP:BOOL=OFF',
+                             '-DBUILD_WITH_STATIC_CRT:BOOL=OFF',
+                             '-DBUILD_opencv_videoio:BOOL=OFF',
+                             '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                             '-DBUILD_PROTOBUF:BOOL=OFF',
+                             '-DBUILD_opencv_python2:BOOL=OFF',
+                             '-DBUILD_opencv_videostab:BOOL=ON',
+                             '-DBUILD_opencv_hdf:BOOL=OFF',
+                             '-DBUILD_opencv_sfm:BOOL=OFF',
+                             '-DBUILD_opencv_ts:BOOL=OFF',
+                             '-DBUILD_opencv_xfeatures2d:BOOL=OFF',
+                             '-DBUILD_PROTOBUF:BOOL=OFF',
+                             '-DEIGEN_INCLUDE_PATH:PATH=' + ext_dir + '\\eigen',
+                             '-DBUILD_opencv_world:BOOL=OFF',
+                             '-DWITH_TBB:BOOL=ON',
+                             '-DWITH_VTK:BOOL=OFF',
+                             '-DBUILD_PERF_TESTS:BOOL=OFF',
+                             '-DWITH_PNG:BOOL=OFF',
+                             '-DWITH_MATLAB:BOOL=OFF',
+                             '-DWITH_OPENCL:BOOL=OFF',
+                             '-DWITH_WIN32UI:BOOL=OFF',
+                             '-DWITH_FFMPEG:BOOL=OFF',
+                             '-DWITH_1394:BOOL=OFF',
+                             '-DWITH_GSTREAMER:BOOL=OFF',
+                             '-DBUILD_DOCS:BOOL=OFF',
+                             '-DBUILD_PNG:BOOL=OFF',
+                             '-DWITH_GPHOTO2:BOOL=OFF',
+                             '-DBUILD_ZLIB:BOOL=OFF',
+                             '-DWITH_CUDA:BOOL=OFF',
+                             '-DWITH_PVAPI:BOOL=OFF',
+                             '-DBUILD_JASPER:BOOL=OFF',
+                             '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '\\modules',
+                             '-DBUILD_TESTS:BOOL=OFF',
+                             '-DBUILD_JPEG:BOOL=OFF',
+                             '-DBUILD_TIFF:BOOL=OFF',
+                             '-DWITH_LIBV4L:BOOL=OFF',
+                             '-DWITH_GIGEAPI:BOOL=OFF',
+                             '-DBUILD_opencv_video:BOOL=ON',
+                             '-DWITH_V4L:BOOL=OFF',
+                             '-DWITH_WEBP:BOOL=OFF',
+                             '-DWITH_TIFF:BOOL=OFF',
+                             '-DBUILD_FAT_JAVA_LIB:BOOL=OFF',
+                             '-DBUILD_OPENEXR:BOOL=OFF',
+                             '-DWITH_CUFFT:BOOL=ON',
+                             '-DWITH_JPEG:BOOL=OFF',
+                             '-DWITH_OPENEXR:BOOL=OFF',
+                             '-DBUILD_PACKAGE:BOOL=OFF',
+                             '-DWITH_JASPER:BOOL=OFF',
+                             '-DBUILD_WITH_DEBUG_INFO:BOOL=OFF',
+                             '-DBUILD_opencv_apps:BOOL=OFF',
+                             '-DBUILD_opencv_matlab:BOOL=OFF',
+                             '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
+                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '\\zlib\\lib\\zlibstatic.lib',
+                             src_dir])
+            subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
+                           cwd=build_dir, shell=True, check=True, env=env)
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+                           cwd=build_dir, shell=True, check=True, env=env)
         else:
             env = get_enviroment_from_shell_script('/opt/intel/tbb/bin/tbbvars.sh')
-        print('TBBROOT:', env['TBBROOT'])
+            print('TBBROOT:', env['TBBROOT'])
 
-        cmakecmd = get_cmake_cmd_common_part(install_dir)
-        cmakecmd.extend(['-DIPPROOT=/opt/intel/ipp',
-                         '-DBUILD_WITH_DYNAMIC_IPP:BOOL=OFF',
-                         '-DWITH_PTHREADS_PF:BOOL=OFF',
-                         '-DBUILD_opencv_videoio:BOOL=OFF',
-                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
-                         '-DBUILD_opencv_python2:BOOL=OFF',
-                         '-DBUILD_opencv_videostab:BOOL=ON',
-                         '-DBUILD_opencv_hdf:BOOL=OFF',
-                         '-DEIGEN_INCLUDE_PATH:PATH=' + ext_dir + '/eigen',
-                         '-DBUILD_opencv_world:BOOL=OFF',
-                         '-DWITH_TBB:BOOL=ON',
-                         '-DWITH_VTK:BOOL=OFF',
-                         '-DBUILD_PERF_TESTS:BOOL=OFF',
-                         '-DWITH_PNG:BOOL=OFF',
-                         '-DWITH_FFMPEG:BOOL=OFF',
-                         '-DWITH_QUICKTIME:BOOL=OFF',
-                         '-DWITH_1394:BOOL=OFF',
-                         '-DWITH_GSTREAMER:BOOL=OFF',
-                         '-DBUILD_DOCS:BOOL=OFF',
-                         '-DBUILD_PNG:BOOL=OFF',
-                         '-DWITH_GPHOTO2:BOOL=OFF',
-                         '-DBUILD_ZLIB:BOOL=OFF',
-                         '-DWITH_CUDA:BOOL=OFF',
-                         '-DWITH_PVAPI:BOOL=OFF',
-                         '-DBUILD_JASPER:BOOL=OFF',
-                         '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '/modules',
-                         '-DBUILD_TESTS:BOOL=OFF',
-                         '-DBUILD_JPEG:BOOL=OFF',
-                         '-DBUILD_TIFF:BOOL=OFF',
-                         '-DWITH_LIBV4L:BOOL=OFF',
-                         '-DWITH_GIGEAPI:BOOL=OFF',
-                         '-DBUILD_opencv_video:BOOL=ON',
-                         '-DWITH_V4L:BOOL=OFF',
-                         '-DWITH_WEBP:BOOL=OFF',
-                         '-DWITH_TIFF:BOOL=OFF',
-                         '-DBUILD_FAT_JAVA_LIB:BOOL=OFF',
-                         '-DBUILD_OPENEXR:BOOL=OFF',
-                         '-DWITH_CUFFT:BOOL=ON',
-                         '-DWITH_JPEG:BOOL=OFF',
-                         '-DWITH_OPENEXR:BOOL=OFF',
-                         '-DBUILD_PACKAGE:BOOL=OFF',
-                         '-DWITH_JASPER:BOOL=OFF',
-                         '-DBUILD_WITH_DEBUG_INFO:BOOL=OFF',
-                         '-DBUILD_opencv_apps:BOOL=OFF',
-                         '-DBUILD_opencv_matlab:BOOL=OFF',
-                        src_dir])
-        subprocess.run(cmakecmd, cwd=build_dir, shell=shell, check=True, env=env)
-        subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                       cwd=build_dir, shell=shell, check=True, env=env)
+            cmakecmd = get_cmake_cmd_common_part(install_dir)
+            cmakecmd.extend(['-DIPPROOT=/opt/intel/ipp',
+                             '-DBUILD_WITH_DYNAMIC_IPP:BOOL=OFF',
+                             '-DWITH_PTHREADS_PF:BOOL=OFF',
+                             '-DBUILD_opencv_videoio:BOOL=OFF',
+                             '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                             '-DBUILD_opencv_python2:BOOL=OFF',
+                             '-DBUILD_opencv_videostab:BOOL=ON',
+                             '-DBUILD_opencv_hdf:BOOL=OFF',
+                             '-DEIGEN_INCLUDE_PATH:PATH=' + ext_dir + '/eigen',
+                             '-DBUILD_opencv_world:BOOL=OFF',
+                             '-DWITH_TBB:BOOL=ON',
+                             '-DWITH_VTK:BOOL=OFF',
+                             '-DBUILD_PERF_TESTS:BOOL=OFF',
+                             '-DWITH_PNG:BOOL=OFF',
+                             '-DWITH_FFMPEG:BOOL=OFF',
+                             '-DWITH_QUICKTIME:BOOL=OFF',
+                             '-DWITH_1394:BOOL=OFF',
+                             '-DWITH_GSTREAMER:BOOL=OFF',
+                             '-DBUILD_DOCS:BOOL=OFF',
+                             '-DBUILD_PNG:BOOL=OFF',
+                             '-DWITH_GPHOTO2:BOOL=OFF',
+                             '-DBUILD_ZLIB:BOOL=OFF',
+                             '-DWITH_CUDA:BOOL=OFF',
+                             '-DWITH_PVAPI:BOOL=OFF',
+                             '-DBUILD_JASPER:BOOL=OFF',
+                             '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '/modules',
+                             '-DBUILD_TESTS:BOOL=OFF',
+                             '-DBUILD_JPEG:BOOL=OFF',
+                             '-DBUILD_TIFF:BOOL=OFF',
+                             '-DWITH_LIBV4L:BOOL=OFF',
+                             '-DWITH_GIGEAPI:BOOL=OFF',
+                             '-DBUILD_opencv_video:BOOL=ON',
+                             '-DWITH_V4L:BOOL=OFF',
+                             '-DWITH_WEBP:BOOL=OFF',
+                             '-DWITH_TIFF:BOOL=OFF',
+                             '-DBUILD_FAT_JAVA_LIB:BOOL=OFF',
+                             '-DBUILD_OPENEXR:BOOL=OFF',
+                             '-DWITH_CUFFT:BOOL=ON',
+                             '-DWITH_JPEG:BOOL=OFF',
+                             '-DWITH_OPENEXR:BOOL=OFF',
+                             '-DBUILD_PACKAGE:BOOL=OFF',
+                             '-DWITH_JASPER:BOOL=OFF',
+                             '-DBUILD_WITH_DEBUG_INFO:BOOL=OFF',
+                             '-DBUILD_opencv_apps:BOOL=OFF',
+                             '-DBUILD_opencv_matlab:BOOL=OFF',
+                            src_dir])
+            subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+            subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                           cwd=build_dir, shell=False, check=True, env=env)
 
-        orig_file_2 = os.path.join(install_dir, 'share', 'OpenCV', 'OpenCVModules-release.cmake')
-        bak_file_2 = get_bak_file_name(orig_file_2)
-        os.rename(orig_file_2, bak_file_2)
-        with open(bak_file_2, mode='r', encoding='utf-8') as f:
-            from_lines = f.readlines()
-        with open(orig_file_2, mode='w', encoding='utf-8') as f:
-            to_lines = []
-            for line in from_lines:
-                line = line.replace(r';tbb;ippcore;ipps;ippi;ippcc;ippcv;ippvm;'
-                                    r'/opt/intel/compilers_and_libraries_2017.1.126/mac/compiler/lib/libirc.dylib;'
-                                    r'/opt/intel/compilers_and_libraries_2017.1.126/mac/compiler/lib/libimf.dylib;'
-                                    r'/opt/intel/compilers_and_libraries_2017.1.126/mac/compiler/lib/libsvml.dylib',
-                                    r'')
-                f.write(line)
-                to_lines.append(line)
-        print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
+            orig_file_2 = os.path.join(install_dir, 'share', 'OpenCV', 'OpenCVModules-release.cmake')
+            bak_file_2 = get_bak_file_name(orig_file_2)
+            os.rename(orig_file_2, bak_file_2)
+            with open(bak_file_2, mode='r', encoding='utf-8') as f:
+                from_lines = f.readlines()
+            with open(orig_file_2, mode='w', encoding='utf-8') as f:
+                to_lines = []
+                for line in from_lines:
+                    line = line.replace(r';tbb;ippcore;ipps;ippi;ippcc;ippcv;ippvm;'
+                                        r'/opt/intel/compilers_and_libraries_2017.1.126/mac/compiler/lib/libirc.dylib;'
+                                        r'/opt/intel/compilers_and_libraries_2017.1.126/mac/compiler/lib/libimf.dylib;'
+                                        r'/opt/intel/compilers_and_libraries_2017.1.126/mac/compiler/lib/libsvml.dylib',
+                                        r'')
+                    f.write(line)
+                    to_lines.append(line)
+            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
     finally:
         os.replace(bak_file, orig_file)
         shutil.rmtree(build_dir, ignore_errors=False)
@@ -798,6 +964,13 @@ def build_libs(libs: dict, update_src: bool):
                 unpack_file_to_folder(os.path.join(src_package_dir, 'zlib128.zip'),
                                       base_dir)
             build_zlib(os.path.join(base_dir, 'zlib-1.2.8'), os.path.join(ext_dir, 'zlib'), ext_dir)
+
+        if libs['ffmpeg']:
+            unpack_file_to_folder(os.path.join(src_package_dir, 'ffmpeg-3.2.2-win64-static.zip'),
+                                  ext_dir)
+            os.replace(os.path.join(ext_dir, 'ffmpeg-3.2.2-win64-static', 'bin', 'ffmpeg.exe'),
+                       os.path.join(ext_dir, 'ffmpeg.exe'))
+            shutil.rmtree(os.path.join(ext_dir, 'ffmpeg-3.2.2-win64-static'), ignore_errors=False)
     else:
         if libs['ffmpeg']:
             unpack_file_to_folder(os.path.join(src_package_dir, 'ffmpeg-3.2.2.7z'),
@@ -805,15 +978,15 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['boost']:
         shutil.rmtree(os.path.join(ext_dir, 'boost'), ignore_errors=True)
-        unpack_file_to_folder(os.path.join(src_package_dir, 'boost_1_63_0.tar.bz2'),
+        unpack_file_to_folder(os.path.join(src_package_dir, 'boost_1_62_0.tar.bz2'),
                               ext_dir)
-        os.rename(os.path.join(ext_dir, 'boost_1_63_0'), os.path.join(ext_dir, 'boost'))
+        os.rename(os.path.join(ext_dir, 'boost_1_62_0'), os.path.join(ext_dir, 'boost'))
 
     if libs['eigen']:
         shutil.rmtree(os.path.join(ext_dir, 'eigen'), ignore_errors=True)
-        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-d7f257380d20.zip'),
+        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-4951fdc821dd.zip'),
                               ext_dir)
-        os.rename(os.path.join(ext_dir, 'eigen-eigen-d7f257380d20'), os.path.join(ext_dir, 'eigen'))
+        os.rename(os.path.join(ext_dir, 'eigen-eigen-4951fdc821dd'), os.path.join(ext_dir, 'eigen'))
 
     if libs['glm']:
         update_or_clone_git_repository(os.path.join(base_dir, 'glm'), 'git@github.com:g-truc/glm.git')
@@ -920,26 +1093,26 @@ def build_libs(libs: dict, update_src: bool):
     embree_dir = ''
     if sys.platform.startswith('win32'):
         if libs['ospray']:
+            ispc_dir = os.path.join(base_dir, 'ispc-v1.9.1-windows-vs2015')
+            embree_dir = os.path.join(base_dir, 'embree-2.13.0.x64.windows', 'lib', 'cmake', 'embree-2.13.0')
             if update_src:
                 shutil.rmtree(os.path.join(base_dir, 'ispc-v1.9.1-windows-vs2015'), ignore_errors=True)
                 unpack_file_to_folder(os.path.join(src_package_dir, 'ispc-v1.9.1-windows-vs2015.zip'),
                                       base_dir)
-                ispc_dir = os.path.join(base_dir, 'ispc-v1.9.1-windows-vs2015')
                 shutil.rmtree(os.path.join(base_dir, 'embree-2.13.0.x64.windows'), ignore_errors=True)
                 unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.13.0.x64.windows.zip'),
                                       base_dir)
-                embree_dir = os.path.join(base_dir, 'embree-2.13.0.x64.windows', 'lib', 'cmake', 'embree-2.13.0')
     else:
         if libs['ospray']:
+            ispc_dir = os.path.join(base_dir, 'ispc-v1.9.1-osx')
+            embree_dir = os.path.join(base_dir, 'embree-2.13.0.x86_64.macosx', 'lib', 'cmake', 'embree-2.13.0')
             if update_src:
                 shutil.rmtree(os.path.join(base_dir, 'ispc-v1.9.1-osx'), ignore_errors=True)
                 unpack_file_to_folder(os.path.join(src_package_dir, 'ispc-v1.9.1-osx.tar.gz'),
                                       base_dir)
-                ispc_dir = os.path.join(base_dir, 'ispc-v1.9.1-osx')
                 shutil.rmtree(os.path.join(base_dir, 'embree-2.13.0.x86_64.macosx'), ignore_errors=True)
                 unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.13.0.x86_64.macosx.tar.gz'),
                                       base_dir)
-                embree_dir = os.path.join(base_dir, 'embree-2.13.0.x86_64.macosx', 'lib', 'cmake', 'embree-2.13.0')
 
     if libs['ospray']:
         if update_src:
@@ -974,7 +1147,7 @@ def parse_inputs(argv: list):
             }
     update_src = True
     libs_reverse_depends = {'eigen': ['opencv'],
-                            'zlib': ['libpng', 'assimp', 'hdf5']
+                            'zlib': ['libpng', 'assimp', 'hdf5', 'itk', 'vtk', 'opencv']
                             }
 
     print('current interpreter: ' + sys.executable)
@@ -991,7 +1164,6 @@ def parse_inputs(argv: list):
         if lib.lower() == "all":
             for vlib in libs:
                 libs[vlib] = state
-            libs['zlib'] = sys.platform.startswith('win') & state
         elif lib.lower() == "except":
             state = False
         elif lib.lower() in libs:
@@ -1000,6 +1172,8 @@ def parse_inputs(argv: list):
             update_src = False
         else:
             raise SyntaxError("wrong lib name: " + lib)
+    if not sys.platform.startswith('win'):
+        libs['zlib'] = False
 
     for lib, rev_dep in libs_reverse_depends.items():
         if libs[lib.lower()]:
