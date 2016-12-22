@@ -25,10 +25,10 @@ def unpack_file_to_folder(file: str, folder: str):
             tf.extractall(path=folder)
     elif file.lower().endswith('.7z'):
         if sys.platform.startswith('win'):
-            subprocess.run(['7za', 'x', '-y', '-o', folder, file],
+            subprocess.run(['7za', 'x', '-y', '-o' + folder, file],
                            shell=False, check=True, cwd=common_dirs.curr_dir())
         else:
-            subprocess.run(['7za', 'x', '-y', '-o', folder, file],
+            subprocess.run(['7za', 'x', '-y', '-o' + folder, file],
                            shell=False, check=True)
 
 
