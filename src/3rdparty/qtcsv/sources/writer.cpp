@@ -1,4 +1,4 @@
-#include "include/writer.h"
+#include "include/qtcsv/writer.h"
 
 #include <limits>
 
@@ -8,14 +8,14 @@
 #include <QCoreApplication>
 #include <QDebug>
 
-#include "include/abstractdata.h"
-#include "filechecker.h"
+#include "include/qtcsv/abstractdata.h"
+#include "sources/filechecker.h"
 #include "sources/contentiterator.h"
 
 using namespace QtCSV;
 
 // Class TempFileHandler is a helper class. Its main purpose is to delete file
-// on destruction. It is kinda "smart poiter" but for temporary file. When you
+// on destruction. It is like "smart poiter" but for temporary file. When you
 // create object of class TempFileHandler, you must specify absolute path
 // to the (temp) file (as a string). When object will be about to destroy, it
 // will try to remove specified file.
@@ -60,7 +60,7 @@ bool WriterPrivate::appendToFile(const QString& filePath,
                                  ContentIterator& content,
                                  QTextCodec* codec)
 {
-    if ( true == filePath.isEmpty() || true == content.isEmpty() )
+    if ( filePath.isEmpty() || content.isEmpty() )
     {
         qDebug() << __FUNCTION__ << "Error - invalid arguments";
         return false;
@@ -109,14 +109,14 @@ bool WriterPrivate::overwriteFile(const QString& filePath,
 
     TempFileHandler handler(tempFileName);
 
-    // Write information to temporary file
+    // Write information to the temporary file
     if ( false == appendToFile(tempFileName, content, codec) )
     {
         return false;
     }
 
     // Remove "old" file if it exists
-    if ( true == QFile::exists(filePath) && false == QFile::remove(filePath) )
+    if ( QFile::exists(filePath) && false == QFile::remove(filePath) )
     {
         qDebug() << __FUNCTION__ << "Error - failed to remove file" << filePath;
         return false;
@@ -163,7 +163,7 @@ QString WriterPrivate::getTempFileName()
 // be written to csv-file
 // - separator - string or character that would separate values in a row
 // (line) in csv-file
-// - textDelimeter - string or character that enclose each element in a row
+// - textDelimiter - string or character that enclose each element in a row
 // - mode - write mode of the file
 // - header - strings that will be written at the beginning of the file in
 // one line. separator will be used as delimiter character.
@@ -175,15 +175,21 @@ QString WriterPrivate::getTempFileName()
 bool Writer::write(const QString& filePath,
                    const AbstractData& data,
                    const QString& separator,
-                   const QString& textDelimeter,
+                   const QString& textDelimiter,
                    const WriteMode& mode,
                    const QStringList& header,
                    const QStringList& footer,
                    QTextCodec* codec)
 {
-    if ( true == filePath.isEmpty() || true == data.isEmpty() )
+    if ( filePath.isEmpty() )
     {
-        qDebug() << __FUNCTION__ << "Error - invalid arguments";
+        qDebug() << __FUNCTION__ << "Error - empty path to file";
+        return false;
+    }
+
+    if ( data.isEmpty() )
+    {
+        qDebug() << __FUNCTION__ << "Error - empty data";
         return false;
     }
 
@@ -193,7 +199,7 @@ bool Writer::write(const QString& filePath,
         return false;
     }
 
-    ContentIterator content(data, separator, textDelimeter, header, footer);
+    ContentIterator content(data, separator, textDelimiter, header, footer);
 
     bool result = false;
     switch (mode)

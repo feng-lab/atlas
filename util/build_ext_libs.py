@@ -825,6 +825,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                              '-DEIGEN_INCLUDE_PATH:PATH=' + ext_dir + '\\eigen',
                              '-DBUILD_opencv_world:BOOL=OFF',
                              '-DWITH_TBB:BOOL=ON',
+                             '-DWITH_LAPACK:BOOL=OFF',
                              '-DWITH_VTK:BOOL=OFF',
                              '-DBUILD_PERF_TESTS:BOOL=OFF',
                              '-DWITH_PNG:BOOL=OFF',
@@ -885,6 +886,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                              '-DEIGEN_INCLUDE_PATH:PATH=' + ext_dir + '/eigen',
                              '-DBUILD_opencv_world:BOOL=OFF',
                              '-DWITH_TBB:BOOL=ON',
+                             '-DWITH_LAPACK:BOOL=OFF',
                              '-DWITH_VTK:BOOL=OFF',
                              '-DBUILD_PERF_TESTS:BOOL=OFF',
                              '-DWITH_PNG:BOOL=OFF',
@@ -978,15 +980,15 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['boost']:
         shutil.rmtree(os.path.join(ext_dir, 'boost'), ignore_errors=True)
-        unpack_file_to_folder(os.path.join(src_package_dir, 'boost_1_62_0.tar.bz2'),
+        unpack_file_to_folder(os.path.join(src_package_dir, 'boost_1_63_0.tar.bz2'),
                               ext_dir)
-        os.rename(os.path.join(ext_dir, 'boost_1_62_0'), os.path.join(ext_dir, 'boost'))
+        os.rename(os.path.join(ext_dir, 'boost_1_63_0'), os.path.join(ext_dir, 'boost'))
 
     if libs['eigen']:
         shutil.rmtree(os.path.join(ext_dir, 'eigen'), ignore_errors=True)
-        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-4951fdc821dd.zip'),
+        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-9ba936354ee8.zip'),
                               ext_dir)
-        os.rename(os.path.join(ext_dir, 'eigen-eigen-4951fdc821dd'), os.path.join(ext_dir, 'eigen'))
+        os.rename(os.path.join(ext_dir, 'eigen-eigen-9ba936354ee8'), os.path.join(ext_dir, 'eigen'))
 
     if libs['glm']:
         update_or_clone_git_repository(os.path.join(base_dir, 'glm'), 'git@github.com:g-truc/glm.git')

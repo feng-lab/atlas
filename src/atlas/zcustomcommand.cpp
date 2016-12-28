@@ -15,7 +15,7 @@
 #include "zbenchtimer.h"
 #include "zrandom.h"
 #include "zstringutils.h"
-#include <include/reader.h>
+#include <include/qtcsv/reader.h>
 #include <itkMath.h>
 #include <QDir>
 #include <tbb/task_scheduler_init.h>

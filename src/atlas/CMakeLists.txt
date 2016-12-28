@@ -166,12 +166,12 @@ source_group(libqxt FILES ${LIBQXT_HEADERS} ${LIBQXT_SOURCES})
 #qtcsv srcs
 set(QTCSVDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/qtcsv)
 set(QTCSV_HEADERS
-    ${QTCSVDIR}/include/qtcsv_global.h
-    ${QTCSVDIR}/include/writer.h
-    ${QTCSVDIR}/include/variantdata.h
-    ${QTCSVDIR}/include/stringdata.h
-    ${QTCSVDIR}/include/reader.h
-    ${QTCSVDIR}/include/abstractdata.h
+    ${QTCSVDIR}/include/qtcsv/qtcsv_global.h
+    ${QTCSVDIR}/include/qtcsv/writer.h
+    ${QTCSVDIR}/include/qtcsv/variantdata.h
+    ${QTCSVDIR}/include/qtcsv/stringdata.h
+    ${QTCSVDIR}/include/qtcsv/reader.h
+    ${QTCSVDIR}/include/qtcsv/abstractdata.h
     ${QTCSVDIR}/sources/filechecker.h
     ${QTCSVDIR}/sources/contentiterator.h
     ${QTCSVDIR}/sources/symbols.h
@@ -689,7 +689,7 @@ target_include_directories(${APP_NAME} PUBLIC ${IPP_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${GEOMETRICTOOLS_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${HDF5_INCLUDE_DIR})
 target_include_directories(${APP_NAME} PUBLIC ${CERESSOLVER_INCLUDE_DIRS})
-target_include_directories(${APP_NAME} PUBLIC ${QTCSVDIR})
+target_include_directories(${APP_NAME} PRIVATE ${QTCSVDIR})
 target_include_directories(${APP_NAME} PUBLIC ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
 target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/eigen)
 target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/boost)
