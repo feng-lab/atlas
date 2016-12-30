@@ -986,9 +986,9 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['eigen']:
         shutil.rmtree(os.path.join(ext_dir, 'eigen'), ignore_errors=True)
-        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-9ba936354ee8.zip'),
+        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-b41d7cc81e72.zip'),
                               ext_dir)
-        os.rename(os.path.join(ext_dir, 'eigen-eigen-9ba936354ee8'), os.path.join(ext_dir, 'eigen'))
+        os.rename(os.path.join(ext_dir, 'eigen-eigen-b41d7cc81e72'), os.path.join(ext_dir, 'eigen'))
 
     if libs['glm']:
         update_or_clone_git_repository(os.path.join(base_dir, 'glm'), 'git@github.com:g-truc/glm.git')
@@ -1030,10 +1030,10 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['libpng']:
         if update_src:
-            shutil.rmtree(os.path.join(base_dir, 'libpng-1.6.26'), ignore_errors=True)
-            unpack_file_to_folder(os.path.join(src_package_dir, 'libpng-1.6.26.tar.gz'),
+            shutil.rmtree(os.path.join(base_dir, 'libpng-1.6.27'), ignore_errors=True)
+            unpack_file_to_folder(os.path.join(src_package_dir, 'libpng-1.6.27.tar.gz'),
                                   base_dir)
-        build_libpng(os.path.join(base_dir, 'libpng-1.6.26'), os.path.join(ext_dir, 'libpng'), ext_dir)
+        build_libpng(os.path.join(base_dir, 'libpng-1.6.27'), os.path.join(ext_dir, 'libpng'), ext_dir)
 
     if libs['jxrlib']:
         if update_src:
