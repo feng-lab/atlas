@@ -962,10 +962,10 @@ def build_libs(libs: dict, update_src: bool):
     if sys.platform.startswith('win32'):
         if libs['zlib']:
             if update_src:
-                shutil.rmtree(os.path.join(base_dir, 'zlib-1.2.8'), ignore_errors=True)
-                unpack_file_to_folder(os.path.join(src_package_dir, 'zlib128.zip'),
+                shutil.rmtree(os.path.join(base_dir, 'zlib-1.2.10'), ignore_errors=True)
+                unpack_file_to_folder(os.path.join(src_package_dir, 'zlib1210.zip'),
                                       base_dir)
-            build_zlib(os.path.join(base_dir, 'zlib-1.2.8'), os.path.join(ext_dir, 'zlib'), ext_dir)
+            build_zlib(os.path.join(base_dir, 'zlib-1.2.10'), os.path.join(ext_dir, 'zlib'), ext_dir)
 
         if libs['ffmpeg']:
             unpack_file_to_folder(os.path.join(src_package_dir, 'ffmpeg-3.2.2-win64-static.zip'),
@@ -986,9 +986,9 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['eigen']:
         shutil.rmtree(os.path.join(ext_dir, 'eigen'), ignore_errors=True)
-        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-b41d7cc81e72.zip'),
+        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-60f8b0f18340.zip'),
                               ext_dir)
-        os.rename(os.path.join(ext_dir, 'eigen-eigen-b41d7cc81e72'), os.path.join(ext_dir, 'eigen'))
+        os.rename(os.path.join(ext_dir, 'eigen-eigen-60f8b0f18340'), os.path.join(ext_dir, 'eigen'))
 
     if libs['glm']:
         update_or_clone_git_repository(os.path.join(base_dir, 'glm'), 'git@github.com:g-truc/glm.git')
@@ -1030,10 +1030,10 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['libpng']:
         if update_src:
-            shutil.rmtree(os.path.join(base_dir, 'libpng-1.6.27'), ignore_errors=True)
-            unpack_file_to_folder(os.path.join(src_package_dir, 'libpng-1.6.27.tar.gz'),
+            shutil.rmtree(os.path.join(base_dir, 'libpng-1.6.28'), ignore_errors=True)
+            unpack_file_to_folder(os.path.join(src_package_dir, 'libpng-1.6.28.tar.gz'),
                                   base_dir)
-        build_libpng(os.path.join(base_dir, 'libpng-1.6.27'), os.path.join(ext_dir, 'libpng'), ext_dir)
+        build_libpng(os.path.join(base_dir, 'libpng-1.6.28'), os.path.join(ext_dir, 'libpng'), ext_dir)
 
     if libs['jxrlib']:
         if update_src:

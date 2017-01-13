@@ -733,7 +733,7 @@ void ZTiff::load(const QString& filename, bool tagOnly)
   close();
 
   readIFDs(filename, m_ifds, m_isNativeEndianness);
-  //LOG(INFO) << toQString();
+  // LOG(INFO) << toQString();
 
   if (m_useColormap) {
     bool allGray = true;
