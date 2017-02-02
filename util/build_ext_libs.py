@@ -1001,30 +1001,33 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['boost']:
         package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'boost*'))
-        package_unpack_folder = get_package_top_level_folder(package_name, ext_dir)
+        src_dir = get_package_top_level_folder(package_name, ext_dir)
         shutil.rmtree(os.path.join(ext_dir, 'boost'), ignore_errors=True)
         unpack_file_to_folder(package_name, ext_dir)
-        os.rename(package_unpack_folder, os.path.join(ext_dir, 'boost'))
+        os.rename(src_dir, os.path.join(ext_dir, 'boost'))
 
     if libs['eigen']:
         package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'eigen*'))
-        package_unpack_folder = get_package_top_level_folder(package_name, ext_dir)
+        src_dir = get_package_top_level_folder(package_name, ext_dir)
         shutil.rmtree(os.path.join(ext_dir, 'eigen'), ignore_errors=True)
         unpack_file_to_folder(package_name, ext_dir)
-        os.rename(package_unpack_folder, os.path.join(ext_dir, 'eigen'))
+        os.rename(src_dir, os.path.join(ext_dir, 'eigen'))
 
     if libs['glm']:
-        update_or_clone_git_repository(os.path.join(base_dir, 'glm'), 'git@github.com:g-truc/glm.git')
-        export_git_repository(os.path.join(base_dir, 'glm'), os.path.join(ext_dir, 'glm'))
+        src_dir = os.path.join(base_dir, 'glm')
+        update_or_clone_git_repository(src_dir, 'git@github.com:g-truc/glm.git')
+        export_git_repository(src_dir, os.path.join(ext_dir, 'glm'))
 
     if libs['googletest']:
-        update_or_clone_git_repository(os.path.join(base_dir, 'googletest'), 'git@github.com:google/googletest.git')
+        src_dir = os.path.join(base_dir, 'googletest')
+        update_or_clone_git_repository(src_dir, 'git@github.com:google/googletest.git')
         shutil.rmtree(os.path.join(ext_dir, 'googletest'), ignore_errors=True)
-        shutil.copytree(os.path.join(base_dir, 'googletest', 'googletest'), os.path.join(ext_dir, 'googletest'))
+        shutil.copytree(os.path.join(src_dir, 'googletest'), os.path.join(ext_dir, 'googletest'))
 
     if libs['folly']:
-        update_or_clone_git_repository(os.path.join(base_dir, 'folly'), 'git@github.com:facebook/folly.git')
-        export_git_repository(os.path.join(base_dir, 'folly'), os.path.join(ext_dir, 'folly'), tag='aebb140')
+        src_dir = os.path.join(base_dir, 'folly')
+        update_or_clone_git_repository(src_dir, 'git@github.com:facebook/folly.git')
+        export_git_repository(src_dir, os.path.join(ext_dir, 'folly'), tag='aebb140')
 
     if libs['glog']:
         src_dir = os.path.join(base_dir, 'glog')
