@@ -15,6 +15,17 @@ import glob
 import common_dirs
 
 
+def get_package_top_level_folder(file: str, folder: str):
+    if file.lower().endswith('.zip'):
+        with zipfile.ZipFile(file, mode='r') as zf:
+            return os.path.join(folder, os.path.commonprefix(zf.namelist()))
+    elif file.lower().endswith('.tar.gz') or file.lower().endswith('.tar.bz2') or file.lower().endswith('.tar.xz'):
+        with tarfile.open(file, mode='r|*') as tf:
+            return os.path.join(folder, os.path.commonprefix(tf.getnames()))
+    elif file.lower().endswith('.7z'):
+        raise Exception("Can not get top level dir from 7z package.")
+
+
 def unpack_file_to_folder(file: str, folder: str):
     print('unpacking', file)
     if file.lower().endswith('.zip'):
@@ -72,6 +83,16 @@ def glob_copy(files: str, dst: str):
     assert os.path.isdir(dst)
     for file in glob.glob(files):
         shutil.copy2(file, dst)
+
+
+def find_src_package_with_glob(files: str):
+    file_list = glob.glob(files)
+    if len(file_list) == 1:
+        return file_list[0]
+    elif len(file_list) == 0:
+        raise Exception("Can not find matching package.")
+    else:
+        raise Exception("Find more than one matching packages.")
 
 
 def get_vcvars_environment(remove_conda_from_path: bool=True):
@@ -934,10 +955,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
             with open(orig_file_2, mode='w', encoding='utf-8') as f:
                 to_lines = []
                 for line in from_lines:
-                    line = line.replace(r';tbb;ippcore;ipps;ippi;ippcc;ippcv;ippvm;'
-                                        r'/opt/intel/compilers_and_libraries_2017.1.126/mac/compiler/lib/libirc.dylib;'
-                                        r'/opt/intel/compilers_and_libraries_2017.1.126/mac/compiler/lib/libimf.dylib;'
-                                        r'/opt/intel/compilers_and_libraries_2017.1.126/mac/compiler/lib/libsvml.dylib',
+                    line = line.replace(r';tbb;ippcv;ippi;ippcc;ipps;ippvm;ippcore',
                                         r'')
                     f.write(line)
                     to_lines.append(line)
@@ -961,34 +979,39 @@ def build_libs(libs: dict, update_src: bool):
 
     if sys.platform.startswith('win32'):
         if libs['zlib']:
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'zlib*'))
+            src_dir = get_package_top_level_folder(package_name, base_dir)
             if update_src:
-                shutil.rmtree(os.path.join(base_dir, 'zlib-1.2.10'), ignore_errors=True)
-                unpack_file_to_folder(os.path.join(src_package_dir, 'zlib1210.zip'),
-                                      base_dir)
-            build_zlib(os.path.join(base_dir, 'zlib-1.2.10'), os.path.join(ext_dir, 'zlib'), ext_dir)
+                shutil.rmtree(src_dir, ignore_errors=True)
+                unpack_file_to_folder(package_name, base_dir)
+            assert os.path.exists(src_dir)
+            build_zlib(src_dir, os.path.join(ext_dir, 'zlib'), ext_dir)
 
         if libs['ffmpeg']:
-            unpack_file_to_folder(os.path.join(src_package_dir, 'ffmpeg-3.2.2-win64-static.zip'),
-                                  ext_dir)
-            os.replace(os.path.join(ext_dir, 'ffmpeg-3.2.2-win64-static', 'bin', 'ffmpeg.exe'),
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*win*'))
+            package_unpack_folder = get_package_top_level_folder(package_name, ext_dir)
+            unpack_file_to_folder(package_name, ext_dir)
+            os.replace(os.path.join(package_unpack_folder, 'bin', 'ffmpeg.exe'),
                        os.path.join(ext_dir, 'ffmpeg.exe'))
-            shutil.rmtree(os.path.join(ext_dir, 'ffmpeg-3.2.2-win64-static'), ignore_errors=False)
+            shutil.rmtree(package_unpack_folder, ignore_errors=False)
     else:
         if libs['ffmpeg']:
-            unpack_file_to_folder(os.path.join(src_package_dir, 'ffmpeg-3.2.2.7z'),
+            unpack_file_to_folder(find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*7z')),
                                   ext_dir)
 
     if libs['boost']:
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'boost*'))
+        package_unpack_folder = get_package_top_level_folder(package_name, ext_dir)
         shutil.rmtree(os.path.join(ext_dir, 'boost'), ignore_errors=True)
-        unpack_file_to_folder(os.path.join(src_package_dir, 'boost_1_63_0.tar.bz2'),
-                              ext_dir)
-        os.rename(os.path.join(ext_dir, 'boost_1_63_0'), os.path.join(ext_dir, 'boost'))
+        unpack_file_to_folder(package_name, ext_dir)
+        os.rename(package_unpack_folder, os.path.join(ext_dir, 'boost'))
 
     if libs['eigen']:
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'eigen*'))
+        package_unpack_folder = get_package_top_level_folder(package_name, ext_dir)
         shutil.rmtree(os.path.join(ext_dir, 'eigen'), ignore_errors=True)
-        unpack_file_to_folder(os.path.join(src_package_dir, 'eigen-eigen-60f8b0f18340.zip'),
-                              ext_dir)
-        os.rename(os.path.join(ext_dir, 'eigen-eigen-60f8b0f18340'), os.path.join(ext_dir, 'eigen'))
+        unpack_file_to_folder(package_name, ext_dir)
+        os.rename(package_unpack_folder, os.path.join(ext_dir, 'eigen'))
 
     if libs['glm']:
         update_or_clone_git_repository(os.path.join(base_dir, 'glm'), 'git@github.com:g-truc/glm.git')
@@ -1004,123 +1027,142 @@ def build_libs(libs: dict, update_src: bool):
         export_git_repository(os.path.join(base_dir, 'folly'), os.path.join(ext_dir, 'folly'), tag='aebb140')
 
     if libs['glog']:
+        src_dir = os.path.join(base_dir, 'glog')
+        gflags_src_dir = os.path.join(base_dir, 'gflags')
         if update_src:
-            update_or_clone_git_repository(os.path.join(base_dir, 'gflags'), 'git@github.com:gflags/gflags.git')
-            update_or_clone_git_repository(os.path.join(base_dir, 'glog'), 'git@github.com:google/glog.git')
-        build_gflags(os.path.join(base_dir, 'gflags'), os.path.join(ext_dir, 'gflags'), ext_dir)
-        build_glog(os.path.join(base_dir, 'glog'), os.path.join(ext_dir, 'glog'), ext_dir)
+            update_or_clone_git_repository(gflags_src_dir, 'git@github.com:gflags/gflags.git')
+            update_or_clone_git_repository(src_dir, 'git@github.com:google/glog.git')
+        assert os.path.exists(src_dir)
+        assert os.path.exists(gflags_src_dir)
+        build_gflags(gflags_src_dir, os.path.join(ext_dir, 'gflags'), ext_dir)
+        build_glog(src_dir, os.path.join(ext_dir, 'glog'), ext_dir)
 
     if libs['benchmark']:
+        src_dir = os.path.join(base_dir, 'benchmark')
         if update_src:
-            update_or_clone_git_repository(os.path.join(base_dir, 'benchmark'), 'git@github.com:google/benchmark.git')
-        build_benchmark(os.path.join(base_dir, 'benchmark'), os.path.join(ext_dir, 'benchmark'), ext_dir)
+            update_or_clone_git_repository(src_dir, 'git@github.com:google/benchmark.git')
+        assert os.path.exists(src_dir)
+        build_benchmark(src_dir, os.path.join(ext_dir, 'benchmark'), ext_dir)
 
     if libs['glbinding']:
+        src_dir = os.path.join(base_dir, 'glbinding')
         if update_src:
-            update_or_clone_git_repository(os.path.join(base_dir, 'glbinding'),
-                                           'git@github.com:cginternals/glbinding.git')
-        build_glbinding(os.path.join(base_dir, 'glbinding'), os.path.join(ext_dir, 'glbinding'), ext_dir)
+            update_or_clone_git_repository(src_dir, 'git@github.com:cginternals/glbinding.git')
+        assert os.path.exists(src_dir)
+        build_glbinding(src_dir, os.path.join(ext_dir, 'glbinding'), ext_dir)
 
     if libs['libjpeg']:
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'libjpeg*'))
+        src_dir = get_package_top_level_folder(package_name, base_dir)
         if update_src:
-            shutil.rmtree(os.path.join(base_dir, 'libjpeg-turbo-1.5.1'), ignore_errors=True)
-            unpack_file_to_folder(os.path.join(src_package_dir, 'libjpeg-turbo-1.5.1.tar.gz'),
-                                  base_dir)
-        build_libjpeg(os.path.join(base_dir, 'libjpeg-turbo-1.5.1'), os.path.join(ext_dir, 'libjpeg-turbo'), ext_dir)
+            shutil.rmtree(src_dir, ignore_errors=True)
+            unpack_file_to_folder(package_name, base_dir)
+        assert os.path.exists(src_dir)
+        build_libjpeg(src_dir, os.path.join(ext_dir, 'libjpeg-turbo'), ext_dir)
 
     if libs['libpng']:
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'libpng*'))
+        src_dir = get_package_top_level_folder(package_name, base_dir)
         if update_src:
-            shutil.rmtree(os.path.join(base_dir, 'libpng-1.6.28'), ignore_errors=True)
-            unpack_file_to_folder(os.path.join(src_package_dir, 'libpng-1.6.28.tar.gz'),
-                                  base_dir)
-        build_libpng(os.path.join(base_dir, 'libpng-1.6.28'), os.path.join(ext_dir, 'libpng'), ext_dir)
+            shutil.rmtree(src_dir, ignore_errors=True)
+            unpack_file_to_folder(package_name, base_dir)
+        assert os.path.exists(src_dir)
+        build_libpng(src_dir, os.path.join(ext_dir, 'libpng'), ext_dir)
 
     if libs['jxrlib']:
+        src_dir = os.path.join(base_dir, 'jxrlib')
         if update_src:
-            update_or_clone_git_repository(os.path.join(base_dir, 'jxrlib'), 'https://git01.codeplex.com/jxrlib')
-        build_jxrlib(os.path.join(base_dir, 'jxrlib'), os.path.join(ext_dir, 'jxrlib'), ext_dir)
+            update_or_clone_git_repository(src_dir, 'https://git01.codeplex.com/jxrlib')
+        assert os.path.exists(src_dir)
+        build_jxrlib(src_dir, os.path.join(ext_dir, 'jxrlib'), ext_dir)
 
     if libs['geometrictools']:
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'GeometricToolsEngine*'))
+        src_dir = get_package_top_level_folder(package_name, base_dir)
         if update_src:
-            shutil.rmtree(os.path.join(base_dir, 'GeometricTools'), ignore_errors=True)
-            unpack_file_to_folder(os.path.join(src_package_dir, 'GeometricToolsEngine3p5.zip'),
-                                  base_dir)
-        build_geometrictools(os.path.join(base_dir, 'GeometricTools', 'GTEngine'),
-                             os.path.join(ext_dir, 'geometrictools'), ext_dir)
+            shutil.rmtree(src_dir, ignore_errors=True)
+            unpack_file_to_folder(package_name, base_dir)
+        assert os.path.exists(src_dir)
+        build_geometrictools(os.path.join(src_dir, 'GTEngine'), os.path.join(ext_dir, 'geometrictools'), ext_dir)
 
     if libs['assimp']:
+        src_dir = os.path.join(base_dir, 'assimp')
         if update_src:
-            update_or_clone_git_repository(os.path.join(base_dir, 'assimp'), 'git@github.com:assimp/assimp.git')
-        build_assimp(os.path.join(base_dir, 'assimp'), os.path.join(ext_dir, 'assimp'), ext_dir)
+            update_or_clone_git_repository(src_dir, 'git@github.com:assimp/assimp.git')
+        assert os.path.exists(src_dir)
+        build_assimp(src_dir, os.path.join(ext_dir, 'assimp'), ext_dir)
 
     if libs['hdf5']:
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'hdf5*'))
+        src_dir = get_package_top_level_folder(package_name, base_dir)
         if update_src:
-            shutil.rmtree(os.path.join(base_dir, 'hdf5-1.10.0-patch1'), ignore_errors=True)
-            unpack_file_to_folder(os.path.join(src_package_dir, 'hdf5-1.10.0-patch1.tar.bz2'),
-                                  base_dir)
-        build_hdf5(os.path.join(base_dir, 'hdf5-1.10.0-patch1'), os.path.join(ext_dir, 'hdf5'), ext_dir)
+            shutil.rmtree(src_dir, ignore_errors=True)
+            unpack_file_to_folder(package_name, base_dir)
+        assert os.path.exists(src_dir)
+        build_hdf5(src_dir, os.path.join(ext_dir, 'hdf5'), ext_dir)
 
     if libs['freeimage']:
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'freeimage*'))
+        src_dir = get_package_top_level_folder(package_name, base_dir)
         if update_src:
-            shutil.rmtree(os.path.join(base_dir, 'FreeImage'), ignore_errors=True)
-            unpack_file_to_folder(os.path.join(src_package_dir, 'freeimage-FreeImage.tar.gz'),
-                                  base_dir)
-        build_freeimage(os.path.join(base_dir, 'FreeImage'), os.path.join(ext_dir, 'freeimage'), ext_dir)
+            shutil.rmtree(src_dir, ignore_errors=True)
+            unpack_file_to_folder(package_name, base_dir)
+        assert os.path.exists(src_dir)
+        build_freeimage(src_dir, os.path.join(ext_dir, 'freeimage'), ext_dir)
 
     if libs['itk']:
+        src_dir = os.path.join(base_dir, 'ITK')
         if update_src:
-            update_or_clone_git_repository(os.path.join(base_dir, 'ITK'), 'git://itk.org/ITK.git')
-        build_itk(os.path.join(base_dir, 'ITK'), os.path.join(ext_dir, 'itk'), ext_dir)
+            update_or_clone_git_repository(src_dir, 'git://itk.org/ITK.git')
+        assert os.path.exists(src_dir)
+        build_itk(src_dir, os.path.join(ext_dir, 'itk'), ext_dir)
 
     if libs['vtk']:
+        src_dir = os.path.join(base_dir, 'VTK')
         if update_src:
-            update_or_clone_git_repository(os.path.join(base_dir, 'VTK'), 'https://gitlab.kitware.com/vtk/vtk.git')
-        build_vtk(os.path.join(base_dir, 'VTK'), os.path.join(ext_dir, 'vtk'), ext_dir)
+            update_or_clone_git_repository(src_dir, 'https://gitlab.kitware.com/vtk/vtk.git')
+        assert os.path.exists(src_dir)
+        build_vtk(src_dir, os.path.join(ext_dir, 'vtk'), ext_dir)
 
     if libs['opencv']:
+        src_dir = os.path.join(base_dir, 'opencv')
+        src_contrib_dir = os.path.join(base_dir, 'opencv_contrib')
         if update_src:
-            update_or_clone_git_repository(os.path.join(base_dir, 'opencv'),
-                                           'git@github.com:Itseez/opencv.git')
-            update_or_clone_git_repository(os.path.join(base_dir, 'opencv_contrib'),
-                                           'git@github.com:Itseez/opencv_contrib.git')
-        build_opencv(os.path.join(base_dir, 'opencv'), os.path.join(base_dir, 'opencv_contrib'),
-                     os.path.join(ext_dir, 'opencv'), ext_dir)
+            update_or_clone_git_repository(src_dir, 'git@github.com:Itseez/opencv.git')
+            update_or_clone_git_repository(src_contrib_dir, 'git@github.com:Itseez/opencv_contrib.git')
+        assert os.path.exists(src_dir)
+        assert os.path.exists(src_contrib_dir)
+        build_opencv(src_dir, src_contrib_dir, os.path.join(ext_dir, 'opencv'), ext_dir)
 
     if libs['botan']:
+        src_dir = os.path.join(base_dir, 'botan')
         if update_src:
-            update_or_clone_git_repository(os.path.join(base_dir, 'botan'), 'git@github.com:randombit/botan.git')
-        build_botan(os.path.join(base_dir, 'botan'), os.path.join(ext_dir, 'botan'), ext_dir)
-
-    ispc_dir = ''
-    embree_dir = ''
-    if sys.platform.startswith('win32'):
-        if libs['ospray']:
-            ispc_dir = os.path.join(base_dir, 'ispc-v1.9.1-windows-vs2015')
-            embree_dir = os.path.join(base_dir, 'embree-2.13.0.x64.windows', 'lib', 'cmake', 'embree-2.13.0')
-            if update_src:
-                shutil.rmtree(os.path.join(base_dir, 'ispc-v1.9.1-windows-vs2015'), ignore_errors=True)
-                unpack_file_to_folder(os.path.join(src_package_dir, 'ispc-v1.9.1-windows-vs2015.zip'),
-                                      base_dir)
-                shutil.rmtree(os.path.join(base_dir, 'embree-2.13.0.x64.windows'), ignore_errors=True)
-                unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.13.0.x64.windows.zip'),
-                                      base_dir)
-    else:
-        if libs['ospray']:
-            ispc_dir = os.path.join(base_dir, 'ispc-v1.9.1-osx')
-            embree_dir = os.path.join(base_dir, 'embree-2.13.0.x86_64.macosx', 'lib', 'cmake', 'embree-2.13.0')
-            if update_src:
-                shutil.rmtree(os.path.join(base_dir, 'ispc-v1.9.1-osx'), ignore_errors=True)
-                unpack_file_to_folder(os.path.join(src_package_dir, 'ispc-v1.9.1-osx.tar.gz'),
-                                      base_dir)
-                shutil.rmtree(os.path.join(base_dir, 'embree-2.13.0.x86_64.macosx'), ignore_errors=True)
-                unpack_file_to_folder(os.path.join(src_package_dir, 'embree-2.13.0.x86_64.macosx.tar.gz'),
-                                      base_dir)
+            update_or_clone_git_repository(src_dir, 'git@github.com:randombit/botan.git')
+        assert os.path.exists(src_dir)
+        build_botan(src_dir, os.path.join(ext_dir, 'botan'), ext_dir)
 
     if libs['ospray']:
+        if sys.platform.startswith('win32'):
+            ispc_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ispc*win*'))
+            embree_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'embree*win*'))
+        else:
+            ispc_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ispc*osx*'))
+            embree_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'embree*osx*'))
+        ispc_package_unpack_folder = get_package_top_level_folder(ispc_package_name, base_dir)
+        embree_package_unpack_folder = get_package_top_level_folder(embree_package_name, base_dir)
+        src_dir = os.path.join(base_dir, 'OSPRay')
         if update_src:
-            update_or_clone_git_repository(os.path.join(base_dir, 'OSPRay'), 'git@github.com:ospray/OSPRay.git')
-        build_ospray(os.path.join(base_dir, 'OSPRay'), os.path.join(ext_dir, 'ospray'), ext_dir,
-                     ispc_dir=ispc_dir, embree_dir=embree_dir)
+            shutil.rmtree(ispc_package_unpack_folder, ignore_errors=True)
+            unpack_file_to_folder(ispc_package_name, base_dir)
+            shutil.rmtree(embree_package_unpack_folder, ignore_errors=True)
+            unpack_file_to_folder(embree_package_name, base_dir)
+            update_or_clone_git_repository(src_dir, 'git@github.com:ospray/OSPRay.git')
+        ispc_dir = ispc_package_unpack_folder
+        embree_dir = find_src_package_with_glob(os.path.join(embree_package_unpack_folder, 'lib', 'cmake', 'embree*'))
+        assert os.path.exists(src_dir)
+        assert os.path.exists(ispc_dir)
+        assert os.path.exists(embree_dir)
+        build_ospray(src_dir, os.path.join(ext_dir, 'ospray'), ext_dir, ispc_dir=ispc_dir, embree_dir=embree_dir)
 
 
 def parse_inputs(argv: list):
