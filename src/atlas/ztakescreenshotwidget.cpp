@@ -10,6 +10,7 @@
 #include <QMessageBox>
 #include <QLabel>
 #include <QGroupBox>
+#include <QSettings>
 #include <QApplication>
 
 namespace nim {
@@ -73,6 +74,10 @@ void ZTakeScreenShotWidget::captureButtonPressed()
       return;
     }
     QDir dir(m_folderWidget->getSelectedDirectory());
+
+    QSettings settings;
+    settings.setValue(QString("ScreenShot/exportPath"), dir.absolutePath());
+
     while (true) {
       QString filename = QString("%1%2.tif").arg(m_namePrefix.get()).arg(m_nextNumber++);
       if (dir.exists(filename))
@@ -327,9 +332,13 @@ void ZTakeScreenShotWidget::createWidget()
   int bottom;
   hlo->getContentsMargins(&left, &top, &right, &bottom);
   hlo->setContentsMargins(left + 20, top, right, bottom);
+  QSettings settings;
+  QString folder = settings.value(QString("ScreenShot/exportPath")).toString();
+  if (folder.isEmpty())
+    folder = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
   m_folderWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::Directory, "output folder:", QString(),
                                          QBoxLayout::LeftToRight,
-                                         QStandardPaths::writableLocation(QStandardPaths::DesktopLocation), this);
+                                         folder, this);
   hlo->addWidget(m_folderWidget);
   lo->addLayout(hlo);
 
