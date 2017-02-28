@@ -957,6 +957,8 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                 for line in from_lines:
                     line = line.replace(r';tbb;ippcv;ippi;ippcc;ipps;ippvm;ippcore',
                                         r'')
+                    line = line.replace(r'tbb;ippcv;ippi;ippcc;ipps;ippvm;ippcore;',
+                                        r'')
                     f.write(line)
                     to_lines.append(line)
             print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
