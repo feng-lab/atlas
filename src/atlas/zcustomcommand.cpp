@@ -861,7 +861,7 @@ void createCellTable()
   QJsonObject sceneObj = loadObj["Scene"].toObject();
   QJsonObject docObject = sceneObj["Doc"].toObject();
 
-  std::map<std::tuple<int, double, double, QString>, std::tuple<QString, QString, double>> cells;
+  std::map<std::tuple<QString, int, double, double, QString>, std::tuple<QString, double>> cells;
 
   for (int metaIdx = 0; metaIdx < metaData.size(); ++metaIdx) {
     QString cellType = metaData[metaIdx][1];
@@ -876,7 +876,9 @@ void createCellTable()
     if (cellType == "Pyr") {
       continue;
     }
-    cells[std::make_tuple(somaLocationOrder, AP, ML, cellName)] = std::make_tuple(cellType, somaLocation, r2);
+    cells[std::make_tuple(cellType, somaLocationOrder, AP, ML, cellName)] = std::make_tuple(somaLocation, r2);
+
+    continue;
     QString swcName = QString("/Users/feng/Documents/PV/PVSWC/%1_layer.swc").arg(cellName);
     QString punctaName = QString("/Users/feng/Documents/PV/PVSWC/%1_neurite.nimp").arg(cellName);
 
@@ -923,7 +925,18 @@ void createCellTable()
     QApplication::processEvents();
   }
 
-
+  for (auto it : cells) {
+    QString cellType = std::get<0>(it.first);
+    cellType.chop(2);
+    QString cellName = std::get<4>(it.first);
+    QString somaLocation = std::get<0>(it.second);
+    double AP = std::get<2>(it.first);
+    double ML = std::get<3>(it.first);
+    double r2 = std::get<1>(it.second);
+    QString row = QString("%1 & (%2, %3) mm & %4 & %5 & \\parbox[c]{1em}{\\includegraphics[height=0.5in]{%6}} \\\\").arg(
+      cellType).arg(AP).arg(ML, 0, 'g', 3).arg(somaLocation.toLower()).arg(r2, 0, 'g', 3).arg(cellName);
+    LOG(INFO) << row;
+  }
 }
 
 void testLogSpeed()
