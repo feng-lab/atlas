@@ -15,9 +15,14 @@
 #include "zbenchtimer.h"
 #include "zrandom.h"
 #include "zstringutils.h"
+#include "zmainwindow.h"
+#include "zdoc.h"
+#include "z3dmainwindow.h"
+#include "z3dview.h"
 #include <include/qtcsv/reader.h>
 #include <itkMath.h>
 #include <QDir>
+#include <QApplication>
 #include <tbb/task_scheduler_init.h>
 
 namespace nim {
@@ -820,6 +825,107 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
   }
 }
 
+void createCellTable()
+{
+  QList<QStringList> metaData = QtCSV::Reader::readToList("/Users/feng/code/mgrasp-analysis/pv_figs/orig_cell_props.csv");
+  metaData.removeFirst();
+
+  std::map<QString, int> somaLocationMap;
+  somaLocationMap["Ori"] = 1;
+  somaLocationMap["Deep"] = 2;
+  somaLocationMap["Superficial"] = 3;
+  somaLocationMap["Rad"] = 4;
+
+  ZMainWindow* mainWin = nullptr;
+  for (auto widget : QApplication::topLevelWidgets()) {
+    mainWin = qobject_cast<ZMainWindow*>(widget);
+    if (mainWin)
+      break;
+  }
+
+
+  QFile file("/Users/feng/Downloads/template_cell.scene");
+  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    return;
+  }
+  QByteArray saveData = file.readAll();
+  QJsonParseError jsonError;
+  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
+  if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
+    return;
+  }
+  QJsonObject loadObj = loadDoc.object();
+  if (!loadObj.contains("Scene") || !loadObj["Scene"].isObject()) {
+    return;
+  }
+  QJsonObject sceneObj = loadObj["Scene"].toObject();
+  QJsonObject docObject = sceneObj["Doc"].toObject();
+
+  std::map<std::tuple<int, double, double, QString>, std::tuple<QString, QString, double>> cells;
+
+  for (int metaIdx = 0; metaIdx < metaData.size(); ++metaIdx) {
+    QString cellType = metaData[metaIdx][1];
+    QString cellName = metaData[metaIdx][2];
+    QString somaLocation = metaData[metaIdx][3];
+    double AP = metaData[metaIdx][4].toDouble();
+    double ML = metaData[metaIdx][5].toDouble();
+    double r2 = metaData[metaIdx][27].toDouble();
+    int somaLocationOrder = somaLocationMap[somaLocation];
+    assert(somaLocationOrder > 0 && somaLocationOrder < 5);
+
+    if (cellType == "Pyr") {
+      continue;
+    }
+    cells[std::make_tuple(somaLocationOrder, AP, ML, cellName)] = std::make_tuple(cellType, somaLocation, r2);
+    QString swcName = QString("/Users/feng/Documents/PV/PVSWC/%1_layer.swc").arg(cellName);
+    QString punctaName = QString("/Users/feng/Documents/PV/PVSWC/%1_neurite.nimp").arg(cellName);
+
+    for (QJsonObject::iterator it = docObject.begin(); it != docObject.end(); ++it) {
+      QStringList typeAndID = it.key().split(" ");
+      QString IDString = typeAndID[1].trimmed();
+      QFileInfo docPath(it.value().toString());
+      QString filename = docPath.completeBaseName();
+      if (typeAndID[0] == "Swc") {
+        modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(swcName));
+      } else if (typeAndID[0] == "Puncta") {
+        modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(punctaName));
+      }
+      removeJsonValue(sceneObj, IDString + ".View3D.X Cut FloatSpan");
+      removeJsonValue(sceneObj, IDString + ".View3D.Y Cut FloatSpan");
+      removeJsonValue(sceneObj, IDString + ".View3D.Z Cut FloatSpan");
+    }
+    QString scnName = QString("/Users/feng/Downloads/cell_table/%1.scene").arg(cellName);
+    QFile resfile(scnName);
+    if (!resfile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+      return;
+    }
+
+    QJsonObject saveObj;
+    saveObj.insert("Scene", sceneObj);
+
+    QJsonDocument saveDoc(saveObj);
+    if (resfile.write(saveDoc.toJson()) == -1) {
+      return;
+    }
+    resfile.flush();
+
+    mainWin->removeAllObjs();
+    mainWin->loadJsonScene(scnName);
+    QApplication::processEvents();
+
+    Z3DView *view3d = mainWin->get3DWindow()->view();
+    view3d->resetCameraAction()->trigger();
+    view3d->zoomInAction()->trigger();
+    view3d->zoomInAction()->trigger();
+    QApplication::processEvents();
+    QString imgName = QString("/Users/feng/Downloads/cell_table/%1.tif").arg(cellName);
+    view3d->takeFixedSizeScreenShot(imgName, 512, 512, Z3DScreenShotType::MonoView);
+    QApplication::processEvents();
+  }
+
+
+}
+
 void testLogSpeed()
 {
   ZBenchTimer bt;
@@ -883,47 +989,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-//  moveObjectToCorrectLocation("/Users/feng/Documents/PV/contra.scene",
-//                              "/Users/feng/Documents/PV/contra_center_overlap.scene",
-//                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
-//                              "/Users/feng/Documents/PV/PVSWC",
-//                              2);
-//  moveObjectToCorrectLocation("/Users/feng/Documents/PV/ipsi.scene",
-//                              "/Users/feng/Documents/PV/ipsi_center_overlap.scene",
-//                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
-//                              "/Users/feng/Documents/PV/PVSWC",
-//                              2);
-//  moveObjectToCorrectLocation("/Users/feng/Documents/PY/pyr.scene",
-//                              "/Users/feng/Documents/PY/pyr_center_overlap.scene",
-//                              "/Users/feng/code/mgrasp-analysis/py_neuron_metadata.csv",
-//                              "/Users/feng/Documents/PY/PySWC",
-//                              2);
-//  moveObjectToCorrectLocation("/Users/feng/Documents/PV/contra.scene",
-//                              "/Users/feng/Documents/PV/contra_in_ca1.scene",
-//                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
-//                              "/Users/feng/Documents/PV/PVSWC",
-//                              1);
-//  moveObjectToCorrectLocation("/Users/feng/Documents/PV/ipsi.scene",
-//                              "/Users/feng/Documents/PV/ipsi_in_ca1.scene",
-//                              "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv",
-//                              "/Users/feng/Documents/PV/PVSWC",
-//                              1);
-//  moveObjectToCorrectLocation("/Users/feng/Documents/PY/pyr.scene",
-//                              "/Users/feng/Documents/PY/pyr_in_ca1.scene",
-//                              "/Users/feng/code/mgrasp-analysis/py_neuron_metadata.csv",
-//                              "/Users/feng/Documents/PY/PySWC",
-//                              1);
-  QStringList metaFiles;
-  metaFiles << "/Users/feng/code/mgrasp-analysis/py_neuron_metadata.csv"
-            << "/Users/feng/code/mgrasp-analysis/pv_neuron_metadata.csv";
-  QStringList swcFolders;
-  swcFolders << "/Users/feng/Documents/PV/PVSWC"
-             << "/Users/feng/Documents/PY/PySWC";
-  moveObjectToCorrectLocation("/Users/feng/Downloads/all.scene",
-                              "/Users/feng/Downloads/all_in_ca1.scene",
-                              metaFiles,
-                              swcFolders,
-                              1);
+  createCellTable();
   LOG(INFO) << "done";
 }
 

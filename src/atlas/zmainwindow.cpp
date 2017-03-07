@@ -148,6 +148,17 @@ void ZMainWindow::loadUrls(const QList<QUrl>& urlList)
     m_doc->loadFileList(fileList);
 }
 
+void ZMainWindow::removeAllObjs()
+{
+  m_doc->removeAllObjs();
+  QApplication::processEvents();
+}
+
+Z3DMainWindow* ZMainWindow::get3DWindow()
+{
+  return m_3dWindow.data();
+}
+
 void ZMainWindow::closeEvent(QCloseEvent* event)
 {
   // Qt mac bug, use dock icon context menu -> quit will call this function twice and crash

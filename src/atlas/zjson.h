@@ -10,5 +10,9 @@ void modifyJsonValue(QJsonObject& obj, const QString& path, const QJsonValue& ne
 
 void modifyJsonValue(QJsonDocument& doc, const QString& path, const QJsonValue& newValue);
 
+void removeJsonValue(QJsonObject& obj, const QString& path);
+
+void removeJsonValue(QJsonDocument& doc, const QString& path);
+
 } // namespace nim
 

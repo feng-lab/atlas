@@ -41,6 +41,13 @@ public:
 
   void loadUrls(const QList<QUrl>& urlList);
 
+  void loadJsonScene(const QString& fn);
+
+  void removeAllObjs();
+
+  // might be nullptr
+  Z3DMainWindow* get3DWindow();
+
 protected:
   //void appAboutToQuit();
 
@@ -85,8 +92,6 @@ private:
   void loadScene();
 
   void saveScene();
-
-  void loadJsonScene(const QString& fn);
 
   void openNewInstance();
 

@@ -12,8 +12,7 @@ void modifyJsonValue(QJsonObject& obj, const QString& path, const QJsonValue& ne
 
   if (subPath.isEmpty()) {
     subValue = newValue;
-  }
-  else {
+  } else {
     QJsonObject lobj = subValue.toObject();
     modifyJsonValue(lobj, subPath, newValue);
     subValue = lobj;
@@ -26,6 +25,30 @@ void modifyJsonValue(QJsonDocument& doc, const QString& path, const QJsonValue& 
 {
   QJsonObject obj = doc.object();
   modifyJsonValue(obj, path, newValue);
+  doc = QJsonDocument(obj);
+}
+
+void removeJsonValue(QJsonObject& obj, const QString& path)
+{
+  const int indexOfDot = path.indexOf('.');
+  const QString propertyName = path.left(indexOfDot);
+  const QString subPath = indexOfDot > 0 ? path.mid(indexOfDot + 1) : QString();
+
+  if (subPath.isEmpty()) {
+    obj.remove(propertyName);
+  } else {
+    QJsonValue subValue = obj[propertyName];
+    QJsonObject lobj = subValue.toObject();
+    removeJsonValue(lobj, subPath);
+    subValue = lobj;
+    obj[propertyName] = subValue;
+  }
+}
+
+void removeJsonValue(QJsonDocument& doc, const QString& path)
+{
+  QJsonObject obj = doc.object();
+  removeJsonValue(obj, path);
   doc = QJsonDocument(obj);
 }
 

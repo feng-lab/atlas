@@ -248,6 +248,25 @@ void ZGenerateAnalysisTextFile::generate()
     layerTree.resortID();
     layerTree.save(m_layerSwcFilename);
     getLayerFeature(tree, layerTree, nodeToLayer);
+
+    QString layerWithSomaSwcName = m_input.swcFilename;
+    layerWithSomaSwcName.replace(".swc", "_layer_with_soma.swc", Qt::CaseInsensitive);
+    QString layerWithSomaSwcFilename = outputDir.filePath(QFileInfo(layerWithSomaSwcName).fileName());
+    ConstSwcTreeNode tn = tree.begin();
+    SwcTreeNode layerTn = layerTree.begin();
+    while (tn != tree.end()) {
+      if (glm::length(glm::dvec3(tn->x - layerTn->x, tn->y - layerTn->y, tn->z - layerTn->z)) > 1.) {
+        LOG(WARNING) << "node " << tn->x << " " << tn->y << " " << tn->z << " " << tn->radius;
+        LOG(WARNING) << "layer node " << layerTn->x << " " << layerTn->y << " " << layerTn->z << " " << layerTn->radius;
+        throw ZImgException("wrong layer node match");
+      }
+      if (tn->type == ZSwc::SomaType) {
+        layerTn->type = 6;
+      }
+      ++tn;
+      ++layerTn;
+    }
+    layerTree.save(layerWithSomaSwcFilename);
   }
   // subclass
   if (m_input.doPyramidalSubclassSeparation) {
