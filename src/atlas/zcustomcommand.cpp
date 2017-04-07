@@ -930,10 +930,14 @@ void createCellTable()
     cellType.chop(2);
     QString cellName = std::get<4>(it.first);
     QString somaLocation = std::get<0>(it.second);
+    if (somaLocation == "ori")
+      somaLocation = "oriens";
+    if (somaLocation == "rad")
+      somaLocation = "radiatum";
     double AP = std::get<2>(it.first);
     double ML = std::get<3>(it.first);
     double r2 = std::get<1>(it.second);
-    QString row = QString("%1 & (%2, %3) mm & %4 & %5 & \\parbox[c]{1em}{\\includegraphics[height=0.5in]{%6}} \\\\").arg(
+    QString row = QString("%1 & (%2, %3)$mm$ & %4 & %5 & \\parbox[c]{0.5in}{\\includegraphics[height=0.5in]{%6}} \\\\").arg(
       cellType).arg(AP).arg(ML, 0, 'g', 3).arg(somaLocation.toLower()).arg(r2, 0, 'g', 3).arg(cellName);
     LOG(INFO) << row;
   }

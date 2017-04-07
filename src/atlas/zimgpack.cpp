@@ -189,6 +189,7 @@ ZImgPack::ZImgPack(const QString& fileName, size_t scene, FileFormat format, siz
   } else if (m_imgInfo.voxelFormat != VoxelFormat::Float && (hasPyramidal || !needScale)) {
     buildFastReadIndex(*sceneSubBlock);
   } else {
+    //buildFastReadIndex(*sceneSubBlock);
     buildPyramidal();
   }
 

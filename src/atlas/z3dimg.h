@@ -57,7 +57,10 @@ public:
   { return glm::vec3(0, 0, 0); }
 
   glm::vec3 physicalRDB() const
-  { return glm::vec3(m_imgPack.imgInfo().width - 1, m_imgPack.imgInfo().height - 1, m_imgPack.imgInfo().depth - 1); }
+  { return glm::max(glm::vec3(1, 1, 1),
+                    glm::vec3(m_imgPack.imgInfo().width - 1,
+                              m_imgPack.imgInfo().height - 1,
+                              m_imgPack.imgInfo().depth - 1)); }
 
   glm::vec3 physicalLDF() const
   { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z); }
