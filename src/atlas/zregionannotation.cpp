@@ -70,7 +70,11 @@ ZRegionAnnotation::ZRegionAnnotation(QObject* parent)
   clear();
 
   QStringList regions;
+#if 1
   regions << "GPe" << "STN" << "SNr" << "STRv" << "STRd" << "GPi" << "SPF";
+#else
+  regions << "GPe" << "STN" << "SNr" << "STRv" << "STRd" << "GPi" << "SPF" << "grey";
+#endif
   readMouseBrainAtlasOntology(regions, m_ontology);
   connect(&m_undoStack, &QUndoStack::cleanChanged,
           this, &ZRegionAnnotation::undoStackCleanChanged);
@@ -210,10 +214,18 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
     }
   }
   for (auto it = m_ontology.beginRoot(); it != m_ontology.endRoot(); ++it) {
+#if 1
     if (it->abbreviation.compare("STRv", Qt::CaseInsensitive) == 0 ||
         it->abbreviation.compare("STRd", Qt::CaseInsensitive) == 0) {
       m_ontology.eraseChildren(it);
     }
+#else
+    if (it->abbreviation.compare("STRv", Qt::CaseInsensitive) == 0 ||
+        it->abbreviation.compare("STRd", Qt::CaseInsensitive) == 0 ||
+        it->abbreviation.compare("grey", Qt::CaseInsensitive) == 0) {
+      m_ontology.eraseChildren(it);
+    }
+#endif
   }
   LOG(INFO) << "Finish importing label image";
 
@@ -494,6 +506,12 @@ void ZRegionAnnotation::updateMesh()
   }
 }
 
+void ZRegionAnnotation::transformMesh(const glm::mat4& transformation)
+{
+  auto cmd = new ZRegionAnnotationTransformMeshCommand(*this, transformation);
+  m_undoStack.push(cmd);
+}
+
 void ZRegionAnnotation::updateMesh_Impl(const ZTree<RegionNode>& newOntology)
 {
   auto it = m_ontology.begin();
@@ -502,6 +520,27 @@ void ZRegionAnnotation::updateMesh_Impl(const ZTree<RegionNode>& newOntology)
     it->mesh = itn->mesh;
   }
   emit allMeshChanged();
+}
+
+void ZRegionAnnotation::transformMesh_Impl(const glm::mat4& trans)
+{
+  for (RegionNode& rn : m_ontology) {
+    if (rn.mesh) {
+      rn.mesh->transformVerticesByMatrix(trans);
+    }
+  }
+  emit allMeshChanged();
+}
+
+ZTree<RegionNode> ZRegionAnnotation::copyAnnotationTreeWithDeepCopyedMesh() const
+{
+  ZTree<RegionNode> res(m_ontology);
+  auto it = m_ontology.begin();
+  auto itn = res.begin();
+  for (; it != m_ontology.end(); ++it, ++itn) {
+    itn->mesh = std::make_shared<ZMesh>(*it->mesh);
+  }
+  return res;
 }
 
 void ZRegionAnnotation::updateBoundBox()
@@ -529,6 +568,11 @@ void ZRegionAnnotationUpdateMeshCommand::redo()
   } else {
     m_regionAnnotation.updateMesh_Impl(m_newOntology);
   }
+}
+
+void ZRegionAnnotationTransformMeshCommand::redo()
+{
+  m_regionAnnotation.transformMesh_Impl(m_trans);
 }
 
 } // namespace nim

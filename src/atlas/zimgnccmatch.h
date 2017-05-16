@@ -98,6 +98,13 @@ public:
                                             double* lowResMaxWeightedNCC = nullptr,
                                             double* lowResNumOverlapVoxels = nullptr);
 
+  // use prior info of offset, intvXYZ is the search radius in each direction
+  ZVoxelCoordinate refineMovingImgOffset(const ZVoxelCoordinate& offset,
+                                         size_t intvX, size_t intvY, size_t intvZ,
+                                         double* maxNCC = nullptr,
+                                         double* maxWeightedNCC = nullptr,
+                                         double* numOverlapVoxels = nullptr);
+
   // give a offset of moving img, get ncc of this offset
   double computeNCCOfOffset(const ZVoxelCoordinate& offset);
 

@@ -79,6 +79,7 @@ else (WIN32)
       ${IPP_PATH}/lib/libipps.a
       ${IPP_PATH}/lib/libippcv.a
       ${IPP_PATH}/lib/libippcc.a
+      ${IPP_PATH}/lib/intel64/libipp_iw.a
       ${INTEL_PATH}/lib/libirc.a)
 endif (WIN32)
 
@@ -671,7 +672,7 @@ set(SOURCES
     zsvgfilter.h
     zsvgview.cpp
     zsvgview.h
-    zgraphicsitemtype.h)
+    zgraphicsitemtype.h zparametereditdialog.cpp zparametereditdialog.h)
 
 # our target
 set(APP_NAME Atlas)
@@ -740,7 +741,7 @@ else (WIN32)
   set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ffmpeg PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 endif (WIN32)
 
-target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding hdf5_cpp-static hdf5-static
+target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding hdf5::hdf5_cpp-static hdf5::hdf5-static
                       img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${GEOMETRICTOOLS_LIBRARIES}
                       ${ASSIMP_LIBRARIES} ${MKL_LIBRARIES} ${IPP_LIBRARIES})
 if (BUILD_TESTING)
@@ -748,7 +749,7 @@ if (BUILD_TESTING)
 endif (BUILD_TESTING)
 
 if (APPLE)
-  set(copyright_line "Copyright 2011-2016 Linqing Feng @ JinnyLab")
+  set(copyright_line "Copyright 2011-2017 Linqing Feng")
 
   set_target_properties(${APP_NAME} PROPERTIES
                         OUTPUT_NAME "${APP_NAME}"

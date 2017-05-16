@@ -578,6 +578,7 @@ def build_hdf5(src_dir: str, install_dir: str, ext_dir: str):
 
         if sys.platform.startswith('win'):
             cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
+                             '-DBUILD_SHARED_LIBS:BOOL=OFF',
                              '-DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=OFF',
                              '-DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON',
                              '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
@@ -593,6 +594,7 @@ def build_hdf5(src_dir: str, install_dir: str, ext_dir: str):
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
+                             '-DBUILD_SHARED_LIBS:BOOL=OFF',
                              '-DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=OFF',
                              '-DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON',
                              '-DHDF5_ENABLE_THREADSAFE:BOOL=OFF',
@@ -831,6 +833,8 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
 
             cmakecmd = get_cmake_cmd_common_part(install_dir)
             cmakecmd.extend(['-DIPPROOT=' + os.environ['ICPP_COMPILER17'] + 'ipp',
+                             '-DIPPIWROOT=' + os.environ['ICPP_COMPILER17'] + 'ipp',
+                             '-DBUILD_IPP_IW:BOOL=OFF',
                              '-DBUILD_WITH_DYNAMIC_IPP:BOOL=OFF',
                              '-DBUILD_WITH_STATIC_CRT:BOOL=OFF',
                              '-DBUILD_opencv_videoio:BOOL=OFF',
@@ -897,6 +901,8 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
 
             cmakecmd = get_cmake_cmd_common_part(install_dir)
             cmakecmd.extend(['-DIPPROOT=/opt/intel/ipp',
+                             '-DIPPIWROOT=/opt/intel/ipp',
+                             '-DBUILD_IPP_IW:BOOL=OFF',
                              '-DBUILD_WITH_DYNAMIC_IPP:BOOL=OFF',
                              '-DWITH_PTHREADS_PF:BOOL=OFF',
                              '-DBUILD_opencv_videoio:BOOL=OFF',
@@ -955,9 +961,9 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
             with open(orig_file_2, mode='w', encoding='utf-8') as f:
                 to_lines = []
                 for line in from_lines:
-                    line = line.replace(r';tbb;ippcv;ippi;ippcc;ipps;ippvm;ippcore',
+                    line = line.replace(r';tbb;ippiw;ippcv;ippi;ippcc;ipps;ippvm;ippcore',
                                         r'')
-                    line = line.replace(r'tbb;ippcv;ippi;ippcc;ipps;ippvm;ippcore;',
+                    line = line.replace(r'tbb;ippiw;ippcv;ippi;ippcc;ipps;ippvm;ippcore;',
                                         r'')
                     f.write(line)
                     to_lines.append(line)
@@ -1088,7 +1094,7 @@ def build_libs(libs: dict, update_src: bool):
             shutil.rmtree(src_dir, ignore_errors=True)
             unpack_file_to_folder(package_name, base_dir)
         assert os.path.exists(src_dir)
-        build_geometrictools(os.path.join(src_dir, 'GTEngine'), os.path.join(ext_dir, 'geometrictools'), ext_dir)
+        build_geometrictools(src_dir, os.path.join(ext_dir, 'geometrictools'), ext_dir)
 
     if libs['assimp']:
         src_dir = os.path.join(base_dir, 'assimp')

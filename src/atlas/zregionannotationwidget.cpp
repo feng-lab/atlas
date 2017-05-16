@@ -4,6 +4,8 @@
 #include "zsysteminfo.h"
 #include "zregionannotationtreemodel.h"
 #include "zregionannotationtreeview.h"
+#include "z3dtransformparameter.h"
+#include "zparametereditdialog.h"
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QFileDialog>
@@ -61,15 +63,30 @@ void ZRegionAnnotationWidget::exportLabelImage()
   }
 }
 
+void ZRegionAnnotationWidget::transformMesh()
+{
+  Z3DTransformParameter para("Transform Mesh");
+  ZParameterEditDialog dialog(para);
+  if (dialog.exec()) {
+    m_regionAnnotation.transformMesh(para.get());
+  }
+}
+
 void ZRegionAnnotationWidget::createWidget()
 {
   auto vlo = new QVBoxLayout;
 
-  QPushButton* pb = new QPushButton("Update 3D Mesh");
+  QPushButton* pb = new QPushButton("Update 3D Mesh From Modified ROIs");
   pb->setToolTip("Update 3D mesh with current region contours");
   pb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   vlo->addWidget(pb, 0, Qt::AlignLeft | Qt::AlignVCenter);
   connect(pb, &QPushButton::clicked, &m_regionAnnotation, &ZRegionAnnotation::updateMesh);
+
+  pb = new QPushButton("Transform 3D Mesh...");
+  pb->setToolTip("Apply transformation to 3D mesh");
+  pb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  vlo->addWidget(pb, 0, Qt::AlignLeft | Qt::AlignVCenter);
+  connect(pb, &QPushButton::clicked, this, &ZRegionAnnotationWidget::transformMesh);
 
   pb = new QPushButton("Export Label Image...");
   pb->setToolTip("Export Region Annotation To Label Image");

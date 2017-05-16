@@ -927,12 +927,12 @@ void createCellTable()
 
   for (auto it : cells) {
     QString cellType = std::get<0>(it.first);
-    cellType.chop(2);
+    //cellType.chop(2);
     QString cellName = std::get<4>(it.first);
     QString somaLocation = std::get<0>(it.second);
-    if (somaLocation == "ori")
+    if (somaLocation == "Ori")
       somaLocation = "oriens";
-    if (somaLocation == "rad")
+    if (somaLocation == "Rad")
       somaLocation = "radiatum";
     double AP = std::get<2>(it.first);
     double ML = std::get<3>(it.first);

@@ -79,6 +79,9 @@ public:
   // update Mesh after editing contours
   void updateMesh();
 
+  // apply transformation to mesh
+  void transformMesh(const glm::mat4& transformation);
+
 signals:
 
   void boundBoxChanged();
@@ -95,10 +98,15 @@ signals:
 private:
   void updateMesh_Impl(const ZTree<RegionNode>& newOntology);
 
+  void transformMesh_Impl(const glm::mat4& trans);
+
+  ZTree<RegionNode> copyAnnotationTreeWithDeepCopyedMesh() const;
+
   void updateBoundBox();
 
 private:
   friend class ZRegionAnnotationUpdateMeshCommand;
+  friend class ZRegionAnnotationTransformMeshCommand;
 
   int m_width;
   int m_height;
@@ -132,6 +140,25 @@ protected:
   ZTree<RegionNode> m_oldOntology;
   ZTree<RegionNode> m_newOntology;
   bool m_firstRun;
+};
+
+class ZRegionAnnotationTransformMeshCommand : public QUndoCommand
+{
+public:
+  explicit ZRegionAnnotationTransformMeshCommand(ZRegionAnnotation& ra, const glm::mat4& trans)
+    : QUndoCommand(), m_regionAnnotation(ra), m_trans(trans)
+    , m_oldOntology(m_regionAnnotation.copyAnnotationTreeWithDeepCopyedMesh())
+  {}
+
+  void undo() override
+  { m_regionAnnotation.updateMesh_Impl(m_oldOntology); }
+
+  void redo() override;
+
+protected:
+  ZRegionAnnotation& m_regionAnnotation;
+  glm::mat4 m_trans;
+  ZTree<RegionNode> m_oldOntology;
 };
 
 } // namespace nim

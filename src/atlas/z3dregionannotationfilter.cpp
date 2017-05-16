@@ -154,7 +154,7 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
       meshList.push_back(node.mesh.get());
       flt->setData(&meshList);
     }
-    flt->setVisible(false);
+    //flt->setVisible(false);
     flt->setMeshColor(glm::vec4(node.red / 255.f, node.green / 255.f, node.blue / 255.f, 1.f));
     flt->setOpacity(0.5);
     m_idToRegionNames[id] = QString("%1_%2").arg(node.abbreviation).arg(node.id);

@@ -365,6 +365,48 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(size_t intvX, size_t int
   return res;
 }
 
+ZVoxelCoordinate ZImgNCCMatch::refineMovingImgOffset(const ZVoxelCoordinate& offset,
+                                                     size_t intvX, size_t intvY, size_t intvZ,
+                                                     double* maxNCC, double* maxWeightedNCC, double* numOverlapVoxels)
+{
+  if (m_fixedImg.isEmpty() || m_movingImg.isEmpty()) {
+    throw ZImgException("computeMovingImgOffset: Can not match empty imgs");
+  }
+  ZVoxelCoordinate res;
+
+  ZImg fixedImg;
+  ZImg movingImg;
+  constructSingleChannelFixedImg(ZImgRegion(), fixedImg);
+  constructSingleChannelMovingImg(ZImgRegion(), movingImg);
+  //LOG(INFO) << fixedImg.info().toQString();
+  //LOG(INFO) << movingImg.info().toQString();
+
+  double tmpMaxNCC;
+  double tmpMaxWeightedNCC;
+  double tmpNumOverlapVoxels;
+  ZImg subFixedImg;
+  ZImg subMovingImg;
+  cropOverlapSubImg(fixedImg, movingImg, offset, subFixedImg, subMovingImg);
+  size_t xEnd = subMovingImg.width() + subFixedImg.width() - 1;
+  size_t yEnd = subMovingImg.height() + subFixedImg.height() - 1;
+  size_t zEnd = subMovingImg.depth() + subFixedImg.depth() - 1;
+  size_t xStart = std::max(0, static_cast<int>(subMovingImg.width()) - 1 - static_cast<int>(intvX));
+  xEnd = std::min(xEnd, subMovingImg.width() + intvX);
+  size_t yStart = std::max(0, static_cast<int>(subMovingImg.height()) - 1 - static_cast<int>(intvY));
+  yEnd = std::min(yEnd, subMovingImg.height() + intvY);
+  size_t zStart = std::max(0, static_cast<int>(subMovingImg.depth()) - 1 - static_cast<int>(intvZ));
+  zEnd = std::min(zEnd, subMovingImg.depth() + intvZ);
+  res = maxNormXCorrLocPart(subFixedImg, subMovingImg, xStart, xEnd, yStart, yEnd, zStart, zEnd,
+                            tmpMaxNCC, tmpMaxWeightedNCC, tmpNumOverlapVoxels);
+  res += offset;
+  //LOG(INFO) << "final offset: " << res;
+
+  if (maxNCC) *maxNCC = tmpMaxNCC;
+  if (maxWeightedNCC) *maxWeightedNCC = tmpMaxWeightedNCC;
+  if (numOverlapVoxels) *numOverlapVoxels = tmpNumOverlapVoxels;
+  return res;
+}
+
 double ZImgNCCMatch::computeNCCOfOffset(const ZVoxelCoordinate& offset)
 {
   if (m_fixedImg.isEmpty() || m_movingImg.isEmpty()) {
@@ -860,11 +902,11 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(const PositionHint& movi
   size_t yEnd = subMovingImg.height() + subFixedImg.height() - 1;
   size_t zEnd = subMovingImg.depth() + subFixedImg.depth() - 1;
   size_t xStart = std::max(0, static_cast<int>(subMovingImg.width()) - 1 - static_cast<int>(intvX) - 1);
-  xEnd = std::min(xEnd, subMovingImg.width() - 1 + intvX + 1 + 1);
+  xEnd = std::min(xEnd, subMovingImg.width() + intvX + 1);
   size_t yStart = std::max(0, static_cast<int>(subMovingImg.height()) - 1 - static_cast<int>(intvY) - 1);
-  yEnd = std::min(yEnd, subMovingImg.height() - 1 + intvY + 1 + 1);
+  yEnd = std::min(yEnd, subMovingImg.height() + intvY + 1);
   size_t zStart = std::max(0, static_cast<int>(subMovingImg.depth()) - 1 - static_cast<int>(intvZ) - 1);
-  zEnd = std::min(zEnd, subMovingImg.depth() - 1 + intvZ + 1 + 1);
+  zEnd = std::min(zEnd, subMovingImg.depth() + intvZ + 1);
   res = maxNormXCorrLocPart(subFixedImg, subMovingImg, xStart, xEnd, yStart, yEnd, zStart, zEnd, maxNCC, maxWeightedNCC,
                             numOverlapVoxels);
   res += offset;

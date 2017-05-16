@@ -15,6 +15,8 @@ public:
 protected:
   void exportLabelImage();
 
+  void transformMesh();
+
 private:
   void createWidget();
 
