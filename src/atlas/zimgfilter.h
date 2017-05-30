@@ -4,7 +4,9 @@
 #include "zimgpackdisplay.h"
 #include "znumericparameter.h"
 #include "zparameter.h"
+#include "zgraphicsitemtype.h"
 #include <QGraphicsPixmapItem>
+#include <QGraphicsItemGroup>
 #include <QList>
 #include <vector>
 
@@ -13,6 +15,22 @@ class ZWidgetsGroup;
 namespace nim {
 
 class ZDoubleSpanParameter;
+
+class ZGraphicsItemGroup : public QGraphicsItemGroup
+{
+public:
+  enum
+  {
+    Type = GraphicsItemType::ZGraphicsItemGroup
+  };
+
+  int type() const override
+  { return Type; }
+
+  ZGraphicsItemGroup(double z = 2, QGraphicsItem* parent = nullptr);
+
+  virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
+};
 
 class ZImgFilter : public ZObjFilter
 {
@@ -79,7 +97,8 @@ private:
 private:
   ZImgPack* m_imgPack;
 
-  std::vector<std::unique_ptr<QGraphicsPixmapItem>> m_imgItems;
+  std::vector<QGraphicsPixmapItem*> m_imgItems;
+  std::unique_ptr<ZGraphicsItemGroup> m_item;
 
   ZBoolParameter m_visible;
   bool m_sliceValid;

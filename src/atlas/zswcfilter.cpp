@@ -5,7 +5,9 @@
 #include "zwidgetsgroup.h"
 #include "zsaturateoperation.h"
 #include "zgraphicsscene.h"
+#include "zlogqttypesupport.h"
 #include <QWindow>
+#include <QStyleOption>
 
 namespace nim {
 
@@ -45,6 +47,8 @@ ZSwcGraphicsItem::ZSwcGraphicsItem(ZSwc& swc, double z, QGraphicsItem* parent)
   //  m_outlineColor.setAlpha(m_opacity * 0.5 * 255);
   //  painter.setPen(QPen(m_outlineColor));
   //  painter.drawLines(m_lines);
+
+  setFlag(QGraphicsItem::ItemIsSelectable, true);
 }
 
 QRectF ZSwcGraphicsItem::boundingRect() const
@@ -55,11 +59,70 @@ QRectF ZSwcGraphicsItem::boundingRect() const
                 m_boundBox[3] - m_boundBox[2] + penWidth);
 }
 
+/*!
+    \internal
+    Highlights \a item as selected.
+    NOTE: This function is a duplicate of qt_graphicsItem_highlightSelected() in
+          qgraphicssvgitem.cpp!
+*/
+static void qt_graphicsItem_highlightSelected(
+  QGraphicsItem *item, QPainter *painter, const QStyleOptionGraphicsItem *option)
+{
+  const QRectF murect = painter->transform().mapRect(QRectF(0, 0, 1, 1));
+  if (qFuzzyIsNull(qMax(murect.width(), murect.height())))
+    return;
+
+  const QRectF mbrect = painter->transform().mapRect(item->boundingRect());
+  if (qMin(mbrect.width(), mbrect.height()) < qreal(1.0))
+    return;
+
+  qreal itemPenWidth;
+  switch (item->type()) {
+    case QGraphicsEllipseItem::Type:
+      itemPenWidth = static_cast<QGraphicsEllipseItem *>(item)->pen().widthF();
+      break;
+    case QGraphicsPathItem::Type:
+      itemPenWidth = static_cast<QGraphicsPathItem *>(item)->pen().widthF();
+      break;
+    case QGraphicsPolygonItem::Type:
+      itemPenWidth = static_cast<QGraphicsPolygonItem *>(item)->pen().widthF();
+      break;
+    case QGraphicsRectItem::Type:
+      itemPenWidth = static_cast<QGraphicsRectItem *>(item)->pen().widthF();
+      break;
+    case QGraphicsSimpleTextItem::Type:
+      itemPenWidth = static_cast<QGraphicsSimpleTextItem *>(item)->pen().widthF();
+      break;
+    case QGraphicsLineItem::Type:
+      itemPenWidth = static_cast<QGraphicsLineItem *>(item)->pen().widthF();
+      break;
+    default:
+      itemPenWidth = 1.0;
+  }
+  const qreal pad = itemPenWidth / 2;
+
+  const qreal penWidth = 0; // cosmetic pen
+
+  const QColor fgcolor = option->palette.windowText().color();
+  const QColor bgcolor( // ensure good contrast against fgcolor
+    fgcolor.red()   > 127 ? 0 : 255,
+    fgcolor.green() > 127 ? 0 : 255,
+    fgcolor.blue()  > 127 ? 0 : 255);
+
+  painter->setPen(QPen(bgcolor, penWidth, Qt::SolidLine));
+  painter->setBrush(Qt::NoBrush);
+  painter->drawRect(item->boundingRect().adjusted(pad, pad, -pad, -pad));
+
+  painter->setPen(QPen(option->palette.windowText(), 0, Qt::DashLine));
+  painter->setBrush(Qt::NoBrush);
+  painter->drawRect(item->boundingRect().adjusted(pad, pad, -pad, -pad));
+}
+
 void ZSwcGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
   if (m_t != 0)
     return;
-  Q_UNUSED(option)
+
   if (m_mip) {
     m_outlineColor.setAlpha(m_opacity * 255);
     painter->setPen(QPen(m_outlineColor, 1));
@@ -102,13 +165,18 @@ void ZSwcGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* 
     pnt.setTransform(painter->combinedTransform());
     pnt.setPen(QPen(m_outlineColor, 0));
     pnt.drawLines(m_lines);
+
     painter->resetTransform();
     painter->drawPixmap(0, 0, widget->width(), widget->height(), buffer);
+    painter->setTransform(pnt.combinedTransform());
   } else if (m_mip || m_showSkeleton) {
     m_outlineColor.setAlpha(m_opacity * 0.5 * 255);
     painter->setPen(QPen(m_outlineColor, 0));
     painter->drawLines(m_lines);
   }
+
+  if (option->state & QStyle::State_Selected)
+    qt_graphicsItem_highlightSelected(this, painter, option);
 }
 
 ZSwcFilter::ZSwcFilter(ZView& view)

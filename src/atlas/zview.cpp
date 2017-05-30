@@ -191,7 +191,8 @@ void ZView::updateBoundBox()
     m_doNotReceiveSliceSignal = false;
     return;
   }
-  QRectF sceneRect(m_boundBox[0], m_boundBox[2], m_boundBox[1] - m_boundBox[0] + 1, m_boundBox[3] - m_boundBox[2] + 1);
+  QRectF sceneRect(m_boundBox[0], m_boundBox[2],
+                   m_boundBox[1] - m_boundBox[0] + 1, m_boundBox[3] - m_boundBox[2] + 1);
   m_scene->setSceneRect(sceneRect);
   m_view->updateScaleFactorRange();
   int sliceBefore = m_imgSlice->get();

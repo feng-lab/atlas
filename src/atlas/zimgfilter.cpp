@@ -7,9 +7,85 @@
 #include "zlog.h"
 #include "znumericparameter.h"
 #include "zwidgetsgroup.h"
+#include "zlogqttypesupport.h"
 #include <QGraphicsPixmapItem>
+#include <QStyleOption>
+#include <QPainter>
 
 namespace nim {
+
+ZGraphicsItemGroup::ZGraphicsItemGroup(double z, QGraphicsItem* parent)
+  : QGraphicsItemGroup(parent)
+{
+  setZValue(z);
+  setFlag(QGraphicsItem::ItemIsSelectable, true);
+}
+
+/*!
+    \internal
+    Highlights \a item as selected.
+    NOTE: This function is a duplicate of qt_graphicsItem_highlightSelected() in
+          qgraphicssvgitem.cpp!
+*/
+static void qt_graphicsItem_highlightSelected(
+  QGraphicsItem *item, QPainter *painter, const QStyleOptionGraphicsItem *option)
+{
+  const QRectF murect = painter->transform().mapRect(QRectF(0, 0, 1, 1));
+  if (qFuzzyIsNull(qMax(murect.width(), murect.height())))
+    return;
+
+  const QRectF mbrect = painter->transform().mapRect(item->boundingRect());
+  if (qMin(mbrect.width(), mbrect.height()) < qreal(1.0))
+    return;
+
+  qreal itemPenWidth;
+  switch (item->type()) {
+    case QGraphicsEllipseItem::Type:
+      itemPenWidth = static_cast<QGraphicsEllipseItem *>(item)->pen().widthF();
+      break;
+    case QGraphicsPathItem::Type:
+      itemPenWidth = static_cast<QGraphicsPathItem *>(item)->pen().widthF();
+      break;
+    case QGraphicsPolygonItem::Type:
+      itemPenWidth = static_cast<QGraphicsPolygonItem *>(item)->pen().widthF();
+      break;
+    case QGraphicsRectItem::Type:
+      itemPenWidth = static_cast<QGraphicsRectItem *>(item)->pen().widthF();
+      break;
+    case QGraphicsSimpleTextItem::Type:
+      itemPenWidth = static_cast<QGraphicsSimpleTextItem *>(item)->pen().widthF();
+      break;
+    case QGraphicsLineItem::Type:
+      itemPenWidth = static_cast<QGraphicsLineItem *>(item)->pen().widthF();
+      break;
+    default:
+      itemPenWidth = 1.0;
+  }
+  const qreal pad = -itemPenWidth / 2;
+
+  const qreal penWidth = 0; // cosmetic pen
+
+  const QColor fgcolor = option->palette.windowText().color();
+  const QColor bgcolor( // ensure good contrast against fgcolor
+    fgcolor.red()   > 127 ? 0 : 255,
+    fgcolor.green() > 127 ? 0 : 255,
+    fgcolor.blue()  > 127 ? 0 : 255);
+
+  painter->setPen(QPen(bgcolor, penWidth, Qt::SolidLine));
+  painter->setBrush(Qt::NoBrush);
+  painter->drawRect(item->boundingRect().adjusted(pad, pad, -pad, -pad));
+
+  painter->setPen(QPen(fgcolor, penWidth, Qt::DashLine));
+  painter->setBrush(Qt::NoBrush);
+  painter->drawRect(item->boundingRect().adjusted(pad, pad, -pad, -pad));
+}
+
+void ZGraphicsItemGroup::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
+{
+  Q_UNUSED(widget);
+  if (option->state & QStyle::State_Selected)
+    qt_graphicsItem_highlightSelected(this, painter, option);
+}
 
 ZImgFilter::ZImgFilter(ZView& view)
   : ZObjFilter(view)
@@ -120,9 +196,7 @@ void ZImgFilter::setData(ZImgPack& pack)
 
 void ZImgFilter::releaseItemsOwnership()
 {
-  for (size_t i = 0; i < m_imgItems.size(); ++i) {
-    m_imgItems[i].release();
-  }
+  m_item.release();
 }
 
 void ZImgFilter::setNormalView(int z, int t)
@@ -333,9 +407,10 @@ void ZImgFilter::channelColorChanged()
 
 void ZImgFilter::opacityChanged()
 {
-  for (const auto& item : m_imgItems) {
-    item->setOpacity(m_opacity.get());
-  }
+  //for (const auto& item : m_imgItems) {
+  //  item->setOpacity(m_opacity.get());
+  //}
+  m_item->setOpacity(m_opacity.get());
 //  m_display->setAlpha(m_opacity.get());
 //  if (m_maxZProjDisplay)
 //    m_maxZProjDisplay->setAlpha(m_opacity.get());
@@ -380,16 +455,15 @@ ZImgPackDisplay* ZImgFilter::getDisplay() const
 
 void ZImgFilter::hideImgItems()
 {
-  for (size_t i = 0; i < m_imgItems.size(); ++i) {
-    m_imgItems[i]->setVisible(false);
-  }
+  //for (size_t i = 0; i < m_imgItems.size(); ++i) {
+  //  m_imgItems[i]->setVisible(false);
+  //}
+  m_item->setVisible(false);
 }
 
 void ZImgFilter::destroyImgItems()
 {
-  for (size_t i = 0; i < m_imgItems.size(); ++i) {
-    m_view.scene().removeItem(m_imgItems[i].get());
-  }
+  m_item.reset();
   m_imgItems.clear();
 }
 
@@ -403,10 +477,8 @@ void ZImgFilter::updateImgItems()
       curDisplay == m_lastDisplay && m_lastSlice == m_view.currentSlice() && m_lastTime == m_view.currentTime()) {
     //LOG(INFO) << "0";
     // pixmap is same, we only need to show it
-    if (!m_imgItems[0]->isVisible()) {
-      for (const auto& item : m_imgItems) {
-        item->setVisible(true);
-      }
+    if (!m_item->isVisible()) {
+      m_item->setVisible(true);
     }
   } else {
     destroyImgItems();
@@ -416,14 +488,17 @@ void ZImgFilter::updateImgItems()
     vp.moveTo(vp.x() - m_offsetPara.get().x, vp.y() - m_offsetPara.get().y);
     curDisplay->setViewport(vp);
 
+    m_item = std::make_unique<ZGraphicsItemGroup>();
+    m_view.scene().addItem(m_item.get());
     const ZQImagePack& qImagePack = curDisplay->toQImagePack();
     for (size_t i = 0; i < qImagePack.numImages(); ++i) {
-      m_imgItems.emplace_back(std::make_unique<QGraphicsPixmapItem>(QPixmap::fromImage(qImagePack.image(i))));
+      m_imgItems.push_back(new QGraphicsPixmapItem(QPixmap::fromImage(qImagePack.image(i))));
+      //m_imgItems[i]->setFlag(QGraphicsItem::ItemIsSelectable, true);
       m_imgItems[i]->setScale(qImagePack.scale(i));
       m_imgItems[i]->setPos(QPointF(qImagePack.location(i)) + QPointF(m_offsetPara.get().x, m_offsetPara.get().y));
       m_imgItems[i]->setOpacity(m_opacity.get());
       m_imgItems[i]->setVisible(m_isVisible);
-      m_view.scene().addItem(m_imgItems[i].get());
+      m_item->addToGroup(m_imgItems[i]);
     }
 
     m_lastDisplay = curDisplay;
