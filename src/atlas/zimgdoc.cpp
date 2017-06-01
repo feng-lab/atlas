@@ -19,15 +19,6 @@ ZImgDoc::ZImgDoc(ZDoc& doc)
   createActions();
 }
 
-void ZImgDoc::setImgOffset(size_t id, int offx, int offy, int offz, int offt)
-{
-  auto& pack = m_idToImgPacks.at(id);
-  pack->setOffsetX(offx);
-  pack->setOffsetY(offy);
-  pack->setOffsetZ(offz);
-  pack->setOffsetT(offt);
-}
-
 void ZImgDoc::setImgChannelColor(size_t id, size_t c, col4 col)
 {
   auto& pack = m_idToImgPacks.at(id);

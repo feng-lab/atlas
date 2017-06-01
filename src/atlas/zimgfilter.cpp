@@ -105,6 +105,7 @@ ZImgFilter::ZImgFilter(ZView& view)
   addParameter(&m_visible);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZImgFilter::opacityChanged);
   addParameter(&m_opacity);
+  addParameter(&m_transform);
   addParameter(&m_offsetPara);
 }
 
@@ -163,11 +164,6 @@ void ZImgFilter::setData(ZImgPack& pack)
       m_channelColorParas[c]->setVisible(false);
     }
   }
-
-  m_offsetPara.blockSignals(true);
-  m_offsetPara.set(glm::dvec4(m_imgPack->offsetX(), m_imgPack->offsetY(),
-                              m_imgPack->offsetZ(), m_imgPack->offsetT()));
-  m_offsetPara.blockSignals(false);
 
   m_display.reset(new ZImgPackDisplay(*m_imgPack, false));
   if (m_view.isMaxZProjView() && m_imgPack->imgInfo().depth > 1) {
@@ -235,8 +231,7 @@ void ZImgFilter::setMaxZProjView(int t)
 
 void ZImgFilter::setViewport(const QRectF& rect, double scale)
 {
-  QRectF vp = rect;
-  vp.moveTo(vp.x() - m_offsetPara.get().x, vp.y() - m_offsetPara.get().y);
+  QRectF vp = mapFromSceneRect(rect);
   if (m_imgPack->needUpdate(vp, scale, m_lastViewport, m_lastScale, realT(), realZ(), m_view.isMaxZProjView())) {
     if (!m_isVisible) {
       destroyImgItems(); // will create new one next time
@@ -282,6 +277,7 @@ std::shared_ptr<ZWidgetsGroup> ZImgFilter::viewSettingWidgetsGroup()
       m_widgetsGroup->addChild(*m_channelColorParas[i], 1);
       m_widgetsGroup->addChild(*m_doubleChannelRangeParas[i], 1);
     }
+    m_widgetsGroup->addChild(m_transform, 1);
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
     m_widgetsGroup->setBasicAdvancedCutoff(5);
@@ -289,19 +285,21 @@ std::shared_ptr<ZWidgetsGroup> ZImgFilter::viewSettingWidgetsGroup()
   return m_widgetsGroup;
 }
 
+void ZImgFilter::transformChanged()
+{
+  m_item->setTransform(getQTransform());
+  ZObjFilter::transformChanged();
+}
+
 void ZImgFilter::offsetChanged()
 {
-  m_imgPack->setOffsetX(m_offsetPara.get().x);
-  m_imgPack->setOffsetY(m_offsetPara.get().y);
-  m_imgPack->setOffsetZ(m_offsetPara.get().z);
-  m_imgPack->setOffsetT(m_offsetPara.get().w);
-  ZObjFilter::offsetChanged();
   m_displayValid = false;
   if (m_view.isMaxZProjView()) {
     setMaxZProjView(m_view.currentTime());
   } else {
     setNormalView(m_view.currentSlice(), m_view.currentTime());
   }
+  ZObjFilter::offsetChanged();
 }
 
 void ZImgFilter::updateViewSettingWidgetsGroup()
@@ -315,6 +313,7 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
       m_widgetsGroup->addChild(*m_channelColorParas[i], 1);
       m_widgetsGroup->addChild(*m_doubleChannelRangeParas[i], 1);
     }
+    m_widgetsGroup->addChild(m_transform, 1);
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
     m_widgetsGroup->setBasicAdvancedCutoff(5);
@@ -485,17 +484,18 @@ void ZImgFilter::updateImgItems()
 
     curDisplay->setScale(m_view.currentScale());
     QRectF vp = m_view.currentViewport();
-    vp.moveTo(vp.x() - m_offsetPara.get().x, vp.y() - m_offsetPara.get().y);
-    curDisplay->setViewport(vp);
+    curDisplay->setViewport(mapFromSceneRect(vp));
 
     m_item = std::make_unique<ZGraphicsItemGroup>();
     m_view.scene().addItem(m_item.get());
+    m_item->setTransform(getQTransform());
     const ZQImagePack& qImagePack = curDisplay->toQImagePack();
     for (size_t i = 0; i < qImagePack.numImages(); ++i) {
       m_imgItems.push_back(new QGraphicsPixmapItem(QPixmap::fromImage(qImagePack.image(i))));
       //m_imgItems[i]->setFlag(QGraphicsItem::ItemIsSelectable, true);
       m_imgItems[i]->setScale(qImagePack.scale(i));
-      m_imgItems[i]->setPos(QPointF(qImagePack.location(i)) + QPointF(m_offsetPara.get().x, m_offsetPara.get().y));
+      m_imgItems[i]->setPos(QPointF(qImagePack.location(i)));
+      m_imgItems[i]->setTransform(getQTransform());
       m_imgItems[i]->setOpacity(m_opacity.get());
       m_imgItems[i]->setVisible(m_isVisible);
       m_item->addToGroup(m_imgItems[i]);

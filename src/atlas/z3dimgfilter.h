@@ -32,8 +32,6 @@ public:
   void setVisible(bool v)
   { m_visible.set(v); }
 
-  void setOffset(double x, double y, double z);
-
   void setData(const ZImgPack& imgPack);
 
   virtual bool isStayOnTop() const

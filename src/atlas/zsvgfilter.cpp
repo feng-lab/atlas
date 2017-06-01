@@ -18,6 +18,7 @@ ZSvgFilter::ZSvgFilter(ZView& view)
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZSvgFilter::visibleChanged);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZSvgFilter::opacityChanged);
   addParameter(&m_visible);
+  addParameter(&m_transform);
   addParameter(&m_offsetPara);
   addParameter(&m_opacity);
 }
@@ -27,7 +28,7 @@ void ZSvgFilter::setData(QSvgRenderer& svg)
   m_item = std::make_unique<QGraphicsSvgItem>();
   m_item->setSharedRenderer(&svg);
   m_item->setOpacity(m_opacity.get());
-  m_item->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
+  m_item->setTransform(getQTransform());
   m_item->setVisible((realZ() == 0 || m_view.isMaxZProjView()) && realT() == 0 && m_visible.get());
   //if (svg.animated())
     //connect(m_item->renderer(), &QSvgRenderer::repaintNeeded, [this](){ m_item->update(); });
@@ -67,15 +68,21 @@ std::shared_ptr<ZWidgetsGroup> ZSvgFilter::viewSettingWidgetsGroup()
   if (!m_widgetsGroup) {
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("", 1);
     m_widgetsGroup->addChild(m_visible, 1);
+    m_widgetsGroup->addChild(m_transform, 1);
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
   }
   return m_widgetsGroup;
 }
 
+void ZSvgFilter::transformChanged()
+{
+  m_item->setTransform(getQTransform());
+  ZObjFilter::transformChanged();
+}
+
 void ZSvgFilter::offsetChanged()
 {
-  m_item->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
   m_item->setVisible((realZ() == 0 || m_view.isMaxZProjView()) && realT() == 0 && m_visible.get());
   ZObjFilter::offsetChanged();
 }

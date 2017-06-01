@@ -3,7 +3,7 @@ project(img)
 
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_OSX_DEPLOYMENT_TARGET 10.8)
+set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
 
 LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -105,7 +105,7 @@ find_package(glog REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glog ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/gflags
              NO_DEFAULT_PATH)
 
-find_package(Qt5Core 5.8.0 REQUIRED PATHS ~/Qt/5.8/clang_64)
+find_package(Qt5Core 5.9.0 REQUIRED PATHS ~/Qt/5.9/clang_64)
 
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})

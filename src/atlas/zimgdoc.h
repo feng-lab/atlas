@@ -18,9 +18,6 @@ public:
   inline const ZImgPack& imgPack(size_t id) const
   { return *m_idToImgPacks.at(id); }
 
-  //
-  void setImgOffset(size_t id, int offx, int offy, int offz, int offt);
-
   void setImgChannelColor(size_t id, size_t c, col4 col);
 
   void showImg(ZImg* img, const QString& path);

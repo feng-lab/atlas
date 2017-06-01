@@ -15,7 +15,6 @@ void Z3DImgView::docImgsAdded(const QList<size_t>& objs)
     for (int i = 0; i < objs.size(); ++i) {
       size_t id = objs[i];
       Z3DImgFilter* viewControl = new Z3DImgFilter(globalParas(), this);
-      viewControl->setOffset(m_doc.imgPack(id).offsetX(), m_doc.imgPack(id).offsetY(), m_doc.imgPack(id).offsetZ());
       viewControl->setData(m_doc.imgPack(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
@@ -50,7 +49,6 @@ void Z3DImgView::docImgAdded(size_t id)
 {
   try {
     Z3DImgFilter* viewControl = new Z3DImgFilter(globalParas(), this);
-    viewControl->setOffset(m_doc.imgPack(id).offsetX(), m_doc.imgPack(id).offsetY(), m_doc.imgPack(id).offsetZ());
     viewControl->setData(m_doc.imgPack(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());

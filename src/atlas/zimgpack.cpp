@@ -120,7 +120,6 @@ ZImgPack::ZImgPack(ZImg& img, const QString& fileName)
   : m_imgInfo(img.info())
   , m_imgSource(fileName)
   , m_numScenes(1), m_hasUnsavedChange(false)
-  , m_offsetX(0), m_offsetY(0), m_offsetZ(0), m_offsetT(0)
   , m_diskCached(true)
 {
   if (m_imgInfo.isEmpty()) {
@@ -143,7 +142,6 @@ ZImgPack::ZImgPack(const QString& fileName, size_t scene, FileFormat format, siz
                    const ZImgInfo* info, const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock)
   : m_imgSource(fileName, ZImgRegion(), scene, format)
   , m_hasUnsavedChange(false)
-  , m_offsetX(0), m_offsetY(0), m_offsetZ(0), m_offsetT(0)
   , m_diskCached(true)
 {
   const std::vector<std::shared_ptr<ZImgSubBlock>>* sceneSubBlock = nullptr;
@@ -200,7 +198,6 @@ ZImgPack::ZImgPack(const QStringList& files, Dimension catDim, size_t scene, Fil
                    const ZImgInfo* info, const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock)
   : m_imgSource(files, catDim, ZImgRegion(), scene, format, true)
   , m_hasUnsavedChange(false)
-  , m_offsetX(0), m_offsetY(0), m_offsetZ(0), m_offsetT(0)
   , m_diskCached(true)
 {
   const std::vector<std::shared_ptr<ZImgSubBlock>>* sceneSubBlock = nullptr;

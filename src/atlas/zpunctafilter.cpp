@@ -135,6 +135,7 @@ ZPunctaFilter::ZPunctaFilter(ZView& view)
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZPunctaFilter::opacityChanged);
   addParameter(&m_visible);
   addParameter(&m_outlineColor);
+  addParameter(&m_transform);
   addParameter(&m_offsetPara);
   addParameter(&m_opacity);
 }
@@ -147,7 +148,7 @@ void ZPunctaFilter::setData(ZPuncta& puncta)
                                  m_outlineColor.get().y * 255,
                                  m_outlineColor.get().z * 255));
   m_item->setOpacity(m_opacity.get());
-  m_item->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
+  m_item->setTransform(getQTransform());
   if (m_view.isMaxZProjView()) {
     m_item->setMaxZProjView(realT());
   } else {
@@ -186,15 +187,21 @@ std::shared_ptr<ZWidgetsGroup> ZPunctaFilter::viewSettingWidgetsGroup()
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("Puncta", 1);
     m_widgetsGroup->addChild(m_visible, 1);
     m_widgetsGroup->addChild(m_outlineColor, 1);
+    m_widgetsGroup->addChild(m_transform, 1);
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
   }
   return m_widgetsGroup;
 }
 
+void ZPunctaFilter::transformChanged()
+{
+  m_item->setTransform(getQTransform());
+  ZObjFilter::transformChanged();
+}
+
 void ZPunctaFilter::offsetChanged()
 {
-  m_item->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
   if (m_view.isMaxZProjView()) {
     m_item->setMaxZProjView(realT());
   } else {

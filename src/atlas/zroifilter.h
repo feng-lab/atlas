@@ -128,10 +128,15 @@ public:
 
   virtual void rotateCounterclockwise() override;
 
-  ZDVec4Parameter& offsetPara()
+  Z2DTransformParameter& transformPara()
+  { return m_transform; }
+
+  ZDVec2Parameter& offsetPara()
   { return m_offsetPara; }
 
 protected:
+  virtual void transformChanged() override;
+
   virtual void offsetChanged() override;
 
   std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> createCtrlPtItems(int slice);

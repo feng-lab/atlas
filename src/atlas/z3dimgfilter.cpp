@@ -191,11 +191,6 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   m_numParas = m_parameters.size();
 }
 
-void Z3DImgFilter::setOffset(double x, double y, double z)
-{
-  m_rendererBase.translate(x, y, z);
-}
-
 void Z3DImgFilter::setData(const ZImgPack& imgPack)
 {
   if (m_widgetsGroup) {

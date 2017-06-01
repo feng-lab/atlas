@@ -2239,6 +2239,11 @@ DECLARESepPutFunc(putseparate8bitYCbCr11tile)
 }
 #undef YCbCrtoRGB
 
+static int isInRefBlackWhiteRange(float f)
+{
+    return f > (float)(-0x7FFFFFFF + 128) && f < (float)0x7FFFFFFF;
+}
+
 static int
 initYCbCrConversion(TIFFRGBAImage* img)
 {
@@ -2263,6 +2268,31 @@ initYCbCrConversion(TIFFRGBAImage* img)
 	TIFFGetFieldDefaulted(img->tif, TIFFTAG_YCBCRCOEFFICIENTS, &luma);
 	TIFFGetFieldDefaulted(img->tif, TIFFTAG_REFERENCEBLACKWHITE,
 	    &refBlackWhite);
+
+        /* Do some validation to avoid later issues. Detect NaN for now */
+        /* and also if lumaGreen is zero since we divide by it later */
+        if( luma[0] != luma[0] ||
+            luma[1] != luma[1] ||
+            luma[1] == 0.0 ||
+            luma[2] != luma[2] )
+        {
+            TIFFErrorExt(img->tif->tif_clientdata, module,
+                "Invalid values for YCbCrCoefficients tag");
+            return (0);
+        }
+
+        if( !isInRefBlackWhiteRange(refBlackWhite[0]) ||
+            !isInRefBlackWhiteRange(refBlackWhite[1]) ||
+            !isInRefBlackWhiteRange(refBlackWhite[2]) ||
+            !isInRefBlackWhiteRange(refBlackWhite[3]) ||
+            !isInRefBlackWhiteRange(refBlackWhite[4]) ||
+            !isInRefBlackWhiteRange(refBlackWhite[5]) )
+        {
+            TIFFErrorExt(img->tif->tif_clientdata, module,
+                "Invalid values for ReferenceBlackWhite tag");
+            return (0);
+        }
+
 	if (TIFFYCbCrToRGBInit(img->ycbcr, luma, refBlackWhite) < 0)
 		return(0);
 	return (1);

@@ -131,30 +131,6 @@ public:
   bool hasUnsavedChange() const
   { return m_hasUnsavedChange; }
 
-  int offsetX() const
-  { return m_offsetX; }
-
-  int offsetY() const
-  { return m_offsetY; }
-
-  int offsetZ() const
-  { return m_offsetZ; }
-
-  int offsetT() const
-  { return m_offsetT; }
-
-  void setOffsetX(int off)
-  { m_offsetX = off; }
-
-  void setOffsetY(int off)
-  { m_offsetY = off; }
-
-  void setOffsetZ(int off)
-  { m_offsetZ = off; }
-
-  void setOffsetT(int off)
-  { m_offsetT = off; }
-
   void save(const QString& fileName, FileFormat format, Compression comp);
 
   bool needUpdate(const QRectF& viewport, double scale,
@@ -237,11 +213,6 @@ protected:
   ZImgSource m_imgSource;
   size_t m_numScenes;
   bool m_hasUnsavedChange;
-
-  int m_offsetX;
-  int m_offsetY;
-  int m_offsetZ;
-  int m_offsetT;
 
   // derived data
 private:

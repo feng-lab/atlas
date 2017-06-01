@@ -21,6 +21,7 @@
 #include <glm/gtx/vector_angle.hpp>
 #include <glm/gtx/hash.hpp>
 #include <glm/gtx/rotate_vector.hpp>
+#include <glm/gtx/matrix_transform_2d.hpp>
 #include <QRegularExpression>
 #include <QStringList>
 #include <QColor>

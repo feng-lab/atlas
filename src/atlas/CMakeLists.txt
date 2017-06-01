@@ -4,7 +4,7 @@ set(ATLAS_VERSION ${GIT_VERSION})
 
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_OSX_DEPLOYMENT_TARGET 10.8)
+set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
 
 LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -137,8 +137,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt5 5.8.0 REQUIRED COMPONENTS Core Widgets Network Svg
-             PATHS ~/Qt/5.8/clang_64)
+find_package(Qt5 5.9.0 REQUIRED COMPONENTS Core Widgets Network Svg
+             PATHS ~/Qt/5.9/clang_64)
 
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
@@ -672,7 +672,11 @@ set(SOURCES
     zsvgfilter.h
     zsvgview.cpp
     zsvgview.h
-    zgraphicsitemtype.h zparametereditdialog.cpp zparametereditdialog.h)
+    zgraphicsitemtype.h
+    zparametereditdialog.cpp
+    zparametereditdialog.h
+    z2dtransformparameter.cpp
+    z2dtransformparameter.h)
 
 # our target
 set(APP_NAME Atlas)

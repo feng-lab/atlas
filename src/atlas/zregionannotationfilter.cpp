@@ -65,6 +65,7 @@ std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup(
       wg->setGroupName(nameID.first);
       m_widgetsGroup->addChild(wg);
     }
+    m_widgetsGroup->addChild(m_transform, 2);
     m_widgetsGroup->addChild(m_offsetPara, 2);
   }
   m_widgetsGroup->setUseToolBoxStyle(true);
@@ -133,6 +134,7 @@ void ZRegionAnnotationFilter::allROIChanged()
 
   m_parameters.clear();
   //addParameter(&m_visible);
+  addParameter(&m_transform);
   addParameter(&m_offsetPara);
 
   for (const auto& node : m_regionAnnotation->annotationTree()) {
@@ -144,7 +146,10 @@ void ZRegionAnnotationFilter::allROIChanged()
     flt->setVisible(false);
     flt->setOutlineColor(glm::vec3(node.red / 255.f, node.green / 255.f, node.blue / 255.f));
     flt->setRegionColor(glm::vec3(node.red / 255.f, node.green / 255.f, node.blue / 255.f));
-    connect(&m_offsetPara, &ZDVec4Parameter::valueChanged, &flt->offsetPara(), &ZDVec4Parameter::updateFromSender);
+    connect(&m_transform, &Z2DTransformParameter::valueChanged,
+            &flt->transformPara(), &Z2DTransformParameter::updateFromSender);
+    connect(&m_offsetPara, &ZDVec2Parameter::valueChanged,
+            &flt->offsetPara(), &ZDVec2Parameter::updateFromSender);
     m_idToRegionNames[id] = QString("%1_%2").arg(node.abbreviation).arg(node.id);
     m_nameToID[m_idToRegionNames[id]] = id;
     for (auto para : flt->parameters()) {

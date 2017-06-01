@@ -1,9 +1,11 @@
 #pragma once
 
 #include "znumericparameter.h"
+#include "z2dtransformparameter.h"
 #include "zview.h"
 #include <QObject>
 #include <QList>
+#include <QTransform>
 
 namespace nim {
 
@@ -45,6 +47,8 @@ public:
   QList<ZParameter*> parameters()
   { return m_parameters; }
 
+  QPointF mapFromScene(QPointF p) const;
+
 signals:
 
   void boundBoxChanged();
@@ -60,17 +64,25 @@ protected:
 
   void updateBoundBoxWithOffsetPara(std::array<int, 8>& boundBox) const;
 
+  QTransform getQTransform() const;
+
+  QRectF mapToSceneRect(const QRectF& rect) const;
+
+  QRectF mapFromSceneRect(const QRectF& rect) const;
+
   int realZ() const
-  { return m_view.currentSlice() - int(m_offsetPara.get().z); }
+  { return m_view.currentSlice() - int(m_offsetPara.get().x); }
 
   int realZ(int z) const
-  { return z - int(m_offsetPara.get().z); }
+  { return z - int(m_offsetPara.get().x); }
 
   int realT() const
-  { return m_view.currentTime() - int(m_offsetPara.get().w); }
+  { return m_view.currentTime() - int(m_offsetPara.get().y); }
 
   int realT(int t) const
-  { return t - int(m_offsetPara.get().w); }
+  { return t - int(m_offsetPara.get().y); }
+
+  virtual void transformChanged();
 
   virtual void offsetChanged();
 
@@ -79,7 +91,8 @@ protected:
 
   ZView& m_view;
 
-  ZDVec4Parameter m_offsetPara;
+  Z2DTransformParameter m_transform;
+  ZDVec2Parameter m_offsetPara;
 };
 
 } // namespace nim

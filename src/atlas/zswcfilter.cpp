@@ -194,6 +194,7 @@ ZSwcFilter::ZSwcFilter(ZView& view)
   addParameter(&m_visible);
   addParameter(&m_showSkeleton);
   addParameter(&m_outlineColor);
+  addParameter(&m_transform);
   addParameter(&m_offsetPara);
   addParameter(&m_opacity);
 }
@@ -207,7 +208,7 @@ void ZSwcFilter::setData(ZSwc& swc)
                                  m_outlineColor.get().y * 255,
                                  m_outlineColor.get().z * 255));
   m_item->setOpacity(m_opacity.get());
-  m_item->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
+  m_item->setTransform(getQTransform());
   if (m_view.isMaxZProjView()) {
     m_item->setMaxZProjView(realT());
   } else {
@@ -245,15 +246,21 @@ std::shared_ptr<ZWidgetsGroup> ZSwcFilter::viewSettingWidgetsGroup()
     m_widgetsGroup->addChild(m_visible, 1);
     m_widgetsGroup->addChild(m_showSkeleton, 1);
     m_widgetsGroup->addChild(m_outlineColor, 1);
+    m_widgetsGroup->addChild(m_transform, 1);
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
   }
   return m_widgetsGroup;
 }
 
+void ZSwcFilter::transformChanged()
+{
+  m_item->setTransform(getQTransform());
+  ZObjFilter::transformChanged();
+}
+
 void ZSwcFilter::offsetChanged()
 {
-  m_item->setPos(m_offsetPara.get().x, m_offsetPara.get().y);
   if (m_view.isMaxZProjView()) {
     m_item->setMaxZProjView(realT());
   } else {

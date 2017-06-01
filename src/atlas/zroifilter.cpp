@@ -205,6 +205,7 @@ ZROIFilter::ZROIFilter(ZView& view)
   addParameter(&m_showControlPoints);
   addParameter(&m_outlineColor);
   addParameter(&m_regionColor);
+  addParameter(&m_transform);
   addParameter(&m_offsetPara);
   addParameter(&m_opacity);
 
@@ -229,7 +230,7 @@ void ZROIFilter::setData(ZROI& roi)
                                m_regionColor.get().z * 255,
                                m_opacity.get() * 255));
       //roiItem->setOpacity(m_opacity.get());
-      roiItem->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
+      roiItem->setTransform(getQTransform());
       roiItem->setVisible((realZ() == i || m_view.isMaxZProjView()) && m_visible.get());
       m_view.scene().addItem(roiItem);
 
@@ -306,6 +307,7 @@ std::shared_ptr<ZWidgetsGroup> ZROIFilter::viewSettingWidgetsGroup()
     m_widgetsGroup->addChild(m_showControlPoints, 1);
     m_widgetsGroup->addChild(m_outlineColor, 1);
     m_widgetsGroup->addChild(m_regionColor, 1);
+    m_widgetsGroup->addChild(m_transform, 1);
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
   }
@@ -414,18 +416,25 @@ void ZROIFilter::rotateCounterclockwise()
     m_ROI->rotateROIControlPoints(controlPoints, -5. * degree);
 }
 
-void ZROIFilter::offsetChanged()
+void ZROIFilter::transformChanged()
 {
+  QTransform trans = getQTransform();
+
   for (const auto& sliceItem : m_sliceToROIItem) {
-    sliceItem.second->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
+    sliceItem.second->setTransform(trans);
   }
   if (m_showControlPoints.get()) {
     for (const auto& sliceItems : m_sliceToCtrlPtItems) {
       for (const auto& item : sliceItems.second) {
-        item->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
+        item->setTransform(trans);
       }
     }
   }
+  ZObjFilter::transformChanged();
+}
+
+void ZROIFilter::offsetChanged()
+{
 }
 
 std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> ZROIFilter::createCtrlPtItems(int slice)
@@ -436,7 +445,7 @@ std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> ZROIFilter::createCtrlPtItem
     ROICtrlPtGraphicsItem* rectItem = new ROICtrlPtGraphicsItem(*m_ROI, controlPoint,
                                                                 m_view.graphicsView().currentScale());
     rectItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get() && m_showControlPoints.get());
-    rectItem->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
+    rectItem->setTransform(getQTransform());
     m_view.scene().addItem(rectItem);
     items.emplace_back(rectItem);
   }
@@ -527,7 +536,7 @@ void ZROIFilter::onRoiChanged(int slice)
                              m_regionColor.get().z * 255,
                              m_opacity.get() * 255));
     //roiItem->setOpacity(m_opacity.get());
-    roiItem->setOffset(m_offsetPara.get().x, m_offsetPara.get().y);
+    roiItem->setTransform(getQTransform());
     roiItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get());
     m_view.scene().addItem(roiItem);
 

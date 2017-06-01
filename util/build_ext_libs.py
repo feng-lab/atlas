@@ -15,6 +15,10 @@ import glob
 import common_dirs
 
 
+def macos_min_version():
+    return '10.9'
+
+
 def get_package_top_level_folder(file: str, folder: str):
     if file.lower().endswith('.zip'):
         with zipfile.ZipFile(file, mode='r') as zf:
@@ -51,7 +55,7 @@ def update_or_clone_git_repository(repository_folder: str, repository_url: str):
         subprocess.run(['git', 'clone', repository_url, repository_folder], shell=False, check=True)
 
 
-def export_git_repository(repository_folder: str, target_folder: str, branch: str='', tag: str=''):
+def export_git_repository(repository_folder: str, target_folder: str, branch: str = '', tag: str = ''):
     if not branch:
         branch = 'master'
     shutil.rmtree(target_folder, ignore_errors=True)
@@ -95,7 +99,7 @@ def find_src_package_with_glob(files: str):
         raise Exception("Find more than one matching packages.")
 
 
-def get_vcvars_environment(remove_conda_from_path: bool=True):
+def get_vcvars_environment(remove_conda_from_path: bool = True):
     """
     Returns a dictionary containing the environment variables set up by vcvarsall.bat amd64
     """
@@ -115,8 +119,8 @@ def get_vcvars_environment(remove_conda_from_path: bool=True):
     return get_enviroment_from_shell_script(vcvars, 'amd64', remove_conda_from_path=remove_conda_from_path)
 
 
-def get_enviroment_from_shell_script(script: str, para: str='', start_env=os.environ,
-                                     remove_conda_from_path: bool=True):
+def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.environ,
+                                     remove_conda_from_path: bool = True):
     python = sys.executable
     if sys.platform.startswith('win32'):
         process = subprocess.Popen(
@@ -159,7 +163,7 @@ def get_cmake_cmd_common_part(install_dir: str):
         return ['cmake',  # '-E', 'echo',
                 '-DCMAKE_BUILD_TYPE=Release',
                 '-DCMAKE_INSTALL_PREFIX=' + install_dir,
-                '-DCMAKE_OSX_DEPLOYMENT_TARGET=10.8',
+                '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + macos_min_version(),
                 '-DCMAKE_OSX_SYSROOT=' + osx_sysroot,
                 '-DCMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -std=c++14'
                 ]
@@ -271,7 +275,7 @@ def build_glbinding(src_dir: str, install_dir: str, ext_dir: str):
             cmakecmd.extend(['-DOPTION_BUILD_GPU_TESTS:BOOL=OFF',
                              '-DBUILD_SHARED_LIBS:BOOL=OFF',
                              '-DOPTION_BUILD_TESTS:BOOL=OFF',
-                            src_dir])
+                             src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True)
@@ -319,8 +323,9 @@ def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str):
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             subprocess.run(['sh', src_dir + '/configure', '--host', 'x86_64-apple-darwin', 'NASM=' + ext_dir + '/nasm',
-                            '--enable-static', '--disable-shared', 'CFLAGS=-mmacosx-version-min=10.8 -O3',
-                            'LDFLAGS=-mmacosx-version-min=10.8'],
+                            '--enable-static', '--disable-shared',
+                            'CFLAGS=-mmacosx-version-min=' + macos_min_version() + ' -O3',
+                            'LDFLAGS=-mmacosx-version-min=' + macos_min_version()],
                            cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count())],
                            cwd=build_dir, shell=False, check=True)
@@ -386,7 +391,7 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
         else:
             cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
                              '-DPNG_SHARED:BOOL=OFF',
-                            src_dir])
+                             src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True)
@@ -437,8 +442,9 @@ def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
                 for line in from_lines:
                     line = line.replace(r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
                                         r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O',
-                                        r'CFLAGS=-mmacosx-version-min=10.8 -I. -Icommon/include -I$(DIR_SYS) '
-                                        r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3')
+                                        r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
+                                        r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 '
+                                        r'-mmacosx-version-min={0}'.format(macos_min_version()))
                     f.write(line)
                     to_lines.append(line)
             print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
@@ -471,7 +477,8 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
         else:
             subprocess.run(['xcodebuild', '-project', 'GTEngine.xcodeproj', '-configuration', 'Default',
                             '-target', 'Release Static', 'build', '-arch', 'x86_64',
-                            'MACOSX_DEPLOYMENT_TARGET=10.8', 'CLANG_CXX_LANGUAGE_STANDARD=c++14'],
+                            'MACOSX_DEPLOYMENT_TARGET=' + macos_min_version(),
+                            'CLANG_CXX_LANGUAGE_STANDARD=c++14'],
                            cwd=src_dir, shell=False, check=True)
             shutil.copytree(os.path.join(src_dir, 'build', 'Default'), os.path.join(install_dir, 'lib'))
 
@@ -516,7 +523,7 @@ def build_ospray(src_dir: str, install_dir: str, ext_dir: str, ispc_dir: str, em
                              '-DOSPRAY_APPS_GLUTVIEWER:BOOL=OFF',
                              '-DOSPRAY_APPS_QTVIEWER:BOOL=OFF',
                              '-DOSPRAY_APPS_VOLUMEVIEWER:BOOL=OFF',
-                            src_dir])
+                             src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True)
@@ -560,7 +567,7 @@ def build_assimp(src_dir: str, install_dir: str, ext_dir: str):
         else:
             cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
                              '-DASSIMP_BUILD_TESTS:BOOL=OFF',
-                            src_dir])
+                             src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True)
@@ -599,7 +606,7 @@ def build_hdf5(src_dir: str, install_dir: str, ext_dir: str):
                              '-DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON',
                              '-DHDF5_ENABLE_THREADSAFE:BOOL=OFF',
                              '-DHDF5_BUILD_EXAMPLES:BOOL=OFF',
-                            src_dir])
+                             src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True)
@@ -707,10 +714,10 @@ def build_botan(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['botan-test'],
                            cwd=src_dir, shell=True, check=True, env=env)
             subprocess.run(['nmake', 'install'],
-                           cwd=src_dir, shell=False, check=True, env=env)   # todo: install not working
+                           cwd=src_dir, shell=False, check=True, env=env)  # todo: install not working
         else:
             subprocess.run([python, src_dir + '/configure.py', '--cc=clang', '--with-zlib',
-                            '--cc-abi-flags=-mmacosx-version-min=10.8',
+                            '--cc-abi-flags=-mmacosx-version-min=' + macos_min_version(),
                             '--prefix=' + install_dir],
                            cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
@@ -760,7 +767,7 @@ def build_itk(src_dir: str, install_dir: str, ext_dir: str):
                              '-DModule_ITKReview:BOOL=ON',
                              '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
                              '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
-                            src_dir])
+                             src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True)
@@ -798,7 +805,7 @@ def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
                              '-DVTK_USE_SYSTEM_ZLIB:BOOL=ON',
                              '-DVTK_LEGACY_REMOVE:BOOL=ON',
                              '-DVTK_USE_SYSTEM_LIBXML2:BOOL=ON',
-                            src_dir])
+                             src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True)
@@ -948,7 +955,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                              '-DBUILD_WITH_DEBUG_INFO:BOOL=OFF',
                              '-DBUILD_opencv_apps:BOOL=OFF',
                              '-DBUILD_opencv_matlab:BOOL=OFF',
-                            src_dir])
+                             src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True, env=env)
@@ -1169,7 +1176,7 @@ def build_libs(libs: dict, update_src: bool):
             unpack_file_to_folder(embree_package_name, base_dir)
             update_or_clone_git_repository(src_dir, 'git@github.com:ospray/OSPRay.git')
         ispc_dir = ispc_package_unpack_folder
-        embree_dir = find_src_package_with_glob(os.path.join(embree_package_unpack_folder, 'lib', 'cmake', 'embree*'))
+        embree_dir = embree_package_unpack_folder
         assert os.path.exists(src_dir)
         assert os.path.exists(ispc_dir)
         assert os.path.exists(embree_dir)
