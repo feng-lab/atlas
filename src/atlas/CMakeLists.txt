@@ -79,7 +79,6 @@ else (WIN32)
       ${IPP_PATH}/lib/libipps.a
       ${IPP_PATH}/lib/libippcv.a
       ${IPP_PATH}/lib/libippcc.a
-      ${IPP_PATH}/lib/intel64/libipp_iw.a
       ${INTEL_PATH}/lib/libirc.a)
 endif (WIN32)
 
