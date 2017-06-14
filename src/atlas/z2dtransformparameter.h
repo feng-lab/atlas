@@ -45,6 +45,9 @@ public:
   inline void setYScale(double s)
   { m_scale.set(glm::dvec2(m_scale.get().x, s)); }
 
+  inline void setScale(double sx, double xy)
+  { m_scale.set(glm::dvec2(sx, xy)); }
+
   inline void translate(double x, double y)
   { m_translation.set(glm::dvec2(x, y) + m_translation.get()); }
 
@@ -54,6 +57,10 @@ public:
   void rotate(double ang);
 
   void rotate(double ang, const glm::dvec2& center);
+
+  void flipHorizontally(const QRectF& boundRect);
+
+  void flipVertically(const QRectF& boundRect);
 
   virtual void setValueSameAs(const ZParameter& rhs) override;
 

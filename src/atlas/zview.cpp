@@ -47,6 +47,8 @@ ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
           this, &ZView::mousePressed);
   connect(m_scene, &ZGraphicsScene::mouseReleased,
           this, &ZView::mouseReleased);
+  connect(m_scene, &ZGraphicsScene::selectionChanged,
+          this, &ZView::selectionChanged);
   m_view = new ZGraphicsView(m_scene, this);
   connect(m_view, &ZGraphicsView::viewportChanged,
           this, &ZView::viewportChanged);
@@ -407,6 +409,14 @@ void ZView::mouseReleased(QPointF scenePos)
 {
   for (const auto& view : m_objViews) {
     view->mouseReleased(scenePos);
+  }
+}
+
+void ZView::selectionChanged()
+{
+  QList<QGraphicsItem*> items = m_scene->selectedItems();
+  for (const auto& view : m_objViews) {
+    view->selectionChanged(items);
   }
 }
 

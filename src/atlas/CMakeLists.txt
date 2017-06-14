@@ -100,21 +100,12 @@ else (WIN32)
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/lib/libGTEngine.a)
 endif (WIN32)
 
-set(BENCHMARK_INCLUDE_DIRS ${BENCHMARK_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/benchmark/include)
-if (WIN32)
-  set(BENCHMARK_LIBRARIES ${BENCHMARK_LIBRARIES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/benchmark/lib/benchmark.lib)
-else (WIN32)
-  set(BENCHMARK_LIBRARIES ${BENCHMARK_LIBRARIES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/benchmark/lib/libbenchmark.a)
-endif (WIN32)
+find_package(BENCHMARK REQUIRED
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/benchmark NO_DEFAULT_PATH)
 
 find_package(HDF5 REQUIRED COMPONENTS C CXX static
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/share NO_DEFAULT_PATH)
 message(${HDF5_INCLUDE_DIR})
-message(${HDF5_C_STATIC_LIBRARY})
-message(${HDF5_CXX_STATIC_LIBRARY})
 
 find_package(ASSIMP REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/assimp NO_DEFAULT_PATH)
@@ -748,7 +739,7 @@ target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding h
                       img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${GEOMETRICTOOLS_LIBRARIES}
                       ${ASSIMP_LIBRARIES} ${MKL_LIBRARIES} ${IPP_LIBRARIES})
 if (BUILD_TESTING)
-  target_link_libraries(${APP_NAME} PUBLIC ${BENCHMARK_LIBRARIES})
+  target_link_libraries(${APP_NAME} PUBLIC benchmark::benchmark)
 endif (BUILD_TESTING)
 
 if (APPLE)

@@ -45,8 +45,7 @@ public:
   void setVisible(bool v)
   { m_visible.set(v); }
 
-  void setSelected(bool v)
-  { Q_UNUSED(v) }
+  void setSelected(bool v);
 
   void setNormalView(int z, int t) override;
 
@@ -95,6 +94,10 @@ private:
   double getLowerChannelRange(size_t c) const;
 
   double getUpperChannelRange(size_t c) const;
+
+  void flipHorizontally();
+
+  void flipVertically();
 
 private:
   ZImgPack* m_imgPack;

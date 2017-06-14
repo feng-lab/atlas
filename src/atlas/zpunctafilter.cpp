@@ -164,6 +164,13 @@ void ZPunctaFilter::releaseItemsOwnership()
   m_item.release();
 }
 
+void ZPunctaFilter::setSelected(bool v)
+{
+  if (m_item->isSelected() != v) {
+    m_item->setSelected(v);
+  }
+}
+
 void ZPunctaFilter::setNormalView(int z, int t)
 {
   m_item->setNormalView(realZ(z), realT(t));

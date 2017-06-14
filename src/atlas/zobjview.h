@@ -49,6 +49,9 @@ public:
 
   virtual void mouseReleased(const QPointF& scenePos) = 0;
 
+  // called if selection changed from view
+  virtual void selectionChanged(const QList<QGraphicsItem*>& items) = 0;
+
   //
   virtual void rotateClockwise() = 0;
 

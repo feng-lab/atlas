@@ -11,6 +11,7 @@
 #include <QGraphicsPixmapItem>
 #include <QStyleOption>
 #include <QPainter>
+#include <QPushButton>
 
 namespace nim {
 
@@ -195,6 +196,13 @@ void ZImgFilter::releaseItemsOwnership()
   m_item.release();
 }
 
+void ZImgFilter::setSelected(bool v)
+{
+  if (m_item->isSelected() != v) {
+    m_item->setSelected(v);
+  }
+}
+
 void ZImgFilter::setNormalView(int z, int t)
 {
   bool isVisibleBefore = m_isVisible;
@@ -277,6 +285,15 @@ std::shared_ptr<ZWidgetsGroup> ZImgFilter::viewSettingWidgetsGroup()
       m_widgetsGroup->addChild(*m_channelColorParas[i], 1);
       m_widgetsGroup->addChild(*m_doubleChannelRangeParas[i], 1);
     }
+
+    QPushButton* pb = new QPushButton("Flip Horizontally");
+    connect(pb, &QPushButton::clicked, this, &ZImgFilter::flipHorizontally);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    pb = new QPushButton("Flip Vertically");
+    connect(pb, &QPushButton::clicked, this, &ZImgFilter::flipVertically);
+    m_widgetsGroup->addChild(*pb, 1);
+
     m_widgetsGroup->addChild(m_transform, 1);
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
@@ -313,6 +330,15 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
       m_widgetsGroup->addChild(*m_channelColorParas[i], 1);
       m_widgetsGroup->addChild(*m_doubleChannelRangeParas[i], 1);
     }
+
+    QPushButton* pb = new QPushButton("Flip Horizontally");
+    connect(pb, &QPushButton::clicked, this, &ZImgFilter::flipHorizontally);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    pb = new QPushButton("Flip Vertically");
+    connect(pb, &QPushButton::clicked, this, &ZImgFilter::flipVertically);
+    m_widgetsGroup->addChild(*pb, 1);
+
     m_widgetsGroup->addChild(m_transform, 1);
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
@@ -488,18 +514,17 @@ void ZImgFilter::updateImgItems()
 
     m_item = std::make_unique<ZGraphicsItemGroup>();
     m_view.scene().addItem(m_item.get());
-    m_item->setTransform(getQTransform());
     const ZQImagePack& qImagePack = curDisplay->toQImagePack();
     for (size_t i = 0; i < qImagePack.numImages(); ++i) {
       m_imgItems.push_back(new QGraphicsPixmapItem(QPixmap::fromImage(qImagePack.image(i))));
       //m_imgItems[i]->setFlag(QGraphicsItem::ItemIsSelectable, true);
       m_imgItems[i]->setScale(qImagePack.scale(i));
       m_imgItems[i]->setPos(QPointF(qImagePack.location(i)));
-      m_imgItems[i]->setTransform(getQTransform());
       m_imgItems[i]->setOpacity(m_opacity.get());
       m_imgItems[i]->setVisible(m_isVisible);
       m_item->addToGroup(m_imgItems[i]);
     }
+    m_item->setTransform(getQTransform());
 
     m_lastDisplay = curDisplay;
     m_lastSlice = m_lastDisplay->slice();
@@ -518,6 +543,20 @@ double ZImgFilter::getLowerChannelRange(size_t c) const
 double ZImgFilter::getUpperChannelRange(size_t c) const
 {
   return m_doubleChannelRangeParas[c]->get().y;
+}
+
+void ZImgFilter::flipHorizontally()
+{
+  if (m_item) {
+    m_transform.flipHorizontally(m_item->sceneBoundingRect());
+  }
+}
+
+void ZImgFilter::flipVertically()
+{
+  if (m_item) {
+    m_transform.flipVertically(m_item->sceneBoundingRect());
+  }
 }
 
 } // namespace nim

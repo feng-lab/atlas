@@ -59,7 +59,7 @@ void Z3DCameraControlWidget::createWidget()
   int minDegrees = -360;
   int maxDegrees = 360;
 
-  auto  vlo = new QVBoxLayout;
+  auto vlo = new QVBoxLayout;
   QHBoxLayout* hlo = nullptr;
 
   hlo = new QHBoxLayout;

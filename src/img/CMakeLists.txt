@@ -97,10 +97,8 @@ else (WIN32)
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/lib/libfreeimageplus.dylib)
 endif (WIN32)
 
-find_package(gflags REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/gflags NO_DEFAULT_PATH)
-message(${GFLAGS_INCLUDE_DIR})
-message(${GFLAGS_LIBRARIES})
-
+find_package(gflags REQUIRED
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/gflags NO_DEFAULT_PATH)
 find_package(glog REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glog ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/gflags
              NO_DEFAULT_PATH)

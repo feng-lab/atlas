@@ -17,6 +17,7 @@ ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, double z, QGraphicsItem* 
   , m_roi(roi)
   , m_slice(slice)
 {
+  setFlags(QGraphicsItem::ItemIsSelectable);
   //todo: uncomment this when we have undo
   //setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
   //         QGraphicsItem::ItemIsSelectable);
@@ -254,6 +255,22 @@ void ZROIFilter::releaseItemsOwnership()
   }
   for (auto& sliceItem : m_sliceToROIItem) {
     sliceItem.second.release();
+  }
+}
+
+void ZROIFilter::setSelected(bool v)
+{
+  for (auto& sliceItems : m_sliceToCtrlPtItems) {
+    for (auto& item : sliceItems.second) {
+      if (item->isSelected() != v) {
+        item->setSelected(v);
+      }
+    }
+  }
+  for (auto& sliceItem : m_sliceToROIItem) {
+    if (sliceItem.second->isSelected() != v) {
+      sliceItem.second->setSelected(v);
+    }
   }
 }
 

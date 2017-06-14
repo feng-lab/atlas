@@ -131,6 +131,11 @@ public:
     }
   }
 
+  virtual void selectionChanged(const QList<QGraphicsItem*>& items) override
+  {
+
+  }
+
   virtual void rotateClockwise() override
   {
     for (const auto& idFilter : m_idToFilter) {

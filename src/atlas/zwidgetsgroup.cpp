@@ -2,6 +2,7 @@
 
 #include "z3dcameraparameter.h"
 #include "z3dtransformparameter.h"
+#include "z2dtransformparameter.h"
 #include "zparameter.h"
 #include <QGroupBox>
 #include <QVBoxLayout>
@@ -158,7 +159,9 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
     }
     case Type::Parameter: {
       QHBoxLayout* hbl = new QHBoxLayout;
-      if (qobject_cast<Z3DCameraParameter*>(m_parameter) || qobject_cast<Z3DTransformParameter*>(m_parameter)) {
+      if (qobject_cast<Z3DCameraParameter*>(m_parameter) ||
+        qobject_cast<Z3DTransformParameter*>(m_parameter) ||
+        qobject_cast<Z2DTransformParameter*>(m_parameter)) {
         QWidget* wg = m_parameter->createWidget();
         hbl->addWidget(wg);
         return hbl;

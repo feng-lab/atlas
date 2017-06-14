@@ -40,6 +40,13 @@ void ZSvgFilter::releaseItemsOwnership()
   m_item.release();
 }
 
+void ZSvgFilter::setSelected(bool v)
+{
+  if (m_item->isSelected() != v) {
+    m_item->setSelected(v);
+  }
+}
+
 void ZSvgFilter::setNormalView(int z, int t)
 {
   m_item->setVisible(realZ(z) == 0 && realT(t) == 0 && m_visible.get());

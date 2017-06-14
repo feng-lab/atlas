@@ -2,6 +2,7 @@
 
 #include "zwidgetsgroup.h"
 #include "zlog.h"
+#include "zlogqttypesupport.h"
 #include <QWidget>
 #include <QGroupBox>
 #include <QPushButton>
@@ -114,6 +115,47 @@ void Z2DTransformParameter::rotate(double ang, const glm::dvec2& center)
   currValue = trans2 * rot2 * trans1 * currValue;
   setRotation(rotation() + ang);
   m_translation.set(currValue[2].xy());
+  m_center.set(glm::dvec2(0));
+}
+
+void Z2DTransformParameter::flipHorizontally(const QRectF& boundRect)
+{
+  glm::dmat3 currValue = m_value;
+  glm::dmat3 trans = glm::translate(glm::dmat3(1), glm::dvec2(-boundRect.left() - boundRect.right(), 0.));
+  glm::dmat3 flip = glm::scale(glm::dmat3(1), glm::dvec2(-1, 1));
+  currValue = flip * trans * currValue;
+  setTranslation(currValue[2].xy());
+  double xs = glm::length(currValue[0].xy());
+  double ys = glm::length(currValue[1].xy());
+  if (currValue[0][0] < 0) {
+    xs = -xs;
+  }
+  if (currValue[1][1] < 0) {
+    ys = -ys;
+  }
+  setScale(xs, ys);
+  setRotation(std::atan(currValue[0][1] / currValue[0][0]));
+  m_center.set(glm::dvec2(0));
+}
+
+void Z2DTransformParameter::flipVertically(const QRectF& boundRect)
+{
+  glm::dmat3 currValue = m_value;
+  glm::dmat3 trans = glm::translate(glm::dmat3(1), glm::dvec2(0., -boundRect.top() - boundRect.bottom()));
+  glm::dmat3 flip = glm::scale(glm::dmat3(1), glm::dvec2(1, -1));
+  currValue = flip * trans * currValue;
+  setTranslation(currValue[2].xy());
+  double xs = glm::length(currValue[0].xy());
+  double ys = glm::length(currValue[1].xy());
+  if (currValue[0][0] < 0) {
+    xs = -xs;
+  }
+  if (currValue[1][1] < 0) {
+    ys = -ys;
+  }
+  setScale(xs, ys);
+  setRotation(std::atan(currValue[0][1] / currValue[0][0]));
+  m_center.set(glm::dvec2(0));
 }
 
 void Z2DTransformParameter::setValueSameAs(const ZParameter& rhs)

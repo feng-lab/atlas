@@ -175,6 +175,8 @@ private:
 
   void mouseReleased(QPointF scenePos);
 
+  void selectionChanged();
+
   void setViewDragMode(QAction* act);
 
   void createActions();

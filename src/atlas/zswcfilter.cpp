@@ -222,6 +222,13 @@ void ZSwcFilter::releaseItemsOwnership()
   m_item.release();
 }
 
+void ZSwcFilter::setSelected(bool v)
+{
+  if (m_item->isSelected() != v) {
+    m_item->setSelected(v);
+  }
+}
+
 void ZSwcFilter::setNormalView(int z, int t)
 {
   m_item->setNormalView(realZ(z), realT(t));

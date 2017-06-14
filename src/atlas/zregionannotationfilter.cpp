@@ -36,6 +36,13 @@ void ZRegionAnnotationFilter::releaseItemsOwnership()
   }
 }
 
+void ZRegionAnnotationFilter::setSelected(bool v)
+{
+  for (const auto& idFilter : m_idToROIFilters) {
+    idFilter.second->setSelected(v);
+  }
+}
+
 void ZRegionAnnotationFilter::setNormalView(int z, int t)
 {
   for (const auto& idFilter : m_idToROIFilters) {
