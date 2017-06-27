@@ -20,15 +20,20 @@ def macos_min_version():
 
 
 def get_package_top_level_folder(file: str, folder: str):
+    res = ''
     if file.lower().endswith('.zip'):
         with zipfile.ZipFile(file, mode='r') as zf:
-            return os.path.join(folder, os.path.commonprefix(zf.namelist()))
+            res = os.path.join(folder, os.path.commonprefix(zf.namelist()))
     elif file.lower().endswith('.tar.gz') or file.lower().endswith('.tar.bz2') or file.lower().endswith('.tar.xz') \
             or file.lower().endswith('.tgz'):
         with tarfile.open(file, mode='r|*') as tf:
-            return os.path.join(folder, os.path.commonprefix(tf.getnames()))
+            res = os.path.join(folder, os.path.commonprefix(tf.getnames()))
     elif file.lower().endswith('.7z'):
         raise Exception("Can not get top level dir from 7z package.")
+
+    if res.endswith('/'):
+        res = res[:-1]
+    return res
 
 
 def unpack_file_to_folder(file: str, folder: str):
@@ -106,19 +111,19 @@ def get_vcvars_environment(remove_conda_from_path: bool = True):
     Returns a dictionary containing the environment variables set up by vcvarsall.bat amd64
     """
 
-    comntools_var_names = ['VS140COMNTOOLS']
+    vsinstalldir_var_names = ['VS2017INSTALLDIR']
 
-    vscomntools = None
-    for var_name in comntools_var_names:
-        vscomntools = os.getenv(var_name)
-        if vscomntools is not None:
+    vsinstalldir = None
+    for var_name in vsinstalldir_var_names:
+        vsinstalldir = os.getenv(var_name)
+        if vsinstalldir is not None:
             break
 
-    if vscomntools is None:
+    if vsinstalldir is None:
         raise OSError('could not find COMNTOOLS environment variable')
 
-    vcvars = os.path.normpath(os.path.join(vscomntools, '..', '..', 'VC', 'vcvarsall.bat'))
-    return get_enviroment_from_shell_script(vcvars, 'amd64', remove_conda_from_path=remove_conda_from_path)
+    vcvars = os.path.normpath(os.path.join(vsinstalldir, 'VC', 'Auxiliary', 'Build', 'vcvarsall.bat'))
+    return get_enviroment_from_shell_script(vcvars, 'x64', remove_conda_from_path=remove_conda_from_path)
 
 
 def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.environ,
@@ -148,7 +153,7 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
 def get_cmake_cmd_common_part(install_dir: str):
     if sys.platform.startswith('win'):
         return ['cmake',  # '-E', 'echo',
-                '-G', 'Visual Studio 14 2015 Win64',
+                '-G', 'Visual Studio 15 2017 Win64',
                 '-DCMAKE_INSTALL_PREFIX=' + install_dir
                 ]
     else:
@@ -411,6 +416,8 @@ def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
         if sys.platform.startswith('win'):
             env = get_vcvars_environment()
             subprocess.run(['MSBuild', 'JXR_vc14.sln', '/target:JXRDecApp', '/property:Platform=x64',
+                            '/ToolsVersion:15.0', '/property:PlatformToolset=v141',
+                            '/property:WindowsTargetPlatformVersion=10.0.14393.0',
                             '/property:ForceImportBeforeCppTargets=' + ext_dir + '\\runtime_md.props',
                             '/property:Configuration=Release', '/maxcpucount'],
                            cwd=os.path.join(src_dir, 'jxrencoderdecoder'), shell=True, check=True, env=env)
@@ -467,14 +474,14 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
     try:
         if sys.platform.startswith('win'):
             env = get_vcvars_environment()
-            subprocess.run(['MSBuild', 'GTEngine.v14.vcxproj', '/property:Platform=x64',
+            subprocess.run(['MSBuild', 'GTEngine.v15.vcxproj', '/property:Platform=x64',
                             '/property:Configuration=Release', '/maxcpucount'],
                            cwd=src_dir, shell=True, check=True, env=env)
-            glob_copy(os.path.join(src_dir, '_Output', 'v140', 'x64', 'Release', 'GTEngine.v14.lib'),
+            glob_copy(os.path.join(src_dir, '_Output', 'v141', 'x64', 'Release', 'GTEngine.v15.lib'),
                       os.path.join(install_dir, 'lib'))
-            glob_copy(os.path.join(src_dir, '_Output', 'v140', 'x64', 'Release', 'GTEngine.v14.pch'),
+            glob_copy(os.path.join(src_dir, '_Output', 'v141', 'x64', 'Release', 'GTEngine.v15.pch'),
                       os.path.join(install_dir, 'lib'))
-            glob_copy(os.path.join(src_dir, '_Output', 'v140', 'x64', 'Release', 'GTEngine.v14.pdb'),
+            glob_copy(os.path.join(src_dir, '_Output', 'v141', 'x64', 'Release', 'GTEngine.v15.pdb'),
                       os.path.join(install_dir, 'lib'))
         else:
             subprocess.run(['xcodebuild', '-project', 'GTEngine.xcodeproj', '-configuration', 'Default',
@@ -659,7 +666,8 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['devenv', 'FreeImage.2013.sln', '/Upgrade'],
                            cwd=src_dir, shell=True, check=True, env=env)
             subprocess.run(['MSBuild', 'FreeImage.2013.sln', '/target:FreeImagePlus', '/property:Platform=x64',
-                            '/property:Configuration=Release', '/maxcpucount'],
+                            '/property:Configuration=Release', '/maxcpucount',
+                            '/property:WindowsTargetPlatformVersion=10.0.14393.0'],
                            cwd=src_dir, shell=True, check=True, env=env)
             distutils.dir_util.copy_tree(os.path.join(src_dir, 'Dist', 'x64'),
                                          install_dir)
@@ -835,14 +843,15 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
         print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
 
         if sys.platform.startswith('win32'):
-            env = get_enviroment_from_shell_script(os.environ['ICPP_COMPILER17'] + 'tbb\\bin\\tbbvars.bat',
-                                                   para='intel64 vs2015',
+            intel_sw_dir = 'C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\'
+            env = get_enviroment_from_shell_script(intel_sw_dir + 'tbb\\bin\\tbbvars.bat',
+                                                   para='intel64 vs2017',
                                                    start_env=get_vcvars_environment())
             print('TBBROOT:', env['TBBROOT'])
 
             cmakecmd = get_cmake_cmd_common_part(install_dir)
-            cmakecmd.extend(['-DIPPROOT=' + os.environ['ICPP_COMPILER17'] + 'ipp',
-                             '-DIPPIWROOT=' + ippiw_dir,
+            cmakecmd.extend(['-DIPPROOT=' + intel_sw_dir + 'ipp',
+                             '-DIPPIWROOT=' + ippiw_dir.replace("\\", "/"),
                              '-DBUILD_IPP_IW:BOOL=OFF',
                              '-DBUILD_WITH_DYNAMIC_IPP:BOOL=OFF',
                              '-DBUILD_WITH_STATIC_CRT:BOOL=OFF',
@@ -904,6 +913,22 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                            cwd=build_dir, shell=True, check=True, env=env)
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
                            cwd=build_dir, shell=True, check=True, env=env)
+
+            orig_file_2 = os.path.join(install_dir, 'x64', 'vc15', 'staticlib', 'OpenCVModules-release.cmake')
+            bak_file_2 = get_bak_file_name(orig_file_2)
+            os.rename(orig_file_2, bak_file_2)
+            with open(bak_file_2, mode='r', encoding='utf-8') as f:
+                from_lines = f.readlines()
+            with open(orig_file_2, mode='w', encoding='utf-8') as f:
+                to_lines = []
+                for line in from_lines:
+                    line = line.replace(r';tbb;ippiw;ippcv;ippi;ippcc;ipps;ippvm;ippcore',
+                                        r';ippiw')
+                    line = line.replace(r'tbb;ippiw;ippcv;ippi;ippcc;ipps;ippvm;ippcore;',
+                                        r'ippiw;')
+                    f.write(line)
+                    to_lines.append(line)
+            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
         else:
             env = get_enviroment_from_shell_script('/opt/intel/tbb/bin/tbbvars.sh')
             print('TBBROOT:', env['TBBROOT'])
@@ -993,6 +1018,11 @@ def build_libs(libs: dict, update_src: bool):
     remove_path_contains('miniconda')
     remove_path_contains('anaconda')
     print('PATH:', os.environ['PATH'])
+
+    if sys.platform.startswith('win32'):
+        os.environ['HOME'] = os.path.expanduser("~")
+
+    print('HOME:', os.environ['HOME'])
 
     if sys.platform.startswith('win32'):
         if libs['zlib']:
