@@ -2,6 +2,7 @@
 
 #include "zjson.h"
 #include <QEasingCurve>
+#include <memory>
 
 namespace nim {
 

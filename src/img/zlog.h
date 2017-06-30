@@ -8,6 +8,8 @@
 #include <glog/logging.h>
 #include <QString>
 #include <QDateTime>
+#include <memory>
+#include <functional>
 
 namespace nim {
 

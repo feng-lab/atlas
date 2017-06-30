@@ -36,10 +36,10 @@ Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase& rendererBase)
 
   if (m_hardwareSupportVAO) {
     m_VAO.bind();
-    const GLfloat vertices[] = {-1.f, 1.f, 1.0f - 1e-5, //top left corner
-                                -1.f, -1.f, 1.0f - 1e-5, //bottom left corner
-                                1.f, 1.f, 1.0f - 1e-5, //top right corner
-                                1.f, -1.f, 1.0f - 1e-5}; // bottom right rocner
+    const GLfloat vertices[] = {-1.f, 1.f, 1.0f - 1e-5f, //top left corner
+                                -1.f, -1.f, 1.0f - 1e-5f, //bottom left corner
+                                1.f, 1.f, 1.0f - 1e-5f, //top right corner
+                                1.f, -1.f, 1.0f - 1e-5f}; // bottom right rocner
     GLint attr_vertex = m_backgroundShaderGrp.get().vertexAttributeLocation();
 
     glEnableVertexAttribArray(attr_vertex);
@@ -145,10 +145,10 @@ void Z3DBackgroundRenderer::render(Z3DEye eye)
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     m_VAO.release();
   } else {
-    const GLfloat vertices[] = {-1.f, 1.f, 1.0f - 1e-5, //top left corner
-                                -1.f, -1.f, 1.0f - 1e-5, //bottom left corner
-                                1.f, 1.f, 1.0f - 1e-5, //top right corner
-                                1.f, -1.f, 1.0f - 1e-5}; // bottom right rocner
+    const GLfloat vertices[] = {-1.f, 1.f, 1.0f - 1e-5f, //top left corner
+                                -1.f, -1.f, 1.0f - 1e-5f, //bottom left corner
+                                1.f, 1.f, 1.0f - 1e-5f, //top right corner
+                                1.f, -1.f, 1.0f - 1e-5f}; // bottom right rocner
     GLint attr_vertex = shader.vertexAttributeLocation();
 
     glEnableVertexAttribArray(attr_vertex);

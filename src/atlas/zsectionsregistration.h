@@ -2,6 +2,7 @@
 
 #include "zimgprocess.h"
 #include <map>
+#include <memory>
 
 namespace nim {
 

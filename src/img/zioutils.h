@@ -3,6 +3,7 @@
 #include <QString>
 #include <fstream>
 #include <iostream>
+#include <memory>
 
 namespace nim {
 

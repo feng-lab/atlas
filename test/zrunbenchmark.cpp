@@ -148,7 +148,9 @@ static void addSaturateMulBench()
 {
   BENCHMARK(BM_saturate_mul_i64)->Range(8, 8 << 10);
   BENCHMARK(BM_saturate_mul_i64_boost)->Range(8, 8 << 10);
+#ifdef __GNUG__ // clang or gcc
   BENCHMARK(BM_saturate_mul_i64_buildin128)->Range(8, 8 << 10);
+#endif
   BENCHMARK(BM_saturate_mul_i32)->Range(8, 8 << 10);
   BENCHMARK(BM_saturate_mul_i16)->Range(8, 8 << 10);
 }

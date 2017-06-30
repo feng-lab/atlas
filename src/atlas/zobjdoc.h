@@ -8,6 +8,7 @@
 #include <QMenu>
 #include <QAction>
 #include <QUndoStack>
+#include <memory>
 
 namespace nim {
 

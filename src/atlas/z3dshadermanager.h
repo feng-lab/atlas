@@ -3,6 +3,7 @@
 #include "z3dcontext.h"
 #include <QString>
 #include <map>
+#include <memory>
 
 namespace nim {
 

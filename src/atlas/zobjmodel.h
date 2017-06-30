@@ -4,6 +4,7 @@
 #include <QModelIndex>
 #include <QVariant>
 #include <QIcon>
+#include <memory>
 
 #define CONFIG_OLD
 

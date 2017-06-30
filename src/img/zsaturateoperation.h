@@ -334,7 +334,7 @@ inline uint64_t saturate_mul(uint64_t x, uint64_t y)
 #if 1
   boost::multiprecision::uint128_t res =
     static_cast<boost::multiprecision::uint128_t>(x) * static_cast<boost::multiprecision::uint128_t>(y);
-  return (-((res >> 64) != 0)) | static_cast<uint64_t>(res);
+  return (-int64_t((res >> 64) != 0)) | static_cast<uint64_t>(res);
 #else
   if (x == 0 || y == 0) {
     return 0;

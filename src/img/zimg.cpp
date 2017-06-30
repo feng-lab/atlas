@@ -1305,7 +1305,7 @@ template ZImg ZImg::castTo<float>() const;
 
 template ZImg ZImg::castTo<double>() const;
 
-ZImg ZImg::castTo(VoxelFormat vf, size_t bytePerVoxel)
+ZImg __warn_unused_result ZImg::castTo(VoxelFormat vf, size_t bytePerVoxel)
 {
   if (voxelFormat() == vf && bytesPerVoxel() == bytePerVoxel) {
     return *this;

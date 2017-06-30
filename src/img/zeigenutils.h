@@ -3,11 +3,19 @@
 #include "zioutils.h"
 #include "zrandom.h"
 #include "zlog.h"
+
+#ifdef _MSC_VER
+#pragma warning(push, 0)
+#endif
 #include <Eigen/Dense>
 #ifndef Q_MOC_RUN
 #include <boost/math/special_functions.hpp>
 #include <boost/math/constants/constants.hpp>
 #endif
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
 #include <cmath>
 #include <limits>
 #include <map>

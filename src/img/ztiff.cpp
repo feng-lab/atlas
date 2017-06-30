@@ -318,7 +318,7 @@ void LibtiffErrorHandler(const char* module, const char* fmt, va_list ap)
   //if (module)
   //off = snprintf(buf, 2048, "libtiff %s: ", module);
   //else
-  off = snprintf(buf, 2048, "libtiff: ");
+  off = std::max(0, snprintf(buf, 2048, "libtiff: "));
   vsnprintf(buf + off, 2048 - off, fmt, ap);
   throw nim::ZIOException(QString(buf));
 }
@@ -332,7 +332,7 @@ void LibtiffErrorHandlerIgnoreColormapError(const char* module, const char* fmt,
   //if (module)
   //off = snprintf(buf, 2048, "libtiff %s: ", module);
   //else
-  off = snprintf(buf, 2048, "libtiff: ");
+  off = std::max(0, snprintf(buf, 2048, "libtiff: "));
   vsnprintf(buf + off, 2048 - off, fmt, ap);
   QString str(buf);
   if (str.contains("Colormap", Qt::CaseInsensitive))

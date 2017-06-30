@@ -35,7 +35,7 @@ endif (NOT CMAKE_BUILD_TYPE)
 # main stuff
 
 find_package(TBB REQUIRED)
-message("${TBB_tbb_LIBRARY_RELEASE}")
+message("${TBB_LIBRARY}")
 
 find_package(ITK REQUIRED COMPONENTS ITKIOMeta ITKIONIFTI ITKIONRRD ITKIOGDCM ITKBinaryMathematicalMorphology
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/itk NO_DEFAULT_PATH)
@@ -86,13 +86,15 @@ else (WIN32)
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/jxrlib/lib/libjpegxr.a)
 endif (WIN32)
 
-set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/include)
 if (WIN32)
+  set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage)
   set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/lib/FreeImagePlus.lib
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/lib/FreeImage.lib)
 else (WIN32)
+  set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/include)
   set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/lib/libfreeimageplus.dylib)
 endif (WIN32)
@@ -103,7 +105,7 @@ find_package(glog REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glog ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/gflags
              NO_DEFAULT_PATH)
 
-find_package(Qt5Core 5.9.0 REQUIRED PATHS ~/Qt/5.9/clang_64)
+find_package(Qt5Core 5.9.0 REQUIRED PATHS ~/Qt/5.9/clang_64 C:/Qt/Qt/5.9/msvc2017_64)
 
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
@@ -152,7 +154,7 @@ set(TIFF_SOURCES
     ${TIFFDIR}/tif_stream.cxx
     )
 if (WIN32)
-  set(TIFF_SOURCES ${TIFF_SOURCES} ${TIFFDIR}/tif_win32.c)
+  set(TIFF_SOURCES ${TIFF_SOURCES} ${TIFFDIR}/tif_unix.c)
 else (WIN32)
   set(TIFF_SOURCES ${TIFF_SOURCES} ${TIFFDIR}/tif_unix.c)
 endif (WIN32)
@@ -254,21 +256,24 @@ target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/boost)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glm)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/folly)
+target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${TBB_INCLUDE_DIR})
 target_compile_definitions(${LIBRARY_NAME} PUBLIC EIGEN_NO_DEBUG EIGEN_DONT_PARALLELIZE EIGEN_MPL2_ONLY)
 target_compile_definitions(${LIBRARY_NAME} PUBLIC QT_USE_QSTRINGBUILDER QT_NO_CAST_FROM_BYTEARRAY QT_NO_CAST_TO_ASCII)
 if (WIN32)
-  target_compile_definitions(${LIBRARY_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN)
+  target_compile_definitions(${LIBRARY_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
 
   target_compile_options(${LIBRARY_NAME} PUBLIC /GR) # Enable Run-Time Type Information
   target_compile_options(${LIBRARY_NAME} PUBLIC /EHsc) # exception handling model, https://msdn.microsoft.com/en-us/library/1deeycx5.aspx
-  target_compile_options(${LIBRARY_NAME} PUBLIC /Wall)
+  # target_compile_options(${LIBRARY_NAME} PUBLIC /Wall)
   target_compile_options(${LIBRARY_NAME} PUBLIC /bigobj /GL) # Enables whole program optimization.
   target_compile_options(${LIBRARY_NAME} PUBLIC /wd4267) # 'var' : conversion from 'size_t' to 'type', possible loss of data
   target_compile_options(${LIBRARY_NAME} PUBLIC /wd4244) # 'argument' : conversion from 'type1' to 'type2', possible loss of data
   target_compile_options(${LIBRARY_NAME} PUBLIC /wd4305) # 'identifier' : truncation from 'type1' to 'type2'
   target_compile_options(${LIBRARY_NAME} PUBLIC /wd4819) # The file contains a character that cannot be represented in the current code page (number). Save the file in Unicode format to prevent data loss.
+  target_compile_options(${LIBRARY_NAME} PUBLIC /wd4828) # The file contains a character starting at offset 0x60 that is illegal in the current source character set (codepage 65001).
   target_compile_options(${LIBRARY_NAME} PUBLIC /utf-8)  # https://blogs.msdn.microsoft.com/vcblog/2016/02/22/new-options-for-managing-character-sets-in-the-microsoft-cc-compiler/
-  target_compile_options($(LIBRARY_NAME) PUBLIC /analyze) # The C/C++ Code Analysis tool provides information to developers about possible defects in their C/C++ source code
+  target_compile_options(${LIBRARY_NAME} PUBLIC /analyze) # The C/C++ Code Analysis tool provides information to developers about possible defects in their C/C++ source code
+  target_compile_options(${LIBRARY_NAME} PUBLIC /MP) # Build with Multiple Processes
 
   target_link_libraries(${LIBRARY_NAME} PUBLIC /LTCG) # Link-time Code Generation
 
@@ -319,7 +324,7 @@ else (WIN32)
   set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS -I${FREEIMAGE_INCLUDE_DIRS})
 endif (WIN32)
 
-target_link_libraries(${LIBRARY_NAME} PUBLIC tbb ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
+target_link_libraries(${LIBRARY_NAME} PUBLIC {TBB_LIBRARY} ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
                       png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} glog::glog Qt5::Core)
 
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zclickablelabel.h"
+#include <memory>
 
 namespace nim {
 

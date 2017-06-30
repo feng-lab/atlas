@@ -35,8 +35,8 @@ endif (NOT CMAKE_BUILD_TYPE)
 # main stuff
 
 if (WIN32)
-  set(INTEL_PATH "C:\\Program Files (x86)\\Intel\\Composer XE\\compiler")
-  set(MKL_PATH "C:\\Program Files (x86)\\Intel\\Composer XE\\mkl")
+  set(INTEL_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\compiler")
+  set(MKL_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\mkl")
 else (WIN32)
   set(INTEL_PATH /opt/intel)
   set(MKL_PATH ${INTEL_PATH}/mkl)
@@ -57,7 +57,7 @@ else (WIN32)
 endif (WIN32)
 
 if (WIN32)
-  set(IPP_PATH "C:\\Program Files (x86)\\Intel\\Composer XE\\ipp")
+  set(IPP_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\ipp")
 else (WIN32)
   set(IPP_PATH ${INTEL_PATH}/ipp)
 endif (WIN32)
@@ -94,7 +94,7 @@ set(GEOMETRICTOOLS_INCLUDE_DIRS ${GEOMETRICTOOLS_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/include)
 if (WIN32)
   set(GEOMETRICTOOLS_LIBRARIES ${GEOMETRICTOOLS_LIBRARIES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/lib/GTEngine.lib)
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/lib/GTEngine.v15.lib)
 else (WIN32)
   set(GEOMETRICTOOLS_LIBRARIES ${GEOMETRICTOOLS_LIBRARIES}
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/lib/libGTEngine.a)
@@ -104,7 +104,7 @@ find_package(BENCHMARK REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/benchmark NO_DEFAULT_PATH)
 
 find_package(HDF5 REQUIRED COMPONENTS C CXX static
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/share NO_DEFAULT_PATH)
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/share ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/cmake NO_DEFAULT_PATH)
 message(${HDF5_INCLUDE_DIR})
 
 find_package(ASSIMP REQUIRED
@@ -128,7 +128,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 find_package(Qt5 5.9.0 REQUIRED COMPONENTS Core Widgets Network Svg
-             PATHS ~/Qt/5.9/clang_64)
+             PATHS ~/Qt/5.9/clang_64 C:/Qt/Qt/5.9/msvc2017_64)
 
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
@@ -695,18 +695,21 @@ target_compile_definitions(${APP_NAME} PUBLIC EIGEN_USE_BLAS EIGEN_USE_LAPACKE_S
 target_compile_definitions(${APP_NAME} PUBLIC QT_USE_QSTRINGBUILDER QT_NO_CAST_FROM_BYTEARRAY QT_NO_CAST_TO_ASCII)
 target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_CORE_PROFILE ATLAS_USE_MKL ATLAS_USE_IPP)
 if (WIN32)
-  target_compile_definitions(${APP_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN)
+  target_compile_definitions(${APP_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
+  target_compile_definitions(${APP_NAME} PUBLIC lapack_complex_float=std::complex<float> lapack_complex_double=std::complex<double>)
 
   target_compile_options(${APP_NAME} PUBLIC /GR) # Enable Run-Time Type Information
   target_compile_options(${APP_NAME} PUBLIC /EHsc) # exception handling model, https://msdn.microsoft.com/en-us/library/1deeycx5.aspx
-  target_compile_options(${APP_NAME} PUBLIC /Wall)
+  # target_compile_options(${APP_NAME} PUBLIC /Wall)
   target_compile_options(${APP_NAME} PUBLIC /bigobj /GL) # Enables whole program optimization.
   target_compile_options(${APP_NAME} PUBLIC /wd4267) # 'var' : conversion from 'size_t' to 'type', possible loss of data
   target_compile_options(${APP_NAME} PUBLIC /wd4244) # 'argument' : conversion from 'type1' to 'type2', possible loss of data
   target_compile_options(${APP_NAME} PUBLIC /wd4305) # 'identifier' : truncation from 'type1' to 'type2'
   target_compile_options(${APP_NAME} PUBLIC /wd4819) # The file contains a character that cannot be represented in the current code page (number). Save the file in Unicode format to prevent data loss.
+  target_compile_options(${APP_NAME} PUBLIC /wd4828) # The file contains a character starting at offset 0x60 that is illegal in the current source character set (codepage 65001).
   target_compile_options(${APP_NAME} PUBLIC /utf-8)  # https://blogs.msdn.microsoft.com/vcblog/2016/02/22/new-options-for-managing-character-sets-in-the-microsoft-cc-compiler/
-  target_compile_options($(APP_NAME) PUBLIC /analyze) # The C/C++ Code Analysis tool provides information to developers about possible defects in their C/C++ source code
+  target_compile_options(${APP_NAME} PUBLIC /analyze) # The C/C++ Code Analysis tool provides information to developers about possible defects in their C/C++ source code
+  target_compile_options(${APP_NAME} PUBLIC /MP) # Build with Multiple Processes
 
   target_link_libraries(${APP_NAME} PUBLIC /LTCG) # Link-time Code Generation
 

@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QLayout>
+#include <memory>
 
 class QLabel;
 

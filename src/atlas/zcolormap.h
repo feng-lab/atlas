@@ -1,5 +1,6 @@
 #pragma once
 
+#include "z3dtexture.h"
 #include "zglmutils.h"
 #include "zglobal.h"
 #include "zparameter.h"
@@ -8,8 +9,6 @@
 #include <vector>
 
 namespace nim {
-
-class Z3DTexture;
 
 class ZColorMapKey
 {

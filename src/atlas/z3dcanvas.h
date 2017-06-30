@@ -6,6 +6,7 @@
 #include <QInputEvent>
 #include <QShortcut>
 #include <deque>
+#include <memory>
 
 class QOpenGLWidget;
 
