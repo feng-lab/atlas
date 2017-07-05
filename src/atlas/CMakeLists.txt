@@ -69,8 +69,7 @@ if (WIN32)
       ${IPP_PATH}/lib/intel64/ippvmmt.lib
       ${IPP_PATH}/lib/intel64/ippsmt.lib
       ${IPP_PATH}/lib/intel64/ippcvmt.lib
-      ${IPP_PATH}/lib/intel64/ippccmt.lib
-      ${INTEL_PATH}/lib/intel64/libirc.lib)
+      ${IPP_PATH}/lib/intel64/ippccmt.lib)
 else (WIN32)
   set(IPP_LIBRARIES ${IPP_LIBRARIES}
       ${IPP_PATH}/lib/libippi.a
@@ -128,7 +127,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 find_package(Qt5 5.9.0 REQUIRED COMPONENTS Core Widgets Network Svg
-             PATHS ~/Qt/5.9/clang_64 C:/Qt/Qt/5.9/msvc2017_64)
+             PATHS ~/Qt/5.9/clang_64 C:/Qt/Qt/5.9.1/msvc2017_64)
 
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
@@ -711,7 +710,8 @@ if (WIN32)
   target_compile_options(${APP_NAME} PUBLIC /analyze) # The C/C++ Code Analysis tool provides information to developers about possible defects in their C/C++ source code
   target_compile_options(${APP_NAME} PUBLIC /MP) # Build with Multiple Processes
 
-  target_link_libraries(${APP_NAME} PUBLIC /LTCG) # Link-time Code Generation
+  #target_link_libraries(${APP_NAME} PUBLIC /LTCG) # Link-time Code Generation
+  set_target_properties(${APP_NAME} PROPERTIES LINK_FLAGS /LTCG)
 
   # for some files
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS

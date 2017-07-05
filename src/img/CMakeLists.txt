@@ -90,8 +90,8 @@ if (WIN32)
   set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage)
   set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/lib/FreeImagePlus.lib
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/lib/FreeImage.lib)
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/FreeImagePlus.lib
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/FreeImage.lib)
 else (WIN32)
   set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/include)
@@ -105,7 +105,7 @@ find_package(glog REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glog ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/gflags
              NO_DEFAULT_PATH)
 
-find_package(Qt5Core 5.9.0 REQUIRED PATHS ~/Qt/5.9/clang_64 C:/Qt/Qt/5.9/msvc2017_64)
+find_package(Qt5Core 5.9.0 REQUIRED PATHS ~/Qt/5.9/clang_64 C:/Qt/Qt/5.9.1/msvc2017_64)
 
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
@@ -275,7 +275,8 @@ if (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC /analyze) # The C/C++ Code Analysis tool provides information to developers about possible defects in their C/C++ source code
   target_compile_options(${LIBRARY_NAME} PUBLIC /MP) # Build with Multiple Processes
 
-  target_link_libraries(${LIBRARY_NAME} PUBLIC /LTCG) # Link-time Code Generation
+  #target_link_libraries(${LIBRARY_NAME} PUBLIC /LTCG) # Link-time Code Generation
+  set_target_properties(${LIBRARY_NAME} PROPERTIES LINK_FLAGS /LTCG)
 
   # for some files
   set_source_files_properties(zimageavx.cpp PROPERTIES COMPILE_FLAGS /arch:AVX)
@@ -324,7 +325,7 @@ else (WIN32)
   set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS -I${FREEIMAGE_INCLUDE_DIRS})
 endif (WIN32)
 
-target_link_libraries(${LIBRARY_NAME} PUBLIC {TBB_LIBRARY} ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
+target_link_libraries(${LIBRARY_NAME} PUBLIC ${TBB_LIBRARY} ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
                       png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} glog::glog Qt5::Core)
 
 
