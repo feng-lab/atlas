@@ -51,8 +51,6 @@ public:
 
   void setMaxZProjView(int t) override;
 
-  void setViewport(const QRectF& rect, double scale) override;
-
   inline bool isVisible() const
   { return m_isVisible; }
 
@@ -94,6 +92,8 @@ private:
   double getLowerChannelRange(size_t c) const;
 
   double getUpperChannelRange(size_t c) const;
+
+  void viewportChanged();
 
   void flipHorizontally();
 

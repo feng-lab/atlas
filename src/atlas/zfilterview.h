@@ -74,18 +74,6 @@ public:
     }
   }
 
-  virtual void setViewport(const QRectF& rect, double scale) override
-  {
-    for (const auto& idFilter : m_idToFilter) {
-      try {
-        idFilter.second->setViewport(rect, scale);
-      }
-      catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
-      }
-    }
-  }
-
   virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override
   {
     auto it = m_idToFilter.find(id);

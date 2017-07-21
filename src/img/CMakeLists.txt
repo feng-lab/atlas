@@ -105,7 +105,7 @@ find_package(glog REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glog ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/gflags
              NO_DEFAULT_PATH)
 
-find_package(Qt5Core 5.9.0 REQUIRED PATHS ~/Qt/5.9/clang_64 C:/Qt/Qt/5.9.1/msvc2017_64)
+find_package(Qt5Core 5.9 REQUIRED PATHS ~/Qt/5.9.1/clang_64 C:/Qt/Qt/5.9.1/msvc2017_64)
 
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
@@ -371,7 +371,7 @@ if (Matlab_FOUND)
 
     add_custom_command(TARGET correct_czi_shading_mex
                        POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy ${TBB_tbb_LIBRARY_RELEASE}
+                       COMMAND ${CMAKE_COMMAND} -E copy ${TBB_LIBRARY}
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>
                        COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>

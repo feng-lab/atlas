@@ -35,9 +35,6 @@ public:
   // called to show a max z projection view of time
   virtual void setMaxZProjView(int time) = 0;
 
-  // called to show a rect with scale
-  virtual void setViewport(const QRectF& rect, double scale) = 0;
-
   // get view setting widget group of obj id, default return nullptr
   virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id);
 

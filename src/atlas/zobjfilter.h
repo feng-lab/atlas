@@ -23,12 +23,6 @@ public:
 
   virtual void setMaxZProjView(int t) = 0;
 
-  virtual void setViewport(const QRectF& rect, double scale)
-  {
-    Q_UNUSED(rect)
-    Q_UNUSED(scale)
-  }
-
   virtual void deleteKeyPressed()
   {}
 

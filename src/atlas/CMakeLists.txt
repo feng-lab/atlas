@@ -126,8 +126,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt5 5.9.0 REQUIRED COMPONENTS Core Widgets Network Svg
-             PATHS ~/Qt/5.9/clang_64 C:/Qt/Qt/5.9.1/msvc2017_64)
+find_package(Qt5 5.9 REQUIRED COMPONENTS Core Widgets Network Svg
+             PATHS ~/Qt/5.9.1/clang_64 C:/Qt/Qt/5.9.1/msvc2017_64)
 
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
@@ -730,7 +730,7 @@ else (WIN32)
 
   # for some files
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
-                              "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
+                              "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
   set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
   set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS "-isystem ${ASSIMP_INCLUDE_DIRS}")
 

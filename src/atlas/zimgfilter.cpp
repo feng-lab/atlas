@@ -108,6 +108,7 @@ ZImgFilter::ZImgFilter(ZView& view)
   addParameter(&m_opacity);
   addParameter(&m_transform);
   addParameter(&m_offsetPara);
+  connect(&m_view, &ZView::viewportChanged, this, &ZImgFilter::viewportChanged);
 }
 
 void ZImgFilter::setData(ZImgPack& pack)
@@ -198,7 +199,7 @@ void ZImgFilter::releaseItemsOwnership()
 
 void ZImgFilter::setSelected(bool v)
 {
-  if (m_item->isSelected() != v) {
+  if (m_item && m_item->isSelected() != v) {
     m_item->setSelected(v);
   }
 }
@@ -234,19 +235,6 @@ void ZImgFilter::setMaxZProjView(int t)
     updateImgItems();
   } else if (isVisibleBefore) {
     hideImgItems();
-  }
-}
-
-void ZImgFilter::setViewport(const QRectF& rect, double scale)
-{
-  QRectF vp = mapFromSceneRect(rect);
-  if (m_imgPack->needUpdate(vp, scale, m_lastViewport, m_lastScale, realT(), realZ(), m_view.isMaxZProjView())) {
-    if (!m_isVisible) {
-      destroyImgItems(); // will create new one next time
-    } else {
-      m_displayValid = false;
-      updateImgItems();
-    }
   }
 }
 
@@ -305,6 +293,7 @@ std::shared_ptr<ZWidgetsGroup> ZImgFilter::viewSettingWidgetsGroup()
 void ZImgFilter::transformChanged()
 {
   m_item->setTransform(getQTransform());
+  viewportChanged();
   ZObjFilter::transformChanged();
 }
 
@@ -545,17 +534,31 @@ double ZImgFilter::getUpperChannelRange(size_t c) const
   return m_doubleChannelRangeParas[c]->get().y;
 }
 
+void ZImgFilter::viewportChanged()
+{
+  QRectF vp = mapFromSceneRect(m_view.currentViewport());
+  if (m_imgPack->needUpdate(vp, m_view.currentScale(), m_lastViewport, m_lastScale,
+                            realT(), realZ(), m_view.isMaxZProjView())) {
+    if (!m_isVisible) {
+      destroyImgItems(); // will create new one next time
+    } else {
+      m_displayValid = false;
+      updateImgItems();
+    }
+  }
+}
+
 void ZImgFilter::flipHorizontally()
 {
   if (m_item) {
-    m_transform.flipHorizontally(m_item->sceneBoundingRect());
+    m_transform.flipHorizontally(QRectF(0, 0, m_imgPack->imgInfo().width, m_imgPack->imgInfo().height));
   }
 }
 
 void ZImgFilter::flipVertically()
 {
   if (m_item) {
-    m_transform.flipVertically(m_item->sceneBoundingRect());
+    m_transform.flipVertically(QRectF(0, 0, m_imgPack->imgInfo().width, m_imgPack->imgInfo().height));
   }
 }
 

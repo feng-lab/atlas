@@ -389,15 +389,6 @@ void ZView::takeScreenShot(QString filename)
   }
 }
 
-void ZView::viewportChanged()
-{
-  //LOG(INFO) << m_view->getCurrrentlyVisibleRegion().intersected(m_scene->sceneRect()) << " " << m_view->currentScale();
-  for (const auto& view : m_objViews) {
-    view->setViewport(m_view->getCurrrentlyVisibleRegion().intersected(m_scene->sceneRect()),
-                      m_view->currentScale());
-  }
-}
-
 void ZView::mousePressed(QPointF scenePos)
 {
   for (const auto& view : m_objViews) {

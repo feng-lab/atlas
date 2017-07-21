@@ -147,6 +147,8 @@ signals:
 
   void objViewReady(size_t id);
 
+  void viewportChanged();
+
 protected:
   void keyPressEvent(QKeyEvent* e) override;
 
@@ -168,8 +170,6 @@ private:
   void takeFixedSizeScreenShot(QString filename, int width, int height);
 
   void takeScreenShot(QString filename);
-
-  void viewportChanged();
 
   void mousePressed(QPointF scenePos);
 
