@@ -5,7 +5,7 @@
 #ifdef _WIN32
 #define GET_TEST_DATA_DIR QDir("Z:\\Google Drive\\atlas_test_data")
 #else
-#define GET_TEST_DATA_DIR QDir("/Users/feng/Google Drive/atlas_test_data")
+#define GET_TEST_DATA_DIR QDir(QDir::homePath() + "/Google Drive/atlas_test_data")
 #endif
 
 #include "zfilereadtest.h"

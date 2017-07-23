@@ -1,5 +1,3 @@
-#!/Users/feng/miniconda3/bin/python3
-
 import os
 import shutil
 import sys

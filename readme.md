@@ -9,5 +9,5 @@
 
 ### All:
 * code repository folder should be named as "atlas"; "atlas_others" folder and "atlas" folder should be in same directory
-* (setup SSH credential for github), run "util/build_ext_libs.py all" to build external libraries
+* (setup SSH credential for github), run "python3 util/build_ext_libs.py all" to build external libraries
 * build CMakeLists.txt

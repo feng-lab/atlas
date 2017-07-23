@@ -2,22 +2,10 @@
 
 namespace nim {
 
-template<> const char* EnumStrings<DataType>::data[] = {
-  "0", "Byte", "Ascii", "Short", "Long", "Rational", "SByte", "Undefined", "SShort", "SLong",
-  "SRational", "Float", "Double", "IFD", "14", "15", "Long8", "SLong8", "IFD8"
-};
-
-template<> const char* EnumStrings<VoxelFormat>::data[] = {
-  "0", "Unsigned", "Signed", "Float"
-};
-
-template<> const char* EnumStrings<VoxelSizeUnit>::data[] = {
-  "none", "inch", "cm", "mm", "um", "nm", "m", "hm", "km"
-};
-
-template<> const char* EnumStrings<Dimension>::data[] = {
-  "X", "Y", "Z", "C", "T"
-};
+constexpr const char* const EnumStrings<DataType>::data[];
+constexpr const char* const EnumStrings<VoxelFormat>::data[];
+constexpr const char* const EnumStrings<VoxelSizeUnit>::data[];
+constexpr const char* const EnumStrings<Dimension>::data[];
 
 size_t byteNumber(DataType dt)
 {

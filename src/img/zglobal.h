@@ -25,12 +25,18 @@ constexpr typename std::underlying_type<TEnum>::type enumToUnderlyingType(TEnum 
 }
 
 // define string of enum as:
-// template<> const char* EnumString<TEnum>::data[] = {"a", "b", ...};
+// template<>
+// struct EnumStrings<TEnum>
+// {
+//   static constexpr const char* const data[] = {
+//     "a", "b", "c", ...
+//   };
+// };
 // to enable enumToString for TEnum
 template<typename TEnum>
 struct EnumStrings
 {
-  static const char* data[];
+  // static constexpr const char* const data[];
 };
 
 // crash if enum e is not valid

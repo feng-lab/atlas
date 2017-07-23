@@ -25,6 +25,15 @@ enum class DataType : std::uint16_t
   IFD8 = 18  // BigTIFF 64-bit unsigned integer (offset)
 };
 
+template<>
+struct EnumStrings<DataType>
+{
+  static constexpr const char* const data[] = {
+    "0", "Byte", "Ascii", "Short", "Long", "Rational", "SByte", "Undefined", "SShort", "SLong",
+    "SRational", "Float", "Double", "IFD", "14", "15", "Long8", "SLong8", "IFD8"
+  };
+};
+
 inline bool isValidDataType(uint32_t dataType)
 {
   return dataType >= 1 && dataType <= 18 && dataType != 14 && dataType != 15;
@@ -41,6 +50,14 @@ enum class VoxelFormat : std::uint16_t
   Float = 3   // IEEE floating point data [IEEE]
 };
 
+template<>
+struct EnumStrings<VoxelFormat>
+{
+  static constexpr const char* const data[] = {
+    "0", "Unsigned", "Signed", "Float"
+  };
+};
+
 //
 enum class VoxelSizeUnit
 {
@@ -53,6 +70,14 @@ enum class VoxelSizeUnit
   m = 6,  // Meter 1 m
   hm = 7,  // Hecto Meter 1e2 m
   km = 8   // Kilo Meters 1e3 m
+};
+
+template<>
+struct EnumStrings<VoxelSizeUnit>
+{
+  static constexpr const char* const data[] = {
+    "none", "inch", "cm", "mm", "um", "nm", "m", "hm", "km"
+  };
 };
 
 double unitSizeInMeter(VoxelSizeUnit vsu);
@@ -208,5 +233,13 @@ enum class Dimension
   T = 4
 };
 
-}
+template<>
+struct EnumStrings<Dimension>
+{
+  static constexpr const char* const data[] = {
+    "X", "Y", "Z", "C", "T"
+  };
+};
+
+} // namespace nim
 
