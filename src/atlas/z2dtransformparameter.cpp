@@ -98,6 +98,7 @@ void Z2DTransformParameter::rotate(double ang)
 
 void Z2DTransformParameter::rotate(double ang, const glm::dvec2& center)
 {
+  m_receiveWidgetSignal = false;
   glm::dvec2 scale = m_scale.get();
   glm::dmat3 currValue = m_value;
   if (scale.x == 0 || scale.y == 0) {
@@ -116,10 +117,13 @@ void Z2DTransformParameter::rotate(double ang, const glm::dvec2& center)
   setRotation(rotation() + ang);
   m_translation.set(currValue[2].xy());
   m_center.set(glm::dvec2(0));
+  m_receiveWidgetSignal = true;
+  updateMatrix();
 }
 
 void Z2DTransformParameter::flipHorizontally(const QRectF& boundRect)
 {
+  m_receiveWidgetSignal = false;
   glm::dmat3 currValue = m_value;
   glm::dmat3 trans = glm::translate(glm::dmat3(1), glm::dvec2(-boundRect.left() - boundRect.right(), 0.));
   glm::dmat3 flip = glm::scale(glm::dmat3(1), glm::dvec2(-1, 1));
@@ -136,10 +140,13 @@ void Z2DTransformParameter::flipHorizontally(const QRectF& boundRect)
   setScale(xs, ys);
   setRotation(std::atan(currValue[0][1] / currValue[0][0]));
   m_center.set(glm::dvec2(0));
+  m_receiveWidgetSignal = true;
+  updateMatrix();
 }
 
 void Z2DTransformParameter::flipVertically(const QRectF& boundRect)
 {
+  m_receiveWidgetSignal = false;
   glm::dmat3 currValue = m_value;
   glm::dmat3 trans = glm::translate(glm::dmat3(1), glm::dvec2(0., -boundRect.top() - boundRect.bottom()));
   glm::dmat3 flip = glm::scale(glm::dmat3(1), glm::dvec2(1, -1));
@@ -156,16 +163,21 @@ void Z2DTransformParameter::flipVertically(const QRectF& boundRect)
   setScale(xs, ys);
   setRotation(std::atan(currValue[0][1] / currValue[0][0]));
   m_center.set(glm::dvec2(0));
+  m_receiveWidgetSignal = true;
+  updateMatrix();
 }
 
 void Z2DTransformParameter::setValueSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
   const Z2DTransformParameter& src = static_cast<const Z2DTransformParameter&>(rhs);
+  m_receiveWidgetSignal = false;
   m_scale.set(src.m_scale.get());
   m_translation.set(src.m_translation.get());
   m_rotation.set(src.m_rotation.get());
   m_center.set(src.m_center.get());
+  m_receiveWidgetSignal = true;
+  updateMatrix();
 }
 
 void Z2DTransformParameter::interpolate(const ZParameter& prev, double progress, ZParameter& dest)
@@ -173,12 +185,15 @@ void Z2DTransformParameter::interpolate(const ZParameter& prev, double progress,
   CHECK(this->isSameType(prev) && this->isSameType(dest));
   const Z2DTransformParameter& prevPara = static_cast<const Z2DTransformParameter&>(prev);
   Z2DTransformParameter& desPara = static_cast<Z2DTransformParameter&>(dest);
+  desPara.m_receiveWidgetSignal = false;
   desPara.setScale(glm::mix(prevPara.scale(), scale(), progress));
   desPara.setRotation(glm::mix(prevPara.m_rotation.get(), m_rotation.get(), progress));
   //desPara.setRotation(glm::vec4(glm::mix(prevPara.m_rotation.get().x, m_rotation.get().x, progress), prevPara.m_rotation.get().yzw()));
   desPara.setTranslation(glm::mix(prevPara.translation(), translation(), progress));
   //desPara.setRotationCenter(glm::mix(prevPara.m_center.get(), m_center.get(), progress));
   desPara.setRotationCenter(progress >= 1.0 ? m_center.get() : prevPara.m_center.get());
+  desPara.m_receiveWidgetSignal = true;
+  desPara.updateMatrix();
 }
 
 void Z2DTransformParameter::updateMatrix()
@@ -270,10 +285,13 @@ void Z2DTransformParameter::readValue(const QJsonValue& jsonValue)
 {
   if (jsonValue.isObject()) {
     QJsonObject obj = jsonValue.toObject();
+    m_receiveWidgetSignal = false;
     m_scale.read(obj);
     m_translation.read(obj);
     m_rotation.read(obj);
     m_center.read(obj);
+    m_receiveWidgetSignal = true;
+    updateMatrix();
   }
 }
 

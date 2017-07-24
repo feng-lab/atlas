@@ -16,7 +16,7 @@
 #include <array>
 #include <tuple>
 
-#define DUMP_CZI_INFO
+//#define DUMP_CZI_INFO
 #define NO_MIXED_TILE
 
 namespace {

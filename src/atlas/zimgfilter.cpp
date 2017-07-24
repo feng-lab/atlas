@@ -550,14 +550,14 @@ void ZImgFilter::viewportChanged()
 
 void ZImgFilter::flipHorizontally()
 {
-  if (m_item) {
+  if (m_item && m_item->isVisible()) {
     m_transform.flipHorizontally(QRectF(0, 0, m_imgPack->imgInfo().width, m_imgPack->imgInfo().height));
   }
 }
 
 void ZImgFilter::flipVertically()
 {
-  if (m_item) {
+  if (m_item && m_item->isVisible()) {
     m_transform.flipVertically(QRectF(0, 0, m_imgPack->imgInfo().width, m_imgPack->imgInfo().height));
   }
 }
