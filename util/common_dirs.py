@@ -66,6 +66,6 @@ def deploy_target_dir():
 
 
 def qt_bin_dir():
-    res = os.path.join(os.path.expanduser('~'), 'Qt', "5.9", 'clang_64', 'bin')
+    res = os.path.join(os.path.expanduser('~'), 'Qt', "5.9.1", 'clang_64', 'bin')
     assert os.path.exists(res)
     return res
