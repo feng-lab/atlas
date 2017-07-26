@@ -636,7 +636,7 @@ set(SOURCES
     zparametereditdialog.cpp
     zparametereditdialog.h
     z2dtransformparameter.cpp
-    z2dtransformparameter.h)
+    z2dtransformparameter.h zspinboxdelegate.cpp zspinboxdelegate.h)
 
 # our target
 set(APP_NAME Atlas)

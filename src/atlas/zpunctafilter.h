@@ -25,7 +25,7 @@ public:
   int type() const override
   { return Type; }
 
-  explicit ZPunctaGraphicsItem(ZPuncta& puncta, double z = 1, QGraphicsItem* parent = nullptr);
+  explicit ZPunctaGraphicsItem(ZPuncta& puncta, QGraphicsItem* parent = nullptr);
 
   void setOutlineColor(const QColor& c)
   {
@@ -101,6 +101,8 @@ public:
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
 protected:
+  virtual void viewPrecedenceChanged() override;
+
   virtual void transformChanged() override;
 
   virtual void offsetChanged() override;

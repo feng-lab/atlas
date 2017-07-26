@@ -7,6 +7,7 @@
 #include "zwidgetsgroup.h"
 #include "zlogqttypesupport.h"
 #include <QWindow>
+#include <QPushButton>
 
 namespace nim {
 
@@ -18,6 +19,10 @@ ZSvgFilter::ZSvgFilter(ZView& view)
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZSvgFilter::visibleChanged);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZSvgFilter::opacityChanged);
   addParameter(&m_visible);
+  m_viewPrecedencePara.blockSignals(true);
+  m_viewPrecedencePara.set(100);
+  m_viewPrecedencePara.blockSignals(false);
+  addParameter(&m_viewPrecedencePara);
   addParameter(&m_transform);
   addParameter(&m_offsetPara);
   addParameter(&m_opacity);
@@ -26,6 +31,7 @@ ZSvgFilter::ZSvgFilter(ZView& view)
 void ZSvgFilter::setData(QSvgRenderer& svg)
 {
   m_item = std::make_unique<QGraphicsSvgItem>();
+  m_item->setZValue(m_viewPrecedencePara.get());
   m_item->setSharedRenderer(&svg);
   m_item->setOpacity(m_opacity.get());
   m_item->setTransform(getQTransform());
@@ -75,11 +81,27 @@ std::shared_ptr<ZWidgetsGroup> ZSvgFilter::viewSettingWidgetsGroup()
   if (!m_widgetsGroup) {
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("", 1);
     m_widgetsGroup->addChild(m_visible, 1);
+
+    QPushButton* pb = new QPushButton("Bring to Front");
+    connect(pb, &QPushButton::clicked, this, &ZSvgFilter::bringToFront);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    pb = new QPushButton("Send to Back");
+    connect(pb, &QPushButton::clicked, this, &ZSvgFilter::sendToBack);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
     m_widgetsGroup->addChild(m_transform, 1);
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
   }
   return m_widgetsGroup;
+}
+
+void ZSvgFilter::viewPrecedenceChanged()
+{
+  m_item->setZValue(m_viewPrecedencePara.get());
+  ZObjFilter::viewPrecedenceChanged();
 }
 
 void ZSvgFilter::transformChanged()

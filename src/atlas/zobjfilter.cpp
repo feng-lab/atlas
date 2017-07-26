@@ -7,11 +7,16 @@ namespace nim {
 
 ZObjFilter::ZObjFilter(ZView& view)
   : m_view(view)
+  , m_viewPrecedencePara(QString("View Precedence"), 0,
+                         std::numeric_limits<int>::min(),
+                         std::numeric_limits<int>::max())
   , m_transform(QString("Transform"))
   , m_offsetPara(QString("Offset"), glm::dvec2(0),
                  glm::dvec2(std::numeric_limits<int>::min()),
                  glm::dvec2(std::numeric_limits<int>::max()))
 {
+  m_viewPrecedencePara.setStyle("SPINBOX");
+  connect(&m_viewPrecedencePara, &ZIntParameter::valueChanged, this, &ZObjFilter::viewPrecedenceChanged);
   connect(&m_transform, &Z2DTransformParameter::valueChanged, this, &ZObjFilter::transformChanged);
   QList<QString> names;
   names << "z" << "t";
@@ -94,6 +99,10 @@ QRectF ZObjFilter::mapFromSceneRect(const QRectF& rect) const
   return itrans.mapRect(rect);
 }
 
+void ZObjFilter::viewPrecedenceChanged()
+{
+}
+
 void ZObjFilter::transformChanged()
 {
   emit boundBoxChanged();
@@ -102,6 +111,16 @@ void ZObjFilter::transformChanged()
 void ZObjFilter::offsetChanged()
 {
   emit boundBoxChanged();
+}
+
+void ZObjFilter::bringToFront()
+{
+  m_viewPrecedencePara.set(m_view.maxViewPrecedence() + 1);
+}
+
+void ZObjFilter::sendToBack()
+{
+  m_viewPrecedencePara.set(m_view.minViewPrecedence() - 1);
 }
 
 } // namespace nim

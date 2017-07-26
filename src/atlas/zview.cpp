@@ -299,6 +299,24 @@ void ZView::fitContentIntoWindow()
   m_view->fitRect(sceneRect);
 }
 
+int ZView::minViewPrecedence() const
+{
+  int res = std::numeric_limits<int>::max();
+  for (const auto& view : m_objViews) {
+    res = std::min(res, view->minViewPrecedence());
+  }
+  return res;
+}
+
+int ZView::maxViewPrecedence() const
+{
+  int res = std::numeric_limits<int>::min();
+  for (const auto& view : m_objViews) {
+    res = std::max(res, view->maxViewPrecedence());
+  }
+  return res;
+}
+
 void ZView::sliceChanged()
 {
   if (m_doNotReceiveSliceSignal)

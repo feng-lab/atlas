@@ -26,7 +26,7 @@ public:
   int type() const override
   { return Type; }
 
-  ROIGraphicsItem(ZROI& roi, int slice, double z = 100, QGraphicsItem* parent = nullptr);
+  ROIGraphicsItem(ZROI& roi, int slice, QGraphicsItem* parent = nullptr);
 
   void updateValue();
 
@@ -59,7 +59,7 @@ public:
   { return Type; }
 
   ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint,
-                        double viewScale = 1., double z = 100, QGraphicsItem* parent = nullptr);
+                        double viewScale = 1., QGraphicsItem* parent = nullptr);
 
   void updateValue();
 
@@ -127,6 +127,9 @@ public:
 
   virtual void rotateCounterclockwise() override;
 
+  ZIntParameter& viewPrecedencePara()
+  { return m_viewPrecedencePara; }
+
   Z2DTransformParameter& transformPara()
   { return m_transform; }
 
@@ -134,6 +137,8 @@ public:
   { return m_offsetPara; }
 
 protected:
+  virtual void viewPrecedenceChanged() override;
+
   virtual void transformChanged() override;
 
   virtual void offsetChanged() override;

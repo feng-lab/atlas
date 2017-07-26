@@ -8,11 +8,12 @@
 #include "zwidgetsgroup.h"
 #include <QGraphicsSceneContextMenuEvent>
 #include <QToolTip>
+#include <QPushButton>
 #include <boost/math/constants/constants.hpp>
 
 namespace nim {
 
-ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, double z, QGraphicsItem* parent)
+ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, QGraphicsItem* parent)
   : QGraphicsPathItem(parent)
   , m_roi(roi)
   , m_slice(slice)
@@ -29,7 +30,6 @@ ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, double z, QGraphicsItem* 
   setPos(m_basePos + m_offset);
   //todo: uncomment this when we have undo
   //setCursor(Qt::OpenHandCursor);
-  setZValue(z);
 }
 
 void ROIGraphicsItem::updateValue()
@@ -92,7 +92,7 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 }
 
 ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint,
-                                             double viewScale, double z, QGraphicsItem* parent)
+                                             double viewScale, QGraphicsItem* parent)
   : QGraphicsRectItem(parent)
   , m_roi(roi)
   , m_controlPoint(controlPoint)
@@ -114,7 +114,6 @@ ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& 
   setPen(QPen(QColor(0, 0, 0), 0));
   setBrush(QBrush(QColor(255, 255, 255)));
   setCursor(Qt::PointingHandCursor);
-  setZValue(z);
 }
 
 void ROICtrlPtGraphicsItem::updateValue()
@@ -206,6 +205,10 @@ ZROIFilter::ZROIFilter(ZView& view)
   addParameter(&m_showControlPoints);
   addParameter(&m_outlineColor);
   addParameter(&m_regionColor);
+  m_viewPrecedencePara.blockSignals(true);
+  m_viewPrecedencePara.set(3000);
+  m_viewPrecedencePara.blockSignals(false);
+  addParameter(&m_viewPrecedencePara);
   addParameter(&m_transform);
   addParameter(&m_offsetPara);
   addParameter(&m_opacity);
@@ -222,6 +225,7 @@ void ZROIFilter::setData(ZROI& roi)
     for (const auto& sliceROI : *m_ROI) {
       int i = sliceROI.first;
       auto roiItem = new ROIGraphicsItem(*m_ROI, i);
+      roiItem->setZValue(m_viewPrecedencePara.get());
       roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
                                   m_outlineColor.get().y * 255,
                                   m_outlineColor.get().z * 255),
@@ -321,6 +325,16 @@ std::shared_ptr<ZWidgetsGroup> ZROIFilter::viewSettingWidgetsGroup()
   if (!m_widgetsGroup) {
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("ROI", 1);
     m_widgetsGroup->addChild(m_visible, 1);
+
+    QPushButton* pb = new QPushButton("Bring to Front");
+    connect(pb, &QPushButton::clicked, this, &ZROIFilter::bringToFront);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    pb = new QPushButton("Send to Back");
+    connect(pb, &QPushButton::clicked, this, &ZROIFilter::sendToBack);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
     m_widgetsGroup->addChild(m_showControlPoints, 1);
     m_widgetsGroup->addChild(m_outlineColor, 1);
     m_widgetsGroup->addChild(m_regionColor, 1);
@@ -433,6 +447,21 @@ void ZROIFilter::rotateCounterclockwise()
     m_ROI->rotateROIControlPoints(controlPoints, -5. * degree);
 }
 
+void ZROIFilter::viewPrecedenceChanged()
+{
+  for (const auto& sliceItem : m_sliceToROIItem) {
+    sliceItem.second->setZValue(m_viewPrecedencePara.get());
+  }
+  if (m_showControlPoints.get()) {
+    for (const auto& sliceItems : m_sliceToCtrlPtItems) {
+      for (const auto& item : sliceItems.second) {
+        item->setZValue(m_viewPrecedencePara.get());
+      }
+    }
+  }
+  ZObjFilter::viewPrecedenceChanged();
+}
+
 void ZROIFilter::transformChanged()
 {
   QTransform trans = getQTransform();
@@ -461,6 +490,7 @@ std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> ZROIFilter::createCtrlPtItem
   for (const auto& controlPoint : controlPoints) {
     ROICtrlPtGraphicsItem* rectItem = new ROICtrlPtGraphicsItem(*m_ROI, controlPoint,
                                                                 m_view.graphicsView().currentScale());
+    rectItem->setZValue(m_viewPrecedencePara.get());
     rectItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get() && m_showControlPoints.get());
     rectItem->setTransform(getQTransform());
     m_view.scene().addItem(rectItem);
@@ -544,6 +574,7 @@ void ZROIFilter::onRoiChanged(int slice)
 {
   if (m_sliceToROIItem.find(slice) == m_sliceToROIItem.end()) {
     auto roiItem = new ROIGraphicsItem(*m_ROI, slice);
+    roiItem->setZValue(m_viewPrecedencePara.get());
     roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
                                 m_outlineColor.get().y * 255,
                                 m_outlineColor.get().z * 255),

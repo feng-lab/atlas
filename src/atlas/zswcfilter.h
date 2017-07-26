@@ -26,7 +26,7 @@ public:
   int type() const override
   { return Type; }
 
-  explicit ZSwcGraphicsItem(ZSwc& swc, double z = 1, QGraphicsItem* parent = nullptr);
+  explicit ZSwcGraphicsItem(ZSwc& swc, QGraphicsItem* parent = nullptr);
 
   void setShowSkeleton(bool v)
   {
@@ -110,6 +110,8 @@ public:
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
 protected:
+  virtual void viewPrecedenceChanged() override;
+
   virtual void transformChanged() override;
 
   virtual void offsetChanged() override;

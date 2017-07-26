@@ -143,6 +143,10 @@ public:
 
   void fitContentIntoWindow();
 
+  int minViewPrecedence() const;
+
+  int maxViewPrecedence() const;
+
 signals:
 
   void objViewReady(size_t id);

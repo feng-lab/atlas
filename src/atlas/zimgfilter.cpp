@@ -15,10 +15,9 @@
 
 namespace nim {
 
-ZGraphicsItemGroup::ZGraphicsItemGroup(double z, QGraphicsItem* parent)
+ZGraphicsItemGroup::ZGraphicsItemGroup(QGraphicsItem* parent)
   : QGraphicsItemGroup(parent)
 {
-  setZValue(z);
   setFlag(QGraphicsItem::ItemIsSelectable, true);
 }
 
@@ -106,6 +105,10 @@ ZImgFilter::ZImgFilter(ZView& view)
   addParameter(&m_visible);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZImgFilter::opacityChanged);
   addParameter(&m_opacity);
+  m_viewPrecedencePara.blockSignals(true);
+  m_viewPrecedencePara.set(0);
+  m_viewPrecedencePara.blockSignals(false);
+  addParameter(&m_viewPrecedencePara);
   addParameter(&m_transform);
   addParameter(&m_offsetPara);
   connect(&m_view, &ZView::viewportChanged, this, &ZImgFilter::viewportChanged);
@@ -268,13 +271,23 @@ std::shared_ptr<ZWidgetsGroup> ZImgFilter::viewSettingWidgetsGroup()
   if (!m_widgetsGroup) {
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>(m_imgPack->name(), 1);
     m_widgetsGroup->addChild(m_visible, 1);
+
+    QPushButton* pb = new QPushButton("Bring to Front");
+    connect(pb, &QPushButton::clicked, this, &ZImgFilter::bringToFront);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    pb = new QPushButton("Send to Back");
+    connect(pb, &QPushButton::clicked, this, &ZImgFilter::sendToBack);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
     for (size_t i = 0; i < m_channelVisibleParas.size(); ++i) {
       m_widgetsGroup->addChild(*m_channelVisibleParas[i], 1);
       m_widgetsGroup->addChild(*m_channelColorParas[i], 1);
       m_widgetsGroup->addChild(*m_doubleChannelRangeParas[i], 1);
     }
 
-    QPushButton* pb = new QPushButton("Flip Horizontally");
+    pb = new QPushButton("Flip Horizontally");
     connect(pb, &QPushButton::clicked, this, &ZImgFilter::flipHorizontally);
     m_widgetsGroup->addChild(*pb, 1);
 
@@ -288,6 +301,14 @@ std::shared_ptr<ZWidgetsGroup> ZImgFilter::viewSettingWidgetsGroup()
     m_widgetsGroup->setBasicAdvancedCutoff(5);
   }
   return m_widgetsGroup;
+}
+
+void ZImgFilter::viewPrecedenceChanged()
+{
+  if (m_item) {
+    m_item->setZValue(m_viewPrecedencePara.get());
+  }
+  ZObjFilter::viewPrecedenceChanged();
 }
 
 void ZImgFilter::transformChanged()
@@ -314,13 +335,23 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
     m_widgetsGroup->removeAllChildren();
 
     m_widgetsGroup->addChild(m_visible, 1);
+
+    QPushButton* pb = new QPushButton("Bring to Front");
+    connect(pb, &QPushButton::clicked, this, &ZImgFilter::bringToFront);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    pb = new QPushButton("Send to Back");
+    connect(pb, &QPushButton::clicked, this, &ZImgFilter::sendToBack);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
     for (size_t i = 0; i < m_channelVisibleParas.size(); ++i) {
       m_widgetsGroup->addChild(*m_channelVisibleParas[i], 1);
       m_widgetsGroup->addChild(*m_channelColorParas[i], 1);
       m_widgetsGroup->addChild(*m_doubleChannelRangeParas[i], 1);
     }
 
-    QPushButton* pb = new QPushButton("Flip Horizontally");
+    pb = new QPushButton("Flip Horizontally");
     connect(pb, &QPushButton::clicked, this, &ZImgFilter::flipHorizontally);
     m_widgetsGroup->addChild(*pb, 1);
 
@@ -513,6 +544,7 @@ void ZImgFilter::updateImgItems()
       m_imgItems[i]->setVisible(m_isVisible);
       m_item->addToGroup(m_imgItems[i]);
     }
+    m_item->setZValue(m_viewPrecedencePara.get());
     m_item->setTransform(getQTransform());
 
     m_lastDisplay = curDisplay;

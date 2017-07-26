@@ -41,6 +41,9 @@ public:
   QList<ZParameter*> parameters()
   { return m_parameters; }
 
+  int viewPrecedence() const
+  { return m_viewPrecedencePara.get(); }
+
   QPointF mapFromScene(QPointF p) const;
 
 signals:
@@ -76,15 +79,24 @@ protected:
   int realT(int t) const
   { return t - int(m_offsetPara.get().y); }
 
+  virtual void viewPrecedenceChanged();
+
   virtual void transformChanged();
 
   virtual void offsetChanged();
+
+  // set view precedence to highest value in the scene
+  void bringToFront();
+
+  // set view precedence to lowest value in the scene
+  void sendToBack();
 
 protected:
   QList<ZParameter*> m_parameters;
 
   ZView& m_view;
 
+  ZIntParameter m_viewPrecedencePara;
   Z2DTransformParameter m_transform;
   ZDVec2Parameter m_offsetPara;
 };

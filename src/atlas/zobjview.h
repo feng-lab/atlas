@@ -54,6 +54,11 @@ public:
 
   virtual void rotateCounterclockwise() = 0;
 
+  //
+  virtual int minViewPrecedence() const = 0;
+
+  virtual int maxViewPrecedence() const = 0;
+
 signals:
 
   void objViewReady(size_t id);

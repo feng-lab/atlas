@@ -224,6 +224,7 @@ void Z3DTransformParameter::rotate(const glm::vec3& axis, float ang)
 
 void Z3DTransformParameter::rotate(const glm::vec3& axis, float ang, const glm::vec3& center)
 {
+  m_receiveWidgetSignal = false;
   glm::vec3 scale = m_scale.get();
   glm::mat4 currValue = m_value;
   if (scale.x == 0 || scale.y == 0 || scale.z == 0) {
@@ -248,16 +249,21 @@ void Z3DTransformParameter::rotate(const glm::vec3& axis, float ang, const glm::
   setRotation(quat);
   m_translation.set(currValue[3].xyz());
   m_center.set(glm::vec3(0, 0, 0));
+  m_receiveWidgetSignal = true;
+  updateMatrix();
 }
 
 void Z3DTransformParameter::setValueSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
   const Z3DTransformParameter& src = static_cast<const Z3DTransformParameter&>(rhs);
+  m_receiveWidgetSignal = false;
   m_scale.set(src.m_scale.get());
   m_translation.set(src.m_translation.get());
   m_rotation.set(src.m_rotation.get());
   m_center.set(src.m_center.get());
+  m_receiveWidgetSignal = true;
+  updateMatrix();
 }
 
 void Z3DTransformParameter::interpolate(const ZParameter& prev, double progress, ZParameter& dest)
@@ -265,6 +271,7 @@ void Z3DTransformParameter::interpolate(const ZParameter& prev, double progress,
   CHECK(this->isSameType(prev) && this->isSameType(dest));
   const Z3DTransformParameter& prevPara = static_cast<const Z3DTransformParameter&>(prev);
   Z3DTransformParameter& desPara = static_cast<Z3DTransformParameter&>(dest);
+  desPara.m_receiveWidgetSignal = false;
   desPara.setScale(glm::mix(prevPara.scale(), scale(), progress));
   if (prevPara.m_rotation.get().yzw() == m_rotation.get().yzw()) {
     desPara.setRotation(glm::mix(prevPara.m_rotation.get(), m_rotation.get(), progress));
@@ -275,6 +282,8 @@ void Z3DTransformParameter::interpolate(const ZParameter& prev, double progress,
   desPara.setTranslation(glm::mix(prevPara.translation(), translation(), progress));
   //desPara.setRotationCenter(glm::mix(prevPara.m_center.get(), m_center.get(), progress));
   desPara.setRotationCenter(progress >= 1.0 ? m_center.get() : prevPara.m_center.get());
+  desPara.m_receiveWidgetSignal = true;
+  desPara.updateMatrix();
 }
 
 void Z3DTransformParameter::updateMatrix()
@@ -366,10 +375,13 @@ void Z3DTransformParameter::readValue(const QJsonValue& jsonValue)
 {
   if (jsonValue.isObject()) {
     QJsonObject obj = jsonValue.toObject();
+    m_receiveWidgetSignal = false;
     m_scale.read(obj);
     m_translation.read(obj);
     m_rotation.read(obj);
     m_center.read(obj);
+    m_receiveWidgetSignal = true;
+    updateMatrix();
   }
 }
 

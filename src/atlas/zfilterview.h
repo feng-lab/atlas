@@ -148,6 +148,24 @@ public:
     }
   }
 
+  virtual int minViewPrecedence() const override
+  {
+    int res = std::numeric_limits<int>::max();
+    for (const auto& idFilter : m_idToFilter) {
+      res = std::min(res, idFilter.second->viewPrecedence());
+    }
+    return res;
+  }
+
+  virtual int maxViewPrecedence() const override
+  {
+    int res = std::numeric_limits<int>::min();
+    for (const auto& idFilter : m_idToFilter) {
+      res = std::max(res, idFilter.second->viewPrecedence());
+    }
+    return res;
+  }
+
 protected:
   virtual void updateBoundBox() override
   {

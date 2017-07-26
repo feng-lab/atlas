@@ -6,15 +6,14 @@
 #include "zsaturateoperation.h"
 #include "zgraphicsscene.h"
 #include <QStyleOption>
+#include <QPushButton>
 
 namespace nim {
 
-ZPunctaGraphicsItem::ZPunctaGraphicsItem(ZPuncta& puncta, double z, QGraphicsItem* parent)
+ZPunctaGraphicsItem::ZPunctaGraphicsItem(ZPuncta& puncta, QGraphicsItem* parent)
   : QGraphicsItem(parent)
   , m_puncta(puncta)
 {
-  setZValue(z);
-
   m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = m_boundBox[6] = std::numeric_limits<int>::max();
   m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = m_boundBox[7] = std::numeric_limits<int>::min();
   for (const auto& p : m_puncta) {
@@ -135,6 +134,10 @@ ZPunctaFilter::ZPunctaFilter(ZView& view)
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZPunctaFilter::opacityChanged);
   addParameter(&m_visible);
   addParameter(&m_outlineColor);
+  m_viewPrecedencePara.blockSignals(true);
+  m_viewPrecedencePara.set(2000);
+  m_viewPrecedencePara.blockSignals(false);
+  addParameter(&m_viewPrecedencePara);
   addParameter(&m_transform);
   addParameter(&m_offsetPara);
   addParameter(&m_opacity);
@@ -144,6 +147,7 @@ void ZPunctaFilter::setData(ZPuncta& puncta)
 {
   m_puncta = &puncta;
   m_item.reset(new ZPunctaGraphicsItem(puncta));
+  m_item->setZValue(m_viewPrecedencePara.get());
   m_item->setOutlineColor(QColor(m_outlineColor.get().x * 255,
                                  m_outlineColor.get().y * 255,
                                  m_outlineColor.get().z * 255));
@@ -193,12 +197,28 @@ std::shared_ptr<ZWidgetsGroup> ZPunctaFilter::viewSettingWidgetsGroup()
   if (!m_widgetsGroup) {
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("Puncta", 1);
     m_widgetsGroup->addChild(m_visible, 1);
+
+    QPushButton* pb = new QPushButton("Bring to Front");
+    connect(pb, &QPushButton::clicked, this, &ZPunctaFilter::bringToFront);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    pb = new QPushButton("Send to Back");
+    connect(pb, &QPushButton::clicked, this, &ZPunctaFilter::sendToBack);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
     m_widgetsGroup->addChild(m_outlineColor, 1);
     m_widgetsGroup->addChild(m_transform, 1);
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
   }
   return m_widgetsGroup;
+}
+
+void ZPunctaFilter::viewPrecedenceChanged()
+{
+  m_item->setZValue(m_viewPrecedencePara.get());
+  ZObjFilter::viewPrecedenceChanged();
 }
 
 void ZPunctaFilter::transformChanged()

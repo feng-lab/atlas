@@ -6,6 +6,7 @@
 #include "zgraphicsscene.h"
 #include "zsaturateoperation.h"
 #include "zlog.h"
+#include <QPushButton>
 
 namespace nim {
 
@@ -16,6 +17,9 @@ ZRegionAnnotationFilter::ZRegionAnnotationFilter(ZView& view)
 {
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZRegionAnnotationFilter::visibleChanged);
   //addParameter(&m_visible);
+  m_viewPrecedencePara.blockSignals(true);
+  m_viewPrecedencePara.set(3000);
+  m_viewPrecedencePara.blockSignals(false);
 }
 
 void ZRegionAnnotationFilter::setData(ZRegionAnnotation& regionAnnotation)
@@ -67,6 +71,16 @@ std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup(
   if (!m_widgetsGroup) {
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("", 1);
     m_widgetsGroup->addChild(m_visible, 1);
+
+    QPushButton* pb = new QPushButton("Bring to Front");
+    connect(pb, &QPushButton::clicked, this, &ZRegionAnnotationFilter::bringToFront);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    pb = new QPushButton("Send to Back");
+    connect(pb, &QPushButton::clicked, this, &ZRegionAnnotationFilter::sendToBack);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
     for (const auto& nameID : m_nameToID) {
       std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[nameID.second]->viewSettingWidgetsGroupForAnnotationFilter();
       wg->setGroupName(nameID.first);
@@ -141,6 +155,7 @@ void ZRegionAnnotationFilter::allROIChanged()
 
   m_parameters.clear();
   //addParameter(&m_visible);
+  addParameter(&m_viewPrecedencePara);
   addParameter(&m_transform);
   addParameter(&m_offsetPara);
 
@@ -153,6 +168,8 @@ void ZRegionAnnotationFilter::allROIChanged()
     flt->setVisible(false);
     flt->setOutlineColor(glm::vec3(node.red / 255.f, node.green / 255.f, node.blue / 255.f));
     flt->setRegionColor(glm::vec3(node.red / 255.f, node.green / 255.f, node.blue / 255.f));
+    connect(&m_viewPrecedencePara, &ZIntParameter::valueChanged,
+            &flt->viewPrecedencePara(), &ZIntParameter::updateFromSender);
     connect(&m_transform, &Z2DTransformParameter::valueChanged,
             &flt->transformPara(), &Z2DTransformParameter::updateFromSender);
     connect(&m_offsetPara, &ZDVec2Parameter::valueChanged,

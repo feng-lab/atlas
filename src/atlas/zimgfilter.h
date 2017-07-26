@@ -27,7 +27,7 @@ public:
   int type() const override
   { return Type; }
 
-  ZGraphicsItemGroup(double z = 2, QGraphicsItem* parent = nullptr);
+  ZGraphicsItemGroup(QGraphicsItem* parent = nullptr);
 
   virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 };
@@ -64,6 +64,8 @@ public:
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
 protected:
+  virtual void viewPrecedenceChanged() override;
+
   virtual void transformChanged() override;
 
   virtual void offsetChanged() override;

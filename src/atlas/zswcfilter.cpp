@@ -8,15 +8,14 @@
 #include "zlogqttypesupport.h"
 #include <QWindow>
 #include <QStyleOption>
+#include <QPushButton>
 
 namespace nim {
 
-ZSwcGraphicsItem::ZSwcGraphicsItem(ZSwc& swc, double z, QGraphicsItem* parent)
+ZSwcGraphicsItem::ZSwcGraphicsItem(ZSwc& swc, QGraphicsItem* parent)
   : QGraphicsItem(parent)
   , m_swc(swc)
 {
-  setZValue(z);
-
   m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = m_boundBox[6] = std::numeric_limits<int>::max();
   m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = m_boundBox[7] = std::numeric_limits<int>::min();
   for (ZSwc::Iterator it = m_swc.begin(); it != m_swc.end(); ++it) {
@@ -194,6 +193,10 @@ ZSwcFilter::ZSwcFilter(ZView& view)
   addParameter(&m_visible);
   addParameter(&m_showSkeleton);
   addParameter(&m_outlineColor);
+  m_viewPrecedencePara.blockSignals(true);
+  m_viewPrecedencePara.set(1000);
+  m_viewPrecedencePara.blockSignals(false);
+  addParameter(&m_viewPrecedencePara);
   addParameter(&m_transform);
   addParameter(&m_offsetPara);
   addParameter(&m_opacity);
@@ -203,6 +206,7 @@ void ZSwcFilter::setData(ZSwc& swc)
 {
   m_swc = &swc;
   m_item.reset(new ZSwcGraphicsItem(swc));
+  m_item->setZValue(m_viewPrecedencePara.get());
   m_item->setShowSkeleton(m_showSkeleton.get());
   m_item->setOutlineColor(QColor(m_outlineColor.get().x * 255,
                                  m_outlineColor.get().y * 255,
@@ -251,6 +255,16 @@ std::shared_ptr<ZWidgetsGroup> ZSwcFilter::viewSettingWidgetsGroup()
   if (!m_widgetsGroup) {
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("", 1);
     m_widgetsGroup->addChild(m_visible, 1);
+
+    QPushButton* pb = new QPushButton("Bring to Front");
+    connect(pb, &QPushButton::clicked, this, &ZSwcFilter::bringToFront);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    pb = new QPushButton("Send to Back");
+    connect(pb, &QPushButton::clicked, this, &ZSwcFilter::sendToBack);
+    m_widgetsGroup->addChild(*pb, 1);
+
+    m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
     m_widgetsGroup->addChild(m_showSkeleton, 1);
     m_widgetsGroup->addChild(m_outlineColor, 1);
     m_widgetsGroup->addChild(m_transform, 1);
@@ -258,6 +272,12 @@ std::shared_ptr<ZWidgetsGroup> ZSwcFilter::viewSettingWidgetsGroup()
     m_widgetsGroup->addChild(m_opacity, 1);
   }
   return m_widgetsGroup;
+}
+
+void ZSwcFilter::viewPrecedenceChanged()
+{
+  m_item->setZValue(m_viewPrecedencePara.get());
+  ZObjFilter::viewPrecedenceChanged();
 }
 
 void ZSwcFilter::transformChanged()
