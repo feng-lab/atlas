@@ -86,4 +86,11 @@ inline std::ostream& operator<<(std::ostream& s, const QString& q)
 inline std::ostream& operator<<(std::ostream& s, const QStringRef& q)
 { return (s << q.toUtf8().constData()); }
 
+template <class T, std::size_t N>
+inline std::ostream& operator<<(std::ostream& s, const std::array<T, N>& arr)
+{
+  copy(arr.cbegin(), arr.cend(), std::ostream_iterator<T>(s, " "));
+  return s;
+}
+
 } // namespace nim
