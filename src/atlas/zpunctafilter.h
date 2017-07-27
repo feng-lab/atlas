@@ -58,7 +58,7 @@ public:
     }
   }
 
-  const std::array<int, 8>& boundBox() const
+  const ZBBox<glm::ivec4>& boundBox() const
   { return m_boundBox; }
 
   // QGraphicsItem interface
@@ -69,7 +69,7 @@ public:
 
 protected:
   ZPuncta& m_puncta;
-  std::array<int, 8> m_boundBox;
+  ZBBox<glm::ivec4> m_boundBox;
   QColor m_outlineColor{255, 0, 0};
   double m_opacity = 1;
   bool m_mip = false;
@@ -96,7 +96,7 @@ public:
 
   void setMaxZProjView(int t) override;
 
-  std::array<int, 8> boundBox() const;
+  ZBBox<glm::ivec4> boundBox() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
@@ -124,8 +124,6 @@ private:
   bool m_sliceValid;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
-
-  std::array<int, 8> m_boundBox;
 };
 
 } // namespace nim

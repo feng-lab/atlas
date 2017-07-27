@@ -1,6 +1,8 @@
 #pragma once
 
 #include "zviewsettinginterface.h"
+#include "zglmutils.h"
+#include "zbbox.h"
 #include <QWidget>
 #include <QAction>
 #include <array>
@@ -221,7 +223,7 @@ private:
   QAction* m_roiLineAction;
 
   bool m_doNotReceiveSliceSignal;
-  std::array<int, 8> m_boundBox;
+  ZBBox<glm::ivec4> m_boundBox;
 
   std::vector<std::unique_ptr<ZObjView>> m_objViews;
 

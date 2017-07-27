@@ -605,46 +605,32 @@ void Z3DSwcFilter::prepareData()
   m_dataIsInvalid = false;
 }
 
-void Z3DSwcFilter::treeBound(ZSwc* tree, std::array<double, 6>& res) const
+void Z3DSwcFilter::treeBound(ZSwc* tree, ZBBox<glm::dvec3>& res) const
 {
-  res[0] = res[2] = res[4] = std::numeric_limits<double>::max();
-  res[1] = res[3] = res[5] = std::numeric_limits<double>::lowest();
-  std::array<double, 6> nodeBound;
+  res.reset();
+  ZBBox<glm::dvec3> nodeBound;
   for (ZSwc::Iterator tn = tree->begin(); tn != tree->end(); ++tn) {
     treeNodeBound(tn, nodeBound);
-    res[0] = std::min(res[0], nodeBound[0]);
-    res[1] = std::max(res[1], nodeBound[1]);
-    res[2] = std::min(res[2], nodeBound[2]);
-    res[3] = std::max(res[3], nodeBound[3]);
-    res[4] = std::min(res[4], nodeBound[4]);
-    res[5] = std::max(res[5], nodeBound[5]);
+    res.expand(nodeBound);
   }
 }
 
-void Z3DSwcFilter::treeNodeBound(const SwcTreeNode& tn, std::array<double, 6>& result) const
+void Z3DSwcFilter::treeNodeBound(const SwcTreeNode& tn, ZBBox<glm::dvec3>& result) const
 {
-  glm::vec3 cent = glm::applyMatrix(coordTransform(), glm::vec3(tn->x, tn->y, tn->z));
-  result[0] = cent.x - std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale());
-  result[1] = cent.x + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale());
-  result[2] = cent.y - std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale());
-  result[3] = cent.y + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale());
-  result[4] = cent.z - std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale());
-  result[5] = cent.z + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale());
+  glm::dvec3 cent = glm::dvec3(glm::applyMatrix(coordTransform(), glm::vec3(tn->x, tn->y, tn->z)));
+  result.setMinCorner(cent
+                      - std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale()));
+  result.setMaxCorner(cent
+                      + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale()));
 }
 
-void Z3DSwcFilter::notTransformedTreeBound(ZSwc* tree, std::array<double, 6>& res) const
+void Z3DSwcFilter::notTransformedTreeBound(ZSwc* tree, ZBBox<glm::dvec3>& res) const
 {
-  res[0] = res[2] = res[4] = std::numeric_limits<double>::max();
-  res[1] = res[3] = res[5] = std::numeric_limits<double>::lowest();
-  std::array<double, 6> nodeBound;
+  res.reset();
+  ZBBox<glm::dvec3> nodeBound;
   for (ZSwc::Iterator tn = tree->begin(); tn != tree->end(); ++tn) {
     notTransformedTreeNodeBound(tn, nodeBound);
-    res[0] = std::min(res[0], nodeBound[0]);
-    res[1] = std::max(res[1], nodeBound[1]);
-    res[2] = std::min(res[2], nodeBound[2]);
-    res[3] = std::max(res[3], nodeBound[3]);
-    res[4] = std::min(res[4], nodeBound[4]);
-    res[5] = std::max(res[5], nodeBound[5]);
+    res.expand(nodeBound);
   }
 }
 
@@ -671,14 +657,13 @@ void Z3DSwcFilter::addSelectionLines()
   }
 }
 
-void Z3DSwcFilter::notTransformedTreeNodeBound(const SwcTreeNode& tn, std::array<double, 6>& result) const
+void Z3DSwcFilter::notTransformedTreeNodeBound(const SwcTreeNode& tn, ZBBox<glm::dvec3>& result) const
 {
-  result[0] = tn->x - std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale());
-  result[1] = tn->x + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale());
-  result[2] = tn->y - std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale());
-  result[3] = tn->y + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale());
-  result[4] = tn->z - std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale());
-  result[5] = tn->z + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale());
+  glm::dvec3 cent(tn->x, tn->y, tn->z);
+  result.setMinCorner(cent
+                      - std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale()));
+  result.setMaxCorner(cent
+                      + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale()));
 }
 
 glm::vec4 Z3DSwcFilter::colorByDirection(const SwcTreeNode& n)

@@ -332,18 +332,14 @@ void Z3DPunctaFilter::prepareData()
   m_dataIsInvalid = false;
 }
 
-void Z3DPunctaFilter::punctumBound(const ZPunctum& p, std::array<double, 6>& result) const
+void Z3DPunctaFilter::punctumBound(const ZPunctum& p, ZBBox<glm::dvec3>& result) const
 {
   double radius = p.radius() * m_rendererBase.sizeScale();
   if (m_useSameSizeForAllPuncta.get())
     radius = 2.0 * m_rendererBase.sizeScale();
-  glm::vec3 cent = glm::applyMatrix(coordTransform(), glm::vec3(p.x(), p.y(), p.z()));
-  result[0] = cent.x - radius;
-  result[1] = cent.x + radius;
-  result[2] = cent.y - radius;
-  result[3] = cent.y + radius;
-  result[4] = cent.z - radius;
-  result[5] = cent.z + radius;
+  glm::dvec3 cent = glm::dvec3(glm::applyMatrix(coordTransform(), glm::vec3(p.x(), p.y(), p.z())));
+  result.setMinCorner(cent - radius);
+  result.setMaxCorner(cent + radius);
 }
 
 void Z3DPunctaFilter::updateData()
@@ -367,38 +363,29 @@ void Z3DPunctaFilter::updateData()
   updateBoundBox();
 }
 
-void Z3DPunctaFilter::notTransformedPunctumBound(const ZPunctum& p, std::array<double, 6>& result) const
+void Z3DPunctaFilter::notTransformedPunctumBound(const ZPunctum& p, ZBBox<glm::dvec3>& result) const
 {
   double radius = p.radius() * m_rendererBase.sizeScale();
   if (m_useSameSizeForAllPuncta.get())
     radius = 2.0 * m_rendererBase.sizeScale();
-  result[0] = p.x() - radius;
-  result[1] = p.x() + radius;
-  result[2] = p.y() - radius;
-  result[3] = p.y() + radius;
-  result[4] = p.z() - radius;
-  result[5] = p.z() + radius;
+  glm::dvec3 cent(p.x(), p.y(), p.z());
+  result.setMinCorner(cent - radius);
+  result.setMaxCorner(cent + radius);
 }
 
 void Z3DPunctaFilter::updateNotTransformedBoundBoxImpl()
 {
-  m_notTransformedBoundBox[0] = m_notTransformedBoundBox[2] = m_notTransformedBoundBox[4] = std::numeric_limits<double>::max();
-  m_notTransformedBoundBox[1] = m_notTransformedBoundBox[3] = m_notTransformedBoundBox[5] = std::numeric_limits<double>::lowest();
-  std::array<double, 6> boundBox;
+  m_notTransformedBoundBox.reset();
+  ZBBox<glm::dvec3> boundBox;
   for (const auto& p : *m_origPuncta) {
     notTransformedPunctumBound(p, boundBox);
-    m_notTransformedBoundBox[0] = std::min(boundBox[0], m_notTransformedBoundBox[0]);
-    m_notTransformedBoundBox[1] = std::max(boundBox[1], m_notTransformedBoundBox[1]);
-    m_notTransformedBoundBox[2] = std::min(boundBox[2], m_notTransformedBoundBox[2]);
-    m_notTransformedBoundBox[3] = std::max(boundBox[3], m_notTransformedBoundBox[3]);
-    m_notTransformedBoundBox[4] = std::min(boundBox[4], m_notTransformedBoundBox[4]);
-    m_notTransformedBoundBox[5] = std::max(boundBox[5], m_notTransformedBoundBox[5]);
+    m_notTransformedBoundBox.expand(boundBox);
   }
 }
 
 void Z3DPunctaFilter::addSelectionLines()
 {
-  std::array<double, 6> boundBox;
+  ZBBox<glm::dvec3> boundBox;
   for (const auto& p : *m_origPuncta) {
     punctumBound(p, boundBox);
     appendBoundboxLines(boundBox, m_selectionLines);

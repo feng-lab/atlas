@@ -843,12 +843,10 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
 
 void Z3DImgFilter::updateNotTransformedBoundBoxImpl()
 {
-  m_notTransformedBoundBox[0] = 0;
-  m_notTransformedBoundBox[2] = 0;
-  m_notTransformedBoundBox[4] = 0;
-  m_notTransformedBoundBox[1] = m_3dImg->dimensions().x;
-  m_notTransformedBoundBox[3] = m_3dImg->dimensions().y;
-  m_notTransformedBoundBox[5] = m_3dImg->dimensions().z;
+  m_notTransformedBoundBox.setMinCorner(glm::dvec3(0.0));
+  m_notTransformedBoundBox.setMaxCorner(glm::dvec3(m_3dImg->dimensions().x,
+                                                   m_3dImg->dimensions().y,
+                                                   m_3dImg->dimensions().z));
 }
 
 void Z3DImgFilter::updateBlockIDTarget()

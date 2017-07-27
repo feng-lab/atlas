@@ -43,17 +43,15 @@ void Z3DCamera::setTileFrustum(double left, double right, double bottom, double 
   makeProjectionMatrices();
 }
 
-void Z3DCamera::resetCamera(const std::array<double, 6>& bound, ResetOption options)
+void Z3DCamera::resetCamera(const ZBBox<glm::dvec3>& bound, ResetOption options)
 {
-  glm::vec3 center;
-  center[0] = (bound[0] + bound[1]) / 2.0;
-  center[1] = (bound[2] + bound[3]) / 2.0;
-  center[2] = (bound[4] + bound[5]) / 2.0;
+  glm::vec3 center = glm::vec3((bound.minCorner() + bound.maxCorner()) / 2.0);
 
   if (!is_flag_set(options, ResetOption::PreserveCenterDistance)) {
-    float w1 = bound[1] - bound[0];
-    float w2 = bound[3] - bound[2];
-    float w3 = bound[5] - bound[4];
+    auto boundSize = bound.size();
+    float w1 = boundSize.x;
+    float w2 = boundSize.y;
+    float w3 = boundSize.z;
     w1 *= w1;
     w2 *= w2;
     w3 *= w3;
@@ -80,8 +78,7 @@ void Z3DCamera::resetCamera(const std::array<double, 6>& bound, ResetOption opti
       angle = 2.0 * std::atan(std::tan(angle * 0.5) * m_aspectRatio);
     }
 
-    //m_centerDist = radius/std::sin(angle*0.5);
-    m_centerDist = radius / std::sin(angle * 0.5) + (bound[5] - bound[4]) / 2.0;
+    m_centerDist = radius / std::sin(angle * 0.5);
   }
   if (!is_flag_set(options, ResetOption::PreserveViewVector)) {
     m_viewVector = glm::vec3(0.f, 0.f, 1.f);
@@ -96,35 +93,36 @@ void Z3DCamera::resetCamera(const std::array<double, 6>& bound, ResetOption opti
 void Z3DCamera::resetCamera(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax,
                             ResetOption options)
 {
-  std::array<double, 6> bound;
-  bound[0] = xmin;
-  bound[1] = xmax;
-  bound[2] = ymin;
-  bound[3] = ymax;
-  bound[4] = zmin;
-  bound[5] = zmax;
-  resetCamera(bound, options);
+  resetCamera(ZBBox<glm::dvec3>(glm::dvec3(xmin, ymin, zmin), glm::dvec3(xmax, ymax, zmax)), options);
 }
 
-void Z3DCamera::resetCameraNearFarPlane(const std::array<double, 6>& bound)
+void Z3DCamera::resetCameraNearFarPlane(const ZBBox<glm::dvec3>& bound)
 {
   double a = m_viewVector[0];
   double b = m_viewVector[1];
   double c = m_viewVector[2];
   double d = -(a * m_eye[0] + b * m_eye[1] + c * m_eye[2]);
 
+  double bd[6];
+  bd[0] = bound.minCorner().x;
+  bd[1] = bound.maxCorner().x;
+  bd[2] = bound.minCorner().y;
+  bd[3] = bound.maxCorner().y;
+  bd[4] = bound.minCorner().z;
+  bd[5] = bound.maxCorner().z;
+
   // Set the max near clipping plane and the min far clipping plane
   double range[2];
-  range[0] = a * bound[0] + b * bound[2] + c * bound[4] + d;
+  range[0] = std::numeric_limits<double>::max();
   range[1] = 1e-18;
 
   // Find the closest / farthest bounding box vertex
   for (int k = 0; k < 2; ++k) {
     for (int j = 0; j < 2; ++j) {
       for (int i = 0; i < 2; ++i) {
-        double dist = a * bound[i] + b * bound[2 + j] + c * bound[4 + k] + d;
-        range[0] = (dist < range[0]) ? (dist) : (range[0]);
-        range[1] = (dist > range[1]) ? (dist) : (range[1]);
+        double dist = a * bd[i] + b * bd[2 + j] + c * bd[4 + k] + d;
+        range[0] = std::min(dist, range[0]);
+        range[1] = std::max(dist, range[1]);
       }
     }
   }
@@ -159,14 +157,7 @@ void Z3DCamera::resetCameraNearFarPlane(const std::array<double, 6>& bound)
 
 void Z3DCamera::resetCameraNearFarPlane(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax)
 {
-  std::array<double, 6> bound;
-  bound[0] = xmin;
-  bound[1] = xmax;
-  bound[2] = ymin;
-  bound[3] = ymax;
-  bound[4] = zmin;
-  bound[5] = zmax;
-  resetCameraNearFarPlane(bound);
+  resetCameraNearFarPlane(ZBBox<glm::dvec3>(glm::dvec3(xmin, ymin, zmin), glm::dvec3(xmax, ymax, zmax)));
 }
 
 bool Z3DCamera::operator==(const Z3DCamera& rhs) const

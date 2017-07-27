@@ -280,35 +280,21 @@ void ZMesh::save(H5::Group& allGrp) const
   }
 }
 
-std::array<double, 6> ZMesh::boundBox() const
+ZBBox<glm::dvec3> ZMesh::boundBox() const
 {
-  std::array<double, 6> result;
-  result[0] = result[2] = result[4] = std::numeric_limits<double>::max();
-  result[1] = result[3] = result[5] = std::numeric_limits<double>::lowest();
+  ZBBox<glm::dvec3> result;
   for (size_t i = 0; i < m_vertices.size(); ++i) {
-    result[0] = std::min(result[0], static_cast<double>(m_vertices[i].x));
-    result[1] = std::max(result[1], static_cast<double>(m_vertices[i].x));
-    result[2] = std::min(result[2], static_cast<double>(m_vertices[i].y));
-    result[3] = std::max(result[3], static_cast<double>(m_vertices[i].y));
-    result[4] = std::min(result[4], static_cast<double>(m_vertices[i].z));
-    result[5] = std::max(result[5], static_cast<double>(m_vertices[i].z));
+    result.expand(glm::dvec3(m_vertices[i]));
   }
   return result;
 }
 
-std::array<double, 6> ZMesh::boundBox(const glm::mat4& transform) const
+ZBBox<glm::dvec3> ZMesh::boundBox(const glm::mat4& transform) const
 {
-  std::array<double, 6> result;
-  result[0] = result[2] = result[4] = std::numeric_limits<double>::max();
-  result[1] = result[3] = result[5] = std::numeric_limits<double>::lowest();
+  ZBBox<glm::dvec3> result;
   for (size_t i = 0; i < m_vertices.size(); ++i) {
     glm::vec3 vert = glm::applyMatrix(transform, m_vertices[i]);
-    result[0] = std::min(result[0], static_cast<double>(vert.x));
-    result[1] = std::max(result[1], static_cast<double>(vert.x));
-    result[2] = std::min(result[2], static_cast<double>(vert.y));
-    result[3] = std::max(result[3], static_cast<double>(vert.y));
-    result[4] = std::min(result[4], static_cast<double>(vert.z));
-    result[5] = std::max(result[5], static_cast<double>(vert.z));
+    result.expand(glm::dvec3(vert));
   }
   return result;
 }

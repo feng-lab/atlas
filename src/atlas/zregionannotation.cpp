@@ -102,7 +102,6 @@ void ZRegionAnnotation::clear()
   m_voxelSizeX = 1;
   m_voxelSizeX = 1;
   m_ontology.clear();
-  m_boundBox.fill(0);
   updateBoundBox();
 }
 
@@ -546,17 +545,10 @@ ZTree<RegionNode> ZRegionAnnotation::copyAnnotationTreeWithDeepCopyedMesh() cons
 void ZRegionAnnotation::updateBoundBox()
 {
   if (m_width <= 0 || m_height <= 0 || m_depth <= 0) {
-    m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = m_boundBox[6] = std::numeric_limits<int>::max();
-    m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = m_boundBox[7] = std::numeric_limits<int>::min();
+    m_boundBox.reset();
   } else {
-    m_boundBox[0] = 0;
-    m_boundBox[1] = m_width - 1;
-    m_boundBox[2] = 0;
-    m_boundBox[3] = m_height - 1;
-    m_boundBox[4] = 0;
-    m_boundBox[5] = (m_depth - 1);
-    m_boundBox[6] = 0;
-    m_boundBox[7] = 0;
+    m_boundBox.setMinCorner(glm::ivec4(0));
+    m_boundBox.setMaxCorner(glm::ivec4(m_width - 1, m_height - 1, m_depth - 1, 0));
   }
   emit boundBoxChanged();
 }

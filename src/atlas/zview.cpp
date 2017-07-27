@@ -168,43 +168,33 @@ QWidget* ZView::captureWidget()
 void ZView::updateBoundBox()
 {
   m_doNotReceiveSliceSignal = true;
-  std::array<int, 8> oldBound = m_boundBox;
-  m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = m_boundBox[6] = std::numeric_limits<int>::max();
-  m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = m_boundBox[7] = std::numeric_limits<int>::min();
+  ZBBox<glm::ivec4> oldBound = m_boundBox;
+  m_boundBox.reset();
   for (const auto& view : m_objViews) {
-    const std::array<int, 8>& boundBox = view->boundBox();
-    m_boundBox[0] = std::min(boundBox[0], m_boundBox[0]);
-    m_boundBox[1] = std::max(boundBox[1], m_boundBox[1]);
-    m_boundBox[2] = std::min(boundBox[2], m_boundBox[2]);
-    m_boundBox[3] = std::max(boundBox[3], m_boundBox[3]);
-    m_boundBox[4] = std::min(boundBox[4], m_boundBox[4]);
-    m_boundBox[5] = std::max(boundBox[5], m_boundBox[5]);
-    m_boundBox[6] = std::min(boundBox[6], m_boundBox[6]);
-    m_boundBox[7] = std::max(boundBox[7], m_boundBox[7]);
+    m_boundBox.expand(view->boundBox());
   }
-  if (m_boundBox[0] > m_boundBox[1] || m_boundBox[2] > m_boundBox[3] || m_boundBox[4] > m_boundBox[5] ||
-      m_boundBox[6] > m_boundBox[7]) {
+  if (m_boundBox.empty()) {
     // nothing visible
-    m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = m_boundBox[6] = 0;
-    m_boundBox[1] = m_boundBox[3] = 100;
-    m_boundBox[5] = m_boundBox[7] = 0;
+    m_boundBox.setMinCorner(glm::ivec4(0));
+    m_boundBox.setMaxCorner(glm::ivec4(100, 100, 0, 0));
   }
   if (oldBound == m_boundBox) {
     m_doNotReceiveSliceSignal = false;
     return;
   }
-  QRectF sceneRect(m_boundBox[0], m_boundBox[2],
-                   m_boundBox[1] - m_boundBox[0] + 1, m_boundBox[3] - m_boundBox[2] + 1);
+  QRectF sceneRect(m_boundBox.minCorner().x, m_boundBox.minCorner().y,
+                   m_boundBox.maxCorner().x - m_boundBox.minCorner().x + 1,
+                   m_boundBox.maxCorner().y - m_boundBox.minCorner().y + 1);
   m_scene->setSceneRect(sceneRect);
   m_view->updateScaleFactorRange();
   int sliceBefore = m_imgSlice->get();
   int timeBefore = m_imgTime->get();
-  m_imgSlice->setRange(m_boundBox[4], m_boundBox[5]);
-  m_imgSlice->setVisible(m_boundBox[5] > m_boundBox[4] || m_maxZProjViewAction->isChecked());
-  m_imgTime->setRange(m_boundBox[6], m_boundBox[7]);
-  m_imgTime->setVisible(m_boundBox[7] > m_boundBox[6]);
+  m_imgSlice->setRange(m_boundBox.minCorner().z, m_boundBox.maxCorner().z);
+  m_imgSlice->setVisible(m_boundBox.maxCorner().z > m_boundBox.minCorner().z || m_maxZProjViewAction->isChecked());
+  m_imgTime->setRange(m_boundBox.minCorner().w, m_boundBox.maxCorner().w);
+  m_imgTime->setVisible(m_boundBox.maxCorner().w > m_boundBox.minCorner().w);
   if (m_numObjsBefore == 0 && m_doc.numObjs() > 0) {
-    m_imgSlice->set((m_boundBox[4] + m_boundBox[5]) / 2);
+    m_imgSlice->set((m_boundBox.minCorner().z + m_boundBox.maxCorner().z) / 2);
     fitContentIntoWindow();
   }
   m_numObjsBefore = m_doc.numObjs();
@@ -212,7 +202,7 @@ void ZView::updateBoundBox()
 
   m_zoomInAction->setEnabled(m_doc.hasObj());
   m_zoomOutAction->setEnabled(m_doc.hasObj());
-  m_imgViewStyleActionGroup->setEnabled(m_doc.hasObj() && m_boundBox[5] > m_boundBox[4]);
+  m_imgViewStyleActionGroup->setEnabled(m_doc.hasObj() && m_boundBox.maxCorner().z > m_boundBox.minCorner().z);
 
   if (m_imgSlice->get() != sliceBefore || m_imgTime->get() != timeBefore)
     sliceChanged();
@@ -295,7 +285,9 @@ void ZView::write(QJsonObject& json) const
 
 void ZView::fitContentIntoWindow()
 {
-  QRectF sceneRect(m_boundBox[0], m_boundBox[2], m_boundBox[1] - m_boundBox[0] + 1, m_boundBox[3] - m_boundBox[2] + 1);
+  QRectF sceneRect(m_boundBox.minCorner().x, m_boundBox.minCorner().y,
+                   m_boundBox.maxCorner().x - m_boundBox.minCorner().x + 1,
+                   m_boundBox.maxCorner().y - m_boundBox.minCorner().y + 1);
   m_view->fitRect(sceneRect);
 }
 

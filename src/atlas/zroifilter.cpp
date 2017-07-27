@@ -313,9 +313,9 @@ void ZROIFilter::setMaxZProjView(int t)
   }
 }
 
-std::array<int, 8> ZROIFilter::boundBox() const
+ZBBox<glm::ivec4> ZROIFilter::boundBox() const
 {
-  std::array<int, 8> res = m_ROI->boundBox();
+  ZBBox<glm::ivec4> res = m_ROI->boundBox();
   updateBoundBoxWithOffsetPara(res);
   return res;
 }

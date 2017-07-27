@@ -16,18 +16,16 @@ ZSwcGraphicsItem::ZSwcGraphicsItem(ZSwc& swc, QGraphicsItem* parent)
   : QGraphicsItem(parent)
   , m_swc(swc)
 {
-  m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = m_boundBox[6] = std::numeric_limits<int>::max();
-  m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = m_boundBox[7] = std::numeric_limits<int>::min();
   for (ZSwc::Iterator it = m_swc.begin(); it != m_swc.end(); ++it) {
     int slice = roundTo<int>(it->z);
-    m_boundBox[0] = std::min(roundTo<int>(it->x - std::max(it->radius, .5)), m_boundBox[0]);
-    m_boundBox[1] = std::max(roundTo<int>(it->x + std::max(it->radius, .5)), m_boundBox[1]);
-    m_boundBox[2] = std::min(roundTo<int>(it->y - std::max(it->radius, .5)), m_boundBox[2]);
-    m_boundBox[3] = std::max(roundTo<int>(it->y + std::max(it->radius, .5)), m_boundBox[3]);
-    m_boundBox[4] = std::min(slice, m_boundBox[4]);
-    m_boundBox[5] = std::max(slice, m_boundBox[5]);
-    m_boundBox[6] = std::min(0, m_boundBox[6]);
-    m_boundBox[7] = std::max(0, m_boundBox[7]);
+    m_boundBox.expand(glm::ivec4(roundTo<int>(it->x - std::max(it->radius, .5)),
+                                 roundTo<int>(it->y - std::max(it->radius, .5)),
+                                 slice,
+                                 0));
+    m_boundBox.expand(glm::ivec4(roundTo<int>(it->x + std::max(it->radius, .5)),
+                                 roundTo<int>(it->y + std::max(it->radius, .5)),
+                                 slice,
+                                 0));
     if (!ZSwc::isRoot(it)) {
       ZSwc::Iterator par = ZSwc::parent(it);
       m_lines.push_back(QLineF(it->x, it->y, par->x, par->y));
@@ -53,9 +51,10 @@ ZSwcGraphicsItem::ZSwcGraphicsItem(ZSwc& swc, QGraphicsItem* parent)
 QRectF ZSwcGraphicsItem::boundingRect() const
 {
   qreal penWidth = 1;
-  return QRectF(m_boundBox[0] - penWidth / 2, m_boundBox[2] - penWidth / 2,
-                m_boundBox[1] - m_boundBox[0] + penWidth,
-                m_boundBox[3] - m_boundBox[2] + penWidth);
+  return QRectF(m_boundBox.minCorner().x - penWidth / 2,
+                m_boundBox.minCorner().y - penWidth / 2,
+                m_boundBox.maxCorner().x - m_boundBox.minCorner().x + penWidth,
+                m_boundBox.maxCorner().y - m_boundBox.minCorner().y + penWidth);
 }
 
 /*!
@@ -243,9 +242,9 @@ void ZSwcFilter::setMaxZProjView(int t)
   m_item->setMaxZProjView(realT(t));
 }
 
-std::array<int, 8> ZSwcFilter::boundBox() const
+ZBBox<glm::ivec4> ZSwcFilter::boundBox() const
 {
-  std::array<int, 8> res = m_item->boundBox();
+  ZBBox<glm::ivec4> res = m_item->boundBox();
   updateBoundBoxWithOffsetPara(res);
   return res;
 }

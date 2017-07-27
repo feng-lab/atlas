@@ -453,13 +453,13 @@ ZROI::ZROI(QUndoStack* undoStack, QObject* parent)
 ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpolation) const
 {
   ZImg img;
-  const std::array<int, 8>& bBox = boundBox();
-  if (bBox[5] == bBox[4]) {
-    img = ZImg(ZImgInfo(bBox[1] + 3, bBox[3] + 3, 1));
+  const auto& bBox = boundBox();
+  if (bBox.minCorner().z == bBox.maxCorner().z) {
+    img = ZImg(ZImgInfo(bBox.maxCorner().x + 3, bBox.maxCorner().y + 3, 1));
     const ZSliceROI& sliceROI = cbegin()->second;
     const QPainterPath& path = sliceROI.paintPath();
-    for (size_t x = std::max(0, bBox[0]); x < img.width(); ++x) {
-      for (size_t y = std::max(0, bBox[2]); y < img.height(); ++y) {
+    for (size_t x = std::max(0, bBox.minCorner().x); x < img.width(); ++x) {
+      for (size_t y = std::max(0, bBox.minCorner().y); y < img.height(); ++y) {
         if (path.contains(QPointF(x, y))) {
           *img.data<uint8_t>(x, y, 0) = 255;
         }
@@ -467,12 +467,12 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
     }
 
     if (outWidth <= 0 || outHeight <= 0 || outDepth <= 0) {
-      img = img.crop(ZImgRegion(0, bBox[1], 0, bBox[3], 0, 1));
+      img = img.crop(ZImgRegion(0, bBox.maxCorner().x, 0, bBox.maxCorner().y, 0, 1));
     } else {
       img = img.cropWithPad(ZVoxelCoordinate(), ZVoxelCoordinate(outWidth, outHeight, outDepth, 1, 1));
     }
   } else {
-    img = ZImg(ZImgInfo(bBox[1] + 3, bBox[3] + 3, bBox[5] + 3));
+    img = ZImg(ZImgInfo(bBox.maxCorner().x + 3, bBox.maxCorner().y + 3, bBox.maxCorner().z + 3));
     std::map<size_t, ZImg> distMapImgs;
     std::vector<size_t> srcSlices;
     ZImgSignedDistanceMap<> distMap;
@@ -485,10 +485,10 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
       const QPainterPath& path = sliceROI.second.paintPath();
       QRectF pathRect = path.boundingRect();
       size_t minX = std::max(static_cast<int>(std::floor(pathRect.left())),
-                             std::max(0, bBox[0]));
+                             std::max(0, bBox.minCorner().x));
       size_t maxX = std::min(img.width(), static_cast<size_t>(std::ceil(pathRect.right())));
       size_t minY = std::max(static_cast<int>(std::floor(pathRect.top())),
-                             std::max(0, bBox[2]));
+                             std::max(0, bBox.minCorner().y));
       size_t maxY = std::min(img.height(), static_cast<size_t>(std::ceil(pathRect.bottom())));
       for (size_t x = minX; x < maxX; ++x) {
         for (size_t y = minY; y < maxY; ++y) {
@@ -541,7 +541,7 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
     }
 
     if (outWidth <= 0 || outHeight <= 0 || outDepth <= 0) {
-      img = img.crop(ZImgRegion(0, bBox[1], 0, bBox[3], 0, bBox[5]));
+      img = img.crop(ZImgRegion(0, bBox.maxCorner().x, 0, bBox.maxCorner().y, 0, bBox.maxCorner().z));
     } else {
       img = img.cropWithPad(ZVoxelCoordinate(), ZVoxelCoordinate(outWidth, outHeight, outDepth, 1, 1));
     }
@@ -953,18 +953,13 @@ void ZROI::save(H5::Group& allGrp) const
 
 void ZROI::resetBoundBox()
 {
-  m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = m_boundBox[6] = std::numeric_limits<int>::max();
-  m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = m_boundBox[7] = std::numeric_limits<int>::min();
+  m_boundBox.reset();
   for (const auto& sliceROI : m_sliceROIs) {
     QRectF rect = sliceROI.second.paintPath().boundingRect();
-    m_boundBox[0] = std::min(roundTo<int>(rect.left()), m_boundBox[0]);
-    m_boundBox[1] = std::max(roundTo<int>(rect.right() - 1), m_boundBox[1]);
-    m_boundBox[2] = std::min(roundTo<int>(rect.top()), m_boundBox[2]);
-    m_boundBox[3] = std::max(roundTo<int>(rect.bottom() - 1), m_boundBox[3]);
-    m_boundBox[4] = std::min(sliceROI.first, m_boundBox[4]);
-    m_boundBox[5] = std::max(sliceROI.first, m_boundBox[5]);
-    m_boundBox[6] = std::min(0, m_boundBox[6]);
-    m_boundBox[7] = std::max(0, m_boundBox[7]);
+    m_boundBox.expand(glm::ivec4(roundTo<int>(rect.left()), roundTo<int>(rect.top()),
+                                 sliceROI.first, 0));
+    m_boundBox.expand(glm::ivec4(roundTo<int>(rect.right() - 1), roundTo<int>(rect.bottom() - 1),
+                                 sliceROI.first, 0));
   }
   emit boundBoxChanged();
 }

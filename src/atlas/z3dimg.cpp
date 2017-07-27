@@ -165,20 +165,6 @@ std::vector<std::unique_ptr<Z3DVolume> > Z3DImg::makeZSliceVolume(size_t z)
   return res;
 }
 
-std::array<double, 6> Z3DImg::physicalBoundBox() const
-{
-  glm::vec3 luf = physicalLUF();
-  glm::vec3 rdb = physicalRDB();
-  std::array<double, 6> res;
-  res[0] = luf.x;
-  res[1] = rdb.x;
-  res[2] = luf.y;
-  res[3] = rdb.y;
-  res[4] = luf.z;
-  res[5] = rdb.z;
-  return res;
-}
-
 void Z3DImg::setScale(const glm::vec3& scale)
 {
   if (!m_isVolumeDownsampled) {

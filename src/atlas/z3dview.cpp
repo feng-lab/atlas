@@ -151,25 +151,16 @@ QWidget* Z3DView::axisWidget()
 
 void Z3DView::updateBoundBox()
 {
-  m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = std::numeric_limits<double>::max();
-  m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = std::numeric_limits<double>::lowest();
+  m_boundBox.reset();
   for (int i = 0; i < m_3dObjViews.size(); ++i) {
-    const std::array<double, 6>& boundBox = m_3dObjViews[i]->boundBox();
-    m_boundBox[0] = std::min(boundBox[0], m_boundBox[0]);
-    m_boundBox[1] = std::max(boundBox[1], m_boundBox[1]);
-    m_boundBox[2] = std::min(boundBox[2], m_boundBox[2]);
-    m_boundBox[3] = std::max(boundBox[3], m_boundBox[3]);
-    m_boundBox[4] = std::min(boundBox[4], m_boundBox[4]);
-    m_boundBox[5] = std::max(boundBox[5], m_boundBox[5]);
+    m_boundBox.expand(m_3dObjViews[i]->boundBox());
   }
-  if (m_boundBox[0] > m_boundBox[1] || m_boundBox[2] > m_boundBox[3] || m_boundBox[4] > m_boundBox[5]) {
+  if (m_boundBox.empty()) {
     // nothing visible
-    m_boundBox[0] = m_boundBox[2] = m_boundBox[4] = 0.0;
-    m_boundBox[1] = m_boundBox[3] = m_boundBox[5] = 1.0;
+    m_boundBox.setMinCorner(glm::dvec3(0.0));
+    m_boundBox.setMaxCorner(glm::dvec3(1.0));
   }
-  m_boundBox[1] = std::max(m_boundBox[1], m_boundBox[0] + 1.0);
-  m_boundBox[3] = std::max(m_boundBox[3], m_boundBox[2] + 1.0);
-  m_boundBox[5] = std::max(m_boundBox[5], m_boundBox[4] + 1.0);
+  m_boundBox.setMaxCorner(glm::max(m_boundBox.maxCorner(), m_boundBox.minCorner() + 1.0));
   if (m_numObjsBefore == 0 && m_doc->numObjs() > 0) {
     resetCamera();
   } else {

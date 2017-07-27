@@ -241,17 +241,14 @@ void ZImgFilter::setMaxZProjView(int t)
   }
 }
 
-std::array<int, 8> ZImgFilter::boundBox() const
+ZBBox<glm::ivec4> ZImgFilter::boundBox() const
 {
-  std::array<int, 8> res;
-  res[0] = 0;
-  res[1] = int(m_imgPack->imgInfo().width) - 1;
-  res[2] = 0;
-  res[3] = int(m_imgPack->imgInfo().height) - 1;
-  res[4] = 0;
-  res[5] = int(m_imgPack->imgInfo().depth) - 1;
-  res[6] = 0;
-  res[7] = int(m_imgPack->imgInfo().numTimes) - 1;
+  ZBBox<glm::ivec4> res;
+  res.setMinCorner(glm::ivec4(0));
+  res.setMaxCorner(glm::ivec4(int(m_imgPack->imgInfo().width) - 1,
+                              int(m_imgPack->imgInfo().height) - 1,
+                              int(m_imgPack->imgInfo().depth) - 1,
+                              int(m_imgPack->imgInfo().numTimes) - 1));
   updateBoundBoxWithOffsetPara(res);
   return res;
 }

@@ -183,24 +183,13 @@ void Z3DAnimationFilter::deregisterPickingObjects()
 
 void Z3DAnimationFilter::updateNotTransformedBoundBoxImpl()
 {
-  m_notTransformedBoundBox[0] = m_notTransformedBoundBox[2] = m_notTransformedBoundBox[4] = std::numeric_limits<double>::max();
-  m_notTransformedBoundBox[1] = m_notTransformedBoundBox[3] = m_notTransformedBoundBox[5] = std::numeric_limits<double>::lowest();
+  m_notTransformedBoundBox.reset();
   for (size_t i = 0; i < m_lines.size(); ++i) {
-    m_notTransformedBoundBox[0] = std::min(double(m_lines[i].x), m_notTransformedBoundBox[0]);
-    m_notTransformedBoundBox[1] = std::max(double(m_lines[i].x), m_notTransformedBoundBox[1]);
-    m_notTransformedBoundBox[2] = std::min(double(m_lines[i].y), m_notTransformedBoundBox[2]);
-    m_notTransformedBoundBox[3] = std::max(double(m_lines[i].y), m_notTransformedBoundBox[3]);
-    m_notTransformedBoundBox[4] = std::min(double(m_lines[i].z), m_notTransformedBoundBox[4]);
-    m_notTransformedBoundBox[5] = std::max(double(m_lines[i].z), m_notTransformedBoundBox[5]);
+    m_notTransformedBoundBox.expand(glm::dvec3(m_lines[i]));
   }
   if (!m_lines.empty()) {
     double cameraSize = std::max(m_cameraDirectionSize.get(), m_cameraSize.get());
-    m_notTransformedBoundBox[0] -= cameraSize;
-    m_notTransformedBoundBox[1] += cameraSize;
-    m_notTransformedBoundBox[2] -= cameraSize;
-    m_notTransformedBoundBox[3] += cameraSize;
-    m_notTransformedBoundBox[4] -= cameraSize;
-    m_notTransformedBoundBox[5] += cameraSize;
+    m_notTransformedBoundBox.expand(cameraSize);
   }
 }
 
@@ -330,9 +319,8 @@ void Z3DAnimationFilter::updateData()
 
     m_cameraDirectionSize.set(100);
     updateBoundBox();
-    double arrowSize = std::max(m_axisAlignedBoundBox[1] - m_axisAlignedBoundBox[0],
-                                m_axisAlignedBoundBox[3] - m_axisAlignedBoundBox[2]);
-    arrowSize = std::max(arrowSize, m_axisAlignedBoundBox[5] - m_axisAlignedBoundBox[4]) / 50.;
+    auto bbsz = m_axisAlignedBoundBox.size();
+    double arrowSize = std::max(bbsz.z, std::max(bbsz.x, bbsz.y)) / 50.;
     if (arrowSize < 0 || arrowSize > std::numeric_limits<float>::max())
       arrowSize = 10;
     m_cameraDirectionSize.set(arrowSize);

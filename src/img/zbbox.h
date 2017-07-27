@@ -11,12 +11,7 @@ class ZBBox
 public:
   // inverse box
   ZBBox()
-  {
-    for (size_t i = 0; i < m_minCorner.length(); ++i) {
-      m_minCorner[i] = std::numeric_limits<typename Point::value_type>::max();
-      m_maxCorner[i] = std::numeric_limits<typename Point::value_type>::min();
-    }
-  }
+  { reset(); }
 
   explicit ZBBox(const Point& minmaxCorner)
     : m_minCorner(minmaxCorner), m_maxCorner(minmaxCorner)
@@ -26,13 +21,21 @@ public:
     : m_minCorner(minCorner), m_maxCorner(maxCorner)
   {}
 
-  ZBBox(ZBBox&&) = default;
+  ZBBox(ZBBox&&) noexcept = default;
 
-  ZBBox& operator=(ZBBox&&) = default;
+  ZBBox& operator=(ZBBox&&) noexcept = default;
 
   ZBBox(const ZBBox&) = default;
 
   ZBBox& operator=(const ZBBox&) = default;
+
+  inline void reset()
+  {
+    for (size_t i = 0; i < m_minCorner.length(); ++i) {
+      m_minCorner[i] = std::numeric_limits<typename Point::value_type>::max();
+      m_maxCorner[i] = std::numeric_limits<typename Point::value_type>::lowest();
+    }
+  }
 
   inline Point const& minCorner() const
   { return m_minCorner; }
@@ -89,6 +92,12 @@ public:
   {
     m_minCorner = min(m_minCorner, other);
     m_maxCorner = max(m_maxCorner, other);
+  }
+
+  inline void expand(typename Point::value_type v)
+  {
+    m_minCorner -= v;
+    m_maxCorner += v;
   }
 
   inline ZBBox& operator+=(const ZBBox& other)

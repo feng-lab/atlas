@@ -59,7 +59,7 @@ protected:
 
   void removeParameter(ZParameter* para);
 
-  void updateBoundBoxWithOffsetPara(std::array<int, 8>& boundBox) const;
+  void updateBoundBoxWithOffsetPara(ZBBox<glm::ivec4>& boundBox) const;
 
   QTransform getQTransform() const;
 

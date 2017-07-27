@@ -58,18 +58,18 @@ public:
   inline Z3DRendererBase::ShaderHookParameter& shaderHookPara()
   { return m_rendererBase.shaderHookPara(); }
 
-  const std::array<double, 6>& axisAlignedBoundBox() const
+  const ZBBox<glm::dvec3>& axisAlignedBoundBox() const
   { return m_axisAlignedBoundBox; }
 
-  const std::array<double, 6>& notTransformedBoundBox() const
+  const ZBBox<glm::dvec3>& notTransformedBoundBox() const
   { return m_notTransformedBoundBox; }
 
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
   glm::vec3 physicalLUF() const
-  { return glm::vec3(m_notTransformedBoundBox[0], m_notTransformedBoundBox[2], m_notTransformedBoundBox[4]); }
+  { return glm::vec3(m_notTransformedBoundBox.minCorner()); }
 
   glm::vec3 physicalRDB() const
-  { return glm::vec3(m_notTransformedBoundBox[1], m_notTransformedBoundBox[3], m_notTransformedBoundBox[5]); }
+  { return glm::vec3(m_notTransformedBoundBox.maxCorner()); }
 
   glm::vec3 physicalLDF() const
   { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z); }
@@ -171,7 +171,7 @@ protected:
 
   void renderBoundBox(Z3DEye eye);
 
-  void appendBoundboxLines(const std::array<double, 6>& bound, std::vector<glm::vec3>& lines);
+  void appendBoundboxLines(const ZBBox<glm::dvec3>& bound, std::vector<glm::vec3>& lines);
 
   // output v1 is start point of ray, v2 is a point on the ray, v2-v1 is normalized
   // x and y are input screen point, width and height are input screen dimension
@@ -241,9 +241,9 @@ protected:
   ZFloatParameter m_manipulatorSize;
   ZEventListenerParameter m_handleEvent;
 
-  std::array<double, 6> m_axisAlignedBoundBox;
+  ZBBox<glm::dvec3> m_axisAlignedBoundBox;
   glm::vec3 m_center;
-  std::array<double, 6> m_notTransformedBoundBox;
+  ZBBox<glm::dvec3> m_notTransformedBoundBox;
 
   std::vector<glm::vec3> m_normalBoundBoxLines;
   std::vector<glm::vec3> m_axisAlignedBoundBoxLines;
@@ -267,7 +267,7 @@ protected:
   bool m_isSelected;
 
 private:
-  std::array<double, 6> m_selectionBoundBox;
+  ZBBox<glm::dvec3> m_selectionBoundBox;
 
   glm::ivec2 m_lastMousePosition;
   glm::vec3 m_startMouseWorldPos;

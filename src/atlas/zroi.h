@@ -3,6 +3,8 @@
 #include "zimg.h"
 #include "zimgsigneddistancemap.h"
 #include "zlog.h"
+#include "zglmutils.h"
+#include "zbbox.h"
 #include <H5Cpp.h>
 #include <QObject>
 #include <QPointF>
@@ -144,7 +146,7 @@ public:
 
   ZImg toMaskImg(int outWidth = 0, int outHeight = 0, int outDepth = -1, bool doInterpolation = true) const;
 
-  const std::array<int, 8>& boundBox() const
+  const ZBBox<glm::ivec4>& boundBox() const
   { return m_boundBox; }
 
   QUndoStack* undoStack()
@@ -311,7 +313,7 @@ protected:
   friend class ZROICommand;
 
   std::map<int, ZSliceROI> m_sliceROIs;
-  std::array<int, 8> m_boundBox;
+  ZBBox<glm::ivec4> m_boundBox;
 
   QUndoStack* m_undoStack;
   ZROISliceMoveSelectedControlPointsCommand* m_moveSelectedControlPointsCommand = nullptr;

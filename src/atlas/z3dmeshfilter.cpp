@@ -317,11 +317,11 @@ void Z3DMeshFilter::deregisterPickingObjects()
   m_pickingObjectsRegistered = false;
 }
 
-std::array<double, 6> Z3DMeshFilter::meshBound(ZMesh* p)
+ZBBox<glm::dvec3> Z3DMeshFilter::meshBound(ZMesh* p)
 {
-  std::map<ZMesh*, std::array<double, 6>>::const_iterator it = m_meshBoundboxMapper.find(p);
+  std::map<ZMesh*, ZBBox<glm::dvec3>>::const_iterator it = m_meshBoundboxMapper.find(p);
   if (it != m_meshBoundboxMapper.end()) {
-    std::array<double, 6> result = it->second;
+    ZBBox<glm::dvec3> result = it->second;
     //    result[0] *= getCoordTransform().x;
     //    result[1] *= getCoordTransform().x;
     //    result[2] *= getCoordTransform().y;
@@ -330,7 +330,7 @@ std::array<double, 6> Z3DMeshFilter::meshBound(ZMesh* p)
     //    result[5] *= getCoordTransform().z;
     return result;
   } else {
-    std::array<double, 6> result = p->boundBox(coordTransform());
+    ZBBox<glm::dvec3> result = p->boundBox(coordTransform());
     m_meshBoundboxMapper[p] = result;
     //    result[0] *= getCoordTransform().x;
     //    result[1] *= getCoordTransform().x;
@@ -344,16 +344,9 @@ std::array<double, 6> Z3DMeshFilter::meshBound(ZMesh* p)
 
 void Z3DMeshFilter::updateNotTransformedBoundBoxImpl()
 {
-  m_notTransformedBoundBox[0] = m_notTransformedBoundBox[2] = m_notTransformedBoundBox[4] = std::numeric_limits<double>::max();
-  m_notTransformedBoundBox[1] = m_notTransformedBoundBox[3] = m_notTransformedBoundBox[5] = std::numeric_limits<double>::lowest();
+  m_notTransformedBoundBox.reset();
   for (size_t i = 0; i < m_origMeshList.size(); ++i) {
-    std::array<double, 6> boundBox = m_origMeshList[i]->boundBox();
-    m_notTransformedBoundBox[0] = std::min(boundBox[0], m_notTransformedBoundBox[0]);
-    m_notTransformedBoundBox[1] = std::max(boundBox[1], m_notTransformedBoundBox[1]);
-    m_notTransformedBoundBox[2] = std::min(boundBox[2], m_notTransformedBoundBox[2]);
-    m_notTransformedBoundBox[3] = std::max(boundBox[3], m_notTransformedBoundBox[3]);
-    m_notTransformedBoundBox[4] = std::min(boundBox[4], m_notTransformedBoundBox[4]);
-    m_notTransformedBoundBox[5] = std::max(boundBox[5], m_notTransformedBoundBox[5]);
+    m_notTransformedBoundBox.expand(m_origMeshList[i]->boundBox());
   }
 }
 

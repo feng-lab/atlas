@@ -5,6 +5,7 @@
 #include "z3dblockcache.h"
 #include "z3dtexture.h"
 #include "z3dvolume.h"
+#include "zbbox.h"
 #include <QObject>
 #include <set>
 
@@ -86,8 +87,8 @@ public:
 
   std::vector<std::unique_ptr<Z3DVolume>> makeZSliceVolume(size_t z);
 
-  // xmin, xmax, ymin, ymax, zmin, zmax
-  std::array<double, 6> physicalBoundBox() const;
+  ZBBox<glm::dvec3> physicalBoundBox() const
+  { return ZBBox<glm::dvec3>(glm::dvec3(physicalLUF()), glm::dvec3(physicalRDB())); }
 
   void setScale(const glm::vec3& scale);
 

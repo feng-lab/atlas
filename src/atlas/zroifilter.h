@@ -111,7 +111,7 @@ public:
   void setRegionColor(const glm::vec3& col)
   { m_regionColor.set(col); }
 
-  std::array<int, 8> boundBox() const;
+  ZBBox<glm::ivec4> boundBox() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 

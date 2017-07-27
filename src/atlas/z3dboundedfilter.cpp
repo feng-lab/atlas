@@ -320,12 +320,15 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
 void Z3DBoundedFilter::initializeCutRange()
 {
   m_canUpdateClipPlane = false;
-  const std::array<double, 6>& bound = notTransformedBoundBox();
-  m_xCut.setRange(std::floor(bound[0]) - 1, std::ceil(bound[1]) + 1);
+  const ZBBox<glm::dvec3>& bound = notTransformedBoundBox();
+  m_xCut.setRange(std::floor(bound.minCorner().x) - 1,
+                  std::ceil(bound.maxCorner().x) + 1);
   m_xCut.set(m_xCut.range());
-  m_yCut.setRange(std::floor(bound[2]) - 1, std::ceil(bound[3]) + 1);
+  m_yCut.setRange(std::floor(bound.minCorner().y) - 1,
+                  std::ceil(bound.maxCorner().y) + 1);
   m_yCut.set(m_yCut.range());
-  m_zCut.setRange(std::floor(bound[4]) - 1, std::ceil(bound[5]) + 1);
+  m_zCut.setRange(std::floor(bound.minCorner().z) - 1,
+                  std::ceil(bound.maxCorner().z) + 1);
   m_zCut.set(m_zCut.range());
   m_canUpdateClipPlane = true;
   m_rendererBase.setClipPlanes(nullptr);
@@ -333,9 +336,8 @@ void Z3DBoundedFilter::initializeCutRange()
 
 void Z3DBoundedFilter::initializeRotationCenter()
 {
-  const std::array<double, 6>& bound = notTransformedBoundBox();
-  m_rendererBase.setRotationCenter(
-    glm::vec3((bound[0] + bound[1]) / 2.0, (bound[2] + bound[3]) / 2.0, (bound[4] + bound[5]) / 2.0));
+  const ZBBox<glm::dvec3>& bound = notTransformedBoundBox();
+  m_rendererBase.setRotationCenter(glm::vec3((bound.minCorner() + bound.maxCorner()) / 2.0));
 }
 
 void Z3DBoundedFilter::renderBoundBox(Z3DEye eye)
@@ -347,14 +349,14 @@ void Z3DBoundedFilter::renderBoundBox(Z3DEye eye)
   }
 }
 
-void Z3DBoundedFilter::appendBoundboxLines(const std::array<double, 6>& bound, std::vector<glm::vec3>& lines)
+void Z3DBoundedFilter::appendBoundboxLines(const ZBBox<glm::dvec3>& bound, std::vector<glm::vec3>& lines)
 {
-  float xmin = bound[0];
-  float xmax = bound[1];
-  float ymin = bound[2];
-  float ymax = bound[3];
-  float zmin = bound[4];
-  float zmax = bound[5];
+  float xmin = bound.minCorner().x;
+  float xmax = bound.maxCorner().x;
+  float ymin = bound.minCorner().y;
+  float ymax = bound.maxCorner().y;
+  float zmin = bound.minCorner().z;
+  float zmax = bound.maxCorner().z;
   lines.emplace_back(xmin, ymin, zmin);
   lines.emplace_back(xmin, ymin, zmax);
   lines.emplace_back(xmin, ymax, zmin);
@@ -420,59 +422,35 @@ void Z3DBoundedFilter::rayUnderScreenPoint(glm::dvec3& v1, glm::dvec3& v2, int x
 
 void Z3DBoundedFilter::updateAxisAlignedBoundBoxImpl()
 {
-  if (m_notTransformedBoundBox[0] > m_notTransformedBoundBox[1] ||
-      m_notTransformedBoundBox[2] > m_notTransformedBoundBox[3] ||
-      m_notTransformedBoundBox[4] > m_notTransformedBoundBox[5]) {
-    m_axisAlignedBoundBox[0] = m_axisAlignedBoundBox[2] = m_axisAlignedBoundBox[4] = std::numeric_limits<double>::max();
-    m_axisAlignedBoundBox[1] = m_axisAlignedBoundBox[3] = m_axisAlignedBoundBox[5] = std::numeric_limits<double>::lowest();
-    return;
+  m_axisAlignedBoundBox.reset();
+  if (!m_notTransformedBoundBox.empty()) {
+    m_axisAlignedBoundBox.expand(glm::dvec3(worldLUF()));
+    m_axisAlignedBoundBox.expand(glm::dvec3(worldLDB()));
+    m_axisAlignedBoundBox.expand(glm::dvec3(worldLDF()));
+    m_axisAlignedBoundBox.expand(glm::dvec3(worldLUB()));
+    m_axisAlignedBoundBox.expand(glm::dvec3(worldRUF()));
+    m_axisAlignedBoundBox.expand(glm::dvec3(worldRDB()));
+    m_axisAlignedBoundBox.expand(glm::dvec3(worldRDF()));
+    m_axisAlignedBoundBox.expand(glm::dvec3(worldRUB()));
   }
-
-  glm::vec3 minCoord = glm::min(worldLUF(), worldRDB());
-  glm::vec3 maxCoord = glm::max(worldLUF(), worldRDB());
-
-  minCoord = glm::min(minCoord, worldLDB());
-  maxCoord = glm::max(maxCoord, worldLDB());
-
-  minCoord = glm::min(minCoord, worldLDF());
-  maxCoord = glm::max(maxCoord, worldLDF());
-
-  minCoord = glm::min(minCoord, worldLUB());
-  maxCoord = glm::max(maxCoord, worldLUB());
-
-  minCoord = glm::min(minCoord, worldRUF());
-  maxCoord = glm::max(maxCoord, worldRUF());
-
-  minCoord = glm::min(minCoord, worldRDF());
-  maxCoord = glm::max(maxCoord, worldRDF());
-
-  minCoord = glm::min(minCoord, worldRUB());
-  maxCoord = glm::max(maxCoord, worldRUB());
-
-  m_axisAlignedBoundBox[0] = minCoord.x;
-  m_axisAlignedBoundBox[1] = maxCoord.x;
-  m_axisAlignedBoundBox[2] = minCoord.y;
-  m_axisAlignedBoundBox[3] = maxCoord.y;
-  m_axisAlignedBoundBox[4] = minCoord.z;
-  m_axisAlignedBoundBox[5] = maxCoord.z;
 }
 
 void Z3DBoundedFilter::expandCutRange()
 {
   m_canUpdateClipPlane = false;
-  const std::array<double, 6>& bound = notTransformedBoundBox();
+  const ZBBox<glm::dvec3>& bound = notTransformedBoundBox();
   bool noLowXCut = m_xCut.lowerValue() == m_xCut.minimum();
   bool noHighXCut = m_xCut.upperValue() == m_xCut.maximum();
   bool noLowYCut = m_yCut.lowerValue() == m_yCut.minimum();
   bool noHighYCut = m_yCut.upperValue() == m_yCut.maximum();
   bool noLowZCut = m_zCut.lowerValue() == m_zCut.minimum();
   bool noHighZCut = m_zCut.upperValue() == m_zCut.maximum();
-  m_xCut.setRange(std::min(m_xCut.minimum(), float(std::floor(bound[0]) - 1)),
-                  std::max(m_xCut.maximum(), float(std::ceil(bound[1]) + 1)));
-  m_yCut.setRange(std::min(m_yCut.minimum(), float(std::floor(bound[2]) - 1)),
-                  std::max(m_yCut.maximum(), float(std::ceil(bound[3]) + 1)));
-  m_zCut.setRange(std::min(m_yCut.minimum(), float(std::floor(bound[4]) - 1)),
-                  std::max(m_zCut.maximum(), float(std::ceil(bound[5]) + 1)));
+  m_xCut.setRange(std::min(m_xCut.minimum(), float(std::floor(bound.minCorner().x) - 1)),
+                  std::max(m_xCut.maximum(), float(std::ceil(bound.maxCorner().x) + 1)));
+  m_yCut.setRange(std::min(m_yCut.minimum(), float(std::floor(bound.minCorner().y) - 1)),
+                  std::max(m_yCut.maximum(), float(std::ceil(bound.maxCorner().y) + 1)));
+  m_zCut.setRange(std::min(m_yCut.minimum(), float(std::floor(bound.minCorner().z) - 1)),
+                  std::max(m_zCut.maximum(), float(std::ceil(bound.maxCorner().z) + 1)));
   float xCutLow = noLowXCut ? m_xCut.minimum() : m_xCut.get().x;
   float xCutHigh = noHighXCut ? m_xCut.maximum() : m_xCut.get().y;
   float yCutLow = noLowYCut ? m_yCut.minimum() : m_yCut.get().x;
@@ -499,9 +477,7 @@ void Z3DBoundedFilter::updateAxisAlignedBoundBox()
     m_baseBoundBoxRenderer.setData(&m_axisAlignedBoundBoxLines);
   }
 
-  m_center = glm::vec3((m_axisAlignedBoundBox[0] + m_axisAlignedBoundBox[1]) / 2.f,
-                       (m_axisAlignedBoundBox[2] + m_axisAlignedBoundBox[3]) / 2.f,
-                       (m_axisAlignedBoundBox[4] + m_axisAlignedBoundBox[5]) / 2.f);
+  m_center = glm::vec3((m_axisAlignedBoundBox.minCorner() + m_axisAlignedBoundBox.maxCorner()) / 2.0);
 
   makeSelectionGeometries();
   m_handleValid = false;
@@ -556,19 +532,12 @@ void Z3DBoundedFilter::onSelectionBoundBoxLineWidthChanged()
 
 void Z3DBoundedFilter::makeSelectionGeometries()
 {
-  float sizeX = m_axisAlignedBoundBox[1] - m_axisAlignedBoundBox[0];
-  float sizeY = m_axisAlignedBoundBox[3] - m_axisAlignedBoundBox[2];
-  float sizeZ = m_axisAlignedBoundBox[5] - m_axisAlignedBoundBox[4];
-  float size = sizeX + sizeY + sizeZ - std::max(sizeZ, std::max(sizeX, sizeY)) -
-               std::min(sizeZ, std::min(sizeX, sizeY));
-  float cornerRadius = std::min(100.f, 0.01f * size);
+  auto bbsz = m_axisAlignedBoundBox.size();
+  auto size = bbsz.x + bbsz.y + bbsz.z - std::max(bbsz.z, std::max(bbsz.x, bbsz.y)) -
+              std::min(bbsz.z, std::min(bbsz.x, bbsz.y));
+  auto cornerRadius = std::min(100.0, 0.01 * size);
   m_selectionBoundBox = m_axisAlignedBoundBox;
-  m_selectionBoundBox[0] -= cornerRadius;
-  m_selectionBoundBox[1] += cornerRadius;
-  m_selectionBoundBox[2] -= cornerRadius;
-  m_selectionBoundBox[3] += cornerRadius;
-  m_selectionBoundBox[4] -= cornerRadius;
-  m_selectionBoundBox[5] += cornerRadius;
+  m_selectionBoundBox.expand(cornerRadius);
   m_selectionLines.clear();
   appendBoundboxLines(m_selectionBoundBox, m_selectionLines);
 
@@ -576,30 +545,22 @@ void Z3DBoundedFilter::makeSelectionGeometries()
 
   std::vector<glm::vec3> lowcoords;
   std::vector<glm::vec3> highcoords;
-  glm::vec3 pos(m_selectionBoundBox[0], m_selectionBoundBox[2], m_selectionBoundBox[4]);
-  lowcoords.push_back(pos - cornerShift);
-  highcoords.push_back(pos + cornerShift);
-  pos = glm::vec3(m_selectionBoundBox[1], m_selectionBoundBox[2], m_selectionBoundBox[4]);
-  lowcoords.push_back(pos - cornerShift);
-  highcoords.push_back(pos + cornerShift);
-  pos = glm::vec3(m_selectionBoundBox[0], m_selectionBoundBox[3], m_selectionBoundBox[4]);
-  lowcoords.push_back(pos - cornerShift);
-  highcoords.push_back(pos + cornerShift);
-  pos = glm::vec3(m_selectionBoundBox[1], m_selectionBoundBox[3], m_selectionBoundBox[4]);
-  lowcoords.push_back(pos - cornerShift);
-  highcoords.push_back(pos + cornerShift);
-  pos = glm::vec3(m_selectionBoundBox[0], m_selectionBoundBox[2], m_selectionBoundBox[5]);
-  lowcoords.push_back(pos - cornerShift);
-  highcoords.push_back(pos + cornerShift);
-  pos = glm::vec3(m_selectionBoundBox[1], m_selectionBoundBox[2], m_selectionBoundBox[5]);
-  lowcoords.push_back(pos - cornerShift);
-  highcoords.push_back(pos + cornerShift);
-  pos = glm::vec3(m_selectionBoundBox[0], m_selectionBoundBox[3], m_selectionBoundBox[5]);
-  lowcoords.push_back(pos - cornerShift);
-  highcoords.push_back(pos + cornerShift);
-  pos = glm::vec3(m_selectionBoundBox[1], m_selectionBoundBox[3], m_selectionBoundBox[5]);
-  lowcoords.push_back(pos - cornerShift);
-  highcoords.push_back(pos + cornerShift);
+  double bd[6];
+  bd[0] = m_selectionBoundBox.minCorner().x;
+  bd[1] = m_selectionBoundBox.maxCorner().x;
+  bd[2] = m_selectionBoundBox.minCorner().y;
+  bd[3] = m_selectionBoundBox.maxCorner().y;
+  bd[4] = m_selectionBoundBox.minCorner().z;
+  bd[5] = m_selectionBoundBox.maxCorner().z;
+  for (int k = 0; k < 2; ++k) {
+    for (int j = 0; j < 2; ++j) {
+      for (int i = 0; i < 2; ++i) {
+        glm::vec3 pos(bd[i], bd[2 + j], bd[4 + k]);
+        lowcoords.push_back(pos - cornerShift);
+        highcoords.push_back(pos + cornerShift);
+      }
+    }
+  }
 
   m_selectionCornerCubes = ZMesh::createCubesWithNormal(lowcoords, highcoords);
   m_selectionCornerCubesWrapper.clear();

@@ -5,6 +5,7 @@
 #include <QDir>
 #include <QObject>
 #include <QAction>
+#include <zbbox.h>
 
 class QMainWindow;
 
@@ -130,7 +131,7 @@ private:
   std::unique_ptr<Z3DCanvasPainter> m_canvasPainter;
   std::unique_ptr<Z3DCompositor> m_compositor;
 
-  std::array<double, 6> m_boundBox;
+  ZBBox<glm::dvec3> m_boundBox;
   size_t m_numObjsBefore;
 
   bool m_lock;

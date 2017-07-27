@@ -148,51 +148,18 @@ Z3DTexture* Z3DVolume::texture() const
   return m_texture.get();
 }
 
-std::array<double, 6> Z3DVolume::physicalBoundBox() const
-{
-  glm::vec3 luf = physicalLUF();
-  glm::vec3 rdb = physicalRDB();
-  std::array<double, 6> res;
-  res[0] = luf.x;
-  res[1] = rdb.x;
-  res[2] = luf.y;
-  res[3] = rdb.y;
-  res[4] = luf.z;
-  res[5] = rdb.z;
-  return res;
-}
-
-std::array<double, 6> Z3DVolume::worldBoundBox() const
+ZBBox<glm::dvec3> Z3DVolume::worldBoundBox() const
 {
   if (m_hasTransformMatrix) {
-    std::array<double, 6> res;
-    glm::vec3 minCoord = glm::min(worldLUF(), worldRDB());
-    glm::vec3 maxCoord = glm::max(worldLUF(), worldRDB());
-
-    minCoord = glm::min(minCoord, worldLDB());
-    maxCoord = glm::max(maxCoord, worldLDB());
-
-    minCoord = glm::min(minCoord, worldLDF());
-    maxCoord = glm::max(maxCoord, worldLDF());
-
-    minCoord = glm::min(minCoord, worldLUB());
-    maxCoord = glm::max(maxCoord, worldLUB());
-
-    minCoord = glm::min(minCoord, worldRUF());
-    maxCoord = glm::max(maxCoord, worldRUF());
-
-    minCoord = glm::min(minCoord, worldRDF());
-    maxCoord = glm::max(maxCoord, worldRDF());
-
-    minCoord = glm::min(minCoord, worldRUB());
-    maxCoord = glm::max(maxCoord, worldRUB());
-
-    res[0] = minCoord.x;
-    res[1] = maxCoord.x;
-    res[2] = minCoord.y;
-    res[3] = maxCoord.y;
-    res[4] = minCoord.z;
-    res[5] = maxCoord.z;
+    ZBBox<glm::dvec3> res;
+    res.expand(glm::dvec3(worldLUF()));
+    res.expand(glm::dvec3(worldLDB()));
+    res.expand(glm::dvec3(worldLDF()));
+    res.expand(glm::dvec3(worldLUB()));
+    res.expand(glm::dvec3(worldRUF()));
+    res.expand(glm::dvec3(worldRDB()));
+    res.expand(glm::dvec3(worldRDF()));
+    res.expand(glm::dvec3(worldRUB()));
 
     return res;
   } else {

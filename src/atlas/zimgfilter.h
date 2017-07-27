@@ -54,7 +54,7 @@ public:
   inline bool isVisible() const
   { return m_isVisible; }
 
-  std::array<int, 8> boundBox() const;
+  ZBBox<glm::ivec4> boundBox() const;
 
   // location within img, can be out of img range
   int imgSlice() const;

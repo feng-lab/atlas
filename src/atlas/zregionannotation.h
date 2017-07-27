@@ -43,7 +43,7 @@ public:
 
   const ZROI* roiOfRegion(int64_t regionID);
 
-  const std::array<int, 8>& boundBox() const
+  const ZBBox<glm::ivec4>& boundBox() const
   { return m_boundBox; }
 
   const ZTree<RegionNode>& annotationTree() const
@@ -115,7 +115,7 @@ private:
   double m_voxelSizeY;
   double m_voxelSizeZ;
   ZTree<RegionNode> m_ontology;
-  std::array<int, 8> m_boundBox;
+  ZBBox<glm::ivec4> m_boundBox;
 
   QUndoStack m_undoStack;
 };

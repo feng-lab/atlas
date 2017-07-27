@@ -2,6 +2,7 @@
 
 #include "z3dgl.h"
 #include "zlog.h"
+#include "zbbox.h"
 #include <H5Cpp.h>
 #include <vector>
 
@@ -75,9 +76,9 @@ public:
 
   void save(H5::Group& allGrp) const;
 
-  std::array<double, 6> boundBox() const;
+  ZBBox<glm::dvec3> boundBox() const;
 
-  std::array<double, 6> boundBox(const glm::mat4& transform) const;
+  ZBBox<glm::dvec3> boundBox(const glm::mat4& transform) const;
 
   GLenum type() const
   { return m_type; }

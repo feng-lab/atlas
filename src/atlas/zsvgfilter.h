@@ -32,7 +32,7 @@ public:
 
   void setMaxZProjView(int t) override;
 
-  std::array<int, 8> boundBox() const;
+  ZBBox<glm::ivec4> boundBox() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 

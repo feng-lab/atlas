@@ -61,7 +61,7 @@ void ZRegionAnnotationFilter::setMaxZProjView(int t)
   }
 }
 
-const std::array<int, 8>& ZRegionAnnotationFilter::boundBox() const
+const ZBBox<glm::ivec4>& ZRegionAnnotationFilter::boundBox() const
 {
   return m_regionAnnotation->boundBox();
 }

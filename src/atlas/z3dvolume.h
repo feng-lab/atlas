@@ -2,6 +2,7 @@
 
 #include "z3dgl.h"
 #include "zimg.h"
+#include "zbbox.h"
 #include <QObject>
 #include <QThread>
 
@@ -169,8 +170,8 @@ public:
   glm::vec3 physicalRUB() const
   { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalRDB().z); }
 
-  // xmin, xmax, ymin, ymax, zmin, zmax
-  std::array<double, 6> physicalBoundBox() const;
+  ZBBox<glm::dvec3> physicalBoundBox() const
+  { return ZBBox<glm::dvec3>(glm::dvec3(physicalLUF()), glm::dvec3(physicalRDB())); }
 
   // bound voxels in world coordinate
   glm::vec3 worldLUF() const
@@ -197,8 +198,7 @@ public:
   glm::vec3 worldRUB() const
   { return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalRUB()) : physicalRUB(); }
 
-  // xmin, xmax, ymin, ymax, zmin, zmax
-  std::array<double, 6> worldBoundBox() const;
+  ZBBox<glm::dvec3> worldBoundBox() const;
 
   // corners of parent volume
   glm::vec3 parentVolPhysicalLUF() const
