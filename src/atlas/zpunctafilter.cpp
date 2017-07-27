@@ -170,7 +170,7 @@ void ZPunctaFilter::releaseItemsOwnership()
 
 void ZPunctaFilter::setSelected(bool v)
 {
-  if (m_item && m_item->isSelected() != v) {
+  if (m_item->isSelected() != v) {
     m_item->setSelected(v);
   }
 }

@@ -48,7 +48,7 @@ void ZSvgFilter::releaseItemsOwnership()
 
 void ZSvgFilter::setSelected(bool v)
 {
-  if (m_item && m_item->isSelected() != v) {
+  if (m_item->isSelected() != v) {
     m_item->setSelected(v);
   }
 }

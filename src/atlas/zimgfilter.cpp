@@ -313,8 +313,10 @@ void ZImgFilter::viewPrecedenceChanged()
 
 void ZImgFilter::transformChanged()
 {
-  m_item->setTransform(getQTransform());
-  viewportChanged();
+  if (m_item) {
+    m_item->setTransform(getQTransform());
+    viewportChanged();
+  }
   ZObjFilter::transformChanged();
 }
 
@@ -455,7 +457,9 @@ void ZImgFilter::opacityChanged()
   //for (const auto& item : m_imgItems) {
   //  item->setOpacity(m_opacity.get());
   //}
-  m_item->setOpacity(m_opacity.get());
+  if (m_item) {
+    m_item->setOpacity(m_opacity.get());
+  }
 //  m_display->setAlpha(m_opacity.get());
 //  if (m_maxZProjDisplay)
 //    m_maxZProjDisplay->setAlpha(m_opacity.get());
@@ -503,7 +507,9 @@ void ZImgFilter::hideImgItems()
   //for (size_t i = 0; i < m_imgItems.size(); ++i) {
   //  m_imgItems[i]->setVisible(false);
   //}
-  m_item->setVisible(false);
+  if (m_item) {
+    m_item->setVisible(false);
+  }
 }
 
 void ZImgFilter::destroyImgItems()
@@ -522,7 +528,7 @@ void ZImgFilter::updateImgItems()
       curDisplay == m_lastDisplay && m_lastSlice == m_view.currentSlice() && m_lastTime == m_view.currentTime()) {
     //LOG(INFO) << "0";
     // pixmap is same, we only need to show it
-    if (!m_item->isVisible()) {
+    if (m_item && !m_item->isVisible()) {
       m_item->setVisible(true);
     }
   } else {
