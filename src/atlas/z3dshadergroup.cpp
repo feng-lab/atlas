@@ -126,6 +126,10 @@ void Z3DShaderGroup::rebuild(const QString& header, const QString& geomHeader)
         break;
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
         buildWeightedAverageShader(i->second.get());
+        break;
+      case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
+        buildWeightedBlendedShader(i->second.get());
+        break;
       default:
         break;
     }

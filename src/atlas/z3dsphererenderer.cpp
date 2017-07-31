@@ -413,6 +413,7 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
         }
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+
         m_pickingVAOs.release();
       }
 

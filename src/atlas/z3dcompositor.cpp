@@ -1334,7 +1334,7 @@ bool Z3DCompositor::createWBRenderTarget(const glm::uvec2& size)
   g_accumulationTexId[0] = new Z3DTexture(GLint(GL_RGBA16F), glm::uvec3(size, 1), GL_RGBA, GL_FLOAT);
   g_accumulationTexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   g_accumulationTexId[0]->uploadImage();
-  g_accumulationTexId[1] = new Z3DTexture(GLint(GL_R8), glm::uvec3(size, 1), GL_RED, GL_FLOAT);
+  g_accumulationTexId[1] = new Z3DTexture(GLint(GL_R16F), glm::uvec3(size, 1), GL_RED, GL_FLOAT);
   g_accumulationTexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   g_accumulationTexId[1]->uploadImage();
 

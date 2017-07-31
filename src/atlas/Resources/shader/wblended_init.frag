@@ -61,6 +61,6 @@ void main(void)
   // See Equation (9) from http://jcgt.org/published/0002/02/09/
   float linearDepth = viewDepth * uDepthScale;
   float weight = clamp(0.03 / (1e-5 + pow(linearDepth, 4.0)), 1e-2, 3e3);
-  FragData0 = vec4(color.rgb, color.a) * weight;
-  FragData1.r = color.a;
+  FragData0 = color * weight;
+  FragData1.x = color.a;
 }
