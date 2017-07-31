@@ -34,7 +34,7 @@ public:
 
   // find all objects within a radius of pos, sort by distance
   // if radius is -1, search the whole image
-  std::vector<const void*> sortObjectsByDistanceToPos(glm::ivec2 pos, int radius = -1, bool ascend = true);
+  std::vector<const void*> sortObjectsByDistanceToPos(const glm::ivec2& pos, int radius = -1, bool ascend = true);
 
   void bindTarget()
   { m_renderTarget->bind(); }

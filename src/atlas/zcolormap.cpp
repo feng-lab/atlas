@@ -960,5 +960,6 @@ bool ZColorMap::equalTo(const ZColorMap& cm) const
   return m_keys == cm.m_keys && m_hasDataRange == cm.m_hasDataRange && m_dataMin == cm.m_dataMin &&
          m_dataMax == cm.m_dataMax;
 }
+
 } // namespace nim
 

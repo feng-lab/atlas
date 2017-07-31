@@ -504,6 +504,9 @@ void ZSystemInfo::detectOS()
     case QSysInfo::MV_10_11:
       m_osString = "Mac OS X El Capitan";
       break;
+    case QSysInfo::MV_10_12:
+      m_osString = "macOS Sierra";
+      break;
     default:
       m_osString = "unknown mac os";
       return;

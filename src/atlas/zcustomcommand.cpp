@@ -999,6 +999,19 @@ void tmp()
 //            << res << std::endl;
 }
 
+void fixImg()
+{
+  ZImgRegion rgn1;
+  rgn1.start.z = 0;
+  rgn1.end.z = 5;
+  ZImg img1("/Users/feng/Downloads/ChaehyunImage/c.tif", rgn1);
+  ZImgRegion rgn2;
+  rgn2.start.z = 5;
+  ZImg img2("/Users/feng/Downloads/ChaehyunImage/c.tif", rgn2);
+  ZImg img = ZImg::cat(img2, img1, Dimension::Z);
+  img.save("/Users/feng/Downloads/ChaehyunImage/c_fix.tif");
+}
+
 
 }  // namespace nim
 
@@ -1006,7 +1019,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  createCellTable();
+  //fixImg();
   LOG(INFO) << "done";
 }
 

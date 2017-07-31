@@ -34,6 +34,8 @@
         <file>Resources/shader/dual_peeling_peel.frag</file>
         <file>Resources/shader/wavg_final.frag</file>
         <file>Resources/shader/wavg_init.frag</file>
+        <file>Resources/shader/wblended_final.frag</file>
+        <file>Resources/shader/wblended_init.frag</file>
         <file>Resources/shader/cone_func.frag</file>
         <file>Resources/shader/sphere_func.frag</file>
         <file>Resources/shader/common.frag</file>

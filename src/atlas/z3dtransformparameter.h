@@ -3,7 +3,6 @@
 #include "zglmutils.h"
 #include "znumericparameter.h"
 #include "zparameter.h"
-#include "zquatparameter.h"
 
 namespace nim {
 

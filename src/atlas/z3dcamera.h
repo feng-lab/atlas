@@ -149,8 +149,7 @@ public:
   //
   void setTileFrustum(double left = 0.0, double right = 1.0, double bottom = 0.0, double top = 1.0);
 
-  // Automatically set up the camera based on a specified bounding box
-  // (xmin,xmax, ymin,ymax, zmin,zmax). Camera will reposition itself so
+  // Automatically set up the camera based on a specified bounding box. Camera will reposition itself so
   // that its focal point is the center of the bounding box, and adjust its
   // position (if PreserveCenterDistance is not set) and frustum to make sure everything inside bounding
   // box is visible. Initial view vector (vector defined from eye to center)
@@ -269,28 +268,28 @@ public:
 
   // rotate around a point
   // axis and point in worldspace, axis should be normalized
-  void rotate(float angle, glm::vec3 axis, glm::vec3 point);
+  void rotate(float angle, const glm::vec3& axis, const glm::vec3& point);
 
-  void rotate(glm::quat quat, glm::vec3 point);
+  void rotate(const glm::quat& quat, const glm::vec3& point);
 
   // rotate around center (focus point)
-  void rotate(float angle, glm::vec3 axis);
+  void rotate(float angle, const glm::vec3& axis);
 
-  void rotate(glm::quat quat);
+  void rotate(const glm::quat& quat);
 
   // convert between eye space and world space
-  glm::vec3 vectorEyeToWorld(glm::vec3 vec, Z3DEye eye = Z3DEye::Mono);
+  glm::vec3 vectorEyeToWorld(const glm::vec3& vec, Z3DEye eye = Z3DEye::Mono);
 
-  glm::vec3 vectorWorldToEye(glm::vec3 vec, Z3DEye eye = Z3DEye::Mono);
+  glm::vec3 vectorWorldToEye(const glm::vec3& vec, Z3DEye eye = Z3DEye::Mono);
 
-  glm::vec3 pointEyeToWorld(glm::vec3 pt, Z3DEye eye = Z3DEye::Mono);
+  glm::vec3 pointEyeToWorld(const glm::vec3& pt, Z3DEye eye = Z3DEye::Mono);
 
-  glm::vec3 pointWorldToEye(glm::vec3 pt, Z3DEye eye = Z3DEye::Mono);
+  glm::vec3 pointWorldToEye(const glm::vec3& pt, Z3DEye eye = Z3DEye::Mono);
 
   // world to screen, if point is clipped, its screen coord will be (-1,-1,-1)
-  glm::vec3 worldToScreen(glm::vec3 wpt, glm::ivec4 viewport, Z3DEye eye = Z3DEye::Mono);
+  glm::vec3 worldToScreen(const glm::vec3& wpt, const glm::ivec4& viewport, Z3DEye eye = Z3DEye::Mono);
 
-  glm::vec3 screenToWorld(glm::vec3 spt, glm::ivec4 viewport, Z3DEye eye = Z3DEye::Mono);
+  glm::vec3 screenToWorld(const glm::vec3& spt, const glm::ivec4& viewport, Z3DEye eye = Z3DEye::Mono);
 
 protected:
   void updateCamera();
@@ -311,11 +310,11 @@ private:
   float m_nearDist = .1f;
   float m_farDist = 50.f;
   float m_windowAspectRatio = 1.f;
-  float m_eyeSeparation;  // dist from left eye to right eye
   float m_eyeSeparationAngle = glm::radians(8.f);  // angle between two eyes to focus point
-  float m_focusDistance;
 
   // derived camera variables
+  float m_eyeSeparation;  // dist from left eye to right eye
+  float m_focusDistance;
   glm::vec3 m_viewVector;  // normalized vector from eye to center (center - eye)
   float m_centerDist; // distance from eye to center
   glm::vec3 m_strafeVector; // normalized vector point at right in eye space

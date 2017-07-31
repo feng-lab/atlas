@@ -25,11 +25,6 @@ class Z3DRendererBase : public QObject
 {
 Q_OBJECT
 public:
-  enum class ActivateRendererOption
-  {
-    KeepOthers, DeactivateOthers
-  };
-
   enum class ShaderHookType
   {
     Normal, DualDepthPeelingInit, DualDepthPeelingPeel, WeightedAverageInit
@@ -149,7 +144,6 @@ public:
   const std::vector<ZParameter*>& globalParameters() const
   { return m_globalParas.parameters(); }
 
-  // return scale of x,y,z coordinate
   inline glm::mat4 coordTransform() const
   { return m_coordTransform.get(); }
 

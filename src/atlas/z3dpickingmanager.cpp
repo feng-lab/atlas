@@ -78,7 +78,7 @@ const void* Z3DPickingManager::objectAtWidgetPos(glm::ivec2 pos)
   return objectOfColor(m_renderTarget->colorAtPos(pos));
 }
 
-std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(glm::ivec2 pos, int radius, bool ascend)
+std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm::ivec2& pos, int radius, bool ascend)
 {
   std::map<glm::col4, int, Col4Compare> col2dist;
   const Z3DTexture* tex = m_renderTarget->attachment(GL_COLOR_ATTACHMENT0);

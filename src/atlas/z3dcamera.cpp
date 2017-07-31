@@ -171,7 +171,7 @@ bool Z3DCamera::operator==(const Z3DCamera& rhs) const
          (m_nearDist == rhs.m_nearDist) &&
          (m_farDist == rhs.m_farDist) &&
          (m_windowAspectRatio == rhs.m_windowAspectRatio) &&
-         (m_eyeSeparation == rhs.m_eyeSeparation);
+         (m_eyeSeparationAngle == rhs.m_eyeSeparationAngle);
 }
 
 bool Z3DCamera::operator!=(const Z3DCamera& rhs) const
@@ -237,12 +237,12 @@ void Z3DCamera::zoom(float factor)
   setFieldOfView(m_fieldOfView / factor);
 }
 
-void Z3DCamera::rotate(float angle, glm::vec3 axis, glm::vec3 point)
+void Z3DCamera::rotate(float angle, const glm::vec3& axis, const glm::vec3& point)
 {
   rotate(glm::angleAxis(angle, glm::normalize(axis)), point);
 }
 
-void Z3DCamera::rotate(glm::quat quat, glm::vec3 point)
+void Z3DCamera::rotate(const glm::quat& quat, const glm::vec3& point)
 {
   glm::vec3 eye = m_eye - point;
   eye = glm::rotate(quat, eye);
@@ -257,12 +257,12 @@ void Z3DCamera::rotate(glm::quat quat, glm::vec3 point)
   setCamera(eye, center, upVector);
 }
 
-void Z3DCamera::rotate(float angle, glm::vec3 axis)
+void Z3DCamera::rotate(float angle, const glm::vec3& axis)
 {
   rotate(glm::angleAxis(angle, glm::normalize(axis)));
 }
 
-void Z3DCamera::rotate(glm::quat quat)
+void Z3DCamera::rotate(const glm::quat& quat)
 {
   glm::vec3 eye = m_eye - m_center;
   eye = glm::rotate(quat, eye);
@@ -273,27 +273,27 @@ void Z3DCamera::rotate(glm::quat quat)
   setCamera(eye, m_center, upVector);
 }
 
-glm::vec3 Z3DCamera::vectorEyeToWorld(glm::vec3 vec, Z3DEye eye)
+glm::vec3 Z3DCamera::vectorEyeToWorld(const glm::vec3& vec, Z3DEye eye)
 {
   return glm::inverse(glm::mat3(viewMatrix(eye))) * vec;
 }
 
-glm::vec3 Z3DCamera::vectorWorldToEye(glm::vec3 vec, Z3DEye eye)
+glm::vec3 Z3DCamera::vectorWorldToEye(const glm::vec3& vec, Z3DEye eye)
 {
   return glm::mat3(viewMatrix(eye)) * vec;
 }
 
-glm::vec3 Z3DCamera::pointEyeToWorld(glm::vec3 pt, Z3DEye eye)
+glm::vec3 Z3DCamera::pointEyeToWorld(const glm::vec3& pt, Z3DEye eye)
 {
   return glm::applyMatrix(glm::inverse(viewMatrix(eye)), pt);
 }
 
-glm::vec3 Z3DCamera::pointWorldToEye(glm::vec3 pt, Z3DEye eye)
+glm::vec3 Z3DCamera::pointWorldToEye(const glm::vec3& pt, Z3DEye eye)
 {
   return glm::applyMatrix(viewMatrix(eye), pt);
 }
 
-glm::vec3 Z3DCamera::worldToScreen(glm::vec3 wpt, glm::ivec4 viewport, Z3DEye eye)
+glm::vec3 Z3DCamera::worldToScreen(const glm::vec3& wpt, const glm::ivec4& viewport, Z3DEye eye)
 {
   glm::vec4 clipSpacePos = projectionMatrix(eye) * viewMatrix(eye) * glm::vec4(wpt, 1.f);
   if (clipSpacePos.w == 0.f)
@@ -303,7 +303,7 @@ glm::vec3 Z3DCamera::worldToScreen(glm::vec3 wpt, glm::ivec4 viewport, Z3DEye ey
          + glm::vec3(viewport.x, viewport.y, 0.f);
 }
 
-glm::vec3 Z3DCamera::screenToWorld(glm::vec3 spt, glm::ivec4 viewport, Z3DEye eye)
+glm::vec3 Z3DCamera::screenToWorld(const glm::vec3& spt, const glm::ivec4& viewport, Z3DEye eye)
 {
   return glm::unProject(spt, viewMatrix(eye), projectionMatrix(eye), viewport);
 }
