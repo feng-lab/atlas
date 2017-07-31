@@ -65,6 +65,11 @@ private:
 
   bool createWARenderTarget(const glm::uvec2& size);
 
+  void renderTransparentWB(const std::vector<Z3DBoundedFilter*>& filters,
+                           Z3DRenderOutputPort& port, Z3DEye eye, Z3DTexture* depthTexture = nullptr);
+
+  bool createWBRenderTarget(const glm::uvec2& size);
+
   // if image inport has more than 1 image, blend use tempport3 and tempport4,
   // send output to colorTex and depthTex
   void renderImages(Z3DRenderInputPort& currentInport, Z3DRenderOutputPort& currentOutport,
@@ -106,6 +111,9 @@ private:
 
   std::unique_ptr<Z3DRenderTarget> m_waRT;
   Z3DShaderProgram m_waFinalShader;
+
+  std::unique_ptr<Z3DRenderTarget> m_wbRT;
+  Z3DShaderProgram m_wbFinalShader;
 
   ZBoolParameter m_showBackground;
   std::shared_ptr<ZWidgetsGroup> m_backgroundWidgetsGroup;

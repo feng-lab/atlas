@@ -34,6 +34,7 @@ void Z3DShaderGroup::addAllSupportedPostShaders()
 {
   addDualDepthPeelingShaders();
   addWeightedAverageShaders();
+  addWeightedBlendedShaders();
 }
 
 void Z3DShaderGroup::addDualDepthPeelingShaders()
@@ -69,6 +70,20 @@ void Z3DShaderGroup::addWeightedAverageShaders()
         m_geometryOutputVertexCount);
     }
     buildWeightedAverageShader(m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit].get());
+  }
+}
+
+void Z3DShaderGroup::addWeightedBlendedShaders()
+{
+  if (Z3DGpuInfo::instance().isWeightedBlendedSupported()) {
+    m_shaders[Z3DRendererBase::ShaderHookType::WeightedBlendedInit].reset(new Z3DShaderProgram());
+    if (!GLVersionGE(3, 2)) {
+      m_shaders[Z3DRendererBase::ShaderHookType::WeightedBlendedInit]->setGeometryInputType(m_geometryInputType);
+      m_shaders[Z3DRendererBase::ShaderHookType::WeightedBlendedInit]->setGeometryOutputType(m_geometryOutputType);
+      m_shaders[Z3DRendererBase::ShaderHookType::WeightedBlendedInit]->setGeometryOutputVertexCount(
+        m_geometryOutputVertexCount);
+    }
+    buildWeightedBlendedShader(m_shaders[Z3DRendererBase::ShaderHookType::WeightedBlendedInit].get());
   }
 }
 
@@ -165,6 +180,15 @@ void Z3DShaderGroup::buildWeightedAverageShader(Z3DShaderProgram* shader)
 {
   QStringList allshaders(m_shaderFiles);
   allshaders << "wavg_init.frag";
+  shader->bindFragDataLocation(0, "FragData0");
+  shader->bindFragDataLocation(1, "FragData1");
+  shader->loadFromSourceFile(allshaders, m_header, m_geomHeader);
+}
+
+void Z3DShaderGroup::buildWeightedBlendedShader(Z3DShaderProgram *shader)
+{
+  QStringList allshaders(m_shaderFiles);
+  allshaders << "wblended_init.frag";
   shader->bindFragDataLocation(0, "FragData0");
   shader->bindFragDataLocation(1, "FragData1");
   shader->loadFromSourceFile(allshaders, m_header, m_geomHeader);

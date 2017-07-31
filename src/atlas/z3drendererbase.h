@@ -27,7 +27,7 @@ Q_OBJECT
 public:
   enum class ShaderHookType
   {
-    Normal, DualDepthPeelingInit, DualDepthPeelingPeel, WeightedAverageInit
+    Normal, DualDepthPeelingInit, DualDepthPeelingPeel, WeightedAverageInit, WeightedBlendedInit
   };
 
   struct ShaderHookParameter

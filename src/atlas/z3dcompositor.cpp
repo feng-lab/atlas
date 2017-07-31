@@ -35,6 +35,7 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_ddpBlendShader()
   , m_ddpFinalShader()
   , m_waFinalShader()
+  , m_wbFinalShader()
   , m_showBackground("Show Background", true)
   , m_lineRenderer(m_rendererBase)
   , m_arrowRenderer(m_rendererBase)
@@ -79,6 +80,16 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
                                        m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
 #else
     m_waFinalShader.loadFromSourceFile("pass.vert", "wavg_final.frag", m_rendererBase.generateHeader());
+#endif
+  }
+
+  if (Z3DGpuInfo::instance().isWeightedBlendedSupported()) {
+    m_wbFinalShader.bindFragDataLocation(0, "FragData0");
+#ifdef USE_RECT_TEX
+    m_wbFinalShader.loadFromSourceFile("pass.vert", "wblended_final.frag",
+                                       m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
+#else
+    m_wbFinalShader.loadFromSourceFile("pass.vert", "wblended_final.frag", m_rendererBase.generateHeader());
 #endif
   }
 
@@ -787,6 +798,8 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
       renderTransparentDDP(transparentFilters, port, eye);
     } else if (method == "Weighted Average") {
       renderTransparentWA(transparentFilters, port, eye);
+    } else if (method == "Weighted Blended") {
+      renderTransparentWB(transparentFilters, port, eye);
     }
   } else {
     m_tempPort3.resize(port.size());
@@ -797,6 +810,8 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
       renderTransparentDDP(transparentFilters, m_tempPort4, eye, m_tempPort3.depthTexture());
     } else if (method == "Weighted Average") {
       renderTransparentWA(transparentFilters, m_tempPort4, eye, m_tempPort3.depthTexture());
+    } else if (method == "Weighted Blended") {
+      renderTransparentWB(transparentFilters, m_tempPort4, eye, m_tempPort3.depthTexture());
     }
 
     // blend temport3 and temport4 into outport
@@ -1213,6 +1228,121 @@ bool Z3DCompositor::createWARenderTarget(const glm::uvec2& size)
   bool comp = m_waRT->isFBOComplete();
   if (!comp) {
     m_waRT.reset();
+  }
+  return comp;
+}
+
+void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& filters,
+                                        Z3DRenderOutputPort& port, Z3DEye eye, Z3DTexture* depthTexture)
+{
+  if (!m_wbRT) {
+    if (!createWBRenderTarget(port.size())) {
+      LOG(ERROR) << "Can not create fbo for weighted blended rendering";
+      return;
+    }
+  }
+  m_wbRT->resize(port.size());
+  if (depthTexture) {
+    m_wbRT->attachTextureToFBO(depthTexture, GL_DEPTH_ATTACHMENT, false);
+    m_wbRT->isFBOComplete();
+    CHECK_GL_ERROR
+  }
+
+  const Z3DTexture* g_accumulationTexId[2];
+  g_accumulationTexId[0] = m_wbRT->attachment(GL_COLOR_ATTACHMENT0);
+  g_accumulationTexId[1] = m_wbRT->attachment(GL_COLOR_ATTACHMENT1);
+  const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
+                                  GL_COLOR_ATTACHMENT1
+  };
+
+  if (depthTexture)
+    glDepthMask(GL_FALSE);
+  else
+    glDisable(GL_DEPTH_TEST);
+
+  // ---------------------------------------------------------------------
+  // 1. Geometry pass
+  // ---------------------------------------------------------------------
+
+  m_wbRT->bind();
+
+  glDrawBuffers(2, g_drawBuffers);
+
+  // Render target 0 stores a sum (weighted RGBA colors). Clear it to 0.f.
+  // Render target 1 stores a product (transmittances). Clear it to 1.f.
+  float clearColorZero[4] = { 0.f, 0.f, 0.f, 0.f };
+  float clearColorOne[4]  = { 1.f, 1.f, 1.f, 1.f };
+  glClearBufferfv(GL_COLOR, 0, clearColorZero);
+  glClearBufferfv(GL_COLOR, 1, clearColorOne);
+
+  glEnable(GL_BLEND);
+  glBlendEquation(GL_FUNC_ADD);
+  glBlendFunci(0, GL_ONE, GL_ONE);
+  glBlendFunci(1, GL_ZERO, GL_ONE_MINUS_SRC_COLOR);
+
+  for (auto filter : filters) {
+    filter->setViewport(m_wbRT->size());
+    filter->setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
+    filter->renderTransparent(eye);
+    CHECK_GL_ERROR
+  }
+
+  if (depthTexture) {
+    m_wbRT->detach(GL_DEPTH_ATTACHMENT);
+    m_wbRT->isFBOComplete();
+    CHECK_GL_ERROR
+  }
+  m_wbRT->release();
+
+  if (depthTexture)
+    glDepthMask(GL_TRUE);
+  glBlendFunc(GL_ONE, GL_ZERO);
+  glDisable(GL_BLEND);
+
+  for (auto filter : filters) {
+    filter->setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
+  }
+  CHECK_GL_ERROR
+
+  // ---------------------------------------------------------------------
+  // 2. Compositing pass
+  // ---------------------------------------------------------------------
+
+  port.bindTarget();
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  m_wbFinalShader.bind();
+  m_wbFinalShader.bindTexture("ColorTex0", g_accumulationTexId[0]);
+  m_wbFinalShader.bindTexture("ColorTex1", g_accumulationTexId[1]);
+#if !defined(USE_RECT_TEX)
+  m_rendererBase.setViewport(m_wbRT->size());
+  m_rendererBase.setGlobalShaderParameters(m_wbFinalShader, eye);
+#endif
+  renderScreenQuad(m_screenQuadVAO, m_wbFinalShader);
+  m_wbFinalShader.release();
+  port.releaseTarget();
+
+  glEnable(GL_DEPTH_TEST);
+
+  CHECK_GL_ERROR
+}
+
+bool Z3DCompositor::createWBRenderTarget(const glm::uvec2& size)
+{
+  m_wbRT.reset(new Z3DRenderTarget(size));
+  Z3DTexture* g_accumulationTexId[2];
+
+  g_accumulationTexId[0] = new Z3DTexture(GLint(GL_RGBA16F), glm::uvec3(size, 1), GL_RGBA, GL_FLOAT);
+  g_accumulationTexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+  g_accumulationTexId[0]->uploadImage();
+  g_accumulationTexId[1] = new Z3DTexture(GLint(GL_R8), glm::uvec3(size, 1), GL_RED, GL_FLOAT);
+  g_accumulationTexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+  g_accumulationTexId[1]->uploadImage();
+
+  m_wbRT->attachTextureToFBO(g_accumulationTexId[0], GL_COLOR_ATTACHMENT0);
+  m_wbRT->attachTextureToFBO(g_accumulationTexId[1], GL_COLOR_ATTACHMENT1);
+  bool comp = m_wbRT->isFBOComplete();
+  if (!comp) {
+    m_wbRT.reset();
   }
   return comp;
 }

@@ -35,6 +35,10 @@ Z3DGlobalParameters::Z3DGlobalParameters()
     transparencyMethod.select("Weighted Average");
   }
 
+  if (Z3DGpuInfo::instance().isWeightedBlendedSupported()) {
+    transparencyMethod.addOption("Weighted Blended");
+  }
+
   if (Z3DGpuInfo::instance().isDualDepthPeelingSupported())
     transparencyMethod.addOption("Dual Depth Peeling");
 

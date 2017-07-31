@@ -20,6 +20,8 @@ public:
 
   void addWeightedAverageShaders();
 
+  void addWeightedBlendedShaders();
+
   void setGeometryInputType(GLenum inputType)
   { m_geometryInputType = inputType; }
 
@@ -45,6 +47,8 @@ private:
   void buildDualDepthPeelingPeelShader(Z3DShaderProgram* shader);
 
   void buildWeightedAverageShader(Z3DShaderProgram* shader);
+
+  void buildWeightedBlendedShader(Z3DShaderProgram* shader);
 
 private:
   QStringList m_shaderFiles;

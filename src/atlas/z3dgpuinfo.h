@@ -191,6 +191,8 @@ public:
   // check avalibility of some special effect
   bool isWeightedAverageSupported() const;
 
+  bool isWeightedBlendedSupported() const;
+
   bool isDualDepthPeelingSupported() const;
 
   bool isLinkedListSupported() const;
