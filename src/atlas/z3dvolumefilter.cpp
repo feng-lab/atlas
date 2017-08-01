@@ -4,7 +4,7 @@
 #include "zimg.h"
 #include "zeventlistenerparameter.h"
 #include "zmesh.h"
-#include "QsLog.h"
+#include "zlog.h"
 #include "zbenchtimer.h"
 #include "zmeshutils.h"
 #include <QApplication>
@@ -34,13 +34,13 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
   , m_layerColorTexture(GL_TEXTURE_2D_ARRAY, (GLint) GL_RGBA16, glm::uvec3(32, 32, 3), GL_RGBA, GL_FLOAT)
   , m_layerDepthTexture(GL_TEXTURE_2D_ARRAY, (GLint) GL_DEPTH_COMPONENT24, glm::uvec3(32, 32, 3), GL_DEPTH_COMPONENT,
                         GL_FLOAT)
-  , m_outport("Image", true, InvalidMonoViewResult)
-  , m_leftEyeOutport("LeftEyeImage", true, InvalidLeftEyeResult)
-  , m_rightEyeOutport("RightEyeImage", true, InvalidRightEyeResult)
-  , m_vPPort("VolumeFilter")
-  , m_opaqueOutport("OpaqueImage", true, InvalidMonoViewResult)
-  , m_opaqueLeftEyeOutport("OpaqueLeftEyeImage", true, InvalidLeftEyeResult)
-  , m_opaqueRightEyeOutport("OpaqueRightEyeImage", true, InvalidRightEyeResult)
+  , m_outport("Image", this)
+  , m_leftEyeOutport("LeftEyeImage", this)
+  , m_rightEyeOutport("RightEyeImage", this)
+  , m_vPPort("VolumeFilter", this)
+  , m_opaqueOutport("OpaqueImage", this)
+  , m_opaqueLeftEyeOutport("OpaqueLeftEyeImage", this)
+  , m_opaqueRightEyeOutport("OpaqueRightEyeImage", this)
   , m_FRVolumeSlices(m_maxNumOfFullResolutionVolumeSlice)
   , m_FRVolumeSlicesValidState(m_maxNumOfFullResolutionVolumeSlice, false)
   , m_useFRVolumeSlice("Use Full Resolution Volume Slice", true)
@@ -70,7 +70,7 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
   //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_A_TERM (128)
   //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_B_TERM (0.25f)
   //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_C_TERM (2048)
-  size_t currentAvailableTexMem = Z3DGpuInfoInstance.dedicatedVideoMemoryMB();
+  size_t currentAvailableTexMem = Z3DGpuInfo::instance().dedicatedVideoMemoryMB();
   m_maxVoxelNumber =
     std::min(std::max(size_t(128), static_cast<size_t>(0.25 * currentAvailableTexMem)), size_t(2048)) * 1024 * 1024;
 
@@ -312,9 +312,9 @@ bool Z3DVolumeFilter::volumeNeedDownsample() const
 {
   size_t maxTextureSize = 100;
   if (m_imgPack->imgInfo().depth > 1)
-    maxTextureSize = Z3DGpuInfoInstance.max3DTextureSize();
+    maxTextureSize = Z3DGpuInfo::instance().max3DTextureSize();
   else
-    maxTextureSize = Z3DGpuInfoInstance.maxTextureSize();
+    maxTextureSize = Z3DGpuInfo::instance().maxTextureSize();
   return m_imgPack->imgInfo().timeVoxelNumber() > m_maxVoxelNumber ||
          m_imgPack->imgInfo().width > maxTextureSize || m_imgPack->imgInfo().height > maxTextureSize ||
          m_imgPack->imgInfo().depth > maxTextureSize;
@@ -704,7 +704,7 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
   if (m_useFRVolumeSlice.get() && volume->isDownsampledVolume()) {
     std::vector<Z3DPrimitiveRenderer*> renderers;
 
-    size_t maxTextureSize = Z3DGpuInfoInstance.maxTextureSize();
+    size_t maxTextureSize = Z3DGpuInfo::instance().maxTextureSize();
 
     size_t sliceRendererIdx = 0;
     if (m_showZSlice.get()) {
@@ -997,12 +997,8 @@ const std::vector<std::unique_ptr<Z3DVolume>>& Z3DVolumeFilter::getVolumes() con
 
 void Z3DVolumeFilter::updateNotTransformedBoundBoxImpl()
 {
-  m_notTransformedBoundBox[0] = m_volumes[0]->parentVolPhysicalLUF().x;
-  m_notTransformedBoundBox[1] = m_volumes[0]->parentVolPhysicalLUF().y;
-  m_notTransformedBoundBox[2] = m_volumes[0]->parentVolPhysicalLUF().z;
-  m_notTransformedBoundBox[1] = m_volumes[0]->parentVolPhysicalRDB().x;
-  m_notTransformedBoundBox[3] = m_volumes[0]->parentVolPhysicalRDB().y;
-  m_notTransformedBoundBox[5] = m_volumes[0]->parentVolPhysicalRDB().z;
+  m_notTransformedBoundBox.setMinCorner(glm::dvec3(m_volumes[0]->parentVolPhysicalLUF()));
+  m_notTransformedBoundBox.setMaxCorner(glm::dvec3(m_volumes[0]->parentVolPhysicalRDB()));
 }
 
 void Z3DVolumeFilter::readVolumes()
@@ -1016,7 +1012,7 @@ void Z3DVolumeFilter::readVolumes()
   // see https://www.opengl.org/wiki/Shader#Resource_limitations
   size_t maxPossibleChannels = std::min(20, (Z3DGpuInfoInstance.maxTextureImageUnits() - 4) / 2);
 #else
-  size_t maxPossibleChannels = Z3DGpuInfoInstance.maxArrayTextureLayers();
+  size_t maxPossibleChannels = Z3DGpuInfo::instance().maxArrayTextureLayers();
 #endif
   if (m_nChannels > maxPossibleChannels) {
     QMessageBox::warning(QApplication::activeWindow(), "Too many channels",
@@ -1054,9 +1050,9 @@ void Z3DVolumeFilter::readVolumes()
   double depthScale = 1.0;
   int maxTextureSize = 100;
   if (m_imgPack->imgInfo().depth > 1)
-    maxTextureSize = Z3DGpuInfoInstance.max3DTextureSize();
+    maxTextureSize = Z3DGpuInfo::instance().max3DTextureSize();
   else
-    maxTextureSize = Z3DGpuInfoInstance.maxTextureSize();
+    maxTextureSize = Z3DGpuInfo::instance().maxTextureSize();
 
   if (height > maxTextureSize) {
     heightScale = static_cast<double>(maxTextureSize) / height;
@@ -1171,7 +1167,7 @@ glm::vec3 Z3DVolumeFilter::getFirstHit3DPosition(int x, int y, int width, int he
       height /= m_interactionDownsample.get();
     }
     glm::vec3 fpos3D = get3DPosition(pos2D, width, height, port);
-    glm::vec3 res = glm::round(glm::applyMatrix(getVolumes()[0]->worldToPhysicalMatrix(), fpos3D));
+    res = glm::round(glm::applyMatrix(getVolumes()[0]->worldToPhysicalMatrix(), fpos3D));
     if (res.x >= 0 && res.x < m_imgPack->imgInfo().width &&
         res.y >= 0 && res.y < m_imgPack->imgInfo().height &&
         res.z >= 0 && res.z < m_imgPack->imgInfo().depth) {
@@ -1196,7 +1192,7 @@ glm::vec3 Z3DVolumeFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, i
       height /= m_interactionDownsample.get();
     }
     glm::vec3 fpos3D = get3DPosition(pos2D, width, height, port);
-    glm::vec3 res = glm::round(glm::applyMatrix(getVolumes()[0]->worldToPhysicalMatrix(), fpos3D));
+    res = glm::round(glm::applyMatrix(getVolumes()[0]->worldToPhysicalMatrix(), fpos3D));
     if (res.x >= 0 && res.x < m_imgPack->imgInfo().width &&
         res.y >= 0 && res.y < m_imgPack->imgInfo().height &&
         res.z >= 0 && res.z < m_imgPack->imgInfo().depth) {
@@ -1450,9 +1446,10 @@ void Z3DVolumeFilter::volumeChanged()
   }
 
   m_volumeRaycasterRenderer.setChannels(getVolumes());
-  if (!is2DImage) {
-    m_volumeSliceRenderer.setChannels(getVolumes(), m_sliceColormaps);
-  }
+  //todo
+//  if (!is2DImage) {
+//    m_volumeSliceRenderer.setData(getVolumes(), m_sliceColormaps);
+//  }
 }
 
 } // namespace nim

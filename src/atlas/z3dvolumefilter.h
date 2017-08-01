@@ -54,7 +54,7 @@ public:
 
   void exitZoomInView();
 
-  std::vector<double> zoomInBound() const
+  const ZBBox<glm::dvec3>& zoomInBound() const
   { return m_zoomInBound; }
 
   bool volumeNeedDownsample() const;
@@ -174,7 +174,7 @@ private:
   ZBoolParameter m_isSubVolume;
   ZIntParameter m_zoomInViewSize;
   glm::ivec3 m_zoomInPos;
-  std::vector<double> m_zoomInBound;
+  ZBBox<glm::dvec3> m_zoomInBound;
 
   size_t m_maxVoxelNumber;
 

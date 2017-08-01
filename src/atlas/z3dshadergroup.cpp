@@ -93,6 +93,15 @@ void Z3DShaderGroup::bind()
   if (m_base.shaderHookType() == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
     get().bindTexture("DepthBlenderTex", m_base.shaderHookPara().dualDepthPeelingDepthBlenderTexture);
     get().bindTexture("FrontBlenderTex", m_base.shaderHookPara().dualDepthPeelingFrontBlenderTexture);
+  } else if (m_base.shaderHookType() == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
+    float n = m_base.camera().nearDist();
+    float f = m_base.camera().farDist();
+    //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
+    // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
+    float a = f * n / (f - n);
+    float b = 0.5f * (f + n) / (f - n) + 0.5f;
+    get().setUniform("ze_to_zw_b", b);
+    get().setUniform("ze_to_zw_a", a);
   }
 }
 

@@ -32,6 +32,9 @@
 //
 //----------------------------------------------------------------------------------
 
+uniform float ze_to_zw_a;
+uniform float ze_to_zw_b;
+
 #if GLSL_VERSION >= 330
 layout(location = 0) out vec4 FragData0;
 layout(location = 1) out vec4 FragData1;
@@ -43,7 +46,7 @@ out vec4 FragData1;  // call glBindFragDataLocation before linking
 #define FragData1 gl_FragData[1]
 #endif
 
-uniform float uDepthScale = 1.0;
+uniform float uDepthScale = 0.005;
 
 void fragment_func(out vec4 fragColor, out float fragDepth);
 
@@ -53,14 +56,14 @@ void main(void)
   vec4 color;
   fragment_func(color, fragDepth);
   gl_FragDepth = fragDepth;
-  // Assuming that the projection matrix is a perspective projection
-  // gl_FragCoord.w returns the inverse of the oPos.w register from the vertex shader
-  float viewDepth = abs(1.0 / gl_FragCoord.w);
+  // calculate z from fragDepth
+  //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
+  // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
+  float viewDepth = ze_to_zw_a / (fragDepth - ze_to_zw_b); //abs(1.0 / gl_FragCoord.w);
 
   // Tuned to work well with FP16 accumulation buffers and 0.001 < linearDepth < 2.5
   // See Equation (9) from http://jcgt.org/published/0002/02/09/
-  float linearDepth = viewDepth * uDepthScale;
-  float weight = clamp(0.03 / (1e-5 + pow(linearDepth, 4.0)), 1e-2, 3e3);
+  float weight = clamp(0.03 / (1e-5 + pow(viewDepth * uDepthScale, 4.0)), 1e-2, 3e3);
   FragData0 = color * weight;
   FragData1.x = color.a;
 }

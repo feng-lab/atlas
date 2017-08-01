@@ -129,7 +129,7 @@ void Z3DVolumeRaycasterRenderer::addQuad(const ZMesh& quad)
       (quad.numVertices() != 4 && quad.numVertices() != 6) ||
       (quad.numVertices() != quad.num2DTextureCoordinates() &&
        quad.numVertices() != quad.num3DTextureCoordinates())) {
-    LERROR() << "Input quad should be 2D slice with either 2D or 3D texture coordinates";
+    LOG(ERROR) << "Input quad should be 2D slice with either 2D or 3D texture coordinates";
     return;
   }
   m_quads.push_back(quad);
