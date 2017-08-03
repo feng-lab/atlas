@@ -8,7 +8,7 @@
 #include "zstringutils.h"
 #include "zsysteminfo.h"
 #include "zlog.h"
-#include <include/qtcsv/reader.h>
+#include <qtcsv/reader.h>
 #include <QtWidgets>
 
 namespace {

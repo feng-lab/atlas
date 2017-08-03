@@ -5,7 +5,7 @@
 #include "zimgautothreshold.h"
 #include "zglmutils.h"
 #include "zioutils.h"
-#include <include/qtcsv/reader.h>
+#include <qtcsv/reader.h>
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>

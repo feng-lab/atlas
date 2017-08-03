@@ -19,7 +19,7 @@
 #include "zdoc.h"
 #include "z3dmainwindow.h"
 #include "z3dview.h"
-#include <include/qtcsv/reader.h>
+#include <qtcsv/reader.h>
 #include <itkMath.h>
 #include <QDir>
 #include <QApplication>

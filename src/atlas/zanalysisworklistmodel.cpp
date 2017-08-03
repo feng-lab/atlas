@@ -1,9 +1,9 @@
 #include "zanalysisworklistmodel.h"
 
 #include "zlog.h"
-#include <include/qtcsv/reader.h>
-#include <include/qtcsv/variantdata.h>
-#include <include/qtcsv/writer.h>
+#include <qtcsv/reader.h>
+#include <qtcsv/variantdata.h>
+#include <qtcsv/writer.h>
 #include <QUrl>
 #include <QFile>
 #include <QTextStream>

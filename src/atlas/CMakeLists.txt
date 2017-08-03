@@ -55,11 +55,11 @@ endif (WIN32)
 
 find_package(VTK REQUIRED COMPONENTS vtkFiltersGeometry vtkFiltersSources
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/vtk NO_DEFAULT_PATH)
-message(${VTK_DIR})
-message(${VTK_USE_FILE})
+message(STATUS "VTK_DIR: ${VTK_DIR}")
+message(STATUS "VTK_USE_FILE: ${VTK_USE_FILE}")
 include(${VTK_USE_FILE})
-message("${VTK_INCLUDE_DIRS}")
-message("${VTK_LIBRARIES}")
+message(STATUS "VTK_INCLUDE_DIRS: ${VTK_INCLUDE_DIRS}")
+message(STATUS "VTK_LIBRARIES: ${VTK_LIBRARIES}")
 
 set(GEOMETRICTOOLS_INCLUDE_DIRS ${GEOMETRICTOOLS_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/include)
@@ -76,19 +76,19 @@ find_package(BENCHMARK REQUIRED
 
 find_package(HDF5 REQUIRED COMPONENTS C CXX static
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/share ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/cmake NO_DEFAULT_PATH)
-message(${HDF5_INCLUDE_DIR})
+message(STATUS "HDF5_INCLUDE_DIR: ${HDF5_INCLUDE_DIR}")
 
 find_package(ASSIMP REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/assimp NO_DEFAULT_PATH)
-message(${ASSIMP_INCLUDE_DIRS})
-message(${ASSIMP_LIBRARY_DIRS})
-message(${ASSIMP_LIBRARIES})
+message(STATUS "ASSIMP_INCLUDE_DIRS: ${ASSIMP_INCLUDE_DIRS}")
+message(STATUS "ASSIMP_LIBRARY_DIRS: ${ASSIMP_LIBRARY_DIRS}")
+message(STATUS "ASSIMP_LIBRARIES: ${ASSIMP_LIBRARIES}")
 link_directories(${ASSIMP_LIBRARY_DIRS})  # need to do this before creating target
 
 find_package(OpenCV REQUIRED COMPONENTS imgproc core
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/opencv NO_DEFAULT_PATH)
-message("${OpenCV_INCLUDE_DIRS}")
-message("${OpenCV_LIBS}")
+message(STATUS "OpenCV_INCLUDE_DIRS: ${OpenCV_INCLUDE_DIRS}")
+message(STATUS "OpenCV_LIBS: ${OpenCV_LIBS}")
 
 find_package(GLBINDING REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glbinding NO_DEFAULT_PATH)
@@ -648,7 +648,7 @@ set(SOURCES
 set(APP_NAME Atlas)
 add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
                ${SYS_SOURCES}
-               ${QTCSV_HEADERS} ${QTCSV_SOURCES}
+               ${QTCSV_SOURCES}
                ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
                ${CERESSOLVER_HEADERS} ${CERESSOLVER_INTERNAL}
                ${SOURCES} ${FORMS} ${RESOURCES} ${ASSETS}
@@ -660,7 +660,7 @@ target_include_directories(${APP_NAME} PUBLIC ${IPP_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${GEOMETRICTOOLS_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${HDF5_INCLUDE_DIR})
 target_include_directories(${APP_NAME} PUBLIC ${CERESSOLVER_INCLUDE_DIRS})
-target_include_directories(${APP_NAME} PRIVATE ${QTCSVDIR})
+target_include_directories(${APP_NAME} PRIVATE ${QTCSVDIR} ${QTCSVDIR}/include)
 target_include_directories(${APP_NAME} PUBLIC ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
 target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/eigen)
 target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/boost)
