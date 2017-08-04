@@ -155,21 +155,21 @@ def get_cmake_cmd_common_part(install_dir: str):
                 '-DCMAKE_INSTALL_PREFIX=' + install_dir
                 ]
     else:
-        osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/' \
-                      r'MacOSX10.12.sdk'
-        if not os.path.exists(osx_sysroot):
-            osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/' \
-                          r'MacOSX10.11.sdk'
-        if not os.path.exists(osx_sysroot):
-            osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/' \
-                          r'MacOSX10.10.sdk'
-        assert os.path.exists(osx_sysroot)
+        # osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/' \
+        #               r'MacOSX10.12.sdk'
+        # if not os.path.exists(osx_sysroot):
+        #     osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/' \
+        #                   r'MacOSX10.11.sdk'
+        # if not os.path.exists(osx_sysroot):
+        #     osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/' \
+        #                   r'MacOSX10.10.sdk'
+        # assert os.path.exists(osx_sysroot)
 
         return ['cmake',  # '-E', 'echo',
                 '-DCMAKE_BUILD_TYPE=Release',
                 '-DCMAKE_INSTALL_PREFIX=' + install_dir,
                 '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + macos_min_version(),
-                '-DCMAKE_OSX_SYSROOT=' + osx_sysroot,
+                # '-DCMAKE_OSX_SYSROOT=' + osx_sysroot,
                 '-DCMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -std=c++14'
                 ]
 

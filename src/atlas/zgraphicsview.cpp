@@ -108,7 +108,7 @@ bool ZGraphicsView::renderToImage(const QString& filename, int width, int height
   img.fill(0);
   QPainter painter(&img);
   painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
-  render(&painter);
+  render(&painter, QRectF(), QRect(), Qt::KeepAspectRatioByExpanding);
   QImageWriter writer(filename);
   writer.setCompression(1);
   if (!writer.write(img)) {
