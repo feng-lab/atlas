@@ -10,6 +10,7 @@ namespace nim {
 Z3DGlobalParameters::Z3DGlobalParameters()
   : geometriesMultisampleMode("Multisample Anti-Aliasing")
   , transparencyMethod("Transparency")
+  , weightedBlendedDepthScale("Weighted Blended Depth Scale", 1.f, 1e-3f, 1e3f)
   , lightCount("Light Count", 5, 1, 5)
   , sceneAmbient("Scene Ambient", glm::vec4(0.2f, 0.2f, 0.2f, 1.f))
   , fogMode("Fog Mode")
@@ -39,14 +40,16 @@ Z3DGlobalParameters::Z3DGlobalParameters()
     transparencyMethod.addOption("Weighted Blended");
   }
 
-  if (Z3DGpuInfo::instance().isDualDepthPeelingSupported())
+  if (Z3DGpuInfo::instance().isDualDepthPeelingSupported()) {
     transparencyMethod.addOption("Dual Depth Peeling");
+  }
+  //weightedBlendedDepthScale.setStyle("SPINBOX");
 
   //  if (Z3DGpuInfoInstance.isLinkedListSupported())
   //    m_transparencyMethod.addOption("Linked List");
 
   addParameter(transparencyMethod);
-
+  addParameter(weightedBlendedDepthScale);
 
   addParameter(camera);
 
@@ -223,11 +226,13 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   m_widgetsGrp = std::make_shared<ZWidgetsGroup>("Global", 1);
   m_widgetsGrp->addChild(geometriesMultisampleMode, 1);
   m_widgetsGrp->addChild(transparencyMethod, 1);
+  m_widgetsGrp->addChild(weightedBlendedDepthScale, 1);
   m_widgetsGrp->addChild(*(new Z3DCameraControlWidget(camera)), 1);
   m_widgetsGrp->addChild(camera, 1);
   m_widgetsGrpNoCamera = std::make_shared<ZWidgetsGroup>("Lighting", 1);
   m_widgetsGrpNoCamera->addChild(geometriesMultisampleMode, 1);
   m_widgetsGrpNoCamera->addChild(transparencyMethod, 1);
+  m_widgetsGrpNoCamera->addChild(weightedBlendedDepthScale, 1);
   for (size_t i = 3; i < m_parameters.size(); ++i) {
     m_widgetsGrp->addChild(*m_parameters[i], 1);
     m_widgetsGrpNoCamera->addChild(*m_parameters[i], 1);

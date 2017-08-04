@@ -102,6 +102,7 @@ void Z3DShaderGroup::bind()
     float b = 0.5f * (f + n) / (f - n) + 0.5f;
     get().setUniform("ze_to_zw_b", b);
     get().setUniform("ze_to_zw_a", a);
+    get().setUniform("weighted_blended_depth_scale", m_base.globalParas().weightedBlendedDepthScale.get());
   }
 }
 

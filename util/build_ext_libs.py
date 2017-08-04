@@ -269,6 +269,7 @@ def build_glbinding(src_dir: str, install_dir: str, ext_dir: str):
             cmakecmd.extend(['-DOPTION_BUILD_TOOLS:BOOL=OFF',
                              '-DBUILD_SHARED_LIBS:BOOL=OFF',
                              '-DOPTION_BUILD_TESTS:BOOL=OFF',
+                             '-DOPTION_BUILD_GPU_TESTS:BOOL=OFF',
                              src_dir])
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
@@ -277,9 +278,10 @@ def build_glbinding(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
-            cmakecmd.extend(['-DOPTION_BUILD_GPU_TESTS:BOOL=OFF',
+            cmakecmd.extend(['-DOPTION_BUILD_TOOLS:BOOL=OFF',
                              '-DBUILD_SHARED_LIBS:BOOL=OFF',
                              '-DOPTION_BUILD_TESTS:BOOL=OFF',
+                             '-DOPTION_BUILD_GPU_TESTS:BOOL=OFF',
                              src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],

@@ -46,7 +46,7 @@ out vec4 FragData1;  // call glBindFragDataLocation before linking
 #define FragData1 gl_FragData[1]
 #endif
 
-uniform float uDepthScale = 0.005;
+uniform float weighted_blended_depth_scale = 1;
 
 void fragment_func(out vec4 fragColor, out float fragDepth);
 
@@ -61,9 +61,9 @@ void main(void)
   // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
   float viewDepth = ze_to_zw_a / (fragDepth - ze_to_zw_b); //abs(1.0 / gl_FragCoord.w);
 
-  // Tuned to work well with FP16 accumulation buffers and 0.001 < linearDepth < 2.5
+  // Tuned to work well with FP16 accumulation buffers and 0.0005 < viewDepth * 0.005 * weighted_blended_depth_scale < 2.5
   // See Equation (9) from http://jcgt.org/published/0002/02/09/
-  float weight = clamp(0.03 / (1e-5 + pow(viewDepth * uDepthScale, 4.0)), 1e-2, 3e3);
+  float weight = clamp(0.03 / (1e-5 + pow(viewDepth * 0.005 * weighted_blended_depth_scale, 4.0)), 1e-2, 3e3);
   FragData0 = color * weight;
   FragData1.x = color.a;
 }
