@@ -109,9 +109,5 @@ void Z3DTextureAndEyeCoordinateRenderer::render(Z3DEye eye)
   m_renderTextureAndEyeCoordinateShader.release();
 }
 
-void Z3DTextureAndEyeCoordinateRenderer::renderPicking(Z3DEye /*unused*/)
-{
-}
-
 } // namespace nim
 

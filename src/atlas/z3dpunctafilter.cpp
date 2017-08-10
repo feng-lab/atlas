@@ -31,10 +31,6 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   //  , m_glowPercentage("Glow Percentage", 0.2f, 0.f, 1.f)
   //  , m_textureCopyRenderer(m_rendererBase)
   , m_selectPunctumEvent("Select Puncta", false)
-  , m_pressedPunctum(nullptr)
-  , m_selectedPuncta(nullptr)
-  , m_dataIsInvalid(false)
-  , m_origPuncta(nullptr)
 {
   addPrivateRenderPort(m_monoEyeOutport);
   addPrivateRenderPort(m_leftEyeOutport);
@@ -433,10 +429,7 @@ void Z3DPunctaFilter::prepareColor()
 
 void Z3DPunctaFilter::adjustWidgets()
 {
-  if (m_colorMode.isSelected("Single Color"))
-    m_singleColorForAllPuncta.setVisible(true);
-  else
-    m_singleColorForAllPuncta.setVisible(false);
+  m_singleColorForAllPuncta.setVisible(m_colorMode.isSelected("Single Color"));
   m_colorMapScore.setVisible(m_colorMode.isSelected("Colormap Score"));
   m_colorMapMeanIntensity.setVisible(m_colorMode.isSelected("Colormap Mean Intensity"));
   m_colorMapMaxIntensity.setVisible(m_colorMode.isSelected("Colormap Max Intensity"));
@@ -484,11 +477,12 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*unused*/, int h)
     }
 
     // Check if any point was selected...
-    for (auto p : m_punctaList)
+    for (auto p : m_punctaList) {
       if (p == obj) {
         m_pressedPunctum = p;
         break;
       }
+    }
     return;
   }
 

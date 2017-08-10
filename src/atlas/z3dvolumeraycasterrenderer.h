@@ -18,7 +18,6 @@ Q_OBJECT
 public:
   explicit Z3DVolumeRaycasterRenderer(Z3DRendererBase& rendererBase);
 
-  // input vols can not be nullptr
   void setChannels(const std::vector<std::unique_ptr<Z3DVolume>>& vols);
 
   void setChannels(const Z3DImg& img);
@@ -52,7 +51,8 @@ public:
   // return true if something is rendered by this renderer
   bool hasVisibleRendering() const;
 
-  QString compositeMode() const;
+  QString compositeMode() const
+  { return m_compositingMode.get(); }
 
   ZStringIntOptionParameter& compositingModePara()
   { return m_compositingMode; }
@@ -75,13 +75,10 @@ public:
   const std::vector<std::unique_ptr<ZStringIntOptionParameter>>& texFilterModeParas() const
   { return m_texFilterModeParas; }
 
-signals:
-
-protected slots:
+protected:
 
   void adjustWidgets();
 
-protected:
   void bindVolumesAndTransferFuncs(Z3DShaderProgram& shader);
 
   void bindVolumeAndTransferFunc(Z3DShaderProgram& shader, size_t idx);

@@ -176,22 +176,24 @@ void downsampleImage()
 
 void extractNeuronChannel()
 {
-  QDir dir("/Volumes/lq/image/mCA3_CA1_raw");
-  QString outFolder("/Volumes/Jinny/");
+//  QDir dir("/Volumes/lq/image/mCA3_CA1_raw");
+//  QString outFolder("/Volumes/Jinny/");
+  QDir dir("/Volumes/PVPY/Py");
+  QString outFolder("/Users/feng/Downloads/PyNeurons/");
   QStringList filters;
   filters << "*.raw";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  dir = QDir("/Volumes/lq/image/devCA3");
-  list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
-  dir = QDir("/Volumes/lq/image/1201_devCA3_CA1/35143_01");
-  list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
-  dir = QDir("/Volumes/lq/image/1201_devCA3_CA1/35143_02");
-  list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
+//  dir = QDir("/Volumes/lq/image/devCA3");
+//  list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
+//  dir = QDir("/Volumes/lq/image/1201_devCA3_CA1/35143_01");
+//  list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
+//  dir = QDir("/Volumes/lq/image/1201_devCA3_CA1/35143_02");
+//  list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
   for (int i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0, -1, 0, -1, 0, -1, 1, 2));
-    QString outname = outFolder + fileInfo.baseName() + "_ch2.v3draw";
+    QString outname = outFolder + fileInfo.baseName() + "_ch2.tif";
     img.save(outname);
   }
 }
@@ -1019,7 +1021,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  //fixImg();
+  //extractNeuronChannel();
   LOG(INFO) << "done";
 }
 

@@ -122,8 +122,8 @@ private:
 
   ZEventListenerParameter m_selectPunctumEvent;
   glm::ivec2 m_startCoord;
-  ZPunctum* m_pressedPunctum;
-  std::set<ZPunctum*>* m_selectedPuncta;   //point to all selected puncta, managed by other class
+  ZPunctum* m_pressedPunctum = nullptr;
+  std::set<ZPunctum*>* m_selectedPuncta = nullptr;   //point to all selected puncta, managed by other class
 
   std::vector<glm::vec4> m_pointAndRadius;
   std::vector<glm::vec4> m_specularAndShininess;
@@ -138,9 +138,9 @@ private:
   std::vector<glm::vec4> m_pointColorsNormal;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
-  bool m_dataIsInvalid;
+  bool m_dataIsInvalid = false;
 
-  ZPuncta* m_origPuncta;
+  ZPuncta* m_origPuncta = nullptr;
 };
 
 } // namespace nim

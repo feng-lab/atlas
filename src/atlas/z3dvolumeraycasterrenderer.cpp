@@ -63,11 +63,6 @@ Z3DVolumeRaycasterRenderer::Z3DVolumeRaycasterRenderer(Z3DRendererBase& renderer
   CHECK_GL_ERROR
 }
 
-QString Z3DVolumeRaycasterRenderer::compositeMode() const
-{
-  return m_compositingMode.get();
-}
-
 void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume>>& volsIn)
 {
   std::vector<Z3DVolume*> vols;

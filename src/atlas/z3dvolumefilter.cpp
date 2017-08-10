@@ -1447,9 +1447,9 @@ void Z3DVolumeFilter::volumeChanged()
 
   m_volumeRaycasterRenderer.setChannels(getVolumes());
   //todo
-//  if (!is2DImage) {
-//    m_volumeSliceRenderer.setData(getVolumes(), m_sliceColormaps);
-//  }
+  if (!is2DImage) {
+    m_volumeSliceRenderer.setData(getVolumes(), m_sliceColormaps);
+  }
 }
 
 } // namespace nim

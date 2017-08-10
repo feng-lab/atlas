@@ -105,10 +105,10 @@ protected:
 
   void prepareData();
 
-  //get bounding box of swc tree in world coordinate :[xmin xmax ymin ymax zmin zmax]
+  //get bounding box of swc tree in world coordinate
   void treeBound(ZSwc* tree, ZBBox<glm::dvec3>& result) const;
 
-  //get bounding box of swc tree node in world coordinate :[xmin xmax ymin ymax zmin zmax]
+  //get bounding box of swc tree node in world coordinate
   void treeNodeBound(const SwcTreeNode& tn, ZBBox<glm::dvec3>& result) const;
 
   void notTransformedTreeBound(ZSwc* tree, ZBBox<glm::dvec3>& result) const;

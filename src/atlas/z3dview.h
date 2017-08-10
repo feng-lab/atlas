@@ -2,10 +2,10 @@
 
 #include "z3dglobalparameters.h"
 #include "zviewsettinginterface.h"
+#include "zbbox.h"
 #include <QDir>
 #include <QObject>
 #include <QAction>
-#include <zbbox.h>
 
 class QMainWindow;
 

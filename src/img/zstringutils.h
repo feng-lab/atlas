@@ -20,5 +20,14 @@ void removeComment(std::string& line, const std::string& commentStart = "#", boo
 
 void removeComment(QString& line, const QString& commentStart = "#", bool checkSpecialNumber = true);
 
+class QStringNaturalCompare
+{
+public:
+  inline bool operator()(const QString& s1, const QString& s2) const
+  {
+    return naturalSortLessThan(s1, s2);
+  }
+};
+
 } // namespace nim
 

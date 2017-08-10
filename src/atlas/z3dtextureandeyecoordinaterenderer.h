@@ -27,8 +27,6 @@ protected:
 
   virtual void render(Z3DEye eye) override;
 
-  virtual void renderPicking(Z3DEye /*unused*/) override;
-
 protected:
   const ZMesh* m_mesh;
 

@@ -10,8 +10,6 @@ namespace nim {
 
 class Z3DVolume;
 
-class Z3DShaderProgram;
-
 class Z3DTexture;
 
 class Z3DVolumeHistogramThread : public QThread
