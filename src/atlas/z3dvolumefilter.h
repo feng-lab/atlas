@@ -35,9 +35,6 @@ public:
 
   ~Z3DVolumeFilter();
 
-  void setVisible(bool v)
-  { m_visible.set(v); }
-
   void setOffset(double x, double y, double z);
 
   void setData(const ZImgPack& img);
@@ -168,7 +165,6 @@ private:
   const ZImgPack* m_imgPack;
   std::vector<std::unique_ptr<Z3DVolume>> m_volumes;
   std::vector<std::unique_ptr<Z3DVolume>> m_zoomInVolumes;
-  ZBoolParameter m_visible;
   ZBoolParameter m_stayOnTop;
   ZBoolParameter m_isVolumeDownsampled;
   ZBoolParameter m_isSubVolume;

@@ -29,9 +29,6 @@ public:
 
   explicit Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  void setVisible(bool v)
-  { m_visible.set(v); }
-
   void setData(ZSwc& tree);
 
   inline void setSelectedSwcs(std::set<ZSwc*>* list)
@@ -147,7 +144,6 @@ private:
   Z3DSphereRenderer m_sphereRenderer;
   Z3DSphereRenderer m_sphereRendererForCone;
 
-  ZBoolParameter m_visible;
   ZStringIntOptionParameter m_renderingPrimitive;
   ZStringIntOptionParameter m_colorMode;
   ZVec4Parameter m_swcTreeColor;

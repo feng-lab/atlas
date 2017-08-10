@@ -18,7 +18,6 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject
   , m_triangleListRenderer(m_rendererBase)
   , m_dataIsInvalid(false)
   , m_animation(nullptr)
-  , m_visible("Visible", true)
   , m_lineWidth("Line Width", 2, 1, 100)
   , m_colorMode("Color Mode")
   , m_color("Color", glm::vec4(1, 1, 0, 1))
@@ -60,7 +59,6 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject
   connect(&m_viewDirectionColor, &ZVec4Parameter::valueChanged, this, &Z3DAnimationFilter::prepareColor);
   connect(&m_cameraDirectionTimeInterval, &ZDoubleParameter::valueChanged, this, &Z3DAnimationFilter::updateData);
 
-  addParameter(m_visible);
   addParameter(m_lineWidth);
   addParameter(m_colorMode);
   addParameter(m_color);
@@ -77,8 +75,6 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject
   m_trianglesWrapper.push_back(&m_triangles);
 
   m_lineRenderer.setLineWidth(m_lineWidth.get());
-
-  connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DAnimationFilter::objVisibleChanged);
 }
 
 void Z3DAnimationFilter::process(Z3DEye /*unused*/)

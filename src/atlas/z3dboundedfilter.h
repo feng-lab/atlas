@@ -17,6 +17,12 @@ Q_OBJECT
 public:
   explicit Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* parent = nullptr);
 
+  void setVisible(bool v)
+  { m_visible.set(v); }
+
+  bool isVisible() const
+  { return m_visible.get(); }
+
   void setSelected(bool v);
 
   bool isSelected() const
@@ -229,6 +235,7 @@ protected:
   Z3DSphereRenderer m_handleCenterRenderer;
   Z3DArrowRenderer m_handleArrowRenderer;
 
+  ZBoolParameter m_visible;
   ZFloatSpanParameter m_xCut;
   ZFloatSpanParameter m_yCut;
   ZFloatSpanParameter m_zCut;

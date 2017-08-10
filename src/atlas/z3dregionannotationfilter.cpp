@@ -8,12 +8,10 @@ namespace nim {
 
 Z3DRegionAnnotationFilter::Z3DRegionAnnotationFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   : Z3DGeometryFilter(globalParas, parent)
-  , m_visible("Visible", true)
 {
   //addParameter(m_visible);
 
   connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DRegionAnnotationFilter::visibleChanged);
-  connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DRegionAnnotationFilter::objVisibleChanged);
 
   m_numParas = m_parameters.size();
 }

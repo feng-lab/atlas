@@ -17,8 +17,6 @@ public:
 
   virtual bool isReady(Z3DEye eye) const override;
 
-  void setVisible(bool visible);
-
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   virtual bool hasOpaque(Z3DEye /*unused*/) const override

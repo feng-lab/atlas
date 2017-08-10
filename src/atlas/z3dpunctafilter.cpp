@@ -15,7 +15,6 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   , m_leftEyeOutport2("LeftEyeImage2", this)
   , m_rightEyeOutport2("RightEyeImage2", this)
   , m_sphereRenderer(m_rendererBase)
-  , m_visible("Visible", true)
   , m_colorMode("Color Mode")
   , m_singleColorForAllPuncta("Puncta Color", glm::vec4(ZRandom::instance().randReal<float>(),
                                                         ZRandom::instance().randReal<float>(),
@@ -56,7 +55,6 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
 
   connect(&m_useSameSizeForAllPuncta, &ZBoolParameter::valueChanged, this, &Z3DPunctaFilter::changePunctaSize);
 
-  addParameter(m_visible);
   addParameter(m_colorMode);
 
   addParameter(m_singleColorForAllPuncta);
@@ -90,8 +88,6 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   addEventListener(m_selectPunctumEvent);
 
   adjustWidgets();
-
-  connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DPunctaFilter::objVisibleChanged);
 }
 
 void Z3DPunctaFilter::process(Z3DEye eye)

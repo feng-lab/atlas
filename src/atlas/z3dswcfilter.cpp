@@ -14,7 +14,6 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_coneRenderer(m_rendererBase)
   , m_sphereRenderer(m_rendererBase)
   , m_sphereRendererForCone(m_rendererBase)
-  , m_visible("Visible", true)
   , m_renderingPrimitive("Rendering Mode")
   , m_colorMode("Color Mode")
   , m_swcTreeColor("Color", glm::vec4(1, 0, 0, 1))
@@ -33,7 +32,6 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   initTypeColor();
   initSubclassTypeColor();
 
-  addParameter(m_visible);
   // rendering primitive
   m_renderingPrimitive.addOptions("Normal", "Line", "Sphere", "Cylinder");
   m_renderingPrimitive.select("Normal");
@@ -107,8 +105,6 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   connect(&m_colorMapBranchType, &ZColorMapParameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
 
   adjustWidgets();
-
-  connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DSwcFilter::objVisibleChanged);
 }
 
 void Z3DSwcFilter::process(Z3DEye /*unused*/)

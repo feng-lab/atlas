@@ -49,11 +49,6 @@ bool Z3DAxisFilter::isReady(Z3DEye eye) const
   return Z3DGeometryFilter::isReady(eye) && m_showAxis.get();
 }
 
-void Z3DAxisFilter::setVisible(bool visible)
-{
-  m_showAxis.setValue(visible);
-}
-
 std::shared_ptr<ZWidgetsGroup> Z3DAxisFilter::widgetsGroup()
 {
   if (!m_widgetsGroup) {

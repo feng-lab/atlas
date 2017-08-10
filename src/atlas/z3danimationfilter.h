@@ -24,9 +24,6 @@ Q_OBJECT
 public:
   explicit Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  void setVisible(bool v)
-  { m_visible.set(v); }
-
   virtual void process(Z3DEye /*unused*/) override;
 
   void setData(Z3DAnimation* animation);
@@ -80,7 +77,6 @@ private:
 
   bool m_dataIsInvalid;
   Z3DAnimation* m_animation;
-  ZBoolParameter m_visible;
   ZIntParameter m_lineWidth;
   ZStringIntOptionParameter m_colorMode;
   ZVec4Parameter m_color;

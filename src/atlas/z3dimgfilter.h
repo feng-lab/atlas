@@ -29,9 +29,6 @@ Q_OBJECT
 public:
   explicit Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  void setVisible(bool v)
-  { m_visible.set(v); }
-
   void setData(const ZImgPack& imgPack);
 
   virtual bool isStayOnTop() const
@@ -104,7 +101,6 @@ private:
   Z3DTextureCopyRenderer m_textureCopyRenderer;
 
   std::unique_ptr<Z3DImg> m_3dImg;
-  ZBoolParameter m_visible;
   ZBoolParameter m_stayOnTop;
   ZBoolParameter m_isVolumeDownsampled;
 

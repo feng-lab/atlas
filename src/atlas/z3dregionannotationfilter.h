@@ -11,9 +11,6 @@ Q_OBJECT
 public:
   explicit Z3DRegionAnnotationFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  void setVisible(bool v)
-  { m_visible.set(v); }
-
   virtual void process(Z3DEye eye) override;
 
   void setData(ZRegionAnnotation& regAnno);
@@ -57,8 +54,6 @@ protected:
   virtual void updateNotTransformedBoundBoxImpl() override;
 
 private:
-  ZBoolParameter m_visible;
-
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_dataIsInvalid;
 

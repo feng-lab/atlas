@@ -14,6 +14,7 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   , m_selectionCornerRenderer(m_rendererBase)
   , m_handleCenterRenderer(m_rendererBase)
   , m_handleArrowRenderer(m_rendererBase)
+  , m_visible("Visible", true)
   , m_xCut("X Cut", glm::vec2(0, 0), 0, 0)
   , m_yCut("Y Cut", glm::vec2(0, 0), 0, 0)
   , m_zCut("Z Cut", glm::vec2(0, 0), 0, 0)
@@ -47,6 +48,7 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   connect(&m_rendererBase.globalCameraPara(), &Z3DCameraParameter::valueChanged, this,
           &Z3DBoundedFilter::invalidateHandle);
 
+  connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DBoundedFilter::objVisibleChanged);
   m_xCut.setSingleStep(1);
   m_yCut.setSingleStep(1);
   m_zCut.setSingleStep(1);
@@ -63,6 +65,7 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   m_selectionLineColor.setStyle("COLOR");
   connect(&m_selectionLineColor, &ZVec4Parameter::valueChanged, this, &Z3DBoundedFilter::updateSelectionLineColors);
 
+  addParameter(m_visible);
   addParameter(m_xCut);
   addParameter(m_yCut);
   addParameter(m_zCut);

@@ -24,9 +24,6 @@ Q_OBJECT
 public:
   explicit Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  void setVisible(bool v)
-  { m_visible.set(v); }
-
   void setData(ZPuncta& puncta);
 
   inline void setSelectedPuncta(std::set<ZPunctum*>* list)
@@ -99,7 +96,6 @@ private:
 
   Z3DSphereRenderer m_sphereRenderer;
 
-  ZBoolParameter m_visible;
   ZStringIntOptionParameter m_colorMode;
   ZVec4Parameter m_singleColorForAllPuncta;
   ZColorMapParameter m_colorMapScore;

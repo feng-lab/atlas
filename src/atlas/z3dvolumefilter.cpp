@@ -21,7 +21,6 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
   , m_textureAndEyeCoordinateRenderer(m_rendererBase)
   , m_textureCopyRenderer(m_rendererBase)
   , m_imgPack(nullptr)
-  , m_visible("Visible", true)
   , m_stayOnTop("Stay On Top", false)
   , m_isVolumeDownsampled("Volume Is Downsampled", false)
   , m_isSubVolume("Is Subvolume", false)
@@ -74,7 +73,6 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
   m_maxVoxelNumber =
     std::min(std::max(size_t(128), static_cast<size_t>(0.25 * currentAvailableTexMem)), size_t(2048)) * 1024 * 1024;
 
-  addParameter(m_visible);
   addParameter(m_stayOnTop);
   m_isVolumeDownsampled.setEnabled(false);
   addParameter(m_isVolumeDownsampled);
@@ -175,8 +173,6 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
 
   adjustWidget();
   CHECK_GL_ERROR
-
-  connect(&m_visible, SIGNAL(valueChanged(bool)), this, SIGNAL(objVisibleChanged(bool)));
 
   m_numParas = m_parameters.size();
 }

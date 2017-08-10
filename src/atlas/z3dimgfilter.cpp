@@ -20,7 +20,6 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_imgSliceRenderer(m_rendererBase)
   , m_textureAndEyeCoordinateRenderer(m_rendererBase)
   , m_textureCopyRenderer(m_rendererBase)
-  , m_visible("Visible", true)
   , m_stayOnTop("Stay On Top", false)
   , m_isVolumeDownsampled("Volume Is Downsampled", false)
   , m_numParas(0)
@@ -62,11 +61,9 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_zSlice2Position("Z Slice 2 Position", 0, 0, 1)
   , m_leftMouseButtonPressEvent("Left Mouse Button Pressed", false)
 {
-  CHECK_GL_ERROR
   m_baseBoundBoxRenderer.setEnableMultisample(false);
   m_textureCopyRenderer.setDiscardTransparent(true);
 
-  addParameter(m_visible);
   addParameter(m_stayOnTop);
   m_isVolumeDownsampled.setEnabled(false);
   addParameter(m_isVolumeDownsampled);
@@ -185,8 +182,6 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
 
   adjustWidget();
   CHECK_GL_ERROR
-
-  connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DImgFilter::objVisibleChanged);
 
   m_numParas = m_parameters.size();
 }
