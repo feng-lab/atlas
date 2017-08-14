@@ -178,6 +178,7 @@ enum class FileFormat
   MetaImage,
   ZeissCZI,
   ITKImage,
+  HDF5Img,
 };
 
 enum class Compression : std::uint16_t

@@ -139,7 +139,10 @@ struct ZImgInfo
 
   // set voxel format from template argument, don't accept const type
   template<typename TVoxel>
-  void setVoxelFormat();
+  void setVoxelFormat(size_t validBitCountIn = 0);
+
+  // set voxel format from data type string such as "float32", "int8" ...
+  void setVoxelFormat(const QString& dt, size_t validBitCountIn = 0);
 
   // property of img type
   // intensity range of current img type, for float img, range is [0.0 1.0]

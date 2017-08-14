@@ -230,7 +230,7 @@ void ZImgMetaImage::writeImg(const QString& filename, const ZImgSliceProvider& i
   if (imgSliceProvider.imgInfo().numTimes != 1) {
     throw ZIOException("time sequence image is not supported");
   }
-  writeImg(filename, imgSliceProvider.allSlices(0), comp);
+  writeImg(filename, imgSliceProvider.allSlices(0, 1), comp);
 }
 
 bool ZImgMetaImage::supportRead() const

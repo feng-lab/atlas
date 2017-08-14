@@ -204,30 +204,37 @@ void ZImgV3DRaw::writeImg(const QString& filename, const ZImgSliceProvider& imgS
   if (imgSliceProvider.imgInfo().numTimes != 1) {
     throw ZIOException("time sequence is not supported");
   }
+
+  std::ofstream outputFileStream;
+  openFileStream(outputFileStream, filename, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
+
+  const char formatkey[] = "raw_image_stack_by_hpeng";
+  writeStream(outputFileStream, formatkey, std::strlen(formatkey));
+
+  char endian = 'L';
+  writeStream(outputFileStream, &endian, 1);
+
+  uint16_t dataType = imgSliceProvider.imgInfo().voxelByteNumber();
+  writeStream(outputFileStream, &dataType, 2);
+
+  uint32_t sz[4];
+  sz[0] = imgSliceProvider.imgInfo().width;
+  sz[1] = imgSliceProvider.imgInfo().height;
+  sz[2] = imgSliceProvider.imgInfo().depth;
+  sz[3] = imgSliceProvider.imgInfo().numChannels;
+  writeStream(outputFileStream, sz, 16);
+
   if (imgSliceProvider.imgInfo().numChannels > 1 && imgSliceProvider.imgInfo().depth > 1) {
-    writeImg(filename, imgSliceProvider.allSlices(0), comp);
+    //writeImg(filename, imgSliceProvider.allSlices(0), comp);
+    for (size_t c = 0; c < imgSliceProvider.imgInfo().numChannels; ++c) {
+      for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
+        ZImg img = imgSliceProvider.slice(z, 0, 1);
+        writeStream(outputFileStream, img.channelData<char>(c, 0), img.channelByteNumber());
+      }
+    }
   } else {
-    std::ofstream outputFileStream;
-    openFileStream(outputFileStream, filename, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
-
-    const char formatkey[] = "raw_image_stack_by_hpeng";
-    writeStream(outputFileStream, formatkey, std::strlen(formatkey));
-
-    char endian = 'L';
-    writeStream(outputFileStream, &endian, 1);
-
-    uint16_t dataType = imgSliceProvider.imgInfo().voxelByteNumber();
-    writeStream(outputFileStream, &dataType, 2);
-
-    uint32_t sz[4];
-    sz[0] = imgSliceProvider.imgInfo().width;
-    sz[1] = imgSliceProvider.imgInfo().height;
-    sz[2] = imgSliceProvider.imgInfo().depth;
-    sz[3] = imgSliceProvider.imgInfo().numChannels;
-    writeStream(outputFileStream, sz, 16);
-
     for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
-      ZImg img = imgSliceProvider.slice(z, 0);
+      ZImg img = imgSliceProvider.slice(z, 0, 1);
       writeStream(outputFileStream, img.timeData<char>(0), img.timeByteNumber());
     }
   }

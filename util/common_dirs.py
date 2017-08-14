@@ -60,7 +60,7 @@ def binary_dir():
 
 
 def deploy_target_dir():
-    res = os.path.join(os.path.expanduser('~'), 'Google Drive', "jinny'lab", 'software')
+    res = os.path.join(os.path.expanduser('~'), 'Google Drive', "lab", 'software')
     assert os.path.exists(res)
     return res
 

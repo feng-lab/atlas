@@ -712,16 +712,16 @@ ZImg& ZImgPack::maxZProjectedImg()
   return m_maximumProjectedAlongZImg;
 }
 
-ZImg ZImgPack::slice(size_t z, size_t t) const
+ZImg ZImgPack::slice(size_t z, size_t t, size_t ratio) const
 {
   CHECK(m_diskCached);
-  return assembleImg(1, t, z);
+  return assembleImg(ratio, t, z);
 }
 
-ZImg ZImgPack::allSlices(size_t t) const
+ZImg ZImgPack::allSlices(size_t t, size_t ratio) const
 {
   CHECK(m_diskCached);
-  return assembleImg(1, t);
+  return assembleImg(ratio, t);
 }
 
 void ZImgPack::createSliceTiles(ZImg* img, size_t z, size_t t, bool mip)

@@ -6,14 +6,13 @@
 #include "zimgtiff.h"
 #include "zimgzeisslsm.h"
 #include "zimgzeissczi.h"
-#ifndef _NEUTUBE_
 #include "zimgjpeg.h"
 #include "zimgjpegxr.h"
 #include "zimgpng.h"
 #include "zimgfreeimage.h"
 #include "zimgmetaimage.h"
 #include "zimgitkimage.h"
-#endif
+#include "zimghdf5.h"
 #include "zlog.h"
 
 namespace nim {
@@ -31,14 +30,13 @@ ZImgIO::ZImgIO()
   m_ioFormats[FileFormat::Tiff] = std::make_unique<ZImgTiff>();
   m_ioFormats[FileFormat::ZeissLsm] = std::make_unique<ZImgZeissLsm>();
   m_ioFormats[FileFormat::ZeissCZI] = std::make_unique<ZImgZeissCZI>();
-#ifndef _NEUTUBE_
   m_ioFormats[FileFormat::Jpeg] = std::make_unique<ZImgJpeg>();
   m_ioFormats[FileFormat::JpegXR] = std::make_unique<ZImgJpegXR>();
   m_ioFormats[FileFormat::Png] = std::make_unique<ZImgPng>();
   m_ioFormats[FileFormat::FreeImage] = std::make_unique<ZImgFreeImage>();
   m_ioFormats[FileFormat::MetaImage] = std::make_unique<ZImgMetaImage>();
   m_ioFormats[FileFormat::ITKImage] = std::make_unique<ZImgITKImage>();
-#endif
+  m_ioFormats[FileFormat::HDF5Img] = std::make_unique<ZImgHDF5>();
 }
 
 void ZImgIO::readInfo(const QString& filename, std::vector<ZImgInfo>& res,

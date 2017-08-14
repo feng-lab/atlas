@@ -214,12 +214,12 @@ double ZImgInfo::voxelSizeZInUnit(VoxelSizeUnit unit) const
 }
 
 template<typename TVoxel>
-void ZImgInfo::setVoxelFormat()
+void ZImgInfo::setVoxelFormat(size_t validBitCountIn)
 {
   static_assert(std::is_arithmetic<TVoxel>::value &&
                 (sizeof(TVoxel) == 1 || sizeof(TVoxel) == 2 || sizeof(TVoxel) == 4 || sizeof(TVoxel) == 8),
                 "need arithmetic type");
-  validBitCount = 0;
+  validBitCount = validBitCountIn;
   bytesPerVoxel = sizeof(TVoxel);
   if (std::is_integral<TVoxel>::value) {
     voxelFormat = std::is_signed<TVoxel>::value ? VoxelFormat::Signed : VoxelFormat::Unsigned;
@@ -228,25 +228,50 @@ void ZImgInfo::setVoxelFormat()
   }
 }
 
-template void ZImgInfo::setVoxelFormat<uint8_t>();
+template void ZImgInfo::setVoxelFormat<uint8_t>(size_t validBitCountIn);
 
-template void ZImgInfo::setVoxelFormat<uint16_t>();
+template void ZImgInfo::setVoxelFormat<uint16_t>(size_t validBitCountIn);
 
-template void ZImgInfo::setVoxelFormat<uint32_t>();
+template void ZImgInfo::setVoxelFormat<uint32_t>(size_t validBitCountIn);
 
-template void ZImgInfo::setVoxelFormat<uint64_t>();
+template void ZImgInfo::setVoxelFormat<uint64_t>(size_t validBitCountIn);
 
-template void ZImgInfo::setVoxelFormat<int8_t>();
+template void ZImgInfo::setVoxelFormat<int8_t>(size_t validBitCountIn);
 
-template void ZImgInfo::setVoxelFormat<int16_t>();
+template void ZImgInfo::setVoxelFormat<int16_t>(size_t validBitCountIn);
 
-template void ZImgInfo::setVoxelFormat<int32_t>();
+template void ZImgInfo::setVoxelFormat<int32_t>(size_t validBitCountIn);
 
-template void ZImgInfo::setVoxelFormat<int64_t>();
+template void ZImgInfo::setVoxelFormat<int64_t>(size_t validBitCountIn);
 
-template void ZImgInfo::setVoxelFormat<float>();
+template void ZImgInfo::setVoxelFormat<float>(size_t validBitCountIn);
 
-template void ZImgInfo::setVoxelFormat<double>();
+template void ZImgInfo::setVoxelFormat<double>(size_t validBitCountIn);
+
+void ZImgInfo::setVoxelFormat(const QString& dt, size_t validBitCountIn)
+{
+  if (dt.startsWith("uint")) {
+    voxelFormat = VoxelFormat::Unsigned;
+  } else if (dt.startsWith("int")) {
+    voxelFormat = VoxelFormat::Signed;
+  } else if (dt.startsWith("float")) {
+    voxelFormat = VoxelFormat::Float;
+  } else {
+    throw ZIOException(QString("invalid data type string %1").arg(dt));
+  }
+  if (dt.endsWith("8")) {
+    bytesPerVoxel = 1;
+  } else if (dt.endsWith("16")) {
+    bytesPerVoxel = 2;
+  } else if (dt.endsWith("32")) {
+    bytesPerVoxel = 4;
+  } else if (dt.endsWith("64")) {
+    bytesPerVoxel = 8;
+  } else {
+    throw ZIOException(QString("invalid data type string %1").arg(dt));
+  }
+  validBitCount = validBitCountIn;
+}
 
 #ifndef _MSC_VER
 #pragma clang diagnostic push

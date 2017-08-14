@@ -166,7 +166,7 @@ void ZImgTiff::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
   }
   for (size_t t = 0; t < imgSliceProvider.imgInfo().numTimes; ++t) {
     for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
-      tiffWriter.writeIFD(imgSliceProvider.slice(z, t), 0, 0, -1, true);
+      tiffWriter.writeIFD(imgSliceProvider.slice(z, t, 1), 0, 0, -1, true);
     }
   }
 }

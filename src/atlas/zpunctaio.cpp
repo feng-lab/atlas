@@ -116,14 +116,14 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta) const
 
     H5::Group allGrp = file.openGroup("Puncta");
     H5::Attribute ver = allGrp.openAttribute("Version");
-    int punctaVer;
+    int32_t punctaVer;
     ver.read(intType, &punctaVer);
 
     H5::Attribute numPunctaAttr = allGrp.openAttribute("Number");
-    int numPuncta;
+    int32_t numPuncta;
     numPunctaAttr.read(intType, &numPuncta);
 
-    for (int i = 0; i < numPuncta; ++i) {
+    for (int32_t i = 0; i < numPuncta; ++i) {
       H5::Group punctumGrp = allGrp.openGroup(qUtf8Printable(QString("Punctum%1").arg(i + 1)));
       ZPunctum p;
 
@@ -232,10 +232,10 @@ void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename) co
     H5::Group allGrp = file.createGroup("Puncta");
 
     H5::Attribute ver = allGrp.createAttribute("Version", intType, attrDataSpace);
-    int punctaVer = 100;
+    int32_t punctaVer = 100;
     ver.write(intType, &punctaVer);
 
-    int idx = 0;
+    int32_t idx = 0;
     for (const auto& p : puncta) {
       H5::Group punctumGrp = allGrp.createGroup(qUtf8Printable(QString("Punctum%1").arg(idx + 1)));
       ++idx;
