@@ -33,10 +33,6 @@ Q_OBJECT
 public:
   explicit Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  ~Z3DVolumeFilter();
-
-  void setOffset(double x, double y, double z);
-
   void setData(const ZImgPack& img);
 
   virtual bool isStayOnTop() const

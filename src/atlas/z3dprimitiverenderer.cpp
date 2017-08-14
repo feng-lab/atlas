@@ -10,7 +10,9 @@ namespace nim {
 Z3DPrimitiveRenderer::Z3DPrimitiveRenderer(Z3DRendererBase& rendererBase)
   : m_rendererBase(rendererBase)
   , m_needLighting(true)
+  #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   , m_useDisplayList(false)
+  #endif
   , m_followCoordTransform(true)
   , m_followOpacity(true)
   , m_followSizeScale(true)
@@ -168,21 +170,19 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao, con
   vao.release();
 }
 
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DPrimitiveRenderer::invalidateOpenglRenderer()
 {
-#ifndef ATLAS_USE_CORE_PROFILE
   if (m_useDisplayList)
     emit openglRendererInvalid();
-#endif
 }
 
 void Z3DPrimitiveRenderer::invalidateOpenglPickingRenderer()
 {
-#ifndef ATLAS_USE_CORE_PROFILE
   if (m_useDisplayList)
     emit openglPickingRendererInvalid();
-#endif
 }
+#endif
 
 void Z3DPrimitiveRenderer::setShaderParameters(Z3DShaderProgram& shader)
 {

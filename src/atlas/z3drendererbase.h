@@ -62,6 +62,9 @@ public:
   inline Z3DGlobalParameters& globalParas()
   { return m_globalParas; }
 
+  inline const Z3DGlobalParameters& globalParas() const
+  { return m_globalParas; }
+
   inline ZStringIntOptionParameter& geometriesMultisampleModePara()
   { return m_globalParas.geometriesMultisampleMode; }
 
@@ -116,7 +119,10 @@ public:
   inline void setZScale(float s)
   { m_coordTransform.setZScale(s); }
 
-  inline void translate(float x, float y, float z)
+  inline void setScale(float x, float y, float z)
+  { m_coordTransform.setScale(glm::vec3(x, y, z)); }
+
+  inline void setOffset(float x, float y, float z)
   { m_coordTransform.translate(x, y, z); }
 
   inline void setRotationCenter(const glm::vec3& c)
@@ -124,6 +130,12 @@ public:
 
   inline void setOpacity(float o)
   { m_opacity.set(o); }
+
+  inline void setMaterialSpecular(const glm::vec4& v)
+  { m_materialSpecular.set(v); }
+
+  inline void setMaterialAmbient(const glm::vec4& v)
+  { m_materialAmbient.set(v); }
 
   void setClipPlanes(std::vector<glm::vec4>* clipPlanes);
 
@@ -227,7 +239,7 @@ signals:
 
 protected:
 
-#ifndef ATLAS_USE_CORE_PROFILE
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   void generateDisplayList(const std::vector<Z3DPrimitiveRenderer *> &renderers);
   void generatePickingDisplayList(const std::vector<Z3DPrimitiveRenderer *> &renderers);
 
@@ -246,7 +258,7 @@ protected:
   inline bool hasClipPlanes()
   { return !m_clipPlanes.empty(); }
 
-#ifndef ATLAS_USE_CORE_PROFILE
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   void activateClipPlanesOpenGL();
   void deactivateClipPlanesOpenGL();
 #endif
@@ -258,7 +270,7 @@ protected:
   void makeViewportMatrix();
 
 private:
-#ifndef ATLAS_USE_CORE_PROFILE
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   void invalidateDisplayList();
   void invalidatePickingDisplayList();
 #endif
@@ -270,7 +282,7 @@ private:
 protected:
   Z3DGlobalParameters& m_globalParas;
 
-#ifndef ATLAS_USE_CORE_PROFILE
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   // display list generated from the geometry.
   GLuint m_displayList;
   GLuint m_pickingDisplayList;

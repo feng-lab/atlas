@@ -8,14 +8,18 @@ Z3DLineWithFixedWidthColorRenderer::Z3DLineWithFixedWidthColorRenderer(Z3DRender
   , m_lineColor("Line Color", glm::vec4(1.f, 1.f, 0.f, 1.f))
 {
   setUseSmoothLine(false);
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   setUseDisplayList(true);
+#endif
   m_lineColor.setStyle("COLOR");
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   connect(&m_lineWidth, &ZFloatParameter::valueChanged, this,
           &Z3DLineWithFixedWidthColorRenderer::invalidateOpenglRenderer);
   connect(&m_lineWidth, &ZFloatParameter::valueChanged, this,
           &Z3DLineWithFixedWidthColorRenderer::invalidateOpenglPickingRenderer);
   connect(&m_lineColor, &ZVec4Parameter::valueChanged, this,
           &Z3DLineWithFixedWidthColorRenderer::invalidateOpenglRenderer);
+#endif
   connect(&m_lineColor, &ZVec4Parameter::valueChanged, this, &Z3DLineWithFixedWidthColorRenderer::setLineColors);
 }
 

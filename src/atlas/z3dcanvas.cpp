@@ -478,12 +478,6 @@ void Z3DCanvas::broadcastEvent(QEvent* e, int w, int h)
   }
 }
 
-double Z3DCanvas::devicePixelRatio()
-{
-  return (window() && window()->windowHandle()) ?
-         window()->windowHandle()->devicePixelRatio() : 1.0;
-}
-
 #endif
 
 } // namespace nim

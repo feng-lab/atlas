@@ -70,8 +70,9 @@ const void* Z3DPickingManager::objectOfColor(const glm::col4& col)
 
 const void* Z3DPickingManager::objectAtWidgetPos(glm::ivec2 pos)
 {
-  pos[0] = pos[0] * qApp->devicePixelRatio();
-  pos[1] = pos[1] * qApp->devicePixelRatio();
+  assert(m_devicePixelRatio >= 1);
+  pos[0] = pos[0] * m_devicePixelRatio;
+  pos[1] = pos[1] * m_devicePixelRatio;
 
   glm::ivec3 texSize = glm::ivec3(m_renderTarget->attachment(GL_COLOR_ATTACHMENT0)->dimension());
   pos[1] = texSize[1] - pos[1];

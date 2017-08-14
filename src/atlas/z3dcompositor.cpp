@@ -134,8 +134,10 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_fontRenderer.fontOutlineColorPara());
   addParameter(m_fontRenderer.showFontShadowPara());
   addParameter(m_fontRenderer.fontShadowColorPara());
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   m_arrowRenderer.setUseDisplayList(false);
   m_lineRenderer.setUseDisplayList(false);
+#endif
   m_fontRenderer.setFollowCoordTransform(false);
   setupAxisCamera();
 }
@@ -1117,9 +1119,11 @@ bool Z3DCompositor::createDDPRenderTarget(const glm::uvec2& size)
 void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& filters,
                                         Z3DRenderOutputPort& port, Z3DEye eye, Z3DTexture* depthTexture)
 {
-  if (!m_waRT) if (!createWARenderTarget(port.size())) {
-    LOG(ERROR) << "Can not create fbo for weighted average rendering";
-    return;
+  if (!m_waRT) {
+    if (!createWARenderTarget(port.size())) {
+      LOG(ERROR) << "Can not create fbo for weighted average rendering";
+      return;
+    }
   }
   m_waRT->resize(port.size());
   if (depthTexture) {
@@ -1442,9 +1446,9 @@ void Z3DCompositor::prepareAxisData(Z3DEye eye)
   m_textPositions.push_back(m_YEnd * glm::vec3(0.93));
   m_textPositions.push_back(m_ZEnd * glm::vec3(0.93));
   QStringList texts;
-  texts.push_back("ML");
-  texts.push_back("DV");
-  texts.push_back("AP");
+  texts.push_back("X");
+  texts.push_back("Y");
+  texts.push_back("Z");
 
   m_fontRenderer.setData(&m_textPositions, texts);
 }

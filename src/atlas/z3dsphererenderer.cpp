@@ -19,10 +19,13 @@ Z3DSphereRenderer::Z3DSphereRenderer(Z3DRendererBase& rendererBase)
   , m_pickingDataChanged(false)
   , m_oneBatchNumber(4e6)
 {
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   setUseDisplayList(true);
   connect(&m_sphereSlicesStacks, &ZIntParameter::valueChanged, this, &Z3DSphereRenderer::invalidateOpenglRenderer);
-  connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, &Z3DSphereRenderer::compile);
   connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, &Z3DSphereRenderer::invalidateOpenglRenderer);
+#endif
+
+  connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, &Z3DSphereRenderer::compile);
   //addParameter(m_sphereSlicesStacks);
   //addParameter(m_useDynamicMaterial);
 
@@ -78,8 +81,10 @@ void Z3DSphereRenderer::setData(std::vector<glm::vec4>* pointAndRadiusInput,
       m_allFlags[i + 3] = cornerFlags[3];
     }
   }
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
   invalidateOpenglPickingRenderer();
+#endif
   m_dataChanged = true;
   m_pickingDataChanged = true;
 }
@@ -93,7 +98,9 @@ void Z3DSphereRenderer::setDataColors(std::vector<glm::vec4>* pointColorsInput)
     m_pointColors.push_back(color);
     m_pointColors.push_back(color);
   }
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
+#endif
   m_dataChanged = true;
 }
 
@@ -108,7 +115,9 @@ void Z3DSphereRenderer::setDataPickingColors(std::vector<glm::vec4>* pointPickin
     m_pointPickingColors.push_back(color);
     m_pointPickingColors.push_back(color);
   }
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglPickingRenderer();
+#endif
   m_pickingDataChanged = true;
 }
 
@@ -126,7 +135,7 @@ QString Z3DSphereRenderer::generateHeader()
   return headerSource;
 }
 
-#ifndef ATLAS_USE_CORE_PROFILE
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DSphereRenderer::renderUsingOpengl()
 {
   if (m_pointAndRadius.empty())

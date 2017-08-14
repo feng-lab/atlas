@@ -81,8 +81,8 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
   m_zoomInViewSize.setTracking(false);
   m_zoomInViewSize.setSingleStep(32);
   addParameter(m_zoomInViewSize);
-  connect(&m_rendererBase, SIGNAL(coordTransformChanged()), this, SLOT(changeCoordTransform()));
-  connect(&m_zoomInViewSize, SIGNAL(valueChanged()), this, SLOT(changeZoomInViewSize()));
+  connect(&m_rendererBase, &Z3DRendererBase::coordTransformChanged, this, &Z3DVolumeFilter::changeCoordTransform);
+  connect(&m_zoomInViewSize, &ZIntParameter::valueChanged, this, &Z3DVolumeFilter::changeZoomInViewSize);
 
   addParameter(m_interactionDownsample);
 
@@ -137,19 +137,19 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
   addParameter(m_showZSlice2);
   addParameter(m_zSlice2Position);
 
-  connect(&m_showXSlice, SIGNAL(valueChanged()), this, SLOT(adjustWidget()));
-  connect(&m_showYSlice, SIGNAL(valueChanged()), this, SLOT(adjustWidget()));
-  connect(&m_showZSlice, SIGNAL(valueChanged()), this, SLOT(adjustWidget()));
-  connect(&m_showXSlice2, SIGNAL(valueChanged()), this, SLOT(adjustWidget()));
-  connect(&m_showYSlice2, SIGNAL(valueChanged()), this, SLOT(adjustWidget()));
-  connect(&m_showZSlice2, SIGNAL(valueChanged()), this, SLOT(adjustWidget()));
+  connect(&m_showXSlice, &ZBoolParameter::valueChanged, this, &Z3DVolumeFilter::adjustWidget);
+  connect(&m_showYSlice, &ZBoolParameter::valueChanged, this, &Z3DVolumeFilter::adjustWidget);
+  connect(&m_showZSlice, &ZBoolParameter::valueChanged, this, &Z3DVolumeFilter::adjustWidget);
+  connect(&m_showXSlice2, &ZBoolParameter::valueChanged, this, &Z3DVolumeFilter::adjustWidget);
+  connect(&m_showYSlice2, &ZBoolParameter::valueChanged, this, &Z3DVolumeFilter::adjustWidget);
+  connect(&m_showZSlice2, &ZBoolParameter::valueChanged, this, &Z3DVolumeFilter::adjustWidget);
 
-  connect(&m_xSlicePosition, SIGNAL(valueChanged()), this, SLOT(invalidateFRVolumeXSlice()));
-  connect(&m_ySlicePosition, SIGNAL(valueChanged()), this, SLOT(invalidateFRVolumeYSlice()));
-  connect(&m_zSlicePosition, SIGNAL(valueChanged()), this, SLOT(invalidateFRVolumeZSlice()));
-  connect(&m_xSlice2Position, SIGNAL(valueChanged()), this, SLOT(invalidateFRVolumeXSlice2()));
-  connect(&m_ySlice2Position, SIGNAL(valueChanged()), this, SLOT(invalidateFRVolumeXSlice2()));
-  connect(&m_zSlice2Position, SIGNAL(valueChanged()), this, SLOT(invalidateFRVolumeXSlice2()));
+  connect(&m_xSlicePosition, &ZIntParameter::valueChanged, this, &Z3DVolumeFilter::invalidateFRVolumeXSlice);
+  connect(&m_ySlicePosition, &ZIntParameter::valueChanged, this, &Z3DVolumeFilter::invalidateFRVolumeYSlice);
+  connect(&m_zSlicePosition, &ZIntParameter::valueChanged, this, &Z3DVolumeFilter::invalidateFRVolumeZSlice);
+  connect(&m_xSlice2Position, &ZIntParameter::valueChanged, this, &Z3DVolumeFilter::invalidateFRVolumeXSlice2);
+  connect(&m_ySlice2Position, &ZIntParameter::valueChanged, this, &Z3DVolumeFilter::invalidateFRVolumeYSlice2);
+  connect(&m_zSlice2Position, &ZIntParameter::valueChanged, this, &Z3DVolumeFilter::invalidateFRVolumeZSlice2);
 
   m_leftMouseButtonPressEvent.listenTo("trace", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonPress);
   m_leftMouseButtonPressEvent.listenTo("trace", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonRelease);
@@ -175,15 +175,6 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
   CHECK_GL_ERROR
 
   m_numParas = m_parameters.size();
-}
-
-Z3DVolumeFilter::~Z3DVolumeFilter()
-{
-}
-
-void Z3DVolumeFilter::setOffset(double x, double y, double z)
-{
-  m_rendererBase.translate(x, y, z);
 }
 
 void Z3DVolumeFilter::setData(const ZImgPack& img)

@@ -15,6 +15,10 @@ public:
   // must call
   void setRenderTarget(Z3DRenderTarget& rt);
 
+  // must call
+  void setDevicePixelRatio(double dpr)
+  { m_devicePixelRatio = dpr; }
+
   glm::col4 registerObject(const void* obj);
 
   void deregisterObject(const void* obj);
@@ -35,6 +39,9 @@ public:
   // find all objects within a radius of pos, sort by distance
   // if radius is -1, search the whole image
   std::vector<const void*> sortObjectsByDistanceToPos(const glm::ivec2& pos, int radius = -1, bool ascend = true);
+
+  bool isHit(const glm::ivec2& pos, const void* obj)
+  { return (objectAtWidgetPos(pos) == obj); }
 
   void bindTarget()
   { m_renderTarget->bind(); }
@@ -61,6 +68,7 @@ private:
   std::map<const void*, glm::col4> m_objectToColor;
   Z3DRenderTarget* m_renderTarget = nullptr;
   glm::col4 m_currentColor{0, 0, 0, 128};
+  double m_devicePixelRatio = 0;
 };
 
 } // namespace nim

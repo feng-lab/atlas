@@ -38,7 +38,9 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
   updateLineWidth();
   connect(&m_rendererBase.geometriesMultisampleModePara(), &ZStringIntOptionParameter::valueChanged,
           this, &Z3DLineRenderer::updateLineWidth);
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   setUseDisplayList(true);
+#endif
 
   QStringList allshaders;
   allshaders << "line.vert" << "line_func.frag";
@@ -129,8 +131,10 @@ void Z3DLineRenderer::setData(std::vector<glm::vec3>* linesInput)
     }
   }
 
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
   invalidateOpenglPickingRenderer();
+#endif
   m_dataChanged = true;
   m_pickingDataChanged = true;
 }
@@ -172,7 +176,9 @@ void Z3DLineRenderer::setDataColors(std::vector<glm::vec4>* lineColorsInput)
       }
     }
   }
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
+#endif
   m_dataChanged = true;
 }
 
@@ -213,7 +219,9 @@ void Z3DLineRenderer::setDataPickingColors(std::vector<glm::vec4>* linePickingCo
       }
     }
   }
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglPickingRenderer();
+#endif
   m_pickingDataChanged = true;
 }
 
@@ -293,7 +301,7 @@ std::vector<glm::vec4>* Z3DLineRenderer::lineColors()
   return m_lineColorsPt;
 }
 
-#ifndef ATLAS_USE_CORE_PROFILE
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DLineRenderer::renderUsingOpengl()
 {
   if (!m_linesPt || m_linesPt->empty())

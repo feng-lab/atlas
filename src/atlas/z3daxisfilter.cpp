@@ -38,8 +38,10 @@ Z3DAxisFilter::Z3DAxisFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_fontRenderer.showFontShadowPara());
   addParameter(m_fontRenderer.fontShadowColorPara());
 
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   m_arrowRenderer.setUseDisplayList(false);
   m_lineRenderer.setUseDisplayList(false);
+#endif
   m_fontRenderer.setFollowCoordTransform(false);
   setupCamera();
 }

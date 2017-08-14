@@ -21,7 +21,9 @@ Z3DConeRenderer::Z3DConeRenderer(Z3DRendererBase& rendererBase)
   , m_dataChanged(false)
   , m_pickingDataChanged(false)
 {
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   setUseDisplayList(true);
+#endif
 
   m_coneCapStyle.addOptionsWithData(qMakePair<QString, QString>("Flat Caps", "FLAT_CAPS"),
     //qMakePair<QString,QString>("Round Caps", "ROUND_CAPS"),
@@ -29,6 +31,8 @@ Z3DConeRenderer::Z3DConeRenderer(Z3DRendererBase& rendererBase)
     //qMakePair<QString,QString>("Round Base Flat Top", "ROUND_BASE_CAP_FLAT_TOP_CAP"),
                                     qMakePair<QString, QString>("Flat Base Round Top", "FLAT_BASE_CAP_ROUND_TOP_CAP"));
   m_coneCapStyle.select("Flat Caps");
+
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   connect(&m_coneCapStyle, &ZStringStringOptionParameter::valueChanged, this,
           &Z3DConeRenderer::invalidateOpenglRenderer);
   connect(&m_coneCapStyle, &ZStringStringOptionParameter::valueChanged, this,
@@ -37,6 +41,7 @@ Z3DConeRenderer::Z3DConeRenderer(Z3DRendererBase& rendererBase)
   connect(&m_cylinderSubdivisionAroundZ, &ZIntParameter::valueChanged, this,
           &Z3DConeRenderer::invalidateOpenglRenderer);
   connect(&m_cylinderSubdivisionAlongZ, &ZIntParameter::valueChanged, this, &Z3DConeRenderer::invalidateOpenglRenderer);
+#endif
 
   QStringList allshaders;
   if (m_useConeShader2) {
@@ -109,8 +114,10 @@ void Z3DConeRenderer::setData(std::vector<glm::vec4>* baseAndBaseRadius, std::ve
     }
   }
 
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
   invalidateOpenglPickingRenderer();
+#endif
   m_dataChanged = true;
   m_pickingDataChanged = true;
 }
@@ -125,7 +132,9 @@ void Z3DConeRenderer::setDataColors(std::vector<glm::vec4>* coneColors)
     for (int k = 0; k < dup; ++k)
       m_coneBaseColors.push_back(color);
   }
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
+#endif
   m_dataChanged = true;
 }
 
@@ -141,7 +150,9 @@ void Z3DConeRenderer::setDataColors(std::vector<glm::vec4>* coneBaseColors, std:
       m_coneTopColors.push_back((*coneTopColors)[i]);
     }
   }
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
+#endif
   m_dataChanged = true;
 }
 
@@ -155,7 +166,9 @@ void Z3DConeRenderer::setDataPickingColors(std::vector<glm::vec4>* conePickingCo
     for (int k = 0; k < dup; ++k)
       m_conePickingColors.push_back(color);
   }
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglPickingRenderer();
+#endif
   m_pickingDataChanged = true;
 }
 
@@ -169,7 +182,7 @@ QString Z3DConeRenderer::generateHeader()
   return QString("#define %1\n").arg(m_coneCapStyle.associatedData());
 }
 
-#ifndef ATLAS_USE_CORE_PROFILE
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DConeRenderer::renderUsingOpengl()
 {
   if (m_baseAndBaseRadius.empty())

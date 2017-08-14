@@ -354,7 +354,7 @@ bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, c
 
 void Z3DView::init()
 {
-  m_globalParas.setCanvas(m_canvas);
+  m_globalParas.setCanvas(*m_canvas);
 
   // filters
   m_compositor.reset(new Z3DCompositor(m_globalParas));

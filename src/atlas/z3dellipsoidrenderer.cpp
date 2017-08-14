@@ -18,10 +18,13 @@ Z3DEllipsoidRenderer::Z3DEllipsoidRenderer(Z3DRendererBase& rendererBase)
   , m_dataChanged(false)
   , m_pickingDataChanged(false)
 {
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   setUseDisplayList(true);
   connect(&m_sphereSlicesStacks, &ZIntParameter::valueChanged, this, &Z3DEllipsoidRenderer::invalidateOpenglRenderer);
-  connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, &Z3DEllipsoidRenderer::compile);
   connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, &Z3DEllipsoidRenderer::invalidateOpenglRenderer);
+#endif
+
+  connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, &Z3DEllipsoidRenderer::compile);
 
   QStringList allshaders;
   allshaders << "ellipsoid.vert" << "ellipsoid_func.frag" << "lighting2.frag";
@@ -95,8 +98,10 @@ void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3>* centers, std::vector<
       m_allFlags[i + 3] = cornerFlags[3];
     }
   }
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
   invalidateOpenglPickingRenderer();
+#endif
   m_dataChanged = true;
   m_pickingDataChanged = true;
 }
@@ -110,7 +115,9 @@ void Z3DEllipsoidRenderer::setDataColors(std::vector<glm::vec4>* ellipsoidColors
     m_ellipsoidColors.push_back(color);
     m_ellipsoidColors.push_back(color);
   }
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
+#endif
   m_dataChanged = true;
 }
 
@@ -125,7 +132,9 @@ void Z3DEllipsoidRenderer::setDataPickingColors(std::vector<glm::vec4>* ellipsoi
     m_ellipsoidPickingColors.push_back(color);
     m_ellipsoidPickingColors.push_back(color);
   }
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglPickingRenderer();
+#endif
   m_pickingDataChanged = true;
 }
 
@@ -143,7 +152,7 @@ QString Z3DEllipsoidRenderer::generateHeader()
   return headerSource;
 }
 
-#ifndef ATLAS_USE_CORE_PROFILE
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DEllipsoidRenderer::renderUsingOpengl()
 {
   if (m_centers.empty())

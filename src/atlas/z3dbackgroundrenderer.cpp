@@ -82,7 +82,7 @@ QString Z3DBackgroundRenderer::generateHeader()
   return headerSource;
 }
 
-#ifndef ATLAS_USE_CORE_PROFILE
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DBackgroundRenderer::renderUsingOpengl()
 {
   glMatrixMode(GL_PROJECTION);

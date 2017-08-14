@@ -36,7 +36,9 @@ Z3DMeshRenderer::Z3DMeshRenderer(Z3DRendererBase& rendererBase)
   connect(&m_wireframeMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DMeshRenderer::adjustWidgets);
   m_wireframeColor.setStyle("COLOR");
 
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   setUseDisplayList(true);
+#endif
 
   QStringList allshaders;
   allshaders << "mesh.vert" << "mesh_func.frag" << "lighting2.frag";
@@ -54,8 +56,10 @@ void Z3DMeshRenderer::setData(std::vector<ZMesh*>* meshInput)
   m_meshPt = meshInput;
   prepareMesh();
 
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
   invalidateOpenglPickingRenderer();
+#endif
   m_dataChanged = true;
   m_pickingDataChanged = true;
 }
@@ -64,14 +68,18 @@ void Z3DMeshRenderer::setDataColors(std::vector<glm::vec4>* meshColorsInput)
 {
   m_origMeshColorsPt = meshColorsInput;
   m_meshColorReady = false;
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
+#endif
   m_dataChanged = true;
 }
 
 void Z3DMeshRenderer::setTexture(Z3DTexture* tex)
 {
   m_texture = tex;
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
+#endif
   m_dataChanged = true;
 }
 
@@ -79,7 +87,9 @@ void Z3DMeshRenderer::setDataPickingColors(std::vector<glm::vec4>* meshPickingCo
 {
   m_origMeshPickingColorsPt = meshPickingColorsInput;
   m_meshPickingColorReady = false;
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglPickingRenderer();
+#endif
   m_pickingDataChanged = true;
 }
 
@@ -180,7 +190,7 @@ void Z3DMeshRenderer::prepareMeshPickingColor()
   }
 }
 
-#ifndef ATLAS_USE_CORE_PROFILE
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DMeshRenderer::renderUsingOpengl()
 {
   if (!m_meshPt || m_meshPt->empty())

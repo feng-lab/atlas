@@ -75,8 +75,10 @@ void Z3DFontRenderer::setData(std::vector<glm::vec3>* positions, const QStringLi
 {
   m_positionsPt = positions;
   m_texts = texts;
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
   invalidateOpenglPickingRenderer();
+#endif
   m_dataChanged = true;
   m_pickingDataChanged = true;
 }
@@ -85,14 +87,18 @@ void Z3DFontRenderer::setDataColors(std::vector<glm::vec4>* colors)
 {
   m_colorsPt = colors;
   m_colors.clear();
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
+#endif
   m_dataChanged = true;
 }
 
 void Z3DFontRenderer::setDataPickingColors(std::vector<glm::vec4>* pickingColors)
 {
   m_pickingColorsPt = pickingColors;
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglPickingRenderer();
+#endif
   m_pickingDataChanged = true;
 }
 
