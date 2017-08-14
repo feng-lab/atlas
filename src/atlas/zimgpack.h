@@ -177,8 +177,7 @@ public:
   virtual const ZImgInfo& imgInfo() const override
   { return m_imgInfo; }
 
-  virtual std::map<size_t, QSize> ratioSizeMap() const override
-  { return m_ratioToSize; };
+  virtual std::set<size_t> ratios() const override;
 
   virtual ZImg slice(size_t z, size_t t, size_t ratio) const override;
 

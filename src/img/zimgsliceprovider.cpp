@@ -10,9 +10,8 @@ ZImg ZImgSliceProvider::allSlices(size_t t, size_t ratio) const
   } else {
     ZImgRegion rgn(0, -1, 0, -1, 0, -1, 0, -1, t, t + 1);
     ZImgInfo info = rgn.clip(imgInfo());
-    auto ratio2Size = ratioSizeMap();
-    info.width = ratio2Size[ratio].width();
-    info.height = ratio2Size[ratio].height();
+    info.width = std::ceil(info.width * 1.0 / ratio);
+    info.height = std::ceil(info.height * 1.0 / ratio);
     res = ZImg(info);
 
     for (size_t z = 0; z < res.depth(); ++z) {

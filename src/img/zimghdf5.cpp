@@ -1,10 +1,99 @@
-#include "ZImgHDF5.h"
+#include "zimghdf5.h"
 
 #include "zioutils.h"
 #include "zimgsliceprovider.h"
 #include "zlog.h"
-#include "ZImgInfoIO.h"
+#include "zimginfoio.h"
 #include <QFile>
+
+namespace {
+
+inline size_t chunkSize()
+{
+  return size_t(512);
+}
+
+void writeImgSliceToH5Grp(H5::Group& zGrp, const H5std_string& name, const nim::ZImg& img)
+{
+  H5::FloatType doubleType(H5::PredType::IEEE_F64LE);
+  H5::FloatType floatType(H5::PredType::IEEE_F32LE);
+  H5::IntType uint64Type(H5::PredType::STD_U64LE);
+  H5::IntType uint32Type(H5::PredType::STD_U32LE);
+  H5::IntType uint16Type(H5::PredType::STD_U16LE);
+  H5::IntType uint8Type(H5::PredType::STD_U8LE);
+  H5::IntType int64Type(H5::PredType::STD_I64LE);
+  H5::IntType int32Type(H5::PredType::STD_I32LE);
+  H5::IntType int16Type(H5::PredType::STD_I16LE);
+  H5::IntType int8Type(H5::PredType::STD_I8LE);
+
+  hsize_t imgDim[2] = {img.width(), img.height()};
+  hsize_t chunkDim[2] = {std::min(img.width(), chunkSize()), std::min(img.height(), chunkSize())};
+  H5::DataSpace imgDataspace(2, imgDim);
+  H5::DSetCreatPropList pList;
+  pList.setDeflate(9);
+  pList.setChunk(2, chunkDim);
+
+  H5::DataSet imgData;
+
+  if (img.voxelFormat() == nim::VoxelFormat::Unsigned) {
+    switch (img.bytesPerVoxel()) {
+      case 1:
+        imgData = zGrp.createDataSet(name, uint8Type, imgDataspace, pList);
+        imgData.write(img.timeData<uint8_t>(0), uint8Type);
+        break;
+      case 2:
+        imgData = zGrp.createDataSet(name, uint16Type, imgDataspace, pList);
+        imgData.write(img.timeData<uint16_t>(0), uint16Type);
+        break;
+      case 4:
+        imgData = zGrp.createDataSet(name, uint32Type, imgDataspace, pList);
+        imgData.write(img.timeData<uint32_t>(0), uint32Type);
+        break;
+      case 8:
+        imgData = zGrp.createDataSet(name, uint64Type, imgDataspace, pList);
+        imgData.write(img.timeData<uint64_t>(0), uint64Type);
+        break;
+      default:
+        break;
+    }
+  } else if (img.voxelFormat() == nim::VoxelFormat::Float) {
+    switch (img.bytesPerVoxel()) {
+      case 4:
+        imgData = zGrp.createDataSet(name, floatType, imgDataspace, pList);
+        imgData.write(img.timeData<float>(0), floatType);
+        break;
+      case 8:
+        imgData = zGrp.createDataSet(name, doubleType, imgDataspace, pList);
+        imgData.write(img.timeData<double>(0), doubleType);
+        break;
+      default:
+        break;
+    }
+  } else if (img.voxelFormat() == nim::VoxelFormat::Signed) {
+    switch (img.bytesPerVoxel()) {
+      case 1:
+        imgData = zGrp.createDataSet(name, int8Type, imgDataspace, pList);
+        imgData.write(img.timeData<int8_t>(0), int8Type);
+        break;
+      case 2:
+        imgData = zGrp.createDataSet(name, int16Type, imgDataspace, pList);
+        imgData.write(img.timeData<int16_t>(0), int16Type);
+        break;
+      case 4:
+        imgData = zGrp.createDataSet(name, int32Type, imgDataspace, pList);
+        imgData.write(img.timeData<int32_t>(0), int32Type);
+        break;
+      case 8:
+        imgData = zGrp.createDataSet(name, int64Type, imgDataspace, pList);
+        imgData.write(img.timeData<int64_t>(0), int64Type);
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+}
 
 namespace nim {
 
@@ -204,38 +293,44 @@ void ZImgHDF5::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
   }
 }
 
-void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, Compression comp)
+void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, Compression)
 {
   try {
     H5::Exception::dontPrint();
 
     H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_TRUNC);
 
-    hsize_t imgDim[2] = {img.width(), img.height()};
-    hsize_t chunkDim[2] = {std::min(img.width(), 512_usize), std::min(img.height(), 512_usize)};
-
-    H5::FloatType doubleType(H5::PredType::IEEE_F64LE);
-    H5::FloatType floatType(H5::PredType::IEEE_F32LE);
     H5::IntType uint64Type(H5::PredType::STD_U64LE);
-    H5::IntType uint32Type(H5::PredType::STD_U32LE);
-    H5::IntType uint16Type(H5::PredType::STD_U16LE);
-    H5::IntType uint8Type(H5::PredType::STD_U8LE);
-    H5::IntType int64Type(H5::PredType::STD_I64LE);
-    H5::IntType int32Type(H5::PredType::STD_I32LE);
-    H5::IntType int16Type(H5::PredType::STD_I16LE);
-    H5::IntType int8Type(H5::PredType::STD_I8LE);
-    H5::StrType strType(0, H5T_VARIABLE);
-
-    H5::DataSpace attrDataSpace(H5S_SCALAR);
 
     H5::Group allGrp = file.createGroup("Img");
 
     ZImgInfoIO::save(allGrp, img.info());
 
-    H5::DataSpace imgDataspace(2, imgDim);
-    H5::DSetCreatPropList pList;
-    pList.setDeflate(9);
-    pList.setChunk(2, chunkDim);
+    uint64_t numLevels = 1;
+    size_t width = img.width();
+    size_t height = img.height();
+    while (width > chunkSize() && height > chunkSize()) {
+      ++numLevels;
+      width = std::ceil(width / 2.0);
+      height = std::ceil(height / 2.0);
+    }
+    std::vector<uint64_t> levels{1};
+    for (uint64_t l = 1; l < numLevels; ++l) {
+      levels.push_back((*levels.rbegin()) * 2);
+    }
+
+    {
+      H5::DataSpace ds(H5S_SCALAR);
+      H5::Attribute attr = allGrp.createAttribute("NumberOfLevels", uint64Type, ds);
+      attr.write(uint64Type, &numLevels);
+    }
+
+    {
+      hsize_t dims[1] = {levels.size()};
+      H5::DataSpace ds(1, dims);
+      H5::Attribute attr = allGrp.createAttribute("Levels", uint64Type, ds);
+      attr.write(uint64Type, levels.data());
+    }
 
     for (size_t t = 0; t < img.numTimes(); ++t) {
       H5::Group timeGrp = allGrp.createGroup(qUtf8Printable(QString("Time%1").arg(t)));
@@ -244,63 +339,14 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, Compression co
         for (size_t z = 0; z < img.depth(); ++z) {
           H5::Group zGrp = channelGrp.createGroup(qUtf8Printable(QString("Z%1").arg(z)));
 
-          H5::DataSet imgData;
+          ZImg tmpImg = img.createView(z, c, t);
+          writeImgSliceToH5Grp(zGrp, "Data", tmpImg);
 
-          if (img.voxelFormat() == VoxelFormat::Unsigned) {
-            switch (img.bytesPerVoxel()) {
-              case 1:
-                imgData = zGrp.createDataSet("Data", uint8Type, imgDataspace, pList);
-                imgData.write(img.planeData<uint8_t>(z, c, t), uint8Type);
-                break;
-              case 2:
-                imgData = zGrp.createDataSet("Data", uint16Type, imgDataspace, pList);
-                imgData.write(img.planeData<uint16_t>(z, c, t), uint16Type);
-                break;
-              case 4:
-                imgData = zGrp.createDataSet("Data", uint32Type, imgDataspace, pList);
-                imgData.write(img.planeData<uint32_t>(z, c, t), uint32Type);
-                break;
-              case 8:
-                imgData = zGrp.createDataSet("Data", uint64Type, imgDataspace, pList);
-                imgData.write(img.planeData<uint64_t>(z, c, t), uint64Type);
-                break;
-              default:
-                break;
-            }
-          } else if (img.voxelFormat() == VoxelFormat::Float) {
-            switch (img.bytesPerVoxel()) {
-              case 4:
-                imgData = zGrp.createDataSet("Data", floatType, imgDataspace, pList);
-                imgData.write(img.planeData<float>(z, c, t), floatType);
-                break;
-              case 8:
-                imgData = zGrp.createDataSet("Data", doubleType, imgDataspace, pList);
-                imgData.write(img.planeData<double>(z, c, t), doubleType);
-                break;
-              default:
-                break;
-            }
-          } else if (img.voxelFormat() == VoxelFormat::Signed) {
-            switch (img.bytesPerVoxel()) {
-              case 1:
-                imgData = zGrp.createDataSet("Data", int8Type, imgDataspace, pList);
-                imgData.write(img.planeData<int8_t>(z, c, t), int8Type);
-                break;
-              case 2:
-                imgData = zGrp.createDataSet("Data", int16Type, imgDataspace, pList);
-                imgData.write(img.planeData<int16_t>(z, c, t), int16Type);
-                break;
-              case 4:
-                imgData = zGrp.createDataSet("Data", int32Type, imgDataspace, pList);
-                imgData.write(img.planeData<int32_t>(z, c, t), int32Type);
-                break;
-              case 8:
-                imgData = zGrp.createDataSet("Data", int64Type, imgDataspace, pList);
-                imgData.write(img.planeData<int64_t>(z, c, t), int64Type);
-                break;
-              default:
-                break;
-            }
+          uint64_t level = 1;
+          while (tmpImg.width() > chunkSize() && tmpImg.height() > chunkSize()) {
+            level *= 2;
+            tmpImg.zoom(0.5, 0.5);
+            writeImgSliceToH5Grp(zGrp, QString("Level%1Data").arg(level).toStdString(), tmpImg);
           }
         }
       }
@@ -312,39 +358,36 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, Compression co
   }
 }
 
-void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp)
+void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression)
 {
   try {
     H5::Exception::dontPrint();
 
     H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_TRUNC);
 
-    hsize_t imgDim[2] = {imgSliceProvider.imgInfo().width,
-                         imgSliceProvider.imgInfo().height};
-    hsize_t chunkDim[2] = {std::min(imgSliceProvider.imgInfo().width, 512_usize),
-                           std::min(imgSliceProvider.imgInfo().height, 512_usize)};
-
-    H5::FloatType doubleType(H5::PredType::IEEE_F64LE);
-    H5::FloatType floatType(H5::PredType::IEEE_F32LE);
     H5::IntType uint64Type(H5::PredType::STD_U64LE);
-    H5::IntType uint32Type(H5::PredType::STD_U32LE);
-    H5::IntType uint16Type(H5::PredType::STD_U16LE);
-    H5::IntType uint8Type(H5::PredType::STD_U8LE);
-    H5::IntType int64Type(H5::PredType::STD_I64LE);
-    H5::IntType int32Type(H5::PredType::STD_I32LE);
-    H5::IntType int16Type(H5::PredType::STD_I16LE);
-    H5::IntType int8Type(H5::PredType::STD_I8LE);
-
-    H5::DataSpace attrDataSpace(H5S_SCALAR);
 
     H5::Group allGrp = file.createGroup("Img");
 
     ZImgInfoIO::save(allGrp, imgSliceProvider.imgInfo());
 
-    H5::DataSpace imgDataspace(2, imgDim);
-    H5::DSetCreatPropList pList;
-    pList.setDeflate(9);
-    pList.setChunk(2, chunkDim);
+    std::vector<uint64_t> levels;
+    auto ratios = imgSliceProvider.ratios();
+    levels.insert(levels.end(), ratios.begin(), ratios.end());
+    uint64_t numLevels = levels.size();
+
+    {
+      H5::DataSpace ds(H5S_SCALAR);
+      H5::Attribute attr = allGrp.createAttribute("NumberOfLevels", uint64Type, ds);
+      attr.write(uint64Type, &numLevels);
+    }
+
+    {
+      hsize_t dims[1] = {levels.size()};
+      H5::DataSpace ds(1, dims);
+      H5::Attribute attr = allGrp.createAttribute("Levels", uint64Type, ds);
+      attr.write(uint64Type, levels.data());
+    }
 
     for (size_t t = 0; t < imgSliceProvider.imgInfo().numTimes; ++t) {
       H5::Group timeGrp = allGrp.createGroup(qUtf8Printable(QString("Time%1").arg(t)));
@@ -353,64 +396,11 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
         for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
           H5::Group zGrp = channelGrp.createGroup(qUtf8Printable(QString("Z%1").arg(z)));
 
-          H5::DataSet imgData;
-          ZImg img = imgSliceProvider.slice(z, t, 1);
+          writeImgSliceToH5Grp(zGrp, "Data", imgSliceProvider.slice(z, t, 1).createView(c, 0));
 
-          if (img.voxelFormat() == VoxelFormat::Unsigned) {
-            switch (img.bytesPerVoxel()) {
-              case 1:
-                imgData = zGrp.createDataSet("Data", uint8Type, imgDataspace, pList);
-                imgData.write(img.channelData<uint8_t>(c), uint8Type);
-                break;
-              case 2:
-                imgData = zGrp.createDataSet("Data", uint16Type, imgDataspace, pList);
-                imgData.write(img.channelData<uint16_t>(c), uint16Type);
-                break;
-              case 4:
-                imgData = zGrp.createDataSet("Data", uint32Type, imgDataspace, pList);
-                imgData.write(img.channelData<uint32_t>(c), uint32Type);
-                break;
-              case 8:
-                imgData = zGrp.createDataSet("Data", uint64Type, imgDataspace, pList);
-                imgData.write(img.channelData<uint64_t>(c), uint64Type);
-                break;
-              default:
-                break;
-            }
-          } else if (img.voxelFormat() == VoxelFormat::Float) {
-            switch (img.bytesPerVoxel()) {
-              case 4:
-                imgData = zGrp.createDataSet("Data", floatType, imgDataspace, pList);
-                imgData.write(img.channelData<float>(c), floatType);
-                break;
-              case 8:
-                imgData = zGrp.createDataSet("Data", doubleType, imgDataspace, pList);
-                imgData.write(img.channelData<double>(c), doubleType);
-                break;
-              default:
-                break;
-            }
-          } else if (img.voxelFormat() == VoxelFormat::Signed) {
-            switch (img.bytesPerVoxel()) {
-              case 1:
-                imgData = zGrp.createDataSet("Data", int8Type, imgDataspace, pList);
-                imgData.write(img.channelData<int8_t>(c), int8Type);
-                break;
-              case 2:
-                imgData = zGrp.createDataSet("Data", int16Type, imgDataspace, pList);
-                imgData.write(img.channelData<int16_t>(c), int16Type);
-                break;
-              case 4:
-                imgData = zGrp.createDataSet("Data", int32Type, imgDataspace, pList);
-                imgData.write(img.channelData<int32_t>(c), int32Type);
-                break;
-              case 8:
-                imgData = zGrp.createDataSet("Data", int64Type, imgDataspace, pList);
-                imgData.write(img.channelData<int64_t>(c), int64Type);
-                break;
-              default:
-                break;
-            }
+          for (size_t lidx = 1; lidx < levels.size(); ++lidx) {
+            writeImgSliceToH5Grp(zGrp, QString("Level%1Data").arg(levels[lidx]).toStdString(),
+                                 imgSliceProvider.slice(z, t, levels[lidx]).createView(c, 0));
           }
         }
       }

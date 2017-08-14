@@ -1,4 +1,4 @@
-#include "ZImgInfoIO.h"
+#include "zimginfoio.h"
 
 #include "zlog.h"
 

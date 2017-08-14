@@ -712,6 +712,15 @@ ZImg& ZImgPack::maxZProjectedImg()
   return m_maximumProjectedAlongZImg;
 }
 
+std::set<size_t> ZImgPack::ratios() const
+{
+  std::set<size_t> res;
+  for (const auto& kv : m_ratioToSize) {
+    res.insert(kv.first);
+  }
+  return res;
+}
+
 ZImg ZImgPack::slice(size_t z, size_t t, size_t ratio) const
 {
   CHECK(m_diskCached);

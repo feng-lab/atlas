@@ -1,7 +1,6 @@
 #pragma once
 
 #include "zimg.h"
-#include <QSize>
 #include <set>
 
 namespace nim {
@@ -13,8 +12,8 @@ public:
   virtual const ZImgInfo& imgInfo() const = 0;
 
   // must have 1
-  virtual std::map<size_t, QSize> ratioSizeMap() const
-  { return std::map<size_t, QSize>{{1, QSize(imgInfo().width, imgInfo().height)}}; }
+  virtual std::set<size_t> ratios() const
+  { return std::set<size_t>{1}; }
 
   virtual ZImg slice(size_t z, size_t t, size_t ratio) const = 0;
 
