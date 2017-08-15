@@ -206,6 +206,27 @@ std::set<size_t> loadRatiosFromH5Grp(const H5::Group& grp)
   return res;
 }
 
+void writeRatiosToGrp(H5::Group& grp, const std::set<size_t>& ratios)
+{
+  H5::IntType uint64Type(H5::PredType::STD_U64LE);
+  std::vector<uint64_t> levels;
+  levels.insert(levels.end(), ratios.begin(), ratios.end());
+  uint64_t numLevels = levels.size();
+
+  {
+    H5::DataSpace ds(H5S_SCALAR);
+    H5::Attribute attr = grp.createAttribute("NumberOfLevels", uint64Type, ds);
+    attr.write(uint64Type, &numLevels);
+  }
+
+  {
+    hsize_t dims[1] = {levels.size()};
+    H5::DataSpace ds(1, dims);
+    H5::Attribute attr = grp.createAttribute("Levels", uint64Type, ds);
+    attr.write(uint64Type, levels.data());
+  }
+}
+
 }
 
 namespace nim {
@@ -450,37 +471,24 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, Compression)
 
     H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_TRUNC);
 
-    H5::IntType uint64Type(H5::PredType::STD_U64LE);
-
     H5::Group allGrp = file.createGroup("Img");
 
     ZImgInfoIO::save(allGrp, img.info());
 
     uint64_t numLevels = 1;
+    std::set<size_t> levels{1};
+    size_t level = 1;
     size_t width = img.width();
     size_t height = img.height();
     while (width > chunkSize() && height > chunkSize()) {
       ++numLevels;
+      level *= 2;
+      levels.insert(level);
       width = std::ceil(width / 2.0);
       height = std::ceil(height / 2.0);
     }
-    std::vector<uint64_t> levels{1};
-    for (uint64_t l = 1; l < numLevels; ++l) {
-      levels.push_back((*levels.rbegin()) * 2);
-    }
 
-    {
-      H5::DataSpace ds(H5S_SCALAR);
-      H5::Attribute attr = allGrp.createAttribute("NumberOfLevels", uint64Type, ds);
-      attr.write(uint64Type, &numLevels);
-    }
-
-    {
-      hsize_t dims[1] = {levels.size()};
-      H5::DataSpace ds(1, dims);
-      H5::Attribute attr = allGrp.createAttribute("Levels", uint64Type, ds);
-      attr.write(uint64Type, levels.data());
-    }
+    writeRatiosToGrp(allGrp, levels);
 
     for (size_t t = 0; t < img.numTimes(); ++t) {
       H5::Group timeGrp = allGrp.createGroup(qUtf8Printable(QString("Time%1").arg(t)));
@@ -492,7 +500,7 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, Compression)
           ZImg tmpImg = img.createView(z, c, t);
           writeImgSliceToH5Grp(zGrp, "Data", tmpImg);
 
-          uint64_t level = 1;
+          level = 1;
           while (tmpImg.width() > chunkSize() && tmpImg.height() > chunkSize()) {
             level *= 2;
             tmpImg.zoom(0.5, 0.5);
@@ -521,23 +529,8 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
 
     ZImgInfoIO::save(allGrp, imgSliceProvider.imgInfo());
 
-    std::vector<uint64_t> levels;
-    auto ratios = imgSliceProvider.ratios();
-    levels.insert(levels.end(), ratios.begin(), ratios.end());
-    uint64_t numLevels = levels.size();
-
-    {
-      H5::DataSpace ds(H5S_SCALAR);
-      H5::Attribute attr = allGrp.createAttribute("NumberOfLevels", uint64Type, ds);
-      attr.write(uint64Type, &numLevels);
-    }
-
-    {
-      hsize_t dims[1] = {levels.size()};
-      H5::DataSpace ds(1, dims);
-      H5::Attribute attr = allGrp.createAttribute("Levels", uint64Type, ds);
-      attr.write(uint64Type, levels.data());
-    }
+    std::set<size_t> levels = imgSliceProvider.ratios();
+    writeRatiosToGrp(allGrp, levels);
 
     for (size_t t = 0; t < imgSliceProvider.imgInfo().numTimes; ++t) {
       H5::Group timeGrp = allGrp.createGroup(qUtf8Printable(QString("Time%1").arg(t)));
@@ -548,9 +541,11 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
 
           writeImgSliceToH5Grp(zGrp, "Data", imgSliceProvider.slice(z, t, 1).createView(c, 0));
 
-          for (size_t lidx = 1; lidx < levels.size(); ++lidx) {
-            writeImgSliceToH5Grp(zGrp, QString("Level%1Data").arg(levels[lidx]).toStdString(),
-                                 imgSliceProvider.slice(z, t, levels[lidx]).createView(c, 0));
+          for (auto level : levels) {
+            if (level == 1)
+              continue;
+            writeImgSliceToH5Grp(zGrp, QString("Level%1Data").arg(level).toStdString(),
+                                 imgSliceProvider.slice(z, t, level).createView(c, 0));
           }
         }
       }
