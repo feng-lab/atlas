@@ -36,11 +36,11 @@ void readH5DataToImg(nim::ZImg& img, const H5::DataSet& data, size_t x_, size_t 
   filespace.getSimpleExtentDims(dims);
   //LOG(INFO) << dims[0] << " " << dims[1] << img.info().toQString().toStdString() << x_ <<" "<< y_;
 
-  if (dims[0] < img.width() + x_ || dims[1] < img.height() + y_)
+  if (dims[1] < img.width() + x_ || dims[0] < img.height() + y_)
     throw nim::ZIOException("wrong slice data dimension");
 
-  hsize_t offset[2] = { x_, y_ };
-  hsize_t count[2] = { img.width(), img.height() };
+  hsize_t offset[2] = { y_, x_ };
+  hsize_t count[2] = { img.height(), img.width() };
   //Define the memory space to read a chunk.
   H5::DataSpace mspace(2, count);
   filespace.selectHyperslab(H5S_SELECT_SET, count, offset);
@@ -106,8 +106,9 @@ void writeImgSliceToH5Grp(H5::Group& zGrp, const H5std_string& name, const nim::
   H5::IntType int16Type(H5::PredType::STD_I16LE);
   H5::IntType int8Type(H5::PredType::STD_I8LE);
 
-  hsize_t imgDim[2] = {img.width(), img.height()};
-  hsize_t chunkDim[2] = {std::min(img.width(), chunkSize()), std::min(img.height(), chunkSize())};
+  hsize_t imgDim[2] = {img.height(), img.width()};
+  hsize_t chunkDim[2] = {std::min(img.height(), chunkSize()),
+                         std::min(img.width(), chunkSize())};
   H5::DataSpace imgDataspace(2, imgDim);
   H5::DSetCreatPropList pList;
   pList.setDeflate(9);
@@ -266,7 +267,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
     H5::H5File file(QFile::encodeName(m_filename).constData(), H5F_ACC_RDONLY);
 
     if (m_tiles.size() == 1) {
-      LOG(INFO) << m_tiles[0] << m_info.toQString();
+      //LOG(INFO) << m_tiles[0] << m_info.toQString();
       H5::DataSet ds = file.openDataSet(m_tiles[0]);
       *res = ZImg(m_info);
       readH5DataToImg(*res, ds, m_x, m_y);
@@ -300,7 +301,7 @@ QString ZImgHDF5::fullName() const
 QStringList ZImgHDF5::extensions() const
 {
   QStringList res;
-  res << "h5";
+  res << "nim" << "h5";
   return res;
 }
 
