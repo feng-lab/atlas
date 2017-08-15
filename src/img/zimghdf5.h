@@ -4,6 +4,23 @@
 
 namespace nim {
 
+class ZImgHDF5SubBlock : public ZImgSubBlock
+{
+public:
+  ZImgHDF5SubBlock(const QString& fileName, const ZImgInfo& info,
+                   size_t ratio_, size_t t_, size_t z_, size_t x_, size_t y_);
+
+  virtual std::shared_ptr<ZImg> read() const override;
+
+protected:
+  QString m_filename;
+  std::vector<std::string> m_tiles;  // cat in Dimension::C
+  ZImgInfo m_info;
+  size_t m_ratio;
+  size_t m_x;
+  size_t m_y;
+};
+
 class ZImgHDF5 : public ZImgFormat
 {
 public:
