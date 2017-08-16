@@ -216,6 +216,16 @@ void convertRawToNim()
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
+    if (fileInfo.baseName().startsWith("Py")) {
+      img.infoRef().channelColors[0] = col4(0, 255, 0);
+      img.infoRef().channelColors[1] = col4(255, 0, 0);
+    } else if (fileInfo.baseName().startsWith("PV")) {
+      img.infoRef().channelColors[0] = col4(0, 0, 255);
+      img.infoRef().channelColors[1] = col4(0, 255, 0);
+      img.infoRef().channelColors[2] = col4(255, 0, 0);
+    } else {
+      CHECK(false);
+    }
     QString outname = fileInfo.absoluteFilePath();
     outname.replace(".raw", ".nim");
     CHECK(outname.endsWith(".nim"));

@@ -720,7 +720,7 @@ void ZStitchImageDialog::selectInputStacks1()
   tmp = QFileDialog::getOpenFileNames(
     this, tr("select all input stacks"),
     ZSystemInfo::instance().lastOpenedImagePath(),
-    tr("Image Files (*.lsm *.tif *.raw)"));
+    tr("Image Files (*.lsm *.czi *.tif *.raw)"));
   if (tmp.count()) {
     ZSystemInfo::instance().setLastOpenedImagePath(tmp[0]);
     try {
@@ -758,7 +758,7 @@ void ZStitchImageDialog::selectInputStacks2()
   tmp = QFileDialog::getOpenFileNames(
     this, tr("select all input stacks"),
     ZSystemInfo::instance().lastOpenedImagePath(),
-    tr("Image Files (*.lsm *.tif *.raw)"));
+    tr("Image Files (*.lsm *.czi *.tif *.raw)"));
   if (tmp.count()) {
     ZSystemInfo::instance().setLastOpenedImagePath(tmp[0]);
     try {
@@ -935,7 +935,7 @@ void ZStitchImageDialog::getConnFromTileImage()
   QString tmpName = QFileDialog::getOpenFileName(this,
                                                  tr("tile selection image file"),
                                                  ZSystemInfo::instance().lastOpenedImagePath(),
-                                                 tr("Tile Select Image (*.lsm *.tif)"));
+                                                 tr("Tile Select Image (*.lsm *.czi *.tif)"));
   if (!tmpName.isEmpty()) {
     ZSystemInfo::instance().setLastOpenedImagePath(tmpName);
     m_tileSelectionImageFilename = tmpName;
@@ -1588,7 +1588,7 @@ void ZStitchImageDialog::selectOutputFile()
   QString outputFileName = QFileDialog::getSaveFileName(this,
                                                         tr("specify output file"),
                                                         ZSystemInfo::instance().lastOpenedImagePath(),
-                                                        tr("Output Image (*.tif *.v3draw)"));
+                                                        tr("Output Image (*.nim *.tif *.v3draw)"));
   if (!outputFileName.isEmpty()) {
     ZSystemInfo::instance().setLastOpenedImagePath(outputFileName);
     m_outputFileEdit->setText(outputFileName);

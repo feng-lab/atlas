@@ -167,6 +167,7 @@ struct Location
 enum class FileFormat
 {
   Unknown = 0,
+  HDF5Img,
   OmeTiff,
   Tiff,
   Vaa3DRaw,
@@ -178,7 +179,6 @@ enum class FileFormat
   MetaImage,
   ZeissCZI,
   ITKImage,
-  HDF5Img,
 };
 
 enum class Compression : std::uint16_t
