@@ -41,6 +41,8 @@ public:
 
   size_t bitsPerSample(size_t sample) const;
 
+  size_t bitsPerSampleFromMaxSampleValue(size_t sample) const;
+
   size_t imageWidth() const;
 
   size_t imageHeight() const;

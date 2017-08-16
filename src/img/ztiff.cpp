@@ -408,6 +408,15 @@ size_t ZTiffIFD::bitsPerSample(size_t sample) const
   return 1;
 }
 
+size_t ZTiffIFD::bitsPerSampleFromMaxSampleValue(size_t sample) const
+{
+  int64_t i = indexOf(TIFFTAG_MAXSAMPLEVALUE);
+  if (i != -1) {
+    return std::ceil(std::log2(m_entries[i].dataAt<uint16_t>(sample)));
+  }
+  return bitsPerSample(sample);
+}
+
 size_t ZTiffIFD::imageWidth() const
 {
   int64_t i = indexOf(TIFFTAG_IMAGEWIDTH);
@@ -861,6 +870,19 @@ void ZTiff::readInfoFromIFD(const ZTiffIFD& ifd, ZImgInfo& info)
       if (ifd.bitsPerSample(j) != bps)
         throw ZIOException("Different bits per sample is not supported.");
     }
+
+    bool bps1valid = true;
+    size_t bps1 = ifd.bitsPerSampleFromMaxSampleValue(0);
+    for (size_t j = 1; j < info.numChannels; ++j) {
+      if (ifd.bitsPerSampleFromMaxSampleValue(j) != bps1) {
+        bps1valid = false;
+        LOG(WARNING) << "Different bits per sample from MaxSampleValue is not supported.";
+      }
+    }
+    if (bps1valid) {
+      info.validBitCount = bps1;
+    }
+
     if (bps > 64 || (bps > 8 && bps % 8 != 0))
       throw ZIOException(QString("%1 bits per sample tiff is not supported.").arg(bps));
 

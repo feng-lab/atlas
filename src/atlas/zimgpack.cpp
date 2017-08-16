@@ -12,6 +12,7 @@
 #include <tbb/parallel_for.h>
 #include <boost/function_output_iterator.hpp>
 #include <cmath>
+#include <zbenchtimer.h>
 
 namespace {
 
@@ -126,11 +127,7 @@ ZImgPack::ZImgPack(ZImg& img, const QString& fileName)
     throw ZIOException("Can not create ImgPack from empty img");
   }
 
-  m_rangeMin = m_imgInfo.dataRangeMin<double>();
-  m_rangeMax = m_imgInfo.dataRangeMax<double>();
-  m_minIntensity = m_rangeMin;
-  m_maxIntensity = m_rangeMax;
-  m_minMaxState = MinMaxState::Partial;
+  m_minMaxState = MinMaxState::Invalid;
 
   //createPyramidalFolder(m_imgSource.filenames[0]);
   buildPyramidal(img);
@@ -166,11 +163,7 @@ ZImgPack::ZImgPack(const QString& fileName, size_t scene, FileFormat format, siz
     sceneSubBlock = &ssb;
   }
 
-  m_rangeMin = m_imgInfo.dataRangeMin<double>();
-  m_rangeMax = m_imgInfo.dataRangeMax<double>();
-  m_minIntensity = m_rangeMin;
-  m_maxIntensity = m_rangeMax;
-  m_minMaxState = MinMaxState::Partial;
+  m_minMaxState = MinMaxState::Invalid;
 
   bool hasPyramidal = false;
   for (size_t i = 0; i < sceneSubBlock->size(); ++i) {
@@ -184,10 +177,11 @@ ZImgPack::ZImgPack(const QString& fileName, size_t scene, FileFormat format, siz
   if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold && !needScale) {
     m_diskCached = false;
     ZImgIO::instance().readImg(m_imgSource, m_img);
-  } else if (m_imgInfo.voxelFormat != VoxelFormat::Float && (hasPyramidal || !needScale)) {
+    m_img.computeMinMax(m_minIntensity, m_maxIntensity);
+    m_minMaxState = MinMaxState::Complete;
+  } else if (hasPyramidal || !needScale) {
     buildFastReadIndex(*sceneSubBlock);
   } else {
-    //buildFastReadIndex(*sceneSubBlock);
     buildPyramidal();
   }
 
@@ -222,11 +216,7 @@ ZImgPack::ZImgPack(const QStringList& files, Dimension catDim, size_t scene, Fil
     sceneSubBlock = &ssb;
   }
 
-  m_rangeMin = m_imgInfo.dataRangeMin<double>();
-  m_rangeMax = m_imgInfo.dataRangeMax<double>();
-  m_minIntensity = m_rangeMin;
-  m_maxIntensity = m_rangeMax;
-  m_minMaxState = MinMaxState::Partial;
+  m_minMaxState = MinMaxState::Invalid;
 
   bool hasPyramidal = false;
   for (size_t i = 0; i < sceneSubBlock->size(); ++i) {
@@ -240,7 +230,9 @@ ZImgPack::ZImgPack(const QStringList& files, Dimension catDim, size_t scene, Fil
   if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold && !needScale) {
     m_diskCached = false;
     ZImgIO::instance().readImg(m_imgSource, m_img);
-  } else if (m_imgInfo.voxelFormat != VoxelFormat::Float && (hasPyramidal || !needScale)) {
+    m_img.computeMinMax(m_minIntensity, m_maxIntensity);
+    m_minMaxState = MinMaxState::Complete;
+  } else if (hasPyramidal || !needScale) {
     buildFastReadIndex(*sceneSubBlock);
   } else {
     buildPyramidal();
@@ -808,8 +800,6 @@ void ZImgPack::createSliceTiles(ZImg* img, size_t z, size_t t, bool mip)
 void ZImgPack::buildPyramidal(ZImg& img)
 {
   img.computeMinMax(m_minIntensity, m_maxIntensity);
-  m_rangeMin = std::min(m_rangeMin, m_minIntensity);
-  m_rangeMax = std::max(m_rangeMax, m_maxIntensity);
   m_minMaxState = MinMaxState::Complete;
 
   if (m_imgInfo.depth == 1) {
@@ -903,8 +893,6 @@ void ZImgPack::buildPyramidal()
     }
   }
 
-  m_rangeMin = std::min(m_rangeMin, m_minIntensity);
-  m_rangeMax = std::max(m_rangeMax, m_maxIntensity);
   m_minMaxState = MinMaxState::Complete;
 
   createTileIndexStructure();
@@ -922,6 +910,45 @@ void ZImgPack::buildFastReadIndex(const std::vector<std::shared_ptr<ZImgSubBlock
   }
 
   createTileIndexStructure();
+
+  //ZBenchTimer bt;
+  //bt.start();
+
+  // get estimation of minmax if image is float or uint8 or uint16 and if validBitCount is not special
+  if (m_imgInfo.voxelFormat == VoxelFormat::Float) {
+    size_t ratio = m_ratioToSize.rbegin()->first;
+
+    double minV;
+    double maxV;
+    m_minIntensity = std::numeric_limits<double>::max();
+    m_maxIntensity = std::numeric_limits<double>::lowest();
+
+    for (size_t t = 0; t < m_imgInfo.numTimes; ++t) {
+      for (size_t z = 0; z < m_imgInfo.depth; ++z) {
+        auto tiit = m_rtzToTileIndice.find(std::make_tuple(ratio, t, int(z)));
+        if (tiit != m_rtzToTileIndice.end()) {
+          const std::vector<size_t>& tileIndice = tiit->second;
+          for (auto idx : tileIndice) {
+            const ZImgSubBlock& tile = *m_allTiles[idx].get();
+            std::shared_ptr<ZImg> imgPtr =
+              ZImgCache::instance().getOrRead(HashKeyType(this, idx), tile);
+            imgPtr->computeMinMax(minV, maxV);
+            m_minIntensity = std::min(m_minIntensity, minV);
+            m_maxIntensity = std::max(m_maxIntensity, maxV);
+          }
+        }
+      }
+    }
+
+    m_minMaxState = ratio == 1 ? MinMaxState::Complete : MinMaxState::Partial;
+  } else {
+    m_minIntensity = m_imgInfo.dataRangeMin();
+    m_maxIntensity = m_imgInfo.dataRangeMax();
+    m_minMaxState = MinMaxState::Partial;
+  }
+
+  //bt.stop();
+  //LOG(INFO) << bt;
 }
 
 void ZImgPack::createTileIndexStructure()
@@ -1057,23 +1084,32 @@ void ZImgPack::updateDerivedData()
   //LOG(INFO) << m_imgInfo.toQString();
   if (!m_diskCached) {
     m_maximumProjectedAlongZImg.clear();
-    m_img.computeMinMax(m_minIntensity, m_maxIntensity);
-    m_minMaxState = MinMaxState::Complete;
-    m_rangeMin = m_img.dataRangeMin<double>();
-    m_rangeMax = m_img.dataRangeMax<double>();
-    //    if (m_imgInfo.voxelByteNumber() == 2 && m_imgInfo.voxelFormat == VoxelFormat::Unsigned && m_maxIntensity < 4096) {
-    //      m_rangeMax = 4095;
-    //    }
-    if (m_imgInfo.voxelFormat == VoxelFormat::Float && (m_maxIntensity > 1.0 || m_minIntensity < 0.0)) {
-      m_rangeMin = m_minIntensity;
-      m_rangeMax = m_maxIntensity;
-    }
     if (m_imgInfo.depth == 1) {
       m_maximumProjectedAlongZImg = m_img.createView();
     }
   } else {
     m_img.clear();
     m_maximumProjectedAlongZImg.clear();
+  }
+
+  CHECK(m_minMaxState != MinMaxState::Invalid);
+  if (m_imgInfo.validBitCount != 12 && m_imgInfo.voxelByteNumber() == 2 &&
+      m_imgInfo.voxelFormat == VoxelFormat::Unsigned && m_maxIntensity < 4096) {
+    m_imgInfo.validBitCount = 12;
+    if (!m_diskCached)
+      m_img.infoRef().validBitCount = 12;
+  }
+  if (m_imgInfo.validBitCount != 1 && m_imgInfo.voxelByteNumber() == 1 &&
+      m_imgInfo.voxelFormat == VoxelFormat::Unsigned && m_maxIntensity < 2) {
+    m_imgInfo.validBitCount = 1;
+    if (!m_diskCached)
+      m_img.infoRef().validBitCount = 1;
+  }
+  m_rangeMin = m_imgInfo.dataRangeMin<double>();
+  m_rangeMax = m_imgInfo.dataRangeMax<double>();
+  if (m_imgInfo.voxelFormat == VoxelFormat::Float && (m_maxIntensity > 1.0 || m_minIntensity < 0.0)) {
+    m_rangeMin = m_minIntensity;
+    m_rangeMax = m_maxIntensity;
   }
 
   m_sizeInfo.clear();

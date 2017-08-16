@@ -212,7 +212,7 @@ void convertRawToNim()
   list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
 //  dir = QDir("/Volumes/lq/image/1201_devCA3_CA1/35143_02");
 //  list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
-  for (int i = 0; i < list.size(); ++i) {
+  for (int i = 26; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
