@@ -228,6 +228,9 @@ ZImgCZISubBlock::ZImgCZISubBlock(const QString& fileName, std::vector<CZITile>& 
     y = m_mixedTilesStart.y;
     width = endx - x;
     height = endy - y;
+    m_scale = 1.0 / ratio;
+    m_width = std::ceil(width * m_scale);
+    m_height = std::ceil(height * m_scale);
   }
 }
 
@@ -241,14 +244,13 @@ std::shared_ptr<ZImg> ZImgCZISubBlock::read() const
     std::ifstream inputFileStream;
     openFileStream(inputFileStream, m_filename, std::ios_base::in | std::ios_base::binary);
     if (m_mixedTiles) {
-      double scale = 1.0 / ratio;
-      *res = ZImg(ZImgInfo(std::ceil(width * scale), std::ceil(height * scale), 1, m_numChannels, 1, m_bytePerVoxel,
+      *res = ZImg(ZImgInfo(m_width, m_height, 1, m_numChannels, 1, m_bytePerVoxel,
                            m_voxelFormat));
       for (const auto& tile : m_tiles) {
         ZImg img = readCZITile(inputFileStream, tile);
         ZVoxelCoordinate tileStart = tile.start - m_mixedTilesStart;
-        tileStart.x *= scale;
-        tileStart.y *= scale;
+        tileStart.x = std::round(tileStart.x * m_scale);
+        tileStart.y = std::round(tileStart.y * m_scale);
         res->pasteImg(img, tileStart);
       }
     } else {

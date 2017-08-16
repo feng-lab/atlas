@@ -198,6 +198,31 @@ void extractNeuronChannel()
   }
 }
 
+void convertRawToNim()
+{
+//  QDir dir("/Volumes/lq/image/mCA3_CA1_raw");
+//  QString outFolder("/Volumes/Jinny/");
+  QDir dir("/Volumes/PVPY/Py");
+  QStringList filters;
+  filters << "*.raw";
+  QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+  dir = QDir("/Volumes/PVPY/contra");
+  list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
+  dir = QDir("/Volumes/PVPY/ipsi");
+  list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
+//  dir = QDir("/Volumes/lq/image/1201_devCA3_CA1/35143_02");
+//  list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
+  for (int i = 0; i < list.size(); ++i) {
+    QFileInfo fileInfo = list.at(i);
+    LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
+    ZImg img(fileInfo.absoluteFilePath());
+    QString outname = fileInfo.absoluteFilePath();
+    outname.replace(".raw", ".nim");
+    CHECK(outname.endsWith(".nim"));
+    img.save(outname);
+  }
+}
+
 void removeChannel()
 {
   ZImg img("/Volumes/PVPY/Py/Py0515_s15_1_1.raw", ZImgRegion(0, -1, 0, -1, 0, -1, 0, 2));
@@ -1021,7 +1046,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  //fixImg();
+  convertRawToNim();
   LOG(INFO) << "done";
 }
 

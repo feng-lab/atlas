@@ -111,7 +111,7 @@ void writeImgSliceToH5Grp(H5::Group& zGrp, const H5std_string& name, const nim::
                          std::min(img.width(), chunkSize())};
   H5::DataSpace imgDataspace(2, imgDim);
   H5::DSetCreatPropList pList;
-  pList.setDeflate(9);
+  pList.setDeflate(6);
   pList.setChunk(2, chunkDim);
 
   H5::DataSet imgData;
@@ -181,12 +181,12 @@ std::set<size_t> loadRatiosFromH5Grp(const H5::Group& grp)
   std::vector<uint64_t> levels;
 
   {
-    H5::Attribute attr = grp.openAttribute("NumberOfLevels");
+    H5::Attribute attr = grp.openAttribute("NumberOfResolutionLevels");
     attr.read(uint64Type, &numLevels);
   }
 
   {
-    H5::Attribute attr = grp.openAttribute("Levels");
+    H5::Attribute attr = grp.openAttribute("DownsamplingFactors");
     if (attr.getSpace().getSimpleExtentNdims() != 1) {
       throw nim::ZIOException("wrong levels dimension number");
     }
@@ -216,14 +216,14 @@ void writeRatiosToGrp(H5::Group& grp, const std::set<size_t>& ratios)
 
   {
     H5::DataSpace ds(H5S_SCALAR);
-    H5::Attribute attr = grp.createAttribute("NumberOfLevels", uint64Type, ds);
+    H5::Attribute attr = grp.createAttribute("NumberOfResolutionLevels", uint64Type, ds);
     attr.write(uint64Type, &numLevels);
   }
 
   {
     hsize_t dims[1] = {levels.size()};
     H5::DataSpace ds(1, dims);
-    H5::Attribute attr = grp.createAttribute("Levels", uint64Type, ds);
+    H5::Attribute attr = grp.createAttribute("DownsamplingFactors", uint64Type, ds);
     attr.write(uint64Type, levels.data());
   }
 }
@@ -243,10 +243,10 @@ ZImgHDF5SubBlock::ZImgHDF5SubBlock(const QString& fileName, const ZImgInfo& info
 {
   for (size_t c = 0; c < info.numChannels; ++c) {
     if (m_ratio == 1) {
-      m_tiles.push_back(QString("/Img/Time%1/Channel%2/Z%3/Data").arg(t_).arg(c).arg(z_).toStdString());
+      m_tiles.push_back(QString("/Img/TimePoint%1/Channel%2/Z%3/Data").arg(t_).arg(c).arg(z_).toStdString());
     } else {
       m_tiles.push_back(
-        QString("/Img/Time%1/Channel%2/Z%3/Level%4Data").arg(t_).arg(c).arg(z_).arg(ratio).toStdString());
+        QString("/Img/TimePoint%1/Channel%2/Z%3/DownsampledBy%4Data").arg(t_).arg(c).arg(z_).arg(ratio).toStdString());
     }
   }
 }
@@ -260,7 +260,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
     if (m_tiles.empty()) {
       throw ZIOException("empty hdf5 sub block");
     }
-    auto res = std::make_shared<ZImg>();
+    auto res = std::make_shared<ZImg>(m_info);
 
     H5::Exception::dontPrint();
 
@@ -272,13 +272,11 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
       *res = ZImg(m_info);
       readH5DataToImg(*res, ds, m_x, m_y);
     } else {
-      std::vector<ZImg> imgs(m_tiles.size());
       for (size_t i = 0; i < m_tiles.size(); ++i) {
         H5::DataSet ds = file.openDataSet(m_tiles[i]);
-        imgs[i] = ZImg(m_info);
-        readH5DataToImg(imgs[i], ds, m_x, m_y);
+        ZImg img = res->createView(i, 0);
+        readH5DataToImg(img, ds, m_x, m_y);
       }
-      *res = ZImg::cat(imgs, Dimension::C);
     }
 
     return res;
@@ -327,7 +325,7 @@ void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
       subBlocks->resize(infos.size());
       auto& subBlock = subBlocks->at(0);
       if (!infos[0].isEmpty()) {
-        H5::DataSet ds = allGrp.openDataSet("Time0/Channel0/Z0/Data");
+        H5::DataSet ds = allGrp.openDataSet("TimePoint0/Channel0/Z0/Data");
         H5::DSetCreatPropList pList = ds.getCreatePlist();
         hsize_t chunk_dims[2];
         int rank_chunk = pList.getChunk(2, chunk_dims);
@@ -428,13 +426,13 @@ void ZImgHDF5::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
     img = ZImg(resInfo);
 
     std::string datasetName =
-      readRatio == 1 ? std::string("Data") : QString("Level%1Data").arg(readRatio).toStdString();
+      readRatio == 1 ? std::string("Data") : QString("DownsampledBy%1Data").arg(readRatio).toStdString();
 
     for (size_t t = 0; t < info.numTimes; ++t) {
       if (!rgn.tInRegion(t)) {
         continue;
       }
-      H5::Group timeGrp = allGrp.openGroup(qUtf8Printable(QString("Time%1").arg(t)));
+      H5::Group timeGrp = allGrp.openGroup(qUtf8Printable(QString("TimePoint%1").arg(t)));
       for (size_t c = 0; c < info.numChannels; ++c) {
         if (!rgn.cInRegion(c)) {
           continue;
@@ -481,7 +479,7 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, Compression)
     size_t level = 1;
     size_t width = img.width();
     size_t height = img.height();
-    while (width > chunkSize() && height > chunkSize()) {
+    while (width > chunkSize() || height > chunkSize()) {
       ++numLevels;
       level *= 2;
       levels.insert(level);
@@ -492,7 +490,7 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, Compression)
     writeRatiosToGrp(allGrp, levels);
 
     for (size_t t = 0; t < img.numTimes(); ++t) {
-      H5::Group timeGrp = allGrp.createGroup(qUtf8Printable(QString("Time%1").arg(t)));
+      H5::Group timeGrp = allGrp.createGroup(qUtf8Printable(QString("TimePoint%1").arg(t)));
       for (size_t c = 0; c < img.numChannels(); ++c) {
         H5::Group channelGrp = timeGrp.createGroup(qUtf8Printable(QString("Channel%1").arg(c)));
         for (size_t z = 0; z < img.depth(); ++z) {
@@ -502,10 +500,10 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, Compression)
           writeImgSliceToH5Grp(zGrp, "Data", tmpImg);
 
           level = 1;
-          while (tmpImg.width() > chunkSize() && tmpImg.height() > chunkSize()) {
+          while (tmpImg.width() > chunkSize() || tmpImg.height() > chunkSize()) {
             level *= 2;
             tmpImg.zoom(0.5, 0.5);
-            writeImgSliceToH5Grp(zGrp, QString("Level%1Data").arg(level).toStdString(), tmpImg);
+            writeImgSliceToH5Grp(zGrp, QString("DownsampledBy%1Data").arg(level).toStdString(), tmpImg);
           }
         }
       }
@@ -534,7 +532,7 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
     writeRatiosToGrp(allGrp, levels);
 
     for (size_t t = 0; t < imgSliceProvider.imgInfo().numTimes; ++t) {
-      H5::Group timeGrp = allGrp.createGroup(qUtf8Printable(QString("Time%1").arg(t)));
+      H5::Group timeGrp = allGrp.createGroup(qUtf8Printable(QString("TimePoint%1").arg(t)));
       for (size_t c = 0; c < imgSliceProvider.imgInfo().numChannels; ++c) {
         H5::Group channelGrp = timeGrp.createGroup(qUtf8Printable(QString("Channel%1").arg(c)));
         for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
@@ -545,7 +543,7 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
           for (auto level : levels) {
             if (level == 1)
               continue;
-            writeImgSliceToH5Grp(zGrp, QString("Level%1Data").arg(level).toStdString(),
+            writeImgSliceToH5Grp(zGrp, QString("DownsampledBy%1Data").arg(level).toStdString(),
                                  imgSliceProvider.slice(z, t, level).createView(c, 0));
           }
         }

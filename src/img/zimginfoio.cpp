@@ -26,7 +26,7 @@ ZImgInfo ZImgInfoIO::load(const H5::Group& grp)
     verattr.read(int32Type, &ver);
 
     {
-      H5::Attribute attr = grp.openAttribute("NumberOfTimes");
+      H5::Attribute attr = grp.openAttribute("NumberOfTimePoints");
       uint64_t v;
       attr.read(uint64Type, &v);
       info.numTimes = v;
@@ -221,7 +221,7 @@ void ZImgInfoIO::save(H5::Group& grp, const ZImgInfo& info)
     ver.write(int32Type, &h5ImagVer);
 
     uint64_t nt = info.numTimes;
-    H5::Attribute numTimesAttr = grp.createAttribute("NumberOfTimes", uint64Type, attrDataSpace);
+    H5::Attribute numTimesAttr = grp.createAttribute("NumberOfTimePoints", uint64Type, attrDataSpace);
     numTimesAttr.write(uint64Type, &nt);
 
     uint64_t nc = info.numChannels;

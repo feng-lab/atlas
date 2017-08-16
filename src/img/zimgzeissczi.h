@@ -212,6 +212,9 @@ protected:
   size_t m_numChannels;
   size_t m_bytePerVoxel;
   VoxelFormat m_voxelFormat;
+  double m_scale = 0.0;
+  size_t m_width = 0;
+  size_t m_height = 0;
 };
 
 class ZImgZeissCZI : public ZImgFormat
