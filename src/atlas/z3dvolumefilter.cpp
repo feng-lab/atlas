@@ -153,8 +153,7 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
 
   m_leftMouseButtonPressEvent.listenTo("trace", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonPress);
   m_leftMouseButtonPressEvent.listenTo("trace", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonRelease);
-  connect(&m_leftMouseButtonPressEvent, SIGNAL(mouseEventTriggered(QMouseEvent * , int, int)),
-          this, SLOT(leftMouseButtonPressed(QMouseEvent * , int, int)));
+  connect(&m_leftMouseButtonPressEvent, &ZEventListenerParameter::mouseEventTriggered, this, &Z3DVolumeFilter::leftMouseButtonPressed);
   addEventListener(m_leftMouseButtonPressEvent);
 
   m_volumeRaycasterRenderer.setLayerTarget(&m_layerTarget);

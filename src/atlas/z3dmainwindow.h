@@ -84,6 +84,8 @@ private:
 
   void createDockWindows();
 
+  void fillDockWindows();
+
   void readSettings();
 
   void writeSettings();

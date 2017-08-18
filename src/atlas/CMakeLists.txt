@@ -642,7 +642,9 @@ set(SOURCES
     z3dvolumefilter.cpp
     z3dvolumefilter.h
     z3dvolumeraycasterrenderer.cpp
-    z3dvolumeraycasterrenderer.h)
+    z3dvolumeraycasterrenderer.h
+    zopenglwidget.cpp
+    zopenglwidget.h)
 
 # our target
 set(APP_NAME Atlas)

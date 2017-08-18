@@ -66,7 +66,7 @@ protected:
     if (it == m_idToFilter.end())
       return;
     FilterType* viewControl = it->second.get();
-    canvas().removeEventListener(viewControl);
+    canvas().removeEventListener(*viewControl);
     m_view.canvas().getGLFocus();
     m_idToFilter.erase(it);
     networkEvaluator().updateNetwork();
@@ -78,7 +78,7 @@ protected:
     if (m_idToFilter.empty())
       return;
     for (const auto& idFilter : m_idToFilter) {
-      canvas().removeEventListener(idFilter.second.get());
+      canvas().removeEventListener(*idFilter.second);
     }
     m_idToFilter.clear();
     networkEvaluator().updateNetwork();

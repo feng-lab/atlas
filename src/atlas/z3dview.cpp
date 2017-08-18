@@ -88,15 +88,16 @@ Z3DView::Z3DView(ZDoc* doc, bool stereo, Z3DMainWindow* parent)
   , m_lock(false)
 {
   CHECK(m_doc);
-  m_canvas = new Z3DCanvas("", 512, 512);
-  init();
+  m_canvas = new Z3DCanvas("", 512, 512, m_mainWin);
 
   createActions();
+
+  connect(m_canvas, &Z3DCanvas::openGLContextInitialized, this, &Z3DView::init);
 }
 
 Z3DView::~Z3DView()
 {
-  m_canvas->setNetworkEvaluator(nullptr);
+  m_canvas->getGLFocus();
 }
 
 std::shared_ptr<ZWidgetsGroup> Z3DView::viewSettingWidgetsGroupOf(size_t id)
@@ -106,7 +107,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DView::viewSettingWidgetsGroupOf(size_t id)
   } else if (id == 2) {
     return m_compositor->axisWidgetsGroup();
   } else if (id == 3) {
-    return m_globalParas.widgetsGroup(false);
+    return m_globalParas->widgetsGroup(false);
   } else {
     for (int i = 0; i < m_3dObjViews.size(); ++i) {
       std::shared_ptr<ZWidgetsGroup> wg = m_3dObjViews[i]->viewSettingWidgetsGroupOf(id);
@@ -119,7 +120,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DView::viewSettingWidgetsGroupOf(size_t id)
 
 QWidget* Z3DView::globalParasWidget()
 {
-  return m_globalParas.widgetsGroup(true)->createWidget(false);
+  return m_globalParas->widgetsGroup(true)->createWidget(false);
 }
 
 QWidget* Z3DView::captureWidget()
@@ -136,6 +137,7 @@ QWidget* Z3DView::captureWidget()
   connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeSeriesFixedSize3DScreenShot,
           this, &Z3DView::takeFixedSizeSeriesScreenShot);
   res->setWidget(m_screenShotWidget);
+
   return res;
 }
 
@@ -158,9 +160,9 @@ void Z3DView::updateBoundBox()
   if (m_boundBox.empty()) {
     // nothing visible
     m_boundBox.setMinCorner(glm::dvec3(0.0));
-    m_boundBox.setMaxCorner(glm::dvec3(1.0));
+    m_boundBox.setMaxCorner(glm::dvec3(.01));
   }
-  m_boundBox.setMaxCorner(glm::max(m_boundBox.maxCorner(), m_boundBox.minCorner() + 1.0));
+  m_boundBox.setMaxCorner(glm::max(m_boundBox.maxCorner(), m_boundBox.minCorner() + .01));
   if (m_numObjsBefore == 0 && m_doc->numObjs() > 0) {
     resetCamera();
   } else {
@@ -202,7 +204,7 @@ void Z3DView::read(const QJsonObject& json)
     m_compositor->read(json.value("Compositor").toObject());
   }
   if (json.contains("Global") && json.value("Global").isObject()) {
-    m_globalParas.read(json.value("Global").toObject());
+    m_globalParas->read(json.value("Global").toObject());
   }
 }
 
@@ -213,7 +215,7 @@ void Z3DView::write(QJsonObject& json) const
   json.insert("Compositor", compObj);
 
   QJsonObject globObj;
-  m_globalParas.write(globObj);
+  m_globalParas->write(globObj);
   json.insert("Global", globObj);
 }
 
@@ -232,6 +234,11 @@ void Z3DView::zoomOut()
 void Z3DView::resetCamera()
 {
   camera().resetCamera(m_boundBox, Z3DCamera::ResetOption::ResetAll);
+}
+
+void Z3DView::resetCameraCenter()
+{
+  camera().resetCamera(m_boundBox, Z3DCamera::ResetOption::PreserveViewVector);
 }
 
 void Z3DView::resetCameraClippingRange()
@@ -276,6 +283,39 @@ bool Z3DView::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
     QMessageBox::critical(m_mainWin, qApp->applicationName(), m_canvasPainter->renderToImageError());
   }
   return res;
+}
+
+void Z3DView::gotoPosition(double x, double y, double z, double radius)
+{
+  ZBBox<glm::dvec3> bound(glm::dvec3(x, y, z) - radius, glm::dvec3(x, y, z) + radius);
+  camera().resetCamera(bound, Z3DCamera::ResetOption::ResetAll);
+}
+
+void Z3DView::gotoPosition(const ZBBox<glm::dvec3>& bound, double minRadius)
+{
+  glm::dvec3 cent = (bound.minCorner() + bound.maxCorner()) / 2.;
+  auto bd = bound;
+  bd.expand(ZBBox<glm::dvec3>(cent - minRadius, cent + minRadius));
+  camera().resetCamera(bd, Z3DCamera::ResetOption::PreserveViewVector);
+}
+
+void Z3DView::flipView()
+{
+  camera().flipViewDirection();
+}
+
+void Z3DView::setXZView()
+{
+  resetCamera();
+  camera().rotate90X();
+  resetCameraClippingRange();
+}
+
+void Z3DView::setYZView()
+{
+  resetCamera();
+  camera().rotate90XZ();
+  resetCameraClippingRange();
 }
 
 bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
@@ -354,29 +394,20 @@ bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, c
 
 void Z3DView::init()
 {
-  m_globalParas.setCanvas(*m_canvas);
+  m_canvas->getGLFocus();
+  m_globalParas.reset(new Z3DGlobalParameters(*m_canvas));
 
   // filters
-  m_compositor.reset(new Z3DCompositor(m_globalParas));
+  m_canvasPainter.reset(new Z3DCanvasPainter(*m_globalParas, *m_canvas));
 
-  m_canvasPainter.reset(new Z3DCanvasPainter(m_globalParas));
-  m_canvasPainter->setCanvas(m_canvas);
-
-  m_canvas->addEventListenerToBack(m_compositor.get());  // for interaction
-
+  m_compositor.reset(new Z3DCompositor(*m_globalParas));
   m_compositor->outputPort("Image")->connect(m_canvasPainter->inputPort("Image"));
   m_compositor->outputPort("LeftEyeImage")->connect(m_canvasPainter->inputPort("LeftEyeImage"));
   m_compositor->outputPort("RightEyeImage")->connect(m_canvasPainter->inputPort("RightEyeImage"));
+  m_canvas->addEventListenerToBack(*m_compositor);
 
-  // connection: canvas <-----> networkevaluator <-----> canvasrender
-  m_networkEvaluator.reset(new Z3DNetworkEvaluator());
-  m_canvas->setNetworkEvaluator(m_networkEvaluator.get());
-
-  // pass the canvasrender to the network evaluator
-  m_networkEvaluator->setNetworkSink(m_canvasPainter.get());
-
-  // initializes all connected filters
-  m_networkEvaluator->initializeNetwork();
+  // build network and connect to canvas
+  m_networkEvaluator.reset(new Z3DNetworkEvaluator(*m_canvasPainter));
 
   //packages
   for (auto objDoc : m_doc->objDocs()) {
@@ -413,6 +444,8 @@ void Z3DView::init()
   resetCamera();
 
   connect(&camera(), &Z3DCameraParameter::valueChanged, this, &Z3DView::resetCameraClippingRange);
+
+  emit networkConstructed();
 }
 
 void Z3DView::createActions()

@@ -1,5 +1,6 @@
 #pragma once
 
+class QOpenGLContext;
 class QOpenGLContextGroup;
 
 namespace nim {
@@ -19,8 +20,29 @@ public:
 
   bool operator!=(const Z3DContext& rhs) const;
 
+  static void logCurrentContext();
+
 private:
-  QOpenGLContextGroup* m_context;
+  QOpenGLContext* m_context;
+};
+
+class Z3DContextGroup
+{
+public:
+  Z3DContextGroup();
+
+  Z3DContextGroup(const Z3DContextGroup&) = default;
+
+  Z3DContextGroup& operator=(const Z3DContextGroup&) = default;
+
+  bool operator<(const Z3DContextGroup& rhs) const;
+
+  bool operator==(const Z3DContextGroup& rhs) const;
+
+  bool operator!=(const Z3DContextGroup& rhs) const;
+
+private:
+  QOpenGLContextGroup* m_contextGroup;
 };
 
 } // namespace nim

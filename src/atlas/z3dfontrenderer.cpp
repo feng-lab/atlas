@@ -68,7 +68,6 @@ Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase& rendererBase)
       m_allFonts.emplace_back(std::move(sdFont));
     }
   }
-  CHECK_GL_ERROR
 }
 
 void Z3DFontRenderer::setData(std::vector<glm::vec3>* positions, const QStringList& texts)

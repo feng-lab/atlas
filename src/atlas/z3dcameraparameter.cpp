@@ -134,6 +134,18 @@ void Z3DCameraParameter::flipViewDirection()
   setEye(referenceCenter - viewVector);
 }
 
+void Z3DCameraParameter::rotate90X()
+{
+//  azimuth(glm::radians(90.f));
+  rotate(glm::radians(90.f), glm::vec3(1, 0, 0));
+}
+
+void Z3DCameraParameter::rotate90XZ()
+{
+  rotate(glm::radians(90.f), glm::vec3(1, 0, 0));
+  rotate(glm::radians(90.f), glm::vec3(0, 0, 1));
+}
+
 void Z3DCameraParameter::viewportChanged(const glm::uvec2& viewport)
 {
   m_value.setWindowAspectRatio(static_cast<float>(viewport.x) / viewport.y);

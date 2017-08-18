@@ -25,7 +25,7 @@ void Z3DMeshView::docMeshesAdded(const QList<size_t>& objs)
       connect(viewControl, &Z3DMeshFilter::objDeselected, this, &Z3DMeshView::onObjDeselectedFromView);
       connect(viewControl, &Z3DMeshFilter::objSelected, this, &Z3DMeshView::onObjSelectedFromView);
       connect(viewControl, &Z3DMeshFilter::objVisibleChanged, this, &Z3DMeshView::onObjVisibleChangedFromView);
-      canvas().addEventListenerToBack(viewControl);
+      canvas().addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
       networkEvaluator().updateNetwork();
@@ -56,7 +56,7 @@ void Z3DMeshView::docMeshAdded(size_t id)
     connect(viewControl, &Z3DMeshFilter::objDeselected, this, &Z3DMeshView::onObjDeselectedFromView);
     connect(viewControl, &Z3DMeshFilter::objSelected, this, &Z3DMeshView::onObjSelectedFromView);
     connect(viewControl, &Z3DMeshFilter::objVisibleChanged, this, &Z3DMeshView::onObjVisibleChangedFromView);
-    canvas().addEventListenerToBack(viewControl);
+    canvas().addEventListenerToBack(*viewControl);
 
     networkEvaluator().updateNetwork();
     m_view.updateBoundBox();

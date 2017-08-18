@@ -15,10 +15,10 @@
 
 namespace nim {
 
-Z3DCanvasPainter::Z3DCanvasPainter(Z3DGlobalParameters& globalParas, QObject* parent)
+Z3DCanvasPainter::Z3DCanvasPainter(Z3DGlobalParameters& globalParas, Z3DCanvas& canvas, QObject* parent)
   : Z3DBoundedFilter(globalParas, parent)
   , m_textureCopyRenderer(m_rendererBase, Z3DTextureCopyRenderer::OutputColorOption::DivideByAlpha)
-  , m_canvas(nullptr)
+  , m_canvas(canvas)
   , m_inport("Image", false, this, State::MonoViewResultInvalid)
   , m_leftEyeInport("LeftEyeImage", false, this, State::LeftEyeResultInvalid)
   , m_rightEyeInport("RightEyeImage", false, this, State::RightEyeResultInvalid)
@@ -27,18 +27,14 @@ Z3DCanvasPainter::Z3DCanvasPainter(Z3DGlobalParameters& globalParas, QObject* pa
   addPort(m_inport);
   addPort(m_leftEyeInport);
   addPort(m_rightEyeInport);
-}
 
-Z3DCanvasPainter::~Z3DCanvasPainter()
-{
-  setCanvas(nullptr);
+  setOutputSize(m_canvas.physicalSize());
+  emit requestUpstreamSizeChange(this);
+  connect(&m_canvas, &Z3DCanvas::canvasSizeChanged, this, &Z3DCanvasPainter::onCanvasResized);
 }
 
 void Z3DCanvasPainter::process(Z3DEye eye)
 {
-  if (!m_canvas)
-    return;
-
   Z3DRenderInputPort& currentInport = (eye == Z3DEye::Mono) ?
                                       m_inport : (eye == Z3DEye::Left) ? m_leftEyeInport : m_rightEyeInport;
 
@@ -51,8 +47,7 @@ void Z3DCanvasPainter::process(Z3DEye eye)
   }
 
   // render to screen
-  m_canvas->getGLFocus();
-  glViewport(0, 0, m_canvas->physicalSize().x, m_canvas->physicalSize().y);
+  glViewport(0, 0, m_canvas.physicalSize().x, m_canvas.physicalSize().y);
   if (eye == Z3DEye::Left) {
     glDrawBuffer(GL_BACK_LEFT);
   } else if (eye == Z3DEye::Right) {
@@ -60,14 +55,12 @@ void Z3DCanvasPainter::process(Z3DEye eye)
   }
 
   if (currentInport.isReady()) {
-    m_rendererBase.setViewport(m_canvas->physicalSize());
+    m_rendererBase.setViewport(m_canvas.physicalSize());
     m_textureCopyRenderer.setColorTexture(currentInport.colorTexture());
     m_textureCopyRenderer.setDepthTexture(currentInport.depthTexture());
     m_rendererBase.render(eye, m_textureCopyRenderer);
-    CHECK_GL_ERROR
   } else {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    CHECK_GL_ERROR
   }
 }
 
@@ -83,7 +76,7 @@ bool Z3DCanvasPainter::isValid(Z3DEye /*eye*/) const
 
 void Z3DCanvasPainter::updateSize()
 {
-  setOutputSize(m_canvas->physicalSize());
+  setOutputSize(m_canvas.physicalSize());
   emit requestUpstreamSizeChange(this);
 }
 
@@ -98,44 +91,14 @@ void Z3DCanvasPainter::invalidate(State inv)
   if (!m_locked) {
     m_locked = true;
     m_state |= inv;
-    if (m_canvas) {
-      m_canvas->updateAll();
-    }
+    m_canvas.updateAll();
     m_locked = false;
   }
 }
 
-void Z3DCanvasPainter::setCanvas(Z3DCanvas* canvas)
-{
-  if (canvas == m_canvas)
-    return;
-  if (m_canvas)
-    m_canvas->disconnect(this);
-
-  m_canvas = canvas;
-  //register at new canvas:
-  if (m_canvas) {
-    setOutputSize(m_canvas->physicalSize());
-    emit requestUpstreamSizeChange(this);
-    connect(m_canvas, &Z3DCanvas::canvasSizeChanged, this, &Z3DCanvasPainter::onCanvasResized);
-  }
-
-  invalidate();
-}
-
-Z3DCanvas* Z3DCanvasPainter::canvas() const
-{
-  return m_canvas;
-}
-
 bool Z3DCanvasPainter::renderToImage(const QString& filename, Z3DScreenShotType sst)
 {
-  if (!m_canvas) {
-    LOG(WARNING) << "no canvas assigned";
-    m_renderToImageError = "No canvas assigned";
-    return false;
-  }
-  if (m_canvas->format().stereo() && sst == Z3DScreenShotType::MonoView) {
+  if (m_canvas.format().stereo() && sst == Z3DScreenShotType::MonoView) {
     LOG(FATAL) << "impossible configuration";
     return false;
   }
@@ -148,10 +111,10 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, Z3DScreenShotType 
   m_tiledRendering = false;
 
   // force rendering pass
-  if (!m_canvas->format().stereo() && sst != Z3DScreenShotType::MonoView) {
-    m_canvas->setFakeStereoOnce();
+  if (!m_canvas.format().stereo() && sst != Z3DScreenShotType::MonoView) {
+    m_canvas.setFakeStereoOnce();
   }
-  m_canvas->forceUpdate();
+  m_canvas.forceUpdate();
 
   // save Image
   if (m_renderToImageError.isEmpty()) {
@@ -188,7 +151,7 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, Z3DScreenShotType 
   m_leftImg.clear();
   m_rightImg.clear();
 
-  m_canvas->forceUpdate();
+  m_canvas.forceUpdate();
 
   return (m_renderToImageError.isEmpty());
 }
@@ -196,12 +159,7 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, Z3DScreenShotType 
 bool Z3DCanvasPainter::renderToImage(const QString& filename, int width, int height, Z3DScreenShotType sst,
                                      Z3DCompositor& compositor)
 {
-  if (!m_canvas) {
-    LOG(WARNING) << "no canvas assigned";
-    m_renderToImageError = "No canvas assigned";
-    return false;
-  }
-  if (m_canvas->format().stereo() && sst == Z3DScreenShotType::MonoView) {
+  if (m_canvas.format().stereo() && sst == Z3DScreenShotType::MonoView) {
     LOG(FATAL) << "impossible configuration";
     return false;
   }
@@ -225,19 +183,17 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, int width, int hei
 
   if (width <= tileSize && height <= tileSize) {
     // resize texture container to desired image dimensions and propagate change
-    m_canvas->getGLFocus();
     setOutputSize(glm::uvec2(width, height));
     emit requestUpstreamSizeChange(this);
 
     m_tiledRendering = false;
 
     // force rendering pass
-    if (!m_canvas->format().stereo() && sst != Z3DScreenShotType::MonoView) {
-      m_canvas->setFakeStereoOnce();
+    if (!m_canvas.format().stereo() && sst != Z3DScreenShotType::MonoView) {
+      m_canvas.setFakeStereoOnce();
     }
-    m_canvas->forceUpdate();
+    m_canvas.forceUpdate();
   } else {
-    m_canvas->getGLFocus();
     m_inport.setExpectedSize(glm::uvec2(tileSize, tileSize));
     m_leftEyeInport.setExpectedSize(glm::uvec2(tileSize, tileSize));
     m_rightEyeInport.setExpectedSize(glm::uvec2(tileSize, tileSize));
@@ -271,11 +227,11 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, int width, int hei
         //LOG(INFO) << "1";
 
         // force rendering pass
-        if (!m_canvas->format().stereo() && sst != Z3DScreenShotType::MonoView) {
-          m_canvas->setFakeStereoOnce();
+        if (!m_canvas.format().stereo() && sst != Z3DScreenShotType::MonoView) {
+          m_canvas.setFakeStereoOnce();
         }
         //LOG(INFO) << globalCameraPara().get().left() << globalCameraPara().get().right() << globalCameraPara().get().top() << globalCameraPara().get().bottom();
-        m_canvas->forceUpdate();
+        m_canvas.forceUpdate();
         //LOG(INFO) << globalCameraPara().get().left() << globalCameraPara().get().right() << globalCameraPara().get().top() << globalCameraPara().get().bottom();
         //LOG(INFO) << "2";
       }

@@ -8,7 +8,7 @@
 #include <deque>
 #include <memory>
 
-class QOpenGLWidget;
+class ZOpenGLWidget;
 
 namespace nim {
 
@@ -116,19 +116,20 @@ public:
 
   void setFakeStereoOnce();
 
-  void addEventListenerToBack(Z3DCanvasEventListener* e);
+  void addEventListenerToBack(Z3DCanvasEventListener& e)
+  { m_listeners.push_back(&e); }
 
-  void addEventListenerToFront(Z3DCanvasEventListener* e);
+  void addEventListenerToFront(Z3DCanvasEventListener& e)
+  { m_listeners.push_front(&e); }
 
-  void removeEventListener(Z3DCanvasEventListener* e);
+  void removeEventListener(Z3DCanvasEventListener& e);
 
   void clearEventListeners();
 
   void broadcastEvent(QEvent* e, int w, int h);
 
   // Set the opengl context of this canvas as the current one.
-  inline void getGLFocus()
-  {}
+  void getGLFocus();
 
   void toggleFullScreen();
 
@@ -154,6 +155,8 @@ signals:
 
   // w and h is physical size not logical size, opengl works in physical pixel
   void canvasSizeChanged(size_t w, size_t h);
+  
+  void openGLContextInitialized();
 
 protected:
   virtual void enterEvent(QEvent* e) override;
@@ -205,7 +208,7 @@ private:
 private:
   bool m_fullscreen;
 
-  QOpenGLWidget* m_glWidget;
+  ZOpenGLWidget* m_glWidget;
   Z3DScene* m_3dScene;
   std::deque<Z3DCanvasEventListener*> m_listeners;
 

@@ -28,7 +28,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const QList<size_t>& obj
               &Z3DRegionAnnotationView::onObjSelectedFromView);
       connect(viewControl, &Z3DRegionAnnotationFilter::objVisibleChanged, this,
               &Z3DRegionAnnotationView::onObjVisibleChangedFromView);
-      canvas().addEventListenerToBack(viewControl);
+      canvas().addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
       networkEvaluator().updateNetwork();
@@ -62,7 +62,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationAdded(size_t id)
             &Z3DRegionAnnotationView::onObjSelectedFromView);
     connect(viewControl, &Z3DRegionAnnotationFilter::objVisibleChanged, this,
             &Z3DRegionAnnotationView::onObjVisibleChangedFromView);
-    canvas().addEventListenerToBack(viewControl);
+    canvas().addEventListenerToBack(*viewControl);
 
     networkEvaluator().updateNetwork();
     m_view.updateBoundBox();

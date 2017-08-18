@@ -25,7 +25,7 @@ void Z3DPunctaView::docPunctasAdded(const QList<size_t>& objs)
       connect(viewControl, &Z3DPunctaFilter::objDeselected, this, &Z3DPunctaView::onObjDeselectedFromView);
       connect(viewControl, &Z3DPunctaFilter::objSelected, this, &Z3DPunctaView::onObjSelectedFromView);
       connect(viewControl, &Z3DPunctaFilter::objVisibleChanged, this, &Z3DPunctaView::onObjVisibleChangedFromView);
-      canvas().addEventListenerToBack(viewControl);
+      canvas().addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
       networkEvaluator().updateNetwork();
@@ -56,7 +56,7 @@ void Z3DPunctaView::docPunctaAdded(size_t id)
     connect(viewControl, &Z3DPunctaFilter::objDeselected, this, &Z3DPunctaView::onObjDeselectedFromView);
     connect(viewControl, &Z3DPunctaFilter::objSelected, this, &Z3DPunctaView::onObjSelectedFromView);
     connect(viewControl, &Z3DPunctaFilter::objVisibleChanged, this, &Z3DPunctaView::onObjVisibleChangedFromView);
-    canvas().addEventListenerToBack(viewControl);
+    canvas().addEventListenerToBack(*viewControl);
 
     networkEvaluator().updateNetwork();
     m_view.updateBoundBox();

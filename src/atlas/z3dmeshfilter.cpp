@@ -43,7 +43,7 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   connect(&m_singleColorForAllMesh, &ZVec4Parameter::valueChanged, this, &Z3DMeshFilter::prepareColor);
 
   // Color Mode
-  m_colorMode.addOption("Single Color");
+  m_colorMode.addOptions("Mesh Color", "Single Color");
   m_colorMode.select("Single Color");
 
   connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DMeshFilter::prepareColor);
@@ -73,7 +73,6 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, QObject* parent)
 
   addParameter(m_triangleListRenderer.wireframeModePara());
   addParameter(m_triangleListRenderer.wireframeColorPara());
-  m_triangleListRenderer.setColorSource("CustomColor");
 }
 
 void Z3DMeshFilter::process(Z3DEye eye)
@@ -354,9 +353,11 @@ void Z3DMeshFilter::prepareColor()
     for (size_t i = 0; i < m_meshList.size(); ++i) {
       m_meshColors.push_back(m_singleColorForAllMesh.get());
     }
+    m_triangleListRenderer.setDataColors(&m_meshColors);
+    m_triangleListRenderer.setColorSource("CustomColor");
+  } else if (m_colorMode.isSelected("Mesh Color")) {
+    m_triangleListRenderer.setColorSource("MeshColor");
   }
-
-  m_triangleListRenderer.setDataColors(&m_meshColors);
 }
 
 void Z3DMeshFilter::adjustWidgets()

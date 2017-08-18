@@ -40,6 +40,7 @@ ZObjWidget::ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* sele
   connect(this, &ZObjWidget::activated, this, &ZObjWidget::indexActivated);
 
   setMinimumWidth(400);
+  setMinimumHeight(250);
 
   setAlternatingRowColors(true);
   QPalette p = palette();

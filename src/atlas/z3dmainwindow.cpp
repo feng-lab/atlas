@@ -209,6 +209,7 @@ void Z3DMainWindow::init()
   createToolBars();
   createStatusBar();
   createDockWindows();
+  connect(m_view, &Z3DView::networkConstructed, this, &Z3DMainWindow::fillDockWindows);
 
   readSettings();
 
@@ -383,8 +384,6 @@ void Z3DMainWindow::createDockWindows()
   m_objectsDockWidget = new QDockWidget(tr("Objects Manager"), this);
   m_objectsDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
   m_objectsDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  ZObjWidget* objWidget = m_doc->createObjWidget(this);
-  m_objectsDockWidget->setWidget(objWidget);
   connect(m_doc, &ZDoc::openEditWidget, this, &Z3DMainWindow::openEditWidget);
   addDockWidget(Qt::RightDockWidgetArea, m_objectsDockWidget);
   m_windowMenu->addAction(m_objectsDockWidget->toggleViewAction());
@@ -392,10 +391,6 @@ void Z3DMainWindow::createDockWindows()
   m_viewSettingDockWidget = new QDockWidget(tr("Object View Setting"), this);
   m_viewSettingDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
   m_viewSettingDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  m_viewSettingWidget = new ZViewSettingWidget(m_doc, m_view, this);
-  if (m_doc->viewSettingId() > 0)
-    m_viewSettingWidget->showViewSettingWidgetOfObj(m_doc->viewSettingId());
-  m_viewSettingDockWidget->setWidget(m_viewSettingWidget);
   connect(m_doc, &ZDoc::showViewSetting, this, &Z3DMainWindow::raiseViewSettingDockWidget);
   addDockWidget(Qt::RightDockWidgetArea, m_viewSettingDockWidget);
   m_windowMenu->addAction(m_viewSettingDockWidget->toggleViewAction());
@@ -418,7 +413,6 @@ void Z3DMainWindow::createDockWindows()
                                          QDockWidget::DockWidgetMovable |
                                          QDockWidget::DockWidgetFloatable);
   m_globalSettingDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  m_globalSettingDockWidget->setWidget(m_view->globalParasWidget());
   addDockWidget(Qt::RightDockWidgetArea, m_globalSettingDockWidget);
   m_windowMenu->addAction(m_globalSettingDockWidget->toggleViewAction());
   tabifyDockWidget(m_viewSettingDockWidget, m_globalSettingDockWidget);
@@ -428,7 +422,6 @@ void Z3DMainWindow::createDockWindows()
                                    QDockWidget::DockWidgetMovable |
                                    QDockWidget::DockWidgetFloatable);
   m_captureDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  m_captureDockWidget->setWidget(m_view->captureWidget());
   addDockWidget(Qt::RightDockWidgetArea, m_captureDockWidget);
   m_windowMenu->addAction(m_captureDockWidget->toggleViewAction());
   m_captureDockWidget->setVisible(false);
@@ -438,7 +431,6 @@ void Z3DMainWindow::createDockWindows()
                                       QDockWidget::DockWidgetMovable |
                                       QDockWidget::DockWidgetFloatable);
   m_backgroundDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  m_backgroundDockWidget->setWidget(m_view->backgroundWidget());
   addDockWidget(Qt::RightDockWidgetArea, m_backgroundDockWidget);
   m_windowMenu->addAction(m_backgroundDockWidget->toggleViewAction());
   m_backgroundDockWidget->setVisible(false);
@@ -448,7 +440,6 @@ void Z3DMainWindow::createDockWindows()
                                 QDockWidget::DockWidgetMovable |
                                 QDockWidget::DockWidgetFloatable);
   m_axisDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  m_axisDockWidget->setWidget(m_view->axisWidget());
   addDockWidget(Qt::RightDockWidgetArea, m_axisDockWidget);
   m_windowMenu->addAction(m_axisDockWidget->toggleViewAction());
   m_axisDockWidget->setVisible(false);
@@ -461,6 +452,25 @@ void Z3DMainWindow::createDockWindows()
   addDockWidget(Qt::BottomDockWidgetArea, m_editObjDockWidget);
   m_windowMenu->addAction(m_editObjDockWidget->toggleViewAction());
   m_editObjDockWidget->setVisible(false);
+}
+
+void Z3DMainWindow::fillDockWindows()
+{
+  ZObjWidget* objWidget = m_doc->createObjWidget(this);
+  m_objectsDockWidget->setWidget(objWidget);
+
+  m_viewSettingWidget = new ZViewSettingWidget(m_doc, m_view, this);
+  if (m_doc->viewSettingId() > 0)
+    m_viewSettingWidget->showViewSettingWidgetOfObj(m_doc->viewSettingId());
+  m_viewSettingDockWidget->setWidget(m_viewSettingWidget);
+
+  m_globalSettingDockWidget->setWidget(m_view->globalParasWidget());
+
+  m_captureDockWidget->setWidget(m_view->captureWidget());
+
+  m_backgroundDockWidget->setWidget(m_view->backgroundWidget());
+
+  m_axisDockWidget->setWidget(m_view->axisWidget());
 }
 
 void Z3DMainWindow::readSettings()

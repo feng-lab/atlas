@@ -22,7 +22,6 @@ Z3DVolumeSliceRenderer::Z3DVolumeSliceRenderer(Z3DRendererBase& rendererBase)
   m_mergeChannelShader.bindFragDataLocation(0, "FragData0");
   m_mergeChannelShader.loadFromSourceFile("pass.vert", "image2d_array_compositor.frag",
                                           m_rendererBase.generateHeader() + generateHeader());
-  CHECK_GL_ERROR
 }
 
 void
@@ -66,8 +65,6 @@ void Z3DVolumeSliceRenderer::bindVolumes(Z3DShaderProgram& shader) const
 
     // colormap
     shader.bindTexture(m_colormapUniformNames[idx++], (*m_colormaps)[i]->get().texture1D());
-
-    CHECK_GL_ERROR
   }
 }
 
@@ -79,8 +76,6 @@ void Z3DVolumeSliceRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx) co
 
   // colormap
   shader.bindTexture(m_colormapUniformNames[0], (*m_colormaps)[idx]->get().texture1D());
-
-  CHECK_GL_ERROR
 }
 
 void Z3DVolumeSliceRenderer::compile()

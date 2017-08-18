@@ -23,6 +23,9 @@ ZVertexArrayObject::ZVertexArrayObject(GLsizei n)
 
 ZVertexArrayObject::~ZVertexArrayObject()
 {
+#ifdef CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
+  CHECK(m_context == Z3DContext());
+#endif
   if (!m_hardwareSupportVAO)
     return;
   glDeleteVertexArrays(m_arrays.size(), m_arrays.data());
@@ -30,6 +33,9 @@ ZVertexArrayObject::~ZVertexArrayObject()
 
 void ZVertexArrayObject::bind(size_t idx) const
 {
+#ifdef CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
+  CHECK(m_context == Z3DContext());
+#endif
   if (!m_hardwareSupportVAO)
     return;
   glBindVertexArray(m_arrays[idx]);
@@ -37,6 +43,9 @@ void ZVertexArrayObject::bind(size_t idx) const
 
 void ZVertexArrayObject::release() const
 {
+#ifdef CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
+  CHECK(m_context == Z3DContext());
+#endif
   if (!m_hardwareSupportVAO)
     return;
   glBindVertexArray(0);
@@ -44,6 +53,9 @@ void ZVertexArrayObject::release() const
 
 void ZVertexArrayObject::resize(GLsizei n)
 {
+#ifdef CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
+  CHECK(m_context == Z3DContext());
+#endif
   if (!m_hardwareSupportVAO || n == GLsizei(m_arrays.size()))
     return;
   glDeleteVertexArrays(m_arrays.size(), m_arrays.data());

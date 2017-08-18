@@ -28,7 +28,7 @@ void Z3DImgView::docImgsAdded(const QList<size_t>& objs)
       connect(viewControl, &Z3DImgFilter::objDeselected, this, &Z3DImgView::onObjDeselectedFromView);
       connect(viewControl, &Z3DImgFilter::objSelected, this, &Z3DImgView::onObjSelectedFromView);
       connect(viewControl, &Z3DImgFilter::objVisibleChanged, this, &Z3DImgView::onObjVisibleChangedFromView);
-      canvas().addEventListenerToBack(viewControl);
+      canvas().addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
       networkEvaluator().updateNetwork();
@@ -62,7 +62,7 @@ void Z3DImgView::docImgAdded(size_t id)
     connect(viewControl, &Z3DImgFilter::objDeselected, this, &Z3DImgView::onObjDeselectedFromView);
     connect(viewControl, &Z3DImgFilter::objSelected, this, &Z3DImgView::onObjSelectedFromView);
     connect(viewControl, &Z3DImgFilter::objVisibleChanged, this, &Z3DImgView::onObjVisibleChangedFromView);
-    canvas().addEventListenerToBack(viewControl);
+    canvas().addEventListenerToBack(*viewControl);
 
     networkEvaluator().updateNetwork();
     m_view.updateBoundBox();

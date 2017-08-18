@@ -31,21 +31,21 @@ Z3DVolumeRaycasterRenderer::Z3DVolumeRaycasterRenderer(Z3DRendererBase& renderer
                                "MIP Opaque", "Local MIP", "Local MIP Opaque", "ISO Surface", "X Ray");
   m_compositingMode.select("MIP Opaque");
 
-  connect(&m_compositingMode, SIGNAL(valueChanged()), this, SLOT(adjustWidgets()));
-  connect(&m_compositingMode, SIGNAL(valueChanged()), this, SLOT(compile()));
+  connect(&m_compositingMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DVolumeRaycasterRenderer::adjustWidgets);
+  connect(&m_compositingMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DVolumeRaycasterRenderer::compile);
   //connect(&m_gradientMode, SIGNAL(valueChanged()), this, SLOT(compile()));
 
   adjustWidgets();
 
-//  m_raycasterShader.bindFragDataLocation(0, "FragData0");
-//  m_raycasterShader.loadFromSourceFile("pass.vert", "volume_raycaster.frag",
-//                                       m_rendererBase.generateHeader() + generateHeader());
-//  m_2dImageShader.bindFragDataLocation(0, "FragData0");
-//  m_2dImageShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_transfun.frag",
-//                                     m_rendererBase.generateHeader() + generateHeader());
-//  m_volumeSliceWithTransferfunShader.bindFragDataLocation(0, "FragData0");
-//  m_volumeSliceWithTransferfunShader.loadFromSourceFile("transform_with_3dtexture.vert", "volume_slice_with_transfun.frag",
-//                                                        m_rendererBase.generateHeader() + generateHeader());
+  //  m_raycasterShader.bindFragDataLocation(0, "FragData0");
+  //  m_raycasterShader.loadFromSourceFile("pass.vert", "volume_raycaster.frag",
+  //                                       m_rendererBase.generateHeader() + generateHeader());
+  //  m_2dImageShader.bindFragDataLocation(0, "FragData0");
+  //  m_2dImageShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_transfun.frag",
+  //                                     m_rendererBase.generateHeader() + generateHeader());
+  //  m_volumeSliceWithTransferfunShader.bindFragDataLocation(0, "FragData0");
+  //  m_volumeSliceWithTransferfunShader.loadFromSourceFile("transform_with_3dtexture.vert", "volume_slice_with_transfun.frag",
+  //                                                        m_rendererBase.generateHeader() + generateHeader());
 
   m_scRaycasterShader.bindFragDataLocation(0, "FragData0");
   m_scRaycasterShader.loadFromSourceFile("pass.vert", "volume_raycaster_single_channel.frag",
@@ -60,10 +60,9 @@ Z3DVolumeRaycasterRenderer::Z3DVolumeRaycasterRenderer(Z3DRendererBase& renderer
   m_mergeChannelShader.bindFragDataLocation(0, "FragData0");
   m_mergeChannelShader.loadFromSourceFile("pass.vert", "image2d_array_compositor.frag",
                                           m_rendererBase.generateHeader() + generateHeader());
-  CHECK_GL_ERROR
 }
 
-void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume>>& volsIn)
+void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume> >& volsIn)
 {
   std::vector<Z3DVolume*> vols;
   for (size_t i = 0; i < volsIn.size(); ++i) {
@@ -88,12 +87,12 @@ void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z
         m_volumeDimensionNames.push_back(QString("volume_dimensions_%1").arg(i + 1));
         m_transferFuncUniformNames.push_back(QString("transfer_function_%1").arg(i + 1));
         m_channelVisibleParas.emplace_back(
-          std::make_unique<ZBoolParameter>(QString("Show Channel %1").arg(i + 1), true));
-        connect(m_channelVisibleParas[i].get(), SIGNAL(valueChanged()), this, SLOT(compile()));
+              std::make_unique<ZBoolParameter>(QString("Show Channel %1").arg(i + 1), true));
+        connect(m_channelVisibleParas[i].get(), &ZBoolParameter::valueChanged, this, &Z3DVolumeRaycasterRenderer::compile);
         m_transferFuncParas.emplace_back(
-          std::make_unique<Z3DTransferFunctionParameter>(QString("Transfer Function %1").arg(i + 1)));
+              std::make_unique<Z3DTransferFunctionParameter>(QString("Transfer Function %1").arg(i + 1)));
         m_texFilterModeParas.emplace_back(
-          std::make_unique<ZStringIntOptionParameter>(QString("Texture Filtering %1").arg(i + 1)));
+              std::make_unique<ZStringIntOptionParameter>(QString("Texture Filtering %1").arg(i + 1)));
         m_texFilterModeParas[i]->addOptionsWithData(qMakePair(QString("Nearest"), static_cast<int>(GL_NEAREST)),
                                                     qMakePair(QString("Linear"), static_cast<int>(GL_LINEAR)));
         m_texFilterModeParas[i]->select("Linear");
@@ -146,7 +145,6 @@ void Z3DVolumeRaycasterRenderer::setEntryExitInfo(const Z3DTexture* entryTexCoor
   m_quads.clear();
 }
 
-
 void Z3DVolumeRaycasterRenderer::adjustWidgets()
 {
   m_isoValue.setVisible(m_compositingMode.isSelected("ISO Surface"));
@@ -170,8 +168,6 @@ void Z3DVolumeRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram& s
 
     // transfer functions
     shader.bindTexture(m_transferFuncUniformNames[idx++], m_transferFuncParas[i]->get().texture());
-
-    CHECK_GL_ERROR
   }
 
   shader.setLogUniformLocationError(true);
@@ -187,8 +183,6 @@ void Z3DVolumeRaycasterRenderer::bindVolumeAndTransferFunc(Z3DShaderProgram& sha
 
   // transfer functions
   shader.bindTexture(m_transferFuncUniformNames[0], m_transferFuncParas[idx]->get().texture());
-
-  CHECK_GL_ERROR
 
   shader.setLogUniformLocationError(true);
 }

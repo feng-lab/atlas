@@ -20,7 +20,6 @@ Z3DShaderProgram::Z3DShaderProgram()
 Z3DShaderProgram::~Z3DShaderProgram()
 {
   glDeleteProgram(m_id);
-  CHECK_GL_ERROR
 }
 
 void Z3DShaderProgram::addShader(Z3DShader& shader)
@@ -32,7 +31,6 @@ void Z3DShaderProgram::addShader(Z3DShader& shader)
       "Z3DShaderProgram: Add shader failed as program and shader are not associated with same context");
   }
   glAttachShader(m_id, shader.shaderId());
-  CHECK_GL_ERROR
   m_linked = false;
   m_shaders.push_back(&shader);
 }
@@ -140,7 +138,6 @@ void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* textur
     texture->bind();
     setUniform(name, textureNumber);
     glActiveTexture(GL_TEXTURE0);
-    CHECK_GL_ERROR
   }
 }
 
@@ -168,7 +165,6 @@ void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* textur
     texture->setFilter(minFilter, magFilter);
     setUniform(name, textureNumber);
     glActiveTexture(GL_TEXTURE0);
-    CHECK_GL_ERROR
   }
 }
 
@@ -192,7 +188,6 @@ void Z3DShaderProgram::bindTexture(const QString& name, GLenum target, GLuint te
     glBindTexture(target, textureId);
     setUniform(name, textureNumber);
     glActiveTexture(GL_TEXTURE0);
-    CHECK_GL_ERROR
   }
 }
 

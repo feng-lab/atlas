@@ -25,7 +25,7 @@ void Z3DSwcView::docSwcsAdded(const QList<size_t>& objs)
       connect(viewControl, &Z3DSwcFilter::objDeselected, this, &Z3DSwcView::onObjDeselectedFromView);
       connect(viewControl, &Z3DSwcFilter::objSelected, this, &Z3DSwcView::onObjSelectedFromView);
       connect(viewControl, &Z3DSwcFilter::objVisibleChanged, this, &Z3DSwcView::onObjVisibleChangedFromView);
-      canvas().addEventListenerToBack(viewControl);
+      canvas().addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
       networkEvaluator().updateNetwork();
@@ -56,7 +56,7 @@ void Z3DSwcView::docSwcAdded(size_t id)
     connect(viewControl, &Z3DSwcFilter::objDeselected, this, &Z3DSwcView::onObjDeselectedFromView);
     connect(viewControl, &Z3DSwcFilter::objSelected, this, &Z3DSwcView::onObjSelectedFromView);
     connect(viewControl, &Z3DSwcFilter::objVisibleChanged, this, &Z3DSwcView::onObjVisibleChangedFromView);
-    canvas().addEventListenerToBack(viewControl);
+    canvas().addEventListenerToBack(*viewControl);
 
     networkEvaluator().updateNetwork();
     m_view.updateBoundBox();

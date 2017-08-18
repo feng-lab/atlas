@@ -76,6 +76,8 @@ public:
   { m_value.setTileFrustum(left, right, bottom, top); emit valueChanged(); }
 
   void flipViewDirection();
+  void rotate90X();
+  void rotate90XZ();
 
   inline void resetCamera(const ZBBox<glm::dvec3>& bound,
                           Z3DCamera::ResetOption options = Z3DCamera::ResetOption::ResetAll)

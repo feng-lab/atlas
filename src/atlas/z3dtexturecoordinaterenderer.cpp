@@ -16,7 +16,6 @@ Z3DTextureCoordinateRenderer::Z3DTextureCoordinateRenderer(Z3DRendererBase& rend
   m_renderTextureCoordinateShader.loadFromSourceFile("transform_with_3dtexture.vert",
                                                      "render_3dtexture_coordinate.frag",
                                                      m_rendererBase.generateHeader());
-  CHECK_GL_ERROR
 }
 
 void Z3DTextureCoordinateRenderer::compile()
@@ -106,10 +105,6 @@ void Z3DTextureCoordinateRenderer::render(Z3DEye eye)
   }
 
   m_renderTextureCoordinateShader.release();
-}
-
-void Z3DTextureCoordinateRenderer::renderPicking(Z3DEye /*unused*/)
-{
 }
 
 } // namespace nim

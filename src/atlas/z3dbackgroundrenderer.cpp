@@ -51,7 +51,6 @@ Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase& rendererBase)
 
     m_VAO.release();
   }
-  CHECK_GL_ERROR
 }
 
 void Z3DBackgroundRenderer::setRenderingRegion(double left, double right, double bottom, double top)
@@ -119,7 +118,6 @@ void Z3DBackgroundRenderer::renderUsingOpengl()
 
   glMatrixMode(GL_MODELVIEW);
   glPopMatrix();
-  CHECK_GL_ERROR
 }
 
 void Z3DBackgroundRenderer::renderPickingUsingOpengl()

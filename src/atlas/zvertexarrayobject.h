@@ -1,6 +1,7 @@
 #pragma once
 
 #include "z3dgl.h"
+#include "z3dcontext.h"
 #include <vector>
 
 namespace nim {
@@ -32,6 +33,10 @@ public:
 private:
   bool m_hardwareSupportVAO;
   std::vector<GLuint> m_arrays;
+
+#ifdef CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
+  Z3DContext m_context;
+#endif
 };
 
 } // namespace nim

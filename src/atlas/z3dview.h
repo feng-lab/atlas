@@ -45,15 +45,18 @@ public:
   virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override;
 
   Z3DCameraParameter& camera()
-  { return m_globalParas.camera; }
+  { return m_globalParas->camera; }
 
   const Z3DCameraParameter& camera() const
-  { return m_globalParas.camera; }
+  { return m_globalParas->camera; }
 
   Z3DTrackballInteractionHandler& interactionHandler()
-  { return m_globalParas.interactionHandler; }
+  { return m_globalParas->interactionHandler; }
 
   inline Z3DCanvas& canvas()
+  { return *m_canvas; }
+
+  inline const Z3DCanvas& canvas() const
   { return *m_canvas; }
 
   inline Z3DCanvasPainter& canvasPainter()
@@ -66,7 +69,7 @@ public:
   { return *m_networkEvaluator; }
 
   inline Z3DGlobalParameters& globalParas()
-  { return m_globalParas; }
+  { return *m_globalParas; }
 
   QWidget* globalParasWidget();
 
@@ -93,6 +96,8 @@ public:
 signals:
 
   void objViewReady(size_t id);
+  
+  void networkConstructed();
 
 private:
   void zoomIn();
@@ -100,7 +105,16 @@ private:
   void zoomOut();
 
   void resetCamera();  // set up camera based on visible objects in scene, original position
+  void resetCameraCenter();
   void resetCameraClippingRange(); // Reset the camera clipping range to include this entire bounding box
+  
+  void gotoPosition(double x, double y, double z, double radius = 64);
+
+  void gotoPosition(const ZBBox<glm::dvec3>& bound, double minRadius = 64);
+
+  void flipView(); //Look from the oppsite side
+  void setXZView();
+  void setYZView();
 
   bool takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
                                      bool clockWise, int numFrame, int width, int height,
@@ -125,9 +139,9 @@ private:
 
   QList<Z3DObjView*> m_3dObjViews;
 
-  std::unique_ptr<Z3DNetworkEvaluator> m_networkEvaluator;
-  Z3DGlobalParameters m_globalParas;
   Z3DCanvas* m_canvas;
+  std::unique_ptr<Z3DGlobalParameters> m_globalParas;
+  std::unique_ptr<Z3DNetworkEvaluator> m_networkEvaluator;
   std::unique_ptr<Z3DCanvasPainter> m_canvasPainter;
   std::unique_ptr<Z3DCompositor> m_compositor;
 

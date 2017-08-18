@@ -4,8 +4,9 @@
 #include "z3dcanvaseventlistener.h"
 #include "z3dscene.h"
 #include "zlog.h"
+#include "zopenglwidget.h"
 #include <QWindow>
-#include <QOpenGLWidget>
+
 #include <algorithm>
 
 namespace nim {
@@ -251,7 +252,7 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   setAlignment(Qt::AlignLeft | Qt::AlignTop);
   resize(width, height);
 
-  m_glWidget = new QOpenGLWidget(nullptr, f);
+  m_glWidget = new ZOpenGLWidget(nullptr, f);
   m_3dScene = new Z3DScene(width, height, m_glWidget->format().stereo(), this);
 
   setViewport(m_glWidget);
@@ -281,6 +282,8 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   connect(m_rotateYMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateYM);
   m_rotateZMShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Z + Qt::SHIFT), this);
   connect(m_rotateZMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateZM);
+  
+  connect(m_glWidget, &ZOpenGLWidget::openGLContextInitialized, this, &Z3DCanvas::openGLContextInitialized);
 }
 
 QSurfaceFormat Z3DCanvas::format() const
@@ -357,8 +360,8 @@ void Z3DCanvas::resizeEvent(QResizeEvent* event)
   if (m_3dScene)
     m_3dScene->setSceneRect(QRect(QPoint(0, 0), event->size()));
 
-  emit canvasSizeChanged(event->size().width() * devicePixelRatio(),
-                         event->size().height() * devicePixelRatio());
+  emit canvasSizeChanged(event->size().width() * devicePixelRatioF(),
+                         event->size().height() * devicePixelRatioF());
 }
 
 void Z3DCanvas::paintEvent(QPaintEvent* event)
@@ -430,11 +433,9 @@ void Z3DCanvas::timerEvent(QTimerEvent* e)
   broadcastEvent(e, width(), height());
 }
 
-void Z3DCanvas::setNetworkEvaluator(Z3DNetworkEvaluator* n)
+void Z3DCanvas::setNetworkEvaluator(Z3DNetworkEvaluator *n)
 {
   m_3dScene->setNetworkEvaluator(n);
-  if (n)
-    n->setOpenGLContext(this);
 }
 
 void Z3DCanvas::setFakeStereoOnce()
@@ -442,22 +443,10 @@ void Z3DCanvas::setFakeStereoOnce()
   m_3dScene->setFakeStereoOnce();
 }
 
-void Z3DCanvas::addEventListenerToBack(Z3DCanvasEventListener* e)
-{
-  if (e)
-    m_listeners.push_back(e);
-}
-
-void Z3DCanvas::addEventListenerToFront(Z3DCanvasEventListener* e)
-{
-  if (e)
-    m_listeners.push_front(e);
-}
-
-void Z3DCanvas::removeEventListener(Z3DCanvasEventListener* e)
+void Z3DCanvas::removeEventListener(Z3DCanvasEventListener& e)
 {
   std::deque<Z3DCanvasEventListener*>::iterator pos;
-  pos = std::find(m_listeners.begin(), m_listeners.end(), e);
+  pos = std::find(m_listeners.begin(), m_listeners.end(), &e);
 
   if (pos != m_listeners.end())
     m_listeners.erase(pos);
@@ -476,6 +465,11 @@ void Z3DCanvas::broadcastEvent(QEvent* e, int w, int h)
     if (e->isAccepted())
       break;
   }
+}
+
+void Z3DCanvas::getGLFocus()
+{
+  m_glWidget->makeCurrent();
 }
 
 #endif
