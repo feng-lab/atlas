@@ -10,40 +10,45 @@ namespace nim {
 ZImgCommonSubBlock::ZImgCommonSubBlock(const QString& fileName, FileFormat format, size_t scene, size_t ratio, size_t t,
                                        size_t z, size_t x, size_t y, size_t width, size_t height)
   : ZImgSubBlock(ratio, t, z, x, y, width, height)
-  , m_filename(fileName), m_format(format), m_scene(scene), m_t(t), m_z(z), m_x(x), m_y(y)
-  , m_width(width), m_height(height)
-{}
+{
+  ZImgRegion rgn;
+  rgn.start.t = t;
+  rgn.end.t = t + 1;
+  rgn.start.z = z;
+  rgn.end.z = z + 1;
+  rgn.start.x = x;
+  rgn.end.x = x + width;
+  rgn.start.y = y;
+  rgn.end.y = y + height;
+  m_imgSource = ZImgSource(fileName, rgn, scene, format);
+}
+
+ZImgCommonSubBlock::ZImgCommonSubBlock(const QStringList& fileList, Dimension catDim, FileFormat format, size_t scene,
+                                       size_t ratio, size_t t, size_t z, size_t x, size_t y, size_t width,
+                                       size_t height)
+  : ZImgSubBlock(ratio, t, z, x, y, width, height)
+{
+  ZImgRegion rgn;
+  rgn.start.t = t;
+  rgn.end.t = t + 1;
+  rgn.start.z = z;
+  rgn.end.z = z + 1;
+  rgn.start.x = x;
+  rgn.end.x = x + width;
+  rgn.start.y = y;
+  rgn.end.y = y + height;
+  m_imgSource = ZImgSource(fileList, catDim, rgn, scene, format);
+}
 
 std::shared_ptr<ZImg> ZImgCommonSubBlock::read() const
 {
-  ZImgRegion rgn;
-  rgn.start.t = m_t;
-  rgn.end.t = m_t + 1;
-  rgn.start.z = m_z;
-  rgn.end.z = m_z + 1;
-  rgn.start.x = m_x;
-  rgn.end.x = m_x + m_width;
-  rgn.start.y = m_y;
-  rgn.end.y = m_y + m_height;
-  auto res = std::make_shared<ZImg>();
-  res->load(m_filename, rgn, m_scene, m_format);
-  return res;
+  return std::make_shared<ZImg>(m_imgSource);
 }
 
 ZImgInfo ZImgCommonSubBlock::readInfo() const
 {
-  ZImgRegion rgn;
-  rgn.start.t = m_t;
-  rgn.end.t = m_t + 1;
-  rgn.start.z = m_z;
-  rgn.end.z = m_z + 1;
-  rgn.start.x = m_x;
-  rgn.end.x = m_x + m_width;
-  rgn.start.y = m_y;
-  rgn.end.y = m_y + m_height;
-  ZImgSource source(m_filename, rgn, m_scene, m_format);
   ZImgInfo info;
-  ZImgIO::instance().readInfo(source, info);
+  ZImgIO::instance().readInfo(m_imgSource, info);
   return info;
 }
 

@@ -73,9 +73,7 @@ signals:
 protected:
   void loadImg();
 
-  void importImgZSequence();
-
-  void importImgTimeSequence();
+  void importImgSequence();
 
   void stitchImgs();
 
@@ -111,8 +109,7 @@ private:
   std::map<size_t, std::shared_ptr<ZImgPack>> m_idToImgPacks;
 
   QAction* m_loadImgAction;
-  QAction* m_importImgZSequenceAction;
-  QAction* m_importImgTimeSequenceAction;
+  QAction* m_importImgSequenceAction;
 
   QAction* m_stitchImageAction;
   QAction* m_alignSectionsAction;

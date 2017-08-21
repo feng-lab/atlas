@@ -1,5 +1,7 @@
 #pragma once
 
+#include "zimginterface.h"
+#include "zoptionparameter.h"
 #include <QDialog>
 #include <QDialogButtonBox>
 
@@ -13,13 +15,16 @@ Q_OBJECT
 public:
   explicit ZLoadImageSequenceDialog(const QString& title, const QString& startDir, QWidget* parent = nullptr);
 
-  QStringList getSelectedFiles();
+  QStringList selectedFiles();
+
+  Dimension alongDimension();
 
 private:
   QPushButton* m_runButton;
   QPushButton* m_exitButton;
   QDialogButtonBox* m_buttonBox;
   ZSelectFileWidget* m_inputImagesFileWidget;
+  ZStringIntOptionParameter m_catDimension;
 };
 
 } // namespace nim

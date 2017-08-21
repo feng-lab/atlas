@@ -130,8 +130,7 @@ QList<QAction*> ZImgDoc::loadFileActions() const
 {
   QList<QAction*> res;
   res.push_back(m_loadImgAction);
-  res.push_back(m_importImgZSequenceAction);
-  res.push_back(m_importImgTimeSequenceAction);
+  res.push_back(m_importImgSequenceAction);
   return res;
 }
 
@@ -324,32 +323,16 @@ void ZImgDoc::loadImg()
   }
 }
 
-void ZImgDoc::importImgZSequence()
+void ZImgDoc::importImgSequence()
 {
-  ZLoadImageSequenceDialog dlg("Load Z Sequence Images", lastOpenedObjPath(), QApplication::activeWindow());
+  ZLoadImageSequenceDialog dlg("Load Sequence Images", lastOpenedObjPath(), QApplication::activeWindow());
   if (dlg.exec() == QDialog::Accepted) {
-    QStringList files = dlg.getSelectedFiles();
+    QStringList files = dlg.selectedFiles();
     if (files.empty())
       return;
 
     QString errorMsg;
-    if (!loadImg(files, Dimension::Z, FileFormat::Unknown, errorMsg)) {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-                            "Can not load image sequence.\n" + errorMsg);
-    }
-  }
-}
-
-void ZImgDoc::importImgTimeSequence()
-{
-  ZLoadImageSequenceDialog dlg("Load Time Sequence Images", lastOpenedObjPath(), QApplication::activeWindow());
-  if (dlg.exec() == QDialog::Accepted) {
-    QStringList files = dlg.getSelectedFiles();
-    if (files.empty())
-      return;
-
-    QString errorMsg;
-    if (!loadImg(files, Dimension::T, FileFormat::Unknown, errorMsg)) {
+    if (!loadImg(files, dlg.alongDimension(), FileFormat::Unknown, errorMsg)) {
       QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                             "Can not load image sequence.\n" + errorMsg);
     }
@@ -485,13 +468,9 @@ void ZImgDoc::createActions()
   m_loadImgAction->setStatusTip(tr("Load one or more existing image files"));
   connect(m_loadImgAction, &QAction::triggered, this, qOverload<>(&ZImgDoc::loadImg));
 
-  m_importImgZSequenceAction = new QAction(tr("&Import Z Sequence Images..."), this);
-  m_importImgZSequenceAction->setStatusTip(tr("Load sequence images as 3d image stack"));
-  connect(m_importImgZSequenceAction, &QAction::triggered, this, &ZImgDoc::importImgZSequence);
-
-  m_importImgTimeSequenceAction = new QAction(tr("&Import Time Sequence Images..."), this);
-  m_importImgTimeSequenceAction->setStatusTip(tr("Load sequence images as time sequence image"));
-  connect(m_importImgTimeSequenceAction, &QAction::triggered, this, &ZImgDoc::importImgTimeSequence);
+  m_importImgSequenceAction = new QAction(tr("&Import Sequence Images..."), this);
+  m_importImgSequenceAction->setStatusTip(tr("Load sequence images"));
+  connect(m_importImgSequenceAction, &QAction::triggered, this, &ZImgDoc::importImgSequence);
 
   m_stitchImageAction = new QAction(tr("&Stitch Images..."), this);
   m_stitchImageAction->setStatusTip(tr("Stitch Images"));

@@ -106,10 +106,6 @@ void ZImgIO::readInfo(const QStringList& fileList, Dimension catDim, std::vector
     throw ZIOException("Read sequence failed: empty file list");
   }
 
-  if (catDim == Dimension::C) {
-    CHECK(!subBlocks);   // not supported
-  }
-
   readInfo(fileList[0], res, subBlocks, nullptr, format);
   if (res.empty()) {
     throw ZIOException("Read sequence failed: img 0 is empty");
@@ -168,7 +164,6 @@ void ZImgIO::readInfo(const QStringList& fileList, Dimension catDim, std::vector
                   tmpSubBlocks[s][tsidx]->t += res[s].size(dim);
                   break;
                 default:
-                  CHECK(false);
                   break;
               }
               (*subBlocks)[s].push_back(tmpSubBlocks[s][tsidx]);
@@ -191,6 +186,20 @@ void ZImgIO::readInfo(const QStringList& fileList, Dimension catDim, std::vector
                                    tmpInfo[s].channelNames.end());
       } else if (catDim == Dimension::T) {
         res[s].timeStamps.insert(res[s].timeStamps.end(), tmpInfo[s].timeStamps.begin(), tmpInfo[s].timeStamps.end());
+      }
+    }
+  }
+
+  // destroy all and build simple one
+  if (subBlocks && catDim == Dimension::C) {
+    subBlocks->clear();
+    subBlocks->resize(res.size());
+    for (size_t s = 0; s < res.size(); ++s) {
+      for (size_t t = 0; t < res[s].numTimes; ++t) {
+        for (size_t z = 0; z < res[s].depth; ++z) {
+          (*subBlocks)[s].emplace_back(std::make_shared<ZImgCommonSubBlock>(fileList, catDim, format, s, 1, t, z,
+                                                                            0, 0, res[s].width, res[s].height));
+        }
       }
     }
   }
@@ -425,7 +434,7 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, const ZImgRe
   ZImgRegion region = regionIn;
   region.resolveRegionEnd(info);
 
-  std::vector<ZImg> imgs;
+  std::vector<ZImg> imgs(fileList.size());
   size_t sliceCatDimStart = 0;
   size_t sliceCatDimEnd = 0;
   for (size_t i = 0; i < imgs.size(); ++i) {
@@ -452,7 +461,6 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, const ZImgRe
       sliceRegion.end[enumToUnderlyingType(catDim)] = sliceInfo.size(catDim);
     }
 
-    imgs.push_back(ZImg());
     if (expandXY && (sliceInfo.width < info.width || sliceInfo.height < info.height)) {
       int widthPadBefore = (info.width - sliceInfo.width) / 2;
       int heightPadBefore = (info.height - sliceInfo.height) / 2;
@@ -461,7 +469,7 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, const ZImgRe
       sliceRegionFullXY.end.x = -1;
       sliceRegionFullXY.start.y = 0;
       sliceRegionFullXY.end.y = -1;
-      imgs[imgs.size() - 1].load(fileList[i], sliceRegionFullXY, scene, format);
+      imgs[i].load(fileList[i], sliceRegionFullXY, scene, format);
       if (info.voxelFormat == VoxelFormat::Float) {
         double min;
         double max;
@@ -497,7 +505,7 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, const ZImgRe
                                       PadOption::Constant, expandWithMaxValue ? max : min);
       }
     } else {
-      imgs[imgs.size() - 1].load(fileList[i], sliceRegion, scene, format);
+      imgs[i].load(fileList[i], sliceRegion, scene, format);
     }
   }
   if (imgs.size() == 1) {

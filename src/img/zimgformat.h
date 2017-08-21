@@ -14,19 +14,14 @@ public:
   ZImgCommonSubBlock(const QString& fileName, FileFormat format, size_t scene, size_t ratio,
                      size_t t, size_t z, size_t x, size_t y, size_t width, size_t height);
 
+  ZImgCommonSubBlock(const QStringList& fileList, Dimension catDim, FileFormat format, size_t scene, size_t ratio,
+                     size_t t, size_t z, size_t x, size_t y, size_t width, size_t height);
+
   virtual std::shared_ptr<ZImg> read() const override;
   virtual ZImgInfo readInfo() const override;
 
 protected:
-  QString m_filename;
-  FileFormat m_format;
-  size_t m_scene;
-  size_t m_t;
-  size_t m_z;
-  size_t m_x;
-  size_t m_y;
-  size_t m_width;
-  size_t m_height;
+  ZImgSource m_imgSource;
 };
 
 class ZImgSliceProvider;
