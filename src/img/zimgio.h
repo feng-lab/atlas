@@ -32,6 +32,8 @@ public:
                 std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks = nullptr,
                 FileFormat format = FileFormat::Unknown, bool expandXY = false);
 
+  void readInfo(const ZImgSource& imgSource, ZImgInfo& info);
+
   // only metadata
   void
   readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene = 0, FileFormat format = FileFormat::Unknown);

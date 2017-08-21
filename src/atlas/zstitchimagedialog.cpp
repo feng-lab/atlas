@@ -1426,6 +1426,17 @@ void ZStitchImageDialog::stitchStacks2()
           imgNCCMatch.enableRemoveBackgroundForFixedImgChannel(m_bgsub1ComboBox->currentIndex() - 2);
           imgNCCMatch.enableRemoveBackgroundForMovingImgChannel(m_bgsub1ComboBox->currentIndex() - 2);
         }
+        if (m_channel1ComboBox->currentIndex() == 0) {
+          imgNCCMatch.useAllFixedImgChannels();
+          imgNCCMatch.useAllMovingImgChannels();
+        } else if (m_channel1ComboBox->currentIndex() == 1 && fixedImg1.numChannels() > 1) {
+          imgNCCMatch.useFixedImgChannel(0, 1);
+        } else if (m_channel1ComboBox->currentIndex() == 1 && movingImg1.numChannels() > 1) {
+          imgNCCMatch.useMovingImgChannel(0, 1);
+        } else if (m_channel1ComboBox->currentIndex() > 1) {
+          imgNCCMatch.useFixedImgChannel(m_channel1ComboBox->currentIndex() - 2);
+          imgNCCMatch.useMovingImgChannel(m_channel1ComboBox->currentIndex() - 2);
+        }
 
         std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>::iterator it = conn.find(std::make_pair(f, m));
         ZImgNCCMatch::PositionHint hint = ZImgNCCMatch::PositionHint::None;
@@ -1459,6 +1470,17 @@ void ZStitchImageDialog::stitchStacks2()
         } else if (m_bgsub2ComboBox->currentIndex() > 1) {
           imgNCCMatch.enableRemoveBackgroundForFixedImgChannel(m_bgsub2ComboBox->currentIndex() - 2);
           imgNCCMatch.enableRemoveBackgroundForMovingImgChannel(m_bgsub2ComboBox->currentIndex() - 2);
+        }
+        if (m_channel2ComboBox->currentIndex() == 0) {
+          imgNCCMatch.useAllFixedImgChannels();
+          imgNCCMatch.useAllMovingImgChannels();
+        } else if (m_channel2ComboBox->currentIndex() == 1 && fixedImg2.numChannels() > 1) {
+          imgNCCMatch.useFixedImgChannel(0, 1);
+        } else if (m_channel2ComboBox->currentIndex() == 1 && movingImg2.numChannels() > 1) {
+          imgNCCMatch.useMovingImgChannel(0, 1);
+        } else if (m_channel2ComboBox->currentIndex() > 1) {
+          imgNCCMatch.useFixedImgChannel(m_channel2ComboBox->currentIndex() - 2);
+          imgNCCMatch.useMovingImgChannel(m_channel2ComboBox->currentIndex() - 2);
         }
 
         std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>::iterator it = conn.find(std::make_pair(f, m));
@@ -1502,23 +1524,23 @@ void ZStitchImageDialog::stitchStacks2()
   }
 
   ZImgMerge imgMerge;
-  std::vector<ZImg> imgs(nstack * 2);
-  for (size_t i = 0; i < imgs.size(); ++i) {
+  std::vector<ZImgTileSubBlock> imgs;
+  for (size_t i = 0; i < nstack * 2; ++i) {
     if (i < nstack) {
-      imgs[i].load(inputStack1Sources[i]);
       if (m_dsCheckBox->isChecked() &&
           (m_dsXSpinBox->value() > 1 || m_dsYSpinBox->value() > 1 || m_dsZSpinBox->value() > 1)) {
-        m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStack1Sources[i].toQString()));
-        imgs[i].blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                                ZImg::CombineMode::Mean);
+        imgs.emplace_back(inputStack1Sources[i], m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
+                          ZImg::CombineMode::Mean);
+      } else {
+        imgs.emplace_back(inputStack1Sources[i]);
       }
     } else {
-      imgs[i].load(inputStack2Sources[i - nstack]);
       if (m_dsCheckBox->isChecked() &&
           (m_dsXSpinBox->value() > 1 || m_dsYSpinBox->value() > 1 || m_dsZSpinBox->value() > 1)) {
-        m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStack2Sources[i - nstack].toQString()));
-        imgs[i].blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                                ZImg::CombineMode::Mean);
+        imgs.emplace_back(inputStack2Sources[i - nstack], m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
+                          ZImg::CombineMode::Mean);
+      } else {
+        imgs.emplace_back(inputStack2Sources[i - nstack]);
       }
     }
   }
@@ -2008,14 +2030,14 @@ void ZStitchImageDialog::stitchStacks()
         throw ZStitchException("Position information incomplete for image concatenate, Abort.");
       }
 
-      std::vector<ZImg> imgs(nstack);
-      for (size_t i = 0; i < imgs.size(); ++i) {
-        imgs[i].load(inputStackSources[i]);
+      std::vector<ZImgTileSubBlock> imgs;
+      for (size_t i = 0; i < inputStackSources.size(); ++i) {
         if (m_dsCheckBox->isChecked() &&
             (m_dsXSpinBox->value() > 1 || m_dsYSpinBox->value() > 1 || m_dsZSpinBox->value() > 1)) {
-          m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStackSources[i].toQString()));
-          imgs[i].blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                                  ZImg::CombineMode::Mean);
+          imgs.emplace_back(inputStackSources[i], m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
+                            ZImg::CombineMode::Mean);
+        } else {
+          imgs.emplace_back(inputStackSources[i]);
         }
       }
 
@@ -2025,23 +2047,25 @@ void ZStitchImageDialog::stitchStacks()
         if (posHint == ZImgNCCMatch::PositionHint::None) {
           throw ZStitchException("Position information incomplete for image concatenate, Abort.");
         }
-        const ZImg& fixedImg = imgs[fixedMovingPosHint.first.first];
-        const ZImg& movingImg = imgs[fixedMovingPosHint.first.second];
+        const auto& fixedImg = imgs[fixedMovingPosHint.first.first];
+        const auto& movingImg = imgs[fixedMovingPosHint.first.second];
+        auto fixedInfo = fixedImg.readInfo();
+        auto movingInfo = movingImg.readInfo();
         ZVoxelCoordinate movingImgOffset;
         if (is_flag_set(posHint, ZImgNCCMatch::PositionHint::Left)) {
-          movingImgOffset.x = -static_cast<ZVoxelCoordinate::value_type>(movingImg.width());
+          movingImgOffset.x = -static_cast<ZVoxelCoordinate::value_type>(movingInfo.width);
         } else if (is_flag_set(posHint, ZImgNCCMatch::PositionHint::Right)) {
-          movingImgOffset.x = fixedImg.width();
+          movingImgOffset.x = fixedInfo.width;
         }
         if (is_flag_set(posHint, ZImgNCCMatch::PositionHint::Up)) {
-          movingImgOffset.y = -static_cast<ZVoxelCoordinate::value_type>(movingImg.height());
+          movingImgOffset.y = -static_cast<ZVoxelCoordinate::value_type>(movingInfo.height);
         } else if (is_flag_set(posHint, ZImgNCCMatch::PositionHint::Down)) {
-          movingImgOffset.y = fixedImg.height();
+          movingImgOffset.y = fixedInfo.height;
         }
         if (is_flag_set(posHint, ZImgNCCMatch::PositionHint::Front)) {
-          movingImgOffset.z = -static_cast<ZVoxelCoordinate::value_type>(movingImg.depth());
+          movingImgOffset.z = -static_cast<ZVoxelCoordinate::value_type>(movingInfo.depth);
         } else if (is_flag_set(posHint, ZImgNCCMatch::PositionHint::Back)) {
-          movingImgOffset.z = fixedImg.depth();
+          movingImgOffset.z = fixedInfo.depth;
         }
         imgMerge.addImgPair(fixedImg, movingImg, movingImgOffset, 0,
                             QString::number(fixedMovingPosHint.first.first + 1),
@@ -2102,6 +2126,17 @@ void ZStitchImageDialog::stitchStacks()
             imgNCCMatch.enableRemoveBackgroundForFixedImgChannel(m_bgsub1ComboBox->currentIndex() - 2);
             imgNCCMatch.enableRemoveBackgroundForMovingImgChannel(m_bgsub1ComboBox->currentIndex() - 2);
           }
+          if (m_channel1ComboBox->currentIndex() == 0) {
+            imgNCCMatch.useAllFixedImgChannels();
+            imgNCCMatch.useAllMovingImgChannels();
+          } else if (m_channel1ComboBox->currentIndex() == 1 && fixedImg.numChannels() > 1) {
+            imgNCCMatch.useFixedImgChannel(0, 1);
+          } else if (m_channel1ComboBox->currentIndex() == 1 && movingImg.numChannels() > 1) {
+            imgNCCMatch.useMovingImgChannel(0, 1);
+          } else if (m_channel1ComboBox->currentIndex() > 1) {
+            imgNCCMatch.useFixedImgChannel(m_channel1ComboBox->currentIndex() - 2);
+            imgNCCMatch.useMovingImgChannel(m_channel1ComboBox->currentIndex() - 2);
+          }
 
           std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>::iterator it = conn.find(
             std::make_pair(f, m));
@@ -2131,14 +2166,14 @@ void ZStitchImageDialog::stitchStacks()
       }
 
       ZImgMerge imgMerge;
-      std::vector<ZImg> imgs(nstack);
-      for (size_t i = 0; i < imgs.size(); ++i) {
-        imgs[i].load(inputStackSources[i]);
+      std::vector<ZImgTileSubBlock> imgs;
+      for (size_t i = 0; i < inputStackSources.size(); ++i) {
         if (m_dsCheckBox->isChecked() &&
             (m_dsXSpinBox->value() > 1 || m_dsYSpinBox->value() > 1 || m_dsZSpinBox->value() > 1)) {
-          m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStackSources[i].toQString()));
-          imgs[i].blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                                  ZImg::CombineMode::Mean);
+          imgs.emplace_back(inputStackSources[i], m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
+                            ZImg::CombineMode::Mean);
+        } else {
+          imgs.emplace_back(inputStackSources[i]);
         }
       }
       for (const auto& fixedMovingOffsetCost : offsets) {

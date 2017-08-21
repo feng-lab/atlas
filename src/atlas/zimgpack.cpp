@@ -117,6 +117,20 @@ std::shared_ptr<ZImg> ZImgPackSubBlock::read() const
   return res;
 }
 
+ZImgInfo ZImgPackSubBlock::readInfo() const
+{
+  if (m_img) {
+    return m_img->info();
+  }
+
+  ZImgInfo res;
+  ZImgIO::instance().readInfo(m_imgSource, res);
+  if (m_type == Type::OrigSourceMIP) {
+    res.depth = 1;
+  }
+  return res;
+}
+
 ZImgPack::ZImgPack(ZImg& img, const QString& fileName)
   : m_imgInfo(img.info())
   , m_imgSource(fileName)

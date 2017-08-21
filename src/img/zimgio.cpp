@@ -182,7 +182,40 @@ void ZImgIO::readInfo(const QStringList& fileList, Dimension catDim, std::vector
         res[s].width = std::max(res[s].width, tmpInfo[s].width);
         res[s].height = std::max(res[s].height, tmpInfo[s].height);
       }
+      if (catDim == Dimension::C) {
+        res[s].channelColors.insert(res[s].channelColors.end(),
+                                    tmpInfo[s].channelColors.begin(),
+                                    tmpInfo[s].channelColors.end());
+        res[s].channelNames.insert(res[s].channelNames.end(),
+                                   tmpInfo[s].channelNames.begin(),
+                                   tmpInfo[s].channelNames.end());
+      } else if (catDim == Dimension::T) {
+        res[s].timeStamps.insert(res[s].timeStamps.end(), tmpInfo[s].timeStamps.begin(), tmpInfo[s].timeStamps.end());
+      }
     }
+  }
+}
+
+void ZImgIO::readInfo(const ZImgSource& imgSource, ZImgInfo& info)
+{
+  if (imgSource.filenames.size() == 1) {
+    std::vector<ZImgInfo> res;
+    readInfo(imgSource.filenames[0], res, nullptr, nullptr, imgSource.format);
+    if (imgSource.scene >= res.size()) {
+      throw ZIOException("invalid scene");
+    }
+    info = res[imgSource.scene];
+    info = imgSource.region.clip(info);
+  } else if (imgSource.filenames.size() > 1) {
+    std::vector<ZImgInfo> res;
+    readInfo(imgSource.filenames, imgSource.catDim, res, nullptr, imgSource.format, imgSource.expandXY);
+    if (imgSource.scene >= res.size()) {
+      throw ZIOException("invalid scene");
+    }
+    info = res[imgSource.scene];
+    info = imgSource.region.clip(info);
+  } else {
+    throw ZIOException("invalid image source");
   }
 }
 

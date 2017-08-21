@@ -269,7 +269,6 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
     if (m_tiles.size() == 1) {
       //LOG(INFO) << m_tiles[0] << m_info.toQString();
       H5::DataSet ds = file.openDataSet(m_tiles[0]);
-      *res = ZImg(m_info);
       readH5DataToImg(*res, ds, m_x, m_y);
     } else {
       for (size_t i = 0; i < m_tiles.size(); ++i) {
@@ -284,6 +283,11 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
   catch (H5::Exception const& e) {
     throw ZIOException(QString("read %1 hdf5:%2").arg(m_filename).arg(e.getDetailMsg().c_str()));
   }
+}
+
+ZImgInfo ZImgHDF5SubBlock::readInfo() const
+{
+  return m_info;
 }
 
 QString ZImgHDF5::shortName() const

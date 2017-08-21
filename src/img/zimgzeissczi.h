@@ -199,10 +199,8 @@ public:
   ZImgCZISubBlock(const QString& fileName, std::vector<CZITile>& tiles, bool mixedTiles = false,
                   size_t numChannels = 0, size_t bytePerVoxel = 0, VoxelFormat vf = VoxelFormat::Unsigned);
 
-  virtual ~ZImgCZISubBlock()
-  {}
-
   virtual std::shared_ptr<ZImg> read() const override;
+  virtual ZImgInfo readInfo() const override;
 
 protected:
   QString m_filename;

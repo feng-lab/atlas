@@ -11,6 +11,7 @@ public:
                    size_t ratio_, size_t t_, size_t z_, size_t x_, size_t y_);
 
   virtual std::shared_ptr<ZImg> read() const override;
+  virtual ZImgInfo readInfo() const override;
 
 protected:
   QString m_filename;

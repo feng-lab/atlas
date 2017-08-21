@@ -76,6 +76,7 @@ public:
 
   // subclass read should depend its own members rather than member of this class
   virtual std::shared_ptr<ZImg> read() const = 0;
+  virtual ZImgInfo readInfo() const = 0;
 
   size_t ratio;  // realsize / storedsize
   size_t t;

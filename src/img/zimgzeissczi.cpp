@@ -29,6 +29,107 @@ inline bool pixelTypeIsBGR(int32_t pixelType)
          pixelType == 8 || pixelType == 9;
 }
 
+ZImgInfo readCZITileInfo(std::ifstream& inputFileStream, const CZITile& tile)
+{
+  SegmentHeader sh;
+  inputFileStream.seekg(tile.filePosition);
+  readStream(inputFileStream, &sh, sizeof(SegmentHeader));
+
+  if (std::strncmp(sh.id, "ZISRAWSUBBLOCK", 15) != 0) {
+    throw ZIOException("can not locate czi tile");
+  }
+
+  SubBlockSegment sb;
+  readStream(inputFileStream, &sb, sizeof(SubBlockSegment));
+
+  int directoryEntriesSize = sizeof(DimensionEntryDV1) * sb.directoryEntry.dimensionCount;
+  int directoryEntrySize = sizeof(DirectoryEntryDV) + directoryEntriesSize;
+  int fill = std::max(0, 256 - directoryEntrySize - 16);
+
+  inputFileStream.seekg(directoryEntriesSize + fill + sb.metaDataSize, std::ios_base::cur);
+
+  ZImgInfo info;
+  if (sb.dataSize > 0) {
+    QString dimensionOrder = tile.dimensionOrder;
+    if (sb.directoryEntry.compression != 1 &&
+        sb.directoryEntry.compression != 4) {
+
+      info.width = tile.storedSize.x;
+      info.height = tile.storedSize.y;
+      info.depth = tile.storedSize.z;
+      info.numChannels = tile.storedSize.c;
+      info.numTimes = tile.storedSize.t;
+
+      switch (sb.directoryEntry.pixelType) {
+        case 0:
+          info.bytesPerVoxel = 1;
+          info.voxelFormat = VoxelFormat::Unsigned;
+          break;
+        case 1:
+          info.bytesPerVoxel = 2;
+          info.voxelFormat = VoxelFormat::Unsigned;
+          break;
+        case 2:
+          info.bytesPerVoxel = 4;
+          info.voxelFormat = VoxelFormat::Float;
+          break;
+        case 3:
+          CHECK(info.numChannels == 1);
+          dimensionOrder.remove('C');
+          dimensionOrder.push_front('C');
+          info.numChannels = 3;
+          info.bytesPerVoxel = 1;
+          info.voxelFormat = VoxelFormat::Unsigned;
+          break;
+        case 4:
+          CHECK(info.numChannels == 1);
+          dimensionOrder.remove('C');
+          dimensionOrder.push_front('C');
+          info.numChannels = 3;
+          info.bytesPerVoxel = 2;
+          info.voxelFormat = VoxelFormat::Unsigned;
+          break;
+        case 8:
+          CHECK(info.numChannels == 1);
+          dimensionOrder.remove('C');
+          dimensionOrder.push_front('C');
+          info.numChannels = 3;
+          info.bytesPerVoxel = 4;
+          info.voxelFormat = VoxelFormat::Float;
+          break;
+        case 9:
+          CHECK(info.numChannels == 1);
+          dimensionOrder.remove('C');
+          dimensionOrder.push_front('C');
+          info.numChannels = 4;
+          info.lastChannelIsAlphaChannel = true;
+          info.bytesPerVoxel = 1;
+          info.voxelFormat = VoxelFormat::Unsigned;
+          break;
+        case 10:
+          throw ZIOException("complex gray64 image not supported");
+          break;
+        case 11:
+          throw ZIOException("complex bgr192 image not supported");
+          break;
+        case 12:
+          info.bytesPerVoxel = 4;
+          info.voxelFormat = VoxelFormat::Unsigned;
+          break;
+        case 13:
+          info.bytesPerVoxel = 8;
+          info.voxelFormat = VoxelFormat::Float;
+          break;
+        default:
+          throw ZIOException("Wrong Pixel Type");
+          break;
+      }
+      info.createDefaultDescriptions();
+    }
+  }
+  return info;
+}
+
 ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
 {
   ZImg res;
@@ -263,6 +364,31 @@ std::shared_ptr<ZImg> ZImgCZISubBlock::read() const
         }
         *res = ZImg::cat(imgs, Dimension::C);
       }
+    }
+    return res;
+  } catch (const ZIOException& e) {
+    throw ZIOException(QString("read %1 error: %2").arg(m_filename).arg(e.what()));
+  }
+}
+
+ZImgInfo ZImgCZISubBlock::readInfo() const
+{
+  try {
+    if (m_tiles.empty()) {
+      throw ZIOException("empty czi sub block");
+    }
+    ZImgInfo res;
+    std::ifstream inputFileStream;
+    openFileStream(inputFileStream, m_filename, std::ios_base::in | std::ios_base::binary);
+    if (m_mixedTiles) {
+      res = ZImgInfo(m_width, m_height, 1, m_numChannels, 1, m_bytePerVoxel, m_voxelFormat);
+    } else {
+      res = readCZITileInfo(inputFileStream, m_tiles[0]);
+      for (size_t i = 0; i < m_tiles.size(); ++i) {
+        auto tmpInfo = readCZITileInfo(inputFileStream, m_tiles[i]);
+        res.numChannels += tmpInfo.numChannels;
+      }
+      res.createDefaultDescriptions();
     }
     return res;
   } catch (const ZIOException& e) {

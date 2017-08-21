@@ -12,19 +12,27 @@ namespace nim {
 class ZImgTile
 {
 public:
-  explicit ZImgTile(const ZImg* img, const ZVoxelCoordinate& loc = ZVoxelCoordinate())
+  explicit ZImgTile(const ZImgSubBlock& img, const ZVoxelCoordinate& loc = ZVoxelCoordinate())
     : m_img(img)
   {
-    setLocation(loc);
+    m_info = img.readInfo();
+    if (m_info.isEmpty()) throw ZImgException("No max coord for empty img");
+    ZVoxelCoordinate maxCoord(m_info.width - 1, m_info.height - 1, m_info.depth - 1, m_info.numChannels - 1,
+                              m_info.numTimes - 1);
+    m_box = BoxType(loc, loc + maxCoord);
   }
 
-  inline void setLocation(const ZVoxelCoordinate& loc)
-  {
-    m_box = BoxType(loc, loc + m_img->maxCoord());
-  }
+  void createImgCache()
+  { if (!m_imgCache) m_imgCache = m_img.read(); }
+
+  void clearImgCache()
+  { m_imgCache.reset(); }
+
+  inline const ZImgSubBlock& imgBlock() const
+  { return m_img; }
 
   inline const ZImg& img() const
-  { return *m_img; }
+  { return *m_imgCache; }
 
   inline const ZVoxelCoordinate& location() const
   { return m_box.minCorner(); }
@@ -39,14 +47,17 @@ public:
   template<typename TVoxel>
   inline TVoxel value(const ZVoxelCoordinate& v) const
   {
-    return *(m_img->data<TVoxel>(v - m_box.minCorner()));
+    return *(m_imgCache->data<TVoxel>(v - m_box.minCorner()));
   }
 
 private:
-  const ZImg* m_img;
+  const ZImgSubBlock& m_img;
 
   using BoxType = ZBBox<ZVoxelCoordinate>;
   BoxType m_box;
+
+  ZImgInfo m_info;
+  std::shared_ptr<ZImg> m_imgCache;
 };
 
 } // namespace nim

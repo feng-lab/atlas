@@ -39,6 +39,7 @@ public:
                    int64_t x, int64_t y, size_t width, size_t height);
 
   virtual std::shared_ptr<ZImg> read() const override;
+  virtual ZImgInfo readInfo() const override;
 
 protected:
   Type m_type;

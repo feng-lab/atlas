@@ -3,6 +3,7 @@
 #include "zioutils.h"
 #include "zimgsliceprovider.h"
 #include "zlog.h"
+#include "zimgio.h"
 
 namespace nim {
 
@@ -27,6 +28,23 @@ std::shared_ptr<ZImg> ZImgCommonSubBlock::read() const
   auto res = std::make_shared<ZImg>();
   res->load(m_filename, rgn, m_scene, m_format);
   return res;
+}
+
+ZImgInfo ZImgCommonSubBlock::readInfo() const
+{
+  ZImgRegion rgn;
+  rgn.start.t = m_t;
+  rgn.end.t = m_t + 1;
+  rgn.start.z = m_z;
+  rgn.end.z = m_z + 1;
+  rgn.start.x = m_x;
+  rgn.end.x = m_x + m_width;
+  rgn.start.y = m_y;
+  rgn.end.y = m_y + m_height;
+  ZImgSource source(m_filename, rgn, m_scene, m_format);
+  ZImgInfo info;
+  ZImgIO::instance().readInfo(source, info);
+  return info;
 }
 
 ZImgFormat::~ZImgFormat() = default;
