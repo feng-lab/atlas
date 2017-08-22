@@ -205,7 +205,7 @@ public:
 
   // update radius from volSize
   inline void updateRadius()
-  { using namespace boost::math::double_constants; m_radius = std::pow(three_quarters_pi * m_volSize, 1.0 / 3.0); }
+  { using namespace boost::math::double_constants; m_radius = std::pow(m_volSize / four_thirds_pi, 1.0 / 3.0); }
 
   // update volSize from radius
   inline void updateVolSize()

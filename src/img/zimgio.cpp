@@ -177,16 +177,6 @@ void ZImgIO::readInfo(const QStringList& fileList, Dimension catDim, std::vector
         res[s].width = std::max(res[s].width, tmpInfo[s].width);
         res[s].height = std::max(res[s].height, tmpInfo[s].height);
       }
-      if (catDim == Dimension::C) {
-        res[s].channelColors.insert(res[s].channelColors.end(),
-                                    tmpInfo[s].channelColors.begin(),
-                                    tmpInfo[s].channelColors.end());
-        res[s].channelNames.insert(res[s].channelNames.end(),
-                                   tmpInfo[s].channelNames.begin(),
-                                   tmpInfo[s].channelNames.end());
-      } else if (catDim == Dimension::T) {
-        res[s].timeStamps.insert(res[s].timeStamps.end(), tmpInfo[s].timeStamps.begin(), tmpInfo[s].timeStamps.end());
-      }
     }
   }
 
