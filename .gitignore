@@ -46,6 +46,7 @@
 /src/3rdparty/gflags/
 /src/3rdparty/glog/
 /src/3rdparty/folly/
+/src/3rdparty/scopeguard/
 /src/3rdparty/benchmark/
 ffmpeg
 ffmpeg.exe

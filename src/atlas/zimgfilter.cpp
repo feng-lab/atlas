@@ -18,7 +18,7 @@ namespace nim {
 ZGraphicsItemGroup::ZGraphicsItemGroup(QGraphicsItem* parent)
   : QGraphicsItemGroup(parent)
 {
-  setFlag(QGraphicsItem::ItemIsSelectable, true);
+  //setFlag(QGraphicsItem::ItemIsSelectable, true);
 }
 
 /*!

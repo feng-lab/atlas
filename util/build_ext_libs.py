@@ -914,7 +914,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
                            cwd=build_dir, shell=True, check=True, env=env)
 
-            orig_file_2 = os.path.join(install_dir, 'x64', 'vc15', 'staticlib', 'OpenCVModules-release.cmake')
+            orig_file_2 = os.path.join(install_dir, 'x64', 'vc15', 'staticlib', 'OpenCVModules.cmake')
             bak_file_2 = get_bak_file_name(orig_file_2)
             os.rename(orig_file_2, bak_file_2)
             with open(bak_file_2, mode='r', encoding='utf-8') as f:
@@ -922,10 +922,12 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
             with open(orig_file_2, mode='w', encoding='utf-8') as f:
                 to_lines = []
                 for line in from_lines:
-                    line = line.replace(r';tbb;ippiw;ippcv;ippi;ippcc;ipps;ippvm;ippcore',
-                                        r';ippiw')
-                    line = line.replace(r'tbb;ippiw;ippcv;ippi;ippcc;ipps;ippvm;ippcore;',
-                                        r'ippiw;')
+                    line = line.replace(
+                        r';\$<LINK_ONLY:tbb>;\$<LINK_ONLY:ippiw>;\$<LINK_ONLY:ippcv>;\$<LINK_ONLY:ippi>;\$<LINK_ONLY:ippcc>;\$<LINK_ONLY:ipps>;\$<LINK_ONLY:ippvm>;\$<LINK_ONLY:ippcore>',
+                        r';\$<LINK_ONLY:ippiw>')
+                    line = line.replace(
+                        r'\$<LINK_ONLY:tbb>;\$<LINK_ONLY:ippiw>;\$<LINK_ONLY:ippcv>;\$<LINK_ONLY:ippi>;\$<LINK_ONLY:ippcc>;\$<LINK_ONLY:ipps>;\$<LINK_ONLY:ippvm>;\$<LINK_ONLY:ippcore>;',
+                        r'\$<LINK_ONLY:ippiw>;')
                     f.write(line)
                     to_lines.append(line)
             print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
@@ -987,7 +989,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True, env=env)
 
-            orig_file_2 = os.path.join(install_dir, 'share', 'OpenCV', 'OpenCVModules-release.cmake')
+            orig_file_2 = os.path.join(install_dir, 'share', 'OpenCV', 'OpenCVModules.cmake')
             bak_file_2 = get_bak_file_name(orig_file_2)
             os.rename(orig_file_2, bak_file_2)
             with open(bak_file_2, mode='r', encoding='utf-8') as f:
@@ -995,10 +997,12 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
             with open(orig_file_2, mode='w', encoding='utf-8') as f:
                 to_lines = []
                 for line in from_lines:
-                    line = line.replace(r';tbb;ippiw;ippcv;ippi;ippcc;ipps;ippvm;ippcore',
-                                        r';ippiw')
-                    line = line.replace(r'tbb;ippiw;ippcv;ippi;ippcc;ipps;ippvm;ippcore;',
-                                        r'ippiw;')
+                    line = line.replace(
+                        r';\$<LINK_ONLY:tbb>;\$<LINK_ONLY:ippiw>;\$<LINK_ONLY:ippcv>;\$<LINK_ONLY:ippi>;\$<LINK_ONLY:ippcc>;\$<LINK_ONLY:ipps>;\$<LINK_ONLY:ippvm>;\$<LINK_ONLY:ippcore>',
+                        r';\$<LINK_ONLY:ippiw>')
+                    line = line.replace(
+                        r'\$<LINK_ONLY:tbb>;\$<LINK_ONLY:ippiw>;\$<LINK_ONLY:ippcv>;\$<LINK_ONLY:ippi>;\$<LINK_ONLY:ippcc>;\$<LINK_ONLY:ipps>;\$<LINK_ONLY:ippvm>;\$<LINK_ONLY:ippcore>;',
+                        r'\$<LINK_ONLY:ippiw>;')
                     f.write(line)
                     to_lines.append(line)
             print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
@@ -1075,6 +1079,12 @@ def build_libs(libs: dict, update_src: bool):
         src_dir = os.path.join(base_dir, 'folly')
         update_or_clone_git_repository(src_dir, 'git@github.com:facebook/folly.git')
         export_git_repository(src_dir, os.path.join(ext_dir, 'folly'), tag='aebb140')
+
+    if libs['scopeguard']:
+        src_dir = os.path.join(base_dir, 'SC22WG21_Papers')
+        update_or_clone_git_repository(src_dir, 'git@github.com:PeterSommerlad/SC22WG21_Papers.git')
+        shutil.copytree(os.path.join(src_dir, 'workspace', 'P0052_scope_exit', 'src'),
+                        os.path.join(ext_dir, 'scopeguard'))
 
     if libs['glog']:
         src_dir = os.path.join(base_dir, 'glog')
@@ -1238,6 +1248,7 @@ def parse_inputs(argv: list):
             'glm': False,
             'googletest': False,
             'folly': False,
+            'scopeguard': False,
             'glog': False,
             'benchmark': False,
             'glbinding': False,
