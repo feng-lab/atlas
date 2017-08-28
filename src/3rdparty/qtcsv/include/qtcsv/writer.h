@@ -7,19 +7,23 @@
 
 #include "qtcsv/qtcsv_global.h"
 
+class QIODevice;
+
 namespace QtCSV
 {
     class AbstractData;
     class ContentIterator;
 
-    // Writer is a file-writer class that works with csv-files.
+    // Writer is a data-writer class that works with csv-files and IO Devices.
     // As a source of information it requires AbstractData-based container
     // class object.
+    //
     // It supports different write methods:
     // - WriteMode::REWRITE - if file exist, it will be rewritten
     // - WriteMode::APPEND - if file exist, new information will be appended
     // to the end of the file.
-    // Also it can add header and footer to a file.
+    //
+    // Also you can specify header and footer for your data.
     class QTCSVSHARED_EXPORT Writer
     {
     public:
@@ -35,6 +39,15 @@ namespace QtCSV
                         const QString& separator = QString(","),
                         const QString& textDelimiter = QString("\""),
                         const WriteMode& mode = REWRITE,
+                        const QStringList& header = QStringList(),
+                        const QStringList& footer = QStringList(),
+                        QTextCodec* codec = QTextCodec::codecForName("UTF-8"));
+
+        // Write data to IO Device
+        static bool write(QIODevice& ioDevice,
+                        const AbstractData& data,
+                        const QString& separator = QString(","),
+                        const QString& textDelimiter = QString("\""),
                         const QStringList& header = QStringList(),
                         const QStringList& footer = QStringList(),
                         QTextCodec* codec = QTextCodec::codecForName("UTF-8"));

@@ -823,7 +823,7 @@ def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: str, ippiw_dir: str):
+def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
@@ -850,11 +850,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
             print('TBBROOT:', env['TBBROOT'])
 
             cmakecmd = get_cmake_cmd_common_part(install_dir)
-            cmakecmd.extend(['-DIPPROOT=' + intel_sw_dir + 'ipp',
-                             '-DIPPIWROOT=' + ippiw_dir.replace("\\", "/"),
-                             '-DBUILD_IPP_IW:BOOL=OFF',
-                             '-DBUILD_WITH_DYNAMIC_IPP:BOOL=OFF',
-                             '-DBUILD_WITH_STATIC_CRT:BOOL=OFF',
+            cmakecmd.extend(['-DBUILD_WITH_STATIC_CRT:BOOL=OFF',
                              '-DBUILD_opencv_videoio:BOOL=OFF',
                              '-DBUILD_SHARED_LIBS:BOOL=OFF',
                              '-DBUILD_PROTOBUF:BOOL=OFF',
@@ -923,11 +919,11 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                 to_lines = []
                 for line in from_lines:
                     line = line.replace(
-                        r';\$<LINK_ONLY:tbb>;\$<LINK_ONLY:ippiw>;\$<LINK_ONLY:ippcv>;\$<LINK_ONLY:ippi>;\$<LINK_ONLY:ippcc>;\$<LINK_ONLY:ipps>;\$<LINK_ONLY:ippvm>;\$<LINK_ONLY:ippcore>',
-                        r';\$<LINK_ONLY:ippiw>')
+                        r';\$<LINK_ONLY:tbb>',
+                        r'')
                     line = line.replace(
-                        r'\$<LINK_ONLY:tbb>;\$<LINK_ONLY:ippiw>;\$<LINK_ONLY:ippcv>;\$<LINK_ONLY:ippi>;\$<LINK_ONLY:ippcc>;\$<LINK_ONLY:ipps>;\$<LINK_ONLY:ippvm>;\$<LINK_ONLY:ippcore>;',
-                        r'\$<LINK_ONLY:ippiw>;')
+                        r'\$<LINK_ONLY:tbb>;',
+                        r'')
                     f.write(line)
                     to_lines.append(line)
             print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
@@ -936,11 +932,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
             print('TBBROOT:', env['TBBROOT'])
 
             cmakecmd = get_cmake_cmd_common_part(install_dir)
-            cmakecmd.extend(['-DIPPROOT=/opt/intel/ipp',
-                             '-DIPPIWROOT=' + ippiw_dir,
-                             '-DBUILD_IPP_IW:BOOL=OFF',
-                             '-DBUILD_WITH_DYNAMIC_IPP:BOOL=OFF',
-                             '-DWITH_PTHREADS_PF:BOOL=OFF',
+            cmakecmd.extend(['-DWITH_PTHREADS_PF:BOOL=OFF',
                              '-DBUILD_opencv_videoio:BOOL=OFF',
                              '-DBUILD_SHARED_LIBS:BOOL=OFF',
                              '-DBUILD_opencv_python2:BOOL=OFF',
@@ -998,11 +990,11 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                 to_lines = []
                 for line in from_lines:
                     line = line.replace(
-                        r';\$<LINK_ONLY:tbb>;\$<LINK_ONLY:ippiw>;\$<LINK_ONLY:ippcv>;\$<LINK_ONLY:ippi>;\$<LINK_ONLY:ippcc>;\$<LINK_ONLY:ipps>;\$<LINK_ONLY:ippvm>;\$<LINK_ONLY:ippcore>',
-                        r';\$<LINK_ONLY:ippiw>')
+                        r';\$<LINK_ONLY:tbb>',
+                        r'')
                     line = line.replace(
-                        r'\$<LINK_ONLY:tbb>;\$<LINK_ONLY:ippiw>;\$<LINK_ONLY:ippcv>;\$<LINK_ONLY:ippi>;\$<LINK_ONLY:ippcc>;\$<LINK_ONLY:ipps>;\$<LINK_ONLY:ippvm>;\$<LINK_ONLY:ippcore>;',
-                        r'\$<LINK_ONLY:ippiw>;')
+                        r'\$<LINK_ONLY:tbb>;',
+                        r'')
                     f.write(line)
                     to_lines.append(line)
             print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
@@ -1192,22 +1184,7 @@ def build_libs(libs: dict, update_src: bool):
             update_or_clone_git_repository(src_contrib_dir, 'git@github.com:Itseez/opencv_contrib.git')
         assert os.path.exists(src_dir)
         assert os.path.exists(src_contrib_dir)
-        if sys.platform.startswith('win32'):
-            ippiw_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'w_ippiw*'))
-        else:
-            ippiw_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'm_ippiw*'))
-        ippiw_package_unpack_folder = get_package_top_level_folder(ippiw_package_name, base_dir)
-        if update_src:
-            shutil.rmtree(ippiw_package_unpack_folder, ignore_errors=True)
-            unpack_file_to_folder(ippiw_package_name, base_dir)
-        if sys.platform.startswith('win32'):
-            ippiw_dir = ippiw_package_unpack_folder + '\\ippiw_2017_windows'
-        else:
-            glob_copy(ippiw_package_unpack_folder + '/ippiw_2017_osx/lib/*.a',
-                      ippiw_package_unpack_folder + '/ippiw_2017_osx/lib/intel64/')
-            ippiw_dir = ippiw_package_unpack_folder + '/ippiw_2017_osx'
-        assert os.path.exists(ippiw_dir)
-        build_opencv(src_dir, src_contrib_dir, os.path.join(ext_dir, 'opencv'), ext_dir, ippiw_dir)
+        build_opencv(src_dir, src_contrib_dir, os.path.join(ext_dir, 'opencv'), ext_dir)
 
     if libs['botan']:
         src_dir = os.path.join(base_dir, 'botan')
