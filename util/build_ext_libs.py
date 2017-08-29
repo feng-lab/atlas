@@ -154,6 +154,12 @@ def get_cmake_cmd_common_part(install_dir: str):
                 '-G', 'Visual Studio 15 2017 Win64',
                 '-DCMAKE_INSTALL_PREFIX=' + install_dir
                 ]
+    elif sys.platform.startswith('linux'):
+        return ['cmake',  # '-E', 'echo',
+                '-DCMAKE_BUILD_TYPE=Release',
+                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
+                '-DCMAKE_CXX_FLAGS:STRING=-std=c++14'
+                ]
     else:
         # osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/' \
         #               r'MacOSX10.12.sdk'
@@ -248,8 +254,11 @@ def build_benchmark(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
-            cmakecmd.extend(['-DBENCHMARK_USE_LIBCXX:BOOL=ON',
-                             src_dir])
+            if sys.platform.startswith('linux'):
+                cmakecmd.extend([src_dir])
+            else:
+                cmakecmd.extend(['-DBENCHMARK_USE_LIBCXX:BOOL=ON',
+                                 src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True)
@@ -329,11 +338,18 @@ def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
-            subprocess.run(['sh', src_dir + '/configure', '--host', 'x86_64-apple-darwin', 'NASM=' + ext_dir + '/nasm',
-                            '--enable-static', '--disable-shared',
-                            'CFLAGS=-mmacosx-version-min=' + macos_min_version() + ' -O3',
-                            'LDFLAGS=-mmacosx-version-min=' + macos_min_version()],
-                           cwd=build_dir, shell=False, check=True)
+            if sys.platform.startswith('linux'):
+                subprocess.run(['sh', src_dir + '/configure',
+                                'NASM=' + ext_dir + '/nasm_linux',
+                                '--enable-static', '--disable-shared'],
+                               cwd=build_dir, shell=False, check=True)
+            else:
+                subprocess.run(['sh', src_dir + '/configure', '--host', 'x86_64-apple-darwin',
+                                'NASM=' + ext_dir + '/nasm',
+                                '--enable-static', '--disable-shared',
+                                'CFLAGS=-mmacosx-version-min=' + macos_min_version() + ' -O3',
+                                'LDFLAGS=-mmacosx-version-min=' + macos_min_version()],
+                               cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count())],
                            cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', 'install', 'prefix=' + install_dir, 'libdir=' + install_dir + '/lib'],
@@ -449,11 +465,17 @@ def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
             with open(orig_file, mode='w', encoding='utf-8') as f:
                 to_lines = []
                 for line in from_lines:
-                    line = line.replace(r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
-                                        r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O',
-                                        r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
-                                        r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 '
-                                        r'-mmacosx-version-min={0}'.format(macos_min_version()))
+                    if sys.platform.startswith('linux'):
+                        line = line.replace(r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
+                                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O',
+                                            r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
+                                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3')
+                    else:
+                        line = line.replace(r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
+                                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O',
+                                            r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
+                                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 '
+                                            r'-mmacosx-version-min={0}'.format(macos_min_version()))
                     f.write(line)
                     to_lines.append(line)
             print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
@@ -483,6 +505,10 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
                       os.path.join(install_dir, 'lib'))
             glob_copy(os.path.join(src_dir, '_Output', 'v141', 'x64', 'Release', 'GTEngine.v15.pdb'),
                       os.path.join(install_dir, 'lib'))
+        elif sys.platform.startswith('linux'):
+            subprocess.run(['make', '-j' + str(os.cpu_count()), 'CFG=Release', '-f', 'makeengine.gte'],
+                           cwd=src_dir, shell=False, check=True)
+            shutil.copytree(os.path.join(src_dir, 'lib', 'Release'), os.path.join(install_dir, 'lib'))
         else:
             subprocess.run(['xcodebuild', '-project', 'GTEngine.xcodeproj', '-configuration', 'Default',
                             '-target', 'Release Static', 'build', '-arch', 'x86_64',
@@ -673,6 +699,21 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
                                          install_dir)
             distutils.dir_util.copy_tree(os.path.join(src_dir, 'Wrapper', 'FreeImagePlus', 'dist', 'x64'),
                                          install_dir)
+        elif sys.platform.startswith('linux'):
+            subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count())],
+                           cwd=src_dir, shell=False, check=True)
+            subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count()), 'install',
+                            'PREFIX=' + install_dir],
+                           cwd=src_dir, shell=False, check=True)
+            subprocess.run(['make', '-f', 'Makefile.gnu', 'clean'],
+                           cwd=src_dir, shell=False, check=True)
+            subprocess.run(['make', '-f', 'Makefile.fip', '-j' + str(os.cpu_count())],
+                           cwd=src_dir, shell=False, check=True)
+            subprocess.run(['make', '-f', 'Makefile.fip', '-j' + str(os.cpu_count()), 'install',
+                            'PREFIX=' + install_dir],
+                           cwd=src_dir, shell=False, check=True)
+            subprocess.run(['make', '-f', 'Makefile.fip', 'clean'],
+                           cwd=src_dir, shell=False, check=True)
         else:
             shutil.copy2(os.path.join(ext_dir, 'freeimage-makefiles', 'Makefile_gnu'), src_dir)
             shutil.copy2(os.path.join(ext_dir, 'freeimage-makefiles', 'Makefile_fip'), src_dir)
@@ -702,7 +743,7 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
     finally:
         os.replace(bak_file, orig_file)
         os.replace(bak_file_2, orig_file_2)
-        if not sys.platform.startswith('win'):
+        if sys.platform.startswith('darwin'):
             os.remove(os.path.join(src_dir, 'Makefile_gnu'))
             os.remove(os.path.join(src_dir, 'Makefile_fip'))
 
@@ -725,6 +766,14 @@ def build_botan(src_dir: str, install_dir: str, ext_dir: str):
                            cwd=src_dir, shell=True, check=True, env=env)
             subprocess.run(['nmake', 'install'],
                            cwd=src_dir, shell=False, check=True, env=env)  # todo: install not working
+        elif sys.platform.startswith('linux'):
+            subprocess.run([python, src_dir + '/configure.py', '--with-zlib',
+                            '--prefix=' + install_dir],
+                           cwd=src_dir, shell=False, check=True)
+            subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                           cwd=src_dir, shell=False, check=True)
+            subprocess.run(['make', 'clean'],
+                           cwd=src_dir, shell=False, check=True)
         else:
             subprocess.run([python, src_dir + '/configure.py', '--cc=clang', '--with-zlib',
                             '--cc-abi-flags=-mmacosx-version-min=' + macos_min_version(),
@@ -1037,6 +1086,14 @@ def build_libs(libs: dict, update_src: bool):
             os.replace(os.path.join(package_unpack_folder, 'bin', 'ffmpeg.exe'),
                        os.path.join(ext_dir, 'ffmpeg.exe'))
             shutil.rmtree(package_unpack_folder, ignore_errors=False)
+    elif sys.platform.startswith('linux'):
+        if libs['ffmpeg']:
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*static.tar.xz'))
+            package_unpack_folder = get_package_top_level_folder(package_name, ext_dir)
+            unpack_file_to_folder(package_name, ext_dir)
+            os.replace(os.path.join(package_unpack_folder, 'ffmpeg'),
+                       os.path.join(ext_dir, 'ffmpeg'))
+            shutil.rmtree(package_unpack_folder, ignore_errors=False)
     else:
         if libs['ffmpeg']:
             unpack_file_to_folder(find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*7z')),
@@ -1197,6 +1254,9 @@ def build_libs(libs: dict, update_src: bool):
         if sys.platform.startswith('win32'):
             ispc_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ispc*win*'))
             embree_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'embree*win*'))
+        elif sys.platform.startswith('linux'):
+            ispc_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ispc*linux*'))
+            embree_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'embree*linux*'))
         else:
             ispc_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ispc*osx*'))
             embree_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'embree*osx*'))
