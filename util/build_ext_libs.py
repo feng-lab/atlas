@@ -133,16 +133,11 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
             '"{}" {} >nul && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
                 script, para, python),
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, universal_newlines=True, env=start_env)
-    elif sys.platform.startswith('linux'):
-        process = subprocess.Popen(
-            '/bin/bash -c "{}" {} > /dev/null && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
-                script, para, python),
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True, env=start_env)
     else:
-        process = subprocess.Popen(
-            '. "{}" {} > /dev/null && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
-                script, para, python),
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True, env=start_env)
+        source = '. "{}" {}'.format(script, para)
+        dump = '"{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(python)
+        process = subprocess.Popen(['/bin/bash', '-c', '{} && {}'.format(source, dump)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, universal_newlines=True, env=start_env)
     stdout, stderr = process.communicate()
     exitcode = process.wait()
     if exitcode != 0:
