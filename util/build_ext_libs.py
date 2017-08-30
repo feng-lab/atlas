@@ -621,7 +621,7 @@ def build_assimp(src_dir: str, install_dir: str, ext_dir: str):
                 cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
                                  '-DASSIMP_BUILD_TESTS:BOOL=OFF',
                                  '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '/zlib/include',
-                                 '-DZLIB_LIBRARY_REL:FILEPATH=' + ext_dir + '/zlib/lib/libz.a',
+                                 '-DZLIB_LIBRARY_REL:FILEPATH=' + ext_dir + '/zlib/lib/libz.so',
                                  src_dir])
             else:
                 cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
