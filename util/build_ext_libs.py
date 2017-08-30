@@ -143,7 +143,7 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
     if exitcode != 0:
         print(stdout, flush=True)
         print(stderr, flush=True)
-        raise Exception("Got error code {} from subprocess.".format(exitcode))
+        raise Exception("Got error code {} from subprocess.".format(stderr))
     env = json.loads(stdout.strip())
     if remove_conda_from_path:
         remove_path_contains('miniconda', env)
