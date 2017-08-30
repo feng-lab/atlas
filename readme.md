@@ -10,6 +10,7 @@
 ### Linux:
 * install qt5, mkl, ipp, tbb, python3 and cmake
 * sudo apt-get install unrar p7zip-full git nasm
+* maybe sudo chmod +x /opt/intel/tbb/bin/tbbvars.sh
 
 ### All:
 * code repository folder should be named as "atlas"; "atlas_others" folder and "atlas" folder should be in same directory
