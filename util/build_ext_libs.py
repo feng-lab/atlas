@@ -135,7 +135,7 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, universal_newlines=True, env=start_env)
     elif sys.platform.startswith('linux'):
         process = subprocess.Popen(
-            '"{}" {} > /dev/null && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
+            '"{}" {} && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
                 script, para, python),
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True, env=start_env)
     else:
