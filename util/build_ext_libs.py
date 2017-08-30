@@ -341,7 +341,7 @@ def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str, nasm_dir: str):
         else:
             if sys.platform.startswith('linux'):
                 subprocess.run(['sh', src_dir + '/configure',
-                                'NASM=' + nasm_dir + '/nasm',
+                                'NASM=nasm',
                                 '--enable-static', '--disable-shared'],
                                cwd=build_dir, shell=False, check=True)
             else:
