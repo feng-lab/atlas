@@ -368,13 +368,22 @@ def build_zlib(src_dir: str, install_dir: str, ext_dir: str):
 
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
-        cmakecmd.extend([src_dir])
-        env = get_vcvars_environment()
-        subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-        subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
-                       cwd=build_dir, shell=True, check=True, env=env)
-        subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
-                       cwd=build_dir, shell=True, check=True, env=env)
+
+        if sys.platform.startswith('win'):
+            cmakecmd.extend(['-DAMD64:BOOL=ON',
+                             src_dir])
+            env = get_vcvars_environment()
+            subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
+                           cwd=build_dir, shell=True, check=True, env=env)
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+                           cwd=build_dir, shell=True, check=True, env=env)
+        else:
+            cmakecmd.extend(['-DAMD64:BOOL=ON',
+                             src_dir])
+            subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
+            subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                           cwd=build_dir, shell=False, check=True)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
@@ -413,9 +422,16 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
-            cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
-                             '-DPNG_SHARED:BOOL=OFF',
-                             src_dir])
+            if sys.platform.startswith('linux'):
+                cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
+                                 '-DPNG_SHARED:BOOL=OFF',
+                                 '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
+                                 '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '\\zlib\\lib\\zlibstatic.a',
+                                 src_dir])
+            else:
+                cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
+                                 '-DPNG_SHARED:BOOL=OFF',
+                                 src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True)
@@ -1070,8 +1086,8 @@ def build_libs(libs: dict, update_src: bool):
 
     print('HOME:', os.environ['HOME'])
 
-    if sys.platform.startswith('win32'):
-        if libs['zlib']:
+    if libs['zlib']:
+        if not sys.platform.startswith('darwin'):
             package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'zlib*'))
             src_dir = get_package_top_level_folder(package_name, base_dir)
             if update_src:
@@ -1080,23 +1096,22 @@ def build_libs(libs: dict, update_src: bool):
             assert os.path.exists(src_dir)
             build_zlib(src_dir, os.path.join(ext_dir, 'zlib'), ext_dir)
 
-        if libs['ffmpeg']:
+    if libs['ffmpeg']:
+        if sys.platform.startswith('win32'):
             package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*win*'))
             package_unpack_folder = get_package_top_level_folder(package_name, ext_dir)
             unpack_file_to_folder(package_name, ext_dir)
             os.replace(os.path.join(package_unpack_folder, 'bin', 'ffmpeg.exe'),
                        os.path.join(ext_dir, 'ffmpeg.exe'))
             shutil.rmtree(package_unpack_folder, ignore_errors=False)
-    elif sys.platform.startswith('linux'):
-        if libs['ffmpeg']:
+        elif sys.platform.startswith('linux'):
             package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*static.tar.xz'))
             package_unpack_folder = get_package_top_level_folder(package_name, ext_dir)
             unpack_file_to_folder(package_name, ext_dir)
             os.replace(os.path.join(package_unpack_folder, 'ffmpeg'),
                        os.path.join(ext_dir, 'ffmpeg'))
             shutil.rmtree(package_unpack_folder, ignore_errors=False)
-    else:
-        if libs['ffmpeg']:
+        else:
             unpack_file_to_folder(find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*7z')),
                                   ext_dir)
 
@@ -1345,7 +1360,7 @@ def parse_inputs(argv: list):
             update_src = False
         else:
             raise SyntaxError("wrong lib name: " + lib)
-    if not sys.platform.startswith('win'):
+    if sys.platform.startswith('darwin'):
         libs['zlib'] = False
 
     for lib, rev_dep in libs_reverse_depends.items():
