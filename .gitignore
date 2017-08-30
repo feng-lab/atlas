@@ -50,6 +50,8 @@
 /src/3rdparty/benchmark/
 ffmpeg
 ffmpeg.exe
+nasm
+nasm.exe
 .idea/
 __pycache__/
 /src/version/version.h

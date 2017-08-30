@@ -1,4 +1,5 @@
 import os
+import stat
 import sys
 import shutil
 import tarfile
@@ -99,9 +100,9 @@ def find_src_package_with_glob(files: str):
     if len(file_list) == 1:
         return file_list[0]
     elif len(file_list) == 0:
-        raise Exception("Can not find matching package.")
+        raise Exception("Can not find matching package with pattern: " + files)
     else:
-        raise Exception("Find more than one matching packages.")
+        raise Exception("Find more than one matching packages with pattern: " + files)
 
 
 def get_vcvars_environment(remove_conda_from_path: bool = True):
@@ -299,7 +300,7 @@ def build_glbinding(src_dir: str, install_dir: str, ext_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str):
+def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str, nasm_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
@@ -327,7 +328,7 @@ def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str):
 
             cmakecmd = get_cmake_cmd_common_part(install_dir)
             cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
-                             '-DNASM:FILEPATH=' + ext_dir + '\\nasm.exe',
+                             '-DNASM:FILEPATH=' + nasm_dir + '\\nasm.exe',
                              '-DWITH_CRT_DLL:BOOL=ON',
                              src_dir])
             env = get_vcvars_environment()
@@ -340,12 +341,12 @@ def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str):
         else:
             if sys.platform.startswith('linux'):
                 subprocess.run(['sh', src_dir + '/configure',
-                                'NASM=' + ext_dir + '/nasm_linux',
+                                'NASM=' + nasm_dir + '/nasm',
                                 '--enable-static', '--disable-shared'],
                                cwd=build_dir, shell=False, check=True)
             else:
                 subprocess.run(['sh', src_dir + '/configure', '--host', 'x86_64-apple-darwin',
-                                'NASM=' + ext_dir + '/nasm',
+                                'NASM=' + nasm_dir + '/nasm',
                                 '--enable-static', '--disable-shared',
                                 'CFLAGS=-mmacosx-version-min=' + macos_min_version() + ' -O3',
                                 'LDFLAGS=-mmacosx-version-min=' + macos_min_version()],
@@ -1161,13 +1162,26 @@ def build_libs(libs: dict, update_src: bool):
         build_glbinding(src_dir, os.path.join(ext_dir, 'glbinding'), ext_dir)
 
     if libs['libjpeg']:
+        if sys.platform.startswith('win32'):
+            nasm_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'nasm*win64*'))
+        elif sys.platform.startswith('linux'):
+            nasm_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'nasm*linux*'))
+        else:
+            nasm_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'nasm*macosx*'))
+        nasm_package_unpack_folder = get_package_top_level_folder(nasm_package_name, base_dir)
         package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'libjpeg*'))
         src_dir = get_package_top_level_folder(package_name, base_dir)
         if update_src:
+            shutil.rmtree(nasm_package_unpack_folder, ignore_errors=True)
+            unpack_file_to_folder(nasm_package_name, base_dir)
             shutil.rmtree(src_dir, ignore_errors=True)
             unpack_file_to_folder(package_name, base_dir)
+        nasm_dir = nasm_package_unpack_folder
         assert os.path.exists(src_dir)
-        build_libjpeg(src_dir, os.path.join(ext_dir, 'libjpeg-turbo'), ext_dir)
+        assert os.path.exists(nasm_dir)
+        if sys.platform.startswith('darwin'):
+            os.chmod(os.path.join(nasm_dir, 'nasm'), stat.S_IXUSR)
+        build_libjpeg(src_dir, os.path.join(ext_dir, 'libjpeg-turbo'), ext_dir, nasm_dir=nasm_dir)
 
     if libs['libpng']:
         package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'libpng*'))

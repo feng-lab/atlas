@@ -4,8 +4,12 @@
 * brew install unrar p7zip git cmake
 
 ### Windows:
-* install visual studio, qt5, intel c composer (for mkl, ipp, tbb) and python3, 7z, git and cmake
+* install visual studio, qt5, intel c composer (for mkl, ipp, tbb), python3, 7z, git and cmake
 * patch libtiff win32 TIFFFdOpen
+
+### Linux:
+* install qt5, mkl, ipp, tbb, python3 and cmake
+* sudo apt-get install unrar p7zip-full git nasm
 
 ### All:
 * code repository folder should be named as "atlas"; "atlas_others" folder and "atlas" folder should be in same directory
