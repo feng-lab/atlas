@@ -1133,6 +1133,7 @@ def build_libs(libs: dict, update_src: bool):
     if libs['scopeguard']:
         src_dir = os.path.join(base_dir, 'SC22WG21_Papers')
         update_or_clone_git_repository(src_dir, 'git@github.com:PeterSommerlad/SC22WG21_Papers.git')
+        shutil.rmtree(os.path.join(ext_dir, 'scopeguard'), ignore_errors=True)
         shutil.copytree(os.path.join(src_dir, 'workspace', 'P0052_scope_exit', 'src'),
                         os.path.join(ext_dir, 'scopeguard'))
 
