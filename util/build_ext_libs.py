@@ -141,7 +141,7 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
     stdout, stderr = process.communicate()
     exitcode = process.wait()
     if exitcode != 0:
-        print(stderr.strip())
+        print(stderr.strip(), flush=True)
         raise Exception("Got error code {} from subprocess.".format(exitcode))
     env = json.loads(stdout.strip())
     if remove_conda_from_path:
