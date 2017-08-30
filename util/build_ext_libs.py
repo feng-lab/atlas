@@ -139,6 +139,7 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
                 script, para, python),
             stdout=subprocess.PIPE, shell=True, universal_newlines=True, env=start_env)
     stdout, _ = process.communicate()
+    print(stdout.strip())
     exitcode = process.wait()
     if exitcode != 0:
         print(stdout)
