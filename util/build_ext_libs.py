@@ -141,6 +141,7 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
     stdout, _ = process.communicate()
     exitcode = process.wait()
     if exitcode != 0:
+        print(stdout)
         raise Exception("Got error code {} from subprocess.".format(exitcode))
     env = json.loads(stdout.strip())
     if remove_conda_from_path:
@@ -1039,11 +1040,10 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                     to_lines.append(line)
             print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
         else:
-            env = get_enviroment_from_shell_script('/opt/intel/tbb/bin/tbbvars.sh')
-            print('TBBROOT:', env['TBBROOT'])
-
             cmakecmd = get_cmake_cmd_common_part(install_dir)
             if sys.platform.startswith('linux'):
+                env = get_enviroment_from_shell_script('/opt/intel/tbb/bin/tbbvars.sh', 'intel64')
+                print('TBBROOT:', env['TBBROOT'])
                 cmakecmd.extend(['-DWITH_PTHREADS_PF:BOOL=OFF',
                                  '-DBUILD_opencv_videoio:BOOL=OFF',
                                  '-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -1092,6 +1092,8 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                                  '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '/zlib/lib/libz.a',
                                  src_dir])
             else:
+                env = get_enviroment_from_shell_script('/opt/intel/tbb/bin/tbbvars.sh')
+                print('TBBROOT:', env['TBBROOT'])
                 cmakecmd.extend(['-DWITH_PTHREADS_PF:BOOL=OFF',
                                  '-DBUILD_opencv_videoio:BOOL=OFF',
                                  '-DBUILD_SHARED_LIBS:BOOL=OFF',
