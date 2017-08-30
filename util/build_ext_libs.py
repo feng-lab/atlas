@@ -132,7 +132,12 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
         process = subprocess.Popen(
             '"{}" {} >nul && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
                 script, para, python),
-            stdout=subprocess.PIPE, shell=False, universal_newlines=True, env=start_env)
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, universal_newlines=True, env=start_env)
+    elif sys.platform.startswith('linux'):
+        process = subprocess.Popen(
+            '"{}" {} > /dev/null && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
+                script, para, python),
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True, env=start_env)
     else:
         process = subprocess.Popen(
             '. "{}" {} > /dev/null && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
@@ -143,7 +148,7 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
     if exitcode != 0:
         print(stdout, flush=True)
         print(stderr, flush=True)
-        raise Exception("Got error code {} from subprocess.".format(stdout))
+        raise Exception("Got error code {} from subprocess.".format(exitcode))
     env = json.loads(stdout.strip())
     if remove_conda_from_path:
         remove_path_contains('miniconda', env)
