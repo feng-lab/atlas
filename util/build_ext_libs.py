@@ -1169,10 +1169,10 @@ def build_libs(libs: dict, update_src: bool):
             nasm_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'nasm*macosx*'))
         if not sys.platform.startswith('linux'):
             nasm_package_unpack_folder = get_package_top_level_folder(nasm_package_name, base_dir)
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'libjpeg*'))
             nasm_dir = nasm_package_unpack_folder
         else:
             nasm_dir = ''
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'libjpeg*'))
         src_dir = get_package_top_level_folder(package_name, base_dir)
         if update_src:
             if not sys.platform.startswith('linux'):
