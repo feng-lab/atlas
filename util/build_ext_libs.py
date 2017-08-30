@@ -1165,23 +1165,24 @@ def build_libs(libs: dict, update_src: bool):
     if libs['libjpeg']:
         if sys.platform.startswith('win32'):
             nasm_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'nasm*win64*'))
-        elif sys.platform.startswith('linux'):
-            nasm_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'nasm*linux*'))
-        else:
+        elif sys.platform.startswith('darwin'):
             nasm_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'nasm*macosx*'))
-        nasm_package_unpack_folder = get_package_top_level_folder(nasm_package_name, base_dir)
-        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'libjpeg*'))
+        if not sys.platform.startswith('linux'):
+            nasm_package_unpack_folder = get_package_top_level_folder(nasm_package_name, base_dir)
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'libjpeg*'))
+            nasm_dir = nasm_package_unpack_folder
+        else:
+            nasm_dir = ''
         src_dir = get_package_top_level_folder(package_name, base_dir)
         if update_src:
-            shutil.rmtree(nasm_package_unpack_folder, ignore_errors=True)
-            unpack_file_to_folder(nasm_package_name, base_dir)
+            if not sys.platform.startswith('linux'):
+                shutil.rmtree(nasm_package_unpack_folder, ignore_errors=True)
+                unpack_file_to_folder(nasm_package_name, base_dir)
+                if sys.platform.startswith('darwin'):
+                    os.chmod(os.path.join(nasm_dir, 'nasm'), stat.S_IXUSR)
             shutil.rmtree(src_dir, ignore_errors=True)
             unpack_file_to_folder(package_name, base_dir)
-        nasm_dir = nasm_package_unpack_folder
         assert os.path.exists(src_dir)
-        assert os.path.exists(nasm_dir)
-        if sys.platform.startswith('darwin'):
-            os.chmod(os.path.join(nasm_dir, 'nasm'), stat.S_IXUSR)
         build_libjpeg(src_dir, os.path.join(ext_dir, 'libjpeg-turbo'), ext_dir, nasm_dir=nasm_dir)
 
     if libs['libpng']:
