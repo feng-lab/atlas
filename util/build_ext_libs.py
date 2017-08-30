@@ -1048,6 +1048,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
         else:
             cmakecmd = get_cmake_cmd_common_part(install_dir)
             if sys.platform.startswith('linux'):
+                os.chmod('/opt/intel/tbb/bin/tbbvars.sh', stat.S_IXUSR)
                 env = get_enviroment_from_shell_script('/opt/intel/tbb/bin/tbbvars.sh', 'intel64')
                 print('TBBROOT:', env['TBBROOT'])
                 cmakecmd.extend(['-DWITH_PTHREADS_PF:BOOL=OFF',
