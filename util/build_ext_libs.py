@@ -137,7 +137,7 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
         process = subprocess.Popen(
             '. "{}" {} > /dev/null && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
                 script, para, python),
-            stdout=subprocess.PIPE, stderr=sys.stdout, shell=True, universal_newlines=True, env=start_env)
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True, env=start_env)
     stdout, stderr = process.communicate()
     exitcode = process.wait()
     if exitcode != 0:
