@@ -138,11 +138,10 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
             '. "{}" {} > /dev/null && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
                 script, para, python),
             stdout=subprocess.PIPE, shell=True, universal_newlines=True, env=start_env)
-    stdout, _ = process.communicate()
-    print(stdout.strip())
+    stdout, stderr = process.communicate()
     exitcode = process.wait()
     if exitcode != 0:
-        print(stdout)
+        print(stderr.strip())
         raise Exception("Got error code {} from subprocess.".format(exitcode))
     env = json.loads(stdout.strip())
     if remove_conda_from_path:
