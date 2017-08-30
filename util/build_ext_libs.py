@@ -135,7 +135,7 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
             stdout=subprocess.PIPE, shell=False, universal_newlines=True, env=start_env)
     else:
         process = subprocess.Popen(
-            'source "{}" {} > /dev/null && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
+            '. "{}" {} > /dev/null && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
                 script, para, python),
             stdout=subprocess.PIPE, shell=True, universal_newlines=True, env=start_env)
     stdout, _ = process.communicate()
@@ -914,7 +914,7 @@ def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
                                  '-DBUILD_SHARED_LIBS:BOOL=OFF',
                                  '-DVTK_USE_SYSTEM_ZLIB:BOOL=ON',
                                  '-DVTK_LEGACY_REMOVE:BOOL=ON',
-                                 '-DVTK_USE_SYSTEM_LIBXML2:BOOL=ON',
+                                 '-DVTK_USE_SYSTEM_LIBXML2:BOOL=OFF',
                                  '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '/zlib/include',
                                  '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '/zlib/lib/libz.a',
                                  src_dir])
@@ -940,17 +940,18 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
     orig_file = os.path.join(src_dir, 'cmake', 'OpenCVCompilerOptions.cmake')
     bak_file = get_bak_file_name(orig_file)
     try:
-        os.rename(orig_file, bak_file)
-        with open(bak_file, mode='r', encoding='utf-8') as f:
-            from_lines = f.readlines()
-        with open(orig_file, mode='w', encoding='utf-8') as f:
-            to_lines = []
-            for line in from_lines:
-                line = line.replace(r'stdc++',
-                                    r'')
-                f.write(line)
-                to_lines.append(line)
-        print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+        if sys.platform.startswith('darwin'):
+            os.rename(orig_file, bak_file)
+            with open(bak_file, mode='r', encoding='utf-8') as f:
+                from_lines = f.readlines()
+            with open(orig_file, mode='w', encoding='utf-8') as f:
+                to_lines = []
+                for line in from_lines:
+                    line = line.replace(r'stdc++',
+                                        r'')
+                    f.write(line)
+                    to_lines.append(line)
+            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
 
         if sys.platform.startswith('win32'):
             intel_sw_dir = 'C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\'
