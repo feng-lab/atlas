@@ -372,8 +372,7 @@ def build_zlib(src_dir: str, install_dir: str, ext_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
         if sys.platform.startswith('win'):
-            cmakecmd.extend(['-DAMD64:BOOL=ON',
-                             src_dir])
+            cmakecmd.extend([src_dir])
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
             subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
