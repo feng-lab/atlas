@@ -991,20 +991,9 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
 
     orig_file = os.path.join(src_dir, 'cmake', 'OpenCVCompilerOptions.cmake')
     bak_file = get_bak_file_name(orig_file)
+    orig_file_3 = os.path.join(src_dir, 'modules', 'core', 'include', 'opencv2', 'core', 'private.hpp')
+    bak_file_3 = get_bak_file_name(orig_file_3)
     try:
-        if sys.platform.startswith('darwin'):
-            os.rename(orig_file, bak_file)
-            with open(bak_file, mode='r', encoding='utf-8') as f:
-                from_lines = f.readlines()
-            with open(orig_file, mode='w', encoding='utf-8') as f:
-                to_lines = []
-                for line in from_lines:
-                    line = line.replace(r'stdc++',
-                                        r'')
-                    f.write(line)
-                    to_lines.append(line)
-            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
-
         if sys.platform.startswith('win32'):
             intel_sw_dir = 'C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\'
             env = get_enviroment_from_shell_script(intel_sw_dir + 'tbb\\bin\\tbbvars.bat',
@@ -1093,6 +1082,18 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
         else:
             cmakecmd = get_cmake_cmd_common_part(install_dir)
             if sys.platform.startswith('linux'):
+                os.rename(orig_file_3, bak_file_3)
+                with open(bak_file_3, mode='r', encoding='utf-8') as f:
+                    from_lines = f.readlines()
+                with open(orig_file_3, mode='w', encoding='utf-8') as f:
+                    to_lines = []
+                    for line in from_lines:
+                        line = line.replace(r'#define CV_INSTRUMENT_FUN_IPP(FUN, ...) ((FUN)(__VA_ARGS__))',
+                                            r'#define CV_INSTRUMENT_FUN_IPP(FUN, ...) (FUN(__VA_ARGS__))')
+                        f.write(line)
+                        to_lines.append(line)
+                print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_3, tofile='<new>'))))
+
                 env = get_enviroment_from_shell_script('/opt/intel/tbb/bin/tbbvars.sh', 'intel64')
                 print('TBBROOT:', env['TBBROOT'])
                 cmakecmd.extend(['-DWITH_PTHREADS_PF:BOOL=OFF',
@@ -1143,6 +1144,18 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                                  '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '/zlib/lib/libz.a',
                                  src_dir])
             else:
+                os.rename(orig_file, bak_file)
+                with open(bak_file, mode='r', encoding='utf-8') as f:
+                    from_lines = f.readlines()
+                with open(orig_file, mode='w', encoding='utf-8') as f:
+                    to_lines = []
+                    for line in from_lines:
+                        line = line.replace(r'stdc++',
+                                            r'')
+                        f.write(line)
+                        to_lines.append(line)
+                print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+
                 env = get_enviroment_from_shell_script('/opt/intel/tbb/bin/tbbvars.sh')
                 print('TBBROOT:', env['TBBROOT'])
                 cmakecmd.extend(['-DWITH_PTHREADS_PF:BOOL=OFF',
@@ -1190,6 +1203,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                                  '-DBUILD_opencv_apps:BOOL=OFF',
                                  '-DBUILD_opencv_matlab:BOOL=OFF',
                                  src_dir])
+
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True, env=env)
@@ -1212,7 +1226,10 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                     to_lines.append(line)
             print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
     finally:
-        os.replace(bak_file, orig_file)
+        if sys.platform.startswith('darwin'):
+            os.replace(bak_file, orig_file)
+        elif sys.platform.startswith('linux'):
+            os.replace(bak_file_3, orig_file_3)
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
