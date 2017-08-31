@@ -512,6 +512,8 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
     del ext_dir
     shutil.rmtree(install_dir, ignore_errors=True)
 
+    orig_file = os.path.join(src_dir, 'makeengine.gte')
+    bak_file = get_bak_file_name(orig_file)
     try:
         if sys.platform.startswith('win'):
             env = get_vcvars_environment()
@@ -525,6 +527,20 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
             glob_copy(os.path.join(src_dir, '_Output', 'v141', 'x64', 'Release', 'GTEngine.v15.pdb'),
                       os.path.join(install_dir, 'lib'))
         elif sys.platform.startswith('linux'):
+            os.rename(orig_file, bak_file)
+            with open(bak_file, mode='r', encoding='utf-8') as f:
+                from_lines = f.readlines()
+            with open(orig_file, mode='w', encoding='utf-8') as f:
+                to_lines = []
+                for line in from_lines:
+                    line = line.replace(r'$(SRC_APPLICATIONS_GLX)/*.cpp',
+                                        r'$(SRC_APPLICATIONS_GLX)/*.nonono')
+                    line = line.replace(r'$(SRC_APPLICATIONS_GLX)/%.cpp',
+                                        r'$(SRC_APPLICATIONS_GLX)/%.nonono')
+                    f.write(line)
+                    to_lines.append(line)
+            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'CFG=Release', '-f', 'makeengine.gte'],
                            cwd=src_dir, shell=False, check=True)
             shutil.copytree(os.path.join(src_dir, 'lib', 'Release'), os.path.join(install_dir, 'lib'))
@@ -540,6 +556,8 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
     finally:
         shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)  # macOS
         shutil.rmtree(os.path.join(src_dir, '_Output'), ignore_errors=True)  # win
+        if sys.platform.startswith('linux'):
+            os.replace(bak_file, orig_file)
 
 
 def build_ospray(src_dir: str, install_dir: str, ext_dir: str, ispc_dir: str, embree_dir: str):
@@ -693,6 +711,10 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
     bak_file = get_bak_file_name(orig_file)
     orig_file_2 = os.path.join(src_dir, 'Source', 'LibRawLite', 'internal', 'libraw_x3f.cpp')
     bak_file_2 = get_bak_file_name(orig_file_2)
+    orig_file_3 = os.path.join(src_dir, 'Makefile.gnu')
+    bak_file_3 = get_bak_file_name(orig_file_3)
+    orig_file_4 = os.path.join(src_dir, 'Makefile.fip')
+    bak_file_4 = get_bak_file_name(orig_file_4)
     try:
         os.rename(orig_file, bak_file)
         with open(bak_file, mode='r', encoding='utf-8') as f:
@@ -737,6 +759,39 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
             distutils.dir_util.copy_tree(os.path.join(src_dir, 'Wrapper', 'FreeImagePlus', 'dist', 'x64'),
                                          install_dir)
         elif sys.platform.startswith('linux'):
+            os.rename(orig_file_3, bak_file_3)
+            with open(bak_file_3, mode='r', encoding='utf-8') as f:
+                from_lines = f.readlines()
+            with open(orig_file_3, mode='w', encoding='utf-8') as f:
+                to_lines = []
+                for line in from_lines:
+                    line = line.replace(r'INCDIR ?= $(DESTDIR)/usr/include',
+                                        r'INCDIR ?= $(DESTDIR)$(PREFIX)/include')
+                    line = line.replace(r'INSTALLDIR ?= $(DESTDIR)/usr/lib',
+                                        r'INSTALLDIR ?= $(DESTDIR)$(PREFIX)/lib')
+                    line = line.replace(r' -o root -g root ',
+                                        r' ')
+                    f.write(line)
+                    to_lines.append(line)
+            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_3, tofile='<new>'))))
+
+            os.rename(orig_file_4, bak_file_4)
+            with open(bak_file_4, mode='r', encoding='utf-8') as f:
+                from_lines = f.readlines()
+            with open(orig_file_4, mode='w', encoding='utf-8') as f:
+                to_lines = []
+                for line in from_lines:
+                    line = line.replace(r'INCDIR ?= $(DESTDIR)/usr/include',
+                                        r'INCDIR ?= $(DESTDIR)$(PREFIX)/include')
+                    line = line.replace(r'INSTALLDIR ?= $(DESTDIR)/usr/lib',
+                                        r'INSTALLDIR ?= $(DESTDIR)$(PREFIX)/lib')
+                    line = line.replace(r' -o root -g root ',
+                                        r' ')
+                    f.write(line)
+                    to_lines.append(line)
+            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_4, tofile='<new>'))))
+
+
             subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count())],
                            cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count()), 'install',
@@ -768,25 +823,18 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
                            cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-f', 'Makefile_fip', 'clean'],
                            cwd=src_dir, shell=False, check=True)
-
-            subprocess.run(['install_name_tool', '-id',
-                            install_dir + '/lib/libfreeimage.dylib',
-                            install_dir + '/lib/libfreeimage.dylib'],
-                           shell=False, check=True)
-            subprocess.run(['install_name_tool', '-id',
-                            install_dir + '/lib/libfreeimageplus.dylib',
-                            install_dir + '/lib/libfreeimageplus.dylib'],
-                           shell=False, check=True)
     finally:
         os.replace(bak_file, orig_file)
         os.replace(bak_file_2, orig_file_2)
         if sys.platform.startswith('darwin'):
             os.remove(os.path.join(src_dir, 'Makefile_gnu'))
             os.remove(os.path.join(src_dir, 'Makefile_fip'))
+        elif sys.platform.startswith('linux'):
+            os.replace(bak_file_3, orig_file_3)
+            os.replace(bak_file_4, orig_file_4)
 
 
 def build_botan(src_dir: str, install_dir: str, ext_dir: str):
-    del ext_dir
     shutil.rmtree(install_dir, ignore_errors=True)
 
     try:
@@ -805,6 +853,8 @@ def build_botan(src_dir: str, install_dir: str, ext_dir: str):
                            cwd=src_dir, shell=False, check=True, env=env)  # todo: install not working
         elif sys.platform.startswith('linux'):
             subprocess.run([python, src_dir + '/configure.py', '--with-zlib',
+                            '--with-external-includedir=' + ext_dir + '/zlib/include',
+                            '--with-external-libdir=' + ext_dir + '/zlib/lib',
                             '--prefix=' + install_dir],
                            cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
