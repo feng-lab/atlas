@@ -5,7 +5,6 @@ include fipMakefile.srcs
 
 # General configuration variables:
 DESTDIR ?= /
-PREFIX ?= /usr/local
 INCDIR ?= $(DESTDIR)$(PREFIX)/include
 INSTALLDIR ?= $(DESTDIR)$(PREFIX)/lib
 
@@ -48,10 +47,11 @@ default: all
 all: dist
 
 dist: FreeImage
-	cp *.a Dist
-	cp *.dylib Dist
-	cp Source/FreeImage.h Dist
-	cp Wrapper/FreeImagePlus/FreeImagePlus.h Dist
+	mkdir -p Dist
+	cp *.a Dist/
+	cp *.dylib Dist/
+	cp Source/FreeImage.h Dist/
+	cp Wrapper/FreeImagePlus/FreeImagePlus.h Dist/
 
 dos2unix:
 	@$(DOS2UNIX) $(SRCS)
@@ -68,7 +68,7 @@ $(STATICLIB): $(MODULES)
 	$(AR) r $@ $(MODULES)
 
 $(SHAREDLIB): $(MODULES)
-	$(CXX) -dynamiclib -install_name $(LIBNAME) -current_version $(VER_MAJOR).$(VER_MINOR) -compatibility_version $(VER_MAJOR) $(LDFLAGS) -o $@ $(MODULES)
+	$(CXX) -dynamiclib -install_name @rpath/$(LIBNAME) -current_version $(VER_MAJOR).$(VER_MINOR) -compatibility_version $(VER_MAJOR) $(LDFLAGS) -o $@ $(MODULES)
 
 install:
 	install -d $(INCDIR) $(INSTALLDIR)
@@ -76,7 +76,8 @@ install:
 	install -m 644 $(HEADERFIP) $(INCDIR)
 	install -m 644 $(STATICLIB) $(INSTALLDIR)
 	install -m 755 $(SHAREDLIB) $(INSTALLDIR)
-	ln -s $(SHAREDLIB) $(INSTALLDIR)/$(LIBNAME)
+	ln -sf $(SHAREDLIB) $(INSTALLDIR)/$(VERLIBNAME)
+	ln -sf $(VERLIBNAME) $(INSTALLDIR)/$(LIBNAME)
 
 clean:
 	rm -f core Dist/*.* u2dtmp* $(MODULES) $(STATICLIB) $(SHAREDLIB) $(LIBNAME)

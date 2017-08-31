@@ -705,7 +705,11 @@ else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -Wshadow)
   target_compile_options(${APP_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
 
-  target_link_libraries(${APP_NAME} PUBLIC -stdlib=libc++ "-rpath @executable_path/../Frameworks")
+  target_link_libraries(${APP_NAME} PUBLIC -stdlib=libc++)
+
+  set_target_properties(${APP_NAME} PROPERTIES
+                        BUILD_RPATH "@executable_path/../Frameworks"
+                        INSTALL_RPATH "@executable_path/../Frameworks")
 
   # for some files
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
