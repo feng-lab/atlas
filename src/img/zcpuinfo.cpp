@@ -14,6 +14,7 @@
 #include <sys/sysctl.h>
 #include <cpuid.h>
 #else
+#include <sys/sysinfo.h>
 #include <cpuid.h>
 #include <unistd.h>
 #endif
@@ -514,6 +515,56 @@ void ZCpuInfo::detectCoreAndThreadNumber()
   nm[1] = HW_L3CACHESIZE;
   if (sysctl(nm, 2, &count, &len, nullptr, 0) == 0) {
     nL3CacheSize = count;
+  }
+#else
+  struct sysinfo info;
+  if (sysinfo(&info) == 0) {
+    nPhysicalRAM = info.totalram;
+  }
+
+  QProcess lscpu;
+  lscpu.start("lscpu");
+
+  if (lscpu.waitForFinished(-1)) {
+    QString lscpuOutput(lscpu.readAllStandardOutput());
+    QStringList cpuInfos = lscpuOutput.split(QChar('\n'), QString::SkipEmptyParts);
+    int64_t threadsPerCore = 0;
+    for (const auto& cpuInfo : cpuInfos) {
+      QStringList cInfo = cpuInfo.split(QChar(':'), QString::SkipEmptyParts);
+      if (cInfo.size() == 2) {
+        bool ok = false;
+        if (cInfo[0] == "CPU(s)") {
+          nLogicalCores = cInfo[1].toLongLong(&ok);
+        } else if (cInfo[0] == "Thread(s) per core") {
+          threadsPerCore = cInfo[1].toLongLong(&ok);
+        } else if (cInfo[0] == "L1d cache") {
+          if (cInfo[1].endsWith("K")) {
+            cInfo[1].chop(1);
+            nL1DCacheSize = cInfo[1].toLongLong(&ok) * 1024;
+          }
+        } else if (cInfo[0] == "L1i cache") {
+          if (cInfo[1].endsWith("K")) {
+            cInfo[1].chop(1);
+            nL1ICacheSize = cInfo[1].toLongLong(&ok) * 1024;
+          }
+        } else if (cInfo[0] == "L2 cache") {
+          if (cInfo[1].endsWith("K")) {
+            cInfo[1].chop(1);
+            nL2CacheSize = cInfo[1].toLongLong(&ok) * 1024;
+          }
+        } else if (cInfo[0] == "L3 cache") {
+          if (cInfo[1].endsWith("K")) {
+            cInfo[1].chop(1);
+            nL3CacheSize = cInfo[1].toLongLong(&ok) * 1024;
+          }
+        }
+      }
+    }
+    if (threadsPerCore != 0) {
+      nPhysicalCores = nLogicalCores / threadsPerCore;
+    }
+  } else {
+    LOG(ERROR) << lscpu.readAllStandardError();
   }
 #endif
 }

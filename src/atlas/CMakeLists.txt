@@ -155,9 +155,13 @@ if (WIN32)
       ${SYSDIR}/VidMemViaDDraw.cpp
       ${SYSDIR}/VidMemViaDxDiag.cpp
       )
-else (WIN32)
+elseif (APPLE)
   set(SYS_SOURCES
       ${SYSDIR}/VideoMemoryMac.cpp
+      )
+else (WIN32)
+  set(SYS_SOURCES
+      ${SYSDIR}/VideoMemoryLinux.cpp
       )
 endif (WIN32)
 source_group(sys FILES ${SYS_SOURCES})
@@ -703,9 +707,12 @@ else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -Wbool-conversion -Wconstant-conversion -Wenum-conversion)
   target_compile_options(${APP_NAME} PUBLIC -Wc++14-compat-pedantic -Waddress -Waddress-of-temporary -Wdeprecated)
   target_compile_options(${APP_NAME} PUBLIC -Wshadow)
-  target_compile_options(${APP_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
+  target_compile_options(${APP_NAME} PRIVATE -Wundefined-reinterpret-cast)
 
-  target_link_libraries(${APP_NAME} PUBLIC -stdlib=libc++)
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    target_compile_options(${APP_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
+    target_link_libraries(${APP_NAME} PUBLIC -stdlib=libc++)
+  endif ()
 
   set_target_properties(${APP_NAME} PROPERTIES
                         BUILD_RPATH "@executable_path/../Frameworks"
