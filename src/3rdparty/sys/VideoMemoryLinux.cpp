@@ -1,6 +1,7 @@
 #include "zlog.h"
 #include <QProcess>
-#include <QString>
+
+namespace nim {
 
 uint64_t getDedicatedVideoMemoryMB()
 {
@@ -15,9 +16,9 @@ uint64_t getDedicatedVideoMemoryMB()
     for (const auto& gpuInfo : gpuInfos) {
       LOG(INFO) << gpuInfo;
       QStringList gInfo = gpuInfo.split(QChar(' '), QString::SkipEmptyParts);
-      for (size_t i = 0; i < gInfo.size(); ++i) {
+      for (int i = 0; i < gInfo.size(); ++i) {
         if (QString::compare(gInfo[i], "kBytes", Qt::CaseInsensitive) == 0 ||
-          QString::compare(gInfo[i], "kByte", Qt::CaseInsensitive) == 0) {
+            QString::compare(gInfo[i], "kByte", Qt::CaseInsensitive) == 0) {
           if (i > 0 && res == 0) {
             res = gInfo[i-1].toLongLong() * 1024;
           }
@@ -29,3 +30,5 @@ uint64_t getDedicatedVideoMemoryMB()
   }
   return res;
 }
+
+} // namespace nim

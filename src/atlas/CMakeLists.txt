@@ -71,7 +71,7 @@ else (WIN32)
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/lib/libGTEngine.a)
 endif (WIN32)
 
-find_package(BENCHMARK REQUIRED
+find_package(benchmark REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/benchmark NO_DEFAULT_PATH)
 
 find_package(HDF5 REQUIRED COMPONENTS C CXX static
@@ -676,9 +676,9 @@ target_compile_definitions(${APP_NAME} PUBLIC EIGEN_NO_DEBUG EIGEN_DONT_PARALLEL
 target_compile_definitions(${APP_NAME} PUBLIC EIGEN_USE_BLAS EIGEN_USE_LAPACKE_STRICT) # EIGEN_USE_MKL_VML)
 target_compile_definitions(${APP_NAME} PUBLIC QT_USE_QSTRINGBUILDER QT_NO_CAST_FROM_BYTEARRAY QT_NO_CAST_TO_ASCII)
 target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_CORE_PROFILE ATLAS_USE_MKL ATLAS_USE_IPP)
+target_compile_definitions(${APP_NAME} PUBLIC lapack_complex_float=std::complex<float> lapack_complex_double=std::complex<double>)
 if (WIN32)
   target_compile_definitions(${APP_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
-  target_compile_definitions(${APP_NAME} PUBLIC lapack_complex_float=std::complex<float> lapack_complex_double=std::complex<double>)
 
   target_compile_options(${APP_NAME} PUBLIC /GR) # Enable Run-Time Type Information
   target_compile_options(${APP_NAME} PUBLIC /EHsc) # exception handling model, https://msdn.microsoft.com/en-us/library/1deeycx5.aspx
@@ -704,13 +704,14 @@ else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -frtti)
   target_compile_options(${APP_NAME} PUBLIC -fexceptions)
   target_compile_options(${APP_NAME} PUBLIC -Wall -Wextra)
-  target_compile_options(${APP_NAME} PUBLIC -Wbool-conversion -Wconstant-conversion -Wenum-conversion)
-  target_compile_options(${APP_NAME} PUBLIC -Wc++14-compat-pedantic -Waddress -Waddress-of-temporary -Wdeprecated)
-  target_compile_options(${APP_NAME} PUBLIC -Wshadow)
-  target_compile_options(${APP_NAME} PRIVATE -Wundefined-reinterpret-cast)
+  target_compile_options(${APP_NAME} PUBLIC -Waddress -Wdeprecated)
 
   if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    target_compile_options(${APP_NAME} PUBLIC -Wbool-conversion -Wconstant-conversion -Wenum-conversion)
+    target_compile_options(${APP_NAME} PUBLIC -Wc++14-compat-pedantic -Waddress-of-temporary)
+    target_compile_options(${APP_NAME} PRIVATE -Wundefined-reinterpret-cast)
     target_compile_options(${APP_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
+    target_compile_options(${APP_NAME} PUBLIC -Wshadow)
     target_link_libraries(${APP_NAME} PUBLIC -stdlib=libc++)
   endif ()
 
@@ -720,7 +721,7 @@ else (WIN32)
 
   # for some files
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
-                              "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
+                              "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers -Wno-unknown-pragmas -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
   set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
   set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS "-isystem ${ASSIMP_INCLUDE_DIRS}")
 

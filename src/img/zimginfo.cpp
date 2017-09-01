@@ -273,9 +273,12 @@ void ZImgInfo::setVoxelFormat(const QString& dt, size_t validBitCountIn)
   validBitCount = validBitCountIn;
 }
 
-#ifndef _MSC_VER
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconstant-conversion"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverflow"
 #endif
 
 template<typename TValue>
@@ -389,8 +392,10 @@ template float ZImgInfo::dataRangeMax<float>() const;
 
 template double ZImgInfo::dataRangeMax<double>() const;
 
-#ifndef _MSC_VER
+#ifdef __clang__
 #pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
 #endif
 
 } // namespace nim

@@ -5,6 +5,8 @@
 #include <iostream>
 #include "zlog.h"
 
+namespace nim {
+
 uint64_t getDedicatedVideoMemoryMB()
 {
   uint64_t res = 0;
@@ -35,3 +37,5 @@ uint64_t getDedicatedVideoMemoryMB()
   CGLDestroyRendererInfo(rend);
   return res;
 }
+
+} // namespace nim

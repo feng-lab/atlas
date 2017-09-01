@@ -1,7 +1,7 @@
 #include "zimgjpegxr.h"
 
-#include <JXRGlue.h>
 #include <QFile>
+#include <JXRGlue.h>
 #include <cmath>
 
 namespace {

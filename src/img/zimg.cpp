@@ -119,8 +119,14 @@ ZImgSubBlock::~ZImgSubBlock() = default;
 
 //-----------------------------------------------------------------------------------
 
+ZImg::ZImg()
+  : m_ownData(true)
+{
+}
+
 ZImg::ZImg(const ZImgInfo& info)
   : m_info(info)
+  , m_ownData(true)
 {
   allocate();
 }

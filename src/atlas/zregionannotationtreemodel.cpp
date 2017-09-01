@@ -28,7 +28,7 @@ QVariant ZRegionAnnotationTreeModel::data(const QModelIndex& index, int role) co
         return item->abbreviation;
         break;
       case IDColumn:
-        return item->id;
+        return qlonglong(item->id);
         break;
       case NameColumn:
         return item->name;

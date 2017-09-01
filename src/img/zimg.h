@@ -104,7 +104,7 @@ public:
   };
 
   // create empty image
-  ZImg() = default;
+  ZImg();
 
   // create image with size and attribute specified by info and set all data to default value
   // see allocate() for default voxel value
@@ -1129,7 +1129,7 @@ private:
   ZImgThumbernail m_thumbnail;
   ZImgInfo m_info;
   ZImgMetadata m_metadata;
-  bool m_ownData = true;
+  bool m_ownData;
 };
 
 template<typename TPixel>
