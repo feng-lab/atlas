@@ -63,12 +63,17 @@ if (WIN32)
   set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/FreeImagePlus.lib
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/FreeImage.lib)
-else (WIN32)
+elseif (APPLE)
   set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/include)
   set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/lib/libfreeimageplus.dylib)
-endif (WIN32)
+else ()
+  set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/include)
+  set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/freeimage/lib/libfreeimageplus.so)
+endif ()
 
 find_package(gflags REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/gflags NO_DEFAULT_PATH)

@@ -20,13 +20,19 @@ if (WIN32)
       ${MKL_PATH}/lib/intel64/mkl_intel_thread.lib
       ${MKL_PATH}/lib/intel64/mkl_core.lib
       ${INTEL_PATH}/lib/intel64/libiomp5md.lib)
-else (WIN32)
+elseif (APPLE)
   set(MKL_LIBRARIES ${MKL_LIBRARIES}
       ${MKL_PATH}/lib/libmkl_intel_lp64.a
       ${MKL_PATH}/lib/libmkl_intel_thread.a
       ${MKL_PATH}/lib/libmkl_core.a
       ${INTEL_PATH}/lib/libiomp5.dylib)
-endif (WIN32)
+else ()
+  set(MKL_LIBRARIES ${MKL_LIBRARIES}
+      ${MKL_PATH}/lib/intel64/libmkl_intel_lp64.a
+      ${MKL_PATH}/lib/intel64/libmkl_intel_thread.a
+      ${MKL_PATH}/lib/intel64/libmkl_core.a
+      ${INTEL_PATH}/lib/intel64/libiomp5.so)
+endif ()
 
 if (WIN32)
   set(IPP_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\ipp")
@@ -42,7 +48,7 @@ if (WIN32)
       ${IPP_PATH}/lib/intel64/ippsmt.lib
       ${IPP_PATH}/lib/intel64/ippcvmt.lib
       ${IPP_PATH}/lib/intel64/ippccmt.lib)
-else (WIN32)
+elseif (APPLE)
   set(IPP_LIBRARIES ${IPP_LIBRARIES}
       ${IPP_PATH}/lib/libippi.a
       ${IPP_PATH}/lib/libippcore.a
@@ -51,7 +57,15 @@ else (WIN32)
       ${IPP_PATH}/lib/libippcv.a
       ${IPP_PATH}/lib/libippcc.a
       ${INTEL_PATH}/lib/libirc.a)
-endif (WIN32)
+else ()
+  set(IPP_LIBRARIES ${IPP_LIBRARIES}
+      ${IPP_PATH}/lib/intel64/libippi.a
+      ${IPP_PATH}/lib/intel64/libippcore.a
+      ${IPP_PATH}/lib/intel64/libippvm.a
+      ${IPP_PATH}/lib/intel64/libipps.a
+      ${IPP_PATH}/lib/intel64/libippcv.a
+      ${IPP_PATH}/lib/intel64/libippcc.a)
+endif ()
 
 find_package(VTK REQUIRED COMPONENTS vtkFiltersGeometry vtkFiltersSources
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/vtk NO_DEFAULT_PATH)
@@ -66,10 +80,13 @@ set(GEOMETRICTOOLS_INCLUDE_DIRS ${GEOMETRICTOOLS_INCLUDE_DIRS}
 if (WIN32)
   set(GEOMETRICTOOLS_LIBRARIES ${GEOMETRICTOOLS_LIBRARIES}
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/lib/GTEngine.v15.lib)
-else (WIN32)
+elseif (APPLE)
   set(GEOMETRICTOOLS_LIBRARIES ${GEOMETRICTOOLS_LIBRARIES}
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/lib/libGTEngine.a)
-endif (WIN32)
+else ()
+  set(GEOMETRICTOOLS_LIBRARIES ${GEOMETRICTOOLS_LIBRARIES}
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/lib/libgtengine.a)
+endif ()
 
 find_package(benchmark REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/benchmark NO_DEFAULT_PATH)
@@ -731,10 +748,16 @@ endif (WIN32)
 
 target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding hdf5::hdf5_cpp-static hdf5::hdf5-static
                       img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${GEOMETRICTOOLS_LIBRARIES}
-                      ${ASSIMP_LIBRARIES} ${MKL_LIBRARIES} ${IPP_LIBRARIES})
+                      ${ASSIMP_LIBRARIES} ${IPP_LIBRARIES})
 if (BUILD_TESTING)
   target_link_libraries(${APP_NAME} PUBLIC benchmark::benchmark)
 endif (BUILD_TESTING)
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  target_link_libraries(${APP_NAME} PUBLIC -Wl,--start-group ${MKL_LIBRARIES} -Wl,--end-group)
+else ()
+  target_link_libraries(${APP_NAME} PUBLIC ${MKL_LIBRARIES})
+endif ()
 
 if (APPLE)
   set(copyright_line "Copyright 2011-2017 Linqing Feng")

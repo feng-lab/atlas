@@ -5,9 +5,9 @@
 #include <QStringList>
 #include <QProcess>
 
-uint64_t getDedicatedVideoMemoryMB();
-
 namespace nim {
+
+uint64_t getDedicatedVideoMemoryMB();
 
 Z3DGpuInfo& Z3DGpuInfo::instance()
 {
