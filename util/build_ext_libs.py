@@ -568,7 +568,13 @@ def build_ospray(src_dir: str, install_dir: str, ext_dir: str, ispc_dir: str, em
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
         if sys.platform.startswith('win'):
-            cmakecmd.extend(['-DTBB_ROOT:PATH=' + os.environ['ICPP_COMPILER17'] + 'tbb',
+            intel_sw_dir = 'C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\'
+            env = get_enviroment_from_shell_script(intel_sw_dir + 'tbb\\bin\\tbbvars.bat',
+                                                   para='intel64 vs2017',
+                                                   start_env=get_vcvars_environment())
+            print('TBBROOT:', env['TBBROOT'])
+
+            cmakecmd.extend(['-DTBB_ROOT:PATH=' + env['TBBROOT'],
                              '-DOSPRAY_USE_EXTERNAL_EMBREE:BOOL=ON',
                              '-DOSPRAY_USE_EMBREE_STREAMS:BOOL=ON',
                              '-DOSPRAY_USE_HIGH_QUALITY_BVH:BOOL=ON',
