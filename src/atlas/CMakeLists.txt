@@ -723,7 +723,7 @@ else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -Wall -Wextra)
   target_compile_options(${APP_NAME} PUBLIC -Waddress -Wdeprecated)
 
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${APP_NAME} PUBLIC -Wbool-conversion -Wconstant-conversion -Wenum-conversion)
     target_compile_options(${APP_NAME} PUBLIC -Wc++14-compat-pedantic -Waddress-of-temporary)
     target_compile_options(${APP_NAME} PRIVATE -Wundefined-reinterpret-cast)

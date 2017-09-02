@@ -77,8 +77,8 @@ TEST(ZImgRegionalExtrema, max2d1)
   using namespace nim;
 
   try {
-    ZImg img(GET_TEST_DATA_DIR.filePath("img/im2d1.tif"));
-    ZImg res(GET_TEST_DATA_DIR.filePath("img/im2d1maxres.tif"));
+    ZImg img(getTestDataDir().filePath("img/im2d1.tif"));
+    ZImg res(getTestDataDir().filePath("img/im2d1maxres.tif"));
 
     ZBenchTimer bt;
     bt.start();
@@ -106,8 +106,8 @@ TEST(ZImgRegionalExtrema, min2d1)
   using namespace nim;
 
   try {
-    ZImg img(GET_TEST_DATA_DIR.filePath("img/im2d1.tif"));
-    ZImg res(GET_TEST_DATA_DIR.filePath("img/im2d1minres.tif"));
+    ZImg img(getTestDataDir().filePath("img/im2d1.tif"));
+    ZImg res(getTestDataDir().filePath("img/im2d1minres.tif"));
 
     ZBenchTimer bt;
     bt.start();
@@ -135,8 +135,8 @@ TEST(ZImgRegionalExtrema, max3d1)
   using namespace nim;
 
   try {
-    ZImg img(GET_TEST_DATA_DIR.filePath("img/im3d1.tif"));
-    ZImg res(GET_TEST_DATA_DIR.filePath("img/im3d1maxres.tif"));
+    ZImg img(getTestDataDir().filePath("img/im3d1.tif"));
+    ZImg res(getTestDataDir().filePath("img/im3d1maxres.tif"));
 
     ZBenchTimer bt;
     bt.start();
@@ -164,8 +164,8 @@ TEST(ZImgRegionalExtrema, min3d1)
   using namespace nim;
 
   try {
-    ZImg img(GET_TEST_DATA_DIR.filePath("img/im3d1.tif"));
-    ZImg res(GET_TEST_DATA_DIR.filePath("img/im3d1minres.tif"));
+    ZImg img(getTestDataDir().filePath("img/im3d1.tif"));
+    ZImg res(getTestDataDir().filePath("img/im3d1minres.tif"));
 
     ZBenchTimer bt;
     bt.start();

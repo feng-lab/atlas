@@ -25,8 +25,8 @@ TEST(ZImageUtils, GaussianFilter2D)
   using namespace nim;
 
   try {
-    ZImg img(GET_TEST_DATA_DIR.filePath("img/im2d1.tif"));
-    ZImg dres(GET_TEST_DATA_DIR.filePath("img/im2d1doublefilterres.tif"));
+    ZImg img(getTestDataDir().filePath("img/im2d1.tif"));
+    ZImg dres(getTestDataDir().filePath("img/im2d1doublefilterres.tif"));
 
     ZImg cpy = img;
     ZImg dcpy = img.castTo<double>();
@@ -73,8 +73,8 @@ TEST(ZImageUtils, GaussianFilter3D)
   using namespace nim;
 
   try {
-    ZImg img(GET_TEST_DATA_DIR.filePath("img/im3d1.tif"));
-    ZImg dres(GET_TEST_DATA_DIR.filePath("img/im3d1doublefilterres.raw"));
+    ZImg img(getTestDataDir().filePath("img/im3d1.tif"));
+    ZImg dres(getTestDataDir().filePath("img/im3d1doublefilterres.raw"));
 
     ZImg cpy = img;
     ZImg dcpy = img.castTo<double>();
@@ -435,10 +435,10 @@ TEST(ZImageUtils, Resize3D)
   using namespace nim;
 
   try {
-    ZImg img(GET_TEST_DATA_DIR.filePath("img/im3d1.tif"));
+    ZImg img(getTestDataDir().filePath("img/im3d1.tif"));
     img = img.castTo<double>();
 
-    ZImg res(GET_TEST_DATA_DIR.filePath("img/im3d1_resize_cubic_res.tif"));
+    ZImg res(getTestDataDir().filePath("img/im3d1_resize_cubic_res.tif"));
     ZImg cpy = res;
     image3DResize(img.timeData<double>(0), img.width(), img.height(), img.depth(),
                   cpy.timeData<double>(0), cpy.width(), cpy.height(), cpy.depth(),
@@ -450,7 +450,7 @@ TEST(ZImageUtils, Resize3D)
       ASSERT_NEAR(*itres, *itcpy, 1e-10) << *itcpy << " " << itres.index();
     }
 
-    res = ZImg(GET_TEST_DATA_DIR.filePath("img/im3d1_resize_cubic_aa_res.tif"));
+    res = ZImg(getTestDataDir().filePath("img/im3d1_resize_cubic_aa_res.tif"));
     cpy = res;
     image3DResize(img.timeData<double>(0), img.width(), img.height(), img.depth(),
                   cpy.timeData<double>(0), cpy.width(), cpy.height(), cpy.depth(),
@@ -462,7 +462,7 @@ TEST(ZImageUtils, Resize3D)
       ASSERT_NEAR(*itres, *itcpy, 1e-10) << *itcpy << " " << itres.index();
     }
 
-    res = ZImg(GET_TEST_DATA_DIR.filePath("img/im3d1_resize_lanczos2_res.tif"));
+    res = ZImg(getTestDataDir().filePath("img/im3d1_resize_lanczos2_res.tif"));
     cpy = res;
     image3DResize(img.timeData<double>(0), img.width(), img.height(), img.depth(),
                   cpy.timeData<double>(0), cpy.width(), cpy.height(), cpy.depth(),
@@ -474,7 +474,7 @@ TEST(ZImageUtils, Resize3D)
       ASSERT_NEAR(*itres, *itcpy, 1e-10) << *itcpy << " " << itres.index();
     }
 
-    res = ZImg(GET_TEST_DATA_DIR.filePath("img/im3d1_resize_lanczos2_aa_res.tif"));
+    res = ZImg(getTestDataDir().filePath("img/im3d1_resize_lanczos2_aa_res.tif"));
     cpy = res;
     image3DResize(img.timeData<double>(0), img.width(), img.height(), img.depth(),
                   cpy.timeData<double>(0), cpy.width(), cpy.height(), cpy.depth(),
@@ -486,7 +486,7 @@ TEST(ZImageUtils, Resize3D)
       ASSERT_NEAR(*itres, *itcpy, 1e-10) << *itcpy << " " << itres.index();
     }
 
-    res = ZImg(GET_TEST_DATA_DIR.filePath("img/im3d1_resize_lanczos3_res.tif"));
+    res = ZImg(getTestDataDir().filePath("img/im3d1_resize_lanczos3_res.tif"));
     cpy = res;
     image3DResize(img.timeData<double>(0), img.width(), img.height(), img.depth(),
                   cpy.timeData<double>(0), cpy.width(), cpy.height(), cpy.depth(),
@@ -498,7 +498,7 @@ TEST(ZImageUtils, Resize3D)
       ASSERT_NEAR(*itres, *itcpy, 1e-10) << *itcpy << " " << itres.index();
     }
 
-    res = ZImg(GET_TEST_DATA_DIR.filePath("img/im3d1_resize_lanczos3_aa_res.tif"));
+    res = ZImg(getTestDataDir().filePath("img/im3d1_resize_lanczos3_aa_res.tif"));
     cpy = res;
     image3DResize(img.timeData<double>(0), img.width(), img.height(), img.depth(),
                   cpy.timeData<double>(0), cpy.width(), cpy.height(), cpy.depth(),
@@ -510,7 +510,7 @@ TEST(ZImageUtils, Resize3D)
       ASSERT_NEAR(*itres, *itcpy, 1e-10) << *itcpy << " " << itres.index();
     }
 
-    res = ZImg(GET_TEST_DATA_DIR.filePath("img/im3d1_resize_nearest_res.tif"));
+    res = ZImg(getTestDataDir().filePath("img/im3d1_resize_nearest_res.tif"));
     cpy = res;
     image3DResize(img.timeData<double>(0), img.width(), img.height(), img.depth(),
                   cpy.timeData<double>(0), cpy.width(), cpy.height(), cpy.depth(),
@@ -522,7 +522,7 @@ TEST(ZImageUtils, Resize3D)
       ASSERT_NEAR(*itres, *itcpy, 1e-10) << *itcpy << " " << itres.index();
     }
 
-    res = ZImg(GET_TEST_DATA_DIR.filePath("img/im3d1_resize_linear_res.tif"));
+    res = ZImg(getTestDataDir().filePath("img/im3d1_resize_linear_res.tif"));
     cpy = res;
     image3DResize(img.timeData<double>(0), img.width(), img.height(), img.depth(),
                   cpy.timeData<double>(0), cpy.width(), cpy.height(), cpy.depth(),
@@ -534,7 +534,7 @@ TEST(ZImageUtils, Resize3D)
       ASSERT_NEAR(*itres, *itcpy, 1e-10) << *itcpy << " " << itres.index();
     }
 
-    res = ZImg(GET_TEST_DATA_DIR.filePath("img/im3d1_resize_linear_aa_res.tif"));
+    res = ZImg(getTestDataDir().filePath("img/im3d1_resize_linear_aa_res.tif"));
     cpy = res;
     image3DResize(img.timeData<double>(0), img.width(), img.height(), img.depth(),
                   cpy.timeData<double>(0), cpy.width(), cpy.height(), cpy.depth(),

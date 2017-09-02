@@ -8,7 +8,7 @@ TEST(ZImgAutoThreshold, img0515)
   using namespace nim;
 
   try {
-    ZImg img(GET_TEST_DATA_DIR.filePath("img/im3d1.tif"));
+    ZImg img(getTestDataDir().filePath("img/im3d1.tif"));
 
     ZBenchTimer bt;
     bt.start();

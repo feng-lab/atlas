@@ -102,35 +102,35 @@ TEST(saturate, add)
 {
   using namespace nim;
 
-  std::vector<uint8_t> datau8 = readSaturateTestData<uint8_t>(GET_TEST_DATA_DIR.filePath("uint8_add_test.dat"));
+  std::vector<uint8_t> datau8 = readSaturateTestData<uint8_t>(getTestDataDir().filePath("uint8_add_test.dat"));
   for (size_t i=0; i<datau8.size(); i+=3) {
     ASSERT_EQ(datau8[i+2], saturate_add(datau8[i], datau8[i+1])) << (int)datau8[i] << " " << (int)datau8[i+1];
   }
-  std::vector<uint16_t> datau16 = readSaturateTestData<uint16_t>(GET_TEST_DATA_DIR.filePath("uint16_add_test.dat"));
+  std::vector<uint16_t> datau16 = readSaturateTestData<uint16_t>(getTestDataDir().filePath("uint16_add_test.dat"));
   for (size_t i=0; i<datau16.size(); i+=3) {
     ASSERT_EQ(datau16[i+2], saturate_add(datau16[i], datau16[i+1])) << (int)datau16[i] << " " << (int)datau16[i+1];
   }
-  std::vector<uint32_t> datau32 = readSaturateTestData<uint32_t>(GET_TEST_DATA_DIR.filePath("uint32_add_test.dat"));
+  std::vector<uint32_t> datau32 = readSaturateTestData<uint32_t>(getTestDataDir().filePath("uint32_add_test.dat"));
   for (size_t i=0; i<datau32.size(); i+=3) {
     ASSERT_EQ(datau32[i+2], saturate_add(datau32[i], datau32[i+1])) << datau32[i] << " " << datau32[i+1];
   }
-  std::vector<uint64_t> datau64 = readSaturateTestData<uint64_t>(GET_TEST_DATA_DIR.filePath("uint64_add_test.dat"));
+  std::vector<uint64_t> datau64 = readSaturateTestData<uint64_t>(getTestDataDir().filePath("uint64_add_test.dat"));
   for (size_t i=0; i<datau64.size(); i+=3) {
     ASSERT_EQ(datau64[i+2], saturate_add(datau64[i], datau64[i+1])) << datau64[i] << " " << datau64[i+1];
   }
-  std::vector<int8_t> datai8 = readSaturateTestData<int8_t>(GET_TEST_DATA_DIR.filePath("int8_add_test.dat"));
+  std::vector<int8_t> datai8 = readSaturateTestData<int8_t>(getTestDataDir().filePath("int8_add_test.dat"));
   for (size_t i=0; i<datai8.size(); i+=3) {
     ASSERT_EQ(datai8[i+2], saturate_add(datai8[i], datai8[i+1])) << (int)datai8[i] << " " << (int)datai8[i+1];
   }
-  std::vector<int16_t> datai16 = readSaturateTestData<int16_t>(GET_TEST_DATA_DIR.filePath("int16_add_test.dat"));
+  std::vector<int16_t> datai16 = readSaturateTestData<int16_t>(getTestDataDir().filePath("int16_add_test.dat"));
   for (size_t i=0; i<datai16.size(); i+=3) {
     ASSERT_EQ(datai16[i+2], saturate_add(datai16[i], datai16[i+1])) << (int)datai16[i] << " " << (int)datai16[i+1];
   }
-  std::vector<int32_t> datai32 = readSaturateTestData<int32_t>(GET_TEST_DATA_DIR.filePath("int32_add_test.dat"));
+  std::vector<int32_t> datai32 = readSaturateTestData<int32_t>(getTestDataDir().filePath("int32_add_test.dat"));
   for (size_t i=0; i<datai32.size(); i+=3) {
     ASSERT_EQ(datai32[i+2], saturate_add(datai32[i], datai32[i+1])) << datai32[i] << " " << datai32[i+1];
   }
-  std::vector<int64_t> datai64 = readSaturateTestData<int64_t>(GET_TEST_DATA_DIR.filePath("int64_add_test.dat"));
+  std::vector<int64_t> datai64 = readSaturateTestData<int64_t>(getTestDataDir().filePath("int64_add_test.dat"));
   for (size_t i=0; i<datai64.size(); i+=3) {
     ASSERT_EQ(datai64[i+2], saturate_add(datai64[i], datai64[i+1])) << datai64[i] << " " << datai64[i+1];
   }
@@ -309,35 +309,35 @@ TEST(saturate, sub)
 {
   using namespace nim;
 
-  std::vector<uint8_t> datau8 = readSaturateTestData<uint8_t>(GET_TEST_DATA_DIR.filePath("uint8_sub_test.dat"));
+  std::vector<uint8_t> datau8 = readSaturateTestData<uint8_t>(getTestDataDir().filePath("uint8_sub_test.dat"));
   for (size_t i=0; i<datau8.size(); i+=3) {
     ASSERT_EQ(datau8[i+2], saturate_sub(datau8[i], datau8[i+1])) << (int)datau8[i] << " " << (int)datau8[i+1];
   }
-  std::vector<uint16_t> datau16 = readSaturateTestData<uint16_t>(GET_TEST_DATA_DIR.filePath("uint16_sub_test.dat"));
+  std::vector<uint16_t> datau16 = readSaturateTestData<uint16_t>(getTestDataDir().filePath("uint16_sub_test.dat"));
   for (size_t i=0; i<datau16.size(); i+=3) {
     ASSERT_EQ(datau16[i+2], saturate_sub(datau16[i], datau16[i+1])) << (int)datau16[i] << " " << (int)datau16[i+1];
   }
-  std::vector<uint32_t> datau32 = readSaturateTestData<uint32_t>(GET_TEST_DATA_DIR.filePath("uint32_sub_test.dat"));
+  std::vector<uint32_t> datau32 = readSaturateTestData<uint32_t>(getTestDataDir().filePath("uint32_sub_test.dat"));
   for (size_t i=0; i<datau32.size(); i+=3) {
     ASSERT_EQ(datau32[i+2], saturate_sub(datau32[i], datau32[i+1])) << datau32[i] << " " << datau32[i+1];
   }
-  std::vector<uint64_t> datau64 = readSaturateTestData<uint64_t>(GET_TEST_DATA_DIR.filePath("uint64_sub_test.dat"));
+  std::vector<uint64_t> datau64 = readSaturateTestData<uint64_t>(getTestDataDir().filePath("uint64_sub_test.dat"));
   for (size_t i=0; i<datau64.size(); i+=3) {
     ASSERT_EQ(datau64[i+2], saturate_sub(datau64[i], datau64[i+1])) << datau64[i] << " " << datau64[i+1];
   }
-  std::vector<int8_t> datai8 = readSaturateTestData<int8_t>(GET_TEST_DATA_DIR.filePath("int8_sub_test.dat"));
+  std::vector<int8_t> datai8 = readSaturateTestData<int8_t>(getTestDataDir().filePath("int8_sub_test.dat"));
   for (size_t i=0; i<datai8.size(); i+=3) {
     ASSERT_EQ(datai8[i+2], saturate_sub(datai8[i], datai8[i+1])) << (int)datai8[i] << " " << (int)datai8[i+1];
   }
-  std::vector<int16_t> datai16 = readSaturateTestData<int16_t>(GET_TEST_DATA_DIR.filePath("int16_sub_test.dat"));
+  std::vector<int16_t> datai16 = readSaturateTestData<int16_t>(getTestDataDir().filePath("int16_sub_test.dat"));
   for (size_t i=0; i<datai16.size(); i+=3) {
     ASSERT_EQ(datai16[i+2], saturate_sub(datai16[i], datai16[i+1])) << (int)datai16[i] << " " << (int)datai16[i+1];
   }
-  std::vector<int32_t> datai32 = readSaturateTestData<int32_t>(GET_TEST_DATA_DIR.filePath("int32_sub_test.dat"));
+  std::vector<int32_t> datai32 = readSaturateTestData<int32_t>(getTestDataDir().filePath("int32_sub_test.dat"));
   for (size_t i=0; i<datai32.size(); i+=3) {
     ASSERT_EQ(datai32[i+2], saturate_sub(datai32[i], datai32[i+1])) << datai32[i] << " " << datai32[i+1];
   }
-  std::vector<int64_t> datai64 = readSaturateTestData<int64_t>(GET_TEST_DATA_DIR.filePath("int64_sub_test.dat"));
+  std::vector<int64_t> datai64 = readSaturateTestData<int64_t>(getTestDataDir().filePath("int64_sub_test.dat"));
   for (size_t i=0; i<datai64.size(); i+=3) {
     ASSERT_EQ(datai64[i+2], saturate_sub(datai64[i], datai64[i+1])) << datai64[i] << " " << datai64[i+1];
   }
@@ -556,35 +556,35 @@ TEST(saturate, mul)
   ASSERT_EQ(uint64_t(6), saturate_mul(uint64_t(6), 1));
   ASSERT_EQ(uint64_t(6), saturate_mul(uint64_t(3), 2));
 
-  std::vector<uint8_t> datau8 = readSaturateTestData<uint8_t>(GET_TEST_DATA_DIR.filePath("uint8_mul_test.dat"));
+  std::vector<uint8_t> datau8 = readSaturateTestData<uint8_t>(getTestDataDir().filePath("uint8_mul_test.dat"));
   for (size_t i=0; i<datau8.size(); i+=3) {
     ASSERT_EQ(datau8[i+2], saturate_mul(datau8[i], datau8[i+1])) << (int)datau8[i] << " " << (int)datau8[i+1];
   }
-  std::vector<uint16_t> datau16 = readSaturateTestData<uint16_t>(GET_TEST_DATA_DIR.filePath("uint16_mul_test.dat"));
+  std::vector<uint16_t> datau16 = readSaturateTestData<uint16_t>(getTestDataDir().filePath("uint16_mul_test.dat"));
   for (size_t i=0; i<datau16.size(); i+=3) {
     ASSERT_EQ(datau16[i+2], saturate_mul(datau16[i], datau16[i+1])) << (int)datau16[i] << " " << (int)datau16[i+1];
   }
-  std::vector<uint32_t> datau32 = readSaturateTestData<uint32_t>(GET_TEST_DATA_DIR.filePath("uint32_mul_test.dat"));
+  std::vector<uint32_t> datau32 = readSaturateTestData<uint32_t>(getTestDataDir().filePath("uint32_mul_test.dat"));
   for (size_t i=0; i<datau32.size(); i+=3) {
     ASSERT_EQ(datau32[i+2], saturate_mul(datau32[i], datau32[i+1])) << datau32[i] << " " << datau32[i+1];
   }
-  std::vector<uint64_t> datau64 = readSaturateTestData<uint64_t>(GET_TEST_DATA_DIR.filePath("uint64_mul_test.dat"));
+  std::vector<uint64_t> datau64 = readSaturateTestData<uint64_t>(getTestDataDir().filePath("uint64_mul_test.dat"));
   for (size_t i=0; i<datau64.size(); i+=3) {
     ASSERT_EQ(datau64[i+2], saturate_mul(datau64[i], datau64[i+1])) << datau64[i] << " " << datau64[i+1];
   }
-  std::vector<int8_t> datai8 = readSaturateTestData<int8_t>(GET_TEST_DATA_DIR.filePath("int8_mul_test.dat"));
+  std::vector<int8_t> datai8 = readSaturateTestData<int8_t>(getTestDataDir().filePath("int8_mul_test.dat"));
   for (size_t i=0; i<datai8.size(); i+=3) {
     ASSERT_EQ(datai8[i+2], saturate_mul(datai8[i], datai8[i+1])) << (int)datai8[i] << " " << (int)datai8[i+1];
   }
-  std::vector<int16_t> datai16 = readSaturateTestData<int16_t>(GET_TEST_DATA_DIR.filePath("int16_mul_test.dat"));
+  std::vector<int16_t> datai16 = readSaturateTestData<int16_t>(getTestDataDir().filePath("int16_mul_test.dat"));
   for (size_t i=0; i<datai16.size(); i+=3) {
     ASSERT_EQ(datai16[i+2], saturate_mul(datai16[i], datai16[i+1])) << (int)datai16[i] << " " << (int)datai16[i+1];
   }
-  std::vector<int32_t> datai32 = readSaturateTestData<int32_t>(GET_TEST_DATA_DIR.filePath("int32_mul_test.dat"));
+  std::vector<int32_t> datai32 = readSaturateTestData<int32_t>(getTestDataDir().filePath("int32_mul_test.dat"));
   for (size_t i=0; i<datai32.size(); i+=3) {
     ASSERT_EQ(datai32[i+2], saturate_mul(datai32[i], datai32[i+1])) << datai32[i] << " " << datai32[i+1];
   }
-  std::vector<int64_t> datai64 = readSaturateTestData<int64_t>(GET_TEST_DATA_DIR.filePath("int64_mul_test.dat"));
+  std::vector<int64_t> datai64 = readSaturateTestData<int64_t>(getTestDataDir().filePath("int64_mul_test.dat"));
   for (size_t i=0; i<datai64.size(); i+=3) {
     ASSERT_EQ(datai64[i+2], saturate_mul(datai64[i], datai64[i+1])) << datai64[i] << " " << datai64[i+1];
   }
@@ -595,35 +595,35 @@ TEST(saturate, div)
   using namespace nim;
 
   // matlab div do rounding
-  std::vector<uint8_t> datau8 = readSaturateTestData<uint8_t>(GET_TEST_DATA_DIR.filePath("uint8_div_test.dat"));
+  std::vector<uint8_t> datau8 = readSaturateTestData<uint8_t>(getTestDataDir().filePath("uint8_div_test.dat"));
   for (size_t i=0; i<datau8.size(); i+=3) {
     ASSERT_NEAR(datau8[i+2], saturate_div(datau8[i], datau8[i+1]), 1) << (int)datau8[i] << " " << (int)datau8[i+1];
   }
-  std::vector<uint16_t> datau16 = readSaturateTestData<uint16_t>(GET_TEST_DATA_DIR.filePath("uint16_div_test.dat"));
+  std::vector<uint16_t> datau16 = readSaturateTestData<uint16_t>(getTestDataDir().filePath("uint16_div_test.dat"));
   for (size_t i=0; i<datau16.size(); i+=3) {
     ASSERT_NEAR(datau16[i+2], saturate_div(datau16[i], datau16[i+1]), 1) << (int)datau16[i] << " " << (int)datau16[i+1];
   }
-  std::vector<uint32_t> datau32 = readSaturateTestData<uint32_t>(GET_TEST_DATA_DIR.filePath("uint32_div_test.dat"));
+  std::vector<uint32_t> datau32 = readSaturateTestData<uint32_t>(getTestDataDir().filePath("uint32_div_test.dat"));
   for (size_t i=0; i<datau32.size(); i+=3) {
     ASSERT_NEAR(datau32[i+2], saturate_div(datau32[i], datau32[i+1]), 1) << datau32[i] << " " << datau32[i+1];
   }
-  std::vector<uint64_t> datau64 = readSaturateTestData<uint64_t>(GET_TEST_DATA_DIR.filePath("uint64_div_test.dat"));
+  std::vector<uint64_t> datau64 = readSaturateTestData<uint64_t>(getTestDataDir().filePath("uint64_div_test.dat"));
   for (size_t i=0; i<datau64.size(); i+=3) {
     ASSERT_NEAR(datau64[i+2], saturate_div(datau64[i], datau64[i+1]), 1) << datau64[i] << " " << datau64[i+1];
   }
-  std::vector<int8_t> datai8 = readSaturateTestData<int8_t>(GET_TEST_DATA_DIR.filePath("int8_div_test.dat"));
+  std::vector<int8_t> datai8 = readSaturateTestData<int8_t>(getTestDataDir().filePath("int8_div_test.dat"));
   for (size_t i=0; i<datai8.size(); i+=3) {
     ASSERT_NEAR(datai8[i+2], saturate_div(datai8[i], datai8[i+1]), 1) << (int)datai8[i] << " " << (int)datai8[i+1];
   }
-  std::vector<int16_t> datai16 = readSaturateTestData<int16_t>(GET_TEST_DATA_DIR.filePath("int16_div_test.dat"));
+  std::vector<int16_t> datai16 = readSaturateTestData<int16_t>(getTestDataDir().filePath("int16_div_test.dat"));
   for (size_t i=0; i<datai16.size(); i+=3) {
     ASSERT_NEAR(datai16[i+2], saturate_div(datai16[i], datai16[i+1]), 1) << (int)datai16[i] << " " << (int)datai16[i+1];
   }
-  std::vector<int32_t> datai32 = readSaturateTestData<int32_t>(GET_TEST_DATA_DIR.filePath("int32_div_test.dat"));
+  std::vector<int32_t> datai32 = readSaturateTestData<int32_t>(getTestDataDir().filePath("int32_div_test.dat"));
   for (size_t i=0; i<datai32.size(); i+=3) {
     ASSERT_NEAR(datai32[i+2], saturate_div(datai32[i], datai32[i+1]), 1) << datai32[i] << " " << datai32[i+1];
   }
-  std::vector<int64_t> datai64 = readSaturateTestData<int64_t>(GET_TEST_DATA_DIR.filePath("int64_div_test.dat"));
+  std::vector<int64_t> datai64 = readSaturateTestData<int64_t>(getTestDataDir().filePath("int64_div_test.dat"));
   for (size_t i=0; i<datai64.size(); i+=3) {
     ASSERT_NEAR(datai64[i+2], saturate_div(datai64[i], datai64[i+1]), 1) << datai64[i] << " " << datai64[i+1];
   }

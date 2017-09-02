@@ -28,7 +28,7 @@ TEST(SWC, DepthFirstIterator)
       ASSERT_TRUE(false);
     }
 
-    ZSwc smallSwc(GET_TEST_DATA_DIR.filePath("treetest.swc"));
+    ZSwc smallSwc(getTestDataDir().filePath("treetest.swc"));
     const int smallSwcRes[] = {1, 2, 3, 5, 8, 9, 6, 10, 4, 7, 11, 12, 13, 14, 15};
     size_t sidx = 0;
     for (auto it = smallSwc.cbegin(); it != smallSwc.cend(); ++it) {
@@ -90,7 +90,7 @@ TEST(SWC, DepthFirstIterator)
     }
     ASSERT_EQ(c, 2);
 
-    QString file = GET_TEST_DATA_DIR.filePath("0515_15Py.swc");
+    QString file = getTestDataDir().filePath("0515_15Py.swc");
     ZSwc swc(file);
 
     const int res[] = {1, 2, 3, 5, 8, 12, 16, 20, 24, 28, 32, 36, 40, 45, 50, 56, 62, 69, 76, 83, 90, 97, 105, 113, 122,
@@ -506,7 +506,7 @@ TEST(SWC, PostOrderIterator)
       ASSERT_TRUE(false);
     }
 
-    ZSwc smallSwc(GET_TEST_DATA_DIR.filePath("treetest.swc"));
+    ZSwc smallSwc(getTestDataDir().filePath("treetest.swc"));
     const int smallSwcRes[] = {2, 8, 9, 5, 10, 6, 3, 7, 4, 1, 13, 14, 12, 11, 15};
     size_t sidx = 0;
     for (auto it = smallSwc.cbeginPost(); it != smallSwc.cendPost(); ++it) {
@@ -534,7 +534,7 @@ TEST(SWC, PostOrderIterator)
     }
     ASSERT_EQ(c, 2);
 
-    QString file = GET_TEST_DATA_DIR.filePath("0515_15Py.swc");
+    QString file = getTestDataDir().filePath("0515_15Py.swc");
     ZSwc swc(file);
 
     const int res[] = {2447, 2418, 2389, 2360, 2330, 2300, 2270, 2240, 2210, 2181, 2152, 2123, 2094, 2065, 2036, 2007,
@@ -917,7 +917,7 @@ TEST(SWC, BreadthFirstIterator)
       ASSERT_TRUE(false);
     }
 
-    ZSwc smallSwc(GET_TEST_DATA_DIR.filePath("treetest.swc"));
+    ZSwc smallSwc(getTestDataDir().filePath("treetest.swc"));
     const int smallSwcRes[] = {1, 11, 15, 2, 3, 4, 12, 5, 6, 7, 13, 14, 8, 9, 10};
     size_t sidx = 0;
     for (auto it = smallSwc.cbeginBreadthFirst(); it != smallSwc.cendBreadthFirst(); ++it) {
@@ -945,7 +945,7 @@ TEST(SWC, BreadthFirstIterator)
     }
     ASSERT_EQ(c, 3);
 
-    QString file = GET_TEST_DATA_DIR.filePath("0515_15Py.swc");
+    QString file = getTestDataDir().filePath("0515_15Py.swc");
     ZSwc swc(file);
 
     int idx = 0;
@@ -1035,7 +1035,7 @@ TEST(SWC, LeafIterator)
       ASSERT_TRUE(false);
     }
 
-    ZSwc smallSwc(GET_TEST_DATA_DIR.filePath("treetest.swc"));
+    ZSwc smallSwc(getTestDataDir().filePath("treetest.swc"));
     const int smallSwcRes[] = {2, 8, 9, 10, 7, 13, 14, 15};
     size_t sidx = 0;
     for (auto it = smallSwc.cbeginLeaf(); it != smallSwc.cendLeaf(); ++it) {
@@ -1063,7 +1063,7 @@ TEST(SWC, LeafIterator)
     }
     ASSERT_EQ(c, 2);
 
-    QString file = GET_TEST_DATA_DIR.filePath("0515_15Py.swc");
+    QString file = getTestDataDir().filePath("0515_15Py.swc");
     ZSwc swc(file);
 
     const int res[] = {2447, 2803, 3865, 3258, 4322, 4377, 4836, 4848, 4767, 4677, 4648, 4564, 4536, 4669, 3752, 4399,
@@ -1158,7 +1158,7 @@ TEST(SWC, RootIterator)
       ASSERT_TRUE(false);
     }
 
-    ZSwc smallSwc(GET_TEST_DATA_DIR.filePath("treetest.swc"));
+    ZSwc smallSwc(getTestDataDir().filePath("treetest.swc"));
     const int smallSwcRes[] = {1, 11, 15};
     size_t sidx = 0;
     for (auto it = smallSwc.cbeginRoot(); it != smallSwc.cendRoot(); ++it) {
@@ -1169,7 +1169,7 @@ TEST(SWC, RootIterator)
       ASSERT_EQ(it->id, smallSwcRes[--sidx]);
     }
 
-    QString file = GET_TEST_DATA_DIR.filePath("0515_15Py.swc");
+    QString file = getTestDataDir().filePath("0515_15Py.swc");
     ZSwc swc(file);
 
     const int res[] = {1};
@@ -1203,7 +1203,7 @@ TEST(SWC, ChildIterator)
   using namespace nim;
 
   try {
-    ZSwc smallSwc(GET_TEST_DATA_DIR.filePath("treetest.swc"));
+    ZSwc smallSwc(getTestDataDir().filePath("treetest.swc"));
 
     int c = 0;
     auto sit = smallSwc.cbegin();
@@ -1269,7 +1269,7 @@ TEST(SWC, AncestorIterator)
   using namespace nim;
 
   try {
-    ZSwc smallSwc(GET_TEST_DATA_DIR.filePath("treetest.swc"));
+    ZSwc smallSwc(getTestDataDir().filePath("treetest.swc"));
 
     int c = 0;
     auto sit = smallSwc.cbegin();
@@ -1401,7 +1401,7 @@ TEST(SWC, IteratorInteraction)
     ASSERT_EQ(rrit, rproit);
     ASSERT_EQ(crrit, rproit);
 
-    ZSwc swc(GET_TEST_DATA_DIR.filePath("treetest.swc"));
+    ZSwc swc(getTestDataDir().filePath("treetest.swc"));
 
     // not necessary but good to have
     ASSERT_EQ(swc.cend(), swc.end());

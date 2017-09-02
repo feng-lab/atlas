@@ -11,7 +11,7 @@ TEST(fileread, text)
   using namespace Eigen;
 
   try {
-    QString file = GET_TEST_DATA_DIR.filePath("img/fileread.txt");
+    QString file = getTestDataDir().filePath("img/fileread.txt");
     MatrixXd mat = ZEigenUtils::readMatrix(file, "", false, 0, "#");
 
     ASSERT_EQ(6, mat.rows());

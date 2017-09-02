@@ -9,7 +9,7 @@ TEST(ZImgConnectedComponents, text)
   using namespace nim;
 
   try {
-    ZImg img(GET_TEST_DATA_DIR.filePath("img/text.tif"));
+    ZImg img(getTestDataDir().filePath("img/text.tif"));
 
     ZBenchTimer bt;
     bt.start();

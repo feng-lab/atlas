@@ -2,11 +2,29 @@
 
 #include <QDir>
 
+namespace  {
+
+QDir getTestDataDir()
+{
 #ifdef _WIN32
-#define GET_TEST_DATA_DIR QDir("Z:\\Google Drive\\atlas_test_data")
+  QDir res("Z:\\Google Drive\\atlas_test_data");
+  if (!res.exists()) {
+    res = QDir(QDir::homePath() + "/code/atlas_test_data");
+  }
+  return res;
+#elif defined(__APPLE__)
+  QDir res(QDir::homePath() + "/Google Drive/atlas_test_data");
+  if (!res.exists()) {
+    res = QDir(QDir::homePath() + "/code/atlas_test_data");
+  }
+  return res;
 #else
-#define GET_TEST_DATA_DIR QDir(QDir::homePath() + "/Google Drive/atlas_test_data")
+  QDir res(QDir::homePath() + "/code/atlas_test_data");
+  return res;
 #endif
+}
+
+} // namespace
 
 #include "zfilereadtest.h"
 #include "zimggraphtest.h"

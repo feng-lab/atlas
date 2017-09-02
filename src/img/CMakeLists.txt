@@ -281,20 +281,23 @@ else (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC -Wall -Wextra)
   target_compile_options(${LIBRARY_NAME} PUBLIC -Waddress -Wdeprecated)
 
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wbool-conversion -Wconstant-conversion -Wenum-conversion)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wc++14-compat-pedantic -Waddress-of-temporary)
     target_compile_options(${LIBRARY_NAME} PRIVATE -Wundefined-reinterpret-cast)
     target_compile_options(${LIBRARY_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wshadow)
     target_link_libraries(${LIBRARY_NAME} PUBLIC -stdlib=libc++)
+
+    set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS -Wno-unused-parameter)
+  elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS -Wno-unused-but-set-variable)
   endif ()
 
   # for some files
   set_source_files_properties(zimageavx.cpp PROPERTIES COMPILE_FLAGS -mavx)
   set_source_files_properties(zimagesse3.cpp PROPERTIES COMPILE_FLAGS -msse3)
 
-  set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-but-set-variable")
   set_source_files_properties(ztiff.cpp PROPERTIES COMPILE_FLAGS -I${TIFFDIR})
   set_source_files_properties(${TIFFDIR}/tif_ojpeg.c
                               PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -I${JPEGTURBO_INCLUDE_DIRS}")
