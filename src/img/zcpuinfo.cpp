@@ -522,6 +522,8 @@ void ZCpuInfo::detectCoreAndThreadNumber()
     nPhysicalRAM = info.totalram;
   }
 
+  nCacheLine = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
+
   QProcess lscpu;
   lscpu.start("lscpu");
 

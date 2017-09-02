@@ -220,7 +220,7 @@ void Z3DSphereRenderer::render(Z3DEye eye)
 
       // set vertex data
       GLint attr_a_vertex_radius = shader.vertexAttributeLocation();
-      GLint attr_a_specular_shininess;
+      GLint attr_a_specular_shininess = -1;
       if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
         attr_a_specular_shininess = shader.specularShininessAttributeLocation();
       }

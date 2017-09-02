@@ -730,6 +730,8 @@ else (WIN32)
     target_compile_options(${APP_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
     target_compile_options(${APP_NAME} PUBLIC -Wshadow)
     target_link_libraries(${APP_NAME} PUBLIC -stdlib=libc++)
+  elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_link_libraries(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition)
   endif ()
 
   set_target_properties(${APP_NAME} PROPERTIES

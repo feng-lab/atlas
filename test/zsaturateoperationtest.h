@@ -93,6 +93,11 @@ TEST(saturate, ReinterpretCast)
   }
 }
 
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverflow"
+#endif
+
 TEST(saturate, add)
 {
   using namespace nim;
@@ -626,3 +631,6 @@ TEST(saturate, div)
   ASSERT_EQ(INT64_MIN, saturate_div(int64_t(INT64_MIN), 1_u64));
 }
 
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif

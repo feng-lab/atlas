@@ -651,8 +651,8 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
       // set vertex data
       GLint attr_p0 = shader.p0AttributeLocation();
       GLint attr_p1 = shader.p1AttributeLocation();
-      GLint attr_p0color;
-      GLint attr_p1color;
+      GLint attr_p0color = -1;
+      GLint attr_p1color = -1;
       if (!m_useTextureColor) {
         attr_p0color = shader.p0ColorAttributeLocation();
         attr_p1color = shader.p1ColorAttributeLocation();

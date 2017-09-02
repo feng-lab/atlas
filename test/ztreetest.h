@@ -5,7 +5,7 @@
 #include "zswc.h"
 #include "zexception.h"
 
-// treetest.swc is a forest contains three trees
+/* treetest.swc is a forest contains three trees
 //             1             11       15
 //          /  |  \          |
 //         2   3   4         12
@@ -13,6 +13,7 @@
 //           5   6   7     13 14
 //          / \  \
 //         8  9  10
+*/
 
 TEST(SWC, DepthFirstIterator)
 {
@@ -482,7 +483,7 @@ TEST(SWC, DepthFirstIterator)
   }
 }
 
-// treetest.swc is a forest contains three trees
+/* treetest.swc is a forest contains three trees
 //             1             11       15
 //          /  |  \          |
 //         2   3   4         12
@@ -490,7 +491,7 @@ TEST(SWC, DepthFirstIterator)
 //           5   6   7     13 14
 //          / \  \
 //         8  9  10
-
+*/
 
 TEST(SWC, PostOrderIterator)
 {
@@ -893,7 +894,7 @@ TEST(SWC, PostOrderIterator)
   }
 }
 
-// treetest.swc is a forest contains three trees
+/* treetest.swc is a forest contains three trees
 //             1             11       15
 //          /  |  \          |
 //         2   3   4         12
@@ -901,6 +902,7 @@ TEST(SWC, PostOrderIterator)
 //           5   6   7     13 14
 //          / \  \
 //         8  9  10
+*/
 
 TEST(SWC, BreadthFirstIterator)
 {
@@ -1010,7 +1012,7 @@ TEST(SWC, BreadthFirstIterator)
   }
 }
 
-// treetest.swc is a forest contains three trees
+/* treetest.swc is a forest contains three trees
 //             1             11       15
 //          /  |  \          |
 //         2   3   4         12
@@ -1018,6 +1020,7 @@ TEST(SWC, BreadthFirstIterator)
 //           5   6   7     13 14
 //          / \  \
 //         8  9  10
+*/
 
 TEST(SWC, LeafIterator)
 {
@@ -1132,7 +1135,7 @@ TEST(SWC, LeafIterator)
   }
 }
 
-// treetest.swc is a forest contains three trees
+/* treetest.swc is a forest contains three trees
 //             1             11       15
 //          /  |  \          |
 //         2   3   4         12
@@ -1140,6 +1143,7 @@ TEST(SWC, LeafIterator)
 //           5   6   7     13 14
 //          / \  \
 //         8  9  10
+*/
 
 TEST(SWC, RootIterator)
 {
@@ -1184,7 +1188,7 @@ TEST(SWC, RootIterator)
   }
 }
 
-// treetest.swc is a forest contains three trees
+/* treetest.swc is a forest contains three trees
 //             1             11       15
 //          /  |  \          |
 //         2   3   4         12
@@ -1192,6 +1196,7 @@ TEST(SWC, RootIterator)
 //           5   6   7     13 14
 //          / \  \
 //         8  9  10
+*/
 
 TEST(SWC, ChildIterator)
 {
@@ -1249,7 +1254,7 @@ TEST(SWC, ChildIterator)
   }
 }
 
-// treetest.swc is a forest contains three trees
+/* treetest.swc is a forest contains three trees
 //             1             11       15
 //          /  |  \          |
 //         2   3   4         12
@@ -1257,6 +1262,7 @@ TEST(SWC, ChildIterator)
 //           5   6   7     13 14
 //          / \  \
 //         8  9  10
+*/
 
 TEST(SWC, AncestorIterator)
 {
@@ -1310,7 +1316,7 @@ TEST(SWC, AncestorIterator)
   }
 }
 
-// treetest.swc is a forest contains three trees
+/* treetest.swc is a forest contains three trees
 //             1             11       15
 //          /  |  \          |
 //         2   3   4         12
@@ -1318,6 +1324,7 @@ TEST(SWC, AncestorIterator)
 //           5   6   7     13 14
 //          / \  \
 //         8  9  10
+*/
 
 TEST(SWC, IteratorInteraction)
 {

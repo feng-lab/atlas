@@ -1244,7 +1244,7 @@ int vtkCCSSplitAtPinchPoints(
 
       //
       double minsqdist = std::numeric_limits<double>::max();
-      int64_t vertIdx;
+      int64_t vertIdx = -1;
       for (size_t locatorIdx = 0; locatorIdx < locator.size(); ++locatorIdx) {
         double sqdist = glm::dot(vertices[locator[locatorIdx]] - point,
                                  vertices[locator[locatorIdx]] - point);

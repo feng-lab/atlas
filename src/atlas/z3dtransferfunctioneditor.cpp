@@ -238,7 +238,7 @@ void Z3DTransferFunctionWidget::paintEvent(QPaintEvent* event)
 
   origin = relativeToPixelCoordinates(glm::dvec2(0.));
 
-  glm::dvec2 old;
+  glm::dvec2 old(0.0);
   for (size_t i = 0; i < m_transferFunction->get().numKeys(); ++i) {
     ZColorMapKey& key = m_transferFunction->get().key(i);
     glm::dvec2 p = relativeToPixelCoordinates(glm::dvec2(key.intensity(), key.floatAlphaL()));
