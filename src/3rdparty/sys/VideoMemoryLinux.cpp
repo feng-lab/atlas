@@ -20,7 +20,7 @@ uint64_t getDedicatedVideoMemoryMB()
         if (QString::compare(gInfo[i], "kBytes", Qt::CaseInsensitive) == 0 ||
             QString::compare(gInfo[i], "kByte", Qt::CaseInsensitive) == 0) {
           if (i > 0 && res == 0) {
-            res = gInfo[i-1].toLongLong() * 1024;
+            res = gInfo[i-1].toLongLong() / 1024;
           }
         }
       }
