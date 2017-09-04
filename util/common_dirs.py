@@ -42,6 +42,12 @@ def img_dir():
     return res
 
 
+def resource_dir():
+    res = os.path.join(atlas_dir(), 'Resources')
+    assert os.path.exists(res)
+    return res
+
+
 def src_package_dir():
     res = os.path.join(base_dir(), 'atlas_others')
     if not os.path.exists(res):
@@ -60,12 +66,31 @@ def binary_dir():
 
 
 def deploy_target_dir():
-    res = os.path.join(os.path.expanduser('~'), 'Google Drive', "lab", 'software')
+    if sys.platform.startswith('darwin'):
+        res = os.path.join(os.path.expanduser('~'), 'Google Drive', "lab", 'software')
+        assert os.path.exists(res)
+    else:
+        res = repository_dir()
+    return res
+
+
+def qt_ver():
+    return '5.9.1'
+
+
+def qt_base_dir():
+    res = ''
+    if sys.platform.startswith('win32'):
+        res = os.path.join('C:', 'Qt', 'Qt', qt_ver(), 'msvc2017_64')
+    elif sys.platform.startswith('darwin'):
+        res = os.path.join(os.path.expanduser('~'), 'Qt', qt_ver(), 'clang_64')
+    else:
+        res = os.path.join(os.path.expanduser('~'), 'Qt', qt_ver(), 'gcc_64')
     assert os.path.exists(res)
     return res
 
 
 def qt_bin_dir():
-    res = os.path.join(os.path.expanduser('~'), 'Qt', "5.9.1", 'clang_64', 'bin')
+    res = os.path.join(qt_base_dir(), 'bin')
     assert os.path.exists(res)
     return res

@@ -9,7 +9,7 @@
 
 ### Linux:
 * install qt5, mkl, ipp, tbb, python3 and cmake
-* sudo apt-get install unrar p7zip-full git nasm libglfw3-dev zlib1g-dev
+* sudo apt-get install unrar p7zip-full git nasm libglfw3-dev zlib1g-dev patchelf
 * maybe sudo chmod +x /opt/intel/tbb/bin/tbbvars.sh
 
 ### All:

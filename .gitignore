@@ -55,6 +55,7 @@ nasm.exe
 .idea/
 __pycache__/
 /src/version/version.h
+/Atlas.AppDir/
 
 # binary file
 obj/
