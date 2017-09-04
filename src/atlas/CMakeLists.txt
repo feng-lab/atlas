@@ -734,9 +734,23 @@ else (WIN32)
     target_link_libraries(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition)
   endif ()
 
-  set_target_properties(${APP_NAME} PROPERTIES
-                        BUILD_RPATH "@executable_path/../Frameworks"
-                        INSTALL_RPATH "@executable_path/../Frameworks")
+  if (APPLE)
+    set_target_properties(${APP_NAME} PROPERTIES
+                          BUILD_RPATH "@executable_path/../Frameworks"
+                          INSTALL_RPATH "@executable_path/../Frameworks")
+  else ()
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/Resources/atlas.png
+                       $<TARGET_FILE_DIR:${APP_NAME}>)
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${APP_NAME}>/Resources/)
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ffmpeg
+                       $<TARGET_FILE_DIR:${APP_NAME}>/Resources/)
+  endif ()
 
   # for some files
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS

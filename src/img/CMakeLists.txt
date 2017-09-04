@@ -87,6 +87,8 @@ message(STATUS "HDF5_INCLUDE_DIR: ${HDF5_INCLUDE_DIR}")
 
 find_package(Qt5Core ${QT_VERSION} REQUIRED PATHS ${QT_PATHS})
 
+message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
+
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
 #   message(STATUS "${_variableName}=${${_variableName}}")
@@ -288,10 +290,9 @@ else (WIN32)
     target_compile_options(${LIBRARY_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wshadow)
     target_link_libraries(${LIBRARY_NAME} PUBLIC -stdlib=libc++)
-
     set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS -Wno-unused-parameter)
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS -Wno-unused-but-set-variable)
+    set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-but-set-variable")
   endif ()
 
   # for some files

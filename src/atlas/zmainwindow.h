@@ -70,6 +70,10 @@ private:
 
   void about();
 
+#ifdef Q_OS_LINUX
+  void createDesktopEntry();
+#endif
+
   void activateWindowIfNot();  //mac bug?
 
   void openScreenshotPanel();
@@ -151,6 +155,9 @@ private:
   QAction* m_exitAction;
   QAction* m_aboutAction;
   QAction* m_aboutQtAction;
+#ifdef Q_OS_LINUX
+  QAction* m_createDesktopEntryAction;
+#endif
 
   QAction* m_viewLogAction;
   QAction* m_openLogFolderAction;

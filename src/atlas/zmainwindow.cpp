@@ -47,6 +47,7 @@
 #include <QStatusBar>
 #include <QDesktopServices>
 #include <QProcess>
+#include <QTextStream>
 
 namespace nim {
 
@@ -225,9 +226,37 @@ void ZMainWindow::about()
   QMessageBox::about(this, QString("About Atlas"),
                      QString("<p>Atlas version %1</p>"
                                "<p>Atlas is developed by Linqing Feng (flq@live.com).</p>"
-                               "<p>Jinny Kim's Lab, Center for Functional Connectomics, Korea Institute of Science and Technology</p>"
+                               "<p>Jinny Kim Lab and Feng Lab, Center for Functional Connectomics, Korea Institute of Science and Technology</p>"
                                "<p>All rights reserved.</p>").arg(m_versionString));
 }
+
+#ifdef Q_OS_LINUX
+void ZMainWindow::createDesktopEntry()
+{
+  QFile file(QString("%1/.local/share/applications/atlas.desktop").arg(QDir::homePath()));
+  if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+    QTextStream out(&file);
+    out << "[Desktop Entry]\n";
+    out << "Encoding=UTF-8\n";
+    out << "Version=1.0\n";
+    out << "Type=Application\n";
+    out << "Name=Atlas\n";
+    out << "Exec=" << QCoreApplication::applicationDirPath() << "/Atlas %F\n";
+    out << "Icon=" << QCoreApplication::applicationDirPath() << "/atlas.png\n";
+    out << "Comment=Iamge Analysis\n";
+    out << "Categories=Graphics;Science;Utility;\n";
+    out << "Terminal=false\n";
+    out << "StartupWMClass=Atlas\n";
+
+    QMessageBox::information(this, QString("done"),
+                             QString("Desktop entry created."));
+    return;
+  }
+
+  QMessageBox::critical(this, QString("error"),
+                        QString("Can not create desktop entry."));
+}
+#endif
 
 void ZMainWindow::activateWindowIfNot()
 {
@@ -496,6 +525,12 @@ void ZMainWindow::createActions()
   m_aboutQtAction->setStatusTip(tr("Show the Qt library's About box"));
   connect(m_aboutQtAction, &QAction::triggered, qApp, &QApplication::aboutQt);
 
+#ifdef Q_OS_LINUX
+  m_createDesktopEntryAction = new QAction(tr("Create Desktop Entry..."), this);
+  m_createDesktopEntryAction->setStatusTip(tr("Create Desktop Entry for Linux Desktop or Dock"));
+  connect(m_createDesktopEntryAction, &QAction::triggered, this, &ZMainWindow::createDesktopEntry);
+#endif
+
   //
   m_viewLogAction = new QAction(tr("&View Log"), this);
   m_viewLogAction->setStatusTip(tr("View Log"));
@@ -576,6 +611,9 @@ void ZMainWindow::createMenus()
   m_helpMenu = menuBar()->addMenu(tr("&Help"));
   m_helpMenu->addAction(m_aboutAction);
   m_helpMenu->addAction(m_aboutQtAction);
+#ifdef Q_OS_LINUX
+  m_helpMenu->addAction(m_createDesktopEntryAction);
+#endif
   m_helpMenu->addSeparator();
   m_helpMenu->addAction(m_viewLogAction);
   m_helpMenu->addAction(m_openLogFolderAction);

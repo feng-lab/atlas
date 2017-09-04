@@ -158,7 +158,8 @@ def get_cmake_cmd_common_part(install_dir: str):
                 '-DCMAKE_INSTALL_PREFIX=' + install_dir
                 ]
     elif sys.platform.startswith('linux'):
-        return [os.path.expanduser('~/software/cmake-3.9.0-Linux-x86_64/bin/cmake'),  # '-E', 'echo',
+        cmake_folder = find_src_package_with_glob(os.path.join(os.path.expanduser('~'), 'software', 'cmake-*_64'))
+        return [os.path.join(cmake_folder, 'bin', 'cmake'),  # '-E', 'echo',
                 '-DCMAKE_BUILD_TYPE=Release',
                 '-DCMAKE_INSTALL_PREFIX=' + install_dir,
                 '-DCMAKE_CXX_FLAGS:STRING=-std=c++14'

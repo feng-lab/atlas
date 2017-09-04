@@ -26,7 +26,14 @@ void ZVideoEncoder::encode(const QDir& dir, const QString& namePrefix, int field
     emit error("Encoder is already running.");
     return;
   }
+
+#ifdef _WIN32
+  QString program = QApplication::applicationDirPath() + QString("\\Resources\\ffmpeg.exe");
+#elif defined(__APPLE__)
   QString program = QApplication::applicationDirPath() + QString("/../Resources/ffmpeg");
+#else
+  QString program = QApplication::applicationDirPath() + QString("/Resources/ffmpeg");
+#endif
   QStringList arguments;
   arguments << "-r" << QString::number(framesPerSecond, 'f', 2) << "-i"
             << (QString("%1/%2% 0%3d.tif").arg(dir.absolutePath()).arg(namePrefix).arg(fieldWidth).replace("% 0", "%0"))

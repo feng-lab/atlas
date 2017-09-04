@@ -265,14 +265,14 @@ def create_qt_conf(conf_path):
     text_file.close()
 
 
-def create_desktop_file(path, icon_file):
+def create_desktop_file(path):
     d = "[Desktop Entry]\n"
     d += "Type=Application\n"
     d += "Name=Atlas\n"
     d += "Exec=AppRun %F\n"
     d += "Icon=atlas\n"
-    d += "Comment=Img\n"
-    d += "Categories=Graphics;Science;Utility;"
+    d += "Comment=Image Analysis\n"
+    d += "Categories=Graphics;Science;Utility;\n"
     d += "Terminal=false\n"
 
     f = path + os.sep + "atlas.desktop"
@@ -281,10 +281,8 @@ def create_desktop_file(path, icon_file):
     text_file.write(d)
     text_file.close()
 
-    shutil.copy2(icon_file, path)
 
-
-def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins, icon_file):
+def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins):
     from distutils.dir_util import copy_tree
 
     if not os.path.exists(dest_dir):
@@ -308,6 +306,9 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins, 
 
     # Handle executable
     shutil.copyfile(executable, dest_file)  # overrides dest
+    shutil.copytree(os.path.join(os.path.dirname(executable), 'Resources'), os.path.join(dest_dir, 'Resources'))
+    shutil.copy2(os.path.join(os.path.dirname(executable), 'atlas.png'), dest_dir)
+
 
     # Strip executable
     strip(dest_file)
@@ -353,7 +354,7 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins, 
     create_qt_conf(dest_dir)
 
     # Make default desktop file
-    create_desktop_file(dest_dir, icon_file)
+    create_desktop_file(dest_dir)
 
     # Make AppRun symlink
     os.system('cd "' + dest_dir + '" && ln -s ' + os.path.basename(executable) + ' AppRun')
@@ -368,7 +369,7 @@ def build_appimage(appdir, appimage):
     return res
 
 
-def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str, icon_file: str):
+def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str):
     blacklist = [
         'linux-vdso.so.1',
         'ld-linux-x86-64.so.2',
@@ -422,5 +423,5 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str, icon_file
                 dependencies[qt_plugin_dep] = qt_plugin_deps[qt_plugin_dep]
 
     info("Building AppDir in '%s'" % deploy_dir)
-    build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, used_plugins, icon_file)
+    build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, used_plugins)
 

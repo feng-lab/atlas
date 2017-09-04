@@ -45,8 +45,7 @@ def deploy_atlas():
             shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'), ignore_errors=True)
             linuxdeployqt.linuxdeployqt(os.path.join(binary_dir, app_name),
                                         os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'),
-                                        common_dirs.qt_base_dir(),
-                                        os.path.join(common_dirs.resource_dir(), 'atlas.png'))
+                                        common_dirs.qt_base_dir())
             if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
                 os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
             subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, 'Atlas.AppDir'],
