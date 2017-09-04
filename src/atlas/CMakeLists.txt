@@ -717,6 +717,14 @@ if (WIN32)
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
                               "/wd4100 /I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}") # 'identifier' : unreferenced formal parameter)
   set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS /I${ASSIMP_INCLUDE_DIRS})
+
+  add_custom_command(TARGET ${APP_NAME}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${APP_NAME}>\\Resources")
+  add_custom_command(TARGET ${APP_NAME}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}\\..\\3rdparty\\ffmpeg.exe"
+                     "$<TARGET_FILE_DIR:${APP_NAME}>\\Resources\\")
 else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -frtti)
   target_compile_options(${APP_NAME} PUBLIC -fexceptions)
