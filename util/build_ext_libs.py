@@ -423,16 +423,9 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
-            if sys.platform.startswith('linux'):
-                cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
-                                 '-DPNG_SHARED:BOOL=OFF',
-                                 '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '/zlib/include',
-                                 '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '/zlib/lib/libz.a',
-                                 src_dir])
-            else:
-                cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
-                                 '-DPNG_SHARED:BOOL=OFF',
-                                 src_dir])
+            cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
+                             '-DPNG_SHARED:BOOL=OFF',
+                             src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True)
@@ -568,13 +561,7 @@ def build_ospray(src_dir: str, install_dir: str, ext_dir: str, ispc_dir: str, em
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
         if sys.platform.startswith('win'):
-            intel_sw_dir = 'C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\'
-            env = get_enviroment_from_shell_script(intel_sw_dir + 'tbb\\bin\\tbbvars.bat',
-                                                   para='intel64 vs2017',
-                                                   start_env=get_vcvars_environment())
-            print('TBBROOT:', env['TBBROOT'])
-
-            cmakecmd.extend(['-DTBB_ROOT:PATH=' + env['TBBROOT'],
+            cmakecmd.extend(['-DTBB_ROOT:PATH=' + os.environ['ICPP_COMPILER17'] + 'tbb',
                              '-DOSPRAY_USE_EXTERNAL_EMBREE:BOOL=ON',
                              '-DOSPRAY_USE_EMBREE_STREAMS:BOOL=ON',
                              '-DOSPRAY_USE_HIGH_QUALITY_BVH:BOOL=ON',
@@ -642,16 +629,9 @@ def build_assimp(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
-            if sys.platform.startswith('linux'):
-                cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
-                                 '-DASSIMP_BUILD_TESTS:BOOL=OFF',
-                                 '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '/zlib/include',
-                                 '-DZLIB_LIBRARY_REL:FILEPATH=' + ext_dir + '/zlib/lib/libz.so',
-                                 src_dir])
-            else:
-                cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
-                                 '-DASSIMP_BUILD_TESTS:BOOL=OFF',
-                                 src_dir])
+            cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
+                             '-DASSIMP_BUILD_TESTS:BOOL=OFF',
+                             src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True)
@@ -684,24 +664,13 @@ def build_hdf5(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
-            if sys.platform.startswith('linux'):
-                cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
-                                 '-DBUILD_SHARED_LIBS:BOOL=OFF',
-                                 '-DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=OFF',
-                                 '-DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON',
-                                 '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '/zlib/include',
-                                 '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '/zlib/lib/libz.a',
-                                 '-DHDF5_ENABLE_THREADSAFE:BOOL=OFF',
-                                 '-DHDF5_BUILD_EXAMPLES:BOOL=OFF',
-                                 src_dir])
-            else:
-                cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
-                                 '-DBUILD_SHARED_LIBS:BOOL=OFF',
-                                 '-DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=OFF',
-                                 '-DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON',
-                                 '-DHDF5_ENABLE_THREADSAFE:BOOL=OFF',
-                                 '-DHDF5_BUILD_EXAMPLES:BOOL=OFF',
-                                 src_dir])
+            cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
+                             '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                             '-DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=OFF',
+                             '-DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON',
+                             '-DHDF5_ENABLE_THREADSAFE:BOOL=OFF',
+                             '-DHDF5_BUILD_EXAMPLES:BOOL=OFF',
+                             src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True)
@@ -858,8 +827,6 @@ def build_botan(src_dir: str, install_dir: str, ext_dir: str):
                            cwd=src_dir, shell=False, check=True, env=env)  # todo: install not working
         elif sys.platform.startswith('linux'):
             subprocess.run([python, src_dir + '/configure.py', '--with-zlib',
-                            '--with-external-includedir=' + ext_dir + '/zlib/include',
-                            '--with-external-libdir=' + ext_dir + '/zlib/lib',
                             '--prefix=' + install_dir],
                            cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
@@ -908,32 +875,17 @@ def build_itk(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
-            if sys.platform.startswith('linux'):
-                cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
-                                 '-DBUILD_TESTING:BOOL=OFF',
-                                 '-DITK_USE_64BITS_IDS:BOOL=ON',
-                                 '-DITK_LEGACY_REMOVE:BOOL=ON',
-                                 '-DITK_USE_GPU:BOOL=OFF',
-                                 '-DITK_DOXYGEN_HTML:BOOL=OFF',
-                                 '-DITK_USE_STRICT_CONCEPT_CHECKING:BOOL=ON',
-                                 '-DModule_ITKReview:BOOL=ON',
-                                 '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
-                                 '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
-                                 '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '/zlib/include',
-                                 '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '/zlib/lib/libz.a',
-                                 src_dir])
-            else:
-                cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
-                                 '-DBUILD_TESTING:BOOL=OFF',
-                                 '-DITK_USE_64BITS_IDS:BOOL=ON',
-                                 '-DITK_LEGACY_REMOVE:BOOL=ON',
-                                 '-DITK_USE_GPU:BOOL=OFF',
-                                 '-DITK_DOXYGEN_HTML:BOOL=OFF',
-                                 '-DITK_USE_STRICT_CONCEPT_CHECKING:BOOL=ON',
-                                 '-DModule_ITKReview:BOOL=ON',
-                                 '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
-                                 '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
-                                 src_dir])
+            cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
+                             '-DBUILD_TESTING:BOOL=OFF',
+                             '-DITK_USE_64BITS_IDS:BOOL=ON',
+                             '-DITK_LEGACY_REMOVE:BOOL=ON',
+                             '-DITK_USE_GPU:BOOL=OFF',
+                             '-DITK_DOXYGEN_HTML:BOOL=OFF',
+                             '-DITK_USE_STRICT_CONCEPT_CHECKING:BOOL=ON',
+                             '-DModule_ITKReview:BOOL=ON',
+                             '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
+                             '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
+                             src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=build_dir, shell=False, check=True)
@@ -972,8 +924,6 @@ def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
                                  '-DVTK_USE_SYSTEM_ZLIB:BOOL=ON',
                                  '-DVTK_LEGACY_REMOVE:BOOL=ON',
                                  '-DVTK_USE_SYSTEM_LIBXML2:BOOL=OFF',
-                                 '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '/zlib/include',
-                                 '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '/zlib/lib/libz.a',
                                  src_dir])
             else:
                 cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
@@ -1145,8 +1095,6 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                                  '-DBUILD_WITH_DEBUG_INFO:BOOL=OFF',
                                  '-DBUILD_opencv_apps:BOOL=OFF',
                                  '-DBUILD_opencv_matlab:BOOL=OFF',
-                                 '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '/zlib/include',
-                                 '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '/zlib/lib/libz.a',
                                  src_dir])
             else:
                 os.rename(orig_file, bak_file)
@@ -1529,7 +1477,7 @@ def parse_inputs(argv: list):
             update_src = False
         else:
             raise SyntaxError("wrong lib name: " + lib)
-    if sys.platform.startswith('darwin'):
+    if not sys.platform.startswith('win32'):
         libs['zlib'] = False
 
     for lib, rev_dep in libs_reverse_depends.items():
