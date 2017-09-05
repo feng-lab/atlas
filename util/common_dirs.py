@@ -59,8 +59,14 @@ def src_package_dir():
     return res
 
 
+def build_dir():
+    res = os.path.join(repository_dir(), 'cmake-build-release')
+    assert os.path.exists(res)
+    return res
+
+
 def binary_dir():
-    res = os.path.join(repository_dir(), 'cmake-build-release', 'src', 'atlas')
+    res = os.path.join(build_dir(), 'src', 'atlas')
     assert os.path.exists(res)
     return res
 
