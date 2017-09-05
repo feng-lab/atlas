@@ -300,7 +300,11 @@ void ZMainWindow::runBenchmark()
 
 void ZMainWindow::runUnitTest()
 {
-  ZUnitTest::run();
+  if (ZUnitTest::run() == 0) {
+    LOG(INFO) << "Unit Test Passed.";
+  } else {
+    LOG(ERROR) << "Unit Test Failed!";
+  }
 }
 
 #endif
