@@ -21,7 +21,7 @@ def deploy_atlas():
 
     if sys.platform.startswith('darwin'):
         app_name = 'Atlas.app'
-        zip_name = 'atlas.app.new.zip'
+        zip_name = 'atlas.app.zip'
         app_bak_name = get_bak_file_name(app_name)
         if os.path.exists(os.path.join(binary_dir, app_name)):
             shutil.copytree(os.path.join(binary_dir, app_name), os.path.join(binary_dir, app_bak_name),
@@ -34,13 +34,15 @@ def deploy_atlas():
                            cwd=binary_dir, shell=False, check=True)
             shutil.rmtree(os.path.join(binary_dir, app_name), ignore_errors=False)
             os.replace(os.path.join(binary_dir, app_bak_name), os.path.join(binary_dir, app_name))
+
             shutil.copy2(os.path.join(binary_dir, zip_name), os.path.join(common_dirs.deploy_target_dir(), zip_name))
+            shutil.move(os.path.join(binary_dir, zip_name), common_dirs.repository_dir())
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)
     elif sys.platform.startswith('linux'):
         app_name = "Atlas"
-        zip_name = "Atlas_linux.zip"
+        zip_name = "atlas-linux.zip"
         if os.path.exists(os.path.join(binary_dir, app_name)):
             shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'), ignore_errors=True)
             linuxdeployqt.linuxdeployqt(os.path.join(binary_dir, app_name),

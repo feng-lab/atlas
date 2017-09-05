@@ -272,7 +272,7 @@ def create_desktop_file(path):
     d += "Type=Application\n"
     d += "Name=Atlas\n"
     d += "Exec=AppRun %F\n"
-    d += "Icon=atlas.png\n"
+    d += "Icon=Atlas.png\n"
     d += "Comment=Image Analysis\n"
     d += "Categories=Graphics;Science;Utility;\n"
     d += "Terminal=false\n"
@@ -310,7 +310,7 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins):
     # Handle executable
     shutil.copyfile(executable, dest_file)  # overrides dest
     shutil.copytree(os.path.join(os.path.dirname(executable), 'Resources'), os.path.join(dest_dir, 'Resources'))
-    shutil.copy2(os.path.join(os.path.dirname(executable), 'atlas.png'), dest_dir)
+    shutil.copy2(os.path.join(os.path.dirname(executable), 'Atlas.png'), dest_dir)
 
 
     # Strip executable

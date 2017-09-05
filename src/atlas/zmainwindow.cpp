@@ -242,7 +242,7 @@ void ZMainWindow::createDesktopEntry()
     out << "Type=Application\n";
     out << "Name=Atlas\n";
     out << "Exec=" << QCoreApplication::applicationDirPath() << "/Atlas %F\n";
-    out << "Icon=" << QCoreApplication::applicationDirPath() << "/atlas.png\n";
+    out << "Icon=" << QCoreApplication::applicationDirPath() << "/Atlas.png\n";
     out << "Comment=Iamge Analysis\n";
     out << "Categories=Graphics;Science;Utility;\n";
     out << "Terminal=false\n";

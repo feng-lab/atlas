@@ -768,7 +768,7 @@ else (WIN32)
   else ()
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/Resources/atlas.png
+                       COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/Resources/Atlas.png
                        $<TARGET_FILE_DIR:${APP_NAME}>)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
