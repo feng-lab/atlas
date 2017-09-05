@@ -72,12 +72,7 @@ def binary_dir():
 
 
 def deploy_target_dir():
-    if sys.platform.startswith('darwin'):
-        res = os.path.join(os.path.expanduser('~'), 'Google Drive', "lab", 'software')
-        assert os.path.exists(res)
-    else:
-        res = repository_dir()
-    return res
+    return repository_dir()
 
 
 def qt_ver():

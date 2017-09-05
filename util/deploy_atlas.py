@@ -24,6 +24,9 @@ def deploy_atlas():
         zip_name = 'atlas.app.zip'
         app_bak_name = get_bak_file_name(app_name)
         if os.path.exists(os.path.join(binary_dir, app_name)):
+            if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
+                os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
+
             shutil.copytree(os.path.join(binary_dir, app_name), os.path.join(binary_dir, app_bak_name),
                             symlinks=True)
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), app_name],
@@ -35,8 +38,9 @@ def deploy_atlas():
             shutil.rmtree(os.path.join(binary_dir, app_name), ignore_errors=False)
             os.replace(os.path.join(binary_dir, app_bak_name), os.path.join(binary_dir, app_name))
 
-            shutil.copy2(os.path.join(binary_dir, zip_name), os.path.join(common_dirs.deploy_target_dir(), zip_name))
-            shutil.move(os.path.join(binary_dir, zip_name), common_dirs.repository_dir())
+            shutil.move(os.path.join(binary_dir, zip_name), common_dirs.deploy_target_dir())
+            shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), zip_name),
+                         os.path.join(os.path.expanduser('~'), 'Google Drive', "lab", 'software', zip_name))
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)
@@ -51,6 +55,9 @@ def deploy_atlas():
             if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
                 os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
             subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, 'Atlas.AppDir'],
+                           cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+            subprocess.run(['scp', zip_name,
+                            'feng@labmacpro:"/Users/feng/Google\ Drive/lab/software/"'],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
