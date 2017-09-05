@@ -16,12 +16,14 @@ def get_cmake_cmd_common_part():
         cmake_folder = build_ext_libs.find_src_package_with_glob(os.path.join(os.path.expanduser('~'), 'software', 'cmake-*_64'))
         return [os.path.join(cmake_folder, 'bin', 'cmake'),  # '-E', 'echo',
                 '-DCMAKE_BUILD_TYPE=Release',
-                '-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON'
+                '-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON',
+                '-G', 'Ninja'
                 ]
     else:
         return ['cmake',  # '-E', 'echo',
                 '-DCMAKE_BUILD_TYPE=Release',
-                '-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON'
+                '-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON',
+                '-G', 'Ninja'
                 ]
 
 
@@ -40,9 +42,13 @@ def build_atlas():
                        cwd=build_dir, shell=False, check=True, env=env)
         subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                        cwd=build_dir, shell=True, check=True, env=env)
+    elif sys.platform.startswith('linux'):
+        subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
+        subprocess.run([os.path.join(os.path.expanduser('~'), 'bin', 'ninja')],
+                       cwd=build_dir, shell=False, check=True)
     else:
         subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
-        subprocess.run(['make', '-j' + str(os.cpu_count())],
+        subprocess.run(['ninja'],
                        cwd=build_dir, shell=False, check=True)
 
 
