@@ -52,7 +52,7 @@ def src_package_dir():
     res = os.path.join(base_dir(), 'atlas_others')
     if not os.path.exists(res):
         if sys.platform.startswith('win'):
-            res = os.path.join('z:', os.sep, 'Google Drive', 'code', 'my', 'atlas_others')
+            res = os.path.join('Z:', os.sep, 'Google Drive', 'code', 'my', 'atlas_others')
         else:
             res = os.path.join(os.path.expanduser('~'), 'Google Drive', 'code', 'my', 'atlas_others')
     assert os.path.exists(res)
@@ -66,7 +66,10 @@ def build_dir():
 
 
 def binary_dir():
-    res = os.path.join(build_dir(), 'src', 'atlas')
+    if sys.platform.startswith('win32'):
+        res = os.path.join(build_dir(), 'src', 'atlas', 'Release')
+    else:
+        res = os.path.join(build_dir(), 'src', 'atlas')
     assert os.path.exists(res)
     return res
 
@@ -80,9 +83,8 @@ def qt_ver():
 
 
 def qt_base_dir():
-    res = ''
     if sys.platform.startswith('win32'):
-        res = os.path.join('C:', 'Qt', 'Qt', qt_ver(), 'msvc2017_64')
+        res = os.path.join('C:', os.sep, 'Qt', 'Qt', qt_ver(), 'msvc2017_64')
     elif sys.platform.startswith('darwin'):
         res = os.path.join(os.path.expanduser('~'), 'Qt', qt_ver(), 'clang_64')
     else:

@@ -7,9 +7,9 @@
 #  define QTCSVSHARED_EXPORT
 #else
 #  if defined(QTCSV_LIBRARY)
-#    define QTCSVSHARED_EXPORT Q_DECL_EXPORT
+#    define QTCSVSHARED_EXPORT
 #  else
-#    define QTCSVSHARED_EXPORT Q_DECL_IMPORT
+#    define QTCSVSHARED_EXPORT
 #  endif
 #endif
 

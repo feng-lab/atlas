@@ -9,11 +9,14 @@ import build_ext_libs
 
 def get_cmake_cmd_common_part(use_ninja: bool):
     if sys.platform.startswith('win'):
-        return ['cmake',  # '-E', 'echo',
+        cmake_folder = build_ext_libs.find_src_package_with_glob(
+            os.path.join(os.path.expanduser('~'), 'Downloads', 'cmake-*-x64'))
+        return [os.path.join(cmake_folder, 'bin', 'cmake'),  # '-E', 'echo',
                 '-G', 'Visual Studio 15 2017 Win64'
                 ]
     elif sys.platform.startswith('linux'):
-        cmake_folder = build_ext_libs.find_src_package_with_glob(os.path.join(os.path.expanduser('~'), 'software', 'cmake-*_64'))
+        cmake_folder = build_ext_libs.find_src_package_with_glob(
+            os.path.join(os.path.expanduser('~'), 'software', 'cmake-*_64'))
         if use_ninja:
             return [os.path.join(cmake_folder, 'bin', 'cmake'),  # '-E', 'echo',
                     '-DCMAKE_BUILD_TYPE=Release',

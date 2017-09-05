@@ -265,7 +265,7 @@ void QxtCsvModel::setHeaderData(const QStringList& data)
 bool QxtCsvModel::setHeaderData(int section, Qt::Orientation orientation, const QVariant& value, int role)
 {
     if(orientation != Qt::Horizontal) return false;                   // We don't support the vertical header
-    if(role != Qt::DisplayRole || role != Qt::EditRole) return false; // We don't support any other roles
+    if(role != Qt::DisplayRole && role != Qt::EditRole) return false; // We don't support any other roles
     if(section < 0) return false;                                     // Bogus input
     while(section > qxt_d().header.size()) {
         qxt_d().header << QString();

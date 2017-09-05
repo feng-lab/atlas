@@ -5,6 +5,7 @@ import subprocess
 
 import common_dirs
 import linuxdeployqt
+import build_ext_libs
 
 
 def get_bak_file_name(orig_file: str):
@@ -59,6 +60,39 @@ def deploy_atlas():
             subprocess.run(['scp', zip_name,
                             'feng@labmacpro:"/Users/feng/Google Drive/lab/software/"'],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+        else:
+            sys.stderr.write('Error: atlas is not built yet.\n')
+            sys.exit(1)
+    else:
+        app_name = 'Atlas.exe'
+        zip_base_name = 'atlas-win'
+        zip_name = zip_base_name + '.zip'
+        if os.path.exists(os.path.join(binary_dir, app_name)):
+            if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
+                os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
+            shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), ignore_errors=True)
+            os.mkdir(os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+            shutil.copy2(os.path.join(binary_dir, app_name),
+                         os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+            shutil.copytree(os.path.join(binary_dir, 'Resources'),
+                            os.path.join(common_dirs.deploy_target_dir(), 'Atlas', 'Resources'),
+                            symlinks=True)
+            build_ext_libs.glob_copy(os.path.join(common_dirs.ext_dir(), 'assimp', 'bin', '*.dll'),
+                                     os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+            build_ext_libs.glob_copy(os.path.join(common_dirs.ext_dir(), 'freeimage', '*.dll'),
+                                     os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+            shutil.copy2(os.path.join('C:', os.sep, 'Program Files (x86)', 'IntelSWTools', 'compilers_and_libraries',
+                                      'windows', 'redist', 'intel64', 'tbb', 'vc14', 'tbb.dll'),
+                         os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+
+            env = build_ext_libs.get_vcvars_environment()
+            subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'windeployqt'), app_name],
+                           cwd=os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), shell=False, check=True, env=env)
+            shutil.make_archive(os.path.join(common_dirs.deploy_target_dir(), zip_base_name),
+                                'zip',
+                                os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+            shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), zip_name),
+                         os.path.join('Z:', os.sep, 'Google Drive', "lab", 'software', zip_name))
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)

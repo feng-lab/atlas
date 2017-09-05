@@ -708,10 +708,11 @@ if (WIN32)
   target_compile_options(${APP_NAME} PUBLIC /wd4828) # The file contains a character starting at offset 0x60 that is illegal in the current source character set (codepage 65001).
   target_compile_options(${APP_NAME} PUBLIC /utf-8)  # https://blogs.msdn.microsoft.com/vcblog/2016/02/22/new-options-for-managing-character-sets-in-the-microsoft-cc-compiler/
   target_compile_options(${APP_NAME} PUBLIC /analyze) # The C/C++ Code Analysis tool provides information to developers about possible defects in their C/C++ source code
+  target_compile_options(${APP_NAME} PUBLIC /wd6326) # Potential comparison of a constant with another constant.
   target_compile_options(${APP_NAME} PUBLIC /MP) # Build with Multiple Processes
 
   #target_link_libraries(${APP_NAME} PUBLIC /LTCG) # Link-time Code Generation
-  set_target_properties(${APP_NAME} PROPERTIES LINK_FLAGS /LTCG)
+  set_target_properties(${APP_NAME} PROPERTIES LINK_FLAGS "/LTCG /FORCE:MULTIPLE") # to create an output file whether or not LINK finds more than one definition for a symbol.
 
   # for some files
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
@@ -737,9 +738,11 @@ else (WIN32)
     target_compile_options(${APP_NAME} PRIVATE -Wundefined-reinterpret-cast)
     target_compile_options(${APP_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
     target_compile_options(${APP_NAME} PUBLIC -Wshadow)
-    target_link_libraries(${APP_NAME} PUBLIC -stdlib=libc++)
+    #target_link_libraries(${APP_NAME} PUBLIC -stdlib=libc++)
+    set_target_properties(${APP_NAME} PROPERTIES LINK_FLAGS -stdlib=libc++)
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_link_libraries(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition)
+    #target_link_libraries(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition)
+    set_target_properties(${APP_NAME} PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition)
   endif ()
 
   # for some files
