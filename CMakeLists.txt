@@ -7,6 +7,8 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
 
 LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
+
 # generate a version string from git tag-hash and current build time
 include(GetGitRevisionDescription)
 git_describe(GIT_VERSION)

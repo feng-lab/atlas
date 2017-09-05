@@ -742,10 +742,29 @@ else (WIN32)
     target_link_libraries(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition)
   endif ()
 
+  # for some files
+  set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
+                              "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers -Wno-unknown-pragmas -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
+  set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
+  set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS "-isystem ${ASSIMP_INCLUDE_DIRS}")
+
   if (APPLE)
+    set(copyright_line "Copyright 2011-2017 Linqing Feng")
     set_target_properties(${APP_NAME} PROPERTIES
                           BUILD_RPATH "@executable_path/../Frameworks"
-                          INSTALL_RPATH "@executable_path/../Frameworks")
+                          INSTALL_RPATH "@executable_path/../Frameworks"
+                          OUTPUT_NAME "${APP_NAME}"
+                          MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Info.plist.in"
+                          MACOSX_BUNDLE_INFO_STRING "${APP_NAME}"
+                          MACOSX_BUNDLE_LONG_VERSION_STRING "${ATLAS_VERSION}"
+                          MACOSX_BUNDLE_SHORT_VERSION_STRING "${ATLAS_VERSION}"
+                          MACOSX_BUNDLE_BUNDLE_NAME "${APP_NAME}"
+                          MACOSX_BUNDLE_BUNDLE_VERSION "${ATLAS_VERSION}"
+                          MACOSX_BUNDLE_COPYRIGHT "${copyright_line}"
+                          MACOSX_BUNDLE_GUI_IDENTIFIER "org.atlas.Atlas"
+                          )
+    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ffmpeg PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
   else ()
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
@@ -759,15 +778,6 @@ else (WIN32)
                        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ffmpeg
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/)
   endif ()
-
-  # for some files
-  set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
-                              "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers -Wno-unknown-pragmas -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
-  set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
-  set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS "-isystem ${ASSIMP_INCLUDE_DIRS}")
-
-  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ffmpeg PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 endif (WIN32)
 
 target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding hdf5::hdf5_cpp-static hdf5::hdf5-static
@@ -782,20 +792,3 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 else ()
   target_link_libraries(${APP_NAME} PUBLIC ${MKL_LIBRARIES})
 endif ()
-
-if (APPLE)
-  set(copyright_line "Copyright 2011-2017 Linqing Feng")
-
-  set_target_properties(${APP_NAME} PROPERTIES
-                        OUTPUT_NAME "${APP_NAME}"
-                        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Info.plist.in"
-                        MACOSX_BUNDLE_INFO_STRING "${APP_NAME}"
-                        MACOSX_BUNDLE_LONG_VERSION_STRING "${ATLAS_VERSION}"
-                        MACOSX_BUNDLE_SHORT_VERSION_STRING "${ATLAS_VERSION}"
-                        MACOSX_BUNDLE_BUNDLE_NAME "${APP_NAME}"
-                        MACOSX_BUNDLE_BUNDLE_VERSION "${ATLAS_VERSION}"
-                        MACOSX_BUNDLE_COPYRIGHT "${copyright_line}"
-                        MACOSX_BUNDLE_GUI_IDENTIFIER "org.atlas.Atlas"
-                        )
-endif (APPLE)
-

@@ -87,8 +87,6 @@ message(STATUS "HDF5_INCLUDE_DIR: ${HDF5_INCLUDE_DIR}")
 
 find_package(Qt5Core ${QT_VERSION} REQUIRED PATHS ${QT_PATHS})
 
-message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
-
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
 #   message(STATUS "${_variableName}=${${_variableName}}")
