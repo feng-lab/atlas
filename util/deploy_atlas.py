@@ -57,7 +57,7 @@ def deploy_atlas():
             subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, 'Atlas.AppDir'],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
             subprocess.run(['scp', zip_name,
-                            'feng@labmacpro:"/Users/feng/Google\ Drive/lab/software/"'],
+                            'feng@labmacpro:"/Users/feng/Google Drive/lab/software/"'],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
