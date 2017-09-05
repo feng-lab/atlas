@@ -267,13 +267,16 @@ def create_qt_conf(conf_path):
 
 def create_desktop_file(path):
     d = "[Desktop Entry]\n"
+    d += "Encoding=UTF-8\n"
+    d += "Version=1.0\n"
     d += "Type=Application\n"
     d += "Name=Atlas\n"
     d += "Exec=AppRun %F\n"
-    d += "Icon=atlas\n"
+    d += "Icon=atlas.png\n"
     d += "Comment=Image Analysis\n"
     d += "Categories=Graphics;Science;Utility;\n"
     d += "Terminal=false\n"
+    d += "StartupWMClass=Atlas\n"
 
     f = path + os.sep + "atlas.desktop"
     debug("Writing desktop to '%s'" % f)
