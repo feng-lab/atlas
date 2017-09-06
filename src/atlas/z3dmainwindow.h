@@ -38,6 +38,8 @@ signals:
 
   void loadJsonScene(const QString& fn);
 
+  void viewReady(Z3DView* view);
+
 protected:
   void closeEvent(QCloseEvent* event);
 
@@ -101,6 +103,8 @@ private:
   QString strippedName(const QString& fullFileName);
 
   Z3DMainWindow* findMainWindow(const QString& fileName);
+
+  void onViewReady();
 
 private:
   QMenu* m_fileMenu;

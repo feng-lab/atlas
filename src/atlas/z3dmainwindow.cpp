@@ -209,7 +209,7 @@ void Z3DMainWindow::init()
   createToolBars();
   createStatusBar();
   createDockWindows();
-  connect(m_view, &Z3DView::networkConstructed, this, &Z3DMainWindow::fillDockWindows);
+  connect(m_view, &Z3DView::networkConstructed, this, &Z3DMainWindow::onViewReady);
 
   readSettings();
 
@@ -541,6 +541,12 @@ QString Z3DMainWindow::strippedName(const QString& fullFileName)
 Z3DMainWindow* Z3DMainWindow::findMainWindow(const QString& /*unused*/)
 {
   return nullptr;
+}
+
+void Z3DMainWindow::onViewReady()
+{
+  fillDockWindows();
+  emit viewReady(m_view);
 }
 
 } // namespace nim

@@ -23,7 +23,6 @@ ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget* parent)
   , m_customSize("Custom Image Size", glm::ivec2(1920, 1080), glm::ivec2(128, 128),
                  glm::ivec2(Z3DGpuInfo::instance().maxTextureSize()))
   , m_framePerSecond("Frames per Second", 30, 12, 60)
-  , m_filename("Filename Prefix", "")
   , m_is2DAnimation(is2DAni)
 {
   m_customSize.setStyle("SPINBOX");
@@ -33,8 +32,6 @@ ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget* parent)
   m_customSize.setNameForEachValue(names);
   m_stereoImageType.addOptions("Full Side-By-Side", "Half Side-By-Side");
   m_stereoImageType.select("Half Side-By-Side");
-  QString prefix = QString("animation.mp4");
-  m_filename.set(prefix);
   m_framePerSecond.setStyle("SPINBOX");
   m_framePerSecond.setDecimal(2);
   m_framePerSecond.setSingleStep(1);
@@ -55,21 +52,22 @@ QSize ZAnimationExportWidget::sizeHint() const
 
 void ZAnimationExportWidget::captureButtonPressed()
 {
-  if (m_folderWidget->getSelectedDirectory().isEmpty()) {
-    QMessageBox::critical(this, qApp->applicationName(), "Output Folder do not exist");
+  if (m_filenameWidget->getSelectedSaveFile().isEmpty()) {
+    QMessageBox::critical(this, qApp->applicationName(), "Output filename does not exist");
     return;
   }
-  QDir dir(m_folderWidget->getSelectedDirectory());
 
   QSettings settings;
-  settings.setValue(QString("Animation/exportPath"), dir.absolutePath());
+  settings.setValue(QString("Animation/exportPath"),
+                    m_filenameWidget->getSelectedSaveFile());
 
   if (m_is2DAnimation) {
     if (m_useWindowSize.get()) {
-      emit export2DAnimation(dir, m_filename.get(), m_framePerSecond.get());
+      emit export2DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get());
     } else {
       glm::ivec2 size = m_customSize.get();
-      emit exportFixedSize2DAnimation(dir, m_filename.get(), m_framePerSecond.get(), size.x, size.y);
+      emit exportFixedSize2DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(),
+                                      size.x, size.y);
     }
   } else {
     Z3DScreenShotType sst;
@@ -82,10 +80,11 @@ void ZAnimationExportWidget::captureButtonPressed()
       sst = Z3DScreenShotType::MonoView;
 
     if (m_useWindowSize.get()) {
-      emit export3DAnimation(dir, m_filename.get(), m_framePerSecond.get(), sst);
+      emit export3DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(), sst);
     } else {
       glm::ivec2 size = m_customSize.get();
-      emit exportFixedSize3DAnimation(dir, m_filename.get(), m_framePerSecond.get(), size.x, size.y, sst);
+      emit exportFixedSize3DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(),
+                                      size.x, size.y, sst);
     }
   }
 }
@@ -99,8 +98,7 @@ void ZAnimationExportWidget::adjustWidget()
 {
   m_framePerSecond.setVisible(true);
   m_captureButton->setVisible(true);
-  m_folderWidget->setEnabled(true);
-  m_filename.setEnabled(true);
+  m_filenameWidget->setEnabled(true);
   m_stereoImageType.setVisible(m_captureStereoImage.get());
 }
 
@@ -161,20 +159,11 @@ void ZAnimationExportWidget::createWidget()
   hlo->getContentsMargins(&left, &top, &right, &bottom);
   //hlo->setContentsMargins(left+20, top, right, bottom);
   QSettings settings;
-  QString folder = settings.value(QString("Animation/exportPath")).toString();
-  m_folderWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::Directory, "output folder:", QString(),
-                                         QBoxLayout::LeftToRight, folder, this);
-  m_folderWidget->setFile(folder);
-  hlo->addWidget(m_folderWidget);
-  lo->addLayout(hlo);
-
-  hlo = new QHBoxLayout;
-  //hlo->setContentsMargins(left+20, top, right, bottom);
-  hlo->addWidget(m_filename.createNameLabel());
-  wg = m_filename.createWidget();
-  wg->setMinimumWidth(125);
-  wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
-  hlo->addWidget(wg);
+  QString lastFn = settings.value(QString("Animation/exportPath")).toString();
+  m_filenameWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "filename:",
+                                           tr("Video File (*.mp4 *.mov)"),
+                                           QBoxLayout::LeftToRight, lastFn, this);
+  hlo->addWidget(m_filenameWidget);
   lo->addLayout(hlo);
 
   m_captureButton = new QPushButton(tr("Export"), this);

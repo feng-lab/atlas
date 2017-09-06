@@ -26,6 +26,7 @@ void ZVideoEncoder::encode(const QDir& dir, const QString& namePrefix, int field
     emit error("Encoder is already running.");
     return;
   }
+  m_tmpDir = dir;
 
 #ifdef _WIN32
   QString program = QApplication::applicationDirPath() + QString("\\Resources\\ffmpeg.exe");
@@ -53,6 +54,7 @@ void ZVideoEncoder::cancel()
   m_ffmpegProcess->waitForFinished();
   blockSignals(false);
   emit canceled();
+  m_tmpDir.removeRecursively();
   m_lock = false;
 }
 
@@ -91,6 +93,7 @@ void ZVideoEncoder::ffmpegFinished(int exitCode, QProcess::ExitStatus exitStatus
   } else {
     emit error(m_ffmpegProcess->readAllStandardError());
   }
+  m_tmpDir.removeRecursively();
 }
 
 void ZVideoEncoder::logStandardError()

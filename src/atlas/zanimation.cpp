@@ -20,6 +20,8 @@
 #include <QDir>
 #include <QProgressDialog>
 #include <utility>
+#include <QStandardPaths>
+#include <QTemporaryDir>
 
 namespace {
 // generic solution
@@ -299,10 +301,11 @@ void ZAnimation::releaseView()
 }
 
 void
-ZAnimation::exportFixedSize3DAnimation(const QDir& dir, const QString& fn, double framePerSecond, int width, int height,
+ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond, int width, int height,
                                        Z3DScreenShotType sst)
 {
   CHECK(m_view);
+  QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
       QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
@@ -349,7 +352,10 @@ ZAnimation::exportFixedSize3DAnimation(const QDir& dir, const QString& fn, doubl
   double time = 0;
   double timeIncrement = m_duration / numFrame;
   bool checkOverwrite = true;
-  QString namePrefix = QFileInfo(fn).completeBaseName();
+  QString namePrefix = "video";
+  QTemporaryDir tempdir;
+  tempdir.setAutoRemove(false);
+  QDir tmpdir(tempdir.path());
   for (int i = 0; i < numFrame; ++i) {
     progress->setValue(i);
     if (progress->wasCanceled())
@@ -358,9 +364,9 @@ ZAnimation::exportFixedSize3DAnimation(const QDir& dir, const QString& fn, doubl
     setCurrentTime(time);
     time += timeIncrement;
     QString filename = QString("%1%2.tif").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
-    QString filepath = dir.filePath(filename);
+    QString filepath = tmpdir.filePath(filename);
     if (checkOverwrite) {
-      if (dir.exists(filename)) {
+      if (tmpdir.exists(filename)) {
         QMessageBox msgBox(QApplication::activeWindow());
         msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
         msgBox.setInformativeText("");
@@ -382,9 +388,9 @@ ZAnimation::exportFixedSize3DAnimation(const QDir& dir, const QString& fn, doubl
   }
   if (!progress->wasCanceled()) {
     QString filename = QString("%1%2.tif").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
-    QString filepath = dir.filePath(filename);
+    QString filepath = tmpdir.filePath(filename);
     if (checkOverwrite) {
-      if (dir.exists(filename)) {
+      if (tmpdir.exists(filename)) {
         QMessageBox msgBox(QApplication::activeWindow());
         msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
         msgBox.setInformativeText("");
@@ -395,7 +401,7 @@ ZAnimation::exportFixedSize3DAnimation(const QDir& dir, const QString& fn, doubl
         if (ret != QMessageBox::Cancel) {
           return;
         }
-        QFile::remove(dir.filePath(filename));
+        QFile::remove(tmpdir.filePath(filename));
       }
     }
   }
@@ -406,13 +412,16 @@ ZAnimation::exportFixedSize3DAnimation(const QDir& dir, const QString& fn, doubl
     connect(m_videoEncoder, &ZVideoEncoder::finished, progress, &QProgressDialog::reset);
     connect(m_videoEncoder, &ZVideoEncoder::canceled, progress, &QProgressDialog::reset);
     connect(progress, &QProgressDialog::canceled, m_videoEncoder, &ZVideoEncoder::cancel);
-    m_videoEncoder->encode(dir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
+    m_videoEncoder->encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
+  } else {
+    tmpdir.removeRecursively();
   }
 }
 
-void ZAnimation::export3DAnimation(const QDir& dir, const QString& fn, double framePerSecond, Z3DScreenShotType sst)
+void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, Z3DScreenShotType sst)
 {
   CHECK(m_view);
+  QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
       QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
@@ -466,7 +475,10 @@ void ZAnimation::export3DAnimation(const QDir& dir, const QString& fn, double fr
   double time = 0;
   double timeIncrement = m_duration / numFrame;
   bool checkOverwrite = true;
-  QString namePrefix = QFileInfo(fn).completeBaseName();
+  QString namePrefix = "video";
+  QTemporaryDir tempdir;
+  tempdir.setAutoRemove(false);
+  QDir tmpdir(tempdir.path());
   for (int i = 0; i < numFrame; ++i) {
     progress->setValue(i);
     if (progress->wasCanceled())
@@ -475,9 +487,9 @@ void ZAnimation::export3DAnimation(const QDir& dir, const QString& fn, double fr
     setCurrentTime(time);
     time += timeIncrement;
     QString filename = QString("%1%2.tif").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
-    QString filepath = dir.filePath(filename);
+    QString filepath = tmpdir.filePath(filename);
     if (checkOverwrite) {
-      if (dir.exists(filename)) {
+      if (tmpdir.exists(filename)) {
         QMessageBox msgBox(QApplication::activeWindow());
         msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
         msgBox.setInformativeText("");
@@ -499,9 +511,9 @@ void ZAnimation::export3DAnimation(const QDir& dir, const QString& fn, double fr
   }
   if (!progress->wasCanceled()) {
     QString filename = QString("%1%2.tif").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
-    QString filepath = dir.filePath(filename);
+    QString filepath = tmpdir.filePath(filename);
     if (checkOverwrite) {
-      if (dir.exists(filename)) {
+      if (tmpdir.exists(filename)) {
         QMessageBox msgBox(QApplication::activeWindow());
         msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
         msgBox.setInformativeText("");
@@ -512,7 +524,7 @@ void ZAnimation::export3DAnimation(const QDir& dir, const QString& fn, double fr
         if (ret != QMessageBox::Cancel) {
           return;
         }
-        QFile::remove(dir.filePath(filename));
+        QFile::remove(tmpdir.filePath(filename));
       }
     }
   }
@@ -523,14 +535,17 @@ void ZAnimation::export3DAnimation(const QDir& dir, const QString& fn, double fr
     connect(m_videoEncoder, &ZVideoEncoder::finished, progress, &QProgressDialog::reset);
     connect(m_videoEncoder, &ZVideoEncoder::canceled, progress, &QProgressDialog::reset);
     connect(progress, &QProgressDialog::canceled, m_videoEncoder, &ZVideoEncoder::cancel);
-    m_videoEncoder->encode(dir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
+    m_videoEncoder->encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
+  } else {
+    tmpdir.removeRecursively();
   }
 }
 
 void
-ZAnimation::exportFixedSize2DAnimation(const QDir& dir, const QString& fn, double framePerSecond, int width, int height)
+ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSecond, int width, int height)
 {
   CHECK(m_view);
+  QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
       QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
@@ -572,7 +587,10 @@ ZAnimation::exportFixedSize2DAnimation(const QDir& dir, const QString& fn, doubl
   double time = 0;
   double timeIncrement = m_duration / numFrame;
   bool checkOverwrite = true;
-  QString namePrefix = QFileInfo(fn).completeBaseName();
+  QString namePrefix = "video";
+  QTemporaryDir tempdir;
+  tempdir.setAutoRemove(false);
+  QDir tmpdir(tempdir.path());
   QString err;
   for (int i = 0; i < numFrame; ++i) {
     progress->setValue(i);
@@ -582,9 +600,9 @@ ZAnimation::exportFixedSize2DAnimation(const QDir& dir, const QString& fn, doubl
     setCurrentTime(time);
     time += timeIncrement;
     QString filename = QString("%1%2.tif").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
-    QString filepath = dir.filePath(filename);
+    QString filepath = tmpdir.filePath(filename);
     if (checkOverwrite) {
-      if (dir.exists(filename)) {
+      if (tmpdir.exists(filename)) {
         QMessageBox msgBox(QApplication::activeWindow());
         msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
         msgBox.setInformativeText("");
@@ -607,9 +625,9 @@ ZAnimation::exportFixedSize2DAnimation(const QDir& dir, const QString& fn, doubl
   }
   if (!progress->wasCanceled()) {
     QString filename = QString("%1%2.tif").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
-    QString filepath = dir.filePath(filename);
+    QString filepath = tmpdir.filePath(filename);
     if (checkOverwrite) {
-      if (dir.exists(filename)) {
+      if (tmpdir.exists(filename)) {
         QMessageBox msgBox(QApplication::activeWindow());
         msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
         msgBox.setInformativeText("");
@@ -620,7 +638,7 @@ ZAnimation::exportFixedSize2DAnimation(const QDir& dir, const QString& fn, doubl
         if (ret != QMessageBox::Cancel) {
           return;
         }
-        QFile::remove(dir.filePath(filename));
+        QFile::remove(tmpdir.filePath(filename));
       }
     }
   }
@@ -631,15 +649,17 @@ ZAnimation::exportFixedSize2DAnimation(const QDir& dir, const QString& fn, doubl
     connect(m_videoEncoder, &ZVideoEncoder::finished, progress, &QProgressDialog::reset);
     connect(m_videoEncoder, &ZVideoEncoder::canceled, progress, &QProgressDialog::reset);
     connect(progress, &QProgressDialog::canceled, m_videoEncoder, &ZVideoEncoder::cancel);
-    m_videoEncoder->encode(dir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
+    m_videoEncoder->encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
+  } else {
+    tmpdir.removeRecursively();
   }
 }
 
-void ZAnimation::export2DAnimation(const QDir& dir, const QString& fn, double framePerSecond)
+void ZAnimation::export2DAnimation(const QString& fn, double framePerSecond)
 {
   CHECK(m_view);
   ZGraphicsView& canvasPainter = static_cast<ZView*>(m_view)->graphicsView();
-  exportFixedSize2DAnimation(dir, fn, framePerSecond, canvasPainter.viewportSize().width(),
+  exportFixedSize2DAnimation(fn, framePerSecond, canvasPainter.viewportSize().width(),
                              canvasPainter.viewportSize().height());
 }
 

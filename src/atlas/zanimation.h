@@ -97,14 +97,14 @@ public:
 
   void releaseView();
 
-  void exportFixedSize3DAnimation(const QDir& dir, const QString& fn, double framePerSecond, int width, int height,
+  void exportFixedSize3DAnimation(const QString& fn, double framePerSecond, int width, int height,
                                   Z3DScreenShotType sst);
 
-  void export3DAnimation(const QDir& dir, const QString& fn, double framePerSecond, Z3DScreenShotType sst);
+  void export3DAnimation(const QString& fn, double framePerSecond, Z3DScreenShotType sst);
 
-  void exportFixedSize2DAnimation(const QDir& dir, const QString& fn, double framePerSecond, int width, int height);
+  void exportFixedSize2DAnimation(const QString& fn, double framePerSecond, int width, int height);
 
-  void export2DAnimation(const QDir& dir, const QString& fn, double framePerSecond);
+  void export2DAnimation(const QString& fn, double framePerSecond);
 
 signals:
 

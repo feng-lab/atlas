@@ -325,7 +325,7 @@ void ZMainWindow::open3DWindow()
         connect(m_3dWindow, &Z3DMainWindow::saveScene, this, &ZMainWindow::saveScene);
         connect(m_3dWindow, &Z3DMainWindow::loadJsonScene, this, &ZMainWindow::loadJsonScene);
         QApplication::processEvents();
-        m_doc->animation3DDoc().bindView(m_3dWindow->view());
+        connect(m_3dWindow, &Z3DMainWindow::viewReady, &m_doc->animation3DDoc(), &Z3DAnimationDoc::bindView);
       }
 
       m_3dWindow->showNormal();

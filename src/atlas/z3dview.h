@@ -96,7 +96,7 @@ public:
 signals:
 
   void objViewReady(size_t id);
-  
+
   void networkConstructed();
 
 private:
@@ -107,7 +107,7 @@ private:
   void resetCamera();  // set up camera based on visible objects in scene, original position
   void resetCameraCenter();
   void resetCameraClippingRange(); // Reset the camera clipping range to include this entire bounding box
-  
+
   void gotoPosition(double x, double y, double z, double radius = 64);
 
   void gotoPosition(const ZBBox<glm::dvec3>& bound, double minRadius = 64);
