@@ -1050,13 +1050,40 @@ void fixImg()
 }
 
 
+void qFileInfoTest()
+{
+  QString fn("/Users/feng/Downloads/non-ext.tif");
+  QString fon("/Users/feng/Downloads/non-exist/");
+  QString fon1("/Users/feng/Downloads/");
+  QString fon2("/Users/feng/Downloads");
+  LOG(INFO) << QFileInfo(fn).canonicalPath();
+  LOG(INFO) << QFileInfo(fn).canonicalFilePath();
+  LOG(INFO) << QFileInfo(fn).absolutePath();
+  LOG(INFO) << QFileInfo(fn).absoluteFilePath();
+  LOG(INFO) << QFileInfo(fon).isDir();
+  LOG(INFO) << QFileInfo(fon).canonicalPath();
+  LOG(INFO) << QFileInfo(fon).canonicalFilePath();
+  LOG(INFO) << QFileInfo(fon).absolutePath();
+  LOG(INFO) << QFileInfo(fon).absoluteFilePath();
+  LOG(INFO) << QFileInfo(fon1).isDir();
+  LOG(INFO) << QFileInfo(fon1).canonicalPath();
+  LOG(INFO) << QFileInfo(fon1).canonicalFilePath();
+  LOG(INFO) << QFileInfo(fon1).absolutePath();
+  LOG(INFO) << QFileInfo(fon1).absoluteFilePath();
+  LOG(INFO) << QFileInfo(fon2).isDir();
+  LOG(INFO) << QFileInfo(fon2).canonicalPath();
+  LOG(INFO) << QFileInfo(fon2).canonicalFilePath();
+  LOG(INFO) << QFileInfo(fon2).absolutePath();
+  LOG(INFO) << QFileInfo(fon2).absoluteFilePath();
+}
+
 }  // namespace nim
 
 namespace nim {
 
 void ZCustomCommand::run()
 {
-  convertRawToNim();
+  qFileInfoTest();
   LOG(INFO) << "done";
 }
 
