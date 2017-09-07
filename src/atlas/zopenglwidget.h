@@ -11,7 +11,7 @@ public:
 
   // QOpenGLWidget interface
 protected:
-  virtual void initializeGL() override;
+  void initializeGL() override;
 
 signals:
   void openGLContextInitialized();

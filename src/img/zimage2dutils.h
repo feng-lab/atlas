@@ -101,7 +101,7 @@ void image2DPad(const TPixel* img, size_t width, size_t height,
 
     // boundary
     if (padOption == PadOption::Constant) {
-      std::fill(imgOut, imgOut + desWidth * desHeight, static_cast<TPixel>(padValue));
+      std::fill(imgOut, imgOut + desWidth * desHeight, padValue);
     } else if (padOption == PadOption::Symmetric) {
       // corner
       for (size_t j = 0; j < upPad; ++j) {

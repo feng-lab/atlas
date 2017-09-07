@@ -11,8 +11,6 @@
 #include <map>
 #include <vector>
 
-class ZWidgetsGroup;
-
 namespace nim {
 
 class ZSwcGraphicsItem : public QGraphicsItem
@@ -70,9 +68,9 @@ public:
 
   // QGraphicsItem interface
 public:
-  virtual QRectF boundingRect() const override;
+  QRectF boundingRect() const override;
 
-  virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
+  void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
 
 protected:
   ZSwc& m_swc;
@@ -110,11 +108,11 @@ public:
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
 protected:
-  virtual void viewPrecedenceChanged() override;
+  void viewPrecedenceChanged() override;
 
-  virtual void transformChanged() override;
+  void transformChanged() override;
 
-  virtual void offsetChanged() override;
+  void offsetChanged() override;
 
 private:
   void visibleChanged();
@@ -126,14 +124,12 @@ private:
   void opacityChanged();
 
 private:
-  ZSwc* m_swc = nullptr;
   std::unique_ptr<ZSwcGraphicsItem> m_item;
 
   ZBoolParameter m_visible;
   ZBoolParameter m_showSkeleton;
   ZVec3Parameter m_outlineColor;
   ZDoubleParameter m_opacity;
-  bool m_sliceValid;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
 };

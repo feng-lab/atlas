@@ -43,7 +43,7 @@ public:
   inline QAction* resetCameraAction()
   { return m_resetCameraAction; }
 
-  virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override;
+  std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override;
 
   Z3DCameraParameter& camera()
   { return m_globalParas->camera; }

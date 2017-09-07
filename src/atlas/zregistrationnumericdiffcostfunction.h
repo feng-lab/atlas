@@ -15,9 +15,9 @@ public:
 
   void setMetric(ZImageToImageMetric& metric);
 
-  virtual void setUseMultithreading(bool i) override;
+  void setUseMultithreading(bool i) override;
 
-  virtual bool evaluate(const double* const parameters, double* cost, double* gradient = nullptr) const override;
+  bool evaluate(const double* const parameters, double* cost, double* gradient = nullptr) const override;
 
 private:
   template<typename TFixed, typename TMoving>

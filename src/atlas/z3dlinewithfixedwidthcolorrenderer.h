@@ -22,7 +22,7 @@ public:
 protected:
   void setLineColors();
 
-  virtual float lineWidth() const override;
+  float lineWidth() const override;
 
 protected:
   ZFloatParameter m_lineWidth;

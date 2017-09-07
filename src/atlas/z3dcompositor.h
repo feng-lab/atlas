@@ -22,7 +22,7 @@ Q_OBJECT
 public:
   explicit Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  virtual bool isReady(Z3DEye eye) const override;
+  bool isReady(Z3DEye eye) const override;
 
   std::shared_ptr<ZWidgetsGroup> backgroundWidgetsGroup();
 
@@ -33,7 +33,7 @@ public:
   void setRenderingRegion(double left = 0., double right = 1., double bottom = 0., double top = 1.);
 
 protected:
-  virtual void process(Z3DEye eye) override;
+  void process(Z3DEye eye) override;
 
 private:
   // little helper function

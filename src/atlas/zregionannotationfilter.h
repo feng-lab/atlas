@@ -29,15 +29,15 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
-  virtual void deleteKeyPressed() override;
+  void deleteKeyPressed() override;
 
-  virtual void mousePressed(const QPointF& scenePos) override;
+  void mousePressed(const QPointF& scenePos) override;
 
-  virtual void mouseReleased(const QPointF& scenePos) override;
+  void mouseReleased(const QPointF& scenePos) override;
 
-  virtual void rotateClockwise() override;
+  void rotateClockwise() override;
 
-  virtual void rotateCounterclockwise() override;
+  void rotateCounterclockwise() override;
 
 private:
   void visibleChanged();

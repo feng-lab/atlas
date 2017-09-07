@@ -210,9 +210,9 @@ void ZCpuInfo::detectCpuInfo()
   char brandStr[0x40];
   memset(brandStr, 0, sizeof(brandStr));
   if (nExIds >= 0x80000004) {
-    memcpy(brandStr, extdata[2].data(), sizeof(cpui));
-    memcpy(brandStr + 16, extdata[3].data(), sizeof(cpui));
-    memcpy(brandStr + 32, extdata[4].data(), sizeof(cpui));
+    memcpy(brandStr, extdata[2].data(), 16);
+    memcpy(brandStr + 16, extdata[3].data(), 16);
+    memcpy(brandStr + 32, extdata[4].data(), 16);
     brand = QString(brandStr);
   }
 

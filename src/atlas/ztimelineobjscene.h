@@ -16,9 +16,9 @@ public:
   DiagramTextItem(const ZAnimationDisplayPack& pack, QGraphicsItem* parent, Qt::Alignment align);
 
 protected:
-  void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr);
+  void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
 
-  QRectF boundingRect() const;
+  QRectF boundingRect() const override;
 
 private:
   QTextOption m_textOp;
@@ -33,7 +33,7 @@ public:
   ExpandArrowPixmapItem(const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline, QGraphicsItem* parent);
 
 protected:
-  virtual void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
+  void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
 
 private:
   const ZAnimationDisplayPack& m_displayPack;
@@ -46,11 +46,11 @@ public:
   ObjBoundRectItem(const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline, QGraphicsItem* parent = nullptr);
 
 protected:
-  virtual void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
+  void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
 
-  virtual void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
+  void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
 
-  virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
+  void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
 
 private:
   const ZAnimationDisplayPack& m_displayPack;
@@ -64,7 +64,7 @@ public:
                               QGraphicsItem* parent = nullptr);
 
 protected:
-  virtual void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
+  void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
 
 private:
   const ZAnimationDisplayPack& m_displayPack;

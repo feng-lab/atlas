@@ -30,27 +30,27 @@ public:
 
   // ZObjView interface
 public:
-  virtual const ZObjDoc& doc() const override
+  const ZObjDoc& doc() const override
   { return m_doc; }
 
-  virtual bool hasObj(size_t id) const override
+  bool hasObj(size_t id) const override
   { return m_idToFilter.find(id) != m_idToFilter.end(); }
 
-  virtual void read(size_t id, const QJsonObject& json) override
+  void read(size_t id, const QJsonObject& json) override
   {
     if (hasObj(id)) {
       m_idToFilter.at(id)->read(json);
     }
   }
 
-  virtual void write(size_t id, QJsonObject& json) const override
+  void write(size_t id, QJsonObject& json) const override
   {
     if (hasObj(id)) {
       m_idToFilter.at(id)->write(json);
     }
   }
 
-  virtual void setNormalView(int slice, int time) override
+  void setNormalView(int slice, int time) override
   {
     for (const auto& idFilter : m_idToFilter) {
       try {
@@ -62,7 +62,7 @@ public:
     }
   }
 
-  virtual void setMaxZProjView(int time) override
+  void setMaxZProjView(int time) override
   {
     for (const auto& idFilter : m_idToFilter) {
       try {
@@ -74,7 +74,7 @@ public:
     }
   }
 
-  virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override
+  std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override
   {
     auto it = m_idToFilter.find(id);
     if (it != m_idToFilter.end()) {
@@ -83,7 +83,7 @@ public:
     return std::shared_ptr<ZWidgetsGroup>();
   }
 
-  virtual void deleteKeyPressed() override
+  void deleteKeyPressed() override
   {
     for (const auto& idFilter : m_idToFilter) {
       try {
@@ -95,7 +95,7 @@ public:
     }
   }
 
-  virtual void mousePressed(const QPointF& scenePos) override
+  void mousePressed(const QPointF& scenePos) override
   {
     for (const auto& idFilter : m_idToFilter) {
       try {
@@ -107,7 +107,7 @@ public:
     }
   }
 
-  virtual void mouseReleased(const QPointF& scenePos) override
+  void mouseReleased(const QPointF& scenePos) override
   {
     for (const auto& idFilter : m_idToFilter) {
       try {
@@ -119,12 +119,12 @@ public:
     }
   }
 
-  virtual void selectionChanged(const QList<QGraphicsItem*>& items) override
+  void selectionChanged(const QList<QGraphicsItem*>& items) override
   {
 
   }
 
-  virtual void rotateClockwise() override
+  void rotateClockwise() override
   {
     for (const auto& idFilter : m_idToFilter) {
       try {
@@ -136,7 +136,7 @@ public:
     }
   }
 
-  virtual void rotateCounterclockwise() override
+  void rotateCounterclockwise() override
   {
     for (const auto& idFilter : m_idToFilter) {
       try {
@@ -148,7 +148,7 @@ public:
     }
   }
 
-  virtual int minViewPrecedence() const override
+  int minViewPrecedence() const override
   {
     int res = std::numeric_limits<int>::max();
     for (const auto& idFilter : m_idToFilter) {
@@ -157,7 +157,7 @@ public:
     return res;
   }
 
-  virtual int maxViewPrecedence() const override
+  int maxViewPrecedence() const override
   {
     int res = std::numeric_limits<int>::min();
     for (const auto& idFilter : m_idToFilter) {
@@ -167,7 +167,7 @@ public:
   }
 
 protected:
-  virtual void updateBoundBox() override
+  void updateBoundBox() override
   {
     resetBoundBox();
     for (const auto& idFilter : m_idToFilter) {
@@ -176,7 +176,7 @@ protected:
     m_view.updateBoundBox();
   }
 
-  virtual void onObjRemoved(size_t id) override
+  void onObjRemoved(size_t id) override
   {
     auto it = m_idToFilter.find(id);
     if (it == m_idToFilter.end())
@@ -185,7 +185,7 @@ protected:
     updateBoundBox();
   }
 
-  virtual void onAllObjsRemoved() override
+  void onAllObjsRemoved() override
   {
     if (m_idToFilter.empty())
       return;
@@ -193,7 +193,7 @@ protected:
     updateBoundBox();
   }
 
-  virtual void onObjVisibleChanged(size_t id, bool v) override
+  void onObjVisibleChanged(size_t id, bool v) override
   {
     auto it = m_idToFilter.find(id);
     if (it == m_idToFilter.end())
@@ -201,7 +201,7 @@ protected:
     it->second->setVisible(v);
   }
 
-  virtual void onSelectionChanged(const QList<size_t>& selected, const QList<size_t>& deselected) override
+  void onSelectionChanged(const QList<size_t>& selected, const QList<size_t>& deselected) override
   {
     for (auto id : selected) {
       auto it = m_idToFilter.find(id);
@@ -217,7 +217,7 @@ protected:
     }
   }
 
-  virtual void onObjSelectedFromView(bool append) override
+  void onObjSelectedFromView(bool append) override
   {
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
       for (const auto& idFilter : m_idToFilter) {
@@ -232,7 +232,7 @@ protected:
     }
   }
 
-  virtual void onObjDeselectedFromView() override
+  void onObjDeselectedFromView() override
   {
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
       for (const auto& idFilter : m_idToFilter) {

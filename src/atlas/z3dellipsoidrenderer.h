@@ -22,18 +22,18 @@ public:
   { return m_useDynamicMaterial; }
 
 protected:
-  virtual void compile() override;
+  void compile() override;
 
   QString generateHeader();
 
 #ifndef ATLAS_USE_CORE_PROFILE
-  virtual void renderUsingOpengl() override;
-  virtual void renderPickingUsingOpengl() override;
+  void renderUsingOpengl() override;
+  void renderPickingUsingOpengl() override;
 #endif
 
-  virtual void render(Z3DEye eye) override;
+  void render(Z3DEye eye) override;
 
-  virtual void renderPicking(Z3DEye eye) override;
+  void renderPicking(Z3DEye eye) override;
 
   void appendDefaultColors();
 

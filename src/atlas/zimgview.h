@@ -15,7 +15,7 @@ public:
 
   // ZObjView interface
 public:
-  virtual QString infoOfPos(double x, double y) override;
+  QString infoOfPos(double x, double y) override;
 
 private:
   void docImgsAdded(const QList<size_t>& objs);

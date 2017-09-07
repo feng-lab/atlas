@@ -59,9 +59,9 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  virtual void enterInteractionMode() override;
+  void enterInteractionMode() override;
 
-  virtual void exitInteractionMode() override;
+  void exitInteractionMode() override;
 
   bool isReady(Z3DEye eye) const override;
 
@@ -71,13 +71,13 @@ public:
   // otherwise don't use the returned value
   glm::vec3 get3DPosition(int x, int y, int width, int height, bool& success);
 
-  virtual bool hasOpaque(Z3DEye eye) const override;
+  bool hasOpaque(Z3DEye eye) const override;
 
-  virtual void renderOpaque(Z3DEye eye) override;
+  void renderOpaque(Z3DEye eye) override;
 
-  virtual bool hasTransparent(Z3DEye eye) const override;
+  bool hasTransparent(Z3DEye eye) const override;
 
-  virtual void renderTransparent(Z3DEye eye) override;
+  void renderTransparent(Z3DEye eye) override;
 
 signals:
 
@@ -109,11 +109,11 @@ protected slots:
 
   void updateCubeSerieSlices();
 
-  virtual void setClipPlanes() override
+  void setClipPlanes() override
   {}
 
 protected:
-  virtual void process(Z3DEye eye) override;
+  void process(Z3DEye eye) override;
 
   bool hasSlices() const;
 
@@ -121,9 +121,9 @@ protected:
 
   const std::vector<std::unique_ptr<Z3DVolume>>& getVolumes() const;
 
-  virtual void updateNotTransformedBoundBoxImpl() override;
+  void updateNotTransformedBoundBoxImpl() override;
 
-  virtual void expandCutRange() override
+  void expandCutRange() override
   {}
 
 private:

@@ -133,7 +133,7 @@ public:
 
   void registerObjView(std::unique_ptr<ZObjView>&& v);
 
-  virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override;
+  std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override;
 
   void read(size_t id, const QJsonObject& json);
 

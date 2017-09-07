@@ -31,9 +31,9 @@ protected:
 
   void setValue4(double v);
 
-  virtual void beforeChange(glm::quat& value) override;
+  void beforeChange(glm::quat& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 };
 
 

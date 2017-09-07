@@ -30,11 +30,11 @@ public:
   { return m_blendMode; }
 
 protected:
-  virtual void compile() override;
+  void compile() override;
 
   QString generateHeader();
 
-  virtual void render(Z3DEye eye) override;
+  void render(Z3DEye eye) override;
 
 protected:
   const Z3DTexture* m_colorTexture1 = nullptr;

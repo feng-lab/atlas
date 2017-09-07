@@ -41,7 +41,7 @@ public:
     m_selectedSwcTreeNodes = list;
   }
 
-  virtual bool isReady(Z3DEye eye) const override;
+  bool isReady(Z3DEye eye) const override;
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
@@ -59,15 +59,15 @@ public:
   inline InteractionMode interactionMode()
   { return m_interactionMode; }
 
-  virtual bool hasOpaque(Z3DEye /*unused*/) const override
+  bool hasOpaque(Z3DEye /*unused*/) const override
   { return m_rendererBase.opacity() == 1.f && !m_renderingPrimitive.isSelected("Line"); }
 
-  virtual void renderOpaque(Z3DEye eye) override;
+  void renderOpaque(Z3DEye eye) override;
 
-  virtual bool hasTransparent(Z3DEye /*unused*/) const override
+  bool hasTransparent(Z3DEye /*unused*/) const override
   { return m_rendererBase.opacity() < 1.f || m_renderingPrimitive.isSelected("Line"); }
 
-  virtual void renderTransparent(Z3DEye eye) override;
+  void renderTransparent(Z3DEye eye) override;
 
 signals:
 
@@ -92,11 +92,11 @@ protected:
 
   void setColorMode(const std::string& mode);
 
-  virtual void process(Z3DEye /*unused*/) override;
+  void process(Z3DEye /*unused*/) override;
 
-  virtual void registerPickingObjects() override;
+  void registerPickingObjects() override;
 
-  virtual void deregisterPickingObjects() override;
+  void deregisterPickingObjects() override;
 
   void renderPicking(Z3DEye eye) override;
 
@@ -110,10 +110,10 @@ protected:
 
   void notTransformedTreeBound(ZSwc* tree, ZBBox<glm::dvec3>& result) const;
 
-  //virtual void updateAxisAlignedBoundBoxImpl() override;
-  virtual void updateNotTransformedBoundBoxImpl() override;
+  //void updateAxisAlignedBoundBoxImpl() override;
+  void updateNotTransformedBoundBoxImpl() override;
 
-  virtual void addSelectionLines() override;
+  void addSelectionLines() override;
 
   void notTransformedTreeNodeBound(const SwcTreeNode& tn, ZBBox<glm::dvec3>& result) const;
 

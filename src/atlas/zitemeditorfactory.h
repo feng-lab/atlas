@@ -8,7 +8,7 @@ class ZItemEditorFactory : public QItemEditorFactory
 {
 public:
 
-  virtual QWidget* createEditor(int type, QWidget* parent) const override;
+  QWidget* createEditor(int type, QWidget* parent) const override;
 
 };
 

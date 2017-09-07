@@ -38,11 +38,11 @@ protected:
 
   void bindVolume(Z3DShaderProgram& shader, size_t idx) const;
 
-  virtual void compile() override;
+  void compile() override;
 
   QString generateHeader();
 
-  virtual void render(Z3DEye eye) override;
+  void render(Z3DEye eye) override;
 
 protected:
   //Z3DShaderProgram m_volumeSliceShader;

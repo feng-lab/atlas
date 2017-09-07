@@ -36,15 +36,15 @@ public:
 
   // ZParameter interface
 public:
-  virtual void setSameAs(const ZParameter& rhs) override;
+  void setSameAs(const ZParameter& rhs) override;
 
-  virtual void setValueSameAs(const ZParameter& /*rhs*/) override;
+  void setValueSameAs(const ZParameter& /*rhs*/) override;
 
-  virtual void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override;
+  void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override;
 
-  virtual QJsonValue jsonValue() const override;
+  QJsonValue jsonValue() const override;
 
-  virtual void readValue(const QJsonValue& jsonValue) override;
+  void readValue(const QJsonValue& jsonValue) override;
 
 signals:
 
@@ -83,7 +83,7 @@ protected:
     QEvent::Type type;
   };
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 
 private:
   bool m_sharing;

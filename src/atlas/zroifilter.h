@@ -33,11 +33,11 @@ public:
   void setOffset(double x, double y);
 
 protected:
-  //virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
-  //virtual void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
-  virtual QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
+  //void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
+  //void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
+  QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
 
-  virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
+  void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
 
 private:
   ZROI& m_roi;
@@ -68,12 +68,12 @@ public:
   ZROIControlPoint controlPoint() const
   { return m_controlPoint; }
 
-  virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
+  void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
 
   void setOffset(double x, double y);
 
 protected:
-  virtual QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
+  QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
 
 private:
   ZROI& m_roi;
@@ -117,15 +117,15 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupForAnnotationFilter();
 
-  virtual void deleteKeyPressed() override;
+  void deleteKeyPressed() override;
 
-  virtual void mousePressed(const QPointF& scenePos) override;
+  void mousePressed(const QPointF& scenePos) override;
 
-  virtual void mouseReleased(const QPointF& scenePos) override;
+  void mouseReleased(const QPointF& scenePos) override;
 
-  virtual void rotateClockwise() override;
+  void rotateClockwise() override;
 
-  virtual void rotateCounterclockwise() override;
+  void rotateCounterclockwise() override;
 
   ZIntParameter& viewPrecedencePara()
   { return m_viewPrecedencePara; }
@@ -137,11 +137,11 @@ public:
   { return m_offsetPara; }
 
 protected:
-  virtual void viewPrecedenceChanged() override;
+  void viewPrecedenceChanged() override;
 
-  virtual void transformChanged() override;
+  void transformChanged() override;
 
-  virtual void offsetChanged() override;
+  void offsetChanged() override;
 
   std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> createCtrlPtItems(int slice);
 

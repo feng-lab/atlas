@@ -87,7 +87,7 @@ public:
                                                 Eigen::MatrixXd cov2, double conf = 0.8);
 
 protected:
-  virtual void doWork() override;
+  void doWork() override;
 
 private:
   // all works are done here, detect from img with thre and put result into resList

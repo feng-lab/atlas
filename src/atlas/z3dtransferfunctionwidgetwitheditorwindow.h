@@ -16,7 +16,7 @@ public:
 protected:
   void createEditorWindow();
 
-  virtual void labelClicked() override;
+  void labelClicked() override;
 
 private:
   Z3DTransferFunctionParameter* m_transferFunction;

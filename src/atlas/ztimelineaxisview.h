@@ -13,9 +13,9 @@ public:
   explicit CurrentTimeItem(ZTimelineWidget& timeline, QGraphicsItem* parent = nullptr);
 
 protected:
-  virtual QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
+  QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
 
-  virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
+  void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
 
   ZTimelineWidget& m_timeline;
 };

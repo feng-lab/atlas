@@ -138,17 +138,17 @@ public:
 
   void renderSelectionBox(Z3DEye eye);
 
-  virtual void rotateX() override;
+  void rotateX() override;
 
-  virtual void rotateY() override;
+  void rotateY() override;
 
-  virtual void rotateZ() override;
+  void rotateZ() override;
 
-  virtual void rotateXM() override;
+  void rotateXM() override;
 
-  virtual void rotateYM() override;
+  void rotateYM() override;
 
-  virtual void rotateZM() override;
+  void rotateZM() override;
 
 signals:
 

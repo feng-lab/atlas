@@ -61,7 +61,7 @@ public:
 
   // ZParameter interface
 public:
-  virtual void setSameAs(const ZParameter& rhs) override
+  void setSameAs(const ZParameter& rhs) override
   {
     CHECK(this->isSameType(rhs));
     const ZNumericParameter<T>* src = static_cast<const ZNumericParameter<T>*>(&rhs);
@@ -73,7 +73,7 @@ public:
     ZParameter::setSameAs(rhs);
   }
 
-  virtual void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override
+  void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override
   {
     CHECK(this->isSameType(prev) && this->isSameType(dest));
     const ZNumericParameter<T>& prevPara = static_cast<const ZNumericParameter<T>&>(prev);
@@ -81,12 +81,12 @@ public:
     desPara.set(glm::mix(prevPara.get(), this->m_value, progress));
   }
 
-  virtual QJsonValue jsonValue() const override
+  QJsonValue jsonValue() const override
   {
     return QJsonValue(toQString(this->m_value));
   }
 
-  virtual void readValue(const QJsonValue& jsonValue) override
+  void readValue(const QJsonValue& jsonValue) override
   {
     T v;
     toVal(jsonValue.toString(toQString(this->m_value)), v);
@@ -94,7 +94,7 @@ public:
   }
 
 protected:
-  virtual void makeValid(T& value) const override
+  void makeValid(T& value) const override
   {
     if (value < m_min)
       value = m_min;
@@ -136,13 +136,13 @@ signals:
   void rangeChanged(int min, int max);
 
 protected:
-  virtual void beforeChange(int& value) override;
+  void beforeChange(int& value) override;
 
-  virtual void afterChange(int& value) override;
+  void afterChange(int& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 
-  virtual void changeRange() override;
+  void changeRange() override;
 };
 
 class ZDoubleParameter : public ZNumericParameter<double>
@@ -164,13 +164,13 @@ signals:
   void rangeChanged(double min, double max);
 
 protected:
-  virtual void beforeChange(double& value) override;
+  void beforeChange(double& value) override;
 
-  virtual void afterChange(double& value) override;
+  void afterChange(double& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 
-  virtual void changeRange() override;
+  void changeRange() override;
 };
 
 class ZFloatParameter : public ZNumericParameter<float>
@@ -192,13 +192,13 @@ signals:
   void rangeChanged(double min, double max);
 
 protected:
-  virtual void beforeChange(float& value) override;
+  void beforeChange(float& value) override;
 
-  virtual void afterChange(float& value) override;
+  void afterChange(float& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 
-  virtual void changeRange() override;
+  void changeRange() override;
 };
 
 //---------------------------------------------------------------------------------------------------
@@ -265,7 +265,7 @@ public:
 
   // ZParameter interface
 public:
-  virtual void setSameAs(const ZParameter& rhs) override
+  void setSameAs(const ZParameter& rhs) override
   {
     CHECK(this->isSameType(rhs));
     const ZNumericVectorParameter<T>* src = static_cast<const ZNumericVectorParameter<T>*>(&rhs);
@@ -281,7 +281,7 @@ public:
     ZParameter::setSameAs(rhs);
   }
 
-  virtual void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override
+  void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override
   {
     CHECK(this->isSameType(prev) && this->isSameType(dest));
     const ZNumericVectorParameter<T>& prevPara = static_cast<const ZNumericVectorParameter<T>&>(prev);
@@ -289,12 +289,12 @@ public:
     desPara.set(glm::mix(prevPara.get(), this->m_value, progress));
   }
 
-  virtual QJsonValue jsonValue() const override
+  QJsonValue jsonValue() const override
   {
     return QJsonValue(toQString(this->m_value));
   }
 
-  virtual void readValue(const QJsonValue& jsonValue) override
+  void readValue(const QJsonValue& jsonValue) override
   {
     T v;
     toVal(jsonValue.toString(toQString(this->m_value)), v);
@@ -302,7 +302,7 @@ public:
   }
 
 protected:
-  virtual void makeValid(T& value) const override
+  void makeValid(T& value) const override
   {
     for (size_t i = 0; i < this->m_value.length(); ++i) {
       if (value[i] < m_min[i])
@@ -346,9 +346,9 @@ signals:
   void value2WillChange(double);
 
 protected:
-  virtual void beforeChange(glm::vec2& value) override;
+  void beforeChange(glm::vec2& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 };
 
 class ZVec3Parameter : public ZNumericVectorParameter<glm::vec3>
@@ -375,9 +375,9 @@ signals:
   void value3WillChange(double);
 
 protected:
-  virtual void beforeChange(glm::vec3& value) override;
+  void beforeChange(glm::vec3& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 };
 
 class ZVec4Parameter : public ZNumericVectorParameter<glm::vec4>
@@ -408,9 +408,9 @@ signals:
   void value4WillChange(double);
 
 protected:
-  virtual void beforeChange(glm::vec4& value) override;
+  void beforeChange(glm::vec4& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 };
 
 class ZDVec2Parameter : public ZNumericVectorParameter<glm::dvec2>
@@ -433,9 +433,9 @@ signals:
   void value2WillChange(double);
 
 protected:
-  virtual void beforeChange(glm::dvec2& value) override;
+  void beforeChange(glm::dvec2& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 };
 
 class ZDVec3Parameter : public ZNumericVectorParameter<glm::dvec3>
@@ -462,9 +462,9 @@ signals:
   void value3WillChange(double);
 
 protected:
-  virtual void beforeChange(glm::dvec3& value) override;
+  void beforeChange(glm::dvec3& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 };
 
 class ZDVec4Parameter : public ZNumericVectorParameter<glm::dvec4>
@@ -495,9 +495,9 @@ signals:
   void value4WillChange(double);
 
 protected:
-  virtual void beforeChange(glm::dvec4& value) override;
+  void beforeChange(glm::dvec4& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 };
 
 class ZIVec2Parameter : public ZNumericVectorParameter<glm::ivec2>
@@ -520,9 +520,9 @@ signals:
   void value2WillChange(int);
 
 protected:
-  virtual void beforeChange(glm::ivec2& value) override;
+  void beforeChange(glm::ivec2& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 };
 
 class ZIVec3Parameter : public ZNumericVectorParameter<glm::ivec3>
@@ -549,9 +549,9 @@ signals:
   void value3WillChange(int);
 
 protected:
-  virtual void beforeChange(glm::ivec3& value) override;
+  void beforeChange(glm::ivec3& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 };
 
 //---------------------------------------------------------------------------------------------------
@@ -646,7 +646,7 @@ public:
 
   // ZParameter interface
 public:
-  virtual void setSameAs(const ZParameter& rhs) override
+  void setSameAs(const ZParameter& rhs) override
   {
     CHECK(this->isSameType(rhs));
     const ZNumericSpanParameter<T>* src = static_cast<const ZNumericSpanParameter<T>*>(&rhs);
@@ -660,7 +660,7 @@ public:
     ZParameter::setSameAs(rhs);
   }
 
-  virtual void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override
+  void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override
   {
     CHECK(this->isSameType(prev) && this->isSameType(dest));
     const ZNumericSpanParameter<T>& prevPara = static_cast<const ZNumericSpanParameter<T>&>(prev);
@@ -668,12 +668,12 @@ public:
     desPara.set(glm::mix(prevPara.get(), this->m_value, progress));
   }
 
-  virtual QJsonValue jsonValue() const override
+  QJsonValue jsonValue() const override
   {
     return QJsonValue(toQString(this->m_value));
   }
 
-  virtual void readValue(const QJsonValue& jsonValue) override
+  void readValue(const QJsonValue& jsonValue) override
   {
     T v;
     toVal(jsonValue.toString(toQString(this->m_value)), v);
@@ -681,7 +681,7 @@ public:
   }
 
 protected:
-  virtual void makeValid(T& value) const override
+  void makeValid(T& value) const override
   {
     for (int i = 0; i < 2; ++i) {
       if (value[i] < m_min)
@@ -734,11 +734,11 @@ signals:
   void rangeChanged(int min, int max);
 
 protected:
-  virtual void beforeChange(glm::ivec2& value) override;
+  void beforeChange(glm::ivec2& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 
-  virtual void changeRange() override;
+  void changeRange() override;
 };
 
 class ZFloatSpanParameter : public ZNumericSpanParameter<glm::vec2>
@@ -763,11 +763,11 @@ signals:
   void rangeChanged(double min, double max);
 
 protected:
-  virtual void beforeChange(glm::vec2& value) override;
+  void beforeChange(glm::vec2& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 
-  virtual void changeRange() override;
+  void changeRange() override;
 };
 
 class ZDoubleSpanParameter : public ZNumericSpanParameter<glm::dvec2>
@@ -792,11 +792,11 @@ signals:
   void rangeChanged(double min, double max);
 
 protected:
-  virtual void beforeChange(glm::dvec2& value) override;
+  void beforeChange(glm::dvec2& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 
-  virtual void changeRange() override;
+  void changeRange() override;
 };
 
 } // namespace nim

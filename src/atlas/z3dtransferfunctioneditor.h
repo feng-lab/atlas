@@ -41,27 +41,27 @@ public:
                                      QString yAxisText = tr("Opacity"),
                                      QWidget* parent = nullptr);
 
-  virtual void paintEvent(QPaintEvent* event) override;
+  void paintEvent(QPaintEvent* event) override;
 
-  virtual void mousePressEvent(QMouseEvent* event) override;
+  void mousePressEvent(QMouseEvent* event) override;
 
-  virtual void mouseReleaseEvent(QMouseEvent* event) override;
+  void mouseReleaseEvent(QMouseEvent* event) override;
 
-  virtual void leaveEvent(QEvent* /*event*/) override;
+  void leaveEvent(QEvent* /*event*/) override;
 
-  virtual void mouseMoveEvent(QMouseEvent* event) override;
+  void mouseMoveEvent(QMouseEvent* event) override;
 
-  virtual void mouseDoubleClickEvent(QMouseEvent* event) override;
+  void mouseDoubleClickEvent(QMouseEvent* event) override;
 
-  virtual void keyReleaseEvent(QKeyEvent* event) override;
+  void keyReleaseEvent(QKeyEvent* event) override;
 
-  virtual bool event(QEvent* e) override;
+  bool event(QEvent* e) override;
 
   bool findkey(const QPoint& pos, size_t& index, bool& isLeftPart);
 
-  virtual QSize minimumSizeHint() const override;
+  QSize minimumSizeHint() const override;
 
-  virtual QSize sizeHint() const override;
+  QSize sizeHint() const override;
 
   void setTransFunc(Z3DTransferFunctionParameter* tf);
 

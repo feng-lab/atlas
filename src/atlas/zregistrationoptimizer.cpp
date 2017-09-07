@@ -100,7 +100,7 @@ public:
     return m_costFun.evaluate(parameters, cost, gradient);
   }
 
-  virtual int NumParameters() const override
+  int NumParameters() const override
   { return m_costFun.numParameters(); }
 
 private:

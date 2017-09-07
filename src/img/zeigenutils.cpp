@@ -62,7 +62,7 @@ RowVectorXd ZEigenUtils::readRowVector(const std::string& iline, const char* uSe
                                        const std::string& commentStart)
 {
   RowVectorXd rowVector;
-  std::string line = iline.substr(0, iline.find_first_of("\n"));  //extract only one line to process
+  std::string line = iline.substr(0, iline.find_first_of('\n'));  //extract only one line to process
   // remove comment
   removeComment(line, commentStart, true);
   int nData = 0;

@@ -65,7 +65,7 @@ public:
   { m_numNeighbors = i; }
 
 protected:
-  virtual void doWork() override;
+  void doWork() override;
 
 private:
   struct SectionInfo

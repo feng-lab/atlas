@@ -83,13 +83,13 @@ protected:
 
   void bindVolumeAndTransferFunc(Z3DShaderProgram& shader, size_t idx);
 
-  virtual void compile() override;
+  void compile() override;
 
   QString generateHeader();
 
-  virtual void render(Z3DEye eye) override;
+  void render(Z3DEye eye) override;
 
-  virtual void renderPicking(Z3DEye) override;
+  void renderPicking(Z3DEye) override;
 
 //  Z3DShaderProgram m_raycasterShader;
 //  Z3DShaderProgram m_2dImageShader;

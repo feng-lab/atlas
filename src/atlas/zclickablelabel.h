@@ -27,9 +27,9 @@ signals:
   void clicked();
 
 protected:
-  virtual void mousePressEvent(QMouseEvent* ev) override;
+  void mousePressEvent(QMouseEvent* ev) override;
 
-  virtual bool event(QEvent* event) override;
+  bool event(QEvent* event) override;
 
   virtual bool getTip(const QPoint& p, QRect* r, QString* s) = 0;
 
@@ -49,18 +49,18 @@ public:
   explicit ZClickableColorLabel(ZDVec3Parameter* color, QWidget* parent = 0, Qt::WindowFlags f = 0);
 
 protected:
-  virtual void paintEvent(QPaintEvent* e) override;
+  void paintEvent(QPaintEvent* e) override;
 
-  virtual QSize minimumSizeHint() const override;
+  QSize minimumSizeHint() const override;
 
   ZVec4Parameter* m_vec4Color = nullptr;
   ZVec3Parameter* m_vec3Color = nullptr;
   ZDVec4Parameter* m_dvec4Color = nullptr;
   ZDVec3Parameter* m_dvec3Color = nullptr;
 
-  virtual bool getTip(const QPoint& p, QRect* r, QString* s) override;
+  bool getTip(const QPoint& p, QRect* r, QString* s) override;
 
-  virtual void labelClicked() override;
+  void labelClicked() override;
 
 private:
   QColor toQColor();
@@ -75,13 +75,13 @@ public:
                                    Qt::WindowFlags f = 0);
 
 protected:
-  virtual void paintEvent(QPaintEvent* e) override;
+  void paintEvent(QPaintEvent* e) override;
 
-  virtual QSize minimumSizeHint() const override;
+  QSize minimumSizeHint() const override;
 
   ZColorMapParameter* m_colorMap;
 
-  virtual bool getTip(const QPoint& p, QRect* r, QString* s) override;
+  bool getTip(const QPoint& p, QRect* r, QString* s) override;
 };
 
 class ZClickableTransferFunctionLabel : public ZClickableLabel
@@ -91,13 +91,13 @@ public:
                                            Qt::WindowFlags f = 0);
 
 protected:
-  virtual void paintEvent(QPaintEvent* e) override;
+  void paintEvent(QPaintEvent* e) override;
 
-  virtual QSize minimumSizeHint() const override;
+  QSize minimumSizeHint() const override;
 
   Z3DTransferFunctionParameter* m_transferFunction;
 
-  virtual bool getTip(const QPoint& p, QRect* r, QString* s) override;
+  bool getTip(const QPoint& p, QRect* r, QString* s) override;
 };
 
 } // namespace nim

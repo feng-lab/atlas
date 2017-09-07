@@ -22,7 +22,7 @@ signals:
 protected:
   void checkScrollBarValue(int v);
 
-  virtual void scrollContentsBy(int dx, int dy) override;
+  void scrollContentsBy(int dx, int dy) override;
 
 private:
   ZTimelineWidget& m_parent;

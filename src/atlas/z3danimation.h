@@ -29,9 +29,9 @@ public:
   { return m_cameraParameterAnimation; }
 
 protected:
-  virtual void bindGlobalParameters() override;
+  void bindGlobalParameters() override;
 
-  virtual void addGlobalKey(double time) override;
+  void addGlobalKey(double time) override;
 
 protected:
   // managed by parent class

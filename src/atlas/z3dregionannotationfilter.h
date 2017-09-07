@@ -11,47 +11,47 @@ Q_OBJECT
 public:
   explicit Z3DRegionAnnotationFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  virtual void process(Z3DEye eye) override;
+  void process(Z3DEye eye) override;
 
   void setData(ZRegionAnnotation& regAnno);
 
-  virtual bool isReady(Z3DEye eye) const override;
+  bool isReady(Z3DEye eye) const override;
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  virtual void renderOpaque(Z3DEye eye) override;
+  void renderOpaque(Z3DEye eye) override;
 
-  virtual void renderTransparent(Z3DEye eye) override;
+  void renderTransparent(Z3DEye eye) override;
 
-  virtual bool hasOpaque(Z3DEye /*unused*/) const override
+  bool hasOpaque(Z3DEye /*unused*/) const override
   { return true; }
 
-  virtual bool hasTransparent(Z3DEye /*unused*/) const override
+  bool hasTransparent(Z3DEye /*unused*/) const override
   { return true; }
 
-  virtual void setViewport(glm::uvec2 viewport) override;
+  void setViewport(glm::uvec2 viewport) override;
 
-  virtual void setViewport(glm::uvec4 viewport) override;
+  void setViewport(glm::uvec4 viewport) override;
 
-  virtual void setShaderHookType(Z3DRendererBase::ShaderHookType t) override;
+  void setShaderHookType(Z3DRendererBase::ShaderHookType t) override;
 
-  virtual void setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture* t) override;
+  void setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture* t) override;
 
-  virtual void setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture* t) override;
+  void setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture* t) override;
 
 protected:
   void visibleChanged(bool v);
 
   void allMeshChanged();
 
-  virtual void renderPicking(Z3DEye eye) override;
+  void renderPicking(Z3DEye eye) override;
 
-  virtual void registerPickingObjects() override;
+  void registerPickingObjects() override;
 
-  virtual void deregisterPickingObjects() override;
+  void deregisterPickingObjects() override;
 
-  //virtual void updateAxisAlignedBoundBoxImpl() override;
-  virtual void updateNotTransformedBoundBoxImpl() override;
+  //void updateAxisAlignedBoundBoxImpl() override;
+  void updateNotTransformedBoundBoxImpl() override;
 
 private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;

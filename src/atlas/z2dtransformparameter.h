@@ -62,26 +62,26 @@ public:
 
   void flipVertically(const QRectF& boundRect);
 
-  virtual void setValueSameAs(const ZParameter& rhs) override;
+  void setValueSameAs(const ZParameter& rhs) override;
 
-  virtual void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override;
+  void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override;
 
   // ZParameter interface
 public:
-  virtual void setSameAs(const ZParameter& rhs) override;
+  void setSameAs(const ZParameter& rhs) override;
 
-  virtual QJsonValue jsonValue() const override;
+  QJsonValue jsonValue() const override;
 
-  virtual void readValue(const QJsonValue& jsonValue) override;
+  void readValue(const QJsonValue& jsonValue) override;
 
 protected:
   void updateMatrix();
 
   void showTransformMatrix();
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 
-  virtual void beforeChange(glm::dmat3& value) override;
+  void beforeChange(glm::dmat3& value) override;
 
   void updateWidget(const glm::dmat3& value);
 

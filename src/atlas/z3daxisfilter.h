@@ -15,19 +15,19 @@ Q_OBJECT
 public:
   explicit Z3DAxisFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  virtual bool isReady(Z3DEye eye) const override;
+  bool isReady(Z3DEye eye) const override;
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  virtual bool hasOpaque(Z3DEye /*unused*/) const override
+  bool hasOpaque(Z3DEye /*unused*/) const override
   { return false; }
 
-  virtual void renderOpaque(Z3DEye eye) override;
+  void renderOpaque(Z3DEye eye) override;
 
-  virtual bool hasTransparent(Z3DEye /*unused*/) const override
+  bool hasTransparent(Z3DEye /*unused*/) const override
   { return true; }
 
-  virtual void renderTransparent(Z3DEye eye) override
+  void renderTransparent(Z3DEye eye) override
   { renderOpaque(eye); }
 
 protected:

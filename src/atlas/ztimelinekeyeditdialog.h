@@ -25,9 +25,9 @@ public:
 signals:
 
 protected:
-  virtual void accept() override;
+  void accept() override;
 
-  virtual void reject() override;
+  void reject() override;
 
   void raiseAndActivate();
 

@@ -17,8 +17,8 @@ public:
   ZImgCommonSubBlock(const QStringList& fileList, Dimension catDim, FileFormat format, size_t scene, size_t ratio,
                      size_t t, size_t z, size_t x, size_t y, size_t width, size_t height);
 
-  virtual std::shared_ptr<ZImg> read() const override;
-  virtual ZImgInfo readInfo() const override;
+  std::shared_ptr<ZImg> read() const override;
+  ZImgInfo readInfo() const override;
 
 protected:
   ZImgSource m_imgSource;

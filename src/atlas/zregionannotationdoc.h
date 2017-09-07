@@ -17,49 +17,49 @@ public:
 
   // ZObjDoc interface
 public:
-  virtual bool save(size_t id) override;
+  bool save(size_t id) override;
 
-  virtual bool saveAs(size_t id) override;
+  bool saveAs(size_t id) override;
 
-  virtual QString typeName() const override
+  QString typeName() const override
   { return "RegionAnnotation"; }
 
-  virtual QString typePluralName() const override
+  QString typePluralName() const override
   { return "RegionAnnotations"; }
 
-  virtual bool canReadFile(const QString& fileName) override;
+  bool canReadFile(const QString& fileName) override;
 
-  virtual size_t loadFile(const QString& fileName, QString& errorMsg) override;
+  size_t loadFile(const QString& fileName, QString& errorMsg) override;
 
-  virtual size_t loadFile(const QJsonValue& jValue, QString& errorMsg) override;
+  size_t loadFile(const QJsonValue& jValue, QString& errorMsg) override;
 
-  virtual QList<QAction*> loadFileActions() const override;
+  QList<QAction*> loadFileActions() const override;
 
-  virtual QMenu* processObjMenu() const override;
+  QMenu* processObjMenu() const override;
 
-  virtual void removeObj(size_t id) override;
+  void removeObj(size_t id) override;
 
-  virtual QString objName(size_t id) const override;
+  QString objName(size_t id) const override;
 
-  virtual QString objPath(size_t id) const override;
+  QString objPath(size_t id) const override;
 
-  virtual bool objHasUnsavedChange(size_t id) const override;
+  bool objHasUnsavedChange(size_t id) const override;
 
-  virtual QString objInfo(size_t id) const override;
+  QString objInfo(size_t id) const override;
 
-  virtual QString objTooltip(size_t id) const override;
+  QString objTooltip(size_t id) const override;
 
-  virtual QUndoStack* objUndoStack(size_t id) override;
+  QUndoStack* objUndoStack(size_t id) override;
 
-  virtual QJsonValue jsonValue(size_t id) const override;
+  QJsonValue jsonValue(size_t id) const override;
 
-  virtual bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
+  bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
 
-  virtual size_t makeAlias(size_t id) override;
+  size_t makeAlias(size_t id) override;
 
-  virtual bool isAlias(size_t id) const override;
+  bool isAlias(size_t id) const override;
 
-  virtual QWidget* createObjEditWidget(size_t id) override;
+  QWidget* createObjEditWidget(size_t id) override;
 
 protected:
   void loadRegionAnnotation();

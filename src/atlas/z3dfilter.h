@@ -86,7 +86,7 @@ public:
   const std::vector<Z3DOutputPortBase*>& outputPorts() const
   { return m_outputPorts; }
 
-  virtual void onEvent(QEvent* e, int w, int h) override;
+  void onEvent(QEvent* e, int w, int h) override;
 
   const std::vector<ZEventListenerParameter*> eventListeners() const
   { return m_eventListeners; }

@@ -23,9 +23,9 @@ public:
   // todo: add function to set data (vertex, texture coordinate, triangle type, indexes) separately
 
 protected:
-  virtual void compile() override;
+  void compile() override;
 
-  virtual void render(Z3DEye eye) override;
+  void render(Z3DEye eye) override;
 
 protected:
   const ZMesh* m_mesh;

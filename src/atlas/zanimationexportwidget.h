@@ -32,7 +32,7 @@ public:
     if (v) m_captureStereoImage.setVisible(false);
   }
 
-  virtual QSize sizeHint() const override;
+  QSize sizeHint() const override;
 
 signals:
 

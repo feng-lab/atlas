@@ -182,13 +182,13 @@ public:
 
   // ZParameter interface
 public:
-  virtual void setSameAs(const ZParameter& rhs) override;
+  void setSameAs(const ZParameter& rhs) override;
 
-  virtual void setValueSameAs(const ZParameter& rhs) override;
+  void setValueSameAs(const ZParameter& rhs) override;
 
-  virtual QJsonValue jsonValue() const override;
+  QJsonValue jsonValue() const override;
 
-  virtual void readValue(const QJsonValue& jsonValue) override;
+  void readValue(const QJsonValue& jsonValue) override;
 
 signals:
 
@@ -213,9 +213,9 @@ protected:
 
   void updateFarDist();
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 
-  virtual void beforeChange(Z3DCamera& value) override;
+  void beforeChange(Z3DCamera& value) override;
 
   void updateWidget(Z3DCamera& value);
 

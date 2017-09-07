@@ -12,7 +12,7 @@ public:
   explicit ZSpinBoxEventFilter(QObject* parent = nullptr);
 
 protected:
-  virtual bool eventFilter(QObject* obj, QEvent* event) override;
+  bool eventFilter(QObject* obj, QEvent* event) override;
 };
 
 class ZSpinBox : public QSpinBox
@@ -21,14 +21,14 @@ Q_OBJECT
 public:
   explicit ZSpinBox(QWidget* parent = nullptr);
 
-  virtual QSize sizeHint() const override;
+  QSize sizeHint() const override;
 
-  virtual QSize minimumSizeHint() const override;
+  QSize minimumSizeHint() const override;
 
 protected:
-  virtual void focusInEvent(QFocusEvent* e) override;
+  void focusInEvent(QFocusEvent* e) override;
 
-  virtual void focusOutEvent(QFocusEvent* e) override;
+  void focusOutEvent(QFocusEvent* e) override;
 };
 
 
@@ -38,14 +38,14 @@ Q_OBJECT
 public:
   explicit ZDoubleSpinBox(QWidget* parent = nullptr);
 
-  virtual QSize sizeHint() const override;
+  QSize sizeHint() const override;
 
-  virtual QSize minimumSizeHint() const override;
+  QSize minimumSizeHint() const override;
 
 protected:
-  virtual void focusInEvent(QFocusEvent* e) override;
+  void focusInEvent(QFocusEvent* e) override;
 
-  virtual void focusOutEvent(QFocusEvent* e) override;
+  void focusOutEvent(QFocusEvent* e) override;
 };
 
 } // namespace nim

@@ -27,25 +27,25 @@ public:
 protected:
   void updateIntensityScreenWidth();
 
-  virtual void mousePressEvent(QMouseEvent* e) override;
+  void mousePressEvent(QMouseEvent* e) override;
 
-  virtual void mouseMoveEvent(QMouseEvent* e) override;
+  void mouseMoveEvent(QMouseEvent* e) override;
 
-  virtual void mouseReleaseEvent(QMouseEvent* e) override;
+  void mouseReleaseEvent(QMouseEvent* e) override;
 
-  virtual void mouseDoubleClickEvent(QMouseEvent* e) override;
+  void mouseDoubleClickEvent(QMouseEvent* e) override;
 
-  virtual void contextMenuEvent(QContextMenuEvent* e) override;
+  void contextMenuEvent(QContextMenuEvent* e) override;
 
-  virtual void keyPressEvent(QKeyEvent* e) override;
+  void keyPressEvent(QKeyEvent* e) override;
 
-  virtual bool event(QEvent* e) override;
+  bool event(QEvent* e) override;
 
-  virtual void paintEvent(QPaintEvent* /*event*/) override;
+  void paintEvent(QPaintEvent* /*event*/) override;
 
-  virtual void resizeEvent(QResizeEvent* /*event*/) override;
+  void resizeEvent(QResizeEvent* /*event*/) override;
 
-  virtual QSize sizeHint() const override;
+  QSize sizeHint() const override;
 
   enum FindKeyResult
   {

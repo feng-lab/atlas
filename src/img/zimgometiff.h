@@ -13,32 +13,32 @@ public:
 
   // ZImgFormat interface
 public:
-  virtual QString shortName() const override;
+  QString shortName() const override;
 
-  virtual QString fullName() const override;
+  QString fullName() const override;
 
-  virtual QStringList extensions() const override;
+  QStringList extensions() const override;
 
-  virtual FileFormat format() const override
+  FileFormat format() const override
   { return FileFormat::OmeTiff; }
 
-  virtual void writeImg(const QString& filename, const ZImg& img, Compression comp) override;
+  void writeImg(const QString& filename, const ZImg& img, Compression comp) override;
 
-  virtual void writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp) override;
+  void writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp) override;
 
-  virtual bool supportRead() const override;
+  bool supportRead() const override;
 
-  virtual bool supportWrite() const override;
+  bool supportWrite() const override;
 
   // ZImgTiff interface
 protected:
-  virtual void readIntoInternalStructure(const QString& filename, ZTiff& tiff) override;
+  void readIntoInternalStructure(const QString& filename, ZTiff& tiff) override;
 
-  virtual void clearInternalState() override;
+  void clearInternalState() override;
 
-  virtual void detectImgInfo(ZTiff& tiff) override;
+  void detectImgInfo(ZTiff& tiff) override;
 
-  virtual bool mapIFDToImgLocation(size_t ifdIdx, int& z, int& c, int& t, int& l) override;
+  bool mapIFDToImgLocation(size_t ifdIdx, int& z, int& c, int& t, int& l) override;
 
 protected:
   void readOmeInfo(ZTiff& tiff);

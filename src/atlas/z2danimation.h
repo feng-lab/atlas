@@ -20,13 +20,13 @@ public:
 
   void save(const QString& fn);
 
-  virtual bool is2DAnimation() const override
+  bool is2DAnimation() const override
   { return true; }
 
 protected:
-  virtual void bindGlobalParameters() override;
+  void bindGlobalParameters() override;
 
-  virtual void addGlobalKey(double time) override;
+  void addGlobalKey(double time) override;
 
 protected:
   // managed by parent class

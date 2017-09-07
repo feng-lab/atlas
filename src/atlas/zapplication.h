@@ -12,9 +12,9 @@ Q_OBJECT
 public:
   using QApplication::QApplication;
 
-  virtual bool notify(QObject* object, QEvent* event) override;
+  bool notify(QObject* object, QEvent* event) override;
 
-  virtual bool event(QEvent *event) override;
+  bool event(QEvent *event) override;
 
 signals:
   void fileOpenRequest(QList<QUrl> urlList);

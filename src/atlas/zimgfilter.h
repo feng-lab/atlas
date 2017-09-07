@@ -29,7 +29,7 @@ public:
 
   ZGraphicsItemGroup(QGraphicsItem* parent = nullptr);
 
-  virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
+  void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 };
 
 class ZImgFilter : public ZObjFilter
@@ -64,11 +64,11 @@ public:
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
 protected:
-  virtual void viewPrecedenceChanged() override;
+  void viewPrecedenceChanged() override;
 
-  virtual void transformChanged() override;
+  void transformChanged() override;
 
-  virtual void offsetChanged() override;
+  void offsetChanged() override;
 
   void updateViewSettingWidgetsGroup();
 

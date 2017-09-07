@@ -16,8 +16,8 @@ public:
                    size_t downsampleBlockDepth = 1,
                    ZImg::CombineMode downsampleCombineMode = ZImg::CombineMode::Mean);
 
-  virtual std::shared_ptr<ZImg> read() const override;
-  virtual ZImgInfo readInfo() const override;
+  std::shared_ptr<ZImg> read() const override;
+  ZImgInfo readInfo() const override;
 
 private:
   const ZImgSource& m_source;

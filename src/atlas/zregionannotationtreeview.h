@@ -30,7 +30,7 @@ protected:
 
   void buttonClickedForUserData(const QVariant& ud);
 
-  virtual void keyPressEvent(QKeyEvent* e) override;
+  void keyPressEvent(QKeyEvent* e) override;
 
   void createContextMenu();
 

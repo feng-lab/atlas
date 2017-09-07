@@ -163,13 +163,13 @@ public:
   inline T& get()
   { return m_value; }
 
-  virtual void setValueSameAs(const ZParameter& rhs) override
+  void setValueSameAs(const ZParameter& rhs) override
   {
     CHECK(this->isSameType(rhs));
     set(static_cast<const ZSingleValueParameter<T>*>(&rhs)->get());
   }
 
-  virtual void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override
+  void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override
   {
     CHECK(this->isSameType(prev) && this->isSameType(dest));
     dest.setValueSameAs(progress >= 1.0 ? *this : prev);
@@ -253,14 +253,14 @@ public:
 
   // ZParameter interface
 public:
-  virtual void setSameAs(const ZParameter& rhs) override;
+  void setSameAs(const ZParameter& rhs) override;
 
-  virtual bool supportInterpolation() const override
+  bool supportInterpolation() const override
   { return false; }
 
-  virtual QJsonValue jsonValue() const override;
+  QJsonValue jsonValue() const override;
 
-  virtual void readValue(const QJsonValue& jsonValue) override;
+  void readValue(const QJsonValue& jsonValue) override;
 
   void setValue(bool v);
 
@@ -271,11 +271,11 @@ signals:
   void boolChanged(bool);
 
 protected:
-  virtual void beforeChange(bool& value) override;
+  void beforeChange(bool& value) override;
 
-  virtual void afterChange(bool& value) override;
+  void afterChange(bool& value) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 };
 
 } // namespace nim

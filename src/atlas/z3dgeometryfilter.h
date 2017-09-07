@@ -39,11 +39,11 @@ public:
   { m_rendererBase.setSizeScale(s); }
 
 protected:
-  virtual void process(Z3DEye /*eye*/) override
+  void process(Z3DEye /*eye*/) override
   {}
 
   // once processed, should be valid for both stereo view and mono view
-  virtual void setValid(Z3DEye eye) override
+  void setValid(Z3DEye eye) override
   {
     Z3DBoundedFilter::setValid(eye);
     m_state = State::Valid;

@@ -17,7 +17,7 @@ public:
 protected:
   void createEditorWindow();
 
-  virtual void labelClicked() override;
+  void labelClicked() override;
 
 private:
   ZColorMapParameter* m_colorMap;

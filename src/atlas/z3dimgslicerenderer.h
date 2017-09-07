@@ -39,7 +39,7 @@ public:
   // add quad
   void addQuad(const ZMesh& quad);
 
-  virtual void compile() override;
+  void compile() override;
 
 protected:
   void bindVolumes(Z3DShaderProgram& shader) const;
@@ -48,7 +48,7 @@ protected:
 
   QString generateHeader();
 
-  virtual void render(Z3DEye eye) override;
+  void render(Z3DEye eye) override;
 
 protected:
   //Z3DShaderProgram m_volumeSliceShader;

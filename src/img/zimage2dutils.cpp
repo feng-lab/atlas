@@ -132,9 +132,6 @@ void _resizeContributions(size_t inLength, size_t outLength, Interpolant interpo
     case Interpolant::Lanczos3:
       kernelWidth = 6;
       break;
-    default:
-      CHECK(false);
-      break;
   }
   if (scale < 1 && antialiasing) {
     kernelWidth /= scale;
@@ -193,9 +190,6 @@ void _resizeContributions(size_t inLength, size_t outLength, Interpolant interpo
       } else {
         weights = weights.unaryExpr([](double x) -> double { return lanczos3_kernel(x); });
       }
-      break;
-    default:
-      CHECK(false);
       break;
   }
 

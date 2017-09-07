@@ -48,15 +48,15 @@ public:
 protected:
   void adjustWidgets();
 
-  virtual void compile() override;
+  void compile() override;
 
   std::vector<glm::vec4>* getColors();
 
   QString generateHeader();
 
-  virtual void render(Z3DEye eye) override;
+  void render(Z3DEye eye) override;
 
-  virtual void renderPicking(Z3DEye /*unused*/) override;
+  void renderPicking(Z3DEye /*unused*/) override;
 
   void prepareFontShaderData(Z3DEye eye);
 

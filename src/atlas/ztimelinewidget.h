@@ -21,7 +21,7 @@ Q_OBJECT
 public:
   explicit ZTimelineWidget(ZAnimation& ani, ZDoubleParameter* currentTimePara, QWidget* parent = nullptr);
 
-  virtual QSize sizeHint() const override;
+  QSize sizeHint() const override;
 
   ZAnimation& animation()
   { return m_animation; }
@@ -78,7 +78,7 @@ protected:
 
   void showValue(int i);
 
-  virtual void resizeEvent(QResizeEvent* event) override;
+  void resizeEvent(QResizeEvent* event) override;
 
 private:
   ZAnimation& m_animation;

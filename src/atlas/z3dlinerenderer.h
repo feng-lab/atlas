@@ -55,7 +55,7 @@ public:
   void setScreenAlign(bool v);
 
 protected:
-  virtual void compile() override;
+  void compile() override;
 
   QString generateHeader();
 
@@ -64,13 +64,13 @@ protected:
   virtual std::vector<glm::vec4>* lineColors();
 
 #ifndef ATLAS_USE_CORE_PROFILE
-  virtual void renderUsingOpengl() override;
-  virtual void renderPickingUsingOpengl() override;
+  void renderUsingOpengl() override;
+  void renderPickingUsingOpengl() override;
 #endif
 
-  virtual void render(Z3DEye eye) override;
+  void render(Z3DEye eye) override;
 
-  virtual void renderPicking(Z3DEye eye) override;
+  void renderPicking(Z3DEye eye) override;
 
   //void enableLineSmooth();
   //void disableLineSmooth();

@@ -123,7 +123,7 @@ void ZParameter::setEnabled(bool s)
 
 void ZParameter::updateFromSender()
 {
-  ZParameter* para = static_cast<ZParameter*>(sender());
+  auto para = static_cast<ZParameter*>(sender());
   if (isSameType(*para)) {
     setValueSameAs(*para);
   } else {

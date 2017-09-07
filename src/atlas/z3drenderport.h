@@ -14,7 +14,7 @@ public:
                       GLint internalColorFormat = GLint(GL_RGBA16),
                       GLint internalDepthFormat = GLint(GL_DEPTH_COMPONENT24));
 
-  virtual void invalidate() override;
+  void invalidate() override;
 
   void bindTarget()
   {
@@ -34,7 +34,7 @@ public:
   // Clears the contents of an activated outport's RenderTarget,
   void clearTarget() const;
 
-  virtual bool hasValidData() const override
+  bool hasValidData() const override
   { return m_resultIsValid; }
 
   // Returns true, if the associated RenderTarget is currently bound.
@@ -60,14 +60,14 @@ public:
   { return m_renderTarget.attachment(GL_DEPTH_ATTACHMENT); }
 
   // Resizes the associated RenderTarget to the passed dimensions.
-  virtual void resize(const glm::uvec2& newsize) override;
+  void resize(const glm::uvec2& newsize) override;
 
   // change RenderTarget with the given format.
   void changeColorFormat(GLint internalColorFormat);
 
   void chagneDepthFormat(GLint internalDepthFormat);
 
-  virtual bool canConnectTo(const Z3DInputPortBase* inport) const override;
+  bool canConnectTo(const Z3DInputPortBase* inport) const override;
 
   //void setMultisample(bool multisample, int nsample = 4);
 
@@ -90,7 +90,7 @@ public:
                      Z3DFilter* filter,
                      Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid);
 
-  virtual bool isReady() const override
+  bool isReady() const override
   { return numValidInputs() > 0; }
 
   // go through all connected output render ports and count how many have valid rendering

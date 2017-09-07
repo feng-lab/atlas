@@ -15,9 +15,9 @@ public:
 
   // QItemSelectionModel interface
 public:
-  virtual void select(const QModelIndex& index, SelectionFlags command) override;
+  void select(const QModelIndex& index, SelectionFlags command) override;
 
-  virtual void select(const QItemSelection& selection, SelectionFlags command) override;
+  void select(const QItemSelection& selection, SelectionFlags command) override;
 
 private:
   void srcSelectionChanged(const QItemSelection& selected, const QItemSelection& deselected);

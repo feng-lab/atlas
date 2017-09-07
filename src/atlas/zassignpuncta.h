@@ -51,7 +51,7 @@ public:
   { return m_ambiguousPuncta; }
 
 protected:
-  virtual void doWork() override;
+  void doWork() override;
 
 private:
   void separatePuncta();

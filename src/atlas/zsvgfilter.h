@@ -37,11 +37,11 @@ public:
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
 protected:
-  virtual void viewPrecedenceChanged() override;
+  void viewPrecedenceChanged() override;
 
-  virtual void transformChanged() override;
+  void transformChanged() override;
 
-  virtual void offsetChanged() override;
+  void offsetChanged() override;
 
 private:
   void visibleChanged();

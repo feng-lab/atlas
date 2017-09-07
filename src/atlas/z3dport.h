@@ -169,7 +169,7 @@ public:
       return 0;
   }
 
-  virtual bool isReady() const override
+  bool isReady() const override
   { return isConnected(); }
 };
 
@@ -181,7 +181,7 @@ public:
     : Z3DOutputPortBase(name, filter)
   {}
 
-  virtual bool canConnectTo(const Z3DInputPortBase* inport) const override
+  bool canConnectTo(const Z3DInputPortBase* inport) const override
   {
     if (dynamic_cast<const Z3DFilterInputPort<T>*>(inport)) {
       return Z3DOutputPortBase::canConnectTo(inport);
@@ -191,7 +191,7 @@ public:
   }
 
   // data is filter itself, so it is always valid
-  virtual bool hasValidData() const override
+  bool hasValidData() const override
   { return true; }
 };
 

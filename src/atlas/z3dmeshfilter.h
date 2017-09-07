@@ -32,7 +32,7 @@ public:
   void setGlow(bool v)
   { m_glow.set(v); }
 
-  virtual void process(Z3DEye eye) override;
+  void process(Z3DEye eye) override;
 
   void setData(std::vector<ZMesh*>* meshList);
 
@@ -41,21 +41,21 @@ public:
   void setSelectedMeshes(std::set<ZMesh*>* list)
   { m_selectedMeshes = list; }
 
-  virtual bool isReady(Z3DEye eye) const override;
+  bool isReady(Z3DEye eye) const override;
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroupForAnnotationFilter();
 
-  virtual bool hasOpaque(Z3DEye eye) const override
+  bool hasOpaque(Z3DEye eye) const override
   { return Z3DGeometryFilter::hasOpaque(eye) && !m_glow.get(); }
 
-  virtual void renderOpaque(Z3DEye eye) override;
+  void renderOpaque(Z3DEye eye) override;
 
-  virtual bool hasTransparent(Z3DEye eye) const override
+  bool hasTransparent(Z3DEye eye) const override
   { return Z3DGeometryFilter::hasTransparent(eye) || m_glow.get(); }
 
-  virtual void renderTransparent(Z3DEye eye) override;
+  void renderTransparent(Z3DEye eye) override;
 
 signals:
 
@@ -70,18 +70,18 @@ protected:
 
   void onApplyTransform();
 
-  virtual void renderPicking(Z3DEye eye) override;
+  void renderPicking(Z3DEye eye) override;
 
   void prepareData();
 
-  virtual void registerPickingObjects() override;
+  void registerPickingObjects() override;
 
-  virtual void deregisterPickingObjects() override;
+  void deregisterPickingObjects() override;
 
   ZBBox<glm::dvec3> meshBound(ZMesh* p);
 
-  //virtual void updateAxisAlignedBoundBoxImpl() override;
-  virtual void updateNotTransformedBoundBoxImpl() override;
+  //void updateAxisAlignedBoundBoxImpl() override;
+  void updateNotTransformedBoundBoxImpl() override;
 
   void updateMeshVisibleState();
 

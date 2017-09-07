@@ -63,9 +63,9 @@ public:
 
   // QGraphicsItem interface
 public:
-  virtual QRectF boundingRect() const override;
+  QRectF boundingRect() const override;
 
-  virtual void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
+  void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
 
 protected:
   ZPuncta& m_puncta;
@@ -101,11 +101,11 @@ public:
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
 protected:
-  virtual void viewPrecedenceChanged() override;
+  void viewPrecedenceChanged() override;
 
-  virtual void transformChanged() override;
+  void transformChanged() override;
 
-  virtual void offsetChanged() override;
+  void offsetChanged() override;
 
 private:
   void visibleChanged();

@@ -25,23 +25,23 @@ Q_OBJECT
 public:
   explicit Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  virtual void process(Z3DEye /*unused*/) override;
+  void process(Z3DEye /*unused*/) override;
 
   void setData(Z3DAnimation* animation);
 
-  virtual bool isReady(Z3DEye eye) const override;
+  bool isReady(Z3DEye eye) const override;
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  virtual bool hasOpaque(Z3DEye /*unused*/) const override
+  bool hasOpaque(Z3DEye /*unused*/) const override
   { return false; }
 
-  virtual void renderOpaque(Z3DEye eye) override;
+  void renderOpaque(Z3DEye eye) override;
 
-  virtual bool hasTransparent(Z3DEye /*unused*/) const override
+  bool hasTransparent(Z3DEye /*unused*/) const override
   { return true; }
 
-  virtual void renderTransparent(Z3DEye eye) override;
+  void renderTransparent(Z3DEye eye) override;
 
 protected:
   void prepareColor();
@@ -54,15 +54,15 @@ protected:
 
   void updateLineWidth();
 
-  virtual void renderPicking(Z3DEye eye) override;
+  void renderPicking(Z3DEye eye) override;
 
   void prepareData();
 
-  virtual void registerPickingObjects() override;
+  void registerPickingObjects() override;
 
-  virtual void deregisterPickingObjects() override;
+  void deregisterPickingObjects() override;
 
-  virtual void updateNotTransformedBoundBoxImpl() override;
+  void updateNotTransformedBoundBoxImpl() override;
 
 private:
   const ZCameraParameterAnimation* cameraParaAnimation() const

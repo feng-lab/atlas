@@ -155,37 +155,37 @@ signals:
 
   // w and h is physical size not logical size, opengl works in physical pixel
   void canvasSizeChanged(size_t w, size_t h);
-  
+
   void openGLContextInitialized();
 
 protected:
-  virtual void enterEvent(QEvent* e) override;
+  void enterEvent(QEvent* e) override;
 
-  virtual void leaveEvent(QEvent* e) override;
+  void leaveEvent(QEvent* e) override;
 
-  virtual void mousePressEvent(QMouseEvent* e) override;
+  void mousePressEvent(QMouseEvent* e) override;
 
-  virtual void mouseReleaseEvent(QMouseEvent* e) override;
+  void mouseReleaseEvent(QMouseEvent* e) override;
 
-  virtual void mouseMoveEvent(QMouseEvent* e) override;
+  void mouseMoveEvent(QMouseEvent* e) override;
 
-  virtual void mouseDoubleClickEvent(QMouseEvent* e) override;
+  void mouseDoubleClickEvent(QMouseEvent* e) override;
 
-  virtual void wheelEvent(QWheelEvent* e) override;
+  void wheelEvent(QWheelEvent* e) override;
 
-  virtual void timerEvent(QTimerEvent* e) override;
+  void timerEvent(QTimerEvent* e) override;
 
-  virtual void keyPressEvent(QKeyEvent* event) override;
+  void keyPressEvent(QKeyEvent* event) override;
 
-  virtual void keyReleaseEvent(QKeyEvent* event) override;
+  void keyReleaseEvent(QKeyEvent* event) override;
 
-  virtual void resizeEvent(QResizeEvent* event) override;
+  void resizeEvent(QResizeEvent* event) override;
 
-  virtual void paintEvent(QPaintEvent* event) override;
+  void paintEvent(QPaintEvent* event) override;
 
-  virtual void dragEnterEvent(QDragEnterEvent* event) override;
+  void dragEnterEvent(QDragEnterEvent* event) override;
 
-  virtual void dropEvent(QDropEvent* event) override;
+  void dropEvent(QDropEvent* event) override;
 
   void setCursor(const QCursor& c)
   { viewport()->setCursor(c); }

@@ -188,25 +188,25 @@ public:
     addOptionsWithData(op2, op3, op4, op5, op6, op7, op8);
   }
 
-  virtual void setSameAs(const ZParameter& rhs) override;
+  void setSameAs(const ZParameter& rhs) override;
 
-  virtual bool supportInterpolation() const override
+  bool supportInterpolation() const override
   { return false; }
 
-  virtual QJsonValue jsonValue() const override;
+  QJsonValue jsonValue() const override;
 
-  virtual void readValue(const QJsonValue& jsonValue) override;
+  void readValue(const QJsonValue& jsonValue) override;
 
-  virtual void forceSetValueSameAs(const ZParameter& rhs) override;
+  void forceSetValueSameAs(const ZParameter& rhs) override;
 
 protected:
-  virtual void reservedIntSlot1(int v) override;
+  void reservedIntSlot1(int v) override;
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 
-  virtual void beforeChange(T& value) override;
+  void beforeChange(T& value) override;
 
-  virtual void makeValid(T& value) const override;
+  void makeValid(T& value) const override;
 
   QString comboBoxItemString(const T& value) const;
 

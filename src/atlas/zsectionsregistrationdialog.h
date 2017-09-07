@@ -51,7 +51,7 @@ protected:
 
   void cancelButtonPressed();
 
-  virtual void keyPressEvent(QKeyEvent* e) override;
+  void keyPressEvent(QKeyEvent* e) override;
 
 private:
   void adjustInputImageWidget();

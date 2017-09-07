@@ -52,9 +52,9 @@ public:
   void resize(uint32_t width);
 
   // domain should be in [0.0, 1.0] range
-  virtual bool isValidDomainMin(double min) const override;
+  bool isValidDomainMin(double min) const override;
 
-  virtual bool isValidDomainMax(double max) const override;
+  bool isValidDomainMax(double max) const override;
 
 protected:
   void updateTexture() const;
@@ -87,17 +87,17 @@ public:
 
   // ZParameter interface
 public:
-  virtual void setSameAs(const ZParameter& rhs) override;
+  void setSameAs(const ZParameter& rhs) override;
 
-  virtual bool supportInterpolation() const override
+  bool supportInterpolation() const override
   { return false; }
 
-  virtual QJsonValue jsonValue() const override;
+  QJsonValue jsonValue() const override;
 
-  virtual void readValue(const QJsonValue& jsonValue) override;
+  void readValue(const QJsonValue& jsonValue) override;
 
 protected:
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 
 protected:
   Z3DVolume* m_volume;

@@ -16,14 +16,14 @@ public:
 
   // ZParameter interface
 public:
-  virtual void setSameAs(const ZParameter& rhs) override;
+  void setSameAs(const ZParameter& rhs) override;
 
-  virtual bool supportInterpolation() const override
+  bool supportInterpolation() const override
   { return false; }
 
-  virtual QJsonValue jsonValue() const override;
+  QJsonValue jsonValue() const override;
 
-  virtual void readValue(const QJsonValue& jsonValue) override;
+  void readValue(const QJsonValue& jsonValue) override;
 
 signals:
 
@@ -32,9 +32,9 @@ signals:
 protected:
   void setContent(const QString& str);
 
-  virtual QWidget* actualCreateWidget(QWidget* parent) override;
+  QWidget* actualCreateWidget(QWidget* parent) override;
 
-  virtual void afterChange(QString& value) override;
+  void afterChange(QString& value) override;
 };
 
 } // namespace nim

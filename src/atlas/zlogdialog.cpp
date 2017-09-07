@@ -56,7 +56,7 @@ public:
   }
 
 protected:
-  virtual bool filterAcceptsRow(int source_row, const QModelIndex& source_parent) const override
+  bool filterAcceptsRow(int source_row, const QModelIndex& source_parent) const override
   {
     Q_UNUSED(source_parent);
     if (!mLastVisibleRow) {

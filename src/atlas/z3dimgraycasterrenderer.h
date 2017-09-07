@@ -76,7 +76,7 @@ public:
   const std::vector<std::unique_ptr<ZStringIntOptionParameter>>& texFilterModeParas() const
   { return m_texFilterModeParas; }
 
-  virtual void compile() override;
+  void compile() override;
 
 protected:
   void adjustWidgets();
@@ -87,9 +87,9 @@ protected:
 
   QString generateHeader();
 
-  virtual void render(Z3DEye eye) override;
+  void render(Z3DEye eye) override;
 
-  virtual void renderPicking(Z3DEye /*unused*/) override;
+  void renderPicking(Z3DEye /*unused*/) override;
 
 private:
   // this function is used to get proper default

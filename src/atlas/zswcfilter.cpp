@@ -203,7 +203,6 @@ ZSwcFilter::ZSwcFilter(ZView& view)
 
 void ZSwcFilter::setData(ZSwc& swc)
 {
-  m_swc = &swc;
   m_item.reset(new ZSwcGraphicsItem(swc));
   m_item->setZValue(m_viewPrecedencePara.get());
   m_item->setShowSkeleton(m_showSkeleton.get());

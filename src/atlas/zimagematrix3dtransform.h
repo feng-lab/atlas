@@ -28,25 +28,25 @@ public:
 
   // ZImageTransform interface
 public:
-  virtual size_t numParameters() const override;
+  size_t numParameters() const override;
 
   using ZImageTransform::setParameters;
 
-  virtual void setParameters(double const* para) override;
+  void setParameters(double const* para) override;
 
-  virtual bool is2DTransform() const override
+  bool is2DTransform() const override
   { return false; }
 
-  virtual void adaptParameters(size_t fromLevel, size_t toLevel) override;
+  void adaptParameters(size_t fromLevel, size_t toLevel) override;
 
-  virtual void transformPoint(double* inoutCoords) const override;
+  void transformPoint(double* inoutCoords) const override;
 
-  virtual QString toQString() const override
+  QString toQString() const override
   { return m_tform.toQString(); }
 
-  virtual ZImageTransform* clone() const override;
+  ZImageTransform* clone() const override;
 
-  virtual ZImageTransform* makeInverseTransform() const override;
+  ZImageTransform* makeInverseTransform() const override;
 
 protected:
   ZAffine3D m_tform;
@@ -62,19 +62,19 @@ public:
 
   // ZImageTransform interface
 public:
-  virtual size_t numParameters() const override;
+  size_t numParameters() const override;
 
   using ZImageTransform::setParameters;
 
-  virtual void setParameters(double const* para) override;
+  void setParameters(double const* para) override;
 
-  virtual void adaptParameters(size_t fromLevel, size_t toLevel) override;
+  void adaptParameters(size_t fromLevel, size_t toLevel) override;
 
-  virtual void transformPoint(double* inoutCoords) const override;
+  void transformPoint(double* inoutCoords) const override;
 
-  virtual ZImageTransform* clone() const override;
+  ZImageTransform* clone() const override;
 
-  virtual ZImageTransform* makeInverseTransform() const override;
+  ZImageTransform* makeInverseTransform() const override;
 };
 
 class ZImageRigid3DTransform : public ZImageMatrix3DTransform
@@ -84,17 +84,17 @@ public:
 
   // ZImageTransform interface
 public:
-  virtual size_t numParameters() const override;
+  size_t numParameters() const override;
 
   using ZImageTransform::setParameters;
 
-  virtual void setParameters(double const* para) override;
+  void setParameters(double const* para) override;
 
-  virtual void adaptParameters(size_t fromLevel, size_t toLevel) override;
+  void adaptParameters(size_t fromLevel, size_t toLevel) override;
 
-  virtual ZImageTransform* clone() const override;
+  ZImageTransform* clone() const override;
 
-  virtual ZImageTransform* makeInverseTransform() const override;
+  ZImageTransform* makeInverseTransform() const override;
 };
 
 class ZImageSimilarity3DTransform : public ZImageMatrix3DTransform
@@ -104,17 +104,17 @@ public:
 
   // ZImageTransform interface
 public:
-  virtual size_t numParameters() const override;
+  size_t numParameters() const override;
 
   using ZImageTransform::setParameters;
 
-  virtual void setParameters(double const* para) override;
+  void setParameters(double const* para) override;
 
-  virtual void adaptParameters(size_t fromLevel, size_t toLevel) override;
+  void adaptParameters(size_t fromLevel, size_t toLevel) override;
 
-  virtual ZImageTransform* clone() const override;
+  ZImageTransform* clone() const override;
 
-  virtual ZImageTransform* makeInverseTransform() const override;
+  ZImageTransform* makeInverseTransform() const override;
 };
 
 class ZImageAffine3DTransform : public ZImageMatrix3DTransform
@@ -124,17 +124,17 @@ public:
 
   // ZImageTransform interface
 public:
-  virtual size_t numParameters() const override;
+  size_t numParameters() const override;
 
   using ZImageTransform::setParameters;
 
-  virtual void setParameters(double const* para) override;
+  void setParameters(double const* para) override;
 
-  virtual void adaptParameters(size_t fromLevel, size_t toLevel) override;
+  void adaptParameters(size_t fromLevel, size_t toLevel) override;
 
-  virtual ZImageTransform* clone() const override;
+  ZImageTransform* clone() const override;
 
-  virtual ZImageTransform* makeInverseTransform() const override;
+  ZImageTransform* makeInverseTransform() const override;
 };
 
 //((scale-1)/2) in output image maps to 0 in input image, and ((3*scale-1)/2) in output

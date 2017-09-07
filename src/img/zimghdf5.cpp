@@ -254,8 +254,8 @@ ZImgHDF5SubBlock::ZImgHDF5SubBlock(const QString& fileName, const ZImgInfo& info
 std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
 {
   // todo: fix hdf5 multithread reading
-  static QMutex lock;
-  QMutexLocker lk(&lock);
+  static QMutex mutex;
+  QMutexLocker lock(&mutex);
   try {
     if (m_tiles.empty()) {
       throw ZIOException("empty hdf5 sub block");

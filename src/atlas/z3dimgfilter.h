@@ -41,16 +41,16 @@ public:
 
   bool isReady(Z3DEye eye) const override;
 
-  virtual bool hasOpaque(Z3DEye eye) const override;
+  bool hasOpaque(Z3DEye eye) const override;
 
-  virtual void renderOpaque(Z3DEye eye) override;
+  void renderOpaque(Z3DEye eye) override;
 
-  virtual bool hasTransparent(Z3DEye eye) const override;
+  bool hasTransparent(Z3DEye eye) const override;
 
-  virtual void renderTransparent(Z3DEye eye) override;
+  void renderTransparent(Z3DEye eye) override;
 
 protected:
-  virtual void updateSize() override;
+  void updateSize() override;
 
   void changeCoordTransform();
 
@@ -65,14 +65,14 @@ protected:
   //  void invalidateFRVolumeYSlice2();
   //  void invalidateFRVolumeXSlice2();
 
-  virtual void setClipPlanes() override
+  void setClipPlanes() override
   {}
 
   void mousePressed();
 
   void mouseReleased();
 
-  virtual void process(Z3DEye eye) override;
+  void process(Z3DEye eye) override;
 
   bool hasSlices() const;
 
@@ -82,9 +82,9 @@ protected:
 
   void renderImage(Z3DEye eye);
 
-  virtual void updateNotTransformedBoundBoxImpl() override;
+  void updateNotTransformedBoundBoxImpl() override;
 
-  virtual void expandCutRange() override
+  void expandCutRange() override
   {}
 
 private:

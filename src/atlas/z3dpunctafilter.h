@@ -29,7 +29,7 @@ public:
   inline void setSelectedPuncta(std::set<ZPunctum*>* list)
   { m_selectedPuncta = list; }
 
-  virtual bool isReady(Z3DEye eye) const override;
+  bool isReady(Z3DEye eye) const override;
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
@@ -38,11 +38,11 @@ public:
     m_colorMode.select(mode.c_str());
   }
 
-  //virtual bool hasOpaque(Z3DEye eye) const override { return Z3DGeometryFilter::hasOpaque(eye) && !m_randomGlow.get(); }
-  virtual void renderOpaque(Z3DEye eye) override;
+  //bool hasOpaque(Z3DEye eye) const override { return Z3DGeometryFilter::hasOpaque(eye) && !m_randomGlow.get(); }
+  void renderOpaque(Z3DEye eye) override;
 
-  //virtual bool hasTransparent(Z3DEye eye) const override { return Z3DGeometryFilter::hasTransparent(eye) || m_randomGlow.get(); }
-  virtual void renderTransparent(Z3DEye eye) override;
+  //bool hasTransparent(Z3DEye eye) const override { return Z3DGeometryFilter::hasTransparent(eye) || m_randomGlow.get(); }
+  void renderTransparent(Z3DEye eye) override;
 
 signals:
 
@@ -59,13 +59,13 @@ protected:
 
   void updateData();
 
-  virtual void process(Z3DEye eye) override;
+  void process(Z3DEye eye) override;
 
-  virtual void renderPicking(Z3DEye eye) override;
+  void renderPicking(Z3DEye eye) override;
 
-  virtual void registerPickingObjects() override;
+  void registerPickingObjects() override;
 
-  virtual void deregisterPickingObjects() override;
+  void deregisterPickingObjects() override;
 
   void prepareData();
 
@@ -75,10 +75,10 @@ protected:
   // result should have at least 6 elements
   void notTransformedPunctumBound(const ZPunctum& p, ZBBox<glm::dvec3>& result) const;
 
-  //virtual void updateAxisAlignedBoundBoxImpl() override;
-  virtual void updateNotTransformedBoundBoxImpl() override;
+  //void updateAxisAlignedBoundBoxImpl() override;
+  void updateNotTransformedBoundBoxImpl() override;
 
-  virtual void addSelectionLines() override;
+  void addSelectionLines() override;
 
 private:
   // get visible data from origPunctaList put into punctaList

@@ -12,7 +12,7 @@ public:
   explicit ZComboBoxEventFilter(QObject* parent = nullptr);
 
 protected:
-  virtual bool eventFilter(QObject* obj, QEvent* event) override;
+  bool eventFilter(QObject* obj, QEvent* event) override;
 };
 
 class ZComboBox : public QComboBox
@@ -21,18 +21,18 @@ Q_OBJECT
 public:
   explicit ZComboBox(QWidget* parent = nullptr);
 
-  virtual QSize sizeHint() const override;
+  QSize sizeHint() const override;
 
-  virtual QSize minimumSizeHint() const override;
+  QSize minimumSizeHint() const override;
 
   void addItemSlot(const QString& text);
 
   void removeItemSlot(const QString& text);
 
 protected:
-  virtual void focusInEvent(QFocusEvent* event) override;
+  void focusInEvent(QFocusEvent* event) override;
 
-  virtual void focusOutEvent(QFocusEvent* event) override;
+  void focusOutEvent(QFocusEvent* event) override;
 };
 
 } // namespace nim

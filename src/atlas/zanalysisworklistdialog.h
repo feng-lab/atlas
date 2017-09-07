@@ -17,7 +17,7 @@ public:
   explicit ZAnalysisWorklistDialog(QWidget* parent = nullptr);
 
 protected:
-  virtual void reject() override;
+  void reject() override;
 
   void onNew();
 

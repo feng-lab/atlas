@@ -15,7 +15,7 @@ public:
   explicit ZSliderEventFilter(QObject* parent = nullptr);
 
 protected:
-  virtual bool eventFilter(QObject* obj, QEvent* event) override;
+  bool eventFilter(QObject* obj, QEvent* event) override;
 };
 
 class ZSlider2 : public QSlider
@@ -27,9 +27,9 @@ public:
   explicit ZSlider2(Qt::Orientation ori, QWidget* parent = nullptr);
 
 protected:
-  virtual void focusInEvent(QFocusEvent* e) override;
+  void focusInEvent(QFocusEvent* e) override;
 
-  virtual void focusOutEvent(QFocusEvent* e) override;
+  void focusOutEvent(QFocusEvent* e) override;
 };
 
 class ZSpinBoxWithSlider : public QWidget

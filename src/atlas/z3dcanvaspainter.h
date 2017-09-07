@@ -23,7 +23,7 @@ Q_OBJECT
 public:
   explicit Z3DCanvasPainter(Z3DGlobalParameters& globalParas, Z3DCanvas& canvas, QObject* parent = nullptr);
 
-  virtual void invalidate(State inv = State::AllResultInvalid) override;
+  void invalidate(State inv = State::AllResultInvalid) override;
 
   Z3DCanvas& canvas()
   { return m_canvas; }
@@ -41,13 +41,13 @@ public:
 protected:
   void onCanvasResized(size_t w, size_t h);
 
-  virtual void process(Z3DEye eye) override;
+  void process(Z3DEye eye) override;
 
-  virtual bool isReady(Z3DEye /*eye*/) const override;
+  bool isReady(Z3DEye /*eye*/) const override;
 
-  virtual bool isValid(Z3DEye eye) const override;
+  bool isValid(Z3DEye eye) const override;
 
-  virtual void updateSize() override;
+  void updateSize() override;
 
   void renderInportToImage(Z3DEye eye);
 
