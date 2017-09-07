@@ -712,9 +712,10 @@ if (WIN32)
   target_compile_options(${APP_NAME} PUBLIC /wd6326) # Potential comparison of a constant with another constant.
   target_compile_options(${APP_NAME} PUBLIC /wd6330) # Incorrect type passed as parameter in call to function.
   target_compile_options(${APP_NAME} PUBLIC /MP) # Build with Multiple Processes
+  target_compile_options(${APP_NAME} PUBLIC /Zc:inline) #
 
   #target_link_libraries(${APP_NAME} PUBLIC /LTCG) # Link-time Code Generation
-  set_target_properties(${APP_NAME} PROPERTIES LINK_FLAGS "/LTCG /FORCE:MULTIPLE") # to create an output file whether or not LINK finds more than one definition for a symbol.
+  set_target_properties(${APP_NAME} PROPERTIES LINK_FLAGS "/LTCG /DEBUG:NONE /FORCE:MULTIPLE") # to create an output file whether or not LINK finds more than one definition for a symbol.
 
   # for some files
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS

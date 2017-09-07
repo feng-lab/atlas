@@ -26,8 +26,10 @@ QString ZParameter::type() const
 {
   QString className = metaObject()->className();
   if (className.startsWith("nim::"))
-    className.remove(0, 5);
-  return className.remove(0, 1).left(className.length() - 9);
+    className.remove(0, 6);
+  else
+    className.remove(0, 1);
+  return className.left(className.length() - 9);
 }
 
 void ZParameter::setStyle(const QString& style)

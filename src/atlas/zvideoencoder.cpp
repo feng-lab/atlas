@@ -28,7 +28,7 @@ void ZVideoEncoder::encode(const QDir& dir, const QString& namePrefix, int field
   }
 
 #ifdef _WIN32
-  QString program = QApplication::applicationDirPath() + QString("\\Resources\\ffmpeg.exe");
+  QString program = QApplication::applicationDirPath() + QString("/Resources/ffmpeg.exe");
 #elif defined(__APPLE__)
   QString program = QApplication::applicationDirPath() + QString("/../Resources/ffmpeg");
 #else
