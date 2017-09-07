@@ -7,6 +7,7 @@
 #include "zimg.h"
 #include "zexception.h"
 #include <QString>
+#include <QMutexLocker>
 
 class Z3DTexture;
 
@@ -36,9 +37,6 @@ public:
   bool renderToImage(const QString& filename, int width, int height, Z3DScreenShotType sst, Z3DCompositor& compositor);
 
   QString renderToImageError() const;
-
-  void setLock(bool v)
-  { m_locked = v; }
 
 protected:
   void onCanvasResized(size_t w, size_t h);
@@ -74,7 +72,7 @@ private:
   QString m_renderToImageError;
   Z3DScreenShotType m_renderToImageType;
 
-  bool m_locked = false;
+  QMutex m_mutex;
 };
 
 } // namespace nim

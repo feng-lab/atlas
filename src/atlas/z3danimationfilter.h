@@ -13,6 +13,7 @@
 #include "zmesh.h"
 #include <QString>
 #include <QPoint>
+#include <QMutexLocker>
 #include <map>
 #include <vector>
 
@@ -100,7 +101,7 @@ private:
   ZMesh m_triangles;
   std::vector<ZMesh*> m_trianglesWrapper;
 
-  bool m_locked;
+  QMutex m_mutex;
 };
 
 } // namespace nim

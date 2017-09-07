@@ -34,8 +34,6 @@ void EventBoundRectItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
     return;
   QPointF pos = event->scenePos();
   double time = m_timeline.xToTime(pos.x());
-  if (time < 0)
-    time = 0;
   QMenu menu;
 
   QAction* addKeyHereAction = menu.addAction("Add Key Here");

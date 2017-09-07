@@ -4,6 +4,7 @@
 #include <QString>
 #include <QProcess>
 #include <QDir>
+#include <QMutexLocker>
 
 namespace nim {
 
@@ -38,9 +39,7 @@ protected:
 private:
   QProcess* m_ffmpegProcess;
 
-  bool m_lock = false;
-
-  QDir m_tmpDir;
+  QMutex m_mutex;
 };
 
 } // namespace nim

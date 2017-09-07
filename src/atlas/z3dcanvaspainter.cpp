@@ -88,12 +88,12 @@ void Z3DCanvasPainter::onCanvasResized(size_t w, size_t h)
 
 void Z3DCanvasPainter::invalidate(State inv)
 {
-  if (!m_locked) {
-    m_locked = true;
-    m_state |= inv;
-    m_canvas.updateAll();
-    m_locked = false;
+  if (!m_mutex.try_lock()) {
+    return;
   }
+  m_state |= inv;
+  m_canvas.updateAll();
+  m_mutex.unlock();
 }
 
 bool Z3DCanvasPainter::renderToImage(const QString& filename, Z3DScreenShotType sst)

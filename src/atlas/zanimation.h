@@ -7,6 +7,7 @@
 #include <QObject>
 #include <QDir>
 #include <QUndoStack>
+#include <QTemporaryDir>
 #include <map>
 
 namespace nim {
@@ -198,6 +199,8 @@ protected:
   QUndoStack m_undoStack;
 
   ZVideoEncoder* m_videoEncoder;
+
+  std::shared_ptr<QTemporaryDir> m_tempDir;
 };
 
 } // namespace nim

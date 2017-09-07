@@ -19,7 +19,6 @@ namespace nim {
 
 Z3DNetworkEvaluator::Z3DNetworkEvaluator(Z3DCanvasPainter& canvasPainter, QObject* parent)
   : QObject(parent)
-  , m_locked(false)
   , m_processPending(false)
   , m_canvasPainter(canvasPainter)
 {
@@ -42,13 +41,13 @@ Z3DNetworkEvaluator::~Z3DNetworkEvaluator()
 
 void Z3DNetworkEvaluator::process(bool stereo)
 {
-  if (m_locked) {
+  if (!m_mutex.try_lock()) {
     LOG(INFO) << "locked. Scheduling.";
     //m_processPending = true;
     return;
   }
 
-  lock();
+  // already locked
 
 //  for (size_t i = 0; i < m_renderingOrder.size(); ++i) {
 //    Z3DMeshFilter* meshFilter = qobject_cast<Z3DMeshFilter*>(m_renderingOrder[i]);
@@ -119,7 +118,7 @@ void Z3DNetworkEvaluator::process(bool stereo)
     m_filterWrappers[j]->afterNetworkProcess();
   CHECK_GL_ERROR
 
-  unlock();
+  m_mutex.unlock();
 
   // make sure that canvases are repainted, if their update has been blocked by the locked evaluator
   if (m_processPending) {

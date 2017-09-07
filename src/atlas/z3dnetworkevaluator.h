@@ -3,6 +3,7 @@
 #include "z3dcanvas.h"
 #include "zbenchtimer.h"
 #include <QObject>
+#include <QMutex>
 #ifndef Q_MOC_RUN
 #include <boost/graph/adjacency_list.hpp>
 #endif
@@ -54,14 +55,6 @@ public:
   void updateNetwork();
 
 protected:
-  // Locks the evaluator. In this state, it does not perform
-  // any operations, such as initializing or processing, on the filter network
-  void lock()
-  { m_locked = true; }
-
-  void unlock()
-  { m_locked = false; }
-
   // update size of all upstream filters. If input filter is nullptr, update all filters
   void sizeChangedFromFilter(Z3DFilter* rp = nullptr);
 
@@ -70,7 +63,7 @@ private:
 
   std::vector<std::unique_ptr<Z3DFilterWrapper>> m_filterWrappers;
 
-  bool m_locked;
+  QMutex m_mutex;
 
   bool m_processPending;
 

@@ -45,7 +45,7 @@ public:
   { return 10 + time * pixelsPerSecond(); }
 
   inline double xToTime(double x) const
-  { return (x - 10) / pixelsPerSecond(); }
+  { return std::max(0.0, (x - 10) / pixelsPerSecond()); }
 
   double currentTime() const;
 

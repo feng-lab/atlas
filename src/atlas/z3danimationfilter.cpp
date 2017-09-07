@@ -29,7 +29,6 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject
   , m_upDirectionColor("Up Direction Color", glm::vec4(0, 1, 0, 1))
   , m_viewDirectionColor("View Direction Color", glm::vec4(0, 0, 1, 1))
   , m_cameraDirectionTimeInterval("Camera Direction Time Interval", .5, .1, 100)
-  , m_locked(false)
 {
   setTransformEnabled(false);
 
@@ -260,10 +259,10 @@ void Z3DAnimationFilter::setClipPlanes()
 
 void Z3DAnimationFilter::updateData()
 {
-  if (m_locked)
+  if (!m_mutex.try_lock()) {
     return;
+  }
 
-  m_locked = true;
   m_dataIsInvalid = true;
   invalidateResult();
 
@@ -373,7 +372,7 @@ void Z3DAnimationFilter::updateData()
     m_triangles.setNormals(normals);
   }
   updateBoundBox();
-  m_locked = false;
+  m_mutex.unlock();
 }
 
 void Z3DAnimationFilter::adjustWidgets()

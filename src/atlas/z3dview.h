@@ -6,6 +6,7 @@
 #include <QDir>
 #include <QObject>
 #include <QAction>
+#include <QMutexLocker>
 
 class QMainWindow;
 
@@ -148,7 +149,7 @@ private:
   ZBBox<glm::dvec3> m_boundBox;
   size_t m_numObjsBefore;
 
-  bool m_lock;
+  QMutex m_mutex;
 };
 
 } // namespace nim

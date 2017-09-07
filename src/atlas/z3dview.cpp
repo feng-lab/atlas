@@ -85,7 +85,6 @@ Z3DView::Z3DView(ZDoc* doc, bool stereo, Z3DMainWindow* parent)
   , m_isStereoView(stereo)
   , m_mainWin(parent)
   , m_numObjsBefore(m_doc->numObjs())
-  , m_lock(false)
 {
   CHECK(m_doc);
   m_canvas = new Z3DCanvas("", 512, 512, m_mainWin);
@@ -243,22 +242,21 @@ void Z3DView::resetCameraCenter()
 
 void Z3DView::resetCameraClippingRange()
 {
-  if (m_lock)
+  if (!m_mutex.try_lock()) {
     return;
-  m_lock = true;
+  }
   camera().resetCameraNearFarPlane(m_boundBox);
-  m_lock = false;
+  m_mutex.unlock();
 }
 
 bool Z3DView::takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst)
 {
+  QMutexLocker locker(&m_mutex);
   bool res = true;
-  m_lock = true;
   if (!m_canvasPainter->renderToImage(filename, width, height, sst, compositor())) {
     res = false;
     QMessageBox::critical(m_mainWin, qApp->applicationName(), m_canvasPainter->renderToImageError());
   }
-  m_lock = false;
   return res;
 }
 

@@ -20,8 +20,6 @@
 #include <QDir>
 #include <QProgressDialog>
 #include <utility>
-#include <QStandardPaths>
-#include <QTemporaryDir>
 
 namespace {
 // generic solution
@@ -353,9 +351,8 @@ ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
   double timeIncrement = m_duration / numFrame;
   bool checkOverwrite = true;
   QString namePrefix = "video";
-  QTemporaryDir tempdir;
-  tempdir.setAutoRemove(false);
-  QDir tmpdir(tempdir.path());
+  auto tempdir = std::make_shared<QTemporaryDir>();
+  QDir tmpdir(tempdir->path());
   for (int i = 0; i < numFrame; ++i) {
     progress->setValue(i);
     if (progress->wasCanceled())
@@ -412,9 +409,8 @@ ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
     connect(m_videoEncoder, &ZVideoEncoder::finished, progress, &QProgressDialog::reset);
     connect(m_videoEncoder, &ZVideoEncoder::canceled, progress, &QProgressDialog::reset);
     connect(progress, &QProgressDialog::canceled, m_videoEncoder, &ZVideoEncoder::cancel);
+    m_tempDir = tempdir;
     m_videoEncoder->encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
-  } else {
-    tmpdir.removeRecursively();
   }
 }
 
@@ -476,9 +472,8 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, Z3D
   double timeIncrement = m_duration / numFrame;
   bool checkOverwrite = true;
   QString namePrefix = "video";
-  QTemporaryDir tempdir;
-  tempdir.setAutoRemove(false);
-  QDir tmpdir(tempdir.path());
+  auto tempdir = std::make_shared<QTemporaryDir>();
+  QDir tmpdir(tempdir->path());
   for (int i = 0; i < numFrame; ++i) {
     progress->setValue(i);
     if (progress->wasCanceled())
@@ -535,9 +530,8 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, Z3D
     connect(m_videoEncoder, &ZVideoEncoder::finished, progress, &QProgressDialog::reset);
     connect(m_videoEncoder, &ZVideoEncoder::canceled, progress, &QProgressDialog::reset);
     connect(progress, &QProgressDialog::canceled, m_videoEncoder, &ZVideoEncoder::cancel);
+    m_tempDir = tempdir;
     m_videoEncoder->encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
-  } else {
-    tmpdir.removeRecursively();
   }
 }
 
@@ -588,9 +582,8 @@ ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSecond,
   double timeIncrement = m_duration / numFrame;
   bool checkOverwrite = true;
   QString namePrefix = "video";
-  QTemporaryDir tempdir;
-  tempdir.setAutoRemove(false);
-  QDir tmpdir(tempdir.path());
+  auto tempdir = std::make_shared<QTemporaryDir>();
+  QDir tmpdir(tempdir->path());
   QString err;
   for (int i = 0; i < numFrame; ++i) {
     progress->setValue(i);
@@ -649,9 +642,8 @@ ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSecond,
     connect(m_videoEncoder, &ZVideoEncoder::finished, progress, &QProgressDialog::reset);
     connect(m_videoEncoder, &ZVideoEncoder::canceled, progress, &QProgressDialog::reset);
     connect(progress, &QProgressDialog::canceled, m_videoEncoder, &ZVideoEncoder::cancel);
+    m_tempDir = tempdir;
     m_videoEncoder->encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
-  } else {
-    tmpdir.removeRecursively();
   }
 }
 
@@ -698,18 +690,21 @@ void ZAnimation::videoEncoderError(const QString& err)
 {
   QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                         "Video Encoder Error.\nCan not encode video: " + err);
+  m_tempDir.reset();
 }
 
 void ZAnimation::videoEncoderFinished()
 {
   QMessageBox::information(QApplication::activeWindow(), qApp->applicationName(),
                            "Finish Encoding Video.");
+  m_tempDir.reset();
 }
 
 void ZAnimation::videoEncoderCanceled()
 {
   QMessageBox::warning(QApplication::activeWindow(), qApp->applicationName(),
                        "Video Encoding was canceled.");
+  m_tempDir.reset();
 }
 
 void ZAnimation::updateObjAnimation()

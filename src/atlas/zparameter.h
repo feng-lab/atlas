@@ -10,6 +10,7 @@
 #include "zlog.h"
 #include <QObject>
 #include <QStringList>
+#include <QMutexLocker>
 #include <set>
 
 class QWidget;
@@ -188,7 +189,7 @@ protected:
 
 protected:
   T m_value;
-  bool m_locked = false;
+  QMutex m_mutex;
 };
 
 //---------------------------------------------------------------------------
@@ -207,18 +208,20 @@ ZSingleValueParameter<T>::ZSingleValueParameter(const QString& name, QObject* pa
 template<class T>
 void ZSingleValueParameter<T>::set(const T& valueIn)
 {
-  if (m_locked)
-    return;    // prevent widget change echo back
+  if (m_mutex.try_lock()) {
+    m_mutex.unlock();
+  } else {
+    return; // prevent widget change echo back
+  }
   if (m_value != valueIn) {
     T value = valueIn;
     makeValid(value);
     if (m_value != value) {
-      m_locked = true;
+      QMutexLocker locker(&m_mutex);
       beforeChange(value);
       m_value = value;
       emit valueChanged();
       afterChange(value);
-      m_locked = false;
     }
   }
 }
