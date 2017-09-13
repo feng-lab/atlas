@@ -223,7 +223,7 @@ void main()
 
                 ivec4 testPageDirEntry = texelFetch(page_directory, page_directory_bases[nextNonEmptyLevel] + testPageTableCoord / page_table_block_size, 0);
                 testPagingFlag = testPageDirEntry.w;
-                if (testPagingFlag != UNMAPPED && pagingFlag != EMPTY) {
+                if (testPagingFlag != UNMAPPED && testPagingFlag != EMPTY) {
                   testPagingFlag = texelFetch(page_table_cache, testPageDirEntry.xyz + testPageTableCoord % page_table_block_size, 0).w;
                 }
                 ++nextNonEmptyLevel;
@@ -243,7 +243,7 @@ void main()
           do {
             currentRayLength += stepSize;
             samplePos = startRayPosition + currentRayLength * rayVector;
-          } while (ivec3(samplePos * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength <= 1.0);
+          } while (page_directory_bases[curLevel] + ivec3(samplePos * image_dimensions[curLevel]) / image_block_size / page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
         }
 
         finished = finished || (currentRayLength > 1.0);

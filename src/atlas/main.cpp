@@ -7,6 +7,11 @@
 #include "zcpuinfo.h"
 #include "../version/version.h"
 
+#ifdef ATLAS_WITH_TESTS
+#include "../../test/zrunbenchmark.h"
+#include "../../test/zunittest.h"
+#endif
+
 #include <fftw3.h>
 
 #ifdef ATLAS_USE_MKL
@@ -27,6 +32,11 @@
 #include <folly/ScopeGuard.h>
 #include <gflags/gflags.h>
 #include <iostream>
+
+#ifdef ATLAS_WITH_TESTS
+DEFINE_bool(run_unit_tests, false, "run unit tests");
+DEFINE_bool(run_benchmarks, false, "run benchmarks");
+#endif
 
 using namespace nim;
 
@@ -77,43 +87,52 @@ void removeOldLogs(const QDir& dir, int numberToKeep = 20)
 
 int main(int argc, char* argv[])
 {
-  std::string usage("Atlas is a brain map platform.  Usage:\n");
-  usage += std::string(argv[0]) + "";
-  gflags::SetUsageMessage(usage);
-  gflags::SetVersionString(GIT_VERSION);
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
-
-  QSurfaceFormat format;
-#if defined(__APPLE__) && defined(ATLAS_USE_CORE_PROFILE)
-  format.setVersion(3, 2);
-  format.setProfile(QSurfaceFormat::CoreProfile);
-#endif
-  //format.setStereo(true);
-  QSurfaceFormat::setDefaultFormat(format);
-
-  QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
-  QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings, true);
-  nim::ZApplication app(argc, argv);
-  app.setApplicationName("Atlas");
-  app.setOrganizationDomain("atlas.com");
-  app.setOrganizationName("Atlas");
-
-  // init the logging mechanism
-  QDir logDir = nim::ZSystemInfo::instance().logDir();
-  removeOldLogs(logDir);
-
-  nim::initLogging(argv[0], logDir.filePath("atlas"));
-  folly::ScopeGuard guardlogging = folly::makeGuard([]() {
-    LOG(INFO) << "--- App Log End ---";
-    nim::shutdownLogging();
-  });
-  Q_UNUSED(guardlogging)
-
-  nim::addLogSink(&nim::ZLogCache::instance());
-  qInstallMessageHandler(myMessageOutput);
-
   try {
+    // init the logging mechanism
+    QDir logDir = nim::ZSystemInfo::instance().logDir();
+    removeOldLogs(logDir);
+
+    nim::initLogging(argv[0], logDir.filePath("atlas"));
+    folly::ScopeGuard guardlogging = folly::makeGuard([]() {
+      LOG(INFO) << "--- App Log End ---";
+      nim::shutdownLogging();
+    });
+    Q_UNUSED(guardlogging)
+
+    std::string usage("Atlas is a brain map platform.  Usage:\n");
+    usage += std::string(argv[0]) + "";
+    gflags::SetUsageMessage(usage);
+    gflags::SetVersionString(GIT_VERSION);
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+#ifdef ATLAS_WITH_TESTS
+    if (FLAGS_run_unit_tests) {
+      return ZUnitTest::run();
+    }
+    if (FLAGS_run_benchmarks) {
+      return ZRunBenchmark::run();
+    }
+#endif
+
+    QSurfaceFormat format;
+#if defined(__APPLE__) && defined(ATLAS_USE_CORE_PROFILE)
+    format.setVersion(3, 2);
+    format.setProfile(QSurfaceFormat::CoreProfile);
+#endif
+    //format.setStereo(true);
+    QSurfaceFormat::setDefaultFormat(format);
+
+    QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
+    QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings, true);
+    nim::ZApplication app(argc, argv);
+    app.setApplicationName("Atlas");
+    app.setOrganizationDomain("atlas.com");
+    app.setOrganizationName("Atlas");
+
+    nim::addLogSink(&nim::ZLogCache::instance());
+    qInstallMessageHandler(myMessageOutput);
     LOG(INFO) << "--- App Log Start ---";
+
     nim::ZSystemInfo::instance().logOSInfo();
     nim::ZCpuInfo::instance().logCpuInfo();
 
