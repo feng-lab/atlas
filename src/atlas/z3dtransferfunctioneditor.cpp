@@ -212,12 +212,16 @@ void Z3DTransferFunctionWidget::paintEvent(QPaintEvent* event)
   paint.drawText(static_cast<int>(0.15 * m_padding), static_cast<int>(height() - m_padding - 9.0),
                  static_cast<int>(0.7 * m_padding), static_cast<int>(14.0),
                  Qt::AlignRight | Qt::AlignBottom, "0.0");
+
   paint.drawText(static_cast<int>(origin.x - 3), static_cast<int>(height() - m_padding * 0.85),
                  static_cast<int>(m_padding * 2), static_cast<int>(0.7 * m_padding),
-                 Qt::AlignLeft | Qt::AlignTop, "0.0");
+                 Qt::AlignLeft | Qt::AlignTop,
+                 QString::number(m_transferFunction->minIntensity(), 'g', QLocale::FloatingPointShortest));
   paint.drawText(static_cast<int>(width() - m_padding * 3.0), static_cast<int>(height() - m_padding * 0.85),
                  static_cast<int>(m_padding * 2.0 + 3), static_cast<int>(0.7 * m_padding),
-                 Qt::AlignRight | Qt::AlignTop, "1.0");
+                 Qt::AlignRight | Qt::AlignTop,
+                 QString::number(m_transferFunction->maxIntensity(), 'g', QLocale::FloatingPointShortest));
+
   paint.save();
   paint.translate(0.2 * m_padding, height() / 2.0 + 6.2 * m_padding);
   paint.rotate(270.);
@@ -395,18 +399,18 @@ bool Z3DTransferFunctionWidget::event(QEvent* e)
                         m_splitFactor * m_keyCircleRadius * 2, m_keyCircleRadius * 2);
         if (isLeftPart)
           tipText = QString("Key %1 Left\nIntensity: %2\nColor: %3\nOpacity: %4").arg(index + 1).arg(
-              m_transferFunction->get().keyIntensity(index))
+              keyIntensityToRealIntensity(m_transferFunction->get().keyIntensity(index)))
             .arg(m_transferFunction->get().keyQColorL(index).name()).arg(
               m_transferFunction->get().keyFloatAlphaL(index));
         else
           tipText = QString("Key %1 Right\nIntensity: %2\nColor: %3\nOpacity: %4").arg(index + 1).arg(
-              m_transferFunction->get().keyIntensity(index))
+            keyIntensityToRealIntensity(m_transferFunction->get().keyIntensity(index)))
             .arg(m_transferFunction->get().keyQColorR(index).name()).arg(
               m_transferFunction->get().keyFloatAlphaR(index));
       } else {
         tipRect = QRect(p.x - m_keyCircleRadius, p.y - m_keyCircleRadius, m_keyCircleRadius * 2, m_keyCircleRadius * 2);
         tipText = QString("Key %1\nIntensity: %2\nColor: %3\nOpacity: %4").arg(index + 1).arg(
-            m_transferFunction->get().keyIntensity(index))
+          keyIntensityToRealIntensity(m_transferFunction->get().keyIntensity(index)))
           .arg(m_transferFunction->get().keyQColorR(index).name()).arg(m_transferFunction->get().keyFloatAlphaR(index));
       }
       QToolTip::showText(helpEvent->globalPos(), tipText, this, tipRect);
@@ -555,12 +559,12 @@ void Z3DTransferFunctionWidget::changeCurrentIntensity()
 
   bool ok;
   double newI = QInputDialog::getDouble(this, QString("Key %1").arg(index + 1), "Intensity:",
-                                        m_transferFunction->get().keyIntensity(index),
-                                        m_transferFunction->get().domainMin() + 0.001,
-                                        m_transferFunction->get().domainMax() - 0.001,
+                                        keyIntensityToRealIntensity(m_transferFunction->get().keyIntensity(index)),
+                                        keyIntensityToRealIntensity(m_transferFunction->get().domainMin() + 0.001),
+                                        keyIntensityToRealIntensity(m_transferFunction->get().domainMax() - 0.001),
                                         3, &ok);
   if (ok) {
-    m_transferFunction->get().setKeyIntensity(index, newI);
+    m_transferFunction->get().setKeyIntensity(index, realIntensityToKeyIntensity(newI));
   }
 }
 
@@ -704,7 +708,8 @@ void Z3DTransferFunctionWidget::hideKeyInfo()
 
 void Z3DTransferFunctionWidget::showKeyInfo(QPoint pos, const glm::dvec2& values)
 {
-  QToolTip::showText(mapToGlobal(pos), QString("Intensity: %1 \nOpacity: %2").arg(values.x).arg(values.y));
+  QToolTip::showText(mapToGlobal(pos),
+                     QString("Intensity: %1 \nOpacity: %2").arg(keyIntensityToRealIntensity(values.x)).arg(values.y));
 }
 
 void Z3DTransferFunctionWidget::volumeChanged(Z3DVolume* volume)
@@ -719,6 +724,20 @@ void Z3DTransferFunctionWidget::setTransFunc(Z3DTransferFunctionParameter* tf)
 {
   m_transferFunction = tf;
   update();
+}
+
+double Z3DTransferFunctionWidget::keyIntensityToRealIntensity(double keyInten) const
+{
+  double minInten = m_transferFunction->minIntensity();
+  double maxInten = m_transferFunction->maxIntensity();
+  return minInten + keyInten * (maxInten - minInten);
+}
+
+double Z3DTransferFunctionWidget::realIntensityToKeyIntensity(double realInten) const
+{
+  double minInten = m_transferFunction->minIntensity();
+  double maxInten = m_transferFunction->maxIntensity();
+  return (realInten - minInten) / (maxInten - minInten);
 }
 
 //----------------------------------------------------------------------------------------------------------------

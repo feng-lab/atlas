@@ -112,6 +112,8 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg& img)
       connect(m_channelVisibleParas[i].get(), &ZBoolParameter::valueChanged, this, &Z3DImgRaycasterRenderer::compile);
       m_transferFuncParas.emplace_back(
         std::make_unique<Z3DTransferFunctionParameter>(QString("Transfer Function %1").arg(i + 1)));
+      m_transferFuncParas[m_transferFuncParas.size() - 1]->setMinMaxIntensity(m_img->minIntensity(),
+                                                                              m_img->maxsIntensity());
       //m_transferFuncParas[i]->setVolume(m_img->volumes()[i].get());
       m_texFilterModeParas.emplace_back(
         std::make_unique<ZStringIntOptionParameter>(QString("Texture Filtering %1").arg(i + 1)));

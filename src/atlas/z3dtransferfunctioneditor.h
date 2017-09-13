@@ -107,6 +107,10 @@ protected:
   // Re-calculated the histogram
   void updateHistogram();
 
+  double keyIntensityToRealIntensity(double keyInten) const;
+
+  double realIntensityToKeyIntensity(double realInten) const;
+
 protected:
   Z3DTransferFunctionParameter* m_transferFunction;
   std::unique_ptr<QPixmap> m_histogramCache;

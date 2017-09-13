@@ -85,6 +85,18 @@ public:
   inline Z3DVolume* volume() const
   { return m_volume; }
 
+  void setMinMaxIntensity(double minInten, double maxInten)
+  {
+    m_minIntensity = minInten;
+    m_maxIntensity = maxInten;
+  }
+
+  double minIntensity() const
+  { return m_minIntensity; }
+
+  double maxIntensity() const
+  { return m_maxIntensity; }
+
   // ZParameter interface
 public:
   void setSameAs(const ZParameter& rhs) override;
@@ -101,6 +113,8 @@ protected:
 
 protected:
   Z3DVolume* m_volume;
+  double m_minIntensity = 0.0;
+  double m_maxIntensity = 1.0;
 };
 
 } // namespace nim

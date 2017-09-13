@@ -32,6 +32,12 @@ public:
   bool is3DData() const
   { return m_imgPack.imgInfo().depth > 1; }
 
+  double minIntensity() const
+  { return m_imgPack.minIntensity(); }
+
+  double maxsIntensity() const
+  { return m_imgPack.maxIntensity(); }
+
   glm::uvec3 dimensions() const
   { return glm::uvec3(m_imgPack.imgInfo().width, m_imgPack.imgInfo().height, m_imgPack.imgInfo().depth); }
 
