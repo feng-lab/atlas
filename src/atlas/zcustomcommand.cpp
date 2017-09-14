@@ -19,6 +19,7 @@
 #include "zdoc.h"
 #include "z3dmainwindow.h"
 #include "z3dview.h"
+#include "zvbgmm.h"
 #include <qtcsv/reader.h>
 #include <itkMath.h>
 #include <QDir>
@@ -1077,13 +1078,31 @@ void qFileInfoTest()
   LOG(INFO) << QFileInfo(fon2).absoluteFilePath();
 }
 
+void GMMFail()
+{
+  Eigen::MatrixXd data(20, 3);
+  data << 0, 0, 1,  0, 1, 0,  0, 1, 1,  0, 1, 2,  0, 1, 3,
+    0, 2, 0,  0, 2, 1,  0, 2, 2,  0, 2, 3,  0, 2, 4,
+    0, 3, 1,  0, 3, 2,  0, 3, 3,  0, 3, 4,  0, 3, 5,
+    0, 4, 2,  0, 4, 3,  0, 4, 4,  0, 4, 5,  1, 2, 3;
+  Eigen::VectorXd weight(20);
+  weight << 22, 41, 42, 35, 25, 39, 25, 30, 26, 19, 25, 29, 31, 43, 35, 27, 35, 34, 36, 37;
+
+  Eigen::RowVectorXd dataCentre = ZEigenUtils::featureMean(data, weight);
+  Eigen::MatrixXd m = dataCentre.colwise().replicate(3);
+
+  ZVBGMM<double, double> vbgmm(data, weight, 3, 10, m, 0.001,
+                               ZTermCriteria<double>(200, 1e-5), IterAlgorithmLogLevel::Iter);
+  vbgmm.runEM(false);
+}
+
 }  // namespace nim
 
 namespace nim {
 
 void ZCustomCommand::run()
 {
-  qFileInfoTest();
+  GMMFail();
   LOG(INFO) << "done";
 }
 
