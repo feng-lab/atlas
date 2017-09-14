@@ -728,16 +728,20 @@ void Z3DTransferFunctionWidget::setTransFunc(Z3DTransferFunctionParameter* tf)
 
 double Z3DTransferFunctionWidget::keyIntensityToRealIntensity(double keyInten) const
 {
+  double dmin = m_transferFunction->get().domainMin();
+  double dmax = m_transferFunction->get().domainMax();
   double minInten = m_transferFunction->minIntensity();
   double maxInten = m_transferFunction->maxIntensity();
-  return minInten + keyInten * (maxInten - minInten);
+  return minInten + (keyInten - dmin) / (dmax - dmin) * (maxInten - minInten);
 }
 
 double Z3DTransferFunctionWidget::realIntensityToKeyIntensity(double realInten) const
 {
+  double dmin = m_transferFunction->get().domainMin();
+  double dmax = m_transferFunction->get().domainMax();
   double minInten = m_transferFunction->minIntensity();
   double maxInten = m_transferFunction->maxIntensity();
-  return (realInten - minInten) / (maxInten - minInten);
+  return dmin + (realInten - minInten) / (maxInten - minInten) * (dmax - dmin);
 }
 
 //----------------------------------------------------------------------------------------------------------------

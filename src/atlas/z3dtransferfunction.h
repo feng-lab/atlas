@@ -87,15 +87,16 @@ public:
 
   void setMinMaxIntensity(double minInten, double maxInten)
   {
+    CHECK(maxInten > minInten);
     m_minIntensity = minInten;
     m_maxIntensity = maxInten;
   }
 
   double minIntensity() const
-  { return m_minIntensity; }
+  { return m_minIntensity != std::numeric_limits<double>::lowest() ? m_minIntensity : m_value.domainMin(); }
 
   double maxIntensity() const
-  { return m_maxIntensity; }
+  { return m_maxIntensity != std::numeric_limits<double>::lowest() ? m_maxIntensity : m_value.domainMax(); }
 
   // ZParameter interface
 public:
@@ -113,8 +114,8 @@ protected:
 
 protected:
   Z3DVolume* m_volume;
-  double m_minIntensity = 0.0;
-  double m_maxIntensity = 1.0;
+  double m_minIntensity = std::numeric_limits<double>::lowest();
+  double m_maxIntensity = std::numeric_limits<double>::lowest();
 };
 
 } // namespace nim
