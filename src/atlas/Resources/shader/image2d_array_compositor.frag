@@ -14,6 +14,8 @@ out vec4 FragData0;  // call glBindFragDataLocation before linking
 #define FragData0 gl_FragData[0]
 #endif
 
+#define epsilon 1e-6
+
 void main()
 {
 #if NUM_VOLUMES < 2
@@ -76,9 +78,17 @@ void main()
     colors[i+1] = color;
   }
 
-  color = colors[1] + (1 - colors[1].a) * colors[0];
+  if (abs(depths[1] - depths[0]) < epsilon) {
+    color = max(colors[1], colors[0]);
+  } else {
+    color = colors[1] + (1 - colors[1].a) * colors[0];
+  }
   for (int i = 2; i < NUM_VOLUMES; ++i) {
-    color = colors[i] + (1 - colors[i].a) * color;
+    if (abs(depths[i] - depths[i-1]) < epsilon) {
+      color = max(color, colors[i]);
+    } else {
+      color = colors[i] + (1 - colors[i].a) * color;
+    }
   }
   FragData0 = color;
   gl_FragDepth = depths[NUM_VOLUMES-1];
