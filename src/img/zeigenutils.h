@@ -333,13 +333,18 @@ public:
   template<class T>
   inline static size_t rank(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x, double thre = -1)
   {
-    if ((x.array().abs() > std::numeric_limits<T>::epsilon()).any()) {
-      Eigen::JacobiSVD<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>> svd(x);
-      if (thre > 0)
-        svd.setThreshold(thre);
-      return svd.rank();
-    }
-    return 0;
+    Eigen::JacobiSVD<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>> svd(x);
+    if (thre > 0)
+      svd.setThreshold(thre);
+    return svd.rank();
+  }
+
+  template<class T>
+  inline static bool allNearZero(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
+                                 T thre = std::numeric_limits<T>::epsilon())
+  {
+    CHECK(thre >= T(0));
+    return (x.array().abs() < std::numeric_limits<T>::epsilon()).all();
   }
 
   // replicate features based on weight

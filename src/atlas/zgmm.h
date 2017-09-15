@@ -244,7 +244,7 @@ public:
               VectorXrt colj = m_responsibilities.col(j).cwiseProduct(*m_pWeight);
               diffs = diffs.cwiseProduct(colj.cwiseSqrt().rowwise().replicate(m_dimension));
               MatrixXrt covar = (diffs.transpose() * diffs) / new_pr(j);
-              if (m_checkCovars && ZEigenUtils::rank(covar) < m_dimension) {
+              if (m_checkCovars && (ZEigenUtils::allNearZero(covar) || ZEigenUtils::rank(covar) < m_dimension)) {
                 // don't change covar
                 if (m_logLevel == IterAlgorithmLogLevel::Iter) {
                   LOG(INFO) << "GMM check covars is on, rank of covar low:\n" << covar;
@@ -309,7 +309,7 @@ public:
               VectorXrt colj = m_responsibilities.col(j);
               diffs = diffs.cwiseProduct(colj.cwiseSqrt().rowwise().replicate(m_dimension));
               MatrixXrt covar = (diffs.transpose() * diffs) / new_pr(j);
-              if (m_checkCovars && ZEigenUtils::rank(covar) < m_dimension) {
+              if (m_checkCovars && (ZEigenUtils::allNearZero(covar) || ZEigenUtils::rank(covar) < m_dimension)) {
                 // don't change covar
                 if (m_logLevel == IterAlgorithmLogLevel::Iter) {
                   LOG(INFO) << "GMM check covars is on, rank of covar low:\n" << covar;
@@ -665,7 +665,7 @@ protected:
           for (size_t i = 0; i < m_nclasses; ++i) {
             // get cov
             m_covars[i] = ZEigenUtils::featureCovariance(*(sepMats[i]), *(sepWeights[i]), true, true);
-            if (ZEigenUtils::rank(m_covars[i]) < m_dimension) {
+            if (ZEigenUtils::allNearZero(m_covars[i]) || ZEigenUtils::rank(m_covars[i]) < m_dimension) {
               m_covars[i] += MatrixXrt::Identity(m_dimension, m_dimension);
             }
           }
@@ -747,7 +747,7 @@ protected:
           for (size_t i = 0; i < m_nclasses; ++i) {
             // get cov
             m_covars[i] = ZEigenUtils::featureCovariance(*(sepMats[i]), true);
-            if (ZEigenUtils::rank(m_covars[i]) < m_dimension) {
+            if (ZEigenUtils::allNearZero(m_covars[i]) || ZEigenUtils::rank(m_covars[i]) < m_dimension) {
               m_covars[i] += MatrixXrt::Identity(m_dimension, m_dimension);
             }
           }

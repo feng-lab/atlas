@@ -1094,6 +1094,18 @@ void GMMFail()
   ZVBGMM<double, double> vbgmm(data, weight, 3, 10, m, 0.001,
                                ZTermCriteria<double>(200, 1e-5), IterAlgorithmLogLevel::Iter);
   vbgmm.runEM(false);
+
+
+  Eigen::MatrixXd mat(3, 3);
+  mat << 08.99617e-239, -1.79923e-238, 08.78989e-248,
+    -1.79923e-238, 03.59847e-238, -1.75798e-247,
+    08.78989e-248, -1.75798e-247, 08.78989e-248;
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd(mat);
+  LOG(INFO) << svd.rank();
+  LOG(INFO) << std::numeric_limits<double>::min();
+  LOG(INFO) << std::numeric_limits<double>::epsilon();
+  LOG(INFO) << svd.threshold();
+  LOG(INFO) << svd.singularValues();
 }
 
 }  // namespace nim
