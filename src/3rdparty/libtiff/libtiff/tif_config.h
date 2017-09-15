@@ -229,7 +229,7 @@
 #define TM_IN_SYS_TIME 1
 
 /* define to use win32 IO system */
-#define USE_WIN32_FILEIO 1
+//#define USE_WIN32_FILEIO 1
 
 /* Version number of package */
 #define VERSION "4.0.6"

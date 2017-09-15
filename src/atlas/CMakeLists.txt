@@ -142,6 +142,7 @@ set(LIBQXT_SOURCES
 source_group(libqxt FILES ${LIBQXT_HEADERS} ${LIBQXT_SOURCES})
 
 #qtcsv srcs
+add_definitions(-DQTCSV_STATIC_LIB)
 set(QTCSVDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/qtcsv)
 set(QTCSV_HEADERS
     ${QTCSVDIR}/include/qtcsv/qtcsv_global.h
