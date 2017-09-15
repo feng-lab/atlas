@@ -391,6 +391,28 @@ def build_zlib(src_dir: str, install_dir: str, ext_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
+def build_folly(src_dir: str, install_dir: str):
+    del src_dir
+    orig_file = os.path.join(install_dir, 'folly', 'ScopeGuard.h')
+    bak_file = get_bak_file_name(orig_file)
+    try:
+        os.rename(orig_file, bak_file)
+        with open(bak_file, mode='r', encoding='utf-8') as f:
+            from_lines = f.readlines()
+        with open(orig_file, mode='w', encoding='utf-8') as f:
+            to_lines = []
+            for line in from_lines:
+                line = line.replace(r'#include <folly/Portability.h>',
+                                    r'#include <folly/CPortability.h>')
+                line = line.replace(r'static void warnAboutToCrash() noexcept;',
+                                    r'inline static void warnAboutToCrash() noexcept {}')
+                f.write(line)
+                to_lines.append(line)
+        print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+    finally:
+        print('')
+
+
 def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
@@ -1268,7 +1290,8 @@ def build_libs(libs: dict, update_src: bool):
     if libs['folly']:
         src_dir = os.path.join(base_dir, 'folly')
         update_or_clone_git_repository(src_dir, 'git@github.com:facebook/folly.git')
-        export_git_repository(src_dir, os.path.join(ext_dir, 'folly'), tag='aebb140')
+        export_git_repository(src_dir, os.path.join(ext_dir, 'folly'))
+        build_folly(src_dir, os.path.join(ext_dir, 'folly'))
 
     if libs['scopeguard']:
         src_dir = os.path.join(base_dir, 'SC22WG21_Papers')
