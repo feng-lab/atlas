@@ -32,6 +32,9 @@ def deploy_atlas():
                             symlinks=True)
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), app_name],
                            cwd=binary_dir, shell=False, check=True)
+            subprocess.run([os.path.join(binary_dir, app_name, 'Contents', 'MacOS', 'Atlas'),
+                            '--run_unit_tests'])
+
             if os.path.exists(os.path.join(binary_dir, zip_name)):
                 os.remove(os.path.join(binary_dir, zip_name))
             subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, app_name],
@@ -53,6 +56,9 @@ def deploy_atlas():
             linuxdeployqt.linuxdeployqt(os.path.join(binary_dir, app_name),
                                         os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'),
                                         common_dirs.qt_base_dir())
+            subprocess.run([os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir', 'Atlas'),
+                            '--run_unit_tests'])
+
             if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
                 os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
             subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, 'Atlas.AppDir'],
@@ -88,6 +94,9 @@ def deploy_atlas():
             env = build_ext_libs.get_vcvars_environment()
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'windeployqt'), app_name],
                            cwd=os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), shell=False, check=True, env=env)
+            subprocess.run([os.path.join(common_dirs.deploy_target_dir(), 'Atlas', 'Atlas'),
+                            '--run_unit_tests'])
+
             shutil.make_archive(os.path.join(common_dirs.deploy_target_dir(), zip_base_name),
                                 'zip',
                                 os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
