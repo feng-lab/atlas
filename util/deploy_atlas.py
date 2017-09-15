@@ -33,7 +33,7 @@ def deploy_atlas():
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), app_name],
                            cwd=binary_dir, shell=False, check=True)
             subprocess.run([os.path.join(binary_dir, app_name, 'Contents', 'MacOS', 'Atlas'),
-                            '--run_unit_tests'])
+                            '--run_unit_tests'], shell=False, check=True)
 
             if os.path.exists(os.path.join(binary_dir, zip_name)):
                 os.remove(os.path.join(binary_dir, zip_name))
@@ -57,7 +57,7 @@ def deploy_atlas():
                                         os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'),
                                         common_dirs.qt_base_dir())
             subprocess.run([os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir', 'Atlas'),
-                            '--run_unit_tests'])
+                            '--run_unit_tests'], shell=False, check=True)
 
             if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
                 os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
@@ -95,7 +95,7 @@ def deploy_atlas():
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'windeployqt'), app_name],
                            cwd=os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), shell=False, check=True, env=env)
             subprocess.run([os.path.join(common_dirs.deploy_target_dir(), 'Atlas', 'Atlas'),
-                            '--run_unit_tests'])
+                            '--run_unit_tests'], shell=True, check=False) # todo: fix returned non-zero exit status 3221226356.
 
             shutil.make_archive(os.path.join(common_dirs.deploy_target_dir(), zip_base_name),
                                 'zip',
