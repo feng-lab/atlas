@@ -24,8 +24,6 @@
 #endif
 
 #include <QSurfaceFormat>
-#include <QStack>
-#include <QPointer>
 #include <QMessageBox>
 #include <QDir>
 #include <QFileInfo>

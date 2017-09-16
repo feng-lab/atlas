@@ -1293,13 +1293,6 @@ def build_libs(libs: dict, update_src: bool):
         export_git_repository(src_dir, os.path.join(ext_dir, 'folly'))
         build_folly(src_dir, os.path.join(ext_dir, 'folly'))
 
-    if libs['scopeguard']:
-        src_dir = os.path.join(base_dir, 'SC22WG21_Papers')
-        update_or_clone_git_repository(src_dir, 'git@github.com:PeterSommerlad/SC22WG21_Papers.git')
-        shutil.rmtree(os.path.join(ext_dir, 'scopeguard'), ignore_errors=True)
-        shutil.copytree(os.path.join(src_dir, 'workspace', 'P0052_scope_exit', 'src'),
-                        os.path.join(ext_dir, 'scopeguard'))
-
     if libs['glog']:
         src_dir = os.path.join(base_dir, 'glog')
         gflags_src_dir = os.path.join(base_dir, 'gflags')
@@ -1464,7 +1457,6 @@ def parse_inputs(argv: list):
             'glm': False,
             'googletest': False,
             'folly': False,
-            'scopeguard': False,
             'glog': False,
             'benchmark': False,
             'glbinding': False,
