@@ -245,9 +245,8 @@ void Z2DTransformParameter::beforeChange(glm::dmat3& value)
   updateWidget(value);
 }
 
-void Z2DTransformParameter::updateWidget(const glm::dmat3& value)
+void Z2DTransformParameter::updateWidget(const glm::dmat3& /*value*/)
 {
-  Q_UNUSED(value)
   m_receiveWidgetSignal = false;
   //  m_eye.set(value.getEye());
   //  m_center.set(value.getCenter());

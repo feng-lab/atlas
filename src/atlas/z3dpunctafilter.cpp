@@ -90,9 +90,8 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   adjustWidgets();
 }
 
-void Z3DPunctaFilter::process(Z3DEye eye)
+void Z3DPunctaFilter::process(Z3DEye /*eye*/)
 {
-  Q_UNUSED(eye)
   if (m_dataIsInvalid) {
     prepareData();
   }
@@ -437,9 +436,8 @@ void Z3DPunctaFilter::adjustWidgets()
   //  m_textureGlowRenderer.blurStrengthPara().setVisible(m_randomGlow.get());
 }
 
-void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*unused*/, int h)
+void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
 {
-  Q_UNUSED(h)
   if (m_punctaList.empty())
     return;
 

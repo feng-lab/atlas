@@ -64,9 +64,8 @@ ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel&
   adaptColumns();
 }
 
-void ZRegionAnnotationTreeView::contextMenu(const QPoint& pos)
+void ZRegionAnnotationTreeView::contextMenu(const QPoint& /*pos*/)
 {
-  Q_UNUSED(pos)
 //  if (m_doc->numSelectedObjs() > 0) {
 //    m_contextMenu->popup(mapToGlobal(pos));
 //  }
@@ -133,9 +132,8 @@ void ZRegionAnnotationTreeView::buttonClickedForUserData(const QVariant& ud)
   }
 }
 
-void ZRegionAnnotationTreeView::keyPressEvent(QKeyEvent* e)
+void ZRegionAnnotationTreeView::keyPressEvent(QKeyEvent* /*e*/)
 {
-  Q_UNUSED(e)
 }
 
 void ZRegionAnnotationTreeView::createContextMenu()

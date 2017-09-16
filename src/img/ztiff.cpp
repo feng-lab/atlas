@@ -309,12 +309,11 @@ const struct exiftagname
 #define snprintf _snprintf
 #endif
 
-void LibtiffErrorHandler(const char* module, const char* fmt, va_list ap)
+void LibtiffErrorHandler(const char* /*module*/, const char* fmt, va_list ap)
 {
   char buf[2048];
 
   int off = 0;
-  Q_UNUSED(module)
   //if (module)
   //off = snprintf(buf, 2048, "libtiff %s: ", module);
   //else
@@ -323,12 +322,11 @@ void LibtiffErrorHandler(const char* module, const char* fmt, va_list ap)
   throw nim::ZIOException(QString(buf));
 }
 
-void LibtiffErrorHandlerIgnoreColormapError(const char* module, const char* fmt, va_list ap)
+void LibtiffErrorHandlerIgnoreColormapError(const char* /*module*/, const char* fmt, va_list ap)
 {
   char buf[2048];
 
   int off = 0;
-  Q_UNUSED(module)
   //if (module)
   //off = snprintf(buf, 2048, "libtiff %s: ", module);
   //else

@@ -97,11 +97,10 @@ static void qt_graphicsItem_highlightSelected(
   painter->drawRect(item->boundingRect().adjusted(pad, pad, -pad, -pad));
 }
 
-void ZPunctaGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
+void ZPunctaGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* /*widget*/)
 {
   if (m_t != 0)
     return;
-  Q_UNUSED(widget)
   m_outlineColor.setAlpha(m_opacity * 255);
   painter->setPen(QPen(m_outlineColor, 1));
   if (m_mip) {

@@ -80,9 +80,8 @@ static void qt_graphicsItem_highlightSelected(
   painter->drawRect(item->boundingRect().adjusted(pad, pad, -pad, -pad));
 }
 
-void ZGraphicsItemGroup::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
+void ZGraphicsItemGroup::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* /*widget*/)
 {
-  Q_UNUSED(widget);
   if (option->state & QStyle::State_Selected)
     qt_graphicsItem_highlightSelected(this, painter, option);
 }

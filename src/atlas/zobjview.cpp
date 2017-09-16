@@ -11,16 +11,13 @@ ZObjView::ZObjView(ZView& view)
 {
 }
 
-QString ZObjView::infoOfPos(double x, double y)
+QString ZObjView::infoOfPos(double /*x*/, double /*y*/)
 {
-  Q_UNUSED(x)
-  Q_UNUSED(y)
   return QString();
 }
 
-std::shared_ptr<ZWidgetsGroup> ZObjView::viewSettingWidgetsGroupOf(size_t id)
+std::shared_ptr<ZWidgetsGroup> ZObjView::viewSettingWidgetsGroupOf(size_t /*id*/)
 {
-  Q_UNUSED(id)
   return std::shared_ptr<ZWidgetsGroup>();
 }
 

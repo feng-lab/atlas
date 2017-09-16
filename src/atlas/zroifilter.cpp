@@ -278,9 +278,8 @@ void ZROIFilter::setSelected(bool v)
   }
 }
 
-void ZROIFilter::setNormalView(int z, int t)
+void ZROIFilter::setNormalView(int z, int /*t*/)
 {
-  Q_UNUSED(t)
   if (!m_visible.get())
     return;
   int rz = realZ(z);
@@ -296,9 +295,8 @@ void ZROIFilter::setNormalView(int z, int t)
   }
 }
 
-void ZROIFilter::setMaxZProjView(int t)
+void ZROIFilter::setMaxZProjView(int /*t*/)
 {
-  Q_UNUSED(t)
   if (!m_visible.get())
     return;
   for (const auto& sliceItem : m_sliceToROIItem) {

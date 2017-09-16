@@ -219,20 +219,14 @@ void ZImgFreeImage::readInfo(const QString& filename, std::vector<ZImgInfo>& inf
   createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 }
 
-void ZImgFreeImage::readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene)
+void ZImgFreeImage::readMetadata(const QString& /*filename*/, ZImgMetadata& /*meta*/, size_t /*scene*/)
 {
-  Q_UNUSED(filename)
-  Q_UNUSED(meta)
-  Q_UNUSED(scene)
 }
 
-void ZImgFreeImage::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, const ZImgRegion& region,
-                                  size_t scene)
+void ZImgFreeImage::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thumbnail*/,
+                                  const ZImgRegion& /*region*/,
+                                  size_t /*scene*/)
 {
-  Q_UNUSED(filename)
-  Q_UNUSED(thumbnail)
-  Q_UNUSED(region)
-  Q_UNUSED(scene)
 }
 
 void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)

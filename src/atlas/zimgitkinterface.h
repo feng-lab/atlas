@@ -121,9 +121,9 @@ void letITKImgUseMemory(itk::Image<TVoxel, 3>* itkImg, TVoxel* data, size_t widt
 }
 
 template<typename TVoxel>
-void letITKImgUseMemory(itk::Image<TVoxel, 2>* itkImg, TVoxel* data, size_t width, size_t height, size_t dummyDepth = 1)
+void letITKImgUseMemory(itk::Image<TVoxel, 2>* itkImg, TVoxel* data, size_t width, size_t height,
+                        size_t /*dummyDepth*/)
 {
-  Q_UNUSED(dummyDepth)
   using TITKImg = itk::Image<TVoxel, 2>;
   typename TITKImg::SizeType size;
   size[0] = width;

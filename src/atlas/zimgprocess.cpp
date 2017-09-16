@@ -3,6 +3,7 @@
 #include "zlog.h"
 #include <QThread>
 #include <folly/ScopeGuard.h>
+#include <boost/core/ignore_unused.hpp>
 
 namespace nim {
 
@@ -14,7 +15,7 @@ void ZImgProcess::run()
   folly::ScopeGuard guard1 = folly::makeGuard([&fileDestination]() {
     if (fileDestination) { removeLogSink(fileDestination); }
   });
-  Q_UNUSED(guard1)
+  boost::ignore_unused(guard1);
 
   try {
     LOG(INFO) << "run " << QThread::currentThreadId();

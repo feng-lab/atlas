@@ -370,9 +370,8 @@ void Z3DMeshFilter::adjustWidgets()
   m_textureGlowRenderer.blurStrengthPara().setVisible(m_glow.get());
 }
 
-void Z3DMeshFilter::selectMesh(QMouseEvent* e, int, int h)
+void Z3DMeshFilter::selectMesh(QMouseEvent* e, int /*w*/, int /*h*/)
 {
-  Q_UNUSED(h)
   if (m_meshList.empty())
     return;
 

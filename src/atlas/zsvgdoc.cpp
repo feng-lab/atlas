@@ -17,15 +17,13 @@ ZSvgDoc::ZSvgDoc(ZDoc& doc)
   createActions();
 }
 
-bool ZSvgDoc::save(size_t id)
+bool ZSvgDoc::save(size_t /*id*/)
 {
-  Q_UNUSED(id)
   return false;
 }
 
-bool ZSvgDoc::saveAs(size_t id)
+bool ZSvgDoc::saveAs(size_t /*id*/)
 {
-  Q_UNUSED(id)
   return false;
 }
 

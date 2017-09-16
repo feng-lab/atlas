@@ -7,6 +7,7 @@
 #include <jpeglib.h>
 #include <QFile>
 #include <folly/ScopeGuard.h>
+#include <boost/core/ignore_unused.hpp>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
 
@@ -361,7 +362,7 @@ void ZImgJpeg::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
     /* This is an important step since it will release a good deal of memory. */
     jpeg_destroy_decompress(&cinfo);
   });
-  Q_UNUSED(guard1)
+  boost::ignore_unused(guard1);
 
   startReading(infile.get(), cinfo);
 
@@ -387,7 +388,7 @@ void ZImgJpeg::readMetadata(const QString& filename, ZImgMetadata& meta, size_t 
     /* This is an important step since it will release a good deal of memory. */
     jpeg_destroy_decompress(&cinfo);
   });
-  Q_UNUSED(guard1)
+  boost::ignore_unused(guard1);
 
   startReading(infile.get(), cinfo);
 
@@ -431,7 +432,7 @@ ZImgJpeg::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, con
     /* This is an important step since it will release a good deal of memory. */
     jpeg_destroy_decompress(&cinfo);
   });
-  Q_UNUSED(guard1)
+  boost::ignore_unused(guard1);
 
   startReading(infile.get(), cinfo);
 
@@ -464,7 +465,7 @@ ZImgJpeg::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, con
                 /* This is an important step since it will release a good deal of memory. */
                 jpeg_destroy_decompress(&thumbCinfo);
               });
-              Q_UNUSED(guard2)
+              boost::ignore_unused(guard2);
 
               // don't slice thumbnail in x, y, c
               ZImgRegion thumbRegion = region;
@@ -511,7 +512,7 @@ void ZImgJpeg::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
     /* This is an important step since it will release a good deal of memory. */
     jpeg_destroy_decompress(&cinfo);
   });
-  Q_UNUSED(guard1)
+  boost::ignore_unused(guard1);
 
   startReading(infile.get(), cinfo);
 
@@ -546,7 +547,7 @@ void ZImgJpeg::readInfo(uint8_t* mem, size_t size, ZImgInfo& info)
     /* This is an important step since it will release a good deal of memory. */
     jpeg_destroy_decompress(&cinfo);
   });
-  Q_UNUSED(guard1)
+  boost::ignore_unused(guard1);
 
   startReading(mem, size, cinfo);
 
@@ -564,7 +565,7 @@ void ZImgJpeg::readImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
     /* This is an important step since it will release a good deal of memory. */
     jpeg_destroy_decompress(&cinfo);
   });
-  Q_UNUSED(guard1)
+  boost::ignore_unused(guard1);
 
   startReading(mem, size, cinfo);
 

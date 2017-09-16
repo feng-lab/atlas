@@ -5,6 +5,7 @@
 #include "zbenchtimer.h"
 #include <png.h>
 #include <folly/ScopeGuard.h>
+#include <boost/core/ignore_unused.hpp>
 #include <boost/align/aligned_allocator.hpp>
 
 namespace {
@@ -233,7 +234,7 @@ void ZImgPng::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
   folly::ScopeGuard guard1 = folly::makeGuard([&png]() {
     png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
   });
-  Q_UNUSED(guard1)
+  boost::ignore_unused(guard1);
 
   png_init_io(png.pngPtr, infile.get());
   png_set_crc_action(png.pngPtr, PNG_CRC_DEFAULT, PNG_CRC_DEFAULT);
@@ -283,7 +284,7 @@ void ZImgPng::readMetadata(const QString& filename, ZImgMetadata& meta, size_t s
   folly::ScopeGuard guard1 = folly::makeGuard([&png]() {
     png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
   });
-  Q_UNUSED(guard1)
+  boost::ignore_unused(guard1);
 
   png_init_io(png.pngPtr, infile.get());
   png_set_crc_action(png.pngPtr, PNG_CRC_DEFAULT, PNG_CRC_DEFAULT);
@@ -329,7 +330,7 @@ void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& regi
   folly::ScopeGuard guard1 = folly::makeGuard([&png]() {
     png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
   });
-  Q_UNUSED(guard1)
+  boost::ignore_unused(guard1);
 
   png_init_io(png.pngPtr, infile.get());
   png_set_crc_action(png.pngPtr, PNG_CRC_DEFAULT, PNG_CRC_DEFAULT);

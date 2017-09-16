@@ -56,9 +56,8 @@ public:
   }
 
 protected:
-  bool filterAcceptsRow(int source_row, const QModelIndex& source_parent) const override
+  bool filterAcceptsRow(int source_row, const QModelIndex& /*source_parent*/) const override
   {
-    Q_UNUSED(source_parent);
     if (!mLastVisibleRow) {
       ZLogModelSink* model = dynamic_cast<ZLogModelSink*>(sourceModel());
       const LogData& d = model->at(source_row);
@@ -182,11 +181,8 @@ void ZLogDialog::OnAutoScrollChanged(bool checked)
   mHasAutoScroll = checked;
 }
 
-void ZLogDialog::ModelRowsInserted(const QModelIndex& parent, int start, int last)
+void ZLogDialog::ModelRowsInserted(const QModelIndex& /*parent*/, int /*start*/, int /*last*/)
 {
-  Q_UNUSED(parent);
-  Q_UNUSED(start);
-  Q_UNUSED(last);
   if (mHasAutoScroll) {
     mUi->tableViewMessages->scrollToBottom();
   }

@@ -211,11 +211,8 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
   }
 }
 
-void ZImgITKImage::writeImg(const QString& filename, const ZImg& img, Compression comp)
+void ZImgITKImage::writeImg(const QString& /*filename*/, const ZImg& /*img*/, Compression /*comp*/)
 {
-  Q_UNUSED(filename)
-  Q_UNUSED(img)
-  Q_UNUSED(comp)
 //  CHECK(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
 //  if (img.numTimes() != 1) {
 //    throw ZIOException("time sequence image is not supported");
@@ -314,11 +311,10 @@ void ZImgITKImage::writeImg(const QString& filename, const ZImg& img, Compressio
 //  }
 }
 
-void ZImgITKImage::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp)
+void ZImgITKImage::writeImg(const QString& /*filename*/,
+                            const ZImgSliceProvider& /*imgSliceProvider*/,
+                            Compression /*comp*/)
 {
-  Q_UNUSED(filename)
-  Q_UNUSED(imgSliceProvider)
-  Q_UNUSED(comp)
 //  CHECK(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
 //  if (imgSliceProvider.imgInfo().numTimes != 1) {
 //    throw ZIOException("time sequence image is not supported");

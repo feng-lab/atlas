@@ -662,9 +662,8 @@ void Z3DSwcFilter::notTransformedTreeNodeBound(const SwcTreeNode& tn, ZBBox<glm:
                       + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale()));
 }
 
-glm::vec4 Z3DSwcFilter::colorByDirection(const SwcTreeNode& n)
+glm::vec4 Z3DSwcFilter::colorByDirection(const SwcTreeNode& /*n*/)
 {
-  Q_UNUSED(n)
   return glm::vec4(0);
 }
 
@@ -773,10 +772,8 @@ void Z3DSwcFilter::adjustWidgets()
   m_colorMapBranchType.setVisible(m_colorMode.isSelected("Colormap Branch Type"));
 }
 
-void Z3DSwcFilter::selectSwc(QMouseEvent* e, int w, int h)
+void Z3DSwcFilter::selectSwc(QMouseEvent* e, int /*w*/, int /*h*/)
 {
-  Q_UNUSED(w)
-  Q_UNUSED(h)
   if (!m_swcTree)
     return;
 

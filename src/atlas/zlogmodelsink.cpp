@@ -48,15 +48,13 @@ LogData ZLogModelSink::at(size_t index)
   return m_logDatas[index];
 }
 
-int ZLogModelSink::columnCount(const QModelIndex& parent) const
+int ZLogModelSink::columnCount(const QModelIndex& /*parent*/) const
 {
-  Q_UNUSED(parent);
   return 3;
 }
 
-int ZLogModelSink::rowCount(const QModelIndex& parent) const
+int ZLogModelSink::rowCount(const QModelIndex& /*parent*/) const
 {
-  Q_UNUSED(parent);
   QReadLocker lock(&m_messagesLock);
 
   return m_logDatas.size();

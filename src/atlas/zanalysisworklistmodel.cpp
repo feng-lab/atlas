@@ -338,10 +338,8 @@ Qt::DropActions ZAnalysisWorklistModel::supportedDropActions() const
 }
 
 bool ZAnalysisWorklistModel::dropMimeData(const QMimeData* data, Qt::DropAction action,
-                                          int row, int column, const QModelIndex& parent)
+                                          int /*row*/, int /*column*/, const QModelIndex& parent)
 {
-  Q_UNUSED(row)
-  Q_UNUSED(column)
   //LOG(INFO) << row << " " << column << " " << action << " " << parent.row() << " " << parent.column();
 
   if (action == Qt::IgnoreAction)

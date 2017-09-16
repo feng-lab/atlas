@@ -335,9 +335,8 @@ void Z3DTransformParameter::beforeChange(glm::mat4& value)
   updateWidget(value);
 }
 
-void Z3DTransformParameter::updateWidget(const glm::mat4& value)
+void Z3DTransformParameter::updateWidget(const glm::mat4& /*value*/)
 {
-  Q_UNUSED(value)
   m_receiveWidgetSignal = false;
   //  m_eye.set(value.getEye());
   //  m_center.set(value.getCenter());

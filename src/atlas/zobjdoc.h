@@ -84,8 +84,8 @@ public:
 
   virtual QString objDetailedInfo(size_t id) const
   {
-    static QString str;
     Q_UNUSED(id)
+    static QString str;
     return str;
   }
 

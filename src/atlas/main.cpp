@@ -30,6 +30,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <folly/ScopeGuard.h>
+#include <boost/core/ignore_unused.hpp>
 #include <gflags/gflags.h>
 #include <iostream>
 
@@ -97,7 +98,7 @@ int main(int argc, char* argv[])
       LOG(INFO) << "--- App Log End ---";
       nim::shutdownLogging();
     });
-    Q_UNUSED(guardlogging)
+    boost::ignore_unused(guardlogging);
 
     std::string usage("Atlas is a brain map platform.  Usage:\n");
     usage += std::string(argv[0]) + "";
@@ -140,7 +141,7 @@ int main(int argc, char* argv[])
     folly::ScopeGuard guardfftw = folly::makeGuard([]() {
       fftw_cleanup_threads();
     });
-    Q_UNUSED(guardfftw)
+    boost::ignore_unused(guardfftw);
 
     fftw_plan_with_nthreads(nim::ZCpuInfo::instance().nPhysicalCores);
 

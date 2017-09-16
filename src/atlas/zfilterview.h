@@ -119,7 +119,7 @@ public:
     }
   }
 
-  void selectionChanged(const QList<QGraphicsItem*>& items) override
+  void selectionChanged(const QList<QGraphicsItem*>&) override
   {
 
   }

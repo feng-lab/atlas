@@ -10,9 +10,8 @@ Z3DObjView::Z3DObjView(Z3DView& view)
 {
 }
 
-std::shared_ptr<ZWidgetsGroup> Z3DObjView::viewSettingWidgetsGroupOf(size_t id)
+std::shared_ptr<ZWidgetsGroup> Z3DObjView::viewSettingWidgetsGroupOf(size_t /*id*/)
 {
-  Q_UNUSED(id)
   return std::shared_ptr<ZWidgetsGroup>();
 }
 
