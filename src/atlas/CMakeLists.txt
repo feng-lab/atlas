@@ -693,7 +693,7 @@ target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
 target_compile_definitions(${APP_NAME} PUBLIC EIGEN_NO_DEBUG EIGEN_DONT_PARALLELIZE EIGEN_MPL2_ONLY)
 target_compile_definitions(${APP_NAME} PUBLIC EIGEN_USE_BLAS EIGEN_USE_LAPACKE_STRICT) # EIGEN_USE_MKL_VML)
 target_compile_definitions(${APP_NAME} PUBLIC QT_USE_QSTRINGBUILDER QT_NO_CAST_FROM_BYTEARRAY QT_NO_CAST_TO_ASCII)
-target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_MKL ATLAS_USE_IPP) # ATLAS_USE_CORE_PROFILE)
+target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_MKL ATLAS_USE_IPP ATLAS_USE_CORE_PROFILE)
 target_compile_definitions(${APP_NAME} PUBLIC lapack_complex_float=std::complex<float> lapack_complex_double=std::complex<double>)
 if (WIN32)
   target_compile_definitions(${APP_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)

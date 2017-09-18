@@ -36,9 +36,11 @@ QString ZImgView::infoOfPos(double x, double y)
         } else {
           info += QString(" Coord: (%1,%2,%3,%4)").arg(lx).arg(ly).arg(lz).arg(lt);
         }
-        info += QString(" Intensity: (%1").arg(imgPack.displayValue(lx, ly, lz, 0, lt, m_view.isMaxZProjView()));
+        info += QString(" Intensity: (%1").arg(imgPack.displayValue(lx, ly, lz, 0, lt, m_view.isMaxZProjView()), 0, 'g',
+                                               QLocale::FloatingPointShortest);
         for (size_t c = 1; c < imgPack.imgInfo().numChannels; ++c)
-          info += QString(",%1").arg(imgPack.displayValue(lx, ly, lz, c, lt, m_view.isMaxZProjView()));
+          info += QString(",%1").arg(imgPack.displayValue(lx, ly, lz, c, lt, m_view.isMaxZProjView()), 0, 'g',
+                                     QLocale::FloatingPointShortest);
         info += ")      ";
       }
     }

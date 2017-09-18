@@ -125,9 +125,7 @@ void main()
             // save used blockid
             if (usedBlockIDsIndex < 12) {
               uint blockID = pos_to_block_ids[curLevel].w + uint(pageTableCoord.x) + pos_to_block_ids[curLevel].y * uint(pageTableCoord.y) + pos_to_block_ids[curLevel].z * uint(pageTableCoord.z);
-              //if (usedBlockIDsIndex == 0 || blockID != usedBlockIDs[usedBlockIDsIndex-1]) {
-                usedBlockIDs[usedBlockIDsIndex++] = blockID;
-              //}
+              usedBlockIDs[usedBlockIDsIndex++] = blockID;
             }
 
             // goto next block

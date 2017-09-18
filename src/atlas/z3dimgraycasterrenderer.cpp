@@ -3,11 +3,13 @@
 #include "z3dtexture.h"
 #include "z3dvolume.h"
 #include "z3dimg.h"
+#include "zimgformat.h"
 #include "zbenchtimer.h"
 #include "zlog.h"
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
 #include <QApplication>
+#include <QFileInfo>
 
 namespace nim {
 
@@ -536,6 +538,17 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         m_blockIDs.resize(missingBlockIDsTexture->numPixels() * 4);
       }
       missingBlockIDsTexture->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+
+#if 0
+      if (!QFileInfo("/Users/feng/Downloads/test_missid.tif").exists()) {
+        ZImg img;
+        img.wrapData(m_blockIDs.data(), missingBlockIDsTexture->width(), missingBlockIDsTexture->height(), 1, 4);
+        ZImg outImg = img;
+        ZImgFormat::CXYZtoXYZC(img, outImg);
+        outImg.flip(nim::Dimension::Y);
+        outImg.save("/Users/feng/Downloads/test_missid.tif");
+      }
+#endif
 
 #if 0
       missingBlockIDs.insert(m_blockIDs.begin(), m_blockIDs.end());
