@@ -29,8 +29,8 @@ layout(location = 1) out uvec4 FragData1;
 out uvec4 FragData0;  // call glBindFragDataLocation before linking
 out uvec4 FragData1;  // call glBindFragDataLocation before linking
 #else
-#define FragData0 gl_FragData[0]
-#define FragData1 gl_FragData[1]
+varying out uvec4 FragData0;  // call glBindFragDataLocationForce before linking
+varying out uvec4 FragData1;  // call glBindFragDataLocationForce before linking
 #endif
 
 #define UNMAPPED 0

@@ -136,6 +136,13 @@ void Z3DShaderProgram::bindFragDataLocation(GLuint colorNumber, const QString& n
   }
 }
 
+void Z3DShaderProgram::bindFragDataLocationForce(GLuint colorNumber, const QString& name)
+{
+  if (!GLVersionGE(3, 3)) {
+    glBindFragDataLocation(programId(), colorNumber, qUtf8Printable(name));
+  }
+}
+
 void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* texture)
 {
   if (!texture)

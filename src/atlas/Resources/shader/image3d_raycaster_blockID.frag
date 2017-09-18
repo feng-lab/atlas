@@ -34,11 +34,11 @@ out uvec4 FragData2;  // call glBindFragDataLocation before linking
 out uvec4 FragData3;  // call glBindFragDataLocation before linking
 out uvec4 FragData4;  // call glBindFragDataLocation before linking
 #else
-#define FragData0 gl_FragData[0]
-#define FragData1 gl_FragData[1]
-#define FragData2 gl_FragData[2]
-#define FragData3 gl_FragData[3]
-#define FragData4 gl_FragData[4]
+varying out uvec4 FragData0;  // call glBindFragDataLocationForce before linking
+varying out uvec4 FragData1;  // call glBindFragDataLocationForce before linking
+varying out uvec4 FragData2;  // call glBindFragDataLocationForce before linking
+varying out uvec4 FragData3;  // call glBindFragDataLocationForce before linking
+varying out uvec4 FragData4;  // call glBindFragDataLocationForce before linking
 #endif
 
 #define UNMAPPED 0

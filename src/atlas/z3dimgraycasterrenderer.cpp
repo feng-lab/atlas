@@ -64,8 +64,8 @@ Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase& rendererBase)
                                                           "volume_slice_with_transfun_single_channel.frag",
                                                           m_rendererBase.generateHeader() + generateHeader());
 
-  m_image3DSliceWithTransferfunBlockIDsShader.bindFragDataLocation(0, "FragData0");
-  m_image3DSliceWithTransferfunBlockIDsShader.bindFragDataLocation(1, "FragData1");
+  m_image3DSliceWithTransferfunBlockIDsShader.bindFragDataLocationForce(0, "FragData0");
+  m_image3DSliceWithTransferfunBlockIDsShader.bindFragDataLocationForce(1, "FragData1");
   m_image3DSliceWithTransferfunBlockIDsShader.loadFromSourceFile("transform_with_3dtexture_and_eye_coordinate.vert",
                                                                  "image3d_slice_with_transfun_blockID.frag",
                                                                  m_rendererBase.generateHeader() + generateHeader());
@@ -74,11 +74,11 @@ Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase& rendererBase)
                                                          "image3d_slice_with_transfun.frag",
                                                          m_rendererBase.generateHeader() + generateHeader());
 
-  m_image3DRaycasterBlockIDsShader.bindFragDataLocation(0, "FragData0");
-  m_image3DRaycasterBlockIDsShader.bindFragDataLocation(1, "FragData1");
-  m_image3DRaycasterBlockIDsShader.bindFragDataLocation(2, "FragData2");
-  m_image3DRaycasterBlockIDsShader.bindFragDataLocation(3, "FragData3");
-  m_image3DRaycasterBlockIDsShader.bindFragDataLocation(4, "FragData4");
+  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(0, "FragData0");
+  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(1, "FragData1");
+  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(2, "FragData2");
+  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(3, "FragData3");
+  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(4, "FragData4");
   m_image3DRaycasterBlockIDsShader.loadFromSourceFile("pass.vert", "image3d_raycaster_blockID.frag",
                                                       m_rendererBase.generateHeader() + generateHeader());
   m_image3DRaycasterShader.bindFragDataLocation(0, "FragData0");

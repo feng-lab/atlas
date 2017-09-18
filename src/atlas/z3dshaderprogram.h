@@ -54,6 +54,8 @@ public:
 
   void bindFragDataLocation(GLuint colorNumber, const QString& name);
 
+  void bindFragDataLocationForce(GLuint colorNumber, const QString& name);
+
   // bind samplers
   void bindTexture(const QString& name, const Z3DTexture* texture);
 
