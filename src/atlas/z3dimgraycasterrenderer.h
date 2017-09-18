@@ -140,7 +140,7 @@ private:
   double m_alpha; //only takes effect when m_opaque is true
   ZVertexArrayObject m_VAO;
 
-  std::vector<uint32_t, boost::alignment::aligned_allocator<uint32_t, 32>> m_blockIDs;
+  std::vector<uint32_t> m_blockIDs;
   bool m_fastRendering = false;
 };
 
