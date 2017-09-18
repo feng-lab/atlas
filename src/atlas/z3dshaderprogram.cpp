@@ -108,9 +108,30 @@ void Z3DShaderProgram::release()
   glUseProgram(0);
 }
 
+void Z3DShaderProgram::setGeometryInputType(GLenum t)
+{
+  if (!GLVersionGE(3, 2)) {
+    glProgramParameteri(m_id, GL_GEOMETRY_INPUT_TYPE_EXT, static_cast<int>(t));
+  }
+}
+
+void Z3DShaderProgram::setGeometryOutputType(GLenum t)
+{
+  if (!GLVersionGE(3, 2)) {
+    glProgramParameteri(m_id, GL_GEOMETRY_OUTPUT_TYPE_EXT, static_cast<int>(t));
+  }
+}
+
+void Z3DShaderProgram::setGeometryOutputVertexCount(int value)
+{
+  if (!GLVersionGE(3, 2)) {
+    glProgramParameteri(m_id, GL_GEOMETRY_VERTICES_OUT_EXT, value);
+  }
+}
+
 void Z3DShaderProgram::bindFragDataLocation(GLuint colorNumber, const QString& name)
 {
-  if (GLVersionGE(3, 0)) {
+  if (GLVersionGE(3, 0) && !GLVersionGE(3, 3)) {
     glBindFragDataLocation(programId(), colorNumber, qUtf8Printable(name));
   }
 }

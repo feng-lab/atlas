@@ -304,6 +304,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
   }
   catch (const ZException& e) {
     m_3dImg.reset();
+    LOG(ERROR) << e.what();
     QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                           QString("import 3d img error: %1").arg(e.what()));
   }

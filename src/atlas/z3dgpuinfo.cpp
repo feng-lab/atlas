@@ -185,6 +185,16 @@ bool Z3DGpuInfo::isVAOSupported() const
          isExtensionSupported("GL_APPLE_vertex_array_object");
 }
 
+bool Z3DGpuInfo::isGPUShader4Supported() const
+{
+  return GLVersionGE(3, 0) || isExtensionSupported("GL_EXT_gpu_shader4");
+}
+
+bool Z3DGpuInfo::isGeometryShader4Supported() const
+{
+  return GLVersionGE(3, 2) || isExtensionSupported("GL_EXT_geometry_shader4");
+}
+
 QStringList Z3DGpuInfo::gpuInfo() const
 {
   QStringList info;
@@ -321,6 +331,16 @@ void Z3DGpuInfo::detectGpuInfo()
     if (!isFrameBufferObjectSupported()) {
       m_isSupported = false;
       m_notSupportedReason = "Frame Buffer Object (FBO) is not supported by current openGL context.";
+      return;
+    }
+    if (!isGPUShader4Supported()) {
+      m_isSupported = false;
+      m_notSupportedReason = "GPU Shader 4 is not supported by current openGL context.";
+      return;
+    }
+    if (!isGeometryShader4Supported()) {
+      m_isSupported = false;
+      m_notSupportedReason = "Geometry Shader 4 is not supported by current openGL context.";
       return;
     }
     if (!isNonPowerOfTwoTextureSupported()) { // not necessary, NPOT texture is supported since opengl 2.0

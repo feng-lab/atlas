@@ -26,7 +26,7 @@ protected:
 
   QString generateHeader();
 
-#ifndef ATLAS_USE_CORE_PROFILE
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   void renderUsingOpengl() override;
   void renderPickingUsingOpengl() override;
 #endif

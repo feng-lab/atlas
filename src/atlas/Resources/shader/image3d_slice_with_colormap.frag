@@ -1,3 +1,7 @@
+#if GLSL_VERSION < 130
+#extension GL_EXT_gpu_shader4 : enable
+#endif
+
 #if GLSL_VERSION >= 130
 in vec3 texCoord0;
 in vec4 eyeCoord;
@@ -42,13 +46,26 @@ void main()
 
   vec4 color = vec4(0.0);
   vec3 voxelAddress;
+#if GLSL_VERSION >= 130
   vec3 fFracVoxelCoord = modf(texCoord0 * image_dimensions[curLevel], voxelAddress);
   ivec3 voxelCoord = ivec3(voxelAddress);
+#else
+  ivec3 voxelCoord = ivec3(texCoord0 * image_dimensions[curLevel]);
+  vec3 fFracVoxelCoord = texCoord0 * image_dimensions[curLevel] - vec3(voxelCoord);
+#endif
   ivec3 pageTableCoord = voxelCoord / image_block_size;
+#if GLSL_VERSION >= 130
   ivec4 pageDirEntry = texelFetch(page_directory, page_directory_bases[curLevel] + pageTableCoord / page_table_block_size, 0);
+#else
+  ivec4 pageDirEntry = texelFetch3D(page_directory, page_directory_bases[curLevel] + pageTableCoord / page_table_block_size, 0);
+#endif
   int pagingFlag = pageDirEntry.w;
   if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
+#if GLSL_VERSION >= 130
     ivec4 pageTableEntry = texelFetch(page_table_cache, pageDirEntry.xyz + pageTableCoord % page_table_block_size, 0);
+#else
+    ivec4 pageTableEntry = texelFetch3D(page_table_cache, pageDirEntry.xyz + pageTableCoord % page_table_block_size, 0);
+#endif
     pagingFlag = pageTableEntry.w;
     if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
       voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size + fFracVoxelCoord + 1.0;

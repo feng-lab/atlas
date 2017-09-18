@@ -1,3 +1,7 @@
+#if GLSL_VERSION < 130
+#extension GL_EXT_geometry_shader4 : enable
+#endif
+
 #if GLSL_VERSION >= 150
 layout(lines) in;
 layout(triangle_strip, max_vertices = 4) out;

@@ -147,6 +147,10 @@ public:
 
   bool isVAOSupported() const;
 
+  bool isGPUShader4Supported() const;
+
+  bool isGeometryShader4Supported() const;
+
   float maxTextureAnisotropy() const
   { return m_maxTextureAnisotropy; }
 

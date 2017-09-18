@@ -1,3 +1,7 @@
+#if GLSL_VERSION < 130
+#extension GL_EXT_gpu_shader4 : enable
+#endif
+
 uniform isampler3D page_directory;
 uniform ivec3 page_directory_bases[LEVEL_COUNT];
 uniform isampler3D page_table_cache;
@@ -8,9 +12,6 @@ uniform float voxel_world_sizes[LEVEL_COUNT];
 uniform ivec3 image_block_size;
 uniform vec3 image_address_to_normalized_texture_coord;
 
-#if GLSL_VERSION < 130
-uniform vec2 screen_dim_RCP;
-#endif
 uniform float sampling_rate;
 #ifdef ISO
 uniform float iso_value;
@@ -81,13 +82,22 @@ void sampleBlock(in ivec3 pageTableEntry, in int curLevel, in ivec3 pageTableCoo
 {
   bool blockFinished = false;
   vec3 voxelAddress;
+#if GLSL_VERSION >= 130
   vec3 fFracVoxelCoord = modf(samplePos * image_dimensions[curLevel], voxelAddress);
   ivec3 voxelCoord = ivec3(voxelAddress);
+#else
+  ivec3 voxelCoord = ivec3(samplePos * image_dimensions[curLevel]);
+  vec3 fFracVoxelCoord = samplePos * image_dimensions[curLevel] - vec3(voxelCoord);
+#endif
   for (int loop0=0; !blockFinished && loop0<64; loop0++) {
     //ivec3 voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size;
     //float voxel = texelFetch(image_cache, voxelAddress, 0).r;
     voxelAddress = pageTableEntry + voxelCoord % image_block_size + fFracVoxelCoord + 1.0;
+#if GLSL_VERSION >= 130
     float voxel = texture(image_cache, (voxelAddress*2.0+1.0)*image_address_to_normalized_texture_coord).r;
+#else
+    float voxel = texture3D(image_cache, (voxelAddress*2.0+1.0)*image_address_to_normalized_texture_coord).r;
+#endif
 
 #ifdef MIP
 #ifdef LOCAL_MIP
@@ -123,8 +133,13 @@ void sampleBlock(in ivec3 pageTableEntry, in int curLevel, in ivec3 pageTableCoo
     currentRayLength += stepSize;
 
     samplePos = startRayPosition + currentRayLength * rayVector;
+#if GLSL_VERSION >= 130
     fFracVoxelCoord = modf(samplePos * image_dimensions[curLevel], voxelAddress);
     voxelCoord = ivec3(voxelAddress);
+#else
+    voxelCoord = ivec3(samplePos * image_dimensions[curLevel]);
+    fFracVoxelCoord = samplePos * image_dimensions[curLevel] - vec3(voxelCoord);
+#endif
     blockFinished = finished || voxelCoord / image_block_size != pageTableCoord || currentRayLength > 1.0;
   }
 }
@@ -138,9 +153,8 @@ void main()
   vec4 entryTexCoordAndZ = texelFetch(ray_entry_tex_coord, ivec2(gl_FragCoord.xy), 0);
   vec4 exitTexCoordAndZ = texelFetch(ray_exit_tex_coord, ivec2(gl_FragCoord.xy), 0);
 #else
-  vec2 texCoords = gl_FragCoord.xy * screen_dim_RCP;
-  vec4 entryTexCoordAndZ = texture2D(ray_entry_tex_coord, texCoords);
-  vec4 exitTexCoordAndZ = texture2D(ray_exit_tex_coord, texCoords);
+  vec4 entryTexCoordAndZ = texelFetch2D(ray_entry_tex_coord, ivec2(gl_FragCoord.xy), 0);
+  vec4 exitTexCoordAndZ = texelFetch2D(ray_exit_tex_coord, ivec2(gl_FragCoord.xy), 0);
 #endif
   vec3 startRayPosition = entryTexCoordAndZ.xyz;
   vec3 exitRayPosition = exitTexCoordAndZ.xyz;
@@ -160,8 +174,8 @@ void main()
     float zeFront = texelFetch(ray_entry_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
     float zeBack = texelFetch(ray_exit_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
 #else
-    float zeFront = texture2D(ray_entry_eye_coord, texCoords).z;
-    float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
+    float zeFront = texelFetch2D(ray_entry_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
+    float zeBack = texelFetch2D(ray_exit_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
 #endif
     int curLevel = 0;
 
@@ -191,11 +205,19 @@ void main()
         ivec3 curPageDirAddress = page_directory_bases[curLevel] + pageTableCoord / page_table_block_size;
         if (curPageDirAddress != pageDirAddress) {
           pageDirAddress = curPageDirAddress;
+#if GLSL_VERSION >= 130
           pageDirEntry = texelFetch(page_directory, pageDirAddress, 0);
+#else
+          pageDirEntry = texelFetch3D(page_directory, pageDirAddress, 0);
+#endif
         }
         int pagingFlag = pageDirEntry.w;
         if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
+#if GLSL_VERSION >= 130
           ivec4 pageTableEntry = texelFetch(page_table_cache, pageDirEntry.xyz + pageTableCoord % page_table_block_size, 0);
+#else
+          ivec4 pageTableEntry = texelFetch3D(page_table_cache, pageDirEntry.xyz + pageTableCoord % page_table_block_size, 0);
+#endif        
           pagingFlag = pageTableEntry.w;
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
 #ifdef MIP
@@ -221,10 +243,18 @@ void main()
                 ivec3 testVoxelCoord = ivec3(samplePos * image_dimensions[nextNonEmptyLevel]);
                 ivec3 testPageTableCoord = testVoxelCoord / image_block_size;
 
+#if GLSL_VERSION >= 130
                 ivec4 testPageDirEntry = texelFetch(page_directory, page_directory_bases[nextNonEmptyLevel] + testPageTableCoord / page_table_block_size, 0);
+#else
+                ivec4 testPageDirEntry = texelFetch3D(page_directory, page_directory_bases[nextNonEmptyLevel] + testPageTableCoord / page_table_block_size, 0);
+#endif
                 testPagingFlag = testPageDirEntry.w;
                 if (testPagingFlag != UNMAPPED && testPagingFlag != EMPTY) {
+#if GLSL_VERSION >= 130
                   testPagingFlag = texelFetch(page_table_cache, testPageDirEntry.xyz + testPageTableCoord % page_table_block_size, 0).w;
+#else
+                  testPagingFlag = texelFetch3D(page_table_cache, testPageDirEntry.xyz + testPageTableCoord % page_table_block_size, 0).w;
+#endif
                 }
                 ++nextNonEmptyLevel;
               }

@@ -352,6 +352,11 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missin
     int y = blockID / m_posToBlockIDs[level].y;
     blockID -= y * m_posToBlockIDs[level].y;
     glm::ivec4 blockKey(level, blockID, y, z);
+    if (!glm::all(glm::lessThan(blockKey.yzw(), glm::ivec3(m_pageTableDimensions[level]))) ||
+        !glm::all(glm::greaterThanEqual(blockKey.yzw(), glm::ivec3(0)))) {
+      LOG(INFO) << blockID << " " << blockKey << " " << m_pageTableDimensions[level];
+      CHECK(false);
+    }
     usedPageTableKeys.insert(blockKey / glm::ivec4(1, m_pageTableBlockSize));
     m_imageCacheManager->touch(blockKey);
   }
@@ -380,7 +385,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missin
     pageTableEntryKey.y -= pageTableEntryKey.z * m_posToBlockIDs[level].y;
     if (!glm::all(glm::lessThan(pageTableEntryKey.yzw(), glm::ivec3(m_pageTableDimensions[level]))) ||
         !glm::all(glm::greaterThanEqual(pageTableEntryKey.yzw(), glm::ivec3(0)))) {
-      LOG(INFO) << pageTableEntryKey << " " << m_pageTableDimensions[level];
+      LOG(INFO) << blockID << " " << pageTableEntryKey << " " << m_pageTableDimensions[level];
       CHECK(false);
     }
     glm::ivec4 pageDirectoryEntryKey = pageTableEntryKey / glm::ivec4(1, m_pageTableBlockSize);
