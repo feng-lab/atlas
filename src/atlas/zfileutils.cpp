@@ -32,7 +32,13 @@ void ZFileUtils::showInGraphicalShell(const QString& filePath)
   //QString command = "explorer " + param;
   //QProcess::startDetached(command);
 #else
-  QDesktopServices::openUrl(QUrl::fromLocalFile(info.isDir() ? filePath : info.path()));
+  if (QFileInfo("/usr/bin/nautilus").exists() || QFileInfo("/usr/local/bin/nautilus").exists()) {
+    QStringList args;
+    args << filePath;
+    QProcess::startDetached("nautilus", args);
+  } else {
+    QDesktopServices::openUrl(QUrl::fromLocalFile(info.isDir() ? filePath : info.path()));
+  }
 #endif
 }
 
