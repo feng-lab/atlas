@@ -4,6 +4,7 @@
 #include <QFileInfo>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QDir>
 
 namespace nim {
 
