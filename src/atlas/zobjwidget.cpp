@@ -128,9 +128,10 @@ void ZObjWidget::createContextMenu()
   m_contextMenu->addSeparator();
 #ifdef Q_OS_MAC
   m_contextMenu->addAction(QString("Show in Finder"), m_doc, &ZDoc::showSelectedObjsInGraphicalShell);
-#endif
-#ifdef Q_OS_WIN
+#elif defined(Q_OS_WIN)
   m_contextMenu->addAction(QString("Show in Explorer"), m_doc, &ZDoc::showSelectedObjsInGraphicalShell);
+#else
+  m_contextMenu->addAction(QString("Show in Files"), m_doc, &ZDoc::showSelectedObjsInGraphicalShell);
 #endif
   m_contextMenu->addAction(QString("Copy Full Path"), m_doc, &ZDoc::copySelectedObjsPathToClipboard);
 }

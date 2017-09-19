@@ -87,6 +87,21 @@ void removeOldLogs(const QDir& dir, int numberToKeep = 20)
 int main(int argc, char* argv[])
 {
   try {
+    QSurfaceFormat format;
+#if defined(__APPLE__) && defined(ATLAS_USE_CORE_PROFILE)
+    format.setVersion(3, 2);
+    format.setProfile(QSurfaceFormat::CoreProfile);
+#endif
+    //format.setStereo(true);
+    QSurfaceFormat::setDefaultFormat(format);
+
+    QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
+    QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings, true);
+    nim::ZApplication app(argc, argv);
+    app.setApplicationName("Atlas");
+    app.setOrganizationDomain("atlas.com");
+    app.setOrganizationName("Atlas");
+
     // init the logging mechanism
     QDir logDir = nim::ZSystemInfo::instance().logDir();
     removeOldLogs(logDir);
@@ -112,21 +127,6 @@ int main(int argc, char* argv[])
       return ZRunBenchmark::run();
     }
 #endif
-
-    QSurfaceFormat format;
-#if defined(__APPLE__) && defined(ATLAS_USE_CORE_PROFILE)
-    format.setVersion(3, 2);
-    format.setProfile(QSurfaceFormat::CoreProfile);
-#endif
-    //format.setStereo(true);
-    QSurfaceFormat::setDefaultFormat(format);
-
-    QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
-    QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings, true);
-    nim::ZApplication app(argc, argv);
-    app.setApplicationName("Atlas");
-    app.setOrganizationDomain("atlas.com");
-    app.setOrganizationName("Atlas");
 
     nim::addLogSink(&nim::ZLogCache::instance());
     qInstallMessageHandler(myMessageOutput);

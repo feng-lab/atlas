@@ -2,13 +2,15 @@
 
 #include <QProcess>
 #include <QFileInfo>
-#include <QDir>
+#include <QDesktopServices>
+#include <QUrl>
 
 namespace nim {
 
 void ZFileUtils::showInGraphicalShell(const QString& filePath)
 {
-  if (!QFileInfo(filePath).exists())
+  QFileInfo info(filePath);
+  if (!info.exists())
     return;
 
 #ifdef Q_OS_MAC
@@ -22,14 +24,14 @@ void ZFileUtils::showInGraphicalShell(const QString& filePath)
   args << "-e";
   args << "end tell";
   QProcess::startDetached("osascript", args);
-#endif
-
-#ifdef Q_OS_WIN
+#elif defined(Q_OS_WIN)
   QStringList args;
   args << "/select," << QDir::toNativeSeparators(filePath);
   QProcess::startDetached("explorer", args);
   //QString command = "explorer " + param;
   //QProcess::startDetached(command);
+#else
+  QDesktopServices::openUrl(QUrl::fromLocalFile(info.isDir() ? filePath : info.path()));
 #endif
 }
 
