@@ -27,7 +27,7 @@ void ZColorMapWidget::editLColor(size_t index)
     return;
 
   ZColorMapKey key = m_colorMap->get().key(index);
-  QColor newColor = QColorDialog::getColor(key.qColorL());
+  QColor newColor = QColorDialog::getColor(key.qColorL(), QApplication::activeWindow());
   if (newColor.isValid()) {
     m_colorMap->get().setKeyColorL(index, newColor);
   }
@@ -39,7 +39,7 @@ void ZColorMapWidget::editRColor(size_t index)
     return;
 
   ZColorMapKey key = m_colorMap->get().key(index);
-  QColor newColor = QColorDialog::getColor(key.qColorR());
+  QColor newColor = QColorDialog::getColor(key.qColorR(), QApplication::activeWindow());
   if (newColor.isValid()) {
     m_colorMap->get().setKeyColorR(index, newColor);
   }
@@ -418,6 +418,7 @@ void ZColorMapWidget::updateIntensityScreenWidth()
 ZColorMapEditor::ZColorMapEditor(ZColorMapParameter* colorMap, QWidget* parent)
   : QWidget(parent), m_colorMap(colorMap)
 {
+  setWindowFlag(Qt::Window, true);
   createWidget();
   connect(m_colorMap, &ZColorMapParameter::valueChanged, this, &ZColorMapEditor::updateFromColorMap);
   connect(m_domainMinSpinBox, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &ZColorMapEditor::setDomainMin);

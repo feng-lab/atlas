@@ -22,7 +22,7 @@ void ZColorMapWidgetWithEditorWindow::createEditorWindow()
   } else {
     QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
 
-    m_editorWindow = new ZColorMapEditor(m_colorMap);
+    m_editorWindow = new ZColorMapEditor(m_colorMap, QApplication::activeWindow());
     m_editorWindow->showNormal();
     m_editorWindow->raise();
     m_editorWindow->activateWindow();

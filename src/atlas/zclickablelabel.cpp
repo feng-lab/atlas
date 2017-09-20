@@ -9,6 +9,7 @@
 #include <QToolTip>
 #include <QColorDialog>
 #include <QPainter>
+#include <QApplication>
 
 namespace nim {
 
@@ -105,7 +106,7 @@ bool ZClickableColorLabel::getTip(const QPoint& p, QRect* r, QString* s)
 
 void ZClickableColorLabel::labelClicked()
 {
-  QColor newColor = QColorDialog::getColor(toQColor());
+  QColor newColor = QColorDialog::getColor(toQColor(), QApplication::activeWindow());
   if (newColor.isValid()) {
     fromQColor(newColor);
   }

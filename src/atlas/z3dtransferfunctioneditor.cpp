@@ -536,7 +536,7 @@ void Z3DTransferFunctionWidget::changeCurrentColor()
   else
     oldColor = m_transferFunction->get().keyQColorL(selectedIdx);
 
-  QColor newColor = QColorDialog::getColor(oldColor, nullptr);
+  QColor newColor = QColorDialog::getColor(oldColor, QApplication::activeWindow());
   if (newColor.isValid() && oldColor != newColor) {
     if (m_transferFunction->get().isKeySplit(selectedIdx) && !m_selectedLeftPart) {
       newColor.setAlpha(m_transferFunction->get().keyAlphaR(selectedIdx));
@@ -755,6 +755,7 @@ Z3DTransferFunctionEditor::Z3DTransferFunctionEditor(Z3DTransferFunctionParamete
   , m_showHistogram("Show Histogram: ", true)
   , m_histogramNormalizeMethod("Histogram Normalize Method: ")
 {
+  setWindowFlag(Qt::Window, true);
   m_histogramNormalizeMethod.addOptions("Linear", "Log");
   m_histogramNormalizeMethod.select("Log");
   createWidgets();

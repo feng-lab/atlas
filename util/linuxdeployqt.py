@@ -342,16 +342,18 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins):
             src = details['realpath']
             debug("Unhandled type '%s' (%s)" % (details['type'],))
 
-    # for qt_plugin in qt_plugins:
-    #     src = qt_plugin_dir + os.sep + qt_plugin
-    #     dst = dest_dir + os.sep + appdir_plugins + os.sep + qt_plugin
-    #     if not os.path.exists(os.path.dirname(dst)):
-    #         os.makedirs(os.path.dirname(dst))
-    #
-    #     debug("Copying Qt plugin " + os.path.basename(qt_plugin) + ": " + src + ' -> ' + dst)
-    #     shutil.copyfile(src, dst)  # overrides dest no questions asked
-    #     strip(dst)
-    shutil.copytree(qt_plugin_dir, dest_dir + os.sep + appdir_plugins)
+    if False:
+        for qt_plugin in qt_plugins:
+            src = qt_plugin_dir + os.sep + qt_plugin
+            dst = dest_dir + os.sep + appdir_plugins + os.sep + qt_plugin
+            if not os.path.exists(os.path.dirname(dst)):
+                os.makedirs(os.path.dirname(dst))
+
+            debug("Copying Qt plugin " + os.path.basename(qt_plugin) + ": " + src + ' -> ' + dst)
+            shutil.copyfile(src, dst)  # overrides dest no questions asked
+            strip(dst)
+    else:
+        shutil.copytree(qt_plugin_dir, dest_dir + os.sep + appdir_plugins)
 
     # Make qt.conf file
     create_qt_conf(dest_dir)
@@ -407,23 +409,26 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str):
 
     dependencies = merge_dicts(dependencies, exedeps)
 
-    # Determine what Qt plugins are used so far
-    used_plugins, not_used_plugins = determine_qt_plugins(dependencies, qt_plugin_dir)
+    if True:
+        used_plugins = {}
+    else:
+        # Determine what Qt plugins are used so far
+        used_plugins, not_used_plugins = determine_qt_plugins(dependencies, qt_plugin_dir)
 
-    # Resolve dependencies for detected Qt plugins
-    info("Resolving dependencies for %s Qt plugins" % len(used_plugins))
-    for plugin in used_plugins:
-        qp = qt_plugin_dir + os.sep + plugin
-        debug("Resolving shared object dependencies for Qt plugin '%s'" % os.path.basename(
-            qt_plugin_dir + os.sep + plugin))
-        qt_plugin_deps = resolve_dependencies(qp, blacklist)
-        for qt_plugin_dep in qt_plugin_deps:
+        # Resolve dependencies for detected Qt plugins
+        info("Resolving dependencies for %s Qt plugins" % len(used_plugins))
+        for plugin in used_plugins:
+            qp = qt_plugin_dir + os.sep + plugin
+            debug("Resolving shared object dependencies for Qt plugin '%s'" % os.path.basename(
+                qt_plugin_dir + os.sep + plugin))
+            qt_plugin_deps = resolve_dependencies(qp, blacklist)
+            for qt_plugin_dep in qt_plugin_deps:
 
-            qt_plugin_deps[qt_plugin_dep]['dependants'].add(qp)
+                qt_plugin_deps[qt_plugin_dep]['dependants'].add(qp)
 
-            if qt_plugin_dep not in dependencies:
-                debug("Adding Qt plugin shared object dependency '%s'" % qt_plugin_dep)
-                dependencies[qt_plugin_dep] = qt_plugin_deps[qt_plugin_dep]
+                if qt_plugin_dep not in dependencies:
+                    debug("Adding Qt plugin shared object dependency '%s'" % qt_plugin_dep)
+                    dependencies[qt_plugin_dep] = qt_plugin_deps[qt_plugin_dep]
 
     info("Building AppDir in '%s'" % deploy_dir)
     build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, used_plugins)
