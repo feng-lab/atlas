@@ -298,8 +298,8 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins):
 
     if not os.path.exists(dest_dir + os.sep + appdir_libs):
         os.makedirs(dest_dir + os.sep + appdir_libs)
-    if not os.path.exists(dest_dir + os.sep + appdir_plugins):
-        os.makedirs(dest_dir + os.sep + appdir_plugins)
+    # if not os.path.exists(dest_dir + os.sep + appdir_plugins):
+    #     os.makedirs(dest_dir + os.sep + appdir_plugins)
     if not os.path.exists(dest_dir + os.sep + appdir_qml):
         os.makedirs(dest_dir + os.sep + appdir_qml)
 
@@ -342,16 +342,16 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins):
             src = details['realpath']
             debug("Unhandled type '%s' (%s)" % (details['type'],))
 
-    for qt_plugin in qt_plugins:
-
-        src = qt_plugin_dir + os.sep + qt_plugin
-        dst = dest_dir + os.sep + appdir_plugins + os.sep + qt_plugin
-        if not os.path.exists(os.path.dirname(dst)):
-            os.makedirs(os.path.dirname(dst))
-
-        debug("Copying Qt plugin " + os.path.basename(qt_plugin) + ": " + src + ' -> ' + dst)
-        shutil.copyfile(src, dst)  # overrides dest no questions asked
-        strip(dst)
+    # for qt_plugin in qt_plugins:
+    #     src = qt_plugin_dir + os.sep + qt_plugin
+    #     dst = dest_dir + os.sep + appdir_plugins + os.sep + qt_plugin
+    #     if not os.path.exists(os.path.dirname(dst)):
+    #         os.makedirs(os.path.dirname(dst))
+    #
+    #     debug("Copying Qt plugin " + os.path.basename(qt_plugin) + ": " + src + ' -> ' + dst)
+    #     shutil.copyfile(src, dst)  # overrides dest no questions asked
+    #     strip(dst)
+    shutil.copytree(qt_plugin_dir, dest_dir + os.sep + appdir_plugins)
 
     # Make qt.conf file
     create_qt_conf(dest_dir)
