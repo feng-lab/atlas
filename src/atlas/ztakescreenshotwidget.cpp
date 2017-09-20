@@ -2,6 +2,7 @@
 
 #include "zselectfilewidget.h"
 #include "z3dgpuinfo.h"
+#include "zfileutils.h"
 #include <QStandardPaths>
 #include <QDateTime>
 #include <QPushButton>
@@ -62,7 +63,7 @@ void ZTakeScreenShotWidget::captureButtonPressed()
 {
   QString filepath;
   if (m_useManualName->isChecked()) {
-    filepath = QFileDialog::getSaveFileName(
+    filepath = ZFileUtils::getSaveFileName(
       this, "Save Capture", m_lastFName, "",
       nullptr/*, QFileDialog::DontUseNativeDialog*/);
     if (!filepath.isEmpty()) {

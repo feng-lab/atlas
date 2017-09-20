@@ -8,6 +8,7 @@
 #include "zstringutils.h"
 #include "zsysteminfo.h"
 #include "zlog.h"
+#include "zfileutils.h"
 #include <qtcsv/reader.h>
 #include <QtWidgets>
 
@@ -980,7 +981,7 @@ void ZStitchImageDialog::selectAllInTileImageWidget()
 
 void ZStitchImageDialog::saveTileImageWidgetAsImage()
 {
-  QString fn = QFileDialog::getSaveFileName(this, "save tiles image");
+  QString fn = ZFileUtils::getSaveFileName(this, "save tiles image");
   if (!fn.isEmpty())
     m_tileImageWidget->saveAsImage(fn);
 }
@@ -1607,10 +1608,10 @@ void ZStitchImageDialog::selectConnFile()
 
 void ZStitchImageDialog::selectOutputFile()
 {
-  QString outputFileName = QFileDialog::getSaveFileName(this,
-                                                        tr("specify output file"),
-                                                        ZSystemInfo::instance().lastOpenedImagePath(),
-                                                        tr("Output Image (*.nim *.tif *.v3draw)"));
+  QString outputFileName = ZFileUtils::getSaveFileName(this,
+                                                       tr("specify output file"),
+                                                       ZSystemInfo::instance().lastOpenedImagePath(),
+                                                       tr("Output Image (*.nim *.tif *.v3draw)"));
   if (!outputFileName.isEmpty()) {
     ZSystemInfo::instance().setLastOpenedImagePath(outputFileName);
     m_outputFileEdit->setText(outputFileName);

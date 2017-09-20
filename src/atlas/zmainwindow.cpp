@@ -30,6 +30,7 @@
 #include "zsvgdoc.h"
 #include "zsvgview.h"
 #include "zjson.h"
+#include "zfileutils.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QAction>
@@ -85,9 +86,11 @@ void ZMainWindow::updateRecentFileActions()
   int idx = 0;
   for (int i = 0; i < numRecentFiles; ++i) {
     if (QFile::exists(files[i])) {
-      QString text = tr("&%1 %2").arg(i + 1).arg(strippedName(files[i]));
+      QString text = QString("&%1 %2").arg(i + 1).arg(strippedName(files[i]));
       m_recentFileActions[idx]->setText(text);
       m_recentFileActions[idx]->setData(files[i]);
+      m_recentFileActions[idx]->setToolTip(files[i]);
+      m_recentFileActions[idx]->setStatusTip(files[i]);
       m_recentFileActions[idx++]->setVisible(true);
     }
   }
@@ -370,9 +373,9 @@ void ZMainWindow::saveScene()
     return;
   }
 
-  QString fn = QFileDialog::getSaveFileName(QApplication::activeWindow(), "Save scene to file",
-                                            m_doc->lastOpenedFilePath(),
-                                            tr("Scene file (*.scene)"));
+  QString fn = ZFileUtils::getSaveFileName(QApplication::activeWindow(), "Save scene to file",
+                                           m_doc->lastOpenedFilePath(),
+                                           tr("Scene file (*.scene)"));
   if (!fn.isEmpty()) {
     QString err;
     if (!saveJsonSceneImpl(fn, err)) {

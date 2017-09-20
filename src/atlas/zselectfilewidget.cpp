@@ -1,4 +1,5 @@
 #include "zselectfilewidget.h"
+#include "zfileutils.h"
 
 #include <QtWidgets>
 
@@ -183,7 +184,7 @@ void ZSelectFileWidget::selectFile()
       emit changed();
     }
   } else if (m_fileMode == FileMode::SaveFile) {
-    QString outputFileName = QFileDialog::getSaveFileName(
+    QString outputFileName = ZFileUtils::getSaveFileName(
       this, m_guiName, m_lastFName, m_filter,
       nullptr);
     if (!outputFileName.isEmpty()) {

@@ -3,6 +3,7 @@
 #include "zlog.h"
 #include "zanalysisworklistmodel.h"
 #include "zstyleditemdelegate.h"
+#include "zfileutils.h"
 #include <QtWidgets>
 #include <QTableView>
 
@@ -61,10 +62,10 @@ void ZAnalysisWorklistDialog::onSave()
 {
   if (m_filename.isEmpty() && !m_model->worklist().empty()) {
     m_filename =
-      QFileDialog::getSaveFileName(this, tr("Save worklist file as..."),
-                                   m_filename,
-                                   tr("Worklist file (*.csv)"),
-                                   nullptr);
+      ZFileUtils::getSaveFileName(this, tr("Save worklist file as..."),
+                                  m_filename,
+                                  tr("Worklist file (*.csv)"),
+                                  nullptr);
   }
   if (!m_filename.isEmpty()) {
     QString res = m_model->toCSV(m_filename, true);
@@ -79,10 +80,10 @@ void ZAnalysisWorklistDialog::onSave()
 void ZAnalysisWorklistDialog::onSaveAs()
 {
   QString fileName =
-    QFileDialog::getSaveFileName(this, tr("Save worklist file as..."),
-                                 m_filename,
-                                 tr("Worklist file (*.csv)"),
-                                 nullptr);
+    ZFileUtils::getSaveFileName(this, tr("Save worklist file as..."),
+                                m_filename,
+                                tr("Worklist file (*.csv)"),
+                                nullptr);
 
   if (!fileName.isEmpty()) {
     m_filename = fileName;
