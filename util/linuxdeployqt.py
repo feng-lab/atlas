@@ -409,7 +409,7 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str):
 
     dependencies = merge_dicts(dependencies, exedeps)
 
-    if True:
+    if False:
         used_plugins = {}
     else:
         # Determine what Qt plugins are used so far
