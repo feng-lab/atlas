@@ -236,11 +236,14 @@ def determine_qt_plugins(deps, qt_plugin_dir):
 
 
 def strip(f):
-    res = subprocess.call(('strip', "-x", f))
-    debug("Stripping '%s'" % f)
-    if res > 0:
-        warn("'strip' command failed with return code '%s' on file '%s'" % (res, f))
-    return res
+    if False:
+        res = subprocess.call(('strip', "-x", f))
+        debug("Stripping '%s'" % f)
+        if res > 0:
+            warn("'strip' command failed with return code '%s' on file '%s'" % (res, f))
+        return res
+    else:
+        return 0
 
 
 def patch_elf(options, f):
