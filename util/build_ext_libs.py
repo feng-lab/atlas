@@ -555,30 +555,16 @@ def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
 
 
 def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
-    del ext_dir
     shutil.rmtree(install_dir, ignore_errors=True)
 
     orig_file = os.path.join(src_dir, 'makeengine.gte')
     bak_file = get_bak_file_name(orig_file)
     try:
         if is_windows():
-            orig_file = os.path.join(src_dir, 'GTEngine.v15.vcxproj')
-            bak_file = get_bak_file_name(orig_file)
-            os.rename(orig_file, bak_file)
-            with open(bak_file, mode='r', encoding='utf-8') as f:
-                from_lines = f.readlines()
-            with open(orig_file, mode='w', encoding='utf-8') as f:
-                to_lines = []
-                for line in from_lines:
-                    line = line.replace(r'<TreatWarningAsError>true</TreatWarningAsError>',
-                                        r'<TreatWarningAsError>false</TreatWarningAsError>')
-                    f.write(line)
-                    to_lines.append(line)
-            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
-
             env = get_vcvars_environment()
             subprocess.run(['MSBuild', 'GTEngine.v15.vcxproj', '/property:Platform=x64',
-                            '/property:Configuration=Release', '/maxcpucount'],
+                            '/property:Configuration=Release', '/maxcpucount',
+                            '/property:ForceImportBeforeCppTargets=' + ext_dir + '\\no_warning_as_error.props'],
                            cwd=src_dir, shell=True, check=True, env=env)
             glob_copy(os.path.join(src_dir, '_Output', 'v141', 'x64', 'Release', 'GTEngine.v15.lib'),
                       os.path.join(install_dir, 'lib'))
@@ -616,7 +602,7 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
     finally:
         shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)  # macOS
         shutil.rmtree(os.path.join(src_dir, '_Output'), ignore_errors=True)  # win
-        if is_linux() or is_windows():
+        if is_linux():
             os.replace(bak_file, orig_file)
 
 
@@ -944,7 +930,8 @@ def build_itk(src_dir: str, install_dir: str, ext_dir: str):
                              src_dir])
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
+            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount',
+                            '/property:ForceImportBeforeCppTargets=' + ext_dir + '\\no_warning_as_error.props'],
                            cwd=build_dir, shell=True, check=True, env=env)
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
                            cwd=build_dir, shell=True, check=True, env=env)
