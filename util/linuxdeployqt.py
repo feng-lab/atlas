@@ -236,7 +236,8 @@ def determine_qt_plugins(deps, qt_plugin_dir):
 
 
 def strip(f):
-    if False:
+    cp = subprocess.run(['file', f], stdout=subprocess.PIPE, encoding='utf-8')
+    if 'not stripped' in cp.stdout:
         res = subprocess.call(('strip', "-x", f))
         debug("Stripping '%s'" % f)
         if res > 0:
