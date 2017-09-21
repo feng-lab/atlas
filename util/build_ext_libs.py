@@ -562,6 +562,20 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
     bak_file = get_bak_file_name(orig_file)
     try:
         if is_windows():
+            orig_file = os.path.join(src_dir, 'GTEngine.v15.vcxproj')
+            bak_file = get_bak_file_name(orig_file)
+            os.rename(orig_file, bak_file)
+            with open(bak_file, mode='r', encoding='utf-8') as f:
+                from_lines = f.readlines()
+            with open(orig_file, mode='w', encoding='utf-8') as f:
+                to_lines = []
+                for line in from_lines:
+                    line = line.replace(r'<TreatWarningAsError>true</TreatWarningAsError>',
+                                        r'<TreatWarningAsError>false</TreatWarningAsError>')
+                    f.write(line)
+                    to_lines.append(line)
+            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+
             env = get_vcvars_environment()
             subprocess.run(['MSBuild', 'GTEngine.v15.vcxproj', '/property:Platform=x64',
                             '/property:Configuration=Release', '/maxcpucount'],
@@ -602,7 +616,7 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
     finally:
         shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)  # macOS
         shutil.rmtree(os.path.join(src_dir, '_Output'), ignore_errors=True)  # win
-        if is_linux():
+        if is_linux() or is_windows():
             os.replace(bak_file, orig_file)
 
 
