@@ -1246,6 +1246,20 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
+def unpack_tool_to_software_dir(tool_package_folder: str, tool_package_glob_name: str,
+                                tool_folder_glob_name=None) -> str:
+    if tool_folder_glob_name is None:
+        tool_folder_glob_name = tool_package_glob_name
+    package_name = find_src_package_with_glob(os.path.join(tool_package_folder, tool_package_glob_name))
+    package_unpack_folder = get_package_top_level_folder(package_name, common_dirs.software_dir())
+    if not os.path.exists(package_unpack_folder):
+        folder_list = glob.glob(os.path.join(common_dirs.software_dir(), tool_folder_glob_name))
+        if len(folder_list) == 1:
+            shutil.rmtree(folder_list[0], ignore_errors=False)
+        unpack_file_to_folder(package_name, common_dirs.software_dir())
+    return package_unpack_folder
+
+
 def build_libs(libs: dict, update_src: bool):
     ext_dir = common_dirs.ext_dir()
     src_package_dir = common_dirs.src_package_dir()
@@ -1265,31 +1279,13 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['cmake']:
         if is_windows():
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'cmake*win*'))
-            package_unpack_folder = get_package_top_level_folder(package_name, common_dirs.software_dir())
-            if not os.path.exists(package_unpack_folder):
-                folder_list = glob.glob(os.path.join(common_dirs.software_dir(), 'cmake*win*'))
-                if len(folder_list) == 1:
-                    shutil.rmtree(folder_list[0], ignore_errors=False)
-                unpack_file_to_folder(package_name, common_dirs.software_dir())
+            unpack_tool_to_software_dir(src_package_dir, 'cmake*win*')
         elif is_linux():
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'cmake*Linux*'))
-            package_unpack_folder = get_package_top_level_folder(package_name, common_dirs.software_dir())
-            if not os.path.exists(package_unpack_folder):
-                folder_list = glob.glob(os.path.join(common_dirs.software_dir(), 'cmake*Linux*'))
-                if len(folder_list) == 1:
-                    shutil.rmtree(folder_list[0], ignore_errors=False)
-                unpack_file_to_folder(package_name, common_dirs.software_dir())
+            unpack_tool_to_software_dir(src_package_dir, 'cmake*Linux*')
 
     if libs['curl']:
         if is_windows():
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'curl*win*'))
-            package_unpack_folder = get_package_top_level_folder(package_name, common_dirs.software_dir())
-            if not os.path.exists(package_unpack_folder):
-                folder_list = glob.glob(os.path.join(common_dirs.software_dir(), 'curl*win*'))
-                if len(folder_list) == 1:
-                    shutil.rmtree(folder_list[0], ignore_errors=False)
-                unpack_file_to_folder(package_name, common_dirs.software_dir())
+            unpack_tool_to_software_dir(src_package_dir, 'curl*win*')
 
     if libs['zlib']:
         if is_windows():
@@ -1378,22 +1374,15 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['libjpeg']:
         if is_windows():
-            nasm_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'nasm*win64*'))
+            nasm_dir = unpack_tool_to_software_dir(src_package_dir, 'nasm*win64*', 'nasm-*')
         elif is_mac():
-            nasm_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'nasm*macosx*'))
-        if not is_linux():
-            nasm_package_unpack_folder = get_package_top_level_folder(nasm_package_name, base_dir)
-            nasm_dir = nasm_package_unpack_folder
+            nasm_dir = unpack_tool_to_software_dir(src_package_dir, 'nasm*macosx*', 'nasm-*')
+            os.chmod(os.path.join(nasm_dir, 'nasm'), stat.S_IXUSR)
         else:
             nasm_dir = ''
         package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'libjpeg*'))
         src_dir = get_package_top_level_folder(package_name, base_dir)
         if update_src:
-            if not is_linux():
-                shutil.rmtree(nasm_package_unpack_folder, ignore_errors=True)
-                unpack_file_to_folder(nasm_package_name, base_dir)
-                if is_mac():
-                    os.chmod(os.path.join(nasm_dir, 'nasm'), stat.S_IXUSR)
             shutil.rmtree(src_dir, ignore_errors=True)
             unpack_file_to_folder(package_name, base_dir)
         assert os.path.exists(src_dir)
@@ -1482,25 +1471,17 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['ospray']:
         if is_windows():
-            ispc_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ispc*win*'))
-            embree_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'embree*win*'))
+            ispc_dir = unpack_tool_to_software_dir(src_package_dir, 'ispc*win*')
+            embree_dir = unpack_tool_to_software_dir(src_package_dir, 'embree*win*')
         elif is_linux():
-            ispc_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ispc*linux*'))
-            embree_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'embree*linux*'))
+            ispc_dir = unpack_tool_to_software_dir(src_package_dir, 'ispc*linux*')
+            embree_dir = unpack_tool_to_software_dir(src_package_dir, 'embree*linux*')
         else:
-            ispc_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ispc*osx*'))
-            embree_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'embree*osx*'))
-        ispc_package_unpack_folder = get_package_top_level_folder(ispc_package_name, base_dir)
-        embree_package_unpack_folder = get_package_top_level_folder(embree_package_name, base_dir)
+            ispc_dir = unpack_tool_to_software_dir(src_package_dir, 'ispc*osx*')
+            embree_dir = unpack_tool_to_software_dir(src_package_dir, 'embree*osx*')
         src_dir = os.path.join(base_dir, 'OSPRay')
         if update_src:
-            shutil.rmtree(ispc_package_unpack_folder, ignore_errors=True)
-            unpack_file_to_folder(ispc_package_name, base_dir)
-            shutil.rmtree(embree_package_unpack_folder, ignore_errors=True)
-            unpack_file_to_folder(embree_package_name, base_dir)
             update_or_clone_git_repository(src_dir, 'git@github.com:ospray/OSPRay.git')
-        ispc_dir = ispc_package_unpack_folder
-        embree_dir = embree_package_unpack_folder
         assert os.path.exists(src_dir)
         assert os.path.exists(ispc_dir)
         assert os.path.exists(embree_dir)
