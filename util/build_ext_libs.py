@@ -229,9 +229,7 @@ def build_gflags(src_dir: str, install_dir: str, ext_dir: str):
             env = get_vcvars_environment()
             subprocess.run(cmakecmd,
                            cwd=build_dir, shell=False, check=True, env=env)
-            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
-                           cwd=build_dir, shell=True, check=True, env=env)
-            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
@@ -256,9 +254,7 @@ def build_glog(src_dir: str, install_dir: str, ext_dir: str):
                              src_dir])
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
-                           cwd=build_dir, shell=True, check=True, env=env)
-            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             cmakecmd.extend(['-Dgflags_DIR:PATH={}/gflags/lib/cmake/gflags'.format(ext_dir),
@@ -285,9 +281,7 @@ def build_benchmark(src_dir: str, install_dir: str, ext_dir: str):
                              src_dir])
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
-                           cwd=build_dir, shell=True, check=True, env=env)
-            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             if is_linux():
@@ -318,9 +312,7 @@ def build_glbinding(src_dir: str, install_dir: str, ext_dir: str):
                              src_dir])
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
-                           cwd=build_dir, shell=True, check=True, env=env)
-            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             cmakecmd.extend(['-DOPTION_BUILD_TOOLS:BOOL=OFF',
@@ -369,9 +361,7 @@ def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str, nasm_dir: str):
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
             # /property:ForceImportBeforeCppTargets=%currDIR%\runtime_md.props
-            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
-                           cwd=build_dir, shell=True, check=True, env=env)
-            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             if is_linux():
@@ -408,9 +398,7 @@ def build_zlib(src_dir: str, install_dir: str, ext_dir: str):
             cmakecmd.extend([src_dir])
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
-                           cwd=build_dir, shell=True, check=True, env=env)
-            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             cmakecmd.extend(['-DAMD64:BOOL=ON',
@@ -473,9 +461,7 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
                              src_dir])
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
-                           cwd=build_dir, shell=True, check=True, env=env)
-            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
@@ -633,9 +619,7 @@ def build_ospray(src_dir: str, install_dir: str, ext_dir: str, ispc_dir: str, em
                              src_dir])
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
-                           cwd=build_dir, shell=True, check=True, env=env)
-            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             cmakecmd.extend(['-DTBB_ROOT:PATH=/opt/intel/tbb',
@@ -684,9 +668,7 @@ def build_assimp(src_dir: str, install_dir: str, ext_dir: str):
                              src_dir])
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
-                           cwd=build_dir, shell=True, check=True, env=env)
-            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
@@ -719,9 +701,7 @@ def build_hdf5(src_dir: str, install_dir: str, ext_dir: str):
                              src_dir])
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
-                           cwd=build_dir, shell=True, check=True, env=env)
-            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
@@ -930,10 +910,8 @@ def build_itk(src_dir: str, install_dir: str, ext_dir: str):
                              src_dir])
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount',
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount',
                             '/property:ForceImportBeforeCppTargets=' + ext_dir + '\\no_warning_as_error.props'],
-                           cwd=build_dir, shell=True, check=True, env=env)
-            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
@@ -973,9 +951,7 @@ def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
                              src_dir])
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
-                           cwd=build_dir, shell=True, check=True, env=env)
-            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             if is_linux():
@@ -1073,9 +1049,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                              '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '\\zlib\\lib\\zlibstatic.lib',
                              src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
-                           cwd=build_dir, shell=True, check=True, env=env)
-            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
+            subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
 
             orig_file_2 = os.path.join(install_dir, 'x64', 'vc15', 'staticlib', 'OpenCVModules.cmake')
