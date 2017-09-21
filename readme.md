@@ -4,11 +4,11 @@
 * brew install unrar p7zip git cmake ninja
 
 ### Windows:
-* install visual studio, qt5, intel c composer (for mkl, ipp, tbb), python3, 7z, git and cmake
+* install visual studio, qt5, intel c composer (for mkl, ipp, tbb), python3, git
 * patch libtiff win32 TIFFFdOpen
 
 ### Linux:
-* install qt5, mkl, ipp, tbb, python3, cmake and ninja
+* install qt5, mkl, ipp, tbb, python3 and ninja
 * sudo apt install unrar p7zip-full git nasm libglfw3-dev zlib1g-dev patchelf
 
 ### All:

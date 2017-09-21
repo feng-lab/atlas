@@ -1260,7 +1260,7 @@ def build_libs(libs: dict, update_src: bool):
             if not os.path.exists(package_unpack_folder):
                 unpack_file_to_folder(package_name, common_dirs.software_dir())
         elif is_linux():
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'cmake*linux*'))
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'cmake*Linux*'))
             package_unpack_folder = get_package_top_level_folder(package_name, common_dirs.software_dir())
             if not os.path.exists(package_unpack_folder):
                 unpack_file_to_folder(package_name, common_dirs.software_dir())
