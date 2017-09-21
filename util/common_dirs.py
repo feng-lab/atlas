@@ -93,6 +93,14 @@ def qt_base_dir():
     return res
 
 
+def software_dir() -> str:
+    res = os.path.join(os.path.expanduser('~'), 'software')
+    if not os.path.exists(res):
+        os.mkdir(res)
+    assert os.path.exists(res)
+    return res
+
+
 def qt_bin_dir():
     res = os.path.join(qt_base_dir(), 'bin')
     assert os.path.exists(res)

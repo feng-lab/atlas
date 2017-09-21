@@ -14,6 +14,18 @@ import glob
 import common_dirs
 
 
+def is_windows() -> bool:
+    return sys.platform.startswith('win')
+
+
+def is_mac() -> bool:
+    return sys.platform.startswith('darwin')
+
+
+def is_linux() -> bool:
+    return sys.platform.startswith('linux')
+
+
 def macos_min_version():
     return '10.9'
 
@@ -45,7 +57,7 @@ def unpack_file_to_folder(file: str, folder: str):
         with tarfile.open(file, mode='r|*') as tf:
             tf.extractall(path=folder)
     elif file.lower().endswith('.7z'):
-        if sys.platform.startswith('win'):
+        if is_windows():
             subprocess.run(['7za', 'x', '-y', '-o' + folder, file],
                            shell=False, check=True, cwd=common_dirs.curr_dir())
         else:
@@ -128,7 +140,7 @@ def get_vcvars_environment(remove_conda_from_path: bool = True):
 def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.environ,
                                      remove_conda_from_path: bool = True):
     python = sys.executable
-    if sys.platform.startswith('win32'):
+    if is_windows():
         process = subprocess.Popen(
             '"{}" {} >nul && "{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(
                 script, para, python),
@@ -151,16 +163,25 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
     return env
 
 
+def get_cmake_cmd() -> str:
+    if is_windows():
+        cmake_folder = find_src_package_with_glob(os.path.join(common_dirs.software_dir(), 'cmake-*win*-x64'))
+        return os.path.join(cmake_folder, 'bin', 'cmake')
+    elif is_linux():
+        cmake_folder = find_src_package_with_glob(os.path.join(common_dirs.software_dir(), 'cmake-*Linux*_64'))
+        return os.path.join(cmake_folder, 'bin', 'cmake')
+    else:
+        return 'cmake'
+
+
 def get_cmake_cmd_common_part(install_dir: str):
-    if sys.platform.startswith('win'):
-        cmake_folder = find_src_package_with_glob(os.path.join(os.path.expanduser('~'), 'Downloads', 'cmake-*-x64'))
-        return [os.path.join(cmake_folder, 'bin', 'cmake'),  # '-E', 'echo',
+    if is_windows():
+        return [get_cmake_cmd(),  # '-E', 'echo',
                 '-G', 'Visual Studio 15 2017 Win64',
                 '-DCMAKE_INSTALL_PREFIX=' + install_dir
                 ]
-    elif sys.platform.startswith('linux'):
-        cmake_folder = find_src_package_with_glob(os.path.join(os.path.expanduser('~'), 'software', 'cmake-*_64'))
-        return [os.path.join(cmake_folder, 'bin', 'cmake'),  # '-E', 'echo',
+    elif is_linux():
+        return [get_cmake_cmd(),  # '-E', 'echo',
                 '-DCMAKE_BUILD_TYPE=Release',
                 '-DCMAKE_INSTALL_PREFIX=' + install_dir,
                 '-DCMAKE_CXX_FLAGS:STRING=-std=c++14'
@@ -176,7 +197,7 @@ def get_cmake_cmd_common_part(install_dir: str):
         #                   r'MacOSX10.10.sdk'
         # assert os.path.exists(osx_sysroot)
 
-        return ['cmake',  # '-E', 'echo',
+        return [get_cmake_cmd(),  # '-E', 'echo',
                 '-DCMAKE_BUILD_TYPE=Release',
                 '-DCMAKE_INSTALL_PREFIX=' + install_dir,
                 '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + macos_min_version(),
@@ -194,7 +215,7 @@ def build_gflags(src_dir: str, install_dir: str, ext_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend([src_dir])
 
-        if sys.platform.startswith('win'):
+        if is_windows():
             env = get_vcvars_environment()
             subprocess.run(cmakecmd,
                            cwd=build_dir, shell=False, check=True, env=env)
@@ -220,7 +241,7 @@ def build_glog(src_dir: str, install_dir: str, ext_dir: str):
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        if sys.platform.startswith('win'):
+        if is_windows():
             cmakecmd.extend(['-Dgflags_DIR:PATH={}/gflags/CMake'.format(ext_dir),
                              src_dir])
             env = get_vcvars_environment()
@@ -249,7 +270,7 @@ def build_benchmark(src_dir: str, install_dir: str, ext_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        if sys.platform.startswith('win'):
+        if is_windows():
             cmakecmd.extend(['-DBENCHMARK_ENABLE_LTO:BOOL=ON',
                              src_dir])
             env = get_vcvars_environment()
@@ -259,7 +280,7 @@ def build_benchmark(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
-            if sys.platform.startswith('linux'):
+            if is_linux():
                 cmakecmd.extend([src_dir])
             else:
                 cmakecmd.extend(['-DBENCHMARK_USE_LIBCXX:BOOL=ON',
@@ -279,7 +300,7 @@ def build_glbinding(src_dir: str, install_dir: str, ext_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        if sys.platform.startswith('win'):
+        if is_windows():
             cmakecmd.extend(['-DOPTION_BUILD_TOOLS:BOOL=OFF',
                              '-DBUILD_SHARED_LIBS:BOOL=OFF',
                              '-DOPTION_BUILD_TESTS:BOOL=OFF',
@@ -311,7 +332,7 @@ def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str, nasm_dir: str):
     orig_file = os.path.join(src_dir, 'CMakeLists.txt')
     bak_file = get_bak_file_name(orig_file)
     try:
-        if sys.platform.startswith('win'):
+        if is_windows():
             os.rename(orig_file, bak_file)
             with open(bak_file, mode='r', encoding='utf-8') as f:
                 from_lines = f.readlines()
@@ -343,7 +364,7 @@ def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str, nasm_dir: str):
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
-            if sys.platform.startswith('linux'):
+            if is_linux():
                 subprocess.run(['sh', src_dir + '/configure',
                                 'NASM=nasm',
                                 '--enable-static', '--disable-shared'],
@@ -361,7 +382,7 @@ def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str, nasm_dir: str):
                            cwd=build_dir, shell=False, check=True)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        if sys.platform.startswith('win'):
+        if is_windows():
             os.replace(bak_file, orig_file)
 
 
@@ -373,7 +394,7 @@ def build_zlib(src_dir: str, install_dir: str, ext_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        if sys.platform.startswith('win'):
+        if is_windows():
             cmakecmd.extend([src_dir])
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
@@ -434,7 +455,7 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        if sys.platform.startswith('win'):
+        if is_windows():
             cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
                              '-DPNG_SHARED:BOOL=OFF',
                              '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
@@ -464,7 +485,7 @@ def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
     orig_file = os.path.join(src_dir, 'Makefile')
     bak_file = get_bak_file_name(orig_file)
     try:
-        if sys.platform.startswith('win'):
+        if is_windows():
             env = get_vcvars_environment()
             subprocess.run(['MSBuild', 'JXR_vc14.sln', '/target:JXRDecApp', '/property:Platform=x64',
                             '/ToolsVersion:15.0', '/property:PlatformToolset=v141',
@@ -500,7 +521,7 @@ def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
             with open(orig_file, mode='w', encoding='utf-8') as f:
                 to_lines = []
                 for line in from_lines:
-                    if sys.platform.startswith('linux'):
+                    if is_linux():
                         line = line.replace(r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
                                             r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O',
                                             r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
@@ -518,9 +539,8 @@ def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install', 'DIR_INSTALL=' + install_dir],
                            cwd=src_dir, shell=False, check=True)
     finally:
-        if not sys.platform.startswith('win'):
+        if not is_windows():
             shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)
-        if not sys.platform.startswith('win'):
             os.replace(bak_file, orig_file)
 
 
@@ -531,7 +551,7 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
     orig_file = os.path.join(src_dir, 'makeengine.gte')
     bak_file = get_bak_file_name(orig_file)
     try:
-        if sys.platform.startswith('win'):
+        if is_windows():
             env = get_vcvars_environment()
             subprocess.run(['MSBuild', 'GTEngine.v15.vcxproj', '/property:Platform=x64',
                             '/property:Configuration=Release', '/maxcpucount'],
@@ -542,7 +562,7 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
                       os.path.join(install_dir, 'lib'))
             glob_copy(os.path.join(src_dir, '_Output', 'v141', 'x64', 'Release', 'GTEngine.v15.pdb'),
                       os.path.join(install_dir, 'lib'))
-        elif sys.platform.startswith('linux'):
+        elif is_linux():
             os.rename(orig_file, bak_file)
             with open(bak_file, mode='r', encoding='utf-8') as f:
                 from_lines = f.readlines()
@@ -572,7 +592,7 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
     finally:
         shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)  # macOS
         shutil.rmtree(os.path.join(src_dir, '_Output'), ignore_errors=True)  # win
-        if sys.platform.startswith('linux'):
+        if is_linux():
             os.replace(bak_file, orig_file)
 
 
@@ -584,7 +604,7 @@ def build_ospray(src_dir: str, install_dir: str, ext_dir: str, ispc_dir: str, em
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        if sys.platform.startswith('win'):
+        if is_windows():
             intel_sw_dir = 'C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\'
             env = get_enviroment_from_shell_script(intel_sw_dir + 'tbb\\bin\\tbbvars.bat',
                                                    para='intel64 vs2017',
@@ -646,7 +666,7 @@ def build_assimp(src_dir: str, install_dir: str, ext_dir: str):
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        if sys.platform.startswith('win'):
+        if is_windows():
             cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
                              '-DASSIMP_BUILD_TESTS:BOOL=OFF',
                              '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
@@ -677,7 +697,7 @@ def build_hdf5(src_dir: str, install_dir: str, ext_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        if sys.platform.startswith('win'):
+        if is_windows():
             cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
                              '-DBUILD_SHARED_LIBS:BOOL=OFF',
                              '-DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=OFF',
@@ -750,7 +770,7 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
                 to_lines.append(line)
         print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
 
-        if sys.platform.startswith('win'):
+        if is_windows():
             env = get_vcvars_environment()
             subprocess.run(['devenv', 'FreeImage.2013.sln', '/Upgrade'],
                            cwd=src_dir, shell=True, check=True, env=env)
@@ -762,7 +782,7 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
                                          install_dir)
             distutils.dir_util.copy_tree(os.path.join(src_dir, 'Wrapper', 'FreeImagePlus', 'dist', 'x64'),
                                          install_dir)
-        elif sys.platform.startswith('linux'):
+        elif is_linux():
             os.rename(orig_file_3, bak_file_3)
             with open(bak_file_3, mode='r', encoding='utf-8') as f:
                 from_lines = f.readlines()
@@ -830,10 +850,10 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
     finally:
         os.replace(bak_file, orig_file)
         os.replace(bak_file_2, orig_file_2)
-        if sys.platform.startswith('darwin'):
+        if is_mac():
             os.remove(os.path.join(src_dir, 'Makefile_gnu'))
             os.remove(os.path.join(src_dir, 'Makefile_fip'))
-        elif sys.platform.startswith('linux'):
+        elif is_linux():
             os.replace(bak_file_3, orig_file_3)
             os.replace(bak_file_4, orig_file_4)
 
@@ -844,7 +864,7 @@ def build_botan(src_dir: str, install_dir: str, ext_dir: str):
     try:
         python = sys.executable
 
-        if sys.platform.startswith('win'):
+        if is_windows():
             env = get_vcvars_environment()
             subprocess.run([python, src_dir + '/configure.py', '--cc=msvc',
                             '--prefix=' + install_dir],
@@ -855,7 +875,7 @@ def build_botan(src_dir: str, install_dir: str, ext_dir: str):
                            cwd=src_dir, shell=True, check=True, env=env)
             subprocess.run(['nmake', 'install'],
                            cwd=src_dir, shell=False, check=True, env=env)  # todo: install not working
-        elif sys.platform.startswith('linux'):
+        elif is_linux():
             subprocess.run([python, src_dir + '/configure.py', '--with-zlib',
                             '--prefix=' + install_dir],
                            cwd=src_dir, shell=False, check=True)
@@ -884,7 +904,7 @@ def build_itk(src_dir: str, install_dir: str, ext_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        if sys.platform.startswith('win'):
+        if is_windows():
             cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
                              '-DBUILD_TESTING:BOOL=OFF',
                              '-DITK_USE_64BITS_IDS:BOOL=ON',
@@ -930,7 +950,7 @@ def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        if sys.platform.startswith('win'):
+        if is_windows():
             cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
                              '-DBUILD_TESTING:BOOL=OFF',
                              '-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -947,7 +967,7 @@ def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
-            if sys.platform.startswith('linux'):
+            if is_linux():
                 cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
                                  '-DBUILD_TESTING:BOOL=OFF',
                                  '-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -979,7 +999,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
     orig_file_3 = os.path.join(src_dir, 'modules', 'core', 'include', 'opencv2', 'core', 'private.hpp')
     bak_file_3 = get_bak_file_name(orig_file_3)
     try:
-        if sys.platform.startswith('win32'):
+        if is_windows():
             intel_sw_dir = 'C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\'
             env = get_enviroment_from_shell_script(intel_sw_dir + 'tbb\\bin\\tbbvars.bat',
                                                    para='intel64 vs2017',
@@ -1066,7 +1086,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
             print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
         else:
             cmakecmd = get_cmake_cmd_common_part(install_dir)
-            if sys.platform.startswith('linux'):
+            if is_linux():
                 os.rename(orig_file_3, bak_file_3)
                 with open(bak_file_3, mode='r', encoding='utf-8') as f:
                     from_lines = f.readlines()
@@ -1209,9 +1229,9 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                     to_lines.append(line)
             print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
     finally:
-        if sys.platform.startswith('darwin'):
+        if is_mac():
             os.replace(bak_file, orig_file)
-        elif sys.platform.startswith('linux'):
+        elif is_linux():
             os.replace(bak_file_3, orig_file_3)
         shutil.rmtree(build_dir, ignore_errors=False)
 
@@ -1228,13 +1248,32 @@ def build_libs(libs: dict, update_src: bool):
     remove_path_contains('anaconda')
     print('PATH:', os.environ['PATH'])
 
-    if sys.platform.startswith('win32'):
+    if is_windows():
         os.environ['HOME'] = os.path.expanduser("~")
 
     print('HOME:', os.environ['HOME'])
 
+    if libs['cmake']:
+        if is_windows():
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'cmake*win*'))
+            package_unpack_folder = get_package_top_level_folder(package_name, common_dirs.software_dir())
+            if not os.path.exists(package_unpack_folder):
+                unpack_file_to_folder(package_name, common_dirs.software_dir())
+        elif is_linux():
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'cmake*linux*'))
+            package_unpack_folder = get_package_top_level_folder(package_name, common_dirs.software_dir())
+            if not os.path.exists(package_unpack_folder):
+                unpack_file_to_folder(package_name, common_dirs.software_dir())
+
+    if libs['curl']:
+        if is_windows():
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'curl*win*'))
+            package_unpack_folder = get_package_top_level_folder(package_name, common_dirs.software_dir())
+            if not os.path.exists(package_unpack_folder):
+                unpack_file_to_folder(package_name, common_dirs.software_dir())
+
     if libs['zlib']:
-        if not sys.platform.startswith('darwin'):
+        if is_windows():
             package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'zlib*'))
             src_dir = get_package_top_level_folder(package_name, base_dir)
             if update_src:
@@ -1244,14 +1283,14 @@ def build_libs(libs: dict, update_src: bool):
             build_zlib(src_dir, os.path.join(ext_dir, 'zlib'), ext_dir)
 
     if libs['ffmpeg']:
-        if sys.platform.startswith('win32'):
+        if is_windows():
             package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*win*'))
             package_unpack_folder = get_package_top_level_folder(package_name, ext_dir)
             unpack_file_to_folder(package_name, ext_dir)
             os.replace(os.path.join(package_unpack_folder, 'bin', 'ffmpeg.exe'),
                        os.path.join(ext_dir, 'ffmpeg.exe'))
             shutil.rmtree(package_unpack_folder, ignore_errors=False)
-        elif sys.platform.startswith('linux'):
+        elif is_linux():
             package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*static.tar.xz'))
             package_unpack_folder = get_package_top_level_folder(package_name, ext_dir)
             unpack_file_to_folder(package_name, ext_dir)
@@ -1319,11 +1358,11 @@ def build_libs(libs: dict, update_src: bool):
         build_glbinding(src_dir, os.path.join(ext_dir, 'glbinding'), ext_dir)
 
     if libs['libjpeg']:
-        if sys.platform.startswith('win32'):
+        if is_windows():
             nasm_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'nasm*win64*'))
-        elif sys.platform.startswith('darwin'):
+        elif is_mac():
             nasm_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'nasm*macosx*'))
-        if not sys.platform.startswith('linux'):
+        if not is_linux():
             nasm_package_unpack_folder = get_package_top_level_folder(nasm_package_name, base_dir)
             nasm_dir = nasm_package_unpack_folder
         else:
@@ -1331,10 +1370,10 @@ def build_libs(libs: dict, update_src: bool):
         package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'libjpeg*'))
         src_dir = get_package_top_level_folder(package_name, base_dir)
         if update_src:
-            if not sys.platform.startswith('linux'):
+            if not is_linux():
                 shutil.rmtree(nasm_package_unpack_folder, ignore_errors=True)
                 unpack_file_to_folder(nasm_package_name, base_dir)
-                if sys.platform.startswith('darwin'):
+                if is_mac():
                     os.chmod(os.path.join(nasm_dir, 'nasm'), stat.S_IXUSR)
             shutil.rmtree(src_dir, ignore_errors=True)
             unpack_file_to_folder(package_name, base_dir)
@@ -1423,10 +1462,10 @@ def build_libs(libs: dict, update_src: bool):
         build_botan(src_dir, os.path.join(ext_dir, 'botan'), ext_dir)
 
     if libs['ospray']:
-        if sys.platform.startswith('win32'):
+        if is_windows():
             ispc_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ispc*win*'))
             embree_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'embree*win*'))
-        elif sys.platform.startswith('linux'):
+        elif is_linux():
             ispc_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ispc*linux*'))
             embree_package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'embree*linux*'))
         else:
@@ -1450,7 +1489,9 @@ def build_libs(libs: dict, update_src: bool):
 
 
 def parse_inputs(argv: list):
-    libs = {'zlib': False,
+    libs = {'cmake': False,
+            'curl': False,
+            'zlib': False,
             'ffmpeg': False,
             'boost': False,
             'eigen': False,
@@ -1500,8 +1541,14 @@ def parse_inputs(argv: list):
             update_src = False
         else:
             raise SyntaxError("wrong lib name: " + lib)
-    if not sys.platform.startswith('win32'):
+
+    if is_linux():
         libs['zlib'] = False
+        libs['curl'] = False
+    elif is_mac():
+        libs['zlib'] = False
+        libs['curl'] = False
+        libs['cmake'] = False
 
     for lib, rev_dep in libs_reverse_depends.items():
         if libs[lib.lower()]:
