@@ -1268,11 +1268,17 @@ def build_libs(libs: dict, update_src: bool):
             package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'cmake*win*'))
             package_unpack_folder = get_package_top_level_folder(package_name, common_dirs.software_dir())
             if not os.path.exists(package_unpack_folder):
+                folder_list = glob.glob(os.path.join(common_dirs.software_dir(), 'cmake*win*'))
+                if len(folder_list) == 1:
+                    shutil.rmtree(folder_list[0], ignore_errors=False)
                 unpack_file_to_folder(package_name, common_dirs.software_dir())
         elif is_linux():
             package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'cmake*Linux*'))
             package_unpack_folder = get_package_top_level_folder(package_name, common_dirs.software_dir())
             if not os.path.exists(package_unpack_folder):
+                folder_list = glob.glob(os.path.join(common_dirs.software_dir(), 'cmake*Linux*'))
+                if len(folder_list) == 1:
+                    shutil.rmtree(folder_list[0], ignore_errors=False)
                 unpack_file_to_folder(package_name, common_dirs.software_dir())
 
     if libs['curl']:
@@ -1280,6 +1286,9 @@ def build_libs(libs: dict, update_src: bool):
             package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'curl*win*'))
             package_unpack_folder = get_package_top_level_folder(package_name, common_dirs.software_dir())
             if not os.path.exists(package_unpack_folder):
+                folder_list = glob.glob(os.path.join(common_dirs.software_dir(), 'curl*win*'))
+                if len(folder_list) == 1:
+                    shutil.rmtree(folder_list[0], ignore_errors=False)
                 unpack_file_to_folder(package_name, common_dirs.software_dir())
 
     if libs['zlib']:
