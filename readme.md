@@ -9,7 +9,7 @@
 
 ### Linux:
 * install qt5, mkl, ipp, tbb, python3, cmake and ninja
-* sudo apt-get install unrar p7zip-full git nasm libglfw3-dev zlib1g-dev patchelf
+* sudo apt install unrar p7zip-full git nasm libglfw3-dev zlib1g-dev patchelf
 
 ### All:
 * code repository folder should be named as "atlas"; "atlas_others" folder and "atlas" folder should be in same directory

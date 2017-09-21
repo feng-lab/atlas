@@ -3,6 +3,7 @@ import sys
 import subprocess
 import tempfile
 import shutil
+import glob
 
 
 def error(s):
@@ -353,7 +354,9 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins):
             shutil.copyfile(src, dst)  # overrides dest no questions asked
             strip(dst)
     else:
-        shutil.copytree(qt_plugin_dir, dest_dir + os.sep + appdir_plugins)
+        shutil.copytree(qt_plugin_dir, os.path.join(dest_dir, appdir_plugins))
+        for dst in glob.glob(os.path.join(dest_dir, appdir_plugins, '**', '*.so')):
+            strip(dst)
 
     # Make qt.conf file
     create_qt_conf(dest_dir)
