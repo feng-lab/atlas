@@ -87,6 +87,21 @@ void removeOldLogs(const QDir& dir, int numberToKeep = 20)
 int main(int argc, char* argv[])
 {
   try {
+    std::string usage("Atlas is a brain map platform.  Usage:\n");
+    usage += std::string(argv[0]) + "";
+    gflags::SetUsageMessage(usage);
+    gflags::SetVersionString(GIT_VERSION);
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+#ifdef ATLAS_WITH_TESTS
+    if (FLAGS_run_unit_tests) {
+      return ZUnitTest::run();
+    }
+    if (FLAGS_run_benchmarks) {
+      return ZRunBenchmark::run();
+    }
+#endif
+
     QSurfaceFormat format;
 #if defined(__APPLE__) && defined(ATLAS_USE_CORE_PROFILE)
     format.setVersion(3, 2);
@@ -120,21 +135,6 @@ int main(int argc, char* argv[])
       nim::shutdownLogging();
     });
     boost::ignore_unused(guardlogging);
-
-    std::string usage("Atlas is a brain map platform.  Usage:\n");
-    usage += std::string(argv[0]) + "";
-    gflags::SetUsageMessage(usage);
-    gflags::SetVersionString(GIT_VERSION);
-    gflags::ParseCommandLineFlags(&argc, &argv, true);
-
-#ifdef ATLAS_WITH_TESTS
-    if (FLAGS_run_unit_tests) {
-      return ZUnitTest::run();
-    }
-    if (FLAGS_run_benchmarks) {
-      return ZRunBenchmark::run();
-    }
-#endif
 
     nim::addLogSink(&nim::ZLogCache::instance());
     qInstallMessageHandler(myMessageOutput);
