@@ -100,7 +100,7 @@ void ZImgZeissLsm::detectImgInfo(ZTiff& tiff)
 void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
 {
   const ZImgMetatag& lsmInfoTag = tiff.lsmInfoTag();
-  memcpy(&m_lsmInfo, lsmInfoTag.dataArray(), lsmInfoTag.dataByteNumber());
+  std::memcpy(&m_lsmInfo, lsmInfoTag.dataArray(), lsmInfoTag.dataByteNumber());
 
   if (m_lsmInfo.u16ScanType == 3 || m_lsmInfo.u16ScanType == 5 ||
       m_lsmInfo.u16ScanType == 7 || m_lsmInfo.u16ScanType == 9) {
@@ -120,8 +120,8 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
     inputFileStream.seekg(m_lsmInfo.u32OffsetChannelColors);
     readStream(inputFileStream, chStruct.data(), chStruct.size());
     m_lsmImgInfo.channelColors.resize(m_lsmChannelColors.s32NumberColors);
-    memcpy(m_lsmImgInfo.channelColors.data(), chStruct.data() + m_lsmChannelColors.s32ColorsOffset,
-           sizeof(uint32_t) * m_lsmChannelColors.s32NumberColors);
+    std::memcpy(m_lsmImgInfo.channelColors.data(), chStruct.data() + m_lsmChannelColors.s32ColorsOffset,
+                sizeof(uint32_t) * m_lsmChannelColors.s32NumberColors);
 
     size_t offset = m_lsmChannelColors.s32NamesOffset;
     int nameIdx = 0;

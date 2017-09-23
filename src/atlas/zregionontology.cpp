@@ -345,7 +345,7 @@ void binaryImgToMesh1(const ZImg &img, ZMesh &msh)
                                    //img.voxelSizeX(), img.voxelSizeY(), img.voxelSizeZ(),
                                     1, 1, 1,
                                    img.voxelByteNumber(), WK_FIXED, (img.voxelFormat() == VoxelFormat::Unsigned) ? SGN_UNSIGNED : SGN_SIGNED));
-  memcpy(image3.data(), img.channelData(0), img.channelByteNumber());
+  std::memcpy(image3.data(), img.channelData(0), img.channelByteNumber());
 
   // default triangulation for Surface_mesher
   using Tr = CGAL::Surface_mesh_default_triangulation_3;
@@ -408,11 +408,11 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh)
   vimg->SetSpacing(1, 1, 1);
   vimg->SetOrigin(0, 0, 0);
   vimg->AllocateScalars(VTK_UNSIGNED_CHAR, 1);
-  memset(vimg->GetScalarPointer(), 0, (img.width() + 1) * (img.height() + 1) * (img.depth() + 1));
+  std::memset(vimg->GetScalarPointer(), 0, (img.width() + 1) * (img.height() + 1) * (img.depth() + 1));
 
   for (size_t z = 0; z < img.depth(); ++z) {
     for (size_t y = 0; y < img.height(); ++y) {
-      memcpy(static_cast<uint8_t*>(vimg->GetScalarPointer(0, y, z)), img.rowData(y, z, 0, 0), img.rowByteNumber());
+      std::memcpy(static_cast<uint8_t*>(vimg->GetScalarPointer(0, y, z)), img.rowData(y, z, 0, 0), img.rowByteNumber());
     }
   }
 

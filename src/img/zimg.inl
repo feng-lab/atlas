@@ -95,7 +95,7 @@ ZImg& ZImg::fill(TFillValue value)
 {
   if (bytesPerVoxel() == 1 || value == TFillValue(0)) {
     for (size_t t = 0; t < m_info.numTimes; ++t)
-      memset(timeData(t), static_cast<unsigned char>(value), timeByteNumber());
+      std::memset(timeData(t), static_cast<unsigned char>(value), timeByteNumber());
     return *this;
   }
 
@@ -578,7 +578,7 @@ void ZImg::scale_Impl(TVoxel minData, TVoxel maxData, const ZImg* src, ZImg* des
       dataRangeMin == TDesVoxel(minData) && dataRangeMax == TDesVoxel(maxData)) {
     if (src != des) {
       for (size_t t = 0; t < src->numTimes(); ++t) {
-        memcpy(des->timeData(t), src->timeData(t), src->timeByteNumber());
+        std::memcpy(des->timeData(t), src->timeData(t), src->timeByteNumber());
       }
     }
     return;

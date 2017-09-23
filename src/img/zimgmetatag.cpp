@@ -7,7 +7,7 @@ ZImgMetatag::ZImgMetatag(const QString& name, const QString& value)
 {
   QByteArray utf8array = value.toUtf8();
   setCount(utf8array.size() + 1);
-  memcpy(dataArray<char>(), utf8array.constData(), dataByteNumber());
+  std::memcpy(dataArray<char>(), utf8array.constData(), dataByteNumber());
 }
 
 QString ZImgMetatag::toQString() const

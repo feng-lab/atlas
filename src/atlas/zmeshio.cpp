@@ -50,8 +50,8 @@ aiMesh* createAIMesh(const ZMesh& mesh)
   const std::vector<glm::vec3>& vertices = mesh.vertices();
   const std::vector<glm::vec3>& normals = mesh.normals();
   CHECK(normals.size() >= vertices.size());
-  memcpy(pMesh->mVertices, vertices.data(), sizeof(float) * 3 * vertices.size());
-  memcpy(pMesh->mNormals, normals.data(), sizeof(float) * 3 * vertices.size());
+  std::memcpy(pMesh->mVertices, vertices.data(), sizeof(float) * 3 * vertices.size());
+  std::memcpy(pMesh->mNormals, normals.data(), sizeof(float) * 3 * vertices.size());
 
   return pMesh;
 }
@@ -222,8 +222,8 @@ void ZMeshIO::load(const QString& filename, ZMesh& mesh) const
       aiMesh* msh = scene->mMeshes[0];
       mesh.m_vertices.resize(msh->mNumVertices);
       mesh.m_normals.resize(msh->mNumVertices);
-      memcpy(mesh.m_vertices.data(), msh->mVertices, sizeof(float) * 3 * mesh.m_vertices.size());
-      memcpy(mesh.m_normals.data(), msh->mNormals, sizeof(float) * 3 * mesh.m_vertices.size());
+      std::memcpy(mesh.m_vertices.data(), msh->mVertices, sizeof(float) * 3 * mesh.m_vertices.size());
+      std::memcpy(mesh.m_normals.data(), msh->mNormals, sizeof(float) * 3 * mesh.m_vertices.size());
 
       for (size_t i = 0; i < msh->mNumFaces; ++i) {
         if (msh->mFaces[i].mNumIndices != 3)
@@ -238,8 +238,8 @@ void ZMeshIO::load(const QString& filename, ZMesh& mesh) const
         msh = scene->mMeshes[j];
         mesh.m_vertices.resize(numV + msh->mNumVertices);
         mesh.m_normals.resize(numV + msh->mNumVertices);
-        memcpy(&mesh.m_vertices[numV], msh->mVertices, sizeof(float) * 3 * msh->mNumVertices);
-        memcpy(&mesh.m_normals[numV], msh->mNormals, sizeof(float) * 3 * msh->mNumVertices);
+        std::memcpy(&mesh.m_vertices[numV], msh->mVertices, sizeof(float) * 3 * msh->mNumVertices);
+        std::memcpy(&mesh.m_normals[numV], msh->mNormals, sizeof(float) * 3 * msh->mNumVertices);
 
         for (size_t i = 0; i < msh->mNumFaces; ++i) {
           if (msh->mFaces[i].mNumIndices != 3)

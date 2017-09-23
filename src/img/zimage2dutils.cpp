@@ -4,8 +4,7 @@
 
 using namespace Eigen;
 
-namespace
-{
+namespace {
 
 __forceinline double nearest_kernel(double x)
 {
@@ -44,19 +43,18 @@ __forceinline double lanczos3_kernel(double x)
 
 }  // namespace
 
-namespace nim
-{
+namespace nim {
 
 bool seperate2DKernel(const double* kernel, size_t width, size_t height,
                       double* rowKernel, double* colKernel)
 {
   if (height == 1) {
-    memcpy(rowKernel, kernel, sizeof(double) * width);
+    std::memcpy(rowKernel, kernel, sizeof(double) * width);
     colKernel[0] = 1;
     return true;
   }
   if (width == 1) {
-    memcpy(colKernel, kernel, sizeof(double) * height);
+    std::memcpy(colKernel, kernel, sizeof(double) * height);
     rowKernel[0] = 1;
     return true;
   }
@@ -75,8 +73,8 @@ bool seperate2DKernel(const double* kernel, size_t width, size_t height,
       //LOG(INFO) << "rank " << rank;
       //LOG(INFO) << svd.matrixU();
       //LOG(INFO) << svd.matrixV();
-      Map<VectorXd>(colKernel, height) = svd.matrixU().col(0) * sqrt(s(0));
-      Map<VectorXd>(rowKernel, width) = svd.matrixV().col(0) * sqrt(s(0));
+      Map<VectorXd>(colKernel, height) = svd.matrixU().col(0) * std::sqrt(s(0));
+      Map<VectorXd>(rowKernel, width) = svd.matrixV().col(0) * std::sqrt(s(0));
       //      std::vector<double> show;
       //      show.insert(show.end(),rowKernel, rowKernel+width);
       //      logContainer(INFO, show, width);

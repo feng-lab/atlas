@@ -81,7 +81,7 @@ struct ZImgInfo
   // sz should have at least numDimensions() elements
   inline void setSize(size_t* sz)
   {
-    memcpy(&width, sz, sizeof(size_t) * numDimensions());
+    std::memcpy(&width, sz, sizeof(size_t) * numDimensions());
     createDefaultDescriptions();
   }
 

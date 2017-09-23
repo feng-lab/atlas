@@ -57,7 +57,7 @@ __forceinline Dest bit_cast(const Source& source)
   static_assert(std::is_trivially_copyable<Source>::value,
                 "non-trivially-copyable bit_cast is undefined");
   Dest dest;
-  memcpy(&dest, &source, sizeof(dest));
+  std::memcpy(&dest, &source, sizeof(dest));
   return dest;
 }
 

@@ -149,7 +149,7 @@ ZImg convertITKImgToZImg(const itk::Image<TVoxel, 3>* image)
   info.createDefaultDescriptions();
   ZImg res(info);
   const TVoxel* array = image->GetBufferPointer();
-  memcpy(res.channelData<TVoxel>(0, 0), array, res.channelByteNumber());
+  std::memcpy(res.channelData<TVoxel>(0, 0), array, res.channelByteNumber());
   return res;
 }
 
@@ -162,7 +162,7 @@ ZImg convertITKImgToZImg(const itk::Image<TVoxel, 2>* image)
   info.createDefaultDescriptions();
   ZImg res(info);
   const TVoxel* array = image->GetBufferPointer();
-  memcpy(res.channelData<TVoxel>(0, 0), array, res.channelByteNumber());
+  std::memcpy(res.channelData<TVoxel>(0, 0), array, res.channelByteNumber());
   return res;
 }
 
@@ -170,14 +170,14 @@ template<typename TVoxel>
 void copyITKImgToMemory(const itk::Image<TVoxel, 3>* image, TVoxel* data)
 {
   typename itk::Image<TVoxel, 3>::SizeType size = image->GetLargestPossibleRegion().GetSize();
-  memcpy(data, image->GetBufferPointer(), size[0] * size[1] * size[2] * sizeof(TVoxel));
+  std::memcpy(data, image->GetBufferPointer(), size[0] * size[1] * size[2] * sizeof(TVoxel));
 }
 
 template<typename TVoxel>
 void copyITKImgToMemory(const itk::Image<TVoxel, 2>* image, TVoxel* data)
 {
   typename itk::Image<TVoxel, 2>::SizeType size = image->GetLargestPossibleRegion().GetSize();
-  memcpy(data, image->GetBufferPointer(), size[0] * size[1] * sizeof(TVoxel));
+  std::memcpy(data, image->GetBufferPointer(), size[0] * size[1] * sizeof(TVoxel));
 }
 
 // Macro to help use itk library

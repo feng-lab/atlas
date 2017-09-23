@@ -3443,7 +3443,7 @@ char** ZStitchImageDialog::splitstack(Mc_Stack* stack, const char* filepath, int
     int offset = 0;
     int offset2 = 0;
     for (i = 0; i < stack->nchannel; ++i) {
-      memcpy(tmpstack->array + offset2, array + offset, channel_size2);
+      std::memcpy(tmpstack->array + offset2, array + offset, channel_size2);
       offset += channel_size;
       offset2 += channel_size2;
     }
@@ -3524,7 +3524,7 @@ Stack* ZStitchImageDialog::readStack(char* filepath, int bgsubIndex, int channel
 
 int ZStitchImageDialog::load_align(const char* filepath, char*** stack_file, int*** offset)
 {
-  FILE* fp = fopen(filepath, "r");
+  FILE* fp = std::fopen(filepath, "r");
 
   String_Workspace* sw = New_String_Workspace();
 
@@ -3567,7 +3567,7 @@ int ZStitchImageDialog::load_align(const char* filepath, char*** stack_file, int
 int** ZStitchImageDialog::load_conn(char* filepath, int*** config)
 {
   int ntile;
-  FILE* fp = fopen(filepath, "r");
+  FILE* fp = std::fopen(filepath, "r");
 
   if (fp == nullptr) {
     fprintf(stderr, "Cannot open the connection file.\n");

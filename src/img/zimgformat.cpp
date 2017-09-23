@@ -175,9 +175,9 @@ void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool A
   if (bufImg.numChannels() == 1) {
     CHECK(false);
     for (size_t t = 0; t < img.numTimes(); ++t)
-      memcpy(img.timeData<uint8_t>(t),
-             bufImg.timeData<uint8_t>(t),
-             bufImg.timeByteNumber());
+      std::memcpy(img.timeData<uint8_t>(t),
+                  bufImg.timeData<uint8_t>(t),
+                  bufImg.timeByteNumber());
     return;
   }
 
@@ -230,7 +230,7 @@ void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool A
           size_t srcStride = img.numChannels() * voxelByte;
           size_t i = 0;
           while (i++ < img.channelVoxelNumber()) {
-            memcpy(des, src, voxelByte);
+            std::memcpy(des, src, voxelByte);
             des += voxelByte;
             src += srcStride;
           }
@@ -248,9 +248,9 @@ void ZImgFormat::XYZCtoCXYZ(const ZImg& bufImg, ZImg& img)
   if (bufImg.numChannels() == 1) {
     CHECK(false);
     for (size_t t = 0; t < img.numTimes(); ++t)
-      memcpy(img.timeData<uint8_t>(t),
-             bufImg.timeData<uint8_t>(t),
-             bufImg.timeByteNumber());
+      std::memcpy(img.timeData<uint8_t>(t),
+                  bufImg.timeData<uint8_t>(t),
+                  bufImg.timeByteNumber());
     return;
   }
 
@@ -289,7 +289,7 @@ void ZImgFormat::XYZCtoCXYZ(const ZImg& bufImg, ZImg& img)
           size_t desStride = img.numChannels() * voxelByte;
           size_t i = 0;
           while (i++ < img.channelVoxelNumber()) {
-            memcpy(des, src, voxelByte);
+            std::memcpy(des, src, voxelByte);
             des += desStride;
             src += voxelByte;
           }
@@ -334,16 +334,16 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
           } else if (c == 2) {
             srcC = 0;
           }
-          memcpy(img.channelData<uint8_t>(c, t),
-                 buf + t * img.timeByteNumber() + srcC * img.channelByteNumber(),
-                 img.channelByteNumber());
+          std::memcpy(img.channelData<uint8_t>(c, t),
+                      buf + t * img.timeByteNumber() + srcC * img.channelByteNumber(),
+                      img.channelByteNumber());
         }
       }
     } else {
       for (size_t t = 0; t < img.numTimes(); ++t) {
-        memcpy(img.timeData<uint8_t>(t),
-               buf + t * img.timeByteNumber(),
-               img.timeByteNumber());
+        std::memcpy(img.timeData<uint8_t>(t),
+                    buf + t * img.timeByteNumber(),
+                    img.timeByteNumber());
       }
     }
     return;
@@ -401,7 +401,7 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
               }
             }
             uint8_t* desLoc = img.channelData<uint8_t>(desC, desLocs[4]);
-            memcpy(desLoc, srcLoc, srcStride);
+            std::memcpy(desLoc, srcLoc, srcStride);
             srcLoc += srcStride;
           }
         }
@@ -421,7 +421,7 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
                 }
               }
               uint8_t* desLoc = img.planeData<uint8_t>(desLocs[2], desC, desLocs[4]);
-              memcpy(desLoc, srcLoc, srcStride);
+              std::memcpy(desLoc, srcLoc, srcStride);
               srcLoc += srcStride;
             }
           }
@@ -445,7 +445,7 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
                 }
               }
               uint8_t* desLoc = img.rowData<uint8_t>(desLocs[1], desLocs[2], desC, desLocs[4]);
-              memcpy(desLoc, srcLoc, srcStride);
+              std::memcpy(desLoc, srcLoc, srcStride);
               srcLoc += srcStride;
             }
           }
@@ -472,7 +472,7 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
                 }
               }
               uint8_t* desLoc = img.data<uint8_t>(desLocs[0], desLocs[1], desLocs[2], desC, desLocs[4]);
-              memcpy(desLoc, srcLoc, srcStride);
+              std::memcpy(desLoc, srcLoc, srcStride);
               srcLoc += srcStride;
             }
           }

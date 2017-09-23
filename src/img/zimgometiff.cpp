@@ -183,7 +183,7 @@ void ZImgOmeTiff::makeImageDescriptionTag(const ZImgInfo& info, const QString& d
 
   QByteArray xml = createOmeXml(info, dimensionOrder).toUtf8();
   tag.setCount(xml.size() + 1);
-  memcpy(tag.dataArray<char>(), xml.constData(), tag.dataByteNumber());
+  std::memcpy(tag.dataArray<char>(), xml.constData(), tag.dataByteNumber());
 }
 
 void ZImgOmeTiff::parseOME(QXmlStreamReader& xml, ZTiff& tiff)
@@ -404,7 +404,7 @@ void ZImgOmeTiff::parseChannel(QXmlStreamReader& xml)
     if (!ok)
       throw ZIOException("Can not parse ome channel Color");
     col4 col;
-    memcpy(&col, &color, 3);
+    std::memcpy(&col, &color, 3);
     std::swap(col.r, col.b);
     col.a = 255;
     m_omeImgInfo.channelColors.push_back(col);

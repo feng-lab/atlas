@@ -283,11 +283,11 @@ void Z3DImg::setScale(const glm::vec3& scale)
   m_pageDirectoryTexture.reset(
     new Z3DTexture(GL_TEXTURE_3D, GLint(GL_RGBA32I), glm::uvec3(m_pageDirectorySize), GL_RGBA_INTEGER, GL_INT));
   m_pageDirectory.resize(m_pageDirectoryTexture->numPixels());
-  memset(m_pageDirectory.data(), 0, m_pageDirectory.size() * sizeof(glm::ivec4));
+  std::memset(m_pageDirectory.data(), 0, m_pageDirectory.size() * sizeof(glm::ivec4));
   m_pageDirectoryTexture->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
 
-  memset(m_pageTableCache.data(), 0, m_pageTableCache.size() * sizeof(glm::ivec4));
+  std::memset(m_pageTableCache.data(), 0, m_pageTableCache.size() * sizeof(glm::ivec4));
   m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
 
   m_voxelWorldDimensions.resize(m_numLevels);
@@ -440,7 +440,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missin
         if (erasedKey.x >= 0) {
           for (size_t z = 0; z < m_pageTableBlockSize.z; ++z) {
             for (size_t y = 0; y < m_pageTableBlockSize.y; ++y) {
-              memset(
+              std::memset(
                 &m_pageTableCache[(pageTableBlockCachePos.z + z) * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
                                   (pageTableBlockCachePos.y + y) * m_pageTableCacheSize.x + pageTableBlockCachePos.x],
                 0,

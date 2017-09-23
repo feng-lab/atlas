@@ -1023,7 +1023,7 @@ void ZTiff::writeTiffHeader(uint8_t* mem, size_t width, size_t height, size_t bi
   header.compression = compression;
   header.stripOffset = stripOffset;
   header.stripByteCount = stripByteCount;
-  memcpy(mem, &header, sizeof(header));
+  std::memcpy(mem, &header, sizeof(header));
 }
 
 uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigtiff, bool swabflag) const
@@ -1088,7 +1088,7 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
     ZImgMetatag field;
 
     uint16_t tag;
-    memcpy(&tag, dp, sizeof(tag));
+    std::memcpy(&tag, dp, sizeof(tag));
     dp += sizeof(uint16_t);
     if (swabflag)
       boost::endian::endian_reverse_inplace(tag);
@@ -1096,7 +1096,7 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
     field.setName(tagToName(tag));
 
     uint16_t type;
-    memcpy(&type, dp, sizeof(type));
+    std::memcpy(&type, dp, sizeof(type));
     dp += sizeof(uint16_t);
     if (swabflag)
       boost::endian::endian_reverse_inplace(type);
@@ -1107,13 +1107,13 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
     uint64_t count;
     if (!bigtiff) {
       uint32_t count32;
-      memcpy(&count32, dp, sizeof(count32));
+      std::memcpy(&count32, dp, sizeof(count32));
       dp += sizeof(uint32_t);
       if (swabflag)
         boost::endian::endian_reverse_inplace(count32);
       count = count32;
     } else {
-      memcpy(&count, dp, sizeof(count));
+      std::memcpy(&count, dp, sizeof(count));
       dp += sizeof(uint64_t);
       if (swabflag)
         boost::endian::endian_reverse_inplace(count);
@@ -1126,22 +1126,22 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
       if (field.dataByteNumber() > 4) {
         datafits = false;
         uint32_t dataoffset32;
-        memcpy(&dataoffset32, dp, sizeof(dataoffset32));
+        std::memcpy(&dataoffset32, dp, sizeof(dataoffset32));
         if (swabflag)
           boost::endian::endian_reverse_inplace(dataoffset32);
         dataoffset = dataoffset32;
       } else {
-        memcpy(field.dataArray(), dp, field.dataByteNumber());
+        std::memcpy(field.dataArray(), dp, field.dataByteNumber());
       }
       dp += sizeof(uint32_t);
     } else {
       if (field.dataByteNumber() > 8) {
         datafits = false;
-        memcpy(&dataoffset, dp, sizeof(dataoffset));
+        std::memcpy(&dataoffset, dp, sizeof(dataoffset));
         if (swabflag)
           boost::endian::endian_reverse_inplace(dataoffset);
       } else {
-        memcpy(field.dataArray(), dp, field.dataByteNumber());
+        std::memcpy(field.dataArray(), dp, field.dataByteNumber());
       }
       dp += sizeof(uint64_t);
     }
@@ -1728,7 +1728,7 @@ void ZTiff::separateChannel(const ZImg& bufImg, ZImg& img)
         size_t srcStride = img.numChannels() * voxelByte;
         size_t i = 0;
         while (i++ < img.channelVoxelNumber()) {
-          memcpy(des, src, voxelByte);
+          std::memcpy(des, src, voxelByte);
           des += voxelByte;
           src += srcStride;
         }
@@ -1744,7 +1744,7 @@ void ZTiff::copyOneChannelTileToImg(const uint8_t* tileBuf, size_t tileWidth, si
   size_t cpysize = (xEnd - xStart) * voxelByteNumber;
   size_t yEnd = std::min(yStart + tileHeight, img.height());
   for (size_t y = yStart; y < yEnd; ++y) {
-    memcpy(img.data<uint8_t>(xStart, y, 0, c), tileBuf + (y - yStart) * tileWidth * voxelByteNumber, cpysize);
+    std::memcpy(img.data<uint8_t>(xStart, y, 0, c), tileBuf + (y - yStart) * tileWidth * voxelByteNumber, cpysize);
   }
 }
 
@@ -1760,7 +1760,7 @@ void ZTiff::copyTileToImg(const uint8_t* tileBuf, size_t tileWidth, size_t tileH
         uint8_t* des = img.data<uint8_t>(x, y, 0, c);
         const uint8_t* src = tileBuf + (y - yStart) * tileWidth * voxelByteNumber * numChannels +
                              (x - xStart) * voxelByteNumber * numChannels + c * voxelByteNumber;
-        memcpy(des, src, voxelByteNumber);
+        std::memcpy(des, src, voxelByteNumber);
       }
     }
   }

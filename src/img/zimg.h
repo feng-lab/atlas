@@ -74,6 +74,14 @@ public:
 
   virtual ~ZImgSubBlock();
 
+  ZImgSubBlock(ZImgSubBlock&&) = default;
+
+  ZImgSubBlock& operator=(ZImgSubBlock&&) = default;
+
+  ZImgSubBlock(const ZImgSubBlock&) = default;
+
+  ZImgSubBlock& operator=(const ZImgSubBlock&) = default;
+
   // subclass read should depend its own members rather than member of this class
   virtual std::shared_ptr<ZImg> read() const = 0;
   virtual ZImgInfo readInfo() const = 0;

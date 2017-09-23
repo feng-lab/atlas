@@ -30,10 +30,10 @@ void ZImgV3DRaw::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
 
-  char formatkey[] = "raw_image_stack_by_hpeng";
-  readStream(inputFileStream, formatkey, std::strlen(formatkey));
-
-  if (std::strcmp(formatkey, "raw_image_stack_by_hpeng") != 0) {
+  std::array<char, sizeof("raw_image_stack_by_hpeng")> formatKey = {"raw_image_stack_by_hpeng"};
+  auto realKey = formatKey;
+  readStream(inputFileStream, realKey.data(), realKey.size() - 1);
+  if (formatKey != realKey) {
     throw ZIOException("File is not Vaa3D raw format.");
   }
 
@@ -53,7 +53,7 @@ void ZImgV3DRaw::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
 
   if ((sz[0] == 0) || (sz[1] == 0) || (sz[2] == 0) || (sz[3] == 0)) {
     readStream(inputFileStream, sz_buffer + 4, 8);
-    memcpy(sz, sz_buffer, 16);
+    std::memcpy(sz, sz_buffer, 16);
   }
 
   infos.resize(1);
@@ -80,10 +80,10 @@ void ZImgV3DRaw::readMetadata(const QString& filename, ZImgMetadata& /*meta*/, s
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
 
-  char formatkey[] = "raw_image_stack_by_hpeng";
-  readStream(inputFileStream, formatkey, std::strlen(formatkey));
-
-  if (std::strcmp(formatkey, "raw_image_stack_by_hpeng") != 0) {
+  std::array<char, sizeof("raw_image_stack_by_hpeng")> formatKey = {"raw_image_stack_by_hpeng"};
+  auto realKey = formatKey;
+  readStream(inputFileStream, realKey.data(), realKey.size() - 1);
+  if (formatKey != realKey) {
     throw ZIOException("File is not Vaa3D raw format.");
   }
 }
@@ -97,10 +97,10 @@ void ZImgV3DRaw::readThumbnail(const QString& filename, ZImgThumbernail& /*thumb
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
 
-  char formatkey[] = "raw_image_stack_by_hpeng";
-  readStream(inputFileStream, formatkey, std::strlen(formatkey));
-
-  if (std::strcmp(formatkey, "raw_image_stack_by_hpeng") != 0) {
+  std::array<char, sizeof("raw_image_stack_by_hpeng")> formatKey = {"raw_image_stack_by_hpeng"};
+  auto realKey = formatKey;
+  readStream(inputFileStream, realKey.data(), realKey.size() - 1);
+  if (formatKey != realKey) {
     throw ZIOException("File is not Vaa3D raw format.");
   }
 }
@@ -113,10 +113,10 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
 
-  char formatkey[] = "raw_image_stack_by_hpeng";
-  readStream(inputFileStream, formatkey, std::strlen(formatkey));
-
-  if (std::strcmp(formatkey, "raw_image_stack_by_hpeng") != 0) {
+  std::array<char, sizeof("raw_image_stack_by_hpeng")> formatKey = {"raw_image_stack_by_hpeng"};
+  auto realKey = formatKey;
+  readStream(inputFileStream, realKey.data(), realKey.size() - 1);
+  if (formatKey != realKey) {
     throw ZIOException("File is not Vaa3D raw format.");
   }
 
@@ -137,7 +137,7 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
 
   if ((sz[0] == 0) || (sz[1] == 0) || (sz[2] == 0) || (sz[3] == 0)) {
     readStream(inputFileStream, sz_buffer + 4, 8);
-    memcpy(sz, sz_buffer, 16);
+    std::memcpy(sz, sz_buffer, 16);
     dataOffset += 8;
   }
 

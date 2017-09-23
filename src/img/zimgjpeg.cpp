@@ -247,8 +247,8 @@ void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion&
     for (size_t y = lineStart; y < lineStart + lineRead; ++y) {
       if (region.yInRegion(y)) {
         if (imgInfo.numChannels == 1) {
-          memcpy(imgTmp.rowData<uint8_t>(y - region.start.y), &(buffer[y - lineStart][region.start.x]),
-                 imgTmp.rowByteNumber());
+          std::memcpy(imgTmp.rowData<uint8_t>(y - region.start.y), &(buffer[y - lineStart][region.start.x]),
+                      imgTmp.rowByteNumber());
         } else {
           size_t cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
           size_t xEnd = region.end.x == -1 ? imgInfo.width : region.end.x;
@@ -576,7 +576,7 @@ void ZImgJpeg::readImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
     throw ZIOException("buffer space is not enough");
   }
 
-  memcpy(des, img.channelData<uint8_t>(0), img.byteNumber());
+  std::memcpy(des, img.channelData<uint8_t>(0), img.byteNumber());
 }
 
 }  // namespace nim

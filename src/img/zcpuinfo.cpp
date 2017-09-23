@@ -165,10 +165,10 @@ void ZCpuInfo::detectCpuInfo()
 
   // Capture vendor string
   char vendorStr[0x20];
-  memset(vendorStr, 0, sizeof(vendorStr));
-  memcpy(vendorStr, &data[0][1], sizeof(int32_t));
-  memcpy(vendorStr + 4, &data[0][3], sizeof(int32_t));
-  memcpy(vendorStr + 8, &data[0][2], sizeof(int32_t));
+  std::memset(vendorStr, 0, sizeof(vendorStr));
+  std::memcpy(vendorStr, &data[0][1], sizeof(int32_t));
+  std::memcpy(vendorStr + 4, &data[0][3], sizeof(int32_t));
+  std::memcpy(vendorStr + 8, &data[0][2], sizeof(int32_t));
   vendor = QString(vendorStr);
   if (vendor == "GenuineIntel") {
     isIntel = true;
@@ -208,11 +208,11 @@ void ZCpuInfo::detectCpuInfo()
 
   // Interpret CPU brand string if reported
   char brandStr[0x40];
-  memset(brandStr, 0, sizeof(brandStr));
+  std::memset(brandStr, 0, sizeof(brandStr));
   if (nExIds >= 0x80000004) {
-    memcpy(brandStr, extdata[2].data(), 16);
-    memcpy(brandStr + 16, extdata[3].data(), 16);
-    memcpy(brandStr + 32, extdata[4].data(), 16);
+    std::memcpy(brandStr, extdata[2].data(), 16);
+    std::memcpy(brandStr + 16, extdata[3].data(), 16);
+    std::memcpy(brandStr + 32, extdata[4].data(), 16);
     brand = QString(brandStr);
   }
 

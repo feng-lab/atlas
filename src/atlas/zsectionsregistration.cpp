@@ -529,7 +529,7 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
   if (flip) {
     std::vector<ImagePixelType> buffer(m_img.planeVoxelNumber());
     for (size_t i = 0; i < m_registeredImg.numChannels(); ++i) {
-      memcpy(buffer.data(), m_img.planeData<ImagePixelType>(movingImageIndex, i), m_img.planeByteNumber());
+      std::memcpy(buffer.data(), m_img.planeData<ImagePixelType>(movingImageIndex, i), m_img.planeByteNumber());
       image2DFlip(buffer.data(), m_img.width(), m_img.height(), Dimension::X);
       transform->transformImage(buffer.data(),
                                 m_img.width(), m_img.height(),

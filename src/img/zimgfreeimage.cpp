@@ -287,7 +287,7 @@ void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
     uint8_t* imgBuf = img.timeData<uint8_t>(0);
     for (size_t i = 0; i < img.height(); ++i) {
       uint8_t* scanline = fipImg.getScanLine(img.height() - i - 1);
-      memcpy(imgBuf, scanline, fipImg.getLine());
+      std::memcpy(imgBuf, scanline, fipImg.getLine());
       imgBuf += fipImg.getLine();
     }
   } else {
@@ -332,7 +332,7 @@ void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
       uint8_t* imgBuf = img.timeData<uint8_t>(t);
       for (size_t i = 0; i < img.height(); ++i) {
         uint8_t* scanline = fipImg.getScanLine(img.height() - i - 1);
-        memcpy(imgBuf, scanline, fipImg.getLine());
+        std::memcpy(imgBuf, scanline, fipImg.getLine());
         imgBuf += fipImg.getLine();
       }
 
@@ -411,7 +411,7 @@ void ZImgFreeImage::readImg(uint8_t* mem, size_t size, uint8_t* des, size_t desS
   uint8_t* imgBuf = des;
   for (size_t i = 0; i < info.height; ++i) {
     uint8_t* scanline = fipImg.getScanLine(info.height - i - 1);
-    memcpy(imgBuf, scanline, fipImg.getLine());
+    std::memcpy(imgBuf, scanline, fipImg.getLine());
     imgBuf += fipImg.getLine();
   }
 
