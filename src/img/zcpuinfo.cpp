@@ -5,6 +5,7 @@
 #include <QProcess>
 #include <QThread>
 #include <array>
+#include <cstring>
 
 #ifdef _WIN32
 #include "zwindowsheader.h"
