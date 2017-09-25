@@ -393,10 +393,10 @@ bool ZColorMap::setDomainMax(double max, bool rescaleKeys)
       glm::col4 col = mappedColor(max);
       size_t startIdx = m_keys.size();
       size_t endIdx = 0;
-      for (int i = static_cast<int>(m_keys.size()) - 1; i >= 0; --i) {
+      for (size_t i = m_keys.size(); i-- > 0;) {
         if (keyIntensity(i) >= max) {
-          startIdx = std::min(startIdx, static_cast<size_t>(i));
-          endIdx = std::max(endIdx, static_cast<size_t>(i));
+          startIdx = std::min(startIdx, i);
+          endIdx = std::max(endIdx, i);
         } else
           break;
       }

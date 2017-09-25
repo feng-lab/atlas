@@ -810,7 +810,7 @@ ZGenerateAnalysisTextFile::intensityWeightedNearestNode(double x, double y, doub
   for (size_t v = 0; v < dist.size(); ++v) {
     ZVoxelCoordinate coord = img.indexToCoord(v);
     int nodeIdx = -1;
-    for (int i = nodes.size() - 1; i >= 0; --i) {
+    for (size_t i = nodes.size(); i-- > 0;) {
       if (pointFrustumConeDist(coord.x + left, coord.y + up, coord.z + zup, nodes[i], ZSwc::parent(nodes[i])) <= 0.0) {
         nodeIdx = i;
         break;

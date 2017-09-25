@@ -69,7 +69,7 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const ZImg& imgIn, s
   while (minIndex > maxIndex && hist[minIndex] == 0)
     --minIndex;
 
-  for (int i = static_cast<int>(minIndex) - 1; i >= static_cast<int>(maxIndex); --i) {
+  for (size_t i = minIndex; i-- > maxIndex;) {
     if (hist[i] && hist[i] < hist[minIndex]) {
       minIndex = i;
     }

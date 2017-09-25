@@ -190,7 +190,7 @@ void ZNeighborhood::removeSymmetricalOffsets()
 {
   size_t numRemoved = 0;
   // 0 to (size() - 1 - numRemoved) are valid offsets
-  for (size_t i = m_offsets.size() - 1; i > 0; --i) {
+  for (size_t i = m_offsets.size(); i-- > 1;) {
     for (size_t j = 0; j < i; ++j) {
       if (m_offsets[j] + m_offsets[i] == ZVoxelCoordinate()) {
         std::swap(m_offsets[i], m_offsets[m_offsets.size() - 1 - numRemoved]);

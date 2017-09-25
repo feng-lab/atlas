@@ -60,10 +60,7 @@ void ZColorMapWidget::mousePressEvent(QMouseEvent* e)
         m_colorMap->get().setKeySelected(index, true);
       } else {
         for (size_t i = 1; i < m_colorMap->get().numKeys() - 1; ++i) {
-          if (index == i)
-            m_colorMap->get().setKeySelected(i, true);
-          else
-            m_colorMap->get().setKeySelected(i, false);
+          m_colorMap->get().setKeySelected(i, index == i);
         }
       }
     }
@@ -99,7 +96,7 @@ void ZColorMapWidget::mouseMoveEvent(QMouseEvent* e)
       }
     }
   } else {
-    for (int i = int(m_colorMap->get().numKeys()) - 2; i >= 0; --i) {
+    for (size_t i = m_colorMap->get().numKeys() - 1; i-- > 0;) {
       //LOG(INFO) << m_colorMap->get().isKeySelected(i) << " " << m_colorMap->get().key(i).intensity() << " " << m_colorMap->get().domainMax();
       if (m_colorMap->get().isKeySelected(i)) {
         if (m_colorMap->get().key(i).intensity() == m_colorMap->get().domainMax())

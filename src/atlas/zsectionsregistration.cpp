@@ -73,7 +73,7 @@ void ZSectionsRegistration::doWork()
     reportProgress(progress/m_img.depth());
   }
 
-  for (int i=m_fixedSliceIndex-1; i>=0; --i) {
+  for (int i = m_fixedSliceIndex; i-- > 0;) {
     IMG_TYPED_CALL(alignSection, m_img, i+1, i);
     progress += 1.0;
     reportProgress(progress/m_img.depth());

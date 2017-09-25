@@ -263,7 +263,7 @@ void image2DPad(const TPixel* img, size_t width, size_t height,
     } else if (padOption == PadOption::Circular) { //circular
       // left
       int refX = width;
-      for (int i = leftPad - 1; i >= 0; --i) {
+      for (size_t i = leftPad; i-- > 0;) {
         --refX;
         refX = refX < 0 ? width - 1 : refX;
         for (size_t j = 0; j < height; ++j) {
@@ -281,7 +281,7 @@ void image2DPad(const TPixel* img, size_t width, size_t height,
       }
       // up
       int refY = height;
-      for (int j = upPad - 1; j >= 0; --j) {
+      for (size_t j = upPad; j-- > 0;) {
         --refY;
         refY = refY < 0 ? height - 1 : refY;
         std::memcpy(imgOut + j * desWidth,

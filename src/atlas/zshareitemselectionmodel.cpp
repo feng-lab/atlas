@@ -74,7 +74,7 @@ QModelIndex ZShareItemSelectionModel::mapIndexToSrc(const QModelIndex& index) co
   if (!index.isValid())
     return QModelIndex();
   QModelIndex res = index;
-  for (int i = m_proxyChain.size() - 1; i >= 0; --i) {
+  for (int i = m_proxyChain.size(); i-- > 0;) {
     res = m_proxyChain[i]->mapToSource(res);
   }
   return res;
@@ -96,7 +96,7 @@ QItemSelection ZShareItemSelectionModel::mapSelectionToSrc(const QItemSelection&
   if (selection.isEmpty())
     return QItemSelection();
   QItemSelection res = selection;
-  for (int i = m_proxyChain.size() - 1; i >= 0; --i) {
+  for (int i = m_proxyChain.size(); i-- > 0;) {
     res = m_proxyChain[i]->mapSelectionToSource(res);
   }
   return res;

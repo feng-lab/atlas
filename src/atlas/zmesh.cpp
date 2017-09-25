@@ -1223,7 +1223,7 @@ void ZMesh::createSwcMesh(const ZSwc& tree, double zScale, int rootType, ZMesh& 
   for (std::vector<SwcTreeNode>& branch : allBranches) {
     CHECK(branch.size() >= 1);
     size_t lastRootNodeIndex = branch.size();
-    for (size_t i = branch.size() - 1; i > 0; --i) {
+    for (size_t i = branch.size(); i-- > 1;) {
       if (branch[i]->type == rootType) {
         lastRootNodeIndex = i;
         break;

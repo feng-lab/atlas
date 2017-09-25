@@ -1369,7 +1369,7 @@ public:
     for (AncestorIterator it = beginAncestor(pos); it != endAncestor(pos); ++it) {
       chain.push_back(it);
     }
-    for (size_t i = chain.size() - 1; i >= 1; --i) {
+    for (size_t i = chain.size(); i-- > 1;) {
       reverseChildRoot(chain[i - 1], chain[i]);
     }
   }
