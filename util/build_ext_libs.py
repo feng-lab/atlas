@@ -543,8 +543,13 @@ def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
 def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
     shutil.rmtree(install_dir, ignore_errors=True)
 
-    orig_file = os.path.join(src_dir, 'makeengine.gte')
-    bak_file = get_bak_file_name(orig_file)
+    if is_linux():
+        orig_file = os.path.join(src_dir, 'makeengine.gte')
+        bak_file = get_bak_file_name(orig_file)
+    else:
+        orig_file = os.path.join(src_dir, 'Source', 'Mathematics', 'GteGenerateMeshUV.cpp')
+        bak_file = get_bak_file_name(orig_file)
+
     try:
         if is_windows():
             env = get_vcvars_environment()
@@ -577,18 +582,29 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
                            cwd=src_dir, shell=False, check=True)
             shutil.copytree(os.path.join(src_dir, 'lib', 'Release'), os.path.join(install_dir, 'lib'))
         else:
-            subprocess.run(['xcodebuild', '-project', 'GTEngine.xcodeproj', '-configuration', 'Default',
-                            '-target', 'Release Static', 'build', '-arch', 'x86_64',
-                            'MACOSX_DEPLOYMENT_TARGET=' + macos_min_version(),
-                            'CLANG_CXX_LANGUAGE_STANDARD=c++14'],
+            os.rename(orig_file, bak_file)
+            with open(bak_file, mode='r', encoding='utf-8') as f:
+                from_lines = f.readlines()
+            with open(orig_file, mode='w', encoding='utf-8') as f:
+                to_lines = []
+                for line in from_lines:
+                    line = line.replace(r'#include <Mathematics/GteGenerateMeshUV.h>',
+                                        '#include <Mathematics/GteGenerateMeshUV.h>\n#include <string>')
+                    f.write(line)
+                    to_lines.append(line)
+            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+
+            shutil.copy2(os.path.join(ext_dir, 'makeengine.macos.gte'), src_dir)
+            subprocess.run(['make', '-j' + str(os.cpu_count()), 'CFG=Release', '-f', 'makeengine.macos.gte'],
                            cwd=src_dir, shell=False, check=True)
-            shutil.copytree(os.path.join(src_dir, 'build', 'Default'), os.path.join(install_dir, 'lib'))
+            shutil.copytree(os.path.join(src_dir, 'lib', 'Release'), os.path.join(install_dir, 'lib'))
 
         shutil.copytree(os.path.join(src_dir, 'Include'), os.path.join(install_dir, 'include'))
     finally:
-        shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)  # macOS
+        shutil.rmtree(os.path.join(src_dir, 'lib'), ignore_errors=True)  # macOS/linux
+        shutil.rmtree(os.path.join(src_dir, 'obj'), ignore_errors=True)  # macOS/linux
         shutil.rmtree(os.path.join(src_dir, '_Output'), ignore_errors=True)  # win
-        if is_linux():
+        if is_linux() or is_mac():
             os.replace(bak_file, orig_file)
 
 
