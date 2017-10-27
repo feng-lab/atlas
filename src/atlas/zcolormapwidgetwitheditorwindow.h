@@ -21,9 +21,7 @@ protected:
 
 private:
   ZColorMapParameter* m_colorMap;
-  ZColorMapEditor* m_colorMapEditor;
-
-  QWidget* m_editorWindow = nullptr;
+  ZColorMapEditor* m_editorWindow = nullptr;
 };
 
 } // namespace nim

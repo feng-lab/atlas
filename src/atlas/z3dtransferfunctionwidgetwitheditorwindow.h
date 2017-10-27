@@ -20,9 +20,7 @@ protected:
 
 private:
   Z3DTransferFunctionParameter* m_transferFunction;
-  Z3DTransferFunctionEditor* m_transferFunctionEditor;
-
-  std::unique_ptr<QWidget> m_editorWindow;
+  Z3DTransferFunctionEditor* m_editorWindow = nullptr;
 };
 
 } // namespace nim

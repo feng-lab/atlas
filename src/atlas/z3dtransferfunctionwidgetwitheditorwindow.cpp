@@ -22,7 +22,7 @@ void Z3DTransferFunctionWidgetWithEditorWindow::createEditorWindow()
   } else {
     QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
 
-    m_editorWindow.reset(new Z3DTransferFunctionEditor(m_transferFunction, QApplication::activeWindow()));
+    m_editorWindow = new Z3DTransferFunctionEditor(m_transferFunction, QApplication::activeWindow());
     m_editorWindow->showNormal();
     m_editorWindow->raise();
     m_editorWindow->activateWindow();
