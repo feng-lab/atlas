@@ -81,7 +81,7 @@ def deploy_target_dir():
 
 
 def qt_ver():
-    return '5.9.1'
+    return '5.9.2'
 
 
 def qt_base_dir():
