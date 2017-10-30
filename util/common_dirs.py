@@ -61,6 +61,8 @@ def src_package_dir():
 
 def build_dir():
     res = os.path.join(repository_dir(), 'cmake-build-release')
+    if not os.path.exists(res):
+        os.mkdir(res)
     assert os.path.exists(res)
     return res
 
