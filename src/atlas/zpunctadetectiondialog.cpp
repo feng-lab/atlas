@@ -64,10 +64,7 @@ void ZPunctaDetectionDialog::detect()
     try {
       img.load(m_inputImageFileWidget->getSelectedOpenFile());
 #ifndef _NEUTUBE_
-      //auto imgToSend = new ZImg();   // will leak memory if no one receive the signal
-      //imgToSend->swap(img);
-      //img = imgToSend->createView();
-      //emit srcImgReady(imgToSend, m_inputImageFileWidget->getSelectedOpenFile());
+
 #else
       ZStack* stack = imgToZStack(img);
       stack->setSource(QFile::encodeName(m_inputImageFileWidget->getSelectedOpenFile()).constData());

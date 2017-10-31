@@ -33,8 +33,6 @@ signals:
   void stackDocDelivered(ZStack* stack);
 #endif
 
-  void srcImgReady(ZImg* img, QString path);
-
 protected:
   void detect();
 

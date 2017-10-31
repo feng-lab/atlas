@@ -302,11 +302,8 @@ void ZROIDoc::createMaskImage()
 
       int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
       img.save(dialog.selectedFiles().at(0), formats[fmtIdx], comps[fmtIdx]);
-      auto tmpImg = new ZImg();
-      tmpImg->swap(img);
-      m_doc.imgDoc().showImg(tmpImg, dialog.selectedFiles().at(0));
-
-      m_doc.imgDoc().setLastOpenedObjPath(dialog.selectedFiles().at(0));
+      img.clear();
+      m_doc.loadFile(dialog.selectedFiles().at(0));
     }
     catch (const ZException& e) {
       QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),

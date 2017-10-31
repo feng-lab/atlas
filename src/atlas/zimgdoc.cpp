@@ -277,29 +277,6 @@ bool ZImgDoc::isAlias(size_t id) const
   return false;
 }
 
-void ZImgDoc::showImg(ZImg* img, const QString& path)
-{
-  QStringList files;
-  files.push_back(QFileInfo(path).canonicalFilePath());
-  for (const auto& idPack : m_idToImgPacks) {
-    if (idPack.second->paths() == files) {
-      //it->second->setImg(*img);
-      sendChangedSignal(idPack.first);
-      return;
-    }
-  }
-
-  try {
-    addImgPack(new ZImgPack(*img, path));
-    ZSystemInfo::instance().addFileToRecentFileList(path);
-    setLastOpenedObjPath(path);
-  }
-  catch (const ZException& e) {
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-                          "Can not show image.\n" + e.what());
-  }
-}
-
 void ZImgDoc::loadImg()
 {
   QStringList filters;
@@ -349,7 +326,8 @@ void ZImgDoc::stitchImgs()
 void ZImgDoc::alignSections()
 {
   ZSectionsRegistrationDialog alignSectionsDialog(QApplication::activeWindow());
-  connect(&alignSectionsDialog, &ZSectionsRegistrationDialog::resultReady, this, &ZImgDoc::showImg);
+  connect(&alignSectionsDialog, &ZSectionsRegistrationDialog::resultReady,
+          &m_doc, qOverload<const QString&>(&ZDoc::loadFile));
   alignSectionsDialog.exec();
 }
 

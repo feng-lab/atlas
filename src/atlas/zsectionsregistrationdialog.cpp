@@ -188,6 +188,7 @@ void ZSectionsRegistrationDialog::processFinished()
     // first save img
     try {
       m_registeredImg.save(m_outputStackWidget->getSelectedSaveFile());
+      m_registeredImg.clear();
     }
     catch (const ZException& e) {
       QMessageBox::critical(this, qApp->applicationName(), "Can not save result image.\n" + e.what());
@@ -195,9 +196,8 @@ void ZSectionsRegistrationDialog::processFinished()
     }
     // if need open
     if (m_openStackAfterRegistering.get()) {
-      emit resultReady(&m_registeredImg, m_outputStackWidget->getSelectedSaveFile());
+      emit resultReady(m_outputStackWidget->getSelectedSaveFile());
     }
-    m_registeredImg.clear();
     // done
     QMessageBox::information(this, qApp->applicationName(),
                              "Sections Registration Finished.");

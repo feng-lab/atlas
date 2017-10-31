@@ -20,8 +20,6 @@ public:
 
   void setImgChannelColor(size_t id, size_t c, col4 col);
 
-  void showImg(ZImg* img, const QString& path);
-
   // ZObjDoc interface
 public:
   bool save(size_t id) override;

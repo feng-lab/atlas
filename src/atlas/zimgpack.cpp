@@ -403,6 +403,9 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>>& imgs, std
   if (m_imgInfo.depth == 1)
     mip = false;
 
+  if (mip)
+    readRatio = 1;
+
 #if 1
   auto tiit = m_rtzToTileBoxRTree.find(std::make_tuple(readRatio, t, mip ? -1 : int(z)));
   if (tiit != m_rtzToTileBoxRTree.end()) {

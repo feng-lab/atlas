@@ -219,7 +219,6 @@ void ZPunctaDoc::loadPuncta()
 void ZPunctaDoc::detectPuncta()
 {
   ZPunctaDetectionDialog dlg(QApplication::activeWindow());
-  connect(&dlg, &ZPunctaDetectionDialog::srcImgReady, &m_doc.imgDoc(), &ZImgDoc::showImg);
   dlg.exec();
 }
 

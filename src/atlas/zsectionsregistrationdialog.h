@@ -38,7 +38,7 @@ signals:
   void stackDocDelivered(ZStack* stack);
 #endif
 
-  void resultReady(ZImg* img, QString path);
+  void resultReady(QString path);
 
 protected:
   void registerSections();

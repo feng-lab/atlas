@@ -9,6 +9,7 @@
 #include "zsysteminfo.h"
 #include "zlog.h"
 #include "zfileutils.h"
+#include "zcpuinfo.h"
 #include <qtcsv/reader.h>
 #include <QtWidgets>
 
@@ -1556,11 +1557,10 @@ void ZStitchImageDialog::stitchStacks2()
   imgMerge.setMergeMode(mergeMode);
   QString summary = imgMerge.resolveLocations();
   m_commandOutputEdit->append(summary);
-  if (imgMerge.imgInfo().voxelByteNumber() > 0) {
+  if (imgMerge.imgInfo().voxelByteNumber() > ZCpuInfo::instance().nPhysicalRAM / 3) {
     ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
   } else {
-    ZImg res = imgMerge.wholeImg(1);
-    res.save(m_outputFileEdit->text());
+    imgMerge.wholeImg(1).save(m_outputFileEdit->text());
   }
   emit resultReady(m_outputFileEdit->text());
 
@@ -2081,11 +2081,10 @@ void ZStitchImageDialog::stitchStacks()
       imgMerge.setMergeMode(mergeMode);
       QString summary = imgMerge.resolveLocations();
       m_commandOutputEdit->append(summary);
-      if (imgMerge.imgInfo().voxelByteNumber() > 0) {
+      if (imgMerge.imgInfo().voxelByteNumber() > ZCpuInfo::instance().nPhysicalRAM / 3) {
         ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
       } else {
-        ZImg res = imgMerge.wholeImg(1);
-        res.save(m_outputFileEdit->text());
+        imgMerge.wholeImg(1).save(m_outputFileEdit->text());
       }
       emit resultReady(m_outputFileEdit->text());
     } else {
@@ -2198,11 +2197,10 @@ void ZStitchImageDialog::stitchStacks()
       imgMerge.setMergeMode(mergeMode);
       QString summary = imgMerge.resolveLocations();
       m_commandOutputEdit->append(summary);
-      if (imgMerge.imgInfo().voxelByteNumber() > 0) {
+      if (imgMerge.imgInfo().voxelByteNumber() > ZCpuInfo::instance().nPhysicalRAM / 3) {
         ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
       } else {
-        ZImg res = imgMerge.wholeImg(1);
-        res.save(m_outputFileEdit->text());
+        imgMerge.wholeImg(1).save(m_outputFileEdit->text());
       }
       emit resultReady(m_outputFileEdit->text());
     }
