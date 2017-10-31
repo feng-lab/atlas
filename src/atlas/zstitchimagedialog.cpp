@@ -1553,11 +1553,16 @@ void ZStitchImageDialog::stitchStacks2()
                         QString::number(f + 1), QString::number(m + 1));
   }
 
-  QString summary;
-  ZImg res = imgMerge.merge(mergeMode, &summary);
+  imgMerge.setMergeMode(mergeMode);
+  QString summary = imgMerge.resolveLocations();
   m_commandOutputEdit->append(summary);
-  res.save(m_outputFileEdit->text());
-  emit resultReady(&res, m_outputFileEdit->text());
+  if (imgMerge.imgInfo().voxelByteNumber() > 0) {
+    ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
+  } else {
+    ZImg res = imgMerge.wholeImg(1);
+    res.save(m_outputFileEdit->text());
+  }
+  emit resultReady(m_outputFileEdit->text());
 
   m_commandOutputEdit->append(QString("%1 saved.").arg(m_outputFileEdit->text()));
   if (m_useTileImageRadioButton->isChecked() && !m_tileImage.isNull()) {
@@ -1943,7 +1948,7 @@ void ZStitchImageDialog::stitchStacks()
                             ZImg::CombineMode::Mean);
       }
       img.save(m_outputFileEdit->text());
-      emit resultReady(&img, m_outputFileEdit->text());
+      emit resultReady(m_outputFileEdit->text());
 
       m_commandOutputEdit->append(QString("%1 saved.").arg(m_outputFileEdit->text()));
       return;
@@ -2073,11 +2078,16 @@ void ZStitchImageDialog::stitchStacks()
                             QString::number(fixedMovingPosHint.first.second + 1));
       }
 
-      QString summary;
-      ZImg res = imgMerge.merge(mergeMode, &summary);
+      imgMerge.setMergeMode(mergeMode);
+      QString summary = imgMerge.resolveLocations();
       m_commandOutputEdit->append(summary);
-      res.save(m_outputFileEdit->text());
-      emit resultReady(&res, m_outputFileEdit->text());
+      if (imgMerge.imgInfo().voxelByteNumber() > 0) {
+        ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
+      } else {
+        ZImg res = imgMerge.wholeImg(1);
+        res.save(m_outputFileEdit->text());
+      }
+      emit resultReady(m_outputFileEdit->text());
     } else {
       std::map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>> offsets;
       int intv[3];
@@ -2185,11 +2195,16 @@ void ZStitchImageDialog::stitchStacks()
                             QString::number(f + 1), QString::number(m + 1));
       }
 
-      QString summary;
-      ZImg res = imgMerge.merge(mergeMode, &summary);
+      imgMerge.setMergeMode(mergeMode);
+      QString summary = imgMerge.resolveLocations();
       m_commandOutputEdit->append(summary);
-      res.save(m_outputFileEdit->text());
-      emit resultReady(&res, m_outputFileEdit->text());
+      if (imgMerge.imgInfo().voxelByteNumber() > 0) {
+        ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
+      } else {
+        ZImg res = imgMerge.wholeImg(1);
+        res.save(m_outputFileEdit->text());
+      }
+      emit resultReady(m_outputFileEdit->text());
     }
 
     m_commandOutputEdit->append(QString("%1 saved.").arg(m_outputFileEdit->text()));

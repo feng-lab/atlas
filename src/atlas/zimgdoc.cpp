@@ -342,7 +342,7 @@ void ZImgDoc::importImgSequence()
 void ZImgDoc::stitchImgs()
 {
   ZStitchImageDialog stitchImageDialog(QApplication::activeWindow());
-  connect(&stitchImageDialog, &ZStitchImageDialog::resultReady, this, &ZImgDoc::showImg);
+  connect(&stitchImageDialog, &ZStitchImageDialog::resultReady, &m_doc, qOverload<const QString&>(&ZDoc::loadFile));
   stitchImageDialog.exec();
 }
 

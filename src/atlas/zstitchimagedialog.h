@@ -111,7 +111,7 @@ public:
 
 signals:
 
-  void resultReady(ZImg* img, QString path);
+  void resultReady(QString path);
 
 private:
   void stitchStacks();

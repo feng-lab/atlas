@@ -739,6 +739,12 @@ ZImg ZImgPack::allSlices(size_t t, size_t ratio) const
   return assembleImg(ratio, t);
 }
 
+ZImg ZImgPack::wholeImg(size_t ratio) const
+{
+  CHECK(m_diskCached);
+  return assembleImg(ratio);
+}
+
 void ZImgPack::createSliceTiles(ZImg* img, size_t z, size_t t, bool mip)
 {
   if (false || (img->width() <= m_tileSize && img->height() <= m_tileSize)) {

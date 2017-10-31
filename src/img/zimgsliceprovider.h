@@ -18,6 +18,8 @@ public:
   virtual ZImg slice(size_t z, size_t t, size_t ratio) const = 0;
 
   virtual ZImg allSlices(size_t t, size_t ratio) const;
+
+  virtual ZImg wholeImg(size_t ratio) const;
 };
 
 } // namespace nim

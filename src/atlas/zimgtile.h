@@ -22,10 +22,10 @@ public:
     m_box = BoxType(loc, loc + maxCoord);
   }
 
-  void createImgCache()
+  void createImgCache() const
   { if (!m_imgCache) m_imgCache = m_img.read(); }
 
-  void clearImgCache()
+  void clearImgCache() const
   { m_imgCache.reset(); }
 
   inline const ZImgSubBlock& imgBlock() const
@@ -33,6 +33,9 @@ public:
 
   inline const ZImg& img() const
   { return *m_imgCache; }
+
+  inline const ZImgInfo& imgInfo() const
+  { return m_info; }
 
   inline const ZVoxelCoordinate& location() const
   { return m_box.minCorner(); }
@@ -57,7 +60,7 @@ private:
   BoxType m_box;
 
   ZImgInfo m_info;
-  std::shared_ptr<ZImg> m_imgCache;
+  mutable std::shared_ptr<ZImg> m_imgCache;
 };
 
 } // namespace nim

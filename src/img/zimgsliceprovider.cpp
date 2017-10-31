@@ -21,5 +21,22 @@ ZImg ZImgSliceProvider::allSlices(size_t t, size_t ratio) const
   return res;
 }
 
+ZImg ZImgSliceProvider::wholeImg(size_t ratio) const
+{
+  ZImg res;
+  if (imgInfo().numTimes == 1) {
+    allSlices(0, ratio).swap(res);
+  } else {
+    ZImgInfo info = imgInfo();
+    info.width = std::ceil(info.width * 1.0 / ratio);
+    info.height = std::ceil(info.height * 1.0 / ratio);
+    res = ZImg(info);
+
+    for (size_t t = 0; t < res.numTimes(); ++t) {
+      res.pasteImg(allSlices(t, ratio), ZVoxelCoordinate(0, 0, 0, 0, t));
+    }
+  }
+  return res;
+}
 
 } // namespace nim

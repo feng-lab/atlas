@@ -2,6 +2,9 @@
 
 #include "zvoxelcoordinate.h"
 #include "zimg.h"
+#include "zimgsliceprovider.h"
+#include "zvoxelregion.h"
+#include "zimgtile.h"
 #include <QString>
 #include <map>
 
@@ -30,7 +33,7 @@ private:
 // use provided absolute locations or relative locations to merge multiple imgs
 // if one img has multiple relative locations, use minimum spanning tree to find the optimal one
 //
-class ZImgMerge
+class ZImgMerge : public ZImgSliceProvider
 {
 public:
   enum class Mode
@@ -50,10 +53,23 @@ public:
   void removeImg(const ZImgSubBlock& img);
 
   // remove connection between imgs, keep img
-  void removeImgConnection(const ZImgSubBlock& img1, const ZImgSubBlock& img2);
+  void removeImgPair(const ZImgSubBlock& img1, const ZImgSubBlock& img2);
 
+  // return summary info
   // throw ZImgException if error
-  ZImg merge(Mode mode = Mode::Max, QString* summary = nullptr) const;
+  QString resolveLocations();
+
+  void setMergeMode(Mode mode = Mode::Max)
+  { m_mergeMode = mode; }
+
+  const ZImgInfo& imgInfo() const override
+  { return m_imgInfo; }
+
+  ZImg slice(size_t z, size_t t, size_t ratio) const override;
+
+  ZImg allSlices(size_t t, size_t ratio) const override;
+
+  ZImg wholeImg(size_t ratio) const override;
 
 protected:
   void resolveLocations(std::map<const ZImgSubBlock*, ZVoxelCoordinate>& imgs,
@@ -67,6 +83,13 @@ private:
   std::map<std::pair<const ZImgSubBlock*, const ZImgSubBlock*>, std::pair<ZVoxelCoordinate, double>> m_imgPairs;
   std::map<const ZImgSubBlock*, QString> m_imgNames;
   std::map<const ZImgSubBlock*, ZImgInfo> m_imgInfos;
+  Mode m_mergeMode = Mode::Max;
+
+  std::map<const ZImgSubBlock*, ZVoxelCoordinate> m_imgFinalCoords;
+  std::vector<ZImgTile> m_tiles;
+  ZVoxelRegion m_overlapRegion;
+  ZVoxelCoordinate m_minCoord;
+  ZImgInfo m_imgInfo;
 };
 
 } // namespace nim

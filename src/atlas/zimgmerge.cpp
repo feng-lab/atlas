@@ -1,7 +1,5 @@
 #include "zimgmerge.h"
 
-#include "zimgtile.h"
-#include "zvoxelregion.h"
 #include "zstatisticsutils.h"
 #include "zimgio.h"
 #include "zlog.h"
@@ -16,7 +14,7 @@ using namespace nim;
 
 template<typename TVoxel>
 void mergeMin_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
-                   ZImg& res, std::vector<ZImgTile>& tiles)
+                   ZImg& res, const std::vector<ZImgTile>& tiles)
 {
   for (auto& tile : tiles)
     tile.createImgCache();
@@ -38,7 +36,7 @@ void mergeMin_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
 
 template<typename TVoxel>
 void mergeMax_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
-                   ZImg& res, std::vector<ZImgTile>& tiles)
+                   ZImg& res, const std::vector<ZImgTile>& tiles)
 {
   for (auto& tile : tiles)
     tile.createImgCache();
@@ -60,7 +58,7 @@ void mergeMax_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
 
 template<typename TVoxel>
 void mergeMean_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
-                    ZImg& res, std::vector<ZImgTile>& tiles)
+                    ZImg& res, const std::vector<ZImgTile>& tiles)
 {
   for (auto& tile : tiles)
     tile.createImgCache();
@@ -81,7 +79,7 @@ void mergeMean_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord
 
 template<typename TVoxel>
 void mergeMedian_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord,
-                      ZImg& res, std::vector<ZImgTile>& tiles)
+                      ZImg& res, const std::vector<ZImgTile>& tiles)
 {
   for (auto& tile : tiles)
     tile.createImgCache();
@@ -102,7 +100,7 @@ void mergeMedian_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoo
 
 template<typename TVoxel>
 void merge_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord, ZImgMerge::Mode mode,
-                ZImg& res, std::vector<ZImgTile>& tiles)
+                ZImg& res, const std::vector<ZImgTile>& tiles)
 {
   switch (mode) {
     case ZImgMerge::Mode::Min:
@@ -270,7 +268,7 @@ void ZImgMerge::removeImg(const ZImgSubBlock& img)
   }
 }
 
-void ZImgMerge::removeImgConnection(const ZImgSubBlock& img1, const ZImgSubBlock& img2)
+void ZImgMerge::removeImgPair(const ZImgSubBlock& img1, const ZImgSubBlock& img2)
 {
   auto it = m_imgPairs.begin();
   while (it != m_imgPairs.end()) {
@@ -282,9 +280,15 @@ void ZImgMerge::removeImgConnection(const ZImgSubBlock& img1, const ZImgSubBlock
   }
 }
 
-ZImg ZImgMerge::merge(Mode mode, QString* summary) const
+QString ZImgMerge::resolveLocations()
 {
-  ZImg res;
+  m_imgFinalCoords.clear();
+  m_imgInfo.clear();
+  m_tiles.clear();
+  m_overlapRegion = ZVoxelRegion();
+  m_minCoord = ZVoxelCoordinate();
+  QString summ;
+
   if (m_imgCoords.empty() && m_imgPairs.empty()) {
     throw ZImgException("Merge Imgs error: no Input Img");
   }
@@ -307,15 +311,178 @@ ZImg ZImgMerge::merge(Mode mode, QString* summary) const
     }
   }
 
-  std::map<const ZImgSubBlock*, ZVoxelCoordinate> imgs;
-  QString summ;
-  resolveLocations(imgs, refImg, minCost, summ);
-  mergeImgs(res, imgs, mode, summ);
+  resolveLocations(m_imgFinalCoords, refImg, minCost, summ);
+
+  for (const auto& imgCoord : m_imgFinalCoords)
+    m_tiles.emplace_back(*imgCoord.first, imgCoord.second);
+
+  ZVoxelRegion allRegion;
+
+  for (size_t i = 0; i < m_tiles.size(); ++i) {
+    allRegion.addBox(m_tiles[i].location(), m_tiles[i].maxCoord());
+
+    ZVoxelRegion r1;
+    r1.addBox(m_tiles[i].location(), m_tiles[i].maxCoord());
+    for (size_t j = i + 1; j < m_tiles.size(); ++j) {
+      ZVoxelRegion r2;
+      r2.addBox(m_tiles[j].location(), m_tiles[j].maxCoord());
+      if (!r2.intersect(r1).isEmpty())
+        m_overlapRegion.unite(r2);
+    }
+  }
+
+  ZVoxelCoordinate maxCoord;
+  allRegion.getBoundBox(m_minCoord, maxCoord);
+  ZVoxelCoordinate resSize = maxCoord - m_minCoord + 1;
+  // create result with correct meta info (channel color, time stamp, voxel size...)
+  m_imgInfo = m_tiles[0].imgInfo();
+  m_imgInfo.width = resSize.x;
+  m_imgInfo.height = resSize.y;
+  m_imgInfo.depth = resSize.z;
+  m_imgInfo.numChannels = resSize.c;
+  m_imgInfo.numTimes = resSize.t;
+  m_imgInfo.createDefaultDescriptions();
+
+  // to get correct meta info from tile img
+  std::set<size_t> neededChannelInfo;
+  for (size_t i = 0; i < m_imgInfo.numChannels; ++i) {
+    neededChannelInfo.insert(i);
+  }
+  std::set<size_t> neededTimeStamp;
+  for (size_t i = 0; i < m_imgInfo.numTimes; ++i) {
+    neededTimeStamp.insert(i);
+  }
+
+  for (size_t i = 0; i < m_tiles.size(); ++i) {
+    ZVoxelCoordinate tileLoc = m_tiles[i].location() - m_minCoord;
+    summ += QString("tile %1 final offset %2\n").arg(m_imgNames.at(&(m_tiles[i].imgBlock()))).arg(tileLoc.toQString());
+
+    if (!neededChannelInfo.empty()) { // some channnel info need to be filled
+      size_t tileStartC = tileLoc.c;
+      size_t tileEndC = tileStartC + m_tiles[i].imgInfo().numChannels;
+      for (std::set<size_t>::iterator it = neededChannelInfo.begin(); it != neededChannelInfo.end();) {
+        if (*it >= tileStartC && *it < tileEndC) {
+          m_imgInfo.channelColors[*it] = m_tiles[i].imgInfo().channelColors[*it - tileStartC];
+          m_imgInfo.channelNames[*it] = m_tiles[i].imgInfo().channelNames[*it - tileStartC];
+          it = neededChannelInfo.erase(it);
+        } else {
+          ++it;
+        }
+      }
+    }
+    if (!neededTimeStamp.empty()) { // some time stamp info need to be filled
+      size_t tileStartT = tileLoc.t;
+      size_t tileEndT = tileStartT + m_tiles[i].imgInfo().numTimes;
+      for (std::set<size_t>::iterator it = neededTimeStamp.begin(); it != neededTimeStamp.end();) {
+        if (*it >= tileStartT && *it < tileEndT) {
+          m_imgInfo.timeStamps[*it] = m_tiles[i].imgInfo().timeStamps[*it - tileStartT];
+          it = neededTimeStamp.erase(it);
+        } else {
+          ++it;
+        }
+      }
+    }
+  }
+  if (!neededChannelInfo.empty() || !neededTimeStamp.empty()) {
+    LOG(FATAL) << "check";
+  }
 
   LOG(INFO) << "merge summary:";
   LOG(INFO) << summ;
-  if (summary)
-    summ.swap(*summary);
+  return summ;
+}
+
+ZImg ZImgMerge::slice(size_t z, size_t t, size_t ratio) const
+{
+  ZImg res;
+  CHECK(ratio == 1);
+
+  ZImgRegion rgn(0, -1, 0, -1, z, z+1, 0, -1, t, t+1);
+  res.infoRef() = rgn.clip(m_imgInfo);
+  res.allocate();
+
+  ZVoxelCoordinate minCoord = m_minCoord;
+  minCoord.z += z;
+  minCoord.t += t;
+  for (size_t i = 0; i < m_tiles.size(); ++i) {
+    m_tiles[i].createImgCache();
+    ZVoxelCoordinate tileLoc = m_tiles[i].location() - minCoord;
+    if (m_mergeMode == Mode::Max) {
+      res.pasteImgMax(m_tiles[i].img(), tileLoc);
+    } else {
+      res.pasteImg(m_tiles[i].img(), tileLoc);
+    }
+
+    m_tiles[i].clearImgCache();
+  }
+
+  if (m_mergeMode != Mode::First && m_mergeMode != Mode::Max) {
+    // now merge overlap region
+    CHECK(false); // not working yet
+    IMG_TYPED_CALL(merge_Impl, res, m_overlapRegion, minCoord, m_mergeMode, res, m_tiles);
+  }
+
+  LOG(INFO) << "Assembled slice " << z << "/" << m_imgInfo.depth << ".";
+
+  return res;
+}
+
+ZImg ZImgMerge::allSlices(size_t t, size_t ratio) const
+{
+  ZImg res;
+  CHECK(ratio == 1);
+
+  ZImgRegion rgn(0, -1, 0, -1, 0, -1, 0, -1, t, t+1);
+  res.infoRef() = rgn.clip(m_imgInfo);
+  res.allocate();
+
+  ZVoxelCoordinate minCoord = m_minCoord;
+  minCoord.t += t;
+  for (size_t i = 0; i < m_tiles.size(); ++i) {
+    m_tiles[i].createImgCache();
+    ZVoxelCoordinate tileLoc = m_tiles[i].location() - minCoord;
+    if (m_mergeMode == Mode::Max) {
+      res.pasteImgMax(m_tiles[i].img(), tileLoc);
+    } else {
+      res.pasteImg(m_tiles[i].img(), tileLoc);
+    }
+
+    m_tiles[i].clearImgCache();
+  }
+
+  if (m_mergeMode != Mode::First && m_mergeMode != Mode::Max) {
+    // now merge overlap region
+    IMG_TYPED_CALL(merge_Impl, res, m_overlapRegion, minCoord, m_mergeMode, res, m_tiles);
+  }
+
+  return res;
+}
+
+ZImg ZImgMerge::wholeImg(size_t ratio) const
+{
+  ZImg res;
+  CHECK(ratio == 1);
+
+  res.infoRef() = m_imgInfo;
+  res.allocate();
+
+  ZVoxelCoordinate minCoord = m_minCoord;
+  for (size_t i = 0; i < m_tiles.size(); ++i) {
+    m_tiles[i].createImgCache();
+    ZVoxelCoordinate tileLoc = m_tiles[i].location() - minCoord;
+    if (m_mergeMode == Mode::Max) {
+      res.pasteImgMax(m_tiles[i].img(), tileLoc);
+    } else {
+      res.pasteImg(m_tiles[i].img(), tileLoc);
+    }
+
+    m_tiles[i].clearImgCache();
+  }
+
+  if (m_mergeMode != Mode::First && m_mergeMode != Mode::Max) {
+    // now merge overlap region
+    IMG_TYPED_CALL(merge_Impl, res, m_overlapRegion, minCoord, m_mergeMode, res, m_tiles);
+  }
 
   return res;
 }
@@ -460,7 +627,7 @@ void ZImgMerge::mergeImgs(ZImg& res, const std::map<const ZImgSubBlock*, ZVoxelC
   allRegion.getBoundBox(minCoord, maxCoord);
   ZVoxelCoordinate resSize = maxCoord - minCoord + 1;
   // create result with correct meta info (channel color, time stamp, voxel size...)
-  res.infoRef() = tiles[0].img().info();
+  res.infoRef() = tiles[0].imgInfo();
   res.infoRef().width = resSize.x;
   res.infoRef().height = resSize.y;
   res.infoRef().depth = resSize.z;

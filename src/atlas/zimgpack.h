@@ -184,6 +184,8 @@ public:
 
   ZImg allSlices(size_t t, size_t ratio) const override;
 
+  ZImg wholeImg(size_t ratio) const override;
+
 protected:
   // will take ownership of img
   void createSliceTiles(ZImg* img, size_t z, size_t t, bool mip = false);

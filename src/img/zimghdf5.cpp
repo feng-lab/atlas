@@ -530,25 +530,42 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
 
     H5::Group allGrp = file.createGroup("Img");
 
-    ZImgInfoIO::save(allGrp, imgSliceProvider.imgInfo());
+    const ZImgInfo& info = imgSliceProvider.imgInfo();
+    ZImgInfoIO::save(allGrp, info);
 
-    std::set<size_t> levels = imgSliceProvider.ratios();
+    uint64_t numLevels = 1;
+    std::set<size_t> levels{1};
+    size_t level = 1;
+    size_t width = info.width;
+    size_t height = info.height;
+    while (width > chunkSize() || height > chunkSize()) {
+      ++numLevels;
+      level *= 2;
+      levels.insert(level);
+      width = std::ceil(width / 2.0);
+      height = std::ceil(height / 2.0);
+    }
     writeRatiosToGrp(allGrp, levels);
 
     for (size_t t = 0; t < imgSliceProvider.imgInfo().numTimes; ++t) {
       H5::Group timeGrp = allGrp.createGroup(qUtf8Printable(QString("TimePoint%1").arg(t)));
+      std::vector<H5::Group> channelGrps;
       for (size_t c = 0; c < imgSliceProvider.imgInfo().numChannels; ++c) {
-        H5::Group channelGrp = timeGrp.createGroup(qUtf8Printable(QString("Channel%1").arg(c)));
-        for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
-          H5::Group zGrp = channelGrp.createGroup(qUtf8Printable(QString("Z%1").arg(z)));
+        channelGrps.push_back(timeGrp.createGroup(qUtf8Printable(QString("Channel%1").arg(c))));
+      }
+      for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
+        ZImg img = imgSliceProvider.slice(z, t, 1);
+        for (size_t c = 0; c < imgSliceProvider.imgInfo().numChannels; ++c) {
+          H5::Group zGrp = channelGrps[c].createGroup(qUtf8Printable(QString("Z%1").arg(z)));
 
-          writeImgSliceToH5Grp(zGrp, "Data", imgSliceProvider.slice(z, t, 1).createView(c, 0));
+          ZImg tmpImg = img.createView(c, 0);
+          writeImgSliceToH5Grp(zGrp, "Data", tmpImg);
 
-          for (auto level : levels) {
-            if (level == 1)
-              continue;
-            writeImgSliceToH5Grp(zGrp, QString("DownsampledBy%1Data").arg(level).toStdString(),
-                                 imgSliceProvider.slice(z, t, level).createView(c, 0));
+          level = 1;
+          while (tmpImg.width() > chunkSize() || tmpImg.height() > chunkSize()) {
+            level *= 2;
+            tmpImg.zoom(0.5, 0.5);
+            writeImgSliceToH5Grp(zGrp, QString("DownsampledBy%1Data").arg(level).toStdString(), tmpImg);
           }
         }
       }
