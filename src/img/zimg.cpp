@@ -848,12 +848,14 @@ ZImg& ZImg::fillRandom()
   return *this;
 }
 
-ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start)
+ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start, bool warningOn)
 {
   using TCoordinate = ZVoxelCoordinate::value_type;
 
   if (isEmpty() || img.isEmpty()) {
-    LOG(WARNING) << "Trying to paste empty img, abort";
+    if (warningOn) {
+      LOG(WARNING) << "Trying to paste empty img, abort";
+    }
     return *this;
   }
 
@@ -867,7 +869,9 @@ ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start)
       start.c >= static_cast<TCoordinate>(numChannels()) ||
       (start.t < 0 && start.t + static_cast<TCoordinate>(img.numTimes()) <= 0) ||
       start.t >= static_cast<TCoordinate>(numTimes())) {
-    LOG(WARNING) << "Trying to paste img with no overlap region, abort";
+    if (warningOn) {
+      LOG(WARNING) << "Trying to paste img with no overlap region, abort";
+    }
     return *this;
   }
 
@@ -927,12 +931,14 @@ ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start)
   return *this;
 }
 
-ZImg& ZImg::pasteImgMax(const ZImg& img, const ZVoxelCoordinate& start)
+ZImg& ZImg::pasteImgMax(const ZImg& img, const ZVoxelCoordinate& start, bool warningOn)
 {
   using TCoordinate = ZVoxelCoordinate::value_type;
 
   if (isEmpty() || img.isEmpty()) {
-    LOG(WARNING) << "Trying to paste empty img, abort";
+    if (warningOn) {
+      LOG(WARNING) << "Trying to paste empty img, abort";
+    }
     return *this;
   }
 
@@ -946,7 +952,9 @@ ZImg& ZImg::pasteImgMax(const ZImg& img, const ZVoxelCoordinate& start)
       start.c >= static_cast<TCoordinate>(numChannels()) ||
       (start.t < 0 && start.t + static_cast<TCoordinate>(img.numTimes()) <= 0) ||
       start.t >= static_cast<TCoordinate>(numTimes())) {
-    LOG(WARNING) << "Trying to paste img with no overlap region, abort";
+    if (warningOn) {
+      LOG(WARNING) << "Trying to paste img with no overlap region, abort";
+    }
     return *this;
   }
 

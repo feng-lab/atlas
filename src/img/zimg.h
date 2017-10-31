@@ -576,11 +576,11 @@ public:
   // paste another img into this img start from certain location (default zero)
   // type cast might happen if input img has different data type
   // do nothing if input img and current img have no overlap
-  ZImg& pasteImg(const ZImg& img, const ZVoxelCoordinate& start = ZVoxelCoordinate());
+  ZImg& pasteImg(const ZImg& img, const ZVoxelCoordinate& start = ZVoxelCoordinate(), bool warningOn = true);
 
   // similar to pasteImg, except that pasteImg keep the intensity value of input img in overlap area while
   // this function keep the maximum intensity value of current img and input img
-  ZImg& pasteImgMax(const ZImg& img, const ZVoxelCoordinate& start = ZVoxelCoordinate());
+  ZImg& pasteImgMax(const ZImg& img, const ZVoxelCoordinate& start = ZVoxelCoordinate(), bool warningOn = true);
 
   // cat a series of img along certain dimension
   // imgs should be same type and have same dimension size other than the dimension to cat

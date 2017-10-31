@@ -408,9 +408,9 @@ ZImg ZImgMerge::slice(size_t z, size_t t, size_t ratio) const
     m_tiles[i].createImgCache();
     ZVoxelCoordinate tileLoc = m_tiles[i].location() - minCoord;
     if (m_mergeMode == Mode::Max) {
-      res.pasteImgMax(m_tiles[i].img(), tileLoc);
+      res.pasteImgMax(m_tiles[i].img(), tileLoc, false);
     } else {
-      res.pasteImg(m_tiles[i].img(), tileLoc);
+      res.pasteImg(m_tiles[i].img(), tileLoc, false);
     }
 
     m_tiles[i].clearImgCache();
@@ -442,9 +442,9 @@ ZImg ZImgMerge::allSlices(size_t t, size_t ratio) const
     m_tiles[i].createImgCache();
     ZVoxelCoordinate tileLoc = m_tiles[i].location() - minCoord;
     if (m_mergeMode == Mode::Max) {
-      res.pasteImgMax(m_tiles[i].img(), tileLoc);
+      res.pasteImgMax(m_tiles[i].img(), tileLoc, false);
     } else {
-      res.pasteImg(m_tiles[i].img(), tileLoc);
+      res.pasteImg(m_tiles[i].img(), tileLoc, false);
     }
 
     m_tiles[i].clearImgCache();
