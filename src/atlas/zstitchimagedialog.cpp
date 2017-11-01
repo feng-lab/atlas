@@ -1557,7 +1557,7 @@ void ZStitchImageDialog::stitchStacks2()
   imgMerge.setMergeMode(mergeMode);
   QString summary = imgMerge.resolveLocations();
   m_commandOutputEdit->append(summary);
-  if (imgMerge.imgInfo().voxelByteNumber() > ZCpuInfo::instance().nPhysicalRAM / 3) {
+  if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM) {
     ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
   } else {
     imgMerge.wholeImg(1).save(m_outputFileEdit->text());
@@ -2081,7 +2081,7 @@ void ZStitchImageDialog::stitchStacks()
       imgMerge.setMergeMode(mergeMode);
       QString summary = imgMerge.resolveLocations();
       m_commandOutputEdit->append(summary);
-      if (imgMerge.imgInfo().voxelByteNumber() > ZCpuInfo::instance().nPhysicalRAM / 3) {
+      if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM) {
         ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
       } else {
         imgMerge.wholeImg(1).save(m_outputFileEdit->text());
@@ -2197,7 +2197,7 @@ void ZStitchImageDialog::stitchStacks()
       imgMerge.setMergeMode(mergeMode);
       QString summary = imgMerge.resolveLocations();
       m_commandOutputEdit->append(summary);
-      if (imgMerge.imgInfo().voxelByteNumber() > ZCpuInfo::instance().nPhysicalRAM / 3) {
+      if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM) {
         ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
       } else {
         imgMerge.wholeImg(1).save(m_outputFileEdit->text());
