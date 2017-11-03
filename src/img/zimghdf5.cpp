@@ -731,11 +731,10 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgBlockProvider& imgBlo
           }
         }
       }
-      LOG(INFO) << "Finished block " << i << "/" << imgBlockrovider.numBlocks();
+      LOG(INFO) << "Finish block " << i << "/" << imgBlockrovider.numBlocks();
     }
 
     // create pyramidal
-    LOG(INFO) << "Building pyramidal...";
     for (size_t t = 0; t < imgBlockrovider.imgInfo().numTimes; ++t) {
       for (size_t c = 0; c < imgBlockrovider.imgInfo().numChannels; ++c) {
         for (size_t z = 0; z < imgBlockrovider.imgInfo().depth; ++z) {
@@ -753,6 +752,8 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgBlockProvider& imgBlo
             tmpImg.zoom(0.5, 0.5);
             writeImgSliceToH5Grp(zGrp, QString("DownsampledBy%1Data").arg(level).toStdString(), tmpImg);
           }
+
+          LOG(INFO) << "Finish building pyramidal for slice " << z << " of channel " << c;
         }
       }
     }
