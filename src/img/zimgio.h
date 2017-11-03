@@ -10,6 +10,8 @@ class ZImgFormat;
 
 class ZImgSliceProvider;
 
+class ZImgBlockProvider;
+
 class ZImgIO
 {
 public:
@@ -68,6 +70,9 @@ public:
                 Compression comp = Compression::AUTO);
 
   void writeImg(const QString& filename, const ZImgSliceProvider& img, FileFormat format = FileFormat::Unknown,
+                Compression comp = Compression::AUTO);
+
+  void writeImg(const QString& filename, const ZImgBlockProvider& img, FileFormat format = FileFormat::Unknown,
                 Compression comp = Compression::AUTO);
 
   // qt style name filter for image open dialog

@@ -2,6 +2,7 @@
 
 #include "zioutils.h"
 #include "zimgsliceprovider.h"
+#include "zimgblockprovider.h"
 #include "zlog.h"
 #include "zimginfoio.h"
 #include <QFile>
@@ -167,6 +168,102 @@ void writeImgSliceToH5Grp(H5::Group& zGrp, const H5std_string& name, const nim::
       case 8:
         imgData = zGrp.createDataSet(name, int64Type, imgDataspace, pList);
         imgData.write(img.timeData<int64_t>(0), int64Type);
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+void mergeImgToH5DataSetMax(H5::DataSet& imgData, const nim::ZVoxelCoordinate imgDataCoord,
+                            const nim::ZImg& img, const nim::ZVoxelCoordinate imgCoord)
+{
+  CHECK(
+    imgDataCoord.x == 0 && imgDataCoord.y == 0 && imgDataCoord.z >= 0 && imgDataCoord.c >= 0 && imgDataCoord.t >= 0);
+  CHECK(
+    imgCoord.x >= 0 && imgCoord.y >= 0 && imgCoord.z >= 0 && imgCoord.c >= 0 && imgCoord.t >= 0);
+  nim::ZImgInfo info = img.info();
+  info.numTimes = 1;
+  info.numChannels = 1;
+  info.depth = 1;
+  nim::ZImg currentImg(info);
+  readH5DataToImg(currentImg, imgData, imgCoord.x, imgCoord.y);
+  nim::ZVoxelCoordinate off = imgCoord - imgDataCoord;
+  off.x = 0;
+  off.y = 0;
+  currentImg.pasteImgMax(img, off);
+
+  H5::FloatType doubleType(H5::PredType::IEEE_F64LE);
+  H5::FloatType floatType(H5::PredType::IEEE_F32LE);
+  H5::IntType uint64Type(H5::PredType::STD_U64LE);
+  H5::IntType uint32Type(H5::PredType::STD_U32LE);
+  H5::IntType uint16Type(H5::PredType::STD_U16LE);
+  H5::IntType uint8Type(H5::PredType::STD_U8LE);
+  H5::IntType int64Type(H5::PredType::STD_I64LE);
+  H5::IntType int32Type(H5::PredType::STD_I32LE);
+  H5::IntType int16Type(H5::PredType::STD_I16LE);
+  H5::IntType int8Type(H5::PredType::STD_I8LE);
+
+  H5::DataSpace filespace = imgData.getSpace();
+
+  if (filespace.getSimpleExtentNdims() != 2)
+    throw nim::ZIOException("wrong slice data dimension number");
+
+  hsize_t dims[2];
+  filespace.getSimpleExtentDims(dims);
+  //LOG(INFO) << dims[0] << " " << dims[1] << img.info().toQString().toStdString() << x_ <<" "<< y_;
+
+  if (dims[1] < img.width() + imgCoord.x || dims[0] < img.height() + imgCoord.y)
+    throw nim::ZIOException("wrong slice data dimension");
+
+  hsize_t offset[2] = { hsize_t(imgCoord.y), hsize_t(imgCoord.x) };
+  hsize_t count[2] = { img.height(), img.width() };
+  //Define the memory space to read a chunk.
+  H5::DataSpace mspace(2, count);
+  filespace.selectHyperslab(H5S_SELECT_SET, count, offset);
+
+
+  if (currentImg.voxelFormat() == nim::VoxelFormat::Unsigned) {
+    switch (currentImg.bytesPerVoxel()) {
+      case 1:
+        imgData.write(currentImg.timeData<uint8_t>(0), uint8Type, mspace, filespace);
+        break;
+      case 2:
+        imgData.write(currentImg.timeData<uint16_t>(0), uint16Type, mspace, filespace);
+        break;
+      case 4:
+        imgData.write(currentImg.timeData<uint32_t>(0), uint32Type, mspace, filespace);
+        break;
+      case 8:
+        imgData.write(currentImg.timeData<uint64_t>(0), uint64Type, mspace, filespace);
+        break;
+      default:
+        break;
+    }
+  } else if (currentImg.voxelFormat() == nim::VoxelFormat::Float) {
+    switch (currentImg.bytesPerVoxel()) {
+      case 4:
+        imgData.write(currentImg.timeData<float>(0), floatType, mspace, filespace);
+        break;
+      case 8:
+        imgData.write(currentImg.timeData<double>(0), doubleType, mspace, filespace);
+        break;
+      default:
+        break;
+    }
+  } else if (currentImg.voxelFormat() == nim::VoxelFormat::Signed) {
+    switch (currentImg.bytesPerVoxel()) {
+      case 1:
+        imgData.write(currentImg.timeData<int8_t>(0), int8Type, mspace, filespace);
+        break;
+      case 2:
+        imgData.write(currentImg.timeData<int16_t>(0), int16Type, mspace, filespace);
+        break;
+      case 4:
+        imgData.write(currentImg.timeData<int32_t>(0), int32Type, mspace, filespace);
+        break;
+      case 8:
+        imgData.write(currentImg.timeData<int64_t>(0), int64Type, mspace, filespace);
         break;
       default:
         break;
@@ -560,6 +657,95 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
 
           ZImg tmpImg = img.createView(c, 0);
           writeImgSliceToH5Grp(zGrp, "Data", tmpImg);
+
+          level = 1;
+          while (tmpImg.width() > chunkSize() || tmpImg.height() > chunkSize()) {
+            level *= 2;
+            tmpImg.zoom(0.5, 0.5);
+            writeImgSliceToH5Grp(zGrp, QString("DownsampledBy%1Data").arg(level).toStdString(), tmpImg);
+          }
+        }
+      }
+    }
+  }
+  catch (H5::Exception const& e) {
+    QFile::remove(filename);
+    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+  }
+}
+
+void ZImgHDF5::writeImg(const QString& filename, const ZImgBlockProvider& imgBlockrovider, Compression)
+{
+  try {
+    H5::Exception::dontPrint();
+
+    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_TRUNC);
+
+    H5::IntType uint64Type(H5::PredType::STD_U64LE);
+
+    H5::Group allGrp = file.createGroup("Img");
+
+    const ZImgInfo& info = imgBlockrovider.imgInfo();
+    ZImgInfoIO::save(allGrp, info);
+
+    uint64_t numLevels = 1;
+    std::set<size_t> levels{1};
+    size_t level = 1;
+    size_t width = info.width;
+    size_t height = info.height;
+    while (width > chunkSize() || height > chunkSize()) {
+      ++numLevels;
+      level *= 2;
+      levels.insert(level);
+      width = std::ceil(width / 2.0);
+      height = std::ceil(height / 2.0);
+    }
+    writeRatiosToGrp(allGrp, levels);
+
+    // write all zero image
+    ZImgRegion rgn(0, -1, 0, -1, 0, 1, 0, 1, 0, 1);
+    ZImgInfo sliceInfo = rgn.clip(info);
+    ZImg imgSlice(sliceInfo);
+    for (size_t t = 0; t < imgBlockrovider.imgInfo().numTimes; ++t) {
+      H5::Group timeGrp = allGrp.createGroup(qUtf8Printable(QString("TimePoint%1").arg(t)));
+      for (size_t c = 0; c < imgBlockrovider.imgInfo().numChannels; ++c) {
+        H5::Group channelGrp = timeGrp.createGroup(qUtf8Printable(QString("Channel%1").arg(c)));
+        for (size_t z = 0; z < imgBlockrovider.imgInfo().depth; ++z) {
+          H5::Group zGrp = channelGrp.createGroup(qUtf8Printable(QString("Z%1").arg(z)));
+
+          writeImgSliceToH5Grp(zGrp, "Data", imgSlice);
+        }
+      }
+    }
+
+    // update hdf5 file with blocks
+    for (size_t i = 0; i < imgBlockrovider.numBlocks(); ++i) {
+      ZVoxelCoordinate imgCoord = imgBlockrovider.blockCoord(i);
+      ZImg img = imgBlockrovider.block(i);
+      for (size_t t = imgCoord.t; t < imgCoord.t + img.info().numTimes; ++t) {
+        for (size_t c = imgCoord.c; c < imgCoord.c + img.info().numChannels; ++c) {
+          for (size_t z = imgCoord.z; z < imgCoord.c + img.info().depth; ++z) {
+            auto dataLoc = QString("/Img/TimePoint%1/Channel%2/Z%3/Data").arg(t).arg(c).arg(z).toStdString();
+            H5::DataSet imgData = file.openDataSet(dataLoc);
+            mergeImgToH5DataSetMax(imgData, ZVoxelCoordinate(0, 0, z, c, t), img, imgCoord);
+          }
+        }
+      }
+      LOG(INFO) << "Finished block " << i << "/" << imgBlockrovider.numBlocks();
+    }
+
+    // create pyramidal
+    LOG(INFO) << "Building pyramidal...";
+    for (size_t t = 0; t < imgBlockrovider.imgInfo().numTimes; ++t) {
+      for (size_t c = 0; c < imgBlockrovider.imgInfo().numChannels; ++c) {
+        for (size_t z = 0; z < imgBlockrovider.imgInfo().depth; ++z) {
+          auto grpLoc = QString("/Img/TimePoint%1/Channel%2/Z%3").arg(t).arg(c).arg(z).toStdString();
+          auto dataLoc = QString("/Img/TimePoint%1/Channel%2/Z%3/Data").arg(t).arg(c).arg(z).toStdString();
+          H5::DataSet ds = file.openDataSet(dataLoc);
+          H5::Group zGrp = file.openGroup(grpLoc);
+          readH5DataToImg(imgSlice, ds, 0, 0);
+
+          ZImg tmpImg = imgSlice.createView();
 
           level = 1;
           while (tmpImg.width() > chunkSize() || tmpImg.height() > chunkSize()) {

@@ -1557,10 +1557,11 @@ void ZStitchImageDialog::stitchStacks2()
   imgMerge.setMergeMode(mergeMode);
   QString summary = imgMerge.resolveLocations();
   m_commandOutputEdit->append(summary);
-  if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM) {
+  if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
+      mergeMode == ZImgMerge::Mode::Max) {
     ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
   } else {
-    imgMerge.wholeImg(1).save(m_outputFileEdit->text());
+    imgMerge.wholeImg().save(m_outputFileEdit->text());
   }
   emit resultReady(m_outputFileEdit->text());
 
@@ -2081,10 +2082,11 @@ void ZStitchImageDialog::stitchStacks()
       imgMerge.setMergeMode(mergeMode);
       QString summary = imgMerge.resolveLocations();
       m_commandOutputEdit->append(summary);
-      if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM) {
+      if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
+          mergeMode == ZImgMerge::Mode::Max) {
         ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
       } else {
-        imgMerge.wholeImg(1).save(m_outputFileEdit->text());
+        imgMerge.wholeImg().save(m_outputFileEdit->text());
       }
       emit resultReady(m_outputFileEdit->text());
     } else {
@@ -2197,10 +2199,11 @@ void ZStitchImageDialog::stitchStacks()
       imgMerge.setMergeMode(mergeMode);
       QString summary = imgMerge.resolveLocations();
       m_commandOutputEdit->append(summary);
-      if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM) {
+      if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
+          mergeMode == ZImgMerge::Mode::Max) {
         ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
       } else {
-        imgMerge.wholeImg(1).save(m_outputFileEdit->text());
+        imgMerge.wholeImg().save(m_outputFileEdit->text());
       }
       emit resultReady(m_outputFileEdit->text());
     }

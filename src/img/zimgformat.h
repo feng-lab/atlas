@@ -26,6 +26,8 @@ protected:
 
 class ZImgSliceProvider;
 
+class ZImgBlockProvider;
+
 class ZImgFormat
 {
 public:
@@ -73,6 +75,8 @@ public:
   virtual void writeImg(const QString& filename, const ZImg& img, Compression comp);
 
   virtual void writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp);
+
+  virtual void writeImg(const QString& filename, const ZImgBlockProvider& imgBlockProvider, Compression comp);
 
   // convert RGBARGBA..... to RRR...GGG...BBB...AAA...
   static void CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB = false, bool ARGBtoRGBA = false);

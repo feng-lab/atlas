@@ -53,6 +53,8 @@ public:
 
   void writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp) override;
 
+  void writeImg(const QString& filename, const ZImgBlockProvider& imgBlockrovider, Compression comp) override;
+
   bool supportRead() const override;
 
   bool supportWrite() const override;

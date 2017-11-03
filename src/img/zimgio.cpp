@@ -1,6 +1,7 @@
 #include "zimgio.h"
 
 #include "zimgsliceprovider.h"
+#include "zimgblockprovider.h"
 #include "zimgv3draw.h"
 #include "zimgometiff.h"
 #include "zimgtiff.h"
@@ -558,6 +559,45 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
 }
 
 void ZImgIO::writeImg(const QString& filename, const ZImgSliceProvider& img, FileFormat format, Compression comp)
+{
+  if (img.imgInfo().isEmpty()) {
+    throw ZIOException("Can not write empty image.");
+  }
+
+  QString error;
+  if (format == FileFormat::Unknown) {
+    std::vector<ZImgFormat*> writers = getSupportedWriter(filename);
+    if (writers.empty()) {
+      error = QString("Write file %1 is not supported.").arg(filename);
+    } else {
+      for (auto writer : writers) {
+        try {
+          writer->writeImg(filename, img, comp);
+          return;
+        }
+        catch (const ZIOException& e) {
+          error += QString("\nTry write %1 as '%2' format, failed: %3 ").arg(filename).arg(writer->fullName()).arg(
+            e.what());
+        }
+      }
+    }
+  } else if (m_ioFormats.find(format) == m_ioFormats.end() || !m_ioFormats[format]->supportWrite()) {
+    error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
+  } else {
+    try {
+      m_ioFormats[format]->writeImg(filename, img, comp);
+      return;
+    }
+    catch (const ZIOException& e) {
+      error = QString("Try write file %1 as '%2' format, failed: %3").arg(filename).arg(
+        m_ioFormats[format]->fullName()).arg(e.what());
+    }
+  }
+
+  throw ZIOException(error);
+}
+
+void ZImgIO::writeImg(const QString& filename, const ZImgBlockProvider& img, FileFormat format, Compression comp)
 {
   if (img.imgInfo().isEmpty()) {
     throw ZIOException("Can not write empty image.");

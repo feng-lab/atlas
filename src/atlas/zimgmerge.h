@@ -2,7 +2,7 @@
 
 #include "zvoxelcoordinate.h"
 #include "zimg.h"
-#include "zimgsliceprovider.h"
+#include "zimgblockprovider.h"
 #include "zvoxelregion.h"
 #include "zimgtile.h"
 #include <QString>
@@ -33,7 +33,7 @@ private:
 // use provided absolute locations or relative locations to merge multiple imgs
 // if one img has multiple relative locations, use minimum spanning tree to find the optimal one
 //
-class ZImgMerge : public ZImgSliceProvider
+class ZImgMerge : public ZImgBlockProvider
 {
 public:
   enum class Mode
@@ -65,11 +65,19 @@ public:
   const ZImgInfo& imgInfo() const override
   { return m_imgInfo; }
 
-  ZImg slice(size_t z, size_t t, size_t ratio) const override;
+//  ZImg slice(size_t z, size_t t, size_t ratio) const override;
+//
+//  ZImg allSlices(size_t t, size_t ratio) const override;
+//
+//  ZImg wholeImg(size_t ratio) const override;
 
-  ZImg allSlices(size_t t, size_t ratio) const override;
+  size_t numBlocks() const override;
 
-  ZImg wholeImg(size_t ratio) const override;
+  ZImg block(size_t blockIdx) const override;
+
+  ZVoxelCoordinate blockCoord(size_t blockIdx) const override;
+
+  ZImg wholeImg() const override;
 
 protected:
   void resolveLocations(std::map<const ZImgSubBlock*, ZVoxelCoordinate>& imgs,

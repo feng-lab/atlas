@@ -225,7 +225,12 @@ set(IMG_SOURCES
     zimageavx.cpp
     zimgjpegxr.cpp
     zexception.cpp
-    zflags.h zimghdf5.cpp zimghdf5.h zimginfoio.cpp zimginfoio.h)
+    zflags.h
+    zimghdf5.cpp
+    zimghdf5.h
+    zimginfoio.cpp
+    zimginfoio.h
+    zimgblockprovider.h)
 
 # our target
 set(LIBRARY_NAME img)

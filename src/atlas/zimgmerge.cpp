@@ -392,76 +392,124 @@ QString ZImgMerge::resolveLocations()
   return summ;
 }
 
-ZImg ZImgMerge::slice(size_t z, size_t t, size_t ratio) const
+//ZImg ZImgMerge::slice(size_t z, size_t t, size_t ratio) const
+//{
+//  ZImg res;
+//  CHECK(ratio == 1);
+//
+//  ZImgRegion rgn(0, -1, 0, -1, z, z+1, 0, -1, t, t+1);
+//  res.infoRef() = rgn.clip(m_imgInfo);
+//  res.allocate();
+//
+//  ZVoxelCoordinate minCoord = m_minCoord;
+//  minCoord.z += z;
+//  minCoord.t += t;
+//  for (size_t i = 0; i < m_tiles.size(); ++i) {
+//    m_tiles[i].createImgCache();
+//    ZVoxelCoordinate tileLoc = m_tiles[i].location() - minCoord;
+//    if (m_mergeMode == Mode::Max) {
+//      res.pasteImgMax(m_tiles[i].img(), tileLoc, false);
+//    } else {
+//      res.pasteImg(m_tiles[i].img(), tileLoc, false);
+//    }
+//
+//    m_tiles[i].clearImgCache();
+//  }
+//
+//  if (m_mergeMode != Mode::First && m_mergeMode != Mode::Max) {
+//    // now merge overlap region
+//    CHECK(false); // not working yet
+//    IMG_TYPED_CALL(merge_Impl, res, m_overlapRegion, minCoord, m_mergeMode, res, m_tiles);
+//  }
+//
+//  LOG(INFO) << "Assembled slice " << z << "/" << m_imgInfo.depth << ".";
+//
+//  return res;
+//}
+//
+//ZImg ZImgMerge::allSlices(size_t t, size_t ratio) const
+//{
+//  ZImg res;
+//  CHECK(ratio == 1);
+//
+//  ZImgRegion rgn(0, -1, 0, -1, 0, -1, 0, -1, t, t+1);
+//  res.infoRef() = rgn.clip(m_imgInfo);
+//  res.allocate();
+//
+//  ZVoxelCoordinate minCoord = m_minCoord;
+//  minCoord.t += t;
+//  for (size_t i = 0; i < m_tiles.size(); ++i) {
+//    m_tiles[i].createImgCache();
+//    ZVoxelCoordinate tileLoc = m_tiles[i].location() - minCoord;
+//    if (m_mergeMode == Mode::Max) {
+//      res.pasteImgMax(m_tiles[i].img(), tileLoc, false);
+//    } else {
+//      res.pasteImg(m_tiles[i].img(), tileLoc, false);
+//    }
+//
+//    m_tiles[i].clearImgCache();
+//  }
+//
+//  if (m_mergeMode != Mode::First && m_mergeMode != Mode::Max) {
+//    // now merge overlap region
+//    IMG_TYPED_CALL(merge_Impl, res, m_overlapRegion, minCoord, m_mergeMode, res, m_tiles);
+//  }
+//
+//  return res;
+//}
+//
+//ZImg ZImgMerge::wholeImg(size_t ratio) const
+//{
+//  ZImg res;
+//  CHECK(ratio == 1);
+//
+//  res.infoRef() = m_imgInfo;
+//  res.allocate();
+//
+//  ZVoxelCoordinate minCoord = m_minCoord;
+//  for (size_t i = 0; i < m_tiles.size(); ++i) {
+//    m_tiles[i].createImgCache();
+//    ZVoxelCoordinate tileLoc = m_tiles[i].location() - minCoord;
+//    if (m_mergeMode == Mode::Max) {
+//      res.pasteImgMax(m_tiles[i].img(), tileLoc);
+//    } else {
+//      res.pasteImg(m_tiles[i].img(), tileLoc);
+//    }
+//
+//    m_tiles[i].clearImgCache();
+//  }
+//
+//  if (m_mergeMode != Mode::First && m_mergeMode != Mode::Max) {
+//    // now merge overlap region
+//    IMG_TYPED_CALL(merge_Impl, res, m_overlapRegion, minCoord, m_mergeMode, res, m_tiles);
+//  }
+//
+//  return res;
+//}
+
+
+size_t ZImgMerge::numBlocks() const
+{
+  return m_tiles.size();
+}
+
+ZImg ZImgMerge::block(size_t blockIdx) const
 {
   ZImg res;
-  CHECK(ratio == 1);
-
-  ZImgRegion rgn(0, -1, 0, -1, z, z+1, 0, -1, t, t+1);
-  res.infoRef() = rgn.clip(m_imgInfo);
-  res.allocate();
-
-  ZVoxelCoordinate minCoord = m_minCoord;
-  minCoord.z += z;
-  minCoord.t += t;
-  for (size_t i = 0; i < m_tiles.size(); ++i) {
-    m_tiles[i].createImgCache();
-    ZVoxelCoordinate tileLoc = m_tiles[i].location() - minCoord;
-    if (m_mergeMode == Mode::Max) {
-      res.pasteImgMax(m_tiles[i].img(), tileLoc, false);
-    } else {
-      res.pasteImg(m_tiles[i].img(), tileLoc, false);
-    }
-
-    m_tiles[i].clearImgCache();
-  }
-
-  if (m_mergeMode != Mode::First && m_mergeMode != Mode::Max) {
-    // now merge overlap region
-    CHECK(false); // not working yet
-    IMG_TYPED_CALL(merge_Impl, res, m_overlapRegion, minCoord, m_mergeMode, res, m_tiles);
-  }
-
-  LOG(INFO) << "Assembled slice " << z << "/" << m_imgInfo.depth << ".";
-
+  m_tiles[blockIdx].createImgCache();
+  res = m_tiles[blockIdx].img();
+  m_tiles[blockIdx].clearImgCache();
   return res;
 }
 
-ZImg ZImgMerge::allSlices(size_t t, size_t ratio) const
+ZVoxelCoordinate ZImgMerge::blockCoord(size_t blockIdx) const
 {
-  ZImg res;
-  CHECK(ratio == 1);
-
-  ZImgRegion rgn(0, -1, 0, -1, 0, -1, 0, -1, t, t+1);
-  res.infoRef() = rgn.clip(m_imgInfo);
-  res.allocate();
-
-  ZVoxelCoordinate minCoord = m_minCoord;
-  minCoord.t += t;
-  for (size_t i = 0; i < m_tiles.size(); ++i) {
-    m_tiles[i].createImgCache();
-    ZVoxelCoordinate tileLoc = m_tiles[i].location() - minCoord;
-    if (m_mergeMode == Mode::Max) {
-      res.pasteImgMax(m_tiles[i].img(), tileLoc, false);
-    } else {
-      res.pasteImg(m_tiles[i].img(), tileLoc, false);
-    }
-
-    m_tiles[i].clearImgCache();
-  }
-
-  if (m_mergeMode != Mode::First && m_mergeMode != Mode::Max) {
-    // now merge overlap region
-    IMG_TYPED_CALL(merge_Impl, res, m_overlapRegion, minCoord, m_mergeMode, res, m_tiles);
-  }
-
-  return res;
+  return m_tiles[blockIdx].location() - m_minCoord;
 }
 
-ZImg ZImgMerge::wholeImg(size_t ratio) const
+ZImg ZImgMerge::wholeImg() const
 {
   ZImg res;
-  CHECK(ratio == 1);
 
   res.infoRef() = m_imgInfo;
   res.allocate();

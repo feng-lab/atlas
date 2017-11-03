@@ -2,6 +2,7 @@
 
 #include "zioutils.h"
 #include "zimgsliceprovider.h"
+#include "zimgblockprovider.h"
 #include "zlog.h"
 #include "zimgio.h"
 
@@ -82,10 +83,22 @@ void ZImgFormat::writeImg(const QString& /*filename*/, const ZImg& /*img*/, Comp
 {
 }
 
-void ZImgFormat::writeImg(const QString& /*filename*/,
-                          const ZImgSliceProvider& /*imgSliceProvider*/,
-                          Compression /*comp*/)
+void ZImgFormat::writeImg(const QString& filename,
+                          const ZImgSliceProvider& imgSliceProvider,
+                          Compression comp)
 {
+  if (canWrite(filename)) {
+    writeImg(filename, imgSliceProvider.wholeImg(1), comp);
+  }
+}
+
+void ZImgFormat::writeImg(const QString& filename,
+                          const ZImgBlockProvider& imgBlockProvider,
+                          Compression comp)
+{
+  if (canWrite(filename)) {
+    writeImg(filename, imgBlockProvider.wholeImg(), comp);
+  }
 }
 
 ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, const QString& dimensionOrder,
