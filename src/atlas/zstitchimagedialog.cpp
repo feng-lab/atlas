@@ -10,7 +10,10 @@
 #include "zlog.h"
 #include "zfileutils.h"
 #include "zcpuinfo.h"
+#include <tbb/concurrent_unordered_map.h>
+#include <tbb/parallel_for.h>
 #include <qtcsv/reader.h>
+#include <fftw3.h>
 #include <QtWidgets>
 
 namespace {
@@ -2090,7 +2093,6 @@ void ZStitchImageDialog::stitchStacks()
       }
       emit resultReady(m_outputFileEdit->text());
     } else {
-      std::map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>> offsets;
       int intv[3];
 
       intv[0] = m_intvXSpinBox->value();
@@ -2104,76 +2106,150 @@ void ZStitchImageDialog::stitchStacks()
       }
 
       // for every pair of img
-      for (size_t f = 0; f < nstack; ++f) {  // fixed
-        ZImg fixedImg(inputStackSources[f]);
-        if (m_dsCheckBox->isChecked()) {
-          m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStackSources[f].toQString()));
-          fixedImg.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                                   ZImg::CombineMode::Mean);
+      tbb::concurrent_unordered_map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>> offsets;
+      bool concurrent = true;
+      if (concurrent) {
+        fftw_plan_with_nthreads(1);
+
+        std::vector<std::tuple<size_t, size_t, ZImgNCCMatch::PositionHint>> allPairs;
+        for (const auto& con : conn) {
+          allPairs.push_back(std::make_tuple(con.first.first, con.first.second, con.second));
         }
-        for (size_t m = f + 1; m < nstack; ++m) { // moving
-          // no connection
-          if (!conn.empty() &&
-              conn.find(std::make_pair(f, m)) == conn.end() &&
-              conn.find(std::make_pair(m, f)) == conn.end()) {
-            continue;
-          }
-          // already processed
-          if (offsets.find(std::make_pair(m, f)) != offsets.end()) {
-            continue;
-          }
+        tbb::parallel_for(
+          tbb::blocked_range<size_t>(0, allPairs.size()),
+          [&](const tbb::blocked_range<size_t>& r) {
+            for (size_t i = r.begin(); i != r.end(); ++i) {
+              size_t f = std::get<0>(allPairs[i]);
+              size_t m = std::get<1>(allPairs[i]);
+              if (offsets.find(std::make_pair(m, f)) != offsets.end()) {
+                continue;
+              }
+              ZImg fixedImg(inputStackSources[f]);
+              if (m_dsCheckBox->isChecked()) {
+                //m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStackSources[f].toQString()));
+                fixedImg.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
+                                         ZImg::CombineMode::Mean);
+              }
 
-          ZImg movingImg(inputStackSources[m]);
-          if (m_dsCheckBox->isChecked()) {
-            m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStackSources[m].toQString()));
-            movingImg.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                                      ZImg::CombineMode::Mean);
-          }
+              ZImg movingImg(inputStackSources[m]);
+              if (m_dsCheckBox->isChecked()) {
+                //m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStackSources[m].toQString()));
+                movingImg.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
+                                          ZImg::CombineMode::Mean);
+              }
 
-          ZImgNCCMatch imgNCCMatch(fixedImg, movingImg);
-          if (m_bgsub1ComboBox->currentIndex() == 1) {
-            imgNCCMatch.enableRemoveBackgroundForAllFixedImgChannels();
-            imgNCCMatch.enableRemoveBackgroundForAllMovingImgChannels();
-          } else if (m_bgsub1ComboBox->currentIndex() > 1) {
-            imgNCCMatch.enableRemoveBackgroundForFixedImgChannel(m_bgsub1ComboBox->currentIndex() - 2);
-            imgNCCMatch.enableRemoveBackgroundForMovingImgChannel(m_bgsub1ComboBox->currentIndex() - 2);
-          }
-          if (m_channel1ComboBox->currentIndex() == 0) {
-            imgNCCMatch.useAllFixedImgChannels();
-            imgNCCMatch.useAllMovingImgChannels();
-          } else if (m_channel1ComboBox->currentIndex() == 1 && fixedImg.numChannels() > 1) {
-            imgNCCMatch.useFixedImgChannel(0, 1);
-          } else if (m_channel1ComboBox->currentIndex() == 1 && movingImg.numChannels() > 1) {
-            imgNCCMatch.useMovingImgChannel(0, 1);
-          } else if (m_channel1ComboBox->currentIndex() > 1) {
-            imgNCCMatch.useFixedImgChannel(m_channel1ComboBox->currentIndex() - 2);
-            imgNCCMatch.useMovingImgChannel(m_channel1ComboBox->currentIndex() - 2);
-          }
+              ZImgNCCMatch imgNCCMatch(fixedImg, movingImg);
+              if (m_bgsub1ComboBox->currentIndex() == 1) {
+                imgNCCMatch.enableRemoveBackgroundForAllFixedImgChannels();
+                imgNCCMatch.enableRemoveBackgroundForAllMovingImgChannels();
+              } else if (m_bgsub1ComboBox->currentIndex() > 1) {
+                imgNCCMatch.enableRemoveBackgroundForFixedImgChannel(m_bgsub1ComboBox->currentIndex() - 2);
+                imgNCCMatch.enableRemoveBackgroundForMovingImgChannel(m_bgsub1ComboBox->currentIndex() - 2);
+              }
+              if (m_channel1ComboBox->currentIndex() == 0) {
+                imgNCCMatch.useAllFixedImgChannels();
+                imgNCCMatch.useAllMovingImgChannels();
+              } else if (m_channel1ComboBox->currentIndex() == 1 && fixedImg.numChannels() > 1) {
+                imgNCCMatch.useFixedImgChannel(0, 1);
+              } else if (m_channel1ComboBox->currentIndex() == 1 && movingImg.numChannels() > 1) {
+                imgNCCMatch.useMovingImgChannel(0, 1);
+              } else if (m_channel1ComboBox->currentIndex() > 1) {
+                imgNCCMatch.useFixedImgChannel(m_channel1ComboBox->currentIndex() - 2);
+                imgNCCMatch.useMovingImgChannel(m_channel1ComboBox->currentIndex() - 2);
+              }
 
-          std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>::iterator it = conn.find(
-            std::make_pair(f, m));
-          ZImgNCCMatch::PositionHint hint = ZImgNCCMatch::PositionHint::None;
-          if (it != conn.end())
-            hint = it->second;
-          else {
-            it = conn.find(std::make_pair(m, f));
-            if (it != conn.end()) {
-              hint = it->second;
-              ZImgNCCMatch::reversePositionHint(hint);
+
+              ZImgNCCMatch::PositionHint hint = std::get<2>(allPairs[i]);
+              imgNCCMatch.setMovingImgPositionHint(hint, m_overlapRateSpinBox->value() / 100.0);
+
+              double maxNCC;
+              ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(intv[0], intv[1], intv[2],
+                                                                                      &maxNCC);
+              offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
+
+              QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
+                .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(
+                maxNCC);
+              //m_commandOutputEdit->append(info);
+              //QApplication::processEvents();
+              LOG(INFO) << info;
             }
           }
-          imgNCCMatch.setMovingImgPositionHint(hint, m_overlapRateSpinBox->value() / 100.0);
+        );
 
-          double maxNCC;
-          ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(intv[0], intv[1], intv[2], &maxNCC);
-          offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
+        fftw_plan_with_nthreads(ZCpuInfo::instance().nPhysicalCores);
+      } else {
+        for (size_t f = 0; f < nstack; ++f) {  // fixed
+          ZImg fixedImg(inputStackSources[f]);
+          if (m_dsCheckBox->isChecked()) {
+            m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStackSources[f].toQString()));
+            fixedImg.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
+                                     ZImg::CombineMode::Mean);
+          }
+          for (size_t m = f + 1; m < nstack; ++m) { // moving
+            // no connection
+            if (!conn.empty() &&
+                conn.find(std::make_pair(f, m)) == conn.end() &&
+                conn.find(std::make_pair(m, f)) == conn.end()) {
+              continue;
+            }
+            // already processed
+            if (offsets.find(std::make_pair(m, f)) != offsets.end()) {
+              continue;
+            }
 
-          QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
-            .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(
-            maxNCC);
-          m_commandOutputEdit->append(info);
-          QApplication::processEvents();
-          LOG(INFO) << info;
+            ZImg movingImg(inputStackSources[m]);
+            if (m_dsCheckBox->isChecked()) {
+              m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStackSources[m].toQString()));
+              movingImg.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
+                                        ZImg::CombineMode::Mean);
+            }
+
+            ZImgNCCMatch imgNCCMatch(fixedImg, movingImg);
+            if (m_bgsub1ComboBox->currentIndex() == 1) {
+              imgNCCMatch.enableRemoveBackgroundForAllFixedImgChannels();
+              imgNCCMatch.enableRemoveBackgroundForAllMovingImgChannels();
+            } else if (m_bgsub1ComboBox->currentIndex() > 1) {
+              imgNCCMatch.enableRemoveBackgroundForFixedImgChannel(m_bgsub1ComboBox->currentIndex() - 2);
+              imgNCCMatch.enableRemoveBackgroundForMovingImgChannel(m_bgsub1ComboBox->currentIndex() - 2);
+            }
+            if (m_channel1ComboBox->currentIndex() == 0) {
+              imgNCCMatch.useAllFixedImgChannels();
+              imgNCCMatch.useAllMovingImgChannels();
+            } else if (m_channel1ComboBox->currentIndex() == 1 && fixedImg.numChannels() > 1) {
+              imgNCCMatch.useFixedImgChannel(0, 1);
+            } else if (m_channel1ComboBox->currentIndex() == 1 && movingImg.numChannels() > 1) {
+              imgNCCMatch.useMovingImgChannel(0, 1);
+            } else if (m_channel1ComboBox->currentIndex() > 1) {
+              imgNCCMatch.useFixedImgChannel(m_channel1ComboBox->currentIndex() - 2);
+              imgNCCMatch.useMovingImgChannel(m_channel1ComboBox->currentIndex() - 2);
+            }
+
+            std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>::iterator it = conn.find(
+              std::make_pair(f, m));
+            ZImgNCCMatch::PositionHint hint = ZImgNCCMatch::PositionHint::None;
+            if (it != conn.end())
+              hint = it->second;
+            else {
+              it = conn.find(std::make_pair(m, f));
+              if (it != conn.end()) {
+                hint = it->second;
+                ZImgNCCMatch::reversePositionHint(hint);
+              }
+            }
+            imgNCCMatch.setMovingImgPositionHint(hint, m_overlapRateSpinBox->value() / 100.0);
+
+            double maxNCC;
+            ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(intv[0], intv[1], intv[2], &maxNCC);
+            offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
+
+            QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
+              .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(
+              maxNCC);
+            m_commandOutputEdit->append(info);
+            QApplication::processEvents();
+            LOG(INFO) << info;
+          }
         }
       }
 
