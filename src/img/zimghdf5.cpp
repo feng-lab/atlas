@@ -810,7 +810,7 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgBlockProvider& imgBlo
       ZImg img = imgBlockrovider.block(i);
       for (size_t t = imgCoord.t; t < imgCoord.t + img.info().numTimes; ++t) {
         for (size_t c = imgCoord.c; c < imgCoord.c + img.info().numChannels; ++c) {
-          for (size_t z = imgCoord.z; z < imgCoord.c + img.info().depth; ++z) {
+          for (size_t z = imgCoord.z; z < imgCoord.z + img.info().depth; ++z) {
             auto dataLoc = QString("/Img/TimePoint%1/Channel%2/Z%3/Data").arg(t).arg(c).arg(z).toStdString();
             H5::DataSet imgData = file.openDataSet(dataLoc);
             mergeImgToH5DataSetMax(imgData, ZVoxelCoordinate(0, 0, z, c, t), img, imgCoord);
