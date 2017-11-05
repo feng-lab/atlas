@@ -1558,8 +1558,10 @@ void ZStitchImageDialog::stitchStacks2()
   }
 
   imgMerge.setMergeMode(mergeMode);
-  QString summary = imgMerge.resolveLocations();
-  m_commandOutputEdit->append(summary);
+  QStringList summary = imgMerge.resolveLocations();
+  for (const auto& mes : summary) {
+    m_commandOutputEdit->append(mes);
+  }
   if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
       mergeMode == ZImgMerge::Mode::Max) {
     ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
@@ -2083,8 +2085,10 @@ void ZStitchImageDialog::stitchStacks()
       }
 
       imgMerge.setMergeMode(mergeMode);
-      QString summary = imgMerge.resolveLocations();
-      m_commandOutputEdit->append(summary);
+      QStringList summary = imgMerge.resolveLocations();
+      for (const auto& mes : summary) {
+        m_commandOutputEdit->append(mes);
+      }
       if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
           mergeMode == ZImgMerge::Mode::Max) {
         ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
@@ -2273,8 +2277,10 @@ void ZStitchImageDialog::stitchStacks()
       }
 
       imgMerge.setMergeMode(mergeMode);
-      QString summary = imgMerge.resolveLocations();
-      m_commandOutputEdit->append(summary);
+      QStringList summary = imgMerge.resolveLocations();
+      for (const auto& mes : summary) {
+        m_commandOutputEdit->append(mes);
+      }
       if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
           mergeMode == ZImgMerge::Mode::Max) {
         ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
