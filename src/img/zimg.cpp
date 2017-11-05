@@ -189,52 +189,52 @@ void ZImg::swap(ZImg& other) noexcept
 
 void ZImg::getQtReadNameFilter(QStringList& filters, QList<FileFormat>& formats)
 {
-  ZImgIO::instance().getQtReadNameFilter(filters, formats);
+  ZImgIO().getQtReadNameFilter(filters, formats);
 }
 
 void ZImg::getQtWriteNameFilter(QStringList& filters, QList<FileFormat>& formats, QList<Compression>& comps)
 {
-  ZImgIO::instance().getQtWriteNameFilter(filters, formats, comps);
+  ZImgIO().getQtWriteNameFilter(filters, formats, comps);
 }
 
 bool ZImg::fileExtensionReadSupported(const QString& filename)
 {
-  return ZImgIO::instance().fileExtensionReadSupported(filename);
+  return ZImgIO().fileExtensionReadSupported(filename);
 }
 
 bool ZImg::fileExtensionWriteSupported(const QString& filename)
 {
-  return ZImgIO::instance().fileExtensionWriteSupported(filename);
+  return ZImgIO().fileExtensionWriteSupported(filename);
 }
 
 void ZImg::load(const QString& filename, size_t scene, FileFormat format)
 {
   clear();
-  ZImgIO::instance().readImg(filename, *this, ZImgRegion(), scene, 1, format);
+  ZImgIO().readImg(filename, *this, ZImgRegion(), scene, 1, format);
 }
 
 void ZImg::load(const QString& filename, ZImgRegion region, size_t scene, FileFormat format)
 {
   clear();
-  ZImgIO::instance().readImg(filename, *this, region, scene, 1, format);
+  ZImgIO().readImg(filename, *this, region, scene, 1, format);
 }
 
 void ZImg::load(const ZImgSource& imgSource)
 {
   clear();
-  ZImgIO::instance().readImg(imgSource, *this);
+  ZImgIO().readImg(imgSource, *this);
 }
 
 void ZImg::save(const QString& filename, FileFormat format, Compression comp) const
 {
-  ZImgIO::instance().writeImg(filename, *this, format, comp);
+  ZImgIO().writeImg(filename, *this, format, comp);
 }
 
 void ZImg::load(const QStringList& fileList, Dimension catDim, size_t scene, FileFormat format,
                 bool expandXY, bool expandWithMaxValue)
 {
   clear();
-  ZImgIO::instance().readImg(fileList, catDim, *this, scene, format, expandXY, expandWithMaxValue);
+  ZImgIO().readImg(fileList, catDim, *this, scene, format, expandXY, expandWithMaxValue);
 }
 
 void
@@ -242,7 +242,7 @@ ZImg::load(const QStringList& fileList, Dimension catDim, const ZImgRegion& regi
            bool expandXY, bool expandWithMaxValue)
 {
   clear();
-  ZImgIO::instance().readImg(fileList, catDim, region, *this, scene, format, expandXY, expandWithMaxValue);
+  ZImgIO().readImg(fileList, catDim, region, *this, scene, format, expandXY, expandWithMaxValue);
 }
 
 std::vector<ZImgInfo>
@@ -250,7 +250,7 @@ ZImg::readImgInfo(const QString& filename, std::vector<std::vector<std::shared_p
                   FileFormat format)
 {
   std::vector<ZImgInfo> res;
-  ZImgIO::instance().readInfo(filename, res, subBlocks, nullptr, format);
+  ZImgIO().readInfo(filename, res, subBlocks, nullptr, format);
   return res;
 }
 
@@ -259,7 +259,7 @@ std::vector<ZImgInfo> ZImg::readImgInfo(const QStringList& fileList, Dimension c
                                         FileFormat format, bool expandXY)
 {
   std::vector<ZImgInfo> res;
-  ZImgIO::instance().readInfo(fileList, catDim, res, subBlocks, format, expandXY);
+  ZImgIO().readInfo(fileList, catDim, res, subBlocks, format, expandXY);
   return res;
 }
 

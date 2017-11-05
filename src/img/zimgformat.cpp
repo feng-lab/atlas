@@ -49,7 +49,7 @@ std::shared_ptr<ZImg> ZImgCommonSubBlock::read() const
 ZImgInfo ZImgCommonSubBlock::readInfo() const
 {
   ZImgInfo info;
-  ZImgIO::instance().readInfo(m_imgSource, info);
+  ZImgIO().readInfo(m_imgSource, info);
   return info;
 }
 

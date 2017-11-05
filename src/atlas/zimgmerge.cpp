@@ -216,7 +216,7 @@ std::shared_ptr<ZImg> ZImgTileSubBlock::read() const
 ZImgInfo ZImgTileSubBlock::readInfo() const
 {
   ZImgInfo info;
-  ZImgIO::instance().readInfo(m_source, info);
+  ZImgIO().readInfo(m_source, info);
   info.voxelSizeX *= m_downsampleBlockWidth;
   info.voxelSizeY *= m_downsampleBlockHeight;
   info.voxelSizeZ *= m_downsampleBlockDepth;

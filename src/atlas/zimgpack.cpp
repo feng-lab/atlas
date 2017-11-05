@@ -124,7 +124,7 @@ ZImgInfo ZImgPackSubBlock::readInfo() const
   }
 
   ZImgInfo res;
-  ZImgIO::instance().readInfo(m_imgSource, res);
+  ZImgIO().readInfo(m_imgSource, res);
   if (m_type == Type::OrigSourceMIP) {
     res.depth = 1;
   }
