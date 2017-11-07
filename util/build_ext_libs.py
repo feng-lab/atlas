@@ -1270,7 +1270,7 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['cmake']:
         if is_windows():
-            unpack_tool_to_software_dir(src_package_dir, 'cmake*win*')
+            unpack_tool_to_software_dir(src_package_dir, 'cmake*win64*')
         elif is_linux():
             unpack_tool_to_software_dir(src_package_dir, 'cmake*Linux*')
 
