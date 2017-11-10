@@ -14,6 +14,7 @@ class ZImgBlockProvider;
 class ZImgIO
 {
 public:
+  // do not use this from more than 1 thread
   static ZImgIO& instance();
 
   ZImgIO();
