@@ -5,7 +5,6 @@
 
 ### Windows:
 * install visual studio, qt5, intel c composer (for mkl, ipp, tbb), python3, git
-* patch libtiff win32 TIFFFdOpen
 
 ### Linux:
 * install qt5, mkl, ipp, tbb, python3 and ninja
