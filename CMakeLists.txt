@@ -27,8 +27,7 @@ endif ()
 message(STATUS "CMAKE_DEBUG_POSTFIX: " ${CMAKE_DEBUG_POSTFIX})
 
 # qt
-set(QT_VERSION 5.9.2)
-set(QT_PATHS ~/Qt/${QT_VERSION}/clang_64 ~/Qt/${QT_VERSION}/gcc_64 C:/Qt/Qt/${QT_VERSION}/msvc2017_64)
+include(QtInfo)
 message(STATUS "QT_VERSION: " ${QT_VERSION})
 message(STATUS "QT_PATHS: " ${QT_PATHS})
 
