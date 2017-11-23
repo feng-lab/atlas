@@ -250,6 +250,21 @@ def build_glog(src_dir: str, install_dir: str, ext_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
         if is_windows():
+            orig_file = os.path.join(src_dir, 'src', 'logging_unittest.cc')
+            bak_file = get_bak_file_name(orig_file)
+            os.rename(orig_file, bak_file)
+            with open(bak_file, mode='r', encoding='utf-8') as f:
+                from_lines = f.readlines()
+            with open(orig_file, mode='w', encoding='utf-8') as f:
+                to_lines = []
+                for line in from_lines:
+                    line = line.replace(r'google::ERROR',
+                                        r'GLOG_ERROR')
+                    f.write(line)
+                    to_lines.append(line)
+            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+            os.remove(bak_file)
+
             cmakecmd.extend(['-Dgflags_DIR:PATH={}/gflags/CMake'.format(ext_dir),
                              src_dir])
             env = get_vcvars_environment()

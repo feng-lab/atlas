@@ -1,6 +1,7 @@
 import os
 import sys
-import xml.etree.ElementTree as etree
+import xml.etree.ElementTree as eTree
+import difflib
 
 
 def curr_dir() -> str:
@@ -95,7 +96,7 @@ def qt_install_dir() -> str:
 def qt_ver() -> str:
     component_file = os.path.join(qt_install_dir(), 'components.xml')
     assert os.path.exists(component_file)
-    tree = etree.parse(component_file)
+    tree = eTree.parse(component_file)
     root = tree.getroot()
     ver = None
     for child in root:
@@ -117,10 +118,29 @@ def qt_base_dir() -> str:
 
 
 def write_cmake_file_with_qt_info():
-    with open(os.path.join(repository_dir(), 'cmake', 'QtInfo.cmake'), mode='w', encoding='utf-8') as f:
-        f.write('# Set Qt related variables\n')
-        f.write(f'set(QT_VERSION {qt_ver()})\n')
-        f.write(f'set(QT_PATHS {qt_base_dir()})\n')
+    with open(os.path.join(repository_dir(), 'cmake', 'QtInfo.cmake'), mode='w', encoding='utf-8') as file:
+        file.write('# Set Qt related variables\n')
+        file.write(f'set(QT_VERSION {qt_ver()})\n')
+        if sys.platform.startswith('win32'):
+            file.write('set(QT_PATHS {0})\n'.format(qt_base_dir().replace("\\", "/")))
+            # also need to patch Qt
+            orig_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h')
+            bak_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h.bak')
+            if not os.path.exists(bak_file):
+                os.rename(orig_file, bak_file)
+                with open(bak_file, mode='r', encoding='utf-8') as f:
+                    from_lines = f.readlines()
+                with open(orig_file, mode='w', encoding='utf-8') as f:
+                    to_lines = []
+                    for line in from_lines:
+                        line = line.replace(
+                            r'#if defined(__cpp_variable_templates) && __cpp_variable_templates >= 201304 // C++14',
+                            r'#ifdef _MSC_VER')
+                        f.write(line)
+                        to_lines.append(line)
+                print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+        else:
+            file.write(f'set(QT_PATHS {qt_base_dir()})\n')
 
 
 def software_dir() -> str:
