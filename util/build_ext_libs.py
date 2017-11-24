@@ -475,7 +475,8 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
-            if is_mac():  # todo: still need to fix the unsettling warning about function only exists in macOS 10.13
+            if is_mac() and os.path.exists('/usr/include'):
+                # todo: still need to fix the unsettling warning about function only exists in macOS 10.13
                 os.rename(orig_file1, bak_file1)
                 with open(bak_file1, mode='r', encoding='utf-8') as f:
                     from_lines = f.readlines()
