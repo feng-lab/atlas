@@ -27,7 +27,7 @@ def is_linux() -> bool:
 
 
 def macos_min_version():
-    return '10.9'
+    return '10.10'
 
 
 def get_package_top_level_folder(file: str, folder: str):

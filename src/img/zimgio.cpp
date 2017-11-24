@@ -14,6 +14,7 @@
 #include "zimgmetaimage.h"
 #include "zimgitkimage.h"
 #include "zimghdf5.h"
+#include "zimgleica.h"
 #include "zlog.h"
 
 namespace nim {
@@ -38,6 +39,7 @@ ZImgIO::ZImgIO()
   m_ioFormats[FileFormat::MetaImage] = std::make_unique<ZImgMetaImage>();
   m_ioFormats[FileFormat::ITKImage] = std::make_unique<ZImgITKImage>();
   m_ioFormats[FileFormat::HDF5Img] = std::make_unique<ZImgHDF5>();
+  m_ioFormats[FileFormat::Leica] = std::make_unique<ZImgLeica>();
 }
 
 void ZImgIO::readInfo(const QString& filename, std::vector<ZImgInfo>& res,

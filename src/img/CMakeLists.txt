@@ -230,7 +230,7 @@ set(IMG_SOURCES
     zimghdf5.h
     zimginfoio.cpp
     zimginfoio.h
-    zimgblockprovider.h)
+    zimgblockprovider.h zimgleica.cpp zimgleica.h)
 
 # our target
 set(LIBRARY_NAME img)
