@@ -497,7 +497,7 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
                            cwd=build_dir, shell=False, check=True)
     finally:
         os.replace(bak_file, orig_file)
-        if is_mac():
+        if is_mac() and os.path.exists('/usr/include'):
             os.replace(bak_file1, orig_file1)
         shutil.rmtree(build_dir, ignore_errors=False)
 
@@ -1562,6 +1562,7 @@ def parse_inputs(argv: list):
         else:
             raise SyntaxError("wrong lib name: " + lib)
 
+    libs['cmake'] = True
     if is_linux():
         libs['zlib'] = False
         libs['curl'] = False
