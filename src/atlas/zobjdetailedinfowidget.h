@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QStackedWidget>
 #include <QLabel>
+#include <QTextEdit>
 
 namespace nim {
 
@@ -34,12 +35,12 @@ protected:
 
   struct SubWidget
   {
-    SubWidget(size_t id_, QLabel* infoLabel_, QLabel* label_, QWidget* wt)
+    SubWidget(size_t id_, QTextEdit* infoLabel_, QLabel* label_, QWidget* wt)
       : id(id_), infoLabel(infoLabel_), label(label_), widget(wt)
     {}
 
     size_t id;
-    QLabel* infoLabel;
+    QTextEdit* infoLabel;
     QLabel* label;
     QWidget* widget;
   };

@@ -46,10 +46,9 @@ void ZImgLeica::readMetadata(const QString& filename, ZImgMetadata& meta, size_t
 
 }
 
-void
-ZImgLeica::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, const ZImgRegion& region, size_t scene)
+void  ZImgLeica::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thumbnail*/,
+                               const ZImgRegion& /*region*/, size_t /*scene*/)
 {
-
 }
 
 void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)

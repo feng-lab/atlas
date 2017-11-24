@@ -215,6 +215,7 @@ private:
 
 protected:
   ZImgInfo m_imgInfo;
+  ZImgMetadata m_imgMetaData;
   ZImgSource m_imgSource;
   size_t m_numScenes;
   bool m_hasUnsavedChange;

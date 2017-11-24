@@ -44,14 +44,16 @@ void ZObjDetailedInfoWidget::showWidgetOfObj(size_t id)
   QString info = m_doc->objDetailedInfo(id);
   if (!info.isEmpty()) {
     ZWidgetsGroup wg("Info", 1);
-    auto infoLabel = new QLabel(info);
+    auto infoLabel = new QTextEdit();
     infoLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    infoLabel->setWordWrap(true);
+    infoLabel->setReadOnly(true);
+    infoLabel->setWordWrapMode(QTextOption::WordWrap);
+    infoLabel->setPlainText(info);
     wg.addChild(*infoLabel, 1);
     QLabel* label = new QLabel(m_doc->objNameWithModifiedMarkerAndID(id));
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setWordWrap(true);
-    QWidget* wt = wg.createWidget(false, true, label);
+    QWidget* wt = wg.createWidget(false, false, label, true);
     m_subWidgets.emplace_back(id, infoLabel, label, wt);
     m_widget->setCurrentIndex(m_widget->addWidget(wt));
   } else {
@@ -93,7 +95,7 @@ void ZObjDetailedInfoWidget::updateWidgetLabelOfObj(size_t id)
   //LOG(INFO) << "..";
   for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
-      m_subWidgets[i].infoLabel->setText(m_doc->objDetailedInfo(id));
+      m_subWidgets[i].infoLabel->setPlainText(m_doc->objDetailedInfo(id));
       m_subWidgets[i].label->setText(m_doc->objNameWithModifiedMarkerAndID(id));
       break;
     }

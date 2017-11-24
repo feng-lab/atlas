@@ -120,12 +120,14 @@ void ZWidgetsGroup::removeChild(const std::shared_ptr<ZWidgetsGroup>& childIn)
                       m_childGroups.end());
 }
 
-QWidget* ZWidgetsGroup::createWidget(bool createBasic, bool scroll, QLabel* label)
+QWidget* ZWidgetsGroup::createWidget(bool createBasic, bool scroll, QLabel* label, bool noStretch)
 {
   QLayout* lw = createLayout(createBasic);
   // if is boxLayout, add strech to fill the space
   if (QBoxLayout* blo = qobject_cast<QBoxLayout*>(lw)) {
-    blo->addStretch();
+    if (!noStretch) {
+      blo->addStretch();
+    }
     //
     if (label) {
       blo->insertWidget(0, label);
@@ -153,12 +155,12 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
 {
   switch (m_type) {
     case Type::Widget: {
-      QHBoxLayout* hbl = new QHBoxLayout;
+      auto hbl = new QHBoxLayout;
       hbl->addWidget(m_widget);
       return hbl;
     }
     case Type::Parameter: {
-      QHBoxLayout* hbl = new QHBoxLayout;
+      auto hbl = new QHBoxLayout;
       if (qobject_cast<Z3DCameraParameter*>(m_parameter) ||
         qobject_cast<Z3DTransformParameter*>(m_parameter) ||
         qobject_cast<Z2DTransformParameter*>(m_parameter)) {
@@ -179,7 +181,7 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
       return hbl;
     }
     default: /*case GROUP:*/ {
-      QVBoxLayout* vbl = new QVBoxLayout;
+      auto vbl = new QVBoxLayout;
       if (!m_isSorted)
         sortChildGroups();
       if (createBasic) {

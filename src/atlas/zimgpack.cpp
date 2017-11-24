@@ -133,6 +133,7 @@ ZImgInfo ZImgPackSubBlock::readInfo() const
 
 ZImgPack::ZImgPack(ZImg& img, const QString& fileName)
   : m_imgInfo(img.info())
+  , m_imgMetaData(img.metadata())
   , m_imgSource(fileName)
   , m_numScenes(1), m_hasUnsavedChange(false)
   , m_diskCached(true)
@@ -176,6 +177,7 @@ ZImgPack::ZImgPack(const QString& fileName, size_t scene, FileFormat format, siz
     ssb.swap(subBlocks[scene]);
     sceneSubBlock = &ssb;
   }
+  ZImgIO::instance().readMetadata(m_imgSource.filenames[0], m_imgMetaData, scene, m_imgSource.format);
 
   m_minMaxState = MinMaxState::Invalid;
 
@@ -229,6 +231,7 @@ ZImgPack::ZImgPack(const QStringList& files, Dimension catDim, size_t scene, Fil
     ssb.swap(subBlocks[scene]);
     sceneSubBlock = &ssb;
   }
+  // leave m_imgMetaData empty
 
   m_minMaxState = MinMaxState::Invalid;
 
@@ -298,6 +301,12 @@ const QString& ZImgPack::detailedInfo() const
       info << QString("Valid Bit Count: %1").arg(m_imgInfo.validBitCount);
     }
     m_detailedInfo = info.join("\n");
+
+    for (const auto& meta : m_imgMetaData.topLevelAttachments()) {
+      m_detailedInfo += "\n";
+      m_detailedInfo += meta.toQString();
+      m_detailedInfo += "\n";
+    }
   }
   return m_detailedInfo;
 }
@@ -332,6 +341,7 @@ void ZImgPack::save(const QString& fileName, FileFormat format, Compression comp
   CHECK(!infos.empty() && !subBlocks.empty());
   m_imgInfo = infos[0];
   m_numScenes = infos.size();
+  ZImgIO::instance().readMetadata(m_imgSource.filenames[0], m_imgMetaData, 0, m_imgSource.format);
   buildFastReadIndex(subBlocks[0]);
 
   updateDerivedData();

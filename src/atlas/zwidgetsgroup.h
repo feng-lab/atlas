@@ -69,7 +69,7 @@ public:
   inline bool isVisible()
   { return m_isVisible; }
 
-  QWidget* createWidget(bool createBasic = true, bool scroll = true, QLabel* label = nullptr);
+  QWidget* createWidget(bool createBasic = true, bool scroll = true, QLabel* label = nullptr, bool noStretch = false);
 
   QLayout* createLayout(bool createBasic = true);
 
