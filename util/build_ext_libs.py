@@ -181,7 +181,8 @@ def get_cmake_cmd() -> str:
         cmake_folder = find_src_package_with_glob(os.path.join(common_dirs.software_dir(), 'cmake-*Linux*_64'))
         return os.path.join(cmake_folder, 'bin', 'cmake')
     else:
-        return 'cmake'
+        cmake_folder = find_src_package_with_glob(os.path.join(common_dirs.software_dir(), 'cmake-*Darwin*_64'))
+        return os.path.join(cmake_folder, 'CMake.app', 'Contents', 'bin', 'cmake')
 
 
 def get_cmake_cmd_common_part(install_dir: str):
@@ -197,21 +198,14 @@ def get_cmake_cmd_common_part(install_dir: str):
                 '-DCMAKE_CXX_FLAGS:STRING=-std=c++14'
                 ]
     else:
-        # osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/' \
-        #               r'MacOSX10.12.sdk'
-        # if not os.path.exists(osx_sysroot):
-        #     osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/' \
-        #                   r'MacOSX10.11.sdk'
-        # if not os.path.exists(osx_sysroot):
-        #     osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/' \
-        #                   r'MacOSX10.10.sdk'
-        # assert os.path.exists(osx_sysroot)
+        osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk'
+        assert os.path.exists(osx_sysroot)
 
         return [get_cmake_cmd(),  # '-E', 'echo',
                 '-DCMAKE_BUILD_TYPE=Release',
                 '-DCMAKE_INSTALL_PREFIX=' + install_dir,
                 '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + macos_min_version(),
-                # '-DCMAKE_OSX_SYSROOT=' + osx_sysroot,
+                '-DCMAKE_OSX_SYSROOT=' + osx_sysroot,
                 '-DCMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -std=c++14'
                 ]
 
@@ -453,6 +447,8 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
 
     orig_file = os.path.join(src_dir, 'pngread.c')
     bak_file = get_bak_file_name(orig_file)
+    orig_file1 = os.path.join(src_dir, 'pngpriv.h')
+    bak_file1 = get_bak_file_name(orig_file1)
     try:
         os.rename(orig_file, bak_file)
         with open(bak_file, mode='r', encoding='utf-8') as f:
@@ -479,6 +475,19 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
+            if is_mac():  # todo: still need to fix the unsettling warning about function only exists in macOS 10.13
+                os.rename(orig_file1, bak_file1)
+                with open(bak_file1, mode='r', encoding='utf-8') as f:
+                    from_lines = f.readlines()
+                with open(orig_file1, mode='w', encoding='utf-8') as f:
+                    to_lines = []
+                    for line in from_lines:
+                        line = line.replace(r'#if PNG_ZLIB_VERNUM != 0 && PNG_ZLIB_VERNUM != ZLIB_VERNUM',
+                                            r'#if 0')
+                        f.write(line)
+                        to_lines.append(line)
+                print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file1, tofile='<new>'))))
+
             cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
                              '-DPNG_SHARED:BOOL=OFF',
                              src_dir])
@@ -487,6 +496,8 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
                            cwd=build_dir, shell=False, check=True)
     finally:
         os.replace(bak_file, orig_file)
+        if is_mac():
+            os.replace(bak_file1, orig_file1)
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
@@ -1288,6 +1299,8 @@ def build_libs(libs: dict, update_src: bool):
             unpack_tool_to_software_dir(src_package_dir, 'cmake*win64*')
         elif is_linux():
             unpack_tool_to_software_dir(src_package_dir, 'cmake*Linux*')
+        else:
+            unpack_tool_to_software_dir(src_package_dir, 'cmake*Darwin*')
 
     if libs['curl']:
         if is_windows():
@@ -1554,7 +1567,6 @@ def parse_inputs(argv: list):
     elif is_mac():
         libs['zlib'] = False
         libs['curl'] = False
-        libs['cmake'] = False
 
     for lib, rev_dep in libs_reverse_depends.items():
         if libs[lib.lower()]:

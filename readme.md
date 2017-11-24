@@ -1,7 +1,7 @@
 ## Installation
 ### macOS:
 * install xcode, homebrew, qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb) and python3
-* brew install unrar p7zip git cmake ninja
+* brew install unrar p7zip git ninja
 
 ### Windows:
 * install visual studio, qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb), python3, git
