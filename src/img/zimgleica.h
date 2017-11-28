@@ -38,17 +38,16 @@ public:
 private:
   void clearInternalState();
 
+  void readXml(const QString& filename, QString& xml,
+               std::vector<std::tuple<size_t, QString, size_t>>& memoryOffsetNameLength) const;
+
   void readLeicaInfo(const QString& xmlString);
 
   void parseMetadata(QXmlStreamReader& xml);
 
-  void parseChannel(QXmlStreamReader& xml);
+  void parseElement(QXmlStreamReader& xml);
 
-  void parseScene(QXmlStreamReader& xml);
-
-  void parseDistance(QXmlStreamReader& xml);
-
-  void parseDisplaySettingChannel(QXmlStreamReader& xml);
+  void parseReference(QXmlStreamReader& xml);
 
 private:
   int m_version;

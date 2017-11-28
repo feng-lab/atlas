@@ -4,6 +4,8 @@
 #include "zioutils.h"
 #include <QUuid>
 #include <QXmlStreamReader>
+#include <QFile>
+#include <QTextStream>
 
 namespace {
 
@@ -87,7 +89,7 @@ QString ZImgLeica::fullName() const
 QStringList ZImgLeica::extensions() const
 {
   QStringList res;
-  res << "lif" << "lof";
+  res << "lif" << "lof" << "xlef" << "xllf";
   return res;
 }
 
@@ -97,106 +99,24 @@ void ZImgLeica::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
 {
   clearInternalState();
 
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+  QString xml;
+  std::vector<std::tuple<size_t, QString, size_t>> memoryOffsetNameLength;
+  readXml(filename, xml, memoryOffsetNameLength);
 
-  NextBlock nb;
-  readStream(inputFileStream, &nb, sizeof(NextBlock));
-  if (nb.test != 0x70) {
-    throw ZIOException("incorrect leica file header");
-  }
+  readLeicaInfo(xml);
 
-  XMLOrTypeContent xtc;
-  readStream(inputFileStream, &xtc, sizeof(XMLOrTypeContent));
-  if (xtc.test != 0x2A || nb.length != 5 + xtc.textLength * 2) {
-    throw ZIOException("incorrect lecia xml or type content");
-  }
-  std::vector<QChar> charBuf(xtc.textLength);
-  readStream(inputFileStream, charBuf.data(), xtc.textLength * 2);
-  QString xml(charBuf.data(), charBuf.size());
-  bool isLOF = xml == "LMS_Object_File";
-
-  int majorVersion = 0;
-  int minorVersion = 0;
-  if (isLOF) {
-    Int32Block majorVersionBlock;
-    readStream(inputFileStream, &majorVersionBlock, sizeof(majorVersionBlock));
-    if (majorVersionBlock.test == 0x2A) {
-      majorVersion = majorVersionBlock.number;
-    } else {
-      throw ZIOException("incorrect lecia LOF major version");
-    }
-    Int32Block minorVersionBlock;
-    readStream(inputFileStream, &minorVersionBlock, sizeof(minorVersionBlock));
-    if (minorVersionBlock.test == 0x2A) {
-      minorVersion = minorVersionBlock.number;
-    } else {
-      throw ZIOException("incorrect lecia LOF minor version");
-    }
-    UInt64Block memorySizeBlock;
-    readStream(inputFileStream, &memorySizeBlock, sizeof(memorySizeBlock));
-    if (memorySizeBlock.test != 0x2A) {
-      throw ZIOException("incorrect lecia LOF memory size");
-    }
-    inputFileStream.seekg(memorySizeBlock.Number, std::ios_base::cur);
-
-    readStream(inputFileStream, &nb, sizeof(NextBlock));
-    if (nb.test != 0x70) {
-      throw ZIOException("incorrect leica LOF xml header");
-    }
-
-    readStream(inputFileStream, &xtc, sizeof(XMLOrTypeContent));
-    if (xtc.test != 0x2A || nb.length != 5 + xtc.textLength * 2) {
-      throw ZIOException("incorrect lecia LOF xml content");
-    }
-    charBuf.resize(xtc.textLength);
-    readStream(inputFileStream, charBuf.data(), xtc.textLength * 2);
-    xml = QString(charBuf.data(), charBuf.size());
-
-    readLeicaInfo(xml);
-  } else { // LIF
-    readLeicaInfo(xml);
-    do {
-      if (!inputFileStream.read(reinterpret_cast<char*>(&nb), sizeof(NextBlock))) {
-        break;
-      }
-
-      if (m_version == 1) {
-        MemoryBlock32 md;
-        readStream(inputFileStream, &md, sizeof(MemoryBlock32));
-        if (md.test1 != 0x2A || md.test2 != 0x2A || nb.length != 10 + md.textLength * 2) {
-          throw ZIOException("incorrect lecia LOF xml content");
-        }
-        charBuf.resize(md.textLength);
-        readStream(inputFileStream, charBuf.data(), md.textLength * 2);
-        QString imageDescription(charBuf.data(), charBuf.size());
-        LOG(INFO) << imageDescription;
-
-        inputFileStream.seekg(md.memorySize, std::ios_base::cur);
-      } else if (m_version == 2) {
-        MemoryBlock64 md;
-        readStream(inputFileStream, &md, sizeof(MemoryBlock64));
-        if (md.test1 != 0x2A || md.test2 != 0x2A || nb.length != 14 + md.textLength * 2) {
-          throw ZIOException("incorrect lecia LOF xml content");
-        }
-        charBuf.resize(md.textLength);
-        readStream(inputFileStream, charBuf.data(), md.textLength * 2);
-        QString imageDescription(charBuf.data(), charBuf.size());
-        LOG(INFO) << imageDescription << " " << md.memorySize;
-
-        inputFileStream.seekg(md.memorySize, std::ios_base::cur);
-      } else {
-        throw ZIOException(QString("not supported leica lif version: %1").arg(m_version));
-      }
-    } while (true);
-  }
-
-  std::cout << xml.toLocal8Bit();
 }
 
-void ZImgLeica::readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene)
+void ZImgLeica::readMetadata(const QString& filename, ZImgMetadata& meta, size_t /*scene*/)
 {
+  clearInternalState();
 
+  QString xml;
+  std::vector<std::tuple<size_t, QString, size_t>> memoryOffsetNameLength;
+  readXml(filename, xml, memoryOffsetNameLength);
+
+  ZImgMetatag tag("metadata", xml);
+  meta.attachToTopLevel(tag);
 }
 
 void  ZImgLeica::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thumbnail*/,
@@ -212,6 +132,116 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
 void ZImgLeica::clearInternalState()
 {
   m_version = 0;
+}
+
+void ZImgLeica::readXml(const QString& filename, QString& xml,
+                        std::vector<std::tuple<size_t, QString, size_t>>& memoryOffsetNameLength) const
+{
+  if (filename.endsWith(".xlef", Qt::CaseInsensitive) || filename.endsWith(".xllf", Qt::CaseInsensitive)) {
+    QFile f(filename);
+    if (!f.open(QFile::ReadOnly | QFile::Text)) {
+      throw ZIOException("can not open file");
+    }
+    QTextStream in(&f);
+    xml = in.readAll();
+  } else {
+    std::ifstream inputFileStream;
+    openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+
+    NextBlock nb;
+    readStream(inputFileStream, &nb, sizeof(NextBlock));
+    if (nb.test != 0x70) {
+      throw ZIOException("incorrect leica file header");
+    }
+
+    XMLOrTypeContent xtc;
+    readStream(inputFileStream, &xtc, sizeof(XMLOrTypeContent));
+    if (xtc.test != 0x2A || nb.length != 5 + xtc.textLength * 2) {
+      throw ZIOException("incorrect lecia xml or type content");
+    }
+    std::vector<QChar> charBuf(xtc.textLength);
+    readStream(inputFileStream, charBuf.data(), xtc.textLength * 2);
+    xml = QString(charBuf.data(), charBuf.size());
+    bool isLOF = xml == "LMS_Object_File";
+
+    int majorVersion = 0;
+    int minorVersion = 0;
+    if (isLOF) {
+      Int32Block majorVersionBlock;
+      readStream(inputFileStream, &majorVersionBlock, sizeof(majorVersionBlock));
+      if (majorVersionBlock.test == 0x2A) {
+        majorVersion = majorVersionBlock.number;
+      } else {
+        throw ZIOException("incorrect lecia LOF major version");
+      }
+      Int32Block minorVersionBlock;
+      readStream(inputFileStream, &minorVersionBlock, sizeof(minorVersionBlock));
+      if (minorVersionBlock.test == 0x2A) {
+        minorVersion = minorVersionBlock.number;
+      } else {
+        throw ZIOException("incorrect lecia LOF minor version");
+      }
+      UInt64Block memorySizeBlock;
+      readStream(inputFileStream, &memorySizeBlock, sizeof(memorySizeBlock));
+      if (memorySizeBlock.test != 0x2A) {
+        throw ZIOException("incorrect lecia LOF memory size");
+      }
+      memoryOffsetNameLength.push_back(std::make_tuple(size_t(inputFileStream.tellg()),
+                                                       QString(""), size_t(memorySizeBlock.Number)));
+      inputFileStream.seekg(memorySizeBlock.Number, std::ios_base::cur);
+
+      readStream(inputFileStream, &nb, sizeof(NextBlock));
+      if (nb.test != 0x70) {
+        throw ZIOException("incorrect leica LOF xml header");
+      }
+
+      readStream(inputFileStream, &xtc, sizeof(XMLOrTypeContent));
+      if (xtc.test != 0x2A || nb.length != 5 + xtc.textLength * 2) {
+        throw ZIOException("incorrect lecia LOF xml content");
+      }
+      charBuf.resize(xtc.textLength);
+      readStream(inputFileStream, charBuf.data(), xtc.textLength * 2);
+      xml = QString(charBuf.data(), charBuf.size());
+    } else { // LIF
+      do {
+        if (!inputFileStream.read(reinterpret_cast<char*>(&nb), sizeof(NextBlock))) {
+          break;
+        }
+
+        if (m_version == 1) {
+          MemoryBlock32 md;
+          readStream(inputFileStream, &md, sizeof(MemoryBlock32));
+          if (md.test1 != 0x2A || md.test2 != 0x2A || nb.length != 10 + md.textLength * 2) {
+            throw ZIOException("incorrect lecia LOF xml content");
+          }
+          charBuf.resize(md.textLength);
+          readStream(inputFileStream, charBuf.data(), md.textLength * 2);
+          QString imageDescription(charBuf.data(), charBuf.size());
+          memoryOffsetNameLength.push_back(std::make_tuple(size_t(inputFileStream.tellg()),
+                                                           imageDescription, size_t(md.memorySize)));
+
+          inputFileStream.seekg(md.memorySize, std::ios_base::cur);
+        } else if (m_version == 2) {
+          MemoryBlock64 md;
+          readStream(inputFileStream, &md, sizeof(MemoryBlock64));
+          if (md.test1 != 0x2A || md.test2 != 0x2A || nb.length != 14 + md.textLength * 2) {
+            throw ZIOException("incorrect lecia LOF xml content");
+          }
+          charBuf.resize(md.textLength);
+          readStream(inputFileStream, charBuf.data(), md.textLength * 2);
+          QString imageDescription(charBuf.data(), charBuf.size());
+          memoryOffsetNameLength.push_back(std::make_tuple(size_t(inputFileStream.tellg()),
+                                                           imageDescription, size_t(md.memorySize)));
+
+          inputFileStream.seekg(md.memorySize, std::ios_base::cur);
+        } else {
+          throw ZIOException(QString("not supported leica lif version: %1").arg(m_version));
+        }
+      } while (true);
+    }
+  }
+
+  std::cout << xml.toLocal8Bit();
 }
 
 void ZImgLeica::readLeicaInfo(const QString& xmlString)
@@ -258,74 +288,8 @@ void ZImgLeica::parseMetadata(QXmlStreamReader& xml)
   CHECK(xml.isStartElement() && xml.name() == "LMSDataContainerHeader");
 
   while (xml.readNextStartElement()) {
-    if (xml.name() == "Information") {
-      while (xml.readNextStartElement()) {
-        if (xml.name() == "Image") {
-          while (xml.readNextStartElement()) {
-            if (xml.name() == "Dimensions") {
-              while (xml.readNextStartElement()) {
-                if (xml.name() == "Channels") {
-                  while (xml.readNextStartElement()) {
-                    if (xml.name() == "Channel") {
-                      parseChannel(xml);
-                    } else {
-                      xml.skipCurrentElement();
-                    }
-                  }
-                } else if (xml.name() == "S") {
-                  while (xml.readNextStartElement()) {
-                    if (xml.name() == "Scenes") {
-                      while (xml.readNextStartElement()) {
-                        if (xml.name() == "Scene") {
-                          parseScene(xml);
-                        } else {
-                          xml.skipCurrentElement();
-                        }
-                      }
-                    } else {
-                      xml.skipCurrentElement();
-                    }
-                  }
-                } else {
-                  xml.skipCurrentElement();
-                }
-              }
-            } else {
-              xml.skipCurrentElement();
-            }
-          }
-        } else {
-          xml.skipCurrentElement();
-        }
-      }
-    } else if (xml.name() == "Scaling") {
-      while (xml.readNextStartElement()) {
-        if (xml.name() == "Items") {
-          while (xml.readNextStartElement()) {
-            if (xml.name() == "Distance") {
-              parseDistance(xml);
-            } else {
-              xml.skipCurrentElement();
-            }
-          }
-        } else {
-          xml.skipCurrentElement();
-        }
-      }
-    } else if (xml.name() == "DisplaySetting") {
-      while (xml.readNextStartElement()) {
-        if (xml.name() == "Channels") {
-          while (xml.readNextStartElement()) {
-            if (xml.name() == "Channel") {
-              parseDisplaySettingChannel(xml);
-            } else {
-              xml.skipCurrentElement();
-            }
-          }
-        } else {
-          xml.skipCurrentElement();
-        }
-      }
+    if (xml.name() == "Element") {
+      parseElement(xml);
     } else {
       xml.skipCurrentElement();
     }
@@ -384,22 +348,33 @@ void ZImgLeica::parseMetadata(QXmlStreamReader& xml)
 //  }
 }
 
-void ZImgLeica::parseChannel(QXmlStreamReader& xml)
+void ZImgLeica::parseElement(QXmlStreamReader& xml)
 {
   QString name;
-  bool hasColor = false;
-  col4 col;
-  bool hasPixelType = false;
-  int pixelType = -1;
-  bool hasBC = false;
-  int bc = 0;
+  bool visibilityInvalid = true;
+  bool copyOptionInvalid = true;
 
+  bool ok;
   QXmlStreamAttributes attributes = xml.attributes();
   if (attributes.hasAttribute("Name")) {
     name = attributes.value("Name").toString();
   }
+  if (attributes.hasAttribute("Visibility")) {
+    int v = attributes.value("Visibility").toInt(&ok);
+    if (!ok)
+      throw ZIOException("Can not parse leica element Visibility");
+    visibilityInvalid = v != 1;
+  }
+  if (attributes.hasAttribute("CopyOption")) {
+    int v = attributes.value("CopyOption").toInt(&ok);
+    if (!ok)
+      throw ZIOException("Can not parse leica element CopyOption");
+    copyOptionInvalid = v != 1;
+  }
+  if (visibilityInvalid || copyOptionInvalid) {
+    xml.skipCurrentElement();
+  }
 
-  bool ok;
   while (xml.readNextStartElement()) {
     if (xml.name() == "Color") {
       QString colorStr = xml.readElementText();
@@ -470,7 +445,7 @@ void ZImgLeica::parseChannel(QXmlStreamReader& xml)
 //  }
 }
 
-void ZImgLeica::parseScene(QXmlStreamReader& xml)
+void ZImgLeica::parseReference(QXmlStreamReader& xml)
 {
   double sceneCenterX;
   double sceneCenterY;
@@ -494,92 +469,6 @@ void ZImgLeica::parseScene(QXmlStreamReader& xml)
       xml.skipCurrentElement();
     }
   }
-}
-
-void ZImgLeica::parseDistance(QXmlStreamReader& xml)
-{
-  QXmlStreamAttributes attributes = xml.attributes();
-  if (attributes.hasAttribute("Id")) {
-    bool ok;
-    if (attributes.value("Id").toString() == "X") {
-      while (xml.readNextStartElement()) {
-        if (xml.name() == "Value") {
-          //m_voxelSizeX = xml.readElementText().toDouble(&ok);
-          if (!ok)
-            throw ZIOException("Can not parse Distance X");
-        } else {
-          xml.skipCurrentElement();
-        }
-      }
-    } else if (attributes.value("Id").toString() == "Y") {
-      while (xml.readNextStartElement()) {
-        if (xml.name() == "Value") {
-          //m_voxelSizeY = xml.readElementText().toDouble(&ok);
-          if (!ok)
-            throw ZIOException("Can not parse Distance Y");
-        } else {
-          xml.skipCurrentElement();
-        }
-      }
-    } else if (attributes.value("Id").toString() == "Z") {
-      while (xml.readNextStartElement()) {
-        if (xml.name() == "Value") {
-          //m_voxelSizeZ = xml.readElementText().toDouble(&ok);
-          if (!ok)
-            throw ZIOException("Can not parse Distance Z");
-        } else {
-          xml.skipCurrentElement();
-        }
-      }
-    } else {
-      xml.skipCurrentElement();
-    }
-  } else {
-    throw ZIOException("missing items id attribute");
-  }
-}
-
-void ZImgLeica::parseDisplaySettingChannel(QXmlStreamReader& xml)
-{
-  QString name;
-  bool hasColor = false;
-  col4 col;
-
-  QXmlStreamAttributes attributes = xml.attributes();
-  if (attributes.hasAttribute("Name")) {
-    name = attributes.value("Name").toString();
-  }
-
-  bool ok;
-  while (xml.readNextStartElement()) {
-    if (xml.name() == "Color") {
-      QString colorStr = xml.readElementText();
-      if (colorStr.startsWith("#")) {
-        colorStr = colorStr.mid(1);
-      }
-      if (colorStr.size() == 8) {
-        colorStr = colorStr.mid(2);
-      }
-      if (colorStr.size() == 6) {
-        int color = colorStr.toInt(&ok, 16);
-        if (ok) {
-          std::memcpy(&col, &color, 3);
-          std::swap(col.r, col.b);
-          col.a = 255;
-          hasColor = true;
-        } else {
-          LOG(WARNING) << "can not parse czi channel color " << colorStr;
-        }
-      }
-    } else {
-      xml.skipCurrentElement();
-    }
-  }
-
-//  m_channelNamesFromDisplaySettings.push_back(name);
-//  if (hasColor) {
-//    m_channelColorsFromDisplaySettings.push_back(col);
-//  }
 }
 
 } // namespace nim
