@@ -2,10 +2,12 @@
 
 #include "zlog.h"
 #include "zioutils.h"
+#include "zimgio.h"
 #include <QUuid>
 #include <QXmlStreamReader>
 #include <QFile>
 #include <QTextStream>
+#include <QUrl>
 
 namespace {
 
@@ -103,8 +105,13 @@ void ZImgLeica::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
   std::vector<std::tuple<size_t, QString, size_t>> memoryOffsetNameLength;
   readXml(filename, xml, memoryOffsetNameLength);
 
-  readLeicaInfo(xml);
+  std::vector<ImageInfo> leicaImageInfos;
+  readLeicaInfo(xml, QFileInfo(filename).absoluteDir(), leicaImageInfos);
 
+  infos.clear();
+  detectInfos(infos, leicaImageInfos);
+
+  createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
 }
 
 void ZImgLeica::readMetadata(const QString& filename, ZImgMetadata& meta, size_t /*scene*/)
@@ -126,12 +133,142 @@ void  ZImgLeica::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*t
 
 void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
 {
+  clearInternalState();
 
+  QString xml;
+  std::vector<std::tuple<size_t, QString, size_t>> allMemoryOffsetNameLength;
+  readXml(filename, xml, allMemoryOffsetNameLength);
+
+  std::vector<ImageInfo> leicaImageInfos;
+  readLeicaInfo(xml, QFileInfo(filename).absoluteDir(), leicaImageInfos);
+
+  std::vector<ZImgInfo> infos;
+  detectInfos(infos, leicaImageInfos);
+
+  if (scene >= infos.size()) {
+    throw ZIOException("invalid scene");
+  }
+  ZImgInfo& info = infos[scene];
+
+  if (region.isEmpty() || !region.isValid(info)) {
+    throw ZIOException(
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString()).arg(region.toQString()));
+  }
+
+  ZImgRegion rgn = region;
+  rgn.resolveRegionEnd(info);
+
+  CHECK(ratio >= 1);
+
+  const auto& ii = leicaImageInfos[scene];
+  if (!allMemoryOffsetNameLength.empty()) { // lof or lif
+    const auto& monl = allMemoryOffsetNameLength[scene];
+    std::vector<size_t> dimensionStrides(5, 0);  // XYZCT
+    std::vector<uint64_t> channelOffsets;
+    for (const auto& cd : ii.channels) {
+      channelOffsets.push_back(cd.bytesInc);
+    }
+    if (channelOffsets.size() > 1) {
+      std::sort(channelOffsets.begin(), channelOffsets.end());
+      dimensionStrides[3] = channelOffsets[1] - channelOffsets[0];
+    }
+    for (const auto& dd : ii.dimensions) {
+      switch (dd.dimID) {
+        case 1:
+          dimensionStrides[0] = dd.bytesInc;
+          break;
+        case 2:
+          dimensionStrides[1] = dd.bytesInc;
+          break;
+        case 3:
+          dimensionStrides[2] = dd.bytesInc;
+          break;
+        case 4:
+          dimensionStrides[4] = dd.bytesInc;
+          break;
+        default:
+          throw ZIOException("only support XYZT dimension");
+      }
+    }
+
+
+  } else {
+    ZImgIO imgIO;
+    ZImgInfo resInfo = rgn.clip(info);
+    if (ii.imageMemory.fileNames.size() == 1) {
+      std::vector<ZImgInfo> fileInfos;
+      imgIO.readInfo(ii.imageMemory.fileNames[0], fileInfos);
+      if (!fileInfos.empty() && fileInfos[0].isSameType(info) && fileInfos[0].isSameSize(info)) {
+        imgIO.readImg(ii.imageMemory.fileNames[0], img, rgn);
+        img.infoRef() = resInfo;
+      } else {
+        throw ZIOException("image and metadata do not match, please send this file to flq@live.com");
+      }
+    } else if (ii.imageMemory.fileNames.size() == info.numTimes) {
+      std::vector<ZImgInfo> fileInfos;
+      imgIO.readInfo(ii.imageMemory.fileNames, Dimension::T, fileInfos);
+      if (!fileInfos.empty() && fileInfos[0].isSameType(info) && fileInfos[0].isSameSize(info)) {
+        imgIO.readImg(ii.imageMemory.fileNames, Dimension::T, rgn, img);
+        img.infoRef() = resInfo;
+      } else {
+        throw ZIOException("image and metadata do not match, please send this file to flq@live.com");
+      }
+    } else if (ii.imageMemory.fileNames.size() == info.depth) {
+      std::vector<ZImgInfo> fileInfos;
+      imgIO.readInfo(ii.imageMemory.fileNames, Dimension::Z, fileInfos);
+      if (!fileInfos.empty() && fileInfos[0].isSameType(info) && fileInfos[0].isSameSize(info)) {
+        imgIO.readImg(ii.imageMemory.fileNames, Dimension::Z, rgn, img);
+        img.infoRef() = resInfo;
+      } else {
+        throw ZIOException("image and metadata do not match, please send this file to flq@live.com");
+      }
+    } else {
+      throw ZIOException("Unhandled leica image sequence, please send this file to flq@live.com");
+    }
+  }
+
+  ZImgMetatag tag("metadata", xml);
+  img.metadataRef().attachToTopLevel(tag);
+
+  if (ratio > 1) {
+    img.zoom(1.0 / ratio, 1.0 / ratio);
+  }
 }
 
 void ZImgLeica::clearInternalState()
 {
-  m_version = 0;
+}
+
+int ZImgLeica::parseLIFVersion(const QString& xmlString) const
+{
+  int res = 0;
+  QXmlStreamReader xml(xmlString);
+
+  while (!xml.atEnd() && !xml.hasError()) {
+    /* Read next element.*/
+    QXmlStreamReader::TokenType token = xml.readNext();
+    // If token is just StartDocument, we'll go to next.
+    if (token == QXmlStreamReader::StartDocument) {
+      continue;
+    }
+    // If token is StartElement, we'll see if we can read it.
+    if (token == QXmlStreamReader::StartElement) {
+      if (xml.name() != "LMSDataContainerHeader") {
+        continue;
+      }
+
+      QXmlStreamAttributes attributes = xml.attributes();
+      bool ok = false;
+      if (attributes.hasAttribute("Version")) {
+        res = attributes.value("Version").toInt(&ok);
+        if (!ok) {
+          throw ZIOException("Can not parse Leica file version");
+        }
+      }
+      return res;
+    }
+  }
+  return res;
 }
 
 void ZImgLeica::readXml(const QString& filename, QString& xml,
@@ -203,12 +340,13 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
       readStream(inputFileStream, charBuf.data(), xtc.textLength * 2);
       xml = QString(charBuf.data(), charBuf.size());
     } else { // LIF
+      int lifVersion = parseLIFVersion(xml);
       do {
         if (!inputFileStream.read(reinterpret_cast<char*>(&nb), sizeof(NextBlock))) {
           break;
         }
 
-        if (m_version == 1) {
+        if (lifVersion == 1) {
           MemoryBlock32 md;
           readStream(inputFileStream, &md, sizeof(MemoryBlock32));
           if (md.test1 != 0x2A || md.test2 != 0x2A || nb.length != 10 + md.textLength * 2) {
@@ -221,7 +359,7 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
                                                            imageDescription, size_t(md.memorySize)));
 
           inputFileStream.seekg(md.memorySize, std::ios_base::cur);
-        } else if (m_version == 2) {
+        } else if (lifVersion == 2) {
           MemoryBlock64 md;
           readStream(inputFileStream, &md, sizeof(MemoryBlock64));
           if (md.test1 != 0x2A || md.test2 != 0x2A || nb.length != 14 + md.textLength * 2) {
@@ -235,7 +373,7 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
 
           inputFileStream.seekg(md.memorySize, std::ios_base::cur);
         } else {
-          throw ZIOException(QString("not supported leica lif version: %1").arg(m_version));
+          throw ZIOException(QString("not supported leica lif version: %1").arg(lifVersion));
         }
       } while (true);
     }
@@ -244,7 +382,7 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
   std::cout << xml.toLocal8Bit();
 }
 
-void ZImgLeica::readLeicaInfo(const QString& xmlString)
+void ZImgLeica::readLeicaInfo(const QString& xmlString, const QDir& xmlDir, std::vector<ImageInfo>& imageInfos)
 {
   // QXmlStreamReader takes any QIODevice.
   QXmlStreamReader xml(xmlString);
@@ -263,16 +401,7 @@ void ZImgLeica::readLeicaInfo(const QString& xmlString)
         continue;
       }
 
-      QXmlStreamAttributes attributes = xml.attributes();
-      bool ok = false;
-      if (attributes.hasAttribute("Version")) {
-        m_version = attributes.value("Version").toInt(&ok);
-      }
-      if (!ok) {
-        throw ZIOException("Can not parse Leica file version");
-      }
-
-      parseMetadata(xml);
+      parseMetadata(xml, xmlDir, imageInfos);
       break;
     }
   }
@@ -283,72 +412,20 @@ void ZImgLeica::readLeicaInfo(const QString& xmlString)
   xml.clear();
 }
 
-void ZImgLeica::parseMetadata(QXmlStreamReader& xml)
+void ZImgLeica::parseMetadata(QXmlStreamReader& xml, const QDir& xmlDir, std::vector<ImageInfo>& imageInfos)
 {
   CHECK(xml.isStartElement() && xml.name() == "LMSDataContainerHeader");
 
   while (xml.readNextStartElement()) {
     if (xml.name() == "Element") {
-      parseElement(xml);
+      parseElement(xml, xmlDir, imageInfos);
     } else {
       xml.skipCurrentElement();
     }
   }
-
-//  if (m_voxelSizeX > 0 && m_voxelSizeY > 0) {
-//    m_hasVoxelSizeInfo = true;
-//    m_voxelSizeX *= 1e6;
-//    m_voxelSizeY *= 1e6;
-//    m_voxelSizeZ = m_voxelSizeZ <= 0 ? 1 : (m_voxelSizeZ * 1e6);
-//    //LOG(INFO) << m_voxelSizeX << " " << m_voxelSizeY << " " << m_voxelSizeZ;
-//  }
-//
-//  if (m_channelColors.size() < m_channelNames.size()) {
-//    m_channelColors.clear();
-//  }
-//  if (m_channelPixelType.size() < m_channelNames.size()) {
-//    m_channelPixelType.clear();
-//  }
-//  if (m_channelValidBitCount.size() < m_channelNames.size()) {
-//    m_channelValidBitCount.clear();
-//  }
-//  if (m_channelColorsFromDisplaySettings.size() < m_channelNamesFromDisplaySettings.size()) {
-//    m_channelColorsFromDisplaySettings.clear();
-//  }
-//
-//  if (m_channelNamesFromDisplaySettings.size() == m_channelNames.size()) {
-//    for (size_t i = 0; i < m_channelNames.size(); ++i) {
-//      if (m_channelNames[i].isEmpty())
-//        m_channelNames[i] = m_channelNamesFromDisplaySettings[i];
-//    }
-//    if (m_channelColors.empty() && !m_channelColorsFromDisplaySettings.empty())
-//      m_channelColors = m_channelColorsFromDisplaySettings;
-//  }
-//  //  for (size_t i=0; i<channelNames.size(); ++i) {
-//  //    LOG(INFO) << channelNames[i] << " " << channelIs12Bit[i] << " " << channelPixelType[i];
-//  //  }
-//  // channels have different data types
-//  for (size_t i = 1; i < m_channelPixelType.size(); ++i) {
-//    if (m_channelPixelType[i] != m_channelPixelType[0]) {
-//      m_shouldSeparateChannelsToDifferentScenes = true;
-//      break;
-//    }
-//  }
-//  // more than 1 channel and each channel contains BGR image
-//  if (!m_shouldSeparateChannelsToDifferentScenes && m_channelPixelType.size() > 1 &&
-//      pixelTypeIsBGR(m_channelPixelType[0])) {
-//    m_shouldSeparateChannelsToDifferentScenes = true;
-//  }
-//
-//  if (m_channelNames.size() > 0)
-//    m_hasChannelInfo = true;
-//
-//  if (m_sceneCenterX.size() > 0 && m_sceneCenterX.size() == m_sceneCenterY.size()) {
-//    m_hasSceneInfo = true;
-//  }
 }
 
-void ZImgLeica::parseElement(QXmlStreamReader& xml)
+void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vector<ImageInfo>& imageInfos)
 {
   QString name;
   bool visibilityInvalid = true;
@@ -376,98 +453,375 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml)
   }
 
   while (xml.readNextStartElement()) {
-    if (xml.name() == "Color") {
-      QString colorStr = xml.readElementText();
-      if (colorStr.startsWith("#")) {
-        colorStr = colorStr.mid(1);
-      }
-      if (colorStr.size() == 8) {
-        colorStr = colorStr.mid(2);
-      }
-      if (colorStr.size() == 6) {
-        int color = colorStr.toInt(&ok, 16);
-        if (ok) {
-          std::memcpy(&col, &color, 3);
-          std::swap(col.r, col.b);
-          col.a = 255;
-          hasColor = true;
+    ImageInfo imageInfo;
+
+    if (xml.name() == "Data") {
+      while (xml.readNextStartElement()) {
+        if (xml.name() == "Experiment") {
+          xml.skipCurrentElement();
+        } else if (xml.name() == "Image") {
+          while (xml.readNextStartElement()) {
+            if (xml.name() == "ImageDescription") {
+              while (xml.readNextStartElement()) {
+                if (xml.name() == "Channels") {
+                  ChannelDescription cd;
+                  attributes = xml.attributes();
+                  cd.dataType = attributes.value("DataType").toInt(&ok);
+                  if (!ok)
+                    throw ZIOException("Can not parse leica ChannelDescription DataType");
+                  cd.channelTag = attributes.value("ChannelTag").toInt(&ok);
+                  if (!ok)
+                    throw ZIOException("Can not parse leica ChannelDescription ChannelTag");
+                  cd.resolution = attributes.value("Resolution").toUInt(&ok);
+                  if (!ok)
+                    throw ZIOException("Can not parse leica ChannelDescription Resolution");
+                  cd.nameOfMeasuredQuantity = attributes.value("NameOfMeasuredQuantity").toString();
+                  cd.min = attributes.value("Min").toDouble(&ok);
+                  if (!ok)
+                    throw ZIOException("Can not parse leica ChannelDescription Min");
+                  cd.max = attributes.value("Max").toDouble(&ok);
+                  if (!ok)
+                    throw ZIOException("Can not parse leica ChannelDescription Max");
+                  cd.unit = attributes.value("Unit").toString();
+                  cd.LUTName = attributes.value("LUTName").toString();
+                  cd.isLUTInverted = attributes.value("IsLUTInverted").toInt(&ok);
+                  if (!ok)
+                    throw ZIOException("Can not parse leica ChannelDescription isLUTInverted");
+                  cd.bytesInc = attributes.value("BytesInc").toULongLong(&ok);
+                  if (!ok)
+                    throw ZIOException("Can not parse leica ChannelDescription BytesInc");
+                  cd.bitInc = attributes.value("BitInc").toUInt(&ok);
+                  if (!ok)
+                    throw ZIOException("Can not parse leica ChannelDescription BitInc");
+                  imageInfo.channels.push_back(cd);
+                } else if (xml.name() == "Dimensions") {
+                  DimensionDescription dd;
+                  attributes = xml.attributes();
+                  dd.dimID = attributes.value("DimID").toInt(&ok);
+                  if (!ok)
+                    throw ZIOException("Can not parse leica DimensionDescription DimID");
+                  dd.numberOfElements = attributes.value("NumberOfElements").toUInt(&ok);
+                  if (!ok)
+                    throw ZIOException("Can not parse leica DimensionDescription NumberOfElements");
+                  dd.origin = attributes.value("Origin").toUInt(&ok);
+                  if (!ok)
+                    throw ZIOException("Can not parse leica DimensionDescription Origin");
+                  dd.length = attributes.value("Length").toDouble(&ok);
+                  if (!ok)
+                    throw ZIOException("Can not parse leica DimensionDescription Length");
+                  dd.unit = attributes.value("Unit").toString();
+                  dd.bytesInc = attributes.value("BytesInc").toULongLong(&ok);
+                  if (!ok)
+                    throw ZIOException("Can not parse leica DimensionDescription BytesInc");
+                  dd.bitInc = attributes.value("BitInc").toUInt(&ok);
+                  if (!ok)
+                    throw ZIOException("Can not parse leica DimensionDescription BitInc");
+                  imageInfo.dimensions.push_back(dd);
+                } else {
+                  xml.skipCurrentElement();
+                }
+              }
+            } else if (xml.name() == "TimeStampList") {
+              std::vector<uint64_t> values;
+              attributes = xml.attributes();
+              if (attributes.hasAttribute("NumberOfTimeStamps")) {
+                uint64_t nts = attributes.value("NumberOfTimeStamps").toULongLong(&ok);
+                if (!ok)
+                  throw ZIOException("Can not parse leica TimeStampList NumberOfTimeStamps");
+                QString tsText = xml.readElementText();
+                QStringList nums = tsText.split(" ", QString::SkipEmptyParts);
+                if (uint64_t(nums.size()) != nts)
+                  throw ZIOException("TimeStampList NumberOfTimeStamps does not match actual number");
+                for (const auto& num : nums) {
+                  values.push_back(num.toULongLong(&ok, 16));
+                  if (!ok)
+                    throw ZIOException(QString("Can not parse leica TimeStamp string: %1").arg(num));
+                }
+              } else {
+                while (xml.readNextStartElement()) {
+                  if (xml.name() == "TimeStamp") {
+                    attributes = xml.attributes();
+                    uint64_t highInteger = attributes.value("HighInteger").toULongLong(&ok);
+                    if (!ok)
+                      throw ZIOException("Can not parse leica TimeStamp HighInteger");
+                    uint64_t lowInteger = attributes.value("LowInteger").toULongLong(&ok);
+                    if (!ok)
+                      throw ZIOException("Can not parse leica TimeStamp LowInteger");
+                    values.push_back((highInteger << 32) + lowInteger);
+                  } else {
+                    throw ZIOException(QString("invalid child of leica TimeStampList: %1").arg(xml.name().toString()));
+                  }
+                }
+              }
+
+              for (size_t i = 1; i < values.size(); ++i) {
+                values[i] -= values[0];
+              }
+              values[0] = 0;
+              for (auto val : values) {
+                imageInfo.timeStamps.push_back(val * 1e-7);
+              }
+            } else {
+              xml.skipCurrentElement();
+            }
+          }
+        } else if (xml.name() == "Collection") {
+          xml.skipCurrentElement(); //todo: what is ChildTypeTest?
         } else {
-          LOG(WARNING) << "can not parse czi channel color " << colorStr;
+          xml.skipCurrentElement();
         }
       }
-    } else if (xml.name() == "PixelType") {
-      QString pixelTypeStr = xml.readElementText();
-      if (pixelTypeStr.isEmpty()) {
-        throw ZIOException("Can not parse czi channel pixel type");
-      } else if (pixelTypeStr.compare("Gray8", Qt::CaseInsensitive) == 0) {
-        pixelType = 0;
-      } else if (pixelTypeStr.compare("Gray16", Qt::CaseInsensitive) == 0) {
-        pixelType = 1;
-      } else if (pixelTypeStr.compare("Gray32Float", Qt::CaseInsensitive) == 0) {
-        pixelType = 2;
-      } else if (pixelTypeStr.compare("Bgr24", Qt::CaseInsensitive) == 0) {
-        pixelType = 3;
-      } else if (pixelTypeStr.compare("Bgr48", Qt::CaseInsensitive) == 0) {
-        pixelType = 4;
-      } else if (pixelTypeStr.compare("Bgr96Float", Qt::CaseInsensitive) == 0) {
-        pixelType = 8;
-      } else if (pixelTypeStr.compare("Bgra32", Qt::CaseInsensitive) == 0) {
-        pixelType = 9;
-      } else if (pixelTypeStr.compare("Gray64ComplexFloat", Qt::CaseInsensitive) == 0) {
-        pixelType = 10;
-      } else if (pixelTypeStr.compare("Gray192ComplexFloat", Qt::CaseInsensitive) == 0) {
-        pixelType = 11;
-      } else if (pixelTypeStr.compare("Gray32", Qt::CaseInsensitive) == 0) {
-        pixelType = 12;
-      } else if (pixelTypeStr.compare("Gray64", Qt::CaseInsensitive) == 0) {
-        pixelType = 13;
-      } else {
-        throw ZIOException(QString("Not supported czi pixel type: %1").arg(pixelTypeStr));
-      }
-      hasPixelType = true;
-    } else if (xml.name() == "ComponentBitCount") {
-      bc = xml.readElementText().toInt(&ok);
+    } else if (xml.name() == "Memory") {
+      attributes = xml.attributes();
+      imageInfo.imageMemory.size = attributes.value("Size").toULongLong(&ok);
       if (!ok)
-        throw ZIOException("Can not parse czi bit count");
-      hasBC = true;
+        throw ZIOException("Can not parse leica Memory Size");
+      imageInfo.imageMemory.memoryBlockID = attributes.value("MemoryBlockID").toString();
+      while (xml.readNextStartElement()) {
+        if (xml.name() == "Block" || xml.name() == "Frame") {
+          attributes = xml.attributes();
+          QString fp = QUrl::fromPercentEncoding(attributes.value("File").toString().toUtf8());
+          fp.replace(QChar('\\'), QChar('/'));
+          fp = xmlDir.filePath(fp);
+          uint64_t foffset = attributes.value("Offset").toULongLong(&ok);
+          if (!ok)
+            throw ZIOException("Can not parse leica Memory Block/Frame Offset");
+          uint64_t fsize = attributes.value("Size").toULongLong(&ok);
+          if (!ok)
+            throw ZIOException("Can not parse leica Memory Block/Frame Size");
+          imageInfo.imageMemory.fileNames.push_back(fp);
+          imageInfo.imageMemory.fileOffsets.push_back(foffset);
+          imageInfo.imageMemory.fileSizes.push_back(fsize);
+        } else {
+          xml.skipCurrentElement();
+        }
+      }
+    } else if (xml.name() == "Children") {
+      while (xml.readNextStartElement()) {
+        if (xml.name() == "Element") {
+          parseElement(xml, xmlDir, imageInfos);
+        } else if (xml.name() == "Reference") {
+          attributes = xml.attributes();
+          if (attributes.hasAttribute("File")) {
+            QString fp = QUrl::fromPercentEncoding(attributes.value("File").toString().toUtf8());
+            fp.replace(QChar('\\'), QChar('/'));
+            fp = xmlDir.filePath(fp);
+            if (fp.endsWith(".xlif", Qt::CaseInsensitive)) {
+              parseXLIF(fp, imageInfos);
+            } else if (fp.endsWith(".xlcf", Qt::CaseInsensitive)) {
+              parseXLCF(fp, imageInfos);
+            }
+          }
+        } else {
+          xml.skipCurrentElement();
+        }
+      }
     } else {
       xml.skipCurrentElement();
+    }
+
+    bool willRead = !imageInfo.channels.empty() && !imageInfo.dimensions.empty();
+    if (willRead) {
+      for (const auto& channel : imageInfo.channels) {
+        if (channel.bitInc != 0) {
+          willRead = false;
+          LOG(WARNING) << "Leica image with nonzero channel BitInc is not supported";
+          break;
+        }
+      }
+    }
+    if (willRead) {
+      for (const auto& dimension : imageInfo.dimensions) {
+        if (dimension.bitInc != 0) {
+          willRead = false;
+          LOG(WARNING) << "Leica image with nonzero dimension BitInc is not supported";
+          break;
+        }
+      }
+    }
+    if (willRead) {
+      imageInfos.push_back(imageInfo);
     }
   }
-
-//  m_channelNames.push_back(name);
-//  if (hasBC)
-//    m_channelValidBitCount.push_back(bc);
-//  if (hasPixelType)
-//    m_channelPixelType.push_back(pixelType);
-//  if (hasColor) {
-//    m_channelColors.push_back(col);
-//  }
 }
 
-void ZImgLeica::parseReference(QXmlStreamReader& xml)
+void ZImgLeica::parseXLIF(const QString& filename, std::vector<ImageInfo>& imageInfos)
 {
-  double sceneCenterX;
-  double sceneCenterY;
+  QFile f(filename);
+  if (!f.open(QFile::ReadOnly | QFile::Text)) {
+    throw ZIOException("can not open file");
+  }
+  QTextStream in(&f);
+  QString xml = in.readAll();
 
-  bool ok;
-  while (xml.readNextStartElement()) {
-    if (xml.name() == "CenterPosition") {
-      QString centerPositionStr = xml.readElementText();
-      QStringList nums = centerPositionStr.split(",");
-      if (nums.size() != 2)
-        return;
-      sceneCenterX = nums[0].toDouble(&ok);
-      if (!ok)
-        return;
-      sceneCenterY = nums[1].toDouble(&ok);
-      if (!ok)
-        return;
-      //m_sceneCenterX.push_back(sceneCenterX);
-      //m_sceneCenterY.push_back(sceneCenterY);
-    } else {
-      xml.skipCurrentElement();
+  readLeicaInfo(xml, QFileInfo(filename).absoluteDir(), imageInfos);
+}
+
+void ZImgLeica::parseXLCF(const QString& filename, std::vector<ImageInfo>& imageInfos)
+{
+  QFile f(filename);
+  if (!f.open(QFile::ReadOnly | QFile::Text)) {
+    throw ZIOException("can not open file");
+  }
+  QTextStream in(&f);
+  QString xml = in.readAll();
+
+  readLeicaInfo(xml, QFileInfo(filename).absoluteDir(), imageInfos);
+}
+
+void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<ImageInfo>& leicaImageInfos)
+{
+  for (const auto& ii : leicaImageInfos) {
+    ZImgInfo info;
+
+    info.width = 1;
+    info.height = 1;
+    info.depth = 1;
+    info.numTimes = 1;
+    std::vector<VoxelSizeUnit> vsus;
+    for (const auto& dd : ii.dimensions) {
+      switch (dd.dimID) {
+        case 1:
+          info.width = dd.numberOfElements;
+          info.voxelSizeX = dd.length / (std::max(dd.numberOfElements, 1) - 1);
+          break;
+        case 2:
+          info.height = dd.numberOfElements;
+          info.voxelSizeY = dd.length / (std::max(dd.numberOfElements, 1) - 1);
+          break;
+        case 3:
+          info.depth = dd.numberOfElements;
+          info.voxelSizeZ = dd.length / (std::max(dd.numberOfElements, 1) - 1);
+          break;
+        case 4:
+          info.numTimes = dd.numberOfElements;
+          break;
+        default:
+          throw ZIOException("only support XYZT dimension");
+      }
+      if (dd.dimID == 1 || dd.dimID == 2 || dd.dimID == 3) {
+        //"none", "inch", "cm", "mm", "um", "nm", "m", "hm", "km"
+        if (dd.unit.compare("inch", Qt::CaseInsensitive) == 0) {
+          vsus.push_back(VoxelSizeUnit::inch);
+        } else if (dd.unit.compare("cm", Qt::CaseInsensitive) == 0) {
+          vsus.push_back(VoxelSizeUnit::cm);
+        } else if (dd.unit.compare("mm", Qt::CaseInsensitive) == 0) {
+          vsus.push_back(VoxelSizeUnit::mm);
+        } else if (dd.unit.compare("um", Qt::CaseInsensitive) == 0) {
+          vsus.push_back(VoxelSizeUnit::um);
+        } else if (dd.unit.compare("nm", Qt::CaseInsensitive) == 0) {
+          vsus.push_back(VoxelSizeUnit::nm);
+        } else if (dd.unit.compare("m", Qt::CaseInsensitive) == 0) {
+          vsus.push_back(VoxelSizeUnit::m);
+        } else if (dd.unit.compare("hm", Qt::CaseInsensitive) == 0) {
+          vsus.push_back(VoxelSizeUnit::hm);
+        } else if (dd.unit.compare("km", Qt::CaseInsensitive) == 0) {
+          vsus.push_back(VoxelSizeUnit::km);
+        } else {
+          vsus.push_back(VoxelSizeUnit::none);
+        }
+      }
     }
+    bool voxelSizeUnitConsistent = true;
+    for (size_t i = 1; i < vsus.size(); ++i) {
+      if (vsus[i] != vsus[0]) {
+        voxelSizeUnitConsistent = false;
+        break;
+      }
+    }
+    if (voxelSizeUnitConsistent) {
+      info.voxelSizeUnit = vsus[0];
+    }
+
+    info.numChannels = ii.channels.size();
+    std::set<int32_t> dataTypes;
+    std::set<uint32_t> resolutions;
+    std::vector<uint64_t> channelOffsets;
+    for (const auto& cd : ii.channels) {
+      dataTypes.insert(cd.dataType);
+      resolutions.insert(cd.resolution);
+      channelOffsets.push_back(cd.bytesInc);
+    }
+    if (dataTypes.size() != 1) {
+      throw ZIOException("inconsistent channel data types");
+    } else {
+      switch (*dataTypes.begin()) {
+        case 0:
+          info.voxelFormat = VoxelFormat::Unsigned;
+          break;
+        case 1:
+          info.voxelFormat = VoxelFormat::Float;
+          break;
+        default:
+          throw ZIOException("invalid channel data type");
+      }
+    }
+    if (resolutions.size() != 1) {
+      throw ZIOException("inconsistent channel resolutions");
+    } else {
+      uint32_t resl = *resolutions.begin();
+      info.validBitCount = resl;
+      info.bytesPerVoxel = (resl + 7) / 8;
+    }
+    std::vector<size_t> channelOffsetOrder = argSort(channelOffsets.begin(), channelOffsets.end());
+    std::sort(channelOffsets.begin(), channelOffsets.end());
+    if (channelOffsets.size() > 1) {
+      uint64_t channelStride = channelOffsets[1] - channelOffsets[0];
+      if (channelStride == 0) {
+        throw ZIOException("invalid channel stride");
+      }
+      for (size_t i = 2; i < channelOffsets.size(); ++i) {
+        if (channelOffsets[i] - channelOffsets[i - 1] != channelStride) {
+          throw ZIOException("inconsistent channel strides not supported");
+        }
+      }
+    }
+
+    info.createDefaultDescriptions();
+
+    for (size_t i = 0; i < info.channelColors.size(); ++i) {
+      const auto& cd = ii.channels[channelOffsetOrder[i]];
+      if (cd.channelTag == 1) {
+        info.channelColors[i] = col4(255, 0, 0);
+      } else if (cd.channelTag == 2) {
+        info.channelColors[i] = col4(0, 255, 0);
+      } else if (cd.channelTag == 3) {
+        info.channelColors[i] = col4(0, 0, 255);
+      } else if (cd.channelTag == 0) {
+        if (cd.LUTName.compare("Gray", Qt::CaseInsensitive) == 0) {
+          info.channelColors[i] = col4(255, 255, 255);
+        } else if (cd.LUTName.compare("red", Qt::CaseInsensitive) == 0) {
+          info.channelColors[i] = col4(255, 0, 0);
+        } else if (cd.LUTName.compare("green", Qt::CaseInsensitive) == 0) {
+          info.channelColors[i] = col4(0, 255, 0);
+        } else if (cd.LUTName.compare("blue", Qt::CaseInsensitive) == 0) {
+          info.channelColors[i] = col4(0, 0, 255);
+        } else if (cd.LUTName.compare("cyan", Qt::CaseInsensitive) == 0) {
+          info.channelColors[i] = col4(0, 255, 255);
+        } else if (cd.LUTName.compare("magenta", Qt::CaseInsensitive) == 0) {
+          info.channelColors[i] = col4(255, 0, 255);
+        } else if (cd.LUTName.compare("yellow", Qt::CaseInsensitive) == 0) {
+          info.channelColors[i] = col4(255, 255, 0);
+        } else if (!cd.LUTName.isEmpty()) {
+          throw ZIOException(
+            QString("unhandled LUT name: %1, please send this message to flq@live.com").arg(cd.LUTName));
+        }
+      } else {
+        throw ZIOException("invalid channel tag");
+      }
+    }
+
+    if (info.timeStamps.size() == ii.timeStamps.size()) {
+      info.timeStamps = ii.timeStamps;
+    } else if (info.timeStamps.size() * info.numChannels == ii.timeStamps.size()) {
+      for (size_t i = 0; i < info.timeStamps.size(); ++i) {
+        info.timeStamps[i] = ii.timeStamps[i * info.numChannels];
+      }
+    } else {
+      throw ZIOException("unhandled time stamp list, please send this file to flq@live.com");
+    }
+
+    infos.push_back(info);
   }
 }
 

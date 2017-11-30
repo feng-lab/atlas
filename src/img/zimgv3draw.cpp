@@ -155,7 +155,7 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   }
   imgInfo.createDefaultDescriptions();
 
-  img = readRawImg(filename, imgInfo, "ZCTL", dataOffset, region);
+  img = readRawImg(filename, imgInfo, "ZCT", dataOffset, region);
   if ((hostIsLittleEndian() && (endian == 'B' || endian == 'b')) ||
       (!hostIsLittleEndian() && (endian == 'L' || endian == 'l'))) {
     img.reverseEndianness();

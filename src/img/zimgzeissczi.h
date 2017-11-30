@@ -279,7 +279,7 @@ private:
 
   void detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inputFileStream, FileHeader& fh);
 
-  void dump(const QString& filename);
+  QString dump(const QString& filename);
 
   void dumpCZIStream(std::ifstream& inputFileStream, int64_t filesize, int64_t offset, QString& str, int indent = 0);
 

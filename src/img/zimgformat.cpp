@@ -108,7 +108,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
     throw ZIOException(
       QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(region.toQString()));
   }
-  if (dimensionOrder != "ZCTL" && dimensionOrder != "CZTL" && dimensionOrder != "ZTL") {
+  if (dimensionOrder != "ZCT" && dimensionOrder != "CZT" && dimensionOrder != "ZT") {
     throw ZIOException(QString("Not supported dimension order: %1").arg(dimensionOrder));
   }
 
@@ -118,15 +118,15 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
   ZImgInfo partialImgInfo = region.clip(imgInfo);
   ZImg res(partialImgInfo);
 
-  if (region.containsWholeTime(imgInfo) && (dimensionOrder == "ZCTL" || dimensionOrder == "ZTL")) {
+  if (region.containsWholeTime(imgInfo) && (dimensionOrder == "ZCT" || dimensionOrder == "ZT")) {
     inputFileStream.seekg(dataOffset, std::ios_base::beg);
     readStream(inputFileStream, res.timeData<char>(0), res.timeByteNumber());
-  } else if (region.containsWholeChannel(imgInfo) && (dimensionOrder == "ZCTL" || dimensionOrder == "ZTL")) {
+  } else if (region.containsWholeChannel(imgInfo) && (dimensionOrder == "ZCT" || dimensionOrder == "ZT")) {
     size_t offset = dataOffset + region.start.c * imgInfo.channelByteNumber();
     if (offset > 0)
       inputFileStream.seekg(offset, std::ios_base::beg);
     readStream(inputFileStream, res.timeData<char>(0), res.timeByteNumber());
-  } else if (region.containsWholePlane(imgInfo) && (dimensionOrder == "ZCTL" || dimensionOrder == "ZTL")) {
+  } else if (region.containsWholePlane(imgInfo) && (dimensionOrder == "ZCT" || dimensionOrder == "ZT")) {
     int cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
     // channel by channel
     for (int c = region.start.c; c < cEnd; ++c) {
@@ -141,10 +141,10 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
     for (int c = region.start.c; c < cEnd; ++c) {
       for (int z = region.start.z; z < zEnd; ++z) {
         size_t offset = 0;
-        if ((dimensionOrder == "ZCTL" || dimensionOrder == "ZTL")) {
+        if ((dimensionOrder == "ZCT" || dimensionOrder == "ZT")) {
           offset = dataOffset + c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
                    region.start.y * imgInfo.rowByteNumber();
-        } else { // "CZTL"
+        } else { // "CZT"
           offset = dataOffset + (c + imgInfo.numChannels * z) * imgInfo.planeByteNumber() +
                    region.start.y * imgInfo.rowByteNumber();
         }
@@ -162,10 +162,10 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
       for (int z = region.start.z; z < zEnd; ++z) {
         for (int y = region.start.y; y < yEnd; ++y) {
           size_t offset = 0;
-          if ((dimensionOrder == "ZCTL" || dimensionOrder == "ZTL")) {
+          if ((dimensionOrder == "ZCT" || dimensionOrder == "ZT")) {
             offset = dataOffset + c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
                      y * imgInfo.rowByteNumber() + region.start.x * imgInfo.voxelByteNumber();
-          } else { // "CZTL"
+          } else { // "CZT"
             offset = dataOffset + (c + imgInfo.numChannels * z) * imgInfo.planeByteNumber() +
                      y * imgInfo.rowByteNumber() + region.start.x * imgInfo.voxelByteNumber();
           }

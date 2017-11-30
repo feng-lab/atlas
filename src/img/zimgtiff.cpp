@@ -193,7 +193,7 @@ void ZImgTiff::readIntoInternalStructure(const QString& filename, ZTiff& tiff)
 void ZImgTiff::clearInternalState()
 {
   m_imgInfo.clear();
-  m_dimensionOrder = "ZTL";
+  m_dimensionOrder = "ZT";
   m_startIFDIndex = 0;
   m_imageDescription.clear();
   m_isImageJTiff = false;
@@ -277,12 +277,12 @@ void ZImgTiff::detectImgInfo(ZTiff& tiff)
 
       if (channels > 1) {
         if (hyperstack) {
-          m_dimensionOrder = "CZTL";
+          m_dimensionOrder = "CZT";
         } else {
-          m_dimensionOrder = "ZCTL";
+          m_dimensionOrder = "ZCT";
         }
       } else {
-        m_dimensionOrder = "ZTL";
+        m_dimensionOrder = "ZT";
       }
     }
 

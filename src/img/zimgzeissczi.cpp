@@ -781,37 +781,8 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
 
 void ZImgZeissCZI::readMetadata(const QString& filename, ZImgMetadata& meta, size_t /*scene*/)
 {
-  clearInternalState();
-
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
-
-  SegmentHeader sh;
-  readStream(inputFileStream, &sh, sizeof(SegmentHeader));
-
-  if (std::strncmp(sh.id, "ZISRAWFILE", std::extent<decltype(sh.id)>::value - 1) != 0) {
-    throw ZIOException("incorrect czi file header");
-  }
-  FileHeader fh;
-  readStream(inputFileStream, &fh, sizeof(FileHeader));
-  if (fh.updatePending) {
-    throw ZIOException("can not read czi file with pending update");
-  }
-
-  inputFileStream.seekg(fh.metaDataPosition);
-  readStream(inputFileStream, &sh, sizeof(SegmentHeader));
-
-  if (std::strncmp(sh.id, "ZISRAWMETADATA", std::extent<decltype(sh.id)>::value - 1) == 0) {
-    MetaDataSegment md;
-    readStream(inputFileStream, &md, sizeof(MetaDataSegment));
-    std::vector<char> xmlBuffer(md.xmlSize);
-    readStream(inputFileStream, xmlBuffer.data(), md.xmlSize);
-    QString xmlString = QString::fromUtf8(xmlBuffer.data(), md.xmlSize);
-    xmlString.remove(QChar::Null);
-
-    ZImgMetatag tag("metadata", xmlString);
-    meta.attachToTopLevel(tag);
-  }
+  ZImgMetatag tag("metadata", dump(filename));
+  meta.attachToTopLevel(tag);
 }
 
 void
@@ -925,7 +896,7 @@ void ZImgZeissCZI::readImg(const QString& filename, ZImg& img, const ZImgRegion&
     }
   }
 
-  ZImgMetatag tag("metadata", m_metadataXmlString);
+  ZImgMetatag tag("metadata", dump(filename));
   img.metadataRef().attachToTopLevel(tag);
 
   if (ratio > readRatio) {
@@ -1715,7 +1686,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
   }
 }
 
-void ZImgZeissCZI::dump(const QString& filename)
+QString ZImgZeissCZI::dump(const QString& filename)
 {
   int64_t filesize = checkFilename(filename);
 
@@ -1724,7 +1695,7 @@ void ZImgZeissCZI::dump(const QString& filename)
 
   QString str("\n");
   dumpCZIStream(inputFileStream, filesize, 0, str, 0);
-  LOG(INFO) << str;
+  return str;
 }
 
 void

@@ -127,5 +127,31 @@ inline auto end(reversion_wrapper<T> w) { return std::rend(w.iterable); }
 template<typename T>
 inline reversion_wrapper<T> make_reverse(T&& iterable) { return {iterable}; }
 
+template<class RAIter, class Compare>
+std::vector<size_t> argSort(RAIter first, RAIter last, Compare comp)
+{
+  std::vector<size_t> idx(last - first);
+  std::iota(idx.begin(), idx.end(), 0);
+
+  auto idxComp = [&first, comp](size_t i1, size_t i2) {
+    return comp(first[i1], first[i2]);
+  };
+
+  std::sort(idx.begin(), idx.end(), idxComp);
+
+  return idx;
+}
+
+template<class RAIter>
+std::vector<size_t> argSort(RAIter first, RAIter last)
+{
+  std::vector<size_t> idx(last - first);
+  std::iota(idx.begin(), idx.end(), 0);
+
+  // sort indexes based on comparing values in v
+  std::sort(idx.begin(), idx.end(), [&first](size_t i1, size_t i2) { return first[i1] < first[i2]; });
+
+  return idx;
+}
 
 } // namespace nim

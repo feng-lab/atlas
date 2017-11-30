@@ -2,8 +2,52 @@
 
 #include "zimgformat.h"
 #include <QXmlStreamReader>
+#include <QDir>
 
 namespace nim {
+
+struct ChannelDescription
+{
+  int32_t dataType;
+  int32_t channelTag;
+  uint32_t resolution;
+  QString nameOfMeasuredQuantity;
+  double min;
+  double max;
+  QString unit;
+  QString LUTName;
+  bool isLUTInverted;
+  uint64_t bytesInc;
+  uint32_t bitInc;
+};
+
+struct DimensionDescription
+{
+  int32_t dimID;
+  uint32_t numberOfElements;
+  uint32_t origin;
+  double length;
+  QString unit;
+  uint64_t bytesInc;
+  uint32_t bitInc;
+};
+
+struct ImageMemory
+{
+  uint64_t size = 0;
+  QString memoryBlockID;
+  QStringList fileNames;
+  std::vector<uint64_t> fileSizes;
+  std::vector<uint64_t> fileOffsets;
+};
+
+struct ImageInfo
+{
+  std::vector<ChannelDescription> channels;
+  std::vector<DimensionDescription> dimensions;
+  std::vector<double> timeStamps;
+  ImageMemory imageMemory;
+};
 
 class ZImgLeica : public ZImgFormat
 {
@@ -38,19 +82,24 @@ public:
 private:
   void clearInternalState();
 
+  int parseLIFVersion(const QString& xmlString) const;
+
   void readXml(const QString& filename, QString& xml,
                std::vector<std::tuple<size_t, QString, size_t>>& memoryOffsetNameLength) const;
 
-  void readLeicaInfo(const QString& xmlString);
+  void readLeicaInfo(const QString& xmlString, const QDir& xmlDir, std::vector<ImageInfo>& imageInfos);
 
-  void parseMetadata(QXmlStreamReader& xml);
+  void parseMetadata(QXmlStreamReader& xml, const QDir& xmlDir, std::vector<ImageInfo>& imageInfos);
 
-  void parseElement(QXmlStreamReader& xml);
+  void parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vector<ImageInfo>& imageInfos);
 
-  void parseReference(QXmlStreamReader& xml);
+  void parseXLIF(const QString& filename, std::vector<ImageInfo>& imageInfos);
+
+  void parseXLCF(const QString& filename, std::vector<ImageInfo>& imageInfos);
+
+  void detectInfos(std::vector<ZImgInfo>& infos, const std::vector<ImageInfo>& imageInfos);
 
 private:
-  int m_version;
 };
 
 } // namespace
