@@ -449,6 +449,8 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
     bak_file = get_bak_file_name(orig_file)
     orig_file1 = os.path.join(src_dir, 'pngpriv.h')
     bak_file1 = get_bak_file_name(orig_file1)
+    orig_file2 = os.path.join(src_dir, 'pngrutil.c')
+    bak_file2 = get_bak_file_name(orig_file2)
     try:
         os.rename(orig_file, bak_file)
         with open(bak_file, mode='r', encoding='utf-8') as f:
@@ -476,7 +478,6 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             if is_mac() and os.path.exists('/usr/include'):
-                # todo: still need to fix the unsettling warning about function only exists in macOS 10.13
                 os.rename(orig_file1, bak_file1)
                 with open(bak_file1, mode='r', encoding='utf-8') as f:
                     from_lines = f.readlines()
@@ -489,6 +490,19 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
                         to_lines.append(line)
                 print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file1, tofile='<new>'))))
 
+            if is_mac():
+                os.rename(orig_file2, bak_file2)
+                with open(bak_file2, mode='r', encoding='utf-8') as f:
+                    from_lines = f.readlines()
+                with open(orig_file2, mode='w', encoding='utf-8') as f:
+                    to_lines = []
+                    for line in from_lines:
+                        line = line.replace(r'#if ZLIB_VERNUM >= 0x1290',
+                                            r'#if 0')
+                        f.write(line)
+                        to_lines.append(line)
+                print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file2, tofile='<new>'))))
+
             cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
                              '-DPNG_SHARED:BOOL=OFF',
                              src_dir])
@@ -499,6 +513,8 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
         os.replace(bak_file, orig_file)
         if is_mac() and os.path.exists('/usr/include'):
             os.replace(bak_file1, orig_file1)
+        if is_mac():
+            os.replace(bak_file2, orig_file2)
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
@@ -979,6 +995,8 @@ def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
+    orig_file = os.path.join(src_dir, 'Utilities', 'KWSys', 'vtksys', 'SystemTools.cxx')
+    bak_file = get_bak_file_name(orig_file)
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
@@ -997,6 +1015,19 @@ def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
+            if is_mac():
+                os.rename(orig_file, bak_file)
+                with open(bak_file, mode='r', encoding='utf-8') as f:
+                    from_lines = f.readlines()
+                with open(orig_file, mode='w', encoding='utf-8') as f:
+                    to_lines = []
+                    for line in from_lines:
+                        line = line.replace(r'#elif KWSYS_CXX_HAS_UTIMENSAT',
+                                            r'#elif 0')
+                        f.write(line)
+                        to_lines.append(line)
+                print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+
             if is_linux():
                 cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
                                  '-DBUILD_TESTING:BOOL=OFF',
@@ -1018,6 +1049,8 @@ def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
                            cwd=build_dir, shell=False, check=True)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        if is_mac():
+            os.replace(bak_file, orig_file)
 
 
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: str):
@@ -1066,6 +1099,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                              '-DWITH_GPHOTO2:BOOL=OFF',
                              '-DBUILD_ZLIB:BOOL=OFF',
                              '-DWITH_CUDA:BOOL=OFF',
+                             '-DWITH_OPENCL:BOOL=OFF',
                              '-DWITH_PVAPI:BOOL=OFF',
                              '-DBUILD_JASPER:BOOL=OFF',
                              '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '\\modules',
@@ -1151,6 +1185,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                                  '-DWITH_GPHOTO2:BOOL=OFF',
                                  '-DBUILD_ZLIB:BOOL=OFF',
                                  '-DWITH_CUDA:BOOL=OFF',
+                                 '-DWITH_OPENCL:BOOL=OFF',
                                  '-DWITH_PVAPI:BOOL=OFF',
                                  '-DBUILD_JASPER:BOOL=OFF',
                                  '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '/modules',
@@ -1211,6 +1246,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                                  '-DWITH_GPHOTO2:BOOL=OFF',
                                  '-DBUILD_ZLIB:BOOL=OFF',
                                  '-DWITH_CUDA:BOOL=OFF',
+                                 '-DWITH_OPENCL:BOOL=OFF',
                                  '-DWITH_PVAPI:BOOL=OFF',
                                  '-DBUILD_JASPER:BOOL=OFF',
                                  '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '/modules',

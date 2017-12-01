@@ -25,7 +25,7 @@ struct DimensionDescription
 {
   int32_t dimID;
   uint32_t numberOfElements;
-  uint32_t origin;
+  double origin;
   double length;
   QString unit;
   uint64_t bytesInc;

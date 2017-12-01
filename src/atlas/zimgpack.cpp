@@ -573,7 +573,7 @@ ZImg ZImgPack::crop(const ZImgRegion& region) const
 
 ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) const
 {
-  LOG(INFO) << width << " " << height << " " << depth;
+  //LOG(INFO) << width << " " << height << " " << depth;
   CHECK(width <= m_imgInfo.width && height <= m_imgInfo.height && depth <= m_imgInfo.depth &&
         width > 0 && height > 0 && depth > 0);
   ZImg res;
@@ -610,7 +610,7 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
       res.resize(width, height, depth);
     }
   }
-  LOG(INFO) << "end";
+  //LOG(INFO) << "end";
   return res;
 }
 

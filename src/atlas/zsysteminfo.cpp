@@ -28,13 +28,6 @@ using PGPI = BOOL (WINAPI *)(DWORD, DWORD, DWORD, DWORD, PDWORD);
 #define VER_SUITE_WH_SERVER	0x00008000
 #endif
 
-#ifdef Q_OS_DARWIN
-
-#include <CoreServices/CoreServices.h>
-#include <CoreFoundation/CFBundle.h>
-
-#endif
-
 namespace {
 
 #ifdef Q_OS_WIN
@@ -511,12 +504,6 @@ void ZSystemInfo::detectOS()
       m_osString = "unknown mac os";
       return;
   }
-  // deprecated from 10.8
-  //SInt32 majorVersion,minorVersion,bugFixVersion;
-  //Gestalt(gestaltSystemVersionMajor, &majorVersion);
-  //Gestalt(gestaltSystemVersionMinor, &minorVersion);
-  //Gestalt(gestaltSystemVersionBugFix, &bugFixVersion);
-  //m_osString += QString(" %1.%2.%3").arg(majorVersion).arg(minorVersion).arg(bugFixVersion);
 #else
   utsname name;
   if (uname(&name) != 0)

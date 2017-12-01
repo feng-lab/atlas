@@ -4,6 +4,7 @@
 #include "zimgsliceprovider.h"
 #include "zimgblockprovider.h"
 #include "zlog.h"
+#include "zlogqttypesupport.h"
 #include "zimgio.h"
 
 namespace nim {
@@ -222,7 +223,69 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo,
                             const std::vector<size_t>& dimensionStrides,
                             uint64_t dataOffset, const ZImgRegion& region)
 {
+  ZImg res;
 
+  if (region.isEmpty() || !region.isValid(imgInfo)) {
+    throw ZIOException(
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(region.toQString()));
+  }
+
+  CHECK(dimensionStrides.size() == 5);
+  std::vector<size_t> sortedIndexes = argSort(dimensionStrides.begin(), dimensionStrides.end());
+  QString dimensionOrderIn("XYZCT");
+  QString dimensionOrder("XYZCT");
+  std::vector<size_t> packedStrides(5, 0);
+  size_t prev = 1;
+  size_t packedPrev = 1;
+  for (size_t i = 0; i < sortedIndexes.size(); ++i) {
+    auto idx = sortedIndexes[i];
+    packedStrides[idx] = imgInfo.bytesPerVoxel * packedPrev;
+    if (dimensionStrides[idx] < imgInfo.bytesPerVoxel * prev) {
+      throw ZIOException(QString("invalid dimensionStrides %1 for image %2").arg(qtTypeToQString(dimensionStrides)).arg(
+        imgInfo.toQString()));
+    }
+    packedPrev = packedStrides[idx] * imgInfo.size(idx);
+    prev = dimensionStrides[idx] * imgInfo.size(idx);
+    dimensionOrder[uint(i)] = dimensionOrderIn[uint(idx)];
+  }
+  bool packed = packedStrides == dimensionStrides;
+  //LOG(INFO) << dimensionStrides << " " << dimensionOrder << " Packed: " << packed << " " << imgInfo.toQString();
+  if (packed && (dimensionOrderIn == "XYZCT" || dimensionOrderIn == "XYCZT" || dimensionOrderIn == "CXYZT")) {
+    res = readRawImg(filename, imgInfo, dimensionOrder, dataOffset, region);
+  } else {
+    ZImgInfo partialImgInfo = region.clip(imgInfo);
+    res =  ZImg(partialImgInfo);
+
+    std::ifstream inputFileStream;
+    openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+
+    int tEnd = region.end.t == -1 ? imgInfo.numTimes : region.end.t;
+    int cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
+    int zEnd = region.end.z == -1 ? imgInfo.depth : region.end.z;
+    int yEnd = region.end.y == -1 ? imgInfo.height : region.end.y;
+    int xEnd = region.end.x == -1 ? imgInfo.width : region.end.x;
+    // pixel by pixel
+    for (int t = region.start.t; t < tEnd; ++t) {
+      for (int c = region.start.c; c < cEnd; ++c) {
+        for (int z = region.start.z; z < zEnd; ++z) {
+          for (int y = region.start.y; y < yEnd; ++y) {
+            for (int x = region.start.x; x < xEnd; ++x) {
+              size_t offset = dataOffset + t * dimensionStrides[4] +
+                              c * dimensionStrides[3] + z * dimensionStrides[2] +
+                              y * dimensionStrides[1] + x * dimensionStrides[0];
+              inputFileStream.seekg(offset, std::ios_base::beg);
+              readStream(inputFileStream,
+                         res.data<char>(x - region.start.x, y - region.start.y, z - region.start.z, c - region.start.c,
+                                        t - region.start.t),
+                         res.voxelByteNumber());
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return  res;
 }
 
 void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool ARGBtoRGBA)
