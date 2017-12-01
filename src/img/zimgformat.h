@@ -91,6 +91,9 @@ protected:
   ZImg readRawImg(const QString& filename, const ZImgInfo& imgInfo, const QString& dimensionOrder,
                   uint64_t dataOffset, const ZImgRegion& region);
 
+  ZImg readRawImg(const QString& filename, const ZImgInfo& imgInfo, const std::vector<size_t>& dimensionStrides,
+                  uint64_t dataOffset, const ZImgRegion& region);
+
   void createDefaultSubBlocks(const QString& filename, const std::vector<ZImgInfo>& infos,
                               std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
                               std::vector<std::set<size_t>>* pyramidalRatios);

@@ -8,6 +8,8 @@
 #include <iterator>
 #include <memory>
 #include <type_traits>
+#include <vector>
+#include <numeric>
 
 namespace nim {
 
@@ -137,7 +139,7 @@ std::vector<size_t> argSort(RAIter first, RAIter last, Compare comp)
     return comp(first[i1], first[i2]);
   };
 
-  std::sort(idx.begin(), idx.end(), idxComp);
+  std::stable_sort(idx.begin(), idx.end(), idxComp);
 
   return idx;
 }
@@ -149,7 +151,7 @@ std::vector<size_t> argSort(RAIter first, RAIter last)
   std::iota(idx.begin(), idx.end(), 0);
 
   // sort indexes based on comparing values in v
-  std::sort(idx.begin(), idx.end(), [&first](size_t i1, size_t i2) { return first[i1] < first[i2]; });
+  std::stable_sort(idx.begin(), idx.end(), [&first](size_t i1, size_t i2) { return first[i1] < first[i2]; });
 
   return idx;
 }

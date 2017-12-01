@@ -83,7 +83,13 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
         ifds[0].isTiledImage() || ifds[0].stripsPerImage() != 1) {
       throw ZIOException("Wrong ImageJ Tiff file");
     }
-    img = readRawImg(filename, m_imgInfo[scene], m_dimensionOrder, ifds[0].stripOffsets(0), region);
+    auto dimensionOrder = m_dimensionOrder;
+    dimensionOrder.remove('L');
+    dimensionOrder.prepend("XY");
+    if (dimensionOrder == "XYZT")
+      dimensionOrder = "XYZCT";
+    CHECK(dimensionOrder.size() == 5);
+    img = readRawImg(filename, m_imgInfo[scene], dimensionOrder, ifds[0].stripOffsets(0), region);
     if (!tiff.isNativeEndianness()) {
       img.reverseEndianness();
     }
@@ -193,7 +199,7 @@ void ZImgTiff::readIntoInternalStructure(const QString& filename, ZTiff& tiff)
 void ZImgTiff::clearInternalState()
 {
   m_imgInfo.clear();
-  m_dimensionOrder = "ZT";
+  m_dimensionOrder = "ZTL";
   m_startIFDIndex = 0;
   m_imageDescription.clear();
   m_isImageJTiff = false;
@@ -277,12 +283,12 @@ void ZImgTiff::detectImgInfo(ZTiff& tiff)
 
       if (channels > 1) {
         if (hyperstack) {
-          m_dimensionOrder = "CZT";
+          m_dimensionOrder = "CZTL";
         } else {
-          m_dimensionOrder = "ZCT";
+          m_dimensionOrder = "ZCTL";
         }
       } else {
-        m_dimensionOrder = "ZT";
+        m_dimensionOrder = "ZTL";
       }
     }
 

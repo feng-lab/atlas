@@ -101,83 +101,128 @@ void ZImgFormat::writeImg(const QString& filename,
   }
 }
 
-ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, const QString& dimensionOrder,
+ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, const QString& dimensionOrderIn,
                             uint64_t dataOffset, const ZImgRegion& region)
 {
   if (region.isEmpty() || !region.isValid(imgInfo)) {
     throw ZIOException(
       QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(region.toQString()));
   }
-  if (dimensionOrder != "ZCT" && dimensionOrder != "CZT" && dimensionOrder != "ZT") {
-    throw ZIOException(QString("Not supported dimension order: %1").arg(dimensionOrder));
+  if (dimensionOrderIn != "XYZCT" && dimensionOrderIn != "XYCZT" && dimensionOrderIn != "CXYZT") {
+    throw ZIOException(QString("Not supported dimension order: %1").arg(dimensionOrderIn));
   }
-
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+  auto dimensionOrder = dimensionOrderIn;
+  if (dimensionOrder == "CXYZT" && imgInfo.numChannels == 1) {
+    dimensionOrder = "XYZCT";
+  }
 
   ZImgInfo partialImgInfo = region.clip(imgInfo);
   ZImg res(partialImgInfo);
 
-  if (region.containsWholeTime(imgInfo) && (dimensionOrder == "ZCT" || dimensionOrder == "ZT")) {
-    inputFileStream.seekg(dataOffset, std::ios_base::beg);
-    readStream(inputFileStream, res.timeData<char>(0), res.timeByteNumber());
-  } else if (region.containsWholeChannel(imgInfo) && (dimensionOrder == "ZCT" || dimensionOrder == "ZT")) {
-    size_t offset = dataOffset + region.start.c * imgInfo.channelByteNumber();
-    if (offset > 0)
-      inputFileStream.seekg(offset, std::ios_base::beg);
-    readStream(inputFileStream, res.timeData<char>(0), res.timeByteNumber());
-  } else if (region.containsWholePlane(imgInfo) && (dimensionOrder == "ZCT" || dimensionOrder == "ZT")) {
-    int cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
-    // channel by channel
-    for (int c = region.start.c; c < cEnd; ++c) {
-      size_t offset = dataOffset + c * imgInfo.channelByteNumber() + region.start.z * imgInfo.planeByteNumber();
-      inputFileStream.seekg(offset, std::ios_base::beg);
-      readStream(inputFileStream, res.channelData<char>(c - region.start.c, 0), res.channelByteNumber());
-    }
-  } else if (region.containsWholeRow(imgInfo)) {
-    int cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
-    int zEnd = region.end.z == -1 ? imgInfo.depth : region.end.z;
-    // plane by plane
-    for (int c = region.start.c; c < cEnd; ++c) {
-      for (int z = region.start.z; z < zEnd; ++z) {
-        size_t offset = 0;
-        if ((dimensionOrder == "ZCT" || dimensionOrder == "ZT")) {
-          offset = dataOffset + c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
-                   region.start.y * imgInfo.rowByteNumber();
-        } else { // "CZT"
-          offset = dataOffset + (c + imgInfo.numChannels * z) * imgInfo.planeByteNumber() +
-                   region.start.y * imgInfo.rowByteNumber();
-        }
-        inputFileStream.seekg(offset, std::ios_base::beg);
-        readStream(inputFileStream, res.planeData<char>(z - region.start.z, c - region.start.c, 0),
-                   res.planeByteNumber());
-      }
+  if (dimensionOrder == "CXYZT") {
+    ZImgInfo tmpInfo = imgInfo;
+    tmpInfo.bytesPerVoxel *= tmpInfo.numChannels;
+    tmpInfo.numChannels = 1;
+    ZImgRegion rgn = region;
+    rgn.start.c = 0;
+    rgn.end.c = -1;
+    ZImg tmpImg = readRawImg(filename, tmpInfo, "XYZCT", dataOffset, rgn);
+    if (region.start.c == 0 && (region.end.c == -1 || size_t(region.end.c) == imgInfo.numChannels)) { // read all channel
+      tmpImg.infoRef() = res.info();
+      CXYZtoXYZC(tmpImg, res);
+    } else {
+      ZImgInfo tmpPartialImgInfo = rgn.clip(imgInfo);
+      ZImg tmpRes(tmpPartialImgInfo);   // tmpImg contains all channel so res is not big enough, need a tmp res
+      tmpImg.infoRef() = tmpRes.info();
+      CXYZtoXYZC(tmpImg, tmpRes);
+      ZImgRegion tmpRgn;
+      tmpRgn.start.c = region.start.c;
+      tmpRgn.end.c = region.end.c;
+      res = tmpRes.crop(tmpRgn);
     }
   } else {
-    int cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
-    int zEnd = region.end.z == -1 ? imgInfo.depth : region.end.z;
-    int yEnd = region.end.y == -1 ? imgInfo.height : region.end.y;
-    // row by row
-    for (int c = region.start.c; c < cEnd; ++c) {
-      for (int z = region.start.z; z < zEnd; ++z) {
-        for (int y = region.start.y; y < yEnd; ++y) {
-          size_t offset = 0;
-          if ((dimensionOrder == "ZCT" || dimensionOrder == "ZT")) {
-            offset = dataOffset + c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
-                     y * imgInfo.rowByteNumber() + region.start.x * imgInfo.voxelByteNumber();
-          } else { // "CZT"
-            offset = dataOffset + (c + imgInfo.numChannels * z) * imgInfo.planeByteNumber() +
-                     y * imgInfo.rowByteNumber() + region.start.x * imgInfo.voxelByteNumber();
-          }
+    std::ifstream inputFileStream;
+    openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+
+    int tEnd = region.end.t == -1 ? imgInfo.numTimes : region.end.t;
+    for (int t = region.start.t; t < tEnd; ++t) {
+      if (region.containsWholeTime(imgInfo) && (dimensionOrder == "XYZCT")) {
+        size_t offset = dataOffset + t * imgInfo.timeByteNumber();
+        inputFileStream.seekg(offset, std::ios_base::beg);
+        readStream(inputFileStream, res.timeData<char>(t - region.start.t), res.timeByteNumber());
+      } else if (region.containsWholeChannel(imgInfo) && (dimensionOrder == "XYZCT")) {
+        size_t offset = dataOffset + t * imgInfo.timeByteNumber() + region.start.c * imgInfo.channelByteNumber();
+        inputFileStream.seekg(offset, std::ios_base::beg);
+        readStream(inputFileStream, res.timeData<char>(t - region.start.t), res.timeByteNumber());
+      } else if (region.containsWholePlane(imgInfo) && (dimensionOrder == "XYZCT")) {
+        int cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
+        // channel by channel
+        for (int c = region.start.c; c < cEnd; ++c) {
+          size_t offset = dataOffset + t * imgInfo.timeByteNumber() + c * imgInfo.channelByteNumber() +
+                          region.start.z * imgInfo.planeByteNumber();
           inputFileStream.seekg(offset, std::ios_base::beg);
-          readStream(inputFileStream, res.rowData<char>(y - region.start.y, z - region.start.z, c - region.start.c, 0),
-                     res.rowByteNumber());
+          readStream(inputFileStream, res.channelData<char>(c - region.start.c, t - region.start.t),
+                     res.channelByteNumber());
+        }
+      } else if (region.containsWholeRow(imgInfo)) {
+        int cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
+        int zEnd = region.end.z == -1 ? imgInfo.depth : region.end.z;
+        // plane by plane
+        for (int c = region.start.c; c < cEnd; ++c) {
+          for (int z = region.start.z; z < zEnd; ++z) {
+            size_t offset = 0;
+            if ((dimensionOrder == "XYZCT")) {
+              offset = dataOffset + t * imgInfo.timeByteNumber() +
+                       c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
+                       region.start.y * imgInfo.rowByteNumber();
+            } else { // "XYCZT"
+              offset = dataOffset + t * imgInfo.timeByteNumber() +
+                       (c + imgInfo.numChannels * z) * imgInfo.planeByteNumber() +
+                       region.start.y * imgInfo.rowByteNumber();
+            }
+            inputFileStream.seekg(offset, std::ios_base::beg);
+            readStream(inputFileStream, res.planeData<char>(z - region.start.z, c - region.start.c, t - region.start.t),
+                       res.planeByteNumber());
+          }
+        }
+      } else {
+        int cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
+        int zEnd = region.end.z == -1 ? imgInfo.depth : region.end.z;
+        int yEnd = region.end.y == -1 ? imgInfo.height : region.end.y;
+        // row by row
+        for (int c = region.start.c; c < cEnd; ++c) {
+          for (int z = region.start.z; z < zEnd; ++z) {
+            for (int y = region.start.y; y < yEnd; ++y) {
+              size_t offset = 0;
+              if ((dimensionOrder == "XYZCT")) {
+                offset = dataOffset + t * imgInfo.timeByteNumber() +
+                         c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
+                         y * imgInfo.rowByteNumber() + region.start.x * imgInfo.voxelByteNumber();
+              } else { // "XYCZT"
+                offset = dataOffset + t * imgInfo.timeByteNumber() +
+                         (c + imgInfo.numChannels * z) * imgInfo.planeByteNumber() +
+                         y * imgInfo.rowByteNumber() + region.start.x * imgInfo.voxelByteNumber();
+              }
+              inputFileStream.seekg(offset, std::ios_base::beg);
+              readStream(inputFileStream,
+                         res.rowData<char>(y - region.start.y, z - region.start.z, c - region.start.c,
+                                           t - region.start.t),
+                         res.rowByteNumber());
+            }
+          }
         }
       }
     }
   }
 
   return res;
+}
+
+ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo,
+                            const std::vector<size_t>& dimensionStrides,
+                            uint64_t dataOffset, const ZImgRegion& region)
+{
+
 }
 
 void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool ARGBtoRGBA)

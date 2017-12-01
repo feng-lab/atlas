@@ -169,33 +169,6 @@ struct ZDistanceEuclideanSquared
   }
 };
 
-template<class T>
-bool argsort_comp(const std::pair<size_t, T>& left, const std::pair<size_t, T>& right)
-{
-  return left.second < right.second;
-}
-
-template<class RandomAccessIterator>
-std::vector<size_t> argSort(RandomAccessIterator begin, RandomAccessIterator end)
-{
-
-  using ValueType = typename std::iterator_traits<RandomAccessIterator>::value_type;
-  using argsort_pair = std::pair<size_t, ValueType>;
-  CHECK(end > begin);
-  std::vector<size_t> indices(end - begin);
-
-  std::vector<argsort_pair> data(end - begin);
-  for (size_t i = 0; i < data.size(); ++i) {
-    data[i].first = i;
-    data[i].second = *(begin + i);
-  }
-  std::sort(data.begin(), data.end(), argsort_comp<ValueType>);
-  for (size_t i = 0; i < data.size(); ++i) {
-    indices[i] = data[i].first;
-  }
-  return indices;
-}
-
 template<class RandomAccessIterator, class RandomAccessIterator2>
 typename Eigen::NumTraits<typename std::iterator_traits<RandomAccessIterator>::value_type>::NonInteger
 weightedMedian(RandomAccessIterator dataBegin, RandomAccessIterator dataEnd,

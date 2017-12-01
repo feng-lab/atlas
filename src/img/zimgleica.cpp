@@ -162,8 +162,24 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
 
   const auto& ii = leicaImageInfos[scene];
   if (!allMemoryOffsetNameLength.empty()) { // lof or lif
-    const auto& monl = allMemoryOffsetNameLength[scene];
-    std::vector<size_t> dimensionStrides(5, 0);  // XYZCT
+    auto monl = allMemoryOffsetNameLength[0];
+    if (std::get<2>(monl) == 0) {
+      throw ZIOException("find invalid memory, please send this file to flq@live.com");
+    }
+    if (allMemoryOffsetNameLength.size() > 1) {
+      bool found = false;
+      for (const auto& tmp : allMemoryOffsetNameLength) {
+        if (std::get<1>(tmp) == ii.imageMemory.memoryBlockID) {
+          found = true;
+          monl = tmp;
+          break;
+        }
+      }
+      if (!found) {
+        throw ZIOException("can not find valid memory, please send this file to flq@live.com");
+      }
+    }
+    std::vector<size_t> dimensionStrides(5, info.voxelByteNumber());  // XYZCT
     std::vector<uint64_t> channelOffsets;
     for (const auto& cd : ii.channels) {
       channelOffsets.push_back(cd.bytesInc);
@@ -191,7 +207,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
       }
     }
 
-
+    img = readRawImg(filename, info, dimensionStrides, std::get<0>(monl), rgn);
   } else {
     ZImgIO imgIO;
     ZImgInfo resInfo = rgn.clip(info);
@@ -204,7 +220,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
       } else {
         throw ZIOException("image and metadata do not match, please send this file to flq@live.com");
       }
-    } else if (ii.imageMemory.fileNames.size() == info.numTimes) {
+    } else if (size_t(ii.imageMemory.fileNames.size()) == info.numTimes) {
       std::vector<ZImgInfo> fileInfos;
       imgIO.readInfo(ii.imageMemory.fileNames, Dimension::T, fileInfos);
       if (!fileInfos.empty() && fileInfos[0].isSameType(info) && fileInfos[0].isSameSize(info)) {
@@ -213,7 +229,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
       } else {
         throw ZIOException("image and metadata do not match, please send this file to flq@live.com");
       }
-    } else if (ii.imageMemory.fileNames.size() == info.depth) {
+    } else if (size_t(ii.imageMemory.fileNames.size()) == info.depth) {
       std::vector<ZImgInfo> fileInfos;
       imgIO.readInfo(ii.imageMemory.fileNames, Dimension::Z, fileInfos);
       if (!fileInfos.empty() && fileInfos[0].isSameType(info) && fileInfos[0].isSameSize(info)) {
@@ -683,15 +699,15 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
       switch (dd.dimID) {
         case 1:
           info.width = dd.numberOfElements;
-          info.voxelSizeX = dd.length / (std::max(dd.numberOfElements, 1) - 1);
+          info.voxelSizeX = dd.length / (std::max(dd.numberOfElements, 1_u32) - 1);
           break;
         case 2:
           info.height = dd.numberOfElements;
-          info.voxelSizeY = dd.length / (std::max(dd.numberOfElements, 1) - 1);
+          info.voxelSizeY = dd.length / (std::max(dd.numberOfElements, 1_u32) - 1);
           break;
         case 3:
           info.depth = dd.numberOfElements;
-          info.voxelSizeZ = dd.length / (std::max(dd.numberOfElements, 1) - 1);
+          info.voxelSizeZ = dd.length / (std::max(dd.numberOfElements, 1_u32) - 1);
           break;
         case 4:
           info.numTimes = dd.numberOfElements;
