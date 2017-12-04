@@ -107,6 +107,7 @@ void ZImgLeica::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
 
   std::vector<ImageInfo> leicaImageInfos;
   readLeicaInfo(xml, QFileInfo(filename).absoluteDir(), leicaImageInfos);
+  leicaImageInfos = splitLeciaImageInfos(leicaImageInfos);
 
   infos.clear();
   detectInfos(infos, leicaImageInfos);
@@ -141,6 +142,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
 
   std::vector<ImageInfo> leicaImageInfos;
   readLeicaInfo(xml, QFileInfo(filename).absoluteDir(), leicaImageInfos);
+  leicaImageInfos = splitLeciaImageInfos(leicaImageInfos);
 
   std::vector<ZImgInfo> infos;
   detectInfos(infos, leicaImageInfos);
@@ -205,7 +207,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
           dimensionStrides[4] = dd.bytesInc;
           break;
         default:
-          throw ZIOException("only support XYZT dimension");
+          throw ZIOException(QString("impossible dimension %1").arg(dd.dimID));
       }
     }
     if (dimensionStrides[0] == 0) {
@@ -214,18 +216,21 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
     if (dimensionStrides[1] == 0) {
       dimensionStrides[1] = dimensionStrides[0] * info.size(0);
     }
-    if (dimensionStrides[3] == 0) {
-      dimensionStrides[3] = dimensionStrides[1] * info.size(1);
-    }
     if (dimensionStrides[2] == 0) {
-      dimensionStrides[2] = std::max(dimensionStrides[3] * info.size(3), dimensionStrides[1] * info.size(1));
+      dimensionStrides[2] = std::max(dimensionStrides[0] * info.size(0), dimensionStrides[1] * info.size(1));
+    }
+    if (dimensionStrides[3] == 0) {
+      dimensionStrides[3] = std::max(std::max(dimensionStrides[0] * info.size(0), dimensionStrides[1] * info.size(1)),
+                                     dimensionStrides[2] * info.size(2));
     }
     if (dimensionStrides[4] == 0) {
-      dimensionStrides[4] = std::max(dimensionStrides[3] * info.size(3), dimensionStrides[2] * info.size(2));
+      dimensionStrides[4] = std::max(
+        std::max(std::max(dimensionStrides[0] * info.size(0), dimensionStrides[1] * info.size(1)),
+                 dimensionStrides[2] * info.size(2)),
+        dimensionStrides[3] * info.size(3));
     }
 
-
-    img = readRawImg(filename, info, dimensionStrides, std::get<0>(monl), rgn);
+    img = readRawImg(filename, info, dimensionStrides, std::get<0>(monl) + ii.imageMemory.sceneOffset, rgn);
   } else {
     ZImgIO imgIO;
     ZImgInfo resInfo = rgn.clip(info);
@@ -413,7 +418,7 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
     }
   }
 
-  std::cout << xml.toLocal8Bit();
+  //std::cout << xml.toLocal8Bit();
 }
 
 void ZImgLeica::readLeicaInfo(const QString& xmlString, const QDir& xmlDir, std::vector<ImageInfo>& imageInfos)
@@ -719,6 +724,78 @@ void ZImgLeica::parseXLCF(const QString& filename, std::vector<ImageInfo>& image
   readLeicaInfo(xml, QFileInfo(filename).absoluteDir(), imageInfos);
 }
 
+std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageInfo>& imageInfos)
+{
+  // convert channels except XYZCT to scene channel
+  std::vector<ImageInfo> res;
+  for (const auto& ii : imageInfos) {
+    std::vector<size_t> dimSize;
+    std::vector<size_t> dimStride;
+    for (const auto& dd : ii.dimensions) {
+      if (dd.dimID >= 5 && dd.dimID <= 11 && dd.numberOfElements > 1) {
+        dimSize.push_back(dd.numberOfElements);
+        dimStride.push_back(dd.bytesInc);
+      }
+    }
+
+    if (dimSize.empty()) {
+      ImageInfo info = ii;
+      info.dimensions.erase(std::remove_if(info.dimensions.begin(), info.dimensions.end(),
+                                           [](const DimensionDescription& ddd) {
+                                             return ddd.dimID >= 5;
+                                           }),
+                            info.dimensions.end());
+      res.push_back(info);
+    } else {
+      std::vector<size_t> sortIdx = argSort(dimStride.begin(), dimStride.end());
+      std::vector<size_t> tmpDimSize;
+      std::vector<size_t> tmpDimStride;
+      for (auto idx : make_reverse(sortIdx)) {
+        tmpDimSize.push_back(dimSize[idx]);
+        tmpDimStride.push_back(dimStride[idx]);
+      }
+      tmpDimSize.swap(dimSize);
+      tmpDimStride.swap(dimStride);
+
+      std::vector<size_t> sceneOffsets;
+      std::vector<size_t> dimIdx(dimSize.size(), 0);
+      while (dimIdx[0] != dimSize[0]) {
+        sceneOffsets.push_back(std::inner_product(dimIdx.begin(), dimIdx.end(), dimStride.begin(), 0_usize));
+
+        ++dimIdx[dimIdx.size() - 1];
+        for (size_t i = dimIdx.size() - 1; i > 0 && dimIdx[i] == dimSize[i]; --i) {
+          dimIdx[i] = 0;
+          ++dimIdx[i - 1];
+        }
+      }
+
+      for (size_t i = 0; i < sceneOffsets.size(); ++i) {
+        ImageInfo info = ii;
+        info.imageMemory.sceneOffset = sceneOffsets[i];
+        info.imageMemory.fileNames.clear();
+        info.imageMemory.fileOffsets.clear();
+        info.imageMemory.fileSizes.clear();
+        size_t sceneEnd = i + 1 == sceneOffsets.size() ? std::numeric_limits<size_t>::max() : sceneOffsets[i + 1];
+        for (size_t fi = 0; fi < ii.imageMemory.fileOffsets.size(); ++fi) {
+          if (ii.imageMemory.fileOffsets[fi] >= info.imageMemory.sceneOffset &&
+              ii.imageMemory.fileOffsets[fi] + ii.imageMemory.fileSizes[fi] < sceneEnd) {
+            info.imageMemory.fileNames.push_back(ii.imageMemory.fileNames[fi]);
+            info.imageMemory.fileOffsets.push_back(ii.imageMemory.fileOffsets[fi]);
+            info.imageMemory.fileSizes.push_back(ii.imageMemory.fileSizes[fi]);
+          }
+        }
+        info.dimensions.erase(std::remove_if(info.dimensions.begin(), info.dimensions.end(),
+                                             [](const DimensionDescription& ddd) {
+                                               return ddd.dimID >= 5;
+                                             }),
+                              info.dimensions.end());
+        res.push_back(info);
+      }
+    }
+  }
+  return res;
+}
+
 void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<ImageInfo>& leicaImageInfos)
 {
   for (const auto& ii : leicaImageInfos) {
@@ -728,6 +805,7 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
     info.height = 1;
     info.depth = 1;
     info.numTimes = 1;
+    double lastTime = 0.0;
     std::vector<VoxelSizeUnit> vsus;
     for (const auto& dd : ii.dimensions) {
       switch (dd.dimID) {
@@ -745,9 +823,13 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
           break;
         case 4:
           info.numTimes = dd.numberOfElements;
+          lastTime = dd.length;
+          if (dd.unit.compare("s", Qt::CaseInsensitive) != 0) {
+            throw ZIOException(QString("unhandled time unit %1, please send this message to flq@live.com").arg(dd.unit));
+          }
           break;
         default:
-          throw ZIOException("only support XYZT dimension");
+          throw ZIOException(QString("impossible dimension %1").arg(dd.dimID));
       }
       if (dd.dimID == 1 || dd.dimID == 2 || dd.dimID == 3) {
         //"none", "inch", "cm", "mm", "um", "nm", "m", "hm", "km"
@@ -861,18 +943,11 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
       }
     }
 
-    if (info.timeStamps.size() == ii.timeStamps.size()) {
-      info.timeStamps = ii.timeStamps;
-    } else if (info.timeStamps.size() * info.numChannels == ii.timeStamps.size()) {
+    if (info.timeStamps.size() > 1) {
+      double timeInterval = lastTime / (info.timeStamps.size() - 1);
       for (size_t i = 0; i < info.timeStamps.size(); ++i) {
-        info.timeStamps[i] = ii.timeStamps[i * info.numChannels];
+        info.timeStamps[i] = i * timeInterval;
       }
-    } else if (info.timeStamps.size() * info.numChannels * info.depth == ii.timeStamps.size()) {
-      for (size_t i = 0; i < info.timeStamps.size(); ++i) {
-        info.timeStamps[i] = ii.timeStamps[i * info.numChannels * info.depth];
-      }
-    } else {
-      throw ZIOException("unhandled time stamp list, please send this file to flq@live.com");
     }
 
     infos.push_back(info);

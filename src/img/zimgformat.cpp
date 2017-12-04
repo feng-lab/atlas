@@ -103,7 +103,7 @@ void ZImgFormat::writeImg(const QString& filename,
 }
 
 ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, const QString& dimensionOrderIn,
-                            uint64_t dataOffset, const ZImgRegion& region)
+                            uint64_t dataOffset, const ZImgRegion& region, uint64_t timeStride)
 {
   if (region.isEmpty() || !region.isValid(imgInfo)) {
     throw ZIOException(
@@ -127,7 +127,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
     ZImgRegion rgn = region;
     rgn.start.c = 0;
     rgn.end.c = -1;
-    ZImg tmpImg = readRawImg(filename, tmpInfo, "XYZCT", dataOffset, rgn);
+    ZImg tmpImg = readRawImg(filename, tmpInfo, "XYZCT", dataOffset, rgn, timeStride);
     if (region.start.c == 0 && (region.end.c == -1 || size_t(region.end.c) == imgInfo.numChannels)) { // read all channel
       tmpImg.infoRef() = res.info();
       CXYZtoXYZC(tmpImg, res);
@@ -145,21 +145,25 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
     std::ifstream inputFileStream;
     openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
 
+    if (timeStride == 0)
+      timeStride = imgInfo.timeByteNumber();
+    CHECK(timeStride >= imgInfo.timeByteNumber());
+
     int tEnd = region.end.t == -1 ? imgInfo.numTimes : region.end.t;
     for (int t = region.start.t; t < tEnd; ++t) {
       if (region.containsWholeTime(imgInfo) && (dimensionOrder == "XYZCT")) {
-        size_t offset = dataOffset + t * imgInfo.timeByteNumber();
+        size_t offset = dataOffset + t * timeStride;
         inputFileStream.seekg(offset, std::ios_base::beg);
         readStream(inputFileStream, res.timeData<char>(t - region.start.t), res.timeByteNumber());
       } else if (region.containsWholeChannel(imgInfo) && (dimensionOrder == "XYZCT")) {
-        size_t offset = dataOffset + t * imgInfo.timeByteNumber() + region.start.c * imgInfo.channelByteNumber();
+        size_t offset = dataOffset + t * timeStride + region.start.c * imgInfo.channelByteNumber();
         inputFileStream.seekg(offset, std::ios_base::beg);
         readStream(inputFileStream, res.timeData<char>(t - region.start.t), res.timeByteNumber());
       } else if (region.containsWholePlane(imgInfo) && (dimensionOrder == "XYZCT")) {
         int cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
         // channel by channel
         for (int c = region.start.c; c < cEnd; ++c) {
-          size_t offset = dataOffset + t * imgInfo.timeByteNumber() + c * imgInfo.channelByteNumber() +
+          size_t offset = dataOffset + t * timeStride + c * imgInfo.channelByteNumber() +
                           region.start.z * imgInfo.planeByteNumber();
           inputFileStream.seekg(offset, std::ios_base::beg);
           readStream(inputFileStream, res.channelData<char>(c - region.start.c, t - region.start.t),
@@ -173,11 +177,11 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
           for (int z = region.start.z; z < zEnd; ++z) {
             size_t offset = 0;
             if ((dimensionOrder == "XYZCT")) {
-              offset = dataOffset + t * imgInfo.timeByteNumber() +
+              offset = dataOffset + t * timeStride +
                        c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
                        region.start.y * imgInfo.rowByteNumber();
             } else { // "XYCZT"
-              offset = dataOffset + t * imgInfo.timeByteNumber() +
+              offset = dataOffset + t * timeStride +
                        (c + imgInfo.numChannels * z) * imgInfo.planeByteNumber() +
                        region.start.y * imgInfo.rowByteNumber();
             }
@@ -196,11 +200,11 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
             for (int y = region.start.y; y < yEnd; ++y) {
               size_t offset = 0;
               if ((dimensionOrder == "XYZCT")) {
-                offset = dataOffset + t * imgInfo.timeByteNumber() +
+                offset = dataOffset + t * timeStride +
                          c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
                          y * imgInfo.rowByteNumber() + region.start.x * imgInfo.voxelByteNumber();
               } else { // "XYCZT"
-                offset = dataOffset + t * imgInfo.timeByteNumber() +
+                offset = dataOffset + t * timeStride +
                          (c + imgInfo.numChannels * z) * imgInfo.planeByteNumber() +
                          y * imgInfo.rowByteNumber() + region.start.x * imgInfo.voxelByteNumber();
               }
@@ -235,12 +239,12 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo,
   QString dimensionOrderIn("XYZCT");
   QString dimensionOrder("XYZCT");
   std::vector<size_t> packedStrides(5, 0);
-  size_t prev = 1;
-  size_t packedPrev = 1;
+  size_t prev = imgInfo.bytesPerVoxel;
+  size_t packedPrev = imgInfo.bytesPerVoxel;
   for (size_t i = 0; i < sortedIndexes.size(); ++i) {
     auto idx = sortedIndexes[i];
-    packedStrides[idx] = imgInfo.bytesPerVoxel * packedPrev;
-    if (dimensionStrides[idx] < imgInfo.bytesPerVoxel * prev) {
+    packedStrides[idx] =  packedPrev;
+    if (dimensionStrides[idx] < prev) {
       throw ZIOException(QString("invalid dimensionStrides %1 for image %2").arg(qtTypeToQString(dimensionStrides)).arg(
         imgInfo.toQString()));
     }
@@ -248,10 +252,11 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo,
     prev = dimensionStrides[idx] * imgInfo.size(idx);
     dimensionOrder[uint(i)] = dimensionOrderIn[uint(idx)];
   }
+  packedStrides[4] = dimensionStrides[4]; // time dimenstion does not need to be packed
   bool packed = packedStrides == dimensionStrides;
   //LOG(INFO) << dimensionStrides << " " << dimensionOrder << " Packed: " << packed << " " << imgInfo.toQString();
-  if (packed && (dimensionOrderIn == "XYZCT" || dimensionOrderIn == "XYCZT" || dimensionOrderIn == "CXYZT")) {
-    res = readRawImg(filename, imgInfo, dimensionOrder, dataOffset, region);
+  if (packed && (dimensionOrder == "XYZCT" || dimensionOrder == "XYCZT" || dimensionOrder == "CXYZT")) {
+    res = readRawImg(filename, imgInfo, dimensionOrder, dataOffset, region, dimensionStrides[4]);
   } else {
     ZImgInfo partialImgInfo = region.clip(imgInfo);
     res =  ZImg(partialImgInfo);

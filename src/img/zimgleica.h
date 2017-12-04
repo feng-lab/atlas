@@ -39,6 +39,7 @@ struct ImageMemory
   QStringList fileNames;
   std::vector<uint64_t> fileSizes;
   std::vector<uint64_t> fileOffsets;
+  uint64_t sceneOffset = 0;
 };
 
 struct ImageInfo
@@ -96,6 +97,8 @@ private:
   void parseXLIF(const QString& filename, std::vector<ImageInfo>& imageInfos);
 
   void parseXLCF(const QString& filename, std::vector<ImageInfo>& imageInfos);
+
+  std::vector<ImageInfo> splitLeciaImageInfos(const std::vector<ImageInfo>& imageInfos);
 
   void detectInfos(std::vector<ZImgInfo>& infos, const std::vector<ImageInfo>& imageInfos);
 

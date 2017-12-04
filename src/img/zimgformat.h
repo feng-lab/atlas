@@ -89,7 +89,7 @@ public:
 
 protected:
   ZImg readRawImg(const QString& filename, const ZImgInfo& imgInfo, const QString& dimensionOrder,
-                  uint64_t dataOffset, const ZImgRegion& region);
+                  uint64_t dataOffset, const ZImgRegion& region, uint64_t timeStride = 0);
 
   ZImg readRawImg(const QString& filename, const ZImgInfo& imgInfo, const std::vector<size_t>& dimensionStrides,
                   uint64_t dataOffset, const ZImgRegion& region);
