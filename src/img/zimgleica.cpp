@@ -163,7 +163,16 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
   CHECK(ratio >= 1);
 
   const auto& ii = leicaImageInfos[scene];
-  if (!allMemoryOffsetNameLength.empty()) { // lof or lif
+  if (!allMemoryOffsetNameLength.empty() ||  // lof or lif
+      (ii.imageMemory.fileNames.size() == 1 &&
+       ii.imageMemory.fileNames[0].endsWith(".lof", Qt::CaseInsensitive))) { // single lof file
+    QString fn = filename;
+    if (ii.imageMemory.fileNames.size() == 1 && ii.imageMemory.fileNames[0].endsWith(".lof", Qt::CaseInsensitive)) {
+      fn = ii.imageMemory.fileNames[0];
+      QString tmpxml;
+      allMemoryOffsetNameLength.clear();
+      readXml(fn, tmpxml, allMemoryOffsetNameLength);
+    }
     auto monl = allMemoryOffsetNameLength[0];
     if (allMemoryOffsetNameLength.size() > 1) {
       bool found = false;
@@ -230,7 +239,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
         dimensionStrides[3] * info.size(3));
     }
 
-    img = readRawImg(filename, info, dimensionStrides, std::get<0>(monl) + ii.imageMemory.sceneOffset, rgn);
+    img = readRawImg(fn, info, dimensionStrides, std::get<0>(monl) + ii.imageMemory.sceneOffset, rgn);
   } else {
     ZImgIO imgIO;
     ZImgInfo resInfo = rgn.clip(info);
@@ -341,7 +350,6 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
     bool isLOF = xml == "LMS_Object_File";
 
     int majorVersion = 0;
-    int minorVersion = 0;
     if (isLOF) {
       Int32Block majorVersionBlock;
       readStream(inputFileStream, &majorVersionBlock, sizeof(majorVersionBlock));
@@ -352,9 +360,7 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
       }
       Int32Block minorVersionBlock;
       readStream(inputFileStream, &minorVersionBlock, sizeof(minorVersionBlock));
-      if (minorVersionBlock.test == 0x2A) {
-        minorVersion = minorVersionBlock.number;
-      } else {
+      if (minorVersionBlock.test != 0x2A) {
         throw ZIOException("incorrect lecia LOF minor version");
       }
       UInt64Block memorySizeBlock;
@@ -379,13 +385,13 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
       readStream(inputFileStream, charBuf.data(), xtc.textLength * 2);
       xml = QString(charBuf.data(), charBuf.size());
     } else { // LIF
-      int lifVersion = parseLIFVersion(xml);
+      majorVersion = parseLIFVersion(xml);
       do {
         if (!inputFileStream.read(reinterpret_cast<char*>(&nb), sizeof(NextBlock))) {
           break;
         }
 
-        if (lifVersion == 1) {
+        if (majorVersion == 1) {
           MemoryBlock32 md;
           readStream(inputFileStream, &md, sizeof(MemoryBlock32));
           if (md.test1 != 0x2A || md.test2 != 0x2A || nb.length != 10 + md.textLength * 2) {
@@ -398,7 +404,7 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
                                                            imageDescription, size_t(md.memorySize)));
 
           inputFileStream.seekg(md.memorySize, std::ios_base::cur);
-        } else if (lifVersion == 2) {
+        } else if (majorVersion == 2) {
           MemoryBlock64 md;
           readStream(inputFileStream, &md, sizeof(MemoryBlock64));
           if (md.test1 != 0x2A || md.test2 != 0x2A || nb.length != 14 + md.textLength * 2) {
@@ -412,7 +418,7 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
 
           inputFileStream.seekg(md.memorySize, std::ios_base::cur);
         } else {
-          throw ZIOException(QString("not supported leica lif version: %1").arg(lifVersion));
+          throw ZIOException(QString("not supported leica lif version: %1").arg(majorVersion));
         }
       } while (true);
     }
@@ -729,16 +735,61 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
   // convert channels except XYZCT to scene channel
   std::vector<ImageInfo> res;
   for (const auto& ii : imageInfos) {
-    std::vector<size_t> dimSize;
-    std::vector<size_t> dimStride;
+    bool hasSceneDim = false;
+    std::vector<DimensionInfo> dims;
     for (const auto& dd : ii.dimensions) {
-      if (dd.dimID >= 5 && dd.dimID <= 11 && dd.numberOfElements > 1) {
-        dimSize.push_back(dd.numberOfElements);
-        dimStride.push_back(dd.bytesInc);
+      if (dd.numberOfElements <= 1 || dd.dimID == 0)
+        continue;
+
+      if (dd.dimID >= 5 && dd.dimID <= 11) {
+        hasSceneDim = true;
       }
+      DimensionInfo di;
+      di.start = 0;
+      di.end = dd.numberOfElements;
+      di.stride = dd.bytesInc;
+      switch (dd.dimID) {
+        case 1:
+          di.name = "X";
+          break;
+        case 2:
+          di.name = "Y";
+          break;
+        case 3:
+          di.name = "Z";
+          break;
+        case 4:
+          di.name = "T";
+          break;
+        case 5:
+          di.name = "Lambda";
+          break;
+        case 6:
+          di.name = "Rotation";
+          break;
+        case 7:
+          di.name = "XT Slices";
+          break;
+        case 8:
+          di.name = "T Slices";
+          break;
+        case 9:
+          di.name = "Lambda Excitation";
+          break;
+        case 10:
+          di.name = "StagePos";
+          break;
+        case 11:
+          di.name = "Loop";
+          break;
+        default:
+          throw ZIOException("impossible dimension");
+          break;
+      }
+      dims.push_back(di);
     }
 
-    if (dimSize.empty()) {
+    if (!hasSceneDim) {
       ImageInfo info = ii;
       info.dimensions.erase(std::remove_if(info.dimensions.begin(), info.dimensions.end(),
                                            [](const DimensionDescription& ddd) {
@@ -747,41 +798,64 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
                             info.dimensions.end());
       res.push_back(info);
     } else {
-      std::vector<size_t> sortIdx = argSort(dimStride.begin(), dimStride.end());
-      std::vector<size_t> tmpDimSize;
-      std::vector<size_t> tmpDimStride;
-      for (auto idx : make_reverse(sortIdx)) {
-        tmpDimSize.push_back(dimSize[idx]);
-        tmpDimStride.push_back(dimStride[idx]);
+      if (ii.channels.size() > 1) {
+        std::vector<uint64_t> channelOffsets;
+        for (const auto& cd : ii.channels) {
+          channelOffsets.push_back(cd.bytesInc);
+        }
+        std::sort(channelOffsets.begin(), channelOffsets.end());
+        DimensionInfo di;
+        di.name = "C";
+        di.start = 0;
+        di.end = ii.channels.size();
+        di.stride = channelOffsets[1] - channelOffsets[0];
+        dims.push_back(di);
       }
-      tmpDimSize.swap(dimSize);
-      tmpDimStride.swap(dimStride);
+      std::sort(dims.begin(), dims.end(),
+                [](const DimensionInfo& i1, const DimensionInfo& i2) { return i1.stride < i2.stride; });
 
-      std::vector<size_t> sceneOffsets;
-      std::vector<size_t> dimIdx(dimSize.size(), 0);
-      while (dimIdx[0] != dimSize[0]) {
-        sceneOffsets.push_back(std::inner_product(dimIdx.begin(), dimIdx.end(), dimStride.begin(), 0_usize));
-
-        ++dimIdx[dimIdx.size() - 1];
-        for (size_t i = dimIdx.size() - 1; i > 0 && dimIdx[i] == dimSize[i]; --i) {
-          dimIdx[i] = 0;
-          ++dimIdx[i - 1];
+      std::vector<size_t> sceneDimIdxReverseOrder;
+      for (size_t i = dims.size(); i-- > 0; ) {
+        if (dims[i].name != "X" && dims[i].name != "Y" && dims[i].name != "Z" && dims[i].name != "C" &&
+            dims[i].name != "T") {
+          sceneDimIdxReverseOrder.push_back(i);
         }
       }
 
-      for (size_t i = 0; i < sceneOffsets.size(); ++i) {
+      std::vector<size_t> dimCurrIdx(sceneDimIdxReverseOrder.size(), 0);
+      while (dimCurrIdx[0] != dims[sceneDimIdxReverseOrder[0]].end) {
+        auto tmpDims = dims;
+        uint64_t sceneOffset = 0;
+        for (size_t sdiroidx = 0; sdiroidx < sceneDimIdxReverseOrder.size(); ++sdiroidx) {
+          auto sdi = sceneDimIdxReverseOrder[sdiroidx];
+          tmpDims[sdi].start = dimCurrIdx[sdiroidx];
+          tmpDims[sdi].end = tmpDims[sdi].start + 1;
+          sceneOffset += tmpDims[sdi].start * tmpDims[sdi].stride;
+        }
+
         ImageInfo info = ii;
-        info.imageMemory.sceneOffset = sceneOffsets[i];
-        info.imageMemory.fileNames.clear();
-        info.imageMemory.fileOffsets.clear();
-        info.imageMemory.fileSizes.clear();
-        size_t sceneEnd = i + 1 == sceneOffsets.size() ? std::numeric_limits<size_t>::max() : sceneOffsets[i + 1];
-        for (size_t fi = 0; fi < ii.imageMemory.fileOffsets.size(); ++fi) {
-          if (ii.imageMemory.fileOffsets[fi] >= info.imageMemory.sceneOffset &&
-              ii.imageMemory.fileOffsets[fi] + ii.imageMemory.fileSizes[fi] < sceneEnd) {
-            info.imageMemory.fileNames.push_back(ii.imageMemory.fileNames[fi]);
-            info.imageMemory.fileOffsets.push_back(ii.imageMemory.fileOffsets[fi]);
-            info.imageMemory.fileSizes.push_back(ii.imageMemory.fileSizes[fi]);
+        info.imageMemory.sceneOffset = sceneOffset;
+
+        if (ii.imageMemory.fileNames.size() > 1) {
+          auto memoryRange = getMemoryRangeFromDimensionInfo(tmpDims);
+          info.imageMemory.fileNames.clear();
+          info.imageMemory.fileOffsets.clear();
+          info.imageMemory.fileSizes.clear();
+          for (size_t fi = 0; fi < ii.imageMemory.fileOffsets.size(); ++fi) {
+            std::pair<size_t, size_t> fileRange(ii.imageMemory.fileOffsets[fi],
+                                                ii.imageMemory.fileOffsets[fi] + ii.imageMemory.fileSizes[fi]);
+            bool fileRangeInMemoryRange = false;
+            for (const auto& mr : memoryRange) {
+              if (fileRange.first >= mr.first && fileRange.second <= mr.second) {
+                fileRangeInMemoryRange = true;
+                break;
+              }
+            }
+            if (fileRangeInMemoryRange) {
+              info.imageMemory.fileNames.push_back(ii.imageMemory.fileNames[fi]);
+              info.imageMemory.fileOffsets.push_back(ii.imageMemory.fileOffsets[fi]);
+              info.imageMemory.fileSizes.push_back(ii.imageMemory.fileSizes[fi]);
+            }
           }
         }
         info.dimensions.erase(std::remove_if(info.dimensions.begin(), info.dimensions.end(),
@@ -790,9 +864,58 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
                                              }),
                               info.dimensions.end());
         res.push_back(info);
+
+        // advance to next scene
+        ++dimCurrIdx[dimCurrIdx.size() - 1];
+        for (size_t i = dimCurrIdx.size() - 1; i > 0 && dimCurrIdx[i] == dims[sceneDimIdxReverseOrder[i]].end; --i) {
+          dimCurrIdx[i] = 0;
+          ++dimCurrIdx[i - 1];
+        }
       }
     }
   }
+  return res;
+}
+
+std::vector<std::pair<size_t, size_t>>
+ZImgLeica::getMemoryRangeFromDimensionInfo(const std::vector<DimensionInfo>& dimensionInfos)
+{
+  std::vector<std::pair<size_t, size_t>> res;
+
+  size_t startDim = 0;
+  while (startDim + 1 < dimensionInfos.size() &&
+         dimensionInfos[startDim + 1].stride ==
+         dimensionInfos[startDim].stride * (dimensionInfos[startDim].end - dimensionInfos[startDim].start)) {
+    ++startDim;
+  }
+
+  if (startDim + 1 == dimensionInfos.size()) {
+    res.emplace_back(dimensionInfos[startDim].stride * dimensionInfos[startDim].start,
+                     dimensionInfos[startDim].stride * dimensionInfos[startDim].end);
+  } else {
+    std::vector<size_t> dimCurrIdx;
+    std::vector<size_t> dimEnds;
+    std::vector<size_t> dimStrides;
+    for (size_t d = dimensionInfos.size(); d-- > startDim + 1;) {
+      dimCurrIdx.push_back(dimensionInfos[d].start);
+      dimEnds.push_back(dimensionInfos[d].end);
+      dimStrides.push_back(dimensionInfos[d].stride);
+    }
+
+    while (dimCurrIdx[0] != dimEnds[0]) {
+      size_t offset = std::inner_product(dimCurrIdx.begin(), dimCurrIdx.end(), dimStrides.begin(), 0_usize);
+      res.emplace_back(dimensionInfos[startDim].stride * dimensionInfos[startDim].start + offset,
+                       dimensionInfos[startDim].stride * dimensionInfos[startDim].end + offset);
+
+      // advance to next memory block
+      ++dimCurrIdx[dimCurrIdx.size() - 1];
+      for (size_t i = dimCurrIdx.size() - 1; i > 0 && dimCurrIdx[i] == dimEnds[i]; --i) {
+        dimCurrIdx[i] = 0;
+        ++dimCurrIdx[i - 1];
+      }
+    }
+  }
+
   return res;
 }
 

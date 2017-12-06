@@ -259,7 +259,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo,
     res = readRawImg(filename, imgInfo, dimensionOrder, dataOffset, region, dimensionStrides[4]);
   } else {
     ZImgInfo partialImgInfo = region.clip(imgInfo);
-    res =  ZImg(partialImgInfo);
+    res = ZImg(partialImgInfo);
 
     std::ifstream inputFileStream;
     openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);

@@ -50,6 +50,14 @@ struct ImageInfo
   ImageMemory imageMemory;
 };
 
+struct DimensionInfo
+{
+  QString name;
+  size_t start;
+  size_t end;
+  size_t stride;
+};
+
 class ZImgLeica : public ZImgFormat
 {
 public:
@@ -99,6 +107,9 @@ private:
   void parseXLCF(const QString& filename, std::vector<ImageInfo>& imageInfos);
 
   std::vector<ImageInfo> splitLeciaImageInfos(const std::vector<ImageInfo>& imageInfos);
+
+  std::vector<std::pair<size_t, size_t>>
+  getMemoryRangeFromDimensionInfo(const std::vector<DimensionInfo>& dimensionInfos);
 
   void detectInfos(std::vector<ZImgInfo>& infos, const std::vector<ImageInfo>& imageInfos);
 
