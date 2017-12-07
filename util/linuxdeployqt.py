@@ -327,10 +327,11 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins):
 
         if details['type'] == 'lib':
             src = details['realpath']
-            dst = dest_dir + os.sep + appdir_libs + os.sep + dep
-            debug("Copying library " + dep + ": " + src + ' -> ' + dst)
-            shutil.copyfile(src, dst)  # overrides dest no questions asked
-            strip(dst)
+            if not src.startswith('/usr/lib/') and not src.startswith('/lib/'):
+                dst = dest_dir + os.sep + appdir_libs + os.sep + dep
+                debug("Copying library " + dep + ": " + src + ' -> ' + dst)
+                shutil.copyfile(src, dst)  # overrides dest no questions asked
+                strip(dst)
 
         elif details['type'] == 'qml plugin':
             src = details['realpath']
