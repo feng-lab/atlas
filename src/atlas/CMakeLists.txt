@@ -17,9 +17,8 @@ set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${MKL_PATH}/include ${MKL_PATH}/include
 if (WIN32)
   set(MKL_LIBRARIES ${MKL_LIBRARIES}
       ${MKL_PATH}/lib/intel64/mkl_intel_lp64.lib
-      ${MKL_PATH}/lib/intel64/mkl_intel_thread.lib
-      ${MKL_PATH}/lib/intel64/mkl_core.lib
-      ${INTEL_PATH}/lib/intel64/libiomp5md.lib)
+      ${MKL_PATH}/lib/intel64/mkl_tbb_thread.lib
+      ${MKL_PATH}/lib/intel64/mkl_core.lib)
 elseif (APPLE)
   set(MKL_LIBRARIES ${MKL_LIBRARIES}
       ${MKL_PATH}/lib/libmkl_intel_lp64.a
@@ -29,9 +28,8 @@ elseif (APPLE)
 else ()
   set(MKL_LIBRARIES ${MKL_LIBRARIES}
       ${MKL_PATH}/lib/intel64/libmkl_intel_lp64.a
-      ${MKL_PATH}/lib/intel64/libmkl_intel_thread.a
-      ${MKL_PATH}/lib/intel64/libmkl_core.a
-      ${INTEL_PATH}/lib/intel64/libiomp5.so)
+      ${MKL_PATH}/lib/intel64/libmkl_tbb_thread.a
+      ${MKL_PATH}/lib/intel64/libmkl_core.a)
 endif ()
 
 if (WIN32)
@@ -715,6 +713,7 @@ if (WIN32)
   target_compile_options(${APP_NAME} PUBLIC /MP) # Build with Multiple Processes
   target_compile_options(${APP_NAME} PUBLIC /Zc:inline) #
   target_compile_options(${APP_NAME} PUBLIC /GL) # Enables whole program optimization.
+  target_compile_options(${APP_NAME} PUBLIC /permissive-)
 
   #target_link_libraries(${APP_NAME} PUBLIC /LTCG) # Link-time Code Generation
   set_target_properties(${APP_NAME} PROPERTIES LINK_FLAGS "/LTCG /DEBUG:NONE /FORCE:MULTIPLE") # to create an output file whether or not LINK finds more than one definition for a symbol.

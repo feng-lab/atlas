@@ -4,7 +4,7 @@
 #include "zrandom.h"
 #include "gtest/gtest.h"
 
-TEST(ZImgNCC, test)
+TEST(ZImgNCC, normXCorr_S)
 {
   using namespace nim;
 
@@ -30,9 +30,26 @@ TEST(ZImgNCC, test)
       double ncc = getNCCOfOffset(fixedImg, movingImg, offset);
       EXPECT_NEAR(ncc, *nccImg.data<double>(coord), 1e-8);
     }
+  }
+  catch (const ZException & e) {
+    LOG(ERROR) << "caught Exception: " << e.what();
+  }
+}
 
-    fixedImgView = fixedImg.createView();
-    movingImgView = movingImg.createView();
+TEST(ZImgNCC, normXCorr)
+{
+  using namespace nim;
+
+  try {
+    ZImg fixedImg(ZImgInfo(512, 426, 20));
+    fixedImg.fillRandom();
+    ZImg movingImg(ZImgInfo(467, 580, 16));
+    movingImg.fillRandom();
+    ZImg fixedImgView = fixedImg.createView();
+    ZImg movingImgView = movingImg.createView();
+
+    ZImg nccImg;
+    ZImg numberOfOverlapVoxelsImg;
     normXCorr(fixedImgView, movingImgView, nccImg, numberOfOverlapVoxelsImg);
 
     for (size_t i=0; i<1000; ++i) {
@@ -45,6 +62,26 @@ TEST(ZImgNCC, test)
       double ncc = getNCCOfOffset(fixedImg, movingImg, offset);
       EXPECT_NEAR(ncc, *nccImg.data<double>(coord), 1e-8) << qUtf8Printable(offset.toQString()) << qUtf8Printable(coord.toQString());
     }
+  }
+  catch (const ZException & e) {
+    LOG(ERROR) << "caught Exception: " << e.what();
+  }
+}
+
+TEST(ZImgNCC, normXCorrPart)
+{
+  using namespace nim;
+
+  try {
+    ZImg fixedImg(ZImgInfo(512, 426, 20));
+    fixedImg.fillRandom();
+    ZImg movingImg(ZImgInfo(467, 580, 16));
+    movingImg.fillRandom();
+    ZImg fixedImgView;
+    ZImg movingImgView;
+
+    ZImg nccImg;
+    ZImg numberOfOverlapVoxelsImg;
 
     for (size_t i=0; i<10; ++i) {
       // create random
@@ -80,4 +117,3 @@ TEST(ZImgNCC, test)
     LOG(ERROR) << "caught Exception: " << e.what();
   }
 }
-

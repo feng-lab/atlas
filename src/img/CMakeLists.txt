@@ -266,6 +266,7 @@ if (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC /MP) # Build with Multiple Processes
   target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:inline) #
   target_compile_options(${LIBRARY_NAME} PUBLIC /GL) # Enables whole program optimization.
+  target_compile_options(${LIBRARY_NAME} PUBLIC /permissive-)
 
   #target_link_libraries(${LIBRARY_NAME} PUBLIC /LTCG) # Link-time Code Generation
   set_target_properties(${LIBRARY_NAME} PROPERTIES LINK_FLAGS /LTCG)
