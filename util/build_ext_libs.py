@@ -188,7 +188,7 @@ def get_cmake_cmd() -> str:
 def get_cmake_cmd_common_part(install_dir: str):
     if is_windows():
         return [get_cmake_cmd(),  # '-E', 'echo',
-                '-G', 'Visual Studio 15 2017 Win64',
+                '-G', 'Visual Studio 15 2017 Win64', '-T', 'host=x64',
                 '-DCMAKE_INSTALL_PREFIX=' + install_dir
                 ]
     elif is_linux():
@@ -1122,6 +1122,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                              '-DBUILD_WITH_DEBUG_INFO:BOOL=OFF',
                              '-DBUILD_opencv_apps:BOOL=OFF',
                              '-DBUILD_opencv_matlab:BOOL=OFF',
+                             '-DENABLE_PRECOMPILED_HEADERS:BOOL=OFF',
                              '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
                              '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '\\zlib\\lib\\zlibstatic.lib',
                              src_dir])
@@ -1208,6 +1209,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                                  '-DBUILD_WITH_DEBUG_INFO:BOOL=OFF',
                                  '-DBUILD_opencv_apps:BOOL=OFF',
                                  '-DBUILD_opencv_matlab:BOOL=OFF',
+                                 '-DENABLE_PRECOMPILED_HEADERS:BOOL=OFF',
                                  src_dir])
             else:
                 os.rename(orig_file, bak_file)
@@ -1269,6 +1271,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                                  '-DBUILD_WITH_DEBUG_INFO:BOOL=OFF',
                                  '-DBUILD_opencv_apps:BOOL=OFF',
                                  '-DBUILD_opencv_matlab:BOOL=OFF',
+                                 '-DENABLE_PRECOMPILED_HEADERS:BOOL=OFF',
                                  src_dir])
 
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)

@@ -10,7 +10,7 @@ import build_ext_libs
 def get_cmake_cmd_common_part(use_ninja: bool):
     if sys.platform.startswith('win'):
         return [build_ext_libs.get_cmake_cmd(),  # '-E', 'echo',
-                '-G', 'Visual Studio 15 2017 Win64'
+                '-G', 'Visual Studio 15 2017 Win64', '-T', 'host=x64'
                 ]
     elif sys.platform.startswith('linux'):
         if use_ninja:

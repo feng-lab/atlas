@@ -520,7 +520,7 @@ const ZImg ZImg::createView(int c, int t) const
   res.m_info = rgn.clip(m_info);
   res.m_data.resize(res.numTimes());
   for (size_t lt = 0; lt < res.numTimes(); ++lt)
-    res.m_data[lt] = &(m_data[lt + rgn.start.t][0]) + rgn.start.c * m_info.channelByteNumber();
+    res.m_data[lt] = m_data[lt + rgn.start.t] + rgn.start.c * m_info.channelByteNumber();
   res.m_ownData = false;
   return res;
 }
@@ -564,7 +564,7 @@ const ZImg ZImg::createView(size_t z, size_t c, size_t t) const
   res.m_info = rgn.clip(m_info);
   res.m_data.resize(res.numTimes());
   for (size_t lt = 0; lt < res.numTimes(); ++lt)
-    res.m_data[lt] = &(m_data[lt + rgn.start.t][0]) +
+    res.m_data[lt] = m_data[lt + rgn.start.t] +
                      rgn.start.c * m_info.channelByteNumber() + rgn.start.z * m_info.planeByteNumber();
   res.m_ownData = false;
   return res;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zglobal.h"
+#include "zrandom.h"
 #include <sstream>
 #include <tuple>
 
@@ -279,6 +280,44 @@ struct ZVoxelCoordinate
     return QString("(%1,%2,%3,%4,%5)").arg(x).arg(y).arg(z).arg(c).arg(t);
   }
 
+  // ttsize[0] to ttsize[4] are the sizes of x to t, advance current coord to next valid coord,
+  // return false if reach the end
+  template<typename T>
+  inline bool advance(const T& ttsize)
+  {
+    ++(*this)[0];
+    for (size_t i = 0; (i < 4) && ((*this)[i] >= ttsize[i]); ++i) {
+      (*this)[i] = 0;
+      ++(*this)[i + 1];
+    }
+    if ((*this)[4] >= ttsize[4]) {
+      *this = lastCoordinate(ttsize);
+      return false;
+    } else {
+      return true;
+    }
+  }
+
+  // return a valid coord within size, ttsize[0] to ttsize[4] are the sizes of x to t
+  template<typename T>
+  static inline ZVoxelCoordinate random(const T& ttsize)
+  {
+    CHECK(ttsize[0] > 0 && ttsize[1] > 0 && ttsize[2] > 0 && ttsize[3] > 0 && ttsize[4] > 0);
+    value_type resx = ttsize[0] == 1 ? 0 : ZRandom::instance().randInt<value_type>(ttsize[0] - 1);
+    value_type resy = ttsize[1] == 1 ? 0 : ZRandom::instance().randInt<value_type>(ttsize[1] - 1);
+    value_type resz = ttsize[2] == 1 ? 0 : ZRandom::instance().randInt<value_type>(ttsize[2] - 1);
+    value_type resc = ttsize[3] == 1 ? 0 : ZRandom::instance().randInt<value_type>(ttsize[3] - 1);
+    value_type rest = ttsize[4] == 1 ? 0 : ZRandom::instance().randInt<value_type>(ttsize[4] - 1);
+    return ZVoxelCoordinate(resx, resy, resz, resc, rest);
+  }
+
+  // return the last valid coord within size, ttsize[0] to ttsize[4] are the sizes of x to t
+  template<typename T>
+  static inline ZVoxelCoordinate lastCoordinate(const T& ttsize)
+  {
+    CHECK(ttsize[0] > 0 && ttsize[1] > 0 && ttsize[2] > 0 && ttsize[3] > 0 && ttsize[4] > 0);
+    return ZVoxelCoordinate(ttsize[0] - 1, ttsize[1] - 1, ttsize[2] - 1, ttsize[3] - 1, ttsize[4] - 1);
+  }
 };
 
 #pragma pack(pop)

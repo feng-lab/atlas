@@ -292,10 +292,19 @@ TEST(saturate, add)
   ++tmp;
   ASSERT_EQ(uint64_t(INT64_MAX), static_cast<uint64_t>(-tmp));
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4307)
+#endif
+
   ASSERT_EQ(2 * uint64_t(INT64_MAX) + 1, static_cast<uint64_t>(INT64_MAX - INT64_MIN));
   ASSERT_EQ(2 * uint64_t(INT64_MAX), static_cast<uint64_t>(INT64_MAX - (INT64_MIN + 1)));
   ASSERT_EQ(uint64_t(INT64_MAX) + 1, static_cast<uint64_t>(INT64_MAX - int64_t(-1)));
   ASSERT_EQ(uint64_t(INT64_MAX) + 2, static_cast<uint64_t>(INT64_MAX - int64_t(-2)));
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
   ASSERT_EQ(uint64_t(0), saturate_add(uint64_t(INT64_MAX), INT64_MIN));
   ASSERT_EQ(uint64_t(0), saturate_add(uint64_t(INT64_MAX) + 1, INT64_MIN));
@@ -413,10 +422,19 @@ TEST(saturate, sub)
   ASSERT_EQ(uint64_t(0), saturate_sub(uint64_t(UINT64_MAX-5), UINT64_MAX));
   ASSERT_EQ(uint64_t(0), saturate_sub(uint64_t(0), UINT64_MAX));
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4307)
+#endif
+
   ASSERT_EQ(uint64_t(INT64_MAX) + 1, static_cast<uint64_t>(0 - INT64_MIN));
   ASSERT_EQ(uint64_t(INT64_MAX), static_cast<uint64_t>(int64_t(-1) - INT64_MIN));
   ASSERT_EQ(uint64_t(INT64_MAX) + 2, static_cast<uint64_t>(int64_t(1) - INT64_MIN));
   ASSERT_EQ(uint64_t(INT64_MAX) + 3, static_cast<uint64_t>(int64_t(2) - INT64_MIN));
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 }
 
 TEST(saturate, mul)

@@ -177,7 +177,8 @@ struct ZImgInfo
   bool lastChannelIsAlphaChannel;
 
   inline size_t voxelByteNumber() const
-  { return bytesPerVoxel; } // // voxel of one channel
+  { return bytesPerVoxel; } // voxel of one channel
+
   inline size_t rowVoxelNumber() const
   { return width; }
 
