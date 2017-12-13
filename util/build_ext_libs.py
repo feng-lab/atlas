@@ -132,18 +132,7 @@ def get_vcvars_environment(remove_conda_from_path: bool = True):
     Returns a dictionary containing the environment variables set up by vcvarsall.bat amd64
     """
 
-    vsinstalldir_var_names = ['VS2017INSTALLDIR']
-
-    vsinstalldir = None
-    for var_name in vsinstalldir_var_names:
-        vsinstalldir = os.getenv(var_name)
-        if vsinstalldir is not None:
-            break
-
-    if vsinstalldir is None:
-        raise OSError('could not find COMNTOOLS environment variable')
-
-    vcvars = os.path.normpath(os.path.join(vsinstalldir, 'VC', 'Auxiliary', 'Build', 'vcvarsall.bat'))
+    vcvars = os.path.normpath(os.path.join(common_dirs.vs_install_dir(), 'VC', 'Auxiliary', 'Build', 'vcvarsall.bat'))
     return get_enviroment_from_shell_script(vcvars, 'x64', remove_conda_from_path=remove_conda_from_path)
 
 

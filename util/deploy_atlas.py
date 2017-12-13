@@ -83,13 +83,21 @@ def deploy_atlas():
             shutil.copytree(os.path.join(binary_dir, 'Resources'),
                             os.path.join(common_dirs.deploy_target_dir(), 'Atlas', 'Resources'),
                             symlinks=True)
-            build_ext_libs.glob_copy(os.path.join(common_dirs.ext_dir(), 'assimp', 'bin', '*.dll'),
+            build_ext_libs.glob_copy(os.path.join(common_dirs.assimp_redist_dir(), '*.dll'),
                                      os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
-            build_ext_libs.glob_copy(os.path.join(common_dirs.ext_dir(), 'freeimage', '*.dll'),
+            build_ext_libs.glob_copy(os.path.join(common_dirs.freeimage_redist_dir(), '*.dll'),
                                      os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
-            shutil.copy2(os.path.join('C:', os.sep, 'Program Files (x86)', 'IntelSWTools', 'compilers_and_libraries',
-                                      'windows', 'redist', 'intel64', 'tbb', 'vc14', 'tbb.dll'),
+            shutil.copy2(os.path.join(common_dirs.tbb_redist_dir(), 'tbb.dll'),
                          os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+            build_ext_libs.glob_copy(
+                os.path.join(common_dirs.vc_CRT_redist_dir(), '*.dll'),
+                os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+            build_ext_libs.glob_copy(
+                os.path.join(common_dirs.vc_CXXAMP_redist_dir(), '*.dll'),
+                os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+            build_ext_libs.glob_copy(
+                os.path.join(common_dirs.vc_OpenMP_redist_dir(), '*.dll'),
+                os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
 
             env = build_ext_libs.get_vcvars_environment()
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'windeployqt'), app_name],

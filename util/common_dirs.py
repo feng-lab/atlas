@@ -117,6 +117,87 @@ def qt_base_dir() -> str:
     return res
 
 
+def vs_install_dir() -> str:
+    assert sys.platform.startswith('win32')
+
+    vsinstalldir_var_names = ['VS2017INSTALLDIR']
+
+    vsinstalldir = None
+    for var_name in vsinstalldir_var_names:
+        vsinstalldir = os.getenv(var_name)
+        if vsinstalldir is not None:
+            break
+
+    if vsinstalldir is None:
+        raise OSError('could not find VS2017INSTALLDIR environment variable')
+    assert os.path.exists(vsinstalldir)
+
+    return vsinstalldir
+
+
+def vc_redist_dir() -> str:
+    assert sys.platform.startswith('win32')
+
+    vc_redist_version_filename = os.path.join(vs_install_dir(), 'VC', 'Auxiliary', 'Build',
+                                              'Microsoft.VCRedistVersion.default.txt')
+    assert os.path.exists(vc_redist_version_filename)
+    with open(vc_redist_version_filename, mode='r', encoding='utf-8') as f:
+        vc_redist_version = f.readline().splitlines()[0]
+
+    res = os.path.join(vs_install_dir(), 'VC', 'Redist', 'MSVC', vc_redist_version)
+    assert os.path.exists(res)
+    return res
+
+
+def vc_CRT_redist_dir() -> str:
+    assert sys.platform.startswith('win32')
+
+    res = os.path.join(vc_redist_dir(), 'x64', 'Microsoft.VC141.CRT')
+    assert os.path.exists(res)
+    return res
+
+
+def vc_CXXAMP_redist_dir() -> str:
+    assert sys.platform.startswith('win32')
+
+    res = os.path.join(vc_redist_dir(), 'x64', 'Microsoft.VC141.CXXAMP')
+    assert os.path.exists(res)
+    return res
+
+
+def vc_OpenMP_redist_dir() -> str:
+    assert sys.platform.startswith('win32')
+
+    res = os.path.join(vc_redist_dir(), 'x64', 'Microsoft.VC141.OpenMP')
+    assert os.path.exists(res)
+    return res
+
+
+def tbb_redist_dir() -> str:
+    assert sys.platform.startswith('win32')
+
+    res = os.path.join('C:', os.sep, 'Program Files (x86)', 'IntelSWTools', 'compilers_and_libraries',
+                       'windows', 'redist', 'intel64', 'tbb', 'vc14')
+    assert os.path.exists(res)
+    return res
+
+
+def assimp_redist_dir() -> str:
+    assert sys.platform.startswith('win32')
+
+    res = os.path.join(ext_dir(), 'assimp', 'bin')
+    assert os.path.exists(res)
+    return res
+
+
+def freeimage_redist_dir() -> str:
+    assert sys.platform.startswith('win32')
+
+    res = os.path.join(ext_dir(), 'freeimage')
+    assert os.path.exists(res)
+    return res
+
+
 def write_cmake_file_with_qt_info():
     with open(os.path.join(repository_dir(), 'cmake', 'QtInfo.cmake'), mode='w', encoding='utf-8') as file:
         file.write('# Set Qt related variables\n')
@@ -135,7 +216,8 @@ def write_cmake_file_with_qt_info():
                     for line in from_lines:
                         line = line.replace(
                             r'#if defined(__cpp_variable_templates) && __cpp_variable_templates >= 201304 // C++14',
-                            r'#ifdef _MSC_VER')
+                            r'#if defined(_MSC_VER) || '
+                            r'defined(__cpp_variable_templates) && __cpp_variable_templates >= 201304 // C++14')
                         f.write(line)
                         to_lines.append(line)
                 print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
