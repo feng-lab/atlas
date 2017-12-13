@@ -515,9 +515,10 @@ def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
     try:
         if is_windows():
             env = get_vcvars_environment()
+            subprocess.run(['devenv', 'JXR_vc14.sln', '/Upgrade'],
+                           cwd=os.path.join(src_dir, 'jxrencoderdecoder'), shell=True, check=True, env=env)
             subprocess.run(['MSBuild', 'JXR_vc14.sln', '/target:JXRDecApp', '/property:Platform=x64',
-                            '/ToolsVersion:15.0', '/property:PlatformToolset=v141',
-                            '/property:WindowsTargetPlatformVersion=10.0.14393.0',
+                            '/property:WindowsTargetPlatformVersion=' + env['UCRTVERSION'],  #like 10.0.16299.0
                             '/property:ForceImportBeforeCppTargets=' + ext_dir + '\\runtime_md.props',
                             '/property:Configuration=Release', '/maxcpucount'],
                            cwd=os.path.join(src_dir, 'jxrencoderdecoder'), shell=True, check=True, env=env)
@@ -570,6 +571,8 @@ def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
         if not is_windows():
             shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)
             os.replace(bak_file, orig_file)
+        subprocess.run(['git', 'reset', '--hard', 'HEAD'],
+                       cwd=src_dir, shell=False, check=True)
 
 
 def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
@@ -656,14 +659,10 @@ def build_ospray(src_dir: str, install_dir: str, ext_dir: str, ispc_dir: str, em
             print('TBBROOT:', env['TBBROOT'])
 
             cmakecmd.extend(['-DTBB_ROOT:PATH=' + env['TBBROOT'],
-                             '-DOSPRAY_USE_EXTERNAL_EMBREE:BOOL=ON',
                              '-DOSPRAY_USE_EMBREE_STREAMS:BOOL=ON',
-                             '-DOSPRAY_USE_HIGH_QUALITY_BVH:BOOL=ON',
+                             '-DOSPRAY_MODULE_BILINEAR_PATCH:BOOL=ON',
                              '-Dembree_DIR:PATH=' + embree_dir,
                              '-DISPC_EXECUTABLE:FILEPATH=' + ispc_dir + '\\ispc.exe',
-                             '-DOSPRAY_APPS_GLUTVIEWER:BOOL=OFF',
-                             '-DOSPRAY_APPS_QTVIEWER:BOOL=OFF',
-                             '-DOSPRAY_APPS_VOLUMEVIEWER:BOOL=OFF',
                              src_dir])
             env = get_vcvars_environment()
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
@@ -671,14 +670,10 @@ def build_ospray(src_dir: str, install_dir: str, ext_dir: str, ispc_dir: str, em
                            cwd=build_dir, shell=True, check=True, env=env)
         else:
             cmakecmd.extend(['-DTBB_ROOT:PATH=/opt/intel/tbb',
-                             '-DOSPRAY_USE_EXTERNAL_EMBREE:BOOL=ON',
                              '-DOSPRAY_USE_EMBREE_STREAMS:BOOL=ON',
-                             '-DOSPRAY_USE_HIGH_QUALITY_BVH:BOOL=ON',
+                             '-DOSPRAY_MODULE_BILINEAR_PATCH:BOOL=ON',
                              '-Dembree_DIR:PATH=' + embree_dir,
                              '-DISPC_EXECUTABLE:FILEPATH=' + ispc_dir + '/ispc',
-                             '-DOSPRAY_APPS_GLUTVIEWER:BOOL=OFF',
-                             '-DOSPRAY_APPS_QTVIEWER:BOOL=OFF',
-                             '-DOSPRAY_APPS_VOLUMEVIEWER:BOOL=OFF',
                              src_dir])
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
@@ -814,7 +809,8 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
                            cwd=src_dir, shell=True, check=True, env=env)
             subprocess.run(['MSBuild', 'FreeImage.2013.sln', '/target:FreeImagePlus', '/property:Platform=x64',
                             '/property:Configuration=Release', '/maxcpucount',
-                            '/property:WindowsTargetPlatformVersion=10.0.14393.0'],
+                            '/property:WindowsTargetPlatformVersion=' + env['UCRTVERSION']  # like 10.0.16299.0
+                            ],
                            cwd=src_dir, shell=True, check=True, env=env)
             distutils.dir_util.copy_tree(os.path.join(src_dir, 'Dist', 'x64'),
                                          install_dir)
@@ -1052,8 +1048,8 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
     bak_file_3 = get_bak_file_name(orig_file_3)
     try:
         if is_windows():
-            intel_sw_dir = 'C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\'
-            env = get_enviroment_from_shell_script(intel_sw_dir + 'tbb\\bin\\tbbvars.bat',
+            env = get_enviroment_from_shell_script(os.path.join(common_dirs.intel_sw_dir(), 'tbb', 'bin',
+                                                                'tbbvars.bat'),
                                                    para='intel64 vs2017',
                                                    start_env=get_vcvars_environment())
             print('TBBROOT:', env['TBBROOT'])
@@ -1151,8 +1147,10 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                         to_lines.append(line)
                 print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_3, tofile='<new>'))))
 
-                env = get_enviroment_from_shell_script('/opt/intel/tbb/bin/tbbvars.sh', 'intel64')
+                env = get_enviroment_from_shell_script(os.path.join(common_dirs.intel_sw_dir(), 'tbb', 'bin',
+                                                                    'tbbvars.sh'), 'intel64')
                 print('TBBROOT:', env['TBBROOT'])
+
                 cmakecmd.extend(['-DWITH_PTHREADS_PF:BOOL=OFF',
                                  '-DBUILD_opencv_videoio:BOOL=OFF',
                                  '-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -1213,8 +1211,10 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                         to_lines.append(line)
                 print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
 
-                env = get_enviroment_from_shell_script('/opt/intel/tbb/bin/tbbvars.sh')
+                env = get_enviroment_from_shell_script(os.path.join(common_dirs.intel_sw_dir(), 'tbb', 'bin',
+                                                                    'tbbvars.sh'))
                 print('TBBROOT:', env['TBBROOT'])
+
                 cmakecmd.extend(['-DWITH_PTHREADS_PF:BOOL=OFF',
                                  '-DBUILD_opencv_videoio:BOOL=OFF',
                                  '-DBUILD_SHARED_LIBS:BOOL=OFF',

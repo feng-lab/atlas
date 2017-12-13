@@ -142,7 +142,7 @@ def vc_redist_dir() -> str:
                                               'Microsoft.VCRedistVersion.default.txt')
     assert os.path.exists(vc_redist_version_filename)
     with open(vc_redist_version_filename, mode='r', encoding='utf-8') as f:
-        vc_redist_version = f.readline().splitlines()[0]
+        vc_redist_version = f.readline().rstrip()
 
     res = os.path.join(vs_install_dir(), 'VC', 'Redist', 'MSVC', vc_redist_version)
     assert os.path.exists(res)
@@ -169,6 +169,15 @@ def vc_OpenMP_redist_dir() -> str:
     assert sys.platform.startswith('win32')
 
     res = os.path.join(vc_redist_dir(), 'x64', 'Microsoft.VC141.OpenMP')
+    assert os.path.exists(res)
+    return res
+
+
+def intel_sw_dir() -> str:
+    if sys.platform.startswith('win32'):
+        res = os.path.join('C:', os.sep, 'Program Files (x86)', 'IntelSWTools', 'compilers_and_libraries', 'windows')
+    else:
+        res = os.path.join(os.sep, 'opt', 'intel')
     assert os.path.exists(res)
     return res
 
