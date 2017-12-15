@@ -1151,8 +1151,10 @@ def build_libs(libs: dict, update_src: bool):
             unpack_file_to_folder(os.path.join(src_package_dir, 'ninja-win.zip'), common_dirs.software_dir())
         elif is_linux():
             unpack_file_to_folder(os.path.join(src_package_dir, 'ninja-linux.zip'), common_dirs.software_dir())
+            os.chmod(os.path.join(common_dirs.software_dir(), 'ninja'), stat.S_IXUSR)
         else:
             unpack_file_to_folder(os.path.join(src_package_dir, 'ninja-mac.zip'), common_dirs.software_dir())
+            os.chmod(os.path.join(common_dirs.software_dir(), 'ninja'), stat.S_IXUSR)
 
     if libs['curl']:
         if is_windows():
