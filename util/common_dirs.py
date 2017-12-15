@@ -4,6 +4,10 @@ import xml.etree.ElementTree as eTree
 import difflib
 
 
+def use_ninja() -> bool:
+    return True
+
+
 def curr_dir() -> str:
     return os.path.abspath(os.path.dirname(__file__))
 
@@ -62,7 +66,10 @@ def src_package_dir() -> str:
 
 
 def build_dir() -> str:
-    res = os.path.join(repository_dir(), 'cmake-build-release')
+    if use_ninja():
+        res = os.path.join(repository_dir(), 'cmake-build-release-ninja')
+    else:
+        res = os.path.join(repository_dir(), 'cmake-build-release')
     if not os.path.exists(res):
         os.mkdir(res)
     assert os.path.exists(res)
@@ -70,10 +77,9 @@ def build_dir() -> str:
 
 
 def binary_dir() -> str:
-    if sys.platform.startswith('win32'):
+    res = os.path.join(build_dir(), 'src', 'atlas')
+    if not use_ninja() and sys.platform.startswith('win32'):
         res = os.path.join(build_dir(), 'src', 'atlas', 'Release')
-    else:
-        res = os.path.join(build_dir(), 'src', 'atlas')
     assert os.path.exists(res)
     return res
 
