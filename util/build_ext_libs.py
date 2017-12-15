@@ -1153,6 +1153,8 @@ def build_libs(libs: dict, update_src: bool):
             unpack_file_to_folder(os.path.join(src_package_dir, 'ninja-linux.zip'), common_dirs.software_dir())
             os.chmod(os.path.join(common_dirs.software_dir(), 'ninja'), stat.S_IXUSR)
         else:
+            if os.path.exists(os.path.join(common_dirs.software_dir(), 'ninja')):
+                os.remove(os.path.join(common_dirs.software_dir(), 'ninja'))
             unpack_file_to_folder(os.path.join(src_package_dir, 'ninja-mac.zip'), common_dirs.software_dir())
             os.chmod(os.path.join(common_dirs.software_dir(), 'ninja'), stat.S_IXUSR)
 
