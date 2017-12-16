@@ -148,7 +148,8 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
         source = '. "{}" {}'.format(script, para)
         dump = '"{}" -c "import os, json; print(json.dumps(dict(os.environ)))"'.format(python)
         process = subprocess.Popen(['/bin/bash', '-c', '{} && {}'.format(source, dump)],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, universal_newlines=True, env=start_env)
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, universal_newlines=True,
+                                   env=start_env)
     stdout, stderr = process.communicate()
     exitcode = process.wait()
     if exitcode != 0:
@@ -252,6 +253,25 @@ def build_and_install_cmakecmd(cmakecmd, build_dir: str, env=None):
                                cwd=build_dir, shell=False, check=True, env=env)
 
 
+def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: bool=True) -> str:
+    assert len(from_texts) == len(to_texts)
+    bak_file = get_bak_file_name(orig_file)
+    os.rename(orig_file, bak_file)
+    with open(bak_file, mode='r', encoding='utf-8') as f:
+        from_lines = f.readlines()
+    with open(orig_file, mode='w', encoding='utf-8') as f:
+        to_lines = []
+        for line in from_lines:
+            for from_text, to_text in zip(from_texts, to_texts):
+                line = line.replace(from_text, to_text)
+            f.write(line)
+            to_lines.append(line)
+    print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+    if not keep_bak_file:
+        os.remove(bak_file)
+    return bak_file
+
+
 def build_gflags(src_dir: str, install_dir: str, ext_dir: str):
     del ext_dir
     build_dir = create_build_dir(src_dir)
@@ -276,20 +296,10 @@ def build_glog(src_dir: str, install_dir: str, ext_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
         if is_windows():
-            orig_file = os.path.join(src_dir, 'src', 'logging_unittest.cc')
-            bak_file = get_bak_file_name(orig_file)
-            os.rename(orig_file, bak_file)
-            with open(bak_file, mode='r', encoding='utf-8') as f:
-                from_lines = f.readlines()
-            with open(orig_file, mode='w', encoding='utf-8') as f:
-                to_lines = []
-                for line in from_lines:
-                    line = line.replace(r'google::ERROR',
-                                        r'GLOG_ERROR')
-                    f.write(line)
-                    to_lines.append(line)
-            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
-            os.remove(bak_file)
+            patch_file(os.path.join(src_dir, 'src', 'logging_unittest.cc'),
+                       from_texts=[r'google::ERROR'],
+                       to_texts=[r'GLOG_ERROR'],
+                       keep_bak_file=False)
 
             cmakecmd.extend(['-Dgflags_DIR:PATH={}/gflags/CMake'.format(ext_dir)])
         else:
@@ -342,31 +352,25 @@ def build_glbinding(src_dir: str, install_dir: str, ext_dir: str):
 
 
 def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str, nasm_dir: str):
+    del ext_dir
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
-    orig_file = os.path.join(src_dir, 'CMakeLists.txt')
-    bak_file = get_bak_file_name(orig_file)
+    orig_file = None
+    bak_file = None
     try:
         if is_windows():
             if not common_dirs.use_ninja():
-                os.rename(orig_file, bak_file)
-                with open(bak_file, mode='r', encoding='utf-8') as f:
-                    from_lines = f.readlines()
-                with open(orig_file, mode='w', encoding='utf-8') as f:
-                    to_lines = []
-                    for line in from_lines:
-                        line = line.replace(r'${CMAKE_CURRENT_BINARY_DIR}/tjbench-static.exe',
-                                            r'${CMAKE_CURRENT_BINARY_DIR}/Release/tjbench-static.exe')
-                        line = line.replace(r'${CMAKE_CURRENT_BINARY_DIR}/cjpeg-static.exe',
-                                            r'${CMAKE_CURRENT_BINARY_DIR}/Release/cjpeg-static.exe')
-                        line = line.replace(r'${CMAKE_CURRENT_BINARY_DIR}/djpeg-static.exe',
-                                            r'${CMAKE_CURRENT_BINARY_DIR}/Release/djpeg-static.exe')
-                        line = line.replace(r'${CMAKE_CURRENT_BINARY_DIR}/jpegtran-static.exe',
-                                            r'${CMAKE_CURRENT_BINARY_DIR}/Release/jpegtran-static.exe')
-                        f.write(line)
-                        to_lines.append(line)
-                print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+                orig_file = os.path.join(src_dir, 'CMakeLists.txt')
+                bak_file = patch_file(orig_file,
+                                      from_texts=[r'${CMAKE_CURRENT_BINARY_DIR}/tjbench-static.exe',
+                                                  r'${CMAKE_CURRENT_BINARY_DIR}/cjpeg-static.exe',
+                                                  r'${CMAKE_CURRENT_BINARY_DIR}/djpeg-static.exe',
+                                                  r'${CMAKE_CURRENT_BINARY_DIR}/jpegtran-static.exe'],
+                                      to_texts=[r'${CMAKE_CURRENT_BINARY_DIR}/Release/tjbench-static.exe',
+                                                r'${CMAKE_CURRENT_BINARY_DIR}/Release/cjpeg-static.exe',
+                                                r'${CMAKE_CURRENT_BINARY_DIR}/Release/djpeg-static.exe',
+                                                r'${CMAKE_CURRENT_BINARY_DIR}/Release/jpegtran-static.exe'])
 
             cmakecmd = get_cmake_cmd_common_part(install_dir)
             cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
@@ -416,22 +420,13 @@ def build_zlib(src_dir: str, install_dir: str, ext_dir: str):
 
 def build_folly(src_dir: str, install_dir: str):
     del src_dir
-    orig_file = os.path.join(install_dir, 'folly', 'ScopeGuard.h')
-    bak_file = get_bak_file_name(orig_file)
     try:
-        os.rename(orig_file, bak_file)
-        with open(bak_file, mode='r', encoding='utf-8') as f:
-            from_lines = f.readlines()
-        with open(orig_file, mode='w', encoding='utf-8') as f:
-            to_lines = []
-            for line in from_lines:
-                line = line.replace(r'#include <folly/Portability.h>',
-                                    r'#include <folly/CPortability.h>')
-                line = line.replace(r'static void warnAboutToCrash() noexcept;',
-                                    r'inline static void warnAboutToCrash() noexcept {}')
-                f.write(line)
-                to_lines.append(line)
-        print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+        orig_file = os.path.join(install_dir, 'folly', 'ScopeGuard.h')
+        patch_file(orig_file,
+                   from_texts=[r'#include <folly/Portability.h>',
+                               r'static void warnAboutToCrash() noexcept;'],
+                   to_texts=[r'#include <folly/CPortability.h>',
+                             r'inline static void warnAboutToCrash() noexcept {}'])
     finally:
         print('')
 
@@ -440,24 +435,17 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
-    orig_file = os.path.join(src_dir, 'pngread.c')
-    bak_file = get_bak_file_name(orig_file)
-    orig_file1 = os.path.join(src_dir, 'pngpriv.h')
-    bak_file1 = get_bak_file_name(orig_file1)
-    orig_file2 = os.path.join(src_dir, 'pngrutil.c')
-    bak_file2 = get_bak_file_name(orig_file2)
+    orig_file = None
+    bak_file = None
+    orig_file1 = None
+    bak_file1 = None
+    orig_file2 = None
+    bak_file2 = None
     try:
-        os.rename(orig_file, bak_file)
-        with open(bak_file, mode='r', encoding='utf-8') as f:
-            from_lines = f.readlines()
-        with open(orig_file, mode='w', encoding='utf-8') as f:
-            to_lines = []
-            for line in from_lines:
-                line = line.replace(r'                || (png_ptr->mode & PNG_HAVE_CHUNK_AFTER_IDAT) != 0)',
-                                    r'                && 0)')
-                f.write(line)
-                to_lines.append(line)
-        print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+        orig_file = os.path.join(src_dir, 'pngread.c')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'                || (png_ptr->mode & PNG_HAVE_CHUNK_AFTER_IDAT) != 0)'],
+                              to_texts=[r'                && 0)'])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
@@ -468,30 +456,16 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
                              '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '\\zlib\\lib\\zlibstatic.lib'])
         else:
             if is_mac() and os.path.exists('/usr/include'):
-                os.rename(orig_file1, bak_file1)
-                with open(bak_file1, mode='r', encoding='utf-8') as f:
-                    from_lines = f.readlines()
-                with open(orig_file1, mode='w', encoding='utf-8') as f:
-                    to_lines = []
-                    for line in from_lines:
-                        line = line.replace(r'#if PNG_ZLIB_VERNUM != 0 && PNG_ZLIB_VERNUM != ZLIB_VERNUM',
-                                            r'#if 0')
-                        f.write(line)
-                        to_lines.append(line)
-                print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file1, tofile='<new>'))))
+                orig_file1 = os.path.join(src_dir, 'pngpriv.h')
+                bak_file1 = patch_file(orig_file1,
+                                       from_texts=[r'#if PNG_ZLIB_VERNUM != 0 && PNG_ZLIB_VERNUM != ZLIB_VERNUM'],
+                                       to_texts=[r'#if 0'])
 
             if is_mac():
-                os.rename(orig_file2, bak_file2)
-                with open(bak_file2, mode='r', encoding='utf-8') as f:
-                    from_lines = f.readlines()
-                with open(orig_file2, mode='w', encoding='utf-8') as f:
-                    to_lines = []
-                    for line in from_lines:
-                        line = line.replace(r'#if ZLIB_VERNUM >= 0x1290',
-                                            r'#if 0')
-                        f.write(line)
-                        to_lines.append(line)
-                print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file2, tofile='<new>'))))
+                orig_file2 = os.path.join(src_dir, 'pngrutil.c')
+                bak_file2 = patch_file(orig_file2,
+                                       from_texts=[r'#if ZLIB_VERNUM >= 0x1290'],
+                                       to_texts=[r'#if 0'])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -507,15 +481,15 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
 def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
     shutil.rmtree(install_dir, ignore_errors=True)
 
-    orig_file = os.path.join(src_dir, 'Makefile')
-    bak_file = get_bak_file_name(orig_file)
+    orig_file = None
+    bak_file = None
     try:
         if is_windows():
             env = get_vcvars_environment()
             subprocess.run(['devenv', 'JXR_vc14.sln', '/Upgrade'],
                            cwd=os.path.join(src_dir, 'jxrencoderdecoder'), shell=True, check=True, env=env)
             subprocess.run(['MSBuild', 'JXR_vc14.sln', '/target:JXRDecApp', '/property:Platform=x64',
-                            '/property:WindowsTargetPlatformVersion=' + env['UCRTVERSION'],  #like 10.0.16299.0
+                            '/property:WindowsTargetPlatformVersion=' + env['UCRTVERSION'],  # like 10.0.16299.0
                             '/property:ForceImportBeforeCppTargets=' + ext_dir + '\\runtime_md.props',
                             '/property:Configuration=Release', '/maxcpucount'],
                            cwd=os.path.join(src_dir, 'jxrencoderdecoder'), shell=True, check=True, env=env)
@@ -541,26 +515,18 @@ def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
             glob_copy(os.path.join(src_dir, 'image', 'vc14projects', 'Release', 'JXREncodeLib', 'x64', '*.lib'),
                       os.path.join(install_dir, 'lib'))
         else:
-            os.rename(orig_file, bak_file)
-            with open(bak_file, mode='r', encoding='utf-8') as f:
-                from_lines = f.readlines()
-            with open(orig_file, mode='w', encoding='utf-8') as f:
-                to_lines = []
-                for line in from_lines:
-                    if is_linux():
-                        line = line.replace(r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
-                                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O',
-                                            r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
-                                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3')
-                    else:
-                        line = line.replace(r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
-                                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O',
-                                            r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
-                                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 '
-                                            r'-mmacosx-version-min={0}'.format(macos_min_version()))
-                    f.write(line)
-                    to_lines.append(line)
-            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+            orig_file = os.path.join(src_dir, 'Makefile')
+            from_texts = [r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
+                          r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O']
+            if is_linux():
+                to_texts = [r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
+                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3']
+            else:
+                to_texts = [r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
+                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 '
+                            r'-mmacosx-version-min={0}'.format(macos_min_version())]
+
+            bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
 
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install', 'DIR_INSTALL=' + install_dir],
                            cwd=src_dir, shell=False, check=True)
@@ -575,13 +541,8 @@ def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
 def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
     shutil.rmtree(install_dir, ignore_errors=True)
 
-    if is_linux():
-        orig_file = os.path.join(src_dir, 'makeengine.gte')
-        bak_file = get_bak_file_name(orig_file)
-    else:
-        orig_file = os.path.join(src_dir, 'Source', 'Mathematics', 'GteGenerateMeshUV.cpp')
-        bak_file = get_bak_file_name(orig_file)
-
+    orig_file = None
+    bak_file = None
     try:
         if is_windows():
             env = get_vcvars_environment()
@@ -596,35 +557,21 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
             glob_copy(os.path.join(src_dir, '_Output', 'v141', 'x64', 'Release', 'GTEngine.v15.pdb'),
                       os.path.join(install_dir, 'lib'))
         elif is_linux():
-            os.rename(orig_file, bak_file)
-            with open(bak_file, mode='r', encoding='utf-8') as f:
-                from_lines = f.readlines()
-            with open(orig_file, mode='w', encoding='utf-8') as f:
-                to_lines = []
-                for line in from_lines:
-                    line = line.replace(r'$(SRC_APPLICATIONS_GLX)/*.cpp',
-                                        r'$(SRC_APPLICATIONS_GLX)/*.nonono')
-                    line = line.replace(r'$(SRC_APPLICATIONS_GLX)/%.cpp',
-                                        r'$(SRC_APPLICATIONS_GLX)/%.nonono')
-                    f.write(line)
-                    to_lines.append(line)
-            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+            orig_file = os.path.join(src_dir, 'makeengine.gte')
+            bak_file = patch_file(orig_file,
+                                  from_texts=[r'$(SRC_APPLICATIONS_GLX)/*.cpp',
+                                              r'$(SRC_APPLICATIONS_GLX)/%.cpp'],
+                                  to_texts=[r'$(SRC_APPLICATIONS_GLX)/*.nonono',
+                                            r'$(SRC_APPLICATIONS_GLX)/%.nonono'])
 
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'CFG=Release', '-f', 'makeengine.gte'],
                            cwd=src_dir, shell=False, check=True)
             shutil.copytree(os.path.join(src_dir, 'lib', 'Release'), os.path.join(install_dir, 'lib'))
         else:
-            os.rename(orig_file, bak_file)
-            with open(bak_file, mode='r', encoding='utf-8') as f:
-                from_lines = f.readlines()
-            with open(orig_file, mode='w', encoding='utf-8') as f:
-                to_lines = []
-                for line in from_lines:
-                    line = line.replace(r'#include <Mathematics/GteGenerateMeshUV.h>',
-                                        '#include <Mathematics/GteGenerateMeshUV.h>\n#include <string>')
-                    f.write(line)
-                    to_lines.append(line)
-            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+            orig_file = os.path.join(src_dir, 'Source', 'Mathematics', 'GteGenerateMeshUV.cpp')
+            bak_file = patch_file(orig_file,
+                                  from_texts=[r'#include <Mathematics/GteGenerateMeshUV.h>'],
+                                  to_texts=['#include <Mathematics/GteGenerateMeshUV.h>\n#include <string>'])
 
             shutil.copy2(os.path.join(ext_dir, 'makeengine.macos.gte'), src_dir)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'CFG=Release', '-f', 'makeengine.macos.gte'],
@@ -674,20 +621,13 @@ def build_assimp(src_dir: str, install_dir: str, ext_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
-    orig_file = os.path.join(src_dir, 'include', 'assimp', 'defs.h')
-    bak_file = get_bak_file_name(orig_file)
+    orig_file = None
+    bak_file = None
     try:
-        os.rename(orig_file, bak_file)
-        with open(bak_file, mode='r', encoding='utf-8') as f:
-            from_lines = f.readlines()
-        with open(orig_file, mode='w', encoding='utf-8') as f:
-            to_lines = []
-            for line in from_lines:
-                line = line.replace(r'#define AI_MAX_ALLOC(type) ((256U * 1024 * 1024) / sizeof(type))',
-                                    r'#define AI_MAX_ALLOC(type) ((size_t(256) * 1024 * 1024 * 1024) / sizeof(type))')
-                f.write(line)
-                to_lines.append(line)
-        print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+        orig_file = os.path.join(src_dir, 'include', 'assimp', 'defs.h')
+        from_texts = [r'#define AI_MAX_ALLOC(type) ((256U * 1024 * 1024) / sizeof(type))']
+        to_texts = [r'#define AI_MAX_ALLOC(type) ((size_t(256) * 1024 * 1024 * 1024) / sizeof(type))']
+        bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
@@ -730,44 +670,17 @@ def build_hdf5(src_dir: str, install_dir: str, ext_dir: str):
 def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
     shutil.rmtree(install_dir, ignore_errors=True)
 
-    orig_file = os.path.join(src_dir, 'Source', 'LibRawLite', 'internal', 'dcraw_common.cpp')
-    bak_file = get_bak_file_name(orig_file)
-    orig_file_2 = os.path.join(src_dir, 'Source', 'LibRawLite', 'internal', 'libraw_x3f.cpp')
-    bak_file_2 = get_bak_file_name(orig_file_2)
-    orig_file_3 = os.path.join(src_dir, 'Makefile.gnu')
-    bak_file_3 = get_bak_file_name(orig_file_3)
-    orig_file_4 = os.path.join(src_dir, 'Makefile.fip')
-    bak_file_4 = get_bak_file_name(orig_file_4)
+    orig_file = None
+    bak_file = None
+    orig_file_3 = None
+    bak_file_3 = None
+    orig_file_4 = None
+    bak_file_4 = None
     try:
-        os.rename(orig_file, bak_file)
-        with open(bak_file, mode='r', encoding='utf-8') as f:
-            from_lines = f.readlines()
-        with open(orig_file, mode='w', encoding='utf-8') as f:
-            to_lines = []
-            for line in from_lines:
-                line = line.replace(r',0,0x80,', r',0,static_cast<signed char>(0x80),')
-                line = line.replace(r',1,0x80,', r',1,static_cast<signed char>(0x80),')
-                line = line.replace(r',0,0x88,', r',0,static_cast<signed char>(0x88),')
-                line = line.replace(r',1,0x88,', r',1,static_cast<signed char>(0x88),')
-                line = line.replace(r'DCRAW_VERSION', r' DCRAW_VERSION')
-                line = line.replace(r'size_t strnlen',
-                                    r'size_t nononononostrnlen')
-                f.write(line)
-                to_lines.append(line)
-        print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
-
-        os.rename(orig_file_2, bak_file_2)
-        with open(bak_file_2, mode='r', encoding='utf-8') as f:
-            from_lines = f.readlines()
-        with open(orig_file_2, mode='w', encoding='utf-8') as f:
-            to_lines = []
-            for line in from_lines:
-                line = line.replace(r'offset,offset,offset',
-                                    r'static_cast<int16_t>(offset),static_cast<int16_t>(offset),'
-                                    r'static_cast<int16_t>(offset)')
-                f.write(line)
-                to_lines.append(line)
-        print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
+        orig_file = os.path.join(src_dir, 'Source', 'LibRawLite', 'internal', 'dcraw_common.cpp')
+        from_texts = [r'DCRAW_VERSION']
+        to_texts = [r' DCRAW_VERSION']
+        bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
 
         if is_windows():
             env = get_vcvars_environment()
@@ -783,38 +696,17 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
             distutils.dir_util.copy_tree(os.path.join(src_dir, 'Wrapper', 'FreeImagePlus', 'dist', 'x64'),
                                          install_dir)
         elif is_linux():
-            os.rename(orig_file_3, bak_file_3)
-            with open(bak_file_3, mode='r', encoding='utf-8') as f:
-                from_lines = f.readlines()
-            with open(orig_file_3, mode='w', encoding='utf-8') as f:
-                to_lines = []
-                for line in from_lines:
-                    line = line.replace(r'INCDIR ?= $(DESTDIR)/usr/include',
-                                        r'INCDIR ?= $(DESTDIR)$(PREFIX)/include')
-                    line = line.replace(r'INSTALLDIR ?= $(DESTDIR)/usr/lib',
-                                        r'INSTALLDIR ?= $(DESTDIR)$(PREFIX)/lib')
-                    line = line.replace(r' -o root -g root ',
-                                        r' ')
-                    f.write(line)
-                    to_lines.append(line)
-            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_3, tofile='<new>'))))
+            orig_file_3 = os.path.join(src_dir, 'Makefile.gnu')
+            from_texts = [r'INCDIR ?= $(DESTDIR)/usr/include',
+                          r'INSTALLDIR ?= $(DESTDIR)/usr/lib',
+                          r' -o root -g root ']
+            to_texts = [r'INCDIR ?= $(DESTDIR)$(PREFIX)/include',
+                        r'INSTALLDIR ?= $(DESTDIR)$(PREFIX)/lib',
+                        r' ']
+            bak_file_3 = patch_file(orig_file_3, from_texts=from_texts, to_texts=to_texts)
 
-            os.rename(orig_file_4, bak_file_4)
-            with open(bak_file_4, mode='r', encoding='utf-8') as f:
-                from_lines = f.readlines()
-            with open(orig_file_4, mode='w', encoding='utf-8') as f:
-                to_lines = []
-                for line in from_lines:
-                    line = line.replace(r'INCDIR ?= $(DESTDIR)/usr/include',
-                                        r'INCDIR ?= $(DESTDIR)$(PREFIX)/include')
-                    line = line.replace(r'INSTALLDIR ?= $(DESTDIR)/usr/lib',
-                                        r'INSTALLDIR ?= $(DESTDIR)$(PREFIX)/lib')
-                    line = line.replace(r' -o root -g root ',
-                                        r' ')
-                    f.write(line)
-                    to_lines.append(line)
-            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_4, tofile='<new>'))))
-
+            orig_file_4 = os.path.join(src_dir, 'Makefile.fip')
+            bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
 
             subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count())],
                            cwd=src_dir, shell=False, check=True)
@@ -849,7 +741,6 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
                            cwd=src_dir, shell=False, check=True)
     finally:
         os.replace(bak_file, orig_file)
-        os.replace(bak_file_2, orig_file_2)
         if is_mac():
             os.remove(os.path.join(src_dir, 'Makefile_gnu'))
             os.remove(os.path.join(src_dir, 'Makefile_fip'))
@@ -859,6 +750,7 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
 
 
 def build_botan(src_dir: str, install_dir: str, ext_dir: str):
+    del ext_dir
     shutil.rmtree(install_dir, ignore_errors=True)
 
     try:
@@ -928,8 +820,8 @@ def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
-    orig_file = os.path.join(src_dir, 'Utilities', 'KWSys', 'vtksys', 'SystemTools.cxx')
-    bak_file = get_bak_file_name(orig_file)
+    orig_file = None
+    bak_file = None
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
@@ -944,17 +836,8 @@ def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
                              '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '\\zlib\\lib\\zlibstatic.lib'])
         else:
             if is_mac():
-                os.rename(orig_file, bak_file)
-                with open(bak_file, mode='r', encoding='utf-8') as f:
-                    from_lines = f.readlines()
-                with open(orig_file, mode='w', encoding='utf-8') as f:
-                    to_lines = []
-                    for line in from_lines:
-                        line = line.replace(r'#elif KWSYS_CXX_HAS_UTIMENSAT',
-                                            r'#elif 0')
-                        f.write(line)
-                        to_lines.append(line)
-                print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+                orig_file = os.path.join(src_dir, 'Utilities', 'KWSys', 'vtksys', 'SystemTools.cxx')
+                bak_file = patch_file(orig_file, from_texts=[r'#elif KWSYS_CXX_HAS_UTIMENSAT'], to_texts=[r'#elif 0'])
 
                 cmakecmd.extend(['-DVTK_USE_SYSTEM_LIBXML2:BOOL=ON'])
             else:
@@ -972,10 +855,8 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
-    orig_file = os.path.join(src_dir, 'cmake', 'OpenCVCompilerOptions.cmake')
-    bak_file = get_bak_file_name(orig_file)
-    orig_file_3 = os.path.join(src_dir, 'modules', 'core', 'include', 'opencv2', 'core', 'private.hpp')
-    bak_file_3 = get_bak_file_name(orig_file_3)
+    orig_file_3 = None
+    bak_file_3 = None
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_opencv_videoio:BOOL=OFF',
@@ -1045,33 +926,14 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                              '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '/modules'])
 
             if is_linux():
-                os.rename(orig_file_3, bak_file_3)
-                with open(bak_file_3, mode='r', encoding='utf-8') as f:
-                    from_lines = f.readlines()
-                with open(orig_file_3, mode='w', encoding='utf-8') as f:
-                    to_lines = []
-                    for line in from_lines:
-                        line = line.replace(r'#define CV_INSTRUMENT_FUN_IPP(FUN, ...) ((FUN)(__VA_ARGS__))',
-                                            r'#define CV_INSTRUMENT_FUN_IPP(FUN, ...) (FUN(__VA_ARGS__))')
-                        f.write(line)
-                        to_lines.append(line)
-                print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_3, tofile='<new>'))))
+                orig_file_3 = os.path.join(src_dir, 'modules', 'core', 'include', 'opencv2', 'core', 'private.hpp')
+                bak_file_3 = patch_file(orig_file_3,
+                                        from_texts=[r'#define CV_INSTRUMENT_FUN_IPP(FUN, ...) ((FUN)(__VA_ARGS__))'],
+                                        to_texts=[r'#define CV_INSTRUMENT_FUN_IPP(FUN, ...) (FUN(__VA_ARGS__))'])
 
                 env = get_enviroment_from_shell_script(os.path.join(common_dirs.intel_sw_dir(), 'tbb', 'bin',
                                                                     'tbbvars.sh'), 'intel64')
             else:
-                os.rename(orig_file, bak_file)
-                with open(bak_file, mode='r', encoding='utf-8') as f:
-                    from_lines = f.readlines()
-                with open(orig_file, mode='w', encoding='utf-8') as f:
-                    to_lines = []
-                    for line in from_lines:
-                        line = line.replace(r'stdc++',
-                                            r'')
-                        f.write(line)
-                        to_lines.append(line)
-                print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
-
                 env = get_enviroment_from_shell_script(os.path.join(common_dirs.intel_sw_dir(), 'tbb', 'bin',
                                                                     'tbbvars.sh'))
 
@@ -1083,26 +945,11 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
             orig_file_2 = os.path.join(install_dir, 'x64', 'vc15', 'staticlib', 'OpenCVModules.cmake')
         else:
             orig_file_2 = os.path.join(install_dir, 'share', 'OpenCV', 'OpenCVModules.cmake')
-        bak_file_2 = get_bak_file_name(orig_file_2)
-        os.rename(orig_file_2, bak_file_2)
-        with open(bak_file_2, mode='r', encoding='utf-8') as f:
-            from_lines = f.readlines()
-        with open(orig_file_2, mode='w', encoding='utf-8') as f:
-            to_lines = []
-            for line in from_lines:
-                line = line.replace(
-                    r';\$<LINK_ONLY:tbb>',
-                    r'')
-                line = line.replace(
-                    r'\$<LINK_ONLY:tbb>;',
-                    r'')
-                f.write(line)
-                to_lines.append(line)
-        print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file_2, tofile='<new>'))))
+        patch_file(orig_file_2,
+                   from_texts=[r';\$<LINK_ONLY:tbb>', r'\$<LINK_ONLY:tbb>;'],
+                   to_texts=[r'', r''])
     finally:
-        if is_mac():
-            os.replace(bak_file, orig_file)
-        elif is_linux():
+        if is_linux():
             os.replace(bak_file_3, orig_file_3)
         shutil.rmtree(build_dir, ignore_errors=False)
 

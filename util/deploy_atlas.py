@@ -103,7 +103,8 @@ def deploy_atlas():
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'windeployqt'), app_name],
                            cwd=os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), shell=False, check=True, env=env)
             subprocess.run([os.path.join(common_dirs.deploy_target_dir(), 'Atlas', 'Atlas'),
-                            '--run_unit_tests'], shell=True, check=False) # todo: fix returned non-zero exit status 3221226356.
+                            '--run_unit_tests'], shell=True,
+                           check=False)  # todo: fix returned non-zero exit status 3221226356.
 
             shutil.make_archive(os.path.join(common_dirs.deploy_target_dir(), zip_base_name),
                                 'zip',

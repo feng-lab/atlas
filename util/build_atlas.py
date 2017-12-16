@@ -1,6 +1,5 @@
 import os
 import sys
-import shutil
 import subprocess
 
 import common_dirs

@@ -1,5 +1,4 @@
 import os
-import sys
 import subprocess
 import tempfile
 import shutil
@@ -24,17 +23,17 @@ def debug(s):
 
 
 def merge_dicts(x, y):
-    '''Given two dicts, merge them into a new dict as a shallow copy.'''
+    """Given two dicts, merge them into a new dict as a shallow copy."""
     z = x.copy()
     z.update(y)
     return z
 
 
 def which(program):
-    '''Determine if argument is an executable and return the full path. Return None if none of either.'''
+    """Determine if argument is an executable and return the full path. Return None if none of either."""
 
-    def is_exe(fpath):
-        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+    def is_exe(ffpath):
+        return os.path.isfile(ffpath) and os.access(ffpath, os.X_OK)
 
     fpath, fname = os.path.split(program)
     if fpath:
@@ -59,13 +58,13 @@ def resolve_dependencies(executable, blacklist):
 
 
 def objdump(executable, blacklist):
-    '''Get all library dependencies (recursive) of 'executable' using objdump'''
+    """Get all library dependencies (recursive) of 'executable' using objdump"""
     libs = {}
     return objdumpr(executable, libs, blacklist)
 
 
 def objdumpr(executable, libs, blacklist):
-    '''Get all library dependencies (recursive) of 'executable' using objdump'''
+    """Get all library dependencies (recursive) of 'executable' using objdump"""
     output = subprocess.check_output(["objdump", "-x", executable]).decode('utf-8')
     output = output.split('\n')
 
@@ -92,12 +91,12 @@ def objdumpr(executable, libs, blacklist):
             continue
 
         if so not in libs:
-            details = {'so': so, 'path': path, 'realpath': realpath, 'dependants': set([executable]), 'type': 'lib'}
+            details = {'so': so, 'path': path, 'realpath': realpath, 'dependants': {executable}, 'type': 'lib'}
             libs[so] = details
 
             debug("Resolved %s to %s" % (so, realpath))
 
-            libs = merge_dicts(libs, lddr(realpath, libs))
+            libs = merge_dicts(libs, lddr(realpath, libs, blacklist))
         else:
             libs[so]['dependants'].add(executable)
 
@@ -105,13 +104,13 @@ def objdumpr(executable, libs, blacklist):
 
 
 def ldd(executable, blacklist):
-    '''Get all library dependencies (recursive) of 'executable' '''
+    """Get all library dependencies (recursive) of 'executable' """
     libs = {}
     return lddr(executable, libs, blacklist)
 
 
 def lddr(executable, libs, blacklist):
-    '''Get all library dependencies (recursive) of 'executable' '''
+    """Get all library dependencies (recursive) of 'executable' """
     output = subprocess.check_output(["ldd", "-r", executable]).decode('utf-8')
     output = output.split('\n')
 
@@ -124,7 +123,7 @@ def lddr(executable, libs, blacklist):
             continue
 
         if split[0] in blacklist or os.path.basename(split[0]) in blacklist:
-            #debug("'%s' is blacklisted. Skipping..." % (split[0]))
+            # debug("'%s' is blacklisted. Skipping..." % (split[0]))
             continue
 
         if split[0] == 'statically' and split[1] == 'linked':
@@ -132,8 +131,8 @@ def lddr(executable, libs, blacklist):
             continue
 
         if len(split) < 3:
-            warn("Could not determine path of %s %s for ldd output line '%s'. Skipping..." % (
-            os.path.basename(executable), split, line))
+            warn("Could not determine path of %s %s for ldd output line '%s'. Skipping..."
+                 % (os.path.basename(executable), split, line))
             continue
 
         so = split[0]
@@ -145,7 +144,7 @@ def lddr(executable, libs, blacklist):
             continue
 
         if so not in libs:
-            details = {'so': so, 'path': path, 'realpath': realpath, 'dependants': set([executable]), 'type': 'lib'}
+            details = {'so': so, 'path': path, 'realpath': realpath, 'dependants': {executable}, 'type': 'lib'}
             libs[so] = details
 
             debug("Resolved %s to %s" % (so, realpath))
@@ -290,7 +289,7 @@ def create_desktop_file(path):
     text_file.close()
 
 
-def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins):
+def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins, qt_qml_dir):
     from distutils.dir_util import copy_tree
 
     if not os.path.exists(dest_dir):
@@ -316,7 +315,6 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins):
     shutil.copyfile(executable, dest_file)  # overrides dest
     shutil.copytree(os.path.join(os.path.dirname(executable), 'Resources'), os.path.join(dest_dir, 'Resources'))
     shutil.copy2(os.path.join(os.path.dirname(executable), 'Atlas.png'), dest_dir)
-
 
     # Strip executable
     strip(dest_file)
@@ -346,7 +344,7 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins):
             strip(dst)
         else:
             src = details['realpath']
-            debug("Unhandled type '%s' (%s)" % (details['type'],))
+            debug("Unhandled type '%s' (%s)" % (details['type'], src))
 
     if False:
         for qt_plugin in qt_plugins:
@@ -389,7 +387,8 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str):
         '/lib64/ld-linux-x86-64.so.2'
     ]
 
-    update_blacklist_cmd = 'wget --quiet https://raw.githubusercontent.com/probonopd/AppImages/master/excludelist -O - | sort | uniq | grep -v "^#.*" | grep "[^-\s]"'
+    update_blacklist_cmd = r'wget --quiet https://raw.githubusercontent.com/probonopd/AppImages/master/excludelist' \
+                           r' -O - | sort | uniq | grep -v "^#.*" | grep "[^-\s]"'
     blacklist += os.popen(update_blacklist_cmd).read().split('\n')
     print(blacklist)
     # exit(0)
@@ -439,5 +438,4 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str):
                     dependencies[qt_plugin_dep] = qt_plugin_deps[qt_plugin_dep]
 
     info("Building AppDir in '%s'" % deploy_dir)
-    build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, used_plugins)
-
+    build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, used_plugins, qt_qml_dir)
