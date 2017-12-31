@@ -1048,11 +1048,9 @@ def build_libs(libs: dict, update_src: bool):
         os.rename(src_dir, os.path.join(ext_dir, 'boost'))
 
     if libs['eigen']:
-        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'eigen*'))
-        src_dir = get_package_top_level_folder(package_name, ext_dir)
-        shutil.rmtree(os.path.join(ext_dir, 'eigen'), ignore_errors=True)
-        unpack_file_to_folder(package_name, ext_dir)
-        os.rename(src_dir, os.path.join(ext_dir, 'eigen'))
+        src_dir = os.path.join(base_dir, 'eigen')
+        update_or_clone_git_repository(src_dir, 'git@github.com:eigenteam/eigen-git-mirror.git')
+        export_git_repository(src_dir, os.path.join(ext_dir, 'eigen'))
 
     if libs['glm']:
         src_dir = os.path.join(base_dir, 'glm')
