@@ -12,6 +12,7 @@
 #include "zcpuinfo.h"
 #include <tbb/concurrent_unordered_map.h>
 #include <tbb/parallel_for.h>
+#include <tbb/task_scheduler_init.h>
 #include <qtcsv/reader.h>
 #include <fftw3.h>
 #include <QtWidgets>
@@ -2111,9 +2112,16 @@ void ZStitchImageDialog::stitchStacks()
 
       // for every pair of img
       tbb::concurrent_unordered_map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>> offsets;
-      bool concurrent = true;
+      ZImgInfo oneImgInfo = ZImg::readImgInfo(inputStackSources[0]);
+      bool concurrent = ZCpuInfo::instance().nPhysicalRAM >= oneImgInfo.byteNumber() * 6;
       if (concurrent) {
         fftw_plan_with_nthreads(1);
+
+        int nthread =
+          std::min<int>(tbb::task_scheduler_init::default_num_threads(),
+                        std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
+        LOG(INFO) << "using " << nthread << " threads to stitch.";
+        tbb::task_scheduler_init init(nthread);
 
         std::vector<std::tuple<size_t, size_t, ZImgNCCMatch::PositionHint>> allPairs;
         for (const auto& con : conn) {
@@ -2129,6 +2137,7 @@ void ZStitchImageDialog::stitchStacks()
                 continue;
               }
               ZImg fixedImg(inputStackSources[f]);
+              //LOG(INFO) << "load " << inputStackSources[f].filenames[0];
               if (m_dsCheckBox->isChecked()) {
                 //m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStackSources[f].toQString()));
                 fixedImg.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
@@ -2136,6 +2145,7 @@ void ZStitchImageDialog::stitchStacks()
               }
 
               ZImg movingImg(inputStackSources[m]);
+              //LOG(INFO) << "load " << inputStackSources[m].filenames[0];
               if (m_dsCheckBox->isChecked()) {
                 //m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStackSources[m].toQString()));
                 movingImg.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),

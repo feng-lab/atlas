@@ -263,6 +263,13 @@ std::vector<ZImgInfo> ZImg::readImgInfo(const QStringList& fileList, Dimension c
   return res;
 }
 
+ZImgInfo ZImg::readImgInfo(const ZImgSource& imgSource)
+{
+  ZImgInfo res;
+  ZImgIO().readInfo(imgSource, res);
+  return res;
+}
+
 void ZImg::wrapData(void* data, const ZImgInfo& info)
 {
   clear();

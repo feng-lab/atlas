@@ -184,6 +184,8 @@ public:
                                            std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks = nullptr,
                                            FileFormat format = FileFormat::Unknown, bool expandXY = false);
 
+  static ZImgInfo readImgInfo(const ZImgSource& imgSource);
+
   // wrap exist raw data as ZImg, ZImg will **not** free the memory after using
   // only accept non-const data pointer (link error if input is const)
   // previous data of current img will be cleared
