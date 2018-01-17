@@ -231,7 +231,7 @@ void ZImgPng::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
     throw ZIOException("Libpng read error");
   }
 
-  folly::ScopeGuard guard1 = folly::makeGuard([&png]() {
+  auto guard1 = folly::makeGuard([&png]() {
     png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
   });
   boost::ignore_unused(guard1);
@@ -281,7 +281,7 @@ void ZImgPng::readMetadata(const QString& filename, ZImgMetadata& meta, size_t s
     throw ZIOException("Libpng read error");
   }
 
-  folly::ScopeGuard guard1 = folly::makeGuard([&png]() {
+  auto guard1 = folly::makeGuard([&png]() {
     png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
   });
   boost::ignore_unused(guard1);
@@ -327,7 +327,7 @@ void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& regi
     throw ZIOException("Libpng read error");
   }
 
-  folly::ScopeGuard guard1 = folly::makeGuard([&png]() {
+  auto guard1 = folly::makeGuard([&png]() {
     png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
   });
   boost::ignore_unused(guard1);

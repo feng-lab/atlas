@@ -130,7 +130,7 @@ int main(int argc, char* argv[])
     removeOldLogs(logDir);
 
     nim::initLogging(argv[0], logDir.filePath("atlas"));
-    folly::ScopeGuard guardlogging = folly::makeGuard([]() {
+    auto guardlogging = folly::makeGuard([]() {
       LOG(INFO) << "--- App Log End ---";
       nim::shutdownLogging();
     });
@@ -144,7 +144,7 @@ int main(int argc, char* argv[])
     nim::ZCpuInfo::instance().logCpuInfo();
 
     fftw_init_threads();
-    folly::ScopeGuard guardfftw = folly::makeGuard([]() {
+    auto guardfftw = folly::makeGuard([]() {
       fftw_cleanup_threads();
     });
     boost::ignore_unused(guardfftw);

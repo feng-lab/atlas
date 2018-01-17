@@ -356,7 +356,7 @@ void ZImgJpeg::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo]() {
+  auto guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
@@ -382,7 +382,7 @@ void ZImgJpeg::readMetadata(const QString& filename, ZImgMetadata& meta, size_t 
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo]() {
+  auto guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
@@ -426,7 +426,7 @@ ZImgJpeg::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, con
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo]() {
+  auto guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
@@ -459,7 +459,7 @@ ZImgJpeg::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, con
               struct jpeg_decompress_struct thumbCinfo;
               my_error_mgr thumbJerr;
               createcinfo(thumbCinfo, thumbJerr);
-              folly::ScopeGuard guard2 = folly::makeGuard([&thumbCinfo]() {
+              auto guard2 = folly::makeGuard([&thumbCinfo]() {
                 /* Step 8: Release JPEG decompression object */
 
                 /* This is an important step since it will release a good deal of memory. */
@@ -506,7 +506,7 @@ void ZImgJpeg::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo]() {
+  auto guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
@@ -541,7 +541,7 @@ void ZImgJpeg::readInfo(uint8_t* mem, size_t size, ZImgInfo& info)
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo]() {
+  auto guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
@@ -559,7 +559,7 @@ void ZImgJpeg::readImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  folly::ScopeGuard guard1 = folly::makeGuard([&cinfo]() {
+  auto guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */

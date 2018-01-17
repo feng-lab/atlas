@@ -12,7 +12,7 @@ void ZImgProcess::run()
   LogSinkPtr fileDestination = createFileLogSink(m_logFile);
   if (fileDestination)
     addLogSink(fileDestination);
-  folly::ScopeGuard guard1 = folly::makeGuard([&fileDestination]() {
+  auto guard1 = folly::makeGuard([&fileDestination]() {
     if (fileDestination) { removeLogSink(fileDestination); }
   });
   boost::ignore_unused(guard1);
