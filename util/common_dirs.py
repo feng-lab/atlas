@@ -2,6 +2,7 @@ import os
 import sys
 import xml.etree.ElementTree as eTree
 import difflib
+from pkg_resources import parse_version
 
 
 def use_ninja() -> bool:
@@ -99,28 +100,41 @@ def qt_install_dir() -> str:
     return res
 
 
+def qt_compiler_name() -> str:
+    if sys.platform.startswith('win32'):
+        return 'msvc2017_64'
+    elif sys.platform.startswith('darwin'):
+        return 'clang_64'
+    else:
+        return 'gcc_64'
+
+
+def qmake_bin_name() -> str:
+    if sys.platform.startswith('win32'):
+        return 'qmake.exe'
+    else:
+        return 'qmake'
+
+
 def qt_ver() -> str:
-    component_file = os.path.join(qt_install_dir(), 'components.xml')
-    assert os.path.exists(component_file)
-    tree = eTree.parse(component_file)
-    root = tree.getroot()
-    ver = None
-    for child in root:
-        if child.tag == 'ApplicationName' and child.text.startswith('Qt '):
-            ver = child.text[3:]
-    assert ver is not None
+    vers = [fd for fd in os.listdir(qt_install_dir()) if
+            os.path.exists(os.path.join(qt_install_dir(), fd, qt_compiler_name(), 'bin', qmake_bin_name()))]
+    assert vers
+    vers = sorted(vers, key=parse_version)
+    ver = vers[-1]
     return ver
 
 
 def qt_base_dir() -> str:
-    if sys.platform.startswith('win32'):
-        res = os.path.join(qt_install_dir(), qt_ver(), 'msvc2017_64')
-    elif sys.platform.startswith('darwin'):
-        res = os.path.join(qt_install_dir(), qt_ver(), 'clang_64')
-    else:
-        res = os.path.join(qt_install_dir(), qt_ver(), 'gcc_64')
-    assert os.path.exists(res)
-    return res
+    return os.path.join(qt_install_dir(), qt_ver(), qt_compiler_name())
+
+
+def qt_bin_dir() -> str:
+    return os.path.join(qt_base_dir(), 'bin')
+
+
+def qmake_bin() -> str:
+    return os.path.join(qt_bin_dir(), qmake_bin_name())
 
 
 def vs_install_dir() -> str:
@@ -244,12 +258,6 @@ def software_dir() -> str:
     res = os.path.join(os.path.expanduser('~'), 'software')
     if not os.path.exists(res):
         os.mkdir(res)
-    assert os.path.exists(res)
-    return res
-
-
-def qt_bin_dir() -> str:
-    res = os.path.join(qt_base_dir(), 'bin')
     assert os.path.exists(res)
     return res
 
