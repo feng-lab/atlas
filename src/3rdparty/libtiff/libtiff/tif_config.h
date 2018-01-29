@@ -2,6 +2,9 @@
 
 #define TIF_PLATFORM_CONSOLE
 
+/* libtiff/tif_config.h.cmake.in.  Not generated, but originated from autoheader.  */
+/* This file must be kept up-to-date with needed substitutions from libtiff/tif_config.h.in. */
+
 /* Support CCITT Group 3 & 4 algorithms */
 #define CCITT_SUPPORT 1
 
@@ -142,7 +145,7 @@
 /* #undef JPEG_DUAL_MODE_8_12 */
 
 /* 12bit libjpeg primary include file with path */
-#define LIBJPEG_12_PATH 
+#define LIBJPEG_12_PATH
 
 /* Support LZMA2 compression */
 /* #undef LZMA_SUPPORT */
@@ -157,7 +160,7 @@
 #define PACKAGE_NAME "LibTIFF Software"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "LibTIFF Software 4.0.6"
+#define PACKAGE_STRING "LibTIFF Software "
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "tiff"
@@ -166,7 +169,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "4.0.6"
+#define PACKAGE_VERSION ""
 
 /* The size of `signed int', as computed by sizeof. */
 #define SIZEOF_SIGNED_INT 4
@@ -179,6 +182,9 @@
 
 /* The size of `signed short', as computed by sizeof. */
 #define SIZEOF_SIGNED_SHORT 2
+
+/* The size of `size_t', as computed by sizeof. */
+#define SIZEOF_SIZE_T 8
 
 /* The size of `unsigned char *', as computed by sizeof. */
 #define SIZEOF_UNSIGNED_CHAR_P 8
@@ -229,10 +235,10 @@
 #define TM_IN_SYS_TIME 1
 
 /* define to use win32 IO system */
-//#define USE_WIN32_FILEIO 1
+#define USE_WIN32_FILEIO 1
 
 /* Version number of package */
-#define VERSION "4.0.6"
+#define VERSION ""
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
@@ -247,7 +253,7 @@
 #endif
 
 /* Number of bits in a file offset, on hosts where this is settable. */
-#define _FILE_OFFSET_BITS 
+#define _FILE_OFFSET_BITS
 
 /* Define to `__inline__' or `__inline' if that's what the C compiler
    calls it, or to nothing if 'inline' is not supported under any name.  */
@@ -265,8 +271,8 @@
 
 #else
 
-/* libtiff/tif_config.h.  Generated from tif_config.h.in by configure.  */
-/* libtiff/tif_config.h.in.  Generated from configure.ac by autoheader.  */
+/* libtiff/tif_config.h.cmake.in.  Not generated, but originated from autoheader.  */
+/* This file must be kept up-to-date with needed substitutions from libtiff/tif_config.h.in. */
 
 /* Support CCITT Group 3 & 4 algorithms */
 #define CCITT_SUPPORT 1
@@ -408,13 +414,13 @@
 /* #undef JPEG_DUAL_MODE_8_12 */
 
 /* 12bit libjpeg primary include file with path */
-#define LIBJPEG_12_PATH 
+#define LIBJPEG_12_PATH
 
 /* Support LZMA2 compression */
 /* #undef LZMA_SUPPORT */
 
 /* Name of package */
-#define PACKAGE "tiff"
+#define PACKAGE "LibTIFF Software"
 
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT "tiff@lists.maptools.org"
@@ -423,7 +429,7 @@
 #define PACKAGE_NAME "LibTIFF Software"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "LibTIFF Software 4.0.6"
+#define PACKAGE_STRING "LibTIFF Software "
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "tiff"
@@ -432,7 +438,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "4.0.6"
+#define PACKAGE_VERSION ""
 
 /* The size of `signed int', as computed by sizeof. */
 #define SIZEOF_SIGNED_INT 4
@@ -463,10 +469,6 @@
 
 /* The size of `unsigned short', as computed by sizeof. */
 #define SIZEOF_UNSIGNED_SHORT 2
-
-/* Support strip chopping (whether or not to convert single-strip uncompressed
-   images to mutiple strips of specified size to reduce memory usage) */
-#define STRIPCHOP_DEFAULT TIFF_STRIPCHOP
 
 /* Default size of the strip in bytes (when strip chopping enabled) */
 #define STRIP_SIZE_DEFAULT 8192
@@ -505,7 +507,7 @@
 /* #undef USE_WIN32_FILEIO */
 
 /* Version number of package */
-#define VERSION "4.0.6"
+#define VERSION ""
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */

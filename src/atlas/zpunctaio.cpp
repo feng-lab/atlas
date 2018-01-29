@@ -20,7 +20,7 @@ ZPunctaIO& ZPunctaIO::instance()
 
 ZPunctaIO::ZPunctaIO()
 {
-  m_readExts << "nimp" << "apo" << "marker" << "txt";
+  m_readExts << "nimp" << "apo" << "marker" << "txt" << "xyz";
   m_readFilter = QString("All Puncta files (*.") + m_readExts.join(" *.") + QString(")");
 
   m_writeExts << "nimp" << "apo" << "txt";
@@ -66,7 +66,8 @@ void ZPunctaIO::load(const QString& filename, ZPuncta& puncta) const
       readV3DApoFile(filename, puncta);
     } else if (filename.endsWith(".marker", Qt::CaseInsensitive)) {
       readV3DMarkerFile(filename, puncta);
-    } else if (filename.endsWith(".txt", Qt::CaseInsensitive)) {
+    } else if (filename.endsWith(".txt", Qt::CaseInsensitive) ||
+               filename.endsWith(".xyz", Qt::CaseInsensitive)) {
       readMatFile(filename, puncta);
     } else {
       throw ZIOException("Not supported puncta format");

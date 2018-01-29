@@ -1,4 +1,3 @@
-/* libtiff/tiffconf.h.  Generated from tiffconf.h.in by configure.  */
 /*
   Configuration defines for installed libtiff.
   This file maintained for backward compatibility. Do not use definitions
@@ -35,7 +34,7 @@
 #define TIFF_UINT8_T unsigned char
 
 /* Unsigned size type */
-#define TIFF_SIZE_T unsigned long
+#define TIFF_SIZE_T unsigned long long
 
 /* Signed size type */
 #define TIFF_SSIZE_T signed long long
@@ -85,7 +84,7 @@
 
 /* Support Old JPEG compresson (read contrib/ojpeg/README first! Compilation
    fails with unpatched IJG JPEG library) */
-#define OJPEG_SUPPORT 1
+/* #undef OJPEG_SUPPORT */
 
 /* Support Macintosh PackBits algorithm */
 #define PACKBITS_SUPPORT 1
@@ -101,7 +100,7 @@
 
 /* Support strip chopping (whether or not to convert single-strip uncompressed
    images to mutiple strips of ~8Kb to reduce memory usage) */
-#define STRIPCHOP_DEFAULT 1
+/* #undef STRIPCHOP_DEFAULT */
 
 /* Enable SubIFD tag (330) support */
 #define SUBIFD_SUPPORT 1
@@ -157,6 +156,9 @@
 /* Unsigned 8-bit type */
 #define TIFF_UINT8_T unsigned char
 
+/* Unsigned size type */
+#define TIFF_SIZE_T unsigned long
+
 /* Signed size type */
 #define TIFF_SSIZE_T signed long
 
@@ -205,7 +207,7 @@
 
 /* Support Old JPEG compresson (read contrib/ojpeg/README first! Compilation
    fails with unpatched IJG JPEG library) */
-#define OJPEG_SUPPORT 1
+/* #undef OJPEG_SUPPORT */
 
 /* Support Macintosh PackBits algorithm */
 #define PACKBITS_SUPPORT 1
@@ -221,7 +223,7 @@
 
 /* Support strip chopping (whether or not to convert single-strip uncompressed
    images to mutiple strips of ~8Kb to reduce memory usage) */
-#define STRIPCHOP_DEFAULT TIFF_STRIPCHOP
+/* #undef STRIPCHOP_DEFAULT */
 
 /* Enable SubIFD tag (330) support */
 #define SUBIFD_SUPPORT 1
