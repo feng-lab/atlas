@@ -134,7 +134,7 @@ set(TIFF_SOURCES
     ${TIFFDIR}/tif_stream.cxx
     )
 if (WIN32)
-  set(TIFF_SOURCES ${TIFF_SOURCES} ${TIFFDIR}/tif_win32.c)
+  set(TIFF_SOURCES ${TIFF_SOURCES} ${TIFFDIR}/tif_unix.c)
 else (WIN32)
   set(TIFF_SOURCES ${TIFF_SOURCES} ${TIFFDIR}/tif_unix.c)
 endif (WIN32)

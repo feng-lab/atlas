@@ -439,11 +439,7 @@ extern TIFF* TIFFOpen(const char*, const char*);
 # ifdef __WIN32__
 extern TIFF* TIFFOpenW(const wchar_t*, const char*);
 # endif /* __WIN32__ */
-#ifdef __WIN32__
-extern TIFF* TIFFFdOpen(thandle_t, const char*, const char*);
-#else
 extern TIFF* TIFFFdOpen(int, const char*, const char*);
-#endif
 extern TIFF* TIFFClientOpen(const char*, const char*,
 	    thandle_t,
 	    TIFFReadWriteProc, TIFFReadWriteProc,
