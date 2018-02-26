@@ -91,7 +91,7 @@ def deploy_target_dir() -> str:
 
 def qt_install_dir() -> str:
     if sys.platform.startswith('win32'):
-        res = os.path.join('C:', os.sep, 'Qt', 'Qt')
+        res = os.path.join('C:', os.sep, 'Qt')
     elif sys.platform.startswith('darwin'):
         res = os.path.join(os.path.expanduser('~'), 'Qt')
     else:
