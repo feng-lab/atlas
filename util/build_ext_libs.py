@@ -34,10 +34,12 @@ def get_package_top_level_folder(file: str, folder: str):
     res = ''
     if file.lower().endswith('.zip'):
         with zipfile.ZipFile(file, mode='r') as zf:
-            res = os.path.join(folder, os.path.commonpath(zf.namelist()))
+            # print(zf.namelist())
+            res = os.path.join(folder, os.path.commonpath([nm for nm in zf.namelist() if not nm.endswith('/')]))
     elif file.lower().endswith('.tar.gz') or file.lower().endswith('.tar.bz2') or file.lower().endswith('.tar.xz') \
             or file.lower().endswith('.tgz'):
         with tarfile.open(file, mode='r|*') as tf:
+            # print(tf.getnames())
             res = os.path.join(folder, os.path.commonpath(tf.getnames()))
     elif file.lower().endswith('.7z'):
         cp = subprocess.run(['7za', 'l', '-slt', file], stdout=subprocess.PIPE, encoding='utf-8')
