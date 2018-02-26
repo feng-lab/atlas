@@ -1122,7 +1122,7 @@ def build_libs(libs: dict, update_src: bool):
     if libs['jxrlib']:
         src_dir = os.path.join(base_dir, 'jxrlib')
         if update_src:
-            update_or_clone_git_repository(src_dir, 'https://git01.codeplex.com/jxrlib')
+            update_or_clone_git_repository(src_dir, 'git@github.com:4creators/jxrlib.git')
         assert os.path.exists(src_dir)
         build_jxrlib(src_dir, os.path.join(ext_dir, 'jxrlib'), ext_dir)
 
