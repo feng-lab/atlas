@@ -16,6 +16,16 @@ include(${ITK_USE_FILE})
 message(STATUS "ITK_INCLUDE_DIRS: ${ITK_INCLUDE_DIRS}")
 message(STATUS "ITK_LIBRARIES: ${ITK_LIBRARIES}")
 
+set(CPUINFO_INCLUDE_DIRS ${CPUINFO_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/cpuinfo/include)
+if (WIN32)
+  set(CPUINFO_LIBRARIES ${CPUINFO_LIBRARIES}
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/cpuinfo/lib/cpuinfo.lib)
+else (WIN32)
+  set(CPUINFO_LIBRARIES ${CPUINFO_LIBRARIES}
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/cpuinfo/lib/libcpuinfo.a)
+endif (WIN32)
+
 #find_package(libjpeg REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libjpeg-turbo NO_DEFAULT_PATH)
 set(JPEGTURBO_INCLUDE_DIRS ${JPEGTURBO_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libjpeg-turbo/include)
@@ -246,6 +256,7 @@ target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${TBB_INCLUDE_DIR})
 target_include_directories(${LIBRARY_NAME} PUBLIC ${HDF5_INCLUDE_DIR})
 target_compile_definitions(${LIBRARY_NAME} PUBLIC EIGEN_NO_DEBUG EIGEN_DONT_PARALLELIZE EIGEN_MPL2_ONLY)
 target_compile_definitions(${LIBRARY_NAME} PUBLIC QT_USE_QSTRINGBUILDER QT_NO_CAST_FROM_BYTEARRAY QT_NO_CAST_TO_ASCII)
+target_compile_definitions(${LIBRARY_NAME} PUBLIC FOLLY_NO_CONFIG)
 if (WIN32)
   target_compile_definitions(${LIBRARY_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
 
@@ -279,6 +290,7 @@ if (WIN32)
   set_source_files_properties(${TIFFDIR}/tif_jpeg.c PROPERTIES COMPILE_FLAGS /I${JPEGTURBO_INCLUDE_DIRS})
   set_source_files_properties(zimgjpeg.cpp PROPERTIES COMPILE_FLAGS /I${JPEGTURBO_INCLUDE_DIRS})
   set_source_files_properties(zimgpng.cpp PROPERTIES COMPILE_FLAGS /I${PNG_INCLUDE_DIRS})
+  set_source_files_properties(zcpuinfo.cpp PROPERTIES COMPILE_FLAGS /I${CPUINFO_INCLUDE_DIRS})
   foreach (item IN LISTS JPEGXR_INCLUDE_DIRS)
     message(STATUS "JPEGXR_INCLUDE_DIRS: ${item}")
     set(JXRINC "${JXRINC} /I${item}")
@@ -316,6 +328,7 @@ else (WIN32)
                               PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -I${JPEGTURBO_INCLUDE_DIRS}")
   set_source_files_properties(zimgjpeg.cpp PROPERTIES COMPILE_FLAGS -I${JPEGTURBO_INCLUDE_DIRS})
   set_source_files_properties(zimgpng.cpp PROPERTIES COMPILE_FLAGS -I${PNG_INCLUDE_DIRS})
+  set_source_files_properties(zcpuinfo.cpp PROPERTIES COMPILE_FLAGS -I${CPUINFO_INCLUDE_DIRS})
   foreach (item IN LISTS JPEGXR_INCLUDE_DIRS)
     message(STATUS "JPEGXR_INCLUDE_DIRS: ${item}")
     set(JXRINC "${JXRINC} -I${item}")
@@ -326,7 +339,8 @@ else (WIN32)
 endif (WIN32)
 
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${TBB_LIBRARY} ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
-                      png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} hdf5::hdf5_cpp-static hdf5::hdf5-static
+                      png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} ${CPUINFO_LIBRARIES}
+                      hdf5::hdf5_cpp-static hdf5::hdf5-static
                       glog::glog Qt5::Core)
 
 

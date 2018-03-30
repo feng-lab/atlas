@@ -3,10 +3,11 @@
 #include "z3dgl.h"
 #include "zlog.h"
 #include "z3dgpuinfo.h"
+#include "z3dcontext.h"
 #include "zmainwindow.h"
 #include "z3dmainwindow.h"
-#include <glbinding/Binding.h>
-#include <glbinding/Meta.h>
+#include <glbinding/glbinding.h>
+#include <glbinding-aux/Meta.h>
 #include <QStandardPaths>
 #include <QStorageInfo>
 #include <QSettings>
@@ -262,7 +263,9 @@ bool ZSystemInfo::initializeGL()
     return false;
   }
 
-  glbinding::Binding::initialize();
+  glbinding::initialize([this](const char* name) {
+    return Z3DContext().getProcAddress(name);
+  });
   Z3DGpuInfo::instance().logGpuInfo();
 #if defined(ATLAS_CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS)
   glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After |
@@ -276,17 +279,17 @@ bool ZSystemInfo::initializeGL()
 
       os << call.function->name() << "(";
       for (size_t i = 0; i < call.parameters.size(); ++i) {
-        os << call.parameters[i]->asString();
+        os << call.parameters[i].get();
         if (i + 1 < call.parameters.size())
           os << ", ";
       }
       os << ")";
 
       if (call.returnValue) {
-        os << " -> " << call.returnValue->asString();
+        os << " -> " << call.returnValue.get();
       }
 
-      LOG(ERROR) << "OpenGL error: " << glbinding::Meta::getString(error) << " with " << os.str();
+      LOG(ERROR) << "OpenGL error: " << glbinding::aux::Meta::getString(error) << " with " << os.str();
     }
   });
 #elif 0
@@ -323,7 +326,7 @@ bool ZSystemInfo::initializeGL()
   glbinding::setUnresolvedCallback([](const glbinding::AbstractFunction& call) {
     LOG(ERROR) << "OpenGL function " << call.name() << " can not be resolved.";
   });
-  glbinding::Binding::addContextSwitchCallback([](glbinding::ContextHandle handle) {
+  glbinding::addContextSwitchCallback([](glbinding::ContextHandle handle) {
     LOG(INFO) << "Switching to OpenGL context " << handle;
   });
   if (Z3DGpuInfo::instance().isSupported()) {

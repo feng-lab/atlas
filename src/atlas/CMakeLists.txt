@@ -187,13 +187,12 @@ source_group(sys FILES ${SYS_SOURCES})
 if (WIN32)
   set(ASSETS
       ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.rc)
-endif ()
-if (APPLE)
+elseif (APPLE)
   set(ASSETS
       ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ffmpeg)
   set(MACOSX_BUNDLE_ICON_FILE app.icns)
-endif ()
+endif (WIN32)
 
 set(FORMS
     LogDialog.ui
@@ -716,7 +715,9 @@ if (WIN32)
   target_compile_options(${APP_NAME} PUBLIC /permissive-)
 
   #target_link_libraries(${APP_NAME} PUBLIC /LTCG) # Link-time Code Generation
-  set_target_properties(${APP_NAME} PROPERTIES LINK_FLAGS "/LTCG /DEBUG:NONE /FORCE:MULTIPLE") # to create an output file whether or not LINK finds more than one definition for a symbol.
+  set_target_properties(${APP_NAME} PROPERTIES
+                        LINK_FLAGS "/LTCG /DEBUG:NONE /FORCE:MULTIPLE" # to create an output file whether or not LINK finds more than one definition for a symbol.
+                        )
 
   # for some files
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
@@ -744,7 +745,7 @@ else (WIN32)
     target_compile_options(${APP_NAME} PUBLIC -Wshadow)
     #target_link_libraries(${APP_NAME} PUBLIC -stdlib=libc++)
     #set_target_properties(${APP_NAME} PROPERTIES LINK_FLAGS "-stdlib=libc++ -Wl,-no_weak_imports")
-    set_target_properties(${APP_NAME} PROPERTIES LINK_FLAGS "-stdlib=libc++")
+    set_target_properties(${APP_NAME} PROPERTIES LINK_FLAGS "-stdlib=libc++ -framework OpenGL")
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     #target_link_libraries(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition)
     set_target_properties(${APP_NAME} PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition)
@@ -770,9 +771,8 @@ else (WIN32)
                           MACOSX_BUNDLE_BUNDLE_VERSION "${ATLAS_VERSION}"
                           MACOSX_BUNDLE_COPYRIGHT "${copyright_line}"
                           MACOSX_BUNDLE_GUI_IDENTIFIER "org.atlas.Atlas"
+                          RESOURCE "${ASSETS}"
                           )
-    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ffmpeg PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
   else ()
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
@@ -788,7 +788,8 @@ else (WIN32)
   endif ()
 endif (WIN32)
 
-target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding hdf5::hdf5_cpp-static hdf5::hdf5-static
+target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding-aux glbinding::glbinding
+                      hdf5::hdf5_cpp-static hdf5::hdf5-static
                       img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${GEOMETRICTOOLS_LIBRARIES}
                       ${ASSIMP_LIBRARIES} ${IPP_LIBRARIES})
 if (BUILD_TESTING)

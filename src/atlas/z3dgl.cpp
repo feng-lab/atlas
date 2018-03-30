@@ -1,15 +1,15 @@
 #include "z3dgl.h"
 
 #include "zlog.h"
-#include <glbinding/ContextInfo.h>
+#include <glbinding-aux/ContextInfo.h>
 #include <glbinding/Version.h>
-#include <glbinding/Meta.h>
+#include <glbinding-aux/Meta.h>
 
 namespace nim {
 
 bool GLVersionGE(int majorVersion, int minorVersion)
 {
-  return glbinding::ContextInfo::version() >= glbinding::Version(majorVersion, minorVersion);
+  return glbinding::aux::ContextInfo::version() >= glbinding::Version(majorVersion, minorVersion);
 }
 
 void _CheckGLError(const char* file, int line)
@@ -17,7 +17,7 @@ void _CheckGLError(const char* file, int line)
   GLenum err = glGetError();
 
   if (err != GL_NO_ERROR) {
-    LERRORF(file, line) << "OpenGL error: " << glbinding::Meta::getString(err);
+    LERRORF(file, line) << "OpenGL error: " << glbinding::aux::Meta::getString(err);
   }
 }
 

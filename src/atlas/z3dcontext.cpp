@@ -31,6 +31,16 @@ void Z3DContext::logCurrentContext()
   LOG(INFO) << QOpenGLContext::currentContext();
 }
 
+ProcAddress Z3DContext::getProcAddress(const char* name) const
+{
+  if (!name) {
+    return nullptr;
+  }
+
+  const auto qtSymbol = QByteArray::fromStdString(name);
+  return m_context->getProcAddress(qtSymbol);
+}
+
 
 
 Z3DContextGroup::Z3DContextGroup()

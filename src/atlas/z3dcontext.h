@@ -5,6 +5,8 @@ class QOpenGLContextGroup;
 
 namespace nim {
 
+using ProcAddress = void(*)();
+
 class Z3DContext
 {
 public:
@@ -21,6 +23,8 @@ public:
   bool operator!=(const Z3DContext& rhs) const;
 
   static void logCurrentContext();
+
+  ProcAddress getProcAddress(const char* name) const;
 
 private:
   QOpenGLContext* m_context;

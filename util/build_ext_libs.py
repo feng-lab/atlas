@@ -274,6 +274,25 @@ def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: 
     return bak_file
 
 
+def build_cpuinfo(src_dir: str, install_dir: str, ext_dir: str):
+    del ext_dir
+    build_dir = create_build_dir(src_dir)
+    shutil.rmtree(install_dir, ignore_errors=True)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DBUILD_GMOCK:BOOL=OFF',
+                         '-DCPUINFO_BUILD_MOCK_TESTS:BOOL=OFF',
+                         '-DCPUINFO_BUILD_BENCHMARKS:BOOL=OFF',
+                         '-DCPUINFO_BUILD_UNIT_TESTS:BOOL=OFF',
+                         '-DCPUINFO_BUILD_TOOLS:BOOL=ON'])
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
 def build_gflags(src_dir: str, install_dir: str, ext_dir: str):
     del ext_dir
     build_dir = create_build_dir(src_dir)
@@ -1039,8 +1058,15 @@ def build_libs(libs: dict, update_src: bool):
                        os.path.join(ext_dir, 'ffmpeg'))
             shutil.rmtree(package_unpack_folder, ignore_errors=False)
         else:
-            unpack_file_to_folder(find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*7z')),
-                                  ext_dir)
+            # unpack_file_to_folder(find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*7z')),
+            #                       ext_dir)
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*macos*'))
+            package_unpack_folder = get_package_top_level_folder(package_name, ext_dir)
+            unpack_file_to_folder(package_name, ext_dir)
+            os.replace(os.path.join(package_unpack_folder, 'bin', 'ffmpeg'),
+                       os.path.join(ext_dir, 'ffmpeg'))
+            shutil.rmtree(package_unpack_folder, ignore_errors=False)
+            os.chmod(os.path.join(ext_dir, 'ffmpeg'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
 
     if libs['boost']:
         package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'boost*'))
@@ -1070,6 +1096,13 @@ def build_libs(libs: dict, update_src: bool):
         update_or_clone_git_repository(src_dir, 'git@github.com:facebook/folly.git')
         export_git_repository(src_dir, os.path.join(ext_dir, 'folly'))
         build_folly(src_dir, os.path.join(ext_dir, 'folly'))
+
+    if libs['cpuinfo']:
+        src_dir = os.path.join(base_dir, 'cpuinfo')
+        if update_src:
+            update_or_clone_git_repository(src_dir, 'git@github.com:Maratyszcza/cpuinfo.git')
+        assert os.path.exists(src_dir)
+        build_cpuinfo(src_dir, os.path.join(ext_dir, 'cpuinfo'), ext_dir)
 
     if libs['glog']:
         src_dir = os.path.join(base_dir, 'glog')
@@ -1223,6 +1256,7 @@ def parse_inputs(argv: list):
             'glm': False,
             'googletest': False,
             'folly': False,
+            'cpuinfo': False,
             'glog': False,
             'benchmark': False,
             'glbinding': False,
@@ -1280,6 +1314,10 @@ def parse_inputs(argv: list):
         if libs[lib.lower()]:
             for dlib in rev_dep:
                 libs[dlib.lower()] = True
+
+    # not used now
+    libs['botan'] = False
+    libs['ospray'] = False
 
     return libs, update_src
 
