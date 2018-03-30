@@ -130,6 +130,7 @@ def make_cmake_ceres_solver_project(ceres_folder: str, out_folder: str):
         if os.path.isfile(os.path.join(out_folder, 'internal', 'ceres', item)):
             if (item.endswith(".cc") or item.endswith(".h")) and (not item.endswith("_test.cc")) and \
                     (not item.endswith("_test.h")) and (not item.endswith("test_util.cc")) and \
+                    (not item.endswith('_benchmark.cc')) and \
                     (not item.endswith("test_util.h")) and (not item.endswith("test_utils.cc")) and \
                     (not item.endswith("test_utils.h")) and (not item.endswith("collections_port.cc")) and \
                     (not item.startswith("gmock") and (item != "c_api.cc")) and (not item.startswith(".")):

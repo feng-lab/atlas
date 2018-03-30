@@ -758,7 +758,7 @@ else (WIN32)
   set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS "-isystem ${ASSIMP_INCLUDE_DIRS}")
 
   if (APPLE)
-    set(copyright_line "Copyright 2011-2017 Linqing Feng")
+    set(copyright_line "Copyright 2011-2018 Linqing Feng")
     set_target_properties(${APP_NAME} PROPERTIES
                           BUILD_RPATH "@executable_path/../Frameworks"
                           INSTALL_RPATH "@executable_path/../Frameworks"
