@@ -403,7 +403,8 @@ def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str, nasm_dir: str):
             if is_linux():
                 subprocess.run(['sh', src_dir + '/configure',
                                 'NASM=nasm',
-                                '--enable-static', '--disable-shared'],
+                                '--enable-static', '--disable-shared',
+                                'CFLAGS=-fPIC'],
                                cwd=build_dir, shell=False, check=True)
             else:
                 subprocess.run(['sh', src_dir + '/configure', '--host', 'x86_64-apple-darwin',
