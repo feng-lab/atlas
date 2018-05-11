@@ -412,7 +412,7 @@ if (Matlab_FOUND)
       )
       add_custom_command(TARGET ${mexname}
                          POST_BUILD
-                         COMMAND patchelf --set-rpath $ORIGIN $<TARGET_FILE:${mexname}>
+                         COMMAND patchelf --set-rpath $$ORIGIN $<TARGET_FILE:${mexname}>
                          )
     endfunction(add_mex_target)
 
