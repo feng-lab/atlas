@@ -410,21 +410,10 @@ if (Matlab_FOUND)
         SRC ${CMAKE_CURRENT_SOURCE_DIR}/matlab/${mexname}.cpp
         LINK_TO ${LIBRARY_NAME}
       )
-#      add_custom_command(TARGET ${mexname}
-#                         POST_BUILD
-#                         COMMAND install_name_tool -change
-#                         @rpath/QtCore.framework/Versions/5/QtCore
-#                         @loader_path/QtCore
-#                         $<TARGET_FILE:${mexname}>
-#                         COMMAND install_name_tool -change
-#                         /Users/feng/code/atlas/src/3rdparty/freeimage/lib/libfreeimageplus.dylib
-#                         @loader_path/libfreeimageplus.dylib
-#                         $<TARGET_FILE:${mexname}>
-#                         COMMAND install_name_tool -change
-#                         @rpath/libtbb.dylib
-#                         @loader_path/libtbb.dylib
-#                         $<TARGET_FILE:${mexname}>
-#                         )
+      add_custom_command(TARGET ${mexname}
+                         POST_BUILD
+                         COMMAND patchelf --set-rpath '$ORIGIN' $<TARGET_FILE:${mexname}>
+                         )
     endfunction(add_mex_target)
 
     add_mex_target(correct_czi_shading_mex)
@@ -433,21 +422,21 @@ if (Matlab_FOUND)
     add_mex_target(stack_czi_tiles_mex)
     add_mex_target(stack_czi_tiles_with_mask_mex)
 
-#    add_custom_command(TARGET correct_czi_shading_mex
-#                       POST_BUILD
-#                       COMMAND ${CMAKE_COMMAND} -E copy ${TBB_LIBRARY}
-#                       $<TARGET_FILE_DIR:correct_czi_shading_mex>
-#                       COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
-#                       $<TARGET_FILE_DIR:correct_czi_shading_mex>
-#                       COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:Qt5::Core>
-#                       $<TARGET_FILE_DIR:correct_czi_shading_mex>
+    add_custom_command(TARGET correct_czi_shading_mex
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy ${TBB_LIBRARY}
+                       $<TARGET_FILE_DIR:correct_czi_shading_mex>
+                       COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
+                       $<TARGET_FILE_DIR:correct_czi_shading_mex>
+                       COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:Qt5::Core>
+                       $<TARGET_FILE_DIR:correct_czi_shading_mex>
 #                       COMMAND install_name_tool -id QtCore
 #                       $<TARGET_FILE_DIR:correct_czi_shading_mex>/QtCore
 #                       COMMAND install_name_tool -id libfreeimageplus.dylib
 #                       $<TARGET_FILE_DIR:correct_czi_shading_mex>/libfreeimageplus.dylib
 #                       COMMAND install_name_tool -id libtbb.dylib
 #                       $<TARGET_FILE_DIR:correct_czi_shading_mex>/libtbb.dylib
-#                       )
+                       )
   endif()
 endif (Matlab_FOUND)
 
