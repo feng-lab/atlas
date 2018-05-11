@@ -413,10 +413,6 @@ if (Matlab_FOUND)
       add_custom_command(TARGET ${mexname}
                          POST_BUILD
                          COMMAND patchelf --set-rpath '$$ORIGIN' $<TARGET_FILE:${mexname}>
-                         COMMAND patchelf --replace-needed libfreeimageplus.so.3 libfreeimageplus.so
-                         $<TARGET_FILE:${mexname}>
-                         COMMAND patchelf --replace-needed libQt5Core.so.5 $<TARGET_FILE_NAME:Qt5::Core>
-                         $<TARGET_FILE:${mexname}>
                          )
     endfunction(add_mex_target)
 
@@ -431,9 +427,9 @@ if (Matlab_FOUND)
                        COMMAND ${CMAKE_COMMAND} -E copy ${TBB_LIBRARY}
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>
                        COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
-                       $<TARGET_FILE_DIR:correct_czi_shading_mex>
+                       $<TARGET_FILE_DIR:correct_czi_shading_mex>/libfreeimageplus.so.3
                        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:Qt5::Core>
-                       $<TARGET_FILE_DIR:correct_czi_shading_mex>
+                       $<TARGET_FILE_DIR:correct_czi_shading_mex>/libQt5Core.so.5
 #                       COMMAND install_name_tool -id QtCore
 #                       $<TARGET_FILE_DIR:correct_czi_shading_mex>/QtCore
 #                       COMMAND install_name_tool -id libfreeimageplus.dylib
