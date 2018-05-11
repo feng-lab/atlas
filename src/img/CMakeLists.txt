@@ -430,12 +430,12 @@ if (Matlab_FOUND)
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>/libfreeimageplus.so.3
                        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:Qt5::Core>
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>/libQt5Core.so.5
-#                       COMMAND install_name_tool -id QtCore
-#                       $<TARGET_FILE_DIR:correct_czi_shading_mex>/QtCore
-#                       COMMAND install_name_tool -id libfreeimageplus.dylib
-#                       $<TARGET_FILE_DIR:correct_czi_shading_mex>/libfreeimageplus.dylib
-#                       COMMAND install_name_tool -id libtbb.dylib
-#                       $<TARGET_FILE_DIR:correct_czi_shading_mex>/libtbb.dylib
+                       COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE_DIR:Qt5::Core>/libicui18n.so.56
+                       $<TARGET_FILE_DIR:correct_czi_shading_mex>
+                       COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE_DIR:Qt5::Core>/libicuuc.so.56
+                       $<TARGET_FILE_DIR:correct_czi_shading_mex>
+                       COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE_DIR:Qt5::Core>/libicudata.so.56
+                       $<TARGET_FILE_DIR:correct_czi_shading_mex>
                        )
   endif()
 endif (Matlab_FOUND)
