@@ -345,6 +345,7 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC ${TBB_LIBRARY} ${ITK_LIBRARIES} ${J
 
 
 # mex file
+set(MATLAB_ADDITIONAL_VERSIONS R2018a=9.4)
 find_package(Matlab COMPONENTS MX_LIBRARY MEX_COMPILER)
 if (Matlab_FOUND)
   message(STATUS "Matlab_ROOT_DIR: ${Matlab_ROOT_DIR}")

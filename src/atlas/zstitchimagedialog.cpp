@@ -2291,6 +2291,15 @@ void ZStitchImageDialog::stitchStacks()
       for (const auto& mes : summary) {
         m_commandOutputEdit->append(mes);
       }
+      QString stitchInfoOutputName = m_outputFileEdit->text();
+      stitchInfoOutputName.append("_info.txt");
+      QFile fOut(stitchInfoOutputName);
+      if (fOut.open(QFile::WriteOnly | QFile::Text)) {
+        QTextStream s(&fOut);
+        for (const auto& mes : summary)
+          s << mes << '\n';
+      }
+      fOut.close();
       if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
           mergeMode == ZImgMerge::Mode::Max) {
         ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);

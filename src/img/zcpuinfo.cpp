@@ -2,6 +2,7 @@
 
 #include "zbitset.h"
 #include "zlog.h"
+#include "cpuinfo.h"
 #include <QProcess>
 #include <QThread>
 #include <array>
@@ -81,6 +82,7 @@ ZCpuInfo& ZCpuInfo::instance()
 
 ZCpuInfo::ZCpuInfo()
 {
+  cpuinfo_initialize();
   detectCpuInfo();
 }
 

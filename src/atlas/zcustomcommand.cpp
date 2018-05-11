@@ -20,6 +20,7 @@
 #include "z3dmainwindow.h"
 #include "z3dview.h"
 #include "zvbgmm.h"
+#include "zpunctadetection.h"
 #include <qtcsv/reader.h>
 #include <itkMath.h>
 #include <QDir>
@@ -1108,13 +1109,76 @@ void GMMFail()
   LOG(INFO) << svd.singularValues();
 }
 
+void detectPuncta()
+{
+  QDir dir("/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK574-1_RNAscope_PV-Gria1-Gabra1");
+
+  QStringList filters;
+  filters << "JK574-*";
+  QFileInfoList fdlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
+  filters.clear();
+  filters << "JK584-*";
+  QFileInfoList fdlist2 = QDir(
+    "/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK584-6_RNAscope_PV-Gria1-Gabra1").entryInfoList(filters,
+                                                                                                               QDir::Dirs |
+                                                                                                               QDir::NoSymLinks);
+  fdlist.append(fdlist2);
+  filters.clear();
+  filters << "*.nim";
+  for (int i = 0; i < fdlist.size(); ++i) {
+    QDir fdir(fdlist.at(i).absoluteFilePath());
+    QFileInfoList list = fdir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+    if (list.size() == 1) {
+      LOG(INFO) << list.at(0).absoluteFilePath();
+
+      ZImg img(list.at(0).absoluteFilePath());
+      for (size_t ch = 1; ch < 4; ++ch) {
+        QString pfn = QString("%1/%2_ch%3.nimp").arg(fdlist.at(i).absoluteFilePath()).arg(
+          list.at(0).completeBaseName()).arg(ch + 1);
+        if (QFile::exists(pfn)) {
+          continue;
+        }
+        QString lfn = QString("%1/%2_ch%3_log.txt").arg(fdlist.at(i).absoluteFilePath()).arg(
+          list.at(0).completeBaseName()).arg(ch + 1);
+        LOG(INFO) << pfn;
+        ZPunctaDetection pd(img, ch);
+        pd.setLogFile(lfn);
+        pd.setResultPunctaFilename(pfn);
+        pd.run();
+      }
+    }
+  }
+}
+
+void changeDapifileType()
+{
+  QDir dir("/Users/feng/Documents/dapi_detection_dataset/JK575-1_RNAscope_PV-Gria1-Gabra1/");
+
+  QStringList filters;
+  filters << "JK575-*";
+  QFileInfoList fdlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
+  filters.clear();
+  filters << "*.nim";
+  for (int i = 0; i < fdlist.size(); ++i) {
+    QDir fdir(fdlist.at(i).absoluteFilePath());
+    QFileInfoList list = fdir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+    if (list.size() == 1) {
+      LOG(INFO) << list.at(0).absoluteFilePath();
+
+      ZImg img(list.at(0).absoluteFilePath());
+      img = img.maximumZProjection();
+      img.save(fdir.filePath(list.at(0).completeBaseName() + ".tif"));
+    }
+  }
+}
+
 }  // namespace nim
 
 namespace nim {
 
 void ZCustomCommand::run()
 {
-  GMMFail();
+  detectPuncta();
   LOG(INFO) << "done";
 }
 
