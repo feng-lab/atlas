@@ -543,7 +543,7 @@ def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
                           r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O']
             if is_linux():
                 to_texts = [r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
-                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3']
+                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -fPIC']
             else:
                 to_texts = [r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
                             r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 '
