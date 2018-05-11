@@ -413,6 +413,10 @@ if (Matlab_FOUND)
       add_custom_command(TARGET ${mexname}
                          POST_BUILD
                          COMMAND patchelf --set-rpath '$$ORIGIN' $<TARGET_FILE:${mexname}>
+                         COMMAND patchelf --replace-needed libfreeimageplus.so.3 libfreeimageplus.so
+                         $<TARGET_FILE:${mexname}>
+                         COMMAND patchelf --replace-needed libQt5Core.so.5 $<TARGET_FILE_NAME:Qt5::Core>
+                         $<TARGET_FILE:${mexname}>
                          )
     endfunction(add_mex_target)
 
