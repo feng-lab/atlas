@@ -291,6 +291,14 @@ void ZView::fitContentIntoWindow()
   m_view->fitRect(sceneRect);
 }
 
+void ZView::gotoPosition(int x, int y, int z, int radius)
+{
+  m_imgSlice->set(z);
+  QRectF sceneRect(x - radius, y - radius,
+                   radius * 2 + 1, radius * 2 + 1);
+  m_view->fitRect(sceneRect);
+}
+
 int ZView::minViewPrecedence() const
 {
   int res = std::numeric_limits<int>::max();

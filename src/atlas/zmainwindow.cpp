@@ -163,6 +163,11 @@ Z3DMainWindow* ZMainWindow::get3DWindow()
   return m_3dWindow.data();
 }
 
+ZView* ZMainWindow::view()
+{
+  return m_view.get();
+}
+
 void ZMainWindow::closeEvent(QCloseEvent* event)
 {
   // Qt mac bug, use dock icon context menu -> quit will call this function twice and crash

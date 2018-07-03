@@ -158,14 +158,19 @@ uint16_t getOrientation(jpeg_decompress_struct& cinfo)
   jpeg_saved_marker_ptr marker = cinfo.marker_list;
   while (marker) {
     if (marker->data_length > 6 && std::equal(marker->data, marker->data + 6, "Exif\0\0")) {
-      using Device = boost::iostreams::basic_array_source<char>;
-      // reinterpret_cast allowed (AliasedType is char or unsigned char: this permits
-      // examination of the object representation of any object as an array of unsigned char.)
-      boost::iostreams::stream<Device> exifs(reinterpret_cast<char*>(marker->data) + 6, marker->data_length - 6);
-      ZTiff exif;
-      exif.load(exifs, true);
-      if (exif.isValid()) {
-        orientation = exif.ifds()[0].orientation();
+      try {
+        using Device = boost::iostreams::basic_array_source<char>;
+        // reinterpret_cast allowed (AliasedType is char or unsigned char: this permits
+        // examination of the object representation of any object as an array of unsigned char.)
+        boost::iostreams::stream<Device> exifs(reinterpret_cast<char*>(marker->data) + 6, marker->data_length - 6);
+        ZTiff exif;
+        exif.load(exifs, true);
+        if (exif.isValid()) {
+          orientation = exif.ifds()[0].orientation();
+        }
+      }
+      catch (const ZIOException& e) {
+        LOG(WARNING) << "failed to read Orientation from Exif: " << e.what();
       }
       break;
     }

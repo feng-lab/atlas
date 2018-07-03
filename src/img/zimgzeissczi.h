@@ -226,7 +226,7 @@ public:
   };
 
   // stack tiles to make a 3d stack
-  ZImg stackTiles(const QString& filename, size_t ch, size_t scene);
+  ZImg stackTiles(const QString& filename, size_t ch, size_t scene, std::vector<ZVoxelCoordinate>& coords);
 
   ZImg stackTiles(const QString& filename, size_t ch, size_t scene, const QString& inverseMaskFile,
                   size_t maskFilePyramidalLevel = 0);

@@ -20,10 +20,12 @@ set(CPUINFO_INCLUDE_DIRS ${CPUINFO_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/cpuinfo/include)
 if (WIN32)
   set(CPUINFO_LIBRARIES ${CPUINFO_LIBRARIES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/cpuinfo/lib/cpuinfo.lib)
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/cpuinfo/lib/cpuinfo.lib
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/cpuinfo/lib/clog.lib)
 else (WIN32)
   set(CPUINFO_LIBRARIES ${CPUINFO_LIBRARIES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/cpuinfo/lib/libcpuinfo.a)
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/cpuinfo/lib/libcpuinfo.a
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/cpuinfo/lib/libclog.a)
 endif (WIN32)
 
 #find_package(libjpeg REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libjpeg-turbo NO_DEFAULT_PATH)
@@ -369,7 +371,7 @@ if (Matlab_FOUND)
                          @loader_path/QtCore
                          $<TARGET_FILE:${mexname}>
                          COMMAND install_name_tool -change
-                         /Users/feng/code/atlas/src/3rdparty/freeimage/lib/libfreeimageplus.dylib
+                         @rpath/libfreeimageplus.dylib
                          @loader_path/libfreeimageplus.dylib
                          $<TARGET_FILE:${mexname}>
                          COMMAND install_name_tool -change

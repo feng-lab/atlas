@@ -402,7 +402,7 @@ ZImgZeissCZI& ZImgZeissCZI::instance()
   return imgCzi;
 }
 
-ZImg ZImgZeissCZI::stackTiles(const QString& filename, size_t ch, size_t scene)
+ZImg ZImgZeissCZI::stackTiles(const QString& filename, size_t ch, size_t scene, std::vector<ZVoxelCoordinate>& coords)
 {
   clearInternalState();
 
@@ -433,9 +433,11 @@ ZImg ZImgZeissCZI::stackTiles(const QString& filename, size_t ch, size_t scene)
   }
 
   std::vector<ZImg> imgs;
+  coords.clear();
   for (const auto& tile : m_sceneTiles[scene]) {
     if (tile.ratio == 1_usize && tile.start.c == static_cast<int>(ch)) {
       imgs.push_back(readCZITile(inputFileStream, tile));
+      coords.push_back(tile.start);
     }
   }
   return ZImg::cat(imgs, Dimension::Z);

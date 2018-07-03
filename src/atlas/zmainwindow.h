@@ -49,6 +49,8 @@ public:
   // might be nullptr
   Z3DMainWindow* get3DWindow();
 
+  ZView* view();
+
 protected:
   //void appAboutToQuit();
 

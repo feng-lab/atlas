@@ -12,6 +12,7 @@
 #include <cmath>
 #include <set>
 #include <sstream>
+#include <tiff.h>
 
 namespace {
 

@@ -19,6 +19,7 @@
 #include "zdoc.h"
 #include "z3dmainwindow.h"
 #include "z3dview.h"
+#include "zview.h"
 #include "zvbgmm.h"
 #include "zpunctadetection.h"
 #include <qtcsv/reader.h>
@@ -982,6 +983,24 @@ void createCellTable()
   }
 }
 
+void checkSWC()
+{
+  ZMainWindow* mainWin = nullptr;
+  for (auto widget : QApplication::topLevelWidgets()) {
+    mainWin = qobject_cast<ZMainWindow*>(widget);
+    if (mainWin)
+      break;
+  }
+  ZView* view = mainWin->view();
+
+  ZSwc swc("/Users/feng/Documents/bigimage_new/0515_15Py.swc");
+
+  for (auto node : swc) {
+    view->gotoPosition(node.x, node.y, node.z);
+    QApplication::processEvents();
+  }
+}
+
 void testLogSpeed()
 {
   ZBenchTimer bt;
@@ -1114,10 +1133,10 @@ void detectPuncta()
   QDir dir("/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK574-1_RNAscope_PV-Gria1-Gabra1");
 
   QStringList filters;
-  filters << "JK574-*";
+  filters << "JK574-1-7_left*";
   QFileInfoList fdlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
   filters.clear();
-  filters << "JK584-*";
+  filters << "JK584-nonono*";
   QFileInfoList fdlist2 = QDir(
     "/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK584-6_RNAscope_PV-Gria1-Gabra1").entryInfoList(filters,
                                                                                                                QDir::Dirs |
