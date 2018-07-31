@@ -162,11 +162,69 @@ ZTile::ZTile(int index_, QPoint topleft, QPoint bottomright)
 ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, QList<ZTile>* pTiles, const QStringList& filenames) :
   QWidget(parent), m_image(image), m_pTiles(pTiles)
 {
-  m_scaleFactor = 1.0;
+  m_scaleFactor = 0.4;
   m_rubberBand = nullptr;
   m_filenames = filenames;
-  //for (int i=0; i<m_filenames.size(); ++i)
-  //m_tileimages.push_back(QImage(m_filenames[i]));
+  if (filenames.size() == pTiles->size()) {
+    for (int i=0; i<m_filenames.size(); ++i) {
+      std::vector<ZImgInfo> infos;
+      ZImgIO::instance().readInfo(m_filenames[i], infos);
+      if (infos.size() != 1) {
+        m_tileimages.clear();
+        break;
+      }
+      ZImgThumbernail tn;
+      ZImgIO::instance().readThumbnail(m_filenames[i], tn);
+      bool sbreak = false;
+      std::vector<ZImg> imgs;
+      for (size_t z = 0; z < infos[0].depth; ++z) {
+        const auto& tbs = tn.planeAttachments(z, 0);
+        if (tbs.empty()) {
+          sbreak = true;
+          break;
+        }
+        imgs.push_back(tbs[0]);
+      }
+      if (sbreak) {
+        m_tileimages.clear();
+        break;
+      }
+      ZImg maxProj = ZImg::combine(imgs, ZImg::CombineMode::Max);
+      ZImgDisplay display(maxProj);
+      for (size_t ch = 0; ch < maxProj.numChannels(); ++ch) {
+        double min;
+        double max;
+        maxProj.createView(ch, 0).computeMinMax(min, max);
+        display.showChannel(ch, min, max);
+      }
+      m_tileimages.push_back(display.toQImage());
+    }
+  }
+  if (m_tileimages.size() == m_pTiles->size()) {
+    if (m_pTiles->size() > 0 && (m_pTiles->at(0).region.width() < 128 || m_pTiles->at(0).region.height() < 128)) {
+      int scale = 2;
+      int width = m_pTiles->at(0).region.width();
+      int height = m_pTiles->at(0).region.height();
+      while (width * scale < 128 || height * scale < 128) {
+        scale *= 2;
+      }
+      *m_image = m_image->scaled(m_image->width() * scale, m_image->height() * scale);
+      for (int i = 0; i < m_pTiles->size(); ++i) {
+        (*m_pTiles)[i].region.setTop(m_pTiles->at(i).region.top() * scale);
+        (*m_pTiles)[i].region.setLeft(m_pTiles->at(i).region.left() * scale);
+        (*m_pTiles)[i].region.setWidth(width * scale);
+        (*m_pTiles)[i].region.setHeight(height * scale);
+      }
+    }
+    QPainter painter(m_image);
+    for (int i = 0; i < m_pTiles->size(); ++i) {
+      QPoint tl = m_pTiles->at(i).region.topLeft();
+      QPoint br = m_pTiles->at(i).region.bottomRight();
+      painter.drawImage(QRectF(tl.x(), tl.y(), br.x() - tl.x() + 1, br.y() - tl.y() + 1),
+                        m_tileimages[i],
+                        QRectF(0, 0, m_tileimages[i].size().width(), m_tileimages[i].size().height()));
+    }
+  }
 }
 
 QSize ZTileImageWidget::minimumSizeHint() const
@@ -185,14 +243,14 @@ QSize ZTileImageWidget::sizeHint() const
   if (!m_image) {
     return minimumSizeHint();
   }
-  return m_image->size();
+  return m_image->size() * m_scaleFactor;
 }
 
 void ZTileImageWidget::init(QImage* image, QList<ZTile>* pTiles)
 {
   m_image = image;
   m_pTiles = pTiles;
-  resize(image->width(), image->height());
+  resize(image->width() * m_scaleFactor, image->height() * m_scaleFactor);
   update();
 }
 
@@ -209,21 +267,13 @@ void ZTileImageWidget::paintEvent(QPaintEvent* /*event*/)
 
 
       for (int i = 0; i < m_pTiles->size(); ++i) {
-        QPoint tl = m_pTiles->at(i).region.topLeft() * m_scaleFactor;
-        QPoint br = m_pTiles->at(i).region.bottomRight() * m_scaleFactor;
-        painter.drawImage(QRectF(tl.x(), tl.y(), br.x() - tl.x() + m_scaleFactor, br.y() - tl.y() + m_scaleFactor),
-                          m_tileimages[i],
-                          QRectF(0, 0, m_tileimages[i].size().width(), m_tileimages[i].size().height()));
-
         if (m_pTiles->at(i).bIsSelected) {
-
+          QPoint tl = m_pTiles->at(i).region.topLeft() * m_scaleFactor;
+          QPoint br = m_pTiles->at(i).region.bottomRight() * m_scaleFactor;
           painter.setPen(QPen(QBrush(QColor(255, 255, 0, 255)), 4));
           painter.drawRect(
             QRectF(tl.x() - 4, tl.y() - 4, br.x() - tl.x() + m_scaleFactor + 4, br.y() - tl.y() + m_scaleFactor + 4));
-          //painter.fillRect(rect, QColor(255, 255, 0, 128));
         }
-        //QString str = QString("Image %1").arg(i+1);
-        //painter.drawText(rect, str);
       }
     } else {
       for (int i = 0; i < m_pTiles->size(); ++i) {
@@ -266,7 +316,7 @@ void ZTileImageWidget::mouseReleaseEvent(QMouseEvent* event)
       }
     }
   }
-  update();
+  repaint();
 }
 
 void ZTileImageWidget::clearAllSelected()
@@ -274,7 +324,7 @@ void ZTileImageWidget::clearAllSelected()
   for (int i = 0; i < m_pTiles->size(); ++i) {
     (*m_pTiles)[i].bIsSelected = false;
   }
-  update();
+  repaint();
 }
 
 void ZTileImageWidget::selectAll()
@@ -282,7 +332,7 @@ void ZTileImageWidget::selectAll()
   for (int i = 0; i < m_pTiles->size(); ++i) {
     (*m_pTiles)[i].bIsSelected = true;
   }
-  update();
+  repaint();
 }
 
 void ZTileImageWidget::saveAsImage(const QString& fn)
@@ -295,17 +345,19 @@ void ZTileImageWidget::saveAsImage(const QString& fn)
 
 void ZTileImageWidget::zoomIn()
 {
-  if (m_scaleFactor < 5) {
-    m_scaleFactor += 1;
+  if (m_scaleFactor < 4.9) {
+    m_scaleFactor += .2;
     resize(m_scaleFactor * m_image->size());
+    repaint();
   }
 }
 
 void ZTileImageWidget::zoomOut()
 {
-  if (m_scaleFactor > 1) {
-    m_scaleFactor -= 1;
+  if (m_scaleFactor > 0.3) {
+    m_scaleFactor -= .2;
     resize(m_scaleFactor * m_image->size());
+    repaint();
   }
 }
 
@@ -884,19 +936,36 @@ void ZStitchImageDialog::editConnFromTileImage()
     m_scrollArea->ensureWidgetVisible(m_tileImageWidget);
     auto vlayout = new QVBoxLayout;
     auto hlayout = new QHBoxLayout;
-    QPushButton* zoomInButton = new QPushButton(tr("zoom in"), this);
-    connect(zoomInButton, &QPushButton::clicked, this, &ZStitchImageDialog::zoomInTileImageWidget);
+
+    auto m_zoomInAction = new QAction(QIcon(":/icons/zoom_in-512.png"), tr("Zoom &In"), &dia);
+    QList<QKeySequence> zoomInKey;
+    zoomInKey << QKeySequence::ZoomIn << QKeySequence(Qt::Key_Plus) << QKeySequence(Qt::Key_Equal);
+    m_zoomInAction->setShortcuts(zoomInKey);
+    m_zoomInAction->setStatusTip(tr("Zoom In"));
+    connect(m_zoomInAction, &QAction::triggered, this, &ZStitchImageDialog::zoomInTileImageWidget);
+
+    auto m_zoomOutAction = new QAction(QIcon(":/icons/zoom_out-512.png"), tr("Zoom &Out"), &dia);
+    QList<QKeySequence> zoomOutKey;
+    zoomOutKey << QKeySequence::ZoomOut << QKeySequence(Qt::Key_Minus);
+    m_zoomOutAction->setShortcuts(zoomOutKey);
+    m_zoomOutAction->setStatusTip(tr("Zoom Out"));
+    connect(m_zoomOutAction, &QAction::triggered, this, &ZStitchImageDialog::zoomOutTileImageWidget);
+
+    auto zoomInButton = new QToolButton(&dia);
+    zoomInButton->setDefaultAction(m_zoomInAction);
     hlayout->addWidget(zoomInButton);
-    QPushButton* zoomOutButton = new QPushButton(tr("zoom out"), this);
-    connect(zoomOutButton, &QPushButton::clicked, this, &ZStitchImageDialog::zoomOutTileImageWidget);
+
+    auto zoomOutButton = new QToolButton(&dia);
+    zoomOutButton->setDefaultAction(m_zoomOutAction);
     hlayout->addWidget(zoomOutButton);
-    QPushButton* clearAllButton = new QPushButton(tr("clear all selected"), this);
+    
+    QPushButton* clearAllButton = new QPushButton(tr("Clear All Selected"), this);
     connect(clearAllButton, &QPushButton::clicked, this, &ZStitchImageDialog::clearAllSelectedInTileImageWidget);
     hlayout->addWidget(clearAllButton);
-    QPushButton* selectAllButton = new QPushButton(tr("select all"), this);
+    QPushButton* selectAllButton = new QPushButton(tr("Select All"), this);
     connect(selectAllButton, &QPushButton::clicked, this, &ZStitchImageDialog::selectAllInTileImageWidget);
     hlayout->addWidget(selectAllButton);
-    QPushButton* saveButton = new QPushButton(tr("save"), this);
+    QPushButton* saveButton = new QPushButton(tr("Save"), this);
     connect(saveButton, &QPushButton::clicked, this, &ZStitchImageDialog::saveTileImageWidgetAsImage);
     hlayout->addWidget(saveButton);
 
@@ -911,7 +980,7 @@ void ZStitchImageDialog::editConnFromTileImage()
     vlayout->addWidget(buttonBox);
 
     dia.setLayout(vlayout);
-    dia.resize(m_tileImage.width(), m_tileImage.height());
+    dia.resize(1024, 1024);
     if (dia.exec() == QDialog::Accepted) {
       m_tileList = tmpList;
       m_nSel = 0;

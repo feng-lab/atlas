@@ -318,8 +318,12 @@ void ZPunctaDetectionDialog::updateInterface(const QString& fn, size_t numChanne
   }
 
   m_dendriteChannel.select("None");
-  if (numChannel > 0)
+  if (numChannel > 2) {
+    m_punctaChannel.select(2);
+    m_dendriteChannel.select("Ch3");
+  } else if (numChannel > 0) {
     m_punctaChannel.select(1);
+  }
 }
 
 void ZPunctaDetectionDialog::init()
