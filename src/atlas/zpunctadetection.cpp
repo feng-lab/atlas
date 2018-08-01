@@ -19,6 +19,7 @@
 #include <itkBinaryDilateImageFilter.h>
 #include <itkBinaryMorphologicalOpeningImageFilter.h>
 #include <itkBinaryThresholdImageFilter.h>
+#include <itkStreamingImageFilter.h>
 #include <QFileInfo>
 #include <QFile>
 #include <boost/math/distributions/chi_squared.hpp>
@@ -667,11 +668,16 @@ void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& b
   dilateFilter->SetNumberOfThreads(numThreads);
   registerSubOperation(dilateFilter.GetPointer(), .45 * .3);
 
-  dilateFilter->Update();
+  using StreamingFilterType = itk::StreamingImageFilter<BinaryImage3DType, BinaryImage3DType>;
+  StreamingFilterType::Pointer streamingFilter = StreamingFilterType::New();
+  streamingFilter->SetInput(dilateFilter->GetOutput());
+  streamingFilter->SetNumberOfStreamDivisions(m_img.channelByteNumber() / 1024 / 1024 / 1024);
+
+  streamingFilter->Update();
   using ConstIteratorType = itk::ImageRegionConstIterator<BinaryImage3DType>;
   std::vector<int> coords;
 
-  ConstIteratorType maskIt(dilateFilter->GetOutput(), dilateFilter->GetOutput()->GetLargestPossibleRegion());
+  ConstIteratorType maskIt(streamingFilter->GetOutput(), streamingFilter->GetOutput()->GetLargestPossibleRegion());
   maskIt.GoToBegin();
   coords.clear();
   while (!maskIt.IsAtEnd()) {
@@ -699,9 +705,9 @@ void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& b
   dlElementRadius[2] = std::max(1., std::floor(1.8 / m_img.voxelSizeZInUm()));
   dlStructuringElement = StructuringElementType::Box(dlElementRadius);
   dilateFilter->SetKernel(dlStructuringElement);
-  dilateFilter->Update();
+  streamingFilter->Update();
 
-  ConstIteratorType maskIt2(dilateFilter->GetOutput(), dilateFilter->GetOutput()->GetLargestPossibleRegion());
+  ConstIteratorType maskIt2(streamingFilter->GetOutput(), streamingFilter->GetOutput()->GetLargestPossibleRegion());
   maskIt2.GoToBegin();
   coords.clear();
   while (!maskIt2.IsAtEnd()) {

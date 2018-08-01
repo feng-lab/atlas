@@ -3,6 +3,7 @@
 #include "zstatisticsutils.h"
 #include "zimgio.h"
 #include "zlog.h"
+#include "zstringutils.h"
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/connected_components.hpp>
 #include <boost/graph/kruskal_min_spanning_tree.hpp>
@@ -313,8 +314,22 @@ QStringList ZImgMerge::resolveLocations()
 
   resolveLocations(m_imgFinalCoords, refImg, minCost, summ);
 
-  for (const auto& imgCoord : m_imgFinalCoords)
-    m_tiles.emplace_back(*imgCoord.first, imgCoord.second);
+  // sort m_tiles based on image name (natural order) to make sure the "First" merge mode follows image name order
+  std::map<QString, const ZImgSubBlock*, QStringNaturalCompare> orderedTiles;
+  for (const auto& imgName : m_imgNames) {
+    orderedTiles[imgName.second] = imgName.first;
+  }
+  // only do it when every image name is unique
+  if (orderedTiles.size() == m_imgFinalCoords.size()) {
+    // should be in reverse order as we write tiles from begin to end and we want lower image overwrites higher image
+    for (const auto& nameBlock : make_reverse(orderedTiles)) {
+      //LOG(INFO) << nameBlock.first;
+      m_tiles.emplace_back(*nameBlock.second, m_imgFinalCoords[nameBlock.second]);
+    }
+  } else {
+    for (const auto& imgCoord : m_imgFinalCoords)
+      m_tiles.emplace_back(*imgCoord.first, imgCoord.second);
+  }
 
   ZVoxelRegion allRegion;
 

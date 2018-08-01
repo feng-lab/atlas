@@ -267,13 +267,15 @@ void ZTileImageWidget::paintEvent(QPaintEvent* /*event*/)
 
 
       for (int i = 0; i < m_pTiles->size(); ++i) {
+        QPoint tl = m_pTiles->at(i).region.topLeft() * m_scaleFactor;
+        QPoint br = m_pTiles->at(i).region.bottomRight() * m_scaleFactor;
         if (m_pTiles->at(i).bIsSelected) {
-          QPoint tl = m_pTiles->at(i).region.topLeft() * m_scaleFactor;
-          QPoint br = m_pTiles->at(i).region.bottomRight() * m_scaleFactor;
           painter.setPen(QPen(QBrush(QColor(255, 255, 0, 255)), 4));
           painter.drawRect(
             QRectF(tl.x() - 4, tl.y() - 4, br.x() - tl.x() + m_scaleFactor + 4, br.y() - tl.y() + m_scaleFactor + 4));
         }
+        QString str = QString("Image %1").arg(i + 1);
+        painter.drawText(QRect(tl, br), str);
       }
     } else {
       for (int i = 0; i < m_pTiles->size(); ++i) {
@@ -958,7 +960,7 @@ void ZStitchImageDialog::editConnFromTileImage()
     auto zoomOutButton = new QToolButton(&dia);
     zoomOutButton->setDefaultAction(m_zoomOutAction);
     hlayout->addWidget(zoomOutButton);
-    
+
     QPushButton* clearAllButton = new QPushButton(tr("Clear All Selected"), this);
     connect(clearAllButton, &QPushButton::clicked, this, &ZStitchImageDialog::clearAllSelectedInTileImageWidget);
     hlayout->addWidget(clearAllButton);
@@ -1651,7 +1653,12 @@ void ZStitchImageDialog::stitchStacks2()
       QRect rect = QRect(m_tileList.at(i).region.topLeft(),
                          m_tileList.at(i).region.bottomRight());
       if (m_tileList.at(i).bIsSelected) {
-        painter.fillRect(rect, QColor(255, 255, 0, 128));
+        //painter.fillRect(rect, QColor(255, 255, 0, 128));
+        painter.setPen(QPen(QBrush(QColor(255, 255, 0, 255)), 4));
+        auto tl = rect.topLeft();
+        auto br = rect.bottomRight();
+        painter.drawRect(
+          QRectF(tl.x() - 4, tl.y() - 4, br.x() - tl.x() + 5, br.y() - tl.y() + 1 + 4));
       }
       QString str = QString("Image %1").arg(i + 1);
       painter.drawText(rect, str);
@@ -2389,7 +2396,12 @@ void ZStitchImageDialog::stitchStacks()
         QRect rect = QRect(m_tileList.at(i).region.topLeft(),
                            m_tileList.at(i).region.bottomRight());
         if (m_tileList.at(i).bIsSelected) {
-          painter.fillRect(rect, QColor(255, 255, 0, 128));
+          //painter.fillRect(rect, QColor(255, 255, 0, 128));
+          painter.setPen(QPen(QBrush(QColor(255, 255, 0, 255)), 4));
+          auto tl = rect.topLeft();
+          auto br = rect.bottomRight();
+          painter.drawRect(
+            QRectF(tl.x() - 4, tl.y() - 4, br.x() - tl.x() + 5, br.y() - tl.y() + 1 + 4));
         }
         QString str = QString("Image %1").arg(i + 1);
         painter.drawText(rect, str);

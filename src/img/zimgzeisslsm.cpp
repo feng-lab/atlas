@@ -39,6 +39,7 @@ void ZImgZeissLsm::readIntoInternalStructure(const QString& filename, ZTiff& tif
   ZImgTiff::readIntoInternalStructure(filename, tiff);
   if (tiff.isLsmFile()) {
     readLsmInfo(filename, tiff);
+    //logLsmInfo(filename);
   } else {
     throw ZIOException("Not lsm file");
   }
