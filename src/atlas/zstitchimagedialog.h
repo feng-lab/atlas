@@ -63,10 +63,10 @@ class ZTileImageWidget : public QWidget
 {
 Q_OBJECT
 public:
-  explicit ZTileImageWidget(QWidget* parent, QImage* image = nullptr, QList<ZTile>* pTiles = nullptr,
+  explicit ZTileImageWidget(QWidget* parent, QImage* image,
+                            const std::vector<std::vector<int>>& tileMatrix,
+                            QList<ZTile>* pTiles = nullptr,
                             const QStringList& filenames = QStringList());
-
-  void init(QImage* image, QList<ZTile>* pTiles);
 
   void paintEvent(QPaintEvent* event) override;
 
@@ -93,6 +93,7 @@ public:
 private:
   QPixmap* m_pixmap;
   QImage* m_image;
+  const std::vector<std::vector<int>>& m_tileMatrix;
   QList<ZTile>* m_pTiles;
   double m_scaleFactor;
   QRubberBand* m_rubberBand;

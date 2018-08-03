@@ -159,10 +159,11 @@ ZTile::ZTile(int index_, QPoint topleft, QPoint bottomright)
   bIsSelected = true;
 }
 
-ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, QList<ZTile>* pTiles, const QStringList& filenames) :
-  QWidget(parent), m_image(image), m_pTiles(pTiles)
+ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, const std::vector<std::vector<int>>& tileMatrix,
+                                   QList<ZTile>* pTiles, const QStringList& filenames) :
+  QWidget(parent), m_image(image), m_tileMatrix(tileMatrix), m_pTiles(pTiles)
 {
-  m_scaleFactor = 0.4;
+  m_scaleFactor = 0.6;
   m_rubberBand = nullptr;
   m_filenames = filenames;
   if (filenames.size() == pTiles->size()) {
@@ -205,19 +206,20 @@ ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, QList<ZTile>*
     }
   }
   if (m_tileimages.size() == m_pTiles->size()) {
-    if (m_pTiles->size() > 0 && (m_pTiles->at(0).region.width() < 128 || m_pTiles->at(0).region.height() < 128)) {
-      int scale = 2;
-      int width = m_pTiles->at(0).region.width();
-      int height = m_pTiles->at(0).region.height();
-      while (width * scale < 128 || height * scale < 128) {
-        scale *= 2;
-      }
-      *m_image = m_image->scaled(m_image->width() * scale, m_image->height() * scale);
-      for (int i = 0; i < m_pTiles->size(); ++i) {
-        (*m_pTiles)[i].region.setTop(m_pTiles->at(i).region.top() * scale);
-        (*m_pTiles)[i].region.setLeft(m_pTiles->at(i).region.left() * scale);
-        (*m_pTiles)[i].region.setWidth(width * scale);
-        (*m_pTiles)[i].region.setHeight(height * scale);
+    int margin = 15;
+    int tileSize = 128;
+    int width = margin + (margin + tileSize) * m_tileMatrix[0].size();
+    int height = margin + (margin + tileSize) * m_tileMatrix.size();
+    *m_image = QImage(width, height, QImage::Format_ARGB32_Premultiplied);
+    for (size_t c = 0; c < m_tileMatrix[0].size(); ++c) {
+      for (size_t r = 0; r < m_tileMatrix.size(); ++r) {
+        if (m_tileMatrix[r][c] == 0) {
+          continue;
+        }
+        CHECK(m_pTiles->at(m_tileMatrix[r][c] - 1).index == m_tileMatrix[r][c]);
+        (*m_pTiles)[m_tileMatrix[r][c] - 1].region = QRect(margin + (margin + tileSize) * c,
+                                                           margin + (margin + tileSize) * r,
+                                                           tileSize, tileSize);
       }
     }
     QPainter painter(m_image);
@@ -250,14 +252,6 @@ QSize ZTileImageWidget::sizeHint() const
   return m_image->size() * m_scaleFactor;
 }
 
-void ZTileImageWidget::init(QImage* image, QList<ZTile>* pTiles)
-{
-  m_image = image;
-  m_pTiles = pTiles;
-  resize(image->width() * m_scaleFactor, image->height() * m_scaleFactor);
-  update();
-}
-
 void ZTileImageWidget::paintEvent(QPaintEvent* /*event*/)
 {
   if (m_image) {
@@ -268,13 +262,11 @@ void ZTileImageWidget::paintEvent(QPaintEvent* /*event*/)
                       QRectF(0, 0, m_image->size().width(), m_image->size().height()));
 
     if (m_tileimages.size() == m_pTiles->size()) {
-
-
+      painter.setPen(QPen(QBrush(QColor(255, 255, 0, 255)), 4));
       for (int i = 0; i < m_pTiles->size(); ++i) {
         QPoint tl = m_pTiles->at(i).region.topLeft() * m_scaleFactor;
         QPoint br = m_pTiles->at(i).region.bottomRight() * m_scaleFactor;
         if (m_pTiles->at(i).bIsSelected) {
-          painter.setPen(QPen(QBrush(QColor(255, 255, 0, 255)), 4));
           painter.drawRect(
             QRectF(tl.x() - 4, tl.y() - 4, br.x() - tl.x() + m_scaleFactor + 4, br.y() - tl.y() + m_scaleFactor + 4));
         }
@@ -282,6 +274,7 @@ void ZTileImageWidget::paintEvent(QPaintEvent* /*event*/)
         painter.drawText(QRect(tl, br), str);
       }
     } else {
+      painter.setPen(QPen(QBrush(QColor(255, 255, 0, 255)), 4));
       for (int i = 0; i < m_pTiles->size(); ++i) {
         QRect rect = QRect(m_pTiles->at(i).region.topLeft() * m_scaleFactor,
                            m_pTiles->at(i).region.bottomRight() * m_scaleFactor);
@@ -937,7 +930,7 @@ void ZStitchImageDialog::editConnFromTileImage()
     QList<ZTile> tmpList(m_tileList);
     QDialog dia;
     m_scrollArea = new QScrollArea(this);
-    m_tileImageWidget = new ZTileImageWidget(this, &m_tileImage, &tmpList, m_inputStack1Filenames);
+    m_tileImageWidget = new ZTileImageWidget(this, &m_tileImage, m_tileMatrix, &tmpList, m_inputStack1Filenames);
     m_scrollArea->setWidget(m_tileImageWidget);
     m_scrollArea->ensureWidgetVisible(m_tileImageWidget);
     auto vlayout = new QVBoxLayout;
