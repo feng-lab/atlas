@@ -195,7 +195,11 @@ ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, QList<ZTile>*
         double min;
         double max;
         maxProj.createView(ch, 0).computeMinMax(min, max);
-        display.showChannel(ch, min, max);
+        if ((max - min) / (maxProj.dataRangeMax() - maxProj.dataRangeMin()) < 0.2) { // channel signal too low
+          display.showChannel(ch, maxProj.dataRangeMin(), maxProj.dataRangeMax());
+        } else {
+          display.showChannel(ch, maxProj.dataRangeMin(), max);
+        }
       }
       m_tileimages.push_back(display.toQImage());
     }
@@ -444,7 +448,7 @@ QLayout* ZStitchImageDialog::createIOLayout()
   m_mergeMode1ComboBox->addItem(tr("Mean"));
   m_mergeMode1ComboBox->addItem(tr("Median"));
   m_mergeMode1ComboBox->addItem(tr("First"));
-  m_mergeMode1ComboBox->setCurrentIndex(0);   //default max
+  m_mergeMode1ComboBox->setCurrentIndex(4);   //default First
   tmphlayout->addWidget(pl);
   tmphlayout->addWidget(m_mergeMode1ComboBox);
   input1vlayout->addLayout(tmphlayout);
@@ -488,7 +492,7 @@ QLayout* ZStitchImageDialog::createIOLayout()
   m_mergeMode2ComboBox->addItem(tr("Mean"));
   m_mergeMode2ComboBox->addItem(tr("Median"));
   m_mergeMode2ComboBox->addItem(tr("First"));
-  m_mergeMode2ComboBox->setCurrentIndex(0);   //default max
+  m_mergeMode2ComboBox->setCurrentIndex(4);   //default First
   tmphlayout->addWidget(pl);
   tmphlayout->addWidget(m_mergeMode2ComboBox);
   input2vlayout->addLayout(tmphlayout);
