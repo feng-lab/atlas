@@ -166,6 +166,22 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
     return env
 
 
+def get_tbb_env():
+    if is_windows():
+        env = get_enviroment_from_shell_script(os.path.join(common_dirs.intel_sw_dir(), 'tbb', 'bin',
+                                                            'tbbvars.bat'),
+                                               para='intel64 vs2017',
+                                               start_env=get_vcvars_environment())
+    else:
+        if is_linux():
+            env = get_enviroment_from_shell_script(os.path.join(common_dirs.intel_sw_dir(), 'tbb', 'bin',
+                                                                'tbbvars.sh'), 'intel64')
+        else:
+            env = get_enviroment_from_shell_script(os.path.join(common_dirs.intel_sw_dir(), 'tbb', 'bin',
+                                                                'tbbvars.sh'))
+    return env
+
+
 def get_cmake_binary() -> str:
     if is_windows():
         cmake_folder = find_src_package_with_glob(os.path.join(common_dirs.software_dir(), 'cmake-*win*-x64'))
@@ -378,50 +394,25 @@ def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str, nasm_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
-    orig_file = None
-    bak_file = None
     try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
         if is_windows():
-            if not common_dirs.use_ninja():
-                orig_file = os.path.join(src_dir, 'CMakeLists.txt')
-                bak_file = patch_file(orig_file,
-                                      from_texts=[r'${CMAKE_CURRENT_BINARY_DIR}/tjbench-static.exe',
-                                                  r'${CMAKE_CURRENT_BINARY_DIR}/cjpeg-static.exe',
-                                                  r'${CMAKE_CURRENT_BINARY_DIR}/djpeg-static.exe',
-                                                  r'${CMAKE_CURRENT_BINARY_DIR}/jpegtran-static.exe'],
-                                      to_texts=[r'${CMAKE_CURRENT_BINARY_DIR}/Release/tjbench-static.exe',
-                                                r'${CMAKE_CURRENT_BINARY_DIR}/Release/cjpeg-static.exe',
-                                                r'${CMAKE_CURRENT_BINARY_DIR}/Release/djpeg-static.exe',
-                                                r'${CMAKE_CURRENT_BINARY_DIR}/Release/jpegtran-static.exe'])
-
-            cmakecmd = get_cmake_cmd_common_part(install_dir)
             cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
-                             '-DNASM:FILEPATH=' + nasm_dir + '\\nasm.exe',
+                             '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '\\nasm.exe',
                              '-DWITH_CRT_DLL:BOOL=ON',
                              src_dir])
-            build_and_install_cmakecmd(cmakecmd, build_dir)
         else:
             if is_linux():
-                subprocess.run(['sh', src_dir + '/configure',
-                                'NASM=nasm',
-                                '--enable-static', '--disable-shared',
-                                'CFLAGS=-fPIC'],
-                               cwd=build_dir, shell=False, check=True)
+                cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
+                                 '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=nasm',
+                                 src_dir])
             else:
-                subprocess.run(['sh', src_dir + '/configure', '--host', 'x86_64-apple-darwin',
-                                'NASM=' + nasm_dir + '/nasm',
-                                '--enable-static', '--disable-shared',
-                                'CFLAGS=-mmacosx-version-min=' + macos_min_version() + ' -O3',
-                                'LDFLAGS=-mmacosx-version-min=' + macos_min_version()],
-                               cwd=build_dir, shell=False, check=True)
-            subprocess.run(['make', '-j' + str(os.cpu_count())],
-                           cwd=build_dir, shell=False, check=True)
-            subprocess.run(['make', 'install', 'prefix=' + install_dir, 'libdir=' + install_dir + '/lib'],
-                           cwd=build_dir, shell=False, check=True)
+                cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
+                                 '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '/nasm',
+                                 src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        if is_windows() and not common_dirs.use_ninja():
-            os.replace(bak_file, orig_file)
 
 
 def build_zlib(src_dir: str, install_dir: str, ext_dir: str):
@@ -621,17 +612,13 @@ def build_ospray(src_dir: str, install_dir: str, ext_dir: str, ispc_dir: str, em
                          '-DOSPRAY_MODULE_BILINEAR_PATCH:BOOL=ON',
                          '-Dembree_DIR:PATH=' + embree_dir])
 
+        env = get_tbb_env()
+        print('TBBROOT:', env['TBBROOT'])
         if is_windows():
-            env = get_enviroment_from_shell_script(os.path.join(common_dirs.intel_sw_dir(), 'tbb', 'bin',
-                                                                'tbbvars.bat'),
-                                                   para='intel64 vs2017',
-                                                   start_env=get_vcvars_environment())
-            print('TBBROOT:', env['TBBROOT'])
-
             cmakecmd.extend(['-DTBB_ROOT:PATH=' + env['TBBROOT'],
                              '-DISPC_EXECUTABLE:FILEPATH=' + ispc_dir + '\\ispc.exe'])
         else:
-            cmakecmd.extend(['-DTBB_ROOT:PATH=/opt/intel/tbb',
+            cmakecmd.extend(['-DTBB_ROOT:PATH=' + env['TBBROOT'],
                              '-DISPC_EXECUTABLE:FILEPATH=' + ispc_dir + '/ispc'])
 
         cmakecmd.extend([src_dir])
@@ -707,9 +694,7 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
 
         if is_windows():
             env = get_vcvars_environment()
-            subprocess.run(['devenv', 'FreeImage.2013.sln', '/Upgrade'],
-                           cwd=src_dir, shell=True, check=True, env=env)
-            subprocess.run(['MSBuild', 'FreeImage.2013.sln', '/target:FreeImagePlus', '/property:Platform=x64',
+            subprocess.run(['MSBuild', 'FreeImage.2017.sln', '/target:FreeImagePlus', '/property:Platform=x64',
                             '/property:Configuration=Release', '/maxcpucount',
                             '/property:WindowsTargetPlatformVersion=' + env['UCRTVERSION']  # like 10.0.16299.0
                             ],
@@ -816,18 +801,29 @@ def build_itk(src_dir: str, install_dir: str, ext_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
+    orig_file = None
+    bak_file = None
     try:
+        orig_file = os.path.join(src_dir, 'Modules', 'ThirdParty', 'MetaIO', 'src', 'MetaIO', 'src', 'CMakeLists.txt')
+        bak_file = patch_file(orig_file, from_texts=[r'install(FILES ${headers}'],
+                              to_texts=['file(GLOB __files "${CMAKE_CURRENT_SOURCE_DIR}/*.h")\n'
+                                        'set(headers ${headers} ${__files})\n'
+                                        'install(FILES ${headers}'])
         cmakecmd = get_cmake_cmd_common_part(install_dir)
+        env = get_tbb_env()
         cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_TESTING:BOOL=OFF',
                          '-DITK_USE_64BITS_IDS:BOOL=ON',
+                         '-DITK_FUTURE_LEGACY_REMOVE:BOOL=ON',
                          '-DITK_LEGACY_REMOVE:BOOL=ON',
                          '-DITK_USE_GPU:BOOL=OFF',
                          '-DITK_DOXYGEN_HTML:BOOL=OFF',
                          '-DITK_USE_STRICT_CONCEPT_CHECKING:BOOL=ON',
                          '-DModule_ITKReview:BOOL=ON',
                          '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
-                         '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF'])
+                         '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
+                         '-DModule_ITKTBB:BOOL=ON',
+                         '-DTBB_DIR:PATH=' + env['TBBROOT'] + '/cmake'])
 
         if is_windows():
             cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
@@ -835,8 +831,15 @@ def build_itk(src_dir: str, install_dir: str, ext_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
+
+        # duplicated call to find_package cause cmake error
+        orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.0', 'Modules', 'ITKTBB.cmake')
+        patch_file(orig_file_2,
+                   from_texts=[r'find_package(TBB REQUIRED CONFIG)'],
+                   to_texts=[r'#find_package(TBB REQUIRED CONFIG)'])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
 
 
 def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
@@ -931,11 +934,6 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                          '-DENABLE_PRECOMPILED_HEADERS:BOOL=OFF'])
 
         if is_windows():
-            env = get_enviroment_from_shell_script(os.path.join(common_dirs.intel_sw_dir(), 'tbb', 'bin',
-                                                                'tbbvars.bat'),
-                                                   para='intel64 vs2017',
-                                                   start_env=get_vcvars_environment())
-
             cmakecmd.extend(['-DBUILD_WITH_STATIC_CRT:BOOL=OFF',
                              '-DEIGEN_INCLUDE_PATH:PATH=' + ext_dir + '\\eigen',
                              '-DWITH_WIN32UI:BOOL=OFF',
@@ -954,12 +952,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                                         from_texts=[r'#define CV_INSTRUMENT_FUN_IPP(FUN, ...) ((FUN)(__VA_ARGS__))'],
                                         to_texts=[r'#define CV_INSTRUMENT_FUN_IPP(FUN, ...) (FUN(__VA_ARGS__))'])
 
-                env = get_enviroment_from_shell_script(os.path.join(common_dirs.intel_sw_dir(), 'tbb', 'bin',
-                                                                    'tbbvars.sh'), 'intel64')
-            else:
-                env = get_enviroment_from_shell_script(os.path.join(common_dirs.intel_sw_dir(), 'tbb', 'bin',
-                                                                    'tbbvars.sh'))
-
+        env = get_tbb_env()
         print('TBBROOT:', env['TBBROOT'])
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir, env=env)
@@ -1136,7 +1129,8 @@ def build_libs(libs: dict, update_src: bool):
             nasm_dir = unpack_tool_to_software_dir(src_package_dir, 'nasm*win64*', 'nasm-*')
         elif is_mac():
             nasm_dir = unpack_tool_to_software_dir(src_package_dir, 'nasm*macosx*', 'nasm-*')
-            os.chmod(os.path.join(nasm_dir, 'nasm'), stat.S_IXUSR)
+            os.chown(os.path.join(nasm_dir, 'nasm'), os.getuid(), os.getgid())
+            os.chmod(os.path.join(nasm_dir, 'nasm'), os.stat(os.path.join(nasm_dir, 'nasm')).st_mode | stat.S_IXUSR)
         else:
             nasm_dir = ''
         package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'libjpeg*'))
@@ -1189,7 +1183,7 @@ def build_libs(libs: dict, update_src: bool):
         build_hdf5(src_dir, os.path.join(ext_dir, 'hdf5'), ext_dir)
 
     if libs['freeimage']:
-        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'freeimage*'))
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'FreeImage*'))
         src_dir = get_package_top_level_folder(package_name, base_dir)
         if update_src:
             shutil.rmtree(src_dir, ignore_errors=True)

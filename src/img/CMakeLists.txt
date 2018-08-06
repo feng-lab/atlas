@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.6.1)
 project(img)
 
-LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-
 # main stuff
 
-find_package(TBB REQUIRED)
+find_package(TBB REQUIRED tbb)
+# get_target_property(TBB_INCLUDE_DIRS TBB::tbb INTERFACE_INCLUDE_DIRECTORIES)
+# message(STATUS "TBB_INCLUDE_DIRS:" ${TBB_INCLUDE_DIRS})
+get_target_property(TBB_LIBRARY TBB::tbb IMPORTED_LOCATION_RELEASE)
 message(STATUS "TBB_LIBRARY: ${TBB_LIBRARY}")
 
 find_package(ITK REQUIRED COMPONENTS ITKIOMeta ITKIONIFTI ITKIONRRD ITKIOGDCM ITKBinaryMathematicalMorphology
@@ -95,7 +96,6 @@ find_package(glog REQUIRED
 
 find_package(HDF5 REQUIRED COMPONENTS C CXX static
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/share ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/cmake NO_DEFAULT_PATH)
-message(STATUS "HDF5_INCLUDE_DIR: ${HDF5_INCLUDE_DIR}")
 
 find_package(Qt5Core ${QT_VERSION} REQUIRED PATHS ${QT_PATHS})
 
@@ -254,8 +254,6 @@ target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glm)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/folly)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/scopeguard)
-target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${TBB_INCLUDE_DIR})
-target_include_directories(${LIBRARY_NAME} PUBLIC ${HDF5_INCLUDE_DIR})
 target_compile_definitions(${LIBRARY_NAME} PUBLIC EIGEN_NO_DEBUG EIGEN_DONT_PARALLELIZE EIGEN_MPL2_ONLY)
 target_compile_definitions(${LIBRARY_NAME} PUBLIC QT_USE_QSTRINGBUILDER QT_NO_CAST_FROM_BYTEARRAY QT_NO_CAST_TO_ASCII)
 target_compile_definitions(${LIBRARY_NAME} PUBLIC FOLLY_NO_CONFIG)
@@ -340,7 +338,7 @@ else (WIN32)
   set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS -I${FREEIMAGE_INCLUDE_DIRS})
 endif (WIN32)
 
-target_link_libraries(${LIBRARY_NAME} PUBLIC ${TBB_LIBRARY} ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
+target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
                       png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} ${CPUINFO_LIBRARIES}
                       hdf5::hdf5_cpp-static hdf5::hdf5-static
                       glog::glog Qt5::Core)
