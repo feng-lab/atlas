@@ -810,7 +810,6 @@ def build_itk(src_dir: str, install_dir: str, ext_dir: str):
                                         'set(headers ${headers} ${__files})\n'
                                         'install(FILES ${headers}'])
         cmakecmd = get_cmake_cmd_common_part(install_dir)
-        env = get_tbb_env()
         cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_TESTING:BOOL=OFF',
                          '-DITK_USE_64BITS_IDS:BOOL=ON',
@@ -823,7 +822,7 @@ def build_itk(src_dir: str, install_dir: str, ext_dir: str):
                          '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
                          '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
                          '-DModule_ITKTBB:BOOL=ON',
-                         '-DTBB_DIR:PATH=' + env['TBBROOT'] + '/cmake'])
+                         '-DTBB_DIR:PATH=' + common_dirs.repository_dir() + '/cmake'])
 
         if is_windows():
             cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
