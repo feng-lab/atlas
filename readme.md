@@ -1,16 +1,13 @@
 ## Installation
 ### macOS:
 * install xcode, homebrew, qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb) and python3
-* create folder "cmake" under TBB_ROOT (e.g. /opt/intel/tbb)
 * brew install unrar p7zip git ninja
 
 ### Windows:
 * install visual studio, qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb), python3, git
-* create folder "cmake" under TBB_ROOT (e.g. C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/tbb)
 
 ### Linux:
 * install qt5 (>= 5.9), mkl, ipp, tbb, python3 and ninja
-* create folder "cmake" under TBB_ROOT (e.g. /opt/intel/tbb)
 * sudo apt install unrar p7zip-full git nasm libglfw3-dev zlib1g-dev patchelf
 
 ### All:

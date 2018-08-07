@@ -65,8 +65,8 @@ else (WIN32)
             /opt/intel/tbb
             )
 endif (WIN32)
-tbb_make_config(TBB_ROOT ${TBBROOT})
-set(TBB_DIR ${TBBROOT}/cmake)
+tbb_make_config(TBB_ROOT ${TBBROOT} SAVE_TO ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+set(TBB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # subprojects
 add_subdirectory(src/img)
