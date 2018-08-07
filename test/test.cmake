@@ -30,6 +30,7 @@ if (WIN32)
 else (WIN32)
   set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest/src/gtest-all.cc
                               PROPERTIES COMPILE_FLAGS
-                              "-I${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest -Wno-deprecated")
-  set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/zunittest.cpp PROPERTIES COMPILE_FLAGS "-Wno-deprecated")
+                              "-I${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest -Wno-deprecated -Wno-missing-field-initializers")
+  set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/zunittest.cpp PROPERTIES COMPILE_FLAGS
+                              "-Wno-deprecated -Wmissing-field-initializers")
 endif (WIN32)

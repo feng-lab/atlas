@@ -753,7 +753,7 @@ else (WIN32)
 
   # for some files
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
-                              "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers -Wno-unknown-pragmas -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
+                              "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers -Wno-unknown-pragmas -Wno-unused-variable -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
   set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
   set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS "-isystem ${ASSIMP_INCLUDE_DIRS}")
 

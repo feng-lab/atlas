@@ -44,7 +44,7 @@ void ZImgSignedDistanceMap<ReportProgress>::run_Impl(TITKImg* itkimg, bool useVo
   dmFilter->SetInsideIsPositive(m_insideIsPositive);
   dmFilter->SetSquaredDistance(m_useSquaredDistance);
   dmFilter->SetUseImageSpacing(useVoxelSize);
-  dmFilter->SetNumberOfThreads(this->m_numThreads);
+  dmFilter->SetNumberOfWorkUnits(this->m_numThreads);
   dmFilter->Update();
   copyITKImgToMemory(dmFilter->GetOutput(), res.channelData<TVoxelOut>(c, t));
 }

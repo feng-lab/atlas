@@ -6,13 +6,13 @@
 #define GLM_FORCE_SSE3
 //#define GLM_FORCE_INLINE
 #define GLM_FORCE_SIZE_T_LENGTH
-#define GLM_FORCE_NO_CTOR_INIT
 #define GLM_FORCE_EXPLICIT_CTOR
 //#define GLM_FORCE_MESSAGES
 #define GLM_FORCE_SWIZZLE
 #define GLM_ENABLE_EXPERIMENTAL
 
 #include <glm/glm.hpp>
+#include <glm/gtc/type_precision.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>

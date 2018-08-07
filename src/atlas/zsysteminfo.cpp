@@ -263,7 +263,7 @@ bool ZSystemInfo::initializeGL()
     return false;
   }
 
-  glbinding::initialize([this](const char* name) {
+  glbinding::initialize([](const char* name) {
     return Z3DContext().getProcAddress(name);
   });
   Z3DGpuInfo::instance().logGpuInfo();

@@ -23,6 +23,8 @@
 #include <ippi.h>
 #endif
 
+#include <itkMultiThreaderBase.h>
+
 #include <QSurfaceFormat>
 #include <QMessageBox>
 #include <QDir>
@@ -235,6 +237,9 @@ int main(int argc, char* argv[])
     const IppLibraryVersion* ippVer = ippiGetLibVersion();
     LOG(INFO) << "IPP: " << ippVer->Name << " " << ippVer->Version;
 #endif
+
+    itk::MultiThreaderBase::Pointer mt = itk::MultiThreaderBase::New();
+    mt.Print(std::cout);
 
     if (!nim::ZCpuInfo::instance().bSSE3) {
       QMessageBox::critical(nullptr, app.applicationName(),

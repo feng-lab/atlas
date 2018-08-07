@@ -30,7 +30,7 @@ void ZImgFillHole<ReportProgress>::run_Impl(TITKImg* itkimg, ZImg& res, size_t c
   bfhFilter->SetFullyConnected(m_fullyConnected);
   if (m_foregroundValue != 0)
     bfhFilter->SetForegroundValue(m_foregroundValue);
-  bfhFilter->SetNumberOfThreads(this->m_numThreads);
+  bfhFilter->SetNumberOfWorkUnits(this->m_numThreads);
   bfhFilter->Update();
   copyITKImgToMemory(bfhFilter->GetOutput(), res.channelData<typename TITKImg::PixelType>(c, t));
 }

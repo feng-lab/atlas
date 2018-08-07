@@ -492,7 +492,7 @@ MatrixXi ZPunctaDetection::detectSomaPuncta(const Image3DType *preprocessedImage
   typename MaskFilterType::Pointer maskFilter = MaskFilterType::New();
   maskFilter->SetInput(somaArea);
   maskFilter->SetMaskImage(somaPunctaImage);
-  maskFilter->SetNumberOfThreads(m_numThreads);
+  maskFilter->(m_numThreads);
   registerOperation(maskFilter.GetPointer(), .25);
 
   using StructuringElementType = itk::FlatStructuringElement<3>;
@@ -613,7 +613,7 @@ void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& b
     = BinaryThresholdImageFilterType::New();
   thresholdFilter->SetInput(image);
   thresholdFilter->SetLowerThreshold(m_dendriteThreshold);
-  thresholdFilter->SetNumberOfThreads(numThreads);
+  thresholdFilter->SetNumberOfWorkUnits(numThreads);
   registerSubOperation(thresholdFilter.GetPointer(), .45 * .2);
 
   double tubeRadiusX = std::floor(m_maxDendriteTubeRadius / m_img.voxelSizeXInUm());
@@ -642,14 +642,14 @@ void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& b
   BinaryMorphologicalOpeningImageFilterType::Pointer openFilter
     = BinaryMorphologicalOpeningImageFilterType::New();
   openFilter->SetKernel(structuringElement);
-  openFilter->SetNumberOfThreads(numThreads);
+  openFilter->SetNumberOfWorkUnits(numThreads);
 
   using SliceBySliceImageFilterType = itk::SliceBySliceImageFilter<BinaryImage3DType, BinaryImage3DType>;
   SliceBySliceImageFilterType::Pointer sliceBySliceImageFilter
     = SliceBySliceImageFilterType::New();
   sliceBySliceImageFilter->SetFilter(openFilter);
   sliceBySliceImageFilter->SetInput(thresholdFilter->GetOutput());
-  sliceBySliceImageFilter->SetNumberOfThreads(numThreads);
+  sliceBySliceImageFilter->SetNumberOfWorkUnits(numThreads);
   registerSubOperation(sliceBySliceImageFilter.GetPointer(), .45 * .5);
 
   using StructuringElementType = itk::FlatStructuringElement<3>;
@@ -665,7 +665,7 @@ void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& b
     = BinaryDilateImageFilterType::New();
   dilateFilter->SetInput(sliceBySliceImageFilter->GetOutput());
   dilateFilter->SetKernel(dlStructuringElement);
-  dilateFilter->SetNumberOfThreads(numThreads);
+  dilateFilter->SetNumberOfWorkUnits(numThreads);
   registerSubOperation(dilateFilter.GetPointer(), .45 * .3);
 
   using StreamingFilterType = itk::StreamingImageFilter<BinaryImage3DType, BinaryImage3DType>;
