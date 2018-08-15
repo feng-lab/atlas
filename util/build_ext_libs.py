@@ -899,6 +899,8 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
                          '-DBUILD_opencv_sfm:BOOL=OFF',
                          '-DBUILD_opencv_ts:BOOL=OFF',
                          '-DBUILD_opencv_xfeatures2d:BOOL=OFF',
+                         '-DBUILD_opencv_dnn:BOOL=OFF',
+                         '-DBUILD_opencv_dnn_objdetect:BOOL=OFF',
                          '-DBUILD_opencv_world:BOOL=OFF',
                          '-DWITH_TBB:BOOL=ON',
                          '-DWITH_LAPACK:BOOL=OFF',
