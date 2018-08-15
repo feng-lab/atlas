@@ -574,9 +574,15 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
             orig_file = os.path.join(src_dir, 'makeengine.gte')
             bak_file = patch_file(orig_file,
                                   from_texts=[r'$(SRC_APPLICATIONS_GLX)/*.cpp',
-                                              r'$(SRC_APPLICATIONS_GLX)/%.cpp'],
+                                              r'$(SRC_APPLICATIONS_GLX)/%.cpp',
+                                              r'$(SRC_GRAPHICS_GLX)/*.cpp',
+                                              r'$(SRC_GRAPHICS_GLX)/%.cpp'
+                                              ],
                                   to_texts=[r'$(SRC_APPLICATIONS_GLX)/*.nonono',
-                                            r'$(SRC_APPLICATIONS_GLX)/%.nonono'])
+                                            r'$(SRC_APPLICATIONS_GLX)/%.nonono',
+                                            r'$(SRC_GRAPHICS_GLX)/*.nonono',
+                                            r'$(SRC_GRAPHICS_GLX)/%.nonono'
+                                            ])
 
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'CFG=Release', '-f', 'makeengine.gte'],
                            cwd=src_dir, shell=False, check=True)

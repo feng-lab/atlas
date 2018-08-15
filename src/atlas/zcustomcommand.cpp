@@ -1130,18 +1130,25 @@ void GMMFail()
 
 void detectPuncta()
 {
-  QDir dir("/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK574-1_RNAscope_PV-Gria1-Gabra1");
+//  QDir dir("/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK574-1_RNAscope_PV-Gria1-Gabra1");
+//
+//  QStringList filters;
+//  filters << "JK574-1-7_left*";
+//  QFileInfoList fdlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
+//  filters.clear();
+//  filters << "JK584-nonono*";
+//  QFileInfoList fdlist2 = QDir(
+//    "/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK584-6_RNAscope_PV-Gria1-Gabra1").entryInfoList(filters,
+//                                                                                                               QDir::Dirs |
+//                                                                                                               QDir::NoSymLinks);
+//  fdlist.append(fdlist2);
+
+  QDir dir("/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK584-6_RNAscope_PV-Gria1-Gabra1/180727_JK586-6_referenceRegions");
 
   QStringList filters;
-  filters << "JK574-1-7_left*";
+  filters << "JK586-6*";
   QFileInfoList fdlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
-  filters.clear();
-  filters << "JK584-nonono*";
-  QFileInfoList fdlist2 = QDir(
-    "/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK584-6_RNAscope_PV-Gria1-Gabra1").entryInfoList(filters,
-                                                                                                               QDir::Dirs |
-                                                                                                               QDir::NoSymLinks);
-  fdlist.append(fdlist2);
+
   filters.clear();
   filters << "*.nim";
   for (int i = 0; i < fdlist.size(); ++i) {
