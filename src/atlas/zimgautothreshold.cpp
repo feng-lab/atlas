@@ -107,6 +107,106 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const ZImg& imgIn, s
 
 template<bool ReportProgress>
 template<typename TVoxel>
+TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const QString& filename, size_t c, size_t t, size_t scene)
+{
+  //todo
+  ZImg img(filename, ZImgRegion(0, -1, 0, -1, 0, -1, c, c + 1, t, t + 1), scene);
+  if (!img.isType<TVoxel>()) {
+    throw ZImgException("input img voxel type doesnot match provided type");
+  }
+
+  size_t conn = 18;
+
+  this->clearRegisteredSubOperations();
+  this->setTotalSubOperationWeight(.8);
+
+  //ZBenchTimer bt;
+  //bt.start();
+  ZImgRegionalExtrema<ReportProgress> regionalExtrema;
+  this->registerSubOperation(&regionalExtrema, .4);
+  ZImg locmaxMask = regionalExtrema.regionalMax(img, conn);
+  //bt.stop();
+  //LOG(INFO) << bt;
+
+  //bt.reset();
+  //bt.start();
+  ZImgConnectedComponents<ReportProgress> conncomp;
+  this->registerSubOperation(&conncomp, .4);
+  ConnComp CC = conncomp.runLabelModifyInput(locmaxMask, conn);
+  //bt.stop();
+  //LOG(INFO) << bt;
+
+  locmaxMask.fill(0);
+  uint8_t* locmaxMaskData = locmaxMask.timeData<uint8_t>(0);
+  for (size_t i = 0; i < CC.voxelIdxList.size(); ++i) {
+    locmaxMaskData[CC.voxelIdxList[i][0]] = 1;
+  }
+  CC.voxelIdxList.clear();
+
+  std::vector<size_t> hist = img.histogram(0, locmaxMask);
+  locmaxMask.clear();
+
+  this->reportProgress(.8);
+
+  size_t low, high;
+  histNonZeroRange(hist, low, high);
+
+  if (low == high) { // flat img, return smallest possible value as threshold
+    this->reportProgress(1.0);
+    return img.dataRangeMin<TVoxel>();
+  }
+
+  // search in range [low, high-1]
+  // maximum position
+  size_t maxIndex = low;
+  for (size_t i = low + 1; i < high; ++i) {
+    if (hist[i] > hist[maxIndex]) {
+      maxIndex = i;
+    }
+  }
+  // minimum position
+  size_t minIndex = high - 1;
+  while (minIndex > maxIndex && hist[minIndex] == 0)
+    --minIndex;
+
+  for (size_t i = minIndex; i-- > maxIndex;) {
+    if (hist[i] && hist[i] < hist[minIndex]) {
+      minIndex = i;
+    }
+  }
+
+  if (maxIndex == minIndex) {
+    this->reportProgress(1.0);
+    return saturate_cast<TVoxel>(img.binRange(low - 1, hist.size()).first);
+  }
+
+  // normalize the histogram
+  std::vector<double> nhist(minIndex - maxIndex + 1);
+  double scale = (nhist.size() - 1.0) / (hist[maxIndex] * 1.0 - hist[minIndex]);
+  for (size_t i = 0; i < nhist.size(); ++i) {
+    nhist[i] = (hist[i + maxIndex] - hist[minIndex]) * scale;
+  }
+
+  size_t threBin = 0;
+  double bestScore = nhist[0];
+
+  for (size_t i = 1; i < nhist.size(); ++i) {
+    if (nhist[i] > 0) {
+      double score = nhist[i] + i;
+      if (score < bestScore) {
+        bestScore = score;
+        threBin = i;
+      }
+    }
+  }
+  threBin += maxIndex;
+
+  this->reportProgress(1.0);
+  return saturate_cast<TVoxel>(img.binRange(threBin, hist.size()).first);
+}
+
+template<bool ReportProgress>
+template<typename TVoxel>
 TVoxel ZImgAutoThreshold<ReportProgress>::typedCentroidThre(double& cent1, double& cent2, const ZImg& imgIn, size_t c,
                                                             size_t t)
 {
@@ -261,6 +361,46 @@ template int64_t ZImgAutoThreshold<false>::typedTriangleThre<int64_t>(const ZImg
 template float ZImgAutoThreshold<false>::typedTriangleThre<float>(const ZImg&, size_t, size_t);
 
 template double ZImgAutoThreshold<false>::typedTriangleThre<double>(const ZImg&, size_t, size_t);
+
+template uint8_t ZImgAutoThreshold<true>::typedTriangleThre<uint8_t>(const QString&, size_t, size_t, size_t);
+
+template uint16_t ZImgAutoThreshold<true>::typedTriangleThre<uint16_t>(const QString&, size_t, size_t, size_t);
+
+template uint32_t ZImgAutoThreshold<true>::typedTriangleThre<uint32_t>(const QString&, size_t, size_t, size_t);
+
+template uint64_t ZImgAutoThreshold<true>::typedTriangleThre<uint64_t>(const QString&, size_t, size_t, size_t);
+
+template int8_t ZImgAutoThreshold<true>::typedTriangleThre<int8_t>(const QString&, size_t, size_t, size_t);
+
+template int16_t ZImgAutoThreshold<true>::typedTriangleThre<int16_t>(const QString&, size_t, size_t, size_t);
+
+template int32_t ZImgAutoThreshold<true>::typedTriangleThre<int32_t>(const QString&, size_t, size_t, size_t);
+
+template int64_t ZImgAutoThreshold<true>::typedTriangleThre<int64_t>(const QString&, size_t, size_t, size_t);
+
+template float ZImgAutoThreshold<true>::typedTriangleThre<float>(const QString&, size_t, size_t, size_t);
+
+template double ZImgAutoThreshold<true>::typedTriangleThre<double>(const QString&, size_t, size_t, size_t);
+
+template uint8_t ZImgAutoThreshold<false>::typedTriangleThre<uint8_t>(const QString&, size_t, size_t, size_t);
+
+template uint16_t ZImgAutoThreshold<false>::typedTriangleThre<uint16_t>(const QString&, size_t, size_t, size_t);
+
+template uint32_t ZImgAutoThreshold<false>::typedTriangleThre<uint32_t>(const QString&, size_t, size_t, size_t);
+
+template uint64_t ZImgAutoThreshold<false>::typedTriangleThre<uint64_t>(const QString&, size_t, size_t, size_t);
+
+template int8_t ZImgAutoThreshold<false>::typedTriangleThre<int8_t>(const QString&, size_t, size_t, size_t);
+
+template int16_t ZImgAutoThreshold<false>::typedTriangleThre<int16_t>(const QString&, size_t, size_t, size_t);
+
+template int32_t ZImgAutoThreshold<false>::typedTriangleThre<int32_t>(const QString&, size_t, size_t, size_t);
+
+template int64_t ZImgAutoThreshold<false>::typedTriangleThre<int64_t>(const QString&, size_t, size_t, size_t);
+
+template float ZImgAutoThreshold<false>::typedTriangleThre<float>(const QString&, size_t, size_t, size_t);
+
+template double ZImgAutoThreshold<false>::typedTriangleThre<double>(const QString&, size_t, size_t, size_t);
 
 template uint8_t ZImgAutoThreshold<true>::typedCentroidThre<uint8_t>(double&, double&, const ZImg&, size_t, size_t);
 

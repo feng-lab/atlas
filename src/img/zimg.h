@@ -1273,6 +1273,55 @@ void image3DWrite(const TPixel* data, size_t width, size_t height, size_t depth,
   }                                                  \
 }
 
+#define IMGINFO_RETURN_TYPED_CALL(function, info, ...) {  \
+  if (info.voxelFormat == VoxelFormat::Unsigned) {            \
+    switch (info.bytesPerVoxel) {                   \
+    case 1:                                          \
+      return function<uint8_t>(__VA_ARGS__);         \
+      break;                                         \
+    case 2:                                          \
+      return function<uint16_t>(__VA_ARGS__);        \
+      break;                                         \
+    case 4:                                          \
+      return function<uint32_t>(__VA_ARGS__);        \
+      break;                                         \
+    case 8:                                          \
+      return function<uint64_t>(__VA_ARGS__);        \
+      break;                                         \
+    default:                                         \
+      break;                                         \
+    }                                                \
+  } else if (info.voxelFormat == VoxelFormat::Float) {        \
+    switch (info.bytesPerVoxel) {                   \
+    case 4:                                          \
+      return function<float>(__VA_ARGS__);           \
+      break;                                         \
+    case 8:                                          \
+      return function<double>(__VA_ARGS__);          \
+      break;                                         \
+    default:                                         \
+      break;                                         \
+    }                                                \
+  } else if (info.voxelFormat == VoxelFormat::Signed) {       \
+    switch (info.bytesPerVoxel) {                   \
+    case 1:                                          \
+      return function<int8_t>(__VA_ARGS__);          \
+      break;                                         \
+    case 2:                                          \
+      return function<int16_t>(__VA_ARGS__);         \
+      break;                                         \
+    case 4:                                          \
+      return function<int32_t>(__VA_ARGS__);         \
+      break;                                         \
+    case 8:                                          \
+      return function<int64_t>(__VA_ARGS__);         \
+      break;                                         \
+    default:                                         \
+      break;                                         \
+    }                                                \
+  }                                                  \
+}
+
 // for function that take 2 template argument
 // first one is derived from img, second one is provided by user
 #define IMG_TYPED_CALL_FIX2NDTYPE(function, img, T2ND, ...) {         \

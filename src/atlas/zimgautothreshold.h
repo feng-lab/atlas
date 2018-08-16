@@ -20,10 +20,25 @@ public:
     return 0;
   }
 
+  // for big image
+  template<typename TValue>
+  TValue triangleThre(const QString& filename, size_t c = 0, size_t t = 0, size_t scene = 0)
+  {
+    std::vector<ZImgInfo> infos = ZImg::readImgInfo(filename);
+    if (scene >= infos.size()) {
+      throw ZImgException("input scene");
+    }
+    IMGINFO_RETURN_TYPED_CALL(typedTriangleThre, infos[scene], filename, c, t, scene);
+    return 0;
+  }
+
   // in case you already know img type, call this version and pass type as template parameter
   // throw ZImgException if passed type don't match voxel type of imgIn
   template<typename TVoxel>
   TVoxel typedTriangleThre(const ZImg& imgIn, size_t c = 0, size_t t = 0);
+
+  template<typename TVoxel>
+  TVoxel typedTriangleThre(const QString& filename, size_t c = 0, size_t t = 0, size_t scene = 0);
 
   template<typename TValue>
   TValue centroidThre(double& cent1, double& cent2, const ZImg& img, size_t c = 0, size_t t = 0)

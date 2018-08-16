@@ -3,10 +3,13 @@
 #include "zimgprocess.h"
 #include "zeigenutils.h"
 #include "zpuncta.h"
-#include "zimg.h"
+#include "zimginfo.h"
+#include "zimgregion.h"
 #include <QList>
 
 namespace nim {
+
+class ZImg;
 
 class ZSwc;
 
@@ -93,13 +96,16 @@ protected:
 private:
   // all works are done here, detect from img with thre and put result into resList
   // img will be cleared after using
-  void detectImpl(ZImg& img, int thre, ZPuncta& resList, ZPuncta& filteredList,
+  void detectImpl(const ZImg& rawimg, size_t pc, size_t t,
+                  ZImg& img, int thre, ZPuncta& resList, ZPuncta& filteredList,
                   const Eigen::RowVectorXi& minLoc, double weight, double baseWeight);
 
+#if 0
   // detect puncta in soma area, save result in m_detectedSomaPuncta, return soma voxels
   // input preprcocessedImage contains only foreground voxels
   template<typename Image3DType>
   Eigen::MatrixXi detectSomaPuncta(const Image3DType* preprocessedImage);
+#endif
 
   // remove all detected punctum
   void cleanup();
@@ -116,25 +122,27 @@ private:
 
   // simple method, remove all tube based on its maximum radius (default use 2.6um)
   // typical soma diameter would be 10-15um
-  void detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& big);
+  void detectSomaMask(const ZImg& dendriteImg, Eigen::MatrixXi& small, Eigen::MatrixXi& big);
 
-  int cropOutSomaImg(ZImg& img, ZImg& somaImg, Eigen::RowVectorXi& minLoc);
+  int cropOutSomaImg(const Eigen::MatrixXi& somaMaskVoxelList, const Eigen::MatrixXi& bigSomaMaskVoxelList,
+                     ZImg& img, ZImg& somaImg, Eigen::RowVectorXi& minLoc);
 
   std::vector<Eigen::MatrixXi> watershedSplit(const ZImg& img) const;
 
   void getVoxelRange(const Eigen::MatrixXi& voxelLocations, Eigen::RowVectorXi& minLoc, Eigen::RowVectorXi& size);
 
-  Eigen::VectorXd getVoxelIntensities(const Eigen::MatrixXi& voxelLocations, const ZImg& img, size_t c, size_t t);
+  Eigen::VectorXd getVoxelIntensities(const Eigen::MatrixXi& voxelLocations, const ZImg& rawimg, size_t c, size_t t);
 
   // crop with minLoc and size, then set any voxel other than voxels in voxelLocations as zero
   // both img and res are uint8_t type
-  ZImg cropZImg(const Eigen::MatrixXi& voxelLocations, const nim::ZImg& img, size_t c, size_t t,
+  ZImg cropZImg(const Eigen::MatrixXi& voxelLocations, const ZImg& rawimg, size_t c, size_t t,
                 const Eigen::RowVectorXi& minLoc, const Eigen::RowVectorXi& size);
 
-  ZImg cropZImg(const nim::ZImg& img, size_t c, size_t t,
+  ZImg cropZImg(const ZImg& rawimg, size_t c, size_t t,
                 const Eigen::RowVectorXi& minLoc, const Eigen::RowVectorXi& size);
 
-  size_t getNumCenters(const Eigen::MatrixXi& voxelLocations, const Eigen::VectorXd& voxelIntensities,
+  size_t getNumCenters(const ZImg& rawimg, size_t pc, size_t t,
+                       const Eigen::MatrixXi& voxelLocations, const Eigen::VectorXd& voxelIntensities,
                        const ZImg& locmax, double saturatedIntensity, const Eigen::RowVectorXi& minLoc);
 
   // split voxels use vbgmm and save result puncta into detectedPunctaList
@@ -148,7 +156,6 @@ private:
 private:
   QString m_filename;
   ZImgInfo m_imgInfo;
-  ZImg m_img;
   size_t m_punctaChannel;
   size_t m_t;
 

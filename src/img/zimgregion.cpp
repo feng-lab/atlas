@@ -1,5 +1,7 @@
 #include "zimgregion.h"
 
+#include "zlog.h"
+
 namespace nim {
 
 bool ZImgRegion::containsCoord(const nim::ZVoxelCoordinate& coord, const nim::ZImgInfo& info) const
@@ -76,6 +78,31 @@ ZImgInfo ZImgRegion::clip(const ZImgInfo& info) const
   res.height = end.y >= 0 ? (end.y - start.y) : (info.height - start.y);
   res.width = end.x >= 0 ? (end.x - start.x) : (info.width - start.x);
   res.validBitCount = info.validBitCount;
+
+  return res;
+}
+
+std::vector<ZImgRegion>
+ZImgRegion::splitBigImage(const ZImgInfo& info, std::vector<ZImgRegion>& nonExpandRegions, size_t tileSize,
+                          size_t expand, int ch, int t)
+{
+  CHECK(expand < tileSize);
+  std::vector<ZImgRegion> res;
+  nonExpandRegions.clear();
+  int chs = ch < 0 ? 0 : ch;
+  int che = ch < 0 ? -1 : ch + 1;
+  int ts = t < 0 ? 0 : t;
+  int te = t < 0 ? -1 : t + 1;
+  for (size_t y = 0; y < info.height; y += tileSize) {
+    for (size_t x = 0; x < info.width; x += tileSize) {
+      nonExpandRegions.emplace_back(x, std::min(x + tileSize, info.width),
+                                    y, std::min(y + tileSize, info.height),
+                                    0, -1, chs, che, ts, te);
+      res.emplace_back(std::max(expand, x) - expand, std::min(x + tileSize + expand, info.width),
+                       std::max(expand, y) - expand, std::min(y + tileSize + expand, info.height),
+                       0, -1, chs, che, ts, te);
+    }
+  }
 
   return res;
 }

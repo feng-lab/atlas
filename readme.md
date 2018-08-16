@@ -22,7 +22,6 @@
 * $ROOT_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: -stdlib=libc++ -std=c++14
 * $ROOT_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: -stdlib=libc++ -std=c++14
 * $ROOT_DIR/src/3rdparty/makeengine.macos.gte: -std=c++14 -stdlib=libc++
-* $ROOT_DIR/src/atlas/zglmutil.h: #define GLM_FORCE_CXX14
 
 ## Minimum macOS Defines
 * $ROOT_DIR/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 10.10)

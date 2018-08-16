@@ -10,7 +10,6 @@
 //#define GLM_FORCE_MESSAGES
 #define GLM_FORCE_SWIZZLE
 #define GLM_ENABLE_EXPERIMENTAL
-#define GLM_HAS_CXX11_STL 1
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_precision.hpp>

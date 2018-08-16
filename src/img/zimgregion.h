@@ -161,6 +161,10 @@ struct ZImgRegion
   //inline value_type lStart() const { return start.l; }
   //inline value_type lEnd() const { return end.l; }
 
+  static std::vector<ZImgRegion> splitBigImage(const ZImgInfo& info, std::vector<ZImgRegion>& nonExpandRegions,
+                                               size_t tileSize = 1024, size_t expand = 0,
+                                               int ch = -1, int t = -1);
+
   ZVoxelCoordinate start;
   ZVoxelCoordinate end;
 };

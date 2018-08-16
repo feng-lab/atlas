@@ -114,10 +114,10 @@ Eigen::MatrixXd meanShiftGaussianCenters(const nim::ZVBGMM<T, double>& vbgmm, co
                 z_shifts.push_back(lz);
               }
             }
-        double value_sum = std::accumulate(values.begin(), values.end(), 0);
-        epsx = std::inner_product(values.begin(), values.end(), x_shifts.begin(), 0) / value_sum;
-        epsy = std::inner_product(values.begin(), values.end(), y_shifts.begin(), 0) / value_sum;
-        epsz = std::inner_product(values.begin(), values.end(), z_shifts.begin(), 0) / value_sum;
+        double value_sum = std::accumulate(values.begin(), values.end(), 0.);
+        epsx = std::inner_product(values.begin(), values.end(), x_shifts.begin(), 0.) / value_sum;
+        epsy = std::inner_product(values.begin(), values.end(), y_shifts.begin(), 0.) / value_sum;
+        epsz = std::inner_product(values.begin(), values.end(), z_shifts.begin(), 0.) / value_sum;
         if (std::abs(epsx) > 0.5)
           m.x() += epsx > 0 ? 1 : -1;
         if (std::abs(epsy) > 0.5)
@@ -143,9 +143,9 @@ Eigen::MatrixXd meanShiftGaussianCenters(const nim::ZVBGMM<T, double>& vbgmm, co
               y_shifts.push_back(y);
             }
           }
-        double value_sum = std::accumulate(values.begin(), values.end(), 0);
-        epsx = std::inner_product(values.begin(), values.end(), x_shifts.begin(), 0) / value_sum;
-        epsy = std::inner_product(values.begin(), values.end(), y_shifts.begin(), 0) / value_sum;
+        double value_sum = std::accumulate(values.begin(), values.end(), 0.);
+        epsx = std::inner_product(values.begin(), values.end(), x_shifts.begin(), 0.) / value_sum;
+        epsy = std::inner_product(values.begin(), values.end(), y_shifts.begin(), 0.) / value_sum;
         if (std::abs(epsx) > 0.5)
           m.x() += epsx > 0 ? 1 : -1;
         if (std::abs(epsy) > 0.5)
@@ -170,7 +170,6 @@ ZPunctaDetection::ZPunctaDetection(const QString& filename, size_t punctaChannel
   , m_punctaChannel(punctaChannel)
   , m_t(t)
 {
-  m_img.load(m_filename);
 }
 
 ZPunctaDetection::ZPunctaDetection(const QString& filename, const ZImgInfo& imgInfo, size_t punctaChannel, size_t t)
@@ -181,35 +180,29 @@ ZPunctaDetection::ZPunctaDetection(const QString& filename, const ZImgInfo& imgI
 
 void ZPunctaDetection::doWork()
 {
-  // todo: select time spot
-  if (!m_img.is3DImg() && !m_img.is2DImg()) {
-    throw ZImgException(QString("Can not detect puncta from time sequence image"));
-  }
-  if (!m_img.isType<uint8_t>()) {
-    m_img = m_img.convertNormalizedTo<uint8_t>();
-  }
-
   cleanup();
 
   LOG(INFO) << "";
   LOG(INFO) << "Start Detect Puncta";
   LOG(INFO) << "";
 
-  if (m_punctaChannel < m_img.numChannels()) {
+  LOG(INFO) << m_imgInfo.toQString();
+
+  if (m_punctaChannel < m_imgInfo.numChannels) {
     LOG(INFO) << "Puncta Channel: " << m_punctaChannel + 1 << " (start from 1)";
   } else {
     throw ZImgException(QString("Wrong puncta channel: %1. Abort.").arg(m_punctaChannel));
   }
 
   if (m_dendriteChannel != -1) {
-    if (m_dendriteChannel >= 0 && m_dendriteChannel < static_cast<int>(m_img.numChannels())) {
+    if (m_dendriteChannel >= 0 && m_dendriteChannel < static_cast<int>(m_imgInfo.numChannels)) {
       LOG(INFO) << "Dendrite Channel: " << m_dendriteChannel + 1 << " (start from 1)";
       LOG(INFO) << "Dendrite Threshold: " << m_dendriteThreshold;
       LOG(INFO) << "Max Dendrite Tube Radius: " << m_maxDendriteTubeRadius << "um";
     } else {
       throw ZImgException(QString("Wrong dendrite channel: %1. Abort.").arg(m_dendriteChannel));
     }
-    if (m_img.info().voxelSizeUnit == VoxelSizeUnit::none) {
+    if (m_imgInfo.voxelSizeUnit == VoxelSizeUnit::none) {
       throw ZImgException(
         "Voxel Size not set (need by soma detection and puncta-tree matching), Abort Puncta Detection.");
     }
@@ -228,17 +221,121 @@ void ZPunctaDetection::doWork()
 
   setTotalSubOperationWeight(totalSubWeight);
 
+  double punctaChannelMinValue = std::numeric_limits<double>::max();
+  double punctaChannelMaxValue = std::numeric_limits<double>::lowest();
+  double dendriteChannelMinValue = std::numeric_limits<double>::max();
+  double dendriteChannelMaxValue = std::numeric_limits<double>::lowest();
+  ZImgRegion punctaChannelRegion(0, -1, 0, -1, 0, -1, m_punctaChannel, m_punctaChannel + 1, m_t, m_t + 1);
+  ZImgRegion dendriteChannelRegion(0, -1, 0, -1, 0, -1, m_dendriteChannel, m_dendriteChannel + 1, m_t, m_t + 1);
+  if (ZCpuInfo::instance().nPhysicalRAM >= 1.25 * m_imgInfo.channelByteNumber()) { // enough memory
+    ZImg cimg(m_filename, punctaChannelRegion, 0);
+    cimg.computeMinMax(punctaChannelMinValue, punctaChannelMaxValue);
+    if (m_dendriteChannel != -1) {
+      cimg = ZImg(m_filename, dendriteChannelRegion, 0);
+      cimg.computeMinMax(dendriteChannelMinValue, dendriteChannelMaxValue);
+    }
+  } else {
+    std::vector<ZImgRegion> nonexpandRegions;
+    std::vector<ZImgRegion> rgns = ZImgRegion::splitBigImage(m_imgInfo, nonexpandRegions, 1024, 0, m_punctaChannel, m_t);
+    for (const auto& rgn : rgns) {
+      ZImg cimg(m_filename, rgn, 0);
+      double blockmin;
+      double blockmax;
+      cimg.computeMinMax(blockmin, blockmax);
+      punctaChannelMinValue = std::min(punctaChannelMinValue, blockmin);
+      punctaChannelMaxValue = std::max(punctaChannelMaxValue, blockmax);
+    }
+    if (m_dendriteChannel != -1) {
+      rgns = ZImgRegion::splitBigImage(m_imgInfo, nonexpandRegions, 1024, 0, m_dendriteChannel, m_t);
+      for (const auto& rgn : rgns) {
+        ZImg cimg(m_filename, rgn, 0);
+        double blockmin;
+        double blockmax;
+        cimg.computeMinMax(blockmin, blockmax);
+        dendriteChannelMinValue = std::min(dendriteChannelMinValue, blockmin);
+        dendriteChannelMaxValue = std::max(dendriteChannelMaxValue, blockmax);
+      }
+    }
+  };
+
+  bool imageTooBig = ZCpuInfo::instance().nPhysicalRAM < m_imgInfo.channelVoxelNumber() * 4;
+
+  Eigen::MatrixXi somaMaskVoxelList(0, 3);
+  Eigen::MatrixXi bigSomaMaskVoxelList(0, 3);
+  if (m_dendriteChannel != -1) {
+    LOG(INFO) << "Start Soma Detection";
+    if (!imageTooBig) { // enough memory
+      ZImg dendriteImg(m_filename, dendriteChannelRegion, 0);
+      if (!dendriteImg.isType<uint8_t>()) {
+        dendriteImg = dendriteImg.convertTo<uint8_t>(dendriteChannelMinValue, dendriteChannelMaxValue);
+      }
+
+      detectSomaMask(dendriteImg, somaMaskVoxelList, bigSomaMaskVoxelList);
+    } else {
+      std::vector<ZImgRegion> nonexpandRegions;
+      std::vector<ZImgRegion> rgns = ZImgRegion::splitBigImage(m_imgInfo, nonexpandRegions,
+                                                               2048, 256, m_dendriteChannel, m_t);
+      for (size_t rgni = 0; rgni < rgns.size(); ++rgni) {
+        const ZImgRegion& rgn = rgns[rgni];
+        const ZImgRegion& validRgn = nonexpandRegions[rgni];
+        ZImg cimg(m_filename, rgn, 0);
+        if (!cimg.isType<uint8_t>()) {
+          cimg = cimg.convertTo<uint8_t>(dendriteChannelMinValue, dendriteChannelMaxValue);
+        }
+        Eigen::MatrixXi blockSomaMaskVoxelList;
+        Eigen::MatrixXi blockBigSomaMaskVoxelList;
+        detectSomaMask(cimg, blockSomaMaskVoxelList, blockBigSomaMaskVoxelList);
+        Eigen::RowVectorXi voxelStart(3);
+        voxelStart(0) = rgn.xStart();
+        voxelStart(1) = rgn.yStart();
+        voxelStart(2) = 0;
+        blockSomaMaskVoxelList.rowwise() += voxelStart;
+        blockBigSomaMaskVoxelList.rowwise() += voxelStart;
+
+        for (Eigen::Index r = 0; r < blockSomaMaskVoxelList.rows(); ++r) {
+          if (validRgn.xInRegion(blockSomaMaskVoxelList(r, 0)) && validRgn.yInRegion(blockSomaMaskVoxelList(r, 1))) {
+            somaMaskVoxelList.conservativeResize(somaMaskVoxelList.rows() + 1, Eigen::NoChange);
+            somaMaskVoxelList.row(somaMaskVoxelList.rows() - 1) = blockSomaMaskVoxelList.row(r);
+          }
+        }
+        for (Eigen::Index r = 0; r < blockBigSomaMaskVoxelList.rows(); ++r) {
+          if (validRgn.xInRegion(blockBigSomaMaskVoxelList(r, 0)) && validRgn.yInRegion(blockBigSomaMaskVoxelList(r, 1))) {
+            bigSomaMaskVoxelList.conservativeResize(bigSomaMaskVoxelList.rows() + 1, Eigen::NoChange);
+            bigSomaMaskVoxelList.row(bigSomaMaskVoxelList.rows() - 1) = blockBigSomaMaskVoxelList.row(r);
+          }
+        }
+      }
+    }
+    LOG(INFO) << "End Soma Detection";
+  }
+
+  ZImg punctaImg;
+
+  if (!imageTooBig) {
+    punctaImg = ZImg(m_filename, punctaChannelRegion, 0);
+    if (!punctaImg.isType<uint8_t>()) {
+      punctaImg = punctaImg.convertTo<uint8_t>(punctaChannelMinValue, punctaChannelMaxValue);
+    }
+  }
   // get threshold
   if (m_punctaThreshold == -1) {
     ZImgAutoThreshold<true> imgAutoThre;
     registerSubOperation(&imgAutoThre, .1);
-    m_punctaThreshold = imgAutoThre.triangleThre<uint8_t>(m_img, m_punctaChannel, m_t) + 3;
+    if (imageTooBig) {
+      m_punctaThreshold = imgAutoThre.triangleThre<uint8_t>(m_filename, m_punctaChannel, m_t, 0);
+    } else {
+      m_punctaThreshold = imgAutoThre.triangleThre<uint8_t>(punctaImg, 0, 0) + 3;
+    }
   }
-  LOG(INFO) << "Voxel Size X: " << m_img.voxelSizeXInUm() << "um";
-  LOG(INFO) << "Voxel Size Y: " << m_img.voxelSizeYInUm() << "um";
-  LOG(INFO) << "Voxel Size Z: " << m_img.voxelSizeZInUm() << "um";
-  LOG(INFO) << "Use puncta threshold: " << m_punctaThreshold;
-  LOG(INFO) << "Use split size threshold: " << m_splitSizeThreshold;
+  LOG(INFO) << "Voxel Size X: " << m_imgInfo.voxelSizeXInUm() << "um";
+  LOG(INFO) << "Voxel Size Y: " << m_imgInfo.voxelSizeYInUm() << "um";
+  LOG(INFO) << "Voxel Size Z: " << m_imgInfo.voxelSizeZInUm() << "um";
+  LOG(INFO) << "Puncta Channel Range: (" << punctaChannelMinValue << ", " << punctaChannelMaxValue << ")";
+  if (m_dendriteChannel != -1) {
+    LOG(INFO) << "Dendrite Channel Range: (" << dendriteChannelMinValue << ", " << dendriteChannelMaxValue << ")";
+  }
+  LOG(INFO) << "Use Puncta Threshold: " << m_punctaThreshold;
+  LOG(INFO) << "Use Split Size Threshold: " << m_splitSizeThreshold;
   LOG(INFO) << "Confidence Region for Radius Estimate: " << m_confRadius;
   LOG(INFO) << "Confidence Region for Gaussian Models Overlap Rate: " << m_confOverlapArea;
   LOG(INFO) << "Overlap Rate Threshold: " << m_overlapRateThreshold;
@@ -247,27 +344,34 @@ void ZPunctaDetection::doWork()
   LOG(INFO) << "Ambiguous Factor: " << m_ambiguousFactor;
   LOG(INFO) << "Saturate Intensity: " << 255;
 
-  ZImg img = m_img.extractChannel(m_punctaChannel, m_t);
   if (m_dendriteChannel != -1) {
-    ZImg somaImg;
+    ZImg somaPunctaImg;
+    ZImg otherPunctaImg = punctaImg;
     Eigen::RowVectorXi minLoc;
-    LOG(INFO) << "Start Soma Detection";
-    int somaThre = cropOutSomaImg(img, somaImg, minLoc);
-    LOG(INFO) << "End Soma Detection";
-    if (somaThre != -1) {
-      LOG(INFO) << "Use puncta threshold in soma area: " << somaThre;
+    int somaPunctaThreshold = cropOutSomaImg(somaMaskVoxelList, bigSomaMaskVoxelList,
+                                             otherPunctaImg, somaPunctaImg, minLoc);
+    if (somaPunctaThreshold != -1) {
+      LOG(INFO) << "Use puncta threshold in soma area: " << somaPunctaThreshold;
       LOG(INFO) << "Start Detect Puncta in Soma";
-      detectImpl(somaImg, somaThre, m_detectedSomaPuncta, m_filteredSomaPuncta, minLoc, 0.1, 0.0);
+      detectImpl(punctaImg, 0, 0,
+                 somaPunctaImg, somaPunctaThreshold, m_detectedSomaPuncta, m_filteredSomaPuncta,
+                 minLoc, 0.1, 0.0);
       LOG(INFO) << "End Detect Puncta in Soma";
       LOG(INFO) << "";
     } else {
       LOG(INFO) << "Can not detect any soma!";
       LOG(INFO) << "";
     }
-    detectImpl(img, m_punctaThreshold, m_detectedPuncta, m_filteredPuncta, Eigen::RowVectorXi::Zero(3), 0.9, 0.1);
+    detectImpl(punctaImg, 0, 0,
+               otherPunctaImg, m_punctaThreshold, m_detectedPuncta, m_filteredPuncta,
+               Eigen::RowVectorXi::Zero(3), 0.9, 0.1);
   } else {
-    detectImpl(img, m_punctaThreshold, m_detectedPuncta, m_filteredPuncta, Eigen::RowVectorXi::Zero(3), 1.0, 0.0);
+    ZImg otherPunctaImg = punctaImg;
+    detectImpl(punctaImg, 0, 0,
+               otherPunctaImg, m_punctaThreshold, m_detectedPuncta, m_filteredPuncta,
+               Eigen::RowVectorXi::Zero(3), 1.0, 0.0);
   }
+  punctaImg.clear();
 
   LOG(INFO) << "";
   LOG(INFO) << "End Detect Puncta";
@@ -283,7 +387,11 @@ void ZPunctaDetection::doWork()
   }
 
   if (!m_swcTrees.empty() && m_dendriteChannel != -1) {
-    ZAssignPuncta assignPuncta(m_img, m_dendriteChannel, m_t);
+    ZImg dendriteImg(m_filename, dendriteChannelRegion);
+    if (!dendriteImg.isType<uint8_t>()) {
+      dendriteImg = dendriteImg.convertTo<uint8_t>(dendriteChannelMinValue, dendriteChannelMaxValue);
+    }
+    ZAssignPuncta assignPuncta(dendriteImg, 0, 0);
     assignPuncta.addSwcTrees(m_swcTrees);
     assignPuncta.setAmbiguousFactor(m_ambiguousFactor);
     assignPuncta.setMaxDistToBranchInUm(m_maxDistToBranch);
@@ -300,7 +408,7 @@ void ZPunctaDetection::doWork()
       puncta.save(fn);
     }
     ZPuncta puncta = assignPuncta.getAmbiguousPuncta();
-    if (puncta.size() > 0) {
+    if (!puncta.empty()) {
       QString fn = getAmbiguousPunctaOutputFileName();
       puncta.save(fn);
     }
@@ -347,7 +455,8 @@ ZPunctaDetection::getOverlapRateOfTwoErrorEllipse(Eigen::RowVectorXd m1, Eigen::
   }
 }
 
-void ZPunctaDetection::detectImpl(ZImg& img, int thre, ZPuncta& resList, ZPuncta& filteredList,
+void ZPunctaDetection::detectImpl(const ZImg& rawimg, size_t pc, size_t t,
+                                  ZImg& img, int thre, ZPuncta& resList, ZPuncta& filteredList,
                                   const Eigen::RowVectorXi& minLocIn, double weight, double baseWeight)
 {
   double saturatedIntensity = 255;
@@ -391,7 +500,7 @@ void ZPunctaDetection::detectImpl(ZImg& img, int thre, ZPuncta& resList, ZPuncta
 
     if (voxels.rows() < m_splitSizeThreshold) {  // no split, save to punctum
       LOG(INFO) << "  No split for this Connected Component, save to punctum.";
-      Eigen::VectorXd voxelIntensities = getVoxelIntensities(voxels, m_img, m_punctaChannel, m_t);
+      Eigen::VectorXd voxelIntensities = getVoxelIntensities(voxels, rawimg, pc, t);
       ZPunctum punc;
       punc.setVoxelIntensities(voxelIntensities);
       punc.setVoxelLocations(voxels);
@@ -404,7 +513,7 @@ void ZPunctaDetection::detectImpl(ZImg& img, int thre, ZPuncta& resList, ZPuncta
       Eigen::RowVectorXi minLoc;
       Eigen::RowVectorXi size;
       getVoxelRange(voxels, minLoc, size);
-      ZImg cropImg = cropZImg(voxels, m_img, m_punctaChannel, m_t, minLoc, size);
+      ZImg cropImg = cropZImg(voxels, rawimg, pc, t, minLoc, size);
       std::vector<Eigen::MatrixXi> wsObjects = watershedSplit(cropImg);
       LOG(INFO) << "    Number of Watershed Components: " << wsObjects.size();
       for (size_t wsObjIdx = 0; wsObjIdx < wsObjects.size(); ++wsObjIdx) {
@@ -423,7 +532,8 @@ void ZPunctaDetection::detectImpl(ZImg& img, int thre, ZPuncta& resList, ZPuncta
           resList.push_back(punc);
         } else { // go to vbgmm
           LOG(INFO) << "    Start VBGMM Split for Watershed Component " << wsObjIdx + 1;
-          int numCenter = getNumCenters(wsObjVoxelLocs, wsObjVoxelIntens, locmax, saturatedIntensity, minLocIn);
+          int numCenter = getNumCenters(rawimg, pc, t,
+                                        wsObjVoxelLocs, wsObjVoxelIntens, locmax, saturatedIntensity, minLocIn);
           LOG(INFO) << "      Number of voxels: " << wsObjVoxelIntens.size();
           LOG(INFO) << "      Initial number of centers: " << numCenter;
           if (numCenter == 1) {
@@ -614,12 +724,12 @@ QString ZPunctaDetection::getFilteredSomaPunctaFilename()
   }
 }
 
-void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& big)
+void ZPunctaDetection::detectSomaMask(const ZImg& dendriteImg, Eigen::MatrixXi& small, Eigen::MatrixXi& big)
 {
   size_t numThreads = m_useMultithreading ? ZCpuInfo::instance().nLogicalCores : 1;
   using Image3DType = itk::Image<uint8_t, 3>;
   using BinaryImage3DType = itk::Image<bool, 3>;
-  Image3DType::Pointer image = wrapZImgChannelAsITKImg<uint8_t>(m_img, m_dendriteChannel, m_t);
+  Image3DType::Pointer image = wrapZImgChannelAsITKImg<uint8_t>(dendriteImg, 0, 0);
 
   using BinaryThresholdImageFilterType = itk::BinaryThresholdImageFilter<Image3DType, BinaryImage3DType>;
   BinaryThresholdImageFilterType::Pointer thresholdFilter
@@ -629,8 +739,8 @@ void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& b
   thresholdFilter->SetNumberOfWorkUnits(numThreads);
   registerSubOperation(thresholdFilter.GetPointer(), .45 * .2);
 
-  double tubeRadiusX = std::floor(m_maxDendriteTubeRadius / m_img.voxelSizeXInUm());
-  double tubeRadiusY = std::floor(m_maxDendriteTubeRadius / m_img.voxelSizeYInUm());
+  double tubeRadiusX = std::floor(m_maxDendriteTubeRadius / m_imgInfo.voxelSizeXInUm());
+  double tubeRadiusY = std::floor(m_maxDendriteTubeRadius / m_imgInfo.voxelSizeYInUm());
 
   using StructuringElement2DType = itk::Neighborhood<bool, 2>;
   StructuringElement2DType::SizeType radius;
@@ -667,9 +777,9 @@ void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& b
 
   using StructuringElementType = itk::FlatStructuringElement<3>;
   StructuringElementType::RadiusType dlElementRadius;
-  dlElementRadius[0] = std::max(1., std::floor(.32 / m_img.voxelSizeXInUm()));
-  dlElementRadius[1] = std::max(1., std::floor(.32 / m_img.voxelSizeYInUm()));
-  dlElementRadius[2] = std::max(1., std::floor(1.2 / m_img.voxelSizeZInUm()));
+  dlElementRadius[0] = std::max(1., std::floor(.32 / m_imgInfo.voxelSizeXInUm()));
+  dlElementRadius[1] = std::max(1., std::floor(.32 / m_imgInfo.voxelSizeYInUm()));
+  dlElementRadius[2] = std::max(1., std::floor(1.2 / m_imgInfo.voxelSizeZInUm()));
   StructuringElementType dlStructuringElement = StructuringElementType::Box(dlElementRadius);
 
   using BinaryDilateImageFilterType
@@ -681,16 +791,11 @@ void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& b
   dilateFilter->SetNumberOfWorkUnits(numThreads);
   registerSubOperation(dilateFilter.GetPointer(), .45 * .3);
 
-  using StreamingFilterType = itk::StreamingImageFilter<BinaryImage3DType, BinaryImage3DType>;
-  StreamingFilterType::Pointer streamingFilter = StreamingFilterType::New();
-  streamingFilter->SetInput(dilateFilter->GetOutput());
-  streamingFilter->SetNumberOfStreamDivisions(m_img.channelByteNumber() / 1024 / 1024 / 1024);
-
-  streamingFilter->Update();
+  dilateFilter->Update();
   using ConstIteratorType = itk::ImageRegionConstIterator<BinaryImage3DType>;
   std::vector<int> coords;
 
-  ConstIteratorType maskIt(streamingFilter->GetOutput(), streamingFilter->GetOutput()->GetLargestPossibleRegion());
+  ConstIteratorType maskIt(dilateFilter->GetOutput(), dilateFilter->GetOutput()->GetLargestPossibleRegion());
   maskIt.GoToBegin();
   coords.clear();
   while (!maskIt.IsAtEnd()) {
@@ -713,14 +818,14 @@ void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& b
     }
   }
 
-  dlElementRadius[0] = std::max(1., std::floor(.42 / m_img.voxelSizeXInUm()));
-  dlElementRadius[1] = std::max(1., std::floor(.42 / m_img.voxelSizeYInUm()));
-  dlElementRadius[2] = std::max(1., std::floor(1.8 / m_img.voxelSizeZInUm()));
+  dlElementRadius[0] = std::max(1., std::floor(.42 / m_imgInfo.voxelSizeXInUm()));
+  dlElementRadius[1] = std::max(1., std::floor(.42 / m_imgInfo.voxelSizeYInUm()));
+  dlElementRadius[2] = std::max(1., std::floor(1.8 / m_imgInfo.voxelSizeZInUm()));
   dlStructuringElement = StructuringElementType::Box(dlElementRadius);
   dilateFilter->SetKernel(dlStructuringElement);
-  streamingFilter->Update();
+  dilateFilter->Update();
 
-  ConstIteratorType maskIt2(streamingFilter->GetOutput(), streamingFilter->GetOutput()->GetLargestPossibleRegion());
+  ConstIteratorType maskIt2(dilateFilter->GetOutput(), dilateFilter->GetOutput()->GetLargestPossibleRegion());
   maskIt2.GoToBegin();
   coords.clear();
   while (!maskIt2.IsAtEnd()) {
@@ -744,11 +849,10 @@ void ZPunctaDetection::detectSomaMask(Eigen::MatrixXi& small, Eigen::MatrixXi& b
   }
 }
 
-int ZPunctaDetection::cropOutSomaImg(ZImg& img, ZImg& somaImg, Eigen::RowVectorXi& minLoc)
+int ZPunctaDetection::cropOutSomaImg(const Eigen::MatrixXi& somaMaskVoxelList,
+                                     const Eigen::MatrixXi& bigSomaMaskVoxelList,
+                                     ZImg& img, ZImg& somaImg, Eigen::RowVectorXi& minLoc)
 {
-  Eigen::MatrixXi somaMaskVoxelList;
-  Eigen::MatrixXi bigSomaMaskVoxelList;
-  detectSomaMask(somaMaskVoxelList, bigSomaMaskVoxelList);
   if (somaMaskVoxelList.rows() == 0) {
     return -1;
   }
@@ -900,16 +1004,16 @@ void ZPunctaDetection::getVoxelRange(const Eigen::MatrixXi& voxelLocations, Eige
 }
 
 Eigen::VectorXd
-ZPunctaDetection::getVoxelIntensities(const Eigen::MatrixXi& voxelLocations, const ZImg& img, size_t c, size_t t)
+ZPunctaDetection::getVoxelIntensities(const Eigen::MatrixXi& voxelLocations, const ZImg& rawimg, size_t c, size_t t)
 {
   Eigen::VectorXd voxelIntensities(voxelLocations.rows());
   for (int i = 0; i < voxelLocations.rows(); ++i) {
-    voxelIntensities(i) = *img.data<uint8_t>(voxelLocations(i, 0), voxelLocations(i, 1), voxelLocations(i, 2), c, t);
+    voxelIntensities(i) = *rawimg.data<uint8_t>(voxelLocations(i, 0), voxelLocations(i, 1), voxelLocations(i, 2), c, t);
   }
   return voxelIntensities;
 }
 
-ZImg ZPunctaDetection::cropZImg(const Eigen::MatrixXi& voxelLocations, const ZImg& img, size_t c, size_t t,
+ZImg ZPunctaDetection::cropZImg(const Eigen::MatrixXi& voxelLocations, const ZImg& rawimg, size_t c, size_t t,
                                 const Eigen::RowVectorXi& minLoc, const Eigen::RowVectorXi& size)
 {
   ZImg res(nim::ZImgInfo(size(0), size(1), size(2)));
@@ -920,7 +1024,7 @@ ZImg ZPunctaDetection::cropZImg(const Eigen::MatrixXi& voxelLocations, const ZIm
                                                    t);
     ZVoxelCoordinate resCoord = stackCoord - minCoord;
     if (res.isCoordValid(resCoord)) {
-      *res.data<uint8_t>(resCoord) = *img.data<uint8_t>(stackCoord);
+      *res.data<uint8_t>(resCoord) = *rawimg.data<uint8_t>(stackCoord);
       if (*res.data<uint8_t>(resCoord) == 0)
         numZeros++;
     }
@@ -929,15 +1033,16 @@ ZImg ZPunctaDetection::cropZImg(const Eigen::MatrixXi& voxelLocations, const ZIm
   return res;
 }
 
-ZImg ZPunctaDetection::cropZImg(const ZImg& img, size_t c, size_t t, const Eigen::RowVectorXi& minLoc,
+ZImg ZPunctaDetection::cropZImg(const ZImg& rawimg, size_t c, size_t t, const Eigen::RowVectorXi& minLoc,
                                 const Eigen::RowVectorXi& size)
 {
   ZImgRegion rgn(minLoc(0), minLoc(0) + size(0), minLoc(1), minLoc(1) + size(1), minLoc(2), minLoc(2) + size(2), c,
                  c + 1, t, t + 1);
-  return img.crop(rgn);
+  return rawimg.crop(rgn);
 }
 
-size_t ZPunctaDetection::getNumCenters(const Eigen::MatrixXi& voxelLocations, const Eigen::VectorXd& voxelIntensities,
+size_t ZPunctaDetection::getNumCenters(const ZImg& rawimg, size_t pc, size_t t,
+                                       const Eigen::MatrixXi& voxelLocations, const Eigen::VectorXd& voxelIntensities,
                                        const ZImg& locmax, double saturatedIntensity,
                                        const Eigen::RowVectorXi& minLocIn)
 {
@@ -956,7 +1061,7 @@ size_t ZPunctaDetection::getNumCenters(const Eigen::MatrixXi& voxelLocations, co
     Eigen::RowVectorXi minLoc;
     Eigen::RowVectorXi size;
     getVoxelRange(voxelLocations, minLoc, size);
-    ZImg cropCenter = cropZImg(voxelLocations, m_img, m_punctaChannel, m_t, minLoc, size);
+    ZImg cropCenter = cropZImg(voxelLocations, rawimg, pc, t, minLoc, size);
     // leave only saturated center
     cropCenter = cropCenter.binarized(saturatedIntensity, ZImg::ThresholdMode::IncludeThreshold);
     cropCenter = cropCenter.projectAlongDim(Dimension::Z, ZImg::CombineMode::Max);

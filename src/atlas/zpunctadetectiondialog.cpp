@@ -80,6 +80,10 @@ void ZPunctaDetectionDialog::detect()
     QMessageBox::critical(this, qApp->applicationName(), "No Image to detect.");
     return;
   }
+  if (imgInfo.numTimes != 1) {
+    QMessageBox::critical(this, qApp->applicationName(), "Can not detect puncta from time sequence image.");
+    return;
+  }
   if (m_outputPunctaFileWidget->getSelectedSaveFile().isEmpty()) {
     QMessageBox::critical(this, qApp->applicationName(), "Result puncta file must be specified.");
     return;
