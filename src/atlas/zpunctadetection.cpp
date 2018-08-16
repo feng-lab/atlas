@@ -164,18 +164,31 @@ Eigen::MatrixXd meanShiftGaussianCenters(const nim::ZVBGMM<T, double>& vbgmm, co
 
 namespace nim {
 
-ZPunctaDetection::ZPunctaDetection(const ZImg& img, size_t punctaChannel, size_t t)
-  : m_img(img)
+ZPunctaDetection::ZPunctaDetection(const QString& filename, size_t punctaChannel, size_t t)
+  : m_filename(filename)
+  , m_imgInfo(ZImg::readImgInfo(filename).at(0))
   , m_punctaChannel(punctaChannel)
   , m_t(t)
 {
-  if (!m_img.isType<uint8_t>()) {
-    throw ZImgException("puncta detecion only support uint8_t img");
-  }
+  m_img.load(m_filename);
+}
+
+ZPunctaDetection::ZPunctaDetection(const QString& filename, const ZImgInfo& imgInfo, size_t punctaChannel, size_t t)
+  : ZPunctaDetection(filename, punctaChannel, t)
+{
+  m_imgInfo = imgInfo;
 }
 
 void ZPunctaDetection::doWork()
 {
+  // todo: select time spot
+  if (!m_img.is3DImg() && !m_img.is2DImg()) {
+    throw ZImgException(QString("Can not detect puncta from time sequence image"));
+  }
+  if (!m_img.isType<uint8_t>()) {
+    m_img = m_img.convertNormalizedTo<uint8_t>();
+  }
+
   cleanup();
 
   LOG(INFO) << "";

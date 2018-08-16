@@ -11,7 +11,7 @@
 #define GLM_FORCE_SWIZZLE
 #define GLM_ENABLE_EXPERIMENTAL
 #if defined(__GLIBCPP__) || defined(__GLIBCXX__)
-#define GLM_FORCE_CXX14
+#define GLM_HAS_CXX11_STL
 #endif
 
 #include <glm/glm.hpp>

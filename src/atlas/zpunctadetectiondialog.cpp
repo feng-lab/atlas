@@ -54,7 +54,7 @@ ZPunctaDetectionDialog::ZPunctaDetectionDialog(QWidget* parent)
 void ZPunctaDetectionDialog::detect()
 {
   focusNextChild();
-  ZImg img;
+  ZImgInfo imgInfo;
 #ifdef _NEUTUBE_
   if (m_useCurrentActiveImage.get() && m_doc && m_doc->hasStackData()) {
     img = wrapZStackAsZImg(*m_doc->stack());
@@ -62,7 +62,7 @@ void ZPunctaDetectionDialog::detect()
 #endif
   if (!m_useCurrentActiveImage.get() && QFile::exists(m_inputImageFileWidget->getSelectedOpenFile())) {
     try {
-      img.load(m_inputImageFileWidget->getSelectedOpenFile());
+      imgInfo = ZImg::readImgInfo(m_inputImageFileWidget->getSelectedOpenFile()).at(0);
 #ifndef _NEUTUBE_
 
 #else
@@ -73,21 +73,12 @@ void ZPunctaDetectionDialog::detect()
 #endif
     }
     catch (const ZException& e) {
-      QMessageBox::critical(this, qApp->applicationName(), "Read Image Error.\n" + e.what());
-      return;
-    }
-    // todo: select time spot
-    if (!img.is3DImg() && !img.is2DImg()) {
-      QMessageBox::critical(this, qApp->applicationName(),
-                            QString("Can not detect puncta from time sequence image"));
+      QMessageBox::critical(this, qApp->applicationName(), "Read Image Info Error.\n" + e.what());
       return;
     }
   } else {
     QMessageBox::critical(this, qApp->applicationName(), "No Image to detect.");
     return;
-  }
-  if (!img.isType<uint8_t>()) {
-    img = img.convertNormalizedTo<uint8_t>();
   }
   if (m_outputPunctaFileWidget->getSelectedSaveFile().isEmpty()) {
     QMessageBox::critical(this, qApp->applicationName(), "Result puncta file must be specified.");
@@ -108,10 +99,10 @@ void ZPunctaDetectionDialog::detect()
       QMessageBox::critical(this, qApp->applicationName(), "Image Resolution is not correct.");
       return;
     }
-    img.infoRef().voxelSizeUnit = VoxelSizeUnit::um;
-    img.infoRef().voxelSizeX = m_voxelSize.get().x;
-    img.infoRef().voxelSizeY = m_voxelSize.get().y;
-    img.infoRef().voxelSizeZ = m_voxelSize.get().z;
+    imgInfo.voxelSizeUnit = VoxelSizeUnit::um;
+    imgInfo.voxelSizeX = m_voxelSize.get().x;
+    imgInfo.voxelSizeY = m_voxelSize.get().y;
+    imgInfo.voxelSizeZ = m_voxelSize.get().z;
   }
 
   QStringList swcFiles = m_inputSwcFilesWidget->getSelectedMultipleOpenFiles();
@@ -129,44 +120,50 @@ void ZPunctaDetectionDialog::detect()
   m_isCanceled = false;
   m_hasError = false;
 
-  auto worker = new ZPunctaDetection(img, punctaChannel);
-  worker->setAmbiguousFactor(m_ambiguousFactor.get());
-  if (dendriteChannel >= 0)
-    worker->setDendriteChannel(dendriteChannel);
-  worker->setSwcTrees(swcTrees, swcFiles);
-  worker->setCancelFlag(&m_isCanceled);
-  worker->setLogFile(m_outputLogFileWidget->getSelectedSaveFile());
-  worker->setResultPunctaFilename(m_outputPunctaFileWidget->getSelectedSaveFile());
-  if (dendriteChannel >= 0)
-    worker->setResultSomaPunctaFilename(m_outputSomaPunctaFileWidget->getSelectedSaveFile());
-  if (m_punctaThreshold.get() != -1)
-    worker->setPunctaThreshold(m_punctaThreshold.get());
-  if (dendriteChannel >= 0)
-    worker->setDendriteThreshold(m_tubeThreshold.get());
+  try {
+    auto worker = new ZPunctaDetection(m_inputImageFileWidget->getSelectedOpenFile(), imgInfo, punctaChannel);
+    worker->setAmbiguousFactor(m_ambiguousFactor.get());
+    if (dendriteChannel >= 0)
+      worker->setDendriteChannel(dendriteChannel);
+    worker->setSwcTrees(swcTrees, swcFiles);
+    worker->setCancelFlag(&m_isCanceled);
+    worker->setLogFile(m_outputLogFileWidget->getSelectedSaveFile());
+    worker->setResultPunctaFilename(m_outputPunctaFileWidget->getSelectedSaveFile());
+    if (dendriteChannel >= 0)
+      worker->setResultSomaPunctaFilename(m_outputSomaPunctaFileWidget->getSelectedSaveFile());
+    if (m_punctaThreshold.get() != -1)
+      worker->setPunctaThreshold(m_punctaThreshold.get());
+    if (dendriteChannel >= 0)
+      worker->setDendriteThreshold(m_tubeThreshold.get());
 
-  m_progressDialog = new QProgressDialog(this);
-  m_progressDialog->setLabelText("Detecting Puncta...");
-  m_progressDialog->setAutoReset(false);
-  m_progressDialog->setAttribute(Qt::WA_DeleteOnClose);
-  QObject::disconnect(m_progressDialog, &QProgressDialog::canceled, m_progressDialog, &QProgressDialog::cancel);
-  connect(worker, qOverload<int>(&ZPunctaDetection::progressChanged), m_progressDialog, &QProgressDialog::setValue);
-  connect(worker, &ZPunctaDetection::canceled, this, &ZPunctaDetectionDialog::processCanceled);
-  connect(worker, &ZPunctaDetection::processError, this, &ZPunctaDetectionDialog::processError);
-  connect(m_progressDialog, &QProgressDialog::canceled, this, &ZPunctaDetectionDialog::cancelButtonPressed);
+    m_progressDialog = new QProgressDialog(this);
+    m_progressDialog->setLabelText("Detecting Puncta...");
+    m_progressDialog->setAutoReset(false);
+    m_progressDialog->setAttribute(Qt::WA_DeleteOnClose);
+    QObject::disconnect(m_progressDialog, &QProgressDialog::canceled, m_progressDialog, &QProgressDialog::cancel);
+    connect(worker, qOverload<int>(&ZPunctaDetection::progressChanged), m_progressDialog, &QProgressDialog::setValue);
+    connect(worker, &ZPunctaDetection::canceled, this, &ZPunctaDetectionDialog::processCanceled);
+    connect(worker, &ZPunctaDetection::processError, this, &ZPunctaDetectionDialog::processError);
+    connect(m_progressDialog, &QProgressDialog::canceled, this, &ZPunctaDetectionDialog::cancelButtonPressed);
 
-  QThread* thread = new QThread(this);
-  connect(thread, &QThread::started, worker, &ZPunctaDetection::run);
-  connect(worker, &ZPunctaDetection::canceled, thread, &QThread::quit);
-  connect(worker, &ZPunctaDetection::finished, thread, &QThread::quit);
-  connect(worker, &ZPunctaDetection::processError, thread, &QThread::quit);
-  connect(thread, &QThread::finished, worker, &ZPunctaDetection::deleteLater);
-  connect(thread, &QThread::finished, m_progressDialog, &QProgressDialog::reset);
-  connect(thread, &QThread::finished, this, &ZPunctaDetectionDialog::processFinished);
-  connect(thread, &QThread::finished, thread, &QThread::deleteLater);
-  worker->moveToThread(thread);
+    auto thread = new QThread(this);
+    connect(thread, &QThread::started, worker, &ZPunctaDetection::run);
+    connect(worker, &ZPunctaDetection::canceled, thread, &QThread::quit);
+    connect(worker, &ZPunctaDetection::finished, thread, &QThread::quit);
+    connect(worker, &ZPunctaDetection::processError, thread, &QThread::quit);
+    connect(thread, &QThread::finished, worker, &ZPunctaDetection::deleteLater);
+    connect(thread, &QThread::finished, m_progressDialog, &QProgressDialog::reset);
+    connect(thread, &QThread::finished, this, &ZPunctaDetectionDialog::processFinished);
+    connect(thread, &QThread::finished, thread, &QThread::deleteLater);
+    worker->moveToThread(thread);
 
-  thread->start();
-  m_progressDialog->exec();
+    thread->start();
+    m_progressDialog->exec();
+  }
+  catch (const ZException& e) {
+    QMessageBox::critical(this, qApp->applicationName(), "Puncta Detection Error.\n" + e.what());
+    return;
+  }
 }
 
 void ZPunctaDetectionDialog::processCanceled()

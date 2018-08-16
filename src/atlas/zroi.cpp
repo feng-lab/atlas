@@ -467,7 +467,7 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
     }
 
     if (outWidth <= 0 || outHeight <= 0 || outDepth <= 0) {
-      img = img.crop(ZImgRegion(0, bBox.maxCorner().x, 0, bBox.maxCorner().y, 0, 1));
+      img = img.crop(ZImgRegion(0, bBox.maxCorner().x + 1, 0, bBox.maxCorner().y + 1, 0, 1));
     } else {
       img = img.cropWithPad(ZVoxelCoordinate(), ZVoxelCoordinate(outWidth, outHeight, outDepth, 1, 1));
     }
@@ -541,7 +541,7 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
     }
 
     if (outWidth <= 0 || outHeight <= 0 || outDepth <= 0) {
-      img = img.crop(ZImgRegion(0, bBox.maxCorner().x, 0, bBox.maxCorner().y, 0, bBox.maxCorner().z));
+      img = img.crop(ZImgRegion(0, bBox.maxCorner().x + 1, 0, bBox.maxCorner().y + 1, 0, bBox.maxCorner().z + 1));
     } else {
       img = img.cropWithPad(ZVoxelCoordinate(), ZVoxelCoordinate(outWidth, outHeight, outDepth, 1, 1));
     }

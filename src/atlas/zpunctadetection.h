@@ -3,18 +3,19 @@
 #include "zimgprocess.h"
 #include "zeigenutils.h"
 #include "zpuncta.h"
+#include "zimg.h"
 #include <QList>
 
 namespace nim {
-
-class ZImg;
 
 class ZSwc;
 
 class ZPunctaDetection : public ZImgProcess
 {
 public:
-  ZPunctaDetection(const ZImg& img, size_t punctaChannel, size_t t = 0);
+  ZPunctaDetection(const QString& filename, size_t punctaChannel, size_t t = 0);
+
+  ZPunctaDetection(const QString& filename, const ZImgInfo& imgInfo, size_t punctaChannel, size_t t = 0);
 
   // if set, result will be saved to these files
   void setResultPunctaFilename(const QString& fn)
@@ -145,7 +146,9 @@ private:
                          Eigen::RowVectorXi minLoc = Eigen::RowVectorXi::Zero(3));
 
 private:
-  const ZImg& m_img;
+  QString m_filename;
+  ZImgInfo m_imgInfo;
+  ZImg m_img;
   size_t m_punctaChannel;
   size_t m_t;
 

@@ -1157,7 +1157,6 @@ void detectPuncta()
     if (list.size() == 1) {
       LOG(INFO) << list.at(0).absoluteFilePath();
 
-      ZImg img(list.at(0).absoluteFilePath());
       for (size_t ch = 1; ch < 4; ++ch) {
         QString pfn = QString("%1/%2_ch%3.nimp").arg(fdlist.at(i).absoluteFilePath()).arg(
           list.at(0).completeBaseName()).arg(ch + 1);
@@ -1167,7 +1166,7 @@ void detectPuncta()
         QString lfn = QString("%1/%2_ch%3_log.txt").arg(fdlist.at(i).absoluteFilePath()).arg(
           list.at(0).completeBaseName()).arg(ch + 1);
         LOG(INFO) << pfn;
-        ZPunctaDetection pd(img, ch);
+        ZPunctaDetection pd(list.at(0).absoluteFilePath(), ch);
         pd.setLogFile(lfn);
         pd.setResultPunctaFilename(pfn);
         pd.run();
