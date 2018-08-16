@@ -15,3 +15,18 @@
 * code repository folder should be named as "atlas"; "atlas_others" folder and "atlas" folder should be in same directory
 * (setup SSH credential for github), run "python3 util/build_ext_libs.py all" to build external libraries
 * run "python3 util/build_and_deploy_atlas.py all" or build CMakeLists.txt
+
+## C++ Version Defines
+* $ROOT_DIR/CMakeLists.txt: set(CMAKE_CXX_STANDARD 14)
+* $ROOT_DIR/util/build_ext_libs.py: def get_cmake_cmd_common_part(install_dir: str) ...
+* $ROOT_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: -stdlib=libc++ -std=c++14
+* $ROOT_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: -stdlib=libc++ -std=c++14
+* $ROOT_DIR/src/3rdparty/makeengine.macos.gte: -std=c++14 -stdlib=libc++
+* $ROOT_DIR/src/atlas/zglmutil.h: #define GLM_FORCE_CXX14
+
+## Minimum macOS Defines
+* $ROOT_DIR/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 10.10)
+* $ROOT_DIR/util/build_ext_libs.py: def macos_min_version() ...
+* $ROOT_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: -mmacosx-version-min=10.10
+* $ROOT_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: -mmacosx-version-min=10.10
+* $ROOT_DIR/src/3rdparty/makeengine.macos.gte: -mmacosx-version-min=10.10
