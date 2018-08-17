@@ -16,9 +16,11 @@ class ZSwc;
 class ZPunctaDetection : public ZImgProcess
 {
 public:
-  ZPunctaDetection(const QString& filename, size_t punctaChannel, size_t t = 0);
+  ZPunctaDetection(const QString& filename, size_t punctaChannel, size_t t = 0, size_t scene = 0);
 
-  ZPunctaDetection(const QString& filename, const ZImgInfo& imgInfo, size_t punctaChannel, size_t t = 0);
+  // only image resolution in imgInfo is used
+  ZPunctaDetection(const QString& filename, const ZImgInfo& imgInfo,
+                   size_t punctaChannel, size_t t = 0, size_t scene = 0);
 
   // if set, result will be saved to these files
   void setResultPunctaFilename(const QString& fn)
@@ -96,9 +98,10 @@ protected:
 private:
   // all works are done here, detect from img with thre and put result into resList
   // img will be cleared after using
+  // minLoc is the offset of img related to rawimg, so img can be a subimg of rawimg
   void detectImpl(const ZImg& rawimg, size_t pc, size_t t,
                   ZImg& img, int thre, ZPuncta& resList, ZPuncta& filteredList,
-                  const Eigen::RowVectorXi& minLoc, double weight, double baseWeight);
+                  const Eigen::RowVectorXi& minLoc, double weight, double baseWeight, double totalSubOpsWeight);
 
 #if 0
   // detect puncta in soma area, save result in m_detectedSomaPuncta, return soma voxels
@@ -122,10 +125,7 @@ private:
 
   // simple method, remove all tube based on its maximum radius (default use 2.6um)
   // typical soma diameter would be 10-15um
-  void detectSomaMask(const ZImg& dendriteImg, Eigen::MatrixXi& small, Eigen::MatrixXi& big);
-
-  int cropOutSomaImg(const Eigen::MatrixXi& somaMaskVoxelList, const Eigen::MatrixXi& bigSomaMaskVoxelList,
-                     ZImg& img, ZImg& somaImg, Eigen::RowVectorXi& minLoc);
+  void detectSomaMask(const ZImg& dendriteImg, Eigen::MatrixXi& small, Eigen::MatrixXi& big, double totalWeight);
 
   std::vector<Eigen::MatrixXi> watershedSplit(const ZImg& img) const;
 
@@ -158,6 +158,7 @@ private:
   ZImgInfo m_imgInfo;
   size_t m_punctaChannel;
   size_t m_t;
+  size_t m_scene;
 
   // parameters
   int m_punctaThreshold = -1;

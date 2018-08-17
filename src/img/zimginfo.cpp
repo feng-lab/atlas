@@ -398,4 +398,68 @@ template double ZImgInfo::dataRangeMax<double>() const;
 #pragma GCC diagnostic pop
 #endif
 
+template<typename TVoxel>
+bool ZImgInfo::isType() const
+{
+  if (voxelByteNumber() == sizeof(TVoxel)) {
+    switch (voxelFormat) {
+      case VoxelFormat::Unsigned:
+        if (std::is_integral<TVoxel>::value && std::is_unsigned<TVoxel>::value)
+          return true;
+        break;
+      case VoxelFormat::Signed:
+        if (std::is_integral<TVoxel>::value && std::is_signed<TVoxel>::value)
+          return true;
+        break;
+      case VoxelFormat::Float:
+        if (std::is_floating_point<TVoxel>::value)
+          return true;
+        break;
+      default:
+        break;
+    }
+  }
+  return false;
+}
+
+template bool ZImgInfo::isType<uint8_t>() const;
+
+template bool ZImgInfo::isType<uint16_t>() const;
+
+template bool ZImgInfo::isType<uint32_t>() const;
+
+template bool ZImgInfo::isType<uint64_t>() const;
+
+template bool ZImgInfo::isType<int8_t>() const;
+
+template bool ZImgInfo::isType<int16_t>() const;
+
+template bool ZImgInfo::isType<int32_t>() const;
+
+template bool ZImgInfo::isType<int64_t>() const;
+
+template bool ZImgInfo::isType<float>() const;
+
+template bool ZImgInfo::isType<double>() const;
+
+template bool ZImgInfo::isType<const uint8_t>() const;
+
+template bool ZImgInfo::isType<const uint16_t>() const;
+
+template bool ZImgInfo::isType<const uint32_t>() const;
+
+template bool ZImgInfo::isType<const uint64_t>() const;
+
+template bool ZImgInfo::isType<const int8_t>() const;
+
+template bool ZImgInfo::isType<const int16_t>() const;
+
+template bool ZImgInfo::isType<const int32_t>() const;
+
+template bool ZImgInfo::isType<const int64_t>() const;
+
+template bool ZImgInfo::isType<const float>() const;
+
+template bool ZImgInfo::isType<const double>() const;
+
 } // namespace nim

@@ -339,70 +339,6 @@ template void ZImg::wrapData(float*, size_t, size_t, size_t, size_t, size_t);
 
 template void ZImg::wrapData(double*, size_t, size_t, size_t, size_t, size_t);
 
-template<typename TVoxel>
-bool ZImg::isType() const
-{
-  if (m_info.voxelByteNumber() == sizeof(TVoxel)) {
-    switch (m_info.voxelFormat) {
-      case VoxelFormat::Unsigned:
-        if (std::is_integral<TVoxel>::value && std::is_unsigned<TVoxel>::value)
-          return true;
-        break;
-      case VoxelFormat::Signed:
-        if (std::is_integral<TVoxel>::value && std::is_signed<TVoxel>::value)
-          return true;
-        break;
-      case VoxelFormat::Float:
-        if (std::is_floating_point<TVoxel>::value)
-          return true;
-        break;
-      default:
-        break;
-    }
-  }
-  return false;
-}
-
-template bool ZImg::isType<uint8_t>() const;
-
-template bool ZImg::isType<uint16_t>() const;
-
-template bool ZImg::isType<uint32_t>() const;
-
-template bool ZImg::isType<uint64_t>() const;
-
-template bool ZImg::isType<int8_t>() const;
-
-template bool ZImg::isType<int16_t>() const;
-
-template bool ZImg::isType<int32_t>() const;
-
-template bool ZImg::isType<int64_t>() const;
-
-template bool ZImg::isType<float>() const;
-
-template bool ZImg::isType<double>() const;
-
-template bool ZImg::isType<const uint8_t>() const;
-
-template bool ZImg::isType<const uint16_t>() const;
-
-template bool ZImg::isType<const uint32_t>() const;
-
-template bool ZImg::isType<const uint64_t>() const;
-
-template bool ZImg::isType<const int8_t>() const;
-
-template bool ZImg::isType<const int16_t>() const;
-
-template bool ZImg::isType<const int32_t>() const;
-
-template bool ZImg::isType<const int64_t>() const;
-
-template bool ZImg::isType<const float>() const;
-
-template bool ZImg::isType<const double>() const;
-
 void ZImg::allocate()
 {
   clearData();
@@ -620,17 +556,6 @@ std::vector<size_t> ZImg::histogram(size_t nbins, const ZImg& mask) const
   }
 
   return res;
-}
-
-std::pair<double, double> ZImg::binRange(size_t binIdx, size_t nbins) const
-{
-  if (voxelFormat() == VoxelFormat::Float) {
-    return binRange(binIdx, 0.0, 1.0, nbins);
-  } else if (voxelFormat() == VoxelFormat::Signed) {
-    return binRange(binIdx, dataRangeMin<int64_t>(), dataRangeMax<int64_t>(), nbins);
-  } else {
-    return binRange(binIdx, dataRangeMin<uint64_t>(), dataRangeMax<uint64_t>(), nbins);
-  }
 }
 
 ZImg ZImg::crop(const ZImgRegion& region) const

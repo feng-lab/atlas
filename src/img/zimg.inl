@@ -26,30 +26,6 @@ std::vector<size_t> ZImg::histogram(TRange minData, TRange maxData, size_t nbins
   return res;
 }
 
-template<typename TRange>
-std::pair<double, double> ZImg::binRange(size_t binIdx, TRange minData, TRange maxData, size_t nbins) const
-{
-  if (nbins == 0) {
-    nbins = bytesPerVoxel() > 1 ? 65536 : 256;
-  }
-  double min;
-  double max;
-  if (voxelFormat() == VoxelFormat::Float) {
-    double minD = minData;
-    double maxD = maxData;
-    double binSize = (maxD - minD) / nbins;
-    min = binIdx * binSize + minD;
-    max = min + binSize;
-  } else {
-    double minD = minData;
-    double maxD = maxData;
-    double binSize = (maxD - minD + 1) / nbins;
-    min = binSize * binIdx + minD;
-    max = min + binSize;
-  }
-  return std::make_pair(min, max);
-}
-
 template<typename TPadValue>
 ZImg ZImg::cropWithPad(const ZVoxelCoordinate& startCoord, const ZVoxelCoordinate& endCoord,
                        PadOption padOption, TPadValue padValue) const

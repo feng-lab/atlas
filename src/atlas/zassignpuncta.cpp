@@ -9,15 +9,43 @@
 namespace nim {
 
 ZAssignPuncta::ZAssignPuncta(const ZImg& img, size_t dendriteChannel, size_t t)
-  : m_img(img)
+  : m_img(&img)
   , m_dendriteChannel(dendriteChannel)
   , m_t(t)
   , m_maxDistToBranch(2.5)
   , m_ambiguousFactor(1.0)
 {
-  if (!m_img.isType<uint8_t>()) {
+  if (!m_img->isType<uint8_t>()) {
     throw ZImgException("puncta assign only support uint8_t img");
   }
+  m_imgInfo = m_img->info();
+}
+
+ZAssignPuncta::ZAssignPuncta(const QString& filename, double minValue, double maxValue, size_t dendriteChannel,
+                             size_t t, size_t scene)
+  : m_filename(filename)
+  , m_minValue(minValue)
+  , m_maxValue(maxValue)
+  , m_dendriteChannel(dendriteChannel)
+  , m_t(t)
+  , m_scene(scene)
+{
+  auto infos = ZImg::readImgInfo(m_filename);
+  if (m_scene >= infos.size()) {
+    throw ZImgException("invalid scene");
+  }
+}
+
+ZAssignPuncta::ZAssignPuncta(const QString& filename, const nim::ZImgInfo& imgInfo, double minValue, double maxValue,
+                             size_t dendriteChannel, size_t t, size_t scene)
+  : ZAssignPuncta(filename, minValue, maxValue, dendriteChannel, t, scene)
+{
+  auto infos = ZImg::readImgInfo(m_filename);
+  m_imgInfo = infos[scene];
+  m_imgInfo.voxelSizeUnit = imgInfo.voxelSizeUnit;
+  m_imgInfo.voxelSizeX = imgInfo.voxelSizeX;
+  m_imgInfo.voxelSizeY = imgInfo.voxelSizeY;
+  m_imgInfo.voxelSizeZ = imgInfo.voxelSizeZ;
 }
 
 ZAssignPuncta::~ZAssignPuncta()
@@ -52,15 +80,15 @@ void ZAssignPuncta::addSwcTrees(std::vector<ZSwc>& trees)
 
 void ZAssignPuncta::doWork()
 {
-  if (m_img.info().voxelSizeUnit == VoxelSizeUnit::none) {
+  if (m_imgInfo.voxelSizeUnit == VoxelSizeUnit::none) {
     throw ZImgException("Voxel Size not set, Abort Assign Puncta.");
   }
-  if (m_dendriteChannel < m_img.numChannels()) {
+  if (m_dendriteChannel < m_imgInfo.numChannels) {
     LOG(INFO) << "Start Assign Puncta.";
     LOG(INFO) << "Dendrite Channel: " << m_dendriteChannel + 1 << " (start from 1)";
-    LOG(INFO) << "Voxel Size X: " << m_img.voxelSizeXInUm() << " um";
-    LOG(INFO) << "Voxel Size Y: " << m_img.voxelSizeYInUm() << " um";
-    LOG(INFO) << "Voxel Size Z: " << m_img.voxelSizeZInUm() << " um";
+    LOG(INFO) << "Voxel Size X: " << m_imgInfo.voxelSizeXInUm() << " um";
+    LOG(INFO) << "Voxel Size Y: " << m_imgInfo.voxelSizeYInUm() << " um";
+    LOG(INFO) << "Voxel Size Z: " << m_imgInfo.voxelSizeZInUm() << " um";
     LOG(INFO) << "Max Distance To Branch: " << m_maxDistToBranch << " um";
     LOG(INFO) << "Ambiguous Factor: " << m_ambiguousFactor;
     LOG(INFO) << "Number of Puncta: " << m_puncta.size();
@@ -70,7 +98,7 @@ void ZAssignPuncta::doWork()
     throw ZImgException(QString("Wrong dendrite channel: %1. Abort.").arg(m_dendriteChannel));
   }
   for (auto& treePuncta : m_swcTreeToPuncta) {
-    treePuncta.first->labelSomaAndOthers(3.0 / m_img.voxelSizeXInUm()); // soma radius at least 3um
+    treePuncta.first->labelSomaAndOthers(3.0 / m_imgInfo.voxelSizeXInUm()); // soma radius at least 3um
     treePuncta.second.clear();
   }
   for (auto& treePuncta : m_swcTreeToSomaPuncta) {
@@ -184,7 +212,7 @@ double ZAssignPuncta::punctaTreeDist(const ZPunctum& punctum, ZSwc* tree, SwcTre
   nearestNode = SwcTreeNode();
   double min_dist = std::numeric_limits<double>::max();
   glm::dvec3 pt(punctum.x(), punctum.y(), punctum.z());
-  glm::dvec3 res(m_img.voxelSizeXInUm(), m_img.voxelSizeYInUm(), m_img.voxelSizeZInUm());
+  glm::dvec3 res(m_imgInfo.voxelSizeXInUm(), m_imgInfo.voxelSizeYInUm(), m_imgInfo.voxelSizeZInUm());
   pt *= res;
   for (SwcTreeNode tn = tree->begin(); tn != tree->end(); ++tn) {
     if (!ZSwc::isRoot(tn) && tn->type != m_somaType) {
@@ -195,7 +223,7 @@ double ZAssignPuncta::punctaTreeDist(const ZPunctum& punctum, ZSwc* tree, SwcTre
         continue;
       }
       dist = pointFrustumConeDist(punctum.x(), punctum.y(), punctum.z(), tn, ZSwc::parent(tn));
-      if (dist < m_maxDistToBranch + punctum.radius() * m_img.voxelSizeXInUm() && dist < min_dist) {   //in mask area
+      if (dist < m_maxDistToBranch + punctum.radius() * m_imgInfo.voxelSizeXInUm() && dist < min_dist) {   //in mask area
         min_dist = dist;
         nearestNode = tn;
       }
@@ -208,7 +236,7 @@ std::vector<ZAssignPuncta::SwcTreeNode> ZAssignPuncta::nodesNearbyPuncta(const Z
 {
   std::vector<SwcTreeNode> nodes;
   glm::dvec3 pt(punctum.x(), punctum.y(), punctum.z());
-  glm::dvec3 res(m_img.voxelSizeXInUm(), m_img.voxelSizeYInUm(), m_img.voxelSizeZInUm());
+  glm::dvec3 res(m_imgInfo.voxelSizeXInUm(), m_imgInfo.voxelSizeYInUm(), m_imgInfo.voxelSizeZInUm());
   pt *= res;
   for (SwcTreeNode tn = tree->begin(); tn != tree->end(); ++tn) {
     if (!ZSwc::isRoot(tn) && tn->type != m_somaType) {
@@ -219,7 +247,7 @@ std::vector<ZAssignPuncta::SwcTreeNode> ZAssignPuncta::nodesNearbyPuncta(const Z
         continue;
       }
       dist = pointFrustumConeDist(punctum.x(), punctum.y(), punctum.z(), tn, ZSwc::parent(tn));
-      if (dist < m_maxDistToBranch + punctum.radius() * m_img.voxelSizeXInUm()) {   //in mask area
+      if (dist < m_maxDistToBranch + punctum.radius() * m_imgInfo.voxelSizeXInUm()) {   //in mask area
         nodes.push_back(tn);
       }
     }
@@ -231,7 +259,7 @@ double ZAssignPuncta::punctaSomaDist(const ZPunctum& punctum, ZSwc* tree) const
 {
   double min_dist = std::numeric_limits<double>::max();
   glm::dvec3 pt(punctum.x(), punctum.y(), punctum.z());
-  glm::dvec3 res(m_img.voxelSizeXInUm(), m_img.voxelSizeYInUm(), m_img.voxelSizeZInUm());
+  glm::dvec3 res(m_imgInfo.voxelSizeXInUm(), m_imgInfo.voxelSizeYInUm(), m_imgInfo.voxelSizeZInUm());
   pt *= res;
   for (SwcTreeNode tn = tree->begin(); tn != tree->end(); ++tn) {
     if (ZSwc::isRoot(tn) || tn->type == m_somaType) {
@@ -254,7 +282,7 @@ ZAssignPuncta::pointFrustumConeDist(double x, double y, double z, const SwcTreeN
   glm::dvec3 pt(x, y, z);
   glm::dvec3 bot(tn->x, tn->y, tn->z);
   glm::dvec3 top(ptn->x, ptn->y, ptn->z);
-  glm::dvec3 res(m_img.voxelSizeXInUm(), m_img.voxelSizeYInUm(), m_img.voxelSizeZInUm());
+  glm::dvec3 res(m_imgInfo.voxelSizeXInUm(), m_imgInfo.voxelSizeYInUm(), m_imgInfo.voxelSizeZInUm());
   pt *= res;
   bot *= res;
   top *= res;
@@ -264,11 +292,11 @@ ZAssignPuncta::pointFrustumConeDist(double x, double y, double z, const SwcTreeN
   double dotbptb = glm::dot(bot - pt, top - bot);
   double frac = -dotbptb / normtb;
   if (frac < 0)
-    dist = std::sqrt(normbp) - tn->radius * m_img.voxelSizeXInUm();
+    dist = std::sqrt(normbp) - tn->radius * m_imgInfo.voxelSizeXInUm();
   else if (frac > 1)
-    dist = std::sqrt(normtp) - ptn->radius * m_img.voxelSizeXInUm();
+    dist = std::sqrt(normtp) - ptn->radius * m_imgInfo.voxelSizeXInUm();
   else {
-    double radius = m_img.voxelSizeXInUm() * ((1 - frac) * tn->radius + frac * ptn->radius);
+    double radius = m_imgInfo.voxelSizeXInUm() * ((1 - frac) * tn->radius + frac * ptn->radius);
     dist = std::sqrt(normbp - dotbptb * dotbptb / normtb) - radius;
   }
   return dist;
@@ -296,13 +324,21 @@ ZAssignPuncta::SwcTreeNode ZAssignPuncta::intensityWeightedNearestNode(double x,
   }
 
   left = std::max(0, left);
-  right = std::min(right, static_cast<int>(m_img.width()) - 1);
+  right = std::min(right, static_cast<int>(m_imgInfo.width) - 1);
   up = std::max(0, up);
-  down = std::min(down, static_cast<int>(m_img.height()) - 1);
+  down = std::min(down, static_cast<int>(m_imgInfo.height) - 1);
   zup = std::max(0, zup);
-  zdown = std::min(zdown, static_cast<int>(m_img.depth()) - 1);
+  zdown = std::min(zdown, static_cast<int>(m_imgInfo.depth) - 1);
   ZImgRegion rgn(left, right + 1, up, down + 1, zup, zdown + 1, m_dendriteChannel, m_dendriteChannel + 1, m_t, m_t + 1);
-  ZImg img = m_img.crop(rgn);
+  ZImg img;
+  if (m_img) {
+    img = m_img->crop(rgn);
+  } else {
+    img = ZImg(m_filename, rgn, m_scene);
+    if (!img.isType<uint8_t>()) {
+      img = img.convertTo<uint8_t>(m_minValue, m_maxValue);
+    }
+  }
 
   ZImgGraph imgGraph(img);
   imgGraph.setConnectivity(26);

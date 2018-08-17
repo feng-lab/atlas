@@ -210,6 +210,46 @@ struct ZImgInfo
 
   inline size_t byteNumber() const
   { return width * height * depth * numChannels * numTimes * bytesPerVoxel; }
+
+  template<typename TVoxel>
+  bool isType() const;
+
+  // given an bin index, return data range this bin represent
+  // not very accurate for 64-bit integer type
+  std::pair<double, double> binRange(size_t binIdx, size_t nbins) const
+  {
+    if (voxelFormat == VoxelFormat::Float) {
+      return binRange(binIdx, 0.0, 1.0, nbins);
+    } else if (voxelFormat == VoxelFormat::Signed) {
+      return binRange(binIdx, dataRangeMin<int64_t>(), dataRangeMax<int64_t>(), nbins);
+    } else {
+      return binRange(binIdx, dataRangeMin<uint64_t>(), dataRangeMax<uint64_t>(), nbins);
+    }
+  }
+
+  template<typename TRange>
+  std::pair<double, double> binRange(size_t binIdx, TRange minData, TRange maxData, size_t nbins = 0) const
+  {
+    if (nbins == 0) {
+      nbins = bytesPerVoxel > 1 ? 65536 : 256;
+    }
+    double min;
+    double max;
+    if (voxelFormat == VoxelFormat::Float) {
+      double minD = minData;
+      double maxD = maxData;
+      double binSize = (maxD - minD) / nbins;
+      min = binIdx * binSize + minD;
+      max = min + binSize;
+    } else {
+      double minD = minData;
+      double maxD = maxData;
+      double binSize = (maxD - minD + 1) / nbins;
+      min = binSize * binIdx + minD;
+      max = min + binSize;
+    }
+    return std::make_pair(min, max);
+  }
 };
 
 #pragma pack(pop)

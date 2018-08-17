@@ -221,7 +221,8 @@ public:
   { return m_metadata; }
 
   template<typename TVoxel>
-  bool isType() const;
+  bool isType() const
+  { return m_info.isType<TVoxel>(); }
 
   inline bool isSameType(const ZImg& other) const
   { return m_info.isSameType(other.m_info); }
@@ -518,7 +519,8 @@ public:
 
   // given an bin index, return data range this bin represent
   // not very accurate for 64-bit integer type
-  std::pair<double, double> binRange(size_t binIdx, size_t nbins = 0) const;
+  std::pair<double, double> binRange(size_t binIdx, size_t nbins = 0) const
+  { return m_info.binRange(binIdx, nbins); }
 
   // take range as parameter, TRange will be cast to img data type
   // bin size for float img is (maxData-minData)/nbins
@@ -528,7 +530,8 @@ public:
 
   // overload
   template<typename TRange>
-  std::pair<double, double> binRange(size_t binIdx, TRange minData, TRange maxData, size_t nbins = 0) const;
+  std::pair<double, double> binRange(size_t binIdx, TRange minData, TRange maxData, size_t nbins = 0) const
+  { return m_info.binRange<TRange>(binIdx, minData, maxData, nbins); }
 
   // property of img type
   // intensity range of current img type, for float img, range is [0.0 1.0]

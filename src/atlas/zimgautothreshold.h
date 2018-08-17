@@ -21,14 +21,16 @@ public:
   }
 
   // for big image
+  // no mask if mask is empty
   template<typename TValue>
-  TValue triangleThre(const QString& filename, size_t c = 0, size_t t = 0, size_t scene = 0)
+  TValue triangleThre(const QString& filename, size_t c = 0, size_t t = 0, size_t scene = 0,
+                      const std::vector<ZVoxelCoordinate>& mask = std::vector<ZVoxelCoordinate>())
   {
     std::vector<ZImgInfo> infos = ZImg::readImgInfo(filename);
     if (scene >= infos.size()) {
-      throw ZImgException("input scene");
+      throw ZImgException("input scene incorrect");
     }
-    IMGINFO_RETURN_TYPED_CALL(typedTriangleThre, infos[scene], filename, c, t, scene);
+    IMGINFO_RETURN_TYPED_CALL(typedTriangleThre, infos[scene], filename, c, t, scene, mask);
     return 0;
   }
 
@@ -38,7 +40,14 @@ public:
   TVoxel typedTriangleThre(const ZImg& imgIn, size_t c = 0, size_t t = 0);
 
   template<typename TVoxel>
-  TVoxel typedTriangleThre(const QString& filename, size_t c = 0, size_t t = 0, size_t scene = 0);
+  TVoxel typedTriangleThre(const QString& filename, size_t c = 0, size_t t = 0, size_t scene = 0,
+                           const std::vector<ZVoxelCoordinate>& mask = std::vector<ZVoxelCoordinate>());
+
+  // convert img to uint8_t with minValue and maxValue then threshold
+  // minValue and maxValue are not used if img is uint8_t
+  uint8_t u8TriangleThre(const QString& filename, double minValue, double maxValue,
+                         size_t c = 0, size_t t = 0, size_t scene = 0,
+                         const std::vector<ZVoxelCoordinate>& mask = std::vector<ZVoxelCoordinate>());
 
   template<typename TValue>
   TValue centroidThre(double& cent1, double& cent2, const ZImg& img, size_t c = 0, size_t t = 0)

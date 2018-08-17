@@ -3,6 +3,7 @@
 #include "zimgprocess.h"
 #include "zpuncta.h"
 #include "zswc.h"
+#include "zimginfo.h"
 #include <QList>
 #include <map>
 
@@ -15,6 +16,13 @@ class ZAssignPuncta : public ZImgProcess
   using SwcTreeNode = ZSwc::Iterator;
 public:
   ZAssignPuncta(const ZImg& img, size_t dendriteChannel, size_t t = 0);
+
+  // for big image, minValue and maxValue are used to convert image into uint8_t if it is not
+  ZAssignPuncta(const QString& filename, double minValue, double maxValue,
+                size_t dendriteChannel = 0, size_t t = 0, size_t scene = 0);
+  // only image resolution in imgInfo is used
+  ZAssignPuncta(const QString& filename, const ZImgInfo& imgInfo, double minValue, double maxValue,
+                size_t dendriteChannel = 0, size_t t = 0, size_t scene = 0);
 
   ~ZAssignPuncta();
 
@@ -73,9 +81,14 @@ private:
 
 private:
   // input
-  const ZImg& m_img;
+  const ZImg* m_img = nullptr;
+  QString m_filename;
+  ZImgInfo m_imgInfo;
+  double m_minValue;
+  double m_maxValue;
   size_t m_dendriteChannel;
   size_t m_t;
+  size_t m_scene;
   ZPuncta m_puncta;
   ZPuncta m_somaPuncta;
   // image info
