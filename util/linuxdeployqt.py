@@ -220,6 +220,8 @@ def determine_qt_plugins(deps, qt_plugin_dir):
         for plugin in os.listdir(qt_plugin_dir + os.sep + 'xcbglintegrations'):
             plugin_list.add('xcbglintegrations' + os.sep + plugin)
 
+    plugin_list = {p for p in plugin_list if not p.endswith(".debug")}
+
     not_added = set()
     for root, subdirs, files in os.walk(qt_plugin_dir):
         for f in files:
@@ -229,6 +231,7 @@ def determine_qt_plugins(deps, qt_plugin_dir):
                 # print files #os.path.join(root, files)
                 #
     not_added = list(not_added)
+    debug("Used Qt plugins: %s" % list(plugin_list))
     debug("Left out these Qt plugins: %s" % not_added)
 
     return list(plugin_list), not_added
