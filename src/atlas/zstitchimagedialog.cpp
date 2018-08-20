@@ -211,6 +211,7 @@ ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, const std::ve
     int width = margin + (margin + tileSize) * m_tileMatrix[0].size();
     int height = margin + (margin + tileSize) * m_tileMatrix.size();
     *m_image = QImage(width, height, QImage::Format_ARGB32_Premultiplied);
+    m_image->fill(0);
     for (size_t c = 0; c < m_tileMatrix[0].size(); ++c) {
       for (size_t r = 0; r < m_tileMatrix.size(); ++r) {
         if (m_tileMatrix[r][c] == 0) {

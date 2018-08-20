@@ -947,38 +947,32 @@ void ZImgPack::buildFastReadIndex(const std::vector<std::shared_ptr<ZImgSubBlock
   //ZBenchTimer bt;
   //bt.start();
 
-  // get estimation of minmax if image is float or uint8 or uint16 and if validBitCount is not special
-  if (m_imgInfo.voxelFormat == VoxelFormat::Float) {
-    size_t ratio = m_ratioToSize.rbegin()->first;
+  // get estimation of minmax
+  size_t ratio = m_ratioToSize.rbegin()->first;
 
-    double minV;
-    double maxV;
-    m_minIntensity = std::numeric_limits<double>::max();
-    m_maxIntensity = std::numeric_limits<double>::lowest();
+  double minV;
+  double maxV;
+  m_minIntensity = std::numeric_limits<double>::max();
+  m_maxIntensity = std::numeric_limits<double>::lowest();
 
-    for (size_t t = 0; t < m_imgInfo.numTimes; ++t) {
-      for (size_t z = 0; z < m_imgInfo.depth; ++z) {
-        auto tiit = m_rtzToTileIndice.find(std::make_tuple(ratio, t, int(z)));
-        if (tiit != m_rtzToTileIndice.end()) {
-          const std::vector<size_t>& tileIndice = tiit->second;
-          for (auto idx : tileIndice) {
-            const ZImgSubBlock& tile = *m_allTiles[idx].get();
-            std::shared_ptr<ZImg> imgPtr =
-              ZImgCache::instance().getOrRead(HashKeyType(this, idx), tile);
-            imgPtr->computeMinMax(minV, maxV);
-            m_minIntensity = std::min(m_minIntensity, minV);
-            m_maxIntensity = std::max(m_maxIntensity, maxV);
-          }
+  for (size_t t = 0; t < m_imgInfo.numTimes; ++t) {
+    for (size_t z = 0; z < m_imgInfo.depth; ++z) {
+      auto tiit = m_rtzToTileIndice.find(std::make_tuple(ratio, t, int(z)));
+      if (tiit != m_rtzToTileIndice.end()) {
+        const std::vector<size_t>& tileIndice = tiit->second;
+        for (auto idx : tileIndice) {
+          const ZImgSubBlock& tile = *m_allTiles[idx].get();
+          std::shared_ptr<ZImg> imgPtr =
+            ZImgCache::instance().getOrRead(HashKeyType(this, idx), tile);
+          imgPtr->computeMinMax(minV, maxV);
+          m_minIntensity = std::min(m_minIntensity, minV);
+          m_maxIntensity = std::max(m_maxIntensity, maxV);
         }
       }
     }
-
-    m_minMaxState = ratio == 1 ? MinMaxState::Complete : MinMaxState::Partial;
-  } else {
-    m_minIntensity = m_imgInfo.dataRangeMin();
-    m_maxIntensity = m_imgInfo.dataRangeMax();
-    m_minMaxState = MinMaxState::Partial;
   }
+
+  m_minMaxState = ratio == 1 ? MinMaxState::Complete : MinMaxState::Partial;
 
   //bt.stop();
   //LOG(INFO) << bt;
