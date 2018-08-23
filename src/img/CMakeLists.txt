@@ -95,7 +95,7 @@ find_package(glog REQUIRED
              NO_DEFAULT_PATH)
 
 find_package(HDF5 REQUIRED COMPONENTS C CXX static
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/share ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/cmake NO_DEFAULT_PATH)
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/share/cmake/hdf5 ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/cmake NO_DEFAULT_PATH)
 
 find_package(Qt5Core ${QT_VERSION} REQUIRED PATHS ${QT_PATHS})
 

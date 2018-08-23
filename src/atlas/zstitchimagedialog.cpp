@@ -2377,8 +2377,27 @@ void ZStitchImageDialog::stitchStacks()
       if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
           mergeMode == ZImgMerge::Mode::Max) {
         ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
+        if (imgMerge.imgInfo().numChannels == 3) { // mGRASP image only todo
+          QFileInfo fi(m_outputFileEdit->text());
+          QString ofn = fi.path() + "/" + fi.baseName() + "_ch3.v3draw";
+          QString dsofn = fi.path() + "/" + fi.baseName() + "_ch3_downsampled.v3draw";
+          ZImg img(m_outputFileEdit->text(), ZImgRegion(0, -1, 0, -1, 0, -1, 2, 3));
+          img.save(ofn);
+          img.blockDownsample(2, 2, 1, ZImg::CombineMode::Mean);
+          img.save(dsofn);
+        }
       } else {
-        imgMerge.wholeImg().save(m_outputFileEdit->text());
+        auto wholeImg = imgMerge.wholeImg();
+        wholeImg.save(m_outputFileEdit->text());
+        if (imgMerge.imgInfo().numChannels == 3) { // mGRASP image only todo
+          QFileInfo fi(m_outputFileEdit->text());
+          QString ofn = fi.path() + "/" + fi.baseName() + "_ch3.v3draw";
+          QString dsofn = fi.path() + "/" + fi.baseName() + "_ch3_downsampled.v3draw";
+          wholeImg = wholeImg.extractChannel(2);
+          wholeImg.save(ofn);
+          wholeImg.blockDownsample(2, 2, 1, ZImg::CombineMode::Mean);
+          wholeImg.save(dsofn);
+        }
       }
       emit resultReady(m_outputFileEdit->text());
     }
