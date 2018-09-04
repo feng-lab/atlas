@@ -169,13 +169,13 @@ ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, const std::ve
   if (filenames.size() == pTiles->size()) {
     for (int i=0; i<m_filenames.size(); ++i) {
       std::vector<ZImgInfo> infos;
-      ZImgIO::instance().readInfo(m_filenames[i], infos);
+      ZImgIO().readInfo(m_filenames[i], infos);
       if (infos.size() != 1) {
         m_tileimages.clear();
         break;
       }
       ZImgThumbernail tn;
-      ZImgIO::instance().readThumbnail(m_filenames[i], tn);
+      ZImgIO().readThumbnail(m_filenames[i], tn);
       bool sbreak = false;
       std::vector<ZImg> imgs;
       for (size_t z = 0; z < infos[0].depth; ++z) {
@@ -1634,7 +1634,7 @@ void ZStitchImageDialog::stitchStacks2()
   }
   if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
       mergeMode == ZImgMerge::Mode::Max) {
-    ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
+    ZImgIO().writeImg(m_outputFileEdit->text(), imgMerge);
   } else {
     imgMerge.wholeImg().save(m_outputFileEdit->text());
   }
@@ -2166,7 +2166,7 @@ void ZStitchImageDialog::stitchStacks()
       }
       if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
           mergeMode == ZImgMerge::Mode::Max) {
-        ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
+        ZImgIO().writeImg(m_outputFileEdit->text(), imgMerge);
       } else {
         imgMerge.wholeImg().save(m_outputFileEdit->text());
       }
@@ -2376,7 +2376,7 @@ void ZStitchImageDialog::stitchStacks()
       fOut.close();
       if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
           mergeMode == ZImgMerge::Mode::Max) {
-        ZImgIO::instance().writeImg(m_outputFileEdit->text(), imgMerge);
+        ZImgIO().writeImg(m_outputFileEdit->text(), imgMerge);
         if (imgMerge.imgInfo().numChannels == 3) { // mGRASP image only todo
           QFileInfo fi(m_outputFileEdit->text());
           QString ofn = fi.path() + "/" + fi.baseName() + "_ch3.v3draw";

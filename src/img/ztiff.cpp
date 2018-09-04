@@ -45,13 +45,6 @@ namespace {
 #define	TIFFPRINT_GEOKEYDIRECTORY	0x80000000
 #define	TIFFPRINT_GEOKEYPARAMS		0x40000000
 
-union
-{
-  TIFFHeaderClassic classic;
-  TIFFHeaderBig big;
-  TIFFHeaderCommon common;
-} hdr;
-
 const struct tiftagname
 {
   uint32 tag;
@@ -1259,6 +1252,13 @@ void ZTiff::readIFDs(const QString& filename, std::vector<ZTiffIFD>& ifds, bool&
 
 void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds, bool& isNativeEndianness) const
 {
+  union
+  {
+    TIFFHeaderClassic classic;
+    TIFFHeaderBig big;
+    TIFFHeaderCommon common;
+  } hdr;
+
   std::vector<ZTiffIFD> _ifds;
   readStream(fs, &hdr, sizeof(TIFFHeaderCommon));
 
@@ -1276,8 +1276,12 @@ void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds, bool& isNati
     swabflag = !hostIsLittleEndian();
   }
   isNativeEndianness = !swabflag;
+  //LOG(INFO) << swabflag << " " << hostIsLittleEndian() << " " << (hdr.common.tiff_magic == TIFF_LITTLEENDIAN);
+
   if (swabflag)
     boost::endian::endian_reverse_inplace(hdr.common.tiff_version);
+
+  //LOG(INFO) << swabflag << " " << hostIsLittleEndian() << " " << (hdr.common.tiff_magic == TIFF_LITTLEENDIAN) << " " << hdr.common.tiff_version;
 
   bool bigtiff = false;
   uint64_t diroff = 0;
