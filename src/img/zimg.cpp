@@ -938,6 +938,15 @@ ZImg ZImg::cat(const std::vector<const ZImg*>& imgsIn, Dimension dim)
         QString("Can not concat img <%1> and img <%2>").arg(info.toQString()).arg(firstInfo.toQString()));
     }
   }
+  if (dim == Dimension::C) {
+    resInfo.channelNames.clear();
+    resInfo.channelColors.clear();
+    for (size_t idx = 0; idx < imgs.size(); ++idx) {
+      ZImgInfo info = imgs[idx]->info();
+      resInfo.channelNames.insert(resInfo.channelNames.end(), info.channelNames.begin(), info.channelNames.end());
+      resInfo.channelColors.insert(resInfo.channelColors.end(), info.channelColors.begin(), info.channelColors.end());
+    }
+  }
 
   // create result img
   ZImg res(resInfo);

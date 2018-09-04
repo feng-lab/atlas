@@ -1197,13 +1197,106 @@ void changeDapifileType()
   }
 }
 
+void convertPVRawToNim()
+{
+  QList<QStringList> metaData = QtCSV::Reader::readToList("/Volumes/shared/feng/Chris/pv_img/img_srclist.txt");
+  ZImg refPYImg("/Volumes/shared/feng/Chris/slice15/slice15_L18_Sum.lsm");
+  ZImg refPVImg("/Volumes/shared/os/PV/201602_contraPV/PV139/5/s9/PV139_5_s9_R1_GR1_B1_L19.lsm");
+  for (int i = 0; i < metaData.size(); ++i) {
+    QFileInfo fileInfo = QFileInfo(metaData[i][0]);
+    LOG(INFO) << i << " " << metaData.size() << " " << fileInfo.absoluteFilePath();
+
+    ZImg img(fileInfo.absoluteFilePath());
+    if (fileInfo.baseName().startsWith("Py")) {
+      img.infoRef().channelColors[0] = col4(0, 255, 0);
+      img.infoRef().channelColors[1] = col4(255, 0, 0);
+      img.infoRef().channelColors[2] = col4(0, 0, 255);
+      img.infoRef().channelNames[0] = refPYImg.channelName(0);
+      img.infoRef().channelNames[1] = refPYImg.channelName(1);
+      img.infoRef().channelNames[2] = refPYImg.channelName(2);
+      img.infoRef().voxelSizeUnit = refPYImg.voxelSizeUnit();
+      img.infoRef().voxelSizeX = refPYImg.voxelSizeX();
+      img.infoRef().voxelSizeY = refPYImg.voxelSizeY();
+      img.infoRef().voxelSizeZ = refPYImg.voxelSizeZ();
+    } else if (fileInfo.baseName().startsWith("PV")) {
+      img.infoRef().channelColors[0] = col4(0, 0, 255);
+      img.infoRef().channelColors[1] = col4(0, 255, 0);
+      img.infoRef().channelColors[2] = col4(255, 0, 0);
+      img.infoRef().channelNames[0] = refPVImg.channelName(0);
+      img.infoRef().channelNames[1] = refPVImg.channelName(1);
+      img.infoRef().channelNames[2] = refPVImg.channelName(2);
+      img.infoRef().voxelSizeUnit = refPVImg.voxelSizeUnit();
+      img.infoRef().voxelSizeX = refPVImg.voxelSizeX();
+      img.infoRef().voxelSizeY = refPVImg.voxelSizeY();
+      img.infoRef().voxelSizeZ = refPVImg.voxelSizeZ();
+    } else {
+      CHECK(false);
+    }
+    QDir outpath("/Volumes/shared/feng/Chris/pv_img");
+    QString outname = outpath.filePath(fileInfo.baseName() + ".nim");
+    CHECK(outname.endsWith(".nim"));
+    LOG(INFO) << "to " << outname;
+    img.save(outname);
+  }
+}
+
+void convertPYRawToNim()
+{
+  QDir dir("/Volumes/shared/feng/Chris/py_img_old");
+  QStringList filters;
+  filters << "*.nim";
+  QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+  ZImg refPYImg("/Volumes/shared/feng/Chris/slice15/slice15_L18_Sum.lsm");
+  ZImg refPVImg("/Volumes/shared/os/PV/201602_contraPV/PV139/5/s9/PV139_5_s9_R1_GR1_B1_L19.lsm");
+
+  for (int i = 0; i < list.size(); ++i) {
+    auto fileInfo = list.at(i);
+    LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
+    ZImg img(fileInfo.absoluteFilePath());
+    if (fileInfo.baseName().startsWith("Py")) {
+      img.infoRef().channelColors[0] = col4(0, 255, 0);
+      img.infoRef().channelColors[1] = col4(255, 0, 0);
+      img.infoRef().channelColors[2] = col4(0, 0, 255);
+      img.infoRef().channelNames[0] = refPYImg.channelName(0);
+      img.infoRef().channelNames[1] = refPYImg.channelName(1);
+      img.infoRef().channelNames[2] = refPYImg.channelName(2);
+      img.infoRef().voxelSizeUnit = refPYImg.voxelSizeUnit();
+      img.infoRef().voxelSizeX = refPYImg.voxelSizeX();
+      img.infoRef().voxelSizeY = refPYImg.voxelSizeY();
+      img.infoRef().voxelSizeZ = refPYImg.voxelSizeZ();
+
+      auto tmpimg = ZImg::cat(img.createView(2), img.createView(0), img.createView(1), Dimension::C);
+      img.swap(tmpimg);
+    } else if (fileInfo.baseName().startsWith("PV")) {
+      img.infoRef().channelColors[0] = col4(0, 0, 255);
+      img.infoRef().channelColors[1] = col4(0, 255, 0);
+      img.infoRef().channelColors[2] = col4(255, 0, 0);
+      img.infoRef().channelNames[0] = refPVImg.channelName(0);
+      img.infoRef().channelNames[1] = refPVImg.channelName(1);
+      img.infoRef().channelNames[2] = refPVImg.channelName(2);
+      img.infoRef().voxelSizeUnit = refPVImg.voxelSizeUnit();
+      img.infoRef().voxelSizeX = refPVImg.voxelSizeX();
+      img.infoRef().voxelSizeY = refPVImg.voxelSizeY();
+      img.infoRef().voxelSizeZ = refPVImg.voxelSizeZ();
+    } else {
+      CHECK(false);
+    }
+    QDir outpath("/Volumes/shared/feng/Chris/py_img");
+    QString outname = outpath.filePath(fileInfo.fileName());
+    CHECK(outname.endsWith(".nim"));
+    LOG(INFO) << "to " << outname;
+    img.save(outname);
+  }
+}
+
 }  // namespace nim
 
 namespace nim {
 
 void ZCustomCommand::run()
 {
-  detectPuncta();
+  //convertPYRawToNim();
+  //convertPVRawToNim();
   LOG(INFO) << "done";
 }
 

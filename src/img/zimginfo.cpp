@@ -127,7 +127,9 @@ QString ZImgInfo::displayChannelName(size_t c) const
 
 void ZImgInfo::createDefaultChannelNames()
 {
-  channelNames.resize(numChannels);
+  if (channelNames.size() != numChannels) {
+    channelNames.resize(numChannels);
+  }
 }
 
 void ZImgInfo::createDefaultChannelColors()
