@@ -3,6 +3,7 @@
 #include "z3dcameraparameter.h"
 #include "z3dtransferfunction.h"
 #include "z3dtransformparameter.h"
+#include "z2dtransformparameter.h"
 #include "zcolormap.h"
 #include "znumericparameter.h"
 #include "zoptionparameter.h"
@@ -34,6 +35,7 @@ ZParameterFactory::ZParameterFactory()
   registerMaker("3DCamera", new ZParameterMaker<Z3DCameraParameter>());
   registerMaker("3DTransferFunction", new ZParameterMaker<Z3DTransferFunctionParameter>());
   registerMaker("3DTransform", new ZParameterMaker<Z3DTransformParameter>());
+  registerMaker("2DTransform", new ZParameterMaker<Z2DTransformParameter>());
   registerMaker("ColorMap", new ZParameterMaker<ZColorMapParameter>());
   registerMaker("Double", new ZParameterMaker<ZDoubleParameter>());
   registerMaker("Float", new ZParameterMaker<ZFloatParameter>());

@@ -152,6 +152,7 @@ void ZAnimation::addKeyFrame(double time)
 
     for (size_t i = 0; i < paraList.size(); ++i) {
       bool found = false;
+      //LOG(INFO) << paraList[i]->name();
       for (size_t j = 0; j < paraAnimationList.size(); ++j) {
         if (paraList[i] == paraAnimationList[j]->boundParameter()) {
           found = true;
