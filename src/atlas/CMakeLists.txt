@@ -64,10 +64,7 @@ else ()
       ${IPP_PATH}/lib/intel64/libippvm.a
       ${IPP_PATH}/lib/intel64/libipps.a
       ${IPP_PATH}/lib/intel64/libippcv.a
-      ${IPP_PATH}/lib/intel64/libippcc.a
-      ${INTEL_PATH}/lib/intel64/libirc.a
-      ${INTEL_PATH}/lib/intel64/libsvml.a
-      ${INTEL_PATH}/lib/intel64/libimf.a)
+      ${IPP_PATH}/lib/intel64/libippcc.a)
 endif ()
 
 find_package(VTK REQUIRED COMPONENTS vtkFiltersGeometry vtkFiltersSources
