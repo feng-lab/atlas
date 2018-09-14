@@ -100,6 +100,7 @@ message(STATUS "ASSIMP_LIBRARY_DIRS: ${ASSIMP_LIBRARY_DIRS}")
 message(STATUS "ASSIMP_LIBRARIES: ${ASSIMP_LIBRARIES}")
 link_directories(${ASSIMP_LIBRARY_DIRS})  # need to do this before creating target
 
+set(OpenCV_STATIC ON)
 find_package(OpenCV REQUIRED COMPONENTS imgproc core
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/opencv NO_DEFAULT_PATH)
 message(STATUS "OpenCV_INCLUDE_DIRS: ${OpenCV_INCLUDE_DIRS}")
