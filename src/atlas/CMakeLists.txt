@@ -51,10 +51,12 @@ elseif (APPLE)
       ${IPP_PATH}/lib/libippi.a
       ${IPP_PATH}/lib/libippcore.a
       ${IPP_PATH}/lib/libippvm.a
-      ${IPP_PATH}/lib/libipps.a
+      #${IPP_PATH}/lib/libipps.a
       ${IPP_PATH}/lib/libippcv.a
       ${IPP_PATH}/lib/libippcc.a
-      ${INTEL_PATH}/lib/libirc.a)
+      ${INTEL_PATH}/lib/libirc.a
+      ${INTEL_PATH}/lib/libsvml.a
+      ${INTEL_PATH}/lib/libimf.a)
 else ()
   set(IPP_LIBRARIES ${IPP_LIBRARIES}
       ${IPP_PATH}/lib/intel64/libippi.a
@@ -62,7 +64,10 @@ else ()
       ${IPP_PATH}/lib/intel64/libippvm.a
       ${IPP_PATH}/lib/intel64/libipps.a
       ${IPP_PATH}/lib/intel64/libippcv.a
-      ${IPP_PATH}/lib/intel64/libippcc.a)
+      ${IPP_PATH}/lib/intel64/libippcc.a
+      ${INTEL_PATH}/lib/intel64/libirc.a
+      ${INTEL_PATH}/lib/intel64/libsvml.a
+      ${INTEL_PATH}/lib/intel64/libimf.a)
 endif ()
 
 find_package(VTK REQUIRED COMPONENTS vtkFiltersGeometry vtkFiltersSources
