@@ -7,6 +7,7 @@
 #include "zregistrationnumericdiffcostfunction.h"
 #include "zswc.h"
 #include "zimgio.h"
+#include "zimgnccmatch.h"
 #include "zmesh.h"
 #include "zimgautothreshold.h"
 #include "zimggraph.h"
@@ -1289,6 +1290,26 @@ void convertPYRawToNim()
   }
 }
 
+void channelCalibration()
+{
+  QDir dir("/Users/feng/Google Drive/confocal calibration");
+  QStringList filters;
+  filters << "*.lsm";
+  QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+
+  for (int i = 0; i < list.size(); ++i) {
+    auto fileInfo = list.at(i);
+    LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
+    ZImg img(fileInfo.absoluteFilePath());
+    ZImg fixed = img.extractChannel(0);
+    fixed.save(fileInfo.absoluteFilePath() + "_ch0.tif");
+    ZImg moving = img.extractChannel(1);
+    moving.save(fileInfo.absoluteFilePath() + "_ch1.tif");
+    ZImgNCCMatch mat(fixed, moving);
+    LOG(INFO) << mat.computeMovingImgOffset();
+  }
+}
+
 }  // namespace nim
 
 namespace nim {
@@ -1297,6 +1318,7 @@ void ZCustomCommand::run()
 {
   //convertPYRawToNim();
   //convertPVRawToNim();
+  channelCalibration();
   LOG(INFO) << "done";
 }
 
