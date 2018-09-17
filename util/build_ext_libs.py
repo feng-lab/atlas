@@ -203,8 +203,7 @@ def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: 
     return bak_file
 
 
-def build_cpuinfo(src_dir: str, install_dir: str, ext_dir: str):
-    del ext_dir
+def build_cpuinfo(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
@@ -222,8 +221,7 @@ def build_cpuinfo(src_dir: str, install_dir: str, ext_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_gflags(src_dir: str, install_dir: str, ext_dir: str):
-    del ext_dir
+def build_gflags(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
@@ -235,12 +233,12 @@ def build_gflags(src_dir: str, install_dir: str, ext_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_glog(src_dir: str, install_dir: str, ext_dir: str):
+def build_glog(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
     try:
-        subprocess.run(['git', 'apply', '--stat', '--apply', os.path.join(ext_dir, 'glog_patch.txt')],
+        subprocess.run(['git', 'apply', '--stat', '--apply', os.path.join(ext_dir(), 'glog_patch.txt')],
                        cwd=src_dir, shell=False, check=True)
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
@@ -251,9 +249,9 @@ def build_glog(src_dir: str, install_dir: str, ext_dir: str):
                        to_texts=[r'GLOG_ERROR'],
                        keep_bak_file=False)
 
-            cmakecmd.extend(['-Dgflags_DIR:PATH={}/gflags/CMake'.format(ext_dir)])
+            cmakecmd.extend([f'-Dgflags_DIR:PATH={ext_dir()}/gflags/CMake'])
         else:
-            cmakecmd.extend(['-Dgflags_DIR:PATH={}/gflags/lib/cmake/gflags'.format(ext_dir)])
+            cmakecmd.extend([f'-Dgflags_DIR:PATH={ext_dir()}/gflags/lib/cmake/gflags'])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -263,8 +261,7 @@ def build_glog(src_dir: str, install_dir: str, ext_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_benchmark(src_dir: str, install_dir: str, ext_dir: str):
-    del ext_dir
+def build_benchmark(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
@@ -284,8 +281,7 @@ def build_benchmark(src_dir: str, install_dir: str, ext_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_glbinding(src_dir: str, install_dir: str, ext_dir: str):
-    del ext_dir
+def build_glbinding(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
@@ -301,8 +297,7 @@ def build_glbinding(src_dir: str, install_dir: str, ext_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str, nasm_dir: str):
-    del ext_dir
+def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
@@ -327,8 +322,7 @@ def build_libjpeg(src_dir: str, install_dir: str, ext_dir: str, nasm_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_zlib(src_dir: str, install_dir: str, ext_dir: str):
-    del ext_dir
+def build_zlib(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
@@ -357,7 +351,7 @@ def build_folly(src_dir: str, install_dir: str):
         print('')
 
 
-def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
+def build_libpng(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
@@ -378,8 +372,8 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
                          '-DPNG_SHARED:BOOL=OFF'])
 
         if is_windows():
-            cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
-                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '\\zlib\\lib\\zlibstatic.lib'])
+            cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
+                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib'])
         else:
             if is_mac() and os.path.exists('/usr/include'):
                 orig_file1 = os.path.join(src_dir, 'pngpriv.h')
@@ -404,7 +398,7 @@ def build_libpng(src_dir: str, install_dir: str, ext_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
+def build_jxrlib(src_dir: str, install_dir: str):
     shutil.rmtree(install_dir, ignore_errors=True)
 
     orig_file = None
@@ -416,7 +410,7 @@ def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
                            cwd=os.path.join(src_dir, 'jxrencoderdecoder'), shell=True, check=True, env=env)
             subprocess.run(['MSBuild', 'JXR_vc14.sln', '/target:JXRDecApp', '/property:Platform=x64',
                             '/property:WindowsTargetPlatformVersion=' + env['UCRTVERSION'],  # like 10.0.16299.0
-                            '/property:ForceImportBeforeCppTargets=' + ext_dir + '\\runtime_md.props',
+                            '/property:ForceImportBeforeCppTargets=' + ext_dir() + '\\runtime_md.props',
                             '/property:Configuration=Release', '/maxcpucount'],
                            cwd=os.path.join(src_dir, 'jxrencoderdecoder'), shell=True, check=True, env=env)
             glob_copy(os.path.join(src_dir, 'common', 'include', '*.h'),
@@ -464,7 +458,7 @@ def build_jxrlib(src_dir: str, install_dir: str, ext_dir: str):
                        cwd=src_dir, shell=False, check=True)
 
 
-def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
+def build_geometrictools(src_dir: str, install_dir: str):
     shutil.rmtree(install_dir, ignore_errors=True)
 
     orig_file = None
@@ -474,7 +468,7 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
             env = get_vcvars_environment()
             subprocess.run(['MSBuild', 'GTEngine.v15.vcxproj', '/property:Platform=x64',
                             '/property:Configuration=Release', '/maxcpucount',
-                            '/property:ForceImportBeforeCppTargets=' + ext_dir + '\\no_warning_as_error.props'],
+                            '/property:ForceImportBeforeCppTargets=' + ext_dir() + '\\no_warning_as_error.props'],
                            cwd=src_dir, shell=True, check=True, env=env)
             glob_copy(os.path.join(src_dir, '_Output', 'v141', 'x64', 'Release', 'GTEngine.v15.lib'),
                       os.path.join(install_dir, 'lib'))
@@ -505,7 +499,7 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
                                   from_texts=[r'#include <Mathematics/GteGenerateMeshUV.h>'],
                                   to_texts=['#include <Mathematics/GteGenerateMeshUV.h>\n#include <string>'])
 
-            shutil.copy2(os.path.join(ext_dir, 'makeengine.macos.gte'), src_dir)
+            shutil.copy2(os.path.join(ext_dir(), 'makeengine.macos.gte'), src_dir)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'CFG=Release', '-f', 'makeengine.macos.gte'],
                            cwd=src_dir, shell=False, check=True)
             shutil.copytree(os.path.join(src_dir, 'lib', 'Release'), os.path.join(install_dir, 'lib'))
@@ -519,8 +513,7 @@ def build_geometrictools(src_dir: str, install_dir: str, ext_dir: str):
             os.replace(bak_file, orig_file)
 
 
-def build_ospray(src_dir: str, install_dir: str, ext_dir: str, ispc_dir: str, embree_dir: str):
-    del ext_dir
+def build_ospray(src_dir: str, install_dir: str, ispc_dir: str, embree_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
@@ -545,7 +538,7 @@ def build_ospray(src_dir: str, install_dir: str, ext_dir: str, ispc_dir: str, em
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_assimp(src_dir: str, install_dir: str, ext_dir: str):
+def build_assimp(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
@@ -562,8 +555,8 @@ def build_assimp(src_dir: str, install_dir: str, ext_dir: str):
                          '-DASSIMP_BUILD_TESTS:BOOL=OFF'])
 
         if is_windows():
-            cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
-                             '-DZLIB_LIBRARY_REL:FILEPATH=' + ext_dir + '\\zlib\\lib\\zlibstatic.lib'])
+            cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
+                             '-DZLIB_LIBRARY_REL:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib'])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -572,7 +565,7 @@ def build_assimp(src_dir: str, install_dir: str, ext_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_hdf5(src_dir: str, install_dir: str, ext_dir: str):
+def build_hdf5(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
@@ -586,8 +579,8 @@ def build_hdf5(src_dir: str, install_dir: str, ext_dir: str):
                          '-DHDF5_BUILD_EXAMPLES:BOOL=OFF'])
 
         if is_windows():
-            cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
-                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '\\zlib\\lib\\zlibstatic.lib'])
+            cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
+                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib'])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -595,7 +588,7 @@ def build_hdf5(src_dir: str, install_dir: str, ext_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
+def build_freeimage(src_dir: str, install_dir: str):
     shutil.rmtree(install_dir, ignore_errors=True)
 
     orig_file = None
@@ -649,8 +642,8 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
             subprocess.run(['make', '-f', 'Makefile.fip', 'clean'],
                            cwd=src_dir, shell=False, check=True)
         else:
-            shutil.copy2(os.path.join(ext_dir, 'freeimage-makefiles', 'Makefile_gnu'), src_dir)
-            shutil.copy2(os.path.join(ext_dir, 'freeimage-makefiles', 'Makefile_fip'), src_dir)
+            shutil.copy2(os.path.join(ext_dir(), 'freeimage-makefiles', 'Makefile_gnu'), src_dir)
+            shutil.copy2(os.path.join(ext_dir(), 'freeimage-makefiles', 'Makefile_fip'), src_dir)
             subprocess.run(['make', '-f', 'Makefile_gnu', '-j' + str(os.cpu_count())],
                            cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-f', 'Makefile_gnu', '-j' + str(os.cpu_count()), 'install',
@@ -675,8 +668,7 @@ def build_freeimage(src_dir: str, install_dir: str, ext_dir: str):
             os.replace(bak_file_4, orig_file_4)
 
 
-def build_botan(src_dir: str, install_dir: str, ext_dir: str):
-    del ext_dir
+def build_botan(src_dir: str, install_dir: str):
     shutil.rmtree(install_dir, ignore_errors=True)
 
     try:
@@ -715,7 +707,7 @@ def build_botan(src_dir: str, install_dir: str, ext_dir: str):
         os.remove(os.path.join(src_dir, 'Makefile'))
 
 
-def build_itk(src_dir: str, install_dir: str, ext_dir: str):
+def build_itk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
@@ -740,11 +732,11 @@ def build_itk(src_dir: str, install_dir: str, ext_dir: str):
                          '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
                          '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
                          '-DModule_ITKTBB:BOOL=ON',
-                         '-DTBB_DIR:PATH=' + repository_dir() + '/cmake'])
+                         '-DTBB_DIR:PATH=' + atlas_repository_dir() + '/cmake'])
 
         if is_windows():
-            cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
-                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '\\zlib\\lib\\zlibstatic.lib'])
+            cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
+                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib'])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -759,7 +751,7 @@ def build_itk(src_dir: str, install_dir: str, ext_dir: str):
         os.replace(bak_file, orig_file)
 
 
-def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
+def build_vtk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
@@ -775,8 +767,8 @@ def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
 
         if is_windows():
             cmakecmd.extend(['-DVTK_USE_SYSTEM_LIBXML2:BOOL=OFF',
-                             '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
-                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '\\zlib\\lib\\zlibstatic.lib'])
+                             '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
+                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib'])
         else:
             if is_mac():
                 orig_file = os.path.join(src_dir, 'Utilities', 'KWSys', 'vtksys', 'SystemTools.cxx')
@@ -794,7 +786,7 @@ def build_vtk(src_dir: str, install_dir: str, ext_dir: str):
             os.replace(bak_file, orig_file)
 
 
-def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: str):
+def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
@@ -854,14 +846,14 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
 
         if is_windows():
             cmakecmd.extend(['-DBUILD_WITH_STATIC_CRT:BOOL=OFF',
-                             '-DEIGEN_INCLUDE_PATH:PATH=' + ext_dir + '\\eigen',
+                             '-DEIGEN_INCLUDE_PATH:PATH=' + ext_dir() + '\\eigen',
                              '-DWITH_WIN32UI:BOOL=OFF',
                              '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '\\modules',
-                             '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
-                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir + '\\zlib\\lib\\zlibstatic.lib'])
+                             '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
+                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib'])
         else:
             cmakecmd.extend(['-DWITH_PTHREADS_PF:BOOL=OFF',
-                             '-DEIGEN_INCLUDE_PATH:PATH=' + ext_dir + '/eigen',
+                             '-DEIGEN_INCLUDE_PATH:PATH=' + ext_dir() + '/eigen',
                              '-DWITH_QUICKTIME:BOOL=OFF',
                              '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '/modules'])
 
@@ -921,7 +913,7 @@ def build_libs(libs: dict, update_src: bool):
                 shutil.rmtree(src_dir, ignore_errors=True)
                 unpack_file_to_folder(package_name, base_dir())
             assert os.path.exists(src_dir)
-            build_zlib(src_dir, os.path.join(ext_dir(), 'zlib'), ext_dir())
+            build_zlib(src_dir, os.path.join(ext_dir(), 'zlib'))
 
     if libs['ffmpeg']:
         if is_windows():
@@ -983,7 +975,7 @@ def build_libs(libs: dict, update_src: bool):
         if update_src:
             update_or_clone_git_repository(src_dir, 'git@github.com:Maratyszcza/cpuinfo.git')
         assert os.path.exists(src_dir)
-        build_cpuinfo(src_dir, os.path.join(ext_dir(), 'cpuinfo'), ext_dir())
+        build_cpuinfo(src_dir, os.path.join(ext_dir(), 'cpuinfo'))
 
     if libs['glog']:
         src_dir = os.path.join(base_dir(), 'glog')
@@ -993,22 +985,22 @@ def build_libs(libs: dict, update_src: bool):
             update_or_clone_git_repository(src_dir, 'git@github.com:google/glog.git')
         assert os.path.exists(src_dir)
         assert os.path.exists(gflags_src_dir)
-        build_gflags(gflags_src_dir, os.path.join(ext_dir(), 'gflags'), ext_dir())
-        build_glog(src_dir, os.path.join(ext_dir(), 'glog'), ext_dir())
+        build_gflags(gflags_src_dir, os.path.join(ext_dir(), 'gflags'))
+        build_glog(src_dir, os.path.join(ext_dir(), 'glog'))
 
     if libs['benchmark']:
         src_dir = os.path.join(base_dir(), 'benchmark')
         if update_src:
             update_or_clone_git_repository(src_dir, 'git@github.com:google/benchmark.git')
         assert os.path.exists(src_dir)
-        build_benchmark(src_dir, os.path.join(ext_dir(), 'benchmark'), ext_dir())
+        build_benchmark(src_dir, os.path.join(ext_dir(), 'benchmark'))
 
     if libs['glbinding']:
         src_dir = os.path.join(base_dir(), 'glbinding')
         if update_src:
             update_or_clone_git_repository(src_dir, 'git@github.com:cginternals/glbinding.git')
         assert os.path.exists(src_dir)
-        build_glbinding(src_dir, os.path.join(ext_dir(), 'glbinding'), ext_dir())
+        build_glbinding(src_dir, os.path.join(ext_dir(), 'glbinding'))
 
     if libs['libjpeg']:
         if is_windows():
@@ -1025,7 +1017,7 @@ def build_libs(libs: dict, update_src: bool):
             shutil.rmtree(src_dir, ignore_errors=True)
             unpack_file_to_folder(package_name, base_dir())
         assert os.path.exists(src_dir)
-        build_libjpeg(src_dir, os.path.join(ext_dir(), 'libjpeg-turbo'), ext_dir(), nasm_dir=nasm_dir)
+        build_libjpeg(src_dir, os.path.join(ext_dir(), 'libjpeg-turbo'), nasm_dir=nasm_dir)
 
     if libs['libpng']:
         package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libpng*'))
@@ -1034,14 +1026,14 @@ def build_libs(libs: dict, update_src: bool):
             shutil.rmtree(src_dir, ignore_errors=True)
             unpack_file_to_folder(package_name, base_dir())
         assert os.path.exists(src_dir)
-        build_libpng(src_dir, os.path.join(ext_dir(), 'libpng'), ext_dir())
+        build_libpng(src_dir, os.path.join(ext_dir(), 'libpng'))
 
     if libs['jxrlib']:
         src_dir = os.path.join(base_dir(), 'jxrlib')
         if update_src:
             update_or_clone_git_repository(src_dir, 'git@github.com:4creators/jxrlib.git')
         assert os.path.exists(src_dir)
-        build_jxrlib(src_dir, os.path.join(ext_dir(), 'jxrlib'), ext_dir())
+        build_jxrlib(src_dir, os.path.join(ext_dir(), 'jxrlib'))
 
     if libs['geometrictools']:
         package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'GeometricToolsEngine*'))
@@ -1050,14 +1042,14 @@ def build_libs(libs: dict, update_src: bool):
             shutil.rmtree(src_dir, ignore_errors=True)
             unpack_file_to_folder(package_name, base_dir())
         assert os.path.exists(src_dir)
-        build_geometrictools(src_dir, os.path.join(ext_dir(), 'geometrictools'), ext_dir())
+        build_geometrictools(src_dir, os.path.join(ext_dir(), 'geometrictools'))
 
     if libs['assimp']:
         src_dir = os.path.join(base_dir(), 'assimp')
         if update_src:
             update_or_clone_git_repository(src_dir, 'git@github.com:assimp/assimp.git')
         assert os.path.exists(src_dir)
-        build_assimp(src_dir, os.path.join(ext_dir(), 'assimp'), ext_dir())
+        build_assimp(src_dir, os.path.join(ext_dir(), 'assimp'))
 
     if libs['hdf5']:
         package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'hdf5*'))
@@ -1066,7 +1058,7 @@ def build_libs(libs: dict, update_src: bool):
             shutil.rmtree(src_dir, ignore_errors=True)
             unpack_file_to_folder(package_name, base_dir())
         assert os.path.exists(src_dir)
-        build_hdf5(src_dir, os.path.join(ext_dir(), 'hdf5'), ext_dir())
+        build_hdf5(src_dir, os.path.join(ext_dir(), 'hdf5'))
 
     if libs['freeimage']:
         package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'FreeImage*'))
@@ -1075,21 +1067,21 @@ def build_libs(libs: dict, update_src: bool):
             shutil.rmtree(src_dir, ignore_errors=True)
             unpack_file_to_folder(package_name, base_dir())
         assert os.path.exists(src_dir)
-        build_freeimage(src_dir, os.path.join(ext_dir(), 'freeimage'), ext_dir())
+        build_freeimage(src_dir, os.path.join(ext_dir(), 'freeimage'))
 
     if libs['itk']:
         src_dir = os.path.join(base_dir(), 'ITK')
         if update_src:
             update_or_clone_git_repository(src_dir, 'git://itk.org/ITK.git')
         assert os.path.exists(src_dir)
-        build_itk(src_dir, os.path.join(ext_dir(), 'itk'), ext_dir())
+        build_itk(src_dir, os.path.join(ext_dir(), 'itk'))
 
     if libs['vtk']:
         src_dir = os.path.join(base_dir(), 'VTK')
         if update_src:
             update_or_clone_git_repository(src_dir, 'https://gitlab.kitware.com/vtk/vtk.git')
         assert os.path.exists(src_dir)
-        build_vtk(src_dir, os.path.join(ext_dir(), 'vtk'), ext_dir())
+        build_vtk(src_dir, os.path.join(ext_dir(), 'vtk'))
 
     if libs['opencv']:
         src_dir = os.path.join(base_dir(), 'opencv')
@@ -1099,14 +1091,14 @@ def build_libs(libs: dict, update_src: bool):
             update_or_clone_git_repository(src_contrib_dir, 'git@github.com:Itseez/opencv_contrib.git')
         assert os.path.exists(src_dir)
         assert os.path.exists(src_contrib_dir)
-        build_opencv(src_dir, src_contrib_dir, os.path.join(ext_dir(), 'opencv'), ext_dir())
+        build_opencv(src_dir, src_contrib_dir, os.path.join(ext_dir(), 'opencv'))
 
     if libs['botan']:
         src_dir = os.path.join(base_dir(), 'botan')
         if update_src:
             update_or_clone_git_repository(src_dir, 'git@github.com:randombit/botan.git')
         assert os.path.exists(src_dir)
-        build_botan(src_dir, os.path.join(ext_dir(), 'botan'), ext_dir())
+        build_botan(src_dir, os.path.join(ext_dir(), 'botan'))
 
     if libs['ospray']:
         if is_windows():
@@ -1124,7 +1116,7 @@ def build_libs(libs: dict, update_src: bool):
         assert os.path.exists(src_dir)
         assert os.path.exists(ispc_dir)
         assert os.path.exists(embree_dir)
-        build_ospray(src_dir, os.path.join(ext_dir(), 'ospray'), ext_dir(), ispc_dir=ispc_dir, embree_dir=embree_dir)
+        build_ospray(src_dir, os.path.join(ext_dir(), 'ospray'), ispc_dir=ispc_dir, embree_dir=embree_dir)
 
 
 def parse_inputs(argv: list):

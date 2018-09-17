@@ -19,38 +19,38 @@ def curr_dir() -> str:
     return os.path.abspath(os.path.dirname(__file__))
 
 
-def repository_dir() -> str:
+def atlas_repository_dir() -> str:
     res = os.path.normpath(os.path.join(curr_dir(), '..'))
     assert os.path.exists(res)
     return res
 
 
 def base_dir() -> str:
-    res = os.path.normpath(os.path.join(repository_dir(), '..'))
+    res = os.path.normpath(os.path.join(atlas_repository_dir(), '..'))
     assert os.path.exists(res)
     return res
 
 
-def src_dir() -> str:
-    res = os.path.join(repository_dir(), 'src')
+def atlas_src_dir() -> str:
+    res = os.path.join(atlas_repository_dir(), 'src')
     assert os.path.exists(res)
     return res
 
 
 def ext_dir() -> str:
-    res = os.path.join(src_dir(), '3rdparty')
+    res = os.path.join(atlas_src_dir(), '3rdparty')
     assert os.path.exists(res)
     return res
 
 
 def atlas_dir() -> str:
-    res = os.path.join(src_dir(), 'atlas')
+    res = os.path.join(atlas_src_dir(), 'atlas')
     assert os.path.exists(res)
     return res
 
 
 def img_dir() -> str:
-    res = os.path.join(src_dir(), 'img')
+    res = os.path.join(atlas_src_dir(), 'img')
     assert os.path.exists(res)
     return res
 
@@ -72,27 +72,27 @@ def src_package_dir() -> str:
     return res
 
 
-def build_dir() -> str:
+def atlas_build_dir() -> str:
     if use_ninja():
-        res = os.path.join(repository_dir(), 'cmake-build-release-ninja')
+        res = os.path.join(atlas_repository_dir(), 'cmake-build-release-ninja')
     else:
-        res = os.path.join(repository_dir(), 'cmake-build-release')
+        res = os.path.join(atlas_repository_dir(), 'cmake-build-release')
     if not os.path.exists(res):
         os.mkdir(res)
     assert os.path.exists(res)
     return res
 
 
-def binary_dir() -> str:
-    res = os.path.join(build_dir(), 'src', 'atlas')
+def atlas_binary_dir() -> str:
+    res = os.path.join(atlas_build_dir(), 'src', 'atlas')
     if not use_ninja() and sys.platform.startswith('win32'):
-        res = os.path.join(build_dir(), 'src', 'atlas', 'Release')
+        res = os.path.join(atlas_build_dir(), 'src', 'atlas', 'Release')
     assert os.path.exists(res)
     return res
 
 
 def deploy_target_dir() -> str:
-    return repository_dir()
+    return atlas_repository_dir()
 
 
 def qt_install_dir() -> str:
@@ -234,7 +234,7 @@ def freeimage_redist_dir() -> str:
 
 
 def write_cmake_file_with_qt_info():
-    with open(os.path.join(repository_dir(), 'cmake', 'QtInfo.cmake'), mode='w', encoding='utf-8') as file:
+    with open(os.path.join(atlas_repository_dir(), 'cmake', 'QtInfo.cmake'), mode='w', encoding='utf-8') as file:
         file.write('# Set Qt related variables\n')
         file.write(f'set(QT_VERSION {qt_ver()})\n')
         if sys.platform.startswith('win32'):
@@ -399,4 +399,4 @@ if __name__ == "__main__":
     write_cmake_file_with_qt_info()
     install_cmake()
     subprocess.run([get_cmake_binary(), '-P', 'MakeTBBConfigFiles.cmake'],
-                   cwd=os.path.join(repository_dir(), 'cmake'), shell=False, check=True)
+                   cwd=os.path.join(atlas_repository_dir(), 'cmake'), shell=False, check=True)

@@ -44,8 +44,8 @@ def get_cmake_cmd_common_part(use_ninja: bool):
 
 
 def build_atlas():
-    build_dir = common_dirs.build_dir()
-    src_dir = common_dirs.repository_dir()
+    build_dir = common_dirs.atlas_build_dir()
+    src_dir = common_dirs.atlas_repository_dir()
     print('srcDIR:', src_dir)
     print('buildDIR:', build_dir)
     print('useNinja:', common_dirs.use_ninja())

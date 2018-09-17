@@ -15,7 +15,7 @@ def get_bak_file_name(orig_file: str):
 def deploy_atlas():
     print('current interpreter: ' + sys.executable)
 
-    binary_dir = common_dirs.binary_dir()
+    binary_dir = common_dirs.atlas_binary_dir()
     print('binaryDIR:', binary_dir)
     print('deployTargetDIR:', common_dirs.deploy_target_dir())
     print('qtBaseDIR:', common_dirs.qt_base_dir())
