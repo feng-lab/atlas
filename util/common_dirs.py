@@ -3,6 +3,12 @@ import sys
 import xml.etree.ElementTree as eTree
 import difflib
 from pkg_resources import parse_version
+import shutil
+import glob
+import tarfile
+import zipfile
+import stat
+import subprocess
 
 
 def use_ninja() -> bool:
@@ -262,6 +268,135 @@ def software_dir() -> str:
     return res
 
 
+def is_windows() -> bool:
+    return sys.platform.startswith('win')
+
+
+def is_mac() -> bool:
+    return sys.platform.startswith('darwin')
+
+
+def is_linux() -> bool:
+    return sys.platform.startswith('linux')
+
+
+def find_src_package_with_glob(files: str):
+    file_list = glob.glob(files)
+    if len(file_list) == 1:
+        return file_list[0]
+    elif len(file_list) == 0:
+        raise Exception("Can not find matching package with pattern: " + files)
+    else:
+        raise Exception("Find more than one matching packages with pattern: " + files)
+
+
+def get_package_top_level_folder(file: str, folder: str):
+    res = ''
+    if file.lower().endswith('.zip'):
+        with zipfile.ZipFile(file, mode='r') as zf:
+            # print(zf.namelist())
+            res = os.path.join(folder, os.path.commonpath([nm for nm in zf.namelist() if not nm.endswith('/')]))
+    elif file.lower().endswith('.tar.gz') or file.lower().endswith('.tar.bz2') or file.lower().endswith('.tar.xz') \
+            or file.lower().endswith('.tgz'):
+        with tarfile.open(file, mode='r|*') as tf:
+            # print(tf.getnames())
+            res = os.path.join(folder, os.path.commonpath(tf.getnames()))
+    elif file.lower().endswith('.7z'):
+        cp = subprocess.run(['7za', 'l', '-slt', file], stdout=subprocess.PIPE, encoding='utf-8')
+        started = False
+        filenames = []
+        for line in cp.stdout.splitlines():
+            if started:
+                if line.startswith('Path = '):
+                    filenames.append(line.replace('Path = ', ''))
+            else:
+                if line.startswith('-------'):
+                    started = True
+        res = os.path.join(folder, os.path.commonpath(filenames))
+
+    if res.endswith('/') or res.endswith('\\'):
+        res = res[:-1]
+    return res
+
+
+def unpack_file_to_folder(file: str, folder: str):
+    print('unpacking', file)
+    if file.lower().endswith('.zip'):
+        with zipfile.ZipFile(file, mode='r') as zf:
+            zf.extractall(path=folder)
+    elif file.lower().endswith('.tar.gz') or file.lower().endswith('.tar.bz2') or file.lower().endswith('.tar.xz') \
+            or file.lower().endswith('.tgz'):
+        with tarfile.open(file, mode='r|*') as tf:
+            tf.extractall(path=folder)
+    elif file.lower().endswith('.7z'):
+        if is_windows():
+            subprocess.run(['7za', 'x', '-y', '-o' + folder, file],
+                           shell=False, check=True, cwd=curr_dir())
+        else:
+            subprocess.run(['7za', 'x', '-y', '-o' + folder, file],
+                           shell=False, check=True)
+
+
+def unpack_tool_to_software_dir(tool_package_folder: str, tool_package_glob_name: str,
+                                tool_folder_glob_name=None) -> str:
+    if tool_folder_glob_name is None:
+        tool_folder_glob_name = tool_package_glob_name
+    package_name = find_src_package_with_glob(os.path.join(tool_package_folder, tool_package_glob_name))
+    package_unpack_folder = get_package_top_level_folder(package_name, software_dir())
+    if not os.path.exists(package_unpack_folder):
+        folder_list = glob.glob(os.path.join(software_dir(), tool_folder_glob_name))
+        if len(folder_list) == 1:
+            shutil.rmtree(folder_list[0], ignore_errors=False)
+        unpack_file_to_folder(package_name, software_dir())
+    return package_unpack_folder
+
+
+def install_cmake():
+    if is_windows():
+        unpack_tool_to_software_dir(src_package_dir(), 'cmake*win64*')
+    elif is_linux():
+        unpack_tool_to_software_dir(src_package_dir(), 'cmake*Linux*')
+    else:
+        unpack_tool_to_software_dir(src_package_dir(), 'cmake*Darwin*')
+
+
+def install_ninja():
+    if is_windows():
+        unpack_file_to_folder(os.path.join(src_package_dir(), 'ninja-win.zip'), software_dir())
+    elif is_linux():
+        if os.path.exists(os.path.join(software_dir(), 'ninja')):
+            os.remove(os.path.join(software_dir(), 'ninja'))
+        unpack_file_to_folder(os.path.join(src_package_dir(), 'ninja-linux.zip'), software_dir())
+        os.chmod(os.path.join(software_dir(), 'ninja'), stat.S_IXUSR)
+    else:
+        if os.path.exists(os.path.join(software_dir(), 'ninja')):
+            os.remove(os.path.join(software_dir(), 'ninja'))
+        unpack_file_to_folder(os.path.join(src_package_dir(), 'ninja-mac.zip'), software_dir())
+        os.chmod(os.path.join(software_dir(), 'ninja'), stat.S_IXUSR)
+
+
+def get_cmake_binary() -> str:
+    if is_windows():
+        cmake_folder = find_src_package_with_glob(os.path.join(software_dir(), 'cmake-*win*-x64'))
+        return os.path.join(cmake_folder, 'bin', 'cmake')
+    elif is_linux():
+        cmake_folder = find_src_package_with_glob(os.path.join(software_dir(), 'cmake-*Linux*_64'))
+        return os.path.join(cmake_folder, 'bin', 'cmake')
+    else:
+        cmake_folder = find_src_package_with_glob(os.path.join(software_dir(), 'cmake-*Darwin*_64'))
+        return os.path.join(cmake_folder, 'CMake.app', 'Contents', 'bin', 'cmake')
+
+
+def get_ninja_binary() -> str:
+    if is_windows():
+        return os.path.join(software_dir(), 'ninja.exe')
+    else:
+        return os.path.join(software_dir(), 'ninja')
+
+
 if __name__ == "__main__":
     print(f'Qt {qt_ver()} in {qt_base_dir()}')
     write_cmake_file_with_qt_info()
+    install_cmake()
+    subprocess.run([get_cmake_binary(), '-P', 'MakeTBBConfigFiles.cmake'],
+                   cwd=os.path.join(repository_dir(), 'cmake'), shell=False, check=True)

@@ -11,70 +11,11 @@ import json
 import distutils.dir_util
 import glob
 
-import common_dirs
-
-
-def is_windows() -> bool:
-    return sys.platform.startswith('win')
-
-
-def is_mac() -> bool:
-    return sys.platform.startswith('darwin')
-
-
-def is_linux() -> bool:
-    return sys.platform.startswith('linux')
+from common_dirs import *
 
 
 def macos_min_version():
     return '10.10'
-
-
-def get_package_top_level_folder(file: str, folder: str):
-    res = ''
-    if file.lower().endswith('.zip'):
-        with zipfile.ZipFile(file, mode='r') as zf:
-            # print(zf.namelist())
-            res = os.path.join(folder, os.path.commonpath([nm for nm in zf.namelist() if not nm.endswith('/')]))
-    elif file.lower().endswith('.tar.gz') or file.lower().endswith('.tar.bz2') or file.lower().endswith('.tar.xz') \
-            or file.lower().endswith('.tgz'):
-        with tarfile.open(file, mode='r|*') as tf:
-            # print(tf.getnames())
-            res = os.path.join(folder, os.path.commonpath(tf.getnames()))
-    elif file.lower().endswith('.7z'):
-        cp = subprocess.run(['7za', 'l', '-slt', file], stdout=subprocess.PIPE, encoding='utf-8')
-        started = False
-        filenames = []
-        for line in cp.stdout.splitlines():
-            if started:
-                if line.startswith('Path = '):
-                    filenames.append(line.replace('Path = ', ''))
-            else:
-                if line.startswith('-------'):
-                    started = True
-        res = os.path.join(folder, os.path.commonpath(filenames))
-
-    if res.endswith('/') or res.endswith('\\'):
-        res = res[:-1]
-    return res
-
-
-def unpack_file_to_folder(file: str, folder: str):
-    print('unpacking', file)
-    if file.lower().endswith('.zip'):
-        with zipfile.ZipFile(file, mode='r') as zf:
-            zf.extractall(path=folder)
-    elif file.lower().endswith('.tar.gz') or file.lower().endswith('.tar.bz2') or file.lower().endswith('.tar.xz') \
-            or file.lower().endswith('.tgz'):
-        with tarfile.open(file, mode='r|*') as tf:
-            tf.extractall(path=folder)
-    elif file.lower().endswith('.7z'):
-        if is_windows():
-            subprocess.run(['7za', 'x', '-y', '-o' + folder, file],
-                           shell=False, check=True, cwd=common_dirs.curr_dir())
-        else:
-            subprocess.run(['7za', 'x', '-y', '-o' + folder, file],
-                           shell=False, check=True)
 
 
 def update_or_clone_git_repository(repository_folder: str, repository_url: str):
@@ -119,22 +60,12 @@ def glob_copy(files: str, dst: str):
         shutil.copy2(file, dst)
 
 
-def find_src_package_with_glob(files: str):
-    file_list = glob.glob(files)
-    if len(file_list) == 1:
-        return file_list[0]
-    elif len(file_list) == 0:
-        raise Exception("Can not find matching package with pattern: " + files)
-    else:
-        raise Exception("Find more than one matching packages with pattern: " + files)
-
-
 def get_vcvars_environment(remove_conda_from_path: bool = True):
     """
     Returns a dictionary containing the environment variables set up by vcvarsall.bat amd64
     """
 
-    vcvars = os.path.normpath(os.path.join(common_dirs.vs_install_dir(), 'VC', 'Auxiliary', 'Build', 'vcvarsall.bat'))
+    vcvars = os.path.normpath(os.path.join(vs_install_dir(), 'VC', 'Auxiliary', 'Build', 'vcvarsall.bat'))
     return get_enviroment_from_shell_script(vcvars, 'x64', remove_conda_from_path=remove_conda_from_path)
 
 
@@ -168,42 +99,23 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
 
 def get_tbb_env():
     if is_windows():
-        env = get_enviroment_from_shell_script(os.path.join(common_dirs.intel_sw_dir(), 'tbb', 'bin',
+        env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin',
                                                             'tbbvars.bat'),
                                                para='intel64 vs2017',
                                                start_env=get_vcvars_environment())
     else:
         if is_linux():
-            env = get_enviroment_from_shell_script(os.path.join(common_dirs.intel_sw_dir(), 'tbb', 'bin',
+            env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin',
                                                                 'tbbvars.sh'), 'intel64')
         else:
-            env = get_enviroment_from_shell_script(os.path.join(common_dirs.intel_sw_dir(), 'tbb', 'bin',
+            env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin',
                                                                 'tbbvars.sh'))
     return env
 
 
-def get_cmake_binary() -> str:
-    if is_windows():
-        cmake_folder = find_src_package_with_glob(os.path.join(common_dirs.software_dir(), 'cmake-*win*-x64'))
-        return os.path.join(cmake_folder, 'bin', 'cmake')
-    elif is_linux():
-        cmake_folder = find_src_package_with_glob(os.path.join(common_dirs.software_dir(), 'cmake-*Linux*_64'))
-        return os.path.join(cmake_folder, 'bin', 'cmake')
-    else:
-        cmake_folder = find_src_package_with_glob(os.path.join(common_dirs.software_dir(), 'cmake-*Darwin*_64'))
-        return os.path.join(cmake_folder, 'CMake.app', 'Contents', 'bin', 'cmake')
-
-
-def get_ninja_binary() -> str:
-    if is_windows():
-        return os.path.join(common_dirs.software_dir(), 'ninja.exe')
-    else:
-        return os.path.join(common_dirs.software_dir(), 'ninja')
-
-
 def get_cmake_cmd_common_part(install_dir: str):
     if is_windows():
-        if common_dirs.use_ninja():
+        if use_ninja():
             return [get_cmake_binary(),  # '-E', 'echo',
                     '-DCMAKE_BUILD_TYPE=Release',
                     '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary(),
@@ -221,7 +133,7 @@ def get_cmake_cmd_common_part(install_dir: str):
                '-DCMAKE_C_FLAGS:STRING=-fPIC',
                '-DCMAKE_CXX_FLAGS:STRING=-std=c++14 -fPIC'
                ]
-        if common_dirs.use_ninja():
+        if use_ninja():
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])
         return res
     else:
@@ -235,7 +147,7 @@ def get_cmake_cmd_common_part(install_dir: str):
                '-DCMAKE_OSX_SYSROOT=' + osx_sysroot,
                '-DCMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -std=c++14'
                ]
-        if common_dirs.use_ninja():
+        if use_ninja():
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])
         return res
 
@@ -245,14 +157,14 @@ def build_and_install_cmakecmd(cmakecmd, build_dir: str, env=None):
         if env is None:
             env = get_vcvars_environment()
         subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-        if common_dirs.use_ninja():
+        if use_ninja():
             subprocess.run([get_ninja_binary(), 'install'],
                            cwd=build_dir, shell=False, check=True, env=env)
         else:
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
     else:
-        if common_dirs.use_ninja():
+        if use_ninja():
             if env is None:
                 subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
                 subprocess.run([get_ninja_binary(), 'install'],
@@ -828,7 +740,7 @@ def build_itk(src_dir: str, install_dir: str, ext_dir: str):
                          '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
                          '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
                          '-DModule_ITKTBB:BOOL=ON',
-                         '-DTBB_DIR:PATH=' + common_dirs.repository_dir() + '/cmake'])
+                         '-DTBB_DIR:PATH=' + repository_dir() + '/cmake'])
 
         if is_windows():
             cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir + '\\zlib\\include',
@@ -977,27 +889,10 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, ext_dir: 
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def unpack_tool_to_software_dir(tool_package_folder: str, tool_package_glob_name: str,
-                                tool_folder_glob_name=None) -> str:
-    if tool_folder_glob_name is None:
-        tool_folder_glob_name = tool_package_glob_name
-    package_name = find_src_package_with_glob(os.path.join(tool_package_folder, tool_package_glob_name))
-    package_unpack_folder = get_package_top_level_folder(package_name, common_dirs.software_dir())
-    if not os.path.exists(package_unpack_folder):
-        folder_list = glob.glob(os.path.join(common_dirs.software_dir(), tool_folder_glob_name))
-        if len(folder_list) == 1:
-            shutil.rmtree(folder_list[0], ignore_errors=False)
-        unpack_file_to_folder(package_name, common_dirs.software_dir())
-    return package_unpack_folder
-
-
 def build_libs(libs: dict, update_src: bool):
-    ext_dir = common_dirs.ext_dir()
-    src_package_dir = common_dirs.src_package_dir()
-    base_dir = common_dirs.base_dir()
-    print('extDIR:', ext_dir)
-    print('srcPackageDIR:', src_package_dir)
-    print('baseDIR:', base_dir)
+    print('extDIR:', ext_dir())
+    print('srcPackageDIR:', src_package_dir())
+    print('baseDIR:', base_dir())
 
     remove_path_contains('miniconda')
     remove_path_contains('anaconda')
@@ -1009,243 +904,227 @@ def build_libs(libs: dict, update_src: bool):
     print('HOME:', os.environ['HOME'])
 
     if libs['cmake']:
-        if is_windows():
-            unpack_tool_to_software_dir(src_package_dir, 'cmake*win64*')
-        elif is_linux():
-            unpack_tool_to_software_dir(src_package_dir, 'cmake*Linux*')
-        else:
-            unpack_tool_to_software_dir(src_package_dir, 'cmake*Darwin*')
+        install_cmake()
 
     if libs['ninja']:
-        if is_windows():
-            unpack_file_to_folder(os.path.join(src_package_dir, 'ninja-win.zip'), common_dirs.software_dir())
-        elif is_linux():
-            if os.path.exists(os.path.join(common_dirs.software_dir(), 'ninja')):
-                os.remove(os.path.join(common_dirs.software_dir(), 'ninja'))
-            unpack_file_to_folder(os.path.join(src_package_dir, 'ninja-linux.zip'), common_dirs.software_dir())
-            os.chmod(os.path.join(common_dirs.software_dir(), 'ninja'), stat.S_IXUSR)
-        else:
-            if os.path.exists(os.path.join(common_dirs.software_dir(), 'ninja')):
-                os.remove(os.path.join(common_dirs.software_dir(), 'ninja'))
-            unpack_file_to_folder(os.path.join(src_package_dir, 'ninja-mac.zip'), common_dirs.software_dir())
-            os.chmod(os.path.join(common_dirs.software_dir(), 'ninja'), stat.S_IXUSR)
+        install_ninja()
 
     if libs['curl']:
         if is_windows():
-            unpack_tool_to_software_dir(src_package_dir, 'curl*win*')
+            unpack_tool_to_software_dir(src_package_dir(), 'curl*win*')
 
     if libs['zlib']:
         if is_windows():
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'zlib*'))
-            src_dir = get_package_top_level_folder(package_name, base_dir)
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'zlib*'))
+            src_dir = get_package_top_level_folder(package_name, base_dir())
             if update_src:
                 shutil.rmtree(src_dir, ignore_errors=True)
-                unpack_file_to_folder(package_name, base_dir)
+                unpack_file_to_folder(package_name, base_dir())
             assert os.path.exists(src_dir)
-            build_zlib(src_dir, os.path.join(ext_dir, 'zlib'), ext_dir)
+            build_zlib(src_dir, os.path.join(ext_dir(), 'zlib'), ext_dir())
 
     if libs['ffmpeg']:
         if is_windows():
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*win*'))
-            package_unpack_folder = get_package_top_level_folder(package_name, ext_dir)
-            unpack_file_to_folder(package_name, ext_dir)
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'ffmpeg*win*'))
+            package_unpack_folder = get_package_top_level_folder(package_name, ext_dir())
+            unpack_file_to_folder(package_name, ext_dir())
             os.replace(os.path.join(package_unpack_folder, 'bin', 'ffmpeg.exe'),
-                       os.path.join(ext_dir, 'ffmpeg.exe'))
+                       os.path.join(ext_dir(), 'ffmpeg.exe'))
             shutil.rmtree(package_unpack_folder, ignore_errors=False)
         elif is_linux():
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*static.tar.xz'))
-            package_unpack_folder = get_package_top_level_folder(package_name, ext_dir)
-            unpack_file_to_folder(package_name, ext_dir)
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'ffmpeg*static.tar.xz'))
+            package_unpack_folder = get_package_top_level_folder(package_name, ext_dir())
+            unpack_file_to_folder(package_name, ext_dir())
             os.replace(os.path.join(package_unpack_folder, 'ffmpeg'),
-                       os.path.join(ext_dir, 'ffmpeg'))
+                       os.path.join(ext_dir(), 'ffmpeg'))
             shutil.rmtree(package_unpack_folder, ignore_errors=False)
         else:
             # unpack_file_to_folder(find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*7z')),
             #                       ext_dir)
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*macos*'))
-            package_unpack_folder = get_package_top_level_folder(package_name, ext_dir)
-            unpack_file_to_folder(package_name, ext_dir)
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'ffmpeg*macos*'))
+            package_unpack_folder = get_package_top_level_folder(package_name, ext_dir())
+            unpack_file_to_folder(package_name, ext_dir())
             os.replace(os.path.join(package_unpack_folder, 'bin', 'ffmpeg'),
-                       os.path.join(ext_dir, 'ffmpeg'))
+                       os.path.join(ext_dir(), 'ffmpeg'))
             shutil.rmtree(package_unpack_folder, ignore_errors=False)
-            os.chmod(os.path.join(ext_dir, 'ffmpeg'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+            os.chmod(os.path.join(ext_dir(), 'ffmpeg'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
 
     if libs['boost']:
-        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'boost*'))
-        src_dir = get_package_top_level_folder(package_name, ext_dir)
-        shutil.rmtree(os.path.join(ext_dir, 'boost'), ignore_errors=True)
-        unpack_file_to_folder(package_name, ext_dir)
-        os.rename(src_dir, os.path.join(ext_dir, 'boost'))
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'boost*'))
+        src_dir = get_package_top_level_folder(package_name, ext_dir())
+        shutil.rmtree(os.path.join(ext_dir(), 'boost'), ignore_errors=True)
+        unpack_file_to_folder(package_name, ext_dir())
+        os.rename(src_dir, os.path.join(ext_dir(), 'boost'))
 
     if libs['eigen']:
-        src_dir = os.path.join(base_dir, 'eigen')
+        src_dir = os.path.join(base_dir(), 'eigen')
         update_or_clone_git_repository(src_dir, 'git@github.com:eigenteam/eigen-git-mirror.git')
-        export_git_repository(src_dir, os.path.join(ext_dir, 'eigen'))
+        export_git_repository(src_dir, os.path.join(ext_dir(), 'eigen'))
 
     if libs['glm']:
-        src_dir = os.path.join(base_dir, 'glm')
+        src_dir = os.path.join(base_dir(), 'glm')
         update_or_clone_git_repository(src_dir, 'git@github.com:g-truc/glm.git')
-        export_git_repository(src_dir, os.path.join(ext_dir, 'glm'))
+        export_git_repository(src_dir, os.path.join(ext_dir(), 'glm'))
 
     if libs['googletest']:
-        src_dir = os.path.join(base_dir, 'googletest')
+        src_dir = os.path.join(base_dir(), 'googletest')
         update_or_clone_git_repository(src_dir, 'git@github.com:google/googletest.git')
-        shutil.rmtree(os.path.join(ext_dir, 'googletest'), ignore_errors=True)
-        shutil.copytree(os.path.join(src_dir, 'googletest'), os.path.join(ext_dir, 'googletest'))
+        shutil.rmtree(os.path.join(ext_dir(), 'googletest'), ignore_errors=True)
+        shutil.copytree(os.path.join(src_dir, 'googletest'), os.path.join(ext_dir(), 'googletest'))
 
     if libs['folly']:
-        src_dir = os.path.join(base_dir, 'folly')
+        src_dir = os.path.join(base_dir(), 'folly')
         update_or_clone_git_repository(src_dir, 'git@github.com:facebook/folly.git')
-        export_git_repository(src_dir, os.path.join(ext_dir, 'folly'))
-        build_folly(src_dir, os.path.join(ext_dir, 'folly'))
+        export_git_repository(src_dir, os.path.join(ext_dir(), 'folly'))
+        build_folly(src_dir, os.path.join(ext_dir(), 'folly'))
 
     if libs['cpuinfo']:
-        src_dir = os.path.join(base_dir, 'cpuinfo')
+        src_dir = os.path.join(base_dir(), 'cpuinfo')
         if update_src:
             update_or_clone_git_repository(src_dir, 'git@github.com:Maratyszcza/cpuinfo.git')
         assert os.path.exists(src_dir)
-        build_cpuinfo(src_dir, os.path.join(ext_dir, 'cpuinfo'), ext_dir)
+        build_cpuinfo(src_dir, os.path.join(ext_dir(), 'cpuinfo'), ext_dir())
 
     if libs['glog']:
-        src_dir = os.path.join(base_dir, 'glog')
-        gflags_src_dir = os.path.join(base_dir, 'gflags')
+        src_dir = os.path.join(base_dir(), 'glog')
+        gflags_src_dir = os.path.join(base_dir(), 'gflags')
         if update_src:
             update_or_clone_git_repository(gflags_src_dir, 'git@github.com:gflags/gflags.git')
             update_or_clone_git_repository(src_dir, 'git@github.com:google/glog.git')
         assert os.path.exists(src_dir)
         assert os.path.exists(gflags_src_dir)
-        build_gflags(gflags_src_dir, os.path.join(ext_dir, 'gflags'), ext_dir)
-        build_glog(src_dir, os.path.join(ext_dir, 'glog'), ext_dir)
+        build_gflags(gflags_src_dir, os.path.join(ext_dir(), 'gflags'), ext_dir())
+        build_glog(src_dir, os.path.join(ext_dir(), 'glog'), ext_dir())
 
     if libs['benchmark']:
-        src_dir = os.path.join(base_dir, 'benchmark')
+        src_dir = os.path.join(base_dir(), 'benchmark')
         if update_src:
             update_or_clone_git_repository(src_dir, 'git@github.com:google/benchmark.git')
         assert os.path.exists(src_dir)
-        build_benchmark(src_dir, os.path.join(ext_dir, 'benchmark'), ext_dir)
+        build_benchmark(src_dir, os.path.join(ext_dir(), 'benchmark'), ext_dir())
 
     if libs['glbinding']:
-        src_dir = os.path.join(base_dir, 'glbinding')
+        src_dir = os.path.join(base_dir(), 'glbinding')
         if update_src:
             update_or_clone_git_repository(src_dir, 'git@github.com:cginternals/glbinding.git')
         assert os.path.exists(src_dir)
-        build_glbinding(src_dir, os.path.join(ext_dir, 'glbinding'), ext_dir)
+        build_glbinding(src_dir, os.path.join(ext_dir(), 'glbinding'), ext_dir())
 
     if libs['libjpeg']:
         if is_windows():
-            nasm_dir = unpack_tool_to_software_dir(src_package_dir, 'nasm*win64*', 'nasm-*')
+            nasm_dir = unpack_tool_to_software_dir(src_package_dir(), 'nasm*win64*', 'nasm-*')
         elif is_mac():
-            nasm_dir = unpack_tool_to_software_dir(src_package_dir, 'nasm*macosx*', 'nasm-*')
+            nasm_dir = unpack_tool_to_software_dir(src_package_dir(), 'nasm*macosx*', 'nasm-*')
             os.chown(os.path.join(nasm_dir, 'nasm'), os.getuid(), os.getgid())
             os.chmod(os.path.join(nasm_dir, 'nasm'), os.stat(os.path.join(nasm_dir, 'nasm')).st_mode | stat.S_IXUSR)
         else:
             nasm_dir = ''
-        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'libjpeg*'))
-        src_dir = get_package_top_level_folder(package_name, base_dir)
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libjpeg*'))
+        src_dir = get_package_top_level_folder(package_name, base_dir())
         if update_src:
             shutil.rmtree(src_dir, ignore_errors=True)
-            unpack_file_to_folder(package_name, base_dir)
+            unpack_file_to_folder(package_name, base_dir())
         assert os.path.exists(src_dir)
-        build_libjpeg(src_dir, os.path.join(ext_dir, 'libjpeg-turbo'), ext_dir, nasm_dir=nasm_dir)
+        build_libjpeg(src_dir, os.path.join(ext_dir(), 'libjpeg-turbo'), ext_dir(), nasm_dir=nasm_dir)
 
     if libs['libpng']:
-        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'libpng*'))
-        src_dir = get_package_top_level_folder(package_name, base_dir)
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libpng*'))
+        src_dir = get_package_top_level_folder(package_name, base_dir())
         if update_src:
             shutil.rmtree(src_dir, ignore_errors=True)
-            unpack_file_to_folder(package_name, base_dir)
+            unpack_file_to_folder(package_name, base_dir())
         assert os.path.exists(src_dir)
-        build_libpng(src_dir, os.path.join(ext_dir, 'libpng'), ext_dir)
+        build_libpng(src_dir, os.path.join(ext_dir(), 'libpng'), ext_dir())
 
     if libs['jxrlib']:
-        src_dir = os.path.join(base_dir, 'jxrlib')
+        src_dir = os.path.join(base_dir(), 'jxrlib')
         if update_src:
             update_or_clone_git_repository(src_dir, 'git@github.com:4creators/jxrlib.git')
         assert os.path.exists(src_dir)
-        build_jxrlib(src_dir, os.path.join(ext_dir, 'jxrlib'), ext_dir)
+        build_jxrlib(src_dir, os.path.join(ext_dir(), 'jxrlib'), ext_dir())
 
     if libs['geometrictools']:
-        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'GeometricToolsEngine*'))
-        src_dir = get_package_top_level_folder(package_name, base_dir)
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'GeometricToolsEngine*'))
+        src_dir = get_package_top_level_folder(package_name, base_dir())
         if update_src:
             shutil.rmtree(src_dir, ignore_errors=True)
-            unpack_file_to_folder(package_name, base_dir)
+            unpack_file_to_folder(package_name, base_dir())
         assert os.path.exists(src_dir)
-        build_geometrictools(src_dir, os.path.join(ext_dir, 'geometrictools'), ext_dir)
+        build_geometrictools(src_dir, os.path.join(ext_dir(), 'geometrictools'), ext_dir())
 
     if libs['assimp']:
-        src_dir = os.path.join(base_dir, 'assimp')
+        src_dir = os.path.join(base_dir(), 'assimp')
         if update_src:
             update_or_clone_git_repository(src_dir, 'git@github.com:assimp/assimp.git')
         assert os.path.exists(src_dir)
-        build_assimp(src_dir, os.path.join(ext_dir, 'assimp'), ext_dir)
+        build_assimp(src_dir, os.path.join(ext_dir(), 'assimp'), ext_dir())
 
     if libs['hdf5']:
-        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'hdf5*'))
-        src_dir = get_package_top_level_folder(package_name, base_dir)
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'hdf5*'))
+        src_dir = get_package_top_level_folder(package_name, base_dir())
         if update_src:
             shutil.rmtree(src_dir, ignore_errors=True)
-            unpack_file_to_folder(package_name, base_dir)
+            unpack_file_to_folder(package_name, base_dir())
         assert os.path.exists(src_dir)
-        build_hdf5(src_dir, os.path.join(ext_dir, 'hdf5'), ext_dir)
+        build_hdf5(src_dir, os.path.join(ext_dir(), 'hdf5'), ext_dir())
 
     if libs['freeimage']:
-        package_name = find_src_package_with_glob(os.path.join(src_package_dir, 'FreeImage*'))
-        src_dir = get_package_top_level_folder(package_name, base_dir)
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'FreeImage*'))
+        src_dir = get_package_top_level_folder(package_name, base_dir())
         if update_src:
             shutil.rmtree(src_dir, ignore_errors=True)
-            unpack_file_to_folder(package_name, base_dir)
+            unpack_file_to_folder(package_name, base_dir())
         assert os.path.exists(src_dir)
-        build_freeimage(src_dir, os.path.join(ext_dir, 'freeimage'), ext_dir)
+        build_freeimage(src_dir, os.path.join(ext_dir(), 'freeimage'), ext_dir())
 
     if libs['itk']:
-        src_dir = os.path.join(base_dir, 'ITK')
+        src_dir = os.path.join(base_dir(), 'ITK')
         if update_src:
             update_or_clone_git_repository(src_dir, 'git://itk.org/ITK.git')
         assert os.path.exists(src_dir)
-        build_itk(src_dir, os.path.join(ext_dir, 'itk'), ext_dir)
+        build_itk(src_dir, os.path.join(ext_dir(), 'itk'), ext_dir())
 
     if libs['vtk']:
-        src_dir = os.path.join(base_dir, 'VTK')
+        src_dir = os.path.join(base_dir(), 'VTK')
         if update_src:
             update_or_clone_git_repository(src_dir, 'https://gitlab.kitware.com/vtk/vtk.git')
         assert os.path.exists(src_dir)
-        build_vtk(src_dir, os.path.join(ext_dir, 'vtk'), ext_dir)
+        build_vtk(src_dir, os.path.join(ext_dir(), 'vtk'), ext_dir())
 
     if libs['opencv']:
-        src_dir = os.path.join(base_dir, 'opencv')
-        src_contrib_dir = os.path.join(base_dir, 'opencv_contrib')
+        src_dir = os.path.join(base_dir(), 'opencv')
+        src_contrib_dir = os.path.join(base_dir(), 'opencv_contrib')
         if update_src:
             update_or_clone_git_repository(src_dir, 'git@github.com:Itseez/opencv.git')
             update_or_clone_git_repository(src_contrib_dir, 'git@github.com:Itseez/opencv_contrib.git')
         assert os.path.exists(src_dir)
         assert os.path.exists(src_contrib_dir)
-        build_opencv(src_dir, src_contrib_dir, os.path.join(ext_dir, 'opencv'), ext_dir)
+        build_opencv(src_dir, src_contrib_dir, os.path.join(ext_dir(), 'opencv'), ext_dir())
 
     if libs['botan']:
-        src_dir = os.path.join(base_dir, 'botan')
+        src_dir = os.path.join(base_dir(), 'botan')
         if update_src:
             update_or_clone_git_repository(src_dir, 'git@github.com:randombit/botan.git')
         assert os.path.exists(src_dir)
-        build_botan(src_dir, os.path.join(ext_dir, 'botan'), ext_dir)
+        build_botan(src_dir, os.path.join(ext_dir(), 'botan'), ext_dir())
 
     if libs['ospray']:
         if is_windows():
-            ispc_dir = unpack_tool_to_software_dir(src_package_dir, 'ispc*win*')
-            embree_dir = unpack_tool_to_software_dir(src_package_dir, 'embree*win*')
+            ispc_dir = unpack_tool_to_software_dir(src_package_dir(), 'ispc*win*')
+            embree_dir = unpack_tool_to_software_dir(src_package_dir(), 'embree*win*')
         elif is_linux():
-            ispc_dir = unpack_tool_to_software_dir(src_package_dir, 'ispc*linux*')
-            embree_dir = unpack_tool_to_software_dir(src_package_dir, 'embree*linux*')
+            ispc_dir = unpack_tool_to_software_dir(src_package_dir(), 'ispc*linux*')
+            embree_dir = unpack_tool_to_software_dir(src_package_dir(), 'embree*linux*')
         else:
-            ispc_dir = unpack_tool_to_software_dir(src_package_dir, 'ispc*osx*')
-            embree_dir = unpack_tool_to_software_dir(src_package_dir, 'embree*osx*')
-        src_dir = os.path.join(base_dir, 'OSPRay')
+            ispc_dir = unpack_tool_to_software_dir(src_package_dir(), 'ispc*osx*')
+            embree_dir = unpack_tool_to_software_dir(src_package_dir(), 'embree*osx*')
+        src_dir = os.path.join(base_dir(), 'OSPRay')
         if update_src:
             update_or_clone_git_repository(src_dir, 'git@github.com:ospray/OSPRay.git')
         assert os.path.exists(src_dir)
         assert os.path.exists(ispc_dir)
         assert os.path.exists(embree_dir)
-        build_ospray(src_dir, os.path.join(ext_dir, 'ospray'), ext_dir, ispc_dir=ispc_dir, embree_dir=embree_dir)
+        build_ospray(src_dir, os.path.join(ext_dir(), 'ospray'), ext_dir(), ispc_dir=ispc_dir, embree_dir=embree_dir)
 
 
 def parse_inputs(argv: list):
