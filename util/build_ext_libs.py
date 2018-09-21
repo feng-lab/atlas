@@ -882,7 +882,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
         if is_windows():
             orig_file_2 = os.path.join(install_dir, 'x64', 'vc15', 'staticlib', 'OpenCVModules.cmake')
         else:
-            orig_file_2 = os.path.join(install_dir, 'share', 'OpenCV', 'OpenCVModules.cmake')
+            orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'opencv4', 'OpenCVModules.cmake')
         patch_file(orig_file_2,
                    from_texts=[r';\$<LINK_ONLY:tbb>', r'\$<LINK_ONLY:tbb>;'],
                    to_texts=[r'', r''])
