@@ -2377,11 +2377,11 @@ void ZStitchImageDialog::stitchStacks()
       if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
           mergeMode == ZImgMerge::Mode::Max) {
         ZImgIO().writeImg(m_outputFileEdit->text(), imgMerge);
-        if (imgMerge.imgInfo().numChannels == 3) { // mGRASP image only todo
+        for (size_t c = 0; c < imgMerge.imgInfo().numChannels; ++c) {
           QFileInfo fi(m_outputFileEdit->text());
-          QString ofn = fi.path() + "/" + fi.baseName() + "_ch3.v3draw";
-          QString dsofn = fi.path() + "/" + fi.baseName() + "_ch3_downsampled.v3draw";
-          ZImg img(m_outputFileEdit->text(), ZImgRegion(0, -1, 0, -1, 0, -1, 2, 3));
+          QString ofn = fi.path() + "/" + fi.baseName() + QString("_ch%1.v3draw").arg(c+1);
+          QString dsofn = fi.path() + "/" + fi.baseName() + QString("_ch%1_downsampled.v3draw").arg(c+1);
+          ZImg img(m_outputFileEdit->text(), ZImgRegion(0, -1, 0, -1, 0, -1, c, c+1));
           img.save(ofn);
           img.blockDownsample(2, 2, 1, ZImg::CombineMode::Mean);
           img.save(dsofn);
@@ -2389,14 +2389,14 @@ void ZStitchImageDialog::stitchStacks()
       } else {
         auto wholeImg = imgMerge.wholeImg();
         wholeImg.save(m_outputFileEdit->text());
-        if (imgMerge.imgInfo().numChannels == 3) { // mGRASP image only todo
+        for (size_t c = 0; c < imgMerge.imgInfo().numChannels; ++c) {
           QFileInfo fi(m_outputFileEdit->text());
-          QString ofn = fi.path() + "/" + fi.baseName() + "_ch3.v3draw";
-          QString dsofn = fi.path() + "/" + fi.baseName() + "_ch3_downsampled.v3draw";
-          wholeImg = wholeImg.extractChannel(2);
-          wholeImg.save(ofn);
-          wholeImg.blockDownsample(2, 2, 1, ZImg::CombineMode::Mean);
-          wholeImg.save(dsofn);
+          QString ofn = fi.path() + "/" + fi.baseName() + QString("_ch%1.v3draw").arg(c+1);
+          QString dsofn = fi.path() + "/" + fi.baseName() + QString("_ch%1_downsampled.v3draw").arg(c+1);
+          ZImg tmp = wholeImg.createView(c);
+          tmp.save(ofn);
+          tmp.blockDownsample(2, 2, 1, ZImg::CombineMode::Mean);
+          tmp.save(dsofn);
         }
       }
       emit resultReady(m_outputFileEdit->text());

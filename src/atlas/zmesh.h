@@ -10,6 +10,8 @@ namespace nim {
 
 class ZSwc;
 
+class ZPuncta;
+
 struct ZMeshProperties
 {
   double surfaceArea = -1.0;
@@ -272,6 +274,8 @@ public:
   static ZMesh merge(const std::vector<ZMesh>& meshes);
 
   static void createSwcMesh(const ZSwc& tree, double zScale, int rootType, ZMesh& rootMesh, ZMesh& branchMesh);
+
+  static void createPunctaMesh(const ZPuncta& puncta, double zScale, ZMesh& punctaMesh, int resolution = 32);
 
 private:
   enum class BooleanOperationType

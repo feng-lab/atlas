@@ -463,6 +463,10 @@ def build_geometrictools(src_dir: str, install_dir: str):
 
     orig_file = None
     bak_file = None
+    orig_file2 = None
+    bak_file2 = None
+    orig_file3 = None
+    bak_file3 = None
     try:
         if is_windows():
             env = get_vcvars_environment()
@@ -498,6 +502,10 @@ def build_geometrictools(src_dir: str, install_dir: str):
             bak_file = patch_file(orig_file,
                                   from_texts=[r'#include <Mathematics/GteGenerateMeshUV.h>'],
                                   to_texts=['#include <Mathematics/GteGenerateMeshUV.h>\n#include <string>'])
+            orig_file2 = os.path.join(src_dir, 'Source', 'Mathematics', 'GteIEEEBinary16.cpp')
+            bak_file2 = patch_file(orig_file2, from_texts=[r'_Float16'], to_texts=[r'___Float16'])
+            orig_file3 = os.path.join(src_dir, 'Include', 'Mathematics', 'GteIEEEBinary16.h')
+            bak_file3 = patch_file(orig_file3, from_texts=[r'_Float16'], to_texts=[r'___Float16'])
 
             shutil.copy2(os.path.join(ext_dir(), 'makeengine.macos.gte'), src_dir)
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'CFG=Release', '-f', 'makeengine.macos.gte'],
@@ -511,6 +519,9 @@ def build_geometrictools(src_dir: str, install_dir: str):
         shutil.rmtree(os.path.join(src_dir, '_Output'), ignore_errors=True)  # win
         if is_linux() or is_mac():
             os.replace(bak_file, orig_file)
+        if is_mac():
+            os.replace(bak_file2, orig_file2)
+            os.replace(bak_file3, orig_file3)
 
 
 def build_ospray(src_dir: str, install_dir: str, ispc_dir: str, embree_dir: str):

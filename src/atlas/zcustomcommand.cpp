@@ -1310,15 +1310,20 @@ void channelCalibration()
   }
 }
 
+void createPunctaMesh()
+{
+  ZPuncta pun("/Volumes/shared/feng/Chris/py_post_neurons/Py0515_s15_1_1_1c_puncta.nimp");
+  ZMesh mesh;
+  ZMesh::createPunctaMesh(pun, 5, mesh, 16);
+  mesh.save("/Users/feng/Downloads/Py0515_s15_1_1_1c_puncta.obj");
+}
+
 }  // namespace nim
 
 namespace nim {
 
 void ZCustomCommand::run()
 {
-  //convertPYRawToNim();
-  //convertPVRawToNim();
-  channelCalibration();
   LOG(INFO) << "done";
 }
 

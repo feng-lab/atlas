@@ -6,6 +6,7 @@
 #include "zexception.h"
 #include "zswc.h"
 #include "zlog.h"
+#include "zpuncta.h"
 #include <vtkPolyData.h>
 #include <vtkPointData.h>
 #include <vtkSmartPointer.h>
@@ -1290,6 +1291,20 @@ void ZMesh::createSwcMesh(const ZSwc& tree, double zScale, int rootType, ZMesh& 
 //  }
 //  LOG(INFO) << sumVolume;
 //  return res;
+}
+
+void ZMesh::createPunctaMesh(const ZPuncta& puncta, double zScale, ZMesh& punctaMesh, int resolution)
+{
+  resolution = std::max(resolution, 4);
+  std::vector<ZMesh> meshes;
+  for (auto p : puncta) {
+    meshes.push_back(createSphereMesh(glm::vec3(p.x(), p.y(), p.z() * zScale), p.radius(), resolution, resolution));
+  }
+  if (meshes.empty()) {
+    punctaMesh.clear();
+  } else {
+    punctaMesh = merge(meshes);
+  }
 }
 
 void ZMesh::appendTriangle(const ZMesh& mesh, const glm::uvec3& triangle)
