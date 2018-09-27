@@ -402,7 +402,7 @@ QDir ZSystemInfo::logDir() const
 QString ZSystemInfo::lastOpenedObjPath(const QString& typeName) const
 {
   QSettings settings;
-  QString res = settings.value(QString("%1/lastOpenedPath").arg(typeName)).toString();
+  QString res = settings.value(lastOpenedObjPathQSettingLocation(typeName)).toString();
   if (res.isEmpty()) {
 #ifdef _WIN32
     res = "C:/";
@@ -417,9 +417,9 @@ void ZSystemInfo::setLastOpenedObjPath(const QString& typeName, const QString& p
 {
   if (path.isEmpty())
     return;
-  QDir dir = QFileInfo(path).dir();
+  auto fi = QFileInfo(path);
   QSettings settings;
-  settings.setValue(QString("%1/lastOpenedPath").arg(typeName), dir.absolutePath());
+  settings.setValue(lastOpenedObjPathQSettingLocation(typeName), fi.canonicalPath());
 }
 
 void ZSystemInfo::addFileToRecentFileList(const QString& fileName) const

@@ -3,6 +3,7 @@
 #include "zloadimagesequencedialog.h"
 #include "zstitchimagedialog.h"
 #include "zsectionsregistrationdialog.h"
+#include "zchromaticshiftcorrectiondialog.h"
 #include "zlog.h"
 #include <QApplication>
 #include <QFileDialog>
@@ -139,6 +140,7 @@ QMenu* ZImgDoc::processObjMenu() const
   QMenu* res = new QMenu(typeName());
   res->addAction(m_stitchImageAction);
   res->addAction(m_alignSectionsAction);
+  res->addAction(m_correctChromaticShiftAction);
   return res;
 }
 
@@ -302,7 +304,7 @@ void ZImgDoc::loadImg()
 
 void ZImgDoc::importImgSequence()
 {
-  ZLoadImageSequenceDialog dlg("Load Sequence Images", lastOpenedObjPath(), QApplication::activeWindow());
+  ZLoadImageSequenceDialog dlg("Load Sequence Images", QApplication::activeWindow());
   if (dlg.exec() == QDialog::Accepted) {
     QStringList files = dlg.selectedFiles();
     if (files.empty())
@@ -319,7 +321,8 @@ void ZImgDoc::importImgSequence()
 void ZImgDoc::stitchImgs()
 {
   ZStitchImageDialog stitchImageDialog(QApplication::activeWindow());
-  connect(&stitchImageDialog, &ZStitchImageDialog::resultReady, &m_doc, qOverload<const QString&>(&ZDoc::loadFile));
+  connect(&stitchImageDialog, &ZStitchImageDialog::resultReady,
+          &m_doc, qOverload<const QString&>(&ZDoc::loadFile));
   stitchImageDialog.exec();
 }
 
@@ -329,6 +332,14 @@ void ZImgDoc::alignSections()
   connect(&alignSectionsDialog, &ZSectionsRegistrationDialog::resultReady,
           &m_doc, qOverload<const QString&>(&ZDoc::loadFile));
   alignSectionsDialog.exec();
+}
+
+void ZImgDoc::correctChromaticShift()
+{
+  ZChromaticShiftCorrectionDialog chromaticShiftCorrectionDialog(QApplication::activeWindow());
+  connect(&chromaticShiftCorrectionDialog, &ZChromaticShiftCorrectionDialog::resultReady,
+          &m_doc, qOverload<const QString&>(&ZDoc::loadFile));
+  chromaticShiftCorrectionDialog.exec();
 }
 
 size_t ZImgDoc::addImgPack(ZImgPack* imgPack)
@@ -457,6 +468,10 @@ void ZImgDoc::createActions()
   m_alignSectionsAction = new QAction(tr("&Align Sections..."), this);
   m_alignSectionsAction->setStatusTip(tr("Align Sections"));
   connect(m_alignSectionsAction, &QAction::triggered, this, &ZImgDoc::alignSections);
+
+  m_correctChromaticShiftAction = new QAction(tr("&Correct Chromatic Shift..."), this);
+  m_correctChromaticShiftAction->setStatusTip(tr("Correct Chromatic Shift"));
+  connect(m_correctChromaticShiftAction, &QAction::triggered, this, &ZImgDoc::correctChromaticShift);
 }
 
 bool ZImgDoc::saveImg(ZImgPack* pack, const QString& fileName, FileFormat format, Compression comp, QString& errorMsg)

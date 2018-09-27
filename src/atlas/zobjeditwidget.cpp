@@ -2,7 +2,6 @@
 
 #include "zobjdoc.h"
 #include "zlog.h"
-#include "zlogcache.h"
 #include "zexception.h"
 #include <QTabBar>
 #include <QApplication>
@@ -14,7 +13,7 @@ namespace nim {
 ZObjEditWidget::ZObjEditWidget(ZDoc* doc, QWidget* mw)
   : QTabWidget(mw)
   , m_doc(doc)
-  , m_logWidget(new QPlainTextEdit(this))
+  , m_logWidget(new ZLogWidget(true, this))
 {
   addTab(m_logWidget, "Log Output");
   connect(m_doc, &ZDoc::objAboutToBeRemoved, this, &ZObjEditWidget::removeObjEditWidgetOfObj);
@@ -27,12 +26,6 @@ ZObjEditWidget::ZObjEditWidget(ZDoc* doc, QWidget* mw)
 #else
   tabBar()->tabButton(0, QTabBar::RightSide)->hide();
 #endif
-
-  m_logWidget->setCenterOnScroll(true);
-  m_normalFormat = m_logWidget->currentCharFormat();
-  m_errorFormat = m_normalFormat;
-  m_errorFormat.setForeground(QBrush(QColor(176, 0, 0)));
-  ZLogCache::instance().receiveLogMessages(this, &ZObjEditWidget::writeLogData);
 }
 
 bool ZObjEditWidget::showObjEditWidgetOfObj(size_t id)
@@ -63,38 +56,6 @@ void ZObjEditWidget::updateEditWidgetTitleOfObj(size_t id)
       setTabText(indexOf(m_subWidgets[i].widget), QString("Edit %1").arg(m_doc->objNameWithModifiedMarkerAndID(id)));
       return;
     }
-  }
-}
-
-void ZObjEditWidget::writeLogData(const QList<LogData>* messages, int start, int end)
-{
-  if (end - start == 1) {
-    if (messages->at(start).level <= InfoLevel) {
-      m_logWidget->appendPlainText(messages->at(start).formatted);
-    } else {
-      m_logWidget->setCurrentCharFormat(m_errorFormat);
-      m_logWidget->appendPlainText(messages->at(start).formatted);
-      m_logWidget->setCurrentCharFormat(m_normalFormat);
-    }
-  } else {
-    bool firstFormat = messages->at(start).level <= InfoLevel;
-    bool lastFormat = firstFormat;
-    QList<QStringList> textList;
-    textList.push_back(QStringList());
-    textList.back().push_back(messages->at(start).formatted);
-    for (int i = start + 1; i < end; ++i) {
-      if ((messages->at(i).level <= InfoLevel) != lastFormat) {
-        lastFormat = !lastFormat;
-        textList.push_back(QStringList());
-      }
-      textList.back().push_back(messages->at(i).formatted);
-    }
-    for (int i = 0; i < textList.size(); ++i) {
-      m_logWidget->setCurrentCharFormat(firstFormat ? m_normalFormat : m_errorFormat);
-      firstFormat = !firstFormat;
-      m_logWidget->appendPlainText(textList[i].join("\n"));
-    }
-    m_logWidget->setCurrentCharFormat(m_normalFormat);
   }
 }
 

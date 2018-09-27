@@ -38,6 +38,9 @@ public:
 
   QDir logDir() const;
 
+  QString lastOpenedObjPathQSettingLocation(const QString& typeName) const
+  { return QString("%1/lastOpenedPath").arg(typeName); }
+
   QString lastOpenedObjPath(const QString& typeName) const;
 
   void setLastOpenedObjPath(const QString& typeName, const QString& path) const;

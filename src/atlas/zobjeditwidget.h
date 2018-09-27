@@ -1,8 +1,8 @@
 #pragma once
 
 #include "zdoc.h"
+#include "zlogwidget.h"
 #include <QStackedWidget>
-#include <QPlainTextEdit>
 #include <QTabWidget>
 
 namespace nim {
@@ -20,8 +20,6 @@ public:
   void updateEditWidgetTitleOfObj(size_t id);
 
 private:
-  void writeLogData(const QList<LogData>* messages, int start, int end);
-
   void removeObjEditWidgetOfObj(size_t id);
 
   void closeTab(int index);
@@ -35,9 +33,7 @@ protected:
     QWidget* widget;
   };
 
-  QPlainTextEdit* m_logWidget;
-  QTextCharFormat m_normalFormat;
-  QTextCharFormat m_errorFormat;
+  ZLogWidget* m_logWidget;
   QList<SubWidget> m_subWidgets;
 };
 

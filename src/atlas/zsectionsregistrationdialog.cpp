@@ -9,6 +9,7 @@
 #include "zimgstackinterface.h"
 #include "zstringutils.h"
 #include "zlog.h"
+#include "zsysteminfo.h"
 #include <QApplication>
 #include <QVBoxLayout>
 #include <QFileInfo>
@@ -245,7 +246,7 @@ void ZSectionsRegistrationDialog::inputImagesChanged()
   QFileInfo fi(fn);
   QString logFn = fi.path() + "/" + replaceLastInteger(fi.baseName(), "_all") + "_sections_registration_log.txt";
   m_outputLogFileWidget->setFile(logFn);
-  QString stackFn = fi.path() + "/" + replaceLastInteger(fi.baseName(), "_all") + "_aligned_stack.tif";
+  QString stackFn = fi.path() + "/" + replaceLastInteger(fi.baseName(), "_all") + "_aligned_stack.nim";
   m_outputStackWidget->setFile(stackFn);
 
   int channelNumber = 0;
@@ -326,8 +327,9 @@ void ZSectionsRegistrationDialog::createIOGroupBox()
 #endif
   m_inputImagesFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenMultipleFilesWithFilter,
                                                   "Input Sections:",
-                                                  tr("Images (*.tif *.tiff *.raw *.lsm *.jpg *.png)"));
+                                                  tr("Images (*.nim *.tif *.tiff *.v3draw *.lsm *.jpg *.png)"));
   m_inputImagesFileWidget->setCompareFunc(naturalSortLessThan);
+  m_inputImagesFileWidget->setStartDirQSettingLocation(ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_inputImagesFileWidget);
   connect(m_inputImagesFileWidget, &ZSelectFileWidget::changed, this, &ZSectionsRegistrationDialog::inputImagesChanged);
 
@@ -339,11 +341,13 @@ void ZSectionsRegistrationDialog::createIOGroupBox()
   adjustInputImageWidget();
 
   m_outputStackWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Aligned Image:",
-                                              tr("Stack (*.tif *.raw)"));
+                                              tr("Stack (*.nim)"));
+  m_outputStackWidget->setStartDirQSettingLocation(ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_outputStackWidget);
 
   m_outputLogFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Log File:",
                                                 tr("Log (*.txt)"));
+  m_outputLogFileWidget->setStartDirQSettingLocation(ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_outputLogFileWidget);
 
   //  hlayout = new QHBoxLayout;

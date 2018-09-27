@@ -49,6 +49,8 @@ namespace nim {
 
 class ZImg;
 
+class ZLogWidget;
+
 class ZTile
 {
 public:
@@ -221,7 +223,7 @@ private:
   QTextEdit* m_inputStack1FileEdit;
   QTextEdit* m_inputStack2FileEdit;
   QTextEdit* m_connEdit;
-  QTextEdit* m_commandOutputEdit;
+  ZLogWidget* m_commandOutputEdit;
 
   QSpinBox* m_overlapRateSpinBox;
   QRadioButton* m_useConfigRadioButton;

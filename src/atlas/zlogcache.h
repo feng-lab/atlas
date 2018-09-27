@@ -29,11 +29,11 @@ public:
   // receiver must be in ZLogCache's thread, which is the main gui thread
   template<typename Func1>
   QMetaObject::Connection
-  receiveLogMessages(typename QtPrivate::FunctionPointer<Func1>::Object* receiver, Func1 slot) const
+  receiveLogMessages(typename QtPrivate::FunctionPointer<Func1>::Object* receiver, Func1 slot, bool receiveOldMessages = true) const
   {
     CHECK(this->thread() == receiver->thread()) << "receiver must be in main gui thread";
     QMutexLocker lock(&m_mutex);
-    if (m_unsendLogDataStart > 0)
+    if (receiveOldMessages && m_unsendLogDataStart > 0)
       (receiver->*slot)(&m_logDatas, 0, m_unsendLogDataStart);
     return QObject::connect(this, &ZLogCache::logDataReady, receiver, slot, Qt::DirectConnection);
   }

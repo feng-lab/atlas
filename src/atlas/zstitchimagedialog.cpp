@@ -10,6 +10,7 @@
 #include "zlog.h"
 #include "zfileutils.h"
 #include "zcpuinfo.h"
+#include "zlogwidget.h"
 #include <tbb/concurrent_unordered_map.h>
 #include <tbb/parallel_for.h>
 #include <tbb/task_scheduler_init.h>
@@ -26,6 +27,18 @@ class ZStitchException : public ZException
 public:
   using ZException::ZException;
 };
+
+void buildFullConnection(size_t nstack, std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>& conn)
+{
+  if (nstack <= 1)
+    return;
+
+  for (size_t f = 0; f < nstack - 1; ++f) {
+    for (size_t m = f; m < nstack; ++m) {
+      conn[std::make_pair(f, m)] = ZImgNCCMatch::PositionHint::None;
+    }
+  }
+}
 
 void buildConnectionFromGrid(const std::vector<std::vector<size_t>>& grid,
                              std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>& conn)
@@ -721,9 +734,8 @@ QLayout* ZStitchImageDialog::createCommandOutputLayout()
 {
   auto layout = new QVBoxLayout;
 
-  m_commandOutputEdit = new QTextEdit(this);
+  m_commandOutputEdit = new ZLogWidget(false, this);
   layout->addWidget(m_commandOutputEdit);
-  m_commandOutputEdit->setReadOnly(true);
   return layout;
 }
 
@@ -778,7 +790,7 @@ void ZStitchImageDialog::selectInputStacks1()
   tmp = QFileDialog::getOpenFileNames(
     this, tr("select all input stacks"),
     ZSystemInfo::instance().lastOpenedImagePath(),
-    tr("Image Files (*.lsm *.czi *.tif *.raw)"));
+    tr("Image Files (*.lsm *.czi *.tif *.v3draw)"));
   if (tmp.count()) {
     ZSystemInfo::instance().setLastOpenedImagePath(tmp[0]);
     try {
@@ -816,7 +828,7 @@ void ZStitchImageDialog::selectInputStacks2()
   tmp = QFileDialog::getOpenFileNames(
     this, tr("select all input stacks"),
     ZSystemInfo::instance().lastOpenedImagePath(),
-    tr("Image Files (*.lsm *.czi *.tif *.raw)"));
+    tr("Image Files (*.lsm *.czi *.tif *.v3draw)"));
   if (tmp.count()) {
     ZSystemInfo::instance().setLastOpenedImagePath(tmp[0]);
     try {
@@ -1201,7 +1213,7 @@ void ZStitchImageDialog::stitchStacks2()
 
   if (m_inputStack1Filenames.size() == 1 && m_useTileImageRadioButton->isChecked() && m_tileList.size() > 1) {
     // split input into m_tileList.size() tiles
-    m_commandOutputEdit->append("Splitting image ...>");
+    LOG(INFO) << "Splitting image ...";
     QApplication::processEvents();
     nstack = m_tileList.size();
     if (stack1File1Infos.size() != nstack && stack1File1Infos[0].numTimes != nstack)
@@ -1252,7 +1264,7 @@ void ZStitchImageDialog::stitchStacks2()
     if (m_useTileImageRadioButton->isChecked()) {
       if (m_nSel >= 0) {
         // first check number of input stacks and selected stacks
-        m_commandOutputEdit->setText(tr("checking file numbers..."));
+        LOG(INFO) << "checking file numbers...";
         if (m_inputStack1Filenames.size() != m_nSel && m_inputStack1Filenames.size() != m_tileList.size()) {
           throw ZStitchException(QString("The number of input stacks (%1) is not equal to either "
                                            "number of selected tiles (%2) or number of all tiles (%3). "
@@ -1276,7 +1288,7 @@ void ZStitchImageDialog::stitchStacks2()
           }
         }
       } else {
-        m_commandOutputEdit->setText(QString("<font color=red>No Tile Image, switching to blind stitching.</font>"));
+        LOG(WARNING) << "No Tile Image, switching to blind stitching.";
         QApplication::processEvents();
         nstack = m_inputStack1Filenames.size();
         for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
@@ -1345,7 +1357,7 @@ void ZStitchImageDialog::stitchStacks2()
     }
   }
 
-  m_commandOutputEdit->append(QString("Stitching %1 images ...").arg(nstack * 2));
+  LOG(INFO) << QString("Stitching %1 images ...").arg(nstack * 2);
   QApplication::processEvents();
 
   std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint> conn;
@@ -1386,18 +1398,18 @@ void ZStitchImageDialog::stitchStacks2()
     buildConnectionFromGrid(tileMatrix, conn);
 
     for (size_t i = 0; i < inputStack1Sources.size(); ++i) {
-      m_commandOutputEdit->append(inputStack1Sources[i].toQString());
+      LOG(INFO) << inputStack1Sources[i].toQString();
     }
     for (size_t i = 0; i < inputStack2Sources.size(); ++i) {
-      m_commandOutputEdit->append(inputStack2Sources[i].toQString());
+      LOG(INFO) << inputStack2Sources[i].toQString();
     }
     QApplication::processEvents();
 
   } else if (m_useConnFileRadioButton->isChecked()) {
     buildConnectionFromTextFile(m_connFileEdit->text(), conn);
   } else if (m_useFullConnectionRadioButton->isChecked()) {
-    m_commandOutputEdit->append("<font color=red>Blind Stitching...</font>");
-    QApplication::processEvents();
+    LOG(WARNING) << "Blind Stitching...";
+    buildFullConnection(nstack, conn);
   } else if (m_useLayoutRadioButton->isChecked()) {
 
     int row = m_layout1SpinBox->value();
@@ -1432,10 +1444,10 @@ void ZStitchImageDialog::stitchStacks2()
     ZImg fixedImg1(inputStack1Sources[f]);
     ZImg fixedImg2(inputStack2Sources[f]);
     if (m_dsCheckBox->isChecked()) {
-      m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStack1Sources[f].toQString()));
+      LOG(INFO) << QString("Downsampling %1").arg(inputStack1Sources[f].toQString());
       fixedImg1.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
                                 ZImg::CombineMode::Mean);
-      m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStack2Sources[f].toQString()));
+      LOG(INFO) << QString("Downsampling %1").arg(inputStack2Sources[f].toQString());
       fixedImg2.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
                                 ZImg::CombineMode::Mean);
     }
@@ -1464,8 +1476,6 @@ void ZStitchImageDialog::stitchStacks2()
 
       QString info = QString("img %1 -- img %2, img %2 position hint: None, offset: %3, NCC: %4")
         .arg(f + 1).arg(f + nstack + 1).arg(movingImgOffset.toQString()).arg(maxNCC);
-      m_commandOutputEdit->append(info);
-      QApplication::processEvents();
       LOG(INFO) << info;
     }
     for (size_t m = f + 1; m < nstack; ++m) { // moving
@@ -1483,10 +1493,10 @@ void ZStitchImageDialog::stitchStacks2()
       ZImg movingImg1(inputStack1Sources[m]);
       ZImg movingImg2(inputStack2Sources[m]);
       if (m_dsCheckBox->isChecked()) {
-        m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStack1Sources[m].toQString()));
+        LOG(INFO) << QString("Downsampling %1").arg(inputStack1Sources[m].toQString());
         movingImg1.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
                                    ZImg::CombineMode::Mean);
-        m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStack2Sources[m].toQString()));
+        LOG(INFO) << QString("Downsampling %1").arg(inputStack2Sources[m].toQString());
         movingImg2.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
                                    ZImg::CombineMode::Mean);
       }
@@ -1532,8 +1542,6 @@ void ZStitchImageDialog::stitchStacks2()
 
         QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
           .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(maxNCC);
-        m_commandOutputEdit->append(info);
-        QApplication::processEvents();
         LOG(INFO) << info;
       }
       // img2
@@ -1578,8 +1586,6 @@ void ZStitchImageDialog::stitchStacks2()
         QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
           .arg(f + nstack + 1).arg(m + nstack + 1).arg(imgNCCMatch.positionHintToQString()).arg(
           movingImgOffset.toQString()).arg(maxNCC);
-        m_commandOutputEdit->append(info);
-        QApplication::processEvents();
         LOG(INFO) << info;
       }
     }
@@ -1629,9 +1635,7 @@ void ZStitchImageDialog::stitchStacks2()
 
   imgMerge.setMergeMode(mergeMode);
   QStringList summary = imgMerge.resolveLocations();
-  for (const auto& mes : summary) {
-    m_commandOutputEdit->append(mes);
-  }
+
   if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
       mergeMode == ZImgMerge::Mode::Max) {
     ZImgIO().writeImg(m_outputFileEdit->text(), imgMerge);
@@ -1640,7 +1644,7 @@ void ZStitchImageDialog::stitchStacks2()
   }
   emit resultReady(m_outputFileEdit->text());
 
-  m_commandOutputEdit->append(QString("%1 saved.").arg(m_outputFileEdit->text()));
+  LOG(INFO) << QString("%1 saved.").arg(m_outputFileEdit->text());
   if (m_useTileImageRadioButton->isChecked() && !m_tileImage.isNull()) {
     QString selectionImageOutputName = m_outputFileEdit->text();
     selectionImageOutputName.append("_TileSelectionInfo.tif");
@@ -1663,9 +1667,9 @@ void ZStitchImageDialog::stitchStacks2()
     }
     QImageWriter writer(selectionImageOutputName);
     if (!writer.write(image)) {
-      m_commandOutputEdit->append(writer.errorString());
+      LOG(ERROR) << writer.errorString();
     } else {
-      m_commandOutputEdit->append(QString("%1 saved.").arg(selectionImageOutputName));
+      LOG(INFO) << QString("%1 saved.").arg(selectionImageOutputName);
     }
   }
 }
@@ -1910,7 +1914,7 @@ void ZStitchImageDialog::stitchStacks()
 
     if (m_inputStack1Filenames.size() == 1 && m_useTileImageRadioButton->isChecked() && m_tileList.size() > 1) {
       // split input into m_tileList.size() tiles
-      m_commandOutputEdit->append("Splitting image ...>");
+      LOG(INFO) << "Splitting image ...";
       QApplication::processEvents();
       nstack = m_tileList.size();
       if (stack1File1Infos.size() != nstack && stack1File1Infos[0].numTimes != nstack)
@@ -1942,7 +1946,7 @@ void ZStitchImageDialog::stitchStacks()
       if (m_useTileImageRadioButton->isChecked()) {
         if (m_nSel >= 0) {
           // first check number of input stacks and selected stacks
-          m_commandOutputEdit->setText(tr("checking file numbers..."));
+          LOG(INFO) << "checking file numbers...";
           if (m_inputStack1Filenames.size() != m_nSel && m_inputStack1Filenames.size() != m_tileList.size()) {
             throw ZStitchException(QString("The number of input stacks (%1) is not equal to either "
                                              "number of selected tiles (%2) or number of all tiles (%3). "
@@ -1964,7 +1968,7 @@ void ZStitchImageDialog::stitchStacks()
             }
           }
         } else {
-          m_commandOutputEdit->setText(QString("<font color=red>No Tile Image, switching to blind stitching.</font>"));
+          LOG(WARNING) << "No Tile Image, switching to blind stitching.";
           QApplication::processEvents();
           nstack = m_inputStack1Filenames.size();
           for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
@@ -2013,14 +2017,14 @@ void ZStitchImageDialog::stitchStacks()
       }
     }
 
-    m_commandOutputEdit->append(QString("Stitching %1 images ...").arg(nstack));
+    LOG(INFO) << QString("Stitching %1 images ...").arg(nstack);
     QApplication::processEvents();
 
     if (nstack == 1) {
       ZImg img(inputStackSources[0]);
 
       if (m_dsCheckBox->isChecked()) {
-        m_commandOutputEdit->append("Downsampling ...");
+        LOG(INFO) << "Downsampling ...";
         QApplication::processEvents();
 
         img.blockDownsample(m_dsXSpinBox->value(),
@@ -2031,7 +2035,7 @@ void ZStitchImageDialog::stitchStacks()
       img.save(m_outputFileEdit->text());
       emit resultReady(m_outputFileEdit->text());
 
-      m_commandOutputEdit->append(QString("%1 saved.").arg(m_outputFileEdit->text()));
+      LOG(INFO) << QString("%1 saved.").arg(m_outputFileEdit->text());
       return;
     }
 
@@ -2073,15 +2077,15 @@ void ZStitchImageDialog::stitchStacks()
       buildConnectionFromGrid(tileMatrix, conn);
 
       for (size_t i = 0; i < inputStackSources.size(); ++i) {
-        m_commandOutputEdit->append(inputStackSources[i].toQString());
+        LOG(INFO) << inputStackSources[i].toQString();
       }
       QApplication::processEvents();
 
     } else if (m_useConnFileRadioButton->isChecked()) {
       buildConnectionFromTextFile(m_connFileEdit->text(), conn);
     } else if (m_useFullConnectionRadioButton->isChecked()) {
-      m_commandOutputEdit->append("<font color=red>Blind Stitching...</font>");
-      QApplication::processEvents();
+      LOG(WARNING) << "Blind Stitching...";
+      buildFullConnection(nstack, conn);
     } else if (m_useLayoutRadioButton->isChecked()) {
 
       int row = m_layout1SpinBox->value();
@@ -2161,9 +2165,7 @@ void ZStitchImageDialog::stitchStacks()
 
       imgMerge.setMergeMode(mergeMode);
       QStringList summary = imgMerge.resolveLocations();
-      for (const auto& mes : summary) {
-        m_commandOutputEdit->append(mes);
-      }
+
       if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
           mergeMode == ZImgMerge::Mode::Max) {
         ZImgIO().writeImg(m_outputFileEdit->text(), imgMerge);
@@ -2270,7 +2272,7 @@ void ZStitchImageDialog::stitchStacks()
         for (size_t f = 0; f < nstack; ++f) {  // fixed
           ZImg fixedImg(inputStackSources[f]);
           if (m_dsCheckBox->isChecked()) {
-            m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStackSources[f].toQString()));
+            LOG(INFO) << QString("Downsampling %1").arg(inputStackSources[f].toQString());
             fixedImg.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
                                      ZImg::CombineMode::Mean);
           }
@@ -2288,7 +2290,7 @@ void ZStitchImageDialog::stitchStacks()
 
             ZImg movingImg(inputStackSources[m]);
             if (m_dsCheckBox->isChecked()) {
-              m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStackSources[m].toQString()));
+              LOG(INFO) << QString("Downsampling %1").arg(inputStackSources[m].toQString());
               movingImg.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
                                         ZImg::CombineMode::Mean);
             }
@@ -2334,8 +2336,6 @@ void ZStitchImageDialog::stitchStacks()
             QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
               .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(
               maxNCC);
-            m_commandOutputEdit->append(info);
-            QApplication::processEvents();
             LOG(INFO) << info;
           }
         }
@@ -2362,9 +2362,7 @@ void ZStitchImageDialog::stitchStacks()
 
       imgMerge.setMergeMode(mergeMode);
       QStringList summary = imgMerge.resolveLocations();
-      for (const auto& mes : summary) {
-        m_commandOutputEdit->append(mes);
-      }
+
       QString stitchInfoOutputName = m_outputFileEdit->text();
       stitchInfoOutputName.append("_info.txt");
       QFile fOut(stitchInfoOutputName);
@@ -2402,7 +2400,7 @@ void ZStitchImageDialog::stitchStacks()
       emit resultReady(m_outputFileEdit->text());
     }
 
-    m_commandOutputEdit->append(QString("%1 saved.").arg(m_outputFileEdit->text()));
+    LOG(INFO) << QString("%1 saved.").arg(m_outputFileEdit->text());
     if (m_useTileImageRadioButton->isChecked() && !m_tileImage.isNull()) {
       QString selectionImageOutputName = m_outputFileEdit->text();
       selectionImageOutputName.append("_TileSelectionInfo.tif");
@@ -2425,19 +2423,19 @@ void ZStitchImageDialog::stitchStacks()
       }
       QImageWriter writer(selectionImageOutputName);
       if (!writer.write(image)) {
-        m_commandOutputEdit->append(writer.errorString());
+        LOG(ERROR) << writer.errorString();
       } else {
-        m_commandOutputEdit->append(QString("%1 saved.").arg(selectionImageOutputName));
+        LOG(INFO) << QString("%1 saved.").arg(selectionImageOutputName);
       }
 
     }
   }
   catch (const ZStitchException& e) {
-    m_commandOutputEdit->append(QString("<font color=red>%1</font>").arg(e.what()));
+    LOG(ERROR) << e.what();
     QMessageBox::critical(this, qApp->applicationName(), e.what());
   }
   catch (const ZException& e) {
-    m_commandOutputEdit->append(QString("<font color=red>%1</font>").arg(e.what()));
+    LOG(ERROR) << e.what();
     QMessageBox::critical(this, qApp->applicationName(), e.what());
   }
 }

@@ -57,10 +57,6 @@ void ZAnimationExportWidget::captureButtonPressed()
     return;
   }
 
-  QSettings settings;
-  settings.setValue(QString("Animation/exportPath"),
-                    m_filenameWidget->getSelectedSaveFile());
-
   if (m_is2DAnimation) {
     if (m_useWindowSize.get()) {
       emit export2DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get());
@@ -158,14 +154,11 @@ void ZAnimationExportWidget::createWidget()
   int bottom;
   hlo->getContentsMargins(&left, &top, &right, &bottom);
   //hlo->setContentsMargins(left+20, top, right, bottom);
-  QSettings settings;
-  QString lastFn = settings.value(QString("Animation/exportPath")).toString();
-  if (QFileInfo(lastFn).isDir()) {
-    lastFn = QDir(lastFn).absoluteFilePath("animation.mp4");
-  }
+
   m_filenameWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "filename:",
                                            tr("Video File (*.mp4 *.mov)"),
-                                           QBoxLayout::LeftToRight, lastFn, this);
+                                           QBoxLayout::LeftToRight, this);
+  m_filenameWidget->setStartDirQSettingLocation(QString("Animation/exportPath"));
   hlo->addWidget(m_filenameWidget);
   lo->addLayout(hlo);
 

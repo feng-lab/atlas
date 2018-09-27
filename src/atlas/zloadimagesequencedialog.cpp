@@ -3,6 +3,7 @@
 #include "zselectfilewidget.h"
 #include "zimg.h"
 #include "zstringutils.h"
+#include "zsysteminfo.h"
 #include <QVBoxLayout>
 #include <QFileInfo>
 #include <QKeyEvent>
@@ -14,7 +15,7 @@
 
 namespace nim {
 
-ZLoadImageSequenceDialog::ZLoadImageSequenceDialog(const QString& title, const QString& startDir, QWidget* parent)
+ZLoadImageSequenceDialog::ZLoadImageSequenceDialog(const QString& title, QWidget* parent)
   : QDialog(parent)
   , m_catDimension("Along Dimension")
 {
@@ -23,7 +24,8 @@ ZLoadImageSequenceDialog::ZLoadImageSequenceDialog(const QString& title, const Q
   nim::ZImg::getQtReadNameFilter(filters, formats);
   m_inputImagesFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenMultipleFilesWithFilter,
                                                   "Input Sequence:",
-                                                  filters.join(";;"), QBoxLayout::LeftToRight, startDir);
+                                                  filters.join(";;"), QBoxLayout::LeftToRight);
+  m_inputImagesFileWidget->setStartDirQSettingLocation(ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   m_inputImagesFileWidget->setCompareFunc(naturalSortLessThan);
 
   m_catDimension.addOptions("X", "Y", "Z", "C", "T");

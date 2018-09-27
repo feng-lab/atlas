@@ -77,6 +77,8 @@ protected:
 
   void alignSections();
 
+  void correctChromaticShift();
+
   // append another img into this doc
   size_t addImgPack(ZImgPack* imgPack);
 
@@ -111,6 +113,7 @@ private:
 
   QAction* m_stitchImageAction;
   QAction* m_alignSectionsAction;
+  QAction* m_correctChromaticShiftAction;
 };
 
 } // namespace nim

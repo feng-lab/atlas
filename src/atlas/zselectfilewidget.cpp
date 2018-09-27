@@ -6,15 +6,26 @@
 namespace nim {
 
 ZSelectFileWidget::ZSelectFileWidget(FileMode mode, const QString& guiname, const QString& filter,
-                                     QBoxLayout::Direction direction,
-                                     const QString& startDir, QWidget* parent)
+                                     QBoxLayout::Direction direction, QWidget* parent)
   : QWidget(parent)
   , m_fileMode(mode)
   , m_guiName(guiname)
   , m_filter(filter)
-  , m_lastFName(startDir)
 {
   createWidget(direction);
+}
+
+void ZSelectFileWidget::setStartDirQSettingLocation(const QString& qSettingLocation, const QString& alternativeDir)
+{
+  m_startDir = alternativeDir;
+  m_startDirQSettingLocation = qSettingLocation;
+  if (!m_startDirQSettingLocation.isEmpty()) {
+    QSettings settings;
+    QString res = settings.value(m_startDirQSettingLocation).toString();
+    if (!res.isEmpty()) {
+      m_startDir = res;
+    }
+  }
 }
 
 void ZSelectFileWidget::setDestination(QString* name)
@@ -143,7 +154,7 @@ void ZSelectFileWidget::createWidget(QBoxLayout::Direction direction)
     m_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_lineEdit = new QLineEdit(this);
     m_lineEdit->setReadOnly(true);
-    m_lineEdit->setText(m_lastFName);
+    //m_lineEdit->setText(m_startDir);
     m_button = new QToolButton(this);
     m_button->setText(tr("..."));
     connect(m_button, &QToolButton::clicked, this, &ZSelectFileWidget::selectFile);
@@ -157,10 +168,10 @@ void ZSelectFileWidget::selectFile()
 {
   if (m_fileMode == FileMode::OpenMultipleFiles || m_fileMode == FileMode::OpenMultipleFilesWithFilter) {
     QStringList tmp;
-    tmp = QFileDialog::getOpenFileNames(this, m_guiName, m_lastFName, m_filter,
+    tmp = QFileDialog::getOpenFileNames(this, m_guiName, getStartDir(), m_filter,
                                         nullptr);
     if (!tmp.isEmpty()) {
-      m_lastFName = tmp[0];
+      setStartDir(tmp[0]);
       m_multipleFNames.clear();
       m_multipleFNames = tmp;
       if (m_lessThan)
@@ -174,10 +185,10 @@ void ZSelectFileWidget::selectFile()
     }
   } else if (m_fileMode == FileMode::OpenSingleFile) {
     QString fileName = QFileDialog::getOpenFileName(
-      this, m_guiName, m_lastFName, m_filter,
+      this, m_guiName, getStartDir(), m_filter,
       nullptr);
     if (!fileName.isEmpty()) {
-      m_lastFName = fileName;
+      setStartDir(fileName);
       m_lineEdit->setText(fileName);
       if (m_destName)
         *m_destName = fileName;
@@ -185,10 +196,10 @@ void ZSelectFileWidget::selectFile()
     }
   } else if (m_fileMode == FileMode::SaveFile) {
     QString outputFileName = ZFileUtils::getSaveFileName(
-      this, m_guiName, m_lastFName, m_filter,
+      this, m_guiName, getStartDir(), m_filter,
       nullptr);
     if (!outputFileName.isEmpty()) {
-      m_lastFName = outputFileName;
+      setStartDir(outputFileName);
       m_lineEdit->setText(outputFileName);
       if (m_destName)
         *m_destName = outputFileName;
@@ -196,9 +207,9 @@ void ZSelectFileWidget::selectFile()
     }
   } else if (m_fileMode == FileMode::Directory) {
     QString dir = QFileDialog::getExistingDirectory(
-      this, m_guiName, m_lastFName);
+      this, m_guiName, getStartDir());
     if (!dir.isEmpty()) {
-      m_lastFName = dir;
+      setStartDir(dir);
       m_lineEdit->setText(dir);
       if (m_destName)
         *m_destName = dir;
@@ -210,6 +221,27 @@ void ZSelectFileWidget::selectFile()
 void ZSelectFileWidget::previewFilterResult()
 {
   setFiles(getSelectedMultipleOpenFiles());
+}
+
+QString ZSelectFileWidget::getStartDir()
+{
+  if (!m_startDirQSettingLocation.isEmpty()) {
+    QSettings settings;
+    QString res = settings.value(m_startDirQSettingLocation).toString();
+    if (!res.isEmpty()) {
+      m_startDir = res;
+    }
+  }
+  return m_startDir;
+}
+
+void ZSelectFileWidget::setStartDir(const QString& path)
+{
+  m_startDir = QFileInfo(path).canonicalPath();
+  if (!m_startDirQSettingLocation.isEmpty()) {
+    QSettings settings;
+    settings.setValue(m_startDirQSettingLocation, m_startDir);
+  }
 }
 
 } // namespace nim

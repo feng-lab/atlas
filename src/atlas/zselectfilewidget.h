@@ -30,8 +30,11 @@ public:
 
   explicit ZSelectFileWidget(FileMode mode, const QString& guiname = QString(),
                              const QString& filter = QString(),
-                             QBoxLayout::Direction direction = QBoxLayout::LeftToRight,
-                             const QString& startDir = QString(), QWidget* parent = nullptr);
+                             QBoxLayout::Direction direction = QBoxLayout::LeftToRight, QWidget* parent = nullptr);
+
+  // if set, last opened dir will be retrieved from QSetting, and if QSetting is empty, alternativeDir will be used
+  // first parameter can be an empty string, then second parameter will be used to init startDir
+  void setStartDirQSettingLocation(const QString& qSettingLocation, const QString& alternativeDir = QString());
 
   // This variable will be changed with the widget or you can use the get* function
   void setDestination(QString* name);
@@ -64,11 +67,16 @@ private:
 
   void createWidget(QBoxLayout::Direction direction);
 
+  QString getStartDir();
+
+  void setStartDir(const QString& path);
+
 private:
   FileMode m_fileMode;
   QString m_guiName;
   QString m_filter;
-  QString m_lastFName;
+  QString m_startDirQSettingLocation;
+  QString m_startDir;
 
   QString* m_destName = NULL;
   QStringList* m_destNames = nullptr;
