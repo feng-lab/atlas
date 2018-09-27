@@ -37,7 +37,7 @@ protected:
   void keyPressEvent(QKeyEvent* e) override;
 
 private:
-  void adjustInputImageWidget();
+  void adjustWidget();
 
   void inputImagesChanged();
 
@@ -64,6 +64,7 @@ private:
 
   ZStringIntOptionParameter m_referenceChannel;
   ZStringIntOptionParameter m_targetChannel;
+  ZStringStringOptionParameter m_method;
   ZBoolParameter m_removeBackground;
   ZBoolParameter m_removeHighForeground;
   ZIntParameter m_numScales;

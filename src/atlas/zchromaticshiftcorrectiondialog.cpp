@@ -22,6 +22,7 @@ ZChromaticShiftCorrectionDialog::ZChromaticShiftCorrectionDialog(QWidget* parent
   , m_openStackAfterRegistering("Open Result Image After Registering", true)
   , m_referenceChannel("Reference Channel:")
   , m_targetChannel("Far-red Channel:")
+  , m_method("Method")
   , m_removeBackground("Remove Background", true)
   , m_removeHighForeground("Remove High Foreground", true)
   , m_numScales("Number of Scales", 3, 1, 5)
@@ -80,6 +81,7 @@ void ZChromaticShiftCorrectionDialog::correctShift()
     worker->setReferenceChannel(refChannel);
   if (targetChannel >= 0)
     worker->setTargetChannel(targetChannel);
+  worker->setMethod(m_method.associatedData());
   worker->setRemoveBackground(m_removeBackground.get());
   worker->setRemoveHighForeground(m_removeHighForeground.get());
   worker->setBrightBackground(m_brightBackground.get());
@@ -170,8 +172,16 @@ void ZChromaticShiftCorrectionDialog::keyPressEvent(QKeyEvent* e)
   }
 }
 
-void ZChromaticShiftCorrectionDialog::adjustInputImageWidget()
+void ZChromaticShiftCorrectionDialog::adjustWidget()
 {
+  m_referenceChannel.setVisible(m_method.isSelected("Signal Matching"));
+  m_removeBackground.setVisible(m_method.isSelected("Signal Matching"));
+  m_removeHighForeground.setVisible(m_method.isSelected("Signal Matching"));
+  m_numScales.setVisible(m_method.isSelected("Signal Matching"));
+  m_brightBackground.setVisible(m_method.isSelected("Signal Matching"));
+  m_metric.setVisible(m_method.isSelected("Signal Matching"));
+  m_transform.setVisible(m_method.isSelected("Signal Matching"));
+  m_optimizer.setVisible(m_method.isSelected("Signal Matching"));
 }
 
 void ZChromaticShiftCorrectionDialog::inputImagesChanged()
@@ -212,6 +222,15 @@ void ZChromaticShiftCorrectionDialog::inputImagesChanged()
 
 void ZChromaticShiftCorrectionDialog::init()
 {
+  m_method.addOptionsWithData(qMakePair<QString, QString>("Signal Matching", "Registration"),
+                              qMakePair<QString, QString>("Use 40x_1z Preset", "40x_1z"),
+                              qMakePair<QString, QString>("Use 40x_2z Preset", "40x_2z"),
+                              qMakePair<QString, QString>("Use 40x_4z Preset", "40x_4z"),
+                              qMakePair<QString, QString>("Use 60x_1z Preset", "60x_1z"),
+                              qMakePair<QString, QString>("Use 60x_2z Preset", "60x_2z"),
+                              qMakePair<QString, QString>("Use 60x_4z Preset", "60x_4z"));
+  m_method.select("Signal Matching");
+
   m_metric.addOptions("Normalized Cross-Correlation",
                       "Normalized Mutual Information");
   m_metric.select("Normalized Cross-Correlation");
@@ -262,8 +281,6 @@ void ZChromaticShiftCorrectionDialog::createIOGroupBox()
   //  hlayout->addWidget(m_openLoadedStack.createWidget());
   //  alllayout->addLayout(hlayout);
 
-  adjustInputImageWidget();
-
   m_outputStackWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Aligned Image:",
                                               tr("Stack (*.nim)"));
   m_outputStackWidget->setStartDirQSettingLocation(ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
@@ -289,9 +306,8 @@ void ZChromaticShiftCorrectionDialog::createParaGroupBox()
   auto alllayout = new QVBoxLayout;
 
   auto hlayout = new QHBoxLayout;
-  hlayout->addWidget(m_referenceChannel.createNameLabel());
-  hlayout->addWidget(m_referenceChannel.createWidget());
-  //hlayout->addStretch(1);
+  hlayout->addWidget(m_method.createNameLabel());
+  hlayout->addWidget(m_method.createWidget());
   alllayout->addLayout(hlayout);
 
   hlayout = new QHBoxLayout;
@@ -301,14 +317,20 @@ void ZChromaticShiftCorrectionDialog::createParaGroupBox()
   alllayout->addLayout(hlayout);
 
   hlayout = new QHBoxLayout;
-  hlayout->addWidget(m_removeBackground.createNameLabel());
-  hlayout->addWidget(m_removeBackground.createWidget());
+  hlayout->addWidget(m_referenceChannel.createNameLabel());
+  hlayout->addWidget(m_referenceChannel.createWidget());
+  //hlayout->addStretch(1);
   alllayout->addLayout(hlayout);
 
-  hlayout = new QHBoxLayout;
-  hlayout->addWidget(m_removeHighForeground.createNameLabel());
-  hlayout->addWidget(m_removeHighForeground.createWidget());
-  alllayout->addLayout(hlayout);
+//  hlayout = new QHBoxLayout;
+//  hlayout->addWidget(m_removeBackground.createNameLabel());
+//  hlayout->addWidget(m_removeBackground.createWidget());
+//  alllayout->addLayout(hlayout);
+//
+//  hlayout = new QHBoxLayout;
+//  hlayout->addWidget(m_removeHighForeground.createNameLabel());
+//  hlayout->addWidget(m_removeHighForeground.createWidget());
+//  alllayout->addLayout(hlayout);
 
   hlayout = new QHBoxLayout;
   m_numScales.setStyle("SPINBOX");
@@ -316,10 +338,10 @@ void ZChromaticShiftCorrectionDialog::createParaGroupBox()
   hlayout->addWidget(m_numScales.createWidget());
   alllayout->addLayout(hlayout);
 
-  hlayout = new QHBoxLayout;
-  hlayout->addWidget(m_brightBackground.createNameLabel());
-  hlayout->addWidget(m_brightBackground.createWidget());
-  alllayout->addLayout(hlayout);
+//  hlayout = new QHBoxLayout;
+//  hlayout->addWidget(m_brightBackground.createNameLabel());
+//  hlayout->addWidget(m_brightBackground.createWidget());
+//  alllayout->addLayout(hlayout);
 
   hlayout = new QHBoxLayout;
   hlayout->addWidget(m_metric.createNameLabel());
@@ -337,6 +359,10 @@ void ZChromaticShiftCorrectionDialog::createParaGroupBox()
   alllayout->addLayout(hlayout);
 
   m_paraGroupBox->setLayout(alllayout);
+
+  adjustWidget();
+
+  connect(&m_method, &ZStringStringOptionParameter::valueChanged, this, &ZChromaticShiftCorrectionDialog::adjustWidget);
 }
 
 void ZChromaticShiftCorrectionDialog::createOutputGroupBox()

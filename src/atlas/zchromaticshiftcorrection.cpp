@@ -8,6 +8,7 @@
 #include "zimagematrix3dtransform.h"
 #include "zimagematrix2dtransform.h"
 #include "zimagetransformresolve.h"
+#include "zlogqttypesupport.h"
 #include <algorithm>
 #include <memory>
 #include <numeric>
@@ -32,32 +33,89 @@ void ZChromaticShiftCorrection::doWork()
   //  }
   //  LOG(INFO) << "";
 
-  if (m_referenceChannel >= 0 && static_cast<size_t>(m_referenceChannel) < m_img.numChannels()) {
-    LOG(INFO) << "Reference Channel: " << m_referenceChannel + 1 << " (start from 1)";
-  } else {
-    throw ZImgException(QString("Wrong reference channel: %1. Abort").arg(m_referenceChannel));
+  LOG(INFO) << "Method: " << m_method;
+
+  if (m_method == "Registration") {
+    if (m_referenceChannel >= 0 && static_cast<size_t>(m_referenceChannel) < m_img.numChannels()) {
+      LOG(INFO) << "Reference Channel: " << m_referenceChannel + 1 << " (start from 1)";
+    } else {
+      throw ZImgException(QString("Wrong reference channel: %1. Abort").arg(m_referenceChannel));
+    }
   }
 
   if (m_targetChannel >= 0 && static_cast<size_t>(m_targetChannel) < m_img.numChannels() &&
-      m_targetChannel != m_referenceChannel) {
+    (m_method != "Registration" || m_targetChannel != m_referenceChannel)) {
     LOG(INFO) << "Target Channel: " << m_targetChannel + 1 << " (start from 1)";
   } else {
     throw ZImgException(QString("Wrong target channel: %1. Abort").arg(m_targetChannel));
   }
 
-  LOG(INFO) << "Remove Background: " << m_removeBackground;
-  LOG(INFO) << "Remove High Foreground: " << m_removeHighForeground;
-  LOG(INFO) << "Multithreading: " << m_useMultithreading;
-  LOG(INFO) << "Metirc: " << m_metric;
-  LOG(INFO) << "Transform: " << m_transform;
-  LOG(INFO) << "Optimizer: " << m_optimizer;
+  if (m_method == "Registration") {
+    LOG(INFO) << "Remove Background: " << m_removeBackground;
+    LOG(INFO) << "Remove High Foreground: " << m_removeHighForeground;
+    LOG(INFO) << "Multithreading: " << m_useMultithreading;
+    LOG(INFO) << "Metirc: " << m_metric;
+    LOG(INFO) << "Transform: " << m_transform;
+    LOG(INFO) << "Optimizer: " << m_optimizer;
 
-  IMG_TYPED_CALL(calcChannelInfs, m_img);
+    IMG_TYPED_CALL(calcChannelInfs, m_img);
 
-  m_correctedImg = m_img;
-  reportProgress(0.5);
-  IMG_TYPED_CALL(alignChannel, m_img, m_referenceChannel, m_targetChannel);
-  reportProgress(1.0);
+    m_correctedImg = m_img;
+    reportProgress(0.5);
+    IMG_TYPED_CALL(alignChannel, m_img, m_referenceChannel, m_targetChannel);
+    reportProgress(1.0);
+  } else {
+    IMG_TYPED_CALL(calcChannelInfs, m_img);
+
+    m_correctedImg = m_img;
+    reportProgress(0.5);
+    IMG_TYPED_CALL(alignChannelWithPresetTransform, m_img, m_targetChannel, m_method);
+    reportProgress(1.0);
+  }
+}
+
+template<typename ImagePixelType>
+void ZChromaticShiftCorrection::alignChannelWithPresetTransform(int movingChannel, const QString& presetName)
+{
+  std::map<QString, std::vector<double>> presetNameToParameters = {
+    {"40x_1z", {-0.481418, 0.702386, 0.}},
+    {"40x_2z", {-1.29442,  1.44593,  0.}},
+    {"40x_4z", {-2.56525,  2.57374,  0.}},
+    {"60x_1z", {-0.440559, 2.27874,  0.}},
+    {"60x_2z", {-0.891503, 4.75318,  0.}},
+    {"60x_4z", {-2.137,    10.1926,  0.}}
+  };
+
+  std::unique_ptr<ZImageTransform> transform;
+  if (m_img.depth() > 1) {
+    auto tfm = new ZImageTranslation3DTransform();
+    transform.reset(tfm);
+  } else {
+    auto tfm = new ZImageTranslation2DTransform();
+    transform.reset(tfm);
+  }
+
+  auto it = presetNameToParameters.find(presetName);
+  if (it == presetNameToParameters.end()) {
+    throw ZImgException(QString("Unknown preset name: %1. Abort").arg(presetName));
+  } else {
+    LOG(INFO) << "Use " << it->first << " preset: " << it->second;
+    transform->setParameters(it->second);
+  }
+
+  // get output image from registered parameters
+  transform->setImageInterpolation(ZImageInterpolation(Interpolant::Cubic, PadOption::Constant,
+                                                       m_brightBackground ? m_channelInfos[movingChannel].max
+                                                                          : m_channelInfos[movingChannel].min));
+  if (m_img.depth() > 1) {
+    transform->transformImage(m_img.channelData<ImagePixelType>(movingChannel),
+                              m_img.width(), m_img.height(), m_img.depth(),
+                              m_correctedImg.channelData<ImagePixelType>(movingChannel));
+  } else {
+    transform->transformImage(m_img.channelData<ImagePixelType>(movingChannel),
+                              m_img.width(), m_img.height(),
+                              m_correctedImg.channelData<ImagePixelType>(movingChannel));
+  }
 }
 
 template<typename ImagePixelType>

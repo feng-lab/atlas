@@ -38,8 +38,10 @@ public:
   void setBrightBackground(bool v)
   { m_brightBackground = v; }
 
+  void setMethod(const QString& str)
+  { m_method = str; }
+
   // registration methods
-  //
   void setMetric(const QString& str)
   { m_metric = str; }
 
@@ -76,6 +78,9 @@ private:
   void alignChannel(int fixedChannel, int movingChannel);
 
   template<typename ImagePixelType>
+  void alignChannelWithPresetTransform(int movingChannel, const QString& presetName);
+
+  template<typename ImagePixelType>
   void calcChannelInfs();
 
 private:
@@ -94,6 +99,8 @@ private:
   std::vector<SectionInfo> m_channelInfos;
   double m_minValue;
   double m_maxValue;
+
+  QString m_method{"Registration"};
 
   QString m_metric{"Normalized Cross-Correlation"};
   QString m_transform{"Translation"};
