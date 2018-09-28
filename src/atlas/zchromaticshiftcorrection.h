@@ -16,10 +16,7 @@ class ZChromaticShiftCorrection : public ZImgProcess
 {
 Q_OBJECT
 public:
-  explicit ZChromaticShiftCorrection(const ZImg& img);
-
-  void setResultFilename(const QString& str)
-  { m_resultFilename = str; }
+  ZChromaticShiftCorrection(const QString& imgFilename, const QString& resultFilename);
 
   // use this channel to do registration
   void setReferenceChannel(int ch)
@@ -82,17 +79,16 @@ private:
   };
 
   template<typename ImagePixelType>
-  void alignChannel(int fixedChannel, int movingChannel);
+  void alignChannel(const ZImg& srcImg, int fixedChannel, int movingChannel);
 
   template<typename ImagePixelType>
-  void alignChannelWithPresetTransform(int movingChannel, const QString& presetName);
+  void alignChannelWithPresetTransform(const ZImg& srcImg, int movingChannel, const QString& presetName);
 
   template<typename ImagePixelType>
-  void calcChannelInfs();
+  void calcChannelInfs(const ZImg& srcImg);
 
 private:
-  const ZImg& m_img;
-
+  QString m_imgFilename;
   QString m_resultFilename;
   int m_referenceChannel = -1;
   int m_targetChannel = -1;

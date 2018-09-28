@@ -44,30 +44,20 @@ void ZSectionsRegistrationDialog::createWorker(nim::ZImgProcess*& worker, QStrin
   focusNextChild();
 
   if (m_inputImagesFileWidget->getSelectedMultipleOpenFiles().isEmpty()) {
-    throw ZImgException(QString("No input images."));
+    throw ZImgException(QString("No input images. Abort."));
   }
-
-  ZImg img;
-  img.load(m_inputImagesFileWidget->getSelectedMultipleOpenFiles(), Dimension::Z, 0, FileFormat::Unknown, true,
-           m_brightBackground.get());
-
-  if (img.depth() <= 1) {
-    throw ZImgException(QString("Only one slice. Do not need align"));
-  }
-  if (img.numTimes() > 1) {
-    throw ZImgException(QString("Can not align time sequence image: %1").arg(img.info().toQString()));
-  }
-
   if (m_outputStackWidget->getSelectedSaveFile().isEmpty()) {
     throw ZImgException(QString("Result image file must be specified."));
   }
   if (m_outputLogFileWidget->getSelectedSaveFile().isEmpty()) {
     throw ZImgException(QString("Registration log file must be specified."));
   }
+
   int refChannel = m_referenceChannel.associatedData() - 1;
 
-  auto workertmp = new ZSectionsRegistration(img, m_referenceImageIndex.get());
-  workertmp->setResultFilename(m_outputStackWidget->getSelectedSaveFile());
+  auto workertmp = new ZSectionsRegistration(m_inputImagesFileWidget->getSelectedMultipleOpenFiles(),
+                                             m_outputStackWidget->getSelectedSaveFile(),
+                                             m_referenceImageIndex.get());
   if (refChannel >= 0)
     workertmp->setReferenceChannel(refChannel);
   workertmp->setRemoveBackground(m_removeBackground.get());
@@ -107,11 +97,11 @@ void ZSectionsRegistrationDialog::inputImagesChanged()
   QString stackFn = fi.path() + "/" + replaceLastInteger(fi.baseName(), "_all") + "_aligned_stack.nim";
   m_outputStackWidget->setFile(stackFn);
 
-  int channelNumber = 0;
-  int numFrames = 0;
+  size_t channelNumber = 0;
+  size_t numFrames = 0;
   try {
     std::vector<ZImgInfo> info = ZImg::readImgInfo(fns, Dimension::Z, nullptr, FileFormat::Unknown, true);
-    if (info.size() != 1) {
+    if (info.size() != 1 || info[0].isEmpty()) {
       throw ZIOException("Not supported image dimensions");
     }
     channelNumber = info[0].numChannels;
@@ -119,14 +109,14 @@ void ZSectionsRegistrationDialog::inputImagesChanged()
   }
   catch (const ZIOException& e) {
     QMessageBox::critical(this, qApp->applicationName(), "Can not parse input image.\n" + e.what());
+    return;
   }
 
   m_referenceChannel.clearOptions();
   m_referenceChannel.addOptionWithData(qMakePair<QString, int>("Auto", 0));
-  for (int i = 0; i < channelNumber; ++i) {
+  for (size_t i = 0; i < channelNumber; ++i) {
     m_referenceChannel.addOptionWithData(qMakePair(QString("Ch%1").arg(i + 1), i + 1));
   }
-
   m_referenceChannel.select("Auto");
 
   m_referenceImageIndex.setRange(0, numFrames - 1);

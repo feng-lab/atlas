@@ -16,10 +16,7 @@ class ZSectionsRegistration : public ZImgProcess
 {
   Q_OBJECT
 public:
-  ZSectionsRegistration(const ZImg& img, int fixedSliceIndex);
-
-  void setResultFilename(const QString& str)
-  { m_resultFilename = str; }
+  ZSectionsRegistration(const QStringList& imgFilenames, const QString& resultFilename, int fixedSliceIndex);
 
   // use this channel to do registration, if not set or set to -1, the channel with strongest image signal
   // will be used.
@@ -85,22 +82,23 @@ private:
   };
 
   template<typename ImagePixelType>
-  void alignSection(int fixedImageIndex, int movingImageIndex, double& cost, ZImageTransform*& transform);
+  void alignSection(const ZImg& srcImg, int fixedImageIndex, int movingImageIndex,
+                    double& cost, ZImageTransform*& transform);
 
   template<typename ImagePixelType>
-  void transformSections(const std::map<size_t, std::unique_ptr<ZImageCompositeTransform>>& tfmmap, const ZImg& inImg,
+  void transformSections(const std::map<size_t, std::unique_ptr<ZImageCompositeTransform>>& tfmmap, const ZImg& srcImg,
                          const QString& outImgFilename) const;
 
   template<typename ImagePixelType>
-  void calcRefCh();
+  void calcRefCh(const ZImg& srcImg);
 
   template<typename ImagePixelType>
-  void calcSecInfs();
+  void calcSecInfs(const ZImg& srcImg);
 
 private:
-  const ZImg& m_img;
-  int m_fixedSliceIndex;
+  QStringList m_imgFilenames;
   QString m_resultFilename;
+  int m_fixedSliceIndex;
 
   int m_referenceChannel = -1;
 

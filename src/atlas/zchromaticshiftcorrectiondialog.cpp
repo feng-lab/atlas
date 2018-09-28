@@ -45,26 +45,22 @@ ZChromaticShiftCorrectionDialog::ZChromaticShiftCorrectionDialog(QWidget* parent
 void ZChromaticShiftCorrectionDialog::createWorker(nim::ZImgProcess*& worker, QString& workerName)
 {
   focusNextChild();
-  ZImg img(m_inputImagesFileWidget->getSelectedOpenFile());
 
-  if (img.numChannels() <= 1) {
-    throw ZImgException(QString("Only one channel. Do not need correction"));
+  if (m_inputImagesFileWidget->getSelectedOpenFile().isEmpty()) {
+    throw ZImgException(QString("No input image. Abort."));
   }
-  if (img.numTimes() > 1) {
-    throw ZImgException(QString("Can not align time sequence image: %1").arg(img.info().toQString()));
-  }
-
   if (m_outputStackWidget->getSelectedSaveFile().isEmpty()) {
     throw ZImgException(QString("Result image file must be specified."));
   }
   if (m_outputLogFileWidget->getSelectedSaveFile().isEmpty()) {
     throw ZImgException(QString("Correction log file must be specified."));
   }
+
   int refChannel = m_referenceChannel.associatedData() - 1;
   int targetChannel = m_targetChannel.associatedData() - 1;
 
-  auto* workertmp = new ZChromaticShiftCorrection(img);
-  workertmp->setResultFilename(m_outputStackWidget->getSelectedSaveFile());
+  auto* workertmp = new ZChromaticShiftCorrection(m_inputImagesFileWidget->getSelectedOpenFile(),
+                                                  m_outputStackWidget->getSelectedSaveFile());
   if (refChannel >= 0)
     workertmp->setReferenceChannel(refChannel);
   if (targetChannel >= 0)
@@ -110,23 +106,22 @@ void ZChromaticShiftCorrectionDialog::inputImagesChanged()
   QString stackFn = fi.path() + "/" + fi.baseName() + "_chromatic_shift_corrected.nim";
   m_outputStackWidget->setFile(stackFn);
 
-  int channelNumber = 0;
-  int numFrames = 0;
+  size_t channelNumber = 0;
   try {
-    std::vector<ZImgInfo> info = ZImg::readImgInfo(fn, nullptr, FileFormat::Unknown);
-    if (info.size() != 1) {
+    std::vector<ZImgInfo> info = ZImg::readImgInfo(fn);
+    if (info.size() != 1 || info[0].isEmpty()) {
       throw ZIOException("Not supported image dimensions");
     }
     channelNumber = info[0].numChannels;
-    numFrames = info[0].depth;
   }
   catch (const ZIOException& e) {
     QMessageBox::critical(this, qApp->applicationName(), "Can not parse input image.\n" + e.what());
+    return;
   }
 
   m_referenceChannel.clearOptions();
   m_targetChannel.clearOptions();
-  for (int i = 0; i < channelNumber; ++i) {
+  for (size_t i = 0; i < channelNumber; ++i) {
     m_referenceChannel.addOptionWithData(qMakePair(QString("Ch%1").arg(i + 1), i + 1));
     m_targetChannel.addOptionWithData(qMakePair(QString("Ch%1").arg(i + 1), i + 1));
   }

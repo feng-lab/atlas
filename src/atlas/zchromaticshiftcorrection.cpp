@@ -16,33 +16,28 @@
 
 namespace nim {
 
-ZChromaticShiftCorrection::ZChromaticShiftCorrection(const ZImg& img)
-  : m_img(img)
+ZChromaticShiftCorrection::ZChromaticShiftCorrection(const QString& imgFilename, const QString& resultFilename)
+  : m_imgFilename(imgFilename)
+  , m_resultFilename(resultFilename)
 {
 }
 
 void ZChromaticShiftCorrection::doWork()
 {
   LOG(INFO) << "";
-  // todo : add back
-  //  if (!m_stack.sourcePath()) {
-  //    LOG(INFO) << "Start Registering Sections";
-  //  } else {
-  //    LOG(INFO) << "Start Registering Sections for Image " << m_stack.sourcePath();
-  //  }
-  //  LOG(INFO) << "";
-
+  LOG(INFO) << "Image Filename: " << m_imgFilename;
+  LOG(INFO) << "Result Filename: " << m_resultFilename;
   LOG(INFO) << "Method: " << m_method;
 
-  if (m_method == "Registration") {
-    if (m_referenceChannel >= 0 && static_cast<size_t>(m_referenceChannel) < m_img.numChannels()) {
-      LOG(INFO) << "Reference Channel: " << m_referenceChannel + 1 << " (start from 1)";
-    } else {
-      throw ZImgException(QString("Wrong reference channel: %1. Abort").arg(m_referenceChannel));
-    }
+  ZImg srcImg(m_imgFilename);
+  if (srcImg.numChannels() <= 1) {
+    throw ZImgException(QString("Only one channel. Do not need correction"));
+  }
+  if (srcImg.numTimes() > 1) {
+    throw ZImgException(QString("Can not align time sequence image: %1").arg(srcImg.info().toQString()));
   }
 
-  if (m_targetChannel >= 0 && static_cast<size_t>(m_targetChannel) < m_img.numChannels() &&
+  if (m_targetChannel >= 0 && static_cast<size_t>(m_targetChannel) < srcImg.numChannels() &&
     (m_method != "Registration" || m_targetChannel != m_referenceChannel)) {
     LOG(INFO) << "Target Channel: " << m_targetChannel + 1 << " (start from 1)";
   } else {
@@ -50,31 +45,34 @@ void ZChromaticShiftCorrection::doWork()
   }
 
   if (m_method == "Registration") {
+    if (m_referenceChannel >= 0 && static_cast<size_t>(m_referenceChannel) < srcImg.numChannels()) {
+      LOG(INFO) << "Reference Channel: " << m_referenceChannel + 1 << " (start from 1)";
+    } else {
+      throw ZImgException(QString("Wrong reference channel: %1. Abort").arg(m_referenceChannel));
+    }
+
     LOG(INFO) << "Remove Background: " << m_removeBackground;
     LOG(INFO) << "Remove High Foreground: " << m_removeHighForeground;
     LOG(INFO) << "Multithreading: " << m_useMultithreading;
     LOG(INFO) << "Metirc: " << m_metric;
     LOG(INFO) << "Transform: " << m_transform;
     LOG(INFO) << "Optimizer: " << m_optimizer;
-
-    IMG_TYPED_CALL(calcChannelInfs, m_img);
-
-    reportProgress(0.5);
-    IMG_TYPED_CALL(alignChannel, m_img, m_referenceChannel, m_targetChannel);
-    emit resultReady(m_resultFilename);
-    reportProgress(1.0);
-  } else {
-    IMG_TYPED_CALL(calcChannelInfs, m_img);
-
-    reportProgress(0.5);
-    IMG_TYPED_CALL(alignChannelWithPresetTransform, m_img, m_targetChannel, m_method);
-    emit resultReady(m_resultFilename);
-    reportProgress(1.0);
   }
+
+  IMG_TYPED_CALL(calcChannelInfs, srcImg, srcImg);
+  reportProgress(0.5);
+  if (m_method == "Registration") {
+    IMG_TYPED_CALL(alignChannel, srcImg, srcImg, m_referenceChannel, m_targetChannel);
+  } else {
+    IMG_TYPED_CALL(alignChannelWithPresetTransform, srcImg, srcImg, m_targetChannel, m_method);
+  }
+  emit resultReady(m_resultFilename);
+  reportProgress(1.0);
 }
 
 template<typename ImagePixelType>
-void ZChromaticShiftCorrection::alignChannelWithPresetTransform(int movingChannel, const QString& presetName)
+void ZChromaticShiftCorrection::alignChannelWithPresetTransform(const ZImg& srcImg,
+                                                                int movingChannel, const QString& presetName)
 {
   std::map<QString, std::vector<double>> presetNameToParameters = {
     {"40x_1z", {-0.481418, 0.702386, 0.}},
@@ -86,7 +84,7 @@ void ZChromaticShiftCorrection::alignChannelWithPresetTransform(int movingChanne
   };
 
   std::unique_ptr<ZImageTransform> transform;
-  if (m_img.depth() > 1) {
+  if (srcImg.depth() > 1) {
     auto tfm = new ZImageTranslation3DTransform();
     transform.reset(tfm);
   } else {
@@ -107,14 +105,14 @@ void ZChromaticShiftCorrection::alignChannelWithPresetTransform(int movingChanne
                                                        m_brightBackground ? m_channelInfos[movingChannel].max
                                                                           : m_channelInfos[movingChannel].min));
 
-  ZImg correctedImg = m_img;
-  if (m_img.depth() > 1) {
-    transform->transformImage(m_img.channelData<ImagePixelType>(movingChannel),
-                              m_img.width(), m_img.height(), m_img.depth(),
+  ZImg correctedImg = srcImg;
+  if (srcImg.depth() > 1) {
+    transform->transformImage(srcImg.channelData<ImagePixelType>(movingChannel),
+                              srcImg.width(), srcImg.height(), srcImg.depth(),
                               correctedImg.channelData<ImagePixelType>(movingChannel));
   } else {
-    transform->transformImage(m_img.channelData<ImagePixelType>(movingChannel),
-                              m_img.width(), m_img.height(),
+    transform->transformImage(srcImg.channelData<ImagePixelType>(movingChannel),
+                              srcImg.width(), srcImg.height(),
                               correctedImg.channelData<ImagePixelType>(movingChannel));
   }
 
@@ -122,17 +120,17 @@ void ZChromaticShiftCorrection::alignChannelWithPresetTransform(int movingChanne
 }
 
 template<typename ImagePixelType>
-void ZChromaticShiftCorrection::alignChannel(int fixedChannel, int movingChannel)
+void ZChromaticShiftCorrection::alignChannel(const ZImg& srcImg, int fixedChannel, int movingChannel)
 {
   LOG(INFO) << "";
   LOG(INFO) << "Registering Channel " << (movingChannel) << " to Channel " << (fixedChannel);
 
-  size_t length = m_img.channelVoxelNumber();
+  size_t length = srcImg.channelVoxelNumber();
   std::vector<double> fixedImageData(length);
   std::vector<double> movingImageData(length);
 
-  const ImagePixelType* fixedImageDataSrc = m_img.channelData<ImagePixelType>(fixedChannel);
-  const ImagePixelType* movingImageDataSrc = m_img.channelData<ImagePixelType>(movingChannel);
+  const ImagePixelType* fixedImageDataSrc = srcImg.channelData<ImagePixelType>(fixedChannel);
+  const ImagePixelType* movingImageDataSrc = srcImg.channelData<ImagePixelType>(movingChannel);
   double fixedMin = std::numeric_limits<double>::max();
   double fixedMax = std::numeric_limits<double>::lowest();
   double movingMin = fixedMin;
@@ -227,12 +225,12 @@ void ZChromaticShiftCorrection::alignChannel(int fixedChannel, int movingChannel
   std::vector<double> filteredFixedImageData(length);
   std::vector<double> filteredMovingImageData(length);
 
-  for (size_t i = 0; i < m_img.depth(); ++i) {
-    image2DGaussianFilter(fixedImageData.data() + i * m_img.planeByteNumber(), m_img.width(), m_img.height(),
-                          2.5, 2.5, filteredFixedImageData.data() + i * m_img.planeByteNumber(), 11, 11, PadOption::Constant, 0.0,
+  for (size_t i = 0; i < srcImg.depth(); ++i) {
+    image2DGaussianFilter(fixedImageData.data() + i * srcImg.planeByteNumber(), srcImg.width(), srcImg.height(),
+                          2.5, 2.5, filteredFixedImageData.data() + i * srcImg.planeByteNumber(), 11, 11, PadOption::Constant, 0.0,
                           m_useMultithreading);
-    image2DGaussianFilter(movingImageData.data() + i * m_img.planeByteNumber(), m_img.width(), m_img.height(),
-                          2.5, 2.5, filteredMovingImageData.data() + i * m_img.planeByteNumber(), 11, 11, PadOption::Constant, 0.0,
+    image2DGaussianFilter(movingImageData.data() + i * srcImg.planeByteNumber(), srcImg.width(), srcImg.height(),
+                          2.5, 2.5, filteredMovingImageData.data() + i * srcImg.planeByteNumber(), 11, 11, PadOption::Constant, 0.0,
                           m_useMultithreading);
   }
 
@@ -252,7 +250,7 @@ void ZChromaticShiftCorrection::alignChannel(int fixedChannel, int movingChannel
 
   std::unique_ptr<ZImageTransform> transform;
   if (m_transform == "Translation") {
-    if (m_img.depth() > 1) {
+    if (srcImg.depth() > 1) {
       auto tfm = new ZImageTranslation3DTransform();
       transform.reset(tfm);
     } else {
@@ -260,13 +258,13 @@ void ZChromaticShiftCorrection::alignChannel(int fixedChannel, int movingChannel
       transform.reset(tfm);
     }
   } else if (m_transform == "Rigid") {
-    if (m_img.depth() > 1) {
+    if (srcImg.depth() > 1) {
       auto tfm = new ZImageRigid3DTransform();
-      tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0, m_img.depth() / 2.0);
+      tfm->setRotationCenter(srcImg.width() / 2.0, srcImg.height() / 2.0, srcImg.depth() / 2.0);
       transform.reset(tfm);
     } else {
       auto tfm = new ZImageRigid2DTransform();
-      tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
+      tfm->setRotationCenter(srcImg.width() / 2.0, srcImg.height() / 2.0);
       transform.reset(tfm);
     }
   } else {
@@ -285,9 +283,9 @@ void ZChromaticShiftCorrection::alignChannel(int fixedChannel, int movingChannel
   registration.setInitialTransform(*transform.get());
 
   ZImg fixedImg;
-  fixedImg.wrapData(filteredFixedImageData.data(), m_img.width(), m_img.height(), m_img.depth());
+  fixedImg.wrapData(filteredFixedImageData.data(), srcImg.width(), srcImg.height(), srcImg.depth());
   ZImg movingImg;
-  movingImg.wrapData(filteredMovingImageData.data(), m_img.width(), m_img.height(), m_img.depth());
+  movingImg.wrapData(filteredMovingImageData.data(), srcImg.width(), srcImg.height(), srcImg.depth());
   registration.setFixedImg(fixedImg);
   registration.setMovingImg(movingImg);
   registration.run();
@@ -297,14 +295,14 @@ void ZChromaticShiftCorrection::alignChannel(int fixedChannel, int movingChannel
                                                        m_brightBackground ? m_channelInfos[movingChannel].max
                                                                           : m_channelInfos[movingChannel].min));
 
-  ZImg correctedImg = m_img;
-  if (m_img.depth() > 1) {
-    transform->transformImage(m_img.channelData<ImagePixelType>(movingChannel),
-                              m_img.width(), m_img.height(), m_img.depth(),
+  ZImg correctedImg = srcImg;
+  if (srcImg.depth() > 1) {
+    transform->transformImage(srcImg.channelData<ImagePixelType>(movingChannel),
+                              srcImg.width(), srcImg.height(), srcImg.depth(),
                               correctedImg.channelData<ImagePixelType>(movingChannel));
   } else {
-    transform->transformImage(m_img.channelData<ImagePixelType>(movingChannel),
-                              m_img.width(), m_img.height(),
+    transform->transformImage(srcImg.channelData<ImagePixelType>(movingChannel),
+                              srcImg.width(), srcImg.height(),
                               correctedImg.channelData<ImagePixelType>(movingChannel));
   }
 
@@ -312,14 +310,14 @@ void ZChromaticShiftCorrection::alignChannel(int fixedChannel, int movingChannel
 }
 
 template<typename ImagePixelType>
-void ZChromaticShiftCorrection::calcChannelInfs()
+void ZChromaticShiftCorrection::calcChannelInfs(const ZImg& srcImg)
 {
-  m_channelInfos.resize(m_img.numChannels());
+  m_channelInfos.resize(srcImg.numChannels());
   m_minValue = std::numeric_limits<double>::max();
   m_maxValue = std::numeric_limits<double>::lowest();
-  size_t length = m_img.channelVoxelNumber();
-  for (size_t i = 0; i < m_img.numChannels(); ++i) {
-    const ImagePixelType* data = m_img.channelData<ImagePixelType>(i);
+  size_t length = srcImg.channelVoxelNumber();
+  for (size_t i = 0; i < srcImg.numChannels(); ++i) {
+    const ImagePixelType* data = srcImg.channelData<ImagePixelType>(i);
     std::pair<const ImagePixelType*, const ImagePixelType*> minmax =
       minMaxElement(data, data + length);
     m_channelInfos[i].min = *minmax.first;
