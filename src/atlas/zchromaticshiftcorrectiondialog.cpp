@@ -38,6 +38,8 @@ ZChromaticShiftCorrectionDialog::ZChromaticShiftCorrectionDialog(QWidget* parent
   m_targetChannel.addOptionWithData(qMakePair<QString, int>("Auto", 0));
   m_targetChannel.select("Auto");
   init();
+
+  logUsageInfo();
 }
 
 void ZChromaticShiftCorrectionDialog::correctShift()
@@ -260,7 +262,7 @@ void ZChromaticShiftCorrectionDialog::init()
   mainLayout->addWidget(m_buttonBox);
   setLayout(mainLayout);
 
-  setWindowTitle(tr("Sections Registration"));
+  setWindowTitle(tr("Chromatic Shift Correction"));
 }
 
 void ZChromaticShiftCorrectionDialog::createIOGroupBox()
@@ -373,6 +375,20 @@ void ZChromaticShiftCorrectionDialog::createOutputGroupBox()
   alllayout->addWidget(new ZLogWidget(false, this));
 
   m_outputGroupBox->setLayout(alllayout);
+}
+
+void ZChromaticShiftCorrectionDialog::logUsageInfo()
+{
+  LOG(INFO) << R"(
+Usage:
+  1. Select input image file.
+  2. Select Method:
+    Signal Matching: Correct the shift by find the best match between the far-red channel and the reference channel.
+    Use ##x_#z Preset: Correct the shift by using the predetermined shift values for different combinations of len and zoom.
+  3. Make sure the "Far-red Channel" and the "Reference Channel" are correct.
+  4. Click the "Correct" button.
+
+)";
 }
 
 } // namespace nim

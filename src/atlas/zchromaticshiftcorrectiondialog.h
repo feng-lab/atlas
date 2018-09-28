@@ -49,6 +49,8 @@ private:
 
   void createOutputGroupBox();
 
+  void logUsageInfo();
+
 private:
   QGroupBox* m_ioGroupBox;
   QGroupBox* m_paraGroupBox;
