@@ -135,9 +135,9 @@ void ZChromaticShiftCorrectionDialog::init()
                               qMakePair<QString, QString>("Use 40x_1z Preset", "40x_1z"),
                               qMakePair<QString, QString>("Use 40x_2z Preset", "40x_2z"),
                               qMakePair<QString, QString>("Use 40x_4z Preset", "40x_4z"),
-                              qMakePair<QString, QString>("Use 60x_1z Preset", "60x_1z"),
-                              qMakePair<QString, QString>("Use 60x_2z Preset", "60x_2z"),
-                              qMakePair<QString, QString>("Use 60x_4z Preset", "60x_4z"));
+                              qMakePair<QString, QString>("Use 63x_1z Preset", "63x_1z"),
+                              qMakePair<QString, QString>("Use 63x_2z Preset", "63x_2z"),
+                              qMakePair<QString, QString>("Use 63x_4z Preset", "63x_4z"));
   m_method.select("Signal Matching");
 
   m_metric.addOptions("Normalized Cross-Correlation",
