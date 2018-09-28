@@ -14,10 +14,9 @@
 
 namespace nim {
 
-ZSectionsRegistration::ZSectionsRegistration(const ZImg& img, int fixedSliceIndex, ZImg& registeredImg)
+ZSectionsRegistration::ZSectionsRegistration(const ZImg& img, int fixedSliceIndex)
   : m_img(img)
   , m_fixedSliceIndex(fixedSliceIndex)
-  , m_registeredImg(registeredImg)
 {
 }
 
@@ -62,23 +61,6 @@ void ZSectionsRegistration::doWork()
 
   IMG_TYPED_CALL(calcSecInfs, m_img);
 
-#if 0
-  m_registeredImg = m_img;
-  double progress = 1.0;
-  reportProgress(progress/m_img.depth());
-
-  for (size_t i=m_fixedSliceIndex+1; i<m_img.depth(); ++i) {
-    IMG_TYPED_CALL(alignSection, m_img, i-1, i);
-    progress += 1.0;
-    reportProgress(progress/m_img.depth());
-  }
-
-  for (int i = m_fixedSliceIndex; i-- > 0;) {
-    IMG_TYPED_CALL(alignSection, m_img, i+1, i);
-    progress += 1.0;
-    reportProgress(progress/m_img.depth());
-  }
-#else
   double totalNumPairs = m_img.depth() * m_numNeighbors;
 
   std::map<std::pair<size_t, size_t>, std::pair<std::unique_ptr<ZImageTransform>, double>> idxPairs;
@@ -107,10 +89,9 @@ void ZSectionsRegistration::doWork()
   }
   std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> tfmmap = tfmResolve.resolve();
 
-  IMG_TYPED_CALL(transformSections, m_img, tfmmap, m_img, m_registeredImg);
+  IMG_TYPED_CALL(transformSections, m_img, tfmmap, m_img, m_resultFilename);
 
   reportProgress(1.0);
-#endif
 }
 
 template<typename ImagePixelType>
@@ -293,9 +274,9 @@ void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageInd
 template<typename ImagePixelType>
 void
 ZSectionsRegistration::transformSections(const std::map<size_t, std::unique_ptr<ZImageCompositeTransform> >& tfmmap,
-                                         const ZImg& inImg, ZImg& outImg) const
+                                         const ZImg& inImg, const QString& outImgFilename) const
 {
-  outImg = inImg;
+  ZImg outImg = inImg;
   for (size_t i = 0; i < inImg.depth(); ++i) {
     auto& tfm = tfmmap.at(i);
     tfm->setImageInterpolation(ZImageInterpolation(Interpolant::Cubic, PadOption::Constant,
@@ -306,242 +287,7 @@ ZSectionsRegistration::transformSections(const std::map<size_t, std::unique_ptr<
                           outImg.planeData<ImagePixelType>(i, c));
     }
   }
-}
-
-template<typename ImagePixelType>
-void ZSectionsRegistration::alignSection(int fixedImageIndex, int movingImageIndex)
-{
-  LOG(INFO) << "";
-  LOG(INFO) << "Registering Image " << (movingImageIndex) << " to Image " << (fixedImageIndex);
-
-  size_t length = m_img.planeVoxelNumber();
-  std::vector<double> fixedImageData(length);
-  std::vector<double> movingImageData(length);
-
-  const ImagePixelType* fixedImageDataSrc = m_registeredImg.planeData<ImagePixelType>(fixedImageIndex,
-                                                                                      m_referenceChannel);
-  const ImagePixelType* movingImageDataSrc = m_img.planeData<ImagePixelType>(movingImageIndex, m_referenceChannel);
-  double fixedMin = std::numeric_limits<double>::max();
-  double fixedMax = std::numeric_limits<double>::lowest();
-  double movingMin = fixedMin;
-  double movingMax = fixedMax;
-  for (size_t i = 0; i < length; ++i) {
-    fixedImageData[i] = fixedImageDataSrc[i];
-    fixedMin = std::min(fixedMin, fixedImageData[i]);
-    fixedMax = std::max(fixedMax, fixedImageData[i]);
-  }
-  for (size_t i = 0; i < length; ++i) {
-    movingImageData[i] = movingImageDataSrc[i];
-    movingMin = std::min(movingMin, movingImageData[i]);
-    movingMax = std::max(movingMax, movingImageData[i]);
-  }
-
-  if (fixedMin == fixedMax || movingMin == movingMax) {
-    LOG(INFO) << "At least one image is empty, skip registratering.";
-    // we already copied the img, so do nothing
-    return;
-  }
-
-  double thre1 = m_sectionInfos[fixedImageIndex].median + 0 * m_sectionInfos[fixedImageIndex].std;
-  double thre2 = m_sectionInfos[movingImageIndex].median + 0 * m_sectionInfos[movingImageIndex].std;
-
-  if (m_removeBackground) {
-    if (m_brightBackground) {
-      double subtval = std::max(fixedMax, movingMax);
-      for (size_t i = 0; i < length; ++i) {
-        fixedImageData[i] = fixedImageData[i] > thre1 ? subtval : fixedImageData[i];
-      }
-      for (size_t i = 0; i < length; ++i) {
-        movingImageData[i] = movingImageData[i] > thre2 ? subtval : movingImageData[i];
-      }
-      fixedMax = subtval;
-      movingMax = subtval;
-    } else {
-      double subtval = std::min(fixedMin, movingMin);
-      for (size_t i = 0; i < length; ++i) {
-        fixedImageData[i] = fixedImageData[i] < thre1 ? subtval : fixedImageData[i];
-      }
-      for (size_t i = 0; i < length; ++i) {
-        movingImageData[i] = movingImageData[i] < thre2 ? subtval : movingImageData[i];
-      }
-      fixedMin = subtval;
-      movingMin = subtval;
-    }
-  }
-
-  if (m_removeHighForeground) {
-    if (m_brightBackground) {
-      double thre1up = thre1 - 3 * m_sectionInfos[fixedImageIndex].std;
-      double thre2up = thre2 - 3 * m_sectionInfos[movingImageIndex].std;
-      for (size_t i = 0; i < length; ++i) {
-        fixedImageData[i] = fixedImageData[i] < thre1up ? thre1up : fixedImageData[i];
-      }
-      fixedMin = std::max(thre1up, fixedMin);
-      for (size_t i = 0; i < length; ++i) {
-        movingImageData[i] = movingImageData[i] < thre2up ? thre2up : movingImageData[i];
-      }
-      movingMin = std::max(thre2up, movingMin);
-    } else {
-      double thre1up = thre1 + 3 * m_sectionInfos[fixedImageIndex].std;
-      double thre2up = thre2 + 3 * m_sectionInfos[movingImageIndex].std;
-      for (size_t i = 0; i < length; ++i) {
-        fixedImageData[i] = fixedImageData[i] > thre1up ? thre1up : fixedImageData[i];
-      }
-      fixedMax = std::min(thre1up, fixedMax);
-      for (size_t i = 0; i < length; ++i) {
-        movingImageData[i] = movingImageData[i] > thre2up ? thre2up : movingImageData[i];
-      }
-      movingMax = std::min(thre2up, movingMax);
-    }
-  }
-
-  if (fixedMin == fixedMax || movingMin == movingMax) {
-    LOG(INFO) << "At least one image is empty, skip registratering.";
-    // we already copied the img, so do nothing
-    return;
-  }
-
-  double Imin = std::min(fixedMin, movingMin);
-  double Imax = std::max(fixedMax, movingMax);
-  double scale = 1.0 / (Imax - Imin);
-
-  for (size_t i = 0; i < length; ++i) {
-    fixedImageData[i] = (fixedImageData[i] - Imin) * scale;
-  }
-  for (size_t i = 0; i < length; ++i) {
-    movingImageData[i] = (movingImageData[i] - Imin) * scale;
-  }
-
-  std::vector<double> filteredFixedImageData(length);
-  std::vector<double> filteredMovingImageData(length);
-
-  image2DGaussianFilter(fixedImageData.data(), m_img.width(), m_img.height(),
-                        2.5, 2.5, filteredFixedImageData.data(), 11, 11, PadOption::Constant, 0.0, m_useMultithreading);
-  image2DGaussianFilter(movingImageData.data(), m_img.width(), m_img.height(),
-                        2.5, 2.5, filteredMovingImageData.data(), 11, 11, PadOption::Constant, 0.0,
-                        m_useMultithreading);
-
-  //  image2DWrite(fixedImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/fim.tif");
-  //  image2DWrite(movingImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/mim.tif");
-  //  image2DWrite(filteredFixedImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/ffim.tif");
-  //  image2DWrite(filteredMovingImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/fmim.tif");
-
-  ZImageToImageMetric metric;
-  if (m_metric == "Mean Differences") {
-    metric.setType(ZImageToImageMetric::Type::MeanDifferences);
-  } else if (m_metric == "Mean Squared Differences") {
-    metric.setType(ZImageToImageMetric::Type::MeanSquaredDifferences);
-  } else if (m_metric == "Log Absolute Differences") {
-    metric.setType(ZImageToImageMetric::Type::LogAbsoluteDifferences);
-  } else if (m_metric == "Normalized Cross-Correlation") {
-    metric.setType(ZImageToImageMetric::Type::NormalizedCrossCorrelation);
-  } else if (m_metric == "Normalized Mutual Information") {
-    metric.setType(ZImageToImageMetric::Type::NormalizedMutualInformation);
-  } else {
-    LOG(FATAL) << "impossible transform type selection";
-  }
-
-  std::unique_ptr<ZImageTransform> transform;
-  if (m_transform == "YTranslation") {
-    auto tfm = new ZImageYTranslation2DTransform();
-    transform.reset(tfm);
-  } else if (m_transform == "Translation") {
-    auto tfm = new ZImageTranslation2DTransform();
-    transform.reset(tfm);
-  } else if (m_transform == "Rigid") {
-    auto tfm = new ZImageRigid2DTransform();
-    tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
-    transform.reset(tfm);
-  } else if (m_transform == "Similarity") {
-    auto tfm = new ZImageSimilarity2DTransform();
-    tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
-    transform.reset(tfm);
-  } else if (m_transform == "Affine") {
-    auto tfm = new ZImageAffine2DTransform();
-    tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
-    transform.reset(tfm);
-  } else {
-    LOG(FATAL) << "impossible transform type selection";
-  }
-  transform->setImageInterpolation(ZImageInterpolation(Interpolant::Linear, PadOption::Replicate));
-
-  ZRegistrationNumericDiffCostFunction costFunction(1e-6);
-  costFunction.setMetric(metric);
-
-  ZImgRegistration registration;
-  registration.setUseMultithreading(m_useMultithreading);
-  registration.setCostFunction(costFunction);
-  registration.setOptimizer(m_optimizer);
-  registration.setNumScales(m_numScales);
-  registration.setInitialTransform(*transform.get());
-
-  bool flip = false;
-  ZImg fixedImg;
-  fixedImg.wrapData(filteredFixedImageData.data(), m_img.width(), m_img.height());
-  ZImg movingImg;
-  movingImg.wrapData(filteredMovingImageData.data(), m_img.width(), m_img.height());
-  registration.setFixedImg(fixedImg);
-  registration.setMovingImg(movingImg);
-  double cost = registration.run();
-  if (m_allowFlip) {
-    image2DFlip(filteredMovingImageData.data(), m_img.width(), m_img.height(), Dimension::X);
-    std::unique_ptr<ZImageTransform> flipTransform;
-    if (m_transform == "YTranslation") {
-      auto tfm = new ZImageYTranslation2DTransform();
-      flipTransform.reset(tfm);
-    } else if (m_transform == "Translation") {
-      auto tfm = new ZImageTranslation2DTransform();
-      flipTransform.reset(tfm);
-    } else if (m_transform == "Rigid") {
-      auto tfm = new ZImageRigid2DTransform();
-      tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
-      flipTransform.reset(tfm);
-    } else if (m_transform == "Similarity") {
-      auto tfm = new ZImageSimilarity2DTransform();
-      tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
-      flipTransform.reset(tfm);
-    } else if (m_transform == "Affine") {
-      auto tfm = new ZImageAffine2DTransform();
-      tfm->setRotationCenter(m_img.width() / 2.0, m_img.height() / 2.0);
-      flipTransform.reset(tfm);
-    } else {
-      LOG(FATAL) << "impossible transform type selection";
-    }
-    flipTransform->setImageInterpolation(ZImageInterpolation(Interpolant::Linear, PadOption::Replicate));
-    registration.setInitialTransform(*flipTransform.get());
-
-    LOG(INFO) << "";
-    LOG(INFO) << "Align fixed image with flipped moving image: ";
-    movingImg.wrapData(filteredMovingImageData.data(), m_img.width(), m_img.height());
-    registration.setMovingImg(movingImg);
-    double flipCost = registration.run();
-    if (flipCost < cost) {
-      flip = true;
-      LOG(INFO) << "** Flip slice " << movingImageIndex;
-      transform = std::move(flipTransform);
-    }
-  }
-
-  // get output image from registered parameters
-  transform->setImageInterpolation(ZImageInterpolation(Interpolant::Cubic, PadOption::Constant,
-                                                       m_brightBackground ? m_sectionInfos[movingImageIndex].max
-                                                                          : m_sectionInfos[movingImageIndex].min));
-  if (flip) {
-    std::vector<ImagePixelType> buffer(m_img.planeVoxelNumber());
-    for (size_t i = 0; i < m_registeredImg.numChannels(); ++i) {
-      std::memcpy(buffer.data(), m_img.planeData<ImagePixelType>(movingImageIndex, i), m_img.planeByteNumber());
-      image2DFlip(buffer.data(), m_img.width(), m_img.height(), Dimension::X);
-      transform->transformImage(buffer.data(),
-                                m_img.width(), m_img.height(),
-                                m_registeredImg.planeData<ImagePixelType>(movingImageIndex, i));
-    }
-  } else {
-    for (size_t i = 0; i < m_registeredImg.numChannels(); ++i) {
-      transform->transformImage(m_img.planeData<ImagePixelType>(movingImageIndex, i),
-                                m_img.width(), m_img.height(),
-                                m_registeredImg.planeData<ImagePixelType>(movingImageIndex, i));
-    }
-  }
+  outImg.save(outImgFilename);
 }
 
 template<typename ImagePixelType>

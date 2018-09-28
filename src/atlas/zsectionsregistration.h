@@ -14,8 +14,12 @@ class ZImageCompositeTransform;
 
 class ZSectionsRegistration : public ZImgProcess
 {
+  Q_OBJECT
 public:
-  ZSectionsRegistration(const ZImg& img, int fixedSliceIndex, ZImg& registeredImg);
+  ZSectionsRegistration(const ZImg& img, int fixedSliceIndex);
+
+  void setResultFilename(const QString& str)
+  { m_resultFilename = str; }
 
   // use this channel to do registration, if not set or set to -1, the channel with strongest image signal
   // will be used.
@@ -64,6 +68,9 @@ public:
   void setNumNeighbors(int i)
   { m_numNeighbors = i; }
 
+signals:
+  void resultReady(QString path);
+
 protected:
   void doWork() override;
 
@@ -82,10 +89,7 @@ private:
 
   template<typename ImagePixelType>
   void transformSections(const std::map<size_t, std::unique_ptr<ZImageCompositeTransform>>& tfmmap, const ZImg& inImg,
-                         ZImg& outImg) const;
-
-  template<typename ImagePixelType>
-  void alignSection(int fixedImageIndex, int movingImageIndex);
+                         const QString& outImgFilename) const;
 
   template<typename ImagePixelType>
   void calcRefCh();
@@ -96,8 +100,7 @@ private:
 private:
   const ZImg& m_img;
   int m_fixedSliceIndex;
-
-  ZImg& m_registeredImg;
+  QString m_resultFilename;
 
   int m_referenceChannel = -1;
 

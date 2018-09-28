@@ -18,7 +18,7 @@
 namespace nim {
 
 ZChromaticShiftCorrectionDialog::ZChromaticShiftCorrectionDialog(QWidget* parent)
-  : QDialog(parent)
+  : ZImgProcessDialog(parent)
   , m_openStackAfterRegistering("Open Result Image After Registering", true)
   , m_referenceChannel("Reference Channel:")
   , m_targetChannel("Far-red Channel:")
@@ -42,136 +42,48 @@ ZChromaticShiftCorrectionDialog::ZChromaticShiftCorrectionDialog(QWidget* parent
   logUsageInfo();
 }
 
-void ZChromaticShiftCorrectionDialog::correctShift()
+void ZChromaticShiftCorrectionDialog::createWorker(nim::ZImgProcess*& worker, QString& workerName)
 {
   focusNextChild();
-  ZImg img;
-
-  try {
-    img.load(m_inputImagesFileWidget->getSelectedOpenFile());
-  }
-  catch (const ZException& e) {
-    QMessageBox::critical(this, qApp->applicationName(), "Read Image Error.\n" + e.what());
-    return;
-  }
+  ZImg img(m_inputImagesFileWidget->getSelectedOpenFile());
 
   if (img.numChannels() <= 1) {
-    QMessageBox::critical(this, qApp->applicationName(), QString("Only one channel.\nDo not need align"));
-    return;
+    throw ZImgException(QString("Only one channel. Do not need correction"));
   }
   if (img.numTimes() > 1) {
-    LOG(INFO) << img.info().toQString();
-    QMessageBox::critical(this, qApp->applicationName(), QString("Can not align time sequence image"));
-    return;
+    throw ZImgException(QString("Can not align time sequence image: %1").arg(img.info().toQString()));
   }
 
   if (m_outputStackWidget->getSelectedSaveFile().isEmpty()) {
-    QMessageBox::critical(this, qApp->applicationName(), "Result image file must be specified.");
-    return;
+    throw ZImgException(QString("Result image file must be specified."));
   }
   if (m_outputLogFileWidget->getSelectedSaveFile().isEmpty()) {
-    QMessageBox::critical(this, qApp->applicationName(), "Registration log file must be specified.");
-    return;
+    throw ZImgException(QString("Correction log file must be specified."));
   }
   int refChannel = m_referenceChannel.associatedData() - 1;
   int targetChannel = m_targetChannel.associatedData() - 1;
 
-  m_isCanceled = false;
-  m_hasError = false;
-  ZChromaticShiftCorrection* worker = new ZChromaticShiftCorrection(img, m_correctedImg);
+  auto* workertmp = new ZChromaticShiftCorrection(img);
+  workertmp->setResultFilename(m_outputStackWidget->getSelectedSaveFile());
   if (refChannel >= 0)
-    worker->setReferenceChannel(refChannel);
+    workertmp->setReferenceChannel(refChannel);
   if (targetChannel >= 0)
-    worker->setTargetChannel(targetChannel);
-  worker->setMethod(m_method.associatedData());
-  worker->setRemoveBackground(m_removeBackground.get());
-  worker->setRemoveHighForeground(m_removeHighForeground.get());
-  worker->setBrightBackground(m_brightBackground.get());
-  worker->setMetric(m_metric.get());
-  worker->setTransform(m_transform.get());
-  worker->setOptimizer(m_optimizer.get());
-  worker->setCancelFlag(&m_isCanceled);
-  worker->setLogFile(m_outputLogFileWidget->getSelectedSaveFile());
-  worker->setNumScales(m_numScales.get());
-
-  m_progressDialog = new QProgressDialog(this);
-  m_progressDialog->setLabelText("Correcting Chromatic Shift...");
-  m_progressDialog->setAutoReset(false);
-  m_progressDialog->setAttribute(Qt::WA_DeleteOnClose);
-  QObject::disconnect(m_progressDialog, &QProgressDialog::canceled, m_progressDialog, &QProgressDialog::cancel);
-  connect(worker, qOverload<int>(&ZChromaticShiftCorrection::progressChanged), m_progressDialog,
-          &QProgressDialog::setValue);
-  connect(worker, &ZChromaticShiftCorrection::canceled, this, &ZChromaticShiftCorrectionDialog::processCanceled);
-  connect(worker, &ZChromaticShiftCorrection::processError, this, &ZChromaticShiftCorrectionDialog::processError);
-  connect(m_progressDialog, &QProgressDialog::canceled, this, &ZChromaticShiftCorrectionDialog::cancelButtonPressed);
-
-  QThread* thread = new QThread(this);
-  connect(thread, &QThread::started, worker, &ZChromaticShiftCorrection::run);
-  connect(worker, &ZChromaticShiftCorrection::canceled, thread, &QThread::quit);
-  connect(worker, &ZChromaticShiftCorrection::finished, thread, &QThread::quit);
-  connect(worker, &ZChromaticShiftCorrection::processError, thread, &QThread::quit);
-  connect(thread, &QThread::finished, worker, &ZChromaticShiftCorrection::deleteLater);
-  connect(thread, &QThread::finished, m_progressDialog, &QProgressDialog::reset);
-  connect(thread, &QThread::finished, this, &ZChromaticShiftCorrectionDialog::processFinished);
-  connect(thread, &QThread::finished, thread, &QThread::deleteLater);
-  worker->moveToThread(thread);
-
-  thread->start();
-  m_progressDialog->exec();
-}
-
-void ZChromaticShiftCorrectionDialog::processCanceled()
-{
-  QMessageBox::critical(this, qApp->applicationName(),
-                        "Canceled by user.");
-  m_correctedImg.clear();
-}
-
-void ZChromaticShiftCorrectionDialog::processFinished()
-{
-  if (!m_isCanceled && !m_hasError) {
-    // first save img
-    try {
-      m_correctedImg.save(m_outputStackWidget->getSelectedSaveFile());
-      m_correctedImg.clear();
-    }
-    catch (const ZException& e) {
-      QMessageBox::critical(this, qApp->applicationName(), "Can not save result image.\n" + e.what());
-      return;
-    }
-    // if need open
-    if (m_openStackAfterRegistering.get()) {
-      emit resultReady(m_outputStackWidget->getSelectedSaveFile());
-    }
-    // done
-    QMessageBox::information(this, qApp->applicationName(),
-                             "Chromatic Shift Correction Finished.");
+    workertmp->setTargetChannel(targetChannel);
+  workertmp->setMethod(m_method.associatedData());
+  workertmp->setRemoveBackground(m_removeBackground.get());
+  workertmp->setRemoveHighForeground(m_removeHighForeground.get());
+  workertmp->setBrightBackground(m_brightBackground.get());
+  workertmp->setMetric(m_metric.get());
+  workertmp->setTransform(m_transform.get());
+  workertmp->setOptimizer(m_optimizer.get());
+  workertmp->setLogFile(m_outputLogFileWidget->getSelectedSaveFile());
+  workertmp->setNumScales(m_numScales.get());
+  if (m_openStackAfterRegistering.get()) {
+    connect(workertmp, &ZChromaticShiftCorrection::resultReady, this, &ZChromaticShiftCorrectionDialog::resultReady);
   }
-}
 
-void ZChromaticShiftCorrectionDialog::processError(const QString& e)
-{
-  m_hasError = true;
-  QMessageBox::critical(this, qApp->applicationName(),
-                        QString("Error During Correction: %1").arg(e));
-  m_correctedImg.clear();
-}
-
-void ZChromaticShiftCorrectionDialog::cancelButtonPressed()
-{
-  m_progressDialog->setLabelText("Canceling...");
-  m_isCanceled = true;
-}
-
-void ZChromaticShiftCorrectionDialog::keyPressEvent(QKeyEvent* e)
-{
-  switch (e->key()) {
-    case Qt::Key_Return:
-    case Qt::Key_Enter:
-      break;
-    default:
-      QDialog::keyPressEvent(e);
-  }
+  worker = workertmp;
+  workerName = "Chromatic Shift Correction";
 }
 
 void ZChromaticShiftCorrectionDialog::adjustWidget()
@@ -247,19 +159,11 @@ void ZChromaticShiftCorrectionDialog::init()
   createParaGroupBox();
   createOutputGroupBox();
 
-  m_runButton = new QPushButton(tr("Correct"), this);
-  m_exitButton = new QPushButton(tr("Exit"), this);
-  m_buttonBox = new QDialogButtonBox(Qt::Horizontal, this);
-  m_buttonBox->addButton(m_exitButton, QDialogButtonBox::RejectRole);
-  m_buttonBox->addButton(m_runButton, QDialogButtonBox::ActionRole);
-  connect(m_exitButton, &QPushButton::clicked, this, &ZChromaticShiftCorrectionDialog::reject);
-  connect(m_runButton, &QPushButton::clicked, this, &ZChromaticShiftCorrectionDialog::correctShift);
-
   auto mainLayout = new QVBoxLayout;
   mainLayout->addWidget(m_ioGroupBox);
   mainLayout->addWidget(m_paraGroupBox);
   mainLayout->addWidget(m_outputGroupBox);
-  mainLayout->addWidget(m_buttonBox);
+  mainLayout->addWidget(createButtonBox("Correct"));
   setLayout(mainLayout);
 
   setWindowTitle(tr("Chromatic Shift Correction"));

@@ -1,9 +1,5 @@
 #include "zpunctadetectiondialog.h"
 
-#ifdef _NEUTUBE_
-#include "zstack.hxx"
-#include "zstackdoc.h"
-#endif
 #include "zpunctadetection.h"
 #include "zimg.h"
 #include "zselectfilewidget.h"
@@ -17,29 +13,13 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QApplication>
+#include <QPushButton>
 #include <QThread>
 
 namespace nim {
 
-#ifdef _NEUTUBE_
-ZPunctaDetectionDialog::ZPunctaDetectionDialog(std::tr1::shared_ptr<ZStackDoc> doc, QWidget *parent)
-  : QDialog(parent)
-  , m_doc(doc)
-  , m_useCurrentActiveImage("Use Current Active Image", true)
-  , m_voxelSize("Voxel Size (um)", glm::dvec3(.0,.0,.0), glm::dvec3(.0,.0,.0),
-                glm::dvec3(1e6,1e6,1e6))
-  , m_punctaChannel("Puncta Channel:", nullptr, "Ch")
-  , m_punctaThreshold("Puncta Threshold (-1 means auto detect)", -1, -1, 255)
-  , m_dendriteChannel("Tube Channel:")
-  , m_tubeThreshold("Tube Threshold", 100, 1, 255)
-  , m_ambiguousFactor("Ambiguous Factor", 1.0, 1., 2.)
-{
-  init();
-}
-#endif
-
 ZPunctaDetectionDialog::ZPunctaDetectionDialog(QWidget* parent)
-  : QDialog(parent)
+  : ZImgProcessDialog(parent)
   , m_useCurrentActiveImage("Use Current Active Image", false)
   , m_voxelSize("Voxel Size (um)", glm::dvec3(.0, .0, .0), glm::dvec3(.0, .0, .0),
                 glm::dvec3(1e6, 1e6, 1e6))
@@ -52,57 +32,33 @@ ZPunctaDetectionDialog::ZPunctaDetectionDialog(QWidget* parent)
   init();
 }
 
-void ZPunctaDetectionDialog::detect()
+void ZPunctaDetectionDialog::createWorker(ZImgProcess*& worker, QString& workerName)
 {
   focusNextChild();
   ZImgInfo imgInfo;
-#ifdef _NEUTUBE_
-  if (m_useCurrentActiveImage.get() && m_doc && m_doc->hasStackData()) {
-    img = wrapZStackAsZImg(*m_doc->stack());
-  } else if (!m_useCurrentActiveImage.get() && QFile::exists(m_inputImageFileWidget->getSelectedOpenFile())) {
-#endif
-  if (!m_useCurrentActiveImage.get() && QFile::exists(m_inputImageFileWidget->getSelectedOpenFile())) {
-    try {
-      imgInfo = ZImg::readImgInfo(m_inputImageFileWidget->getSelectedOpenFile()).at(0);
-#ifndef _NEUTUBE_
 
-#else
-      ZStack* stack = imgToZStack(img);
-      stack->setSource(QFile::encodeName(m_inputImageFileWidget->getSelectedOpenFile()).constData());
-      emit stackDocDelivered(stack);
-      img = wrapZStackAsZImg(*stack);
-#endif
-    }
-    catch (const ZException& e) {
-      QMessageBox::critical(this, qApp->applicationName(), "Read Image Info Error.\n" + e.what());
-      return;
-    }
+  if (!m_useCurrentActiveImage.get() && QFile::exists(m_inputImageFileWidget->getSelectedOpenFile())) {
+    imgInfo = ZImg::readImgInfo(m_inputImageFileWidget->getSelectedOpenFile()).at(0);
   } else {
-    QMessageBox::critical(this, qApp->applicationName(), "No Image to detect.");
-    return;
+    throw ZImgException(QString("No Image to detect."));
   }
   if (imgInfo.numTimes != 1) {
-    QMessageBox::critical(this, qApp->applicationName(), "Can not detect puncta from time sequence image.");
-    return;
+    throw ZImgException(QString("Can not detect puncta from time sequence image."));
   }
   if (m_outputPunctaFileWidget->getSelectedSaveFile().isEmpty()) {
-    QMessageBox::critical(this, qApp->applicationName(), "Result puncta file must be specified.");
-    return;
+    throw ZImgException(QString("Result puncta file must be specified."));
   }
   if (m_outputLogFileWidget->getSelectedSaveFile().isEmpty()) {
-    QMessageBox::critical(this, qApp->applicationName(), "Detection log file must be specified.");
-    return;
+    throw ZImgException(QString("Detection log file must be specified."));
   }
   int punctaChannel = m_punctaChannel.get() - 1;
   int dendriteChannel = m_dendriteChannel.associatedData() - 1;
   if (punctaChannel == dendriteChannel) {
-    QMessageBox::critical(this, qApp->applicationName(), "Puncta and tube channels are not correct.");
-    return;
+    throw ZImgException(QString("Puncta and dendrite channels are not correct."));
   }
   if (dendriteChannel >= 0) {
     if (m_voxelSize.get().x == 0.0 || m_voxelSize.get().y == 0.0 || m_voxelSize.get().z == 0.0) {
-      QMessageBox::critical(this, qApp->applicationName(), "Image Resolution is not correct.");
-      return;
+      throw ZImgException(QString("Image Resolution is not correct."));
     }
     imgInfo.voxelSizeUnit = VoxelSizeUnit::um;
     imgInfo.voxelSizeX = m_voxelSize.get().x;
@@ -112,129 +68,32 @@ void ZPunctaDetectionDialog::detect()
 
   QStringList swcFiles = m_inputSwcFilesWidget->getSelectedMultipleOpenFiles();
   std::vector<ZSwc> swcTrees(swcFiles.size());
-  try {
-    for (int i = 0; i < swcFiles.size(); ++i) {
-      swcTrees[i] = ZSwc(swcFiles.at(i));
-    }
-  }
-  catch (const ZException& e) {
-    QMessageBox::critical(this, qApp->applicationName(), "Read Swc Error.\n" + e.what());
-    return;
+  for (int i = 0; i < swcFiles.size(); ++i) {
+    swcTrees[i] = ZSwc(swcFiles.at(i));
   }
 
-  m_isCanceled = false;
-  m_hasError = false;
+  auto workertmp = new ZPunctaDetection(m_inputImageFileWidget->getSelectedOpenFile(), imgInfo, punctaChannel);
+  workertmp->setAmbiguousFactor(m_ambiguousFactor.get());
+  if (dendriteChannel >= 0)
+    workertmp->setDendriteChannel(dendriteChannel);
+  workertmp->setSwcTrees(swcTrees, swcFiles);
+  workertmp->setLogFile(m_outputLogFileWidget->getSelectedSaveFile());
+  workertmp->setResultPunctaFilename(m_outputPunctaFileWidget->getSelectedSaveFile());
+  if (dendriteChannel >= 0)
+    workertmp->setResultSomaPunctaFilename(m_outputSomaPunctaFileWidget->getSelectedSaveFile());
+  if (m_punctaThreshold.get() != -1)
+    workertmp->setPunctaThreshold(m_punctaThreshold.get());
+  if (dendriteChannel >= 0)
+    workertmp->setDendriteThreshold(m_tubeThreshold.get());
 
-  try {
-    auto worker = new ZPunctaDetection(m_inputImageFileWidget->getSelectedOpenFile(), imgInfo, punctaChannel);
-    worker->setAmbiguousFactor(m_ambiguousFactor.get());
-    if (dendriteChannel >= 0)
-      worker->setDendriteChannel(dendriteChannel);
-    worker->setSwcTrees(swcTrees, swcFiles);
-    worker->setCancelFlag(&m_isCanceled);
-    worker->setLogFile(m_outputLogFileWidget->getSelectedSaveFile());
-    worker->setResultPunctaFilename(m_outputPunctaFileWidget->getSelectedSaveFile());
-    if (dendriteChannel >= 0)
-      worker->setResultSomaPunctaFilename(m_outputSomaPunctaFileWidget->getSelectedSaveFile());
-    if (m_punctaThreshold.get() != -1)
-      worker->setPunctaThreshold(m_punctaThreshold.get());
-    if (dendriteChannel >= 0)
-      worker->setDendriteThreshold(m_tubeThreshold.get());
-
-    m_progressDialog = new QProgressDialog(this);
-    m_progressDialog->setLabelText("Detecting Puncta...");
-    m_progressDialog->setAutoReset(false);
-    m_progressDialog->setAttribute(Qt::WA_DeleteOnClose);
-    QObject::disconnect(m_progressDialog, &QProgressDialog::canceled, m_progressDialog, &QProgressDialog::cancel);
-    connect(worker, qOverload<int>(&ZPunctaDetection::progressChanged), m_progressDialog, &QProgressDialog::setValue);
-    connect(worker, &ZPunctaDetection::canceled, this, &ZPunctaDetectionDialog::processCanceled);
-    connect(worker, &ZPunctaDetection::processError, this, &ZPunctaDetectionDialog::processError);
-    connect(m_progressDialog, &QProgressDialog::canceled, this, &ZPunctaDetectionDialog::cancelButtonPressed);
-
-    auto thread = new QThread(this);
-    connect(thread, &QThread::started, worker, &ZPunctaDetection::run);
-    connect(worker, &ZPunctaDetection::canceled, thread, &QThread::quit);
-    connect(worker, &ZPunctaDetection::finished, thread, &QThread::quit);
-    connect(worker, &ZPunctaDetection::processError, thread, &QThread::quit);
-    connect(thread, &QThread::finished, worker, &ZPunctaDetection::deleteLater);
-    connect(thread, &QThread::finished, m_progressDialog, &QProgressDialog::reset);
-    connect(thread, &QThread::finished, this, &ZPunctaDetectionDialog::processFinished);
-    connect(thread, &QThread::finished, thread, &QThread::deleteLater);
-    worker->moveToThread(thread);
-
-    thread->start();
-    m_progressDialog->exec();
-  }
-  catch (const ZException& e) {
-    QMessageBox::critical(this, qApp->applicationName(), "Puncta Detection Error.\n" + e.what());
-    return;
-  }
+  worker = workertmp;
+  workerName = "Puncta Detection";
 }
-
-void ZPunctaDetectionDialog::processCanceled()
-{
-  QMessageBox::critical(this, qApp->applicationName(),
-                        "Puncta Detection is canceled by user.");
-}
-
-void ZPunctaDetectionDialog::processFinished()
-{
-  if (!m_isCanceled && !m_hasError) {
-    QMessageBox::information(this, qApp->applicationName(),
-                             "Puncta Detection Finished.");
-  }
-}
-
-void ZPunctaDetectionDialog::processError(const QString& e)
-{
-  m_hasError = true;
-  QMessageBox::critical(this, qApp->applicationName(),
-                        QString("Error During Detection: %1").arg(e));
-}
-
-void ZPunctaDetectionDialog::cancelButtonPressed()
-{
-  m_progressDialog->setLabelText("Canceling...");
-  m_isCanceled = true;
-}
-
-//void ZPunctaDetectionDialog::reject()
-//{
-//  m_thread->wait();
-//  QDialog::reject();
-//}
-
-void ZPunctaDetectionDialog::keyPressEvent(QKeyEvent* e)
-{
-  switch (e->key()) {
-    case Qt::Key_Return:
-    case Qt::Key_Enter:
-      break;
-    default:
-      QDialog::keyPressEvent(e);
-  }
-}
-
-//void ZPunctaDetectionDialog::closeEvent(QCloseEvent *e)
-//{
-//  m_thread->wait();
-//  QDialog::closeEvent(e);
-//}
 
 void ZPunctaDetectionDialog::adjustInputImageWidget()
 {
   m_inputImageFileWidget->setVisible(!m_useCurrentActiveImage.get());
   if (m_useCurrentActiveImage.get()) {
-#ifdef _NEUTUBE_
-    ZResolution res = m_doc->stackResolution();
-    if (res.unit() == 'u') {
-      updateInterface(QString::fromStdString(m_doc->stackSourcePath()), m_doc->stackChannelNumber(),
-                      res.voxelSizeX(), res.voxelSizeY(), res.voxelSizeZ());
-    } else {
-      updateInterface(QString::fromStdString(m_doc->stackSourcePath()), m_doc->stackChannelNumber(),
-                      0, 0, 0);
-    }
-#endif
   } else {
     inputImageChanged();
   }
@@ -287,10 +146,7 @@ void ZPunctaDetectionDialog::detectLSMResolution()
 
 void ZPunctaDetectionDialog::dendriteChannelChanged()
 {
-  if (m_dendriteChannel.isSelected("None"))
-    m_tubeThreshold.setVisible(false);
-  else
-    m_tubeThreshold.setVisible(true);
+  m_tubeThreshold.setVisible(!m_dendriteChannel.isSelected("None"));
 }
 
 void ZPunctaDetectionDialog::updateInterface(const QString& fn, size_t numChannel, double vsx, double vsy, double vsz)
@@ -334,14 +190,6 @@ void ZPunctaDetectionDialog::init()
   createParaGroupBox();
   adjustInputImageWidget();
 
-  m_runButton = new QPushButton(tr("Detect"), this);
-  m_exitButton = new QPushButton(tr("Exit"), this);
-  m_buttonBox = new QDialogButtonBox(Qt::Horizontal, this);
-  m_buttonBox->addButton(m_exitButton, QDialogButtonBox::RejectRole);
-  m_buttonBox->addButton(m_runButton, QDialogButtonBox::ActionRole);
-  connect(m_exitButton, &QPushButton::clicked, this, &ZPunctaDetectionDialog::reject);
-  connect(m_runButton, &QPushButton::clicked, this, &ZPunctaDetectionDialog::detect);
-
   m_tubeThreshold.setVisible(false);
   connect(&m_dendriteChannel, &ZStringIntOptionParameter::valueChanged, this,
           &ZPunctaDetectionDialog::dendriteChannelChanged);
@@ -349,7 +197,7 @@ void ZPunctaDetectionDialog::init()
   auto mainLayout = new QVBoxLayout;
   mainLayout->addWidget(m_ioGroupBox);
   mainLayout->addWidget(m_paraGroupBox);
-  mainLayout->addWidget(m_buttonBox);
+  mainLayout->addWidget(createButtonBox("Detect"));
   setLayout(mainLayout);
 
   setWindowTitle(tr("Detect Puncta"));
@@ -361,17 +209,6 @@ void ZPunctaDetectionDialog::createIOGroupBox()
   // everything
   auto alllayout = new QVBoxLayout;
 
-#ifdef _NEUTUBE_
-  QHBoxLayout *hlayout;
-  if (m_doc) {
-    hlayout = new QHBoxLayout;
-    hlayout->addWidget(m_useCurrentActiveImage.createNameLabel(), 0, Qt::AlignLeft);
-    hlayout->addWidget(m_useCurrentActiveImage.createWidget(), 0, Qt::AlignLeft);
-    hlayout->addStretch(1);
-    alllayout->addLayout(hlayout);
-    connect(&m_useCurrentActiveImage, &ZBoolParameter::valueChanged, this, &ZPunctaDetectionDialog::adjustInputImageWidget);
-  }
-#endif
   QStringList filters;
   QList<FileFormat> formats;
   ZImg::getQtReadNameFilter(filters, formats);

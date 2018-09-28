@@ -666,7 +666,15 @@ set(SOURCES
     z3dvolumeraycasterrenderer.cpp
     z3dvolumeraycasterrenderer.h
     zopenglwidget.cpp
-    zopenglwidget.h zchromaticshiftcorrectiondialog.cpp zchromaticshiftcorrectiondialog.h zchromaticshiftcorrection.cpp zchromaticshiftcorrection.h zlogwidget.cpp zlogwidget.h)
+    zopenglwidget.h
+    zchromaticshiftcorrectiondialog.cpp
+    zchromaticshiftcorrectiondialog.h
+    zchromaticshiftcorrection.cpp
+    zchromaticshiftcorrection.h
+    zlogwidget.cpp
+    zlogwidget.h
+    zimgprocessdialog.cpp
+    zimgprocessdialog.h)
 
 # our target
 set(APP_NAME Atlas)

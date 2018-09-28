@@ -16,9 +16,8 @@
 
 namespace nim {
 
-ZChromaticShiftCorrection::ZChromaticShiftCorrection(const ZImg& img, ZImg& correctedImg)
+ZChromaticShiftCorrection::ZChromaticShiftCorrection(const ZImg& img)
   : m_img(img)
-  , m_correctedImg(correctedImg)
 {
 }
 
@@ -60,16 +59,16 @@ void ZChromaticShiftCorrection::doWork()
 
     IMG_TYPED_CALL(calcChannelInfs, m_img);
 
-    m_correctedImg = m_img;
     reportProgress(0.5);
     IMG_TYPED_CALL(alignChannel, m_img, m_referenceChannel, m_targetChannel);
+    emit resultReady(m_resultFilename);
     reportProgress(1.0);
   } else {
     IMG_TYPED_CALL(calcChannelInfs, m_img);
 
-    m_correctedImg = m_img;
     reportProgress(0.5);
     IMG_TYPED_CALL(alignChannelWithPresetTransform, m_img, m_targetChannel, m_method);
+    emit resultReady(m_resultFilename);
     reportProgress(1.0);
   }
 }
@@ -107,15 +106,19 @@ void ZChromaticShiftCorrection::alignChannelWithPresetTransform(int movingChanne
   transform->setImageInterpolation(ZImageInterpolation(Interpolant::Cubic, PadOption::Constant,
                                                        m_brightBackground ? m_channelInfos[movingChannel].max
                                                                           : m_channelInfos[movingChannel].min));
+
+  ZImg correctedImg = m_img;
   if (m_img.depth() > 1) {
     transform->transformImage(m_img.channelData<ImagePixelType>(movingChannel),
                               m_img.width(), m_img.height(), m_img.depth(),
-                              m_correctedImg.channelData<ImagePixelType>(movingChannel));
+                              correctedImg.channelData<ImagePixelType>(movingChannel));
   } else {
     transform->transformImage(m_img.channelData<ImagePixelType>(movingChannel),
                               m_img.width(), m_img.height(),
-                              m_correctedImg.channelData<ImagePixelType>(movingChannel));
+                              correctedImg.channelData<ImagePixelType>(movingChannel));
   }
+
+  correctedImg.save(m_resultFilename);
 }
 
 template<typename ImagePixelType>
@@ -128,8 +131,8 @@ void ZChromaticShiftCorrection::alignChannel(int fixedChannel, int movingChannel
   std::vector<double> fixedImageData(length);
   std::vector<double> movingImageData(length);
 
-  const ImagePixelType* fixedImageDataSrc = m_correctedImg.channelData<ImagePixelType>(fixedChannel);
-  const ImagePixelType* movingImageDataSrc = m_correctedImg.channelData<ImagePixelType>(movingChannel);
+  const ImagePixelType* fixedImageDataSrc = m_img.channelData<ImagePixelType>(fixedChannel);
+  const ImagePixelType* movingImageDataSrc = m_img.channelData<ImagePixelType>(movingChannel);
   double fixedMin = std::numeric_limits<double>::max();
   double fixedMax = std::numeric_limits<double>::lowest();
   double movingMin = fixedMin;
@@ -293,15 +296,19 @@ void ZChromaticShiftCorrection::alignChannel(int fixedChannel, int movingChannel
   transform->setImageInterpolation(ZImageInterpolation(Interpolant::Cubic, PadOption::Constant,
                                                        m_brightBackground ? m_channelInfos[movingChannel].max
                                                                           : m_channelInfos[movingChannel].min));
+
+  ZImg correctedImg = m_img;
   if (m_img.depth() > 1) {
     transform->transformImage(m_img.channelData<ImagePixelType>(movingChannel),
                               m_img.width(), m_img.height(), m_img.depth(),
-                              m_correctedImg.channelData<ImagePixelType>(movingChannel));
+                              correctedImg.channelData<ImagePixelType>(movingChannel));
   } else {
     transform->transformImage(m_img.channelData<ImagePixelType>(movingChannel),
                               m_img.width(), m_img.height(),
-                              m_correctedImg.channelData<ImagePixelType>(movingChannel));
+                              correctedImg.channelData<ImagePixelType>(movingChannel));
   }
+
+  correctedImg.save(m_resultFilename);
 }
 
 template<typename ImagePixelType>

@@ -14,8 +14,12 @@ class ZImageCompositeTransform;
 
 class ZChromaticShiftCorrection : public ZImgProcess
 {
+Q_OBJECT
 public:
-  ZChromaticShiftCorrection(const ZImg& img, ZImg& correctedImg);
+  explicit ZChromaticShiftCorrection(const ZImg& img);
+
+  void setResultFilename(const QString& str)
+  { m_resultFilename = str; }
 
   // use this channel to do registration
   void setReferenceChannel(int ch)
@@ -61,6 +65,9 @@ public:
   void setNumScales(int i)
   { m_numScales = i; }
 
+signals:
+  void resultReady(QString path);
+
 protected:
   void doWork() override;
 
@@ -85,8 +92,8 @@ private:
 
 private:
   const ZImg& m_img;
-  ZImg& m_correctedImg;
 
+  QString m_resultFilename;
   int m_referenceChannel = -1;
   int m_targetChannel = -1;
 

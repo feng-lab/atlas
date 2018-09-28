@@ -4,54 +4,24 @@
 #include "znumericparameter.h"
 #include "zselectfilewidget.h"
 #include "zoptionparameter.h"
-#include <QDialog>
+#include "zimgprocessdialog.h"
 #include <QGroupBox>
-#include <QDialogButtonBox>
-#include <QPushButton>
-#include <QProgressDialog>
 #include <QLabel>
 #include <memory>
 
-#ifdef _NEUTUBE_
-#include <zsharedpointer.h>
-#endif
-
-#ifdef _NEUTUBE_
-class ZStackDoc;
-class ZStack;
-#endif
-
 namespace nim {
 
-class ZSectionsRegistrationDialog : public QDialog
+class ZSectionsRegistrationDialog : public ZImgProcessDialog
 {
 Q_OBJECT
 public:
-#ifdef _NEUTUBE_
-  explicit ZSectionsRegistrationDialog(ZSharedPointer<ZStackDoc> doc, QWidget *parent = 0);
-#endif
-
   explicit ZSectionsRegistrationDialog(QWidget* parent = nullptr);
 
 signals:
-#ifdef _NEUTUBE_
-  void stackDocDelivered(ZStack* stack);
-#endif
-
   void resultReady(QString path);
 
 protected:
-  void registerSections();
-
-  void processCanceled();
-
-  void processFinished();
-
-  void processError(const QString& e);
-
-  void cancelButtonPressed();
-
-  void keyPressEvent(QKeyEvent* e) override;
+  void createWorker(ZImgProcess*& worker, QString& workerName) override;
 
 private:
   void adjustInputImageWidget();
@@ -65,15 +35,8 @@ private:
   void createParaGroupBox();
 
 private:
-#ifdef _NEUTUBE_
-  ZSharedPointer<ZStackDoc> m_doc;
-#endif
-
   QGroupBox* m_ioGroupBox;
   QGroupBox* m_paraGroupBox;
-  QPushButton* m_runButton;
-  QPushButton* m_exitButton;
-  QDialogButtonBox* m_buttonBox;
 
   ZBoolParameter m_useCurrentActiveImage;
   ZSelectFileWidget* m_inputImagesFileWidget;
@@ -93,13 +56,6 @@ private:
   ZStringIntOptionParameter m_metric;
   ZStringIntOptionParameter m_transform;
   ZStringIntOptionParameter m_optimizer;
-
-  std::atomic<bool> m_isCanceled;
-  bool m_hasError;
-
-  QProgressDialog* m_progressDialog;
-
-  ZImg m_registeredImg;
 };
 
 } // namespace nim

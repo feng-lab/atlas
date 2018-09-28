@@ -1,53 +1,26 @@
 #pragma once
 
+#include "zimgprocessdialog.h"
 #include "znumericparameter.h"
 #include "zselectfilewidget.h"
 #include "zoptionparameter.h"
-#include <QDialog>
 #include <QGroupBox>
-#include <QDialogButtonBox>
-#include <QPushButton>
-#include <QProgressDialog>
 #include <QLabel>
-#ifdef _NEUTUBE_
-class ZStackDoc;
-class ZStack;
-#endif
 
 namespace nim {
 
 class ZImg;
 
-class ZPunctaDetectionDialog : public QDialog
+class ZPunctaDetectionDialog : public ZImgProcessDialog
 {
 Q_OBJECT
 public:
-#ifdef _NEUTUBE_
-  explicit ZPunctaDetectionDialog(ZSharedPointer<ZStackDoc> doc, QWidget *parent = 0);
-#endif
-
   explicit ZPunctaDetectionDialog(QWidget* parent = nullptr);
 
 signals:
-#ifdef _NEUTUBE_
-  void stackDocDelivered(ZStack* stack);
-#endif
 
 protected:
-  void detect();
-
-  void processCanceled();
-
-  void processFinished();
-
-  void processError(const QString& e);
-
-  void cancelButtonPressed();
-
-  //void reject() override;
-
-  void keyPressEvent(QKeyEvent* e) override;
-  //void closeEvent(QCloseEvent *e) override;
+  void createWorker(ZImgProcess*& worker, QString& workerName) override;
 
 private:
   void adjustInputImageWidget();
@@ -67,15 +40,8 @@ private:
   void createParaGroupBox();
 
 private:
-#ifdef _NEUTUBE_
-  ZSharedPointer<ZStackDoc> m_doc;
-#endif
-
   QGroupBox* m_ioGroupBox;
   QGroupBox* m_paraGroupBox;
-  QPushButton* m_runButton;
-  QPushButton* m_exitButton;
-  QDialogButtonBox* m_buttonBox;
 
   ZBoolParameter m_useCurrentActiveImage;
   ZSelectFileWidget* m_inputImageFileWidget;
@@ -91,11 +57,6 @@ private:
   ZStringIntOptionParameter m_dendriteChannel;
   ZIntParameter m_tubeThreshold;
   ZDoubleParameter m_ambiguousFactor;
-
-  std::atomic<bool> m_isCanceled;
-  bool m_hasError;
-
-  QProgressDialog* m_progressDialog;
 };
 
 } // namespace nim

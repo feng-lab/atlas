@@ -4,17 +4,14 @@
 #include "znumericparameter.h"
 #include "zselectfilewidget.h"
 #include "zoptionparameter.h"
-#include <QDialog>
+#include "zimgprocessdialog.h"
 #include <QGroupBox>
-#include <QDialogButtonBox>
-#include <QPushButton>
-#include <QProgressDialog>
 #include <QLabel>
 #include <memory>
 
 namespace nim {
 
-class ZChromaticShiftCorrectionDialog : public QDialog
+class ZChromaticShiftCorrectionDialog : public ZImgProcessDialog
 {
 Q_OBJECT
 public:
@@ -24,17 +21,7 @@ signals:
   void resultReady(QString path);
 
 protected:
-  void correctShift();
-
-  void processCanceled();
-
-  void processFinished();
-
-  void processError(const QString& e);
-
-  void cancelButtonPressed();
-
-  void keyPressEvent(QKeyEvent* e) override;
+  void createWorker(ZImgProcess*& worker, QString& workerName) override;
 
 private:
   void adjustWidget();
@@ -55,9 +42,6 @@ private:
   QGroupBox* m_ioGroupBox;
   QGroupBox* m_paraGroupBox;
   QGroupBox* m_outputGroupBox;
-  QPushButton* m_runButton;
-  QPushButton* m_exitButton;
-  QDialogButtonBox* m_buttonBox;
 
   ZSelectFileWidget* m_inputImagesFileWidget;
   ZSelectFileWidget* m_outputStackWidget;
@@ -74,13 +58,6 @@ private:
   ZStringIntOptionParameter m_metric;
   ZStringIntOptionParameter m_transform;
   ZStringIntOptionParameter m_optimizer;
-
-  std::atomic<bool> m_isCanceled;
-  bool m_hasError;
-
-  QProgressDialog* m_progressDialog;
-
-  ZImg m_correctedImg;
 };
 
 } // namespace nim
