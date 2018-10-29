@@ -257,13 +257,18 @@ void Z3DTransformParameter::setValueSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
   const Z3DTransformParameter& src = static_cast<const Z3DTransformParameter&>(rhs);
-  m_receiveWidgetSignal = false;
-  m_scale.set(src.m_scale.get());
-  m_translation.set(src.m_translation.get());
-  m_rotation.set(src.m_rotation.get());
-  m_center.set(src.m_center.get());
-  m_receiveWidgetSignal = true;
-  updateMatrix();
+  if (m_scale.get() != src.m_scale.get() ||
+    m_translation.get() != src.m_translation.get() ||
+    m_rotation.get() != src.m_rotation.get() ||
+    m_center.get() != src.m_center.get()) {
+    m_receiveWidgetSignal = false;
+    m_scale.set(src.m_scale.get());
+    m_translation.set(src.m_translation.get());
+    m_rotation.set(src.m_rotation.get());
+    m_center.set(src.m_center.get());
+    m_receiveWidgetSignal = true;
+    updateMatrix();
+  }
 }
 
 void Z3DTransformParameter::interpolate(const ZParameter& prev, double progress, ZParameter& dest)

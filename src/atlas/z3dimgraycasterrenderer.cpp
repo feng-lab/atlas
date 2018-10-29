@@ -338,7 +338,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         float n = m_rendererBase.camera().nearDist();
         glm::vec2 pixelEyeSpaceSize = m_rendererBase.camera().frustumNearPlaneSize() / glm::vec2(m_layerTarget->size());
         float ze_to_screen_pixel_voxel_size =
-          -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio();
+          -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio() * 2;
 
         LOG(INFO) << "";
         ZBenchTimer bt("render and collect blockids");
@@ -491,7 +491,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       float ze_to_zw_a = f * n / (f - n);
       float ze_to_zw_b = 0.5f * (f + n) / (f - n) + 0.5f;
       float ze_to_screen_pixel_voxel_size =
-        -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio();
+        -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio() * 2.;
 
       LOG(INFO) << "";
       ZBenchTimer bt("render blockids");

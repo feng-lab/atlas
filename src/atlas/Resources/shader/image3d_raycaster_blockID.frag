@@ -70,7 +70,7 @@ void main()
     float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
 #endif
     int curLevel = 0;
-    
+
     uint missBlockIDs[8] = uint[8](0u,0u,0u,0u, 0u,0u,0u,0u);
     int missBlockIDsIndex = 0;
     uint usedBlockIDs[12] = uint[12](0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u);
