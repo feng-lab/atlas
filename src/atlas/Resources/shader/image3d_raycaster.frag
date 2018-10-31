@@ -94,9 +94,9 @@ void sampleBlock(in ivec3 pageTableEntry, in int curLevel, in ivec3 pageTableCoo
     //float voxel = texelFetch(image_cache, voxelAddress, 0).r;
     voxelAddress = pageTableEntry + voxelCoord % image_block_size + fFracVoxelCoord + 1.0;
 #if GLSL_VERSION >= 130
-    float voxel = texture(image_cache, (voxelAddress*2.0+1.0)*image_address_to_normalized_texture_coord).r;
+    float voxel = texture(image_cache, (voxelAddress)*image_address_to_normalized_texture_coord).r;
 #else
-    float voxel = texture3D(image_cache, (voxelAddress*2.0+1.0)*image_address_to_normalized_texture_coord).r;
+    float voxel = texture3D(image_cache, (voxelAddress)*image_address_to_normalized_texture_coord).r;
 #endif
 
 #ifdef MIP
@@ -192,7 +192,7 @@ void main()
 
     vec3 samplePos = startRayPosition;
 
-    //for (int loop0=0; !finished && loop0<255; loop0++) {
+    for (int loop0=0; !finished && loop0<255; loop0++) {
       for (int loop1=0; !finished && loop1<255; loop1++) {
         float desiredVoxelSize = mix(zeFront, zeBack, currentRayLength) * ze_to_screen_pixel_voxel_size;
         while (curLevel+1 < LEVEL_COUNT && voxel_world_sizes[curLevel+1] <= desiredVoxelSize) {
@@ -278,7 +278,7 @@ void main()
 
         finished = finished || (currentRayLength > 1.0);
       } // for
-    //}
+    }
 
 #ifdef MIP
 #if GLSL_VERSION >= 130

@@ -33,9 +33,12 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
                         GL_FLOAT)
   , m_missBlocksTexture1(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
   , m_missBlocksTexture2(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
+  , m_missBlocksTexture3(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
+  , m_missBlocksTexture4(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
   , m_usedBlocksTexture1(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
   , m_usedBlocksTexture2(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
   , m_usedBlocksTexture3(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
+  , m_usedBlocksTexture4(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
   , m_blockIDsRenderTarget(glm::uvec2(32, 32))
   , m_outport("Image", this)
   , m_leftEyeOutport("LeftEyeImage", this)
@@ -103,19 +106,28 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
 
   m_missBlocksTexture1.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   m_missBlocksTexture2.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+  m_missBlocksTexture3.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+  m_missBlocksTexture4.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   m_usedBlocksTexture1.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   m_usedBlocksTexture2.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   m_usedBlocksTexture3.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+  m_usedBlocksTexture4.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   m_missBlocksTexture1.uploadImage();
   m_missBlocksTexture2.uploadImage();
+  m_missBlocksTexture3.uploadImage();
+  m_missBlocksTexture4.uploadImage();
   m_usedBlocksTexture1.uploadImage();
   m_usedBlocksTexture2.uploadImage();
   m_usedBlocksTexture3.uploadImage();
+  m_usedBlocksTexture4.uploadImage();
   m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture1, GL_COLOR_ATTACHMENT0, false);
   m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture2, GL_COLOR_ATTACHMENT1, false);
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_usedBlocksTexture1, GL_COLOR_ATTACHMENT2, false);
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_usedBlocksTexture2, GL_COLOR_ATTACHMENT3, false);
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_usedBlocksTexture3, GL_COLOR_ATTACHMENT4, false);
+  m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture3, GL_COLOR_ATTACHMENT2, false);
+  m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture4, GL_COLOR_ATTACHMENT3, false);
+  m_blockIDsRenderTarget.attachTextureToFBO(&m_usedBlocksTexture1, GL_COLOR_ATTACHMENT4, false);
+  m_blockIDsRenderTarget.attachTextureToFBO(&m_usedBlocksTexture2, GL_COLOR_ATTACHMENT5, false);
+  m_blockIDsRenderTarget.attachTextureToFBO(&m_usedBlocksTexture3, GL_COLOR_ATTACHMENT6, false);
+  m_blockIDsRenderTarget.attachTextureToFBO(&m_usedBlocksTexture4, GL_COLOR_ATTACHMENT7, false);
   m_blockIDsRenderTarget.isFBOComplete();
 
   // ports
@@ -846,8 +858,9 @@ void Z3DImgFilter::updateBlockIDTarget()
 {
   if (m_3dImg && m_3dImg->isVolumeDownsampled()) {
     glm::uvec2 size = m_layerTarget.size();
-    uint32_t sizeScale =
-      std::min(std::min(Z3DImg::imageBlockSize().x, Z3DImg::imageBlockSize().y), Z3DImg::imageBlockSize().z) / 6;
+//    uint32_t sizeScale =
+//      std::min(std::min(Z3DImg::imageBlockSize().x, Z3DImg::imageBlockSize().y), Z3DImg::imageBlockSize().z) / 10;
+    uint32_t sizeScale = 1;
     size.x = (size.x + sizeScale - 1) / sizeScale;
     size.y = (size.y + sizeScale - 1) / sizeScale;
     m_blockIDsRenderTarget.resize(size);

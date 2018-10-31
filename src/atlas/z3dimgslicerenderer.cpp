@@ -139,7 +139,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
     float n = m_rendererBase.camera().nearDist();
     glm::vec2 pixelEyeSpaceSize = m_rendererBase.camera().frustumNearPlaneSize() / glm::vec2(m_layerTarget->size());
     float ze_to_screen_pixel_voxel_size =
-      -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio() * 2;
+      -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio();
 
     LOG(INFO) << "";
     ZBenchTimer bt("render and collect blockids");

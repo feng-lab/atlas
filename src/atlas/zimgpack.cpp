@@ -617,8 +617,9 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
 void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_t sy, int64_t sz, size_t sc, size_t t,
                                ZImg& res) const
 {
+  CHECK(xyRatio >= 1_usize && zRatio >= 1_usize);
   size_t readRatio = readRatioOf(xyRatio);
-  if (readRatio == xyRatio) {
+  if (readRatio == xyRatio && zRatio == 1_usize) {
     TileBoxType queryBox(TileCornerType(sx * static_cast<int64_t>(xyRatio),
                                         sy * static_cast<int64_t>(xyRatio)),
                          TileCornerType((sx + static_cast<int64_t>(res.width())) * static_cast<int64_t>(xyRatio) - 1,
@@ -706,9 +707,13 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
     ZImgInfo info = res.info();
     info.width = std::round(info.width * xyRatio * 1.0 / readRatio);
     info.height = std::round(info.height * xyRatio * 1.0 / readRatio);
+    info.depth = info.depth * zRatio;
     ZImg tmp(info);
-    readRegionToImg(readRatio, zRatio, std::round(sx * xyRatio * 1.0 / readRatio),
-                    std::round(sy * xyRatio * 1.0 / readRatio), sz, sc, t, tmp);
+    readRegionToImg(readRatio, 1,
+                    std::round(sx * xyRatio * 1.0 / readRatio),
+                    std::round(sy * xyRatio * 1.0 / readRatio),
+                    sz * zRatio,
+                    sc, t, tmp);
     res = tmp.resized(res.width(), res.height(), res.depth());
   }
 }

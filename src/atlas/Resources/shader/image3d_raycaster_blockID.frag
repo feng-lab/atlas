@@ -27,18 +27,27 @@ layout(location = 1) out uvec4 FragData1;
 layout(location = 2) out uvec4 FragData2;
 layout(location = 3) out uvec4 FragData3;
 layout(location = 4) out uvec4 FragData4;
+layout(location = 5) out uvec4 FragData5;
+layout(location = 6) out uvec4 FragData6;
+layout(location = 7) out uvec4 FragData7;
 #elif GLSL_VERSION >= 130
 out uvec4 FragData0;  // call glBindFragDataLocation before linking
 out uvec4 FragData1;  // call glBindFragDataLocation before linking
 out uvec4 FragData2;  // call glBindFragDataLocation before linking
 out uvec4 FragData3;  // call glBindFragDataLocation before linking
 out uvec4 FragData4;  // call glBindFragDataLocation before linking
+out uvec4 FragData5;  // call glBindFragDataLocation before linking
+out uvec4 FragData6;  // call glBindFragDataLocation before linking
+out uvec4 FragData7;  // call glBindFragDataLocation before linking
 #else
 varying out uvec4 FragData0;  // call glBindFragDataLocationForce before linking
 varying out uvec4 FragData1;  // call glBindFragDataLocationForce before linking
 varying out uvec4 FragData2;  // call glBindFragDataLocationForce before linking
 varying out uvec4 FragData3;  // call glBindFragDataLocationForce before linking
 varying out uvec4 FragData4;  // call glBindFragDataLocationForce before linking
+varying out uvec4 FragData5;  // call glBindFragDataLocationForce before linking
+varying out uvec4 FragData6;  // call glBindFragDataLocationForce before linking
+varying out uvec4 FragData7;  // call glBindFragDataLocationForce before linking
 #endif
 
 #define UNMAPPED 0
@@ -71,9 +80,9 @@ void main()
 #endif
     int curLevel = 0;
 
-    uint missBlockIDs[8] = uint[8](0u,0u,0u,0u, 0u,0u,0u,0u);
+    uint missBlockIDs[16] = uint[16](0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u);
     int missBlockIDsIndex = 0;
-    uint usedBlockIDs[12] = uint[12](0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u);
+    uint usedBlockIDs[16] = uint[16](0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u);
     int usedBlockIDsIndex = 0;
 
     vec3 rayVector = exitRayPosition - startRayPosition;
@@ -123,7 +132,7 @@ void main()
           pagingFlag = pageTableEntry.w;
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
             // save used blockid
-            if (usedBlockIDsIndex < 12) {
+            if (usedBlockIDsIndex < 16) {
               uint blockID = pos_to_block_ids[curLevel].w + uint(pageTableCoord.x) + pos_to_block_ids[curLevel].y * uint(pageTableCoord.y) + pos_to_block_ids[curLevel].z * uint(pageTableCoord.z);
               usedBlockIDs[usedBlockIDsIndex++] = blockID;
             }
@@ -182,10 +191,10 @@ void main()
         }
 
         // save missed blockid
-        if (pagingFlag == UNMAPPED && missBlockIDsIndex < 8) {
+        if (pagingFlag == UNMAPPED && missBlockIDsIndex < 16) {
           uint blockID = pos_to_block_ids[curLevel].w + uint(pageTableCoord.x) + pos_to_block_ids[curLevel].y * uint(pageTableCoord.y) + pos_to_block_ids[curLevel].z * uint(pageTableCoord.z);
           missBlockIDs[missBlockIDsIndex++] = blockID;
-          finished = missBlockIDsIndex == 8;
+          finished = missBlockIDsIndex == 16;
         }
 
         finished = finished || (currentRayLength > 1.0);
@@ -194,9 +203,12 @@ void main()
 
     FragData0 = uvec4(missBlockIDs[0], missBlockIDs[1], missBlockIDs[2], missBlockIDs[3]);
     FragData1 = uvec4(missBlockIDs[4], missBlockIDs[5], missBlockIDs[6], missBlockIDs[7]);
-    FragData2 = uvec4(usedBlockIDs[0], usedBlockIDs[1], usedBlockIDs[2], usedBlockIDs[3]);
-    FragData3 = uvec4(usedBlockIDs[4], usedBlockIDs[5], usedBlockIDs[6], usedBlockIDs[7]);
-    FragData4 = uvec4(usedBlockIDs[8], usedBlockIDs[9], usedBlockIDs[10], usedBlockIDs[11]);
+    FragData2 = uvec4(missBlockIDs[8], missBlockIDs[9], missBlockIDs[10], missBlockIDs[11]);
+    FragData3 = uvec4(missBlockIDs[12], missBlockIDs[13], missBlockIDs[14], missBlockIDs[15]);
+    FragData4 = uvec4(usedBlockIDs[0], usedBlockIDs[1], usedBlockIDs[2], usedBlockIDs[3]);
+    FragData5 = uvec4(usedBlockIDs[4], usedBlockIDs[5], usedBlockIDs[6], usedBlockIDs[7]);
+    FragData6 = uvec4(usedBlockIDs[8], usedBlockIDs[9], usedBlockIDs[10], usedBlockIDs[11]);
+    FragData7 = uvec4(usedBlockIDs[12], usedBlockIDs[13], usedBlockIDs[14], usedBlockIDs[15]);
   }
 }
 

@@ -79,6 +79,9 @@ Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase& rendererBase)
   m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(2, "FragData2");
   m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(3, "FragData3");
   m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(4, "FragData4");
+  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(5, "FragData5");
+  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(6, "FragData6");
+  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(7, "FragData7");
   m_image3DRaycasterBlockIDsShader.loadFromSourceFile("pass.vert", "image3d_raycaster_blockID.frag",
                                                       m_rendererBase.generateHeader() + generateHeader());
   m_image3DRaycasterShader.bindFragDataLocation(0, "FragData0");
@@ -338,7 +341,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         float n = m_rendererBase.camera().nearDist();
         glm::vec2 pixelEyeSpaceSize = m_rendererBase.camera().frustumNearPlaneSize() / glm::vec2(m_layerTarget->size());
         float ze_to_screen_pixel_voxel_size =
-          -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio() * 2;
+          -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio();
 
         LOG(INFO) << "";
         ZBenchTimer bt("render and collect blockids");
@@ -491,7 +494,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       float ze_to_zw_a = f * n / (f - n);
       float ze_to_zw_b = 0.5f * (f + n) / (f - n) + 0.5f;
       float ze_to_screen_pixel_voxel_size =
-        -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio() * 2.;
+        -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio();
 
       LOG(INFO) << "";
       ZBenchTimer bt("render blockids");
@@ -514,10 +517,13 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
                                       GL_COLOR_ATTACHMENT1,
                                       GL_COLOR_ATTACHMENT2,
                                       GL_COLOR_ATTACHMENT3,
-                                      GL_COLOR_ATTACHMENT4
+                                      GL_COLOR_ATTACHMENT4,
+                                      GL_COLOR_ATTACHMENT5,
+                                      GL_COLOR_ATTACHMENT6,
+                                      GL_COLOR_ATTACHMENT7,
       };
       m_blockIDsRenderTarget->bind();
-      glDrawBuffers(5, g_drawBuffers);
+      glDrawBuffers(8, g_drawBuffers);
       glClear(GL_COLOR_BUFFER_BIT);
 
       m_img->bindFullResBlockIDsShader(m_image3DRaycasterBlockIDsShader);
@@ -581,31 +587,58 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           ccSet.insert(range.begin(), range.end()); // inserts a sequence
         }
       );
+      m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT2)->downloadTextureToBuffer(GL_RGBA_INTEGER,
+                                                                                        GL_UNSIGNED_INT,
+                                                                                        m_blockIDs.data());
+      tbb::parallel_for(
+        tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
+        [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
+          ccSet.insert(range.begin(), range.end()); // inserts a sequence
+        }
+      );
+      m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT3)->downloadTextureToBuffer(GL_RGBA_INTEGER,
+                                                                                        GL_UNSIGNED_INT,
+                                                                                        m_blockIDs.data());
+      tbb::parallel_for(
+        tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
+        [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
+          ccSet.insert(range.begin(), range.end()); // inserts a sequence
+        }
+      );
       ccSet.unsafe_erase(0_u32);
 
       if (!ccSet.empty()) {
         missingBlockIDs.insert(ccSet.begin(), ccSet.end());
         ccSet.clear();
 
-        m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT2)->downloadTextureToBuffer(GL_RGBA_INTEGER,
-                                                                                          GL_UNSIGNED_INT,
-                                                                                          m_blockIDs.data());
-        tbb::parallel_for(
-          tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-          [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-            ccSet.insert(range.begin(), range.end()); // inserts a sequence
-          }
-        );
-        m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT3)->downloadTextureToBuffer(GL_RGBA_INTEGER,
-                                                                                          GL_UNSIGNED_INT,
-                                                                                          m_blockIDs.data());
-        tbb::parallel_for(
-          tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-          [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-            ccSet.insert(range.begin(), range.end()); // inserts a sequence
-          }
-        );
         m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT4)->downloadTextureToBuffer(GL_RGBA_INTEGER,
+                                                                                          GL_UNSIGNED_INT,
+                                                                                          m_blockIDs.data());
+        tbb::parallel_for(
+          tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
+          [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
+            ccSet.insert(range.begin(), range.end()); // inserts a sequence
+          }
+        );
+        m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT5)->downloadTextureToBuffer(GL_RGBA_INTEGER,
+                                                                                          GL_UNSIGNED_INT,
+                                                                                          m_blockIDs.data());
+        tbb::parallel_for(
+          tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
+          [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
+            ccSet.insert(range.begin(), range.end()); // inserts a sequence
+          }
+        );
+        m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT6)->downloadTextureToBuffer(GL_RGBA_INTEGER,
+                                                                                          GL_UNSIGNED_INT,
+                                                                                          m_blockIDs.data());
+        tbb::parallel_for(
+          tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
+          [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
+            ccSet.insert(range.begin(), range.end()); // inserts a sequence
+          }
+        );
+        m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT7)->downloadTextureToBuffer(GL_RGBA_INTEGER,
                                                                                           GL_UNSIGNED_INT,
                                                                                           m_blockIDs.data());
         tbb::parallel_for(

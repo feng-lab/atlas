@@ -117,9 +117,12 @@ private:
   Z3DTexture m_layerDepthTexture;
   Z3DTexture m_missBlocksTexture1;
   Z3DTexture m_missBlocksTexture2;
+  Z3DTexture m_missBlocksTexture3;
+  Z3DTexture m_missBlocksTexture4;
   Z3DTexture m_usedBlocksTexture1;
   Z3DTexture m_usedBlocksTexture2;
   Z3DTexture m_usedBlocksTexture3;
+  Z3DTexture m_usedBlocksTexture4;
   Z3DRenderTarget m_blockIDsRenderTarget;
 
   Z3DRenderOutputPort m_outport;

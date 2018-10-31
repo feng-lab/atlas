@@ -50,7 +50,7 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent)
     m_imageBlockSize = imageBlockSize();
     m_imageBlockReadSize = glm::ivec3(510, 510, 30);
     if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 4096) {
-      m_imageCacheNumBlocks = glm::uvec3(32, 32, 32); // 1G
+      m_imageCacheNumBlocks = glm::uvec3(64, 32, 32); // 1G
       m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 2); // 256*256*64*4*4   64MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 2048) {
       m_imageCacheNumBlocks = glm::uvec3(32, 32, 16);
@@ -321,7 +321,7 @@ void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader) const
   shader.setUniformArray("voxel_world_sizes", m_voxelWorldSizes.data(), m_numLevels);
   shader.setUniform("image_block_size", glm::ivec3(m_imageBlockSize));
   shader.setUniform("image_address_to_normalized_texture_coord",
-                    1.f / glm::vec3(m_imageCacheTextures[0]->dimension() * 2_u32));
+                    1.f / glm::vec3(m_imageCacheTextures[0]->dimension() - 1_u32));
 }
 
 void Z3DImg::bindImageCacheToFullResRenderShader(Z3DShaderProgram& shader, size_t c) const
@@ -333,6 +333,10 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missin
                                                 const std::set<uint32_t>& usedBlockIDs)
 {
   int numBlocksToRead = int(m_imageCacheManager->size()) - int(usedBlockIDs.size());
+  LOG(INFO) << "total " << m_imageCacheManager->size()
+            << " reuse " << usedBlockIDs.size()
+            << " missing " << missingBlockIDs.size()
+            << " will upload " << std::min<int>(missingBlockIDs.size(), numBlocksToRead);
   if (missingBlockIDs.empty() || numBlocksToRead <= 0)
     return false;
 
