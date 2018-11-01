@@ -344,8 +344,12 @@ def build_folly(src_dir: str, install_dir: str):
         orig_file = os.path.join(install_dir, 'folly', 'ScopeGuard.h')
         patch_file(orig_file,
                    from_texts=[r'#include <folly/Portability.h>',
+                               r'#include <folly/Utility.h>',
+                               r'= exchange(',
                                r'static void warnAboutToCrash() noexcept;'],
                    to_texts=[r'#include <folly/CPortability.h>',
+                             r'#include <utility>',
+                             r'= std::exchange(',
                              r'inline static void warnAboutToCrash() noexcept {}'])
     finally:
         print('')

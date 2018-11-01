@@ -359,6 +359,9 @@
 /* Support ZSTD compression */
 /* #undef ZSTD_SUPPORT */
 
+/* Support WEBP compression */
+/* #undef WEBP_SUPPORT */
+
 /* Name of package */
 #define PACKAGE "LibTIFF Software"
 

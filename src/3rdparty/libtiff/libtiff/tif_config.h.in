@@ -71,6 +71,9 @@
 /* Define to 1 if you have the `lfind' function. */
 #undef HAVE_LFIND
 
+/* Define to 1 if you have the <memory.h> header file. */
+#undef HAVE_MEMORY_H
+
 /* Define to 1 if you have the `mmap' function. */
 #undef HAVE_MMAP
 
@@ -331,6 +334,9 @@
 
 /* Support zstd compression */
 #undef ZSTD_SUPPORT
+
+/* Support webp compression */
+#undef WEBP_SUPPORT
 
 /* Enable large inode numbers on Mac OS X 10.5.  */
 #ifndef _DARWIN_USE_64_BIT_INODE
