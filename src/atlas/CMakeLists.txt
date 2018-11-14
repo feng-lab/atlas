@@ -674,7 +674,7 @@ set(SOURCES
     zlogwidget.cpp
     zlogwidget.h
     zimgprocessdialog.cpp
-    zimgprocessdialog.h)
+    zimgprocessdialog.h zstitchimage.cpp zstitchimage.h)
 
 # our target
 set(APP_NAME Atlas)

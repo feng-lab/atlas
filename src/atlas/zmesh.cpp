@@ -1177,8 +1177,16 @@ ZMesh ZMesh::merge(const std::vector<ZMesh>& meshes)
   return vtkPolyDataToMesh(cleanFilter->GetOutput());
 }
 
-void ZMesh::createSwcMesh(const ZSwc& tree, double zScale, int rootType, ZMesh& rootMesh, ZMesh& branchMesh)
+void ZMesh::createSwcMesh(const ZSwc& tree, int rootType, ZMesh& rootMesh, ZMesh& somaMesh, ZMesh& branchMesh,
+                          const glm::mat4& intfmat)
 {
+  rootMesh.clear();
+  somaMesh.clear();
+  branchMesh.clear();
+  if (tree.empty()) {
+    return;
+  }
+
   using SwcTreeNode = ZSwc::ConstIterator;
   std::map<SwcTreeNode, size_t> nodeToBranchId;
   std::vector<std::vector<SwcTreeNode>> allBranches;
@@ -1188,6 +1196,10 @@ void ZMesh::createSwcMesh(const ZSwc& tree, double zScale, int rootType, ZMesh& 
   std::vector<SwcTreeNode> rootNodes;
 
   size_t label = 0;
+
+  glm::mat4 tfmat = intfmat;
+  float zscale = tfmat[2][2];
+  tfmat[2][2] = 1.f;
 
   for (SwcTreeNode tn = tree.begin(); tn != tree.end(); ++tn) {
     if (tn->type == rootType) {
@@ -1245,17 +1257,19 @@ void ZMesh::createSwcMesh(const ZSwc& tree, double zScale, int rootType, ZMesh& 
     }
   }
 
+  SwcTreeNode rootnode = rootNodes[0];
+  rootMesh = createSphereMesh(glm::vec3(rootnode->x, rootnode->y, rootnode->z * zscale), rootnode->radius);
+
   std::vector<ZMesh> meshes;
   for (auto node : rootNodes) {
-    meshes.push_back(createSphereMesh(glm::vec3(node->x, node->y, node->z * zScale), node->radius));
+    meshes.push_back(createSphereMesh(glm::vec3(node->x, node->y, node->z * zscale), node->radius));
   }
-  if (meshes.empty()) {
-    rootMesh.clear();
-  } else {
-    rootMesh = meshes[0];
-    for (size_t i = 1; i < meshes.size(); ++i) {
-      rootMesh = unite(rootMesh, meshes[i]);
-    }
+  if (!meshes.empty()) {
+//    somaMesh = meshes[0];
+//    for (size_t i = 1; i < meshes.size(); ++i) {
+//      somaMesh = unite(somaMesh, meshes[i]);
+//    }
+    somaMesh = merge(meshes);
   }
 
   meshes.clear();
@@ -1263,7 +1277,7 @@ void ZMesh::createSwcMesh(const ZSwc& tree, double zScale, int rootType, ZMesh& 
     std::vector<glm::vec3> line(branch.size());
     std::vector<float> radius(branch.size());
     for (size_t i = 0; i < branch.size(); ++i) {
-      line[i] = glm::vec3(branch[i]->x, branch[i]->y, branch[i]->z * zScale);
+      line[i] = glm::vec3(branch[i]->x, branch[i]->y, branch[i]->z * zscale);
       radius[i] = branch[i]->radius;
     }
     meshes.push_back(createTubeMesh(line, radius));
@@ -1272,7 +1286,13 @@ void ZMesh::createSwcMesh(const ZSwc& tree, double zScale, int rootType, ZMesh& 
 //    }
 //    LOG(INFO) << branch[0]->type;
   }
-  branchMesh = merge(meshes);
+  if (!meshes.empty()) {
+    branchMesh = merge(meshes);
+  }
+
+  rootMesh.transformVerticesByMatrix(tfmat);
+  somaMesh.transformVerticesByMatrix(tfmat);
+  branchMesh.transformVerticesByMatrix(tfmat);
 
 //  ZMesh res = meshes[0];
 //  ZMeshProperties prop = res.properties();
@@ -1293,18 +1313,24 @@ void ZMesh::createSwcMesh(const ZSwc& tree, double zScale, int rootType, ZMesh& 
 //  return res;
 }
 
-void ZMesh::createPunctaMesh(const ZPuncta& puncta, double zScale, ZMesh& punctaMesh, int resolution)
+void ZMesh::createPunctaMesh(const ZPuncta& puncta, ZMesh& punctaMesh, int resolution, const glm::mat4& intfmat)
 {
+  glm::mat4 tfmat = intfmat;
+  float zscale = tfmat[2][2];
+  tfmat[2][2] = 1.f;
+
   resolution = std::max(resolution, 4);
   std::vector<ZMesh> meshes;
   for (auto p : puncta) {
-    meshes.push_back(createSphereMesh(glm::vec3(p.x(), p.y(), p.z() * zScale), p.radius(), resolution, resolution));
+    meshes.push_back(createSphereMesh(glm::vec3(p.x(), p.y(), p.z() * zscale), p.radius(), resolution, resolution));
   }
   if (meshes.empty()) {
     punctaMesh.clear();
   } else {
     punctaMesh = merge(meshes);
   }
+
+  punctaMesh.transformVerticesByMatrix(tfmat);
 }
 
 void ZMesh::appendTriangle(const ZMesh& mesh, const glm::uvec3& triangle)

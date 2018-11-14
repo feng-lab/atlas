@@ -49,6 +49,8 @@ public:
     return std::shared_ptr<ZWidgetsGroup>();
   }
 
+  const std::map<size_t, std::unique_ptr<FilterType>>& idToFilter() { return m_idToFilter; }
+
 protected:
   void updateBoundBox() override
   {

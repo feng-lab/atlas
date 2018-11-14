@@ -8,6 +8,8 @@ namespace nim {
 
 void modifyJsonValue(QJsonObject& obj, const QString& path, const QJsonValue& newValue);
 
+void modifyJsonValue(QJsonArray& array, const QString& path, const QJsonValue& newValue);
+
 void modifyJsonValue(QJsonDocument& doc, const QString& path, const QJsonValue& newValue);
 
 void removeJsonValue(QJsonObject& obj, const QString& path);

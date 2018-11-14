@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zstitchimage.h"
 #include <QDialog>
 #include <QList>
 #include <vector>
@@ -50,16 +51,6 @@ namespace nim {
 class ZImg;
 
 class ZLogWidget;
-
-class ZTile
-{
-public:
-  ZTile(int index_, QPoint topleft, QPoint bottomright);
-
-  bool bIsSelected;
-  int index;
-  QRect region;
-};
 
 class ZTileImageWidget : public QWidget
 {

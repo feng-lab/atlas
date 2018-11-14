@@ -265,8 +265,20 @@ void ZMeshIO::save(const ZMesh& mesh, const QString& filename, std::string forma
   try {
     if (format.empty()) {
       for (int i = 0; i < m_writeExts.size(); ++i) {
-        if (filename.endsWith(QString(".%1").arg(m_writeExts[i]), Qt::CaseInsensitive))
+        if (filename.endsWith(QString(".%1").arg(m_writeExts[i]), Qt::CaseInsensitive) &&
+            (m_writeFilters[i].contains("binary", Qt::CaseInsensitive) ||
+             m_writeFilters[i].contains("without", Qt::CaseInsensitive))) {
           format = m_writeFormats[i];
+          break;
+        }
+      }
+      if (format.empty()) {
+        for (int i = 0; i < m_writeExts.size(); ++i) {
+          if (filename.endsWith(QString(".%1").arg(m_writeExts[i]), Qt::CaseInsensitive)) {
+            format = m_writeFormats[i];
+            break;
+          }
+        }
       }
     }
     CHECK(m_writeFormats.contains(format));

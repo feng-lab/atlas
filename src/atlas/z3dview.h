@@ -94,6 +94,8 @@ public:
 
   bool takeScreenShot(const QString& filename, Z3DScreenShotType sst);
 
+  QList<Z3DObjView*> objViews() { return m_3dObjViews; }
+
 signals:
 
   void objViewReady(size_t id);

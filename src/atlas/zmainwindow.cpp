@@ -152,6 +152,12 @@ void ZMainWindow::loadUrls(const QList<QUrl>& urlList)
     m_doc->loadFileList(fileList);
 }
 
+void ZMainWindow::loadFileList(const QStringList& fileList)
+{
+  if (!fileList.isEmpty())
+    m_doc->loadFileList(fileList);
+}
+
 void ZMainWindow::removeAllObjs()
 {
   m_doc->removeAllObjs();

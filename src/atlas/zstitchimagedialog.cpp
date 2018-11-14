@@ -165,13 +165,6 @@ void buildConnectionFromTextFile(const QString& filename,
 
 namespace nim {
 
-ZTile::ZTile(int index_, QPoint topleft, QPoint bottomright)
-  : index(index_)
-{
-  region = QRect(topleft, bottomright);
-  bIsSelected = true;
-}
-
 ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, const std::vector<std::vector<int>>& tileMatrix,
                                    QList<ZTile>* pTiles, const QStringList& filenames) :
   QWidget(parent), m_image(image), m_tileMatrix(tileMatrix), m_pTiles(pTiles)

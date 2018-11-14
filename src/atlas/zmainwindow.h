@@ -42,6 +42,8 @@ public:
 
   void loadUrls(const QList<QUrl>& urlList);
 
+  void loadFileList(const QStringList& fileList);
+
   void loadJsonScene(const QString& fn);
 
   void removeAllObjs();

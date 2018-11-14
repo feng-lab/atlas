@@ -23,6 +23,10 @@
 #include "zview.h"
 #include "zvbgmm.h"
 #include "zpunctadetection.h"
+#include "zstitchimage.h"
+#include "z3dmeshview.h"
+#include "z3dpunctaview.h"
+#include "z3dswcview.h"
 #include <qtcsv/reader.h>
 #include <itkMath.h>
 #include <QDir>
@@ -612,6 +616,7 @@ void calcSwcVolume()
   QFileInfoList dirlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks | QDir::NoDotAndDotDot);
   //LOG(INFO) << dirlist.size() << " " << dirlist.at(0).absolutePath();
   ZMesh rootMesh;
+  ZMesh somaMesh;
   ZMesh branchMesh;
   filters << "*c.swc";
   LOG(INFO) << "NameOfCell, SomaSurfaceArea, SomaVolume, NeuriteSurfaceArea, NeuriteVolume";
@@ -621,10 +626,10 @@ void calcSwcVolume()
     QFileInfoList list = subDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
     CHECK(list.size() == 1);
     QFileInfo fileInfo = list.at(0);
-    ZMesh::createSwcMesh(ZSwc(fileInfo.absoluteFilePath()), 5, 1, rootMesh, branchMesh);
-    rootMesh.save(outFolder.filePath(fileInfo.baseName() + "_soma.obj"));
-    branchMesh.save(outFolder.filePath(fileInfo.baseName() + "_neurite.obj"));
-    auto rootProp = rootMesh.properties();
+    ZMesh::createSwcMesh(ZSwc(fileInfo.absoluteFilePath()), 1, rootMesh, somaMesh, branchMesh);
+    somaMesh.save(outFolder.filePath(fileInfo.baseName() + "_soma.stl"));
+    branchMesh.save(outFolder.filePath(fileInfo.baseName() + "_neurite.stl"));
+    auto rootProp = somaMesh.properties();
     auto branchProp = branchMesh.properties();
     LOG(INFO) << fileInfo.baseName() << ", "
               << rootProp.surfaceArea * (1.0 / 9.66 / 9.66) << ", "
@@ -1312,10 +1317,320 @@ void channelCalibration()
 
 void createPunctaMesh()
 {
-  ZPuncta pun("/Volumes/shared/feng/Chris/py_post_neurons/Py0515_s15_1_1_1c_puncta.nimp");
+  ZPuncta pun("/Users/feng/Documents/PY/PySWC/Py0515_s15_1_1_1c_puncta.apo");
   ZMesh mesh;
-  ZMesh::createPunctaMesh(pun, 5, mesh, 16);
-  mesh.save("/Users/feng/Downloads/Py0515_s15_1_1_1c_puncta.obj");
+  glm::mat4 tfm(1.f);
+  tfm[2][2] = 5.f;
+  ZMesh::createPunctaMesh(pun, mesh, 8, tfm);
+  mesh.save("/Users/feng/Google Drive/eeum/scene/Py0515_s15_1_1_1c_puncta.stl");
+}
+
+void createPyThumbnails()
+{
+  ZMainWindow* mainWin = nullptr;
+  for (auto widget : QApplication::topLevelWidgets()) {
+    mainWin = qobject_cast<ZMainWindow*>(widget);
+    if (mainWin)
+      break;
+  }
+
+  QFile file("/Users/feng/Google Drive/eeum/template/template.scene");
+  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    return;
+  }
+  QByteArray saveData = file.readAll();
+  QJsonParseError jsonError;
+  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
+  if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
+    return;
+  }
+  QJsonObject loadObj = loadDoc.object();
+  if (!loadObj.contains("Scene") || !loadObj["Scene"].isObject()) {
+    return;
+  }
+  QJsonObject sceneObj = loadObj["Scene"].toObject();
+  QJsonObject docObject = sceneObj["Doc"].toObject();
+
+  QDir dir("/Users/feng/Google Drive/eeum/template");
+  QStringList filters;
+  filters << "*.swc";
+  QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+
+  for (int i = 0; i < list.size(); ++i) {
+    auto fileInfo = list.at(i);
+    LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
+
+    QString cellName = fileInfo.completeBaseName();
+
+    QString swcName = QString("/Users/feng/Google Drive/eeum/template/%1.swc").arg(cellName);
+    QString punctaName = QString("/Users/feng/Google Drive/eeum/template/%1_puncta_small.apo").arg(cellName);
+
+    for (QJsonObject::iterator it = docObject.begin(); it != docObject.end(); ++it) {
+      QStringList typeAndID = it.key().split(" ");
+      QString IDString = typeAndID[1].trimmed();
+      QFileInfo docPath(it.value().toString());
+      QString filename = docPath.completeBaseName();
+      if (typeAndID[0] == "Swc") {
+        modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(swcName));
+      } else if (typeAndID[0] == "Puncta") {
+        modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(punctaName));
+      }
+      removeJsonValue(sceneObj, IDString + ".View3D.X Cut FloatSpan");
+      removeJsonValue(sceneObj, IDString + ".View3D.Y Cut FloatSpan");
+      removeJsonValue(sceneObj, IDString + ".View3D.Z Cut FloatSpan");
+    }
+    QString scnName = QString("/Users/feng/Google Drive/eeum/template/%1.scene").arg(cellName);
+    QFile resfile(scnName);
+    if (!resfile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+      return;
+    }
+
+    QJsonObject saveObj;
+    saveObj.insert("Scene", sceneObj);
+
+    QJsonDocument saveDoc(saveObj);
+    if (resfile.write(saveDoc.toJson()) == -1) {
+      return;
+    }
+    resfile.flush();
+
+    mainWin->removeAllObjs();
+    mainWin->loadJsonScene(scnName);
+    QApplication::processEvents();
+
+    Z3DView* view3d = mainWin->get3DWindow()->view();
+    view3d->resetCameraAction()->trigger();
+    view3d->zoomInAction()->trigger();
+    //view3d->zoomInAction()->trigger();
+    QApplication::processEvents();
+    QString imgName = QString("/Users/feng/Google Drive/eeum/template/%1.tif").arg(cellName);
+    view3d->takeFixedSizeScreenShot(imgName, 1024, 1024, Z3DScreenShotType::MonoView);
+    QApplication::processEvents();
+  }
+}
+
+void exportSceneForGlance()
+{
+  ZMainWindow* mainWin = nullptr;
+  for (auto widget : QApplication::topLevelWidgets()) {
+    mainWin = qobject_cast<ZMainWindow*>(widget);
+    if (mainWin)
+      break;
+  }
+
+  QStringList cellnames;
+
+  Z3DView* view3d = mainWin->get3DWindow()->view();
+  for (auto ojbview : view3d->objViews()) {
+    if (Z3DMeshView* meshView = qobject_cast<Z3DMeshView*>(ojbview)) {
+      auto doc = const_cast<ZMeshDoc*>(qobject_cast<const ZMeshDoc*>(&meshView->doc()));
+      CHECK(doc);
+      for (auto& kv : meshView->idToFilter()) {
+        size_t id = kv.first;
+        auto filter = kv.second.get();
+        LOG(INFO) << doc->objName(id);
+        LOG(INFO) << filter->coordTransform();
+        auto meshList = doc->meshList(id);
+        QString name = QString("/Users/feng/Google Drive/eeum/static/data/%1.stl").arg(doc->objName(id));
+        ZMesh mesh = *meshList->at(0);
+        mesh.transformVerticesByMatrix(filter->coordTransform());
+        mesh.generateNormals();
+        mesh.save(name);
+      }
+    } else if (Z3DSwcView* swcView = qobject_cast<Z3DSwcView*>(ojbview)) {
+      auto doc = const_cast<ZSwcDoc*>(qobject_cast<const ZSwcDoc*>(&swcView->doc()));
+      CHECK(doc);
+      for (auto& kv : swcView->idToFilter()) {
+        size_t id = kv.first;
+        auto filter = kv.second.get();
+        LOG(INFO) << doc->objName(id);
+        LOG(INFO) << filter->coordTransform();
+        if (!doc->objName(id).startsWith("Py")) {
+          continue;
+        }
+        ZSwc swc = doc->swc(id);
+        swc.labelSomaAndOthers();
+        ZMesh rootMesh;
+        ZMesh somaMesh;
+        ZMesh branchMesh;
+        ZMesh::createSwcMesh(swc, 1, rootMesh, somaMesh, branchMesh, filter->coordTransform());
+        rootMesh.generateNormals();
+        somaMesh.generateNormals();
+        branchMesh.generateNormals();
+        rootMesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1_root.stl").arg(doc->objName(id)));
+        somaMesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1_soma.stl").arg(doc->objName(id)));
+        branchMesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1_neurite.stl").arg(doc->objName(id)));
+        QString cellname = doc->objName(id);
+        cellnames.push_back(cellname);
+      }
+    } else if (Z3DPunctaView* punctaView = qobject_cast<Z3DPunctaView*>(ojbview)) {
+      auto doc = const_cast<ZPunctaDoc*>(qobject_cast<const ZPunctaDoc*>(&punctaView->doc()));
+      CHECK(doc);
+      for (auto& kv : punctaView->idToFilter()) {
+        size_t id = kv.first;
+        auto filter = kv.second.get();
+        LOG(INFO) << doc->objName(id);
+        LOG(INFO) << filter->coordTransform();
+        if (!doc->objName(id).startsWith("Py")) {
+          continue;
+        }
+        auto puncta = doc->puncta(id);
+        ZMesh mesh;
+        ZMesh::createPunctaMesh(puncta, mesh, 8, filter->coordTransform());
+        mesh.generateNormals();
+        mesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1.stl").arg(doc->objName(id)));
+      }
+    }
+  }
+
+  QJsonArray allObjs;
+  for (auto cellname : cellnames) {
+    QStringList fileList;
+    QString somaMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_soma.stl").arg(cellname);
+    fileList.push_back(somaMeshName);
+    QString branchMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_neurite.stl").arg(cellname);
+    fileList.push_back(branchMeshName);
+    LOG(INFO) << cellname;
+    auto truncatePos = cellname.indexOf("_layer.swc", Qt::CaseInsensitive);
+    if (truncatePos < 0) {
+      truncatePos = cellname.indexOf(".swc", Qt::CaseInsensitive);
+    }
+    LOG(INFO) << truncatePos;
+    cellname.truncate(truncatePos);
+    LOG(INFO) << cellname;
+    QString punctaMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_puncta.apo.stl").arg(cellname);
+    if (!QFile::exists(punctaMeshName)) {
+      punctaMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_neurite.nimp.stl").arg(cellname);
+    }
+    CHECK(QFile::exists(punctaMeshName)) << punctaMeshName;
+    fileList.push_back(punctaMeshName);
+
+    mainWin->removeAllObjs();
+    mainWin->loadFileList(fileList);
+    QApplication::processEvents();
+
+    view3d->resetCameraAction()->trigger();
+    view3d->zoomInAction()->trigger();
+    //view3d->zoomInAction()->trigger();
+    QApplication::processEvents();
+
+    LOG(INFO) << "position: " << view3d->camera().get().eye();
+    LOG(INFO) << "focalPoint: " << view3d->camera().get().center();
+
+    QJsonObject obj;
+    obj["soma"] = somaMeshName;
+    obj["neurite"] = branchMeshName;
+    obj["puncta"] = punctaMeshName;
+    QJsonArray arr;
+    arr.append(view3d->camera().get().eye().x);
+    arr.append(view3d->camera().get().eye().y);
+    arr.append(view3d->camera().get().eye().z);
+    obj["camera position"] = arr;
+
+    QJsonArray arr2;
+    arr2.append(view3d->camera().get().center().x);
+    arr2.append(view3d->camera().get().center().y);
+    arr2.append(view3d->camera().get().center().z);
+    obj["camera focalPoint"] = arr2;
+
+    allObjs.append(obj);
+  }
+
+  QJsonDocument saveDoc(allObjs);
+
+  QString scnName = QString("/Users/feng/Google Drive/eeum/static/data/allObjs.json");
+  QFile resfile(scnName);
+  if (!resfile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+    return;
+  }
+
+  if (resfile.write(saveDoc.toJson()) == -1) {
+    return;
+  }
+  resfile.flush();
+}
+
+void stitchAndDetectPuncta()
+{
+  QDir dir("/Volumes/shared/Imaging/JK656M1/Confocal");
+  QStringList filters;
+  filters << "JK656M1*";
+  QFileInfoList fdlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
+
+  QDir dir2("/Volumes/shared/Imaging/JK636M1/confocal");
+  filters.clear();
+  filters << "JK636M1*";
+  QFileInfoList fdlist2 = dir2.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
+
+  fdlist.append(fdlist2);
+
+  filters.clear();
+  filters << "*_Sum.lsm";
+  for (int i = 0; i < fdlist.size(); ++i) {
+    QDir fdir(fdlist.at(i).absoluteFilePath());
+    QString tsfn = fdir.filePath("TileSelection.lsm");
+    if (!QFile::exists(tsfn)) {
+      LOG(WARNING) << fdir.absolutePath() << "no tile selection file";
+      continue;
+    }
+    QFileInfoList list = fdir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+    if (list.size() < 2) {
+      LOG(WARNING) << fdir.absolutePath() << "not enough lsm file for stitching";
+      continue;
+    }
+
+    QStringList inputFiles;
+    for (auto fi : list) {
+      inputFiles.push_back(fi.absoluteFilePath());
+    }
+    std::sort(inputFiles.begin(), inputFiles.end(), naturalSortLessThan);
+
+    QString outputName = inputFiles[0];
+    outputName.truncate(outputName.lastIndexOf("_L"));
+    for (int j = 1; j < list.size(); ++j) {
+      QString tmpfn = inputFiles[j];
+      tmpfn.truncate(tmpfn.lastIndexOf("_L"));
+      CHECK(outputName == tmpfn);
+    }
+    outputName += ".nim";
+    LOG(INFO) << "output: " << outputName;
+
+    ZStitchImage stitch;
+    stitch.setInputFilenames(inputFiles);
+    stitch.setConnTileImage(tsfn);
+    stitch.setMergeMode(ZImgMerge::Mode::First);
+    stitch.setResultFilename(outputName);
+    std::vector<size_t> chs;
+    chs.push_back(0_usize);
+    stitch.setUseChannels(chs);
+
+    stitch.run();
+  }
+
+  filters.clear();
+  filters << "*.nim";
+  for (int i = 0; i < fdlist.size(); ++i) {
+    QDir fdir(fdlist.at(i).absoluteFilePath());
+    QFileInfoList list = fdir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+    if (list.size() == 1) {
+      LOG(INFO) << list.at(0).absoluteFilePath();
+
+      for (size_t ch = 1; ch < 4; ++ch) {
+        QString pfn = QString("%1/%2_ch%3.nimp").arg(fdlist.at(i).absoluteFilePath()).arg(
+          list.at(0).completeBaseName()).arg(ch + 1);
+        if (QFile::exists(pfn)) {
+          continue;
+        }
+        QString lfn = QString("%1/%2_ch%3_log.txt").arg(fdlist.at(i).absoluteFilePath()).arg(
+          list.at(0).completeBaseName()).arg(ch + 1);
+        LOG(INFO) << pfn;
+        ZPunctaDetection pd(list.at(0).absoluteFilePath(), ch);
+        pd.setLogFile(lfn);
+        pd.setResultPunctaFilename(pfn);
+        pd.run();
+      }
+    }
+  }
 }
 
 }  // namespace nim
@@ -1324,6 +1639,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
+  exportSceneForGlance();
   LOG(INFO) << "done";
 }
 
