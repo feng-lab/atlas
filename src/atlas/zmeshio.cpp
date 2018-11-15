@@ -136,6 +136,7 @@ ZMeshIO::ZMeshIO()
   exts.replace("*.", "");
   m_readExts = exts.split(";", QString::SkipEmptyParts);
   m_readExts.push_back("msh");
+  m_readExts.push_back("vtp");
 
   m_readFilter = QString("All Mesh files (*.") + m_readExts.join(" *.") + QString(")");
 
@@ -148,6 +149,11 @@ ZMeshIO::ZMeshIO()
     filter += QString(" (*.%1)").arg(format->fileExtension);
     m_writeFilters.push_back(filter);
   }
+  m_writeExts.push_back("vtp");
+  m_writeFormats.push_back("vtp");
+  QString filter("VTK Polydata");
+  filter += QString(" (*.%1)").arg("vtp");
+  m_writeFilters.push_back(filter);
 }
 
 bool ZMeshIO::canReadFile(const QString& filename)
@@ -181,6 +187,8 @@ void ZMeshIO::load(const QString& filename, ZMesh& mesh) const
     mesh.setType(GL_TRIANGLES);
     if (filename.endsWith(".msh", Qt::CaseInsensitive)) {
       readAllenAtlasMesh(filename, mesh.m_normals, mesh.m_vertices, mesh.m_indices);
+    } else if (filename.endsWith(".vtp", Qt::CaseInsensitive)) {
+      mesh.loadVTP(filename);
     } else {
       Assimp::Importer importer;
       importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE,
@@ -282,6 +290,11 @@ void ZMeshIO::save(const ZMesh& mesh, const QString& filename, std::string forma
       }
     }
     CHECK(m_writeFormats.contains(format));
+
+    if (format == "vtp") {
+      mesh.saveAsVTP(filename);
+      return;
+    }
 
     auto sc = std::make_unique<aiScene>();
     sc->mRootNode = new aiNode;

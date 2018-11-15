@@ -1325,7 +1325,7 @@ void createPunctaMesh()
   mesh.save("/Users/feng/Google Drive/eeum/scene/Py0515_s15_1_1_1c_puncta.stl");
 }
 
-void createPyThumbnails()
+void createGlanceThumbnails()
 {
   ZMainWindow* mainWin = nullptr;
   for (auto widget : QApplication::topLevelWidgets()) {
@@ -1334,78 +1334,91 @@ void createPyThumbnails()
       break;
   }
 
-  QFile file("/Users/feng/Google Drive/eeum/template/template.scene");
-  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-    return;
-  }
-  QByteArray saveData = file.readAll();
-  QJsonParseError jsonError;
-  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
-  if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
-    return;
-  }
-  QJsonObject loadObj = loadDoc.object();
-  if (!loadObj.contains("Scene") || !loadObj["Scene"].isObject()) {
-    return;
-  }
-  QJsonObject sceneObj = loadObj["Scene"].toObject();
-  QJsonObject docObject = sceneObj["Doc"].toObject();
+  std::vector<QString> templateName;
+  templateName.push_back("pc_thumbnail_template.scene");
+  templateName.push_back("pv_thumbnail_template.scene");
+  std::vector<QString> swcDirs;
+  swcDirs.push_back("/Users/feng/Documents/PY/PySWC");
+  swcDirs.push_back("/Users/feng/Documents/PV/PVSWC");
+  std::vector<QString> punctaSuffix;
+  punctaSuffix.push_back("_puncta.apo");
+  punctaSuffix.push_back("_neurite.nimp");
 
-  QDir dir("/Users/feng/Google Drive/eeum/template");
-  QStringList filters;
-  filters << "*.swc";
-  QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+  for (size_t ti = 0; ti < templateName.size(); ++ti) {
+    QFile file(QString("/Users/feng/Google Drive/eeum/raw/%1").arg(templateName[ti]));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+      return;
+    }
+    QByteArray saveData = file.readAll();
+    QJsonParseError jsonError;
+    QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
+    if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
+      return;
+    }
+    QJsonObject loadObj = loadDoc.object();
+    if (!loadObj.contains("Scene") || !loadObj["Scene"].isObject()) {
+      return;
+    }
+    QJsonObject sceneObj = loadObj["Scene"].toObject();
+    QJsonObject docObject = sceneObj["Doc"].toObject();
 
-  for (int i = 0; i < list.size(); ++i) {
-    auto fileInfo = list.at(i);
-    LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
+    QDir dir(swcDirs[ti]);
+    QStringList filters;
+    filters << "*_layer.swc";
+    QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
 
-    QString cellName = fileInfo.completeBaseName();
+    for (int i = 0; i < list.size(); ++i) {
+      auto fileInfo = list.at(i);
+      LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
 
-    QString swcName = QString("/Users/feng/Google Drive/eeum/template/%1.swc").arg(cellName);
-    QString punctaName = QString("/Users/feng/Google Drive/eeum/template/%1_puncta_small.apo").arg(cellName);
+      QString cellName = fileInfo.completeBaseName();
+      cellName.replace("_layer", "");
 
-    for (QJsonObject::iterator it = docObject.begin(); it != docObject.end(); ++it) {
-      QStringList typeAndID = it.key().split(" ");
-      QString IDString = typeAndID[1].trimmed();
-      QFileInfo docPath(it.value().toString());
-      QString filename = docPath.completeBaseName();
-      if (typeAndID[0] == "Swc") {
-        modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(swcName));
-      } else if (typeAndID[0] == "Puncta") {
-        modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(punctaName));
+      QString swcName = QString("%1/%2.swc").arg(swcDirs[ti]).arg(cellName);
+      QString punctaName = QString("%1/%2%3").arg(swcDirs[ti]).arg(cellName).arg(punctaSuffix[ti]);
+
+      for (QJsonObject::iterator it = docObject.begin(); it != docObject.end(); ++it) {
+        QStringList typeAndID = it.key().split(" ");
+        QString IDString = typeAndID[1].trimmed();
+        QFileInfo docPath(it.value().toString());
+        QString filename = docPath.completeBaseName();
+        if (typeAndID[0] == "Swc") {
+          modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(swcName));
+        } else if (typeAndID[0] == "Puncta") {
+          modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(punctaName));
+        }
+        removeJsonValue(sceneObj, IDString + ".View3D.X Cut FloatSpan");
+        removeJsonValue(sceneObj, IDString + ".View3D.Y Cut FloatSpan");
+        removeJsonValue(sceneObj, IDString + ".View3D.Z Cut FloatSpan");
       }
-      removeJsonValue(sceneObj, IDString + ".View3D.X Cut FloatSpan");
-      removeJsonValue(sceneObj, IDString + ".View3D.Y Cut FloatSpan");
-      removeJsonValue(sceneObj, IDString + ".View3D.Z Cut FloatSpan");
+      QString scnName = QString("/Users/feng/Google Drive/eeum/raw/thumbnails/%1.scene").arg(cellName);
+      QFile resfile(scnName);
+      if (!resfile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return;
+      }
+
+      QJsonObject saveObj;
+      saveObj.insert("Scene", sceneObj);
+
+      QJsonDocument saveDoc(saveObj);
+      if (resfile.write(saveDoc.toJson()) == -1) {
+        return;
+      }
+      resfile.flush();
+
+      mainWin->removeAllObjs();
+      mainWin->loadJsonScene(scnName);
+      QApplication::processEvents();
+
+      Z3DView* view3d = mainWin->get3DWindow()->view();
+      view3d->resetCameraAction()->trigger();
+      view3d->zoomInAction()->trigger();
+      //view3d->zoomInAction()->trigger();
+      QApplication::processEvents();
+      QString imgName = QString("/Users/feng/Google Drive/eeum/raw/thumbnails/%1.tif").arg(cellName);
+      view3d->takeFixedSizeScreenShot(imgName, 1024, 1024, Z3DScreenShotType::MonoView);
+      QApplication::processEvents();
     }
-    QString scnName = QString("/Users/feng/Google Drive/eeum/template/%1.scene").arg(cellName);
-    QFile resfile(scnName);
-    if (!resfile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-      return;
-    }
-
-    QJsonObject saveObj;
-    saveObj.insert("Scene", sceneObj);
-
-    QJsonDocument saveDoc(saveObj);
-    if (resfile.write(saveDoc.toJson()) == -1) {
-      return;
-    }
-    resfile.flush();
-
-    mainWin->removeAllObjs();
-    mainWin->loadJsonScene(scnName);
-    QApplication::processEvents();
-
-    Z3DView* view3d = mainWin->get3DWindow()->view();
-    view3d->resetCameraAction()->trigger();
-    view3d->zoomInAction()->trigger();
-    //view3d->zoomInAction()->trigger();
-    QApplication::processEvents();
-    QString imgName = QString("/Users/feng/Google Drive/eeum/template/%1.tif").arg(cellName);
-    view3d->takeFixedSizeScreenShot(imgName, 1024, 1024, Z3DScreenShotType::MonoView);
-    QApplication::processEvents();
   }
 }
 
@@ -1431,7 +1444,7 @@ void exportSceneForGlance()
         LOG(INFO) << doc->objName(id);
         LOG(INFO) << filter->coordTransform();
         auto meshList = doc->meshList(id);
-        QString name = QString("/Users/feng/Google Drive/eeum/static/data/%1.stl").arg(doc->objName(id));
+        QString name = QString("/Users/feng/Google Drive/eeum/static/data/%1.vtp").arg(doc->objName(id));
         ZMesh mesh = *meshList->at(0);
         mesh.transformVerticesByMatrix(filter->coordTransform());
         mesh.generateNormals();
@@ -1445,9 +1458,7 @@ void exportSceneForGlance()
         auto filter = kv.second.get();
         LOG(INFO) << doc->objName(id);
         LOG(INFO) << filter->coordTransform();
-        if (!doc->objName(id).startsWith("Py")) {
-          continue;
-        }
+
         ZSwc swc = doc->swc(id);
         swc.labelSomaAndOthers();
         ZMesh rootMesh;
@@ -1457,9 +1468,9 @@ void exportSceneForGlance()
         rootMesh.generateNormals();
         somaMesh.generateNormals();
         branchMesh.generateNormals();
-        rootMesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1_root.stl").arg(doc->objName(id)));
-        somaMesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1_soma.stl").arg(doc->objName(id)));
-        branchMesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1_neurite.stl").arg(doc->objName(id)));
+        rootMesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1_root.vtp").arg(doc->objName(id)));
+        somaMesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1_soma.vtp").arg(doc->objName(id)));
+        branchMesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1_neurite.vtp").arg(doc->objName(id)));
         QString cellname = doc->objName(id);
         cellnames.push_back(cellname);
       }
@@ -1471,14 +1482,12 @@ void exportSceneForGlance()
         auto filter = kv.second.get();
         LOG(INFO) << doc->objName(id);
         LOG(INFO) << filter->coordTransform();
-        if (!doc->objName(id).startsWith("Py")) {
-          continue;
-        }
+
         auto puncta = doc->puncta(id);
         ZMesh mesh;
         ZMesh::createPunctaMesh(puncta, mesh, 8, filter->coordTransform());
         mesh.generateNormals();
-        mesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1.stl").arg(doc->objName(id)));
+        mesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1.vtp").arg(doc->objName(id)));
       }
     }
   }
@@ -1486,10 +1495,14 @@ void exportSceneForGlance()
   QJsonArray allObjs;
   for (auto cellname : cellnames) {
     QStringList fileList;
-    QString somaMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_soma.stl").arg(cellname);
+    QString somaMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_soma.vtp").arg(cellname);
     fileList.push_back(somaMeshName);
-    QString branchMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_neurite.stl").arg(cellname);
+    QString somaMeshFileName = QString("%1_soma.vtp").arg(cellname);
+    QString branchMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_neurite.vtp").arg(cellname);
     fileList.push_back(branchMeshName);
+    QString branchMeshFileName = QString("%1_neurite.vtp").arg(cellname);
+    QString rootMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_root.vtp").arg(cellname);
+    QString rootMeshFileName = QString("%1_root.vtp").arg(cellname);
     LOG(INFO) << cellname;
     auto truncatePos = cellname.indexOf("_layer.swc", Qt::CaseInsensitive);
     if (truncatePos < 0) {
@@ -1498,9 +1511,11 @@ void exportSceneForGlance()
     LOG(INFO) << truncatePos;
     cellname.truncate(truncatePos);
     LOG(INFO) << cellname;
-    QString punctaMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_puncta.apo.stl").arg(cellname);
+    QString punctaMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_puncta.apo.vtp").arg(cellname);
+    QString punctaMeshFileName = QString("%1_puncta.apo.vtp").arg(cellname);
     if (!QFile::exists(punctaMeshName)) {
-      punctaMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_neurite.nimp.stl").arg(cellname);
+      punctaMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_neurite.nimp.vtp").arg(cellname);
+      punctaMeshFileName = QString("%1_neurite.nimp.vtp").arg(cellname);
     }
     CHECK(QFile::exists(punctaMeshName)) << punctaMeshName;
     fileList.push_back(punctaMeshName);
@@ -1518,9 +1533,11 @@ void exportSceneForGlance()
     LOG(INFO) << "focalPoint: " << view3d->camera().get().center();
 
     QJsonObject obj;
-    obj["soma"] = somaMeshName;
-    obj["neurite"] = branchMeshName;
-    obj["puncta"] = punctaMeshName;
+    obj["cellname"] = cellname;
+    obj["soma"] = somaMeshFileName;
+    obj["neurite"] = branchMeshFileName;
+    obj["root"] = rootMeshFileName;
+    obj["puncta"] = punctaMeshFileName;
     QJsonArray arr;
     arr.append(view3d->camera().get().eye().x);
     arr.append(view3d->camera().get().eye().y);
@@ -1538,7 +1555,7 @@ void exportSceneForGlance()
 
   QJsonDocument saveDoc(allObjs);
 
-  QString scnName = QString("/Users/feng/Google Drive/eeum/static/data/allObjs.json");
+  QString scnName = QString("/Users/feng/Google Drive/eeum/raw/meshes/allObjs.json");
   QFile resfile(scnName);
   if (!resfile.open(QIODevice::WriteOnly | QIODevice::Text)) {
     return;

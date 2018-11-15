@@ -18,6 +18,8 @@
 #include <vtkTriangleFilter.h>
 #include <vtkCleanPolyData.h>
 #include <vtkAppendPolyData.h>
+#include <vtkXMLPolyDataReader.h>
+#include <vtkXMLPolyDataWriter.h>
 #include <boost/math/constants/constants.hpp>
 #include <map>
 
@@ -154,6 +156,31 @@ void ZMesh::load(const QString& filename)
 void ZMesh::save(const QString& filename, const std::string& format) const
 {
   ZMeshIO::instance().save(*this, filename, format);
+}
+
+void ZMesh::loadVTP(const QString& filename)
+{
+  vtkSmartPointer<vtkXMLPolyDataReader> reader =
+    vtkSmartPointer<vtkXMLPolyDataReader>::New();
+  reader->SetFileName(qUtf8Printable(filename));
+  reader->Update();
+
+  auto msh = vtkPolyDataToMesh(reader->GetOutput());
+  swap(msh);
+}
+
+void ZMesh::saveAsVTP(const QString& filename) const
+{
+  vtkSmartPointer<vtkPolyData> polydata = meshToVtkPolyData(*this);
+  vtkSmartPointer<vtkXMLPolyDataWriter> writer =
+    vtkSmartPointer<vtkXMLPolyDataWriter>::New();
+  writer->SetFileName(qUtf8Printable(filename));
+  writer->SetInputData(polydata);
+
+  writer->SetDataModeToBinary();
+  writer->SetCompressorTypeToZLib();
+
+  writer->Write();
 }
 
 void ZMesh::load(H5::Group& allGrp)

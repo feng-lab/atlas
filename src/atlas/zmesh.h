@@ -74,6 +74,10 @@ public:
 
   void save(const QString& filename, const std::string& format = "") const;
 
+  void loadVTP(const QString& filename);
+
+  void saveAsVTP(const QString& filename) const;
+
   void load(H5::Group& allGrp);
 
   void save(H5::Group& allGrp) const;

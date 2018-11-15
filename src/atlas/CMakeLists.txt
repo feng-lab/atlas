@@ -67,7 +67,7 @@ else ()
       ${IPP_PATH}/lib/intel64/libippcc.a)
 endif ()
 
-find_package(VTK REQUIRED COMPONENTS vtkFiltersGeometry vtkFiltersSources
+find_package(VTK REQUIRED COMPONENTS vtkFiltersGeometry vtkFiltersSources vtkIOXML
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/vtk NO_DEFAULT_PATH)
 message(STATUS "VTK_DIR: ${VTK_DIR}")
 message(STATUS "VTK_USE_FILE: ${VTK_USE_FILE}")
