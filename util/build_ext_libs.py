@@ -341,16 +341,20 @@ def build_zlib(src_dir: str, install_dir: str):
 def build_folly(src_dir: str, install_dir: str):
     del src_dir
     try:
+        if is_windows():
+            shutil.copy2(os.path.join(ext_dir(), 'folly-configs', 'folly-config-win.h'),
+                         os.path.join(install_dir, 'folly', 'folly-config.h'))
+        elif is_mac():
+            shutil.copy2(os.path.join(ext_dir(), 'folly-configs', 'folly-config-macos.h'),
+                         os.path.join(install_dir, 'folly', 'folly-config.h'))
+        else:
+            shutil.copy2(os.path.join(ext_dir(), 'folly-configs', 'folly-config-linux.h'),
+                         os.path.join(install_dir, 'folly', 'folly-config.h'))
+
         orig_file = os.path.join(install_dir, 'folly', 'ScopeGuard.h')
         patch_file(orig_file,
-                   from_texts=[r'#include <folly/Portability.h>',
-                               r'#include <folly/Utility.h>',
-                               r'= exchange(',
-                               r'static void warnAboutToCrash() noexcept;'],
-                   to_texts=[r'#include <folly/CPortability.h>',
-                             r'#include <utility>',
-                             r'= std::exchange(',
-                             r'inline static void warnAboutToCrash() noexcept {}'])
+                   from_texts=[r'static void warnAboutToCrash() noexcept;'],
+                   to_texts=[r'inline static void warnAboutToCrash() noexcept {}'])
     finally:
         print('')
 
