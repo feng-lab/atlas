@@ -109,6 +109,18 @@ struct col4
   bool operator==(const col4& c) const
   { return (r == c.r && g == c.g && b == c.b && a == c.a); }
 
+  float redF() const
+  { return r / 255.f; }
+
+  float greenF() const
+  { return g / 255.f; }
+
+  float blueF() const
+  { return b / 255.f; }
+
+  float alphaF() const
+  { return a / 255.f; }
+
   col4& max(const col4& c)
   {
     if (c.r > r) r = c.r;

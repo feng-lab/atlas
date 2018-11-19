@@ -7,34 +7,9 @@ LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 # main stuff
 
 if (WIN32)
-  set(INTEL_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\compiler")
-  set(MKL_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\mkl")
-else (WIN32)
-  set(INTEL_PATH /opt/intel)
-  set(MKL_PATH ${INTEL_PATH}/mkl)
-endif (WIN32)
-set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${MKL_PATH}/include ${MKL_PATH}/include/fftw)
-if (WIN32)
-  set(MKL_LIBRARIES ${MKL_LIBRARIES}
-      ${MKL_PATH}/lib/intel64/mkl_intel_lp64.lib
-      ${MKL_PATH}/lib/intel64/mkl_tbb_thread.lib
-      ${MKL_PATH}/lib/intel64/mkl_core.lib)
-elseif (APPLE)
-  set(MKL_LIBRARIES ${MKL_LIBRARIES}
-      ${MKL_PATH}/lib/libmkl_intel_lp64.a
-      ${MKL_PATH}/lib/libmkl_intel_thread.a
-      ${MKL_PATH}/lib/libmkl_core.a
-      ${INTEL_PATH}/lib/libiomp5.dylib)
-else ()
-  set(MKL_LIBRARIES ${MKL_LIBRARIES}
-      ${MKL_PATH}/lib/intel64/libmkl_intel_lp64.a
-      ${MKL_PATH}/lib/intel64/libmkl_tbb_thread.a
-      ${MKL_PATH}/lib/intel64/libmkl_core.a)
-endif ()
-
-if (WIN32)
   set(IPP_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\ipp")
 else (WIN32)
+  set(INTEL_PATH /opt/intel)
   set(IPP_PATH ${INTEL_PATH}/ipp)
 endif (WIN32)
 set(IPP_INCLUDE_DIRS ${IPP_INCLUDE_DIRS} ${IPP_PATH}/include)
@@ -353,12 +328,6 @@ set(SOURCES
     zmesh.h
     zmeshio.h
     zmeshutils.h
-    zpuncta.h
-    zpunctaio.h
-    zpunctum.h
-    zgmm.h
-    zkmeans.h
-    zvbgmm.h
     zswcfilter.h
     zswcview.h
     zpunctafilter.h
@@ -571,9 +540,6 @@ set(SOURCES
     zmesh.cpp
     zmeshio.cpp
     zmeshutils.cpp
-    zpuncta.cpp
-    zpunctaio.cpp
-    zpunctum.cpp
     zswcfilter.cpp
     zswcview.cpp
     zpunctafilter.cpp
@@ -687,7 +653,6 @@ add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
                ${TESTS})
 
 target_include_directories(${APP_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(${APP_NAME} PUBLIC ${MKL_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${IPP_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${GEOMETRICTOOLS_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${HDF5_INCLUDE_DIR})
@@ -764,7 +729,7 @@ else (WIN32)
 
   # for some files
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
-                              "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers -Wno-unknown-pragmas -Wno-unused-variable -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
+                              "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers -Wno-unknown-pragmas -Wno-unused-variable -Wno-reorder -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
   set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
   set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS "-isystem ${ASSIMP_INCLUDE_DIRS}")
 
@@ -806,9 +771,3 @@ target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding-a
 if (BUILD_TESTING)
   target_link_libraries(${APP_NAME} PUBLIC benchmark::benchmark)
 endif (BUILD_TESTING)
-
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  target_link_libraries(${APP_NAME} PUBLIC -Wl,--start-group ${MKL_LIBRARIES} -Wl,--end-group)
-else ()
-  target_link_libraries(${APP_NAME} PUBLIC ${MKL_LIBRARIES})
-endif ()

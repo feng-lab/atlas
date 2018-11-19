@@ -168,7 +168,7 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta) const
       p.setVolSize(punctaInfo[6]);
       p.setMass(punctaInfo[7]);
       p.setRadius(punctaInfo[8]);
-      p.setColor(QColor(punctaInfo[9], punctaInfo[10], punctaInfo[11]));
+      p.setColor(col4(punctaInfo[9], punctaInfo[10], punctaInfo[11]));
       p.setScore(punctaInfo[12]);
 
       if (H5Lexists(punctumGrp.getId(), "VoxelIntensities", H5P_DEFAULT) > 0 &&
@@ -271,9 +271,9 @@ void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename) co
       punctaInfo[6] = p.volSize();
       punctaInfo[7] = p.mass();
       punctaInfo[8] = p.radius();
-      punctaInfo[9] = p.color().red();
-      punctaInfo[10] = p.color().blue();
-      punctaInfo[11] = p.color().green();
+      punctaInfo[9] = p.color().r;
+      punctaInfo[10] = p.color().g;
+      punctaInfo[11] = p.color().b;
       punctaInfo[12] = p.score();
 
       H5::DataSet info = punctumGrp.createDataSet("Summary", doubleType, infoDataspace);
@@ -370,10 +370,10 @@ void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta) const
       if (fieldList.size() >= 18) {
         bool ok1, ok2;
 
-        punctum.setColor(QColor(fieldList[15].toInt(&ok), fieldList[16].toInt(&ok1), fieldList[17].toInt(&ok2)));
+        punctum.setColor(col4(fieldList[15].toInt(&ok), fieldList[16].toInt(&ok1), fieldList[17].toInt(&ok2)));
         if (!ok || !ok1 || !ok2) {
           if (fieldList[15].isEmpty() && fieldList[16].isEmpty() && fieldList[17].isEmpty()) {
-            punctum.setColor(QColor(0, 0, 0));
+            punctum.setColor(col4(0, 0, 0));
           } else {
             throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
           }
@@ -408,7 +408,7 @@ void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file) cons
       .arg(pun.z()).arg(pun.x()).arg(pun.y()).arg(pun.maxIntensity()).arg(pun.meanIntensity())
       .arg(pun.sDevOfIntensity())
       .arg(pun.volSize()).arg(pun.mass()).arg(pun.property1()).arg(pun.property2()).arg(pun.property3())
-      .arg(pun.color().red()).arg(pun.color().green()).arg(pun.color().blue());
+      .arg(pun.color().r).arg(pun.color().g).arg(pun.color().b);
     ++idx;
     if (out.status() != QTextStream::Ok) {
       throw ZIOException("Error while writing file.");
@@ -462,10 +462,10 @@ void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta) const
 
       bool ok1, ok2;
 
-      punctum.setColor(QColor(fieldList[7].toInt(&ok), fieldList[8].toInt(&ok1), fieldList[9].toInt(&ok2)));
+      punctum.setColor(col4(fieldList[7].toInt(&ok), fieldList[8].toInt(&ok1), fieldList[9].toInt(&ok2)));
       if (!ok || !ok1 || !ok2) {
         if (fieldList[7].isEmpty() && fieldList[8].isEmpty() && fieldList[9].isEmpty())
-          punctum.setColor(QColor(0, 0, 0));
+          punctum.setColor(col4(0, 0, 0));
         else {
           throw ZIOException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
         }

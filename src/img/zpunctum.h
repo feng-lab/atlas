@@ -1,7 +1,7 @@
 #pragma once
 
 #include "zeigenutils.h"
-#include <QColor>
+#include "zimginterface.h"
 #include <QString>
 #include <cmath>
 
@@ -135,7 +135,7 @@ public:
   inline const QString& property3() const
   { return m_property3; }
 
-  inline const QColor& color() const
+  inline const col4& color() const
   { return m_color; }
 
   inline double score() const
@@ -189,7 +189,7 @@ public:
   inline void setProperty3(const QString& n)
   { m_property3 = n; }
 
-  inline void setColor(const QColor& n)
+  inline void setColor(const col4& n)
   { m_color = n; }
 
   inline void setVoxelLocations(const Eigen::MatrixXi& l)
@@ -232,7 +232,7 @@ private:
   QString m_property1;
   QString m_property2;
   QString m_property3;
-  QColor m_color{0, 255, 255};
+  col4 m_color{0, 255, 255};
   double m_score = 1.0;  // detection score [-1.0 1.0]
 
   // info of voxels belong to this punctum

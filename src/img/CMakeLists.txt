@@ -9,6 +9,32 @@ find_package(TBB REQUIRED tbb)
 get_target_property(TBB_LIBRARY TBB::tbb IMPORTED_LOCATION_RELEASE)
 message(STATUS "TBB_LIBRARY: ${TBB_LIBRARY}")
 
+if (WIN32)
+  set(INTEL_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\compiler")
+  set(MKL_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\mkl")
+else (WIN32)
+  set(INTEL_PATH /opt/intel)
+  set(MKL_PATH ${INTEL_PATH}/mkl)
+endif (WIN32)
+set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${MKL_PATH}/include ${MKL_PATH}/include/fftw)
+if (WIN32)
+  set(MKL_LIBRARIES ${MKL_LIBRARIES}
+      ${MKL_PATH}/lib/intel64/mkl_intel_lp64.lib
+      ${MKL_PATH}/lib/intel64/mkl_tbb_thread.lib
+      ${MKL_PATH}/lib/intel64/mkl_core.lib)
+elseif (APPLE)
+  set(MKL_LIBRARIES ${MKL_LIBRARIES}
+      ${MKL_PATH}/lib/libmkl_intel_lp64.a
+      ${MKL_PATH}/lib/libmkl_intel_thread.a
+      ${MKL_PATH}/lib/libmkl_core.a
+      ${INTEL_PATH}/lib/libiomp5.dylib)
+else ()
+  set(MKL_LIBRARIES ${MKL_LIBRARIES}
+      ${MKL_PATH}/lib/intel64/libmkl_intel_lp64.a
+      ${MKL_PATH}/lib/intel64/libmkl_tbb_thread.a
+      ${MKL_PATH}/lib/intel64/libmkl_core.a)
+endif ()
+
 find_package(ITK REQUIRED COMPONENTS ITKIOMeta ITKIONIFTI ITKIONRRD ITKIOGDCM ITKBinaryMathematicalMorphology
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/itk NO_DEFAULT_PATH)
 message(STATUS "ITK_DIR: ${ITK_DIR}")
@@ -242,19 +268,31 @@ set(IMG_SOURCES
     zimghdf5.h
     zimginfoio.cpp
     zimginfoio.h
-    zimgblockprovider.h zimgleica.cpp zimgleica.h)
+    zimgblockprovider.h
+    zimgleica.cpp
+    zimgleica.h
+    zgmm.h
+    zkmeans.h
+    zvbgmm.h
+    zpuncta.cpp
+    zpuncta.h
+    zpunctaio.cpp
+    zpunctaio.h
+    zpunctum.cpp
+    zpunctum.h)
 
 # our target
 set(LIBRARY_NAME img)
 add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${IMG_SOURCES})
 
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(${LIBRARY_NAME} PUBLIC ${MKL_INCLUDE_DIRS})
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/eigen)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/boost)
-target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glm)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/folly)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/scopeguard)
 target_compile_definitions(${LIBRARY_NAME} PUBLIC EIGEN_NO_DEBUG EIGEN_DONT_PARALLELIZE EIGEN_MPL2_ONLY)
+target_compile_definitions(${LIBRARY_NAME} PUBLIC EIGEN_USE_BLAS EIGEN_USE_LAPACKE_STRICT) # EIGEN_USE_MKL_VML)
 target_compile_definitions(${LIBRARY_NAME} PUBLIC QT_USE_QSTRINGBUILDER QT_NO_CAST_FROM_BYTEARRAY QT_NO_CAST_TO_ASCII)
 if (WIN32)
   target_compile_definitions(${LIBRARY_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
@@ -342,9 +380,14 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTUR
                       hdf5::hdf5_cpp-static hdf5::hdf5-static
                       glog::glog Qt5::Core)
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  target_link_libraries(${LIBRARY_NAME} PUBLIC -Wl,--start-group ${MKL_LIBRARIES} -Wl,--end-group)
+else ()
+  target_link_libraries(${LIBRARY_NAME} PUBLIC ${MKL_LIBRARIES})
+endif ()
+
 
 # mex file
-set(MATLAB_ADDITIONAL_VERSIONS R2018a=9.4)
 find_package(Matlab COMPONENTS MX_LIBRARY MEX_COMPILER)
 if (Matlab_FOUND)
   message(STATUS "Matlab_ROOT_DIR: ${Matlab_ROOT_DIR}")
@@ -360,6 +403,7 @@ if (Matlab_FOUND)
         NAME ${mexname}
         SRC ${CMAKE_CURRENT_SOURCE_DIR}/matlab/${mexname}.cpp
         LINK_TO ${LIBRARY_NAME}
+        R2018a
       )
       add_custom_command(TARGET ${mexname}
                          POST_BUILD
@@ -383,6 +427,7 @@ if (Matlab_FOUND)
     add_mex_target(read_stack_mex)
     add_mex_target(stack_czi_tiles_mex)
     add_mex_target(stack_czi_tiles_with_mask_mex)
+    add_mex_target(read_puncta_mex)
 
     add_custom_command(TARGET correct_czi_shading_mex
                        POST_BUILD
@@ -408,6 +453,7 @@ if (Matlab_FOUND)
         NAME ${mexname}
         SRC ${CMAKE_CURRENT_SOURCE_DIR}/matlab/${mexname}.cpp
         LINK_TO ${LIBRARY_NAME}
+        R2018a
       )
       add_custom_command(TARGET ${mexname}
                          POST_BUILD
@@ -420,6 +466,7 @@ if (Matlab_FOUND)
     add_mex_target(read_stack_mex)
     add_mex_target(stack_czi_tiles_mex)
     add_mex_target(stack_czi_tiles_with_mask_mex)
+    add_mex_target(read_puncta_mex)
 
     add_custom_command(TARGET correct_czi_shading_mex
                        POST_BUILD
