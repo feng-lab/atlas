@@ -792,7 +792,7 @@ void ZPunctaDetection::detectImpl(const ZImg& rawimg, size_t pc, size_t t,
   LOG(INFO) << "Detected " << resList.size() << " Puncta.";
 
   resList.remove_if([&](const ZPunctum& p) {
-    if (p.volSize() <= 5.0 && p.maxIntensity() < (thre + .1 * saturatedIntensity)) {
+    if (p.volSize() <= 5_usize && p.maxIntensity() < (thre + .1 * saturatedIntensity)) {
       filteredList.push_back(p);
       return true;
     }

@@ -390,7 +390,7 @@ endif ()
 
 # mex file
 find_package(Matlab COMPONENTS MX_LIBRARY MEX_COMPILER)
-if (Matlab_FOUND)
+if (Matlab_FOUND AND ${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.13.1")
   message(STATUS "Matlab_ROOT_DIR: ${Matlab_ROOT_DIR}")
   message(STATUS "Matlab_INCLUDE_DIRS: ${Matlab_INCLUDE_DIRS}")
   message(STATUS "Matlab_MEX_LIBRARY: ${Matlab_MEX_LIBRARY}")
@@ -485,7 +485,7 @@ if (Matlab_FOUND)
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>
                        )
   endif()
-endif (Matlab_FOUND)
+endif ()
 
 
 

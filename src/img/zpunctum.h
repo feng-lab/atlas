@@ -111,7 +111,7 @@ public:
   inline double meanIntensity() const
   { return m_meanIntensity; }
 
-  inline double volSize() const
+  inline size_t volSize() const
   { return m_volSize; }
 
   inline double mass() const
@@ -165,8 +165,8 @@ public:
   inline void setMeanIntensity(double n)
   { m_meanIntensity = n; }
 
-  inline void setVolSize(double n)
-  { m_volSize = std::max(0.0, n); }
+  inline void setVolSize(size_t n)
+  { m_volSize = std::max(0_usize, n); }
 
   inline void setMass(double n)
   { m_mass = n; }
@@ -226,7 +226,7 @@ private:
   double m_y = -1;
   double m_z = -1;
   double m_sDevOfIntensity = 0;
-  double m_volSize = 33.5103216382911;
+  size_t m_volSize = 33;
   double m_mass = 8545.13201776424;
   double m_radius = 2.0;   //radius
   QString m_property1;
