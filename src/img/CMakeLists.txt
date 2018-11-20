@@ -25,9 +25,8 @@ if (WIN32)
 elseif (APPLE)
   set(MKL_LIBRARIES ${MKL_LIBRARIES}
       ${MKL_PATH}/lib/libmkl_intel_lp64.a
-      ${MKL_PATH}/lib/libmkl_intel_thread.a
-      ${MKL_PATH}/lib/libmkl_core.a
-      ${INTEL_PATH}/lib/libiomp5.dylib)
+      ${MKL_PATH}/lib/libmkl_tbb_thread.a
+      ${MKL_PATH}/lib/libmkl_core.a)
 else ()
   set(MKL_LIBRARIES ${MKL_LIBRARIES}
       ${MKL_PATH}/lib/intel64/libmkl_intel_lp64.a
@@ -390,7 +389,7 @@ endif ()
 
 # mex file
 find_package(Matlab COMPONENTS MX_LIBRARY MEX_COMPILER)
-if (Matlab_FOUND AND ${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.13.1")
+if (Matlab_FOUND AND ${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.13.0")
   message(STATUS "Matlab_ROOT_DIR: ${Matlab_ROOT_DIR}")
   message(STATUS "Matlab_INCLUDE_DIRS: ${Matlab_INCLUDE_DIRS}")
   message(STATUS "Matlab_MEX_LIBRARY: ${Matlab_MEX_LIBRARY}")
