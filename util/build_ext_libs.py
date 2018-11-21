@@ -746,7 +746,6 @@ def build_itk(src_dir: str, install_dir: str):
                          '-DITK_LEGACY_REMOVE:BOOL=ON',
                          '-DITK_USE_GPU:BOOL=OFF',
                          '-DITK_DOXYGEN_HTML:BOOL=OFF',
-                         '-DITK_USE_STRICT_CONCEPT_CHECKING:BOOL=ON',
                          '-DModule_ITKReview:BOOL=ON',
                          '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
                          '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
@@ -972,6 +971,11 @@ def build_libs(libs: dict, update_src: bool):
         update_or_clone_git_repository(src_dir, 'git@github.com:eigenteam/eigen-git-mirror.git')
         export_git_repository(src_dir, os.path.join(ext_dir(), 'eigen'))
 
+    if libs['pybind11']:
+        src_dir = os.path.join(base_dir(), 'pybind11')
+        update_or_clone_git_repository(src_dir, 'git@github.com:pybind/pybind11.git')
+        export_git_repository(src_dir, os.path.join(ext_dir(), 'pybind11'))
+
     if libs['glm']:
         src_dir = os.path.join(base_dir(), 'glm')
         update_or_clone_git_repository(src_dir, 'git@github.com:g-truc/glm.git')
@@ -1146,6 +1150,7 @@ def parse_inputs(argv: list):
             'ffmpeg': False,
             'boost': False,
             'eigen': False,
+            'pybind11': False,
             'glm': False,
             'googletest': False,
             'folly': False,
