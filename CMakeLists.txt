@@ -65,6 +65,11 @@ message(STATUS "QT_PATHS: " ${QT_PATHS})
 # tbb
 set(TBB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+# pybind11
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src/3rdparty/pybind11)
+message(STATUS "PYTHON_VERSION_MAJOR: " ${PYTHON_VERSION_MAJOR})
+message(STATUS "PYTHON_EXECUTABLE: " ${PYTHON_EXECUTABLE})
+
 # subprojects
 add_subdirectory(src/img)
 add_subdirectory(src/atlas)

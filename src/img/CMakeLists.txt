@@ -387,9 +387,9 @@ else ()
 endif ()
 
 
-# mex file
+# build matlab mex
 find_package(Matlab COMPONENTS MX_LIBRARY MEX_COMPILER)
-if (Matlab_FOUND AND ${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.13.0")
+if (Matlab_FOUND AND ${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.13.1")
   message(STATUS "Matlab_ROOT_DIR: ${Matlab_ROOT_DIR}")
   message(STATUS "Matlab_INCLUDE_DIRS: ${Matlab_INCLUDE_DIRS}")
   message(STATUS "Matlab_MEX_LIBRARY: ${Matlab_MEX_LIBRARY}")
@@ -419,6 +419,7 @@ if (Matlab_FOUND AND ${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.13.0")
                          @rpath/libtbb.dylib
                          @loader_path/libtbb.dylib
                          $<TARGET_FILE:${mexname}>
+                         COMMAND ${CMAKE_STRIP} -x $<TARGET_FILE:${mexname}>
                          )
     endfunction(add_mex_target)
 
@@ -458,7 +459,7 @@ if (Matlab_FOUND AND ${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.13.0")
       add_custom_command(TARGET ${mexname}
                          POST_BUILD
                          COMMAND patchelf --set-rpath '$$ORIGIN' --force-rpath $<TARGET_FILE:${mexname}>
-                         )
+                         COMMAND ${CMAKE_STRIP} --discard-all $<TARGET_FILE:${mexname}>)
     endfunction(add_mex_target)
 
     add_mex_target(correct_czi_shading_mex)
@@ -484,7 +485,10 @@ if (Matlab_FOUND AND ${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.13.0")
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>
                        )
   endif()
-endif ()
+endif()
 
-
-
+# build python extensions
+if(PYTHON_VERSION_MAJOR)
+  pybind11_add_module(imgpy ${CMAKE_CURRENT_SOURCE_DIR}/python/imgpy.cpp)
+  target_link_libraries(imgpy PRIVATE ${LIBRARY_NAME})
+endif()

@@ -49,6 +49,7 @@
 /src/3rdparty/scopeguard/
 /src/3rdparty/benchmark/
 /src/3rdparty/cpuinfo/
+/src/3rdparty/pybind11/
 ffmpeg
 ffmpeg.exe
 nasm
