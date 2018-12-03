@@ -22,10 +22,10 @@ if(UNIX AND NOT APPLE)
 
   # Fail if there are missing symbols, except when using Address Sanitizer
   # since libasan symbols are supposed to be preloaded.
-  if (NOT ENABLE_ASAN)
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,defs")
-    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -Wl,-z,defs")
-  endif()
+  # if (NOT ENABLE_ASAN)
+  #   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,defs")
+  #   set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -Wl,-z,defs")
+  # endif()
 endif()
 
 if (UNIX)
