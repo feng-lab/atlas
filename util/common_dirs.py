@@ -55,6 +55,12 @@ def img_dir() -> str:
     return res
 
 
+def python_package_dir() -> str:
+    res = os.path.join(atlas_src_dir(), 'python')
+    assert os.path.exists(res)
+    return res
+
+
 def resource_dir() -> str:
     res = os.path.join(atlas_dir(), 'Resources')
     assert os.path.exists(res)
@@ -77,6 +83,17 @@ def atlas_build_dir() -> str:
         res = os.path.join(atlas_repository_dir(), 'cmake-build-release-ninja')
     else:
         res = os.path.join(atlas_repository_dir(), 'cmake-build-release')
+    if not os.path.exists(res):
+        os.mkdir(res)
+    assert os.path.exists(res)
+    return res
+
+
+def python_package_build_dir() -> str:
+    if use_ninja():
+        res = os.path.join(atlas_repository_dir(), 'cmake-build-python-ninja')
+    else:
+        res = os.path.join(atlas_repository_dir(), 'cmake-build-python')
     if not os.path.exists(res):
         os.mkdir(res)
     assert os.path.exists(res)
@@ -399,4 +416,4 @@ if __name__ == "__main__":
     write_cmake_file_with_qt_info()
     install_cmake()
     subprocess.run([get_cmake_binary(), '-P', 'MakeTBBConfigFiles.cmake'],
-                   cwd=os.path.join(atlas_repository_dir(), 'cmake'), shell=False, check=True)
+                   cwd=os.path.join(atlas_repository_dir(), 'src', 'cmake'), shell=False, check=True)

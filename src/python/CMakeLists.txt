@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.6.1)
-project(atlas)
+project(zimg)
 
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 14)
@@ -28,38 +28,61 @@ if(UNIX AND NOT APPLE)
   endif()
 endif()
 
-if (UNIX)
+if(UNIX)
   # Do not put non-global symbols in the output file's symbol table.
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-x")
   set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -Wl,-x")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-x")
 endif()
 
-LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/src/cmake)
-
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 
-# generate a version string from git tag-hash and current build time
-include(GetGitRevisionDescription)
-git_describe(GIT_VERSION)
-string(TIMESTAMP BUILD_DATE " build %Y-%m-%dT%H:%M:%S")
-string(APPEND GIT_VERSION ${BUILD_DATE})
-message(STATUS "GIT_VERSION: ${GIT_VERSION}")
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version/version.h.in ${CMAKE_CURRENT_SOURCE_DIR}/src/version/version.h
-               ESCAPE_QUOTES @ONLY)
-# set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../build-atlas)
-
-include(BuildType)
-
-if (NOT CMAKE_DEBUG_POSTFIX)
+if(NOT CMAKE_DEBUG_POSTFIX)
   set(CMAKE_DEBUG_POSTFIX d)
-endif ()
+endif()
 message(STATUS "CMAKE_DEBUG_POSTFIX: " ${CMAKE_DEBUG_POSTFIX})
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/src/cmake/LibsForImg.cmake)
+set(BUILD_WITH_CONDA ON)
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/LibsForImg.cmake)
 
 # subprojects
-add_subdirectory(src/img)
-add_subdirectory(src/matlab)
-add_subdirectory(src/atlas)
+add_subdirectory(../img img)
 
+# pybind11
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/pybind11 pybind11)
+message(STATUS "PYTHON_VERSION_MAJOR: " ${PYTHON_VERSION_MAJOR})
+message(STATUS "PYTHON_EXECUTABLE: " ${PYTHON_EXECUTABLE})
+
+# build python extensions
+if(PYTHON_VERSION_MAJOR)
+  pybind11_add_module(imgpy imgpy.cpp)
+  target_link_libraries(imgpy PRIVATE img)
+  if(APPLE)
+    add_custom_command(TARGET imgpy
+                       POST_BUILD
+                       COMMAND install_name_tool -change
+                       @rpath/libfreeimageplus.dylib
+                       @loader_path/libfreeimageplus.dylib
+                       $<TARGET_FILE:imgpy>
+                       COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
+                       $<TARGET_FILE_DIR:imgpy>/libfreeimageplus.dylib
+                       COMMAND install_name_tool -id libfreeimageplus.dylib
+                       $<TARGET_FILE_DIR:imgpy>/libfreeimageplus.dylib
+                       )
+  endif()
+  if(UNIX AND NOT APPLE)
+    add_custom_command(TARGET imgpy
+                       POST_BUILD
+                       COMMAND patchelf --set-rpath '$$ORIGIN' --force-rpath $<TARGET_FILE:imgpy>
+                       )
+  endif()
+endif()
+
+# install
+install(DIRECTORY "./" # source directory
+        DESTINATION $ENV{SP_DIR}/zimg # target directory
+        FILES_MATCHING PATTERN "*.py"
+        )
+install(TARGETS imgpy DESTINATION $ENV{SP_DIR}/zimg)
+install(FILES $<TARGET_FILE_DIR:imgpy>/libfreeimageplus.dylib DESTINATION $ENV{SP_DIR}/zimg)

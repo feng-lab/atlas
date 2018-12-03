@@ -59,7 +59,7 @@ __pycache__/
 /src/version/version.h
 /Atlas.AppDir/
 /Atlas/
-/cmake/QtInfo.cmake
+QtInfo.cmake
 
 # binary file
 obj/
