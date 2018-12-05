@@ -251,7 +251,7 @@ def freeimage_redist_dir() -> str:
 
 
 def write_cmake_file_with_qt_info():
-    with open(os.path.join(atlas_repository_dir(), 'cmake', 'QtInfo.cmake'), mode='w', encoding='utf-8') as file:
+    with open(os.path.join(atlas_src_dir(), 'cmake', 'QtInfo.cmake'), mode='w', encoding='utf-8') as file:
         file.write('# Set Qt related variables\n')
         file.write(f'set(QT_VERSION {qt_ver()})\n')
         if sys.platform.startswith('win32'):
