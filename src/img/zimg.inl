@@ -595,7 +595,8 @@ void ZImg::scale_Impl(TVoxel minData, TVoxel maxData, const ZImg* src, ZImg* des
   }
 }
 
-template<typename TVoxel, typename TDesVoxel>
+template<typename TVoxel, typename TDesVoxel,
+  typename std::enable_if_t<sizeof(TVoxel) <= 2, int>>
 void ZImg::buildScaleColormap(TVoxel minData, TVoxel maxData, TDesVoxel desDataRangeMin, TDesVoxel desDataRangeMax,
                               std::vector<TDesVoxel>& res)
 {
@@ -611,6 +612,13 @@ void ZImg::buildScaleColormap(TVoxel minData, TVoxel maxData, TDesVoxel desDataR
       res[v - dataRangeMin] = (v - minData) * 1.0 / (maxData - minData) * desDataRangeMax + desDataRangeMin;
   }
   res[dataRangeMax - dataRangeMin] = desDataRangeMax;
+}
+
+template<typename TVoxel, typename TDesVoxel,
+  typename std::enable_if_t<sizeof(TVoxel) >= 4, int>>
+void ZImg::buildScaleColormap(TVoxel, TVoxel, TDesVoxel, TDesVoxel,
+                              std::vector<TDesVoxel>&)
+{
 }
 
 template<typename TVoxel, typename TScalar>

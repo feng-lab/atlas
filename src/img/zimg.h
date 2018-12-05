@@ -991,7 +991,13 @@ private:
   template<typename TVoxel, typename TDesVoxel>
   static void scale_Impl(TVoxel minData, TVoxel maxData, const ZImg* src, ZImg* des);
 
-  template<typename TVoxel, typename TDesVoxel>
+  template<typename TVoxel, typename TDesVoxel,
+    typename std::enable_if_t<sizeof(TVoxel) <= 2, int> = 0>
+  static void buildScaleColormap(TVoxel minData, TVoxel maxData, TDesVoxel desDataRangeMin, TDesVoxel desDataRangeMax,
+                                 std::vector<TDesVoxel>& res);
+
+  template<typename TVoxel, typename TDesVoxel,
+    typename std::enable_if_t<sizeof(TVoxel) >= 4, int> = 0>
   static void buildScaleColormap(TVoxel minData, TVoxel maxData, TDesVoxel desDataRangeMin, TDesVoxel desDataRangeMax,
                                  std::vector<TDesVoxel>& res);
 

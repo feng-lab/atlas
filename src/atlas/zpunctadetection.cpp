@@ -79,7 +79,7 @@ Eigen::MatrixXd meanShiftGaussianCenters(const nim::ZVBGMM<T, double>& vbgmm, co
   double k = std::sqrt(boost::math::quantile(dist, 0.9));
 
   for (size_t i = 0; i < vbgmm.numOfClusters(); ++i) {
-    Eigen::Vector3i m;
+    Eigen::Vector3i m(0, 0, 0);
     for (int d = 0; d < dimension; ++d)
       m[d] = nim::roundTo<int>(res(i, d));
     Eigen::MatrixXd cov = vbgmm.covar(i);
