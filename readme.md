@@ -31,7 +31,8 @@
 * $ROOT_DIR/src/3rdparty/makeengine.macos.gte: -mmacosx-version-min=10.10
 
 ## Python Package Build
-* conda install conda-build cmake ninja qt mkl-devel tbb-devel numpy
+* conda install conda-build cmake ninja qt mkl-devel tbb-devel numpy pybind11
 * conda build purge-all
 * conda build conda
-* conda install zimg --use-local
+* conda remove zimg -y
+* conda install zimg --use-local -y

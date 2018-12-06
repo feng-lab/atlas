@@ -56,25 +56,26 @@ message(STATUS "PYTHON_EXECUTABLE: " ${PYTHON_EXECUTABLE})
 
 # build python extensions
 if(PYTHON_VERSION_MAJOR)
-  pybind11_add_module(imgpy imgpy.cpp)
-  target_link_libraries(imgpy PRIVATE img)
+  set(module_name _imgpy)
+  pybind11_add_module(${module_name} imgpy.cpp)
+  target_link_libraries(${module_name} PRIVATE img)
   if(APPLE)
-    add_custom_command(TARGET imgpy
+    add_custom_command(TARGET ${module_name}
                        POST_BUILD
                        COMMAND install_name_tool -change
                        @rpath/libfreeimageplus.dylib
                        @loader_path/libfreeimageplus.dylib
-                       $<TARGET_FILE:imgpy>
+                       $<TARGET_FILE:${module_name}>
                        COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
-                       $<TARGET_FILE_DIR:imgpy>/libfreeimageplus.dylib
+                       $<TARGET_FILE_DIR:${module_name}>/libfreeimageplus.dylib
                        COMMAND install_name_tool -id libfreeimageplus.dylib
-                       $<TARGET_FILE_DIR:imgpy>/libfreeimageplus.dylib
+                       $<TARGET_FILE_DIR:${module_name}>/libfreeimageplus.dylib
                        )
   endif()
   if(UNIX AND NOT APPLE)
-    add_custom_command(TARGET imgpy
+    add_custom_command(TARGET ${module_name}
                        POST_BUILD
-                       COMMAND patchelf --set-rpath '$$ORIGIN' --force-rpath $<TARGET_FILE:imgpy>
+                       COMMAND patchelf --set-rpath '$$ORIGIN' --force-rpath $<TARGET_FILE:${module_name}>
                        )
   endif()
 endif()
@@ -84,5 +85,5 @@ install(DIRECTORY "./" # source directory
         DESTINATION $ENV{SP_DIR}/zimg # target directory
         FILES_MATCHING PATTERN "*.py"
         )
-install(TARGETS imgpy DESTINATION $ENV{SP_DIR}/zimg)
-install(FILES $<TARGET_FILE_DIR:imgpy>/libfreeimageplus.dylib DESTINATION $ENV{SP_DIR}/zimg)
+install(TARGETS ${module_name} DESTINATION $ENV{SP_DIR}/zimg)
+install(FILES $<TARGET_FILE_DIR:${module_name}>/libfreeimageplus.dylib DESTINATION $ENV{SP_DIR}/zimg)
