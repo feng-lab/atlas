@@ -154,9 +154,19 @@ ZImg::ZImg(ZImg&& other) noexcept
   swap(other);
 }
 
-ZImg::ZImg(const QString& filename, ZImgRegion region, size_t scene, FileFormat format)
+ZImg::ZImg(const QString& filename, ZImgRegion region, size_t scene, size_t ratio, FileFormat format)
 {
-  load(filename, region, scene, format);
+  load(filename, region, scene, ratio, format);
+}
+
+ZImg::ZImg(const QStringList& fileList, Dimension catDim,
+           const ZImgRegion& region,
+           size_t scene,
+           FileFormat format,
+           bool expandXY,
+           bool expandWithMaxValue)
+{
+  load(fileList, catDim, region, scene, format, expandXY, expandWithMaxValue);
 }
 
 ZImg::ZImg(const ZImgSource& imgSource)
@@ -207,16 +217,16 @@ bool ZImg::fileExtensionWriteSupported(const QString& filename)
   return ZImgIO().fileExtensionWriteSupported(filename);
 }
 
-void ZImg::load(const QString& filename, size_t scene, FileFormat format)
+void ZImg::load(const QString& filename, size_t scene, size_t ratio, FileFormat format)
 {
   clear();
-  ZImgIO().readImg(filename, *this, ZImgRegion(), scene, 1, format);
+  ZImgIO().readImg(filename, *this, ZImgRegion(), scene, ratio, format);
 }
 
-void ZImg::load(const QString& filename, ZImgRegion region, size_t scene, FileFormat format)
+void ZImg::load(const QString& filename, ZImgRegion region, size_t scene, size_t ratio, FileFormat format)
 {
   clear();
-  ZImgIO().readImg(filename, *this, region, scene, 1, format);
+  ZImgIO().readImg(filename, *this, region, scene, ratio, format);
 }
 
 void ZImg::load(const ZImgSource& imgSource)
@@ -284,6 +294,25 @@ void ZImg::wrapData(void* data, const ZImgInfo& info)
     // reinterpret_cast allowed (AliasedType is char or unsigned char: this permits
     // examination of the object representation of any object as an array of unsigned char.)
     m_data[i] = reinterpret_cast<uint8_t*>(data) + i * info.timeVoxelNumber();
+  }
+}
+
+void ZImg::wrapData(const std::vector<void*>& data, const ZImgInfo& info)
+{
+  clear();
+
+  m_info = info;
+
+  m_ownData = false;
+
+  m_data.resize(m_info.numTimes);
+
+  CHECK(m_data.size() == data.size());
+
+  for (size_t i = 0; i < m_info.numTimes; ++i) {
+    // reinterpret_cast allowed (AliasedType is char or unsigned char: this permits
+    // examination of the object representation of any object as an array of unsigned char.)
+    m_data[i] = reinterpret_cast<uint8_t*>(data[i]);
   }
 }
 

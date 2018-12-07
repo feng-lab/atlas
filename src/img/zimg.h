@@ -124,8 +124,18 @@ public:
   ZImg(ZImg&& other) noexcept;
 
   // read image from file, throw ZIOException if read failed, might throw ZImgException if can't allocate memory
-  explicit ZImg(const QString& filename, ZImgRegion region = ZImgRegion(), size_t scene = 0,
+  explicit ZImg(const QString& filename,
+                ZImgRegion region = ZImgRegion(),
+                size_t scene = 0,
+                size_t ratio = 1,
                 FileFormat format = FileFormat::Unknown);
+
+  explicit ZImg(const QStringList& fileList, Dimension catDim,
+                const ZImgRegion& region = ZImgRegion(),
+                size_t scene = 0,
+                FileFormat format = FileFormat::Unknown,
+                bool expandXY = false,
+                bool expandWithMaxValue = false);
 
   explicit ZImg(const ZImgSource& imgSource);
 
@@ -153,9 +163,9 @@ public:
   static bool fileExtensionWriteSupported(const QString& filename);
 
   // throw ZIOException if io error or empty image, might throw ZImgException if can't allocate memory
-  void load(const QString& filename, size_t scene = 0, FileFormat format = FileFormat::Unknown);
+  void load(const QString& filename, size_t scene = 0, size_t ratio = 1, FileFormat format = FileFormat::Unknown);
 
-  void load(const QString& filename, ZImgRegion region, size_t scene = 0, FileFormat format = FileFormat::Unknown);
+  void load(const QString& filename, ZImgRegion region, size_t scene = 0, size_t ratio = 1, FileFormat format = FileFormat::Unknown);
 
   // load a sequence of imgs, cat these imgs along dimension "catDim"
   // imgs should have same size in other dimensions and have same type
@@ -195,6 +205,8 @@ public:
                 size_t numChannels = 1, size_t numTimes = 1);
 
   void wrapData(void* data, const ZImgInfo& info);
+
+  void wrapData(const std::vector<void*>& data, const ZImgInfo& info);
 
   inline bool isEmpty() const
   { return m_data.empty() || m_info.isEmpty(); }

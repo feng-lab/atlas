@@ -128,7 +128,7 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
     throw ZIOException("label image can not be time sequence or color image");
   }
 
-  ZImg origLabelImg(fn, ZImgRegion(), 0, format);
+  ZImg origLabelImg(fn, ZImgRegion(), 0, 1, format);
   //LOG(INFO) << origLabelImg.info().toQString();
   m_width = origLabelImg.width();
   m_height = origLabelImg.height();

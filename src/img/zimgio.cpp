@@ -363,7 +363,7 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, ZImg& img, s
 
   std::vector<ZImg> imgs(fileList.size());
   for (size_t i = 0; i < imgs.size(); ++i) {
-    imgs[i].load(fileList[i], scene, format);
+    imgs[i].load(fileList[i], scene, 1, format);
     if (expandXY && (imgs[i].width() < info.width || imgs[i].height() < info.height)) {
       int widthPadBefore = (info.width - imgs[i].width()) / 2;
       int widthPadAfter = info.width - imgs[i].width() - widthPadBefore;
@@ -462,7 +462,7 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, const ZImgRe
       sliceRegionFullXY.end.x = -1;
       sliceRegionFullXY.start.y = 0;
       sliceRegionFullXY.end.y = -1;
-      imgs[i].load(fileList[i], sliceRegionFullXY, scene, format);
+      imgs[i].load(fileList[i], sliceRegionFullXY, scene, 1, format);
       if (info.voxelFormat == VoxelFormat::Float) {
         double min;
         double max;
@@ -498,7 +498,7 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, const ZImgRe
                                       PadOption::Constant, expandWithMaxValue ? max : min);
       }
     } else {
-      imgs[i].load(fileList[i], sliceRegion, scene, format);
+      imgs[i].load(fileList[i], sliceRegion, scene, 1, format);
     }
   }
   if (imgs.size() == 1) {

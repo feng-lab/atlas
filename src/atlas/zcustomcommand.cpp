@@ -1571,12 +1571,12 @@ void stitchAndDetectPuncta()
 {
   QDir dir("/Volumes/shared/Imaging/JK656M1/Confocal");
   QStringList filters;
-  filters << "JK656M1*";
+  filters << "JK656M1*_reimaged";
   QFileInfoList fdlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
 
   QDir dir2("/Volumes/shared/Imaging/JK636M1/confocal");
   filters.clear();
-  filters << "JK636M1*";
+  filters << "JK636M1-9_right_reimaged";
   QFileInfoList fdlist2 = dir2.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
 
   fdlist.append(fdlist2);
@@ -1656,7 +1656,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  exportSceneForGlance();
+  stitchAndDetectPuncta();
   LOG(INFO) << "done";
 }
 

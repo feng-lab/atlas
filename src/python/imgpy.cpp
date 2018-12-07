@@ -3,6 +3,101 @@
 #include "zimg.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/numpy.h>
+
+namespace {
+
+namespace py = pybind11;
+using namespace nim;
+
+std::string getFormatDesc(const ZImg& img)
+{
+  if (img.voxelFormat() == VoxelFormat::Unsigned) {
+    switch (img.bytesPerVoxel()) {
+    case 1:
+      return py::format_descriptor<uint8_t>::format();
+    case 2:
+      return py::format_descriptor<uint16_t>::format();
+    case 4:
+      return py::format_descriptor<uint32_t>::format();
+    case 8:
+      return py::format_descriptor<uint64_t>::format();
+    default:
+      throw std::runtime_error("Incorrect Img Info");
+    }
+  } else if (img.voxelFormat() == VoxelFormat::Float) {
+    switch (img.bytesPerVoxel()) {
+    case 4:
+      return py::format_descriptor<float>::format();
+    case 8:
+      return py::format_descriptor<double>::format();
+    default:
+      throw std::runtime_error("Incorrect Img Info");
+    }
+  } else {
+    switch (img.bytesPerVoxel()) {
+    case 1:
+      return py::format_descriptor<int8_t>::format();
+    case 2:
+      return py::format_descriptor<int16_t>::format();
+    case 4:
+      return py::format_descriptor<int32_t>::format();
+    case 8:
+      return py::format_descriptor<int64_t>::format();
+    default:
+      throw std::runtime_error("Incorrect Img Info");
+    }
+  }
+}
+
+ZImgInfo getImgInfoFromNdarray(const py::array& arr, const ZImgInfo& info_in)
+{
+  if (arr.ndim() != 4) {
+    throw std::runtime_error("Only support 4d array: channel x depth x height x width");
+  }
+  if (arr.size() <= 0) {
+    throw std::runtime_error("Empty ndarray");
+  }
+  ZImgInfo res = info_in;
+  res.numTimes = 1;
+  res.numChannels = arr.shape(0);
+  res.depth = arr.shape(1);
+  res.height = arr.shape(2);
+  res.width = arr.shape(3);
+  res.bytesPerVoxel = arr.itemsize();
+
+  if (res.numChannels > 1 && static_cast<py::ssize_t>(res.channelByteNumber()) != arr.strides(0)) {
+    throw std::runtime_error("ndarray is not C_CONTIGUOUS");
+  }
+  if (res.depth > 1 && static_cast<py::ssize_t>(res.planeByteNumber()) != arr.strides(1)) {
+    throw std::runtime_error("ndarray is not C_CONTIGUOUS");
+  }
+  if (res.height > 1 && static_cast<py::ssize_t>(res.rowByteNumber()) != arr.strides(2)) {
+    throw std::runtime_error("ndarray is not C_CONTIGUOUS");
+  }
+  if (res.width > 1 && static_cast<py::ssize_t>(res.voxelByteNumber()) != arr.strides(3)) {
+    throw std::runtime_error("ndarray is not C_CONTIGUOUS");
+  }
+
+  switch (arr.dtype().kind()) {
+    case 'i':
+      res.voxelFormat = VoxelFormat::Signed;
+      break;
+    case 'u':
+      res.voxelFormat = VoxelFormat::Unsigned;
+      break;
+    case 'f':
+      res.voxelFormat = VoxelFormat::Float;
+      break;
+    default:
+      throw std::runtime_error("ndarray dtype is not supported");
+  }
+  res.createDefaultDescriptions();
+
+  return res;
+}
+
+}
 
 namespace py = pybind11;
 
@@ -174,19 +269,10 @@ PYBIND11_MODULE(_imgpy, m)
     .def(py::init<>())
     .def(py::init<const QString&, const ZImgRegion&, size_t, FileFormat>(),
       "filename"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "format"_a = FileFormat::Unknown)
-    .def(py::init<>([](const std::list<QString>& fns, Dimension catDim, const ZImgRegion& rgn, size_t scene,
-                       FileFormat format, bool expandXY, bool expandWithMaxValue) {
-      return new ZImgSource(QStringList::fromStdList(fns), catDim, rgn, scene, format, expandXY, expandWithMaxValue);
-                    }),
+    .def(py::init<const QStringList&, Dimension, const ZImgRegion&, size_t, FileFormat, bool, bool>(),
       "filenames"_a, "catDim"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "format"_a = FileFormat::Unknown,
       "expandXY"_a = false, "expandWithMaxValue"_a = false)
-    .def_property("filenames",
-      [](const ZImgSource& v) {
-        return v.filenames.toStdList();
-      },
-      [](ZImgSource& v, const std::list<QString>& fns) {
-        v.filenames = QStringList::fromStdList(fns);
-      })
+    .def_readwrite("filenames", &ZImgSource::filenames)
     .def_readwrite("catDim", &ZImgSource::catDim)
     .def_readwrite("region", &ZImgSource::region)
     .def_readwrite("scene", &ZImgSource::scene)
@@ -201,8 +287,8 @@ PYBIND11_MODULE(_imgpy, m)
   py::class_<ZImg>(m, "ZImg")
     .def(py::init<>())
     .def(py::init<const ZImgInfo&>())
-    .def(py::init<const QString&, ZImgRegion, size_t, FileFormat>(),
-      "filename"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "format"_a = FileFormat::Unknown)
+    .def(py::init<const QString&, ZImgRegion, size_t, size_t, FileFormat>(),
+      "filename"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "ratio"_a = 1, "format"_a = FileFormat::Unknown)
     .def(py::init<>([](const QStringList& fileList, Dimension catDim, const ZImgRegion& region, size_t scene,
                        FileFormat format, bool expandXY, bool expandWithMaxValue) {
       return new ZImg(fileList, catDim, region, scene, format, expandXY, expandWithMaxValue);
@@ -210,6 +296,31 @@ PYBIND11_MODULE(_imgpy, m)
       "filenames"_a, "catDim"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "format"_a = FileFormat::Unknown,
       "expandXY"_a = false, "expandWithMaxValue"_a = false)
     .def(py::init<const ZImgSource&>())
+    .def(py::init<>([](const py::array& arr, const ZImgInfo& info_in) {
+        auto img = new ZImg();
+        auto info = getImgInfoFromNdarray(arr, info_in);
+        img->wrapData(const_cast<void*>(arr.data()), info);
+        return img;
+      }), "ndarray"_a, "imgInfo"_a = ZImgInfo())
+    .def(py::init<>([](const std::vector<py::array>& arrs, const ZImgInfo& info_in) {
+        auto img = new ZImg();
+        std::vector<void*> data;
+        if (!arrs.empty()) {
+          auto info = getImgInfoFromNdarray(arrs[0], info_in);
+          data.push_back(const_cast<void*>(arrs[0].data()));
+          for (size_t t = 1; t < arrs.size(); ++t) {
+            auto tmpinfo = getImgInfoFromNdarray(arrs[t], info_in);
+            if (!tmpinfo.isSameType(info) || !tmpinfo.isSameSize(info)) {
+              throw std::runtime_error("ndarrays in the list are not compatible");
+            }
+            data.push_back(const_cast<void*>(arrs[t].data()));
+          }
+
+          info.numTimes = arrs.size();
+          img->wrapData(data, info);
+        }
+        return img;
+      }), "listOfndarray"_a, "imgInfo"_a = ZImgInfo())
     .def_static("readImgInfo", [](const QString& filename, FileFormat format) {
       return ZImg::readImgInfo(filename, nullptr, format);
       }, "filename"_a, "format"_a = FileFormat::Unknown)
@@ -219,7 +330,8 @@ PYBIND11_MODULE(_imgpy, m)
     .def_static("readImgInfo", [](const ZImgSource& imgSource) {
       return ZImg::readImgInfo(imgSource);
       })
-    .def("save", &ZImg::save, "format"_a = FileFormat::Unknown, "compression"_a = Compression::AUTO)
+    .def("save", &ZImg::save,
+      "filename"_a, "format"_a = FileFormat::Unknown, "compression"_a = Compression::AUTO)
     .def_property("info",
       [](const ZImg& v) {
         return v.info();
@@ -227,12 +339,24 @@ PYBIND11_MODULE(_imgpy, m)
       [](ZImg& v, const ZImgInfo& info) {
         v.infoRef() = info;
       })
-    .def_property("data",
-      [](const ZImg& v) {
-
-      },
-      [](ZImg& v, py::array arr) {
-
+    .def_property_readonly("data",
+      [](ZImg& v) {
+        std::vector<py::buffer_info> bufs;
+        std::vector<py::array> arrs;
+        auto formatdesc = getFormatDesc(v);
+        for (size_t t = 0; t < v.numTimes(); ++t) {
+          bufs.emplace_back(
+            v.timeData(t),
+            v.info().voxelByteNumber(),
+            formatdesc,
+            4,
+            std::vector<py::size_t>{ v.numChannels(), v.depth(), v.height(), v.width() },
+            std::vector<py::size_t>{ v.info().channelByteNumber(), v.info().planeByteNumber(),
+                                     v.info().rowByteNumber(), v.info().voxelByteNumber() });
+          auto capsule = py::capsule(v.timeData(t), [](void *) {  });
+          arrs.emplace_back(py::dtype(bufs[t]), bufs[t].shape, bufs[t].strides, bufs[t].ptr, capsule);
+        }
+        return arrs;
       })
     .def("__repr__", [](const ZImg& v) {
       return QString("<_imgpy.ZImg %1>").arg(v.info().toQString()).toStdString();

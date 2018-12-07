@@ -3,7 +3,9 @@
 #pragma once
 
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include <QString>
+#include <QStringList>
 
 namespace py = pybind11;
 
@@ -12,7 +14,7 @@ namespace detail {
 
 #if 1
 
-/* Create a TypeCaster for auto python string <--> QString conversion */
+// QString
 template<> struct type_caster<QString>
 {
   PYBIND11_TYPE_CASTER(QString, _("QString"));
@@ -115,7 +117,10 @@ public:
 
 #endif
 
-}
-}
+// QList
+template <> struct type_caster<QStringList> : list_caster<QStringList, QString> {};
+
+} // namespace
+} // namespace
 
 

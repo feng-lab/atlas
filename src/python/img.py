@@ -1,15 +1,7 @@
 import numpy as np
 from dataclasses import dataclass, field
 from typing import List
-
-
-@dataclass
-class Col4:
-    r: np.uint8 = 0
-    g: np.uint8 = 0
-    b: np.uint8 = 0
-    a: np.uint8 = 255
-
+from . import _imgpy as _C
 
 def _array_eq(arr1, arr2):
     return (isinstance(arr1, np.ndarray) and
@@ -19,80 +11,38 @@ def _array_eq(arr1, arr2):
 
 
 @dataclass(eq=False)
-class VoxelCoordinate:
-    # t, c, z, y, x
-    data: np.ndarray = np.zeros(5, dtype=np.int32)
-
-    @classmethod
-    def end(cls):
-        # Do any necessary preparations, use the `string`
-        return cls(data=np.ones(5, dtype=np.int32) * -1)
-
-    def __array__(self, dtype=None):
-        if dtype and dtype != self.data.dtype:
-            return self.data.astype(dtype)
-        else:
-            return self.data
-
-    def __eq__(self, other):
-        if not isinstance(other, VoxelCoordinate):
-            return NotImplemented
-        return _array_eq(self.data, other.data)
-
-    x = property(lambda self: self.data[0],
-                 lambda self, value: self.data.itemset(0, value))
-
-    y = property(lambda self: self.data[1],
-                 lambda self, value: self.data.itemset(1, value))
-
-    z = property(lambda self: self.data[2],
-                 lambda self, value: self.data.itemset(2, value))
-
-    c = property(lambda self: self.data[3],
-                 lambda self, value: self.data.itemset(3, value))
-
-    t = property(lambda self: self.data[4],
-                 lambda self, value: self.data.itemset(4, value))
-
-
-@dataclass(eq=False)
-class ImgInfo:
-    """Class for Image Info."""
+class Img:
+    """Class for Image."""
     # ntimes, nchannels, depth, height, width
-    size: np.ndarray = np.ndarray([1, 1, 1, 0, 0])
+    datas: List[np.ndarray] = field(default_factory=list)
 
-    voxel_format: np.dtype = np.uint8
     valid_bit_count: int = 0
     # z, y, x
     voxel_size_in_um: np.ndarray[np.float64] = np.ndarray([0., 0., 0.])
 
     time_stamps: List[float] = field(default_factory=list)
-    channel_names: List[str] = ['Ch1']
-    channel_colors: List[Col4] = [Col4(r=255, g=255, b=255, a=255)]
+    channel_names: List[str] = field(default_factory=list)
+    channel_colors: List[tuple] = field(default_factory=list)
     position: List[float] = field(default_factory=list)
     last_channel_is_alpha_channel: bool = False
 
     def __eq__(self, other):
-        if not isinstance(other, ImgInfo):
+        if not isinstance(other, Img):
             return NotImplemented
-        return _array_eq(self.size, other.size) and \
-               self.voxel_format == other.voxel_format and \
+        return self.datas == other.datas and \
                _array_eq(self.voxel_size_in_um, other.voxel_size_in_um)
 
-    width = property(lambda self: self.size[4],
-                     lambda self, value: self.size.itemset(4, value))
+    width = property(lambda self: self.datas[0].shape[3] if len(self.datas) > 0 else 0)
 
-    height = property(lambda self: self.size[3],
-                      lambda self, value: self.size.itemset(3, value))
+    height = property(lambda self: self.datas[0].shape[2] if len(self.datas) > 0 else 0)
 
-    depth = property(lambda self: self.size[2],
-                     lambda self, value: self.size.itemset(2, value))
+    depth = property(lambda self: self.datas[0].shape[1] if len(self.datas) > 0 else 0)
 
-    nchannels = property(lambda self: self.size[1],
-                         lambda self, value: self.size.itemset(1, value))
+    nchannels = property(lambda self: self.datas[0].shape[0] if len(self.datas) > 0 else 0)
 
-    ntimes = property(lambda self: self.size[0],
-                      lambda self, value: self.size.itemset(0, value))
+    ntimes = property(lambda self: len(self.datas))
+
+    dtype = property(lambda self: self.datas[0].dtype if len(self.datas) > 0 else np.uint8)
 
     voxel_size_x_in_um = property(lambda self: self.voxel_size_in_um[2],
                                   lambda self, value: self.voxel_size_in_um.itemset(2, value))
@@ -104,20 +54,5 @@ class ImgInfo:
                                   lambda self, value: self.voxel_size_in_um.itemset(0, value))
 
 
-if __name__ == "__main__":
-    # execute only if run as a script
-    vs = VoxelCoordinate()
-    ve = VoxelCoordinate.end()
-    print(vs.x)
-    print(ve.x)
-    vs.x = 3
-    ve.z = 5
-    print(vs, ve)
-    vs = VoxelCoordinate(np.add(vs, ve))
-    print(vs)
-    print(vs == ve)
-    vs = np.add(vs, ve)
-    print(vs)
-    print(ve)
-    print(ve == vs)
-    print(VoxelCoordinate.__name__)
+# if __name__ == "__main__":
+

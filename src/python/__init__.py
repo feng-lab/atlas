@@ -1,4 +1,6 @@
 import sys
+from .img import *
+from ._imgpy import *
 
 
 if sys.version_info[0] < 3 or sys.version_info[1] < 7:
