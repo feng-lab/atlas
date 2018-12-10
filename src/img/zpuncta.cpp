@@ -9,6 +9,11 @@ ZPuncta::ZPuncta(const QString& filename)
   load(filename);
 }
 
+ZPuncta::ZPuncta(const std::list<nim::ZPunctum>& p)
+{
+  m_d = p;
+}
+
 bool ZPuncta::canReadFile(const QString& filename)
 {
   return ZPunctaIO::instance().canReadFile(filename);
@@ -37,6 +42,11 @@ void ZPuncta::load(const QString& filename)
 void ZPuncta::save(const QString& filename, const QString& format) const
 {
   ZPunctaIO::instance().save(*this, filename, format);
+}
+
+QString ZPuncta::toQString()
+{
+  return QString("%1 puncta").arg(m_d.size());
 }
 
 } // namespace nim

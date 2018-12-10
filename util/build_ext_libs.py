@@ -750,7 +750,7 @@ def build_itk(src_dir: str, install_dir: str):
                          '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
                          '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
                          '-DModule_ITKTBB:BOOL=ON',
-                         '-DTBB_DIR:PATH=' + atlas_repository_dir() + '/cmake'])
+                         '-DTBB_DIR:PATH=' + atlas_repository_dir() + '/src/cmake'])
 
         if is_windows():
             cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',

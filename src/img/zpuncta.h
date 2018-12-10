@@ -22,6 +22,8 @@ public:
   // might throw ZIOException
   explicit ZPuncta(const QString& filename);
 
+  explicit ZPuncta(const std::list<ZPunctum>& p);
+
   ZPuncta(ZPuncta&&) = default;
 
   ZPuncta& operator=(ZPuncta&&) = default;
@@ -132,6 +134,9 @@ public:
   inline bool operator!=(const ZPuncta& l) const
   { return !(*this == l); }
 
+  inline const std::list<ZPunctum>& data() const
+  { return m_d; }
+
   // qt style read write name filter for filedialog
   static bool canReadFile(const QString& filename);
 
@@ -145,6 +150,8 @@ public:
   void load(const QString& filename);
 
   void save(const QString& filename, const QString& format = "") const;
+
+  QString toQString();
 
 private:
   friend class ZPunctaIO;

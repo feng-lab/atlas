@@ -16,6 +16,13 @@ ZPunctum::ZPunctum(double x, double y, double z, double r)
   updateMass();
 }
 
+ZPunctum::ZPunctum(const Eigen::MatrixXi& loc, const Eigen::VectorXd& inten)
+{
+  m_voxelLocations = loc;
+  m_voxelIntensities = inten;
+  updateFromVoxelsList();
+}
+
 void ZPunctum::updateFromVoxelsList(double conf)
 {
   CHECK(m_voxelIntensities.size() == m_voxelLocations.rows());

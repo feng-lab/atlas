@@ -1,6 +1,7 @@
 #include "../version/version.h"
 #include "typecast.h"
 #include "zimg.h"
+#include "zpuncta.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
@@ -361,6 +362,43 @@ PYBIND11_MODULE(_imgpy, m)
     .def("__repr__", [](const ZImg& v) {
       return QString("<_imgpy.ZImg %1>").arg(v.info().toQString()).toStdString();
     });
+
+  py::class_<ZPunctum>(m, "ZPunctum")
+    .def(py::init<>())
+    .def(py::init<double, double, double, double>(), "x"_a, "y"_a, "z"_a, "r"_a)
+    .def(py::init<const Eigen::MatrixXi&, const Eigen::VectorXd&>(), "voxelLocations"_a, "voxelIntensities"_a)
+    .def_property("name", &ZPunctum::name, &ZPunctum::setName)
+    .def_property("comment", &ZPunctum::comment, &ZPunctum::setComment)
+    .def_property("x", &ZPunctum::x, &ZPunctum::setX)
+    .def_property("y", &ZPunctum::y, &ZPunctum::setY)
+    .def_property("z", &ZPunctum::z, &ZPunctum::setZ)
+    .def_property("maxIntensity", &ZPunctum::maxIntensity, &ZPunctum::setMaxIntensity)
+    .def_property("meanIntensity", &ZPunctum::meanIntensity, &ZPunctum::setMeanIntensity)
+    .def_property("sDevOfIntensity", &ZPunctum::sDevOfIntensity, &ZPunctum::setSDevOfIntensity)
+    .def_property("volSize", &ZPunctum::volSize, &ZPunctum::setVolSize)
+    .def_property("mass", &ZPunctum::mass, &ZPunctum::setMass)
+    .def_property("radius", &ZPunctum::radius, &ZPunctum::setRadius)
+    .def_property("property1", &ZPunctum::property1, &ZPunctum::setProperty1)
+    .def_property("property2", &ZPunctum::property2, &ZPunctum::setProperty2)
+    .def_property("property3", &ZPunctum::property3, &ZPunctum::setProperty3)
+    .def_property("color", &ZPunctum::color, &ZPunctum::setColor)
+    .def_property("score", &ZPunctum::score, &ZPunctum::setScore)
+    .def_property("voxelLocations", &ZPunctum::voxelLocations, &ZPunctum::setVoxelLocations)
+    .def_property("voxelIntensities", &ZPunctum::voxelIntensities, &ZPunctum::setVoxelIntensities)
+    .def("__repr__", [](const ZPunctum& v) {
+      return QString("<_imgpy.ZPunctum %1>").arg(v.toQString()).toStdString();
+      });
+
+  py::class_<ZPuncta>(m, "ZPuncta")
+    .def(py::init<>())
+    .def(py::init<const std::list<ZPunctum>&>())
+    .def(py::init<const QString&>(), "filename"_a)
+    .def("save", &ZImg::save,
+      "filename"_a, "format"_a = QString())
+    .def_property_readonly("data", &ZPuncta::data)
+    .def("__repr__", [](const ZPuncta& v) {
+      return QString("<_imgpy.ZPuncta %1>").arg(v.toQString()).toStdString();
+      });
 
   m.attr("__version__") = GIT_VERSION;
 }

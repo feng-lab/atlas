@@ -14,6 +14,8 @@ public:
 
   ZPunctum(double x, double y, double z, double r);
 
+  ZPunctum(const Eigen::MatrixXi& loc, const Eigen::VectorXd& inten);
+
   ZPunctum(ZPunctum&&) = default;
 
   ZPunctum& operator=(ZPunctum&&) = default;
