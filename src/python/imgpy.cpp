@@ -393,7 +393,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def(py::init<>())
     .def(py::init<const std::list<ZPunctum>&>())
     .def(py::init<const QString&>(), "filename"_a)
-    .def("save", &ZImg::save,
+    .def("save", &ZPuncta::save,
       "filename"_a, "format"_a = QString())
     .def_property_readonly("data", &ZPuncta::data)
     .def("__repr__", [](const ZPuncta& v) {

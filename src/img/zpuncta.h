@@ -151,7 +151,7 @@ public:
 
   void save(const QString& filename, const QString& format = "") const;
 
-  QString toQString();
+  QString toQString() const;
 
 private:
   friend class ZPunctaIO;

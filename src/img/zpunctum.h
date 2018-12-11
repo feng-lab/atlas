@@ -217,7 +217,7 @@ public:
   inline void updateMass()
   { m_mass = m_volSize * m_meanIntensity; }
 
-  QString toQString();
+  QString toQString() const;
 
 private:
   QString m_name;

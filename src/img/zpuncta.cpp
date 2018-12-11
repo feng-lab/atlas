@@ -44,7 +44,7 @@ void ZPuncta::save(const QString& filename, const QString& format) const
   ZPunctaIO::instance().save(*this, filename, format);
 }
 
-QString ZPuncta::toQString()
+QString ZPuncta::toQString() const
 {
   return QString("%1 puncta").arg(m_d.size());
 }
