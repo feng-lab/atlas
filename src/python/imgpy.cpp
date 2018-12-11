@@ -6,10 +6,13 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 
-namespace {
-
 namespace py = pybind11;
+
 using namespace nim;
+
+using namespace pybind11::literals;
+
+namespace {
 
 std::string getFormatDesc(const ZImg& img)
 {
@@ -99,12 +102,6 @@ ZImgInfo getImgInfoFromNdarray(const py::array& arr, const ZImgInfo& info_in)
 }
 
 }
-
-namespace py = pybind11;
-
-using namespace nim;
-
-using namespace pybind11::literals;
 
 PYBIND11_MODULE(_imgpy, m)
 {
