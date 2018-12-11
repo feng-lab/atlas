@@ -60,6 +60,7 @@ if(PYTHON_VERSION_MAJOR)
   pybind11_add_module(${module_name} imgpy.cpp)
   target_link_libraries(${module_name} PRIVATE img)
   if(APPLE)
+    set(freeimagelibname libfreeimageplus.dylib)
     add_custom_command(TARGET ${module_name}
                        POST_BUILD
                        COMMAND install_name_tool -change
@@ -67,17 +68,17 @@ if(PYTHON_VERSION_MAJOR)
                        @loader_path/libfreeimageplus.dylib
                        $<TARGET_FILE:${module_name}>
                        COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
-                       $<TARGET_FILE_DIR:${module_name}>/libfreeimageplus.dylib
-                       COMMAND install_name_tool -id libfreeimageplus.dylib
-                       $<TARGET_FILE_DIR:${module_name}>/libfreeimageplus.dylib
+                       $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
+                       COMMAND install_name_tool -id ${freeimagelibname}
+                       $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
                        )
   endif()
   if(UNIX AND NOT APPLE)
+    set(freeimagelibname libfreeimageplus.so.3)  
     add_custom_command(TARGET ${module_name}
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
-                       $<TARGET_FILE_DIR:module_name>/libfreeimageplus.so.3
-                       COMMAND patchelf --set-rpath '$$ORIGIN' --force-rpath $<TARGET_FILE:${module_name}>
+                       $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
                        )
   endif()
 endif()
@@ -88,4 +89,4 @@ install(DIRECTORY "./" # source directory
         FILES_MATCHING PATTERN "*.py"
         )
 install(TARGETS ${module_name} DESTINATION $ENV{SP_DIR}/zimg)
-install(FILES $<TARGET_FILE_DIR:${module_name}>/libfreeimageplus.dylib DESTINATION $ENV{SP_DIR}/zimg)
+install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION $ENV{SP_DIR}/zimg)
