@@ -75,6 +75,8 @@ if(PYTHON_VERSION_MAJOR)
   if(UNIX AND NOT APPLE)
     add_custom_command(TARGET ${module_name}
                        POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
+                       $<TARGET_FILE_DIR:correct_czi_shading_mex>/libfreeimageplus.so.3
                        COMMAND patchelf --set-rpath '$$ORIGIN' --force-rpath $<TARGET_FILE:${module_name}>
                        )
   endif()
