@@ -563,11 +563,26 @@ def build_assimp(src_dir: str, install_dir: str):
 
     orig_file = None
     bak_file = None
+    orig_file_3 = None
+    bak_file_3 = None
+    orig_file_4 = None
+    bak_file_4 = None
     try:
         orig_file = os.path.join(src_dir, 'include', 'assimp', 'defs.h')
         from_texts = [r'#define AI_MAX_ALLOC(type) ((256U * 1024 * 1024) / sizeof(type))']
         to_texts = [r'#define AI_MAX_ALLOC(type) ((size_t(256) * 1024 * 1024 * 1024) / sizeof(type))']
         bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
+
+        if is_mac():
+            orig_file_3 = os.path.join(src_dir, 'assimpTargets-release.cmake.in')
+            from_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@']
+            to_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@']
+            bak_file_3 = patch_file(orig_file_3, from_texts=from_texts, to_texts=to_texts)
+
+            orig_file_4 = os.path.join(src_dir, 'assimpTargets-debug.cmake.in')
+            from_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@']
+            to_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@']
+            bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
@@ -581,6 +596,9 @@ def build_assimp(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         os.replace(bak_file, orig_file)
+        if is_mac():
+            os.replace(bak_file_3, orig_file_3)
+            os.replace(bak_file_4, orig_file_4)
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
