@@ -49,10 +49,7 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent)
     m_pageTableBlockSize = glm::uvec3(32, 32, 32);
     m_imageBlockSize = imageBlockSize();
     m_imageBlockReadSize = glm::ivec3(510, 510, 30);
-    if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 16384) {
-      m_imageCacheNumBlocks = glm::uvec3(64, 64, 64); // 8G
-      m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 8); // 256*256*256*4*4   256MB
-    } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 8192) {
+    if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 8192) {
       m_imageCacheNumBlocks = glm::uvec3(64, 64, 48); // 6G
       m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 6); // 256*256*192*4*4   192MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 4096) {
