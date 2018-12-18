@@ -16,6 +16,10 @@
 .DS_Store
 .svn/
 
+*.pb.h
+*.pb.cc
+*_pb2.py
+
 !/neurolabi/lib/Mingw/*.zip
 
 # qtcreator c project file

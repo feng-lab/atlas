@@ -6,6 +6,33 @@ LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # main stuff
 
+find_package(c-ares REQUIRED
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/c-ares NO_DEFAULT_PATH)
+set(OPENSSL_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/boringssl)
+find_package(OpenSSL REQUIRED)
+
+# Find Protobuf installation
+# Looks for protobuf-config.cmake file installed by Protobuf's cmake installation.
+find_package(Protobuf CONFIG REQUIRED
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/protobuf NO_DEFAULT_PATH)
+message(STATUS "Using Protobuf ${Protobuf_VERSION}")
+
+# Find gRPC installation
+# Looks for gRPCConfig.cmake file installed by gRPC's cmake installation.
+find_package(gRPC CONFIG REQUIRED
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/grpc NO_DEFAULT_PATH)
+message(STATUS "Using gRPC ${gRPC_VERSION}")
+
+include(gRPCGenerateCPP)
+
+set(PROTOS
+    ${CMAKE_CURRENT_SOURCE_DIR}/../protos/helloworld.proto
+    )
+set(PROTO_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../protos)
+protobuf_generate(LANGUAGE cpp APPEND_PATH PROTOC_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR} OUT_VAR PROTO_SRCS PROTOS ${PROTOS})
+grpc_generate_cpp(GRPC_SRCS GRPC_HDRS ${CMAKE_CURRENT_BINARY_DIR} ${PROTOS})
+set_property(SOURCE ${PROTO_SRCS} ${GRPC_SRCS} PROPERTY SKIP_AUTOGEN ON)
+
 if (WIN32)
   set(IPP_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\ipp")
 else (WIN32)
@@ -650,9 +677,11 @@ add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
                ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
                ${CERESSOLVER_HEADERS} ${CERESSOLVER_INTERNAL}
                ${SOURCES} ${FORMS} ${RESOURCES} ${ASSETS}
-               ${TESTS})
+               ${TESTS}
+               ${PROTO_SRCS} ${GRPC_SRCS})
 
 target_include_directories(${APP_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(${APP_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(${APP_NAME} PUBLIC ${IPP_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${GEOMETRICTOOLS_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${HDF5_INCLUDE_DIR})
@@ -763,7 +792,7 @@ endif (WIN32)
 target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding-aux glbinding::glbinding
                       hdf5::hdf5_cpp-static hdf5::hdf5-static
                       img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${GEOMETRICTOOLS_LIBRARIES}
-                      ${ASSIMP_LIBRARIES} ${IPP_LIBRARIES})
+                      ${ASSIMP_LIBRARIES} ${IPP_LIBRARIES} gRPC::grpc++_unsecure protobuf::libprotobuf)
 if (BUILD_TESTING)
   target_link_libraries(${APP_NAME} PUBLIC benchmark::benchmark)
 endif (BUILD_TESTING)
