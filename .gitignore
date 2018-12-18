@@ -50,6 +50,10 @@
 /src/3rdparty/benchmark/
 /src/3rdparty/cpuinfo/
 /src/3rdparty/pybind11/
+/src/3rdparty/c-ares/
+/src/3rdparty/protobuf/
+/src/3rdparty/boringssl/
+/src/3rdparty/grpc/
 ffmpeg
 ffmpeg.exe
 nasm

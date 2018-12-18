@@ -250,33 +250,6 @@ def freeimage_redist_dir() -> str:
     return res
 
 
-def write_cmake_file_with_qt_info():
-    with open(os.path.join(atlas_src_dir(), 'cmake', 'QtInfo.cmake'), mode='w', encoding='utf-8') as file:
-        file.write('# Set Qt related variables\n')
-        file.write(f'set(QT_VERSION {qt_ver()})\n')
-        if sys.platform.startswith('win32'):
-            file.write('set(QT_PATHS {0})\n'.format(qt_base_dir().replace("\\", "/")))
-            # also need to patch Qt
-            orig_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h')
-            bak_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h.bak')
-            if not os.path.exists(bak_file):
-                os.rename(orig_file, bak_file)
-                with open(bak_file, mode='r', encoding='utf-8') as f:
-                    from_lines = f.readlines()
-                with open(orig_file, mode='w', encoding='utf-8') as f:
-                    to_lines = []
-                    for line in from_lines:
-                        line = line.replace(
-                            r'#if defined(__cpp_variable_templates) && __cpp_variable_templates >= 201304 // C++14',
-                            r'#if defined(_MSC_VER) || '
-                            r'defined(__cpp_variable_templates) && __cpp_variable_templates >= 201304 // C++14')
-                        f.write(line)
-                        to_lines.append(line)
-                print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
-        else:
-            file.write(f'set(QT_PATHS {qt_base_dir()})\n')
-
-
 def software_dir() -> str:
     res = os.path.join(os.path.expanduser('~'), 'software')
     if not os.path.exists(res):
@@ -412,8 +385,4 @@ def get_ninja_binary() -> str:
 
 
 if __name__ == "__main__":
-    print(f'Qt {qt_ver()} in {qt_base_dir()}')
-    write_cmake_file_with_qt_info()
-    install_cmake()
-    subprocess.run([get_cmake_binary(), '-P', 'MakeTBBConfigFiles.cmake'],
-                   cwd=os.path.join(atlas_repository_dir(), 'src', 'cmake'), shell=False, check=True)
+    print('nothing')

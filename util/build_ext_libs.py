@@ -26,6 +26,15 @@ def update_or_clone_git_repository(repository_folder: str, repository_url: str):
         subprocess.run(['git', 'clone', repository_url, repository_folder], shell=False, check=True)
 
 
+def update_or_clone_git_repository_with_submodules(repository_folder: str, repository_url: str):
+    if os.path.exists(repository_folder):
+        print('git', 'pull', Path(repository_folder).name)
+        subprocess.run(['git', 'pull'], cwd=repository_folder, shell=False, check=False)
+        subprocess.run(['git', 'submodule', 'update', '--init'], cwd=repository_folder, shell=False, check=False)
+    else:
+        subprocess.run(['git', 'clone', '--recursive', repository_url, repository_folder], shell=False, check=True)
+
+
 def export_git_repository(repository_folder: str, target_folder: str, branch: str = '', tag: str = ''):
     if not branch:
         branch = 'master'
@@ -152,6 +161,38 @@ def get_cmake_cmd_common_part(install_dir: str):
         return res
 
 
+def build_cmakecmd(cmakecmd, build_dir: str, env=None):
+    if is_windows():
+        if env is None:
+            env = get_vcvars_environment()
+        subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+        if use_ninja():
+            subprocess.run([get_ninja_binary()],
+                           cwd=build_dir, shell=False, check=True, env=env)
+        else:
+            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
+                           cwd=build_dir, shell=True, check=True, env=env)
+    else:
+        if use_ninja():
+            if env is None:
+                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
+                subprocess.run([get_ninja_binary()],
+                               cwd=build_dir, shell=False, check=True)
+            else:
+                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+                subprocess.run([get_ninja_binary()],
+                               cwd=build_dir, shell=False, check=True, env=env)
+        else:
+            if env is None:
+                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
+                subprocess.run(['make', '-j' + str(os.cpu_count())],
+                               cwd=build_dir, shell=False, check=True)
+            else:
+                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+                subprocess.run(['make', '-j' + str(os.cpu_count())],
+                               cwd=build_dir, shell=False, check=True, env=env)
+
+
 def build_and_install_cmakecmd(cmakecmd, build_dir: str, env=None):
     if is_windows():
         if env is None:
@@ -275,6 +316,86 @@ def build_benchmark(src_dir: str, install_dir: str):
         elif is_mac():
             cmakecmd.extend(['-DBENCHMARK_USE_LIBCXX:BOOL=ON'])
 
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_grpc(src_dir: str, install_dir: str):
+    ssl_src_dir = os.path.join(src_dir, 'third_party', 'boringssl')
+    ssl_install_dir = f'{ext_dir()}/boringssl'
+    ssl_build_dir = os.path.join(ssl_src_dir, 'build')
+    shutil.rmtree(ssl_build_dir, ignore_errors=True)
+    os.makedirs(ssl_build_dir, exist_ok=False)
+    shutil.rmtree(ssl_install_dir, ignore_errors=True)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(ssl_install_dir)
+        cmakecmd.extend([ssl_src_dir])
+        build_cmakecmd(cmakecmd, ssl_build_dir)
+        shutil.copytree(os.path.join(ssl_src_dir, 'include'), os.path.join(ssl_install_dir, 'include'))
+        glob_copy(os.path.join(ssl_build_dir, 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
+        glob_copy(os.path.join(ssl_build_dir, 'decrepit', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
+        glob_copy(os.path.join(ssl_build_dir, 'crypto', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
+        glob_copy(os.path.join(ssl_build_dir, 'ssl', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
+    finally:
+        shutil.rmtree(ssl_build_dir, ignore_errors=False)
+
+    sub_src_dir = os.path.join(src_dir, 'third_party', 'cares', 'cares')
+    sub_install_dir = f'{ext_dir()}/c-ares'
+    sub_build_dir = create_build_dir(sub_src_dir)
+    shutil.rmtree(sub_install_dir, ignore_errors=True)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(sub_install_dir)
+        cmakecmd.extend(['-DCARES_SHARED:BOOL=OFF',
+                         '-DCARES_STATIC:BOOL=ON',
+                         '-DCARES_STATIC_PIC:BOOL=ON',
+                         sub_src_dir])
+        build_and_install_cmakecmd(cmakecmd, sub_build_dir)
+    finally:
+        shutil.rmtree(sub_build_dir, ignore_errors=False)
+
+    sub_src_dir = os.path.join(src_dir, 'third_party', 'protobuf', 'cmake')
+    sub_install_dir = f'{ext_dir()}/protobuf'
+    sub_build_dir = create_build_dir(sub_src_dir)
+    shutil.rmtree(sub_install_dir, ignore_errors=True)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(sub_install_dir)
+        cmakecmd.extend(['-Dprotobuf_BUILD_TESTS:BOOL=OFF',
+                         '-Dprotobuf_WITH_ZLIB:BOOL=ON',
+                         '-Dprotobuf_MSVC_STATIC_RUNTIME:BOOL=OFF'])
+        if is_windows():
+            cmakecmd.extend([f'-DZLIB_ROOT:PATH={ext_dir()}/zlib'])
+        cmakecmd.extend([sub_src_dir])
+        build_and_install_cmakecmd(cmakecmd, sub_build_dir)
+    finally:
+        shutil.rmtree(sub_build_dir, ignore_errors=False)
+
+    build_dir = create_build_dir(src_dir)
+    shutil.rmtree(install_dir, ignore_errors=True)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DgRPC_INSTALL:BOOL=ON',
+                         '-DgRPC_BUILD_TESTS:BOOL=OFF',
+                         '-DgRPC_ZLIB_PROVIDER:STRING=package',
+                         '-DgRPC_PROTOBUF_PROVIDER=package',
+                         '-DgRPC_PROTOBUF_PACKAGE_TYPE:STRING=CONFIG',
+                         '-DgRPC_CARES_PROVIDER=package',
+                         '-DgRPC_SSL_PROVIDER=package',
+                         f'-DOPENSSL_ROOT_DIR:PATH={ssl_install_dir}',
+                         '-DgRPC_GFLAGS_PROVIDER:STRING=package',
+                         '-DgRPC_BENCHMARK_PROVIDER:STRING=package'])
+        if is_windows():
+            cmakecmd.extend([f'-DZLIB_ROOT:PATH={ext_dir()}/zlib',
+                             f'-Dgflags_DIR:PATH={ext_dir()}/gflags/CMake',
+                             f'-Dbenchmark_DIR:PATH={ext_dir()}/benchmark/CMake',
+                             f'-DProtobuf_DIR:PATH={ext_dir()}/protobuf/CMake',
+                             f'-Dc-ares_DIR:PATH={ext_dir()}/c-ares/Cmake'])
+        else:
+            cmakecmd.extend([f'-Dgflags_DIR:PATH={ext_dir()}/gflags/lib/cmake/gflags',
+                             f'-Dbenchmark_DIR:PATH={ext_dir()}/benchmark/lib/cmake/benchmark',
+                             f'-DProtobuf_DIR:PATH={ext_dir()}/protobuf/lib/cmake/protobuf',
+                             f'-Dc-ares_DIR:PATH={ext_dir()}/c-ares/lib/cmake/c-ares'])
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
@@ -948,6 +1069,37 @@ def build_libs(libs: dict, update_src: bool):
         if is_windows():
             unpack_tool_to_software_dir(src_package_dir(), 'curl*win*')
 
+    if libs['tbb']:
+        subprocess.run([get_cmake_binary(), '-P', 'MakeTBBConfigFiles.cmake'],
+                       cwd=os.path.join(atlas_repository_dir(), 'src', 'cmake'), shell=False, check=True)
+
+    if libs['qt']:
+        print(f'Qt {qt_ver()} in {qt_base_dir()}')
+        with open(os.path.join(atlas_src_dir(), 'cmake', 'QtInfo.cmake'), mode='w', encoding='utf-8') as file:
+            file.write('# Set Qt related variables\n')
+            file.write(f'set(QT_VERSION {qt_ver()})\n')
+            if sys.platform.startswith('win32'):
+                file.write('set(QT_PATHS {0})\n'.format(qt_base_dir().replace("\\", "/")))
+                # also need to patch Qt
+                orig_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h')
+                bak_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h.bak')
+                if not os.path.exists(bak_file):
+                    os.rename(orig_file, bak_file)
+                    with open(bak_file, mode='r', encoding='utf-8') as f:
+                        from_lines = f.readlines()
+                    with open(orig_file, mode='w', encoding='utf-8') as f:
+                        to_lines = []
+                        for line in from_lines:
+                            line = line.replace(
+                                r'#if defined(__cpp_variable_templates) && __cpp_variable_templates >= 201304 // C++14',
+                                r'#if defined(_MSC_VER) || '
+                                r'defined(__cpp_variable_templates) && __cpp_variable_templates >= 201304 // C++14')
+                            f.write(line)
+                            to_lines.append(line)
+                    print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+            else:
+                file.write(f'set(QT_PATHS {qt_base_dir()})\n')
+
     if libs['zlib']:
         if is_windows():
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'zlib*'))
@@ -1025,15 +1177,18 @@ def build_libs(libs: dict, update_src: bool):
         assert os.path.exists(src_dir)
         build_cpuinfo(src_dir, os.path.join(ext_dir(), 'cpuinfo'))
 
-    if libs['glog']:
-        src_dir = os.path.join(base_dir(), 'glog')
+    if libs['gflags']:
         gflags_src_dir = os.path.join(base_dir(), 'gflags')
         if update_src:
             update_or_clone_git_repository(gflags_src_dir, 'git@github.com:gflags/gflags.git')
-            update_or_clone_git_repository(src_dir, 'git@github.com:google/glog.git')
-        assert os.path.exists(src_dir)
         assert os.path.exists(gflags_src_dir)
         build_gflags(gflags_src_dir, os.path.join(ext_dir(), 'gflags'))
+
+    if libs['glog']:
+        src_dir = os.path.join(base_dir(), 'glog')
+        if update_src:
+            update_or_clone_git_repository(src_dir, 'git@github.com:google/glog.git')
+        assert os.path.exists(src_dir)
         build_glog(src_dir, os.path.join(ext_dir(), 'glog'))
 
     if libs['benchmark']:
@@ -1042,6 +1197,13 @@ def build_libs(libs: dict, update_src: bool):
             update_or_clone_git_repository(src_dir, 'git@github.com:google/benchmark.git')
         assert os.path.exists(src_dir)
         build_benchmark(src_dir, os.path.join(ext_dir(), 'benchmark'))
+
+    if libs['grpc']:
+        src_dir = os.path.join(base_dir(), 'grpc')
+        if update_src:
+            update_or_clone_git_repository_with_submodules(src_dir, 'git@github.com:grpc/grpc.git')
+        assert os.path.exists(src_dir)
+        build_grpc(src_dir, os.path.join(ext_dir(), 'grpc'))
 
     if libs['glbinding']:
         src_dir = os.path.join(base_dir(), 'glbinding')
@@ -1171,6 +1333,8 @@ def parse_inputs(argv: list):
     libs = {'cmake': True,
             'ninja': True,
             'curl': False,
+            'tbb': False,
+            'qt': False,
             'zlib': False,
             'ffmpeg': False,
             'boost': False,
@@ -1180,8 +1344,10 @@ def parse_inputs(argv: list):
             'googletest': False,
             'folly': False,
             'cpuinfo': False,
+            'gflags': False,
             'glog': False,
             'benchmark': False,
+            'grpc': False,
             'glbinding': False,
             'libjpeg': False,
             'libpng': False,
@@ -1198,7 +1364,9 @@ def parse_inputs(argv: list):
             }
     update_src = True
     libs_reverse_depends = {'eigen': ['opencv'],
-                            'zlib': ['libpng', 'assimp', 'hdf5', 'itk', 'vtk', 'opencv']
+                            'zlib': ['libpng', 'assimp', 'hdf5', 'itk', 'vtk', 'opencv', 'grpc'],
+                            'gflags': ['glog', 'grpc'],
+                            'benchmark': ['grpc']
                             }
 
     print('current interpreter: ' + sys.executable)
