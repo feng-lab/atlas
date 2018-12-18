@@ -5,6 +5,7 @@
 #include "zexception.h"
 #include "zlogcache.h"
 #include "zcpuinfo.h"
+#include "zservicemanager.h"
 #include "../version/version.h"
 
 #ifdef ATLAS_WITH_TESTS
@@ -247,6 +248,8 @@ int main(int argc, char* argv[])
       LOG(ERROR) << "CPU not supported";
       return 1;
     }
+
+    ZServiceManager sm;
 
     // ZMainWindow has Qt::WA_DeleteOnClose attribute
     auto mainWin = new nim::ZMainWindow(GIT_VERSION);

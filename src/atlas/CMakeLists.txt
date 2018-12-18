@@ -667,7 +667,7 @@ set(SOURCES
     zlogwidget.cpp
     zlogwidget.h
     zimgprocessdialog.cpp
-    zimgprocessdialog.h zstitchimage.cpp zstitchimage.h)
+    zimgprocessdialog.h zstitchimage.cpp zstitchimage.h zservicemanager.cpp zservicemanager.h zrpcservice.cpp zrpcservice.h)
 
 # our target
 set(APP_NAME Atlas)
@@ -680,7 +680,7 @@ add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
                ${TESTS}
                ${PROTO_SRCS} ${GRPC_SRCS})
 
-target_include_directories(${APP_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(${APP_NAME} SYSTEM PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(${APP_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(${APP_NAME} PUBLIC ${IPP_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${GEOMETRICTOOLS_INCLUDE_DIRS})
