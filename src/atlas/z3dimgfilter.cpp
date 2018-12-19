@@ -21,7 +21,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_textureAndEyeCoordinateRenderer(m_rendererBase)
   , m_textureCopyRenderer(m_rendererBase)
   , m_stayOnTop("Stay On Top", false)
-  , m_isVolumeDownsampled("Volume Is Downsampled", false)
+  , m_fullResolutionRendering("Full Resolution Rendering", true)
   , m_numParas(0)
   //, m_interactionDownsample("Interaction Downsample", 1, 1, 16)
   , m_smoothInteraction("Smooth Interaction", true)
@@ -68,8 +68,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   m_textureCopyRenderer.setDiscardTransparent(true);
 
   addParameter(m_stayOnTop);
-  m_isVolumeDownsampled.setEnabled(false);
-  addParameter(m_isVolumeDownsampled);
+  addParameter(m_fullResolutionRendering);
   connect(&m_rendererBase, &Z3DRendererBase::coordTransformChanged, this, &Z3DImgFilter::changeCoordTransform);
   connect(&m_rendererBase.globalParas().interactionHandler, &Z3DTrackballInteractionHandler::mousePressed,
           this, &Z3DImgFilter::mousePressed);
@@ -192,6 +191,8 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_imgRaycasterRenderer.localMIPThresholdPara());
   addParameter(m_imgRaycasterRenderer.samplingRatePara());
 
+  connect(&m_fullResolutionRendering, &ZBoolParameter::valueChanged, this, &Z3DImgFilter::fullResolutionRenderingToggled);
+
   adjustWidget();
   CHECK_GL_ERROR
 
@@ -234,7 +235,9 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
       m_layerTarget.attachTextureToFBO(&m_layerDepthTexture, GL_DEPTH_ATTACHMENT, false);
       m_layerTarget.isFBOComplete();
     }
-    m_isVolumeDownsampled.set(m_3dImg->isVolumeDownsampled());
+    m_fullResolutionRendering.set(true);
+    m_fullResolutionRendering.setEnabled(m_3dImg->isVolumeDownsampled());
+    m_smoothInteraction.setVisible(m_3dImg->isVolumeDownsampled());
 
     m_sliceColormaps.clear();
     for (size_t c = 0; c < m_3dImg->numChannels(); ++c) {
@@ -331,7 +334,8 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
 
     m_widgetsGroup->addChild(m_visible, 1);
     m_widgetsGroup->addChild(m_stayOnTop, 1);
-    m_widgetsGroup->addChild(m_isVolumeDownsampled, 2);
+    m_widgetsGroup->addChild(m_fullResolutionRendering, 1);
+    m_widgetsGroup->addChild(m_smoothInteraction, 1);
 
     for (const auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
       m_widgetsGroup->addChild(*para, 2);
@@ -357,7 +361,6 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_selectionLineColor, 17);
     m_widgetsGroup->addChild(m_manipulatorSize, 17);
     //m_widgetsGroup->addChild(m_interactionDownsample, 19);
-    m_widgetsGroup->addChild(m_smoothInteraction, 19);
     m_widgetsGroup->addChild(m_rendererBase.coordTransformPara(), 1);
 
     const std::vector<ZParameter*>& paras = parameters();
@@ -436,6 +439,13 @@ void Z3DImgFilter::adjustWidget()
   m_xSlice2Position.setVisible(m_showXSlice2.get());
 }
 
+void Z3DImgFilter::fullResolutionRenderingToggled()
+{
+  m_imgRaycasterRenderer.setFastRendering(!m_fullResolutionRendering.get());
+  m_imgSliceRenderer.setFastRendering(!m_fullResolutionRendering.get());
+  m_smoothInteraction.setVisible(m_3dImg && m_3dImg->isVolumeDownsampled() && m_fullResolutionRendering.get());
+}
+
 void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent* /*e*/, int /*w*/, int /*h*/)
 {
   //  e->ignore();
@@ -486,7 +496,7 @@ void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent* /*e*/, int /*w*/, int /*h
 
 void Z3DImgFilter::mousePressed()
 {
-  if (m_smoothInteraction.get() && m_3dImg && m_3dImg->isVolumeDownsampled()) {
+  if (m_smoothInteraction.get() && m_3dImg && m_3dImg->isVolumeDownsampled() && m_fullResolutionRendering.get()) {
     m_imgRaycasterRenderer.setFastRendering(true);
     m_imgSliceRenderer.setFastRendering(true);
   }
@@ -494,7 +504,7 @@ void Z3DImgFilter::mousePressed()
 
 void Z3DImgFilter::mouseReleased()
 {
-  if (m_smoothInteraction.get() && m_3dImg && m_3dImg->isVolumeDownsampled()) {
+  if (m_smoothInteraction.get() && m_3dImg && m_3dImg->isVolumeDownsampled() && m_fullResolutionRendering.get()) {
     m_imgRaycasterRenderer.setFastRendering(false);
     m_imgSliceRenderer.setFastRendering(false);
     // upstream will invalidate the network, but in case there are no upstream

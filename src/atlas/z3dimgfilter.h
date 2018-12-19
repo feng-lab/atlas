@@ -56,6 +56,8 @@ protected:
 
   void adjustWidget();
 
+  void fullResolutionRenderingToggled();
+
   void leftMouseButtonPressed(QMouseEvent* e, int w, int h);
 
   //  void invalidateFRVolumeZSlice();
@@ -102,7 +104,7 @@ private:
 
   std::unique_ptr<Z3DImg> m_3dImg;
   ZBoolParameter m_stayOnTop;
-  ZBoolParameter m_isVolumeDownsampled;
+  ZBoolParameter m_fullResolutionRendering;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   size_t m_numParas;

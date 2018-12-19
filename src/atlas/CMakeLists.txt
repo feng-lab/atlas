@@ -757,6 +757,8 @@ else (WIN32)
                               "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers -Wno-unknown-pragmas -Wno-unused-variable -Wno-reorder -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
   set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
   set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS "-isystem ${ASSIMP_INCLUDE_DIRS}")
+  set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS
+                              "-Wno-unused-parameter")
 
   if (APPLE)
     set(copyright_line "Copyright 2011-2018 Linqing Feng")
@@ -792,7 +794,7 @@ endif (WIN32)
 target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding-aux glbinding::glbinding
                       hdf5::hdf5_cpp-static hdf5::hdf5-static
                       img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${GEOMETRICTOOLS_LIBRARIES}
-                      ${ASSIMP_LIBRARIES} ${IPP_LIBRARIES} gRPC::grpc++_unsecure protobuf::libprotobuf)
+                      ${ASSIMP_LIBRARIES} ${IPP_LIBRARIES} gRPC::grpc++ protobuf::libprotobuf)
 if (BUILD_TESTING)
   target_link_libraries(${APP_NAME} PUBLIC benchmark::benchmark)
 endif (BUILD_TESTING)
