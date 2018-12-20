@@ -221,13 +221,19 @@ void ZPunctaDetection::doWork()
     LOG(INFO) << "No Dendrite Channel.";
   }
 
+  std::vector<ZSwc> swcTrees(m_swcPaths.size());
+  for (int i = 0; i < m_swcPaths.size(); ++i) {
+    swcTrees[i] = ZSwc(m_swcPaths.at(i));
+    swcTrees[i].labelSomaAndOthers(3.0 / m_imgInfo.voxelSizeXInUm()); // soma radius at least 3um
+  }
+
   clearRegisteredSubOperations();
   double totalSubWeight = 0.1;
   if (m_punctaThreshold == -1)
     totalSubWeight += .1;
   if (m_dendriteChannel != -1)
     totalSubWeight += .45;
-  if (!m_swcTrees.empty() && m_dendriteChannel != -1)
+  if (!swcTrees.empty() && m_dendriteChannel != -1)
     totalSubWeight += .025;
 
   setTotalSubOperationWeight(totalSubWeight);
@@ -609,7 +615,7 @@ void ZPunctaDetection::doWork()
     m_filteredSomaPuncta.save(getFilteredSomaPunctaFilename());
   }
 
-  if (!m_swcTrees.empty() && m_dendriteChannel != -1) {
+  if (!swcTrees.empty() && m_dendriteChannel != -1) {
 #if 0
     ZImg dendriteImg(m_filename, dendriteChannelRegion, m_scene);
     if (!dendriteImg.isType<uint8_t>()) {
@@ -621,18 +627,18 @@ void ZPunctaDetection::doWork()
                                m_dendriteChannel, m_t, m_scene);
 #endif
 
-    assignPuncta.addSwcTrees(m_swcTrees);
+    assignPuncta.addSwcTrees(swcTrees);
     assignPuncta.setAmbiguousFactor(m_ambiguousFactor);
     assignPuncta.setMaxDistToBranchInUm(m_maxDistToBranch);
     assignPuncta.setPuncta(m_detectedPuncta);
     assignPuncta.setSomaPuncta(m_detectedSomaPuncta);
     registerSubOperation(&assignPuncta, .025);
     assignPuncta.run();
-    for (size_t i = 0; i < m_swcTrees.size(); ++i) {
-      ZPuncta puncta = assignPuncta.getPunctaOfTree(m_swcTrees[i]);
+    for (size_t i = 0; i < swcTrees.size(); ++i) {
+      ZPuncta puncta = assignPuncta.getPunctaOfTree(&swcTrees[i]);
       QString fn = getPunctaOutputFilename(m_swcPaths[i]);
       puncta.save(fn);
-      puncta = assignPuncta.getSomaPunctaOfTree(m_swcTrees[i]);
+      puncta = assignPuncta.getSomaPunctaOfTree(&swcTrees[i]);
       fn = getSomaPunctaOutputFilename(m_swcPaths[i]);
       puncta.save(fn);
     }
@@ -642,20 +648,6 @@ void ZPunctaDetection::doWork()
       puncta.save(fn);
     }
   }
-}
-
-void ZPunctaDetection::setSwcTrees(const std::vector<ZSwc*>& trees, const QStringList& treePaths)
-{
-  m_swcTrees = trees;
-  m_swcPaths = treePaths;
-}
-
-void ZPunctaDetection::setSwcTrees(std::vector<ZSwc>& trees, const QStringList& treePaths)
-{
-  m_swcTrees.clear();
-  for (size_t i = 0; i < trees.size(); ++i)
-    m_swcTrees.push_back(&trees[i]);
-  m_swcPaths = treePaths;
 }
 
 double

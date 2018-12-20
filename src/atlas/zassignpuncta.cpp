@@ -59,20 +59,14 @@ void ZAssignPuncta::clearAllSwcTrees()
   m_swcTreeToSomaPuncta.clear();
 }
 
-void ZAssignPuncta::addSwcTree(ZSwc* tree)
+void ZAssignPuncta::addSwcTree(const ZSwc* tree)
 {
   CHECK(tree);
   m_swcTreeToPuncta[tree] = ZPuncta();
   m_swcTreeToSomaPuncta[tree] = ZPuncta();
 }
 
-void ZAssignPuncta::addSwcTrees(const std::vector<ZSwc*>& trees)
-{
-  for (size_t i = 0; i < trees.size(); ++i)
-    addSwcTree(trees[i]);
-}
-
-void ZAssignPuncta::addSwcTrees(std::vector<ZSwc>& trees)
+void ZAssignPuncta::addSwcTrees(const std::vector<ZSwc>& trees)
 {
   for (size_t i = 0; i < trees.size(); ++i)
     addSwcTree(&trees[i]);
@@ -98,7 +92,6 @@ void ZAssignPuncta::doWork()
     throw ZImgException(QString("Wrong dendrite channel: %1. Abort.").arg(m_dendriteChannel));
   }
   for (auto& treePuncta : m_swcTreeToPuncta) {
-    treePuncta.first->labelSomaAndOthers(3.0 / m_imgInfo.voxelSizeXInUm()); // soma radius at least 3um
     treePuncta.second.clear();
   }
   for (auto& treePuncta : m_swcTreeToSomaPuncta) {
@@ -115,10 +108,9 @@ void ZAssignPuncta::doWork()
   LOG(INFO) << "End Assign Puncta.";
 }
 
-ZPuncta ZAssignPuncta::getPunctaOfTree(ZSwc* tree) const
+ZPuncta ZAssignPuncta::getPunctaOfTree(const ZSwc* tree) const
 {
-  std::map<ZSwc*, ZPuncta>::const_iterator it;
-  it = m_swcTreeToPuncta.find(tree);
+  auto it = m_swcTreeToPuncta.find(tree);
   if (it != m_swcTreeToPuncta.end()) {
     return it->second;
   } else {
@@ -126,10 +118,9 @@ ZPuncta ZAssignPuncta::getPunctaOfTree(ZSwc* tree) const
   }
 }
 
-ZPuncta ZAssignPuncta::getSomaPunctaOfTree(ZSwc* tree) const
+ZPuncta ZAssignPuncta::getSomaPunctaOfTree(const ZSwc* tree) const
 {
-  std::map<ZSwc*, ZPuncta>::const_iterator it;
-  it = m_swcTreeToSomaPuncta.find(tree);
+  auto it = m_swcTreeToSomaPuncta.find(tree);
   if (it != m_swcTreeToSomaPuncta.end()) {
     return it->second;
   } else {
@@ -141,16 +132,16 @@ void ZAssignPuncta::separatePuncta()
 {
   if (m_puncta.empty())
     reportProgress(1.0);
-  std::map<SwcTreeNode, ZSwc*> nodeToTree;
+  std::map<ZSwc::ConstSwcTreeNode, const ZSwc*> nodeToTree;
   double punctaSize = m_puncta.size();
   size_t idx = 1;
   for (const auto& p : m_puncta) {
     LOG(INFO) << "Start Puncta " << idx;
     nodeToTree.clear();
-    std::vector<SwcTreeNode> nodes;
+    std::vector<ZSwc::ConstSwcTreeNode> nodes;
     size_t numTreeInRange = 0;
     for (const auto& treePuncta : m_swcTreeToPuncta) {
-      std::vector<SwcTreeNode> tmpNodes = nodesNearbyPuncta(p, treePuncta.first);
+      std::vector<ZSwc::ConstSwcTreeNode> tmpNodes = nodesNearbyPuncta(p, treePuncta.first);
       if (!tmpNodes.empty()) {
         ++numTreeInRange;
         for (size_t tmpNodesIdx = 0; tmpNodesIdx < tmpNodes.size(); ++tmpNodesIdx) {
@@ -164,8 +155,8 @@ void ZAssignPuncta::separatePuncta()
       m_swcTreeToPuncta[nodeToTree.begin()->second].push_back(p);
     } else if (numTreeInRange > 1) {
       bool isAmbiguous = false;
-      SwcTreeNode tn = intensityWeightedNearestNode(p.x(), p.y(), p.z(),
-                                                    nodes, isAmbiguous);
+      ZSwc::ConstSwcTreeNode tn = intensityWeightedNearestNode(p.x(), p.y(), p.z(),
+                                                               nodes, isAmbiguous);
       if (nearestNode(p.x(), p.y(), p.z(), nodes) != tn) {
         LOG(WARNING) << "Check Punctum: "
                      << p.x() << " " << p.y() << " " << p.z() << " " << p.radius() << " "
@@ -191,7 +182,7 @@ void ZAssignPuncta::separateSomaPuncta()
   for (const auto& p : m_somaPuncta) {
     LOG(INFO) << "Start Soma Puncta " << idx;
     double min_dist = std::numeric_limits<double>::max();
-    ZSwc* tree = nullptr;
+    const ZSwc* tree = nullptr;
     for (const auto& treePuncta : m_swcTreeToSomaPuncta) {
       double dist = punctaSomaDist(p, treePuncta.first);
       if (dist < min_dist) {
@@ -207,14 +198,15 @@ void ZAssignPuncta::separateSomaPuncta()
   }
 }
 
-double ZAssignPuncta::punctaTreeDist(const ZPunctum& punctum, ZSwc* tree, SwcTreeNode& nearestNode) const
+double
+ZAssignPuncta::punctaTreeDist(const ZPunctum& punctum, const ZSwc* tree, ZSwc::ConstSwcTreeNode& nearestNode) const
 {
-  nearestNode = SwcTreeNode();
+  nearestNode = ZSwc::ConstSwcTreeNode();
   double min_dist = std::numeric_limits<double>::max();
   glm::dvec3 pt(punctum.x(), punctum.y(), punctum.z());
   glm::dvec3 res(m_imgInfo.voxelSizeXInUm(), m_imgInfo.voxelSizeYInUm(), m_imgInfo.voxelSizeZInUm());
   pt *= res;
-  for (SwcTreeNode tn = tree->begin(); tn != tree->end(); ++tn) {
+  for (auto tn = tree->begin(); tn != tree->end(); ++tn) {
     if (!ZSwc::isRoot(tn) && tn->type != m_somaType) {
       glm::dvec3 node(tn->x, tn->y, tn->z);
       node *= res;
@@ -223,7 +215,8 @@ double ZAssignPuncta::punctaTreeDist(const ZPunctum& punctum, ZSwc* tree, SwcTre
         continue;
       }
       dist = pointFrustumConeDist(punctum.x(), punctum.y(), punctum.z(), tn, ZSwc::parent(tn));
-      if (dist < m_maxDistToBranch + punctum.radius() * m_imgInfo.voxelSizeXInUm() && dist < min_dist) {   //in mask area
+      if (dist < m_maxDistToBranch + punctum.radius() * m_imgInfo.voxelSizeXInUm() &&
+          dist < min_dist) {   //in mask area
         min_dist = dist;
         nearestNode = tn;
       }
@@ -232,13 +225,13 @@ double ZAssignPuncta::punctaTreeDist(const ZPunctum& punctum, ZSwc* tree, SwcTre
   return min_dist;
 }
 
-std::vector<ZAssignPuncta::SwcTreeNode> ZAssignPuncta::nodesNearbyPuncta(const ZPunctum& punctum, ZSwc* tree) const
+std::vector<ZSwc::ConstSwcTreeNode> ZAssignPuncta::nodesNearbyPuncta(const ZPunctum& punctum, const ZSwc* tree) const
 {
-  std::vector<SwcTreeNode> nodes;
+  std::vector<ZSwc::ConstSwcTreeNode> nodes;
   glm::dvec3 pt(punctum.x(), punctum.y(), punctum.z());
   glm::dvec3 res(m_imgInfo.voxelSizeXInUm(), m_imgInfo.voxelSizeYInUm(), m_imgInfo.voxelSizeZInUm());
   pt *= res;
-  for (SwcTreeNode tn = tree->begin(); tn != tree->end(); ++tn) {
+  for (auto tn = tree->begin(); tn != tree->end(); ++tn) {
     if (!ZSwc::isRoot(tn) && tn->type != m_somaType) {
       glm::dvec3 node(tn->x, tn->y, tn->z);
       node *= res;
@@ -255,13 +248,13 @@ std::vector<ZAssignPuncta::SwcTreeNode> ZAssignPuncta::nodesNearbyPuncta(const Z
   return nodes;
 }
 
-double ZAssignPuncta::punctaSomaDist(const ZPunctum& punctum, ZSwc* tree) const
+double ZAssignPuncta::punctaSomaDist(const ZPunctum& punctum, const ZSwc* tree) const
 {
   double min_dist = std::numeric_limits<double>::max();
   glm::dvec3 pt(punctum.x(), punctum.y(), punctum.z());
   glm::dvec3 res(m_imgInfo.voxelSizeXInUm(), m_imgInfo.voxelSizeYInUm(), m_imgInfo.voxelSizeZInUm());
   pt *= res;
-  for (SwcTreeNode tn = tree->begin(); tn != tree->end(); ++tn) {
+  for (auto tn = tree->begin(); tn != tree->end(); ++tn) {
     if (ZSwc::isRoot(tn) || tn->type == m_somaType) {
       glm::dvec3 node(tn->x, tn->y, tn->z);
       node *= res;
@@ -276,7 +269,8 @@ double ZAssignPuncta::punctaSomaDist(const ZPunctum& punctum, ZSwc* tree) const
 }
 
 double
-ZAssignPuncta::pointFrustumConeDist(double x, double y, double z, const SwcTreeNode& tn, const SwcTreeNode& ptn) const
+ZAssignPuncta::pointFrustumConeDist(double x, double y, double z, const ZSwc::ConstSwcTreeNode& tn,
+                                    const ZSwc::ConstSwcTreeNode& ptn) const
 {
   double dist;
   glm::dvec3 pt(x, y, z);
@@ -302,9 +296,9 @@ ZAssignPuncta::pointFrustumConeDist(double x, double y, double z, const SwcTreeN
   return dist;
 }
 
-ZAssignPuncta::SwcTreeNode ZAssignPuncta::intensityWeightedNearestNode(double x, double y, double z,
-                                                                       const std::vector<SwcTreeNode>& nodes,
-                                                                       bool& isAmbiguous)
+ZSwc::ConstSwcTreeNode ZAssignPuncta::intensityWeightedNearestNode(double x, double y, double z,
+                                                                   const std::vector<ZSwc::ConstSwcTreeNode>& nodes,
+                                                                   bool& isAmbiguous)
 {
   //first crop out the region
   int left = roundTo<int>(x);
@@ -314,7 +308,7 @@ ZAssignPuncta::SwcTreeNode ZAssignPuncta::intensityWeightedNearestNode(double x,
   int zup = roundTo<int>(z);
   int zdown = roundTo<int>(z);
   for (size_t i = 0; i < nodes.size(); ++i) {
-    SwcTreeNode parent = ZSwc::parent(nodes[i]);
+    auto parent = ZSwc::parent(nodes[i]);
     left = std::min(std::min(left, roundTo<int>(nodes[i]->x)), roundTo<int>(parent->x));
     right = std::max(std::max(right, roundTo<int>(nodes[i]->x)), roundTo<int>(parent->x));
     up = std::min(std::min(up, roundTo<int>(nodes[i]->y)), roundTo<int>(parent->y));
@@ -380,13 +374,13 @@ ZAssignPuncta::SwcTreeNode ZAssignPuncta::intensityWeightedNearestNode(double x,
   return nodes[minIndex];
 }
 
-ZAssignPuncta::SwcTreeNode
-ZAssignPuncta::nearestNode(double x, double y, double z, const std::vector<SwcTreeNode>& nodes)
+ZSwc::ConstSwcTreeNode
+ZAssignPuncta::nearestNode(double x, double y, double z, const std::vector<ZSwc::ConstSwcTreeNode>& nodes)
 {
   double dist = std::numeric_limits<double>::max();
-  SwcTreeNode res;
+  ZSwc::ConstSwcTreeNode res;
   for (size_t i = 0; i < nodes.size(); ++i) {
-    const SwcTreeNode& node = nodes[i];
+    const ZSwc::ConstSwcTreeNode& node = nodes[i];
     double nodeDist = pointFrustumConeDist(x, y, z, node, ZSwc::parent(node));
     if (nodeDist < dist) {
       dist = nodeDist;

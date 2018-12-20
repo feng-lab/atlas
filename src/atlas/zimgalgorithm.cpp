@@ -24,7 +24,7 @@ void ZImgAlgorithmBaseWithProgressReporter::setProgressReportInterval(double int
 
 void ZImgAlgorithmBaseWithProgressReporter::subOperationProgressChanged(double p, void* sender)
 {
-  if (false && m_cancelFlag && *m_cancelFlag) {
+  if (false && isCancelledFun && isCancelledFun()) {
     std::set<itk::ProcessObject*>::iterator it = m_itkOperations.find(static_cast<itk::ProcessObject*>(sender));
     if (it != m_itkOperations.end()) {
       (*it)->AbortGenerateDataOn();
@@ -43,7 +43,7 @@ void ZImgAlgorithmBaseWithProgressReporter::subOperationProgressChanged(double p
 
 void ZImgAlgorithmBaseWithProgressReporter::reportProgress(double progress)
 {
-  if (m_cancelFlag && *m_cancelFlag) {
+  if (isCancelledFun && isCancelledFun()) {
     throw ZProcessAbortException("");
   }
   if ((progress - m_progress) * m_weight >= m_reportInterval || progress == 1.0) {
@@ -58,7 +58,7 @@ void ZImgAlgorithmBaseWithProgressReporter::registerSubOperation(ZImgAlgorithmBa
   m_subOperationsWeightProgress[sender].weight = weight;
   m_subOperationsWeightProgress[sender].progress = 0.0;
   sender->setProgressReportInterval(m_reportInterval / weight);
-  sender->setCancelFlag(m_cancelFlag);
+  sender->isCancelledFun = isCancelledFun;
   sender->setParent(this);
 }
 
@@ -94,7 +94,7 @@ void ZImgAlgorithmBaseWithProgressReporter::processITKEvent(itk::Object* caller,
 {
   if (itk::ProgressEvent().CheckEvent(&event)) {
     if (auto process = dynamic_cast<itk::ProcessObject*>(caller)) {
-      if (m_cancelFlag && *m_cancelFlag) {
+      if (isCancelledFun && isCancelledFun()) {
         if (!process->GetAbortGenerateData()) {
           process->AbortGenerateDataOn();
           LOG(INFO) << "abort itk 1";
@@ -111,7 +111,7 @@ ZImgAlgorithmBaseWithProgressReporter::constProcessITKEvent(const itk::Object* c
 {
   if (itk::ProgressEvent().CheckEvent(&event)) {
     if (auto process = const_cast<itk::ProcessObject*>(dynamic_cast<const itk::ProcessObject*>(caller))) {
-      if (m_cancelFlag && *m_cancelFlag) {
+      if (isCancelledFun && isCancelledFun()) {
         if (!process->GetAbortGenerateData()) {
           process->AbortGenerateDataOn();
           LOG(INFO) << "abort itk 2";

@@ -1664,7 +1664,7 @@ class GreeterClient
 {
 public:
   GreeterClient(std::shared_ptr<Channel> channel)
-    : stub_(Greeter::NewStub(channel))
+    : m_stub(Greeter::NewStub(channel))
   {}
 
   // Assembles the client's payload, sends it and presents the response back
@@ -1686,7 +1686,7 @@ public:
     context.set_compression_algorithm(GRPC_COMPRESS_DEFLATE);
 
     // The actual RPC.
-    Status status = stub_->SayHello(&context, request, &reply);
+    Status status = m_stub->SayHello(&context, request, &reply);
 
     // Act upon its status.
     if (status.ok()) {
@@ -1699,7 +1699,7 @@ public:
   }
 
 private:
-  std::unique_ptr<Greeter::Stub> stub_;
+  std::unique_ptr<Greeter::Stub> m_stub;
 };
 
 void helloworldrpc()
@@ -1712,7 +1712,7 @@ void helloworldrpc()
   // Set the default compression algorithm for the channel.
   args.SetCompressionAlgorithm(GRPC_COMPRESS_GZIP);
   GreeterClient greeter(grpc::CreateCustomChannel(
-    "localhost:50051", grpc::InsecureChannelCredentials(), args));
+    "161.122.102.55:50051", grpc::InsecureChannelCredentials(), args));
   std::string user("world");
   std::string reply = greeter.SayHello(user);
   LOG(INFO) << "Greeter received: " << reply;

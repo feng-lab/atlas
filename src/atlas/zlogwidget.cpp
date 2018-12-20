@@ -13,7 +13,7 @@ ZLogWidget::ZLogWidget(bool receiveOldMessages, QWidget* parent)
   ZLogCache::instance().receiveLogMessages(this, &ZLogWidget::writeLogData, receiveOldMessages);
 }
 
-void ZLogWidget::writeLogData(const QList<nim::LogData>* messages, int start, int end)
+void ZLogWidget::writeLogData(const QList<LogData>* messages, int start, int end)
 {
   if (end - start == 1) {
     if (messages->at(start).level <= InfoLevel) {

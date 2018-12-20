@@ -13,6 +13,7 @@
 #include <QObject>
 #include <map>
 #include <set>
+#include <functional>
 
 #undef _WIN32_WINNT
 
@@ -24,10 +25,9 @@ Q_OBJECT
 public:
   ZImgAlgorithmBaseWithProgressReporter();
 
-  // if flag is set to true, current algorithm will abort and throw a ZProcessAbortException
+  // if isCancelledFun returns true, current algorithm will abort and throw a ZProcessAbortException
   // or itk::ProcessAborted
-  inline void setCancelFlag(std::atomic<bool>* flag)
-  { m_cancelFlag = flag; }
+  std::function<bool()> isCancelledFun;
 
   // default report 1 percent change
   // larger value can reduce the number of signals
@@ -101,7 +101,6 @@ protected:
   double m_weight = 1;
   double m_progress = 0;
   double m_reportInterval = 0.01;
-  std::atomic<bool>* m_cancelFlag = nullptr;
   ZImgAlgorithmBaseWithProgressReporter* m_parent = nullptr;
 
   uint32_t m_numThreads = ZCpuInfo::instance().nLogicalCores;

@@ -37,7 +37,7 @@ private:
 
 private:
   QString m_workerName;
-  std::atomic<bool> m_isCanceled;
+  bool m_isCanceled;
   bool m_hasError;
 
   QProgressDialog* m_progressDialog = nullptr;

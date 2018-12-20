@@ -66,17 +66,11 @@ void ZPunctaDetectionDialog::createWorker(ZImgProcess*& worker, QString& workerN
     imgInfo.voxelSizeZ = m_voxelSize.get().z;
   }
 
-  QStringList swcFiles = m_inputSwcFilesWidget->getSelectedMultipleOpenFiles();
-  std::vector<ZSwc> swcTrees(swcFiles.size());
-  for (int i = 0; i < swcFiles.size(); ++i) {
-    swcTrees[i] = ZSwc(swcFiles.at(i));
-  }
-
   auto workertmp = new ZPunctaDetection(m_inputImageFileWidget->getSelectedOpenFile(), imgInfo, punctaChannel);
   workertmp->setAmbiguousFactor(m_ambiguousFactor.get());
   if (dendriteChannel >= 0)
     workertmp->setDendriteChannel(dendriteChannel);
-  workertmp->setSwcTrees(swcTrees, swcFiles);
+  workertmp->setSwcFiles(m_inputSwcFilesWidget->getSelectedMultipleOpenFiles());
   workertmp->setLogFile(m_outputLogFileWidget->getSelectedSaveFile());
   workertmp->setResultPunctaFilename(m_outputPunctaFileWidget->getSelectedSaveFile());
   if (dendriteChannel >= 0)

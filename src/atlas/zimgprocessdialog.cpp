@@ -78,7 +78,7 @@ void ZImgProcessDialog::runWorker()
     CHECK(m_worker);
     CHECK(!m_workerName.isEmpty());
 
-    m_worker->setCancelFlag(&m_isCanceled);
+    m_worker->isCancelledFun = [this]() { return m_isCanceled; };
 
     m_progressDialog = new QProgressDialog(this);
     m_progressDialog->setLabelText(QString("%1 Running...").arg(m_workerName));

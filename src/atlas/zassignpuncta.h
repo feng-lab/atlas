@@ -13,7 +13,6 @@ class ZImg;
 
 class ZAssignPuncta : public ZImgProcess
 {
-  using SwcTreeNode = ZSwc::Iterator;
 public:
   ZAssignPuncta(const ZImg& img, size_t dendriteChannel, size_t t = 0);
 
@@ -24,7 +23,7 @@ public:
   ZAssignPuncta(const QString& filename, const ZImgInfo& imgInfo, double minValue, double maxValue,
                 size_t dendriteChannel = 0, size_t t = 0, size_t scene = 0);
 
-  ~ZAssignPuncta();
+  ~ZAssignPuncta() override;
 
   void setPuncta(const ZPuncta& puncta)
   { m_puncta = puncta; }
@@ -45,15 +44,13 @@ public:
 
   void clearAllSwcTrees();
 
-  void addSwcTree(ZSwc* tree);
+  void addSwcTree(const ZSwc* tree);
 
-  void addSwcTrees(const std::vector<ZSwc*>& trees);
+  void addSwcTrees(const std::vector<ZSwc>& trees);
 
-  void addSwcTrees(std::vector<ZSwc>& trees);
+  ZPuncta getPunctaOfTree(const ZSwc* tree) const;
 
-  ZPuncta getPunctaOfTree(ZSwc* tree) const;
-
-  ZPuncta getSomaPunctaOfTree(ZSwc* tree) const;
+  ZPuncta getSomaPunctaOfTree(const ZSwc* tree) const;
 
   ZPuncta getAmbiguousPuncta() const
   { return m_ambiguousPuncta; }
@@ -66,18 +63,20 @@ private:
 
   void separateSomaPuncta();
 
-  double punctaTreeDist(const ZPunctum& punctum, ZSwc* tree, SwcTreeNode& nearestNode) const;
+  double punctaTreeDist(const ZPunctum& punctum, const ZSwc* tree, ZSwc::ConstSwcTreeNode& nearestNode) const;
 
-  std::vector<SwcTreeNode> nodesNearbyPuncta(const ZPunctum& punctum, ZSwc* tree) const;
+  std::vector<ZSwc::ConstSwcTreeNode> nodesNearbyPuncta(const ZPunctum& punctum, const ZSwc* tree) const;
 
-  double punctaSomaDist(const ZPunctum& punctum, ZSwc* tree) const;
+  double punctaSomaDist(const ZPunctum& punctum, const ZSwc* tree) const;
 
-  double pointFrustumConeDist(double x, double y, double z, const SwcTreeNode& tn, const SwcTreeNode& ptn) const;
+  double pointFrustumConeDist(double x, double y, double z, const ZSwc::ConstSwcTreeNode& tn,
+                              const ZSwc::ConstSwcTreeNode& ptn) const;
 
-  SwcTreeNode intensityWeightedNearestNode(double x, double y, double z,
-                                           const std::vector<SwcTreeNode>& nodes, bool& isAmbiguous);
+  ZSwc::ConstSwcTreeNode intensityWeightedNearestNode(double x, double y, double z,
+                                                      const std::vector<ZSwc::ConstSwcTreeNode>& nodes,
+                                                      bool& isAmbiguous);
 
-  SwcTreeNode nearestNode(double x, double y, double z, const std::vector<SwcTreeNode>& nodes);
+  ZSwc::ConstSwcTreeNode nearestNode(double x, double y, double z, const std::vector<ZSwc::ConstSwcTreeNode>& nodes);
 
 private:
   // input
@@ -98,8 +97,8 @@ private:
 
   // input trees and results
   ZPuncta m_ambiguousPuncta;
-  std::map<ZSwc*, ZPuncta> m_swcTreeToPuncta;
-  std::map<ZSwc*, ZPuncta> m_swcTreeToSomaPuncta;
+  std::map<const ZSwc*, ZPuncta> m_swcTreeToPuncta;
+  std::map<const ZSwc*, ZPuncta> m_swcTreeToSomaPuncta;
 
   const int m_somaType = 1;
 };

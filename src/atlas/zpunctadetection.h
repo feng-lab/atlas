@@ -70,13 +70,8 @@ public:
   void setDendriteThreshold(double tt)
   { m_dendriteThreshold = tt; }
 
-  // assign puncta to each swc tree if set
-  void clearAllSwcTrees()
-  { m_swcTrees.clear(); }
-
-  void setSwcTrees(const std::vector<ZSwc*>& trees, const QStringList& treePaths);
-
-  void setSwcTrees(std::vector<ZSwc>& trees, const QStringList& treePaths);
+  void setSwcFiles(const QStringList& swcFiles)
+  { m_swcPaths = swcFiles; }
 
   // default is 2.5um, valid range of puncta
   // puncta within this distance to branch are considered as belong to
@@ -182,7 +177,6 @@ private:
   ZPuncta m_detectedPuncta;
   ZPuncta m_filteredSomaPuncta;
   ZPuncta m_filteredPuncta;
-  std::vector<ZSwc*> m_swcTrees;
   QStringList m_swcPaths;
 
   QString m_detectedPunctaFileName;
