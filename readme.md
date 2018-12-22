@@ -2,6 +2,7 @@
 ### macOS:
 * install xcode, homebrew, qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb) and python3
 * brew install unrar p7zip git golang
+* disable command line tools: sudo xcode-select -switch /Applications/Xcode.app
 
 ### Windows:
 * install visual studio, qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb), python3, git
