@@ -27,6 +27,7 @@ include(gRPCGenerateCPP)
 
 set(PROTOS
     ${CMAKE_CURRENT_SOURCE_DIR}/../protos/helloworld.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/../protos/imgprocess.proto
     )
 set(PROTO_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../protos)
 protobuf_generate(LANGUAGE cpp APPEND_PATH PROTOC_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR} OUT_VAR PROTO_SRCS PROTOS ${PROTOS})

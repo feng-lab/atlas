@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "io.atlas.imgprocess";
+option java_outer_classname = "ImgProcessProto";
+option objc_class_prefix = "HLW";
+
+package imgprocess;
+
+import "google/protobuf/timestamp.proto";
+
+message LogData {
+  enum LogSeverity {
+    INFO = 0;
+    WARNING = 1;
+    ERROR = 2;
+    FATAL = 3;
+  }
+  LogSeverity level = 1;
+  string full_file_name = 2;
+  string base_file_name = 3;
+  int32 line = 4;
+  google.protobuf.Timestamp time = 5;
+  string message = 6;
+  string formatted_message = 7;
+}
+
+service PunctaDetection {
+  rpc detectPuncta(PunctaDetectionRequest) returns (stream PunctaDetectionReply) {}
+}
+
+message PunctaDetectionRequest {
+  // image file
+  string filename = 1;
+  double voxel_size_x_in_um = 2;
+  double voxel_size_y_in_um = 3;
+  double voxel_size_z_in_um = 4;
+  uint64 puncta_channel = 5;
+  uint64 time = 6;
+  uint64 scene = 7;
+  // parameters
+  int32 puncta_threshold = 8;
+  int32 split_size_threshold = 9;
+  double conf_radius = 10;
+  double conf_vverlap_area = 11;
+  double overlap_rate_threshold = 12;
+  int32 seed_size_threshold = 13;
+  bool use_multithreading = 14;
+  // parameters for soma detection
+  int32 dendrite_channel = 15;
+  double max_dendrite_tube_radius = 16;
+  double dendrite_threshold = 17;
+
+  // parameters for assign puncta to swc tree
+  double max_dist_to_branch = 18;
+  double ambiguous_factor = 19;
+
+  repeated string swc_paths = 20;
+
+  string detected_puncta_filename = 21;
+  string detected_soma_puncta_filename = 22;
+}
+
+message PunctaDetectionReply {
+  LogData log_message = 1;
+}
