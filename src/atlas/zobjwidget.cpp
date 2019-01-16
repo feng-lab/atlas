@@ -43,9 +43,9 @@ ZObjWidget::ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* sele
   setMinimumHeight(250);
 
   setAlternatingRowColors(true);
-  QPalette p = palette();
-  p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
-  setPalette(p);
+  //QPalette p = palette();
+  //p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
+  //setPalette(p);
 
   createContextMenu();
 
