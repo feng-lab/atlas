@@ -919,35 +919,31 @@ def build_vtk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
-    orig_file = None
-    bak_file = None
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
-        cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
+        cmakecmd.extend(['-DVTK_BUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_TESTING:BOOL=OFF',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
-                         '-DVTK_USE_SYSTEM_ZLIB:BOOL=ON',
+                         '-DVTK_BUILD_TESTING:STRING=OFF',
+                         '-DVTK_DATA_EXCLUDE_FROM_ALL:BOOL=OFF',
+                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DVTK_MODULE_USE_EXTERNAL_VTK_zlib:BOOL=ON',
                          '-DVTK_LEGACY_REMOVE:BOOL=ON'])
 
         if is_windows():
-            cmakecmd.extend(['-DVTK_USE_SYSTEM_LIBXML2:BOOL=OFF',
+            cmakecmd.extend(['-DVTK_MODULE_USE_EXTERNAL_VTK_libxml2:BOOL=OFF',
                              '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
                              '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib'])
         else:
             if is_mac():
-                orig_file = os.path.join(src_dir, 'Utilities', 'KWSys', 'vtksys', 'SystemTools.cxx')
-                bak_file = patch_file(orig_file, from_texts=[r'#elif KWSYS_CXX_HAS_UTIMENSAT'], to_texts=[r'#elif 0'])
-
-                cmakecmd.extend(['-DVTK_USE_SYSTEM_LIBXML2:BOOL=ON'])
+                cmakecmd.extend(['-DVTK_MODULE_USE_EXTERNAL_VTK_libxml2:BOOL=ON'])
             else:
-                cmakecmd.extend(['-DVTK_USE_SYSTEM_LIBXML2:BOOL=OFF'])
+                cmakecmd.extend(['-DVTK_MODULE_USE_EXTERNAL_VTK_libxml2:BOOL=OFF'])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        if is_mac():
-            os.replace(bak_file, orig_file)
 
 
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):

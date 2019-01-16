@@ -70,12 +70,9 @@ else ()
       ${IPP_PATH}/lib/intel64/libippcc.a)
 endif ()
 
-find_package(VTK REQUIRED COMPONENTS vtkFiltersGeometry vtkFiltersSources vtkIOXML
+find_package(VTK REQUIRED COMPONENTS FiltersGeometry FiltersSources IOXML
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/vtk NO_DEFAULT_PATH)
 message(STATUS "VTK_DIR: ${VTK_DIR}")
-message(STATUS "VTK_USE_FILE: ${VTK_USE_FILE}")
-include(${VTK_USE_FILE})
-message(STATUS "VTK_INCLUDE_DIRS: ${VTK_INCLUDE_DIRS}")
 message(STATUS "VTK_LIBRARIES: ${VTK_LIBRARIES}")
 
 set(GEOMETRICTOOLS_INCLUDE_DIRS ${GEOMETRICTOOLS_INCLUDE_DIRS}
