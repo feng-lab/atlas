@@ -15,7 +15,7 @@ from common_dirs import *
 
 
 def macos_min_version():
-    return '10.10'
+    return '10.12'
 
 
 def update_or_clone_git_repository(repository_folder: str, repository_url: str):

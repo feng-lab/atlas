@@ -6,10 +6,12 @@
 
 ### Windows:
 * install visual studio, qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb), python3, git
+* install vulkan sdk: https://vulkan.lunarg.com/home/welcome
 
 ### Linux:
 * install qt5 (>= 5.9), mkl, ipp, tbb, python3 and ninja
 * sudo apt install unrar p7zip-full git nasm libglfw3-dev zlib1g-dev libssl-dev golang patchelf
+* install vulkan sdk: https://vulkan.lunarg.com/home/welcome with apt
 
 ### All:
 * code repository folder should be named as "atlas"; "atlas_others" folder and "atlas" folder should be in same directory
@@ -24,11 +26,11 @@
 * $ROOT_DIR/src/3rdparty/makeengine.macos.gte: -std=c++14 -stdlib=libc++
 
 ## Minimum macOS Defines
-* $ROOT_DIR/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 10.10)
+* $ROOT_DIR/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12)
 * $ROOT_DIR/util/build_ext_libs.py: def macos_min_version() ...
-* $ROOT_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: -mmacosx-version-min=10.10
-* $ROOT_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: -mmacosx-version-min=10.10
-* $ROOT_DIR/src/3rdparty/makeengine.macos.gte: -mmacosx-version-min=10.10
+* $ROOT_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: -mmacosx-version-min=10.12
+* $ROOT_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: -mmacosx-version-min=10.12
+* $ROOT_DIR/src/3rdparty/makeengine.macos.gte: -mmacosx-version-min=10.12
 
 ## Python Package Build
 * conda install conda-build cmake ninja qt mkl-devel tbb-devel numpy pybind11
