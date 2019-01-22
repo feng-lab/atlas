@@ -3,6 +3,7 @@
 #include "zpunctadetectiondialog.h"
 #include "zimgdoc.h"
 #include "zanalysisworklistdialog.h"
+#include "ztheme.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
@@ -262,7 +263,7 @@ const QString& ZPunctaDoc::PunctaPack::info() const
 
 void ZPunctaDoc::createActions()
 {
-  m_loadPunctaAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load Puncta..."), this);
+  m_loadPunctaAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load Puncta..."), this);
   m_loadPunctaAction->setStatusTip(tr("Load one or more existing puncta files"));
   connect(m_loadPunctaAction, &QAction::triggered, this, &ZPunctaDoc::loadPuncta);
 

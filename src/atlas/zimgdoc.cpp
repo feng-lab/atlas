@@ -5,6 +5,7 @@
 #include "zsectionsregistrationdialog.h"
 #include "zchromaticshiftcorrectiondialog.h"
 #include "zlog.h"
+#include "ztheme.h"
 #include <QApplication>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -453,7 +454,7 @@ void ZImgDoc::sendChangedSignal(size_t id)
 
 void ZImgDoc::createActions()
 {
-  m_loadImgAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load Image..."), this);
+  m_loadImgAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load Image..."), this);
   m_loadImgAction->setStatusTip(tr("Load one or more existing image files"));
   connect(m_loadImgAction, &QAction::triggered, this, qOverload<>(&ZImgDoc::loadImg));
 

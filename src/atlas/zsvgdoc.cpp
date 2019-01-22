@@ -2,6 +2,7 @@
 
 #include "zlog.h"
 #include "zexception.h"
+#include "ztheme.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
@@ -207,7 +208,7 @@ const QString& ZSvgDoc::SvgPack::info() const
 
 void ZSvgDoc::createActions()
 {
-  m_loadSvgAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load Svg..."), this);
+  m_loadSvgAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load Svg..."), this);
   m_loadSvgAction->setStatusTip(tr("Load an existing Svg file"));
   connect(m_loadSvgAction, &QAction::triggered, this, &ZSvgDoc::loadSvg);
 }

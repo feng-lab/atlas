@@ -23,6 +23,7 @@
 #include "z3danimationview.h"
 #include "z3dregionannotationview.h"
 #include "z3dmainwindow.h"
+#include "ztheme.h"
 #include <QMessageBox>
 #include <QProgressDialog>
 #include <QMainWindow>
@@ -448,14 +449,14 @@ void Z3DView::init()
 
 void Z3DView::createActions()
 {
-  m_zoomInAction = new QAction(QIcon(":/icons/zoom_in-512.png"), tr("Zoom &In"), this);
+  m_zoomInAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomInIcon), tr("Zoom &In"), this);
   QList<QKeySequence> zoomInKey;
   zoomInKey << QKeySequence::ZoomIn << QKeySequence(Qt::Key_Plus) << QKeySequence(Qt::Key_Equal);
   m_zoomInAction->setShortcuts(zoomInKey);
   m_zoomInAction->setStatusTip(tr("Zoom in"));
   connect(m_zoomInAction, &QAction::triggered, this, &Z3DView::zoomIn);
 
-  m_zoomOutAction = new QAction(QIcon(":/icons/zoom_out-512.png"), tr("Zoom &Out"), this);
+  m_zoomOutAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomOutIcon), tr("Zoom &Out"), this);
   QList<QKeySequence> zoomOutKey;
   zoomOutKey << QKeySequence::ZoomOut << QKeySequence(Qt::Key_Minus);
   m_zoomOutAction->setShortcuts(zoomOutKey);

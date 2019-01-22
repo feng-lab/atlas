@@ -5,6 +5,7 @@
 #include "zimgdoc.h"
 #include "zimgsigneddistancemap.h"
 #include "zlog.h"
+#include "ztheme.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
@@ -360,7 +361,7 @@ QString ZROIDoc::ROIPack::generateUniqueName()
 
 void ZROIDoc::createActions()
 {
-  m_loadROIAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load ROI..."), this);
+  m_loadROIAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load ROI..."), this);
   m_loadROIAction->setStatusTip(tr("Load an existing ROI file"));
   connect(m_loadROIAction, &QAction::triggered, this, &ZROIDoc::loadROI);
 

@@ -13,7 +13,7 @@ namespace nim {
 
 ZStyledItemDelegate::ZStyledItemDelegate(QObject* parent)
   : QStyledItemDelegate(parent)
-//, m_settingIcon(":/icons/settings-512.png")
+//, m_settingIcon(ZTheme::instance().icon(ZTheme::SettingIcon))
 {
   setItemEditorFactory(&m_factory);
 

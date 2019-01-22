@@ -4,6 +4,7 @@
 #include "z3dview.h"
 #include "zexception.h"
 #include "zlog.h"
+#include "ztheme.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
@@ -303,7 +304,7 @@ const QString& Z3DAnimationDoc::AnimationPack::info() const
 
 void Z3DAnimationDoc::createActions()
 {
-  m_loadAnimationsAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load 3D Animations..."), this);
+  m_loadAnimationsAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load 3D Animations..."), this);
   m_loadAnimationsAction->setStatusTip(tr("Load one or more existing Animation files"));
   connect(m_loadAnimationsAction, &QAction::triggered, this, &Z3DAnimationDoc::loadAnimation);
 }

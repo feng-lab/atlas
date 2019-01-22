@@ -31,6 +31,7 @@
 #include "zsvgview.h"
 #include "zjson.h"
 #include "zfileutils.h"
+#include "ztheme.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QAction>
@@ -480,22 +481,22 @@ void ZMainWindow::init()
 void ZMainWindow::createActions()
 {
   // file
-//  m_newAction = new QAction(QIcon(":/icons/file-512.png"), tr("&New"), this);
+//  m_newAction = new QAction(ZTheme::instance().icon(ZTheme::FileIcon), tr("&New"), this);
 //  m_newAction->setShortcuts(QKeySequence::New);
 //  m_newAction->setStatusTip(tr("Open a new window"));
 //  connect(m_newAction, &QAction::triggered, this, &ZMainWindow::newWindow);
 
-  m_openAction = new QAction(QIcon(":/icons/folder-512.png"), tr("&Open..."), this);
+  m_openAction = new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Open..."), this);
   m_openAction->setShortcuts(QKeySequence::Open);
   m_openAction->setStatusTip(tr("Open an existing scene file"));
   connect(m_openAction, &QAction::triggered, this, &ZMainWindow::loadScene);
 
-  m_saveAction = new QAction(QIcon(":/icons/save-512.png"), tr("&Save"), this);
+  m_saveAction = new QAction(ZTheme::instance().icon(ZTheme::SaveIcon), tr("&Save"), this);
   m_saveAction->setShortcuts(QKeySequence::Save);
   m_saveAction->setStatusTip(tr("Save unsaved objects to disk"));
   connect(m_saveAction, &QAction::triggered, this, &ZMainWindow::save);
 
-  m_saveAsAction = new QAction(QIcon(":/icons/save_as-512.png"), tr("Save &As..."), this);
+  m_saveAsAction = new QAction(ZTheme::instance().icon(ZTheme::SaveAsIcon), tr("Save &As..."), this);
   m_saveAsAction->setShortcuts(QKeySequence::SaveAs);
   m_saveAsAction->setStatusTip(tr("Save selected objects under a new name"));
   connect(m_saveAsAction, &QAction::triggered, this, &ZMainWindow::saveAs);
@@ -526,7 +527,7 @@ void ZMainWindow::createActions()
   m_open3DViewAction->setStatusTip(tr("Open 3D Window"));
   connect(m_open3DViewAction, &QAction::triggered, this, &ZMainWindow::open3DWindow);
 
-  m_screenShotAction = new QAction(QIcon(":/icons/screenshot-512.png"), tr("&Screenshot"), this);
+  m_screenShotAction = new QAction(ZTheme::instance().icon(ZTheme::ScreenshotIcon), tr("&Screenshot"), this);
   m_screenShotAction->setStatusTip(tr("Screenshot"));
   connect(m_screenShotAction, &QAction::triggered, this, &ZMainWindow::openScreenshotPanel);
 
@@ -554,21 +555,21 @@ void ZMainWindow::createActions()
   m_viewLogAction->setStatusTip(tr("View Log"));
   connect(m_viewLogAction, &QAction::triggered, this, &ZMainWindow::viewLog);
 
-  m_openLogFolderAction = new QAction(QIcon(":/icons/folder-512.png"), tr("&Open Log Folder"), this);
+  m_openLogFolderAction = new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Open Log Folder"), this);
   m_openLogFolderAction->setStatusTip(tr("Open Log Folder"));
   connect(m_openLogFolderAction, &QAction::triggered, this, &ZMainWindow::openLogFolder);
 
 #ifdef ATLAS_WITH_TESTS
-  m_runBenchmarkAction = new QAction(QIcon(":/icons/run_command-512.png"), tr("&Run Benchmark"), this);
+  m_runBenchmarkAction = new QAction(ZTheme::instance().icon(ZTheme::RunCommandIcon), tr("&Run Benchmark"), this);
   m_runBenchmarkAction->setStatusTip(tr("Run Benchmark"));
   connect(m_runBenchmarkAction, &QAction::triggered, this, &ZMainWindow::runBenchmark);
 
-  m_testAction = new QAction(QIcon(":/icons/test-512.png"), tr("&UnitTest"), this);
+  m_testAction = new QAction(ZTheme::instance().icon(ZTheme::RunTestIcon), tr("&UnitTest"), this);
   m_testAction->setStatusTip(tr("Run Unit Test"));
   connect(m_testAction, &QAction::triggered, this, &ZMainWindow::runUnitTest);
 #endif
 
-  m_runCustomCommandAction = new QAction(QIcon(":/icons/run_command-512.png"), tr("&Run Custom Command"), this);
+  m_runCustomCommandAction = new QAction(ZTheme::instance().icon(ZTheme::RunCommandIcon), tr("&Run Custom Command"), this);
   m_runCustomCommandAction->setStatusTip(tr("Run Custom Command"));
   connect(m_runCustomCommandAction, &QAction::triggered, this, &ZMainWindow::runCustomCommand);
 

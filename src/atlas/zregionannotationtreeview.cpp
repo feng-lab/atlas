@@ -38,9 +38,9 @@ ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel&
   setMinimumWidth(400);
 
   setAlternatingRowColors(true);
-  QPalette p = palette();
-  p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
-  setPalette(p);
+  //QPalette p = palette();
+  //p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
+  //setPalette(p);
 
   createContextMenu();
 

@@ -70,8 +70,8 @@ void ZTimelineAxisView::updateAxisScene()
   m_scene->setSceneRect(0, 0, m_timeline.eventViewWidth(), m_timeline.rowHeight());
   auto rect = new QGraphicsRectItem(nullptr);
   rect->setRect(-1, -1, m_timeline.eventViewWidth() + 2, m_timeline.rowHeight() + 2);
-  rect->setPen(QPen(QColor(200, 200, 200)));
-  rect->setBrush(QBrush(QColor(235 + 20, 235 + 20, 235 + 20)));
+  rect->setPen(QPen(palette().color(QPalette::Base)));
+  rect->setBrush(palette().brush(QPalette::Base));
 
   m_scene->addItem(rect);
 
@@ -103,31 +103,31 @@ void ZTimelineAxisView::updateAxisScene()
     if (count % 10 == 0) { // big tick
       auto line = new QGraphicsLineItem();
       line->setLine(x, m_timeline.rowHeight() * 0.2, x, m_timeline.rowHeight());
-      line->setPen(QPen(QColor(100, 100, 100)));
+      line->setPen(QPen(palette().color(QPalette::Text)));
       QGraphicsTextItem* text = new QGraphicsTextItem(timeToString(time));
       text->setPos(x, 0);
       QFont font;
       font.setPointSize(11);
       text->setFont(font);
-      text->setDefaultTextColor(QColor(120, 120, 120));
+      //text->setDefaultTextColor(palette().color(QPalette::Text));
       m_scene->addItem(line);
       m_scene->addItem(text);
     } else if (count % 5 == 0) { // middle tick
       auto line = new QGraphicsLineItem();
       line->setLine(x, m_timeline.rowHeight() * 0.5, x, m_timeline.rowHeight());
-      line->setPen(QPen(QColor(150, 150, 150)));
+      line->setPen(QPen(palette().color(QPalette::Text)));
       QGraphicsTextItem* text = new QGraphicsTextItem(timeToString(time));
       text->setPos(x, 0);
       QFont font;
       font.setPointSize(11);
       text->setFont(font);
-      text->setDefaultTextColor(QColor(150, 150, 150));
+      //text->setDefaultTextColor(palette().color(QPalette::Text));
       m_scene->addItem(line);
       m_scene->addItem(text);
     } else { // small tick
       auto line = new QGraphicsLineItem();
       line->setLine(x, m_timeline.rowHeight() * 0.7, x, m_timeline.rowHeight());
-      line->setPen(QPen(QColor(180, 180, 180)));
+      line->setPen(QPen(palette().color(QPalette::Text)));
       m_scene->addItem(line);
     }
   }

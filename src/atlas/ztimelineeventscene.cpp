@@ -232,7 +232,7 @@ void ZTimelineEventScene::updateItems()
       auto rect = new EventBoundRectItem(pack, m_timeline);
       rect->setRect(-1, 0, m_timeline.eventViewWidth() + 2, m_timeline.rowHeight());
       rect->setPen(QPen(QColor(133, 133, 133)));
-      rect->setBrush(QBrush(QColor(235 + 20, 235 + 20, 235 + 20)));
+      rect->setBrush(palette().brush(QPalette::Base));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
 
       for (const auto& key : pack.paraAnimation->keys()) {
@@ -245,7 +245,7 @@ void ZTimelineEventScene::updateItems()
       auto rect = new EventBoundRectItem(pack, m_timeline);
       rect->setRect(-1, 0, m_timeline.eventViewWidth() + 2, m_timeline.rowHeight());
       rect->setPen(QPen(QColor(133, 133, 133)));
-      rect->setBrush(QBrush(QColor(220 + 20, 220 + 20, 220 + 20)));
+      rect->setBrush(palette().brush(QPalette::AlternateBase));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
 
       for (const auto& pa : m_timeline.animation().paraAnimationList(pack.id)) {
@@ -260,8 +260,8 @@ void ZTimelineEventScene::updateItems()
     } else if (pack.type == ZAnimationDisplayPack::Type::ObjectPara) {
       auto rect = new EventBoundRectItem(pack, m_timeline);
       rect->setRect(-1, 0, m_timeline.eventViewWidth() + 2, m_timeline.rowHeight());
-      rect->setPen(QPen(QColor(200, 200, 200)));
-      rect->setBrush(QBrush(QColor(235 + 20, 235 + 20, 235 + 20)));
+      rect->setPen(QPen(QColor(133, 133, 133)));
+      rect->setBrush(palette().brush(QPalette::Base));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
 
       for (const auto& key : pack.paraAnimation->keys()) {

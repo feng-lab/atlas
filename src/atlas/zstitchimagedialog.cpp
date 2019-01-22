@@ -11,6 +11,7 @@
 #include "zfileutils.h"
 #include "zcpuinfo.h"
 #include "zlogwidget.h"
+#include "ztheme.h"
 #include <tbb/concurrent_unordered_map.h>
 #include <tbb/parallel_for.h>
 #include <tbb/task_scheduler_init.h>
@@ -942,14 +943,14 @@ void ZStitchImageDialog::editConnFromTileImage()
     auto vlayout = new QVBoxLayout;
     auto hlayout = new QHBoxLayout;
 
-    auto m_zoomInAction = new QAction(QIcon(":/icons/zoom_in-512.png"), tr("Zoom &In"), &dia);
+    auto m_zoomInAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomInIcon), tr("Zoom &In"), &dia);
     QList<QKeySequence> zoomInKey;
     zoomInKey << QKeySequence::ZoomIn << QKeySequence(Qt::Key_Plus) << QKeySequence(Qt::Key_Equal);
     m_zoomInAction->setShortcuts(zoomInKey);
     m_zoomInAction->setStatusTip(tr("Zoom In"));
     connect(m_zoomInAction, &QAction::triggered, this, &ZStitchImageDialog::zoomInTileImageWidget);
 
-    auto m_zoomOutAction = new QAction(QIcon(":/icons/zoom_out-512.png"), tr("Zoom &Out"), &dia);
+    auto m_zoomOutAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomOutIcon), tr("Zoom &Out"), &dia);
     QList<QKeySequence> zoomOutKey;
     zoomOutKey << QKeySequence::ZoomOut << QKeySequence(Qt::Key_Minus);
     m_zoomOutAction->setShortcuts(zoomOutKey);

@@ -4,6 +4,7 @@
 #include "zbenchtimer.h"
 #include "zlog.h"
 #include "zparameteranimation.h"
+#include "ztheme.h"
 #include <QGraphicsRectItem>
 #include <QGraphicsTextItem>
 #include <QGraphicsPixmapItem>
@@ -124,8 +125,8 @@ void ParameterAnimationColorItem::mousePressEvent(QGraphicsSceneMouseEvent* /*ev
 ZTimelineObjScene::ZTimelineObjScene(ZTimelineWidget& timeline, QObject* parent)
   : QGraphicsScene(parent)
   , m_timeline(timeline)
-  , m_arrowRight(":/icons/arrow_right.png")
-  , m_arrowDown(":/icons/arrow_down.png")
+  , m_arrowRight(ZTheme::instance().iconFile(ZTheme::ArrowRightIcon))
+  , m_arrowDown(ZTheme::instance().iconFile(ZTheme::ArrowDownIcon))
 {
   updateItems();
   connect(&m_timeline.animation(), &ZAnimation::expandChanged, this, &ZTimelineObjScene::updateItems);
@@ -149,7 +150,7 @@ void ZTimelineObjScene::updateItems()
       auto rect = new ObjBoundRectItem(pack, m_timeline);
       rect->setRect(0, 0, m_timeline.objViewWidth(), m_timeline.rowHeight());
       rect->setPen(QPen(QColor(133, 133, 133)));
-      rect->setBrush(QBrush(QColor(227, 227, 227)));
+      rect->setBrush(palette().brush(QPalette::Base));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
       new DiagramTextItem(pack, rect, Qt::AlignVCenter | Qt::AlignRight);
       new ParameterAnimationColorItem(pack, m_timeline, rect);
@@ -159,7 +160,7 @@ void ZTimelineObjScene::updateItems()
       auto rect = new ObjBoundRectItem(pack, m_timeline);
       rect->setRect(0, 0, m_timeline.objViewWidth(), m_timeline.rowHeight());
       rect->setPen(QPen(QColor(133, 133, 133)));
-      rect->setBrush(QBrush(QColor(220, 220, 220)));
+      rect->setBrush(palette().brush(QPalette::AlternateBase));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
       new DiagramTextItem(pack, rect, Qt::AlignVCenter | Qt::AlignLeft);
       ExpandArrowPixmapItem* arrow = new ExpandArrowPixmapItem(pack, m_timeline, rect);
@@ -174,8 +175,8 @@ void ZTimelineObjScene::updateItems()
     } else if (pack.type == ZAnimationDisplayPack::Type::ObjectPara) {
       auto rect = new ObjBoundRectItem(pack, m_timeline);
       rect->setRect(0, 0, m_timeline.objViewWidth(), m_timeline.rowHeight());
-      rect->setPen(QPen(QColor(200, 200, 200)));
-      rect->setBrush(QBrush(QColor(235, 235, 235)));
+      rect->setPen(QPen(QColor(133, 133, 133)));
+      rect->setBrush(palette().brush(QPalette::Base));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
       new DiagramTextItem(pack, rect, Qt::AlignVCenter | Qt::AlignRight);
       new ParameterAnimationColorItem(pack, m_timeline, rect);
@@ -184,8 +185,8 @@ void ZTimelineObjScene::updateItems()
     } else if (pack.type == ZAnimationDisplayPack::Type::ShowAll) {
       auto rect = new ObjBoundRectItem(pack, m_timeline);
       rect->setRect(0, 0, m_timeline.objViewWidth(), m_timeline.rowHeight());
-      rect->setPen(QPen(QColor(200, 200, 200)));
-      rect->setBrush(QBrush(QColor(235, 235, 235)));
+      rect->setPen(QPen(QColor(133, 133, 133)));
+      rect->setBrush(palette().brush(QPalette::Base));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
       new DiagramTextItem(pack, rect, Qt::AlignVCenter | Qt::AlignHCenter);
       addItem(rect);

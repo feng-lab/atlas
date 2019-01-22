@@ -11,6 +11,7 @@
 #include "z3danimationdoc.h"
 #include "zroidoc.h"
 #include "zmeshdoc.h"
+#include "ztheme.h"
 #include <QUndoGroup>
 #include <QAction>
 #include <QMessageBox>
@@ -584,11 +585,11 @@ void ZDoc::create3DAnimation()
 void ZDoc::createActions()
 {
   m_undoAction = m_undoGroup->createUndoAction(this, tr("&Undo"));
-  m_undoAction->setIcon(QIcon(":/icons/undo-512.png"));
+  m_undoAction->setIcon(ZTheme::instance().icon(ZTheme::UndoIcon));
   m_undoAction->setShortcuts(QKeySequence::Undo);
 
   m_redoAction = m_undoGroup->createRedoAction(this, tr("&Redo"));
-  m_redoAction->setIcon(QIcon(":/icons/redo-512.png"));
+  m_redoAction->setIcon(ZTheme::instance().icon(ZTheme::RedoIcon));
   m_redoAction->setShortcuts(QKeySequence::Redo);
 
   m_removeAllAction = new QAction(tr("&Remove Everything"), this);

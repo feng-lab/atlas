@@ -2,6 +2,7 @@
 
 #include "zexception.h"
 #include "zlog.h"
+#include "ztheme.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
@@ -309,7 +310,7 @@ const QString& ZMeshDoc::MeshPack::detailedInfo() const
 
 void ZMeshDoc::createActions()
 {
-  m_loadMeshAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load Mesh..."), this);
+  m_loadMeshAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load Mesh..."), this);
   m_loadMeshAction->setStatusTip(tr("Load an existing mesh file"));
   connect(m_loadMeshAction, &QAction::triggered, this, &ZMeshDoc::loadMesh);
 }

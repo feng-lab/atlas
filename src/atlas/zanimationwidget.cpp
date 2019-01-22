@@ -3,6 +3,7 @@
 #include "znumericparameter.h"
 #include "ztimelinewidget.h"
 #include "zanimationexportwidget.h"
+#include "ztheme.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QToolButton>
@@ -84,7 +85,7 @@ void ZAnimationWidget::playPause()
     m_playSpeed->setEnabled(true);
 
     m_isPlaying = false;
-    m_playButton->setIcon(QIcon(":/icons/play-512.png"));
+    m_playButton->setIcon(ZTheme::instance().icon(ZTheme::PlayIcon));
     m_timeLine->stop();
   } else {
     m_gotoStartButton->setEnabled(false);
@@ -93,7 +94,7 @@ void ZAnimationWidget::playPause()
     m_playSpeed->setEnabled(false);
 
     m_isPlaying = true;
-    m_playButton->setIcon(QIcon(":/icons/pause-512.png"));
+    m_playButton->setIcon(ZTheme::instance().icon(ZTheme::PauseIcon));
     m_timeLine->setCurrentTime(m_currentTime->get() * 1000 / m_playSpeed->get());
     m_timeLine->setDirection(QTimeLine::Forward);
     m_timeLine->resume();
@@ -109,7 +110,7 @@ void ZAnimationWidget::reversePlayPause()
     m_playSpeed->setEnabled(true);
 
     m_isPlaying = false;
-    m_reversePlayButton->setIcon(QIcon(":/icons/reverse_play-512.png"));
+    m_reversePlayButton->setIcon(ZTheme::instance().icon(ZTheme::ReversePlayIcon));
     m_timeLine->stop();
   } else {
     m_gotoStartButton->setEnabled(false);
@@ -118,7 +119,7 @@ void ZAnimationWidget::reversePlayPause()
     m_playSpeed->setEnabled(false);
 
     m_isPlaying = true;
-    m_reversePlayButton->setIcon(QIcon(":/icons/pause-512.png"));
+    m_reversePlayButton->setIcon(ZTheme::instance().icon(ZTheme::PauseIcon));
     m_timeLine->setCurrentTime(m_currentTime->get() * 1000 / m_playSpeed->get());
     m_timeLine->setDirection(QTimeLine::Backward);
     m_timeLine->resume();
@@ -140,8 +141,8 @@ void ZAnimationWidget::timeLineFinished()
   m_playSpeed->setEnabled(true);
 
   m_isPlaying = false;
-  m_playButton->setIcon(QIcon(":/icons/play-512.png"));
-  m_reversePlayButton->setIcon(QIcon(":/icons/reverse_play-512.png"));
+  m_playButton->setIcon(ZTheme::instance().icon(ZTheme::PlayIcon));
+  m_reversePlayButton->setIcon(ZTheme::instance().icon(ZTheme::ReversePlayIcon));
 }
 
 void ZAnimationWidget::gotoStart()
@@ -194,33 +195,33 @@ void ZAnimationWidget::createWidget()
   hlo->addSpacing(5);
 
   m_gotoStartButton = new QToolButton(this);
-  m_gotoStartButton->setIcon(QIcon(":/icons/skip_to_start-512.png"));
+  m_gotoStartButton->setIcon(ZTheme::instance().icon(ZTheme::ReturnToStartIcon));
   hlo->addWidget(m_gotoStartButton);
 
   //m_rewindButton = new QToolButton(this);
-  //m_rewindButton->setIcon(QIcon(":/icons/rewind-512.png"));
+  //m_rewindButton->setIcon(ZTheme::instance().icon(ZTheme::RewindIcon));
   //hlo->addWidget(m_rewindButton);
 
   m_reversePlayButton = new QToolButton(this);
-  m_reversePlayButton->setIcon(QIcon(":/icons/reverse_play-512.png"));
+  m_reversePlayButton->setIcon(ZTheme::instance().icon(ZTheme::ReversePlayIcon));
   hlo->addWidget(m_reversePlayButton);
 
   m_playButton = new QToolButton(this);
-  m_playButton->setIcon(QIcon(":/icons/play-512.png"));
+  m_playButton->setIcon(ZTheme::instance().icon(ZTheme::PlayIcon));
   hlo->addWidget(m_playButton);
 
   //m_fastForwardButton = new QToolButton(this);
-  //m_fastForwardButton->setIcon(QIcon(":/icons/fast_forward-512.png"));
+  //m_fastForwardButton->setIcon(ZTheme::instance().icon(ZTheme::FastForwardIcon));
   //hlo->addWidget(m_fastForwardButton);
 
   m_gotoEndButton = new QToolButton(this);
-  m_gotoEndButton->setIcon(QIcon(":/icons/end-512.png"));
+  m_gotoEndButton->setIcon(ZTheme::instance().icon(ZTheme::GoToEndIcon));
   hlo->addWidget(m_gotoEndButton);
 
   hlo->addSpacing(5);
 
   m_repeatButton = new QToolButton(this);
-  m_repeatButton->setIcon(QIcon(":/icons/repeat-512.png"));
+  m_repeatButton->setIcon(ZTheme::instance().icon(ZTheme::RepeatIcon));
   m_repeatButton->setCheckable(true);
   hlo->addWidget(m_repeatButton);
 

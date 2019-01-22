@@ -1,5 +1,7 @@
 <RCC>
     <qresource prefix="/">
+        <file>Resources/themes/light.atlastheme</file>
+        <file>Resources/themes/dark.atlastheme</file>
         <file>Resources/shader/almag.frag</file>
         <file>Resources/shader/almag.vert</file>
         <file>Resources/shader/background.frag</file>
@@ -47,64 +49,96 @@
         <file>Resources/shader/lighting.frag</file>
         <file>Resources/shader/cone_2.vert</file>
         <file>Resources/shader/cone_func_2.frag</file>
-        <file>icons/folder-512.png</file>
-        <file>icons/redo-512.png</file>
-        <file>icons/save_as-512.png</file>
-        <file>icons/save-512.png</file>
-        <file>icons/screenshot-512.png</file>
+        <file>icons/folder-open.svg</file>
+        <file>icons/folder-open-dark.svg</file>
+        <file>icons/redo.svg</file>
+        <file>icons/redo-dark.svg</file>
+        <file>icons/save-as.svg</file>
+        <file>icons/save-as-dark.svg</file>
+        <file>icons/save.svg</file>
+        <file>icons/save-dark.svg</file>
+        <file>icons/screenshot.svg</file>
+        <file>icons/screenshot-dark.svg</file>
         <file>icons/settings-512.png</file>
-        <file>icons/undo-512.png</file>
-        <file>icons/zoom_in-512.png</file>
-        <file>icons/zoom_out-512.png</file>
+        <file>icons/undo.svg</file>
+        <file>icons/undo-dark.svg</file>
+        <file>icons/zoom-in.svg</file>
+        <file>icons/zoom-in-dark.svg</file>
+        <file>icons/zoom-out.svg</file>
+        <file>icons/zoom-out-dark.svg</file>
         <file>icons/file-512.png</file>
-        <file>icons/frame-512.png</file>
-        <file>icons/gallery-512.png</file>
-        <file>icons/add_image-512.png</file>
-        <file>icons/test-512.png</file>
-        <file>icons/eye_close-512.png</file>
-        <file>icons/eye_open-512.png</file>
-        <file>icons/eye_half-512.png</file>
-        <file>icons/background_color-512.png</file>
-        <file>icons/axis-512.png</file>
-        <file>icons/skip_to_start-512.png</file>
-        <file>icons/rewind-512.png</file>
-        <file>icons/repeat-512.png</file>
+        <file>icons/projection-view.svg</file>
+        <file>icons/projection-view-dark.svg</file>
+        <file>icons/normal-view.svg</file>
+        <file>icons/normal-view-dark.svg</file>
+        <file>icons/folder-add.svg</file>
+        <file>icons/folder-add-dark.svg</file>
+        <file>icons/run-test.svg</file>
+        <file>icons/run-test-dark.svg</file>
+        <file>icons/eye-close.svg</file>
+        <file>icons/eye-close-dark.svg</file>
+        <file>icons/eye-open.svg</file>
+        <file>icons/eye-open-dark.svg</file>
+        <file>icons/eye-half.svg</file>
+        <file>icons/eye-half-dark.svg</file>
+        <file>icons/background.svg</file>
+        <file>icons/axis.svg</file>
+        <file>icons/axis-dark.svg</file>
+        <file>icons/return-to-start.svg</file>
+        <file>icons/return-to-start-dark.svg</file>
+        <file>icons/repeat.svg</file>
+        <file>icons/repeat-dark.svg</file>
         <file>icons/record-512.png</file>
-        <file>icons/end-512.png</file>
-        <file>icons/fast_forward-512.png</file>
-        <file>icons/pause-512.png</file>
-        <file>icons/play-512.png</file>
-        <file>icons/reverse_play-512.png</file>
-        <file>icons/arrow_down.png</file>
-        <file>icons/arrow_right.png</file>
-        <file>icons/expand-512.png</file>
-        <file>icons/clean_up.png</file>
+        <file>icons/go-to-end.svg</file>
+        <file>icons/go-to-end-dark.svg</file>
+        <file>icons/pause.svg</file>
+        <file>icons/pause-dark.svg</file>
+        <file>icons/play.svg</file>
+        <file>icons/play-dark.svg</file>
+        <file>icons/reverse-play.svg</file>
+        <file>icons/reverse-play-dark.svg</file>
+        <file>icons/arrow-down.svg</file>
+        <file>icons/arrow-down-dark.svg</file>
+        <file>icons/arrow-right.svg</file>
+        <file>icons/arrow-right-dark.svg</file>
+        <file>icons/expand.svg</file>
+        <file>icons/expand-dark.svg</file>
+        <file>icons/cleanup.svg</file>
+        <file>icons/cleanup-dark.svg</file>
         <file>Resources/shader/wideline_func.frag</file>
         <file>Resources/shader/wideline.geom</file>
         <file>Resources/shader/wideline.vert</file>
         <file>Resources/shader/wideline_func1.frag</file>
         <file>Resources/shader/wideline1.vert</file>
-        <file>icons/line-512.png</file>
-        <file>icons/collapse-512.png</file>
+        <file>icons/collapse.svg</file>
+        <file>icons/collapse-dark.svg</file>
         <file>icons/crop-512.png</file>
         <file>icons/flip_horizontal-512.png</file>
         <file>icons/flip_vertical-512.png</file>
         <file>icons/hexagon-512.png</file>
         <file>icons/octagon-512.png</file>
-        <file>icons/rectangle_stroked-512.png</file>
-        <file>icons/ellipse_stroked-512.png</file>
+        <file>icons/rectangle.svg</file>
+        <file>icons/rectangle-dark.svg</file>
+        <file>icons/ellipse.svg</file>
+        <file>icons/ellipse-dark.svg</file>
         <file>Resources/shader/lighting2.frag</file>
         <file>Resources/shader/copyimage_func.frag</file>
         <file>Resources/shader/image2d_with_colormap.frag</file>
         <file>Resources/shader/volume_slice_with_colormap.frag</file>
         <file>icons/export-512.png</file>
-        <file>icons/camcoder_pro-512.png</file>
-        <file>icons/run_command-512.png</file>
-        <file>icons/polygon-512.png</file>
-        <file>icons/spline-512.png</file>
+        <file>icons/camcoder.svg</file>
+        <file>icons/camcoder-dark.svg</file>
+        <file>icons/run-command.svg</file>
+        <file>icons/run-command-dark.svg</file>
+        <file>icons/polygon.svg</file>
+        <file>icons/polygon-dark.svg</file>
+        <file>icons/spline.svg</file>
+        <file>icons/spline-dark.svg</file>
         <file>Resources/ontology/mouse_brain_atlas.json</file>
-        <file>icons/rubber_band-2048.png</file>
-        <file>icons/hand_cursor-512.png</file>
+        <file>icons/selection.svg</file>
+        <file>icons/selection-dark.svg</file>
+        <file>icons/drag.svg</file>
+        <file>icons/drag-dark.svg</file>
         <file>icons/lock-512.png</file>
         <file>icons/unlock-512.png</file>
         <file>Resources/shader/blur.frag</file>

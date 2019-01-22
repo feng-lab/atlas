@@ -2,6 +2,7 @@
 
 #include "zexception.h"
 #include "zlog.h"
+#include "ztheme.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
@@ -237,7 +238,7 @@ const QString& ZSwcDoc::SwcPack::info() const
 
 void ZSwcDoc::createActions()
 {
-  m_loadSwcAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load Swc..."), this);
+  m_loadSwcAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load Swc..."), this);
   m_loadSwcAction->setStatusTip(tr("Load an existing Swc file"));
   connect(m_loadSwcAction, &QAction::triggered, this, &ZSwcDoc::loadSwc);
 }

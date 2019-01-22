@@ -5,6 +5,7 @@
 #include "zobjmodel.h"
 #include "zstyleditemdelegate.h"
 #include "zlog.h"
+#include "ztheme.h"
 #include <QSortFilterProxyModel>
 #include <QKeyEvent>
 #include <QHeaderView>
@@ -29,9 +30,12 @@ ZObjWidget::ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* sele
   setContextMenuPolicy(Qt::CustomContextMenu);
   sortByColumn(ZObjModel::TypeColumn);
   setStyleSheet(
-    "QTreeView::indicator:unchecked {image: url(:/icons/eye_close-512.png);}"
-      "QTreeView::indicator:checked {image: url(:/icons/eye_open-512.png);}"
-      "QTreeView::indicator:indeterminate {image: url(:/icons/eye_half-512.png);}"
+    QString("QTreeView::indicator:unchecked {image: url(%1);}"
+            "QTreeView::indicator:checked {image: url(%2);}"
+            "QTreeView::indicator:indeterminate {image: url(%3);}")
+      .arg(ZTheme::instance().iconFile(ZTheme::EyeCloseIcon))
+      .arg(ZTheme::instance().iconFile(ZTheme::EyeOpenIcon))
+      .arg(ZTheme::instance().iconFile(ZTheme::EyeHalfIcon))
   );
 
   connect(this, &ZObjWidget::customContextMenuRequested, this, &ZObjWidget::contextMenu);

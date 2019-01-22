@@ -665,7 +665,7 @@ set(SOURCES
     zlogwidget.cpp
     zlogwidget.h
     zimgprocessdialog.cpp
-    zimgprocessdialog.h zstitchimage.cpp zstitchimage.h zservicemanager.cpp zservicemanager.h zrpcservice.cpp zrpcservice.h)
+    zimgprocessdialog.h zstitchimage.cpp zstitchimage.h zservicemanager.cpp zservicemanager.h zrpcservice.cpp zrpcservice.h ztheme.cpp ztheme.h)
 
 # our target
 set(APP_NAME Atlas)
@@ -759,6 +759,11 @@ else (WIN32)
                               "-Wno-unused-parameter")
 
   if (APPLE)
+    message(STATUS "Qt5Core_INCLUDE_DIRS: ${Qt5Core_INCLUDE_DIRS}")
+    list(GET Qt5Core_INCLUDE_DIRS 0 Qt5Core_INCLUDE_DIRS0)
+    message(STATUS "Qt5Core_INCLUDE_DIRS0: ${Qt5Core_INCLUDE_DIRS0}")
+    set_source_files_properties(ztheme.cpp PROPERTIES COMPILE_FLAGS "-isystem ${Qt5Core_INCLUDE_DIRS0}/Headers/${QT_VERSION}/QtCore -isystem ${Qt5Core_INCLUDE_DIRS0}/Headers/${QT_VERSION}")
+
     set(copyright_line "Copyright 2011-2018 Linqing Feng")
     set_target_properties(${APP_NAME} PROPERTIES
                           BUILD_RPATH "@executable_path/../Frameworks"

@@ -4,6 +4,7 @@
 #include "zregionannotationwidget.h"
 #include "zlog.h"
 #include "zsysteminfo.h"
+#include "ztheme.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
@@ -401,7 +402,7 @@ const QString& ZRegionAnnotationDoc::RegionAnnotationPack::info() const
 
 void ZRegionAnnotationDoc::createActions()
 {
-  m_loadRegionAnnotationAction = new QAction(QIcon(":/icons/add_image-512.png"), tr("&Load RegionAnnotation..."), this);
+  m_loadRegionAnnotationAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load RegionAnnotation..."), this);
   m_loadRegionAnnotationAction->setStatusTip(tr("Load one or more existing regionAnnotation files"));
   connect(m_loadRegionAnnotationAction, &QAction::triggered, this, &ZRegionAnnotationDoc::loadRegionAnnotation);
 

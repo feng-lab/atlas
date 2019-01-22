@@ -11,6 +11,7 @@
 #include "zobjdoc.h"
 #include "zmainwindow.h"
 #include "zsysteminfo.h"
+#include "ztheme.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QAction>
@@ -221,17 +222,17 @@ void Z3DMainWindow::init()
 void Z3DMainWindow::createActions()
 {
   // file
-  m_openAction = new QAction(QIcon(":/icons/folder-512.png"), tr("&Open..."), this);
+  m_openAction = new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Open..."), this);
   m_openAction->setShortcuts(QKeySequence::Open);
   m_openAction->setStatusTip(tr("Open an existing scene file"));
   connect(m_openAction, &QAction::triggered, this, &Z3DMainWindow::loadScene);
 
-  m_saveAction = new QAction(QIcon(":/icons/save-512.png"), tr("&Save"), this);
+  m_saveAction = new QAction(ZTheme::instance().icon(ZTheme::SaveIcon), tr("&Save"), this);
   m_saveAction->setShortcuts(QKeySequence::Save);
   m_saveAction->setStatusTip(tr("Save unsaved objects to disk"));
   connect(m_saveAction, &QAction::triggered, this, &Z3DMainWindow::save);
 
-  m_saveAsAction = new QAction(QIcon(":/icons/save_as-512.png"), tr("Save &As..."), this);
+  m_saveAsAction = new QAction(ZTheme::instance().icon(ZTheme::SaveAsIcon), tr("Save &As..."), this);
   m_saveAsAction->setShortcuts(QKeySequence::SaveAs);
   m_saveAsAction->setStatusTip(tr("Save selected objects under a new name"));
   connect(m_saveAsAction, &QAction::triggered, this, &Z3DMainWindow::saveAs);
@@ -252,15 +253,15 @@ void Z3DMainWindow::createActions()
   // edit
 
   // view
-  m_changeBackgroundAction = new QAction(QIcon(":/icons/background_color-512.png"), tr("&Change Background"), this);
+  m_changeBackgroundAction = new QAction(ZTheme::instance().icon(ZTheme::BackgroundIcon), tr("&Change Background"), this);
   m_changeBackgroundAction->setStatusTip(tr("Change background of 3d view"));
   connect(m_changeBackgroundAction, &QAction::triggered, this, &Z3DMainWindow::changeBackground);
 
-  m_changeAxisAction = new QAction(QIcon(":/icons/axis-512.png"), tr("&Change Axis"), this);
+  m_changeAxisAction = new QAction(ZTheme::instance().icon(ZTheme::AxisIcon), tr("&Change Axis"), this);
   m_changeAxisAction->setStatusTip(tr("Change axis of 3d view"));
   connect(m_changeAxisAction, &QAction::triggered, this, &Z3DMainWindow::changeAxis);
 
-  m_screenShotAction = new QAction(QIcon(":/icons/screenshot-512.png"), tr("&Screenshot"), this);
+  m_screenShotAction = new QAction(ZTheme::instance().icon(ZTheme::ScreenshotIcon), tr("&Screenshot"), this);
   m_screenShotAction->setStatusTip(tr("Screenshot"));
   connect(m_screenShotAction, &QAction::triggered, this, &Z3DMainWindow::openScreenshotPanel);
 
@@ -283,7 +284,7 @@ void Z3DMainWindow::createActions()
   m_viewLogAction->setStatusTip(tr("View Log"));
   connect(m_viewLogAction, &QAction::triggered, this, &Z3DMainWindow::viewLog);
 
-  m_openLogFolderAction = new QAction(QIcon(":/icons/folder-512.png"), tr("&Open Log Folder"), this);
+  m_openLogFolderAction = new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Open Log Folder"), this);
   m_openLogFolderAction->setStatusTip(tr("Open Log Folder"));
   connect(m_openLogFolderAction, &QAction::triggered, this, &Z3DMainWindow::openLogFolder);
 }

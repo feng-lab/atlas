@@ -7,6 +7,7 @@
 #include "zcpuinfo.h"
 #include "zservicemanager.h"
 #include "../version/version.h"
+#include "ztheme.h"
 
 #ifdef ATLAS_WITH_TESTS
 #include "../../test/zrunbenchmark.h"
@@ -117,6 +118,9 @@ int main(int argc, char* argv[])
 #ifdef Q_OS_LINUX
     QCoreApplication::setAttribute(Qt::AA_DontUseNativeMenuBar, true); // do not use linux global menu bar
 #endif
+#ifdef Q_OS_MACOS
+    QCoreApplication::setAttribute(Qt::AA_DontShowIconsInMenus, true);
+#endif
     QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps, true);
     QCoreApplication::setAttribute(Qt::AA_UseDesktopOpenGL, true);
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
@@ -142,6 +146,8 @@ int main(int argc, char* argv[])
     nim::addLogSink(&nim::ZLogCache::instance());
     qInstallMessageHandler(myMessageOutput);
     LOG(INFO) << "--- App Log Start ---";
+
+    LOG(INFO) << "Current Theme: " << ZTheme::instance().currentTheme();
 
     nim::ZSystemInfo::instance().logOSInfo();
     nim::ZCpuInfo::instance().logCpuInfo();

@@ -3,6 +3,7 @@
 #include "zselectfilewidget.h"
 #include "z3dgpuinfo.h"
 #include "zfileutils.h"
+#include "ztheme.h"
 #include <QStandardPaths>
 #include <QDateTime>
 #include <QPushButton>
@@ -352,12 +353,12 @@ void ZTakeScreenShotWidget::createWidget()
   lo->addLayout(hlo);
 
   m_captureButton = new QPushButton(tr("Capture"), this);
-  m_captureButton->setIcon(QIcon(":/icons/screenshot-512.png"));
+  m_captureButton->setIcon(ZTheme::instance().icon(ZTheme::ScreenshotIcon));
   m_captureButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   lo->addWidget(m_captureButton, 0, Qt::AlignHCenter | Qt::AlignVCenter);
 
   m_captureSequenceButton = new QPushButton(tr("Capture Sequence"), this);
-  m_captureSequenceButton->setIcon(QIcon(":/icons/camcoder_pro-512.png"));
+  m_captureSequenceButton->setIcon(ZTheme::instance().icon(ZTheme::CamcoderIcon));
   m_captureSequenceButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   lo->addWidget(m_captureSequenceButton, 0, Qt::AlignHCenter | Qt::AlignVCenter);
 
