@@ -5,6 +5,7 @@
 #include <QPixmap>
 #include <QGraphicsTextItem>
 #include <QGraphicsPixmapItem>
+#include <QGraphicsSvgItem>
 #include <QGraphicsRectItem>
 #include <QTextOption>
 
@@ -27,10 +28,11 @@ private:
 
 class ZTimelineObjScene;
 
-class ExpandArrowPixmapItem : public QGraphicsPixmapItem
+class ExpandArrowSvgItem : public QGraphicsSvgItem
 {
 public:
-  ExpandArrowPixmapItem(const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline, QGraphicsItem* parent);
+  ExpandArrowSvgItem(const QString& filename,
+                     const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline, QGraphicsItem* parent);
 
 protected:
   void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
@@ -85,8 +87,6 @@ private:
 private:
   ZTimelineWidget& m_timeline;
 
-  QPixmap m_arrowRight;
-  QPixmap m_arrowDown;
   std::map<ObjBoundRectItem*, const ZAnimationDisplayPack*> m_itemToDisplayPack;
 };
 

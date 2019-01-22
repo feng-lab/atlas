@@ -53,16 +53,17 @@ QRectF DiagramTextItem::boundingRect() const
   return parentItem()->boundingRect();
 }
 
-ExpandArrowPixmapItem::ExpandArrowPixmapItem(const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline,
-                                             QGraphicsItem* parent)
-  : QGraphicsPixmapItem(parent)
+ExpandArrowSvgItem::ExpandArrowSvgItem(const QString& filename,
+                                       const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline,
+                                       QGraphicsItem* parent)
+  : QGraphicsSvgItem(filename, parent)
   , m_displayPack(pack)
   , m_timeline(timeline)
 {
-  setShapeMode(QGraphicsPixmapItem::BoundingRectShape);
+  //setShapeMode(QGraphicsPixmapItem::BoundingRectShape);
 }
 
-void ExpandArrowPixmapItem::mousePressEvent(QGraphicsSceneMouseEvent* /*event*/)
+void ExpandArrowSvgItem::mousePressEvent(QGraphicsSceneMouseEvent* /*event*/)
 {
   m_timeline.animation().toogleExpanded(m_displayPack.id);
 }
@@ -125,8 +126,6 @@ void ParameterAnimationColorItem::mousePressEvent(QGraphicsSceneMouseEvent* /*ev
 ZTimelineObjScene::ZTimelineObjScene(ZTimelineWidget& timeline, QObject* parent)
   : QGraphicsScene(parent)
   , m_timeline(timeline)
-  , m_arrowRight(ZTheme::instance().iconFile(ZTheme::ArrowRightIcon))
-  , m_arrowDown(ZTheme::instance().iconFile(ZTheme::ArrowDownIcon))
 {
   updateItems();
   connect(&m_timeline.animation(), &ZAnimation::expandChanged, this, &ZTimelineObjScene::updateItems);
@@ -163,13 +162,18 @@ void ZTimelineObjScene::updateItems()
       rect->setBrush(palette().brush(QPalette::AlternateBase));
       rect->setPos(0, pack.row * m_timeline.rowHeight());
       new DiagramTextItem(pack, rect, Qt::AlignVCenter | Qt::AlignLeft);
-      ExpandArrowPixmapItem* arrow = new ExpandArrowPixmapItem(pack, m_timeline, rect);
-      if (pack.expanded)
-        arrow->setPixmap(m_arrowDown);
-      else
-        arrow->setPixmap(m_arrowRight);
-      arrow->setPos(rect->rect().right() - 8 - m_arrowDown.width(),
-                    (m_timeline.rowHeight() - m_arrowDown.height()) / 2.);
+      if (pack.expanded) {
+        ExpandArrowSvgItem* arrow = new ExpandArrowSvgItem(ZTheme::instance().iconFile(ZTheme::ArrowDownIcon),
+                                                           pack, m_timeline, rect);
+        arrow->setPos(rect->rect().right() - 8 - arrow->boundingRect().width(),
+                      (m_timeline.rowHeight() - arrow->boundingRect().height()) / 2.);
+      } else {
+        ExpandArrowSvgItem* arrow = new ExpandArrowSvgItem(ZTheme::instance().iconFile(ZTheme::ArrowRightIcon),
+                                                           pack, m_timeline, rect);
+        arrow->setPos(rect->rect().right() - 8 - arrow->boundingRect().width(),
+                      (m_timeline.rowHeight() - arrow->boundingRect().height()) / 2.);
+      }
+
       addItem(rect);
       m_itemToDisplayPack[rect] = &pack;
     } else if (pack.type == ZAnimationDisplayPack::Type::ObjectPara) {
