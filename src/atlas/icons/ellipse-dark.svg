@@ -6,9 +6,9 @@
 	.st0{fill:#DCE0DF;}
 	.st1{fill:none;stroke:#FFFFFF;stroke-width:40;stroke-miterlimit:10;}
 </style>
-<rect x="254.36" y="122.58" class="st0" width="116.42" height="116.42"/>
-<ellipse class="st1" cx="312.57" cy="393.3" rx="253.56" ry="212.5"/>
-<rect x="4.15" y="331.58" class="st0" width="116.42" height="116.42"/>
-<rect x="247.79" y="547.59" class="st0" width="116.42" height="116.42"/>
-<rect x="501.36" y="331.58" class="st0" width="116.42" height="116.42"/>
+<rect x="254.4" y="122.6" class="st0" width="116.4" height="116.4"/>
+<ellipse class="st1" cx="307.1" cy="393.3" rx="259.1" ry="212.5"/>
+<rect x="0.2" y="331.6" class="st0" width="116.4" height="116.4"/>
+<rect x="247.8" y="547.6" class="st0" width="116.4" height="116.4"/>
+<rect x="495.4" y="331.6" class="st0" width="116.4" height="116.4"/>
 </svg>

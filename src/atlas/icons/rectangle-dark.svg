@@ -3,12 +3,12 @@
 <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
 	 viewBox="0 0 612 792" style="enable-background:new 0 0 612 792;" xml:space="preserve">
 <style type="text/css">
-	.st0{fill:#DCE0DF;}
-	.st1{fill:none;stroke:#FFFFFF;stroke-width:40;stroke-miterlimit:10;}
+	.st0{fill:none;stroke:#FFFFFF;stroke-width:40;stroke-miterlimit:10;}
+	.st1{fill:#DCE0DF;}
 </style>
-<rect x="473.36" y="135.79" class="st0" width="116.42" height="116.42"/>
-<rect x="31.36" y="142.58" class="st0" width="116.42" height="116.42"/>
-<rect x="31.36" y="456.58" class="st0" width="116.42" height="116.42"/>
-<rect x="480.36" y="453.58" class="st0" width="116.42" height="116.42"/>
-<rect x="89.57" y="200.79" class="st1" width="442" height="311"/>
+<polygon class="st0" points="58.6,216.8 552.1,216.8 552.1,527.8 58.6,530.8 "/>
+<rect x="493.9" y="151.8" class="st1" width="116.4" height="116.4"/>
+<rect x="0.4" y="158.6" class="st1" width="116.4" height="116.4"/>
+<rect x="0.4" y="472.6" class="st1" width="116.4" height="116.4"/>
+<rect x="493.9" y="469.6" class="st1" width="116.4" height="116.4"/>
 </svg>
