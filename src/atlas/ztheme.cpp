@@ -1,6 +1,8 @@
 #include "ztheme.h"
 
 #include "zjson.h"
+#include "zlog.h"
+#include "zlogqttypesupport.h"
 
 #ifdef Q_OS_MACOS
 #include <private/qcore_mac_p.h>
@@ -26,6 +28,8 @@ ZTheme::ZTheme()
   m_iconFiles.resize(m_icons.size());
 
   updateTheme();
+
+  connect(qApp, &QApplication::paletteChanged, this, &ZTheme::updateTheme);
 }
 
 void ZTheme::updateTheme()
@@ -35,6 +39,7 @@ void ZTheme::updateTheme()
 #else
   m_currentTheme = "light";
 #endif
+  LOG(INFO) << "Current Theme: " << m_currentTheme;
   loadTheme(QString(":Resources/themes/%1.atlastheme").arg(m_currentTheme));
 }
 
@@ -108,9 +113,27 @@ std::pair<QColor, QString> ZTheme::readNamedColor(const QString &color) const
   return std::make_pair(col, QString());
 }
 
+//#define DEBUG_QPalette
+
 QPalette ZTheme::palette() const
 {
   QPalette pal = QApplication::palette();
+
+#ifdef DEBUG_QPalette
+  const QMetaObject &m = QPalette::staticMetaObject;
+  QMetaEnum e = m.enumerator(m.indexOfEnumerator("ColorRole"));
+  for (int i = 0, total = static_cast<int>(QPalette::NColorRoles); i < total; ++i) {
+    const QString key = QLatin1String(e.key(i));
+    LOG(INFO) << key
+              << " Color A: " << qtTypeToQString(pal.color(QPalette::Active, static_cast<QPalette::ColorRole>(e.value(i))))
+              << " Color D: " << qtTypeToQString(pal.color(QPalette::Disabled, static_cast<QPalette::ColorRole>(e.value(i))))
+              << " Color I: " << qtTypeToQString(pal.color(QPalette::Inactive, static_cast<QPalette::ColorRole>(e.value(i))));
+    LOG(INFO) << key
+              << " Brush A: " << qtTypeToQString(pal.brush(QPalette::Active, static_cast<QPalette::ColorRole>(e.value(i))))
+              << " Brush D: " << qtTypeToQString(pal.brush(QPalette::Disabled, static_cast<QPalette::ColorRole>(e.value(i))))
+              << " Brush I: " << qtTypeToQString(pal.brush(QPalette::Inactive, static_cast<QPalette::ColorRole>(e.value(i))));
+  }
+#endif
 
   const static struct {
     Color themeColor;
@@ -162,10 +185,17 @@ QPalette ZTheme::palette() const
     const QColor themeColor = color(entry.themeColor);
     // Use original color if color is not defined in theme.
     if (themeColor.isValid()) {
-      if (entry.setColorRoleAsBrush)
+      if (entry.setColorRoleAsBrush) {
         pal.setBrush(entry.paletteColorGroup, entry.paletteColorRole, themeColor);
-      else
+#ifdef DEBUG_QPalette
+        LOG(INFO) << "set brush " << e.valueToKey(entry.paletteColorRole) << " " << entry.paletteColorGroup << " to " << qtTypeToQString(themeColor);
+#endif
+      } else {
         pal.setColor(entry.paletteColorGroup, entry.paletteColorRole, themeColor);
+#ifdef DEBUG_QPalette
+        LOG(INFO) << "set color " << e.valueToKey(entry.paletteColorRole) << " " << entry.paletteColorGroup << " to " << qtTypeToQString(themeColor);
+#endif
+      }
     }
   }
 

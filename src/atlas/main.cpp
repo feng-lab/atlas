@@ -147,7 +147,7 @@ int main(int argc, char* argv[])
     qInstallMessageHandler(myMessageOutput);
     LOG(INFO) << "--- App Log Start ---";
 
-    LOG(INFO) << "Current Theme: " << ZTheme::instance().currentTheme();
+    ZTheme::instance();
 
     nim::ZSystemInfo::instance().logOSInfo();
     nim::ZCpuInfo::instance().logCpuInfo();
