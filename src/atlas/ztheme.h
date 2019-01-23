@@ -22,6 +22,8 @@ public:
 
   ZTheme();
 
+  void updateTheme();
+
   QString currentTheme() const
   { return m_currentTheme; }
 
@@ -114,6 +116,11 @@ public:
     EyeCloseIcon,
     ArrowDownIcon,
     ArrowRightIcon,
+    SettingsIcon,
+    LockedIcon,
+    UnlockedIcon,
+    FlipHorizontalIcon,
+    FlipVerticalIcon,
   };
 
   const QIcon& icon(Icon file) const

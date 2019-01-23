@@ -123,11 +123,6 @@ protected:
     bool show = true;
   };
 
-  QIcon m_settingIcon;
-  QIcon m_visibleIcon;
-  QIcon m_invisibleIcon;
-  QIcon m_lockIcon;
-  QIcon m_unlockIcon;
   std::unique_ptr<ObjItem> m_rootItem;
   ObjItem* m_viewSettingCurrentItem;
 };

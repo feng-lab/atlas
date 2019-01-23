@@ -8,8 +8,8 @@
             "hoverBackground": "18ffffff",
             "selectedBackground": "aa1f75cc",
             "selectedBackgroundText": "aa1f75cc",
-            "normalBackground": "ff333333",
-            "alternateBackground": "ff515151",
+            "normalBackground": "ff323232",
+            "alternateBackground": "ff414141",
             "error": "ffd84044",
             "warning": "ffe0b716",
             "splitterColor": "ff313131",
@@ -79,7 +79,12 @@
             "EyeHalfIcon": ":/icons/eye-half-dark.svg",
             "EyeCloseIcon": ":/icons/eye-close-dark.svg",
             "ArrowRightIcon": ":/icons/arrow-right-dark.svg",
-            "ArrowDownIcon": ":/icons/arrow-down-dark.svg"
+            "ArrowDownIcon": ":/icons/arrow-down-dark.svg",
+            "SettingsIcon": ":/icons/settings-dark.svg",
+            "LockedIcon": ":/icons/locked-dark.svg",
+            "UnlockedIcon": ":/icons/unlocked-dark.svg",
+            "FlipHorizontalIcon": ":/icons/flip-horizontal-dark.svg",
+            "FlipVerticalIcon": ":/icons/flip-vertical-dark.svg"
         }
     }
 }

@@ -2,17 +2,13 @@
 
 #include "zobjdoc.h"
 #include "zlog.h"
+#include "ztheme.h"
 
 namespace nim {
 
 ZObjModel::ZObjModel(ZDoc* doc)
   : QAbstractItemModel(doc)
   , m_doc(doc)
-  , m_settingIcon(":/icons/settings-512.png")
-  , m_visibleIcon(":/icons/eye_open-512.png")
-  , m_invisibleIcon(":/icons/eye_close-512.png")
-  , m_lockIcon(":/icons/lock-512.png")
-  , m_unlockIcon(":/icons/unlock-512.png")
   , m_rootItem(std::make_unique<ObjItem>(0, nullptr, nullptr))
   , m_viewSettingCurrentItem(nullptr)
 {
@@ -65,12 +61,13 @@ QVariant ZObjModel::data(const QModelIndex& index, int role) const
   if (role == Qt::DecorationRole) {
     switch (index.column()) {
       case ShowHideColumn:
-        return item->show ? m_visibleIcon : m_invisibleIcon;
+        return item->show ?
+               ZTheme::instance().icon(ZTheme::EyeOpenIcon) : ZTheme::instance().icon(ZTheme::EyeCloseIcon);
       case LockColumn:
-        return item->locked ? m_lockIcon : m_unlockIcon;
+        return item->locked ?
+               ZTheme::instance().icon(ZTheme::LockedIcon) : ZTheme::instance().icon(ZTheme::UnlockedIcon);
       case ViewSettingColumn:
-        return m_settingIcon;
-        break;
+        return ZTheme::instance().icon(ZTheme::SettingsIcon);
       default:
         break;
     }

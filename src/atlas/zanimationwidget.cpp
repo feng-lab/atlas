@@ -196,6 +196,8 @@ void ZAnimationWidget::createWidget()
 
   m_gotoStartButton = new QToolButton(this);
   m_gotoStartButton->setIcon(ZTheme::instance().icon(ZTheme::ReturnToStartIcon));
+  m_gotoStartButton->setStatusTip("Return to Start");
+  m_gotoStartButton->setToolTip("Return to Start");
   hlo->addWidget(m_gotoStartButton);
 
   //m_rewindButton = new QToolButton(this);
@@ -204,10 +206,14 @@ void ZAnimationWidget::createWidget()
 
   m_reversePlayButton = new QToolButton(this);
   m_reversePlayButton->setIcon(ZTheme::instance().icon(ZTheme::ReversePlayIcon));
+  m_reversePlayButton->setStatusTip("Play/Pause in Reverse");
+  m_reversePlayButton->setToolTip("Play/Pause in Reverse");
   hlo->addWidget(m_reversePlayButton);
 
   m_playButton = new QToolButton(this);
   m_playButton->setIcon(ZTheme::instance().icon(ZTheme::PlayIcon));
+  m_playButton->setStatusTip("Play/Pause");
+  m_playButton->setToolTip("Play/Pause");
   hlo->addWidget(m_playButton);
 
   //m_fastForwardButton = new QToolButton(this);
@@ -216,6 +222,8 @@ void ZAnimationWidget::createWidget()
 
   m_gotoEndButton = new QToolButton(this);
   m_gotoEndButton->setIcon(ZTheme::instance().icon(ZTheme::GoToEndIcon));
+  m_gotoEndButton->setStatusTip("Go to End");
+  m_gotoEndButton->setToolTip("Go to End");
   hlo->addWidget(m_gotoEndButton);
 
   hlo->addSpacing(5);
@@ -223,6 +231,8 @@ void ZAnimationWidget::createWidget()
   m_repeatButton = new QToolButton(this);
   m_repeatButton->setIcon(ZTheme::instance().icon(ZTheme::RepeatIcon));
   m_repeatButton->setCheckable(true);
+  m_repeatButton->setStatusTip("Repeat");
+  m_repeatButton->setToolTip("Repeat");
   hlo->addWidget(m_repeatButton);
 
   hlo->addSpacing(20);

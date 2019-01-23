@@ -34,33 +34,38 @@ ZTimelineWidget::ZTimelineWidget(ZAnimation& ani, ZDoubleParameter* currentTimeP
 
   m_exportButton = new QToolButton(this);
   m_exportButton->setIcon(ZTheme::instance().icon(ZTheme::CamcoderIcon));
-  m_exportButton->setStatusTip(tr("Export Animation"));
-  //m_exportButton->setStyleSheet("border-style: none;");
   m_exportButton->setCheckable(true);
+  m_exportButton->setStatusTip(tr("Export Animation"));
+  //m_expandButton->setToolTip(tr("Export Animation")); // todo: why crash?
+  //m_exportButton->setStyleSheet("border-style: none;");
   connect(m_exportButton, &QToolButton::toggled, this, &ZTimelineWidget::exportButtonToggled);
 
   m_cleanupButton = new QToolButton(this);
   m_cleanupButton->setIcon(ZTheme::instance().icon(ZTheme::CleanupIcon));
   m_cleanupButton->setStatusTip(tr("Remove Redundant Keys"));
-  m_cleanupButton->setStyleSheet("border-style: none;");
+  m_cleanupButton->setToolTip(tr("Remove Redundant Keys"));
+  //m_cleanupButton->setStyleSheet("border-style: none;");
   connect(m_cleanupButton, &QToolButton::clicked, &m_animation, &ZAnimation::removeRedundantKeys);
 
   m_zoomInButton = new QToolButton(this);
   m_zoomInButton->setIcon(ZTheme::instance().icon(ZTheme::ZoomInIcon));
   m_zoomInButton->setStatusTip(tr("Zoom In Timeline"));
-  m_zoomInButton->setStyleSheet("border-style: none;");
+  m_zoomInButton->setToolTip(tr("Zoom In Timeline"));
+  //m_zoomInButton->setStyleSheet("border-style: none;");
   connect(m_zoomInButton, &QToolButton::clicked, this, &ZTimelineWidget::zoomIn);
 
   m_zoomOutButton = new QToolButton(this);
   m_zoomOutButton->setIcon(ZTheme::instance().icon(ZTheme::ZoomOutIcon));
   m_zoomOutButton->setStatusTip(tr("Zoom Out Timeline"));
-  m_zoomOutButton->setStyleSheet("border-style: none;");
+  m_zoomOutButton->setToolTip(tr("Zoom Out Timeline"));
+  //m_zoomOutButton->setStyleSheet("border-style: none;");
   connect(m_zoomOutButton, &QToolButton::clicked, this, &ZTimelineWidget::zoomOut);
 
   m_expandButton = new QToolButton(this);
   m_expandButton->setIcon(ZTheme::instance().icon(ZTheme::ExpandIcon));
   m_expandButton->setStatusTip(tr("Fit Timeline to Window"));
-  m_expandButton->setStyleSheet("border-style: none;");
+  m_expandButton->setToolTip(tr("Fit Timeline to Window"));
+  //m_expandButton->setStyleSheet("border-style: none;");
   connect(m_expandButton, &QToolButton::clicked, this, &ZTimelineWidget::expandToFit);
 
   auto hlo = new QHBoxLayout;

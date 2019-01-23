@@ -25,6 +25,11 @@ ZTheme::ZTheme()
   m_icons.resize(m.enumerator(m.indexOfEnumerator("Icon")).keyCount());
   m_iconFiles.resize(m_icons.size());
 
+  updateTheme();
+}
+
+void ZTheme::updateTheme()
+{
 #ifdef Q_OS_MACOS
   m_currentTheme = qt_mac_applicationIsInDarkMode() ? "dark" : "light";
 #else
@@ -83,7 +88,7 @@ void ZTheme::loadTheme(const QString& fn)
       for (int i = 0, total = e.keyCount(); i < total; ++i) {
         const QString key = QLatin1String(e.key(i));
         m_iconFiles[i] = po[key].toString();
-        m_icons[i] = QIcon(m_iconFiles[i]);
+        QIcon(m_iconFiles[i]).swap(m_icons[i]);
       }
     }
   }

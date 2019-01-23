@@ -59,14 +59,14 @@
         <file>icons/save-dark.svg</file>
         <file>icons/screenshot.svg</file>
         <file>icons/screenshot-dark.svg</file>
-        <file>icons/settings-512.png</file>
+        <file>icons/settings.svg</file>
+        <file>icons/settings-dark.svg</file>
         <file>icons/undo.svg</file>
         <file>icons/undo-dark.svg</file>
         <file>icons/zoom-in.svg</file>
         <file>icons/zoom-in-dark.svg</file>
         <file>icons/zoom-out.svg</file>
         <file>icons/zoom-out-dark.svg</file>
-        <file>icons/file-512.png</file>
         <file>icons/projection-view.svg</file>
         <file>icons/projection-view-dark.svg</file>
         <file>icons/normal-view.svg</file>
@@ -88,7 +88,6 @@
         <file>icons/return-to-start-dark.svg</file>
         <file>icons/repeat.svg</file>
         <file>icons/repeat-dark.svg</file>
-        <file>icons/record-512.png</file>
         <file>icons/go-to-end.svg</file>
         <file>icons/go-to-end-dark.svg</file>
         <file>icons/pause.svg</file>
@@ -112,11 +111,10 @@
         <file>Resources/shader/wideline1.vert</file>
         <file>icons/collapse.svg</file>
         <file>icons/collapse-dark.svg</file>
-        <file>icons/crop-512.png</file>
-        <file>icons/flip_horizontal-512.png</file>
-        <file>icons/flip_vertical-512.png</file>
-        <file>icons/hexagon-512.png</file>
-        <file>icons/octagon-512.png</file>
+        <file>icons/flip-horizontal.svg</file>
+        <file>icons/flip-horizontal-dark.svg</file>
+        <file>icons/flip-vertical.svg</file>
+        <file>icons/flip-vertical-dark.svg</file>
         <file>icons/rectangle.svg</file>
         <file>icons/rectangle-dark.svg</file>
         <file>icons/ellipse.svg</file>
@@ -125,7 +123,6 @@
         <file>Resources/shader/copyimage_func.frag</file>
         <file>Resources/shader/image2d_with_colormap.frag</file>
         <file>Resources/shader/volume_slice_with_colormap.frag</file>
-        <file>icons/export-512.png</file>
         <file>icons/camcoder.svg</file>
         <file>icons/camcoder-dark.svg</file>
         <file>icons/run-command.svg</file>
@@ -139,8 +136,10 @@
         <file>icons/selection-dark.svg</file>
         <file>icons/drag.svg</file>
         <file>icons/drag-dark.svg</file>
-        <file>icons/lock-512.png</file>
-        <file>icons/unlock-512.png</file>
+        <file>icons/locked.svg</file>
+        <file>icons/locked-dark.svg</file>
+        <file>icons/unlocked.svg</file>
+        <file>icons/unlocked-dark.svg</file>
         <file>Resources/shader/blur.frag</file>
         <file>Resources/shader/glow.frag</file>
         <file>Resources/shader/glow_func.frag</file>
@@ -157,7 +156,5 @@
         <file>Resources/shader/image3d_slice_with_transfun_blockID.frag</file>
         <file>Resources/shader/image3d_slice_with_transfun.frag</file>
         <file>Resources/shader/image3d_slice_with_colormap.frag</file>
-        <file>icons/invisible.png</file>
-        <file>icons/visible.png</file>
     </qresource>
 </RCC>

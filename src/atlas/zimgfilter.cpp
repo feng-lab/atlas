@@ -8,6 +8,7 @@
 #include "znumericparameter.h"
 #include "zwidgetsgroup.h"
 #include "zlogqttypesupport.h"
+#include "ztheme.h"
 #include <QGraphicsPixmapItem>
 #include <QStyleOption>
 #include <QPainter>
@@ -283,11 +284,11 @@ std::shared_ptr<ZWidgetsGroup> ZImgFilter::viewSettingWidgetsGroup()
       m_widgetsGroup->addChild(*m_doubleChannelRangeParas[i], 1);
     }
 
-    pb = new QPushButton("Flip Horizontally");
+    pb = new QPushButton(ZTheme::instance().icon(ZTheme::FlipHorizontalIcon), "Flip Horizontally");
     connect(pb, &QPushButton::clicked, this, &ZImgFilter::flipHorizontally);
     m_widgetsGroup->addChild(*pb, 1);
 
-    pb = new QPushButton("Flip Vertically");
+    pb = new QPushButton(ZTheme::instance().icon(ZTheme::FlipVerticalIcon), "Flip Vertically");
     connect(pb, &QPushButton::clicked, this, &ZImgFilter::flipVertically);
     m_widgetsGroup->addChild(*pb, 1);
 
@@ -349,11 +350,11 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
       m_widgetsGroup->addChild(*m_doubleChannelRangeParas[i], 1);
     }
 
-    pb = new QPushButton("Flip Horizontally");
+    pb = new QPushButton(ZTheme::instance().icon(ZTheme::FlipHorizontalIcon), "Flip Horizontally");
     connect(pb, &QPushButton::clicked, this, &ZImgFilter::flipHorizontally);
     m_widgetsGroup->addChild(*pb, 1);
 
-    pb = new QPushButton("Flip Vertically");
+    pb = new QPushButton(ZTheme::instance().icon(ZTheme::FlipVerticalIcon), "Flip Vertically");
     connect(pb, &QPushButton::clicked, this, &ZImgFilter::flipVertically);
     m_widgetsGroup->addChild(*pb, 1);
 
