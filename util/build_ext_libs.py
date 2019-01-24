@@ -322,7 +322,7 @@ def build_benchmark(src_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_grpc(src_dir: str, install_dir: str):
+def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
     ssl_src_dir = os.path.join(src_dir, 'third_party', 'boringssl')
     ssl_install_dir = f'{ext_dir()}/boringssl'
     ssl_build_dir = os.path.join(ssl_src_dir, 'build')
@@ -331,13 +331,23 @@ def build_grpc(src_dir: str, install_dir: str):
     shutil.rmtree(ssl_install_dir, ignore_errors=True)
     try:
         cmakecmd = get_cmake_cmd_common_part(ssl_install_dir)
-        cmakecmd.extend([ssl_src_dir])
+        if is_windows():
+            cmakecmd.extend(['-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '\\nasm.exe',
+                             ssl_src_dir])
+        else:
+            cmakecmd.extend([ssl_src_dir])
         build_cmakecmd(cmakecmd, ssl_build_dir)
         shutil.copytree(os.path.join(ssl_src_dir, 'include'), os.path.join(ssl_install_dir, 'include'))
-        glob_copy(os.path.join(ssl_build_dir, 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
-        glob_copy(os.path.join(ssl_build_dir, 'decrepit', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
-        glob_copy(os.path.join(ssl_build_dir, 'crypto', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
-        glob_copy(os.path.join(ssl_build_dir, 'ssl', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
+        if is_windows():
+            glob_copy(os.path.join(ssl_build_dir, '*.lib'), os.path.join(ssl_install_dir, 'lib'))
+            glob_copy(os.path.join(ssl_build_dir, 'decrepit', '*.lib'), os.path.join(ssl_install_dir, 'lib'))
+            glob_copy(os.path.join(ssl_build_dir, 'crypto', '*.lib'), os.path.join(ssl_install_dir, 'lib'))
+            glob_copy(os.path.join(ssl_build_dir, 'ssl', '*.lib'), os.path.join(ssl_install_dir, 'lib'))
+        else:
+            glob_copy(os.path.join(ssl_build_dir, 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
+            glob_copy(os.path.join(ssl_build_dir, 'decrepit', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
+            glob_copy(os.path.join(ssl_build_dir, 'crypto', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
+            glob_copy(os.path.join(ssl_build_dir, 'ssl', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
     finally:
         shutil.rmtree(ssl_build_dir, ignore_errors=False)
 
@@ -387,10 +397,10 @@ def build_grpc(src_dir: str, install_dir: str):
                          '-DgRPC_BENCHMARK_PROVIDER:STRING=package'])
         if is_windows():
             cmakecmd.extend([f'-DZLIB_ROOT:PATH={ext_dir()}/zlib',
-                             f'-Dgflags_DIR:PATH={ext_dir()}/gflags/CMake',
-                             f'-Dbenchmark_DIR:PATH={ext_dir()}/benchmark/CMake',
-                             f'-DProtobuf_DIR:PATH={ext_dir()}/protobuf/CMake',
-                             f'-Dc-ares_DIR:PATH={ext_dir()}/c-ares/Cmake'])
+                             f'-Dgflags_DIR:PATH={ext_dir()}/gflags/lib/cmake/gflags',
+                             f'-Dbenchmark_DIR:PATH={ext_dir()}/benchmark/lib/cmake/benchmark',
+                             f'-DProtobuf_DIR:PATH={ext_dir()}/protobuf/cmake',
+                             f'-Dc-ares_DIR:PATH={ext_dir()}/c-ares/lib/cmake/c-ares'])
         else:
             cmakecmd.extend([f'-Dgflags_DIR:PATH={ext_dir()}/gflags/lib/cmake/gflags',
                              f'-Dbenchmark_DIR:PATH={ext_dir()}/benchmark/lib/cmake/benchmark',
@@ -1199,7 +1209,11 @@ def build_libs(libs: dict, update_src: bool):
         if update_src:
             update_or_clone_git_repository_with_submodules(src_dir, 'git@github.com:grpc/grpc.git')
         assert os.path.exists(src_dir)
-        build_grpc(src_dir, os.path.join(ext_dir(), 'grpc'))
+        if is_windows():
+            nasm_dir = unpack_tool_to_software_dir(src_package_dir(), 'nasm*win64*', 'nasm-*')
+        else:
+            nasm_dir = ''  # does not need
+        build_grpc(src_dir, os.path.join(ext_dir(), 'grpc'), nasm_dir=nasm_dir)
 
     if libs['glbinding']:
         src_dir = os.path.join(base_dir(), 'glbinding')
