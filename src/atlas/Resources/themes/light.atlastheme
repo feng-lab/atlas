@@ -41,7 +41,9 @@
             "LockedIcon": ":/icons/locked.svg",
             "UnlockedIcon": ":/icons/unlocked.svg",
             "FlipHorizontalIcon": ":/icons/flip-horizontal.svg",
-            "FlipVerticalIcon": ":/icons/flip-vertical.svg"
+            "FlipVerticalIcon": ":/icons/flip-vertical.svg",
+            "ClearIcon": ":/icons/clear.svg",
+            "CopyIcon": ":/icons/copy.svg"
         }
     }
 }

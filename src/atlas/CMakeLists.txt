@@ -202,7 +202,6 @@ set(FORMS
     )
 
 set(RESOURCES
-    LogDialog.qrc
     atlas.qrc
     )
 

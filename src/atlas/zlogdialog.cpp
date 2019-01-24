@@ -1,6 +1,7 @@
 #include "zlogdialog.h"
 
 #include "ui_LogDialog.h"
+#include "ztheme.h"
 
 #include <QIcon>
 #include <QSortFilterProxyModel>
@@ -12,18 +13,6 @@
 #include <cstddef>
 
 namespace nim {
-
-static const QIcon& pauseIcon()
-{
-  static QIcon icon(QString(":/LogDialog/images/icon-pause-16.png"));
-  return icon;
-}
-
-static const QIcon& playIcon()
-{
-  static QIcon icon(QString(":/LogDialog/images/icon-resume-16.png"));
-  return icon;
-}
 
 
 class ZLogFilterProxyModel : public QSortFilterProxyModel
@@ -84,6 +73,11 @@ ZLogDialog::ZLogDialog(LogSinkPtr destination, QWidget* parent)
 
   mUi = new Ui::LogWindow();
   mUi->setupUi(this);
+
+  mUi->toolButtonClear->setIcon(ZTheme::instance().icon(ZTheme::ClearIcon));
+  mUi->toolButtonCopy->setIcon(ZTheme::instance().icon(ZTheme::CopyIcon));
+  mUi->toolButtonPause->setIcon(ZTheme::instance().icon(ZTheme::PauseIcon));
+  mUi->toolButtonSave->setIcon(ZTheme::instance().icon(ZTheme::SaveIcon));
 
   connect(mUi->toolButtonPause, SIGNAL(clicked()), SLOT(OnPauseClicked()));
   connect(mUi->toolButtonSave, SIGNAL(clicked()), SLOT(OnSaveClicked()));
@@ -148,7 +142,8 @@ bool ZLogDialog::eventFilter(QObject* obj, QEvent* event)
 
 void ZLogDialog::OnPauseClicked()
 {
-  mUi->toolButtonPause->setIcon(mIsPaused ? pauseIcon() : playIcon());
+  mUi->toolButtonPause->setIcon(mIsPaused ?
+                                ZTheme::instance().icon(ZTheme::PauseIcon) : ZTheme::instance().icon(ZTheme::PlayIcon));
   mUi->toolButtonPause->setText(mIsPaused ? tr("&Pause") : tr("&Resume"));
 
   mIsPaused = !mIsPaused;

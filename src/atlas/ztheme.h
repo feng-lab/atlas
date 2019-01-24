@@ -121,6 +121,8 @@ public:
     UnlockedIcon,
     FlipHorizontalIcon,
     FlipVerticalIcon,
+    ClearIcon,
+    CopyIcon,
   };
 
   const QIcon& icon(Icon file) const

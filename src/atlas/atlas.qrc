@@ -140,6 +140,10 @@
         <file>icons/locked-dark.svg</file>
         <file>icons/unlocked.svg</file>
         <file>icons/unlocked-dark.svg</file>
+        <file>icons/clear.svg</file>
+        <file>icons/clear-dark.svg</file>
+        <file>icons/copy.svg</file>
+        <file>icons/copy-dark.svg</file>
         <file>Resources/shader/blur.frag</file>
         <file>Resources/shader/glow.frag</file>
         <file>Resources/shader/glow_func.frag</file>

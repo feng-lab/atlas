@@ -21,10 +21,6 @@
        <property name="text">
         <string>&amp;Pause</string>
        </property>
-       <property name="icon">
-        <iconset resource="LogDialog.qrc">
-         <normaloff>:/LogDialog/images/icon-pause-16.png</normaloff>:/LogDialog/images/icon-pause-16.png</iconset>
-       </property>
        <property name="toolButtonStyle">
         <enum>Qt::ToolButtonTextBesideIcon</enum>
        </property>
@@ -37,10 +33,6 @@
       <widget class="QToolButton" name="toolButtonSave">
        <property name="text">
         <string>&amp;Save</string>
-       </property>
-       <property name="icon">
-        <iconset resource="LogDialog.qrc">
-         <normaloff>:/LogDialog/images/icon-save-16.png</normaloff>:/LogDialog/images/icon-save-16.png</iconset>
        </property>
        <property name="toolButtonStyle">
         <enum>Qt::ToolButtonTextBesideIcon</enum>
@@ -55,10 +47,6 @@
        <property name="text">
         <string>C&amp;lear</string>
        </property>
-       <property name="icon">
-        <iconset resource="LogDialog.qrc">
-         <normaloff>:/LogDialog/images/icon-clear-16.png</normaloff>:/LogDialog/images/icon-clear-16.png</iconset>
-       </property>
        <property name="toolButtonStyle">
         <enum>Qt::ToolButtonTextBesideIcon</enum>
        </property>
@@ -71,10 +59,6 @@
       <widget class="QToolButton" name="toolButtonCopy">
        <property name="text">
         <string>&amp;Copy</string>
-       </property>
-       <property name="icon">
-        <iconset resource="LogDialog.qrc">
-         <normaloff>:/LogDialog/images/icon-copy-16.png</normaloff>:/LogDialog/images/icon-copy-16.png</iconset>
        </property>
        <property name="toolButtonStyle">
         <enum>Qt::ToolButtonTextBesideIcon</enum>
@@ -166,8 +150,5 @@
   <tabstop>tableViewMessages</tabstop>
   <tabstop>checkBoxAutoScroll</tabstop>
  </tabstops>
- <resources>
-  <include location="LogDialog.qrc"/>
- </resources>
  <connections/>
 </ui>
