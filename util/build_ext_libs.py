@@ -891,8 +891,12 @@ def build_itk(src_dir: str, install_dir: str):
                                         'install(FILES ${headers}'])
 
         orig_file_1 = os.path.join(src_dir, 'Modules', 'ThirdParty', 'VNL', 'src', 'vxl', 'vcl', 'CMakeLists.txt')
-        bak_file_1 = patch_file(orig_file_1, from_texts=[r'vcl_legacy_aliases.h ${VCL_COMPILER_DETECTION_HEADER}'],
-                                to_texts=[r'vcl_legacy_aliases.h'])
+        if is_windows():
+            bak_file_1 = patch_file(orig_file_1, from_texts=[r'vcl_legacy_aliases.h ${VCL_COMPILER_DETECTION_HEADER}'],
+                                    to_texts=[r'vcl_legacy_aliases.h vcl_msvc_warnings.h'])
+        else:
+            bak_file_1 = patch_file(orig_file_1, from_texts=[r'vcl_legacy_aliases.h ${VCL_COMPILER_DETECTION_HEADER}'],
+                                    to_texts=[r'vcl_legacy_aliases.h'])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',

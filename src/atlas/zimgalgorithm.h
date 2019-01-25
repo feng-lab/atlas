@@ -15,8 +15,6 @@
 #include <set>
 #include <functional>
 
-#undef _WIN32_WINNT
-
 namespace nim {
 
 class ZImgAlgorithmBaseWithProgressReporter : public QObject

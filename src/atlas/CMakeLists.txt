@@ -6,6 +6,11 @@ LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # main stuff
 
+if (WIN32)
+    set(ZLIB_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/zlib)
+    find_package(ZLIB)
+endif (WIN32)
+
 find_package(c-ares REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/c-ares NO_DEFAULT_PATH)
 set(OPENSSL_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/boringssl)
@@ -664,7 +669,15 @@ set(SOURCES
     zlogwidget.cpp
     zlogwidget.h
     zimgprocessdialog.cpp
-    zimgprocessdialog.h zstitchimage.cpp zstitchimage.h zservicemanager.cpp zservicemanager.h zrpcservice.cpp zrpcservice.h ztheme.cpp ztheme.h)
+    zimgprocessdialog.h 
+    zstitchimage.cpp 
+    zstitchimage.h 
+    zservicemanager.cpp 
+    zservicemanager.h 
+    zrpcservice.cpp 
+    zrpcservice.h 
+    ztheme.cpp 
+    ztheme.h)
 
 # our target
 set(APP_NAME Atlas)
@@ -691,7 +704,7 @@ target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
 target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/folly)
 target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_MKL ATLAS_USE_IPP ATLAS_USE_CORE_PROFILE)
 if (WIN32)
-  target_compile_definitions(${APP_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
+  target_compile_definitions(${APP_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE _WIN32_WINNT=0x0601)
 
   target_compile_options(${APP_NAME} PUBLIC /GR) # Enable Run-Time Type Information
   target_compile_options(${APP_NAME} PUBLIC /EHsc) # exception handling model, https://msdn.microsoft.com/en-us/library/1deeycx5.aspx
