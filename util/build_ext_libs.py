@@ -881,12 +881,19 @@ def build_itk(src_dir: str, install_dir: str):
 
     orig_file = None
     bak_file = None
+    orig_file_2 = None
+    bak_file_2 = None
     try:
         orig_file = os.path.join(src_dir, 'Modules', 'ThirdParty', 'MetaIO', 'src', 'MetaIO', 'src', 'CMakeLists.txt')
         bak_file = patch_file(orig_file, from_texts=[r'install(FILES ${headers}'],
                               to_texts=['file(GLOB __files "${CMAKE_CURRENT_SOURCE_DIR}/*.h")\n'
                                         'set(headers ${headers} ${__files})\n'
                                         'install(FILES ${headers}'])
+
+        orig_file_2 = os.path.join(src_dir, 'Modules', 'ThirdParty', 'VNL', 'src', 'vxl', 'vcl', 'CMakeLists.txt')
+        bak_file_2 = patch_file(orig_file_2, from_texts=[r'vcl_legacy_aliases.h ${VCL_COMPILER_DETECTION_HEADER}'],
+                                to_texts=[r'vcl_legacy_aliases.h'])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_TESTING:BOOL=OFF',
@@ -897,7 +904,6 @@ def build_itk(src_dir: str, install_dir: str):
                          '-DITK_DOXYGEN_HTML:BOOL=OFF',
                          '-DModule_ITKReview:BOOL=ON',
                          '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
-                         '-DVNL_CONFIG_LEGACY_METHODS:BOOL=OFF',
                          '-DModule_ITKTBB:BOOL=ON',
                          '-DTBB_DIR:PATH=' + atlas_repository_dir() + '/src/cmake'])
 
@@ -923,6 +929,7 @@ def build_itk(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
+        os.replace(bak_file_2, orig_file_2)
 
 
 def build_vtk(src_dir: str, install_dir: str):
