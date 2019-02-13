@@ -12,6 +12,7 @@
 #include "zmainwindow.h"
 #include "zsysteminfo.h"
 #include "ztheme.h"
+#include "zlogqttypesupport.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QAction>
@@ -121,7 +122,7 @@ bool Z3DMainWindow::saveAs()
 
 void Z3DMainWindow::openRecentFile()
 {
-  if (QAction* action = qobject_cast<QAction*>(sender())) {
+  if (auto action = qobject_cast<QAction*>(sender())) {
     QString fn = action->data().toString();
     if (fn.endsWith(".scene", Qt::CaseInsensitive)) {
       emit loadJsonScene(fn);
@@ -479,6 +480,7 @@ void Z3DMainWindow::readSettings()
   QSettings settings;
   QPoint pos = settings.value("pos3d", QPoint(200, 200)).toPoint();
   QSize size = settings.value("size3d", QSize(400, 400)).toSize();
+  //LOG(INFO) << pos << " " << size.width() << " " <<  size.height();
   move(pos);
   resize(size);
 }
