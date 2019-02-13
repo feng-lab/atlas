@@ -1724,7 +1724,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  stitchAndDetectPuncta();
+  //stitchAndDetectPuncta();
   LOG(INFO) << "done";
 }
 
