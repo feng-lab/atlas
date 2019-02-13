@@ -158,8 +158,9 @@ void ZAnimationExportWidget::createWidget()
 
   m_filenameWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "filename:",
                                            tr("Video File (*.mp4 *.mov)"),
+                                           QString("Animation/exportPath"),
+                                           QString(),
                                            QBoxLayout::LeftToRight, this);
-  m_filenameWidget->setStartDirQSettingLocation(QString("Animation/exportPath"));
   hlo->addWidget(m_filenameWidget);
   lo->addLayout(hlo);
 

@@ -125,7 +125,7 @@ QWidget* Z3DView::globalParasWidget()
 
 QWidget* Z3DView::captureWidget()
 {
-  auto res = new QScrollArea();
+  //auto res = new QScrollArea();
   auto m_screenShotWidget = new ZTakeScreenShotWidget(false, false, nullptr);
   m_screenShotWidget->setCaptureStereoImage(m_isStereoView);
   connect(m_screenShotWidget, &ZTakeScreenShotWidget::take3DScreenShot,
@@ -136,9 +136,9 @@ QWidget* Z3DView::captureWidget()
           this, &Z3DView::takeSeriesScreenShot);
   connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeSeriesFixedSize3DScreenShot,
           this, &Z3DView::takeFixedSizeSeriesScreenShot);
-  res->setWidget(m_screenShotWidget);
+  //res->setWidget(m_screenShotWidget);
 
-  return res;
+  return m_screenShotWidget;
 }
 
 QWidget* Z3DView::backgroundWidget()

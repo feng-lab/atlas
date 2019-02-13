@@ -28,13 +28,14 @@ public:
     OpenMultipleFilesWithFilter
   };
 
-  explicit ZSelectFileWidget(FileMode mode, const QString& guiname = QString(),
-                             const QString& filter = QString(),
-                             QBoxLayout::Direction direction = QBoxLayout::LeftToRight, QWidget* parent = nullptr);
-
   // if set, last opened dir will be retrieved from QSetting, and if QSetting is empty, alternativeDir will be used
   // first parameter can be an empty string, then second parameter will be used to init startDir
-  void setStartDirQSettingLocation(const QString& qSettingLocation, const QString& alternativeDir = QString());
+  explicit ZSelectFileWidget(FileMode mode, const QString& guiname = QString(),
+                             const QString& filter = QString(),
+                             const QString& startDirQSettingLocation = QString(),
+                             const QString& alternativeStartDir = QString(),
+                             QBoxLayout::Direction direction = QBoxLayout::LeftToRight,
+                             QWidget* parent = nullptr);
 
   // This variable will be changed with the widget or you can use the get* function
   void setDestination(QString* name);

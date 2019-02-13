@@ -1818,6 +1818,13 @@ void ZTiffWriter::writeIFD(const ZImg& img, int z, int t, int c, bool writeThumb
       TIFFSetField(m_tif.get(), atag.tag(), atag.dataArray());
   }
 
+  bool planarconfigSeparate = true;
+#ifdef Q_OS_MACOS // macOS mojave bug
+  if (z == 0 && t == 0 && c < 0 && img.numTimes() == 1 && img.depth() == 1 && img.numChannels() == 4) {
+    planarconfigSeparate = false;
+  }
+#endif
+
   uint16_t photo = PHOTOMETRIC_MINISBLACK;
   TIFFSetField(m_tif.get(), TIFFTAG_IMAGEWIDTH, img.width());
   TIFFSetField(m_tif.get(), TIFFTAG_IMAGELENGTH, img.height());
@@ -1830,7 +1837,7 @@ void ZTiffWriter::writeIFD(const ZImg& img, int z, int t, int c, bool writeThumb
   } else {
     TIFFSetField(m_tif.get(), TIFFTAG_SAMPLESPERPIXEL, 1);
   }
-  TIFFSetField(m_tif.get(), TIFFTAG_PLANARCONFIG, PLANARCONFIG_SEPARATE);
+  TIFFSetField(m_tif.get(), TIFFTAG_PLANARCONFIG, planarconfigSeparate ? PLANARCONFIG_SEPARATE : PLANARCONFIG_CONTIG);
   TIFFSetField(m_tif.get(), TIFFTAG_PHOTOMETRIC, photo);
   TIFFSetField(m_tif.get(), TIFFTAG_COMPRESSION, m_compression);
   if (m_compression != Compression::NONE) {
@@ -1857,8 +1864,15 @@ void ZTiffWriter::writeIFD(const ZImg& img, int z, int t, int c, bool writeThumb
   }
 
   if (c < 0) {
-    for (size_t ch = 0; ch < img.numChannels(); ++ch)
-      TIFFWriteEncodedStrip(m_tif.get(), ch, const_cast<uint8_t*>(img.planeData(z, ch, t)), img.planeByteNumber());
+    if (planarconfigSeparate) {
+      for (size_t ch = 0; ch < img.numChannels(); ++ch)
+        TIFFWriteEncodedStrip(m_tif.get(), ch, const_cast<uint8_t*>(img.planeData(z, ch, t)), img.planeByteNumber());
+    } else {
+      CHECK(z == 0 && t == 0 && c < 0 && img.numTimes() == 1 && img.depth() == 1 && img.numChannels() == 4);
+      ZImg tmp = img;
+      ZImgFormat::XYZCtoCXYZ(img, tmp);
+      TIFFWriteEncodedStrip(m_tif.get(), 0, tmp.planeData(0, 0, 0), tmp.byteNumber());
+    }
   } else {
     TIFFWriteEncodedStrip(m_tif.get(), 0, const_cast<uint8_t*>(img.planeData(z, c, t)), img.planeByteNumber());
   }

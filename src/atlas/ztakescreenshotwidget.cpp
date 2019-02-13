@@ -148,21 +148,13 @@ void ZTakeScreenShotWidget::captureSequenceButtonPressed()
 
 void ZTakeScreenShotWidget::setFileNameSource()
 {
-  if (m_useManualName->isChecked()) {
-    m_folderWidget->setEnabled(false);
-    m_namePrefix.setEnabled(false);
-  } else {
-    m_folderWidget->setEnabled(true);
-    m_namePrefix.setEnabled(true);
-  }
+  m_folderWidget->setEnabled(!m_useManualName->isChecked());
+  m_namePrefix.setEnabled(!m_useManualName->isChecked());
 }
 
 void ZTakeScreenShotWidget::updateImageSizeWidget()
 {
-  if (m_useWindowSize.get())
-    m_customSize.setEnabled(false);
-  else
-    m_customSize.setEnabled(true);
+  m_customSize.setEnabled(!m_useWindowSize.get());
 }
 
 void ZTakeScreenShotWidget::prefixChanged()
@@ -333,9 +325,9 @@ void ZTakeScreenShotWidget::createWidget()
   hlo->setContentsMargins(left + 20, top, right, bottom);
 
   m_folderWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::Directory, "output folder:", QString(),
+                                         QString("ScreenShot/exportPath"),
+                                         QStandardPaths::writableLocation(QStandardPaths::DesktopLocation),
                                          QBoxLayout::LeftToRight, this);
-  m_folderWidget->setStartDirQSettingLocation(QString("ScreenShot/exportPath"),
-                                              QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
   hlo->addWidget(m_folderWidget);
   lo->addLayout(hlo);
 

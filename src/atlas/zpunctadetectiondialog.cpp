@@ -207,30 +207,30 @@ void ZPunctaDetectionDialog::createIOGroupBox()
   QList<FileFormat> formats;
   ZImg::getQtReadNameFilter(filters, formats);
   m_inputImageFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenSingleFile, "Input Image:",
-                                                 filters[0]);
-  m_inputImageFileWidget->setStartDirQSettingLocation(ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
+                                                 filters[0],
+                                                 ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_inputImageFileWidget);
   connect(m_inputImageFileWidget, &ZSelectFileWidget::changed, this, &ZPunctaDetectionDialog::inputImageChanged);
 
   m_inputSwcFilesWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenMultipleFiles, "Input Swcs:",
-                                                tr("Swcs (*.swc)"));
-  m_inputSwcFilesWidget->setStartDirQSettingLocation(ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Swc"));
+                                                tr("Swcs (*.swc)"),
+                                                ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Swc"));
   alllayout->addWidget(m_inputSwcFilesWidget);
 
   m_outputPunctaFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output All Puncta File:",
-                                                   tr("Nimp (*.nimp)"));
-  m_outputPunctaFileWidget->setStartDirQSettingLocation(ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Puncta"));
+                                                   tr("Nimp (*.nimp)"),
+                                                   ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Puncta"));
   alllayout->addWidget(m_outputPunctaFileWidget);
 
   m_outputSomaPunctaFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile,
                                                        "Output All Soma Puncta File:",
-                                                       tr("Nimp (*.nimp)"));
-  m_outputSomaPunctaFileWidget->setStartDirQSettingLocation(ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Puncta"));
+                                                       tr("Nimp (*.nimp)"),
+                                                       ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Puncta"));
   alllayout->addWidget(m_outputSomaPunctaFileWidget);
 
   m_outputLogFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Log File:",
-                                                tr("Log (*.txt)"));
-  m_outputLogFileWidget->setStartDirQSettingLocation(ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
+                                                tr("Log (*.txt)"),
+                                                ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_outputLogFileWidget);
 
   m_ioGroupBox->setLayout(alllayout);

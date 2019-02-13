@@ -156,14 +156,14 @@ ZView::State ZView::state() const
 
 QWidget* ZView::captureWidget()
 {
-  auto res = new QScrollArea();
+  //auto res = new QScrollArea();
   auto m_screenShotWidget = new ZTakeScreenShotWidget(true, false, nullptr);
   connect(m_screenShotWidget, &ZTakeScreenShotWidget::take2DScreenShot,
           this, &ZView::takeScreenShot);
   connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeFixedSize2DScreenShot,
           this, &ZView::takeFixedSizeScreenShot);
-  res->setWidget(m_screenShotWidget);
-  return res;
+  //res->setWidget(m_screenShotWidget);
+  return m_screenShotWidget;
 }
 
 void ZView::updateBoundBox()

@@ -1571,17 +1571,17 @@ void exportSceneForGlance()
 
 void stitchAndDetectPuncta()
 {
-  QDir dir("/Volumes/shared/Imaging/JK656M1/Confocal");
+  QDir dir("/Volumes/shared/Imaging/JK699M4/confocal");
   QStringList filters;
-  filters << "JK656M1*_reimaged";
+  filters << "JK699M4*";
   QFileInfoList fdlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
 
-  QDir dir2("/Volumes/shared/Imaging/JK636M1/confocal");
-  filters.clear();
-  filters << "JK636M1-9_right_reimaged";
-  QFileInfoList fdlist2 = dir2.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
-
-  fdlist.append(fdlist2);
+//  QDir dir2("/Volumes/shared/Imaging/JK636M1/confocal");
+//  filters.clear();
+//  filters << "JK636M1-9_right_reimaged";
+//  QFileInfoList fdlist2 = dir2.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
+//
+//  fdlist.append(fdlist2);
 
   filters.clear();
   filters << "*_Sum.lsm";
@@ -1724,7 +1724,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  helloworldrpc();
+  stitchAndDetectPuncta();
   LOG(INFO) << "done";
 }
 

@@ -1,31 +1,32 @@
 #include "zselectfilewidget.h"
 #include "zfileutils.h"
+#include "zlog.h"
 
 #include <QtWidgets>
 
 namespace nim {
 
 ZSelectFileWidget::ZSelectFileWidget(FileMode mode, const QString& guiname, const QString& filter,
+                                     const QString& startDirQSettingLocation,
+                                     const QString& alternativeStartDir,
                                      QBoxLayout::Direction direction, QWidget* parent)
   : QWidget(parent)
   , m_fileMode(mode)
   , m_guiName(guiname)
   , m_filter(filter)
+  , m_startDirQSettingLocation(startDirQSettingLocation)
 {
-  createWidget(direction);
-}
-
-void ZSelectFileWidget::setStartDirQSettingLocation(const QString& qSettingLocation, const QString& alternativeDir)
-{
-  m_startDir = alternativeDir;
-  m_startDirQSettingLocation = qSettingLocation;
+  //LOG(INFO) << alternativeDir;
+  m_startDir = alternativeStartDir;
   if (!m_startDirQSettingLocation.isEmpty()) {
     QSettings settings;
     QString res = settings.value(m_startDirQSettingLocation).toString();
+    //LOG(INFO) << res;
     if (!res.isEmpty()) {
       m_startDir = res;
     }
   }
+  createWidget(direction);
 }
 
 void ZSelectFileWidget::setDestination(QString* name)
@@ -154,7 +155,8 @@ void ZSelectFileWidget::createWidget(QBoxLayout::Direction direction)
     m_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_lineEdit = new QLineEdit(this);
     m_lineEdit->setReadOnly(true);
-    //m_lineEdit->setText(m_startDir);
+    //LOG(INFO) << m_startDir;
+    m_lineEdit->setText(m_startDir);
     m_button = new QToolButton(this);
     m_button->setText(tr("..."));
     connect(m_button, &QToolButton::clicked, this, &ZSelectFileWidget::selectFile);
@@ -237,7 +239,12 @@ QString ZSelectFileWidget::getStartDir()
 
 void ZSelectFileWidget::setStartDir(const QString& path)
 {
-  m_startDir = QFileInfo(path).canonicalPath();
+  if (m_fileMode == FileMode::Directory) {
+    m_startDir = QDir(path).canonicalPath();
+  } else {
+    m_startDir = QFileInfo(path).canonicalPath();
+  }
+  //LOG(INFO) << path << m_startDir;
   if (!m_startDirQSettingLocation.isEmpty()) {
     QSettings settings;
     settings.setValue(m_startDirQSettingLocation, m_startDir);

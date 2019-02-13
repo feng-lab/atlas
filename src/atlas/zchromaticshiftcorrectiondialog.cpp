@@ -172,8 +172,8 @@ void ZChromaticShiftCorrectionDialog::createIOGroupBox()
 
   m_inputImagesFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenSingleFile,
                                                   "Input Image:",
-                                                  tr("Images (*.nim *.tif *.tiff *.v3draw *.lsm *.jpg *.png)"));
-  m_inputImagesFileWidget->setStartDirQSettingLocation(ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
+                                                  tr("Images (*.nim *.tif *.tiff *.v3draw *.lsm *.jpg *.png)"),
+                                                  ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_inputImagesFileWidget);
   connect(m_inputImagesFileWidget, &ZSelectFileWidget::changed, this, &ZChromaticShiftCorrectionDialog::inputImagesChanged);
 
@@ -183,13 +183,13 @@ void ZChromaticShiftCorrectionDialog::createIOGroupBox()
   //  alllayout->addLayout(hlayout);
 
   m_outputStackWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Aligned Image:",
-                                              tr("Stack (*.nim)"));
-  m_outputStackWidget->setStartDirQSettingLocation(ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
+                                              tr("Stack (*.nim)"),
+                                              ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_outputStackWidget);
 
   m_outputLogFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Log File:",
-                                                tr("Log (*.txt)"));
-  m_outputLogFileWidget->setStartDirQSettingLocation(ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
+                                                tr("Log (*.txt)"),
+                                                ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_outputLogFileWidget);
 
   //  hlayout = new QHBoxLayout;
