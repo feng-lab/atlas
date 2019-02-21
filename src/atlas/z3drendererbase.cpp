@@ -211,6 +211,12 @@ QString Z3DRendererBase::generateGeomHeader() const
 
   header += QString("#define GLSL_VERSION %1\n").arg(glslVer);
 
+  if (!m_clipPlanes.empty()) {
+    header += QString("#define HAS_CLIP_PLANE\n");
+  }
+  if (GLVersionGE(3, 0))
+    header += QString("#define CLIP_PLANE_COUNT %1\n").arg(m_clipPlanes.size());
+
   return header;
 }
 

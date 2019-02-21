@@ -12,6 +12,14 @@ uniform float size_scale;
 uniform mat4 viewport_matrix;
 uniform mat4 viewport_matrix_inverse;
 
+#if GLSL_VERSION >= 130 && defined(HAS_CLIP_PLANE)
+out float gl_ClipDistance[CLIP_PLANE_COUNT];
+in gl_PerVertex {
+   vec4 gl_Position;
+   float gl_ClipDistance[CLIP_PLANE_COUNT];
+} gl_in[];
+#endif
+
 #if GLSL_VERSION >= 150
 #ifndef USE_1DTEXTURE
 in vec4 colorIn[2];
@@ -119,6 +127,11 @@ void main()
 #ifdef ROUND_CAP
   p0pos = p0.xy; p1pos = p1.xy;
 #endif
+#if defined(HAS_CLIP_PLANE)
+#if GLSL_VERSION >= 130
+  gl_ClipDistance = gl_in[0].gl_ClipDistance;
+#endif   // version 130 or up
+#endif  // has clipplane
   gl_Position = v0; EmitVertex();
 
 #ifndef USE_1DTEXTURE
@@ -128,6 +141,11 @@ void main()
 #ifdef ROUND_CAP
   p0pos = p0.xy; p1pos = p1.xy;
 #endif
+#if defined(HAS_CLIP_PLANE)
+#if GLSL_VERSION >= 130
+  gl_ClipDistance = gl_in[0].gl_ClipDistance;
+#endif   // version 130 or up
+#endif  // has clipplane
   gl_Position = v3; EmitVertex();
 
 #ifndef USE_1DTEXTURE
@@ -137,6 +155,11 @@ void main()
 #ifdef ROUND_CAP
   p0pos = p0.xy; p1pos = p1.xy;
 #endif
+#if defined(HAS_CLIP_PLANE)
+#if GLSL_VERSION >= 130
+  gl_ClipDistance = gl_in[1].gl_ClipDistance;
+#endif   // version 130 or up
+#endif  // has clipplane
   gl_Position = v1; EmitVertex();
 
 #ifndef USE_1DTEXTURE
@@ -146,5 +169,10 @@ void main()
 #ifdef ROUND_CAP
   p0pos = p0.xy; p1pos = p1.xy;
 #endif
+#if defined(HAS_CLIP_PLANE)
+#if GLSL_VERSION >= 130
+  gl_ClipDistance = gl_in[1].gl_ClipDistance;
+#endif   // version 130 or up
+#endif  // has clipplane
   gl_Position = v2; EmitVertex();
 }

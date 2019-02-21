@@ -1586,6 +1586,7 @@ void stitchAndDetectPuncta()
   filters.clear();
   filters << "*_Sum.lsm";
   for (int i = 0; i < fdlist.size(); ++i) {
+    continue;
     QDir fdir(fdlist.at(i).absoluteFilePath());
     QString tsfn = fdir.filePath("TileSelection.lsm");
     if (!QFile::exists(tsfn)) {
@@ -1622,6 +1623,7 @@ void stitchAndDetectPuncta()
     std::vector<size_t> chs;
     chs.push_back(0_usize);
     stitch.setUseChannels(chs);
+    stitch.setMaxOverlapRate(0.15);
 
     stitch.run();
   }
@@ -1637,9 +1639,9 @@ void stitchAndDetectPuncta()
       for (size_t ch = 1; ch < 4; ++ch) {
         QString pfn = QString("%1/%2_ch%3.nimp").arg(fdlist.at(i).absoluteFilePath()).arg(
           list.at(0).completeBaseName()).arg(ch + 1);
-        if (QFile::exists(pfn)) {
-          continue;
-        }
+//        if (QFile::exists(pfn)) {
+//          continue;
+//        }
         QString lfn = QString("%1/%2_ch%3_log.txt").arg(fdlist.at(i).absoluteFilePath()).arg(
           list.at(0).completeBaseName()).arg(ch + 1);
         LOG(INFO) << pfn;
@@ -1724,7 +1726,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  //stitchAndDetectPuncta();
+  stitchAndDetectPuncta();
   LOG(INFO) << "done";
 }
 

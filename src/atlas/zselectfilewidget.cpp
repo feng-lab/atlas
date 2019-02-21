@@ -241,6 +241,8 @@ void ZSelectFileWidget::setStartDir(const QString& path)
 {
   if (m_fileMode == FileMode::Directory) {
     m_startDir = QDir(path).canonicalPath();
+  } else if (m_fileMode == FileMode::SaveFile) {
+    m_startDir = path;
   } else {
     m_startDir = QFileInfo(path).canonicalPath();
   }

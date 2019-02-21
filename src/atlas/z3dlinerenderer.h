@@ -87,7 +87,14 @@ private:
   }
 
   Z3DShaderGroup& currentShaderGrp()
-  { return m_useGeomLineShader && m_useSmoothLine ? m_smoothLineShaderGrp : m_lineShaderGrp; }
+  {
+    if (m_useGeomLineShader && m_useSmoothLine)
+      return m_smoothLineShaderGrp;
+    else if (m_useSmoothLine)
+      return m_smoothLineShaderGrp1;
+    else
+      return m_lineShaderGrp;
+  }
 
 protected:
   Z3DShaderGroup m_lineShaderGrp;

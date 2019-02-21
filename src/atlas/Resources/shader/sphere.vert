@@ -86,9 +86,9 @@ void main(void)
 #if defined(HAS_CLIP_PLANE)
 #if GLSL_VERSION >= 130
   for (int i=0; i<CLIP_PLANE_COUNT; ++i)
-    gl_ClipDistance[i] = dot(clip_planes[i], vertex);
+    gl_ClipDistance[i] = dot(clip_planes[i], centerVertex);
 #else
-  gl_ClipVertex = vertex;
+  gl_ClipVertex = centerVertex;
 #endif   // version 130 or up
 #endif  // has clipplane
 }
