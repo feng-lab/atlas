@@ -519,6 +519,8 @@ void Z3DImgFilter::process(Z3DEye eye)
 
   if (hasImage()) {
     renderImage(eye);
+  } else if (onlyBoundBox()) {
+    renderOnlyBoundBox(eye);
   }
 
   if (hasSlices()) {
@@ -846,6 +848,32 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
   m_rendererBase.setViewport(currentOutport.size());
 
   m_rendererBase.render(eye, m_imgRaycasterRenderer);
+
+  renderBoundBox(eye);
+  CHECK_GL_ERROR
+
+  currentOutport.releaseTarget();
+
+  glBlendFunc(GL_ONE, GL_ZERO);
+  glDisable(GL_BLEND);
+}
+
+bool Z3DImgFilter::onlyBoundBox() const
+{
+  return !hasImage() && !m_boundBoxMode.isSelected("No Bound Box");
+}
+
+void Z3DImgFilter::renderOnlyBoundBox(nim::Z3DEye eye)
+{
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono) ?
+                                        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+
+  currentOutport.bindTarget();
+  currentOutport.clearTarget();
+  m_rendererBase.setViewport(currentOutport.size());
 
   renderBoundBox(eye);
   CHECK_GL_ERROR

@@ -84,6 +84,10 @@ protected:
 
   void renderImage(Z3DEye eye);
 
+  bool onlyBoundBox() const;
+
+  void renderOnlyBoundBox(Z3DEye eye);
+
   void updateNotTransformedBoundBoxImpl() override;
 
   void expandCutRange() override
