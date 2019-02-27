@@ -789,6 +789,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
                                    glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordStart),
                                    glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordEnd));
     cube.transformVerticesByMatrix(m_rendererBase.coordTransform());
+    bool flipped = glm::determinant(glm::mat3(m_rendererBase.coordTransform())) < 0.0;
 
     // enable culling
     glEnable(GL_CULL_FACE);
@@ -803,7 +804,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     m_exitTarget.bind();
     glDrawBuffers(2, g_drawBuffers);
     glClear(GL_COLOR_BUFFER_BIT);
-    glCullFace(GL_FRONT);
+    glCullFace(flipped ? GL_BACK : GL_FRONT);
 
     m_textureAndEyeCoordinateRenderer.setTriangleList(&cube);
     m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
@@ -814,7 +815,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     m_entryTarget.bind();
     glDrawBuffers(2, g_drawBuffers);
     glClear(GL_COLOR_BUFFER_BIT);
-    glCullFace(GL_BACK);
+    glCullFace(flipped ? GL_FRONT : GL_BACK);
 
     float nearPlaneDistToOrigin =
       glm::dot(globalCamera().eye(), -globalCamera().viewVector()) - globalCamera().nearDist() - 0.01f;

@@ -1720,13 +1720,28 @@ void helloworldrpc()
   LOG(INFO) << "Greeter received: " << reply;
 }
 
+void cutZeroRegion()
+{
+  QDir dir("/Volumes/shared/HJ/Confocal/CLARITY image/20190107_PV+_STN");
+  QStringList filters;
+  filters << "*.nim";
+  QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+
+  for (int i = 0; i < list.size(); ++i) {
+    auto fileInfo = list.at(i);
+    LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
+    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,1100,1800));
+    img.save(fileInfo.absoluteFilePath() + "_zcut.nim");
+  }
+}
+
 }  // namespace nim
 
 namespace nim {
 
 void ZCustomCommand::run()
 {
-  stitchAndDetectPuncta();
+  cutZeroRegion();
   LOG(INFO) << "done";
 }
 

@@ -380,6 +380,7 @@ ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
         }
       }
     }
+    QApplication::processEvents();
     if (!static_cast<Z3DView*>(m_view)->takeFixedSizeScreenShot(filepath, width, height, sst)) {
       break;
     }

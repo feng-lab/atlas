@@ -184,7 +184,7 @@ void Z3DImg::setScale(const glm::vec3& scale)
 
   const ZImgInfo& info = m_imgPack.imgInfo();
   glm::dvec3 imgDim = glm::dvec3(info.width, info.height, info.depth);
-  glm::dvec3 relativeResolution = glm::dvec3(scale);
+  glm::dvec3 relativeResolution = glm::dvec3(glm::abs(scale));
   // make x and y scales same
   relativeResolution.x = std::max(relativeResolution.x, relativeResolution.y);
   relativeResolution.y = relativeResolution.x;
@@ -296,7 +296,7 @@ void Z3DImg::setScale(const glm::vec3& scale)
   m_voxelWorldDimensions.resize(m_numLevels);
   m_voxelWorldSizes.resize(m_numLevels);
   for (size_t l = 0; l < m_numLevels; ++l) {
-    m_voxelWorldDimensions[l] = scale * glm::vec3(m_levelScales[l]);
+    m_voxelWorldDimensions[l] = glm::abs(scale) * glm::vec3(m_levelScales[l]);
     m_voxelWorldSizes[l] = std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y),
                                     m_voxelWorldDimensions[l].z);
   }
