@@ -506,7 +506,7 @@ void Z3DImg::uploadImageCache(size_t channel)
   ZBenchTimer bt2("aff");
   bt2.start();
   bt2.pause();
-  ZBenchTimer bt("upload image cache");
+  ZBenchTimer bt(QString("upload image ch%1 cache").arg(channel).toStdString());
   bt.start();
 
   bt2.resume();

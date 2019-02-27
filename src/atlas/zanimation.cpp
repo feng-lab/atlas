@@ -381,29 +381,45 @@ ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
       }
     }
     QApplication::processEvents();
-    if (!static_cast<Z3DView*>(m_view)->takeFixedSizeScreenShot(filepath, width, height, sst)) {
+    if (!dynamic_cast<Z3DView*>(m_view)->takeFixedSizeScreenShot(filepath, width, height, sst)) {
+      break;
+    }
+    QApplication::processEvents();
+    if (!dynamic_cast<Z3DView*>(m_view)->takeFixedSizeScreenShot(filepath, width, height, sst)) {
+      break;
+    }
+    QApplication::processEvents();
+    if (!dynamic_cast<Z3DView*>(m_view)->takeFixedSizeScreenShot(filepath, width, height, sst)) {
+      break;
+    }
+    QApplication::processEvents();
+    if (!dynamic_cast<Z3DView*>(m_view)->takeFixedSizeScreenShot(filepath, width, height, sst)) {
+      break;
+    }
+    QApplication::processEvents();
+    if (!dynamic_cast<Z3DView*>(m_view)->takeFixedSizeScreenShot(filepath, width, height, sst)) {
       break;
     }
   }
-  if (!progress->wasCanceled()) {
-    QString filename = QString("%1%2.tif").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
-    QString filepath = tmpdir.filePath(filename);
-    if (checkOverwrite) {
-      if (tmpdir.exists(filename)) {
-        QMessageBox msgBox(QApplication::activeWindow());
-        msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
-        msgBox.setInformativeText("");
-        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::YesToAll | QMessageBox::Cancel);
-        msgBox.setDefaultButton(QMessageBox::Cancel);
-        int ret = msgBox.exec();
-
-        if (ret != QMessageBox::Cancel) {
-          return;
-        }
-        QFile::remove(tmpdir.filePath(filename));
-      }
-    }
-  }
+//  if (!progress->wasCanceled()) {
+//    QString filename = QString("%1%2.tif").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
+//    QString filepath = tmpdir.filePath(filename);
+//    if (checkOverwrite) {
+//      if (tmpdir.exists(filename)) {
+//        QMessageBox msgBox(QApplication::activeWindow());
+//        msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
+//        msgBox.setInformativeText("");
+//        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::YesToAll | QMessageBox::Cancel);
+//        msgBox.setDefaultButton(QMessageBox::Cancel);
+//        int ret = msgBox.exec();
+//
+//        if (ret != QMessageBox::Cancel) {
+//          return;
+//        }
+//        QFile::remove(tmpdir.filePath(filename));
+//      }
+//    }
+//  }
 
   if (!progress->wasCanceled()) {
     progress->setLabelText("Compressing Video...");
@@ -502,29 +518,30 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, Z3D
         }
       }
     }
-    if (!static_cast<Z3DView*>(m_view)->takeScreenShot(filepath, sst)) {
+    QApplication::processEvents();
+    if (!dynamic_cast<Z3DView*>(m_view)->takeScreenShot(filepath, sst)) {
       break;
     }
   }
-  if (!progress->wasCanceled()) {
-    QString filename = QString("%1%2.tif").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
-    QString filepath = tmpdir.filePath(filename);
-    if (checkOverwrite) {
-      if (tmpdir.exists(filename)) {
-        QMessageBox msgBox(QApplication::activeWindow());
-        msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
-        msgBox.setInformativeText("");
-        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::YesToAll | QMessageBox::Cancel);
-        msgBox.setDefaultButton(QMessageBox::Cancel);
-        int ret = msgBox.exec();
-
-        if (ret != QMessageBox::Cancel) {
-          return;
-        }
-        QFile::remove(tmpdir.filePath(filename));
-      }
-    }
-  }
+//  if (!progress->wasCanceled()) {
+//    QString filename = QString("%1%2.tif").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
+//    QString filepath = tmpdir.filePath(filename);
+//    if (checkOverwrite) {
+//      if (tmpdir.exists(filename)) {
+//        QMessageBox msgBox(QApplication::activeWindow());
+//        msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
+//        msgBox.setInformativeText("");
+//        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::YesToAll | QMessageBox::Cancel);
+//        msgBox.setDefaultButton(QMessageBox::Cancel);
+//        int ret = msgBox.exec();
+//
+//        if (ret != QMessageBox::Cancel) {
+//          return;
+//        }
+//        QFile::remove(tmpdir.filePath(filename));
+//      }
+//    }
+//  }
 
   if (!progress->wasCanceled()) {
     progress->setLabelText("Compressing Video...");

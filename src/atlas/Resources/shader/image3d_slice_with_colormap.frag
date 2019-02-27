@@ -70,13 +70,24 @@ void main()
     if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
       voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size + fFracVoxelCoord + 1.0;
 #if GLSL_VERSION >= 130
-      color = texture(colormap, texture(image_cache, (voxelAddress*2.0+1.0)*image_address_to_normalized_texture_coord).r);
+      color = texture(colormap, texture(image_cache, (voxelAddress)*image_address_to_normalized_texture_coord).r);
 #else
-      color = texture1D(colormap, texture3D(image_cache, (voxelAddress*2.0+1.0)*image_address_to_normalized_texture_coord).r);
+      color = texture1D(colormap, texture3D(image_cache, (voxelAddress)*image_address_to_normalized_texture_coord).r);
 #endif
       color.rgb *= color.a;
     }
   }
+  if (pagingFlag == EMPTY) {
+#if GLSL_VERSION >= 130
+    color = texture(colormap, 0);
+#else
+    color = texture1D(colormap, 0);
+#endif
+    color.rgb *= color.a;
+  }
+  //if (pagingFlag == UNMAPPED) { // for debug
+    //color = vec4(1,1,0,1);
+  //}
 
   FragData0 = color;
 #else

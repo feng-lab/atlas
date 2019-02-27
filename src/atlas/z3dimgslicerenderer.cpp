@@ -222,10 +222,12 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
     m_image3DSliceWithColorMapShader.setProjectionViewMatrixUniform(m_rendererBase.camera().projectionViewMatrix(eye));
     m_image3DSliceWithColorMapShader.setViewMatrixUniform(m_rendererBase.camera().viewMatrix(eye));
 
-    m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader);
+    // macOS: if sets here, then the following rendering uses old page directory caches. no idea why
+    //m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader);
 
     if (m_img->numChannels() == 1) {
       m_img->uploadImageCache(0);
+      m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader);
       m_img->bindImageCacheToFullResRenderShader(m_image3DSliceWithColorMapShader, 0);
       m_image3DSliceWithColorMapShader.bindTexture("colormap", (*m_colormaps)[0]->get().texture1D());
       for (size_t q = 0; q < m_quads.size(); ++q)
@@ -234,14 +236,15 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
       for (size_t i = 0; i < m_img->numChannels(); ++i) {
         m_layerTarget->attachSlice(i);
 
-        //if (i == 1) {
-        //m_layerTarget->saveAsColorImage("/Users/feng/Downloads/abcd_b.tif");
-        //}
+//        if (i == 1) {
+//        m_layerTarget->saveAsColorImage("/Users/feng/Downloads/abcd_b.tif");
+//        }
 
         m_layerTarget->bind();
         m_layerTarget->clear();
 
         m_img->uploadImageCache(i);
+        m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader);
         m_img->bindImageCacheToFullResRenderShader(m_image3DSliceWithColorMapShader, i);
         m_image3DSliceWithColorMapShader.bindTexture("colormap", (*m_colormaps)[i]->get().texture1D());
         for (size_t q = 0; q < m_quads.size(); ++q)
@@ -290,6 +293,8 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
     renderScreenQuad(m_VAO, m_mergeChannelShader);
     m_mergeChannelShader.release();
   }
+
+  CHECK_GL_ERROR
 }
 
 } // namespace nim
