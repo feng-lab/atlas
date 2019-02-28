@@ -45,6 +45,8 @@ def deploy_atlas():
             shutil.move(os.path.join(binary_dir, zip_name), common_dirs.deploy_target_dir())
             shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), zip_name),
                          os.path.join(os.path.expanduser('~'), 'Google Drive', "lab", 'software', zip_name))
+            shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), zip_name),
+                         os.path.join('/', 'Volumes', "fs3017", 'eeum', 'software', zip_name))
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)
@@ -65,6 +67,9 @@ def deploy_atlas():
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
             subprocess.run(['scp', zip_name,
                             'feng@labmacpro:"/Users/feng/Google Drive/lab/software/"'],
+                           cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+            subprocess.run(['scp', zip_name,
+                            'feng@labmacpro:"/Volumes/fs3017/eeum/software/"'],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')

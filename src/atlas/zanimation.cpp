@@ -384,22 +384,6 @@ ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
     if (!dynamic_cast<Z3DView*>(m_view)->takeFixedSizeScreenShot(filepath, width, height, sst)) {
       break;
     }
-    QApplication::processEvents();
-    if (!dynamic_cast<Z3DView*>(m_view)->takeFixedSizeScreenShot(filepath, width, height, sst)) {
-      break;
-    }
-    QApplication::processEvents();
-    if (!dynamic_cast<Z3DView*>(m_view)->takeFixedSizeScreenShot(filepath, width, height, sst)) {
-      break;
-    }
-    QApplication::processEvents();
-    if (!dynamic_cast<Z3DView*>(m_view)->takeFixedSizeScreenShot(filepath, width, height, sst)) {
-      break;
-    }
-    QApplication::processEvents();
-    if (!dynamic_cast<Z3DView*>(m_view)->takeFixedSizeScreenShot(filepath, width, height, sst)) {
-      break;
-    }
   }
 //  if (!progress->wasCanceled()) {
 //    QString filename = QString("%1%2.tif").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
