@@ -48,6 +48,7 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent)
 #else
     m_pageTableBlockSize = glm::uvec3(32, 32, 32);
     m_imageBlockSize = imageBlockSize();
+    m_imageBlockSizePad = imageBlockSizePad();
     m_imageBlockReadSize = glm::ivec3(510, 510, 30);
     if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 8192) {
       m_imageCacheNumBlocks = glm::uvec3(64, 64, 48); // 6G
@@ -76,7 +77,8 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent)
 
     for (size_t c = 0; c < m_imgPack.imgInfo().numChannels; ++c) {
       m_imageCacheTextures.emplace_back(
-        new Z3DTexture(GLint(GL_R8), (m_imageBlockSize + 2_u32) * m_imageCacheNumBlocks, GL_RED, GL_UNSIGNED_BYTE));
+        new Z3DTexture(GLint(GL_R8), (m_imageBlockSize + m_imageBlockSizePad) * m_imageCacheNumBlocks,
+                       GL_RED, GL_UNSIGNED_BYTE));
       m_imageCacheTextures[c]->uploadImage();
     }
 
@@ -177,7 +179,7 @@ void Z3DImg::setScale(const glm::vec3& scale)
   m_pageTableCacheManager.reset(
     new Z3DBlockCache<glm::ivec4>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
   m_imageCacheManager.reset(
-    new Z3DBlockCache<glm::ivec4>(m_imageBlockSize + 2_u32, m_imageCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
+    new Z3DBlockCache<glm::ivec4>(m_imageBlockSize + m_imageBlockSizePad, m_imageCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
   for (auto& pu : m_channelPendingUpdates) {
     pu.clear();
   }
@@ -515,10 +517,14 @@ void Z3DImg::uploadImageCache(size_t channel)
                     [&](const tbb::blocked_range<size_t>& r) {
                       for (size_t i = r.begin(); i != r.end(); ++i) {
                         const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
-                        imgs[i] = ZImg(ZImgInfo(m_imageBlockSize.x + 2, m_imageBlockSize.y + 2, m_imageBlockSize.z + 2,
+                        imgs[i] = ZImg(ZImgInfo(m_imageBlockSize.x + m_imageBlockSizePad.x,
+                                                m_imageBlockSize.y + m_imageBlockSizePad.y,
+                                                m_imageBlockSize.z + m_imageBlockSizePad.z,
                                                 1));
                         m_imgPack.readRegionToImg(m_levelScales[blockImagePos.x].x, m_levelScales[blockImagePos.x].z,
-                                                  blockImagePos.y - 1, blockImagePos.z - 1, blockImagePos.w - 1,
+                                                  blockImagePos.y - m_imageBlockSizePad.x / 2,
+                                                  blockImagePos.z - m_imageBlockSizePad.y / 2,
+                                                  blockImagePos.w - m_imageBlockSizePad.z / 2,
                                                   channel, 0, imgs[i]);
                       }
                     }
@@ -526,7 +532,7 @@ void Z3DImg::uploadImageCache(size_t channel)
   bt2.pause();
   for (size_t i = 0; i < imgs.size(); ++i) {
     m_imageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][i].first,
-                                                  m_imageBlockSize + 2_u32, imgs[i].channelData(0));
+                                                  m_imageBlockSize + m_imageBlockSizePad, imgs[i].channelData(0));
   }
 
 #if 0

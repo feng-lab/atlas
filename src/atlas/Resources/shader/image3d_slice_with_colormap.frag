@@ -68,7 +68,7 @@ void main()
 #endif
     pagingFlag = pageTableEntry.w;
     if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-      voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size + fFracVoxelCoord + 1.0;
+      voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size + fFracVoxelCoord + 2.0;
 #if GLSL_VERSION >= 130
       color = texture(colormap, texture(image_cache, (voxelAddress)*image_address_to_normalized_texture_coord).r);
 #else

@@ -92,7 +92,7 @@ void sampleBlock(in ivec3 pageTableEntry, in int curLevel, in ivec3 pageTableCoo
   for (int loop0=0; !blockFinished && loop0<64; loop0++) {
     //ivec3 voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size;
     //float voxel = texelFetch(image_cache, voxelAddress, 0).r;
-    voxelAddress = pageTableEntry + voxelCoord % image_block_size + fFracVoxelCoord + 1.0;
+    voxelAddress = pageTableEntry + voxelCoord % image_block_size + fFracVoxelCoord + 2.0;
 #if GLSL_VERSION >= 130
     float voxel = texture(image_cache, (voxelAddress)*image_address_to_normalized_texture_coord).r;
 #else
