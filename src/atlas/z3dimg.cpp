@@ -24,49 +24,32 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent)
 
   if (m_isVolumeDownsampled) {
     m_channelPendingUpdates.resize(m_nChannels);
-#if 0
-    m_pageTableBlockSize = glm::uvec3(32, 32, 32);
-    m_imageBlockSize = glm::uvec3(64, 64, 64);
-    m_imageBlockReadSize = glm::ivec3(512, 512, 64);
-    if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 4096) {
-      //m_imageCacheNumBlocks = glm::uvec3(16,16,16); // 1G
-      m_imageCacheNumBlocks = glm::uvec3(15,15,16); // 1G
-      m_pageTableCacheNumBlocks = glm::uvec3(4, 4, 2); // 128*128*64*4*4   16MB
-    } else if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 2048) {
-      //m_imageCacheNumBlocks = glm::uvec3(16,16,8);
-      m_imageCacheNumBlocks = glm::uvec3(15,15,8);
-      m_pageTableCacheNumBlocks = glm::uvec3(4, 4, 1); // 128*128*32*4*4   8MB
-    } else if (Z3DGpuInfoInstance.dedicatedVideoMemoryMB() >= 1024) {
-      //m_imageCacheNumBlocks = glm::uvec3(16,16,4);
-      m_imageCacheNumBlocks = glm::uvec3(15,15,4);
-      m_pageTableCacheNumBlocks = glm::uvec3(4, 4, 1); // 128*128*32*4*4   8MB
-    } else {
-      //m_imageCacheNumBlocks = glm::uvec3(16,16,2);
-      m_imageCacheNumBlocks = glm::uvec3(15,15,2);
-      m_pageTableCacheNumBlocks = glm::uvec3(4, 4, 1); // 128*128*32*4*4   8MB
-    }
-#else
+
     m_pageTableBlockSize = glm::uvec3(32, 32, 32);
     m_imageBlockSize = imageBlockSize();
     m_imageBlockSizePad = imageBlockSizePad();
+    auto imageBlockTotalSize = m_imageBlockSize + m_imageBlockSizePad;
+    glm::uvec3 imageCacheSize(2048, 2048, 2048); // 8G
+    glm::uvec3 pageTableCacheSize(256, 256, 256); // 256*256*256*4*4   268MB
     m_imageBlockReadSize = glm::ivec3(510, 510, 30);
     if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 8192) {
-      m_imageCacheNumBlocks = glm::uvec3(64, 64, 48); // 6G
-      m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 6); // 256*256*192*4*4   192MB
+      imageCacheSize = glm::uvec3(2048, 2048, 1536); // 6G
+      pageTableCacheSize = glm::uvec3(256, 256, 192); // 256*256*192*4*4   192MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 4096) {
-      m_imageCacheNumBlocks = glm::uvec3(64, 32, 32); // 2G
-      m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 2); // 256*256*64*4*4   64MB
+      imageCacheSize = glm::uvec3(2048, 1024, 1024); // 2G
+      pageTableCacheSize = glm::uvec3(256, 256, 64); // 256*256*64*4*4   64MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 2048) {
-      m_imageCacheNumBlocks = glm::uvec3(32, 32, 16);
-      m_pageTableCacheNumBlocks = glm::uvec3(8, 8, 1); // 256*256*32*4*4   32MB
+      imageCacheSize = glm::uvec3(1024, 1024, 512); // 0.5G
+      pageTableCacheSize = glm::uvec3(256, 256, 32); // 256*256*32*4*4   32MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 1024) {
-      m_imageCacheNumBlocks = glm::uvec3(32, 32, 8);
-      m_pageTableCacheNumBlocks = glm::uvec3(4, 4, 2); // 128*128*64*4*4   16MB
+      imageCacheSize = glm::uvec3(1024, 1024, 256); // 0.25G
+      pageTableCacheSize = glm::uvec3(128, 128, 64); // 128*128*64*4*4   16MB
     } else {
-      m_imageCacheNumBlocks = glm::uvec3(32, 32, 4);
-      m_pageTableCacheNumBlocks = glm::uvec3(4, 4, 1); // 128*128*32*4*4   8MB
+      imageCacheSize = glm::uvec3(1024, 1024, 128); // 0.125G
+      pageTableCacheSize = glm::uvec3(128, 128, 32); // 128*128*32*4*4   8MB
     }
-#endif
+    m_imageCacheNumBlocks = imageCacheSize / imageBlockTotalSize;
+    m_pageTableCacheNumBlocks = pageTableCacheSize / m_pageTableBlockSize;
 
     m_pageTableCacheSize = glm::ivec3(m_pageTableBlockSize * m_pageTableCacheNumBlocks);
     m_pageTableCacheTexture.reset(
