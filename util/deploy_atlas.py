@@ -166,33 +166,39 @@ def deploy_atlas_to_server_repository():
     shutil.copytree(os.path.join(common_dirs.src_package_dir(), 'packages-' + suffix, 'fenglab.neutube'),
                     os.path.join(common_dirs.deploy_target_dir(), 'packages-' + suffix, 'fenglab.neutube'))
 
-    common_dirs.unpack_file_to_folder(os.path.join(common_dirs.deploy_target_dir(), zip_name),
-                                      common_dirs.get_package_top_level_folder(
-                                          os.path.join(common_dirs.deploy_target_dir(), zip_name),
-                                          common_dirs.deploy_target_dir()))
+    if not sys.platform.startswith('linux'):
+	    common_dirs.unpack_file_to_folder(os.path.join(common_dirs.deploy_target_dir(), zip_name),
+	                                      common_dirs.get_package_top_level_folder(
+	                                          os.path.join(common_dirs.deploy_target_dir(), zip_name),
+	                                          common_dirs.deploy_target_dir()))
     if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), repo_package_name)):
         os.remove(os.path.join(common_dirs.deploy_target_dir(), repo_package_name))
     subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'archivegen'),
                     repo_package_name, app_name],
                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-    shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), app_name), ignore_errors=False)
+    if not sys.platform.startswith('linux'):
+    	shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), app_name), ignore_errors=False)
 
     repo_package_folder = os.path.join(common_dirs.deploy_target_dir(),
-                                       'packages-macOS', 'fenglab.atlas', 'data')
+                                       'packages-' + suffix, 'fenglab.atlas', 'data')
     if os.path.exists(os.path.join(repo_package_folder, repo_package_name)):
         os.remove(os.path.join(repo_package_folder, repo_package_name))
     shutil.move(os.path.join(common_dirs.deploy_target_dir(), repo_package_name), repo_package_folder)
     update_pacakge_xml_version(os.path.join(common_dirs.deploy_target_dir(),
                                             'packages-' + suffix, 'fenglab.atlas', 'meta', 'package.xml'))
 
-    shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'macOS'), ignore_errors=True)
+    shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=True)
     subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'repogen'),
                     '-p', 'packages-' + suffix, './' + suffix],
                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
 
     if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name)):
         os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name))
-    shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), installer_app_name), ignore_errors=True)
+    if sys.platform.startswith('darwin'):
+    	shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), installer_app_name), ignore_errors=True)
+    else:
+    	if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), installer_app_name)):
+    		os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_app_name))
     subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'binarycreator'),
                     '--online-only', '-c', 'config/config-' + suffix + '.xml', '-p', 'packages-' + suffix,
                     installer_base_name],
@@ -204,7 +210,10 @@ def deploy_atlas_to_server_repository():
     else:
         subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', installer_zip_name, installer_app_name],
                        cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-    shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), installer_app_name), ignore_errors=False)
+    if sys.platform.startswith('darwin'):
+    	shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), installer_app_name), ignore_errors=False)
+    else:
+    	os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_app_name))
 
     if sys.platform.startswith('darwin'):
         shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
@@ -219,7 +228,7 @@ def deploy_atlas_to_server_repository():
                         'feng@labmacpro:"/Users/feng/Google Drive/lab/software/"'],
                        cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         subprocess.run(['rsync', '-a', '--delete', suffix,
-                        'feng@labmacpro:"/Users/feng/Google Drive/code/my/proxy/static/packages/' + suffix + '"'],
+                        'feng@labmacpro:"/Users/feng/Google Drive/code/my/proxy/static/packages/"'],
                        cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=False)
     else:

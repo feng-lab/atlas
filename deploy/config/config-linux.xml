@@ -9,7 +9,6 @@
     <ProductUrl>https://fenglab.xyz</ProductUrl>
     <InstallerWindowIcon>atlas</InstallerWindowIcon>
     <InstallerApplicationIcon>atlas</InstallerApplicationIcon>
-    <Logo>atlas.png</Logo>
     <Watermark>watermark.png</Watermark>
     <RunProgram>@TargetDir@/Atlas.AppDir/Atlas</RunProgram>
     <RunProgramDescription>Run Atlas now.</RunProgramDescription>
