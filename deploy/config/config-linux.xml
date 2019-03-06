@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Installer>
+    <Name>Atlas</Name>
+    <Version>0.7.0</Version>
+    <Title>Atlas Installer</Title>
+    <Publisher>fenglab</Publisher>
+    <StartMenuDir>fenglab</StartMenuDir>
+    <TargetDir>/opt/fenglab</TargetDir>
+    <ProductUrl>https://fenglab.xyz</ProductUrl>
+    <InstallerWindowIcon>atlas</InstallerWindowIcon>
+    <InstallerApplicationIcon>atlas</InstallerApplicationIcon>
+    <Logo>atlas.png</Logo>
+    <Watermark>watermark.png</Watermark>
+    <RunProgram>@TargetDir@/Atlas.AppDir/Atlas</RunProgram>
+    <RunProgramDescription>Run Atlas now.</RunProgramDescription>
+    <MaintenanceToolName>MaintenanceTool</MaintenanceToolName>
+    <AllowNonAsciiCharacters>true</AllowNonAsciiCharacters>
+    <Background>background.png</Background>
+
+    <RemoteRepositories>
+        <Repository>
+            <Url>https://fenglab.xyz/static/packages/linux/</Url>
+        </Repository>
+    </RemoteRepositories>
+</Installer>

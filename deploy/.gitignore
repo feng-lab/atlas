@@ -1,0 +1,7 @@
+/linux/
+/macOS/
+/windows/
+fenglab.neutube/
+*.app
+*.zip
+*.sh

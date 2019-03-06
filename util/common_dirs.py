@@ -109,7 +109,7 @@ def atlas_binary_dir() -> str:
 
 
 def deploy_target_dir() -> str:
-    return atlas_repository_dir()
+    return os.path.join(atlas_repository_dir(), 'deploy')
 
 
 def qt_install_dir() -> str:
@@ -158,6 +158,21 @@ def qt_bin_dir() -> str:
 
 def qmake_bin() -> str:
     return os.path.join(qt_bin_dir(), qmake_bin_name())
+
+
+def qt_installer_framework_ver() -> str:
+    folder = os.path.join(qt_install_dir(), 'Tools', 'QtInstallerFramework')
+    vers = [fd for fd in os.listdir(folder) if
+            os.path.exists(os.path.join(folder, fd, 'bin'))]
+    assert vers
+    vers = sorted(vers, key=parse_version)
+    ver = vers[-1]
+    return ver
+
+
+def qt_installer_framework_bin_dir() -> str:
+    folder = os.path.join(qt_install_dir(), 'Tools', 'QtInstallerFramework')
+    return os.path.join(folder, qt_installer_framework_ver(), 'bin')
 
 
 def vs_install_dir() -> str:
