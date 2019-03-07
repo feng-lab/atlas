@@ -5,4 +5,9 @@ fenglab.neutube/
 *.app
 *.zip
 *.sh
+*.7z
 /AtlasInstaller
+/AtlasInstaller.exe
+/Atlas/
+/Atlas.AppDir/
+/Atlas.app/

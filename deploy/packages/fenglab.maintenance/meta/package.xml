@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<Package>
+    <DisplayName>Maintenance Tool</DisplayName>
+    <Description>Maintenance Tool</Description>
+    <Version>3.0.6</Version>
+    <ReleaseDate>2019-03-07</ReleaseDate>
+    <Script>installscript.qs</Script>
+    <Essential>true</Essential>
+    <Virtual>true</Virtual> <!-- Set to true if this is a virtual component not showing up in the installer -->
+    <ForcedInstallation>true</ForcedInstallation>
+</Package>

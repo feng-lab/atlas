@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import xml.etree.ElementTree as eTree
 import datetime
+import zipfile
 
 import common_dirs
 import linuxdeployqt
@@ -120,7 +121,8 @@ def build_atlas_package():
 
             shutil.make_archive(os.path.join(common_dirs.deploy_target_dir(), zip_name[0:-4]),
                                 'zip',
-                                os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+                                root_dir=common_dirs.deploy_target_dir(),
+                                base_dir='Atlas')
             shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), zip_name),
                          os.path.join('Z:', os.sep, 'Google Drive', "lab", 'software', zip_name))
         else:
@@ -132,6 +134,8 @@ def build_atlas_installer():
     if sys.platform.startswith('darwin'):
         app_name = 'Atlas.app'
         repo_package_name = 'atlas.7z'
+        mt_app_name = '.tempMaintenanceTool'
+        mt_repo_package_name = 'MaintenanceTool.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller.app'
         installer_zip_name = 'AtlasInstaller-macOS.zip'
@@ -139,6 +143,8 @@ def build_atlas_installer():
     elif sys.platform.startswith('linux'):
         app_name = 'Atlas.AppDir'
         repo_package_name = 'atlas.7z'
+        mt_app_name = '.tempMaintenanceTool'
+        mt_repo_package_name = 'MaintenanceTool.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller'
         installer_zip_name = 'AtlasInstaller-linux.zip'
@@ -146,8 +152,10 @@ def build_atlas_installer():
     else:
         app_name = 'Atlas'
         repo_package_name = 'atlas.7z'
+        mt_app_name = 'tempMaintenanceTool.exe'
+        mt_repo_package_name = 'MaintenanceTool.7z'
         installer_base_name = 'AtlasInstaller'
-        installer_app_name = 'AtlasInstaller'
+        installer_app_name = 'AtlasInstaller.exe'
         installer_zip_name = 'AtlasInstaller-windows.zip'
         suffix = 'windows'
 
@@ -161,36 +169,55 @@ def build_atlas_installer():
     elif os.path.exists(os.path.join(common_dirs.deploy_target_dir(), installer_app_name)):
         os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_app_name))
 
-    if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), 'packages-' + suffix, 'fenglab.neutube')):
-        shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'packages-' + suffix, 'fenglab.neutube'),
+    if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), 'packages', 'fenglab.neutube')):
+        shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'packages', 'fenglab.neutube'),
                       ignore_errors=False)
     shutil.copytree(os.path.join(common_dirs.src_package_dir(), 'packages-' + suffix, 'fenglab.neutube'),
-                    os.path.join(common_dirs.deploy_target_dir(), 'packages-' + suffix, 'fenglab.neutube'))
+                    os.path.join(common_dirs.deploy_target_dir(), 'packages', 'fenglab.neutube'))
+
+    if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), mt_app_name)):
+        os.remove(os.path.join(common_dirs.deploy_target_dir(), mt_app_name))
+    if sys.platform.startswith('win'):
+        shutil.copy(os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'installerbase.exe'),
+                    os.path.join(common_dirs.deploy_target_dir(), mt_app_name))
+    else:
+        shutil.copy(os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'installerbase'),
+                    os.path.join(common_dirs.deploy_target_dir(), mt_app_name))
+    subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'archivegen'),
+                    mt_repo_package_name,
+                    os.path.join(common_dirs.deploy_target_dir(), mt_app_name)],
+                   cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+    os.remove(os.path.join(common_dirs.deploy_target_dir(), mt_app_name))
+    repo_package_folder = os.path.join(common_dirs.deploy_target_dir(),
+                                       'packages', 'fenglab.maintenance', 'data')
+    if os.path.exists(os.path.join(repo_package_folder, mt_repo_package_name)):
+        os.remove(os.path.join(repo_package_folder, mt_repo_package_name))
+    shutil.move(os.path.join(common_dirs.deploy_target_dir(), mt_repo_package_name), repo_package_folder)
 
     subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'archivegen'),
                     repo_package_name, app_name],
                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
 
     repo_package_folder = os.path.join(common_dirs.deploy_target_dir(),
-                                       'packages-' + suffix, 'fenglab.atlas', 'data')
+                                       'packages', 'fenglab.atlas', 'data')
     if os.path.exists(os.path.join(repo_package_folder, repo_package_name)):
         os.remove(os.path.join(repo_package_folder, repo_package_name))
     shutil.move(os.path.join(common_dirs.deploy_target_dir(), repo_package_name), repo_package_folder)
     update_pacakge_xml_version(os.path.join(common_dirs.deploy_target_dir(),
-                                            'packages-' + suffix, 'fenglab.atlas', 'meta', 'package.xml'))
+                                            'packages', 'fenglab.atlas', 'meta', 'package.xml'))
 
     subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'repogen'),
-                    '-p', 'packages-' + suffix, './' + suffix],
+                    '-p', 'packages', './' + suffix],
                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
 
     subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'binarycreator'),
-                    '--online-only', '-c', 'config/config-' + suffix + '.xml', '-p', 'packages-' + suffix,
+                    '--online-only', '-c', 'config/config-' + suffix + '.xml', '-p', 'packages',
                     installer_base_name],
                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+
     if sys.platform.startswith('win'):
-        shutil.make_archive(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name[0:-4]),
-                            'zip',
-                            os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
+        zipfile.ZipFile(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name), mode='w')\
+            .write(os.path.join(common_dirs.deploy_target_dir(), installer_app_name), arcname=installer_app_name)
     else:
         subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', installer_zip_name, installer_app_name],
                        cwd=common_dirs.deploy_target_dir(), shell=False, check=True)

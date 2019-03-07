@@ -65,8 +65,12 @@ nasm.exe
 .idea/
 __pycache__/
 /src/version/version.h
-Atlas.AppDir/
+/deploy/Atlas.AppDir/
+/deploy/Atlas/
+/deploy/Atlas.app/
+/Atlas.AppDir/
 /Atlas/
+/Atlas.app/
 QtInfo.cmake
 
 # binary file

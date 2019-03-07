@@ -5,7 +5,7 @@
     <Title>Atlas Installer</Title>
     <Publisher>fenglab</Publisher>
     <StartMenuDir>fenglab</StartMenuDir>
-    <TargetDir>@ApplicationsDir@/fenglab</TargetDir>
+    <TargetDir>@ApplicationsDirX64@/fenglab</TargetDir>
     <ProductUrl>https://fenglab.xyz</ProductUrl>
     <InstallerWindowIcon>atlas</InstallerWindowIcon>
     <InstallerApplicationIcon>atlas</InstallerApplicationIcon>
