@@ -15,7 +15,6 @@
     <RunProgramDescription>Run Atlas now.</RunProgramDescription>
     <MaintenanceToolName>MaintenanceTool</MaintenanceToolName>
     <AllowNonAsciiCharacters>true</AllowNonAsciiCharacters>
-    <Background>background.png</Background>
 
     <RemoteRepositories>
         <Repository>

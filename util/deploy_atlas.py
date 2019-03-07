@@ -22,7 +22,7 @@ def update_pacakge_xml_version(file: str):
     tree.write(file)
 
 
-def deploy_atlas() -> bool:
+def deploy_atlas():
     print('current interpreter: ' + sys.executable)
 
     binary_dir = common_dirs.atlas_binary_dir()
@@ -33,25 +33,21 @@ def deploy_atlas() -> bool:
     if sys.platform.startswith('darwin'):
         app_name = 'Atlas.app'
         zip_name = 'atlas.app.zip'
-        app_bak_name = get_bak_file_name(app_name)
+        shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), app_name), ignore_errors=True)
+        if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
+            os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
+
         if os.path.exists(os.path.join(binary_dir, app_name)):
-            shutil.copytree(os.path.join(binary_dir, app_name), os.path.join(binary_dir, app_bak_name),
+            shutil.copytree(os.path.join(binary_dir, app_name),
+                            os.path.join(common_dirs.deploy_target_dir(), app_name),
                             symlinks=True)
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), app_name],
-                           cwd=binary_dir, shell=False, check=True)
-            subprocess.run([os.path.join(binary_dir, app_name, 'Contents', 'MacOS', 'Atlas'),
+                           cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+            subprocess.run([os.path.join(common_dirs.deploy_target_dir(), app_name, 'Contents', 'MacOS', 'Atlas'),
                             '--run_unit_tests'], shell=False, check=True)
 
-            if os.path.exists(os.path.join(binary_dir, zip_name)):
-                os.remove(os.path.join(binary_dir, zip_name))
             subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, app_name],
-                           cwd=binary_dir, shell=False, check=True)
-            shutil.rmtree(os.path.join(binary_dir, app_name), ignore_errors=False)
-            os.replace(os.path.join(binary_dir, app_bak_name), os.path.join(binary_dir, app_name))
-
-            if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
-                os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
-            shutil.move(os.path.join(binary_dir, zip_name), common_dirs.deploy_target_dir())
+                           cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
 
             shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), zip_name),
                          os.path.join(os.path.expanduser('~'), 'Google Drive', "lab", 'software', zip_name))
@@ -63,16 +59,17 @@ def deploy_atlas() -> bool:
     elif sys.platform.startswith('linux'):
         app_name = "Atlas"
         zip_name = "atlas-linux.zip"
+        shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'), ignore_errors=True)
+        if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
+            os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
+
         if os.path.exists(os.path.join(binary_dir, app_name)):
-            shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'), ignore_errors=True)
             linuxdeployqt.linuxdeployqt(os.path.join(binary_dir, app_name),
                                         os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'),
                                         common_dirs.qt_base_dir())
             subprocess.run([os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir', 'Atlas'),
                             '--run_unit_tests'], shell=False, check=True)
 
-            if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
-                os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
             subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, 'Atlas.AppDir'],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
             subprocess.run(['scp', zip_name,
@@ -88,10 +85,11 @@ def deploy_atlas() -> bool:
         app_name = 'Atlas.exe'
         zip_base_name = 'atlas-win'
         zip_name = zip_base_name + '.zip'
+        shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), ignore_errors=True)
+        if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
+            os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
+
         if os.path.exists(os.path.join(binary_dir, app_name)):
-            if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
-                os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
-            shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), ignore_errors=True)
             os.mkdir(os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
             shutil.copy2(os.path.join(binary_dir, app_name),
                          os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
@@ -130,13 +128,10 @@ def deploy_atlas() -> bool:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)
 
-    return True
-
 
 def deploy_atlas_to_server_repository():
     if sys.platform.startswith('darwin'):
         app_name = 'Atlas.app'
-        zip_name = 'atlas.app.zip'
         repo_package_name = 'atlas.app.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller.app'
@@ -144,7 +139,6 @@ def deploy_atlas_to_server_repository():
         suffix = 'macOS'
     elif sys.platform.startswith('linux'):
         app_name = 'Atlas.AppDir'
-        zip_name = 'atlas-linux.zip'
         repo_package_name = 'atlas.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller'
@@ -152,13 +146,21 @@ def deploy_atlas_to_server_repository():
         suffix = 'linux'
     else:
         app_name = 'Atlas'
-        zip_name = 'atlas-win.zip'
         repo_package_name = 'atlas.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller'
-        installer_zip_base_name = 'AtlasInstaller-win'
-        installer_zip_name = installer_zip_base_name + '.zip'
+        installer_zip_name = 'AtlasInstaller-win.zip'
         suffix = 'windows'
+
+    if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), repo_package_name)):
+        os.remove(os.path.join(common_dirs.deploy_target_dir(), repo_package_name))
+    shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=True)
+    if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name)):
+        os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name))
+    if sys.platform.startswith('darwin'):
+        shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), installer_app_name), ignore_errors=True)
+    elif os.path.exists(os.path.join(common_dirs.deploy_target_dir(), installer_app_name)):
+        os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_app_name))
 
     if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), 'packages-' + suffix, 'fenglab.neutube')):
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'packages-' + suffix, 'fenglab.neutube'),
@@ -166,18 +168,9 @@ def deploy_atlas_to_server_repository():
     shutil.copytree(os.path.join(common_dirs.src_package_dir(), 'packages-' + suffix, 'fenglab.neutube'),
                     os.path.join(common_dirs.deploy_target_dir(), 'packages-' + suffix, 'fenglab.neutube'))
 
-    if not sys.platform.startswith('linux'):
-	    common_dirs.unpack_file_to_folder(os.path.join(common_dirs.deploy_target_dir(), zip_name),
-	                                      common_dirs.get_package_top_level_folder(
-	                                          os.path.join(common_dirs.deploy_target_dir(), zip_name),
-	                                          common_dirs.deploy_target_dir()))
-    if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), repo_package_name)):
-        os.remove(os.path.join(common_dirs.deploy_target_dir(), repo_package_name))
     subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'archivegen'),
                     repo_package_name, app_name],
                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-    if not sys.platform.startswith('linux'):
-    	shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), app_name), ignore_errors=False)
 
     repo_package_folder = os.path.join(common_dirs.deploy_target_dir(),
                                        'packages-' + suffix, 'fenglab.atlas', 'data')
@@ -187,33 +180,21 @@ def deploy_atlas_to_server_repository():
     update_pacakge_xml_version(os.path.join(common_dirs.deploy_target_dir(),
                                             'packages-' + suffix, 'fenglab.atlas', 'meta', 'package.xml'))
 
-    shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=True)
     subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'repogen'),
                     '-p', 'packages-' + suffix, './' + suffix],
                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
 
-    if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name)):
-        os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name))
-    if sys.platform.startswith('darwin'):
-    	shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), installer_app_name), ignore_errors=True)
-    else:
-    	if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), installer_app_name)):
-    		os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_app_name))
     subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'binarycreator'),
                     '--online-only', '-c', 'config/config-' + suffix + '.xml', '-p', 'packages-' + suffix,
                     installer_base_name],
                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
     if sys.platform.startswith('win'):
-        shutil.make_archive(os.path.join(common_dirs.deploy_target_dir(), installer_zip_base_name),
+        shutil.make_archive(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name[0:-4]),
                             'zip',
                             os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
     else:
         subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', installer_zip_name, installer_app_name],
                        cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-    if sys.platform.startswith('darwin'):
-    	shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), installer_app_name), ignore_errors=False)
-    else:
-    	os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_app_name))
 
     if sys.platform.startswith('darwin'):
         shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
@@ -241,5 +222,5 @@ def deploy_atlas_to_server_repository():
 
 
 if __name__ == "__main__":
-    if deploy_atlas():
-        deploy_atlas_to_server_repository()
+    deploy_atlas()
+    deploy_atlas_to_server_repository()

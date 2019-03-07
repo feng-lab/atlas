@@ -892,11 +892,8 @@ def build_itk(src_dir: str, install_dir: str):
 
         orig_file_1 = os.path.join(src_dir, 'Modules', 'ThirdParty', 'VNL', 'src', 'vxl', 'vcl', 'CMakeLists.txt')
         if is_windows():
-            bak_file_1 = patch_file(orig_file_1, from_texts=[r'vcl_legacy_aliases.h ${VCL_COMPILER_DETECTION_HEADER}'],
+            bak_file_1 = patch_file(orig_file_1, from_texts=[r'vcl_legacy_aliases.h'],
                                     to_texts=[r'vcl_legacy_aliases.h vcl_msvc_warnings.h'])
-        else:
-            bak_file_1 = patch_file(orig_file_1, from_texts=[r'vcl_legacy_aliases.h ${VCL_COMPILER_DETECTION_HEADER}'],
-                                    to_texts=[r'vcl_legacy_aliases.h'])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
@@ -933,7 +930,8 @@ def build_itk(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
-        os.replace(bak_file_1, orig_file_1)
+        if is_windows():
+            os.replace(bak_file_1, orig_file_1)
 
 
 def build_vtk(src_dir: str, install_dir: str):
