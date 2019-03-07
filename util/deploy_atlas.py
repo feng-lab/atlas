@@ -22,7 +22,7 @@ def update_pacakge_xml_version(file: str):
     tree.write(file)
 
 
-def deploy_atlas():
+def build_atlas_package():
     print('current interpreter: ' + sys.executable)
 
     binary_dir = common_dirs.atlas_binary_dir()
@@ -128,7 +128,7 @@ def deploy_atlas():
             sys.exit(1)
 
 
-def deploy_atlas_to_server_repository():
+def build_atlas_installer():
     if sys.platform.startswith('darwin'):
         app_name = 'Atlas.app'
         repo_package_name = 'atlas.7z'
@@ -220,6 +220,10 @@ def deploy_atlas_to_server_repository():
         shutil.move(os.path.join(common_dirs.deploy_target_dir(), suffix), target_folder)
 
 
+def deploy_atlas():
+    build_atlas_package()
+    build_atlas_installer()
+
+
 if __name__ == "__main__":
     deploy_atlas()
-    deploy_atlas_to_server_repository()
