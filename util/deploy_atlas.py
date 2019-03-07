@@ -32,7 +32,7 @@ def deploy_atlas():
 
     if sys.platform.startswith('darwin'):
         app_name = 'Atlas.app'
-        zip_name = 'atlas.app.zip'
+        zip_name = 'atlas-macOS.zip'
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), app_name), ignore_errors=True)
         if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
             os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
@@ -83,8 +83,7 @@ def deploy_atlas():
             sys.exit(1)
     else:
         app_name = 'Atlas.exe'
-        zip_base_name = 'atlas-win'
-        zip_name = zip_base_name + '.zip'
+        zip_name = 'atlas-windows.zip'
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), ignore_errors=True)
         if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
             os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
@@ -119,7 +118,7 @@ def deploy_atlas():
                             '--run_unit_tests'], shell=True,
                            check=False)  # todo: fix returned non-zero exit status 3221226356.
 
-            shutil.make_archive(os.path.join(common_dirs.deploy_target_dir(), zip_base_name),
+            shutil.make_archive(os.path.join(common_dirs.deploy_target_dir(), zip_name[0:-4]),
                                 'zip',
                                 os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
             shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), zip_name),
@@ -132,10 +131,10 @@ def deploy_atlas():
 def deploy_atlas_to_server_repository():
     if sys.platform.startswith('darwin'):
         app_name = 'Atlas.app'
-        repo_package_name = 'atlas.app.7z'
+        repo_package_name = 'atlas.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller.app'
-        installer_zip_name = 'AtlasInstaller.app.zip'
+        installer_zip_name = 'AtlasInstaller-macOS.zip'
         suffix = 'macOS'
     elif sys.platform.startswith('linux'):
         app_name = 'Atlas.AppDir'
@@ -149,7 +148,7 @@ def deploy_atlas_to_server_repository():
         repo_package_name = 'atlas.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller'
-        installer_zip_name = 'AtlasInstaller-win.zip'
+        installer_zip_name = 'AtlasInstaller-windows.zip'
         suffix = 'windows'
 
     if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), repo_package_name)):
@@ -208,7 +207,7 @@ def deploy_atlas_to_server_repository():
         subprocess.run(['scp', installer_zip_name,
                         'feng@labmacpro:"/Users/feng/Google Drive/lab/software/"'],
                        cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-        subprocess.run(['rsync', '-a', '--delete', suffix,
+        subprocess.run(['rsync', '-av', '--delete', suffix,
                         'feng@labmacpro:"/Users/feng/Google Drive/code/my/proxy/static/packages/"'],
                        cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=False)
