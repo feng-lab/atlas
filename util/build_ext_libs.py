@@ -10,6 +10,7 @@ import difflib
 import json
 import distutils.dir_util
 import glob
+import mmap
 
 from common_dirs import *
 
@@ -1119,6 +1120,28 @@ def build_libs(libs: dict, update_src: bool):
                     print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
             else:
                 file.write(f'set(QT_PATHS {qt_base_dir()})\n')
+        # patch installer framework
+        pattern_bytes = b'Mozilla/5.0'
+        replace_bytes = b'Mozilla/590'
+        file = os.path.join(qt_installer_framework_bin_dir(), 'installerbase')
+        if is_windows():
+            file += '.exe'
+        with open(file, 'r+b') as f:
+            with mmap.mmap(f.fileno(), 0) as mm:
+                allIndexes = []
+                index = mm.find(pattern_bytes)
+                while index != -1:
+                    allIndexes.append(index)
+                    index = mm.find(pattern_bytes, index + len(pattern_bytes))
+                if not allIndexes:
+                    print("Pattern not found in {0}, skip patching.".format(file))
+                else:
+                    # make backup
+                    shutil.copy2(file, file + '.bak')
+                    for index in allIndexes:
+                        mm[index:index + len(replace_bytes)] = replace_bytes
+                    mm.flush()
+                    print("{0} successfully patched at {1} places.".format(file, len(allIndexes)))
 
     if libs['zlib']:
         if is_windows():
