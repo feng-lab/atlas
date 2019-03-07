@@ -16,7 +16,14 @@
 
     <RemoteRepositories>
         <Repository>
-            <Url>https://fenglab.xyz/static/packages/macOS/</Url>
+            <Url>https://neutracing.com/static/packages/macOS</Url>
+            <Enabled>1</Enabled>
+            <DisplayName>repository 1</DisplayName>
+        </Repository>
+        <Repository>
+            <Url>https://fenglab.xyz/static/packages/macOS</Url>
+            <Enabled>1</Enabled>
+            <DisplayName>repository 2</DisplayName>
         </Repository>
     </RemoteRepositories>
 </Installer>
