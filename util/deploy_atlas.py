@@ -20,7 +20,7 @@ def update_pacakge_xml_version(file: str):
     tree.find('Version').text = '{0:%Y.%m.%d}'.format(datetime.datetime.now())
     tree.find('ReleaseDate').text = '{0:%Y-%m-%d}'.format(datetime.datetime.now())
     # Write back to file
-    tree.write(file)
+    tree.write(file, encoding="utf-8", xml_declaration=True)
 
 
 def build_atlas_package():

@@ -361,6 +361,8 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins, 
             strip(dst)
     else:
         shutil.copytree(qt_plugin_dir, os.path.join(dest_dir, appdir_plugins))
+        for dst in glob.glob(os.path.join(dest_dir, appdir_plugins, '**', '*.so.debug')):
+            os.remove(dst)
         for dst in glob.glob(os.path.join(dest_dir, appdir_plugins, '**', '*.so')):
             strip(dst)
 
