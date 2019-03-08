@@ -669,14 +669,14 @@ set(SOURCES
     zlogwidget.cpp
     zlogwidget.h
     zimgprocessdialog.cpp
-    zimgprocessdialog.h 
-    zstitchimage.cpp 
-    zstitchimage.h 
-    zservicemanager.cpp 
-    zservicemanager.h 
-    zrpcservice.cpp 
-    zrpcservice.h 
-    ztheme.cpp 
+    zimgprocessdialog.h
+    zstitchimage.cpp
+    zstitchimage.h
+    zservicemanager.cpp
+    zservicemanager.h
+    zrpcservice.cpp
+    zrpcservice.h
+    ztheme.cpp
     ztheme.h)
 
 # our target
@@ -763,8 +763,18 @@ else (WIN32)
   endif ()
 
   # for some files
-  set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
-                              "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers -Wno-unknown-pragmas -Wno-unused-variable -Wno-reorder -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
+  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
+                                "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers \
+                              -Wno-unknown-pragmas -Wno-unused-variable -Wno-reorder \
+                              -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
+  elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
+                                "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers \
+                              -Wno-unknown-pragmas -Wno-unused-variable -Wno-reorder -Wno-maybe-uninitialized \
+                              -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
+  endif ()
+
   set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
   set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS "-isystem ${ASSIMP_INCLUDE_DIRS}")
   set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS

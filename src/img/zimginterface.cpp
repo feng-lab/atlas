@@ -2,11 +2,6 @@
 
 namespace nim {
 
-constexpr const char* const EnumStrings<DataType>::data[];
-constexpr const char* const EnumStrings<VoxelFormat>::data[];
-constexpr const char* const EnumStrings<VoxelSizeUnit>::data[];
-constexpr const char* const EnumStrings<Dimension>::data[];
-
 size_t byteNumber(DataType dt)
 {
   switch (dt) {
