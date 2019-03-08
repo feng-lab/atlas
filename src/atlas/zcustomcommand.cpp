@@ -1571,9 +1571,9 @@ void exportSceneForGlance()
 
 void stitchAndDetectPuncta()
 {
-  QDir dir("/Volumes/shared/Imaging/JK699M4/confocal");
+  QDir dir("/Volumes/shared/Imaging/JK699M5/Confocal");
   QStringList filters;
-  filters << "JK699M4*";
+  filters << "JK699M5*";
   QFileInfoList fdlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
 
 //  QDir dir2("/Volumes/shared/Imaging/JK636M1/confocal");
@@ -1586,7 +1586,6 @@ void stitchAndDetectPuncta()
   filters.clear();
   filters << "*_Sum.lsm";
   for (int i = 0; i < fdlist.size(); ++i) {
-    continue;
     QDir fdir(fdlist.at(i).absoluteFilePath());
     QString tsfn = fdir.filePath("TileSelection.lsm");
     if (!QFile::exists(tsfn)) {
@@ -1741,7 +1740,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  cutZeroRegion();
+  stitchAndDetectPuncta();
   LOG(INFO) << "done";
 }
 

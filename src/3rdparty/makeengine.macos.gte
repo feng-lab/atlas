@@ -1,7 +1,7 @@
 CFG ?= Debug
 
 CC := C++
-CFLAGS += -c -std=c++14 -stdlib=libc++ -mmacosx-version-min=10.12 -DGTE_DEV_OPENGL -DGTE_DISABLE_PCH
+CFLAGS += -c -std=c++17 -stdlib=libc++ -mmacosx-version-min=10.12 -DGTE_DEV_OPENGL -DGTE_DISABLE_PCH
 INCLUDE := -I Include
 LIBDIR := lib/$(CFG)
 

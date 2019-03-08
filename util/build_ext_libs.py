@@ -141,7 +141,7 @@ def get_cmake_cmd_common_part(install_dir: str):
                '-DCMAKE_BUILD_TYPE=Release',
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
                '-DCMAKE_C_FLAGS:STRING=-fPIC',
-               '-DCMAKE_CXX_FLAGS:STRING=-std=c++14 -fPIC'
+               '-DCMAKE_CXX_FLAGS:STRING=-std=c++17 -fPIC'
                ]
         if use_ninja():
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])
@@ -155,7 +155,7 @@ def get_cmake_cmd_common_part(install_dir: str):
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
                '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + macos_min_version(),
                '-DCMAKE_OSX_SYSROOT=' + osx_sysroot,
-               '-DCMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -std=c++14'
+               '-DCMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -std=c++17'
                ]
         if use_ninja():
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])

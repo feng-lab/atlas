@@ -31,13 +31,13 @@ def generate_glance(folder: str, out_folder: str):
     for obj in allobjs:
         template['sources'][0]['props']['name'] = obj['cellname'] + '_neurite'
         template['sources'][0]['props']['dataset']['name'] = obj['neurite']
-        template['sources'][0]['props']['dataset']['url'] = '/data/' + obj['neurite']
+        template['sources'][0]['props']['dataset']['url'] = '/static/data/' + obj['neurite']
         template['sources'][1]['props']['name'] = obj['cellname'] + '_soma'
         template['sources'][1]['props']['dataset']['name'] = obj['soma']
-        template['sources'][1]['props']['dataset']['url'] = '/data/' + obj['soma']
+        template['sources'][1]['props']['dataset']['url'] = '/static/data/' + obj['soma']
         template['sources'][2]['props']['name'] = obj['cellname'] + '_puncta'
         template['sources'][2]['props']['dataset']['name'] = obj['puncta']
-        template['sources'][2]['props']['dataset']['url'] = '/data/' + obj['puncta']
+        template['sources'][2]['props']['dataset']['url'] = '/static/data/' + obj['puncta']
 
         template['views'][0]['camera']['position'] = obj['camera position']
         template['views'][0]['camera']['focalPoint'] = obj['camera focalPoint']

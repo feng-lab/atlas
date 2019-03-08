@@ -20,10 +20,10 @@
 * run `python3 util/build_and_deploy_atlas.py all` or build CMakeLists.txt
 
 ## C++ Version Defines
-* $Repository_DIR/CMakeLists.txt: set(CMAKE_CXX_STANDARD 14)
+* $Repository_DIR/CMakeLists.txt: set(CMAKE_CXX_STANDARD 17)
 * $Repository_DIR/util/build_ext_libs.py: def get_cmake_cmd_common_part(install_dir: str) ...
-* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: -stdlib=libc++ -std=c++14
-* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: -stdlib=libc++ -std=c++14
+* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: -stdlib=libc++ -std=c++14 // todo: change to 17
+* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: -stdlib=libc++ -std=c++14 // todo: change to 17
 * $Repository_DIR/src/3rdparty/makeengine.macos.gte: -std=c++14 -stdlib=libc++
 
 ## Minimum macOS Defines
