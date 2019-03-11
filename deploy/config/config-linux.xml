@@ -23,7 +23,7 @@
         </Repository>
         <Repository>
             <Url>https://fenglab.xyz/static/packages/linux</Url>
-            <Enabled>1</Enabled>
+            <Enabled>0</Enabled>
             <DisplayName>repository 2</DisplayName>
         </Repository>
     </RemoteRepositories>
