@@ -786,7 +786,7 @@ else (WIN32)
     message(STATUS "Qt5Core_INCLUDE_DIRS0: ${Qt5Core_INCLUDE_DIRS0}")
     set_source_files_properties(ztheme.cpp PROPERTIES COMPILE_FLAGS "-isystem ${Qt5Core_INCLUDE_DIRS0}/Headers/${QT_VERSION}/QtCore -isystem ${Qt5Core_INCLUDE_DIRS0}/Headers/${QT_VERSION}")
 
-    set(copyright_line "Copyright 2011-2018 Linqing Feng")
+    set(copyright_line "Copyright 2011-2019 Linqing Feng")
     set_target_properties(${APP_NAME} PROPERTIES
                           BUILD_RPATH "@executable_path/../Frameworks"
                           INSTALL_RPATH "@executable_path/../Frameworks"
@@ -798,9 +798,12 @@ else (WIN32)
                           MACOSX_BUNDLE_BUNDLE_NAME "${APP_NAME}"
                           MACOSX_BUNDLE_BUNDLE_VERSION "${ATLAS_VERSION}"
                           MACOSX_BUNDLE_COPYRIGHT "${copyright_line}"
-                          MACOSX_BUNDLE_GUI_IDENTIFIER "org.atlas.Atlas"
+                          MACOSX_BUNDLE_GUI_IDENTIFIER "fenglab.${APP_NAME}"
                           RESOURCE "${ASSETS}"
                           )
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND codesign --force --deep --sign - $<TARGET_BUNDLE_DIR:${APP_NAME}>)
   else ()
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD

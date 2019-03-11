@@ -1589,12 +1589,12 @@ void stitchAndDetectPuncta()
     QDir fdir(fdlist.at(i).absoluteFilePath());
     QString tsfn = fdir.filePath("TileSelection.lsm");
     if (!QFile::exists(tsfn)) {
-      LOG(WARNING) << fdir.absolutePath() << "no tile selection file";
+      LOG(WARNING) << fdir.absolutePath() << " no tile selection file";
       continue;
     }
     QFileInfoList list = fdir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
     if (list.size() < 2) {
-      LOG(WARNING) << fdir.absolutePath() << "not enough lsm file for stitching";
+      LOG(WARNING) << fdir.absolutePath() << " not enough lsm file for stitching";
       continue;
     }
 
@@ -1613,6 +1613,10 @@ void stitchAndDetectPuncta()
     }
     outputName += ".nim";
     LOG(INFO) << "output: " << outputName;
+    if (QFile::exists(outputName)) {
+      LOG(INFO) << "finished, skip.";
+      continue;
+    }
 
     ZStitchImage stitch;
     stitch.setInputFilenames(inputFiles);
@@ -1638,9 +1642,9 @@ void stitchAndDetectPuncta()
       for (size_t ch = 1; ch < 4; ++ch) {
         QString pfn = QString("%1/%2_ch%3.nimp").arg(fdlist.at(i).absoluteFilePath()).arg(
           list.at(0).completeBaseName()).arg(ch + 1);
-//        if (QFile::exists(pfn)) {
-//          continue;
-//        }
+        if (QFile::exists(pfn)) {
+          continue;
+        }
         QString lfn = QString("%1/%2_ch%3_log.txt").arg(fdlist.at(i).absoluteFilePath()).arg(
           list.at(0).completeBaseName()).arg(ch + 1);
         LOG(INFO) << pfn;
@@ -1740,7 +1744,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  stitchAndDetectPuncta();
+  //stitchAndDetectPuncta();
   LOG(INFO) << "done";
 }
 

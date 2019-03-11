@@ -46,6 +46,8 @@ def build_atlas_package():
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
             subprocess.run([os.path.join(common_dirs.deploy_target_dir(), app_name, 'Contents', 'MacOS', 'Atlas'),
                             '--run_unit_tests'], shell=False, check=True)
+            subprocess.run(['codesign', '--force', '--deep', '--sign', '-',
+                            os.path.join(common_dirs.deploy_target_dir(), app_name)], shell=False, check=True)
 
             subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, app_name],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)

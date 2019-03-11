@@ -128,9 +128,13 @@ int main(int argc, char* argv[])
     QCoreApplication::setAttribute(Qt::AA_UseStyleSheetPropagationInWidgetStyles, true);
     QCoreApplication::setAttribute(Qt::AA_CompressHighFrequencyEvents, true);
     nim::ZApplication app(argc, argv);
-    app.setApplicationName("Atlas");
-    app.setOrganizationDomain("atlas.com");
-    app.setOrganizationName("Atlas");
+    QCoreApplication::setOrganizationName("fenglab");
+    //On macOS and iOS, if both a name and an Internet domain are specified for the organization, the domain
+    // is preferred over the name. On other platforms, the name is preferred over the domain.
+#ifndef Q_OS_MACOS
+    QCoreApplication::setOrganizationDomain("fenglab.xyz");
+#endif
+    QCoreApplication::setApplicationName("Atlas");
 
     // init the logging mechanism
     QDir logDir = nim::ZSystemInfo::instance().logDir();
