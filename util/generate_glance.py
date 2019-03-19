@@ -11,6 +11,8 @@ import zipfile
 import stat
 import subprocess
 import cv2
+import csv
+import collections
 
 
 def generate_glance(folder: str, out_folder: str):
@@ -29,13 +31,13 @@ def generate_glance(folder: str, out_folder: str):
     with open(allobjs_json_file, mode='r', encoding='utf-8') as jf:
         allobjs = json.load(jf)
     for obj in allobjs:
-        template['sources'][0]['props']['name'] = obj['cellname'] + '_neurite'
+        template['sources'][0]['props']['name'] = 'neurites_' + obj['cellname']
         template['sources'][0]['props']['dataset']['name'] = obj['neurite']
         template['sources'][0]['props']['dataset']['url'] = '/static/data/' + obj['neurite']
-        template['sources'][1]['props']['name'] = obj['cellname'] + '_soma'
+        template['sources'][1]['props']['name'] = 'soma_' + obj['cellname']
         template['sources'][1]['props']['dataset']['name'] = obj['soma']
         template['sources'][1]['props']['dataset']['url'] = '/static/data/' + obj['soma']
-        template['sources'][2]['props']['name'] = obj['cellname'] + '_puncta'
+        template['sources'][2]['props']['name'] = 'synapses_' + obj['cellname']
         template['sources'][2]['props']['dataset']['name'] = obj['puncta']
         template['sources'][2]['props']['dataset']['url'] = '/static/data/' + obj['puncta']
 
@@ -77,6 +79,121 @@ def convert_pdf_to_img(pdfs, imgs):
 
 
 def generate_analysis_figures(folder: str, out_folder: str):
+    cells = []
+    with open('/Users/feng/code/mgrasp-analysis/pv_figs_1.0/orig2_cell_props.csv', newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            cellname = row['CellName']
+            print(cellname)
+            res_folder = os.path.join(out_folder, cellname)
+            if os.path.exists(res_folder):
+                continue
+            if not os.path.exists(res_folder):
+                os.mkdir(res_folder)
+
+            cell = collections.OrderedDict()
+            cell['name'] = cellname
+            cell_summary = collections.OrderedDict()
+
+            cell_summary['name'] = row['CellName']
+            cell_summary['animal name'] = row['AnimalName']
+
+            cell_summary['cell type'] = row['CellType']
+            if cell_summary['cell type']  == 'Pyr':
+                cell_summary['cell type'] = 'pyramidal cell (PC)'
+                cell_summary['input region'] = 'left CA3'
+                cell_summary['cell location'] = 'right CA1'
+            elif cell_summary['cell type']  == 'contraPV':
+                cell_summary['cell type'] = 'parvalbumin-positive interneuron (PV+)'
+                cell_summary['input region'] = 'left CA3'
+                cell_summary['cell location'] = 'right CA1'
+            elif cell_summary['cell type']  == 'ipsiPV':
+                cell_summary['cell type'] = 'parvalbumin-positive interneuron (PV+)'
+                cell_summary['input region'] = 'right CA3'
+                cell_summary['cell location'] = 'right CA1'
+
+            cell_summary['soma strata location'] = row['SomaLocation']
+            if cell_summary['soma strata location'] == 'Ori':
+                cell_summary['soma strata location'] = 'stratum oriens (SO)'
+            elif cell_summary['soma strata location'] == 'Rad':
+                cell_summary['soma strata location'] = 'stratum radiatum (SR)'
+            elif cell_summary['soma strata location'] == 'Deep':
+                cell_summary['soma strata location'] = 'stratum pyramidale (SP) deep'
+            elif cell_summary['soma strata location'] == 'Superficial':
+                cell_summary['soma strata location'] = 'stratum pyramidale (SP) superficial'
+
+            cell_summary['synapse number'] = row['SynapseNumber']
+            cell_summary['dendrites surface area (um2)'] = row['BranchSurfaceArea']
+            cell_summary['dendrites volume (um3)'] = row['NeuriteVolume']
+            cell_summary['dendrites length (um)'] = row['NeuriteLength']
+            cell_summary['synapse density (#/um2)'] = row['SynapseDensity']
+
+            cell['summary'] = cell_summary
+
+            cell_analyses = []
+
+            analysis = collections.OrderedDict()
+            analysis['name'] = 'dendrogram'
+            analysis['url'] = '/static/analysis/' + cellname + '/dendrogram.png'
+            analysis['description'] = 'Dendrogram shows the hierarchical tree structure of the neuron and the ' \
+                                      'distribution of synapses on individual dendrite.'
+            cell_analyses.append(analysis)
+
+            analysis = collections.OrderedDict()
+            analysis['name'] = 'sholl analysis'
+            analysis['url'] = '/static/analysis/' + cellname + '/sholl_analysis.png'
+            analysis['description'] = 'Sholl analysis is a method of quantitative analysis commonly used in neuronal' \
+                                      ' studies to characterize the morphological characteristics of a neuron. It uses' \
+                                      ' a series of concentric spherical shells as coordinates of reference to study' \
+                                      ' how the number of dendrites and synapses varies with the distance from the soma.'
+            cell_analyses.append(analysis)
+
+            analysis = collections.OrderedDict()
+            analysis['name'] = 'dendrite-level synapse pattern'
+            analysis['url'] = '/static/analysis/' + cellname + '/overall_synapse_pattern.png'
+            analysis['description'] = 'Dendrite-level synapse pattern analysis shows the variability in the synaptic' \
+                                      ' density of individual dendrites of a given neuron by comparing the measured' \
+                                      ' synapse numbers with those expected by the random null model, i.e., the number' \
+                                      ' of synapses that would be predicted by a Poisson process with a fixed density' \
+                                      ' per unit dendrite area.'
+            cell_analyses.append(analysis)
+
+            if cell['summary']['cell type'] == 'pyramidal cell (PC)':
+                analysis = collections.OrderedDict()
+                analysis['name'] = 'basal dendrite synapse pattern'
+                analysis['url'] = '/static/analysis/' + cellname + '/basal_pattern.png'
+                analysis['description'] = 'Dendrite-level synapse pattern analysis for only basal dendrites'
+                cell_analyses.append(analysis)
+
+                analysis = collections.OrderedDict()
+                analysis['name'] = 'apical dendrite synapse pattern'
+                analysis['url'] = '/static/analysis/' + cellname + '/apical_pattern.png'
+                analysis['description'] = 'Dendrite-level synapse pattern analysis for only apical dendrites'
+                cell_analyses.append(analysis)
+
+            analysis = collections.OrderedDict()
+            analysis['name'] = 'sholl analysis with laminar correction'
+            analysis['url'] = '/static/analysis/' + cellname + '/layer_sholl_analysis.png'
+            analysis['description'] = 'With laminar correction, we removed the dendrite portions in alveus,' \
+                                      ' Stratum pyramidale,  and Stratum lacunosum moleculare. Only dendrite' \
+                                      ' portions in Stratum oriens and Stratum radiatum are analyzed.'
+            cell_analyses.append(analysis)
+
+            analysis = collections.OrderedDict()
+            analysis['name'] = 'dendrite-level synapse pattern with laminar correction'
+            analysis['url'] = '/static/analysis/' + cellname + '/layer_overall_synapse_pattern.png'
+            analysis['description'] = 'With laminar correction, we removed the dendrite portions in alveus,' \
+                                      ' Stratum pyramidale,  and Stratum lacunosum moleculare. Only dendrite' \
+                                      ' portions in Stratum oriens and Stratum radiatum are analyzed.'
+            cell_analyses.append(analysis)
+
+            cell['analyses'] = cell_analyses
+
+            cells.append(cell)
+
+    with open(os.path.join(out_folder, 'all.json'), 'w') as outfile:
+        json.dump(cells, outfile)
+
     mesh_folder = os.path.join(folder, 'meshes')
     allobjs_json_file = os.path.join(mesh_folder, 'allObjs.json')
 
@@ -85,10 +202,8 @@ def generate_analysis_figures(folder: str, out_folder: str):
     for obj in allobjs:
         cellname = obj['cellname']
         res_folder = os.path.join(out_folder, cellname)
-        if os.path.exists(res_folder):
-            continue
         if not os.path.exists(res_folder):
-            os.mkdir(res_folder)
+            continue
 
         pdf_folder = os.path.join(os.path.expanduser('~'), 'code', 'mgrasp-analysis', 'pv_figs_1.0')
 
@@ -150,9 +265,9 @@ def generate_analysis_figures(folder: str, out_folder: str):
 
 
 if __name__ == "__main__":
-    # generate_glance(os.path.join(os.path.expanduser('~'), 'Google Drive', 'eeum', 'raw'),
-    #                 os.path.join(os.path.expanduser('~'), 'Google Drive', 'eeum', 'static', 'data'))
-    # generate_thumbnails(os.path.join(os.path.expanduser('~'), 'Google Drive', 'eeum', 'raw'),
-    #                     os.path.join(os.path.expanduser('~'), 'Google Drive', 'eeum', 'static', 'data'))
-    generate_analysis_figures(os.path.join(os.path.expanduser('~'), 'Google Drive', 'eeum', 'raw'),
-                              os.path.join(os.path.expanduser('~'), 'Google Drive', 'eeum', 'static', 'analysis'))
+    # generate_glance(os.path.join(os.path.expanduser('~'), 'Google Drive', 'lab', 'eeum', 'raw'),
+    #                 os.path.join(os.path.expanduser('~'), 'Google Drive', 'lab', 'eeum', 'static', 'data'))
+    # generate_thumbnails(os.path.join(os.path.expanduser('~'), 'Google Drive', 'lab', 'eeum', 'raw'),
+    #                     os.path.join(os.path.expanduser('~'), 'Google Drive', 'lab', 'eeum', 'static', 'data'))
+    generate_analysis_figures(os.path.join(os.path.expanduser('~'), 'Google Drive', 'lab', 'eeum', 'raw'),
+                              os.path.join(os.path.expanduser('~'), 'Google Drive', 'lab', 'eeum', 'static', 'analysis'))
