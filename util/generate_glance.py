@@ -10,9 +10,10 @@ import tarfile
 import zipfile
 import stat
 import subprocess
-import cv2
 import csv
 import collections
+import numpy as np
+import cv2
 
 
 def generate_glance(folder: str, out_folder: str):
@@ -77,6 +78,20 @@ def convert_pdf_to_img(pdfs, imgs):
         subprocess.run(['gs', '-sDEVICE=png16m', '-r300', '-dTextAlphaBits=4', '-o', imgs[i] + '.png', pdfs[i]],
                        shell=False, check=True)
 
+        img = cv2.imread(imgs[i] + '.png')  # Read in the image and convert to grayscale
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        gray = 255 * (gray < 128).astype(np.uint8)  # To invert the text to white
+        coords = cv2.findNonZero(gray)  # Find all non-zero points (text)
+        x, y, w, h = cv2.boundingRect(coords)  # Find minimum spanning bounding box
+        rect = img[y:y + h, x:x + w]  # Crop the image - note we do this on the original image
+        top = int(0.05 * rect.shape[0])  # shape[0] = rows
+        bottom = top
+        left = int(0.05 * rect.shape[1])  # shape[1] = cols
+        right = left
+        value = [255, 255, 255]
+        rect1 = cv2.copyMakeBorder(rect, top, bottom, left, right, cv2.BORDER_CONSTANT, None, value)
+        cv2.imwrite(imgs[i] + '.png', rect1)  # Save the image
+
 
 def generate_analysis_figures(folder: str, out_folder: str):
     cells = []
@@ -86,8 +101,6 @@ def generate_analysis_figures(folder: str, out_folder: str):
             cellname = row['CellName']
             print(cellname)
             res_folder = os.path.join(out_folder, cellname)
-            if os.path.exists(res_folder):
-                continue
             if not os.path.exists(res_folder):
                 os.mkdir(res_folder)
 
@@ -136,7 +149,9 @@ def generate_analysis_figures(folder: str, out_folder: str):
             analysis['name'] = 'dendrogram'
             analysis['url'] = '/static/analysis/' + cellname + '/dendrogram.png'
             analysis['description'] = 'Dendrogram shows the hierarchical tree structure of the neuron and the ' \
-                                      'distribution of synapses on individual dendrite.'
+                                      'distribution of synapses on individual dendrite. Thin lines indicate dendrite\
+                                       portotions in alveus (alv), Stratum pyramidale (SP), or Stratum lacunosum ' \
+                                      'moleculare (SLM) where little or no axonal input was found.'
             cell_analyses.append(analysis)
 
             analysis = collections.OrderedDict()
@@ -174,17 +189,21 @@ def generate_analysis_figures(folder: str, out_folder: str):
             analysis = collections.OrderedDict()
             analysis['name'] = 'sholl analysis with laminar correction'
             analysis['url'] = '/static/analysis/' + cellname + '/layer_sholl_analysis.png'
-            analysis['description'] = 'With laminar correction, we removed the dendrite portions in alveus,' \
-                                      ' Stratum pyramidale,  and Stratum lacunosum moleculare. Only dendrite' \
-                                      ' portions in Stratum oriens and Stratum radiatum are analyzed.'
+            analysis['description'] = 'In this dataset, little or no axonal input was found in alveus (alv), ' \
+                                      'Stratum pyramidale (SP), and Stratum lacunosum moleculare (SLM). ' \
+                                      'To analyze dendrite-level synaptic connectivity more accurately, ' \
+                                      'we removed the dendrite portions in these regions. Only dendrite portions ' \
+                                      'in Stratum oriens (SO) and Stratum radiatum (SR) were analyzed.'
             cell_analyses.append(analysis)
 
             analysis = collections.OrderedDict()
             analysis['name'] = 'dendrite-level synapse pattern with laminar correction'
             analysis['url'] = '/static/analysis/' + cellname + '/layer_overall_synapse_pattern.png'
-            analysis['description'] = 'With laminar correction, we removed the dendrite portions in alveus,' \
-                                      ' Stratum pyramidale,  and Stratum lacunosum moleculare. Only dendrite' \
-                                      ' portions in Stratum oriens and Stratum radiatum are analyzed.'
+            analysis['description'] = 'In this dataset, little or no axonal input was found in alveus (alv), ' \
+                                      'Stratum pyramidale (SP), and Stratum lacunosum moleculare (SLM). ' \
+                                      'To analyze dendrite-level synaptic connectivity more accurately, ' \
+                                      'we removed the dendrite portions in these regions. Only dendrite portions ' \
+                                      'in Stratum oriens (SO) and Stratum radiatum (SR) were analyzed.'
             cell_analyses.append(analysis)
 
             cell['analyses'] = cell_analyses
@@ -205,7 +224,7 @@ def generate_analysis_figures(folder: str, out_folder: str):
         if not os.path.exists(res_folder):
             continue
 
-        pdf_folder = os.path.join(os.path.expanduser('~'), 'code', 'mgrasp-analysis', 'pv_figs_1.0')
+        pdf_folder = os.path.join(os.path.expanduser('~'), 'code', 'mgrasp-analysis', 'pv_figs_11')
 
         celltype = ''
         if cellname.startswith('PV'):
@@ -242,24 +261,24 @@ def generate_analysis_figures(folder: str, out_folder: str):
             pdfs.append(os.path.join(pdf_folder, 'all', celltype + '_' + cellname + '_apical_fig1.pdf'))
             imgs.append(os.path.join(res_folder, 'apical_pattern'))
 
-        if celltype == 'py':
-            celltype = 'pyr'
-        pdfs.append(os.path.join(pdf_folder, 'distden', celltype + '_' + cellname + '_distden.pdf'))
-        imgs.append(os.path.join(res_folder, 'distden'))
-
-        if celltype == 'pyr':
-            celltype = 'layer_Pyr'
-        if celltype == 'contra':
-            celltype = 'layer_contraPV'
-        if celltype == 'ipsi':
-            celltype = 'layer_ipsiPV'
-        pdfs.append(os.path.join(pdf_folder, 'IndividualCellBranchLevelPattern',
-                                 celltype + '_' + cellname + '_branch_level_pattern.pdf'))
-        imgs.append(os.path.join(res_folder, 'branch_level_pattern'))
-
-        pdfs.append(os.path.join(pdf_folder, 'IndividualCellBranchLevelPattern_length',
-                                 celltype + '_' + cellname + '_branch_level_pattern.pdf'))
-        imgs.append(os.path.join(res_folder, 'branch_level_pattern_length'))
+        # if celltype == 'py':
+        #     celltype = 'pyr'
+        # pdfs.append(os.path.join(pdf_folder, 'distden', celltype + '_' + cellname + '_distden.pdf'))
+        # imgs.append(os.path.join(res_folder, 'distden'))
+        #
+        # if celltype == 'pyr':
+        #     celltype = 'layer_Pyr'
+        # if celltype == 'contra':
+        #     celltype = 'layer_contraPV'
+        # if celltype == 'ipsi':
+        #     celltype = 'layer_ipsiPV'
+        # pdfs.append(os.path.join(pdf_folder, 'IndividualCellBranchLevelPattern',
+        #                          celltype + '_' + cellname + '_branch_level_pattern.pdf'))
+        # imgs.append(os.path.join(res_folder, 'branch_level_pattern'))
+        #
+        # pdfs.append(os.path.join(pdf_folder, 'IndividualCellBranchLevelPattern_length',
+        #                          celltype + '_' + cellname + '_branch_level_pattern.pdf'))
+        # imgs.append(os.path.join(res_folder, 'branch_level_pattern_length'))
 
         convert_pdf_to_img(pdfs, imgs)
 
