@@ -81,6 +81,8 @@ private:
 
   void opacityChanged();
 
+  void mipRangeChanged();
+
   void visibleChanged();
 
   ZImgPackDisplay* getDisplay() const;
@@ -116,6 +118,7 @@ private:
   std::vector<std::unique_ptr<ZDoubleSpanParameter>> m_doubleChannelRangeParas;
   std::vector<std::unique_ptr<ZVec3Parameter>> m_channelColorParas;
   ZDoubleParameter m_opacity;
+  std::unique_ptr<ZIntSpanParameter> m_mipRange;
 
   std::unique_ptr<ZImgPackDisplay> m_display;
   mutable std::unique_ptr<ZImgPackDisplay> m_maxZProjDisplay;

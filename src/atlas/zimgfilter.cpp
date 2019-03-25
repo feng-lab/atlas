@@ -170,6 +170,17 @@ void ZImgFilter::setData(ZImgPack& pack)
     }
   }
 
+  if (m_mipRange) {
+    m_mipRange->disconnect();
+    removeParameter(m_mipRange.get());
+  }
+  m_mipRange = std::make_unique<ZIntSpanParameter>("Maximum Z Projection Range",
+                                                   glm::ivec2(0, m_imgPack->imgInfo().depth - 1),
+                                                   0,
+                                                   m_imgPack->imgInfo().depth - 1);
+  connect(m_mipRange.get(), &ZIntSpanParameter::valueChanged, this, &ZImgFilter::mipRangeChanged);
+  addParameter(m_mipRange.get());
+
   m_display.reset(new ZImgPackDisplay(*m_imgPack, false));
   if (m_view.isMaxZProjView() && m_imgPack->imgInfo().depth > 1) {
     m_maxZProjDisplay.reset(new ZImgPackDisplay(*m_imgPack, true));
@@ -295,6 +306,7 @@ std::shared_ptr<ZWidgetsGroup> ZImgFilter::viewSettingWidgetsGroup()
     m_widgetsGroup->addChild(m_transform, 1);
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
+    m_widgetsGroup->addChild(*m_mipRange, 1);
     m_widgetsGroup->setBasicAdvancedCutoff(5);
   }
   return m_widgetsGroup;
@@ -361,6 +373,7 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
     m_widgetsGroup->addChild(m_transform, 1);
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
+    m_widgetsGroup->addChild(*m_mipRange, 1);
     m_widgetsGroup->setBasicAdvancedCutoff(5);
 
     m_widgetsGroup->emitWidgetsGroupChangedSignal();
@@ -466,6 +479,11 @@ void ZImgFilter::opacityChanged()
 //  } else {
 //    updateImgItems();
 //  }
+}
+
+void ZImgFilter::mipRangeChanged()
+{
+
 }
 
 void ZImgFilter::visibleChanged()

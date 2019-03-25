@@ -75,8 +75,13 @@ def convert_pdf_to_img(pdfs, imgs):
         if not os.path.exists(pdfs[i]):
             print('file', pdfs[i], 'does not exist')
             continue
-        subprocess.run(['gs', '-sDEVICE=png16m', '-r300', '-dTextAlphaBits=4', '-o', imgs[i] + '.png', pdfs[i]],
-                       shell=False, check=True)
+        print(imgs[i])
+        if 'pattern' in imgs[i]:
+            subprocess.run(['gs', '-sDEVICE=png16m', '-r300', '-dTextAlphaBits=4', '-o', imgs[i] + '.png', pdfs[i]],
+                           shell=False, check=True)
+        else:
+            subprocess.run(['gs', '-sDEVICE=png16m', '-r300', '-dTextAlphaBits=4', '-o', imgs[i] + '.png', pdfs[i]],
+                           shell=False, check=True)
 
         img = cv2.imread(imgs[i] + '.png')  # Read in the image and convert to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
