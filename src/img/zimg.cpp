@@ -1140,14 +1140,23 @@ ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, const Z
   return combine(imgs, mode);
 }
 
-ZImg ZImg::projectAlongDim(Dimension dim, CombineMode mode) const
+ZImg ZImg::projectAlongDim(Dimension dim, CombineMode mode, int startIn, int endIn) const
 {
   if (isEmpty() || m_info.size(dim) == 1)
     return *this;
 
+  size_t dstart = 0;
+  size_t dend = m_info.size(dim);
+  if (startIn >= 0 && endIn >= 0) {
+    CHECK(startIn <= endIn);
+    CHECK(size_t(endIn) < m_info.size(dim));
+    dstart = startIn;
+    dend = endIn + 1;
+  }
+
   ZImg res;
   if (mode == CombineMode::Max) {
-    for (size_t i = 0; i < m_info.size(dim); ++i) {
+    for (size_t i = dstart; i < dend; ++i) {
       ZImg subImg;
       switch (dim) {
         case Dimension::T:
@@ -1168,14 +1177,14 @@ ZImg ZImg::projectAlongDim(Dimension dim, CombineMode mode) const
         default:
           break;
       }
-      if (i == 0) {
+      if (i == dstart) {
         res.swap(subImg);
       } else {
         res.binaryOperation(subImg, MaxOp());
       }
     }
   } else if (mode == CombineMode::Min) {
-    for (size_t i = 0; i < m_info.size(dim); ++i) {
+    for (size_t i = dstart; i < dend; ++i) {
       ZImg subImg;
       switch (dim) {
         case Dimension::T:
@@ -1196,30 +1205,30 @@ ZImg ZImg::projectAlongDim(Dimension dim, CombineMode mode) const
         default:
           break;
       }
-      if (i == 0) {
+      if (i == dstart) {
         res.swap(subImg);
       } else {
         res.binaryOperation(subImg, MinOp());
       }
     }
   } else {
-    std::vector<ZImg> subImgs(m_info.size(dim));
-    for (size_t i = 0; i < subImgs.size(); ++i) {
+    std::vector<ZImg> subImgs(dend - dstart);
+    for (size_t i = dstart; i < dend; ++i) {
       switch (dim) {
         case Dimension::T:
-          subImgs[i] = extractTime(i);
+          subImgs[i-dstart] = extractTime(i);
           break;
         case Dimension::C:
-          subImgs[i] = extractChannel(i, -1);
+          subImgs[i-dstart] = extractChannel(i, -1);
           break;
         case Dimension::Z:
-          subImgs[i] = extractPlane(i, -1, -1);
+          subImgs[i-dstart] = extractPlane(i, -1, -1);
           break;
         case Dimension::Y:
-          subImgs[i] = extractRow(i, -1, -1, -1);
+          subImgs[i-dstart] = extractRow(i, -1, -1, -1);
           break;
         case Dimension::X:
-          subImgs[i] = extractCol(i, -1, -1, -1);
+          subImgs[i-dstart] = extractCol(i, -1, -1, -1);
           break;
         default:
           break;
@@ -1234,9 +1243,9 @@ ZImg ZImg::projectAlongDim(Dimension dim, CombineMode mode) const
   return res;
 }
 
-ZImg ZImg::maximumZProjection() const
+ZImg ZImg::maximumZProjection(int start, int end) const
 {
-  return projectAlongDim(Dimension::Z, CombineMode::Max);
+  return projectAlongDim(Dimension::Z, CombineMode::Max, start, end);
 }
 
 ZImg ZImg::normalized() const

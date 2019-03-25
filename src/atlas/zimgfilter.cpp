@@ -95,7 +95,6 @@ ZImgFilter::ZImgFilter(ZView& view)
   , m_isVisible(false)
   , m_opacity(QString("Opacity"), 1.0, 0.0, 1.0)
   , m_displayValid(false)
-  , m_lastDisplay(nullptr)
   , m_lastSlice(-1)
   , m_lastTime(-1)
   , m_lastScale(0)
@@ -119,7 +118,6 @@ void ZImgFilter::setData(ZImgPack& pack)
   m_imgPack = &pack;
   destroyImgItems();
   m_display.reset();
-  m_maxZProjDisplay.reset();
 
   for (size_t i = 0; i < m_channelVisibleParas.size(); ++i) {
     m_channelColorParas[i]->disconnect();
@@ -181,17 +179,14 @@ void ZImgFilter::setData(ZImgPack& pack)
   connect(m_mipRange.get(), &ZIntSpanParameter::valueChanged, this, &ZImgFilter::mipRangeChanged);
   addParameter(m_mipRange.get());
 
-  m_display.reset(new ZImgPackDisplay(*m_imgPack, false));
+  m_display.reset(new ZImgPackDisplay(*m_imgPack));
   if (m_view.isMaxZProjView() && m_imgPack->imgInfo().depth > 1) {
-    m_maxZProjDisplay.reset(new ZImgPackDisplay(*m_imgPack, true));
+    m_display->setMIP(true);
+    m_display->setMIPZRange(m_mipRange->get().x, m_mipRange->get().y);
   }
   for (size_t c = 0; c < m_imgPack->imgInfo().numChannels; ++c) {
     m_display->showChannel(c, getLowerChannelRange(c), getUpperChannelRange(c));
     //m_display->setAlpha(m_opacity.get());
-    if (m_maxZProjDisplay) {
-      m_maxZProjDisplay->showChannel(c, getLowerChannelRange(c), getUpperChannelRange(c));
-      //m_maxZProjDisplay->setAlpha(m_opacity.get());
-    }
 
     addParameter(m_channelVisibleParas[c].get());
     addParameter(m_channelColorParas[c].get());
@@ -227,8 +222,9 @@ void ZImgFilter::setNormalView(int z, int t)
                  logicalZ >= 0 && logicalZ < int(m_imgPack->imgInfo().depth);
   m_isVisible = m_hasVisibleChannel && m_visible.get() && m_sliceValid;
 
-  getDisplay()->setSlice(logicalZ);
-  getDisplay()->setTime(logicalT);
+  m_display->setSlice(logicalZ);
+  m_display->setTime(logicalT);
+  m_display->setMIP(false);
   if (m_isVisible) {
     updateImgItems();
   } else if (isVisibleBefore) {
@@ -243,8 +239,10 @@ void ZImgFilter::setMaxZProjView(int t)
   m_sliceValid = logicalT >= 0 && logicalT < int(m_imgPack->imgInfo().numTimes);
   m_isVisible = m_hasVisibleChannel && m_visible.get() && m_sliceValid;
 
-  getDisplay()->setSlice(0);
-  getDisplay()->setTime(logicalT);
+  m_display->setSlice(0);
+  m_display->setTime(logicalT);
+  m_display->setMIP(true);
+  m_display->setMIPZRange(m_mipRange->get().x, m_mipRange->get().y);
   if (m_isVisible) {
     updateImgItems();
   } else if (isVisibleBefore) {
@@ -397,12 +395,8 @@ void ZImgFilter::channelVisibleChanged()
     }
     if (m_channelVisibleParas[c]->get()) {
       m_display->showChannel(c, getLowerChannelRange(c), getUpperChannelRange(c));
-      if (m_maxZProjDisplay)
-        m_maxZProjDisplay->showChannel(c, getLowerChannelRange(c), getUpperChannelRange(c));
     } else {
       m_display->hideChannel(c);
-      if (m_maxZProjDisplay)
-        m_maxZProjDisplay->hideChannel(c);
     }
     m_displayValid = false;
   } else {
@@ -426,8 +420,6 @@ void ZImgFilter::channelRangeChanged()
     }
     if (m_channelVisibleParas[c]->get()) {  // only redraw if this channel is visible
       m_display->showChannel(c, getLowerChannelRange(c), getUpperChannelRange(c));
-      if (m_maxZProjDisplay)
-        m_maxZProjDisplay->showChannel(c, getLowerChannelRange(c), getUpperChannelRange(c));
       m_displayValid = false;
     }
   }
@@ -483,7 +475,15 @@ void ZImgFilter::opacityChanged()
 
 void ZImgFilter::mipRangeChanged()
 {
-
+  m_display->setMIPZRange(m_mipRange->get().x, m_mipRange->get().y);
+  if (m_display->mip()) {
+    m_displayValid = false;
+    if (!m_isVisible) {
+      destroyImgItems(); // will create new one next time
+    } else {
+      updateImgItems();
+    }
+  }
 }
 
 void ZImgFilter::visibleChanged()
@@ -494,26 +494,6 @@ void ZImgFilter::visibleChanged()
     updateImgItems();
   } else if (!m_isVisible && isVisibleBefore) {
     hideImgItems();
-  }
-}
-
-ZImgPackDisplay* ZImgFilter::getDisplay() const
-{
-  if (m_view.isMaxZProjView() && m_imgPack->imgInfo().depth > 1) {
-    if (!m_maxZProjDisplay) {
-      m_maxZProjDisplay.reset(new ZImgPackDisplay(*m_imgPack, true));
-      m_maxZProjDisplay->hideAllChannels();
-      for (size_t c = 0; c < m_channelVisibleParas.size(); ++c) {
-        if (m_channelVisibleParas[c]->get()) {
-          m_maxZProjDisplay->showChannel(c, getLowerChannelRange(c), getUpperChannelRange(c));
-        }
-      }
-      m_maxZProjDisplay->setSlice(0);
-      m_maxZProjDisplay->setTime(realT());
-    }
-    return m_maxZProjDisplay.get();
-  } else {
-    return m_display.get();
   }
 }
 
@@ -537,10 +517,9 @@ void ZImgFilter::updateImgItems()
 {
   CHECK(m_isVisible);
 
-  ZImgPackDisplay* curDisplay = getDisplay();
   //LOG(INFO) << curDisplay->slice() << " " << m_lastSlice << " " << m_view.currentSlice();
   if (!m_imgItems.empty() && m_displayValid &&
-      curDisplay == m_lastDisplay && m_lastSlice == m_view.currentSlice() && m_lastTime == m_view.currentTime()) {
+      m_lastMIP == m_view.isMaxZProjView() && m_lastSlice == m_view.currentSlice() && m_lastTime == m_view.currentTime()) {
     //LOG(INFO) << "0";
     // pixmap is same, we only need to show it
     if (m_item && !m_item->isVisible()) {
@@ -549,13 +528,13 @@ void ZImgFilter::updateImgItems()
   } else {
     destroyImgItems();
 
-    curDisplay->setScale(m_view.currentScale());
+    m_display->setScale(m_view.currentScale());
     QRectF vp = m_view.currentViewport();
-    curDisplay->setViewport(mapFromSceneRect(vp));
+    m_display->setViewport(mapFromSceneRect(vp));
 
     m_item = std::make_unique<ZGraphicsItemGroup>();
     m_view.scene().addItem(m_item.get());
-    const ZQImagePack& qImagePack = curDisplay->toQImagePack();
+    const ZQImagePack& qImagePack = m_display->toQImagePack();
     for (size_t i = 0; i < qImagePack.numImages(); ++i) {
       m_imgItems.push_back(new QGraphicsPixmapItem(QPixmap::fromImage(qImagePack.image(i))));
       //m_imgItems[i]->setFlag(QGraphicsItem::ItemIsSelectable, true);
@@ -568,11 +547,11 @@ void ZImgFilter::updateImgItems()
     m_item->setZValue(m_viewPrecedencePara.get());
     m_item->setTransform(getQTransform());
 
-    m_lastDisplay = curDisplay;
-    m_lastSlice = m_lastDisplay->slice();
-    m_lastTime = m_lastDisplay->time();
-    m_lastScale = m_lastDisplay->scale();
-    m_lastViewport = m_lastDisplay->viewport();
+    m_lastMIP = m_display->mip();
+    m_lastSlice = m_display->slice();
+    m_lastTime = m_display->time();
+    m_lastScale = m_display->scale();
+    m_lastViewport = m_display->viewport();
   }
   m_displayValid = true;
 }

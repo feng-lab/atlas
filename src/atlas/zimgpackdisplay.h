@@ -11,7 +11,7 @@ namespace nim {
 class ZImgPackDisplay
 {
 public:
-  ZImgPackDisplay(const ZImgPack& imgPack, bool mip);
+  explicit ZImgPackDisplay(const ZImgPack& imgPack);
 
   // default, hide all channels
   // default go to first slice and set alpha and scale to 1
@@ -32,6 +32,9 @@ public:
   double alpha() const
   { return m_alpha; }
 
+  bool mip() const
+  { return m_mip; }
+
   inline void setSlice(size_t z)
   { m_z = std::min(z, m_imgPack.imgInfo().depth - 1); }
 
@@ -46,6 +49,21 @@ public:
 
   inline void setAlpha(double a)
   { m_alpha = std::min(1.0, std::max(0.0, a)); }
+
+  inline void setMIP(bool v)
+  {
+    if (m_imgPack.imgInfo().depth > 1)
+      m_mip = v;
+  }
+
+  inline void setMIPZRange(size_t s, size_t e)
+  {
+    if (m_imgPack.imgInfo().depth > 1) {
+      CHECK(s <= e && e < m_imgPack.imgInfo().depth);
+      m_mipZStart = s;
+      m_mipZEnd = e;
+    }
+  }
 
   // show channel ch and map minData to 0, map maxData to 255
   void showChannel(size_t ch, double minData, double maxData);   // todo: long double??
@@ -97,7 +115,9 @@ private:
   std::map<size_t, std::pair<double, double>> m_channels;
   mutable double m_alpha;
 
-  bool m_mip;
+  bool m_mip = false;
+  size_t m_mipZStart = 0;
+  size_t m_mipZEnd = 0;
 };
 
 } // namespace nim

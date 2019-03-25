@@ -629,9 +629,9 @@ public:
   static ZImg combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, const ZImg& img4, CombineMode mode);
 
   // projection
-  ZImg projectAlongDim(Dimension dim, CombineMode mode) const;
+  ZImg projectAlongDim(Dimension dim, CombineMode mode, int start = -1, int end = -1) const;
 
-  ZImg maximumZProjection() const;
+  ZImg maximumZProjection(int start = -1, int end = -1) const;
 
   // map [minData maxData] to [dataRangeMin, dataRangeMax]
   // for float img, dataRangeMin is 0.0, dataRangeMax is 1.0

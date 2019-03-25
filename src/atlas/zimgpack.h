@@ -144,8 +144,16 @@ public:
                            size_t z,
                            size_t t,
                            const QRectF& viewport,
-                           double scale,
-                           bool mip) const;
+                           double scale) const;
+
+  void retrieveCoveredMIPImgs(std::vector<std::shared_ptr<ZImg>>& imgs,
+                              std::vector<QPoint>& locs,
+                              std::vector<double>& scales,
+                              size_t zStart,
+                              size_t zEnd,
+                              size_t t,
+                              const QRectF& viewport,
+                              double scale) const;
 
   double value(size_t x, size_t y, size_t z, size_t c = 0, size_t t = 0, bool mip = false) const;
 
@@ -169,9 +177,7 @@ public:
     return m_img;
   }
 
-  const ZImg& maxZProjectedImg() const;
-
-  ZImg& maxZProjectedImg();
+  const ZImg& maxZProjectedImg(size_t zStart, size_t zEnd) const;
 
   // ZImgSliceProvider interface
 public:
@@ -188,7 +194,7 @@ public:
 
 protected:
   // will take ownership of img
-  void createSliceTiles(ZImg* img, size_t z, size_t t, bool mip = false);
+  void createSliceTiles(ZImg* img, size_t z, size_t t);
 
   void buildPyramidal(ZImg& img);
 
@@ -250,6 +256,10 @@ private:
   bool m_diskCached;
   ZImg m_img;
   mutable ZImg m_maximumProjectedAlongZImg;
+  mutable size_t m_mipZStart;
+  mutable size_t m_mipZEnd;
+
+  mutable std::vector<std::shared_ptr<ZImg>> m_mipImgs;
 };
 
 }  // namespace nim

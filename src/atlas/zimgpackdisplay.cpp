@@ -9,8 +9,8 @@
 
 namespace nim {
 
-ZImgPackDisplay::ZImgPackDisplay(const ZImgPack& imgPack, bool mip)
-  : m_imgPack(imgPack), m_mip(mip)
+ZImgPackDisplay::ZImgPackDisplay(const ZImgPack& imgPack)
+  : m_imgPack(imgPack)
 {
   reset();
 }
@@ -21,6 +21,10 @@ void ZImgPackDisplay::reset()
   m_t = 0;
   m_scale = 1.0;
   m_alpha = 1.0;
+
+  m_mip = false;
+  m_mipZStart = 0;
+  m_mipZEnd = m_imgPack.imgInfo().depth - 1;
 
   hideAllChannels();
 }
@@ -77,7 +81,7 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
   CHECK(!m_viewport.isNull() && m_scale > 0);
 
   if (!m_imgPack.isDiskCached()) {
-    ZImgDisplay display(m_mip ? m_imgPack.maxZProjectedImg() : m_imgPack.img());
+    ZImgDisplay display(m_mip ? m_imgPack.maxZProjectedImg(m_mipZStart, m_mipZEnd) : m_imgPack.img());
     display.setSlice(m_z);
     display.setTime(m_t);
     display.setAlpha(m_alpha);
@@ -96,7 +100,11 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
     std::vector<QPoint> locs;
     std::vector<double> scales;
 
-    m_imgPack.retrieveCoveredImgs(imgs, locs, scales, m_z, m_t, m_viewport, m_scale, m_mip);
+    if (m_mip) {
+      m_imgPack.retrieveCoveredMIPImgs(imgs, locs, scales, m_mipZStart, m_mipZEnd, m_t, m_viewport, m_scale);
+    } else {
+      m_imgPack.retrieveCoveredImgs(imgs, locs, scales, m_z, m_t, m_viewport, m_scale);
+    }
 
     for (size_t i = 0; i < imgs.size(); ++i) {
       if (imgs[i]->width() <= tileWidth && imgs[i]->height() <= tileHeight) {

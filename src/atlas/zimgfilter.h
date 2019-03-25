@@ -85,8 +85,6 @@ private:
 
   void visibleChanged();
 
-  ZImgPackDisplay* getDisplay() const;
-
   void hideImgItems();
 
   void destroyImgItems();
@@ -121,10 +119,9 @@ private:
   std::unique_ptr<ZIntSpanParameter> m_mipRange;
 
   std::unique_ptr<ZImgPackDisplay> m_display;
-  mutable std::unique_ptr<ZImgPackDisplay> m_maxZProjDisplay;
   bool m_displayValid;
 
-  ZImgPackDisplay* m_lastDisplay;
+  bool m_lastMIP;
   int m_lastSlice;
   int m_lastTime;
   double m_lastScale;
