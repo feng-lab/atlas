@@ -2,8 +2,8 @@
 <Package>
     <DisplayName>Atlas</DisplayName>
     <Description>Install Atlas.</Description>
-    <Version>2019.03.11</Version>
-    <ReleaseDate>2019-03-11</ReleaseDate>
+    <Version>2019.03.26</Version>
+    <ReleaseDate>2019-03-26</ReleaseDate>
     <Name>fenglab.atlas</Name>
     <Licenses>
         <License file="license.txt" name="License Agreement" />
