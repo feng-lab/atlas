@@ -25,14 +25,45 @@ enum class DataType : std::uint16_t
   IFD8 = 18  // BigTIFF 64-bit unsigned integer (offset)
 };
 
-template<>
-struct EnumStrings<DataType>
+inline QString enumToString(DataType dt)
 {
-  static constexpr const char* const data[] = {
-    "0", "Byte", "Ascii", "Short", "Long", "Rational", "SByte", "Undefined", "SShort", "SLong",
-    "SRational", "Float", "Double", "IFD", "14", "15", "Long8", "SLong8", "IFD8"
-  };
-};
+  switch (dt) {
+    case DataType::Byte:
+      return "Byte";
+    case DataType::Ascii:
+      return "Ascii";
+    case DataType::Short:
+      return "Short";
+    case DataType::Long:
+      return "Long";
+    case DataType::Rational:
+      return "Rational";
+    case DataType::SByte:
+      return "SByte";
+    case DataType::Undefined:
+      return "Undefined";
+    case DataType::SShort:
+      return "SShort";
+    case DataType::SLong:
+      return "SLong";
+    case DataType::SRational:
+      return "SRational";
+    case DataType::Float:
+      return "Float";
+    case DataType::Double:
+      return "Double";
+    case DataType::IFD:
+      return "IFD";
+    case DataType::Long8:
+      return "Long8";
+    case DataType::SLong8:
+      return "SLong8";
+    case DataType::IFD8:
+      return "IFD8";
+    default:
+      throw ZIOException("invalid DataType");
+  }
+}
 
 inline bool isValidDataType(uint32_t dataType)
 {
@@ -50,15 +81,20 @@ enum class VoxelFormat : std::uint16_t
   Float = 3   // IEEE floating point data [IEEE]
 };
 
-template<>
-struct EnumStrings<VoxelFormat>
+inline QString enumToString(VoxelFormat vf)
 {
-  static constexpr const char* const data[] = {
-    "0", "Unsigned", "Signed", "Float"
-  };
-};
+  switch (vf) {
+    case VoxelFormat::Unsigned:
+      return "Unsigned";
+    case VoxelFormat::Signed:
+      return "Signed";
+    case VoxelFormat::Float:
+      return "Float";
+    default:
+      throw ZIOException("invalid VoxelFormat");
+  }
+}
 
-//
 enum class VoxelSizeUnit
 {
   none = 0,  // No unit
@@ -72,13 +108,31 @@ enum class VoxelSizeUnit
   km = 8   // Kilo Meters 1e3 m
 };
 
-template<>
-struct EnumStrings<VoxelSizeUnit>
+inline QString enumToString(VoxelSizeUnit vsu)
 {
-  static constexpr const char* const data[] = {
-    "none", "inch", "cm", "mm", "um", "nm", "m", "hm", "km"
-  };
-};
+  switch (vsu) {
+    case VoxelSizeUnit::none:
+      return "none";
+    case VoxelSizeUnit::inch:
+      return "inch";
+    case VoxelSizeUnit::cm:
+      return "cm";
+    case VoxelSizeUnit::mm:
+      return "mm";
+    case VoxelSizeUnit::um:
+      return "um";
+    case VoxelSizeUnit::nm:
+      return "nm";
+    case VoxelSizeUnit::m:
+      return "m";
+    case VoxelSizeUnit::hm:
+      return "hm";
+    case VoxelSizeUnit::km:
+      return "km";
+    default:
+      throw ZIOException("invalid VoxelSizeUnit");
+  }
+}
 
 double unitSizeInMeter(VoxelSizeUnit vsu);
 
@@ -247,13 +301,23 @@ enum class Dimension
   T = 4
 };
 
-template<>
-struct EnumStrings<Dimension>
+inline QString enumToString(Dimension d)
 {
-  static constexpr const char* const data[] = {
-    "X", "Y", "Z", "C", "T"
-  };
-};
+  switch (d) {
+    case Dimension::X:
+      return "X";
+    case Dimension::Y:
+      return "Y";
+    case Dimension::Z:
+      return "Z";
+    case Dimension::C:
+      return "C";
+    case Dimension::T:
+      return "T";
+    default:
+      throw ZIOException("invalid Dimension");
+  }
+}
 
 } // namespace nim
 

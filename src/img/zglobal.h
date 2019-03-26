@@ -26,28 +26,6 @@ constexpr typename std::underlying_type<TEnum>::type enumToUnderlyingType(TEnum 
   return static_cast<typename std::underlying_type<TEnum>::type>(e);
 }
 
-// define string of enum as:
-// template<>
-// struct EnumStrings<TEnum>
-// {
-//   static constexpr const char* const data[] = {
-//     "a", "b", "c", ...
-//   };
-// };
-// to enable enumToString for TEnum
-template<typename TEnum>
-struct EnumStrings
-{
-  // static constexpr const char* const data[];
-};
-
-// crash if enum e is not valid
-template<typename TEnum>
-constexpr const char* enumToString(TEnum e) noexcept
-{
-  return EnumStrings<TEnum>::data[static_cast<typename std::underlying_type<TEnum>::type>(e)];
-}
-
 // https://chromium.googlesource.com/chromium/src/+/master/base/bit_cast.h
 template<class Dest, class Source>
 __forceinline Dest bit_cast(const Source& source)
