@@ -5,6 +5,7 @@
 #include "zimginfo.h"
 #include "zimgregion.h"
 #include "zimgmerge.h"
+#include "zstringutils.h"
 #include <QList>
 #include <QImage>
 
@@ -26,7 +27,10 @@ public:
   ZStitchImage();
 
   void setInputFilenames(const QStringList& fns)
-  { m_inputStack1Filenames = fns; }
+  {
+    m_inputStack1Filenames = fns;
+    std::sort(m_inputStack1Filenames.begin(), m_inputStack1Filenames.end(), naturalSortLessThan);
+  }
 
   // if set, result will be saved to these files
   void setResultFilename(const QString& fn)
@@ -68,7 +72,7 @@ private:
   QImage m_tileImage;
   std::vector<std::vector<int>> m_tileMatrix;
   QList<ZTile> m_tileList;
-  int m_nSel;
+  // int m_nSel;
 };
 
 } // namespace nim

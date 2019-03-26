@@ -168,7 +168,7 @@ void ZStitchImage::doWork()
     inputStackSources.emplace_back(m_inputStack1Filenames[i]);
   }
 
-  CHECK(nstack == m_tileList.size());
+  CHECK(int(nstack) == m_tileList.size());
 
   LOG(INFO) << QString("Stitching %1 images ...").arg(nstack);
 
@@ -324,6 +324,7 @@ void ZStitchImage::doWork()
     imgMerge.setMergeMode(m_mergeMode);
     QStringList summary = imgMerge.resolveLocations();
 
+#if 0
     QString stitchInfoOutputName = m_resFileName;
     stitchInfoOutputName.append("_info.txt");
     QFile fOut(stitchInfoOutputName);
@@ -333,6 +334,7 @@ void ZStitchImage::doWork()
         s << mes << '\n';
     }
     fOut.close();
+#endif
     if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
         m_mergeMode == ZImgMerge::Mode::Max) {
       ZImgIO().writeImg(m_resFileName, imgMerge);

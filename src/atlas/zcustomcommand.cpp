@@ -1602,7 +1602,6 @@ void stitchAndDetectPuncta()
     for (auto fi : list) {
       inputFiles.push_back(fi.absoluteFilePath());
     }
-    std::sort(inputFiles.begin(), inputFiles.end(), naturalSortLessThan);
 
     QString outputName = inputFiles[0];
     outputName.truncate(outputName.lastIndexOf("_L"));
@@ -1627,6 +1626,8 @@ void stitchAndDetectPuncta()
     chs.push_back(0_usize);
     stitch.setUseChannels(chs);
     stitch.setMaxOverlapRate(0.15);
+    QString lfn = QString("%1_stitching_log.txt").arg(outputName);
+    stitch.setLogFile(lfn);
 
     stitch.run();
   }
