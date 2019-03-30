@@ -28,7 +28,7 @@ std::string getFormatDesc(const ZImg& img)
     case 8:
       return py::format_descriptor<uint64_t>::format();
     default:
-      throw std::runtime_error("Incorrect Img Info");
+      throw ZImgException("Incorrect Img Info");
     }
   } else if (img.voxelFormat() == VoxelFormat::Float) {
     switch (img.bytesPerVoxel()) {
@@ -37,7 +37,7 @@ std::string getFormatDesc(const ZImg& img)
     case 8:
       return py::format_descriptor<double>::format();
     default:
-      throw std::runtime_error("Incorrect Img Info");
+      throw ZImgException("Incorrect Img Info");
     }
   } else {
     switch (img.bytesPerVoxel()) {
@@ -50,7 +50,7 @@ std::string getFormatDesc(const ZImg& img)
     case 8:
       return py::format_descriptor<int64_t>::format();
     default:
-      throw std::runtime_error("Incorrect Img Info");
+      throw ZImgException("Incorrect Img Info");
     }
   }
 }
@@ -58,10 +58,10 @@ std::string getFormatDesc(const ZImg& img)
 ZImgInfo getImgInfoFromNdarray(const py::array& arr, const ZImgInfo& info_in)
 {
   if (arr.ndim() != 4) {
-    throw std::runtime_error("Only support 4d array: channel x depth x height x width");
+    throw ZImgException("Only support 4d array: channel x depth x height x width");
   }
   if (arr.size() <= 0) {
-    throw std::runtime_error("Empty ndarray");
+    throw ZImgException("Empty ndarray");
   }
   ZImgInfo res = info_in;
   res.numTimes = 1;
@@ -72,16 +72,16 @@ ZImgInfo getImgInfoFromNdarray(const py::array& arr, const ZImgInfo& info_in)
   res.bytesPerVoxel = arr.itemsize();
 
   if (res.numChannels > 1 && static_cast<py::ssize_t>(res.channelByteNumber()) != arr.strides(0)) {
-    throw std::runtime_error("ndarray is not C_CONTIGUOUS");
+    throw ZImgException("ndarray is not C_CONTIGUOUS");
   }
   if (res.depth > 1 && static_cast<py::ssize_t>(res.planeByteNumber()) != arr.strides(1)) {
-    throw std::runtime_error("ndarray is not C_CONTIGUOUS");
+    throw ZImgException("ndarray is not C_CONTIGUOUS");
   }
   if (res.height > 1 && static_cast<py::ssize_t>(res.rowByteNumber()) != arr.strides(2)) {
-    throw std::runtime_error("ndarray is not C_CONTIGUOUS");
+    throw ZImgException("ndarray is not C_CONTIGUOUS");
   }
   if (res.width > 1 && static_cast<py::ssize_t>(res.voxelByteNumber()) != arr.strides(3)) {
-    throw std::runtime_error("ndarray is not C_CONTIGUOUS");
+    throw ZImgException("ndarray is not C_CONTIGUOUS");
   }
 
   switch (arr.dtype().kind()) {
@@ -95,7 +95,7 @@ ZImgInfo getImgInfoFromNdarray(const py::array& arr, const ZImgInfo& info_in)
       res.voxelFormat = VoxelFormat::Float;
       break;
     default:
-      throw std::runtime_error("ndarray dtype is not supported");
+      throw ZImgException("ndarray dtype is not supported");
   }
   res.createDefaultDescriptions();
 
@@ -173,7 +173,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def_readwrite("a", &col4::a)
     .def("__init__", [](col4 &self, py::tuple t) {
       if (py::len(t) != 4)
-        throw std::runtime_error("col4 needs tuple with 4 values");
+        throw ZImgException("col4 needs tuple with 4 values");
       new(&self) col4(t[0].cast<uint8_t>(), t[1].cast<uint8_t>(), t[2].cast<uint8_t>(), t[3].cast<uint8_t>());
     })
     .def("__repr__", [](const col4& v) {
@@ -245,7 +245,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def_readwrite("t", &ZVoxelCoordinate::t)
     .def("__init__", [](ZVoxelCoordinate &self, py::tuple t) {
       if (py::len(t) != 5)
-        throw std::runtime_error("ZVoxelCoordinate needs tuple with 5 values");
+        throw ZImgException("ZVoxelCoordinate needs tuple with 5 values");
       new(&self) ZVoxelCoordinate(t[0].cast<ZVoxelCoordinate::value_type>(), t[1].cast<ZVoxelCoordinate::value_type>(),
         t[2].cast<ZVoxelCoordinate::value_type>(), t[3].cast<ZVoxelCoordinate::value_type>(),
         t[4].cast<ZVoxelCoordinate::value_type>());
@@ -310,7 +310,7 @@ PYBIND11_MODULE(_imgpy, m)
           for (size_t t = 1; t < arrs.size(); ++t) {
             auto tmpinfo = getImgInfoFromNdarray(arrs[t], info_in);
             if (!tmpinfo.isSameType(info) || !tmpinfo.isSameSize(info)) {
-              throw std::runtime_error("ndarrays in the list are not compatible");
+              throw ZImgException("ndarrays in the list are not compatible");
             }
             data.push_back(const_cast<void*>(arrs[t].data()));
           }

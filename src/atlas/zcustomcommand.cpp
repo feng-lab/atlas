@@ -1571,17 +1571,52 @@ void exportSceneForGlance()
 
 void stitchAndDetectPuncta()
 {
-  QDir dir("/Volumes/shared/Imaging/JK699M5/Confocal");
+  QDir dir("/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK574-1_RNAscope_PV-Gria1-Gabra1");
   QStringList filters;
-  filters << "JK699M5*";
+  filters << "JK574*";
   QFileInfoList fdlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
 
-//  QDir dir2("/Volumes/shared/Imaging/JK636M1/confocal");
-//  filters.clear();
-//  filters << "JK636M1-9_right_reimaged";
-//  QFileInfoList fdlist2 = dir2.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
-//
-//  fdlist.append(fdlist2);
+  dir = QDir("/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK575-1_RNAscope_PV-Gria1-Gabra1");
+  filters.clear();
+  filters << "JK575*";
+  QFileInfoList fdlist2 = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
+  fdlist.append(fdlist2);
+
+  dir = QDir("/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK584-6_RNAscope_PV-Gria1-Gabra1");
+  filters.clear();
+  filters << "JK584*";
+  fdlist2 = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
+  fdlist.append(fdlist2);
+
+  dir = QDir("/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK636-1_RNAscope_PV-Chrnb2-Chrna7");
+  filters.clear();
+  filters << "JK636*";
+  fdlist2 = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
+  fdlist.append(fdlist2);
+
+  dir = QDir("/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK636-1_RNAscope_PV-Drd1-Drd2");
+  filters.clear();
+  filters << "JK636*";
+  fdlist2 = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
+  fdlist.append(fdlist2);
+
+  dir = QDir("/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK656-1_RNAscope_PV-Gria23-Gabra1");
+  filters.clear();
+  filters << "JK656*";
+  fdlist2 = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
+  fdlist.append(fdlist2);
+
+  dir = QDir("/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK699-4_RNAscope_Slc17a6-Rbfox3-Slc32a1");
+  filters.clear();
+  filters << "JK699*";
+  fdlist2 = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
+  fdlist.append(fdlist2);
+
+  dir = QDir("/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK699-5_RNAscope_PV-Slc17a6-Slc32a1");
+  filters.clear();
+  filters << "JK699*";
+  fdlist2 = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
+  fdlist.append(fdlist2);
 
   filters.clear();
   filters << "*_Sum.lsm";
@@ -1630,30 +1665,17 @@ void stitchAndDetectPuncta()
     stitch.setLogFile(lfn);
 
     stitch.run();
-  }
 
-  filters.clear();
-  filters << "*.nim";
-  for (int i = 0; i < fdlist.size(); ++i) {
-    QDir fdir(fdlist.at(i).absoluteFilePath());
-    QFileInfoList list = fdir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-    if (list.size() == 1) {
-      LOG(INFO) << list.at(0).absoluteFilePath();
-
-      for (size_t ch = 1; ch < 4; ++ch) {
-        QString pfn = QString("%1/%2_ch%3.nimp").arg(fdlist.at(i).absoluteFilePath()).arg(
-          list.at(0).completeBaseName()).arg(ch + 1);
-        if (QFile::exists(pfn)) {
-          continue;
-        }
-        QString lfn = QString("%1/%2_ch%3_log.txt").arg(fdlist.at(i).absoluteFilePath()).arg(
-          list.at(0).completeBaseName()).arg(ch + 1);
-        LOG(INFO) << pfn;
-        ZPunctaDetection pd(list.at(0).absoluteFilePath(), ch);
-        pd.setLogFile(lfn);
-        pd.setResultPunctaFilename(pfn);
-        pd.run();
-      }
+    for (size_t ch = 1; ch < 4; ++ch) {
+      QString pfn = QString("%1/%2_ch%3.nimp").arg(fdir.absolutePath()).arg(
+        QFileInfo(outputName).completeBaseName()).arg(ch + 1);
+      lfn = QString("%1/%2_ch%3_log.txt").arg(fdir.absolutePath()).arg(
+        QFileInfo(outputName).completeBaseName()).arg(ch + 1);
+      LOG(INFO) << pfn;
+      ZPunctaDetection pd(list.at(0).absoluteFilePath(), ch);
+      pd.setLogFile(lfn);
+      pd.setResultPunctaFilename(pfn);
+      pd.run();
     }
   }
 }
