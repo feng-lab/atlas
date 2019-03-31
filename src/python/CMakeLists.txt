@@ -10,6 +10,8 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
+
+
 if(UNIX AND NOT APPLE)
   # excludes symbols in all archive libraries from automatic export.
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--exclude-libs,ALL")
@@ -26,6 +28,8 @@ if(UNIX AND NOT APPLE)
 #    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,defs")
 #    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -Wl,-z,defs")
 #  endif()
+
+  set(CMAKE_INSTALL_RPATH "$ORIGIN/")
 endif()
 
 if(UNIX)
