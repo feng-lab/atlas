@@ -128,8 +128,6 @@ find_package(Qt5 ${QT_VERSION} REQUIRED COMPONENTS Core Widgets Network Svg PATH
 #   message(STATUS "${_variableName}=${${_variableName}}")
 # endforeach()
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ceres-solver/ceres-solver.cmake)
-
 #libqxt srcs
 add_definitions(-DBUILD_QXT -DBUILD_QXT_OBJECT)
 set(LIBQXTDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libqxt)
@@ -216,37 +214,15 @@ if (BUILD_TESTING)
 endif (BUILD_TESTING)
 
 set(SOURCES
-    zimageinterpolation.h
     zimgdisplay.h
-    zimgmerge.h
-    zimgtile.h
-    zvoxelregion.h
-    zimgncc.h
-    zcompleximg.h
-    zfft.h
-    zimagetoimagemetric.h
-    zregistrationoptimizer.h
-    zregistrationcostfunction.h
     zsectionsregistrationdialog.h
-    zsectionsregistration.h
     zstitchimagedialog.h
     zpunctadetectiondialog.h
-    zpunctadetection.h
-    zassignpuncta.h
     zgenerateanalysistextfile.h
     zanalysisworklistdialog.h
     zanalysisworklistmodel.h
     zstyleditemdelegate.h
     zitemeditorfactory.h
-    zimgalgorithm.h
-    zimgconnectedcomponents.h
-    zimgregionalextrema.h
-    zimgautothreshold.h
-    zimgitkinterface.h
-    zimgprocess.h
-    zimgsigneddistancemap.h
-    zimggraph.h
-    zimgnccmatch.h
     zmainwindow.h
     zimgdoc.h
     zimgview.h
@@ -361,12 +337,9 @@ set(SOURCES
     zswcview.h
     zpunctafilter.h
     zpunctaview.h
-    zswc.h
-    ztree.hpp
     znumericparameter.h
     zoptionparameter.h
     zparameter.h
-    zglmutils.h
     zcombobox.h
     zselectfilewidget.h
     zloadimagesequencedialog.h
@@ -386,16 +359,7 @@ set(SOURCES
     z3dsdfont.h
     zspanslider.h
     zcustomcommand.h
-    zaffine2d.h
-    zaffine3d.h
     ztakescreenshotwidget.h
-    zimgregistration.h
-    zimagetransform.h
-    zimagematrix2dtransform.h
-    zimagematrix3dtransform.h
-    zregistrationnumericdiffcostfunction.h
-    zimagecompositetransform.h
-    zimagetransformresolve.h
     z3dshader.h
     z3dcontext.h
     z3dgl.h
@@ -411,7 +375,6 @@ set(SOURCES
     zregionannotationview.h
     zregionannotationfilter.h
     z3dregionannotationfilter.h
-    zimgfillhole.h
     zregionannotationwidget.h
     zregionannotationtreemodel.h
     zregionannotationtreeview.h
@@ -433,36 +396,15 @@ set(SOURCES
     zlogdialog.h
     zlogmodelsink.h
     main.cpp
-    zimageinterpolation.cpp
     zimgdisplay.cpp
-    zimgmerge.cpp
-    zimgtile.cpp
-    zvoxelregion.cpp
-    zimgncc.cpp
-    zcompleximg.cpp
-    zfft.cpp
-    zimagetoimagemetric.cpp
-    zregistrationoptimizer.cpp
-    zregistrationcostfunction.cpp
     zsectionsregistrationdialog.cpp
-    zsectionsregistration.cpp
     zstitchimagedialog.cpp
     zpunctadetectiondialog.cpp
-    zpunctadetection.cpp
-    zassignpuncta.cpp
     zgenerateanalysistextfile.cpp
     zanalysisworklistdialog.cpp
     zanalysisworklistmodel.cpp
     zstyleditemdelegate.cpp
     zitemeditorfactory.cpp
-    zimgalgorithm.cpp
-    zimgprocess.cpp
-    zimggraph.cpp
-    zimgnccmatch.cpp
-    zimgsigneddistancemap.cpp
-    zimgconnectedcomponents.cpp
-    zimgautothreshold.cpp
-    zimgregionalextrema.cpp
     zmainwindow.cpp
     zimgdoc.cpp
     zimgview.cpp
@@ -573,7 +515,6 @@ set(SOURCES
     zswcview.cpp
     zpunctafilter.cpp
     zpunctaview.cpp
-    zswc.cpp
     znumericparameter.cpp
     zoptionparameter.cpp
     zparameter.cpp
@@ -595,16 +536,7 @@ set(SOURCES
     z3dsdfont.cpp
     zspanslider.cpp
     zcustomcommand.cpp
-    zaffine2d.cpp
-    zaffine3d.cpp
     ztakescreenshotwidget.cpp
-    zimgregistration.cpp
-    zimagetransform.cpp
-    zimagematrix2dtransform.cpp
-    zimagematrix3dtransform.cpp
-    zregistrationnumericdiffcostfunction.cpp
-    zimagecompositetransform.cpp
-    zimagetransformresolve.cpp
     z3dshader.cpp
     z3dcontext.cpp
     z3dgl.cpp
@@ -619,7 +551,6 @@ set(SOURCES
     zregionannotationview.cpp
     zregionannotationfilter.cpp
     z3dregionannotationfilter.cpp
-    zimgfillhole.cpp
     zregionannotationwidget.cpp
     zregionannotationtreemodel.cpp
     zregionannotationtreeview.cpp
@@ -664,20 +595,16 @@ set(SOURCES
     zopenglwidget.h
     zchromaticshiftcorrectiondialog.cpp
     zchromaticshiftcorrectiondialog.h
-    zchromaticshiftcorrection.cpp
-    zchromaticshiftcorrection.h
     zlogwidget.cpp
     zlogwidget.h
     zimgprocessdialog.cpp
     zimgprocessdialog.h
-    zstitchimage.cpp
-    zstitchimage.h
     zservicemanager.cpp
     zservicemanager.h
     zrpcservice.cpp
     zrpcservice.h
     ztheme.cpp
-    ztheme.h)
+    ztheme.h zserializationutils.h)
 
 # our target
 set(APP_NAME Atlas)
@@ -685,7 +612,6 @@ add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
                ${SYS_SOURCES}
                ${QTCSV_SOURCES}
                ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
-               ${CERESSOLVER_HEADERS} ${CERESSOLVER_INTERNAL}
                ${SOURCES} ${FORMS} ${RESOURCES} ${ASSETS}
                ${TESTS}
                ${PROTO_SRCS} ${GRPC_SRCS})
@@ -695,12 +621,9 @@ target_include_directories(${APP_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(${APP_NAME} PUBLIC ${IPP_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${GEOMETRICTOOLS_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${HDF5_INCLUDE_DIR})
-target_include_directories(${APP_NAME} PUBLIC ${CERESSOLVER_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PRIVATE ${QTCSVDIR} ${QTCSVDIR}/include)
 target_include_directories(${APP_NAME} PUBLIC ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
-target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/eigen)
 target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/boost)
-target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glm)
 target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/folly)
 target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_MKL ATLAS_USE_IPP ATLAS_USE_CORE_PROFILE)
 if (WIN32)
@@ -731,8 +654,6 @@ if (WIN32)
                         )
 
   # for some files
-  set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
-                              "/wd4100 /I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}") # 'identifier' : unreferenced formal parameter)
   set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS /I${ASSIMP_INCLUDE_DIRS})
 
   add_custom_command(TARGET ${APP_NAME}
@@ -763,19 +684,6 @@ else (WIN32)
   endif ()
 
   # for some files
-  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
-                                "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers \
-                              -Wno-unknown-pragmas -Wno-unused-variable -Wno-reorder \
-                              -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
-  elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
-                                "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers \
-                              -Wno-unknown-pragmas -Wno-unused-variable -Wno-reorder -Wno-maybe-uninitialized \
-                              -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
-  endif ()
-
-  set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
   set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS "-isystem ${ASSIMP_INCLUDE_DIRS}")
   set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS
                               "-Wno-unused-parameter")

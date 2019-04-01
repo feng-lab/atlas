@@ -3,12 +3,9 @@
 #include "zlog.h"
 #include "zimgnccmatch.h"
 #include "zimgio.h"
-#include "zimgdisplay.h"
 #include <QDir>
 #include <QTextStream>
 #include <QFileInfo>
-#include <QPainter>
-#include <QImageWriter>
 #include <tbb/concurrent_unordered_map.h>
 #include <tbb/parallel_for.h>
 #include <tbb/task_scheduler_init.h>
@@ -111,20 +108,9 @@ void ZStitchImage::setConnTileImage(const QString& fn)
     m_tileSelectionImageFilename = fn;
     m_tileList.clear();
 
-    ZImg img(fn);
-    if (img.width() > ZImgDisplay::toQImageSizeLimit() || img.height() > ZImgDisplay::toQImageSizeLimit()) {
-      img.resize(std::min(ZImgDisplay::toQImageSizeLimit(), img.width()),
-                 std::min(ZImgDisplay::toQImageSizeLimit(), img.height()), 1, Interpolant::Nearest);
-    }
+    ZImg m_tileImage = ZImg(fn);
 
-    ZImgDisplay display(img);
-    double min;
-    double max;
-    img.createView(0, 0).computeMinMax(min, max);
-    display.showChannel(0, min, max);
-    m_tileImage = display.toQImage();
-
-    if (!getTileMatrix(img, m_tileMatrix, m_tileList)) {
+    if (!getTileMatrix(m_tileImage, m_tileMatrix, m_tileList)) {
       m_tileList.clear();
       throw ZImgException(tr("Failed to parse tile connection image."));
     }
@@ -363,34 +349,6 @@ void ZStitchImage::doWork()
   }
 
   LOG(INFO) << QString("%1 saved.").arg(m_resFileName);
-
-  if (!m_tileImage.isNull()) {
-    QString selectionImageOutputName = m_resFileName;
-    selectionImageOutputName.append("_TileSelectionInfo.tif");
-    QImage image(m_tileImage);
-
-    QPainter painter(&image);
-    for (int i = 0; i < m_tileList.size(); ++i) {
-      QRect rect = QRect(m_tileList.at(i).region.topLeft(),
-                         m_tileList.at(i).region.bottomRight());
-      if (m_tileList.at(i).bIsSelected) {
-        //painter.fillRect(rect, QColor(255, 255, 0, 128));
-        painter.setPen(QPen(QBrush(QColor(255, 255, 0, 255)), 4));
-        auto tl = rect.topLeft();
-        auto br = rect.bottomRight();
-        painter.drawRect(
-          QRectF(tl.x() - 4, tl.y() - 4, br.x() - tl.x() + 5, br.y() - tl.y() + 1 + 4));
-      }
-      QString str = QString("Image %1").arg(i + 1);
-      painter.drawText(rect, str);
-    }
-    QImageWriter writer(selectionImageOutputName);
-    if (!writer.write(image)) {
-      LOG(ERROR) << writer.errorString();
-    } else {
-      LOG(INFO) << QString("%1 saved.").arg(selectionImageOutputName);
-    }
-  }
 }
 
 bool ZStitchImage::getTileMatrix(ZImg& img, std::vector<std::vector<int>>& tileMatrix, QList<ZTile>& tileList)

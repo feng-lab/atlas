@@ -1670,6 +1670,10 @@ void stitchAndDetectPuncta()
         QFileInfo(outputName).completeBaseName()).arg(ch + 1);
       QString lfn = QString("%1/%2_ch%3_log.txt").arg(fdir.absolutePath()).arg(
         QFileInfo(outputName).completeBaseName()).arg(ch + 1);
+      if (QFile::exists(pfn) && QFile::exists(lfn)) {
+        LOG(INFO) << "finished, skip puncta detection.";
+        continue;
+      }
       LOG(INFO) << pfn;
       ZPunctaDetection pd(outputName, ch);
       pd.setLogFile(lfn);
@@ -1677,6 +1681,19 @@ void stitchAndDetectPuncta()
       pd.run();
     }
   }
+}
+
+void testDetectPuncta()
+{
+  ZPunctaDetection pd("/Users/feng/Documents/bigimage_new/0515_3to33_crop.raw", 0);
+  pd.setLogFile("/Users/feng/Documents/bigimage_new/0515_3to33_crop.raw_puncta.log");
+  pd.setResultPunctaFilename("/Users/feng/Documents/bigimage_new/0515_3to33_crop.raw_puncta.nimp");
+  pd.run();
+
+  ZPunctaDetection pd2("/Users/feng/Documents/bigimage_new/0515_3to33_crop.raw", 0);
+  pd2.setLogFile("/Users/feng/Documents/bigimage_new/0515_3to33_crop.raw_puncta.log");
+  pd2.setResultPunctaFilename("/Users/feng/Documents/bigimage_new/0515_3to33_crop.raw_puncta.nimp");
+  pd2.run();
 }
 
 using grpc::Channel;
@@ -1766,7 +1783,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  // stitchAndDetectPuncta();
+  testDetectPuncta();
   LOG(INFO) << "done";
 }
 

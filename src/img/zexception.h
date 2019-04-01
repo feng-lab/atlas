@@ -23,8 +23,8 @@ public:
     m_what = QString::fromUtf8(what.c_str());
   }
 
-  explicit inline ZException(const QString& what)
-    : m_what(what)
+  explicit inline ZException(QString what)
+    : m_what(std::move(what))
   {}
 
   ZException(ZException&&) = default;
@@ -66,8 +66,8 @@ public:
     }
   }
 
-  explicit inline ZIOException(const QString& what)
-    : ZException(what)
+  explicit inline ZIOException(QString what)
+    : ZException(std::move(what))
   {
     if (errno != 0) {
       m_what = m_what % QString(" <errno: %1>").arg(std::strerror(errno));

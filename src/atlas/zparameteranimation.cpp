@@ -5,6 +5,7 @@
 #include "zlog.h"
 #include "zparameterfactory.h"
 #include "zcameraparameteranimation.h"
+#include "zserializationutils.h"
 #include "zglobal.h"
 
 namespace nim {

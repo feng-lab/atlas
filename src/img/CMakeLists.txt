@@ -8,6 +8,8 @@ project(img)
 #   message(STATUS "${_variableName}=${${_variableName}}")
 # endforeach ()
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ceres-solver/ceres-solver.cmake)
+
 # tiff srcs
 set(TIFFDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libtiff/libtiff)
 set(TIFF_SOURCES
@@ -63,6 +65,7 @@ set(IMG_SOURCES
     zbitset.h
     zcpuinfo.h
     zeigenutils.h
+    zglmutils.h
     zexception.h
     zglobal.h
     zimage2dutils.h
@@ -157,16 +160,91 @@ set(IMG_SOURCES
     zpunctaio.cpp
     zpunctaio.h
     zpunctum.cpp
-    zpunctum.h)
+    zpunctum.h
+    zswc.h
+    zswc.cpp
+    ztree.hpp
+    zvoxelregion.h
+    zvoxelregion.cpp
+    zimgtile.h
+    zimgtile.cpp
+    zimgitkinterface.h
+    zcompleximg.h
+    zcompleximg.cpp
+    zfft.h
+    zfft.cpp
+    zaffine2d.h
+    zaffine3d.h
+    zaffine2d.cpp
+    zaffine3d.cpp
+    zimageinterpolation.h
+    zimageinterpolation.cpp
+    zimagetoimagemetric.h
+    zimagetoimagemetric.cpp
+    zimagetransform.h
+    zimagetransform.cpp
+    zimagematrix2dtransform.h
+    zimagematrix2dtransform.cpp
+    zimagematrix3dtransform.h
+    zimagematrix3dtransform.cpp
+    zimagecompositetransform.h
+    zimagecompositetransform.cpp
+    zimagetransformresolve.h
+    zimagetransformresolve.cpp
+    zimgmerge.h
+    zimgncc.h
+    zimgmerge.cpp
+    zimgncc.cpp
+    zimgalgorithm.h
+    zimgconnectedcomponents.h
+    zimgregionalextrema.h
+    zimgautothreshold.h
+    zimgalgorithm.cpp
+    zimgconnectedcomponents.cpp
+    zimgregionalextrema.cpp
+    zimgautothreshold.cpp
+    zimgsigneddistancemap.h
+    zimgsigneddistancemap.cpp
+    zimggraph.h
+    zimgnccmatch.h
+    zimggraph.cpp
+    zimgnccmatch.cpp
+    zimgfillhole.h
+    zimgfillhole.cpp
+    zimgregistration.h
+    zimgregistration.cpp
+    zregistrationoptimizer.h
+    zregistrationcostfunction.h
+    zregistrationoptimizer.cpp
+    zregistrationcostfunction.cpp
+    zregistrationnumericdiffcostfunction.h
+    zregistrationnumericdiffcostfunction.cpp
+    zimgprocess.h
+    zimgprocess.cpp
+    zassignpuncta.h
+    zassignpuncta.cpp
+    zchromaticshiftcorrection.cpp
+    zchromaticshiftcorrection.h
+    zpunctadetection.h
+    zpunctadetection.cpp
+    zsectionsregistration.h
+    zsectionsregistration.cpp
+    zstitchimage.cpp
+    zstitchimage.h
+    )
 
 # our target
 set(LIBRARY_NAME img)
-add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${IMG_SOURCES})
+add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${IMG_SOURCES}
+            ${CERESSOLVER_HEADERS} ${CERESSOLVER_INTERNAL}
+            )
 
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(${LIBRARY_NAME} PUBLIC ${MKL_INCLUDE_DIRS})
+target_include_directories(${LIBRARY_NAME} PUBLIC ${CERESSOLVER_INCLUDE_DIRS})
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/eigen)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/boost)
+target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glm)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/folly)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/scopeguard)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/better-enums)
@@ -215,6 +293,9 @@ if (WIN32)
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_FLAGS ${JXRINC})
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "__ANSI__;DISABLE_PERF_MEASUREMENT")
   set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS /I${FREEIMAGE_INCLUDE_DIRS})
+
+  set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
+                              "/wd4100 /I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}") # 'identifier' : unreferenced formal parameter)
 else (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-frtti>)
   target_compile_options(${LIBRARY_NAME} PUBLIC -fexceptions)
@@ -253,6 +334,20 @@ else (WIN32)
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_FLAGS ${JXRINC})
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "__ANSI__;DISABLE_PERF_MEASUREMENT")
   set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS -I${FREEIMAGE_INCLUDE_DIRS})
+
+  set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
+
+  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
+                                "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers \
+                              -Wno-unknown-pragmas -Wno-unused-variable -Wno-reorder \
+                              -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
+  elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
+                                "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers \
+                              -Wno-unknown-pragmas -Wno-unused-variable -Wno-reorder -Wno-maybe-uninitialized \
+                              -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
+  endif ()
 endif (WIN32)
 
 target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}

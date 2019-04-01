@@ -7,7 +7,7 @@
 #include "zimgmerge.h"
 #include "zstringutils.h"
 #include <QList>
-#include <QImage>
+#include <QRect>
 
 namespace nim {
 
@@ -69,7 +69,6 @@ private:
   ZImgMerge::Mode m_mergeMode = ZImgMerge::Mode::Max;
   double m_maxOverlapRate = 0.1;
   QString m_tileSelectionImageFilename;
-  QImage m_tileImage;
   std::vector<std::vector<int>> m_tileMatrix;
   QList<ZTile> m_tileList;
   // int m_nSel;

@@ -24,7 +24,6 @@
 #include <glm/gtx/matrix_transform_2d.hpp>
 #include <QRegularExpression>
 #include <QStringList>
-#include <QColor>
 #include <QLocale>
 #include <iostream>
 #include <sstream>
@@ -236,34 +235,6 @@ inline void toVal(const QString& str, glm::vec<L, T, Q>& v)
   QStringList numList = str.split(rx, QString::SkipEmptyParts);
   for (size_t i = 0; i < std::min(L, size_t(numList.size())); ++i) {
     toVal(numList[i], v[i]);
-  }
-}
-
-inline QString toQString(const QColor& v)
-{
-  return "[" + QString::number(v.red()) +
-         ", " + QString::number(v.green()) +
-         ", " + QString::number(v.blue()) +
-         ", " + QString::number(v.alpha()) +
-         "]";
-}
-
-inline void toVal(const QString& str, QColor& v)
-{
-  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
-  QStringList numList = str.split(rx, QString::SkipEmptyParts);
-  for (int i = 0; i < std::min(4, numList.size()); ++i) {
-    int c;
-    toVal(numList[i], c);
-    if (i == 0) {
-      v.setRed(c);
-    } else if (i == 1) {
-      v.setGreen(c);
-    } else if (i == 2) {
-      v.setBlue(c);
-    } else if (i == 3) {
-      v.setAlpha(c);
-    }
   }
 }
 
