@@ -1648,31 +1648,30 @@ void stitchAndDetectPuncta()
     outputName += ".nim";
     LOG(INFO) << "output: " << outputName;
     if (QFile::exists(outputName)) {
-      LOG(INFO) << "finished, skip.";
-      continue;
+      LOG(INFO) << "finished, skip stitching.";
+    } else {
+      ZStitchImage stitch;
+      stitch.setInputFilenames(inputFiles);
+      stitch.setConnTileImage(tsfn);
+      stitch.setMergeMode(ZImgMerge::Mode::First);
+      stitch.setResultFilename(outputName);
+      std::vector<size_t> chs;
+      chs.push_back(0_usize);
+      stitch.setUseChannels(chs);
+      stitch.setMaxOverlapRate(0.15);
+      QString lfn = QString("%1_stitching_log.txt").arg(outputName);
+      stitch.setLogFile(lfn);
+
+      stitch.run();
     }
-
-    ZStitchImage stitch;
-    stitch.setInputFilenames(inputFiles);
-    stitch.setConnTileImage(tsfn);
-    stitch.setMergeMode(ZImgMerge::Mode::First);
-    stitch.setResultFilename(outputName);
-    std::vector<size_t> chs;
-    chs.push_back(0_usize);
-    stitch.setUseChannels(chs);
-    stitch.setMaxOverlapRate(0.15);
-    QString lfn = QString("%1_stitching_log.txt").arg(outputName);
-    stitch.setLogFile(lfn);
-
-    stitch.run();
 
     for (size_t ch = 1; ch < 4; ++ch) {
       QString pfn = QString("%1/%2_ch%3.nimp").arg(fdir.absolutePath()).arg(
         QFileInfo(outputName).completeBaseName()).arg(ch + 1);
-      lfn = QString("%1/%2_ch%3_log.txt").arg(fdir.absolutePath()).arg(
+      QString lfn = QString("%1/%2_ch%3_log.txt").arg(fdir.absolutePath()).arg(
         QFileInfo(outputName).completeBaseName()).arg(ch + 1);
       LOG(INFO) << pfn;
-      ZPunctaDetection pd(list.at(0).absoluteFilePath(), ch);
+      ZPunctaDetection pd(outputName, ch);
       pd.setLogFile(lfn);
       pd.setResultPunctaFilename(pfn);
       pd.run();
@@ -1767,7 +1766,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  //stitchAndDetectPuncta();
+  // stitchAndDetectPuncta();
   LOG(INFO) << "done";
 }
 
