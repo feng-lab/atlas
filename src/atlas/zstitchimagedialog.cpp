@@ -1585,17 +1585,17 @@ void ZStitchImageDialog::stitchStacks2()
     }
   }
 
-  ZImgMerge::Mode mergeMode = ZImgMerge::Mode::Max;
+  ImgMergeMode mergeMode = ImgMergeMode::Max;
   if (m_mergeMode1ComboBox->currentIndex() == 0) {
-    mergeMode = ZImgMerge::Mode::Max;
+    mergeMode = ImgMergeMode::Max;
   } else if (m_mergeMode1ComboBox->currentIndex() == 1) {
-    mergeMode = ZImgMerge::Mode::Min;
+    mergeMode = ImgMergeMode::Min;
   } else if (m_mergeMode1ComboBox->currentIndex() == 2) {
-    mergeMode = ZImgMerge::Mode::Mean;
+    mergeMode = ImgMergeMode::Mean;
   } else if (m_mergeMode1ComboBox->currentIndex() == 3) {
-    mergeMode = ZImgMerge::Mode::Median;
+    mergeMode = ImgMergeMode::Median;
   } else {
-    mergeMode = ZImgMerge::Mode::First;
+    mergeMode = ImgMergeMode::First;
   }
 
   ZImgMerge imgMerge;
@@ -1631,7 +1631,7 @@ void ZStitchImageDialog::stitchStacks2()
   QStringList summary = imgMerge.resolveLocations();
 
   if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
-      mergeMode == ZImgMerge::Mode::Max) {
+      mergeMode == ImgMergeMode::Max) {
     ZImgIO().writeImg(m_outputFileEdit->text(), imgMerge);
   } else {
     imgMerge.wholeImg().save(m_outputFileEdit->text());
@@ -2096,17 +2096,17 @@ void ZStitchImageDialog::stitchStacks()
       buildConnectionFromGrid(tileMatrix, conn);
     }
 
-    ZImgMerge::Mode mergeMode = ZImgMerge::Mode::Max;
+    ImgMergeMode mergeMode = ImgMergeMode::Max;
     if (m_mergeMode1ComboBox->currentIndex() == 0) {
-      mergeMode = ZImgMerge::Mode::Max;
+      mergeMode = ImgMergeMode::Max;
     } else if (m_mergeMode1ComboBox->currentIndex() == 1) {
-      mergeMode = ZImgMerge::Mode::Min;
+      mergeMode = ImgMergeMode::Min;
     } else if (m_mergeMode1ComboBox->currentIndex() == 2) {
-      mergeMode = ZImgMerge::Mode::Mean;
+      mergeMode = ImgMergeMode::Mean;
     } else if (m_mergeMode1ComboBox->currentIndex() == 3) {
-      mergeMode = ZImgMerge::Mode::Median;
+      mergeMode = ImgMergeMode::Median;
     } else {
-      mergeMode = ZImgMerge::Mode::First;
+      mergeMode = ImgMergeMode::First;
     }
 
     if (m_concatOnlyCheckBox->isChecked()) {
@@ -2161,7 +2161,7 @@ void ZStitchImageDialog::stitchStacks()
       QStringList summary = imgMerge.resolveLocations();
 
       if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
-          mergeMode == ZImgMerge::Mode::Max) {
+          mergeMode == ImgMergeMode::Max) {
         ZImgIO().writeImg(m_outputFileEdit->text(), imgMerge);
       } else {
         imgMerge.wholeImg().save(m_outputFileEdit->text());
@@ -2367,7 +2367,7 @@ void ZStitchImageDialog::stitchStacks()
       }
       fOut.close();
       if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
-          mergeMode == ZImgMerge::Mode::Max) {
+          mergeMode == ImgMergeMode::Max) {
         ZImgIO().writeImg(m_outputFileEdit->text(), imgMerge);
         for (size_t c = 0; c < imgMerge.imgInfo().numChannels; ++c) {
           QFileInfo fi(m_outputFileEdit->text());

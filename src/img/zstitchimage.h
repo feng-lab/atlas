@@ -44,10 +44,10 @@ public:
   { m_channelsToUse.clear(); }
 
   // default Max
-  void setMergeMode(ZImgMerge::Mode mode)
+  void setMergeMode(ImgMergeMode mode)
   { m_mergeMode = mode; }
 
-  // default 0.1
+  // default 0.15
   void setMaxOverlapRate(double maxOverlapRate)
   { m_maxOverlapRate = maxOverlapRate; }
 
@@ -56,6 +56,10 @@ public:
 
 protected:
   void doWork() override;
+
+  void read(const QJsonObject& json) override;
+
+  void write(QJsonObject& json) const override;
 
 private:
   bool getTileMatrix(ZImg& img, std::vector<std::vector<int>>& tileMatrix, QList<ZTile>& tileList);
@@ -66,8 +70,8 @@ private:
 
   // parameters
   std::vector<size_t> m_channelsToUse;  //empty means all channel
-  ZImgMerge::Mode m_mergeMode = ZImgMerge::Mode::Max;
-  double m_maxOverlapRate = 0.1;
+  ImgMergeMode m_mergeMode = ImgMergeMode::Max;
+  double m_maxOverlapRate = 0.15;
   QString m_tileSelectionImageFilename;
   std::vector<std::vector<int>> m_tileMatrix;
   QList<ZTile> m_tileList;

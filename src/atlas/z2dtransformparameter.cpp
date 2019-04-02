@@ -2,7 +2,6 @@
 
 #include "zwidgetsgroup.h"
 #include "zlog.h"
-#include "zlogqttypesupport.h"
 #include <QWidget>
 #include <QGroupBox>
 #include <QPushButton>

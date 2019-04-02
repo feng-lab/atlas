@@ -16,11 +16,22 @@ class ZSwc;
 class ZPunctaDetection : public ZImgProcess
 {
 public:
-  ZPunctaDetection(const QString& filename, size_t punctaChannel, size_t t = 0, size_t scene = 0);
+  ZPunctaDetection() = default;
+
+  explicit ZPunctaDetection(const QString& filename, size_t punctaChannel = 0, size_t t = 0, size_t scene = 0)
+  { setInputFile(filename, punctaChannel, t, scene); }
 
   // only image resolution in imgInfo is used
   ZPunctaDetection(const QString& filename, const ZImgInfo& imgInfo,
-                   size_t punctaChannel, size_t t = 0, size_t scene = 0);
+                   size_t punctaChannel = 0, size_t t = 0, size_t scene = 0)
+  {
+    CHECK(imgInfo.voxelSizeUnit != VoxelSizeUnit::none);
+    setInputFile(filename, punctaChannel, t, scene,
+                 imgInfo.voxelSizeXInUm(), imgInfo.voxelSizeYInUm(), imgInfo.voxelSizeZInUm());
+  }
+
+  void setInputFile(const QString& filename, size_t punctaChannel = 0, size_t t = 0, size_t scene = 0,
+                    double voxelSizeInUmX = -1, double voxelSizeInUmY = -1, double VoxelSizeInUmZ = -1);
 
   // if set, result will be saved to these files
   void setResultPunctaFilename(const QString& fn)
@@ -90,6 +101,10 @@ public:
 protected:
   void doWork() override;
 
+  void read(const QJsonObject& json) override;
+
+  void write(QJsonObject& json) const override;
+
 private:
   // all works are done here, detect from img with thre and put result into resList
   // img will be cleared after using
@@ -151,9 +166,9 @@ private:
 private:
   QString m_filename;
   ZImgInfo m_imgInfo;
-  size_t m_punctaChannel;
-  size_t m_t;
-  size_t m_scene;
+  size_t m_punctaChannel = 0;
+  size_t m_t = 0;
+  size_t m_scene = 0;
 
   // parameters
   int m_punctaThreshold = -1;

@@ -1628,7 +1628,7 @@ void stitchAndDetectPuncta()
       continue;
     }
     QFileInfoList list = fdir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-    if (list.size() < 2) {
+    if (list.size() < 1) {
       LOG(WARNING) << fdir.absolutePath() << " not enough lsm file for stitching";
       continue;
     }
@@ -1653,7 +1653,7 @@ void stitchAndDetectPuncta()
       ZStitchImage stitch;
       stitch.setInputFilenames(inputFiles);
       stitch.setConnTileImage(tsfn);
-      stitch.setMergeMode(ZImgMerge::Mode::First);
+      stitch.setMergeMode(ImgMergeMode::First);
       stitch.setResultFilename(outputName);
       std::vector<size_t> chs;
       chs.push_back(0_usize);
@@ -1694,6 +1694,8 @@ void testDetectPuncta()
   pd2.setLogFile("/Users/feng/Documents/bigimage_new/0515_3to33_crop.raw_puncta.log");
   pd2.setResultPunctaFilename("/Users/feng/Documents/bigimage_new/0515_3to33_crop.raw_puncta.nimp");
   pd2.run();
+
+  LOG(WARNING) << "abc";
 }
 
 using grpc::Channel;

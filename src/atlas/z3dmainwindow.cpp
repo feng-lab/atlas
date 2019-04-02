@@ -12,7 +12,6 @@
 #include "zmainwindow.h"
 #include "zsysteminfo.h"
 #include "ztheme.h"
-#include "zlogqttypesupport.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QAction>

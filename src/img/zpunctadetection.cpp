@@ -164,29 +164,25 @@ Eigen::MatrixXd meanShiftGaussianCenters(const nim::ZVBGMM<T, double>& vbgmm, co
 
 namespace nim {
 
-ZPunctaDetection::ZPunctaDetection(const QString& filename, size_t punctaChannel, size_t t, size_t scene)
-  : m_filename(filename)
-  , m_imgInfo(ZImg::readImgInfo(filename).at(0))
-  , m_punctaChannel(punctaChannel)
-  , m_t(t)
-  , m_scene(scene)
+void ZPunctaDetection::setInputFile(const QString& filename, size_t punctaChannel, size_t t, size_t scene,
+                                    double voxelSizeInUmX, double voxelSizeInUmY, double VoxelSizeInUmZ)
 {
+  m_filename = filename;
+  m_punctaChannel = punctaChannel;
+  m_t = t;
+  m_scene = scene;
+
   auto infos = ZImg::readImgInfo(m_filename);
   if (m_scene >= infos.size()) {
     throw ZImgException("invalid scene");
   }
-}
-
-ZPunctaDetection::ZPunctaDetection(const QString& filename, const ZImgInfo& imgInfo,
-                                   size_t punctaChannel, size_t t, size_t scene)
-  : ZPunctaDetection(filename, punctaChannel, t, scene)
-{
-  auto infos = ZImg::readImgInfo(m_filename);
-  m_imgInfo = infos[scene];
-  m_imgInfo.voxelSizeUnit = imgInfo.voxelSizeUnit;
-  m_imgInfo.voxelSizeX = imgInfo.voxelSizeX;
-  m_imgInfo.voxelSizeY = imgInfo.voxelSizeY;
-  m_imgInfo.voxelSizeZ = imgInfo.voxelSizeZ;
+  m_imgInfo = infos[m_scene];
+  if (voxelSizeInUmX > 0 || voxelSizeInUmY > 0 || VoxelSizeInUmZ > 0) {
+    m_imgInfo.voxelSizeUnit = VoxelSizeUnit::um;
+    m_imgInfo.voxelSizeX = voxelSizeInUmX;
+    m_imgInfo.voxelSizeY = voxelSizeInUmY;
+    m_imgInfo.voxelSizeZ = VoxelSizeInUmZ;
+  }
 }
 
 void ZPunctaDetection::doWork()
@@ -648,6 +644,72 @@ void ZPunctaDetection::doWork()
       puncta.save(fn);
     }
   }
+}
+
+void ZPunctaDetection::read(const QJsonObject& json)
+{
+  setInputFile(readString(json, "input_file"), readNumber(json, "puncta_channel"),
+               readNumber(json, "t"), readNumber(json, "scene"),
+               readNumber(json, "voxel_size_in_um_x"),
+               readNumber(json, "voxel_size_in_um_y"),
+               readNumber(json, "voxel_size_in_um_z"));
+
+  // parameters
+  setPunctaThreshold(readNumber(json, "puncta_threshold"));
+  setSplitThreshold(readNumber(json, "split_size_threshold"));
+  setConfidenceRegionForRadiusEstimate(readNumber(json, "conf_radius"));
+  setConfidenceRegionForOverlapArea(readNumber(json, "conf_overlap_area"));
+  setOverlapRateThreshold(readNumber(json, "overlap_rate_threshold"));
+  setSeedSizeThreshold(readNumber(json, "seed_size_threshold"));
+  setUseMultithreading(readBool(json, "use_multithreading"));
+
+  // parameters for soma detection
+  setDendriteChannel(readNumber(json, "dendrite_channel"));
+  setMaxDendriteTubeRadiusInUm(readNumber(json, "max_dendrite_tube_radius"));
+  setDendriteThreshold(readNumber(json, "dendrite_threshold"));
+
+  // parameters for assign puncta to swc tree
+  setMaxDistToBranchInUm(readNumber(json, "max_dist_to_branch"));
+  setAmbiguousFactor(readNumber(json, "ambiguous_factor"));
+
+  setSwcFiles(readStringList(json, "swc_paths"));
+
+  setResultPunctaFilename(readString(json, "detected_puncta_filename"));
+  setResultSomaPunctaFilename(readString(json, "detected_soma_puncta_filename"));
+}
+
+void ZPunctaDetection::write(QJsonObject& json) const
+{
+  json["input_file"] = m_filename;
+  json["voxel_size_in_um_x"] = m_imgInfo.voxelSizeXInUm();
+  json["voxel_size_in_um_y"] = m_imgInfo.voxelSizeYInUm();
+  json["voxel_size_in_um_z"] = m_imgInfo.voxelSizeZInUm();
+  json["puncta_channel"] = int(m_punctaChannel);
+  json["t"] = int(m_t);
+  json["scene"] = int(m_scene);
+
+  // parameters
+  json["puncta_threshold"] = m_punctaThreshold;
+  json["split_size_threshold"] = m_splitSizeThreshold;
+  json["conf_radius"] = m_confRadius;
+  json["conf_overlap_area"] = m_confOverlapArea;
+  json["overlap_rate_threshold"] = m_overlapRateThreshold;
+  json["seed_size_threshold"] = m_seedSizeThreshold;
+  json["use_multithreading"] = m_useMultithreading;
+
+  // parameters for soma detection
+  json["dendrite_channel"] = m_dendriteChannel;
+  json["max_dendrite_tube_radius"] = m_maxDendriteTubeRadius;  // in um
+  json["dendrite_threshold"] = m_dendriteThreshold;
+
+  // parameters for assign puncta to swc tree
+  json["max_dist_to_branch"] = m_maxDistToBranch; // in um
+  json["ambiguous_factor"] = m_ambiguousFactor;
+
+  json["swc_paths"] = QJsonArray::fromStringList(m_swcPaths);
+
+  json["detected_puncta_filename"] = m_detectedPunctaFileName;
+  json["detected_soma_puncta_filename"] = m_detectedSomaPunctaFileName;
 }
 
 double

@@ -3,7 +3,6 @@
 #include "zlog.h"
 #include "zroi.h"
 #include "zroifilter.h"
-#include "zlogqttypesupport.h"
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QWheelEvent>

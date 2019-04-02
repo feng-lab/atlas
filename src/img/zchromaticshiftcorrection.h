@@ -16,7 +16,18 @@ class ZChromaticShiftCorrection : public ZImgProcess
 {
 Q_OBJECT
 public:
-  ZChromaticShiftCorrection(const QString& imgFilename, const QString& resultFilename);
+  ZChromaticShiftCorrection() = default;
+
+  ZChromaticShiftCorrection(const QString& imgFilename, const QString& resultFilename)
+  {
+    setInputOutput(imgFilename, resultFilename);
+  }
+
+  void setInputOutput(const QString& imgFilename, const QString& resultFilename)
+  {
+    m_imgFilename = imgFilename;
+    m_resultFilename = resultFilename;
+  }
 
   // use this channel to do registration
   void setReferenceChannel(int ch)
@@ -67,6 +78,10 @@ signals:
 
 protected:
   void doWork() override;
+
+  void read(const QJsonObject& json) override;
+
+  void write(QJsonObject& json) const override;
 
 private:
   struct SectionInfo

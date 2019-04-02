@@ -322,7 +322,7 @@ void ZStitchImage::doWork()
     fOut.close();
 #endif
     if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
-        m_mergeMode == ZImgMerge::Mode::Max) {
+        m_mergeMode == ImgMergeMode::Max) {
       ZImgIO().writeImg(m_resFileName, imgMerge);
       for (size_t c = 0; c < imgMerge.imgInfo().numChannels; ++c) {
         QFileInfo fi(m_resFileName);
@@ -349,6 +349,47 @@ void ZStitchImage::doWork()
   }
 
   LOG(INFO) << QString("%1 saved.").arg(m_resFileName);
+}
+
+void ZStitchImage::read(const QJsonObject& json)
+{
+  setInputFilenames(readStringList(json, "input_files"));
+
+  setResultFilename(readString(json, "result_file"));
+
+  setUseAllChannels();
+  if (json.contains("channels_to_use")) {
+    std::vector<size_t> chs;
+    auto numberArray = readNumberArray(json, "channels_to_use");
+    chs.insert(m_channelsToUse.end(), numberArray.begin(), numberArray.end());
+    setUseChannels(chs);
+  }
+
+  setMergeMode(stringToImgMergeMode(readString(json, "merge_mode")));
+  setMaxOverlapRate(readNumber(json, "max_overlap_rate"));
+  if (json.contains("tile_selection_image_file")) {
+    setConnTileImage(readString(json, "tile_selection_image_file"));
+  }
+}
+
+void ZStitchImage::write(QJsonObject& json) const
+{
+  json["input_files"] = QJsonArray::fromStringList(m_inputStack1Filenames);
+
+  json["result_file"] = m_resFileName;
+
+  if (!m_channelsToUse.empty()) {
+    QJsonArray channelArray;
+    for (auto ch : m_channelsToUse) {
+      channelArray.append(QJsonValue(int(ch)));
+    }
+    json["channels_to_use"] = channelArray;
+  }
+  json["merge_mode"] = enumToString(m_mergeMode);
+  json["max_overlap_rate"] = m_maxOverlapRate;
+  if (!m_tileSelectionImageFilename.isEmpty()) {
+    json["tile_selection_image_file"] = m_tileSelectionImageFilename;
+  }
 }
 
 bool ZStitchImage::getTileMatrix(ZImg& img, std::vector<std::vector<int>>& tileMatrix, QList<ZTile>& tileList)

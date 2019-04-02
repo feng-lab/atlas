@@ -4,7 +4,6 @@
 #include "zimgsliceprovider.h"
 #include "zimgblockprovider.h"
 #include "zlog.h"
-#include "zlogqttypesupport.h"
 #include "zimgio.h"
 
 namespace nim {

@@ -319,5 +319,45 @@ inline QString enumToString(Dimension d)
   }
 }
 
+enum class ImgMergeMode
+{
+  Max, Min, Mean, Median, First
+};
+
+inline QString enumToString(ImgMergeMode m)
+{
+  switch (m) {
+    case ImgMergeMode::Max:
+      return "Max";
+    case ImgMergeMode::Min:
+      return "Min";
+    case ImgMergeMode::Mean:
+      return "Mean";
+    case ImgMergeMode::Median:
+      return "Median";
+    case ImgMergeMode::First:
+      return "First";
+    default:
+      throw ZIOException("invalid ImgMergeMode");
+  }
+}
+
+inline ImgMergeMode stringToImgMergeMode(const QString& str)
+{
+  if (str == "Max") {
+    return ImgMergeMode::Max;
+  } else if (str == "Min") {
+    return ImgMergeMode::Min;
+  } else if (str == "Mean") {
+    return ImgMergeMode::Mean;
+  } else if (str == "Median") {
+    return ImgMergeMode::Median;
+  } else if (str == "First") {
+    return ImgMergeMode::First;
+  } else {
+    throw ZIOException("invalid ImgMergeMode " + str);
+  }
+}
+
 } // namespace nim
 

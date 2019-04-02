@@ -36,11 +36,6 @@ private:
 class ZImgMerge : public ZImgBlockProvider
 {
 public:
-  enum class Mode
-  {
-    Max, Min, Mean, Median, First
-  };
-
   // img has absolute location, if img already exist, update its location
   void addImg(const ZImgSubBlock& img, const ZVoxelCoordinate& loc, const QString& imgName = "");
 
@@ -59,7 +54,7 @@ public:
   // throw ZImgException if error
   QStringList resolveLocations();
 
-  void setMergeMode(Mode mode = Mode::Max)
+  void setMergeMode(ImgMergeMode mode = ImgMergeMode::Max)
   { m_mergeMode = mode; }
 
   const ZImgInfo& imgInfo() const override
@@ -84,14 +79,14 @@ protected:
                         const ZImgSubBlock* refImg, double minCost, QStringList& summary) const;
 
   void mergeImgs(ZImg& res, const std::map<const ZImgSubBlock*, ZVoxelCoordinate>& imgs,
-                 Mode mode, QString& summary) const;
+                 ImgMergeMode mode, QString& summary) const;
 
 private:
   std::map<const ZImgSubBlock*, ZVoxelCoordinate> m_imgCoords;
   std::map<std::pair<const ZImgSubBlock*, const ZImgSubBlock*>, std::pair<ZVoxelCoordinate, double>> m_imgPairs;
   std::map<const ZImgSubBlock*, QString> m_imgNames;
   std::map<const ZImgSubBlock*, ZImgInfo> m_imgInfos;
-  Mode m_mergeMode = Mode::Max;
+  ImgMergeMode m_mergeMode = ImgMergeMode::Max;
 
   std::map<const ZImgSubBlock*, ZVoxelCoordinate> m_imgFinalCoords;
   std::vector<ZImgTile> m_tiles;

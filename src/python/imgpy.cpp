@@ -2,6 +2,11 @@
 #include "typecast.h"
 #include "zimg.h"
 #include "zpuncta.h"
+#include "zglobalinit.h"
+#include "zstitchimage.h"
+#include "zpunctadetection.h"
+#include "zsectionsregistration.h"
+#include "zchromaticshiftcorrection.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
@@ -106,6 +111,8 @@ ZImgInfo getImgInfoFromNdarray(const py::array& arr, const ZImgInfo& info_in)
 
 PYBIND11_MODULE(_imgpy, m)
 {
+  initImgLib();
+
   m.doc() = R"pbdoc(
         Python interface to img lib.
     )pbdoc";
@@ -132,6 +139,13 @@ PYBIND11_MODULE(_imgpy, m)
     .value("Z", Dimension::Z)
     .value("C", Dimension::C)
     .value("T", Dimension::T);
+
+  py::enum_<ImgMergeMode>(m, "ImgMergeMode")
+    .value("Max", ImgMergeMode::Max)
+    .value("Min", ImgMergeMode::Min)
+    .value("Mean", ImgMergeMode::Mean)
+    .value("Median", ImgMergeMode::Median)
+    .value("First", ImgMergeMode::First);
 
   py::enum_<FileFormat>(m, "FileFormat", py::arithmetic())
     .value("Unknown", FileFormat::Unknown)
@@ -398,5 +412,144 @@ PYBIND11_MODULE(_imgpy, m)
       return QString("<_imgpy.ZPuncta %1>").arg(v.toQString()).toStdString();
       });
 
+  py::class_<ZStitchImage>(m, "ZStitchImage")
+    .def(py::init<>())
+    .def("setInputFilenames", &ZStitchImage::setInputFilenames,
+      "filenames"_a)
+    .def("setResultFilename", &ZStitchImage::setResultFilename,
+      "filename"_a)
+    .def("setUseChannels", &ZStitchImage::setUseChannels,
+      "channels"_a)
+    .def("setUseAllChannels", &ZStitchImage::setUseAllChannels)
+    .def("setMergeMode", &ZStitchImage::setMergeMode,
+      "mode"_a)
+    .def("setMaxOverlapRate", &ZStitchImage::setMaxOverlapRate,
+      "maxOverlapRate"_a)
+    .def("setConnTileImage", &ZStitchImage::setConnTileImage,
+      "filename"_a)
+    .def("setLogFile", &ZStitchImage::setLogFile, "logfilename"_a)
+    .def("loadTask", &ZStitchImage::loadTask, "filename"_a)
+    .def("saveTask", &ZStitchImage::saveTask, "filename"_a)
+    .def("run", &ZStitchImage::runInPython)
+    .def("__repr__", [](const ZStitchImage& v) {
+      return QString("<_imgpy.ZStitchImage %1>").arg(v.toQString()).toStdString();
+      });
+
+  py::class_<ZPunctaDetection>(m, "ZPunctaDetection")
+    .def(py::init<>())
+    .def("setInputFile", &ZPunctaDetection::setInputFile,
+      "filename"_a, "punctaChannel"_a = 0, "t"_a = 0, "scene"_a = 0,
+      "voxelSizeInUmX"_a = -1.0, "voxelSizeInUmY"_a = -1.0, "voxelSizeInUmZ"_a = -1.0)
+    .def("setResultPunctaFilename", &ZPunctaDetection::setResultPunctaFilename,
+      "filename"_a)
+    .def("setResultSomaPunctaFilename", &ZPunctaDetection::setResultSomaPunctaFilename,
+      "filename"_a)
+    .def("setPunctaThreshold", &ZPunctaDetection::setPunctaThreshold,
+      "thre"_a)
+    .def("setSplitThreshold", &ZPunctaDetection::setSplitThreshold, "thre"_a)
+    .def("setConfidenceRegionForRadiusEstimate", &ZPunctaDetection::setConfidenceRegionForRadiusEstimate,
+      "confRadius"_a)
+    .def("setConfidenceRegionForOverlapArea", &ZPunctaDetection::setConfidenceRegionForOverlapArea,
+      "confOverlapArea"_a)
+    .def("setOverlapRateThreshold", &ZPunctaDetection::setOverlapRateThreshold,
+      "thre"_a)
+    .def("setSeedSizeThreshold", &ZPunctaDetection::setSeedSizeThreshold,
+      "thre"_a)
+    .def("setUseMultithreading", &ZPunctaDetection::setUseMultithreading,
+      "v"_a)
+    .def("setDendriteChannel", &ZPunctaDetection::setDendriteChannel,
+      "dendriteChannel"_a)
+    .def("setMaxDendriteTubeRadiusInUm", &ZPunctaDetection::setMaxDendriteTubeRadiusInUm,
+      "maxDendriteTubeRadius"_a)
+    .def("setDendriteThreshold", &ZPunctaDetection::setDendriteThreshold,
+      "thre"_a)
+    .def("setSwcFiles", &ZPunctaDetection::setSwcFiles,
+      "swcFiles"_a)
+    .def("setMaxDistToBranchInUm", &ZPunctaDetection::setMaxDistToBranchInUm,
+      "dist"_a)
+    .def("setAmbiguousFactor", &ZPunctaDetection::setAmbiguousFactor,
+      "factor"_a)
+    .def("setLogFile", &ZPunctaDetection::setLogFile, "logfilename"_a)
+    .def("loadTask", &ZPunctaDetection::loadTask, "filename"_a)
+    .def("saveTask", &ZPunctaDetection::saveTask, "filename"_a)
+    .def("run", &ZPunctaDetection::runInPython)
+    .def("__repr__", [](const ZPunctaDetection& v) {
+      return QString("<_imgpy.ZPunctaDetection %1>").arg(v.toQString()).toStdString();
+      });
+
+  py::class_<ZSectionsRegistration>(m, "ZSectionsRegistration")
+    .def(py::init<>())
+    .def("setInputOutput", &ZSectionsRegistration::setInputOutput,
+      "inputFiles"_a, "resultFile"_a, "fixedSliceIndex"_a)
+    .def("setReferenceChannel", &ZSectionsRegistration::setReferenceChannel,
+      "refChannel"_a)
+    .def("setRemoveBackground", &ZSectionsRegistration::setRemoveBackground,
+      "v"_a)
+    .def("setRemoveHighForeground", &ZSectionsRegistration::setRemoveHighForeground,
+      "v"_a)
+    .def("setAllowFlip", &ZSectionsRegistration::setAllowFlip, "v"_a)
+    .def("setBrightBackground", &ZSectionsRegistration::setBrightBackground,
+      "v"_a)
+    .def("setMetric", &ZSectionsRegistration::setMetric,
+      "metric"_a)
+    .def("setTransform", &ZSectionsRegistration::setTransform,
+      "transform"_a)
+    .def("setOptimizer", &ZSectionsRegistration::setOptimizer,
+      "optimizer"_a)
+    .def("setUseMultithreading", &ZSectionsRegistration::setUseMultithreading,
+      "v"_a)
+    .def("setNumScales", &ZSectionsRegistration::setNumScales,
+      "numScales"_a)
+    .def("setNumNeighbors", &ZSectionsRegistration::setNumNeighbors,
+      "numNeighbors"_a)
+    .def("setLogFile", &ZSectionsRegistration::setLogFile, "logfilename"_a)
+    .def("loadTask", &ZSectionsRegistration::loadTask, "filename"_a)
+    .def("saveTask", &ZSectionsRegistration::saveTask, "filename"_a)
+    .def("run", &ZSectionsRegistration::runInPython)
+    .def("__repr__", [](const ZSectionsRegistration& v) {
+      return QString("<_imgpy.ZSectionsRegistration %1>").arg(v.toQString()).toStdString();
+      });
+
+  py::class_<ZChromaticShiftCorrection>(m, "ZChromaticShiftCorrection")
+    .def(py::init<>())
+    .def("setInputOutput", &ZChromaticShiftCorrection::setInputOutput,
+      "inputFile"_a, "resultFile"_a)
+    .def("setReferenceChannel", &ZChromaticShiftCorrection::setReferenceChannel,
+      "refChannel"_a)
+    .def("setTargetChannel", &ZChromaticShiftCorrection::setTargetChannel,
+      "targetChannel"_a)
+    .def("setRemoveBackground", &ZChromaticShiftCorrection::setRemoveBackground,
+      "v"_a)
+    .def("setRemoveHighForeground", &ZChromaticShiftCorrection::setRemoveHighForeground,
+      "v"_a)
+    .def("setBrightBackground", &ZChromaticShiftCorrection::setBrightBackground,
+      "v"_a)
+    .def("setMethod", &ZChromaticShiftCorrection::setMethod,
+      "method"_a)
+    .def("setMetric", &ZChromaticShiftCorrection::setMetric,
+      "metric"_a)
+    .def("setTransform", &ZChromaticShiftCorrection::setTransform,
+      "transform"_a)
+    .def("setOptimizer", &ZChromaticShiftCorrection::setOptimizer,
+      "optimizer"_a)
+    .def("setUseMultithreading", &ZChromaticShiftCorrection::setUseMultithreading,
+      "v"_a)
+    .def("setNumScales", &ZChromaticShiftCorrection::setNumScales,
+      "numScales"_a)
+    .def("setLogFile", &ZChromaticShiftCorrection::setLogFile, "logfilename"_a)
+    .def("loadTask", &ZChromaticShiftCorrection::loadTask, "filename"_a)
+    .def("saveTask", &ZChromaticShiftCorrection::saveTask, "filename"_a)
+    .def("run", &ZChromaticShiftCorrection::runInPython)
+    .def("__repr__", [](const ZChromaticShiftCorrection& v) {
+      return QString("<_imgpy.ZChromaticShiftCorrection %1>").arg(v.toQString()).toStdString();
+      });
+
   m.attr("__version__") = GIT_VERSION;
+
+  auto cleanup_callback = []() {
+    // perform cleanup here -- this function is called with the GIL held
+    shutdownImgLib();
+  };
+
+  m.add_object("_cleanup", py::capsule(cleanup_callback));
 }

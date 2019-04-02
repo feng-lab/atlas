@@ -652,27 +652,27 @@ public:
   // make img of new type by casting current img
   // e.g. img = img.castTo<double>();
   template<typename TDesVoxel>
-  ZImg __warn_unused_result castTo() const;
+  [[nodiscard]] ZImg castTo() const;
 
   // overload, cast voxel to format, throw if combination is not supported (like 3-byte float..)
-  ZImg __warn_unused_result castTo(VoxelFormat vf, size_t bytePerVoxel);
+  [[nodiscard]] ZImg castTo(VoxelFormat vf, size_t bytePerVoxel);
 
   // make img of new type, map current data type range to target img data type range, return new img
   // note: float img data type range is [0.0 1.0]
   template<typename TDesVoxel>
-  ZImg __warn_unused_result convertTo() const;
+  [[nodiscard]] ZImg convertTo() const;
 
   // convert normalized img to another type
   template<typename TDesVoxel>
-  ZImg __warn_unused_result convertNormalizedTo() const;
+  [[nodiscard]] ZImg convertNormalizedTo() const;
 
   // make img of new type, map [minData maxData] to target img data type range, return new img
   template<typename TDesVoxel, typename TRange>
-  ZImg __warn_unused_result convertTo(TRange minData, TRange maxData) const;
+  [[nodiscard]] ZImg convertTo(TRange minData, TRange maxData) const;
 
   // deduce TDesVoxel from img
   template<typename TRange>
-  ZImg __warn_unused_result convertTo(TRange minData, TRange maxData, const ZImg& targetImgType) const;
+  [[nodiscard]] ZImg convertTo(TRange minData, TRange maxData, const ZImg& targetImgType) const;
 
   // resize in x-y-z dimensions
   // 'antialiasing' specifies whether to perform antialiasing when shrinking an image. For the 'nearest' method,

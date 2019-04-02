@@ -5,7 +5,6 @@
 #include "zwidgetsgroup.h"
 #include "zsaturateoperation.h"
 #include "zgraphicsscene.h"
-#include "zlogqttypesupport.h"
 #include <QWindow>
 #include <QStyleOption>
 #include <QPushButton>

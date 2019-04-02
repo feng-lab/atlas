@@ -56,4 +56,49 @@ void ZImgProcess::run()
   }
 }
 
+void ZImgProcess::runInPython()
+{
+  LogSinkPtr fileDestination = createFileLogSink(m_logFile);
+  if (fileDestination)
+    addLogSink(fileDestination);
+  auto guard1 = folly::makeGuard([&fileDestination]() {
+    if (fileDestination) { removeLogSink(fileDestination); }
+  });
+  boost::ignore_unused(guard1);
+
+  try {
+    LOG(INFO) << "run " << QThread::currentThreadId();
+    doWork();
+    emit finished();
+  }
+  catch (itk::ProcessAborted const& e) {
+    LOG(ERROR) << "Process Aborted by User. " << e.what();
+    if (hasParent()) {
+      LOG(ERROR) << "notifying parent operation..";
+    }
+    throw ZException(e.what());
+  }
+  catch (itk::ExceptionObject const& excp) {
+    LOG(ERROR) << "Caught itk exception: " << excp.what();
+    if (hasParent()) {
+      LOG(ERROR) << "notifying parent operation..";
+    }
+    throw ZException(excp.what());
+  }
+  catch (ZProcessAbortException const& e) {
+    LOG(ERROR) << "Process Aborted by User. " << e.what();
+    if (hasParent()) {
+      LOG(ERROR) << "notifying parent operation..";
+    }
+    throw;
+  }
+  catch (ZException const& e) {
+    LOG(ERROR) << "Caught exception: " << e.what();
+    if (hasParent()) {
+      LOG(ERROR) << "notifying parent operation..";
+    }
+    throw;
+  }
+}
+
 } // namespace nim

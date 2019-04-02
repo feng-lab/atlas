@@ -8,19 +8,12 @@
 #include "zimagematrix3dtransform.h"
 #include "zimagematrix2dtransform.h"
 #include "zimagetransformresolve.h"
-#include "zlogqttypesupport.h"
 #include <algorithm>
 #include <memory>
 #include <numeric>
 #include <utility>
 
 namespace nim {
-
-ZChromaticShiftCorrection::ZChromaticShiftCorrection(const QString& imgFilename, const QString& resultFilename)
-  : m_imgFilename(imgFilename)
-  , m_resultFilename(resultFilename)
-{
-}
 
 void ZChromaticShiftCorrection::doWork()
 {
@@ -68,6 +61,41 @@ void ZChromaticShiftCorrection::doWork()
   }
   emit resultReady(m_resultFilename);
   reportProgress(1.0);
+}
+
+void ZChromaticShiftCorrection::read(const QJsonObject& json)
+{
+  setInputOutput(readString(json, "input_file"), readString(json, "result_file"));
+
+  setReferenceChannel(readNumber(json, "reference_channel"));
+  setTargetChannel(readNumber(json, "target_channel"));
+  setRemoveBackground(readBool(json, "remove_background"));
+  setRemoveHighForeground(readBool(json, "remove_high_foreground"));
+  setBrightBackground(readBool(json, "bright_background"));
+  setMethod(readString(json, "method"));
+  setMetric(readString(json, "metric"));
+  setTransform(readString(json, "transform"));
+  setOptimizer(readString(json, "optimizer"));
+  setUseMultithreading(readBool(json, "use_multithreading"));
+  setNumScales(readNumber(json, "num_scales"));
+}
+
+void ZChromaticShiftCorrection::write(QJsonObject& json) const
+{
+  json["input_file"] = m_imgFilename;
+  json["result_file"] = m_resultFilename;
+
+  json["reference_channel"] = m_referenceChannel;
+  json["target_channel"] = m_targetChannel;
+  json["remove_background"] = m_removeBackground;
+  json["remove_high_foreground"] = m_removeHighForeground;
+  json["bright_background"] = m_brightBackground;
+  json["method"] = m_method;
+  json["metric"] = m_metric;
+  json["transform"] = m_transform;
+  json["optimizer"] = m_optimizer;
+  json["use_multithreading"] = m_useMultithreading;
+  json["num_scales"] = m_numScales;
 }
 
 template<typename ImagePixelType>

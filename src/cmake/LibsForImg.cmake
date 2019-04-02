@@ -26,7 +26,7 @@ get_target_property(TBB_LIBRARY TBB::tbb IMPORTED_LOCATION_RELEASE)
 message(STATUS "TBB_LIBRARY: ${TBB_LIBRARY}")
 
 if(BUILD_WITH_CONDA)
-  set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${PREFIX}/include ${PREFIX}/include/fftw)
+  set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} $ENV{PREFIX}/include $ENV{PREFIX}/include/fftw)
   find_library(MKL_INTEL_LP64 NAMES mkl_intel_lp64
                PATHS $ENV{PREFIX}/lib NO_DEFAULT_PATH)
   find_library(MKL_TBB_THREAD NAMES mkl_tbb_thread

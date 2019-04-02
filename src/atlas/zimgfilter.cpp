@@ -7,7 +7,6 @@
 #include "zlog.h"
 #include "znumericparameter.h"
 #include "zwidgetsgroup.h"
-#include "zlogqttypesupport.h"
 #include "ztheme.h"
 #include <QGraphicsPixmapItem>
 #include <QStyleOption>

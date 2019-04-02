@@ -6,13 +6,17 @@ namespace nim {
 
 void initLogging(const char* argv0, const QString& filename)
 {
-  google::SetLogDestination(google::GLOG_INFO, QFile::encodeName(filename).constData());
+  if (filename.isEmpty()) {
+    google::SetLogDestination(google::GLOG_INFO, "");
+  } else {
+    google::SetLogDestination(google::GLOG_INFO, QFile::encodeName(filename).constData());
+  }
   google::SetLogDestination(google::GLOG_ERROR, "");
   google::SetLogDestination(google::GLOG_FATAL, "");
   google::SetLogDestination(google::GLOG_WARNING, "");
 
   // Set whether log messages go to stderr instead of logfiles
-  FLAGS_logtostderr = false;
+  FLAGS_logtostderr = filename.isEmpty();
   // Set whether log messages go to stderr in addition to logfiles.
   FLAGS_alsologtostderr = false;
   // Set color messages logged to stderr (if supported by terminal).

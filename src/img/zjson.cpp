@@ -1,5 +1,9 @@
 #include "zjson.h"
 
+#include "zexception.h"
+#include "zlog.h"
+#include <QFile>
+
 namespace nim {
 
 void modifyJsonValue(QJsonObject& obj, const QString& path, const QJsonValue& newValue)
@@ -93,6 +97,116 @@ void removeJsonValue(QJsonDocument& doc, const QString& path)
   QJsonObject obj = doc.object();
   removeJsonValue(obj, path);
   doc = QJsonDocument(obj);
+}
+
+QJsonObject loadJsonObject(const QString& file)
+{
+  QFile loadFile(file);
+
+  if (!loadFile.open(QIODevice::ReadOnly)) {
+    throw ZIOException("could not open: " + file);
+  }
+
+  QByteArray saveData = loadFile.readAll();
+
+  QJsonDocument doc = QJsonDocument::fromJson(saveData);
+
+  CHECK(doc.isObject());
+
+  return doc.object();
+}
+
+void saveJsonObject(const QJsonObject& json, const QString& file)
+{
+  QFile saveFile(file);
+
+  if (!saveFile.open(QIODevice::WriteOnly)) {
+    throw ZIOException(QString("could not open save file: ") + file);
+  }
+
+  QJsonDocument saveDoc(json);
+  saveFile.write(saveDoc.toJson(QJsonDocument::Indented));
+}
+
+QStringList readStringList(const QJsonObject& json, const QString& key)
+{
+  if (!json.contains(key)) {
+    throw ZIOException(QString("Key %1 required").arg(key));
+  }
+  QJsonValue value = json[key];
+
+  if (!value.isArray()) {
+    throw ZIOException("not stringlist");
+  }
+  QStringList res;
+  QJsonArray array = value.toArray();
+  for (int i = 0; i < array.size(); ++i) {
+    if (!array[i].isString()) {
+      throw ZIOException("not string");
+    }
+    res.append(array[i].toString());
+  }
+  return res;
+}
+
+QString readString(const QJsonObject& json, const QString& key)
+{
+  if (!json.contains(key)) {
+    throw ZIOException(QString("Key %1 required").arg(key));
+  }
+  QJsonValue value = json[key];
+
+  if (!value.isString()) {
+    throw ZIOException("not string");
+  }
+  return value.toString();
+}
+
+double readNumber(const QJsonObject& json, const QString& key)
+{
+  if (!json.contains(key)) {
+    throw ZIOException(QString("Key %1 required").arg(key));
+  }
+  QJsonValue value = json[key];
+
+  if (!value.isDouble()) {
+    throw ZIOException("not number");
+  }
+  return value.toDouble();
+}
+
+std::vector<double> readNumberArray(const QJsonObject& json, const QString& key)
+{
+  if (!json.contains(key)) {
+    throw ZIOException(QString("Key %1 required").arg(key));
+  }
+  QJsonValue value = json[key];
+
+  if (!value.isArray()) {
+    throw ZIOException("not number array");
+  }
+  std::vector<double> res;
+  QJsonArray array = value.toArray();
+  for (int i = 0; i < array.size(); ++i) {
+    if (!array[i].isDouble()) {
+      throw ZIOException("not number");
+    }
+    res.push_back(array[i].toDouble());
+  }
+  return res;
+}
+
+bool readBool(const QJsonObject& json, const QString& key)
+{
+  if (!json.contains(key)) {
+    throw ZIOException(QString("Key %1 required").arg(key));
+  }
+  QJsonValue value = json[key];
+
+  if (!value.isBool()) {
+    throw ZIOException("not bool");
+  }
+  return value.toBool();
 }
 
 } // namespace nim

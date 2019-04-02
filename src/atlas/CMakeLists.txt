@@ -392,7 +392,6 @@ set(SOURCES
     z3dimgslicerenderer.h
     zregionontology.h
     zobjdetailedinfowidget.h
-    zjson.h
     zlogdialog.h
     zlogmodelsink.h
     main.cpp
@@ -567,7 +566,6 @@ set(SOURCES
     z3dimgslicerenderer.cpp
     zregionontology.cpp
     zobjdetailedinfowidget.cpp
-    zjson.cpp
     zlogdialog.cpp
     zlogmodelsink.cpp
     zapplication.cpp

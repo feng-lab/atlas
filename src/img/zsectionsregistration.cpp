@@ -7,21 +7,12 @@
 #include "zimgregistration.h"
 #include "zimagematrix2dtransform.h"
 #include "zimagetransformresolve.h"
-#include "zlogqttypesupport.h"
 #include <algorithm>
 #include <memory>
 #include <numeric>
 #include <utility>
 
 namespace nim {
-
-ZSectionsRegistration::ZSectionsRegistration(const QStringList& imgFilenames, const QString& resultFilename,
-                                             int fixedSliceIndex)
-  : m_imgFilenames(imgFilenames)
-  , m_resultFilename(resultFilename)
-  , m_fixedSliceIndex(fixedSliceIndex)
-{
-}
 
 void ZSectionsRegistration::doWork()
 {
@@ -99,6 +90,43 @@ void ZSectionsRegistration::doWork()
   IMG_TYPED_CALL(transformSections, srcImg, tfmmap, srcImg, m_resultFilename);
 
   reportProgress(1.0);
+}
+
+void ZSectionsRegistration::read(const QJsonObject& json)
+{
+  setInputOutput(readStringList(json, "input_files"), readString(json, "result_file"),
+                 readNumber(json, "fixed_slice_index"));
+
+  setReferenceChannel(readNumber(json, "reference_channel"));
+  setRemoveBackground(readBool(json, "remove_background"));
+  setRemoveHighForeground(readBool(json, "remove_high_foreground"));
+  setAllowFlip(readBool(json, "allow_flip"));
+  setBrightBackground(readBool(json, "bright_background"));
+  setMetric(readString(json, "metric"));
+  setTransform(readString(json, "transform"));
+  setOptimizer(readString(json, "optimizer"));
+  setUseMultithreading(readBool(json, "use_multithreading"));
+  setNumScales(readNumber(json, "num_scales"));
+  setNumNeighbors(readNumber(json, "num_neighbors"));
+}
+
+void ZSectionsRegistration::write(QJsonObject& json) const
+{
+  json["input_files"] = QJsonArray::fromStringList(m_imgFilenames);
+  json["result_file"] = m_resultFilename;
+  json["fixed_slice_index"] = m_fixedSliceIndex;
+
+  json["reference_channel"] = m_referenceChannel;
+  json["remove_background"] = m_removeBackground;
+  json["remove_high_foreground"] = m_removeHighForeground;
+  json["allow_flip"] = m_allowFlip;
+  json["bright_background"] = m_brightBackground;
+  json["metric"] = m_metric;
+  json["transform"] = m_transform;
+  json["optimizer"] = m_optimizer;
+  json["use_multithreading"] = m_useMultithreading;
+  json["num_scales"] = m_numScales;
+  json["num_neighbors"] = m_numNeighbors;
 }
 
 template<typename ImagePixelType>

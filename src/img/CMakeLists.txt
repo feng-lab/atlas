@@ -108,7 +108,6 @@ set(IMG_SOURCES
     zneighborhood.h
     zimgneighborhoodwithptriterator.h
     zlog.h
-    zlogqttypesupport.h
     zwindowsheader.h
     zbenchtimer.cpp
     zcpuinfo.cpp
@@ -231,6 +230,9 @@ set(IMG_SOURCES
     zsectionsregistration.cpp
     zstitchimage.cpp
     zstitchimage.h
+    zglobalinit.h
+    zjson.h
+    zjson.cpp
     )
 
 # our target

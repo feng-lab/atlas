@@ -14,9 +14,7 @@
 namespace nim {
 
 #ifdef _MSC_VER
-#define __warn_unused_result _Check_return_
 #else
-#define __warn_unused_result  __attribute__((warn_unused_result))
 #define __forceinline       inline __attribute__((always_inline))
 #endif
 

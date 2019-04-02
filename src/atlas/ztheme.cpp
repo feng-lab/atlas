@@ -2,7 +2,6 @@
 
 #include "zjson.h"
 #include "zlog.h"
-#include "zlogqttypesupport.h"
 
 #ifdef Q_OS_MACOS
 #include <private/qcore_mac_p.h>

@@ -16,7 +16,19 @@ class ZSectionsRegistration : public ZImgProcess
 {
   Q_OBJECT
 public:
-  ZSectionsRegistration(const QStringList& imgFilenames, const QString& resultFilename, int fixedSliceIndex);
+  ZSectionsRegistration() = default;
+
+  ZSectionsRegistration(const QStringList& imgFilenames, const QString& resultFilename, int fixedSliceIndex)
+  {
+    setInputOutput(imgFilenames, resultFilename, fixedSliceIndex);
+  }
+
+  void setInputOutput(const QStringList& imgFilenames, const QString& resultFilename, int fixedSliceIndex)
+  {
+    m_imgFilenames = imgFilenames;
+    m_resultFilename = resultFilename;
+    m_fixedSliceIndex = fixedSliceIndex;
+  }
 
   // use this channel to do registration, if not set or set to -1, the channel with strongest image signal
   // will be used.
@@ -70,6 +82,10 @@ signals:
 
 protected:
   void doWork() override;
+
+  void read(const QJsonObject& json) override;
+
+  void write(QJsonObject& json) const override;
 
 private:
   struct SectionInfo
