@@ -58,6 +58,12 @@ public:
 protected:
   void doWork() override;
 
+  void read(const QJsonObject&) override
+  {}
+
+  void write(QJsonObject&) const override
+  {}
+
 private:
   void separatePuncta();
 

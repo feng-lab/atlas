@@ -21,18 +21,14 @@ public:
   void loadTask(const QString& file)
   {
     QJsonObject json = loadJsonObject(file);
-    if (json.contains("log_file") && json["log_file"].isString()) {
-      m_logFile = json["log_file"].toString();
-    }
+    m_logFile = readString(json, "log_file");
     read(json);
   }
 
   void saveTask(const QString& file) const
   {
     QJsonObject json;
-    if (!m_logFile.isEmpty()) {
-      json["log_file"] = m_logFile;
-    }
+    json["log_file"] = m_logFile;
     write(json);
     saveJsonObject(json, file);
   }
@@ -40,6 +36,7 @@ public:
   QString toQString() const
   {
     QJsonObject json;
+    json["log_file"] = m_logFile;
     write(json);
     QJsonDocument jsonDoc(json);
     return jsonDoc.toJson(QJsonDocument::Indented);
@@ -56,11 +53,9 @@ signals:
 protected:
   virtual void doWork() = 0;
 
-  virtual void read(const QJsonObject&)
-  {}
+  virtual void read(const QJsonObject&) = 0;
 
-  virtual void write(QJsonObject&) const
-  {}
+  virtual void write(QJsonObject&) const = 0;
 
 private:
   QString m_logFile;

@@ -34,6 +34,7 @@ if(BUILD_WITH_CONDA)
   find_library(MKL_CORE NAMES mkl_core
                PATHS $ENV{PREFIX}/lib NO_DEFAULT_PATH)
   set(MKL_LIBRARIES ${MKL_INTEL_LP64} ${MKL_TBB_THREAD} ${MKL_CORE})
+  message(STATUS "MKL_INCLUDE_DIRS: ${MKL_INCLUDE_DIRS}")
 else()
 if (WIN32)
   set(INTEL_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\compiler")
