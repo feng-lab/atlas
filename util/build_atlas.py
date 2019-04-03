@@ -11,7 +11,7 @@ def get_cmake_cmd_common_part():
                     ]
         else:
             return [get_cmake_binary(),  # '-E', 'echo',
-                    '-G', 'Visual Studio 15 2017 Win64', '-T', 'host=x64'
+                    '-G', 'Visual Studio 16 2019', '-A', 'x64', '-T', 'host=x64'
                     ]
     elif is_linux():
         if use_ninja():

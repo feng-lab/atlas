@@ -133,7 +133,7 @@ def get_cmake_cmd_common_part(install_dir: str):
                     ]
         else:
             return [get_cmake_binary(),  # '-E', 'echo',
-                    '-G', 'Visual Studio 15 2017 Win64', '-T', 'host=x64',
+                    '-G', 'Visual Studio 16 2019', '-A', 'x64', '-T', 'host=x64',
                     '-DCMAKE_INSTALL_PREFIX=' + install_dir
                     ]
     elif is_linux():
@@ -424,7 +424,14 @@ def build_glbinding(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
+    orig_file = None
+    bak_file = None
     try:
+        orig_file = os.path.join(src_dir, 'source', 'glbinding', 'include', 'glbinding', 'glbinding.h')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'#include <set>'],
+                              to_texts=['#include <set>\n#include <string>'])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DOPTION_BUILD_TOOLS:BOOL=OFF',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -433,6 +440,7 @@ def build_glbinding(src_dir: str, install_dir: str):
                          src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
+        os.replace(bak_file, orig_file)
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
@@ -619,13 +627,15 @@ def build_geometrictools(src_dir: str, install_dir: str):
             env = get_vcvars_environment()
             subprocess.run(['MSBuild', 'GTEngine.v15.vcxproj', '/property:Platform=x64',
                             '/property:Configuration=Release', '/maxcpucount',
+                            '/property:WindowsTargetPlatformVersion=' + env['UCRTVERSION'],  # like 10.0.16299.0
+                            '/property:PlatformToolset=v142',
                             '/property:ForceImportBeforeCppTargets=' + ext_dir() + '\\no_warning_as_error.props'],
                            cwd=src_dir, shell=True, check=True, env=env)
-            glob_copy(os.path.join(src_dir, '_Output', 'v141', 'x64', 'Release', 'GTEngine.v15.lib'),
+            glob_copy(os.path.join(src_dir, '_Output', 'v142', 'x64', 'Release', 'GTEngine.v15.lib'),
                       os.path.join(install_dir, 'lib'))
-            glob_copy(os.path.join(src_dir, '_Output', 'v141', 'x64', 'Release', 'GTEngine.v15.pch'),
+            glob_copy(os.path.join(src_dir, '_Output', 'v142', 'x64', 'Release', 'GTEngine.v15.pch'),
                       os.path.join(install_dir, 'lib'))
-            glob_copy(os.path.join(src_dir, '_Output', 'v141', 'x64', 'Release', 'GTEngine.v15.pdb'),
+            glob_copy(os.path.join(src_dir, '_Output', 'v142', 'x64', 'Release', 'GTEngine.v15.pdb'),
                       os.path.join(install_dir, 'lib'))
         elif is_linux():
             orig_file = os.path.join(src_dir, 'makeengine.gte')
@@ -783,6 +793,7 @@ def build_freeimage(src_dir: str, install_dir: str):
             env = get_vcvars_environment()
             subprocess.run(['MSBuild', 'FreeImage.2017.sln', '/target:FreeImagePlus', '/property:Platform=x64',
                             '/property:Configuration=Release', '/maxcpucount',
+                            '/property:PlatformToolset=v142',
                             '/property:WindowsTargetPlatformVersion=' + env['UCRTVERSION']  # like 10.0.16299.0
                             ],
                            cwd=src_dir, shell=True, check=True, env=env)
@@ -1061,7 +1072,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir, env=env)
 
         if is_windows():
-            orig_file_2 = os.path.join(install_dir, 'x64', 'vc15', 'staticlib', 'OpenCVModules.cmake')
+            orig_file_2 = os.path.join(install_dir, 'x64', 'vc16', 'staticlib', 'OpenCVModules.cmake')
         else:
             orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'opencv4', 'OpenCVModules.cmake')
         patch_file(orig_file_2,

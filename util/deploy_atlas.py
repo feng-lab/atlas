@@ -15,10 +15,18 @@ def get_bak_file_name(orig_file: str):
     return orig_file + '.bak'
 
 
-def update_pacakge_xml_version(file: str):
-    tree = eTree.parse(file)
+def update_pacakge_xml_version(template_file:str, file: str):
+    tree = eTree.parse(template_file)
     tree.find('Version').text = '{0:%Y.%m.%d}'.format(datetime.datetime.now())
     tree.find('ReleaseDate').text = '{0:%Y-%m-%d}'.format(datetime.datetime.now())
+    # Write back to file
+    tree.write(file, encoding="utf-8", xml_declaration=True)
+
+
+def update_maintenance_pacakge_xml_version(template_file:str, file: str):
+    tree = eTree.parse(template_file)
+    tree.find('Version').text = '3.0.6-1'  # todo: get version and date from qt components.xml
+    tree.find('ReleaseDate').text = '2019-04-03'
     # Write back to file
     tree.write(file, encoding="utf-8", xml_declaration=True)
 
@@ -195,6 +203,9 @@ def build_atlas_installer():
     if os.path.exists(os.path.join(repo_package_folder, mt_repo_package_name)):
         os.remove(os.path.join(repo_package_folder, mt_repo_package_name))
     shutil.move(os.path.join(common_dirs.deploy_target_dir(), mt_repo_package_name), repo_package_folder)
+    update_maintenance_pacakge_xml_version(os.path.join(common_dirs.deploy_target_dir(), 'maintenance_package.xml'),
+                                           os.path.join(common_dirs.deploy_target_dir(),
+                                                        'packages', 'fenglab.maintenance', 'meta', 'package.xml'))
 
     subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'archivegen'),
                     repo_package_name, app_name],
@@ -205,7 +216,8 @@ def build_atlas_installer():
     if os.path.exists(os.path.join(repo_package_folder, repo_package_name)):
         os.remove(os.path.join(repo_package_folder, repo_package_name))
     shutil.move(os.path.join(common_dirs.deploy_target_dir(), repo_package_name), repo_package_folder)
-    update_pacakge_xml_version(os.path.join(common_dirs.deploy_target_dir(),
+    update_pacakge_xml_version(os.path.join(common_dirs.deploy_target_dir(), 'atlas_package.xml'),
+                               os.path.join(common_dirs.deploy_target_dir(),
                                             'packages', 'fenglab.atlas', 'meta', 'package.xml'))
 
     subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'repogen'),

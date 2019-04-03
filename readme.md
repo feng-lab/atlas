@@ -33,6 +33,13 @@
 * $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: -mmacosx-version-min=10.12
 * $Repository_DIR/src/3rdparty/makeengine.macos.gte: -mmacosx-version-min=10.12
 
+## Visual Studio Update
+* $Repository_DIR/util/common_dirs.py: 178: def vs_install_dir() -> str ...
+* $Repository_DIR/util/build_atlas.py: 11: '-G', 'Visual Studio 16 2019', '-A', 'x64', '-T', 'host=x64'
+* $Repository_DIR/util/build_ext_libs.py: 133: '-G', 'Visual Studio 16 2019', '-A', 'x64', '-T', 'host=x64'
+* $Repository_DIR/util/build_ext_libs.py: change all 'v141' to 'v142'
+* $Repository_DIR/util/build_ext_libs.py: change one 'vc15' to 'vc16'
+
 ## Python Package Build
 ```bash
 conda install conda-build cmake ninja qt mkl-devel tbb-devel numpy pybind11

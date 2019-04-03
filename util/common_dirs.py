@@ -178,16 +178,7 @@ def qt_installer_framework_bin_dir() -> str:
 def vs_install_dir() -> str:
     assert sys.platform.startswith('win32')
 
-    vsinstalldir_var_names = ['VS2017INSTALLDIR']
-
-    vsinstalldir = None
-    for var_name in vsinstalldir_var_names:
-        vsinstalldir = os.getenv(var_name)
-        if vsinstalldir is not None:
-            break
-
-    if vsinstalldir is None:
-        raise OSError('could not find VS2017INSTALLDIR environment variable')
+    vsinstalldir = r'C:\Program Files (x86)\Microsoft Visual Studio\2019\Community'
     assert os.path.exists(vsinstalldir)
 
     return vsinstalldir
