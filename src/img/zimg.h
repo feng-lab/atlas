@@ -1164,7 +1164,7 @@ private:
 };
 
 template<typename TPixel>
-void image2DWrite(const TPixel* data, int width, int height,
+void image2DWrite(const TPixel* data, size_t width, size_t height,
                   const QString& filename)
 {
   ZImg img;

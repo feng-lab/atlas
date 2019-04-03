@@ -65,13 +65,13 @@ LogSinkPtr createFunctorLogSink(LogFunction f);
 inline void addLogSink(LogSink* sink)
 { if (sink) google::AddLogSink(sink); }
 
-inline void addLogSink(LogSinkPtr sink)
+inline void addLogSink(const LogSinkPtr& sink)
 { if (sink) google::AddLogSink(sink.get()); }
 
 inline void removeLogSink(LogSink* sink)
 { if (sink) google::RemoveLogSink(sink); }
 
-inline void removeLogSink(LogSinkPtr sink)
+inline void removeLogSink(const LogSinkPtr& sink)
 { if (sink) google::RemoveLogSink(sink.get()); }
 
 QString levelToString(LogSeverity theLevel);

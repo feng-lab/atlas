@@ -1,7 +1,7 @@
 #include "zlog.h"
 
 #include <QFile>
-
+#include <utility>
 namespace nim {
 
 void initLogging(const char* argv0, const QString& filename)
@@ -77,9 +77,9 @@ public:
 
   // LogSink interface
 public:
-  virtual void send(LogSeverity /*severity*/, const char* /*full_filename*/, const char* /*base_filename*/,
-                    int /*line*/, const ::tm* /*tm_time*/, const char* message,
-                    size_t /*prefix_len*/, size_t message_len) override
+  void send(LogSeverity /*severity*/, const char* /*full_filename*/, const char* /*base_filename*/,
+            int /*line*/, const ::tm* /*tm_time*/, const char* message,
+            size_t /*prefix_len*/, size_t message_len) override
   {
     if (isValid()) {
       m_file.write(message, message_len + 1);  // glog: after message_len is '\n'
@@ -92,8 +92,8 @@ class FunctionLogSink : public LogSink
 {
   LogFunction m_logFunction;
 public:
-  explicit FunctionLogSink(const LogFunction& f)
-    : m_logFunction(f)
+  explicit FunctionLogSink(LogFunction  f)
+    : m_logFunction(std::move(f))
   {}
 
   inline bool isValid() const
@@ -101,8 +101,8 @@ public:
 
   // LogSink interface
 public:
-  virtual void send(LogSeverity severity, const char* full_filename, const char* base_filename, int line,
-                    const tm* tm_time, const char* message, size_t prefix_len, size_t message_len) override
+  void send(LogSeverity severity, const char* full_filename, const char* base_filename, int line,
+            const tm* tm_time, const char* message, size_t prefix_len, size_t message_len) override
   {
     if (isValid()) {
       m_logFunction(LogData(severity, full_filename, base_filename, line, tm_time, message, prefix_len, message_len));
