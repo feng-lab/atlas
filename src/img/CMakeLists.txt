@@ -277,7 +277,7 @@ if (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC /permissive-)
 
   #target_link_libraries(${LIBRARY_NAME} PUBLIC /LTCG) # Link-time Code Generation
-  set_target_properties(${LIBRARY_NAME} PROPERTIES LINK_FLAGS /LTCG)
+  set_target_properties(${LIBRARY_NAME} PROPERTIES LINK_FLAGS /LTCG:STATUS)
 
   # for some files
   set_source_files_properties(zimageavx.cpp PROPERTIES COMPILE_FLAGS /arch:AVX)

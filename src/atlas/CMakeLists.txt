@@ -648,7 +648,7 @@ if (WIN32)
 
   #target_link_libraries(${APP_NAME} PUBLIC /LTCG) # Link-time Code Generation
   set_target_properties(${APP_NAME} PROPERTIES
-                        LINK_FLAGS "/LTCG /DEBUG:NONE /FORCE:MULTIPLE" # to create an output file whether or not LINK finds more than one definition for a symbol.
+                        LINK_FLAGS "/LTCG:STATUS /DEBUG:NONE /FORCE:MULTIPLE" # to create an output file whether or not LINK finds more than one definition for a symbol.
                         )
 
   # for some files
