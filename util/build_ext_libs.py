@@ -1172,30 +1172,8 @@ def build_libs(libs: dict, update_src: bool):
             build_zlib(src_dir, os.path.join(ext_dir(), 'zlib'))
 
     if libs['ffmpeg']:
-        if is_windows():
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'ffmpeg*win*'))
-            package_unpack_folder = get_package_top_level_folder(package_name, ext_dir())
-            unpack_file_to_folder(package_name, ext_dir())
-            os.replace(os.path.join(package_unpack_folder, 'bin', 'ffmpeg.exe'),
-                       os.path.join(ext_dir(), 'ffmpeg.exe'))
-            shutil.rmtree(package_unpack_folder, ignore_errors=False)
-        elif is_linux():
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'ffmpeg*static.tar.xz'))
-            package_unpack_folder = get_package_top_level_folder(package_name, ext_dir())
-            unpack_file_to_folder(package_name, ext_dir())
-            os.replace(os.path.join(package_unpack_folder, 'ffmpeg'),
-                       os.path.join(ext_dir(), 'ffmpeg'))
-            shutil.rmtree(package_unpack_folder, ignore_errors=False)
-        else:
-            # unpack_file_to_folder(find_src_package_with_glob(os.path.join(src_package_dir, 'ffmpeg*7z')),
-            #                       ext_dir)
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'ffmpeg*macos*'))
-            package_unpack_folder = get_package_top_level_folder(package_name, ext_dir())
-            unpack_file_to_folder(package_name, ext_dir())
-            os.replace(os.path.join(package_unpack_folder, 'bin', 'ffmpeg'),
-                       os.path.join(ext_dir(), 'ffmpeg'))
-            shutil.rmtree(package_unpack_folder, ignore_errors=False)
-            os.chmod(os.path.join(ext_dir(), 'ffmpeg'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+        install_ffmpeg()
+        shutil.copy2(get_ffmpeg_binary(), ext_dir())
 
     if libs['boost']:
         package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'boost*'))

@@ -371,6 +371,18 @@ def install_ninja():
         os.chmod(os.path.join(software_dir(), 'ninja'), stat.S_IXUSR)
 
 
+def install_ffmpeg():
+    if is_windows():
+        unpack_tool_to_software_dir(src_package_dir(), 'ffmpeg*win*')
+    elif is_linux():
+        unpack_tool_to_software_dir(src_package_dir(), 'ffmpeg*static.tar.xz')
+    else:
+        folder = unpack_tool_to_software_dir(src_package_dir(), 'ffmpeg*macos*')
+        os.chmod(os.path.join(folder, 'bin', 'ffmpeg'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+        os.chmod(os.path.join(folder, 'bin', 'ffplay'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+        os.chmod(os.path.join(folder, 'bin', 'ffprobe'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+
+
 def get_cmake_binary() -> str:
     if is_windows():
         cmake_folder = find_src_package_with_glob(os.path.join(software_dir(), 'cmake-*win*-x64'))
@@ -388,6 +400,18 @@ def get_ninja_binary() -> str:
         return os.path.join(software_dir(), 'ninja.exe')
     else:
         return os.path.join(software_dir(), 'ninja')
+
+
+def get_ffmpeg_binary() -> str:
+    if is_windows():
+        folder = find_src_package_with_glob(os.path.join(software_dir(), 'ffmpeg*win*'))
+        return os.path.join(folder, 'bin', 'ffmpeg.exe')
+    elif is_linux():
+        folder = find_src_package_with_glob(os.path.join(software_dir(), 'ffmpeg*static'))
+        return os.path.join(folder, 'ffmpeg')
+    else:
+        folder = find_src_package_with_glob(os.path.join(software_dir(), 'ffmpeg*macos*'))
+        return os.path.join(folder, 'bin', 'ffmpeg')
 
 
 if __name__ == "__main__":
