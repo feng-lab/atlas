@@ -642,7 +642,7 @@ if (WIN32)
   target_compile_options(${APP_NAME} PUBLIC /wd6326) # Potential comparison of a constant with another constant.
   target_compile_options(${APP_NAME} PUBLIC /wd6330) # Incorrect type passed as parameter in call to function.
   target_compile_options(${APP_NAME} PUBLIC /MP) # Build with Multiple Processes
-  target_compile_options(${APP_NAME} PUBLIC /Zc:inline) #
+  # target_compile_options(${APP_NAME} PUBLIC /Zc:inline) #
   target_compile_options(${APP_NAME} PUBLIC /GL) # Enables whole program optimization.
   target_compile_options(${APP_NAME} PUBLIC /permissive-)
 
