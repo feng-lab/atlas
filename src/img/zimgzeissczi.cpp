@@ -775,10 +775,12 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
     }
   }
 
+#if 0
   for (size_t i = 0; i < infos.size(); ++i) {
     LOG(INFO) << infos[i].toQString();
   }
   LOG(INFO) << "";
+#endif
 }
 
 void ZImgZeissCZI::readMetadata(const QString& filename, ZImgMetadata& meta, size_t /*scene*/)
