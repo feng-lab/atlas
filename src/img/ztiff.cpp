@@ -1819,6 +1819,9 @@ void ZTiffWriter::writeIFD(const ZImg& img, int z, int t, int c, bool writeThumb
   }
 
   bool planarconfigSeparate = true;
+  if (c >= 0 || img.numChannels() == 1) {
+    planarconfigSeparate = false;  // only one channel
+  }
 #ifdef Q_OS_MACOS // macOS mojave bug
   if (z == 0 && t == 0 && c < 0 && img.numTimes() == 1 && img.depth() == 1 && img.numChannels() == 4) {
     planarconfigSeparate = false;
