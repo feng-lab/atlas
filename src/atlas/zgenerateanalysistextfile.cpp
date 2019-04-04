@@ -131,7 +131,7 @@ void ZGenerateAnalysisTextFile::generate()
   checkFileExist(m_input.punctaFilename);
   checkFileExist(m_input.somaPunctaFilename);
 
-  ZImgInfo info = ZImg::readImgInfo(m_input.imgFilename).at(0);
+  ZImgInfo info = ZImg::readImgInfos(m_input.imgFilename).at(0);
   if (info.voxelSizeUnit != VoxelSizeUnit::none) {
     if (m_input.voxelSizeX != -1) {
       m_input.voxelSizeX = info.voxelSizeXInUm();
@@ -776,7 +776,7 @@ ZGenerateAnalysisTextFile::intensityWeightedNearestNode(double x, double y, doub
     zup = std::min(std::min(zup, roundTo<int>(nodes[i]->z)), roundTo<int>(parent->z));
     zdown = std::max(std::max(zdown, roundTo<int>(nodes[i]->z)), roundTo<int>(parent->z));
   }
-  ZImgInfo imgInfo = ZImg::readImgInfo(m_input.imgFilename).at(0);
+  ZImgInfo imgInfo = ZImg::readImgInfos(m_input.imgFilename).at(0);
   left = std::max(0, left);
   right = std::min(right, static_cast<int>(imgInfo.width) - 1);
   up = std::max(0, up);

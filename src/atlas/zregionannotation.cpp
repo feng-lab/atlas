@@ -110,7 +110,7 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
   ZBenchTimer bt;
   bt.start();
 
-  std::vector<ZImgInfo> infos = ZImg::readImgInfo(fn, nullptr, format);
+  std::vector<ZImgInfo> infos = ZImg::readImgInfos(fn, nullptr, format);
   if (infos.size() > 1) {
     throw ZIOException("label image with more than one scene is not supported");
   }

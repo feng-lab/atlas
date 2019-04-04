@@ -42,10 +42,10 @@ ZImgIO::ZImgIO()
   m_ioFormats[FileFormat::Leica] = std::make_unique<ZImgLeica>();
 }
 
-void ZImgIO::readInfo(const QString& filename, std::vector<ZImgInfo>& res,
-                      std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                      std::vector<std::set<size_t> >* pyramidalRatios,
-                      FileFormat format)
+void ZImgIO::readInfos(const QString& filename, std::vector<ZImgInfo>& res,
+                       std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                       std::vector<std::set<size_t> >* pyramidalRatios,
+                       FileFormat format)
 {
   res.clear();
   QString error;
@@ -97,19 +97,19 @@ void ZImgIO::readInfo(const QString& filename, std::vector<ZImgInfo>& res,
   throw ZIOException(error);
 }
 
-void ZImgIO::readInfo(const QStringList& fileList, Dimension catDim, std::vector<ZImgInfo>& res,
-                      std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                      FileFormat format, bool expandXY)
+void ZImgIO::readInfos(const QStringList& fileList, Dimension catDim, std::vector<ZImgInfo>& res,
+                       std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                       FileFormat format, bool expandXY)
 {
   if (fileList.size() == 1) {
-    readInfo(fileList[0], res, subBlocks, nullptr, format);
+    readInfos(fileList[0], res, subBlocks, nullptr, format);
     return;
   }
   if (fileList.empty()) {
     throw ZIOException("Read sequence failed: empty file list");
   }
 
-  readInfo(fileList[0], res, subBlocks, nullptr, format);
+  readInfos(fileList[0], res, subBlocks, nullptr, format);
   if (res.empty()) {
     throw ZIOException("Read sequence failed: img 0 is empty");
   }
@@ -119,7 +119,7 @@ void ZImgIO::readInfo(const QStringList& fileList, Dimension catDim, std::vector
   for (int i = 1; i < fileList.size(); ++i) {
     std::vector<ZImgInfo> tmpInfo;
     std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
-    readInfo(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, nullptr, format);
+    readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, nullptr, format);
     if (tmpInfo.empty()) {
       throw ZIOException(QString("Read sequence failed: img %1 is empty").arg(i));
     }
@@ -202,7 +202,7 @@ void ZImgIO::readInfo(const ZImgSource& imgSource, ZImgInfo& info)
 {
   if (imgSource.filenames.size() == 1) {
     std::vector<ZImgInfo> res;
-    readInfo(imgSource.filenames[0], res, nullptr, nullptr, imgSource.format);
+    readInfos(imgSource.filenames[0], res, nullptr, nullptr, imgSource.format);
     if (imgSource.scene >= res.size()) {
       throw ZIOException("invalid scene");
     }
@@ -210,7 +210,7 @@ void ZImgIO::readInfo(const ZImgSource& imgSource, ZImgInfo& info)
     info = imgSource.region.clip(info);
   } else if (imgSource.filenames.size() > 1) {
     std::vector<ZImgInfo> res;
-    readInfo(imgSource.filenames, imgSource.catDim, res, nullptr, imgSource.format, imgSource.expandXY);
+    readInfos(imgSource.filenames, imgSource.catDim, res, nullptr, imgSource.format, imgSource.expandXY);
     if (imgSource.scene >= res.size()) {
       throw ZIOException("invalid scene");
     }
@@ -355,7 +355,7 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, ZImg& img, s
   }
 
   std::vector<ZImgInfo> infos;
-  readInfo(fileList, catDim, infos, nullptr, format, expandXY);
+  readInfos(fileList, catDim, infos, nullptr, format, expandXY);
   if (scene >= infos.size()) {
     throw ZIOException("invalid scene for image sequence");
   }
@@ -415,7 +415,7 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, const ZImgRe
   }
 
   std::vector<ZImgInfo> infos;
-  readInfo(fileList, catDim, infos, nullptr, format, expandXY);
+  readInfos(fileList, catDim, infos, nullptr, format, expandXY);
   if (infos.size() <= scene) {
     throw ZIOException("invalid scene for image sequence");
   }
@@ -432,7 +432,7 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, const ZImgRe
   size_t sliceCatDimEnd = 0;
   for (size_t i = 0; i < imgs.size(); ++i) {
     std::vector<ZImgInfo> sliceInfos;
-    readInfo(fileList[i], sliceInfos, nullptr, nullptr, format);
+    readInfos(fileList[i], sliceInfos, nullptr, nullptr, format);
     ZImgInfo& sliceInfo = sliceInfos[scene];
     sliceCatDimStart = i == 0 ? 0 : sliceCatDimEnd;
     sliceCatDimEnd = sliceCatDimStart + sliceInfo.size(catDim);

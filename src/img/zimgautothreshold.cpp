@@ -110,7 +110,7 @@ template<typename TVoxel>
 TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const QString& filename, size_t c, size_t t, size_t scene,
                                                             const std::vector<ZVoxelCoordinate>& mask)
 {
-  std::vector<ZImgInfo> infos = ZImg::readImgInfo(filename);
+  std::vector<ZImgInfo> infos = ZImg::readImgInfos(filename);
   if (scene >= infos.size()) {
     throw ZImgException("input scene incorrect");
   }
@@ -244,7 +244,7 @@ uint8_t ZImgAutoThreshold<ReportProgress>::u8TriangleThre(const QString& filenam
                                                           size_t c, size_t t, size_t scene,
                                                           const std::vector<nim::ZVoxelCoordinate>& mask)
 {
-  std::vector<ZImgInfo> infos = ZImg::readImgInfo(filename);
+  std::vector<ZImgInfo> infos = ZImg::readImgInfos(filename);
   if (scene >= infos.size()) {
     throw ZImgException("input scene incorrect");
   }

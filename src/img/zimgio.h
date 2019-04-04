@@ -25,14 +25,14 @@ public:
   // note: will throw ZIOException or ZImgException if read error or an empty region is passed or image is empty or out of memory
 
   // only info
-  void readInfo(const QString& filename, std::vector<ZImgInfo>& res,
-                std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks = nullptr,
-                std::vector<std::set<size_t>>* pyramidalRatios = nullptr,
-                FileFormat format = FileFormat::Unknown);
+  void readInfos(const QString& filename, std::vector<ZImgInfo>& res,
+                 std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks = nullptr,
+                 std::vector<std::set<size_t>>* pyramidalRatios = nullptr,
+                 FileFormat format = FileFormat::Unknown);
 
-  void readInfo(const QStringList& fileList, Dimension catDim, std::vector<ZImgInfo>& res,
-                std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks = nullptr,
-                FileFormat format = FileFormat::Unknown, bool expandXY = false);
+  void readInfos(const QStringList& fileList, Dimension catDim, std::vector<ZImgInfo>& res,
+                 std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks = nullptr,
+                 FileFormat format = FileFormat::Unknown, bool expandXY = false);
 
   void readInfo(const ZImgSource& imgSource, ZImgInfo& info);
 

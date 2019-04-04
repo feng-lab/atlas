@@ -38,7 +38,7 @@ void ZPunctaDetectionDialog::createWorker(ZImgProcess*& worker, QString& workerN
   ZImgInfo imgInfo;
 
   if (!m_useCurrentActiveImage.get() && QFile::exists(m_inputImageFileWidget->getSelectedOpenFile())) {
-    imgInfo = ZImg::readImgInfo(m_inputImageFileWidget->getSelectedOpenFile()).at(0);
+    imgInfo = ZImg::readImgInfos(m_inputImageFileWidget->getSelectedOpenFile()).at(0);
   } else {
     throw ZImgException(QString("No Image to detect."));
   }
@@ -98,7 +98,7 @@ void ZPunctaDetectionDialog::inputImageChanged()
   QString fn = m_inputImageFileWidget->getSelectedOpenFile();
   if (!fn.isEmpty()) {
     try {
-      ZImgInfo info = ZImg::readImgInfo(fn).at(0);
+      ZImgInfo info = ZImg::readImgInfos(fn).at(0);
       if (info.voxelSizeUnit != VoxelSizeUnit::none) {
         updateInterface(fn, info.numChannels, info.voxelSizeXInUm(),
                         info.voxelSizeYInUm(), info.voxelSizeZInUm());
@@ -121,7 +121,7 @@ void ZPunctaDetectionDialog::detectLSMResolution()
                                                   tr("LSM file (*.lsm)"));
   if (!fileName.isEmpty()) {
     try {
-      ZImgInfo info = ZImg::readImgInfo(fileName).at(0);
+      ZImgInfo info = ZImg::readImgInfos(fileName).at(0);
       if (info.voxelSizeUnit != VoxelSizeUnit::none) {
         m_voxelSize.set(glm::dvec3(info.voxelSizeXInUm(),
                                    info.voxelSizeYInUm(),

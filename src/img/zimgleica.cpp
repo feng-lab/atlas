@@ -245,7 +245,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
     ZImgInfo resInfo = rgn.clip(info);
     if (ii.imageMemory.fileNames.size() == 1) {
       std::vector<ZImgInfo> fileInfos;
-      imgIO.readInfo(ii.imageMemory.fileNames[0], fileInfos);
+      imgIO.readInfos(ii.imageMemory.fileNames[0], fileInfos);
       if (!fileInfos.empty() && fileInfos[0].isSameType(info) && fileInfos[0].isSameSize(info)) {
         imgIO.readImg(ii.imageMemory.fileNames[0], img, rgn);
         img.infoRef() = resInfo;
@@ -254,7 +254,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
       }
     } else if (size_t(ii.imageMemory.fileNames.size()) == info.numTimes) {
       std::vector<ZImgInfo> fileInfos;
-      imgIO.readInfo(ii.imageMemory.fileNames, Dimension::T, fileInfos);
+      imgIO.readInfos(ii.imageMemory.fileNames, Dimension::T, fileInfos);
       if (!fileInfos.empty() && fileInfos[0].isSameType(info) && fileInfos[0].isSameSize(info)) {
         imgIO.readImg(ii.imageMemory.fileNames, Dimension::T, rgn, img);
         img.infoRef() = resInfo;
@@ -263,7 +263,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
       }
     } else if (size_t(ii.imageMemory.fileNames.size()) == info.depth) {
       std::vector<ZImgInfo> fileInfos;
-      imgIO.readInfo(ii.imageMemory.fileNames, Dimension::Z, fileInfos);
+      imgIO.readInfos(ii.imageMemory.fileNames, Dimension::Z, fileInfos);
       if (!fileInfos.empty() && fileInfos[0].isSameType(info) && fileInfos[0].isSameSize(info)) {
         imgIO.readImg(ii.imageMemory.fileNames, Dimension::Z, rgn, img);
         img.infoRef() = resInfo;

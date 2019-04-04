@@ -86,13 +86,13 @@ public:
   virtual std::shared_ptr<ZImg> read() const = 0;
   virtual ZImgInfo readInfo() const = 0;
 
-  size_t ratio;  // realsize / storedsize
-  size_t t;
-  int64_t z;
-  int64_t x;
-  int64_t y;
-  int64_t width;
-  int64_t height;
+  size_t ratio;  // realsize / storedsize, 2 means downsampled by 2
+  size_t t;   // start t
+  int64_t z;   // start z
+  int64_t x;   // actual start x regardless of ratio
+  int64_t y;   // actual start y regardless of ratio
+  int64_t width;  // real image width regardless of ratio; if ratio is 2, the stored image will have width: width/2
+  int64_t height; // real image height regardless of ratio; if ratio is 2, the stored image will have height: height/2
 };
 
 // Dimension order of ZImg is XYZCT
@@ -186,15 +186,21 @@ public:
 
   // convenient function to get img information from file, throw ZIOException if read error or empty image
   static std::vector<ZImgInfo>
-  readImgInfo(const QString& filename, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks = nullptr,
-              FileFormat format = FileFormat::Unknown);
+  readImgInfos(const QString& filename, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks = nullptr,
+               FileFormat format = FileFormat::Unknown);
 
   // throw ZIOException if sequence is not valid or empty image
-  static std::vector<ZImgInfo> readImgInfo(const QStringList& fileList, Dimension catDim,
-                                           std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks = nullptr,
-                                           FileFormat format = FileFormat::Unknown, bool expandXY = false);
+  static std::vector<ZImgInfo> readImgInfos(const QStringList& fileList, Dimension catDim,
+                                            std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks = nullptr,
+                                            FileFormat format = FileFormat::Unknown, bool expandXY = false);
 
   static ZImgInfo readImgInfo(const ZImgSource& imgSource);
+
+  static ZImg readSubBlock(const QString& filename, size_t scene, size_t blockIndex,
+                           FileFormat format = FileFormat::Unknown);
+
+  static ZImg readSubBlock(const QStringList& fileList, Dimension catDim, size_t scene, size_t blockIndex,
+                           FileFormat format = FileFormat::Unknown, bool expandXY = false);
 
   // wrap exist raw data as ZImg, ZImg will **not** free the memory after using
   // only accept non-const data pointer (link error if input is const)

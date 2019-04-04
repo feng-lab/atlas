@@ -176,7 +176,7 @@ ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, const std::ve
   if (filenames.size() == pTiles->size()) {
     for (int i=0; i<m_filenames.size(); ++i) {
       std::vector<ZImgInfo> infos;
-      ZImgIO().readInfo(m_filenames[i], infos);
+      ZImgIO().readInfos(m_filenames[i], infos);
       if (infos.size() != 1) {
         m_tileimages.clear();
         break;
@@ -789,7 +789,7 @@ void ZStitchImageDialog::selectInputStacks1()
     ZSystemInfo::instance().setLastOpenedImagePath(tmp[0]);
     try {
       // test image
-      ZImgInfo info = ZImg::readImgInfo(tmp[0]).at(0);
+      ZImgInfo info = ZImg::readImgInfos(tmp[0]).at(0);
 
       int nchannel = info.numChannels;
       m_nchannelStack1 = nchannel;
@@ -827,7 +827,7 @@ void ZStitchImageDialog::selectInputStacks2()
     ZSystemInfo::instance().setLastOpenedImagePath(tmp[0]);
     try {
       // test image
-      ZImgInfo info = ZImg::readImgInfo(tmp[0]).at(0);
+      ZImgInfo info = ZImg::readImgInfos(tmp[0]).at(0);
 
       int nchannel = info.numChannels;
       m_nchannelStack2 = nchannel;
@@ -1169,7 +1169,7 @@ void ZStitchImageDialog::stitchStacks2()
     throw ZStitchException(QString("Please add input files."));
   }
 
-  std::vector<ZImgInfo> stack1File1Infos = ZImg::readImgInfo(m_inputStack1Filenames[0]);
+  std::vector<ZImgInfo> stack1File1Infos = ZImg::readImgInfos(m_inputStack1Filenames[0]);
   for (size_t s = 1; s < stack1File1Infos.size(); ++s) {
     if (!stack1File1Infos[s].isSameType(stack1File1Infos[0])) {
       throw ZStitchException(QString("Image type of %1 scene 0 <%2> and scene %3 <%4> don't match")
@@ -1178,7 +1178,7 @@ void ZStitchImageDialog::stitchStacks2()
     }
   }
   for (int i = 1; i < m_inputStack1Filenames.size(); ++i) {
-    std::vector<ZImgInfo> tmpInfos = ZImg::readImgInfo(m_inputStack1Filenames[i]);
+    std::vector<ZImgInfo> tmpInfos = ZImg::readImgInfos(m_inputStack1Filenames[i]);
     for (size_t s = 0; s < tmpInfos.size(); ++s) {
       if (!tmpInfos[s].isSameType(stack1File1Infos[0])) {
         throw ZStitchException(QString("Image type of %1 <%2> and %3 <%4> don't match")
@@ -1189,7 +1189,7 @@ void ZStitchImageDialog::stitchStacks2()
   }
   std::vector<ZImgInfo> stack2File1Infos;
   for (int i = 0; i < m_inputStack2Filenames.size(); ++i) {
-    std::vector<ZImgInfo> tmpInfos = ZImg::readImgInfo(m_inputStack2Filenames[i]);
+    std::vector<ZImgInfo> tmpInfos = ZImg::readImgInfos(m_inputStack2Filenames[i]);
     for (size_t s = 0; s < tmpInfos.size(); ++s) {
       if (!tmpInfos[s].isSameType(stack1File1Infos[0])) {
         throw ZStitchException(QString("Image type of %1 <%2> and %3 <%4> don't match")
@@ -1879,7 +1879,7 @@ void ZStitchImageDialog::stitchStacks()
       throw ZStitchException("Please add input files.");
     }
 
-    std::vector<ZImgInfo> stack1File1Infos = ZImg::readImgInfo(m_inputStack1Filenames[0]);
+    std::vector<ZImgInfo> stack1File1Infos = ZImg::readImgInfos(m_inputStack1Filenames[0]);
     for (size_t s = 1; s < stack1File1Infos.size(); ++s) {
       if (!stack1File1Infos[s].isSameType(stack1File1Infos[0])) {
         throw ZStitchException(QString("Image type of %1 scene 0 <%2> and scene %3 <%4> don't match")
@@ -1888,7 +1888,7 @@ void ZStitchImageDialog::stitchStacks()
       }
     }
     for (int i = 1; i < m_inputStack1Filenames.size(); ++i) {
-      std::vector<ZImgInfo> tmpInfos = ZImg::readImgInfo(m_inputStack1Filenames[i]);
+      std::vector<ZImgInfo> tmpInfos = ZImg::readImgInfos(m_inputStack1Filenames[i]);
       for (size_t s = 0; s < tmpInfos.size(); ++s) {
         if (!tmpInfos[s].isSameType(stack1File1Infos[0])) {
           throw ZStitchException(QString("Image type of %1 <%2> and %3 <%4> don't match")

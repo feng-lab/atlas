@@ -256,20 +256,20 @@ ZImg::load(const QStringList& fileList, Dimension catDim, const ZImgRegion& regi
 }
 
 std::vector<ZImgInfo>
-ZImg::readImgInfo(const QString& filename, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                  FileFormat format)
+ZImg::readImgInfos(const QString& filename, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                   FileFormat format)
 {
   std::vector<ZImgInfo> res;
-  ZImgIO().readInfo(filename, res, subBlocks, nullptr, format);
+  ZImgIO().readInfos(filename, res, subBlocks, nullptr, format);
   return res;
 }
 
-std::vector<ZImgInfo> ZImg::readImgInfo(const QStringList& fileList, Dimension catDim,
-                                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                                        FileFormat format, bool expandXY)
+std::vector<ZImgInfo> ZImg::readImgInfos(const QStringList& fileList, Dimension catDim,
+                                         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                                         FileFormat format, bool expandXY)
 {
   std::vector<ZImgInfo> res;
-  ZImgIO().readInfo(fileList, catDim, res, subBlocks, format, expandXY);
+  ZImgIO().readInfos(fileList, catDim, res, subBlocks, format, expandXY);
   return res;
 }
 
@@ -277,6 +277,41 @@ ZImgInfo ZImg::readImgInfo(const ZImgSource& imgSource)
 {
   ZImgInfo res;
   ZImgIO().readInfo(imgSource, res);
+  return res;
+}
+
+ZImg ZImg::readSubBlock(const QString& filename, size_t scene, size_t blockIndex, FileFormat format)
+{
+  std::vector<ZImgInfo> infos;
+  std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
+  ZImgIO().readInfos(filename, infos, &subBlocks, nullptr, format);
+  if (scene >= subBlocks.size()) {
+    throw ZIOException(QString("scene %1 overflow, max %2").arg(scene).arg(subBlocks.size()));
+  }
+  if (blockIndex >= subBlocks[scene].size()) {
+    throw ZIOException(QString("blockIndex %1 overflow, max %2").arg(blockIndex).arg(subBlocks[scene].size()));
+  }
+  auto img = subBlocks[scene][blockIndex]->read();
+  ZImg res;
+  img->swap(res);
+  return res;
+}
+
+ZImg ZImg::readSubBlock(const QStringList& fileList, nim::Dimension catDim, size_t scene, size_t blockIndex,
+                        nim::FileFormat format, bool expandXY)
+{
+  std::vector<ZImgInfo> infos;
+  std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
+  ZImgIO().readInfos(fileList, catDim, infos, &subBlocks, format, expandXY);
+  if (scene >= subBlocks.size()) {
+    throw ZIOException(QString("scene %1 overflow, max %2").arg(scene).arg(subBlocks.size()));
+  }
+  if (blockIndex >= subBlocks[scene].size()) {
+    throw ZIOException(QString("blockIndex %1 overflow, max %2").arg(blockIndex).arg(subBlocks[scene].size()));
+  }
+  auto img = subBlocks[scene][blockIndex]->read();
+  ZImg res;
+  img->swap(res);
   return res;
 }
 

@@ -30,7 +30,7 @@ ZAssignPuncta::ZAssignPuncta(const QString& filename, double minValue, double ma
   , m_t(t)
   , m_scene(scene)
 {
-  auto infos = ZImg::readImgInfo(m_filename);
+  auto infos = ZImg::readImgInfos(m_filename);
   if (m_scene >= infos.size()) {
     throw ZImgException("invalid scene");
   }
@@ -40,7 +40,7 @@ ZAssignPuncta::ZAssignPuncta(const QString& filename, const nim::ZImgInfo& imgIn
                              size_t dendriteChannel, size_t t, size_t scene)
   : ZAssignPuncta(filename, minValue, maxValue, dendriteChannel, t, scene)
 {
-  auto infos = ZImg::readImgInfo(m_filename);
+  auto infos = ZImg::readImgInfos(m_filename);
   m_imgInfo = infos[scene];
   m_imgInfo.voxelSizeUnit = imgInfo.voxelSizeUnit;
   m_imgInfo.voxelSizeX = imgInfo.voxelSizeX;

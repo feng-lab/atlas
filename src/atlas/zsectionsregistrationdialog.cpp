@@ -100,7 +100,7 @@ void ZSectionsRegistrationDialog::inputImagesChanged()
   size_t channelNumber = 0;
   size_t numFrames = 0;
   try {
-    std::vector<ZImgInfo> info = ZImg::readImgInfo(fns, Dimension::Z, nullptr, FileFormat::Unknown, true);
+    std::vector<ZImgInfo> info = ZImg::readImgInfos(fns, Dimension::Z, nullptr, FileFormat::Unknown, true);
     if (info.size() != 1 || info[0].isEmpty()) {
       throw ZIOException("Not supported image dimensions");
     }

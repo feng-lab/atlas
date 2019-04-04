@@ -169,7 +169,7 @@ ZImgPack::ZImgPack(const QString& fileName, size_t scene, FileFormat format, siz
   } else {
     std::vector<ZImgInfo> infos;
     std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-    ZImgIO::instance().readInfo(m_imgSource.filenames[0], infos, &subBlocks, nullptr, m_imgSource.format);
+    ZImgIO::instance().readInfos(m_imgSource.filenames[0], infos, &subBlocks, nullptr, m_imgSource.format);
     if (scene >= infos.size()) {
       throw ZIOException("invalid scene");
     }
@@ -223,7 +223,7 @@ ZImgPack::ZImgPack(const QStringList& files, Dimension catDim, size_t scene, Fil
   } else {
     std::vector<ZImgInfo> infos;
     std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-    ZImgIO::instance().readInfo(m_imgSource.filenames, m_imgSource.catDim, infos, &subBlocks, m_imgSource.format);
+    ZImgIO::instance().readInfos(m_imgSource.filenames, m_imgSource.catDim, infos, &subBlocks, m_imgSource.format);
     if (scene >= infos.size()) {
       throw ZIOException("invalid scene");
     }
@@ -338,7 +338,7 @@ void ZImgPack::save(const QString& fileName, FileFormat format, Compression comp
   }
   std::vector<ZImgInfo> infos;
   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-  ZImgIO::instance().readInfo(m_imgSource.filenames[0], infos, &subBlocks, nullptr, m_imgSource.format);
+  ZImgIO::instance().readInfos(m_imgSource.filenames[0], infos, &subBlocks, nullptr, m_imgSource.format);
   CHECK(!infos.empty() && !subBlocks.empty());
   m_imgInfo = infos[0];
   m_numScenes = infos.size();

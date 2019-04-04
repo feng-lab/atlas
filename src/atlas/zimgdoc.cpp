@@ -359,7 +359,7 @@ size_t ZImgDoc::loadImg(const QString& fileName, FileFormat format, QString& err
 {
   try {
     std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-    std::vector<ZImgInfo> infos = ZImg::readImgInfo(fileName, &subBlocks, format);
+    std::vector<ZImgInfo> infos = ZImg::readImgInfos(fileName, &subBlocks, format);
     size_t id = 0;
     for (size_t s = 0; s < infos.size(); ++s) {
       id = loadImg(fileName, s, format, errorMsg, infos.size(), &infos[s], &subBlocks[s]);
@@ -401,7 +401,7 @@ size_t ZImgDoc::loadImg(const QStringList& files, Dimension catDim, FileFormat f
 {
   try {
     std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-    std::vector<ZImgInfo> infos = ZImg::readImgInfo(files, catDim, &subBlocks, format, true);
+    std::vector<ZImgInfo> infos = ZImg::readImgInfos(files, catDim, &subBlocks, format, true);
     size_t id = 0;
     for (size_t s = 0; s < infos.size(); ++s) {
       id = loadImg(files, catDim, s, format, errorMsg, infos.size(), &infos[s], &subBlocks[s]);

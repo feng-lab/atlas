@@ -334,15 +334,66 @@ PYBIND11_MODULE(_imgpy, m)
         }
         return img;
       }), "listOfndarray"_a, "imgInfo"_a = ZImgInfo())
-    .def_static("readImgInfo", [](const QString& filename, FileFormat format) {
-      return ZImg::readImgInfo(filename, nullptr, format);
+    .def_static("readImgInfos", [](const QString& filename, FileFormat format) {
+      return ZImg::readImgInfos(filename, nullptr, format);
       }, "filename"_a, "format"_a = FileFormat::Unknown)
-    .def_static("readImgInfo", [](const QStringList& fileList, Dimension catDim, FileFormat format, bool expandXY) {
-      return ZImg::readImgInfo(fileList, catDim, nullptr, format, expandXY);
+    .def_static("readImgInfos", [](const QStringList& fileList, Dimension catDim, FileFormat format, bool expandXY) {
+      return ZImg::readImgInfos(fileList, catDim, nullptr, format, expandXY);
       }, "filenames"_a, "catDim"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = false)
     .def_static("readImgInfo", [](const ZImgSource& imgSource) {
       return ZImg::readImgInfo(imgSource);
       })
+    .def_static("readSubBlockLists",
+      [](const QString& filename, FileFormat format) {
+        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
+        ZImg::readImgInfos(filename, &subBlocks, format);
+        std::vector<Eigen::Matrix<int64_t,Eigen::Dynamic,Eigen::Dynamic>> res(subBlocks.size());
+        for (size_t s = 0; s < res.size(); ++s) {
+          auto& mat = res[s];
+          const auto& blocks = subBlocks[s];
+          mat.resize(blocks.size(), 7);
+          for (Eigen::Index r = 0; r < mat.rows(); ++r) {
+            const auto& block = blocks[r];
+            mat(r, 0) = block->ratio;
+            mat(r, 1) = block->t;
+            mat(r, 2) = block->z;
+            mat(r, 3) = block->x;
+            mat(r, 4) = block->y;
+            mat(r, 5) = block->width;
+            mat(r, 6) = block->height;
+          }
+        }
+        return res;
+      }, "filename"_a, "format"_a = FileFormat::Unknown)
+    .def_static("readSubBlockLists",
+      [](const QStringList& fileList, Dimension catDim, FileFormat format, bool expandXY) {
+        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
+        ZImg::readImgInfos(fileList, catDim, &subBlocks, format, expandXY);
+        std::vector<Eigen::Matrix<int64_t,Eigen::Dynamic,Eigen::Dynamic>> res(subBlocks.size());
+        for (size_t s = 0; s < res.size(); ++s) {
+          auto& mat = res[s];
+          const auto& blocks = subBlocks[s];
+          mat.resize(blocks.size(), 7);
+          for (Eigen::Index r = 0; r < mat.rows(); ++r) {
+            const auto& block = blocks[r];
+            mat(r, 0) = block->ratio;
+            mat(r, 1) = block->t;
+            mat(r, 2) = block->z;
+            mat(r, 3) = block->x;
+            mat(r, 4) = block->y;
+            mat(r, 5) = block->width;
+            mat(r, 6) = block->height;
+          }
+        }
+        return res;
+      }, "filenames"_a, "catDim"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = false)
+    .def_static("readSubBlock", [](const QString& filename, size_t scene, size_t blockIndex, FileFormat format) {
+      return ZImg::readSubBlock(filename, scene, blockIndex, format);
+      }, "filename"_a, "scene"_a, "blockIndex"_a, "format"_a = FileFormat::Unknown)
+    .def_static("readSubBlock", [](const QStringList& fileList, Dimension catDim, size_t scene, size_t blockIndex,
+                                   FileFormat format, bool expandXY) {
+      return ZImg::readSubBlock(fileList, catDim, scene, blockIndex, format, expandXY);
+      }, "filenames"_a, "catDim"_a, "scene"_a, "blockIndex"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = false)
     .def("save", &ZImg::save,
       "filename"_a, "format"_a = FileFormat::Unknown, "compression"_a = Compression::AUTO)
     .def_property("info",

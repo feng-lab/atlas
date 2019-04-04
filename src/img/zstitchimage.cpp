@@ -127,7 +127,7 @@ void ZStitchImage::doWork()
     throw ZImgException("Please add input files.");
   }
 
-  std::vector<ZImgInfo> stack1File1Infos = ZImg::readImgInfo(m_inputStack1Filenames[0]);
+  std::vector<ZImgInfo> stack1File1Infos = ZImg::readImgInfos(m_inputStack1Filenames[0]);
   for (size_t s = 1; s < stack1File1Infos.size(); ++s) {
     if (!stack1File1Infos[s].isSameType(stack1File1Infos[0])) {
       throw ZImgException(QString("Image type of %1 scene 0 <%2> and scene %3 <%4> don't match")
@@ -136,7 +136,7 @@ void ZStitchImage::doWork()
     }
   }
   for (int i = 1; i < m_inputStack1Filenames.size(); ++i) {
-    std::vector<ZImgInfo> tmpInfos = ZImg::readImgInfo(m_inputStack1Filenames[i]);
+    std::vector<ZImgInfo> tmpInfos = ZImg::readImgInfos(m_inputStack1Filenames[i]);
     for (size_t s = 0; s < tmpInfos.size(); ++s) {
       if (!tmpInfos[s].isSameType(stack1File1Infos[0])) {
         throw ZImgException(QString("Image type of %1 <%2> and %3 <%4> don't match")

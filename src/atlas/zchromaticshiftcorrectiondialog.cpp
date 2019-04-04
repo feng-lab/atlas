@@ -108,7 +108,7 @@ void ZChromaticShiftCorrectionDialog::inputImagesChanged()
 
   size_t channelNumber = 0;
   try {
-    std::vector<ZImgInfo> info = ZImg::readImgInfo(fn);
+    std::vector<ZImgInfo> info = ZImg::readImgInfos(fn);
     if (info.size() != 1 || info[0].isEmpty()) {
       throw ZIOException("Not supported image dimensions");
     }

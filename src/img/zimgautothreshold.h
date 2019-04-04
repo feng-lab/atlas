@@ -26,7 +26,7 @@ public:
   TValue triangleThre(const QString& filename, size_t c = 0, size_t t = 0, size_t scene = 0,
                       const std::vector<ZVoxelCoordinate>& mask = std::vector<ZVoxelCoordinate>())
   {
-    std::vector<ZImgInfo> infos = ZImg::readImgInfo(filename);
+    std::vector<ZImgInfo> infos = ZImg::readImgInfos(filename);
     if (scene >= infos.size()) {
       throw ZImgException("input scene incorrect");
     }

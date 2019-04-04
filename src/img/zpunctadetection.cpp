@@ -172,7 +172,7 @@ void ZPunctaDetection::setInputFile(const QString& filename, size_t punctaChanne
   m_t = t;
   m_scene = scene;
 
-  auto infos = ZImg::readImgInfo(m_filename);
+  auto infos = ZImg::readImgInfos(m_filename);
   if (m_scene >= infos.size()) {
     throw ZImgException("invalid scene");
   }
