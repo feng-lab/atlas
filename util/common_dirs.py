@@ -381,6 +381,7 @@ def install_ffmpeg():
         os.chmod(os.path.join(folder, 'bin', 'ffmpeg'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
         os.chmod(os.path.join(folder, 'bin', 'ffplay'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
         os.chmod(os.path.join(folder, 'bin', 'ffprobe'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+        os.symlink(os.path.join(folder, 'bin', 'ffmpeg'), '/usr/local/bin/ffmpeg')
 
 
 def get_cmake_binary() -> str:
