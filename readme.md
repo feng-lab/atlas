@@ -46,5 +46,5 @@ conda install conda-build cmake ninja qt mkl-devel tbb-devel numpy pybind11
 conda build purge-all
 conda build conda
 conda remove zimg -y
-conda install zimg --use-local -y
+conda install zimg -c fenglab -y
 ```

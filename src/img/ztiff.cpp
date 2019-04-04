@@ -1867,7 +1867,7 @@ void ZTiffWriter::writeIFD(const ZImg& img, int z, int t, int c, bool writeThumb
   }
 
   if (c < 0) {
-    if (planarconfigSeparate) {
+    if (planarconfigSeparate || img.numChannels() == 1) {
       for (size_t ch = 0; ch < img.numChannels(); ++ch)
         TIFFWriteEncodedStrip(m_tif.get(), ch, const_cast<uint8_t*>(img.planeData(z, ch, t)), img.planeByteNumber());
     } else {
