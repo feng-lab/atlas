@@ -17,7 +17,7 @@ public:
                    size_t downsampleBlockWidth = 1,
                    size_t downsampleBlockHeight = 1,
                    size_t downsampleBlockDepth = 1,
-                   ZImg::CombineMode downsampleCombineMode = ZImg::CombineMode::Mean);
+                   ImgMergeMode downsampleCombineMode = ImgMergeMode::Mean);
 
   std::shared_ptr<ZImg> read() const override;
   ZImgInfo readInfo() const override;
@@ -27,7 +27,7 @@ private:
   size_t m_downsampleBlockWidth;
   size_t m_downsampleBlockHeight;
   size_t m_downsampleBlockDepth;
-  ZImg::CombineMode m_downsampleCombineMode;
+  ImgMergeMode m_downsampleCombineMode;
 };
 
 // use provided absolute locations or relative locations to merge multiple imgs

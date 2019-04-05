@@ -1324,7 +1324,7 @@ size_t ZPunctaDetection::getNumCenters(const ZImg& rawimg, size_t pc, size_t t,
     ZImg cropCenter = cropZImg(voxelLocations, rawimg, pc, t, minLoc, size);
     // leave only saturated center
     cropCenter = cropCenter.binarized(saturatedIntensity, ZImg::ThresholdMode::IncludeThreshold);
-    cropCenter = cropCenter.projectAlongDim(Dimension::Z, ZImg::CombineMode::Max);
+    cropCenter = cropCenter.projectAlongDim(Dimension::Z, ImgMergeMode::Max);
 
     ZImgSignedDistanceMap<> signedDM;
     signedDM.setInsideIsPositive(true);

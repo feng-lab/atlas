@@ -3,9 +3,11 @@
 #include "zlog.h"
 #include "zimgnccmatch.h"
 #include "zimgio.h"
+#include "zeigenutils.h"
 #include <QDir>
 #include <QTextStream>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <tbb/concurrent_unordered_map.h>
 #include <tbb/parallel_for.h>
 #include <tbb/task_scheduler_init.h>
@@ -15,73 +17,212 @@
 
 namespace {
 
-void buildConnectionFromGrid(const std::vector<std::vector<size_t>>& grid,
-                             std::map<std::pair<size_t, size_t>, nim::ZImgNCCMatch::PositionHint>& conn)
+using namespace nim;
+
+void buildConnectionFromTextFile(const QString& filename,
+                                 std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>& conn)
 {
-  for (size_t i = 0; i < grid.size(); ++i) {
-    for (size_t j = 0; j < grid[i].size(); ++j) {
-      if (grid[i][j] > 0) {
-        bool connected = false;
-        if (j + 1 < grid[0].size() && grid[i][j + 1] > 0) { //right
-          size_t idx1 = grid[i][j] - 1;
-          size_t idx2 = grid[i][j + 1] - 1;
-          std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
-          conn[stackPair] = nim::ZImgNCCMatch::PositionHint::Right;
-          connected = true;
-        }
-        if (i + 1 < grid.size() && grid[i + 1][j] > 0) { //down
-          size_t idx1 = grid[i][j] - 1;
-          size_t idx2 = grid[i + 1][j] - 1;
-          std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
-          conn[stackPair] = nim::ZImgNCCMatch::PositionHint::Down;
-          connected = true;
-        }
-        if (i + 1 < grid.size() && j + 1 < grid[0].size() && grid[i + 1][j + 1] > 0
-            && connected == false) {  // down-right, add only if right and down are empty
-          size_t idx1 = grid[i][j] - 1;
-          size_t idx2 = grid[i + 1][j + 1] - 1;
-          std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
-          conn[stackPair] = nim::ZImgNCCMatch::PositionHint::Down | nim::ZImgNCCMatch::PositionHint::Right;
-          connected = true;
-        }
-        if (i + 1 < grid.size() && j >= 1 && grid[i + 1][j - 1] > 0
-            && grid[i][j - 1] == 0 && grid[i + 1][j] == 0) {  // down-left, add only if left and down are empty
-          size_t idx1 = grid[i][j] - 1;
-          size_t idx2 = grid[i + 1][j - 1] - 1;
-          std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
-          conn[stackPair] = nim::ZImgNCCMatch::PositionHint::Down | nim::ZImgNCCMatch::PositionHint::Left;
-          connected = true;
-        }
-        if (!connected) {  // test if this image is connected
-          if (i >= 1 && j >= 1 && grid[i - 1][j - 1] > 0) {  // up-left
-            size_t idx1 = grid[i][j] - 1;
-            size_t idx2 = grid[i - 1][j - 1] - 1;
-            if (conn.find(std::make_pair(idx2, idx1)) != conn.end())
-              connected = true;
-          }
-          if (j >= 1 && grid[i][j - 1] > 0) { // left
-            size_t idx1 = grid[i][j] - 1;
-            size_t idx2 = grid[i][j - 1] - 1;
-            if (conn.find(std::make_pair(idx2, idx1)) != conn.end())
-              connected = true;
-          }
-          if (i >= 1 && grid[i - 1][j] > 0) { //up
-            size_t idx1 = grid[i][j] - 1;
-            size_t idx2 = grid[i - 1][j] - 1;
-            if (conn.find(std::make_pair(idx2, idx1)) != conn.end())
-              connected = true;
-          }
-          if (i >= 1 && j + 1 < grid[0].size() && grid[i - 1][j + 1] > 0) {  // up-right
-            size_t idx1 = grid[i][j] - 1;
-            size_t idx2 = grid[i - 1][j + 1] - 1;
-            if (conn.find(std::make_pair(idx2, idx1)) != conn.end())
-              connected = true;
-          }
-        }
-        if (!connected) {
-          throw nim::ZImgException(QString("Can not stitch because images are not connected. Abort."));
+  if (!QFile::exists(filename)) {
+    throw ZImgException(QString("file %1 doesn't exist").arg(filename));
+  }
+
+  QStringList header;
+  header << "# img1" << "img2" << "position";
+
+  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+  QFile inputFile(filename);
+  if (inputFile.open(QIODevice::ReadOnly))
+  {
+    QTextStream in(&inputFile);
+    while (!in.atEnd())
+    {
+      QString line = in.readLine();
+      QStringList list = line.split(rx, QString::SkipEmptyParts);
+
+      if (list.empty() || list.at(0).startsWith("#")) {
+        continue;
+      }
+      if (list.size() < header.size()) {
+        throw ZImgException(
+          QString("Wrong number of items in line (%1), expected format: <%2>").arg(list.join(',')).arg(header.join(',')));
+      }
+      bool ok = false;
+      int idx1 = list[0].toInt(&ok);
+      if (!ok || idx1 <= 0)
+        throw ZImgException(
+          QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+      int idx2 = list[1].toInt(&ok);
+      if (!ok || idx2 <= 0)
+        throw ZImgException(
+          QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+      auto stackPair = std::make_pair<size_t, size_t>(idx1 - 1, idx2 - 1);
+      conn[stackPair] = ZImgNCCMatch::PositionHint::None;
+      for (int i = 2; i < list.size(); ++i) {
+        QString pos = list[i].trimmed();
+        if (pos.compare("Down", Qt::CaseInsensitive) == 0) {
+          conn[stackPair] = conn[stackPair] | ZImgNCCMatch::PositionHint::Down;
+        } else if (pos.compare("Right", Qt::CaseInsensitive) == 0) {
+          conn[stackPair] = conn[stackPair] | ZImgNCCMatch::PositionHint::Right;
+        } else if (pos.compare("Back", Qt::CaseInsensitive) == 0) {
+          conn[stackPair] = conn[stackPair] | ZImgNCCMatch::PositionHint::Back;
+        } else {
+          throw ZImgException(
+            QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
         }
       }
+    }
+    inputFile.close();
+  }
+}
+
+void buildConnectionFromGrid(const ZImg& grid,
+                             std::map<std::pair<size_t, size_t>, nim::ZImgNCCMatch::PositionHint>& connRes)
+{
+  std::map<size_t, int> idxToMinConnDist;
+  CHECK(grid.info().isType<int32_t>());
+  for (size_t z = 0; z < grid.depth(); ++z) {
+    for (size_t y = 0; y < grid.height(); ++y) {
+      for (size_t x = 0; x < grid.width(); ++x) {
+        if (grid.value<int32_t>(x, y, z) > 0) {
+          size_t idx1 = grid.value<int32_t>(x, y, z) - 1;
+          idxToMinConnDist[idx1] = 10;
+        }
+      }
+    }
+  }
+
+  std::map<std::pair<size_t, size_t>, nim::ZImgNCCMatch::PositionHint> conn;
+  std::map<std::pair<size_t, size_t>, int> connDist;
+  for (size_t z = 0; z < grid.depth(); ++z) {
+    for (size_t y = 0; y < grid.height(); ++y) {
+      for (size_t x = 0; x < grid.width(); ++x) {
+        if (grid.value<int32_t>(x, y, z) > 0) {
+          size_t idx1 = grid.value<int32_t>(x, y, z) - 1;
+
+          if (x + 1 < grid.width() && grid.value<int32_t>(x + 1, y, z) > 0) { //right
+            size_t idx2 = grid.value<int32_t>(x + 1, y, z) - 1;
+            std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
+            conn[stackPair] = ZImgNCCMatch::PositionHint::Right;
+            idxToMinConnDist[idx1] = std::min(1, idxToMinConnDist[idx1]);
+            idxToMinConnDist[idx2] = std::min(1, idxToMinConnDist[idx2]);
+            connDist[stackPair] = 1;
+          }
+          if (y + 1 < grid.height() && grid.value<int32_t>(x, y + 1, z) > 0) { //down
+            size_t idx2 = grid.value<int32_t>(x, y + 1, z) - 1;
+            std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
+            conn[stackPair] = ZImgNCCMatch::PositionHint::Down;
+            idxToMinConnDist[idx1] = std::min(1, idxToMinConnDist[idx1]);
+            idxToMinConnDist[idx2] = std::min(1, idxToMinConnDist[idx2]);
+            connDist[stackPair] = 1;
+          }
+          if (z + 1 < grid.depth() && grid.value<int32_t>(x, y, z + 1) > 0) { //back
+            size_t idx2 = grid.value<int32_t>(x, y, z + 1) - 1;
+            std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
+            conn[stackPair] = ZImgNCCMatch::PositionHint::Back;
+            idxToMinConnDist[idx1] = std::min(1, idxToMinConnDist[idx1]);
+            idxToMinConnDist[idx2] = std::min(1, idxToMinConnDist[idx2]);
+            connDist[stackPair] = 1;
+          }
+
+          if (x + 1 < grid.width() && y + 1 < grid.height() && grid.value<int32_t>(x + 1, y + 1, z) > 0) { //right down
+            size_t idx2 = grid.value<int32_t>(x + 1, y + 1, z) - 1;
+            std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
+            conn[stackPair] = ZImgNCCMatch::PositionHint::Right | ZImgNCCMatch::PositionHint::Down;
+            idxToMinConnDist[idx1] = std::min(2, idxToMinConnDist[idx1]);
+            idxToMinConnDist[idx2] = std::min(2, idxToMinConnDist[idx2]);
+            connDist[stackPair] = 2;
+          }
+          if (x > 0 && y + 1 < grid.height() && grid.value<int32_t>(x - 1, y + 1, z) > 0) { //left down
+            size_t idx2 = grid.value<int32_t>(x - 1, y + 1, z) - 1;
+            std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
+            conn[stackPair] = ZImgNCCMatch::PositionHint::Left | ZImgNCCMatch::PositionHint::Down;
+            idxToMinConnDist[idx1] = std::min(2, idxToMinConnDist[idx1]);
+            idxToMinConnDist[idx2] = std::min(2, idxToMinConnDist[idx2]);
+            connDist[stackPair] = 2;
+          }
+          if (x > 0 && z + 1 < grid.depth() && grid.value<int32_t>(x - 1, y, z + 1) > 0) { // left back
+            size_t idx2 = grid.value<int32_t>(x - 1, y, z + 1) - 1;
+            std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
+            conn[stackPair] = ZImgNCCMatch::PositionHint::Left | ZImgNCCMatch::PositionHint::Back;
+            idxToMinConnDist[idx1] = std::min(2, idxToMinConnDist[idx1]);
+            idxToMinConnDist[idx2] = std::min(2, idxToMinConnDist[idx2]);
+            connDist[stackPair] = 2;
+          }
+          if (y > 0 && z + 1 < grid.depth() && grid.value<int32_t>(x, y - 1, z + 1) > 0) { // up back
+            size_t idx2 = grid.value<int32_t>(x, y - 1, z + 1) - 1;
+            std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
+            conn[stackPair] = ZImgNCCMatch::PositionHint::Up | ZImgNCCMatch::PositionHint::Back;
+            idxToMinConnDist[idx1] = std::min(2, idxToMinConnDist[idx1]);
+            idxToMinConnDist[idx2] = std::min(2, idxToMinConnDist[idx2]);
+            connDist[stackPair] = 2;
+          }
+          if (x + 1 < grid.width() && z + 1 < grid.depth() && grid.value<int32_t>(x + 1, y, z + 1) > 0) { // right back
+            size_t idx2 = grid.value<int32_t>(x + 1, y, z + 1) - 1;
+            std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
+            conn[stackPair] = ZImgNCCMatch::PositionHint::Right | ZImgNCCMatch::PositionHint::Back;
+            idxToMinConnDist[idx1] = std::min(2, idxToMinConnDist[idx1]);
+            idxToMinConnDist[idx2] = std::min(2, idxToMinConnDist[idx2]);
+            connDist[stackPair] = 2;
+          }
+          if (y + 1 < grid.height() && z + 1 < grid.depth() && grid.value<int32_t>(x, y + 1, z + 1) > 0) { // down back
+            size_t idx2 = grid.value<int32_t>(x, y + 1, z + 1) - 1;
+            std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
+            conn[stackPair] = ZImgNCCMatch::PositionHint::Down | ZImgNCCMatch::PositionHint::Back;
+            idxToMinConnDist[idx1] = std::min(2, idxToMinConnDist[idx1]);
+            idxToMinConnDist[idx2] = std::min(2, idxToMinConnDist[idx2]);
+            connDist[stackPair] = 2;
+          }
+
+          if (z + 1 < grid.depth()) {
+            if (x + 1 < grid.width() && y + 1 < grid.height() && grid.value<int32_t>(x + 1, y + 1, z + 1) > 0) { //right down back
+              size_t idx2 = grid.value<int32_t>(x + 1, y + 1, z + 1) - 1;
+              std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
+              conn[stackPair] = ZImgNCCMatch::PositionHint::Right | ZImgNCCMatch::PositionHint::Down | ZImgNCCMatch::PositionHint::Back;
+              idxToMinConnDist[idx1] = std::min(3, idxToMinConnDist[idx1]);
+              idxToMinConnDist[idx2] = std::min(3, idxToMinConnDist[idx2]);
+              connDist[stackPair] = 3;
+            }
+            if (x > 0 && y + 1 < grid.height() && grid.value<int32_t>(x - 1, y + 1, z + 1) > 0) { //left down back
+              size_t idx2 = grid.value<int32_t>(x - 1, y + 1, z + 1) - 1;
+              std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
+              conn[stackPair] = ZImgNCCMatch::PositionHint::Left | ZImgNCCMatch::PositionHint::Down | ZImgNCCMatch::PositionHint::Back;
+              idxToMinConnDist[idx1] = std::min(3, idxToMinConnDist[idx1]);
+              idxToMinConnDist[idx2] = std::min(3, idxToMinConnDist[idx2]);
+              connDist[stackPair] = 3;
+            }
+            if (x + 1 < grid.width() && y > 0 && grid.value<int32_t>(x + 1, y - 1, z + 1) > 0) { //right up back
+              size_t idx2 = grid.value<int32_t>(x + 1, y - 1, z + 1) - 1;
+              std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
+              conn[stackPair] = ZImgNCCMatch::PositionHint::Right | ZImgNCCMatch::PositionHint::Up | ZImgNCCMatch::PositionHint::Back;
+              idxToMinConnDist[idx1] = std::min(3, idxToMinConnDist[idx1]);
+              idxToMinConnDist[idx2] = std::min(3, idxToMinConnDist[idx2]);
+              connDist[stackPair] = 3;
+            }
+            if (x > 0 && y > 0 && grid.value<int32_t>(x - 1, y - 1, z + 1) > 0) { //left up back
+              size_t idx2 = grid.value<int32_t>(x - 1, y - 1, z + 1) - 1;
+              std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
+              conn[stackPair] = ZImgNCCMatch::PositionHint::Left | ZImgNCCMatch::PositionHint::Up | ZImgNCCMatch::PositionHint::Back;
+              idxToMinConnDist[idx1] = std::min(3, idxToMinConnDist[idx1]);
+              idxToMinConnDist[idx2] = std::min(3, idxToMinConnDist[idx2]);
+              connDist[stackPair] = 3;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  for(const auto& [key, val] : idxToMinConnDist) {
+    if (val > 3) {
+      throw ZImgException(QString("Can not stitch because images are not connected. Abort."));
+    }
+  }
+
+  // prune
+  for (const auto& [key, val] : conn) {
+    if (connDist[key] == idxToMinConnDist[key.first] ||
+        connDist[key] == idxToMinConnDist[key.second]) {
+      connRes[key] = val;
     }
   }
 }
@@ -91,12 +232,6 @@ void buildConnectionFromGrid(const std::vector<std::vector<size_t>>& grid,
 
 namespace nim {
 
-ZTile::ZTile(int index_, QPoint topleft, QPoint bottomright)
-  : index(index_)
-{
-  region = QRect(topleft, bottomright);
-}
-
 ZStitchImage::ZStitchImage()
   : ZImgProcess()
 {
@@ -104,17 +239,45 @@ ZStitchImage::ZStitchImage()
 
 void ZStitchImage::setConnTileImage(const QString& fn)
 {
-  if (!fn.isEmpty()) {
-    m_tileSelectionImageFilename = fn;
-    m_tileList.clear();
+  ZImg m_tileImage = ZImg(fn);
+  getTileMatrixFromConnImage(m_tileImage);
+}
 
-    ZImg m_tileImage = ZImg(fn);
+void ZStitchImage::setTileGridFromMatrixFile(const QString& file)
+{
+  auto mat = ZEigenUtils::readMatrix(file);
+  ZImg img(ZImgInfo(mat.cols(), mat.rows(), 1, 1, 1, 4, VoxelFormat::Signed));
+  img.fill(0);
 
-    if (!getTileMatrix(m_tileImage, m_tileMatrix, m_tileList)) {
-      m_tileList.clear();
-      throw ZImgException(tr("Failed to parse tile connection image."));
+  auto data = img.data<int32_t>(0);
+  size_t idx = 0;
+  for (Eigen::Index r = 0; r < mat.rows(); ++r) {
+    for (Eigen::Index c = 0; c < mat.cols(); ++c) {
+      data[idx++] = static_cast<int32_t>(mat(r, c));
     }
   }
+  m_tileGrid = img;
+}
+
+void ZStitchImage::setTileGridFromLayout(size_t numRows, size_t numCols)
+{
+  ZImg img(ZImgInfo(numCols, numRows, 1, 1, 1, 4, VoxelFormat::Signed));
+  img.fill(0);
+
+  auto data = img.data<int32_t>(0);
+  size_t idx = 0;
+  for (size_t r = 0; r < numRows; ++r) {
+    for (size_t c = 0; c < numCols; ++c) {
+      data[idx] = idx + 1;
+      ++idx;
+    }
+  }
+  m_tileGrid = img;
+}
+
+void ZStitchImage::setConnInfoFromConnTextFile(const QString& file)
+{
+  m_connTextFile = file;
 }
 
 void ZStitchImage::doWork()
@@ -153,8 +316,6 @@ void ZStitchImage::doWork()
   for (int i = 0; i < m_inputStack1Filenames.size(); ++i) {
     inputStackSources.emplace_back(m_inputStack1Filenames[i]);
   }
-
-  CHECK(int(nstack) == m_tileList.size());
 
   LOG(INFO) << QString("Stitching %1 images ...").arg(nstack);
 
@@ -330,7 +491,7 @@ void ZStitchImage::doWork()
         QString dsofn = fi.path() + "/" + fi.baseName() + QString("_ch%1_downsampled.v3draw").arg(c + 1);
         ZImg img(m_resFileName, ZImgRegion(0, -1, 0, -1, 0, -1, c, c + 1));
         img.save(ofn);
-        img.blockDownsample(2, 2, 1, ZImg::CombineMode::Mean);
+        img.blockDownsample(2, 2, 1, ImgMergeMode::Mean);
         img.save(dsofn);
       }
     } else {
@@ -342,7 +503,7 @@ void ZStitchImage::doWork()
         QString dsofn = fi.path() + "/" + fi.baseName() + QString("_ch%1_downsampled.v3draw").arg(c + 1);
         ZImg tmp = wholeImg.createView(c);
         tmp.save(ofn);
-        tmp.blockDownsample(2, 2, 1, ZImg::CombineMode::Mean);
+        tmp.blockDownsample(2, 2, 1, ImgMergeMode::Mean);
         tmp.save(dsofn);
       }
     }
@@ -357,7 +518,7 @@ void ZStitchImage::read(const QJsonObject& json)
 
   setResultFilename(readString(json, "result_file"));
 
-  setUseAllChannels();
+  setUseChannels();
   if (json.contains("channels_to_use")) {
     std::vector<size_t> chs;
     auto numberArray = readNumberArray(json, "channels_to_use");
@@ -392,7 +553,7 @@ void ZStitchImage::write(QJsonObject& json) const
   }
 }
 
-bool ZStitchImage::getTileMatrix(ZImg& img, std::vector<std::vector<int>>& tileMatrix, QList<ZTile>& tileList)
+void ZStitchImage::getTileMatrixFromConnImage(ZImg& img)
 {
   double minvalue;
   double maxvalue;
@@ -400,38 +561,38 @@ bool ZStitchImage::getTileMatrix(ZImg& img, std::vector<std::vector<int>>& tileM
   double midvalue = (minvalue + maxvalue) / 2;
   double thre1 = (minvalue + midvalue) / 2;
   double thre2 = (midvalue + maxvalue) / 2;
-  size_t numTilePerRow = 0;
-  size_t numTilePerCol = 0;
-  tileMatrix.clear();
-  tileList.clear();
+  size_t numCols = 0;
+  size_t numRows = 0;
   for (size_t h = 0; h < img.height(); h++) {
     int pre = minvalue;
     for (size_t w = 0; w < img.width(); w++) {
       if (img.value<double>(w, h, 0) > thre1 && img.value<double>(w, h, 0) > pre) {
-        numTilePerRow++;
+        numCols++;
       }
       pre = img.value<double>(w, h, 0);
     }
-    if (numTilePerRow > 0)
+    if (numCols > 0)
       break;
   }
   for (size_t w = 0; w < img.width(); w++) {
     int pre = minvalue;
     for (size_t h = 0; h < img.height(); h++) {
       if (img.value<double>(w, h, 0) > thre1 && img.value<double>(w, h, 0) > pre) {
-        numTilePerCol++;
+        numRows++;
       }
       pre = img.value<double>(w, h, 0);
     }
-    if (numTilePerCol > 0)
+    if (numRows > 0)
       break;
   }
-  if (numTilePerRow == 0 || numTilePerCol == 0) {
-    return false;
+  if (numCols == 0 || numRows == 0) {
+    m_tileGrid.clear();
+    throw ZIOException("can not find any block in conn image");
   }
-  tileMatrix = std::vector<std::vector<int>>(numTilePerCol, std::vector<int>(numTilePerRow, 0));
+
+  m_tileGrid = ZImg(ZImgInfo(numCols, numRows, 1, 1, 1, 4, VoxelFormat::Signed));
+  m_tileGrid.fill(0);
   int tileindex = 1;
-  int tileindex2 = 1;
   size_t currentrow = 0;
   size_t currentcol = 0;
   for (size_t h = 1; h < img.height() - 1; h++) {
@@ -443,30 +604,20 @@ bool ZStitchImage::getTileMatrix(ZImg& img, std::vector<std::vector<int>>& tileM
       int down = img.value<int>(w, h + 1, 0);
       if (value > thre1 && value > pre && value > up) {
         if (value > thre2) {
-          if (currentrow + 1 > tileMatrix.size() || currentcol + 1 > tileMatrix[currentrow].size()) {
-            return false;
+          if (currentrow >= numRows || currentcol >= numCols) {
+            m_tileGrid.clear();
+            throw ZIOException("can not parse tile conn image");
           }
-          tileMatrix[currentrow][currentcol] = tileindex++;
-          QPoint qp(w, h);
-          ZTile tile(tileindex - 1, qp, qp);
-          tileList.push_back(tile);
+          m_tileGrid.setValue(tileindex++, ZVoxelCoordinate(currentcol, currentrow));
         }
         currentcol++;
-        if (currentcol >= numTilePerRow) {
+        if (currentcol >= numCols) {
           currentcol = 0;
           currentrow++;
         }
       }
-      if (value > thre2 && value > post && value > down) {
-        if (tileindex2 > tileList.size()) {
-          return false;
-        }
-        tileList[tileindex2 - 1].region.setBottomRight(QPoint(w, h));
-        tileindex2++;
-      }
     }
   }
-  return tileindex == tileindex2;
 }
 
 } // namespace nim

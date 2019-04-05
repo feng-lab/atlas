@@ -197,7 +197,7 @@ ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, const std::ve
         m_tileimages.clear();
         break;
       }
-      ZImg maxProj = ZImg::combine(imgs, ZImg::CombineMode::Max);
+      ZImg maxProj = ZImg::combine(imgs, ImgMergeMode::Max);
       ZImgDisplay display(maxProj);
       for (size_t ch = 0; ch < maxProj.numChannels(); ++ch) {
         double min;
@@ -1440,10 +1440,10 @@ void ZStitchImageDialog::stitchStacks2()
     if (m_dsCheckBox->isChecked()) {
       LOG(INFO) << QString("Downsampling %1").arg(inputStack1Sources[f].toQString());
       fixedImg1.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                                ZImg::CombineMode::Mean);
+                                ImgMergeMode::Mean);
       LOG(INFO) << QString("Downsampling %1").arg(inputStack2Sources[f].toQString());
       fixedImg2.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                                ZImg::CombineMode::Mean);
+                                ImgMergeMode::Mean);
     }
     // between img1 and img2
     {
@@ -1489,10 +1489,10 @@ void ZStitchImageDialog::stitchStacks2()
       if (m_dsCheckBox->isChecked()) {
         LOG(INFO) << QString("Downsampling %1").arg(inputStack1Sources[m].toQString());
         movingImg1.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                                   ZImg::CombineMode::Mean);
+                                   ImgMergeMode::Mean);
         LOG(INFO) << QString("Downsampling %1").arg(inputStack2Sources[m].toQString());
         movingImg2.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                                   ZImg::CombineMode::Mean);
+                                   ImgMergeMode::Mean);
       }
 
       // img1
@@ -1605,7 +1605,7 @@ void ZStitchImageDialog::stitchStacks2()
       if (m_dsCheckBox->isChecked() &&
           (m_dsXSpinBox->value() > 1 || m_dsYSpinBox->value() > 1 || m_dsZSpinBox->value() > 1)) {
         imgs.emplace_back(inputStack1Sources[i], m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                          ZImg::CombineMode::Mean);
+                          ImgMergeMode::Mean);
       } else {
         imgs.emplace_back(inputStack1Sources[i]);
       }
@@ -1613,7 +1613,7 @@ void ZStitchImageDialog::stitchStacks2()
       if (m_dsCheckBox->isChecked() &&
           (m_dsXSpinBox->value() > 1 || m_dsYSpinBox->value() > 1 || m_dsZSpinBox->value() > 1)) {
         imgs.emplace_back(inputStack2Sources[i - nstack], m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                          ZImg::CombineMode::Mean);
+                          ImgMergeMode::Mean);
       } else {
         imgs.emplace_back(inputStack2Sources[i - nstack]);
       }
@@ -2024,7 +2024,7 @@ void ZStitchImageDialog::stitchStacks()
         img.blockDownsample(m_dsXSpinBox->value(),
                             m_dsYSpinBox->value(),
                             m_dsZSpinBox->value(),
-                            ZImg::CombineMode::Mean);
+                            ImgMergeMode::Mean);
       }
       img.save(m_outputFileEdit->text());
       emit resultReady(m_outputFileEdit->text());
@@ -2120,7 +2120,7 @@ void ZStitchImageDialog::stitchStacks()
         if (m_dsCheckBox->isChecked() &&
             (m_dsXSpinBox->value() > 1 || m_dsYSpinBox->value() > 1 || m_dsZSpinBox->value() > 1)) {
           imgs.emplace_back(inputStackSources[i], m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                            ZImg::CombineMode::Mean);
+                            ImgMergeMode::Mean);
         } else {
           imgs.emplace_back(inputStackSources[i]);
         }
@@ -2211,7 +2211,7 @@ void ZStitchImageDialog::stitchStacks()
               if (m_dsCheckBox->isChecked()) {
                 //m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStackSources[f].toQString()));
                 fixedImg.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                                         ZImg::CombineMode::Mean);
+                                         ImgMergeMode::Mean);
               }
 
               ZImg movingImg(inputStackSources[m]);
@@ -2219,7 +2219,7 @@ void ZStitchImageDialog::stitchStacks()
               if (m_dsCheckBox->isChecked()) {
                 //m_commandOutputEdit->append(QString("Downsampling %1").arg(inputStackSources[m].toQString()));
                 movingImg.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                                          ZImg::CombineMode::Mean);
+                                          ImgMergeMode::Mean);
               }
 
               ZImgNCCMatch imgNCCMatch(fixedImg, movingImg);
@@ -2268,7 +2268,7 @@ void ZStitchImageDialog::stitchStacks()
           if (m_dsCheckBox->isChecked()) {
             LOG(INFO) << QString("Downsampling %1").arg(inputStackSources[f].toQString());
             fixedImg.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                                     ZImg::CombineMode::Mean);
+                                     ImgMergeMode::Mean);
           }
           for (size_t m = f + 1; m < nstack; ++m) { // moving
             // no connection
@@ -2286,7 +2286,7 @@ void ZStitchImageDialog::stitchStacks()
             if (m_dsCheckBox->isChecked()) {
               LOG(INFO) << QString("Downsampling %1").arg(inputStackSources[m].toQString());
               movingImg.blockDownsample(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                                        ZImg::CombineMode::Mean);
+                                        ImgMergeMode::Mean);
             }
 
             ZImgNCCMatch imgNCCMatch(fixedImg, movingImg);
@@ -2341,7 +2341,7 @@ void ZStitchImageDialog::stitchStacks()
         if (m_dsCheckBox->isChecked() &&
             (m_dsXSpinBox->value() > 1 || m_dsYSpinBox->value() > 1 || m_dsZSpinBox->value() > 1)) {
           imgs.emplace_back(inputStackSources[i], m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value(),
-                            ZImg::CombineMode::Mean);
+                            ImgMergeMode::Mean);
         } else {
           imgs.emplace_back(inputStackSources[i]);
         }
@@ -2375,7 +2375,7 @@ void ZStitchImageDialog::stitchStacks()
           QString dsofn = fi.path() + "/" + fi.baseName() + QString("_ch%1_downsampled.v3draw").arg(c+1);
           ZImg img(m_outputFileEdit->text(), ZImgRegion(0, -1, 0, -1, 0, -1, c, c+1));
           img.save(ofn);
-          img.blockDownsample(2, 2, 1, ZImg::CombineMode::Mean);
+          img.blockDownsample(2, 2, 1, ImgMergeMode::Mean);
           img.save(dsofn);
         }
       } else {
@@ -2387,7 +2387,7 @@ void ZStitchImageDialog::stitchStacks()
           QString dsofn = fi.path() + "/" + fi.baseName() + QString("_ch%1_downsampled.v3draw").arg(c+1);
           ZImg tmp = wholeImg.createView(c);
           tmp.save(ofn);
-          tmp.blockDownsample(2, 2, 1, ZImg::CombineMode::Mean);
+          tmp.blockDownsample(2, 2, 1, ImgMergeMode::Mean);
           tmp.save(dsofn);
         }
       }

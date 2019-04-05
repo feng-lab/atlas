@@ -8,6 +8,7 @@
 #include "zbenchtimer.h"
 #include <QTextStream>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <boost/endian/conversion.hpp>
 #include <algorithm>
 
@@ -313,6 +314,11 @@ ZImg ZImg::readSubBlock(const QStringList& fileList, nim::Dimension catDim, size
   ZImg res;
   img->swap(res);
   return res;
+}
+
+std::vector<std::vector<ZImgRegion>> ZImg::getInternalSubRegions(const QString& filename, nim::FileFormat format)
+{
+  return ZImgIO().getInternalSubRegions(filename, format);
 }
 
 void ZImg::wrapData(void* data, const ZImgInfo& info)
@@ -1103,7 +1109,7 @@ ZImg ZImg::cat(const ZImg& img1, const ZImg& img2, const ZImg& img3, const ZImg&
   return cat(imgs, dim);
 }
 
-ZImg ZImg::combine(const std::vector<ZImg>& imgsIn, ZImg::CombineMode mode)
+ZImg ZImg::combine(const std::vector<ZImg>& imgsIn, ImgMergeMode mode)
 {
   std::vector<const ZImg*> imgs;
   for (size_t i = 0; i < imgsIn.size(); ++i)
@@ -1111,7 +1117,7 @@ ZImg ZImg::combine(const std::vector<ZImg>& imgsIn, ZImg::CombineMode mode)
   return combine(imgs, mode);
 }
 
-ZImg ZImg::combine(const std::vector<ZImg*>& imgsIn, ZImg::CombineMode mode)
+ZImg ZImg::combine(const std::vector<ZImg*>& imgsIn, ImgMergeMode mode)
 {
   std::vector<const ZImg*> imgs;
   for (size_t i = 0; i < imgsIn.size(); ++i)
@@ -1119,7 +1125,7 @@ ZImg ZImg::combine(const std::vector<ZImg*>& imgsIn, ZImg::CombineMode mode)
   return combine(imgs, mode);
 }
 
-ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ZImg::CombineMode mode)
+ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ImgMergeMode mode)
 {
   // remove empty img
   std::vector<const ZImg*> imgs;
@@ -1148,7 +1154,7 @@ ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ZImg::CombineMode mod
   return ZImg();
 }
 
-ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, ZImg::CombineMode mode)
+ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, ImgMergeMode mode)
 {
   std::vector<const ZImg*> imgs;
   imgs.push_back(&img1);
@@ -1156,7 +1162,7 @@ ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, ZImg::CombineMode mode)
   return combine(imgs, mode);
 }
 
-ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, ZImg::CombineMode mode)
+ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, ImgMergeMode mode)
 {
   std::vector<const ZImg*> imgs;
   imgs.push_back(&img1);
@@ -1165,7 +1171,7 @@ ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, ZImg::C
   return combine(imgs, mode);
 }
 
-ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, const ZImg& img4, ZImg::CombineMode mode)
+ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, const ZImg& img4, ImgMergeMode mode)
 {
   std::vector<const ZImg*> imgs;
   imgs.push_back(&img1);
@@ -1175,7 +1181,7 @@ ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, const Z
   return combine(imgs, mode);
 }
 
-ZImg ZImg::projectAlongDim(Dimension dim, CombineMode mode, int startIn, int endIn) const
+ZImg ZImg::projectAlongDim(Dimension dim, ImgMergeMode mode, int startIn, int endIn) const
 {
   if (isEmpty() || m_info.size(dim) == 1)
     return *this;
@@ -1190,7 +1196,7 @@ ZImg ZImg::projectAlongDim(Dimension dim, CombineMode mode, int startIn, int end
   }
 
   ZImg res;
-  if (mode == CombineMode::Max) {
+  if (mode == ImgMergeMode::Max) {
     for (size_t i = dstart; i < dend; ++i) {
       ZImg subImg;
       switch (dim) {
@@ -1218,7 +1224,7 @@ ZImg ZImg::projectAlongDim(Dimension dim, CombineMode mode, int startIn, int end
         res.binaryOperation(subImg, MaxOp());
       }
     }
-  } else if (mode == CombineMode::Min) {
+  } else if (mode == ImgMergeMode::Min) {
     for (size_t i = dstart; i < dend; ++i) {
       ZImg subImg;
       switch (dim) {
@@ -1244,6 +1250,33 @@ ZImg ZImg::projectAlongDim(Dimension dim, CombineMode mode, int startIn, int end
         res.swap(subImg);
       } else {
         res.binaryOperation(subImg, MinOp());
+      }
+    }
+  } else if (mode == ImgMergeMode::First) {
+    for (size_t i = dstart; i < dend; ++i) {
+      ZImg subImg;
+      switch (dim) {
+        case Dimension::T:
+          subImg = extractTime(i);
+          break;
+        case Dimension::C:
+          subImg = extractChannel(i, -1);
+          break;
+        case Dimension::Z:
+          subImg = extractPlane(i, -1, -1);
+          break;
+        case Dimension::Y:
+          subImg = extractRow(i, -1, -1, -1);
+          break;
+        case Dimension::X:
+          subImg = extractCol(i, -1, -1, -1);
+          break;
+        default:
+          break;
+      }
+      if (i == dstart) {
+        res.swap(subImg);
+        break;
       }
     }
   } else {
@@ -1280,7 +1313,7 @@ ZImg ZImg::projectAlongDim(Dimension dim, CombineMode mode, int startIn, int end
 
 ZImg ZImg::maximumZProjection(int start, int end) const
 {
-  return projectAlongDim(Dimension::Z, CombineMode::Max, start, end);
+  return projectAlongDim(Dimension::Z, ImgMergeMode::Max, start, end);
 }
 
 ZImg ZImg::normalized() const
@@ -1393,7 +1426,7 @@ ZImg ZImg::zoomed(double scaleX, double scaleY, double scaleZ, Interpolant inter
   return resized(desWidth, desHeight, desDepth, interpolant, antialiasing, antialiasingForNearest);
 }
 
-ZImg ZImg::blockDownsampled(size_t blockWidth, size_t blockHeight, size_t blockDepth, ZImg::CombineMode mode) const
+ZImg ZImg::blockDownsampled(size_t blockWidth, size_t blockHeight, size_t blockDepth, ImgMergeMode mode) const
 {
   ZImgInfo info = m_info;
   info.voxelSizeX *= blockWidth;
@@ -1431,7 +1464,7 @@ ZImg& ZImg::zoom(double scaleX, double scaleY, double scaleZ, Interpolant interp
   return *this;
 }
 
-ZImg& ZImg::blockDownsample(size_t blockWidth, size_t blockHeight, size_t blockDepth, ZImg::CombineMode mode)
+ZImg& ZImg::blockDownsample(size_t blockWidth, size_t blockHeight, size_t blockDepth, ImgMergeMode mode)
 {
   if (blockWidth == 1 && blockHeight == 1 && blockDepth == 1)
     return *this;
@@ -1669,6 +1702,53 @@ ZImg& ZImg::correctPreMultipliedColor()
   return *this;
 }
 
+QJsonValue ZImg::toJson() const
+{
+  CHECK(!isEmpty() && info().isType<int32_t>());
+  QJsonObject res;
+  QString size = QString("[%1, %2, %3, %4, %5]").arg(width()).arg(height()).arg(depth()).arg(
+    numChannels()).arg(numTimes());
+  res["size"] = size;
+  QString vl = QString::number(value<int32_t>(0));
+  for (size_t i = 1; i < voxelNumber(); ++i) {
+    if (i % width() == 0) {
+      vl += QString("; %1").arg(value<int32_t>(i));
+    } else {
+      vl += QString(", %1").arg(value<int32_t>(i));
+    }
+  }
+  res["values"] = vl;
+  return res;
+}
+
+ZImg ZImg::fromJson(const QJsonValue& value)
+{
+  if (!value.isObject()) {
+    throw ZIOException("not object");
+  }
+  QJsonObject obj = value.toObject();
+  QString size = readString(obj, "size");
+  QString values = readString(obj, "values");
+
+  ZImgInfo info(0, 0, 0, 0, 0, 4, VoxelFormat::Signed);
+
+  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+  QStringList numList = size.split(rx, QString::SkipEmptyParts);
+  CHECK(numList.size() == 5);
+  info.width = numList[0].toInt();
+  info.height = numList[1].toInt();
+  info.depth = numList[2].toInt();
+  info.numChannels = numList[3].toInt();
+  info.numTimes = numList[4].toInt();
+  ZImg img(info);
+  numList = values.split(rx, QString::SkipEmptyParts);
+  CHECK(img.voxelNumber() == size_t(numList.size()));
+  for (size_t i = 0; i < size_t(numList.size()); ++i) {
+    img.setValue(numList[i].toInt(), i);
+  }
+  return img;
+}
+
 void ZImg::clearData()
 {
   if (!m_ownData) {
@@ -1859,9 +1939,14 @@ void ZImg::pasteImgMax_Impl(const ZImg& img, const ZVoxelCoordinate& start)
 }
 
 template<typename TVoxel>
-ZImg ZImg::combine_Impl(const std::vector<const ZImg*>& imgs, CombineMode mode)
+ZImg ZImg::combine_Impl(const std::vector<const ZImg*>& imgs, ImgMergeMode mode)
 {
-  if (mode == CombineMode::Min) {
+  if (mode == ImgMergeMode::First) {
+    ZImg res(*imgs[0]);
+    return res;
+  }
+
+  if (mode == ImgMergeMode::Min) {
     ZImg res(*imgs[0]);
     for (size_t i = 1; i < imgs.size(); ++i) {
       const ZImg* img = imgs[i];
@@ -1876,7 +1961,7 @@ ZImg ZImg::combine_Impl(const std::vector<const ZImg*>& imgs, CombineMode mode)
     return res;
   }
 
-  if (mode == CombineMode::Max) {
+  if (mode == ImgMergeMode::Max) {
     ZImg res(*imgs[0]);
     for (size_t i = 1; i < imgs.size(); ++i) {
       const ZImg* img = imgs[i];
@@ -1891,7 +1976,7 @@ ZImg ZImg::combine_Impl(const std::vector<const ZImg*>& imgs, CombineMode mode)
     return res;
   }
 
-  if (mode == CombineMode::Mean) {
+  if (mode == ImgMergeMode::Mean) {
     ZImg res(imgs[0]->info());
     std::vector<TVoxel> buf(imgs.size());
 
@@ -1908,7 +1993,7 @@ ZImg ZImg::combine_Impl(const std::vector<const ZImg*>& imgs, CombineMode mode)
     return res;
   }
 
-  if (mode == CombineMode::Median) {
+  if (mode == ImgMergeMode::Median) {
     ZImg res(imgs[0]->info());
     std::vector<TVoxel> buf(imgs.size());
 
@@ -1928,25 +2013,25 @@ ZImg ZImg::combine_Impl(const std::vector<const ZImg*>& imgs, CombineMode mode)
   return ZImg();
 }
 
-template ZImg ZImg::combine_Impl<uint8_t>(const std::vector<const ZImg*>&, CombineMode);
+template ZImg ZImg::combine_Impl<uint8_t>(const std::vector<const ZImg*>&, ImgMergeMode);
 
-template ZImg ZImg::combine_Impl<uint16_t>(const std::vector<const ZImg*>&, CombineMode);
+template ZImg ZImg::combine_Impl<uint16_t>(const std::vector<const ZImg*>&, ImgMergeMode);
 
-template ZImg ZImg::combine_Impl<uint32_t>(const std::vector<const ZImg*>&, CombineMode);
+template ZImg ZImg::combine_Impl<uint32_t>(const std::vector<const ZImg*>&, ImgMergeMode);
 
-template ZImg ZImg::combine_Impl<uint64_t>(const std::vector<const ZImg*>&, CombineMode);
+template ZImg ZImg::combine_Impl<uint64_t>(const std::vector<const ZImg*>&, ImgMergeMode);
 
-template ZImg ZImg::combine_Impl<int8_t>(const std::vector<const ZImg*>&, CombineMode);
+template ZImg ZImg::combine_Impl<int8_t>(const std::vector<const ZImg*>&, ImgMergeMode);
 
-template ZImg ZImg::combine_Impl<int16_t>(const std::vector<const ZImg*>&, CombineMode);
+template ZImg ZImg::combine_Impl<int16_t>(const std::vector<const ZImg*>&, ImgMergeMode);
 
-template ZImg ZImg::combine_Impl<int32_t>(const std::vector<const ZImg*>&, CombineMode);
+template ZImg ZImg::combine_Impl<int32_t>(const std::vector<const ZImg*>&, ImgMergeMode);
 
-template ZImg ZImg::combine_Impl<int64_t>(const std::vector<const ZImg*>&, CombineMode);
+template ZImg ZImg::combine_Impl<int64_t>(const std::vector<const ZImg*>&, ImgMergeMode);
 
-template ZImg ZImg::combine_Impl<float>(const std::vector<const ZImg*>&, CombineMode);
+template ZImg ZImg::combine_Impl<float>(const std::vector<const ZImg*>&, ImgMergeMode);
 
-template ZImg ZImg::combine_Impl<double>(const std::vector<const ZImg*>&, CombineMode);
+template ZImg ZImg::combine_Impl<double>(const std::vector<const ZImg*>&, ImgMergeMode);
 
 template<typename TVoxel>
 ZImg& ZImg::normalize_Impl()
@@ -2000,9 +2085,10 @@ void ZImg::resize_Impl(ZImg& res, Interpolant interpolant, bool antialiasing, bo
 
 template<typename TVoxel>
 void
-ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, size_t blockDepth, CombineMode mode) const
+ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, size_t blockDepth,
+                            ImgMergeMode mode) const
 {
-  if (mode == CombineMode::Mean) {
+  if (mode == ImgMergeMode::Mean) {
     for (size_t t = 0; t < res.numTimes(); ++t) {
       for (size_t c = 0; c < res.numChannels(); ++c) {
         TVoxel* resData = res.channelData<TVoxel>(c, t);
@@ -2037,7 +2123,7 @@ ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, si
         }
       }
     }
-  } else if (mode == CombineMode::Median) {
+  } else if (mode == ImgMergeMode::Median) {
     std::vector<TVoxel> buf(blockWidth * blockHeight * blockDepth);
     for (size_t t = 0; t < res.numTimes(); ++t) {
       for (size_t c = 0; c < res.numChannels(); ++c) {
@@ -2070,7 +2156,7 @@ ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, si
         }
       }
     }
-  } else if (mode == CombineMode::Min) {
+  } else if (mode == ImgMergeMode::Min) {
     for (size_t t = 0; t < res.numTimes(); ++t) {
       for (size_t c = 0; c < res.numChannels(); ++c) {
         TVoxel* resData = res.channelData<TVoxel>(c, t);
@@ -2101,7 +2187,7 @@ ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, si
         }
       }
     }
-  } else if (mode == CombineMode::Max) {
+  } else if (mode == ImgMergeMode::Max) {
     for (size_t t = 0; t < res.numTimes(); ++t) {
       for (size_t c = 0; c < res.numChannels(); ++c) {
         TVoxel* resData = res.channelData<TVoxel>(c, t);
@@ -2126,6 +2212,25 @@ ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, si
                 }
                 srcOffset += planeVoxelNumber() - (yEnd - yStart) * rowVoxelNumber();
               }
+              ++resOffset;
+            }
+          }
+        }
+      }
+    }
+  } else if (mode == ImgMergeMode::First) {
+    for (size_t t = 0; t < res.numTimes(); ++t) {
+      for (size_t c = 0; c < res.numChannels(); ++c) {
+        TVoxel* resData = res.channelData<TVoxel>(c, t);
+        size_t resOffset = 0;
+        for (size_t z = 0; z < res.depth(); ++z) {
+          size_t zStart = z * blockDepth;
+          for (size_t y = 0; y < res.height(); ++y) {
+            size_t yStart = y * blockHeight;
+            for (size_t x = 0; x < res.width(); ++x) {
+              size_t xStart = x * blockWidth;
+              const TVoxel* srcData = data<TVoxel>(xStart, yStart, zStart, c, t);
+              resData[resOffset] = srcData[0];
               ++resOffset;
             }
           }

@@ -191,7 +191,7 @@ private:
 namespace nim {
 
 ZImgTileSubBlock::ZImgTileSubBlock(const ZImgSource& source, size_t downsampleBlockWidth, size_t downsampleBlockHeight,
-                                   size_t downsampleBlockDepth, ZImg::CombineMode downsampleCombineMode)
+                                   size_t downsampleBlockDepth, ImgMergeMode downsampleCombineMode)
   : ZImgSubBlock(1, 0, 0, 0, 0, 0, 0)
   , m_source(source)
   , m_downsampleBlockWidth(downsampleBlockWidth)

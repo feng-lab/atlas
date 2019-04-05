@@ -880,23 +880,60 @@ void ZImgZeissCZI::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       resInfo.voxelSizeY /= scale;
     }
     img = ZImg(resInfo);
-    ZBBox<ZVoxelCoordinate> imgBox(rgn.start, rgn.end - 1);
-    for (const auto& tile : m_sceneTiles[scene]) {
-      if (tile.ratio == readRatio) {
-        ZBBox<ZVoxelCoordinate> tileBox(tile.start, tile.start + tile.size - 1);
-        if (imgBox.conjoint(tileBox)) {
-          ZImg tileImg = readCZITile(inputFileStream, tile);
-          ZVoxelCoordinate start = tile.start - rgn.start;
-          if (readRatio > 1) {
-            start.x *= scale;
-            start.y *= scale;
+    // czi tiles usually overlap with each other because of the stitching.
+    // if our target region (in xy plane) matches exactly to some internal CZI tiles, then we probably only wanted those internal tiles,
+    // even though there might be some other tiles overlap a little bit with our target region, we can safely ignore or probably want to
+    // ignore those duplicated signals
+    // this is useful if we are extracting internal 3d blocks for restitching
+    // we check readRatio is 1 and the region can be exactly covered in x-y direction by 1 CZI tile
+    size_t totalWritten = 0_usize;
+    if (readRatio == 1) {
+      ZBBox<ZVoxelCoordinate> imgBox(rgn.start, rgn.end - 1);
+      for (const auto& tile : m_sceneTiles[scene]) {
+        if (tile.ratio == readRatio) {
+          ZBBox<ZVoxelCoordinate> tileBox(tile.start, tile.start + tile.size - 1);
+          if (imgBox.conjoint(tileBox) &&
+              rgn.start.x == tile.start.x && rgn.start.y == tile.start.y &&
+              rgn.end.x == tile.start.x + tile.size.x && rgn.end.y == tile.start.y + tile.size.y) {
+            ZImg tileImg = readCZITile(inputFileStream, tile);
+            ZVoxelCoordinate start = tile.start - rgn.start;
+            img.pasteImg(tileImg, start);
+            totalWritten += tileImg.voxelNumber();
           }
-          img.pasteImg(tileImg, start);
+        }
+        if (tile.ratio > readRatio) {
+          break;
         }
       }
-      if (tile.ratio > readRatio) {
-        break;
+    }
+    // it is possible that even totalWritten >= img.voxelNumber() we still haven't read enough like in mixedTile plus 3D tile situation
+    // if that happens we need to write a lot more code
+    if (totalWritten < img.voxelNumber()) {
+      if (totalWritten > 0) {
+        LOG(WARNING) << "mixedTile?";
       }
+      img = ZImg(resInfo);
+      // not special case
+      ZBBox<ZVoxelCoordinate> imgBox(rgn.start, rgn.end - 1);
+      for (const auto& tile : m_sceneTiles[scene]) {
+        if (tile.ratio == readRatio) {
+          ZBBox<ZVoxelCoordinate> tileBox(tile.start, tile.start + tile.size - 1);
+          if (imgBox.conjoint(tileBox)) {
+            ZImg tileImg = readCZITile(inputFileStream, tile);
+            ZVoxelCoordinate start = tile.start - rgn.start;
+            if (readRatio > 1) {
+              start.x *= scale;
+              start.y *= scale;
+            }
+            img.pasteImg(tileImg, start);
+          }
+        }
+        if (tile.ratio > readRatio) {
+          break;
+        }
+      }
+    } else {
+      LOG(INFO) << "region matches internal tiles";
     }
   }
 

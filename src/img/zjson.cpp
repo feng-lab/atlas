@@ -2,6 +2,7 @@
 
 #include "zexception.h"
 #include "zlog.h"
+#include <QRegularExpression>
 #include <QFile>
 
 namespace nim {

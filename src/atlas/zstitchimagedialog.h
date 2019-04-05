@@ -1,8 +1,10 @@
 #pragma once
 
 #include "zstitchimage.h"
-#include <QDialog>
+#include "zimgprocessdialog.h"
 #include <QList>
+#include <QPoint>
+#include <QRect>
 #include <vector>
 
 QT_BEGIN_NAMESPACE
@@ -52,6 +54,20 @@ class ZImg;
 
 class ZLogWidget;
 
+class ZTile
+{
+public:
+  ZTile(int index_, QPoint topleft, QPoint bottomright)
+    : index(index_)
+  {
+    region = QRect(topleft, bottomright);
+  }
+
+  bool bIsSelected = true;
+  int index;
+  QRect region;
+};
+
 class ZTileImageWidget : public QWidget
 {
 Q_OBJECT
@@ -95,13 +111,13 @@ private:
   QList<QImage> m_tileimages;
 };
 
-class ZStitchImageDialog : public QDialog
+class ZStitchImageDialog : public ZImgProcessDialog
 {
 Q_OBJECT
 public:
   explicit ZStitchImageDialog(QWidget* parent = nullptr);
 
-  virtual ~ZStitchImageDialog();
+~ZStitchImageDialog() override;
 
 signals:
 

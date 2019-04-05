@@ -36,6 +36,10 @@ public:
 
   void readInfo(const ZImgSource& imgSource, ZImgInfo& info);
 
+  //
+  std::vector<std::vector<ZImgRegion>> getInternalSubRegions(const QString& filename,
+                                                             FileFormat format = FileFormat::Unknown);
+
   // only metadata
   void
   readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene = 0, FileFormat format = FileFormat::Unknown);

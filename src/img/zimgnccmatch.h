@@ -90,6 +90,7 @@ public:
                                           double* numOverlapVoxels = nullptr);
 
   // use coarse-to-fine method to reduce memory usage
+  // coarse image is created by averaging pixels in block of size (intvX + 1, intvY + 1, intvZ + 1)
   ZVoxelCoordinate computeMovingImgOffsetMR(size_t intvX, size_t intvY, size_t intvZ,
                                             double* maxNCC = nullptr,
                                             double* maxWeightedNCC = nullptr,

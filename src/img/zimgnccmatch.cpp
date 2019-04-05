@@ -470,7 +470,7 @@ void ZImgNCCMatch::constructSingleChannelFixedImg(const ZImgRegion& rgn, ZImg& f
         }
         idx++;
       }
-      fixedImg = ZImg::combine(imgs, ZImg::CombineMode::Mean);
+      fixedImg = ZImg::combine(imgs, ImgMergeMode::Mean);
     }
   } else {
     if (m_fixedImgChannelsToUse.size() == 1) {
@@ -499,7 +499,7 @@ void ZImgNCCMatch::constructSingleChannelFixedImg(const ZImgRegion& rgn, ZImg& f
         }
         idx++;
       }
-      fixedImg = ZImg::combine(imgs, ZImg::CombineMode::Mean);
+      fixedImg = ZImg::combine(imgs, ImgMergeMode::Mean);
     }
   }
 }
@@ -530,7 +530,7 @@ void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg& 
         }
         idx++;
       }
-      movingImg = ZImg::combine(imgs, ZImg::CombineMode::Mean);
+      movingImg = ZImg::combine(imgs, ImgMergeMode::Mean);
     }
   } else {
     if (m_movingImgChannelsToUse.size() == 1) {
@@ -559,7 +559,7 @@ void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg& 
         }
         idx++;
       }
-      movingImg = ZImg::combine(imgs, ZImg::CombineMode::Mean);
+      movingImg = ZImg::combine(imgs, ImgMergeMode::Mean);
     }
   }
 }
@@ -850,8 +850,8 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(const PositionHint& movi
   ZImg dsFixedImg = fixedImg.zoomed(scaleX, scaleY, scaleZ, Interpolant::Cubic);
   ZImg dsMovingImg = movingImg.zoomed(scaleX, scaleY, scaleZ, Interpolant::Cubic);
 #else
-  ZImg dsFixedImg = fixedImg.blockDownsampled(intvX + 1, intvY + 1, intvZ + 1, ZImg::CombineMode::Mean);
-  ZImg dsMovingImg = movingImg.blockDownsampled(intvX + 1, intvY + 1, intvZ + 1, ZImg::CombineMode::Mean);
+  ZImg dsFixedImg = fixedImg.blockDownsampled(intvX + 1, intvY + 1, intvZ + 1, ImgMergeMode::Mean);
+  ZImg dsMovingImg = movingImg.blockDownsampled(intvX + 1, intvY + 1, intvZ + 1, ImgMergeMode::Mean);
 #endif
 
   ZImgInfo fixedInfo = m_fixedImg.info();

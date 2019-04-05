@@ -471,7 +471,6 @@ PYBIND11_MODULE(_imgpy, m)
       "filename"_a)
     .def("setUseChannels", &ZStitchImage::setUseChannels,
       "channels"_a)
-    .def("setUseAllChannels", &ZStitchImage::setUseAllChannels)
     .def("setMergeMode", &ZStitchImage::setMergeMode,
       "mode"_a)
     .def("setMaxOverlapRate", &ZStitchImage::setMaxOverlapRate,

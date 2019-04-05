@@ -221,6 +221,54 @@ void ZImgIO::readInfo(const ZImgSource& imgSource, ZImgInfo& info)
   }
 }
 
+std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString& filename,
+                                                                   FileFormat format)
+{
+  std::vector<ZImgInfo> infos;
+  std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
+  readInfos(filename, infos, &subBlocks, nullptr, format);
+  std::vector<std::vector<ZImgRegion>> res(infos.size());
+  for (size_t i = 0; i < res.size(); ++i) {
+    auto& blocks = subBlocks[i];
+    std::set<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t, size_t>> tiles;
+    for (const auto& block : blocks) {
+      tiles.insert(
+        std::tuple<size_t, size_t, size_t, size_t, size_t, size_t, size_t>(block->ratio, block->t, block->x, block->y,
+                                                                           block->width,
+                                                                           block->height, block->z));
+    }
+    auto lastTile = std::tuple<size_t, size_t, size_t, size_t, size_t, size_t, size_t>();
+    for (const auto& tile : tiles) {
+      auto [ratio, t, x, y, width, height, z] = tile;
+      if (ratio != 1) {
+        continue;
+      }
+      if (res[i].empty()) {
+        ZVoxelCoordinate startC(x, y, z, 0, t);
+        ZVoxelCoordinate endC(x+width, y+width, z+1, -1, t+1);
+        res[i].push_back(ZImgRegion(startC, endC));
+        lastTile = tile;
+        continue;
+      }
+      auto [lratio, lt, lx, ly, lwidth, lheight, lz] = lastTile;
+      if (lt == t && lx == x && ly == y && lwidth == width && lheight == height) {
+        auto& rgn = res[i][res[i].size() - 1];
+        if (lz != size_t(rgn.end.z) + 1) {
+          throw ZIOException("z jumping");
+        } else {
+          rgn.end.z += 1;
+        }
+      } else {
+        ZVoxelCoordinate startC(x, y, z, 0, t);
+        ZVoxelCoordinate endC(x+width, y+width, z+1, -1, t+1);
+        res[i].push_back(ZImgRegion(startC, endC));
+        lastTile = tile;
+      }
+    }
+  }
+  return res;
+}
+
 void ZImgIO::readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene, FileFormat format)
 {
   meta.clear();

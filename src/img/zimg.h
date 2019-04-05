@@ -4,6 +4,7 @@
 #include "zimgregion.h"
 #include "zimgmetadatabase.h"
 #include "zimgmetatag.h"
+#include "zjson.h"
 #include <QStringList>
 
 namespace nim {
@@ -101,11 +102,6 @@ public:
 class ZImg
 {
 public:
-  enum class CombineMode
-  {
-    Max, Min, Mean, Median
-  };
-
   enum class ThresholdMode
   {
     IncludeThreshold, ExcludeThreshold
@@ -201,6 +197,9 @@ public:
 
   static ZImg readSubBlock(const QStringList& fileList, Dimension catDim, size_t scene, size_t blockIndex,
                            FileFormat format = FileFormat::Unknown, bool expandXY = false);
+
+  static std::vector<std::vector<ZImgRegion>> getInternalSubRegions(const QString& filename,
+                                                                    FileFormat format = FileFormat::Unknown);
 
   // wrap exist raw data as ZImg, ZImg will **not** free the memory after using
   // only accept non-const data pointer (link error if input is const)
@@ -622,20 +621,20 @@ public:
   static ZImg cat(const ZImg& img1, const ZImg& img2, const ZImg& img3, const ZImg& img4, Dimension dim);
 
   // combine image of same type and same dimensions
-  static ZImg combine(const std::vector<ZImg>& imgs, CombineMode mode);
+  static ZImg combine(const std::vector<ZImg>& imgs, ImgMergeMode mode);
 
-  static ZImg combine(const std::vector<ZImg*>& imgs, CombineMode mode);
+  static ZImg combine(const std::vector<ZImg*>& imgs, ImgMergeMode mode);
 
-  static ZImg combine(const std::vector<const ZImg*>& imgs, CombineMode mode);
+  static ZImg combine(const std::vector<const ZImg*>& imgs, ImgMergeMode mode);
 
-  static ZImg combine(const ZImg& img1, const ZImg& img2, CombineMode mode);
+  static ZImg combine(const ZImg& img1, const ZImg& img2, ImgMergeMode mode);
 
-  static ZImg combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, CombineMode mode);
+  static ZImg combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, ImgMergeMode mode);
 
-  static ZImg combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, const ZImg& img4, CombineMode mode);
+  static ZImg combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, const ZImg& img4, ImgMergeMode mode);
 
   // projection
-  ZImg projectAlongDim(Dimension dim, CombineMode mode, int start = -1, int end = -1) const;
+  ZImg projectAlongDim(Dimension dim, ImgMergeMode mode, int start = -1, int end = -1) const;
 
   ZImg maximumZProjection(int start = -1, int end = -1) const;
 
@@ -693,7 +692,7 @@ public:
 
   // combine voxels in each block into one voxel of result img
   // result img size is ceil(width/blockWidth) * ceil(height/blockHeight) * ceil(depth/blockDepth)
-  ZImg blockDownsampled(size_t blockWidth, size_t blockHeight, size_t blockDepth, CombineMode mode) const;
+  ZImg blockDownsampled(size_t blockWidth, size_t blockHeight, size_t blockDepth, ImgMergeMode mode) const;
 
   // resize zoom this img, will change img memory and make virtual img non-virtual
   ZImg& resize(size_t desWidth, size_t desHeight, size_t desDepth,
@@ -704,7 +703,7 @@ public:
              Interpolant interpolant = Interpolant::Cubic, bool antialiasing = true,
              bool antialiasingForNearest = false);
 
-  ZImg& blockDownsample(size_t blockWidth, size_t blockHeight, size_t blockDepth, CombineMode mode);
+  ZImg& blockDownsample(size_t blockWidth, size_t blockHeight, size_t blockDepth, ImgMergeMode mode);
 
   // flip along dim, dim can be normal x-y-z dim(0-1-2), channel dim(3), location dim(5) or time dimension(4)
   ZImg& flip(Dimension dim);
@@ -968,6 +967,11 @@ public:
   // from alpha pre-multiplied color to normal color, assume last channel is alpha channel
   ZImg& correctPreMultipliedColor();
 
+  // only int32_t now
+  QJsonValue toJson() const;
+
+  static ZImg fromJson(const QJsonValue& value);
+
 #ifdef _NEUTUBE_
   // only for interface with zstack
   void releaseTimeData(size_t t) { m_data[t] = nullptr; }
@@ -1001,7 +1005,7 @@ private:
   void pasteImgMax_Impl(const ZImg& img, const ZVoxelCoordinate& start);
 
   template<typename TVoxel>
-  static ZImg combine_Impl(const std::vector<const ZImg*>& imgs, CombineMode mode);
+  static ZImg combine_Impl(const std::vector<const ZImg*>& imgs, ImgMergeMode mode);
 
   template<typename TVoxel, typename TDesVoxel>
   static void convert_Impl(bool normalize, const ZImg* src, ZImg* des);
@@ -1030,7 +1034,7 @@ private:
 
   template<typename TVoxel>
   void
-  blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, size_t blockDepth, CombineMode mode) const;
+  blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, size_t blockDepth, ImgMergeMode mode) const;
 
   template<typename TVoxel, typename TValue>
   void computeMinMax_Impl(TValue& minV, TValue& maxV) const;
