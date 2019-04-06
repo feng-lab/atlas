@@ -111,7 +111,7 @@ private:
   QList<QImage> m_tileimages;
 };
 
-class ZStitchImageDialog : public ZImgProcessDialog
+class ZStitchImageDialog : public QDialog
 {
 Q_OBJECT
 public:

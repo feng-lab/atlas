@@ -39,7 +39,8 @@ public:
   void setMergeMode(ImgMergeMode mode)
   { m_mergeMode = mode; }
 
-  void setDownsampleBeforeStitching(size_t blockWidth, size_t blockHeight, size_t blockDepth, ImgMergeMode mode)
+  void setDownsampleBeforeStitching(size_t blockWidth, size_t blockHeight, size_t blockDepth,
+                                    ImgMergeMode mode = ImgMergeMode::Mean)
   {
     m_downsampleBlockWidth = blockWidth;
     m_downsampleBlockHeight = blockHeight;
@@ -56,17 +57,26 @@ public:
     m_startResolutionIntvZ = intvZ;
   }
 
+  // only works with grid or conn text file
+  void setConcatenateOnly()
+  {
+    m_concatenateOnly = true;
+  }
+
   // default 0.15
   void setMaxOverlapRate(double maxOverlapRate)
   { m_maxOverlapRate = maxOverlapRate; }
 
-  // set Tile configuration
+  // set Tile configuration to be one of grid, conn text file, blind, czi restitching
 
   // matrix with the grid configuration of tiles, positive number represents tile index
   // [0 0 1 2 0; 0 0 3 0 0]: tile 2 is on the right side of tile 1, tile 3 is at bottom side of tile 1
   // the maximum index in the grid matrix must match the number of inputs
   void setTileGrid(const ZImg& tileGrid)
-  { m_tileGrid = tileGrid; }
+  {
+    unsetTileConfiguration();
+    m_tileGrid = tileGrid;
+  }
 
   // derive m_tileGrid from Zeiss tile selection image
   void setConnTileImage(const QString& fn);
@@ -77,7 +87,22 @@ public:
   // derive m_tileGrid from a matrix
   void setTileGridFromLayout(size_t numRows, size_t numCols);
 
-  void setConnInfoFromConnTextFile(const QString& file);
+  void setConnInfoFromConnTextFile(const QString& file)
+  {
+    unsetTileConfiguration();
+    m_connTextFile = file;
+  }
+
+  void setRestitch()
+  {
+    unsetTileConfiguration();
+    m_restitch = true;
+  }
+
+  void setBlindStitching()
+  {
+    unsetTileConfiguration();
+  }
 
 protected:
   void doWork() override;
@@ -88,6 +113,10 @@ protected:
 
 private:
   void getTileMatrixFromConnImage(ZImg& img);
+
+  void unsetTileConfiguration();
+
+  void doRestitch();
 
 private:
   QStringList m_inputStack1Filenames;
@@ -102,12 +131,16 @@ private:
   size_t m_downsampleBlockHeight = 1;
   size_t m_downsampleBlockDepth = 1;
   ImgMergeMode m_downsampleMergeMode = ImgMergeMode::Mean;
-  size_t m_startResolutionIntvX = 1;  // start from image downsampled by 2
-  size_t m_startResolutionIntvY = 1;  // start from image downsampled by 2
-  size_t m_startResolutionIntvZ = 1;  // start from image downsampled by 2
+  bool m_concatenateOnly = false;
+  size_t m_startResolutionIntvX = 1;  // start from image downsampled by (m_startResolutionIntvX+1)
+  size_t m_startResolutionIntvY = 1;  // start from image downsampled by (m_startResolutionIntvY+1)
+  size_t m_startResolutionIntvZ = 1;  // start from image downsampled by (m_startResolutionIntvZ+1)
   double m_maxOverlapRate = 0.15;
+
+  // one of the configuration will be valid:
   ZImg m_tileGrid;  // a 2d or 3d img contains the tile grid
   QString m_connTextFile;
+  bool m_restitch = false; // only works for czi now
 };
 
 } // namespace nim

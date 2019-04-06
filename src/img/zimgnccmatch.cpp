@@ -422,6 +422,43 @@ double ZImgNCCMatch::computeNCCOfOffset(const ZVoxelCoordinate& offset)
   return getNCCOfOffset(fixedImg, movingImg, offset);
 }
 
+ZVoxelCoordinate ZImgNCCMatch::getMovingImgOffsetFromHint(double exactOverlapRateX,
+                                                          double exactOverlapRateY,
+                                                          double exactOverlapRateZ)
+{
+  if (m_movingImgPosHint == PositionHint::None) {
+    throw ZImgException("Can not get offset without position hint");
+  }
+  if (exactOverlapRateX >= 1.0 || exactOverlapRateX < 0.0 ||
+      exactOverlapRateZ >= 1.0 || exactOverlapRateZ < 0.0 ||
+      exactOverlapRateY >= 1.0 || exactOverlapRateY < 0.0) {
+    throw ZImgException("overlap rate should be between 0 and 1");
+  }
+  ZVoxelCoordinate movingImgOffset;
+  if (is_flag_set(m_movingImgPosHint, PositionHint::Left)) {
+    auto shift = std::round(m_fixedImg.info().width * exactOverlapRateX);
+    movingImgOffset.x = -static_cast<ZVoxelCoordinate::value_type>(m_movingImg.info().width) + shift;
+  } else if (is_flag_set(m_movingImgPosHint, PositionHint::Right)) {
+    auto shift = std::round(m_fixedImg.info().width * exactOverlapRateX);
+    movingImgOffset.x = m_fixedImg.info().width - shift;
+  }
+  if (is_flag_set(m_movingImgPosHint, PositionHint::Up)) {
+    auto shift = std::round(m_fixedImg.info().height * exactOverlapRateY);
+    movingImgOffset.y = -static_cast<ZVoxelCoordinate::value_type>(m_movingImg.info().height) + shift;
+  } else if (is_flag_set(m_movingImgPosHint, PositionHint::Down)) {
+    auto shift = std::round(m_fixedImg.info().height * exactOverlapRateY);
+    movingImgOffset.y = m_fixedImg.info().height - shift;
+  }
+  if (is_flag_set(m_movingImgPosHint, PositionHint::Front)) {
+    auto shift = std::round(m_fixedImg.info().depth * exactOverlapRateZ);
+    movingImgOffset.z = -static_cast<ZVoxelCoordinate::value_type>(m_movingImg.info().depth) + shift;
+  } else if (is_flag_set(m_movingImgPosHint, PositionHint::Back)) {
+    auto shift = std::round(m_fixedImg.info().depth * exactOverlapRateZ);
+    movingImgOffset.z = m_fixedImg.info().depth - shift;
+  }
+  return movingImgOffset;
+}
+
 void ZImgNCCMatch::init()
 {
   useAllFixedImgChannels();

@@ -109,6 +109,11 @@ public:
   // give a offset of moving img, get ncc of this offset
   double computeNCCOfOffset(const ZVoxelCoordinate& offset);
 
+  // use hint to get the offset to concatenate fixed img and moving img, throw exception if hint is none
+  ZVoxelCoordinate getMovingImgOffsetFromHint(double exactOverlapRateX = 0.00,
+                                              double exactOverlapRateY = 0.00,
+                                              double exactOverlapRateZ = 0.00);
+
 private:
   void init();
 
