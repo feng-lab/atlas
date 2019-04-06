@@ -313,11 +313,15 @@ void ZStitchImage::doWork()
   if (m_resFileName.isEmpty() || !outputFI.absoluteDir().exists()) {
     throw ZImgException("Please make sure the output folder exists.");
   }
-  if (m_inputStack1Filenames.empty()) {
+  if (m_inputFilenames.empty()) {
     throw ZImgException("No input image.");
   }
+  bool hasStack2 = m_2ndInputFilenames.size() == m_inputFilenames.size();
 
   if (m_restitch) {
+    if (hasStack2) {
+      throw ZImgException("restitch and two sets of input stacks are not compatible.");
+    }
     doRestitch();
     return;
   }
@@ -331,34 +335,55 @@ void ZStitchImage::doWork()
     nStacks = buildConnectionFromGrid(m_tileGrid, conn);
   } else {
     LOG(INFO) << "no connection configuration, blind stitching...";
-    nStacks = m_inputStack1Filenames.size();
+    nStacks = m_inputFilenames.size();
     buildFullConnection(nStacks, conn);
   }
 
+  if (hasStack2) {
+    for (const auto&[key, val] : conn) {
+      conn[std::make_pair(key.first, key.first + nStacks)] = ZImgNCCMatch::PositionHint::None;
+      conn[std::make_pair(key.second, key.second + nStacks)] = ZImgNCCMatch::PositionHint::None;
+      conn[std::make_pair(key.first + nStacks, key.second + nStacks)] = val;
+    }
+  }
+
   std::vector<ZImgSource> inputStackSources;
+  std::vector<ZImgSource> input2ndStackSources;
   if (nStacks == 0) {
     throw ZImgException("No image to stitch.");
   } else if (nStacks == 1) {
-    if (m_downsampleBlockDepth > 1 || m_downsampleBlockWidth > 1 || m_downsampleBlockHeight > 1) {
-      ZImg img(m_inputStack1Filenames[0], ZImgRegion(), m_scene);
-      LOG(INFO) << "Downsampling ...";
-      img.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
-                          m_downsampleMergeMode);
+    if (hasStack2) {
+      inputStackSources.emplace_back(m_inputFilenames[0], ZImgRegion(), m_scene);
+      input2ndStackSources.emplace_back(m_2ndInputFilenames[0], ZImgRegion(), m_2ndScene);
+      auto info = ZImg::readImgInfo(inputStackSources[0]);
+      auto tmpInfo = ZImg::readImgInfo(input2ndStackSources[0]);
+      if (!tmpInfo.isSameType(info)) {
+        throw ZImgException(QString("Image type of %1 <%2> and %3 <%4> don't match")
+                              .arg(inputStackSources[0].toQString()).arg(info.toQString())
+                              .arg(input2ndStackSources[0].toQString()).arg(tmpInfo.toQString()));
+      }
+    } else {
+      if (m_downsampleBlockDepth > 1 || m_downsampleBlockWidth > 1 || m_downsampleBlockHeight > 1) {
+        ZImg img(m_inputFilenames[0], ZImgRegion(), m_scene);
+        LOG(INFO) << "Downsampling ...";
+        img.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
+                            m_downsampleMergeMode);
 
-      img.save(m_resFileName);
+        img.save(m_resFileName);
 
-      LOG(INFO) << QString("%1 saved.").arg(m_resFileName);
-      return;
+        LOG(INFO) << QString("%1 saved.").arg(m_resFileName);
+        return;
+      }
+      throw ZImgException("Need at least two images to do stitching.");
     }
-    throw ZImgException("Need at least two images to do stitching.");
   } else {
-    if (nStacks == size_t(m_inputStack1Filenames.size())) {
+    if (nStacks == size_t(m_inputFilenames.size())) {
       // perfect
-      for (const auto& filename : m_inputStack1Filenames) {
+      for (const auto& filename : m_inputFilenames) {
         inputStackSources.emplace_back(filename, ZImgRegion(), m_scene);
       }
       auto info = ZImg::readImgInfo(inputStackSources[0]);
-      for (size_t i = 0; i < inputStackSources.size(); ++i) {
+      for (size_t i = 1; i < inputStackSources.size(); ++i) {
         auto tmpInfo = ZImg::readImgInfo(inputStackSources[i]);
         if (!tmpInfo.isSameType(info)) {
           throw ZImgException(QString("Image type of %1 <%2> and %3 <%4> don't match")
@@ -366,10 +391,23 @@ void ZStitchImage::doWork()
                                 .arg(inputStackSources[i].toQString()).arg(tmpInfo.toQString()));
         }
       }
-    } else if (m_inputStack1Filenames.size() == 1) {
+      if (hasStack2) {
+        for (const auto& filename : m_2ndInputFilenames) {
+          input2ndStackSources.emplace_back(filename, ZImgRegion(), m_2ndScene);
+        }
+        for (size_t i = 0; i < input2ndStackSources.size(); ++i) {
+          auto tmpInfo = ZImg::readImgInfo(input2ndStackSources[i]);
+          if (!tmpInfo.isSameType(info)) {
+            throw ZImgException(QString("Image type of %1 <%2> and %3 <%4> don't match")
+                                  .arg(inputStackSources[0].toQString()).arg(info.toQString())
+                                  .arg(input2ndStackSources[i].toQString()).arg(tmpInfo.toQString()));
+          }
+        }
+      }
+    } else if (m_inputFilenames.size() == 1) {
       // try to split the input image to nStacks images
       LOG(WARNING) << "trying to split the input image to " << nStacks << " parts. This can be wrong.";
-      const auto& filename = m_inputStack1Filenames[0];
+      const auto& filename = m_inputFilenames[0];
       auto info = ZImg::readImgInfo(ZImgSource(filename, ZImgRegion(), m_scene));
       if (info.numTimes == nStacks) {
         LOG(WARNING) << "trying to split the input image by time points";
@@ -378,6 +416,19 @@ void ZStitchImage::doWork()
           rgn.start.t = i;
           rgn.end.t = i + 1;
           inputStackSources.emplace_back(filename, rgn, m_scene);
+        }
+        if (hasStack2) {
+          auto info2 = ZImg::readImgInfo(ZImgSource(m_2ndInputFilenames[0], ZImgRegion(), m_2ndScene));
+          if (info2.numTimes == nStacks) {
+            for (size_t i = 0; i < nStacks; ++i) {
+              ZImgRegion rgn;
+              rgn.start.t = i;
+              rgn.end.t = i + 1;
+              input2ndStackSources.emplace_back(m_2ndInputFilenames[0], rgn, m_2ndScene);
+            }
+          } else {
+            throw ZImgException("can not split 2nd stack input in the same way");
+          }
         }
       } else if (info.depth % nStacks == 0) {
         LOG(WARNING) << "trying to split the input image by depth";
@@ -388,18 +439,40 @@ void ZStitchImage::doWork()
           rgn.end.z = (i + 1) * depthPerStack;
           inputStackSources.emplace_back(filename, rgn, m_scene);
         }
+        if (hasStack2) {
+          auto info2 = ZImg::readImgInfo(ZImgSource(m_2ndInputFilenames[0], ZImgRegion(), m_2ndScene));
+          if (info2.depth % nStacks == 0) {
+            depthPerStack = info2.depth / nStacks;
+            for (size_t i = 0; i < nStacks; ++i) {
+              ZImgRegion rgn;
+              rgn.start.z = depthPerStack * i;
+              rgn.end.z = (i + 1) * depthPerStack;
+              input2ndStackSources.emplace_back(m_2ndInputFilenames[0], rgn, m_2ndScene);
+            }
+          } else {
+            throw ZImgException("can not split 2nd stack input in the same way");
+          }
+        }
       } else {
         throw ZImgException(QString("do not know how to split the input image to %1 parts.").arg(nStacks));
       }
     } else {
       throw ZImgException(
         QString("number of inputs %1 does not match number of stacks %2 to stitch.").arg(
-          m_inputStack1Filenames.size()).arg(nStacks));
+          m_inputFilenames.size()).arg(nStacks));
     }
 
     LOG(INFO) << QString("Stitching %1 images ...").arg(nStacks);
     for (const auto& ss : inputStackSources) {
       LOG(INFO) << ss.toQString();
+    }
+    if (hasStack2) {
+      for (const auto& ss : input2ndStackSources) {
+        LOG(INFO) << ss.toQString();
+      }
+      inputStackSources.insert(inputStackSources.end(),
+                               input2ndStackSources.begin(),
+                               input2ndStackSources.end());
     }
   }
 
@@ -438,41 +511,82 @@ void ZStitchImage::doWork()
                                     m_downsampleMergeMode);
 
           ZImgNCCMatch imgNCCMatch(fixedImg, movingImg);
+          ZImgNCCMatch::PositionHint hint = std::get<2>(allPairs[i]);
+          imgNCCMatch.setMovingImgPositionHint(hint, m_maxOverlapRate);
 
           if (m_concatenateOnly) {
-            ZVoxelCoordinate movingImgOffset = imgNCCMatch.getMovingImgOffsetFromHint(0., 0., 0.);
-            offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, 0);
-          } else {
-            if (m_channelsToUse.empty()) {
-              imgNCCMatch.useAllFixedImgChannels();
-              imgNCCMatch.useAllMovingImgChannels();
+            if ((f < nStacks && m < nStacks) || (f >= nStacks && m >= nStacks)) {
+              // within same input set
+              ZVoxelCoordinate movingImgOffset = imgNCCMatch.getMovingImgOffsetFromHint(0., 0., 0.);
+              offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, 0);
             } else {
-              imgNCCMatch.useFixedImgChannel(m_channelsToUse);
-              imgNCCMatch.useMovingImgChannel(m_channelsToUse);
+              // between input set
+              CHECK(m == f + nStacks);
+              // append channels of 2nd input set to channels of 1st input set
+              offsets[std::make_pair(f, m)] = std::make_pair(ZVoxelCoordinate(0, 0, 0, oneImgInfo.numChannels), 0);
             }
+          } else {
+            if ((f < nStacks && m < nStacks) || (f >= nStacks && m >= nStacks)) {
+              // within same input set
+              const auto& chsToUse = f < nStacks ? m_channelsToUse : m_2ndChannelsToUse;
+              const auto& chsToRemoveBackground =
+                f < nStacks ? m_channelsToRemoveBackground : m_2ndChannelsToRemoveBackground;
 
-            if (!m_channelsToRemoveBackground.empty()) {
+              if (chsToUse.empty()) {
+                imgNCCMatch.useAllFixedImgChannels();
+                imgNCCMatch.useAllMovingImgChannels();
+              } else {
+                imgNCCMatch.useFixedImgChannel(chsToUse);
+                imgNCCMatch.useMovingImgChannel(chsToUse);
+              }
+
+              if (!chsToRemoveBackground.empty()) {
+                for (auto ch : chsToRemoveBackground) {
+                  imgNCCMatch.enableRemoveBackgroundForFixedImgChannel(ch);
+                  imgNCCMatch.enableRemoveBackgroundForMovingImgChannel(ch);
+                }
+              }
+
+              double maxNCC;
+              ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(m_startResolutionIntvX,
+                                                                                      m_startResolutionIntvY,
+                                                                                      m_startResolutionIntvZ,
+                                                                                      &maxNCC);
+              offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
+
+              QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
+                .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(
+                maxNCC);
+
+              LOG(INFO) << info;
+            } else {
+              // between input set
+              CHECK(m == f + nStacks);
+
+              imgNCCMatch.useFixedImgChannel(m_commonChannelOfInput);
+              imgNCCMatch.useMovingImgChannel(m_commonChannelOf2ndInput);
               for (auto ch : m_channelsToRemoveBackground) {
                 imgNCCMatch.enableRemoveBackgroundForFixedImgChannel(ch);
+              }
+              for (auto ch : m_2ndChannelsToRemoveBackground) {
                 imgNCCMatch.enableRemoveBackgroundForMovingImgChannel(ch);
               }
+
+              double maxNCC;
+              ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(m_startResolutionIntvX,
+                                                                                      m_startResolutionIntvY,
+                                                                                      m_startResolutionIntvZ,
+                                                                                      &maxNCC);
+              // append moving img channels to fixed img channels
+              movingImgOffset.c = oneImgInfo.numChannels;
+              offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
+
+              QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
+                .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(
+                maxNCC);
+
+              LOG(INFO) << info;
             }
-
-            ZImgNCCMatch::PositionHint hint = std::get<2>(allPairs[i]);
-            imgNCCMatch.setMovingImgPositionHint(hint, m_maxOverlapRate);
-
-            double maxNCC;
-            ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(m_startResolutionIntvX,
-                                                                                    m_startResolutionIntvY,
-                                                                                    m_startResolutionIntvZ,
-                                                                                    &maxNCC);
-            offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
-
-            QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
-              .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(
-              maxNCC);
-
-            LOG(INFO) << info;
           }
         }
       }
@@ -541,7 +655,7 @@ void ZStitchImage::doWork()
 
 void ZStitchImage::read(const QJsonObject& json)
 {
-  setInputFilenames(readStringList(json, "input_files"));
+  setInputFilenames(readStringList(json, "input_files"), readNumber(json, "input_files_scene"));
 
   setResultFilename(readString(json, "result_file"));
 
@@ -549,20 +663,65 @@ void ZStitchImage::read(const QJsonObject& json)
   if (json.contains("channels_to_use")) {
     std::vector<size_t> chs;
     auto numberArray = readNumberArray(json, "channels_to_use");
-    chs.insert(m_channelsToUse.end(), numberArray.begin(), numberArray.end());
+    chs.insert(chs.end(), numberArray.begin(), numberArray.end());
     setUseChannels(chs);
   }
 
+  setRemoveBackgroundForChannels();
+  if (json.contains("channels_to_remove_background")) {
+    std::vector<size_t> chs;
+    auto numberArray = readNumberArray(json, "channels_to_remove_background");
+    chs.insert(chs.end(), numberArray.begin(), numberArray.end());
+    setRemoveBackgroundForChannels(chs);
+  }
+
+  if (json.contains("input_2_files")) {
+    std::vector<size_t> chsToUse;
+    std::vector<size_t> chsToRB;
+    if (json.contains("input_2_channels_to_use")) {
+      auto numberArray = readNumberArray(json, "input_2_channels_to_use");
+      chsToUse.insert(chsToUse.end(), numberArray.begin(), numberArray.end());
+    }
+    if (json.contains("input_2_channels_to_remove_background")) {
+      auto numberArray = readNumberArray(json, "input_2_channels_to_remove_background");
+      chsToRB.insert(chsToRB.end(), numberArray.begin(), numberArray.end());
+    }
+    set2ndInput(readStringList(json, "input_2_files"), readNumber(json, "input_2_files_scene"),
+                chsToUse, chsToRB, readNumber(json, "input_common_channel"),
+                readNumber(json, "input_2_common_channel"));
+  }
+
   setMergeMode(stringToImgMergeMode(readString(json, "merge_mode")));
+  if (json.contains("downsample_block_width")) {
+    setDownsampleBeforeStitching(readNumber(json, "downsample_block_width"),
+                                 readNumber(json, "downsample_block_height"),
+                                 readNumber(json, "downsample_block_depth"),
+                                 stringToImgMergeMode(readString(json, "downsample_block_merge_mode")));
+  }
+  setStartResolution(readNumber(json, "start_resolution_intv_X"),
+                     readNumber(json, "start_resolution_intv_Y"),
+                     readNumber(json, "start_resolution_intv_Z"));
+  if (json.contains("concatenate_only") && readBool(json, "concatenate_only")) {
+    setConcatenateOnly();
+  }
   setMaxOverlapRate(readNumber(json, "max_overlap_rate"));
-  if (json.contains("conn_text_file")) {
+
+  if (json.contains("tile_grid")) {
+    setTileGrid(ZImg::fromJson(json["tile_grid"]));
+  } else if (json.contains("conn_text_file")) {
     setConnInfoFromConnTextFile(readString(json, "conn_text_file"));
+  } else if (json.contains("restitch") && readBool(json, "restitch")) {
+    setRestitch();
+  } else {
+    setBlindStitching();
   }
 }
 
 void ZStitchImage::write(QJsonObject& json) const
 {
-  json["input_files"] = QJsonArray::fromStringList(m_inputStack1Filenames);
+  json["input_files"] = QJsonArray::fromStringList(m_inputFilenames);
+
+  json["input_files_scene"] = int(m_scene);
 
   json["result_file"] = m_resFileName;
 
@@ -573,10 +732,57 @@ void ZStitchImage::write(QJsonObject& json) const
     }
     json["channels_to_use"] = channelArray;
   }
+  if (!m_channelsToRemoveBackground.empty()) {
+    QJsonArray channelArray;
+    for (auto ch : m_channelsToRemoveBackground) {
+      channelArray.append(QJsonValue(int(ch)));
+    }
+    json["channels_to_remove_background"] = channelArray;
+  }
+  if (m_downsampleBlockDepth > 1 || m_downsampleBlockWidth > 1 || m_downsampleBlockHeight > 1) {
+    json["downsample_block_width"] = (int)m_downsampleBlockWidth;
+    json["downsample_block_height"] = (int)m_downsampleBlockHeight;
+    json["downsample_block_depth"] = (int)m_downsampleBlockDepth;
+    json["downsample_block_merge_mode"] = enumToString(m_downsampleMergeMode);
+  }
   json["merge_mode"] = enumToString(m_mergeMode);
+  if (m_concatenateOnly) {
+    json["concatenate_only"] = m_concatenateOnly;
+  }
+  json["start_resolution_intv_X"] = (int)m_startResolutionIntvX;
+  json["start_resolution_intv_Y"] = (int)m_startResolutionIntvY;
+  json["start_resolution_intv_Z"] = (int)m_startResolutionIntvZ;
   json["max_overlap_rate"] = m_maxOverlapRate;
-  if (!m_connTextFile.isEmpty()) {
+
+  if (!m_tileGrid.isEmpty()) {
+    json["tile_grid"] = m_tileGrid.toJson();
+  } else  if (!m_connTextFile.isEmpty()) {
     json["conn_text_file"] = m_connTextFile;
+  } else if (m_restitch) {
+    json["restitch"] = m_restitch;
+  }
+
+  if (!m_2ndInputFilenames.isEmpty()) {
+    json["input_2_files"] = QJsonArray::fromStringList(m_2ndInputFilenames);
+
+    json["input_2_files_scene"] = int(m_2ndScene);
+
+    if (!m_2ndChannelsToUse.empty()) {
+      QJsonArray channelArray;
+      for (auto ch : m_2ndChannelsToUse) {
+        channelArray.append(QJsonValue(int(ch)));
+      }
+      json["input_2_channels_to_use"] = channelArray;
+    }
+    if (!m_2ndChannelsToRemoveBackground.empty()) {
+      QJsonArray channelArray;
+      for (auto ch : m_2ndChannelsToRemoveBackground) {
+        channelArray.append(QJsonValue(int(ch)));
+      }
+      json["input_2_channels_to_remove_background"] = channelArray;
+    }
+    json["input_common_channel"] = int(m_commonChannelOfInput);
+    json["input_2_common_channel"] = int(m_commonChannelOf2ndInput);
   }
 }
 

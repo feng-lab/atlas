@@ -18,8 +18,8 @@ public:
 
   void setInputFilenames(const QStringList& fns, size_t scene = 0)
   {
-    m_inputStack1Filenames = fns;
-    std::sort(m_inputStack1Filenames.begin(), m_inputStack1Filenames.end(), naturalSortLessThan);
+    m_inputFilenames = fns;
+    std::sort(m_inputFilenames.begin(), m_inputFilenames.end(), naturalSortLessThan);
     m_scene = scene;
   }
 
@@ -34,6 +34,20 @@ public:
   // default apply to no channel
   void setRemoveBackgroundForChannels(const std::vector<size_t>& chs = std::vector<size_t>())
   { m_channelsToRemoveBackground = chs; }
+
+  // for stitching two sets of images with one common channel and same tile cofigurations
+  void set2ndInput(const QStringList& fns, size_t scene, const std::vector<size_t>& useChs,
+                   const std::vector<size_t>& chsForBackgroundRemove,
+                   size_t commonChannelOfInput, size_t commonChannelof2ndInput)
+  {
+    m_2ndInputFilenames = fns;
+    std::sort(m_2ndInputFilenames.begin(), m_2ndInputFilenames.end(), naturalSortLessThan);
+    m_2ndScene = scene;
+    m_2ndChannelsToUse = useChs;
+    m_2ndChannelsToRemoveBackground = chsForBackgroundRemove;
+    m_commonChannelOfInput = commonChannelOfInput;
+    m_commonChannelOf2ndInput = commonChannelof2ndInput;
+  }
 
   // default Max
   void setMergeMode(ImgMergeMode mode)
@@ -119,7 +133,7 @@ private:
   void doRestitch();
 
 private:
-  QStringList m_inputStack1Filenames;
+  QStringList m_inputFilenames;
   size_t m_scene = 0;
   QString m_resFileName;
 
@@ -141,6 +155,14 @@ private:
   ZImg m_tileGrid;  // a 2d or 3d img contains the tile grid
   QString m_connTextFile;
   bool m_restitch = false; // only works for czi now
+
+  // another set of stacks that have common channel and same tile configuraton with the main inputs
+  QStringList m_2ndInputFilenames;
+  size_t m_2ndScene;
+  std::vector<size_t> m_2ndChannelsToUse;  //empty means all channel
+  std::vector<size_t> m_2ndChannelsToRemoveBackground;
+  size_t m_commonChannelOfInput = 0;
+  size_t m_commonChannelOf2ndInput = 0;
 };
 
 } // namespace nim
