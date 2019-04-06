@@ -25,6 +25,7 @@
 * $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: -stdlib=libc++ -std=c++14 // todo: change to 17
 * $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: -stdlib=libc++ -std=c++14 // todo: change to 17
 * $Repository_DIR/src/3rdparty/makeengine.macos.gte: -std=c++14 -stdlib=libc++
+* $Repository_DIR/src/python/CMakeLists.txt: set(CMAKE_CXX_STANDARD 17)
 
 ## Minimum macOS Defines
 * $Repository_DIR/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12)
@@ -32,6 +33,7 @@
 * $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: -mmacosx-version-min=10.12
 * $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: -mmacosx-version-min=10.12
 * $Repository_DIR/src/3rdparty/makeengine.macos.gte: -mmacosx-version-min=10.12
+* $Repository_DIR/src/python/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12)
 
 ## Visual Studio Update
 * $Repository_DIR/util/common_dirs.py: 178: def vs_install_dir() -> str ...

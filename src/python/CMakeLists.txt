@@ -1,16 +1,15 @@
 cmake_minimum_required(VERSION 3.6.1)
 project(zimg)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_OSX_DEPLOYMENT_TARGET 10.10)
+set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # set_target_properties(MyTarget PROPERTIES CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-
-
 
 if(UNIX AND NOT APPLE)
   # excludes symbols in all archive libraries from automatic export.
@@ -78,7 +77,7 @@ if(PYTHON_VERSION_MAJOR)
                        )
   endif()
   if(UNIX AND NOT APPLE)
-    set(freeimagelibname libfreeimageplus.so.3)  
+    set(freeimagelibname libfreeimageplus.so.3)
     add_custom_command(TARGET ${module_name}
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
