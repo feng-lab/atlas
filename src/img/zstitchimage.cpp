@@ -309,6 +309,11 @@ void ZStitchImage::setTileGridFromLayout(size_t numRows, size_t numCols)
 
 void ZStitchImage::doWork()
 {
+  LOG(INFO) << "";
+  LOG(INFO) << "Start Stitching";
+  LOG(INFO) << toQString();
+  LOG(INFO) << "";
+
   QFileInfo outputFI(m_resFileName);
   if (m_resFileName.isEmpty() || !outputFI.absoluteDir().exists()) {
     throw ZImgException("Please make sure the output folder exists.");

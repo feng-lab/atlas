@@ -191,6 +191,7 @@ void ZPunctaDetection::doWork()
 
   LOG(INFO) << "";
   LOG(INFO) << "Start Detect Puncta";
+  LOG(INFO) << toQString();
   LOG(INFO) << "";
 
   LOG(INFO) << m_imgInfo.toQString();

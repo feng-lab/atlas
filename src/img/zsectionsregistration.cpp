@@ -17,6 +17,10 @@ namespace nim {
 void ZSectionsRegistration::doWork()
 {
   LOG(INFO) << "";
+  LOG(INFO) << "Start Sections Registration";
+  LOG(INFO) << toQString();
+  LOG(INFO) << "";
+
   LOG(INFO) << "Image Filenames: " << m_imgFilenames;
   LOG(INFO) << "Result Filename: " << m_resultFilename;
 

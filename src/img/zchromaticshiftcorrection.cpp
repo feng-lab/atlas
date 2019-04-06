@@ -18,6 +18,10 @@ namespace nim {
 void ZChromaticShiftCorrection::doWork()
 {
   LOG(INFO) << "";
+  LOG(INFO) << "Start Chromatic Shift Correction";
+  LOG(INFO) << toQString();
+  LOG(INFO) << "";
+
   LOG(INFO) << "Image Filename: " << m_imgFilename;
   LOG(INFO) << "Result Filename: " << m_resultFilename;
   LOG(INFO) << "Method: " << m_method;
