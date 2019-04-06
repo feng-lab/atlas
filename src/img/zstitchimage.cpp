@@ -651,6 +651,7 @@ void ZStitchImage::doWork()
   }
 
   LOG(INFO) << QString("%1 saved.").arg(m_resFileName);
+  emit resultReady(m_resFileName);
 }
 
 void ZStitchImage::read(const QJsonObject& json)

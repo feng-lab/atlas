@@ -13,6 +13,7 @@ namespace nim {
 
 class ZStitchImage : public ZImgProcess
 {
+  Q_OBJECT
 public:
   ZStitchImage();
 
@@ -117,6 +118,9 @@ public:
   {
     unsetTileConfiguration();
   }
+
+signals:
+  void resultReady(QString path);
 
 protected:
   void doWork() override;

@@ -111,7 +111,7 @@ private:
   QList<QImage> m_tileimages;
 };
 
-class ZStitchImageDialog : public QDialog
+class ZStitchImageDialog : public ZImgProcessDialog
 {
 Q_OBJECT
 public:
@@ -120,12 +120,12 @@ public:
 ~ZStitchImageDialog() override;
 
 signals:
-
   void resultReady(QString path);
 
-private:
-  void stitchStacks();
+protected:
+  void createWorker(ZImgProcess*& worker, QString& workerName) override;
 
+private:
   void selectInputStacks1();
 
   void selectInputStacks2();
@@ -138,8 +138,6 @@ private:
 
   void editConnFromTileImage();
 
-  void d8Changed(int index);
-
   void configDim1Changed(int index);
 
   void configDim2Changed(int index);
@@ -147,8 +145,6 @@ private:
   void configDim3Changed(int index);
 
   void fixCheckBoxChanged(int state);
-
-  void d8CheckBoxChanged(int state);
 
   void dsCheckBoxChanged(int state);
 
@@ -197,10 +193,6 @@ private:
 
   void initBgsub2ComboBox(int nchannel);
 
-  void setStack1ChRange();   // set correct ch range for output ch1 ch2 ch3
-  void setStack2ChRange();   // set correct ch range for output ch1 ch2 ch3
-  void stitchStacks2(); //stitch two stack sets with common channel, merge channel into output
-
 private:
   std::vector<std::vector<int>> m_tileMatrix;
   QList<ZTile> m_tileList;
@@ -209,17 +201,12 @@ private:
   QGroupBox* m_ioGroupBox;
   QGroupBox* m_connGroupBox;
   QGroupBox* m_commandOutputGroupBox;
-  QPushButton* m_runButton;
-  QPushButton* m_exitButton;
-  QDialogButtonBox* m_buttonBox;
 
   QStringList m_inputStack1Filenames;
   QStringList m_inputStack2Filenames;
   QString m_tileSelectionImageFilename;
   QImage m_tileImage;
 
-
-  QCheckBox* m_d8CheckBox;
   QCheckBox* m_dsCheckBox;
   //QCheckBox *m_useLayoutRadioButton;
   QCheckBox* m_concatOnlyCheckBox;
@@ -245,10 +232,9 @@ private:
   QPushButton* m_editTileImageButton;
   QToolButton* m_selectConnFileButton;
   QToolButton* m_selectOutputButton;
-  QComboBox* m_mergeMode1ComboBox;
+  QComboBox* m_mergeModeComboBox;
   QComboBox* m_bgsub1ComboBox;
   QComboBox* m_channel1ComboBox;
-  QComboBox* m_mergeMode2ComboBox;
   QComboBox* m_bgsub2ComboBox;
   QComboBox* m_channel2ComboBox;
   QSpinBox* m_commonChannel1SpinBox;
@@ -270,7 +256,6 @@ private:
   QSpinBox* m_dsXSpinBox;
   QSpinBox* m_dsYSpinBox;
   QSpinBox* m_dsZSpinBox;
-  QComboBox* m_d8ComboBox;
 
   QList<QLabel*> m_labelsForTwoInputs;
 
@@ -278,9 +263,6 @@ private:
   QScrollArea* m_scrollArea;
 
   QTabWidget* m_tabWidget;
-
-  int m_nchannelStack1;
-  int m_nchannelStack2;
 };
 
 } // namespace nim

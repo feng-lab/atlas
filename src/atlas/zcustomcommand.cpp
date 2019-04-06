@@ -1652,7 +1652,7 @@ void stitchAndDetectPuncta()
     } else {
       ZStitchImage stitch;
       stitch.setInputFilenames(inputFiles);
-      stitch.setConnTileImage(tsfn);
+      stitch.setTileGridFromTileSelectionImage(tsfn);
       stitch.setMergeMode(ImgMergeMode::First);
       stitch.setResultFilename(outputName);
       std::vector<size_t> chs;
