@@ -63,6 +63,7 @@ if(PYTHON_VERSION_MAJOR)
   pybind11_add_module(${module_name} imgpy.cpp)
   target_link_libraries(${module_name} PRIVATE img)
   if(APPLE)
+    target_compile_options(${module_name} PRIVATE -faligned-allocation)
     set(freeimagelibname libfreeimageplus.dylib)
     add_custom_command(TARGET ${module_name}
                        POST_BUILD
