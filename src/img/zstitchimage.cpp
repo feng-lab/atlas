@@ -266,7 +266,7 @@ ZStitchImage::ZStitchImage()
 {
 }
 
-void ZStitchImage::setConnTileImage(const QString& fn)
+void ZStitchImage::setTileGridFromTileSelectionImage(const QString& fn)
 {
   unsetTileConfiguration();
   ZImg m_tileImage = ZImg(fn);

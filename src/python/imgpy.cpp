@@ -466,17 +466,36 @@ PYBIND11_MODULE(_imgpy, m)
   py::class_<ZStitchImage>(m, "ZStitchImage")
     .def(py::init<>())
     .def("setInputFilenames", &ZStitchImage::setInputFilenames,
-      "filenames"_a)
+      "filenames"_a, "scene"_a = 0)
     .def("setResultFilename", &ZStitchImage::setResultFilename,
       "filename"_a)
     .def("setUseChannels", &ZStitchImage::setUseChannels,
-      "channels"_a)
+      "channels"_a = std::vector<size_t>())
+    .def("setRemoveBackgroundForChannels", &ZStitchImage::setRemoveBackgroundForChannels,
+      "channels"_a = std::vector<size_t>())
+    .def("setDownsampleBeforeStitching", &ZStitchImage::setDownsampleBeforeStitching,
+      "blockWidth"_a, "blockHeight"_a, "blockDepth"_a, "blockMergeMode"_a = ImgMergeMode::Mean)
+    .def("setStartResolution", &ZStitchImage::setStartResolution,
+      "intvX"_a, "intvY"_a, "intvZ"_a)
+    .def("setConcatenateOnly", &ZStitchImage::setConcatenateOnly)
     .def("setMergeMode", &ZStitchImage::setMergeMode,
       "mode"_a)
     .def("setMaxOverlapRate", &ZStitchImage::setMaxOverlapRate,
       "maxOverlapRate"_a)
-    .def("setConnTileImage", &ZStitchImage::setConnTileImage,
+    .def("setTileGrid", &ZStitchImage::setTileGrid,
+      "tileGrid"_a)
+    .def("setTileGridFromMatrixFile", &ZStitchImage::setTileGridFromMatrixFile,
       "filename"_a)
+    .def("setTileGridFromTileSelectionImage", &ZStitchImage::setTileGridFromTileSelectionImage,
+      "filename"_a)
+    .def("setConnInfoFromConnTextFile", &ZStitchImage::setConnInfoFromConnTextFile,
+      "filename"_a)
+    .def("setTileGridFromLayout", &ZStitchImage::setTileGridFromLayout,
+      "numRows"_a, "numCols"_a)
+    .def("setRestitch", &ZStitchImage::setRestitch)
+    .def("setBlindStitching", &ZStitchImage::setBlindStitching)
+    .def("set2ndInput", &ZStitchImage::set2ndInput,
+      "fns"_a, "scene"_a, "chsToUse"_a, "chsToRemoveBackground"_a, "commonChannelOfInput"_a, "commonChannelOf2ndInput"_a)
     .def("setLogFile", &ZStitchImage::setLogFile, "logfilename"_a)
     .def("loadTask", &ZStitchImage::loadTask, "filename"_a)
     .def("saveTask", &ZStitchImage::saveTask, "filename"_a)

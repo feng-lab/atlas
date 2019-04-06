@@ -93,7 +93,7 @@ public:
   }
 
   // derive m_tileGrid from Zeiss tile selection image
-  void setConnTileImage(const QString& fn);
+  void setTileGridFromTileSelectionImage(const QString& fn);
 
   // read m_tileGrid from text file that contains a matrix
   void setTileGridFromMatrixFile(const QString& file);
