@@ -230,6 +230,7 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
   std::vector<std::vector<ZImgRegion>> res(infos.size());
   for (size_t i = 0; i < res.size(); ++i) {
     auto& blocks = subBlocks[i];
+    const auto& info = infos[i];
     std::set<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t, size_t>> tiles;
     for (const auto& block : blocks) {
       tiles.insert(
@@ -245,7 +246,7 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
       }
       if (res[i].empty()) {
         ZVoxelCoordinate startC(x, y, z, 0, t);
-        ZVoxelCoordinate endC(x+width, y+width, z+1, -1, t+1);
+        ZVoxelCoordinate endC(x+width, y+width, z+1, info.numChannels, t+1);
         res[i].push_back(ZImgRegion(startC, endC));
         lastTile = tile;
         continue;
@@ -253,14 +254,14 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
       auto [lratio, lt, lx, ly, lwidth, lheight, lz] = lastTile;
       if (lt == t && lx == x && ly == y && lwidth == width && lheight == height) {
         auto& rgn = res[i][res[i].size() - 1];
-        if (lz != size_t(rgn.end.z) + 1) {
+        if (z != size_t(rgn.end.z)) {
           throw ZIOException("z jumping");
         } else {
           rgn.end.z += 1;
         }
       } else {
         ZVoxelCoordinate startC(x, y, z, 0, t);
-        ZVoxelCoordinate endC(x+width, y+width, z+1, -1, t+1);
+        ZVoxelCoordinate endC(x+width, y+width, z+1, info.numChannels, t+1);
         res[i].push_back(ZImgRegion(startC, endC));
         lastTile = tile;
       }

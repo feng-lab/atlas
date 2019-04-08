@@ -185,9 +185,13 @@ private:
 
   bool getTileMatrix(ZImg& img, std::vector<std::vector<int>>& tileMatrix, QList<ZTile>& tileList);
 
+  void initScene1ComboBox(int scene);
+
   void initChannel1ComboBox(int nchannel);
 
   void initBgsub1ComboBox(int nchannel);
+
+  void initScene2ComboBox(int scene);
 
   void initChannel2ComboBox(int nchannel);
 
@@ -225,6 +229,7 @@ private:
   QRadioButton* m_useConnFileRadioButton;
   QRadioButton* m_useFullConnectionRadioButton;
   QRadioButton* m_useLayoutRadioButton;
+  QRadioButton* m_restitchCZIRadioButton;
 
   QPushButton* m_selectInputStacks1Button;
   QPushButton* m_selectInputStacks2Button;
@@ -233,8 +238,10 @@ private:
   QToolButton* m_selectConnFileButton;
   QToolButton* m_selectOutputButton;
   QComboBox* m_mergeModeComboBox;
+  QComboBox* m_scene1ComboBox;
   QComboBox* m_bgsub1ComboBox;
   QComboBox* m_channel1ComboBox;
+  QComboBox* m_scene2ComboBox;
   QComboBox* m_bgsub2ComboBox;
   QComboBox* m_channel2ComboBox;
   QSpinBox* m_commonChannel1SpinBox;

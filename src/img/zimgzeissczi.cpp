@@ -909,6 +909,7 @@ void ZImgZeissCZI::readImg(const QString& filename, ZImg& img, const ZImgRegion&
     // it is possible that even totalWritten >= img.voxelNumber() we still haven't read enough like in mixedTile plus 3D tile situation
     // if that happens we need to write a lot more code
     if (totalWritten < img.voxelNumber()) {
+      LOG(WARNING) << "not internal tiles";
       if (totalWritten > 0) {
         LOG(WARNING) << "mixedTile?";
       }
@@ -932,9 +933,10 @@ void ZImgZeissCZI::readImg(const QString& filename, ZImg& img, const ZImgRegion&
           break;
         }
       }
-    } else {
-      LOG(INFO) << "region matches internal tiles";
     }
+//    else {
+//      LOG(INFO) << "region matches internal tiles";
+//    }
   }
 
   ZImgMetatag tag("metadata", dump(filename));

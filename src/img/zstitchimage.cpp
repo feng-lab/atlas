@@ -4,6 +4,7 @@
 #include "zimgnccmatch.h"
 #include "zimgio.h"
 #include "zeigenutils.h"
+#include "zvbgmm.h"
 #include <QDir>
 #include <QTextStream>
 #include <QFileInfo>
@@ -256,6 +257,80 @@ size_t buildConnectionFromGrid(const ZImg& grid,
   return nStacks;
 }
 
+void buildConnectionFromRegions(const std::vector<ZImgRegion>& rgns,
+                                std::map<std::pair<size_t, size_t>, ZVoxelCoordinate>& connRes)
+{
+  std::map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>> conn;
+  std::map<size_t, std::vector<std::pair<size_t, double>>> idxToConn;
+  std::vector<double> allOverlaps;
+  Eigen::MatrixXd allOverlapMat;
+  for (size_t f = 0; f < rgns.size(); ++f) {
+    const ZImgRegion& rgnf = rgns[f];
+    double areaf = (rgnf.end.y - rgnf.start.y) * 1.0 * (rgnf.end.x - rgnf.start.x);
+    for (size_t m = f + 1; m < rgns.size(); ++m) {
+      const ZImgRegion& rgnm = rgns[m];
+      if (rgnm.start.x >= rgnf.end.x || rgnm.end.x <= rgnf.start.x ||
+          rgnm.start.y >= rgnf.end.y || rgnm.end.y <= rgnf.start.y) {
+        continue; // no overlap
+      }
+      double aream = (rgnm.end.y - rgnm.start.y) * 1.0 * (rgnm.end.x - rgnm.start.x);
+      double overlaparea = (std::min(rgnm.end.y, rgnf.end.y) - std::max(rgnm.start.y, rgnf.start.y)) * 1.0 *
+                           (std::min(rgnm.end.x, rgnf.end.x) - std::max(rgnm.start.x, rgnf.start.x));
+      double overlap = std::max(overlaparea / areaf, overlaparea / aream);
+      allOverlaps.push_back(overlap);
+      conn[std::make_pair(f, m)] = std::make_pair(rgnm.start - rgnf.start, overlap);
+      idxToConn[f].push_back(std::make_pair(m, overlap));
+      idxToConn[m].push_back(std::make_pair(f, overlap));
+    }
+  }
+
+  allOverlapMat.resize(allOverlaps.size(), 1);
+  for (size_t r = 0; r < allOverlaps.size(); ++r) {
+    allOverlapMat(r, 0) = allOverlaps[r];
+  }
+  ZVBGMM<double, double> vbgmm(allOverlapMat, 3);
+  vbgmm.runEM(true);
+  LOG(INFO) << vbgmm.numOfClusters();
+  LOG(INFO) << vbgmm.centroids();
+  std::map<double, double> overlapToCentroid;
+  for (size_t r = 0; r < allOverlaps.size(); ++r) {
+    overlapToCentroid[allOverlaps[r]] = vbgmm.centroids()(vbgmm.labels()(r), 0);
+  }
+
+  std::map<size_t, std::set<size_t>> idxToPrunedConn;
+  for (const auto&[key, val] : idxToConn) {
+    if (val.empty()) {
+      throw ZImgException(QString("Can not do restitching because images are not connected. Abort."));
+    }
+    std::vector<std::pair<size_t, double>> valC = val;
+    for (auto& p : valC) {
+      CHECK(overlapToCentroid.find(p.second) != overlapToCentroid.end());
+      p.second = overlapToCentroid[p.second];
+    }
+    // LOG(INFO) << valC.size();
+    std::sort(valC.begin(), valC.end(), [](const std::pair<size_t, double>& a, const std::pair<size_t, double>& b) {
+      return a.second > b.second;
+    });
+    idxToPrunedConn[key].insert(valC[0].first);
+    double lastOverlap = valC[0].second;
+    for (size_t i = 1; i < valC.size(); ++i) { // keep two
+      if (valC[i].second != lastOverlap) {
+        break;
+      }
+      idxToPrunedConn[key].insert(valC[i].first);
+      // LOG(INFO) << valC[i].second;
+    }
+  }
+
+  // prune
+  for (const auto&[key, val] : conn) {
+    if (idxToPrunedConn[key.first].find(key.second) != idxToPrunedConn[key.first].end() ||
+        idxToPrunedConn[key.second].find(key.first) != idxToPrunedConn[key.second].end()) {
+      connRes[key] = val.first;
+    }
+  }
+}
+
 }  // anonymous namespace
 
 
@@ -326,6 +401,9 @@ void ZStitchImage::doWork()
   if (m_restitch) {
     if (hasStack2) {
       throw ZImgException("restitch and two sets of input stacks are not compatible.");
+    }
+    if (m_concatenateOnly) {
+      throw ZImgException("restitch and concatenate-only are not compatible.");
     }
     doRestitch();
     return;
@@ -746,23 +824,23 @@ void ZStitchImage::write(QJsonObject& json) const
     json["channels_to_remove_background"] = channelArray;
   }
   if (m_downsampleBlockDepth > 1 || m_downsampleBlockWidth > 1 || m_downsampleBlockHeight > 1) {
-    json["downsample_block_width"] = (int)m_downsampleBlockWidth;
-    json["downsample_block_height"] = (int)m_downsampleBlockHeight;
-    json["downsample_block_depth"] = (int)m_downsampleBlockDepth;
+    json["downsample_block_width"] = (int) m_downsampleBlockWidth;
+    json["downsample_block_height"] = (int) m_downsampleBlockHeight;
+    json["downsample_block_depth"] = (int) m_downsampleBlockDepth;
     json["downsample_block_merge_mode"] = enumToString(m_downsampleMergeMode);
   }
   json["merge_mode"] = enumToString(m_mergeMode);
   if (m_concatenateOnly) {
     json["concatenate_only"] = m_concatenateOnly;
   }
-  json["start_resolution_intv_X"] = (int)m_startResolutionIntvX;
-  json["start_resolution_intv_Y"] = (int)m_startResolutionIntvY;
-  json["start_resolution_intv_Z"] = (int)m_startResolutionIntvZ;
+  json["start_resolution_intv_X"] = (int) m_startResolutionIntvX;
+  json["start_resolution_intv_Y"] = (int) m_startResolutionIntvY;
+  json["start_resolution_intv_Z"] = (int) m_startResolutionIntvZ;
   json["max_overlap_rate"] = m_maxOverlapRate;
 
   if (!m_tileGrid.isEmpty()) {
     json["tile_grid"] = m_tileGrid.toJson();
-  } else  if (!m_connTextFile.isEmpty()) {
+  } else if (!m_connTextFile.isEmpty()) {
     json["conn_text_file"] = m_connTextFile;
   } else if (m_restitch) {
     json["restitch"] = m_restitch;
@@ -866,7 +944,160 @@ void ZStitchImage::unsetTileConfiguration()
 
 void ZStitchImage::doRestitch()
 {
-  // todo
+  if (m_inputFilenames.size() != 1 || !m_2ndInputFilenames.empty() ||
+      !m_inputFilenames[0].endsWith(".czi", Qt::CaseInsensitive)) {
+    throw ZImgException("restitching requires single czi file as input");
+  }
+  std::vector<std::vector<ZImgRegion>> rgnss = ZImg::getInternalSubRegions(m_inputFilenames[0]);
+  if (m_scene >= rgnss.size()) {
+    throw ZImgException("invalid scene");
+  }
+  const auto& rgns = rgnss[m_scene];
+
+  std::vector<ZImgSource> inputStackSources;
+  for (const auto& rgn : rgns) {
+    inputStackSources.emplace_back(m_inputFilenames[0], rgn, m_scene);
+  }
+  std::map<std::pair<size_t, size_t>, ZVoxelCoordinate> conn;
+  buildConnectionFromRegions(rgns, conn);
+
+  {
+    // for every pair of img
+    tbb::concurrent_unordered_map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>> offsets;
+    ZImgInfo oneImgInfo = ZImg::readImgInfo(inputStackSources[0]);
+
+    fftw_plan_with_nthreads(1);
+
+    int nthread =
+      std::min<int>(tbb::task_scheduler_init::default_num_threads(),
+                    std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
+    nthread = std::max(1, nthread);
+    LOG(INFO) << "using " << nthread << " threads to stitch " << rgns.size() << " regions.";
+    tbb::task_scheduler_init init(nthread);
+
+    std::vector<std::tuple<size_t, size_t, ZVoxelCoordinate>> allPairs;
+    for (const auto& con : conn) {
+      allPairs.push_back(std::make_tuple(con.first.first, con.first.second, con.second));
+    }
+    tbb::parallel_for(
+      tbb::blocked_range<size_t>(0, allPairs.size()),
+      [&](const tbb::blocked_range<size_t>& r) {
+        for (size_t i = r.begin(); i != r.end(); ++i) {
+          size_t f = std::get<0>(allPairs[i]);
+          size_t m = std::get<1>(allPairs[i]);
+          if (offsets.find(std::make_pair(m, f)) != offsets.end()) {
+            continue;
+          }
+          ZImg fixedImg(inputStackSources[f]);
+          ZImg movingImg(inputStackSources[m]);
+          fixedImg.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
+                                   m_downsampleMergeMode);
+          movingImg.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
+                                    m_downsampleMergeMode);
+
+          ZImgNCCMatch imgNCCMatch(fixedImg, movingImg);
+          ZVoxelCoordinate initOffset = std::get<2>(allPairs[i]);
+
+          const auto& chsToUse = m_channelsToUse;
+          const auto& chsToRemoveBackground = m_channelsToRemoveBackground;
+
+          if (chsToUse.empty()) {
+            imgNCCMatch.useAllFixedImgChannels();
+            imgNCCMatch.useAllMovingImgChannels();
+          } else {
+            imgNCCMatch.useFixedImgChannel(chsToUse);
+            imgNCCMatch.useMovingImgChannel(chsToUse);
+          }
+
+          if (!chsToRemoveBackground.empty()) {
+            for (auto ch : chsToRemoveBackground) {
+              imgNCCMatch.enableRemoveBackgroundForFixedImgChannel(ch);
+              imgNCCMatch.enableRemoveBackgroundForMovingImgChannel(ch);
+            }
+          }
+
+          size_t radiusX = std::ceil(m_maxOverlapRate / 5.0 * std::max(fixedImg.width(), movingImg.width()));
+          size_t radiusY = std::ceil(m_maxOverlapRate / 5.0 * std::max(fixedImg.height(), movingImg.height()));
+          size_t radiusZ = std::ceil(m_maxOverlapRate / 5.0 * std::max(fixedImg.depth(), movingImg.depth()));
+          LOG(INFO) << QString("radius: %1, %2, %3").arg(radiusX).arg(radiusY).arg(radiusZ);
+
+          double maxNCC;
+          ZVoxelCoordinate movingImgOffset = imgNCCMatch.refineMovingImgOffsetMR(initOffset, radiusX, radiusY, radiusZ,
+                                                                                 m_startResolutionIntvX,
+                                                                                 m_startResolutionIntvY,
+                                                                                 m_startResolutionIntvZ,
+                                                                                 &maxNCC);
+          offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
+
+          QString info = QString("tile %1 (%2) -- tile %3 (%4), tile %3 initial offset: %5, final offset: %6, NCC: %7")
+            .arg(f + 1).arg(rgns[f].start.toQString()).arg(m + 1).arg(rgns[m].start.toQString()).arg(
+            initOffset.toQString()).arg(movingImgOffset.toQString()).arg(maxNCC);
+
+          LOG(INFO) << info;
+        }
+      }
+    );
+
+    fftw_plan_with_nthreads(ZCpuInfo::instance().nPhysicalCores);
+
+
+    ZImgMerge imgMerge;
+    std::vector<ZImgTileSubBlock> imgs;
+    for (const auto& ss : inputStackSources) {
+      imgs.emplace_back(ss, m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
+                        m_downsampleMergeMode);
+    }
+    for (const auto& fixedMovingOffsetCost : offsets) {
+      size_t f = fixedMovingOffsetCost.first.first;
+      size_t m = fixedMovingOffsetCost.first.second;
+      imgMerge.addImgPair(imgs[f], imgs[m], fixedMovingOffsetCost.second.first,
+                          -(fixedMovingOffsetCost.second.second),
+                          QString::number(f + 1), QString::number(m + 1));
+    }
+
+    imgMerge.setMergeMode(m_mergeMode);
+    QStringList summary = imgMerge.resolveLocations();
+
+#if 0
+    QString stitchInfoOutputName = m_resFileName;
+    stitchInfoOutputName.append("_info.txt");
+    QFile fOut(stitchInfoOutputName);
+    if (fOut.open(QFile::WriteOnly | QFile::Text)) {
+      QTextStream s(&fOut);
+      for (const auto& mes : summary)
+        s << mes << '\n';
+    }
+    fOut.close();
+#endif
+    if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
+        m_mergeMode == ImgMergeMode::Max) {
+      ZImgIO().writeImg(m_resFileName, imgMerge);
+      for (size_t c = 0; c < imgMerge.imgInfo().numChannels; ++c) {
+        QFileInfo fi(m_resFileName);
+        QString ofn = fi.path() + "/" + fi.baseName() + QString("_ch%1.v3draw").arg(c + 1);
+        QString dsofn = fi.path() + "/" + fi.baseName() + QString("_ch%1_downsampled.v3draw").arg(c + 1);
+        ZImg img(m_resFileName, ZImgRegion(0, -1, 0, -1, 0, -1, c, c + 1));
+        img.save(ofn);
+        img.blockDownsample(2, 2, 1, ImgMergeMode::Mean);
+        img.save(dsofn);
+      }
+    } else {
+      auto wholeImg = imgMerge.wholeImg();
+      wholeImg.save(m_resFileName);
+      for (size_t c = 0; c < imgMerge.imgInfo().numChannels; ++c) {
+        QFileInfo fi(m_resFileName);
+        QString ofn = fi.path() + "/" + fi.baseName() + QString("_ch%1.v3draw").arg(c + 1);
+        QString dsofn = fi.path() + "/" + fi.baseName() + QString("_ch%1_downsampled.v3draw").arg(c + 1);
+        ZImg tmp = wholeImg.createView(c);
+        tmp.save(ofn);
+        tmp.blockDownsample(2, 2, 1, ImgMergeMode::Mean);
+        tmp.save(dsofn);
+      }
+    }
+  }
+
+  LOG(INFO) << QString("%1 saved.").arg(m_resFileName);
+  emit resultReady(m_resFileName);
 }
 
 } // namespace nim

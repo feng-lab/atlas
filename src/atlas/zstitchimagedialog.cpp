@@ -275,7 +275,7 @@ void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
   }
 
   auto* workertmp = new ZStitchImage();
-  workertmp->setInputFilenames(m_inputStack1Filenames, 0);  // todo: get scene from UI
+  workertmp->setInputFilenames(m_inputStack1Filenames, m_scene1ComboBox->currentIndex());
   workertmp->setResultFilename(resFilename);
 
   if (m_channel1ComboBox->currentIndex() == 1) { // use ch0 and ch1
@@ -320,7 +320,7 @@ void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
       chsToRB.push_back(m_bgsub2ComboBox->currentIndex() - 2);
     }
 
-    workertmp->set2ndInput(m_inputStack2Filenames, 0, chsToUse, chsToRB,
+    workertmp->set2ndInput(m_inputStack2Filenames, m_scene2ComboBox->currentIndex(), chsToUse, chsToRB,
                            m_commonChannel1SpinBox->value() - 1,
                            m_commonChannel2SpinBox->value() - 1);
   }
@@ -353,7 +353,6 @@ void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
 
   workertmp->setMaxOverlapRate(m_overlapRateSpinBox->value() / 100.0);
 
-  // tile configuration todo: add restitch option
   if (m_useConfigRadioButton->isChecked()) {
     ZImg tileGrid(ZImgInfo(3, 3, 3, 1, 1, 4, VoxelFormat::Signed));
     tileGrid.fill(0);
@@ -382,6 +381,9 @@ void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
       workertmp->setTileGrid(tileGrid);
     }
   } else if (m_useTileImageRadioButton->isChecked()) {
+    if (m_tileMatrix.empty() || m_tileList.isEmpty()) {
+      throw ZImgException("no tile selection image");
+    }
     size_t numCols = m_tileMatrix[0].size();
     size_t numRows = m_tileMatrix.size();
     ZImg tileGrid(ZImgInfo(numCols, numRows, 1, 1, 1, 4, VoxelFormat::Signed));
@@ -397,6 +399,9 @@ void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
 
     workertmp->setTileGrid(tileGrid);
   } else if (m_useConnFileRadioButton->isChecked()) {
+    if (m_connFileEdit->text().isEmpty()) {
+      throw ZImgException("no conn text file");
+    }
     workertmp->setConnInfoFromConnTextFile(m_connFileEdit->text());
   } else if (m_useFullConnectionRadioButton->isChecked()) {
     workertmp->setBlindStitching();
@@ -404,6 +409,8 @@ void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
     int row = m_layout1SpinBox->value();
     int col = m_layout2SpinBox->value();
     workertmp->setTileGridFromLayout(row, col);
+  } else if (m_restitchCZIRadioButton->isChecked()) {
+    workertmp->setRestitch();
   }
 
   connect(workertmp, &ZStitchImage::resultReady, this, &ZStitchImageDialog::resultReady);
@@ -454,8 +461,17 @@ QLayout* ZStitchImageDialog::createIOLayout()
   input1vlayout->addWidget(m_selectInputStacks1Button);
   input1vlayout->addWidget(m_inputStack1FileEdit);
   auto tmphlayout = new QHBoxLayout;
-  QLabel* pl = new QLabel(tr("Use channel: "), this);
-  pl->setToolTip(tr("channel used for stitch"));
+  QLabel* pl = new QLabel(tr("Use scene: "), this);
+  pl->setToolTip(tr("scene used for stitching"));
+  m_scene1ComboBox = new QComboBox(this);
+  m_scene1ComboBox->addItem(tr("scene 1"));
+  m_scene1ComboBox->setCurrentIndex(0);     //default use scene 0
+  tmphlayout->addWidget(pl);
+  tmphlayout->addWidget(m_scene1ComboBox);
+  input1vlayout->addLayout(tmphlayout);
+  tmphlayout = new QHBoxLayout;
+  pl = new QLabel(tr("Use channel: "), this);
+  pl->setToolTip(tr("channel used for stitching"));
   m_channel1ComboBox = new QComboBox(this);
   m_channel1ComboBox->addItem(tr("Average of all channels"));
   m_channel1ComboBox->addItem(tr("Average of Ch1 and Ch2"));
@@ -482,8 +498,17 @@ QLayout* ZStitchImageDialog::createIOLayout()
   input2vlayout->addWidget(m_selectInputStacks2Button);
   input2vlayout->addWidget(m_inputStack2FileEdit);
   tmphlayout = new QHBoxLayout;
+  pl = new QLabel(tr("Use scene: "), this);
+  pl->setToolTip(tr("scene used for stitching"));
+  m_labelsForTwoInputs.push_back(pl);
+  m_scene2ComboBox = new QComboBox(this);
+  m_scene2ComboBox->addItem(tr("scene 0"));
+  m_scene2ComboBox->setCurrentIndex(0);     //default use scene 0
+  tmphlayout->addWidget(pl);
+  tmphlayout->addWidget(m_scene2ComboBox);
+  tmphlayout = new QHBoxLayout;
   pl = new QLabel(tr("Use channel: "), this);
-  pl->setToolTip(tr("channel used for stitch"));
+  pl->setToolTip(tr("channel used for stitching"));
   m_labelsForTwoInputs.push_back(pl);
   m_channel2ComboBox = new QComboBox(this);
   m_channel2ComboBox->addItem(tr("Average of all channels"));
@@ -646,7 +671,7 @@ QLayout* ZStitchImageDialog::createConnLayout()
   m_overlapRateSpinBox->setMaximum(100);
   m_overlapRateSpinBox->setSuffix("%");
   m_overlapRateSpinBox->setSingleStep(1);
-  m_overlapRateSpinBox->setValue(10);
+  m_overlapRateSpinBox->setValue(15);
   hlayout->addWidget(m_overlapRateSpinBox);
   layout->addLayout(hlayout);
 
@@ -663,6 +688,8 @@ QLayout* ZStitchImageDialog::createConnLayout()
   connect(m_useLayoutRadioButton, &QRadioButton::clicked, this, &ZStitchImageDialog::setConnInfoSource);
   m_useFullConnectionRadioButton = new QRadioButton(tr("No (blind stitching)"), this);
   connect(m_useFullConnectionRadioButton, &QRadioButton::clicked, this, &ZStitchImageDialog::setConnInfoSource);
+  m_restitchCZIRadioButton = new QRadioButton(tr("Restitch Zeiss CZI file"), this);
+  connect(m_restitchCZIRadioButton, &QRadioButton::clicked, this, &ZStitchImageDialog::setConnInfoSource);
   m_editTileImageButton = new QPushButton(tr("edit selection..."), this);
   connect(m_editTileImageButton, &QPushButton::clicked, this, &ZStitchImageDialog::editConnFromTileImage);
   hlayout->addWidget(m_useTileImageRadioButton);
@@ -723,6 +750,10 @@ QLayout* ZStitchImageDialog::createConnLayout()
   hlayout->addWidget(m_layout2SpinBox);
   m_layout1SpinBox->setEnabled(false);
   m_layout2SpinBox->setEnabled(false);
+  layout->addLayout(hlayout);
+
+  hlayout = new QHBoxLayout;
+  hlayout->addWidget(m_restitchCZIRadioButton);
   layout->addLayout(hlayout);
 
   m_useTileImageRadioButton->click();
@@ -795,9 +826,10 @@ void ZStitchImageDialog::selectInputStacks1()
     ZSystemInfo::instance().setLastOpenedImagePath(tmp[0]);
     try {
       // test image
-      ZImgInfo info = ZImg::readImgInfos(tmp[0]).at(0);
+      auto infos = ZImg::readImgInfos(tmp[0]);
 
-      int nchannel = info.numChannels;
+      initScene1ComboBox(infos.size());
+      int nchannel = infos[0].numChannels;
       m_commonChannel1SpinBox->setRange(1, nchannel);
       initChannel1ComboBox(nchannel);
       initBgsub1ComboBox(nchannel);
@@ -814,10 +846,15 @@ void ZStitchImageDialog::selectInputStacks1()
     if (m_useConfigRadioButton->isChecked()) {
       m_useTileImageRadioButton->click();
     }
-    m_useConfigRadioButton->setEnabled(false);
-  } else if (m_inputStack1Filenames.size() == 2) {
-    m_useConfigRadioButton->setEnabled(true);
   }
+  m_useConfigRadioButton->setEnabled(m_inputStack1Filenames.size() == 2);
+  if (m_inputStack1Filenames.size() != 1) {
+    if (m_restitchCZIRadioButton->isChecked()) {
+      m_useTileImageRadioButton->click();
+    }
+  }
+  m_restitchCZIRadioButton->setEnabled(m_inputStack1Filenames.size() == 1);
+
 }
 
 void ZStitchImageDialog::selectInputStacks2()
@@ -831,9 +868,10 @@ void ZStitchImageDialog::selectInputStacks2()
     ZSystemInfo::instance().setLastOpenedImagePath(tmp[0]);
     try {
       // test image
-      ZImgInfo info = ZImg::readImgInfos(tmp[0]).at(0);
+      auto infos = ZImg::readImgInfos(tmp[0]);
 
-      int nchannel = info.numChannels;
+      initScene2ComboBox(infos.size());
+      int nchannel = infos[0].numChannels;
       m_commonChannel2SpinBox->setRange(1, nchannel);
       initChannel2ComboBox(nchannel);
       initBgsub2ComboBox(nchannel);
@@ -850,10 +888,14 @@ void ZStitchImageDialog::selectInputStacks2()
     if (m_useConfigRadioButton->isChecked()) {
       m_useTileImageRadioButton->click();
     }
-    m_useConfigRadioButton->setEnabled(false);
-  } else if (m_inputStack1Filenames.size() == 2) {
-    m_useConfigRadioButton->setEnabled(true);
   }
+  m_useConfigRadioButton->setEnabled(m_inputStack1Filenames.size() == 2);
+  if (m_inputStack2Filenames.size() != 1) {
+    if (m_restitchCZIRadioButton->isChecked()) {
+      m_useTileImageRadioButton->click();
+    }
+  }
+  m_restitchCZIRadioButton->setEnabled(m_inputStack1Filenames.size() == 1);
 }
 
 bool ZStitchImageDialog::getTileMatrix(ZImg& img, std::vector<std::vector<int>>& tileMatrix, QList<ZTile>& tileList)
@@ -1092,6 +1134,17 @@ void ZStitchImageDialog::saveTileImageWidgetAsImage()
 //    m_outputCh3ImageChannelSpinBox->setEnabled(true);
 //}
 
+void ZStitchImageDialog::initScene1ComboBox(int nscene)
+{
+  m_scene1ComboBox->setCurrentIndex(0);    //default value
+  while (m_scene1ComboBox->count() > nscene) {
+    m_scene1ComboBox->removeItem(m_scene1ComboBox->count() - 1);
+  }
+  for (int i = m_scene1ComboBox->count(); i < nscene; ++i) {
+    m_scene1ComboBox->addItem(QString("scene %1").arg(i + 1));
+  }
+}
+
 void ZStitchImageDialog::initChannel1ComboBox(int nchannel)
 {
   m_channel1ComboBox->setCurrentIndex(0);    //default value
@@ -1111,6 +1164,17 @@ void ZStitchImageDialog::initBgsub1ComboBox(int nchannel)
   }
   for (int i = 0; i < nchannel; ++i) {
     m_bgsub1ComboBox->addItem(QString("Ch%1").arg(i + 1));
+  }
+}
+
+void ZStitchImageDialog::initScene2ComboBox(int nscene)
+{
+  m_scene2ComboBox->setCurrentIndex(0);    //default value
+  while (m_scene2ComboBox->count() > nscene) {
+    m_scene2ComboBox->removeItem(m_scene2ComboBox->count() - 1);
+  }
+  for (int i = m_scene2ComboBox->count(); i < nscene; ++i) {
+    m_scene2ComboBox->addItem(QString("scene %1").arg(i + 1));
   }
 }
 
@@ -1192,125 +1256,40 @@ void ZStitchImageDialog::fixCheckBoxChanged(int /*unused*/)
 
 void ZStitchImageDialog::dsCheckBoxChanged(int state)
 {
-  if (state == Qt::Checked) {
-    m_dsXSpinBox->setEnabled(true);
-    m_dsYSpinBox->setEnabled(true);
-    m_dsZSpinBox->setEnabled(true);
-  } else {
-    m_dsXSpinBox->setEnabled(false);
-    m_dsYSpinBox->setEnabled(false);
-    m_dsZSpinBox->setEnabled(false);
-  }
+  m_dsXSpinBox->setEnabled(state == Qt::Checked);
+  m_dsYSpinBox->setEnabled(state == Qt::Checked);
+  m_dsZSpinBox->setEnabled(state == Qt::Checked);
 }
 
 void ZStitchImageDialog::hasTwoInputStackSetCheckBoxChanged(int state)
 {
-  if (state == Qt::Checked) {
-    m_inputStack2FileEdit->show();
-    m_selectInputStacks2Button->show();
-    m_channel2ComboBox->show();
-    m_bgsub2ComboBox->show();
+  m_inputStack2FileEdit->setVisible(state == Qt::Checked);
+  m_selectInputStacks2Button->setVisible(state == Qt::Checked);
+  m_scene2ComboBox->setVisible(state == Qt::Checked);
+  m_channel2ComboBox->setVisible(state == Qt::Checked);
+  m_bgsub2ComboBox->setVisible(state == Qt::Checked);
 
-    m_commonChannel1SpinBox->show();
-    m_commonChannel2SpinBox->show();
+  m_commonChannel1SpinBox->setVisible(state == Qt::Checked);
+  m_commonChannel2SpinBox->setVisible(state == Qt::Checked);
 
-    //    m_outputCh1ImageChannelSpinBox->show();
-    //    m_outputCh2ImageChannelSpinBox->show();
-    //    m_outputCh3ImageChannelSpinBox->show();
-    //    m_outputCh1ImageComboBox->show();
-    //    m_outputCh2ImageComboBox->show();
-    //    m_outputCh3ImageComboBox->show();
-    for (int i = 0; i < m_labelsForTwoInputs.size(); ++i) {
-      m_labelsForTwoInputs[i]->show();
-    }
-  } else {
-    m_inputStack2FileEdit->hide();
-    m_selectInputStacks2Button->hide();
-    m_channel2ComboBox->hide();
-    m_bgsub2ComboBox->hide();
-
-    m_commonChannel1SpinBox->hide();
-    m_commonChannel2SpinBox->hide();
-
-    //    m_outputCh1ImageChannelSpinBox->hide();
-    //    m_outputCh2ImageChannelSpinBox->hide();
-    //    m_outputCh3ImageChannelSpinBox->hide();
-    //    m_outputCh1ImageComboBox->hide();
-    //    m_outputCh2ImageComboBox->hide();
-    //    m_outputCh3ImageComboBox->hide();
-    for (int i = 0; i < m_labelsForTwoInputs.size(); ++i) {
-      m_labelsForTwoInputs[i]->hide();
-    }
+  for (int i = 0; i < m_labelsForTwoInputs.size(); ++i) {
+    m_labelsForTwoInputs[i]->setVisible(state == Qt::Checked);
   }
 }
 
 void ZStitchImageDialog::setConnInfoSource()
 {
-  if (m_useTileImageRadioButton->isChecked()) {
-    m_openTileImageButton->setEnabled(true);
-    m_connEdit->setVisible(true);
-    if (!m_tileImage.isNull()) {
-      m_editTileImageButton->setEnabled(true);
-    } else {
-      m_editTileImageButton->setEnabled(false);
-    }
-    m_connEdit->setEnabled(true);
-    m_configDim1ComboBox->setEnabled(false);
-    m_configDim2ComboBox->setEnabled(false);
-    m_configDim3ComboBox->setEnabled(false);
-    m_connFileEdit->setEnabled(false);
-    m_selectConnFileButton->setEnabled(false);
-    m_layout1SpinBox->setEnabled(false);
-    m_layout2SpinBox->setEnabled(false);
-  } else if (m_useConnFileRadioButton->isChecked()) {
-    m_openTileImageButton->setEnabled(false);
-    m_connEdit->setEnabled(false);
-    m_editTileImageButton->setEnabled(false);
-    m_connEdit->setVisible(false);
-    m_configDim1ComboBox->setEnabled(false);
-    m_configDim2ComboBox->setEnabled(false);
-    m_configDim3ComboBox->setEnabled(false);
-    m_connFileEdit->setEnabled(true);
-    m_selectConnFileButton->setEnabled(true);
-    m_layout1SpinBox->setEnabled(false);
-    m_layout2SpinBox->setEnabled(false);
-  } else if (m_useConfigRadioButton->isChecked()) {
-    m_openTileImageButton->setEnabled(false);
-    m_connEdit->setEnabled(false);
-    m_editTileImageButton->setEnabled(false);
-    m_connEdit->setVisible(false);
-    m_configDim1ComboBox->setEnabled(true);
-    m_configDim2ComboBox->setEnabled(true);
-    m_configDim3ComboBox->setEnabled(true);
-    m_connFileEdit->setEnabled(false);
-    m_selectConnFileButton->setEnabled(false);
-    m_layout1SpinBox->setEnabled(false);
-    m_layout2SpinBox->setEnabled(false);
-  } else if (m_useFullConnectionRadioButton->isChecked()) {
-    m_openTileImageButton->setEnabled(false);
-    m_connEdit->setEnabled(false);
-    m_editTileImageButton->setEnabled(false);
-    m_connEdit->setVisible(false);
-    m_configDim1ComboBox->setEnabled(false);
-    m_configDim2ComboBox->setEnabled(false);
-    m_configDim3ComboBox->setEnabled(false);
-    m_connFileEdit->setEnabled(false);
-    m_selectConnFileButton->setEnabled(false);
-    m_layout1SpinBox->setEnabled(false);
-    m_layout2SpinBox->setEnabled(false);
-  } else if (m_useLayoutRadioButton->isChecked()) {
-    m_openTileImageButton->setEnabled(false);
-    m_connEdit->setEnabled(false);
-    m_editTileImageButton->setEnabled(false);
-    m_connEdit->setVisible(false);
-    m_configDim1ComboBox->setEnabled(false);
-    m_configDim2ComboBox->setEnabled(false);
-    m_configDim3ComboBox->setEnabled(false);
-    m_connFileEdit->setEnabled(false);
-    m_selectConnFileButton->setEnabled(false);
-    m_layout1SpinBox->setEnabled(true);
-    m_layout2SpinBox->setEnabled(true);
-  }
+  m_openTileImageButton->setEnabled(m_useTileImageRadioButton->isChecked());
+  m_connEdit->setVisible(m_useTileImageRadioButton->isChecked());
+  m_connEdit->setEnabled(m_useTileImageRadioButton->isChecked());
+  m_editTileImageButton->setEnabled(m_useTileImageRadioButton->isChecked() && !m_tileImage.isNull());
+  m_configDim1ComboBox->setEnabled(m_useConfigRadioButton->isChecked());
+  m_configDim2ComboBox->setEnabled(m_useConfigRadioButton->isChecked());
+  m_configDim3ComboBox->setEnabled(m_useConfigRadioButton->isChecked());
+  m_connFileEdit->setEnabled(m_useConnFileRadioButton->isChecked());
+  m_selectConnFileButton->setEnabled(m_useConnFileRadioButton->isChecked());
+  m_layout1SpinBox->setEnabled(m_useLayoutRadioButton->isChecked());
+  m_layout2SpinBox->setEnabled(m_useLayoutRadioButton->isChecked());
 }
 
 } // namespace nim
