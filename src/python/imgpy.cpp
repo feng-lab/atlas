@@ -615,10 +615,10 @@ PYBIND11_MODULE(_imgpy, m)
 
   m.attr("__version__") = GIT_VERSION;
 
-  auto cleanup_callback = []() {
-    // perform cleanup here -- this function is called with the GIL held
-    shutdownImgLib();
-  };
-
-  m.add_object("_cleanup", py::capsule(cleanup_callback));
+//  auto cleanup_callback = []() {
+//    // perform cleanup here -- this function is called with the GIL held
+//    shutdownImgLib();
+//  };
+//
+//  m.add_object("_cleanup", py::capsule(cleanup_callback));
 }
