@@ -52,6 +52,8 @@ def build_atlas_package():
                             symlinks=True)
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), app_name],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+            shutil.copy2(os.path.join(common_dirs.ext_dir(), 'assimp', 'lib', 'libIrrXML.dylib'),
+                         os.path.join(common_dirs.deploy_target_dir(), app_name, "Contents", 'Frameworks'))
             subprocess.run([os.path.join(common_dirs.deploy_target_dir(), app_name, 'Contents', 'MacOS', 'Atlas'),
                             '--run_unit_tests'], shell=False, check=True)
             subprocess.run(['codesign', '--force', '--deep', '--sign', '-',

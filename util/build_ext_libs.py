@@ -743,6 +743,13 @@ def build_assimp(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
+
+        if is_mac():
+            subprocess.run(['install_name_tool', '-id', '@rpath/libIrrXML.dylib', 'lib/libIrrXML.dylib'],
+                           cwd=install_dir, shell=False, check=True)
+            subprocess.run(['install_name_tool', '-change', 'libIrrXML.dylib', '@loader_path/libIrrXML.dylib',
+                            'lib/libassimp.dylib'],
+                           cwd=install_dir, shell=False, check=True)
     finally:
         os.replace(bak_file, orig_file)
         if is_mac():
