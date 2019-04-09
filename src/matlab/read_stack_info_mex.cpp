@@ -27,7 +27,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   std::vector<ZImgInfo> infos;
 
   try {
-    ZImgIO::instance().readInfo(QString(filename), infos, nullptr, nullptr);
+    ZImgIO::instance().readInfos(QString(filename), infos, nullptr, nullptr);
   } catch (const ZException & e) {
     mexErrMsgTxt(qPrintable(e.what()));
   }

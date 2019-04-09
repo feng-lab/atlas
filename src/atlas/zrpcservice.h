@@ -1,10 +1,7 @@
 #pragma once
 
 #include <QObject>
-
-namespace grpc {
-class Server;
-}
+#include <grpcpp/server.h>
 
 namespace nim {
 
