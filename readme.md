@@ -8,6 +8,17 @@
 * install visual studio, qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb), python3, git
 * install vulkan sdk: https://vulkan.lunarg.com/home/welcome
 * install golang: https://golang.org
+* install vcpkg: https://github.com/Microsoft/vcpkg
+* install vcpkg packages
+    ```bash
+    vcpkg install folly:x64-windows
+    vcpkg update
+    vcpkg upgrade --no-dry-run
+    # remove
+    vcpkg remove zlib:x64-windows --recurse
+    vcpkg remove double-conversion:x64-windows --recurse
+    vcpkg remove gflags:x64-windows --recurse
+    ```
 
 ### Linux:
 * install qt5 (>= 5.9), mkl, ipp, tbb, python3 and ninja

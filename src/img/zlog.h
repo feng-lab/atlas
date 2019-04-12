@@ -97,6 +97,15 @@ inline std::ostream& operator<<(std::ostream& s, const std::array<T, N>& arr)
   return s;
 }
 
+inline void logLongString(const QString& q)
+{
+  for (int i = 0; i < q.size(); i += 10000) {   // glog limit is 30000
+    int length = std::min(10000, q.size() - i);
+    QStringRef qRef(&q, i, length);
+    LOG(INFO) << qRef;
+  }
+}
+
 template<typename T>
 inline QString qtTypeToQString(const T& v)
 {

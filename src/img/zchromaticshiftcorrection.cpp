@@ -19,7 +19,7 @@ void ZChromaticShiftCorrection::doWork()
 {
   LOG(INFO) << "";
   LOG(INFO) << "Start Chromatic Shift Correction";
-  LOG(INFO) << toQString();
+  logLongString(toQString());
   LOG(INFO) << "";
 
   LOG(INFO) << "Image Filename: " << m_imgFilename;

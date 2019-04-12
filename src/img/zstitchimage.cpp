@@ -386,7 +386,7 @@ void ZStitchImage::doWork()
 {
   LOG(INFO) << "";
   LOG(INFO) << "Start Stitching";
-  LOG(INFO) << toQString();
+  logLongString(toQString());
   LOG(INFO) << "";
 
   QFileInfo outputFI(m_resFileName);

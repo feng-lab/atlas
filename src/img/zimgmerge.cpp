@@ -643,10 +643,11 @@ void ZImgMerge::resolveLocations(std::map<const ZImgSubBlock*, ZVoxelCoordinate>
         pairIt = m_imgPairs.find(std::make_pair(img2, img1));  // must exist
         imgCoords[img2] = imgCoords[img1] - pairIt->second.first;
       }
-      summary.push_back(QString("tile %1 connects to tile %2 with cost %3")
-                          .arg(m_imgNames.at(img1))
-                          .arg(m_imgNames.at(img2))
-                          .arg(pairIt->second.second));
+      summary.push_back(QString("tile %1 connects to tile %2 with cost %3, offset %4")
+                          .arg(m_imgNames.at(pairIt->first.first))
+                          .arg(m_imgNames.at(pairIt->first.second))
+                          .arg(pairIt->second.second)
+                          .arg(pairIt->second.first.toQString()));
     } else if (!img1HasLocation && img2HasLocation) {
       auto pairIt = m_imgPairs.find(std::make_pair(img1, img2));
       if (pairIt != m_imgPairs.end())
@@ -655,10 +656,11 @@ void ZImgMerge::resolveLocations(std::map<const ZImgSubBlock*, ZVoxelCoordinate>
         pairIt = m_imgPairs.find(std::make_pair(img2, img1));  // must exist
         imgCoords[img1] = imgCoords[img2] + pairIt->second.first;
       }
-      summary.push_back(QString("tile %1 connects to tile %2 with cost %3")
-                          .arg(m_imgNames.at(img1))
-                          .arg(m_imgNames.at(img2))
-                          .arg(pairIt->second.second));
+      summary.push_back(QString("tile %1 connects to tile %2 with cost %3, offset %4")
+                          .arg(m_imgNames.at(pairIt->first.first))
+                          .arg(m_imgNames.at(pairIt->first.second))
+                          .arg(pairIt->second.second)
+                          .arg(pairIt->second.first.toQString()));
     } else {
       CHECK(img1HasLocation && img2HasLocation);
     }

@@ -18,7 +18,7 @@ void ZSectionsRegistration::doWork()
 {
   LOG(INFO) << "";
   LOG(INFO) << "Start Sections Registration";
-  LOG(INFO) << toQString();
+  logLongString(toQString());
   LOG(INFO) << "";
 
   LOG(INFO) << "Image Filenames: " << m_imgFilenames;
