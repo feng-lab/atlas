@@ -117,9 +117,10 @@ Q_OBJECT
 public:
   explicit ZStitchImageDialog(QWidget* parent = nullptr);
 
-~ZStitchImageDialog() override;
+  ~ZStitchImageDialog() override;
 
 signals:
+
   void resultReady(QString path);
 
 protected:
@@ -137,14 +138,6 @@ private:
   void getConnFromTileImage();
 
   void editConnFromTileImage();
-
-  void configDim1Changed(int index);
-
-  void configDim2Changed(int index);
-
-  void configDim3Changed(int index);
-
-  void fixCheckBoxChanged(int state);
 
   void dsCheckBoxChanged(int state);
 
@@ -183,7 +176,7 @@ private:
 
   QWidget* createCommandOutputWidget();
 
-  bool getTileMatrix(ZImg& img, std::vector<std::vector<int>>& tileMatrix, QList<ZTile>& tileList);
+  static bool getTileMatrix(ZImg& img, std::vector<std::vector<int>>& tileMatrix, QList<ZTile>& tileList);
 
   void initScene1ComboBox(int scene);
 

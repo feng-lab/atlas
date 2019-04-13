@@ -29,7 +29,7 @@ ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, const std::ve
   m_rubberBand = nullptr;
   m_filenames = filenames;
   if (filenames.size() == pTiles->size()) {
-    for (int i=0; i<m_filenames.size(); ++i) {
+    for (int i = 0; i < m_filenames.size(); ++i) {
       std::vector<ZImgInfo> infos;
       ZImgIO().readInfos(m_filenames[i], infos);
       if (infos.size() != 1) {
@@ -169,13 +169,9 @@ void ZTileImageWidget::mouseReleaseEvent(QMouseEvent* event)
 {
   m_rubberBand->hide();
   QRect selRegion = QRect(m_origin / m_scaleFactor, event->pos() / m_scaleFactor).normalized();
-  for (int i = 0; i < m_pTiles->size(); ++i) {
-    if (m_pTiles->at(i).region.intersects(selRegion)) {
-      if ((*m_pTiles)[i].bIsSelected) {
-        (*m_pTiles)[i].bIsSelected = false;
-      } else {
-        (*m_pTiles)[i].bIsSelected = true;
-      }
+  for (auto& tile : *m_pTiles) {
+    if (tile.region.intersects(selRegion)) {
+      tile.bIsSelected = !tile.bIsSelected;
     }
   }
   repaint();
@@ -183,16 +179,16 @@ void ZTileImageWidget::mouseReleaseEvent(QMouseEvent* event)
 
 void ZTileImageWidget::clearAllSelected()
 {
-  for (int i = 0; i < m_pTiles->size(); ++i) {
-    (*m_pTiles)[i].bIsSelected = false;
+  for (auto& tile : *m_pTiles) {
+    tile.bIsSelected = false;
   }
   repaint();
 }
 
 void ZTileImageWidget::selectAll()
 {
-  for (int i = 0; i < m_pTiles->size(); ++i) {
-    (*m_pTiles)[i].bIsSelected = true;
+  for (auto& tile : *m_pTiles) {
+    tile.bIsSelected = true;
   }
   repaint();
 }
@@ -329,7 +325,7 @@ void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
     workertmp->setDownsampleBeforeStitching(m_dsXSpinBox->value(), m_dsYSpinBox->value(), m_dsZSpinBox->value());
   }
 
-  ImgMergeMode mergeMode = ImgMergeMode::Max;
+  ImgMergeMode mergeMode;
   if (m_mergeModeComboBox->currentIndex() == 0) {
     mergeMode = ImgMergeMode::Max;
   } else if (m_mergeModeComboBox->currentIndex() == 1) {
@@ -629,7 +625,7 @@ QLayout* ZStitchImageDialog::createIOLayout()
   pl = new QLabel(tr("interval: "), this);
   pl->setToolTip(tr(
     "Use the interval to downsample stack while stitching (more memory efficient). Note that this interval will be "
-      "applied to original stack, not downsampled one."));
+    "applied to original stack, not downsampled one."));
   layout->addWidget(pl, row, 0);
   m_intvXSpinBox = new QSpinBox(this);
   m_intvXSpinBox->setRange(0, 10);
@@ -793,7 +789,7 @@ void ZStitchImageDialog::createCommandOutputGroupBox()
 
 QWidget* ZStitchImageDialog::createIOWidget()
 {
-  QWidget* res = new QWidget(this);
+  auto res = new QWidget(this);
   QLayout* alllayout = createIOLayout();
   res->setLayout(alllayout);
   return res;
@@ -801,7 +797,7 @@ QWidget* ZStitchImageDialog::createIOWidget()
 
 QWidget* ZStitchImageDialog::createConnWidget()
 {
-  QWidget* res = new QWidget(this);
+  auto res = new QWidget(this);
   QLayout* alllayout = createConnLayout();
   res->setLayout(alllayout);
   return res;
@@ -809,7 +805,7 @@ QWidget* ZStitchImageDialog::createConnWidget()
 
 QWidget* ZStitchImageDialog::createCommandOutputWidget()
 {
-  QWidget* res = new QWidget(this);
+  auto res = new QWidget(this);
   QLayout* alllayout = createCommandOutputLayout();
   res->setLayout(alllayout);
   return res;
@@ -838,7 +834,7 @@ void ZStitchImageDialog::selectInputStacks1()
       std::sort(m_inputStack1Filenames.begin(), m_inputStack1Filenames.end(), naturalSortLessThan);
       m_inputStack1FileEdit->setText(QString("%1").arg(m_inputStack1Filenames.join("\n")));
     } catch (const ZException& e) {
-      QMessageBox::critical(this, qApp->applicationName(), "Can not read image.\n" + e.what());
+      QMessageBox::critical(this, "Stitching Error", "Can not read image.\n" + e.what());
       return;
     }
   }
@@ -880,7 +876,7 @@ void ZStitchImageDialog::selectInputStacks2()
       std::sort(m_inputStack2Filenames.begin(), m_inputStack2Filenames.end(), naturalSortLessThan);
       m_inputStack2FileEdit->setText(QString("%1").arg(m_inputStack2Filenames.join("\n")));
     } catch (const ZException& e) {
-      QMessageBox::critical(this, qApp->applicationName(), "Can not read image.\n" + e.what());
+      QMessageBox::critical(this, "Stitching Error", "Can not read image.\n" + e.what());
       return;
     }
   }
@@ -911,7 +907,7 @@ bool ZStitchImageDialog::getTileMatrix(ZImg& img, std::vector<std::vector<int>>&
   tileMatrix.clear();
   tileList.clear();
   for (size_t h = 0; h < img.height(); h++) {
-    int pre = minvalue;
+    double pre = minvalue;
     for (size_t w = 0; w < img.width(); w++) {
       if (img.value<double>(w, h, 0) > thre1 && img.value<double>(w, h, 0) > pre) {
         numTilePerRow++;
@@ -922,7 +918,7 @@ bool ZStitchImageDialog::getTileMatrix(ZImg& img, std::vector<std::vector<int>>&
       break;
   }
   for (size_t w = 0; w < img.width(); w++) {
-    int pre = minvalue;
+    double pre = minvalue;
     for (size_t h = 0; h < img.height(); h++) {
       if (img.value<double>(w, h, 0) > thre1 && img.value<double>(w, h, 0) > pre) {
         numTilePerCol++;
@@ -1022,8 +1018,7 @@ void ZStitchImageDialog::editConnFromTileImage()
     vlayout->addLayout(hlayout);
     vlayout->addWidget(m_scrollArea);
 
-    QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok
-                                                       | QDialogButtonBox::Cancel, Qt::Horizontal, this);
+    auto buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, Qt::Horizontal, this);
 
     connect(buttonBox, &QDialogButtonBox::accepted, &dia, &QDialog::accept);
     connect(buttonBox, &QDialogButtonBox::rejected, &dia, &QDialog::reject);
@@ -1034,17 +1029,17 @@ void ZStitchImageDialog::editConnFromTileImage()
     if (dia.exec() == QDialog::Accepted) {
       m_tileList = tmpList;
       m_nSel = 0;
-      for (int i = 0; i < m_tileList.size(); ++i) {
-        if (m_tileList[i].bIsSelected)
+      for (const auto& tile : m_tileList) {
+        if (tile.bIsSelected)
           m_nSel++;
       }
       QString str = QString("%1 images selected to stitch:").arg(m_nSel);
       m_connEdit->setText(str);
-      for (size_t i = 0; i < m_tileMatrix.size(); ++i) {
+      for (const auto& row : m_tileMatrix) {
         str = QString("  ");
-        for (size_t j = 0; j < m_tileMatrix[0].size(); ++j) {
-          if (m_tileMatrix[i][j] > 0 && m_tileList[m_tileMatrix[i][j] - 1].bIsSelected) {
-            str += QString("%1\t").arg(m_tileMatrix[i][j]);
+        for (auto tileidx : row) {
+          if (tileidx > 0 && m_tileList[tileidx - 1].bIsSelected) {
+            str += QString("%1\t").arg(tileidx);
           } else {
             str += QString("%1\t").arg(0);
           }
@@ -1084,10 +1079,10 @@ void ZStitchImageDialog::getConnFromTileImage()
         m_editTileImageButton->setEnabled(true);
       } else {
         m_tileList.clear();
-        QMessageBox::warning(this, qApp->applicationName(), tr("Failed to parse tile connection image."));
+        QMessageBox::warning(this, "Stitching Error", tr("Failed to parse tile connection image."));
       }
     } catch (const ZException& e) {
-      QMessageBox::warning(this, qApp->applicationName(), "Read image failed.\n" + e.what());
+      QMessageBox::warning(this, "Stitching Error", "Read image failed.\n" + e.what());
       m_tileSelectionImageFilename.clear();
     }
   }
@@ -1234,26 +1229,6 @@ void ZStitchImageDialog::selectOutputFile()
   }
 }
 
-void ZStitchImageDialog::configDim1Changed(int /*unused*/)
-{
-
-}
-
-void ZStitchImageDialog::configDim2Changed(int /*unused*/)
-{
-
-}
-
-void ZStitchImageDialog::configDim3Changed(int /*unused*/)
-{
-
-}
-
-void ZStitchImageDialog::fixCheckBoxChanged(int /*unused*/)
-{
-
-}
-
 void ZStitchImageDialog::dsCheckBoxChanged(int state)
 {
   m_dsXSpinBox->setEnabled(state == Qt::Checked);
@@ -1272,8 +1247,8 @@ void ZStitchImageDialog::hasTwoInputStackSetCheckBoxChanged(int state)
   m_commonChannel1SpinBox->setVisible(state == Qt::Checked);
   m_commonChannel2SpinBox->setVisible(state == Qt::Checked);
 
-  for (int i = 0; i < m_labelsForTwoInputs.size(); ++i) {
-    m_labelsForTwoInputs[i]->setVisible(state == Qt::Checked);
+  for (auto label : m_labelsForTwoInputs) {
+    label->setVisible(state == Qt::Checked);
   }
 }
 
