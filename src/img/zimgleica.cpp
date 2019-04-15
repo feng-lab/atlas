@@ -127,8 +127,8 @@ void ZImgLeica::readMetadata(const QString& filename, ZImgMetadata& meta, size_t
   meta.attachToTopLevel(tag);
 }
 
-void  ZImgLeica::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thumbnail*/,
-                               const ZImgRegion& /*region*/, size_t /*scene*/)
+void ZImgLeica::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thumbnail*/,
+                              const ZImgRegion& /*region*/, size_t /*scene*/)
 {
 }
 
@@ -815,7 +815,7 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
                 [](const DimensionInfo& i1, const DimensionInfo& i2) { return i1.stride < i2.stride; });
 
       std::vector<size_t> sceneDimIdxReverseOrder;
-      for (size_t i = dims.size(); i-- > 0; ) {
+      for (size_t i = dims.size(); i-- > 0;) {
         if (dims[i].name != "X" && dims[i].name != "Y" && dims[i].name != "Z" && dims[i].name != "C" &&
             dims[i].name != "T") {
           sceneDimIdxReverseOrder.push_back(i);
@@ -948,7 +948,8 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
           info.numTimes = dd.numberOfElements;
           lastTime = dd.length;
           if (dd.unit.compare("s", Qt::CaseInsensitive) != 0) {
-            throw ZIOException(QString("unhandled time unit %1, please send this message to flq@live.com").arg(dd.unit));
+            throw ZIOException(
+              QString("unhandled time unit %1, please send this message to flq@live.com").arg(dd.unit));
           }
           break;
         default:

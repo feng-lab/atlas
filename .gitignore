@@ -59,6 +59,7 @@
 /src/3rdparty/boringssl/
 /src/3rdparty/grpc/
 /src/3rdparty/better-enums/
+/src/3rdparty/cppitertools/
 ffmpeg
 ffmpeg.exe
 nasm

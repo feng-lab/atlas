@@ -291,7 +291,7 @@ void Z3DShaderProgram::setHeaderAndRebuild(const QString& header, const QString&
 
 int Z3DShaderProgram::uniformLocation(const QString& name) const
 {
-  std::map<QString, Uniform>::const_iterator it = m_uniforms.find(name);
+  auto it = m_uniforms.find(name);
   if (it != m_uniforms.end()) {
     return it->second.location;
   }
@@ -303,7 +303,7 @@ int Z3DShaderProgram::uniformLocation(const QString& name) const
 
 int Z3DShaderProgram::attributeLocation(const QString& name) const
 {
-  std::map<QString, Attribute>::const_iterator it = m_attributes.find(name);
+  auto it = m_attributes.find(name);
   if (it != m_attributes.end()) {
     return it->second.location;
   }
@@ -368,7 +368,7 @@ void Z3DShaderProgram::storeUniformLocations()
     QString nm(name.data());
     if (nm.endsWith("[0]"))
       nm.chop(3);
-    efficientAddOrUpdate(m_uniforms, nm, u);
+    m_uniforms.insert_or_assign(nm, u);
   }
 
   std::map<QString, Uniform>::const_iterator it;
@@ -475,7 +475,7 @@ void Z3DShaderProgram::storeAttributeLocations()
     Attribute u;
     glGetActiveAttrib(programId(), i, maxLength, nullptr, &u.size, &u.type, name.data());
     u.location = glGetAttribLocation(programId(), name.data());
-    efficientAddOrUpdate(m_attributes, name.data(), u);
+    m_attributes.insert_or_assign(name.data(), u);
   }
 
   std::map<QString, Attribute>::const_iterator it;

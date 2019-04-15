@@ -127,7 +127,8 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
     rgn.start.c = 0;
     rgn.end.c = -1;
     ZImg tmpImg = readRawImg(filename, tmpInfo, "XYZCT", dataOffset, rgn, timeStride);
-    if (region.start.c == 0 && (region.end.c == -1 || size_t(region.end.c) == imgInfo.numChannels)) { // read all channel
+    if (region.start.c == 0 &&
+        (region.end.c == -1 || size_t(region.end.c) == imgInfo.numChannels)) { // read all channel
       tmpImg.infoRef() = res.info();
       CXYZtoXYZC(tmpImg, res);
     } else {
@@ -242,7 +243,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo,
   size_t packedPrev = imgInfo.bytesPerVoxel;
   for (size_t i = 0; i < sortedIndexes.size(); ++i) {
     auto idx = sortedIndexes[i];
-    packedStrides[idx] =  packedPrev;
+    packedStrides[idx] = packedPrev;
     if (dimensionStrides[idx] < prev) {
       throw ZIOException(QString("invalid dimensionStrides %1 for image %2").arg(qtTypeToQString(dimensionStrides)).arg(
         imgInfo.toQString()));
@@ -289,7 +290,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo,
     }
   }
 
-  return  res;
+  return res;
 }
 
 void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool ARGBtoRGBA)

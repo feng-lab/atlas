@@ -9,6 +9,7 @@
 #ifdef ATLAS_SUPPORT_DICOM
 #include <itkGDCMImageIOFactory.h>
 #endif
+
 #include <QFile>
 #include <QStringList>
 #include <QFileInfo>

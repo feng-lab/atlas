@@ -26,7 +26,7 @@ public:
     : m_nclasses(nclasses), m_checkCovars(checkCovars), m_covarType(covarType), m_termCriteria(termCriteria)
     , m_logLevel(logLevel), m_hasWeight(false), m_labelsNeedUpdate(false), m_hasInitData(false)
   {
-    if (std::is_same<T, ResultDataType>::value) {
+    if constexpr (std::is_same_v<T, ResultDataType>) {
       // reinterpret_cast allowed (AliasedType is (possibly cv-qualified) DynamicType)
       m_pData = reinterpret_cast<const MatrixXrt*>(&data);
     } else {
@@ -75,13 +75,13 @@ public:
       m_pData = &m_NonIntegerData;
       m_pWeight = &m_NonIntegerWeight;
     } else {
-      if (std::is_same<T, ResultDataType>::value) {
+      if constexpr (std::is_same_v<T, ResultDataType>) {
         m_pData = reinterpret_cast<const MatrixXrt*>(&data);
       } else {
         m_NonIntegerData = data.template cast<ResultDataType>();
         m_pData = &m_NonIntegerData;
       }
-      if (std::is_same<WeightT, ResultDataType>::value) {
+      if constexpr (std::is_same_v<WeightT, ResultDataType>) {
         m_pWeight = reinterpret_cast<const VectorXrt*>(&weight);
       } else {
         m_NonIntegerWeight = weight.template cast<ResultDataType>();

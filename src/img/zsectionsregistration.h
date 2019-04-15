@@ -14,7 +14,7 @@ class ZImageCompositeTransform;
 
 class ZSectionsRegistration : public ZImgProcess
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   ZSectionsRegistration() = default;
 
@@ -78,6 +78,7 @@ public:
   { m_numNeighbors = i; }
 
 signals:
+
   void resultReady(QString path);
 
 protected:

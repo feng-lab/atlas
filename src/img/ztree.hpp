@@ -34,7 +34,7 @@ struct TreeNode
   T data;
 };
 
-template<typename TNode, bool TNodeIsConst = std::is_const<TNode>::value>
+template<typename TNode, bool TNodeIsConst = std::is_const_v<TNode>>
 class BaseIterator
 {
   template<typename>
@@ -419,7 +419,7 @@ public:
 
   template<class OtherTBaseIter>
   Iterator(Iterator<OtherTBaseIter> const& other, typename std::enable_if<
-    std::is_convertible<typename OtherTBaseIter::ValueType*, typename TBaseIter::ValueType*>::value, enabler
+    std::is_convertible_v<typename OtherTBaseIter::ValueType*, typename TBaseIter::ValueType*>, enabler
   >::type = enabler())
   { this->init(other.node, other.parent); }
 

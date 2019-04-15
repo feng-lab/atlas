@@ -74,6 +74,7 @@ public:
   { m_numScales = i; }
 
 signals:
+
   void resultReady(QString path);
 
 protected:

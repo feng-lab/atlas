@@ -19,6 +19,7 @@ public:
   // for big image, minValue and maxValue are used to convert image into uint8_t if it is not
   ZAssignPuncta(const QString& filename, double minValue, double maxValue,
                 size_t dendriteChannel = 0, size_t t = 0, size_t scene = 0);
+
   // only image resolution in imgInfo is used
   ZAssignPuncta(const QString& filename, const ZImgInfo& imgInfo, double minValue, double maxValue,
                 size_t dendriteChannel = 0, size_t t = 0, size_t scene = 0);

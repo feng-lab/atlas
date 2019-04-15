@@ -1284,19 +1284,19 @@ ZImg ZImg::projectAlongDim(Dimension dim, ImgMergeMode mode, int startIn, int en
     for (size_t i = dstart; i < dend; ++i) {
       switch (dim) {
         case Dimension::T:
-          subImgs[i-dstart] = extractTime(i);
+          subImgs[i - dstart] = extractTime(i);
           break;
         case Dimension::C:
-          subImgs[i-dstart] = extractChannel(i, -1);
+          subImgs[i - dstart] = extractChannel(i, -1);
           break;
         case Dimension::Z:
-          subImgs[i-dstart] = extractPlane(i, -1, -1);
+          subImgs[i - dstart] = extractPlane(i, -1, -1);
           break;
         case Dimension::Y:
-          subImgs[i-dstart] = extractRow(i, -1, -1, -1);
+          subImgs[i - dstart] = extractRow(i, -1, -1, -1);
           break;
         case Dimension::X:
-          subImgs[i-dstart] = extractCol(i, -1, -1, -1);
+          subImgs[i - dstart] = extractCol(i, -1, -1, -1);
           break;
         default:
           break;
@@ -2311,66 +2311,54 @@ void ZImg::secureDivImg_Impl(const ZImg& rhs)
   }
 }
 
-template<typename TVoxel,
-  typename std::enable_if_t<std::is_integral<std::remove_reference_t<TVoxel>>::value, int>
->
+template<typename TVoxel>
 void ZImg::histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData) const
 {
-  static_assert(std::is_integral<std::remove_reference_t<TVoxel>>::value, "");
-  if (maxData < minData) {
+  if (maxData <= minData) {
     throw ZImgException(QString("Invalid histogram range %1:%2").arg(minData).arg(maxData));
   }
 
-  size_t numData = maxData - minData + 1_usize;
-  if (numData == res.size()) {
-    if (minData == dataRangeMin<TVoxel>() && maxData == dataRangeMax<TVoxel>()) {
-      for (size_t t = 0; t < numTimes(); ++t) {
-        const TVoxel* data = timeData<TVoxel>(t);
-        for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-          res[data[v] - minData] += 1;
-        }
-      }
-    } else {
-      for (size_t t = 0; t < numTimes(); ++t) {
-        const TVoxel* data = timeData<TVoxel>(t);
-        for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-          if (data[v] >= minData && data[v] <= maxData)
-            res[data[v] - minData] += 1;
-        }
-      }
-    }
-  } else {
-    double scale = res.size() / (maxData + 1. - minData);
+  if constexpr (std::is_floating_point_v<std::remove_reference_t<TVoxel>>) {
+    double scale = res.size() / (maxData - minData);
     for (size_t t = 0; t < numTimes(); ++t) {
       const TVoxel* data = timeData<TVoxel>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
         if (data[v] >= minData && data[v] <= maxData) {
           size_t idx = (data[v] - minData) * scale;
+          if (idx == res.size()) idx = res.size() - 1;  // only maxData map to index that out of bound
           res[idx] += 1;
         }
       }
     }
-  }
-}
-
-template<typename TVoxel,
-  typename std::enable_if_t<std::is_floating_point<std::remove_reference_t<TVoxel>>::value, int>
->
-void ZImg::histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData) const
-{
-  static_assert(std::is_floating_point<std::remove_reference_t<TVoxel>>::value, "");
-  if (maxData <= minData) {
-    throw ZImgException(QString("Invalid histogram range %1:%2").arg(minData).arg(maxData));
-  }
-
-  double scale = res.size() / (maxData - minData);
-  for (size_t t = 0; t < numTimes(); ++t) {
-    const TVoxel* data = timeData<TVoxel>(t);
-    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      if (data[v] >= minData && data[v] <= maxData) {
-        size_t idx = (data[v] - minData) * scale;
-        if (idx == res.size()) idx = res.size() - 1;  // only maxData map to index that out of bound
-        res[idx] += 1;
+  } else {
+    size_t numData = maxData - minData + 1_usize;
+    if (numData == res.size()) {
+      if (minData == dataRangeMin<TVoxel>() && maxData == dataRangeMax<TVoxel>()) {
+        for (size_t t = 0; t < numTimes(); ++t) {
+          const TVoxel* data = timeData<TVoxel>(t);
+          for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+            res[data[v] - minData] += 1;
+          }
+        }
+      } else {
+        for (size_t t = 0; t < numTimes(); ++t) {
+          const TVoxel* data = timeData<TVoxel>(t);
+          for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+            if (data[v] >= minData && data[v] <= maxData)
+              res[data[v] - minData] += 1;
+          }
+        }
+      }
+    } else {
+      double scale = res.size() / (maxData + 1. - minData);
+      for (size_t t = 0; t < numTimes(); ++t) {
+        const TVoxel* data = timeData<TVoxel>(t);
+        for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+          if (data[v] >= minData && data[v] <= maxData) {
+            size_t idx = (data[v] - minData) * scale;
+            res[idx] += 1;
+          }
+        }
       }
     }
   }
@@ -2387,71 +2375,59 @@ void ZImg::histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxDa
 //template void ZImg::histogram_Impl<float>(std::vector<size_t>&, float, float) const;
 //template void ZImg::histogram_Impl<double>(std::vector<size_t>&, double, double) const;
 
-template<typename TVoxel, typename TMaskVoxel,
-  typename std::enable_if_t<std::is_integral<std::remove_reference_t<TVoxel>>::value, int>
->
+template<typename TVoxel, typename TMaskVoxel>
 void ZImg::histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData, const ZImg& mask) const
 {
-  static_assert(std::is_integral<std::remove_reference_t<TVoxel>>::value, "");
   if (maxData < minData) {
     throw ZImgException(QString("Invalid histogram range %1:%2").arg(minData).arg(maxData));
   }
 
-  size_t numData = maxData - minData + 1_usize;
-  if (numData == res.size()) {
-    if (minData == dataRangeMin<TVoxel>() && maxData == dataRangeMax<TVoxel>()) {
-      for (size_t t = 0; t < numTimes(); ++t) {
-        const TVoxel* data = timeData<TVoxel>(t);
-        const TMaskVoxel* maskData = mask.timeData<TMaskVoxel>(t);
-        for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-          if (maskData[v])
-            res[data[v] - minData] += 1;
-        }
-      }
-    } else {
-      for (size_t t = 0; t < numTimes(); ++t) {
-        const TVoxel* data = timeData<TVoxel>(t);
-        const TMaskVoxel* maskData = mask.timeData<TMaskVoxel>(t);
-        for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-          if (maskData[v] && data[v] >= minData && data[v] <= maxData)
-            res[data[v] - minData] += 1;
-        }
-      }
-    }
-  } else {
-    double scale = res.size() / (maxData + 1. - minData);
+  if constexpr (std::is_floating_point_v<std::remove_reference_t<TVoxel>>) {
+    double scale = res.size() / (maxData - minData);
     for (size_t t = 0; t < numTimes(); ++t) {
       const TVoxel* data = timeData<TVoxel>(t);
       const TMaskVoxel* maskData = mask.timeData<TMaskVoxel>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
         if (maskData[v] && data[v] >= minData && data[v] <= maxData) {
           size_t idx = (data[v] - minData) * scale;
+          if (idx == res.size()) idx = res.size() - 1;  // only maxData map to index that out of bound
           res[idx] += 1;
         }
       }
     }
-  }
-}
-
-template<typename TVoxel, typename TMaskVoxel,
-  typename std::enable_if_t<std::is_floating_point<std::remove_reference_t<TVoxel>>::value, int>
->
-void ZImg::histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData, const ZImg& mask) const
-{
-  static_assert(std::is_floating_point<std::remove_reference_t<TVoxel>>::value, "");
-  if (maxData <= minData) {
-    throw ZImgException(QString("Invalid histogram range %1:%2").arg(minData).arg(maxData));
-  }
-
-  double scale = res.size() / (maxData - minData);
-  for (size_t t = 0; t < numTimes(); ++t) {
-    const TVoxel* data = timeData<TVoxel>(t);
-    const TMaskVoxel* maskData = mask.timeData<TMaskVoxel>(t);
-    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      if (maskData[v] && data[v] >= minData && data[v] <= maxData) {
-        size_t idx = (data[v] - minData) * scale;
-        if (idx == res.size()) idx = res.size() - 1;  // only maxData map to index that out of bound
-        res[idx] += 1;
+  } else {
+    size_t numData = maxData - minData + 1_usize;
+    if (numData == res.size()) {
+      if (minData == dataRangeMin<TVoxel>() && maxData == dataRangeMax<TVoxel>()) {
+        for (size_t t = 0; t < numTimes(); ++t) {
+          const TVoxel* data = timeData<TVoxel>(t);
+          const TMaskVoxel* maskData = mask.timeData<TMaskVoxel>(t);
+          for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+            if (maskData[v])
+              res[data[v] - minData] += 1;
+          }
+        }
+      } else {
+        for (size_t t = 0; t < numTimes(); ++t) {
+          const TVoxel* data = timeData<TVoxel>(t);
+          const TMaskVoxel* maskData = mask.timeData<TMaskVoxel>(t);
+          for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+            if (maskData[v] && data[v] >= minData && data[v] <= maxData)
+              res[data[v] - minData] += 1;
+          }
+        }
+      }
+    } else {
+      double scale = res.size() / (maxData + 1. - minData);
+      for (size_t t = 0; t < numTimes(); ++t) {
+        const TVoxel* data = timeData<TVoxel>(t);
+        const TMaskVoxel* maskData = mask.timeData<TMaskVoxel>(t);
+        for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+          if (maskData[v] && data[v] >= minData && data[v] <= maxData) {
+            size_t idx = (data[v] - minData) * scale;
+            res[idx] += 1;
+          }
+        }
       }
     }
   }

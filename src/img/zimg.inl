@@ -2,6 +2,7 @@
 
 #include "zimg.h"
 #include "zsaturateoperation.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -244,7 +245,7 @@ ZImg ZImg::typedBinarized(const ForegroundPredictor& isForeground) const
 template<typename TScalar>
 ZImg& ZImg::operator+=(TScalar scalar)
 {
-  static_assert(std::is_arithmetic<TScalar>::value, "Arithmetic not possible on this type");
+  static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
   if (scalar != TScalar(0)) {
     IMG_TYPED_CALL(addScalar_Impl, (*this), scalar);
   }
@@ -262,7 +263,7 @@ ZImg ZImg::operator+(const TScalarOrZImg& scalarOrZImg) const
 template<typename TScalar>
 ZImg& ZImg::operator-=(TScalar scalar)
 {
-  static_assert(std::is_arithmetic<TScalar>::value, "Arithmetic not possible on this type");
+  static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
   if (scalar != TScalar(0)) {
     IMG_TYPED_CALL(subScalar_Impl, (*this), scalar);
   }
@@ -280,7 +281,7 @@ ZImg ZImg::operator-(const TScalarOrZImg& scalarOrZImg) const
 template<typename TScalar>
 ZImg& ZImg::operator*=(TScalar scalar)
 {
-  static_assert(std::is_arithmetic<TScalar>::value, "Arithmetic not possible on this type");
+  static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
   if (scalar != TScalar(0)) {
     IMG_TYPED_CALL(mulScalar_Impl, (*this), scalar);
   } else {
@@ -300,7 +301,7 @@ ZImg ZImg::operator*(const TScalarOrZImg& scalarOrZImg) const
 template<typename TScalar>
 ZImg& ZImg::operator/=(TScalar scalar)
 {
-  static_assert(std::is_arithmetic<TScalar>::value, "Arithmetic not possible on this type");
+  static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
   if (scalar != TScalar(0)) {
     IMG_TYPED_CALL(divScalar_Impl, (*this), scalar);
   } else {
@@ -533,6 +534,8 @@ void ZImg::convert_Impl(bool normalize, const ZImg* src, ZImg* des)
 template<typename TVoxel, typename TDesVoxel>
 void ZImg::scale_Impl(TVoxel minData, TVoxel maxData, const ZImg* src, ZImg* des)
 {
+  CHECK(src->isType<TVoxel>());
+  CHECK(des->isType<TDesVoxel>());
   TDesVoxel dataRangeMin = std::numeric_limits<TDesVoxel>::min();
   TDesVoxel dataRangeMax = std::numeric_limits<TDesVoxel>::max();
   if (des->voxelFormat() == VoxelFormat::Float) {
@@ -550,7 +553,7 @@ void ZImg::scale_Impl(TVoxel minData, TVoxel maxData, const ZImg* src, ZImg* des
     }
   }
 
-  if (src->voxelFormat() != VoxelFormat::Float && std::is_same<TVoxel, TDesVoxel>::value &&
+  if (src->voxelFormat() != VoxelFormat::Float && std::is_same_v<TVoxel, TDesVoxel> &&
       dataRangeMin == TDesVoxel(minData) && dataRangeMax == TDesVoxel(maxData)) {
     if (src != des) {
       for (size_t t = 0; t < src->numTimes(); ++t) {
@@ -561,7 +564,7 @@ void ZImg::scale_Impl(TVoxel minData, TVoxel maxData, const ZImg* src, ZImg* des
   }
 
   // use colormap
-  if (src->bytesPerVoxel() <= 2) {  // can not be float
+  if constexpr (sizeof(TVoxel) <= 2) {  // can not be float
     std::vector<TDesVoxel> colormap;
     buildScaleColormap(minData, maxData, dataRangeMin, dataRangeMax, colormap);
     TVoxel colormapMin = std::numeric_limits<TVoxel>::min();
@@ -575,7 +578,6 @@ void ZImg::scale_Impl(TVoxel minData, TVoxel maxData, const ZImg* src, ZImg* des
         }
       }
     }
-
   } else {
     for (size_t t = 0; t < src->numTimes(); ++t) {
       for (size_t c = 0; c < src->numChannels(); ++c) {
@@ -595,30 +597,24 @@ void ZImg::scale_Impl(TVoxel minData, TVoxel maxData, const ZImg* src, ZImg* des
   }
 }
 
-template<typename TVoxel, typename TDesVoxel,
-  typename std::enable_if_t<sizeof(TVoxel) <= 2, int>>
+template<typename TVoxel, typename TDesVoxel>
 void ZImg::buildScaleColormap(TVoxel minData, TVoxel maxData, TDesVoxel desDataRangeMin, TDesVoxel desDataRangeMax,
                               std::vector<TDesVoxel>& res)
 {
-  TVoxel dataRangeMin = std::numeric_limits<TVoxel>::min();
-  TVoxel dataRangeMax = std::numeric_limits<TVoxel>::max();
-  res.resize(dataRangeMax - dataRangeMin + 1);
-  for (TVoxel v = dataRangeMin; v < dataRangeMax; ++v) {
-    if (v <= minData)
-      res[v - dataRangeMin] = desDataRangeMin;
-    else if (v >= maxData)
-      res[v - dataRangeMin] = desDataRangeMax;
-    else
-      res[v - dataRangeMin] = (v - minData) * 1.0 / (maxData - minData) * desDataRangeMax + desDataRangeMin;
+  if constexpr (sizeof(TVoxel) <= 2) {
+    TVoxel srcDataRangeMin = std::numeric_limits<TVoxel>::min();
+    TVoxel srcDataRangeMax = std::numeric_limits<TVoxel>::max();
+    res.resize(srcDataRangeMax - srcDataRangeMin + 1);
+    for (TVoxel v = srcDataRangeMin; v < srcDataRangeMax; ++v) {
+      if (v <= minData)
+        res[v - srcDataRangeMin] = desDataRangeMin;
+      else if (v >= maxData)
+        res[v - srcDataRangeMin] = desDataRangeMax;
+      else
+        res[v - srcDataRangeMin] = (v - minData) * 1.0 / (maxData - minData) * desDataRangeMax + desDataRangeMin;
+    }
+    res[srcDataRangeMax - srcDataRangeMin] = desDataRangeMax;
   }
-  res[dataRangeMax - dataRangeMin] = desDataRangeMax;
-}
-
-template<typename TVoxel, typename TDesVoxel,
-  typename std::enable_if_t<sizeof(TVoxel) >= 4, int>>
-void ZImg::buildScaleColormap(TVoxel, TVoxel, TDesVoxel, TDesVoxel,
-                              std::vector<TDesVoxel>&)
-{
 }
 
 template<typename TVoxel, typename TScalar>

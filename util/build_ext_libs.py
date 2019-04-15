@@ -1199,10 +1199,10 @@ def build_libs(libs: dict, update_src: bool):
         update_or_clone_git_repository(src_dir, 'git@github.com:pybind/pybind11.git')
         export_git_repository(src_dir, os.path.join(ext_dir(), 'pybind11'))
 
-    if libs['betterenums']:
-        src_dir = os.path.join(base_dir(), 'better-enums')
-        update_or_clone_git_repository(src_dir, 'git@github.com:aantron/better-enums.git')
-        export_git_repository(src_dir, os.path.join(ext_dir(), 'better-enums'))
+    if libs['cppitertools']:
+        src_dir = os.path.join(base_dir(), 'cppitertools')
+        update_or_clone_git_repository(src_dir, 'git@github.com:ryanhaining/cppitertools.git')
+        export_git_repository(src_dir, os.path.join(ext_dir(), 'cppitertools'))
 
     if libs['glm']:
         src_dir = os.path.join(base_dir(), 'glm')
@@ -1395,7 +1395,7 @@ def parse_inputs(argv: list):
             'boost': False,
             'eigen': False,
             'pybind11': False,
-            'betterenums': False,
+            'cppitertools': False,
             'glm': False,
             'googletest': False,
             'folly': False,

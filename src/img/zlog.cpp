@@ -2,6 +2,7 @@
 
 #include <QFile>
 #include <utility>
+
 namespace nim {
 
 void initLogging(const char* argv0, const QString& filename)
@@ -92,7 +93,7 @@ class FunctionLogSink : public LogSink
 {
   LogFunction m_logFunction;
 public:
-  explicit FunctionLogSink(LogFunction  f)
+  explicit FunctionLogSink(LogFunction f)
     : m_logFunction(std::move(f))
   {}
 

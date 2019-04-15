@@ -242,7 +242,8 @@ struct Image3DFilterForOneBlock
           double sum = 0.0;
           for (size_t s = 0; s < m_kernelDepth; ++s) { // plane by plane
             for (size_t r = 0; r < m_kernelHeight; ++r) {  // row by row
-              const TPixel* imgStart = m_padImg + (j + r) * m_padImgWidth + i + (s + k) * m_padImgWidth * m_padImgHeight;
+              const TPixel* imgStart =
+                m_padImg + (j + r) * m_padImgWidth + i + (s + k) * m_padImgWidth * m_padImgHeight;
               sum = std::inner_product(imgStart, imgStart + m_kernelWidth,
                                        m_kernel + r * m_kernelWidth + s * m_kernelWidth * m_kernelHeight, sum);
             }
@@ -300,7 +301,8 @@ struct Image3DFilterForOneBlock<double, double>
             double sum = 0.0;
             for (size_t s = 0; s < m_kernelDepth; ++s) { // plane by plane
               for (size_t r = 0; r < m_kernelHeight; ++r) {  // row by row
-                const double* imgStart = m_padImg + (j + r) * m_padImgWidth + i + (s + k) * m_padImgWidth * m_padImgHeight;
+                const double* imgStart =
+                  m_padImg + (j + r) * m_padImgWidth + i + (s + k) * m_padImgWidth * m_padImgHeight;
                 sum = std::inner_product(imgStart, imgStart + m_kernelWidth,
                                          m_kernel + r * m_kernelWidth + s * m_kernelWidth * m_kernelHeight, sum);
               }

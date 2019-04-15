@@ -11,6 +11,7 @@
 #define GLM_FORCE_SWIZZLE
 #define GLM_ENABLE_EXPERIMENTAL
 
+#include "zglobal.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/type_precision.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -128,65 +129,60 @@ using Col4Compare = Vec4Compare<unsigned char, glm::highp>;
 
 // serialization support
 
-inline void toVal(const QString& str, bool& v)
+__forceinline void toVal(const QString& str, bool& v)
 {
   v = QString::compare(str, "false", Qt::CaseInsensitive) != 0;
 }
 
-inline void toVal(const QString& str, QString& v)
+__forceinline void toVal(const QString& str, QString& v)
 {
   v = str;
 }
 
-inline void toVal(const QString& str, float& v)
+__forceinline void toVal(const QString& str, float& v)
 {
   v = str.toFloat();
 }
 
-inline void toVal(const QString& str, double& v)
+__forceinline void toVal(const QString& str, double& v)
 {
   v = str.toDouble();
 }
 
-inline void toVal(const QString& str, int& v)
+__forceinline void toVal(const QString& str, int& v)
 {
   v = str.toInt();
 }
 
-inline void toVal(const QString& str, unsigned char& v)
+__forceinline void toVal(const QString& str, unsigned char& v)
 {
   v = str.toUShort();
 }
 
-inline void toVal(const QString& str, size_t& v)
+__forceinline void toVal(const QString& str, size_t& v)
 {
   v = str.toULongLong();
 }
 
 template<typename T>
-inline void toVal(const std::string& str, T& v)
+__forceinline void toVal(const std::string& str, T& v)
 {
   toVal(QString::fromStdString(str), v);
 }
 
 template<typename T>
-inline QString toQString(T v)
+__forceinline QString toQString(T v)
 {
-  static_assert(std::is_integral<T>::value, "Integer required.");
-  return QString::number(v);
+  if constexpr (std::is_floating_point_v<std::remove_reference_t<T>>) {
+    return QString::number(v, 'g', QLocale::FloatingPointShortest);
+  } else if constexpr (std::is_integral_v<std::remove_reference_t<T>>) {
+    return QString::number(v);
+  } else {
+    static_assert(dependent_false<T>::value, "Must be number");
+  }
 }
 
-inline QString toQString(float v)
-{
-  return QString::number(v, 'g', QLocale::FloatingPointShortest);
-}
-
-inline QString toQString(double v)
-{
-  return QString::number(v, 'g', QLocale::FloatingPointShortest);
-}
-
-inline QString toQString(const QString& v)
+__forceinline QString toQString(const QString& v)
 {
   return v;
 }
@@ -194,35 +190,10 @@ inline QString toQString(const QString& v)
 template<size_t L, typename T, glm::qualifier Q>
 inline QString toQString(const glm::vec<L, T, Q>& v)
 {
-  static_assert(std::is_integral<T>::value, "Integer required.");
   QString res = "[" + QString::number(v[0]);
   for (size_t i = 1; i < L; ++i) {
     res += ", ";
-    res += QString::number(v[i]);
-  }
-  res += "]";
-  return res;
-}
-
-template<size_t L, glm::qualifier Q>
-inline QString toQString(const glm::vec<L, float, Q>& v)
-{
-  QString res = "[" + QString::number(v[0], 'g', QLocale::FloatingPointShortest);
-  for (size_t i = 1; i < L; ++i) {
-    res += ", ";
-    res += QString::number(v[i], 'g', QLocale::FloatingPointShortest);
-  }
-  res += "]";
-  return res;
-}
-
-template<size_t L, glm::qualifier Q>
-inline QString toQString(const glm::vec<L, double, Q>& v)
-{
-  QString res = "[" + QString::number(v[0], 'g', QLocale::FloatingPointShortest);
-  for (size_t i = 1; i < L; ++i) {
-    res += ", ";
-    res += QString::number(v[i], 'g', QLocale::FloatingPointShortest);
+    res += toQString(v[i]);
   }
   res += "]";
   return res;
@@ -241,7 +212,6 @@ inline void toVal(const QString& str, glm::vec<L, T, Q>& v)
 template<size_t C, size_t R, typename T, glm::qualifier Q>
 inline QString toQString(const glm::mat<C, R, T, Q>& m)
 {
-  static_assert(std::is_integral<T>::value, "Integer required.");
   QString res = "[";
   for (size_t r = 0; r < R; ++r) {
     if (r > 0)
@@ -249,41 +219,7 @@ inline QString toQString(const glm::mat<C, R, T, Q>& m)
     for (size_t c = 0; c < C; ++c) {
       if (c > 0)
         res += ", ";
-      res += QString::number(m[c][r]);
-    }
-  }
-  res += "]";
-  return res;
-}
-
-template<size_t C, size_t R, glm::qualifier Q>
-inline QString toQString(const glm::mat<C, R, float, Q>& m)
-{
-  QString res = "[";
-  for (size_t r = 0; r < R; ++r) {
-    if (r > 0)
-      res += "; ";
-    for (size_t c = 0; c < C; ++c) {
-      if (c > 0)
-        res += ", ";
-      res += QString::number(m[c][r], 'g', QLocale::FloatingPointShortest);
-    }
-  }
-  res += "]";
-  return res;
-}
-
-template<size_t C, size_t R, glm::qualifier Q>
-inline QString toQString(const glm::mat<C, R, double, Q>& m)
-{
-  QString res = "[";
-  for (size_t r = 0; r < R; ++r) {
-    if (r > 0)
-      res += "; ";
-    for (size_t c = 0; c < C; ++c) {
-      if (c > 0)
-        res += ", ";
-      res += QString::number(m[c][r], 'g', QLocale::FloatingPointShortest);
+      res += toQString(m[c][r]);
     }
   }
   res += "]";
@@ -303,31 +239,10 @@ inline void toVal(const QString& str, glm::mat<C, R, T, Q>& m)
 template<typename T, glm::qualifier Q>
 inline QString toQString(const glm::tquat<T, Q>& v)
 {
-  static_assert(std::is_integral<T>::value, "Integer required.");
-  return "[" + QString::number(v[0]) +
-         ", " + QString::number(v[1]) +
-         ", " + QString::number(v[2]) +
-         ", " + QString::number(v[3]) +
-         "]";
-}
-
-template<glm::qualifier Q>
-inline QString toQString(const glm::tquat<float, Q>& v)
-{
-  return "[" + QString::number(v[0], 'g', QLocale::FloatingPointShortest) +
-         ", " + QString::number(v[1], 'g', QLocale::FloatingPointShortest) +
-         ", " + QString::number(v[2], 'g', QLocale::FloatingPointShortest) +
-         ", " + QString::number(v[3], 'g', QLocale::FloatingPointShortest) +
-         "]";
-}
-
-template<glm::qualifier Q>
-inline QString toQString(const glm::tquat<double, Q>& v)
-{
-  return "[" + QString::number(v[0], 'g', QLocale::FloatingPointShortest) +
-         ", " + QString::number(v[1], 'g', QLocale::FloatingPointShortest) +
-         ", " + QString::number(v[2], 'g', QLocale::FloatingPointShortest) +
-         ", " + QString::number(v[3], 'g', QLocale::FloatingPointShortest) +
+  return "[" + toQString(v[0]) +
+         ", " + toQString(v[1]) +
+         ", " + toQString(v[2]) +
+         ", " + toQString(v[3]) +
          "]";
 }
 

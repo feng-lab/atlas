@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zglobal.h"
 #include "zioutils.h"
 #include "zrandom.h"
 #include "zlog.h"
@@ -7,10 +8,14 @@
 #ifdef _MSC_VER
 #pragma warning(push, 0)
 #endif
+
 #include <Eigen/Dense>
+
 #ifndef Q_MOC_RUN
+
 #include <boost/math/special_functions.hpp>
 #include <boost/math/constants/constants.hpp>
+
 #endif
 #ifdef _MSC_VER
 #pragma warning(pop)
@@ -363,18 +368,17 @@ public:
   }
 
   // similar to matlab mean, get mean of each column
-  template<class T, typename std::enable_if_t<std::is_integral<std::remove_reference_t<T>>::value, int> = 0>
+  template<class T>
   inline static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, 1, Eigen::Dynamic>
   featureMean(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
   {
-    return x.template cast<typename Eigen::NumTraits<T>::NonInteger>().colwise().mean();
-  }
-
-  template<class T, typename std::enable_if_t<std::is_floating_point<std::remove_reference_t<T>>::value, int> = 0>
-  inline static Eigen::Matrix<T, 1, Eigen::Dynamic>
-  featureMean(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
-  {
-    return x.colwise().mean();
+    if constexpr (std::is_integral_v<std::remove_reference_t<T>>) {
+      return x.template cast<typename Eigen::NumTraits<T>::NonInteger>().colwise().mean();
+    } else if constexpr (std::is_floating_point_v<std::remove_reference_t<T>>) {
+      return x.colwise().mean();
+    } else {
+      static_assert(dependent_false<T>::value, "Must be number");
+    }
   }
 
   template<typename T, typename WeightT>
@@ -649,7 +653,7 @@ public:
     std::pair<typename std::set<VectorXt, ZVectorCompare<T>>::iterator, bool> ret;
     for (Eigen::Index r = 0; r < x.rows(); ++r) {
       ret = myset.insert(x.row(r));
-      if (ret.second != false) {
+      if (ret.second) {
         uniqueMat.row(nUniqueData++) = x.row(r);
       }
     }

@@ -85,6 +85,7 @@ public:
 
   // subclass read should depend its own members rather than member of this class
   virtual std::shared_ptr<ZImg> read() const = 0;
+
   virtual ZImgInfo readInfo() const = 0;
 
   size_t ratio;  // realsize / storedsize, 2 means downsampled by 2
@@ -161,7 +162,8 @@ public:
   // throw ZIOException if io error or empty image, might throw ZImgException if can't allocate memory
   void load(const QString& filename, size_t scene = 0, size_t ratio = 1, FileFormat format = FileFormat::Unknown);
 
-  void load(const QString& filename, ZImgRegion region, size_t scene = 0, size_t ratio = 1, FileFormat format = FileFormat::Unknown);
+  void load(const QString& filename, ZImgRegion region, size_t scene = 0, size_t ratio = 1,
+            FileFormat format = FileFormat::Unknown);
 
   // load a sequence of imgs, cat these imgs along dimension "catDim"
   // imgs should have same size in other dimensions and have same type
@@ -1013,13 +1015,7 @@ private:
   template<typename TVoxel, typename TDesVoxel>
   static void scale_Impl(TVoxel minData, TVoxel maxData, const ZImg* src, ZImg* des);
 
-  template<typename TVoxel, typename TDesVoxel,
-    typename std::enable_if_t<sizeof(TVoxel) <= 2, int> = 0>
-  static void buildScaleColormap(TVoxel minData, TVoxel maxData, TDesVoxel desDataRangeMin, TDesVoxel desDataRangeMax,
-                                 std::vector<TDesVoxel>& res);
-
-  template<typename TVoxel, typename TDesVoxel,
-    typename std::enable_if_t<sizeof(TVoxel) >= 4, int> = 0>
+  template<typename TVoxel, typename TDesVoxel>
   static void buildScaleColormap(TVoxel minData, TVoxel maxData, TDesVoxel desDataRangeMin, TDesVoxel desDataRangeMax,
                                  std::vector<TDesVoxel>& res);
 
@@ -1066,24 +1062,14 @@ private:
   template<typename TVoxel, typename TVoxelRhs>
   void secureDivImg_Impl(const ZImg& rhs);
 
-  template<typename TVoxel,
-    typename std::enable_if_t<std::is_integral<std::remove_reference_t<TVoxel>>::value, int> = 0>
-  void histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData) const;
-
-  template<typename TVoxel,
-    typename std::enable_if_t<std::is_floating_point<std::remove_reference_t<TVoxel>>::value, int> = 0>
+  template<typename TVoxel>
   void histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData) const;
 
   template<typename TVoxel>
   inline void histogram_Impl(std::vector<size_t>& res) const
   { histogram_Impl(res, dataRangeMin<TVoxel>(), dataRangeMax<TVoxel>()); }
 
-  template<typename TVoxel, typename TMaskVoxel,
-    typename std::enable_if_t<std::is_integral<std::remove_reference_t<TVoxel>>::value, int> = 0>
-  void histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData, const ZImg& mask) const;
-
-  template<typename TVoxel, typename TMaskVoxel,
-    typename std::enable_if_t<std::is_floating_point<std::remove_reference_t<TVoxel>>::value, int> = 0>
+  template<typename TVoxel, typename TMaskVoxel>
   void histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData, const ZImg& mask) const;
 
   template<typename TVoxel, typename TMaskVoxel>

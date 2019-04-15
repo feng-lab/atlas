@@ -250,7 +250,8 @@ void ZPunctaDetection::doWork()
     }
   } else {
     std::vector<ZImgRegion> nonexpandRegions;
-    std::vector<ZImgRegion> rgns = ZImgRegion::splitBigImage(m_imgInfo, nonexpandRegions, 1024, 0, m_punctaChannel, m_t);
+    std::vector<ZImgRegion> rgns = ZImgRegion::splitBigImage(m_imgInfo, nonexpandRegions, 1024, 0, m_punctaChannel,
+                                                             m_t);
     for (const auto& rgn : rgns) {
       ZImg cimg(m_filename, rgn, m_scene);
       double blockmin;
@@ -1047,7 +1048,7 @@ void ZPunctaDetection::detectSomaMask(const ZImg& dendriteImg, Eigen::MatrixXi& 
 
   using BinaryImage2DType = itk::Image<bool, 2>;
   using BinaryMorphologicalOpeningImageFilterType
-    = itk::BinaryMorphologicalOpeningImageFilter<BinaryImage2DType, BinaryImage2DType, StructuringElement2DType>;
+  = itk::BinaryMorphologicalOpeningImageFilter<BinaryImage2DType, BinaryImage2DType, StructuringElement2DType>;
   BinaryMorphologicalOpeningImageFilterType::Pointer openFilter
     = BinaryMorphologicalOpeningImageFilterType::New();
   openFilter->SetKernel(structuringElement);
@@ -1069,7 +1070,7 @@ void ZPunctaDetection::detectSomaMask(const ZImg& dendriteImg, Eigen::MatrixXi& 
   StructuringElementType dlStructuringElement = StructuringElementType::Box(dlElementRadius);
 
   using BinaryDilateImageFilterType
-    = itk::BinaryDilateImageFilter<BinaryImage3DType, BinaryImage3DType, StructuringElementType>;
+  = itk::BinaryDilateImageFilter<BinaryImage3DType, BinaryImage3DType, StructuringElementType>;
   BinaryDilateImageFilterType::Pointer dilateFilter
     = BinaryDilateImageFilterType::New();
   dilateFilter->SetInput(sliceBySliceImageFilter->GetOutput());

@@ -35,7 +35,7 @@ void ZChromaticShiftCorrection::doWork()
   }
 
   if (m_targetChannel >= 0 && static_cast<size_t>(m_targetChannel) < srcImg.numChannels() &&
-    (m_method != "Registration" || m_targetChannel != m_referenceChannel)) {
+      (m_method != "Registration" || m_targetChannel != m_referenceChannel)) {
     LOG(INFO) << "Target Channel: " << m_targetChannel + 1 << " (start from 1)";
   } else {
     throw ZImgException(QString("Wrong target channel: %1. Abort").arg(m_targetChannel));
@@ -259,10 +259,12 @@ void ZChromaticShiftCorrection::alignChannel(const ZImg& srcImg, int fixedChanne
 
   for (size_t i = 0; i < srcImg.depth(); ++i) {
     image2DGaussianFilter(fixedImageData.data() + i * srcImg.planeByteNumber(), srcImg.width(), srcImg.height(),
-                          2.5, 2.5, filteredFixedImageData.data() + i * srcImg.planeByteNumber(), 11, 11, PadOption::Constant, 0.0,
+                          2.5, 2.5, filteredFixedImageData.data() + i * srcImg.planeByteNumber(), 11, 11,
+                          PadOption::Constant, 0.0,
                           m_useMultithreading);
     image2DGaussianFilter(movingImageData.data() + i * srcImg.planeByteNumber(), srcImg.width(), srcImg.height(),
-                          2.5, 2.5, filteredMovingImageData.data() + i * srcImg.planeByteNumber(), 11, 11, PadOption::Constant, 0.0,
+                          2.5, 2.5, filteredMovingImageData.data() + i * srcImg.planeByteNumber(), 11, 11,
+                          PadOption::Constant, 0.0,
                           m_useMultithreading);
   }
 

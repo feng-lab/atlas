@@ -9,19 +9,21 @@
 
 namespace nim {
 
-static_assert(sizeof(QUuid) == 16 && std::is_trivially_copyable<QUuid>::value, "wrong uuid type");
+static_assert(sizeof(QUuid) == 16 && std::is_trivially_copyable_v<QUuid>, "wrong uuid type");
 
 #pragma pack(push, 1)
-struct SegmentHeader {
-  char id[16];   // A sequence of up to 15 Ansi – characters 'A'...'Z', e.g. "ZISSUBBLOCK"
-                 // The special name "DELETED" marks a segment as eleted - readers should ignore or skip this
-                 // segment.
+struct SegmentHeader
+{
+  // A sequence of up to 15 Ansi – characters 'A'...'Z', e.g. "ZISSUBBLOCK".
+  // The special name "DELETED" marks a segment as deleted - readers should ignore or skip this segment.
+  char id[16];
   int64_t allocatedSize; // The total numer of bytes allocated for this segment.
   int64_t usedSize; // The currently used number of bytes.
 };
 
 // SID = ZISRAWFILE  512 bytes
-struct FileHeader {
+struct FileHeader
+{
   int32_t major; // "1"
   int32_t minor; // "0"
   int32_t reserved1;
@@ -31,24 +33,27 @@ struct FileHeader {
   int32_t filePart; // Part number in multi-file scenarios
   int64_t directoryPosition; // File position of the SubBlockDirectory Segment
   int64_t metaDataPosition; // File position of the Metadata Segment.
-  uint32_t updatePending; // 0xffff, 0
-                          // This flag indicates a currently inconsistent situation
-                          // (e.g. updating Index, Directory or Metadata segment).
-                          // Readers should either wait until this flag is reset (in case that a
-                          // writer is still accessing the file), or try a recovery
-                          // procedure by scanning all segments.
+  // 0xffff, 0
+  // This flag indicates a currently inconsistent situation
+  // (e.g. updating Index, Directory or Metadata segment).
+  // Readers should either wait until this flag is reset (in case that a
+  // writer is still accessing the file), or try a recovery
+  // procedure by scanning all segments.
+  uint32_t updatePending;
   int64_t attachmentDirectoryPosition; // File position of the AttachmentDirectory Segment.
 };
 
 // SID = ZISRAWMETADATA  256 bytes
-struct MetaDataSegment {
+struct MetaDataSegment
+{
   int32_t xmlSize;  // Size of the XML data.
   int32_t attachmentSize; // Size of the the (binary) attachments. NOT USED CURRENTLY.
   uint8_t spare[248];
 };
 
 // 20 bytes
-struct DimensionEntryDV1 {
+struct DimensionEntryDV1
+{
   char dimension[4]; // Typically 1 Byte ANSI e.g. 'X', see Dimensions / dimensions indices
   int32_t start; // Start position / index. May be < 0.
   int32_t size; // Size in units of pixels (logical size). Must be > 0.
@@ -57,96 +62,115 @@ struct DimensionEntryDV1 {
 };
 
 // 32 bytes + EntryCount * 20
-struct DirectoryEntryDV {
+struct DirectoryEntryDV
+{
   char schemaType[2]; // "DV"
   int32_t pixelType; // The type of the image pixels, see PixelTypes.
   int64_t filePosition; // Seek offset of the referenced SubBlockSegment relative to the first byte of the file
   int32_t filePart; // Reserved.
   int32_t compression; // See Compression Constants
-  uint8_t pyramidType; // [INTERNAL] Contains information for automatic image pyramids using SubBlocks of different resolution,
-                       // current values are: None=0, SingleSubblock=1, MultiSubblock=2.
+  // [INTERNAL] Contains information for automatic image pyramids using SubBlocks of different resolution,
+  // current values are: None=0, SingleSubblock=1, MultiSubblock=2.
+  uint8_t pyramidType;
   uint8_t spare1;
   uint8_t spare2[4];
-  int32_t dimensionCount; // Number of entries. Minimum is 1.
+  // Number of entries. Minimum is 1.
+  int32_t dimensionCount;
   // DimensionEntries of type DimensionEntryDV1[dimensionCount] follows
 };
 
 // SID = ZISRAWSUBBLOCK  at least 256 bytes
-struct SubBlockSegment {
+struct SubBlockSegment
+{
   int32_t metaDataSize; // Size of the metadata section.
   int32_t attachmentSize; // Size of the optional attachment section.
   int64_t dataSize; // Size of the data section.
-  DirectoryEntryDV directoryEntry; // Subset indices and size information, a 1:1 copy will be stored as part of the File's
-                                   // SubBlockDirectory Segment. The length of this information depends on the directory schema.
+  // Subset indices and size information, a 1:1 copy will be stored as part of the File's
+  // SubBlockDirectory Segment. The length of this information depends on the directory schema.
+  DirectoryEntryDV directoryEntry;
 };
 
-struct subBlockDirectorySegment {
+struct subBlockDirectorySegment
+{
   int32_t entryCount; // The number of entries
   uint8_t reserved[124];
-  // List of EntryCount DirectoryEntryDV follows. Each item is a copy of the DirectoryEntry in the referenced SubBlock segment.
+  // List of EntryCount DirectoryEntryDV follows.
+  // Each item is a copy of the DirectoryEntry in the referenced SubBlock segment.
 };
 
 // 128 bytes
-struct AttachmentEntryA1 {
+struct AttachmentEntryA1
+{
   char schemaType[2]; // "A1"
   uint8_t reserved[10];
   int64_t filePosition; // Seek offset relative to the first byte of the file
   int32_t filePart; // Reserved;
   QUuid contentGuid; // Unique Id to be used in strong, fully qualified references
   char contentFileType[8]; // Unique file type Identifier (see table below)
-  char name[80]; // Null terminated (80-1) character UTF8 encoded string defining a name for this item.
-                 // May be used in references instead of GUID.
+  // Null terminated (80-1) character UTF8 encoded string defining a name for this item.
+  // May be used in references instead of GUID.
+  char name[80];
 };
 
 // SID = ZISRAWATTACH
-struct AttachmentSegment {
+struct AttachmentSegment
+{
   int32_t dataSize; // Size of the data section.
   uint8_t spare1[12];
-  AttachmentEntryA1 attachmentEntry; // Core information, an 1:1 copy will be stored as part of the
-                                     // File's AttachmentDirectory Segment.
+  // Core information, an 1:1 copy will be stored as part of the
+  // File's AttachmentDirectory Segment.
+  AttachmentEntryA1 attachmentEntry;
   uint8_t spare2[112];
   // [Data] follows
 };
 
-struct TimeStampSegment {
+struct TimeStampSegment
+{
   int32_t size; // Size of the whole block used for time stamps.
   int32_t numberTimeStamps; // Number of time stamps in the list.
-  // timeStamps of type double[NumberTimeStamps] follows // Time stamps in seconds relative to the start time of the acquisition engine.
+  // timeStamps of type double[NumberTimeStamps] follows
+  // Time stamps in seconds relative to the start time of the acquisition engine.
 };
 
-struct FocusPositions {
+struct FocusPositions
+{
   int32_t size; // Size of the whole block used for focus positions.
   int32_t numberPositions; // Number of positions in the list.
-  // positions of type double[numberPositions] follows // Focus positions in micrometers relative to the Z start position of the acquisition engine.
+  // positions of type double[numberPositions] follows
+  // Focus positions in micrometers relative to the Z start position of the acquisition engine.
 };
 
-struct EventListEntry {
+struct EventListEntry
+{
   int32_t size; // Size of the entry in bytes.
   double time; // Time of the event in seconds relative to the start time of the LSM electronic module controller program.
-  int32_t eventType; // Can be one of the following values:
-                     //  EV_TYPE_MARKER (= 0)
-                     //  - Experimental annotation
-                     //  EV_TYPE_TIMER_CHANGE (= 1)
-                     //  - The time interval has changed
-                     //  EV_TYPE_BLEACH_START ( = 2 )
-                     //  - Start of a bleach operation
-                     //  EV_TYPE_BLEACH_STOP ( = 3 )
-                     //  - End of a bleach operation
-                     //  EV_TYPE_TRIGGER ( = 4 )
-                     //  - A trigger signal was detected on the
-                     //  user port of the electronic module.
+  // Can be one of the following values:
+  //  EV_TYPE_MARKER (= 0)
+  //  - Experimental annotation
+  //  EV_TYPE_TIMER_CHANGE (= 1)
+  //  - The time interval has changed
+  //  EV_TYPE_BLEACH_START ( = 2 )
+  //  - Start of a bleach operation
+  //  EV_TYPE_BLEACH_STOP ( = 3 )
+  //  - End of a bleach operation
+  //  EV_TYPE_TRIGGER ( = 4 )
+  //  - A trigger signal was detected on the
+  //  user port of the electronic module.
+  int32_t eventType;
   int32_t descriptionSize; // Size of the description character array.
   // Null terminated descriptionSize character UTF8 encoded string defining a description for this event.
 };
 
-struct EventListSegment {
+struct EventListSegment
+{
   int32_t size;
   int32_t numberEvents;
   // events of type EventListEntry[numberEvents] follows
 };
 
 // SID = ZISRAWATTDIR
-struct AttachmentDirectorySegment {
+struct AttachmentDirectorySegment
+{
   int32_t entryCount;
   uint8_t reserved[252];
   // AttachmentEntryA1[entryCount] follows
@@ -200,6 +224,7 @@ public:
                   size_t numChannels = 0, size_t bytePerVoxel = 0, VoxelFormat vf = VoxelFormat::Unsigned);
 
   std::shared_ptr<ZImg> read() const override;
+
   ZImgInfo readInfo() const override;
 
 protected:

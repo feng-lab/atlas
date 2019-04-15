@@ -12,9 +12,11 @@
 #include "zwindowsheader.h"
 #include <intrin.h>
 #elif defined(__APPLE__)
+
 #include <sys/param.h>
 #include <sys/sysctl.h>
 #include <cpuid.h>
+
 #else
 #include <sys/sysinfo.h>
 #include <cpuid.h>

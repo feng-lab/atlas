@@ -10,11 +10,11 @@ template<typename TVoxelOut>
 ZImg ZImgSignedDistanceMap<ReportProgress>::run(const ZImg& img, bool useVoxelSize)
 {
   if (useVoxelSize || !m_useSquaredDistance) {
-    if (!std::is_floating_point<TVoxelOut>::value) {
+    if (!std::is_floating_point_v<TVoxelOut>) {
       throw ZImgException("need float output for distance map");
     }
   } else {
-    if (!std::is_signed<TVoxelOut>::value && !std::is_floating_point<TVoxelOut>::value) {
+    if (!std::is_signed_v<TVoxelOut> && !std::is_floating_point_v<TVoxelOut>) {
       throw ZImgException("need signed or float output for distance map");
     }
   }

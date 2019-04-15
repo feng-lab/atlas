@@ -13,7 +13,7 @@ namespace nim {
 
 class ZStitchImage : public ZImgProcess
 {
-  Q_OBJECT
+Q_OBJECT
 public:
   ZStitchImage();
 
@@ -120,6 +120,7 @@ public:
   }
 
 signals:
+
   void resultReady(QString path);
 
 protected:

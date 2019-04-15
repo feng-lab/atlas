@@ -20,6 +20,7 @@ public:
                    ImgMergeMode downsampleCombineMode = ImgMergeMode::Mean);
 
   std::shared_ptr<ZImg> read() const override;
+
   ZImgInfo readInfo() const override;
 
 private:

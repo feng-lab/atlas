@@ -40,8 +40,8 @@ void readH5DataToImg(nim::ZImg& img, const H5::DataSet& data, size_t x_, size_t 
   if (dims[1] < img.width() + x_ || dims[0] < img.height() + y_)
     throw nim::ZIOException("wrong slice data dimension");
 
-  hsize_t offset[2] = { y_, x_ };
-  hsize_t count[2] = { img.height(), img.width() };
+  hsize_t offset[2] = {y_, x_};
+  hsize_t count[2] = {img.height(), img.width()};
   //Define the memory space to read a chunk.
   H5::DataSpace mspace(2, count);
   filespace.selectHyperslab(H5S_SELECT_SET, count, offset);
@@ -302,8 +302,8 @@ void mergeImgToH5DataSetMax(H5::DataSet& imgData, const nim::ZVoxelCoordinate im
   if (dims[1] < img.width() + imgCoord.x || dims[0] < img.height() + imgCoord.y)
     throw nim::ZIOException("wrong slice data dimension");
 
-  hsize_t offset[2] = { hsize_t(imgCoord.y), hsize_t(imgCoord.x) };
-  hsize_t count[2] = { img.height(), img.width() };
+  hsize_t offset[2] = {hsize_t(imgCoord.y), hsize_t(imgCoord.x)};
+  hsize_t count[2] = {img.height(), img.width()};
   //Define the memory space to read a chunk.
   H5::DataSpace mspace(2, count);
   filespace.selectHyperslab(H5S_SELECT_SET, count, offset);
@@ -491,8 +491,8 @@ QStringList ZImgHDF5::extensions() const
 }
 
 void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
-                          std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                          std::vector<std::set<size_t>>* pyramidalRatios)
+                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                        std::vector<std::set<size_t>>* pyramidalRatios)
 {
   try {
     H5::Exception::dontPrint();
@@ -559,7 +559,7 @@ void ZImgHDF5::readMetadata(const QString& /*filename*/, ZImgMetadata& /*meta*/,
 }
 
 void ZImgHDF5::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thumbnail*/,
-                               const ZImgRegion& /*region*/, size_t scene)
+                             const ZImgRegion& /*region*/, size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");

@@ -33,7 +33,7 @@ public:
 
   template<class OtherValue>
   voxel_iter(voxel_iter<OtherValue> const& other, typename std::enable_if<
-    std::is_convertible<OtherValue*, TVoxelRegion*>::value, enabler
+    std::is_convertible_v<OtherValue*, TVoxelRegion*>, enabler
   >::type = enabler()
   )
     : m_region(other.m_region), m_boxIdx(other.m_boxIdx), m_voxel(other.m_voxel)

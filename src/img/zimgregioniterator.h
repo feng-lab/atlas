@@ -52,7 +52,7 @@ public:
 
   template<typename OtherTImg, typename OtherTVoxel>
   img_region_iter(img_region_iter<OtherTImg, OtherTVoxel> const& other, typename std::enable_if<
-    std::is_convertible<OtherTImg*, TImg*>::value && std::is_convertible<OtherTVoxel*, TVoxel*>::value, enabler
+    std::is_convertible_v<OtherTImg*, TImg*> && std::is_convertible_v<OtherTVoxel*, TVoxel*>, enabler
   >::type = enabler()
   )
     : m_img(other.m_img), m_region(other.m_region), m_regionInfo(other.m_regionInfo), m_endIdx(other.m_endIdx), m_idx(

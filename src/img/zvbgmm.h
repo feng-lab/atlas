@@ -116,7 +116,7 @@ public:
     : m_nclasses(nclasses), m_nattemps(nattempts), m_m0(m), m_alpha0(alpha0), m_termCriteria(termCriteria)
     , m_logLevel(logLevel), m_hasWeight(false), m_hasInitData(false)
   {
-    if (std::is_same<T, ResultDataType>::value) {
+    if constexpr (std::is_same_v<T, ResultDataType>) {
       // reinterpret_cast allowed (AliasedType is (possibly cv-qualified) DynamicType)
       m_pData = reinterpret_cast<const MatrixXrt*>(&data);
     } else {
@@ -133,8 +133,8 @@ public:
          const MatrixXrt& m = MatrixXrt(0, 0), ResultDataType alpha0 = 0.001,
          ZTermCriteria<ResultDataType> termCriteria = ZTermCriteria<ResultDataType>(200, 1e-5),
          IterAlgorithmLogLevel logLevel = IterAlgorithmLogLevel::Off)
-    : m_nclasses(nclasses), m_nattemps(nattempts), m_m0(m), m_alpha0(alpha0), m_termCriteria(termCriteria),
-    m_logLevel(logLevel), m_hasWeight(true), m_hasInitData(false)
+    : m_nclasses(nclasses), m_nattemps(nattempts), m_m0(m), m_alpha0(alpha0), m_termCriteria(termCriteria), m_logLevel(
+    logLevel), m_hasWeight(true), m_hasInitData(false)
   {
     bool hasZeroWeight = false;
     for (Eigen::Index i = 0; i < data.rows(); ++i) {
@@ -158,13 +158,13 @@ public:
       m_pData = &m_NonIntegerData;
       m_pWeight = &m_NonIntegerWeight;
     } else {
-      if (std::is_same<T, ResultDataType>::value) {
+      if constexpr (std::is_same_v<T, ResultDataType>) {
         m_pData = reinterpret_cast<const MatrixXrt*>(&data);
       } else {
         m_NonIntegerData = data.template cast<ResultDataType>();
         m_pData = &m_NonIntegerData;
       }
-      if (std::is_same<WeightT, ResultDataType>::value) {
+      if constexpr (std::is_same_v<WeightT, ResultDataType>) {
         m_pWeight = reinterpret_cast<const VectorXrt*>(&weight);
       } else {
         m_NonIntegerWeight = weight.template cast<ResultDataType>();

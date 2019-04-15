@@ -30,10 +30,10 @@ __forceinline Dest bit_cast(const Source& source)
 {
   static_assert(sizeof(Dest) == sizeof(Source),
                 "bit_cast requires source and destination to be the same size");
-  static_assert(std::is_trivially_copyable<Dest>::value,
-                "non-trivially-copyable bit_cast is undefined");
-  static_assert(std::is_trivially_copyable<Source>::value,
-                "non-trivially-copyable bit_cast is undefined");
+  static_assert(std::is_trivially_copyable_v<Dest>,
+                "bit_cast requires the destination type to be copyable");
+  static_assert(std::is_trivially_copyable_v<Source>,
+                "bit_cast requires the source type to be copyable");
   Dest dest;
   std::memcpy(&dest, &source, sizeof(dest));
   return dest;
@@ -63,31 +63,36 @@ inline void clearAndDeallocate(Container& c)
   Container().swap(c);
 }
 
-// effective stl, item 24, Scott Meyers
-template<typename MapType, // type of map
-  typename KeyArgType,
-  typename ValueArgtype>
-__forceinline typename MapType::iterator efficientAddOrUpdate(MapType& m, const KeyArgType& k, const ValueArgtype& v)
-{
-  typename MapType::iterator lb = m.lower_bound(k); // find where k is or should be
-  if (lb != m.end() && !(m.key_comp()(k, lb->first))) { // if Ib points to a pair whose key is equiv to k...
-    lb->second = v; // update the pair's value
-    return lb; // and return an iterator to that pair
-  }
-  return m.emplace_hint(lb, k, v); // add pair(k, v) to m and return an iterator to the new map element
-}
-
 // literal
-constexpr size_t operator "" _usize(unsigned long long int n) noexcept { return static_cast<size_t>(n); }
-constexpr ptrdiff_t operator "" _isize(unsigned long long int n) noexcept { return static_cast<ptrdiff_t>(n); }
-constexpr uint8_t operator "" _u8(unsigned long long int n) noexcept { return static_cast<uint8_t>(n); }
-constexpr int8_t operator "" _i8(unsigned long long int n) noexcept { return static_cast<int8_t>(n); }
-constexpr uint16_t operator "" _u16(unsigned long long int n) noexcept { return static_cast<uint16_t>(n); }
-constexpr int16_t operator "" _i16(unsigned long long int n) noexcept { return static_cast<int16_t>(n); }
-constexpr uint32_t operator "" _u32(unsigned long long int n) noexcept { return static_cast<uint32_t>(n); }
-constexpr int32_t operator "" _i32(unsigned long long int n) noexcept { return static_cast<int32_t>(n); }
-constexpr uint64_t operator "" _u64(unsigned long long int n) noexcept { return static_cast<uint64_t>(n); }
-constexpr int64_t operator "" _i64(unsigned long long int n) noexcept { return static_cast<int64_t>(n); }
+constexpr size_t operator "" _usize(unsigned long long int n) noexcept
+{ return static_cast<size_t>(n); }
+
+constexpr ptrdiff_t operator "" _isize(unsigned long long int n) noexcept
+{ return static_cast<ptrdiff_t>(n); }
+
+constexpr uint8_t operator "" _u8(unsigned long long int n) noexcept
+{ return static_cast<uint8_t>(n); }
+
+constexpr int8_t operator "" _i8(unsigned long long int n) noexcept
+{ return static_cast<int8_t>(n); }
+
+constexpr uint16_t operator "" _u16(unsigned long long int n) noexcept
+{ return static_cast<uint16_t>(n); }
+
+constexpr int16_t operator "" _i16(unsigned long long int n) noexcept
+{ return static_cast<int16_t>(n); }
+
+constexpr uint32_t operator "" _u32(unsigned long long int n) noexcept
+{ return static_cast<uint32_t>(n); }
+
+constexpr int32_t operator "" _i32(unsigned long long int n) noexcept
+{ return static_cast<int32_t>(n); }
+
+constexpr uint64_t operator "" _u64(unsigned long long int n) noexcept
+{ return static_cast<uint64_t>(n); }
+
+constexpr int64_t operator "" _i64(unsigned long long int n) noexcept
+{ return static_cast<int64_t>(n); }
 
 //http://stackoverflow.com/questions/8542591/c11-reverse-range-based-for-loop
 template<typename T>
@@ -97,13 +102,16 @@ struct reversion_wrapper
 };
 
 template<typename T>
-inline auto begin(reversion_wrapper<T> w) { return std::rbegin(w.iterable); }
+inline auto begin(reversion_wrapper<T> w)
+{ return std::rbegin(w.iterable); }
 
 template<typename T>
-inline auto end(reversion_wrapper<T> w) { return std::rend(w.iterable); }
+inline auto end(reversion_wrapper<T> w)
+{ return std::rend(w.iterable); }
 
 template<typename T>
-inline reversion_wrapper<T> make_reverse(T&& iterable) { return {iterable}; }
+inline reversion_wrapper<T> make_reverse(T&& iterable)
+{ return {iterable}; }
 
 template<class RAIter, class Compare>
 std::vector<size_t> argSort(RAIter first, RAIter last, Compare comp)
@@ -131,5 +139,10 @@ std::vector<size_t> argSort(RAIter first, RAIter last)
 
   return idx;
 }
+
+template<class T>
+struct dependent_false : std::false_type
+{
+};
 
 } // namespace nim

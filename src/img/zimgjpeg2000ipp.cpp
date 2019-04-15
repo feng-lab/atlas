@@ -27,16 +27,16 @@ bool IsJP2(BaseStreamInput& in)
   unsigned char buf[4];
   UIC::BaseStream::TSize cnt;
 
-  if(UIC::BaseStream::StatusOk != in.Seek(4, UIC::BaseStreamInput::Beginning))
+  if (UIC::BaseStream::StatusOk != in.Seek(4, UIC::BaseStreamInput::Beginning))
     throw ZIOException("unsupported Image format");
 
-  if(UIC::BaseStream::StatusOk != in.Read(buf, 4*sizeof(char),cnt))
+  if (UIC::BaseStream::StatusOk != in.Read(buf, 4 * sizeof(char), cnt))
     throw ZIOException("unsupported Image format");
 
-  if(UIC::BaseStream::StatusOk != in.Seek(0, UIC::BaseStreamInput::Beginning))
+  if (UIC::BaseStream::StatusOk != in.Seek(0, UIC::BaseStreamInput::Beginning))
     throw ZIOException("unsupported Image format");
 
-  if(buf[0] == 0x6a && buf[1] == 0x50 && buf[2] == 0x20 && buf[3] == 0x20)
+  if (buf[0] == 0x6a && buf[1] == 0x50 && buf[2] == 0x20 && buf[3] == 0x20)
     return true;
 
   return false;
@@ -49,15 +49,17 @@ inline void checkIPPError(IppStatus status)
   }
 }
 
-class LogDiagn: public BaseStreamDiagn {
-  void Write(const BaseDiagnDescriptor &descr)
+class LogDiagn : public BaseStreamDiagn
+{
+  void Write(const BaseDiagnDescriptor& descr)
   {
-    const BaseDiagnDescriptor *pD = &descr;
+    const BaseDiagnDescriptor* pD = &descr;
     LWARN() << pD->GetMessage() << "\n";
   }
 };
 
-BaseImageDecoder* initDecoder(CStdFileInput &in, JP2Decoder &JP2decoder, JPEG2000Decoder &JP2Kdecoder, LogDiagn &diagnOutput)
+BaseImageDecoder*
+initDecoder(CStdFileInput& in, JP2Decoder& JP2decoder, JPEG2000Decoder& JP2Kdecoder, LogDiagn& diagnOutput)
 {
   BaseImageDecoder* decoder = nullptr;
   if (IsJP2(in))
@@ -78,7 +80,7 @@ BaseImageDecoder* initDecoder(CStdFileInput &in, JP2Decoder &JP2decoder, JPEG200
   return decoder;
 }
 
-ZImgInfo infoFromHead(const ImageColorSpec &colorSpec, const ImageSamplingGeometry &geometry)
+ZImgInfo infoFromHead(const ImageColorSpec& colorSpec, const ImageSamplingGeometry& geometry)
 {
   ZImgInfo info;
   info.bytesPerVoxel = std::ceil((colorSpec.DataRange()->BitDepth() + 1) / 8);
@@ -122,7 +124,7 @@ QStringList ZImgJpeg2000::extensions() const
   return res;
 }
 
-void ZImgJpeg2000::readInfo(const QString &filename, ZImgInfo &info)
+void ZImgJpeg2000::readInfo(const QString& filename, ZImgInfo& info)
 {
   CStdFileInput in;
   if (!BaseStream::IsOk(in.Open(qPrintable(filename)))) {
@@ -131,24 +133,24 @@ void ZImgJpeg2000::readInfo(const QString &filename, ZImgInfo &info)
   JP2Decoder JP2decoder;
   JPEG2000Decoder JP2Kdecoder;
   LogDiagn diagnOutput;
-  BaseImageDecoder *decoder = initDecoder(in, JP2decoder, JP2Kdecoder, diagnOutput);
+  BaseImageDecoder* decoder = initDecoder(in, JP2decoder, JP2Kdecoder, diagnOutput);
   ImageColorSpec colorSpec;
   ImageSamplingGeometry geometry;
-  if(ExcStatusOk != decoder->ReadHeader(colorSpec, geometry))
+  if (ExcStatusOk != decoder->ReadHeader(colorSpec, geometry))
     throw ZIOException("can not read head");
   geometry.ReduceByGCD();
   info = infoFromHead(colorSpec, geometry);
 }
 
-void ZImgJpeg2000::readMetadata(const QString &, ZImgMetadata &)
+void ZImgJpeg2000::readMetadata(const QString&, ZImgMetadata&)
 {
 }
 
-void ZImgJpeg2000::readThumbnail(const QString &, ZImgThumbernail &, const ZImgRegion &)
+void ZImgJpeg2000::readThumbnail(const QString&, ZImgThumbernail&, const ZImgRegion&)
 {
 }
 
-void ZImgJpeg2000::readImg(const QString &filename, ZImg &img, const ZImgRegion &region)
+void ZImgJpeg2000::readImg(const QString& filename, ZImg& img, const ZImgRegion& region)
 {
   CStdFileInput in;
   if (!BaseStream::IsOk(in.Open(qPrintable(filename)))) {
@@ -157,16 +159,17 @@ void ZImgJpeg2000::readImg(const QString &filename, ZImg &img, const ZImgRegion 
   JP2Decoder JP2decoder;
   JPEG2000Decoder JP2Kdecoder;
   LogDiagn diagnOutput;
-  BaseImageDecoder *decoder = initDecoder(in, JP2decoder, JP2Kdecoder, diagnOutput);
+  BaseImageDecoder* decoder = initDecoder(in, JP2decoder, JP2Kdecoder, diagnOutput);
   ImageColorSpec colorSpec;
   ImageSamplingGeometry geometry;
-  if(ExcStatusOk != decoder->ReadHeader(colorSpec, geometry))
+  if (ExcStatusOk != decoder->ReadHeader(colorSpec, geometry))
     throw ZIOException("can not read head");
   geometry.ReduceByGCD();
   ZImgInfo info = infoFromHead(colorSpec, geometry);
 
   if (region.isEmpty() || !region.isValid(info)) {
-    throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString()).arg(region.toQString()));
+    throw ZIOException(
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString()).arg(region.toQString()));
   }
 
   Image imagePn;
@@ -180,7 +183,7 @@ void ZImgJpeg2000::readImg(const QString &filename, ZImg &img, const ZImgRegion 
   else //J2K_16 == j2kArithmetic)
     imagePn.Buffer().ReAlloc(T16s, Plane, geometry);
 
-  const ImageDataOrder &dataOrderPn = imagePn.Buffer().BufferFormat().DataOrder();
+  const ImageDataOrder& dataOrderPn = imagePn.Buffer().BufferFormat().DataOrder();
   //LINFO() << colorSpec.DataRange()->BitDepth() << colorSpec.DataRange()->DataType() << colorSpec.DataRange()->Max().v32u << dataOrderPn.ComponentOrder()
   //           << geometry.NOfComponents();
 
@@ -198,10 +201,10 @@ void ZImgJpeg2000::readImg(const QString &filename, ZImg &img, const ZImgRegion 
 
   IppiSize size;
 
-  size.width  = res.width();
+  size.width = res.width();
   size.height = res.height();
 
-  for (size_t c=0; c<res.numChannels(); ++c) {
+  for (size_t c = 0; c < res.numChannels(); ++c) {
     if (res.bytesPerVoxel() <= 1) {
       if (J2K_32 == j2kArithmetic) {
         checkIPPError(ippiConvert_32s8u_C1R(imagePn.Buffer().DataPtr()[c].p32s, dataOrderPn.LineStep()[c],
@@ -212,12 +215,12 @@ void ZImgJpeg2000::readImg(const QString &filename, ZImg &img, const ZImgRegion 
       }
     } else {
       if (J2K_32 == j2kArithmetic) {
-        int32_t *src = imagePn.Buffer().DataPtr()[c].p32s;
-        uint16_t *pDst = res.channelData<uint16_t>(c);
+        int32_t* src = imagePn.Buffer().DataPtr()[c].p32s;
+        uint16_t* pDst = res.channelData<uint16_t>(c);
 
-        for(int i = 0; i < size.height; ++i) {
-          int32_t *pSrc = (int32_t*)((uint8_t*)src + i*dataOrderPn.LineStep()[c]);
-          for(int j = 0; j < size.width; ++j)
+        for (int i = 0; i < size.height; ++i) {
+          int32_t* pSrc = (int32_t*) ((uint8_t*) src + i * dataOrderPn.LineStep()[c]);
+          for (int j = 0; j < size.width; ++j)
             *pDst++ = saturate_cast<uint16_t>(*pSrc++);
         }
       } else { // J2K_16 == j2kArithmetic
@@ -251,7 +254,7 @@ void ZImgJpeg2000::readImg(const QString &filename, ZImg &img, const ZImgRegion 
     img = res.crop(region);
 }
 
-void ZImgJpeg2000::writeImg(const QString &filename, const ZImg &img, Compression)
+void ZImgJpeg2000::writeImg(const QString& filename, const ZImg& img, Compression)
 {
   if (!img.is2DImg() || (img.numChannels() != 1 && img.numChannels() != 3) || img.bytesPerVoxel() > 2) {
     throw ZIOException("only support 8 and 16 bit grayscale or RGB 2d image");
@@ -263,7 +266,7 @@ void ZImgJpeg2000::writeImg(const QString &filename, const ZImg &img, Compressio
 
   IppiSize roi;
   roi.height = img.height();
-  roi.width  = img.width();
+  roi.width = img.width();
 
   JP2Encoder jp2enc;
   if (ExcStatusOk != jp2enc.Init())
@@ -298,7 +301,7 @@ void ZImgJpeg2000::writeImg(const QString &filename, const ZImg &img, Compressio
 
   for (size_t i = 0; i < img.numChannels(); ++i) {
     dataOrder.PixelStep()[i] = NOfBytes(dataOrder.DataType());
-    dataOrder.LineStep() [i] = geometry.RefGridRect().Width() * du;
+    dataOrder.LineStep()[i] = geometry.RefGridRect().Width() * du;
   }
 
   Image imagePn;
@@ -309,7 +312,7 @@ void ZImgJpeg2000::writeImg(const QString &filename, const ZImg &img, Compressio
   imagePn.ColorSpec().SetComponentToColorMap(Direct);
 
   for (size_t i = 0; i < img.numChannels(); ++i) {
-    if(img.bytesPerVoxel() <= 1) {
+    if (img.bytesPerVoxel() <= 1) {
       imagePn.ColorSpec().DataRange()[i].SetAsRange8u(255);
     } else {
       imagePn.ColorSpec().DataRange()[i].SetAsRange16u(65535);
@@ -318,7 +321,7 @@ void ZImgJpeg2000::writeImg(const QString &filename, const ZImg &img, Compressio
 
   imagePn.ColorSpec().SetEnumColorSpace((img.numChannels() == 1) ? Grayscale : RGB);
 
-  for (size_t c=0; c<img.numChannels(); ++c) {
+  for (size_t c = 0; c < img.numChannels(); ++c) {
     if (img.bytesPerVoxel() <= 1) {
       checkIPPError(ippiConvert_8u32s_C1R(img.channelData<uint8_t>(c), img.rowByteNumber(),
                                           imagePn.Buffer().DataPtr()[c].p32s, dataOrder.LineStep()[c], roi));
@@ -334,7 +337,7 @@ void ZImgJpeg2000::writeImg(const QString &filename, const ZImg &img, Compressio
   if (ExcStatusOk != jp2enc.AttachImage(imagePn))
     throw ZIOException("can not attach image");
 
-  if (ExcStatusOk != jp2enc.SetParams(5, false, true ,false, 0, 0, img.byteNumber()))
+  if (ExcStatusOk != jp2enc.SetParams(5, false, true, false, 0, 0, img.byteNumber()))
     throw ZIOException("can not set parameters");
 
   if (ExcStatusOk != jp2enc.WriteHeader())

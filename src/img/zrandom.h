@@ -32,7 +32,7 @@ public:
   template<typename IntType>
   inline std::vector<IntType> randPermutation(IntType maxValue, IntType minValue = 0)
   {
-    static_assert(std::is_integral<IntType>::value, "randPermutation requires integer type");
+    static_assert(std::is_integral_v<IntType>, "randPermutation requires integer type");
     std::vector<IntType> res;
     if (maxValue >= minValue) {
       res.resize(maxValue - minValue + 1);

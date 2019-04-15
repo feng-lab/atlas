@@ -162,9 +162,9 @@ public:
         return 1000;
       }
       return dist *
-        (1.0 / (1.0 + std::exp((v1 - m_thre) / m_scale))
-         + 1.0 / (1.0 + std::exp((v2 - m_thre) / m_scale))
-         + 0.00001);
+             (1.0 / (1.0 + std::exp((v1 - m_thre) / m_scale))
+              + 1.0 / (1.0 + std::exp((v2 - m_thre) / m_scale))
+              + 0.00001);
     }
 
   private:

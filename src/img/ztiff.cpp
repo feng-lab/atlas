@@ -42,8 +42,8 @@ namespace {
  *  be printed out in full, rather than just an indicator
  *  of whether they are present or not.
  */
-#define	TIFFPRINT_GEOKEYDIRECTORY	0x80000000
-#define	TIFFPRINT_GEOKEYPARAMS		0x40000000
+#define  TIFFPRINT_GEOKEYDIRECTORY  0x80000000
+#define  TIFFPRINT_GEOKEYPARAMS    0x40000000
 
 const struct tiftagname
 {

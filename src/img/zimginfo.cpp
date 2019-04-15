@@ -218,13 +218,13 @@ double ZImgInfo::voxelSizeZInUnit(VoxelSizeUnit unit) const
 template<typename TVoxel>
 void ZImgInfo::setVoxelFormat(size_t validBitCountIn)
 {
-  static_assert(std::is_arithmetic<TVoxel>::value &&
+  static_assert(std::is_arithmetic_v<TVoxel> &&
                 (sizeof(TVoxel) == 1 || sizeof(TVoxel) == 2 || sizeof(TVoxel) == 4 || sizeof(TVoxel) == 8),
                 "need arithmetic type");
   validBitCount = validBitCountIn;
   bytesPerVoxel = sizeof(TVoxel);
-  if (std::is_integral<TVoxel>::value) {
-    voxelFormat = std::is_signed<TVoxel>::value ? VoxelFormat::Signed : VoxelFormat::Unsigned;
+  if (std::is_integral_v<TVoxel>) {
+    voxelFormat = std::is_signed_v<TVoxel> ? VoxelFormat::Signed : VoxelFormat::Unsigned;
   } else {
     voxelFormat = VoxelFormat::Float;
   }
@@ -406,15 +406,15 @@ bool ZImgInfo::isType() const
   if (voxelByteNumber() == sizeof(TVoxel)) {
     switch (voxelFormat) {
       case VoxelFormat::Unsigned:
-        if (std::is_integral<TVoxel>::value && std::is_unsigned<TVoxel>::value)
+        if (std::is_integral_v<TVoxel> && std::is_unsigned_v<TVoxel>)
           return true;
         break;
       case VoxelFormat::Signed:
-        if (std::is_integral<TVoxel>::value && std::is_signed<TVoxel>::value)
+        if (std::is_integral_v<TVoxel> && std::is_signed_v<TVoxel>)
           return true;
         break;
       case VoxelFormat::Float:
-        if (std::is_floating_point<TVoxel>::value)
+        if (std::is_floating_point_v<TVoxel>)
           return true;
         break;
       default:
