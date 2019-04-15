@@ -260,7 +260,7 @@ void ZRegionAnnotationDoc::importLabelImage()
     }
     catch (const ZException& e) {
       QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-                            "Can not import label image.\n" + e.what());
+                            QString("Can not import label image:\n%1").arg(e.what()));
     }
   }
 }
@@ -280,7 +280,7 @@ void ZRegionAnnotationDoc::exportLabelImage()
   if (m_idToRegionAnnotationPacks.size() > 1) {
     QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                           tr("Two many RegionAnnotations, don't know which one to export. "
-                               "Right now this function only works when there is only one regionannotation object"));
+                             "Right now this function only works when there is only one regionannotation object"));
     return;
   }
   int id = m_idToRegionAnnotationPacks.begin()->first;
@@ -320,7 +320,7 @@ void ZRegionAnnotationDoc::exportLabelImage()
     }
     catch (const ZException& e) {
       QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-                            "Can not export label image.\n" + e.what());
+                            QString("Can not export label image:\n%1").arg(e.what()));
     }
   }
 }
@@ -402,7 +402,8 @@ const QString& ZRegionAnnotationDoc::RegionAnnotationPack::info() const
 
 void ZRegionAnnotationDoc::createActions()
 {
-  m_loadRegionAnnotationAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load RegionAnnotation..."), this);
+  m_loadRegionAnnotationAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon),
+                                             tr("&Load RegionAnnotation..."), this);
   m_loadRegionAnnotationAction->setStatusTip(tr("Load one or more existing regionAnnotation files"));
   connect(m_loadRegionAnnotationAction, &QAction::triggered, this, &ZRegionAnnotationDoc::loadRegionAnnotation);
 

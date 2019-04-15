@@ -121,7 +121,8 @@ void ZAnalysisWorklistDialog::onGenerate()
     catch (const ZException& e) {
       progress.setValue(list.size());
       LOG(ERROR) << "Error while generating analysis files: " << e.what();
-      QMessageBox::critical(this, qApp->applicationName(), "Error while generating analysis files.\n" + e.what());
+      QMessageBox::critical(this, qApp->applicationName(),
+                            QString("Error while generating analysis files:\n%1").arg(e.what()));
     }
   } else {
     QMessageBox::information(this, qApp->applicationName(), "Empty list.\nNo work to do.");

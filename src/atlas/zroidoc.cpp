@@ -51,7 +51,7 @@ void ZROIDoc::askToSave(const ZROI& roi, const QString& title)
     }
     catch (const ZException& e) {
       QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-                            "Save ROI Error.\n" + e.what());
+                            QString("Save ROI Error:\n%1").arg(e.what()));
     }
   }
 }
@@ -91,7 +91,8 @@ bool ZROIDoc::saveAs(size_t id)
       return true;
     }
     QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-                          tr("Error saving %1 as file %2: %3").arg(objName(id)).arg(dialog.selectedFiles().at(0)).arg(err));
+                          tr("Error saving %1 as file %2: %3").arg(objName(id)).arg(dialog.selectedFiles().at(0)).arg(
+                            err));
   }
   return false;
 }

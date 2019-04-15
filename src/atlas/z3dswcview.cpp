@@ -38,7 +38,8 @@ void Z3DSwcView::docSwcsAdded(const QList<size_t>& objs)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render swc: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(), "Failed to render swc.\n" + e.what());
+    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(),
+                          QString("Failed to render swc:\n%1").arg(e.what()));
   }
 }
 
@@ -65,7 +66,8 @@ void Z3DSwcView::docSwcAdded(size_t id)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render swc: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(), "Failed to render swc.\n" + e.what());
+    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(),
+                          QString("Failed to render swc:\n%1").arg(e.what()));
   }
 }
 

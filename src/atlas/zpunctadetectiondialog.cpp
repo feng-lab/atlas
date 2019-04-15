@@ -108,7 +108,7 @@ void ZPunctaDetectionDialog::inputImageChanged()
     }
     catch (const ZIOException& e) {
       updateInterface(fn, 0, 0, 0, 0);
-      QMessageBox::critical(this, qApp->applicationName(), "Can not read input image.\n" + e.what());
+      QMessageBox::critical(this, qApp->applicationName(), QString("Can not read input image:\n%1").arg(e.what()));
     }
   } else {
     updateInterface(fn, 0, 0, 0, 0);
@@ -133,7 +133,7 @@ void ZPunctaDetectionDialog::detectLSMResolution()
     }
     catch (const ZException& e) {
       QMessageBox::critical(this, qApp->applicationName(),
-                            "Can not detect resolution from lsm file.\n" + e.what());
+                            QString("Can not detect resolution from lsm file:\n%1").arg(e.what()));
     }
   }
 }
@@ -225,7 +225,8 @@ void ZPunctaDetectionDialog::createIOGroupBox()
   m_outputSomaPunctaFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile,
                                                        "Output All Soma Puncta File:",
                                                        tr("Nimp (*.nimp)"),
-                                                       ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Puncta"));
+                                                       ZSystemInfo::instance().lastOpenedObjPathQSettingLocation(
+                                                         "Puncta"));
   alllayout->addWidget(m_outputSomaPunctaFileWidget);
 
   m_outputLogFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Log File:",

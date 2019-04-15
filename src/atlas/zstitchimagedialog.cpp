@@ -834,7 +834,7 @@ void ZStitchImageDialog::selectInputStacks1()
       std::sort(m_inputStack1Filenames.begin(), m_inputStack1Filenames.end(), naturalSortLessThan);
       m_inputStack1FileEdit->setText(QString("%1").arg(m_inputStack1Filenames.join("\n")));
     } catch (const ZException& e) {
-      QMessageBox::critical(this, "Stitching Error", "Can not read image.\n" + e.what());
+      QMessageBox::critical(this, "Stitching Error", QString("Can not read image:\n%1").arg(e.what()));
       return;
     }
   }
@@ -876,7 +876,7 @@ void ZStitchImageDialog::selectInputStacks2()
       std::sort(m_inputStack2Filenames.begin(), m_inputStack2Filenames.end(), naturalSortLessThan);
       m_inputStack2FileEdit->setText(QString("%1").arg(m_inputStack2Filenames.join("\n")));
     } catch (const ZException& e) {
-      QMessageBox::critical(this, "Stitching Error", "Can not read image.\n" + e.what());
+      QMessageBox::critical(this, "Stitching Error", QString("Can not read image:\n%1").arg(e.what()));
       return;
     }
   }
@@ -1082,7 +1082,7 @@ void ZStitchImageDialog::getConnFromTileImage()
         QMessageBox::warning(this, "Stitching Error", tr("Failed to parse tile connection image."));
       }
     } catch (const ZException& e) {
-      QMessageBox::warning(this, "Stitching Error", "Read image failed.\n" + e.what());
+      QMessageBox::warning(this, "Stitching Error", QString("Can not read image:\n%1").arg(e.what()));
       m_tileSelectionImageFilename.clear();
     }
   }

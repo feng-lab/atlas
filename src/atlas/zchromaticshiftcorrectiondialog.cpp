@@ -115,7 +115,7 @@ void ZChromaticShiftCorrectionDialog::inputImagesChanged()
     channelNumber = info[0].numChannels;
   }
   catch (const ZIOException& e) {
-    QMessageBox::critical(this, qApp->applicationName(), "Can not parse input image.\n" + e.what());
+    QMessageBox::critical(this, qApp->applicationName(), QString("Can not parse input image:\n%1").arg(e.what()));
     return;
   }
 
@@ -175,7 +175,8 @@ void ZChromaticShiftCorrectionDialog::createIOGroupBox()
                                                   tr("Images (*.nim *.tif *.tiff *.v3draw *.lsm *.jpg *.png)"),
                                                   ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_inputImagesFileWidget);
-  connect(m_inputImagesFileWidget, &ZSelectFileWidget::changed, this, &ZChromaticShiftCorrectionDialog::inputImagesChanged);
+  connect(m_inputImagesFileWidget, &ZSelectFileWidget::changed, this,
+          &ZChromaticShiftCorrectionDialog::inputImagesChanged);
 
   //  hlayout = new QHBoxLayout;
   //  hlayout->addWidget(m_openLoadedStack.createNameLabel());

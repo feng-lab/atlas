@@ -58,7 +58,7 @@ void ZRegionAnnotationWidget::exportLabelImage()
     }
     catch (const ZException& e) {
       QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-                            "Can not export label image.\n" + e.what());
+                            QString("Can not export label image:\n%1").arg(e.what()));
     }
   }
 }

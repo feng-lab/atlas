@@ -44,7 +44,8 @@ void ZMeshDoc::askToSave(const ZMesh& msh, const QString& title)
       setLastOpenedObjPath(dialog.selectedFiles().at(0));
     }
     catch (const ZException& e) {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Mesh Error.\n" + e.what());
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                            QString("Save Mesh Error:\n%1").arg(e.what()));
     }
   }
 }
@@ -61,7 +62,7 @@ bool ZMeshDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
+    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error:\n" + err);
     return false;
   }
   return saveAs(id);

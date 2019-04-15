@@ -4,10 +4,14 @@
 #include "zsysteminfo.h"
 #include "zdoc.h"
 #include "zview.h"
+
 #ifdef ATLAS_WITH_TESTS
+
 #include "../../test/zrunbenchmark.h"
 #include "../../test/zunittest.h"
+
 #endif
+
 #include "zcustomcommand.h"
 #include "zviewsettingwidget.h"
 #include "z3dmainwindow.h"
@@ -241,9 +245,9 @@ void ZMainWindow::about()
 {
   QMessageBox::about(this, QString("About Atlas"),
                      QString("<p>Atlas version %1</p>"
-                               "<p>Atlas is developed by Linqing Feng (flq@live.com).</p>"
-                               "<p>Jinny Kim Lab and Feng Lab, Center for Functional Connectomics, Korea Institute of Science and Technology</p>"
-                               "<p>All rights reserved.</p>").arg(m_versionString));
+                             "<p>Atlas is developed by Linqing Feng (flq@live.com).</p>"
+                             "<p>Jinny Kim Lab and Feng Lab, Center for Functional Connectomics, Korea Institute of Science and Technology</p>"
+                             "<p>All rights reserved.</p>").arg(m_versionString));
 }
 
 #ifdef Q_OS_LINUX
@@ -295,8 +299,8 @@ void ZMainWindow::viewLog()
   QStringList filters;
   filters << "atlas*_log.txt";
   QFileInfoList list = ZSystemInfo::instance().logDir().entryInfoList(filters,
-                                                                  QDir::Files | QDir::NoSymLinks,
-                                                                  QDir::Name);  // sorted by modification time
+                                                                      QDir::Files | QDir::NoSymLinks,
+                                                                      QDir::Name);  // sorted by modification time
   if (!list.isEmpty()) {
     QDesktopServices::openUrl(QUrl::fromLocalFile(list.last().absoluteFilePath()));
   }
@@ -351,13 +355,13 @@ void ZMainWindow::open3DWindow()
     }
     catch (const ZException& e) {
       LOG(ERROR) << "Failed to open 3D window: " << e.what();
-      QMessageBox::critical(this, qApp->applicationName(), "Failed to open 3D window.\n" + e.what());
+      QMessageBox::critical(this, qApp->applicationName(), QString("Failed to open 3D window:\n%1").arg(e.what()));
       delete m_3dWindow.data();
       m_3dWindow.clear();
     }
   } else {
     QMessageBox::critical(this, qApp->applicationName(),
-                          "3D functions are disabled.\n" + ZSystemInfo::instance().errorMessage());
+                          QString("3D functions are disabled:\n%1").arg(ZSystemInfo::instance().errorMessage()));
   }
 }
 
@@ -570,7 +574,8 @@ void ZMainWindow::createActions()
   connect(m_testAction, &QAction::triggered, this, &ZMainWindow::runUnitTest);
 #endif
 
-  m_runCustomCommandAction = new QAction(ZTheme::instance().icon(ZTheme::RunCommandIcon), tr("&Run Custom Command"), this);
+  m_runCustomCommandAction = new QAction(ZTheme::instance().icon(ZTheme::RunCommandIcon), tr("&Run Custom Command"),
+                                         this);
   m_runCustomCommandAction->setStatusTip(tr("Run Custom Command"));
   connect(m_runCustomCommandAction, &QAction::triggered, this, &ZMainWindow::runCustomCommand);
 

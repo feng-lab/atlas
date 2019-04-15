@@ -108,7 +108,7 @@ void ZSectionsRegistrationDialog::inputImagesChanged()
     numFrames = info[0].depth;
   }
   catch (const ZIOException& e) {
-    QMessageBox::critical(this, qApp->applicationName(), "Can not parse input image.\n" + e.what());
+    QMessageBox::critical(this, qApp->applicationName(), QString("Can not parse input image:\n%1").arg(e.what()));
     return;
   }
 
