@@ -125,8 +125,8 @@ ZImg::ZImg()
 {
 }
 
-ZImg::ZImg(const ZImgInfo& info)
-  : m_info(info)
+ZImg::ZImg(ZImgInfo info)
+  : m_info(std::move(info))
   , m_ownData(true)
 {
   allocate();
@@ -456,7 +456,7 @@ void ZImg::reverseEndianness()
 
   if (m_info.bytesPerVoxel == 2) {
     for (size_t t = 0; t < numTimes(); ++t) {
-      uint16_t* data = timeData<uint16_t>(t);
+      auto data = timeData<uint16_t>(t);
       size_t count = timeVoxelNumber();
       for (size_t v = 0; v < count; ++v) {
         boost::endian::endian_reverse_inplace(data[v]);
@@ -464,7 +464,7 @@ void ZImg::reverseEndianness()
     }
   } else if (m_info.bytesPerVoxel == 4) {
     for (size_t t = 0; t < numTimes(); ++t) {
-      uint32_t* data = timeData<uint32_t>(t);
+      auto data = timeData<uint32_t>(t);
       size_t count = timeVoxelNumber();
       for (size_t v = 0; v < count; ++v) {
         boost::endian::endian_reverse_inplace(data[v]);
@@ -472,7 +472,7 @@ void ZImg::reverseEndianness()
     }
   } else if (m_info.bytesPerVoxel == 8) {
     for (size_t t = 0; t < numTimes(); ++t) {
-      uint64_t* data = timeData<uint64_t>(t);
+      auto data = timeData<uint64_t>(t);
       size_t count = timeVoxelNumber();
       for (size_t v = 0; v < count; ++v) {
         boost::endian::endian_reverse_inplace(data[v]);
@@ -782,64 +782,41 @@ ZImg ZImg::extractTime(size_t t) const
 template<typename TVoxel>
 void ZImg::fillRandom_Impl()
 {
-  std::uniform_int_distribution<TVoxel> dist(dataRangeMin<TVoxel>(), dataRangeMax<TVoxel>());
-  auto& eng = ZRandom::instance().engine();
-  for (size_t t = 0; t < numTimes(); ++t) {
-    TVoxel* data = timeData<TVoxel>(t);
-    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      data[v] = dist(eng);
+  if constexpr (std::is_floating_point_v<TVoxel>) {
+    std::uniform_real_distribution<TVoxel> dist(dataRangeMin<TVoxel>(), dataRangeMax<TVoxel>());
+    auto& eng = ZRandom::instance().engine();
+    for (size_t t = 0; t < numTimes(); ++t) {
+      auto data = timeData<TVoxel>(t);
+      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+        data[v] = dist(eng);
+      }
     }
-  }
-}
-
-template<>
-void ZImg::fillRandom_Impl<uint8_t>()
-{
-  std::uniform_int_distribution<uint32_t> dist(dataRangeMin<uint32_t>(), dataRangeMax<uint32_t>());
-  auto& eng = ZRandom::instance().engine();
-  for (size_t t = 0; t < numTimes(); ++t) {
-    uint8_t* data = timeData<uint8_t>(t);
-    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      data[v] = dist(eng);
+  } else if constexpr (std::is_same_v<std::uint8_t, TVoxel>) {
+    std::uniform_int_distribution<uint32_t> dist(dataRangeMin<uint32_t>(), dataRangeMax<uint32_t>());
+    auto& eng = ZRandom::instance().engine();
+    for (size_t t = 0; t < numTimes(); ++t) {
+      auto data = timeData<uint8_t>(t);
+      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+        data[v] = dist(eng);
+      }
     }
-  }
-}
-
-template<>
-void ZImg::fillRandom_Impl<int8_t>()
-{
-  std::uniform_int_distribution<int32_t> dist(dataRangeMin<int32_t>(), dataRangeMax<int32_t>());
-  auto& eng = ZRandom::instance().engine();
-  for (size_t t = 0; t < numTimes(); ++t) {
-    int8_t* data = timeData<int8_t>(t);
-    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      data[v] = dist(eng);
+  } else if constexpr (std::is_same_v<std::int8_t, TVoxel>) {
+    std::uniform_int_distribution<int32_t> dist(dataRangeMin<int32_t>(), dataRangeMax<int32_t>());
+    auto& eng = ZRandom::instance().engine();
+    for (size_t t = 0; t < numTimes(); ++t) {
+      auto data = timeData<int8_t>(t);
+      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+        data[v] = dist(eng);
+      }
     }
-  }
-}
-
-template<>
-void ZImg::fillRandom_Impl<float>()
-{
-  std::uniform_real_distribution<float> dist(dataRangeMin<float>(), dataRangeMax<float>());
-  auto& eng = ZRandom::instance().engine();
-  for (size_t t = 0; t < numTimes(); ++t) {
-    float* data = timeData<float>(t);
-    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      data[v] = dist(eng);
-    }
-  }
-}
-
-template<>
-void ZImg::fillRandom_Impl<double>()
-{
-  std::uniform_real_distribution<double> dist(dataRangeMin<double>(), dataRangeMax<double>());
-  auto& eng = ZRandom::instance().engine();
-  for (size_t t = 0; t < numTimes(); ++t) {
-    double* data = timeData<double>(t);
-    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      data[v] = dist(eng);
+  } else {
+    std::uniform_int_distribution<TVoxel> dist(dataRangeMin<TVoxel>(), dataRangeMax<TVoxel>());
+    auto& eng = ZRandom::instance().engine();
+    for (size_t t = 0; t < numTimes(); ++t) {
+      auto data = timeData<TVoxel>(t);
+      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+        data[v] = dist(eng);
+      }
     }
   }
 }
@@ -968,16 +945,15 @@ ZImg& ZImg::pasteImgMax(const ZImg& img, const ZVoxelCoordinate& start, bool war
 ZImg ZImg::cat(const std::vector<ZImg>& imgsIn, Dimension dim)
 {
   std::vector<const ZImg*> imgs;
-  for (size_t i = 0; i < imgsIn.size(); ++i)
-    imgs.push_back(&imgsIn[i]);
+  for (const auto& img : imgsIn)
+    imgs.push_back(&img);
   return cat(imgs, dim);
 }
 
 ZImg ZImg::cat(const std::vector<ZImg*>& imgsIn, Dimension dim)
 {
   std::vector<const ZImg*> imgs;
-  for (size_t i = 0; i < imgsIn.size(); ++i)
-    imgs.push_back(imgsIn[i]);
+  imgs.insert(imgs.end(), imgsIn.begin(), imgsIn.end());
   return cat(imgs, dim);
 }
 
@@ -985,9 +961,9 @@ ZImg ZImg::cat(const std::vector<const ZImg*>& imgsIn, Dimension dim)
 {
   // remove empty img
   std::vector<const ZImg*> imgs;
-  for (size_t i = 0; i < imgsIn.size(); ++i)
-    if (imgsIn[i] && !imgsIn[i]->isEmpty())
-      imgs.push_back(imgsIn[i]);
+  for (auto img : imgsIn)
+    if (img && !img->isEmpty())
+      imgs.push_back(img);
 
   if (imgs.empty())
     return ZImg();
@@ -1011,8 +987,8 @@ ZImg ZImg::cat(const std::vector<const ZImg*>& imgsIn, Dimension dim)
   if (dim == Dimension::C) {
     resInfo.channelNames.clear();
     resInfo.channelColors.clear();
-    for (size_t idx = 0; idx < imgs.size(); ++idx) {
-      ZImgInfo info = imgs[idx]->info();
+    for (auto img : imgs) {
+      ZImgInfo info = img->info();
       resInfo.channelNames.insert(resInfo.channelNames.end(), info.channelNames.begin(), info.channelNames.end());
       resInfo.channelColors.insert(resInfo.channelColors.end(), info.channelColors.begin(), info.channelColors.end());
     }
@@ -1023,29 +999,27 @@ ZImg ZImg::cat(const std::vector<const ZImg*>& imgsIn, Dimension dim)
 
   if (dim == Dimension::T) {
     size_t tIdx = 0;
-    for (size_t idx = 0; idx < imgs.size(); ++idx) {
-      for (size_t t = 0; t < imgs[idx]->numTimes(); ++t) {
+    for (auto img : imgs) {
+      for (size_t t = 0; t < img->numTimes(); ++t) {
         size_t desT = tIdx++;
-        std::memcpy(res.timeData(desT), imgs[idx]->timeData(t), res.timeByteNumber());
+        std::memcpy(res.timeData(desT), img->timeData(t), res.timeByteNumber());
       }
     }
   } else if (dim == Dimension::C) {
     for (size_t t = 0; t < res.numTimes(); ++t) {
       size_t cIdx = 0;
-      for (size_t idx = 0; idx < imgs.size(); ++idx) {
-        std::memcpy(res.channelData(cIdx, t),
-                    imgs[idx]->timeData(t), imgs[idx]->timeByteNumber());
-        cIdx += imgs[idx]->numChannels();
+      for (auto img : imgs) {
+        std::memcpy(res.channelData(cIdx, t), img->timeData(t), img->timeByteNumber());
+        cIdx += img->numChannels();
       }
     }
   } else if (dim == Dimension::Z) {
     for (size_t t = 0; t < res.numTimes(); ++t) {
       for (size_t c = 0; c < res.numChannels(); ++c) {
         size_t zIdx = 0;
-        for (size_t idx = 0; idx < imgs.size(); ++idx) {
-          std::memcpy(res.planeData(zIdx, c, t),
-                      imgs[idx]->channelData(c, t), imgs[idx]->channelByteNumber());
-          zIdx += imgs[idx]->depth();
+        for (auto img : imgs) {
+          std::memcpy(res.planeData(zIdx, c, t), img->channelData(c, t), img->channelByteNumber());
+          zIdx += img->depth();
         }
       }
     }
@@ -1054,10 +1028,9 @@ ZImg ZImg::cat(const std::vector<const ZImg*>& imgsIn, Dimension dim)
       for (size_t c = 0; c < res.numChannels(); ++c) {
         for (size_t z = 0; z < res.depth(); ++z) {
           size_t yIdx = 0;
-          for (size_t idx = 0; idx < imgs.size(); ++idx) {
-            std::memcpy(res.rowData(yIdx, z, c, t),
-                        imgs[idx]->planeData(z, c, t), imgs[idx]->planeByteNumber());
-            yIdx += imgs[idx]->height();
+          for (auto img : imgs) {
+            std::memcpy(res.rowData(yIdx, z, c, t), img->planeData(z, c, t), img->planeByteNumber());
+            yIdx += img->height();
           }
         }
       }
@@ -1068,10 +1041,9 @@ ZImg ZImg::cat(const std::vector<const ZImg*>& imgsIn, Dimension dim)
         for (size_t z = 0; z < res.depth(); ++z) {
           for (size_t y = 0; y < res.height(); ++y) {
             size_t xIdx = 0;
-            for (size_t idx = 0; idx < imgs.size(); ++idx) {
-              std::memcpy(res.data(xIdx, y, z, c, t),
-                          imgs[idx]->rowData(y, z, c, t), imgs[idx]->rowByteNumber());
-              xIdx += imgs[idx]->width();
+            for (auto img : imgs) {
+              std::memcpy(res.data(xIdx, y, z, c, t), img->rowData(y, z, c, t), img->rowByteNumber());
+              xIdx += img->width();
             }
           }
         }
@@ -1084,44 +1056,34 @@ ZImg ZImg::cat(const std::vector<const ZImg*>& imgsIn, Dimension dim)
 
 ZImg ZImg::cat(const ZImg& img1, const ZImg& img2, Dimension dim)
 {
-  std::vector<const ZImg*> imgs;
-  imgs.push_back(&img1);
-  imgs.push_back(&img2);
+  std::vector<const ZImg*> imgs{&img1, &img2};
   return cat(imgs, dim);
 }
 
 ZImg ZImg::cat(const ZImg& img1, const ZImg& img2, const ZImg& img3, Dimension dim)
 {
-  std::vector<const ZImg*> imgs;
-  imgs.push_back(&img1);
-  imgs.push_back(&img2);
-  imgs.push_back(&img3);
+  std::vector<const ZImg*> imgs{&img1, &img2, &img3};
   return cat(imgs, dim);
 }
 
 ZImg ZImg::cat(const ZImg& img1, const ZImg& img2, const ZImg& img3, const ZImg& img4, Dimension dim)
 {
-  std::vector<const ZImg*> imgs;
-  imgs.push_back(&img1);
-  imgs.push_back(&img2);
-  imgs.push_back(&img3);
-  imgs.push_back(&img4);
+  std::vector<const ZImg*> imgs{&img1, &img2, &img3, &img4};
   return cat(imgs, dim);
 }
 
 ZImg ZImg::combine(const std::vector<ZImg>& imgsIn, ImgMergeMode mode)
 {
   std::vector<const ZImg*> imgs;
-  for (size_t i = 0; i < imgsIn.size(); ++i)
-    imgs.push_back(&imgsIn[i]);
+  for (const auto& img : imgsIn)
+    imgs.push_back(&img);
   return combine(imgs, mode);
 }
 
 ZImg ZImg::combine(const std::vector<ZImg*>& imgsIn, ImgMergeMode mode)
 {
   std::vector<const ZImg*> imgs;
-  for (size_t i = 0; i < imgsIn.size(); ++i)
-    imgs.push_back(imgsIn[i]);
+  imgs.insert(imgs.end(), imgsIn.begin(), imgsIn.end());
   return combine(imgs, mode);
 }
 
@@ -1129,9 +1091,9 @@ ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ImgMergeMode mode)
 {
   // remove empty img
   std::vector<const ZImg*> imgs;
-  for (size_t i = 0; i < imgsIn.size(); ++i)
-    if (imgsIn[i] && !imgsIn[i]->isEmpty())
-      imgs.push_back(imgsIn[i]);
+  for (auto img : imgsIn)
+    if (img && !img->isEmpty())
+      imgs.push_back(img);
 
   if (imgs.empty())
     return ZImg();
@@ -1156,28 +1118,19 @@ ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ImgMergeMode mode)
 
 ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, ImgMergeMode mode)
 {
-  std::vector<const ZImg*> imgs;
-  imgs.push_back(&img1);
-  imgs.push_back(&img2);
+  std::vector<const ZImg*> imgs{&img1, &img2};
   return combine(imgs, mode);
 }
 
 ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, ImgMergeMode mode)
 {
-  std::vector<const ZImg*> imgs;
-  imgs.push_back(&img1);
-  imgs.push_back(&img2);
-  imgs.push_back(&img3);
+  std::vector<const ZImg*> imgs{&img1, &img2, &img3};
   return combine(imgs, mode);
 }
 
 ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, const ZImg& img4, ImgMergeMode mode)
 {
-  std::vector<const ZImg*> imgs;
-  imgs.push_back(&img1);
-  imgs.push_back(&img2);
-  imgs.push_back(&img3);
-  imgs.push_back(&img4);
+  std::vector<const ZImg*> imgs{&img1, &img2, &img3, &img4};
   return combine(imgs, mode);
 }
 
@@ -1304,8 +1257,8 @@ ZImg ZImg::projectAlongDim(Dimension dim, ImgMergeMode mode, int startIn, int en
     }
 
     std::vector<const ZImg*> imgs;
-    for (size_t i = 0; i < subImgs.size(); ++i)
-      imgs.push_back(&subImgs[i]);
+    for (const auto& subImg : subImgs)
+      imgs.push_back(&subImg);
     res = combine(imgs, mode);
   }
   return res;
@@ -1756,15 +1709,15 @@ void ZImg::clearData()
     return;
   }
 
-  for (size_t i = 0; i < m_data.size(); ++i) {
-    boost::alignment::aligned_free(m_data[i]);
+  for (auto d : m_data) {
+    boost::alignment::aligned_free(d);
   }
   m_data.clear();
 }
 
 void ZImg::wrapCoord(ZVoxelCoordinate& coord, PadOption padOption) const
 {
-  wrapCoordToImage(&coord.x, &m_info.width, m_info.numDimensions(), padOption);
+  wrapCoordToImage(&coord.x, &m_info.width, ZImgInfo::numDimensions(), padOption);
 }
 
 void ZImg::checkConnInput(size_t& conn) const
@@ -1835,7 +1788,7 @@ template<typename TVoxel>
 void ZImg::fill_Impl(TVoxel value)
 {
   for (size_t t = 0; t < m_info.numTimes; ++t) {
-    TVoxel* data = timeData<TVoxel>(t);
+    auto data = timeData<TVoxel>(t);
     std::fill(data, data + m_info.timeVoxelNumber(), value);
   }
 }
@@ -1890,8 +1843,8 @@ void ZImg::pasteImg_Impl(const ZImg& img, const ZVoxelCoordinate& start)
              ++desY) {
           size_t srcY = desY - start.y;
 
-          TVoxel* desData = data<TVoxel>(desX, desY, desZ, desC, desT);
-          const TVoxelImg* srcData = img.data<TVoxelImg>(srcX, srcY, srcZ, srcC, srcT);
+          auto* desData = data<TVoxel>(desX, desY, desZ, desC, desT);
+          auto srcData = img.data<TVoxelImg>(srcX, srcY, srcZ, srcC, srcT);
           for (size_t v = 0; v < rowVoxelNumber; ++v) {
             desData[v] = static_cast<TVoxel>(srcData[v]);
           }
@@ -1927,8 +1880,8 @@ void ZImg::pasteImgMax_Impl(const ZImg& img, const ZVoxelCoordinate& start)
              std::min(start.y + static_cast<TCoordinate>(img.height()), static_cast<TCoordinate>(height())); ++desY) {
           size_t srcY = desY - start.y;
 
-          TVoxel* desData = data<TVoxel>(desX, desY, desZ, desC, desT);
-          const TVoxelImg* srcData = img.data<TVoxelImg>(srcX, srcY, srcZ, srcC, srcT);
+          auto desData = data<TVoxel>(desX, desY, desZ, desC, desT);
+          auto srcData = img.data<TVoxelImg>(srcX, srcY, srcZ, srcC, srcT);
           for (size_t v = 0; v < rowVoxelNumber; ++v) {
             desData[v] = std::max(static_cast<TVoxel>(srcData[v]), desData[v]);
           }
@@ -1951,8 +1904,8 @@ ZImg ZImg::combine_Impl(const std::vector<const ZImg*>& imgs, ImgMergeMode mode)
     for (size_t i = 1; i < imgs.size(); ++i) {
       const ZImg* img = imgs[i];
       for (size_t t = 0; t < res.numTimes(); ++t) {
-        TVoxel* resData = res.timeData<TVoxel>(t);
-        const TVoxel* srcData = img->timeData<TVoxel>(t);
+        auto resData = res.timeData<TVoxel>(t);
+        auto srcData = img->timeData<TVoxel>(t);
         for (size_t v = 0; v < res.timeVoxelNumber(); ++v) {
           resData[v] = std::min(resData[v], srcData[v]);
         }
@@ -1966,8 +1919,8 @@ ZImg ZImg::combine_Impl(const std::vector<const ZImg*>& imgs, ImgMergeMode mode)
     for (size_t i = 1; i < imgs.size(); ++i) {
       const ZImg* img = imgs[i];
       for (size_t t = 0; t < res.numTimes(); ++t) {
-        TVoxel* resData = res.timeData<TVoxel>(t);
-        const TVoxel* srcData = img->timeData<TVoxel>(t);
+        auto resData = res.timeData<TVoxel>(t);
+        auto srcData = img->timeData<TVoxel>(t);
         for (size_t v = 0; v < res.timeVoxelNumber(); ++v) {
           resData[v] = std::max(resData[v], srcData[v]);
         }
@@ -1981,10 +1934,10 @@ ZImg ZImg::combine_Impl(const std::vector<const ZImg*>& imgs, ImgMergeMode mode)
     std::vector<TVoxel> buf(imgs.size());
 
     for (size_t t = 0; t < res.numTimes(); ++t) {
-      TVoxel* resData = res.timeData<TVoxel>(t);
+      auto resData = res.timeData<TVoxel>(t);
       for (size_t v = 0; v < res.timeVoxelNumber(); ++v) {
         for (size_t i = 0; i < imgs.size(); ++i) {
-          const TVoxel* srcData = imgs[i]->timeData<TVoxel>(t);
+          auto srcData = imgs[i]->timeData<TVoxel>(t);
           buf[i] = srcData[v];
         }
         resData[v] = static_cast<TVoxel>(mean(buf.begin(), buf.end()));
@@ -1998,10 +1951,10 @@ ZImg ZImg::combine_Impl(const std::vector<const ZImg*>& imgs, ImgMergeMode mode)
     std::vector<TVoxel> buf(imgs.size());
 
     for (size_t t = 0; t < res.numTimes(); ++t) {
-      TVoxel* resData = res.timeData<TVoxel>(t);
+      auto resData = res.timeData<TVoxel>(t);
       for (size_t v = 0; v < res.timeVoxelNumber(); ++v) {
         for (size_t i = 0; i < imgs.size(); ++i) {
-          const TVoxel* srcData = imgs[i]->timeData<TVoxel>(t);
+          auto srcData = imgs[i]->timeData<TVoxel>(t);
           buf[i] = srcData[v];
         }
         resData[v] = static_cast<TVoxel>(medianInPlace(buf.begin(), buf.end()));
@@ -2046,8 +1999,8 @@ template<typename TVoxel, typename TDesVoxel>
 void ZImg::cast_Impl(ZImg& res) const
 {
   for (size_t t = 0; t < numTimes(); ++t) {
-    const TVoxel* srcData = timeData<TVoxel>(t);
-    TDesVoxel* desData = res.timeData<TDesVoxel>(t);
+    auto srcData = timeData<TVoxel>(t);
+    auto desData = res.timeData<TDesVoxel>(t);
     for (size_t v = 0; v < timeVoxelNumber(); ++v) {
       desData[v] = static_cast<TDesVoxel>(srcData[v]);
     }
@@ -2091,7 +2044,7 @@ ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, si
   if (mode == ImgMergeMode::Mean) {
     for (size_t t = 0; t < res.numTimes(); ++t) {
       for (size_t c = 0; c < res.numChannels(); ++c) {
-        TVoxel* resData = res.channelData<TVoxel>(c, t);
+        auto resData = res.channelData<TVoxel>(c, t);
         size_t resOffset = 0;
         for (size_t z = 0; z < res.depth(); ++z) {
           size_t zStart = z * blockDepth;
@@ -2105,7 +2058,7 @@ ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, si
               size_t xStart = x * blockWidth;
               size_t xEnd = std::min((x + 1) * blockWidth, width());
               size_t numVoxel = (xEnd - xStart) * yzSpan;
-              const TVoxel* srcData = data<TVoxel>(xStart, yStart, zStart, c, t);
+              auto srcData = data<TVoxel>(xStart, yStart, zStart, c, t);
               size_t srcOffset = 0;
               double sum = 0;
               for (size_t mz = zStart; mz < zEnd; ++mz) {
@@ -2127,7 +2080,7 @@ ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, si
     std::vector<TVoxel> buf(blockWidth * blockHeight * blockDepth);
     for (size_t t = 0; t < res.numTimes(); ++t) {
       for (size_t c = 0; c < res.numChannels(); ++c) {
-        TVoxel* resData = res.channelData<TVoxel>(c, t);
+        auto resData = res.channelData<TVoxel>(c, t);
         size_t resOffset = 0;
         for (size_t z = 0; z < res.depth(); ++z) {
           size_t zStart = z * blockDepth;
@@ -2138,7 +2091,7 @@ ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, si
             for (size_t x = 0; x < res.width(); ++x) {
               size_t xStart = x * blockWidth;
               size_t xEnd = std::min((x + 1) * blockWidth, width());
-              const TVoxel* srcData = data<TVoxel>(xStart, yStart, zStart, c, t);
+              auto srcData = data<TVoxel>(xStart, yStart, zStart, c, t);
               size_t srcOffset = 0;
               size_t bufIdx = 0;
               for (size_t mz = zStart; mz < zEnd; ++mz) {
@@ -2159,7 +2112,7 @@ ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, si
   } else if (mode == ImgMergeMode::Min) {
     for (size_t t = 0; t < res.numTimes(); ++t) {
       for (size_t c = 0; c < res.numChannels(); ++c) {
-        TVoxel* resData = res.channelData<TVoxel>(c, t);
+        auto resData = res.channelData<TVoxel>(c, t);
         size_t resOffset = 0;
         for (size_t z = 0; z < res.depth(); ++z) {
           size_t zStart = z * blockDepth;
@@ -2170,7 +2123,7 @@ ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, si
             for (size_t x = 0; x < res.width(); ++x) {
               size_t xStart = x * blockWidth;
               size_t xEnd = std::min((x + 1) * blockWidth, width());
-              const TVoxel* srcData = data<TVoxel>(xStart, yStart, zStart, c, t);
+              auto srcData = data<TVoxel>(xStart, yStart, zStart, c, t);
               size_t srcOffset = 0;
               for (size_t mz = zStart; mz < zEnd; ++mz) {
                 for (size_t my = yStart; my < yEnd; ++my) {
@@ -2190,7 +2143,7 @@ ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, si
   } else if (mode == ImgMergeMode::Max) {
     for (size_t t = 0; t < res.numTimes(); ++t) {
       for (size_t c = 0; c < res.numChannels(); ++c) {
-        TVoxel* resData = res.channelData<TVoxel>(c, t);
+        auto resData = res.channelData<TVoxel>(c, t);
         size_t resOffset = 0;
         for (size_t z = 0; z < res.depth(); ++z) {
           size_t zStart = z * blockDepth;
@@ -2201,7 +2154,7 @@ ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, si
             for (size_t x = 0; x < res.width(); ++x) {
               size_t xStart = x * blockWidth;
               size_t xEnd = std::min((x + 1) * blockWidth, width());
-              const TVoxel* srcData = data<TVoxel>(xStart, yStart, zStart, c, t);
+              auto srcData = data<TVoxel>(xStart, yStart, zStart, c, t);
               size_t srcOffset = 0;
               for (size_t mz = zStart; mz < zEnd; ++mz) {
                 for (size_t my = yStart; my < yEnd; ++my) {
@@ -2221,7 +2174,7 @@ ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, si
   } else if (mode == ImgMergeMode::First) {
     for (size_t t = 0; t < res.numTimes(); ++t) {
       for (size_t c = 0; c < res.numChannels(); ++c) {
-        TVoxel* resData = res.channelData<TVoxel>(c, t);
+        auto resData = res.channelData<TVoxel>(c, t);
         size_t resOffset = 0;
         for (size_t z = 0; z < res.depth(); ++z) {
           size_t zStart = z * blockDepth;
@@ -2229,7 +2182,7 @@ ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, si
             size_t yStart = y * blockHeight;
             for (size_t x = 0; x < res.width(); ++x) {
               size_t xStart = x * blockWidth;
-              const TVoxel* srcData = data<TVoxel>(xStart, yStart, zStart, c, t);
+              auto srcData = data<TVoxel>(xStart, yStart, zStart, c, t);
               resData[resOffset] = srcData[0];
               ++resOffset;
             }
@@ -2249,7 +2202,7 @@ void ZImg::computeMinMax_Impl(TValue& minV, TValue& maxV) const
     return;
   }
   for (size_t t = 0; t < numTimes(); ++t) {
-    const TVoxel* data = timeData<TVoxel>(t);
+    auto data = timeData<TVoxel>(t);
     std::pair<const TVoxel*, const TVoxel*> res = minMaxElement(data, data + timeVoxelNumber(), true);
     if (t == 0) {
       minV = static_cast<TValue>(*res.first);
@@ -2265,8 +2218,8 @@ template<typename TVoxel, typename TVoxelRhs>
 void ZImg::addImg_Impl(const ZImg& rhs)
 {
   for (size_t t = 0; t < numTimes(); ++t) {
-    TVoxel* data = timeData<TVoxel>(t);
-    const TVoxelRhs* rhsData = rhs.timeData<TVoxelRhs>(t);
+    auto data = timeData<TVoxel>(t);
+    auto rhsData = rhs.timeData<TVoxelRhs>(t);
     saturate_add(data, rhsData, timeVoxelNumber(), data);
   }
 }
@@ -2275,8 +2228,8 @@ template<typename TVoxel, typename TVoxelRhs>
 void ZImg::subImg_Impl(const ZImg& rhs)
 {
   for (size_t t = 0; t < numTimes(); ++t) {
-    TVoxel* data = timeData<TVoxel>(t);
-    const TVoxelRhs* rhsData = rhs.timeData<TVoxelRhs>(t);
+    auto data = timeData<TVoxel>(t);
+    auto rhsData = rhs.timeData<TVoxelRhs>(t);
     saturate_sub(data, rhsData, timeVoxelNumber(), data);
   }
 }
@@ -2285,8 +2238,8 @@ template<typename TVoxel, typename TVoxelRhs>
 void ZImg::mulImg_Impl(const ZImg& rhs)
 {
   for (size_t t = 0; t < numTimes(); ++t) {
-    TVoxel* data = timeData<TVoxel>(t);
-    const TVoxelRhs* rhsData = rhs.timeData<TVoxelRhs>(t);
+    auto data = timeData<TVoxel>(t);
+    auto rhsData = rhs.timeData<TVoxelRhs>(t);
     saturate_mul(data, rhsData, timeVoxelNumber(), data);
   }
 }
@@ -2295,8 +2248,8 @@ template<typename TVoxel, typename TVoxelRhs>
 void ZImg::divImg_Impl(const ZImg& rhs)
 {
   for (size_t t = 0; t < numTimes(); ++t) {
-    TVoxel* data = timeData<TVoxel>(t);
-    const TVoxelRhs* rhsData = rhs.timeData<TVoxelRhs>(t);
+    auto data = timeData<TVoxel>(t);
+    auto rhsData = rhs.timeData<TVoxelRhs>(t);
     saturate_div(data, rhsData, timeVoxelNumber(), data);
   }
 }
@@ -2305,8 +2258,8 @@ template<typename TVoxel, typename TVoxelRhs>
 void ZImg::secureDivImg_Impl(const ZImg& rhs)
 {
   for (size_t t = 0; t < numTimes(); ++t) {
-    TVoxel* data = timeData<TVoxel>(t);
-    const TVoxelRhs* rhsData = rhs.timeData<TVoxelRhs>(t);
+    auto data = timeData<TVoxel>(t);
+    auto rhsData = rhs.timeData<TVoxelRhs>(t);
     saturate_div_secure(data, rhsData, timeVoxelNumber(), data);
   }
 }
@@ -2440,7 +2393,7 @@ void ZImg::flip_Impl(Dimension dim)
   if (dim == Dimension::X || dim == Dimension::Y || dim == Dimension::Z) {
     for (size_t t = 0; t < numTimes(); ++t) {
       for (size_t c = 0; c < numChannels(); ++c) {
-        TVoxel* data = channelData<TVoxel>(c, t);
+        auto data = channelData<TVoxel>(c, t);
         image3DFlip(data, width(), height(), depth(), dim);
       }
     }
@@ -2451,7 +2404,7 @@ template<typename TVoxel>
 void ZImg::reflect_Impl()
 {
   for (size_t t = 0; t < numTimes(); ++t) {
-    TVoxel* data = timeData<TVoxel>(t);
+    auto data = timeData<TVoxel>(t);
     std::reverse(data, data + timeVoxelNumber());
   }
 }
@@ -2464,8 +2417,8 @@ void ZImg::cumulativeSum_Impl(ZImg& res, Dimension dim) const
     for (size_t t = 0; t < numTimes(); ++t) {
       for (size_t c = 0; c < numChannels(); ++c) {
         for (size_t z = 1; z < depth(); ++z) {
-          TVoxel* data = res.planeData<TVoxel>(z, c, t);
-          TVoxel* prevData = res.planeData<TVoxel>(z - 1, c, t);
+          auto data = res.planeData<TVoxel>(z, c, t);
+          auto prevData = res.planeData<TVoxel>(z - 1, c, t);
           saturate_add(data, prevData, planeVoxelNumber(), data);
         }
       }
@@ -2475,8 +2428,8 @@ void ZImg::cumulativeSum_Impl(ZImg& res, Dimension dim) const
       for (size_t c = 0; c < numChannels(); ++c) {
         for (size_t z = 0; z < depth(); ++z) {
           for (size_t y = 1; y < height(); ++y) {
-            TVoxel* data = res.rowData<TVoxel>(y, z, c, t);
-            TVoxel* prevData = res.rowData<TVoxel>(y - 1, z, c, t);
+            auto data = res.rowData<TVoxel>(y, z, c, t);
+            auto prevData = res.rowData<TVoxel>(y - 1, z, c, t);
             saturate_add(data, prevData, rowVoxelNumber(), data);
           }
         }
@@ -2487,7 +2440,7 @@ void ZImg::cumulativeSum_Impl(ZImg& res, Dimension dim) const
       for (size_t c = 0; c < numChannels(); ++c) {
         for (size_t z = 0; z < depth(); ++z) {
           for (size_t y = 0; y < height(); ++y) {
-            TVoxel* data = res.data<TVoxel>(1, y, z, c, t);
+            auto data = res.data<TVoxel>(1, y, z, c, t);
             for (size_t x = 1; x < width(); ++x, ++data) {
               *data = saturate_add(*data, *(data - 1));
             }
@@ -2519,8 +2472,8 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
         for (size_t c = 0; c < res.numChannels(); ++c) {
           for (size_t z = tdepth - 1; z < res.depth(); ++z) {
             for (size_t y = theight - 1; y < res.height(); ++y) {
-              TVoxel* resData = res.rowData<TVoxel>(y, z, c, t);
-              const TVoxel* origData = rowData<TVoxel>(y - theight + 1, z - tdepth + 1, c, t);
+              auto resData = res.rowData<TVoxel>(y, z, c, t);
+              auto origData = rowData<TVoxel>(y - theight + 1, z - tdepth + 1, c, t);
               resData[0] = origData[0];
               for (size_t x = 1; x < twidth; ++x) {
                 resData[x] = saturate_add(origData[x], resData[x - 1]);
@@ -2540,8 +2493,8 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
         for (size_t c = 0; c < res.numChannels(); ++c) {
           for (size_t z = tdepth - 1; z < res.depth(); ++z) {
             for (size_t y = theight - 1; y < res.height(); ++y) {
-              TVoxel* resData = res.rowData<TVoxel>(y, z, c, t);
-              const TVoxel* origData = rowData<TVoxel>(y - theight + 1, z - tdepth + 1, c, t);
+              auto resData = res.rowData<TVoxel>(y, z, c, t);
+              auto origData = rowData<TVoxel>(y - theight + 1, z - tdepth + 1, c, t);
               resData[0] = origData[0];
               for (size_t x = 1; x < width(); ++x) {
                 resData[x] = saturate_add(origData[x], resData[x - 1]);
@@ -2577,14 +2530,14 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
             std::memcpy(bufRow.data(), res.rowData(0, z, c, t), rowByteNum);
             // other
             for (size_t y = 1; y < theight; ++y) {
-              TVoxel* resData = res.rowData<TVoxel>(y, z, c, t);
+              auto resData = res.rowData<TVoxel>(y, z, c, t);
               for (size_t v = 0; v < rowVoxelNum; ++v) {
                 resData[v] = saturate_add(resData[v - rowVoxelNum],
                                           resData[v + dataOffset]);
               }
             }
             for (size_t y = theight; y < height(); ++y) {
-              TVoxel* resData = res.rowData<TVoxel>(y, z, c, t);
+              auto resData = res.rowData<TVoxel>(y, z, c, t);
               std::memcpy(buf.data(), resData, rowByteNum);
               for (size_t v = 0; v < rowVoxelNum; ++v) {
                 resData[v] = saturate_sub(saturate_add(resData[v - rowVoxelNum],
@@ -2593,7 +2546,7 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
               std::memcpy(bufRow.data(), buf.data(), rowByteNum);
             }
             for (size_t y = height(); y < res.height(); ++y) {
-              TVoxel* resData = res.rowData<TVoxel>(y, z, c, t);
+              auto resData = res.rowData<TVoxel>(y, z, c, t);
               std::memcpy(buf.data(), resData, rowByteNum);
               for (size_t v = 0; v < rowVoxelNum; ++v) {
                 resData[v] = saturate_sub(resData[v - rowVoxelNum], bufRow[v]);
@@ -2615,18 +2568,18 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
             std::memcpy(bufRow.data(), res.rowData(0, z, c, t), rowByteNum);
             // other
             for (size_t y = 1; y < height(); ++y) {
-              TVoxel* resData = res.rowData<TVoxel>(y, z, c, t);
+              auto resData = res.rowData<TVoxel>(y, z, c, t);
               for (size_t v = 0; v < rowVoxelNum; ++v) {
                 resData[v] = saturate_add(resData[v - rowVoxelNum],
                                           resData[v + dataOffset]);
               }
             }
             for (size_t y = height(); y < theight; ++y) {
-              TVoxel* resData = res.rowData<TVoxel>(y, z, c, t);
+              auto resData = res.rowData<TVoxel>(y, z, c, t);
               std::memcpy(resData, resData - rowVoxelNum, rowByteNum);
             }
             for (size_t y = theight; y < res.height(); ++y) {
-              TVoxel* resData = res.rowData<TVoxel>(y, z, c, t);
+              auto resData = res.rowData<TVoxel>(y, z, c, t);
               std::memcpy(buf.data(), resData, rowByteNum);
               for (size_t v = 0; v < rowVoxelNum; ++v) {
                 resData[v] = saturate_sub(resData[v - rowVoxelNum], bufRow[v]);
@@ -2656,14 +2609,14 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
           std::memcpy(bufPlane.data(), res.planeData(0, c, t), planeByteNum);
           // other
           for (size_t z = 1; z < tdepth; ++z) {
-            TVoxel* resData = res.planeData<TVoxel>(z, c, t);
+            auto resData = res.planeData<TVoxel>(z, c, t);
             for (size_t v = 0; v < planeVoxelNum; ++v) {
               resData[v] = saturate_add(resData[v - planeVoxelNum],
                                         resData[v + dataOffset]);
             }
           }
           for (size_t z = tdepth; z < depth(); ++z) {
-            TVoxel* resData = res.planeData<TVoxel>(z, c, t);
+            auto resData = res.planeData<TVoxel>(z, c, t);
             std::memcpy(buf.data(), resData, planeByteNum);
             for (size_t v = 0; v < planeVoxelNum; ++v) {
               resData[v] = saturate_sub(saturate_add(resData[v - planeVoxelNum],
@@ -2672,7 +2625,7 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
             std::memcpy(bufPlane.data(), buf.data(), planeByteNum);
           }
           for (size_t z = depth(); z < res.depth(); ++z) {
-            TVoxel* resData = res.planeData<TVoxel>(z, c, t);
+            auto resData = res.planeData<TVoxel>(z, c, t);
             std::memcpy(buf.data(), resData, planeByteNum);
             for (size_t v = 0; v < planeVoxelNum; ++v) {
               resData[v] = saturate_sub(resData[v - planeVoxelNum], bufPlane[v]);
@@ -2692,18 +2645,18 @@ void ZImg::blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth
           std::memcpy(bufPlane.data(), res.planeData(0, c, t), planeByteNum);
           // other
           for (size_t z = 1; z < depth(); ++z) {
-            TVoxel* resData = res.planeData<TVoxel>(z, c, t);
+            auto resData = res.planeData<TVoxel>(z, c, t);
             for (size_t v = 0; v < planeVoxelNum; ++v) {
               resData[v] = saturate_add(resData[v - planeVoxelNum],
                                         resData[v + dataOffset]);
             }
           }
           for (size_t z = depth(); z < tdepth; ++z) {
-            TVoxel* resData = res.planeData<TVoxel>(z, c, t);
+            auto resData = res.planeData<TVoxel>(z, c, t);
             std::memcpy(resData, resData - planeVoxelNum, planeByteNum);
           }
           for (size_t z = tdepth; z < res.depth(); ++z) {
-            TVoxel* resData = res.planeData<TVoxel>(z, c, t);
+            auto resData = res.planeData<TVoxel>(z, c, t);
             std::memcpy(buf.data(), resData, planeByteNum);
             for (size_t v = 0; v < planeVoxelNum; ++v) {
               resData[v] = saturate_sub(resData[v - planeVoxelNum], bufPlane[v]);
@@ -2724,7 +2677,7 @@ void ZImg::blockSumPart_Impl(ZImg& res, size_t twidth, size_t theight, size_t td
   size_t srcPlaneNum = planeVoxelNumber();
   for (size_t t = 0; t < res.numTimes(); ++t) {
     for (size_t c = 0; c < res.numChannels(); ++c) {
-      TVoxel* desData = res.channelData<TVoxel>(c, t);
+      auto desData = res.channelData<TVoxel>(c, t);
       size_t desOffset = 0;
       for (size_t z = 0; z < res.depth(); ++z) {
         size_t blockZStart = std::max(0, static_cast<int>(zStart + z) - static_cast<int>(tdepth) + 1);
@@ -2739,7 +2692,7 @@ void ZImg::blockSumPart_Impl(ZImg& res, size_t twidth, size_t theight, size_t td
             size_t tright = xStart + x + 1;
             size_t blockXStart = std::max(0, tleft);
             size_t blockXEnd = std::min(width(), tright);
-            const TVoxel* srcData = data<TVoxel>(blockXStart, blockYStart, blockZStart, c, t);
+            auto srcData = data<TVoxel>(blockXStart, blockYStart, blockZStart, c, t);
             size_t srcOffset = 0;
             if (x == 0) {
               inc = 0;
@@ -2790,7 +2743,7 @@ void ZImg::thresholdAbove_Impl(TVoxel threshold, ThresholdMode threMode, TVoxel 
 {
   if (threMode == ThresholdMode::IncludeThreshold) {
     for (size_t t = 0; t < numTimes(); ++t) {
-      TVoxel* data = timeData<TVoxel>(t);
+      auto data = timeData<TVoxel>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
         if (data[v] >= threshold)
           data[v] = outsideValue;
@@ -2798,7 +2751,7 @@ void ZImg::thresholdAbove_Impl(TVoxel threshold, ThresholdMode threMode, TVoxel 
     }
   } else if (threMode == ThresholdMode::ExcludeThreshold) {
     for (size_t t = 0; t < numTimes(); ++t) {
-      TVoxel* data = timeData<TVoxel>(t);
+      auto data = timeData<TVoxel>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
         if (data[v] > threshold)
           data[v] = outsideValue;
@@ -2832,7 +2785,7 @@ void ZImg::thresholdBelow_Impl(TVoxel threshold, ThresholdMode threMode, TVoxel 
 {
   if (threMode == ThresholdMode::IncludeThreshold) {
     for (size_t t = 0; t < numTimes(); ++t) {
-      TVoxel* data = timeData<TVoxel>(t);
+      auto data = timeData<TVoxel>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
         if (data[v] <= threshold)
           data[v] = outsideValue;
@@ -2840,7 +2793,7 @@ void ZImg::thresholdBelow_Impl(TVoxel threshold, ThresholdMode threMode, TVoxel 
     }
   } else if (threMode == ThresholdMode::ExcludeThreshold) {
     for (size_t t = 0; t < numTimes(); ++t) {
-      TVoxel* data = timeData<TVoxel>(t);
+      auto data = timeData<TVoxel>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
         if (data[v] < threshold)
           data[v] = outsideValue;
@@ -2874,8 +2827,8 @@ void ZImg::binarized_Impl(ZImg& res, TVoxel threshold, ThresholdMode threMode) c
 {
   if (threMode == ThresholdMode::IncludeThreshold) {
     for (size_t t = 0; t < numTimes(); ++t) {
-      const TVoxel* data = timeData<TVoxel>(t);
-      uint8_t* resData = res.timeData<uint8_t>(t);
+      auto data = timeData<TVoxel>(t);
+      auto resData = res.timeData<uint8_t>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
         if (data[v] >= threshold)
           resData[v] = 1;
@@ -2883,8 +2836,8 @@ void ZImg::binarized_Impl(ZImg& res, TVoxel threshold, ThresholdMode threMode) c
     }
   } else if (threMode == ThresholdMode::ExcludeThreshold) {
     for (size_t t = 0; t < numTimes(); ++t) {
-      const TVoxel* data = timeData<TVoxel>(t);
-      uint8_t* resData = res.timeData<uint8_t>(t);
+      auto data = timeData<TVoxel>(t);
+      auto resData = res.timeData<uint8_t>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
         if (data[v] > threshold)
           resData[v] = 1;
@@ -2923,7 +2876,7 @@ void ZImg::showContentAsQString_Impl(QString& res) const
       for (size_t z = 0; z < depth(); ++z) {
         for (size_t y = 0; y < height(); ++y) {
           os << t << ":" << c << ":" << z << ":" << y << ": ";
-          const TVoxel* data = rowData<TVoxel>(y, z, c, t);
+          auto data = rowData<TVoxel>(y, z, c, t);
           for (size_t x = 0; x < width(); ++x) {
             os << data[x] << " ";
           }

@@ -113,7 +113,7 @@ public:
 
   // create image with size and attribute specified by info and set all data to default value
   // see allocate() for default voxel value
-  explicit ZImg(const ZImgInfo& info);
+  explicit ZImg(ZImgInfo info);
 
   //
   ZImg(const ZImg& other);

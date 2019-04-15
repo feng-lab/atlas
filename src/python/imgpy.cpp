@@ -205,19 +205,19 @@ PYBIND11_MODULE(_imgpy, m)
       if (p) std::rethrow_exception(p);
     }
     catch (const ZIOException &e) {
-      io_ex(qUtf8Printable(e.what()));
+      io_ex(e.what());
     }
     catch (const ZImgException &e) {
-      img_ex(qUtf8Printable(e.what()));
+      img_ex(e.what());
     }
     catch (const ZProcessAbortException &e) {
-      pa_ex(qUtf8Printable(e.what()));
+      pa_ex(e.what());
     }
     catch (const ZGLException &e) {
-      gl_ex(qUtf8Printable(e.what()));
+      gl_ex(e.what());
     }
     catch (const ZException &e) {
-      base_ex(qUtf8Printable(e.what()));
+      base_ex(e.what());
     }
   });
 

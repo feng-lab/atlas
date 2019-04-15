@@ -767,7 +767,7 @@ void ZImg::binarized_Impl(ZImg& res, const GenericForegroundPredictor& isForegro
 {
   for (size_t t = 0; t < numTimes(); ++t) {
     const TVoxel* data = timeData<TVoxel>(t);
-    uint8_t* resData = res.timeData<uint8_t>(t);
+    auto resData = res.timeData<uint8_t>(t);
     for (size_t v = 0; v < timeVoxelNumber(); ++v) {
       if (isForeground(data[v]))
         resData[v] = 1;
