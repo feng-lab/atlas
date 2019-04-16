@@ -63,4 +63,3 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/src/cmake/LibsForImg.cmake)
 add_subdirectory(src/img)
 add_subdirectory(src/matlab)
 add_subdirectory(src/atlas)
-

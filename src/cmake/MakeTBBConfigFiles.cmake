@@ -46,4 +46,5 @@ else (WIN32)
             /opt/intel/tbb
             )
 endif (WIN32)
+message(STATUS "TBBROOT: ${TBBROOT}")
 tbb_make_config(TBB_ROOT ${TBBROOT} SAVE_TO ${CMAKE_CURRENT_LIST_DIR})

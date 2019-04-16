@@ -236,7 +236,11 @@ set(IMG_SOURCES
     )
 
 # our target
-set(LIBRARY_NAME img)
+if (BUILD_WITH_CONDA)
+  set(LIBRARY_NAME condaimg)
+else ()
+  set(LIBRARY_NAME img)
+endif ()
 add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${IMG_SOURCES}
             ${CERESSOLVER_HEADERS} ${CERESSOLVER_INTERNAL}
             )

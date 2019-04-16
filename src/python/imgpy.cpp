@@ -24,38 +24,38 @@ std::string getFormatDesc(const ZImg& img)
 {
   if (img.voxelFormat() == VoxelFormat::Unsigned) {
     switch (img.bytesPerVoxel()) {
-    case 1:
-      return py::format_descriptor<uint8_t>::format();
-    case 2:
-      return py::format_descriptor<uint16_t>::format();
-    case 4:
-      return py::format_descriptor<uint32_t>::format();
-    case 8:
-      return py::format_descriptor<uint64_t>::format();
-    default:
-      throw ZImgException("Incorrect Img Info");
+      case 1:
+        return py::format_descriptor<uint8_t>::format();
+      case 2:
+        return py::format_descriptor<uint16_t>::format();
+      case 4:
+        return py::format_descriptor<uint32_t>::format();
+      case 8:
+        return py::format_descriptor<uint64_t>::format();
+      default:
+        throw ZImgException("Incorrect Img Info");
     }
   } else if (img.voxelFormat() == VoxelFormat::Float) {
     switch (img.bytesPerVoxel()) {
-    case 4:
-      return py::format_descriptor<float>::format();
-    case 8:
-      return py::format_descriptor<double>::format();
-    default:
-      throw ZImgException("Incorrect Img Info");
+      case 4:
+        return py::format_descriptor<float>::format();
+      case 8:
+        return py::format_descriptor<double>::format();
+      default:
+        throw ZImgException("Incorrect Img Info");
     }
   } else {
     switch (img.bytesPerVoxel()) {
-    case 1:
-      return py::format_descriptor<int8_t>::format();
-    case 2:
-      return py::format_descriptor<int16_t>::format();
-    case 4:
-      return py::format_descriptor<int32_t>::format();
-    case 8:
-      return py::format_descriptor<int64_t>::format();
-    default:
-      throw ZImgException("Incorrect Img Info");
+      case 1:
+        return py::format_descriptor<int8_t>::format();
+      case 2:
+        return py::format_descriptor<int16_t>::format();
+      case 4:
+        return py::format_descriptor<int32_t>::format();
+      case 8:
+        return py::format_descriptor<int64_t>::format();
+      default:
+        throw ZImgException("Incorrect Img Info");
     }
   }
 }
@@ -180,12 +180,12 @@ PYBIND11_MODULE(_imgpy, m)
   py::class_<col4>(m, "col4")
     .def(py::init<>())
     .def(py::init<uint8_t, uint8_t, uint8_t, uint8_t>(),
-      "r"_a, "g"_a, "b"_a, "a"_a = 255_u8)
+         "r"_a, "g"_a, "b"_a, "a"_a = 255_u8)
     .def_readwrite("r", &col4::r)
     .def_readwrite("g", &col4::g)
     .def_readwrite("b", &col4::b)
     .def_readwrite("a", &col4::a)
-    .def("__init__", [](col4 &self, py::tuple t) {
+    .def("__init__", [](col4& self, py::tuple t) {
       if (py::len(t) != 4)
         throw ZImgException("col4 needs tuple with 4 values");
       new(&self) col4(t[0].cast<uint8_t>(), t[1].cast<uint8_t>(), t[2].cast<uint8_t>(), t[3].cast<uint8_t>());
@@ -204,19 +204,19 @@ PYBIND11_MODULE(_imgpy, m)
     try {
       if (p) std::rethrow_exception(p);
     }
-    catch (const ZIOException &e) {
+    catch (const ZIOException& e) {
       io_ex(e.what());
     }
-    catch (const ZImgException &e) {
+    catch (const ZImgException& e) {
       img_ex(e.what());
     }
-    catch (const ZProcessAbortException &e) {
+    catch (const ZProcessAbortException& e) {
       pa_ex(e.what());
     }
-    catch (const ZGLException &e) {
+    catch (const ZGLException& e) {
       gl_ex(e.what());
     }
-    catch (const ZException &e) {
+    catch (const ZException& e) {
       base_ex(e.what());
     }
   });
@@ -224,8 +224,8 @@ PYBIND11_MODULE(_imgpy, m)
   py::class_<ZImgInfo>(m, "ZImgInfo")
     .def(py::init<>())
     .def(py::init<size_t, size_t, size_t, size_t, size_t, size_t, VoxelFormat>(),
-      "width"_a, "height"_a, "depth"_a = 1, "numChannels"_a = 1, "numTimes"_a = 1,
-      "bytePerVox"_a = 1, "voxelFormat"_a = VoxelFormat::Unsigned)
+         "width"_a, "height"_a, "depth"_a = 1, "numChannels"_a = 1, "numTimes"_a = 1,
+         "bytePerVox"_a = 1, "voxelFormat"_a = VoxelFormat::Unsigned)
     .def_readwrite("width", &ZImgInfo::width)
     .def_readwrite("height", &ZImgInfo::height)
     .def_readwrite("depth", &ZImgInfo::depth)
@@ -250,19 +250,19 @@ PYBIND11_MODULE(_imgpy, m)
   py::class_<ZVoxelCoordinate>(m, "ZVoxelCoordinate")
     .def(py::init<>())
     .def(py::init<ZVoxelCoordinate::value_type, ZVoxelCoordinate::value_type, ZVoxelCoordinate::value_type,
-      ZVoxelCoordinate::value_type, ZVoxelCoordinate::value_type>(),
-      "x"_a, "y"_a, "z"_a = 0, "c"_a = 0, "t"_a = 0)
+           ZVoxelCoordinate::value_type, ZVoxelCoordinate::value_type>(),
+         "x"_a, "y"_a, "z"_a = 0, "c"_a = 0, "t"_a = 0)
     .def_readwrite("x", &ZVoxelCoordinate::x)
     .def_readwrite("y", &ZVoxelCoordinate::y)
     .def_readwrite("z", &ZVoxelCoordinate::z)
     .def_readwrite("c", &ZVoxelCoordinate::c)
     .def_readwrite("t", &ZVoxelCoordinate::t)
-    .def("__init__", [](ZVoxelCoordinate &self, py::tuple t) {
+    .def("__init__", [](ZVoxelCoordinate& self, py::tuple t) {
       if (py::len(t) != 5)
         throw ZImgException("ZVoxelCoordinate needs tuple with 5 values");
       new(&self) ZVoxelCoordinate(t[0].cast<ZVoxelCoordinate::value_type>(), t[1].cast<ZVoxelCoordinate::value_type>(),
-        t[2].cast<ZVoxelCoordinate::value_type>(), t[3].cast<ZVoxelCoordinate::value_type>(),
-        t[4].cast<ZVoxelCoordinate::value_type>());
+                                  t[2].cast<ZVoxelCoordinate::value_type>(), t[3].cast<ZVoxelCoordinate::value_type>(),
+                                  t[4].cast<ZVoxelCoordinate::value_type>());
     })
     .def("__repr__", [](const ZVoxelCoordinate& v) {
       return QString("<_imgpy.ZVoxelCoordinate xyzct:%1>").arg(v.toQString()).toStdString();
@@ -281,10 +281,10 @@ PYBIND11_MODULE(_imgpy, m)
   py::class_<ZImgSource>(m, "ZImgSource")
     .def(py::init<>())
     .def(py::init<const QString&, const ZImgRegion&, size_t, FileFormat>(),
-      "filename"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "format"_a = FileFormat::Unknown)
+         "filename"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "format"_a = FileFormat::Unknown)
     .def(py::init<const QStringList&, Dimension, const ZImgRegion&, size_t, FileFormat, bool, bool>(),
-      "filenames"_a, "catDim"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "format"_a = FileFormat::Unknown,
-      "expandXY"_a = false, "expandWithMaxValue"_a = false)
+         "filenames"_a, "catDim"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "format"_a = FileFormat::Unknown,
+         "expandXY"_a = false, "expandWithMaxValue"_a = false)
     .def_readwrite("filenames", &ZImgSource::filenames)
     .def_readwrite("catDim", &ZImgSource::catDim)
     .def_readwrite("region", &ZImgSource::region)
@@ -301,127 +301,128 @@ PYBIND11_MODULE(_imgpy, m)
     .def(py::init<>())
     .def(py::init<const ZImgInfo&>())
     .def(py::init<const QString&, ZImgRegion, size_t, size_t, FileFormat>(),
-      "filename"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "ratio"_a = 1, "format"_a = FileFormat::Unknown)
+         "filename"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "ratio"_a = 1, "format"_a = FileFormat::Unknown)
     .def(py::init<>([](const QStringList& fileList, Dimension catDim, const ZImgRegion& region, size_t scene,
                        FileFormat format, bool expandXY, bool expandWithMaxValue) {
-      return new ZImg(fileList, catDim, region, scene, format, expandXY, expandWithMaxValue);
-                    }),
-      "filenames"_a, "catDim"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "format"_a = FileFormat::Unknown,
-      "expandXY"_a = false, "expandWithMaxValue"_a = false)
+           return new ZImg(fileList, catDim, region, scene, format, expandXY, expandWithMaxValue);
+         }),
+         "filenames"_a, "catDim"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "format"_a = FileFormat::Unknown,
+         "expandXY"_a = false, "expandWithMaxValue"_a = false)
     .def(py::init<const ZImgSource&>())
     .def(py::init<>([](const py::array& arr, const ZImgInfo& info_in) {
-        auto img = new ZImg();
-        auto info = getImgInfoFromNdarray(arr, info_in);
-        img->wrapData(const_cast<void*>(arr.data()), info);
-        return img;
-      }), "ndarray"_a, "imgInfo"_a = ZImgInfo())
+      auto img = new ZImg();
+      auto info = getImgInfoFromNdarray(arr, info_in);
+      img->wrapData(const_cast<void*>(arr.data()), info);
+      return img;
+    }), "ndarray"_a, "imgInfo"_a = ZImgInfo())
     .def(py::init<>([](const std::vector<py::array>& arrs, const ZImgInfo& info_in) {
-        auto img = new ZImg();
-        std::vector<void*> data;
-        if (!arrs.empty()) {
-          auto info = getImgInfoFromNdarray(arrs[0], info_in);
-          data.push_back(const_cast<void*>(arrs[0].data()));
-          for (size_t t = 1; t < arrs.size(); ++t) {
-            auto tmpinfo = getImgInfoFromNdarray(arrs[t], info_in);
-            if (!tmpinfo.isSameType(info) || !tmpinfo.isSameSize(info)) {
-              throw ZImgException("ndarrays in the list are not compatible");
-            }
-            data.push_back(const_cast<void*>(arrs[t].data()));
+      auto img = new ZImg();
+      std::vector<void*> data;
+      if (!arrs.empty()) {
+        auto info = getImgInfoFromNdarray(arrs[0], info_in);
+        data.push_back(const_cast<void*>(arrs[0].data()));
+        for (size_t t = 1; t < arrs.size(); ++t) {
+          auto tmpinfo = getImgInfoFromNdarray(arrs[t], info_in);
+          if (!tmpinfo.isSameType(info) || !tmpinfo.isSameSize(info)) {
+            throw ZImgException("ndarrays in the list are not compatible");
           }
-
-          info.numTimes = arrs.size();
-          img->wrapData(data, info);
+          data.push_back(const_cast<void*>(arrs[t].data()));
         }
-        return img;
-      }), "listOfndarray"_a, "imgInfo"_a = ZImgInfo())
+
+        info.numTimes = arrs.size();
+        img->wrapData(data, info);
+      }
+      return img;
+    }), "listOfndarray"_a, "imgInfo"_a = ZImgInfo())
     .def_static("readImgInfos", [](const QString& filename, FileFormat format) {
       return ZImg::readImgInfos(filename, nullptr, format);
-      }, "filename"_a, "format"_a = FileFormat::Unknown)
+    }, "filename"_a, "format"_a = FileFormat::Unknown)
     .def_static("readImgInfos", [](const QStringList& fileList, Dimension catDim, FileFormat format, bool expandXY) {
       return ZImg::readImgInfos(fileList, catDim, nullptr, format, expandXY);
-      }, "filenames"_a, "catDim"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = false)
+    }, "filenames"_a, "catDim"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = false)
     .def_static("readImgInfo", [](const ZImgSource& imgSource) {
       return ZImg::readImgInfo(imgSource);
-      })
+    })
     .def_static("readSubBlockLists",
-      [](const QString& filename, FileFormat format) {
-        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-        ZImg::readImgInfos(filename, &subBlocks, format);
-        std::vector<Eigen::Matrix<int64_t,Eigen::Dynamic,Eigen::Dynamic>> res(subBlocks.size());
-        for (size_t s = 0; s < res.size(); ++s) {
-          auto& mat = res[s];
-          const auto& blocks = subBlocks[s];
-          mat.resize(blocks.size(), 7);
-          for (Eigen::Index r = 0; r < mat.rows(); ++r) {
-            const auto& block = blocks[r];
-            mat(r, 0) = block->ratio;
-            mat(r, 1) = block->t;
-            mat(r, 2) = block->z;
-            mat(r, 3) = block->x;
-            mat(r, 4) = block->y;
-            mat(r, 5) = block->width;
-            mat(r, 6) = block->height;
-          }
-        }
-        return res;
-      }, "filename"_a, "format"_a = FileFormat::Unknown)
+                [](const QString& filename, FileFormat format) {
+                  std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
+                  ZImg::readImgInfos(filename, &subBlocks, format);
+                  std::vector<Eigen::Matrix<int64_t, Eigen::Dynamic, Eigen::Dynamic>> res(subBlocks.size());
+                  for (size_t s = 0; s < res.size(); ++s) {
+                    auto& mat = res[s];
+                    const auto& blocks = subBlocks[s];
+                    mat.resize(blocks.size(), 7);
+                    for (Eigen::Index r = 0; r < mat.rows(); ++r) {
+                      const auto& block = blocks[r];
+                      mat(r, 0) = block->ratio;
+                      mat(r, 1) = block->t;
+                      mat(r, 2) = block->z;
+                      mat(r, 3) = block->x;
+                      mat(r, 4) = block->y;
+                      mat(r, 5) = block->width;
+                      mat(r, 6) = block->height;
+                    }
+                  }
+                  return res;
+                }, "filename"_a, "format"_a = FileFormat::Unknown)
     .def_static("readSubBlockLists",
-      [](const QStringList& fileList, Dimension catDim, FileFormat format, bool expandXY) {
-        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-        ZImg::readImgInfos(fileList, catDim, &subBlocks, format, expandXY);
-        std::vector<Eigen::Matrix<int64_t,Eigen::Dynamic,Eigen::Dynamic>> res(subBlocks.size());
-        for (size_t s = 0; s < res.size(); ++s) {
-          auto& mat = res[s];
-          const auto& blocks = subBlocks[s];
-          mat.resize(blocks.size(), 7);
-          for (Eigen::Index r = 0; r < mat.rows(); ++r) {
-            const auto& block = blocks[r];
-            mat(r, 0) = block->ratio;
-            mat(r, 1) = block->t;
-            mat(r, 2) = block->z;
-            mat(r, 3) = block->x;
-            mat(r, 4) = block->y;
-            mat(r, 5) = block->width;
-            mat(r, 6) = block->height;
-          }
-        }
-        return res;
-      }, "filenames"_a, "catDim"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = false)
+                [](const QStringList& fileList, Dimension catDim, FileFormat format, bool expandXY) {
+                  std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
+                  ZImg::readImgInfos(fileList, catDim, &subBlocks, format, expandXY);
+                  std::vector<Eigen::Matrix<int64_t, Eigen::Dynamic, Eigen::Dynamic>> res(subBlocks.size());
+                  for (size_t s = 0; s < res.size(); ++s) {
+                    auto& mat = res[s];
+                    const auto& blocks = subBlocks[s];
+                    mat.resize(blocks.size(), 7);
+                    for (Eigen::Index r = 0; r < mat.rows(); ++r) {
+                      const auto& block = blocks[r];
+                      mat(r, 0) = block->ratio;
+                      mat(r, 1) = block->t;
+                      mat(r, 2) = block->z;
+                      mat(r, 3) = block->x;
+                      mat(r, 4) = block->y;
+                      mat(r, 5) = block->width;
+                      mat(r, 6) = block->height;
+                    }
+                  }
+                  return res;
+                }, "filenames"_a, "catDim"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = false)
     .def_static("readSubBlock", [](const QString& filename, size_t scene, size_t blockIndex, FileFormat format) {
       return ZImg::readSubBlock(filename, scene, blockIndex, format);
-      }, "filename"_a, "scene"_a, "blockIndex"_a, "format"_a = FileFormat::Unknown)
+    }, "filename"_a, "scene"_a, "blockIndex"_a, "format"_a = FileFormat::Unknown)
     .def_static("readSubBlock", [](const QStringList& fileList, Dimension catDim, size_t scene, size_t blockIndex,
                                    FileFormat format, bool expandXY) {
       return ZImg::readSubBlock(fileList, catDim, scene, blockIndex, format, expandXY);
-      }, "filenames"_a, "catDim"_a, "scene"_a, "blockIndex"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = false)
+    }, "filenames"_a, "catDim"_a, "scene"_a, "blockIndex"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = false)
     .def("save", &ZImg::save,
-      "filename"_a, "format"_a = FileFormat::Unknown, "compression"_a = Compression::AUTO)
+         "filename"_a, "format"_a = FileFormat::Unknown, "compression"_a = Compression::AUTO)
     .def_property("info",
-      [](const ZImg& v) {
-        return v.info();
-      },
-      [](ZImg& v, const ZImgInfo& info) {
-        v.infoRef() = info;
-      })
+                  [](const ZImg& v) {
+                    return v.info();
+                  },
+                  [](ZImg& v, const ZImgInfo& info) {
+                    v.infoRef() = info;
+                  })
     .def_property_readonly("data",
-      [](ZImg& v) {
-        std::vector<py::buffer_info> bufs;
-        std::vector<py::array> arrs;
-        auto formatdesc = getFormatDesc(v);
-        for (size_t t = 0; t < v.numTimes(); ++t) {
-          bufs.emplace_back(
-            v.timeData(t),
-            v.info().voxelByteNumber(),
-            formatdesc,
-            4,
-            std::vector<py::size_t>{ v.numChannels(), v.depth(), v.height(), v.width() },
-            std::vector<py::size_t>{ v.info().channelByteNumber(), v.info().planeByteNumber(),
-                                     v.info().rowByteNumber(), v.info().voxelByteNumber() });
-          auto capsule = py::capsule(v.timeData(t), [](void *) {  });
-          arrs.emplace_back(py::dtype(bufs[t]), bufs[t].shape, bufs[t].strides, bufs[t].ptr, capsule);
-        }
-        return arrs;
-      })
+                           [](ZImg& v) {
+                             std::vector<py::buffer_info> bufs;
+                             std::vector<py::array> arrs;
+                             auto formatdesc = getFormatDesc(v);
+                             for (size_t t = 0; t < v.numTimes(); ++t) {
+                               bufs.emplace_back(
+                                 v.timeData(t),
+                                 v.info().voxelByteNumber(),
+                                 formatdesc,
+                                 4,
+                                 std::vector<py::size_t>{v.numChannels(), v.depth(), v.height(), v.width()},
+                                 std::vector<py::size_t>{v.info().channelByteNumber(), v.info().planeByteNumber(),
+                                                         v.info().rowByteNumber(), v.info().voxelByteNumber()});
+                               auto capsule = py::capsule(v.timeData(t), [](void*) {});
+                               arrs.emplace_back(py::dtype(bufs[t]), bufs[t].shape, bufs[t].strides, bufs[t].ptr,
+                                                 capsule);
+                             }
+                             return arrs;
+                           })
     .def("__repr__", [](const ZImg& v) {
       return QString("<_imgpy.ZImg %1>").arg(v.info().toQString()).toStdString();
     });
@@ -450,168 +451,169 @@ PYBIND11_MODULE(_imgpy, m)
     .def_property("voxelIntensities", &ZPunctum::voxelIntensities, &ZPunctum::setVoxelIntensities)
     .def("__repr__", [](const ZPunctum& v) {
       return QString("<_imgpy.ZPunctum %1>").arg(v.toQString()).toStdString();
-      });
+    });
 
   py::class_<ZPuncta>(m, "ZPuncta")
     .def(py::init<>())
     .def(py::init<const std::list<ZPunctum>&>())
     .def(py::init<const QString&>(), "filename"_a)
     .def("save", &ZPuncta::save,
-      "filename"_a, "format"_a = QString())
+         "filename"_a, "format"_a = QString())
     .def_property_readonly("data", &ZPuncta::data)
     .def("__repr__", [](const ZPuncta& v) {
       return QString("<_imgpy.ZPuncta %1>").arg(v.toQString()).toStdString();
-      });
+    });
 
   py::class_<ZStitchImage>(m, "ZStitchImage")
     .def(py::init<>())
     .def("setInputFilenames", &ZStitchImage::setInputFilenames,
-      "filenames"_a, "scene"_a = 0)
+         "filenames"_a, "scene"_a = 0)
     .def("setResultFilename", &ZStitchImage::setResultFilename,
-      "filename"_a)
+         "filename"_a)
     .def("setUseChannels", &ZStitchImage::setUseChannels,
-      "channels"_a = std::vector<size_t>())
+         "channels"_a = std::vector<size_t>())
     .def("setRemoveBackgroundForChannels", &ZStitchImage::setRemoveBackgroundForChannels,
-      "channels"_a = std::vector<size_t>())
+         "channels"_a = std::vector<size_t>())
     .def("setDownsampleBeforeStitching", &ZStitchImage::setDownsampleBeforeStitching,
-      "blockWidth"_a, "blockHeight"_a, "blockDepth"_a, "blockMergeMode"_a = ImgMergeMode::Mean)
+         "blockWidth"_a, "blockHeight"_a, "blockDepth"_a, "blockMergeMode"_a = ImgMergeMode::Mean)
     .def("setStartResolution", &ZStitchImage::setStartResolution,
-      "intvX"_a, "intvY"_a, "intvZ"_a)
+         "intvX"_a, "intvY"_a, "intvZ"_a)
     .def("setConcatenateOnly", &ZStitchImage::setConcatenateOnly)
     .def("setMergeMode", &ZStitchImage::setMergeMode,
-      "mode"_a)
+         "mode"_a)
     .def("setMaxOverlapRate", &ZStitchImage::setMaxOverlapRate,
-      "maxOverlapRate"_a)
+         "maxOverlapRate"_a)
     .def("setTileGrid", &ZStitchImage::setTileGrid,
-      "tileGrid"_a)
+         "tileGrid"_a)
     .def("setTileGridFromMatrixFile", &ZStitchImage::setTileGridFromMatrixFile,
-      "filename"_a)
+         "filename"_a)
     .def("setTileGridFromTileSelectionImage", &ZStitchImage::setTileGridFromTileSelectionImage,
-      "filename"_a)
+         "filename"_a)
     .def("setConnInfoFromConnTextFile", &ZStitchImage::setConnInfoFromConnTextFile,
-      "filename"_a)
+         "filename"_a)
     .def("setTileGridFromLayout", &ZStitchImage::setTileGridFromLayout,
-      "numRows"_a, "numCols"_a)
+         "numRows"_a, "numCols"_a)
     .def("setRestitch", &ZStitchImage::setRestitch)
     .def("setBlindStitching", &ZStitchImage::setBlindStitching)
     .def("set2ndInput", &ZStitchImage::set2ndInput,
-      "fns"_a, "scene"_a, "chsToUse"_a, "chsToRemoveBackground"_a, "commonChannelOfInput"_a, "commonChannelOf2ndInput"_a)
+         "fns"_a, "scene"_a, "chsToUse"_a, "chsToRemoveBackground"_a, "commonChannelOfInput"_a,
+         "commonChannelOf2ndInput"_a)
     .def("setLogFile", &ZStitchImage::setLogFile, "logfilename"_a)
     .def("loadTask", &ZStitchImage::loadTask, "filename"_a)
     .def("saveTask", &ZStitchImage::saveTask, "filename"_a)
     .def("run", &ZStitchImage::runInPython)
     .def("__repr__", [](const ZStitchImage& v) {
       return QString("<_imgpy.ZStitchImage %1>").arg(v.toQString()).toStdString();
-      });
+    });
 
   py::class_<ZPunctaDetection>(m, "ZPunctaDetection")
     .def(py::init<>())
     .def("setInputFile", &ZPunctaDetection::setInputFile,
-      "filename"_a, "punctaChannel"_a = 0, "t"_a = 0, "scene"_a = 0,
-      "voxelSizeInUmX"_a = -1.0, "voxelSizeInUmY"_a = -1.0, "voxelSizeInUmZ"_a = -1.0)
+         "filename"_a, "punctaChannel"_a = 0, "t"_a = 0, "scene"_a = 0,
+         "voxelSizeInUmX"_a = -1.0, "voxelSizeInUmY"_a = -1.0, "voxelSizeInUmZ"_a = -1.0)
     .def("setResultPunctaFilename", &ZPunctaDetection::setResultPunctaFilename,
-      "filename"_a)
+         "filename"_a)
     .def("setResultSomaPunctaFilename", &ZPunctaDetection::setResultSomaPunctaFilename,
-      "filename"_a)
+         "filename"_a)
     .def("setPunctaThreshold", &ZPunctaDetection::setPunctaThreshold,
-      "thre"_a)
+         "thre"_a)
     .def("setSplitThreshold", &ZPunctaDetection::setSplitThreshold, "thre"_a)
     .def("setConfidenceRegionForRadiusEstimate", &ZPunctaDetection::setConfidenceRegionForRadiusEstimate,
-      "confRadius"_a)
+         "confRadius"_a)
     .def("setConfidenceRegionForOverlapArea", &ZPunctaDetection::setConfidenceRegionForOverlapArea,
-      "confOverlapArea"_a)
+         "confOverlapArea"_a)
     .def("setOverlapRateThreshold", &ZPunctaDetection::setOverlapRateThreshold,
-      "thre"_a)
+         "thre"_a)
     .def("setSeedSizeThreshold", &ZPunctaDetection::setSeedSizeThreshold,
-      "thre"_a)
+         "thre"_a)
     .def("setUseMultithreading", &ZPunctaDetection::setUseMultithreading,
-      "v"_a)
+         "v"_a)
     .def("setDendriteChannel", &ZPunctaDetection::setDendriteChannel,
-      "dendriteChannel"_a)
+         "dendriteChannel"_a)
     .def("setMaxDendriteTubeRadiusInUm", &ZPunctaDetection::setMaxDendriteTubeRadiusInUm,
-      "maxDendriteTubeRadius"_a)
+         "maxDendriteTubeRadius"_a)
     .def("setDendriteThreshold", &ZPunctaDetection::setDendriteThreshold,
-      "thre"_a)
+         "thre"_a)
     .def("setSwcFiles", &ZPunctaDetection::setSwcFiles,
-      "swcFiles"_a)
+         "swcFiles"_a)
     .def("setMaxDistToBranchInUm", &ZPunctaDetection::setMaxDistToBranchInUm,
-      "dist"_a)
+         "dist"_a)
     .def("setAmbiguousFactor", &ZPunctaDetection::setAmbiguousFactor,
-      "factor"_a)
+         "factor"_a)
     .def("setLogFile", &ZPunctaDetection::setLogFile, "logfilename"_a)
     .def("loadTask", &ZPunctaDetection::loadTask, "filename"_a)
     .def("saveTask", &ZPunctaDetection::saveTask, "filename"_a)
     .def("run", &ZPunctaDetection::runInPython)
     .def("__repr__", [](const ZPunctaDetection& v) {
       return QString("<_imgpy.ZPunctaDetection %1>").arg(v.toQString()).toStdString();
-      });
+    });
 
   py::class_<ZSectionsRegistration>(m, "ZSectionsRegistration")
     .def(py::init<>())
     .def("setInputOutput", &ZSectionsRegistration::setInputOutput,
-      "inputFiles"_a, "resultFile"_a, "fixedSliceIndex"_a)
+         "inputFiles"_a, "resultFile"_a, "fixedSliceIndex"_a)
     .def("setReferenceChannel", &ZSectionsRegistration::setReferenceChannel,
-      "refChannel"_a)
+         "refChannel"_a)
     .def("setRemoveBackground", &ZSectionsRegistration::setRemoveBackground,
-      "v"_a)
+         "v"_a)
     .def("setRemoveHighForeground", &ZSectionsRegistration::setRemoveHighForeground,
-      "v"_a)
+         "v"_a)
     .def("setAllowFlip", &ZSectionsRegistration::setAllowFlip, "v"_a)
     .def("setBrightBackground", &ZSectionsRegistration::setBrightBackground,
-      "v"_a)
+         "v"_a)
     .def("setMetric", &ZSectionsRegistration::setMetric,
-      "metric"_a)
+         "metric"_a)
     .def("setTransform", &ZSectionsRegistration::setTransform,
-      "transform"_a)
+         "transform"_a)
     .def("setOptimizer", &ZSectionsRegistration::setOptimizer,
-      "optimizer"_a)
+         "optimizer"_a)
     .def("setUseMultithreading", &ZSectionsRegistration::setUseMultithreading,
-      "v"_a)
+         "v"_a)
     .def("setNumScales", &ZSectionsRegistration::setNumScales,
-      "numScales"_a)
+         "numScales"_a)
     .def("setNumNeighbors", &ZSectionsRegistration::setNumNeighbors,
-      "numNeighbors"_a)
+         "numNeighbors"_a)
     .def("setLogFile", &ZSectionsRegistration::setLogFile, "logfilename"_a)
     .def("loadTask", &ZSectionsRegistration::loadTask, "filename"_a)
     .def("saveTask", &ZSectionsRegistration::saveTask, "filename"_a)
     .def("run", &ZSectionsRegistration::runInPython)
     .def("__repr__", [](const ZSectionsRegistration& v) {
       return QString("<_imgpy.ZSectionsRegistration %1>").arg(v.toQString()).toStdString();
-      });
+    });
 
   py::class_<ZChromaticShiftCorrection>(m, "ZChromaticShiftCorrection")
     .def(py::init<>())
     .def("setInputOutput", &ZChromaticShiftCorrection::setInputOutput,
-      "inputFile"_a, "resultFile"_a)
+         "inputFile"_a, "resultFile"_a)
     .def("setReferenceChannel", &ZChromaticShiftCorrection::setReferenceChannel,
-      "refChannel"_a)
+         "refChannel"_a)
     .def("setTargetChannel", &ZChromaticShiftCorrection::setTargetChannel,
-      "targetChannel"_a)
+         "targetChannel"_a)
     .def("setRemoveBackground", &ZChromaticShiftCorrection::setRemoveBackground,
-      "v"_a)
+         "v"_a)
     .def("setRemoveHighForeground", &ZChromaticShiftCorrection::setRemoveHighForeground,
-      "v"_a)
+         "v"_a)
     .def("setBrightBackground", &ZChromaticShiftCorrection::setBrightBackground,
-      "v"_a)
+         "v"_a)
     .def("setMethod", &ZChromaticShiftCorrection::setMethod,
-      "method"_a)
+         "method"_a)
     .def("setMetric", &ZChromaticShiftCorrection::setMetric,
-      "metric"_a)
+         "metric"_a)
     .def("setTransform", &ZChromaticShiftCorrection::setTransform,
-      "transform"_a)
+         "transform"_a)
     .def("setOptimizer", &ZChromaticShiftCorrection::setOptimizer,
-      "optimizer"_a)
+         "optimizer"_a)
     .def("setUseMultithreading", &ZChromaticShiftCorrection::setUseMultithreading,
-      "v"_a)
+         "v"_a)
     .def("setNumScales", &ZChromaticShiftCorrection::setNumScales,
-      "numScales"_a)
+         "numScales"_a)
     .def("setLogFile", &ZChromaticShiftCorrection::setLogFile, "logfilename"_a)
     .def("loadTask", &ZChromaticShiftCorrection::loadTask, "filename"_a)
     .def("saveTask", &ZChromaticShiftCorrection::saveTask, "filename"_a)
     .def("run", &ZChromaticShiftCorrection::runInPython)
     .def("__repr__", [](const ZChromaticShiftCorrection& v) {
       return QString("<_imgpy.ZChromaticShiftCorrection %1>").arg(v.toQString()).toStdString();
-      });
+    });
 
   m.attr("__version__") = GIT_VERSION;
 

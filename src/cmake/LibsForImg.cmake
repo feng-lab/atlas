@@ -1,4 +1,4 @@
-if(BUILD_WITH_CONDA)
+if (BUILD_WITH_CONDA)
   # qt
   set(QT_PATHS $ENV{PREFIX})
 
@@ -10,14 +10,15 @@ if(BUILD_WITH_CONDA)
             PATHS
             $ENV{PREFIX}
             )
-  tbb_make_config(TBB_ROOT ${TBBROOT} SAVE_TO ${CMAKE_CURRENT_LIST_DIR})
-else()
+  tbb_make_config(TBB_ROOT ${TBBROOT} SAVE_TO ${CMAKE_CURRENT_LIST_DIR}/../python/cmake)
+  # tbb
+  set(TBB_DIR ${CMAKE_CURRENT_LIST_DIR}/../python/cmake)
+else ()
   # qt
   include(${CMAKE_CURRENT_LIST_DIR}/QtInfo.cmake)
-endif()
-
-# tbb
-set(TBB_DIR ${CMAKE_CURRENT_LIST_DIR})
+  # tbb
+  set(TBB_DIR ${CMAKE_CURRENT_LIST_DIR})
+endif ()
 
 find_package(TBB REQUIRED tbb)
 # get_target_property(TBB_INCLUDE_DIRS TBB::tbb INTERFACE_INCLUDE_DIRECTORIES)
@@ -25,7 +26,7 @@ find_package(TBB REQUIRED tbb)
 get_target_property(TBB_LIBRARY TBB::tbb IMPORTED_LOCATION_RELEASE)
 message(STATUS "TBB_LIBRARY: ${TBB_LIBRARY}")
 
-if(BUILD_WITH_CONDA)
+if (BUILD_WITH_CONDA)
   set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} $ENV{PREFIX}/include $ENV{PREFIX}/include/fftw)
   find_library(MKL_INTEL_LP64 NAMES mkl_intel_lp64
                PATHS $ENV{PREFIX}/lib NO_DEFAULT_PATH)
@@ -35,32 +36,32 @@ if(BUILD_WITH_CONDA)
                PATHS $ENV{PREFIX}/lib NO_DEFAULT_PATH)
   set(MKL_LIBRARIES ${MKL_INTEL_LP64} ${MKL_TBB_THREAD} ${MKL_CORE})
   message(STATUS "MKL_INCLUDE_DIRS: ${MKL_INCLUDE_DIRS}")
-else()
-if (WIN32)
-  set(INTEL_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\compiler")
-  set(MKL_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\mkl")
-else (WIN32)
-  set(INTEL_PATH /opt/intel)
-  set(MKL_PATH ${INTEL_PATH}/mkl)
-endif (WIN32)
-set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${MKL_PATH}/include ${MKL_PATH}/include/fftw)
-if (WIN32)
-  set(MKL_LIBRARIES ${MKL_LIBRARIES}
-      ${MKL_PATH}/lib/intel64/mkl_intel_lp64.lib
-      ${MKL_PATH}/lib/intel64/mkl_tbb_thread.lib
-      ${MKL_PATH}/lib/intel64/mkl_core.lib)
-elseif (APPLE)
-  set(MKL_LIBRARIES ${MKL_LIBRARIES}
-      ${MKL_PATH}/lib/libmkl_intel_lp64.a
-      ${MKL_PATH}/lib/libmkl_tbb_thread.a
-      ${MKL_PATH}/lib/libmkl_core.a)
 else ()
-  set(MKL_LIBRARIES ${MKL_LIBRARIES}
-      ${MKL_PATH}/lib/intel64/libmkl_intel_lp64.a
-      ${MKL_PATH}/lib/intel64/libmkl_tbb_thread.a
-      ${MKL_PATH}/lib/intel64/libmkl_core.a)
+  if (WIN32)
+    set(INTEL_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\compiler")
+    set(MKL_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\mkl")
+  else (WIN32)
+    set(INTEL_PATH /opt/intel)
+    set(MKL_PATH ${INTEL_PATH}/mkl)
+  endif (WIN32)
+  set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${MKL_PATH}/include ${MKL_PATH}/include/fftw)
+  if (WIN32)
+    set(MKL_LIBRARIES ${MKL_LIBRARIES}
+        ${MKL_PATH}/lib/intel64/mkl_intel_lp64.lib
+        ${MKL_PATH}/lib/intel64/mkl_tbb_thread.lib
+        ${MKL_PATH}/lib/intel64/mkl_core.lib)
+  elseif (APPLE)
+    set(MKL_LIBRARIES ${MKL_LIBRARIES}
+        ${MKL_PATH}/lib/libmkl_intel_lp64.a
+        ${MKL_PATH}/lib/libmkl_tbb_thread.a
+        ${MKL_PATH}/lib/libmkl_core.a)
+  else ()
+    set(MKL_LIBRARIES ${MKL_LIBRARIES}
+        ${MKL_PATH}/lib/intel64/libmkl_intel_lp64.a
+        ${MKL_PATH}/lib/intel64/libmkl_tbb_thread.a
+        ${MKL_PATH}/lib/intel64/libmkl_core.a)
+  endif ()
 endif ()
-endif()
 
 find_package(ITK REQUIRED COMPONENTS ITKIOMeta ITKIONIFTI ITKIONRRD ITKIOGDCM ITKBinaryMathematicalMorphology
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/itk NO_DEFAULT_PATH)
@@ -125,13 +126,13 @@ endif (WIN32)
 
 if (WIN32)
   set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/freeimage)
+      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/freeimage)
   set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
       ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/freeimage/FreeImagePlus.lib
       ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/freeimage/FreeImage.lib)
 elseif (APPLE)
   set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/freeimage/include)
+      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/freeimage/include)
   set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
       ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/freeimage/lib/libfreeimageplus.dylib)
 else ()
@@ -152,10 +153,10 @@ find_package(HDF5 REQUIRED COMPONENTS C CXX static
 
 message(STATUS "QT_PATHS: " ${QT_PATHS})
 set(CMAKE_AUTOMOC ON)
-if(BUILD_WITH_CONDA)
+if (BUILD_WITH_CONDA)
   find_package(Qt5Core ${QT_VERSION} REQUIRED PATHS ${QT_PATHS} NO_DEFAULT_PATH)
-else()
+else ()
   find_package(Qt5Core ${QT_VERSION} REQUIRED PATHS ${QT_PATHS})
-endif()
+endif ()
 get_target_property(Qt5CoreLoc Qt5::Core IMPORTED_LOCATION_RELEASE)
 message(STATUS "Qt5Core: ${Qt5CoreLoc}")
