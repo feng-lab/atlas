@@ -95,7 +95,7 @@ if (PYTHON_VERSION_MAJOR)
 endif ()
 
 # install
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}" # source directory
+install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/" # source directory
         DESTINATION $ENV{SP_DIR}/zimg # target directory
         FILES_MATCHING PATTERN "*.py"
         PATTERN "*idea*" EXCLUDE
