@@ -875,7 +875,8 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
 
 void createCellTable()
 {
-  QList<QStringList> metaData = QtCSV::Reader::readToList("/Users/feng/code/mgrasp-analysis/pv_figs/orig_cell_props.csv");
+  QList<QStringList> metaData = QtCSV::Reader::readToList(
+    "/Users/feng/code/mgrasp-analysis/pv_figs/orig_cell_props.csv");
   metaData.removeFirst();
 
   std::map<QString, int> somaLocationMap;
@@ -963,7 +964,7 @@ void createCellTable()
     mainWin->loadJsonScene(scnName);
     QApplication::processEvents();
 
-    Z3DView *view3d = mainWin->get3DWindow()->view();
+    Z3DView* view3d = mainWin->get3DWindow()->view();
     view3d->resetCameraAction()->trigger();
     view3d->zoomInAction()->trigger();
     view3d->zoomInAction()->trigger();
@@ -985,7 +986,8 @@ void createCellTable()
     double AP = std::get<2>(it.first);
     double ML = std::get<3>(it.first);
     double r2 = std::get<1>(it.second);
-    QString row = QString("%1 & (%2, %3)$mm$ & %4 & %5 & \\parbox[c]{0.5in}{\\includegraphics[height=0.5in]{%6}} \\\\").arg(
+    QString row = QString(
+      "%1 & (%2, %3)$mm$ & %4 & %5 & \\parbox[c]{0.5in}{\\includegraphics[height=0.5in]{%6}} \\\\").arg(
       cellType).arg(AP).arg(ML, 0, 'g', 3).arg(somaLocation.toLower()).arg(r2, 0, 'g', 3).arg(cellName);
     LOG(INFO) << row;
   }
@@ -1109,10 +1111,10 @@ void qFileInfoTest()
 void GMMFail()
 {
   Eigen::MatrixXd data(20, 3);
-  data << 0, 0, 1,  0, 1, 0,  0, 1, 1,  0, 1, 2,  0, 1, 3,
-    0, 2, 0,  0, 2, 1,  0, 2, 2,  0, 2, 3,  0, 2, 4,
-    0, 3, 1,  0, 3, 2,  0, 3, 3,  0, 3, 4,  0, 3, 5,
-    0, 4, 2,  0, 4, 3,  0, 4, 4,  0, 4, 5,  1, 2, 3;
+  data << 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 2, 0, 1, 3,
+    0, 2, 0, 0, 2, 1, 0, 2, 2, 0, 2, 3, 0, 2, 4,
+    0, 3, 1, 0, 3, 2, 0, 3, 3, 0, 3, 4, 0, 3, 5,
+    0, 4, 2, 0, 4, 3, 0, 4, 4, 0, 4, 5, 1, 2, 3;
   Eigen::VectorXd weight(20);
   weight << 22, 41, 42, 35, 25, 39, 25, 30, 26, 19, 25, 29, 31, 43, 35, 27, 35, 34, 36, 37;
 
@@ -1151,7 +1153,8 @@ void detectPuncta()
 //                                                                                                               QDir::NoSymLinks);
 //  fdlist.append(fdlist2);
 
-  QDir dir("/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK584-6_RNAscope_PV-Gria1-Gabra1/180727_JK586-6_referenceRegions");
+  QDir dir(
+    "/Volumes/shared/Jiwon/Zeiss Confocal Microscopy/RNAscope/JK584-6_RNAscope_PV-Gria1-Gabra1/180727_JK586-6_referenceRegions");
 
   QStringList filters;
   filters << "JK586-6*";
@@ -1774,10 +1777,29 @@ void cutZeroRegion()
   for (int i = 0; i < list.size(); ++i) {
     auto fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
-    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0,-1,0,-1,1100,1800));
+    ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0, -1, 0, -1, 1100, 1800));
     img.save(fileInfo.absoluteFilePath() + "_zcut.nim");
   }
 }
+
+void swapMeshXY()
+{
+  QDir dir(
+    "/Users/feng/Library/Application Support/Brain Explorer 2/Atlases/Allen Mouse Brain Common Coordinate Framework/Spaces/P56/Meshes");
+  QStringList filters;
+  filters << "*.msh";
+  QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+  QString outFolder = "/Volumes/fs3017/eeum/AllenMouseBrainCommonCoordinateFrameworkSpacesP56MeshesSwapXY";
+
+  for (int i = 0; i < list.size(); ++i) {
+    QFileInfo fileInfo = list.at(i);
+    ZMesh msh(fileInfo.absoluteFilePath());
+    msh.swapXY();
+
+    msh.save(QString("%1/%2.stl").arg(outFolder).arg(fileInfo.fileName()));
+  }
+}
+
 
 }  // namespace nim
 
@@ -1785,7 +1807,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  testDetectPuncta();
+  swapMeshXY();
   LOG(INFO) << "done";
 }
 

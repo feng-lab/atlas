@@ -1360,6 +1360,24 @@ void ZMesh::createPunctaMesh(const ZPuncta& puncta, ZMesh& punctaMesh, int resol
   punctaMesh.transformVerticesByMatrix(tfmat);
 }
 
+void ZMesh::swapXY()
+{
+  for (auto& vert : m_vertices) {
+    vert = glm::vec3(vert.y, vert.x, vert.z);
+  }
+  std::vector<GLuint> newIndices;
+
+  for (size_t i = 0; i < numTriangles(); ++i) {
+    glm::uvec3 tri = triangleIndices(i);
+    newIndices.push_back(tri[0]);
+    newIndices.push_back(tri[2]);
+    newIndices.push_back(tri[1]);
+  }
+  m_indices = newIndices;
+  m_type = GL_TRIANGLES;
+  generateNormals();
+}
+
 void ZMesh::appendTriangle(const ZMesh& mesh, const glm::uvec3& triangle)
 {
   if (!m_indices.empty() || m_type != GL_TRIANGLES)

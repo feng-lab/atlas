@@ -280,7 +280,10 @@ public:
   static void createSwcMesh(const ZSwc& tree, int rootType, ZMesh& rootMesh, ZMesh& somaMesh, ZMesh& branchMesh,
                             const glm::mat4& tfmat = glm::mat4(1.f));
 
-  static void createPunctaMesh(const ZPuncta& puncta, ZMesh& punctaMesh, int resolution = 32, const glm::mat4& tfmat = glm::mat4(1.f));
+  static void createPunctaMesh(const ZPuncta& puncta, ZMesh& punctaMesh, int resolution = 32,
+                               const glm::mat4& tfmat = glm::mat4(1.f));
+
+  void swapXY();
 
 private:
   enum class BooleanOperationType
