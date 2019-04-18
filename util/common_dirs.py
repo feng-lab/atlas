@@ -378,10 +378,13 @@ def install_ffmpeg():
         unpack_tool_to_software_dir(src_package_dir(), 'ffmpeg*static.tar.xz')
     else:
         folder = unpack_tool_to_software_dir(src_package_dir(), 'ffmpeg*macos*')
-        os.chmod(os.path.join(folder, 'bin', 'ffmpeg'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-        os.chmod(os.path.join(folder, 'bin', 'ffplay'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-        os.chmod(os.path.join(folder, 'bin', 'ffprobe'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-        os.symlink(os.path.join(folder, 'bin', 'ffmpeg'), '/usr/local/bin/ffmpeg')
+        if 'feng' in os.path.expanduser("~"):
+            os.chmod(os.path.join(folder, 'bin', 'ffmpeg'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+            os.chmod(os.path.join(folder, 'bin', 'ffplay'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+            os.chmod(os.path.join(folder, 'bin', 'ffprobe'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+            if os.path.exists('/usr/local/bin/ffmpeg'):
+                os.remove('/usr/local/bin/ffmpeg')
+            os.symlink(os.path.join(folder, 'bin', 'ffmpeg'), '/usr/local/bin/ffmpeg')
 
 
 def get_cmake_binary() -> str:
