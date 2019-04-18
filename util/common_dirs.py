@@ -375,7 +375,7 @@ def install_ffmpeg():
     if is_windows():
         unpack_tool_to_software_dir(src_package_dir(), 'ffmpeg*win*')
     elif is_linux():
-        unpack_tool_to_software_dir(src_package_dir(), 'ffmpeg*static.tar.xz')
+        unpack_tool_to_software_dir(src_package_dir(), 'ffmpeg*amd64*')
     else:
         folder = unpack_tool_to_software_dir(src_package_dir(), 'ffmpeg*macos*')
         if 'feng' in os.path.expanduser("~"):
