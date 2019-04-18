@@ -298,7 +298,7 @@ def get_package_top_level_folder(file: str, folder: str):
             # print(tf.getnames())
             res = os.path.join(folder, os.path.commonpath(tf.getnames()))
     elif file.lower().endswith('.7z'):
-        cp = subprocess.run(['7za', 'l', '-slt', file], stdout=subprocess.PIPE, encoding='utf-8')
+        cp = subprocess.run(['7za', 'l', '-slt', '-sccUTF-8', file], stdout=subprocess.PIPE, encoding='utf-8')
         started = False
         filenames = []
         for line in cp.stdout.splitlines():
