@@ -156,7 +156,8 @@ void ZSelectFileWidget::createWidget(QBoxLayout::Direction direction)
     m_lineEdit = new QLineEdit(this);
     m_lineEdit->setReadOnly(true);
     //LOG(INFO) << m_startDir;
-    m_lineEdit->setText(m_startDir);
+    if (m_fileMode != FileMode::OpenSingleFile)
+      m_lineEdit->setText(m_startDir);
     m_button = new QToolButton(this);
     m_button->setText(tr("..."));
     connect(m_button, &QToolButton::clicked, this, &ZSelectFileWidget::selectFile);

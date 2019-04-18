@@ -1438,15 +1438,16 @@ ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs, const Eigen::Vect
     numTotalVoxels += vbVoxelIntens.size();
     LOG(INFO) << "      Number of voxels in VBGMM component " << g + 1 << " : " << vbVoxelIntens.size();
     if (vbVoxelIntens.size() == 0) {
-      LOG(ERROR) << vbgmm.labels();
+      LOG(FATAL) << vbgmm.labels();
+    } else {
+      ZPunctum punc;
+      punc.setVoxelIntensities(vbVoxelIntens);
+      punc.setVoxelLocations(vbVoxelLocs);
+      punc.updateFromVoxelsList(confRadius);
+      LOG(INFO) << "        Punctum: " << punc.x() << " " << punc.y() << " " << punc.z() << " "
+                << punc.maxIntensity() << " " << punc.volSize() << " " << punc.meanIntensity();
+      detectedPunctaList.push_back(punc);
     }
-    ZPunctum punc;
-    punc.setVoxelIntensities(vbVoxelIntens);
-    punc.setVoxelLocations(vbVoxelLocs);
-    punc.updateFromVoxelsList(confRadius);
-    LOG(INFO) << "        Punctum: " << punc.x() << " " << punc.y() << " " << punc.z()
-              << punc.maxIntensity() << punc.volSize() << punc.meanIntensity();
-    detectedPunctaList.push_back(punc);
   }
   if (numTotalVoxels != static_cast<size_t>(voxelIntens.size())) {
     LOG(ERROR) << "voxel number doesn't match";

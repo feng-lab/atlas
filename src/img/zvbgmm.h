@@ -693,8 +693,14 @@ protected:
     m_result.logWishartConst = VectorXrt::Zero(m_nclasses);
     m_result.entropy = VectorXrt::Zero(m_nclasses);
     m_resultRnk = MatrixXrt::Zero(post.rnk.rows(), post.rnk.cols());
+    std::set<size_t> allLabels;
+    for (Eigen::Index i = 0; i < post.rnk.rows(); ++i) {
+      Eigen::Index index;
+      post.rnk.row(i).maxCoeff(&index);
+      allLabels.insert(index);
+    }
     for (size_t k = 0; k < m_nclasses; ++k) {
-      if (post.v(k) > m_prior.v(k)) {
+      if (post.v(k) > m_prior.v(k) && allLabels.find(k) != allLabels.end()) {
         m_result.alpha(idx) = post.alpha(k);
         m_result.beta(idx) = post.beta(k);
         m_result.W.push_back(post.W[k]);
