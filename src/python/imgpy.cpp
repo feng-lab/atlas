@@ -394,6 +394,9 @@ PYBIND11_MODULE(_imgpy, m)
                                    FileFormat format, bool expandXY) {
       return ZImg::readSubBlock(fileList, catDim, scene, blockIndex, format, expandXY);
     }, "filenames"_a, "catDim"_a, "scene"_a, "blockIndex"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = false)
+    .def_static("getInternalSubRegions", [](const QString& filename, FileFormat format) {
+      return ZImg::getInternalSubRegions(filename, format);
+    }, "filename"_a, "format"_a = FileFormat::Unknown)
     .def("save", &ZImg::save,
          "filename"_a, "format"_a = FileFormat::Unknown, "compression"_a = Compression::AUTO)
     .def_property("info",
