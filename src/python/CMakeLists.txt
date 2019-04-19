@@ -50,7 +50,7 @@ set(BUILD_WITH_CONDA ON)
 if (DEFINED ENV{PREFIX})
   message(STATUS "PREFIX environment variable defined, conda build is running: " $ENV{PREFIX})
 else ()
-  set(ENV{PREFIX} $ENV{CONDA_EXE}/../../)
+  set(ENV{PREFIX} $ENV{CONDA_EXE}/../..)
   message(STATUS "PREFIX environment variable not defined, set this for IDE: " $ENV{PREFIX})
 endif ()
 

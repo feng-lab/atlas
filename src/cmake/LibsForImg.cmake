@@ -61,6 +61,43 @@ else ()
         ${MKL_PATH}/lib/intel64/libmkl_tbb_thread.a
         ${MKL_PATH}/lib/intel64/libmkl_core.a)
   endif ()
+
+  # ipp
+  if (WIN32)
+    set(IPP_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\ipp")
+  else (WIN32)
+    set(INTEL_PATH /opt/intel)
+    set(IPP_PATH ${INTEL_PATH}/ipp)
+  endif (WIN32)
+  set(IPP_INCLUDE_DIRS ${IPP_INCLUDE_DIRS} ${IPP_PATH}/include)
+  if (WIN32)
+    set(IPP_LIBRARIES ${IPP_LIBRARIES}
+        ${IPP_PATH}/lib/intel64/ippimt.lib
+        ${IPP_PATH}/lib/intel64/ippcoremt.lib
+        ${IPP_PATH}/lib/intel64/ippvmmt.lib
+        ${IPP_PATH}/lib/intel64/ippsmt.lib
+        ${IPP_PATH}/lib/intel64/ippcvmt.lib
+        ${IPP_PATH}/lib/intel64/ippccmt.lib)
+  elseif (APPLE)
+    set(IPP_LIBRARIES ${IPP_LIBRARIES}
+        ${IPP_PATH}/lib/libippi.a
+        ${IPP_PATH}/lib/libippcore.a
+        ${IPP_PATH}/lib/libippvm.a
+        #${IPP_PATH}/lib/libipps.a
+        ${IPP_PATH}/lib/libippcv.a
+        ${IPP_PATH}/lib/libippcc.a
+        ${INTEL_PATH}/lib/libirc.a
+        ${INTEL_PATH}/lib/libsvml.a
+        ${INTEL_PATH}/lib/libimf.a)
+  else ()
+    set(IPP_LIBRARIES ${IPP_LIBRARIES}
+        ${IPP_PATH}/lib/intel64/libippi.a
+        ${IPP_PATH}/lib/intel64/libippcore.a
+        ${IPP_PATH}/lib/intel64/libippvm.a
+        ${IPP_PATH}/lib/intel64/libipps.a
+        ${IPP_PATH}/lib/intel64/libippcv.a
+        ${IPP_PATH}/lib/intel64/libippcc.a)
+  endif ()
 endif ()
 
 find_package(ITK REQUIRED COMPONENTS ITKIOMeta ITKIONIFTI ITKIONRRD ITKIOGDCM ITKBinaryMathematicalMorphology

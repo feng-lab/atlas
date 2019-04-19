@@ -7,8 +7,8 @@ LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 # main stuff
 
 if (WIN32)
-    set(ZLIB_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/zlib)
-    find_package(ZLIB)
+  set(ZLIB_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/zlib)
+  find_package(ZLIB)
 endif (WIN32)
 
 find_package(c-ares REQUIRED
@@ -39,41 +39,6 @@ protobuf_generate(LANGUAGE cpp APPEND_PATH PROTOC_OUT_DIR ${CMAKE_CURRENT_BINARY
 grpc_generate_cpp(GRPC_SRCS GRPC_HDRS ${CMAKE_CURRENT_BINARY_DIR} ${PROTOS})
 set_property(SOURCE ${PROTO_SRCS} ${GRPC_SRCS} PROPERTY SKIP_AUTOGEN ON)
 
-if (WIN32)
-  set(IPP_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\ipp")
-else (WIN32)
-  set(INTEL_PATH /opt/intel)
-  set(IPP_PATH ${INTEL_PATH}/ipp)
-endif (WIN32)
-set(IPP_INCLUDE_DIRS ${IPP_INCLUDE_DIRS} ${IPP_PATH}/include)
-if (WIN32)
-  set(IPP_LIBRARIES ${IPP_LIBRARIES}
-      ${IPP_PATH}/lib/intel64/ippimt.lib
-      ${IPP_PATH}/lib/intel64/ippcoremt.lib
-      ${IPP_PATH}/lib/intel64/ippvmmt.lib
-      ${IPP_PATH}/lib/intel64/ippsmt.lib
-      ${IPP_PATH}/lib/intel64/ippcvmt.lib
-      ${IPP_PATH}/lib/intel64/ippccmt.lib)
-elseif (APPLE)
-  set(IPP_LIBRARIES ${IPP_LIBRARIES}
-      ${IPP_PATH}/lib/libippi.a
-      ${IPP_PATH}/lib/libippcore.a
-      ${IPP_PATH}/lib/libippvm.a
-      #${IPP_PATH}/lib/libipps.a
-      ${IPP_PATH}/lib/libippcv.a
-      ${IPP_PATH}/lib/libippcc.a
-      ${INTEL_PATH}/lib/libirc.a
-      ${INTEL_PATH}/lib/libsvml.a
-      ${INTEL_PATH}/lib/libimf.a)
-else ()
-  set(IPP_LIBRARIES ${IPP_LIBRARIES}
-      ${IPP_PATH}/lib/intel64/libippi.a
-      ${IPP_PATH}/lib/intel64/libippcore.a
-      ${IPP_PATH}/lib/intel64/libippvm.a
-      ${IPP_PATH}/lib/intel64/libipps.a
-      ${IPP_PATH}/lib/intel64/libippcv.a
-      ${IPP_PATH}/lib/intel64/libippcc.a)
-endif ()
 
 find_package(VTK REQUIRED COMPONENTS FiltersGeometry FiltersSources IOXML
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/vtk NO_DEFAULT_PATH)
@@ -616,14 +581,13 @@ add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
 
 target_include_directories(${APP_NAME} SYSTEM PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(${APP_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(${APP_NAME} PUBLIC ${IPP_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${GEOMETRICTOOLS_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${HDF5_INCLUDE_DIR})
 target_include_directories(${APP_NAME} PRIVATE ${QTCSVDIR} ${QTCSVDIR}/include)
 target_include_directories(${APP_NAME} PUBLIC ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
 target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/boost)
 target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/folly)
-target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_MKL ATLAS_USE_IPP ATLAS_USE_CORE_PROFILE)
+target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_CORE_PROFILE)
 if (WIN32)
   target_compile_definitions(${APP_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE _WIN32_WINNT=0x0601)
 
@@ -728,7 +692,7 @@ endif (WIN32)
 target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding-aux glbinding::glbinding
                       hdf5::hdf5_cpp-static hdf5::hdf5-static
                       img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${GEOMETRICTOOLS_LIBRARIES}
-                      ${ASSIMP_LIBRARIES} ${IPP_LIBRARIES} gRPC::grpc++ protobuf::libprotobuf)
+                      ${ASSIMP_LIBRARIES} gRPC::grpc++ protobuf::libprotobuf)
 if (BUILD_TESTING)
   target_link_libraries(${APP_NAME} PUBLIC benchmark::benchmark)
 endif (BUILD_TESTING)

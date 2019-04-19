@@ -12,11 +12,6 @@
 #include "zcpuinfo.h"
 #include "zlogwidget.h"
 #include "ztheme.h"
-#include <tbb/concurrent_unordered_map.h>
-#include <tbb/parallel_for.h>
-#include <tbb/task_scheduler_init.h>
-#include <qtcsv/reader.h>
-#include <fftw3.h>
 #include <QtWidgets>
 
 namespace nim {

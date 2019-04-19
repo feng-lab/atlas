@@ -245,6 +245,13 @@ add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${IMG_SOURCES}
             ${CERESSOLVER_HEADERS} ${CERESSOLVER_INTERNAL}
             )
 
+if (BUILD_WITH_CONDA)
+  set(IPP_LIBRARIES "")
+else ()
+  target_compile_definitions(${LIBRARY_NAME} PUBLIC ZIMG_USE_IPP)
+  target_include_directories(${LIBRARY_NAME} PUBLIC ${IPP_INCLUDE_DIRS})
+endif ()
+
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(${LIBRARY_NAME} PUBLIC ${MKL_INCLUDE_DIRS})
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CERESSOLVER_INCLUDE_DIRS})
@@ -363,7 +370,7 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTUR
                       glog::glog Qt5::Core)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  target_link_libraries(${LIBRARY_NAME} PUBLIC -Wl,--start-group ${MKL_LIBRARIES} -Wl,--end-group)
+  target_link_libraries(${LIBRARY_NAME} PUBLIC -Wl,--start-group ${MKL_LIBRARIES} ${IPP_LIBRARIES} -Wl,--end-group)
 else ()
-  target_link_libraries(${LIBRARY_NAME} PUBLIC ${MKL_LIBRARIES})
+  target_link_libraries(${LIBRARY_NAME} PUBLIC ${MKL_LIBRARIES} ${IPP_LIBRARIES})
 endif ()
