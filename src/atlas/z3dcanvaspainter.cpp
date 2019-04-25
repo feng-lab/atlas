@@ -127,14 +127,15 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, Z3DScreenShotType 
       } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
         m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
         m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
-        ZImg::cat(m_leftImg, m_rightImg, Dimension::X).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
+        ZImg::cat(std::vector<const ZImg*>{&m_leftImg, &m_rightImg}, Dimension::X).correctPreMultipliedColor().flip(
+          Dimension::Y).save(filename);
         LOG(INFO) << "Saved stereo rendering (" << m_leftImg.width() << " x 2, " <<
                   m_leftImg.height() << ") to file: " << filename;
       } else {
         m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
         m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
-        ZImg::cat(m_leftImg, m_rightImg, Dimension::X).zoom(0.5, 1).correctPreMultipliedColor().flip(Dimension::Y).save(
-          filename);
+        ZImg::cat(std::vector<const ZImg*>{&m_leftImg, &m_rightImg}, Dimension::X).zoom(
+          0.5, 1).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
         LOG(INFO) << "Saved half sbs stereo rendering (" << m_leftImg.width() << ", " <<
                   m_leftImg.height() << ") to file: " << filename;
       }
@@ -252,14 +253,15 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, int width, int hei
       } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
         m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
         m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
-        ZImg::cat(m_leftImg, m_rightImg, Dimension::X).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
+        ZImg::cat(std::vector<const ZImg*>{&m_leftImg, &m_rightImg}, Dimension::X).correctPreMultipliedColor().flip(
+          Dimension::Y).save(filename);
         LOG(INFO) << "Saved stereo rendering (" << m_leftImg.width() << " x 2, " <<
                   m_leftImg.height() << ") to file: " << filename;
       } else {
         m_leftImg.infoRef().lastChannelIsAlphaChannel = true;
         m_rightImg.infoRef().lastChannelIsAlphaChannel = true;
-        ZImg::cat(m_leftImg, m_rightImg, Dimension::X).zoom(0.5, 1).correctPreMultipliedColor().flip(Dimension::Y).save(
-          filename);
+        ZImg::cat(std::vector<const ZImg*>{&m_leftImg, &m_rightImg}, Dimension::X).zoom(
+          0.5, 1).correctPreMultipliedColor().flip(Dimension::Y).save(filename);
         LOG(INFO) << "Saved half sbs stereo rendering (" << m_leftImg.width() << ", " <<
                   m_leftImg.height() << ") to file:" << filename;
       }

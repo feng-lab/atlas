@@ -616,24 +616,12 @@ public:
 
   static ZImg cat(const std::vector<const ZImg*>& imgs, Dimension dim);
 
-  static ZImg cat(const ZImg& img1, const ZImg& img2, Dimension dim);
-
-  static ZImg cat(const ZImg& img1, const ZImg& img2, const ZImg& img3, Dimension dim);
-
-  static ZImg cat(const ZImg& img1, const ZImg& img2, const ZImg& img3, const ZImg& img4, Dimension dim);
-
   // combine image of same type and same dimensions
   static ZImg combine(const std::vector<ZImg>& imgs, ImgMergeMode mode);
 
   static ZImg combine(const std::vector<ZImg*>& imgs, ImgMergeMode mode);
 
   static ZImg combine(const std::vector<const ZImg*>& imgs, ImgMergeMode mode);
-
-  static ZImg combine(const ZImg& img1, const ZImg& img2, ImgMergeMode mode);
-
-  static ZImg combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, ImgMergeMode mode);
-
-  static ZImg combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, const ZImg& img4, ImgMergeMode mode);
 
   // projection
   ZImg projectAlongDim(Dimension dim, ImgMergeMode mode, int start = -1, int end = -1) const;

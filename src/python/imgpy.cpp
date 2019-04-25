@@ -4,6 +4,7 @@
 #include "zpuncta.h"
 #include "zglobalinit.h"
 #include "zstitchimage.h"
+#include "zimgnccmatch.h"
 #include "zpunctadetection.h"
 #include "zsectionsregistration.h"
 #include "zchromaticshiftcorrection.h"
@@ -616,6 +617,29 @@ PYBIND11_MODULE(_imgpy, m)
     .def("run", &ZChromaticShiftCorrection::runInPython)
     .def("__repr__", [](const ZChromaticShiftCorrection& v) {
       return QString("<_imgpy.ZChromaticShiftCorrection %1>").arg(v.toQString()).toStdString();
+    });
+
+  py::class_<ZImgNCCMatch>(m, "ZImgNCCMatch")
+    .def(py::init<const ZImg&, const ZImg&, size_t, size_t>(),
+         "fixedImg"_a, "movingImg"_a, "fixedT"_a = 0, "movingT"_a = 0)
+    .def("useFixedImgChannels", &ZImgNCCMatch::useFixedImgChannels,
+         "chs"_a)
+    .def("useMovingImgChannels", &ZImgNCCMatch::useMovingImgChannels,
+         "chs"_a)
+    .def("useAllFixedImgChannels", &ZImgNCCMatch::useAllFixedImgChannels)
+    .def("useAllMovingImgChannels", &ZImgNCCMatch::useAllMovingImgChannels)
+    .def("removeBackgroundForFixedImgChannels", &ZImgNCCMatch::removeBackgroundForFixedImgChannels,
+         "chs"_a)
+    .def("removeBackgroundForMovingImgChannels", &ZImgNCCMatch::removeBackgroundForMovingImgChannels,
+         "chs"_a)
+    .def("disableRemoveBackgroundForAllFixedImgChannels", &ZImgNCCMatch::disableRemoveBackgroundForAllFixedImgChannels)
+    .def("disableRemoveBackgroundForAllMovingImgChannels",
+         &ZImgNCCMatch::disableRemoveBackgroundForAllMovingImgChannels)
+    .def("computeNCCOfOffset", &ZImgNCCMatch::computeNCCOfOffset,
+         "offset"_a)
+    .def("computeNCC", &ZImgNCCMatch::computeNCC)
+    .def("__repr__", [](const ZImgNCCMatch&) {
+      return QString("<_imgpy.ZImgNCCMatch>").toStdString();
     });
 
   m.attr("__version__") = GIT_VERSION;

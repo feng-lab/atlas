@@ -619,16 +619,11 @@ void ZStitchImage::doWork()
                 imgNCCMatch.useAllFixedImgChannels();
                 imgNCCMatch.useAllMovingImgChannels();
               } else {
-                imgNCCMatch.useFixedImgChannel(chsToUse);
-                imgNCCMatch.useMovingImgChannel(chsToUse);
+                imgNCCMatch.useFixedImgChannels(chsToUse);
+                imgNCCMatch.useMovingImgChannels(chsToUse);
               }
-
-              if (!chsToRemoveBackground.empty()) {
-                for (auto ch : chsToRemoveBackground) {
-                  imgNCCMatch.enableRemoveBackgroundForFixedImgChannel(ch);
-                  imgNCCMatch.enableRemoveBackgroundForMovingImgChannel(ch);
-                }
-              }
+              imgNCCMatch.removeBackgroundForFixedImgChannels(chsToRemoveBackground);
+              imgNCCMatch.removeBackgroundForMovingImgChannels(chsToRemoveBackground);
 
               double maxNCC;
               ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(m_startResolutionIntvX,
@@ -646,14 +641,10 @@ void ZStitchImage::doWork()
               // between input set
               CHECK(m == f + nStacks);
 
-              imgNCCMatch.useFixedImgChannel(m_commonChannelOfInput);
-              imgNCCMatch.useMovingImgChannel(m_commonChannelOf2ndInput);
-              for (auto ch : m_channelsToRemoveBackground) {
-                imgNCCMatch.enableRemoveBackgroundForFixedImgChannel(ch);
-              }
-              for (auto ch : m_2ndChannelsToRemoveBackground) {
-                imgNCCMatch.enableRemoveBackgroundForMovingImgChannel(ch);
-              }
+              imgNCCMatch.useFixedImgChannels(std::vector<size_t>{m_commonChannelOfInput});
+              imgNCCMatch.useMovingImgChannels(std::vector<size_t>{m_commonChannelOf2ndInput});
+              imgNCCMatch.removeBackgroundForFixedImgChannels(m_channelsToRemoveBackground);
+              imgNCCMatch.removeBackgroundForMovingImgChannels(m_2ndChannelsToRemoveBackground);
 
               double maxNCC;
               ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(m_startResolutionIntvX,
@@ -1005,16 +996,11 @@ void ZStitchImage::doRestitch()
             imgNCCMatch.useAllFixedImgChannels();
             imgNCCMatch.useAllMovingImgChannels();
           } else {
-            imgNCCMatch.useFixedImgChannel(chsToUse);
-            imgNCCMatch.useMovingImgChannel(chsToUse);
+            imgNCCMatch.useFixedImgChannels(chsToUse);
+            imgNCCMatch.useMovingImgChannels(chsToUse);
           }
-
-          if (!chsToRemoveBackground.empty()) {
-            for (auto ch : chsToRemoveBackground) {
-              imgNCCMatch.enableRemoveBackgroundForFixedImgChannel(ch);
-              imgNCCMatch.enableRemoveBackgroundForMovingImgChannel(ch);
-            }
-          }
+          imgNCCMatch.removeBackgroundForFixedImgChannels(chsToRemoveBackground);
+          imgNCCMatch.removeBackgroundForMovingImgChannels(chsToRemoveBackground);
 
           size_t radiusX = std::ceil(m_maxOverlapRate / 5.0 * std::max(fixedImg.width(), movingImg.width()));
           size_t radiusY = std::ceil(m_maxOverlapRate / 5.0 * std::max(fixedImg.height(), movingImg.height()));

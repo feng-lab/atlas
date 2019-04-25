@@ -4,6 +4,7 @@
 #include "zvoxelcoordinate.h"
 #include "zflags.h"
 #include <set>
+#include <tuple>
 
 namespace nim {
 
@@ -38,25 +39,9 @@ public:
   // NCC works for single channel, if img contains many channels, these methods control
   // which channels to use. Default use average of all channels
   // don't need to call this for single channel img
-  // use one channel
-  void useFixedImgChannel(size_t ch);
+  void useFixedImgChannels(const std::vector<size_t>& chs);
 
-  void useMovingImgChannel(size_t ch);
-
-  // use two channels
-  void useFixedImgChannel(size_t ch1, size_t ch2);
-
-  void useMovingImgChannel(size_t ch1, size_t ch2);
-
-  // use three channels
-  void useFixedImgChannel(size_t ch1, size_t ch2, size_t ch3);
-
-  void useMovingImgChannel(size_t ch1, size_t ch2, size_t ch3);
-
-  // use many channels
-  void useFixedImgChannel(const std::vector<size_t>& chs);
-
-  void useMovingImgChannel(const std::vector<size_t>& chs);
+  void useMovingImgChannels(const std::vector<size_t>& chs);
 
   // use all channels, this is default
   void useAllFixedImgChannels();
@@ -65,19 +50,9 @@ public:
 
   // optional preprocess
   // remove background for channel ch
-  void enableRemoveBackgroundForFixedImgChannel(size_t ch);
+  void removeBackgroundForFixedImgChannels(const std::vector<size_t>& chs);
 
-  void enableRemoveBackgroundForMovingImgChannel(size_t ch);
-
-  // don't remove background for channel ch
-  void disableRemoveBackgroundForFixedImgChannel(size_t ch);
-
-  void disableRemoveBackgroundForMovingImgChannel(size_t ch);
-
-  //
-  void enableRemoveBackgroundForAllFixedImgChannels();
-
-  void enableRemoveBackgroundForAllMovingImgChannels();
+  void removeBackgroundForMovingImgChannels(const std::vector<size_t>& chs);
 
   //  this is default behavior
   void disableRemoveBackgroundForAllFixedImgChannels();
@@ -125,6 +100,9 @@ public:
   ZVoxelCoordinate getMovingImgOffsetFromHint(double exactOverlapRateX = 0.00,
                                               double exactOverlapRateY = 0.00,
                                               double exactOverlapRateZ = 0.00);
+
+  // return ncc img and overlapvoxels img
+  std::tuple<ZImg, ZImg> computeNCC();
 
 private:
   void init();

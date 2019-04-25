@@ -1054,24 +1054,6 @@ ZImg ZImg::cat(const std::vector<const ZImg*>& imgsIn, Dimension dim)
   return res;
 }
 
-ZImg ZImg::cat(const ZImg& img1, const ZImg& img2, Dimension dim)
-{
-  std::vector<const ZImg*> imgs{&img1, &img2};
-  return cat(imgs, dim);
-}
-
-ZImg ZImg::cat(const ZImg& img1, const ZImg& img2, const ZImg& img3, Dimension dim)
-{
-  std::vector<const ZImg*> imgs{&img1, &img2, &img3};
-  return cat(imgs, dim);
-}
-
-ZImg ZImg::cat(const ZImg& img1, const ZImg& img2, const ZImg& img3, const ZImg& img4, Dimension dim)
-{
-  std::vector<const ZImg*> imgs{&img1, &img2, &img3, &img4};
-  return cat(imgs, dim);
-}
-
 ZImg ZImg::combine(const std::vector<ZImg>& imgsIn, ImgMergeMode mode)
 {
   std::vector<const ZImg*> imgs;
@@ -1114,24 +1096,6 @@ ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ImgMergeMode mode)
   IMG_RETURN_TYPED_CALL(combine_Impl, (*firstImg), imgs, mode);
 
   return ZImg();
-}
-
-ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, ImgMergeMode mode)
-{
-  std::vector<const ZImg*> imgs{&img1, &img2};
-  return combine(imgs, mode);
-}
-
-ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, ImgMergeMode mode)
-{
-  std::vector<const ZImg*> imgs{&img1, &img2, &img3};
-  return combine(imgs, mode);
-}
-
-ZImg ZImg::combine(const ZImg& img1, const ZImg& img2, const ZImg& img3, const ZImg& img4, ImgMergeMode mode)
-{
-  std::vector<const ZImg*> imgs{&img1, &img2, &img3, &img4};
-  return combine(imgs, mode);
 }
 
 ZImg ZImg::projectAlongDim(Dimension dim, ImgMergeMode mode, int startIn, int endIn) const

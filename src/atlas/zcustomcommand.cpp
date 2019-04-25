@@ -1076,7 +1076,7 @@ void fixImg()
   ZImgRegion rgn2;
   rgn2.start.z = 76;
   ZImg img2("/Users/feng/Downloads/ChaehyunImage/c_fix.tif", rgn2);
-  ZImg img = ZImg::cat(img2, img1, Dimension::Z);
+  ZImg img = ZImg::cat(std::vector<const ZImg*>{&img2, &img1}, Dimension::Z);
   img.save("/Users/feng/Downloads/ChaehyunImage/c_fix2.tif");
 }
 
@@ -1276,7 +1276,7 @@ void convertPYRawToNim()
       img.infoRef().voxelSizeY = refPYImg.voxelSizeY();
       img.infoRef().voxelSizeZ = refPYImg.voxelSizeZ();
 
-      auto tmpimg = ZImg::cat(img.createView(2), img.createView(0), img.createView(1), Dimension::C);
+      auto tmpimg = ZImg::cat(std::vector<ZImg>{img.createView(2), img.createView(0), img.createView(1)}, Dimension::C);
       img.swap(tmpimg);
     } else if (fileInfo.baseName().startsWith("PV")) {
       img.infoRef().channelColors[0] = col4(0, 0, 255);

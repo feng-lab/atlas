@@ -140,75 +140,27 @@ QString ZImgNCCMatch::positionHintToQString(PositionHint hint, double maxOverlap
   return res;
 }
 
-void ZImgNCCMatch::useFixedImgChannel(size_t ch)
+void ZImgNCCMatch::useFixedImgChannels(const std::vector<size_t>& chs)
 {
-  std::vector<size_t> chs;
-  chs.push_back(ch);
-  useFixedImgChannel(chs);
-}
-
-void ZImgNCCMatch::useMovingImgChannel(size_t ch)
-{
-  std::vector<size_t> chs;
-  chs.push_back(ch);
-  useMovingImgChannel(chs);
-}
-
-void ZImgNCCMatch::useFixedImgChannel(size_t ch1, size_t ch2)
-{
-  std::vector<size_t> chs;
-  chs.push_back(ch1);
-  chs.push_back(ch2);
-  useFixedImgChannel(chs);
-}
-
-void ZImgNCCMatch::useMovingImgChannel(size_t ch1, size_t ch2)
-{
-  std::vector<size_t> chs;
-  chs.push_back(ch1);
-  chs.push_back(ch2);
-  useMovingImgChannel(chs);
-}
-
-void ZImgNCCMatch::useFixedImgChannel(size_t ch1, size_t ch2, size_t ch3)
-{
-  std::vector<size_t> chs;
-  chs.push_back(ch1);
-  chs.push_back(ch2);
-  chs.push_back(ch3);
-  useFixedImgChannel(chs);
-}
-
-void ZImgNCCMatch::useMovingImgChannel(size_t ch1, size_t ch2, size_t ch3)
-{
-  std::vector<size_t> chs;
-  chs.push_back(ch1);
-  chs.push_back(ch2);
-  chs.push_back(ch3);
-  useMovingImgChannel(chs);
-}
-
-void ZImgNCCMatch::useFixedImgChannel(const std::vector<size_t>& chs)
-{
-  for (size_t i = 0; i < chs.size(); ++i) {
-    checkFixedImgChannel(chs[i]);
+  for (auto ch : chs) {
+    checkFixedImgChannel(ch);
   }
 
   m_fixedImgChannelsToUse.clear();
-  for (size_t i = 0; i < chs.size(); ++i) {
-    m_fixedImgChannelsToUse.insert(chs[i]);
+  for (auto ch : chs) {
+    m_fixedImgChannelsToUse.insert(ch);
   }
 }
 
-void ZImgNCCMatch::useMovingImgChannel(const std::vector<size_t>& chs)
+void ZImgNCCMatch::useMovingImgChannels(const std::vector<size_t>& chs)
 {
-  for (size_t i = 0; i < chs.size(); ++i) {
-    checkMovingImgChannel(chs[i]);
+  for (auto ch : chs) {
+    checkMovingImgChannel(ch);
   }
 
   m_movingImgChannelsToUse.clear();
-  for (size_t i = 0; i < chs.size(); ++i) {
-    m_movingImgChannelsToUse.insert(chs[i]);
+  for (auto ch : chs) {
+    m_movingImgChannelsToUse.insert(ch);
   }
 }
 
@@ -226,40 +178,28 @@ void ZImgNCCMatch::useAllMovingImgChannels()
     m_movingImgChannelsToUse.insert(c);
 }
 
-void ZImgNCCMatch::enableRemoveBackgroundForFixedImgChannel(size_t ch)
+void ZImgNCCMatch::removeBackgroundForFixedImgChannels(const std::vector<size_t>& chs)
 {
-  checkFixedImgChannel(ch);
-  m_fixedImgChannelsToRemoveBackground.insert(ch);
+  for (auto ch : chs) {
+    checkFixedImgChannel(ch);
+  }
+
+  m_fixedImgChannelsToRemoveBackground.clear();
+  for (auto ch : chs) {
+    m_fixedImgChannelsToRemoveBackground.insert(ch);
+  }
 }
 
-void ZImgNCCMatch::enableRemoveBackgroundForMovingImgChannel(size_t ch)
+void ZImgNCCMatch::removeBackgroundForMovingImgChannels(const std::vector<size_t>& chs)
 {
-  checkMovingImgChannel(ch);
-  m_movingImgChannelsToRemoveBackground.insert(ch);
-}
+  for (auto ch : chs) {
+    checkMovingImgChannel(ch);
+  }
 
-void ZImgNCCMatch::disableRemoveBackgroundForFixedImgChannel(size_t ch)
-{
-  checkFixedImgChannel(ch);
-  m_fixedImgChannelsToRemoveBackground.erase(ch);
-}
-
-void ZImgNCCMatch::disableRemoveBackgroundForMovingImgChannel(size_t ch)
-{
-  checkMovingImgChannel(ch);
-  m_movingImgChannelsToRemoveBackground.erase(ch);
-}
-
-void ZImgNCCMatch::enableRemoveBackgroundForAllFixedImgChannels()
-{
-  for (size_t c = 0; c < m_fixedImg.numChannels(); ++c)
-    m_fixedImgChannelsToRemoveBackground.insert(c);
-}
-
-void ZImgNCCMatch::enableRemoveBackgroundForAllMovingImgChannels()
-{
-  for (size_t c = 0; c < m_movingImg.numChannels(); ++c)
-    m_movingImgChannelsToRemoveBackground.insert(c);
+  m_movingImgChannelsToRemoveBackground.clear();
+  for (auto ch : chs) {
+    m_movingImgChannelsToRemoveBackground.insert(ch);
+  }
 }
 
 void ZImgNCCMatch::disableRemoveBackgroundForAllFixedImgChannels()
@@ -482,6 +422,25 @@ ZVoxelCoordinate ZImgNCCMatch::getMovingImgOffsetFromHint(double exactOverlapRat
     movingImgOffset.z = m_fixedImg.info().depth - shift;
   }
   return movingImgOffset;
+}
+
+std::tuple<ZImg, ZImg> ZImgNCCMatch::computeNCC()
+{
+  if (m_fixedImg.isEmpty() || m_movingImg.isEmpty()) {
+    throw ZImgException("computeNCC: Can not match empty imgs");
+  }
+
+  ZImg fixedImg;
+  ZImg movingImg;
+
+  constructSingleChannelFixedImg(ZImgRegion(), fixedImg);
+  constructSingleChannelMovingImg(ZImgRegion(), movingImg);
+
+  ZImg nccImg;
+  ZImg numberOfOverlapVoxelsImg;
+  normXCorr(fixedImg, movingImg, nccImg, numberOfOverlapVoxelsImg);
+
+  return {nccImg, numberOfOverlapVoxelsImg};
 }
 
 void ZImgNCCMatch::init()
