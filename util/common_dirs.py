@@ -295,8 +295,8 @@ def get_package_top_level_folder(file: str, folder: str):
     elif file.lower().endswith('.tar.gz') or file.lower().endswith('.tar.bz2') or file.lower().endswith('.tar.xz') \
             or file.lower().endswith('.tgz'):
         with tarfile.open(file, mode='r|*') as tf:
-            # print(tf.getnames())
-            res = os.path.join(folder, os.path.commonpath(tf.getnames()))
+            names = [nm for nm in tf.getnames() if not nm == '.']
+            res = os.path.join(folder, os.path.commonpath(names))
     elif file.lower().endswith('.7z'):
         cp = subprocess.run(['7za', 'l', '-slt', '-sccUTF-8', file], stdout=subprocess.PIPE, encoding='utf-8')
         started = False

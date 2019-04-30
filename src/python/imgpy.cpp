@@ -112,7 +112,7 @@ ZImgInfo getImgInfoFromNdarray(const py::array& arr, const ZImgInfo& info_in)
 
 PYBIND11_MODULE(_imgpy, m)
 {
-  initImgLib("_imgpy");
+  initImgLib("_imgpy", "", qgetenv("ZIMG_JARS_DIR"), "");
 
   m.doc() = R"pbdoc(
         Python interface to img lib.

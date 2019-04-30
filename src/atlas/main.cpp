@@ -1,5 +1,6 @@
 #include "zapplication.h"
 #include "zmainwindow.h"
+#include "zcpuinfo.h"
 #include "zsysteminfo.h"
 #include "zglobalinit.h"
 #include "zexception.h"
@@ -134,7 +135,17 @@ int main(int argc, char* argv[])
     QDir logDir = nim::ZSystemInfo::instance().logDir();
     removeOldLogs(logDir);
 
-    initImgLib(argv[0], logDir.filePath("atlas"));
+#ifdef _WIN32
+    QString jdkDIR = QApplication::applicationDirPath() + QString("/Resources/jdk");
+    QString jarsDIR = QApplication::applicationDirPath() + QString("/Resources/jars");
+#elif defined(__APPLE__)
+    QString jdkDIR = QApplication::applicationDirPath() + QString("/../Resources/jdk");
+    QString jarsDIR = QApplication::applicationDirPath() + QString("/../Resources/jars");
+#else
+    QString jdkDIR = QApplication::applicationDirPath() + QString("/Resources/jdk");
+    QString jarsDIR = QApplication::applicationDirPath() + QString("/Resources/jars");
+#endif
+    initImgLib(argv[0], jdkDIR, jarsDIR, logDir.filePath("atlas"));
     [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
       LOG(INFO) << "--- App Log End ---";
       nim::shutdownImgLib();

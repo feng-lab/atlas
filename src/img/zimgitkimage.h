@@ -44,7 +44,11 @@ public:
   bool supportWrite() const override;
 
 protected:
-  void parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info);
+  void parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bool isNd2);
+
+  void parseMetadata(const itk::ImageIOBase* imageIO, ZImgMetadata& meta);
+
+  bool hasSCIFIOSupport() const;
 };
 
 } // namespace nim

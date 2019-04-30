@@ -19,6 +19,7 @@
 *.pb.h
 *.pb.cc
 *_pb2.py
+*.jar
 
 !/neurolabi/lib/Mingw/*.zip
 
@@ -60,6 +61,8 @@
 /src/3rdparty/grpc/
 /src/3rdparty/better-enums/
 /src/3rdparty/cppitertools/
+/src/3rdparty/jdk/
+/src/3rdparty/jars/
 ffmpeg
 ffmpeg.exe
 nasm

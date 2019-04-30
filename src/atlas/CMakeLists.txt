@@ -625,6 +625,14 @@ if (WIN32)
                      POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}\\..\\3rdparty\\ffmpeg.exe"
                      "$<TARGET_FILE_DIR:${APP_NAME}>\\Resources\\")
+  add_custom_command(TARGET ${APP_NAME}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}\\..\\3rdparty\\jdk"
+                     "$<TARGET_FILE_DIR:${APP_NAME}>\\Resources\\jdk")
+  add_custom_command(TARGET ${APP_NAME}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}\\..\\3rdparty\\jars"
+                     "$<TARGET_FILE_DIR:${APP_NAME}>\\Resources\\jars")
 else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -frtti)
   target_compile_options(${APP_NAME} PUBLIC -fexceptions)
@@ -673,6 +681,14 @@ else (WIN32)
                           )
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/jdk
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/jdk)
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/jars
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/jars)
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
                        COMMAND codesign --force --deep --sign - $<TARGET_BUNDLE_DIR:${APP_NAME}>)
   else ()
     add_custom_command(TARGET ${APP_NAME}
@@ -686,6 +702,14 @@ else (WIN32)
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ffmpeg
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/)
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/jdk
+                       $<TARGET_FILE_DIR:${APP_NAME}>/Resources/jdk)
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/jars
+                       $<TARGET_FILE_DIR:${APP_NAME}>/Resources/jars)
   endif ()
 endif (WIN32)
 

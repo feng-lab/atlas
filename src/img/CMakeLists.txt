@@ -58,6 +58,14 @@ else (WIN32)
 endif (WIN32)
 source_group(libtiff FILES ${TIFF_SOURCES})
 
+# tiff srcs
+set(SCIFIODIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/scifio)
+set(SCIFIO_SOURCES
+    ${SCIFIODIR}/itkSCIFIOImageIO.cxx
+    ${SCIFIODIR}/itkSCIFIOImageIOFactory.cxx
+    )
+source_group(scifio FILES ${SCIFIO_SOURCES})
+
 # main srcs
 set(IMG_SOURCES
     zbbox.h
@@ -231,6 +239,7 @@ set(IMG_SOURCES
     zstitchimage.cpp
     zstitchimage.h
     zglobalinit.h
+    zglobalinit.cpp
     zjson.h
     zjson.cpp
     )
@@ -241,7 +250,7 @@ if (BUILD_WITH_CONDA)
 else ()
   set(LIBRARY_NAME img)
 endif ()
-add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${IMG_SOURCES}
+add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${SCIFIO_SOURCES} ${IMG_SOURCES}
             ${CERESSOLVER_HEADERS} ${CERESSOLVER_INTERNAL}
             )
 
@@ -306,6 +315,7 @@ if (WIN32)
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_FLAGS ${JXRINC})
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "__ANSI__;DISABLE_PERF_MEASUREMENT")
   set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS /I${FREEIMAGE_INCLUDE_DIRS})
+  set_source_files_properties(zimgitkimage.cpp PROPERTIES COMPILE_FLAGS /I${SCIFIODIR})
 
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
                               "/wd4100 /I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}") # 'identifier' : unreferenced formal parameter)
@@ -348,6 +358,7 @@ else (WIN32)
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_FLAGS ${JXRINC})
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "__ANSI__;DISABLE_PERF_MEASUREMENT")
   set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS -I${FREEIMAGE_INCLUDE_DIRS})
+  set_source_files_properties(zimgitkimage.cpp PROPERTIES COMPILE_FLAGS -I${SCIFIODIR})
 
   set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
 

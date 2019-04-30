@@ -145,4 +145,11 @@ struct dependent_false : std::false_type
 {
 };
 
+class ZGlobal
+{
+public:
+  inline static QString jdkDIR = "";
+  inline static QString jarsDIR = "";
+};
+
 } // namespace nim

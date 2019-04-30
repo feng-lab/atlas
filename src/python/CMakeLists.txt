@@ -103,3 +103,9 @@ install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/" # source directory
         )
 install(TARGETS ${module_name} DESTINATION $ENV{SP_DIR}/zimg)
 install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION $ENV{SP_DIR}/zimg)
+install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/jars" # source directory
+        DESTINATION $ENV{SP_DIR}/zimg/jars # target directory
+        FILES_MATCHING PATTERN "*.jar"
+        PATTERN "*idea*" EXCLUDE
+        PATTERN "*cmake*" EXCLUDE
+        )

@@ -302,9 +302,9 @@ const QString& ZImgPack::detailedInfo() const
       info << QString("Valid Bit Count: %1").arg(m_imgInfo.validBitCount);
     }
     m_detailedInfo = info.join("\n");
+    m_detailedInfo += "\n\n";
 
     for (const auto& meta : m_imgMetaData.topLevelAttachments()) {
-      m_detailedInfo += "\n";
       m_detailedInfo += meta.toQString();
       m_detailedInfo += "\n";
     }

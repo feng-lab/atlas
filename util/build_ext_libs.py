@@ -226,7 +226,7 @@ def build_and_install_cmakecmd(cmakecmd, build_dir: str, env=None):
                                cwd=build_dir, shell=False, check=True, env=env)
 
 
-def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: bool=True) -> str:
+def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: bool = True) -> str:
     assert len(from_texts) == len(to_texts)
     bak_file = get_bak_file_name(orig_file)
     os.rename(orig_file, bak_file)
@@ -729,8 +729,10 @@ def build_assimp(src_dir: str, install_dir: str):
             bak_file_3 = patch_file(orig_file_3, from_texts=from_texts, to_texts=to_texts)
 
             orig_file_4 = os.path.join(src_dir, 'assimpTargets-debug.cmake.in')
-            from_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@']
-            to_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@']
+            from_texts = [
+                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@']
+            to_texts = [
+                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@']
             bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
@@ -1383,6 +1385,28 @@ def build_libs(libs: dict, update_src: bool):
         assert os.path.exists(embree_dir)
         build_ospray(src_dir, os.path.join(ext_dir(), 'ospray'), ispc_dir=ispc_dir, embree_dir=embree_dir)
 
+    if libs['java']:
+        shutil.rmtree(os.path.join(ext_dir(), 'jars'), ignore_errors=True)
+        shutil.rmtree(os.path.join(ext_dir(), 'jdk'), ignore_errors=True)
+        shutil.copytree(os.path.join(src_package_dir(), 'jars'), os.path.join(ext_dir(), 'jars'))
+
+        if is_mac():
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*jdk*osx*'))
+            jdk_dir = get_package_top_level_folder(package_name, ext_dir())
+            unpack_file_to_folder(package_name, ext_dir())
+            print(jdk_dir)
+            shutil.move(os.path.join(jdk_dir, 'Contents', 'Home'), ext_dir())
+            os.rename(os.path.join(ext_dir(), 'Home'), os.path.join(ext_dir(), 'jdk'))
+            shutil.rmtree(jdk_dir, ignore_errors=True)
+        else:
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*jdk*linux*'))
+            if is_windows():
+                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*jdk*windows*'))
+            jdk_dir = get_package_top_level_folder(package_name, ext_dir())
+            unpack_file_to_folder(package_name, ext_dir())
+            print(jdk_dir)
+            os.rename(jdk_dir, os.path.join(ext_dir(), 'jdk'))
+
 
 def parse_inputs(argv: list):
     libs = {'cmake': True,
@@ -1416,7 +1440,8 @@ def parse_inputs(argv: list):
             'vtk': False,
             'opencv': False,
             'botan': False,
-            'ospray': False
+            'ospray': False,
+            'java': False,
             }
     update_src = True
     libs_reverse_depends = {'eigen': ['opencv'],

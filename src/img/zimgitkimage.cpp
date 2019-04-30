@@ -1,10 +1,13 @@
 #include "zimgitkimage.h"
 
 #include "zimgsliceprovider.h"
+#include "zglobal.h"
 #include <itkImageIOBase.h>
 #include <itkNiftiImageIOFactory.h>
 #include <itkNrrdImageIOFactory.h>
 #include <itkImageIOFactory.h>
+#include <itkSCIFIOImageIOFactory.h>
+#include <itkMetaDataObject.h>
 //#define ATLAS_SUPPORT_DICOM
 #ifdef ATLAS_SUPPORT_DICOM
 #include <itkGDCMImageIOFactory.h>
@@ -22,6 +25,9 @@ ZImgITKImage::ZImgITKImage()
   if (itk::ObjectFactoryBase::GetRegisteredFactories().empty()) {
     itk::NiftiImageIOFactory::RegisterOneFactory();
     itk::NrrdImageIOFactory::RegisterOneFactory();
+    if (hasSCIFIOSupport()) {
+      itk::SCIFIOImageIOFactory::RegisterOneFactory();
+    }
 #ifdef ATLAS_SUPPORT_DICOM
     itk::GDCMImageIOFactory::RegisterOneFactory();
 #endif
@@ -51,6 +57,9 @@ QStringList ZImgITKImage::extensions() const
       }
     }
   }
+  if (hasSCIFIOSupport()) {
+    res.push_back("nd2");
+  }
 #ifdef ATLAS_SUPPORT_DICOM
   res.push_back("dcm");
 #endif
@@ -74,8 +83,10 @@ void ZImgITKImage::readInfo(const QString& filename, std::vector<ZImgInfo>& info
 
     bool isNrrd = QString(imageIO->GetNameOfClass()).contains("Nrrd");
 
+    bool isNd2 = filename.endsWith(".nd2", Qt::CaseInsensitive);
+
     infos.resize(1);
-    parseInfo(imageIO.GetPointer(), infos[0]);
+    parseInfo(imageIO.GetPointer(), infos[0], isNd2);
 
     if (isNrrd) {
       createEmptySubBlocks(infos, subBlocks, pyramidalRatios);
@@ -88,9 +99,19 @@ void ZImgITKImage::readInfo(const QString& filename, std::vector<ZImgInfo>& info
   }
 }
 
-void ZImgITKImage::readMetadata(const QString& /*filename*/, ZImgMetadata& /*meta*/, size_t /*scene*/)
+void ZImgITKImage::readMetadata(const QString& filename, ZImgMetadata& meta, size_t /*scene*/)
 {
   try {
+    itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
+                                                                           itk::ImageIOFactory::ReadMode);
+
+    if (imageIO.IsNull())
+      throw ZIOException("can not create reader");
+
+    imageIO->SetFileName(QFile::encodeName(filename).constData());
+    imageIO->ReadImageInformation();
+
+    parseMetadata(imageIO.GetPointer(), meta);
   }
   catch (itk::ExceptionObject& err) {
     throw ZIOException(err.what());
@@ -125,8 +146,10 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
 
     bool isNrrd = QString(imageIO->GetNameOfClass()).contains("Nrrd");
 
+    bool isNd2 = filename.endsWith(".nd2", Qt::CaseInsensitive);
+
     ZImgInfo imgInfo;
-    parseInfo(imageIO.GetPointer(), imgInfo);
+    parseInfo(imageIO.GetPointer(), imgInfo, isNd2);
 
     if (region.isEmpty() || !region.isValid(imgInfo)) {
       throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(
@@ -148,11 +171,16 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       if (imgInfo.numTimes > 1) {
         std::vector<uint8_t> buf(img.byteNumber());
         imageIO->Read(buf.data());
-        fixDimensionOrder(buf.data(), "CXYZT", img);
+        if (isNd2) {
+          fixDimensionOrder(buf.data(), "XYZTC", img);
+        } else {
+          fixDimensionOrder(buf.data(), "CXYZT", img);
+        }
       } else {
         imageIO->Read(img.channelData(0));
       }
-      if (imgInfo.numChannels > 1 && imgInfo.numTimes == 1) { // if numTimes > 1 then dimension order is already fixed
+      if (imgInfo.numChannels > 1 && imgInfo.numTimes == 1 &&
+          !isNd2) { // if numTimes > 1 or isNd2 then dimension order is already fixed
         ZImg tpImg(imgInfo);
         CXYZtoXYZC(img, tpImg);
         img.swap(tpImg);
@@ -183,11 +211,16 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       if (clipInfo.numTimes > 1) {
         std::vector<uint8_t> buf(tmpImg.byteNumber());
         imageIO->Read(buf.data());
-        fixDimensionOrder(buf.data(), "CXYZT", tmpImg);
+        if (isNd2) {
+          fixDimensionOrder(buf.data(), "XYZTC", tmpImg);
+        } else {
+          fixDimensionOrder(buf.data(), "CXYZT", tmpImg);
+        }
       } else {
         imageIO->Read(tmpImg.channelData(0));
       }
-      if (clipInfo.numChannels > 1 && clipInfo.numTimes == 1) { // if numTimes > 1 then dimension order is already fixed
+      if (clipInfo.numChannels > 1 && clipInfo.numTimes == 1 &&
+          !isNd2) { // if numTimes > 1 or isNd2 then dimension order is already fixed
         ZImg tpImg(clipInfo);
         CXYZtoXYZC(tmpImg, tpImg);
         tmpImg.swap(tpImg);
@@ -202,6 +235,8 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
         img.swap(tmpImg);
       }
     }
+
+    parseMetadata(imageIO.GetPointer(), img.metadataRef());
   }
   catch (itk::ExceptionObject& err) {
     throw ZIOException(err.what());
@@ -333,7 +368,7 @@ bool ZImgITKImage::supportWrite() const
   return false;
 }
 
-void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info)
+void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bool isNd2)
 {
   uint32_t ndims = imageIO->GetNumberOfDimensions();
   if (ndims == 1) {
@@ -356,10 +391,21 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info)
     info.height = imageIO->GetDimensions(1);
     info.depth = imageIO->GetDimensions(2);
     info.numTimes = imageIO->GetDimensions(3);
+  } else if (ndims == 5 && isNd2) {
+    info.width = imageIO->GetDimensions(0);
+    info.height = imageIO->GetDimensions(1);
+    info.depth = imageIO->GetDimensions(2);
+    info.numTimes = imageIO->GetDimensions(3);
+    info.numChannels = imageIO->GetDimensions(4);
+    if (imageIO->GetNumberOfComponents() > 1) {
+      throw ZIOException(QString("Can not handle this nd2"));
+    }
   } else {
     throw ZIOException(QString("NDims not supported: %1.").arg(ndims));
   }
-  info.numChannels = imageIO->GetNumberOfComponents();
+  if (!isNd2) {
+    info.numChannels = imageIO->GetNumberOfComponents();
+  }
   switch (imageIO->GetComponentType()) {
     case itk::ImageIOBase::CHAR:
       info.bytesPerVoxel = 1;
@@ -426,6 +472,73 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info)
   if (info.isEmpty()) {
     throw ZIOException("Empty Image");
   }
+
+  if (isNd2) {
+    using DictionaryType = itk::MetaDataDictionary;
+    const DictionaryType& dictionary = imageIO->GetMetaDataDictionary();
+
+    using MetaDataStringType = itk::MetaDataObject<std::string>;
+
+    auto itr = dictionary.Begin();
+    auto end = dictionary.End();
+
+    while (itr != end) {
+      itk::MetaDataObjectBase::Pointer entry = itr->second;
+      MetaDataStringType::Pointer entryvalue =
+        dynamic_cast<MetaDataStringType*>( entry.GetPointer());
+      if (entryvalue) {
+        std::string tagkey = itr->first;
+        for (size_t ch = 0; ch < info.numChannels; ++ch) {
+          if (tagkey == QString("CH%1ChannelColor").arg(ch + 1).toStdString()) {
+            QString tagvalue = QString::fromStdString(entryvalue->GetMetaDataObjectValue());
+            bool ok;
+            int color = tagvalue.toInt(&ok);
+            if (!ok)
+              throw ZIOException("Can not parse nd2 channel Color");
+            col4 col;
+            std::memcpy(&col, &color, 3);
+            col.a = 255;
+            info.channelColors[ch] = col;
+            break;
+          }
+          if (tagkey == QString("CH%1ChannelDyeName").arg(ch + 1).toStdString()) {
+            info.channelNames[ch] = QString::fromStdString(entryvalue->GetMetaDataObjectValue());
+            break;
+          }
+        }
+      }
+      ++itr;
+    }
+  }
+}
+
+void ZImgITKImage::parseMetadata(const itk::ImageIOBase* imageIO, nim::ZImgMetadata& meta)
+{
+  using DictionaryType = itk::MetaDataDictionary;
+  const DictionaryType& dictionary = imageIO->GetMetaDataDictionary();
+
+  using MetaDataStringType = itk::MetaDataObject<std::string>;
+
+  auto itr = dictionary.Begin();
+  auto end = dictionary.End();
+
+  while (itr != end) {
+    itk::MetaDataObjectBase::Pointer entry = itr->second;
+    MetaDataStringType::Pointer entryvalue =
+      dynamic_cast<MetaDataStringType*>( entry.GetPointer());
+    if (entryvalue) {
+      std::string tagkey = itr->first;
+      std::string tagvalue = entryvalue->GetMetaDataObjectValue();
+      // std::cout << tagkey << " = " << tagvalue << std::endl;
+      meta.attachToTopLevel(ZImgMetatag(QString::fromStdString(tagkey), QString::fromStdString(tagvalue)));
+    }
+    ++itr;
+  }
+}
+
+bool ZImgITKImage::hasSCIFIOSupport() const
+{
+  return !ZGlobal::jarsDIR.isEmpty();
 }
 
 }  // namespace nim
