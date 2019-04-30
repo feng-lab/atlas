@@ -57,15 +57,6 @@ void checkLength(long length, double spacing,
   }
 }
 
-std::string getEnv(const char* name)
-{
-  char* result = getenv(name);
-  if (result == NULL) {
-    return "";
-  }
-  return result;
-}
-
 /*
  * Splits a string into tokens using the given delimiter.
  *
@@ -305,8 +296,8 @@ SCIFIOImageIO::SCIFIOImageIO() : m_Argv(0)
   m_Args.push_back(classpath);
 
 // append any user-given parameters
-  std::string javaFlags = getEnv("JAVA_FLAGS");
-  split(javaFlags, ' ', m_Args);
+  // std::string javaFlags = getEnv("JAVA_FLAGS");
+  // split(javaFlags, ' ', m_Args);
 
 // append the name of the main class to execute
   m_Args.push_back("io.scif.itk.SCIFIOITKBridge");
