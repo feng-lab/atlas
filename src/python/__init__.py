@@ -2,7 +2,6 @@ import sys
 import os
 
 jarsDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'jars')
-print(jarsDIR)
 os.environ['ZIMG_JARS_DIR'] = jarsDIR
 
 from ._imgpy import *
