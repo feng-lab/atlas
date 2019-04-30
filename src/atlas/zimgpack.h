@@ -39,6 +39,7 @@ public:
                    int64_t x, int64_t y, size_t width, size_t height);
 
   std::shared_ptr<ZImg> read() const override;
+
   ZImgInfo readInfo() const override;
 
 protected:
@@ -236,7 +237,7 @@ private:
   QString m_tooltip;
 
   size_t m_tileSize = 512;
-  int64_t m_fastReadSizeThreshold = 100 * 1024 * 1024;  // 100MB
+  int64_t m_fastReadSizeThreshold = 2_i64 * 1024 * 1024 * 1024;  // 2000MB
 
   std::vector<std::shared_ptr<ZImgSubBlock>> m_allTiles;
   std::map<size_t, QSize> m_ratioToSize;
