@@ -1807,7 +1807,6 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  swapMeshXY();
   LOG(INFO) << "done";
 }
 

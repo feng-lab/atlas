@@ -21,7 +21,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_textureAndEyeCoordinateRenderer(m_rendererBase)
   , m_textureCopyRenderer(m_rendererBase)
   , m_stayOnTop("Stay On Top", false)
-  , m_fullResolutionRendering("Full Resolution Rendering", true)
+  , m_fullResolutionRendering("Full Resolution Rendering", false)
   , m_numParas(0)
   //, m_interactionDownsample("Interaction Downsample", 1, 1, 16)
   , m_smoothInteraction("Smooth Interaction", true)
@@ -191,7 +191,10 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_imgRaycasterRenderer.localMIPThresholdPara());
   addParameter(m_imgRaycasterRenderer.samplingRatePara());
 
-  connect(&m_fullResolutionRendering, &ZBoolParameter::valueChanged, this, &Z3DImgFilter::fullResolutionRenderingToggled);
+  m_imgRaycasterRenderer.setFastRendering(!m_fullResolutionRendering.get());
+  m_imgSliceRenderer.setFastRendering(!m_fullResolutionRendering.get());
+  connect(&m_fullResolutionRendering, &ZBoolParameter::valueChanged,
+          this, &Z3DImgFilter::fullResolutionRenderingToggled);
 
   adjustWidget();
   CHECK_GL_ERROR
@@ -235,7 +238,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
       m_layerTarget.attachTextureToFBO(&m_layerDepthTexture, GL_DEPTH_ATTACHMENT, false);
       m_layerTarget.isFBOComplete();
     }
-    m_fullResolutionRendering.set(true);
+    m_fullResolutionRendering.set(!m_3dImg->isVolumeDownsampled());
     m_fullResolutionRendering.setEnabled(m_3dImg->isVolumeDownsampled());
     m_smoothInteraction.setVisible(m_3dImg->isVolumeDownsampled());
 
@@ -548,7 +551,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
   currentOutport.clearTarget();
   m_rendererBase.setViewport(currentOutport.size());
 
-  glm::uvec3 volDim = glm::max(glm::uvec3(2,2,2), m_3dImg->dimensions());
+  glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
   glm::vec3 coordLuf = m_3dImg->physicalLUF();
   glm::vec3 coordRdb = m_3dImg->physicalRDB();
 
@@ -734,7 +737,7 @@ bool Z3DImgFilter::hasImage() const
 
 void Z3DImgFilter::renderImage(Z3DEye eye)
 {
-  glm::uvec3 volDim = glm::max(glm::uvec3(2,2,2), m_3dImg->dimensions());
+  glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
   glm::vec3 coordLuf = m_3dImg->physicalLUF();
   glm::vec3 coordRdb = m_3dImg->physicalRDB();
 

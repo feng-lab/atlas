@@ -22,15 +22,20 @@ namespace nim {
 
 ZImgITKImage::ZImgITKImage()
 {
-  if (itk::ObjectFactoryBase::GetRegisteredFactories().empty()) {
-    itk::NiftiImageIOFactory::RegisterOneFactory();
-    itk::NrrdImageIOFactory::RegisterOneFactory();
-    if (hasSCIFIOSupport()) {
-      itk::SCIFIOImageIOFactory::RegisterOneFactory();
-    }
+  try {
+    if (itk::ObjectFactoryBase::GetRegisteredFactories().empty()) {
+      itk::NiftiImageIOFactory::RegisterOneFactory();
+      itk::NrrdImageIOFactory::RegisterOneFactory();
+      if (hasSCIFIOSupport()) {
+        itk::SCIFIOImageIOFactory::RegisterOneFactory();
+      }
 #ifdef ATLAS_SUPPORT_DICOM
-    itk::GDCMImageIOFactory::RegisterOneFactory();
+      itk::GDCMImageIOFactory::RegisterOneFactory();
 #endif
+    }
+  }
+  catch (itk::ExceptionObject& err) {
+    throw ZIOException(err.what());
   }
 }
 
@@ -48,21 +53,26 @@ QStringList ZImgITKImage::extensions() const
 {
   QStringList res;
 
-  for (const auto& pt : itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase")) {
-    if (auto io = dynamic_cast<const itk::ImageIOBase*>(pt.GetPointer())) {
-      //LOG(INFO) << "ImageIO: " << io->GetNameOfClass();
-      for (const auto& ext : io->GetSupportedReadExtensions()) {
-        res.push_back(ext.c_str());
-        res.last().remove(0, 1); // remove '.'
+  try {
+    for (const auto& pt : itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase")) {
+      if (auto io = dynamic_cast<const itk::ImageIOBase*>(pt.GetPointer())) {
+        //LOG(INFO) << "ImageIO: " << io->GetNameOfClass();
+        for (const auto& ext : io->GetSupportedReadExtensions()) {
+          res.push_back(ext.c_str());
+          res.last().remove(0, 1); // remove '.'
+        }
       }
     }
-  }
-  if (hasSCIFIOSupport()) {
-    res.push_back("nd2");
-  }
+    if (hasSCIFIOSupport()) {
+      res.push_back("nd2");
+    }
 #ifdef ATLAS_SUPPORT_DICOM
-  res.push_back("dcm");
+    res.push_back("dcm");
 #endif
+  }
+  catch (itk::ExceptionObject& err) {
+    throw ZIOException(err.what());
+  }
 
   return res;
 }

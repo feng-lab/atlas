@@ -57,10 +57,11 @@ initImgLib(const char* argv0, const QString& jdkDIR, const QString& jarsDIR, con
         throw ZIOException(QString("invalid jdkDIR: %1").arg(jdkD.absolutePath()));
       }
 #ifdef _WIN32
-      if (!jdkD.exists("bin/javaw.exe")) {
+      if (!jdkD.exists("bin/javaw.exe"))
 #else
-      if (!jdkD.exists("bin/java")) {
+      if (!jdkD.exists("bin/java"))
 #endif
+      {
         throw ZIOException(QString("no java in jdkDIR: %1").arg(jdkD.absolutePath()));
       }
 

@@ -349,6 +349,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
         if (m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4 != m_blockIDs.size()) {
           m_blockIDs.resize(m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4);
+          LOG(INFO) << m_blockIDs.size();
         }
 
         m_image3DSliceWithTransferfunBlockIDsShader.bind();
@@ -501,7 +502,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       ZBenchTimer btcb("collect blockids");
       ZBenchTimer btri("render image");
 
-      for (int repeat = 0;  repeat < 10; ++repeat) {
+      for (int repeat = 0; repeat < 10; ++repeat) {
         btrb.start();
         m_image3DRaycasterBlockIDsShader.bind();
         m_image3DRaycasterBlockIDsShader.setUniform("screen_dim_RCP", 1.f / glm::vec2(m_blockIDsRenderTarget->size()));
@@ -545,6 +546,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         const Z3DTexture* missingBlockIDsTexture = m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0);
         if (missingBlockIDsTexture->numPixels() * 4 != m_blockIDs.size()) {
           m_blockIDs.resize(missingBlockIDsTexture->numPixels() * 4);
+          LOG(INFO) << m_blockIDs.size();
         }
         missingBlockIDsTexture->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
 
