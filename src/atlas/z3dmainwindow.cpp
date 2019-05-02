@@ -445,10 +445,10 @@ void Z3DMainWindow::createDockWindows()
   m_helpDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
                                 QDockWidget::DockWidgetMovable |
                                 QDockWidget::DockWidgetFloatable);
+  m_helpDockWidget->setVisible(false);
   addDockWidget(Qt::LeftDockWidgetArea, m_helpDockWidget);
   m_windowMenu->addAction(m_helpDockWidget->toggleViewAction());
   m_helpDockWidget->setFloating(true);
-  m_helpDockWidget->setVisible(false);
 
   m_backgroundDockWidget = new QDockWidget(tr("Background"), this);
   m_backgroundDockWidget->setFeatures(QDockWidget::DockWidgetClosable |

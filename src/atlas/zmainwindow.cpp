@@ -761,6 +761,7 @@ void ZMainWindow::createDockWindows()
   m_helpDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
                                 QDockWidget::DockWidgetMovable |
                                 QDockWidget::DockWidgetFloatable);
+  m_helpDockWidget->setVisible(false);
   auto edt = new QPlainTextEdit(this);
   edt->setReadOnly(true);
   edt->appendPlainText("zoom:");
@@ -774,7 +775,6 @@ void ZMainWindow::createDockWindows()
   addDockWidget(Qt::LeftDockWidgetArea, m_helpDockWidget);
   m_windowMenu->addAction(m_helpDockWidget->toggleViewAction());
   m_helpDockWidget->setFloating(true);
-  m_helpDockWidget->setVisible(false);
 
   m_editObjDockWidget = new QDockWidget(tr("Edit and Output"), this);
   m_editObjDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
