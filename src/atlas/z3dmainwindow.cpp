@@ -184,6 +184,14 @@ void Z3DMainWindow::openScreenshotPanel()
   m_captureDockWidget->raise();
 }
 
+void Z3DMainWindow::openHelpPanel()
+{
+  if (m_helpDockWidget->isHidden()) {
+    m_helpDockWidget->show();
+  }
+  m_helpDockWidget->raise();
+}
+
 void Z3DMainWindow::raiseViewSettingDockWidget()
 {
   if (m_viewSettingDockWidget->isHidden()) {
@@ -253,7 +261,8 @@ void Z3DMainWindow::createActions()
   // edit
 
   // view
-  m_changeBackgroundAction = new QAction(ZTheme::instance().icon(ZTheme::BackgroundIcon), tr("&Change Background"), this);
+  m_changeBackgroundAction = new QAction(ZTheme::instance().icon(ZTheme::BackgroundIcon), tr("&Change Background"),
+                                         this);
   m_changeBackgroundAction->setStatusTip(tr("Change background of 3d view"));
   connect(m_changeBackgroundAction, &QAction::triggered, this, &Z3DMainWindow::changeBackground);
 
@@ -264,6 +273,10 @@ void Z3DMainWindow::createActions()
   m_screenShotAction = new QAction(ZTheme::instance().icon(ZTheme::ScreenshotIcon), tr("&Screenshot"), this);
   m_screenShotAction->setStatusTip(tr("Screenshot"));
   connect(m_screenShotAction, &QAction::triggered, this, &Z3DMainWindow::openScreenshotPanel);
+
+  m_helpAction = new QAction(ZTheme::instance().icon(ZTheme::HelpIcon), tr("&Help"), this);
+  m_helpAction->setStatusTip(tr("Help"));
+  connect(m_helpAction, &QAction::triggered, this, &Z3DMainWindow::openHelpPanel);
 
   //
   m_exitAction = new QAction(tr("E&xit"), this);
@@ -340,6 +353,7 @@ void Z3DMainWindow::createMenus()
   m_helpMenu = menuBar()->addMenu(tr("&Help"));
   m_helpMenu->addAction(m_aboutAction);
   m_helpMenu->addAction(m_aboutQtAction);
+  m_helpMenu->addAction(m_helpAction);
   m_helpMenu->addSeparator();
   m_helpMenu->addAction(m_viewLogAction);
   m_helpMenu->addAction(m_openLogFolderAction);
@@ -370,9 +384,9 @@ void Z3DMainWindow::createToolBars()
   m_viewToolBar->addAction(m_screenShotAction);
   m_viewToolBar->setIconSize(iconSize);
 
-  //m_helpToolBar = addToolBar(tr("Help"));
-  //m_helpToolBar->addAction(m_openLogFolderAction);
-  //m_helpToolBar->setIconSize(iconSize);
+  m_helpToolBar = addToolBar(tr("Help"));
+  m_helpToolBar->addAction(m_helpAction);
+  m_helpToolBar->setIconSize(iconSize);
 }
 
 void Z3DMainWindow::createStatusBar()
@@ -427,6 +441,15 @@ void Z3DMainWindow::createDockWindows()
   m_windowMenu->addAction(m_captureDockWidget->toggleViewAction());
   m_captureDockWidget->setVisible(false);
 
+  m_helpDockWidget = new QDockWidget(tr("Help"), this);
+  m_helpDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
+                                QDockWidget::DockWidgetMovable |
+                                QDockWidget::DockWidgetFloatable);
+  addDockWidget(Qt::LeftDockWidgetArea, m_helpDockWidget);
+  m_windowMenu->addAction(m_helpDockWidget->toggleViewAction());
+  m_helpDockWidget->setFloating(true);
+  m_helpDockWidget->setVisible(false);
+
   m_backgroundDockWidget = new QDockWidget(tr("Background"), this);
   m_backgroundDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
                                       QDockWidget::DockWidgetMovable |
@@ -472,6 +495,8 @@ void Z3DMainWindow::fillDockWindows()
   m_backgroundDockWidget->setWidget(m_view->backgroundWidget());
 
   m_axisDockWidget->setWidget(m_view->axisWidget());
+
+  m_helpDockWidget->setWidget(m_view->helpWidget());
 }
 
 void Z3DMainWindow::readSettings()
@@ -497,7 +522,7 @@ bool Z3DMainWindow::maybeSave()
     QMessageBox::StandardButton ret;
     ret = QMessageBox::warning(this, qApp->applicationName(),
                                tr("This workspace has been modified.\n"
-                                    "Do you want to save your changes?"),
+                                  "Do you want to save your changes?"),
                                QMessageBox::Save | QMessageBox::Discard
                                | QMessageBox::Cancel);
     if (ret == QMessageBox::Save)

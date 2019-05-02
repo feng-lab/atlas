@@ -162,7 +162,8 @@ void Z3DImg::setScale(const glm::vec3& scale)
   m_pageTableCacheManager.reset(
     new Z3DBlockCache<glm::ivec4>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
   m_imageCacheManager.reset(
-    new Z3DBlockCache<glm::ivec4>(m_imageBlockSize + m_imageBlockSizePad, m_imageCacheNumBlocks, glm::ivec4(-1, -1, -1, -1)));
+    new Z3DBlockCache<glm::ivec4>(m_imageBlockSize + m_imageBlockSizePad, m_imageCacheNumBlocks,
+                                  glm::ivec4(-1, -1, -1, -1)));
   for (auto& pu : m_channelPendingUpdates) {
     pu.clear();
   }
@@ -505,9 +506,9 @@ void Z3DImg::uploadImageCache(size_t channel)
                                                 m_imageBlockSize.z + m_imageBlockSizePad.z,
                                                 1));
                         m_imgPack.readRegionToImg(m_levelScales[blockImagePos.x].x, m_levelScales[blockImagePos.x].z,
-                                                  blockImagePos.y - m_imageBlockSizePad.x / 2,
-                                                  blockImagePos.z - m_imageBlockSizePad.y / 2,
-                                                  blockImagePos.w - m_imageBlockSizePad.z / 2,
+                                                  int64_t(blockImagePos.y) - int64_t(m_imageBlockSizePad.x) / 2,
+                                                  int64_t(blockImagePos.z) - int64_t(m_imageBlockSizePad.y) / 2,
+                                                  int64_t(blockImagePos.w) - int64_t(m_imageBlockSizePad.z) / 2,
                                                   channel, 0, imgs[i]);
                       }
                     }
@@ -594,7 +595,8 @@ void Z3DImg::readVolumes()
   double widthScale = 1.0;
   double heightScale = 1.0;
   double depthScale = 1.0;
-  Z3DGpuInfo::instance().getDataScaleForTexture(info.width, info.height, info.depth, widthScale, heightScale, depthScale);
+  Z3DGpuInfo::instance().getDataScaleForTexture(info.width, info.height, info.depth, widthScale, heightScale,
+                                                depthScale);
 
   if (widthScale != 1.0 || heightScale != 1.0 || depthScale != 1.0) {
     m_isVolumeDownsampled = true;

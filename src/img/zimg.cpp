@@ -1349,9 +1349,9 @@ ZImg ZImg::blockDownsampled(size_t blockWidth, size_t blockHeight, size_t blockD
   info.voxelSizeX *= blockWidth;
   info.voxelSizeY *= blockHeight;
   info.voxelSizeZ *= blockDepth;
-  info.width = m_info.width / blockWidth + m_info.width % blockWidth;
-  info.height = m_info.height / blockHeight + m_info.height % blockHeight;
-  info.depth = m_info.depth / blockDepth + m_info.depth % blockDepth;
+  info.width = (m_info.width + blockWidth - 1) / blockWidth;
+  info.height = (m_info.height + blockHeight - 1) / blockHeight;
+  info.depth = (m_info.depth + blockDepth - 1) / blockDepth;
   ZImg res(info);
 
   if (res.isEmpty())

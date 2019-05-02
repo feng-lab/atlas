@@ -80,6 +80,8 @@ public:
 
   QWidget* axisWidget();
 
+  QWidget* helpWidget();
+
   void updateBoundBox();
 
   void read(size_t id, const QJsonObject& json);
@@ -94,7 +96,8 @@ public:
 
   bool takeScreenShot(const QString& filename, Z3DScreenShotType sst);
 
-  QList<Z3DObjView*> objViews() { return m_3dObjViews; }
+  QList<Z3DObjView*> objViews()
+  { return m_3dObjViews; }
 
 signals:
 
@@ -109,6 +112,7 @@ private:
 
   void resetCamera();  // set up camera based on visible objects in scene, original position
   void resetCameraCenter();
+
   void resetCameraClippingRange(); // Reset the camera clipping range to include this entire bounding box
 
   void gotoPosition(double x, double y, double z, double radius = 64);
@@ -117,6 +121,7 @@ private:
 
   void flipView(); //Look from the oppsite side
   void setXZView();
+
   void setYZView();
 
   bool takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,

@@ -160,5 +160,7 @@
         <file>Resources/shader/image3d_slice_with_transfun_blockID.frag</file>
         <file>Resources/shader/image3d_slice_with_transfun.frag</file>
         <file>Resources/shader/image3d_slice_with_colormap.frag</file>
+        <file>icons/help.svg</file>
+        <file>icons/help-dark.svg</file>
     </qresource>
 </RCC>

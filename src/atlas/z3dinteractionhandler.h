@@ -42,6 +42,10 @@ signals:
 
   void mouseReleased();
 
+  void controlPressed();
+
+  void controlReleased();
+
 protected:
   enum class State
   {
@@ -131,7 +135,7 @@ protected:
 
   void mouseRollEvent(QMouseEvent* e, int w, int h);
 
-  void wheelRollEvent(QWheelEvent* e, int w, int h);
+  // void wheelRollEvent(QWheelEvent* e, int w, int h);
 
   void keyRotateEvent(QKeyEvent* e, int w, int h);
 

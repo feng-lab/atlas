@@ -655,22 +655,22 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
   return res;
 }
 
-void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_t sy, int64_t sz, size_t sc, size_t t,
+void ZImgPack::readRegionToImg(int64_t xyRatio, int64_t zRatio, int64_t sx, int64_t sy, int64_t sz, size_t sc, size_t t,
                                ZImg& res) const
 {
-  CHECK(xyRatio >= 1_usize && zRatio >= 1_usize);
-  size_t readRatio = readRatioOf(xyRatio);
-  if (readRatio == xyRatio && zRatio == 1_usize) {
-    TileBoxType queryBox(TileCornerType(sx * static_cast<int64_t>(xyRatio),
-                                        sy * static_cast<int64_t>(xyRatio)),
-                         TileCornerType((sx + static_cast<int64_t>(res.width())) * static_cast<int64_t>(xyRatio) - 1,
-                                        (sy + static_cast<int64_t>(res.height())) * static_cast<int64_t>(xyRatio) - 1));
+  CHECK(xyRatio >= 1 && zRatio >= 1);
+  auto readRatio = static_cast<int64_t>(readRatioOf(xyRatio));
+  if (readRatio == xyRatio && zRatio == 1) {
+    TileBoxType queryBox(TileCornerType(sx * xyRatio,
+                                        sy * xyRatio),
+                         TileCornerType((sx + static_cast<int64_t>(res.width())) * xyRatio - 1,
+                                        (sy + static_cast<int64_t>(res.height())) * xyRatio - 1));
     int64_t zEnd = std::min(static_cast<int64_t>(m_imgInfo.depth),
-                            (sz + static_cast<int64_t>(res.depth())) * static_cast<int64_t>(zRatio));
+                            sz + static_cast<int64_t>(res.depth()));
 
 #if 1
     size_t zIdx = 0;
-    for (int64_t z = sz * static_cast<int64_t>(zRatio); z < zEnd; z += static_cast<int64_t>(zRatio), ++zIdx) {
+    for (int64_t z = sz; z < zEnd; z += 1, ++zIdx) {
       if (z < 0)
         continue;
 
@@ -680,8 +680,8 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
         tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
         for (size_t i = 0; i < queryResult.size(); ++i) {
           const ZImgSubBlock& tile = *m_allTiles[queryResult[i].second].get();
-          ZVoxelCoordinate start(tile.x / static_cast<int64_t>(xyRatio) - sx,
-                                 tile.y / static_cast<int64_t>(xyRatio) - sy,
+          ZVoxelCoordinate start(tile.x / xyRatio - sx,
+                                 tile.y / xyRatio - sy,
                                  zIdx,
                                  -ZVoxelCoordinate::value_type(sc),
                                  0);
@@ -745,17 +745,24 @@ void ZImgPack::readRegionToImg(size_t xyRatio, size_t zRatio, int64_t sx, int64_
     );
 #endif
   } else {
+    CHECK(readRatio == xyRatio && zRatio > 1);
     ZImgInfo info = res.info();
-    info.width = std::round(info.width * xyRatio * 1.0 / readRatio);
-    info.height = std::round(info.height * xyRatio * 1.0 / readRatio);
-    info.depth = info.depth * zRatio;
+    int64_t startZ = std::max(0_i64, sz * zRatio);
+    int64_t endZ = std::min(int64_t(m_imgInfo.depth), (sz + static_cast<int64_t>(info.depth)) * zRatio);
+    info.depth = endZ - startZ;
     ZImg tmp(info);
+//    LOG(INFO) << info.toQString();
+//    LOG(INFO) << xyRatio << " " << zRatio << " " << readRatio;
+//    LOG(INFO) << sx << " " << sy << " " << sz;
     readRegionToImg(readRatio, 1,
-                    std::round(sx * xyRatio * 1.0 / readRatio),
-                    std::round(sy * xyRatio * 1.0 / readRatio),
-                    sz * zRatio,
+                    sx,
+                    sy,
+                    startZ,
                     sc, t, tmp);
-    res = tmp.resized(res.width(), res.height(), res.depth());
+    // LOG(INFO) << zRatio;
+    tmp.blockDownsample(1, 1, zRatio, ImgMergeMode::Max);
+    // LOG(INFO) << tmp.info().toQString();
+    res.pasteImg(tmp, ZVoxelCoordinate(0, 0, sz < 0 ? -sz : 0));
   }
 }
 
@@ -995,6 +1002,7 @@ void ZImgPack::createTileIndexStructure()
     if (m_ratioToSize.find(tile.ratio) == m_ratioToSize.end()) {
       m_ratioToSize[tile.ratio] = QSize(std::ceil(double(m_imgInfo.width) / tile.ratio),
                                         std::ceil(double(m_imgInfo.height) / tile.ratio));
+      // LOG(INFO) << tile.ratio;
     }
     m_rtzToTileIndice[std::tie(tile.ratio, tile.t, tile.z)].push_back(i);
     // LOG(INFO) << tile.z << " " <<  tile.width << " " << tile.height;

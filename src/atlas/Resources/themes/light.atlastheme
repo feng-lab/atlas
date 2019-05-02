@@ -43,7 +43,8 @@
             "FlipHorizontalIcon": ":/icons/flip-horizontal.svg",
             "FlipVerticalIcon": ":/icons/flip-vertical.svg",
             "ClearIcon": ":/icons/clear.svg",
-            "CopyIcon": ":/icons/copy.svg"
+            "CopyIcon": ":/icons/copy.svg",
+            "HelpIcon": ":/icons/help.svg"
         }
     }
 }

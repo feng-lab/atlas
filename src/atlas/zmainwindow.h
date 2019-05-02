@@ -82,6 +82,8 @@ private:
 
   void openScreenshotPanel();
 
+  void openHelpPanel();
+
   void viewLog();
 
   void openLogFolder();
@@ -176,6 +178,7 @@ private:
 
   QAction* m_open3DViewAction;
   QAction* m_screenShotAction;
+  QAction* m_helpAction;
 
   QAction* m_openNewInstanceAction;
 
@@ -183,6 +186,7 @@ private:
   QDockWidget* m_viewSettingDockWidget;
   QDockWidget* m_objectDetailedInfoDockWidget;
   QDockWidget* m_captureDockWidget;
+  QDockWidget* m_helpDockWidget;
   QDockWidget* m_editObjDockWidget;
   ZObjEditWidget* m_objEditWidget;
 

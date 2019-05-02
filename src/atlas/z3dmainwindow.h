@@ -70,6 +70,8 @@ private:
 
   void openScreenshotPanel();
 
+  void openHelpPanel();
+
   void raiseViewSettingDockWidget();
 
   void raiseGlobalSettingDockWidget();
@@ -139,6 +141,7 @@ private:
   QDockWidget* m_objectDetailedInfoDockWidget;
   QDockWidget* m_globalSettingDockWidget;
   QDockWidget* m_captureDockWidget;
+  QDockWidget* m_helpDockWidget;
   QDockWidget* m_backgroundDockWidget;
   QDockWidget* m_axisDockWidget;
   ZViewSettingWidget* m_viewSettingWidget;
@@ -149,6 +152,7 @@ private:
   QAction* m_changeBackgroundAction;
   QAction* m_changeAxisAction;
   QAction* m_screenShotAction;
+  QAction* m_helpAction;
 
   //
   ZDoc* m_doc;

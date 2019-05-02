@@ -12,7 +12,7 @@ namespace nim {
 
 class ZTheme : public QObject
 {
-  Q_OBJECT
+Q_OBJECT
 
   Q_ENUMS(Color)
   Q_ENUMS(Icon)
@@ -27,10 +27,11 @@ public:
   QString currentTheme() const
   { return m_currentTheme; }
 
-  enum Color {
+  enum Color
+  {
     /* Palette for QPalette */
 
-    PaletteWindow,
+      PaletteWindow,
     PaletteWindowText,
     PaletteBase,
     PaletteAlternateBase,
@@ -74,12 +75,13 @@ public:
 
     /* Log */
 
-    LogErrorMessageTextColor,
+      LogErrorMessageTextColor,
     LogNormalMessageTextColor,
     LogWarningMessageTextColor,
   };
 
-  enum Icon {
+  enum Icon
+  {
     LoadObjectIcon,
     OpenFolderIcon,
     SaveIcon,
@@ -123,6 +125,7 @@ public:
     FlipVerticalIcon,
     ClearIcon,
     CopyIcon,
+    HelpIcon,
   };
 
   const QIcon& icon(Icon file) const
@@ -133,11 +136,13 @@ public:
 
 private:
   void loadTheme(const QString& file);
+
   const QColor& color(Color role) const
   { return m_colors.at(role).first; }
 
   QPalette palette() const;
-  std::pair<QColor, QString> readNamedColor(const QString &color) const;
+
+  std::pair<QColor, QString> readNamedColor(const QString& color) const;
 
   std::map<QString, QColor> m_palette;
   std::vector<std::pair<QColor, QString>> m_colors;

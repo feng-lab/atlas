@@ -34,6 +34,19 @@ void Z3DInteractionHandler::setSharing(bool sharing)
 
 void Z3DInteractionHandler::onEvent(QEvent* e, int w, int h)
 {
+  if (e->type() == QEvent::MouseButtonPress) {
+    LOG(INFO) << "MouseButtonPress";
+    emit mousePressed();
+  } else if (e->type() == QEvent::MouseButtonRelease) {
+    LOG(INFO) << "MouseButtonRelease";
+    emit mouseReleased();
+  } else if (e->type() == QEvent::KeyPress && dynamic_cast<QKeyEvent*>(e)->modifiers() == Qt::ControlModifier) {
+    LOG(INFO) << "control pressed";
+    emit controlPressed();
+  } else if (e->type() == QEvent::KeyRelease && dynamic_cast<QKeyEvent*>(e)->key() == Qt::Key_Control) {
+    LOG(INFO) << "control released";
+    emit controlReleased();
+  }
   for (size_t j = 0; j < m_eventListeners.size() && !e->isAccepted(); ++j) {
     m_eventListeners[j]->sendEvent(e, w, h);
   }
@@ -70,21 +83,22 @@ Z3DTrackballInteractionHandler::Z3DTrackballInteractionHandler(const QString& na
           &Z3DTrackballInteractionHandler::shiftEvent);
   addEventListener(m_shiftEvent);
 
-  m_mouseDollyEvent = new ZEventListenerParameter(name + " Mouse Dolly");
-  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::NoModifier, QEvent::MouseButtonPress);
-  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::NoModifier, QEvent::MouseButtonRelease);
-  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::NoModifier, QEvent::MouseMove);
-#ifdef __APPLE__
-  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::MetaModifier, QEvent::MouseButtonPress);
-  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::MetaModifier, QEvent::MouseButtonRelease);
-  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::MetaModifier, QEvent::MouseMove);
-#endif
-  connect(m_mouseDollyEvent, &ZEventListenerParameter::mouseEventTriggered, this,
-          &Z3DTrackballInteractionHandler::mouseDollyEvent);
-  addEventListener(m_mouseDollyEvent);
+//  m_mouseDollyEvent = new ZEventListenerParameter(name + " Mouse Dolly");
+//  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::NoModifier, QEvent::MouseButtonPress);
+//  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::NoModifier, QEvent::MouseButtonRelease);
+//  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::NoModifier, QEvent::MouseMove);
+//#ifdef __APPLE__
+//  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::MetaModifier, QEvent::MouseButtonPress);
+//  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::MetaModifier, QEvent::MouseButtonRelease);
+//  m_mouseDollyEvent->listenTo("mouse dolly", Qt::RightButton, Qt::MetaModifier, QEvent::MouseMove);
+//#endif
+//  connect(m_mouseDollyEvent, &ZEventListenerParameter::mouseEventTriggered, this,
+//          &Z3DTrackballInteractionHandler::mouseDollyEvent);
+//  addEventListener(m_mouseDollyEvent);
 
   m_wheelDollyEvent = new ZEventListenerParameter(name + " Wheel Dolly");
   m_wheelDollyEvent->listenTo("dolly", Qt::NoButton, Qt::NoModifier, QEvent::Wheel);
+  m_wheelDollyEvent->listenTo("dolly", Qt::NoButton, Qt::ControlModifier, QEvent::Wheel);
   connect(m_wheelDollyEvent, &ZEventListenerParameter::wheelEventTriggered, this,
           &Z3DTrackballInteractionHandler::dollyEvent);
   addEventListener(m_wheelDollyEvent);
@@ -93,18 +107,18 @@ Z3DTrackballInteractionHandler::Z3DTrackballInteractionHandler(const QString& na
   m_rollEvent->listenTo("roll", Qt::LeftButton, Qt::AltModifier, QEvent::MouseButtonPress);
   m_rollEvent->listenTo("roll", Qt::LeftButton, Qt::AltModifier, QEvent::MouseButtonRelease);
   m_rollEvent->listenTo("roll", Qt::LeftButton, Qt::AltModifier, QEvent::MouseMove);
-  m_rollEvent->listenTo("roll", Qt::NoButton, Qt::AltModifier, QEvent::Wheel);
+  // m_rollEvent->listenTo("roll", Qt::NoButton, Qt::AltModifier, QEvent::Wheel);
   connect(m_rollEvent, &ZEventListenerParameter::mouseEventTriggered, this,
           &Z3DTrackballInteractionHandler::mouseRollEvent);
-  connect(m_rollEvent, &ZEventListenerParameter::wheelEventTriggered, this,
-          &Z3DTrackballInteractionHandler::wheelRollEvent);
+//  connect(m_rollEvent, &ZEventListenerParameter::wheelEventTriggered, this,
+//          &Z3DTrackballInteractionHandler::wheelRollEvent);
   addEventListener(m_rollEvent);
 
   m_keyRotateEvent = new ZEventListenerParameter(name + " Key Rotate");
-  m_keyRotateEvent->listenTo("rotate left", Qt::Key_Left, Qt::KeypadModifier, QEvent::KeyPress);
-  m_keyRotateEvent->listenTo("rotate right", Qt::Key_Right, Qt::KeypadModifier, QEvent::KeyPress);
-  m_keyRotateEvent->listenTo("rotate up", Qt::Key_Up, Qt::KeypadModifier, QEvent::KeyPress);
-  m_keyRotateEvent->listenTo("rotate down", Qt::Key_Down, Qt::KeypadModifier, QEvent::KeyPress);
+  m_keyRotateEvent->listenTo("rotate left", Qt::Key_Left, Qt::ControlModifier | Qt::KeypadModifier, QEvent::KeyPress);
+  m_keyRotateEvent->listenTo("rotate right", Qt::Key_Right, Qt::ControlModifier | Qt::KeypadModifier, QEvent::KeyPress);
+  m_keyRotateEvent->listenTo("rotate up", Qt::Key_Up, Qt::ControlModifier | Qt::KeypadModifier, QEvent::KeyPress);
+  m_keyRotateEvent->listenTo("rotate down", Qt::Key_Down, Qt::ControlModifier | Qt::KeypadModifier, QEvent::KeyPress);
   connect(m_keyRotateEvent, &ZEventListenerParameter::keyEventTriggered, this,
           &Z3DTrackballInteractionHandler::keyRotateEvent);
   addEventListener(m_keyRotateEvent);
@@ -119,17 +133,15 @@ Z3DTrackballInteractionHandler::Z3DTrackballInteractionHandler(const QString& na
   addEventListener(m_keyShiftEvent);
 
   m_keyDollyEvent = new ZEventListenerParameter(name + " Key Dolly");
-  m_keyDollyEvent->listenTo("dolly in", Qt::Key_Equal, Qt::NoModifier, QEvent::KeyPress);
-  m_keyDollyEvent->listenTo("dolly out", Qt::Key_Minus, Qt::NoModifier, QEvent::KeyPress);
-  m_keyDollyEvent->listenTo("dolly in", Qt::Key_Up, Qt::ControlModifier | Qt::KeypadModifier, QEvent::KeyPress);
-  m_keyDollyEvent->listenTo("dolly out", Qt::Key_Down, Qt::ControlModifier | Qt::KeypadModifier, QEvent::KeyPress);
+  m_keyDollyEvent->listenTo("dolly in", Qt::Key_Equal, Qt::ControlModifier, QEvent::KeyPress);
+  m_keyDollyEvent->listenTo("dolly out", Qt::Key_Minus, Qt::ControlModifier, QEvent::KeyPress);
   connect(m_keyDollyEvent, &ZEventListenerParameter::keyEventTriggered, this,
           &Z3DTrackballInteractionHandler::keyDollyEvent);
   addEventListener(m_keyDollyEvent);
 
   m_keyRollEvent = new ZEventListenerParameter(name + " Key Roll");
-  m_keyRollEvent->listenTo("left", Qt::Key_Left, Qt::AltModifier | Qt::KeypadModifier, QEvent::KeyPress);
-  m_keyRollEvent->listenTo("right", Qt::Key_Right, Qt::AltModifier | Qt::KeypadModifier, QEvent::KeyPress);
+  m_keyRollEvent->listenTo("rool left", Qt::Key_Left, Qt::AltModifier | Qt::KeypadModifier, QEvent::KeyPress);
+  m_keyRollEvent->listenTo("rool right", Qt::Key_Right, Qt::AltModifier | Qt::KeypadModifier, QEvent::KeyPress);
   connect(m_keyRollEvent, &ZEventListenerParameter::keyEventTriggered, this,
           &Z3DTrackballInteractionHandler::keyRollEvent);
   addEventListener(m_keyRollEvent);
@@ -194,12 +206,12 @@ void Z3DTrackballInteractionHandler::mouseRollEvent(QMouseEvent* e, int w, int h
   }
 }
 
-void Z3DTrackballInteractionHandler::wheelRollEvent(QWheelEvent* e, int w, int h)
-{
-  setState(State::Roll);
-  wheelEvent(e, w, h);
-  emit cameraMoved();
-}
+//void Z3DTrackballInteractionHandler::wheelRollEvent(QWheelEvent* e, int w, int h)
+//{
+//  setState(State::Roll);
+//  wheelEvent(e, w, h);
+//  emit cameraMoved();
+//}
 
 void Z3DTrackballInteractionHandler::keyRotateEvent(QKeyEvent* e, int /*unused*/, int /*unused*/)
 {
@@ -211,10 +223,10 @@ void Z3DTrackballInteractionHandler::keyRotateEvent(QKeyEvent* e, int /*unused*/
     m_camera->rotate(-m_keyPressAngle, m_camera->get().vectorEyeToWorld(glm::vec3(0.f, 1.f, 0.f)));
     accepted = true;
   } else if (e->key() == Qt::Key_Up) {
-    m_camera->rotate(-m_keyPressAngle, m_camera->get().vectorEyeToWorld(glm::vec3(1.f, 0.f, 0.f)));
+    m_camera->rotate(m_keyPressAngle, m_camera->get().vectorEyeToWorld(glm::vec3(1.f, 0.f, 0.f)));
     accepted = true;
   } else if (e->key() == Qt::Key_Down) {
-    m_camera->rotate(m_keyPressAngle, m_camera->get().vectorEyeToWorld(glm::vec3(1.f, 0.f, 0.f)));
+    m_camera->rotate(-m_keyPressAngle, m_camera->get().vectorEyeToWorld(glm::vec3(1.f, 0.f, 0.f)));
     accepted = true;
   }
   if (accepted) {
@@ -253,8 +265,7 @@ void Z3DTrackballInteractionHandler::keyDollyEvent(QKeyEvent* e, int /*unused*/,
   if (e->key() == Qt::Key_Up || e->key() == Qt::Key_Equal) {
     m_camera->dolly(std::pow(1.1f, factor));
     accepted = true;
-  }
-  else if (e->key() == Qt::Key_Down || e->key() == Qt::Key_Minus) {
+  } else if (e->key() == Qt::Key_Down || e->key() == Qt::Key_Minus) {
     m_camera->dolly(std::pow(1.1f, -factor));
     accepted = true;
   }
@@ -282,7 +293,6 @@ void Z3DTrackballInteractionHandler::keyRollEvent(QKeyEvent* e, int /*unused*/, 
 
 void Z3DTrackballInteractionHandler::mousePressEvent(QMouseEvent* e, int /*unused*/, int h)
 {
-  emit mousePressed();
   m_lastMousePosition = glm::ivec2(e->x(), h - e->y());
   m_lastCenterDistance = m_camera->get().centerDist();
   e->ignore();
@@ -290,7 +300,6 @@ void Z3DTrackballInteractionHandler::mousePressEvent(QMouseEvent* e, int /*unuse
 
 void Z3DTrackballInteractionHandler::mouseReleaseEvent(QMouseEvent* e, int /*unused*/, int /*unused*/)
 {
-  emit mouseReleased();
   setState(State::None);
   e->ignore();
 }

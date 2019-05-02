@@ -74,6 +74,10 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
           this, &Z3DImgFilter::mousePressed);
   connect(&m_rendererBase.globalParas().interactionHandler, &Z3DTrackballInteractionHandler::mouseReleased,
           this, &Z3DImgFilter::mouseReleased);
+  connect(&m_rendererBase.globalParas().interactionHandler, &Z3DTrackballInteractionHandler::controlPressed,
+          this, &Z3DImgFilter::mousePressed);
+  connect(&m_rendererBase.globalParas().interactionHandler, &Z3DTrackballInteractionHandler::controlReleased,
+          this, &Z3DImgFilter::mouseReleased);
 
   //addParameter(m_interactionDownsample);
   addParameter(m_smoothInteraction);

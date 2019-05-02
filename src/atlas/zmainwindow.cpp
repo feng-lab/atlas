@@ -292,6 +292,14 @@ void ZMainWindow::openScreenshotPanel()
   m_captureDockWidget->raise();
 }
 
+void ZMainWindow::openHelpPanel()
+{
+  if (m_helpDockWidget->isHidden()) {
+    m_helpDockWidget->show();
+  }
+  m_helpDockWidget->raise();
+}
+
 void ZMainWindow::viewLog()
 {
   //ZLogDialog logDialog(logModelSinkInstance(), this);
@@ -536,6 +544,10 @@ void ZMainWindow::createActions()
   m_screenShotAction->setStatusTip(tr("Screenshot"));
   connect(m_screenShotAction, &QAction::triggered, this, &ZMainWindow::openScreenshotPanel);
 
+  m_helpAction = new QAction(ZTheme::instance().icon(ZTheme::HelpIcon), tr("&Help"), this);
+  m_helpAction->setStatusTip(tr("Help"));
+  connect(m_helpAction, &QAction::triggered, this, &ZMainWindow::openHelpPanel);
+
   m_exitAction = new QAction(tr("E&xit"), this);
   m_exitAction->setShortcuts(QKeySequence::Quit);
   m_exitAction->setStatusTip(tr("Exit the application"));
@@ -636,6 +648,7 @@ void ZMainWindow::createMenus()
   m_helpMenu = menuBar()->addMenu(tr("&Help"));
   m_helpMenu->addAction(m_aboutAction);
   m_helpMenu->addAction(m_aboutQtAction);
+  m_helpMenu->addAction(m_helpAction);
 #ifdef Q_OS_LINUX
   m_helpMenu->addAction(m_createDesktopEntryAction);
 #endif
@@ -692,13 +705,13 @@ void ZMainWindow::createToolBars()
   m_roiToolBar->addWidget(m_view->createROIToolButton(this));
   m_roiToolBar->setIconSize(iconSize);
 
-  //m_helpToolBar = addToolBar(tr("Help"));
-  //m_helpToolBar->addAction(m_openLogFolderAction);
-  //#ifdef ATLAS_WITH_TESTS
-  //  m_helpToolBar->addAction(m_testAction);
-  //#endif
-  //  m_helpToolBar->addAction(m_runCustomCommandAction);
-  //m_helpToolBar->setIconSize(iconSize);
+  m_helpToolBar = addToolBar(tr("Help"));
+  m_helpToolBar->addAction(m_helpAction);
+//  #ifdef ATLAS_WITH_TESTS
+//    m_helpToolBar->addAction(m_testAction);
+//  #endif
+//    m_helpToolBar->addAction(m_runCustomCommandAction);
+  m_helpToolBar->setIconSize(iconSize);
 }
 
 void ZMainWindow::createStatusBar()
@@ -743,6 +756,25 @@ void ZMainWindow::createDockWindows()
   addDockWidget(Qt::RightDockWidgetArea, m_captureDockWidget);
   m_windowMenu->addAction(m_captureDockWidget->toggleViewAction());
   m_captureDockWidget->setVisible(false);
+
+  m_helpDockWidget = new QDockWidget(tr("Help"), this);
+  m_helpDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
+                                QDockWidget::DockWidgetMovable |
+                                QDockWidget::DockWidgetFloatable);
+  auto edt = new QPlainTextEdit(this);
+  edt->setReadOnly(true);
+  edt->appendPlainText("zoom:");
+  edt->appendPlainText("    1) command/control key + =(+)/- key");
+  edt->appendPlainText("    2) =(+)/- key");
+  edt->appendPlainText("zoom in to location:");
+  edt->appendPlainText("    1) =(+) key while pointing mouse cursor to the target location");
+  edt->moveCursor(QTextCursor::Start);
+  edt->ensureCursorVisible();
+  m_helpDockWidget->setWidget(edt);
+  addDockWidget(Qt::LeftDockWidgetArea, m_helpDockWidget);
+  m_windowMenu->addAction(m_helpDockWidget->toggleViewAction());
+  m_helpDockWidget->setFloating(true);
+  m_helpDockWidget->setVisible(false);
 
   m_editObjDockWidget = new QDockWidget(tr("Edit and Output"), this);
   m_editObjDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
