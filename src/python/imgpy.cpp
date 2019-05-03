@@ -12,6 +12,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include <pybind11/eigen.h>
+#include <pybind11/operators.h>
 
 namespace py = pybind11;
 
@@ -133,6 +134,13 @@ PYBIND11_MODULE(_imgpy, m)
     .value("m", VoxelSizeUnit::m)
     .value("hm", VoxelSizeUnit::hm)
     .value("km", VoxelSizeUnit::km);
+
+  py::enum_<Interpolant>(m, "Interpolant", py::arithmetic())
+    .value("Nearest", Interpolant::Nearest)
+    .value("Linear", Interpolant::Linear)
+    .value("Cubic", Interpolant::Cubic)
+    .value("Lanczos2", Interpolant::Lanczos2)
+    .value("Lanczos3", Interpolant::Lanczos3);
 
   py::enum_<Dimension>(m, "Dimension", py::arithmetic())
     .value("X", Dimension::X)
@@ -427,6 +435,64 @@ PYBIND11_MODULE(_imgpy, m)
                              }
                              return arrs;
                            })
+    .def("resize", &ZImg::resize,
+         "desWidth"_a, "desHeight"_a, "desDepth"_a, "interpolant"_a = Interpolant::Cubic, "antialiasing"_a = true,
+         "antialiasingForNearest"_a = false)
+    .def("zoom", &ZImg::zoom,
+         "scaleX"_a, "scaleY"_a, "scaleZ"_a = 1.0, "interpolant"_a = Interpolant::Cubic, "antialiasing"_a = true,
+         "antialiasingForNearest"_a = false)
+    .def("blockDownsample", &ZImg::blockDownsample,
+         "blockWidth"_a, "blockHeight"_a, "blockDepth"_a, "mergeMode"_a)
+    .def("secureDivideBy", &ZImg::secureDivideBy,
+         "rhs"_a)
+    .def(py::self + py::self)
+    .def(py::self += py::self)
+    .def(py::self - py::self)
+    .def(py::self -= py::self)
+    .def(py::self * py::self)
+    .def(py::self *= py::self)
+    .def(py::self / py::self)
+    .def(py::self /= py::self)
+    .def(py::self + double())
+    .def(py::self += double())
+    .def(py::self - double())
+    .def(py::self -= double())
+    .def(py::self * double())
+    .def(py::self *= double())
+    .def(py::self / double())
+    .def(py::self /= double())
+    .def(py::self + int32_t())
+    .def(py::self += int32_t())
+    .def(py::self - int32_t())
+    .def(py::self -= int32_t())
+    .def(py::self * int32_t())
+    .def(py::self *= int32_t())
+    .def(py::self / int32_t())
+    .def(py::self /= int32_t())
+    .def(py::self + uint32_t())
+    .def(py::self += uint32_t())
+    .def(py::self - uint32_t())
+    .def(py::self -= uint32_t())
+    .def(py::self * uint32_t())
+    .def(py::self *= uint32_t())
+    .def(py::self / uint32_t())
+    .def(py::self /= uint32_t())
+    .def(py::self + int64_t())
+    .def(py::self += int64_t())
+    .def(py::self - int64_t())
+    .def(py::self -= int64_t())
+    .def(py::self * int64_t())
+    .def(py::self *= int64_t())
+    .def(py::self / int64_t())
+    .def(py::self /= int64_t())
+    .def(py::self + uint64_t())
+    .def(py::self += uint64_t())
+    .def(py::self - uint64_t())
+    .def(py::self -= uint64_t())
+    .def(py::self * uint64_t())
+    .def(py::self *= uint64_t())
+    .def(py::self / uint64_t())
+    .def(py::self /= uint64_t())
     .def("__repr__", [](const ZImg& v) {
       return QString("<_imgpy.ZImg %1>").arg(v.info().toQString()).toStdString();
     });
