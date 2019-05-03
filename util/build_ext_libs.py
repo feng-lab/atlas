@@ -1359,7 +1359,7 @@ def build_libs(libs: dict, update_src: bool):
         build_itk(src_dir, os.path.join(ext_dir(), 'itk'))
 
     if libs['vtk']:
-        src_dir = os.path.join(base_dir(), 'VTK')
+        src_dir = os.path.join(base_dir(), 'vtk')
         if update_src:
             update_or_clone_git_repository(src_dir, 'https://gitlab.kitware.com/vtk/vtk.git')
         assert os.path.exists(src_dir)
