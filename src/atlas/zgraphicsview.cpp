@@ -180,7 +180,7 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
             m_roiAction = ROIAction::Subtract;
             break;
           default:
-            m_roiAction = ROIAction::New;
+            m_roiAction = ROIAction::Add;
             break;
         }
         if (m_roiAction == ROIAction::New) {
@@ -261,7 +261,7 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
             m_roiAction = ROIAction::Subtract;
             break;
           default:
-            m_roiAction = ROIAction::New;
+            m_roiAction = ROIAction::Add;
             break;
         }
         if (m_roiAction == ROIAction::New) {
@@ -375,7 +375,7 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
         m_roiAction = ROIAction::Subtract;
         break;
       default:
-        m_roiAction = ROIAction::New;
+        m_roiAction = ROIAction::Add;
         break;
     }
     if (m_roiAction == ROIAction::New) {
@@ -403,7 +403,7 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
         m_roiAction = ROIAction::Subtract;
         break;
       default:
-        m_roiAction = ROIAction::New;
+        m_roiAction = ROIAction::Add;
         break;
     }
     if (m_roiAction == ROIAction::New) {
