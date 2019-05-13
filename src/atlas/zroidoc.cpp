@@ -161,6 +161,7 @@ QList<QAction*> ZROIDoc::loadFileActions() const
 QMenu* ZROIDoc::processObjMenu() const
 {
   QMenu* res = new QMenu(typeName());
+  res->addAction(m_importMaskImageAction);
   res->addAction(m_createMaskImageAction);
   return res;
 }
@@ -271,6 +272,43 @@ void ZROIDoc::setModified()
   }
 }
 
+void ZROIDoc::importMaskImage()
+{
+  QStringList filters;
+  QList<FileFormat> formats;
+  ZImg::getQtReadNameFilter(filters, formats);
+
+  int fmtIdx = -1;
+  QString fn;
+  {
+    QFileDialog dialog(QApplication::activeWindow());
+    dialog.setFileMode(QFileDialog::ExistingFile);
+    dialog.setNameFilters(filters);
+    dialog.setDirectory(lastOpenedObjPath());
+    dialog.setWindowTitle("Import Mask Image File");
+    if (dialog.exec()) {
+      fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+      fn = dialog.selectedFiles().at(0);
+    }
+    dialog.close();
+  }
+  QApplication::processEvents();
+  if (fmtIdx >= 0 && !fn.isEmpty()) {
+    try {
+      auto roi = new ZROI();
+      roi->importMaskImage(fn, formats[fmtIdx]);
+
+      addROI(roi, QFileInfo(fn).baseName() + "_roi", true);
+      ZSystemInfo::instance().addFileToRecentFileList(fn);
+      ZSystemInfo::instance().setLastOpenedImagePath(fn);
+    }
+    catch (const ZException& e) {
+      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                            QString("Can not import mask image:\n%1").arg(e.what()));
+    }
+  }
+}
+
 void ZROIDoc::createMaskImage()
 {
   if (m_idToROIPacks.empty()) {
@@ -314,10 +352,13 @@ void ZROIDoc::createMaskImage()
   }
 }
 
-size_t ZROIDoc::addROI(ZROI* roi, const QString& path)
+size_t ZROIDoc::addROI(ZROI* roi, const QString& path, bool unsaved)
 {
   size_t id = m_doc.getNewObjId();
   m_idToROIPacks[id] = std::make_shared<ROIPack>(roi, path);
+  if (unsaved) {
+    m_idToROIPacks[id]->hasUnsavedChange = true;
+  }
   m_doc.registerNewObj(id, this);
   m_doc.undoGroup()->addStack(roi->undoStack());
 
@@ -334,7 +375,7 @@ ZROIDoc::ROIPack::ROIPack(ZROI* roi_, const QString& path_)
   updateDerivedData();
   if (path.isEmpty()) {
     hasUnsavedChange = true;
-    m_name = generateUniqueName();
+    m_name = path_.endsWith("_roi") ? path_ : generateUniqueName();
   }
 }
 
@@ -365,6 +406,10 @@ void ZROIDoc::createActions()
   m_loadROIAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load ROI..."), this);
   m_loadROIAction->setStatusTip(tr("Load an existing ROI file"));
   connect(m_loadROIAction, &QAction::triggered, this, &ZROIDoc::loadROI);
+
+  m_importMaskImageAction = new QAction(tr("&Import Mask Image..."), this);
+  m_importMaskImageAction->setStatusTip(tr("Import ROI From Mask Image"));
+  connect(m_importMaskImageAction, &QAction::triggered, this, &ZROIDoc::importMaskImage);
 
   m_createMaskImageAction = new QAction(tr("&To Mask Image..."), this);
   m_createMaskImageAction->setStatusTip(tr("Save ROI as Mask Image"));

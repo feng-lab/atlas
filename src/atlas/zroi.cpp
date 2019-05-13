@@ -3,6 +3,7 @@
 #include "zglmutils.h"
 #include "zlog.h"
 #include "zsaturateoperation.h"
+#include "zregionontology.h"
 #include <Mathematics/GteNaturalSplineCurve.h>
 #include <QFile>
 #include <cmath>
@@ -448,6 +449,36 @@ ZROI::ZROI(QUndoStack* undoStack, QObject* parent)
   if (!m_undoStack) {
     m_undoStack = new QUndoStack(this);
   }
+}
+
+void ZROI::importMaskImage(const QString& fn, nim::FileFormat format)
+{
+  ZBenchTimer bt;
+  bt.start();
+
+  std::vector<ZImgInfo> infos = ZImg::readImgInfos(fn, nullptr, format);
+  if (infos.size() > 1) {
+    throw ZIOException("mask image with more than one scene is not supported");
+  }
+  ZImgInfo info = infos[0];
+  if (info.isEmpty()) {
+    throw ZIOException("mask image is empty");
+  }
+  if (info.numChannels > 1 || info.numTimes > 1) {
+    throw ZIOException("mask image can not be time sequence or color image");
+  }
+
+  if (info.isType<uint8_t>()) {
+    ZImg binaryImg(fn, ZImgRegion(), 0, 1, format);
+    binaryImgToROI(binaryImg, *this);
+  } else {
+    ZImg origMaskImg(fn, ZImgRegion(), 0, 1, format);
+    binaryImgToROI(origMaskImg.binarized(), *this);
+  }
+
+  LOG(INFO) << "Finish importing mask image";
+
+  STOP_AND_LOG(bt);
 }
 
 ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpolation) const

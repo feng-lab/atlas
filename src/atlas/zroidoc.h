@@ -70,10 +70,12 @@ protected:
 
   void setModified();
 
+  void importMaskImage();
+
   void createMaskImage();
 
   // append another ROI into this doc
-  size_t addROI(ZROI* roi, const QString& path);
+  size_t addROI(ZROI* roi, const QString& path, bool unsaved = false);
 
 private:
   struct ROIPack
@@ -116,7 +118,7 @@ private:
   std::map<size_t, std::shared_ptr<ROIPack>> m_idToROIPacks;
 
   QAction* m_loadROIAction;
-
+  QAction* m_importMaskImageAction;
   QAction* m_createMaskImageAction;
 };
 

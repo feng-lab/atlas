@@ -144,6 +144,8 @@ public:
 
   explicit ZROI(QUndoStack* undoStack = nullptr, QObject* parent = nullptr);
 
+  void importMaskImage(const QString& fn, FileFormat format);
+
   ZImg toMaskImg(int outWidth = 0, int outHeight = 0, int outDepth = -1, bool doInterpolation = true) const;
 
   const ZBBox<glm::ivec4>& boundBox() const
