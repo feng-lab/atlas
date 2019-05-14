@@ -62,10 +62,8 @@ def build_atlas_package():
             subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, app_name],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
 
-            shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), zip_name),
-                         os.path.join(os.path.expanduser('~'), 'Google Drive', "lab", 'software', zip_name))
             # shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), zip_name),
-            #              os.path.join('/', 'Volumes', "fs3017", 'eeum', 'software', zip_name))
+            #              os.path.join(os.path.expanduser('~'), 'Google Drive', "lab", 'software', zip_name))
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)
@@ -85,11 +83,8 @@ def build_atlas_package():
 
             subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, 'Atlas.AppDir'],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-            subprocess.run(['scp', zip_name,
-                            'feng@labmacpro:"/Users/feng/Google Drive/lab/software/"'],
-                           cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
             # subprocess.run(['scp', zip_name,
-            #                 'feng@labmacpro:"/Volumes/fs3017/eeum/software/"'],
+            #                 'feng@labmacpro:"/Users/feng/Google Drive/lab/software/"'],
             #                cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
@@ -135,8 +130,8 @@ def build_atlas_package():
                                 'zip',
                                 root_dir=common_dirs.deploy_target_dir(),
                                 base_dir='Atlas')
-            shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), zip_name),
-                         os.path.join('Z:', os.sep, 'Google Drive', "lab", 'software', zip_name))
+            # shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), zip_name),
+            #              os.path.join('Z:', os.sep, 'Google Drive', "lab", 'software', zip_name))
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)
