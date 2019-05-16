@@ -240,7 +240,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
         ZImgRegion crgn;
         crgn.start.c = rgn.start.c;
         crgn.end.c = rgn.end.c;
-        img = tmpImg.crop(rgn);
+        img = tmpImg.crop(crgn);
       } else {
         img.swap(tmpImg);
       }

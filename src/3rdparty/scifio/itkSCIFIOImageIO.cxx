@@ -282,7 +282,7 @@ SCIFIOImageIO::SCIFIOImageIO() : m_Argv(0)
     javaHome = "";
   }
   if (javaHome.empty()) {
-    LOG(WARNING) << "Warning: JAVA_HOME not set; assuming Java is on the path";
+    VLOG(1) << "SCIFIO: JAVA_HOME not set; assuming Java is on the path";
   }
 // use the appropriate java command
   m_Args.push_back(javaCmd);
