@@ -134,9 +134,9 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
   m_height = origLabelImg.height();
   m_depth = origLabelImg.depth();
   // todo: ask user if voxel size not exist
-  m_voxelSizeX = origLabelImg.voxelSizeXInUm();
-  m_voxelSizeY = origLabelImg.voxelSizeYInUm();
-  m_voxelSizeZ = origLabelImg.voxelSizeZInUm();
+  m_voxelSizeX = origLabelImg.info().voxelSizeXInUm();
+  m_voxelSizeY = origLabelImg.info().voxelSizeYInUm();
+  m_voxelSizeZ = origLabelImg.info().voxelSizeZInUm();
   updateBoundBox();
 
   for (auto it = m_ontology.beginPost(); it != m_ontology.endPost(); ++it) {

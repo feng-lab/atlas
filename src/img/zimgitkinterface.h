@@ -41,9 +41,15 @@ typename itk::Image<TVoxel, 3>::Pointer wrapZImgChannelAsITKImg(const ZImg& img,
   origin[2] = 0;
   importFilter->SetOrigin(origin);
   SpacingType spacing;
-  spacing[0] = img.info().voxelSizeXInUm();
-  spacing[1] = img.info().voxelSizeYInUm();
-  spacing[2] = img.info().voxelSizeZInUm();
+  if (img.info().voxelSizeUnit != VoxelSizeUnit::none) {
+    spacing[0] = img.info().voxelSizeXInUm();
+    spacing[1] = img.info().voxelSizeYInUm();
+    spacing[2] = img.info().voxelSizeZInUm();
+  } else {
+    spacing[0] = 1.0;
+    spacing[1] = 1.0;
+    spacing[2] = 1.0;
+  }
   importFilter->SetSpacing(spacing);
   importFilter->SetImportPointer(const_cast<TVoxel*>(img.channelData<TVoxel>(c, t)), img.channelVoxelNumber(), false);
   importFilter->Update();
@@ -83,8 +89,13 @@ typename itk::Image<TVoxel, 2>::Pointer wrapZImgPlaneAsITKImg(const ZImg& img, s
   origin[1] = 0;
   importFilter->SetOrigin(origin);
   SpacingType spacing;
-  spacing[0] = img.info().voxelSizeXInUm();
-  spacing[1] = img.info().voxelSizeYInUm();
+  if (img.info().voxelSizeUnit != VoxelSizeUnit::none) {
+    spacing[0] = img.info().voxelSizeXInUm();
+    spacing[1] = img.info().voxelSizeYInUm();
+  } else {
+    spacing[0] = 1.0;
+    spacing[1] = 1.0;
+  }
   importFilter->SetSpacing(spacing);
   importFilter->SetImportPointer(const_cast<TVoxel*>(img.planeData<TVoxel>(z, c, t)), img.planeVoxelNumber(), false);
   importFilter->Update();

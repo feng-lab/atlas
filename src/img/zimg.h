@@ -348,24 +348,24 @@ public:
   inline double voxelSizeZ() const
   { return m_info.voxelSizeZ; }
 
-  // if current or result voxelSizeUnit is Voxel, result is meaningless
-  inline double voxelSizeXInUnit(VoxelSizeUnit unit) const
-  { return m_info.voxelSizeXInUnit(unit); }
-
-  inline double voxelSizeYInUnit(VoxelSizeUnit unit) const
-  { return m_info.voxelSizeYInUnit(unit); }
-
-  inline double voxelSizeZInUnit(VoxelSizeUnit unit) const
-  { return m_info.voxelSizeZInUnit(unit); }
-
-  inline double voxelSizeXInUm() const
-  { return voxelSizeXInUnit(VoxelSizeUnit::um); }
-
-  inline double voxelSizeYInUm() const
-  { return voxelSizeYInUnit(VoxelSizeUnit::um); }
-
-  inline double voxelSizeZInUm() const
-  { return voxelSizeZInUnit(VoxelSizeUnit::um); }
+//  // if current or result voxelSizeUnit is Voxel, throw exception
+//  inline double voxelSizeXInUnit(VoxelSizeUnit unit) const
+//  { return m_info.voxelSizeXInUnit(unit); }
+//
+//  inline double voxelSizeYInUnit(VoxelSizeUnit unit) const
+//  { return m_info.voxelSizeYInUnit(unit); }
+//
+//  inline double voxelSizeZInUnit(VoxelSizeUnit unit) const
+//  { return m_info.voxelSizeZInUnit(unit); }
+//
+//  inline double voxelSizeXInUm() const
+//  { return voxelSizeXInUnit(VoxelSizeUnit::um); }
+//
+//  inline double voxelSizeYInUm() const
+//  { return voxelSizeYInUnit(VoxelSizeUnit::um); }
+//
+//  inline double voxelSizeZInUm() const
+//  { return voxelSizeZInUnit(VoxelSizeUnit::um); }
 
   inline col4 channelColor(size_t c) const
   { return m_info.channelColors[c]; }

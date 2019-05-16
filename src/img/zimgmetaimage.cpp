@@ -154,9 +154,9 @@ void ZImgMetaImage::writeImg(const QString& filename, const ZImg& img, Compressi
     elementSpacing[2] = img.voxelSizeZ();
   } else {
     distanceUnitType = MET_DISTANCE_UNITS_UM;
-    elementSpacing[0] = img.voxelSizeXInUm();
-    elementSpacing[1] = img.voxelSizeYInUm();
-    elementSpacing[2] = img.voxelSizeZInUm();
+    elementSpacing[0] = img.info().voxelSizeXInUm();
+    elementSpacing[1] = img.info().voxelSizeYInUm();
+    elementSpacing[2] = img.info().voxelSizeZInUm();
   }
   MET_ValueEnumType elementType = MET_CHAR;
   switch (img.voxelFormat()) {
