@@ -252,6 +252,9 @@ PYBIND11_MODULE(_imgpy, m)
     .def_readwrite("channelColors", &ZImgInfo::channelColors)
     .def_readwrite("position", &ZImgInfo::position)
     .def_readwrite("lastChannelIsAlphaChannel", &ZImgInfo::lastChannelIsAlphaChannel)
+    .def("voxelSizeXInUm", &ZImgInfo::voxelSizeXInUm)
+    .def("voxelSizeYInUm", &ZImgInfo::voxelSizeYInUm)
+    .def("voxelSizeZInUm", &ZImgInfo::voxelSizeZInUm)
     .def("__repr__", [](const ZImgInfo& v) {
       return QString("<_imgpy.ZImgInfo %1>").arg(v.toQString()).toStdString();
     });

@@ -193,7 +193,10 @@ void ZImgInfo::createDefaultDescriptions()
 
 double ZImgInfo::voxelSizeXInUnit(VoxelSizeUnit unit) const
 {
-  if (voxelSizeUnit == VoxelSizeUnit::none || unit == VoxelSizeUnit::none || voxelSizeUnit == unit) {
+  if (voxelSizeUnit == VoxelSizeUnit::none || unit == VoxelSizeUnit::none) {
+    throw ZIOException(QString("no resolution info"));
+  }
+  if (voxelSizeUnit == unit) {
     return voxelSizeX;
   }
   return voxelSizeX * unitSizeInMeter(voxelSizeUnit) / unitSizeInMeter(unit);
@@ -201,7 +204,10 @@ double ZImgInfo::voxelSizeXInUnit(VoxelSizeUnit unit) const
 
 double ZImgInfo::voxelSizeYInUnit(VoxelSizeUnit unit) const
 {
-  if (voxelSizeUnit == VoxelSizeUnit::none || unit == VoxelSizeUnit::none || voxelSizeUnit == unit) {
+  if (voxelSizeUnit == VoxelSizeUnit::none || unit == VoxelSizeUnit::none) {
+    throw ZIOException(QString("no resolution info"));
+  }
+  if (voxelSizeUnit == unit) {
     return voxelSizeY;
   }
   return voxelSizeY * unitSizeInMeter(voxelSizeUnit) / unitSizeInMeter(unit);
@@ -209,7 +215,10 @@ double ZImgInfo::voxelSizeYInUnit(VoxelSizeUnit unit) const
 
 double ZImgInfo::voxelSizeZInUnit(VoxelSizeUnit unit) const
 {
-  if (voxelSizeUnit == VoxelSizeUnit::none || unit == VoxelSizeUnit::none || voxelSizeUnit == unit) {
+  if (voxelSizeUnit == VoxelSizeUnit::none || unit == VoxelSizeUnit::none) {
+    throw ZIOException(QString("no resolution info"));
+  }
+  if (voxelSizeUnit == unit) {
     return voxelSizeZ;
   }
   return voxelSizeZ * unitSizeInMeter(voxelSizeUnit) / unitSizeInMeter(unit);

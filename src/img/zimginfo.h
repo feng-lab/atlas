@@ -121,7 +121,7 @@ struct ZImgInfo
   inline bool isAlphaChannel(size_t ch) const
   { return lastChannelIsAlphaChannel && ch + 1 == numChannels; }
 
-  // if current or result voxelSizeUnit is Voxel, result is meaningless
+  // if current or result voxelSizeUnit is Voxel, throw exception
   double voxelSizeXInUnit(VoxelSizeUnit unit) const;
 
   double voxelSizeYInUnit(VoxelSizeUnit unit) const;
