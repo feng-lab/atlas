@@ -199,15 +199,18 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       if (isNrrd && !region.containsWholeImg(imgInfo))
         img = img.crop(region);
     } else {
-      ZImgInfo clipInfo = region.clip(imgInfo);
-      bool clipChannel = clipInfo.numChannels != imgInfo.numChannels;
-      if (clipChannel) {
-        clipInfo.numChannels = imgInfo.numChannels;
-      }
-
-      ZImg tmpImg(clipInfo);
       ZImgRegion rgn = region;
       rgn.resolveRegionEnd(imgInfo);
+
+      bool clipChannel = rgn.start.c != 0 || rgn.end.c != int(imgInfo.numChannels);
+      if (clipChannel) {
+        rgn.start.c = 0;
+        rgn.end.c = imgInfo.numChannels;
+      }
+
+      ZImgInfo clipInfo = rgn.clip(imgInfo);
+      ZImg tmpImg(clipInfo);
+
       itk::ImageIORegion ioRegion(4);
       ioRegion.SetIndex(0, rgn.start.x);
       ioRegion.SetIndex(1, rgn.start.y);
@@ -238,8 +241,8 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
 
       if (clipChannel) {
         ZImgRegion crgn;
-        crgn.start.c = rgn.start.c;
-        crgn.end.c = rgn.end.c;
+        crgn.start.c = region.start.c;
+        crgn.end.c = region.end.c;
         img = tmpImg.crop(crgn);
       } else {
         img.swap(tmpImg);
