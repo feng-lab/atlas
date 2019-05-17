@@ -84,6 +84,8 @@ private:
   std::unique_ptr<QGraphicsPathItem> m_polygonItem;
   QPolygonF m_spline;
   std::unique_ptr<QGraphicsPathItem> m_splineItem;
+  QPolygonF m_ffpolygon;
+  std::unique_ptr<QGraphicsPathItem> m_ffpolygonItem;
 };
 
 } // namespace nim

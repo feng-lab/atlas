@@ -161,7 +161,8 @@ private:
   static void vbgmmSplit(const Eigen::MatrixXi& voxelLocs, const Eigen::VectorXd& voxelIntens,
                          size_t numCenter, const ZImg& img, ZPuncta& detectedPunctaList,
                          double confRadius = .95, double confOverlapArea = .8, double overlapRateThreshold = .8,
-                         Eigen::RowVectorXi minLoc = Eigen::RowVectorXi::Zero(3));
+                         Eigen::RowVectorXi minLoc = Eigen::RowVectorXi::Zero(3),
+                         bool useMultithreading = true);
 
 private:
   QString m_filename;

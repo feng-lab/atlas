@@ -833,7 +833,7 @@ void ZPunctaDetection::detectImpl(const ZImg& rawimg, size_t pc, size_t t,
             resList.push_back(punc);
           } else {
             vbgmmSplit(wsObjects[wsObjIdx], wsObjVoxelIntens, numCenter, cropImg, resList,
-                       m_confRadius, m_confOverlapArea, m_overlapRateThreshold, minLoc);
+                       m_confRadius, m_confOverlapArea, m_overlapRateThreshold, minLoc, m_useMultithreading);
           }
           LOG(INFO) << "    End VBGMM Split for Watershed Component " << wsObjIdx + 1;
         }
@@ -1353,7 +1353,8 @@ size_t ZPunctaDetection::getNumCenters(const ZImg& rawimg, size_t pc, size_t t,
 void
 ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs, const Eigen::VectorXd& voxelIntens, size_t numCenter,
                              const ZImg& img, ZPuncta& detectedPunctaList, double confRadius,
-                             double confOverlapArea, double overlapRateThreshold, Eigen::RowVectorXi minLoc)
+                             double confOverlapArea, double overlapRateThreshold, Eigen::RowVectorXi minLoc,
+                             bool useMultitheading)
 {
   Eigen::MatrixXd data = voxelLocs.cast<double>();
   int z = -1;
@@ -1368,7 +1369,7 @@ ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs, const Eigen::Vect
 
   ZVBGMM<double, double> vbgmm(data, weight, numCenter, 10, m, 0.001,
                                ZTermCriteria<double>(200, 1e-5), IterAlgorithmLogLevel::Off);
-  vbgmm.runEM();
+  vbgmm.runEM(useMultitheading);
   LOG(INFO) << "      Number of components after vbgmm: " << vbgmm.numOfClusters();
   // check if we can merge some models
   Eigen::MatrixXd centroids = meanShiftGaussianCenters(vbgmm, img, z);

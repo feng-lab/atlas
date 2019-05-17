@@ -566,105 +566,116 @@ void ZStitchImage::doWork()
 
     fftw_plan_with_nthreads(1);
 
-    int nthread =
-      std::min<int>(tbb::task_scheduler_init::default_num_threads(),
-                    std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
-    nthread = std::max(1, nthread);
-    LOG(INFO) << "using " << nthread << " threads to stitch.";
-    tbb::task_scheduler_init init(nthread);
-
     std::vector<std::tuple<size_t, size_t, ZImgNCCMatch::PositionHint>> allPairs;
     for (const auto& con : conn) {
       allPairs.push_back(std::make_tuple(con.first.first, con.first.second, con.second));
     }
-    tbb::parallel_for(
-      tbb::blocked_range<size_t>(0, allPairs.size()),
-      [&](const tbb::blocked_range<size_t>& r) {
-        for (size_t i = r.begin(); i != r.end(); ++i) {
-          size_t f = std::get<0>(allPairs[i]);
-          size_t m = std::get<1>(allPairs[i]);
-          if (offsets.find(std::make_pair(m, f)) != offsets.end()) {
-            continue;
-          }
-          ZImg fixedImg(inputStackSources[f]);
-          ZImg movingImg(inputStackSources[m]);
-          fixedImg.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
-                                   m_downsampleMergeMode);
-          movingImg.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
-                                    m_downsampleMergeMode);
 
-          ZImgNCCMatch imgNCCMatch(fixedImg, movingImg);
-          ZImgNCCMatch::PositionHint hint = std::get<2>(allPairs[i]);
-          imgNCCMatch.setMovingImgPositionHint(hint, m_maxOverlapRate);
+    auto stitch_pair = [&](size_t i) {
+      size_t f = std::get<0>(allPairs[i]);
+      size_t m = std::get<1>(allPairs[i]);
+      if (offsets.find(std::make_pair(m, f)) != offsets.end()) {
+        return;
+      }
+      ZImg fixedImg(inputStackSources[f]);
+      ZImg movingImg(inputStackSources[m]);
+      fixedImg.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
+                               m_downsampleMergeMode);
+      movingImg.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
+                                m_downsampleMergeMode);
 
-          if (m_concatenateOnly) {
-            if ((f < nStacks && m < nStacks) || (f >= nStacks && m >= nStacks)) {
-              // within same input set
-              ZVoxelCoordinate movingImgOffset = imgNCCMatch.getMovingImgOffsetFromHint(0., 0., 0.);
-              offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, 0);
-            } else {
-              // between input set
-              CHECK(m == f + nStacks);
-              // append channels of 2nd input set to channels of 1st input set
-              offsets[std::make_pair(f, m)] = std::make_pair(ZVoxelCoordinate(0, 0, 0, oneImgInfo.numChannels), 0);
-            }
+      ZImgNCCMatch imgNCCMatch(fixedImg, movingImg);
+      ZImgNCCMatch::PositionHint hint = std::get<2>(allPairs[i]);
+      imgNCCMatch.setMovingImgPositionHint(hint, m_maxOverlapRate);
+
+      if (m_concatenateOnly) {
+        if ((f < nStacks && m < nStacks) || (f >= nStacks && m >= nStacks)) {
+          // within same input set
+          ZVoxelCoordinate movingImgOffset = imgNCCMatch.getMovingImgOffsetFromHint(0., 0., 0.);
+          offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, 0);
+        } else {
+          // between input set
+          CHECK(m == f + nStacks);
+          // append channels of 2nd input set to channels of 1st input set
+          offsets[std::make_pair(f, m)] = std::make_pair(ZVoxelCoordinate(0, 0, 0, oneImgInfo.numChannels), 0);
+        }
+      } else {
+        if ((f < nStacks && m < nStacks) || (f >= nStacks && m >= nStacks)) {
+          // within same input set
+          const auto& chsToUse = f < nStacks ? m_channelsToUse : m_2ndChannelsToUse;
+          const auto& chsToRemoveBackground =
+            f < nStacks ? m_channelsToRemoveBackground : m_2ndChannelsToRemoveBackground;
+
+          if (chsToUse.empty()) {
+            imgNCCMatch.useAllFixedImgChannels();
+            imgNCCMatch.useAllMovingImgChannels();
           } else {
-            if ((f < nStacks && m < nStacks) || (f >= nStacks && m >= nStacks)) {
-              // within same input set
-              const auto& chsToUse = f < nStacks ? m_channelsToUse : m_2ndChannelsToUse;
-              const auto& chsToRemoveBackground =
-                f < nStacks ? m_channelsToRemoveBackground : m_2ndChannelsToRemoveBackground;
-
-              if (chsToUse.empty()) {
-                imgNCCMatch.useAllFixedImgChannels();
-                imgNCCMatch.useAllMovingImgChannels();
-              } else {
-                imgNCCMatch.useFixedImgChannels(chsToUse);
-                imgNCCMatch.useMovingImgChannels(chsToUse);
-              }
-              imgNCCMatch.removeBackgroundForFixedImgChannels(chsToRemoveBackground);
-              imgNCCMatch.removeBackgroundForMovingImgChannels(chsToRemoveBackground);
-
-              double maxNCC;
-              ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(m_startResolutionIntvX,
-                                                                                      m_startResolutionIntvY,
-                                                                                      m_startResolutionIntvZ,
-                                                                                      &maxNCC);
-              offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
-
-              QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
-                .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(
-                maxNCC);
-
-              LOG(INFO) << info;
-            } else {
-              // between input set
-              CHECK(m == f + nStacks);
-
-              imgNCCMatch.useFixedImgChannels(std::vector<size_t>{m_commonChannelOfInput});
-              imgNCCMatch.useMovingImgChannels(std::vector<size_t>{m_commonChannelOf2ndInput});
-              imgNCCMatch.removeBackgroundForFixedImgChannels(m_channelsToRemoveBackground);
-              imgNCCMatch.removeBackgroundForMovingImgChannels(m_2ndChannelsToRemoveBackground);
-
-              double maxNCC;
-              ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(m_startResolutionIntvX,
-                                                                                      m_startResolutionIntvY,
-                                                                                      m_startResolutionIntvZ,
-                                                                                      &maxNCC);
-              // append moving img channels to fixed img channels
-              movingImgOffset.c = oneImgInfo.numChannels;
-              offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
-
-              QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
-                .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(
-                maxNCC);
-
-              LOG(INFO) << info;
-            }
+            imgNCCMatch.useFixedImgChannels(chsToUse);
+            imgNCCMatch.useMovingImgChannels(chsToUse);
           }
+          imgNCCMatch.removeBackgroundForFixedImgChannels(chsToRemoveBackground);
+          imgNCCMatch.removeBackgroundForMovingImgChannels(chsToRemoveBackground);
+
+          double maxNCC;
+          ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(m_startResolutionIntvX,
+                                                                                  m_startResolutionIntvY,
+                                                                                  m_startResolutionIntvZ,
+                                                                                  &maxNCC);
+          offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
+
+          QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
+            .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(
+            maxNCC);
+
+          LOG(INFO) << info;
+        } else {
+          // between input set
+          CHECK(m == f + nStacks);
+
+          imgNCCMatch.useFixedImgChannels(std::vector<size_t>{m_commonChannelOfInput});
+          imgNCCMatch.useMovingImgChannels(std::vector<size_t>{m_commonChannelOf2ndInput});
+          imgNCCMatch.removeBackgroundForFixedImgChannels(m_channelsToRemoveBackground);
+          imgNCCMatch.removeBackgroundForMovingImgChannels(m_2ndChannelsToRemoveBackground);
+
+          double maxNCC;
+          ZVoxelCoordinate movingImgOffset = imgNCCMatch.computeMovingImgOffsetMR(m_startResolutionIntvX,
+                                                                                  m_startResolutionIntvY,
+                                                                                  m_startResolutionIntvZ,
+                                                                                  &maxNCC);
+          // append moving img channels to fixed img channels
+          movingImgOffset.c = oneImgInfo.numChannels;
+          offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
+
+          QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
+            .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(
+            maxNCC);
+
+          LOG(INFO) << info;
         }
       }
-    );
+    };
+
+    if (m_useMultithreading) {
+      int nthread =
+        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
+                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
+      nthread = std::max(1, nthread);
+      LOG(INFO) << "using " << nthread << " threads to stitch.";
+      tbb::task_scheduler_init init(nthread);
+
+      tbb::parallel_for(
+        tbb::blocked_range<size_t>(0, allPairs.size()),
+        [&](const tbb::blocked_range<size_t>& r) {
+          for (size_t i = r.begin(); i != r.end(); ++i) {
+            stitch_pair(i);
+          }
+        }
+      );
+    } else {
+      for (size_t i = 0; i < allPairs.size(); ++i) {
+        stitch_pair(i);
+      }
+    }
 
     fftw_plan_with_nthreads(ZCpuInfo::instance().nPhysicalCores);
 
@@ -734,6 +745,8 @@ void ZStitchImage::read(const QJsonObject& json)
 
   setResultFilename(readString(json, "result_file"));
 
+  setUseMultithreading(readBool(json, "use_multithreading"));
+
   setUseChannels();
   if (json.contains("channels_to_use")) {
     std::vector<size_t> chs;
@@ -799,6 +812,8 @@ void ZStitchImage::write(QJsonObject& json) const
   json["input_files_scene"] = int(m_scene);
 
   json["result_file"] = m_resFileName;
+
+  json["use_multithreading"] = m_useMultithreading;
 
   if (!m_channelsToUse.empty()) {
     QJsonArray channelArray;
@@ -959,73 +974,83 @@ void ZStitchImage::doRestitch()
 
     fftw_plan_with_nthreads(1);
 
-    int nthread =
-      std::min<int>(tbb::task_scheduler_init::default_num_threads(),
-                    std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
-    nthread = std::max(1, nthread);
-    LOG(INFO) << "using " << nthread << " threads to stitch " << rgns.size() << " regions.";
-    tbb::task_scheduler_init init(nthread);
-
     std::vector<std::tuple<size_t, size_t, ZVoxelCoordinate>> allPairs;
     for (const auto& con : conn) {
       allPairs.push_back(std::make_tuple(con.first.first, con.first.second, con.second));
     }
-    tbb::parallel_for(
-      tbb::blocked_range<size_t>(0, allPairs.size()),
-      [&](const tbb::blocked_range<size_t>& r) {
-        for (size_t i = r.begin(); i != r.end(); ++i) {
-          size_t f = std::get<0>(allPairs[i]);
-          size_t m = std::get<1>(allPairs[i]);
-          if (offsets.find(std::make_pair(m, f)) != offsets.end()) {
-            continue;
-          }
-          ZImg fixedImg(inputStackSources[f]);
-          ZImg movingImg(inputStackSources[m]);
-          fixedImg.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
-                                   m_downsampleMergeMode);
-          movingImg.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
-                                    m_downsampleMergeMode);
 
-          ZImgNCCMatch imgNCCMatch(fixedImg, movingImg);
-          ZVoxelCoordinate initOffset = std::get<2>(allPairs[i]);
-
-          const auto& chsToUse = m_channelsToUse;
-          const auto& chsToRemoveBackground = m_channelsToRemoveBackground;
-
-          if (chsToUse.empty()) {
-            imgNCCMatch.useAllFixedImgChannels();
-            imgNCCMatch.useAllMovingImgChannels();
-          } else {
-            imgNCCMatch.useFixedImgChannels(chsToUse);
-            imgNCCMatch.useMovingImgChannels(chsToUse);
-          }
-          imgNCCMatch.removeBackgroundForFixedImgChannels(chsToRemoveBackground);
-          imgNCCMatch.removeBackgroundForMovingImgChannels(chsToRemoveBackground);
-
-          size_t radiusX = std::ceil(m_maxOverlapRate / 5.0 * std::max(fixedImg.width(), movingImg.width()));
-          size_t radiusY = std::ceil(m_maxOverlapRate / 5.0 * std::max(fixedImg.height(), movingImg.height()));
-          size_t radiusZ = std::ceil(m_maxOverlapRate / 5.0 * std::max(fixedImg.depth(), movingImg.depth()));
-          LOG(INFO) << QString("radius: %1, %2, %3").arg(radiusX).arg(radiusY).arg(radiusZ);
-
-          double maxNCC;
-          ZVoxelCoordinate movingImgOffset = imgNCCMatch.refineMovingImgOffsetMR(initOffset, radiusX, radiusY, radiusZ,
-                                                                                 m_startResolutionIntvX,
-                                                                                 m_startResolutionIntvY,
-                                                                                 m_startResolutionIntvZ,
-                                                                                 &maxNCC);
-          offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
-
-          QString info = QString("tile %1 (%2) -- tile %3 (%4), tile %3 initial offset: %5, final offset: %6, NCC: %7")
-            .arg(f + 1).arg(rgns[f].start.toQString()).arg(m + 1).arg(rgns[m].start.toQString()).arg(
-            initOffset.toQString()).arg(movingImgOffset.toQString()).arg(maxNCC);
-
-          LOG(INFO) << info;
-        }
+    auto stitch_pair = [&](size_t i) {
+      size_t f = std::get<0>(allPairs[i]);
+      size_t m = std::get<1>(allPairs[i]);
+      if (offsets.find(std::make_pair(m, f)) != offsets.end()) {
+        return;
       }
-    );
+      ZImg fixedImg(inputStackSources[f]);
+      ZImg movingImg(inputStackSources[m]);
+      fixedImg.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
+                               m_downsampleMergeMode);
+      movingImg.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
+                                m_downsampleMergeMode);
+
+      ZImgNCCMatch imgNCCMatch(fixedImg, movingImg);
+      ZVoxelCoordinate initOffset = std::get<2>(allPairs[i]);
+
+      const auto& chsToUse = m_channelsToUse;
+      const auto& chsToRemoveBackground = m_channelsToRemoveBackground;
+
+      if (chsToUse.empty()) {
+        imgNCCMatch.useAllFixedImgChannels();
+        imgNCCMatch.useAllMovingImgChannels();
+      } else {
+        imgNCCMatch.useFixedImgChannels(chsToUse);
+        imgNCCMatch.useMovingImgChannels(chsToUse);
+      }
+      imgNCCMatch.removeBackgroundForFixedImgChannels(chsToRemoveBackground);
+      imgNCCMatch.removeBackgroundForMovingImgChannels(chsToRemoveBackground);
+
+      size_t radiusX = std::ceil(m_maxOverlapRate / 5.0 * std::max(fixedImg.width(), movingImg.width()));
+      size_t radiusY = std::ceil(m_maxOverlapRate / 5.0 * std::max(fixedImg.height(), movingImg.height()));
+      size_t radiusZ = std::ceil(m_maxOverlapRate / 5.0 * std::max(fixedImg.depth(), movingImg.depth()));
+      LOG(INFO) << QString("radius: %1, %2, %3").arg(radiusX).arg(radiusY).arg(radiusZ);
+
+      double maxNCC;
+      ZVoxelCoordinate movingImgOffset = imgNCCMatch.refineMovingImgOffsetMR(initOffset, radiusX, radiusY, radiusZ,
+                                                                             m_startResolutionIntvX,
+                                                                             m_startResolutionIntvY,
+                                                                             m_startResolutionIntvZ,
+                                                                             &maxNCC);
+      offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
+
+      QString info = QString("tile %1 (%2) -- tile %3 (%4), tile %3 initial offset: %5, final offset: %6, NCC: %7")
+        .arg(f + 1).arg(rgns[f].start.toQString()).arg(m + 1).arg(rgns[m].start.toQString()).arg(
+        initOffset.toQString()).arg(movingImgOffset.toQString()).arg(maxNCC);
+
+      LOG(INFO) << info;
+    };
+
+    if (m_useMultithreading) {
+      int nthread =
+        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
+                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
+      nthread = std::max(1, nthread);
+      LOG(INFO) << "using " << nthread << " threads to stitch " << rgns.size() << " regions.";
+      tbb::task_scheduler_init init(nthread);
+
+      tbb::parallel_for(
+        tbb::blocked_range<size_t>(0, allPairs.size()),
+        [&](const tbb::blocked_range<size_t>& r) {
+          for (size_t i = r.begin(); i != r.end(); ++i) {
+            stitch_pair(i);
+          }
+        }
+      );
+    } else {
+      for (size_t i = 0; i < allPairs.size(); ++i) {
+        stitch_pair(i);
+      }
+    }
 
     fftw_plan_with_nthreads(ZCpuInfo::instance().nPhysicalCores);
-
 
     ZImgMerge imgMerge;
     std::vector<ZImgTileSubBlock> imgs;

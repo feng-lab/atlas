@@ -41,7 +41,7 @@ Q_OBJECT
 public:
   enum class State
   {
-    Normal, ROIRect, ROIEllipse, ROIPolygon, ROISpline
+    Normal, ROIRect, ROIEllipse, ROIPolygon, ROISpline, ROIFFPolygon
   };
 
   ZView(ZDoc& doc, QWidget* parent = nullptr, Qt::WindowFlags f = Qt::Widget);
@@ -222,7 +222,7 @@ private:
   QAction* m_roiEllipseAction;
   QAction* m_roiPolygonAction;
   QAction* m_roiSplineAction;
-  QAction* m_roiLineAction;
+  QAction* m_roiFFPolygonAction;
 
   bool m_doNotReceiveSliceSignal;
   ZBBox<glm::ivec4> m_boundBox;

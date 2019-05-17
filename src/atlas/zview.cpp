@@ -100,6 +100,7 @@ QToolButton* ZView::createROIToolButton(QWidget* parent)
   res->addAction(m_roiPolygonAction);
   res->addAction(m_roiRectangleAction);
   res->addAction(m_roiEllipseAction);
+  res->addAction(m_roiFFPolygonAction);
   connect(res, &QToolButton::triggered, res, &QToolButton::setDefaultAction);
   res->setDefaultAction(m_roiSplineAction);
   res->setPopupMode(QToolButton::MenuButtonPopup);
@@ -150,6 +151,8 @@ ZView::State ZView::state() const
     return State::ROIPolygon;
   if (m_roiSplineAction->isChecked())
     return State::ROISpline;
+  if (m_roiFFPolygonAction->isChecked())
+    return State::ROIFFPolygon;
 
   return State::Normal;
 }
@@ -562,6 +565,10 @@ void ZView::createActions()
   m_roiSplineAction->setCheckable(true);
   m_roiSplineAction->setStatusTip(tr("Make Spline Selections"));
 
+  m_roiFFPolygonAction = new QAction(tr("&Free-form Polygon Selections"), this);
+  m_roiFFPolygonAction->setCheckable(true);
+  m_roiFFPolygonAction->setStatusTip(tr("Make Free-form Polygon Selections"));
+
   //m_roiLineAction = new QAction(ZTheme::instance().icon(ZTheme::LineIcon), tr("&Line Selections"), this);
   //m_roiLineAction->setCheckable(true);
   //m_roiLineAction->setStatusTip(tr("Make Line Selections"));
@@ -571,6 +578,7 @@ void ZView::createActions()
   m_roiStyleActionGroup->addAction(m_roiPolygonAction);
   m_roiStyleActionGroup->addAction(m_roiRectangleAction);
   m_roiStyleActionGroup->addAction(m_roiEllipseAction);
+  m_roiStyleActionGroup->addAction(m_roiFFPolygonAction);
   //m_roiStyleActionGroup->addAction(m_roiLineAction);
 }
 

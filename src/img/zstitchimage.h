@@ -119,6 +119,10 @@ public:
     unsetTileConfiguration();
   }
 
+  // default is true
+  void setUseMultithreading(bool v)
+  { m_useMultithreading = v; }
+
 signals:
 
   void resultReady(QString path);
@@ -168,6 +172,8 @@ private:
   std::vector<size_t> m_2ndChannelsToRemoveBackground;
   size_t m_commonChannelOfInput = 0;
   size_t m_commonChannelOf2ndInput = 0;
+
+  bool m_useMultithreading = true;
 };
 
 } // namespace nim
