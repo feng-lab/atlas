@@ -571,6 +571,8 @@ PYBIND11_MODULE(_imgpy, m)
     .def("set2ndInput", &ZStitchImage::set2ndInput,
          "fns"_a, "scene"_a, "chsToUse"_a, "chsToRemoveBackground"_a, "commonChannelOfInput"_a,
          "commonChannelOf2ndInput"_a)
+    .def("setUseMultithreading", &ZStitchImage::setUseMultithreading,
+         "v"_a)
     .def("setLogFile", &ZStitchImage::setLogFile, "logfilename"_a)
     .def("loadTask", &ZStitchImage::loadTask, "filename"_a)
     .def("saveTask", &ZStitchImage::saveTask, "filename"_a)
