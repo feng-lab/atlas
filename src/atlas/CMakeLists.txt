@@ -567,7 +567,7 @@ set(SOURCES
     zrpcservice.cpp
     zrpcservice.h
     ztheme.cpp
-    ztheme.h zserializationutils.h)
+    ztheme.h zserializationutils.h zroiwidget.cpp zroiwidget.h)
 
 # our target
 set(APP_NAME Atlas)

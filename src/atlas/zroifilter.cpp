@@ -18,7 +18,7 @@ ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, QGraphicsItem* parent)
   , m_roi(roi)
   , m_slice(slice)
 {
-  setFlags(QGraphicsItem::ItemIsSelectable);
+  // setFlags(QGraphicsItem::ItemIsSelectable);
   //todo: uncomment this when we have undo
   //setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
   //         QGraphicsItem::ItemIsSelectable);
@@ -143,11 +143,11 @@ void ROICtrlPtGraphicsItem::setViewScale(double s)
 void ROICtrlPtGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
   if (isSelected()) {
-    double halfwidth = 6. / m_viewScale;
+    double halfwidth = 1.5; // / m_viewScale;
     QRectF rect(-halfwidth, -halfwidth, halfwidth * 2, halfwidth * 2);
     setRect(rect);
   } else {
-    double halfwidth = 3. / m_viewScale;
+    double halfwidth = 1.; // / m_viewScale;
     QRectF rect(-halfwidth, -halfwidth, halfwidth * 2, halfwidth * 2);
     setRect(rect);
   }
@@ -611,11 +611,11 @@ void ZROIFilter::onRoiDeleted(int slice)
 
 void ZROIFilter::viewScaleChanged(double s)
 {
-  for (const auto& sliceItems : m_sliceToCtrlPtItems) {
-    for (const auto& item : sliceItems.second) {
-      item->setViewScale(s);
-    }
-  }
+//  for (const auto& sliceItems : m_sliceToCtrlPtItems) {
+//    for (const auto& item : sliceItems.second) {
+//      item->setViewScale(s);
+//    }
+//  }
 }
 
 } // namespace nim

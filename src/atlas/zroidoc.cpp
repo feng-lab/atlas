@@ -6,6 +6,7 @@
 #include "zimgsigneddistancemap.h"
 #include "zlog.h"
 #include "ztheme.h"
+#include "zroiwidget.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
@@ -237,6 +238,14 @@ bool ZROIDoc::isAlias(size_t id) const
       return true;
   }
   return false;
+}
+
+QWidget* ZROIDoc::createObjEditWidget(size_t id)
+{
+  CHECK(m_idToROIPacks.find(id) != m_idToROIPacks.end());
+
+  auto& pack = m_idToROIPacks.at(id);
+  return new ZROIWidget(*pack->roi, m_doc);
 }
 
 void ZROIDoc::loadROI()
