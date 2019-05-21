@@ -68,7 +68,7 @@ public:
   ZROIControlPoint controlPoint() const
   { return m_controlPoint; }
 
-  void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
+  // void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
 
   void setOffset(double x, double y);
 

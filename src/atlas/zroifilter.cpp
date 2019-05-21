@@ -114,6 +114,16 @@ ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& 
   setPen(QPen(QColor(0, 0, 0), 0));
   setBrush(QBrush(QColor(255, 255, 255)));
   setCursor(Qt::PointingHandCursor);
+
+  if (isSelected()) {
+    double halfwidth = 1.5; // / m_viewScale;
+    QRectF rect(-halfwidth, -halfwidth, halfwidth * 2, halfwidth * 2);
+    setRect(rect);
+  } else {
+    double halfwidth = 1.; // / m_viewScale;
+    QRectF rect(-halfwidth, -halfwidth, halfwidth * 2, halfwidth * 2);
+    setRect(rect);
+  }
 }
 
 void ROICtrlPtGraphicsItem::updateValue()
@@ -140,19 +150,19 @@ void ROICtrlPtGraphicsItem::setViewScale(double s)
   }
 }
 
-void ROICtrlPtGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
-{
-  if (isSelected()) {
-    double halfwidth = 1.5; // / m_viewScale;
-    QRectF rect(-halfwidth, -halfwidth, halfwidth * 2, halfwidth * 2);
-    setRect(rect);
-  } else {
-    double halfwidth = 1.; // / m_viewScale;
-    QRectF rect(-halfwidth, -halfwidth, halfwidth * 2, halfwidth * 2);
-    setRect(rect);
-  }
-  QGraphicsRectItem::paint(painter, option, widget);
-}
+//void ROICtrlPtGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
+//{
+//  if (isSelected()) {
+//    double halfwidth = 1.5; // / m_viewScale;
+//    QRectF rect(-halfwidth, -halfwidth, halfwidth * 2, halfwidth * 2);
+//    setRect(rect);
+//  } else {
+//    double halfwidth = 1.; // / m_viewScale;
+//    QRectF rect(-halfwidth, -halfwidth, halfwidth * 2, halfwidth * 2);
+//    setRect(rect);
+//  }
+//  QGraphicsRectItem::paint(painter, option, widget);
+//}
 
 void ROICtrlPtGraphicsItem::setOffset(double x, double y)
 {
@@ -182,6 +192,17 @@ QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange cha
       }
     }
     return m_roi.setControlPointCoord(m_controlPoint, newPos) + m_offset;
+  } else if (change == ItemSelectedHasChanged && scene()) {
+    if (value.toBool()) {
+      double halfwidth = 1.5; // / m_viewScale;
+      QRectF rect(-halfwidth, -halfwidth, halfwidth * 2, halfwidth * 2);
+      setRect(rect);
+    } else {
+      double halfwidth = 1.; // / m_viewScale;
+      QRectF rect(-halfwidth, -halfwidth, halfwidth * 2, halfwidth * 2);
+      setRect(rect);
+    }
+    return value;
   }
   return QGraphicsRectItem::itemChange(change, value);
 }

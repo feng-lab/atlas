@@ -850,9 +850,10 @@ void ZROI::sliceAddCtrlPoint(int slice, const QPointF& pt)
 
 void ZROI::startMoveSelectedControlPointsCommand()
 {
-  CHECK(!m_moveSelectedControlPointsCommand);
-  m_changedSlices.clear();
-  m_moveSelectedControlPointsCommand = new ZROISliceMoveSelectedControlPointsCommand(*this);
+  if (!m_moveSelectedControlPointsCommand) {
+    m_changedSlices.clear();
+    m_moveSelectedControlPointsCommand = new ZROISliceMoveSelectedControlPointsCommand(*this);
+  }
 }
 
 void ZROI::endMoveSelectedControlPointsCommand()

@@ -122,12 +122,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
   mxSetFieldByNumber(plhs[0], 0, voxelSizeUnit_field, mxCreateString(img.voxelSizeUnit() == VoxelSizeUnit::none ? "none" : "um"));
   mxArray *vsx = mxCreateDoubleMatrix(1, 1, mxREAL);
-  *mxGetDoubles(vsx) = img.voxelSizeXInUm();
+  *mxGetDoubles(vsx) = img.voxelSizeUnit() == VoxelSizeUnit::none ? 1.0 : img.info().voxelSizeXInUm();
   mxSetFieldByNumber(plhs[0], 0, voxelSizeX_field, vsx);
   mxArray *vsy = mxCreateDoubleMatrix(1, 1, mxREAL);
-  *mxGetDoubles(vsy) = img.voxelSizeYInUm();
+  *mxGetDoubles(vsy) = img.voxelSizeUnit() == VoxelSizeUnit::none ? 1.0 : img.info().voxelSizeYInUm();
   mxSetFieldByNumber(plhs[0], 0, voxelSizeY_field, vsy);
   mxArray *vsz = mxCreateDoubleMatrix(1, 1, mxREAL);
-  *mxGetDoubles(vsz) = img.voxelSizeZInUm();
+  *mxGetDoubles(vsz) = img.voxelSizeUnit() == VoxelSizeUnit::none ? 1.0 : img.info().voxelSizeZInUm();
   mxSetFieldByNumber(plhs[0], 0, voxelSizeZ_field, vsz);
 }
