@@ -243,29 +243,13 @@ void ZROIFilter::setData(ZROI& roi)
   m_ROI = &roi;
   m_sliceToROIItem.clear();
   m_sliceToCtrlPtItems.clear();
-  if (!m_ROI->isEmpty()) {
+  if (!m_ROI->isEmpty() && !m_lazyRendering) {
     for (const auto& sliceROI : *m_ROI) {
       int slice = sliceROI.first;
       auto& shapeItems = m_sliceToROIItem[slice];
       auto& shapeCtrlPtItems = m_sliceToCtrlPtItems[slice];
       for (auto shapeID : m_ROI->sliceShapeIDs(slice)) {
-        auto roiItem = new ROIGraphicsItem(*m_ROI, slice, shapeID);
-        roiItem->setZValue(m_viewPrecedencePara.get());
-        roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
-                                    m_outlineColor.get().y * 255,
-                                    m_outlineColor.get().z * 255),
-                             0));
-        roiItem->setBrush(QColor(m_regionColor.get().x * 255,
-                                 m_regionColor.get().y * 255,
-                                 m_regionColor.get().z * 255,
-                                 m_opacity.get() * 255));
-        //roiItem->setOpacity(m_opacity.get());
-        roiItem->setTransform(getQTransform());
-        roiItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get());
-        m_view.scene().addItem(roiItem);
-
-        shapeItems[shapeID] = std::unique_ptr<ROIGraphicsItem>(roiItem);
-
+        shapeItems[shapeID] = createShapeItem(slice, shapeID);
         shapeCtrlPtItems[shapeID] = createCtrlPtItems(slice, shapeID);
       }
     }
@@ -318,16 +302,31 @@ void ZROIFilter::setNormalView(int z, int /*t*/)
   if (!m_visible.get())
     return;
   int rz = realZ(z);
-  for (auto&[slice, sliceItem] : m_sliceToROIItem) {
-    for (auto&[id, shapeItem] : sliceItem) {
-      shapeItem->setVisible(slice == int(rz));
+
+  if (m_lazyRendering) {
+    m_sliceToROIItem.clear();
+    m_sliceToCtrlPtItems.clear();
+    size_t slice = rz;
+    if (m_ROI->hasSlice(slice)) {
+      auto& shapeItems = m_sliceToROIItem[slice];
+      auto& shapeCtrlPtItems = m_sliceToCtrlPtItems[slice];
+      for (auto shapeID : m_ROI->sliceShapeIDs(slice)) {
+        shapeItems[shapeID] = createShapeItem(slice, shapeID);
+        shapeCtrlPtItems[shapeID] = createCtrlPtItems(slice, shapeID);
+      }
     }
-  }
-  if (m_showControlPoints.get()) {
-    for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
-      for (auto&[id, ctrlItems] : sliceItem) {
-        for (auto& item : ctrlItems) {
-          item->setVisible(slice == int(rz));
+  } else {
+    for (auto&[slice, sliceItem] : m_sliceToROIItem) {
+      for (auto&[id, shapeItem] : sliceItem) {
+        shapeItem->setVisible(slice == int(rz));
+      }
+    }
+    if (m_showControlPoints.get()) {
+      for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
+        for (auto&[id, ctrlItems] : sliceItem) {
+          for (auto& item : ctrlItems) {
+            item->setVisible(slice == int(rz));
+          }
         }
       }
     }
@@ -338,16 +337,31 @@ void ZROIFilter::setMaxZProjView(int /*t*/)
 {
   if (!m_visible.get())
     return;
-  for (auto&[slice, sliceItem] : m_sliceToROIItem) {
-    for (auto&[id, shapeItem] : sliceItem) {
-      shapeItem->setVisible(true);
+
+  if (m_lazyRendering) {
+    m_sliceToROIItem.clear();
+    m_sliceToCtrlPtItems.clear();
+    for (const auto& sliceROI : *m_ROI) {
+      int slice = sliceROI.first;
+      auto& shapeItems = m_sliceToROIItem[slice];
+      auto& shapeCtrlPtItems = m_sliceToCtrlPtItems[slice];
+      for (auto shapeID : m_ROI->sliceShapeIDs(slice)) {
+        shapeItems[shapeID] = createShapeItem(slice, shapeID);
+        shapeCtrlPtItems[shapeID] = createCtrlPtItems(slice, shapeID);
+      }
     }
-  }
-  if (m_showControlPoints.get()) {
-    for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
-      for (auto&[id, ctrlItems] : sliceItem) {
-        for (auto& item : ctrlItems) {
-          item->setVisible(true);
+  } else {
+    for (auto&[slice, sliceItem] : m_sliceToROIItem) {
+      for (auto&[id, shapeItem] : sliceItem) {
+        shapeItem->setVisible(true);
+      }
+    }
+    if (m_showControlPoints.get()) {
+      for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
+        for (auto&[id, ctrlItems] : sliceItem) {
+          for (auto& item : ctrlItems) {
+            item->setVisible(true);
+          }
         }
       }
     }
@@ -546,21 +560,24 @@ void ZROIFilter::offsetChanged()
 {
 }
 
-std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> ZROIFilter::createCtrlPtItems(int slice)
+std::unique_ptr<ROIGraphicsItem> ZROIFilter::createShapeItem(int slice, size_t shapeID)
 {
-  std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> items;
-  std::vector<ZROIControlPoint> controlPoints = m_ROI->sliceControlPoints(slice);
-  for (const auto& controlPoint : controlPoints) {
-    ROICtrlPtGraphicsItem* rectItem = new ROICtrlPtGraphicsItem(*m_ROI, controlPoint,
-                                                                m_view.graphicsView().currentScale());
-    rectItem->setZValue(m_viewPrecedencePara.get());
-    rectItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get() && m_showControlPoints.get());
-    rectItem->setTransform(getQTransform());
-    m_view.scene().addItem(rectItem);
-    items.emplace_back(rectItem);
-  }
+  auto roiItem = new ROIGraphicsItem(*m_ROI, slice, shapeID);
+  roiItem->setZValue(m_viewPrecedencePara.get());
+  roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
+                              m_outlineColor.get().y * 255,
+                              m_outlineColor.get().z * 255),
+                       0));
+  roiItem->setBrush(QColor(m_regionColor.get().x * 255,
+                           m_regionColor.get().y * 255,
+                           m_regionColor.get().z * 255,
+                           m_opacity.get() * 255));
+  //roiItem->setOpacity(m_opacity.get());
+  roiItem->setTransform(getQTransform());
+  roiItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get());
+  m_view.scene().addItem(roiItem);
 
-  return items;
+  return std::unique_ptr<ROIGraphicsItem>(roiItem);
 }
 
 std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> ZROIFilter::createCtrlPtItems(int slice, size_t shapeID)
@@ -670,60 +687,29 @@ void ZROIFilter::onRoiChanged(int slice, const std::vector<size_t>& newShapes,
       auto& shapeItems = m_sliceToROIItem[slice];
       auto& shapeCtrlPtItems = m_sliceToCtrlPtItems[slice];
       for (auto shapeID : m_ROI->sliceShapeIDs(slice)) {
-        auto roiItem = new ROIGraphicsItem(*m_ROI, slice, shapeID);
-        roiItem->setZValue(m_viewPrecedencePara.get());
-        roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
-                                    m_outlineColor.get().y * 255,
-                                    m_outlineColor.get().z * 255),
-                             0));
-        roiItem->setBrush(QColor(m_regionColor.get().x * 255,
-                                 m_regionColor.get().y * 255,
-                                 m_regionColor.get().z * 255,
-                                 m_opacity.get() * 255));
-        //roiItem->setOpacity(m_opacity.get());
-        roiItem->setTransform(getQTransform());
-        roiItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get());
-        m_view.scene().addItem(roiItem);
-
-        shapeItems[shapeID] = std::unique_ptr<ROIGraphicsItem>(roiItem);
+        shapeItems[shapeID] = createShapeItem(slice, shapeID);
         shapeCtrlPtItems[shapeID] = createCtrlPtItems(slice, shapeID);
       }
     }
   } else {
     if (!deletedShapes.empty()) {
       for (auto shapeID : deletedShapes) {
-        m_sliceToROIItem.at(slice).erase(shapeID);
-        m_sliceToCtrlPtItems.at(slice).erase(shapeID);
+        m_sliceToROIItem[slice].erase(shapeID);
+        m_sliceToCtrlPtItems[slice].erase(shapeID);
       }
     }
     if (!changedShapes.empty()) {
       for (auto shapeID : changedShapes) {
         m_sliceToROIItem[slice][shapeID]->updateValue();
-        m_sliceToCtrlPtItems.at(slice).erase(shapeID);
-        m_sliceToCtrlPtItems.at(slice)[shapeID] = createCtrlPtItems(slice, shapeID);
+        m_sliceToCtrlPtItems[slice].erase(shapeID);
+        m_sliceToCtrlPtItems[slice][shapeID] = createCtrlPtItems(slice, shapeID);
       }
     }
     if (!newShapes.empty()) {
       auto& shapeItems = m_sliceToROIItem[slice];
       auto& ctrlItems = m_sliceToCtrlPtItems[slice];
       for (auto shapeID : newShapes) {
-        auto roiItem = new ROIGraphicsItem(*m_ROI, slice, shapeID);
-        roiItem->setZValue(m_viewPrecedencePara.get());
-        roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
-                                    m_outlineColor.get().y * 255,
-                                    m_outlineColor.get().z * 255),
-                             0));
-        roiItem->setBrush(QColor(m_regionColor.get().x * 255,
-                                 m_regionColor.get().y * 255,
-                                 m_regionColor.get().z * 255,
-                                 m_opacity.get() * 255));
-        //roiItem->setOpacity(m_opacity.get());
-        roiItem->setTransform(getQTransform());
-        roiItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get());
-        m_view.scene().addItem(roiItem);
-
-        shapeItems[shapeID] = std::unique_ptr<ROIGraphicsItem>(roiItem);
-
+        shapeItems[shapeID] = createShapeItem(slice, shapeID);
         ctrlItems[shapeID] = createCtrlPtItems(slice, shapeID);
       }
     }

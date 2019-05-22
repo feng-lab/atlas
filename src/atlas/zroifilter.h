@@ -144,7 +144,7 @@ protected:
 
   void offsetChanged() override;
 
-  std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> createCtrlPtItems(int slice);
+  std::unique_ptr<ROIGraphicsItem> createShapeItem(int slice, size_t shapeID);
 
   std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> createCtrlPtItems(int slice, size_t shapeID);
 
@@ -183,6 +183,8 @@ private:
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_hasSelectedItems = false;
+
+  bool m_lazyRendering = true;
 };
 
 } // namespace nim
