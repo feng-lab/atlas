@@ -430,6 +430,7 @@ bool ZROIDoc::saveROI(ROIPack* pack, const QString& fileName, QString& errorMsg)
   try {
     pack->roi->save(fileName);
     pack->path = QFileInfo(fileName).canonicalFilePath();
+    pack->roi->undoStack()->setClean();
     pack->hasUnsavedChange = false;
     pack->updateDerivedData();
 

@@ -26,7 +26,7 @@ public:
   int type() const override
   { return Type; }
 
-  ROIGraphicsItem(ZROI& roi, int slice, QGraphicsItem* parent = nullptr);
+  ROIGraphicsItem(ZROI& roi, int slice, size_t id, QGraphicsItem* parent = nullptr);
 
   void updateValue();
 
@@ -35,13 +35,14 @@ public:
 protected:
   //void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
   //void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
-  QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
+  // QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
 
   void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
 
 private:
   ZROI& m_roi;
   int m_slice;
+  size_t m_id;
 
   QPointF m_basePos;
   QPointF m_offset;
@@ -145,6 +146,8 @@ protected:
 
   std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> createCtrlPtItems(int slice);
 
+  std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> createCtrlPtItems(int slice, size_t shapeID);
+
 private:
   void visibleChanged();
 
@@ -156,9 +159,11 @@ private:
 
   void opacityChanged();
 
-  void onRoiChanged(int slice);
+  void onRoiChanged(int slice, const std::vector<size_t>& newShapes,
+                    const std::vector<size_t>& deletedShapes,
+                    const std::vector<size_t>& changedShapes);
 
-  void onRoiMoved(int slice);
+  void onRoiMoved(int slice, const std::vector<size_t>& changedShapes);
 
   void onRoiDeleted(int slice);
 
@@ -166,8 +171,8 @@ private:
 
 private:
   ZROI* m_ROI = nullptr;
-  std::map<int, std::unique_ptr<ROIGraphicsItem>> m_sliceToROIItem;
-  std::map<int, std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>>> m_sliceToCtrlPtItems;
+  std::map<int, std::map<size_t, std::unique_ptr<ROIGraphicsItem>>> m_sliceToROIItem;
+  std::map<int, std::map<size_t, std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>>>> m_sliceToCtrlPtItems;
 
   ZBoolParameter m_visible;
   ZBoolParameter m_showControlPoints;

@@ -227,23 +227,17 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
       }
     } else if (event->button() == Qt::RightButton) {
       if (m_splineItem) {
-        if (m_startPtItem->contains(m_spline.last())) {
-          m_spline.last() = m_spline[0];
+        //LOG(INFO) << m_ctrlPtsItem.size() << " " << m_spline.size();
+        if (!m_ctrlPtsItem.empty()) {
+          m_ctrlPtsItem.pop_back();
+          std::swap(m_spline[m_spline.size() - 1], m_spline[m_spline.size() - 2]);
+          m_spline.pop_back();
+          m_splineItem->setPath(ZROI::splineToPainterPath(m_spline));
         } else {
-          m_spline << m_spline[0];
+          m_startPtItem.reset();
+          m_ctrlPtsItem.clear();
+          m_splineItem.reset();
         }
-        if (m_spline.size() > 3) {
-          std::pair<int, int> sliceRange = m_view->currentSliceRange();
-          for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-            if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
-              m_view->roi().addSpline(i, m_spline);
-            else if (m_roiAction == ROIAction::Subtract)
-              m_view->roi().subtractSpline(i, m_spline);
-          }
-        }
-        m_startPtItem.reset();
-        m_ctrlPtsItem.clear();
-        m_splineItem.reset();
       }
     }
   } else if ((m_polygonItem || m_view->state() == ZView::State::ROIPolygon) && canUpdateROI) {
@@ -344,23 +338,19 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
       }
     } else if (event->button() == Qt::RightButton) {
       if (m_polygonItem) {
-        if (m_startPtItem->contains(m_polygon.last())) {
-          m_polygon.last() = m_polygon[0];
+        //LOG(INFO) << m_ctrlPtsItem.size() << " " << m_spline.size();
+        if (!m_ctrlPtsItem.empty()) {
+          m_ctrlPtsItem.pop_back();
+          std::swap(m_polygon[m_polygon.size() - 1], m_polygon[m_polygon.size() - 2]);
+          m_polygon.pop_back();
+          QPainterPath path;
+          path.addPolygon(m_polygon);
+          m_polygonItem->setPath(path);
         } else {
-          m_polygon << m_polygon[0];
+          m_startPtItem.reset();
+          m_ctrlPtsItem.clear();
+          m_polygonItem.reset();
         }
-        if (m_polygon.size() > 3) {
-          std::pair<int, int> sliceRange = m_view->currentSliceRange();
-          for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-            if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
-              m_view->roi().addPolygon(i, m_polygon);
-            else if (m_roiAction == ROIAction::Subtract)
-              m_view->roi().subtractPolygon(i, m_polygon);
-          }
-        }
-        m_startPtItem.reset();
-        m_ctrlPtsItem.clear();
-        m_polygonItem.reset();
       }
     }
   } else if (m_view->state() == ZView::State::ROIRect && event->button() == Qt::LeftButton && canUpdateROI) {
@@ -424,6 +414,49 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
     LOG(INFO) << scenePt.x() << " " << scenePt.y() << " " << m_view->currentSlice();
     QGraphicsView::mousePressEvent(event);
     //viewport()->setCursor(Qt::ArrowCursor);
+  }
+}
+
+void ZGraphicsView::mouseDoubleClickEvent(QMouseEvent* event)
+{
+  if (event->button() == Qt::LeftButton) {
+    QGraphicsItem* item = itemAt(event->x(), event->y());
+    ROIGraphicsItem* roiItem = qgraphicsitem_cast<ROIGraphicsItem*>(item);
+    ROICtrlPtGraphicsItem* roiCtrlPtItem = qgraphicsitem_cast<ROICtrlPtGraphicsItem*>(item);
+    bool canUpdateROI = (!roiItem && !roiCtrlPtItem)
+                        || event->modifiers() == Qt::ControlModifier
+                        || event->modifiers() == Qt::AltModifier;
+
+    CHECK(!m_rectItem);
+    CHECK(!m_ellipseItem);
+    if (m_splineItem && m_view->state() == ZView::State::ROISpline && canUpdateROI) {
+      m_spline.last() = m_spline[0];
+      if (m_spline.size() > 3) {
+        std::pair<int, int> sliceRange = m_view->currentSliceRange();
+        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+          m_view->roi().addSpline(i, m_spline);
+        }
+      }
+      m_startPtItem.reset();
+      m_ctrlPtsItem.clear();
+      m_splineItem.reset();
+    } else if (m_polygonItem && m_view->state() == ZView::State::ROIPolygon && canUpdateROI) {
+      m_polygon.last() = m_polygon[0];
+      if (m_polygon.size() > 3) {
+        std::pair<int, int> sliceRange = m_view->currentSliceRange();
+        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+          m_view->roi().addPolygon(i, m_polygon);
+        }
+      }
+      m_startPtItem.reset();
+      m_ctrlPtsItem.clear();
+      m_polygonItem.reset();
+    } else {
+      QPointF scenePt = mapToScene(event->x(), event->y());
+      LOG(INFO) << "d " << scenePt.x() << " " << scenePt.y() << " " << m_view->currentSlice();
+      QGraphicsView::mousePressEvent(event);
+      //viewport()->setCursor(Qt::ArrowCursor);
+    }
   }
 }
 

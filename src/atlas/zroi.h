@@ -24,6 +24,9 @@ enum class ROIType
 
 struct ZROIShapeOperation
 {
+  ZROIShapeOperation()
+  {}
+
   ZROIShapeOperation(bool isAdd_, ROIType type_, const QRectF& rect)
     : isAdd(isAdd_), type(type_)
   {
@@ -53,7 +56,9 @@ struct ZROIShapeOperation
     poly.push_back(rect.bottomRight());
   }
 
-  bool isAdd;
+  QPainterPath toPainterPath() const;
+
+  bool isAdd = true;
   ROIType type;
   QPolygonF poly;
 };
@@ -62,40 +67,41 @@ class ZSliceROI
 {
 public:
   bool isEmpty() const
-  { return m_roi.isEmpty(); }
+  { return m_idToShapeOperations.empty(); }
 
-  void updateROI(bool moveOnly);
+  void addRect(const QRectF& rect, size_t id);
 
-  void addRect(const QRectF& rect);
+  void addEllipse(const QRectF& ellipse, size_t id);
 
-  void addEllipse(const QRectF& ellipse);
+  void addPolygon(const QPolygonF& poly, size_t id);
 
-  void addPolygon(const QPolygonF& poly);
+  void addSpline(const QPolygonF& spline, size_t id);
 
-  void addSpline(const QPolygonF& spline);
+  void subtractRect(const QRectF& rect, size_t id);
 
-  void subtractRect(const QRectF& rect);
+  void subtractEllipse(const QRectF& ellipse, size_t id);
 
-  void subtractEllipse(const QRectF& ellipse);
+  void subtractPolygon(const QPolygonF& poly, size_t id);
 
-  void subtractPolygon(const QPolygonF& poly);
+  void subtractSpline(const QPolygonF& spline, size_t id);
 
-  void subtractSpline(const QPolygonF& spline);
+  void rotateCtrlPoints(const std::map<size_t, std::set<size_t>>& shapeOpIDToPointIndices, double angle,
+                        std::vector<size_t>& editedShapes);
 
-  void rotateCtrlPoints(const std::map<size_t, std::set<size_t>>& shapeOpIndexToPointIndices, double angle);
+  void deleteCtrlPoints(const std::map<size_t, std::set<size_t>>& shapeOpIDToPointIndices,
+                        std::vector<size_t>& removedShapes, std::vector<size_t>& editedShapes);
 
-  void deleteCtrlPoints(const std::map<size_t, std::set<size_t>>& shapeOpIndexToPointIndices);
+  bool addCtrlPoint(const QPointF& pt, std::vector<size_t>& editedShapes);
 
-  bool addCtrlPoint(const QPointF& pt);
-
-  void mergeWith(const ZSliceROI& other);
+  size_t mergeWith(const ZSliceROI& other, size_t id, std::vector<size_t>& newShapes);
 
   void setTopLeft(double x, double y);
 
-  const QPainterPath& paintPath() const
-  { return m_roi; }
+  QRectF boundingRect() const;
 
-  void load(H5::Group& sliceGrp);
+  QPainterPath paintPath() const;
+
+  size_t load(H5::Group& sliceGrp, size_t id);
 
   void save(H5::Group& sliceGrp) const;
 
@@ -104,8 +110,8 @@ public:
 protected:
   friend class ZROI;
 
-  QPainterPath m_roi;
-  QList<ZROIShapeOperation> m_shapeOperations;
+  std::map<size_t, ZROIShapeOperation> m_idToShapeOperations;
+  std::map<size_t, QPainterPath> m_idToPainterPath;
 };
 
 struct ZROIControlPoint
@@ -124,12 +130,12 @@ struct ZROIControlPoint
     Any
   };
 
-  ZROIControlPoint(int slice_, size_t shapeOperationIndex_, Pos pos_, size_t pointIndex_ = 0)
-    : slice(slice_), shapeOperationIndex(shapeOperationIndex_), pos(pos_), pointIndex(pointIndex_)
+  ZROIControlPoint(int slice_, size_t shapeOperationID_, Pos pos_, size_t pointIndex_ = 0)
+    : slice(slice_), shapeOperationID(shapeOperationID_), pos(pos_), pointIndex(pointIndex_)
   {}
 
   int slice;
-  size_t shapeOperationIndex;
+  size_t shapeOperationID;
   Pos pos;
   size_t pointIndex;
 };
@@ -162,54 +168,54 @@ public:
   void deleteSliceROI(int slice);
 
   void deleteSliceROI_Impl(int slice)
-  { m_sliceROIs.erase(slice); emit roiDeleted(slice); }
+  { emit roiDeleted(slice); m_sliceROIs.erase(slice); }
 
   void addRect(int slice, const QRectF& rect)
   {
-    m_sliceROIs[slice].addRect(rect);
-    onSliceROIUpdated(slice);
+    m_sliceROIs[slice].addRect(rect, m_shapeID++);
+    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
   }
 
   void addEllipse(int slice, const QRectF& ellipse)
   {
-    m_sliceROIs[slice].addEllipse(ellipse);
-    onSliceROIUpdated(slice);
+    m_sliceROIs[slice].addEllipse(ellipse, m_shapeID++);
+    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
   }
 
   void addPolygon(int slice, const QPolygonF& poly)
   {
-    m_sliceROIs[slice].addPolygon(poly);
-    onSliceROIUpdated(slice);
+    m_sliceROIs[slice].addPolygon(poly, m_shapeID++);
+    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
   }
 
   void addSpline(int slice, const QPolygonF& spline)
   {
-    m_sliceROIs[slice].addSpline(spline);
-    onSliceROIUpdated(slice);
+    m_sliceROIs[slice].addSpline(spline, m_shapeID++);
+    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
   }
 
   void subtractRect(int slice, const QRectF& rect)
   {
-    m_sliceROIs[slice].subtractRect(rect);
-    onSliceROIUpdated(slice);
+    m_sliceROIs[slice].subtractRect(rect, m_shapeID++);
+    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
   }
 
   void subtractEllipse(int slice, const QRectF& ellipse)
   {
-    m_sliceROIs[slice].subtractEllipse(ellipse);
-    onSliceROIUpdated(slice);
+    m_sliceROIs[slice].subtractEllipse(ellipse, m_shapeID++);
+    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
   }
 
   void subtractPolygon(int slice, const QPolygonF& poly)
   {
-    m_sliceROIs[slice].subtractPolygon(poly);
-    onSliceROIUpdated(slice);
+    m_sliceROIs[slice].subtractPolygon(poly, m_shapeID++);
+    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
   }
 
   void subtractSpline(int slice, const QPolygonF& spline)
   {
-    m_sliceROIs[slice].subtractSpline(spline);
-    onSliceROIUpdated(slice);
+    m_sliceROIs[slice].subtractSpline(spline, m_shapeID++);
+    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
   }
 
   void mergeWith(const ZROI& other);
@@ -235,6 +241,25 @@ public:
 
   std::vector<ZROIControlPoint> sliceControlPoints(int slice) const;
 
+  std::vector<ZROIControlPoint> sliceControlPoints(int slice, size_t shapeID) const;
+
+  bool hasSlice(int slice) const
+  { return m_sliceROIs.find(slice) != m_sliceROIs.end(); }
+
+  std::vector<size_t> sliceShapeIDs(int slice) const
+  {
+    std::vector<size_t> res;
+    for (const auto&[id, shape] : m_sliceROIs.at(slice).m_idToShapeOperations) {
+      res.push_back(id);
+    }
+    return res;
+  }
+
+  const QPainterPath& shapePainterPath(int slice, size_t id) const
+  {
+    return m_sliceROIs.at(slice).m_idToPainterPath.at(id);
+  }
+
   void rotateROIControlPoints(const std::vector<ZROIControlPoint>& controlPoints, double angle);
 
   std::set<int> rotateROIControlPoints_Impl(const std::vector<ZROIControlPoint>& controlPoints, double angle);
@@ -252,18 +277,22 @@ public:
   bool sliceHasPolyOrSpline(int slice) const
   { return m_sliceROIs.at(slice).hasPolyOrSpline(); }
 
-  const QPainterPath& slicePaintPath(int slice) const
+  QPainterPath slicePaintPath(int slice) const
   { return m_sliceROIs.at(slice).paintPath(); }
 
   void sliceAddCtrlPoint(int slice, const QPointF& pt);
 
   void sliceAddCtrlPoint_Impl(int slice, const QPointF& pt)
-  { if (m_sliceROIs.at(slice).addCtrlPoint(pt)) onSliceROIUpdated(slice); }
+  {
+    std::vector<size_t> shapes;
+    if (m_sliceROIs.at(slice).addCtrlPoint(pt, shapes))
+      onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), shapes);
+  }
 
   void sliceSetTopLeft(int slice, double x, double y)
   {
     m_sliceROIs.at(slice).setTopLeft(x, y);
-    onSliceROIMoved(slice);
+    onSliceROIMoved(slice, std::vector<size_t>());
   }
 
   void startMoveSelectedControlPointsCommand();
@@ -296,20 +325,25 @@ public:
 
 signals:
 
-  void roiChanged(int slice);
+  void roiChanged(int slice, const std::vector<size_t>& newShapes,
+                  const std::vector<size_t>& deletedShapes,
+                  const std::vector<size_t>& changedShapes);
 
   void roiDeleted(int slice);
 
-  void roiMoved(int slice);
+  void roiMoved(int slice, const std::vector<size_t>& changedShapes);
 
   void boundBoxChanged();
 
 protected:
   void resetBoundBox();
 
-  void onSliceROIUpdated(int slice);
+  void onSliceROIUpdated(int slice,
+                         const std::vector<size_t>& newShapes,
+                         const std::vector<size_t>& deletedShapes,
+                         const std::vector<size_t>& changedShapes);
 
-  void onSliceROIMoved(int slice);
+  void onSliceROIMoved(int slice, const std::vector<size_t>& changedShapes);
 
 protected:
   friend class ZROICommand;
@@ -320,6 +354,8 @@ protected:
   QUndoStack* m_undoStack;
   ZROISliceMoveSelectedControlPointsCommand* m_moveSelectedControlPointsCommand = nullptr;
   std::set<int> m_changedSlices;
+
+  size_t m_shapeID = 0;
 };
 
 class ZROICommand : public QUndoCommand
