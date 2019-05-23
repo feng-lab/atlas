@@ -233,6 +233,7 @@ bool ZSliceROI::addCtrlPoint(const QPointF& pt, std::vector<size_t>& editedShape
   }
   if (shapeID >= 0 && pos >= 0) {
     m_idToShapeOperations.at(shapeID).poly.insert(pos, pt);
+    m_idToPainterPath[shapeID] = m_idToShapeOperations[shapeID].toPainterPath();
     editedShapes.push_back(shapeID);
     return true;
   }

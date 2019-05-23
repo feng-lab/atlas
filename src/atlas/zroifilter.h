@@ -64,6 +64,8 @@ public:
 
   void updateValue();
 
+  void setFixedSize(bool v);
+
   void setViewScale(double s);
 
   ZROIControlPoint controlPoint() const
@@ -76,10 +78,13 @@ public:
 protected:
   QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
 
+  void updateRectSize();
+
 private:
   ZROI& m_roi;
   ZROIControlPoint m_controlPoint;
   double m_viewScale;
+  bool m_fixedSize = true;
 
   const ZROIShapeOperation& m_shapeOp;
 
@@ -144,14 +149,16 @@ protected:
 
   void offsetChanged() override;
 
-  std::unique_ptr<ROIGraphicsItem> createShapeItem(int slice, size_t shapeID);
+  void createShapeItem(int slice, size_t shapeID);
 
-  std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> createCtrlPtItems(int slice, size_t shapeID);
+  void createCtrlPtItems(int slice, size_t shapeID);
 
 private:
   void visibleChanged();
 
   void showControlPointsChanged();
+
+  void fixedControlPointsSizeChanged();
 
   void outlineColorChanged();
 
@@ -176,6 +183,7 @@ private:
 
   ZBoolParameter m_visible;
   ZBoolParameter m_showControlPoints;
+  ZBoolParameter m_fixedControlPointsSize;
   ZVec3Parameter m_outlineColor;
   ZVec3Parameter m_regionColor;
   ZDoubleParameter m_opacity;
