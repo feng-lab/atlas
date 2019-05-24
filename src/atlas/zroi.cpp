@@ -4,75 +4,9 @@
 #include "zlog.h"
 #include "zsaturateoperation.h"
 #include "zregionontology.h"
-#include <Mathematics/GteNaturalSplineCurve.h>
+#include "zroiutils.h"
 #include <QFile>
 #include <cmath>
-
-namespace {
-
-QPainterPath splineToQPainterPath(const QPolygonF& spline, bool showLastSeg = true)
-{
-  QPainterPath res;
-  if (spline.size() < 2)
-    return res;
-  bool isClosed = spline.isClosed();
-  if ((isClosed && spline.size() < 4) ||
-      (!isClosed && spline.size() < 3)) {
-    res.moveTo(spline[0]);
-    res.lineTo(spline[1]);
-    return res;
-  }
-
-  int numSegments = spline.size() - 1;
-  std::vector<double> times(spline.size());
-  times[0] = 0;
-  for (size_t i = 1; i < times.size(); ++i) {
-    times[i] = times[i - 1] + std::sqrt(QPointF::dotProduct(spline[i] - spline[i - 1], spline[i] - spline[i - 1]));
-  }
-
-  if (isClosed) {
-    gte::NaturalSplineCurve<2, double> splineCurve(false, spline.size(), (gte::Vector<2, double> const*) spline.data(),
-                                                   times.data());
-    res.moveTo(spline[0]);
-    int endSeg = showLastSeg ? numSegments : numSegments - 1;
-    for (int i = 0; i < endSeg; ++i) {
-      gte::Vector<2, double> values0[4];
-      gte::Vector<2, double> values1[4];
-      splineCurve.Evaluate(times[i], 1, values0);
-      splineCurve.Evaluate(times[i + 1], 1, values1);
-      gte::Vector<2, double>& m0 = values0[1];
-      gte::Vector<2, double>& m1 = values1[1];
-      m0 *= times[i + 1] - times[i];
-      m1 *= times[i + 1] - times[i];
-      //LOG(INFO) << m0.X() << " " << m0.Y() << " " << m1.X() << " " << m1.Y() << " " << cspline[i] << " " << cspline[i+1];
-      res.cubicTo(spline[i].x() + 1. / 3. * m0[0], spline[i].y() + 1. / 3. * m0[1],
-                  spline[i + 1].x() - 1. / 3. * m1[0], spline[i + 1].y() - 1. / 3. * m1[1],
-                  spline[i + 1].x(), spline[i + 1].y());
-    }
-  } else {
-    gte::NaturalSplineCurve<2, double> splineCurve(true, spline.size(), (gte::Vector<2, double> const*) spline.data(),
-                                                   times.data());
-    res.moveTo(spline[0]);
-    int endSeg = showLastSeg ? numSegments : numSegments - 1;
-    for (int i = 0; i < endSeg; ++i) {
-      gte::Vector<2, double> values0[4];
-      gte::Vector<2, double> values1[4];
-      splineCurve.Evaluate(times[i], 1, values0);
-      splineCurve.Evaluate(times[i + 1], 1, values1);
-      gte::Vector<2, double>& m0 = values0[1];
-      gte::Vector<2, double>& m1 = values1[1];
-      m0 *= times[i + 1] - times[i];
-      m1 *= times[i + 1] - times[i];
-      //LOG(INFO) << m0.X() << " " << m0.Y() << " " << m1.X() << " " << m1.Y() << " " << cspline[i] << " " << cspline[i+1];
-      res.cubicTo(spline[i].x() + 1. / 3. * m0[0], spline[i].y() + 1. / 3. * m0[1],
-                  spline[i + 1].x() - 1. / 3. * m1[0], spline[i + 1].y() - 1. / 3. * m1[1],
-                  spline[i + 1].x(), spline[i + 1].y());
-    }
-  }
-  return res;
-}
-
-} // namespace
 
 namespace nim {
 
@@ -80,7 +14,7 @@ QPainterPath ZROIShapeOperation::toPainterPath() const
 {
   QPainterPath res;
   if (type == ROIType::Spline) {
-    res.addPath(splineToQPainterPath(poly));
+    res.addPath(ZROIUtils::splineToQPainterPath(poly));
   } else if (type == ROIType::Polygon) {
     res.addPolygon(poly);
   } else if (type == ROIType::Rect) {
@@ -646,7 +580,7 @@ QPainterPath ZROI::splineToPainterPath(const QPolygonF& spline, bool makeCloseIf
   if (!cspline.isClosed() && makeCloseIfNot)
     cspline << cspline[0];
 
-  return splineToQPainterPath(cspline);
+  return ZROIUtils::splineToQPainterPath(cspline);
 }
 
 std::vector<ZROIControlPoint> ZROI::sliceControlPoints(int slice) const

@@ -242,7 +242,8 @@ set(IMG_SOURCES
     zglobalinit.cpp
     zjson.h
     zjson.cpp
-    )
+    zroiutils.cpp
+    zroiutils.h)
 
 # our target
 if (BUILD_WITH_CONDA)
@@ -319,6 +320,8 @@ if (WIN32)
 
   set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
                               "/wd4100 /I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}") # 'identifier' : unreferenced formal parameter)
+
+  set_source_files_properties(zroiutils.cpp PROPERTIES COMPILE_FLAGS /I${GEOMETRICTOOLS_INCLUDE_DIRS})
 else (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-frtti>)
   target_compile_options(${LIBRARY_NAME} PUBLIC -fexceptions)
@@ -373,12 +376,15 @@ else (WIN32)
                               -Wno-unknown-pragmas -Wno-unused-variable -Wno-reorder -Wno-maybe-uninitialized \
                               -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
   endif ()
+
+  set_source_files_properties(zroiutils.cpp PROPERTIES COMPILE_FLAGS -I${GEOMETRICTOOLS_INCLUDE_DIRS})
 endif (WIN32)
 
 target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
                       png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} ${CPUINFO_LIBRARIES}
+                      ${GEOMETRICTOOLS_LIBRARIES}
                       hdf5::hdf5_cpp-static hdf5::hdf5-static
-                      glog::glog Qt5::Core)
+                      glog::glog Qt5::Core Qt5::Gui)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_link_libraries(${LIBRARY_NAME} PUBLIC -Wl,--start-group ${MKL_LIBRARIES} ${IPP_LIBRARIES} -Wl,--end-group)

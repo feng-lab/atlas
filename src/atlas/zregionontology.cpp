@@ -567,7 +567,7 @@ void binaryImgToROI(const ZImg& img, ZROI& roi)
       for (auto it = contoursTree.cbeginBreadthFirst(); it != contoursTree.cendBreadthFirst(); ++it) {
         //LOG(INFO) << it->index << " " << contours[it->index].size();
         size_t c = it->index;
-        if (contours[c].size() < 15) {
+        if (contours[c].size() < 3) {
           continue;
         } else {
           size_t dst = std::max<size_t>(1, std::min<size_t>(30, contours[c].size() / 20));

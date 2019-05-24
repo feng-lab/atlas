@@ -24,8 +24,7 @@ enum class ROIType
 
 struct ZROIShapeOperation
 {
-  ZROIShapeOperation()
-  {}
+  ZROIShapeOperation() = default;
 
   ZROIShapeOperation(bool isAdd_, ROIType type_, const QRectF& rect)
     : isAdd(isAdd_), type(type_)

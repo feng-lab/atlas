@@ -185,15 +185,30 @@ find_package(glog REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/glog ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/gflags
              NO_DEFAULT_PATH)
 
+set(GEOMETRICTOOLS_INCLUDE_DIRS ${GEOMETRICTOOLS_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/geometrictools/include)
+if (WIN32)
+  set(GEOMETRICTOOLS_LIBRARIES ${GEOMETRICTOOLS_LIBRARIES}
+      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/geometrictools/lib/GTEngine.v15.lib)
+elseif (APPLE)
+  set(GEOMETRICTOOLS_LIBRARIES ${GEOMETRICTOOLS_LIBRARIES}
+      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/geometrictools/lib/libGTEngine.a)
+else ()
+  set(GEOMETRICTOOLS_LIBRARIES ${GEOMETRICTOOLS_LIBRARIES}
+      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/geometrictools/lib/libgtengine.a)
+endif ()
+
 find_package(HDF5 REQUIRED COMPONENTS C CXX static
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/hdf5/share/cmake/hdf5 ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/hdf5/cmake NO_DEFAULT_PATH)
 
 message(STATUS "QT_PATHS: " ${QT_PATHS})
 set(CMAKE_AUTOMOC ON)
 if (BUILD_WITH_CONDA)
-  find_package(Qt5Core ${QT_VERSION} REQUIRED PATHS ${QT_PATHS} NO_DEFAULT_PATH)
+  # find_package(Qt5Core ${QT_VERSION} REQUIRED PATHS ${QT_PATHS} NO_DEFAULT_PATH)
+  find_package(Qt5 ${QT_VERSION} REQUIRED COMPONENTS Core Gui PATHS ${QT_PATHS} NO_DEFAULT_PATH)
 else ()
-  find_package(Qt5Core ${QT_VERSION} REQUIRED PATHS ${QT_PATHS})
+  # find_package(Qt5Core ${QT_VERSION} REQUIRED PATHS ${QT_PATHS})
+  find_package(Qt5 ${QT_VERSION} REQUIRED COMPONENTS Core Gui PATHS ${QT_PATHS})
 endif ()
 get_target_property(Qt5CoreLoc Qt5::Core IMPORTED_LOCATION_RELEASE)
 message(STATUS "Qt5Core: ${Qt5CoreLoc}")

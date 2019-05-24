@@ -8,6 +8,7 @@
 #include "zpunctadetection.h"
 #include "zsectionsregistration.h"
 #include "zchromaticshiftcorrection.h"
+#include "zroiutils.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
@@ -711,6 +712,19 @@ PYBIND11_MODULE(_imgpy, m)
     .def("computeNCC", &ZImgNCCMatch::computeNCC)
     .def("__repr__", [](const ZImgNCCMatch&) {
       return QString("<_imgpy.ZImgNCCMatch>").toStdString();
+    });
+
+  py::class_<ZROIUtils>(m, "ZROIUtils")
+    .def_static("splineToMask", &ZROIUtils::splineToMask_Python,
+                "spline"_a.noconvert())
+    .def_static("rectToMask", &ZROIUtils::rectToMask_Python,
+                "rect"_a.noconvert())
+    .def_static("ellipseToMask", &ZROIUtils::ellipseToMask_Python,
+                "ellipse"_a.noconvert())
+    .def_static("polygonToMask", &ZROIUtils::polygonToMask_Python,
+                "polygon"_a.noconvert())
+    .def("__repr__", [](const ZROIUtils&) {
+      return QString("<_imgpy.ZROIUtils>").toStdString();
     });
 
   m.attr("__version__") = GIT_VERSION;
