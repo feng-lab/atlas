@@ -92,6 +92,8 @@ std::tuple<ZROIUtils::RowMatrixXb, size_t, size_t> ZROIUtils::qPainterPathToMask
     for (int x = minX; x <= maxX; ++x) {
       if (path.contains(QPointF(x, y))) {
         img(y - minY, x - minX) = true;
+      } else {
+        img(y - minY, x - minX) = false;
       }
     }
   }
