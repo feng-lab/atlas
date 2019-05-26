@@ -742,6 +742,15 @@ def build_assimp(src_dir: str, install_dir: str):
                 r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@']
             bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
 
+        if is_windows():
+            orig_file_3 = os.path.join(src_dir, 'assimpTargets-release.cmake.in')
+            from_texts = [r'set(MSVC_PREFIX "vc140")']
+            to_texts = [r'set(MSVC_PREFIX "vc142")']
+            bak_file_3 = patch_file(orig_file_3, from_texts=from_texts, to_texts=to_texts)
+
+            orig_file_4 = os.path.join(src_dir, 'assimpTargets-debug.cmake.in')
+            bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
                          '-DASSIMP_BUILD_TESTS:BOOL=OFF'])
@@ -762,7 +771,7 @@ def build_assimp(src_dir: str, install_dir: str):
     finally:
         os.replace(bak_file, orig_file)
         os.replace(bak_file2, orig_file2)
-        if is_mac():
+        if is_mac() or is_windows():
             os.replace(bak_file_3, orig_file_3)
             os.replace(bak_file_4, orig_file_4)
         shutil.rmtree(build_dir, ignore_errors=False)

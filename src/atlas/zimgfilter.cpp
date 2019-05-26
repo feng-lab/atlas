@@ -8,6 +8,7 @@
 #include "znumericparameter.h"
 #include "zwidgetsgroup.h"
 #include "ztheme.h"
+#include "zgraphicsview.h"
 #include <QGraphicsPixmapItem>
 #include <QStyleOption>
 #include <QPainter>
@@ -28,7 +29,7 @@ ZGraphicsItemGroup::ZGraphicsItemGroup(QGraphicsItem* parent)
           qgraphicssvgitem.cpp!
 */
 static void qt_graphicsItem_highlightSelected(
-  QGraphicsItem *item, QPainter *painter, const QStyleOptionGraphicsItem *option)
+  QGraphicsItem* item, QPainter* painter, const QStyleOptionGraphicsItem* option)
 {
   const QRectF murect = painter->transform().mapRect(QRectF(0, 0, 1, 1));
   if (qFuzzyIsNull(qMax(murect.width(), murect.height())))
@@ -41,22 +42,22 @@ static void qt_graphicsItem_highlightSelected(
   qreal itemPenWidth;
   switch (item->type()) {
     case QGraphicsEllipseItem::Type:
-      itemPenWidth = static_cast<QGraphicsEllipseItem *>(item)->pen().widthF();
+      itemPenWidth = static_cast<QGraphicsEllipseItem*>(item)->pen().widthF();
       break;
     case QGraphicsPathItem::Type:
-      itemPenWidth = static_cast<QGraphicsPathItem *>(item)->pen().widthF();
+      itemPenWidth = static_cast<QGraphicsPathItem*>(item)->pen().widthF();
       break;
     case QGraphicsPolygonItem::Type:
-      itemPenWidth = static_cast<QGraphicsPolygonItem *>(item)->pen().widthF();
+      itemPenWidth = static_cast<QGraphicsPolygonItem*>(item)->pen().widthF();
       break;
     case QGraphicsRectItem::Type:
-      itemPenWidth = static_cast<QGraphicsRectItem *>(item)->pen().widthF();
+      itemPenWidth = static_cast<QGraphicsRectItem*>(item)->pen().widthF();
       break;
     case QGraphicsSimpleTextItem::Type:
-      itemPenWidth = static_cast<QGraphicsSimpleTextItem *>(item)->pen().widthF();
+      itemPenWidth = static_cast<QGraphicsSimpleTextItem*>(item)->pen().widthF();
       break;
     case QGraphicsLineItem::Type:
-      itemPenWidth = static_cast<QGraphicsLineItem *>(item)->pen().widthF();
+      itemPenWidth = static_cast<QGraphicsLineItem*>(item)->pen().widthF();
       break;
     default:
       itemPenWidth = 1.0;
@@ -67,9 +68,9 @@ static void qt_graphicsItem_highlightSelected(
 
   const QColor fgcolor = option->palette.windowText().color();
   const QColor bgcolor( // ensure good contrast against fgcolor
-    fgcolor.red()   > 127 ? 0 : 255,
+    fgcolor.red() > 127 ? 0 : 255,
     fgcolor.green() > 127 ? 0 : 255,
-    fgcolor.blue()  > 127 ? 0 : 255);
+    fgcolor.blue() > 127 ? 0 : 255);
 
   painter->setPen(QPen(bgcolor, penWidth, Qt::SolidLine));
   painter->setBrush(Qt::NoBrush);
@@ -86,6 +87,54 @@ void ZGraphicsItemGroup::paint(QPainter* painter, const QStyleOptionGraphicsItem
     qt_graphicsItem_highlightSelected(this, painter, option);
 }
 
+ZImgScaleBarGraphicsItem::ZImgScaleBarGraphicsItem(double length, double height, double voxelSizeXInUm,
+                                                   double viewScale, const QRectF& viewPort, const glm::vec3& color,
+                                                   QGraphicsItem* parent)
+  : QGraphicsRectItem(parent)
+  , m_lengthInUm(length)
+  , m_height(height)
+  , m_voxelSizeXInUm(voxelSizeXInUm)
+  , m_viewScale(viewScale)
+  , m_viewPort(viewPort)
+  , m_viewPortPos(.8, .8)
+{
+  setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
+           QGraphicsItem::ItemIsSelectable);
+
+  setToolTip(QString("length: %1 µm (voxel size: %2 µm)").arg(m_lengthInUm).arg(m_voxelSizeXInUm));
+  setColor(color);
+  setCursor(Qt::PointingHandCursor);
+  updateRectSize();
+  updatePos();
+}
+
+QVariant ZImgScaleBarGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
+{
+  if (change == ItemPositionChange && scene()) {
+    QPointF newPos = value.toPointF();
+    newPos.setX(qMin(m_viewPort.right(), qMax(newPos.x(), m_viewPort.left())));
+    newPos.setY(qMin(m_viewPort.bottom(), qMax(newPos.y(), m_viewPort.top())));
+    m_viewPortPos.x = (newPos.x() - m_viewPort.left()) / m_viewPort.width();
+    m_viewPortPos.y = (newPos.y() - m_viewPort.top()) / m_viewPort.height();
+    return newPos;
+  }
+  return QGraphicsRectItem::itemChange(change, value);
+}
+
+void ZImgScaleBarGraphicsItem::updateRectSize()
+{
+  double height = m_height / m_viewScale;
+  double width = m_lengthInUm / m_voxelSizeXInUm;
+  QRectF rect(0, 0, width, height);
+  setRect(rect);
+}
+
+void ZImgScaleBarGraphicsItem::updatePos()
+{
+  setPos(m_viewPort.left() + m_viewPort.width() * m_viewPortPos.x,
+         m_viewPort.top() + m_viewPort.height() * m_viewPortPos.y);
+}
+
 ZImgFilter::ZImgFilter(ZView& view)
   : ZObjFilter(view)
   , m_imgPack(nullptr)
@@ -93,6 +142,10 @@ ZImgFilter::ZImgFilter(ZView& view)
   , m_hasVisibleChannel(true)
   , m_isVisible(false)
   , m_opacity(QString("Opacity"), 1.0, 0.0, 1.0)
+  , m_showScaleBar("Show Scale Bar", false)
+  , m_scaleBarLengthInUm("Scale Bar Length", 10., 0.0001, 1e9)
+  , m_scaleBarHeight("Scale Bar Height", 5, 1, 500)
+  , m_scaleBarColor("Scale Bar Color", glm::vec3(1., 1., 1.))
   , m_displayValid(false)
   , m_lastSlice(-1)
   , m_lastTime(-1)
@@ -103,6 +156,19 @@ ZImgFilter::ZImgFilter(ZView& view)
   addParameter(&m_visible);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZImgFilter::opacityChanged);
   addParameter(&m_opacity);
+  connect(&m_showScaleBar, &ZBoolParameter::valueChanged, this, &ZImgFilter::showScaleBarChanged);
+  addParameter(&m_showScaleBar);
+  m_scaleBarLengthInUm.setSuffix(" µm");
+  m_scaleBarLengthInUm.setStyle("SPINBOX");
+  connect(&m_scaleBarLengthInUm, &ZDoubleParameter::valueChanged, this, &ZImgFilter::scaleBarLengthChanged);
+  addParameter(&m_scaleBarLengthInUm);
+  m_scaleBarHeight.setSuffix(" pixels");
+  m_scaleBarHeight.setStyle("SPINBOX");
+  connect(&m_scaleBarHeight, &ZIntParameter::valueChanged, this, &ZImgFilter::scaleBarHeightChanged);
+  addParameter(&m_scaleBarHeight);
+  m_scaleBarColor.setStyle("COLOR");
+  connect(&m_scaleBarColor, &ZVec3Parameter::valueChanged, this, &ZImgFilter::scaleBarColorChanged);
+  addParameter(&m_scaleBarColor);
   m_viewPrecedencePara.blockSignals(true);
   m_viewPrecedencePara.set(0);
   m_viewPrecedencePara.blockSignals(false);
@@ -110,6 +176,7 @@ ZImgFilter::ZImgFilter(ZView& view)
   addParameter(&m_transform);
   addParameter(&m_offsetPara);
   connect(&m_view, &ZView::viewportChanged, this, &ZImgFilter::viewportChanged);
+  connect(&view.graphicsView(), &ZGraphicsView::scaleChanged, this, &ZImgFilter::viewScaleChanged);
 }
 
 void ZImgFilter::setData(ZImgPack& pack)
@@ -191,6 +258,22 @@ void ZImgFilter::setData(ZImgPack& pack)
     addParameter(m_channelColorParas[c].get());
     addParameter(m_doubleChannelRangeParas[c].get());
   }
+
+  if (m_imgPack->imgInfo().voxelSizeUnit != VoxelSizeUnit::none) {
+    m_showScaleBar.setEnabled(true);
+    m_scaleBarItem = std::make_unique<ZImgScaleBarGraphicsItem>(m_scaleBarLengthInUm.get(),
+                                                                m_scaleBarHeight.get(),
+                                                                m_imgPack->imgInfo().voxelSizeXInUm(),
+                                                                m_view.currentScale(),
+                                                                mapFromSceneRect(m_view.currentViewport()),
+                                                                m_scaleBarColor.get());
+    m_scaleBarItem->setVisible(false);
+    m_scaleBarItem->setZValue(m_viewPrecedencePara.get() + 1);
+    m_view.scene().addItem(m_scaleBarItem.get());
+  } else {
+    m_showScaleBar.setEnabled(false);
+  }
+
   if (m_view.isMaxZProjView()) {
     setMaxZProjView(m_view.currentTime());
   } else {
@@ -203,6 +286,7 @@ void ZImgFilter::setData(ZImgPack& pack)
 void ZImgFilter::releaseItemsOwnership()
 {
   m_item.release();
+  m_scaleBarItem.release();
 }
 
 void ZImgFilter::setSelected(bool v)
@@ -229,6 +313,8 @@ void ZImgFilter::setNormalView(int z, int t)
   } else if (isVisibleBefore) {
     hideImgItems();
   }
+
+  showScaleBarChanged();
 }
 
 void ZImgFilter::setMaxZProjView(int t)
@@ -247,6 +333,8 @@ void ZImgFilter::setMaxZProjView(int t)
   } else if (isVisibleBefore) {
     hideImgItems();
   }
+
+  showScaleBarChanged();
 }
 
 ZBBox<glm::ivec4> ZImgFilter::boundBox() const
@@ -304,6 +392,10 @@ std::shared_ptr<ZWidgetsGroup> ZImgFilter::viewSettingWidgetsGroup()
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
     m_widgetsGroup->addChild(*m_mipRange, 1);
+    m_widgetsGroup->addChild(m_showScaleBar, 2);
+    m_widgetsGroup->addChild(m_scaleBarLengthInUm, 2);
+    m_widgetsGroup->addChild(m_scaleBarColor, 2);
+    m_widgetsGroup->addChild(m_scaleBarHeight, 2);
     m_widgetsGroup->setBasicAdvancedCutoff(5);
   }
   return m_widgetsGroup;
@@ -313,6 +405,9 @@ void ZImgFilter::viewPrecedenceChanged()
 {
   if (m_item) {
     m_item->setZValue(m_viewPrecedencePara.get());
+  }
+  if (m_scaleBarItem) {
+    m_scaleBarItem->setZValue(m_viewPrecedencePara.get() + 1);
   }
   ZObjFilter::viewPrecedenceChanged();
 }
@@ -371,6 +466,10 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
     m_widgetsGroup->addChild(*m_mipRange, 1);
+    m_widgetsGroup->addChild(m_showScaleBar, 2);
+    m_widgetsGroup->addChild(m_scaleBarLengthInUm, 2);
+    m_widgetsGroup->addChild(m_scaleBarColor, 2);
+    m_widgetsGroup->addChild(m_scaleBarHeight, 2);
     m_widgetsGroup->setBasicAdvancedCutoff(5);
 
     m_widgetsGroup->emitWidgetsGroupChangedSignal();
@@ -406,6 +505,8 @@ void ZImgFilter::channelVisibleChanged()
   } else {
     updateImgItems();
   }
+
+  showScaleBarChanged();
 }
 
 void ZImgFilter::channelRangeChanged()
@@ -494,6 +595,8 @@ void ZImgFilter::visibleChanged()
   } else if (!m_isVisible && isVisibleBefore) {
     hideImgItems();
   }
+
+  showScaleBarChanged();
 }
 
 void ZImgFilter::hideImgItems()
@@ -518,7 +621,8 @@ void ZImgFilter::updateImgItems()
 
   //LOG(INFO) << curDisplay->slice() << " " << m_lastSlice << " " << m_view.currentSlice();
   if (!m_imgItems.empty() && m_displayValid &&
-      m_lastMIP == m_view.isMaxZProjView() && m_lastSlice == m_view.currentSlice() && m_lastTime == m_view.currentTime()) {
+      m_lastMIP == m_view.isMaxZProjView() && m_lastSlice == m_view.currentSlice() &&
+      m_lastTime == m_view.currentTime()) {
     //LOG(INFO) << "0";
     // pixmap is same, we only need to show it
     if (m_item && !m_item->isVisible()) {
@@ -577,6 +681,8 @@ void ZImgFilter::viewportChanged()
       updateImgItems();
     }
   }
+  if (m_scaleBarItem)
+    m_scaleBarItem->setViewPort(vp);
 }
 
 void ZImgFilter::flipHorizontally()
@@ -590,6 +696,41 @@ void ZImgFilter::flipVertically()
 {
   if (m_item && m_item->isVisible()) {
     m_transform.flipVertically(QRectF(0, 0, m_imgPack->imgInfo().width, m_imgPack->imgInfo().height));
+  }
+}
+
+void ZImgFilter::showScaleBarChanged()
+{
+  if (m_scaleBarItem) {
+    m_scaleBarItem->setVisible(m_isVisible & m_showScaleBar.get());
+  }
+}
+
+void ZImgFilter::scaleBarLengthChanged()
+{
+  if (m_scaleBarItem) {
+    m_scaleBarItem->setLengthInUm(m_scaleBarLengthInUm.get());
+  }
+}
+
+void ZImgFilter::scaleBarHeightChanged()
+{
+  if (m_scaleBarItem) {
+    m_scaleBarItem->setHeight(m_scaleBarHeight.get());
+  }
+}
+
+void ZImgFilter::scaleBarColorChanged()
+{
+  if (m_scaleBarItem) {
+    m_scaleBarItem->setColor(m_scaleBarColor.get());
+  }
+}
+
+void ZImgFilter::viewScaleChanged(double s)
+{
+  if (m_scaleBarItem) {
+    m_scaleBarItem->setViewScale(s);
   }
 }
 

@@ -11,7 +11,8 @@ enum Type
   ROICtrlPtGraphicsItem,
   ZSwcGraphicsItem,
   ParameterKeysItem,
-  ZGraphicsItemGroup
+  ZGraphicsItemGroup,
+  ZImgScaleBarGraphicsItem
 };
 
 } // namespace GraphicsItemType
