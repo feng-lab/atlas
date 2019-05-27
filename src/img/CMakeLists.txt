@@ -243,7 +243,9 @@ set(IMG_SOURCES
     zjson.h
     zjson.cpp
     zroiutils.cpp
-    zroiutils.h)
+    zroiutils.h
+    zlogcache.cpp
+    zlogcache.h)
 
 # our target
 if (BUILD_WITH_CONDA)

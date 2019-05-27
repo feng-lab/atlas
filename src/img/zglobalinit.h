@@ -5,9 +5,10 @@
 namespace nim {
 
 void
-initImgLib(const char* argv0, const QString& jdkDIR = "", const QString& jarsDIR = "", const QString& logFilename = "");
+initImgLib(const char* argv0, const QString& jdkDIR = "", const QString& jarsDIR = "", const QString& logFilename = "",
+           bool isApp = true);
 
-void shutdownImgLib();
+void shutdownImgLib(bool isApp = true);
 
 } // namespace nim
 

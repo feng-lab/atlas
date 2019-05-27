@@ -535,8 +535,6 @@ set(SOURCES
     zlogmodelsink.cpp
     zapplication.cpp
     zapplication.h
-    zlogcache.cpp
-    zlogcache.h
     zsvgdoc.cpp
     zsvgdoc.h
     zsvgfilter.cpp

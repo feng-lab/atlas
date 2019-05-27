@@ -1,6 +1,7 @@
 #include "zlog.h"
 #include "zcpuinfo.h"
 #include "zglobal.h"
+#include "zlogcache.h"
 #include <fftw3.h>
 #include <mkl_service.h>
 #include <itkMultiThreaderBase.h>
@@ -15,10 +16,39 @@
 
 namespace nim {
 
+void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QString& msg)
+{
+  switch (type) {
+    case QtDebugMsg:
+      LWARNF(context.file ? context.file : "QtFile", context.line) << msg;
+      break;
+    case QtInfoMsg:
+      LINFOF(context.file ? context.file : "QtFile", context.line) << msg;
+      break;
+    case QtWarningMsg:
+      LWARNF(context.file ? context.file : "QtFile", context.line) << msg;
+      break;
+    case QtCriticalMsg:
+      LERRORF(context.file ? context.file : "QtFile", context.line) << msg;
+      break;
+    case QtFatalMsg:
+      LFATALF(context.file ? context.file : "QtFile", context.line) << msg;
+      break;
+    default:
+      break;
+  }
+}
+
 void
-initImgLib(const char* argv0, const QString& jdkDIR, const QString& jarsDIR, const QString& logFilename)
+initImgLib(const char* argv0, const QString& jdkDIR, const QString& jarsDIR, const QString& logFilename, bool isApp)
 {
   initLogging(argv0, logFilename);
+  
+  if (isApp) {
+    addLogSink(&ZLogCache::instance());
+    qInstallMessageHandler(myMessageOutput);
+    LOG(INFO) << "--- App Log Start ---";
+  }
 
   ZCpuInfo::instance().logCpuInfo();
 
@@ -166,8 +196,12 @@ initImgLib(const char* argv0, const QString& jdkDIR, const QString& jarsDIR, con
   }
 }
 
-void shutdownImgLib()
+void shutdownImgLib(bool isApp)
 {
+  if (isApp) {
+    LOG(INFO) << "--- App Log End ---";
+  }
+  
   fftw_cleanup_threads();
 
   shutdownLogging();

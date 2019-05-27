@@ -3,8 +3,8 @@
 #include "zcpuinfo.h"
 #include "zsysteminfo.h"
 #include "zglobalinit.h"
+#include "zlog.h"
 #include "zexception.h"
-#include "zlogcache.h"
 #include "zservicemanager.h"
 #include "../version/version.h"
 #include "ztheme.h"
@@ -30,29 +30,6 @@ DEFINE_bool(run_benchmarks, false, "run benchmarks");
 #endif
 
 using namespace nim;
-
-void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QString& msg)
-{
-  switch (type) {
-    case QtDebugMsg:
-      LWARNF(context.file ? context.file : "QtFile", context.line) << msg;
-      break;
-    case QtInfoMsg:
-      LINFOF(context.file ? context.file : "QtFile", context.line) << msg;
-      break;
-    case QtWarningMsg:
-      LWARNF(context.file ? context.file : "QtFile", context.line) << msg;
-      break;
-    case QtCriticalMsg:
-      LERRORF(context.file ? context.file : "QtFile", context.line) << msg;
-      break;
-    case QtFatalMsg:
-      LFATALF(context.file ? context.file : "QtFile", context.line) << msg;
-      break;
-    default:
-      break;
-  }
-}
 
 // force NVidia Optimus to used dedicated graphics
 #ifdef _WIN32
@@ -147,19 +124,14 @@ int main(int argc, char* argv[])
 #endif
     initImgLib(argv[0], jdkDIR, jarsDIR, logDir.filePath("atlas"));
     [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
-      LOG(INFO) << "--- App Log End ---";
       nim::shutdownImgLib();
     });
-
-    nim::addLogSink(&nim::ZLogCache::instance());
-    qInstallMessageHandler(myMessageOutput);
-    LOG(INFO) << "--- App Log Start ---";
 
     ZTheme::instance();
 
     nim::ZSystemInfo::instance().logOSInfo();
 
-    ZServiceManager sm;
+    // ZServiceManager sm;
 
     // ZMainWindow has Qt::WA_DeleteOnClose attribute
     auto mainWin = new nim::ZMainWindow(GIT_VERSION);
