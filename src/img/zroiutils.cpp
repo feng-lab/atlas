@@ -90,11 +90,7 @@ std::tuple<ZROIUtils::RowMatrixXb, size_t, size_t> ZROIUtils::qPainterPathToMask
   img = RowMatrixXb(maxY - minY + 1, maxX - minX + 1);
   for (int y = minY; y <= maxY; ++y) {
     for (int x = minX; x <= maxX; ++x) {
-      if (path.contains(QPointF(x, y))) {
-        img(y - minY, x - minX) = true;
-      } else {
-        img(y - minY, x - minX) = false;
-      }
+      img(y - minY, x - minX) = path.contains(QPointF(x, y));
     }
   }
   return std::make_tuple(img, size_t(minX), size_t(minY));
