@@ -410,6 +410,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def_static("getInternalSubRegions", [](const QString& filename, FileFormat format) {
       return ZImg::getInternalSubRegions(filename, format);
     }, "filename"_a, "format"_a = FileFormat::Unknown)
+    .def("isEmpty", &ZImg::isEmpty)
     .def("save", &ZImg::save,
          "filename"_a, "format"_a = FileFormat::Unknown, "compression"_a = Compression::AUTO)
     .def_property("info",
@@ -423,19 +424,21 @@ PYBIND11_MODULE(_imgpy, m)
                            [](ZImg& v) {
                              std::vector<py::buffer_info> bufs;
                              std::vector<py::array> arrs;
-                             auto formatdesc = getFormatDesc(v);
-                             for (size_t t = 0; t < v.numTimes(); ++t) {
-                               bufs.emplace_back(
-                                 v.timeData(t),
-                                 v.info().voxelByteNumber(),
-                                 formatdesc,
-                                 4,
-                                 std::vector<py::size_t>{v.numChannels(), v.depth(), v.height(), v.width()},
-                                 std::vector<py::size_t>{v.info().channelByteNumber(), v.info().planeByteNumber(),
-                                                         v.info().rowByteNumber(), v.info().voxelByteNumber()});
-                               auto capsule = py::capsule(v.timeData(t), [](void*) {});
-                               arrs.emplace_back(py::dtype(bufs[t]), bufs[t].shape, bufs[t].strides, bufs[t].ptr,
-                                                 capsule);
+                             if (!v.isEmpty()) {
+                               auto formatdesc = getFormatDesc(v);
+                               for (size_t t = 0; t < v.numTimes(); ++t) {
+                                 bufs.emplace_back(
+                                   v.timeData(t),
+                                   v.info().voxelByteNumber(),
+                                   formatdesc,
+                                   4,
+                                   std::vector<py::size_t>{v.numChannels(), v.depth(), v.height(), v.width()},
+                                   std::vector<py::size_t>{v.info().channelByteNumber(), v.info().planeByteNumber(),
+                                                           v.info().rowByteNumber(), v.info().voxelByteNumber()});
+                                 auto capsule = py::capsule(v.timeData(t), [](void*) {});
+                                 arrs.emplace_back(py::dtype(bufs[t]), bufs[t].shape, bufs[t].strides, bufs[t].ptr,
+                                                   capsule);
+                               }
                              }
                              return arrs;
                            })
