@@ -73,7 +73,7 @@ public:
 
   void setColor(const glm::vec3& color)
   {
-    setPen(QPen(QColor(color.r * 255, color.g * 255, color.b * 255), 0));
+    setPen(Qt::NoPen);
     setBrush(QBrush(QColor(color.r * 255, color.g * 255, color.b * 255)));
   }
 
