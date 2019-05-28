@@ -439,13 +439,8 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
   if (bBox.minCorner().z == bBox.maxCorner().z) {
     img = ZImg(ZImgInfo(bBox.maxCorner().x + 3, bBox.maxCorner().y + 3, 1));
     const QPainterPath& path = slicePaintPath(cbegin()->first);
-    for (size_t x = std::max(0, bBox.minCorner().x); x < img.width(); ++x) {
-      for (size_t y = std::max(0, bBox.minCorner().y); y < img.height(); ++y) {
-        if (path.contains(QPointF(x, y))) {
-          *img.data<uint8_t>(x, y, 0) = 255;
-        }
-      }
-    }
+    auto [mask, x_start, y_start] = ZROIUtils::qPainterPathToMask(path);
+    img.pasteImg(mask, ZVoxelCoordinate(x_start, y_start));
 
     if (outWidth <= 0 || outHeight <= 0 || outDepth <= 0) {
       img = img.crop(ZImgRegion(0, bBox.maxCorner().x + 1, 0, bBox.maxCorner().y + 1, 0, 1));
@@ -464,20 +459,8 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
       size_t slice = sliceROI.first;
       //LOG(INFO) << slice;
       const QPainterPath& path = slicePaintPath(slice);
-      QRectF pathRect = path.boundingRect();
-      size_t minX = std::max(static_cast<int>(std::floor(pathRect.left())),
-                             std::max(0, bBox.minCorner().x));
-      size_t maxX = std::min(img.width(), static_cast<size_t>(std::ceil(pathRect.right())));
-      size_t minY = std::max(static_cast<int>(std::floor(pathRect.top())),
-                             std::max(0, bBox.minCorner().y));
-      size_t maxY = std::min(img.height(), static_cast<size_t>(std::ceil(pathRect.bottom())));
-      for (size_t x = minX; x < maxX; ++x) {
-        for (size_t y = minY; y < maxY; ++y) {
-          if (path.contains(QPointF(x, y))) {
-            *img.data<uint8_t>(x, y, slice) = 255;
-          }
-        }
-      }
+      auto [mask, x_start, y_start] = ZROIUtils::qPainterPathToMask(path);
+      img.pasteImg(mask, ZVoxelCoordinate(x_start, y_start, slice));
       srcSlices.push_back(slice);
     }
 
@@ -505,13 +488,13 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
         for (size_t idx = 0; idx < img.planeVoxelNumber(); ++idx) {
           if (prevData[idx] <= 0 && nextData[idx] <= 0) {
             for (size_t k = 0; k < numSlice; ++k) {
-              dataPts[k][idx] = 255;
+              dataPts[k][idx] = 1;
             }
           } else if (prevData[idx] <= 0 || nextData[idx] <= 0) {
             for (size_t k = 0; k < numSlice; ++k) {
               double dst = prevData[idx] + progresses[k] * (nextData[idx] - prevData[idx]);
               if (dst <= 0)
-                dataPts[k][idx] = 255;
+                dataPts[k][idx] = 1;
             }
           }
         }

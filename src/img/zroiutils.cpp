@@ -2,6 +2,8 @@
 
 #include "zglobal.h"
 #include <Mathematics/GteNaturalSplineCurve.h>
+#include <QImage>
+#include <QPainter>
 #include <cmath>
 
 namespace nim {
@@ -48,52 +50,69 @@ QPainterPath ZROIUtils::splineToQPainterPath(const QPolygonF& spline, bool showL
   return res;
 }
 
-std::tuple<ZImg, size_t, size_t> ZROIUtils::qPainterPathToMask(const QPainterPath& path)
+std::tuple<ZImg, int32_t, int32_t> ZROIUtils::qPainterPathToMask(const QPainterPath& path)
 {
   ZImg img;
   if (path.isEmpty()) {
-    return std::make_tuple(img, 0_usize, 0_usize);
+    return std::make_tuple(img, 0_i32, 0_i32);
   }
   QRectF pathRect = path.boundingRect();
-  int minX = std::max(static_cast<int>(std::floor(pathRect.left())), 0);
+  int minX = static_cast<int>(std::floor(pathRect.left()));
   int maxX = static_cast<int>(std::ceil(pathRect.right()));
-  int minY = std::max(static_cast<int>(std::floor(pathRect.top())), 0);
+  int minY = static_cast<int>(std::floor(pathRect.top()));
   int maxY = static_cast<int>(std::ceil(pathRect.bottom()));
   if (maxX < minX || maxY < minY) {
-    return std::make_tuple(img, 0_usize, 0_usize);
+    return std::make_tuple(img, 0_i32, 0_i32);
   }
-  img = ZImg(ZImgInfo(maxX - minX + 1, maxY - minY + 1));
-  for (int y = minY; y <= maxY; ++y) {
-    for (int x = minX; x <= maxX; ++x) {
-      if (path.contains(QPointF(x, y))) {
-        *img.data<uint8_t>(x - minX, y - minY, 0) = 255;
+
+  int scale = 5;
+  while (scale > 0 && ((maxX - minX + 1) * scale > 32767 || (maxY - minY + 1) * scale > 32767)) {
+    --scale;
+  }
+  if (scale == 0) {
+    img = ZImg(ZImgInfo(maxX - minX + 1, maxY - minY + 1));
+    for (int y = minY; y <= maxY; ++y) {
+      for (int x = minX; x <= maxX; ++x) {
+        if (path.contains(QPointF(x, y))) {       // not accurate for some spline
+          *img.data<uint8_t>(x - minX, y - minY, 0) = 255;
+        }
+      }
+    }
+  } else {
+    QImage imageOut((maxX - minX + 1) * scale, (maxY - minY + 1) * scale, QImage::Format_Mono);
+    imageOut.fill(0);
+    QPainter painter(&imageOut);
+    painter.setBrush(Qt::white);
+    painter.setPen(Qt::NoPen);
+    painter.scale(scale, scale);
+    painter.translate(-minX, -minY);
+    painter.drawPath(path);
+    // auto image = imageOut.scaled(maxX - minX + 1, maxY - minY + 1, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    img = ZImg(ZImgInfo(imageOut.width(), imageOut.height()));
+    for (size_t y = 0; y < img.height(); ++y) {
+      for (size_t x = 0; x < img.width(); ++x) {
+        *img.data<uint8_t>(x, y, 0) = imageOut.pixelIndex(x, y) ? 1 : 0;
+      }
+    }
+    img.resize(maxX - minX + 1, maxY - minY + 1, 1);
+  }
+
+  return std::make_tuple(img, minX, minY);
+}
+
+std::tuple<ZROIUtils::RowMatrixXb, int32_t, int32_t> ZROIUtils::qPainterPathToMask_Python(const QPainterPath& path)
+{
+  RowMatrixXb res;
+  auto [img, x_start, y_start] = qPainterPathToMask(path);
+  if (!img.isEmpty()) {
+    res = RowMatrixXb(img.height(), img.width());
+    for (size_t y = 0; y < img.height(); ++y) {
+      for (size_t x = 0; x < img.width(); ++x) {
+        res(y, x) = *img.data<uint8_t>(x, y, 0);
       }
     }
   }
-  return std::make_tuple(img, size_t(minX), size_t(minY));
-}
-
-std::tuple<ZROIUtils::RowMatrixXb, size_t, size_t> ZROIUtils::qPainterPathToMask_Python(const QPainterPath& path)
-{
-  RowMatrixXb img;
-  if (path.isEmpty()) {
-    return std::make_tuple(img, 0_usize, 0_usize);
-  }
-  QRectF pathRect = path.boundingRect();
-  int minX = std::max(static_cast<int>(std::floor(pathRect.left())), 0);
-  int maxX = static_cast<int>(std::ceil(pathRect.right()));
-  int minY = std::max(static_cast<int>(std::floor(pathRect.top())), 0);
-  int maxY = static_cast<int>(std::ceil(pathRect.bottom()));
-  if (maxX < minX || maxY < minY) {
-    return std::make_tuple(img, 0_usize, 0_usize);
-  }
-  img = RowMatrixXb(maxY - minY + 1, maxX - minX + 1);
-  for (int y = minY; y <= maxY; ++y) {
-    for (int x = minX; x <= maxX; ++x) {
-      img(y - minY, x - minX) = path.contains(QPointF(x, y));
-    }
-  }
-  return std::make_tuple(img, size_t(minX), size_t(minY));
+  return std::make_tuple(res, x_start, y_start);
 }
 
 } // namespace nim
