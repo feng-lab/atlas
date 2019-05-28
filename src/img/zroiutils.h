@@ -67,7 +67,7 @@ public:
   using EigenDRef = Eigen::Ref<const Eigen::MatrixXd, 0, Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>>;
 
 // return tight mask, x_start, y_start in which mask could be empty
-  static std::tuple<RowMatrixXb, int32_t, int32_t> qPainterPathToMask_Python(const QPainterPath& path);
+  // static std::tuple<RowMatrixXb, int32_t, int32_t> qPainterPathToMask_Python(const QPainterPath& path);
 
   inline static RowMatrixXd polyToMat(const QPolygonF& poly)
   {
@@ -93,6 +93,7 @@ public:
     return res;
   }
 
+#if 0
   inline static std::tuple<RowMatrixXb, int32_t, int32_t> splineToMask_Python(const EigenDRef& spline)
   {
     return qPainterPathToMask_Python(splineToQPainterPath(matToPoly(spline)));
@@ -112,6 +113,27 @@ public:
   {
     return qPainterPathToMask_Python(polygonToQPainterPath(matToPoly(poly)));
   }
+#else
+  inline static std::tuple<ZImg, int32_t, int32_t> splineToMask_Python(const EigenDRef& spline)
+  {
+    return qPainterPathToMask(splineToQPainterPath(matToPoly(spline)));
+  }
+
+  inline static std::tuple<ZImg, int32_t, int32_t> rectToMask_Python(const EigenDRef& rect)
+  {
+    return qPainterPathToMask(rectToQPainterPath(matToPoly(rect)));
+  }
+
+  inline static std::tuple<ZImg, int32_t, int32_t> ellipseToMask_Python(const EigenDRef& ellipse)
+  {
+    return qPainterPathToMask(ellipseToQPainterPath(matToPoly(ellipse)));
+  }
+
+  inline static std::tuple<ZImg, int32_t, int32_t> polygonToMask_Python(const EigenDRef& poly)
+  {
+    return qPainterPathToMask(polygonToQPainterPath(matToPoly(poly)));
+  }
+#endif
 
 };
 

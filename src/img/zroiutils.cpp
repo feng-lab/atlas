@@ -100,19 +100,19 @@ std::tuple<ZImg, int32_t, int32_t> ZROIUtils::qPainterPathToMask(const QPainterP
   return std::make_tuple(img, minX, minY);
 }
 
-std::tuple<ZROIUtils::RowMatrixXb, int32_t, int32_t> ZROIUtils::qPainterPathToMask_Python(const QPainterPath& path)
-{
-  RowMatrixXb res;
-  auto [img, x_start, y_start] = qPainterPathToMask(path);
-  if (!img.isEmpty()) {
-    res = RowMatrixXb(img.height(), img.width());
-    for (size_t y = 0; y < img.height(); ++y) {
-      for (size_t x = 0; x < img.width(); ++x) {
-        res(y, x) = *img.data<uint8_t>(x, y, 0);
-      }
-    }
-  }
-  return std::make_tuple(res, x_start, y_start);
-}
+//std::tuple<ZROIUtils::RowMatrixXb, int32_t, int32_t> ZROIUtils::qPainterPathToMask_Python(const QPainterPath& path)
+//{
+//  RowMatrixXb res;
+//  auto [img, x_start, y_start] = qPainterPathToMask(path);
+//  if (!img.isEmpty()) {
+//    res = RowMatrixXb(img.height(), img.width());
+//    for (size_t y = 0; y < img.height(); ++y) {
+//      for (size_t x = 0; x < img.width(); ++x) {
+//        res(y, x) = *img.data<uint8_t>(x, y, 0);
+//      }
+//    }
+//  }
+//  return std::make_tuple(res, x_start, y_start);
+//}
 
 } // namespace nim
