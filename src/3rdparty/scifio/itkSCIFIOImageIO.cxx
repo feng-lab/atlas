@@ -18,7 +18,7 @@
 
 #include "itkSCIFIOImageIO.h"
 #include "itkIOCommon.h"
-#include "itkExceptionObject.h"
+#include "itkMacro.h"
 #include "itkMetaDataObject.h"
 
 #include "zlog.h"
