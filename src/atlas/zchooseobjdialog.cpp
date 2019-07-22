@@ -24,7 +24,7 @@ ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc& doc, QWidget* parent)
                                                 QStringList() << m_doc.objName(id)
                                                               << QDir::toNativeSeparators(m_doc.objPath(id)));
     item->setData(0, Qt::UserRole, qVariantFromValue(id));
-    m_treeWidget->setItemSelected(item, i == 0);
+    item->setSelected(i == 0);
   }
 
   m_treeWidget->resizeColumnToContents(0);

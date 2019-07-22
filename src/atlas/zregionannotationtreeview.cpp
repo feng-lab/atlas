@@ -28,7 +28,7 @@ ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel&
   m_ratProxyModel->setDynamicSortFilter(true);
   setModel(m_ratProxyModel);
   setContextMenuPolicy(Qt::CustomContextMenu);
-  sortByColumn(ZRegionAnnotationTreeModel::AbbreviationColumn);
+  sortByColumn(ZRegionAnnotationTreeModel::AbbreviationColumn, Qt::AscendingOrder);
 
   connect(this, &ZRegionAnnotationTreeView::customContextMenuRequested, this, &ZRegionAnnotationTreeView::contextMenu);
   connect(this, &ZRegionAnnotationTreeView::clicked, this, &ZRegionAnnotationTreeView::indexClicked);

@@ -86,7 +86,7 @@ QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
     return QString();
   }
 
-  if (role == Qt::BackgroundColorRole) {
+  if (role == Qt::BackgroundRole) {
     QReadLocker lock(&m_messagesLock);
 
     const LogData& item = m_logDatas.at(index.row());

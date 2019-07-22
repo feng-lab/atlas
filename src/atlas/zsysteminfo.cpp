@@ -13,6 +13,7 @@
 #include <QSettings>
 #include <QApplication>
 #include <QDateTime>
+#include <QOperatingSystemVersion>
 #include <chrono>
 
 #if !defined(Q_OS_WIN) && !defined(Q_OS_DARWIN)
@@ -229,7 +230,7 @@ ZSystemInfo::ZSystemInfo()
 
 void ZSystemInfo::logOSInfo() const
 {
-  //LOG(INFO) << "OS: " << m_osString;
+  LOG(INFO) << "OS: " << m_osString;
   LOG(INFO) << "OS: " << QSysInfo::prettyProductName();
   LOG(INFO) << "Kernel: " << QSysInfo::kernelType() + " " + QSysInfo::kernelVersion();
   LOG(INFO) << "Build ABI: " << QSysInfo::buildAbi();
@@ -484,29 +485,9 @@ void ZSystemInfo::detectOS()
     }
   }
 #elif defined(Q_OS_DARWIN)
-  switch (QSysInfo::MacintoshVersion) {
-    case QSysInfo::MV_10_7:
-      m_osString = "Mac OS X LION";
-      break;
-    case QSysInfo::MV_10_8:
-      m_osString = "Mac OS X MOUNTAIN LION";
-      break;
-    case QSysInfo::MV_10_9:
-      m_osString = "Mac OS X MAVERICKS";
-      break;
-    case QSysInfo::MV_10_10:
-      m_osString = "Mac OS X YOSEMITE";
-      break;
-    case QSysInfo::MV_10_11:
-      m_osString = "Mac OS X El Capitan";
-      break;
-    case QSysInfo::MV_10_12:
-      m_osString = "macOS Sierra";
-      break;
-    default:
-      m_osString = "unknown mac os";
-      return;
-  }
+  auto current = QOperatingSystemVersion::current();
+  m_osString = QString("%1 %2.%3.%4").
+    arg(current.name()).arg(current.majorVersion()).arg(current.minorVersion()).arg(current.microVersion());
 #else
   utsname name;
   if (uname(&name) != 0)

@@ -73,7 +73,7 @@ QVariant ZObjModel::data(const QModelIndex& index, int role) const
     }
   }
 
-  if (role == Qt::BackgroundColorRole) {
+  if (role == Qt::BackgroundRole) {
     switch (index.column()) {
       case ViewSettingColumn:
         if (item == m_viewSettingCurrentItem)

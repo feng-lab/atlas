@@ -28,7 +28,7 @@ ZObjWidget::ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* sele
   setSelectionMode(QAbstractItemView::ExtendedSelection);
   setSelectionBehavior(QAbstractItemView::SelectItems);
   setContextMenuPolicy(Qt::CustomContextMenu);
-  sortByColumn(ZObjModel::TypeColumn);
+  sortByColumn(ZObjModel::TypeColumn, Qt::AscendingOrder);
   setStyleSheet(
     QString("QTreeView::indicator:unchecked {image: url(%1);}"
             "QTreeView::indicator:checked {image: url(%2);}"
