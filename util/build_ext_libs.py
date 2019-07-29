@@ -992,7 +992,9 @@ def build_vtk(src_dir: str, install_dir: str):
                          '-DVTK_DATA_EXCLUDE_FROM_ALL:BOOL=OFF',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_zlib:BOOL=ON',
-                         '-DVTK_LEGACY_REMOVE:BOOL=ON'])
+                         '-DVTK_LEGACY_REMOVE:BOOL=ON',
+                         '-DVTK_MODULE_ENABLE_VTK_IOADIOS2:STRING=NO',
+                         '-DVTK_MODULE_ENABLE_VTK_IOADIOS:STRING=NO'])
 
         if is_windows():
             cmakecmd.extend(['-DVTK_MODULE_USE_EXTERNAL_VTK_libxml2:BOOL=OFF',
