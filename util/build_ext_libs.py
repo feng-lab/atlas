@@ -1034,7 +1034,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                          '-DBUILD_opencv_world:BOOL=OFF',
                          '-DBUILD_opencv_python2:BOOL=OFF',
                          '-DBUILD_opencv_python3:BOOL=OFF',
-                         '-DPYTHON3_EXECUTABLE=' + os.environ['CONDA_PYTHON_EXE'],
+                         '-DPYTHON3_EXECUTABLE=' + sys.executable,
                          '-DINSTALL_PYTHON_EXAMPLES:BOOL=ON',
                          '-DOPENCV_ENABLE_NONFREE:BOOL=ON',
                          '-DBUILD_opencv_java:BOOL=OFF',
