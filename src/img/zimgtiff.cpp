@@ -128,9 +128,8 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
           (region.tInRegion(t)) &&
           (static_cast<int>(scene) == l)) {
         tiff.readImgFromIFD(i, buf2DImg);
-        int desc = c == -1 ? c : c - region.start.c;
         //LOG(INFO) << ifdIdx << " " << z << " " << c << " " << t << " " << l;
-        cpyImg(buf2DImg, region, imgTmp, z - region.start.z, desc, t - region.start.t);
+        cpyImg(buf2DImg, region, imgTmp, z - region.start.z, c, t - region.start.t);
       }
       ifdIdx++;
     }

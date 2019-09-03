@@ -81,7 +81,7 @@ protected:
 private:
   // img2D contains a 2D image, use x,y,and optional c range to cut it then copy it to img at location (z,c,t)
   // img2D contains all channel if c == -1
-  void cpyImg(const ZImg& img2D, const ZImgRegion& region, ZImg& img, int z, int c, int t);
+  static void cpyImg(const ZImg& img2D, const ZImgRegion& region, ZImg& img, int z, int c, int t);
 
 protected:
   std::vector<ZImgInfo> m_imgInfo;
