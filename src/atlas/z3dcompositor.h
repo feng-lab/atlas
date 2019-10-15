@@ -95,6 +95,7 @@ private:
   Z3DTextureBlendRenderer m_alphaBlendRenderer;
   Z3DTextureBlendRenderer m_firstOnTopBlendRenderer;
   Z3DTextureBlendRenderer m_firstOnTopRenderer;
+  Z3DTextureBlendRenderer m_MIPImageAlphaBlendRenderer;
   Z3DTextureCopyRenderer m_textureCopyRenderer;
   Z3DBackgroundRenderer m_backgroundRenderer;
 

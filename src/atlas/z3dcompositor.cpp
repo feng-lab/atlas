@@ -15,6 +15,7 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_alphaBlendRenderer(m_rendererBase, "DepthTestBlending")
   , m_firstOnTopBlendRenderer(m_rendererBase, "FirstOnTopBlending")
   , m_firstOnTopRenderer(m_rendererBase, "FirstOnTop")
+  , m_MIPImageAlphaBlendRenderer(m_rendererBase, "MIPImageDepthTestBlending")
   , m_textureCopyRenderer(m_rendererBase)
   , m_backgroundRenderer(m_rendererBase)
   //, m_renderGeometries("Render Geometries", true)
@@ -1379,11 +1380,11 @@ void Z3DCompositor::renderImages(Z3DRenderInputPort& currentInport, Z3DRenderOut
     m_tempPort3.clearTarget();
 
     m_rendererBase.setViewport(m_tempPort3.size());
-    m_alphaBlendRenderer.setColorTexture1(currentInport.colorTexture(0));
-    m_alphaBlendRenderer.setDepthTexture1(currentInport.depthTexture(0));
-    m_alphaBlendRenderer.setColorTexture2(currentInport.colorTexture(1));
-    m_alphaBlendRenderer.setDepthTexture2(currentInport.depthTexture(1));
-    m_rendererBase.render(eye, m_alphaBlendRenderer);
+    m_MIPImageAlphaBlendRenderer.setColorTexture1(currentInport.colorTexture(0));
+    m_MIPImageAlphaBlendRenderer.setDepthTexture1(currentInport.depthTexture(0));
+    m_MIPImageAlphaBlendRenderer.setColorTexture2(currentInport.colorTexture(1));
+    m_MIPImageAlphaBlendRenderer.setDepthTexture2(currentInport.depthTexture(1));
+    m_rendererBase.render(eye, m_MIPImageAlphaBlendRenderer);
 
     m_tempPort3.releaseTarget();
 
@@ -1393,11 +1394,11 @@ void Z3DCompositor::renderImages(Z3DRenderInputPort& currentInport, Z3DRenderOut
       nextResPort->bindTarget();
       nextResPort->clearTarget();
 
-      m_alphaBlendRenderer.setColorTexture1(resPort->colorTexture());
-      m_alphaBlendRenderer.setDepthTexture1(resPort->depthTexture());
-      m_alphaBlendRenderer.setColorTexture2(currentInport.colorTexture(i));
-      m_alphaBlendRenderer.setDepthTexture2(currentInport.depthTexture(i));
-      m_rendererBase.render(eye, m_alphaBlendRenderer);
+      m_MIPImageAlphaBlendRenderer.setColorTexture1(resPort->colorTexture());
+      m_MIPImageAlphaBlendRenderer.setDepthTexture1(resPort->depthTexture());
+      m_MIPImageAlphaBlendRenderer.setColorTexture2(currentInport.colorTexture(i));
+      m_MIPImageAlphaBlendRenderer.setDepthTexture2(currentInport.depthTexture(i));
+      m_rendererBase.render(eye, m_MIPImageAlphaBlendRenderer);
 
       nextResPort->releaseTarget();
 
