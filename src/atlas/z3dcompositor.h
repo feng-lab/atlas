@@ -39,7 +39,9 @@ private:
   // little helper function
   void renderGeometries(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                         const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                        Z3DRenderOutputPort& port, Z3DEye eye);
+                        Z3DRenderOutputPort& port, Z3DEye eye,
+                        const Z3DTexture* imageColorTex = nullptr,
+                        const Z3DTexture* imageDepthTex = nullptr);
 
   void renderGeomsBlendDelayed(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                                const std::vector<Z3DBoundedFilter*>& transparentFilters,
@@ -51,22 +53,30 @@ private:
 
   void renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                       const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                      Z3DRenderOutputPort& port, Z3DEye eye, const QString& method);
+                      Z3DRenderOutputPort& port, Z3DEye eye, const QString& method,
+                      const Z3DTexture* imageColorTex = nullptr,
+                      const Z3DTexture* imageDepthTex = nullptr);
 
   void renderOpaqueFilters(const std::vector<Z3DBoundedFilter*>& filters, Z3DRenderOutputPort& port, Z3DEye eye);
 
   void renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& filters,
-                            Z3DRenderOutputPort& port, Z3DEye eye, Z3DTexture* depthTexture = nullptr);
+                            Z3DRenderOutputPort& port, Z3DEye eye, Z3DTexture* depthTexture = nullptr,
+                            const Z3DTexture* imageColorTex = nullptr,
+                            const Z3DTexture* imageDepthTex = nullptr);
 
   bool createDDPRenderTarget(const glm::uvec2& size);
 
   void renderTransparentWA(const std::vector<Z3DBoundedFilter*>& filters,
-                           Z3DRenderOutputPort& port, Z3DEye eye, Z3DTexture* depthTexture = nullptr);
+                           Z3DRenderOutputPort& port, Z3DEye eye, Z3DTexture* depthTexture = nullptr,
+                           const Z3DTexture* imageColorTex = nullptr,
+                           const Z3DTexture* imageDepthTex = nullptr);
 
   bool createWARenderTarget(const glm::uvec2& size);
 
   void renderTransparentWB(const std::vector<Z3DBoundedFilter*>& filters,
-                           Z3DRenderOutputPort& port, Z3DEye eye, Z3DTexture* depthTexture = nullptr);
+                           Z3DRenderOutputPort& port, Z3DEye eye, Z3DTexture* depthTexture = nullptr,
+                           const Z3DTexture* imageColorTex = nullptr,
+                           const Z3DTexture* imageDepthTex = nullptr);
 
   bool createWBRenderTarget(const glm::uvec2& size);
 

@@ -51,14 +51,22 @@ void main()
     gl_FragDepth = depth0;
   }
 #elif defined(DEPTH_TEST_BLENDING)
-  if (depth1 < depth0) {
+  if (all(equal(color0.rgb, vec3(0.0)))) {
+    FragData0 = color1;
+    gl_FragDepth = depth1;
+  } else if (all(equal(color1.rgb, vec3(0.0)))) {
+    FragData0 = color0;
+    gl_FragDepth = depth0;
+  } else if (depth1 < depth0) {
     // use premultiplied alpha
     FragData0 = color1 + (1 - color1.a) * color0;
+    gl_FragDepth = depth1;
   } else {
     // use premultiplied alpha
     FragData0 = color0 + (1 - color0.a) * color1;
+    gl_FragDepth = depth0;
   }
-  gl_FragDepth = min(depth0, depth1);
+  // gl_FragDepth = min(depth0, depth1);
 #elif defined(FIRST_ON_TOP_BLENDING)
   // use premultiplied alpha
   FragData0 = color0 + (1 - color0.a) * color1;

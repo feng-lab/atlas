@@ -17,17 +17,17 @@ public:
 
   explicit ZRegionAnnotation(const QString& filename, QObject* parent = nullptr);
 
-  ~ZRegionAnnotation();
+  ~ZRegionAnnotation() override;
 
   void clear();
 
-  ZRegionAnnotation(ZRegionAnnotation&&) = default;
-
-  ZRegionAnnotation& operator=(ZRegionAnnotation&&) = default;
-
-  ZRegionAnnotation(const ZRegionAnnotation&) = default;
-
-  ZRegionAnnotation& operator=(const ZRegionAnnotation&) = default;
+//  ZRegionAnnotation(ZRegionAnnotation&&) = default;
+//
+//  ZRegionAnnotation& operator=(ZRegionAnnotation&&) = default;
+//
+//  ZRegionAnnotation(const ZRegionAnnotation&) = default;
+//
+//  ZRegionAnnotation& operator=(const ZRegionAnnotation&) = default;
 
   void importLabelImage(const QString& fn, FileFormat format, bool createMesh = true, bool createROI = true);
 
