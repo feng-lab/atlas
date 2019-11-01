@@ -1800,6 +1800,125 @@ void swapMeshXY()
   }
 }
 
+void createPCCellTable()
+{
+  QList<QStringList> metaData = QtCSV::Reader::readToList(
+    "/Users/feng/code/mgrasp-analysis/pv_figs_1.0/orig_cell_props.csv");
+  metaData.removeFirst();
+
+  std::map<QString, int> somaLocationMap;
+  somaLocationMap["Ori"] = 1;
+  somaLocationMap["Deep"] = 2;
+  somaLocationMap["Superficial"] = 3;
+  somaLocationMap["Rad"] = 4;
+
+  ZMainWindow* mainWin = nullptr;
+  for (auto widget : QApplication::topLevelWidgets()) {
+    mainWin = qobject_cast<ZMainWindow*>(widget);
+    if (mainWin)
+      break;
+  }
+
+
+  QFile file("/Users/feng/Downloads/template_cell.scene");
+  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    return;
+  }
+  QByteArray saveData = file.readAll();
+  QJsonParseError jsonError;
+  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
+  if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
+    return;
+  }
+  QJsonObject loadObj = loadDoc.object();
+  if (!loadObj.contains("Scene") || !loadObj["Scene"].isObject()) {
+    return;
+  }
+  QJsonObject sceneObj = loadObj["Scene"].toObject();
+  QJsonObject docObject = sceneObj["Doc"].toObject();
+
+  std::map<std::tuple<QString, int, double, double, QString>, std::tuple<QString, double>> cells;
+
+  for (int metaIdx = 0; metaIdx < metaData.size(); ++metaIdx) {
+    QString cellType = metaData[metaIdx][1];
+    QString cellName = metaData[metaIdx][2];
+    QString somaLocation = metaData[metaIdx][3];
+    double AP = metaData[metaIdx][4].toDouble();
+    double ML = metaData[metaIdx][5].toDouble();
+    double r2 = metaData[metaIdx][27].toDouble();
+    int somaLocationOrder = somaLocationMap[somaLocation];
+    assert(somaLocationOrder > 0 && somaLocationOrder < 5);
+
+    if (cellType == "contraPV" || cellType == "ipsiPV") {
+      continue;
+    }
+    cells[std::make_tuple(cellType, somaLocationOrder, AP, ML, cellName)] = std::make_tuple(somaLocation, r2);
+
+    QString swcName = QString("/Volumes/shared/feng/PVPY/PY/PySWC/%1_layer.swc").arg(cellName);
+    QString punctaName = QString("/Volumes/shared/feng/PVPY/PY/PySWC/%1_puncta_small.apo").arg(cellName);
+
+    for (QJsonObject::iterator it = docObject.begin(); it != docObject.end(); ++it) {
+      QStringList typeAndID = it.key().split(" ");
+      QString IDString = typeAndID[1].trimmed();
+      QFileInfo docPath(it.value().toString());
+      QString filename = docPath.completeBaseName();
+      if (typeAndID[0] == "Swc") {
+        modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(swcName));
+      } else if (typeAndID[0] == "Puncta") {
+        modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(punctaName));
+      }
+      removeJsonValue(sceneObj, IDString + ".View3D.X Cut FloatSpan");
+      removeJsonValue(sceneObj, IDString + ".View3D.Y Cut FloatSpan");
+      removeJsonValue(sceneObj, IDString + ".View3D.Z Cut FloatSpan");
+    }
+    QString scnName = QString("/Users/feng/Desktop/cell_table_pc/%1.scene").arg(cellName);
+    QFile resfile(scnName);
+    if (!resfile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+      return;
+    }
+
+    QJsonObject saveObj;
+    saveObj.insert("Scene", sceneObj);
+
+    QJsonDocument saveDoc(saveObj);
+    if (resfile.write(saveDoc.toJson()) == -1) {
+      return;
+    }
+    resfile.flush();
+
+    mainWin->removeAllObjs();
+    mainWin->loadJsonScene(scnName);
+    QApplication::processEvents();
+
+    Z3DView* view3d = mainWin->get3DWindow()->view();
+    view3d->resetCameraAction()->trigger();
+    view3d->zoomInAction()->trigger();
+    view3d->zoomInAction()->trigger();
+    QApplication::processEvents();
+    QString imgName = QString("/Users/feng/Desktop/cell_table_pc/%1.tif").arg(cellName);
+    view3d->takeFixedSizeScreenShot(imgName, 512, 512, Z3DScreenShotType::MonoView);
+    QApplication::processEvents();
+  }
+
+  for (auto it : cells) {
+    QString cellType = std::get<0>(it.first);
+    //cellType.chop(2);
+    QString cellName = std::get<4>(it.first);
+    QString somaLocation = std::get<0>(it.second);
+    if (somaLocation == "Ori")
+      somaLocation = "oriens";
+    if (somaLocation == "Rad")
+      somaLocation = "radiatum";
+    double AP = std::get<2>(it.first);
+    double ML = std::get<3>(it.first);
+    double r2 = std::get<1>(it.second);
+    QString row = QString(
+      "%1 & (%2, %3)$mm$ & %4 & %5 & \\parbox[c]{0.5in}{\\includegraphics[height=0.5in]{%6}} \\\\").arg(
+      cellType).arg(AP).arg(ML, 0, 'g', 3).arg(somaLocation.toLower()).arg(r2, 0, 'g', 3).arg(cellName);
+    LOG(INFO) << row;
+  }
+}
+
 
 }  // namespace nim
 
@@ -1807,6 +1926,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
+  createPCCellTable();
   LOG(INFO) << "done";
 }
 
