@@ -280,8 +280,8 @@ def build_glog(src_dir: str, install_dir: str):
     shutil.rmtree(install_dir, ignore_errors=True)
 
     try:
-        subprocess.run(['git', 'apply', '--stat', '--apply', os.path.join(ext_dir(), 'glog_patch.txt')],
-                       cwd=src_dir, shell=False, check=True)
+        # subprocess.run(['git', 'apply', '--stat', '--apply', os.path.join(ext_dir(), 'glog_patch.txt')],
+        #                cwd=src_dir, shell=False, check=True)
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
@@ -1280,7 +1280,7 @@ def build_libs(libs: dict, update_src: bool):
     if libs['glog']:
         src_dir = os.path.join(base_dir(), 'glog')
         if update_src:
-            update_or_clone_git_repository(src_dir, 'git@github.com:google/glog.git')
+            update_or_clone_git_repository(src_dir, 'git@github.com:feng-lab/glog.git')
         assert os.path.exists(src_dir)
         build_glog(src_dir, os.path.join(ext_dir(), 'glog'))
 
