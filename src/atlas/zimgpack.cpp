@@ -660,6 +660,7 @@ void ZImgPack::readRegionToImg(int64_t xyRatio, int64_t zRatio, int64_t sx, int6
 {
   CHECK(xyRatio >= 1 && zRatio >= 1);
   auto readRatio = static_cast<int64_t>(readRatioOf(xyRatio));
+  // LOG(INFO) << readRatio << " " << xyRatio << " " << zRatio;
   if (readRatio == xyRatio && zRatio == 1) {
     TileBoxType queryBox(TileCornerType(sx * xyRatio,
                                         sy * xyRatio),
@@ -744,8 +745,8 @@ void ZImgPack::readRegionToImg(int64_t xyRatio, int64_t zRatio, int64_t sx, int6
                       }
     );
 #endif
-  } else {
-    CHECK(readRatio == xyRatio && zRatio > 1);
+  } else if (readRatio == xyRatio && zRatio > 1) {
+    CHECK(readRatio == xyRatio && zRatio > 1) << readRatio << " " << xyRatio << " " << zRatio;
     ZImgInfo info = res.info();
     int64_t startZ = std::max(0_i64, sz * zRatio);
     int64_t endZ = std::min(int64_t(m_imgInfo.depth), (sz + static_cast<int64_t>(info.depth)) * zRatio);
@@ -763,6 +764,32 @@ void ZImgPack::readRegionToImg(int64_t xyRatio, int64_t zRatio, int64_t sx, int6
     tmp.blockDownsample(1, 1, zRatio, ImgMergeMode::Max);
     // LOG(INFO) << tmp.info().toQString();
     res.pasteImg(tmp, ZVoxelCoordinate(0, 0, sz < 0 ? -sz : 0));
+  } else {
+    CHECK(readRatio < xyRatio && zRatio >= 1 && (xyRatio % readRatio) == 0) << readRatio << " " << xyRatio << " " << zRatio;
+    ZImgInfo info = res.info();
+    int64_t startZ = std::max(0_i64, sz * zRatio);
+    int64_t endZ = std::min(int64_t(m_imgInfo.depth), (sz + static_cast<int64_t>(info.depth)) * zRatio);
+    info.depth = endZ - startZ;
+    int64_t readScale = xyRatio / readRatio;
+    int64_t startY = std::max(0_i64, sy * readScale);
+    int64_t endY = std::min(int64_t(m_imgInfo.height), (sy + static_cast<int64_t>(info.height)) * readScale);
+    info.height = endY - startY;
+    int64_t startX = std::max(0_i64, sx * readScale);
+    int64_t endX = std::min(int64_t(m_imgInfo.width), (sx + static_cast<int64_t>(info.width)) * readScale);
+    info.width = endX - startX;
+    ZImg tmp(info);
+//    LOG(INFO) << info.toQString();
+//    LOG(INFO) << xyRatio << " " << zRatio << " " << readRatio;
+//    LOG(INFO) << sx << " " << sy << " " << sz;
+    readRegionToImg(readRatio, 1,
+                    startX,
+                    startY,
+                    startZ,
+                    sc, t, tmp);
+    // LOG(INFO) << zRatio;
+    tmp.blockDownsample(readScale, readScale, zRatio, ImgMergeMode::Max);
+    // LOG(INFO) << tmp.info().toQString();
+    res.pasteImg(tmp, ZVoxelCoordinate(sx < 0 ? -sx : 0, sy < 0 ? -sy : 0, sz < 0 ? -sz : 0));
   }
 }
 

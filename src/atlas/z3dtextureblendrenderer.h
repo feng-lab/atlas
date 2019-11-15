@@ -12,6 +12,7 @@ public:
   // supported modes:
   // "DepthTest", "FirstOnTop", "SecondOnTop"
   // "DepthTestBlending", "FirstOnTopBlending", "SecondOnTopBlending"
+  // "MIPImageDepthTestBlending"
   explicit Z3DTextureBlendRenderer(Z3DRendererBase& rendererBase, const QString& mode = "DepthTestBlending");
 
   void setColorTexture1(const Z3DTexture* colorTex)
