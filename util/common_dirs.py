@@ -201,7 +201,7 @@ def vc_redist_dir() -> str:
 def vc_CRT_redist_dir() -> str:
     assert sys.platform.startswith('win32')
 
-    res = os.path.join(vc_redist_dir(), 'x64', 'Microsoft.VC141.CRT')
+    res = os.path.join(vc_redist_dir(), 'x64', 'Microsoft.VC142.CRT')
     assert os.path.exists(res)
     return res
 
@@ -209,7 +209,7 @@ def vc_CRT_redist_dir() -> str:
 def vc_CXXAMP_redist_dir() -> str:
     assert sys.platform.startswith('win32')
 
-    res = os.path.join(vc_redist_dir(), 'x64', 'Microsoft.VC141.CXXAMP')
+    res = os.path.join(vc_redist_dir(), 'x64', 'Microsoft.VC142.CXXAMP')
     assert os.path.exists(res)
     return res
 
@@ -217,7 +217,7 @@ def vc_CXXAMP_redist_dir() -> str:
 def vc_OpenMP_redist_dir() -> str:
     assert sys.platform.startswith('win32')
 
-    res = os.path.join(vc_redist_dir(), 'x64', 'Microsoft.VC141.OpenMP')
+    res = os.path.join(vc_redist_dir(), 'x64', 'Microsoft.VC142.OpenMP')
     assert os.path.exists(res)
     return res
 
