@@ -491,7 +491,7 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh)
     //pointsNormals->GetTuple(id, &normals[id][0]);
   }
   vtkIdType npts;
-  vtkIdType* pts;
+  const vtkIdType* pts;
   for (int i = 0; i < outputPolydata->GetNumberOfPolys(); ++i) {
     int h = polys->GetNextCell(npts, pts);
     if (h == 0) {

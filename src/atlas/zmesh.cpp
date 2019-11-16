@@ -41,7 +41,7 @@ nim::ZMesh vtkPolyDataToMesh(vtkPolyData* polyData)
     pointsNormals->GetTuple(id, &normals[id][0]);
   }
   vtkIdType npts;
-  vtkIdType* pts;
+  const vtkIdType* pts;
   for (int i = 0; i < polyData->GetNumberOfPolys(); ++i) {
     int h = polys->GetNextCell(npts, pts);
     if (h == 0) {
