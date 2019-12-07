@@ -3,6 +3,11 @@
 #include "znumericparameter.h"
 #include "zview.h"
 #include <QGraphicsView>
+QT_BEGIN_NAMESPACE
+class QGestureEvent;
+class QPanGesture;
+class QPinchGesture;
+QT_END_NAMESPACE
 
 namespace nim {
 
@@ -72,6 +77,13 @@ protected:
   inline bool isScenePtOverlap(const QPointF& p1, const QPointF& p2) const
   { return mapFromScene(p1) == mapFromScene(p2) || p1.toPoint() == p2.toPoint(); }
 
+  bool event(QEvent *event) override;
+
+private:
+  bool gestureEvent(QGestureEvent *event);
+  void panTriggered(QPanGesture*);
+  void pinchTriggered(QPinchGesture*);
+
 private:
   ZView* m_view;
   ZDoubleParameter m_scale;
@@ -88,6 +100,8 @@ private:
   std::unique_ptr<QGraphicsPathItem> m_splineItem;
   QPolygonF m_ffpolygon;
   std::unique_ptr<QGraphicsPathItem> m_ffpolygonItem;
+
+  double m_currentStepScaleFactor = 1.;
 };
 
 } // namespace nim

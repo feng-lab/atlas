@@ -374,8 +374,7 @@ void ZPunctaDetection::doWork()
   }
 
   // get puncta threshold in soma region
-  int somaPunctaThreshold = -1;
-  if (m_dendriteChannel != -1 && somaMaskVoxelList.rows() > 0) {
+  if (m_somaPunctaThreshold == -1 && m_dendriteChannel != -1 && somaMaskVoxelList.rows() > 0) {
     LOG(INFO) << "Determining Soma Puncta Threshold";
     if (!imageTooBig) { // enough memory
       Eigen::RowVectorXi size;
@@ -384,18 +383,18 @@ void ZPunctaDetection::doWork()
       ZImg somaPunctaImg = cropZImg(somaMaskVoxelList, punctaImg, 0, 0, minLoc, size);
 
       ZImgAutoThreshold<> imgAutoThre;
-      somaPunctaThreshold = imgAutoThre.triangleThre<uint8_t>(somaPunctaImg, 0, 0);
+      m_somaPunctaThreshold = imgAutoThre.triangleThre<uint8_t>(somaPunctaImg, 0, 0);
     } else {
       ZImgAutoThreshold<> imgAutoThre;
       std::vector<ZVoxelCoordinate> mask;
       for (Eigen::Index r = 0; r < somaMaskVoxelList.rows(); ++r) {
         mask.emplace_back(somaMaskVoxelList(r, 0), somaMaskVoxelList(r, 1), somaMaskVoxelList(r, 2));
       }
-      somaPunctaThreshold = imgAutoThre.u8TriangleThre(m_filename, punctaChannelMinValue, punctaChannelMaxValue,
-                                                       m_punctaChannel, m_t, m_scene, mask);
+      m_somaPunctaThreshold = imgAutoThre.u8TriangleThre(m_filename, punctaChannelMinValue, punctaChannelMaxValue,
+                                                         m_punctaChannel, m_t, m_scene, mask);
     }
 
-    somaPunctaThreshold = std::max(somaPunctaThreshold, m_punctaThreshold);
+    m_somaPunctaThreshold = std::max(m_somaPunctaThreshold, m_punctaThreshold);
   }
 
   LOG(INFO) << "Voxel Size X: " << m_imgInfo.voxelSizeXInUm() << "um";
@@ -406,7 +405,7 @@ void ZPunctaDetection::doWork()
     LOG(INFO) << "Dendrite Channel Range: (" << dendriteChannelMinValue << ", " << dendriteChannelMaxValue << ")";
   }
   if (m_dendriteChannel != -1 && somaMaskVoxelList.rows() > 0) {
-    LOG(INFO) << "Use Puncta Threshold in Soma Area: " << somaPunctaThreshold;
+    LOG(INFO) << "Use Puncta Threshold in Soma Area: " << m_somaPunctaThreshold;
   }
   LOG(INFO) << "Use Puncta Threshold: " << m_punctaThreshold;
   LOG(INFO) << "Use Split Size Threshold: " << m_splitSizeThreshold;
@@ -427,7 +426,7 @@ void ZPunctaDetection::doWork()
 
       LOG(INFO) << "Start Detect Puncta in Soma";
       detectImpl(punctaImg, 0, 0,
-                 somaPunctaImg, somaPunctaThreshold, m_detectedSomaPuncta, m_filteredSomaPuncta,
+                 somaPunctaImg, m_somaPunctaThreshold, m_detectedSomaPuncta, m_filteredSomaPuncta,
                  minLoc, 0.1, 0.0, 0.1);
       somaPunctaImg.clear();
       LOG(INFO) << "End Detect Puncta in Soma";
@@ -475,7 +474,7 @@ void ZPunctaDetection::doWork()
         ZPuncta detectedSomaPuncta;
         ZPuncta filteredSomaPuncta;
         detectImpl(pimg, 0, 0,
-                   somaPunctaImg, somaPunctaThreshold, detectedSomaPuncta, filteredSomaPuncta,
+                   somaPunctaImg, m_somaPunctaThreshold, detectedSomaPuncta, filteredSomaPuncta,
                    Eigen::RowVectorXi::Zero(3), 0.1 / rgns.size(), rgni * 1.0 / rgns.size(), 0.1 / rgns.size());
         somaPunctaImg.clear();
 
@@ -658,6 +657,7 @@ void ZPunctaDetection::read(const QJsonObject& json)
 
   // parameters
   setPunctaThreshold(readNumber(json, "puncta_threshold"));
+  setSomaPunctaThreshold(readNumber(json, "soma_puncta_threshold"));
   setSplitThreshold(readNumber(json, "split_size_threshold"));
   setConfidenceRegionForRadiusEstimate(readNumber(json, "conf_radius"));
   setConfidenceRegionForOverlapArea(readNumber(json, "conf_overlap_area"));
@@ -692,6 +692,7 @@ void ZPunctaDetection::write(QJsonObject& json) const
 
   // parameters
   json["puncta_threshold"] = m_punctaThreshold;
+  json["soma_puncta_threshold"] = m_somaPunctaThreshold;
   json["split_size_threshold"] = m_splitSizeThreshold;
   json["conf_radius"] = m_confRadius;
   json["conf_overlap_area"] = m_confOverlapArea;

@@ -596,6 +596,8 @@ PYBIND11_MODULE(_imgpy, m)
          "filename"_a)
     .def("setPunctaThreshold", &ZPunctaDetection::setPunctaThreshold,
          "thre"_a)
+    .def("setSomaPunctaThreshold", &ZPunctaDetection::setSomaPunctaThreshold,
+         "thre"_a)
     .def("setSplitThreshold", &ZPunctaDetection::setSplitThreshold, "thre"_a)
     .def("setConfidenceRegionForRadiusEstimate", &ZPunctaDetection::setConfidenceRegionForRadiusEstimate,
          "confRadius"_a)

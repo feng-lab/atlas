@@ -11,6 +11,8 @@
 #include <QGraphicsRectItem>
 #include <QGraphicsEllipseItem>
 #include <QImageWriter>
+#include <QPinchGesture>
+#include <QPanGesture>
 
 namespace nim {
 
@@ -32,6 +34,9 @@ ZGraphicsView::ZGraphicsView(QGraphicsScene* scene, ZView* parent)
   setAcceptDrops(true);
   //setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
   //setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+
+  grabGesture(Qt::PanGesture);
+  grabGesture(Qt::PinchGesture);
 
   m_scale.setStyle("SPINBOX");
   m_scale.setSuffix("%");
@@ -548,6 +553,61 @@ void ZGraphicsView::wheelEvent(QWheelEvent* event)
 {
   QGraphicsView::wheelEvent(event);
   checkViewport();
+}
+
+bool ZGraphicsView::event(QEvent *event)
+{
+  if (event->type() == QEvent::Gesture)
+    return gestureEvent(static_cast<QGestureEvent*>(event));
+  return QGraphicsView::event(event);
+}
+
+bool ZGraphicsView::gestureEvent(QGestureEvent *event)
+{
+  LOG(INFO) << "gestureEvent():" << event;
+  if (QGesture *pan = event->gesture(Qt::PanGesture))
+    panTriggered(static_cast<QPanGesture *>(pan));
+  if (QGesture *pinch = event->gesture(Qt::PinchGesture))
+    pinchTriggered(static_cast<QPinchGesture *>(pinch));
+  return true;
+}
+
+void ZGraphicsView::panTriggered(QPanGesture *gesture)
+{
+#ifndef QT_NO_CURSOR
+  switch (gesture->state()) {
+    case Qt::GestureStarted:
+    case Qt::GestureUpdated:
+      setCursor(Qt::SizeAllCursor);
+      break;
+    default:
+      setCursor(Qt::ArrowCursor);
+  }
+#endif
+  QPointF delta = gesture->delta();
+  LOG(INFO) << "panTriggered():" << gesture;
+  translate(delta.x(), delta.y());
+}
+
+void ZGraphicsView::pinchTriggered(QPinchGesture *gesture)
+{
+  QPinchGesture::ChangeFlags changeFlags = gesture->changeFlags();
+  if (changeFlags & QPinchGesture::RotationAngleChanged) {
+//    qreal rotationDelta = gesture->rotationAngle() - gesture->lastRotationAngle();
+//    rotationAngle += rotationDelta;
+//    qCDebug(lcExample) << "pinchTriggered(): rotate by" <<
+//                       rotationDelta << "->" << rotationAngle;
+  }
+  if (changeFlags & QPinchGesture::ScaleFactorChanged) {
+    m_currentStepScaleFactor = gesture->scaleFactor();
+    LOG(INFO) << "pinchTriggered(): zoom by " <<
+              gesture->scaleFactor() << " -> " << m_currentStepScaleFactor;
+    setScale(currentScale() * m_currentStepScaleFactor);
+  }
+//  if (gesture->state() == Qt::GestureFinished) {
+//    setScale(currentScale() * m_currentStepScaleFactor)
+//    m_currentStepScaleFactor = 1.;
+//  }
 }
 
 } // namespace nim

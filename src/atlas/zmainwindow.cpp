@@ -446,7 +446,7 @@ void ZMainWindow::openNewInstance()
 
 void ZMainWindow::init()
 {
-  setAttribute(Qt::WA_DeleteOnClose);
+  setAttribute(Qt::WA_DeleteOnClose, true);
   setAcceptDrops(true);
 
   m_doc = std::make_unique<ZDoc>(this);

@@ -44,6 +44,10 @@ public:
   void setPunctaThreshold(int thre)
   { m_punctaThreshold = thre; }
 
+  // if not set, auto threshold will be used
+  void setSomaPunctaThreshold(int thre)
+  { m_somaPunctaThreshold = thre; }
+
   // miminum voxel number to goto split step, default is 20 voxels
   void setSplitThreshold(int thre)
   { m_splitSizeThreshold = thre; }
@@ -173,6 +177,7 @@ private:
 
   // parameters
   int m_punctaThreshold = -1;
+  int m_somaPunctaThreshold = -1;
   int m_splitSizeThreshold = 20;
   double m_confRadius = 0.95;
   double m_confOverlapArea = 0.8;

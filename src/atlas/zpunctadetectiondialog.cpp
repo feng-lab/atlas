@@ -25,6 +25,7 @@ ZPunctaDetectionDialog::ZPunctaDetectionDialog(QWidget* parent)
                 glm::dvec3(1e6, 1e6, 1e6))
   , m_punctaChannel("Puncta Channel", nullptr, "Ch")
   , m_punctaThreshold("Puncta Threshold (-1 means auto detect)", -1, -1, 255)
+  , m_somaPunctaThreshold("Soma Puncta Threshold (-1 means auto detect)", -1, -1, 255)
   , m_dendriteChannel("Tube Channel")
   , m_tubeThreshold("Tube Threshold", 100, 1, 255)
   , m_ambiguousFactor("Ambiguous Factor", 1.0, 1., 2.)
@@ -77,6 +78,8 @@ void ZPunctaDetectionDialog::createWorker(ZImgProcess*& worker, QString& workerN
     workertmp->setResultSomaPunctaFilename(m_outputSomaPunctaFileWidget->getSelectedSaveFile());
   if (m_punctaThreshold.get() != -1)
     workertmp->setPunctaThreshold(m_punctaThreshold.get());
+  if (m_somaPunctaThreshold.get() != -1)
+    workertmp->setSomaPunctaThreshold(m_somaPunctaThreshold.get());
   if (dendriteChannel >= 0)
     workertmp->setDendriteThreshold(m_tubeThreshold.get());
 
@@ -298,14 +301,17 @@ void ZPunctaDetectionDialog::createParaGroupBox()
   glayout->addWidget(m_punctaThreshold.createNameLabel(), 1, 0);
   glayout->addWidget(m_punctaThreshold.createWidget(), 1, 1);
 
-  glayout->addWidget(m_dendriteChannel.createNameLabel(), 2, 0);
-  glayout->addWidget(m_dendriteChannel.createWidget(), 2, 1);
+  glayout->addWidget(m_somaPunctaThreshold.createNameLabel(), 2, 0);
+  glayout->addWidget(m_somaPunctaThreshold.createWidget(), 2, 1);
 
-  glayout->addWidget(m_tubeThreshold.createNameLabel(), 3, 0);
-  glayout->addWidget(m_tubeThreshold.createWidget(), 3, 1);
+  glayout->addWidget(m_dendriteChannel.createNameLabel(), 3, 0);
+  glayout->addWidget(m_dendriteChannel.createWidget(), 3, 1);
 
-  //glayout->addWidget(m_ambiguousFactor.createNameLabel(), 4, 0);
-  //glayout->addWidget(m_ambiguousFactor.createWidget(), 4, 1);
+  glayout->addWidget(m_tubeThreshold.createNameLabel(), 4, 0);
+  glayout->addWidget(m_tubeThreshold.createWidget(), 4, 1);
+
+  //glayout->addWidget(m_ambiguousFactor.createNameLabel(), 5, 0);
+  //glayout->addWidget(m_ambiguousFactor.createWidget(), 5, 1);
   alllayout->addLayout(glayout);
 #endif
 

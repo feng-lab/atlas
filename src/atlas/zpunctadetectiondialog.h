@@ -54,6 +54,7 @@ private:
   QPushButton* m_detectResolutionButton;
   ZIntIntOptionParameter m_punctaChannel;
   ZIntParameter m_punctaThreshold;
+  ZIntParameter m_somaPunctaThreshold;
   ZStringIntOptionParameter m_dendriteChannel;
   ZIntParameter m_tubeThreshold;
   ZDoubleParameter m_ambiguousFactor;
