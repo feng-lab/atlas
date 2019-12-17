@@ -83,7 +83,7 @@ void ZImgITKImage::readInfo(const QString& filename, std::vector<ZImgInfo>& info
 {
   try {
     itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
-                                                                           itk::ImageIOFactory::FileModeType::ReadMode);
+                                                                           itk::ImageIOFactory::FileModeEnum::ReadMode);
 
     if (imageIO.IsNull())
       throw ZIOException("can not create reader");
@@ -113,7 +113,7 @@ void ZImgITKImage::readMetadata(const QString& filename, ZImgMetadata& meta, siz
 {
   try {
     itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
-                                                                           itk::ImageIOFactory::FileModeType::ReadMode);
+                                                                           itk::ImageIOFactory::FileModeEnum::ReadMode);
 
     if (imageIO.IsNull())
       throw ZIOException("can not create reader");
@@ -146,7 +146,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
 
   try {
     itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
-                                                                           itk::ImageIOFactory::FileModeType::ReadMode);
+                                                                           itk::ImageIOFactory::FileModeEnum::ReadMode);
 
     if (imageIO.IsNull())
       throw ZIOException("can not create reader");
