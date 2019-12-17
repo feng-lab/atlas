@@ -1380,7 +1380,7 @@ def build_libs(libs: dict, update_src: bool):
     if libs['itk']:
         src_dir = os.path.join(base_dir(), 'ITK')
         if update_src:
-            update_or_clone_git_repository(src_dir, 'git://itk.org/ITK.git')
+            update_or_clone_git_repository(src_dir, 'git@github.com:InsightSoftwareConsortium/ITK.git')
         assert os.path.exists(src_dir)
         build_itk(src_dir, os.path.join(ext_dir(), 'itk'))
 
